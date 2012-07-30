@@ -1,54 +1,46 @@
-From: B10812@freescale.com (Aggrwal Poonam-B10812)
-Date: Mon, 30 Jul 2012 09:13:02 +0000
-Subject: [2/3][PATCH][v2] TDM Framework
-In-Reply-To: <20120727181208.GC23105@kroah.com>
-References: <1343397940-12975-1-git-send-email-sandeep@freescale.com>
- <20120727181208.GC23105@kroah.com>
-Message-ID: <ACB6D0C0104CFF42A45A5D82A0DD4F3D079C0BEC@039-SN2MPN1-013.039d.mgd.msft.net>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Mon, 30 Jul 2012 17:17:58 +0800
+Subject: [PATCH 00/12] chipidea/imx: add otg support and some bug fix
+In-Reply-To: <20120726105947.GW21635@b20223-02.ap.freescale.net>
+References: <1342076512-19207-1-git-send-email-richard.zhao@freescale.com>
+ <20120717004057.GA25562@kroah.com>
+ <20120719020553.GO21635@b20223-02.ap.freescale.net>
+ <20120726105947.GW21635@b20223-02.ap.freescale.net>
+Message-ID: <20120730091757.GH3347@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jul 26, 2012 at 06:59:48PM +0800, Richard Zhao wrote:
+> On Thu, Jul 19, 2012 at 10:05:54AM +0800, Richard Zhao wrote:
+> > On Mon, Jul 16, 2012 at 05:40:57PM -0700, Greg KH wrote:
+> > > On Thu, Jul 12, 2012 at 03:01:40PM +0800, Richard Zhao wrote:
+> > > > The patch set is tested on imx6q_sabrelite board.
+> > > > 
+> > > > The patch can also be found at
+> > > > https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
+> > > > 
+> > > > For test which merged platform patches:
+> > > > https://github.com/riczhao/kernel-imx/commits/topics/usb-test
+> > > > 
+> > > > It's better apply after patch I sent out:
+> > > > usb: chipidea: cleanup dma_pool if udc_start() fails
+> > > 
+> > > I need acks from Alexander before I can accept any of these.
+> > ping Alexander ...
+> ping Alexander again ...
+Hi Greg,
 
+Is there a better way but keeping waiting?
 
-> -----Original Message-----
-> From: Linuxppc-dev [mailto:linuxppc-dev-
-> bounces+poonam.aggrwal=freescale.com at lists.ozlabs.org] On Behalf Of Greg
-> KH
-> Sent: Friday, July 27, 2012 11:42 PM
-> To: Singh Sandeep-B37400
-> Cc: devel at driverdev.osuosl.org; linuxppc-dev at lists.ozlabs.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Subject: Re: [2/3][PATCH][v2] TDM Framework
-> 
-> On Fri, Jul 27, 2012 at 07:35:38PM +0530, sandeep at freescale.com wrote:
-> > +static struct kobj_type tdm_type = {
-> > +	.sysfs_ops = &tdm_ops,
-> > +	.default_attrs = tdm_attr,
-> > +};
-> 
-> Ah, also, as per the documentation in the kernel (go look, it's there), I
-> now get to publicly mock you for ignoring the error messages that the
-> kernel is giving you when you try to shut down your code path.
-> 
-> Well, to be fair, you are leaking memory like a sieve, so I doubt you
-> ever saw those error messages because you never cleaned up after
-> yourself, so perhaps I can forgive you, but your users can't, sorry.
-> They like to rely on the fact that Linux is a reliable operating system,
-> don't cause them to doubt that.
-> 
-> Please fix this code, it's horribly broken.  Read
-> Documentation/kobject.txt for why.  That file was written for a reason,
-> and not just because we like writing documentation (hint, we hate to...)
-To be honest we are not sysfs experts. Thanks for pointing to the documentation.
-We will rework the stuff.
+Hi Felipe,
 
-Regards
-Poonam
+Could you help review the patch series?
+
+Thanks
+Richard
 > 
-> Ugh,
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> greg k-h
-> _______________________________________________
-> Linuxppc-dev mailing list
-> Linuxppc-dev at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/linuxppc-dev
