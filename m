@@ -1,22 +1,28 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 30 Jul 2012 10:18:15 +0200
-Subject: [PATCH 07/25] gpio/gpio-omap.c: add a const qualifier
-In-Reply-To: <1343034810-3386-8-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1343034810-3386-8-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <50164347.1040600@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 30 Jul 2012 16:20:54 +0800
+Subject: [PATCH 3/3] cpufreq: Add a generic cpufreq-cpu0 driver
+In-Reply-To: <20120730065218.GB31509@S2101-09.ap.freescale.net>
+References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
+ <1342713281-31114-4-git-send-email-shawn.guo@linaro.org>
+ <20120726131121.GB7306@sirena.org.uk>
+ <20120730065218.GB31509@S2101-09.ap.freescale.net>
+Message-ID: <20120730082052.GD31509@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 July 2012 11:13 AM, Uwe Kleine-K?nig wrote:
-> This prepares *of_device_id.data becoming const. Without this change
-> the following warning would occur:
->
-> 	drivers/gpio/gpio-omap.c: In function 'omap_gpio_probe':
-> 	drivers/gpio/gpio-omap.c:1060: warning: assignment discards qualifiers from pointer target type
->
-> Signed-off-by: Uwe Kleine-K?nig<u.kleine-koenig@pengutronix.de>
-> ---
-Looks fine to me. Thanks
+On Mon, Jul 30, 2012 at 02:52:20PM +0800, Shawn Guo wrote:
+> On Thu, Jul 26, 2012 at 02:11:21PM +0100, Mark Brown wrote:
+> > regulator_get_voltage() might be a bit expensive, many regulators will
+> > query the hardware every time.  Since it's just for diagnostic purposes
+> > it'd be better to not bother and let people read the historical
+> > information from the logs.
+> > 
+> Ok, makes sense to me.
+> 
+In the reply to one of Richard's comment, the volt_old will be used
+not only for diagnostic purpose but also for reverting voltage back
+when clk_set_rate fails.
 
-Acked-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+-- 
+Regards,
+Shawn
