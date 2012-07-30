@@ -1,43 +1,199 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 30 Jul 2012 11:40:07 +0300
-Subject: [PATCHv4 4/8] ARM: OMAP3: add manual control for mpu / core
- pwrdm usecounting
-In-Reply-To: <878ve5j8se.fsf@ti.com>
-References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
- <1342189185-5306-5-git-send-email-t-kristo@ti.com>  <878ve5j8se.fsf@ti.com>
-Message-ID: <1343637607.9847.13.camel@sokoban>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Mon, 30 Jul 2012 14:12:43 +0530
+Subject: [PATCH v7] ARM: davinci: i2c: add OF support
+In-Reply-To: <1343632872-25896-1-git-send-email-hs@denx.de>
+References: <1343632872-25896-1-git-send-email-hs@denx.de>
+Message-ID: <CAM=Q2csb6pvU5WA6BeFMmBSXg9h_jacft5U8239ZtE=2dbyODw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-07-27 at 12:36 -0700, Kevin Hilman wrote:
-> Tero Kristo <t-kristo@ti.com> writes:
-> 
-> > mpu / core powerdomain usecounts are now statically increased
-> > by 1 during MPU activity. This allows the domains to reflect
-> > actual usage, and will allow the usecount to reach 0 just before
-> > all CPUs are ready to idle. Proper powerdomain usecounts are
-> > propageted to voltagedomain level also, and will allow vc
-> > callbacks to be triggered at right point of time.
-> >
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > Cc: Kevin Hilman <khilman@ti.com>
-> 
-> IMO, the idea is fine, but I'm not crazy about the implementation in
-> powerdomain.c, which is meant for pwrdm generic code.   In particular,
-> I'm not crazy about the pwrdm lookups in powerdomain.c.
-> 
-> Since pm<soc>.c already has references to mpu_pwrdm and core_pwrdm, why
-> not just add the pwrdm_clkdm_enable/disable calls directly in pm<soc>.c
+On Mon, Jul 30, 2012 at 12:51 PM, Heiko Schocher <hs@denx.de> wrote:
+> add of support for the davinci i2c driver.
+>
+> Signed-off-by: Heiko Schocher <hs@denx.de>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: linux-i2c at vger.kernel.org
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Wolfram Sang <w.sang@pengutronix.de>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Wolfgang Denk <wd@denx.de>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>
+> ---
+> - changes for v2:
+> - add comments from Sylwester Nawrocki <s.nawrocki@samsung.com>:
+>   - use "cell-index" instead "id"
+>   - OF_DEV_AUXDATA in the machine code, instead pre-define platform
+>     device name
+> - add comment from Grant Likely:
+>   - removed "id" resp. "cell-index" completely
+>   - fixed documentation
+>   - use of_match_ptr()
+>   - use devm_kzalloc() for allocating plattform data mem
+>   - fixed a whitespace issue
+> - no changes for v3
+> - changes for v4
+>   remove "pinmux-handle" property as discussed here:
+>   http://www.spinics.net/lists/arm-kernel/msg175701.html
+>   with Nori Sekhar
+>
+> - changes for v5
+>   add comments from Grant Likely:
+>   - do not change value of dev->dev->platform_data, instead
+>     hold a copy in davinci_i2c_dev.
+>
+> - changes for v6:
+>   add comments from Sekhar Nori:
+>   - removed unneccessary include
+>   - merge patch from Sekhar Nori:
+>     setup the newly introduced dev->pdata member correctly once in
+>     probe -> i2c_get_plattformdata(() not needed, remove a lot of
+>     checks for pdata in code
+>   - add Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>   - patch no longer in patchserie, as it has no dependencies.
+>
+> - changes for v7:
+>   add comments from Wolfram Sang:
+>   - move Documentation/devicetree/bindings/arm/davinci/i2c.txt
+>     to Documentation/devicetree/bindings/i2c/davinci.txt
+>   - remove bus-delay property
+>
+>  Documentation/devicetree/bindings/i2c/davinci.txt |   28 ++++++++++++
+>  drivers/i2c/busses/i2c-davinci.c                  |   48 ++++++++++++++++-----
+>  2 files changed, 65 insertions(+), 11 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/davinci.txt
+>
+> diff --git a/Documentation/devicetree/bindings/i2c/davinci.txt b/Documentation/devicetree/bindings/i2c/davinci.txt
+> new file mode 100644
+> index 0000000..c79078e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/i2c/davinci.txt
+> @@ -0,0 +1,28 @@
+> +* Texas Instruments Davinci I2C
+> +
+> +This file provides information, what the device node for the
+> +davinci i2c interface contain.
+> +
+> +Required properties:
+> +- compatible: "ti,davinci-i2c";
+> +- reg : Offset and length of the register set for the device
+> +
+> +Recommended properties :
+> +- interrupts : <a> standard interrupt property.
+> +- clock-frequency : desired I2C bus clock frequency in Hz.
+> +
+> +Example (enbw_cmc board):
+> +       i2c at 1c22000 {
+> +               compatible = "ti,davinci-i2c";
+> +               reg = <0x22000 0x1000>;
+> +               clock-frequency = <100000>;
+> +               interrupts = <15>;
+> +               interrupt-parent = <&intc>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               dtt at 48 {
+> +                               compatible = "national,lm75";
+> +                               reg = <0x48>;
+> +                       };
+> +       };
+> diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
+> index 79b4bcb..b6185dc 100644
+> --- a/drivers/i2c/busses/i2c-davinci.c
+> +++ b/drivers/i2c/busses/i2c-davinci.c
+> @@ -38,6 +38,8 @@
+>  #include <linux/slab.h>
+>  #include <linux/cpufreq.h>
+>  #include <linux/gpio.h>
+> +#include <linux/of_i2c.h>
+> +#include <linux/of_device.h>
+>
+>  #include <mach/hardware.h>
+>  #include <mach/i2c.h>
+> @@ -114,6 +116,7 @@ struct davinci_i2c_dev {
+>         struct completion       xfr_complete;
+>         struct notifier_block   freq_transition;
+>  #endif
+> +       struct davinci_i2c_platform_data *pdata;
+>  };
+>
+>  /* default platform data to use if not supplied in the platform_device */
+> @@ -155,7 +158,7 @@ static void generic_i2c_clock_pulse(unsigned int scl_pin)
+>  static void i2c_recover_bus(struct davinci_i2c_dev *dev)
+>  {
+>         u32 flag = 0;
+> -       struct davinci_i2c_platform_data *pdata = dev->dev->platform_data;
+> +       struct davinci_i2c_platform_data *pdata = dev->pdata;
+>
+>         dev_err(dev->dev, "initiating i2c bus recovery\n");
+>         /* Send NACK to the slave */
+> @@ -163,8 +166,7 @@ static void i2c_recover_bus(struct davinci_i2c_dev *dev)
+>         flag |=  DAVINCI_I2C_MDR_NACK;
+>         /* write the data into mode register */
+>         davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, flag);
+> -       if (pdata)
+> -               generic_i2c_clock_pulse(pdata->scl_pin);
+> +       generic_i2c_clock_pulse(pdata->scl_pin);
+>         /* Send STOP */
+>         flag = davinci_i2c_read_reg(dev, DAVINCI_I2C_MDR_REG);
+>         flag |= DAVINCI_I2C_MDR_STP;
+> @@ -187,7 +189,7 @@ static inline void davinci_i2c_reset_ctrl(struct davinci_i2c_dev *i2c_dev,
+>
+>  static void i2c_davinci_calc_clk_dividers(struct davinci_i2c_dev *dev)
+>  {
+> -       struct davinci_i2c_platform_data *pdata = dev->dev->platform_data;
+> +       struct davinci_i2c_platform_data *pdata = dev->pdata;
+>         u16 psc;
+>         u32 clk;
+>         u32 d;
+> @@ -235,10 +237,7 @@ static void i2c_davinci_calc_clk_dividers(struct davinci_i2c_dev *dev)
+>   */
+>  static int i2c_davinci_init(struct davinci_i2c_dev *dev)
+>  {
+> -       struct davinci_i2c_platform_data *pdata = dev->dev->platform_data;
+> -
+> -       if (!pdata)
+> -               pdata = &davinci_i2c_platform_data_default;
+> +       struct davinci_i2c_platform_data *pdata = dev->pdata;
+>
+>         /* put I2C into reset */
+>         davinci_i2c_reset_ctrl(dev, 0);
+> @@ -260,6 +259,7 @@ static int i2c_davinci_init(struct davinci_i2c_dev *dev)
+>         dev_dbg(dev->dev, "bus_freq = %dkHz, bus_delay = %d\n",
+>                 pdata->bus_freq, pdata->bus_delay);
+>
+> +
+>         /* Take the I2C module out of reset: */
+>         davinci_i2c_reset_ctrl(dev, 1);
+>
+> @@ -308,13 +308,11 @@ static int
+>  i2c_davinci_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg, int stop)
+>  {
+>         struct davinci_i2c_dev *dev = i2c_get_adapdata(adap);
+> -       struct davinci_i2c_platform_data *pdata = dev->dev->platform_data;
+> +       struct davinci_i2c_platform_data *pdata = dev->pdata;
+>         u32 flag;
+>         u16 w;
+>         int r;
+>
+> -       if (!pdata)
+> -               pdata = &davinci_i2c_platform_data_default;
+>         /* Introduce a delay, required for some boards (e.g Davinci EVM) */
+>         if (pdata->bus_delay)
+>                 udelay(pdata->bus_delay);
+> @@ -635,6 +633,12 @@ static struct i2c_algorithm i2c_davinci_algo = {
+>         .functionality  = i2c_davinci_func,
+>  };
+>
+> +static const struct of_device_id davinci_i2c_of_match[] = {
+> +       {.compatible = "ti,davinci-i2c", },
+> +       {},
+> +};
+> +MODULE_DEVICE_TABLE(of, davinci_i2c_of_match);
+> +
 
-I think this was how the patch was in some earlier rev but I thought I'd
-try to be more clever with this. :) I can revert the implementation back
-to this.
-
-> Also, the changelog should be a bit more specific about why CORE
-> powerdomain is also handled here when most of the code only talks about
-> the CPU.
-
-Yea, I'll add some beef to this also.
-
--Tero
+Should this be protected under OF flag?
