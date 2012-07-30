@@ -1,55 +1,69 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Mon, 30 Jul 2012 13:56:05 +0530
-Subject: rmk back but still recovering (was Re: Reminder - rmk still on
- vacation)
-In-Reply-To: <CAMQu2gzAcJBCxC5VtmyUOPMhc7D5P_MKCczdrxdeR0GNqMFYUg@mail.gmail.com>
-References: <20120725141222.GA6939@n2100.arm.linux.org.uk>
- <20120727134231.GA5934@n2100.arm.linux.org.uk>
- <CAMQu2gzrG2qC3_YXjaxQnc+2WzsiqoyMeOMScEWWR+gR2Vc0cw@mail.gmail.com>
- <20120727165049.GB7405@n2100.arm.linux.org.uk>
- <CAMQu2gyTgkswS1tYY=0g1oF7u=RGdQKEw0C3m3r3Jr+j_k9dsQ@mail.gmail.com>
- <CANfBPZ_qzXgm0bX8XDnKLwoYTtcARPj+8MHpsSEWy0=G5f9qAA@mail.gmail.com>
- <CAMQu2gzAcJBCxC5VtmyUOPMhc7D5P_MKCczdrxdeR0GNqMFYUg@mail.gmail.com>
-Message-ID: <CAM=Q2cuF6S9T369DFhGF8LoYaPMF=f1x9mjX1Se9S9qZ3WfiPg@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 30 Jul 2012 10:28:17 +0200
+Subject: [PATCHv6 0/2] ARM: replace custom consistent dma region with vmalloc
+Message-ID: <1343636899-19508-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 1:10 PM, Shilimkar, Santosh
-<santosh.shilimkar@ti.com> wrote:
-[...]
->>>>
->>>> Why?  The DMA driver itself is optional.
->>> That was Tony's point too. Unfortunately MMC and SPI driver don't work
->>> today without DMA. Some works needs to be done to support polling
->>> mode and am bit skeptical if it is really worth it. Same case be with other
->>> SDMA supported drivers mostly.
->>>
->> Russell, Tony,
->>   Can I request to include the DMA & MMC changes into this merge window ?
->> We have many cleanups and new patches waiting to be queued up for next (3.7)
->> merge window, and it'd be easier if they are implemented on top of the
->> DMA changes,
->> so that it gets tested together, and don't create merge conflicts.
->>   I am looking into implementing polling mode, which might take some time.
->
-> Thanks Venkat. For the SPI driver as well I heard from Shubro (in cc) that
-> he is looking into polling mode.
+Hello!
 
-I had a patch in case of errors falling back to poll mode
+This is yet another quick update on the patchset which replaces custom 
+consistent dma regions usage in dma-mapping framework in favour of
+generic vmalloc areas created on demand for each allocation. The main
+purpose for this patchset is to remove 2MiB limit of dma
+coherent/writecombine allocations.
 
-http://www.spinics.net/lists/linux-omap/msg74417.html
+This version addresses a few more cleanups pointed by Minchan Kim.
 
->
-> IMHO, we should merge the OMAP DMA engine support which is now sufficiently
-> tested and has been in linux-next for some time. Polling mode and ASOC
-> related issues can be then debugged directly on mainline.
-> For the time being, the SOC patch which Tony merged in linux-omap
-> master can be included along with rest of the OMAP DMA engine patches
-> to have working kernel.
->
-> Regards
-> Santosh
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+This patch is based on vanilla v3.5 release.
+
+Best regards
+Marek Szyprowski
+Samsung Poland R&D Center
+
+Changelog:
+
+v6:
+- more cleanups of minor issues pointed by Minchan Kim, moved
+  arm_dma_mmap() changes into separate patch
+
+v5: http://thread.gmane.org/gmane.linux.kernel.mm/83096
+- fixed another minor issues pointed by Minchan Kim: added more comments
+  here and there, changed pr_err() + stack_dump() to WARN(), added a fix
+  for no-MMU systems
+
+v4: http://thread.gmane.org/gmane.linux.kernel.mm/80906
+- replaced arch-independent VM_DMA flag with ARM-specific
+  VM_ARM_DMA_CONSISTENT flag
+
+v3: http://thread.gmane.org/gmane.linux.kernel.mm/80028
+- rebased onto v3.4-rc2: added support for IOMMU-aware implementation 
+  of dma-mapping calls, unified with CMA coherent dma pool
+- implemented changes requested by Minchan Kim: added more checks for
+  vmarea->flags & VM_DMA, renamed some variables, removed obsole locks,
+  squashed find_vm_area() exporting patch into the main redesign patch 
+
+v2: http://thread.gmane.org/gmane.linux.kernel.mm/78563
+- added support for atomic allocations (served from preallocated pool)
+- minor cleanup here and there
+- rebased onto v3.4-rc7
+
+v1: http://thread.gmane.org/gmane.linux.kernel.mm/76703
+- initial version
+
+Patch summary:
+
+Marek Szyprowski (2):
+  mm: vmalloc: use const void * for caller argument
+  ARM: dma-mapping: remove custom consistent dma region
+
+ Documentation/kernel-parameters.txt |    2 +-
+ arch/arm/include/asm/dma-mapping.h  |    2 +-
+ arch/arm/mm/dma-mapping.c           |  486 ++++++++++++-----------------------
+ arch/arm/mm/mm.h                    |    3 +
+ include/linux/vmalloc.h             |    9 +-
+ mm/vmalloc.c                        |   28 ++-
+ 6 files changed, 194 insertions(+), 336 deletions(-)
+
+-- 
+1.7.1.569.g6f426
