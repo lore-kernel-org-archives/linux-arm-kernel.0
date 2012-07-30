@@ -1,109 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jul 2012 15:07:24 +0100
-Subject: [PATCH 07/11] ARM: Add KGDB/KDB FIQ debugger generic code
-In-Reply-To: <1343649500-18491-7-git-send-email-anton.vorontsov@linaro.org>
-References: <20120730115719.GA5742@lizard>
- <1343649500-18491-7-git-send-email-anton.vorontsov@linaro.org>
-Message-ID: <20120730140724.GI6802@n2100.arm.linux.org.uk>
+From: john@stoffel.org (John Stoffel)
+Date: Mon, 30 Jul 2012 10:10:13 -0400
+Subject: [2/3][PATCH][v2] TDM Framework
+In-Reply-To: <3F1D9DCAAB49B94D88DBE05911FA4E6E511095@039-SN1MPN1-006.039d.mgd.msft.net>
+References: <1343397940-12975-1-git-send-email-sandeep@freescale.com>
+ <20498.41365.853741.261834@quad.stoffel.home>
+ <3F1D9DCAAB49B94D88DBE05911FA4E6E511095@039-SN1MPN1-006.039d.mgd.msft.net>
+Message-ID: <20502.38341.619003.356462@quad.stoffel.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 04:58:16AM -0700, Anton Vorontsov wrote:
-> +	.align	5
-> +__fiq_svc:
-> +	svc_entry
-> +	fiq_handler
-> +	svc_exit r5				@ return from exception
-> + UNWIND(.fnend		)
-> +ENDPROC(__fiq_svc)
-> +	.ltorg
-> +
-> +	.align	5
-> +__fiq_usr:
-> +	usr_entry
-> +	kuser_cmpxchg_check
-> +	fiq_handler
-> +	get_thread_info tsk
-> +	mov	why, #0
-> +	b	ret_to_user_from_irq
-> + UNWIND(.fnend		)
-> +ENDPROC(__fiq_usr)
-> +	.ltorg
-> +
-> +	.global kgdb_fiq_handler
-> +kgdb_fiq_handler:
-> +
-> +	vector_stub	fiq, FIQ_MODE, 4
-> +
-> +	.long	__fiq_usr			@  0  (USR_26 / USR_32)
-> +	.long	__fiq_svc			@  1  (FIQ_26 / FIQ_32)
-> +	.long	__fiq_svc			@  2  (IRQ_26 / IRQ_32)
-> +	.long	__fiq_svc			@  3  (SVC_26 / SVC_32)
-> +	.long	__fiq_svc			@  4
-> +	.long	__fiq_svc			@  5
-> +	.long	__fiq_svc			@  6
-> +	.long	__fiq_svc			@  7
-> +	.long	__fiq_svc			@  8
-> +	.long	__fiq_svc			@  9
-> +	.long	__fiq_svc			@  a
-> +	.long	__fiq_svc			@  b
-> +	.long	__fiq_svc			@  c
-> +	.long	__fiq_svc			@  d
-> +	.long	__fiq_svc			@  e
-> +	.long	__fiq_svc			@  f
+>>>>> "Singh" == Singh Sandeep-B37400 <B37400@freescale.com> writes:
 
-I am not convinced that this does not cause loss of state from the parent
-context.  Let's review what happens when a FIQ is received from SVC mode
-with the above code.
+Singh> -----Original Message-----
+Singh> From: John Stoffel [mailto:john at stoffel.org] 
+Singh> Sent: 27 July 2012 19:42
+Singh> To: Singh Sandeep-B37400
+Singh> Cc: linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org; galak at kernel.crashing.org; linux-kernel at vger.kernel.org; devel at driverdev.osuosl.org
+Singh> Subject: Re: [2/3][PATCH][v2] TDM Framework
 
-- The CPU will be in SVC mode.
-- FIQ received.
-- CPU saves CPSR into SPSR_fiq and PC into LR_fiq, and jumps to the FIQ
-  vector.
-- We apply the 4 byte correction to LR_fiq, and store r0, LR_fiq and
-  SPSR_fiq to the FIQ 'stack'
-- We switch to SVC mode and jump to __fiq_svc
-- svc_entry:
-  - adjusts the SVC stack pointer down, and saves r1 - r12
-  - loads r0, LR_fiq and SPSR_fiq and saves them as ARM_r0, ARM_pc, ARM_cpsr
-    into the pt_regs
-  - the original value of the SVC stack pointer is saved as ARM_r13
-  - LR_svc is saved as ARM_r14
 
-At this point, we have saved everything *except* for the SPSR_svc register.
+>> From: Sandeep Singh <Sandeep@freescale.com> TDM Framework is an 
+>> attempt to provide a platform independent layer which can offer a 
+>> standard interface  for TDM access to different client modules.
 
-Now, when we return from the above, we use svc_exit:
-- write SPSR_svc with ARM_cpsr (from SPSR_fiq)
-- load r0-pc from the pt_regs and load CPSR from SPSR_svc
+Singh> Please don't use TLAs (Three Letter Acronyms) like TDM without explaining the clearly and up front.  It makes it hard for anyone else who doens't know your code to look it over without having to spend lots of time poking around to figure it out from either context or somewhere else.
 
-Now the thing here is that even if we did preserve SPSR_svc, with the
-above exit sequence, there is _no_ way to preserve the value of SPSR_svc.
-Normally, this doesn't matter because we know that the regions we care
-about this have IRQs disabled.
+Singh> [Sandeep] Patch for documentation for TDM is present in this
+Singh> patch set, which explains TDM in detail. Should we do this in
+Singh> commit message too??  Link too documentation patch:
+Singh> http://patchwork.ozlabs.org/patch/173680/
 
-However, what this means, if we receive an FIQ and use this path from any
-part of the kernel which expects SPSR_svc to be preserved (eg, the exit
-path from any exception) the kernel will blow up.
+You should put the expansion of TDM into the initial commit message,
+and also into the Kconfig text, so that someone configuring the kernel
+has a clue what you're talking about.  
 
-I guess you could do something like this instead:
-- disable FIQs
-- load SPSR_svc with a saved value of it from entry.
-- load r1-r14 from ARM_r1..ARM_lr
-- switch to FIQ mode
-- load SPSR_fiq from saved ARM_cpsr
-- load r0 from ARM_r0
-- load pc from ARM_pc
+Try to approach this as a brandnew user who doesn't have your
+knowledge of the software.  Write for the un-initiated if at all
+possible.
 
-So, maybe something like this for the svc return path:
-
-	cpsid	f
-	ldr	r1, [saved_spsr_svc]
-	mov	r0, sp
-	mrs	spsr_cxsf, r1
-	ldmib	r0, {r1 - r14}
-	msr	cpsr_c, #FIQ_MODE | PSR_I_BIT | PSR_F_BIT
-	add	r7, r0, #S_PC
-	ldr	r8, [r0, #S_CPSR]
-	mrs	spsr_cxsf, r8
-	ldr	r0, [r0, #S_R0]
-	ldmia	r7, {pc}^
+John
