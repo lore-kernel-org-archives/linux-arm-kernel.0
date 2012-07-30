@@ -1,31 +1,62 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 30 Jul 2012 16:07:54 +0100
-Subject: [PATCH 01/18] Documentation: Describe the ux500 realated audio
- related DT nodes
-In-Reply-To: <50169AE8.4020601@linaro.org>
-References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
- <1343393162-11938-2-git-send-email-lee.jones@linaro.org>
- <20120729203106.GD4384@opensource.wolfsonmicro.com>
- <50163A09.8060203@linaro.org>
- <20120730134804.GE4468@opensource.wolfsonmicro.com>
- <50169AE8.4020601@linaro.org>
-Message-ID: <20120730150753.GH4468@opensource.wolfsonmicro.com>
+From: ian.molton@codethink.co.uk (Ian Molton)
+Date: Mon, 30 Jul 2012 16:15:53 +0100
+Subject: [PATCH 0/6] mv643xx Ethernet DT support and CSB1724 board support.
+Message-ID: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 03:32:08PM +0100, Lee Jones wrote:
-> On 30/07/12 14:48, Mark Brown wrote:
+This patch series adds support for the CSB1724 SoM by Cogent.
 
-> >Which is part of the problem here, it makes it much harder to tell what
-> >you need to do for the individual devices.
+It also provides mv643xx DT support, and the CSB1724 was my test platform
+for this support.
 
-> Once again, I'll split them out, but I think there are people
-> talking about documentation consolidation, as it's going to become
-> very messy, very quickly if we keep adding new files for each
-> device. Soon the Documentation directory will be as large as the
-> driver base. :)
+The mv643xx driver needs a LOT more TLC, but this should be a pretty
+non-invasive way to get started on it.
 
-Well, that's device tree for you.  You can probably get away with a
-single document if there's no differences but as soon as you get into
-anything where you've got custom properties and no overlap you need to
-start splitting things out.
+The CSB1724 SoM platform support is ready-to-go. Supported so far is
+SATA, Ethernet, and Serial.
+
+SATA is built upon Thomas' work.
+
+Ian Molton (6):
+  Initial csb1724 board support (FDT)
+  mv643xx.c: Remove magic numbers.
+  mv643xx.c: Add basic device tree support.
+  kirkwood: setup clock only in eth helpers.
+  csb1724: Enable device tree based mv643xx ethernet support.
+  DT: Convert all kirkwood boards with mv643xx that use DT
+
+ arch/arm/boot/dts/kirkwood-csb1724.dts     |   55 ++++++++++++++
+ arch/arm/boot/dts/kirkwood-dnskw.dtsi      |   12 +++
+ arch/arm/boot/dts/kirkwood-dreamplug.dts   |   24 ++++++
+ arch/arm/boot/dts/kirkwood-goflexnet.dts   |   11 +++
+ arch/arm/boot/dts/kirkwood-ib62x0.dts      |   13 ++++
+ arch/arm/boot/dts/kirkwood-iconnect.dts    |   13 ++++
+ arch/arm/boot/dts/kirkwood-lsxl.dtsi       |   23 ++++++
+ arch/arm/boot/dts/kirkwood-ts219-6281.dts  |   11 ++-
+ arch/arm/boot/dts/kirkwood-ts219-6282.dts  |   11 ++-
+ arch/arm/boot/dts/kirkwood-ts219.dtsi      |    3 +
+ arch/arm/boot/dts/kirkwood.dtsi            |   16 ++++
+ arch/arm/configs/csb1724_defconfig         |   92 ++++++++++++++++++++++
+ arch/arm/mach-kirkwood/Kconfig             |    7 ++
+ arch/arm/mach-kirkwood/Makefile            |    1 +
+ arch/arm/mach-kirkwood/Makefile.boot       |    1 +
+ arch/arm/mach-kirkwood/board-csb1724.c     |   62 +++++++++++++++
+ arch/arm/mach-kirkwood/board-dnskw.c       |    7 +-
+ arch/arm/mach-kirkwood/board-dreamplug.c   |   13 +---
+ arch/arm/mach-kirkwood/board-dt.c          |    4 +
+ arch/arm/mach-kirkwood/board-goflexnet.c   |    7 +-
+ arch/arm/mach-kirkwood/board-ib62x0.c      |    7 +-
+ arch/arm/mach-kirkwood/board-iconnect.c    |    7 +-
+ arch/arm/mach-kirkwood/board-lsxl.c        |   13 +---
+ arch/arm/mach-kirkwood/board-ts219.c       |   10 +--
+ arch/arm/mach-kirkwood/common.c            |    6 +-
+ arch/arm/mach-kirkwood/common.h            |    6 ++
+ drivers/net/ethernet/marvell/mv643xx_eth.c |  114 ++++++++++++++++++++++++----
+ 27 files changed, 475 insertions(+), 74 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-csb1724.dts
+ create mode 100644 arch/arm/configs/csb1724_defconfig
+ create mode 100644 arch/arm/mach-kirkwood/board-csb1724.c
+
+-- 
+1.7.9.5
