@@ -1,55 +1,30 @@
-From: ian.molton@codethink.co.uk (Ian Molton)
-Date: Mon, 30 Jul 2012 17:32:39 +0100
-Subject: [PATCH 3/6] mv643xx.c: Add basic device tree support.
-In-Reply-To: <CANTYSESY0A7LaKpqUOjyR42e72Rw_6yn9fvarVFUWWJxw43Jcw@mail.gmail.com>
-References: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
- <1343661359-10150-4-git-send-email-ian.molton@codethink.co.uk>
- <CANTYSESY0A7LaKpqUOjyR42e72Rw_6yn9fvarVFUWWJxw43Jcw@mail.gmail.com>
-Message-ID: <5016B727.2030909@codethink.co.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 30 Jul 2012 17:37:02 +0100
+Subject: [PATCH 2/2] arm: pmu: add support for per-cpu PMU interrupts.
+In-Reply-To: <1343658732-31080-2-git-send-email-chris.smith@st.com>
+References: <1343658732-31080-1-git-send-email-chris.smith@st.com>
+ <1343658732-31080-2-git-send-email-chris.smith@st.com>
+Message-ID: <20120730163701.GH15195@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/07/12 17:19, Amar Nath wrote:
-> Hi Ian,
->
-> On Mon, Jul 30, 2012 at 8:45 PM, Ian Molton <ian.molton@codethink.co.uk>wrote:
->
->> -       pd = pdev->dev.platform_data;
->> +       if (pdev->dev.of_node) {
->> +               struct device_node *np = NULL;
->> +
->> +               /* when all users of this driver use FDT, we can remove
->> this */
->> +               pd = kzalloc(sizeof(*pd), GFP_ATOMIC);
->> +               if (!pd) {
->> +                       dev_dbg(&pdev->dev, "Could not allocate platform
->> data\n");
->> +                       return -ENOMEM;
->> +               }
->> +
->> +               of_property_read_u32(pdev->dev.of_node,
->> +                       "port_number", &pd->port_number);
->> +               of_property_read_u32(pdev->dev.of_node,
->> +                       "phy_addr", &pd->phy_addr);
->> +               np = of_parse_phandle(pdev->dev.of_node, "mdio", 0);
->> +               if (np) {
->> +                       pd->shared = of_find_device_by_node(np);
->> +               } else {
->> +                       kfree(pd);
->> +                       return -ENODEV;
->> +               }
->> +       } else {
->> +               pd = pdev->dev.platform_data;
->> +       }
->> +
->>         if (pd == NULL) {
->>                 dev_err(&pdev->dev, "no mv643xx_eth_platform_data\n");
->>                 return -ENODEV;
->>
-> Can this check for pd be moved in the else part above as well, as for the
-> pd allocation with kzalloc,
-> we have already made a check for memory allocation failure?
+Hi Chris,
 
-Yes, Folded in for v2.
+On Mon, Jul 30, 2012 at 03:32:12PM +0100, Chris Smith wrote:
+> We have systems where the PMU interrupts are PPIs, and so per-cpu. This
+> patch adds support for per-cpu PMU interrupts to the perf event code.
+> 
+> Note that because the dev_id passed to request_percpu_irq has to be
+> percpu data, we now pass cpu_hw_events as the dev_id rather than armpmu.
+> This only place the dev_id was used was in armpmu_platform_irq, which is
+> fixed up accordingly.
+> 
+> Signed-off-by: Chris Smith <chris.smith@st.com>
+> ---
 
--Ian
+I'm actually in the process of moving request/free IRQ into an armpmu
+callback, so this patch would fit more neatly into that.
+
+I should have something available this week that you can take a look at.
+
+Will
