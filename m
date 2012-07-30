@@ -1,163 +1,39 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 30 Jul 2012 09:29:12 +0200
-Subject: [PATCH v2] USB: ohci-pxa27x: add DT bindings
-Message-ID: <1343633352-2414-1-git-send-email-zonque@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 30 Jul 2012 08:32:43 +0100
+Subject: [PATCH 13/18] ARM: ux500: Add ux500 PCM to DB8500 Device Tree
+In-Reply-To: <20120729205001.GK4384@opensource.wolfsonmicro.com>
+References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
+ <1343393162-11938-14-git-send-email-lee.jones@linaro.org>
+ <20120729205001.GK4384@opensource.wolfsonmicro.com>
+Message-ID: <5016389B.4020003@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings to the ohci-pxa27x driver and some documentation.
+On 29/07/12 21:50, Mark Brown wrote:
+> On Fri, Jul 27, 2012 at 01:45:57PM +0100, Lee Jones wrote:
+>> Nothing special here. We're only providing a compatible string
+>> to ensure the driver is probed using a Device Tree boot.
+>
+>> +		pcm: ux500-pcm {
+>> +			compatible = "stericsson,ux500-pcm";
+>> +		};
+>> +
+>
+> One of two things is wrong here.  Either you've not provided any
+> information about the hardware so the driver won't be able to work out
+> what to talk to or you've not provided any data so you're registering a
+> purely virtual Linux-internal device via the device tree.
+>
+> Once more, the idea here is to describe the hardware not to dump Linux's
+> internal data structures into the device tree.
 
-Successfully tested on a PXA3xx board.
+We use it register the driver for probe()ing. In the same way we do for 
+the PMU and Regulators. All three of which actually belong to a 
+different hardware block. Do you know of a better way to register those 
+devices?
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
----
-Changes from v1:
- - renamed "mrvl" to "marvell"
-
-Greg, I think that would best go through your usb tree. Is that ok?
-
-
- Documentation/devicetree/bindings/usb/pxa-usb.txt | 31 +++++++++++
- drivers/usb/host/ohci-pxa27x.c                    | 68 +++++++++++++++++++++++
- 2 files changed, 99 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/pxa-usb.txt
-
-diff --git a/Documentation/devicetree/bindings/usb/pxa-usb.txt b/Documentation/devicetree/bindings/usb/pxa-usb.txt
-new file mode 100644
-index 0000000..79729a9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/pxa-usb.txt
-@@ -0,0 +1,31 @@
-+PXA USB controllers
-+
-+OHCI
-+
-+Required properties:
-+ - compatible: Should be "marvell,pxa-ohci" for USB controllers
-+   used in host mode.
-+
-+Optional properties:
-+ - "marvell,enable-port1", "marvell,enable-port2", "marvell,enable-port3"
-+   If present, enables the appropriate USB port of the controller.
-+ - "marvell,port-mode" selects the mode of the ports:
-+	1 = PMM_NPS_MODE
-+	2 = PMM_GLOBAL_MODE
-+	3 = PMM_PERPORT_MODE
-+ - "marvell,power-sense-low" - power sense pin is low-active.
-+ - "marvell,power-control-low" - power control pin is low-active.
-+ - "marvell,no-oc-protection" - disable over-current protection.
-+ - "marvell,oc-mode-perport" - enable per-port over-current protection.
-+ - "marvell,power_on_delay" Power On to Power Good time - in ms.
-+
-+Example:
-+
-+	usb0: ohci at 4c000000 {
-+		compatible = "marvell,pxa-ohci", "usb-ohci";
-+		reg = <0x4c000000 0x100000>;
-+		interrupts = <18>;
-+		marvell,enable-port1;
-+		marvell,port-mode = <2>; /* PMM_GLOBAL_MODE */
-+	};
-+
-diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
-index e1a3cc6..77f4402 100644
---- a/drivers/usb/host/ohci-pxa27x.c
-+++ b/drivers/usb/host/ohci-pxa27x.c
-@@ -23,6 +23,8 @@
- #include <linux/signal.h>
- #include <linux/platform_device.h>
- #include <linux/clk.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_gpio.h>
- #include <mach/hardware.h>
- #include <mach/ohci.h>
- #include <mach/pxa3xx-u2d.h>
-@@ -272,6 +274,67 @@ static void pxa27x_stop_hc(struct pxa27x_ohci *ohci, struct device *dev)
- 	clk_disable_unprepare(ohci->clk);
- }
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id pxa_ohci_dt_ids[] = {
-+	{ .compatible = "marvell,pxa-ohci" },
-+	{ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, pxa_ohci_dt_ids);
-+
-+static u64 pxa_ohci_dma_mask = DMA_BIT_MASK(32);
-+
-+static int __devinit ohci_pxa_of_init(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct pxaohci_platform_data *pdata;
-+	u32 tmp;
-+
-+	if (!np)
-+		return 0;
-+
-+	/* Right now device-tree probed devices don't get dma_mask set.
-+	 * Since shared usb code relies on it, set it here for now.
-+	 * Once we have dma capability bindings this can go away.
-+	 */
-+	if (!pdev->dev.dma_mask)
-+		pdev->dev.dma_mask = &pxa_ohci_dma_mask;
-+
-+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata)
-+		return -ENOMEM;
-+
-+	if (of_get_property(np, "marvell,enable-port1", NULL))
-+		pdata->flags |= ENABLE_PORT1;
-+	if (of_get_property(np, "marvell,enable-port2", NULL))
-+		pdata->flags |= ENABLE_PORT2;
-+	if (of_get_property(np, "marvell,enable-port3", NULL))
-+		pdata->flags |= ENABLE_PORT3;
-+	if (of_get_property(np, "marvell,port-sense-low", NULL))
-+		pdata->flags |= POWER_SENSE_LOW;
-+	if (of_get_property(np, "marvell,power-control-low", NULL))
-+		pdata->flags |= POWER_CONTROL_LOW;
-+	if (of_get_property(np, "marvell,no-oc-protection", NULL))
-+		pdata->flags |= NO_OC_PROTECTION;
-+	if (of_get_property(np, "marvell,oc-mode-perport", NULL))
-+		pdata->flags |= OC_MODE_PERPORT;
-+	if (!of_property_read_u32(np, "marvell,power-on-delay", &tmp))
-+		pdata->power_on_delay = tmp;
-+	if (!of_property_read_u32(np, "marvell,port-mode", &tmp))
-+		pdata->port_mode = tmp;
-+	if (!of_property_read_u32(np, "marvell,power-budget", &tmp))
-+		pdata->power_budget = tmp;
-+
-+	pdev->dev.platform_data = pdata;
-+
-+	return 0;
-+}
-+#else
-+static int __devinit ohci_pxa_of_init(struct platform_device *pdev)
-+{
-+	return 0;
-+}
-+#endif
- 
- /*-------------------------------------------------------------------------*/
- 
-@@ -297,6 +360,10 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
- 	struct resource *r;
- 	struct clk *usb_clk;
- 
-+	retval = ohci_pxa_of_init(pdev);
-+	if (retval)
-+		return retval;
-+
- 	inf = pdev->dev.platform_data;
- 
- 	if (!inf)
-@@ -544,6 +611,7 @@ static struct platform_driver ohci_hcd_pxa27x_driver = {
- 	.driver		= {
- 		.name	= "pxa27x-ohci",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(pxa_ohci_dt_ids),
- #ifdef CONFIG_PM
- 		.pm	= &ohci_hcd_pxa27x_pm_ops,
- #endif
 -- 
-1.7.11.2
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
