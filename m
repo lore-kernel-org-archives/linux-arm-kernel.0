@@ -1,43 +1,43 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 30 Jul 2012 11:36:11 +0300
-Subject: [PATCHv4 6/8] ARM: OMAP: pm-debug: enhanced usecount debug support
-In-Reply-To: <87y5m5htcu.fsf@ti.com>
+Date: Mon, 30 Jul 2012 11:40:07 +0300
+Subject: [PATCHv4 4/8] ARM: OMAP3: add manual control for mpu / core
+ pwrdm usecounting
+In-Reply-To: <878ve5j8se.fsf@ti.com>
 References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
- <1342189185-5306-7-git-send-email-t-kristo@ti.com>  <87y5m5htcu.fsf@ti.com>
-Message-ID: <1343637371.9847.11.camel@sokoban>
+ <1342189185-5306-5-git-send-email-t-kristo@ti.com>  <878ve5j8se.fsf@ti.com>
+Message-ID: <1343637607.9847.13.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-07-27 at 12:55 -0700, Kevin Hilman wrote:
+On Fri, 2012-07-27 at 12:36 -0700, Kevin Hilman wrote:
 > Tero Kristo <t-kristo@ti.com> writes:
 > 
-> > Voltdm, pwrdm, clkdm, hwmod and clk usecounts are now separeted to
-> > their own file, 'usecount'. This file shows the usecounts for every
-> > active domain and their children recursively. 'count' file now only
-> > shows power state counts for powerdomains.
-> >
-> > This patch also provices a way to do printk dumps from kernel code,
-> > by calling the pm_dbg_dump_X functions. The plan is to call these
-> > functions once an error condition is detected, e.g. failed suspend.
+> > mpu / core powerdomain usecounts are now statically increased
+> > by 1 during MPU activity. This allows the domains to reflect
+> > actual usage, and will allow the usecount to reach 0 just before
+> > all CPUs are ready to idle. Proper powerdomain usecounts are
+> > propageted to voltagedomain level also, and will allow vc
+> > callbacks to be triggered at right point of time.
 > >
 > > Signed-off-by: Tero Kristo <t-kristo@ti.com>
 > > Cc: Paul Walmsley <paul@pwsan.com>
 > > Cc: Kevin Hilman <khilman@ti.com>
 > 
-> I think we should separate out the debug stuff as a separate patch set.
+> IMO, the idea is fine, but I'm not crazy about the implementation in
+> powerdomain.c, which is meant for pwrdm generic code.   In particular,
+> I'm not crazy about the pwrdm lookups in powerdomain.c.
 > 
-> Where I want to go with PM debug is away from in-kernel debug prints and
-> towards using tracepoints.  We have tracepoints in the clock code that
-> correspond to usecounts, but we need them in the clkdm, pwrdm and voltdm
-> code as well.  With that, you can use userspace tools (perf, ftrace) to
-> trace a problem (e.g. failed suspend) and see voltdm/pwrdm/clkdm/clks
-> are on when they shouldn't be.
+> Since pm<soc>.c already has references to mpu_pwrdm and core_pwrdm, why
+> not just add the pwrdm_clkdm_enable/disable calls directly in pm<soc>.c
 
-Yes, I can split out the debug stuff from this set for next rev. I'll
-also take a look at the tracepoints if they can be used reasonably for
-this purpose. We can add tracepoints for failed suspend for each
-powerdomain, but are tracepoints a good way to do this kind of recursive
-dumps (well, we could maybe register a trace event recursively from
-clkdm + clk code if a powerdomain fails to transition.)
+I think this was how the patch was in some earlier rev but I thought I'd
+try to be more clever with this. :) I can revert the implementation back
+to this.
+
+> Also, the changelog should be a bit more specific about why CORE
+> powerdomain is also handled here when most of the code only talks about
+> the CPU.
+
+Yea, I'll add some beef to this also.
 
 -Tero
