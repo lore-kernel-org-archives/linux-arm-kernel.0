@@ -1,30 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 30 Jul 2012 09:14:28 +0800
-Subject: [PATCH 1/2] ARM: i.MX6: set ARCH_NR_GPIO to 244
-In-Reply-To: <5015624D.50305@googlemail.com>
-References: <1343219864-3040-1-git-send-email-dirk.behme@de.bosch.com>
- <20120728133215.GG2128@S2101-09.ap.freescale.net>
- <5015624D.50305@googlemail.com>
-Message-ID: <20120730011426.GB30774@S2101-09.ap.freescale.net>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 30 Jul 2012 09:20:59 +0800
+Subject: [PATCH v2 4/7] ARM: pxa: add devicetree code for irq handling
+In-Reply-To: <50158890.8080504@gmail.com>
+References: <1343330187-20049-1-git-send-email-zonque@gmail.com>
+ <1343330187-20049-5-git-send-email-zonque@gmail.com>
+ <CAN1soZwGp=OKsyAy=iL7ZUvxG+VPBm-d==8Q-AiPqNUMoiPz-w@mail.gmail.com>
+ <5013B750.6060608@gmail.com>
+ <CAN1soZxgw-pu3OQ357Be9Nuk_Ln7B9EjkVWeh5gEXB_y6tO7ig@mail.gmail.com>
+ <501551E4.6020806@gmail.com>
+ <CAN1soZzAMiduQw+mZLs+bB2E-G5Lrm-TV4tEZKL7vUBUuwj+ig@mail.gmail.com>
+ <50158890.8080504@gmail.com>
+Message-ID: <CAN1soZypgp0N5KwQi3ZT2ama8quk5yPnQEHFABp-CWWh94nrvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 29, 2012 at 06:18:21PM +0200, Dirk Behme wrote:
-> Hmm, sorry if I missed anything, but how is adding a 'default ..
-> SOC_IMX6Q' related to any defconfig? If you want to deselect
-> SOC_IMX6Q using the way you like you'll get the standard 256 (if I
-> remember correctly).
-> 
-I'm essentially questioning about the point of the patch.  It intends
-to save a little space for imx6q build without caring about imx3 and
-imx5.  That said, when imx6q is excluded from the build, we are still
-wasting those space.  That's why I'm not so excited about the patch.
+On Mon, Jul 30, 2012 at 3:01 AM, Daniel Mack <zonque@gmail.com> wrote:
+>
+> Please check the appended version. What I also changed now is that
+> pxa_init_irq() only really handles non-DT initialization, so we have to
+> care for some details in pxa_dt_irq_init() separately. Also, the map()
+> function still had a bug, which I also fixed.
+>
+>
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 
-Looking at current users of this definition, you will find all of them
-are defining a number bigger than 256 for extending the maximum number.
-It might be a sign that having a gpio array which is a little bigger
-than necessary is not a concern on machines today.
+Since "marvell,intc-priority" is appended. Maybe you need to update the DTSI
+file. How about send out the updated v4 patch series? I'll merge it in
+this week.
 
--- 
-Regards,
-Shawn
+Regards
+Haojian
