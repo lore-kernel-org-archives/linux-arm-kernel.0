@@ -1,173 +1,25 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 30 Jul 2012 18:42:20 +0530
-Subject: [PATCH 2/2] arm/dts: Cleanup regulator naming and remove @0,1..
-In-Reply-To: <1343653940-16614-1-git-send-email-rnayak@ti.com>
-References: <1343653940-16614-1-git-send-email-rnayak@ti.com>
-Message-ID: <1343653940-16614-3-git-send-email-rnayak@ti.com>
+Date: Mon, 30 Jul 2012 18:42:18 +0530
+Subject: [PATCH 0/2] OMAP DT fixes
+Message-ID: <1343653940-16614-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-regulators do not have a 'reg' property, hence the regulator at 0,
-regulator at 1 do not make sense. get rid of it.
+Hi Tony,
 
-Reported-by: David Brown <davidb@codeaurora.org>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
+These are couple of DT fixes for OMAP, first fixes a lockup
+/boot failure on OMAP4 boards (SDP and panda) on mainline,
+second is a long pending cleanup.
+
+regards,
+Rajendra
+
+Rajendra Nayak (2):
+  arm/dts: Mark vcxio, v2v1 and v1v8 regulators as always on
+  arm/dts: Cleanup regulator naming and remove @0,1..
+
  arch/arm/boot/dts/omap3-beagle.dts |    2 +-
  arch/arm/boot/dts/omap4-sdp.dts    |    4 ++--
  arch/arm/boot/dts/twl4030.dtsi     |    6 +++---
- arch/arm/boot/dts/twl6030.dtsi     |   26 +++++++++++++-------------
- 4 files changed, 19 insertions(+), 19 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index cdcb98c..e60cba0 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -27,7 +27,7 @@
- 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
- 		interrupt-parent = <&intc>;
- 
--		vsim: regulator at 10 {
-+		vsim: regulator-vsim {
- 			compatible = "ti,twl4030-vsim";
- 			regulator-min-microvolt = <1800000>;
- 			regulator-max-microvolt = <3000000>;
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 72216e9..dbcdc4a 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -18,7 +18,7 @@
- 		reg = <0x80000000 0x40000000>; /* 1 GB */
- 	};
- 
--	vdd_eth: fixedregulator at 0 {
-+	vdd_eth: fixedregulator-vdd-eth {
- 		compatible = "regulator-fixed";
- 		regulator-name = "VDD_ETH";
- 		regulator-min-microvolt = <3300000>;
-@@ -28,7 +28,7 @@
- 		regulator-boot-on;
- 	};
- 
--	vbat: fixedregulator at 2 {
-+	vbat: fixedregulator-vbat {
- 		compatible = "regulator-fixed";
- 		regulator-name = "VBAT";
- 		regulator-min-microvolt = <3750000>;
-diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
-index 22f4d13..ff00017 100644
---- a/arch/arm/boot/dts/twl4030.dtsi
-+++ b/arch/arm/boot/dts/twl4030.dtsi
-@@ -19,19 +19,19 @@
- 		interrupts = <11>;
- 	};
- 
--	vdac: regulator at 0 {
-+	vdac: regulator-vdac {
- 		compatible = "ti,twl4030-vdac";
- 		regulator-min-microvolt = <1800000>;
- 		regulator-max-microvolt = <1800000>;
- 	};
- 
--	vpll2: regulator at 1 {
-+	vpll2: regulator-vpll2 {
- 		compatible = "ti,twl4030-vpll2";
- 		regulator-min-microvolt = <1800000>;
- 		regulator-max-microvolt = <1800000>;
- 	};
- 
--	vmmc1: regulator at 2 {
-+	vmmc1: regulator-vmmc1 {
- 		compatible = "ti,twl4030-vmmc1";
- 		regulator-min-microvolt = <1850000>;
- 		regulator-max-microvolt = <3150000>;
-diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
-index d351b27..123e2c4 100644
---- a/arch/arm/boot/dts/twl6030.dtsi
-+++ b/arch/arm/boot/dts/twl6030.dtsi
-@@ -20,70 +20,70 @@
- 		interrupts = <11>;
- 	};
- 
--	vaux1: regulator at 0 {
-+	vaux1: regulator-vaux1 {
- 		compatible = "ti,twl6030-vaux1";
- 		regulator-min-microvolt = <1000000>;
- 		regulator-max-microvolt = <3000000>;
- 	};
- 
--	vaux2: regulator at 1 {
-+	vaux2: regulator-vaux2 {
- 		compatible = "ti,twl6030-vaux2";
- 		regulator-min-microvolt = <1200000>;
- 		regulator-max-microvolt = <2800000>;
- 	};
- 
--	vaux3: regulator at 2 {
-+	vaux3: regulator-vaux3 {
- 		compatible = "ti,twl6030-vaux3";
- 		regulator-min-microvolt = <1000000>;
- 		regulator-max-microvolt = <3000000>;
- 	};
- 
--	vmmc: regulator at 3 {
-+	vmmc: regulator-vmmc {
- 		compatible = "ti,twl6030-vmmc";
- 		regulator-min-microvolt = <1200000>;
- 		regulator-max-microvolt = <3000000>;
- 	};
- 
--	vpp: regulator at 4 {
-+	vpp: regulator-vpp {
- 		compatible = "ti,twl6030-vpp";
- 		regulator-min-microvolt = <1800000>;
- 		regulator-max-microvolt = <2500000>;
- 	};
- 
--	vusim: regulator at 5 {
-+	vusim: regulator-vusim {
- 		compatible = "ti,twl6030-vusim";
- 		regulator-min-microvolt = <1200000>;
- 		regulator-max-microvolt = <2900000>;
- 	};
- 
--	vdac: regulator at 6 {
-+	vdac: regulator-vdac {
- 		compatible = "ti,twl6030-vdac";
- 	};
- 
--	vana: regulator at 7 {
-+	vana: regulator-vana {
- 		compatible = "ti,twl6030-vana";
- 	};
- 
--	vcxio: regulator at 8 {
-+	vcxio: regulator-vcxio {
- 		compatible = "ti,twl6030-vcxio";
- 		regulator-always-on;
- 	};
- 
--	vusb: regulator at 9 {
-+	vusb: regulator-vusb {
- 		compatible = "ti,twl6030-vusb";
- 	};
- 
--	v1v8: regulator at 10 {
-+	v1v8: regulator-v1v8 {
- 		compatible = "ti,twl6030-v1v8";
- 		regulator-always-on;
- 	};
- 
--	v2v1: regulator at 11 {
-+	v2v1: regulator-v2v1 {
- 		compatible = "ti,twl6030-v2v1";
- 		regulator-always-on;
- 	};
- 
--	clk32kg: regulator at 12 {
-+	clk32kg: regulator-clk32kg {
- 		compatible = "ti,twl6030-clk32kg";
- 	};
- };
--- 
-1.7.1
+ arch/arm/boot/dts/twl6030.dtsi     |   29 ++++++++++++++++-------------
+ 4 files changed, 22 insertions(+), 19 deletions(-)
