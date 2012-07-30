@@ -1,28 +1,40 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 30 Jul 2012 09:34:54 +0200
-Subject: [PATCH] mtd: mxc_nand: Fix compiler warnings
-In-Reply-To: <1343466310-14584-1-git-send-email-dirk.behme@gmail.com>
-References: <1343466310-14584-1-git-send-email-dirk.behme@gmail.com>
-Message-ID: <20120730073454.GI1528@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 30 Jul 2012 08:35:18 +0100
+Subject: [PATCH 17/18] ARM: ux500: Add all encompassing Sound node to
+ DB8500 Device Tree
+In-Reply-To: <20120729205227.GL4384@opensource.wolfsonmicro.com>
+References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
+ <1343393162-11938-18-git-send-email-lee.jones@linaro.org>
+ <20120729205227.GL4384@opensource.wolfsonmicro.com>
+Message-ID: <50163936.1050901@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 29/07/12 21:52, Mark Brown wrote:
+> On Fri, Jul 27, 2012 at 01:46:01PM +0100, Lee Jones wrote:
+>
+>>   arch/arm/boot/dts/db8500.dtsi |    8 ++++++++
+>
+> This is a generic DT include file but...
+>
+>> +		sound {
+>> +			compatible = "stericsson,snd-soc-mop500";
+>> +
+>> +			stericsson,platform-pcm-dma = <&pcm>;
+>> +			stericsson,cpu-dai = <&msp1 &msp3>;
+>> +			stericsson,audio-codec = <&codec>;
+>> +		};
+>
+> ...this is clearly the board-specific setup for the system, showing how
+> the CPU and CODEC are hooked up.  This should therefore be in the DT for
+> whatever board this is you're working on.
 
-On Sat, Jul 28, 2012 at 11:05:10AM +0200, Dirk Behme wrote:
-> From: Dirk Behme <dirk.behme@googlemail.com>
-> 
-> Fix the compiler warnings
-> 
-> drivers/mtd/nand/mxc_nand.c:1267: warning: initialization discards qualifiers from pointer target type
-> drivers/mtd/nand/mxc_nand.c:1270: warning: initialization discards qualifiers from pointer target type
-> drivers/mtd/nand/mxc_nand.c:1273: warning: initialization discards qualifiers from pointer target type
-> drivers/mtd/nand/mxc_nand.c:1276: warning: initialization discards qualifiers from pointer target type
-These should be gone in next already.
-
-Best regards,
-Uwe
+I don't think it's board specific. I believe this is the setup on all 
+db8500 platforms. I'm happy to be told I'm wrong here, in which case I 
+can move it to the board specific files.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
