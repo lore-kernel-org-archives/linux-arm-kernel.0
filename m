@@ -1,31 +1,56 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Mon, 30 Jul 2012 21:24:07 +0200
-Subject: imx6q: poor FEC Gigabit implementation
-Message-ID: <5016DF57.2060207@grandegger.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 30 Jul 2012 16:33:44 -0300
+Subject: [PATCH] ARM: imx23-olinuxino.dts: Add AUART0 support
+Message-ID: <1343676824-16913-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add AUART0 support.
 
-I did some Gigabit performance measurements with the i.MX6Q Sabrelite
-board. I measure an UDP throughput of 470 Mb/s to an external host,
-which is already very close to the theoretical limit listed in the Chip
-Errata ERR004512 for the i.MX 6Dual/6Quad, Rev. C, 2/2012.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx23-olinuxino.dts |    6 ++++++
+ arch/arm/boot/dts/imx23.dtsi          |   11 +++++++++++
+ 2 files changed, 17 insertions(+), 0 deletions(-)
 
-At a closer look to the driver I realized that there is no support for
-
-  - NAPI
-  - IP checksum offloading
-  - Jumbo frames
-
-According to the manual, these features are support by the ENET via
-enhanced buffer descriptors. Even if they will not increase the
-performance due to the mentioned system limitation, they should reduce
-the interrupt and CPU load significantly. I did some quick tests with IP
-checksum offloading and Jumbo frames but without success. Are there any
-known issues? Is anybody already working on an enhanced FEC Gigabit
-ethernet driver?
-
-TIA.
-
-Wolfgang.
+diff --git a/arch/arm/boot/dts/imx23-olinuxino.dts b/arch/arm/boot/dts/imx23-olinuxino.dts
+index 20912b1..a286873 100644
+--- a/arch/arm/boot/dts/imx23-olinuxino.dts
++++ b/arch/arm/boot/dts/imx23-olinuxino.dts
+@@ -39,6 +39,12 @@
+ 				pinctrl-0 = <&duart_pins_a>;
+ 				status = "okay";
+ 			};
++
++			auart0: serial at 8006c000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&auart0_2pins_a>;
++				status = "okay";
++			};
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index a874dbf..f58118b 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -140,6 +140,17 @@
+ 					fsl,pull-up = <0>;
+ 				};
+ 
++				auart0_2pins_a: auart0-2pins at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x01e2 /* MX23_PAD_I2C_SCL__AUART1_TX */
++						0x01f2 /* MX23_PAD_I2C_SDA__AUART1_RX */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++
+ 				gpmi_pins_a: gpmi-nand at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+-- 
+1.7.1
