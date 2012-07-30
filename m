@@ -1,23 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jul 2012 23:19:11 +0100
-Subject: [PATCH] ARM: Sort exception table at compile time
-In-Reply-To: <20120730215118.GA32670@merkur.ravnborg.org>
-References: <1343683803-15507-1-git-send-email-sboyd@codeaurora.org>
- <20120730215118.GA32670@merkur.ravnborg.org>
-Message-ID: <20120730221911.GB10335@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 30 Jul 2012 19:27:33 -0300
+Subject: [PATCH v6 00/14] add imx usb driver based on Greg next tree
+In-Reply-To: <20120626023754.GJ2342@S2101-09.ap.freescale.net>
+References: <1340260875-21934-1-git-send-email-richard.zhao@freescale.com>
+ <CAOMZO5BEVrPrgZ7E5xUE-_3zXb317mzqoZXaxXw1SNACuRzOPw@mail.gmail.com>
+ <20120626023754.GJ2342@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5Bg11-ocEXoOd5W+0hEAHvuVqP6_6CW=rANySDTiNo6SA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 11:51:18PM +0200, Sam Ravnborg wrote:
-> Here you should be able to use the macro EXCEPTION_TABLE from
-> vmlinux.lds.h.
-> I cannot see why the ifdef for not NON-MMU case is needed,
-> but if it is needed the macro is not good...
+On Mon, Jun 25, 2012 at 11:37 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Mon, Jun 25, 2012 at 01:18:22PM -0300, Fabio Estevam wrote:
+>> Any suggestions as to how to make the driver work on mx23?
+>>
+> I won't be able to test it on my imx23-evk board, because the board
+> design is somehow odd on vbus supply, which probably requires a board
+> rework.
 
-Because you can not mention the same input section in two different
-places and end up with predictable output from the linker.
+Which board rework?
 
-We discard the __ex_table for noMMU, but I think the start/stop
-symbols are still referenced somewhere.  Dunno, I don't have much to
-do with noMMU ARM, and the only platform I'd be interested in never
-got merged.
+It looks like the 2.6.35 FSL kernel supports USB host on mx23evk
+without the need of hardware rework.
+
+Can we try getting USB to work on mx23 too?
+
+Regards,
+
+Fabio Estevam
