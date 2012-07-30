@@ -1,49 +1,67 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Mon, 30 Jul 2012 08:40:58 +0200
-Subject: [PATCH 1/2] ARM: i.MX6: set ARCH_NR_GPIO to 244
-In-Reply-To: <20120730011426.GB30774@S2101-09.ap.freescale.net>
-References: <1343219864-3040-1-git-send-email-dirk.behme@de.bosch.com>
- <20120728133215.GG2128@S2101-09.ap.freescale.net>
- <5015624D.50305@googlemail.com>
- <20120730011426.GB30774@S2101-09.ap.freescale.net>
-Message-ID: <50162C7A.1060307@de.bosch.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 30 Jul 2012 14:52:20 +0800
+Subject: [PATCH 3/3] cpufreq: Add a generic cpufreq-cpu0 driver
+In-Reply-To: <20120726131121.GB7306@sirena.org.uk>
+References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
+ <1342713281-31114-4-git-send-email-shawn.guo@linaro.org>
+ <20120726131121.GB7306@sirena.org.uk>
+Message-ID: <20120730065218.GB31509@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.07.2012 03:14, Shawn Guo wrote:
-> On Sun, Jul 29, 2012 at 06:18:21PM +0200, Dirk Behme wrote:
->> Hmm, sorry if I missed anything, but how is adding a 'default ..
->> SOC_IMX6Q' related to any defconfig? If you want to deselect
->> SOC_IMX6Q using the way you like you'll get the standard 256 (if I
->> remember correctly).
->>
-> I'm essentially questioning about the point of the patch.  It intends
-> to save a little space for imx6q build without caring about imx3 and
-> imx5.  That said, when imx6q is excluded from the build, we are still
-> wasting those space.
+On Thu, Jul 26, 2012 at 02:11:21PM +0100, Mark Brown wrote:
+> On Thu, Jul 19, 2012 at 11:54:41PM +0800, Shawn Guo wrote:
+> 
+> > +Optional properties:
+> > +- transition-latency: Specify the possible maximum transition latency,
+> > +  in unit of nanoseconds.
+> 
+> This should make it clear that the transition latency being documented
+> here is just that for the core clock change itself, there may be other
+> sources of latency like the regulator ramp time or reprogramming PLLs.
+> 
+I intended to make it be the total latency from whatever sources that
+should be counted on particular system.  Rather than adding complexity
+for the driver to figure out these latencies from every single source,
+I would expect that people know the possible maximum latency in total
+for their systems and specify it in device tree.
 
-It's my understanding that the ARCH_NR_GPIO Kconfig was introduced 
-recently for optimization/conversion/cleanup reasons. So from my point 
-of view it's in a first step better to use it for iMX6 than ignoring 
-this optimization/conversion/cleanup.
+> > +	if (cpu_reg) {
+> > +		opp = opp_find_freq_ceil(cpu_dev, &freq_Hz);
+> > +		if (IS_ERR(opp)) {
+> > +			pr_err("failed to find OPP for %ld\n", freq_Hz);
+> > +			return PTR_ERR(opp);
+> > +		}
+> > +		volt = opp_get_voltage(opp);
+> > +		tol = volt * voltage_tolerance / 100;
+> > +		volt_old = regulator_get_voltage(cpu_reg);
+> 
+> regulator_get_voltage() might be a bit expensive, many regulators will
+> query the hardware every time.  Since it's just for diagnostic purposes
+> it'd be better to not bother and let people read the historical
+> information from the logs.
+> 
+Ok, makes sense to me.
 
-But yes, it's even better to enable it for imx3/imx5, too. As I don't 
-know these platforms, two questions:
+> > +	/* scaling up?  scale voltage before frequency */
+> > +	if (cpu_reg && freqs.new > freqs.old) {
+> > +		if (regulator_set_voltage(cpu_reg, volt - tol, volt + tol)) {
+> 
+> This is a totally sane and sensible use case for specifying a voltage
+> range, we should move it into the regulator core for other users so you
+> can just specify the voltage and the tolerance directly.
+> 
+Are you asking for a change on regulator_set_voltage API?  While I agree
+with your comment, it's not a thing we need to necessarily do in this
+series.  The change on the API requires a touch on all the existing
+users.  I do not think it's nice to carry such a patch in this series.
 
-- Do you like to propose a better macro than SOC_IMX6Q to cover 
-imx3/imx6, too?
+> It is a little sad here as it means that we loose the ability to do
+> frequency only scaling if there's no regulator which is nice.
 
-- Do imx3 and imx5 have the same GPIO number like imx6? I.e. 7 banks 
-with 32 pins == 224 GPIOs?
+I do not understand it.  The regulator is optional for the driver, and
+we can still scale frequency even if there is no regulator.
 
-> Looking at current users of this definition, you will find all of them
-> are defining a number bigger than 256 for extending the maximum number.
-> It might be a sign that having a gpio array which is a little bigger
-> than necessary is not a concern on machines today.
-
-Or it might be a sign that they *have* more than 256? I don't know. But 
-what's the issue using a matching number if possible?
-
-Best regards
-
-Dirk
+-- 
+Regards,
+Shawn
