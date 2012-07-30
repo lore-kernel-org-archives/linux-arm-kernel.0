@@ -1,39 +1,28 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 30 Jul 2012 08:32:43 +0100
-Subject: [PATCH 13/18] ARM: ux500: Add ux500 PCM to DB8500 Device Tree
-In-Reply-To: <20120729205001.GK4384@opensource.wolfsonmicro.com>
-References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
- <1343393162-11938-14-git-send-email-lee.jones@linaro.org>
- <20120729205001.GK4384@opensource.wolfsonmicro.com>
-Message-ID: <5016389B.4020003@linaro.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 30 Jul 2012 09:34:54 +0200
+Subject: [PATCH] mtd: mxc_nand: Fix compiler warnings
+In-Reply-To: <1343466310-14584-1-git-send-email-dirk.behme@gmail.com>
+References: <1343466310-14584-1-git-send-email-dirk.behme@gmail.com>
+Message-ID: <20120730073454.GI1528@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/07/12 21:50, Mark Brown wrote:
-> On Fri, Jul 27, 2012 at 01:45:57PM +0100, Lee Jones wrote:
->> Nothing special here. We're only providing a compatible string
->> to ensure the driver is probed using a Device Tree boot.
->
->> +		pcm: ux500-pcm {
->> +			compatible = "stericsson,ux500-pcm";
->> +		};
->> +
->
-> One of two things is wrong here.  Either you've not provided any
-> information about the hardware so the driver won't be able to work out
-> what to talk to or you've not provided any data so you're registering a
-> purely virtual Linux-internal device via the device tree.
->
-> Once more, the idea here is to describe the hardware not to dump Linux's
-> internal data structures into the device tree.
+Hello,
 
-We use it register the driver for probe()ing. In the same way we do for 
-the PMU and Regulators. All three of which actually belong to a 
-different hardware block. Do you know of a better way to register those 
-devices?
+On Sat, Jul 28, 2012 at 11:05:10AM +0200, Dirk Behme wrote:
+> From: Dirk Behme <dirk.behme@googlemail.com>
+> 
+> Fix the compiler warnings
+> 
+> drivers/mtd/nand/mxc_nand.c:1267: warning: initialization discards qualifiers from pointer target type
+> drivers/mtd/nand/mxc_nand.c:1270: warning: initialization discards qualifiers from pointer target type
+> drivers/mtd/nand/mxc_nand.c:1273: warning: initialization discards qualifiers from pointer target type
+> drivers/mtd/nand/mxc_nand.c:1276: warning: initialization discards qualifiers from pointer target type
+These should be gone in next already.
+
+Best regards,
+Uwe
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
