@@ -1,59 +1,167 @@
-From: Matthias.Thomae@de.bosch.com (Thomae Matthias (CM-AI/PJ-CF31))
-Date: Mon, 30 Jul 2012 09:28:21 +0200
-Subject: [PATCH 2/2] ARM: dts: imx6q: Invert the GPIO controller order
-In-Reply-To: <20120728134114.GH2128@S2101-09.ap.freescale.net>
-References: <1343219864-3040-1-git-send-email-dirk.behme@de.bosch.com>
- <1343219864-3040-2-git-send-email-dirk.behme@de.bosch.com>
- <20120728134114.GH2128@S2101-09.ap.freescale.net>
-Message-ID: <8E7BE7398BB9294F8B826ADE09B18EBE6CC2FF7EE1@SI-MBX20.de.bosch.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 30 Jul 2012 09:39:03 +0200
+Subject: [PATCH v2] USB: ohci-pxa27x: add DT bindings
+In-Reply-To: <1343633352-2414-1-git-send-email-zonque@gmail.com>
+References: <1343633352-2414-1-git-send-email-zonque@gmail.com>
+Message-ID: <50163A17.6060200@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Shawn Guo [mailto:shawn.guo at linaro.org]
-> On Wed, Jul 25, 2012 at 02:37:44PM +0200, Dirk Behme wrote:
-> > From: Matthias Thomae <matthias.thomae@de.bosch.com>
-> >
-> > The GPIO controllers in the device tree are registered dynamically
-> > via gpiochip_add and gpiochip_find_base in descending order (from
-> > ARCH_NR_GPIO to 0). This change reorders the controllers in the
-> > device tree (from gpio7 to gpio1) so that they finally appear in
-> > ascending order after registration.
-> >
-> First of all, the device nodes in device tree are sorted in address
-> order, and should be independent with Linux implementation.
->
-> Secondly, I'm wondering why you care about the global gpio number,
-> as gpio and associated interrupt should be addressed by port + offset.
->
-> Regards,
-> Shawn
+(Cc Greg)
 
-Shawn,
-
-I care about the global number because it is used to access GPIOs
-from userspace via the Sysfs interface (see Documentation/gpio.txt).
-Without the 2 patches, the GPIOs are mapped this way:
-
-gpiochip_add: registered GPIOs 224 to 255 on device: 209c000.gpio
-gpiochip_add: registered GPIOs 192 to 223 on device: 20a0000.gpio
-gpiochip_add: registered GPIOs 160 to 191 on device: 20a4000.gpio
-gpiochip_add: registered GPIOs 128 to 159 on device: 20a8000.gpio
-gpiochip_add: registered GPIOs 96 to 127 on device: 20ac000.gpio
-gpiochip_add: registered GPIOs 64 to 95 on device: 20b0000.gpio
-gpiochip_add: registered GPIOs 32 to 63 on device: 20b4000.gpio
-
-With the patches, the mapping looks like this:
-
-gpiochip_add: registered GPIOs 192 to 223 on device: 20b4000.gpio
-gpiochip_add: registered GPIOs 160 to 191 on device: 20b0000.gpio
-gpiochip_add: registered GPIOs 128 to 159 on device: 20ac000.gpio
-gpiochip_add: registered GPIOs 96 to 127 on device: 20a8000.gpio
-gpiochip_add: registered GPIOs 64 to 95 on device: 20a4000.gpio
-gpiochip_add: registered GPIOs 32 to 63 on device: 20a0000.gpio
-gpiochip_add: registered GPIOs 0 to 31 on device: 209c000.gpio
-
-I.e. pin 0 on gpio1 is now accessed via /sys/class/gpio/gpio0
-instead of /sys/class/gpio/gpio224.
-
-BR
-Matthias
+On 30.07.2012 09:29, Daniel Mack wrote:
+> Add DT bindings to the ohci-pxa27x driver and some documentation.
+> 
+> Successfully tested on a PXA3xx board.
+> 
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> ---
+> Changes from v1:
+>  - renamed "mrvl" to "marvell"
+> 
+> Greg, I think that would best go through your usb tree. Is that ok?
+> 
+> 
+>  Documentation/devicetree/bindings/usb/pxa-usb.txt | 31 +++++++++++
+>  drivers/usb/host/ohci-pxa27x.c                    | 68 +++++++++++++++++++++++
+>  2 files changed, 99 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/pxa-usb.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/pxa-usb.txt b/Documentation/devicetree/bindings/usb/pxa-usb.txt
+> new file mode 100644
+> index 0000000..79729a9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/pxa-usb.txt
+> @@ -0,0 +1,31 @@
+> +PXA USB controllers
+> +
+> +OHCI
+> +
+> +Required properties:
+> + - compatible: Should be "marvell,pxa-ohci" for USB controllers
+> +   used in host mode.
+> +
+> +Optional properties:
+> + - "marvell,enable-port1", "marvell,enable-port2", "marvell,enable-port3"
+> +   If present, enables the appropriate USB port of the controller.
+> + - "marvell,port-mode" selects the mode of the ports:
+> +	1 = PMM_NPS_MODE
+> +	2 = PMM_GLOBAL_MODE
+> +	3 = PMM_PERPORT_MODE
+> + - "marvell,power-sense-low" - power sense pin is low-active.
+> + - "marvell,power-control-low" - power control pin is low-active.
+> + - "marvell,no-oc-protection" - disable over-current protection.
+> + - "marvell,oc-mode-perport" - enable per-port over-current protection.
+> + - "marvell,power_on_delay" Power On to Power Good time - in ms.
+> +
+> +Example:
+> +
+> +	usb0: ohci at 4c000000 {
+> +		compatible = "marvell,pxa-ohci", "usb-ohci";
+> +		reg = <0x4c000000 0x100000>;
+> +		interrupts = <18>;
+> +		marvell,enable-port1;
+> +		marvell,port-mode = <2>; /* PMM_GLOBAL_MODE */
+> +	};
+> +
+> diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
+> index e1a3cc6..77f4402 100644
+> --- a/drivers/usb/host/ohci-pxa27x.c
+> +++ b/drivers/usb/host/ohci-pxa27x.c
+> @@ -23,6 +23,8 @@
+>  #include <linux/signal.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/clk.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_gpio.h>
+>  #include <mach/hardware.h>
+>  #include <mach/ohci.h>
+>  #include <mach/pxa3xx-u2d.h>
+> @@ -272,6 +274,67 @@ static void pxa27x_stop_hc(struct pxa27x_ohci *ohci, struct device *dev)
+>  	clk_disable_unprepare(ohci->clk);
+>  }
+>  
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id pxa_ohci_dt_ids[] = {
+> +	{ .compatible = "marvell,pxa-ohci" },
+> +	{ }
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, pxa_ohci_dt_ids);
+> +
+> +static u64 pxa_ohci_dma_mask = DMA_BIT_MASK(32);
+> +
+> +static int __devinit ohci_pxa_of_init(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct pxaohci_platform_data *pdata;
+> +	u32 tmp;
+> +
+> +	if (!np)
+> +		return 0;
+> +
+> +	/* Right now device-tree probed devices don't get dma_mask set.
+> +	 * Since shared usb code relies on it, set it here for now.
+> +	 * Once we have dma capability bindings this can go away.
+> +	 */
+> +	if (!pdev->dev.dma_mask)
+> +		pdev->dev.dma_mask = &pxa_ohci_dma_mask;
+> +
+> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +	if (!pdata)
+> +		return -ENOMEM;
+> +
+> +	if (of_get_property(np, "marvell,enable-port1", NULL))
+> +		pdata->flags |= ENABLE_PORT1;
+> +	if (of_get_property(np, "marvell,enable-port2", NULL))
+> +		pdata->flags |= ENABLE_PORT2;
+> +	if (of_get_property(np, "marvell,enable-port3", NULL))
+> +		pdata->flags |= ENABLE_PORT3;
+> +	if (of_get_property(np, "marvell,port-sense-low", NULL))
+> +		pdata->flags |= POWER_SENSE_LOW;
+> +	if (of_get_property(np, "marvell,power-control-low", NULL))
+> +		pdata->flags |= POWER_CONTROL_LOW;
+> +	if (of_get_property(np, "marvell,no-oc-protection", NULL))
+> +		pdata->flags |= NO_OC_PROTECTION;
+> +	if (of_get_property(np, "marvell,oc-mode-perport", NULL))
+> +		pdata->flags |= OC_MODE_PERPORT;
+> +	if (!of_property_read_u32(np, "marvell,power-on-delay", &tmp))
+> +		pdata->power_on_delay = tmp;
+> +	if (!of_property_read_u32(np, "marvell,port-mode", &tmp))
+> +		pdata->port_mode = tmp;
+> +	if (!of_property_read_u32(np, "marvell,power-budget", &tmp))
+> +		pdata->power_budget = tmp;
+> +
+> +	pdev->dev.platform_data = pdata;
+> +
+> +	return 0;
+> +}
+> +#else
+> +static int __devinit ohci_pxa_of_init(struct platform_device *pdev)
+> +{
+> +	return 0;
+> +}
+> +#endif
+>  
+>  /*-------------------------------------------------------------------------*/
+>  
+> @@ -297,6 +360,10 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
+>  	struct resource *r;
+>  	struct clk *usb_clk;
+>  
+> +	retval = ohci_pxa_of_init(pdev);
+> +	if (retval)
+> +		return retval;
+> +
+>  	inf = pdev->dev.platform_data;
+>  
+>  	if (!inf)
+> @@ -544,6 +611,7 @@ static struct platform_driver ohci_hcd_pxa27x_driver = {
+>  	.driver		= {
+>  		.name	= "pxa27x-ohci",
+>  		.owner	= THIS_MODULE,
+> +		.of_match_table = of_match_ptr(pxa_ohci_dt_ids),
+>  #ifdef CONFIG_PM
+>  		.pm	= &ohci_hcd_pxa27x_pm_ops,
+>  #endif
+> 
