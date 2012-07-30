@@ -1,80 +1,57 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 30 Jul 2012 14:15:16 +0200
-Subject: [GIT PULL] DMA-mapping updates for v3.6
-Message-ID: <1343650516-15726-1-git-send-email-m.szyprowski@samsung.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Mon, 30 Jul 2012 12:31:45 +0000
+Subject: [RFC] ARM: sched_clock: update epoch_cyc on resume
+In-Reply-To: <CACRpkdaiZKGEQatbLPpOQd-7J+m38mYFupLoOeALdhVUcUEdrA@mail.gmail.com>
+References: <1342567672-29071-1-git-send-email-ccross@android.com>
+ <CACRpkdaHdCvx1HJNDsyJSZAN--sF+4-V1TbzXZL1v+7Asoe_oA@mail.gmail.com>
+ <CAMbhsRR2-VjUeL2XPKubeaG=iLV5NE-i_sVYbuMAryXLxsbo1g@mail.gmail.com>
+ <CACRpkdYayLaKzUSq5V9N5sRkV74a+nZ1CbLJzRW7RP=pOU9bfw@mail.gmail.com>
+ <CAMbhsRQuXsytM9QLwjW1z1E=0XNztXP1xezbcDEj7Ra6deKLDQ@mail.gmail.com>
+ <B5906170F1614E41A8A28DE3B8D121433EB19376@DBDE01.ent.ti.com>
+ <CACRpkdaiZKGEQatbLPpOQd-7J+m38mYFupLoOeALdhVUcUEdrA@mail.gmail.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EB22EF9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Sat, Jul 28, 2012 at 03:53:05, Linus Walleij wrote:
+> On Tue, Jul 24, 2012 at 11:16 AM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
+> 
+> >> > A connecting theme is that of being avle to flag clock sources as
+> >> > sched_clock providers. If all clocksources were tagged with
+> >> > rating, and only clocksources were used for sched_clock(), the
+> >> > kernel could select the highest-rated clock under all circumstances.
+> >> >
+> >> > But that's quite intrusive, more of an idea. :-P
+> >>
+> >
+> > Too intrusive I guess ;)
+> >
+> > There were some discussions on this in the context of AM335x [1] [2].
+> > Right now only sched_clock can be registered and I guess this restriction
+> > is not going to go away any time soon.
+> 
+> Why do you think that? The restriction to only assign sched_clock() at
+> compile-time was recently removed so its now runtime assigned.
+> 
 
-I would like to ask for pulling another set of DMA-mapping framework
-updates for v3.6.
+Yes it's runtime assigned but multiple calls to setup_sched_clock()
+will trigger a WARN_ON() from arch/arm/kernel/sched_clock.c
+unless I missing something basic here.
 
-The following changes since commit 28a33cbc24e4256c143dce96c7d93bf423229f92:
+> So yes, a clock source that can die and change frequency is no good
+> as primary system time, but the abstraction could still be used for
+> those that do, just add another flag NOT_CONTINUOUS or so, and
+> make sure the system does not select this for primary system
+> clock source.
+> 
+> Then modelling sched_clock() on clock sources makes all more
+> sense: just select the best one. For primary system clock source,
+> do not select one which is non-continous.
+> 
 
-  Linux 3.5 (2012-07-21 13:58:29 -0700)
+I think what you are suggesting above is similar to what AM335x was trying
+to do but Russell pointed out issues with switching of timing sources and
+that's what I was trying to highlight.
 
-with the top-most commit 97ef952a20853fad72087a53fa556fbec45edd8f
-
-  ARM: dma-mapping: add support for DMA_ATTR_SKIP_CPU_SYNC attribute
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git for-linus-for-3.6-rc1
-
-Those patches are continuation of my earlier works merged in commits
-58bca4a8fa90 and d484864dd96e1. They contains extensions to DMA-mapping
-framework to remove limitation of the current ARM implementation (like
-limited total size of DMA coherent/write combine buffers), improve
-performance of buffer sharing between devices (attributes to skip cpu
-cache operations or creation of additional kernel mapping for some
-specific use cases) as well as some unification of the common code for
-dma_mmap_attrs()/dma_mmap_coherent() functions. All extensions have been
-implemented and tested for ARM architecture.
-
-Thanks!
-
-Best regards
-Marek Szyprowski
-Samsung Poland R&D Center
-
-
-Patch summary:
-
-Marek Szyprowski (11):
-      mm: vmalloc: use const void * for caller argument
-      ARM: dma-mapping: remove custom consistent dma region
-      ARM: dma-mapping: add more sanity checks in arm_dma_mmap()
-      ARM: dma-mapping: fix error path for memory allocation failure
-      common: dma-mapping: add support for generic dma_mmap_* calls
-      common: DMA-mapping: add DMA_ATTR_NO_KERNEL_MAPPING attribute
-      ARM: dma-mapping: add support for DMA_ATTR_NO_KERNEL_MAPPING attribute
-      common: dma-mapping: introduce dma_get_sgtable() function
-      ARM: dma-mapping: add support for dma_get_sgtable()
-      common: DMA-mapping: add DMA_ATTR_SKIP_CPU_SYNC attribute
-      ARM: dma-mapping: add support for DMA_ATTR_SKIP_CPU_SYNC attribute
-
-Tomasz Stanislawski (1):
-      scatterlist: add sg_alloc_table_from_pages function
-
- Documentation/DMA-attributes.txt         |   42 +++
- Documentation/kernel-parameters.txt      |    2 +-
- arch/arm/common/dmabounce.c              |    1 +
- arch/arm/include/asm/dma-mapping.h       |   24 +-
- arch/arm/mm/dma-mapping.c                |  561 ++++++++++++------------------
- arch/arm/mm/mm.h                         |    3 +
- arch/powerpc/include/asm/dma-mapping.h   |    8 +-
- arch/powerpc/kernel/dma-iommu.c          |    1 +
- arch/powerpc/kernel/dma-swiotlb.c        |    1 +
- arch/powerpc/kernel/dma.c                |   36 +-
- arch/powerpc/kernel/vio.c                |    1 +
- drivers/base/dma-mapping.c               |   49 +++
- include/asm-generic/dma-coherent.h       |    1 +
- include/asm-generic/dma-mapping-common.h |   55 +++
- include/linux/dma-attrs.h                |    2 +
- include/linux/dma-mapping.h              |    3 +
- include/linux/scatterlist.h              |    4 +
- include/linux/vmalloc.h                  |    9 +-
- lib/scatterlist.c                        |   64 ++++
- mm/vmalloc.c                             |   28 +-
- 20 files changed, 505 insertions(+), 390 deletions(-)
+Regards,
+Vaibhav B.
