@@ -1,48 +1,30 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 30 Jul 2012 10:29:52 +0200
-Subject: [PATCH] ARM: dma-mapping: add more sanity checks in arm_dma_mmap()
-Message-ID: <1343636992-19774-1-git-send-email-m.szyprowski@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 Jul 2012 08:31:32 +0000
+Subject: [PATCH v2 4/7] ARM: pxa: add devicetree code for irq handling
+In-Reply-To: <50159FBC.2010409@gmail.com>
+References: <1343330187-20049-1-git-send-email-zonque@gmail.com>
+ <201207291409.56645.arnd@arndb.de> <50159FBC.2010409@gmail.com>
+Message-ID: <201207300831.32988.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add some sanity checks and forbid mmaping of buffers into vma areas larger
-than allocated dma buffer.
+On Sunday 29 July 2012, Daniel Mack wrote:
+> Hmm, PXA25x (which does not feature IRQ priorities) shares a fair amount
+> of peripherals with other PXA series (which do have support for that). I
+> would much like to reflect that fact by inherhiting device nodes from
+> one dtsi to the other. Hence, if at all, we would need to have two cells
+> always, and just ignore the second argument on PXA25x.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/mm/dma-mapping.c |   14 ++++++++++----
- 1 files changed, 10 insertions(+), 4 deletions(-)
+But that can only work if the interrupt numbers are identical between PXA25x
+and the other SoCs. Are they?
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index f906d5f..a2881c9 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -611,16 +611,22 @@ int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- {
- 	int ret = -ENXIO;
- #ifdef CONFIG_MMU
-+	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
-+	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
- 	unsigned long pfn = dma_to_pfn(dev, dma_addr);
-+	unsigned long off = vma->vm_pgoff;
-+
- 	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
- 
- 	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
- 		return ret;
- 
--	ret = remap_pfn_range(vma, vma->vm_start,
--			      pfn + vma->vm_pgoff,
--			      vma->vm_end - vma->vm_start,
--			      vma->vm_page_prot);
-+	if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
-+		ret = remap_pfn_range(vma, vma->vm_start,
-+				      pfn + off,
-+				      vma->vm_end - vma->vm_start,
-+				      vma->vm_page_prot);
-+	}
- #endif	/* CONFIG_MMU */
- 
- 	return ret;
--- 
-1.7.1.569.g6f426
+> And I also wonder whether using the second spec value for a priority
+> wouldn't be somehow abusive? Isn't that considered to denote the trigger
+> flags in contexts of interrupt controllers? At least, that is what
+> irq_domain_xlate_twocell() assumes.
+
+You would not use irq_domain_xlate_twocell in that scenario but provide your
+own, which is ok. Interpreting the second cell as the trigger flags is just
+a convenient default because it's the most common use for that.
+
+	Arnd
