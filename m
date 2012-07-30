@@ -1,28 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 30 Jul 2012 14:49:43 +0100
-Subject: AB8500 Regulators
-Message-ID: <501690F7.2010904@linaro.org>
+Date: Mon, 30 Jul 2012 14:57:12 +0100
+Subject: [PATCH 05/18] ASoC: Ux500: Enable ux500 MSP driver for Device Tree
+In-Reply-To: <20120730133930.GB4468@opensource.wolfsonmicro.com>
+References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
+ <1343393162-11938-6-git-send-email-lee.jones@linaro.org>
+ <20120729204218.GI4384@opensource.wolfsonmicro.com>
+ <50162F70.2050900@linaro.org>
+ <20120730133930.GB4468@opensource.wolfsonmicro.com>
+Message-ID: <501692B8.6050102@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 30/07/12 14:39, Mark Brown wrote:
+> On Mon, Jul 30, 2012 at 07:53:36AM +0100, Lee Jones wrote:
+>> On 29/07/12 21:42, Mark Brown wrote:
+>
+>>>> +	if (of_get_property(np, "stericsson,use-pinctrl", NULL))
+>
+>>> This doesn't seem particularly sane...  why is this conditional?
+>
+>> It's conditional because only MSP1 and MSP3 have pinctrl support.
+>
+> Why does the driver care - doesn't the pinctrl abstraction and/or
+> bindings handle this sensibly?
 
-I've taken some time to review the way we currently initialise the 
-AB8500 regulators. I don't know if you recall, but in platform code we 
-have a struct full of initial values, which sets up lots of bespoke 
-options. These options require lots of non-standard register writes in 
-order to configure the regulators in the way which best suits 
-ST-Ericsson's needs.
-
-I wrote a patch which pulled each of these initial values into Device 
-Tree, but you NACK:ed it believing that most of the options could be 
-dealt with using the API. There is currently no API to set up 
-ST-Ericsson's configuration. So what's the best thing to do? How do all 
-of the other regulator drivers deal with non-standard configuration? Or 
-is it unheard of to use non-standard start-up values?
-
-Kind regards,
-Lee
+Not when I tested it. pinctrl_get() came back !IS_ERR() for MSP0, MSP2 & 
+MSP3, then when it went on to pinctrl_lookup_state(), only then did it 
+fail. Would it be more sane to retract the error messages and just let 
+it fail silently? It's either that or have lots of "could not get MSP 
+defstate" clogging up the log.
 
 -- 
 Lee Jones
