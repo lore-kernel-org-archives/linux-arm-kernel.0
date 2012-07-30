@@ -1,41 +1,107 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 30 Jul 2012 09:24:20 +0800
-Subject: [PATCH v2 4/7] ARM: pxa: add devicetree code for irq handling
-In-Reply-To: <CAN1soZypgp0N5KwQi3ZT2ama8quk5yPnQEHFABp-CWWh94nrvw@mail.gmail.com>
-References: <1343330187-20049-1-git-send-email-zonque@gmail.com>
- <1343330187-20049-5-git-send-email-zonque@gmail.com>
- <CAN1soZwGp=OKsyAy=iL7ZUvxG+VPBm-d==8Q-AiPqNUMoiPz-w@mail.gmail.com>
- <5013B750.6060608@gmail.com>
- <CAN1soZxgw-pu3OQ357Be9Nuk_Ln7B9EjkVWeh5gEXB_y6tO7ig@mail.gmail.com>
- <501551E4.6020806@gmail.com>
- <CAN1soZzAMiduQw+mZLs+bB2E-G5Lrm-TV4tEZKL7vUBUuwj+ig@mail.gmail.com>
- <50158890.8080504@gmail.com>
- <CAN1soZypgp0N5KwQi3ZT2ama8quk5yPnQEHFABp-CWWh94nrvw@mail.gmail.com>
-Message-ID: <CAN1soZzuCnaJOBb=GtJETyBCCEZcB1KHjAUZ0OoMR=3q-W=bnw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 30 Jul 2012 09:27:46 +0800
+Subject: [PATCH v3 2/3] ARM: dts: imx6q-sabrelite: add usbmisc device
+In-Reply-To: <1343298916-11101-3-git-send-email-richard.zhao@freescale.com>
+References: <1343298916-11101-1-git-send-email-richard.zhao@freescale.com>
+ <1343298916-11101-3-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120730012744.GC30774@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 9:20 AM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On Mon, Jul 30, 2012 at 3:01 AM, Daniel Mack <zonque@gmail.com> wrote:
->>
->> Please check the appended version. What I also changed now is that
->> pxa_init_irq() only really handles non-DT initialization, so we have to
->> care for some details in pxa_dt_irq_init() separately. Also, the map()
->> function still had a bug, which I also fixed.
->>
->>
-> Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
->
-> Since "marvell,intc-priority" is appended. Maybe you need to update the DTSI
-> file. How about send out the updated v4 patch series? I'll merge it in
-> this week.
->
-> Regards
-> Haojian
+The patch is doing a little bit more than what patch subject says.
+Please either come up with a better subject and commit message or
+split the patch to have it match the subject.
 
-I requested for you sending patch since 2 patches in v3 are lost in my
-gmail account.
+On Thu, Jul 26, 2012 at 06:35:15PM +0800, Richard Zhao wrote:
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6q-sabrelite.dts |    1 +
+>  arch/arm/boot/dts/imx6q.dtsi          |   18 ++++++++++++++----
+>  2 files changed, 15 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> index d42e851..b32ebfc 100644
+> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
+> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> @@ -62,6 +62,7 @@
+>  		aips-bus at 02100000 { /* AIPS2 */
+>  			usb at 02184000 { /* USB OTG */
+>  				vbus-supply = <&reg_usb_otg_vbus>;
+> +				disable-over-current;
+>  				status = "okay";
+>  			};
+>  
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index c25d495..41d16cc 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -19,6 +19,11 @@
+>  		serial2 = &uart3;
+>  		serial3 = &uart4;
+>  		serial4 = &uart5;
+> +
+> +		usb0 = &usbotg;
+> +		usb1 = &usbhost1;
+> +		usb2 = &usbhost2;
+> +		usb3 = &usbhost3;
+>  	};
+>  
+>  	cpus {
+> @@ -624,7 +629,7 @@
+>  				reg = <0x0217c000 0x4000>;
+>  			};
+>  
+> -			usb at 02184000 { /* USB OTG */
+> +			usbotg: usb at 02184000 {
 
-Regards
-Haojian
+I basically would like to have the first line of every node exactly
+match between <soc>.dtsi and <board>.dts.  Please also update the node
+in imx6q-sabrelite.dtsi.
+
+Regards,
+Shawn
+
+>  				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
+>  				reg = <0x02184000 0x200>;
+>  				interrupts = <0 43 0x04>;
+> @@ -632,7 +637,7 @@
+>  				status = "disabled";
+>  			};
+>  
+> -			usb at 02184200 { /* USB1 */
+> +			usbhost1: usb at 02184200 {
+>  				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
+>  				reg = <0x02184200 0x200>;
+>  				interrupts = <0 40 0x04>;
+> @@ -640,20 +645,25 @@
+>  				status = "disabled";
+>  			};
+>  
+> -			usb at 02184400 { /* USB2 */
+> +			usbhost2: usb at 02184400 {
+>  				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
+>  				reg = <0x02184400 0x200>;
+>  				interrupts = <0 41 0x04>;
+>  				status = "disabled";
+>  			};
+>  
+> -			usb at 02184600 { /* USB3 */
+> +			usbhost3: usb at 02184600 {
+>  				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
+>  				reg = <0x02184600 0x200>;
+>  				interrupts = <0 42 0x04>;
+>  				status = "disabled";
+>  			};
+>  
+> +			usbmisc at 02184800 {
+> +				compatible = "fsl,imx6q-usbmisc";
+> +				reg = <0x02184800 0x200>;
+> +			};
+> +
+>  			ethernet at 02188000 {
+>  				compatible = "fsl,imx6q-fec";
+>  				reg = <0x02188000 0x4000>;
+> -- 
+> 1.7.9.5
+> 
+> 
