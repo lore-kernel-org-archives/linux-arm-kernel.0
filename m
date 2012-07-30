@@ -1,23 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jul 2012 15:16:17 +0100
-Subject: [PATCH 10/11] ARM: versatile: Make able to use UART ports for
- KGDB FIQ debugger
-In-Reply-To: <1343649500-18491-10-git-send-email-anton.vorontsov@linaro.org>
-References: <20120730115719.GA5742@lizard>
- <1343649500-18491-10-git-send-email-anton.vorontsov@linaro.org>
-Message-ID: <20120730141617.GK6802@n2100.arm.linux.org.uk>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 30 Jul 2012 22:22:36 +0800
+Subject: [PATCH] ARM: mmp: add missing irqs.h
+Message-ID: <1343658156-8154-1-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 04:58:19AM -0700, Anton Vorontsov wrote:
-> diff --git a/arch/arm/mach-versatile/include/mach/irqs.h b/arch/arm/mach-versatile/include/mach/irqs.h
-> index bf44c61..fcd2a95 100644
-> --- a/arch/arm/mach-versatile/include/mach/irqs.h
-> +++ b/arch/arm/mach-versatile/include/mach/irqs.h
-> @@ -26,6 +26,7 @@
->   *  held within platform.h
->   */
->  #define IRQ_VIC_START		0
-> +#define FIQ_START		IRQ_VIC_START
+arch/arm/mach-mmp/gplugd.c:195:13: error: ?MMP_NR_IRQS? undeclared here
+(not in a function)
+make[1]: *** [arch/arm/mach-mmp/gplugd.o] Error 1
 
-No.  We want to ultimately get rid of FIQ_START.
+Include <mach/irqs.h> to fix this issue.
+
+Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+---
+ arch/arm/mach-mmp/gplugd.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
+index f516e74..5c3d61e 100644
+--- a/arch/arm/mach-mmp/gplugd.c
++++ b/arch/arm/mach-mmp/gplugd.c
+@@ -14,6 +14,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+ 
++#include <mach/irqs.h>
+ #include <mach/pxa168.h>
+ #include <mach/mfp-pxa168.h>
+ 
+-- 
+1.7.9.5
