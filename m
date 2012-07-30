@@ -1,27 +1,37 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Mon, 30 Jul 2012 15:34:23 +0530
-Subject: [PATCH v6 01/11] drivers: usb: otg: add a new driver for omap
- usb2 phy
-In-Reply-To: <CAAe_U6LWEiAE8TVVEQ5LcKy0_+J7Er2vP71MrQVrg=ZteyAeCw@mail.gmail.com>
-References: <1343639400-28725-1-git-send-email-kishon@ti.com>
- <1343639400-28725-2-git-send-email-kishon@ti.com> <501655F2.7070900@ti.com>
- <CAAe_U6LWEiAE8TVVEQ5LcKy0_+J7Er2vP71MrQVrg=ZteyAeCw@mail.gmail.com>
-Message-ID: <50165C27.3010107@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 30 Jul 2012 06:05:04 -0500
+Subject: [GIT PULL] io.h clean-up for PCI
+In-Reply-To: <20120728143850.GA11713@mudshark.cambridge.arm.com>
+References: <50049285.1060100@gmail.com> <50130F36.4090902@gmail.com>
+ <20120728143850.GA11713@mudshark.cambridge.arm.com>
+Message-ID: <50166A60.8000502@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 July 2012 03:16 PM, ABRAHAM, KISHON VIJAY wrote:
-> Hi,
->
-> On Mon, Jul 30, 2012 at 3:07 PM, Shubhrajyoti <shubhrajyoti@ti.com> wrote:
->> On Monday 30 July 2012 02:39 PM, Kishon Vijay Abraham I wrote:
->>> +                     writel(~PHY_PD, phy->control_dev);
->>> +                     /* XXX: add proper documentation for this delay */
->>> +                     mdelay(200);
->> Do you need this to be busy?
-> This might be called from interrupt context. This delay was initially
-> added in omap_phy_internal.c and I just inherited it.
-Thanks for the explanation.
+On 07/28/2012 09:38 AM, Will Deacon wrote:
+> Hi Rob,
+> 
+> On Fri, Jul 27, 2012 at 10:59:18PM +0100, Rob Herring wrote:
+>> Please pull updated io.h cleanup for PCI branch. I rebased this as the
+>> changes shifted things around a bit. This has the following changes:
+>>
+>> - Incorporated fixes from you and Stephen
+>> - Add early i/o mapping pci_map_io_early and enable on footbridge and
+>> integrator for VGA console
+> 
+> Unfortunately, I still experience the same hang on integrator with this
+> revised patch series. Given the turnaround time for testing this, I don't
+> think this should block the series, but I would like to get to the bottom of
+> it if possible.
+> 
+> I tried annotating the PCI code (including fault handlers) and the VGA
+> console code but I couldn't find the culprit. I suppose the next step is
+> JTAG, but that requires steal^Wborrowing some hardware from work.
 
-> Thanks
-> Kishon
+I did do some tests with qemu by adding i/o setup to integrator/cp.
+Without it, I would abort on 0xfee003xx (vga regs). Once I added the
+setup, I got to an abort on a PCI memory address which I did not setup.
+
+We can always revert integrator change if we can figure this out...
+
+Rob
