@@ -1,27 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jul 2012 15:29:08 +0100
-Subject: [PATCH 1/2] ARM: i.MX6: set ARCH_NR_GPIO to 244
-In-Reply-To: <20120730084558.GE31509@S2101-09.ap.freescale.net>
-References: <1343219864-3040-1-git-send-email-dirk.behme@de.bosch.com>
- <20120728133215.GG2128@S2101-09.ap.freescale.net>
- <5015624D.50305@googlemail.com>
- <20120730011426.GB30774@S2101-09.ap.freescale.net>
- <50162C7A.1060307@de.bosch.com>
- <20120730084558.GE31509@S2101-09.ap.freescale.net>
-Message-ID: <20120730142908.GM6802@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 30 Jul 2012 15:30:15 +0100
+Subject: [PATCH 17/18] ARM: ux500: Add all encompassing Sound node to
+ DB8500 Device Tree
+In-Reply-To: <20120730134220.GD4468@opensource.wolfsonmicro.com>
+References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
+ <1343393162-11938-18-git-send-email-lee.jones@linaro.org>
+ <20120729205227.GL4384@opensource.wolfsonmicro.com>
+ <50163936.1050901@linaro.org>
+ <20120730134220.GD4468@opensource.wolfsonmicro.com>
+Message-ID: <50169A77.3050402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 04:46:07PM +0800, Shawn Guo wrote:
-> On Mon, Jul 30, 2012 at 08:40:58AM +0200, Dirk Behme wrote:
-> > - Do you like to propose a better macro than SOC_IMX6Q to cover
-> > imx3/imx6, too?
-> > 
-> No, I do not see the need of this.  CONFIG_ARCH_NR_GPIO is not the only
-> way to overwrite the default number.  We can define ARCH_NR_GPIOS to
-> the number we want in IMX platform headers.
+On 30/07/12 14:42, Mark Brown wrote:
+> On Mon, Jul 30, 2012 at 08:35:18AM +0100, Lee Jones wrote:
+>> On 29/07/12 21:52, Mark Brown wrote:
+>
+>>> ...this is clearly the board-specific setup for the system, showing how
+>>> the CPU and CODEC are hooked up.  This should therefore be in the DT for
+>>> whatever board this is you're working on.
+>
+>> I don't think it's board specific. I believe this is the setup on
+>> all db8500 platforms. I'm happy to be told I'm wrong here, in which
+>> case I can move it to the board specific files.
+>
+> I think that's more a sign that all the platforms you've seen are just
+> cut'n'pasted from the reference design than anything else.  If the thing
+> you're describing is on the PCB it's generally board specific...
 
-Don't do that.  CONFIG_ARCH_NR_GPIO is there so that we can consolidate
-out as much crap from mach/gpio.h as possible.  Either use it now, or I
-will patch you to make you use it.  Either way, you will end up using
-it... :)
+I'll split it out into the board file(s) if it makes you happy. I'd 
+rather just get it in and move on to something more productive. We can 
+change it retrospectively if I'm told by someone more knowledgeable that 
+it's 100% common across all platforms.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
