@@ -1,41 +1,28 @@
-From: john@stoffel.org (John Stoffel)
-Date: Mon, 30 Jul 2012 10:10:13 -0400
-Subject: [2/3][PATCH][v2] TDM Framework
-In-Reply-To: <3F1D9DCAAB49B94D88DBE05911FA4E6E511095@039-SN1MPN1-006.039d.mgd.msft.net>
-References: <1343397940-12975-1-git-send-email-sandeep@freescale.com>
- <20498.41365.853741.261834@quad.stoffel.home>
- <3F1D9DCAAB49B94D88DBE05911FA4E6E511095@039-SN1MPN1-006.039d.mgd.msft.net>
-Message-ID: <20502.38341.619003.356462@quad.stoffel.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Jul 2012 15:15:44 +0100
+Subject: [PATCH 11/11] ARM: Get rid of .LCcralign local label usage in
+ alignment_trap macro
+In-Reply-To: <1343649500-18491-11-git-send-email-anton.vorontsov@linaro.org>
+References: <20120730115719.GA5742@lizard>
+ <1343649500-18491-11-git-send-email-anton.vorontsov@linaro.org>
+Message-ID: <20120730141544.GJ6802@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Singh" == Singh Sandeep-B37400 <B37400@freescale.com> writes:
+On Mon, Jul 30, 2012 at 04:58:20AM -0700, Anton Vorontsov wrote:
+> This makes the code more izolated.
+> 
+> The downside of this is that we now have an additional branch and the
+> code itself is 8 bytes longer. But on the bright side, this new layout
+> can be more cache friendly since cr_alignment address might be already
+> in the cache line (not that I measured anything, it's just fun to think
+> about it).
 
-Singh> -----Original Message-----
-Singh> From: John Stoffel [mailto:john at stoffel.org] 
-Singh> Sent: 27 July 2012 19:42
-Singh> To: Singh Sandeep-B37400
-Singh> Cc: linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org; galak at kernel.crashing.org; linux-kernel at vger.kernel.org; devel at driverdev.osuosl.org
-Singh> Subject: Re: [2/3][PATCH][v2] TDM Framework
+The caches are harvard, so mixing data and code together does not increase
+performance.  Having data which is used by the same code in the same cache
+line results in better performance.
 
+The additional branch will also cause a pipeline stall on older CPUs.
 
->> From: Sandeep Singh <Sandeep@freescale.com> TDM Framework is an 
->> attempt to provide a platform independent layer which can offer a 
->> standard interface  for TDM access to different client modules.
-
-Singh> Please don't use TLAs (Three Letter Acronyms) like TDM without explaining the clearly and up front.  It makes it hard for anyone else who doens't know your code to look it over without having to spend lots of time poking around to figure it out from either context or somewhere else.
-
-Singh> [Sandeep] Patch for documentation for TDM is present in this
-Singh> patch set, which explains TDM in detail. Should we do this in
-Singh> commit message too??  Link too documentation patch:
-Singh> http://patchwork.ozlabs.org/patch/173680/
-
-You should put the expansion of TDM into the initial commit message,
-and also into the Kconfig text, so that someone configuring the kernel
-has a clue what you're talking about.  
-
-Try to approach this as a brandnew user who doesn't have your
-knowledge of the software.  Write for the un-initiated if at all
-possible.
-
-John
+So no, I don't see any way that this is a performance improvement.  Please
+leave this as is.
