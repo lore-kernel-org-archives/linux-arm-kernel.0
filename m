@@ -1,37 +1,53 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 30 Jul 2012 06:05:04 -0500
-Subject: [GIT PULL] io.h clean-up for PCI
-In-Reply-To: <20120728143850.GA11713@mudshark.cambridge.arm.com>
-References: <50049285.1060100@gmail.com> <50130F36.4090902@gmail.com>
- <20120728143850.GA11713@mudshark.cambridge.arm.com>
-Message-ID: <50166A60.8000502@gmail.com>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Mon, 30 Jul 2012 16:35:01 +0530
+Subject: [PATCH 1/3] Move FIMD register headers to include/video/
+In-Reply-To: <50164A8B.3070907@samsung.com>
+References: <1343637905-17764-1-git-send-email-l.krishna@samsung.com>
+ <1343637905-17764-2-git-send-email-l.krishna@samsung.com>
+ <50164A8B.3070907@samsung.com>
+Message-ID: <CAL1wa8fc30-9C=2Rx9WJCPVPcAPvBDo25eCkoyCkm73-jG_jgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28/2012 09:38 AM, Will Deacon wrote:
-> Hi Rob,
-> 
-> On Fri, Jul 27, 2012 at 10:59:18PM +0100, Rob Herring wrote:
->> Please pull updated io.h cleanup for PCI branch. I rebased this as the
->> changes shifted things around a bit. This has the following changes:
->>
->> - Incorporated fixes from you and Stephen
->> - Add early i/o mapping pci_map_io_early and enable on footbridge and
->> integrator for VGA console
-> 
-> Unfortunately, I still experience the same hang on integrator with this
-> revised patch series. Given the turnaround time for testing this, I don't
-> think this should block the series, but I would like to get to the bottom of
-> it if possible.
-> 
-> I tried annotating the PCI code (including fault handlers) and the VGA
-> console code but I couldn't find the culprit. I suppose the next step is
-> JTAG, but that requires steal^Wborrowing some hardware from work.
+Hello Sylwester,
 
-I did do some tests with qemu by adding i/o setup to integrator/cp.
-Without it, I would abort on 0xfee003xx (vga regs). Once I added the
-setup, I got to an abort on a PCI memory address which I did not setup.
+On Mon, Jul 30, 2012 at 2:19 PM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
+>
+> Hi,
+>
+> On 07/30/2012 10:45 AM, Leela Krishna Amudala wrote:
+> > Moved the contents of regs-fb-v4.h and regs-fb.h from arch side
+> > to include/video/samsung_fimd.h
+> >
+> > Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+> > ---
+> >  arch/arm/plat-samsung/include/plat/regs-fb-v4.h |  159 -------
+> >  arch/arm/plat-samsung/include/plat/regs-fb.h    |  403 -----------------
+> >  include/video/samsung_fimd.h                    |  533 +++++++++++++++++++++++
+> >  3 files changed, 533 insertions(+), 562 deletions(-)
+> >  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+> >  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb.h
+> >  create mode 100644 include/video/samsung_fimd.h
+>
+> Thanks for taking care if this. However you might need to split this
+> patch in two, so there is no build and git bisection breakage. In the
+> first patch a new header file would be added, then the patch updating
+> users of the FIMD headers would be applied, and finally the regs-fb*.h
+> files would be removed.
+>
+> Also it helps to use -M option to git format-patch when creating patches
+> that mainly move files.
+>
 
-We can always revert integrator change if we can figure this out...
+Will do it in the suggested way,
+Thanks for reviewing the patch.
 
-Rob
+> --
+>
+> Regards,
+> Sylwester
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
