@@ -1,30 +1,24 @@
-From: ian.molton@codethink.co.uk (Ian Molton)
-Date: Mon, 30 Jul 2012 17:58:36 +0100
-Subject: [PATCH 5/6] csb1724: Enable device tree based mv643xx ethernet
- support.
-In-Reply-To: <20120730155547.GL18016@lunn.ch>
-References: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
- <1343661359-10150-6-git-send-email-ian.molton@codethink.co.uk>
- <20120730155547.GL18016@lunn.ch>
-Message-ID: <5016BD3C.2060205@codethink.co.uk>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 30 Jul 2012 10:05:56 -0700
+Subject: [PATCH v2] USB: ohci-pxa27x: add DT bindings
+In-Reply-To: <1343633352-2414-1-git-send-email-zonque@gmail.com>
+References: <1343633352-2414-1-git-send-email-zonque@gmail.com>
+Message-ID: <20120730170556.GA27462@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/07/12 16:55, Andrew Lunn wrote:
-> On Mon, Jul 30, 2012 at 04:15:58PM +0100, Ian Molton wrote:
+On Mon, Jul 30, 2012 at 09:29:12AM +0200, Daniel Mack wrote:
+> Add DT bindings to the ohci-pxa27x driver and some documentation.
+> 
+> Successfully tested on a PXA3xx board.
+> 
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> ---
+> Changes from v1:
+>  - renamed "mrvl" to "marvell"
+> 
+> Greg, I think that would best go through your usb tree. Is that ok?
 
-> Hi Ian
->
-> I'm trying to keep this in order. Currently i2c is in the wrong
-> place, but the rest are incremental. It looks like these should be
-> between wdt & sata.
+Ok, but it will have to wait until after 3.6-rc1 is out.
 
-Will fix.
-
-> What about default entries for egiga0 and egiga1 with status
-> "disabled"? It looks like the only thing which changes between
-> boards is phy_addr.
-
-Seems sensible. I'll change that for v2.
-
--Ian
+greg k-h
