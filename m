@@ -1,37 +1,27 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 30 Jul 2012 14:40:54 +0100
-Subject: [PATCH 13/18] ARM: ux500: Add ux500 PCM to DB8500 Device Tree
-In-Reply-To: <5016389B.4020003@linaro.org>
+Date: Mon, 30 Jul 2012 14:42:21 +0100
+Subject: [PATCH 17/18] ARM: ux500: Add all encompassing Sound node to
+ DB8500 Device Tree
+In-Reply-To: <50163936.1050901@linaro.org>
 References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
- <1343393162-11938-14-git-send-email-lee.jones@linaro.org>
- <20120729205001.GK4384@opensource.wolfsonmicro.com>
- <5016389B.4020003@linaro.org>
-Message-ID: <20120730134054.GC4468@opensource.wolfsonmicro.com>
+ <1343393162-11938-18-git-send-email-lee.jones@linaro.org>
+ <20120729205227.GL4384@opensource.wolfsonmicro.com>
+ <50163936.1050901@linaro.org>
+Message-ID: <20120730134220.GD4468@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 08:32:43AM +0100, Lee Jones wrote:
-> On 29/07/12 21:50, Mark Brown wrote:
-> >On Fri, Jul 27, 2012 at 01:45:57PM +0100, Lee Jones wrote:
+On Mon, Jul 30, 2012 at 08:35:18AM +0100, Lee Jones wrote:
+> On 29/07/12 21:52, Mark Brown wrote:
 
-> >>+		pcm: ux500-pcm {
-> >>+			compatible = "stericsson,ux500-pcm";
-> >>+		};
-> >>+
+> >...this is clearly the board-specific setup for the system, showing how
+> >the CPU and CODEC are hooked up.  This should therefore be in the DT for
+> >whatever board this is you're working on.
 
-> >One of two things is wrong here.  Either you've not provided any
-> >information about the hardware so the driver won't be able to work out
-> >what to talk to or you've not provided any data so you're registering a
-> >purely virtual Linux-internal device via the device tree.
+> I don't think it's board specific. I believe this is the setup on
+> all db8500 platforms. I'm happy to be told I'm wrong here, in which
+> case I can move it to the board specific files.
 
-> >Once more, the idea here is to describe the hardware not to dump Linux's
-> >internal data structures into the device tree.
-
-> We use it register the driver for probe()ing. In the same way we do
-> for the PMU and Regulators. All three of which actually belong to a
-> different hardware block. Do you know of a better way to register
-> those devices?
-
-You've not identified which of the two cases above we're in...  assuming
-it's a virtal device look at how the DT bindings for the other platforms
-are doing things.
+I think that's more a sign that all the platforms you've seen are just
+cut'n'pasted from the reference design than anything else.  If the thing
+you're describing is on the PCB it's generally board specific...
