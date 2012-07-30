@@ -1,27 +1,65 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 30 Jul 2012 10:33:34 -0700
-Subject: [PATCH 03/11] kdb: Implement disable_nmi command
-In-Reply-To: <1343649500-18491-3-git-send-email-anton.vorontsov@linaro.org>
-References: <20120730115719.GA5742@lizard>
- <1343649500-18491-3-git-send-email-anton.vorontsov@linaro.org>
-Message-ID: <CAMbhsRS1cOf1T8k7K6CFmRA7M52AGPZ2TqmEnpZqDGYnbyetbw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 30 Jul 2012 18:41:22 +0100
+Subject: [PATCH] Fix undefined instruction exception handling
+In-Reply-To: <20120730133619.GH6802@n2100.arm.linux.org.uk>
+References: <20120729182236.GG6802@n2100.arm.linux.org.uk>
+ <20120730112607.GD15195@mudshark.cambridge.arm.com>
+ <20120730133619.GH6802@n2100.arm.linux.org.uk>
+Message-ID: <20120730174122.GK15195@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 4:58 AM, Anton Vorontsov
-<anton.vorontsov@linaro.org> wrote:
-> This command disables NMI-entry. If NMI source was previously shared with
-> a serial console ("debug port"), this effectively releases the port from
-> KDB exclusive use, and makes the console available for normal use.
->
-> Of course, NMI can be reenabled, enable_nmi modparam is used for that:
->
->         echo 1 > /sys/module/kdb/parameters/enable_nmi
+On Mon, Jul 30, 2012 at 02:36:19PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 30, 2012 at 12:26:07PM +0100, Will Deacon wrote:
+> > >  __und_svc:
+> > >  #ifdef CONFIG_KPROBES
+> > > @@ -261,7 +274,7 @@ ENDPROC(__irq_svc)
+> > >  	@
+> > >  	@  r0 - instruction
+> > >  	@
+> > > -#ifndef	CONFIG_THUMB2_KERNEL
+> > > +#ifndef CONFIG_THUMB2_KERNEL
+> > >  	ldr	r0, [r4, #-4]
+> > >  #else
+> > >  	ldrh	r0, [r4, #-2]			@ Thumb instruction at LR - 2
+> > > @@ -269,17 +282,24 @@ ENDPROC(__irq_svc)
+> > >  	ldrhhs	r9, [r4]			@ bottom 16 bits
+> > >  	orrhs	r0, r9, r0, lsl #16
+> > 
+> > Do we not need an addhs r4, r4, #2 here?
+> 
+> And we'd need to store it back into the pt_regs struct.
 
-This is very different behavior from the FIQ debugger "console"
-command you are trying to replace.  In the FIQ debugger, everything
-goes through the FIQ/NMI, even when in console mode.  That means that
-the user can always get back to FIQ debugger/KDB mode using a special
-sequence (we use a break character).  With your implementation, if you
-switch from KDB to console to see if the console is working, and find
-that it is not working, you can never get back into KDB.
+[...]
+
+> New patch below.
+
+[...]
+
+>  __und_svc:
+>  #ifdef CONFIG_KPROBES
+> @@ -261,25 +274,32 @@ __und_svc:
+>  	@
+>  	@  r0 - instruction
+>  	@
+> -#ifndef	CONFIG_THUMB2_KERNEL
+> +#ifndef CONFIG_THUMB2_KERNEL
+>  	ldr	r0, [r4, #-4]
+>  #else
+> +	mov	r1, #2
+>  	ldrh	r0, [r4, #-2]			@ Thumb instruction at LR - 2
+>  	cmp	r0, #0xe800			@ 32-bit instruction if xx >= 0
+> -	ldrhhs	r9, [r4]			@ bottom 16 bits
+> -	orrhs	r0, r9, r0, lsl #16
+> +	blo	__und_svc_fault
+> +	ldrh	r9, [r4]			@ bottom 16 bits
+> +	add	r4, r4, #2
+> +	str	r4, [sp, #S_PSR]
+
+If you change that to #S_PC then:
+
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Cheers,
+
+Will
