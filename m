@@ -1,101 +1,80 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Mon, 30 Jul 2012 04:58:19 -0700
-Subject: [PATCH 10/11] ARM: versatile: Make able to use UART ports for KGDB
- FIQ debugger
-In-Reply-To: <20120730115719.GA5742@lizard>
-References: <20120730115719.GA5742@lizard>
-Message-ID: <1343649500-18491-10-git-send-email-anton.vorontsov@linaro.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 30 Jul 2012 14:15:16 +0200
+Subject: [GIT PULL] DMA-mapping updates for v3.6
+Message-ID: <1343650516-15726-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If enabled, kernel will able to enter KGDB upon serial line activity on
-UART ports.
+Hi Linus,
 
-Note that even with this patch and CONFIG_KGDB_FIQ is enabled, you still
-need to pass kgdb_fiq.enable=1 kernel command line option, otherwise UART
-will behave in a normal way.
+I would like to ask for pulling another set of DMA-mapping framework
+updates for v3.6.
 
-By default UART0 is used, but this can be changed via kgdb_fiq.uart_num
-kernel command line option.
+The following changes since commit 28a33cbc24e4256c143dce96c7d93bf423229f92:
 
-Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
----
- arch/arm/Kconfig                            |    1 +
- arch/arm/mach-versatile/Makefile            |    1 +
- arch/arm/mach-versatile/include/mach/irqs.h |    1 +
- arch/arm/mach-versatile/kgdb_fiq.c          |   31 +++++++++++++++++++++++++++
- 4 files changed, 34 insertions(+)
- create mode 100644 arch/arm/mach-versatile/kgdb_fiq.c
+  Linux 3.5 (2012-07-21 13:58:29 -0700)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ae6ddf1..c0df1ba 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -311,6 +311,7 @@ config ARCH_VERSATILE
- 	select ICST
- 	select GENERIC_CLOCKEVENTS
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
-+	select ARCH_MIGHT_HAVE_FIQ
- 	select NEED_MACH_IO_H if PCI
- 	select PLAT_VERSATILE
- 	select PLAT_VERSATILE_CLCD
-diff --git a/arch/arm/mach-versatile/Makefile b/arch/arm/mach-versatile/Makefile
-index 81fa3fe..bfd761f 100644
---- a/arch/arm/mach-versatile/Makefile
-+++ b/arch/arm/mach-versatile/Makefile
-@@ -7,3 +7,4 @@ obj-$(CONFIG_ARCH_VERSATILE_PB)		+= versatile_pb.o
- obj-$(CONFIG_MACH_VERSATILE_AB)		+= versatile_ab.o
- obj-$(CONFIG_MACH_VERSATILE_DT)		+= versatile_dt.o
- obj-$(CONFIG_PCI)			+= pci.o
-+obj-$(CONFIG_KGDB_FIQ)			+= kgdb_fiq.o
-diff --git a/arch/arm/mach-versatile/include/mach/irqs.h b/arch/arm/mach-versatile/include/mach/irqs.h
-index bf44c61..fcd2a95 100644
---- a/arch/arm/mach-versatile/include/mach/irqs.h
-+++ b/arch/arm/mach-versatile/include/mach/irqs.h
-@@ -26,6 +26,7 @@
-  *  held within platform.h
-  */
- #define IRQ_VIC_START		0
-+#define FIQ_START		IRQ_VIC_START
- #define IRQ_WDOGINT		(IRQ_VIC_START + INT_WDOGINT)
- #define IRQ_SOFTINT		(IRQ_VIC_START + INT_SOFTINT)
- #define IRQ_COMMRx		(IRQ_VIC_START + INT_COMMRx)
-diff --git a/arch/arm/mach-versatile/kgdb_fiq.c b/arch/arm/mach-versatile/kgdb_fiq.c
-new file mode 100644
-index 0000000..3cdf71d
---- /dev/null
-+++ b/arch/arm/mach-versatile/kgdb_fiq.c
-@@ -0,0 +1,31 @@
-+/*
-+ * KGDB FIQ board support
-+ *
-+ * Copyright 2012 Linaro Ltd.
-+ *		  Anton Vorontsov <anton.vorontsov@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published
-+ * by the Free Software Foundation.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/kgdb.h>
-+#include <mach/hardware.h>
-+#include <mach/platform.h>
-+#include <asm/hardware/vic.h>
-+
-+static int kgdb_fiq;
-+module_param_named(uart_num, kgdb_fiq, int, 0600);
-+MODULE_PARM_DESC(uart_num, "UART<number> port to use for KGDB FIQ");
-+
-+static int __init kgdb_fiq_init(void)
-+{
-+	WARN_ON(kgdb_fiq > INT_UARTINT2 - INT_UARTINT0);
-+
-+	return kgdb_register_fiq(INT_UARTINT0 + kgdb_fiq,
-+				 vic_fiq_select,
-+				 vic_is_fiq_rised);
-+}
-+console_initcall(kgdb_fiq_init);
--- 
-1.7.10.4
+with the top-most commit 97ef952a20853fad72087a53fa556fbec45edd8f
+
+  ARM: dma-mapping: add support for DMA_ATTR_SKIP_CPU_SYNC attribute
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git for-linus-for-3.6-rc1
+
+Those patches are continuation of my earlier works merged in commits
+58bca4a8fa90 and d484864dd96e1. They contains extensions to DMA-mapping
+framework to remove limitation of the current ARM implementation (like
+limited total size of DMA coherent/write combine buffers), improve
+performance of buffer sharing between devices (attributes to skip cpu
+cache operations or creation of additional kernel mapping for some
+specific use cases) as well as some unification of the common code for
+dma_mmap_attrs()/dma_mmap_coherent() functions. All extensions have been
+implemented and tested for ARM architecture.
+
+Thanks!
+
+Best regards
+Marek Szyprowski
+Samsung Poland R&D Center
+
+
+Patch summary:
+
+Marek Szyprowski (11):
+      mm: vmalloc: use const void * for caller argument
+      ARM: dma-mapping: remove custom consistent dma region
+      ARM: dma-mapping: add more sanity checks in arm_dma_mmap()
+      ARM: dma-mapping: fix error path for memory allocation failure
+      common: dma-mapping: add support for generic dma_mmap_* calls
+      common: DMA-mapping: add DMA_ATTR_NO_KERNEL_MAPPING attribute
+      ARM: dma-mapping: add support for DMA_ATTR_NO_KERNEL_MAPPING attribute
+      common: dma-mapping: introduce dma_get_sgtable() function
+      ARM: dma-mapping: add support for dma_get_sgtable()
+      common: DMA-mapping: add DMA_ATTR_SKIP_CPU_SYNC attribute
+      ARM: dma-mapping: add support for DMA_ATTR_SKIP_CPU_SYNC attribute
+
+Tomasz Stanislawski (1):
+      scatterlist: add sg_alloc_table_from_pages function
+
+ Documentation/DMA-attributes.txt         |   42 +++
+ Documentation/kernel-parameters.txt      |    2 +-
+ arch/arm/common/dmabounce.c              |    1 +
+ arch/arm/include/asm/dma-mapping.h       |   24 +-
+ arch/arm/mm/dma-mapping.c                |  561 ++++++++++++------------------
+ arch/arm/mm/mm.h                         |    3 +
+ arch/powerpc/include/asm/dma-mapping.h   |    8 +-
+ arch/powerpc/kernel/dma-iommu.c          |    1 +
+ arch/powerpc/kernel/dma-swiotlb.c        |    1 +
+ arch/powerpc/kernel/dma.c                |   36 +-
+ arch/powerpc/kernel/vio.c                |    1 +
+ drivers/base/dma-mapping.c               |   49 +++
+ include/asm-generic/dma-coherent.h       |    1 +
+ include/asm-generic/dma-mapping-common.h |   55 +++
+ include/linux/dma-attrs.h                |    2 +
+ include/linux/dma-mapping.h              |    3 +
+ include/linux/scatterlist.h              |    4 +
+ include/linux/vmalloc.h                  |    9 +-
+ lib/scatterlist.c                        |   64 ++++
+ mm/vmalloc.c                             |   28 +-
+ 20 files changed, 505 insertions(+), 390 deletions(-)
