@@ -1,39 +1,43 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 30 Jul 2012 10:34:04 +0200
-Subject: [PATCH v2 4/7] ARM: pxa: add devicetree code for irq handling
-In-Reply-To: <201207300831.32988.arnd@arndb.de>
-References: <1343330187-20049-1-git-send-email-zonque@gmail.com>
- <201207291409.56645.arnd@arndb.de> <50159FBC.2010409@gmail.com>
- <201207300831.32988.arnd@arndb.de>
-Message-ID: <501646FC.60900@gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 30 Jul 2012 11:36:11 +0300
+Subject: [PATCHv4 6/8] ARM: OMAP: pm-debug: enhanced usecount debug support
+In-Reply-To: <87y5m5htcu.fsf@ti.com>
+References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
+ <1342189185-5306-7-git-send-email-t-kristo@ti.com>  <87y5m5htcu.fsf@ti.com>
+Message-ID: <1343637371.9847.11.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.07.2012 10:31, Arnd Bergmann wrote:
-> On Sunday 29 July 2012, Daniel Mack wrote:
->> Hmm, PXA25x (which does not feature IRQ priorities) shares a fair amount
->> of peripherals with other PXA series (which do have support for that). I
->> would much like to reflect that fact by inherhiting device nodes from
->> one dtsi to the other. Hence, if at all, we would need to have two cells
->> always, and just ignore the second argument on PXA25x.
+On Fri, 2012-07-27 at 12:55 -0700, Kevin Hilman wrote:
+> Tero Kristo <t-kristo@ti.com> writes:
 > 
-> But that can only work if the interrupt numbers are identical between PXA25x
-> and the other SoCs. Are they?
-
-Yes.
-
->> And I also wonder whether using the second spec value for a priority
->> wouldn't be somehow abusive? Isn't that considered to denote the trigger
->> flags in contexts of interrupt controllers? At least, that is what
->> irq_domain_xlate_twocell() assumes.
+> > Voltdm, pwrdm, clkdm, hwmod and clk usecounts are now separeted to
+> > their own file, 'usecount'. This file shows the usecounts for every
+> > active domain and their children recursively. 'count' file now only
+> > shows power state counts for powerdomains.
+> >
+> > This patch also provices a way to do printk dumps from kernel code,
+> > by calling the pm_dbg_dump_X functions. The plan is to call these
+> > functions once an error condition is detected, e.g. failed suspend.
+> >
+> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Kevin Hilman <khilman@ti.com>
 > 
-> You would not use irq_domain_xlate_twocell in that scenario but provide your
-> own, which is ok. Interpreting the second cell as the trigger flags is just
-> a convenient default because it's the most common use for that.
+> I think we should separate out the debug stuff as a separate patch set.
+> 
+> Where I want to go with PM debug is away from in-kernel debug prints and
+> towards using tracepoints.  We have tracepoints in the clock code that
+> correspond to usecounts, but we need them in the clkdm, pwrdm and voltdm
+> code as well.  With that, you can use userspace tools (perf, ftrace) to
+> trace a problem (e.g. failed suspend) and see voltdm/pwrdm/clkdm/clks
+> are on when they shouldn't be.
 
-I see. Don't know how much sense it makes to have that detail
-configurable though. Haojian? And I think we can still change that
-detail later.
+Yes, I can split out the debug stuff from this set for next rev. I'll
+also take a look at the tracepoints if they can be used reasonably for
+this purpose. We can add tracepoints for failed suspend for each
+powerdomain, but are tracepoints a good way to do this kind of recursive
+dumps (well, we could maybe register a trace event recursively from
+clkdm + clk code if a powerdomain fails to transition.)
 
-
-Daniel
+-Tero
