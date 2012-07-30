@@ -1,37 +1,31 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 30 Jul 2012 16:02:53 +0100
-Subject: [PATCH 13/18] ARM: ux500: Add ux500 PCM to DB8500 Device Tree
-In-Reply-To: <501699B2.7030002@linaro.org>
+Date: Mon, 30 Jul 2012 16:07:54 +0100
+Subject: [PATCH 01/18] Documentation: Describe the ux500 realated audio
+ related DT nodes
+In-Reply-To: <50169AE8.4020601@linaro.org>
 References: <1343393162-11938-1-git-send-email-lee.jones@linaro.org>
- <1343393162-11938-14-git-send-email-lee.jones@linaro.org>
- <20120729205001.GK4384@opensource.wolfsonmicro.com>
- <5016389B.4020003@linaro.org>
- <20120730134054.GC4468@opensource.wolfsonmicro.com>
- <501699B2.7030002@linaro.org>
-Message-ID: <20120730150252.GG4468@opensource.wolfsonmicro.com>
+ <1343393162-11938-2-git-send-email-lee.jones@linaro.org>
+ <20120729203106.GD4384@opensource.wolfsonmicro.com>
+ <50163A09.8060203@linaro.org>
+ <20120730134804.GE4468@opensource.wolfsonmicro.com>
+ <50169AE8.4020601@linaro.org>
+Message-ID: <20120730150753.GH4468@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 03:26:58PM +0100, Lee Jones wrote:
-> On 30/07/12 14:40, Mark Brown wrote:
+On Mon, Jul 30, 2012 at 03:32:08PM +0100, Lee Jones wrote:
+> On 30/07/12 14:48, Mark Brown wrote:
 
-> >>We use it register the driver for probe()ing. In the same way we do
-> >>for the PMU and Regulators. All three of which actually belong to a
-> >>different hardware block. Do you know of a better way to register
-> >>those devices?
+> >Which is part of the problem here, it makes it much harder to tell what
+> >you need to do for the individual devices.
 
-> >You've not identified which of the two cases above we're in...  assuming
-> >it's a virtal device look at how the DT bindings for the other platforms
-> >are doing things.
+> Once again, I'll split them out, but I think there are people
+> talking about documentation consolidation, as it's going to become
+> very messy, very quickly if we keep adding new files for each
+> device. Soon the Documentation directory will be as large as the
+> driver base. :)
 
-> I thought it would have been obvious by my response. The PMU seems
-> to be a virtual device with no registers or IRQs.
-
-That's not at all obvious, no.
-
-> I've found a DT which seems to do it in the same way as I do
-> 'arch/powerpc/boot/dts/p1022ds.dts', but some others call PCM
-> registration from the CPU-side DAI probe(). Would that be your
-> preference?
-
-Yes, do what the other drivers are doing
+Well, that's device tree for you.  You can probably get away with a
+single document if there's no differences but as soon as you get into
+anything where you've got custom properties and no overlap you need to
+start splitting things out.
