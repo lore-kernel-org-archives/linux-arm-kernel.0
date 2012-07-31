@@ -1,43 +1,53 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 31 Jul 2012 12:29:32 +0200
-Subject: [PATCHv2 0/4] Add support for the OLED in the CFA10036
-Message-ID: <1343730576-20494-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Tue, 31 Jul 2012 12:29:36 +0200
+Subject: [PATCH 4/4] ARM: dts: mxs: add oled support for the cfa-10036
+In-Reply-To: <1343730576-20494-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1343730576-20494-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1343730576-20494-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Brian Lilly <brian@crystalfontz.com>
+---
+ arch/arm/boot/dts/imx28-cfa10036.dts |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-This patchset adds support for the solomon SSD1307 OLED controller present
-in the CFA-10036 board.
-
-It first adds the framebuffer driver for this controller, and then the
-needed bits to enable it in the cfa10036 dts.
-
-Thanks,
-Maxime
-
-Changes from v1:
-  * Did some factorisation of the ssd1307fb_write* functions.
-  * Filled the smem_start field of the fb_fix_screeninfo structure
-  * Fixed the broken pwm declaration
-  * Change the names of oled-reset-gpios and reset-active-low properties in the
-    device tree to oled-reset-gpio and oled-reset-active-low for consistency
-
-Maxime Ripard (4):
-  video: Add support for the Solomon SSD1307 OLED Controller
-  ARM: dts: mxs: Add alternative I2C muxing options for imx28
-  ARM: dts: mxs: Add pwm4 muxing options for imx28
-  ARM: dts: mxs: add oled support for the cfa-10036
-
- .../devicetree/bindings/video/ssd1307fb.txt        |   24 ++
- arch/arm/boot/dts/imx28-cfa10036.dts               |   20 +
- arch/arm/boot/dts/imx28.dtsi                       |   18 +
- drivers/video/Kconfig                              |   14 +
- drivers/video/Makefile                             |    1 +
- drivers/video/ssd1307fb.c                          |  418 ++++++++++++++++++++
- 6 files changed, 495 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/video/ssd1307fb.txt
- create mode 100644 drivers/video/ssd1307fb.c
-
+diff --git a/arch/arm/boot/dts/imx28-cfa10036.dts b/arch/arm/boot/dts/imx28-cfa10036.dts
+index c03a577..92784a9 100644
+--- a/arch/arm/boot/dts/imx28-cfa10036.dts
++++ b/arch/arm/boot/dts/imx28-cfa10036.dts
+@@ -33,11 +33,31 @@
+ 		};
+ 
+ 		apbx at 80040000 {
++			pwm: pwm at 80064000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pwm4_pins_a>;
++				status = "okay";
++			};
++
+ 			duart: serial at 80074000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&duart_pins_b>;
+ 				status = "okay";
+ 			};
++
++			i2c0: i2c at 80058000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&i2c0_pins_b>;
++				status = "okay";
++
++				ssd1307: oled at 3c {
++					compatible = "solomon,ssd1307fb-i2c";
++					reg = <0x3c>;
++					pwms = <&pwm 4 3000>;
++					oled-reset-gpio = <&gpio2 7 1>;
++					oled-reset-active-low;
++				};
++			};
+ 		};
+ 	};
+ 
 -- 
 1.7.9.5
