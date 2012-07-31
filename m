@@ -1,71 +1,30 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Tue, 31 Jul 2012 17:12:39 +0200
-Subject: [PATCH 3/6] mv643xx.c: Add basic device tree support.
-In-Reply-To: <5016B727.2030909@codethink.co.uk>
-References: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
- <CANTYSESY0A7LaKpqUOjyR42e72Rw_6yn9fvarVFUWWJxw43Jcw@mail.gmail.com>
- <5016B727.2030909@codethink.co.uk>
-Message-ID: <1465148.S7eyX1x8k7@flexo>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 31 Jul 2012 16:15:59 +0100
+Subject: [PATCH 1/5] ASoC: dapm: If one widget fails, do not force all
+ subsequent widgets to fail too
+In-Reply-To: <5017F514.4030106@linaro.org>
+References: <1343745944-18418-1-git-send-email-lee.jones@linaro.org>
+ <1343745944-18418-2-git-send-email-lee.jones@linaro.org>
+ <20120731145614.GZ4468@opensource.wolfsonmicro.com>
+ <5017F514.4030106@linaro.org>
+Message-ID: <20120731151559.GB4468@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ian,
+On Tue, Jul 31, 2012 at 04:09:08PM +0100, Lee Jones wrote:
+> On 31/07/12 15:56, Mark Brown wrote:
 
-On Monday 30 July 2012 17:32:39 Ian Molton wrote:
-> On 30/07/12 17:19, Amar Nath wrote:
-> > Hi Ian,
-> >
-> > On Mon, Jul 30, 2012 at 8:45 PM, Ian Molton 
-<ian.molton@codethink.co.uk>wrote:
-> >
-> >> -       pd = pdev->dev.platform_data;
-> >> +       if (pdev->dev.of_node) {
-> >> +               struct device_node *np = NULL;
-> >> +
-> >> +               /* when all users of this driver use FDT, we can remove
-> >> this */
-> >> +               pd = kzalloc(sizeof(*pd), GFP_ATOMIC);
+> >To reiterate, this is in *no* way urgent or even a bug fix.
 
-Do you really need an allocation in atomic context here? Is not GFP_KERNEL 
-sufficient?
+> It fixes sound in our driver.
 
-There was a second place like this where you used an atomic allocation that 
-needs fixing.
+> Without this the card failes to instantiate.
 
-> >> +               if (!pd) {
-> >> +                       dev_dbg(&pdev->dev, "Could not allocate platform
-> >> data\n");
-> >> +                       return -ENOMEM;
-> >> +               }
-> >> +
-> >> +               of_property_read_u32(pdev->dev.of_node,
-> >> +                       "port_number", &pd->port_number);
-> >> +               of_property_read_u32(pdev->dev.of_node,
-> >> +                       "phy_addr", &pd->phy_addr);
-> >> +               np = of_parse_phandle(pdev->dev.of_node, "mdio", 0);
-> >> +               if (np) {
-> >> +                       pd->shared = of_find_device_by_node(np);
-> >> +               } else {
-> >> +                       kfree(pd);
-> >> +                       return -ENODEV;
-> >> +               }
-> >> +       } else {
-> >> +               pd = pdev->dev.platform_data;
-> >> +       }
-> >> +
-> >>         if (pd == NULL) {
-> >>                 dev_err(&pdev->dev, "no mv643xx_eth_platform_data\n");
-> >>                 return -ENODEV;
-> >>
-> > Can this check for pd be moved in the else part above as well, as for the
-> > pd allocation with kzalloc,
-> > we have already made a check for memory allocation failure?
-> 
-> Yes, Folded in for v2.
-> 
-> -Ian
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+You're kidding, right?  Fix the actual error.
+
+> Isn't the return code incorrect? There are a multitude of reasons
+> why snd_soc_dapm_new_control() would fail. No-memory is just one of
+> them, so why do we force this probable lie?
+
+I don't think anyone actually cares what the error code is, feel free to
+pick another random number.
