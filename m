@@ -1,20 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 31 Jul 2012 15:45:39 +0100
-Subject: [PATCH 0/6] Bugfixes and clean-ups bound for the v3.6 RCs
-Message-ID: <1343745944-18418-1-git-send-email-lee.jones@linaro.org>
+Date: Tue, 31 Jul 2012 15:45:43 +0100
+Subject: [PATCH 4/5] ARM: ux500: Fix merge error,
+ so such struct 'snd_soc_u8500'
+In-Reply-To: <1343745944-18418-1-git-send-email-lee.jones@linaro.org>
+References: <1343745944-18418-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343745944-18418-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-set includes some important changes which should make
-their way to the Mainline Release Candidates for the v3.6 release.
-Without them Audio doesn't even probe (at all) when booting with
-Device Tree selected. The kernel can't compile with ux500 audio
-enabled. Even if we can get that far SoC Core will assume we're
-using regmaps and attempt to use them; however, none exist for
-this driver, so the kernel will oops.
+The platform attempts to register platform device 'snd_soc_u8500'
+which doesn't actually exist. Here we change the reference to the
+correct one 'snd_soc_mop500'.
 
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
  arch/arm/mach-ux500/board-mop500-msp.c |    2 +-
- arch/arm/mach-ux500/board-mop500.c     |    9 ++++-----
- sound/soc/codecs/ab8500-codec.c        |    4 ++++
- sound/soc/soc-dapm.c                   |    2 --
- 4 files changed, 9 insertions(+), 8 deletions(-)
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-ux500/board-mop500-msp.c b/arch/arm/mach-ux500/board-mop500-msp.c
+index 9960480..1b6a193 100644
+--- a/arch/arm/mach-ux500/board-mop500-msp.c
++++ b/arch/arm/mach-ux500/board-mop500-msp.c
+@@ -228,7 +228,7 @@ int mop500_msp_init(struct device *parent)
+ 	struct platform_device *msp1;
+ 
+ 	pr_info("%s: Register platform-device 'snd-soc-u8500'.\n", __func__);
+-	platform_device_register(&snd_soc_u8500);
++	platform_device_register(&snd_soc_mop500);
+ 
+ 	pr_info("Initialize MSP I2S-devices.\n");
+ 	db8500_add_msp_i2s(parent, 0, U8500_MSP0_BASE, IRQ_DB8500_MSP0,
+-- 
+1.7.9.5
