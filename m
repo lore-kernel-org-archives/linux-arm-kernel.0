@@ -1,34 +1,70 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 31 Jul 2012 14:39:04 +0100
-Subject: [PATCH 10/19] ARM: ux500: Stop registering the MOP500 Audio driver
- from platform code
+Date: Tue, 31 Jul 2012 14:39:12 +0100
+Subject: [PATCH 18/19] Documentation: Define the MSP Driver Device Tree
+ bindings
 In-Reply-To: <1343741953-17828-1-git-send-email-lee.jones@linaro.org>
 References: <1343741953-17828-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343741953-17828-11-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343741953-17828-19-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In this patch we prevent MOP500 driver registration from platform
-code and rely solely on Device Tree to do the probing for us.
+Here we add the required documentation for the new Device Tree
+bindings pertaining to the MSP CPU-side DAI Driver.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500-msp.c |    3 ---
- 1 file changed, 3 deletions(-)
+ .../devicetree/bindings/sound/ux500-msp.txt        |   43 ++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/ux500-msp.txt
 
-diff --git a/arch/arm/mach-ux500/board-mop500-msp.c b/arch/arm/mach-ux500/board-mop500-msp.c
-index 3328c3a..71d62ed 100644
---- a/arch/arm/mach-ux500/board-mop500-msp.c
-+++ b/arch/arm/mach-ux500/board-mop500-msp.c
-@@ -175,9 +175,6 @@ struct msp_i2s_platform_data msp3_platform_data = {
- /* Due for removal once the MSP driver has been fully DT:ed. */
- void mop500_of_msp_init(struct device *parent)
- {
--	pr_info("%s: Register platform-device 'snd-soc-u8500'.\n", __func__);
--	platform_device_register(&snd_soc_mop500);
--
- 	pr_info("Initialize MSP I2S-devices.\n");
- 	db8500_add_msp_i2s(parent, 0, U8500_MSP0_BASE, IRQ_DB8500_MSP0,
- 			   &msp0_platform_data);
+diff --git a/Documentation/devicetree/bindings/sound/ux500-msp.txt b/Documentation/devicetree/bindings/sound/ux500-msp.txt
+new file mode 100644
+index 0000000..5b883cc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/ux500-msp.txt
+@@ -0,0 +1,43 @@
++* ux500 MSP (CPU-side Digital Audio Interface)
++
++Required properties:
++ - compatible       :"stericsson,ux500-msp-i2s"
++ - reg              : Physical base address and length of the device's registers.
++
++Optional properties:
++ - interrupts       : The interrupt outputs from the device.
++ - interrupt-parent : The parent interrupt controller.
++ - <name>-supply    : Phandle to the regulator <name> supply
++
++Example:
++
++	sound {
++		compatible = "stericsson,snd-soc-mop500";
++
++		stericsson,platform-pcm-dma = <&pcm>;
++		stericsson,cpu-dai = <&msp1 &msp3>;
++		stericsson,audio-codec = <&codec>;
++	};
++
++	pcm: ux500-pcm {
++		compatible = "stericsson,ux500-pcm";
++	};
++
++	msp1: msp at 80124000 {
++		compatible = "stericsson,ux500-msp-i2s";
++		reg = <0x80124000 0x1000>;
++		interrupts = <0 62 0x4>;
++		v-ape-supply = <&db8500_vape_reg>;
++	};
++
++	msp3: msp at 80125000 {
++		compatible = "stericsson,ux500-msp-i2s";
++		reg = <0x80125000 0x1000>;
++		interrupts = <0 62 0x4>;
++		v-ape-supply = <&db8500_vape_reg>;
++	};
++
++	codec: ab8500-codec {
++		compatible = "stericsson,ab8500-codec";
++		stericsson,earpeice-cmv = <950>; /* Units in mV. */
++	};
 -- 
 1.7.9.5
