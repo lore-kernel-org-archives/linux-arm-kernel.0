@@ -1,191 +1,224 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 31 Jul 2012 23:05:34 -0000
-Subject: [RFC 21/22] ARM: keystone: enable SMP on Keystone machines
+Date: Tue, 31 Jul 2012 23:05:50 -0000
+Subject: [RFC 22/22] ARM: keystone: add switch over to high physical address
+ range
 In-Reply-To: <1343775898-28345-1-git-send-email-cyril@ti.com>
 References: <1343775898-28345-1-git-send-email-cyril@ti.com>
-Message-ID: <1343775898-28345-22-git-send-email-cyril@ti.com>
+Message-ID: <1343775898-28345-23-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic SMP support for Keystone machines.  Nothing very fancy
-here, just enough to get 4 CPUs booted up.  This does not include support for
-hotplug, etc.
+Keystone platforms have their physical memory mapped at an address outside the
+32-bit physical range.  A Keystone machine with 16G of RAM would find its
+memory at 0x0800000000 - 0x0bffffffff.
+
+For boot purposes, the interconnect supports a limited alias of some of this
+memory within the 32-bit addressable space (0x80000000 - 0xffffffff).  This
+aliasing is implemented in hardware, and is not intended to be used much
+beyond boot.  For instance, DMA coherence does not work when running out of
+this aliased address space.
+
+Therefore, we've taken the approach of booting out of the low physical address
+range, and subsequently we switch over to the high range once we're safely
+inside machine specific territory.  This patch implements this switch over
+mechanism, which involves rewiring the TTBRs and page tables to point to the
+new physical address space.
 
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 ---
- arch/arm/Kconfig                    |    1 +
- arch/arm/configs/keystone_defconfig |    2 +
- arch/arm/mach-keystone/Makefile     |    1 +
- arch/arm/mach-keystone/keystone.c   |    3 ++
- arch/arm/mach-keystone/keystone.h   |   23 +++++++++++
- arch/arm/mach-keystone/platsmp.c    |   74 +++++++++++++++++++++++++++++++++++
- 6 files changed, 104 insertions(+)
- create mode 100644 arch/arm/mach-keystone/keystone.h
- create mode 100644 arch/arm/mach-keystone/platsmp.c
+ arch/arm/Kconfig                             |    1 +
+ arch/arm/boot/dts/keystone-sim.dts           |    8 +++---
+ arch/arm/configs/keystone_defconfig          |    1 +
+ arch/arm/mach-keystone/include/mach/memory.h |   25 +++++++++++++++++
+ arch/arm/mach-keystone/keystone.c            |   37 ++++++++++++++++++++++++++
+ arch/arm/mach-keystone/platsmp.c             |   18 +++++++++++--
+ 6 files changed, 84 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e0588e3..7a76924 100644
+index 7a76924..33a17c7 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -372,6 +372,7 @@ config ARCH_KEYSTONE
- 	select SPARSE_IRQ
+@@ -373,6 +373,7 @@ config ARCH_KEYSTONE
  	select NEED_MACH_MEMORY_H
  	select HAVE_SCHED_CLOCK
-+	select HAVE_SMP
+ 	select HAVE_SMP
++	select ZONE_DMA if ARM_LPAE
  	help
  	  Support for boards based on the Texas Instruments Keystone family of
  	  SoCs.
+diff --git a/arch/arm/boot/dts/keystone-sim.dts b/arch/arm/boot/dts/keystone-sim.dts
+index 118d631..5912fa1 100644
+--- a/arch/arm/boot/dts/keystone-sim.dts
++++ b/arch/arm/boot/dts/keystone-sim.dts
+@@ -4,8 +4,8 @@
+ / {
+ 	model = "Texas Instruments Keystone 2 SoC";
+ 	compatible = "ti,keystone-evm";
+-	#address-cells = <1>;
+-	#size-cells = <1>;
++	#address-cells = <2>;
++	#size-cells = <2>;
+ 	interrupt-parent = <&gic>;
+ 
+ 	aliases {
+@@ -13,11 +13,11 @@
+ 	};
+ 
+ 	chosen {
+-		bootargs = "console=ttyS0,115200n8 debug earlyprintk lpj=50000 rdinit=/bin/ash rw root=/dev/ram0 initrd=0x85000000,9M";
++		bootargs = "console=ttyS0,115200n8 debug earlyprintk lpj=50000 rdinit=/bin/ash rw root=/dev/ram0 initrd=0x805000000,9M";
+ 	};
+ 
+ 	memory {
+-		reg = <0x80000000 0x8000000>;
++		reg = <0x00000008 0x00000000 0x00000000 0x8000000>;
+ 	};
+ 
+ 	cpus {
 diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
-index 7f2a04b..5f71e66 100644
+index 5f71e66..8ea3b96 100644
 --- a/arch/arm/configs/keystone_defconfig
 +++ b/arch/arm/configs/keystone_defconfig
-@@ -1,7 +1,9 @@
+@@ -1,6 +1,7 @@
  CONFIG_EXPERIMENTAL=y
  CONFIG_BLK_DEV_INITRD=y
  CONFIG_ARCH_KEYSTONE=y
-+CONFIG_SMP=y
++CONFIG_ARM_LPAE=y
+ CONFIG_SMP=y
  CONFIG_ARM_ARCH_TIMER=y
-+CONFIG_NR_CPUS=4
- CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
- CONFIG_VFP=y
-diff --git a/arch/arm/mach-keystone/Makefile b/arch/arm/mach-keystone/Makefile
-index d4671d5..3f6b8ab 100644
---- a/arch/arm/mach-keystone/Makefile
-+++ b/arch/arm/mach-keystone/Makefile
-@@ -1 +1,2 @@
- obj-y					:= keystone.o
-+obj-$(CONFIG_SMP)			+= platsmp.o
+ CONFIG_NR_CPUS=4
+diff --git a/arch/arm/mach-keystone/include/mach/memory.h b/arch/arm/mach-keystone/include/mach/memory.h
+index 7c78b1e..a5f7a1a 100644
+--- a/arch/arm/mach-keystone/include/mach/memory.h
++++ b/arch/arm/mach-keystone/include/mach/memory.h
+@@ -19,4 +19,29 @@
+ #define MAX_PHYSMEM_BITS	36
+ #define SECTION_SIZE_BITS	34
+ 
++#define KEYSTONE_LOW_PHYS_START		0x80000000ULL
++#define KEYSTONE_LOW_PHYS_SIZE		0x80000000ULL /* 2G */
++#define KEYSTONE_LOW_PHYS_END		(KEYSTONE_LOW_PHYS_START + \
++					 KEYSTONE_LOW_PHYS_SIZE - 1)
++
++#define KEYSTONE_HIGH_PHYS_START	0x800000000ULL
++#define KEYSTONE_HIGH_PHYS_SIZE		0x400000000ULL	/* 16G */
++#define KEYSTONE_HIGH_PHYS_END		(KEYSTONE_HIGH_PHYS_START + \
++					 KEYSTONE_HIGH_PHYS_SIZE - 1)
++#ifdef CONFIG_ARM_LPAE
++
++#ifndef __ASSEMBLY__
++
++static inline phys_addr_t __virt_to_idmap(unsigned long x)
++{
++	return (phys_addr_t)(x) - CONFIG_PAGE_OFFSET +
++		KEYSTONE_LOW_PHYS_START;
++}
++
++#define virt_to_idmap(x)	__virt_to_idmap((unsigned long)(x))
++
++#endif /* __ASSEMBLY__ */
++
++#endif /* CONFIG_ARM_LPAE */
++
+ #endif /* __ASM_MACH_MEMORY_H */
 diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
-index 4bc60ec..a4eed57 100644
+index a4eed57..e8aee85 100644
 --- a/arch/arm/mach-keystone/keystone.c
 +++ b/arch/arm/mach-keystone/keystone.c
-@@ -26,6 +26,8 @@
- #include <asm/arch_timer.h>
- #include <asm/hardware/gic.h>
- 
-+#include "keystone.h"
-+
- static struct map_desc io_desc[] = {
- 	{
- 		.virtual        = 0xfe800000UL,
-@@ -73,6 +75,7 @@ static const char *keystone_match[] __initconst = {
+@@ -74,6 +74,39 @@ static const char *keystone_match[] __initconst = {
+ 	NULL,
  };
  
- DT_MACHINE_START(KEYSTONE, "Keystone")
-+	smp_ops(keystone_smp_ops)
- 	.map_io		= keystone_map_io,
- 	.init_irq	= keystone_init_irq,
- 	.timer		= &keystone_timer,
-diff --git a/arch/arm/mach-keystone/keystone.h b/arch/arm/mach-keystone/keystone.h
-new file mode 100644
-index 0000000..71bd0f4
---- /dev/null
-+++ b/arch/arm/mach-keystone/keystone.h
-@@ -0,0 +1,23 @@
-+/*
-+ * Copyright 2010-2012 Texas Instruments, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef __KEYSTONE_H__
-+#define __KEYSTONE_H__
-+
-+extern struct smp_ops keystone_smp_ops;
-+extern void secondary_startup(void);
-+
-+#endif /* __KEYSTONE_H__ */
-diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
-new file mode 100644
-index 0000000..dbe7601
---- /dev/null
-+++ b/arch/arm/mach-keystone/platsmp.c
-@@ -0,0 +1,74 @@
-+/*
-+ * Copyright 2012 Texas Instruments, Inc.
-+ *
-+ * Based on platsmp.c, Copyright 2010-2011 Calxeda, Inc.
-+ * Based on platsmp.c, Copyright (C) 2002 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#include <linux/init.h>
-+#include <linux/smp.h>
-+#include <linux/io.h>
-+
-+#include <asm/smp_plat.h>
-+#include <asm/smp_ops.h>
-+#include <asm/hardware/gic.h>
-+#include <asm/cacheflush.h>
-+#include <asm/memory.h>
-+
-+#include "keystone.h"
-+
-+static void __init keystone_smp_init_cpus(void)
++static void __init keystone_init_meminfo(void)
 +{
-+	unsigned int i, ncores;
++	bool lpae = IS_ENABLED(CONFIG_ARM_LPAE);
++	bool pvpatch = IS_ENABLED(CONFIG_ARM_PATCH_PHYS_VIRT);
++	phys_addr_t mem_start, mem_end;
 +
-+	ncores = 4;
++	BUG_ON(meminfo.nr_banks < 1);
 +
-+	/* sanity check */
-+	if (ncores > NR_CPUS) {
-+		pr_warn("restricted to %d cpus\n", NR_CPUS);
-+		ncores = NR_CPUS;
++	mem_start = meminfo.bank[0].start;
++	mem_end   = mem_start + meminfo.bank[0].size - 1;
++
++	/* nothing to do if we are running out of the <32-bit space */
++	if (mem_start >= KEYSTONE_LOW_PHYS_START &&
++	    mem_end   <= KEYSTONE_LOW_PHYS_END)
++		return;
++
++	if (!lpae || !pvpatch) {
++		panic("Enable %s%s%s to run outside 32-bit space\n",
++		      !lpae ? __stringify(CONFIG_ARM_LPAE) : "",
++		      (!lpae && !pvpatch) ? " and " : "",
++		      !pvpatch ? __stringify(CONFIG_ARM_PATCH_PHYS_VIRT) : "");
 +	}
 +
-+	for (i = 0; i < ncores; i++)
-+		set_cpu_possible(i, true);
++	if (mem_start < KEYSTONE_HIGH_PHYS_START ||
++	    mem_end   > KEYSTONE_HIGH_PHYS_END) {
++		panic("Invalid address space for memory (%08llx-%08llx)\n",
++		      (u64)KEYSTONE_HIGH_PHYS_START,
++		      (u64)KEYSTONE_HIGH_PHYS_END);
++	}
 +
-+	set_smp_cross_call(gic_raise_softirq);
++	set_phys_offset(KEYSTONE_HIGH_PHYS_START);
 +}
 +
-+static void __init keystone_smp_prepare_cpus(unsigned int max_cpus)
+ DT_MACHINE_START(KEYSTONE, "Keystone")
+ 	smp_ops(keystone_smp_ops)
+ 	.map_io		= keystone_map_io,
+@@ -82,4 +115,8 @@ DT_MACHINE_START(KEYSTONE, "Keystone")
+ 	.handle_irq	= gic_handle_irq,
+ 	.init_machine	= keystone_init,
+ 	.dt_compat	= keystone_match,
++	.init_meminfo	= keystone_init_meminfo,
++#ifdef CONFIG_ZONE_DMA
++	.dma_zone_size	= SZ_2G,
++#endif
+ MACHINE_END
+diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
+index dbe7601..b7f0724 100644
+--- a/arch/arm/mach-keystone/platsmp.c
++++ b/arch/arm/mach-keystone/platsmp.c
+@@ -24,6 +24,7 @@
+ #include <asm/smp_ops.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/cacheflush.h>
++#include <asm/tlbflush.h>
+ #include <asm/memory.h>
+ 
+ #include "keystone.h"
+@@ -51,17 +52,30 @@ static void __init keystone_smp_prepare_cpus(unsigned int max_cpus)
+ 	/* nothing for now */
+ }
+ 
++static void __cpuinit keystone_secondary_initmem(void)
 +{
-+	/* nothing for now */
++#ifdef CONFIG_ARM_LPAE
++	pgd_t *pgd0 = pgd_offset_k(0);
++	cpu_set_ttbr(1, __pa(pgd0) + TTBR1_OFFSET);
++	local_flush_tlb_all();
++#endif
 +}
 +
-+static void __cpuinit keystone_secondary_init(unsigned int cpu)
-+{
-+	gic_secondary_init(0);
-+}
+ static void __cpuinit keystone_secondary_init(unsigned int cpu)
+ {
+ 	gic_secondary_init(0);
++	keystone_secondary_initmem();
+ }
+ 
+ static int __cpuinit
+ keystone_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	unsigned long *ptr;
+-	
+-	ptr = phys_to_virt(0x800001f0);
 +
-+static int __cpuinit
-+keystone_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	unsigned long *ptr;
-+	
-+	ptr = phys_to_virt(0x800001f0);
-+	ptr[cpu] = virt_to_idmap(&secondary_startup);
-+	__cpuc_flush_dcache_area(ptr, sizeof(ptr) * 4);
++	ptr = IS_ENABLED(CONFIG_ARM_LPAE) ?
++		phys_to_virt(KEYSTONE_HIGH_PHYS_START + 0x1f0) :
++		phys_to_virt(KEYSTONE_LOW_PHYS_START + 0x1f0);
 +
-+	return 0;
-+}
-+
-+struct smp_ops keystone_smp_ops __initdata = {
-+	smp_init_ops(keystone)
-+	smp_secondary_ops(keystone)
-+};
+ 	ptr[cpu] = virt_to_idmap(&secondary_startup);
+ 	__cpuc_flush_dcache_area(ptr, sizeof(ptr) * 4);
+ 
 -- 
 1.7.9.5
