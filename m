@@ -1,56 +1,39 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Tue, 31 Jul 2012 13:12:47 -0500
-Subject: [PATCH] ARM: OMAP3xxx: clockdomain: fix software supervised
- wakeup/sleep
-In-Reply-To: <50176FEF.6060600@ti.com>
-References: <alpine.DEB.2.00.1207261503290.14468@utopia.booyaka.com>
- <50122A75.2030108@ti.com> <501761E8.3030307@ti.com> <50176FEF.6060600@ti.com>
-Message-ID: <5018201F.7020206@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 31 Jul 2012 11:27:36 +0000
+Subject: [PATCH 1/6] Initial csb1724 board support (FDT)
+In-Reply-To: <5016B619.7030602@codethink.co.uk>
+References: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
+ <20120730152829.GJ18016@lunn.ch> <5016B619.7030602@codethink.co.uk>
+Message-ID: <201207311127.37094.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
-
-On 07/31/2012 12:41 AM, Rajendra Nayak wrote:
-> Hi Jon,
+On Monday 30 July 2012, Ian Molton wrote:
+> On 30/07/12 16:28, Andrew Lunn wrote:
+> > Hi Ian
+> >
+> >> diff --git a/arch/arm/configs/csb1724_defconfig
+> >> b/arch/arm/configs/csb1724_defconfig new file mode 100644 index
+> >> 0000000..927b269 --- /dev/null +++
+> >> b/arch/arm/configs/csb1724_defconfig @@ -0,0 +1,47 @@
+> >> +CONFIG_ARCH_KIRKWOOD=y +CONFIG_ARCH_KIRKWOOD_DT=y
+> >> +CONFIG_MACH_CSB1724_DT=y
+> > Do you really need this? Its the only kirkwood board with its on
+> > _defconfig file. What makes this board special?
 > 
-> On Tuesday 31 July 2012 10:11 AM, Jon Hunter wrote:
->> Hi Paul, Rajendra,
->>
->> On 07/27/2012 12:43 AM, Rajendra Nayak wrote:
->>> On Friday 27 July 2012 02:34 AM, Paul Walmsley wrote:
->>>>
->>>> Commit 4da71ae6 ("OMAP: clockdomain: Arch specific funcs for
->>>> clkdm_clk_enable/disable") called the OMAP2xxx-specific functions for
->>>> clockdomain wakeup and sleep.  This would probably have broken
->>>> software-supervised clockdomain wakeup and sleep on OMAP3.
->>>
->>> Its strange this went unnoticed for so long. Thanks for this fix and
->>> sorry about introducing the bug in the first place.
->>
->> Any chance that's because of the following code? I needed to
->> remove this to get the EMU clock domain to turn off on OMAP3
->> whilst testing PMU.
+> Nothing. defconfigs are just there to make configuring your kernel easy.
 > 
-> No, this doesn't seem right. We still have clockdomains for omap2/3
-> controlled using clkdm_clk_enable/disable functions called from
-> within clk framework, and not clkdm_hwmod_enable/disable from
-> within hwmod framework.
-> Besides you removing these checks only in clkdm_hwmod_disable (and
-> keeping them in clkdm_hwmod_enable) tells me its just hiding some
-> usecounting issues you were having with clkdm_clk_enable/disable.
+> The kirkwood defconfig doesnt fit the currently supported hardware
+> set on the csb1724 very well. Why build stuff you dont need?
 
-Yes you are right. I was focused in the disable side because the EMU CD
-is staying on.
+The defconfig files serve a number of purposes. One of them is for
+build regression testing, and for that reason we try to enable as
+many boards as possible with a small number of defconfig files.
 
-> Btw, on OMAP2/3 as long as a domain has interface clocks which are
-> explicitly enabled and autoidled, the clkdm usecount never ends up
-> going to 0, which is probably what you are hit with too.
+It's very rare that we have a board specific defconfig file, and
+I would also ask you to just enable the hardware you need in the
+kirkwood defconfig. It should not be hard for you to create
+your own configuration by starting with that and disabling everything
+you don't need.
 
-Yes so after further debugging, this is not a problem and not the cause
-of my problem either.
-
-Sorry for the noise.
-
-Cheers
-Jon
+	Arnd
