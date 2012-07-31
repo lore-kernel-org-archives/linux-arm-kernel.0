@@ -1,79 +1,92 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 31 Jul 2012 19:04:52 -0400
-Subject: [PATCH 16/22] ARM: mm: cleanup checks for membank overlap with
- vmalloc area
+Date: Tue, 31 Jul 2012 19:04:46 -0400
+Subject: [PATCH 10/22] ARM: LPAE: use 64-bit accessors for TTBR registers
 In-Reply-To: <1343775898-28345-1-git-send-email-cyril@ti.com>
 References: <1343775898-28345-1-git-send-email-cyril@ti.com>
-Message-ID: <1343775898-28345-17-git-send-email-cyril@ti.com>
+Message-ID: <1343775898-28345-11-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Keystone platforms, physical memory is entirely outside the 32-bit
-addressible range.  Therefore, the (bank->start > ULONG_MAX) check below marks
-the entire system memory as highmem, and this causes unpleasentness all over.
+This patch adds TTBR accessor macros, and modifies cpu_get_pgd() and
+the LPAE version of cpu_set_reserved_ttbr0() to use these instead.
 
-This patch eliminates the extra bank start check (against ULONG_MAX) by
-checking bank->start against the physical address corresponding to vmalloc_min
-instead.
-
-In the process, this patch also cleans up parts of the highmem sanity check
-code by removing what has now become a redundant check for banks that entirely
-overlap with the vmalloc range.
+In the process, we also fix these functions to correctly handle cases
+where the physical address lies beyond the 4G limit of 32-bit addressing.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 ---
- arch/arm/mm/mmu.c |   19 +------------------
- 1 file changed, 1 insertion(+), 18 deletions(-)
+ arch/arm/include/asm/proc-fns.h |   24 +++++++++++++++++++-----
+ arch/arm/mm/context.c           |   13 ++-----------
+ 2 files changed, 21 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index adaf8c3..4840efa 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -907,15 +907,12 @@ void __init sanity_check_meminfo(void)
- 		struct membank *bank = &meminfo.bank[j];
- 		*bank = meminfo.bank[i];
+diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
+index fa6554e..918b4f9 100644
+--- a/arch/arm/include/asm/proc-fns.h
++++ b/arch/arm/include/asm/proc-fns.h
+@@ -116,13 +116,27 @@ extern void cpu_resume(void);
+ #define cpu_switch_mm(pgd,mm) cpu_do_switch_mm(virt_to_phys(pgd),mm)
  
--		if (bank->start > ULONG_MAX)
--			highmem = 1;
+ #ifdef CONFIG_ARM_LPAE
++
++#define cpu_get_ttbr(nr)					\
++	({							\
++		u64 ttbr;					\
++		__asm__("mrrc	p15, " #nr ", %Q0, %R0, c2"	\
++			: "=r" (ttbr)				\
++			: : "cc");				\
++		ttbr;						\
++	})
++
++#define cpu_set_ttbr(nr, val)					\
++	do {							\
++		u64 ttbr = val;					\
++		__asm__("mcrr	p15, " #nr ", %Q0, %R0, c2"	\
++			: : "r" (ttbr)				\
++			: "cc");				\
++	} while (0)
++
+ #define cpu_get_pgd()	\
+ 	({						\
+-		unsigned long pg, pg2;			\
+-		__asm__("mrrc	p15, 0, %0, %1, c2"	\
+-			: "=r" (pg), "=r" (pg2)		\
+-			:				\
+-			: "cc");			\
++		u64 pg = cpu_get_ttbr(0);		\
+ 		pg &= ~(PTRS_PER_PGD*sizeof(pgd_t)-1);	\
+ 		(pgd_t *)phys_to_virt(pg);		\
+ 	})
+diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
+index 806cc4f..ad70bd8 100644
+--- a/arch/arm/mm/context.c
++++ b/arch/arm/mm/context.c
+@@ -15,6 +15,7 @@
+ 
+ #include <asm/mmu_context.h>
+ #include <asm/tlbflush.h>
++#include <asm/proc-fns.h>
+ 
+ static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
+ unsigned int cpu_last_asid = ASID_FIRST_VERSION;
+@@ -22,17 +23,7 @@ unsigned int cpu_last_asid = ASID_FIRST_VERSION;
+ #ifdef CONFIG_ARM_LPAE
+ void cpu_set_reserved_ttbr0(void)
+ {
+-	unsigned long ttbl = __pa(swapper_pg_dir);
+-	unsigned long ttbh = 0;
 -
--#ifdef CONFIG_HIGHMEM
- 		if (bank->start >= vmalloc_limit)
- 			highmem = 1;
- 
- 		bank->highmem = highmem;
- 
-+#ifdef CONFIG_HIGHMEM
- 		/*
- 		 * Split those memory banks which are partially overlapping
- 		 * the vmalloc area greatly simplifying things later.
-@@ -938,8 +935,6 @@ void __init sanity_check_meminfo(void)
- 			bank->size = vmalloc_limit - bank->start;
- 		}
+-	/*
+-	 * Set TTBR0 to swapper_pg_dir which contains only global entries. The
+-	 * ASID is set to 0.
+-	 */
+-	asm volatile(
+-	"	mcrr	p15, 0, %0, %1, c2		@ set TTBR0\n"
+-	:
+-	: "r" (ttbl), "r" (ttbh));
++	cpu_set_ttbr(0, __pa(swapper_pg_dir));
+ 	isb();
+ }
  #else
--		bank->highmem = highmem;
--
- 		/*
- 		 * Highmem banks not allowed with !CONFIG_HIGHMEM.
- 		 */
-@@ -952,18 +947,6 @@ void __init sanity_check_meminfo(void)
- 		}
- 
- 		/*
--		 * Check whether this memory bank would entirely overlap
--		 * the vmalloc area.
--		 */
--		if (bank->start >= vmalloc_limit) {
--			printk(KERN_NOTICE "Ignoring RAM at %.8llx-%.8llx "
--			       "(vmalloc region overlap).\n",
--			       (unsigned long long)bank->start,
--			       (unsigned long long)bank->start + bank->size - 1);
--			continue;
--		}
--
--		/*
- 		 * Check whether this memory bank would partially overlap
- 		 * the vmalloc area.
- 		 */
 -- 
 1.7.9.5
