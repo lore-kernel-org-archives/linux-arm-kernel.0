@@ -1,131 +1,81 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 31 Jul 2012 17:09:20 +0900
-Subject: [PATCH 1/3] Move FIMD register headers to include/video/
-In-Reply-To: <2073177.5bSgcKjVcU@easynote>
-References: <1343637905-17764-1-git-send-email-l.krishna@samsung.com>
- <CAL1wa8e7Joghf9S=SgbQLJFWcYOrP5uK6qYXsV_N6rX1MVEALg@mail.gmail.com>
- <000a01cd6eb6$2113a050$633ae0f0$%han@samsung.com>
- <2073177.5bSgcKjVcU@easynote>
-Message-ID: <000501cd6ef3$c9e3a4e0$5daaeea0$%han@samsung.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Tue, 31 Jul 2012 10:15:11 +0200
+Subject: [PATCH 2/2] ARM: dts: imx6q: Invert the GPIO controller order
+In-Reply-To: <20120730142443.GL6802@n2100.arm.linux.org.uk>
+References: <1343219864-3040-1-git-send-email-dirk.behme@de.bosch.com>
+ <1343219864-3040-2-git-send-email-dirk.behme@de.bosch.com>
+ <20120728134114.GH2128@S2101-09.ap.freescale.net>
+ <8E7BE7398BB9294F8B826ADE09B18EBE6CC2FF7EE1@SI-MBX20.de.bosch.com>
+ <20120730142443.GL6802@n2100.arm.linux.org.uk>
+Message-ID: <5017940F.4070706@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Tuesday, July 31, 2012 3:37 PM, Tomasz Figa wrote:
+On 30.07.2012 16:24, Russell King - ARM Linux wrote:
+> On Mon, Jul 30, 2012 at 09:28:21AM +0200, Thomae Matthias (CM-AI/PJ-CF31) wrote:
+>> I care about the global number because it is used to access GPIOs
+>> from userspace via the Sysfs interface (see Documentation/gpio.txt).
+>> Without the 2 patches, the GPIOs are mapped this way:
+>>
+>> gpiochip_add: registered GPIOs 224 to 255 on device: 209c000.gpio
+>> gpiochip_add: registered GPIOs 192 to 223 on device: 20a0000.gpio
+>> gpiochip_add: registered GPIOs 160 to 191 on device: 20a4000.gpio
+>> gpiochip_add: registered GPIOs 128 to 159 on device: 20a8000.gpio
+>> gpiochip_add: registered GPIOs 96 to 127 on device: 20ac000.gpio
+>> gpiochip_add: registered GPIOs 64 to 95 on device: 20b0000.gpio
+>> gpiochip_add: registered GPIOs 32 to 63 on device: 20b4000.gpio
+>>
+>> With the patches, the mapping looks like this:
+>>
+>> gpiochip_add: registered GPIOs 192 to 223 on device: 20b4000.gpio
+>> gpiochip_add: registered GPIOs 160 to 191 on device: 20b0000.gpio
+>> gpiochip_add: registered GPIOs 128 to 159 on device: 20ac000.gpio
+>> gpiochip_add: registered GPIOs 96 to 127 on device: 20a8000.gpio
+>> gpiochip_add: registered GPIOs 64 to 95 on device: 20a4000.gpio
+>> gpiochip_add: registered GPIOs 32 to 63 on device: 20a0000.gpio
+>> gpiochip_add: registered GPIOs 0 to 31 on device: 209c000.gpio
+>>
+>> I.e. pin 0 on gpio1 is now accessed via /sys/class/gpio/gpio0
+>> instead of /sys/class/gpio/gpio224.
 > 
-> Hi,
+> I think you're caring too much about the numbers you see within the Linux
+> kernel...
 > 
-> On Tuesday 31 of July 2012 at 09:47:57, Jingoo Han wrote:
-> > On Monday, July 30, 2012 8:16 PM, Leela Krishna Amudala wrote:
-> > > Hello Jingoo Han,
-> > >
-> > > On Mon, Jul 30, 2012 at 2:23 PM, Jingoo Han <jg1.han@samsung.com> wrote:
-> > > > On Monday, July 30, 2012 5:45 PM, Leela Krishna Amudala wrote:
-> > > >> Moved the contents of regs-fb-v4.h and regs-fb.h from arch side
-> > > >> to include/video/samsung_fimd.h
-> > > >>
-> > > >> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
-> > > >> ---
-> > > >>
-> > > >>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h |  159 -------
-> > > >>  arch/arm/plat-samsung/include/plat/regs-fb.h    |  403
-> > > >>  -----------------
-> > > >>  include/video/samsung_fimd.h                    |  533
-> > > >>  +++++++++++++++++++++++ 3 files changed, 533 insertions(+), 562
-> > > >>  deletions(-)
-> > > >>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
-> > > >>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb.h
-> > > >>  create mode 100644 include/video/samsung_fimd.h
-> > > >>
-> > > >> +*/
-> > > >> +
-> > > >> +/*FIMD V8 REG OFFSET */
-> > > >> +#define FIMD_V8_VIDTCON0     (0x20010)
-> > > >> +#define FIMD_V8_VIDTCON1     (0x20014)
-> > > >> +#define FIMD_V8_VIDTCON2     (0x20018)
-> > > >> +#define FIMD_V8_VIDTCON3     (0x2001C)
-> > > >> +#define FIMD_V8_VIDCON1              (0x20004)
-> >
-> > How about using soc_is_exynos5250()?
-> >
-> > +#define VIDTCON0				(soc_is_exynos5250() ? \
-> > +						(0x20010) : (0x10))
-> >
-> > In this case, the FIMD driver does not need to change.
-> > Also, one binary is available.
-> >
+> So what happens when your platform is built as part of a single zImage
+> along side a platform needing all the 256 GPIOs?  If the answer is "it
+> doesn't work" you need to go back and re-evaluate what you're doing.
 > 
-> This would look good indeed, but there are some drawbacks:
-> - it would not scale nicely for future SoCs using the new FIMD
+> Especially with DT, you shouldn't need to worry about the absolute GPIO
+> numbering.
 
-I don't think so.
-Currently, one clear thing is that only Exynos5250 FIMD has VIDTCON0 offset
-with 0x20000.
-We cannot know whether future SoCs have VIDTCON0 offset with 0x20000.
+Ok, thanks! If the patches we sent are not the way to go, maybe we need 
+a better understanding then. Trying to learn something, I'd like to ask:
 
-Also, VIDTCON offset is not relevant to FIMD version.
-There was the case that FIMD version 7 has VIDTCON0 offset with 0x20000.
+ From my understanding, a user in the _user_ space expects a 1:1 mapping:
 
+user touching /sys/class/gpio/gpio0   -> controls HW GPIO bank 1 pin  0
+...
+user touching /sys/class/gpio/gpio31  -> controls HW GPIO bank 1 pin 31
+...
+user touching /sys/class/gpio/gpio223 -> controls HW GPIO bank 7 pin 31
 
-> - it would add the overhead of checking SoC ID for every access to affected
-> registers (at least 1 load, 1 AND, 1 compare, 1 move and 1 conditional OR, so
-> 5 instructions in total, possibly even more, as opposed to a single load from
-> a variant struct).
+Is this understanding wrong? Or is there a way to achieve this with the 
+existing DT logic?
 
-I don't think that it's critical.
-VIDTCON registers are used for controlling LCD timing values.
-These registers are just used for probing and resuming.
-It is not used at running time.
+The above is what we tried to achieve with our patches. Without the 
+patches, an unmodified DT and kernel gives us:
 
-Anyway, your point would be considered.
-Thank you.
+user touching /sys/class/gpio/gpio0   -> n/a (*)
+...
+user touching /sys/class/gpio/gpio32  -> controls HW GPIO bank 7 pin  0
+...
+user touching /sys/class/gpio/gpio224 -> controls HW GPIO bank 1 pin  0
+...
+user touching /sys/class/gpio/gpio255 -> controls HW GPIO bank 1 pin 31
 
-> 
-> I would stay with the way used in s3c-fb driver, using variant structs
-> describing FIMD revisions.
-> 
-> Best regards,
-> Tomasz Figa
-> 
-> >
-> > Best regards,
-> > Jingoo Han
-> >
-> > > > CC'ed Marek.
-> > > >
-> > > > To Leela Krishna Amudala,
-> > > >
-> > > > Don't add these definitions for FIMD_V8_xxx registers, which arenot
-> > > > related to current "regs-fb-v4.h>
-> > > and regs-fb.h".
-> > >
-> > > > Just "move" and "merge" regs-fb-v4.h and regs-fb.h to one header file,
-> > > > not "add" new definitions. If you want to add these definitions, please
-> > > > make new patch for this.>
-> > > Will do it in the suggested way,
-> > >
-> > > > Also, "#define FIMD_V8_xxx" is ugly.
-> > > > I think that there is better way.
-> > > > Please, find other way.
-> > >
-> > > I used FIMD_V8_xxx instead of  EXYNOS5_FIMD_*, because in future,
-> > > there is a possibility that version 8 FIMD can be used in other
-> > > application processors also.
-> > > Thanks for reviewing the patch.
-> > >
-> > > Best Wishes,
-> > > Leela Krishna.
-> > >
-> > > >> --
-> > > >> 1.7.0.4
-> > > >
-> > > > --
-> > > > To unsubscribe from this list: send the line "unsubscribe linux-fbdev"
-> > > > in
-> > > > the body of a message to majordomo at vger.kernel.org
-> > > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> > in the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+(*) Note the offset of 32 due to ARCH_NR_GPIO is 256 while only 224 
+GPIOs are there. And the 'inverted' access order from bank 7 to 1.
+
+Many thanks for the help and best regards
+
+Dirk
