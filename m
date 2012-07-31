@@ -1,108 +1,52 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 31 Jul 2012 08:37:01 +0200
-Subject: [PATCH 1/3] Move FIMD register headers to include/video/
-In-Reply-To: <000a01cd6eb6$2113a050$633ae0f0$%han@samsung.com>
-References: <1343637905-17764-1-git-send-email-l.krishna@samsung.com>
- <CAL1wa8e7Joghf9S=SgbQLJFWcYOrP5uK6qYXsV_N6rX1MVEALg@mail.gmail.com>
- <000a01cd6eb6$2113a050$633ae0f0$%han@samsung.com>
-Message-ID: <2073177.5bSgcKjVcU@easynote>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 31 Jul 2012 08:36:45 +0200
+Subject: [PATCH 15/16] ARM: Kirkwood: Describe iConnect LEDs in DT.
+In-Reply-To: <5016FE26.8090509@baker-net.org.uk>
+References: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
+ <1342805751-18048-16-git-send-email-andrew@lunn.ch>
+ <5016FE26.8090509@baker-net.org.uk>
+Message-ID: <20120731063645.GO18016@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jul 30, 2012 at 10:35:34PM +0100, Adam Baker wrote:
+> On 20/07/12 18:35, Andrew Lunn wrote:
+> 
+> Sorry it's taken a while to spot this but I've got one comment below
+> 
+> >Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> >---
+> >  arch/arm/boot/dts/kirkwood-iconnect.dts |   34 +++++++++++++++++++++++
+> >  arch/arm/mach-kirkwood/board-iconnect.c |   46 -------------------------------
+> >  2 files changed, 34 insertions(+), 46 deletions(-)
+> >
+> >diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
+> >index a7dd07b..b77b38f 100644
+> >--- a/arch/arm/boot/dts/kirkwood-iconnect.dts
+> >+++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
+> >@@ -31,4 +31,38 @@
+> >  			status = "ok";
+> >  		};
+> >  	};
+> >+	gpio-leds {
+> >+		compatible = "gpio-leds";
+> >+
+> >+		led-level {
+> >+			label = "led_level";
+> >+			gpios = <&gpio1 9 0>;
+> >+			linux,default-trigger = "default-on";
+> >+		};
+> >+		power-blue {
+> >+			label = "power:blue";
+> >+			gpios = <&gpio1 11 0>;
+> >+			linux,default-trigger = "timer";
+> >+		};
+> 
+> Is there any reason that power:red is missing here?
 
-On Tuesday 31 of July 2012 at 09:47:57, Jingoo Han wrote:
-> On Monday, July 30, 2012 8:16 PM, Leela Krishna Amudala wrote:
-> > Hello Jingoo Han,
-> > 
-> > On Mon, Jul 30, 2012 at 2:23 PM, Jingoo Han <jg1.han@samsung.com> wrote:
-> > > On Monday, July 30, 2012 5:45 PM, Leela Krishna Amudala wrote:
-> > >> Moved the contents of regs-fb-v4.h and regs-fb.h from arch side
-> > >> to include/video/samsung_fimd.h
-> > >> 
-> > >> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
-> > >> ---
-> > >> 
-> > >>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h |  159 -------
-> > >>  arch/arm/plat-samsung/include/plat/regs-fb.h    |  403
-> > >>  -----------------
-> > >>  include/video/samsung_fimd.h                    |  533
-> > >>  +++++++++++++++++++++++ 3 files changed, 533 insertions(+), 562
-> > >>  deletions(-)
-> > >>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
-> > >>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb.h
-> > >>  create mode 100644 include/video/samsung_fimd.h
-> > >> 
-> > >> +*/
-> > >> +
-> > >> +/*FIMD V8 REG OFFSET */
-> > >> +#define FIMD_V8_VIDTCON0     (0x20010)
-> > >> +#define FIMD_V8_VIDTCON1     (0x20014)
-> > >> +#define FIMD_V8_VIDTCON2     (0x20018)
-> > >> +#define FIMD_V8_VIDTCON3     (0x2001C)
-> > >> +#define FIMD_V8_VIDCON1              (0x20004)
-> 
-> How about using soc_is_exynos5250()?
-> 
-> +#define VIDTCON0				(soc_is_exynos5250() ? \
-> +						(0x20010) : (0x10))
-> 
-> In this case, the FIMD driver does not need to change.
-> Also, one binary is available.
-> 
+The monkey driving the keyboard is not reliable at monkey work...
 
-This would look good indeed, but there are some drawbacks:
-- it would not scale nicely for future SoCs using the new FIMD
-- it would add the overhead of checking SoC ID for every access to affected 
-registers (at least 1 load, 1 AND, 1 compare, 1 move and 1 conditional OR, so 
-5 instructions in total, possibly even more, as opposed to a single load from 
-a variant struct).
+Please create a patch and i will try to get it into rc1.
 
-I would stay with the way used in s3c-fb driver, using variant structs 
-describing FIMD revisions.
-
-Best regards,
-Tomasz Figa
-
-> 
-> Best regards,
-> Jingoo Han
-> 
-> > > CC'ed Marek.
-> > > 
-> > > To Leela Krishna Amudala,
-> > > 
-> > > Don't add these definitions for FIMD_V8_xxx registers, which arenot
-> > > related to current "regs-fb-v4.h> 
-> > and regs-fb.h".
-> > 
-> > > Just "move" and "merge" regs-fb-v4.h and regs-fb.h to one header file,
-> > > not "add" new definitions. If you want to add these definitions, please
-> > > make new patch for this.> 
-> > Will do it in the suggested way,
-> > 
-> > > Also, "#define FIMD_V8_xxx" is ugly.
-> > > I think that there is better way.
-> > > Please, find other way.
-> > 
-> > I used FIMD_V8_xxx instead of  EXYNOS5_FIMD_*, because in future,
-> > there is a possibility that version 8 FIMD can be used in other
-> > application processors also.
-> > Thanks for reviewing the patch.
-> > 
-> > Best Wishes,
-> > Leela Krishna.
-> > 
-> > >> --
-> > >> 1.7.0.4
-> > > 
-> > > --
-> > > To unsubscribe from this list: send the line "unsubscribe linux-fbdev"
-> > > in
-> > > the body of a message to majordomo at vger.kernel.org
-> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+       Thanks
+  	 Andrew
