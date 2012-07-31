@@ -1,33 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Jul 2012 10:27:14 +0100
-Subject: [PATCH v3 1/3] ARM: omap: clk: add clk_prepare and clk_unprepare
-In-Reply-To: <50179584.9070006@codeaurora.org>
-References: <1341224669-15231-1-git-send-email-rnayak@ti.com>
- <1341224669-15231-2-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1207301614590.8722@utopia.booyaka.com>
- <CAJOA=zPmfq+WsAF-7nAkMGghPLYHpd+fCkrsv=3JSWLGMb-zkg@mail.gmail.com>
- <20120730230233.GA12574@n2100.arm.linux.org.uk>
- <CAJOA=zNnLahwhzjE0jkmiax8=kU8O4puJQJ1VbA-gDScawg6jw@mail.gmail.com>
- <50179584.9070006@codeaurora.org>
-Message-ID: <20120731092714.GL7405@n2100.arm.linux.org.uk>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Tue, 31 Jul 2012 17:53:41 +0800
+Subject: [GIT PULL] LED CPU trigger driver and ARM LED code consolidation
+In-Reply-To: <CAOesGMgav2dqvUk623u_1ZuAE82drg2tF7rMpKMCZN4_Oq12_A@mail.gmail.com>
+References: <CAK5ve-JuZcjdbw_tV8vcriHWxOq1KFHm2mZBm6z3_j7hpPw-eA@mail.gmail.com>
+ <CAK5ve-+3rKjeQA-WMQWvT48roFx-3Y-jNLZ3ciyOuH42x4Nu9A@mail.gmail.com>
+ <CAOesGMgav2dqvUk623u_1ZuAE82drg2tF7rMpKMCZN4_Oq12_A@mail.gmail.com>
+Message-ID: <CAK5ve-K29fKi57hEWLh6gQ-F5KXXr7hHfyAkk_MebxcQf6Dp=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 01:21:24AM -0700, Saravana Kannan wrote:
-> I have heard this idea about removing the clk_prepare/unprepare API too  
-> many times and it makes me uncomfortable. I would really prefer we (the  
-> community) take this discussion to the end and put an end to it. We  
-> either agree to stick with the clk_prepare APIs or figure out the newer  
-> APIs. I don't want to keep having to deal with the "we really should be  
-> removing the clk_prepare() APIs" wrench thrown into the discussion every  
-> time we discuss anything related to a locking issue.
+On Fri, Jun 8, 2012 at 4:20 PM, Olof Johansson <olof@lixom.net> wrote:
+> Hi,
+>
+> On Wed, Jun 6, 2012 at 11:12 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
+>> Hi Arnd and Olof,
+>>
+>> Is there any chance to pull this LED code into ARM SoC tree?
+>>
+>> Thanks,
+>> -Bryan
+>>
+>> On Mon, Jun 4, 2012 at 3:25 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
+>>> Hi Arnd and Olof,
+>>>
+>>> Please consider to pull my branch for LED CPU trigger driver and ARM
+>>> LED code consolidation, which is based on 3.5-rc1:
+>>>
+>>> The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
+>>>
+>>>  Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>  git://git.kernel.org/pub/scm/linux/kernel/git/cooloney/linux-leds.git
+>>> for-arm-soc
+>
+> Pulled into arm-soc as devel/led-driver in next/drivers.
+>
+>
+> Thanks,
+>
+> -Olof
 
-Well, part of the motivation to remove it comes from the fact that we
-have this "clk_prepare_enable()" thing which _everyone_ simply converts
-their existing clk_enable() call to without _thinking_ one little bit
-about the rest of the picture.
+Olof and Arnd,
 
-It's that which is making the justification for getting rid of the split
-API soo easy.  If people put more thought into it then the separation of
-the two calls would be much clearer, and there would be more of a
-justification to prevent its removal.
+Will you guys send out pull request for this led-driver patches during
+this merge window?
+
+Thanks,
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer    +86.186-168-78255 Mobile
+Canonical Ltd.      www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
