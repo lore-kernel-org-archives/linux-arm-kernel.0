@@ -1,27 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 31 Jul 2012 20:50:02 +0000
-Subject: [PATCH 5/6] ARM: ux500: Enable HIGHMEM on all mop500 platforms
-In-Reply-To: <20120731143732.GS6802@n2100.arm.linux.org.uk>
+Date: Tue, 31 Jul 2012 20:54:13 +0000
+Subject: [PATCH 5/6] ARM: ux500: Ensure probing of Audio devices when
+ Device Tree is enabled
+In-Reply-To: <1343741493-17671-11-git-send-email-lee.jones@linaro.org>
 References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
- <5017EBDC.6010005@linaro.org> <20120731143732.GS6802@n2100.arm.linux.org.uk>
-Message-ID: <201207312050.03113.arnd@arndb.de>
+ <1343741493-17671-11-git-send-email-lee.jones@linaro.org>
+Message-ID: <201207312054.13818.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 31 July 2012, Russell King - ARM Linux wrote:
-> I still fail to see how not having highmem enabled would ever cause memory
-> corruption errors (unless something dealing with memory in a very very
-> wrong way - iow, not using one of the reservation or memory allocation
-> methods provided by the kernel.)
+On Tuesday 31 July 2012, Lee Jones wrote:
+> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+> index e641003..87a5cd7 100644
+> --- a/arch/arm/mach-ux500/board-mop500.c
+> +++ b/arch/arm/mach-ux500/board-mop500.c
+> @@ -794,6 +794,7 @@ static void __init u8500_init_machine(void)
+>                                 ARRAY_SIZE(mop500_platform_devs));
+>  
+>                 mop500_sdi_init(parent);
+> +               mop500_msp_init(parent);
+>                 i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
+>                 i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
+>                 i2c_register_board_info(2, mop500_i2c2_devices,
+> @@ -801,6 +802,8 @@ static void __init u8500_init_machine(void)
+>  
+>                 mop500_uib_init();
+>  
+> +       } else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
+> +               mop500_of_msp_init(parent);
+>         } else if (of_machine_is_compatible("st-ericsson,hrefv60+")) {
+>                 /*
+>                  * The HREFv60 board removed a GPIO expander and routed
+> @@ -812,6 +815,7 @@ static void __init u8500_init_machine(void)
+>                                 ARRAY_SIZE(mop500_platform_devs));
+>  
+>                 hrefv60_sdi_init(parent);
+> +               mop500_msp_init(parent);
+>  
+>                 i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
+>                 i2c0_devs -= NUM_PRE_V60_I2C0_DEVICES;
 
-The problem is that all users of ux500 systems pass a command line like
 
-vmalloc=256M mem=128M at 0 mali.mali_mem=32M at 128M hwmem=168M at 160M mem=48M at 328M mem_issw=1M at 383M mem=640M at 384M
-
-This is of course totally bogus and should not be done. If I understand
-Lee correctly, one of the issues resulting from passing a command
-line like this without enabling highmem is memory corruption.
-
-"Doctor it hurts when I do this ..."
+Looks like you're adding the same call to each of the three cases:
+mop500, snowball and hrefv60+. How about moving it before or after
+the if/elseif block?
 
 	Arnd
