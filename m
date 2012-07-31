@@ -1,74 +1,1252 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 31 Jul 2012 14:39:06 +0100
-Subject: [PATCH 12/19] ARM: ux500: Remove platform registration of MSP devices
+Date: Tue, 31 Jul 2012 14:39:08 +0100
+Subject: [PATCH 14/19] ARM: ux500: Rename db8500.dtsi to dbx5x0.dtsi to
+ encompass the u9500, u8540 and u9540
 In-Reply-To: <1343741953-17828-1-git-send-email-lee.jones@linaro.org>
 References: <1343741953-17828-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343741953-17828-13-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343741953-17828-15-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes platform device registration of all 4 MSP
-devices. It also takes care of all redundant infrastructure now
-that each of the ux500 audio components have been Device Tree
-enabled.
-
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500-msp.c |   14 --------------
- arch/arm/mach-ux500/board-mop500.c     |    2 --
- arch/arm/mach-ux500/board-mop500.h     |    2 --
- 3 files changed, 18 deletions(-)
+ arch/arm/boot/dts/db8500.dtsi  |  603 ----------------------------------------
+ arch/arm/boot/dts/dbx5x0.dtsi  |  603 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/snowball.dts |    2 +-
+ 3 files changed, 604 insertions(+), 604 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/db8500.dtsi
+ create mode 100644 arch/arm/boot/dts/dbx5x0.dtsi
 
-diff --git a/arch/arm/mach-ux500/board-mop500-msp.c b/arch/arm/mach-ux500/board-mop500-msp.c
-index 7af2dce..19473f7 100644
---- a/arch/arm/mach-ux500/board-mop500-msp.c
-+++ b/arch/arm/mach-ux500/board-mop500-msp.c
-@@ -172,20 +172,6 @@ struct msp_i2s_platform_data msp3_platform_data = {
- 	.msp_i2s_dma_tx	= NULL,
- };
- 
--/* Due for removal once the MSP driver has been fully DT:ed. */
--void mop500_of_msp_init(struct device *parent)
--{
--	pr_info("Initialize MSP I2S-devices.\n");
--	db8500_add_msp_i2s(parent, 0, U8500_MSP0_BASE, IRQ_DB8500_MSP0,
--			   &msp0_platform_data);
--	db8500_add_msp_i2s(parent, 1, U8500_MSP1_BASE, IRQ_DB8500_MSP1,
--			   &msp1_platform_data);
--	db8500_add_msp_i2s(parent, 2, U8500_MSP2_BASE, IRQ_DB8500_MSP2,
--			   &msp2_platform_data);
--	db8500_add_msp_i2s(parent, 3, U8500_MSP3_BASE, IRQ_DB8500_MSP1,
--			   &msp3_platform_data);
--}
+diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
+deleted file mode 100644
+index a3bee0a..0000000
+--- a/arch/arm/boot/dts/db8500.dtsi
++++ /dev/null
+@@ -1,603 +0,0 @@
+-/*
+- * Copyright 2012 Linaro Ltd
+- *
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
+- *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
+- */
 -
- void mop500_msp_init(struct device *parent)
- {
- 	pr_info("%s: Register platform-device 'snd-soc-u8500'.\n", __func__);
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index d455a61..2ef26c8 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -810,8 +810,6 @@ static void __init u8500_init_machine(void)
+-/include/ "skeleton.dtsi"
+-
+-/ {
+-	soc-u9500 {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		compatible = "stericsson,db8500";
+-		interrupt-parent = <&intc>;
+-		ranges;
+-
+-		intc: interrupt-controller at a0411000 {
+-			compatible = "arm,cortex-a9-gic";
+-			#interrupt-cells = <3>;
+-			#address-cells = <1>;
+-			interrupt-controller;
+-			reg = <0xa0411000 0x1000>,
+-			      <0xa0410100 0x100>;
+-		};
+-
+-		L2: l2-cache {
+-			compatible = "arm,pl310-cache";
+-			reg = <0xa0412000 0x1000>;
+-			interrupts = <0 13 4>;
+-			cache-unified;
+-			cache-level = <2>;
+-		};
+-
+-		pmu {
+-			compatible = "arm,cortex-a9-pmu";
+-			interrupts = <0 7 0x4>;
+-		};
+-
+-		timer at a0410600 {
+-			compatible = "arm,cortex-a9-twd-timer";
+-			reg = <0xa0410600 0x20>;
+-			interrupts = <1 13 0x304>;
+-		};
+-
+-		rtc at 80154000 {
+-			compatible = "arm,rtc-pl031", "arm,primecell";
+-			reg = <0x80154000 0x1000>;
+-			interrupts = <0 18 0x4>;
+-		};
+-
+-		gpio0: gpio at 8012e000 {
+-			compatible = "stericsson,db8500-gpio",
+-				"st,nomadik-gpio";
+-			reg =  <0x8012e000 0x80>;
+-			interrupts = <0 119 0x4>;
+-			interrupt-controller;
+-			#interrupt-cells = <2>;
+-			st,supports-sleepmode;
+-			gpio-controller;
+-			#gpio-cells = <2>;
+-			gpio-bank = <0>;
+-		};
+-
+-		gpio1: gpio at 8012e080 {
+-			compatible = "stericsson,db8500-gpio",
+-				"st,nomadik-gpio";
+-			reg =  <0x8012e080 0x80>;
+-			interrupts = <0 120 0x4>;
+-			interrupt-controller;
+-			#interrupt-cells = <2>;
+-			st,supports-sleepmode;
+-			gpio-controller;
+-			#gpio-cells = <2>;
+-			gpio-bank = <1>;
+-		};
+-
+-		gpio2: gpio at 8000e000 {
+-			compatible = "stericsson,db8500-gpio",
+-				"st,nomadik-gpio";
+-			reg =  <0x8000e000 0x80>;
+-			interrupts = <0 121 0x4>;
+-			interrupt-controller;
+-			#interrupt-cells = <2>;
+-			st,supports-sleepmode;
+-			gpio-controller;
+-			#gpio-cells = <2>;
+-			gpio-bank = <2>;
+-		};
+-
+-		gpio3: gpio at 8000e080 {
+-			compatible = "stericsson,db8500-gpio",
+-				"st,nomadik-gpio";
+-			reg =  <0x8000e080 0x80>;
+-			interrupts = <0 122 0x4>;
+-			interrupt-controller;
+-			#interrupt-cells = <2>;
+-			st,supports-sleepmode;
+-			gpio-controller;
+-			#gpio-cells = <2>;
+-			gpio-bank = <3>;
+-		};
+-
+-		gpio4: gpio at 8000e100 {
+-			compatible = "stericsson,db8500-gpio",
+-				"st,nomadik-gpio";
+-			reg =  <0x8000e100 0x80>;
+-			interrupts = <0 123 0x4>;
+-			interrupt-controller;
+-			#interrupt-cells = <2>;
+-			st,supports-sleepmode;
+-			gpio-controller;
+-			#gpio-cells = <2>;
+-			gpio-bank = <4>;
+-		};
+-
+-		gpio5: gpio at 8000e180 {
+-			compatible = "stericsson,db8500-gpio",
+-				"st,nomadik-gpio";
+-			reg =  <0x8000e180 0x80>;
+-			interrupts = <0 124 0x4>;
+-			interrupt-controller;
+-			#interrupt-cells = <2>;
+-			st,supports-sleepmode;
+-			gpio-controller;
+-			#gpio-cells = <2>;
+-			gpio-bank = <5>;
+-		};
+-
+-		gpio6: gpio at 8011e000 {
+-			compatible = "stericsson,db8500-gpio",
+-				"st,nomadik-gpio";
+-			reg =  <0x8011e000 0x80>;
+-			interrupts = <0 125 0x4>;
+-			interrupt-controller;
+-			#interrupt-cells = <2>;
+-			st,supports-sleepmode;
+-			gpio-controller;
+-			#gpio-cells = <2>;
+-			gpio-bank = <6>;
+-		};
+-
+-		gpio7: gpio at 8011e080 {
+-			compatible = "stericsson,db8500-gpio",
+-				"st,nomadik-gpio";
+-			reg =  <0x8011e080 0x80>;
+-			interrupts = <0 126 0x4>;
+-			interrupt-controller;
+-			#interrupt-cells = <2>;
+-			st,supports-sleepmode;
+-			gpio-controller;
+-			#gpio-cells = <2>;
+-			gpio-bank = <7>;
+-		};
+-
+-		gpio8: gpio at a03fe000 {
+-			compatible = "stericsson,db8500-gpio",
+-				"st,nomadik-gpio";
+-			reg =  <0xa03fe000 0x80>;
+-			interrupts = <0 127 0x4>;
+-			interrupt-controller;
+-			#interrupt-cells = <2>;
+-			st,supports-sleepmode;
+-			gpio-controller;
+-			#gpio-cells = <2>;
+-			gpio-bank = <8>;
+-		};
+-
+-		pinctrl {
+-			compatible = "stericsson,nmk_pinctrl";
+-		};
+-
+-		usb at a03e0000 {
+-			compatible = "stericsson,db8500-musb",
+-				"mentor,musb";
+-			reg = <0xa03e0000 0x10000>;
+-			interrupts = <0 23 0x4>;
+-		};
+-
+-		dma-controller at 801C0000 {
+-			compatible = "stericsson,db8500-dma40",
+-					"stericsson,dma40";
+-			reg = <0x801C0000 0x1000 0x40010000 0x800>;
+-			interrupts = <0 25 0x4>;
+-		};
+-
+-		prcmu at 80157000 {
+-			compatible = "stericsson,db8500-prcmu";
+-			reg = <0x80157000 0x1000>;
+-			interrupts = <0 47 0x4>;
+-			#address-cells = <1>;
+-			#size-cells = <1>;
+-			ranges;
+-
+-			prcmu-timer-4 at 80157450 {
+-				compatible = "stericsson,db8500-prcmu-timer-4";
+-				reg = <0x80157450 0xC>;
+-			};
+-
+-			db8500-prcmu-regulators {
+-				compatible = "stericsson,db8500-prcmu-regulator";
+-
+-				// DB8500_REGULATOR_VAPE
+-				db8500_vape_reg: db8500_vape {
+-					regulator-name = "db8500-vape";
+-					regulator-always-on;
+-				};
+-
+-				// DB8500_REGULATOR_VARM
+-				db8500_varm_reg: db8500_varm {
+-					regulator-name = "db8500-varm";
+-				};
+-
+-				// DB8500_REGULATOR_VMODEM
+-				db8500_vmodem_reg: db8500_vmodem {
+-					regulator-name = "db8500-vmodem";
+-				};
+-
+-				// DB8500_REGULATOR_VPLL
+-				db8500_vpll_reg: db8500_vpll {
+-					regulator-name = "db8500-vpll";
+-				};
+-
+-				// DB8500_REGULATOR_VSMPS1
+-				db8500_vsmps1_reg: db8500_vsmps1 {
+-					regulator-name = "db8500-vsmps1";
+-				};
+-
+-				// DB8500_REGULATOR_VSMPS2
+-				db8500_vsmps2_reg: db8500_vsmps2 {
+-					regulator-name = "db8500-vsmps2";
+-				};
+-
+-				// DB8500_REGULATOR_VSMPS3
+-				db8500_vsmps3_reg: db8500_vsmps3 {
+-					regulator-name = "db8500-vsmps3";
+-				};
+-
+-				// DB8500_REGULATOR_VRF1
+-				db8500_vrf1_reg: db8500_vrf1 {
+-					regulator-name = "db8500-vrf1";
+-				};
+-
+-				// DB8500_REGULATOR_SWITCH_SVAMMDSP
+-				db8500_sva_mmdsp_reg: db8500_sva_mmdsp {
+-					regulator-name = "db8500-sva-mmdsp";
+-				};
+-
+-				// DB8500_REGULATOR_SWITCH_SVAMMDSPRET
+-				db8500_sva_mmdsp_ret_reg: db8500_sva_mmdsp_ret {
+-					regulator-name = "db8500-sva-mmdsp-ret";
+-				};
+-
+-				// DB8500_REGULATOR_SWITCH_SVAPIPE
+-				db8500_sva_pipe_reg: db8500_sva_pipe {
+-					regulator-name = "db8500_sva_pipe";
+-				};
+-
+-				// DB8500_REGULATOR_SWITCH_SIAMMDSP
+-				db8500_sia_mmdsp_reg: db8500_sia_mmdsp {
+-					regulator-name = "db8500_sia_mmdsp";
+-				};
+-
+-				// DB8500_REGULATOR_SWITCH_SIAMMDSPRET
+-				db8500_sia_mmdsp_ret_reg: db8500_sia_mmdsp_ret {
+-					regulator-name = "db8500-sia-mmdsp-ret";
+-				};
+-
+-				// DB8500_REGULATOR_SWITCH_SIAPIPE
+-				db8500_sia_pipe_reg: db8500_sia_pipe {
+-					regulator-name = "db8500-sia-pipe";
+-				};
+-
+-				// DB8500_REGULATOR_SWITCH_SGA
+-				db8500_sga_reg: db8500_sga {
+-					regulator-name = "db8500-sga";
+-					vin-supply = <&db8500_vape_reg>;
+-				};
+-
+-				// DB8500_REGULATOR_SWITCH_B2R2_MCDE
+-				db8500_b2r2_mcde_reg: db8500_b2r2_mcde {
+-					regulator-name = "db8500-b2r2-mcde";
+-					vin-supply = <&db8500_vape_reg>;
+-				};
+-
+-				// DB8500_REGULATOR_SWITCH_ESRAM12
+-				db8500_esram12_reg: db8500_esram12 {
+-					regulator-name = "db8500-esram12";
+-				};
+-
+-				// DB8500_REGULATOR_SWITCH_ESRAM12RET
+-				db8500_esram12_ret_reg: db8500_esram12_ret {
+-					regulator-name = "db8500-esram12-ret";
+-				};
+-
+-				// DB8500_REGULATOR_SWITCH_ESRAM34
+-				db8500_esram34_reg: db8500_esram34 {
+-					regulator-name = "db8500-esram34";
+-				};
+-
+-				// DB8500_REGULATOR_SWITCH_ESRAM34RET
+-				db8500_esram34_ret_reg: db8500_esram34_ret {
+-					regulator-name = "db8500-esram34-ret";
+-				};
+-			};
+-
+-			ab8500 at 5 {
+-				compatible = "stericsson,ab8500";
+-				reg = <5>; /* mailbox 5 is i2c */
+-				interrupts = <0 40 0x4>;
+-				interrupt-controller;
+-				#interrupt-cells = <2>;
+-
+-				ab8500-rtc {
+-					compatible = "stericsson,ab8500-rtc";
+-					interrupts = <17 0x4
+-					              18 0x4>;
+-					interrupt-names = "60S", "ALARM";
+-				};
+-
+-				ab8500-gpadc {
+-					compatible = "stericsson,ab8500-gpadc";
+-					interrupts = <32 0x4
+-						      39 0x4>;
+-					interrupt-names = "HW_CONV_END", "SW_CONV_END";
+-					vddadc-supply = <&ab8500_ldo_tvout_reg>;
+-				};
+-
+-				ab8500-usb {
+-					compatible = "stericsson,ab8500-usb";
+-					interrupts = < 90 0x4
+-						       96 0x4
+-						       14 0x4
+-						       15 0x4
+-						       79 0x4
+-						       74 0x4
+-						       75 0x4>;
+-					interrupt-names = "ID_WAKEUP_R",
+-							  "ID_WAKEUP_F",
+-							  "VBUS_DET_F",
+-							  "VBUS_DET_R",
+-							  "USB_LINK_STATUS",
+-							  "USB_ADP_PROBE_PLUG",
+-							  "USB_ADP_PROBE_UNPLUG";
+-					vddulpivio18-supply = <&ab8500_ldo_initcore_reg>;
+-					v-ape-supply = <&db8500_vape_reg>;
+-					musb_1v8-supply = <&db8500_vsmps2_reg>;
+-				};
+-
+-				ab8500-ponkey {
+-					compatible = "stericsson,ab8500-ponkey";
+-					interrupts = <6 0x4
+-						      7 0x4>;
+-					interrupt-names = "ONKEY_DBF", "ONKEY_DBR";
+-				};
+-
+-				ab8500-sysctrl {
+-					compatible = "stericsson,ab8500-sysctrl";
+-				};
+-
+-				ab8500-pwm {
+-					compatible = "stericsson,ab8500-pwm";
+-				};
+-
+-				ab8500-debugfs {
+-					compatible = "stericsson,ab8500-debug";
+-				};
+-
+-				codec: ab8500-codec {
+-					compatible = "stericsson,ab8500-codec";
+-
+-					stericsson,earpeice-cmv = <950>; /* Units in mV. */
+-				};
+-
+-				ab8500-regulators {
+-					compatible = "stericsson,ab8500-regulator";
+-
+-					// supplies to the display/camera
+-					ab8500_ldo_aux1_reg: ab8500_ldo_aux1 {
+-						regulator-name = "V-DISPLAY";
+-						regulator-min-microvolt = <2500000>;
+-						regulator-max-microvolt = <2900000>;
+-						regulator-boot-on;
+-						/* BUG: If turned off MMC will be affected. */
+-						regulator-always-on;
+-					};
+-
+-					// supplies to the on-board eMMC
+-					ab8500_ldo_aux2_reg: ab8500_ldo_aux2 {
+-						regulator-name = "V-eMMC1";
+-						regulator-min-microvolt = <1100000>;
+-						regulator-max-microvolt = <3300000>;
+-					};
+-
+-					// supply for VAUX3; SDcard slots
+-					ab8500_ldo_aux3_reg: ab8500_ldo_aux3 {
+-						regulator-name = "V-MMC-SD";
+-						regulator-min-microvolt = <1100000>;
+-						regulator-max-microvolt = <3300000>;
+-					};
+-
+-					// supply for v-intcore12; VINTCORE12 LDO
+-					ab8500_ldo_initcore_reg: ab8500_ldo_initcore {
+-						regulator-name = "V-INTCORE";
+-					};
+-
+-					// supply for tvout; gpadc; TVOUT LDO
+-					ab8500_ldo_tvout_reg: ab8500_ldo_tvout {
+-						regulator-name = "V-TVOUT";
+-					};
+-
+-					// supply for ab8500-usb; USB LDO
+-					ab8500_ldo_usb_reg: ab8500_ldo_usb {
+-						regulator-name = "dummy";
+-					};
+-
+-					// supply for ab8500-vaudio; VAUDIO LDO
+-					ab8500_ldo_audio_reg: ab8500_ldo_audio {
+-						regulator-name = "V-AUD";
+-					};
+-
+-					// supply for v-anamic1 VAMic1-LDO
+-					ab8500_ldo_anamic1_reg: ab8500_ldo_anamic1 {
+-						regulator-name = "V-AMIC1";
+-					};
+-
+-					// supply for v-amic2; VAMIC2 LDO; reuse constants for AMIC1
+-					ab8500_ldo_amamic2_reg: ab8500_ldo_amamic2 {
+-						regulator-name = "V-AMIC2";
+-					};
+-
+-					// supply for v-dmic; VDMIC LDO
+-					ab8500_ldo_dmic_reg: ab8500_ldo_dmic {
+-						regulator-name = "V-DMIC";
+-					};
+-
+-					// supply for U8500 CSI/DSI; VANA LDO
+-					ab8500_ldo_ana_reg: ab8500_ldo_ana {
+-						regulator-name = "V-CSI/DSI";
+-					};
+-				};
+-			};
+-		};
+-
+-		i2c at 80004000 {
+-			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
+-			reg = <0x80004000 0x1000>;
+-			interrupts = <0 21 0x4>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			clock-frequency = <400000>;
+-			stericsson,slsu = <0xe>;
+-			stericsson,tft = <1>;
+-			stericsson,rft = <8>;
+-			stericsson,timeout = <200>;
+-			stericsson,i2c_freq_mode_fast;
+-		};
+-
+-		i2c at 80122000 {
+-			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
+-			reg = <0x80122000 0x1000>;
+-			interrupts = <0 22 0x4>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			clock-frequency = <400000>;
+-			stericsson,slsu = <0xe>;
+-			stericsson,tft = <1>;
+-			stericsson,rft = <8>;
+-			stericsson,timeout = <200>;
+-			stericsson,i2c_freq_mode_fast;
+-		};
+-
+-		i2c at 80128000 {
+-			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
+-			reg = <0x80128000 0x1000>;
+-			interrupts = <0 55 0x4>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			clock-frequency = <400000>;
+-			stericsson,slsu = <0xe>;
+-			stericsson,tft = <1>;
+-			stericsson,rft = <8>;
+-			stericsson,timeout = <200>;
+-			stericsson,i2c_freq_mode_fast;
+-		};
+-
+-		i2c at 80110000 {
+-			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
+-			reg = <0x80110000 0x1000>;
+-			interrupts = <0 12 0x4>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			clock-frequency = <400000>;
+-			stericsson,slsu = <0xe>;
+-			stericsson,tft = <1>;
+-			stericsson,rft = <8>;
+-			stericsson,timeout = <200>;
+-			stericsson,i2c_freq_mode_fast;
+-		};
+-
+-		i2c at 8012a000 {
+-			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
+-			reg = <0x8012a000 0x1000>;
+-			interrupts = <0 51 0x4>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			clock-frequency = <400000>;
+-			stericsson,slsu = <0xe>;
+-			stericsson,tft = <1>;
+-			stericsson,rft = <8>;
+-			stericsson,timeout = <200>;
+-			stericsson,i2c_freq_mode_fast;
+-		};
+-
+-		ssp at 80002000 {
+-			compatible = "arm,pl022", "arm,primecell";
+-			reg = <80002000 0x1000>;
+-			interrupts = <0 14 0x4>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			status = "disabled";
+-
+-			// Add one of these for each child device
+-			cs-gpios = <&gpio0 31 0x4 &gpio4 14 0x4 &gpio4 16 0x4
+-				    &gpio6 22 0x4 &gpio7 0 0x4>;
+-
+-		};
+-
+-		uart at 80120000 {
+-			compatible = "arm,pl011", "arm,primecell";
+-			reg = <0x80120000 0x1000>;
+-			interrupts = <0 11 0x4>;
+-			status = "disabled";
+-		};
+-		uart at 80121000 {
+-			compatible = "arm,pl011", "arm,primecell";
+-			reg = <0x80121000 0x1000>;
+-			interrupts = <0 19 0x4>;
+-			status = "disabled";
+-		};
+-		uart at 80007000 {
+-			compatible = "arm,pl011", "arm,primecell";
+-			reg = <0x80007000 0x1000>;
+-			interrupts = <0 26 0x4>;
+-			status = "disabled";
+-		};
+-
+-		sdi at 80126000 {
+-			compatible = "arm,pl18x", "arm,primecell";
+-			reg = <0x80126000 0x1000>;
+-			interrupts = <0 60 0x4>;
+-			status = "disabled";
+-		};
+-		sdi at 80118000 {
+-			compatible = "arm,pl18x", "arm,primecell";
+-			reg = <0x80118000 0x1000>;
+-			interrupts = <0 50 0x4>;
+-			status = "disabled";
+-		};
+-		sdi at 80005000 {
+-			compatible = "arm,pl18x", "arm,primecell";
+-			reg = <0x80005000 0x1000>;
+-			interrupts = <0 41 0x4>;
+-			status = "disabled";
+-		};
+-		sdi at 80119000 {
+-			compatible = "arm,pl18x", "arm,primecell";
+-			reg = <0x80119000 0x1000>;
+-			interrupts = <0 59 0x4>;
+-			status = "disabled";
+-		};
+-		sdi at 80114000 {
+-			compatible = "arm,pl18x", "arm,primecell";
+-			reg = <0x80114000 0x1000>;
+-			interrupts = <0 99 0x4>;
+-			status = "disabled";
+-		};
+-		sdi at 80008000 {
+-			compatible = "arm,pl18x", "arm,primecell";
+-			reg = <0x80114000 0x1000>;
+-			interrupts = <0 100 0x4>;
+-			status = "disabled";
+-		};
+-
+-		external-bus at 50000000 {
+-			compatible = "simple-bus";
+-			reg = <0x50000000 0x4000000>;
+-			#address-cells = <1>;
+-			#size-cells = <1>;
+-			ranges = <0 0x50000000 0x4000000>;
+-			status = "disabled";
+-		};
+-	};
+-};
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+new file mode 100644
+index 0000000..a3bee0a
+--- /dev/null
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -0,0 +1,603 @@
++/*
++ * Copyright 2012 Linaro Ltd
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/include/ "skeleton.dtsi"
++
++/ {
++	soc-u9500 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "stericsson,db8500";
++		interrupt-parent = <&intc>;
++		ranges;
++
++		intc: interrupt-controller at a0411000 {
++			compatible = "arm,cortex-a9-gic";
++			#interrupt-cells = <3>;
++			#address-cells = <1>;
++			interrupt-controller;
++			reg = <0xa0411000 0x1000>,
++			      <0xa0410100 0x100>;
++		};
++
++		L2: l2-cache {
++			compatible = "arm,pl310-cache";
++			reg = <0xa0412000 0x1000>;
++			interrupts = <0 13 4>;
++			cache-unified;
++			cache-level = <2>;
++		};
++
++		pmu {
++			compatible = "arm,cortex-a9-pmu";
++			interrupts = <0 7 0x4>;
++		};
++
++		timer at a0410600 {
++			compatible = "arm,cortex-a9-twd-timer";
++			reg = <0xa0410600 0x20>;
++			interrupts = <1 13 0x304>;
++		};
++
++		rtc at 80154000 {
++			compatible = "arm,rtc-pl031", "arm,primecell";
++			reg = <0x80154000 0x1000>;
++			interrupts = <0 18 0x4>;
++		};
++
++		gpio0: gpio at 8012e000 {
++			compatible = "stericsson,db8500-gpio",
++				"st,nomadik-gpio";
++			reg =  <0x8012e000 0x80>;
++			interrupts = <0 119 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			st,supports-sleepmode;
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-bank = <0>;
++		};
++
++		gpio1: gpio at 8012e080 {
++			compatible = "stericsson,db8500-gpio",
++				"st,nomadik-gpio";
++			reg =  <0x8012e080 0x80>;
++			interrupts = <0 120 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			st,supports-sleepmode;
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-bank = <1>;
++		};
++
++		gpio2: gpio at 8000e000 {
++			compatible = "stericsson,db8500-gpio",
++				"st,nomadik-gpio";
++			reg =  <0x8000e000 0x80>;
++			interrupts = <0 121 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			st,supports-sleepmode;
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-bank = <2>;
++		};
++
++		gpio3: gpio at 8000e080 {
++			compatible = "stericsson,db8500-gpio",
++				"st,nomadik-gpio";
++			reg =  <0x8000e080 0x80>;
++			interrupts = <0 122 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			st,supports-sleepmode;
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-bank = <3>;
++		};
++
++		gpio4: gpio at 8000e100 {
++			compatible = "stericsson,db8500-gpio",
++				"st,nomadik-gpio";
++			reg =  <0x8000e100 0x80>;
++			interrupts = <0 123 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			st,supports-sleepmode;
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-bank = <4>;
++		};
++
++		gpio5: gpio at 8000e180 {
++			compatible = "stericsson,db8500-gpio",
++				"st,nomadik-gpio";
++			reg =  <0x8000e180 0x80>;
++			interrupts = <0 124 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			st,supports-sleepmode;
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-bank = <5>;
++		};
++
++		gpio6: gpio at 8011e000 {
++			compatible = "stericsson,db8500-gpio",
++				"st,nomadik-gpio";
++			reg =  <0x8011e000 0x80>;
++			interrupts = <0 125 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			st,supports-sleepmode;
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-bank = <6>;
++		};
++
++		gpio7: gpio at 8011e080 {
++			compatible = "stericsson,db8500-gpio",
++				"st,nomadik-gpio";
++			reg =  <0x8011e080 0x80>;
++			interrupts = <0 126 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			st,supports-sleepmode;
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-bank = <7>;
++		};
++
++		gpio8: gpio at a03fe000 {
++			compatible = "stericsson,db8500-gpio",
++				"st,nomadik-gpio";
++			reg =  <0xa03fe000 0x80>;
++			interrupts = <0 127 0x4>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			st,supports-sleepmode;
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-bank = <8>;
++		};
++
++		pinctrl {
++			compatible = "stericsson,nmk_pinctrl";
++		};
++
++		usb at a03e0000 {
++			compatible = "stericsson,db8500-musb",
++				"mentor,musb";
++			reg = <0xa03e0000 0x10000>;
++			interrupts = <0 23 0x4>;
++		};
++
++		dma-controller at 801C0000 {
++			compatible = "stericsson,db8500-dma40",
++					"stericsson,dma40";
++			reg = <0x801C0000 0x1000 0x40010000 0x800>;
++			interrupts = <0 25 0x4>;
++		};
++
++		prcmu at 80157000 {
++			compatible = "stericsson,db8500-prcmu";
++			reg = <0x80157000 0x1000>;
++			interrupts = <0 47 0x4>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			prcmu-timer-4 at 80157450 {
++				compatible = "stericsson,db8500-prcmu-timer-4";
++				reg = <0x80157450 0xC>;
++			};
++
++			db8500-prcmu-regulators {
++				compatible = "stericsson,db8500-prcmu-regulator";
++
++				// DB8500_REGULATOR_VAPE
++				db8500_vape_reg: db8500_vape {
++					regulator-name = "db8500-vape";
++					regulator-always-on;
++				};
++
++				// DB8500_REGULATOR_VARM
++				db8500_varm_reg: db8500_varm {
++					regulator-name = "db8500-varm";
++				};
++
++				// DB8500_REGULATOR_VMODEM
++				db8500_vmodem_reg: db8500_vmodem {
++					regulator-name = "db8500-vmodem";
++				};
++
++				// DB8500_REGULATOR_VPLL
++				db8500_vpll_reg: db8500_vpll {
++					regulator-name = "db8500-vpll";
++				};
++
++				// DB8500_REGULATOR_VSMPS1
++				db8500_vsmps1_reg: db8500_vsmps1 {
++					regulator-name = "db8500-vsmps1";
++				};
++
++				// DB8500_REGULATOR_VSMPS2
++				db8500_vsmps2_reg: db8500_vsmps2 {
++					regulator-name = "db8500-vsmps2";
++				};
++
++				// DB8500_REGULATOR_VSMPS3
++				db8500_vsmps3_reg: db8500_vsmps3 {
++					regulator-name = "db8500-vsmps3";
++				};
++
++				// DB8500_REGULATOR_VRF1
++				db8500_vrf1_reg: db8500_vrf1 {
++					regulator-name = "db8500-vrf1";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SVAMMDSP
++				db8500_sva_mmdsp_reg: db8500_sva_mmdsp {
++					regulator-name = "db8500-sva-mmdsp";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SVAMMDSPRET
++				db8500_sva_mmdsp_ret_reg: db8500_sva_mmdsp_ret {
++					regulator-name = "db8500-sva-mmdsp-ret";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SVAPIPE
++				db8500_sva_pipe_reg: db8500_sva_pipe {
++					regulator-name = "db8500_sva_pipe";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SIAMMDSP
++				db8500_sia_mmdsp_reg: db8500_sia_mmdsp {
++					regulator-name = "db8500_sia_mmdsp";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SIAMMDSPRET
++				db8500_sia_mmdsp_ret_reg: db8500_sia_mmdsp_ret {
++					regulator-name = "db8500-sia-mmdsp-ret";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SIAPIPE
++				db8500_sia_pipe_reg: db8500_sia_pipe {
++					regulator-name = "db8500-sia-pipe";
++				};
++
++				// DB8500_REGULATOR_SWITCH_SGA
++				db8500_sga_reg: db8500_sga {
++					regulator-name = "db8500-sga";
++					vin-supply = <&db8500_vape_reg>;
++				};
++
++				// DB8500_REGULATOR_SWITCH_B2R2_MCDE
++				db8500_b2r2_mcde_reg: db8500_b2r2_mcde {
++					regulator-name = "db8500-b2r2-mcde";
++					vin-supply = <&db8500_vape_reg>;
++				};
++
++				// DB8500_REGULATOR_SWITCH_ESRAM12
++				db8500_esram12_reg: db8500_esram12 {
++					regulator-name = "db8500-esram12";
++				};
++
++				// DB8500_REGULATOR_SWITCH_ESRAM12RET
++				db8500_esram12_ret_reg: db8500_esram12_ret {
++					regulator-name = "db8500-esram12-ret";
++				};
++
++				// DB8500_REGULATOR_SWITCH_ESRAM34
++				db8500_esram34_reg: db8500_esram34 {
++					regulator-name = "db8500-esram34";
++				};
++
++				// DB8500_REGULATOR_SWITCH_ESRAM34RET
++				db8500_esram34_ret_reg: db8500_esram34_ret {
++					regulator-name = "db8500-esram34-ret";
++				};
++			};
++
++			ab8500 at 5 {
++				compatible = "stericsson,ab8500";
++				reg = <5>; /* mailbox 5 is i2c */
++				interrupts = <0 40 0x4>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++
++				ab8500-rtc {
++					compatible = "stericsson,ab8500-rtc";
++					interrupts = <17 0x4
++					              18 0x4>;
++					interrupt-names = "60S", "ALARM";
++				};
++
++				ab8500-gpadc {
++					compatible = "stericsson,ab8500-gpadc";
++					interrupts = <32 0x4
++						      39 0x4>;
++					interrupt-names = "HW_CONV_END", "SW_CONV_END";
++					vddadc-supply = <&ab8500_ldo_tvout_reg>;
++				};
++
++				ab8500-usb {
++					compatible = "stericsson,ab8500-usb";
++					interrupts = < 90 0x4
++						       96 0x4
++						       14 0x4
++						       15 0x4
++						       79 0x4
++						       74 0x4
++						       75 0x4>;
++					interrupt-names = "ID_WAKEUP_R",
++							  "ID_WAKEUP_F",
++							  "VBUS_DET_F",
++							  "VBUS_DET_R",
++							  "USB_LINK_STATUS",
++							  "USB_ADP_PROBE_PLUG",
++							  "USB_ADP_PROBE_UNPLUG";
++					vddulpivio18-supply = <&ab8500_ldo_initcore_reg>;
++					v-ape-supply = <&db8500_vape_reg>;
++					musb_1v8-supply = <&db8500_vsmps2_reg>;
++				};
++
++				ab8500-ponkey {
++					compatible = "stericsson,ab8500-ponkey";
++					interrupts = <6 0x4
++						      7 0x4>;
++					interrupt-names = "ONKEY_DBF", "ONKEY_DBR";
++				};
++
++				ab8500-sysctrl {
++					compatible = "stericsson,ab8500-sysctrl";
++				};
++
++				ab8500-pwm {
++					compatible = "stericsson,ab8500-pwm";
++				};
++
++				ab8500-debugfs {
++					compatible = "stericsson,ab8500-debug";
++				};
++
++				codec: ab8500-codec {
++					compatible = "stericsson,ab8500-codec";
++
++					stericsson,earpeice-cmv = <950>; /* Units in mV. */
++				};
++
++				ab8500-regulators {
++					compatible = "stericsson,ab8500-regulator";
++
++					// supplies to the display/camera
++					ab8500_ldo_aux1_reg: ab8500_ldo_aux1 {
++						regulator-name = "V-DISPLAY";
++						regulator-min-microvolt = <2500000>;
++						regulator-max-microvolt = <2900000>;
++						regulator-boot-on;
++						/* BUG: If turned off MMC will be affected. */
++						regulator-always-on;
++					};
++
++					// supplies to the on-board eMMC
++					ab8500_ldo_aux2_reg: ab8500_ldo_aux2 {
++						regulator-name = "V-eMMC1";
++						regulator-min-microvolt = <1100000>;
++						regulator-max-microvolt = <3300000>;
++					};
++
++					// supply for VAUX3; SDcard slots
++					ab8500_ldo_aux3_reg: ab8500_ldo_aux3 {
++						regulator-name = "V-MMC-SD";
++						regulator-min-microvolt = <1100000>;
++						regulator-max-microvolt = <3300000>;
++					};
++
++					// supply for v-intcore12; VINTCORE12 LDO
++					ab8500_ldo_initcore_reg: ab8500_ldo_initcore {
++						regulator-name = "V-INTCORE";
++					};
++
++					// supply for tvout; gpadc; TVOUT LDO
++					ab8500_ldo_tvout_reg: ab8500_ldo_tvout {
++						regulator-name = "V-TVOUT";
++					};
++
++					// supply for ab8500-usb; USB LDO
++					ab8500_ldo_usb_reg: ab8500_ldo_usb {
++						regulator-name = "dummy";
++					};
++
++					// supply for ab8500-vaudio; VAUDIO LDO
++					ab8500_ldo_audio_reg: ab8500_ldo_audio {
++						regulator-name = "V-AUD";
++					};
++
++					// supply for v-anamic1 VAMic1-LDO
++					ab8500_ldo_anamic1_reg: ab8500_ldo_anamic1 {
++						regulator-name = "V-AMIC1";
++					};
++
++					// supply for v-amic2; VAMIC2 LDO; reuse constants for AMIC1
++					ab8500_ldo_amamic2_reg: ab8500_ldo_amamic2 {
++						regulator-name = "V-AMIC2";
++					};
++
++					// supply for v-dmic; VDMIC LDO
++					ab8500_ldo_dmic_reg: ab8500_ldo_dmic {
++						regulator-name = "V-DMIC";
++					};
++
++					// supply for U8500 CSI/DSI; VANA LDO
++					ab8500_ldo_ana_reg: ab8500_ldo_ana {
++						regulator-name = "V-CSI/DSI";
++					};
++				};
++			};
++		};
++
++		i2c at 80004000 {
++			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
++			reg = <0x80004000 0x1000>;
++			interrupts = <0 21 0x4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			clock-frequency = <400000>;
++			stericsson,slsu = <0xe>;
++			stericsson,tft = <1>;
++			stericsson,rft = <8>;
++			stericsson,timeout = <200>;
++			stericsson,i2c_freq_mode_fast;
++		};
++
++		i2c at 80122000 {
++			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
++			reg = <0x80122000 0x1000>;
++			interrupts = <0 22 0x4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			clock-frequency = <400000>;
++			stericsson,slsu = <0xe>;
++			stericsson,tft = <1>;
++			stericsson,rft = <8>;
++			stericsson,timeout = <200>;
++			stericsson,i2c_freq_mode_fast;
++		};
++
++		i2c at 80128000 {
++			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
++			reg = <0x80128000 0x1000>;
++			interrupts = <0 55 0x4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			clock-frequency = <400000>;
++			stericsson,slsu = <0xe>;
++			stericsson,tft = <1>;
++			stericsson,rft = <8>;
++			stericsson,timeout = <200>;
++			stericsson,i2c_freq_mode_fast;
++		};
++
++		i2c at 80110000 {
++			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
++			reg = <0x80110000 0x1000>;
++			interrupts = <0 12 0x4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			clock-frequency = <400000>;
++			stericsson,slsu = <0xe>;
++			stericsson,tft = <1>;
++			stericsson,rft = <8>;
++			stericsson,timeout = <200>;
++			stericsson,i2c_freq_mode_fast;
++		};
++
++		i2c at 8012a000 {
++			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
++			reg = <0x8012a000 0x1000>;
++			interrupts = <0 51 0x4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			clock-frequency = <400000>;
++			stericsson,slsu = <0xe>;
++			stericsson,tft = <1>;
++			stericsson,rft = <8>;
++			stericsson,timeout = <200>;
++			stericsson,i2c_freq_mode_fast;
++		};
++
++		ssp at 80002000 {
++			compatible = "arm,pl022", "arm,primecell";
++			reg = <80002000 0x1000>;
++			interrupts = <0 14 0x4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++
++			// Add one of these for each child device
++			cs-gpios = <&gpio0 31 0x4 &gpio4 14 0x4 &gpio4 16 0x4
++				    &gpio6 22 0x4 &gpio7 0 0x4>;
++
++		};
++
++		uart at 80120000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x80120000 0x1000>;
++			interrupts = <0 11 0x4>;
++			status = "disabled";
++		};
++		uart at 80121000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x80121000 0x1000>;
++			interrupts = <0 19 0x4>;
++			status = "disabled";
++		};
++		uart at 80007000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x80007000 0x1000>;
++			interrupts = <0 26 0x4>;
++			status = "disabled";
++		};
++
++		sdi at 80126000 {
++			compatible = "arm,pl18x", "arm,primecell";
++			reg = <0x80126000 0x1000>;
++			interrupts = <0 60 0x4>;
++			status = "disabled";
++		};
++		sdi at 80118000 {
++			compatible = "arm,pl18x", "arm,primecell";
++			reg = <0x80118000 0x1000>;
++			interrupts = <0 50 0x4>;
++			status = "disabled";
++		};
++		sdi at 80005000 {
++			compatible = "arm,pl18x", "arm,primecell";
++			reg = <0x80005000 0x1000>;
++			interrupts = <0 41 0x4>;
++			status = "disabled";
++		};
++		sdi at 80119000 {
++			compatible = "arm,pl18x", "arm,primecell";
++			reg = <0x80119000 0x1000>;
++			interrupts = <0 59 0x4>;
++			status = "disabled";
++		};
++		sdi at 80114000 {
++			compatible = "arm,pl18x", "arm,primecell";
++			reg = <0x80114000 0x1000>;
++			interrupts = <0 99 0x4>;
++			status = "disabled";
++		};
++		sdi at 80008000 {
++			compatible = "arm,pl18x", "arm,primecell";
++			reg = <0x80114000 0x1000>;
++			interrupts = <0 100 0x4>;
++			status = "disabled";
++		};
++
++		external-bus at 50000000 {
++			compatible = "simple-bus";
++			reg = <0x50000000 0x4000000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x50000000 0x4000000>;
++			status = "disabled";
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+index 7e334d4..df6fc57 100644
+--- a/arch/arm/boot/dts/snowball.dts
++++ b/arch/arm/boot/dts/snowball.dts
+@@ -10,7 +10,7 @@
+  */
  
- 		mop500_uib_init();
+ /dts-v1/;
+-/include/ "db8500.dtsi"
++/include/ "dbx5x0.dtsi"
  
--	} else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
--		mop500_of_msp_init(parent);
- 	} else if (of_machine_is_compatible("st-ericsson,hrefv60+")) {
- 		/*
- 		 * The HREFv60 board removed a GPIO expander and routed
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index 3fbf48f..e56c983 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -98,8 +98,6 @@ void __init mop500_pinmaps_init(void);
- void __init snowball_pinmaps_init(void);
- void __init hrefv60_pinmaps_init(void);
- void mop500_msp_init(struct device *parent);
--/* Due for removal once the MSP driver has been fully DT:ed. */
--void mop500_of_msp_init(struct device *parent);
- 
- int __init mop500_uib_init(void);
- void mop500_uib_i2c_add(int busnum, struct i2c_board_info *info,
+ / {
+ 	model = "Calao Systems Snowball platform with device tree";
 -- 
 1.7.9.5
