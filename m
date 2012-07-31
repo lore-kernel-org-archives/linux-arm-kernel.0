@@ -1,26 +1,15 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 31 Jul 2012 15:56:15 +0100
-Subject: [PATCH 1/5] ASoC: dapm: If one widget fails, do not force all
- subsequent widgets to fail too
-In-Reply-To: <1343745944-18418-2-git-send-email-lee.jones@linaro.org>
-References: <1343745944-18418-1-git-send-email-lee.jones@linaro.org>
- <1343745944-18418-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120731145614.GZ4468@opensource.wolfsonmicro.com>
+From: dczarn@o2.pl (Damian Czarnecki)
+Date: Tue, 31 Jul 2012 14:58:34 +0000 (UTC)
+Subject: PXA 26x GPIO possible regression in kernel 3.3 and newer
+References: <loom.20120728T185108-140@post.gmane.org>
+ <1343506998.34469.YahooMailClassic@web171606.mail.ir2.yahoo.com>
+ <loom.20120729T083200-889@post.gmane.org>
+Message-ID: <loom.20120731T165621-512@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 03:45:40PM +0100, Lee Jones wrote:
-> If a list of widgets is provided and one of them fails to be added as
-> a control, the present semantics fail all subsequent widgets. A better
-> solution would be to only fail that widget, but pursue in attempting
-> to add the rest of the list.
+Thank you, Miko?aj. Your solution fixes the problem.
+Maybe you should put in mainline?
 
-To reiterate, this is in *no* way urgent or even a bug fix.
-
->  			dev_err(dapm->dev,
->  				"ASoC: Failed to create DAPM control %s\n",
->  				widget->name);
-> -			ret = -ENOMEM;
-> -			break;
-
-Indeed, removing the error return is a regression.
+As to Blue Angel and the kernel: I have given up on that.
+Too many things doesn't work.
