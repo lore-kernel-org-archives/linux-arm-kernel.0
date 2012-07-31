@@ -1,52 +1,50 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 31 Jul 2012 08:36:45 +0200
-Subject: [PATCH 15/16] ARM: Kirkwood: Describe iConnect LEDs in DT.
-In-Reply-To: <5016FE26.8090509@baker-net.org.uk>
-References: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
- <1342805751-18048-16-git-send-email-andrew@lunn.ch>
- <5016FE26.8090509@baker-net.org.uk>
-Message-ID: <20120731063645.GO18016@lunn.ch>
+From: B37400@freescale.com (Singh Sandeep-B37400)
+Date: Tue, 31 Jul 2012 06:40:31 +0000
+Subject: [2/3][PATCH][v2] TDM Framework
+In-Reply-To: <20502.38341.619003.356462@quad.stoffel.home>
+References: <1343397940-12975-1-git-send-email-sandeep@freescale.com>
+ <20498.41365.853741.261834@quad.stoffel.home>
+ <3F1D9DCAAB49B94D88DBE05911FA4E6E511095@039-SN1MPN1-006.039d.mgd.msft.net>
+ <20502.38341.619003.356462@quad.stoffel.home>
+Message-ID: <3F1D9DCAAB49B94D88DBE05911FA4E6E511B76@039-SN1MPN1-006.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 10:35:34PM +0100, Adam Baker wrote:
-> On 20/07/12 18:35, Andrew Lunn wrote:
-> 
-> Sorry it's taken a while to spot this but I've got one comment below
-> 
-> >Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> >---
-> >  arch/arm/boot/dts/kirkwood-iconnect.dts |   34 +++++++++++++++++++++++
-> >  arch/arm/mach-kirkwood/board-iconnect.c |   46 -------------------------------
-> >  2 files changed, 34 insertions(+), 46 deletions(-)
-> >
-> >diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
-> >index a7dd07b..b77b38f 100644
-> >--- a/arch/arm/boot/dts/kirkwood-iconnect.dts
-> >+++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
-> >@@ -31,4 +31,38 @@
-> >  			status = "ok";
-> >  		};
-> >  	};
-> >+	gpio-leds {
-> >+		compatible = "gpio-leds";
-> >+
-> >+		led-level {
-> >+			label = "led_level";
-> >+			gpios = <&gpio1 9 0>;
-> >+			linux,default-trigger = "default-on";
-> >+		};
-> >+		power-blue {
-> >+			label = "power:blue";
-> >+			gpios = <&gpio1 11 0>;
-> >+			linux,default-trigger = "timer";
-> >+		};
-> 
-> Is there any reason that power:red is missing here?
 
-The monkey driving the keyboard is not reliable at monkey work...
+-----Original Message-----
+From: John Stoffel [mailto:john at stoffel.org] 
+Sent: Monday, July 30, 2012 7:40 PM
+To: Singh Sandeep-B37400
+Cc: John Stoffel; linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org; galak at kernel.crashing.org; linux-kernel at vger.kernel.org; devel at driverdev.osuosl.org
+Subject: RE: [2/3][PATCH][v2] TDM Framework
 
-Please create a patch and i will try to get it into rc1.
+>>>>> "Singh" == Singh Sandeep-B37400 <B37400@freescale.com> writes:
 
-       Thanks
-  	 Andrew
+Singh> -----Original Message-----
+Singh> From: John Stoffel [mailto:john at stoffel.org]
+Singh> Sent: 27 July 2012 19:42
+Singh> To: Singh Sandeep-B37400
+Singh> Cc: linuxppc-dev at lists.ozlabs.org; 
+Singh> linux-arm-kernel at lists.infradead.org; galak at kernel.crashing.org; 
+Singh> linux-kernel at vger.kernel.org; devel at driverdev.osuosl.org
+Singh> Subject: Re: [2/3][PATCH][v2] TDM Framework
+
+
+>> From: Sandeep Singh <Sandeep@freescale.com> TDM Framework is an 
+>> attempt to provide a platform independent layer which can offer a 
+>> standard interface  for TDM access to different client modules.
+
+Singh> Please don't use TLAs (Three Letter Acronyms) like TDM without explaining the clearly and up front.  It makes it hard for anyone else who doens't know your code to look it over without having to spend lots of time poking around to figure it out from either context or somewhere else.
+
+Singh> [Sandeep] Patch for documentation for TDM is present in this 
+Singh> patch set, which explains TDM in detail. Should we do this in 
+Singh> commit message too??  Link too documentation patch:
+Singh> http://patchwork.ozlabs.org/patch/173680/
+
+You should put the expansion of TDM into the initial commit message, and also into the Kconfig text, so that someone configuring the kernel has a clue what you're talking about.  
+[Sandeep] Thanks for suggestion. Will take care.
+
+Try to approach this as a brandnew user who doesn't have your knowledge of the software.  Write for the un-initiated if at all possible.
+
+
+John
