@@ -1,39 +1,34 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 31 Jul 2012 19:04:42 -0400
-Subject: [PATCH 06/22] ARM: LPAE: use phys_addr_t in alloc_init_pud()
+Date: Tue, 31 Jul 2012 19:04:47 -0400
+Subject: [PATCH 11/22] ARM: LPAE: define ARCH_LOW_ADDRESS_LIMIT for bootmem
 In-Reply-To: <1343775898-28345-1-git-send-email-cyril@ti.com>
 References: <1343775898-28345-1-git-send-email-cyril@ti.com>
-Message-ID: <1343775898-28345-7-git-send-email-cyril@ti.com>
+Message-ID: <1343775898-28345-12-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vitaly Andrianov <vitalya@ti.com>
+This patch adds an architecture defined override for ARCH_LOW_ADDRESS_LIMIT.
+On PAE systems, the absence of this override causes bootmem to incorrectly
+limit itself to 32-bit addressable physical memory.
 
-This patch fixes the alloc_init_pud() function to use phys_addr_t instead of
-unsigned long when passing in the phys argument.
-
-This is an extension to commit 97092e0c56830457af0639f6bd904537a150ea4a, which
-applied similar changes elsewhere in the ARM memory management code.
-
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 ---
- arch/arm/mm/mmu.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/memory.h |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index cf4528d..226985c 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -628,7 +628,8 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
- }
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 110495c..0c1b396 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -281,6 +281,8 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
+ #define arch_is_coherent()		0
+ #endif
  
- static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
--	unsigned long end, unsigned long phys, const struct mem_type *type)
-+				  unsigned long end, phys_addr_t phys,
-+				  const struct mem_type *type)
- {
- 	pud_t *pud = pud_offset(pgd, addr);
- 	unsigned long next;
++#define ARCH_LOW_ADDRESS_LIMIT		PHYS_MASK
++
+ #endif
+ 
+ #include <asm-generic/memory_model.h>
 -- 
 1.7.9.5
