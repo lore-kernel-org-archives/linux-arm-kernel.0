@@ -1,24 +1,54 @@
-From: jason.wessel@windriver.com (Jason Wessel)
-Date: Mon, 30 Jul 2012 22:53:04 -0500
-Subject: [PATCH 01/11] kernel/debug: Make use of KGDB_REASON_NMI
-In-Reply-To: <1343649500-18491-1-git-send-email-anton.vorontsov@linaro.org>
-References: <20120730115719.GA5742@lizard>
- <1343649500-18491-1-git-send-email-anton.vorontsov@linaro.org>
-Message-ID: <501756A0.4080405@windriver.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 31 Jul 2012 12:20:52 +0800
+Subject: [PATCH 3/3] cpufreq: Add a generic cpufreq-cpu0 driver
+In-Reply-To: <20120730185344.GT4468@opensource.wolfsonmicro.com>
+References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
+ <1342713281-31114-4-git-send-email-shawn.guo@linaro.org>
+ <20120726131121.GB7306@sirena.org.uk>
+ <20120730065218.GB31509@S2101-09.ap.freescale.net>
+ <20120730185344.GT4468@opensource.wolfsonmicro.com>
+Message-ID: <20120731042050.GF762@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2012 06:58 AM, Anton Vorontsov wrote:
-> Currently kernel never set KGDB_REASON_NMI. We do now, when we enter
-> KGDB/KDB from an NMI.
->
-> This is not to be confused with kgdb_nmicallback(), NMI callback is
-> an entry for the slave CPUs during CPUs roundup, but REASON_NMI is the
-> entry for the master CPU.
+On Mon, Jul 30, 2012 at 07:53:45PM +0100, Mark Brown wrote:
+> Quite honestly this seems totally unrealistic for the majority of users,
 
-No need for confusion here :-)
+I doubt that.  Searching drivers/cpufreq folder, I can see there are
+several cpufreq drivers scaling voltage with regulator API, but none
+of them is calling regulator_set_voltage_time to find voltage latency.
+That said, all these users are specify transition latency on their own.
 
-I'll take this one for the kernel merge window if it passes regression tests, no reason not to be setting the stop codes properly.
+> especially given the very poor documentation for this stuff which SoC
+> vendors typically provide.  It's a reasonable amount of work to go back
+> and figure this stuff out (especially given that it should be varying
+> depending on the transition in question), and it's going to give us a
+> bunch of magic numbers in people's bindings.
+> 
+There will be only one magic number, and it can easily become "magic"
+with some comments put there.
 
-Thanks,
-Jason.
+> No, add a new API.
+> 
+Is the following patch what you are ordering here?
+
+diff --git a/include/linux/regulator/consumer.h b/include/linux/regulator/consumer.h
+index da339fd..bfd3cfb 100644
+--- a/include/linux/regulator/consumer.h
++++ b/include/linux/regulator/consumer.h
+@@ -352,4 +352,11 @@ static inline void regulator_set_drvdata(struct regulator *regulator,
+
+ #endif
+
++static inline int regulator_set_voltage_tolerance(struct regulator *regulator,
++                                                 int new_uV, int tol_uV)
++{
++       return regulator_set_voltage(regulator,
++                                    new_uV - tol_uV, new_uV + tol_uV);
++}
++
+ #endif
+
+-- 
+Regards,
+Shawn
