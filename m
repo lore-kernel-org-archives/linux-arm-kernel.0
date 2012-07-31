@@ -1,45 +1,54 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 31 Jul 2012 11:54:42 +0000
-Subject: [PATCH 2/5] clk: mmp: add clock definition for pxa168
-In-Reply-To: <1343716792-10399-2-git-send-email-xiechao.mail@gmail.com>
-References: <1343716792-10399-1-git-send-email-xiechao.mail@gmail.com>
- <1343716792-10399-2-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <201207311154.42866.arnd@arndb.de>
+Date: Tue, 31 Jul 2012 12:18:43 +0000
+Subject: [PATCH v2 4/7] ARM: pxa: add devicetree code for irq handling
+In-Reply-To: <50165466.1020901@gmail.com>
+References: <1343330187-20049-1-git-send-email-zonque@gmail.com>
+ <CAN1soZwmyf=Q5mBJhr6AXYp0RzJDj9eN0GBRFzB0gUMzwJzO3g@mail.gmail.com>
+ <50165466.1020901@gmail.com>
+Message-ID: <201207311218.43440.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 31 July 2012, Chao Xie wrote:
-> +#define APBC_RTC       APBC_REG(0x28)
-> +#define APBC_TWSI0     APBC_REG(0x2c)
-> +#define APBC_KPC       APBC_REG(0x30)
-> +#define APBC_UART0     APBC_REG(0x00)
-> +#define APBC_UART1     APBC_REG(0x04)
-> +#define APBC_GPIO      APBC_REG(0x08)
-> +#define APBC_PWM0      APBC_REG(0x0c)
-> +#define APBC_PWM1      APBC_REG(0x10)
-> +#define APBC_PWM2      APBC_REG(0x14)
-> +#define APBC_PWM3      APBC_REG(0x18)
-> +#define APBC_SSP0      APBC_REG(0x81c)
-> +#define APBC_SSP1      APBC_REG(0x820)
-> +#define APBC_SSP2      APBC_REG(0x84c)
-> +#define APBC_SSP3      APBC_REG(0x858)
-> +#define APBC_SSP4      APBC_REG(0x85c)
-> +#define APBC_TWSI1     APBC_REG(0x6c)
-> +#define APBC_UART2     APBC_REG(0x70)
-> +
-> +#define APMU_SDH0      APMU_REG(0x54)
-> +#define APMU_SDH1      APMU_REG(0x58)
-> +#define APMU_USB       APMU_REG(0x5c)
-> +#define APMU_DISP0     APMU_REG(0x4c)
-> +#define APMU_CCIC0     APMU_REG(0x50)
-> +#define APMU_DFC       APMU_REG(0x60)
+On Monday 30 July 2012, Daniel Mack wrote:
+> On 30.07.2012 10:55, Haojian Zhuang wrote:
+> > On Mon, Jul 30, 2012 at 4:34 PM, Daniel Mack <zonque@gmail.com> wrote:
+> >> On 30.07.2012 10:31, Arnd Bergmann wrote:
+> >>> On Sunday 29 July 2012, Daniel Mack wrote:
+> >>>> And I also wonder whether using the second spec value for a priority
+> >>>> wouldn't be somehow abusive? Isn't that considered to denote the trigger
+> >>>> flags in contexts of interrupt controllers? At least, that is what
+> >>>> irq_domain_xlate_twocell() assumes.
+> >>>
+> >>> You would not use irq_domain_xlate_twocell in that scenario but provide your
+> >>> own, which is ok. Interpreting the second cell as the trigger flags is just
+> >>> a convenient default because it's the most common use for that.
+> >>
+> >> I see. Don't know how much sense it makes to have that detail
+> >> configurable though. Haojian? And I think we can still change that
+> >> detail later.
+> >>
+> > Arnd's suggestion is good. So we can setup each interrupt's priority
+> > while parsing
+> > all these pxa interrupts. In current code, we only assign priority
+> > with the irq number.
+> > Maybe it's not perfect solution. For example, Timer interrupt should
+> > have highest
+> > priority. LCD interrupt also has higher priority.
+> 
+> Arnd mentioned that instead of using the default
+> irq_domain_xlate_onecell(), we can hook up our own translation function.
+> While that is true, I wonder how that value that we send back in
+> *out_type will ever appear in the irq_chip callbacks. Looking at the
+> code that calls ->xlate(), I can see that irq_create_of_mapping() would
+> call irq_set_irq_type() with our passed value, which will then &= it
+> with IRQ_TYPE_SENSE_MASK (which is 0xf which doesn't suffice for our up
+> to 96 interrupts).
+> 
+> Arnd, either I don't get your point, or this would need some changes in
+> the irqdomain core. Could you elaborate a little?
 
-Same comment as for patch 1: get the address from the device tree and just
-define those macros to the offset, like:
-
-#define APBC_RTC       0x28
-
-apbc_clks[rtc_clk] = mmp_clk_register_apbc(rtc_clk, clk32k, APBC_RTC, 10, APBC_POWER_CTRL, mmp_clk_lock);
-clk_register_clkdev(apbc_clks[rtc_clk], NULL, "sa1100-rtc");
+When you have your own xlate function, you would still always set the default
+flags (IRQ_TYPE_NONE), but you do record the priority from the flags
+in the same way that at91_aic_irq_domain_xlate does.
 
 	Arnd
