@@ -1,54 +1,42 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Tue, 31 Jul 2012 17:04:46 +0200
-Subject: [PATCH 3/6] mv643xx.c: Add basic device tree support.
-In-Reply-To: <5017EBE8.10208@codethink.co.uk> (Ben Dooks's message of "Tue, 31
- Jul 2012 15:30:00 +0100")
-References: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
- <1343661359-10150-4-git-send-email-ian.molton@codethink.co.uk>
- <87obmw5rm9.fsf@lebrac.rtp-net.org> <5017EBE8.10208@codethink.co.uk>
-Message-ID: <87boiw55v5.fsf@lebrac.rtp-net.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 31 Jul 2012 16:09:08 +0100
+Subject: [PATCH 1/5] ASoC: dapm: If one widget fails, do not force all
+ subsequent widgets to fail too
+In-Reply-To: <20120731145614.GZ4468@opensource.wolfsonmicro.com>
+References: <1343745944-18418-1-git-send-email-lee.jones@linaro.org>
+ <1343745944-18418-2-git-send-email-lee.jones@linaro.org>
+ <20120731145614.GZ4468@opensource.wolfsonmicro.com>
+Message-ID: <5017F514.4030106@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks <ben.dooks@codethink.co.uk> writes:
-
-> On 31/07/12 08:14, Arnaud Patard (Rtp) wrote:
->> Ian Molton<ian.molton@codethink.co.uk>  writes:
->> Hi,
->>
->> [...]
->>
->>> @@ -2873,7 +2913,31 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
->>>   	struct resource *res;
->>>   	int err;
->>>
->>> -	pd = pdev->dev.platform_data;
->>> +	if (pdev->dev.of_node) {
->>> +		struct device_node *np = NULL;
->>> +
->>> +		/* when all users of this driver use FDT, we can remove this */
->>> +		pd = kzalloc(sizeof(*pd), GFP_ATOMIC);
->>> +		if (!pd) {
->>> +			dev_dbg(&pdev->dev, "Could not allocate platform data\n");
->>> +			return -ENOMEM;
->>> +		}
->>> +
->>> +		of_property_read_u32(pdev->dev.of_node,
->>> +			"port_number",&pd->port_number);
->>> +		of_property_read_u32(pdev->dev.of_node,
->>> +			"phy_addr",&pd->phy_addr);
->>
->> I guess we need something for tx_csum_limit in the device tree too. It's
->> important for kirkwood and dove.
+On 31/07/12 15:56, Mark Brown wrote:
+> On Tue, Jul 31, 2012 at 03:45:40PM +0100, Lee Jones wrote:
+>> If a list of widgets is provided and one of them fails to be added as
+>> a control, the present semantics fail all subsequent widgets. A better
+>> solution would be to only fail that widget, but pursue in attempting
+>> to add the rest of the list.
 >
-> Is this something for all kirkwood devices? I think the best way of
-> doing this is to give the driver a new device-tree name and having
-> it set this field in the init sequence.
+> To reiterate, this is in *no* way urgent or even a bug fix.
+
+It fixes sound in our driver.
+
+Without this the card failes to instantiate.
+
+>>   			dev_err(dapm->dev,
+>>   				"ASoC: Failed to create DAPM control %s\n",
+>>   				widget->name);
+>> -			ret = -ENOMEM;
+>> -			break;
 >
-> However we could also do with some of these as dt parameters just in
-> case people want to try and alter them for their own systems.
+> Indeed, removing the error return is a regression.
 
-It's for _all_ kirkwood and dove devices. The kirkwood and dove fifos
-are smaller than the orion/mv78xxx ones (no idea about armada xp/370).
+Isn't the return code incorrect? There are a multitude of reasons why 
+snd_soc_dapm_new_control() would fail. No-memory is just one of them, so 
+why do we force this probable lie?
 
-Arnaud
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
