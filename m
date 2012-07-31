@@ -1,56 +1,71 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 31 Jul 2012 16:15:23 +0100
-Subject: [PATCH 1/6] ASoC: dapm: If one widget fails, do not force all
- subsequent widgets to fail too
-In-Reply-To: <20120731145443.GY4468@opensource.wolfsonmicro.com>
-References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
- <1343741493-17671-3-git-send-email-lee.jones@linaro.org>
- <20120731134214.GK4468@opensource.wolfsonmicro.com>
- <5017EAC3.3080504@linaro.org>
- <20120731142820.GW4468@opensource.wolfsonmicro.com>
- <5017EDCA.4020601@linaro.org>
- <20120731145443.GY4468@opensource.wolfsonmicro.com>
-Message-ID: <5017F68B.3060400@linaro.org>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Tue, 31 Jul 2012 17:12:39 +0200
+Subject: [PATCH 3/6] mv643xx.c: Add basic device tree support.
+In-Reply-To: <5016B727.2030909@codethink.co.uk>
+References: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
+ <CANTYSESY0A7LaKpqUOjyR42e72Rw_6yn9fvarVFUWWJxw43Jcw@mail.gmail.com>
+ <5016B727.2030909@codethink.co.uk>
+Message-ID: <1465148.S7eyX1x8k7@flexo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/07/12 15:54, Mark Brown wrote:
-> On Tue, Jul 31, 2012 at 03:38:02PM +0100, Lee Jones wrote:
->
->> Neither of those are in my Inbox. Blame Mozilla. :)
->
-> You might want to look at a better mail program.
+Hello Ian,
 
-Willingly. Any good suggestions?
+On Monday 30 July 2012 17:32:39 Ian Molton wrote:
+> On 30/07/12 17:19, Amar Nath wrote:
+> > Hi Ian,
+> >
+> > On Mon, Jul 30, 2012 at 8:45 PM, Ian Molton 
+<ian.molton@codethink.co.uk>wrote:
+> >
+> >> -       pd = pdev->dev.platform_data;
+> >> +       if (pdev->dev.of_node) {
+> >> +               struct device_node *np = NULL;
+> >> +
+> >> +               /* when all users of this driver use FDT, we can remove
+> >> this */
+> >> +               pd = kzalloc(sizeof(*pd), GFP_ATOMIC);
 
->> It's better because the whole audio system doesn't fail in the case
->> of minor failure. It'd be like calling off a football game (or
->> whatever you're into) because one of the substitutes ruptured an
->> eyelash.
->
-> It shouldn't make any difference to startup - we should still be
-> checking errors and failing the init if we're failing to add links,
-> this isn't something that's likely to randomly break on a particular
-> boot, it's more something that indicates nobody bothered testing.
->
-> It's certainly totally inappropriate for an "urgent" bugfix.
+Do you really need an allocation in atomic context here? Is not GFP_KERNEL 
+sufficient?
 
-Well it just means that audio won't work for the ux500 for this kernel 
-release, but as we're waiting on clocks, this isn't a big issue for us. 
-If you do take it (with or without the return code), feel free to add it 
-to for-next instead of the -rc:s
+There was a second place like this where you used an atomic allocation that 
+needs fixing.
 
->> During start-up the ux500 has a couple of very unimportant widgets
->> fail. It's the wrong behavior to force failure on the everything
->> audio just because of that.
->
-> Fixes for those errors, however...
-
-I'll leave that to the audio expert. I'd like to move to to something 
-else (that you maintain - perhaps I'll go and mess-up regulators next). :)
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> >> +               if (!pd) {
+> >> +                       dev_dbg(&pdev->dev, "Could not allocate platform
+> >> data\n");
+> >> +                       return -ENOMEM;
+> >> +               }
+> >> +
+> >> +               of_property_read_u32(pdev->dev.of_node,
+> >> +                       "port_number", &pd->port_number);
+> >> +               of_property_read_u32(pdev->dev.of_node,
+> >> +                       "phy_addr", &pd->phy_addr);
+> >> +               np = of_parse_phandle(pdev->dev.of_node, "mdio", 0);
+> >> +               if (np) {
+> >> +                       pd->shared = of_find_device_by_node(np);
+> >> +               } else {
+> >> +                       kfree(pd);
+> >> +                       return -ENODEV;
+> >> +               }
+> >> +       } else {
+> >> +               pd = pdev->dev.platform_data;
+> >> +       }
+> >> +
+> >>         if (pd == NULL) {
+> >>                 dev_err(&pdev->dev, "no mv643xx_eth_platform_data\n");
+> >>                 return -ENODEV;
+> >>
+> > Can this check for pd be moved in the else part above as well, as for the
+> > pd allocation with kzalloc,
+> > we have already made a check for memory allocation failure?
+> 
+> Yes, Folded in for v2.
+> 
+> -Ian
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
