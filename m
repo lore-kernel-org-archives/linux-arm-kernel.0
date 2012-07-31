@@ -1,54 +1,120 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 31 Jul 2012 12:18:43 +0000
-Subject: [PATCH v2 4/7] ARM: pxa: add devicetree code for irq handling
-In-Reply-To: <50165466.1020901@gmail.com>
-References: <1343330187-20049-1-git-send-email-zonque@gmail.com>
- <CAN1soZwmyf=Q5mBJhr6AXYp0RzJDj9eN0GBRFzB0gUMzwJzO3g@mail.gmail.com>
- <50165466.1020901@gmail.com>
-Message-ID: <201207311218.43440.arnd@arndb.de>
+Date: Tue, 31 Jul 2012 11:47:25 +0000
+Subject: [PATCH 1/5] clk: mmp: add mmp specific clocks
+In-Reply-To: <1343716792-10399-1-git-send-email-xiechao.mail@gmail.com>
+References: <1343716792-10399-1-git-send-email-xiechao.mail@gmail.com>
+Message-ID: <201207311147.25862.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 July 2012, Daniel Mack wrote:
-> On 30.07.2012 10:55, Haojian Zhuang wrote:
-> > On Mon, Jul 30, 2012 at 4:34 PM, Daniel Mack <zonque@gmail.com> wrote:
-> >> On 30.07.2012 10:31, Arnd Bergmann wrote:
-> >>> On Sunday 29 July 2012, Daniel Mack wrote:
-> >>>> And I also wonder whether using the second spec value for a priority
-> >>>> wouldn't be somehow abusive? Isn't that considered to denote the trigger
-> >>>> flags in contexts of interrupt controllers? At least, that is what
-> >>>> irq_domain_xlate_twocell() assumes.
-> >>>
-> >>> You would not use irq_domain_xlate_twocell in that scenario but provide your
-> >>> own, which is ok. Interpreting the second cell as the trigger flags is just
-> >>> a convenient default because it's the most common use for that.
-> >>
-> >> I see. Don't know how much sense it makes to have that detail
-> >> configurable though. Haojian? And I think we can still change that
-> >> detail later.
-> >>
-> > Arnd's suggestion is good. So we can setup each interrupt's priority
-> > while parsing
-> > all these pxa interrupts. In current code, we only assign priority
-> > with the irq number.
-> > Maybe it's not perfect solution. For example, Timer interrupt should
-> > have highest
-> > priority. LCD interrupt also has higher priority.
-> 
-> Arnd mentioned that instead of using the default
-> irq_domain_xlate_onecell(), we can hook up our own translation function.
-> While that is true, I wonder how that value that we send back in
-> *out_type will ever appear in the irq_chip callbacks. Looking at the
-> code that calls ->xlate(), I can see that irq_create_of_mapping() would
-> call irq_set_irq_type() with our passed value, which will then &= it
-> with IRQ_TYPE_SENSE_MASK (which is 0xf which doesn't suffice for our up
-> to 96 interrupts).
-> 
-> Arnd, either I don't get your point, or this would need some changes in
-> the irqdomain core. Could you elaborate a little?
+On Tuesday 31 July 2012, Chao Xie wrote:
+> +static int clk_apbc_prepare(struct clk_hw *hw)
+> +{
+> +	struct clk_apbc *apbc = to_clk_apbc(hw);
+> +	unsigned int data;
+> +	unsigned long flags = 0;
+> +
+> +	/*
+> +	 * It may share same register as MUX clock,
+> +	 * and it will impact FNCLK enable. Spinlock is needed
+> +	 */
+> +	if (apbc->lock)
+> +		spin_lock_irqsave(apbc->lock, flags);
+> +
+> +	data = __raw_readl(apbc->base);
+> +	if (apbc->flags & APBC_POWER_CTRL)
+> +		data |= APBC_POWER;
+> +	data |= APBC_FNCLK;
+> +	__raw_writel(data, apbc->base);
 
-When you have your own xlate function, you would still always set the default
-flags (IRQ_TYPE_NONE), but you do record the priority from the flags
-in the same way that at91_aic_irq_domain_xlate does.
+Better use readl_relaxed() in device drivers rather than __raw_readl().
+
+> +#define MPMU_PLL2CR		MPMU_REG(0x0034)
+> +#define MPMU_PLL2_CTRL1		MPMU_REG(0x0414)
+
+In a device driver like this, don't hardcode the MMIO register addresses. Instead,
+use ioremap or of_iomap to get a virtual address from a resource or a DT
+property that gets passed.
+
+> +static int clk_pll2_prepare(struct clk_hw *hw)
+> +{
+> +	unsigned long data;
+> +
+> +	data = __raw_readl(MPMU_PLL2CR);
+> +	if (data & (1 << 8))
+> +		return 0;
+> +	data |= (1 << 8);
+> +	__raw_writel(data, MPMU_PLL2CR);
+> +
+> +	udelay(500);
+> +
+> +	if (cpu_is_mmp2()) {
+> +		/* out of reset */
+> +		data = __raw_readl(MPMU_PLL2_CTRL1);
+> +		data |= (1 << 29);
+> +		__raw_writel(data, MPMU_PLL2CR);
+> +
+> +		udelay(500);
+> +	}
+> +
+> +	return 0;
+> +}
+
+500 microsends is a long time to waste. Can you do an msleep(1)
+instead so the CPU is allowed to sleep here?
+
+The cpu_is_mmp2() check here looks a bit clumsy. I think you're
+better off making this two separate functions like
+
+static int pxa_clk_pll2_prepare(struct clk_hw *hw)
+{
+	unsigned long data;
+
+	data = __raw_readl(MPMU_PLL2CR);
+	if (data & (1 << 8))
+		return 0;
+	data |= (1 << 8);
+	__raw_writel(data, MPMU_PLL2CR);
+
+	udelay(500);
+	return 0;
+}
+
+static int mmp2_clk_pll2_prepare(struct clk_hw *hw)
+{
+	unsigned long data;
+
+	pxa_clk_pll2_prepare(hw);
+
+	/* out of reset */
+	data = __raw_readl(MPMU_PLL2_CTRL1);
+	data |= (1 << 29);
+	__raw_writel(data, MPMU_PLL2CR);
+	udelay(500);
+	return 0;
+}
+
+and then using two separate clk_ops structures but picking the one
+you need based on the chip.
+
+> +#define MMP_CLK_REGISTER_FIXED_RATE(_clk, _name, _rate)			\
+> +	do {								\
+> +		_clk[_name] = clk_register_fixed_rate(NULL, #_name,	\
+> +					NULL, CLK_IS_ROOT, _rate);	\
+> +		clk_register_clkdev(_clk[_name], #_name, NULL);		\
+> +	} while (0)
+> +
+> +#define MMP_CLK_REGISTER_FIXED_FACTOR(_clk, _name, _parent, _flags,	\
+> +				_mul, _div)				\
+> +	do {								\
+> +		_clk[_name] = clk_register_fixed_factor(NULL, #_name,	\
+> +				 #_parent, _flags, _mul, _div);		\
+> +		clk_register_clkdev(_clk[_name], #_name, NULL);		\
+> +	} while (0)
+
+I very much dislike macros like these that don't add much value in terms of
+shortening the code, but at the same time make the code much harder to read
+by someone who is looking over all clock drivers. Better just open-code
+all of the call sites of this.
 
 	Arnd
