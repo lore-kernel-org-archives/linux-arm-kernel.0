@@ -1,73 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Jul 2012 10:09:31 +0100
-Subject: About dma_sync_single_for_{cpu,device}
-In-Reply-To: <20120731064557.GA4676@gobelin>
-References: <20120730202401.GA4947@gobelin> <20120731064557.GA4676@gobelin>
-Message-ID: <20120731090931.GP6802@n2100.arm.linux.org.uk>
+From: ian.molton@codethink.co.uk (Ian Molton)
+Date: Tue, 31 Jul 2012 10:14:23 +0100
+Subject: [PATCH 3/6] mv643xx.c: Add basic device tree support.
+In-Reply-To: <87k3xk5mti.fsf@lebrac.rtp-net.org>
+References: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
+ <1343661359-10150-4-git-send-email-ian.molton@codethink.co.uk>
+ <87obmw5rm9.fsf@lebrac.rtp-net.org> <50179528.2020801@codethink.co.uk>
+ <20120731082742.GU18016@lunn.ch> <50179B31.1000202@codethink.co.uk>
+ <87k3xk5mti.fsf@lebrac.rtp-net.org>
+Message-ID: <5017A1EF.2000307@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 08:45:57AM +0200, Karl Beldan wrote:
-> I was expecting the following to work:
-> 	addr = dma_map_single(dev, buffer, size, DMA_TO_DEVICE);
-> 	dma_sync_single_for_device(dev, buffer, pattern_size, DMA_FROM_DEVICE);
-> 	dev_send(buffer);
-> 	// wait for irq (don't peek in the buffer) ... got irq
-> 	dma_sync_single_for_cpu(dev, buffer, pattern_size, DMA_FROM_DEVICE);
-> 	if (!xfer_done(buffer)) // not RAM value
-> 		dma_sync_single_for_device(dev, buffer, pattern_size, DMA_FROM_DEVICE);
-> 	[...]
+On 31/07/12 09:58, Arnaud Patard (Rtp) wrote:
+>> Ah, this postdates the D-T branches on which I am working being forked.
+> the original patch was from years ago but I noticed only recently it was
+> still not merged and sent this patch. I asked about it on DT because I
+> don't want it to get lost again, even if it looks like not a lot of
+> people are using jumbo frames on kirkwood or dove.
 
-First point is that you clearly do not understand the DMA API at all.  The
-DMA API has the idea of buffer ownership.  Only the owner may access the
-buffer:
+No problem :) actually it works really nicely in DT, just drop it in
+the toplevel includes!
 
-*CPU OWNS THE BUFFER*
-dma_map_single()
-*DEVICE OWNS THE BUFFER*
-dma_sync_single_for_cpu()
-*CPU OWNS THE BUFFER*
-dma_sync_single_for_device()
-*DEVICE OWNS THE BUFFER*
-dma_unmap_single()
-*CPU OWNS THE BUFFER*
-
-So, there is absolutely no noeed what so ever to follow dma_map_single()
-with dma_sync_single_for_device().
-
-Second point is that you should not change the 'direction' argument while
-a buffer is mapped.
-
-Thirdly, enable DMA API debugging (DMA_API_DEBUG) to make sure you're
-using the DMA API correctly.
-
-Fourthly, remember that the CPU deals with cache lines, and dirty cache
-lines may be written back in their _entirety_ - which means that data
-DMA'd from a device in the same cache line that you've modified via the
-CPU will not work (either the data in the cache line has to be invalidated
-and therefore the CPU update discarded, or the cache line has to be flushed
-back to RAM and the DMA'd data is overwritten.)  Hence why the buffer
-ownership rules are extremely important.
-
-The solution for this fourth point is to use coherent DMA memory for things
-like ring buffers and the like, which does not suffer from this.
-
-> Maybe the following comment in dma-mapping.c explains the situation :
-> /*
->  * The DMA API is built upon the notion of "buffer ownership".  A buffer
->  * is either exclusively owned by the CPU (and therefore may be accessed
->  * by it) or exclusively owned by the DMA device.  These helper functions
->  * represent the transitions between these two ownership states.
->  *
->  * Note, however, that on later ARMs, this notion does not work due to
->  * speculative prefetches.  We model our approach on the assumption that
->  * the CPU does do speculative prefetches, which means we clean caches
->  * before transfers and delay cache invalidation until transfer completion.
->  *
->  */
-
-Even with that comment, the idea of buffer ownership must be preserved by
-drivers, and they must follow that rule.  The fact that some ARM CPU
-do not respect the ownership entirely is worked around inside the DMA API
-and is of no interest to drivers.  Feroceon is not one CPU which does this
-though.
+-Ian
