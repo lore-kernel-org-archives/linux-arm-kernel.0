@@ -1,212 +1,76 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 30 Jul 2012 21:29:18 -0300
-Subject: [PATCH 1/2] ARM: mx23: Fix registers range
-Message-ID: <1343694559-3373-1-git-send-email-festevam@gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 30 Jul 2012 17:31:14 -0700
+Subject: [RFC 1/6] ARM: OMAP3: PRM: move prcm interrupt handlers to PRM
+ driver code
+In-Reply-To: <1342197459-7920-2-git-send-email-t-kristo@ti.com> (Tero Kristo's
+ message of "Fri, 13 Jul 2012 19:37:34 +0300")
+References: <1342197459-7920-1-git-send-email-t-kristo@ti.com>
+ <1342197459-7920-2-git-send-email-t-kristo@ti.com>
+Message-ID: <87ipd4g4a5.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Tero Kristo <t-kristo@ti.com> writes:
 
-Fix registers range.
+> PM code doesn't really care about the PRCM wakeup + io interrupts on
+> OMAP3, as these are used only for acking PRCM internal events, and the
+> IO chain handler is taken care of by hwmod code. Thus move the interrupt
+> handling logic from pm34xx.c to prm2xxx_3xxx.c file. This patch also
+> includes a minor cleanup for removing the priority handling and replacing
+> it with a mechanism for acking pending events. This gets rid of the need
+> for registering the shared interrupt handlers in specific order.
+>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx23.dtsi |   52 +++++++++++++++++++++---------------------
- 1 files changed, 26 insertions(+), 26 deletions(-)
+Like Rajendra, I found this combination a bit difficult to review, so I
+decided to apply it and test it first.
 
-diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index a874dbf..e613831 100644
---- a/arch/arm/boot/dts/imx23.dtsi
-+++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -51,11 +51,11 @@
- 
- 			dma-apbh at 80004000 {
- 				compatible = "fsl,imx23-dma-apbh";
--				reg = <0x80004000 2000>;
-+				reg = <0x80004000 0x2000>;
- 			};
- 
- 			ecc at 80008000 {
--				reg = <0x80008000 2000>;
-+				reg = <0x80008000 0x2000>;
- 				status = "disabled";
- 			};
- 
-@@ -63,7 +63,7 @@
- 				compatible = "fsl,imx23-gpmi-nand";
- 				#address-cells = <1>;
- 				#size-cells = <1>;
--				reg = <0x8000c000 2000>, <0x8000a000 2000>;
-+				reg = <0x8000c000 0x2000>, <0x8000a000 0x2000>;
- 				reg-names = "gpmi-nand", "bch";
- 				interrupts = <13>, <56>;
- 				interrupt-names = "gpmi-dma", "bch";
-@@ -72,14 +72,14 @@
- 			};
- 
- 			ssp0: ssp at 80010000 {
--				reg = <0x80010000 2000>;
-+				reg = <0x80010000 0x2000>;
- 				interrupts = <15 14>;
- 				fsl,ssp-dma-channel = <1>;
- 				status = "disabled";
- 			};
- 
- 			etm at 80014000 {
--				reg = <0x80014000 2000>;
-+				reg = <0x80014000 0x2000>;
- 				status = "disabled";
- 			};
- 
-@@ -87,7 +87,7 @@
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				compatible = "fsl,imx23-pinctrl", "simple-bus";
--				reg = <0x80018000 2000>;
-+				reg = <0x80018000 0x2000>;
- 
- 				gpio0: gpio at 0 {
- 					compatible = "fsl,imx23-gpio", "fsl,mxs-gpio";
-@@ -273,32 +273,32 @@
- 			};
- 
- 			emi at 80020000 {
--				reg = <0x80020000 2000>;
-+				reg = <0x80020000 0x2000>;
- 				status = "disabled";
- 			};
- 
- 			dma-apbx at 80024000 {
- 				compatible = "fsl,imx23-dma-apbx";
--				reg = <0x80024000 2000>;
-+				reg = <0x80024000 0x2000>;
- 			};
- 
- 			dcp at 80028000 {
--				reg = <0x80028000 2000>;
-+				reg = <0x80028000 0x2000>;
- 				status = "disabled";
- 			};
- 
- 			pxp at 8002a000 {
--				reg = <0x8002a000 2000>;
-+				reg = <0x8002a000 0x2000>;
- 				status = "disabled";
- 			};
- 
- 			ocotp at 8002c000 {
--				reg = <0x8002c000 2000>;
-+				reg = <0x8002c000 0x2000>;
- 				status = "disabled";
- 			};
- 
- 			axi-ahb at 8002e000 {
--				reg = <0x8002e000 2000>;
-+				reg = <0x8002e000 0x2000>;
- 				status = "disabled";
- 			};
- 
-@@ -310,14 +310,14 @@
- 			};
- 
- 			ssp1: ssp at 80034000 {
--				reg = <0x80034000 2000>;
-+				reg = <0x80034000 0x2000>;
- 				interrupts = <2 20>;
- 				fsl,ssp-dma-channel = <2>;
- 				status = "disabled";
- 			};
- 
- 			tvenc at 80038000 {
--				reg = <0x80038000 2000>;
-+				reg = <0x80038000 0x2000>;
- 				status = "disabled";
- 			};
-                 };
-@@ -330,37 +330,37 @@
- 			ranges;
- 
- 			clkctl at 80040000 {
--				reg = <0x80040000 2000>;
-+				reg = <0x80040000 0x2000>;
- 				status = "disabled";
- 			};
- 
- 			saif0: saif at 80042000 {
--				reg = <0x80042000 2000>;
-+				reg = <0x80042000 0x2000>;
- 				status = "disabled";
- 			};
- 
- 			power at 80044000 {
--				reg = <0x80044000 2000>;
-+				reg = <0x80044000 0x2000>;
- 				status = "disabled";
- 			};
- 
- 			saif1: saif at 80046000 {
--				reg = <0x80046000 2000>;
-+				reg = <0x80046000 0x2000>;
- 				status = "disabled";
- 			};
- 
- 			audio-out at 80048000 {
--				reg = <0x80048000 2000>;
-+				reg = <0x80048000 0x2000>;
- 				status = "disabled";
- 			};
- 
- 			audio-in at 8004c000 {
--				reg = <0x8004c000 2000>;
-+				reg = <0x8004c000 0x2000>;
- 				status = "disabled";
- 			};
- 
- 			lradc at 80050000 {
--				reg = <0x80050000 2000>;
-+				reg = <0x80050000 0x2000>;
- 				status = "disabled";
- 			};
- 
-@@ -370,26 +370,26 @@
- 			};
- 
- 			i2c at 80058000 {
--				reg = <0x80058000 2000>;
-+				reg = <0x80058000 0x2000>;
- 				status = "disabled";
- 			};
- 
- 			rtc at 8005c000 {
- 				compatible = "fsl,imx23-rtc", "fsl,stmp3xxx-rtc";
--				reg = <0x8005c000 2000>;
-+				reg = <0x8005c000 0x2000>;
- 				interrupts = <22>;
- 			};
- 
- 			pwm: pwm at 80064000 {
- 				compatible = "fsl,imx23-pwm";
--				reg = <0x80064000 2000>;
-+				reg = <0x80064000 0x2000>;
- 				#pwm-cells = <2>;
- 				fsl,pwm-number = <5>;
- 				status = "disabled";
- 			};
- 
- 			timrot at 80068000 {
--				reg = <0x80068000 2000>;
-+				reg = <0x80068000 0x2000>;
- 				status = "disabled";
- 			};
- 
-@@ -429,7 +429,7 @@
- 		ranges;
- 
- 		usbctrl at 80080000 {
--			reg = <0x80080000 0x10000>;
-+			reg = <0x80080000 0x40000>;
- 			status = "disabled";
- 		};
- 	};
--- 
-1.7.1
+Testing with just this patch (on top of Paul's omap4_warnings_fix_3.6
+branch, which has the setup_preprogram hooks), and I get a hang on
+3530 and 3730 Overo platforms (works fine on 3430/n900 and 3630/xM.)
+
+I'm not sure what is happening yet, but there seems to be a race between
+the IO and wkup handlers...
+
+[...]
+
+> +/**
+> + * omap3xxx_prm_clear_wakeups - clears wakeup event sources
+> + * @events: active PRCM interrupt event mask
+> + *
+> + * This function will first check if PRCM chain handler detected
+> + * a wakeup event or not. If yes, it will continue to clear any
+> + * pending wakeup events from PRCM module. Typically the module
+> + * will generate an actual interrupt together with the wakeup event,
+> + * which will then be handled separately by the driver code.
+> + */
+> +void omap3xxx_prm_clear_wakeups(unsigned long *events)
+> +{
+> +	int c;
+> +
+> +	/*
+> +	 * If we didn't come here because of a wakeup event, do nothing
+> +	 */
+> +	if (!(events[0] & OMAP3430_WKUP_ST_MASK))
+> +		return;
+
+... because if I comment out the above two lines, it goes back to
+working again.
+
+> +	c = _prcm_clear_mod_irqs(WKUP_MOD, 1);
+> +	c += _prcm_clear_mod_irqs(CORE_MOD, 1);
+> +	c += _prcm_clear_mod_irqs(OMAP3430_PER_MOD, 1);
+> +	if (omap_rev() > OMAP3430_REV_ES1_0) {
+> +		c += _prcm_clear_mod_irqs(CORE_MOD, 3);
+> +		c += _prcm_clear_mod_irqs(OMAP3430ES2_USBHOST_MOD, 1);
+> +	}
+> +}
+
+At first, I wasn't sure why this was happening on Overo boards and not
+on the other boards, but then I notcied there was a *lot* more pm_wkup
+interrupts during boot on Overo compared to the other boards.  This is
+because of the GPIO IRQ for the network interface as well as the network
+stack itself setting timers, resulting in a lot more pm_wkup events
+during boot and making the race more likely.
+
+Kevin
