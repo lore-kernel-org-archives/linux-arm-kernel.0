@@ -1,40 +1,35 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 31 Jul 2012 19:49:01 +0200
-Subject: [PATCH 4/4] media: mx2_camera: Fix clock handling for i.MX27.
-In-Reply-To: <Pine.LNX.4.64.1207311644590.27888@axis700.grange>
-References: <1343301637-19676-1-git-send-email-javier.martin@vista-silicon.com>
- <1343301637-19676-5-git-send-email-javier.martin@vista-silicon.com>
- <Pine.LNX.4.64.1207311644590.27888@axis700.grange>
-Message-ID: <20120731174901.GD30009@pengutronix.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 31 Jul 2012 12:00:14 -0600 (MDT)
+Subject: [PATCH v3 1/3] ARM: omap: clk: add clk_prepare and clk_unprepare
+In-Reply-To: <CAJOA=zPmfq+WsAF-7nAkMGghPLYHpd+fCkrsv=3JSWLGMb-zkg@mail.gmail.com>
+References: <1341224669-15231-1-git-send-email-rnayak@ti.com>
+ <1341224669-15231-2-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.00.1207301614590.8722@utopia.booyaka.com>
+ <CAJOA=zPmfq+WsAF-7nAkMGghPLYHpd+fCkrsv=3JSWLGMb-zkg@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1207311141300.8722@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+Hi Mike,
 
-On Tue, Jul 31, 2012 at 05:14:25PM +0200, Guennadi Liakhovetski wrote:
-> Hi Javier
+On Mon, 30 Jul 2012, Turquette, Mike wrote:
+
+> On Mon, Jul 30, 2012 at 3:31 PM, Paul Walmsley <paul@pwsan.com> wrote:
+>
+> > So if we make a change like this one, it seems like we would basically 
+> > expect it to break once we start doing anything meaningful with 
+> > clk_prepare(), like using clk_prepare() for voltage scaling or 
+> > something that requires I2C?  We'd also probably want to mark this 
+> > with some kind of "HACK" comment.
 > 
-> > @@ -436,7 +436,8 @@ static void mx2_camera_deactivate(struct mx2_camera_dev *pcdev)
-> >  {
-> >  	unsigned long flags;
-> >  
-> > -	clk_disable(pcdev->clk_csi);
-> > +	if (cpu_is_mx27())
-> > +		clk_disable_unprepare(pcdev->clk_csi);
-> 
-> This tells me, there are already 2 things going on here:
-> 
-> 1. add clock-(un)prepare operations to enable / disable. Is this a problem 
-> atm? is the driver non-functional without this change or is it just an API 
-> correctness change? I thought you replied to this already, but 
-> unfortunately I couldn't find that your reply again, sorry.
+> Did you have anything in mind to start using clk_prepare?  I still hope 
+> to get rid of it some day and replace that call with a combination of 
+> clk_enable and a check like clk_enable_can_sleep.
 
-Since the common clock framework clk_prepare is mandatory.
+Nothing that requires immediate attention.  Mostly am just trying to think 
+through how to reconcile the clock and device management code that we have 
+with what other SoC programmers are apparently implementing in their 
+platform code.
 
-Sascha
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+- Paul
