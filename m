@@ -1,54 +1,94 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 31 Jul 2012 12:20:52 +0800
-Subject: [PATCH 3/3] cpufreq: Add a generic cpufreq-cpu0 driver
-In-Reply-To: <20120730185344.GT4468@opensource.wolfsonmicro.com>
-References: <1342713281-31114-1-git-send-email-shawn.guo@linaro.org>
- <1342713281-31114-4-git-send-email-shawn.guo@linaro.org>
- <20120726131121.GB7306@sirena.org.uk>
- <20120730065218.GB31509@S2101-09.ap.freescale.net>
- <20120730185344.GT4468@opensource.wolfsonmicro.com>
-Message-ID: <20120731042050.GF762@S2101-09.ap.freescale.net>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 30 Jul 2012 23:36:15 -0500
+Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain
+ transitioning to OFF when in-use
+In-Reply-To: <50171841.40309@ti.com>
+References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
+ <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
+ <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
+ <500028B3.1040309@ti.com>
+ <alpine.DEB.2.00.1207131418500.25585@utopia.booyaka.com>
+ <50045D17.9050704@ti.com>
+ <alpine.DEB.2.00.1207161228470.28834@utopia.booyaka.com>
+ <50171841.40309@ti.com>
+Message-ID: <501760BF.8070801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 07:53:45PM +0100, Mark Brown wrote:
-> Quite honestly this seems totally unrealistic for the majority of users,
+Hi Paul,
 
-I doubt that.  Searching drivers/cpufreq folder, I can see there are
-several cpufreq drivers scaling voltage with regulator API, but none
-of them is calling regulator_set_voltage_time to find voltage latency.
-That said, all these users are specify transition latency on their own.
+On 07/30/2012 06:26 PM, Jon Hunter wrote:
 
-> especially given the very poor documentation for this stuff which SoC
-> vendors typically provide.  It's a reasonable amount of work to go back
-> and figure this stuff out (especially given that it should be varying
-> depending on the transition in question), and it's going to give us a
-> bunch of magic numbers in people's bindings.
+[...]
+
+> 1. When HWMOD attempts to disable the clock domain for OMAP2/3 devices 
+>    we simply return without doing anything. Not sure if it is safe to 
+>    remove this but I can do some more testing on OMAP2/3. 
 > 
-There will be only one magic number, and it can easily become "magic"
-with some comments put there.
-
-> No, add a new API.
+> commit a0307bd539ecef976793679a1c4ff0d47b22c4bd
+> Author: Jon Hunter <jon-hunter@ti.com>
+> Date:   Mon Jul 30 18:04:06 2012 -0500
 > 
-Is the following patch what you are ordering here?
+>     ARM: OMAP2/3: Allow HWMOD to disable clock domains
+>     
+>     Currently when HWMOD attempts to disable a clock domain on OMAP2/3 devices we
+>     will return from the function clkdm_hwmod_disable() without actually disabling
+>     the clock domain. Per the comment this is deliberate because initially HWMOD
+>     OMAP2/3 devices did not support clock domains. However, clock domains are now
+>     supported by HWMOD for these devices and so allow HWMOD to disable the clock
+>     domains.
+>     
+>     XXX - Tested on OMAP3430 beagle board, but needs more testing on OMAP2/3
+> 
+> diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
+> index 011186f..8f7a941 100644
+> --- a/arch/arm/mach-omap2/clockdomain.c
+> +++ b/arch/arm/mach-omap2/clockdomain.c
+> @@ -1075,10 +1075,6 @@ int clkdm_hwmod_enable(struct clockdomain *clkdm, struct omap_hwmod *oh)
+>   */
+>  int clkdm_hwmod_disable(struct clockdomain *clkdm, struct omap_hwmod *oh)
+>  {
+> -       /* The clkdm attribute does not exist yet prior OMAP4 */
+> -       if (cpu_is_omap24xx() || cpu_is_omap34xx())
+> -               return 0;
+> -
+>         /*
+>          * XXX Rewrite this code to maintain a list of enabled
+>          * downstream hwmods for debugging purposes?
+> 
+> 
+> 2. I need to make the following changes to your patch. The change to
+>    omap2_clkdm_clk_disable() was needed to get the EMU to turn off.
+>    At the same time I thought we should make the same change to
+>    omap2_clkdm_clk_enable().
+> 
+> diff --git a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+> index 09385a9..c94b2fb 100644
+> --- a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+> +++ b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+> @@ -223,7 +223,8 @@ static int omap2_clkdm_clk_enable(struct clockdomain *clkdm)
+>                 _enable_hwsup(clkdm);
+>         } else {
+>                 if (clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
+> -                       omap2_clkdm_wakeup(clkdm);
+> +                       (cpu_is_omap24xx()) ? omap2_clkdm_wakeup(clkdm) :
+> +                               omap3_clkdm_wakeup(clkdm);
+>         }
+>  
+>         return 0;
+> @@ -257,7 +258,8 @@ static int omap2_clkdm_clk_disable(struct clockdomain *clkdm)
+>                 _enable_hwsup(clkdm);
+>         } else {
+>                 if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
+> -                       omap2_clkdm_sleep(clkdm);
+> +                       (cpu_is_omap24xx()) ? omap2_clkdm_sleep(clkdm) :
+> +                               omap3_clkdm_sleep(clkdm);
+>         }
 
-diff --git a/include/linux/regulator/consumer.h b/include/linux/regulator/consumer.h
-index da339fd..bfd3cfb 100644
---- a/include/linux/regulator/consumer.h
-+++ b/include/linux/regulator/consumer.h
-@@ -352,4 +352,11 @@ static inline void regulator_set_drvdata(struct regulator *regulator,
+I just remembered you sending out a patch [1] to address #2 above. Let
+me know your thoughts about change #1.
 
- #endif
+Cheers
+Jon
 
-+static inline int regulator_set_voltage_tolerance(struct regulator *regulator,
-+                                                 int new_uV, int tol_uV)
-+{
-+       return regulator_set_voltage(regulator,
-+                                    new_uV - tol_uV, new_uV + tol_uV);
-+}
-+
- #endif
-
--- 
-Regards,
-Shawn
+[1] http://marc.info/?l=linux-omap&m=134333691309305&w=2
