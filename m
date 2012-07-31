@@ -1,31 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 31 Jul 2012 16:14:47 +0100
-Subject: [PATCH V2 01/10] ARM: PMU: Add runtime PM Support
-In-Reply-To: <50115F3F.7050705@ti.com>
-References: <4FD7B1DC.30108@ti.com>
- <20120612213150.GC24380@mudshark.cambridge.arm.com>
- <4FD7C597.7060501@ti.com>
- <20120702095539.GD22239@mudshark.cambridge.arm.com>
- <4FF1D15E.7040301@ti.com>
- <20120702220117.GD25234@mudshark.cambridge.arm.com>
- <4FF6340A.6020409@ti.com> <50109233.3090302@ti.com>
- <20120726150534.GD6382@mudshark.cambridge.arm.com>
- <50115F3F.7050705@ti.com>
-Message-ID: <20120731151446.GK3903@mudshark.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 31 Jul 2012 16:15:23 +0100
+Subject: [PATCH 1/6] ASoC: dapm: If one widget fails, do not force all
+ subsequent widgets to fail too
+In-Reply-To: <20120731145443.GY4468@opensource.wolfsonmicro.com>
+References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
+ <1343741493-17671-3-git-send-email-lee.jones@linaro.org>
+ <20120731134214.GK4468@opensource.wolfsonmicro.com>
+ <5017EAC3.3080504@linaro.org>
+ <20120731142820.GW4468@opensource.wolfsonmicro.com>
+ <5017EDCA.4020601@linaro.org>
+ <20120731145443.GY4468@opensource.wolfsonmicro.com>
+Message-ID: <5017F68B.3060400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2012 at 04:16:15PM +0100, Jon Hunter wrote:
-> On 07/26/2012 10:05 AM, Will Deacon wrote:
-> > Ok, thanks for updating me. I've pushed the patches out onto my
-> > perf/omap4-dev branch as that seems to be a good place to collate the
-> > current state of things. I've not tried doing anything with it yet though.
-> 
-> Ok, great. Let me know if you have any problems. I have ran some initial
-> testing on omap3430, omap4430 and omap4460 and it seems ok (AFAICT).
+On 31/07/12 15:54, Mark Brown wrote:
+> On Tue, Jul 31, 2012 at 03:38:02PM +0100, Lee Jones wrote:
+>
+>> Neither of those are in my Inbox. Blame Mozilla. :)
+>
+> You might want to look at a better mail program.
 
-Just an FYI that I gave up maintaining the old perf/omap4 branch and instead
-moved everything from perf/omap4-dev onto that as the rebase was getting
-painful.
+Willingly. Any good suggestions?
 
-Will
+>> It's better because the whole audio system doesn't fail in the case
+>> of minor failure. It'd be like calling off a football game (or
+>> whatever you're into) because one of the substitutes ruptured an
+>> eyelash.
+>
+> It shouldn't make any difference to startup - we should still be
+> checking errors and failing the init if we're failing to add links,
+> this isn't something that's likely to randomly break on a particular
+> boot, it's more something that indicates nobody bothered testing.
+>
+> It's certainly totally inappropriate for an "urgent" bugfix.
+
+Well it just means that audio won't work for the ux500 for this kernel 
+release, but as we're waiting on clocks, this isn't a big issue for us. 
+If you do take it (with or without the return code), feel free to add it 
+to for-next instead of the -rc:s
+
+>> During start-up the ux500 has a couple of very unimportant widgets
+>> fail. It's the wrong behavior to force failure on the everything
+>> audio just because of that.
+>
+> Fixes for those errors, however...
+
+I'll leave that to the audio expert. I'd like to move to to something 
+else (that you maintain - perhaps I'll go and mess-up regulators next). :)
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
