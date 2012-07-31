@@ -1,29 +1,36 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 31 Jul 2012 09:16:11 +0800
-Subject: [PATCH 1/2] ARM: i.MX6: set ARCH_NR_GPIO to 244
-In-Reply-To: <20120730142908.GM6802@n2100.arm.linux.org.uk>
-References: <1343219864-3040-1-git-send-email-dirk.behme@de.bosch.com>
- <20120728133215.GG2128@S2101-09.ap.freescale.net>
- <5015624D.50305@googlemail.com>
- <20120730011426.GB30774@S2101-09.ap.freescale.net>
- <50162C7A.1060307@de.bosch.com>
- <20120730084558.GE31509@S2101-09.ap.freescale.net>
- <20120730142908.GM6802@n2100.arm.linux.org.uk>
-Message-ID: <20120731011609.GE762@S2101-09.ap.freescale.net>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 31 Jul 2012 09:39:55 +0800
+Subject: [GIT PULL][for 3.6] pull request from board branch in pxa git tree
+Message-ID: <CAN1soZxxZMy7iVx=r1XwaxfXVLAXBGd03t5rv7PM4A7dQm_HFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 03:29:08PM +0100, Russell King - ARM Linux wrote:
-> Don't do that.  CONFIG_ARCH_NR_GPIO is there so that we can consolidate
-> out as much crap from mach/gpio.h as possible.  Either use it now, or I
-> will patch you to make you use it.  Either way, you will end up using
-> it... :)
+Hi Arnd & Olof,
 
-Right.  I was wrong on that.  But I still maintain my position that
-there is no much point to define CONFIG_ARCH_NR_GPIO as 224 for space
-saving.  I would rather not use it for IMX until we have an IMX SoC
-implementing more than 256 gpio.
+Please help to pull these from board branch of pxa git tree for v3.6
 
--- 
-Regards,
-Shawn
+Regards
+Haojian
+
+The following changes since commit 28a33cbc24e4256c143dce96c7d93bf423229f92:
+
+  Linux 3.5 (2012-07-21 13:58:29 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hzhuang1/linux.git board
+
+for you to fetch changes up to b168c113cb4be1352465d04a9828a0af2300410b:
+
+  ARM: mmp: add missing irqs.h (2012-07-31 09:36:44 +0800)
+
+----------------------------------------------------------------
+Haojian Zhuang (1):
+      ARM: mmp: add missing irqs.h
+
+Lei Wen (1):
+      ARM: ttc_dkb: add nand support
+
+ arch/arm/mach-mmp/gplugd.c  |    1 +
+ arch/arm/mach-mmp/ttc_dkb.c |   10 ++++++++++
+ 2 files changed, 11 insertions(+)
