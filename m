@@ -1,62 +1,100 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 31 Jul 2012 19:04:41 -0400
-Subject: [PATCH 05/22] ARM: LPAE: use signed arithmetic for mask definitions
+Date: Tue, 31 Jul 2012 19:04:45 -0400
+Subject: [PATCH 09/22] ARM: LPAE: use 64-bit pgd physical address in
+ switch_mm()
 In-Reply-To: <1343775898-28345-1-git-send-email-cyril@ti.com>
 References: <1343775898-28345-1-git-send-email-cyril@ti.com>
-Message-ID: <1343775898-28345-6-git-send-email-cyril@ti.com>
+Message-ID: <1343775898-28345-10-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch applies to PAGE_MASK, PMD_MASK, and PGDIR_MASK, where forcing
-unsigned long math truncates the mask at the 32-bits.  This clearly does bad
-things on PAE systems.
+This patch modifies the switch_mm() processor functions to use 64-bit
+addresses.  We use u64 instead of phys_addr_t, in order to avoid having config
+dependent register usage when calling into switch_mm assembly code.
 
-This patch fixes this problem by defining these masks as signed quantities.
-We then rely on sign extension to do the right thing.
+The changes in this patch are primarily adjustments for registers used for
+arguments to switch_mm.  The few processor definitions that did use the second
+argument have been modified accordingly.
+
+Arguments and calling conventions aside, this patch should be a no-op on v6
+and non-LPAE v7 processors.  On LPAE systems, we now honor the upper 32-bits
+of the physical address that is being passed in.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 ---
- arch/arm/include/asm/page.h           |    2 +-
- arch/arm/include/asm/pgtable-3level.h |    6 +++---
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/proc-fns.h |    4 ++--
+ arch/arm/mm/proc-v6.S           |    2 +-
+ arch/arm/mm/proc-v7-2level.S    |    2 +-
+ arch/arm/mm/proc-v7-3level.S    |    5 +++--
+ 4 files changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
-index ecf9019..1e0fe08 100644
---- a/arch/arm/include/asm/page.h
-+++ b/arch/arm/include/asm/page.h
-@@ -13,7 +13,7 @@
- /* PAGE_SHIFT determines the page size */
- #define PAGE_SHIFT		12
- #define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
--#define PAGE_MASK		(~(PAGE_SIZE-1))
-+#define PAGE_MASK		(~((1 << PAGE_SHIFT) - 1))
- 
- #ifndef __ASSEMBLY__
- 
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index b249035..ae39d11 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -48,16 +48,16 @@
- #define PMD_SHIFT		21
- 
- #define PMD_SIZE		(1UL << PMD_SHIFT)
--#define PMD_MASK		(~(PMD_SIZE-1))
-+#define PMD_MASK		(~((1 << PMD_SHIFT) - 1))
- #define PGDIR_SIZE		(1UL << PGDIR_SHIFT)
--#define PGDIR_MASK		(~(PGDIR_SIZE-1))
-+#define PGDIR_MASK		(~((1 << PGDIR_SHIFT) - 1))
- 
- /*
-  * section address mask and size definitions.
+diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
+index f3628fb..fa6554e 100644
+--- a/arch/arm/include/asm/proc-fns.h
++++ b/arch/arm/include/asm/proc-fns.h
+@@ -60,7 +60,7 @@ extern struct processor {
+ 	/*
+ 	 * Set the page table
+ 	 */
+-	void (*switch_mm)(unsigned long pgd_phys, struct mm_struct *mm);
++	void (*switch_mm)(u64 pgd_phys, struct mm_struct *mm);
+ 	/*
+ 	 * Set a possibly extended PTE.  Non-extended PTEs should
+ 	 * ignore 'ext'.
+@@ -82,7 +82,7 @@ extern void cpu_proc_init(void);
+ extern void cpu_proc_fin(void);
+ extern int cpu_do_idle(void);
+ extern void cpu_dcache_clean_area(void *, int);
+-extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
++extern void cpu_do_switch_mm(u64 pgd_phys, struct mm_struct *mm);
+ #ifdef CONFIG_ARM_LPAE
+ extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte);
+ #else
+diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
+index 5900cd5..566c658 100644
+--- a/arch/arm/mm/proc-v6.S
++++ b/arch/arm/mm/proc-v6.S
+@@ -100,8 +100,8 @@ ENTRY(cpu_v6_dcache_clean_area)
   */
- #define SECTION_SHIFT		21
- #define SECTION_SIZE		(1UL << SECTION_SHIFT)
--#define SECTION_MASK		(~(SECTION_SIZE-1))
-+#define SECTION_MASK		(~((1 << SECTION_SHIFT) - 1))
- 
- #define USER_PTRS_PER_PGD	(PAGE_OFFSET / PGDIR_SIZE)
- 
+ ENTRY(cpu_v6_switch_mm)
+ #ifdef CONFIG_MMU
++	ldr	r1, [r2, #MM_CONTEXT_ID]	@ get mm->context.id
+ 	mov	r2, #0
+-	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
+ 	ALT_SMP(orr	r0, r0, #TTB_FLAGS_SMP)
+ 	ALT_UP(orr	r0, r0, #TTB_FLAGS_UP)
+ 	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
+diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+index 42ac069..3397803 100644
+--- a/arch/arm/mm/proc-v7-2level.S
++++ b/arch/arm/mm/proc-v7-2level.S
+@@ -39,8 +39,8 @@
+  */
+ ENTRY(cpu_v7_switch_mm)
+ #ifdef CONFIG_MMU
++	ldr	r1, [r2, #MM_CONTEXT_ID]	@ get mm->context.id
+ 	mov	r2, #0
+-	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
+ 	ALT_SMP(orr	r0, r0, #TTB_FLAGS_SMP)
+ 	ALT_UP(orr	r0, r0, #TTB_FLAGS_UP)
+ #ifdef CONFIG_ARM_ERRATA_430973
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index 8de0f1d..0001581 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -47,9 +47,10 @@
+  */
+ ENTRY(cpu_v7_switch_mm)
+ #ifdef CONFIG_MMU
+-	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
+-	and	r3, r1, #0xff
++	ldr	r2, [r2, #MM_CONTEXT_ID]	@ get mm->context.id
++	and	r3, r2, #0xff
+ 	mov	r3, r3, lsl #(48 - 32)		@ ASID
++	orr	r3, r3, r1			@ upper 32-bits of pgd phys
+ 	mcrr	p15, 0, r0, r3, c2		@ set TTB 0
+ 	isb
+ #endif
 -- 
 1.7.9.5
