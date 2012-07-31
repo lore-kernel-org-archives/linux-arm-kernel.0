@@ -1,35 +1,61 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 31 Jul 2012 16:18:20 +0100
-Subject: [PATCH 1/6] ASoC: dapm: If one widget fails, do not force all
- subsequent widgets to fail too
-In-Reply-To: <5017F68B.3060400@linaro.org>
-References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
- <1343741493-17671-3-git-send-email-lee.jones@linaro.org>
- <20120731134214.GK4468@opensource.wolfsonmicro.com>
- <5017EAC3.3080504@linaro.org>
- <20120731142820.GW4468@opensource.wolfsonmicro.com>
- <5017EDCA.4020601@linaro.org>
- <20120731145443.GY4468@opensource.wolfsonmicro.com>
- <5017F68B.3060400@linaro.org>
-Message-ID: <20120731151819.GC4468@opensource.wolfsonmicro.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Tue, 31 Jul 2012 11:35:09 -0400
+Subject: [RFC 02/23] ARM: LPAE: use signed arithmetic for mask definitions
+In-Reply-To: <20120724100511.GE20132@arm.com>
+References: <1343092165-9470-1-git-send-email-cyril@ti.com>
+ <1343092165-9470-3-git-send-email-cyril@ti.com>
+ <20120724100511.GE20132@arm.com>
+Message-ID: <5017FB2D.6090404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 04:15:23PM +0100, Lee Jones wrote:
-> On 31/07/12 15:54, Mark Brown wrote:
+Hi Catalin,
 
-> >You might want to look at a better mail program.
+On 7/24/2012 6:05 AM, Catalin Marinas wrote:
+> On Tue, Jul 24, 2012 at 02:09:04AM +0100, Cyril Chemparathy wrote:
+>> This patch applies to PAGE_MASK, PMD_MASK, and PGDIR_MASK, where forcing
+>> unsigned long math truncates the mask at the 32-bits.  This clearly does bad
+>> things on PAE systems.
+>>
+>> This patch fixes this problem by defining these masks as signed quantities.
+>> We then rely on sign extension to do the right thing.
+>>
+>> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+>> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+>> ---
+>>   arch/arm/include/asm/page.h           |    7 ++++++-
+>>   arch/arm/include/asm/pgtable-3level.h |    6 +++---
+>>   2 files changed, 9 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
+>> index ecf9019..1c810d2 100644
+>> --- a/arch/arm/include/asm/page.h
+>> +++ b/arch/arm/include/asm/page.h
+>> @@ -13,7 +13,12 @@
+>>   /* PAGE_SHIFT determines the page size */
+>>   #define PAGE_SHIFT		12
+>>   #define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
+>> -#define PAGE_MASK		(~(PAGE_SIZE-1))
+>> +
+>> +/*
+>> + * We do not use PAGE_SIZE in the following because we rely on sign
+>> + * extension to appropriately extend upper bits for PAE systems
+>> + */
+>> +#define PAGE_MASK		(~((1 << PAGE_SHIFT) - 1))
+>
+> Would it work if we use a 1ULL here and avoid the sign trick? I'm
+> worried about some context where this would lose the sign. We could have
+> an #ifdef here while the PGDIR/PMD masks are in a separate file already.
+>
 
-> Willingly. Any good suggestions?
+I tried out this approach, and it spews size mismatch warnings in a few 
+places when the mask is applied to a virtual address and casted to a 
+pointer.  Rather than having to scatter fixes in all these places, 
+relying on sign extension may be cleaner.
 
-mutt works for me.
+Are there any particular areas that you are concerned about, that could 
+potentially break with the sign extension approach?
 
-> >It's certainly totally inappropriate for an "urgent" bugfix.
-
-> Well it just means that audio won't work for the ux500 for this
-> kernel release, but as we're waiting on clocks, this isn't a big
-> issue for us. If you do take it (with or without the return code),
-> feel free to add it to for-next instead of the -rc:s
-
-I'm not going to apply this patch.  This isn't a vendor BSP, we
-shouldn't be putting random hacks like this in core code.
+-- 
+Thanks
+- Cyril
