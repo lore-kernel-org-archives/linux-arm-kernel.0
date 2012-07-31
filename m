@@ -1,75 +1,76 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Tue, 31 Jul 2012 21:29:43 +0200
-Subject: Current state of AM33xx patches
-In-Reply-To: <50118272.1050209@gmail.com>
-References: <4FD5BA4C.9070706@gmail.com> <CBFB6F19.95320%jkridner@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5361A@DBDE01.ent.ti.com>
- <4FE326A8.8090807@gmail.com> <4FE8AB37.7030907@gmail.com>
- <4FE9A00B.6010908@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
- <4FEC7394.9030208@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
- <4FEDF54D.4030609@gmail.com>
- <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
- <4FEEC7F2.8070507@gmail.com>
- <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA635DC@DBDE01.ent.ti.com>
- <4FF42761.2000701@gmail.com>
- <EB1619762EAF8B4E97A227FB77B7E0293E9C2548@DBDE01.ent.ti.com>
- <500CEF97.4050207@gmail.com>
- <EB1619762EAF8B4E97A227FB77B7E0293E9D04EB@DBDE01.ent.ti.com>
- <501159C3.3020109@gmail.com>
- <704C899A-606B-41A3-99E8-6D92C0EA5BC5@dominion.thruhere.net>
- <50116926.4060309@gmail.com>
- <587C7FB9-2DD3-48EE-B74D-BEBDF199BE23@dominion.thruhere.net>
- <50118272.1050209@gmail.com>
-Message-ID: <9F9237B3-55BD-471B-ADD1-1A18F3644387@dominion.thruhere.net>
+From: karl.beldan@gmail.com (Karl Beldan)
+Date: Tue, 31 Jul 2012 21:31:13 +0200
+Subject: About dma_sync_single_for_{cpu,device}
+In-Reply-To: <20120731090931.GP6802@n2100.arm.linux.org.uk>
+References: <20120730202401.GA4947@gobelin> <20120731064557.GA4676@gobelin>
+ <20120731090931.GP6802@n2100.arm.linux.org.uk>
+Message-ID: <CACYmx9MnEn_XOosBn2-YJ=ny9FiLPADMNa6okwG08xrSpCUSpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 7/31/12, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Tue, Jul 31, 2012 at 08:45:57AM +0200, Karl Beldan wrote:
+>> I was expecting the following to work:
+>> 	addr = dma_map_single(dev, buffer, size, DMA_TO_DEVICE);
+>> 	dma_sync_single_for_device(dev, buffer, pattern_size, DMA_FROM_DEVICE);
+>> 	dev_send(buffer);
+>> 	// wait for irq (don't peek in the buffer) ... got irq
+>> 	dma_sync_single_for_cpu(dev, buffer, pattern_size, DMA_FROM_DEVICE);
+>> 	if (!xfer_done(buffer)) // not RAM value
+>> 		dma_sync_single_for_device(dev, buffer, pattern_size, DMA_FROM_DEVICE);
+>> 	[...]
+>
 
-Op 26 jul. 2012, om 19:46 heeft Daniel Mack <zonque@gmail.com> het volgende geschreven:
+Hi Russell,
 
-> On 26.07.2012 18:09, Koen Kooi wrote:
->> 
->> Op 26 jul. 2012, om 17:58 heeft Daniel Mack <zonque@gmail.com> het
->> volgende geschreven:
->> 
->>> On 26.07.2012 17:00, Koen Kooi wrote:
->>> 
->>>> With Ajay's usb patches you can easily boot from a usb stick,
->>>> you'll only need the bootloads to be on mmc or tftp. That's what
->>>> I have been doing on my beaglebone :)
->>>> 
->>>> I'm going to update 
->>>> https://github.com/beagleboard/kernel/tree/beaglebone-3.6 to use 
->>>> linus' tree when I get a chance to test a build.
->>> 
->>> Hmm, how are the patches in this repository generated? Is there a
->>> tree that has them as real commits?
->> 
->> If only! I'm manually pulling them from the mailinglist archives and
->> patchwork. I keep hoping for TI to put up a git tree with all their
->> WIP stuff, but I guess that goes into the world peace and pony
->> category of wanting things.
->> 
->> Even with this small patchset I'm already having a ton of merge
->> conflicts in the .dtsi files which is keeping me from posting my
->> patches (e.g. the leds-gpio one) to the proper mailinglists.
->> 
->> Anyway, enough ranting, mainline + those patches now works on my
->> beaglebone so for now I'm a happy camper :)
-> 
-> I'm not on beaglebone here, so things are different. I'd be happy to get
-> some sniplet that make the cpsw stuff work ...
 
-2/3 of the way there:
+> First point is that you clearly do not understand the DMA API at all.  The
+> DMA API has the idea of buffer ownership.  Only the owner may access the
+> buffer:
+>
+Are you saying that this scenario does not work ?
+We are taking some liberties with the DMA API, we're more using some
+of its funcs rather than _using_ it ;).
+The question was not whether this was a proper usage of the API, but
+why that scenario would not lead to the expected results .. and now
+I've found the culprit peek I am happy.
 
-http://patchwork.ozlabs.org/patch/174085/
-http://patchwork.ozlabs.org/patch/174086/
 
-I keep failing to create a .dts that doesn't upset the dtc, so I don't have it working yet :(
+[...]
+> So, there is absolutely no noeed what so ever to follow dma_map_single()
+> with dma_sync_single_for_device().
+>
+Cleaning a wide address range while invalidating a small one ?
 
-regards,
+[...]
+> Fourthly, remember that the CPU deals with cache lines, and dirty cache
+> lines may be written back in their _entirety_ - which means that data
+> DMA'd from a device in the same cache line that you've modified via the
+> CPU will not work (either the data in the cache line has to be invalidated
+> and therefore the CPU update discarded, or the cache line has to be flushed
+> back to RAM and the DMA'd data is overwritten.)  Hence why the buffer
+> ownership rules are extremely important.
+>
+Of course.
 
-Koen
+> The solution for this fourth point is to use coherent DMA memory for things
+> like ring buffers and the like, which does not suffer from this.
+>
+I might use something different in a not so distant future, yet, for
+the time being, this way of doing as its advantages.
+
+[...]
+> Even with that comment, the idea of buffer ownership must be preserved by
+> drivers, and they must follow that rule.  The fact that some ARM CPU
+> do not respect the ownership entirely is worked around inside the DMA API
+> and is of no interest to drivers.  Feroceon is not one CPU which does this
+> though.
+>
+It was kind of a last resort explanation for a cache line filled out
+of the blue .. before I spotted the culprit peek this morning.
+
+Thanks for your input,
+
+
+
+Karl
