@@ -1,56 +1,73 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 31 Jul 2012 17:06:33 +0800
-Subject: [PATCH v3 1/3] USB: chipidea: add imx usbmisc support
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803C0B776@039-SN2MPN1-022.039d.mgd.msft.net>
-References: <1343298916-11101-1-git-send-email-richard.zhao@freescale.com>
- <1343298916-11101-2-git-send-email-richard.zhao@freescale.com>
- <20120730093244.GQ30009@pengutronix.de>
- <20120730093956.GI3347@b20223-02.ap.freescale.net>
- <F281D0F91ED19E4D8E63A7504E8A649803C0B776@039-SN2MPN1-022.039d.mgd.msft.net>
-Message-ID: <20120731090632.GK3347@b20223-02.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 31 Jul 2012 10:09:31 +0100
+Subject: About dma_sync_single_for_{cpu,device}
+In-Reply-To: <20120731064557.GA4676@gobelin>
+References: <20120730202401.GA4947@gobelin> <20120731064557.GA4676@gobelin>
+Message-ID: <20120731090931.GP6802@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 09:06:33AM +0800, Chen Peter-B29397 wrote:
->  
-> > >
-> > > <&usbmisc 0> would then mean port 0 of the usbmisc device.
-> > I didn't add the restriction that a usbmisc driver must have a usbmisc
-> > device. I'm not sure whether all SoC and future SoC can be look as
-> > a device.
-> > 
-> > Peter, do you have any idea?
-> > 
-> I have not followed this usbmisc design, I just list some facts at i.mx
-> USB controller:
-> 
-> Sigmatel-derived SoCs (i.mx23, i.mx28) have no this register region, all phy controls
-> are through PHY register.
-> Other freescale SoCs have this usbmisc register region to control phy and tune some
-> signal quality. This register region is from another 0x800 or (last controller base address + 0x200) 
-Looks good. I'll take Sascha's suggestion.
+On Tue, Jul 31, 2012 at 08:45:57AM +0200, Karl Beldan wrote:
+> I was expecting the following to work:
+> 	addr = dma_map_single(dev, buffer, size, DMA_TO_DEVICE);
+> 	dma_sync_single_for_device(dev, buffer, pattern_size, DMA_FROM_DEVICE);
+> 	dev_send(buffer);
+> 	// wait for irq (don't peek in the buffer) ... got irq
+> 	dma_sync_single_for_cpu(dev, buffer, pattern_size, DMA_FROM_DEVICE);
+> 	if (!xfer_done(buffer)) // not RAM value
+> 		dma_sync_single_for_device(dev, buffer, pattern_size, DMA_FROM_DEVICE);
+> 	[...]
 
-Thanks
-Richard
-> 
-> > Thanks
-> > Richard
-> > >
-> > > If the usbmisc property exists, you can return -EPROBE_DEFER until it
-> > is
-> > > available. If it doesn't exist, you just continue without usbmisc
-> > > support (i.MX28)
-> > >
-> > > Sascha
-> > >
-> > >
-> > > --
-> > > Pengutronix e.K.                           |
-> > |
-> > > Industrial Linux Solutions                 | http://www.pengutronix.de/
-> > |
-> > > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
-> > |
-> > > Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-
-> > 5555 |
-> > >
+First point is that you clearly do not understand the DMA API at all.  The
+DMA API has the idea of buffer ownership.  Only the owner may access the
+buffer:
+
+*CPU OWNS THE BUFFER*
+dma_map_single()
+*DEVICE OWNS THE BUFFER*
+dma_sync_single_for_cpu()
+*CPU OWNS THE BUFFER*
+dma_sync_single_for_device()
+*DEVICE OWNS THE BUFFER*
+dma_unmap_single()
+*CPU OWNS THE BUFFER*
+
+So, there is absolutely no noeed what so ever to follow dma_map_single()
+with dma_sync_single_for_device().
+
+Second point is that you should not change the 'direction' argument while
+a buffer is mapped.
+
+Thirdly, enable DMA API debugging (DMA_API_DEBUG) to make sure you're
+using the DMA API correctly.
+
+Fourthly, remember that the CPU deals with cache lines, and dirty cache
+lines may be written back in their _entirety_ - which means that data
+DMA'd from a device in the same cache line that you've modified via the
+CPU will not work (either the data in the cache line has to be invalidated
+and therefore the CPU update discarded, or the cache line has to be flushed
+back to RAM and the DMA'd data is overwritten.)  Hence why the buffer
+ownership rules are extremely important.
+
+The solution for this fourth point is to use coherent DMA memory for things
+like ring buffers and the like, which does not suffer from this.
+
+> Maybe the following comment in dma-mapping.c explains the situation :
+> /*
+>  * The DMA API is built upon the notion of "buffer ownership".  A buffer
+>  * is either exclusively owned by the CPU (and therefore may be accessed
+>  * by it) or exclusively owned by the DMA device.  These helper functions
+>  * represent the transitions between these two ownership states.
+>  *
+>  * Note, however, that on later ARMs, this notion does not work due to
+>  * speculative prefetches.  We model our approach on the assumption that
+>  * the CPU does do speculative prefetches, which means we clean caches
+>  * before transfers and delay cache invalidation until transfer completion.
+>  *
+>  */
+
+Even with that comment, the idea of buffer ownership must be preserved by
+drivers, and they must follow that rule.  The fact that some ARM CPU
+do not respect the ownership entirely is worked around inside the DMA API
+and is of no interest to drivers.  Feroceon is not one CPU which does this
+though.
