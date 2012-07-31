@@ -1,58 +1,40 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 31 Jul 2012 10:27:42 +0200
-Subject: [PATCH 3/6] mv643xx.c: Add basic device tree support.
-In-Reply-To: <50179528.2020801@codethink.co.uk>
-References: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
- <1343661359-10150-4-git-send-email-ian.molton@codethink.co.uk>
- <87obmw5rm9.fsf@lebrac.rtp-net.org>
- <50179528.2020801@codethink.co.uk>
-Message-ID: <20120731082742.GU18016@lunn.ch>
+From: karl.beldan@gmail.com (Karl Beldan)
+Date: Tue, 31 Jul 2012 10:30:22 +0200
+Subject: About dma_sync_single_for_{cpu,device}
+In-Reply-To: <50178A69.8050906@ladisch.de>
+References: <20120730202401.GA4947@gobelin> <20120731064557.GA4676@gobelin>
+ <50178249.7090306@ladisch.de>
+ <CACYmx9O_TJoSmhiai_Mv09JE3HZ+-V=w8KobTn3zPXtkWbojkw@mail.gmail.com>
+ <50178A69.8050906@ladisch.de>
+Message-ID: <20120731083022.GA5026@ed-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 09:19:52AM +0100, Ian Molton wrote:
-> On 31/07/12 08:14, Arnaud Patard (Rtp) wrote:
-> > Ian Molton <ian.molton@codethink.co.uk> writes:
-> > Hi,
+On Tue, Jul 31, 2012 at 09:34:01AM +0200, Clemens Ladisch wrote:
+> Karl Beldan wrote:
+> > On 7/31/12, Clemens Ladisch <clemens@ladisch.de> wrote:
+> >> Karl Beldan wrote:
+> >>> To tx a chunk of data from the SoC => network device, we :
+> >>> - prepare a buffer with a leading header embedding a pattern,
+> >>> - trigger the xfer and wait for an irq
+> >>> // The device updates the pattern and then triggers an irq
+> >>> - upon irq we check the pattern for the xfer completion
+> >>>
+> >>> I was expecting the following to work:
+> >>> 	addr = dma_map_single(dev, buffer, size, DMA_TO_DEVICE);
+> >>
+> >> Of both the CPU and the device write to the buffer, you must use
+> >> DMA_BIDIRECTIONAL.
 > >
-> > [...]
-> >
-> >> @@ -2873,7 +2913,31 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
-> >>  	struct resource *res;
-> >>  	int err;
-> >>  
-> >> -	pd = pdev->dev.platform_data;
-> >> +	if (pdev->dev.of_node) {
-> >> +		struct device_node *np = NULL;
-> >> +
-> >> +		/* when all users of this driver use FDT, we can remove this */
-> >> +		pd = kzalloc(sizeof(*pd), GFP_ATOMIC);
-> >> +		if (!pd) {
-> >> +			dev_dbg(&pdev->dev, "Could not allocate platform data\n");
-> >> +			return -ENOMEM;
-> >> +		}
-> >> +
-> >> +		of_property_read_u32(pdev->dev.of_node,
-> >> +			"port_number", &pd->port_number);
-> >> +		of_property_read_u32(pdev->dev.of_node,
-> >> +			"phy_addr", &pd->phy_addr);
-> > I guess we need something for tx_csum_limit in the device tree too. It's
-> > important for kirkwood and dove.
+> > This does not work (tested) :  seems to me BIDIRECTIONAL would just
+> > add invalidate, and invalidate before the ram has been updated, as
+> > stated, does not work.
 > 
-> It was my intention to keep the patch as non-invasive as possible - none
-> of the platforms using D-T at present require this.
+> Please show the exact sequence of dma_* calls, and also show when and
+> how the CPU and the device access the buffer.
 > 
-> Furthermore, git grep shows nothing in mach-kirkwood or mach-dove using
-> at all...
-> 
-> Are you sure this is required? It can always be added if anything
-> actually uses it :)
-
-Hi Ian
-
-Try using jumbo packets on kirkwood.
-
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/178785
-http://www.spinics.net/lists/arm-kernel/msg186152.html
-
-	Andrew
+Hmm, so I just spotted a line where we peek in the buffer after
+invalidating .. cannot believe I missed it .. so sorry for the noise ..
+now it's working.
+I felt I would find the culprit right after posting ;)
+Thanks Clemens !
