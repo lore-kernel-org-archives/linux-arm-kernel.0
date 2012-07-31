@@ -1,34 +1,54 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 31 Jul 2012 16:00:16 +0100
-Subject: [PATCH 17/19] Documentation: Define the MOP500 Audio Machine
- Driver Device Tree bindings
-In-Reply-To: <20120731135337.GM4468@opensource.wolfsonmicro.com>
-References: <1343741953-17828-1-git-send-email-lee.jones@linaro.org>
- <1343741953-17828-18-git-send-email-lee.jones@linaro.org>
- <20120731135337.GM4468@opensource.wolfsonmicro.com>
-Message-ID: <5017F300.8020206@linaro.org>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Tue, 31 Jul 2012 17:04:46 +0200
+Subject: [PATCH 3/6] mv643xx.c: Add basic device tree support.
+In-Reply-To: <5017EBE8.10208@codethink.co.uk> (Ben Dooks's message of "Tue, 31
+ Jul 2012 15:30:00 +0100")
+References: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
+ <1343661359-10150-4-git-send-email-ian.molton@codethink.co.uk>
+ <87obmw5rm9.fsf@lebrac.rtp-net.org> <5017EBE8.10208@codethink.co.uk>
+Message-ID: <87boiw55v5.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/07/12 14:53, Mark Brown wrote:
-> On Tue, Jul 31, 2012 at 02:39:11PM +0100, Lee Jones wrote:
->
->> +Required properties:
->> + - compatible                : "stericsson,snd-soc-mop500"
->
->> +Non-standard properties:
->> + - Machine Driver:
->> +   - stericsson,cpu-dai      : Phandle to the CPU-side DAI
->> +   - stericsson,audio-codec  : Phandle to the Audio CODEC
->
-> You should also support the card name property (there's a helper to
-> parse it, you can define the name of the property though) so apps can
-> tell what board they're on.
+Ben Dooks <ben.dooks@codethink.co.uk> writes:
 
-Okay.
+> On 31/07/12 08:14, Arnaud Patard (Rtp) wrote:
+>> Ian Molton<ian.molton@codethink.co.uk>  writes:
+>> Hi,
+>>
+>> [...]
+>>
+>>> @@ -2873,7 +2913,31 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+>>>   	struct resource *res;
+>>>   	int err;
+>>>
+>>> -	pd = pdev->dev.platform_data;
+>>> +	if (pdev->dev.of_node) {
+>>> +		struct device_node *np = NULL;
+>>> +
+>>> +		/* when all users of this driver use FDT, we can remove this */
+>>> +		pd = kzalloc(sizeof(*pd), GFP_ATOMIC);
+>>> +		if (!pd) {
+>>> +			dev_dbg(&pdev->dev, "Could not allocate platform data\n");
+>>> +			return -ENOMEM;
+>>> +		}
+>>> +
+>>> +		of_property_read_u32(pdev->dev.of_node,
+>>> +			"port_number",&pd->port_number);
+>>> +		of_property_read_u32(pdev->dev.of_node,
+>>> +			"phy_addr",&pd->phy_addr);
+>>
+>> I guess we need something for tx_csum_limit in the device tree too. It's
+>> important for kirkwood and dove.
+>
+> Is this something for all kirkwood devices? I think the best way of
+> doing this is to give the driver a new device-tree name and having
+> it set this field in the init sequence.
+>
+> However we could also do with some of these as dt parameters just in
+> case people want to try and alter them for their own systems.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+It's for _all_ kirkwood and dove devices. The kirkwood and dove fifos
+are smaller than the orion/mv78xxx ones (no idea about armada xp/370).
+
+Arnaud
