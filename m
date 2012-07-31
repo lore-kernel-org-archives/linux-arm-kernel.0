@@ -1,50 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 31 Jul 2012 15:45:44 +0100
-Subject: [PATCH 5/5] ARM: ux500: Ensure probing of Audio devices when Device
- Tree is enabled
-In-Reply-To: <1343745944-18418-1-git-send-email-lee.jones@linaro.org>
-References: <1343745944-18418-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343745944-18418-6-git-send-email-lee.jones@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 31 Jul 2012 15:54:44 +0100
+Subject: [PATCH 1/6] ASoC: dapm: If one widget fails, do not force all
+ subsequent widgets to fail too
+In-Reply-To: <5017EDCA.4020601@linaro.org>
+References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
+ <1343741493-17671-3-git-send-email-lee.jones@linaro.org>
+ <20120731134214.GK4468@opensource.wolfsonmicro.com>
+ <5017EAC3.3080504@linaro.org>
+ <20120731142820.GW4468@opensource.wolfsonmicro.com>
+ <5017EDCA.4020601@linaro.org>
+Message-ID: <20120731145443.GY4468@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previous attempts to add platform probing of the Audio related devices
-only call from non-DT initialisation functions. This patch extends that
-functionality to the Device Tree related ones too.
+On Tue, Jul 31, 2012 at 03:38:02PM +0100, Lee Jones wrote:
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/board-mop500.c |    4 ++++
- 1 file changed, 4 insertions(+)
+> Neither of those are in my Inbox. Blame Mozilla. :)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index e641003..87a5cd7 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -794,6 +794,7 @@ static void __init u8500_init_machine(void)
- 				ARRAY_SIZE(mop500_platform_devs));
- 
- 		mop500_sdi_init(parent);
-+		mop500_msp_init(parent);
- 		i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
- 		i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
- 		i2c_register_board_info(2, mop500_i2c2_devices,
-@@ -801,6 +802,8 @@ static void __init u8500_init_machine(void)
- 
- 		mop500_uib_init();
- 
-+	} else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
-+		mop500_of_msp_init(parent);
- 	} else if (of_machine_is_compatible("st-ericsson,hrefv60+")) {
- 		/*
- 		 * The HREFv60 board removed a GPIO expander and routed
-@@ -812,6 +815,7 @@ static void __init u8500_init_machine(void)
- 				ARRAY_SIZE(mop500_platform_devs));
- 
- 		hrefv60_sdi_init(parent);
-+		mop500_msp_init(parent);
- 
- 		i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
- 		i2c0_devs -= NUM_PRE_V60_I2C0_DEVICES;
--- 
-1.7.9.5
+You might want to look at a better mail program.
+
+> It's better because the whole audio system doesn't fail in the case
+> of minor failure. It'd be like calling off a football game (or
+> whatever you're into) because one of the substitutes ruptured an
+> eyelash.
+
+It shouldn't make any difference to startup - we should still be
+checking errors and failing the init if we're failing to add links, 
+this isn't something that's likely to randomly break on a particular
+boot, it's more something that indicates nobody bothered testing.
+
+It's certainly totally inappropriate for an "urgent" bugfix.
+
+> During start-up the ux500 has a couple of very unimportant widgets
+> fail. It's the wrong behavior to force failure on the everything
+> audio just because of that.
+
+Fixes for those errors, however...
