@@ -1,159 +1,244 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 31 Jul 2012 19:04:49 -0400
-Subject: [PATCH 13/22] ARM: LPAE: allow proc override of TTB setup
+Date: Tue, 31 Jul 2012 19:04:38 -0400
+Subject: [PATCH 02/22] ARM: use late patch framework for phys-virt patching
 In-Reply-To: <1343775898-28345-1-git-send-email-cyril@ti.com>
 References: <1343775898-28345-1-git-send-email-cyril@ti.com>
-Message-ID: <1343775898-28345-14-git-send-email-cyril@ti.com>
+Message-ID: <1343775898-28345-3-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows ARM processor setup functions (*_setup in proc-*.S) to
-indicate that the page table has already been programmed.  This is
-done by setting r4 (page table pointer) to -1 before returning from the
-processor setup handler.
-
-This capability is particularly needed on LPAE systems, where the translation
-table base needs to be programmed differently with 64-bit control
-register operations.
-
-Further, a few of the processors (arm1026, mohawk, xsc3) were programming the
-TTB twice.  This patch prevents the main head.S code from programming TTB the
-second time on these machines.
+This patch replaces the original physical offset patching implementation
+with one that uses the newly added patching framework.  In the process, we now
+unconditionally initialize the __pv_phys_offset and __pv_offset globals in the
+head.S code.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 ---
- arch/arm/kernel/head.S       |   10 +++++-----
- arch/arm/mm/proc-arm1026.S   |    1 +
- arch/arm/mm/proc-mohawk.S    |    1 +
- arch/arm/mm/proc-v6.S        |    2 ++
- arch/arm/mm/proc-v7-2level.S |    3 ++-
- arch/arm/mm/proc-v7-3level.S |    1 +
- arch/arm/mm/proc-v7.S        |    1 +
- arch/arm/mm/proc-xsc3.S      |    1 +
- 8 files changed, 14 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/memory.h |   20 ++-------
+ arch/arm/kernel/head.S        |   96 +++++------------------------------------
+ arch/arm/kernel/module.c      |    5 ---
+ arch/arm/kernel/vmlinux.lds.S |    5 ---
+ 4 files changed, 15 insertions(+), 111 deletions(-)
 
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index fcb5757..01c710d 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -17,6 +17,7 @@
+ #include <linux/const.h>
+ #include <linux/types.h>
+ #include <asm/sizes.h>
++#include <asm/patch.h>
+ 
+ #ifdef CONFIG_NEED_MACH_MEMORY_H
+ #include <mach/memory.h>
+@@ -151,35 +152,22 @@
+ #ifndef __virt_to_phys
+ #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
+ 
+-/*
+- * Constants used to force the right instruction encodings and shifts
+- * so that all we need to do is modify the 8-bit constant field.
+- */
+-#define __PV_BITS_31_24	0x81000000
+-
+ extern unsigned long __pv_phys_offset;
+ #define PHYS_OFFSET __pv_phys_offset
+ 
+-#define __pv_stub(from,to,instr,type)			\
+-	__asm__("@ __pv_stub\n"				\
+-	"1:	" instr "	%0, %1, %2\n"		\
+-	"	.pushsection .pv_table,\"a\"\n"		\
+-	"	.long	1b\n"				\
+-	"	.popsection\n"				\
+-	: "=r" (to)					\
+-	: "r" (from), "I" (type))
++extern unsigned long __pv_offset;
+ 
+ static inline unsigned long __virt_to_phys(unsigned long x)
+ {
+ 	unsigned long t;
+-	__pv_stub(x, t, "add", __PV_BITS_31_24);
++	early_patch_imm8(x, t, "add", __pv_offset);
+ 	return t;
+ }
+ 
+ static inline unsigned long __phys_to_virt(unsigned long x)
+ {
+ 	unsigned long t;
+-	__pv_stub(x, t, "sub", __PV_BITS_31_24);
++	early_patch_imm8(x, t, "sub", __pv_offset);
+ 	return t;
+ }
+ #else
 diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index fa820b3..7b1a3be 100644
+index 835898e..d165896 100644
 --- a/arch/arm/kernel/head.S
 +++ b/arch/arm/kernel/head.S
-@@ -414,17 +414,17 @@ __enable_mmu:
- #ifdef CONFIG_CPU_ICACHE_DISABLE
- 	bic	r0, r0, #CR_I
- #endif
--#ifdef CONFIG_ARM_LPAE
--	mov	r5, #0
--	mcrr	p15, 0, r4, r5, c2		@ load TTBR0
--#else
-+#ifndef CONFIG_ARM_LPAE
- 	mov	r5, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
- 		      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
- 		      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
- 		      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
- 	mcr	p15, 0, r5, c3, c0, 0		@ load domain access register
--	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
- #endif
-+
-+	@ has the processor setup already programmed the page table pointer?
-+	adds	r5, r4, #1
-+	mcrne	p15, 0, r4, c2, c0, 0		@ load page table pointer
- 	b	__turn_mmu_on
- ENDPROC(__enable_mmu)
+@@ -109,9 +109,13 @@ ENTRY(stext)
  
-diff --git a/arch/arm/mm/proc-arm1026.S b/arch/arm/mm/proc-arm1026.S
-index fbc1d5f..c28070e 100644
---- a/arch/arm/mm/proc-arm1026.S
-+++ b/arch/arm/mm/proc-arm1026.S
-@@ -404,6 +404,7 @@ __arm1026_setup:
- #ifdef CONFIG_MMU
- 	mcr	p15, 0, r0, c8, c7		@ invalidate I,D TLBs on v4
- 	mcr	p15, 0, r4, c2, c0		@ load page table pointer
-+	mvn	r4, #0				@ do not set page table pointer
+ #ifndef CONFIG_XIP_KERNEL
+ 	adr	r3, 2f
+-	ldmia	r3, {r4, r8}
++	ldmia	r3, {r4, r5, r6, r8}
+ 	sub	r4, r3, r4			@ (PHYS_OFFSET - PAGE_OFFSET)
+ 	add	r8, r8, r4			@ PHYS_OFFSET
++	add	r5, r5, r4
++	str	r8, [r5]			@ set __pv_phys_offset
++	add	r6, r6, r4
++	str	r4, [r6]			@ set __pv_offset
+ #else
+ 	ldr	r8, =PHYS_OFFSET		@ always constant in this case
  #endif
- #ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
- 	mov	r0, #4				@ explicitly disable writeback
-diff --git a/arch/arm/mm/proc-mohawk.S b/arch/arm/mm/proc-mohawk.S
-index fbb2124..a26303c 100644
---- a/arch/arm/mm/proc-mohawk.S
-+++ b/arch/arm/mm/proc-mohawk.S
-@@ -390,6 +390,7 @@ __mohawk_setup:
- 	mcr	p15, 0, r0, c8, c7		@ invalidate I,D TLBs
- 	orr	r4, r4, #0x18			@ cache the page table in L2
- 	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
-+	mvn	r4, #0				@ do not set page table pointer
- 
- 	mov	r0, #0				@ don't allow CP access
- 	mcr	p15, 0, r0, c15, c1, 0		@ write CP access register
-diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-index 566c658..872156e 100644
---- a/arch/arm/mm/proc-v6.S
-+++ b/arch/arm/mm/proc-v6.S
-@@ -210,7 +210,9 @@ __v6_setup:
- 	ALT_UP(orr	r4, r4, #TTB_FLAGS_UP)
- 	ALT_SMP(orr	r8, r8, #TTB_FLAGS_SMP)
- 	ALT_UP(orr	r8, r8, #TTB_FLAGS_UP)
-+	mcr	p15, 0, r4, c2, c0, 0		@ load TTB0
- 	mcr	p15, 0, r8, c2, c0, 1		@ load TTB1
-+	mvn	r4, #0				@ do not set page table pointer
- #endif /* CONFIG_MMU */
- 	adr	r5, v6_crval
- 	ldmia	r5, {r5, r6}
-diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
-index 3397803..cc78c0c 100644
---- a/arch/arm/mm/proc-v7-2level.S
-+++ b/arch/arm/mm/proc-v7-2level.S
-@@ -139,7 +139,7 @@ ENDPROC(cpu_v7_set_pte_ext)
+@@ -124,9 +128,6 @@ ENTRY(stext)
+ #ifdef CONFIG_SMP_ON_UP
+ 	bl	__fixup_smp
+ #endif
+-#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
+-	bl	__fixup_pv_table
+-#endif
+ 	bl	__create_page_tables
  
  	/*
- 	 * Macro for setting up the TTBRx and TTBCR registers.
--	 * - \ttb0 and \ttb1 updated with the corresponding flags.
-+	 * - \ttbr0 and \ttbr1 updated with the corresponding flags.
- 	 */
- 	.macro	v7_ttb_setup, zero, ttbr0, ttbr1, tmp
- 	mcr	p15, 0, \zero, c2, c0, 2	@ TTB control register
-@@ -147,6 +147,7 @@ ENDPROC(cpu_v7_set_pte_ext)
- 	ALT_UP(orr	\ttbr0, \ttbr0, #TTB_FLAGS_UP)
- 	ALT_SMP(orr	\ttbr1, \ttbr1, #TTB_FLAGS_SMP)
- 	ALT_UP(orr	\ttbr1, \ttbr1, #TTB_FLAGS_UP)
-+	mcr	p15, 0, \ttbr0, c2, c0, 0	@ load TTB0
- 	mcr	p15, 0, \ttbr1, c2, c0, 1	@ load TTB1
- 	.endm
+@@ -148,6 +149,8 @@ ENDPROC(stext)
+ 	.ltorg
+ #ifndef CONFIG_XIP_KERNEL
+ 2:	.long	.
++	.long	__pv_phys_offset
++	.long	__pv_offset
+ 	.long	PAGE_OFFSET
+ #endif
  
-diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-index 3b1a745..5e3bed1 100644
---- a/arch/arm/mm/proc-v7-3level.S
-+++ b/arch/arm/mm/proc-v7-3level.S
-@@ -124,6 +124,7 @@ ENDPROC(cpu_v7_set_pte_ext)
- 	mcr	p15, 0, \tmp, c2, c0, 2				@ TTBCR
- 	addls	\ttbr1, \ttbr1, #TTBR1_OFFSET
- 	mcrr	p15, 1, \ttbr1, \zero, c2			@ load TTBR1
-+	mcrr	p15, 0, \ttbr0, \zero, c2			@ load TTBR0
- 	.endm
+@@ -522,94 +525,17 @@ ENTRY(fixup_smp)
+ 	ldmfd	sp!, {r4 - r6, pc}
+ ENDPROC(fixup_smp)
  
- 	__CPUINIT
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index c2e2b66..8850194 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -250,6 +250,7 @@ __v7_setup:
- #ifdef CONFIG_MMU
- 	mcr	p15, 0, r10, c8, c7, 0		@ invalidate I + D TLBs
- 	v7_ttb_setup r10, r4, r8, r5		@ TTBCR, TTBRx setup
-+	mvn	r4, #0				@ do not set page table pointer
- 	ldr	r5, =PRRR			@ PRRR
- 	ldr	r6, =NMRR			@ NMRR
- 	mcr	p15, 0, r5, c10, c2, 0		@ write PRRR
-diff --git a/arch/arm/mm/proc-xsc3.S b/arch/arm/mm/proc-xsc3.S
-index b0d5786..db3836b 100644
---- a/arch/arm/mm/proc-xsc3.S
-+++ b/arch/arm/mm/proc-xsc3.S
-@@ -455,6 +455,7 @@ __xsc3_setup:
- 	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I and D TLBs
- 	orr	r4, r4, #0x18			@ cache the page table in L2
- 	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
-+	mvn	r4, #0				@ do not set page table pointer
+-#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
+-
+-/* __fixup_pv_table - patch the stub instructions with the delta between
+- * PHYS_OFFSET and PAGE_OFFSET, which is assumed to be 16MiB aligned and
+- * can be expressed by an immediate shifter operand. The stub instruction
+- * has a form of '(add|sub) rd, rn, #imm'.
+- */
+-	__HEAD
+-__fixup_pv_table:
+-	adr	r0, 1f
+-	ldmia	r0, {r3-r5, r7}
+-	sub	r3, r0, r3	@ PHYS_OFFSET - PAGE_OFFSET
+-	add	r4, r4, r3	@ adjust table start address
+-	add	r5, r5, r3	@ adjust table end address
+-	add	r7, r7, r3	@ adjust __pv_phys_offset address
+-	str	r8, [r7]	@ save computed PHYS_OFFSET to __pv_phys_offset
+-	mov	r6, r3, lsr #24	@ constant for add/sub instructions
+-	teq	r3, r6, lsl #24 @ must be 16MiB aligned
+-THUMB(	it	ne		@ cross section branch )
+-	bne	__error
+-	str	r6, [r7, #4]	@ save to __pv_offset
+-	b	__fixup_a_pv_table
+-ENDPROC(__fixup_pv_table)
+-
+-	.align
+-1:	.long	.
+-	.long	__pv_table_begin
+-	.long	__pv_table_end
+-2:	.long	__pv_phys_offset
+-
+-	.text
+-__fixup_a_pv_table:
+-#ifdef CONFIG_THUMB2_KERNEL
+-	lsls	r6, #24
+-	beq	2f
+-	clz	r7, r6
+-	lsr	r6, #24
+-	lsl	r6, r7
+-	bic	r6, #0x0080
+-	lsrs	r7, #1
+-	orrcs	r6, #0x0080
+-	orr	r6, r6, r7, lsl #12
+-	orr	r6, #0x4000
+-	b	2f
+-1:	add     r7, r3
+-	ldrh	ip, [r7, #2]
+-	and	ip, 0x8f00
+-	orr	ip, r6	@ mask in offset bits 31-24
+-	strh	ip, [r7, #2]
+-2:	cmp	r4, r5
+-	ldrcc	r7, [r4], #4	@ use branch for delay slot
+-	bcc	1b
+-	bx	lr
+-#else
+-	b	2f
+-1:	ldr	ip, [r7, r3]
+-	bic	ip, ip, #0x000000ff
+-	orr	ip, ip, r6	@ mask in offset bits 31-24
+-	str	ip, [r7, r3]
+-2:	cmp	r4, r5
+-	ldrcc	r7, [r4], #4	@ use branch for delay slot
+-	bcc	1b
+-	mov	pc, lr
+-#endif
+-ENDPROC(__fixup_a_pv_table)
+-
+-ENTRY(fixup_pv_table)
+-	stmfd	sp!, {r4 - r7, lr}
+-	ldr	r2, 2f			@ get address of __pv_phys_offset
+-	mov	r3, #0			@ no offset
+-	mov	r4, r0			@ r0 = table start
+-	add	r5, r0, r1		@ r1 = table size
+-	ldr	r6, [r2, #4]		@ get __pv_offset
+-	bl	__fixup_a_pv_table
+-	ldmfd	sp!, {r4 - r7, pc}
+-ENDPROC(fixup_pv_table)
+-
+-	.align
+-2:	.long	__pv_phys_offset
+-
+ 	.data
+ 	.globl	__pv_phys_offset
+ 	.type	__pv_phys_offset, %object
+ __pv_phys_offset:
+ 	.long	0
+ 	.size	__pv_phys_offset, . - __pv_phys_offset
++
++	.globl	__pv_offset
++	.type	__pv_offset, %object
+ __pv_offset:
+ 	.long	0
+-#endif
++	.size	__pv_offset, . - __pv_offset
  
- 	mov	r0, #1 << 6			@ cp6 access for early sched_clock
- 	mcr	p15, 0, r0, c15, c1, 0		@ write CP access register
+ #include "head-common.S"
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index df5e897..39f8fce 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -317,11 +317,6 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
+ 					         maps[i].txt_sec->sh_addr,
+ 					         maps[i].txt_sec->sh_size);
+ #endif
+-#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
+-	s = find_mod_section(hdr, sechdrs, ".pv_table");
+-	if (s)
+-		fixup_pv_table((void *)s->sh_addr, s->sh_size);
+-#endif
+ 	s = find_mod_section(hdr, sechdrs, ".patch.table");
+ 	if (s)
+ 		patch_kernel((void *)s->sh_addr, s->sh_size);
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index bacb275..13731e3 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -162,11 +162,6 @@ SECTIONS
+ 		__smpalt_end = .;
+ 	}
+ #endif
+-	.init.pv_table : {
+-		__pv_table_begin = .;
+-		*(.pv_table)
+-		__pv_table_end = .;
+-	}
+ 	.init.patch_table : {
+ 		__patch_table_begin = .;
+ 		*(.patch.table)
 -- 
 1.7.9.5
