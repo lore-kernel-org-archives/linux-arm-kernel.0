@@ -1,22 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 31 Jul 2012 08:53:31 +0800
-Subject: [PATCH 1/2] ARM: mx23: Fix registers range
-In-Reply-To: <1343694559-3373-1-git-send-email-festevam@gmail.com>
-References: <1343694559-3373-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120731005329.GD762@S2101-09.ap.freescale.net>
+From: rvaswani@codeaurora.org (Rohit Vaswani)
+Date: Mon, 30 Jul 2012 17:53:50 -0700
+Subject: [PATCH 1/2] msm: io: Remove 7x30 iomap region from 7x00
+Message-ID: <1343696030-11403-1-git-send-email-rvaswani@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 09:29:18PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Fix registers range.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
+This is redundant code.
 
-Queued both for 3.6-rc, thanks.
+Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+---
+ arch/arm/mach-msm/io.c |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
+index 5835c96..61d61cb 100644
+--- a/arch/arm/mach-msm/io.c
++++ b/arch/arm/mach-msm/io.c
+@@ -51,9 +51,6 @@ static struct map_desc msm_io_desc[] __initdata = {
+ 	defined(CONFIG_DEBUG_MSM_UART3)
+ 	MSM_DEVICE(DEBUG_UART),
+ #endif
+-#ifdef CONFIG_ARCH_MSM7X30
+-	MSM_DEVICE(GCC),
+-#endif
+ 	{
+ 		.virtual =  (unsigned long) MSM_SHARED_RAM_BASE,
+ 		.pfn = __phys_to_pfn(MSM_SHARED_RAM_PHYS),
 -- 
-Regards,
-Shawn
+Sent by an employee of the Qualcomm Innovation Center,Inc
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
