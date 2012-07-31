@@ -1,45 +1,142 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 31 Jul 2012 14:31:25 +0100
-Subject: [PATCH 2/6] ASoC: ab8500: Inform SoC Core that we have our own I/O
- arrangements
-In-Reply-To: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
-References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343741493-17671-5-git-send-email-lee.jones@linaro.org>
+Date: Tue, 31 Jul 2012 14:38:58 +0100
+Subject: [PATCH 04/19] ASoC: Ux500: Initialise PCM from MSP probe rather than
+ as a device
+In-Reply-To: <1343741953-17828-1-git-send-email-lee.jones@linaro.org>
+References: <1343741953-17828-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343741953-17828-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If codec->control_data is not populated SoC Core assumes we want to
-use regmap, which fails catastrophically, as we don't have one:
-
-Unable to handle kernel NULL pointer dereference at virtual address 00000080
-pgd = c0004000
-[00000080] *pgd=00000000
-Internal error: Oops: 17 [#1] PREEMPT SMP ARM
-Modules linked in:
-CPU: 1    Not tainted  (3.5.0-rc6-00884-g0b2419e-dirty #130)
-PC is at regmap_read+0x10/0x5c
-LR is at hw_read+0x80/0x90
-pc : [<c01a91b8>]    lr : [<c0216804>]    psr: 60000013
+The PCM is a pseudo-device. It doesn't have any of it's own registers
+or hardware. It rather acts as a layer of abstraction for DMA
+transfers. Hence, instead of classifying it as a device in its own
+right, we call the initialisation from the MSP driver.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- sound/soc/codecs/ab8500-codec.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ sound/soc/ux500/mop500.c        |    4 ++--
+ sound/soc/ux500/ux500_msp_dai.c |   14 +++++++++++++-
+ sound/soc/ux500/ux500_pcm.c     |   19 ++++---------------
+ sound/soc/ux500/ux500_pcm.h     |    3 +++
+ 4 files changed, 22 insertions(+), 18 deletions(-)
 
-diff --git a/sound/soc/codecs/ab8500-codec.c b/sound/soc/codecs/ab8500-codec.c
-index 3c79592..23b4018 100644
---- a/sound/soc/codecs/ab8500-codec.c
-+++ b/sound/soc/codecs/ab8500-codec.c
-@@ -2406,6 +2406,10 @@ static int ab8500_codec_probe(struct snd_soc_codec *codec)
+diff --git a/sound/soc/ux500/mop500.c b/sound/soc/ux500/mop500.c
+index 821f2a9..69bd69a 100644
+--- a/sound/soc/ux500/mop500.c
++++ b/sound/soc/ux500/mop500.c
+@@ -33,7 +33,7 @@ struct snd_soc_dai_link mop500_dai_links[] = {
+ 		.stream_name = "ab8500_0",
+ 		.cpu_dai_name = "ux500-msp-i2s.1",
+ 		.codec_dai_name = "ab8500-codec-dai.0",
+-		.platform_name = "ux500-pcm.0",
++		.platform_name = "ux500-msp-i2s.1",
+ 		.codec_name = "ab8500-codec.0",
+ 		.init = mop500_ab8500_machine_init,
+ 		.ops = mop500_ab8500_ops,
+@@ -43,7 +43,7 @@ struct snd_soc_dai_link mop500_dai_links[] = {
+ 		.stream_name = "ab8500_1",
+ 		.cpu_dai_name = "ux500-msp-i2s.3",
+ 		.codec_dai_name = "ab8500-codec-dai.1",
+-		.platform_name = "ux500-pcm.0",
++		.platform_name = "ux500-msp-i2s.3",
+ 		.codec_name = "ab8500-codec.0",
+ 		.init = NULL,
+ 		.ops = mop500_ab8500_ops,
+diff --git a/sound/soc/ux500/ux500_msp_dai.c b/sound/soc/ux500/ux500_msp_dai.c
+index 0f7dd49..3476d6a 100644
+--- a/sound/soc/ux500/ux500_msp_dai.c
++++ b/sound/soc/ux500/ux500_msp_dai.c
+@@ -28,6 +28,7 @@
  
- 	/* Setup AB8500 according to board-settings */
- 	pdata = (struct ab8500_platform_data *)dev_get_platdata(dev->parent);
+ #include "ux500_msp_i2s.h"
+ #include "ux500_msp_dai.h"
++#include "ux500_pcm.h"
+ 
+ static int setup_pcm_multichan(struct snd_soc_dai *dai,
+ 			struct ux500_msp_config *msp_config)
+@@ -806,11 +807,20 @@ static int __devinit ux500_msp_drv_probe(struct platform_device *pdev)
+ 		goto err_init_msp;
+ 	}
+ 
++	ret = ux500_pcm_register_platform(pdev);
++	if (ret < 0) {
++		dev_err(&pdev->dev,
++			"Error: %s: Failed to register PCM platform device!\n",
++			__func__);
++		goto err_reg_plat;
++	}
 +
-+	/* Inform SoC Core that we have our own I/O arrangements. */
-+	codec->control_data = (void *)true;
+ 	return 0;
+ 
++err_reg_plat:
++	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(ux500_msp_dai_drv));
+ err_init_msp:
+ 	clk_put(drvdata->clk);
+-
+ err_clk:
+ 	devm_regulator_put(drvdata->reg_vape);
+ 
+@@ -821,6 +831,8 @@ static int __devexit ux500_msp_drv_remove(struct platform_device *pdev)
+ {
+ 	struct ux500_msp_i2s_drvdata *drvdata = dev_get_drvdata(&pdev->dev);
+ 
++	ux500_pcm_unregister_platform(pdev);
 +
- 	status = ab8500_audio_setup_mics(codec, &pdata->codec->amics);
- 	if (status < 0) {
- 		pr_err("%s: Failed to setup mics (%d)!\n", __func__, status);
+ 	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(ux500_msp_dai_drv));
+ 
+ 	devm_regulator_put(drvdata->reg_vape);
+diff --git a/sound/soc/ux500/ux500_pcm.c b/sound/soc/ux500/ux500_pcm.c
+index 1a04e24..894c9f4 100644
+--- a/sound/soc/ux500/ux500_pcm.c
++++ b/sound/soc/ux500/ux500_pcm.c
+@@ -282,7 +282,7 @@ static struct snd_soc_platform_driver ux500_pcm_soc_drv = {
+ 	.pcm_new        = ux500_pcm_new,
+ };
+ 
+-static int __devexit ux500_pcm_drv_probe(struct platform_device *pdev)
++int __devinit ux500_pcm_register_platform(struct platform_device *pdev)
+ {
+ 	int ret;
+ 
+@@ -296,23 +296,12 @@ static int __devexit ux500_pcm_drv_probe(struct platform_device *pdev)
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(ux500_pcm_register_platform);
+ 
+-static int __devinit ux500_pcm_drv_remove(struct platform_device *pdev)
++int __devexit ux500_pcm_unregister_platform(struct platform_device *pdev)
+ {
+ 	snd_soc_unregister_platform(&pdev->dev);
+ 
+ 	return 0;
+ }
+-
+-static struct platform_driver ux500_pcm_driver = {
+-	.driver = {
+-		.name = "ux500-pcm",
+-		.owner = THIS_MODULE,
+-	},
+-
+-	.probe = ux500_pcm_drv_probe,
+-	.remove = __devexit_p(ux500_pcm_drv_remove),
+-};
+-module_platform_driver(ux500_pcm_driver);
+-
+-MODULE_LICENSE("GPL v2");
++EXPORT_SYMBOL_GPL(ux500_pcm_unregister_platform);
+diff --git a/sound/soc/ux500/ux500_pcm.h b/sound/soc/ux500/ux500_pcm.h
+index 77ed44d..76d3444 100644
+--- a/sound/soc/ux500/ux500_pcm.h
++++ b/sound/soc/ux500/ux500_pcm.h
+@@ -32,4 +32,7 @@
+ #define UX500_PLATFORM_PERIODS_MAX		48
+ #define UX500_PLATFORM_BUFFER_BYTES_MAX		(2048 * PAGE_SIZE)
+ 
++int ux500_pcm_register_platform(struct platform_device *pdev);
++int ux500_pcm_unregister_platform(struct platform_device *pdev);
++
+ #endif
 -- 
 1.7.9.5
