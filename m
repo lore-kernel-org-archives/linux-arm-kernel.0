@@ -1,60 +1,57 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Tue, 31 Jul 2012 16:36:52 +0530
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <5011680A.6040400@ti.com>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <500EF27F.6050905@ti.com> <1343284960.1726.8978.camel@vkoul-udesk3>
- <201207260714.34540.arnd@arndb.de>
- <1343302083.1726.9027.camel@vkoul-udesk3>  <5011680A.6040400@ti.com>
-Message-ID: <1343732812.1726.14412.camel@vkoul-udesk3>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 31 Jul 2012 12:08:30 +0100
+Subject: AB8500 Regulators
+In-Reply-To: <50179B64.60209@linaro.org>
+References: <501690F7.2010904@linaro.org>
+ <20120730152618.GI4468@opensource.wolfsonmicro.com>
+ <5016B70A.1030601@linaro.org>
+ <20120730174831.GP4468@opensource.wolfsonmicro.com>
+ <50179B64.60209@linaro.org>
+Message-ID: <20120731110830.GY4468@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-07-26 at 10:53 -0500, Jon Hunter wrote:
-> On 07/26/2012 06:28 AM, Vinod Koul wrote:
-> > On Thu, 2012-07-26 at 07:14 +0000, Arnd Bergmann wrote:
-> >> On Thursday 26 July 2012, Vinod Koul wrote:
-> >>>>> But from a client POV it makes sense as with the given direction you
-> >>>>> would need a specific request line for a channel. So this is right.
-> >>>>> But direction is something I don't expect to be used for "give me a
-> >>>>> channel" 
-> >>>>
-> >>>> Ok. The thought was that the user would have the following means of
-> >>>> requesting a channel ...
-> >>>>
-> >>>> 1. By name
-> >>> Bare name maynot be enough. In a dmac we have many channels which one to
-> >>> choose?
-> >> The name is what is associated with the property in the client device
-> >> node, which describes everything the dmac driver needs to know.
-> >> If the dmac needs to pick a specific channel, it can find out from the
-> >> "dmas" property in combination with that name. If it is allowed to
-> >> pick any channel, it doesn't need to bother.
-> > dmac doesn't pick a channel. They don't come into picture till dmaengine
-> > and client have agreed on channel. And then channel callback in invoked,
-> > still it doesn't know which client.
-> 
-> I think what Arnd meant was that dmaengine (not the dmac) would use the
-> DT node and name information to extract the dma mapping information from
-> the device tree and provide a channel back to the client. So yes the
-> dmac is not involved here.
-Ok good that was main concern :)
-> 
-> By the way, when I said "by name" above (and probably this was not
-> clear) but it should have been "DT node and name". So really a channel
-> is requested by ...
-> 
-> 1. DT node and a name
-> 2. DT node and a filter parameter (flags)
-> 3. DT node, a name and a filter parameter (flags)
-> 
-> The DT node points us to the specific device in the DT, say an MMC node,
-> and the MMC node then contains the DMA mapping info. The device node may
-> have the mapping information have one or more DMA requests/channels and
-> so then the name and/or flags is used to determine which the client needs.
-> 
-> Sorry hope that this is a little clearer.
-It is...
+On Tue, Jul 31, 2012 at 09:46:28AM +0100, Lee Jones wrote:
 
--- 
-~Vinod
+> Please listen to what I'm saying as a whole. Breaking that paragraph
+> up takes it entirely out of context. I'm mostly agreeing with what
+> you're saying, and asking you some advice.
+
+That's unfortunately not how it comes over (especially in the context of
+some of the other serieses), it really feels like a lot of work to find
+out what these magic register writes are supposed to do.
+
+> - I now know how the changing voltage API works
+>   - What I don't know is where we'd call it from to initialise them
+>   - Can we do that from the ab8500 regulator driver's init() or probe()?
+
+I'm surprised you've managed to miss the existing interfaces:
+
+   include/linux/regulator/machine.h
+   Documentation/devicetree/bindings/regulator/regulator.txt
+
+> - WRT the 'valid' registers, I'm not sure what they do. The doc says:
+>   "Supply control thru Hardware signal and SysClkReq balls validation."
+>   - More comments on what the writes do individually can be seen in [1]
+>   - Perhaps we can extend the API thus:
+
+These things don't tie very well.  The comments in the sequences look
+reasonably meaningful but you're saying the datasheet doesn't document
+anything at all.
+
+> >+       u8 valid_bank;
+> >+       u8 valid_reg;
+> >+       u8 valid_mask;
+> >+       u8 valid_val_enable;
+
+> Then I think most (if not all) of our bases are covered.
+
+No, there's a whole series of problems here.  The most serious one is
+that "valid" means nothing, we need *some* effort at semantics here.
+We're also going to run into trouble as soon as we've got to update two
+different registers.
+
+It looks like you're trying to put something vaugely like regmap patches
+into the regulator API, but it seems fairly clear that this stuff is
+board specific configuration rather than things that should be blasted
+in unconditionally on any board.
