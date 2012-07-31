@@ -1,23 +1,20 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 31 Jul 2012 02:35:21 +0200
-Subject: [PATCH 1/2] ARM: mx23: Fix registers range
-In-Reply-To: <1343694559-3373-1-git-send-email-festevam@gmail.com>
-References: <1343694559-3373-1-git-send-email-festevam@gmail.com>
-Message-ID: <201207310235.21610.marex@denx.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 31 Jul 2012 08:35:41 +0800
+Subject: [PATCH v3] ARM: dts: imx: Always enable the watchdog
+In-Reply-To: <1343656996-15030-1-git-send-email-fabio.estevam@freescale.com>
+References: <1343656996-15030-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20120731003539.GB762@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Fabio Estevam,
-
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Fix registers range.
+On Mon, Jul 30, 2012 at 11:03:16AM -0300, Fabio Estevam wrote:
+> Instead of enabling the watchdog in each individual dts file, select in 
+> the SoC dtsi file instead.
 > 
 > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Acked-by: Marek Vasut <marex@denx.de>
+Queued it up, thanks.
 
-[...]
-
-Best regards,
-Marek Vasut
+-- 
+Regards,
+Shawn
