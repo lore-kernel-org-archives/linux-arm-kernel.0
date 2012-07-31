@@ -1,33 +1,42 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 31 Jul 2012 20:32:06 +0200
-Subject: [PATCH] ARM: imx35: don't disable the uart clock when DEBUG_LL
- is in use
-In-Reply-To: <20120731174358.GC30009@pengutronix.de>
-References: <1343742279-29570-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20120731174358.GC30009@pengutronix.de>
-Message-ID: <20120731183206.GC10670@pengutronix.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 31 Jul 2012 21:24:58 +0200
+Subject: [PATCH v2 3/6] mv643xx.c: Add basic device tree support.
+In-Reply-To: <201207311823.54857.arnd@arndb.de>
+References: <1343749529-17571-1-git-send-email-ian.molton@codethink.co.uk>
+ <1343749529-17571-4-git-send-email-ian.molton@codethink.co.uk>
+ <201207311823.54857.arnd@arndb.de>
+Message-ID: <20120731192458.GE28852@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sascha,
-
-On Tue, Jul 31, 2012 at 07:43:58PM +0200, Sascha Hauer wrote:
-> On Tue, Jul 31, 2012 at 03:44:39PM +0200, Uwe Kleine-K?nig wrote:
-> > Otherwise printch et al. and printk with earlyprintk and keep_bootcon
-> > becomes unfunctional when the clk framework disables all unused clocks.
+On Tue, Jul 31, 2012 at 06:23:54PM +0000, Arnd Bergmann wrote:
+> On Tuesday 31 July 2012, Ian Molton wrote:
+> > @@ -33,6 +34,10 @@ struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
+> >  	OF_DEV_AUXDATA("marvell,orion-wdt", 0xf1020300, "orion_wdt", NULL),
+> >  	OF_DEV_AUXDATA("marvell,orion-sata", 0xf1080000, "sata_mv.0", NULL),
+> >  	OF_DEV_AUXDATA("marvell,orion-nand", 0xf4000000, "orion_nand", NULL),
+> > +	OF_DEV_AUXDATA("marvell,mv643xx", 0xf1072000, MV643XX_ETH_NAME ".0",
+> > +			NULL),
+> > +	OF_DEV_AUXDATA("marvell,mv643xx", 0xf1076000, MV643XX_ETH_NAME ".1",
+> > +			NULL),
+> >  	{},
+> >  };
 > 
-> Why don't you use the regular console? Letting the clock framework
-> disable the clocks was pretty much intentional.
-I don't question that disabling unused clocks is sensible. But usually
-if you enable DEBUG_LL you want to use it even after the clock framework
-disabled all (apparently) unused clocks. And in my case the regular
-console didn't work yet and so I relied on earlyprintk.
-Even if the problem proved to be the result of my stupidity this patch
-asserts that earlyprintk just works as it should be for debug aids.
+> Please don't do string concatenation like this, it just makes it harder to grep for the
+> strings.
 
-Best regards
-Uwe
+Hi Arnd
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+This pattern is used in other places, e.g. when creating the
+clocks. The macro MV643XX_ETH_NAME is also used when creating the
+platform data, and in the driver itself. 
+
+Are you suggested we replace this with "mv643xx_eth.0"? Or is adding
+the macro
+
+#define MV643XX_ETH_NAME0 "mv643xx_eth.0" 
+
+in include/linux/mv643xx_eth.h O.K, since grep will find it, and
+induce the grep'er to perform a second grep on the macro?
+
+     Andrew
