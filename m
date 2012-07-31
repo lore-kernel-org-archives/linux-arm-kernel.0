@@ -1,120 +1,115 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 31 Jul 2012 11:47:25 +0000
-Subject: [PATCH 1/5] clk: mmp: add mmp specific clocks
-In-Reply-To: <1343716792-10399-1-git-send-email-xiechao.mail@gmail.com>
-References: <1343716792-10399-1-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <201207311147.25862.arnd@arndb.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 31 Jul 2012 13:16:42 -0500
+Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain
+ transitioning to OFF when in-use
+In-Reply-To: <501760BF.8070801@ti.com>
+References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
+ <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
+ <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
+ <500028B3.1040309@ti.com>
+ <alpine.DEB.2.00.1207131418500.25585@utopia.booyaka.com>
+ <50045D17.9050704@ti.com>
+ <alpine.DEB.2.00.1207161228470.28834@utopia.booyaka.com>
+ <50171841.40309@ti.com> <501760BF.8070801@ti.com>
+Message-ID: <5018210A.1040902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 31 July 2012, Chao Xie wrote:
-> +static int clk_apbc_prepare(struct clk_hw *hw)
-> +{
-> +	struct clk_apbc *apbc = to_clk_apbc(hw);
-> +	unsigned int data;
-> +	unsigned long flags = 0;
-> +
-> +	/*
-> +	 * It may share same register as MUX clock,
-> +	 * and it will impact FNCLK enable. Spinlock is needed
-> +	 */
-> +	if (apbc->lock)
-> +		spin_lock_irqsave(apbc->lock, flags);
-> +
-> +	data = __raw_readl(apbc->base);
-> +	if (apbc->flags & APBC_POWER_CTRL)
-> +		data |= APBC_POWER;
-> +	data |= APBC_FNCLK;
-> +	__raw_writel(data, apbc->base);
+Hi Paul,
 
-Better use readl_relaxed() in device drivers rather than __raw_readl().
+On 07/30/2012 11:36 PM, Jon Hunter wrote:
+> Hi Paul,
+> 
+> On 07/30/2012 06:26 PM, Jon Hunter wrote:
+> 
+> [...]
+> 
+>> 1. When HWMOD attempts to disable the clock domain for OMAP2/3 devices 
+>>    we simply return without doing anything. Not sure if it is safe to 
+>>    remove this but I can do some more testing on OMAP2/3. 
+>>
+>> commit a0307bd539ecef976793679a1c4ff0d47b22c4bd
+>> Author: Jon Hunter <jon-hunter@ti.com>
+>> Date:   Mon Jul 30 18:04:06 2012 -0500
+>>
+>>     ARM: OMAP2/3: Allow HWMOD to disable clock domains
+>>     
+>>     Currently when HWMOD attempts to disable a clock domain on OMAP2/3 devices we
+>>     will return from the function clkdm_hwmod_disable() without actually disabling
+>>     the clock domain. Per the comment this is deliberate because initially HWMOD
+>>     OMAP2/3 devices did not support clock domains. However, clock domains are now
+>>     supported by HWMOD for these devices and so allow HWMOD to disable the clock
+>>     domains.
+>>     
+>>     XXX - Tested on OMAP3430 beagle board, but needs more testing on OMAP2/3
+>>
+>> diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
+>> index 011186f..8f7a941 100644
+>> --- a/arch/arm/mach-omap2/clockdomain.c
+>> +++ b/arch/arm/mach-omap2/clockdomain.c
+>> @@ -1075,10 +1075,6 @@ int clkdm_hwmod_enable(struct clockdomain *clkdm, struct omap_hwmod *oh)
+>>   */
+>>  int clkdm_hwmod_disable(struct clockdomain *clkdm, struct omap_hwmod *oh)
+>>  {
+>> -       /* The clkdm attribute does not exist yet prior OMAP4 */
+>> -       if (cpu_is_omap24xx() || cpu_is_omap34xx())
+>> -               return 0;
+>> -
+>>         /*
+>>          * XXX Rewrite this code to maintain a list of enabled
+>>          * downstream hwmods for debugging purposes?
+>>
+>>
+>> 2. I need to make the following changes to your patch. The change to
+>>    omap2_clkdm_clk_disable() was needed to get the EMU to turn off.
+>>    At the same time I thought we should make the same change to
+>>    omap2_clkdm_clk_enable().
+>>
+>> diff --git a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+>> index 09385a9..c94b2fb 100644
+>> --- a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+>> +++ b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+>> @@ -223,7 +223,8 @@ static int omap2_clkdm_clk_enable(struct clockdomain *clkdm)
+>>                 _enable_hwsup(clkdm);
+>>         } else {
+>>                 if (clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
+>> -                       omap2_clkdm_wakeup(clkdm);
+>> +                       (cpu_is_omap24xx()) ? omap2_clkdm_wakeup(clkdm) :
+>> +                               omap3_clkdm_wakeup(clkdm);
+>>         }
+>>  
+>>         return 0;
+>> @@ -257,7 +258,8 @@ static int omap2_clkdm_clk_disable(struct clockdomain *clkdm)
+>>                 _enable_hwsup(clkdm);
+>>         } else {
+>>                 if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
+>> -                       omap2_clkdm_sleep(clkdm);
+>> +                       (cpu_is_omap24xx()) ? omap2_clkdm_sleep(clkdm) :
+>> +                               omap3_clkdm_sleep(clkdm);
+>>         }
+> 
+> I just remembered you sending out a patch [1] to address #2 above. Let
+> me know your thoughts about change #1.
 
-> +#define MPMU_PLL2CR		MPMU_REG(0x0034)
-> +#define MPMU_PLL2_CTRL1		MPMU_REG(0x0414)
+So scratch item #1 above. As Rajendra pointed out in another thread this
+is not right. The only other comment I have with your patch is maybe we
+need to add the following to prevent the EMU PD being idled during
+boot-up if enabled early in the boot process. 
 
-In a device driver like this, don't hardcode the MMIO register addresses. Instead,
-use ioremap or of_iomap to get a virtual address from a resource or a DT
-property that gets passed.
+diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
+index 011186f..84d3fbc 100644
+--- a/arch/arm/mach-omap2/clockdomain.c
++++ b/arch/arm/mach-omap2/clockdomain.c
+@@ -825,7 +825,8 @@ void clkdm_allow_idle(struct clockdomain *clkdm)
+        if (!clkdm)
+                return;
+ 
+-       if (!(clkdm->flags & CLKDM_CAN_ENABLE_AUTO)) {
++       if (!(clkdm->flags & CLKDM_CAN_ENABLE_AUTO) ||
++                       (clkdm->flags & CLKDM_MISSING_IDLE_REPORTING)) {
+                pr_debug("clock: automatic idle transitions cannot be enabled "
+                         "on clockdomain %s\n", clkdm->name);
+                return;
 
-> +static int clk_pll2_prepare(struct clk_hw *hw)
-> +{
-> +	unsigned long data;
-> +
-> +	data = __raw_readl(MPMU_PLL2CR);
-> +	if (data & (1 << 8))
-> +		return 0;
-> +	data |= (1 << 8);
-> +	__raw_writel(data, MPMU_PLL2CR);
-> +
-> +	udelay(500);
-> +
-> +	if (cpu_is_mmp2()) {
-> +		/* out of reset */
-> +		data = __raw_readl(MPMU_PLL2_CTRL1);
-> +		data |= (1 << 29);
-> +		__raw_writel(data, MPMU_PLL2CR);
-> +
-> +		udelay(500);
-> +	}
-> +
-> +	return 0;
-> +}
-
-500 microsends is a long time to waste. Can you do an msleep(1)
-instead so the CPU is allowed to sleep here?
-
-The cpu_is_mmp2() check here looks a bit clumsy. I think you're
-better off making this two separate functions like
-
-static int pxa_clk_pll2_prepare(struct clk_hw *hw)
-{
-	unsigned long data;
-
-	data = __raw_readl(MPMU_PLL2CR);
-	if (data & (1 << 8))
-		return 0;
-	data |= (1 << 8);
-	__raw_writel(data, MPMU_PLL2CR);
-
-	udelay(500);
-	return 0;
-}
-
-static int mmp2_clk_pll2_prepare(struct clk_hw *hw)
-{
-	unsigned long data;
-
-	pxa_clk_pll2_prepare(hw);
-
-	/* out of reset */
-	data = __raw_readl(MPMU_PLL2_CTRL1);
-	data |= (1 << 29);
-	__raw_writel(data, MPMU_PLL2CR);
-	udelay(500);
-	return 0;
-}
-
-and then using two separate clk_ops structures but picking the one
-you need based on the chip.
-
-> +#define MMP_CLK_REGISTER_FIXED_RATE(_clk, _name, _rate)			\
-> +	do {								\
-> +		_clk[_name] = clk_register_fixed_rate(NULL, #_name,	\
-> +					NULL, CLK_IS_ROOT, _rate);	\
-> +		clk_register_clkdev(_clk[_name], #_name, NULL);		\
-> +	} while (0)
-> +
-> +#define MMP_CLK_REGISTER_FIXED_FACTOR(_clk, _name, _parent, _flags,	\
-> +				_mul, _div)				\
-> +	do {								\
-> +		_clk[_name] = clk_register_fixed_factor(NULL, #_name,	\
-> +				 #_parent, _flags, _mul, _div);		\
-> +		clk_register_clkdev(_clk[_name], #_name, NULL);		\
-> +	} while (0)
-
-I very much dislike macros like these that don't add much value in terms of
-shortening the code, but at the same time make the code much harder to read
-by someone who is looking over all clock drivers. Better just open-code
-all of the call sites of this.
-
-	Arnd
+Cheers
+Jon
