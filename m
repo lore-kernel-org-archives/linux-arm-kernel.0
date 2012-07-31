@@ -1,9 +1,9 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 31 Jul 2012 14:31:30 +0100
-Subject: [PATCH 5/6] ARM: ux500: Enable HIGHMEM on all mop500 platforms
+Date: Tue, 31 Jul 2012 14:31:32 +0100
+Subject: [PATCH 6/6] ARM: ux500: Enable HIGHMEM on all mop500 platforms
 In-Reply-To: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
 References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343741493-17671-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343741493-17671-12-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
