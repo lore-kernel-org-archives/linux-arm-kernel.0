@@ -1,50 +1,34 @@
 From: xiechao.mail@gmail.com (Chao Xie)
-Date: Tue, 31 Jul 2012 14:13:09 +0800
-Subject: [PATCH 2/7] gpio: pxa: add chain_eneter and chain_exit for irq handler
+Date: Tue, 31 Jul 2012 14:13:10 +0800
+Subject: [PATCH 3/7] arm: cache: fix uninitialized ptr in tauros2_init
 In-Reply-To: <1343715194-25900-1-git-send-email-xiechao.mail@gmail.com>
 References: <1343715194-25900-1-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <1343715194-25900-2-git-send-email-xiechao.mail@gmail.com>
+Message-ID: <1343715194-25900-3-git-send-email-xiechao.mail@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chao Xie <chao.xie@marvell.com>
 
+init the variable "mode" to NULL to ensure the later NULL checking is
+taking effect.
+
 Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
 ---
- drivers/gpio/gpio-pxa.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+ arch/arm/mm/cache-tauros2.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-index 58a6a63..97ade14 100644
---- a/drivers/gpio/gpio-pxa.c
-+++ b/drivers/gpio/gpio-pxa.c
-@@ -26,6 +26,8 @@
- #include <linux/syscore_ops.h>
- #include <linux/slab.h>
+diff --git a/arch/arm/mm/cache-tauros2.c b/arch/arm/mm/cache-tauros2.c
+index 23a7643..97e2ac8 100644
+--- a/arch/arm/mm/cache-tauros2.c
++++ b/arch/arm/mm/cache-tauros2.c
+@@ -192,7 +192,7 @@ static inline void __init write_actlr(u32 actlr)
+ void __init tauros2_init(void)
+ {
+ 	extern int processor_id;
+-	char *mode;
++	char *mode = NULL;
  
-+#include <asm/mach/irq.h>
-+
- #include <mach/irqs.h>
+ 	disable_l2_prefetch();
  
- /*
-@@ -379,6 +381,9 @@ static void pxa_gpio_demux_handler(unsigned int irq, struct irq_desc *desc)
- 	struct pxa_gpio_chip *c;
- 	int loop, gpio, gpio_base, n;
- 	unsigned long gedr;
-+	struct irq_chip *chip = irq_desc_get_chip(desc);
-+
-+	chained_irq_enter(chip, desc);
- 
- 	do {
- 		loop = 0;
-@@ -398,6 +403,8 @@ static void pxa_gpio_demux_handler(unsigned int irq, struct irq_desc *desc)
- 			}
- 		}
- 	} while (loop);
-+
-+	chained_irq_exit(chip, desc);
- }
- 
- static void pxa_ack_muxed_gpio(struct irq_data *d)
 -- 
 1.7.0.4
