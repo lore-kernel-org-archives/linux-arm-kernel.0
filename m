@@ -1,76 +1,50 @@
-From: karl.beldan@gmail.com (Karl Beldan)
-Date: Tue, 31 Jul 2012 21:31:13 +0200
-Subject: About dma_sync_single_for_{cpu,device}
-In-Reply-To: <20120731090931.GP6802@n2100.arm.linux.org.uk>
-References: <20120730202401.GA4947@gobelin> <20120731064557.GA4676@gobelin>
- <20120731090931.GP6802@n2100.arm.linux.org.uk>
-Message-ID: <CACYmx9MnEn_XOosBn2-YJ=ny9FiLPADMNa6okwG08xrSpCUSpA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 31 Jul 2012 13:01:19 -0700
+Subject: [PATCH] ARM: Sort exception table at compile time
+In-Reply-To: <50170CF8.9010307@codeaurora.org>
+References: <1343683803-15507-1-git-send-email-sboyd@codeaurora.org>
+ <20120730215617.GA10335@n2100.arm.linux.org.uk>
+ <50170CF8.9010307@codeaurora.org>
+Message-ID: <5018398F.5010800@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/31/12, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Tue, Jul 31, 2012 at 08:45:57AM +0200, Karl Beldan wrote:
->> I was expecting the following to work:
->> 	addr = dma_map_single(dev, buffer, size, DMA_TO_DEVICE);
->> 	dma_sync_single_for_device(dev, buffer, pattern_size, DMA_FROM_DEVICE);
->> 	dev_send(buffer);
->> 	// wait for irq (don't peek in the buffer) ... got irq
->> 	dma_sync_single_for_cpu(dev, buffer, pattern_size, DMA_FROM_DEVICE);
->> 	if (!xfer_done(buffer)) // not RAM value
->> 		dma_sync_single_for_device(dev, buffer, pattern_size, DMA_FROM_DEVICE);
->> 	[...]
+On 07/30/12 15:38, Stephen Boyd wrote:
+> On 07/30/12 14:56, Russell King - ARM Linux wrote:
+>> On Mon, Jul 30, 2012 at 02:30:03PM -0700, Stephen Boyd wrote:
+>>> Add the ARM machine identifier to sortextable and select the
+>>> config option so that we can sort the exception table at compile
+>>> time. sortextable relies on a section named __ex_table existing
+>>> in the vmlinux, but ARM's linker script places the exception
+>>> table in the data section. Give the exception table its own
+>>> section so that sortextable can find it.
+>>>
+>>> This allows us to skip the runtime sorting step during boot.
+>>>
+>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>>> Cc: David Daney <david.daney@cavium.com>
+>>> ---
+>>>
+>>> I can't find any information on why the exception table lives in the data
+>>> section. If there's a good reason for that, I'll look into changing
+>>> sortextable to look for the __start___ex_table symbol.
+>> Be careful about the placement of this, especially with XIP.
+>>
+> Thanks for the hint. I'm unfamiliar with how XIP works so I'll take a
+> closer look there.
 >
 
-Hi Russell,
+Ok. It looks like the exception table is placed in the data section so
+that XIP kernels can boot up and sort the exception table (otherwise the
+exception table would be in read-only flash). Now that the exception
+table is sorted at compile time, we should be able to place the
+exception table in the rodata area, essentially placing the table in the
+non-volatile storage on XIP kernels.
 
+I propose we move the exception table right after the rodata. Other
+arches (x86/mips) may actually want to put the exception table into the
+rodata, but that looks like a larger change.
 
-> First point is that you clearly do not understand the DMA API at all.  The
-> DMA API has the idea of buffer ownership.  Only the owner may access the
-> buffer:
->
-Are you saying that this scenario does not work ?
-We are taking some liberties with the DMA API, we're more using some
-of its funcs rather than _using_ it ;).
-The question was not whether this was a proper usage of the API, but
-why that scenario would not lead to the expected results .. and now
-I've found the culprit peek I am happy.
-
-
-[...]
-> So, there is absolutely no noeed what so ever to follow dma_map_single()
-> with dma_sync_single_for_device().
->
-Cleaning a wide address range while invalidating a small one ?
-
-[...]
-> Fourthly, remember that the CPU deals with cache lines, and dirty cache
-> lines may be written back in their _entirety_ - which means that data
-> DMA'd from a device in the same cache line that you've modified via the
-> CPU will not work (either the data in the cache line has to be invalidated
-> and therefore the CPU update discarded, or the cache line has to be flushed
-> back to RAM and the DMA'd data is overwritten.)  Hence why the buffer
-> ownership rules are extremely important.
->
-Of course.
-
-> The solution for this fourth point is to use coherent DMA memory for things
-> like ring buffers and the like, which does not suffer from this.
->
-I might use something different in a not so distant future, yet, for
-the time being, this way of doing as its advantages.
-
-[...]
-> Even with that comment, the idea of buffer ownership must be preserved by
-> drivers, and they must follow that rule.  The fact that some ARM CPU
-> do not respect the ownership entirely is worked around inside the DMA API
-> and is of no interest to drivers.  Feroceon is not one CPU which does this
-> though.
->
-It was kind of a last resort explanation for a cache line filled out
-of the blue .. before I spotted the culprit peek this morning.
-
-Thanks for your input,
-
-
-
-Karl
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
