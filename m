@@ -1,92 +1,87 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 31 Jul 2012 19:04:46 -0400
-Subject: [PATCH 10/22] ARM: LPAE: use 64-bit accessors for TTBR registers
+Date: Tue, 31 Jul 2012 19:04:53 -0400
+Subject: [PATCH 17/22] ARM: mm: clean up membank size limit checks
 In-Reply-To: <1343775898-28345-1-git-send-email-cyril@ti.com>
 References: <1343775898-28345-1-git-send-email-cyril@ti.com>
-Message-ID: <1343775898-28345-11-git-send-email-cyril@ti.com>
+Message-ID: <1343775898-28345-18-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds TTBR accessor macros, and modifies cpu_get_pgd() and
-the LPAE version of cpu_set_reserved_ttbr0() to use these instead.
+This patch cleans up the highmem sanity check code by simplifying the range
+checks with a pre-calculated size_limit.  This patch should otherwise have no
+functional impact on behavior.
 
-In the process, we also fix these functions to correctly handle cases
-where the physical address lies beyond the 4G limit of 32-bit addressing.
+This patch also removes a redundant (bank->start < vmalloc_limit) check, since
+this is already covered by the !highmem condition.
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 ---
- arch/arm/include/asm/proc-fns.h |   24 +++++++++++++++++++-----
- arch/arm/mm/context.c           |   13 ++-----------
- 2 files changed, 21 insertions(+), 16 deletions(-)
+ arch/arm/mm/mmu.c |   19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
-index fa6554e..918b4f9 100644
---- a/arch/arm/include/asm/proc-fns.h
-+++ b/arch/arm/include/asm/proc-fns.h
-@@ -116,13 +116,27 @@ extern void cpu_resume(void);
- #define cpu_switch_mm(pgd,mm) cpu_do_switch_mm(virt_to_phys(pgd),mm)
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 4840efa..6b0baf3 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -905,10 +905,15 @@ void __init sanity_check_meminfo(void)
  
- #ifdef CONFIG_ARM_LPAE
+ 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
+ 		struct membank *bank = &meminfo.bank[j];
++		phys_addr_t size_limit;
 +
-+#define cpu_get_ttbr(nr)					\
-+	({							\
-+		u64 ttbr;					\
-+		__asm__("mrrc	p15, " #nr ", %Q0, %R0, c2"	\
-+			: "=r" (ttbr)				\
-+			: : "cc");				\
-+		ttbr;						\
-+	})
-+
-+#define cpu_set_ttbr(nr, val)					\
-+	do {							\
-+		u64 ttbr = val;					\
-+		__asm__("mcrr	p15, " #nr ", %Q0, %R0, c2"	\
-+			: : "r" (ttbr)				\
-+			: "cc");				\
-+	} while (0)
-+
- #define cpu_get_pgd()	\
- 	({						\
--		unsigned long pg, pg2;			\
--		__asm__("mrrc	p15, 0, %0, %1, c2"	\
--			: "=r" (pg), "=r" (pg2)		\
--			:				\
--			: "cc");			\
-+		u64 pg = cpu_get_ttbr(0);		\
- 		pg &= ~(PTRS_PER_PGD*sizeof(pgd_t)-1);	\
- 		(pgd_t *)phys_to_virt(pg);		\
- 	})
-diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index 806cc4f..ad70bd8 100644
---- a/arch/arm/mm/context.c
-+++ b/arch/arm/mm/context.c
-@@ -15,6 +15,7 @@
+ 		*bank = meminfo.bank[i];
++		size_limit = bank->size;
  
- #include <asm/mmu_context.h>
- #include <asm/tlbflush.h>
-+#include <asm/proc-fns.h>
+ 		if (bank->start >= vmalloc_limit)
+ 			highmem = 1;
++		else
++			size_limit = vmalloc_limit - bank->start;
  
- static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
- unsigned int cpu_last_asid = ASID_FIRST_VERSION;
-@@ -22,17 +23,7 @@ unsigned int cpu_last_asid = ASID_FIRST_VERSION;
- #ifdef CONFIG_ARM_LPAE
- void cpu_set_reserved_ttbr0(void)
- {
--	unsigned long ttbl = __pa(swapper_pg_dir);
--	unsigned long ttbh = 0;
--
--	/*
--	 * Set TTBR0 to swapper_pg_dir which contains only global entries. The
--	 * ASID is set to 0.
--	 */
--	asm volatile(
--	"	mcrr	p15, 0, %0, %1, c2		@ set TTBR0\n"
--	:
--	: "r" (ttbl), "r" (ttbh));
-+	cpu_set_ttbr(0, __pa(swapper_pg_dir));
- 	isb();
- }
+ 		bank->highmem = highmem;
+ 
+@@ -917,8 +922,7 @@ void __init sanity_check_meminfo(void)
+ 		 * Split those memory banks which are partially overlapping
+ 		 * the vmalloc area greatly simplifying things later.
+ 		 */
+-		if (!highmem && bank->start < vmalloc_limit &&
+-		    bank->size > vmalloc_limit - bank->start) {
++		if (!highmem && bank->size > size_limit) {
+ 			if (meminfo.nr_banks >= NR_BANKS) {
+ 				printk(KERN_CRIT "NR_BANKS too low, "
+ 						 "ignoring high memory\n");
+@@ -927,12 +931,12 @@ void __init sanity_check_meminfo(void)
+ 					(meminfo.nr_banks - i) * sizeof(*bank));
+ 				meminfo.nr_banks++;
+ 				i++;
+-				bank[1].size -= vmalloc_limit - bank->start;
++				bank[1].size -= size_limit;
+ 				bank[1].start = vmalloc_limit;
+ 				bank[1].highmem = highmem = 1;
+ 				j++;
+ 			}
+-			bank->size = vmalloc_limit - bank->start;
++			bank->size = size_limit;
+ 		}
  #else
+ 		/*
+@@ -950,14 +954,13 @@ void __init sanity_check_meminfo(void)
+ 		 * Check whether this memory bank would partially overlap
+ 		 * the vmalloc area.
+ 		 */
+-		if (bank->start + bank->size > vmalloc_limit)
+-			unsigned long newsize = vmalloc_limit - bank->start;
++		if (bank->size > size_limit) {
+ 			printk(KERN_NOTICE "Truncating RAM at %.8llx-%.8llx "
+ 			       "to -%.8llx (vmalloc region overlap).\n",
+ 			       (unsigned long long)bank->start,
+ 			       (unsigned long long)bank->start + bank->size - 1,
+-			       (unsigned long long)bank->start + newsize - 1);
+-			bank->size = newsize;
++			       (unsigned long long)bank->start + size_limit - 1);
++			bank->size = size_limit;
+ 		}
+ #endif
+ 		if (!bank->highmem && bank->start + bank->size > arm_lowmem_limit)
 -- 
 1.7.9.5
