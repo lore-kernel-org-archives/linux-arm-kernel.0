@@ -1,25 +1,28 @@
-From: clemens@ladisch.de (Clemens Ladisch)
-Date: Tue, 31 Jul 2012 08:59:21 +0200
-Subject: About dma_sync_single_for_{cpu,device}
-In-Reply-To: <20120731064557.GA4676@gobelin>
-References: <20120730202401.GA4947@gobelin> <20120731064557.GA4676@gobelin>
-Message-ID: <50178249.7090306@ladisch.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 31 Jul 2012 09:01:53 +0200
+Subject: [PATCH 6/7] arm: mmp&dove: modify tauros2_init call
+Message-ID: <20120731070153.GA13777@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Karl Beldan wrote:
-> To tx a chunk of data from the SoC => network device, we :
-> - prepare a buffer with a leading header embedding a pattern,
-> - trigger the xfer and wait for an irq
-> // The device updates the pattern and then triggers an irq
-> - upon irq we check the pattern for the xfer completion
->
-> I was expecting the following to work:
-> 	addr = dma_map_single(dev, buffer, size, DMA_TO_DEVICE);
+Hi Chao
 
-Of both the CPU and the device write to the buffer, you must use
-DMA_BIDIRECTIONAL.
+When making changes to Dove, or any other Orion system, please could
+you CC: the orion maintainers:
 
+ARM/Marvell Dove/Kirkwood/MV78xx0/Orion SOC support
+M:      Jason Cooper <jason@lakedaemon.net>
+M:      Andrew Lunn <andrew@lunn.ch>
+L:      linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+S:      Maintained
+F:      arch/arm/mach-dove/
+F:      arch/arm/mach-kirkwood/
+F:      arch/arm/mach-mv78xx0/
+F:      arch/arm/mach-orion5x/
+F:      arch/arm/plat-orion/
 
-Regards,
-Clemens
+Does this also affect Armada 370 and Armada XP SOC? I've no idea what
+cache it uses.
+
+Thanks
+	Andrew
