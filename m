@@ -1,35 +1,56 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 31 Jul 2012 12:00:14 -0600 (MDT)
-Subject: [PATCH v3 1/3] ARM: omap: clk: add clk_prepare and clk_unprepare
-In-Reply-To: <CAJOA=zPmfq+WsAF-7nAkMGghPLYHpd+fCkrsv=3JSWLGMb-zkg@mail.gmail.com>
-References: <1341224669-15231-1-git-send-email-rnayak@ti.com>
- <1341224669-15231-2-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1207301614590.8722@utopia.booyaka.com>
- <CAJOA=zPmfq+WsAF-7nAkMGghPLYHpd+fCkrsv=3JSWLGMb-zkg@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1207311141300.8722@utopia.booyaka.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 31 Jul 2012 13:12:47 -0500
+Subject: [PATCH] ARM: OMAP3xxx: clockdomain: fix software supervised
+ wakeup/sleep
+In-Reply-To: <50176FEF.6060600@ti.com>
+References: <alpine.DEB.2.00.1207261503290.14468@utopia.booyaka.com>
+ <50122A75.2030108@ti.com> <501761E8.3030307@ti.com> <50176FEF.6060600@ti.com>
+Message-ID: <5018201F.7020206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi Rajendra,
 
-On Mon, 30 Jul 2012, Turquette, Mike wrote:
-
-> On Mon, Jul 30, 2012 at 3:31 PM, Paul Walmsley <paul@pwsan.com> wrote:
->
-> > So if we make a change like this one, it seems like we would basically 
-> > expect it to break once we start doing anything meaningful with 
-> > clk_prepare(), like using clk_prepare() for voltage scaling or 
-> > something that requires I2C?  We'd also probably want to mark this 
-> > with some kind of "HACK" comment.
+On 07/31/2012 12:41 AM, Rajendra Nayak wrote:
+> Hi Jon,
 > 
-> Did you have anything in mind to start using clk_prepare?  I still hope 
-> to get rid of it some day and replace that call with a combination of 
-> clk_enable and a check like clk_enable_can_sleep.
+> On Tuesday 31 July 2012 10:11 AM, Jon Hunter wrote:
+>> Hi Paul, Rajendra,
+>>
+>> On 07/27/2012 12:43 AM, Rajendra Nayak wrote:
+>>> On Friday 27 July 2012 02:34 AM, Paul Walmsley wrote:
+>>>>
+>>>> Commit 4da71ae6 ("OMAP: clockdomain: Arch specific funcs for
+>>>> clkdm_clk_enable/disable") called the OMAP2xxx-specific functions for
+>>>> clockdomain wakeup and sleep.  This would probably have broken
+>>>> software-supervised clockdomain wakeup and sleep on OMAP3.
+>>>
+>>> Its strange this went unnoticed for so long. Thanks for this fix and
+>>> sorry about introducing the bug in the first place.
+>>
+>> Any chance that's because of the following code? I needed to
+>> remove this to get the EMU clock domain to turn off on OMAP3
+>> whilst testing PMU.
+> 
+> No, this doesn't seem right. We still have clockdomains for omap2/3
+> controlled using clkdm_clk_enable/disable functions called from
+> within clk framework, and not clkdm_hwmod_enable/disable from
+> within hwmod framework.
+> Besides you removing these checks only in clkdm_hwmod_disable (and
+> keeping them in clkdm_hwmod_enable) tells me its just hiding some
+> usecounting issues you were having with clkdm_clk_enable/disable.
 
-Nothing that requires immediate attention.  Mostly am just trying to think 
-through how to reconcile the clock and device management code that we have 
-with what other SoC programmers are apparently implementing in their 
-platform code.
+Yes you are right. I was focused in the disable side because the EMU CD
+is staying on.
 
+> Btw, on OMAP2/3 as long as a domain has interface clocks which are
+> explicitly enabled and autoidled, the clkdm usecount never ends up
+> going to 0, which is probably what you are hit with too.
 
-- Paul
+Yes so after further debugging, this is not a problem and not the cause
+of my problem either.
+
+Sorry for the noise.
+
+Cheers
+Jon
