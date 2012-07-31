@@ -1,28 +1,57 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 31 Jul 2012 09:01:53 +0200
-Subject: [PATCH 6/7] arm: mmp&dove: modify tauros2_init call
-Message-ID: <20120731070153.GA13777@lunn.ch>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Tue, 31 Jul 2012 09:08:53 +0200
+Subject: [PATCH 15/16] ARM: Kirkwood: Describe iConnect LEDs in DT.
+In-Reply-To: <20120731063645.GO18016@lunn.ch> (Andrew Lunn's message of "Tue,
+ 31 Jul 2012 08:36:45 +0200")
+References: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
+ <1342805751-18048-16-git-send-email-andrew@lunn.ch>
+ <5016FE26.8090509@baker-net.org.uk> <20120731063645.GO18016@lunn.ch>
+Message-ID: <87sjc85rwa.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chao
+Andrew Lunn <andrew@lunn.ch> writes:
 
-When making changes to Dove, or any other Orion system, please could
-you CC: the orion maintainers:
+> On Mon, Jul 30, 2012 at 10:35:34PM +0100, Adam Baker wrote:
+>> On 20/07/12 18:35, Andrew Lunn wrote:
+>> 
+>> Sorry it's taken a while to spot this but I've got one comment below
+>> 
+>> >Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+>> >---
+>> >  arch/arm/boot/dts/kirkwood-iconnect.dts |   34 +++++++++++++++++++++++
+>> >  arch/arm/mach-kirkwood/board-iconnect.c |   46 -------------------------------
+>> >  2 files changed, 34 insertions(+), 46 deletions(-)
+>> >
+>> >diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
+>> >index a7dd07b..b77b38f 100644
+>> >--- a/arch/arm/boot/dts/kirkwood-iconnect.dts
+>> >+++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
+>> >@@ -31,4 +31,38 @@
+>> >  			status = "ok";
+>> >  		};
+>> >  	};
+>> >+	gpio-leds {
+>> >+		compatible = "gpio-leds";
+>> >+
+>> >+		led-level {
+>> >+			label = "led_level";
+>> >+			gpios = <&gpio1 9 0>;
+>> >+			linux,default-trigger = "default-on";
+>> >+		};
+>> >+		power-blue {
+>> >+			label = "power:blue";
+>> >+			gpios = <&gpio1 11 0>;
+>> >+			linux,default-trigger = "timer";
+>> >+		};
+>> 
+>> Is there any reason that power:red is missing here?
+>
+> The monkey driving the keyboard is not reliable at monkey work...
+>
+> Please create a patch and i will try to get it into rc1.
 
-ARM/Marvell Dove/Kirkwood/MV78xx0/Orion SOC support
-M:      Jason Cooper <jason@lakedaemon.net>
-M:      Andrew Lunn <andrew@lunn.ch>
-L:      linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-S:      Maintained
-F:      arch/arm/mach-dove/
-F:      arch/arm/mach-kirkwood/
-F:      arch/arm/mach-mv78xx0/
-F:      arch/arm/mach-orion5x/
-F:      arch/arm/plat-orion/
+There's already a patch for that in your mailbox ("ARM: Kirkwood: Fix
+iconnect leds"). I guess you're not yet fully awake :)
 
-Does this also affect Armada 370 and Armada XP SOC? I've no idea what
-cache it uses.
-
-Thanks
-	Andrew
+Arnaud
