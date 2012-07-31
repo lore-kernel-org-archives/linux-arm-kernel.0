@@ -1,84 +1,19 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 31 Jul 2012 14:39:09 +0100
-Subject: [PATCH 15/19] ARM: ux500: Add nodes for the MSP into Device Tree
-In-Reply-To: <1343741953-17828-1-git-send-email-lee.jones@linaro.org>
-References: <1343741953-17828-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1343741953-17828-16-git-send-email-lee.jones@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 31 Jul 2012 14:42:14 +0100
+Subject: [PATCH 1/6] ASoC: dapm: If one widget fails, do not force all
+ subsequent widgets to fail too
+In-Reply-To: <1343741493-17671-3-git-send-email-lee.jones@linaro.org>
+References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
+ <1343741493-17671-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20120731134214.GK4468@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch inserts all known MSP devices into the DBx5x0 Device Tree
-disabled and enables the two important ones for the Snowball low-cost
-development board.
+On Tue, Jul 31, 2012 at 02:31:23PM +0100, Lee Jones wrote:
+> If a list of widgets is provided and one of them fails to be added as
+> a control, the present semantics fail all subsequent widgets. A better
+> solution would be to only fail that widget, but pursue in attempting
+> to add the rest of the list.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/dbx5x0.dtsi  |   33 +++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/snowball.dts |    8 ++++++++
- 2 files changed, 41 insertions(+)
-
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index a3bee0a..241213c 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -591,6 +591,39 @@
- 			status = "disabled";
- 		};
- 
-+		msp0: msp at 80123000 {
-+			compatible = "stericsson,ux500-msp-i2s";
-+			reg = <0x80123000 0x1000>;
-+			interrupts = <0 31 0x4>;
-+			v-ape-supply = <&db8500_vape_reg>;
-+			status = "disabled";
-+		};
-+
-+		msp1: msp at 80124000 {
-+			compatible = "stericsson,ux500-msp-i2s";
-+			reg = <0x80124000 0x1000>;
-+			interrupts = <0 62 0x4>;
-+			v-ape-supply = <&db8500_vape_reg>;
-+			status = "disabled";
-+		};
-+
-+		// HDMI sound
-+		msp2: msp at 80117000 {
-+			compatible = "stericsson,ux500-msp-i2s";
-+			reg = <0x80117000 0x1000>;
-+			interrupts = <0 98 0x4>;
-+			v-ape-supply = <&db8500_vape_reg>;
-+			status = "disabled";
-+		};
-+
-+		msp3: msp at 80125000 {
-+			compatible = "stericsson,ux500-msp-i2s";
-+			reg = <0x80125000 0x1000>;
-+			interrupts = <0 62 0x4>;
-+			v-ape-supply = <&db8500_vape_reg>;
-+			status = "disabled";
-+		};
-+
- 		external-bus at 50000000 {
- 			compatible = "simple-bus";
- 			reg = <0x50000000 0x4000000>;
-diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
-index df6fc57..fce4a00 100644
---- a/arch/arm/boot/dts/snowball.dts
-+++ b/arch/arm/boot/dts/snowball.dts
-@@ -83,6 +83,14 @@
- 	};
- 
- 	soc-u9500 {
-+		msp1: msp at 80124000 {
-+			status = "okay";
-+		};
-+
-+		msp3: msp at 80125000 {
-+			status = "okay";
-+		};
-+
- 		external-bus at 50000000 {
- 			status = "okay";
- 
--- 
-1.7.9.5
+You're posting this *again* without bothering to respond to my review
+comments.
