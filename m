@@ -1,46 +1,27 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 31 Jul 2012 15:21:53 +0100
-Subject: AB8500 Regulators
-In-Reply-To: <20120731134716.GL4468@opensource.wolfsonmicro.com>
-References: <501690F7.2010904@linaro.org>
- <20120730152618.GI4468@opensource.wolfsonmicro.com>
- <5016B70A.1030601@linaro.org>
- <20120730174831.GP4468@opensource.wolfsonmicro.com>
- <50179B64.60209@linaro.org>
- <20120731110830.GY4468@opensource.wolfsonmicro.com>
- <5017CEE4.5010602@linaro.org>
- <20120731134716.GL4468@opensource.wolfsonmicro.com>
-Message-ID: <5017EA01.6090401@linaro.org>
+Date: Tue, 31 Jul 2012 15:25:07 +0100
+Subject: [PATCH 1/6] ASoC: dapm: If one widget fails, do not force all
+ subsequent widgets to fail too
+In-Reply-To: <20120731134214.GK4468@opensource.wolfsonmicro.com>
+References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
+ <1343741493-17671-3-git-send-email-lee.jones@linaro.org>
+ <20120731134214.GK4468@opensource.wolfsonmicro.com>
+Message-ID: <5017EAC3.3080504@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/07/12 14:47, Mark Brown wrote:
-> On Tue, Jul 31, 2012 at 01:26:12PM +0100, Lee Jones wrote:
->> On 31/07/12 12:08, Mark Brown wrote:
+On 31/07/12 14:42, Mark Brown wrote:
+> On Tue, Jul 31, 2012 at 02:31:23PM +0100, Lee Jones wrote:
+>> If a list of widgets is provided and one of them fails to be added as
+>> a control, the present semantics fail all subsequent widgets. A better
+>> solution would be to only fail that widget, but pursue in attempting
+>> to add the rest of the list.
 >
->>>> - I now know how the changing voltage API works
->>>>    - What I don't know is where we'd call it from to initialise them
->>>>    - Can we do that from the ab8500 regulator driver's init() or probe()?
->
->>> I'm surprised you've managed to miss the existing interfaces:
->
->>>     include/linux/regulator/machine.h
->>>     Documentation/devicetree/bindings/regulator/regulator.txt
->
->> I saw the interfaces, I just don't know what's the correct thing to
->> do. I'm leaving Device Tree for the moment. I'm more concerned about
->> addressing the problem in the AB8500 Regulator Driver and it's
->> Platform counterpart.
->
->> The only thing of interest that I could see was the regulator_init()
->> call-back. Is this what you were alluding to in the first link?
->
-> No.  apply_uV.
+> You're posting this *again* without bothering to respond to my review
+> comments.
 
-Ah, nice.
 
-So is it worth me making at least those changes, so we can start 
-thinning down our platform data overhead?
+I didn't see any comments on this.
 
 -- 
 Lee Jones
