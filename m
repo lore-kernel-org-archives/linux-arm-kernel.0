@@ -1,14 +1,49 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 31 Jul 2012 14:40:51 +0100
-Subject: [PATCH 1/6] Bugfixes and clean-ups bound for the v3.6 RCs
-In-Reply-To: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
-References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120731134051.GJ4468@opensource.wolfsonmicro.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Tue, 31 Jul 2012 13:37:38 +0000
+Subject: [PATCH RESEND v2 1/2] arm/dts: Add AM33XX basic pinctrl support
+In-Reply-To: <50125B1C.8000209@ti.com>
+References: <1343144719-26352-1-git-send-email-anilkumar@ti.com>
+ <1343144719-26352-2-git-send-email-anilkumar@ti.com>
+ <50125B1C.8000209@ti.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA06E4B@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 02:31:21PM +0100, Lee Jones wrote:
-> This patch-set includes some important changes which should make
-> their way to the Mainline Release Candidates for the v3.6 release.
+Hi Peter,
 
-You appear to have double sent this or something...
+On Fri, Jul 27, 2012 at 14:40:52, Ujfalusi, Peter wrote:
+> Hi,
+> 
+> On 07/24/2012 06:45 PM, AnilKumar Ch wrote:
+> > Adds basic pinctrl support for AM33XX family of devices. This patch
+> > is based on the pinctrl-simple driver submitted by Tony Lindgren's
+> > here: http://lwn.net/Articles/496075/
+> > 
+> > Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> > ---
+> >  arch/arm/boot/dts/am33xx.dtsi |    9 +++++++++
+> >  1 file changed, 9 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> > index 59509c4..9b974dc 100644
+> > --- a/arch/arm/boot/dts/am33xx.dtsi
+> > +++ b/arch/arm/boot/dts/am33xx.dtsi
+> > @@ -40,6 +40,15 @@
+> >  		};
+> >  	};
+> >  
+> > +	am3358_pinmux: pinmux at 44E10800 {
+> > +		compatible = "pinctrl-single";
+> > +		reg = <0x44E10800 0x0338>;
+> 
+> I'm just curious about the size here: how it ended up as 0x0338?
+> While looking at the TRM of AM335x I can come up with 0x0238 (0x44e10800 -
+> 0x44e10a38), but I don't see any sings of the remaining 0x0100 to be
+> documented at least.
+
+No, pinmux registers are available till 0x44E10B38, look at AM335x latest TRM
+or pinmux utility (we cannot find the exact offsets but pins we can find after
+0x0A38, conf_ddr_resetn) at http://www.ti.com/tool/pinmuxtool
+
+Regards
+AnilKumar
