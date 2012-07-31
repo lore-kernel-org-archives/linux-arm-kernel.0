@@ -1,26 +1,31 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 31 Jul 2012 15:59:46 +0100
-Subject: [PATCH 18/19] Documentation: Define the MSP Driver Device Tree
- bindings
-In-Reply-To: <20120731135539.GO4468@opensource.wolfsonmicro.com>
+Date: Tue, 31 Jul 2012 16:00:16 +0100
+Subject: [PATCH 17/19] Documentation: Define the MOP500 Audio Machine
+ Driver Device Tree bindings
+In-Reply-To: <20120731135337.GM4468@opensource.wolfsonmicro.com>
 References: <1343741953-17828-1-git-send-email-lee.jones@linaro.org>
- <1343741953-17828-19-git-send-email-lee.jones@linaro.org>
- <20120731135539.GO4468@opensource.wolfsonmicro.com>
-Message-ID: <5017F2E2.4040100@linaro.org>
+ <1343741953-17828-18-git-send-email-lee.jones@linaro.org>
+ <20120731135337.GM4468@opensource.wolfsonmicro.com>
+Message-ID: <5017F300.8020206@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/07/12 14:55, Mark Brown wrote:
-> On Tue, Jul 31, 2012 at 02:39:12PM +0100, Lee Jones wrote:
+On 31/07/12 14:53, Mark Brown wrote:
+> On Tue, Jul 31, 2012 at 02:39:11PM +0100, Lee Jones wrote:
 >
->> +Optional properties:
->> + - interrupts       : The interrupt outputs from the device.
+>> +Required properties:
+>> + - compatible                : "stericsson,snd-soc-mop500"
 >
-> If there's more than one interrupt then how are they ordered?
+>> +Non-standard properties:
+>> + - Machine Driver:
+>> +   - stericsson,cpu-dai      : Phandle to the CPU-side DAI
+>> +   - stericsson,audio-codec  : Phandle to the Audio CODEC
+>
+> You should also support the card name property (there's a helper to
+> parse it, you can define the name of the property though) so apps can
+> tell what board they're on.
 
-It doesn't matter. If there are any more than one (which there aren't in 
-this case), we usually use the interrupt-names property then request 
-them by name in the driver.
+Okay.
 
 -- 
 Lee Jones
