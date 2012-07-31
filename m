@@ -1,72 +1,56 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Tue, 31 Jul 2012 10:59:14 +0200
-Subject: [PATCH 15/16] ARM: Kirkwood: Describe iConnect LEDs in DT.
-In-Reply-To: <20120731072012.GR18016@lunn.ch> (Andrew Lunn's message of "Tue,
- 31 Jul 2012 09:20:12 +0200")
-References: <1342805751-18048-1-git-send-email-andrew@lunn.ch>
- <1342805751-18048-16-git-send-email-andrew@lunn.ch>
- <5016FE26.8090509@baker-net.org.uk> <20120731063645.GO18016@lunn.ch>
- <87sjc85rwa.fsf@lebrac.rtp-net.org> <20120731072012.GR18016@lunn.ch>
-Message-ID: <87fw885msd.fsf@lebrac.rtp-net.org>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Tue, 31 Jul 2012 17:06:33 +0800
+Subject: [PATCH v3 1/3] USB: chipidea: add imx usbmisc support
+In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803C0B776@039-SN2MPN1-022.039d.mgd.msft.net>
+References: <1343298916-11101-1-git-send-email-richard.zhao@freescale.com>
+ <1343298916-11101-2-git-send-email-richard.zhao@freescale.com>
+ <20120730093244.GQ30009@pengutronix.de>
+ <20120730093956.GI3347@b20223-02.ap.freescale.net>
+ <F281D0F91ED19E4D8E63A7504E8A649803C0B776@039-SN2MPN1-022.039d.mgd.msft.net>
+Message-ID: <20120731090632.GK3347@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew Lunn <andrew@lunn.ch> writes:
+On Tue, Jul 31, 2012 at 09:06:33AM +0800, Chen Peter-B29397 wrote:
+>  
+> > >
+> > > <&usbmisc 0> would then mean port 0 of the usbmisc device.
+> > I didn't add the restriction that a usbmisc driver must have a usbmisc
+> > device. I'm not sure whether all SoC and future SoC can be look as
+> > a device.
+> > 
+> > Peter, do you have any idea?
+> > 
+> I have not followed this usbmisc design, I just list some facts at i.mx
+> USB controller:
+> 
+> Sigmatel-derived SoCs (i.mx23, i.mx28) have no this register region, all phy controls
+> are through PHY register.
+> Other freescale SoCs have this usbmisc register region to control phy and tune some
+> signal quality. This register region is from another 0x800 or (last controller base address + 0x200) 
+Looks good. I'll take Sascha's suggestion.
 
-> On Tue, Jul 31, 2012 at 09:08:53AM +0200, Arnaud Patard wrote:
->> Andrew Lunn <andrew@lunn.ch> writes:
->> 
->> > On Mon, Jul 30, 2012 at 10:35:34PM +0100, Adam Baker wrote:
->> >> On 20/07/12 18:35, Andrew Lunn wrote:
->> >> 
->> >> Sorry it's taken a while to spot this but I've got one comment below
->> >> 
->> >> >Signed-off-by: Andrew Lunn <andrew@lunn.ch>
->> >> >---
->> >> >  arch/arm/boot/dts/kirkwood-iconnect.dts |   34 +++++++++++++++++++++++
->> >> >  arch/arm/mach-kirkwood/board-iconnect.c |   46 -------------------------------
->> >> >  2 files changed, 34 insertions(+), 46 deletions(-)
->> >> >
->> >> >diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
->> >> >index a7dd07b..b77b38f 100644
->> >> >--- a/arch/arm/boot/dts/kirkwood-iconnect.dts
->> >> >+++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
->> >> >@@ -31,4 +31,38 @@
->> >> >  			status = "ok";
->> >> >  		};
->> >> >  	};
->> >> >+	gpio-leds {
->> >> >+		compatible = "gpio-leds";
->> >> >+
->> >> >+		led-level {
->> >> >+			label = "led_level";
->> >> >+			gpios = <&gpio1 9 0>;
->> >> >+			linux,default-trigger = "default-on";
->> >> >+		};
->> >> >+		power-blue {
->> >> >+			label = "power:blue";
->> >> >+			gpios = <&gpio1 11 0>;
->> >> >+			linux,default-trigger = "timer";
->> >> >+		};
->> >> 
->> >> Is there any reason that power:red is missing here?
->> >
->> > The monkey driving the keyboard is not reliable at monkey work...
->> >
->> > Please create a patch and i will try to get it into rc1.
->> 
->> There's already a patch for that in your mailbox ("ARM: Kirkwood: Fix
->> iconnect leds"). I guess you're not yet fully awake :)
->
-> Hi Arnaud
->
-> Still need my second coffee of the day.
->
-> Those patches never went to the list, as far as i remember. Please can
-> you post the two fixes and the two development patches, as seperate
-> patchsets.
-
-Will do.
-
-Thanks,
-Arnaud
+Thanks
+Richard
+> 
+> > Thanks
+> > Richard
+> > >
+> > > If the usbmisc property exists, you can return -EPROBE_DEFER until it
+> > is
+> > > available. If it doesn't exist, you just continue without usbmisc
+> > > support (i.MX28)
+> > >
+> > > Sascha
+> > >
+> > >
+> > > --
+> > > Pengutronix e.K.                           |
+> > |
+> > > Industrial Linux Solutions                 | http://www.pengutronix.de/
+> > |
+> > > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
+> > |
+> > > Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-
+> > 5555 |
+> > >
