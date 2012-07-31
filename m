@@ -1,61 +1,73 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Tue, 31 Jul 2012 16:42:12 +0530
-Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <501181C3.1020301@ti.com>
-References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
- <201207171924.33756.arnd@arndb.de> <1342756850.1726.74.camel@vkoul-udesk3>
- <201207200839.24259.arnd@arndb.de> <1342777047.1726.435.camel@vkoul-udesk3>
- <500EF27F.6050905@ti.com> <1343284960.1726.8978.camel@vkoul-udesk3>
- <501181C3.1020301@ti.com>
-Message-ID: <1343733132.1726.14418.camel@vkoul-udesk3>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Tue, 31 Jul 2012 19:12:50 +0800
+Subject: [GIT PULL] LED CPU trigger driver and ARM LED code consolidation
+In-Reply-To: <CAK5ve-K5jh3cnm+T6VGp_njv7rLBMhFZsACFbYnkOu+Ortmbgg@mail.gmail.com>
+References: <CAK5ve-JuZcjdbw_tV8vcriHWxOq1KFHm2mZBm6z3_j7hpPw-eA@mail.gmail.com>
+ <CAK5ve-+3rKjeQA-WMQWvT48roFx-3Y-jNLZ3ciyOuH42x4Nu9A@mail.gmail.com>
+ <CAOesGMgav2dqvUk623u_1ZuAE82drg2tF7rMpKMCZN4_Oq12_A@mail.gmail.com>
+ <CAK5ve-K29fKi57hEWLh6gQ-F5KXXr7hHfyAkk_MebxcQf6Dp=A@mail.gmail.com>
+ <20120731101502.GQ6802@n2100.arm.linux.org.uk>
+ <CAK5ve-K5jh3cnm+T6VGp_njv7rLBMhFZsACFbYnkOu+Ortmbgg@mail.gmail.com>
+Message-ID: <CAK5ve-JYZgWQLz8if2KO3Wy0pTL2auLCyO2Ogjb_gvCsiucdUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-07-26 at 12:43 -0500, Jon Hunter wrote:
-> >> So yes I can see that a channel itself could be configured to
-> support a
-> >> given direction, but when we ask for a channel via
-> dma_request_channel()
-> >> we are going to get a channel that matches the criteria we pass
-> using
-> >> the filter parameter. So here the thinking was that "flags" is a
-> filter
-> >> parameter that the user could specify and one example being
-> direction
-> >> but it could be something else too.
-> > Yes that can be done, but I am leaning towards clients not have to
-> do
-> > anything :) DMAEngine needs to know mapping and when
-> > dma_request_channel() is called it _always_ gives you the right
-> channel.
-> 
-> Ok, so are you proposing to remove the filter function and parameter
-> from the dma_request_channel()?
-No. But add a new request call, dma_request_slave_channel() which is
-exclusive for slave usages and takes into account the mapping to be done
-for channels
-> 
-> > Maybe for slave case we need to create dma_request_slave_channel()
-> which
-> > has additional arguments for dmaengine to do the filtering.
-Yup
-> 
-> Ok, so what is not clear to me is if you envision that
-> dma_request_slave_channel() is using a mapping table based look-up or
-> the DT scheme or both.
-The API should not worry about it. It would be good to have DT/ other be
-behind this API, so it is transparent to users. They just request a
-slave channel.
-> 
-> As Arnd highlighted the DT convention is to store the DMA info in each
-> of the device nodes and not store in a global mapping table which
-> conflicts with having a mapping table approach for non-DT usage. So I
-> am
-> still not sure how you envision this function working for both the
-> non-DT and DT use-cases. 
-I expect the clients to pass the mapping information to dmaengine in way
-dmaengine understands. This information can come from DT or other
-places. That way dmaengine gets info from any system being used and be
-able to allocate slave channel properly.
+On Tue, Jul 31, 2012 at 7:08 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
+> On Tue, Jul 31, 2012 at 6:15 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Tue, Jul 31, 2012 at 05:53:41PM +0800, Bryan Wu wrote:
+>>> On Fri, Jun 8, 2012 at 4:20 PM, Olof Johansson <olof@lixom.net> wrote:
+>>> > Hi,
+>>> >
+>>> > On Wed, Jun 6, 2012 at 11:12 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
+>>> >> Hi Arnd and Olof,
+>>> >>
+>>> >> Is there any chance to pull this LED code into ARM SoC tree?
+>>> >>
+>>> >> Thanks,
+>>> >> -Bryan
+>>> >>
+>>> >> On Mon, Jun 4, 2012 at 3:25 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
+>>> >>> Hi Arnd and Olof,
+>>> >>>
+>>> >>> Please consider to pull my branch for LED CPU trigger driver and ARM
+>>> >>> LED code consolidation, which is based on 3.5-rc1:
+>>> >>>
+>>> >>> The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
+>>> >>>
+>>> >>>  Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
+>>> >>>
+>>> >>> are available in the git repository at:
+>>> >>>
+>>> >>>  git://git.kernel.org/pub/scm/linux/kernel/git/cooloney/linux-leds.git
+>>> >>> for-arm-soc
+>>> >
+>>> > Pulled into arm-soc as devel/led-driver in next/drivers.
+>>> >
+>>> >
+>>> > Thanks,
+>>> >
+>>> > -Olof
+>>>
+>>> Olof and Arnd,
+>>>
+>>> Will you guys send out pull request for this led-driver patches during
+>>> this merge window?
+>>
+>> They're not, because you're ignoring bug reports against the patches.
+>> They got dropped from arm-soc when I pointed out that they cause the
+>> same old regression on Versatile platforms that I reported to you about
+>> a year before.
+>
+> OMG? I missed such email, could you please point me out that?
+>
+
+Sorry for the mess, I got this email which was archived automatically.
+I will try to fix this as soon as possible.
+
+Thanks,
 -- 
-~Vinod
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer    +86.186-168-78255 Mobile
+Canonical Ltd.      www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
