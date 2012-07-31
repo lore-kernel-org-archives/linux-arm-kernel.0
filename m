@@ -1,51 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Jul 2012 23:01:45 +0100
-Subject: [PATCH 5/6] ARM: ux500: Enable HIGHMEM on all mop500 platforms
-In-Reply-To: <201207312050.03113.arnd@arndb.de>
-References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
- <5017EBDC.6010005@linaro.org> <20120731143732.GS6802@n2100.arm.linux.org.uk>
- <201207312050.03113.arnd@arndb.de>
-Message-ID: <20120731220145.GD10335@n2100.arm.linux.org.uk>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Tue, 31 Jul 2012 19:04:41 -0400
+Subject: [PATCH 05/22] ARM: LPAE: use signed arithmetic for mask definitions
+In-Reply-To: <1343775898-28345-1-git-send-email-cyril@ti.com>
+References: <1343775898-28345-1-git-send-email-cyril@ti.com>
+Message-ID: <1343775898-28345-6-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 08:50:02PM +0000, Arnd Bergmann wrote:
-> On Tuesday 31 July 2012, Russell King - ARM Linux wrote:
-> > I still fail to see how not having highmem enabled would ever cause memory
-> > corruption errors (unless something dealing with memory in a very very
-> > wrong way - iow, not using one of the reservation or memory allocation
-> > methods provided by the kernel.)
-> 
-> The problem is that all users of ux500 systems pass a command line like
-> 
-> vmalloc=256M mem=128M at 0 mali.mali_mem=32M at 128M hwmem=168M at 160M mem=48M at 328M mem_issw=1M at 383M mem=640M at 384M
-> 
-> This is of course totally bogus and should not be done. If I understand
-> Lee correctly, one of the issues resulting from passing a command
-> line like this without enabling highmem is memory corruption.
+This patch applies to PAGE_MASK, PMD_MASK, and PGDIR_MASK, where forcing
+unsigned long math truncates the mask at the 32-bits.  This clearly does bad
+things on PAE systems.
 
-But the question is _why_ does that corruption happen.
+This patch fixes this problem by defining these masks as signed quantities.
+We then rely on sign extension to do the right thing.
 
->From the above, we will end up with the kernel getting:
+Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+---
+ arch/arm/include/asm/page.h           |    2 +-
+ arch/arm/include/asm/pgtable-3level.h |    6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-0x00000000 - 0x07ffffff (128M @ 0)
-0x14800000 - 0x177fffff (48M  @ 328M)
-0x18000000 - 0x3fffffff (640M @ 384M)
-
-with:
-
-0x08000000 - 0x081fffff used for mali
-0x0a000000 - 0x147fffff used for hwmem
-0x17f00000 - 0x17ffffff used for mem_issw
-
-Now, with highmem disabled, the kernel should still map exactly the
-regions: 0x00000000 - 0x07ffffff, 0x14800000 - 0x177fffff, into the
-direct mapped region, and truncate the 0x18000000 - 0x3fffffff
-region appropriately, reducing the amount of memory available such
-that it won't overlap the vmalloc area (which you've specified to be
-a minimum of 256M.)
-
-This should _NOT_ cause any memory corruption.
-
-So, come on guys.  Debugging is *mandatory* for this kind of problem.
-Papering over it is obscene.
+diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
+index ecf9019..1e0fe08 100644
+--- a/arch/arm/include/asm/page.h
++++ b/arch/arm/include/asm/page.h
+@@ -13,7 +13,7 @@
+ /* PAGE_SHIFT determines the page size */
+ #define PAGE_SHIFT		12
+ #define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
+-#define PAGE_MASK		(~(PAGE_SIZE-1))
++#define PAGE_MASK		(~((1 << PAGE_SHIFT) - 1))
+ 
+ #ifndef __ASSEMBLY__
+ 
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index b249035..ae39d11 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -48,16 +48,16 @@
+ #define PMD_SHIFT		21
+ 
+ #define PMD_SIZE		(1UL << PMD_SHIFT)
+-#define PMD_MASK		(~(PMD_SIZE-1))
++#define PMD_MASK		(~((1 << PMD_SHIFT) - 1))
+ #define PGDIR_SIZE		(1UL << PGDIR_SHIFT)
+-#define PGDIR_MASK		(~(PGDIR_SIZE-1))
++#define PGDIR_MASK		(~((1 << PGDIR_SHIFT) - 1))
+ 
+ /*
+  * section address mask and size definitions.
+  */
+ #define SECTION_SHIFT		21
+ #define SECTION_SIZE		(1UL << SECTION_SHIFT)
+-#define SECTION_MASK		(~(SECTION_SIZE-1))
++#define SECTION_MASK		(~((1 << SECTION_SHIFT) - 1))
+ 
+ #define USER_PTRS_PER_PGD	(PAGE_OFFSET / PGDIR_SIZE)
+ 
+-- 
+1.7.9.5
