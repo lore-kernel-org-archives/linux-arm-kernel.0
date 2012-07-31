@@ -1,38 +1,45 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 31 Jul 2012 15:03:47 +0200
-Subject: [PATCH V2 2/5] include/video: Add Exynos5 specific FIMD register
- offsets
-In-Reply-To: <5017D4D7.3040303@mvista.com>
-References: <1343737385-23337-1-git-send-email-l.krishna@samsung.com>
- <1343737385-23337-3-git-send-email-l.krishna@samsung.com>
- <5017D4D7.3040303@mvista.com>
-Message-ID: <5017D7B3.1080001@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 31 Jul 2012 14:31:22 +0100
+Subject: [PATCH 1/6] ASoC: ab8500: Inform SoC Core that we have our own I/O
+ arrangements
+In-Reply-To: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
+References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1343741493-17671-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+If codec->control_data is not populated SoC Core assumes we want to
+use regmap, which fails catastrophically, as we don't have one:
 
-On 07/31/2012 02:51 PM, Sergei Shtylyov wrote:
->> +/*EXYNOS5 FIMD REG OFFSET */
+Unable to handle kernel NULL pointer dereference at virtual address 00000080
+pgd = c0004000
+[00000080] *pgd=00000000
+Internal error: Oops: 17 [#1] PREEMPT SMP ARM
+Modules linked in:
+CPU: 1    Not tainted  (3.5.0-rc6-00884-g0b2419e-dirty #130)
+PC is at regmap_read+0x10/0x5c
+LR is at hw_read+0x80/0x90
+pc : [<c01a91b8>]    lr : [<c0216804>]    psr: 60000013
 
-How about changing it to, e.g.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ sound/soc/codecs/ab8500-codec.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-/* EXYNOS5 specific register offset definitions */
-
-(but just in case you happen to resend this patch series)
-
->> +#define EXYNOS5_VIDTCON0    (0x20010)
->> +#define EXYNOS5_VIDTCON1    (0x20014)
->> +#define EXYNOS5_VIDTCON2    (0x20018)
->> +#define EXYNOS5_VIDTCON3    (0x2001C)
->> +#define EXYNOS5_VIDCON1        (0x20004)
-> 
->    Parens not needed around simple literals.
-
-Yes, I agree it looks insane. But, I think we could allow
-this for consistency with the remaining definitions.
-
+diff --git a/sound/soc/codecs/ab8500-codec.c b/sound/soc/codecs/ab8500-codec.c
+index 3c79592..23b4018 100644
+--- a/sound/soc/codecs/ab8500-codec.c
++++ b/sound/soc/codecs/ab8500-codec.c
+@@ -2406,6 +2406,10 @@ static int ab8500_codec_probe(struct snd_soc_codec *codec)
+ 
+ 	/* Setup AB8500 according to board-settings */
+ 	pdata = (struct ab8500_platform_data *)dev_get_platdata(dev->parent);
++
++	/* Inform SoC Core that we have our own I/O arrangements. */
++	codec->control_data = (void *)true;
++
+ 	status = ab8500_audio_setup_mics(codec, &pdata->codec->amics);
+ 	if (status < 0) {
+ 		pr_err("%s: Failed to setup mics (%d)!\n", __func__, status);
 -- 
-
-Regards,
-Sylwester
+1.7.9.5
