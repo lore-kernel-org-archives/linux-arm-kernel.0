@@ -1,24 +1,31 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 31 Jul 2012 15:28:21 +0100
-Subject: [PATCH 1/6] ASoC: dapm: If one widget fails, do not force all
- subsequent widgets to fail too
-In-Reply-To: <5017EAC3.3080504@linaro.org>
-References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
- <1343741493-17671-3-git-send-email-lee.jones@linaro.org>
- <20120731134214.GK4468@opensource.wolfsonmicro.com>
- <5017EAC3.3080504@linaro.org>
-Message-ID: <20120731142820.GW4468@opensource.wolfsonmicro.com>
+Date: Tue, 31 Jul 2012 15:28:52 +0100
+Subject: AB8500 Regulators
+In-Reply-To: <5017EA01.6090401@linaro.org>
+References: <501690F7.2010904@linaro.org>
+ <20120730152618.GI4468@opensource.wolfsonmicro.com>
+ <5016B70A.1030601@linaro.org>
+ <20120730174831.GP4468@opensource.wolfsonmicro.com>
+ <50179B64.60209@linaro.org>
+ <20120731110830.GY4468@opensource.wolfsonmicro.com>
+ <5017CEE4.5010602@linaro.org>
+ <20120731134716.GL4468@opensource.wolfsonmicro.com>
+ <5017EA01.6090401@linaro.org>
+Message-ID: <20120731142852.GX4468@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 03:25:07PM +0100, Lee Jones wrote:
-> On 31/07/12 14:42, Mark Brown wrote:
+On Tue, Jul 31, 2012 at 03:21:53PM +0100, Lee Jones wrote:
+> On 31/07/12 14:47, Mark Brown wrote:
 
-> >You're posting this *again* without bothering to respond to my review
-> >comments.
+> >>The only thing of interest that I could see was the regulator_init()
+> >>call-back. Is this what you were alluding to in the first link?
 
-> I didn't see any comments on this.
+> >No.  apply_uV.
 
-Read your email.  <20120726115450.GE3099@opensource.wolfsonmicro.com>
-and <20120729202510.GB4384@opensource.wolfsonmicro.com>, the second one
-even includes a complaint about you ignoring the first mail.
+> Ah, nice.
+
+> So is it worth me making at least those changes, so we can start
+> thinning down our platform data overhead?
+
+Implementing support for framework features is of course useful.
