@@ -1,24 +1,37 @@
-From: ian.molton@codethink.co.uk (Ian Molton)
-Date: Tue, 31 Jul 2012 10:14:23 +0100
-Subject: [PATCH 3/6] mv643xx.c: Add basic device tree support.
-In-Reply-To: <87k3xk5mti.fsf@lebrac.rtp-net.org>
-References: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
- <1343661359-10150-4-git-send-email-ian.molton@codethink.co.uk>
- <87obmw5rm9.fsf@lebrac.rtp-net.org> <50179528.2020801@codethink.co.uk>
- <20120731082742.GU18016@lunn.ch> <50179B31.1000202@codethink.co.uk>
- <87k3xk5mti.fsf@lebrac.rtp-net.org>
-Message-ID: <5017A1EF.2000307@codethink.co.uk>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 31 Jul 2012 11:16:06 +0200
+Subject: [PATCH 1/2] ARM: mx23: Fix registers range
+In-Reply-To: <20120731005329.GD762@S2101-09.ap.freescale.net>
+References: <1343694559-3373-1-git-send-email-festevam@gmail.com>
+ <20120731005329.GD762@S2101-09.ap.freescale.net>
+Message-ID: <5017A256.2090803@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/07/12 09:58, Arnaud Patard (Rtp) wrote:
->> Ah, this postdates the D-T branches on which I am working being forked.
-> the original patch was from years ago but I noticed only recently it was
-> still not merged and sent this patch. I asked about it on DT because I
-> don't want it to get lost again, even if it looks like not a lot of
-> people are using jumbo frames on kirkwood or dove.
+On 07/31/2012 02:53 AM, Shawn Guo wrote:
+> On Mon, Jul 30, 2012 at 09:29:18PM -0300, Fabio Estevam wrote:
+>> From: Fabio Estevam <fabio.estevam@freescale.com>
+>>
+>> Fix registers range.
+>>
+>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>> ---
+> 
+> Queued both for 3.6-rc, thanks.
 
-No problem :) actually it works really nicely in DT, just drop it in
-the toplevel includes!
+Can you put stable on Cc?
 
--Ian
+Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 262 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120731/527f8957/attachment.sig>
