@@ -1,44 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 31 Jul 2012 18:23:54 +0000
-Subject: [PATCH v2 3/6] mv643xx.c: Add basic device tree support.
-In-Reply-To: <1343749529-17571-4-git-send-email-ian.molton@codethink.co.uk>
-References: <1343749529-17571-1-git-send-email-ian.molton@codethink.co.uk>
- <1343749529-17571-4-git-send-email-ian.molton@codethink.co.uk>
-Message-ID: <201207311823.54857.arnd@arndb.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 31 Jul 2012 20:32:06 +0200
+Subject: [PATCH] ARM: imx35: don't disable the uart clock when DEBUG_LL
+ is in use
+In-Reply-To: <20120731174358.GC30009@pengutronix.de>
+References: <1343742279-29570-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20120731174358.GC30009@pengutronix.de>
+Message-ID: <20120731183206.GC10670@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 31 July 2012, Ian Molton wrote:
-> @@ -33,6 +34,10 @@ struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
->  	OF_DEV_AUXDATA("marvell,orion-wdt", 0xf1020300, "orion_wdt", NULL),
->  	OF_DEV_AUXDATA("marvell,orion-sata", 0xf1080000, "sata_mv.0", NULL),
->  	OF_DEV_AUXDATA("marvell,orion-nand", 0xf4000000, "orion_nand", NULL),
-> +	OF_DEV_AUXDATA("marvell,mv643xx", 0xf1072000, MV643XX_ETH_NAME ".0",
-> +			NULL),
-> +	OF_DEV_AUXDATA("marvell,mv643xx", 0xf1076000, MV643XX_ETH_NAME ".1",
-> +			NULL),
->  	{},
->  };
+Hello Sascha,
 
-Please don't do string concatenation like this, it just makes it harder to grep for the
-strings.
+On Tue, Jul 31, 2012 at 07:43:58PM +0200, Sascha Hauer wrote:
+> On Tue, Jul 31, 2012 at 03:44:39PM +0200, Uwe Kleine-K?nig wrote:
+> > Otherwise printch et al. and printk with earlyprintk and keep_bootcon
+> > becomes unfunctional when the clk framework disables all unused clocks.
+> 
+> Why don't you use the regular console? Letting the clock framework
+> disable the clocks was pretty much intentional.
+I don't question that disabling unused clocks is sensible. But usually
+if you enable DEBUG_LL you want to use it even after the clock framework
+disabled all (apparently) unused clocks. And in my case the regular
+console didn't work yet and so I relied on earlyprintk.
+Even if the problem proved to be the result of my stupidity this patch
+asserts that earlyprintk just works as it should be for debug aids.
 
-> @@ -2654,15 +2677,22 @@ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
->  	/*
->  	 * Check whether the error interrupt is hooked up.
->  	 */
-> -	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> -	if (res != NULL) {
-> +	if (pdev->dev.of_node) {
-> +		irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
-> +	} else {
-> +		res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> +		if (res)
-> +			irq = res->start;
-> +	}
-> +
+Best regards
+Uwe
 
-Why is this necessary? In theory, the old code should be the same as the new one,
-unless something goes wrong in the domain registration.
-
-	Arnd
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
