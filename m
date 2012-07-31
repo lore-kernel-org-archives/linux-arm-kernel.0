@@ -1,33 +1,108 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Tue, 31 Jul 2012 14:29:07 +0800
-Subject: [PATCH 7/8] arm: pxa: fix device id for pwm
-In-Reply-To: <1343716148-3899-1-git-send-email-xiechao.mail@gmail.com>
-References: <1343716148-3899-1-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <1343716148-3899-7-git-send-email-xiechao.mail@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 31 Jul 2012 08:37:01 +0200
+Subject: [PATCH 1/3] Move FIMD register headers to include/video/
+In-Reply-To: <000a01cd6eb6$2113a050$633ae0f0$%han@samsung.com>
+References: <1343637905-17764-1-git-send-email-l.krishna@samsung.com>
+ <CAL1wa8e7Joghf9S=SgbQLJFWcYOrP5uK6qYXsV_N6rX1MVEALg@mail.gmail.com>
+ <000a01cd6eb6$2113a050$633ae0f0$%han@samsung.com>
+Message-ID: <2073177.5bSgcKjVcU@easynote>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chao Xie <chao.xie@marvell.com>
+Hi,
 
-pxa910 has same pwm as pxa168. pxa910-pwm is not needed.
-pxa168-pwm does not have depended secondary pwm.
+On Tuesday 31 of July 2012 at 09:47:57, Jingoo Han wrote:
+> On Monday, July 30, 2012 8:16 PM, Leela Krishna Amudala wrote:
+> > Hello Jingoo Han,
+> > 
+> > On Mon, Jul 30, 2012 at 2:23 PM, Jingoo Han <jg1.han@samsung.com> wrote:
+> > > On Monday, July 30, 2012 5:45 PM, Leela Krishna Amudala wrote:
+> > >> Moved the contents of regs-fb-v4.h and regs-fb.h from arch side
+> > >> to include/video/samsung_fimd.h
+> > >> 
+> > >> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+> > >> ---
+> > >> 
+> > >>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h |  159 -------
+> > >>  arch/arm/plat-samsung/include/plat/regs-fb.h    |  403
+> > >>  -----------------
+> > >>  include/video/samsung_fimd.h                    |  533
+> > >>  +++++++++++++++++++++++ 3 files changed, 533 insertions(+), 562
+> > >>  deletions(-)
+> > >>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+> > >>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb.h
+> > >>  create mode 100644 include/video/samsung_fimd.h
+> > >> 
+> > >> +*/
+> > >> +
+> > >> +/*FIMD V8 REG OFFSET */
+> > >> +#define FIMD_V8_VIDTCON0     (0x20010)
+> > >> +#define FIMD_V8_VIDTCON1     (0x20014)
+> > >> +#define FIMD_V8_VIDTCON2     (0x20018)
+> > >> +#define FIMD_V8_VIDTCON3     (0x2001C)
+> > >> +#define FIMD_V8_VIDCON1              (0x20004)
+> 
+> How about using soc_is_exynos5250()?
+> 
+> +#define VIDTCON0				(soc_is_exynos5250() ? \
+> +						(0x20010) : (0x10))
+> 
+> In this case, the FIMD driver does not need to change.
+> Also, one binary is available.
+> 
 
-Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
----
- arch/arm/plat-pxa/pwm.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+This would look good indeed, but there are some drawbacks:
+- it would not scale nicely for future SoCs using the new FIMD
+- it would add the overhead of checking SoC ID for every access to affected 
+registers (at least 1 load, 1 AND, 1 compare, 1 move and 1 conditional OR, so 
+5 instructions in total, possibly even more, as opposed to a single load from 
+a variant struct).
 
-diff --git a/arch/arm/plat-pxa/pwm.c b/arch/arm/plat-pxa/pwm.c
-index ef32686..45f039e 100644
---- a/arch/arm/plat-pxa/pwm.c
-+++ b/arch/arm/plat-pxa/pwm.c
-@@ -30,7 +30,6 @@ static const struct platform_device_id pwm_id_table[] = {
- 	{ "pxa25x-pwm", 0 },
- 	{ "pxa27x-pwm", 0 | HAS_SECONDARY_PWM },
- 	{ "pxa168-pwm", 1 },
--	{ "pxa910-pwm", 1 },
- 	{ },
- };
- MODULE_DEVICE_TABLE(platform, pwm_id_table);
--- 
-1.7.0.4
+I would stay with the way used in s3c-fb driver, using variant structs 
+describing FIMD revisions.
+
+Best regards,
+Tomasz Figa
+
+> 
+> Best regards,
+> Jingoo Han
+> 
+> > > CC'ed Marek.
+> > > 
+> > > To Leela Krishna Amudala,
+> > > 
+> > > Don't add these definitions for FIMD_V8_xxx registers, which arenot
+> > > related to current "regs-fb-v4.h> 
+> > and regs-fb.h".
+> > 
+> > > Just "move" and "merge" regs-fb-v4.h and regs-fb.h to one header file,
+> > > not "add" new definitions. If you want to add these definitions, please
+> > > make new patch for this.> 
+> > Will do it in the suggested way,
+> > 
+> > > Also, "#define FIMD_V8_xxx" is ugly.
+> > > I think that there is better way.
+> > > Please, find other way.
+> > 
+> > I used FIMD_V8_xxx instead of  EXYNOS5_FIMD_*, because in future,
+> > there is a possibility that version 8 FIMD can be used in other
+> > application processors also.
+> > Thanks for reviewing the patch.
+> > 
+> > Best Wishes,
+> > Leela Krishna.
+> > 
+> > >> --
+> > >> 1.7.0.4
+> > > 
+> > > --
+> > > To unsubscribe from this list: send the line "unsubscribe linux-fbdev"
+> > > in
+> > > the body of a message to majordomo at vger.kernel.org
+> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
