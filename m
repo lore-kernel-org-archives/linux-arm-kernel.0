@@ -1,47 +1,37 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 31 Jul 2012 19:43:58 +0200
-Subject: [PATCH] ARM: imx35: don't disable the uart clock when DEBUG_LL
- is in use
-In-Reply-To: <1343742279-29570-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1343742279-29570-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20120731174358.GC30009@pengutronix.de>
+Date: Tue, 31 Jul 2012 19:49:01 +0200
+Subject: [PATCH 4/4] media: mx2_camera: Fix clock handling for i.MX27.
+In-Reply-To: <Pine.LNX.4.64.1207311644590.27888@axis700.grange>
+References: <1343301637-19676-1-git-send-email-javier.martin@vista-silicon.com>
+ <1343301637-19676-5-git-send-email-javier.martin@vista-silicon.com>
+ <Pine.LNX.4.64.1207311644590.27888@axis700.grange>
+Message-ID: <20120731174901.GD30009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 03:44:39PM +0200, Uwe Kleine-K?nig wrote:
-> Otherwise printch et al. and printk with earlyprintk and keep_bootcon
-> becomes unfunctional when the clk framework disables all unused clocks.
+Hi Guennadi,
 
-Why don't you use the regular console? Letting the clock framework
-disable the clocks was pretty much intentional.
+On Tue, Jul 31, 2012 at 05:14:25PM +0200, Guennadi Liakhovetski wrote:
+> Hi Javier
+> 
+> > @@ -436,7 +436,8 @@ static void mx2_camera_deactivate(struct mx2_camera_dev *pcdev)
+> >  {
+> >  	unsigned long flags;
+> >  
+> > -	clk_disable(pcdev->clk_csi);
+> > +	if (cpu_is_mx27())
+> > +		clk_disable_unprepare(pcdev->clk_csi);
+> 
+> This tells me, there are already 2 things going on here:
+> 
+> 1. add clock-(un)prepare operations to enable / disable. Is this a problem 
+> atm? is the driver non-functional without this change or is it just an API 
+> correctness change? I thought you replied to this already, but 
+> unfortunately I couldn't find that your reply again, sorry.
+
+Since the common clock framework clk_prepare is mandatory.
 
 Sascha
-
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm/mach-imx/clk-imx35.c |    4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-> index c6422fb..83d614c 100644
-> --- a/arch/arm/mach-imx/clk-imx35.c
-> +++ b/arch/arm/mach-imx/clk-imx35.c
-> @@ -271,6 +271,10 @@ int __init mx35_clocks_init()
->  	 */
->  	clk_prepare_enable(clk[scc_gate]);
->  
-> +	/* Assert that the UART clock keeps running if DEBUG_LL is in use */
-> +	if (IS_ENABLED(CONFIG_DEBUG_IMX31_IMX35_UART))
-> +		clk_prepare_enable(clk[uart1_gate]);
-> +
->  	imx_print_silicon_rev("i.MX35", mx35_revision());
->  
->  #ifdef CONFIG_MXC_USE_EPIT
-> -- 
-> 1.7.10.4
-> 
-> 
 
 -- 
 Pengutronix e.K.                           |                             |
