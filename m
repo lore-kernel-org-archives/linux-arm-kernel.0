@@ -1,73 +1,111 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 31 Jul 2012 19:04:39 -0400
-Subject: [PATCH 03/22] ARM: LPAE: use phys_addr_t on virt <--> phys conversion
+Date: Tue, 31 Jul 2012 19:04:40 -0400
+Subject: [PATCH 04/22] ARM: LPAE: support 64-bit virt/phys patching
 In-Reply-To: <1343775898-28345-1-git-send-email-cyril@ti.com>
 References: <1343775898-28345-1-git-send-email-cyril@ti.com>
-Message-ID: <1343775898-28345-4-git-send-email-cyril@ti.com>
+Message-ID: <1343775898-28345-5-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes up the types used when converting back and forth between
-physical and virtual addresses.
+This patch adds support for 64-bit physical addresses in virt_to_phys
+patching.  This does not do real 64-bit add/sub, but instead patches in the
+upper 32-bits of the phys_offset directly into the output of virt_to_phys.
 
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+In addition to adding 64-bit support, this patch also adds a set_phys_offset()
+helper that is needed on architectures that need to modify PHYS_OFFSET during
+initialization.
+
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 ---
- arch/arm/include/asm/memory.h |   17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/memory.h |   22 +++++++++++++++-------
+ arch/arm/kernel/head.S        |    6 ++++++
+ arch/arm/kernel/setup.c       |   14 ++++++++++++++
+ 3 files changed, 35 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 01c710d..4a0108f 100644
+index 4a0108f..110495c 100644
 --- a/arch/arm/include/asm/memory.h
 +++ b/arch/arm/include/asm/memory.h
-@@ -157,22 +157,27 @@ extern unsigned long __pv_phys_offset;
+@@ -153,23 +153,31 @@
+ #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
  
+ extern unsigned long __pv_phys_offset;
+-#define PHYS_OFFSET __pv_phys_offset
+-
++extern unsigned long __pv_phys_offset_high;
  extern unsigned long __pv_offset;
  
--static inline unsigned long __virt_to_phys(unsigned long x)
-+static inline phys_addr_t __virt_to_phys(unsigned long x)
++extern void set_phys_offset(phys_addr_t po);
++
++#define PHYS_OFFSET	__virt_to_phys(PAGE_OFFSET)
++
+ static inline phys_addr_t __virt_to_phys(unsigned long x)
  {
- 	unsigned long t;
- 	early_patch_imm8(x, t, "add", __pv_offset);
- 	return t;
+-	unsigned long t;
+-	early_patch_imm8(x, t, "add", __pv_offset);
+-	return t;
++	unsigned long tlo, thi = 0;
++
++	early_patch_imm8(x, tlo, "add", __pv_offset);
++	if (sizeof(phys_addr_t) > 4)
++		early_patch_imm8(0, thi, "add", __pv_phys_offset_high);
++
++	return (u64)tlo | (u64)thi << 32;
  }
  
--static inline unsigned long __phys_to_virt(unsigned long x)
-+static inline unsigned long __phys_to_virt(phys_addr_t x)
+ static inline unsigned long __phys_to_virt(phys_addr_t x)
  {
- 	unsigned long t;
- 	early_patch_imm8(x, t, "sub", __pv_offset);
+-	unsigned long t;
+-	early_patch_imm8(x, t, "sub", __pv_offset);
++	unsigned long t, xlo = x;
++	early_patch_imm8(xlo, t, "sub", __pv_offset);
  	return t;
  }
++
  #else
--#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
--#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
+ 
+ #define __virt_to_phys(x)		\
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index d165896..fa820b3 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -532,6 +532,12 @@ __pv_phys_offset:
+ 	.long	0
+ 	.size	__pv_phys_offset, . - __pv_phys_offset
+ 
++	.globl	__pv_phys_offset_high
++	.type	__pv_phys_offset_high, %object
++__pv_phys_offset_high:
++	.long	0
++	.size	__pv_phys_offset_high, . - __pv_phys_offset_high
 +
-+#define __virt_to_phys(x)		\
-+	((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET)
-+
-+#define __phys_to_virt(x)		\
-+	((unsigned long)((phys_addr_t)(x) - PHYS_OFFSET + PAGE_OFFSET))
-+
+ 	.globl	__pv_offset
+ 	.type	__pv_offset, %object
+ __pv_offset:
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 15a7699..bba3fdc 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -67,6 +67,20 @@
+ #define MEM_SIZE	(16*1024*1024)
  #endif
- #endif
  
-@@ -207,14 +212,14 @@ static inline phys_addr_t virt_to_phys(const volatile void *x)
++#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
++/*
++ * set_phys_offset() sets PHYS_OFFSET and pv_offset.
++ * Note: this is unsafe to use beyond setup_arch().
++ */
++void __init set_phys_offset(phys_addr_t po)
++{
++	__pv_phys_offset	= po;
++	__pv_phys_offset_high	= (u64)po >> 32;
++	__pv_offset		= po - PAGE_OFFSET;
++}
++
++#endif
++
+ #if defined(CONFIG_FPE_NWFPE) || defined(CONFIG_FPE_FASTFPE)
+ char fpe_type[8];
  
- static inline void *phys_to_virt(phys_addr_t x)
- {
--	return (void *)(__phys_to_virt((unsigned long)(x)));
-+	return (void *)__phys_to_virt(x);
- }
- 
- /*
-  * Drivers should NOT use these either.
-  */
- #define __pa(x)			__virt_to_phys((unsigned long)(x))
--#define __va(x)			((void *)__phys_to_virt((unsigned long)(x)))
-+#define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
- #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
- 
- /*
 -- 
 1.7.9.5
