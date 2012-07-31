@@ -1,48 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Jul 2012 15:37:32 +0100
-Subject: [PATCH 5/6] ARM: ux500: Enable HIGHMEM on all mop500 platforms
-In-Reply-To: <5017EBDC.6010005@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 31 Jul 2012 15:38:02 +0100
+Subject: [PATCH 1/6] ASoC: dapm: If one widget fails, do not force all
+ subsequent widgets to fail too
+In-Reply-To: <20120731142820.GW4468@opensource.wolfsonmicro.com>
 References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
- <1343741493-17671-10-git-send-email-lee.jones@linaro.org>
- <20120731135614.GR6802@n2100.arm.linux.org.uk> <5017EBDC.6010005@linaro.org>
-Message-ID: <20120731143732.GS6802@n2100.arm.linux.org.uk>
+ <1343741493-17671-3-git-send-email-lee.jones@linaro.org>
+ <20120731134214.GK4468@opensource.wolfsonmicro.com>
+ <5017EAC3.3080504@linaro.org>
+ <20120731142820.GW4468@opensource.wolfsonmicro.com>
+Message-ID: <5017EDCA.4020601@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 03:29:48PM +0100, Lee Jones wrote:
-> On 31/07/12 14:56, Russell King - ARM Linux wrote:
->> On Tue, Jul 31, 2012 at 02:31:30PM +0100, Lee Jones wrote:
->>> The current kernel commandline for ux500 based devices includes
->>> hard-coded allocations for things like mali and hwmem, which
->>> actually run over lowmem. Here we enable highmem in order to
->>> avoid memory corruption errors.
->>
->> Err what?  highmem should make no difference if things are being done
->> correctly.
->>
->> In other words, your patch description is too vague to understand what
->> the problem is and why you have to force highmem on - and nothing should
->> _require_ highmem.
+On 31/07/12 15:28, Mark Brown wrote:
+> On Tue, Jul 31, 2012 at 03:25:07PM +0100, Lee Jones wrote:
+>> On 31/07/12 14:42, Mark Brown wrote:
 >
-> I think I must have misunderstood some advice which was recently given  
-> to me. I'll drop the patch.
+>>> You're posting this *again* without bothering to respond to my review
+>>> comments.
 >
-> Thanks for reviewing.
+>> I didn't see any comments on this.
+>
+> Read your email.  <20120726115450.GE3099@opensource.wolfsonmicro.com>
+> and <20120729202510.GB4384@opensource.wolfsonmicro.com>, the second one
+> even includes a complaint about you ignoring the first mail.
 
-There are two reasons for not doing this:
+Neither of those are in my Inbox. Blame Mozilla. :)
 
-1. it is wrong to force core optional features on by using 'select'
-2. it is wrong to use 'select' on user visible symbols because it creates
-   confusion, and prevents the user from disabling the option.
+It's better because the whole audio system doesn't fail in the case of 
+minor failure. It'd be like calling off a football game (or whatever 
+you're into) because one of the substitutes ruptured an eyelash.
 
-Note that highmem is just a hack to make larger memory systems work before
-64-bit systems happen - it is _known_ to make systems unstable with large
-amounts of highmem (even on x86) due to the requirement to have a certain
-amount of metadata stored in lowmem.
+During start-up the ux500 has a couple of very unimportant widgets fail. 
+It's the wrong behavior to force failure on the everything audio just 
+because of that.
 
-Nothing should ever force anyone to have highmem enabled.
-
-I still fail to see how not having highmem enabled would ever cause memory
-corruption errors (unless something dealing with memory in a very very
-wrong way - iow, not using one of the reservation or memory allocation
-methods provided by the kernel.)
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
