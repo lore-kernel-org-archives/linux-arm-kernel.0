@@ -1,40 +1,58 @@
-From: ian.molton@codethink.co.uk (Ian Molton)
-Date: Tue, 31 Jul 2012 09:23:41 +0100
-Subject: [PATCH 4/6] kirkwood: setup clock only in eth helpers.
-In-Reply-To: <CAMW5UfahXv--UU5np9HroXWia7-PN9qy1eyCnc_Wf39H-_F+gA@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 31 Jul 2012 10:27:42 +0200
+Subject: [PATCH 3/6] mv643xx.c: Add basic device tree support.
+In-Reply-To: <50179528.2020801@codethink.co.uk>
 References: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
- <1343661359-10150-5-git-send-email-ian.molton@codethink.co.uk>
- <CAMW5UfahXv--UU5np9HroXWia7-PN9qy1eyCnc_Wf39H-_F+gA@mail.gmail.com>
-Message-ID: <5017960D.3040101@codethink.co.uk>
+ <1343661359-10150-4-git-send-email-ian.molton@codethink.co.uk>
+ <87obmw5rm9.fsf@lebrac.rtp-net.org>
+ <50179528.2020801@codethink.co.uk>
+Message-ID: <20120731082742.GU18016@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/07/12 17:46, Josh Coombs wrote:
-> If I'm reading this correctly, if kirkwood_ge00_init is called without
-> any data, all that happens is the clock is enabled.  If the right data
-> is passed in, the ethernet interface is initialized, and then the
-> clock is enabled.
->
-> Patch 6 in your series sets all the existing DT board files to call
-> kirkwood_ge00_init with no data.
->
-> Would it make more sense for readability to separate the clock prep
-> and other interface initialization so DT board files don't appear to
-> be calling for a full turn up despite now handling that in the DTS
-> tree?  IE instead of converting all the board-XXX.c to call
-> kirkwood_ge00_init(NULL) have them call a new function,
-> kirkwood_ge00_clk_prep(NULL) instead, assuming the clock can't be
-> handled directly via DTS.
+On Tue, Jul 31, 2012 at 09:19:52AM +0100, Ian Molton wrote:
+> On 31/07/12 08:14, Arnaud Patard (Rtp) wrote:
+> > Ian Molton <ian.molton@codethink.co.uk> writes:
+> > Hi,
+> >
+> > [...]
+> >
+> >> @@ -2873,7 +2913,31 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+> >>  	struct resource *res;
+> >>  	int err;
+> >>  
+> >> -	pd = pdev->dev.platform_data;
+> >> +	if (pdev->dev.of_node) {
+> >> +		struct device_node *np = NULL;
+> >> +
+> >> +		/* when all users of this driver use FDT, we can remove this */
+> >> +		pd = kzalloc(sizeof(*pd), GFP_ATOMIC);
+> >> +		if (!pd) {
+> >> +			dev_dbg(&pdev->dev, "Could not allocate platform data\n");
+> >> +			return -ENOMEM;
+> >> +		}
+> >> +
+> >> +		of_property_read_u32(pdev->dev.of_node,
+> >> +			"port_number", &pd->port_number);
+> >> +		of_property_read_u32(pdev->dev.of_node,
+> >> +			"phy_addr", &pd->phy_addr);
+> > I guess we need something for tx_csum_limit in the device tree too. It's
+> > important for kirkwood and dove.
+> 
+> It was my intention to keep the patch as non-invasive as possible - none
+> of the platforms using D-T at present require this.
+> 
+> Furthermore, git grep shows nothing in mach-kirkwood or mach-dove using
+> at all...
+> 
+> Are you sure this is required? It can always be added if anything
+> actually uses it :)
 
-This is certainly possible, but I was trying to avoid yet another
-function being added to the sources with a (necessarily) short
-lifespan - it will only be needed until such time as the clk stuff
-is sorted out, which is on my TODO list.
+Hi Ian
 
-My preference would be to add a comment explaining the
-choice in the code.
+Try using jumbo packets on kirkwood.
 
-If its preferred, however, I have no real objection to splitting
-out the functionality.
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/178785
+http://www.spinics.net/lists/arm-kernel/msg186152.html
 
--Ian
+	Andrew
