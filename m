@@ -1,36 +1,81 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Tue, 31 Jul 2012 15:09:12 +0800
-Subject: [PATCH 6/7] arm: mmp&dove: modify tauros2_init call
-In-Reply-To: <20120731070153.GA13777@lunn.ch>
-References: <20120731070153.GA13777@lunn.ch>
-Message-ID: <CADApbehptEE++NoxBmTuPmbWY7q9Je_vXPxMv3Sq86_f_SpBCg@mail.gmail.com>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Tue, 31 Jul 2012 12:42:18 +0530
+Subject: [PATCH 1/3] Move FIMD register headers to include/video/
+In-Reply-To: <032201cd6ee5$ad4a0d50$07de27f0$%szyprowski@samsung.com>
+References: <1343637905-17764-1-git-send-email-l.krishna@samsung.com>
+ <1343637905-17764-2-git-send-email-l.krishna@samsung.com>
+ <000001cd6e30$da849520$8f8dbf60$%han@samsung.com>
+ <CAL1wa8e7Joghf9S=SgbQLJFWcYOrP5uK6qYXsV_N6rX1MVEALg@mail.gmail.com>
+ <000a01cd6eb6$2113a050$633ae0f0$%han@samsung.com>
+ <032201cd6ee5$ad4a0d50$07de27f0$%szyprowski@samsung.com>
+Message-ID: <CAL1wa8dqyqcWQCXw0=k0T++YMfNrRVu6b_PWRY3P8L=BjxuCCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 3:01 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> Hi Chao
+Hello Marek,
+
+On Tue, Jul 31, 2012 at 11:58 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello,
 >
-> When making changes to Dove, or any other Orion system, please could
-> you CC: the orion maintainers:
+> On Tuesday, July 31, 2012 2:48 AM Jingoo Han wrote:
 >
-> ARM/Marvell Dove/Kirkwood/MV78xx0/Orion SOC support
-> M:      Jason Cooper <jason@lakedaemon.net>
-> M:      Andrew Lunn <andrew@lunn.ch>
-> L:      linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> S:      Maintained
-> F:      arch/arm/mach-dove/
-> F:      arch/arm/mach-kirkwood/
-> F:      arch/arm/mach-mv78xx0/
-> F:      arch/arm/mach-orion5x/
-> F:      arch/arm/plat-orion/
+>> On Monday, July 30, 2012 8:16 PM, Leela Krishna Amudala wrote:
+>> >
+>> > Hello Jingoo Han,
+>> >
+>> > On Mon, Jul 30, 2012 at 2:23 PM, Jingoo Han <jg1.han@samsung.com> wrote:
+>> > > On Monday, July 30, 2012 5:45 PM, Leela Krishna Amudala wrote:
+>> > >>
+>> > >> Moved the contents of regs-fb-v4.h and regs-fb.h from arch side
+>> > >> to include/video/samsung_fimd.h
+>> > >>
+>> > >> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+>> > >> ---
+>> > >>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h |  159 -------
+>> > >>  arch/arm/plat-samsung/include/plat/regs-fb.h    |  403 -----------------
+>> > >>  include/video/samsung_fimd.h                    |  533 +++++++++++++++++++++++
+>> > >>  3 files changed, 533 insertions(+), 562 deletions(-)
+>> > >>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+>> > >>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb.h
+>> > >>  create mode 100644 include/video/samsung_fimd.h
+>> > >>
+>> > >> +*/
+>> > >> +
+>> > >> +/*FIMD V8 REG OFFSET */
+>> > >> +#define FIMD_V8_VIDTCON0     (0x20010)
+>> > >> +#define FIMD_V8_VIDTCON1     (0x20014)
+>> > >> +#define FIMD_V8_VIDTCON2     (0x20018)
+>> > >> +#define FIMD_V8_VIDTCON3     (0x2001C)
+>> > >> +#define FIMD_V8_VIDCON1              (0x20004)
+>>
+>>
+>> How about using soc_is_exynos5250()?
+>>
+>> +#define VIDTCON0                             (soc_is_exynos5250() ? \
+>> +                                             (0x20010) : (0x10))
+>>
+>> In this case, the FIMD driver does not need to change.
+>> Also, one binary is available.
 >
-> Does this also affect Armada 370 and Armada XP SOC? I've no idea what
-> cache it uses.
+> Please don't mix two methods of runtime detection. FIMD driver (s3c-fb) already
+> has runtime hw detection based on platform device id. Adding such detection for
+> exynos5 to DRM FIMD driver should not be a big issue too.
 >
-> Thanks
->         Andrew
-It will impact Armada 370. The patch will make the user has choice to
-enable extra features of tauros2
-I have searched the code, only dove will use tauros2_init, and the
-tauros2 default has its extra features off, so i directly pass 0x0 for
-dove
+
+I have code ready for DRM-FIMD driver with the above approach (getting
+FIMD version by runtime detection)
+will post the patches soon along with arch side patches once the arch
+changes are ready.
+and I'll continue the same name FIMD_V8_xxx for macro names.
+
+> Best regards
+> --
+> Marek Szyprowski
+> Samsung Poland R&D Center
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
