@@ -1,39 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 31 Jul 2012 11:27:36 +0000
-Subject: [PATCH 1/6] Initial csb1724 board support (FDT)
-In-Reply-To: <5016B619.7030602@codethink.co.uk>
-References: <1343661359-10150-1-git-send-email-ian.molton@codethink.co.uk>
- <20120730152829.GJ18016@lunn.ch> <5016B619.7030602@codethink.co.uk>
-Message-ID: <201207311127.37094.arnd@arndb.de>
+Date: Tue, 31 Jul 2012 11:54:42 +0000
+Subject: [PATCH 2/5] clk: mmp: add clock definition for pxa168
+In-Reply-To: <1343716792-10399-2-git-send-email-xiechao.mail@gmail.com>
+References: <1343716792-10399-1-git-send-email-xiechao.mail@gmail.com>
+ <1343716792-10399-2-git-send-email-xiechao.mail@gmail.com>
+Message-ID: <201207311154.42866.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 July 2012, Ian Molton wrote:
-> On 30/07/12 16:28, Andrew Lunn wrote:
-> > Hi Ian
-> >
-> >> diff --git a/arch/arm/configs/csb1724_defconfig
-> >> b/arch/arm/configs/csb1724_defconfig new file mode 100644 index
-> >> 0000000..927b269 --- /dev/null +++
-> >> b/arch/arm/configs/csb1724_defconfig @@ -0,0 +1,47 @@
-> >> +CONFIG_ARCH_KIRKWOOD=y +CONFIG_ARCH_KIRKWOOD_DT=y
-> >> +CONFIG_MACH_CSB1724_DT=y
-> > Do you really need this? Its the only kirkwood board with its on
-> > _defconfig file. What makes this board special?
-> 
-> Nothing. defconfigs are just there to make configuring your kernel easy.
-> 
-> The kirkwood defconfig doesnt fit the currently supported hardware
-> set on the csb1724 very well. Why build stuff you dont need?
+On Tuesday 31 July 2012, Chao Xie wrote:
+> +#define APBC_RTC       APBC_REG(0x28)
+> +#define APBC_TWSI0     APBC_REG(0x2c)
+> +#define APBC_KPC       APBC_REG(0x30)
+> +#define APBC_UART0     APBC_REG(0x00)
+> +#define APBC_UART1     APBC_REG(0x04)
+> +#define APBC_GPIO      APBC_REG(0x08)
+> +#define APBC_PWM0      APBC_REG(0x0c)
+> +#define APBC_PWM1      APBC_REG(0x10)
+> +#define APBC_PWM2      APBC_REG(0x14)
+> +#define APBC_PWM3      APBC_REG(0x18)
+> +#define APBC_SSP0      APBC_REG(0x81c)
+> +#define APBC_SSP1      APBC_REG(0x820)
+> +#define APBC_SSP2      APBC_REG(0x84c)
+> +#define APBC_SSP3      APBC_REG(0x858)
+> +#define APBC_SSP4      APBC_REG(0x85c)
+> +#define APBC_TWSI1     APBC_REG(0x6c)
+> +#define APBC_UART2     APBC_REG(0x70)
+> +
+> +#define APMU_SDH0      APMU_REG(0x54)
+> +#define APMU_SDH1      APMU_REG(0x58)
+> +#define APMU_USB       APMU_REG(0x5c)
+> +#define APMU_DISP0     APMU_REG(0x4c)
+> +#define APMU_CCIC0     APMU_REG(0x50)
+> +#define APMU_DFC       APMU_REG(0x60)
 
-The defconfig files serve a number of purposes. One of them is for
-build regression testing, and for that reason we try to enable as
-many boards as possible with a small number of defconfig files.
+Same comment as for patch 1: get the address from the device tree and just
+define those macros to the offset, like:
 
-It's very rare that we have a board specific defconfig file, and
-I would also ask you to just enable the hardware you need in the
-kirkwood defconfig. It should not be hard for you to create
-your own configuration by starting with that and disabling everything
-you don't need.
+#define APBC_RTC       0x28
+
+apbc_clks[rtc_clk] = mmp_clk_register_apbc(rtc_clk, clk32k, APBC_RTC, 10, APBC_POWER_CTRL, mmp_clk_lock);
+clk_register_clkdev(apbc_clks[rtc_clk], NULL, "sa1100-rtc");
 
 	Arnd
