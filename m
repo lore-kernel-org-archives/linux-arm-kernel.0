@@ -1,48 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 31 Jul 2012 20:54:13 +0000
-Subject: [PATCH 5/6] ARM: ux500: Ensure probing of Audio devices when
- Device Tree is enabled
-In-Reply-To: <1343741493-17671-11-git-send-email-lee.jones@linaro.org>
-References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
- <1343741493-17671-11-git-send-email-lee.jones@linaro.org>
-Message-ID: <201207312054.13818.arnd@arndb.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 31 Jul 2012 15:56:37 -0500
+Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain
+ transitioning to OFF when in-use
+In-Reply-To: <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
+References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
+ <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
+ <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
+Message-ID: <50184685.9010608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 31 July 2012, Lee Jones wrote:
-> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-> index e641003..87a5cd7 100644
-> --- a/arch/arm/mach-ux500/board-mop500.c
-> +++ b/arch/arm/mach-ux500/board-mop500.c
-> @@ -794,6 +794,7 @@ static void __init u8500_init_machine(void)
->                                 ARRAY_SIZE(mop500_platform_devs));
->  
->                 mop500_sdi_init(parent);
-> +               mop500_msp_init(parent);
->                 i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
->                 i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
->                 i2c_register_board_info(2, mop500_i2c2_devices,
-> @@ -801,6 +802,8 @@ static void __init u8500_init_machine(void)
->  
->                 mop500_uib_init();
->  
-> +       } else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
-> +               mop500_of_msp_init(parent);
->         } else if (of_machine_is_compatible("st-ericsson,hrefv60+")) {
->                 /*
->                  * The HREFv60 board removed a GPIO expander and routed
-> @@ -812,6 +815,7 @@ static void __init u8500_init_machine(void)
->                                 ARRAY_SIZE(mop500_platform_devs));
->  
->                 hrefv60_sdi_init(parent);
-> +               mop500_msp_init(parent);
->  
->                 i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
->                 i2c0_devs -= NUM_PRE_V60_I2C0_DEVICES;
+Hi Paul,
 
+On 07/12/2012 04:17 PM, Paul Walmsley wrote:
 
-Looks like you're adding the same call to each of the three cases:
-mop500, snowball and hrefv60+. How about moving it before or after
-the if/elseif block?
+[snip]
 
-	Arnd
+> @@ -170,6 +201,18 @@ static int omap2_clkdm_clk_enable(struct clockdomain *clkdm)
+>  	if (!clkdm->clktrctrl_mask)
+>  		return 0;
+>  
+> +	/*
+> +	 * The CLKDM_MISSING_IDLE_REPORTING flag documentation has
+> +	 * more details on the unpleasant problem this is working
+> +	 * around
+> +	 */
+> +	if (clkdm->flags & (CLKDM_MISSING_IDLE_REPORTING |
+> +			    CLKDM_CAN_FORCE_WAKEUP)) {
+> +		(cpu_is_omap24xx()) ? omap2_clkdm_wakeup(clkdm) :
+> +			omap3_clkdm_wakeup(clkdm);
+> +		return 0;
+> +	}
+> +
+>  	hwsup = omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+>  				clkdm->clktrctrl_mask);
+
+I think that the above needs to be ...
+
+diff --git a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+index e5bb219..d2b081d 100644
+--- a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+@@ -253,8 +253,8 @@ static int omap3xxx_clkdm_clk_enable(struct clockdomain *clkdm)
+         * more details on the unpleasant problem this is working
+         * around
+         */
+-       if (clkdm->flags & (CLKDM_MISSING_IDLE_REPORTING |
+-                           CLKDM_CAN_FORCE_WAKEUP)) {
++       if ((clkdm->flags & CLKDM_MISSING_IDLE_REPORTING) &&
++                               (clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)) {
+                omap3_clkdm_wakeup(clkdm);
+                return 0;
+
+... otherwise I see other clkdm such as MPU being put in force-wakeup state 
+although they don't have CLKDM_MISSING_IDLE_REPORTING set.
+
+Cheers
+Jon
