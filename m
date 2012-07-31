@@ -1,57 +1,67 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 31 Jul 2012 12:08:30 +0100
-Subject: AB8500 Regulators
-In-Reply-To: <50179B64.60209@linaro.org>
-References: <501690F7.2010904@linaro.org>
- <20120730152618.GI4468@opensource.wolfsonmicro.com>
- <5016B70A.1030601@linaro.org>
- <20120730174831.GP4468@opensource.wolfsonmicro.com>
- <50179B64.60209@linaro.org>
-Message-ID: <20120731110830.GY4468@opensource.wolfsonmicro.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Tue, 31 Jul 2012 19:08:22 +0800
+Subject: [GIT PULL] LED CPU trigger driver and ARM LED code consolidation
+In-Reply-To: <20120731101502.GQ6802@n2100.arm.linux.org.uk>
+References: <CAK5ve-JuZcjdbw_tV8vcriHWxOq1KFHm2mZBm6z3_j7hpPw-eA@mail.gmail.com>
+ <CAK5ve-+3rKjeQA-WMQWvT48roFx-3Y-jNLZ3ciyOuH42x4Nu9A@mail.gmail.com>
+ <CAOesGMgav2dqvUk623u_1ZuAE82drg2tF7rMpKMCZN4_Oq12_A@mail.gmail.com>
+ <CAK5ve-K29fKi57hEWLh6gQ-F5KXXr7hHfyAkk_MebxcQf6Dp=A@mail.gmail.com>
+ <20120731101502.GQ6802@n2100.arm.linux.org.uk>
+Message-ID: <CAK5ve-K5jh3cnm+T6VGp_njv7rLBMhFZsACFbYnkOu+Ortmbgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 09:46:28AM +0100, Lee Jones wrote:
+On Tue, Jul 31, 2012 at 6:15 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jul 31, 2012 at 05:53:41PM +0800, Bryan Wu wrote:
+>> On Fri, Jun 8, 2012 at 4:20 PM, Olof Johansson <olof@lixom.net> wrote:
+>> > Hi,
+>> >
+>> > On Wed, Jun 6, 2012 at 11:12 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
+>> >> Hi Arnd and Olof,
+>> >>
+>> >> Is there any chance to pull this LED code into ARM SoC tree?
+>> >>
+>> >> Thanks,
+>> >> -Bryan
+>> >>
+>> >> On Mon, Jun 4, 2012 at 3:25 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
+>> >>> Hi Arnd and Olof,
+>> >>>
+>> >>> Please consider to pull my branch for LED CPU trigger driver and ARM
+>> >>> LED code consolidation, which is based on 3.5-rc1:
+>> >>>
+>> >>> The following changes since commit f8f5701bdaf9134b1f90e5044a82c66324d2073f:
+>> >>>
+>> >>>  Linux 3.5-rc1 (2012-06-02 18:29:26 -0700)
+>> >>>
+>> >>> are available in the git repository at:
+>> >>>
+>> >>>  git://git.kernel.org/pub/scm/linux/kernel/git/cooloney/linux-leds.git
+>> >>> for-arm-soc
+>> >
+>> > Pulled into arm-soc as devel/led-driver in next/drivers.
+>> >
+>> >
+>> > Thanks,
+>> >
+>> > -Olof
+>>
+>> Olof and Arnd,
+>>
+>> Will you guys send out pull request for this led-driver patches during
+>> this merge window?
+>
+> They're not, because you're ignoring bug reports against the patches.
+> They got dropped from arm-soc when I pointed out that they cause the
+> same old regression on Versatile platforms that I reported to you about
+> a year before.
 
-> Please listen to what I'm saying as a whole. Breaking that paragraph
-> up takes it entirely out of context. I'm mostly agreeing with what
-> you're saying, and asking you some advice.
+OMG? I missed such email, could you please point me out that?
 
-That's unfortunately not how it comes over (especially in the context of
-some of the other serieses), it really feels like a lot of work to find
-out what these magic register writes are supposed to do.
-
-> - I now know how the changing voltage API works
->   - What I don't know is where we'd call it from to initialise them
->   - Can we do that from the ab8500 regulator driver's init() or probe()?
-
-I'm surprised you've managed to miss the existing interfaces:
-
-   include/linux/regulator/machine.h
-   Documentation/devicetree/bindings/regulator/regulator.txt
-
-> - WRT the 'valid' registers, I'm not sure what they do. The doc says:
->   "Supply control thru Hardware signal and SysClkReq balls validation."
->   - More comments on what the writes do individually can be seen in [1]
->   - Perhaps we can extend the API thus:
-
-These things don't tie very well.  The comments in the sequences look
-reasonably meaningful but you're saying the datasheet doesn't document
-anything at all.
-
-> >+       u8 valid_bank;
-> >+       u8 valid_reg;
-> >+       u8 valid_mask;
-> >+       u8 valid_val_enable;
-
-> Then I think most (if not all) of our bases are covered.
-
-No, there's a whole series of problems here.  The most serious one is
-that "valid" means nothing, we need *some* effort at semantics here.
-We're also going to run into trouble as soon as we've got to update two
-different registers.
-
-It looks like you're trying to put something vaugely like regmap patches
-into the regulator API, but it seems fairly clear that this stuff is
-board specific configuration rather than things that should be blasted
-in unconditionally on any board.
+Thanks,
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer    +86.186-168-78255 Mobile
+Canonical Ltd.      www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
