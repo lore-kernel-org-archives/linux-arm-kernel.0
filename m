@@ -1,50 +1,29 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Tue, 31 Jul 2012 01:06:33 +0000
-Subject: [PATCH v3 1/3] USB: chipidea: add imx usbmisc support
-In-Reply-To: <20120730093956.GI3347@b20223-02.ap.freescale.net>
-References: <1343298916-11101-1-git-send-email-richard.zhao@freescale.com>
- <1343298916-11101-2-git-send-email-richard.zhao@freescale.com>
- <20120730093244.GQ30009@pengutronix.de>
- <20120730093956.GI3347@b20223-02.ap.freescale.net>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803C0B776@039-SN2MPN1-022.039d.mgd.msft.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 31 Jul 2012 09:16:11 +0800
+Subject: [PATCH 1/2] ARM: i.MX6: set ARCH_NR_GPIO to 244
+In-Reply-To: <20120730142908.GM6802@n2100.arm.linux.org.uk>
+References: <1343219864-3040-1-git-send-email-dirk.behme@de.bosch.com>
+ <20120728133215.GG2128@S2101-09.ap.freescale.net>
+ <5015624D.50305@googlemail.com>
+ <20120730011426.GB30774@S2101-09.ap.freescale.net>
+ <50162C7A.1060307@de.bosch.com>
+ <20120730084558.GE31509@S2101-09.ap.freescale.net>
+ <20120730142908.GM6802@n2100.arm.linux.org.uk>
+Message-ID: <20120731011609.GE762@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> >
-> > <&usbmisc 0> would then mean port 0 of the usbmisc device.
-> I didn't add the restriction that a usbmisc driver must have a usbmisc
-> device. I'm not sure whether all SoC and future SoC can be look as
-> a device.
-> 
-> Peter, do you have any idea?
-> 
-I have not followed this usbmisc design, I just list some facts at i.mx
-USB controller:
+On Mon, Jul 30, 2012 at 03:29:08PM +0100, Russell King - ARM Linux wrote:
+> Don't do that.  CONFIG_ARCH_NR_GPIO is there so that we can consolidate
+> out as much crap from mach/gpio.h as possible.  Either use it now, or I
+> will patch you to make you use it.  Either way, you will end up using
+> it... :)
 
-Sigmatel-derived SoCs (i.mx23, i.mx28) have no this register region, all phy controls
-are through PHY register.
-Other freescale SoCs have this usbmisc register region to control phy and tune some
-signal quality. This register region is from another 0x800 or (last controller base address + 0x200) 
+Right.  I was wrong on that.  But I still maintain my position that
+there is no much point to define CONFIG_ARCH_NR_GPIO as 224 for space
+saving.  I would rather not use it for IMX until we have an IMX SoC
+implementing more than 256 gpio.
 
-> Thanks
-> Richard
-> >
-> > If the usbmisc property exists, you can return -EPROBE_DEFER until it
-> is
-> > available. If it doesn't exist, you just continue without usbmisc
-> > support (i.MX28)
-> >
-> > Sascha
-> >
-> >
-> > --
-> > Pengutronix e.K.                           |
-> |
-> > Industrial Linux Solutions                 | http://www.pengutronix.de/
-> |
-> > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
-> |
-> > Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-
-> 5555 |
-> >
+-- 
+Regards,
+Shawn
