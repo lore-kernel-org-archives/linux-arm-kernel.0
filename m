@@ -1,36 +1,40 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 1 Aug 2012 06:48:05 +0200
-Subject: [06/10,V2] spi: Add SPI driver for mx233/mx28
-In-Reply-To: <20120801035333.GB1672@S2100-06.ap.freescale.net>
-References: <1341555449-17507-6-git-send-email-marex@denx.de>
- <201208010431.04399.marex@denx.de>
- <20120801035333.GB1672@S2100-06.ap.freescale.net>
-Message-ID: <201208010648.05325.marex@denx.de>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Wed, 1 Aug 2012 12:59:09 +0800
+Subject: [GIT PULL] LED CPU trigger driver and ARM LED code consolidation
+ (v2)
+In-Reply-To: <CAOesGMhK3bkk+86jDM7bd6rFUE_RuTGWiWsB7SYJ=i2NocOiLA@mail.gmail.com>
+References: <CAK5ve-KjK2mU0qjdp2HK5CdrM=eQ-hN0nw-0cJj7HGuRyGjH8w@mail.gmail.com>
+ <CAK5ve-+wWWARGz4ky_VW2AK7hHLXENkw2ANToLztcDjsegubsw@mail.gmail.com>
+ <CAOesGMhK3bkk+86jDM7bd6rFUE_RuTGWiWsB7SYJ=i2NocOiLA@mail.gmail.com>
+Message-ID: <CAK5ve-KuB=5evdiJDSQbN0N=56fofNeaof==GuRXFWhA44KcAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+On Wed, Aug 1, 2012 at 12:55 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Jul 31, 2012 at 9:48 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
+>> On Tue, Jul 31, 2012 at 9:46 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
+>>> Russell, Arnd and Olof,
+>>>
+>>
+>> I felt very sorry about this issue, the email was archived
+>> automatically in my Gmail account. I found the root cause of the issue
+>> Russell met and actually that code about trigger_data is totally
+>> useless, which was removed just now. I pushed an update version again
+>> to the same branch of my git tree. Please consider a pull. If I did
+>> something bad, please let me know, I will fix it as soon as possible.
+>
+> Hi,
+>
+> We'll pull this in for staging again once the merge window is done.
+> It's definitely not 3.6 material at this time.
+>
 
-> On Wed, Aug 01, 2012 at 04:31:04AM +0200, Marek Vasut wrote:
-> > > Couple of reasons for asking: No other SPI master driver calls it in
-> > > the remove function (unless I missed it), most drivers don't call it
-> > > in the probe function error path, and if I call it in the remove
-> > > function in a SPI master driver I am working on, and load/unload the
-> > > module several times in a row, I get a nasty kernel crash.
-> > 
-> > It seems the spi_master class takes care of that kfree() in
-> > spi.c:spi_master_release() . Good catch, thanks!
-> 
-> I do not hardware setup to confirm that right away.  When
-> spi_master_release will be called exactly?  The time that
-> spi_master_put gets called?  I'm trying to understand if the kfree
-> is not needed only in remove function, or both probe and remove.
+OK, I will rebase to 3.6-rc1 after merge window close and send out
+pull request again.
 
-I checked, it's called in both cases ... (if .probe() crashes, release() is 
-called, so kfree() is unneeded)
-
-> Regards,
-> Shawn
-
-Best regards,
-Marek Vasut
+Thanks,
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer    +86.186-168-78255 Mobile
+Canonical Ltd.      www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
