@@ -1,81 +1,50 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 1 Aug 2012 08:54:37 +0200
-Subject: [PATCH v3 09/10] of: Add of_pci_parse_ranges()
-In-Reply-To: <50183B03.2090809@gmail.com>
-References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
- <1343332512-28762-10-git-send-email-thierry.reding@avionic-design.de>
- <50183B03.2090809@gmail.com>
-Message-ID: <20120801065437.GB26791@avionic-0098.adnet.avionic-design.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 1 Aug 2012 09:02:52 +0200 (CEST)
+Subject: [PATCH 4/4] media: mx2_camera: Fix clock handling for i.MX27.
+In-Reply-To: <20120731174901.GD30009@pengutronix.de>
+References: <1343301637-19676-1-git-send-email-javier.martin@vista-silicon.com>
+ <1343301637-19676-5-git-send-email-javier.martin@vista-silicon.com>
+ <Pine.LNX.4.64.1207311644590.27888@axis700.grange>
+ <20120731174901.GD30009@pengutronix.de>
+Message-ID: <Pine.LNX.4.64.1208010850110.5406@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 03:07:31PM -0500, Rob Herring wrote:
-> On 07/26/2012 02:55 PM, Thierry Reding wrote:
-> > This new function parses the ranges property of PCI device nodes into
-> > an array of struct resource elements. It is useful in multiple-port PCI
-> > host controller drivers to collect information about the ranges that it
-> > needs to forward to the respective ports.
+Hi Sascha
+
+On Tue, 31 Jul 2012, Sascha Hauer wrote:
+
+> Hi Guennadi,
 > 
-> It seems to me that some of the DT PCI code in arch/powerpc/kernel/pci*
-> like pci_process_bridge_OF_ranges() should apply for ARM as well.
-> 
-> Each arch defining their own pci controller structs complicates this,
-> but I would think at least the DT parsing can be common.
-
-Yes, there's quite a lot of room for refactoring. When I first started
-work on this there had been some discussion about whether it would make
-sense to move PCI controller drivers into a common location to make it
-easier to refactor but the consensus at the time was that this should
-not be done.
-
-I still think this might be worthwhile, but I have other things that I
-need to finish first.
-
-> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> > ---
-> > Changes in v3:
-> > - new patch
+> On Tue, Jul 31, 2012 at 05:14:25PM +0200, Guennadi Liakhovetski wrote:
+> > Hi Javier
 > > 
-> >  drivers/of/of_pci.c    | 84 +++++++++++++++++++++++++++++++++++++++++++++++++-
-> >  include/linux/of_pci.h |  2 ++
-> >  2 files changed, 85 insertions(+), 1 deletion(-)
+> > > @@ -436,7 +436,8 @@ static void mx2_camera_deactivate(struct mx2_camera_dev *pcdev)
+> > >  {
+> > >  	unsigned long flags;
+> > >  
+> > > -	clk_disable(pcdev->clk_csi);
+> > > +	if (cpu_is_mx27())
+> > > +		clk_disable_unprepare(pcdev->clk_csi);
 > > 
-> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> > index 13e37e2..bcff301 100644
-> > --- a/drivers/of/of_pci.c
-> > +++ b/drivers/of/of_pci.c
-> > @@ -1,7 +1,8 @@
-> >  #include <linux/kernel.h>
-> >  #include <linux/export.h>
-> > -#include <linux/of.h>
-> > +#include <linux/of_address.h>
-> >  #include <linux/of_pci.h>
-> > +#include <linux/slab.h>
-> >  #include <asm/prom.h>
-> >  
-> >  static inline int __of_pci_pci_compare(struct device_node *node,
-> > @@ -40,3 +41,84 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
-> >  	return NULL;
-> >  }
-> >  EXPORT_SYMBOL_GPL(of_pci_find_child_device);
-> > +
-> > +struct resource *of_pci_parse_ranges(struct device_node *node,
-> > +				     unsigned int *countp)
-> > +{
-> > +	unsigned int count, i = 0;
-> > +	struct resource *ranges;
+> > This tells me, there are already 2 things going on here:
+> > 
+> > 1. add clock-(un)prepare operations to enable / disable. Is this a problem 
+> > atm? is the driver non-functional without this change or is it just an API 
+> > correctness change? I thought you replied to this already, but 
+> > unfortunately I couldn't find that your reply again, sorry.
 > 
-> I think res or pci_res would be clearer than ranges that this is a
-> struct resource.
+> Since the common clock framework clk_prepare is mandatory.
 
-"range" is the term used by the PCI specifications to denote these
-regions. I don't see what's wrong with using it as a variable name.
+Good, thanks for the clarification. So, this is not a functional, but a 
+correctness fix. I think, such fixes are acceptable after -rc1 until 
+something like -rc5, but maybe not after that. So, I'd try to push this 
+some time within the next couple of weeks, once I get this fix as a 
+separate patch.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120801/7826e0d5/attachment.sig>
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
