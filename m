@@ -1,34 +1,59 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 1 Aug 2012 17:17:57 -0300
-Subject: [RFC] ARM: imx6q-sabrelite: Add CLKO IOMUX
-In-Reply-To: <1343833836-14287-1-git-send-email-festevam@gmail.com>
-References: <1343833836-14287-1-git-send-email-festevam@gmail.com>
-Message-ID: <CAOMZO5A2g+UCFuiP7yqYkFQ36F=2yrqJA3ssujeYXE_Q0Sz5nQ@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 1 Aug 2012 21:31:07 +0100
+Subject: [PATCH 06/10 V2] spi: Add SPI driver for mx233/mx28
+In-Reply-To: <1343076052-27312-7-git-send-email-marex@denx.de>
+References: <1343076052-27312-1-git-send-email-marex@denx.de>
+ <1343076052-27312-7-git-send-email-marex@denx.de>
+Message-ID: <20120801203106.GW4483@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 1, 2012 at 12:10 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
->
-> In order to have audio functional on mx6qsabrelite, it is necessary to setup
-> the IOMUX for MX6Q_PAD_GPIO_0__CCM_CLKO and MX6Q_PAD_GPIO_3__CCM_CLKO2 pins.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Dirk,
->
-> Not tested. If you have a chance to try it, please let me know.
+On Mon, Jul 23, 2012 at 10:40:48PM +0200, Marek Vasut wrote:
 
-I managed to get a board and tried it with current Linus' tree and
-also linux-next. Both result in:
+> This is slightly reworked version of the SPI driver.
+> Support for DT has been added and it's been converted
+> to queued API.
 
-sgtl5000 0-000a: Device with ID register ffff is not a sgtl5000
-sgtl5000 0-000a: asoc: failed to probe CODEC sgtl5000.0-000a: -19
-asoc: failed to instantiate card imx6q-sabrelite-sgtl5000: -19
-imx-sgtl5000 sound.11: snd_soc_register_card failed (-19)
+Looks reasonable overall.
 
-Any ideas?
+> +	bits_per_word = dev->bits_per_word;
+> +	if (t && t->bits_per_word)
+> +		bits_per_word = t->bits_per_word;
+> +
+> +	if (bits_per_word != 8) {
+> +		dev_err(&dev->dev, "%s, unsupported bits_per_word=%d\n",
+> +					__func__, bits_per_word);
+> +		return -EINVAL;
+> +	}
 
-Thanks,
+> +	if (dev->max_speed_hz)
+> +		hz = dev->max_speed_hz;
+> +	if (t && t->speed_hz)
+> +		hz = t->speed_hz;
+> +	if (hz == 0) {
+> +		dev_err(&dev->dev, "Cannot continue with zero clock\n");
+> +		return -EINVAL;
+> +	}
 
-Fabio Estevam
+These two blocks use a different style (the first does the first assign
+unconditionally, the second uses initialisation with declaration).  I
+prefer the first style but YMMV and it doesn't matter.
+
+For the missing clock rate might it make sense to just use whatever the
+clock happens to come out as?
+
+> +static void mxs_spi_cleanup(struct spi_device *dev)
+> +{
+> +	return;
+> +}
+
+Empty functions are generally a warning sign...  why do we need this
+one?
+
+> +static int __devexit mxs_spi_remove(struct platform_device *pdev)
+> +{
+
+> +	clk_disable_unprepare(ssp->clk);
+
+It'd be nice to only keep the clocks enabled while doing transfers but
+again totally non-essential.
