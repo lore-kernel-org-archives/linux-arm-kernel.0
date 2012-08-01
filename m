@@ -1,50 +1,28 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 1 Aug 2012 09:02:52 +0200 (CEST)
-Subject: [PATCH 4/4] media: mx2_camera: Fix clock handling for i.MX27.
-In-Reply-To: <20120731174901.GD30009@pengutronix.de>
-References: <1343301637-19676-1-git-send-email-javier.martin@vista-silicon.com>
- <1343301637-19676-5-git-send-email-javier.martin@vista-silicon.com>
- <Pine.LNX.4.64.1207311644590.27888@axis700.grange>
- <20120731174901.GD30009@pengutronix.de>
-Message-ID: <Pine.LNX.4.64.1208010850110.5406@axis700.grange>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 1 Aug 2012 15:12:20 +0800
+Subject: [PATCH v5 2/3] ARM: imx6q: clk_register_clkdev usbmisc clock
+In-Reply-To: <1343805141-5872-1-git-send-email-richard.zhao@freescale.com>
+References: <1343805141-5872-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1343805141-5872-3-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha
-
-On Tue, 31 Jul 2012, Sascha Hauer wrote:
-
-> Hi Guennadi,
-> 
-> On Tue, Jul 31, 2012 at 05:14:25PM +0200, Guennadi Liakhovetski wrote:
-> > Hi Javier
-> > 
-> > > @@ -436,7 +436,8 @@ static void mx2_camera_deactivate(struct mx2_camera_dev *pcdev)
-> > >  {
-> > >  	unsigned long flags;
-> > >  
-> > > -	clk_disable(pcdev->clk_csi);
-> > > +	if (cpu_is_mx27())
-> > > +		clk_disable_unprepare(pcdev->clk_csi);
-> > 
-> > This tells me, there are already 2 things going on here:
-> > 
-> > 1. add clock-(un)prepare operations to enable / disable. Is this a problem 
-> > atm? is the driver non-functional without this change or is it just an API 
-> > correctness change? I thought you replied to this already, but 
-> > unfortunately I couldn't find that your reply again, sorry.
-> 
-> Since the common clock framework clk_prepare is mandatory.
-
-Good, thanks for the clarification. So, this is not a functional, but a 
-correctness fix. I think, such fixes are acceptable after -rc1 until 
-something like -rc5, but maybe not after that. So, I'd try to push this 
-some time within the next couple of weeks, once I get this fix as a 
-separate patch.
-
-Thanks
-Guennadi
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 ---
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+ arch/arm/mach-imx/clk-imx6q.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index ea89520..660fcbb 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -405,6 +405,7 @@ int __init mx6q_clocks_init(void)
+ 	clk_register_clkdev(clk[usboh3], NULL, "2184200.usb");
+ 	clk_register_clkdev(clk[usboh3], NULL, "2184400.usb");
+ 	clk_register_clkdev(clk[usboh3], NULL, "2184600.usb");
++	clk_register_clkdev(clk[usboh3], NULL, "2184800.usbmisc");
+ 	clk_register_clkdev(clk[usbphy1], NULL, "20c9000.usbphy");
+ 	clk_register_clkdev(clk[usbphy2], NULL, "20ca000.usbphy");
+ 	clk_register_clkdev(clk[uart_serial], "per", "2020000.serial");
+-- 
+1.7.9.5
