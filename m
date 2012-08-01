@@ -1,37 +1,39 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 1 Aug 2012 17:07:42 +0100
-Subject: [Xen-devel] [PATCH 04/24] xen/arm: sync_bitops
-In-Reply-To: <20120801143551.GI7227@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-4-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120726163759.GE9222@phenom.dumpdata.com>
- <1343381305.6812.116.camel@zakaz.uk.xensource.com>
- <20120801143551.GI7227@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1208011707280.4645@kaball.uk.xensource.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 1 Aug 2012 17:08:24 +0100
+Subject: [PATCH 1/6] ASoC: dapm: If one widget fails, do not force all
+ subsequent widgets to fail too
+In-Reply-To: <50193428.5000708@linaro.org>
+References: <20120731134214.GK4468@opensource.wolfsonmicro.com>
+ <5017EAC3.3080504@linaro.org>
+ <20120731142820.GW4468@opensource.wolfsonmicro.com>
+ <5017EDCA.4020601@linaro.org>
+ <20120731145443.GY4468@opensource.wolfsonmicro.com>
+ <5017F68B.3060400@linaro.org>
+ <20120731151819.GC4468@opensource.wolfsonmicro.com>
+ <5018D880.5090306@linaro.org>
+ <20120801132022.GS11892@opensource.wolfsonmicro.com>
+ <50193428.5000708@linaro.org>
+Message-ID: <20120801160824.GB11892@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 1 Aug 2012, Konrad Rzeszutek Wilk wrote:
-> On Fri, Jul 27, 2012 at 10:28:25AM +0100, Ian Campbell wrote:
-> > On Thu, 2012-07-26 at 17:37 +0100, Konrad Rzeszutek Wilk wrote:
-> > > On Thu, Jul 26, 2012 at 04:33:46PM +0100, Stefano Stabellini wrote:
-> > > > sync_bitops functions are equivalent to the SMP implementation of the
-> > > > original functions, independently from CONFIG_SMP being defined.
-> > > 
-> > > So why can't the code be changed to use that? Is it that
-> > > the _set_bit, _clear_bit, etc are not available with !CONFIG_SMP?
-> > 
-> > _set_bit etc are not SMP safe if !CONFIG_SMP. But under Xen you might be
-> > communicating with a completely external entity who might be on another
-> > CPU (e.g. two uniprocessor guests communicating via event channels and
-> > grant tables). So we need a variant of the bit ops which are SMP safe
-> > even on a UP kernel.
-> > 
-> > The users are common code and the sync_foo vs foo distinction matters on
-> > some platforms (e.g. x86 where a UP kernel would omit the LOCK prefix
-> > for the normal ones).
-> 
-> OK, that makes sense. Stefano can you include that comment in the git
-> commit description and in the sync_bitops.h file please?
+On Wed, Aug 01, 2012 at 02:50:32PM +0100, Lee Jones wrote:
 
-Yep, I'll do that.
+> I am under the impression that it was tested. Perhaps before it was
+> rebased, but tests were completed. Ola was very surprised when I
+> told him there were link failures. The only issue is that I only
+> found out and told him a day before he was due to take his Summer
+> leave.
+
+That's really surprising.  What are the actual issues here, you've never
+shown the actual errors?
+
+> >It's very disappointing to see such an error exist, and even more
+> >disappointing that there's no interest in fixing the driver.
+
+> This is incorrect. I'm sure the driver will be fixed post-haste when
+> Ola returns back from vacation. If I can find some time I might
+> dabble in the mean-time also.
+
+It may not be what you're intending but it's unfortuantely what's I'm
+seeing.
