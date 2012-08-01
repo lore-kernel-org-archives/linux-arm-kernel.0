@@ -1,42 +1,45 @@
-From: greg@kroah.com (Greg KH)
-Date: Wed, 1 Aug 2012 05:37:38 -0700
-Subject: [2/3][PATCH][v2] TDM Framework
-In-Reply-To: <3F1D9DCAAB49B94D88DBE05911FA4E6E515F98@039-SN1MPN1-001.039d.mgd.msft.net>
-References: <1343397940-12975-1-git-send-email-sandeep@freescale.com>
- <20120727152542.GB1613@electric-eye.fr.zoreil.com>
- <3F1D9DCAAB49B94D88DBE05911FA4E6E511121@039-SN1MPN1-006.039d.mgd.msft.net>
- <20120730160146.GB28703@kroah.com>
- <3F1D9DCAAB49B94D88DBE05911FA4E6E515F98@039-SN1MPN1-001.039d.mgd.msft.net>
-Message-ID: <20120801123738.GA28291@kroah.com>
+From: p.paneri@samsung.com (Praveen Paneri)
+Date: Wed, 01 Aug 2012 18:35:46 +0530
+Subject: [PATCH 0/5] usb: phy: samsung: Introducing usb phy driver for samsung
+ SoCs
+Message-ID: <1343826351-8756-1-git-send-email-p.paneri@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 01, 2012 at 12:13:19PM +0000, Singh Sandeep-B37400 wrote:
-> > On Mon, Jul 30, 2012 at 09:50:57AM +0000, Singh Sandeep-B37400 wrote:
-> > > 1. You should send some kernel mode TDM clients. Without those the
-> > framework
-> > >    is pretty useless.
-> > > [Sandeep] We do have a test client but not good enough to be pushed in
-> > > open source, should we add it to documentation??
-> > 
-> > Then how do you know if the framework is "correct" and good enough for
-> > real clients?  We don't add frameworks, or apis, to the kernel without
-> > users, so you will have to come up with some users before we can accept
-> > it.
-> We can only say that this framework is available in FSL BSPs and being used by VoIP companies.
-> But running a complete voice stack itself is beyond the scope of Freescale.
-> So vendors integrate their solutions with FSL solution.
-> To test the framework we have a small application in our BSP (this is a very basic test client) which tests the TDM driver and the SLIC interface from voice  transfer perspective.
-> We can get this added in the Linux codebase in some test directory. What could be a good place for this?
+This patch set introduces a phy driver for samsung SoCs. It uses the existing
+transceiver infrastructure to provide phy control functions. Use of this driver
+can be extended for usb host phy as well. Over the period of time all the phy
+related code for most of the samsung SoCs can be integrated here.
+Removing the existing phy code from mach-s3c64xx but not from other machine 
+code.This driver is tested with smdk6410 and Exynos4210(with DT).
 
-tools/ is a good place for that.
+Praveen Paneri (5):
+  usb: phy: samsung: Introducing usb phy driver for hsotg
+  usb: s3c-hsotg: Adding phy driver support
+  ARM: S3C64XX: Removing old phy setup code
+  ARM: S3C64XX: Enabling sec_usbphy driver
+  ARM: Exynos4210: Enabling sec_usbphy driver
 
-And sorry, I was thinking you had kernel drivers that attached to this
-framework, not userspace programs.  Actually, what is the user/kernel
-interface for this framework, I seem to have missed that entirely.  You
-will have to document that quite well, and run it by the linux-api
-mailing list.
-
-thanks,
-
-greg k-h
+ .../devicetree/bindings/usb/samsung-usbphy.txt     |    9 +
+ arch/arm/boot/dts/exynos4210.dtsi                  |    5 +
+ arch/arm/mach-exynos/include/mach/map.h            |    1 +
+ arch/arm/mach-exynos/mach-exynos4-dt.c             |    8 +
+ arch/arm/mach-exynos/setup-usb-phy.c               |   13 +
+ arch/arm/mach-s3c64xx/include/mach/map.h           |    2 +
+ arch/arm/mach-s3c64xx/mach-crag6410.c              |    5 +-
+ arch/arm/mach-s3c64xx/mach-smartq.c                |    6 +-
+ arch/arm/mach-s3c64xx/mach-smdk6410.c              |    5 +-
+ arch/arm/mach-s3c64xx/setup-usb-phy.c              |   79 +----
+ arch/arm/plat-samsung/devs.c                       |   32 ++
+ arch/arm/plat-samsung/include/plat/devs.h          |    1 +
+ arch/arm/plat-samsung/include/plat/usb-phy.h       |    1 +
+ drivers/usb/gadget/s3c-hsotg.c                     |   38 ++-
+ drivers/usb/phy/Kconfig                            |    8 +
+ drivers/usb/phy/Makefile                           |    1 +
+ drivers/usb/phy/sec_usbphy.c                       |  354 ++++++++++++++++++++
+ drivers/usb/phy/sec_usbphy.h                       |   48 +++
+ include/linux/platform_data/s3c-hsotg.h            |    5 +
+ 19 files changed, 533 insertions(+), 88 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/samsung-usbphy.txt
+ create mode 100644 drivers/usb/phy/sec_usbphy.c
+ create mode 100644 drivers/usb/phy/sec_usbphy.h
