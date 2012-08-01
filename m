@@ -1,60 +1,42 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Wed, 1 Aug 2012 17:50:16 +0530
-Subject: omap_device: query on "fck" clk alias created
-Message-ID: <50191F00.1040501@ti.com>
+From: greg@kroah.com (Greg KH)
+Date: Wed, 1 Aug 2012 05:37:38 -0700
+Subject: [2/3][PATCH][v2] TDM Framework
+In-Reply-To: <3F1D9DCAAB49B94D88DBE05911FA4E6E515F98@039-SN1MPN1-001.039d.mgd.msft.net>
+References: <1343397940-12975-1-git-send-email-sandeep@freescale.com>
+ <20120727152542.GB1613@electric-eye.fr.zoreil.com>
+ <3F1D9DCAAB49B94D88DBE05911FA4E6E511121@039-SN1MPN1-006.039d.mgd.msft.net>
+ <20120730160146.GB28703@kroah.com>
+ <3F1D9DCAAB49B94D88DBE05911FA4E6E515F98@039-SN1MPN1-001.039d.mgd.msft.net>
+Message-ID: <20120801123738.GA28291@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Aug 01, 2012 at 12:13:19PM +0000, Singh Sandeep-B37400 wrote:
+> > On Mon, Jul 30, 2012 at 09:50:57AM +0000, Singh Sandeep-B37400 wrote:
+> > > 1. You should send some kernel mode TDM clients. Without those the
+> > framework
+> > >    is pretty useless.
+> > > [Sandeep] We do have a test client but not good enough to be pushed in
+> > > open source, should we add it to documentation??
+> > 
+> > Then how do you know if the framework is "correct" and good enough for
+> > real clients?  We don't add frameworks, or apis, to the kernel without
+> > users, so you will have to come up with some users before we can accept
+> > it.
+> We can only say that this framework is available in FSL BSPs and being used by VoIP companies.
+> But running a complete voice stack itself is beyond the scope of Freescale.
+> So vendors integrate their solutions with FSL solution.
+> To test the framework we have a small application in our BSP (this is a very basic test client) which tests the TDM driver and the SLIC interface from voice  transfer perspective.
+> We can get this added in the Linux codebase in some test directory. What could be a good place for this?
 
-In OMAP world, we have omap_device layer, which exports api's like
-omap_device_build() to create and register platform_device to the
-kernel. This layer understands hwmod infrastructure and parses all the
-platform specific information from it.
-Now with DT migration, the same thing is achieved using a notifier,
-which in turn omap_device_build_from_dt(), which in turn does same thing.
+tools/ is a good place for that.
 
-One of the thing which is happening in both execution path is, creating
-alias for functional clock (hwmod_data->main_clk) for each device
-getting created with the con_id = "fck".
+And sorry, I was thinking you had kernel drivers that attached to this
+framework, not userspace programs.  Actually, what is the user/kernel
+interface for this framework, I seem to have missed that entirely.  You
+will have to document that quite well, and run it by the linux-api
+mailing list.
 
-Now the problem with this is,
+thanks,
 
-The clk_get() api will not work, unless we pass both the arguments (dev,
-con_id) properly. Now expecting driver to always label con_id with "fck"
-is undesirable, as the same driver can be reused on multiple platforms,
-which can be non-omap and/or non-ti platforms.
-Also we have multiple examples where driver simply calls (which is right)
-
-clk = clk_get(&pdev->dev, NULL);
-
-This would fail on OMAP platforms, unless you modify clockxxx_data.c
-file with,
-
-CLK("<device>",  NULL,           &xxx_fck,    CK_34XX),
-
-
-Devices specially with only one clock source always prefer not to
-specify con_id.
-And it seems wrong thing, as across platforms IP integration can be very
-different and you can not expect to change the clock-tree table always.
-
-So the option here we have is,
-
-1. Instead of creating alias with "fck", create an alias only with dev
-pointer, that means con_id = NULL.
-I have already tested this and it works on AM33xx platform.
-
-2. Add a new flag inside hwmod or omap_device, so that it can be read at
-omap_device layer and based on that we can decide whether to add con_id
-or not while invoking clkdev_alloc().
-This may be required to support legacy drivers which are not migrated to
-runtime_pm and still calls clk_get() for both "fck" and "ick", so here
-we need "fck" clk alias.
-
-
-Any comments or opinion on this? Based on the feedback I can create the
-changes and submit it to the list.
-
-Thanks,
-Vaibhav
+greg k-h
