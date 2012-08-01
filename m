@@ -1,42 +1,36 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 1 Aug 2012 09:08:59 -0600 (MDT)
-Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain
- transitioning to OFF when in-use
-In-Reply-To: <50187644.40308@ti.com>
-References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
- <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
- <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
- <500028B3.1040309@ti.com>
- <alpine.DEB.2.00.1207131418500.25585@utopia.booyaka.com>
- <50045D17.9050704@ti.com>
- <alpine.DEB.2.00.1207161228470.28834@utopia.booyaka.com>
- <50171841.40309@ti.com> <501760BF.8070801@ti.com> <5018210A.1040902@ti.com>
- <50187644.40308@ti.com>
-Message-ID: <alpine.DEB.2.00.1208010906470.21488@utopia.booyaka.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  1 Aug 2012 12:10:36 -0300
+Subject: [RFC] ARM: imx6q-sabrelite: Add CLKO IOMUX
+Message-ID: <1343833836-14287-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On Tue, 31 Jul 2012, Jon Hunter wrote:
+In order to have audio functional on mx6qsabrelite, it is necessary to setup
+the IOMUX for MX6Q_PAD_GPIO_0__CCM_CLKO and MX6Q_PAD_GPIO_3__CCM_CLKO2 pins.
 
-> Sorry for all the emails. However, I wanted to get this out to you as
-> I am due to be out for a couple weeks. 
-> 
-> So I have updated your patch [1] with the following changes ...
-> 
-> 1. Re-based on top of your omap3 clock domain fix [2]
-> 2. Modified the above change I mentioned to check for
->    CLKDM_MISSING_IDLE_REPORTING in omap_pm_clkdms_setup() instead of
->    the omap2_clkdm_clk_enable(). This is to prevent the clock domain
->    being placed in HW_AUTO on boot if enabled early.
-> 3. Made the other change I mentioned earlier [3].
-> 
-> This is now working well for me on OMAP3/4.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Dirk,
 
-Your changes look good to me.  Do you have a strong preference as to 
-whether that patch should go in as part of 3.6-rc or 3.7?  I'd be inclined 
-to queue it for 3.7 based on the size of the patch.
+Not tested. If you have a chance to try it, please let me know.
 
+ arch/arm/boot/dts/imx6q-sabrelite.dts |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-- Paul
+diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+index d42e851..f22c089 100644
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -53,6 +53,8 @@
+ 						fsl,pins = <
+ 							   144  0x80000000	/* MX6Q_PAD_EIM_D22__GPIO_3_22 */
+ 							   121  0x80000000	/* MX6Q_PAD_EIM_D19__GPIO_3_19 */
++							   953  0x00000000	/* MX6Q_PAD_GPIO_0__CCM_CLKO */
++							   979  0x00000004	/* MX6Q_PAD_GPIO_3__CCM_CLKO2 */
+ 							   >;
+ 					};
+ 				};
+-- 
+1.7.1
