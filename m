@@ -1,33 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 1 Aug 2012 16:20:26 +0800
-Subject: [06/10,V2] spi: Add SPI driver for mx233/mx28
-In-Reply-To: <20504.56543.699097.320114@ipc1.ka-ro>
-References: <1341555449-17507-6-git-send-email-marex@denx.de>
- <201208010810.37652.marex@denx.de>
- <20120801063936.GC2764@roeck-us.net>
- <201208010845.19361.marex@denx.de>
- <20120801074051.GG1672@S2100-06.ap.freescale.net>
- <20504.56543.699097.320114@ipc1.ka-ro>
-Message-ID: <20120801082024.GJ1672@S2100-06.ap.freescale.net>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 1 Aug 2012 15:49:53 +0800
+Subject: [RFC PATCH 1/1] ASoC: soc-dapm: warn if no avaiable path found
+ for widget kcontrol
+In-Reply-To: <20120729202219.GA4384@opensource.wolfsonmicro.com>
+References: <1343387941-25266-1-git-send-email-b29396@freescale.com>
+ <20120729202219.GA4384@opensource.wolfsonmicro.com>
+Message-ID: <20120801074952.GC30492@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 01, 2012 at 09:38:07AM +0200, Lothar Wa?mann wrote:
-> Shawn Guo writes:
-> > On Wed, Aug 01, 2012 at 08:45:19AM +0200, Marek Vasut wrote:
-> > > > I must be missing something.  Why do almost all spi drivers call it in the
-> > > > error path, even if there is no call to spi_master_get ?
-> > > 
-> > > To push the refcounting to 0, to deallocate the device, I'd say ...
-> > > 
-> > It's not going to work if spi_master_put is called without
-> > spi_master_get being called before that.
+On Mon, Jul 30, 2012 at 04:22:19AM +0800, Mark Brown wrote:
+> On Fri, Jul 27, 2012 at 07:19:01PM +0800, Dong Aisheng wrote:
+> > From: Dong Aisheng <dong.aisheng@linaro.org>
 > > 
-> spi_alloc_master() calls device_initialize() which resuires a
-> device_put() (called from spi_master_put()) to free the device.
+> > This could help people know what's wrong going on if the required
+> > path is not registered.
 > 
-Ah, indeed.  I missed that kref_init() will initialize the refcount
-to 1.
+> This isn't a good idea, it's fairly common for widgets to have a "None"
+> option which isn't expected to have an input.
+> 
 
-Thanks,
-Shawn
+What i changed is mux widgets, i'm wondering is it possible or correct
+the mux widget has no input path?
+If i understand correct, we may need set correct input path
+for mux widget, or why we still need a mux?
+
+Or can you help give an example that no input needed for mux widget?
+
+Regards
+Dong Aisheng
