@@ -1,31 +1,65 @@
-From: ian.molton@codethink.co.uk (Ian Molton)
-Date: Wed, 01 Aug 2012 09:50:57 +0100
-Subject: [PATCH v2 3/6] mv643xx.c: Add basic device tree support.
-In-Reply-To: <20120731164652.GD28852@lunn.ch>
-References: <1343749529-17571-1-git-send-email-ian.molton@codethink.co.uk>
- <1343749529-17571-4-git-send-email-ian.molton@codethink.co.uk>
- <20120731164652.GD28852@lunn.ch>
-Message-ID: <5018EDF1.40709@codethink.co.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 01 Aug 2012 18:39:17 +0900
+Subject: [PATCH V2 5/5] arm: samsung: delete frame buffer header files from
+ platform
+In-Reply-To: <CAL1wa8cShB7zDj-CPvfEncX+Up7enKM9MJOt-488dThj_tXbMA@mail.gmail.com>
+References: <1343737385-23337-1-git-send-email-l.krishna@samsung.com>
+ <1343737385-23337-6-git-send-email-l.krishna@samsung.com>
+ <02ee01cd6f89$f218b2c0$d64a1840$%kim@samsung.com>
+ <CAL1wa8cShB7zDj-CPvfEncX+Up7enKM9MJOt-488dThj_tXbMA@mail.gmail.com>
+Message-ID: <037101cd6fc9$85386e30$8fa94a90$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/07/12 17:46, Andrew Lunn wrote:
-> Hi Ian
->
-> Probably the driver change will get upstream by netdev. The rest will
-> go via the Orion maintainers into arm-soc. So you should probably move
-> this board-dt.c change into a patch of its own, or make it part of:
->
-> csb1724: Enable device tree based mv643xx ethernet support.
-Its not csb1724 specific; I've merged it into
+Leela Krishna Amudala wrote:
+> 
+> Hello Kgene,
+> 
+> On Wed, Aug 1, 2012 at 7:34 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Leela Krishna Amudala wrote:
+> >>
+> >> The FIMD register headers are moved to include/video/
+> >> hence, deleting these files from platform side
+> >>
+> >> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+> >> ---
+> >>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h |  159 ---------
+> >>  arch/arm/plat-samsung/include/plat/regs-fb.h    |  403
+> > -------------------
+> >> ----
+> >>  2 files changed, 0 insertions(+), 562 deletions(-)
+> >>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+> >>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb.h
+> >>
+> > No. This should be squashed into first patch on this series. See below.
+> >
+> >  arch/arm/plat-samsung/include/plat/regs-fb-v4.h    |  159
+> > --------------------
+> >  .../plat/regs-fb.h => include/video/samsung_fimd.h |  145
+> > ++++++++++++++++--
+> >  2 files changed, 134 insertions(+), 170 deletions(-)
+> >  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+> >  rename arch/arm/plat-samsung/include/plat/regs-fb.h =>
+> > include/video/samsung_fimd.h (74%)
+> >
+> 
+> If I squash it with the first patch and if somebody set that as a head
+> commit, it will break the build. Hence, splitted it up from the first
+> patch.
+> 
+NACK. your changes are not adding just moving. So should be squashed. If
+required, you could create just one patch for moving them, probably, 1st,
+3rd, 4th and 5th patches into one patch.
 
-kirkwood: Add a clock setup helper for mv643xx ethernet.
+Thanks.
 
-and renamed it to:
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-kirkwood: Add fixups for DT based mv643xx ethernet.
-
-As this described its purpose better. Hopefully in time, we can
-pass something in DT that will allow us to remove that code.
-
--Ian
+> Thank you Sylwester for suggesting this split up change.
+> 
+> Regards,
+> Leela Krishna
