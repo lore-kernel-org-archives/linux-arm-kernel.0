@@ -1,53 +1,32 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 01 Aug 2012 08:34:06 +0100
-Subject: [PATCH 5/6] ARM: ux500: Ensure probing of Audio devices when
- Device Tree is enabled
-In-Reply-To: <201207312054.13818.arnd@arndb.de>
+Date: Wed, 01 Aug 2012 08:37:03 +0100
+Subject: [PATCH 3/6] ARM: ux500: Fix merge error,
+ so such struct 'snd_soc_u8500'
+In-Reply-To: <50180BF6.6080908@mvista.com>
 References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
- <1343741493-17671-11-git-send-email-lee.jones@linaro.org>
- <201207312054.13818.arnd@arndb.de>
-Message-ID: <5018DBEE.9090203@linaro.org>
+ <1343741493-17671-6-git-send-email-lee.jones@linaro.org>
+ <50180BF6.6080908@mvista.com>
+Message-ID: <5018DC9F.30502@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/07/12 21:54, Arnd Bergmann wrote:
-> On Tuesday 31 July 2012, Lee Jones wrote:
->> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
->> index e641003..87a5cd7 100644
->> --- a/arch/arm/mach-ux500/board-mop500.c
->> +++ b/arch/arm/mach-ux500/board-mop500.c
->> @@ -794,6 +794,7 @@ static void __init u8500_init_machine(void)
->>                                  ARRAY_SIZE(mop500_platform_devs));
->>
->>                  mop500_sdi_init(parent);
->> +               mop500_msp_init(parent);
->>                  i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
->>                  i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
->>                  i2c_register_board_info(2, mop500_i2c2_devices,
->> @@ -801,6 +802,8 @@ static void __init u8500_init_machine(void)
->>
->>                  mop500_uib_init();
->>
->> +       } else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
->> +               mop500_of_msp_init(parent);
->>          } else if (of_machine_is_compatible("st-ericsson,hrefv60+")) {
->>                  /*
->>                   * The HREFv60 board removed a GPIO expander and routed
->> @@ -812,6 +815,7 @@ static void __init u8500_init_machine(void)
->>                                  ARRAY_SIZE(mop500_platform_devs));
->>
->>                  hrefv60_sdi_init(parent);
->> +               mop500_msp_init(parent);
->>
->>                  i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
->>                  i2c0_devs -= NUM_PRE_V60_I2C0_DEVICES;
->
->
-> Looks like you're adding the same call to each of the three cases:
-> mop500, snowball and hrefv60+. How about moving it before or after
-> the if/elseif block?
+On 31/07/12 17:46, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 07/31/2012 05:31 PM, Lee Jones wrote:
+> 
+>    Subject doesn't parse for me...
+> 
+>> The platform attempts to register platform device 'snd_soc_u8500'
+>> which doesn't actually exist. Here we change the reference to the
+>> correct one 'snd_soc_mop500'.
+> 
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-The Snowball one is different 'mop500_msp_init' -> 'mop500_of_msp_init'.
+Actually, it does make sense?
+
+As a sentence: "This patch fixes merge error: so such structure 'struct snd_soc_u8500'.
+
 
 -- 
 Lee Jones
