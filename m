@@ -1,39 +1,28 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 01 Aug 2012 14:55:58 +0100
-Subject: [PATCH 5/6] ARM: ux500: Ensure probing of Audio devices when
- Device Tree is enabled
-In-Reply-To: <201208011332.02500.arnd@arndb.de>
-References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
- <201207312054.13818.arnd@arndb.de> <5018DBEE.9090203@linaro.org>
- <201208011332.02500.arnd@arndb.de>
-Message-ID: <5019356E.6020407@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Aug 2012 15:14:14 +0100
+Subject: omap_device: query on "fck" clk alias created
+In-Reply-To: <50191F00.1040501@ti.com>
+References: <50191F00.1040501@ti.com>
+Message-ID: <20120801141414.GM7405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/12 14:32, Arnd Bergmann wrote:
-> On Wednesday 01 August 2012, Lee Jones wrote:
->>> Looks like you're adding the same call to each of the three cases:
->>> mop500, snowball and hrefv60+. How about moving it before or after
->>> the if/elseif block?
->>
->> The Snowball one is different 'mop500_msp_init' -> 'mop500_of_msp_init'.
->
-> Ah, I see. Is there a problem in always using mop500_of_msp_init then?
-> I would guess that this just means you'd have to put the msp into the
-> device tree files, which don't yet exist for mop500 and hrefv60.
+On Wed, Aug 01, 2012 at 05:50:16PM +0530, Vaibhav Hiremath wrote:
+> The clk_get() api will not work, unless we pass both the arguments (dev,
+> con_id) properly. Now expecting driver to always label con_id with "fck"
+> is undesirable, as the same driver can be reused on multiple platforms,
+> which can be non-omap and/or non-ti platforms.
 
-Although that is true, it's only part of the issue.
+Why not?
 
-mop500_of_msp_init is only a temporary solution to aid in step-by-step 
-enablement of DT for audio. By the end of the patch-set it has been 
-removed (along with the call to it if 'of_machine_is_compatible 
-("calaosystems,snowball-a9500")'. What I can do it write a patch to 
-consolidate the calls _after_ "ARM: ux500: Remove platform registration 
-of MSP devices", as a bolt-on.
+The connection ID is defined by the driver, and the platform stuff is
+expected to provide drivers with what they require.  It's not the other
+way around (platforms don't tell drivers what they require.)
 
+In other words, if the device has two clocks, one called ick and one called
+fck, then the device _should_ use clk_get() specifying "ick" for one, and
+"fck" for the other.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+And platforms better provide an "ick" and a "fck" for the device, even if
+they have no respresentation for one or other of them (in which case you
+supply a dummy clock.)
