@@ -1,61 +1,49 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 01 Aug 2012 10:46:31 +0900
-Subject: [PATCH 1/3] Move FIMD register headers to include/video/
-In-Reply-To: <1343637905-17764-2-git-send-email-l.krishna@samsung.com>
-References: <1343637905-17764-1-git-send-email-l.krishna@samsung.com>
- <1343637905-17764-2-git-send-email-l.krishna@samsung.com>
-Message-ID: <02e501cd6f87$79d9aff0$6d8d0fd0$%kim@samsung.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 01 Aug 2012 10:49:38 +0900
+Subject: [PATCH V2 2/5] include/video: Add Exynos5 specific FIMD register
+ offsets
+In-Reply-To: <1343737385-23337-3-git-send-email-l.krishna@samsung.com>
+References: <1343737385-23337-1-git-send-email-l.krishna@samsung.com>
+ <1343737385-23337-3-git-send-email-l.krishna@samsung.com>
+Message-ID: <003301cd6f87$e8ed8240$bac886c0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Leela Krishna Amudala wrote:
+On Tuesday, July 31, 2012 9:23 PM Leela Krishna Amudala wrote:
 > 
-> Moved the contents of regs-fb-v4.h and regs-fb.h from arch side
-> to include/video/samsung_fimd.h
+> Exynos5 has VIDTCON and VIDCON registers at different offsets
+> from the previous SOCs. Hence, adding the macros.
 > 
 > Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
 > ---
->  arch/arm/plat-samsung/include/plat/regs-fb-v4.h |  159 -------
->  arch/arm/plat-samsung/include/plat/regs-fb.h    |  403 -----------------
->  include/video/samsung_fimd.h                    |  533
-+++++++++++++++++++++++
->  3 files changed, 533 insertions(+), 562 deletions(-)
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb.h
->  create mode 100644 include/video/samsung_fimd.h
+>  include/video/samsung_fimd.h |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
 > 
-
-+ I have some comments on this.
-
-[...]
-
-> +/* VIDCON0 */
-
-I don't think above comment is needed because everybody knows that from the
-name of VIDCON0_.
-
+> diff --git a/include/video/samsung_fimd.h b/include/video/samsung_fimd.h
+> index e979f42..820f190 100644
+> --- a/include/video/samsung_fimd.h
+> +++ b/include/video/samsung_fimd.h
+> @@ -524,3 +524,10 @@
+>   * 1110		-none-	 -none-	  -none-   -none-    -none-
+>   * 1111		-none-	 -none-   -none-   -none-    -none-
+>  */
 > +
-> +#define VIDCON0					(0x00)
-> +#define VIDCON0_INTERLACE			(1 << 29)
-> +#define VIDCON0_VIDOUT_MASK			(0x3 << 26)
-> +#define VIDCON0_VIDOUT_SHIFT			(26)
+> +/*EXYNOS5 FIMD REG OFFSET */
+     ^
+Please insert one space between '/*' and 'EXYNOS5'.
+As Sylwester Nawrocki mentioned, the following seems to be better.
 
-I think, you can use either of the following.
+/* EXYNOS5 specific register offset definitions */
 
-+#define VIDCON0_VIDOUT_SHIFT			(26)
-+#define VIDCON0_VIDOUT_MASK			(0x3 <<
-VIDCON0_VIDOUT_SHIFT)
-
-Or just without XXX_SHIFT if the XXX_SHIFT is not used somewhere else,
-
-+#define VIDCON0_VIDOUT_MASK			(0x3 << 26)
-
-[...]
-
-Thanks.
 
 Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Jingoo Han
+
+
+> +#define EXYNOS5_VIDTCON0	(0x20010)
+> +#define EXYNOS5_VIDTCON1	(0x20014)
+> +#define EXYNOS5_VIDTCON2	(0x20018)
+> +#define EXYNOS5_VIDTCON3	(0x2001C)
+> +#define EXYNOS5_VIDCON1		(0x20004)
+> --
+> 1.7.0.4
