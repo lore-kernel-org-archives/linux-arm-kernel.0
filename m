@@ -1,78 +1,37 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 1 Aug 2012 15:12:21 +0800
-Subject: [PATCH v5 3/3] ARM: dts: imx6q-sabrelite: add usbmisc device
-In-Reply-To: <1343805141-5872-1-git-send-email-richard.zhao@freescale.com>
-References: <1343805141-5872-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1343805141-5872-4-git-send-email-richard.zhao@freescale.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 01 Aug 2012 08:19:28 +0100
+Subject: [PATCH 1/6] ASoC: dapm: If one widget fails, do not force all
+ subsequent widgets to fail too
+In-Reply-To: <20120731151819.GC4468@opensource.wolfsonmicro.com>
+References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
+ <1343741493-17671-3-git-send-email-lee.jones@linaro.org>
+ <20120731134214.GK4468@opensource.wolfsonmicro.com>
+ <5017EAC3.3080504@linaro.org>
+ <20120731142820.GW4468@opensource.wolfsonmicro.com>
+ <5017EDCA.4020601@linaro.org>
+ <20120731145443.GY4468@opensource.wolfsonmicro.com>
+ <5017F68B.3060400@linaro.org>
+ <20120731151819.GC4468@opensource.wolfsonmicro.com>
+Message-ID: <5018D880.5090306@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- add usbmisc device
-- set property fsl,usbmisc for usb controllers
-- set disable-over-current for imx6q-sabrelite usb otg
+On 31/07/12 16:18, Mark Brown wrote:
+>>> It's certainly totally inappropriate for an "urgent" bugfix.
+>
+>> Well it just means that audio won't work for the ux500 for this
+>> kernel release, but as we're waiting on clocks, this isn't a big
+>> issue for us. If you do take it (with or without the return code),
+>> feel free to add it to for-next instead of the -rc:s
+>
+> I'm not going to apply this patch.  This isn't a vendor BSP, we
+> shouldn't be putting random hacks like this in core code.
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
----
- arch/arm/boot/dts/imx6q-sabrelite.dts |    1 +
- arch/arm/boot/dts/imx6q.dtsi          |   10 ++++++++++
- 2 files changed, 11 insertions(+)
+BSP kernel or otherwise, it still seems wrong to me to fail and entire 
+audio driver just because of a broken link.
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index d42e851..b32ebfc 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -62,6 +62,7 @@
- 		aips-bus at 02100000 { /* AIPS2 */
- 			usb at 02184000 { /* USB OTG */
- 				vbus-supply = <&reg_usb_otg_vbus>;
-+				disable-over-current;
- 				status = "okay";
- 			};
- 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 3d3c64b..a6e1816 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -629,6 +629,7 @@
- 				reg = <0x02184000 0x200>;
- 				interrupts = <0 43 0x04>;
- 				fsl,usbphy = <&usbphy1>;
-+				fsl,usbmisc = <&usbmisc 0>;
- 				status = "disabled";
- 			};
- 
-@@ -637,6 +638,7 @@
- 				reg = <0x02184200 0x200>;
- 				interrupts = <0 40 0x04>;
- 				fsl,usbphy = <&usbphy2>;
-+				fsl,usbmisc = <&usbmisc 1>;
- 				status = "disabled";
- 			};
- 
-@@ -644,6 +646,7 @@
- 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
- 				reg = <0x02184400 0x200>;
- 				interrupts = <0 41 0x04>;
-+				fsl,usbmisc = <&usbmisc 2>;
- 				status = "disabled";
- 			};
- 
-@@ -651,9 +654,16 @@
- 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
- 				reg = <0x02184600 0x200>;
- 				interrupts = <0 42 0x04>;
-+				fsl,usbmisc = <&usbmisc 3>;
- 				status = "disabled";
- 			};
- 
-+			usbmisc: usbmisc at 02184800 {
-+				#index-cells = <1>;
-+				compatible = "fsl,imx6q-usbmisc";
-+				reg = <0x02184800 0x200>;
-+			};
-+
- 			ethernet at 02188000 {
- 				compatible = "fsl,imx6q-fec";
- 				reg = <0x02188000 0x4000>;
 -- 
-1.7.9.5
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
