@@ -1,42 +1,72 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Wed, 01 Aug 2012 13:35:17 -0700
-Subject: [RFC] ARM: imx6q-sabrelite: Add CLKO IOMUX
-In-Reply-To: <CAOMZO5A2g+UCFuiP7yqYkFQ36F=2yrqJA3ssujeYXE_Q0Sz5nQ@mail.gmail.com>
-References: <1343833836-14287-1-git-send-email-festevam@gmail.com>
- <CAOMZO5A2g+UCFuiP7yqYkFQ36F=2yrqJA3ssujeYXE_Q0Sz5nQ@mail.gmail.com>
-Message-ID: <50199305.60802@boundarydevices.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 1 Aug 2012 15:43:02 -0500
+Subject: [PATCH V3 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <1343733132.1726.14418.camel@vkoul-udesk3>
+References: <1335820679-28721-1-git-send-email-jon-hunter@ti.com>
+ <201207171924.33756.arnd@arndb.de> <1342756850.1726.74.camel@vkoul-udesk3>
+ <201207200839.24259.arnd@arndb.de> <1342777047.1726.435.camel@vkoul-udesk3>
+ <500EF27F.6050905@ti.com> <1343284960.1726.8978.camel@vkoul-udesk3>
+ <501181C3.1020301@ti.com> <1343733132.1726.14418.camel@vkoul-udesk3>
+Message-ID: <501994D6.6070508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/1/2012 1:17 PM, Fabio Estevam wrote:
-> On Wed, Aug 1, 2012 at 12:10 PM, Fabio Estevam <festevam@gmail.com> wrote:
->> From: Fabio Estevam <fabio.estevam@freescale.com>
->>
->> In order to have audio functional on mx6qsabrelite, it is necessary to setup
->> the IOMUX for MX6Q_PAD_GPIO_0__CCM_CLKO and MX6Q_PAD_GPIO_3__CCM_CLKO2 pins.
->>
->> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
->> ---
->> Dirk,
->>
->> Not tested. If you have a chance to try it, please let me know.
-> I managed to get a board and tried it with current Linus' tree and
-> also linux-next. Both result in:
->
-> sgtl5000 0-000a: Device with ID register ffff is not a sgtl5000
-> sgtl5000 0-000a: asoc: failed to probe CODEC sgtl5000.0-000a: -19
-> asoc: failed to instantiate card imx6q-sabrelite-sgtl5000: -19
-> imx-sgtl5000 sound.11: snd_soc_register_card failed (-19)
->
-> Any ideas?
->
-> Thanks,
->
-> Fabio Estevam
->
-No idea, but a comment.
+Hi Vinod,
 
-GPIO_0 is needed for SGTL500 - sys_mclk
-GPIO_3 is needed for Camera mclk, no audio dependency.
+On 07/31/2012 06:12 AM, Vinod Koul wrote:
+> On Thu, 2012-07-26 at 12:43 -0500, Jon Hunter wrote:
+>>>> So yes I can see that a channel itself could be configured to
+>> support a
+>>>> given direction, but when we ask for a channel via
+>> dma_request_channel()
+>>>> we are going to get a channel that matches the criteria we pass
+>> using
+>>>> the filter parameter. So here the thinking was that "flags" is a
+>> filter
+>>>> parameter that the user could specify and one example being
+>> direction
+>>>> but it could be something else too.
+>>> Yes that can be done, but I am leaning towards clients not have to
+>> do
+>>> anything :) DMAEngine needs to know mapping and when
+>>> dma_request_channel() is called it _always_ gives you the right
+>> channel.
+>>
+>> Ok, so are you proposing to remove the filter function and parameter
+>> from the dma_request_channel()?
+> No. But add a new request call, dma_request_slave_channel() which is
+> exclusive for slave usages and takes into account the mapping to be done
+> for channels
+>>
+>>> Maybe for slave case we need to create dma_request_slave_channel()
+>> which
+>>> has additional arguments for dmaengine to do the filtering.
+> Yup
+>>
+>> Ok, so what is not clear to me is if you envision that
+>> dma_request_slave_channel() is using a mapping table based look-up or
+>> the DT scheme or both.
+> The API should not worry about it. It would be good to have DT/ other be
+> behind this API, so it is transparent to users. They just request a
+> slave channel.
 
-Troy
+So would you envision something like (copying from Guennadi's API but
+changing direction to flags) ...
+
+struct dma_chan *dma_request_slave_channel(struct device *dev,
+					char *name, unsigned int flags)
+{
+	/* If device-tree is present get slave info from here */
+	if (dev->of_node)
+		return of_dma_request_slave_channel(dev, name, flags);
+
+	return NULL;
+}
+
+Ok, so right now the above is nothing more than a simple wrapper around
+a DT dma function to extract the slave info. However, it would allow us
+to add another means for getting the slave info in the future if
+necessary by adding an else part to the above.
+
+Cheers
+Jon
