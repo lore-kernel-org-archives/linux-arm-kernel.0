@@ -1,61 +1,40 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Wed, 1 Aug 2012 11:41:08 -0400
-Subject: [RFC 20/22] ARM: keystone: introducing TI Keystone platform
-In-Reply-To: <201207312316.19592.arnd@arndb.de>
+Date: Wed, 1 Aug 2012 11:42:12 -0400
+Subject: [PATCH 06/22] ARM: LPAE: use phys_addr_t in alloc_init_pud()
+In-Reply-To: <50191C46.4090902@mvista.com>
 References: <1343775898-28345-1-git-send-email-cyril@ti.com>
- <1343775898-28345-21-git-send-email-cyril@ti.com>
- <201207312316.19592.arnd@arndb.de>
-Message-ID: <50194E14.4070301@ti.com>
+ <1343775898-28345-7-git-send-email-cyril@ti.com>
+ <50191C46.4090902@mvista.com>
+Message-ID: <50194E54.5040909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/31/2012 7:16 PM, Arnd Bergmann wrote:
-> On Tuesday 31 July 2012, Cyril Chemparathy wrote:
->> Texas Instruments Keystone family of multicore devices now includes an
->> upcoming slew of Cortex A15 based devices.  This patch adds basic definitions
->> for a new Keystone sub-architecture in ARM.
->>
->> Subsequent patches in this series will extend support to include SMP and take
->> advantage of the large physical memory addressing capabilities via LPAE.
->>
+On 8/1/2012 8:08 AM, Sergei Shtylyov wrote:
+> Hello.
+>
+> On 01-08-2012 3:04, Cyril Chemparathy wrote:
+>
+>> From: Vitaly Andrianov <vitalya@ti.com>
+>
+>> This patch fixes the alloc_init_pud() function to use phys_addr_t
+>> instead of
+>> unsigned long when passing in the phys argument.
+>
+>> This is an extension to commit
+>> 97092e0c56830457af0639f6bd904537a150ea4a, which
+>
+>     Please also specify that commit's summary in parens.
+
+Thanks Sergei.  Will do so.  I'm assuming you meant headline and not 
+summary.
+
+>
+>> applied similar changes elsewhere in the ARM memory management code.
+>
 >> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 >> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 >
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
->
-
-Thanks for taking a look, Arnd.
-
-Any inputs on the other patches in this series?  I'd ideally like to 
-have the LPAE fixes, and code patching changes merged in sooner than the 
-Keystone machine specific stuff.
-
-> And some nitpicking:
->> +
->> +	chosen {
->> +		bootargs = "console=ttyS0,115200n8 debug earlyprintk lpj=50000 rdinit=/bin/ash rw root=/dev/ram0 initrd=0x85000000,9M";
->> +	};
->
-> This command line should not really be here. Most of what you put in it is not
-> generic to the platform at all.
->
-> In order to select the console, use an alias for the serial device.
->
-
-Agreed.  The DTS in general needs quite a bit of work.
-
->> +
->> +static void __init keystone_map_io(void)
->> +{
->> +	iotable_init(io_desc, sizeof(io_desc)/sizeof(struct map_desc));
->> +}
->
-> Use the ARRAY_SIZE macro here.
->
-
-Thanks.  I've fixed this in the code, and this will show up in the next rev.
-
-> 	Arnd
+> WBR, Sergei
 >
 
 -- 
