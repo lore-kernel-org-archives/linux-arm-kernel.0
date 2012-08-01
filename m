@@ -1,27 +1,21 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 1 Aug 2012 07:00:54 +0200
-Subject: [06/10,V2] spi: Add SPI driver for mx233/mx28
-In-Reply-To: <20120801045010.GC1672@S2100-06.ap.freescale.net>
-References: <1341555449-17507-6-git-send-email-marex@denx.de>
- <20120801033559.GB2323@roeck-us.net>
- <20120801045010.GC1672@S2100-06.ap.freescale.net>
-Message-ID: <201208010700.54829.marex@denx.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 1 Aug 2012 13:24:26 +0800
+Subject: [PATCH 1/4] video: Add support for the Solomon SSD1307 OLED
+ Controller
+In-Reply-To: <1343730576-20494-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1343730576-20494-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1343730576-20494-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20120801052424.GD1672@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+On Tue, Jul 31, 2012 at 12:29:33PM +0200, Maxime Ripard wrote:
+> +Optional properties:
+> +  - oled-reset-active-low: Is the reset gpio is active on physical low?
 
-> On Tue, Jul 31, 2012 at 08:35:59PM -0700, Guenter Roeck wrote:
-> > I think the call to spi_master_put() triggers the call to
-> > spi_master_release(). If so, kfree() would not be needed at all, and the
-> > documentation is wrong.
-> 
-> Also those drivers calling kfree in probe.
+You may want to take a look at commit c1cb438 (bindings: update imx and
+mxs #gpio-cells) which got merged recently.  In case the driver will
+only work on mxs, this optional property can just be dropped.
 
-Looks like that to me ...
-
-> Regards,
-> Shawn
-
-Best regards,
-Marek Vasut
+Regards,
+Shawn
