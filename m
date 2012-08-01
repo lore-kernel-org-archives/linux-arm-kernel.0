@@ -1,17 +1,52 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 01 Aug 2012 12:04:14 +0900
-Subject: [PATCH] ARM: EXYNOS: Add I2S SFR base addresses
-In-Reply-To: <0M7R00MY1GHTPK20@ms14.samsung.com>
-References: <0M7R00MY1GHTPK20@ms14.samsung.com>
-Message-ID: <030801cd6f92$55370570$ffa51050$%kim@samsung.com>
+Date: Wed, 01 Aug 2012 12:06:57 +0900
+Subject: [PATCH] ASoC: Samsung: Update Kconfig for Exynos5250 and
+ Exynos4412
+In-Reply-To: <1343218351-30577-1-git-send-email-padma.v@samsung.com>
+References: <1343218351-30577-1-git-send-email-padma.v@samsung.com>
+Message-ID: <030901cd6f92$b5fc6da0$21f548e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PADMAVATHI VENNA wrote:
+Padmavathi Venna wrote:
+> 
+> Update Kconfig file to support the Exynos5250 and Exynos4412
+> 
+> Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
+> Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> ---
+>  sound/soc/samsung/Kconfig |    8 ++++----
+>  1 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+> index fe3995c..d54e400 100644
+> --- a/sound/soc/samsung/Kconfig
+> +++ b/sound/soc/samsung/Kconfig
+> @@ -1,6 +1,6 @@
+>  config SND_SOC_SAMSUNG
+>  	tristate "ASoC support for Samsung"
+> -	depends on ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5PC100 ||
+> ARCH_S5PV210 || ARCH_S5P64X0 || ARCH_EXYNOS4
+> +	depends on PLAT_SAMSUNG
+>  	select S3C64XX_DMA if ARCH_S3C64XX
+>  	select S3C2410_DMA if ARCH_S3C24XX
+>  	help
+> @@ -63,7 +63,7 @@ config SND_SOC_SAMSUNG_SMDK_WM8580
+> 
+>  config SND_SOC_SAMSUNG_SMDK_WM8994
+>  	tristate "SoC I2S Audio support for WM8994 on SMDK"
+> -	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210 ||
+> MACH_SMDK4212)
+> +	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210 ||
+> MACH_SMDK4212 || MACH_SMDK4412 || SOC_EXYNOS5250)
 
-Padma, don't post with html styled :(
+Well, do you think _really_ all board which has a EXYNOS5250 SoC is needed
+this config?
 
-And you need to check the regarding addresses as per Sachin commented.
+I don't think so?
+
+[...]
 
 Thanks.
 
@@ -20,71 +55,3 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-------- Original Message -------
-Sender : Sachin Kamat<sachin.kamat@linaro.org>
-Date : Jul 26, 2012 13:41 (GMT+09:00)
-Title : Re: [PATCH] ARM: EXYNOS: Add I2S SFR base addresses
-?
-On 25 July 2012 17:35, Padmavathi Venna wrote:
-> The base address of I2S 0 controller is similar in exynos4 and exynos5
-> platforms. So this patch defines a common macro for the I2S controller
-> 0 base address in both the platforms and use the same macro.
->
-> This patch also defines the I2S controller 1,2 base addresses in exynos5
-> and correct the I2S controller 1 base address in exynos4
->
-> Signed-off-by: Padmavathi Venna 
-> ---
->??arch/arm/mach-exynos/dev-audio.c????????|????2 +-
->??arch/arm/mach-exynos/include/mach/map.h |????6 ++++--
->??2 files changed, 5 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/dev-audio.c
-b/arch/arm/mach-exynos/dev-audio.c
-> index b33a5b6..5dbc9a2 100644
-> --- a/arch/arm/mach-exynos/dev-audio.c
-> +++ b/arch/arm/mach-exynos/dev-audio.c
-> @@ -62,7 +62,7 @@ static struct s3c_audio_pdata i2sv5_pdata = {
->??};
->
->??static struct resource exynos4_i2s0_resource[] = {
-> -?????? [0] = DEFINE_RES_MEM(EXYNOS4_PA_I2S0, SZ_256),
-> +?????? [0] = DEFINE_RES_MEM(EXYNOS_PA_I2S0, SZ_256),
->???????? [1] = DEFINE_RES_DMA(DMACH_I2S0_TX),
->???????? [2] = DEFINE_RES_DMA(DMACH_I2S0_RX),
->???????? [3] = DEFINE_RES_DMA(DMACH_I2S0S_TX),
-> diff --git a/arch/arm/mach-exynos/include/mach/map.h
-b/arch/arm/mach-exynos/include/mach/map.h
-> index c72b675..5cf7d91 100644
-> --- a/arch/arm/mach-exynos/include/mach/map.h
-> +++ b/arch/arm/mach-exynos/include/mach/map.h
-> @@ -39,9 +39,11 @@
->
->??#define EXYNOS4_PA_G2D???????????????? 0x12800000
->
-> -#define EXYNOS4_PA_I2S0????????????????????????0x03830000
-> -#define EXYNOS4_PA_I2S1????????????????????????0xE3100000
-> +#define EXYNOS_PA_I2S0???????????????? 0x03830000
-> +#define EXYNOS4_PA_I2S1????????????????????????0xE2100000
->??#define EXYNOS4_PA_I2S2????????????????????????0xE2A00000
-
-As per the TRM, these addresses (I2S1 and I2S2) are 0x13960000 and
-0x13970000 respectively on Exynos4412 SoC.
-Please verify.
-I didn't verify Exynos4412 before. I will send a new patch for this.
-
-
-> +#define EXYNOS5_PA_I2S1????????????????????????0x12D60000
-> +#define EXYNOS5_PA_I2S2????????????????????????0x12D70000
->
->??#define EXYNOS4_PA_PCM0????????????????????????0x03840000
->??#define EXYNOS4_PA_PCM1????????????????????????0x13980000
-> --
-> 1.7.4.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe
-linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at??http://vger.kernel.org/majordomo-info.html
