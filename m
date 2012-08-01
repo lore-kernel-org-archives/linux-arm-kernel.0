@@ -1,39 +1,24 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 01 Aug 2012 09:19:34 +0100
-Subject: [PATCH 3/6] ARM: ux500: Fix merge error,
- so such struct 'snd_soc_u8500'
-In-Reply-To: <5018DC9F.30502@linaro.org>
-References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
- <1343741493-17671-6-git-send-email-lee.jones@linaro.org>
- <50180BF6.6080908@mvista.com> <5018DC9F.30502@linaro.org>
-Message-ID: <5018E696.9000305@linaro.org>
+From: sbkim73@samsung.com (Sangbeom Kim)
+Date: Wed, 01 Aug 2012 17:29:37 +0900
+Subject: [alsa-devel] [PATCH 1/2] ASOC: SAMSUNG: Add DT support for i2s
+In-Reply-To: <1343218170-30483-2-git-send-email-padma.v@samsung.com>
+References: <1343218170-30483-1-git-send-email-padma.v@samsung.com>
+ <1343218170-30483-2-git-send-email-padma.v@samsung.com>
+Message-ID: <08da01cd6fbf$cd9b5c00$68d21400$@com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/12 08:37, Lee Jones wrote:
-> On 31/07/12 17:46, Sergei Shtylyov wrote:
->> Hello.
->>
->> On 07/31/2012 05:31 PM, Lee Jones wrote:
->>
->>     Subject doesn't parse for me...
->>
->>> The platform attempts to register platform device 'snd_soc_u8500'
->>> which doesn't actually exist. Here we change the reference to the
->>> correct one 'snd_soc_mop500'.
->>
->>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->
-> Actually, it does make sense?
->
-> As a sentence: "This patch fixes merge error: so such structure 'struct snd_soc_u8500'.
+Hi,
+On Wednesday, July 25, 2012 9:09 PM, Padmavathi Venna wrote:
 
-That's interesting. Not only when I read it did it seem correct, I also 
-wrote it wrong "as a sentence". Of course "so" should be "no".
+> Add support for device based discovery.
+> 
+Currently, I'm reviewing your patch set.
+Your patch can support device tree for Samsung's i2s.
+But I wonder that Your patch can support non-dt too,
+So, Please test your patch on non-dt environment.
+It looks unclear handling of clock source.
+After code review, I will give you more detail comments,
 
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Sangbeom.
