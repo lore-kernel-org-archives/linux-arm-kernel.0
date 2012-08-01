@@ -1,55 +1,38 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 01 Aug 2012 18:39:17 +0900
-Subject: [PATCH V2 5/5] arm: samsung: delete frame buffer header files from
- platform
-In-Reply-To: <CAL1wa8cShB7zDj-CPvfEncX+Up7enKM9MJOt-488dThj_tXbMA@mail.gmail.com>
-References: <1343737385-23337-1-git-send-email-l.krishna@samsung.com>
- <1343737385-23337-6-git-send-email-l.krishna@samsung.com>
- <02ee01cd6f89$f218b2c0$d64a1840$%kim@samsung.com>
- <CAL1wa8cShB7zDj-CPvfEncX+Up7enKM9MJOt-488dThj_tXbMA@mail.gmail.com>
-Message-ID: <037101cd6fc9$85386e30$8fa94a90$%kim@samsung.com>
+Date: Wed, 01 Aug 2012 18:42:28 +0900
+Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
+In-Reply-To: <5016D03D.8010607@codeaurora.org>
+References: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
+ <20120611155716.GA18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111241470.23555@xanadu.home>
+ <20120611165115.GB18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
+ <4FD62DBB.8070407@codeaurora.org>
+ <20120611192519.GF18267@n2100.arm.linux.org.uk>
+ <4FE1FB15.3090305@codeaurora.org>
+ <0e0201cd5f2f$2c2f6e60$848e4b20$%kim@samsung.com>
+ <5016D03D.8010607@codeaurora.org>
+Message-ID: <037601cd6fc9$f6e5fe30$e4b1fa90$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Leela Krishna Amudala wrote:
+Stephen Boyd wrote:
 > 
-> Hello Kgene,
-> 
-> On Wed, Aug 1, 2012 at 7:34 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Leela Krishna Amudala wrote:
+> On 07/10/12 23:34, Kukjin Kim wrote:
+> > Stephen Boyd wrote:
+> >> Great. Kukjin Kim, can exynos use SGI0? It looks like exynos is the
+> only
+> >> one left to move to SGI0.
 > >>
-> >> The FIMD register headers are moved to include/video/
-> >> hence, deleting these files from platform side
-> >>
-> >> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
-> >> ---
-> >>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h |  159 ---------
-> >>  arch/arm/plat-samsung/include/plat/regs-fb.h    |  403
-> > -------------------
-> >> ----
-> >>  2 files changed, 0 insertions(+), 562 deletions(-)
-> >>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
-> >>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb.h
-> >>
-> > No. This should be squashed into first patch on this series. See below.
+> > Yeah, EXYNOS can use SGI0 instead of SGI1 :)
 > >
-> >  arch/arm/plat-samsung/include/plat/regs-fb-v4.h    |  159
-> > --------------------
-> >  .../plat/regs-fb.h => include/video/samsung_fimd.h |  145
-> > ++++++++++++++++--
-> >  2 files changed, 134 insertions(+), 170 deletions(-)
-> >  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
-> >  rename arch/arm/plat-samsung/include/plat/regs-fb.h =>
-> > include/video/samsung_fimd.h (74%)
 > >
 > 
-> If I squash it with the first patch and if somebody set that as a head
-> commit, it will break the build. Hence, splitted it up from the first
-> patch.
+> Russell, can we apply something like this?
 > 
-NACK. your changes are not adding just moving. So should be squashed. If
-required, you could create just one patch for moving them, probably, 1st,
-3rd, 4th and 5th patches into one patch.
+Please feel free to add my ack on following change.
+
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
 Thanks.
 
@@ -59,7 +42,26 @@ Kgene.
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-> Thank you Sylwester for suggesting this split up change.
+> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-
+> exynos/platsmp.c
+> index 36c3984..090e32b 100644
+> --- a/arch/arm/mach-exynos/platsmp.c
+> +++ b/arch/arm/mach-exynos/platsmp.c
+> @@ -139,7 +139,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct
+> task_struct *idle)
 > 
-> Regards,
-> Leela Krishna
+>  		__raw_writel(virt_to_phys(exynos4_secondary_startup),
+>  			CPU1_BOOT_REG);
+> -		gic_raise_softirq(cpumask_of(cpu), 1);
+> +		gic_raise_softirq(cpumask_of(cpu), 0);
+> 
+>  		if (pen_release == -1)
+>  			break;
+> 
+> 
+> I see we have another user of SGI1. Magnus/Rafael, can we move
+> smp-emev2.c to use SGI0 instead of SGI1?
+> 
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
