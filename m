@@ -1,23 +1,109 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 1 Aug 2012 13:32:01 +0000
-Subject: [PATCH 5/6] ARM: ux500: Ensure probing of Audio devices when
- Device Tree is enabled
-In-Reply-To: <5018DBEE.9090203@linaro.org>
-References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
- <201207312054.13818.arnd@arndb.de> <5018DBEE.9090203@linaro.org>
-Message-ID: <201208011332.02500.arnd@arndb.de>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 1 Aug 2012 15:42:59 +0200
+Subject: omap_device: query on "fck" clk alias created
+In-Reply-To: <50191F00.1040501@ti.com>
+References: <50191F00.1040501@ti.com>
+Message-ID: <50193263.8070907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 01 August 2012, Lee Jones wrote:
-> > Looks like you're adding the same call to each of the three cases:
-> > mop500, snowball and hrefv60+. How about moving it before or after
-> > the if/elseif block?
+Hi Vaibhav,
+
+On 08/01/2012 02:20 PM, Vaibhav Hiremath wrote:
+> Hi,
 > 
-> The Snowball one is different 'mop500_msp_init' -> 'mop500_of_msp_init'.
+> In OMAP world, we have omap_device layer, which exports api's like
+> omap_device_build() to create and register platform_device to the
+> kernel. This layer understands hwmod infrastructure and parses all the
+> platform specific information from it.
+> Now with DT migration, the same thing is achieved using a notifier,
+> which in turn omap_device_build_from_dt(), which in turn does same thing.
+> 
+> One of the thing which is happening in both execution path is, creating
+> alias for functional clock (hwmod_data->main_clk) for each device
+> getting created with the con_id = "fck".
+> 
+> Now the problem with this is,
+> 
+> The clk_get() api will not work, unless we pass both the arguments (dev,
+> con_id) properly. Now expecting driver to always label con_id with "fck"
+> is undesirable, as the same driver can be reused on multiple platforms,
+> which can be non-omap and/or non-ti platforms.
+> Also we have multiple examples where driver simply calls (which is right)
+> 
+> clk = clk_get(&pdev->dev, NULL);
 
-Ah, I see. Is there a problem in always using mop500_of_msp_init then?
-I would guess that this just means you'd have to put the msp into the
-device tree files, which don't yet exist for mop500 and hrefv60.
+Mmm, I don't know, but even if this is right, shouldn't we avoid such
+usage. It might be better to be explicit than assuming that the IP will
+always have an unique clock.
+Some IP does have several inputs that might or not be connected
+depending or the integration or on the version. So even if only one
+clock is useful at some point it will not always be true.
+We had similar issue with the IRQ lines in the past.
 
-	Arnd
+> This would fail on OMAP platforms, unless you modify clockxxx_data.c
+> file with,
+> 
+> CLK("<device>",  NULL,           &xxx_fck,    CK_34XX),
+> 
+> 
+> Devices specially with only one clock source always prefer not to
+> specify con_id.
+
+How many devices do you have with only one clock source? Could you
+provide the list of drivers that assume that?
+
+Most IPs in OMAP does have a fck and an ick so that does not seems nice
+or even consistent to me to do a clk_get(&pdev->dev, NULL) for "fck" and
+clk_get(&pdev->dev, "ick") for the ick.
+
+> And it seems wrong thing, as across platforms IP integration can be very
+> different and you can not expect to change the clock-tree table always.
+
+FWIW, that table is done for that exact purpose. And we introduced the
+automatic "fck" alias creation mainly to make things easier, but that
+method is still very valid, and if the default alias is not good enough
+for the driver nothing should prevent you to create a new one.
+
+> So the option here we have is,
+> 
+> 1. Instead of creating alias with "fck", create an alias only with dev
+> pointer, that means con_id = NULL.
+> I have already tested this and it works on AM33xx platform.
+
+Do you mean assuming that the fck is always the clock with a NULL
+con_id? And any other clocks for that device will have thus to use a
+explicit name?
+
+> 2. Add a new flag inside hwmod or omap_device, so that it can be read at
+> omap_device layer and based on that we can decide whether to add con_id
+> or not while invoking clkdev_alloc().
+
+hwmod is supposed to contain only HW related information. In that case
+it will be Linux driver dependent and not really HW dependent.
+That one is thus not really acceptable.
+
+> This may be required to support legacy drivers which are not migrated to
+> runtime_pm and still calls clk_get() for both "fck" and "ick", so here
+> we need "fck" clk alias.
+
+We can use "fck" even with runtime_pm. Just because sometime you need to
+get the clock rate of the main clock.
+
+> Any comments or opinion on this? Based on the feedback I can create the
+> changes and submit it to the list.
+
+Well, a #3 suggestion might be to enforce the usage of fck alias in the
+drivers instead of assuming that the "NULL" entry is the proper one.
+
+And a #4 will be to create a extra entry in the clkdev like you have done.
+
+For my point of view, the #4 seems to be the one that will minimize the
+overall change in the drivers and is probably the best one.
+
+That being said, since the DT clock binding is merged now, the whole
+automatic alias creation might disappear as soon as we will have DT boot
+on all the platforms... OK, we are not really there still :-)
+
+Regards,
+Benoit
