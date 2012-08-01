@@ -1,39 +1,37 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 1 Aug 2012 17:08:24 +0100
-Subject: [PATCH 1/6] ASoC: dapm: If one widget fails, do not force all
- subsequent widgets to fail too
-In-Reply-To: <50193428.5000708@linaro.org>
-References: <20120731134214.GK4468@opensource.wolfsonmicro.com>
- <5017EAC3.3080504@linaro.org>
- <20120731142820.GW4468@opensource.wolfsonmicro.com>
- <5017EDCA.4020601@linaro.org>
- <20120731145443.GY4468@opensource.wolfsonmicro.com>
- <5017F68B.3060400@linaro.org>
- <20120731151819.GC4468@opensource.wolfsonmicro.com>
- <5018D880.5090306@linaro.org>
- <20120801132022.GS11892@opensource.wolfsonmicro.com>
- <50193428.5000708@linaro.org>
-Message-ID: <20120801160824.GB11892@opensource.wolfsonmicro.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 01 Aug 2012 10:07:27 -0600
+Subject: [PATCH v3 09/10] of: Add of_pci_parse_ranges()
+In-Reply-To: <20120801065437.GB26791@avionic-0098.adnet.avionic-design.de>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <1343332512-28762-10-git-send-email-thierry.reding@avionic-design.de>
+ <50183B03.2090809@gmail.com>
+ <20120801065437.GB26791@avionic-0098.adnet.avionic-design.de>
+Message-ID: <5019543F.3080601@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 01, 2012 at 02:50:32PM +0100, Lee Jones wrote:
+On 08/01/2012 12:54 AM, Thierry Reding wrote:
+> On Tue, Jul 31, 2012 at 03:07:31PM -0500, Rob Herring wrote:
+>> On 07/26/2012 02:55 PM, Thierry Reding wrote:
+>>> This new function parses the ranges property of PCI device
+>>> nodes into an array of struct resource elements. It is useful
+>>> in multiple-port PCI host controller drivers to collect
+>>> information about the ranges that it needs to forward to the
+>>> respective ports.
+>> 
+>> It seems to me that some of the DT PCI code in
+>> arch/powerpc/kernel/pci* like pci_process_bridge_OF_ranges()
+>> should apply for ARM as well.
+>> 
+>> Each arch defining their own pci controller structs complicates
+>> this, but I would think at least the DT parsing can be common.
+> 
+> Yes, there's quite a lot of room for refactoring. When I first
+> started work on this there had been some discussion about whether
+> it would make sense to move PCI controller drivers into a common
+> location to make it easier to refactor but the consensus at the
+> time was that this should not be done.
 
-> I am under the impression that it was tested. Perhaps before it was
-> rebased, but tests were completed. Ola was very surprised when I
-> told him there were link failures. The only issue is that I only
-> found out and told him a day before he was due to take his Summer
-> leave.
-
-That's really surprising.  What are the actual issues here, you've never
-shown the actual errors?
-
-> >It's very disappointing to see such an error exist, and even more
-> >disappointing that there's no interest in fixing the driver.
-
-> This is incorrect. I'm sure the driver will be fixed post-haste when
-> Ola returns back from vacation. If I can find some time I might
-> dabble in the mean-time also.
-
-It may not be what you're intending but it's unfortuantely what's I'm
-seeing.
+In the long term, if we end up with a separate arch/aarch64/, I think
+we'll have to move the PCIe (and any other) drivers to a common
+location. Still, I imagine there is plenty of time until that's mandatory.
