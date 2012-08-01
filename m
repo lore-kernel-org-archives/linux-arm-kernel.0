@@ -1,35 +1,41 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Wed, 1 Aug 2012 13:53:06 -0700
-Subject: [PATCH 11/11] ARM: Get rid of .LCcralign local label usage in
- alignment_trap macro
-In-Reply-To: <20120730141544.GJ6802@n2100.arm.linux.org.uk>
+From: anton.vorontsov@linaro.org (Anton Vorontsov)
+Date: Wed, 1 Aug 2012 14:02:31 -0700
+Subject: [PATCH 03/11] kdb: Implement disable_nmi command
+In-Reply-To: <CAMbhsRS1cOf1T8k7K6CFmRA7M52AGPZ2TqmEnpZqDGYnbyetbw@mail.gmail.com>
 References: <20120730115719.GA5742@lizard>
- <1343649500-18491-11-git-send-email-anton.vorontsov@linaro.org>
- <20120730141544.GJ6802@n2100.arm.linux.org.uk>
-Message-ID: <20120801205306.GB20714@lizard>
+ <1343649500-18491-3-git-send-email-anton.vorontsov@linaro.org>
+ <CAMbhsRS1cOf1T8k7K6CFmRA7M52AGPZ2TqmEnpZqDGYnbyetbw@mail.gmail.com>
+Message-ID: <20120801210231.GC20714@lizard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 03:15:44PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jul 30, 2012 at 04:58:20AM -0700, Anton Vorontsov wrote:
-> > This makes the code more izolated.
-> > 
-> > The downside of this is that we now have an additional branch and the
-> > code itself is 8 bytes longer. But on the bright side, this new layout
-> > can be more cache friendly since cr_alignment address might be already
-> > in the cache line (not that I measured anything, it's just fun to think
-> > about it).
+On Mon, Jul 30, 2012 at 10:33:34AM -0700, Colin Cross wrote:
+> On Mon, Jul 30, 2012 at 4:58 AM, Anton Vorontsov
+> <anton.vorontsov@linaro.org> wrote:
+> > This command disables NMI-entry. If NMI source was previously shared with
+> > a serial console ("debug port"), this effectively releases the port from
+> > KDB exclusive use, and makes the console available for normal use.
+> >
+> > Of course, NMI can be reenabled, enable_nmi modparam is used for that:
+> >
+> >         echo 1 > /sys/module/kdb/parameters/enable_nmi
 > 
-> The caches are harvard, so mixing data and code together does not increase
-> performance.  Having data which is used by the same code in the same cache
-> line results in better performance.
-> 
-> The additional branch will also cause a pipeline stall on older CPUs.
-> 
-> So no, I don't see any way that this is a performance improvement.  Please
-> leave this as is.
+> This is very different behavior from the FIQ debugger "console"
+> command you are trying to replace.  In the FIQ debugger, everything
+> goes through the FIQ/NMI, even when in console mode.  That means that
+> the user can always get back to FIQ debugger/KDB mode using a special
+> sequence (we use a break character).  With your implementation, if you
+> switch from KDB to console to see if the console is working, and find
+> that it is not working, you can never get back into KDB.
 
-Sure, will drop it.
+Ah, I see. But with disable_nmi, in addition to kernel console,
+applications can use /dev/ttyXX as normal, and with 'console' command
+that is not possible (at least w/o modifying applications to escape
+magic sequence). So, I think we should have both commands, each would
+handle its own use case.
+
+(Initially I just tried to avoid adding another console driver, but
+it seems there is no other way, heh.)
 
 Thanks!
 
