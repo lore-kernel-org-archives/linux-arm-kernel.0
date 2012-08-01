@@ -1,90 +1,25 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 1 Aug 2012 18:08:50 +0100
-Subject: [PATCH 14/24] xen/arm: initialize grant_table on ARM
-In-Reply-To: <20120801144059.GL7227@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-14-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120801144059.GL7227@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1208011752020.4645@kaball.uk.xensource.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 01 Aug 2012 11:20:13 -0600
+Subject: [PATCH v3 12/32] PCI/ARM: use PCIe capabilities access functions
+ to simplify implementation
+In-Reply-To: <1343836477-7287-13-git-send-email-jiang.liu@huawei.com>
+References: <1343836477-7287-1-git-send-email-jiang.liu@huawei.com>
+ <1343836477-7287-13-git-send-email-jiang.liu@huawei.com>
+Message-ID: <5019654D.2000408@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 1 Aug 2012, Konrad Rzeszutek Wilk wrote:
-> On Thu, Jul 26, 2012 at 04:33:56PM +0100, Stefano Stabellini wrote:
-> > Initialize the grant table mapping at the address specified at index 0
-> > in the DT under the /xen node.
+On 08/01/2012 09:54 AM, Jiang Liu wrote:
+> From: Jiang Liu <jiang.liu@huawei.com>
 > 
-> Is it always index 0? If so, should it have a #define for the
-> other index values?
-
-There are no other values at the moment but I'll add an #define.
-
-
-> > After the grant table is initialized, call xenbus_probe (if not dom0).
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > ---
-> >  arch/arm/xen/enlighten.c  |   13 +++++++++++++
-> >  drivers/xen/grant-table.c |    2 +-
-> >  2 files changed, 14 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> > index 2e013cf..854af1e 100644
-> > --- a/arch/arm/xen/enlighten.c
-> > +++ b/arch/arm/xen/enlighten.c
-> > @@ -1,8 +1,12 @@
-> >  #include <xen/xen.h>
-> >  #include <xen/interface/xen.h>
-> >  #include <xen/interface/memory.h>
-> > +#include <xen/interface/hvm/params.h>
-> >  #include <xen/platform_pci.h>
-> >  #include <xen/features.h>
-> > +#include <xen/grant_table.h>
-> > +#include <xen/hvm.h>
-> > +#include <xen/xenbus.h>
-> >  #include <asm/xen/hypervisor.h>
-> >  #include <asm/xen/hypercall.h>
-> >  #include <linux/module.h>
-> > @@ -51,12 +55,16 @@ int __init xen_guest_init(void)
-> >  	struct xen_add_to_physmap xatp;
-> >  	static struct shared_info *shared_info_page = 0;
-> >  	struct device_node *node;
-> > +	struct resource res;
-> >  
-> >  	node = of_find_compatible_node(NULL, NULL, "arm,xen");
-> >  	if (!node) {
-> >  		pr_info("No Xen support\n");
-> >  		return 0;
-> >  	}
-> > +	if (of_address_to_resource(node, 0, &res))
-> > +		return -EINVAL;
-> > +	xen_hvm_resume_frames = res.start >> PAGE_SHIFT;
-> >  	xen_domain_type = XEN_HVM_DOMAIN;
-> >  
-> >  	xen_setup_features();
-> > @@ -97,6 +105,11 @@ int __init xen_guest_init(void)
-> >  		per_cpu(xen_vcpu, cpu) =
-> >  			&HYPERVISOR_shared_info->vcpu_info[cpu];
-> >  	}
-> > +
-> > +	gnttab_init();
-> > +	if (!xen_initial_domain())
-> > +		xenbus_probe(NULL);
-> > +
-> >  	return 0;
-> >  }
-> >  EXPORT_SYMBOL_GPL(xen_guest_init);
-> > diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
-> > index 1d0d95e..fd2137a 100644
-> > --- a/drivers/xen/grant-table.c
-> > +++ b/drivers/xen/grant-table.c
-> > @@ -62,7 +62,7 @@
-> >  
-> >  static grant_ref_t **gnttab_list;
-> >  static unsigned int nr_grant_frames;
-> > -static unsigned int boot_max_nr_grant_frames;
-> > +static unsigned int boot_max_nr_grant_frames = 1;
+> Use PCIe capabilities access functions to simplify PCIe ARM implementation.
 > 
-> Is this going to impact x86 version?
+> Signed-off-by: Jiang Liu <liuj97@gmail.com>
 
-It is not needed so I'll remove this change
+This is probably fine from my perspective assuming the underlying PCI
+API implementation is OKd by relevant people.
+
+Thierry, can you comment on whether this will conflict with your Tegra
+PCIe driver series? If it doesn't, this patch can go through any
+relevant PCI tree. If it does, we may have to take this through the
+Tegra tree after merging the dependencies, or defer it to later.
