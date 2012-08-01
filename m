@@ -1,44 +1,56 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Wed, 1 Aug 2012 14:02:31 -0700
-Subject: [PATCH 03/11] kdb: Implement disable_nmi command
-In-Reply-To: <CAMbhsRS1cOf1T8k7K6CFmRA7M52AGPZ2TqmEnpZqDGYnbyetbw@mail.gmail.com>
-References: <20120730115719.GA5742@lizard>
- <1343649500-18491-3-git-send-email-anton.vorontsov@linaro.org>
- <CAMbhsRS1cOf1T8k7K6CFmRA7M52AGPZ2TqmEnpZqDGYnbyetbw@mail.gmail.com>
-Message-ID: <20120801210231.GC20714@lizard>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 1 Aug 2012 17:34:19 -0500
+Subject: [PATCH V2 01/10] ARM: PMU: Add runtime PM Support
+In-Reply-To: <20120801204731.GA9080@mudshark.cambridge.arm.com>
+References: <4FD7C597.7060501@ti.com>
+ <20120702095539.GD22239@mudshark.cambridge.arm.com> <4FF1D15E.7040301@ti.com>
+ <20120702220117.GD25234@mudshark.cambridge.arm.com> <4FF6340A.6020409@ti.com>
+ <50109233.3090302@ti.com> <20120726150534.GD6382@mudshark.cambridge.arm.com>
+ <50115F3F.7050705@ti.com> <20120731151446.GK3903@mudshark.cambridge.arm.com>
+ <50186524.6060903@ti.com> <20120801204731.GA9080@mudshark.cambridge.arm.com>
+Message-ID: <5019AEEB.7010807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 10:33:34AM -0700, Colin Cross wrote:
-> On Mon, Jul 30, 2012 at 4:58 AM, Anton Vorontsov
-> <anton.vorontsov@linaro.org> wrote:
-> > This command disables NMI-entry. If NMI source was previously shared with
-> > a serial console ("debug port"), this effectively releases the port from
-> > KDB exclusive use, and makes the console available for normal use.
-> >
-> > Of course, NMI can be reenabled, enable_nmi modparam is used for that:
-> >
-> >         echo 1 > /sys/module/kdb/parameters/enable_nmi
+
+On 08/01/2012 03:47 PM, Will Deacon wrote:
+> On Wed, Aug 01, 2012 at 12:07:16AM +0100, Jon Hunter wrote:
+>> I have just updated my pmu branch for omap3/4. You can pull my latest
+>> patches from [1].
 > 
-> This is very different behavior from the FIQ debugger "console"
-> command you are trying to replace.  In the FIQ debugger, everything
-> goes through the FIQ/NMI, even when in console mode.  That means that
-> the user can always get back to FIQ debugger/KDB mode using a special
-> sequence (we use a break character).  With your implementation, if you
-> switch from KDB to console to see if the console is working, and find
-> that it is not working, you can never get back into KDB.
+> Great, thanks for that. I've pushed out to perf/omap4 and I've also
+> included your runtime PM hooks in my perf/updates branch. I have a fair
+> amount of cleanup sitting in there as well, so I'll post that to the list
+> at -rc1 as a candidate for -next. I'll obviously leave the omap-specific
+> bits for others to handle, although I'll continue maintaining my branch
+> until that's hit mainline.
 
-Ah, I see. But with disable_nmi, in addition to kernel console,
-applications can use /dev/ttyXX as normal, and with 'console' command
-that is not possible (at least w/o modifying applications to escape
-magic sequence). So, I think we should have both commands, each would
-handle its own use case.
+I just updated today with Paul's latest patch he sent. I don't think
+much changed from what I had in there yesterday.
 
-(Initially I just tried to avoid adding another console driver, but
-it seems there is no other way, heh.)
+>> In the latest series I have:
+>> 1. Pulled in an omap3 clock domain fix from Paul [2]
+>> 2. Rebased Paul's patch [3] on top of [2]. I have also made a couple
+>>    updates to this patch and I need to get Paul's feedback.
+>> 3. I have removed the OMAP3 PMU dependency on ETM from the Kconfig.
+> 
+> Fantastic! I actually already removed the OMAP3 Kconfig dependency in my
+> perf/updates branch as part of removing CPU_HAS_PMU entirely, so you
+> probably don't need to pursue that patch.
 
-Thanks!
+Great! Glad I don't have to worry about that.
 
--- 
-Anton Vorontsov
-Email: cbouatmailru at gmail.com
+>> I will probably send out the series once I align with Paul on the above
+>> changes and the HWMOD stuff I have added for OMAP3 with Benoit.
+> 
+> Okey doke. If you need me to update my copy of your runtime PM patch,
+> please shout (that seems to be a done deal afaict).
+
+Yes it is good as far as I am concerned.
+
+I am going to be out for a couple weeks, but when I get back I will get
+the OMAP stuff out. I should probably doing some testing on -next too
+with your latest changes.
+
+Cheers
+Jon
