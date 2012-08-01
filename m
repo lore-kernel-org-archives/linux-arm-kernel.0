@@ -1,52 +1,33 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 1 Aug 2012 04:31:04 +0200
-Subject: [06/10,V2] spi: Add SPI driver for mx233/mx28
-In-Reply-To: <20120731205300.GA25721@roeck-us.net>
-References: <1341555449-17507-6-git-send-email-marex@denx.de>
- <20120731205300.GA25721@roeck-us.net>
-Message-ID: <201208010431.04399.marex@denx.de>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 1 Aug 2012 10:51:06 +0800
+Subject: [PATCH v4 0/3] imx: add usbmisc support
+Message-ID: <1343789469-26821-1-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Guenter Roeck,
+usbmisc driver handles the SoC specific non-core usb registers.
 
-[...]
+Changes since last version:
+ - rebase onto torvalds latest git tree
+ - use phandle linke usb controllers and usbmisc device.
+   It also make usbmisc driver possible to be kernel modules.
 
-> > +static int __devexit mxs_spi_remove(struct platform_device *pdev)
-> > +{
-> > +	struct spi_master *host;
-> > +	struct mxs_spi *spi;
-> > +	struct mxs_ssp *ssp;
-> > +
-> > +	host = platform_get_drvdata(pdev);
-> > +	spi = spi_master_get_devdata(host);
-> > +	ssp = &spi->ssp;
-> > +
-> > +	spi_unregister_master(host);
-> > +
-> > +	platform_set_drvdata(pdev, NULL);
-> > +
-> > +	clk_disable_unprepare(ssp->clk);
-> > +
-> > +	spi_master_put(host);
-> > +	kfree(host);
-> > +
-> 
-> Is the kfree() here and in the probe function really necessary ?
+Richard Zhao (3):
+  USB: chipidea: add imx usbmisc support
+  ARM: imx6q: clk_register_clkdev usbmisc clock
+  ARM: dts: imx6q-sabrelite: add usbmisc device
 
-It certainly would seem that way.
+ .../devicetree/bindings/usb/ci13xxx-imx.txt        |    5 +
+ .../devicetree/bindings/usb/usbmisc-imx.txt        |   14 ++
+ arch/arm/boot/dts/imx6q-sabrelite.dts              |    1 +
+ arch/arm/boot/dts/imx6q.dtsi                       |   10 ++
+ arch/arm/mach-imx/clk-imx6q.c                      |    1 +
+ drivers/usb/chipidea/Makefile                      |    2 +-
+ drivers/usb/chipidea/ci13xxx_imx.c                 |   64 ++++++++
+ drivers/usb/chipidea/usbmisc_imx6q.c               |  162 ++++++++++++++++++++
+ 8 files changed, 258 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/usbmisc-imx.txt
+ create mode 100644 drivers/usb/chipidea/usbmisc_imx6q.c
 
-> Couple of reasons for asking: No other SPI master driver calls it in the
-> remove function (unless I missed it), most drivers don't call it in the
-> probe function error path, and if I call it in the remove function in a
-> SPI master driver I am working on, and load/unload the module several
-> times in a row, I get a nasty kernel crash.
-
-It seems the spi_master class takes care of that kfree() in 
-spi.c:spi_master_release() . Good catch, thanks!
-
-> Thanks,
-> Guenter
-
-Best regards,
-Marek Vasut
+-- 
+1.7.9.5
