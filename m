@@ -1,50 +1,55 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 1 Aug 2012 17:04:45 +0100
-Subject: [PATCH 23/24] hvc_xen: allow dom0_write_console for HVM guests
-In-Reply-To: <20120801145413.GR7227@phenom.dumpdata.com>
+Date: Wed, 1 Aug 2012 17:06:42 +0100
+Subject: [PATCH 21/24] arm/v2m: initialize arch_timers even if v2m_timer
+ is not present
+In-Reply-To: <20120801145257.GQ7227@phenom.dumpdata.com>
 References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-23-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120801145413.GR7227@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1208011704000.4645@kaball.uk.xensource.com>
+ <1343316846-25860-21-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120801145257.GQ7227@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1208011705100.4645@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 1 Aug 2012, Konrad Rzeszutek Wilk wrote:
-> On Thu, Jul 26, 2012 at 04:34:05PM +0100, Stefano Stabellini wrote:
-> > On ARM all guests are HVM guests, including Dom0.
-> > Allow dom0_write_console to be called by an HVM domain.
-> 
-> Um, but xen_hvm_domain() != xen_pv_domain() so won't this return without
-> printing anything?
-
-Nope, it would call dom0_write_console that issues a console hypercall.
-However I am going to remove this patch and rely on the simple serial
-emulator we have in Xen for early_printk stuff
-
-> > 
+> On Thu, Jul 26, 2012 at 04:34:03PM +0100, Stefano Stabellini wrote:
 > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> 
+> Should the maintainer of the v2m be CC-ed here?
+> This looks like a bug-fix of itself?
+
+I think so. I'll CC Russell King next time.
+
 > > ---
-> >  drivers/tty/hvc/hvc_xen.c |    5 +----
-> >  1 files changed, 1 insertions(+), 4 deletions(-)
+> >  arch/arm/mach-vexpress/v2m.c |   11 ++++++-----
+> >  1 files changed, 6 insertions(+), 5 deletions(-)
 > > 
-> > diff --git a/drivers/tty/hvc/hvc_xen.c b/drivers/tty/hvc/hvc_xen.c
-> > index 3c04fb8..949edc2 100644
-> > --- a/drivers/tty/hvc/hvc_xen.c
-> > +++ b/drivers/tty/hvc/hvc_xen.c
-> > @@ -616,12 +616,9 @@ static void xenboot_write_console(struct console *console, const char *string,
-> >  	unsigned int linelen, off = 0;
-> >  	const char *pos;
+> > diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+> > index fde26ad..dee1451 100644
+> > --- a/arch/arm/mach-vexpress/v2m.c
+> > +++ b/arch/arm/mach-vexpress/v2m.c
+> > @@ -637,16 +637,17 @@ static void __init v2m_dt_timer_init(void)
+> >  	node = of_find_compatible_node(NULL, NULL, "arm,sp810");
+> >  	v2m_sysctl_init(of_iomap(node, 0));
 > >  
-> > -	if (!xen_pv_domain())
+> > -	err = of_property_read_string(of_aliases, "arm,v2m_timer", &path);
+> > -	if (WARN_ON(err))
 > > -		return;
-> > -
-> >  	dom0_write_console(0, string, len);
+> > -	node = of_find_node_by_path(path);
+> > -	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
+> >  	if (arch_timer_of_register() != 0)
+> >  		twd_local_timer_of_register();
 > >  
-> > -	if (xen_initial_domain())
-> > +	if (!xen_pv_domain())
-> >  		return;
+> >  	if (arch_timer_sched_clock_init() != 0)
+> >  		versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
+> > +
+> > +	err = of_property_read_string(of_aliases, "arm,v2m_timer", &path);
+> > +	if (WARN_ON(err))
+> > +		return;
+> > +	node = of_find_node_by_path(path);
+> > +	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
+> >  }
 > >  
-> >  	domU_write_console(0, "(early) ", 8);
+> >  static struct sys_timer v2m_dt_timer = {
 > > -- 
 > > 1.7.2.5
 > 
