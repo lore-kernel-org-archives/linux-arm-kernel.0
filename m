@@ -1,58 +1,56 @@
-From: andreas.devel@googlemail.com (=?UTF-8?B?QW5kcmVhcyBCaWXDn21hbm4=?=)
-Date: Wed, 01 Aug 2012 09:33:12 +0200
-Subject: [PATCH] arm:gemini: fix irq.c
-In-Reply-To: <4FEE13C0.10505@biessmann.de>
-References: <1338981778-19938-1-git-send-email-andreas@biessmann.de>
- <4FEE13C0.10505@biessmann.de>
-Message-ID: <5018DBB8.2070004@googlemail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 01 Aug 2012 08:34:06 +0100
+Subject: [PATCH 5/6] ARM: ux500: Ensure probing of Audio devices when
+ Device Tree is enabled
+In-Reply-To: <201207312054.13818.arnd@arndb.de>
+References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
+ <1343741493-17671-11-git-send-email-lee.jones@linaro.org>
+ <201207312054.13818.arnd@arndb.de>
+Message-ID: <5018DBEE.9090203@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping
+On 31/07/12 21:54, Arnd Bergmann wrote:
+> On Tuesday 31 July 2012, Lee Jones wrote:
+>> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+>> index e641003..87a5cd7 100644
+>> --- a/arch/arm/mach-ux500/board-mop500.c
+>> +++ b/arch/arm/mach-ux500/board-mop500.c
+>> @@ -794,6 +794,7 @@ static void __init u8500_init_machine(void)
+>>                                  ARRAY_SIZE(mop500_platform_devs));
+>>
+>>                  mop500_sdi_init(parent);
+>> +               mop500_msp_init(parent);
+>>                  i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
+>>                  i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
+>>                  i2c_register_board_info(2, mop500_i2c2_devices,
+>> @@ -801,6 +802,8 @@ static void __init u8500_init_machine(void)
+>>
+>>                  mop500_uib_init();
+>>
+>> +       } else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
+>> +               mop500_of_msp_init(parent);
+>>          } else if (of_machine_is_compatible("st-ericsson,hrefv60+")) {
+>>                  /*
+>>                   * The HREFv60 board removed a GPIO expander and routed
+>> @@ -812,6 +815,7 @@ static void __init u8500_init_machine(void)
+>>                                  ARRAY_SIZE(mop500_platform_devs));
+>>
+>>                  hrefv60_sdi_init(parent);
+>> +               mop500_msp_init(parent);
+>>
+>>                  i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
+>>                  i2c0_devs -= NUM_PRE_V60_I2C0_DEVICES;
+>
+>
+> Looks like you're adding the same call to each of the three cases:
+> mop500, snowball and hrefv60+. How about moving it before or after
+> the if/elseif block?
 
-On 29.06.12 22:44, Andreas Bie?mann wrote:
-> On 06.06.12 13:22, Andreas Bie?mann wrote:
->> Commit 9f97da78bf018206fb623cd351d454af2f105fe0 moved disable_hlt() from
->> arch/arm/include/asm/system.h to arch/arm/include/asm/system_misc.h but missed
->> to change arch/arm/mach-gemini/irq.c.
->>
->> This patch fixes following error:
->>
->> ---8<---
->> arch/arm/mach-gemini/irq.c: In function 'gemini_init_irq':
->> arch/arm/mach-gemini/irq.c:79:2: error: implicit declaration of function 'disable_hlt' [-Werror=implicit-function-declaration]
->> --->8---
->>
->> Signed-off-by: Andreas Bie?mann <andreas@biessmann.de>
->> cc: Hans Ulli Kroll <ulli.kroll@googlemail.com> 
->> cc: Russell King <linux@arm.linux.org.uk>
->> cc: linux-arm-kernel at lists.infradead.org
->> ---
->> Note: this is broken since 3.4 release, 3.3 is sane.
-> 
-> ping
-> 
->>
->>  arch/arm/mach-gemini/irq.c |    1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/mach-gemini/irq.c b/arch/arm/mach-gemini/irq.c
->> index ca70e5f..020852d 100644
->> --- a/arch/arm/mach-gemini/irq.c
->> +++ b/arch/arm/mach-gemini/irq.c
->> @@ -17,6 +17,7 @@
->>  #include <linux/sched.h>
->>  #include <asm/irq.h>
->>  #include <asm/mach/irq.h>
->> +#include <asm/system_misc.h>
->>  #include <mach/hardware.h>
->>  
->>  #define IRQ_SOURCE(base_addr)	(base_addr + 0x00)
->>
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+The Snowball one is different 'mop500_msp_init' -> 'mop500_of_msp_init'.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
