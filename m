@@ -1,40 +1,27 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed, 1 Aug 2012 12:59:09 +0800
-Subject: [GIT PULL] LED CPU trigger driver and ARM LED code consolidation
- (v2)
-In-Reply-To: <CAOesGMhK3bkk+86jDM7bd6rFUE_RuTGWiWsB7SYJ=i2NocOiLA@mail.gmail.com>
-References: <CAK5ve-KjK2mU0qjdp2HK5CdrM=eQ-hN0nw-0cJj7HGuRyGjH8w@mail.gmail.com>
- <CAK5ve-+wWWARGz4ky_VW2AK7hHLXENkw2ANToLztcDjsegubsw@mail.gmail.com>
- <CAOesGMhK3bkk+86jDM7bd6rFUE_RuTGWiWsB7SYJ=i2NocOiLA@mail.gmail.com>
-Message-ID: <CAK5ve-KuB=5evdiJDSQbN0N=56fofNeaof==GuRXFWhA44KcAw@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 1 Aug 2012 07:00:54 +0200
+Subject: [06/10,V2] spi: Add SPI driver for mx233/mx28
+In-Reply-To: <20120801045010.GC1672@S2100-06.ap.freescale.net>
+References: <1341555449-17507-6-git-send-email-marex@denx.de>
+ <20120801033559.GB2323@roeck-us.net>
+ <20120801045010.GC1672@S2100-06.ap.freescale.net>
+Message-ID: <201208010700.54829.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 1, 2012 at 12:55 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Tue, Jul 31, 2012 at 9:48 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
->> On Tue, Jul 31, 2012 at 9:46 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
->>> Russell, Arnd and Olof,
->>>
->>
->> I felt very sorry about this issue, the email was archived
->> automatically in my Gmail account. I found the root cause of the issue
->> Russell met and actually that code about trigger_data is totally
->> useless, which was removed just now. I pushed an update version again
->> to the same branch of my git tree. Please consider a pull. If I did
->> something bad, please let me know, I will fix it as soon as possible.
->
-> Hi,
->
-> We'll pull this in for staging again once the merge window is done.
-> It's definitely not 3.6 material at this time.
->
+Dear Shawn Guo,
 
-OK, I will rebase to 3.6-rc1 after merge window close and send out
-pull request again.
+> On Tue, Jul 31, 2012 at 08:35:59PM -0700, Guenter Roeck wrote:
+> > I think the call to spi_master_put() triggers the call to
+> > spi_master_release(). If so, kfree() would not be needed at all, and the
+> > documentation is wrong.
+> 
+> Also those drivers calling kfree in probe.
 
-Thanks,
--- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer    +86.186-168-78255 Mobile
-Canonical Ltd.      www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+Looks like that to me ...
+
+> Regards,
+> Shawn
+
+Best regards,
+Marek Vasut
