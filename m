@@ -1,28 +1,42 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 1 Aug 2012 21:34:48 +0100
-Subject: [PATCH 08/10 RESEND] spi: Add DMA support into SPI driver
-In-Reply-To: <1343076052-27312-9-git-send-email-marex@denx.de>
-References: <1343076052-27312-1-git-send-email-marex@denx.de>
- <1343076052-27312-9-git-send-email-marex@denx.de>
-Message-ID: <20120801203448.GX4483@opensource.wolfsonmicro.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Wed, 01 Aug 2012 13:35:17 -0700
+Subject: [RFC] ARM: imx6q-sabrelite: Add CLKO IOMUX
+In-Reply-To: <CAOMZO5A2g+UCFuiP7yqYkFQ36F=2yrqJA3ssujeYXE_Q0Sz5nQ@mail.gmail.com>
+References: <1343833836-14287-1-git-send-email-festevam@gmail.com>
+ <CAOMZO5A2g+UCFuiP7yqYkFQ36F=2yrqJA3ssujeYXE_Q0Sz5nQ@mail.gmail.com>
+Message-ID: <50199305.60802@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2012 at 10:40:50PM +0200, Marek Vasut wrote:
+On 8/1/2012 1:17 PM, Fabio Estevam wrote:
+> On Wed, Aug 1, 2012 at 12:10 PM, Fabio Estevam <festevam@gmail.com> wrote:
+>> From: Fabio Estevam <fabio.estevam@freescale.com>
+>>
+>> In order to have audio functional on mx6qsabrelite, it is necessary to setup
+>> the IOMUX for MX6Q_PAD_GPIO_0__CCM_CLKO and MX6Q_PAD_GPIO_3__CCM_CLKO2 pins.
+>>
+>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>> ---
+>> Dirk,
+>>
+>> Not tested. If you have a chance to try it, please let me know.
+> I managed to get a board and tried it with current Linus' tree and
+> also linux-next. Both result in:
+>
+> sgtl5000 0-000a: Device with ID register ffff is not a sgtl5000
+> sgtl5000 0-000a: asoc: failed to probe CODEC sgtl5000.0-000a: -19
+> asoc: failed to instantiate card imx6q-sabrelite-sgtl5000: -19
+> imx-sgtl5000 sound.11: snd_soc_register_card failed (-19)
+>
+> Any ideas?
+>
+> Thanks,
+>
+> Fabio Estevam
+>
+No idea, but a comment.
 
-> +		/*
-> +		 * Small blocks can be transfered via PIO.
-> +		 * Measured by empiric means:
-> +		 *
-> +		 * dd if=/dev/mtdblock0 of=/dev/null bs=1024k count=1
-> +		 *
-> +		 * DMA only: 2.164808 seconds, 473.0KB/s
-> +		 * Combined: 1.676276 seconds, 610.9KB/s
-> +		 */
+GPIO_0 is needed for SGTL500 - sys_mclk
+GPIO_3 is needed for Camera mclk, no audio dependency.
 
-I've seen other devices end up using the FIFO length as the decision
-point here which makes intuitive sense to me unless the FIFO is
-extremely deep.
-
-Not reviewed this properly yet but it looks OK from a first read
-through.
+Troy
