@@ -1,63 +1,81 @@
-From: l.krishna@samsung.com (Leela Krishna Amudala)
-Date: Wed, 1 Aug 2012 08:50:15 +0530
-Subject: [PATCH V2 5/5] arm: samsung: delete frame buffer header files
- from platform
-In-Reply-To: <02ee01cd6f89$f218b2c0$d64a1840$%kim@samsung.com>
-References: <1343737385-23337-1-git-send-email-l.krishna@samsung.com>
- <1343737385-23337-6-git-send-email-l.krishna@samsung.com>
- <02ee01cd6f89$f218b2c0$d64a1840$%kim@samsung.com>
-Message-ID: <CAL1wa8cShB7zDj-CPvfEncX+Up7enKM9MJOt-488dThj_tXbMA@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 01 Aug 2012 12:26:15 +0900
+Subject: [PATCH] ARM: EXYNOS: Add static mapping for EXYNOS Audio Subsystem
+In-Reply-To: <1343218009-30400-1-git-send-email-padma.v@samsung.com>
+References: <1343218009-30400-1-git-send-email-padma.v@samsung.com>
+Message-ID: <030e01cd6f95$68272ae0$387580a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kgene,
+Padmavathi Venna wrote:
+> 
+> The CMU of EXYNOS can't control Audio Subsystem's clocks because
+> AUDSS SFRs aren't located in CMU. But AUDSS is a kind of CMU for
+> Audio Subsystem and need to use clock framework. This mapping
+> address will be used for AUDSS clock control.
+> 
+> Signed-off-by: sangsu4u.park <sangsu4u.park@samsung.com>
 
-On Wed, Aug 1, 2012 at 7:34 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Leela Krishna Amudala wrote:
->>
->> The FIMD register headers are moved to include/video/
->> hence, deleting these files from platform side
->>
->> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
->> ---
->>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h |  159 ---------
->>  arch/arm/plat-samsung/include/plat/regs-fb.h    |  403
-> -------------------
->> ----
->>  2 files changed, 0 insertions(+), 562 deletions(-)
->>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
->>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb.h
->>
-> No. This should be squashed into first patch on this series. See below.
->
->  arch/arm/plat-samsung/include/plat/regs-fb-v4.h    |  159
-> --------------------
->  .../plat/regs-fb.h => include/video/samsung_fimd.h |  145
-> ++++++++++++++++--
->  2 files changed, 134 insertions(+), 170 deletions(-)
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
->  rename arch/arm/plat-samsung/include/plat/regs-fb.h =>
-> include/video/samsung_fimd.h (74%)
->
+Maybe Sangsu Park?
 
-If I squash it with the first patch and if somebody set that as a head
-commit, it will break the build. Hence, splitted it up from the first
-patch.
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> ---
+>  arch/arm/mach-exynos/common.c                |    5 +++++
+>  arch/arm/mach-exynos/include/mach/map.h      |    1 +
+>  arch/arm/plat-samsung/include/plat/map-s5p.h |    2 ++
+>  3 files changed, 8 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+> index 4eb39cd..4070c79 100644
+> --- a/arch/arm/mach-exynos/common.c
+> +++ b/arch/arm/mach-exynos/common.c
+> @@ -109,6 +109,11 @@ static struct map_desc exynos_iodesc[] __initdata = {
+>  		.pfn		= __phys_to_pfn(EXYNOS_PA_CHIPID),
+>  		.length		= SZ_4K,
+>  		.type		= MT_DEVICE,
+> +	}, {
+> +		.virtual	= (unsigned long)S5P_VA_AUDSS,
+> +		.pfn		= __phys_to_pfn(EXYNOS_PA_AUDSS),
+> +		.length		= SZ_4K,
+> +		.type		= MT_DEVICE,
+>  	},
+>  };
+> 
+> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-
+> exynos/include/mach/map.h
+> index 5cf7d91..9c044a0 100644
+> --- a/arch/arm/mach-exynos/include/mach/map.h
+> +++ b/arch/arm/mach-exynos/include/mach/map.h
+> @@ -39,6 +39,7 @@
+> 
+>  #define EXYNOS4_PA_G2D			0x12800000
+> 
+> +#define EXYNOS_PA_AUDSS			0x03810000
+>  #define EXYNOS_PA_I2S0			0x03830000
+>  #define EXYNOS4_PA_I2S1			0xE2100000
+>  #define EXYNOS4_PA_I2S2			0xE2A00000
+> diff --git a/arch/arm/plat-samsung/include/plat/map-s5p.h b/arch/arm/plat-
+> samsung/include/plat/map-s5p.h
+> index c2d7bda..3558277 100644
+> --- a/arch/arm/plat-samsung/include/plat/map-s5p.h
+> +++ b/arch/arm/plat-samsung/include/plat/map-s5p.h
+> @@ -40,6 +40,8 @@
+>  #define S5P_VA_GIC_CPU		S3C_ADDR(0x02810000)
+>  #define S5P_VA_GIC_DIST		S3C_ADDR(0x02820000)
+> 
+> +#define S5P_VA_AUDSS		S3C_ADDR(0x02910000)
 
-Thank you Sylwester for suggesting this split up change.
+Is there any reason to use the offset, 0x02910000?
 
-Regards,
-Leela Krishna
+[...]
 
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+And I think, this patch should be patch-set with your '[PATCH] ARM: EXYNOS:
+Add clocks for EXYNOS Audio Subsystem.'
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
