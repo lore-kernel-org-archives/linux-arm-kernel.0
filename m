@@ -1,32 +1,71 @@
 From: matt@genesi-usa.com (Matt Sealey)
-Date: Wed,  1 Aug 2012 12:49:29 -0500
-Subject: [PATCH 2/4] efikamx: remove Genesi Efika MX from the i.MX v6/v7
- defconfig
+Date: Wed,  1 Aug 2012 12:49:28 -0500
+Subject: [PATCH 1/4] efikamx: remove support for Genesi Efika MX from the build
 In-Reply-To: <1343843371-14143-1-git-send-email-matt@genesi-usa.com>
 References: <1343843371-14143-1-git-send-email-matt@genesi-usa.com>
-Message-ID: <1343843371-14143-3-git-send-email-matt@genesi-usa.com>
+Message-ID: <1343843371-14143-2-git-send-email-matt@genesi-usa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No need to have Efika MX listed in the defconfig if it can't be built.
+Disable building for Efika MX boards by not having any configuration or
+object file definitions.
 
 Signed-off-by: Matt Sealey <matt@genesi-usa.com>
 ---
- arch/arm/configs/imx_v6_v7_defconfig |    2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/mach-imx/Kconfig  |   26 --------------------------
+ arch/arm/mach-imx/Makefile |    3 ---
+ 2 files changed, 29 deletions(-)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index b1d3675..0becdbe 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -31,8 +31,6 @@ CONFIG_MACH_IMX51_DT=y
- CONFIG_MACH_MX51_3DS=y
- CONFIG_MACH_EUKREA_CPUIMX51=y
- CONFIG_MACH_EUKREA_CPUIMX51SD=y
--CONFIG_MACH_MX51_EFIKAMX=y
--CONFIG_MACH_MX51_EFIKASB=y
- CONFIG_MACH_IMX53_DT=y
- CONFIG_SOC_IMX6Q=y
- CONFIG_MXC_PWM=y
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index eff4db5..a8051fe 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -728,32 +728,6 @@ config MACH_EUKREA_MBIMXSD51_BASEBOARD
+ 
+ endchoice
+ 
+-config MX51_EFIKA_COMMON
+-	bool
+-	select SOC_IMX51
+-	select IMX_HAVE_PLATFORM_IMX_UART
+-	select IMX_HAVE_PLATFORM_MXC_EHCI
+-	select IMX_HAVE_PLATFORM_PATA_IMX
+-	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+-	select IMX_HAVE_PLATFORM_SPI_IMX
+-	select MXC_ULPI if USB_ULPI
+-
+-config MACH_MX51_EFIKAMX
+-	bool "Support MX51 Genesi Efika MX nettop"
+-	select LEDS_GPIO_REGISTER
+-	select MX51_EFIKA_COMMON
+-	help
+-	  Include support for Genesi Efika MX nettop. This includes specific
+-	  configurations for the board and its peripherals.
+-
+-config MACH_MX51_EFIKASB
+-	bool "Support MX51 Genesi Efika Smartbook"
+-	select LEDS_GPIO_REGISTER
+-	select MX51_EFIKA_COMMON
+-	help
+-	  Include support for Genesi Efika Smartbook. This includes specific
+-	  configurations for the board and its peripherals.
+-
+ comment "i.MX53 machines:"
+ 
+ config MACH_IMX53_DT
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index ff29421..ff6725d 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -88,9 +88,6 @@ obj-$(CONFIG_MACH_MX53_LOCO) += mach-mx53_loco.o
+ obj-$(CONFIG_MACH_MX53_ARD) += mach-mx53_ard.o
+ obj-$(CONFIG_MACH_EUKREA_CPUIMX51SD) += mach-cpuimx51sd.o
+ obj-$(CONFIG_MACH_EUKREA_MBIMXSD51_BASEBOARD) += eukrea_mbimxsd51-baseboard.o
+-obj-$(CONFIG_MX51_EFIKA_COMMON) += mx51_efika.o
+-obj-$(CONFIG_MACH_MX51_EFIKAMX) += mach-mx51_efikamx.o
+-obj-$(CONFIG_MACH_MX51_EFIKASB) += mach-mx51_efikasb.o
+ obj-$(CONFIG_MACH_MX50_RDP) += mach-mx50_rdp.o
+ 
+ obj-$(CONFIG_MACH_IMX51_DT) += imx51-dt.o
 -- 
 1.7.9.5
