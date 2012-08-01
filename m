@@ -1,47 +1,83 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 01 Aug 2012 11:14:38 +0900
-Subject: [PATCH V2 2/5] include/video: Add Exynos5 specific FIMD register
- offsets
-In-Reply-To: <1343737385-23337-3-git-send-email-l.krishna@samsung.com>
+Date: Wed, 01 Aug 2012 11:19:27 +0900
+Subject: [PATCH V2 3/5] arm: samsung: Include the modified FIMD header file
+In-Reply-To: <1343737385-23337-4-git-send-email-l.krishna@samsung.com>
 References: <1343737385-23337-1-git-send-email-l.krishna@samsung.com>
- <1343737385-23337-3-git-send-email-l.krishna@samsung.com>
-Message-ID: <02f201cd6f8b$673b9df0$35b2d9d0$%kim@samsung.com>
+ <1343737385-23337-4-git-send-email-l.krishna@samsung.com>
+Message-ID: <02f301cd6f8c$137016f0$3a5044d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Leela Krishna Amudala wrote:
 > 
-> Exynos5 has VIDTCON and VIDCON registers at different offsets
-> from the previous SOCs. Hence, adding the macros.
+> The fimd register headers have been moved to include/video/
+> hence, modifying the machine files accordingly.
 > 
 > Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
 > ---
->  include/video/samsung_fimd.h |    7 +++++++
->  1 files changed, 7 insertions(+), 0 deletions(-)
+>  arch/arm/mach-exynos/mach-nuri.c           |    2 +-
+>  arch/arm/mach-exynos/mach-origen.c         |    2 +-
+>  arch/arm/mach-exynos/mach-smdk4x12.c       |    2 +-
+>  arch/arm/mach-exynos/mach-smdkv310.c       |    2 +-
+>  arch/arm/mach-exynos/mach-universal_c210.c |    2 +-
+>  arch/arm/mach-exynos/setup-fimd0.c         |    2 +-
+>  arch/arm/mach-s3c24xx/mach-smdk2416.c      |    2 +-
+>  arch/arm/mach-s3c64xx/mach-anw6410.c       |    2 +-
+>  arch/arm/mach-s3c64xx/mach-crag6410.c      |    2 +-
+>  arch/arm/mach-s3c64xx/mach-hmt.c           |    2 +-
+>  arch/arm/mach-s3c64xx/mach-mini6410.c      |    2 +-
+>  arch/arm/mach-s3c64xx/mach-ncp.c           |    2 +-
+>  arch/arm/mach-s3c64xx/mach-real6410.c      |    2 +-
+>  arch/arm/mach-s3c64xx/mach-smartq5.c       |    2 +-
+>  arch/arm/mach-s3c64xx/mach-smartq7.c       |    2 +-
+>  arch/arm/mach-s3c64xx/mach-smdk6410.c      |    2 +-
+>  arch/arm/mach-s5p64x0/mach-smdk6440.c      |    2 +-
+>  arch/arm/mach-s5p64x0/mach-smdk6450.c      |    2 +-
+>  arch/arm/mach-s5pc100/mach-smdkc100.c      |    2 +-
+>  arch/arm/mach-s5pv210/mach-aquila.c        |    2 +-
+>  arch/arm/mach-s5pv210/mach-goni.c          |    2 +-
+>  arch/arm/mach-s5pv210/mach-smdkv210.c      |    2 +-
+>  22 files changed, 22 insertions(+), 22 deletions(-)
 > 
-> diff --git a/include/video/samsung_fimd.h b/include/video/samsung_fimd.h
-> index e979f42..820f190 100644
-> --- a/include/video/samsung_fimd.h
-> +++ b/include/video/samsung_fimd.h
-> @@ -524,3 +524,10 @@
->   * 1110		-none-	 -none-	  -none-   -none-    -none-
->   * 1111		-none-	 -none-   -none-   -none-    -none-
->  */
-> +
-> +/*EXYNOS5 FIMD REG OFFSET */
-> +#define EXYNOS5_VIDTCON0	(0x20010)
-> +#define EXYNOS5_VIDTCON1	(0x20014)
-> +#define EXYNOS5_VIDTCON2	(0x20018)
-> +#define EXYNOS5_VIDTCON3	(0x2001C)
-> +#define EXYNOS5_VIDCON1		(0x20004)
-> --
-> 1.7.0.4
+> diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-
+> nuri.c
+> index f98a83a..573a0c4 100644
+> --- a/arch/arm/mach-exynos/mach-nuri.c
+> +++ b/arch/arm/mach-exynos/mach-nuri.c
+> @@ -39,7 +39,7 @@
+>  #include <asm/mach-types.h>
+> 
+>  #include <plat/adc.h>
+> -#include <plat/regs-fb-v4.h>
+> +#include <video/samsung_fimd.h>
+>  #include <plat/regs-serial.h>
+>  #include <plat/cpu.h>
+>  #include <plat/devs.h>
 
-All of EXYNOS5 SoCs including upcoming SoCs _really_ have same address like
-above?
+NO! Don't just replace it. Please put the inclusions with the same kind like
+following.
 
-I don't think so. You need to consider its flexibility or some compatibility
-when definitions are added.
+diff --git a/arch/arm/mach-exynos/mach-nuri.c
+b/arch/arm/mach-exynos/mach-nuri.c
+index ea785fc..90d8daa 100644
+--- a/arch/arm/mach-exynos/mach-nuri.c
++++ b/arch/arm/mach-exynos/mach-nuri.c
+@@ -29,6 +29,7 @@
+ #include <drm/exynos_drm.h>
+
+ #include <video/platform_lcd.h>
++#include <video/samsung_fimd.h>
+ #include <media/m5mols.h>
+ #include <media/s5k6aa.h>
+ #include <media/s5p_fimc.h>
+@@ -39,7 +40,6 @@
+ #include <asm/mach-types.h>
+
+ #include <plat/adc.h>
+-#include <plat/regs-fb-v4.h>
+ #include <plat/regs-serial.h>
+ #include <plat/cpu.h>
+ #include <plat/devs.h>
 
 Thanks.
 
