@@ -1,28 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Aug 2012 15:14:14 +0100
-Subject: omap_device: query on "fck" clk alias created
-In-Reply-To: <50191F00.1040501@ti.com>
-References: <50191F00.1040501@ti.com>
-Message-ID: <20120801141414.GM7405@n2100.arm.linux.org.uk>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Wed, 1 Aug 2012 10:16:24 -0400
+Subject: [PATCH 05/24] xen/arm: empty implementation of grant_table arch
+ specific functions
+In-Reply-To: <1343316846-25860-5-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-5-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20120801141624.GD7227@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 01, 2012 at 05:50:16PM +0530, Vaibhav Hiremath wrote:
-> The clk_get() api will not work, unless we pass both the arguments (dev,
-> con_id) properly. Now expecting driver to always label con_id with "fck"
-> is undesirable, as the same driver can be reused on multiple platforms,
-> which can be non-omap and/or non-ti platforms.
+On Thu, Jul 26, 2012 at 04:33:47PM +0100, Stefano Stabellini wrote:
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> ---
+>  arch/arm/xen/Makefile      |    2 +-
+>  arch/arm/xen/grant-table.c |   53 ++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 54 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/xen/grant-table.c
+> 
+> diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
+> index b9d6acc..4384103 100644
+> --- a/arch/arm/xen/Makefile
+> +++ b/arch/arm/xen/Makefile
+> @@ -1 +1 @@
+> -obj-y		:= enlighten.o hypercall.o
+> +obj-y		:= enlighten.o hypercall.o grant-table.o
+> diff --git a/arch/arm/xen/grant-table.c b/arch/arm/xen/grant-table.c
+> new file mode 100644
+> index 0000000..0a4ee80
+> --- /dev/null
+> +++ b/arch/arm/xen/grant-table.c
+> @@ -0,0 +1,53 @@
+> +/******************************************************************************
+> + * grant_table.c
+> + * ARM specific part
+> + *
+> + * Granting foreign access to our memory reservation.
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License version 2
+> + * as published by the Free Software Foundation; or, when distributed
+> + * separately from the Linux kernel or incorporated into other
+> + * software packages, subject to the following license:
+> + *
+> + * Permission is hereby granted, free of charge, to any person obtaining a copy
+> + * of this source file (the "Software"), to deal in the Software without
+> + * restriction, including without limitation the rights to use, copy, modify,
+> + * merge, publish, distribute, sublicense, and/or sell copies of the Software,
+> + * and to permit persons to whom the Software is furnished to do so, subject to
+> + * the following conditions:
+> + *
+> + * The above copyright notice and this permission notice shall be included in
+> + * all copies or substantial portions of the Software.
+> + *
+> + * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+> + * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> + * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+> + * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> + * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+> + * IN THE SOFTWARE.
+> + */
+> +
+> +#include <xen/interface/xen.h>
+> +#include <xen/page.h>
+> +#include <xen/grant_table.h>
+> +
+> +int arch_gnttab_map_shared(unsigned long *frames, unsigned long nr_gframes,
+> +			   unsigned long max_nr_gframes,
+> +			   void **__shared)
+> +{
+> +	return -1;
 
-Why not?
+-ENOSYS
+> +}
+> +
+> +void arch_gnttab_unmap(void *shared, unsigned long nr_gframes)
+> +{
+> +	return;
+> +}
+> +
+> +int arch_gnttab_map_status(uint64_t *frames, unsigned long nr_gframes,
+> +			   unsigned long max_nr_gframes,
+> +			   grant_status_t **__shared)
+> +{
+> +	return -1;
 
-The connection ID is defined by the driver, and the platform stuff is
-expected to provide drivers with what they require.  It's not the other
-way around (platforms don't tell drivers what they require.)
-
-In other words, if the device has two clocks, one called ick and one called
-fck, then the device _should_ use clk_get() specifying "ick" for one, and
-"fck" for the other.
-
-And platforms better provide an "ick" and a "fck" for the device, even if
-they have no respresentation for one or other of them (in which case you
-supply a dummy clock.)
+Same here -ENOSYS
+> +}
+> -- 
+> 1.7.2.5
