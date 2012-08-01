@@ -1,81 +1,52 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 01 Aug 2012 11:28:39 +0900
-Subject: [PATCH V2 0/5] arm: samsung: Move FIMD headers to include/video/
-In-Reply-To: <1343737385-23337-1-git-send-email-l.krishna@samsung.com>
-References: <1343737385-23337-1-git-send-email-l.krishna@samsung.com>
-Message-ID: <02f701cd6f8d$5ca3e850$15ebb8f0$%kim@samsung.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 1 Aug 2012 04:31:04 +0200
+Subject: [06/10,V2] spi: Add SPI driver for mx233/mx28
+In-Reply-To: <20120731205300.GA25721@roeck-us.net>
+References: <1341555449-17507-6-git-send-email-marex@denx.de>
+ <20120731205300.GA25721@roeck-us.net>
+Message-ID: <201208010431.04399.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Leela Krishna Amudala wrote:
-> 
-> This patchset moves the contents of regs-fb-v4.h and regs-fb.h from arch
-> side
-> to include/video/samsung_fimd.h
-> 
-> This patchset is created and rebased against master branch of torvalds
-> tree.
-> Tested on smdk5250 board, build tested for other boards.
-> 
-(Cc'ed Florian Tobias Schandinat)
+Dear Guenter Roeck,
 
-Yeah, since it's merge window, this series could be created against on
-mainline. And IMO, would be helpful to us if this series could be sent to
-upstream via samsung tree after reviewing, because this touches too many
-files in samsung tree and just adds include/video/samsung_fimd.h. But I'm
-not sure the added inclusion will be used in other file of drivers/video. If
-so, I can provide some topic branch can be merged into Florian's tree.
-Florian, how about?
+[...]
 
-Thanks.
+> > +static int __devexit mxs_spi_remove(struct platform_device *pdev)
+> > +{
+> > +	struct spi_master *host;
+> > +	struct mxs_spi *spi;
+> > +	struct mxs_ssp *ssp;
+> > +
+> > +	host = platform_get_drvdata(pdev);
+> > +	spi = spi_master_get_devdata(host);
+> > +	ssp = &spi->ssp;
+> > +
+> > +	spi_unregister_master(host);
+> > +
+> > +	platform_set_drvdata(pdev, NULL);
+> > +
+> > +	clk_disable_unprepare(ssp->clk);
+> > +
+> > +	spi_master_put(host);
+> > +	kfree(host);
+> > +
+> 
+> Is the kfree() here and in the probe function really necessary ?
+
+It certainly would seem that way.
+
+> Couple of reasons for asking: No other SPI master driver calls it in the
+> remove function (unless I missed it), most drivers don't call it in the
+> probe function error path, and if I call it in the remove function in a
+> SPI master driver I am working on, and load/unload the module several
+> times in a row, I get a nasty kernel crash.
+
+It seems the spi_master class takes care of that kfree() in 
+spi.c:spi_master_release() . Good catch, thanks!
+
+> Thanks,
+> Guenter
 
 Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> Changes from version 1:
-> 	- Split the patches as per Sylwester comments
-> 	- Changed FIMD_V8_xxx macro to EXYNOS5_xxx
-> 
-> Leela Krishna Amudala (5):
->   include/video: Add samsung FIMD register header
->   include/video: Add Exynos5 specific FIMD register offsets
->   arm: samsung: Include the modified FIMD header file
->   driver: Include the modified FIMD header file
->   arm: samsung: delete frame buffer header files from platform
-> 
->  arch/arm/mach-exynos/mach-nuri.c                   |    2 +-
->  arch/arm/mach-exynos/mach-origen.c                 |    2 +-
->  arch/arm/mach-exynos/mach-smdk4x12.c               |    2 +-
->  arch/arm/mach-exynos/mach-smdkv310.c               |    2 +-
->  arch/arm/mach-exynos/mach-universal_c210.c         |    2 +-
->  arch/arm/mach-exynos/setup-fimd0.c                 |    2 +-
->  arch/arm/mach-s3c24xx/mach-smdk2416.c              |    2 +-
->  arch/arm/mach-s3c64xx/mach-anw6410.c               |    2 +-
->  arch/arm/mach-s3c64xx/mach-crag6410.c              |    2 +-
->  arch/arm/mach-s3c64xx/mach-hmt.c                   |    2 +-
->  arch/arm/mach-s3c64xx/mach-mini6410.c              |    2 +-
->  arch/arm/mach-s3c64xx/mach-ncp.c                   |    2 +-
->  arch/arm/mach-s3c64xx/mach-real6410.c              |    2 +-
->  arch/arm/mach-s3c64xx/mach-smartq5.c               |    2 +-
->  arch/arm/mach-s3c64xx/mach-smartq7.c               |    2 +-
->  arch/arm/mach-s3c64xx/mach-smdk6410.c              |    2 +-
->  arch/arm/mach-s5p64x0/mach-smdk6440.c              |    2 +-
->  arch/arm/mach-s5p64x0/mach-smdk6450.c              |    2 +-
->  arch/arm/mach-s5pc100/mach-smdkc100.c              |    2 +-
->  arch/arm/mach-s5pv210/mach-aquila.c                |    2 +-
->  arch/arm/mach-s5pv210/mach-goni.c                  |    2 +-
->  arch/arm/mach-s5pv210/mach-smdkv210.c              |    2 +-
->  arch/arm/plat-samsung/include/plat/regs-fb-v4.h    |  159
-----------------
-> ----
->  drivers/gpu/drm/exynos/exynos_drm_fimd.c           |    2 +-
->  drivers/video/s3c-fb.c                             |    2 +-
->  .../plat/regs-fb.h => include/video/samsung_fimd.h |  152
-> +++++++++++++++++--
->  26 files changed, 165 insertions(+), 194 deletions(-)
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
->  rename arch/arm/plat-samsung/include/plat/regs-fb.h =>
-> include/video/samsung_fimd.h (74%)
+Marek Vasut
