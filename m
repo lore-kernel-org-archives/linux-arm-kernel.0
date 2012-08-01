@@ -1,40 +1,60 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 1 Aug 2012 07:58:37 -0700
-Subject: [06/10,V2] spi: Add SPI driver for mx233/mx28
-In-Reply-To: <20120801075010.GI1672@S2100-06.ap.freescale.net>
-References: <1341555449-17507-6-git-send-email-marex@denx.de>
- <201208010810.37652.marex@denx.de>
- <20120801063936.GC2764@roeck-us.net>
- <201208010845.19361.marex@denx.de>
- <20120801065650.GA2928@roeck-us.net>
- <20120801075010.GI1672@S2100-06.ap.freescale.net>
-Message-ID: <20120801145837.GA15630@roeck-us.net>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Wed, 1 Aug 2012 10:52:15 -0400
+Subject: [PATCH 20/24] xen: update xen_add_to_physmap interface
+In-Reply-To: <1343316846-25860-20-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-20-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20120801145215.GP7227@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 01, 2012 at 03:50:12PM +0800, Shawn Guo wrote:
-> On Tue, Jul 31, 2012 at 11:56:50PM -0700, Guenter Roeck wrote:
-> > Guess we are in violent agreement. The sequence would then either be
-> > 	master = spi_alloc_device();
+On Thu, Jul 26, 2012 at 04:34:02PM +0100, Stefano Stabellini wrote:
+> Update struct xen_add_to_physmap to be in sync with Xen's version of the
+> structure.
+> The size field was introduced by:
 > 
-> The discussion is around spi_alloc_master rather than spi_alloc_device,
-> isn't it?
+> changeset:   24164:707d27fe03e7
+> user:        Jean Guyader <jean.guyader@eu.citrix.com>
+> date:        Fri Nov 18 13:42:08 2011 +0000
+> summary:     mm: New XENMEM space, XENMAPSPACE_gmfn_range
 > 
-Yes, sorry. Too late at night, too tired :(.
+> According to the comment:
+> 
+> "This new field .size is located in the 16 bits padding between .domid
+> and .space in struct xen_add_to_physmap to stay compatible with older
+> versions."
+> 
+> This is not true on ARM where there is not padding, but it is valid on
+> X86, so introducing size is safe on X86 and it is going to fix the
+> interace for ARM.
 
-Guenter
+Has this been checked actually for backwards compatibility? It sounds
+like it should work just fine with Xen 4.0 right?
 
-> Regards,
-> Shawn
+I believe this also helps Mukesh's patches, so CC-ing him here for
+his Ack.
+
+I can put this in right now in tree if we are 100% sure its compatiblie with 4.0.
+
 > 
-> > 	...
-> > 	spi_master_put(master);
-> > or
-> > 	master = spi_alloc_device();
-> > 	...
-> > 	kfree(master);
-> > 
-> > which makes sense to me. Question still is why most drivers neither call kfree()
-> > nor spi_master_put() in the remove function.
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> ---
+>  include/xen/interface/memory.h |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
 > 
-> 
+> diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
+> index abbbff0..d8e33a9 100644
+> --- a/include/xen/interface/memory.h
+> +++ b/include/xen/interface/memory.h
+> @@ -163,6 +163,9 @@ struct xen_add_to_physmap {
+>      /* Which domain to change the mapping for. */
+>      domid_t domid;
+>  
+> +    /* Number of pages to go through for gmfn_range */
+> +    uint16_t    size;
+> +
+>      /* Source mapping space. */
+>  #define XENMAPSPACE_shared_info 0 /* shared info page */
+>  #define XENMAPSPACE_grant_table 1 /* grant table page */
+> -- 
+> 1.7.2.5
