@@ -1,31 +1,39 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 1 Aug 2012 15:49:53 +0800
-Subject: [RFC PATCH 1/1] ASoC: soc-dapm: warn if no avaiable path found
- for widget kcontrol
-In-Reply-To: <20120729202219.GA4384@opensource.wolfsonmicro.com>
-References: <1343387941-25266-1-git-send-email-b29396@freescale.com>
- <20120729202219.GA4384@opensource.wolfsonmicro.com>
-Message-ID: <20120801074952.GC30492@shlinux2.ap.freescale.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 01 Aug 2012 09:19:34 +0100
+Subject: [PATCH 3/6] ARM: ux500: Fix merge error,
+ so such struct 'snd_soc_u8500'
+In-Reply-To: <5018DC9F.30502@linaro.org>
+References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
+ <1343741493-17671-6-git-send-email-lee.jones@linaro.org>
+ <50180BF6.6080908@mvista.com> <5018DC9F.30502@linaro.org>
+Message-ID: <5018E696.9000305@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 04:22:19AM +0800, Mark Brown wrote:
-> On Fri, Jul 27, 2012 at 07:19:01PM +0800, Dong Aisheng wrote:
-> > From: Dong Aisheng <dong.aisheng@linaro.org>
-> > 
-> > This could help people know what's wrong going on if the required
-> > path is not registered.
-> 
-> This isn't a good idea, it's fairly common for widgets to have a "None"
-> option which isn't expected to have an input.
-> 
+On 01/08/12 08:37, Lee Jones wrote:
+> On 31/07/12 17:46, Sergei Shtylyov wrote:
+>> Hello.
+>>
+>> On 07/31/2012 05:31 PM, Lee Jones wrote:
+>>
+>>     Subject doesn't parse for me...
+>>
+>>> The platform attempts to register platform device 'snd_soc_u8500'
+>>> which doesn't actually exist. Here we change the reference to the
+>>> correct one 'snd_soc_mop500'.
+>>
+>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>
+> Actually, it does make sense?
+>
+> As a sentence: "This patch fixes merge error: so such structure 'struct snd_soc_u8500'.
 
-What i changed is mux widgets, i'm wondering is it possible or correct
-the mux widget has no input path?
-If i understand correct, we may need set correct input path
-for mux widget, or why we still need a mux?
+That's interesting. Not only when I read it did it seem correct, I also 
+wrote it wrong "as a sentence". Of course "so" should be "no".
 
-Or can you help give an example that no input needed for mux widget?
 
-Regards
-Dong Aisheng
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
