@@ -1,57 +1,63 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 01 Aug 2012 12:06:57 +0900
-Subject: [PATCH] ASoC: Samsung: Update Kconfig for Exynos5250 and
- Exynos4412
-In-Reply-To: <1343218351-30577-1-git-send-email-padma.v@samsung.com>
-References: <1343218351-30577-1-git-send-email-padma.v@samsung.com>
-Message-ID: <030901cd6f92$b5fc6da0$21f548e0$%kim@samsung.com>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Wed, 1 Aug 2012 08:50:15 +0530
+Subject: [PATCH V2 5/5] arm: samsung: delete frame buffer header files
+ from platform
+In-Reply-To: <02ee01cd6f89$f218b2c0$d64a1840$%kim@samsung.com>
+References: <1343737385-23337-1-git-send-email-l.krishna@samsung.com>
+ <1343737385-23337-6-git-send-email-l.krishna@samsung.com>
+ <02ee01cd6f89$f218b2c0$d64a1840$%kim@samsung.com>
+Message-ID: <CAL1wa8cShB7zDj-CPvfEncX+Up7enKM9MJOt-488dThj_tXbMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Padmavathi Venna wrote:
-> 
-> Update Kconfig file to support the Exynos5250 and Exynos4412
-> 
-> Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
-> Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
->  sound/soc/samsung/Kconfig |    8 ++++----
->  1 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-> index fe3995c..d54e400 100644
-> --- a/sound/soc/samsung/Kconfig
-> +++ b/sound/soc/samsung/Kconfig
-> @@ -1,6 +1,6 @@
->  config SND_SOC_SAMSUNG
->  	tristate "ASoC support for Samsung"
-> -	depends on ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5PC100 ||
-> ARCH_S5PV210 || ARCH_S5P64X0 || ARCH_EXYNOS4
-> +	depends on PLAT_SAMSUNG
->  	select S3C64XX_DMA if ARCH_S3C64XX
->  	select S3C2410_DMA if ARCH_S3C24XX
->  	help
-> @@ -63,7 +63,7 @@ config SND_SOC_SAMSUNG_SMDK_WM8580
-> 
->  config SND_SOC_SAMSUNG_SMDK_WM8994
->  	tristate "SoC I2S Audio support for WM8994 on SMDK"
-> -	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210 ||
-> MACH_SMDK4212)
-> +	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210 ||
-> MACH_SMDK4212 || MACH_SMDK4412 || SOC_EXYNOS5250)
+Hello Kgene,
 
-Well, do you think _really_ all board which has a EXYNOS5250 SoC is needed
-this config?
+On Wed, Aug 1, 2012 at 7:34 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Leela Krishna Amudala wrote:
+>>
+>> The FIMD register headers are moved to include/video/
+>> hence, deleting these files from platform side
+>>
+>> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+>> ---
+>>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h |  159 ---------
+>>  arch/arm/plat-samsung/include/plat/regs-fb.h    |  403
+> -------------------
+>> ----
+>>  2 files changed, 0 insertions(+), 562 deletions(-)
+>>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+>>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb.h
+>>
+> No. This should be squashed into first patch on this series. See below.
+>
+>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h    |  159
+> --------------------
+>  .../plat/regs-fb.h => include/video/samsung_fimd.h |  145
+> ++++++++++++++++--
+>  2 files changed, 134 insertions(+), 170 deletions(-)
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+>  rename arch/arm/plat-samsung/include/plat/regs-fb.h =>
+> include/video/samsung_fimd.h (74%)
+>
 
-I don't think so?
+If I squash it with the first patch and if somebody set that as a head
+commit, it will break the build. Hence, splitted it up from the first
+patch.
 
-[...]
+Thank you Sylwester for suggesting this split up change.
 
-Thanks.
+Regards,
+Leela Krishna
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
