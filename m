@@ -1,92 +1,33 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 1 Aug 2012 16:46:02 +0100
-Subject: [PATCH 05/24] xen/arm: empty implementation of grant_table arch
- specific functions
-In-Reply-To: <20120801141624.GD7227@phenom.dumpdata.com>
+Date: Wed, 1 Aug 2012 16:50:59 +0100
+Subject: [PATCH 08/24] xen/arm: Introduce xen_pfn_t for pfn and mfn types
+In-Reply-To: <20120801142249.GF7227@phenom.dumpdata.com>
 References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-5-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120801141624.GD7227@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1208011641110.4645@kaball.uk.xensource.com>
+ <1343316846-25860-8-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120801142249.GF7227@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1208011646560.4645@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 1 Aug 2012, Konrad Rzeszutek Wilk wrote:
-> On Thu, Jul 26, 2012 at 04:33:47PM +0100, Stefano Stabellini wrote:
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > ---
-> >  arch/arm/xen/Makefile      |    2 +-
-> >  arch/arm/xen/grant-table.c |   53 ++++++++++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 54 insertions(+), 1 deletions(-)
-> >  create mode 100644 arch/arm/xen/grant-table.c
-> > 
-> > diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
-> > index b9d6acc..4384103 100644
-> > --- a/arch/arm/xen/Makefile
-> > +++ b/arch/arm/xen/Makefile
-> > @@ -1 +1 @@
-> > -obj-y		:= enlighten.o hypercall.o
-> > +obj-y		:= enlighten.o hypercall.o grant-table.o
-> > diff --git a/arch/arm/xen/grant-table.c b/arch/arm/xen/grant-table.c
-> > new file mode 100644
-> > index 0000000..0a4ee80
-> > --- /dev/null
-> > +++ b/arch/arm/xen/grant-table.c
-> > @@ -0,0 +1,53 @@
-> > +/******************************************************************************
-> > + * grant_table.c
-> > + * ARM specific part
-> > + *
-> > + * Granting foreign access to our memory reservation.
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > + * modify it under the terms of the GNU General Public License version 2
-> > + * as published by the Free Software Foundation; or, when distributed
-> > + * separately from the Linux kernel or incorporated into other
-> > + * software packages, subject to the following license:
-> > + *
-> > + * Permission is hereby granted, free of charge, to any person obtaining a copy
-> > + * of this source file (the "Software"), to deal in the Software without
-> > + * restriction, including without limitation the rights to use, copy, modify,
-> > + * merge, publish, distribute, sublicense, and/or sell copies of the Software,
-> > + * and to permit persons to whom the Software is furnished to do so, subject to
-> > + * the following conditions:
-> > + *
-> > + * The above copyright notice and this permission notice shall be included in
-> > + * all copies or substantial portions of the Software.
-> > + *
-> > + * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-> > + * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-> > + * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-> > + * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-> > + * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> > + * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-> > + * IN THE SOFTWARE.
-> > + */
-> > +
-> > +#include <xen/interface/xen.h>
-> > +#include <xen/page.h>
-> > +#include <xen/grant_table.h>
-> > +
-> > +int arch_gnttab_map_shared(unsigned long *frames, unsigned long nr_gframes,
-> > +			   unsigned long max_nr_gframes,
-> > +			   void **__shared)
-> > +{
-> > +	return -1;
+> On Thu, Jul 26, 2012 at 04:33:50PM +0100, Stefano Stabellini wrote:
+> > All the original Xen headers have xen_pfn_t as mfn and pfn type, however
+> > when they have been imported in Linux, xen_pfn_t has been replaced with
+> > unsigned long. That might work for x86 and ia64 but it does not for arm.
 > 
-> -ENOSYS
-> > +}
-> > +
-> > +void arch_gnttab_unmap(void *shared, unsigned long nr_gframes)
-> > +{
-> > +	return;
-> > +}
-> > +
-> > +int arch_gnttab_map_status(uint64_t *frames, unsigned long nr_gframes,
-> > +			   unsigned long max_nr_gframes,
-> > +			   grant_status_t **__shared)
-> > +{
-> > +	return -1;
-> 
-> Same here -ENOSYS
+> How come?
 
-OK, I'll do that
+see below
+
+> > Bring back xen_pfn_t and let each architecture define xen_pfn_t as they
+> > see fit.
+> 
+> I am OK with this as long as your include a comment in both of the
+> interface.h saying why this is needed. I am curious why 'unsinged long'
+> won't work? Is it b/c on ARM you always want a 64-bit type?
+
+Yes, we would like to make the same interface work for 32 and 64
+bit guests, without any need for a "compat layer" as we currently have
+on x86.
+In fact I am going to add another patch to explicitly size all the
+other unsigned long that we have in the public interface.
