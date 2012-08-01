@@ -1,43 +1,90 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Wed, 01 Aug 2012 12:02:41 +0900
-Subject: [PATCH 2/8 v2] ARM: EXYNOS5: Add machine data for USB 2.0
-In-Reply-To: <201207291311.08012.arnd@arndb.de>
-References: <1342866729-30460-1-git-send-email-gautam.vivek@samsung.com>
- <201207261124.50141.arnd@arndb.de>
- <CAFp+6iH0c=LogUXnpg0pD05X+mMGP9XiWDDxiTyNQAxJq_srJg@mail.gmail.com>
- <201207291311.08012.arnd@arndb.de>
-Message-ID: <50189C51.8080409@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 01 Aug 2012 12:04:14 +0900
+Subject: [PATCH] ARM: EXYNOS: Add I2S SFR base addresses
+In-Reply-To: <0M7R00MY1GHTPK20@ms14.samsung.com>
+References: <0M7R00MY1GHTPK20@ms14.samsung.com>
+Message-ID: <030801cd6f92$55370570$ffa51050$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2012 10:11 PM, Arnd Bergmann wrote:
-> On Saturday 28 July 2012, Vivek Gautam wrote:
->>> Can you pleae explain why this is done in the changelog?
->>>
->>> We try hard to do such mappings from the device driver instead,
->>> so I'm surprised that this is necessary fo rthe USB phy.
->>>
->> We are doing the mapping for device address in the driver, but this memory
->> mapping for USB PHY registers that need to be programmed by the software
->> is done here. This is similar to what we see for exynos4 also. Is it
->> something
->> that i can still change? Please suggest.
->
-> Yes, I think the USB PHY handling for all exynos chips should be changed
-> from an ad-hoc method to a more formal device driver. As I commented
-> in another patch of this series, I think the main problem is that
-> treat the USB PHY as a property of the "platform", which it really isn't.
->
-> We have a bunch of other USB PHY drivers for other platforms that are
-> inside of the drivers/usb hierarchy. For all I know, there is no formal
-> USB PHY driver API yet, and it seems that it would be a good idea to
-> introduce one now, but for now, just move the code to
-> drivers/usb/phy/ and make it one file per different kind of PHY.
->
+PADMAVATHI VENNA wrote:
 
-Totally agree. I think that two PHY drivers need for usb2.0 PHY and
-usb3.0 PHY in drivers/usb/phy directory. First, let's make usb2.0 PHY
-driver for samsung SoCs from phy control codes of arch/arm, then add to
-support usb2.0 PHY for exynos5 and make usb3.0 PHY driver for exynos.
+Padma, don't post with html styled :(
+
+And you need to check the regarding addresses as per Sachin commented.
 
 Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+------- Original Message -------
+Sender : Sachin Kamat<sachin.kamat@linaro.org>
+Date : Jul 26, 2012 13:41 (GMT+09:00)
+Title : Re: [PATCH] ARM: EXYNOS: Add I2S SFR base addresses
+?
+On 25 July 2012 17:35, Padmavathi Venna wrote:
+> The base address of I2S 0 controller is similar in exynos4 and exynos5
+> platforms. So this patch defines a common macro for the I2S controller
+> 0 base address in both the platforms and use the same macro.
+>
+> This patch also defines the I2S controller 1,2 base addresses in exynos5
+> and correct the I2S controller 1 base address in exynos4
+>
+> Signed-off-by: Padmavathi Venna 
+> ---
+>??arch/arm/mach-exynos/dev-audio.c????????|????2 +-
+>??arch/arm/mach-exynos/include/mach/map.h |????6 ++++--
+>??2 files changed, 5 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/dev-audio.c
+b/arch/arm/mach-exynos/dev-audio.c
+> index b33a5b6..5dbc9a2 100644
+> --- a/arch/arm/mach-exynos/dev-audio.c
+> +++ b/arch/arm/mach-exynos/dev-audio.c
+> @@ -62,7 +62,7 @@ static struct s3c_audio_pdata i2sv5_pdata = {
+>??};
+>
+>??static struct resource exynos4_i2s0_resource[] = {
+> -?????? [0] = DEFINE_RES_MEM(EXYNOS4_PA_I2S0, SZ_256),
+> +?????? [0] = DEFINE_RES_MEM(EXYNOS_PA_I2S0, SZ_256),
+>???????? [1] = DEFINE_RES_DMA(DMACH_I2S0_TX),
+>???????? [2] = DEFINE_RES_DMA(DMACH_I2S0_RX),
+>???????? [3] = DEFINE_RES_DMA(DMACH_I2S0S_TX),
+> diff --git a/arch/arm/mach-exynos/include/mach/map.h
+b/arch/arm/mach-exynos/include/mach/map.h
+> index c72b675..5cf7d91 100644
+> --- a/arch/arm/mach-exynos/include/mach/map.h
+> +++ b/arch/arm/mach-exynos/include/mach/map.h
+> @@ -39,9 +39,11 @@
+>
+>??#define EXYNOS4_PA_G2D???????????????? 0x12800000
+>
+> -#define EXYNOS4_PA_I2S0????????????????????????0x03830000
+> -#define EXYNOS4_PA_I2S1????????????????????????0xE3100000
+> +#define EXYNOS_PA_I2S0???????????????? 0x03830000
+> +#define EXYNOS4_PA_I2S1????????????????????????0xE2100000
+>??#define EXYNOS4_PA_I2S2????????????????????????0xE2A00000
+
+As per the TRM, these addresses (I2S1 and I2S2) are 0x13960000 and
+0x13970000 respectively on Exynos4412 SoC.
+Please verify.
+I didn't verify Exynos4412 before. I will send a new patch for this.
+
+
+> +#define EXYNOS5_PA_I2S1????????????????????????0x12D60000
+> +#define EXYNOS5_PA_I2S2????????????????????????0x12D70000
+>
+>??#define EXYNOS4_PA_PCM0????????????????????????0x03840000
+>??#define EXYNOS4_PA_PCM1????????????????????????0x13980000
+> --
+> 1.7.4.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe
+linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at??http://vger.kernel.org/majordomo-info.html
