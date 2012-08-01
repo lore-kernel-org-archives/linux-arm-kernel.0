@@ -1,40 +1,78 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 1 Aug 2012 08:45:19 +0200
-Subject: [06/10,V2] spi: Add SPI driver for mx233/mx28
-In-Reply-To: <20120801063936.GC2764@roeck-us.net>
-References: <1341555449-17507-6-git-send-email-marex@denx.de>
- <201208010810.37652.marex@denx.de> <20120801063936.GC2764@roeck-us.net>
-Message-ID: <201208010845.19361.marex@denx.de>
+From: karl.beldan@gmail.com (Karl Beldan)
+Date: Wed, 1 Aug 2012 08:50:24 +0200
+Subject: About dma_sync_single_for_{cpu,device}
+In-Reply-To: <20120731200855.GC10335@n2100.arm.linux.org.uk>
+References: <20120730202401.GA4947@gobelin> <20120731064557.GA4676@gobelin>
+ <20120731090931.GP6802@n2100.arm.linux.org.uk>
+ <CACYmx9MnEn_XOosBn2-YJ=ny9FiLPADMNa6okwG08xrSpCUSpA@mail.gmail.com>
+ <20120731200855.GC10335@n2100.arm.linux.org.uk>
+Message-ID: <CACYmx9OBhp+8XF3AxVeW2cnVKkTtRsMwf5U-oiFxnJV2Vbzoug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Guenter Roeck,
+On 7/31/12, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Tue, Jul 31, 2012 at 09:31:13PM +0200, Karl Beldan wrote:
+>> On 7/31/12, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>> > On Tue, Jul 31, 2012 at 08:45:57AM +0200, Karl Beldan wrote:
+>> >> I was expecting the following to work:
+>> >> 	addr = dma_map_single(dev, buffer, size, DMA_TO_DEVICE);
+>> >> 	dma_sync_single_for_device(dev, buffer, pattern_size,
+>> >> DMA_FROM_DEVICE);
+>> >> 	dev_send(buffer);
+>> >> 	// wait for irq (don't peek in the buffer) ... got irq
+>> >> 	dma_sync_single_for_cpu(dev, buffer, pattern_size, DMA_FROM_DEVICE);
+>> >> 	if (!xfer_done(buffer)) // not RAM value
+>> >> 		dma_sync_single_for_device(dev, buffer, pattern_size,
+>> >> DMA_FROM_DEVICE);
+>> >> 	[...]
+>> >
+>>
+>> Hi Russell,
+>>
+>>
+>> > First point is that you clearly do not understand the DMA API at all.
+>> > The
+>> > DMA API has the idea of buffer ownership.  Only the owner may access
+>> > the
+>> > buffer:
+>> >
+>> Are you saying that this scenario does not work ?
+>> We are taking some liberties with the DMA API, we're more using some
+>> of its funcs rather than _using_ it ;).
+>> The question was not whether this was a proper usage of the API, but
+>> why that scenario would not lead to the expected results .. and now
+>> I've found the culprit peek I am happy.
+>
+> If you abuse the API don't expect your stuff to work in future kernel
+> versions.
+>
+Of course.
 
-> On Wed, Aug 01, 2012 at 08:10:37AM +0200, Marek Vasut wrote:
-> > Dear Shawn Guo,
-> > 
-> > > On Tue, Jul 31, 2012 at 10:42:28PM -0700, Guenter Roeck wrote:
-> > > > On Wed, Aug 01, 2012 at 01:58:56PM +0800, Shawn Guo wrote:
-> > > > > On Tue, Jul 31, 2012 at 10:29:47PM -0700, Guenter Roeck wrote:
-> > > > > > Anyone up for writing some patches ? If not, I'll do it.
-> > > > > 
-> > > > > Go ahead.
-> > > > 
-> > > > Ok, will do. It isn't that simple, actually, since at least some of
-> > > > the drivers also call spi_master_get(), and thus need two calls to
-> > > > spi_master_put() (or a call to spi_master_put and a call to kfree).
-> > > 
-> > > Hmm, are you saying that there must be a spi_master_put call matching
-> > > spi_alloc_master?  I think we only need to have spi_master_get and
-> > > spi_master_put matched.
-> > 
-> > Naw, spi_master_get() does refcounting, spi_alloc_master() doesnt. You
-> > don't need to match spi_alloc_master() with spi_master_put()
-> 
-> I must be missing something.  Why do almost all spi drivers call it in the
-> error path, even if there is no call to spi_master_get ?
+> It seems that the overall tone of your reply is "what we have now works,
+> we don't care if it's correct, sod you."
+>
+Not at all : {
+On 7/31/12, Karl Beldan <karl.beldan@gmail.com> wrote:
+> I might use something different in a not so distant future, yet, for
+> the time being, this way of doing as its advantages.
+} and during this time I might stick to the API.
+I am not at ease telling people how they should take things,
+especially if I asked for their help, all the more when they put
+efforts within the exchange while being expert on the matter, yet
+please, do not assume I did not care for your advices, which I deem of
+the most valuable, as, needless to say, do the community.
 
-To push the refcounting to 0, to deallocate the device, I'd say ...
+> Fine, I won't spend any more time on this.  Just don't ever think about
+> merging it into mainline, thanks.
+>
+Merge submission while taking such liberties .. that I would not dare
+;) this really was a down to the ground technical question not the
+start of a disguised start of a merging request.
 
-Best regards,
-Marek Vasut
+I am sure that taking such liberties and feeling its limits before
+sticking to a super safe API is not a bad thing, e.g it might trigger
+easierly nasty hidden bugs, it is often beneficial to me at least.
+
+Thanks for your feedback,
+
+Karl
