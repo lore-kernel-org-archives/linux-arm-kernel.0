@@ -1,91 +1,109 @@
 From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Wed, 1 Aug 2012 10:16:24 -0400
-Subject: [PATCH 05/24] xen/arm: empty implementation of grant_table arch
- specific functions
-In-Reply-To: <1343316846-25860-5-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Wed, 1 Aug 2012 10:19:59 -0400
+Subject: [PATCH 07/24] xen/arm: Xen detection and shared_info page mapping
+In-Reply-To: <1343316846-25860-7-git-send-email-stefano.stabellini@eu.citrix.com>
 References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-5-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20120801141624.GD7227@phenom.dumpdata.com>
+ <1343316846-25860-7-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20120801141959.GE7227@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2012 at 04:33:47PM +0100, Stefano Stabellini wrote:
+On Thu, Jul 26, 2012 at 04:33:49PM +0100, Stefano Stabellini wrote:
+> Check for a "/xen" node in the device tree, if it is present set
+> xen_domain_type to XEN_HVM_DOMAIN and continue initialization.
+> 
+> Map the real shared info page using XENMEM_add_to_physmap with
+> XENMAPSPACE_shared_info.
+> 
 > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 > ---
->  arch/arm/xen/Makefile      |    2 +-
->  arch/arm/xen/grant-table.c |   53 ++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 54 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/xen/grant-table.c
+>  arch/arm/xen/enlighten.c |   56 ++++++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 56 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
-> index b9d6acc..4384103 100644
-> --- a/arch/arm/xen/Makefile
-> +++ b/arch/arm/xen/Makefile
-> @@ -1 +1 @@
-> -obj-y		:= enlighten.o hypercall.o
-> +obj-y		:= enlighten.o hypercall.o grant-table.o
-> diff --git a/arch/arm/xen/grant-table.c b/arch/arm/xen/grant-table.c
-> new file mode 100644
-> index 0000000..0a4ee80
-> --- /dev/null
-> +++ b/arch/arm/xen/grant-table.c
-> @@ -0,0 +1,53 @@
-> +/******************************************************************************
-> + * grant_table.c
-> + * ARM specific part
-> + *
-> + * Granting foreign access to our memory reservation.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License version 2
-> + * as published by the Free Software Foundation; or, when distributed
-> + * separately from the Linux kernel or incorporated into other
-> + * software packages, subject to the following license:
-> + *
-> + * Permission is hereby granted, free of charge, to any person obtaining a copy
-> + * of this source file (the "Software"), to deal in the Software without
-> + * restriction, including without limitation the rights to use, copy, modify,
-> + * merge, publish, distribute, sublicense, and/or sell copies of the Software,
-> + * and to permit persons to whom the Software is furnished to do so, subject to
-> + * the following conditions:
-> + *
-> + * The above copyright notice and this permission notice shall be included in
-> + * all copies or substantial portions of the Software.
-> + *
-> + * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-> + * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-> + * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-> + * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-> + * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-> + * IN THE SOFTWARE.
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index d27c2a6..8c923af 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -5,6 +5,9 @@
+>  #include <asm/xen/hypervisor.h>
+>  #include <asm/xen/hypercall.h>
+>  #include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_address.h>
+>  
+>  struct start_info _xen_start_info;
+>  struct start_info *xen_start_info = &_xen_start_info;
+> @@ -33,3 +36,56 @@ int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
+>  	return -ENOSYS;
+>  }
+>  EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_range);
+> +
+> +/*
+> + * == Xen Device Tree format ==
+> + * - /xen node;
+> + * - compatible "arm,xen";
+> + * - one interrupt for Xen event notifications;
+> + * - one memory region to map the grant_table.
 > + */
-> +
-> +#include <xen/interface/xen.h>
-> +#include <xen/page.h>
-> +#include <xen/grant_table.h>
-> +
-> +int arch_gnttab_map_shared(unsigned long *frames, unsigned long nr_gframes,
-> +			   unsigned long max_nr_gframes,
-> +			   void **__shared)
+> +static int __init xen_guest_init(void)
 > +{
-> +	return -1;
+> +	int cpu;
+> +	struct xen_add_to_physmap xatp;
+> +	static struct shared_info *shared_info_page = 0;
+> +	struct device_node *node;
+> +
+> +	node = of_find_compatible_node(NULL, NULL, "arm,xen");
+> +	if (!node) {
+> +		pr_info("No Xen support\n");
 
--ENOSYS
-> +}
-> +
-> +void arch_gnttab_unmap(void *shared, unsigned long nr_gframes)
-> +{
-> +	return;
-> +}
-> +
-> +int arch_gnttab_map_status(uint64_t *frames, unsigned long nr_gframes,
-> +			   unsigned long max_nr_gframes,
-> +			   grant_status_t **__shared)
-> +{
-> +	return -1;
+I don't think the pr_info is appropiate here?
+> +		return 0;
 
-Same here -ENOSYS
+Should this be -ENODEV?
+
+> +	}
+> +	xen_domain_type = XEN_HVM_DOMAIN;
+> +
+> +	if (!shared_info_page)
+> +		shared_info_page = (struct shared_info *)
+> +			get_zeroed_page(GFP_KERNEL);
+> +	if (!shared_info_page) {
+> +		pr_err("not enough memory");
+
+\n
+
+> +		return -ENOMEM;
+> +	}
+> +	xatp.domid = DOMID_SELF;
+> +	xatp.idx = 0;
+> +	xatp.space = XENMAPSPACE_shared_info;
+> +	xatp.gpfn = __pa(shared_info_page) >> PAGE_SHIFT;
+> +	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
+> +		BUG();
+> +
+> +	HYPERVISOR_shared_info = (struct shared_info *)shared_info_page;
+> +
+> +	/* xen_vcpu is a pointer to the vcpu_info struct in the shared_info
+> +	 * page, we use it in the event channel upcall and in some pvclock
+> +	 * related functions. We don't need the vcpu_info placement
+> +	 * optimizations because we don't use any pv_mmu or pv_irq op on
+> +	 * HVM.
+> +	 * When xen_hvm_init_shared_info is run at boot time only vcpu 0 is
+> +	 * online but xen_hvm_init_shared_info is run at resume time too and
+> +	 * in that case multiple vcpus might be online. */
+> +	for_each_online_cpu(cpu) {
+> +		per_cpu(xen_vcpu, cpu) =
+> +			&HYPERVISOR_shared_info->vcpu_info[cpu];
+> +	}
+> +	return 0;
+
+This above looks stringly similar to the x86 one. Could it be
+abstracted away to share the same code? Or is that something that
+ought to be done later on when there is more meat on the bone?
+
+
 > +}
+> +core_initcall(xen_guest_init);
 > -- 
 > 1.7.2.5
