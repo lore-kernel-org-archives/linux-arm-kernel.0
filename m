@@ -1,55 +1,40 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Wed, 1 Aug 2012 10:48:18 -0400
-Subject: [PATCH 18/24] xen/arm: compile blkfront and blkback
-In-Reply-To: <1343316846-25860-18-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-18-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20120801144818.GO7227@phenom.dumpdata.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 1 Aug 2012 07:58:37 -0700
+Subject: [06/10,V2] spi: Add SPI driver for mx233/mx28
+In-Reply-To: <20120801075010.GI1672@S2100-06.ap.freescale.net>
+References: <1341555449-17507-6-git-send-email-marex@denx.de>
+ <201208010810.37652.marex@denx.de>
+ <20120801063936.GC2764@roeck-us.net>
+ <201208010845.19361.marex@denx.de>
+ <20120801065650.GA2928@roeck-us.net>
+ <20120801075010.GI1672@S2100-06.ap.freescale.net>
+Message-ID: <20120801145837.GA15630@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2012 at 04:34:00PM +0100, Stefano Stabellini wrote:
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> ---
->  drivers/block/xen-blkback/blkback.c  |    1 +
->  include/xen/interface/io/protocols.h |    3 +++
->  2 files changed, 4 insertions(+), 0 deletions(-)
+On Wed, Aug 01, 2012 at 03:50:12PM +0800, Shawn Guo wrote:
+> On Tue, Jul 31, 2012 at 11:56:50PM -0700, Guenter Roeck wrote:
+> > Guess we are in violent agreement. The sequence would then either be
+> > 	master = spi_alloc_device();
 > 
-> diff --git a/drivers/block/xen-blkback/blkback.c b/drivers/block/xen-blkback/blkback.c
-> index 73f196c..63dd5b9 100644
-> --- a/drivers/block/xen-blkback/blkback.c
-> +++ b/drivers/block/xen-blkback/blkback.c
-> @@ -42,6 +42,7 @@
->  
->  #include <xen/events.h>
->  #include <xen/page.h>
-> +#include <xen/xen.h>
->  #include <asm/xen/hypervisor.h>
->  #include <asm/xen/hypercall.h>
->  #include "common.h"
-> diff --git a/include/xen/interface/io/protocols.h b/include/xen/interface/io/protocols.h
-> index 01fc8ae..0eafaf2 100644
-> --- a/include/xen/interface/io/protocols.h
-> +++ b/include/xen/interface/io/protocols.h
-> @@ -5,6 +5,7 @@
->  #define XEN_IO_PROTO_ABI_X86_64     "x86_64-abi"
->  #define XEN_IO_PROTO_ABI_IA64       "ia64-abi"
->  #define XEN_IO_PROTO_ABI_POWERPC64  "powerpc64-abi"
-> +#define XEN_IO_PROTO_ABI_ARM        "arm-abi"
+> The discussion is around spi_alloc_master rather than spi_alloc_device,
+> isn't it?
+> 
+Yes, sorry. Too late at night, too tired :(.
 
-So one that has all of the 32/64 issues worked out? Nice.
+Guenter
 
->  
->  #if defined(__i386__)
->  # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_X86_32
-> @@ -14,6 +15,8 @@
->  # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_IA64
->  #elif defined(__powerpc64__)
->  # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_POWERPC64
-> +#elif defined(__arm__)
-> +# define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_ARM
->  #else
->  # error arch fixup needed here
->  #endif
-> -- 
-> 1.7.2.5
+> Regards,
+> Shawn
+> 
+> > 	...
+> > 	spi_master_put(master);
+> > or
+> > 	master = spi_alloc_device();
+> > 	...
+> > 	kfree(master);
+> > 
+> > which makes sense to me. Question still is why most drivers neither call kfree()
+> > nor spi_master_put() in the remove function.
+> 
+> 
