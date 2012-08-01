@@ -1,42 +1,59 @@
 From: matt@genesi-usa.com (Matt Sealey)
-Date: Wed,  1 Aug 2012 12:49:27 -0500
-Subject: [PATCH 0/4] Remove Genesi Efika MX support
-Message-ID: <1343843371-14143-1-git-send-email-matt@genesi-usa.com>
+Date: Wed,  1 Aug 2012 12:49:31 -0500
+Subject: [PATCH 4/4] efikamx: remove Efika MX-specific CHRGVBUS hack from the
+ USB driver
+In-Reply-To: <1343843371-14143-1-git-send-email-matt@genesi-usa.com>
+References: <1343843371-14143-1-git-send-email-matt@genesi-usa.com>
+Message-ID: <1343843371-14143-5-git-send-email-matt@genesi-usa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In an effort to start afresh we are removing the "legacy" Efika MX support
-from the tree in this patch series so as to break ties with any non-device-tree
-code and minimize the possibility that there are two ways to build for our
-boards.
+Since we're removing Efika MX support from the tree (for now), remove
+the hack present in the USB host driver since it will never run and
+isn't useful on any other systems.
 
-Patches to support the board again with FDT (along with a matching U-Boot)
-are not ready for submission, but that doesn't block *this* submission. The
-number of users of 3.5 kernels on Genesi platforms is generally thought of
-as zero and no significant work or support has been committed to the platform
-in a long time. In our opinion, all efforts by external developers wishing to
-run modern kernels on Genesi Efika MX boards should be directed at device tree
-support for the MX51 platforms.
+Signed-off-by: Matt Sealey <matt@genesi-usa.com>
+---
+ drivers/usb/host/ehci-mxc.c |   20 --------------------
+ 1 file changed, 20 deletions(-)
 
-Matt Sealey (4):
-  efikamx: remove support for Genesi Efika MX from the build
-  efikamx: remove Genesi Efika MX from the i.MX v6/v7 defconfig
-  efikamx: remove Genesi Efika MX platform files from the tree
-  efikamx: remove Efika MX-specific CHRGVBUS hack from the USB driver
-
- arch/arm/configs/imx_v6_v7_defconfig  |    2 -
- arch/arm/mach-imx/Kconfig             |   26 --
- arch/arm/mach-imx/Makefile            |    3 -
- arch/arm/mach-imx/efika.h             |   10 -
- arch/arm/mach-imx/mach-mx51_efikamx.c |  300 ----------------
- arch/arm/mach-imx/mach-mx51_efikasb.c |  296 ---------------
- arch/arm/mach-imx/mx51_efika.c        |  632 ---------------------------------
- drivers/usb/host/ehci-mxc.c           |   20 --
- 8 files changed, 1289 deletions(-)
- delete mode 100644 arch/arm/mach-imx/efika.h
- delete mode 100644 arch/arm/mach-imx/mach-mx51_efikamx.c
- delete mode 100644 arch/arm/mach-imx/mach-mx51_efikasb.c
- delete mode 100644 arch/arm/mach-imx/mx51_efika.c
-
+diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+index c778ffe..062f871 100644
+--- a/drivers/usb/host/ehci-mxc.c
++++ b/drivers/usb/host/ehci-mxc.c
+@@ -118,7 +118,6 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 	struct usb_hcd *hcd;
+ 	struct resource *res;
+ 	int irq, ret;
+-	unsigned int flags;
+ 	struct ehci_mxc_priv *priv;
+ 	struct device *dev = &pdev->dev;
+ 	struct ehci_hcd *ehci;
+@@ -235,25 +234,6 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto err_add;
+ 
+-	if (pdata->otg) {
+-		/*
+-		 * efikamx and efikasb have some hardware bug which is
+-		 * preventing usb to work unless CHRGVBUS is set.
+-		 * It's in violation of USB specs
+-		 */
+-		if (machine_is_mx51_efikamx() || machine_is_mx51_efikasb()) {
+-			flags = usb_phy_io_read(pdata->otg,
+-							ULPI_OTG_CTRL);
+-			flags |= ULPI_OTG_CTRL_CHRGVBUS;
+-			ret = usb_phy_io_write(pdata->otg, flags,
+-							ULPI_OTG_CTRL);
+-			if (ret) {
+-				dev_err(dev, "unable to set CHRVBUS\n");
+-				goto err_add;
+-			}
+-		}
+-	}
+-
+ 	return 0;
+ 
+ err_add:
 -- 
 1.7.9.5
