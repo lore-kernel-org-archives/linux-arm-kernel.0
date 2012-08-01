@@ -1,45 +1,50 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Wed,  1 Aug 2012 23:54:17 +0800
-Subject: [PATCH v3 12/32] PCI/ARM: use PCIe capabilities access functions to
- simplify implementation
-In-Reply-To: <1343836477-7287-1-git-send-email-jiang.liu@huawei.com>
-References: <1343836477-7287-1-git-send-email-jiang.liu@huawei.com>
-Message-ID: <1343836477-7287-13-git-send-email-jiang.liu@huawei.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 1 Aug 2012 17:04:45 +0100
+Subject: [PATCH 23/24] hvc_xen: allow dom0_write_console for HVM guests
+In-Reply-To: <20120801145413.GR7227@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-23-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120801145413.GR7227@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1208011704000.4645@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jiang Liu <jiang.liu@huawei.com>
+On Wed, 1 Aug 2012, Konrad Rzeszutek Wilk wrote:
+> On Thu, Jul 26, 2012 at 04:34:05PM +0100, Stefano Stabellini wrote:
+> > On ARM all guests are HVM guests, including Dom0.
+> > Allow dom0_write_console to be called by an HVM domain.
+> 
+> Um, but xen_hvm_domain() != xen_pv_domain() so won't this return without
+> printing anything?
 
-Use PCIe capabilities access functions to simplify PCIe ARM implementation.
+Nope, it would call dom0_write_console that issues a console hypercall.
+However I am going to remove this patch and rely on the simple serial
+emulator we have in Xen for early_printk stuff
 
-Signed-off-by: Jiang Liu <liuj97@gmail.com>
----
- arch/arm/mach-tegra/pcie.c |   13 ++-----------
- 1 file changed, 2 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
-index 0e09137..5f99d33 100644
---- a/arch/arm/mach-tegra/pcie.c
-+++ b/arch/arm/mach-tegra/pcie.c
-@@ -367,17 +367,8 @@ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_NVIDIA, 0x0bf1, tegra_pcie_fixup_class);
- /* Tegra PCIE requires relaxed ordering */
- static void __devinit tegra_pcie_relax_enable(struct pci_dev *dev)
- {
--	u16 val16;
--	int pos = pci_find_capability(dev, PCI_CAP_ID_EXP);
--
--	if (pos <= 0) {
--		dev_err(&dev->dev, "skipping relaxed ordering fixup\n");
--		return;
--	}
--
--	pci_read_config_word(dev, pos + PCI_EXP_DEVCTL, &val16);
--	val16 |= PCI_EXP_DEVCTL_RELAX_EN;
--	pci_write_config_word(dev, pos + PCI_EXP_DEVCTL, val16);
-+	pci_pcie_capability_change_word(dev, PCI_EXP_DEVCTL,
-+					PCI_EXP_DEVCTL_RELAX_EN, 0);
- }
- DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, tegra_pcie_relax_enable);
- 
--- 
-1.7.9.5
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > ---
+> >  drivers/tty/hvc/hvc_xen.c |    5 +----
+> >  1 files changed, 1 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/tty/hvc/hvc_xen.c b/drivers/tty/hvc/hvc_xen.c
+> > index 3c04fb8..949edc2 100644
+> > --- a/drivers/tty/hvc/hvc_xen.c
+> > +++ b/drivers/tty/hvc/hvc_xen.c
+> > @@ -616,12 +616,9 @@ static void xenboot_write_console(struct console *console, const char *string,
+> >  	unsigned int linelen, off = 0;
+> >  	const char *pos;
+> >  
+> > -	if (!xen_pv_domain())
+> > -		return;
+> > -
+> >  	dom0_write_console(0, string, len);
+> >  
+> > -	if (xen_initial_domain())
+> > +	if (!xen_pv_domain())
+> >  		return;
+> >  
+> >  	domU_write_console(0, "(early) ", 8);
+> > -- 
+> > 1.7.2.5
+> 
