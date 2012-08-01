@@ -1,29 +1,60 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 1 Aug 2012 13:15:16 +0100
-Subject: [RFC PATCH 1/1] ASoC: soc-dapm: warn if no avaiable path found
- for widget kcontrol
-In-Reply-To: <20120801074952.GC30492@shlinux2.ap.freescale.net>
-References: <1343387941-25266-1-git-send-email-b29396@freescale.com>
- <20120729202219.GA4384@opensource.wolfsonmicro.com>
- <20120801074952.GC30492@shlinux2.ap.freescale.net>
-Message-ID: <20120801121516.GO11892@opensource.wolfsonmicro.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Wed, 1 Aug 2012 17:50:16 +0530
+Subject: omap_device: query on "fck" clk alias created
+Message-ID: <50191F00.1040501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 01, 2012 at 03:49:53PM +0800, Dong Aisheng wrote:
-> On Mon, Jul 30, 2012 at 04:22:19AM +0800, Mark Brown wrote:
+Hi,
 
-> > This isn't a good idea, it's fairly common for widgets to have a "None"
-> > option which isn't expected to have an input.
+In OMAP world, we have omap_device layer, which exports api's like
+omap_device_build() to create and register platform_device to the
+kernel. This layer understands hwmod infrastructure and parses all the
+platform specific information from it.
+Now with DT migration, the same thing is achieved using a notifier,
+which in turn omap_device_build_from_dt(), which in turn does same thing.
 
-> What i changed is mux widgets, i'm wondering is it possible or correct
-> the mux widget has no input path?
-> If i understand correct, we may need set correct input path
-> for mux widget, or why we still need a mux?
+One of the thing which is happening in both execution path is, creating
+alias for functional clock (hwmod_data->main_clk) for each device
+getting created with the con_id = "fck".
 
-> Or can you help give an example that no input needed for mux widget?
+Now the problem with this is,
 
-The above is the most common example - one of the inputs to a mux being
-a "no input" option which shouldn't be connected to anything.  A mux
-with no inputs at all would be silly, but having one (or sometimes a
-couple for various reasons) that isn't connected isn't unusual.
+The clk_get() api will not work, unless we pass both the arguments (dev,
+con_id) properly. Now expecting driver to always label con_id with "fck"
+is undesirable, as the same driver can be reused on multiple platforms,
+which can be non-omap and/or non-ti platforms.
+Also we have multiple examples where driver simply calls (which is right)
+
+clk = clk_get(&pdev->dev, NULL);
+
+This would fail on OMAP platforms, unless you modify clockxxx_data.c
+file with,
+
+CLK("<device>",  NULL,           &xxx_fck,    CK_34XX),
+
+
+Devices specially with only one clock source always prefer not to
+specify con_id.
+And it seems wrong thing, as across platforms IP integration can be very
+different and you can not expect to change the clock-tree table always.
+
+So the option here we have is,
+
+1. Instead of creating alias with "fck", create an alias only with dev
+pointer, that means con_id = NULL.
+I have already tested this and it works on AM33xx platform.
+
+2. Add a new flag inside hwmod or omap_device, so that it can be read at
+omap_device layer and based on that we can decide whether to add con_id
+or not while invoking clkdev_alloc().
+This may be required to support legacy drivers which are not migrated to
+runtime_pm and still calls clk_get() for both "fck" and "ick", so here
+we need "fck" clk alias.
+
+
+Any comments or opinion on this? Based on the feedback I can create the
+changes and submit it to the list.
+
+Thanks,
+Vaibhav
