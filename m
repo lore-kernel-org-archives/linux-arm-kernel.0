@@ -1,42 +1,118 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Wed, 1 Aug 2012 11:42:12 -0400
-Subject: [PATCH 06/22] ARM: LPAE: use phys_addr_t in alloc_init_pud()
-In-Reply-To: <50191C46.4090902@mvista.com>
-References: <1343775898-28345-1-git-send-email-cyril@ti.com>
- <1343775898-28345-7-git-send-email-cyril@ti.com>
- <50191C46.4090902@mvista.com>
-Message-ID: <50194E54.5040909@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 1 Aug 2012 16:45:40 +0100
+Subject: [PATCH 07/24] xen/arm: Xen detection and shared_info page mapping
+In-Reply-To: <20120801141959.GE7227@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-7-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120801141959.GE7227@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1208011641410.4645@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/1/2012 8:08 AM, Sergei Shtylyov wrote:
-> Hello.
->
-> On 01-08-2012 3:04, Cyril Chemparathy wrote:
->
->> From: Vitaly Andrianov <vitalya@ti.com>
->
->> This patch fixes the alloc_init_pud() function to use phys_addr_t
->> instead of
->> unsigned long when passing in the phys argument.
->
->> This is an extension to commit
->> 97092e0c56830457af0639f6bd904537a150ea4a, which
->
->     Please also specify that commit's summary in parens.
+On Wed, 1 Aug 2012, Konrad Rzeszutek Wilk wrote:
+> On Thu, Jul 26, 2012 at 04:33:49PM +0100, Stefano Stabellini wrote:
+> > Check for a "/xen" node in the device tree, if it is present set
+> > xen_domain_type to XEN_HVM_DOMAIN and continue initialization.
+> > 
+> > Map the real shared info page using XENMEM_add_to_physmap with
+> > XENMAPSPACE_shared_info.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > ---
+> >  arch/arm/xen/enlighten.c |   56 ++++++++++++++++++++++++++++++++++++++++++++++
+> >  1 files changed, 56 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > index d27c2a6..8c923af 100644
+> > --- a/arch/arm/xen/enlighten.c
+> > +++ b/arch/arm/xen/enlighten.c
+> > @@ -5,6 +5,9 @@
+> >  #include <asm/xen/hypervisor.h>
+> >  #include <asm/xen/hypercall.h>
+> >  #include <linux/module.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_irq.h>
+> > +#include <linux/of_address.h>
+> >  
+> >  struct start_info _xen_start_info;
+> >  struct start_info *xen_start_info = &_xen_start_info;
+> > @@ -33,3 +36,56 @@ int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
+> >  	return -ENOSYS;
+> >  }
+> >  EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_range);
+> > +
+> > +/*
+> > + * == Xen Device Tree format ==
+> > + * - /xen node;
+> > + * - compatible "arm,xen";
+> > + * - one interrupt for Xen event notifications;
+> > + * - one memory region to map the grant_table.
+> > + */
+> > +static int __init xen_guest_init(void)
+> > +{
+> > +	int cpu;
+> > +	struct xen_add_to_physmap xatp;
+> > +	static struct shared_info *shared_info_page = 0;
+> > +	struct device_node *node;
+> > +
+> > +	node = of_find_compatible_node(NULL, NULL, "arm,xen");
+> > +	if (!node) {
+> > +		pr_info("No Xen support\n");
+> 
+> I don't think the pr_info is appropiate here?
 
-Thanks Sergei.  Will do so.  I'm assuming you meant headline and not 
-summary.
+Yes, you are right. In fact I had already turned it into a pr_debug.
 
->
->> applied similar changes elsewhere in the ARM memory management code.
->
->> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
->> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
->
-> WBR, Sergei
->
+> > +		return 0;
+> 
+> Should this be -ENODEV?
 
--- 
-Thanks
-- Cyril
+Considering that xen_guest_init is called by a core_initcall, I didn't
+want to return an error just because Xen is not present on the platform.
+
+
+> > +	}
+> > +	xen_domain_type = XEN_HVM_DOMAIN;
+> > +
+> > +	if (!shared_info_page)
+> > +		shared_info_page = (struct shared_info *)
+> > +			get_zeroed_page(GFP_KERNEL);
+> > +	if (!shared_info_page) {
+> > +		pr_err("not enough memory");
+> 
+> \n
+
+OK
+
+> > +		return -ENOMEM;
+> > +	}
+> > +	xatp.domid = DOMID_SELF;
+> > +	xatp.idx = 0;
+> > +	xatp.space = XENMAPSPACE_shared_info;
+> > +	xatp.gpfn = __pa(shared_info_page) >> PAGE_SHIFT;
+> > +	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
+> > +		BUG();
+> > +
+> > +	HYPERVISOR_shared_info = (struct shared_info *)shared_info_page;
+> > +
+> > +	/* xen_vcpu is a pointer to the vcpu_info struct in the shared_info
+> > +	 * page, we use it in the event channel upcall and in some pvclock
+> > +	 * related functions. We don't need the vcpu_info placement
+> > +	 * optimizations because we don't use any pv_mmu or pv_irq op on
+> > +	 * HVM.
+> > +	 * When xen_hvm_init_shared_info is run at boot time only vcpu 0 is
+> > +	 * online but xen_hvm_init_shared_info is run at resume time too and
+> > +	 * in that case multiple vcpus might be online. */
+> > +	for_each_online_cpu(cpu) {
+> > +		per_cpu(xen_vcpu, cpu) =
+> > +			&HYPERVISOR_shared_info->vcpu_info[cpu];
+> > +	}
+> > +	return 0;
+> 
+> This above looks stringly similar to the x86 one. Could it be
+> abstracted away to share the same code? Or is that something that
+> ought to be done later on when there is more meat on the bone?
+
+Actually I had to remove these three lines because on ARM we are going
+to have just one vcpu_info struct in the shared_info page and then rely
+on VCPUOP_register_vcpu_info.
