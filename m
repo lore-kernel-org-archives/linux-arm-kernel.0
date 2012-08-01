@@ -1,183 +1,36 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed, 1 Aug 2012 12:48:10 +0800
-Subject: [GIT PULL] LED CPU trigger driver and ARM LED code consolidation
- (v2)
-In-Reply-To: <CAK5ve-KjK2mU0qjdp2HK5CdrM=eQ-hN0nw-0cJj7HGuRyGjH8w@mail.gmail.com>
-References: <CAK5ve-KjK2mU0qjdp2HK5CdrM=eQ-hN0nw-0cJj7HGuRyGjH8w@mail.gmail.com>
-Message-ID: <CAK5ve-+wWWARGz4ky_VW2AK7hHLXENkw2ANToLztcDjsegubsw@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 1 Aug 2012 06:48:05 +0200
+Subject: [06/10,V2] spi: Add SPI driver for mx233/mx28
+In-Reply-To: <20120801035333.GB1672@S2100-06.ap.freescale.net>
+References: <1341555449-17507-6-git-send-email-marex@denx.de>
+ <201208010431.04399.marex@denx.de>
+ <20120801035333.GB1672@S2100-06.ap.freescale.net>
+Message-ID: <201208010648.05325.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 9:46 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
-> Russell, Arnd and Olof,
->
+Dear Shawn Guo,
 
-I felt very sorry about this issue, the email was archived
-automatically in my Gmail account. I found the root cause of the issue
-Russell met and actually that code about trigger_data is totally
-useless, which was removed just now. I pushed an update version again
-to the same branch of my git tree. Please consider a pull. If I did
-something bad, please let me know, I will fix it as soon as possible.
+> On Wed, Aug 01, 2012 at 04:31:04AM +0200, Marek Vasut wrote:
+> > > Couple of reasons for asking: No other SPI master driver calls it in
+> > > the remove function (unless I missed it), most drivers don't call it
+> > > in the probe function error path, and if I call it in the remove
+> > > function in a SPI master driver I am working on, and load/unload the
+> > > module several times in a row, I get a nasty kernel crash.
+> > 
+> > It seems the spi_master class takes care of that kfree() in
+> > spi.c:spi_master_release() . Good catch, thanks!
+> 
+> I do not hardware setup to confirm that right away.  When
+> spi_master_release will be called exactly?  The time that
+> spi_master_put gets called?  I'm trying to understand if the kfree
+> is not needed only in remove function, or both probe and remove.
 
-The following changes since commit 28a33cbc24e4256c143dce96c7d93bf423229f92:
+I checked, it's called in both cases ... (if .probe() crashes, release() is 
+called, so kfree() is unneeded)
 
-  Linux 3.5 (2012-07-21 13:58:29 -0700)
+> Regards,
+> Shawn
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/cooloney/linux-leds.git
-for-arm-soc
-
-for you to fetch changes up to fa8bbb13ab49e77c00fa09e5504ec25b7176fb4b:
-
-  ARM: use new LEDS CPU trigger stub to replace old one (2012-08-01
-11:22:14 +0800)
-
-----------------------------------------------------------------
-Bryan Wu (18):
-      led-triggers: create a trigger for CPU activity
-      ARM: at91: convert old leds drivers to gpio_led and led_trigger drivers
-      ARM: mach-realview and mach-versatile: retire custom LED code
-      ARM: mach-ks8695: remove leds driver, since nobody use it
-      ARM: mach-shark: retire custom LED code
-      ARM: mach-orion5x: convert custom LED code to gpio_led and LED CPU trigger
-      ARM: mach-integrator: move CM_CTRL to header file for accessing
-by other functions
-      ARM: mach-integrator: retire custom LED code
-      ARM: mach-clps711x: retire custom LED code of P720T machine
-      ARM: mach-ebsa110: retire custom LED code
-      ARM: mach-footbridge: retire custom LED code
-      char: nwflash: remove old led event code
-      ARM: mach-pxa: retire custom LED code
-      ARM: plat-samsung: remove including old leds event API header file
-      ARM: mach-pnx4008: remove including old leds event API header file
-      ARM: mach-omap1: retire custom LED code
-      ARM: mach-sa1100: retire custom LED code
-      ARM: use new LEDS CPU trigger stub to replace old one
-
- arch/arm/Kconfig                             |  53 -----
- arch/arm/include/asm/leds.h                  |  50 -----
- arch/arm/kernel/Makefile                     |   1 -
- arch/arm/kernel/leds.c                       | 121 -----------
- arch/arm/kernel/process.c                    |   6 +-
- arch/arm/kernel/time.c                       |  17 --
- arch/arm/mach-at91/board-csb337.c            |   2 -
- arch/arm/mach-at91/board-ecbat91.c           |  18 +-
- arch/arm/mach-at91/board-eco920.c            |  22 +-
- arch/arm/mach-at91/board-kafa.c              |  17 +-
- arch/arm/mach-at91/board-kb9202.c            |  23 ++-
- arch/arm/mach-at91/board-rm9200dk.c          |   3 -
- arch/arm/mach-at91/board-rm9200ek.c          |   3 -
- arch/arm/mach-at91/board-rsi-ews.c           |   3 -
- arch/arm/mach-at91/board-sam9-l9260.c        |  23 ++-
- arch/arm/mach-at91/board-sam9261ek.c         |   3 -
- arch/arm/mach-at91/board-yl-9200.c           |   3 -
- arch/arm/mach-at91/include/mach/board.h      |   1 -
- arch/arm/mach-at91/leds.c                    | 105 ----------
- arch/arm/mach-clps711x/Makefile              |   2 -
- arch/arm/mach-clps711x/common.c              |   1 -
- arch/arm/mach-clps711x/p720t-leds.c          |  63 ------
- arch/arm/mach-clps711x/p720t.c               |  61 ++++++
- arch/arm/mach-ebsa110/Makefile               |   4 +-
- arch/arm/mach-ebsa110/leds.c                 |  81 +++++---
- arch/arm/mach-footbridge/Makefile            |   4 -
- arch/arm/mach-footbridge/ebsa285-leds.c      | 138 -------------
- arch/arm/mach-footbridge/ebsa285.c           |  81 ++++++++
- arch/arm/mach-footbridge/netwinder-hw.c      | 112 ++++++++--
- arch/arm/mach-footbridge/netwinder-leds.c    | 138 -------------
- arch/arm/mach-integrator/Makefile            |   3 +-
- arch/arm/mach-integrator/core.c              |   3 -
- arch/arm/mach-integrator/include/mach/cm.h   |   2 +
- arch/arm/mach-integrator/leds.c              | 161 +++++++++------
- arch/arm/mach-ks8695/Makefile                |   3 -
- arch/arm/mach-ks8695/devices.c               |  21 --
- arch/arm/mach-ks8695/include/mach/devices.h  |   5 -
- arch/arm/mach-ks8695/leds.c                  |  92 ---------
- arch/arm/mach-omap1/Makefile                 |   8 -
- arch/arm/mach-omap1/board-h2.c               |  32 +++
- arch/arm/mach-omap1/board-h3.c               |  32 +++
- arch/arm/mach-omap1/board-osk.c              |  33 +++
- arch/arm/mach-omap1/leds-h2p2-debug.c        | 166 ---------------
- arch/arm/mach-omap1/leds-innovator.c         |  98 ---------
- arch/arm/mach-omap1/leds-osk.c               | 113 -----------
- arch/arm/mach-omap1/leds.c                   |  69 -------
- arch/arm/mach-omap1/leds.h                   |   3 -
- arch/arm/mach-omap1/time.c                   |   1 -
- arch/arm/mach-omap1/timer32k.c               |   1 -
- arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c |   1 -
- arch/arm/mach-orion5x/rd88f5181l-ge-setup.c  |   1 -
- arch/arm/mach-orion5x/rd88f5182-setup.c      |  72 ++-----
- arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c |   1 -
- arch/arm/mach-pnx4008/time.c                 |   1 -
- arch/arm/mach-pxa/Makefile                   |   8 -
- arch/arm/mach-pxa/idp.c                      |  81 ++++++++
- arch/arm/mach-pxa/leds-idp.c                 | 115 -----------
- arch/arm/mach-pxa/leds-lubbock.c             | 124 ------------
- arch/arm/mach-pxa/leds-mainstone.c           | 119 -----------
- arch/arm/mach-pxa/leds.c                     |  32 ---
- arch/arm/mach-pxa/leds.h                     |  13 --
- arch/arm/mach-pxa/lubbock.c                  |  95 +++++++++
- arch/arm/mach-pxa/mainstone.c                |  94 +++++++++
- arch/arm/mach-realview/core.c                |  39 ----
- arch/arm/mach-realview/core.h                |   2 -
- arch/arm/mach-realview/realview_eb.c         |   5 -
- arch/arm/mach-realview/realview_pb1176.c     |   5 -
- arch/arm/mach-realview/realview_pb11mp.c     |   5 -
- arch/arm/mach-realview/realview_pba8.c       |   5 -
- arch/arm/mach-realview/realview_pbx.c        |   5 -
- arch/arm/mach-sa1100/Makefile                |   9 -
- arch/arm/mach-sa1100/assabet.c               |  85 ++++++++
- arch/arm/mach-sa1100/badge4.c                |  30 +++
- arch/arm/mach-sa1100/cerf.c                  |  42 ++++
- arch/arm/mach-sa1100/hackkit.c               |  32 +++
- arch/arm/mach-sa1100/lart.c                  |  26 +++
- arch/arm/mach-sa1100/leds-assabet.c          | 113 -----------
- arch/arm/mach-sa1100/leds-badge4.c           | 110 ----------
- arch/arm/mach-sa1100/leds-cerf.c             | 109 ----------
- arch/arm/mach-sa1100/leds-hackkit.c          | 111 ----------
- arch/arm/mach-sa1100/leds-lart.c             | 100 ---------
- arch/arm/mach-sa1100/leds.c                  |  50 -----
- arch/arm/mach-sa1100/leds.h                  |  13 --
- arch/arm/mach-shark/Makefile                 |   4 +-
- arch/arm/mach-shark/core.c                   |   1 -
- arch/arm/mach-shark/leds.c                   | 220 ++++++++------------
- arch/arm/mach-versatile/core.c               |   5 -
- arch/arm/plat-omap/Kconfig                   |   3 +-
- arch/arm/plat-omap/debug-leds.c              | 293 ++++++---------------------
- arch/arm/plat-samsung/time.c                 |   1 -
- arch/arm/plat-versatile/Kconfig              |   4 +-
- arch/arm/plat-versatile/leds.c               |   8 +-
- drivers/char/nwflash.c                       |  34 ----
- drivers/leds/Kconfig                         |  10 +
- drivers/leds/Makefile                        |   1 +
- drivers/leds/ledtrig-cpu.c                   | 163 +++++++++++++++
- include/linux/leds.h                         |  16 ++
- 97 files changed, 1440 insertions(+), 2981 deletions(-)
- delete mode 100644 arch/arm/include/asm/leds.h
- delete mode 100644 arch/arm/kernel/leds.c
- delete mode 100644 arch/arm/mach-clps711x/p720t-leds.c
- delete mode 100644 arch/arm/mach-footbridge/ebsa285-leds.c
- delete mode 100644 arch/arm/mach-footbridge/netwinder-leds.c
- delete mode 100644 arch/arm/mach-ks8695/leds.c
- delete mode 100644 arch/arm/mach-omap1/leds-h2p2-debug.c
- delete mode 100644 arch/arm/mach-omap1/leds-innovator.c
- delete mode 100644 arch/arm/mach-omap1/leds-osk.c
- delete mode 100644 arch/arm/mach-omap1/leds.c
- delete mode 100644 arch/arm/mach-omap1/leds.h
- delete mode 100644 arch/arm/mach-pxa/leds-idp.c
- delete mode 100644 arch/arm/mach-pxa/leds-lubbock.c
- delete mode 100644 arch/arm/mach-pxa/leds-mainstone.c
- delete mode 100644 arch/arm/mach-pxa/leds.c
- delete mode 100644 arch/arm/mach-pxa/leds.h
- delete mode 100644 arch/arm/mach-sa1100/leds-assabet.c
- delete mode 100644 arch/arm/mach-sa1100/leds-badge4.c
- delete mode 100644 arch/arm/mach-sa1100/leds-cerf.c
- delete mode 100644 arch/arm/mach-sa1100/leds-hackkit.c
- delete mode 100644 arch/arm/mach-sa1100/leds-lart.c
- delete mode 100644 arch/arm/mach-sa1100/leds.c
- delete mode 100644 arch/arm/mach-sa1100/leds.h
- create mode 100644 drivers/leds/ledtrig-cpu.c
-
---
-Thanks,
--Bryan
+Best regards,
+Marek Vasut
