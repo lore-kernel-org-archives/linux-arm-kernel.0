@@ -1,81 +1,41 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 01 Aug 2012 19:09:01 +0900
-Subject: [PATCH V2 5/5] arm: samsung: delete frame buffer header files from
- platform
-In-Reply-To: <5018FE28.8070907@samsung.com>
-References: <1343737385-23337-1-git-send-email-l.krishna@samsung.com>
- <1343737385-23337-6-git-send-email-l.krishna@samsung.com>
- <02ee01cd6f89$f218b2c0$d64a1840$%kim@samsung.com>
- <CAL1wa8cShB7zDj-CPvfEncX+Up7enKM9MJOt-488dThj_tXbMA@mail.gmail.com>
- <037101cd6fc9$85386e30$8fa94a90$%kim@samsung.com>
- <5018FE28.8070907@samsung.com>
-Message-ID: <037d01cd6fcd$ac64d300$052e7900$%kim@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 01 Aug 2012 12:28:27 +0200
+Subject: [PATCH 1/4] video: Add support for the Solomon SSD1307 OLED
+ Controller
+In-Reply-To: <20120801052424.GD1672@S2100-06.ap.freescale.net>
+References: <1343730576-20494-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1343730576-20494-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20120801052424.GD1672@S2100-06.ap.freescale.net>
+Message-ID: <501904CB.9040104@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
-> 
-> Hi,
-> 
-> On 08/01/2012 11:39 AM, Kukjin Kim wrote:
-> > Leela Krishna Amudala wrote:
-> >> On Wed, Aug 1, 2012 at 7:34 AM, Kukjin Kim <kgene.kim@samsung.com>
-> wrote:
-> >>> Leela Krishna Amudala wrote:
-> >>>>
-> >>>> The FIMD register headers are moved to include/video/
-> >>>> hence, deleting these files from platform side
-> >>>>
-> >>>> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
-> >>>> ---
-> >>>>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h |  159 ---------
-> >>>>  arch/arm/plat-samsung/include/plat/regs-fb.h    |  403
-> >>> -------------------
-> >>>> ----
-> >>>>  2 files changed, 0 insertions(+), 562 deletions(-)
-> >>>>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
-> >>>>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb.h
-> >>>>
-> >>> No. This should be squashed into first patch on this series. See
-below.
-> >>>
-> >>>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h    |  159
-> >>> --------------------
-> >>>  .../plat/regs-fb.h => include/video/samsung_fimd.h |  145
-> >>> ++++++++++++++++--
-> >>>  2 files changed, 134 insertions(+), 170 deletions(-)
-> >>>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
-> >>>  rename arch/arm/plat-samsung/include/plat/regs-fb.h =>
-> >>> include/video/samsung_fimd.h (74%)
-> >>>
-> >>
-> >> If I squash it with the first patch and if somebody set that as a head
-> >> commit, it will break the build. Hence, splitted it up from the first
-> >> patch.
-> >>
-> > NACK. your changes are not adding just moving. So should be squashed. If
-> > required, you could create just one patch for moving them, probably,
-1st,
-> > 3rd, 4th and 5th patches into one patch.
-> 
-> Yes, this patch series is mainly moving files around. But to avoid git
-> bisect breakage, it should be split as it is done now, or the whole
-> series should be squashed into one patch. The latter might be even easier
-> to handle, but having a single patch touching arch/arm/ and drivers/
-> might not be a good idea. If you're fine handling that, then we just
-> need to squash this series into single patch.
-> It just need to be ensured, IMO, there is no bisection breakage.
-> 
-I know you meant. But we don't need to keep the changes 'adding and
-removing' for just moving on this.
+Hi Shawn,
 
-I commented on 0/5 patch in this series before, if this is ready, I will
-create topic branch so that it could be merged into both mine and Florian's.
+Le 01/08/2012 07:24, Shawn Guo a ?crit :
+> On Tue, Jul 31, 2012 at 12:29:33PM +0200, Maxime Ripard wrote:
+>> +Optional properties:
+>> +  - oled-reset-active-low: Is the reset gpio is active on physical low?
+> 
+> You may want to take a look at commit c1cb438 (bindings: update imx and
+> mxs #gpio-cells) which got merged recently.  In case the driver will
+> only work on mxs, this optional property can just be dropped.
 
-Thanks.
+Thanks for the tip.
+However, I'm not sure this device will be mxs specific, since this
+controller is used on some other devices as well (I know for example
+that some uses it with the Arduino, even though it's not related to
+Linux), so relying on mxs-specific capabilities here might not be that
+great.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+But since it's only for a mxs board for now, maybe we can rely on this
+and add a dt parameter if we need it in the future. I don't know, both
+make sense I guess.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
