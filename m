@@ -1,66 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 01 Aug 2012 08:56:14 +0100
-Subject: [PATCH 5/6] ARM: ux500: Enable HIGHMEM on all mop500 platforms
-In-Reply-To: <20120731220145.GD10335@n2100.arm.linux.org.uk>
-References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
- <5017EBDC.6010005@linaro.org> <20120731143732.GS6802@n2100.arm.linux.org.uk>
- <201207312050.03113.arnd@arndb.de>
- <20120731220145.GD10335@n2100.arm.linux.org.uk>
-Message-ID: <5018E11E.7080907@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 1 Aug 2012 16:20:26 +0800
+Subject: [06/10,V2] spi: Add SPI driver for mx233/mx28
+In-Reply-To: <20504.56543.699097.320114@ipc1.ka-ro>
+References: <1341555449-17507-6-git-send-email-marex@denx.de>
+ <201208010810.37652.marex@denx.de>
+ <20120801063936.GC2764@roeck-us.net>
+ <201208010845.19361.marex@denx.de>
+ <20120801074051.GG1672@S2100-06.ap.freescale.net>
+ <20504.56543.699097.320114@ipc1.ka-ro>
+Message-ID: <20120801082024.GJ1672@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/07/12 23:01, Russell King - ARM Linux wrote:
-> On Tue, Jul 31, 2012 at 08:50:02PM +0000, Arnd Bergmann wrote:
->> On Tuesday 31 July 2012, Russell King - ARM Linux wrote:
->>> I still fail to see how not having highmem enabled would ever cause memory
->>> corruption errors (unless something dealing with memory in a very very
->>> wrong way - iow, not using one of the reservation or memory allocation
->>> methods provided by the kernel.)
->>
->> The problem is that all users of ux500 systems pass a command line like
->>
->> vmalloc=256M mem=128M at 0 mali.mali_mem=32M at 128M hwmem=168M at 160M mem=48M at 328M mem_issw=1M at 383M mem=640M at 384M
->>
->> This is of course totally bogus and should not be done. If I understand
->> Lee correctly, one of the issues resulting from passing a command
->> line like this without enabling highmem is memory corruption.
->
-> But the question is _why_ does that corruption happen.
->
->  From the above, we will end up with the kernel getting:
->
-> 0x00000000 - 0x07ffffff (128M @ 0)
-> 0x14800000 - 0x177fffff (48M  @ 328M)
-> 0x18000000 - 0x3fffffff (640M @ 384M)
->
-> with:
->
-> 0x08000000 - 0x081fffff used for mali
-> 0x0a000000 - 0x147fffff used for hwmem
-> 0x17f00000 - 0x17ffffff used for mem_issw
->
-> Now, with highmem disabled, the kernel should still map exactly the
-> regions: 0x00000000 - 0x07ffffff, 0x14800000 - 0x177fffff, into the
-> direct mapped region, and truncate the 0x18000000 - 0x3fffffff
-> region appropriately, reducing the amount of memory available such
-> that it won't overlap the vmalloc area (which you've specified to be
-> a minimum of 256M.)
->
-> This should _NOT_ cause any memory corruption.
->
-> So, come on guys.  Debugging is *mandatory* for this kind of problem.
-> Papering over it is obscene.
+On Wed, Aug 01, 2012 at 09:38:07AM +0200, Lothar Wa?mann wrote:
+> Shawn Guo writes:
+> > On Wed, Aug 01, 2012 at 08:45:19AM +0200, Marek Vasut wrote:
+> > > > I must be missing something.  Why do almost all spi drivers call it in the
+> > > > error path, even if there is no call to spi_master_get ?
+> > > 
+> > > To push the refcounting to 0, to deallocate the device, I'd say ...
+> > > 
+> > It's not going to work if spi_master_put is called without
+> > spi_master_get being called before that.
+> > 
+> spi_alloc_master() calls device_initialize() which resuires a
+> device_put() (called from spi_master_put()) to free the device.
+> 
+Ah, indeed.  I missed that kref_init() will initialize the refcount
+to 1.
 
-Actually I didn't go any further with it, as I changed to another 
-identical piece of hardware and couldn't reproduce the issue.
-
-FYI, here's the boot log from the broken board:
-
-http://paste.ubuntu.com/1102017/
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Shawn
