@@ -1,66 +1,50 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 01 Aug 2012 12:00:08 +0200
-Subject: [PATCH V2 5/5] arm: samsung: delete frame buffer header files from
- platform
-In-Reply-To: <037101cd6fc9$85386e30$8fa94a90$%kim@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 01 Aug 2012 19:03:55 +0900
+Subject: [PATCH V2 0/5] arm: samsung: Move FIMD headers to include/video/
+In-Reply-To: <5018FDF6.4020205@gmx.de>
 References: <1343737385-23337-1-git-send-email-l.krishna@samsung.com>
- <1343737385-23337-6-git-send-email-l.krishna@samsung.com>
- <02ee01cd6f89$f218b2c0$d64a1840$%kim@samsung.com>
- <CAL1wa8cShB7zDj-CPvfEncX+Up7enKM9MJOt-488dThj_tXbMA@mail.gmail.com>
- <037101cd6fc9$85386e30$8fa94a90$%kim@samsung.com>
-Message-ID: <5018FE28.8070907@samsung.com>
+ <02f701cd6f8d$5ca3e850$15ebb8f0$%kim@samsung.com> <5018FDF6.4020205@gmx.de>
+Message-ID: <037c01cd6fcc$f5cb10f0$e16132d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Florian Tobias Schandinat wrote:
+> 
+> On 08/01/2012 02:28 AM, Kukjin Kim wrote:
+> > Leela Krishna Amudala wrote:
+> >>
+> >> This patchset moves the contents of regs-fb-v4.h and regs-fb.h from
+> arch
+> >> side
+> >> to include/video/samsung_fimd.h
+> >>
+> >> This patchset is created and rebased against master branch of torvalds
+> >> tree.
+> >> Tested on smdk5250 board, build tested for other boards.
+> >>
+> > (Cc'ed Florian Tobias Schandinat)
+> >
+> > Yeah, since it's merge window, this series could be created against on
+> > mainline. And IMO, would be helpful to us if this series could be sent
+> to
+> > upstream via samsung tree after reviewing, because this touches too many
+> > files in samsung tree and just adds include/video/samsung_fimd.h. But
+> I'm
+> > not sure the added inclusion will be used in other file of
+drivers/video.
+> If
+> > so, I can provide some topic branch can be merged into Florian's tree.
+> > Florian, how about?
+> 
+> Using a topic branch to merge it in both trees sounds like a good plan
+> to me.
+> 
+Sure, if this change is ready, I will create topic branch then let you know.
 
-On 08/01/2012 11:39 AM, Kukjin Kim wrote:
-> Leela Krishna Amudala wrote:
->> On Wed, Aug 1, 2012 at 7:34 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->>> Leela Krishna Amudala wrote:
->>>>
->>>> The FIMD register headers are moved to include/video/
->>>> hence, deleting these files from platform side
->>>>
->>>> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
->>>> ---
->>>>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h |  159 ---------
->>>>  arch/arm/plat-samsung/include/plat/regs-fb.h    |  403
->>> -------------------
->>>> ----
->>>>  2 files changed, 0 insertions(+), 562 deletions(-)
->>>>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
->>>>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb.h
->>>>
->>> No. This should be squashed into first patch on this series. See below.
->>>
->>>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h    |  159
->>> --------------------
->>>  .../plat/regs-fb.h => include/video/samsung_fimd.h |  145
->>> ++++++++++++++++--
->>>  2 files changed, 134 insertions(+), 170 deletions(-)
->>>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
->>>  rename arch/arm/plat-samsung/include/plat/regs-fb.h =>
->>> include/video/samsung_fimd.h (74%)
->>>
->>
->> If I squash it with the first patch and if somebody set that as a head
->> commit, it will break the build. Hence, splitted it up from the first
->> patch.
->>
-> NACK. your changes are not adding just moving. So should be squashed. If
-> required, you could create just one patch for moving them, probably, 1st,
-> 3rd, 4th and 5th patches into one patch.
+Thanks.
 
-Yes, this patch series is mainly moving files around. But to avoid git
-bisect breakage, it should be split as it is done now, or the whole
-series should be squashed into one patch. The latter might be even easier
-to handle, but having a single patch touching arch/arm/ and drivers/
-might not be a good idea. If you're fine handling that, then we just
-need to squash this series into single patch.
-It just need to be ensured, IMO, there is no bisection breakage.
-
+Best regards,
+Kgene.
 --
-
-Regards,
-Sylwester
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
