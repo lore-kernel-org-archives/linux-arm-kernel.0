@@ -1,68 +1,74 @@
 From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Wed, 1 Aug 2012 10:34:59 -0400
-Subject: [Xen-devel] [PATCH 11/24] xen/arm: introduce CONFIG_XEN on ARM
-In-Reply-To: <1343316846-25860-11-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Wed, 1 Aug 2012 10:35:51 -0400
+Subject: [Xen-devel] [PATCH 04/24] xen/arm: sync_bitops
+In-Reply-To: <1343381305.6812.116.camel@zakaz.uk.xensource.com>
 References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-11-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20120801143459.GH7227@phenom.dumpdata.com>
+ <1343316846-25860-4-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120726163759.GE9222@phenom.dumpdata.com>
+ <1343381305.6812.116.camel@zakaz.uk.xensource.com>
+Message-ID: <20120801143551.GI7227@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2012 at 04:33:53PM +0100, Stefano Stabellini wrote:
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> ---
->  arch/arm/Kconfig |   10 ++++++++++
->  1 files changed, 10 insertions(+), 0 deletions(-)
+On Fri, Jul 27, 2012 at 10:28:25AM +0100, Ian Campbell wrote:
+> On Thu, 2012-07-26 at 17:37 +0100, Konrad Rzeszutek Wilk wrote:
+> > On Thu, Jul 26, 2012 at 04:33:46PM +0100, Stefano Stabellini wrote:
+> > > sync_bitops functions are equivalent to the SMP implementation of the
+> > > original functions, independently from CONFIG_SMP being defined.
+> > 
+> > So why can't the code be changed to use that? Is it that
+> > the _set_bit, _clear_bit, etc are not available with !CONFIG_SMP?
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a91009c..9c54cb4 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -2228,6 +2228,16 @@ config NEON
->  	  Say Y to include support code for NEON, the ARMv7 Advanced SIMD
->  	  Extension.
->  
-> +config XEN_DOM0
-> +	def_bool y
-
-What is the benefit of this ? I was hoping at some point to rip out all of those
-XEN_DOM0 and just have, mostly,
-	CONFIG_XEN_BACKEND_SUPPORT
-		(which would compile whatever is needed for HVM or PV guests to run
-		blkback/netback/grant/grantalloc/etc)
-	CONFIG_XEN_FRONTEND_SUPPORT
-		(the vice-versa)
-
-	CONFIG_XEN_PCI
-		which would have the PCI support, the ACPI routing (which is
-		predomaintaly most of the dom0 support), VGA text support, and
-		whatever else is in there.
-
-In that fashion you could compile a kernel with CONFIG_XEN_BACKEND_SUPPORT
-without any CONFIG_XEN_PCI and drop it in as an HVM device driver domain.
-Thought maybe that wouldn't really work as if you do PCI passthrough to such
-domain, you are going to need the PCI support and ACPI routing. The VGA text
-maybe not...
-
-OK, never mind - we should brainstorm it and figure out how to make this
-nicely work. In the meantime this is OK.
-
-> +
-> +config XEN
-> +	bool "Xen guest support on ARM"
-> +	depends on ARM && OF
-> +	select XEN_DOM0
-> +	help
-> +	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
-> +
->  endmenu
->  
->  menu "Userspace binary formats"
-> -- 
-> 1.7.2.5
+> _set_bit etc are not SMP safe if !CONFIG_SMP. But under Xen you might be
+> communicating with a completely external entity who might be on another
+> CPU (e.g. two uniprocessor guests communicating via event channels and
+> grant tables). So we need a variant of the bit ops which are SMP safe
+> even on a UP kernel.
 > 
+> The users are common code and the sync_foo vs foo distinction matters on
+> some platforms (e.g. x86 where a UP kernel would omit the LOCK prefix
+> for the normal ones).
+
+OK, that makes sense. Stefano can you include that comment in the git
+commit description and in the sync_bitops.h file please?
 > 
-> _______________________________________________
-> Xen-devel mailing list
-> Xen-devel at lists.xen.org
-> http://lists.xen.org/xen-devel
+> > 
+> > > 
+> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > ---
+> > >  arch/arm/include/asm/sync_bitops.h |   17 +++++++++++++++++
+> > >  1 files changed, 17 insertions(+), 0 deletions(-)
+> > >  create mode 100644 arch/arm/include/asm/sync_bitops.h
+> > > 
+> > > diff --git a/arch/arm/include/asm/sync_bitops.h b/arch/arm/include/asm/sync_bitops.h
+> > > new file mode 100644
+> > > index 0000000..d975092903
+> > > --- /dev/null
+> > > +++ b/arch/arm/include/asm/sync_bitops.h
+> > > @@ -0,0 +1,17 @@
+> > > +#ifndef __ASM_SYNC_BITOPS_H__
+> > > +#define __ASM_SYNC_BITOPS_H__
+> > > +
+> > > +#include <asm/bitops.h>
+> > > +#include <asm/system.h>
+> > > +
+> > > +#define sync_set_bit(nr, p)		_set_bit(nr, p)
+> > > +#define sync_clear_bit(nr, p)		_clear_bit(nr, p)
+> > > +#define sync_change_bit(nr, p)		_change_bit(nr, p)
+> > > +#define sync_test_and_set_bit(nr, p)	_test_and_set_bit(nr, p)
+> > > +#define sync_test_and_clear_bit(nr, p)	_test_and_clear_bit(nr, p)
+> > > +#define sync_test_and_change_bit(nr, p)	_test_and_change_bit(nr, p)
+> > > +#define sync_test_bit(nr, addr)		test_bit(nr, addr)
+> > > +#define sync_cmpxchg			cmpxchg
+> > > +
+> > > +
+> > > +#endif
+> > > -- 
+> > > 1.7.2.5
+> > > 
+> > > 
+> > > _______________________________________________
+> > > Xen-devel mailing list
+> > > Xen-devel at lists.xen.org
+> > > http://lists.xen.org/xen-devel
+> 
