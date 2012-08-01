@@ -1,45 +1,30 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 1 Aug 2012 08:41:34 +0200
-Subject: [06/10,V2] spi: Add SPI driver for mx233/mx28
-In-Reply-To: <20120801063639.GB2764@roeck-us.net>
-References: <1341555449-17507-6-git-send-email-marex@denx.de>
- <CAM=Q2csm1m8DCd8__NAUCmk6AN=Czg_=nm4c3ervAgOhOtoMTw@mail.gmail.com>
- <20120801063639.GB2764@roeck-us.net>
-Message-ID: <201208010841.34805.marex@denx.de>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 1 Aug 2012 14:42:31 +0800
+Subject: [PATCH v4 1/3] USB: chipidea: add imx usbmisc support
+In-Reply-To: <20120801063437.GF30009@pengutronix.de>
+References: <1343789469-26821-1-git-send-email-richard.zhao@freescale.com>
+ <1343789469-26821-2-git-send-email-richard.zhao@freescale.com>
+ <20120801063437.GF30009@pengutronix.de>
+Message-ID: <20120801064230.GA29944@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Guenter Roeck,
+> Could it be that something is missing in this patch? I don't see struct
+> usbmisc_usb_device defined anywhere in this patch.
+ah, Sorry I missed the header file. I'll send a new version.
 
-> On Wed, Aug 01, 2012 at 11:16:15AM +0530, Shubhrajyoti Datta wrote:
-> > On Wed, Aug 1, 2012 at 10:59 AM, Guenter Roeck <linux@roeck-us.net> wrote:
-> > > On Wed, Aug 01, 2012 at 07:00:54AM +0200, Marek Vasut wrote:
-> > >> Dear Shawn Guo,
-> > >> 
-> > >> > On Tue, Jul 31, 2012 at 08:35:59PM -0700, Guenter Roeck wrote:
-> > >> > > I think the call to spi_master_put() triggers the call to
-> > >> > > spi_master_release(). If so, kfree() would not be needed at all,
-> > >> > > and the documentation is wrong.
-> > >> > 
-> > >> > Also those drivers calling kfree in probe.
-> > >> 
-> > >> Looks like that to me ...
-> > > 
-> > > Doesn't seem to be far spread, fortunately. Only spi-davinci.c,
-> > > spi-imx.c, and spi-omap2-mcspi.c
-> > 
-> > I have a  omapsdp I could patch spi-omap2-mcspi.c  file thanks for the
-> > catch.
+Thanks
+Richard
 > 
-> For that it would be good to determine if there is a memory leak when
-> removing the driver (I don't see where the memory allocated with
-> spi_alloc_master is removed).
-
-When the refcounting for the device reaches 0, it's deallocated. (Aka _put long 
-enough and it'll disappear)
-
-> Thanks,
-> Guenter
-
-Best regards,
-Marek Vasut
+> Sascha
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
