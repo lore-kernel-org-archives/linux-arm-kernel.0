@@ -1,9 +1,9 @@
 From: mturquette@ti.com (Mike Turquette)
-Date: Thu, 2 Aug 2012 14:20:25 -0700
+Date: Thu, 2 Aug 2012 14:28:18 -0700
 Subject: [PATCH] arm:davinci: clk - migrate to new common clock API
 In-Reply-To: <1343926428-5210-1-git-send-email-m-karicheri2@ti.com>
 References: <1343926428-5210-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20120802212025.GI29410@gmail.com>
+Message-ID: <20120802212818.GJ29410@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,10 +21,15 @@ On 20120802-12:53, Murali Karicheri wrote:
 
 Murali,
 
-The important thing to know about clk_prepare is that it might sleep.
-All of the functions below look like initialization functions for code
-that is never run in interrupt context.  If you can confirm that this is
-true then feel free to add my,
+The patch $subject is a bit misleading.  This patch is preparation for
+converting davinci over to the common clk framework.  How about:
+
+arm: davinci: clk: call clk_prepare_enable
+
+Also, the important thing to know about clk_prepare is that it might
+sleep.  All of the functions below look like initialization functions
+for code that is never run in interrupt context.  If you can confirm
+that this is true then feel free to add my,
 
 Reviewed-by: Mike Turquette <mturquette@linaro.org>
 
