@@ -1,59 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Aug 2012 14:12:50 +0100
-Subject: omap_device: query on "fck" clk alias created
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA7DF5C@DBDE01.ent.ti.com>
-References: <50191F00.1040501@ti.com>
- <20120801141414.GM7405@n2100.arm.linux.org.uk>
- <79CD15C6BA57404B839C016229A409A83EA7DF5C@DBDE01.ent.ti.com>
-Message-ID: <20120802131250.GO7405@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 02 Aug 2012 15:35:22 +0200
+Subject: [PATCH 1/4] video: Add support for the Solomon SSD1307 OLED
+ Controller
+In-Reply-To: <20120802003422.GA2253@S2101-09.ap.freescale.net>
+References: <1343730576-20494-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1343730576-20494-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20120801052424.GD1672@S2100-06.ap.freescale.net>
+ <501904CB.9040104@free-electrons.com>
+ <20120802003422.GA2253@S2101-09.ap.freescale.net>
+Message-ID: <501A821A.2060209@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 02, 2012 at 01:04:37PM +0000, Hiremath, Vaibhav wrote:
-> On Wed, Aug 01, 2012 at 19:44:14, Russell King - ARM Linux wrote:
-> > On Wed, Aug 01, 2012 at 05:50:16PM +0530, Vaibhav Hiremath wrote:
-> > > The clk_get() api will not work, unless we pass both the arguments (dev,
-> > > con_id) properly. Now expecting driver to always label con_id with "fck"
-> > > is undesirable, as the same driver can be reused on multiple platforms,
-> > > which can be non-omap and/or non-ti platforms.
-> > 
-> > Why not?
-> > 
-> > The connection ID is defined by the driver, and the platform stuff is
-> > expected to provide drivers with what they require.  It's not the other
-> > way around (platforms don't tell drivers what they require.)
-> > 
-> > In other words, if the device has two clocks, one called ick and one called
-> > fck, then the device _should_ use clk_get() specifying "ick" for one, and
-> > "fck" for the other.
-> > 
-> > And platforms better provide an "ick" and a "fck" for the device, even if
-> > they have no respresentation for one or other of them (in which case you
-> > supply a dummy clock.)
-> > 
+Le 02/08/2012 02:34, Shawn Guo a ?crit :
+> On Wed, Aug 01, 2012 at 12:28:27PM +0200, Maxime Ripard wrote:
+>> Thanks for the tip.
+>> However, I'm not sure this device will be mxs specific, since this
+>> controller is used on some other devices as well (I know for example
+>> that some uses it with the Arduino, even though it's not related to
+>> Linux), so relying on mxs-specific capabilities here might not be that
+>> great.
+>>
+> Ok, agreed.  In that case, putting "1" in last cell of oled-reset-gpio
+> does not make any point then.
 > 
-> Russell, I completely agree with you, infact I am on the same page.
-> Let me give you a real example, which I am dealing with now,
+> +Examples:
+> +ssd1307: oled at 3c {
+> +        compatible = "solomon,ssd1307fb-i2c";
+> +        reg = <0x3c>;
+> +        pwms = <&pwm 4 3000>;
+> +        oled-reset-gpio = <&gpio2 7 1>;
+> +        oled-reset-active-low;
+> +};
 > 
-> On AM335x device we have integrated DCAN, this IP is not from TI.
-> IP is from Bosch and doesn't follow any of the TI IP standards, like 
-> HighLander spec. The IP is just integrated with interconnect bus and given a 
-> required clocksource (in this case its one clock). 
-> 
-> The driver for this IP is generic, (drivers/net/can/c_can/c_can_platform.c) 
-> obviously used across non-ti devices already and driver is implemented with,
->     clk_get(dev, NULL);
+Ok, I will do that then.
 
-So, elsewhere it only has one clock.  Are there any other clocks it needs
-on OMAP?
+Maxime
 
-If the answer is no, then the driver is doing the right thing, and OMAP's
-clk stuff needs to be adjusted to suit the drivers requirements.
-
-I've said many times over the years that clock connection IDs are defined
-by the device or driver and *nothing* else - they're certainly *not* source
-names.
-
-That's why, when I modified OMAP drivers to fix them, and they take an
-interface and function clock, they end up asking for "ick" and "fck" not
-"blah_ick" and "blah_fck".
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
