@@ -1,37 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 01 Aug 2012 17:20:44 -0000
-Subject: [RFC 20/22] ARM: keystone: introducing TI Keystone platform
-In-Reply-To: <50194E14.4070301@ti.com>
-References: <1343775898-28345-1-git-send-email-cyril@ti.com>
- <201207312316.19592.arnd@arndb.de> <50194E14.4070301@ti.com>
-Message-ID: <3021860.0mUoOFAv0G@wuerfel>
+From: luffy.sun@ymail.com (Luffy Sun)
+Date: Thu, 02 Aug 2012 06:00:25 -0000
+Subject: Vector Modified
+Message-ID: <1343887222.77573.YahooMailNeo@web121605.mail.ne1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 01 August 2012 11:41:08 Cyril Chemparathy wrote:
-> On 7/31/2012 7:16 PM, Arnd Bergmann wrote:
-> > On Tuesday 31 July 2012, Cyril Chemparathy wrote:
-> >> Texas Instruments Keystone family of multicore devices now includes an
-> >> upcoming slew of Cortex A15 based devices.  This patch adds basic definitions
-> >> for a new Keystone sub-architecture in ARM.
-> >>
-> >> Subsequent patches in this series will extend support to include SMP and take
-> >> advantage of the large physical memory addressing capabilities via LPAE.
-> >>
-> >> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-> >> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-> >
-> > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> >
-> 
-> Thanks for taking a look, Arnd.
-> 
-> Any inputs on the other patches in this series?
+Hi,? All,
 
-I briefly looked over them and they largely looked ok, but I'm not really
-qualified to comment on most of them.
 
-	Arnd
+
+I have tested crashme on Marvell PXA920 processor with kernel 3.5-rc6.? System will hang 
+during testing. 
+Sometimes, the board could be connected by JTAG.? I found the?vector_dabt(address 0xFFFF0010) have been
+modified. The instruction 
+should be a jump instruction. But it have been modified to "BKPT 0x1"? or "Undefined".
+The Vector modification doesn't? happen every time when testing.? 
+
+
+Have anyone encountered with this status ?? Why arm vector is modified?
+Thanks in advance.
+
+BR,
+Luffy
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120801/69d764d0/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120802/e6ef379a/attachment.html>
