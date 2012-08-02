@@ -1,44 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 02 Aug 2012 15:35:22 +0200
-Subject: [PATCH 1/4] video: Add support for the Solomon SSD1307 OLED
- Controller
-In-Reply-To: <20120802003422.GA2253@S2101-09.ap.freescale.net>
-References: <1343730576-20494-1-git-send-email-maxime.ripard@free-electrons.com>
- <1343730576-20494-2-git-send-email-maxime.ripard@free-electrons.com>
- <20120801052424.GD1672@S2100-06.ap.freescale.net>
- <501904CB.9040104@free-electrons.com>
- <20120802003422.GA2253@S2101-09.ap.freescale.net>
-Message-ID: <501A821A.2060209@free-electrons.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Thu, 2 Aug 2012 10:13:41 -0400
+Subject: [Xen-devel] [PATCH 01/24] arm: initial Xen support
+In-Reply-To: <1343892951.7571.50.camel@dagon.hellion.org.uk>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <50197527.3070007@gmail.com>
+ <1343892951.7571.50.camel@dagon.hellion.org.uk>
+Message-ID: <20120802141341.GE16749@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 02/08/2012 02:34, Shawn Guo a ?crit :
-> On Wed, Aug 01, 2012 at 12:28:27PM +0200, Maxime Ripard wrote:
->> Thanks for the tip.
->> However, I'm not sure this device will be mxs specific, since this
->> controller is used on some other devices as well (I know for example
->> that some uses it with the Arduino, even though it's not related to
->> Linux), so relying on mxs-specific capabilities here might not be that
->> great.
->>
-> Ok, agreed.  In that case, putting "1" in last cell of oled-reset-gpio
-> does not make any point then.
+On Thu, Aug 02, 2012 at 08:35:51AM +0100, Ian Campbell wrote:
+> On Wed, 2012-08-01 at 19:27 +0100, Rob Herring wrote:
+> > On 07/26/2012 10:33 AM, Stefano Stabellini wrote:
+> > > - Basic hypervisor.h and interface.h definitions.
+> > > - Skelethon enlighten.c, set xen_start_info to an empty struct.
+> > > - Do not limit xen_initial_domain to PV guests.
+> > > 
+> > > The new code only compiles when CONFIG_XEN is set, that is going to be
+> > > added to arch/arm/Kconfig in a later patch.
+> > > 
+> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > ---
+> > >  arch/arm/Makefile                     |    1 +
+> > >  arch/arm/include/asm/hypervisor.h     |    6 +++
+> > >  arch/arm/include/asm/xen/hypervisor.h |   19 ++++++++++
+> > >  arch/arm/include/asm/xen/interface.h  |   64 +++++++++++++++++++++++++++++++++
+> > 
+> > These headers don't seem particularly ARM specific. Could they be moved
+> > to asm-generic or include/linux?
 > 
-> +Examples:
-> +ssd1307: oled at 3c {
-> +        compatible = "solomon,ssd1307fb-i2c";
-> +        reg = <0x3c>;
-> +        pwms = <&pwm 4 3000>;
-> +        oled-reset-gpio = <&gpio2 7 1>;
-> +        oled-reset-active-low;
-> +};
+> Or perhaps include/xen.
 > 
-Ok, I will do that then.
+> A bunch of it also looks like x86 specific stuff which has crept in.
+> e.g. PARAVIRT_LAZY_FOO and paravirt_get_lazy_mode() are arch/x86
+> specific and shouldn't be called from common code (and aren't, AFAICT).
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+The could be moved out..
