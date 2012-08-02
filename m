@@ -1,73 +1,46 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 2 Aug 2012 13:12:56 +0100
-Subject: [PATCH 17/19] Documentation: Define the MOP500 Audio Machine
- Driver Device Tree bindings
-In-Reply-To: <20120731135337.GM4468@opensource.wolfsonmicro.com>
-References: <1343741953-17828-1-git-send-email-lee.jones@linaro.org>
- <1343741953-17828-18-git-send-email-lee.jones@linaro.org>
- <20120731135337.GM4468@opensource.wolfsonmicro.com>
-Message-ID: <20120802121255.GA22201@gmail.com>
+Date: Thu, 2 Aug 2012 13:21:03 +0100
+Subject: [PATCH 1/6] ASoC: dapm: If one widget fails, do not force all
+ subsequent widgets to fail too
+In-Reply-To: <1343741493-17671-3-git-send-email-lee.jones@linaro.org>
+References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
+ <1343741493-17671-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20120802122101.GA22228@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lee Jones <lee.jones@linaro.org>
-Date: Tue, 31 Jul 2012 11:56:51 +0100
-Subject: [PATCH 1/1] Documentation: Define the MOP500 Audio Machine Driver
- Device Tree bindings
+Patch withdrawn.
 
-Here we add the required documentation for the new Device Tree
-bindings pertaining to the MOP500 Audio Machine driver.
+On Tue, Jul 31, 2012 at 02:31:23PM +0100, Lee Jones wrote:
+> If a list of widgets is provided and one of them fails to be added as
+> a control, the present semantics fail all subsequent widgets. A better
+> solution would be to only fail that widget, but pursue in attempting
+> to add the rest of the list.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  sound/soc/soc-dapm.c |    2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/sound/soc/soc-dapm.c b/sound/soc/soc-dapm.c
+> index eded657..7d9c154 100644
+> --- a/sound/soc/soc-dapm.c
+> +++ b/sound/soc/soc-dapm.c
+> @@ -3095,8 +3095,6 @@ int snd_soc_dapm_new_controls(struct snd_soc_dapm_context *dapm,
+>  			dev_err(dapm->dev,
+>  				"ASoC: Failed to create DAPM control %s\n",
+>  				widget->name);
+> -			ret = -ENOMEM;
+> -			break;
+>  		}
+>  		widget++;
+>  	}
+> -- 
+> 1.7.9.5
+> 
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- .../devicetree/bindings/sound/ux500-mop500.txt     |   39 ++++++++++++++++++++
- 1 file changed, 39 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/ux500-mop500.txt
-
-diff --git a/Documentation/devicetree/bindings/sound/ux500-mop500.txt b/Documentation/devicetree/bindings/sound/ux500-mop500.txt
-new file mode 100644
-index 0000000..48e071c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/ux500-mop500.txt
-@@ -0,0 +1,39 @@
-+* MOP500 Audio Machine Driver
-+
-+This node is responsible for linking together all ux500 Audio Driver components.
-+
-+Required properties:
-+ - compatible              : "stericsson,snd-soc-mop500"
-+
-+Non-standard properties:
-+ - stericsson,cpu-dai      : Phandle to the CPU-side DAI
-+ - stericsson,audio-codec  : Phandle to the Audio CODEC
-+ - stericsson,card-name    : Over-ride default card name
-+
-+Example:
-+
-+	sound {
-+		compatible = "stericsson,snd-soc-mop500";
-+
-+		stericsson,cpu-dai = <&msp1 &msp3>;
-+		stericsson,audio-codec = <&codec>;
-+	};
-+
-+	msp1: msp at 80124000 {
-+		compatible = "stericsson,ux500-msp-i2s";
-+		reg = <0x80124000 0x1000>;
-+		interrupts = <0 62 0x4>;
-+		v-ape-supply = <&db8500_vape_reg>;
-+	};
-+
-+	msp3: msp at 80125000 {
-+		compatible = "stericsson,ux500-msp-i2s";
-+		reg = <0x80125000 0x1000>;
-+		interrupts = <0 62 0x4>;
-+		v-ape-supply = <&db8500_vape_reg>;
-+	};
-+
-+	codec: ab8500-codec {
-+		compatible = "stericsson,ab8500-codec";
-+		stericsson,earpeice-cmv = <950>; /* Units in mV. */
-+	};
 -- 
-1.7.9.5
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
