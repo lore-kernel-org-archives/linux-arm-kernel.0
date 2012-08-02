@@ -1,39 +1,60 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 2 Aug 2012 17:00:42 +0200
-Subject: [PATCH 08/10 RESEND] spi: Add DMA support into SPI driver
-In-Reply-To: <20120801203448.GX4483@opensource.wolfsonmicro.com>
-References: <1343076052-27312-1-git-send-email-marex@denx.de>
- <1343076052-27312-9-git-send-email-marex@denx.de>
- <20120801203448.GX4483@opensource.wolfsonmicro.com>
-Message-ID: <201208021700.43159.marex@denx.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 2 Aug 2012 16:01:23 +0100
+Subject: [PATCH] ARM: makefile: work around toolchain bug in recent
+ versions of binutils
+In-Reply-To: <20120802130411.GU6802@n2100.arm.linux.org.uk>
+References: <1343910206-3684-1-git-send-email-will.deacon@arm.com>
+ <20120802130411.GU6802@n2100.arm.linux.org.uk>
+Message-ID: <20120802150123.GE9838@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mark Brown,
+Hi Russell,
 
-> On Mon, Jul 23, 2012 at 10:40:50PM +0200, Marek Vasut wrote:
-> > +		/*
-> > +		 * Small blocks can be transfered via PIO.
-> > +		 * Measured by empiric means:
-> > +		 *
-> > +		 * dd if=/dev/mtdblock0 of=/dev/null bs=1024k count=1
-> > +		 *
-> > +		 * DMA only: 2.164808 seconds, 473.0KB/s
-> > +		 * Combined: 1.676276 seconds, 610.9KB/s
-> > +		 */
+On Thu, Aug 02, 2012 at 02:04:11PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Aug 02, 2012 at 01:23:26PM +0100, Will Deacon wrote:
+> > Recent upstream versions of binutils fail to assembler compressed/head.S
+> > when passed the -march=all option:
+> > 
+> > http://lists.gnu.org/archive/html/bug-binutils/2011-04/msg00162.html
+> > 
+> > The recommended workaround from the tools folks is not to pass the
+> > option, and instead let the assembler deduce the CPU type based on the
+> > features used by the code.
 > 
-> I've seen other devices end up using the FIFO length as the decision
-> point here which makes intuitive sense to me unless the FIFO is
-> extremely deep.
+> That doesn't work for all binutils - binutils historically has had to be
+> told explicitly what architecture its building for and won't "deduce"
+> it from the code.
 
-Yep, that's all good. This device has not too deep FIFO, but the reason I chose 
-not to go that way is because the DMA allocations have some overhead too and 
-this values seemed to be the best.
+Damn. I thought there would be a reason why we passed the option in the
+first place.
 
-> Not reviewed this properly yet but it looks OK from a first read
-> through.
+> Maybe this needs to be a build-time test whether the assembler accepts it?
 
-Thanks!
+That could be tricky since gas still accepts the option, but fails later
+with:
 
-Best regards,
-Marek Vasut
+arch/arm/boot/compressed/head.S: Assembler messages:
+arch/arm/boot/compressed/head.S:127: Error: selected processor does not support requested special purpose register -- `mrs r2,cpsr'
+arch/arm/boot/compressed/head.S:134: Error: selected processor does not support requested special purpose register -- `mrs r2,cpsr'
+arch/arm/boot/compressed/head.S:136: Error: selected processor does not support requested special purpose register -- `msr cpsr_c,r2'
+
+How about grabbing the march from KBUILD_AFLAGS instead (see below)?
+
+Will
+
+---8<---
+
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index bb26756..3774f0d 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -126,7 +126,7 @@ KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
+ endif
+ 
+ ccflags-y := -fpic -fno-builtin -I$(obj)
+-asflags-y := -Wa,-march=all
++asflags-y := -Wa,$(lastword $(filter -march=%,$(KBUILD_AFLAGS)))
+ 
+ # Supply kernel BSS size to the decompressor via a linker symbol.
+ KBSS_SZ = $(shell $(CROSS_COMPILE)size $(obj)/../../../../vmlinux | \
