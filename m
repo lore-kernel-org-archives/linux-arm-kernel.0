@@ -1,39 +1,28 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 2 Aug 2012 10:11:49 -0700
-Subject: [GIT PULL][for 3.6] pull request from board branch in pxa git tree
-In-Reply-To: <CAN1soZxxZMy7iVx=r1XwaxfXVLAXBGd03t5rv7PM4A7dQm_HFA@mail.gmail.com>
-References: <CAN1soZxxZMy7iVx=r1XwaxfXVLAXBGd03t5rv7PM4A7dQm_HFA@mail.gmail.com>
-Message-ID: <20120802171149.GA26795@quad.lixom.net>
+Date: Thu, 2 Aug 2012 10:12:18 -0700
+Subject: [PATCH] ARM: PRIMA2: delete redundant codes to restore LATCHED
+ when timer resumes
+In-Reply-To: <1343626170-27831-1-git-send-email-Barry.Song@csr.com>
+References: <1343626170-27831-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <20120802171218.GB26795@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jul 30, 2012 at 01:29:30PM +0800, Barry Song wrote:
+> From: Barry Song <Baohua.Song@csr.com>
+> 
+> The only way to write LATCHED registers to write LATCH_BIT to LATCH register,
+> that will latch COUNTER into LATCHED.e.g.
+> writel_relaxed(SIRFSOC_TIMER_LATCH_BIT, sirfsoc_timer_base +
+> 	SIRFSOC_TIMER_LATCH);
+> 
+> Writing values to LATCHED registers directly is useless at all.
+> 
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-On Tue, Jul 31, 2012 at 09:39:55AM +0800, Haojian Zhuang wrote:
-> Hi Arnd & Olof,
-> 
-> Please help to pull these from board branch of pxa git tree for v3.6
-> 
-> Regards
-> Haojian
-> 
-> The following changes since commit 28a33cbc24e4256c143dce96c7d93bf423229f92:
-> 
->   Linux 3.5 (2012-07-21 13:58:29 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/hzhuang1/linux.git board
-> 
+Based on off-list email, applied to fixes.
 
-I'm not sure what to think of this branch. It contains one bugfix
-(missing include) and one feature.
 
-All features for a merge window should be in our tree by the time the
-merge window opens.
-
-I've pulled it in this time, but please don't send features this late
-again -- queue them up for the next merge window instead.
-
+Thanks,
 
 -Olof
