@@ -1,46 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 2 Aug 2012 13:21:03 +0100
-Subject: [PATCH 1/6] ASoC: dapm: If one widget fails, do not force all
- subsequent widgets to fail too
-In-Reply-To: <1343741493-17671-3-git-send-email-lee.jones@linaro.org>
-References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
- <1343741493-17671-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120802122101.GA22228@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu,  2 Aug 2012 13:23:26 +0100
+Subject: [PATCH] ARM: makefile: work around toolchain bug in recent versions
+ of binutils
+Message-ID: <1343910206-3684-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch withdrawn.
+Recent upstream versions of binutils fail to assembler compressed/head.S
+when passed the -march=all option:
 
-On Tue, Jul 31, 2012 at 02:31:23PM +0100, Lee Jones wrote:
-> If a list of widgets is provided and one of them fails to be added as
-> a control, the present semantics fail all subsequent widgets. A better
-> solution would be to only fail that widget, but pursue in attempting
-> to add the rest of the list.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  sound/soc/soc-dapm.c |    2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/sound/soc/soc-dapm.c b/sound/soc/soc-dapm.c
-> index eded657..7d9c154 100644
-> --- a/sound/soc/soc-dapm.c
-> +++ b/sound/soc/soc-dapm.c
-> @@ -3095,8 +3095,6 @@ int snd_soc_dapm_new_controls(struct snd_soc_dapm_context *dapm,
->  			dev_err(dapm->dev,
->  				"ASoC: Failed to create DAPM control %s\n",
->  				widget->name);
-> -			ret = -ENOMEM;
-> -			break;
->  		}
->  		widget++;
->  	}
-> -- 
-> 1.7.9.5
-> 
+http://lists.gnu.org/archive/html/bug-binutils/2011-04/msg00162.html
 
+The recommended workaround from the tools folks is not to pass the
+option, and instead let the assembler deduce the CPU type based on the
+features used by the code.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/boot/compressed/Makefile |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index bb26756..0f7f3f4 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -126,7 +126,6 @@ KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
+ endif
+ 
+ ccflags-y := -fpic -fno-builtin -I$(obj)
+-asflags-y := -Wa,-march=all
+ 
+ # Supply kernel BSS size to the decompressor via a linker symbol.
+ KBSS_SZ = $(shell $(CROSS_COMPILE)size $(obj)/../../../../vmlinux | \
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.4.1
