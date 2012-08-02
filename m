@@ -1,60 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 2 Aug 2012 16:01:23 +0100
-Subject: [PATCH] ARM: makefile: work around toolchain bug in recent
- versions of binutils
-In-Reply-To: <20120802130411.GU6802@n2100.arm.linux.org.uk>
-References: <1343910206-3684-1-git-send-email-will.deacon@arm.com>
- <20120802130411.GU6802@n2100.arm.linux.org.uk>
-Message-ID: <20120802150123.GE9838@mudshark.cambridge.arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 2 Aug 2012 23:01:51 +0800
+Subject: [PATCH 1/2] ARM: imx: enable emi_slow_gate clock for imx5
+Message-ID: <1343919712-6240-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+The imx5 common clock migration causes a regression with smsc911x
+driver on imx53-ard board, where a smsc lan9220 controller gets
+connected on imx53 with EIM interface.  EIM needs clock emi_slow_gate
+to be functional.  In the new imx5 clock driver, there is no use count
+incremented for the clock by enabling it, so the framework closes the
+clock at late init time and makes EIM stop working then.
 
-On Thu, Aug 02, 2012 at 02:04:11PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Aug 02, 2012 at 01:23:26PM +0100, Will Deacon wrote:
-> > Recent upstream versions of binutils fail to assembler compressed/head.S
-> > when passed the -march=all option:
-> > 
-> > http://lists.gnu.org/archive/html/bug-binutils/2011-04/msg00162.html
-> > 
-> > The recommended workaround from the tools folks is not to pass the
-> > option, and instead let the assembler deduce the CPU type based on the
-> > features used by the code.
-> 
-> That doesn't work for all binutils - binutils historically has had to be
-> told explicitly what architecture its building for and won't "deduce"
-> it from the code.
+Enable emi_slow_gate in clock driver initialization to fix the
+regression.
 
-Damn. I thought there would be a reason why we passed the option in the
-first place.
+Cc: stable at vger.kernel.org
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/clk-imx51-imx53.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-> Maybe this needs to be a build-time test whether the assembler accepts it?
-
-That could be tricky since gas still accepts the option, but fails later
-with:
-
-arch/arm/boot/compressed/head.S: Assembler messages:
-arch/arm/boot/compressed/head.S:127: Error: selected processor does not support requested special purpose register -- `mrs r2,cpsr'
-arch/arm/boot/compressed/head.S:134: Error: selected processor does not support requested special purpose register -- `mrs r2,cpsr'
-arch/arm/boot/compressed/head.S:136: Error: selected processor does not support requested special purpose register -- `msr cpsr_c,r2'
-
-How about grabbing the march from KBUILD_AFLAGS instead (see below)?
-
-Will
-
----8<---
-
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index bb26756..3774f0d 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -126,7 +126,7 @@ KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
- endif
- 
- ccflags-y := -fpic -fno-builtin -I$(obj)
--asflags-y := -Wa,-march=all
-+asflags-y := -Wa,$(lastword $(filter -march=%,$(KBUILD_AFLAGS)))
- 
- # Supply kernel BSS size to the decompressor via a linker symbol.
- KBSS_SZ = $(shell $(CROSS_COMPILE)size $(obj)/../../../../vmlinux | \
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index f608669..6eee32a 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -303,6 +303,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+ 	clk_prepare_enable(clk[aips_tz2]); /* fec */
+ 	clk_prepare_enable(clk[spba]);
+ 	clk_prepare_enable(clk[emi_fast_gate]); /* fec */
++	clk_prepare_enable(clk[emi_slow_gate]);
+ 	clk_prepare_enable(clk[tmax1]);
+ 	clk_prepare_enable(clk[tmax2]); /* esdhc2, fec */
+ 	clk_prepare_enable(clk[tmax3]); /* esdhc1, esdhc4 */
+-- 
+1.7.5.4
