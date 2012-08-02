@@ -1,50 +1,126 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 02 Aug 2012 21:09:15 +0200
-Subject: [PATCH] ARM: makefile: work around toolchain bug in recent
- versions of binutils
-In-Reply-To: <20120802185033.GA2725@mudshark.cambridge.arm.com> (Will Deacon's
- message of "Thu, 2 Aug 2012 19:50:33 +0100")
-References: <1343910206-3684-1-git-send-email-will.deacon@arm.com>
- <20120802130411.GU6802@n2100.arm.linux.org.uk>
- <20120802150123.GE9838@mudshark.cambridge.arm.com>
- <20120802153030.GV6802@n2100.arm.linux.org.uk>
- <20120802155140.GF9838@mudshark.cambridge.arm.com>
- <20120802181810.GW6802@n2100.arm.linux.org.uk>
- <20120802185033.GA2725@mudshark.cambridge.arm.com>
-Message-ID: <87boit2js4.fsf@lebrac.rtp-net.org>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu,  2 Aug 2012 21:43:36 +0200
+Subject: [PATCH 2/2] net: davinci_mdio: add DT bindings
+In-Reply-To: <1343936616-29318-1-git-send-email-zonque@gmail.com>
+References: <1343936616-29318-1-git-send-email-zonque@gmail.com>
+Message-ID: <1343936616-29318-2-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon <will.deacon@arm.com> writes:
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+---
+ .../devicetree/bindings/net/davinci_mdio.txt       | 24 +++++++++++++
+ drivers/net/ethernet/ti/davinci_mdio.c             | 39 ++++++++++++++++++++++
+ 2 files changed, 63 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/davinci_mdio.txt
 
-> On Thu, Aug 02, 2012 at 07:18:10PM +0100, Russell King - ARM Linux wrote:
->> On Thu, Aug 02, 2012 at 04:51:41PM +0100, Will Deacon wrote:
->> > On Thu, Aug 02, 2012 at 04:30:30PM +0100, Russell King - ARM Linux wrote:
->> > > It might just be easier to specify something like -march=armv4 or
->> > > something like that, and then use .arch armv6 where required.
->> > 
->> > We could do that, but I worry that it will become very messy if/when people
->> > start adding things like virtualisation instructions (hvc and co) to the
->> > entry code. Using the same march flag for kernel and decompressor also keeps
->> > everything consistent.
->> 
->> But you're missing a fundamental point: the decompressor is not designed
->> to be built like that, it is designed to be built in such a way that it
->> works unmodified on any CPU type we have to date, whether you're building
->> a kernel for ARMv4 or ARMv7.
->> 
->> So, the code sequences which are architecture specific are only executed
->> after we've checked the ID registers to determine what we should be doing
->> for a particular CPU.
->
-> That's fine, *if* we can persuade the tools to build the thing for us. With
-> march=all, we got what we wanted but now that doesn't seem to work anymore.
->
-
-and we already had to fix -march=all in the past :
-http://sourceware.org/bugzilla/show_bug.cgi?id=12698
-
-So maybe would be easier to try to fix it instead of trying to
-workaround it ?
-
-Arnaud
+diff --git a/Documentation/devicetree/bindings/net/davinci_mdio.txt b/Documentation/devicetree/bindings/net/davinci_mdio.txt
+new file mode 100644
+index 0000000..03292a5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/davinci_mdio.txt
+@@ -0,0 +1,24 @@
++Davinci MDIO DT bindings
++
++Required properties:
++
++ - compatible : should be "ti,davinci-mdio"
++
++Optional properties:
++
++ - bus-freq : an integer to specify the bus speed
++
++Examples:
++
++	mdio: davinci_mdio at 4a101000 {
++		compatible = "ti,davinci-mdio";
++		ti,hwmods = "davinci_mdio";
++	};
++
++ or
++
++	mdio: davinci_mdio at 4a101000 {
++		compatible = "ti,davinci-mdio";
++		reg = <0x4a101000 0x100>;
++	};
++
+diff --git a/drivers/net/ethernet/ti/davinci_mdio.c b/drivers/net/ethernet/ti/davinci_mdio.c
+index b4b6015..2640cae 100644
+--- a/drivers/net/ethernet/ti/davinci_mdio.c
++++ b/drivers/net/ethernet/ti/davinci_mdio.c
+@@ -36,6 +36,8 @@
+ #include <linux/io.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/davinci_emac.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
+ 
+ /*
+  * This timeout definition is a worst-case ultra defensive measure against
+@@ -289,6 +291,37 @@ static int davinci_mdio_write(struct mii_bus *bus, int phy_id,
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id davinci_mdio_dt_ids[] = {
++	{ .compatible = "ti,davinci-mdio" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, davinci_mdio_dt_ids);
++
++static inline int davinci_mdio_probe_dt(struct device *dev,
++					struct mdio_platform_data *pdata)
++{
++	struct device_node *np = dev->of_node;
++	const struct of_device_id *of_id =
++			of_match_device(davinci_mdio_dt_ids, dev);
++	u32 tmp;
++
++	if (!of_id)
++		return 0;
++
++	if (of_property_read_u32(np, "bus-freq", &tmp) == 0)
++		pdata->bus_freq = tmp;
++
++	return 0;
++}
++#else
++static inline int davinci_mdio_probe_dt(struct device *dev,
++					struct mdio_platform_data *pdata)
++{
++	return 0;
++}
++#endif
++
+ static int __devinit davinci_mdio_probe(struct platform_device *pdev)
+ {
+ 	struct mdio_platform_data *pdata = pdev->dev.platform_data;
+@@ -306,6 +339,10 @@ static int __devinit davinci_mdio_probe(struct platform_device *pdev)
+ 
+ 	data->pdata = pdata ? (*pdata) : default_pdata;
+ 
++	ret = davinci_mdio_probe_dt(dev, pdata);
++	if (ret < 0)
++		goto free_mem;
++
+ 	data->bus = mdiobus_alloc();
+ 	if (!data->bus) {
+ 		dev_err(dev, "failed to alloc mii bus\n");
+@@ -389,6 +426,7 @@ bail_out:
+ 	pm_runtime_put_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ 
++free_mem:
+ 	kfree(data);
+ 
+ 	return ret;
+@@ -471,6 +509,7 @@ static struct platform_driver davinci_mdio_driver = {
+ 		.name	 = "davinci_mdio",
+ 		.owner	 = THIS_MODULE,
+ 		.pm	 = &davinci_mdio_pm_ops,
++		.of_match_table = of_match_ptr(davinci_mdio_dt_ids),
+ 	},
+ 	.probe = davinci_mdio_probe,
+ 	.remove = __devexit_p(davinci_mdio_remove),
+-- 
+1.7.11.2
