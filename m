@@ -1,54 +1,124 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 2 Aug 2012 10:45:48 -0700
-Subject: [GIT PULL 2/3] ARM: arm-soc: cpuidle enablement for OMAP
-Message-ID: <CAOesGMjpnTU=1PBT2PNJOVjNbFhGrwFB0ZskUqRs0TGdHbJ41A@mail.gmail.com>
+Date: Thu, 2 Aug 2012 10:46:31 -0700
+Subject: [GIT PULL 3/3] ARM: arm-soc Marvell Orion device-tree updates
+Message-ID: <CAOesGMjc0PBLEf_Ar=z9TX4bjHEMOVeshxQSmYpp9P=3G6_D_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Coupled cpuidle was meant to merge for 3.5 through Len Brown's tree, but
-didn't go in because the pull request ended up rejected. So it just got
-merged, and we got this staged branch that enables the coupled cpuidle
-code on OMAP.
+This branch contains a set of device-tree conversions for Marvell Orion
+platforms that were staged early but took a few tries to get the branch
+into a format where it was suitable for us to pick up.
 
-With a stable git workflow from the other maintainer we could have staged
-this earlier, but that wasn't the case so we have had to merge it late.
-
-The alternative is to hold it off until 3.7 but given that the code is
-well-isolated to OMAP and they are eager to see it go in, I didn't push
-back hard in that direction.
+Given that most people working on these platforms are hobbyists with
+limited time, we were a bit more flexible with merging it even though
+it came in late.
 
 ----------------------------------------------------------------
 
-The following changes since commit 516b7ab0b42b6dfe765f04a397e499d519e93825:
+The following changes since commit 4695ce021de2a3abdd593155bee291496e735cbf:
 
-  Merge branch 'fixes' into HEAD
+  Merge tag 'pm2' into HEAD
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/pm2
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/dt2
 
-for you to fetch changes up to 5c62202968d4aaf3bd50e19c421d66aec2e508e0:
+for you to fetch changes up to 15a1e1bafe2c924db6d370ad892d7da6c7d83598:
 
-  Merge branch 'for_3.6/pm/coupled-cpuidle' of
-git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm
-into late2/pm
+  Merge branch 'marvell/dt' into late2/dt
 
 ----------------------------------------------------------------
 
-Kevin Hilman (1):
-      ARM: OMAP4: CPUidle: add synchronization for coupled idle states
+Andrew Lunn (16):
+      Merge tag 'spi-3.6' into v3.5-rc7-dt-v3
+      Merge branch 'v3.5-rc7-fixes' into v3.5-rc7-dt-v3
+      ARM: Orion: DT support for IRQ and GPIO Controllers
+      ARM: Orion: Add arch support needed for I2C via DT.
+      ARM: Orion: DTify the watchdog timer.
+      ATA: sata_mv: Add device tree support
+      ARM: Kirkwood: Add basic device tree support for QNAP TS219.
+      ARM: Kirkwood: Use DT to configure SATA device.
+      ARM: Kirkwood: Describe DNS325 temperature sensor in DT.
+      ARM: Kirkwood: Describe IB62x0 gpio-keys in DT.
+      ARM: Kirkwood: Describe IB62x0 LEDs in DT.
+      ARM: Kirkwood: Describe iConnects temperature sensor in DT.
+      ARM: Kirkwood: Describe iConnects LEDs in DT.
+      ARM: Kirkwood: Describe Dreamplug LEDs in DT.
+      ARM: Kirkwood: Describe GoFlex Net LEDs and SATA in DT.
+      ARM: Kirkwood: Replace mrvl with marvell
+
+Jamie Lentin (3):
+      ARM: Kirkwood: Replace DNS-320/DNS-325 leds with dt bindings
+      ARM: Kirkwood: Move common portions into a kirkwood-dnskw.dtsi
+      ARM: Kirkwood: Describe DNS32? gpio-keys in DT.
+
+Josh Coombs (1):
+      ARM: Kirkwood: Initial DTS support for Kirkwood GoFlex Net
+
+Michael Walle (3):
+      ARM: kirkwood: use devicetree for orion-spi
+      ARM: kirkwood: Add LS-XHL and LS-CHLv2 support
+      ARM: kirkwood: use devicetree for SPI on dreamplug
 
 Olof Johansson (1):
-      Merge branch 'for_3.6/pm/coupled-cpuidle' of
-git://git.kernel.org/.../khilman/linux-omap-pm into late2/pm
-
-Santosh Shilimkar (3):
-      ARM: OMAP: timer: allow gp timer clock-event to be used on both cpus
-      ARM: OMAP4: CPUidle: Use coupled cpuidle states to implement SMP cpuidle.
-      ARM: OMAP4: CPUidle: Open broadcast clock-event device.
+      Merge branch 'marvell/dt' into late2/dt
 
 
- arch/arm/mach-omap2/Kconfig       |   1 +
- arch/arm/mach-omap2/cpuidle44xx.c | 145 ++++++++++++++++++++++-----------
- arch/arm/mach-omap2/timer.c       |   4 +-
- 3 files changed, 103 insertions(+), 47 deletions(-)
+ .../devicetree/bindings/arm/mrvl/intc.txt       |  20 +++
+ .../devicetree/bindings/ata/marvell.txt         |  16 ++
+ .../devicetree/bindings/gpio/mrvl-gpio.txt      |  23 +++
+
+ .../devicetree/bindings/watchdog/marvel.txt     |  14 ++
+ arch/arm/Kconfig                                |   1 +
+ arch/arm/boot/dts/kirkwood-dns320.dts           |  62 +++----
+ arch/arm/boot/dts/kirkwood-dns325.dts           |  68 ++++----
+ arch/arm/boot/dts/kirkwood-dnskw.dtsi           |  69 ++++++++
+ arch/arm/boot/dts/kirkwood-dreamplug.dts        |  50 ++++++
+ arch/arm/boot/dts/kirkwood-goflexnet.dts        |  99 +++++++++++
+ arch/arm/boot/dts/kirkwood-ib62x0.dts           |  38 +++++
+ arch/arm/boot/dts/kirkwood-iconnect.dts         |  42 +++++
+ arch/arm/boot/dts/kirkwood-lschlv2.dts          |  20 +++
+ arch/arm/boot/dts/kirkwood-lsxhl.dts            |  20 +++
+ arch/arm/boot/dts/kirkwood-lsxl.dtsi            |  95 +++++++++++
+ arch/arm/boot/dts/kirkwood-ts219-6281.dts       |  21 +++
+ arch/arm/boot/dts/kirkwood-ts219-6282.dts       |  21 +++
+ arch/arm/boot/dts/kirkwood-ts219.dtsi           |  78 +++++++++
+ arch/arm/boot/dts/kirkwood.dtsi                 |  60 +++++++
+ arch/arm/mach-dove/irq.c                        |  58 +++----
+ arch/arm/mach-kirkwood/Kconfig                  |  29 ++++
+ arch/arm/mach-kirkwood/Makefile                 |   3 +
+ arch/arm/mach-kirkwood/Makefile.boot            |   4 +
+ arch/arm/mach-kirkwood/board-dnskw.c            | 143 ----------------
+ arch/arm/mach-kirkwood/board-dreamplug.c        |  80 ---------
+ arch/arm/mach-kirkwood/board-dt.c               |  29 +++-
+ arch/arm/mach-kirkwood/board-goflexnet.c        |  71 ++++++++
+ arch/arm/mach-kirkwood/board-ib62x0.c           |  72 --------
+ arch/arm/mach-kirkwood/board-iconnect.c         |  56 -------
+ arch/arm/mach-kirkwood/board-lsxl.c             | 135 +++++++++++++++
+ arch/arm/mach-kirkwood/board-ts219.c            |  82 +++++++++
+ arch/arm/mach-kirkwood/common.c                 |   2 +
+ arch/arm/mach-kirkwood/common.h                 |  17 ++
+ arch/arm/mach-kirkwood/irq.c                    |  38 ++---
+ arch/arm/mach-mv78xx0/irq.c                     |  22 +--
+ arch/arm/mach-orion5x/irq.c                     |  22 +--
+ arch/arm/plat-orion/common.c                    |   1 +
+ arch/arm/plat-orion/gpio.c                      | 166 ++++++++++++++-----
+ arch/arm/plat-orion/include/plat/gpio.h         |  16 +-
+ arch/arm/plat-orion/include/plat/irq.h          |   3 +-
+ arch/arm/plat-orion/irq.c                       |  40 +++++
+ drivers/ata/sata_mv.c                           |  42 +++--
+ drivers/watchdog/orion_wdt.c                    |   8 +
+ 43 files changed, 1387 insertions(+), 569 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/marvell.txt
+ create mode 100644 Documentation/devicetree/bindings/watchdog/marvel.txt
+ create mode 100644 arch/arm/boot/dts/kirkwood-dnskw.dtsi
+ create mode 100644 arch/arm/boot/dts/kirkwood-goflexnet.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-lschlv2.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-lsxhl.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-lsxl.dtsi
+ create mode 100644 arch/arm/boot/dts/kirkwood-ts219-6281.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ts219-6282.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ts219.dtsi
+ create mode 100644 arch/arm/mach-kirkwood/board-goflexnet.c
+ create mode 100644 arch/arm/mach-kirkwood/board-lsxl.c
+ create mode 100644 arch/arm/mach-kirkwood/board-ts219.c
