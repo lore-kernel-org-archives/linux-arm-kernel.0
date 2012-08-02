@@ -1,19 +1,23 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 2 Aug 2012 09:55:36 +0800
-Subject: [PATCH] ARM: imx6q-sabrelite: Setup CLKO IOMUX
-In-Reply-To: <CAOMZO5BS-exRtxH8gkVtAki1AnY007uPB3oKcz56mnoaJ+EZGg@mail.gmail.com>
-References: <1343869868-29490-1-git-send-email-festevam@gmail.com>
- <20120802013958.GB2253@S2101-09.ap.freescale.net>
- <CAOMZO5BS-exRtxH8gkVtAki1AnY007uPB3oKcz56mnoaJ+EZGg@mail.gmail.com>
-Message-ID: <20120802015535.GC2253@S2101-09.ap.freescale.net>
+From: minggr@gmail.com (Lin Ming)
+Date: Thu, 2 Aug 2012 11:03:31 +0800
+Subject: How to debug hard lockup issue
+Message-ID: <CAF1ivSY=HsqrRypru55cYMBoyY75umkwrjbz5U0F85nL5mh3tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 01, 2012 at 10:43:39PM -0300, Fabio Estevam wrote:
-> Where can I get the mx6 sdma firmware binary from?
-> 
-FSL tree, I think.
+Hi list,
 
--- 
-Regards,
-Shawn
+I encountered a hard lockup on a armv5 board with 2.6.32 kernel.
+There is no any message output since it is hard lockup.
+
+I tried watchdog, but watchdog can only reset the board. I still can't
+get any info.
+
+The hard lockup is possibly because kernel blocked/looped with
+interrupts disabled.
+
+Is there any non-maskable interrupt I can use to dump the kernel stack?
+Or any other hint?
+
+Thanks,
+Lin Ming
