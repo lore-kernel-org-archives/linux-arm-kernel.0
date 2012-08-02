@@ -1,54 +1,278 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Aug 2012 19:18:10 +0100
-Subject: [PATCH] ARM: makefile: work around toolchain bug in recent
- versions of binutils
-In-Reply-To: <20120802155140.GF9838@mudshark.cambridge.arm.com>
-References: <1343910206-3684-1-git-send-email-will.deacon@arm.com>
- <20120802130411.GU6802@n2100.arm.linux.org.uk>
- <20120802150123.GE9838@mudshark.cambridge.arm.com>
- <20120802153030.GV6802@n2100.arm.linux.org.uk>
- <20120802155140.GF9838@mudshark.cambridge.arm.com>
-Message-ID: <20120802181810.GW6802@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu,  2 Aug 2012 12:36:33 -0600
+Subject: [PATCH] ARM: dt: tegra: paz00: add regulators
+Message-ID: <1343932593-999-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 02, 2012 at 04:51:41PM +0100, Will Deacon wrote:
-> On Thu, Aug 02, 2012 at 04:30:30PM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Aug 02, 2012 at 04:01:23PM +0100, Will Deacon wrote:
-> > > On Thu, Aug 02, 2012 at 02:04:11PM +0100, Russell King - ARM Linux wrote:
-> > > > Maybe this needs to be a build-time test whether the assembler accepts it?
-> > > 
-> > > That could be tricky since gas still accepts the option, but fails later
-> > > with:
-> > > 
-> > > arch/arm/boot/compressed/head.S: Assembler messages:
-> > > arch/arm/boot/compressed/head.S:127: Error: selected processor does not support requested special purpose register -- `mrs r2,cpsr'
-> > > arch/arm/boot/compressed/head.S:134: Error: selected processor does not support requested special purpose register -- `mrs r2,cpsr'
-> > > arch/arm/boot/compressed/head.S:136: Error: selected processor does not support requested special purpose register -- `msr cpsr_c,r2'
-> > > 
-> > > How about grabbing the march from KBUILD_AFLAGS instead (see below)?
-> > 
-> > It might just be easier to specify something like -march=armv4 or
-> > something like that, and then use .arch armv6 where required.
-> 
-> We could do that, but I worry that it will become very messy if/when people
-> start adding things like virtualisation instructions (hvc and co) to the
-> entry code. Using the same march flag for kernel and decompressor also keeps
-> everything consistent.
+From: Stephen Warren <swarren@nvidia.com>
 
-But you're missing a fundamental point: the decompressor is not designed
-to be built like that, it is designed to be built in such a way that it
-works unmodified on any CPU type we have to date, whether you're building
-a kernel for ARMv4 or ARMv7.
+The Toshiba AC100/PAZ00 uses a TPS6586x regulator. Instantiate this.
 
-So, the code sequences which are architecture specific are only executed
-after we've checked the ID registers to determine what we should be doing
-for a particular CPU.
+Three data sources were used for the data encoded here:
+* The HW defaults, as extracted from real HW.
+* The schematic, which specifies a voltage for each rail in the signal
+  names.
+* The AC100 kernel used by the Ubuntu port:
 
-Hence, even if you're building for ARMv4, the decompressor will _still_
-contain all the support code for ARMv7 - and the assembler better accept
-those instructions too.
+  repo git://gitorious.org/~marvin24/ac100/marvin24s-kernel.git
+  branch chromeos-ac100-3.0
+  file arch/arm/mach-tegra/board-paz00-power.c
 
-The alternative is we scatter various places with lots of yucky ifdefs,
-and it won't be pretty because quite a number of CPUs share the same code
-(which leads to long #if defined(CPU_A) || defined(CPU_B) etc).
+  For many rails, the constraints in that tree specified differing min
+  and max voltages. In all cases, the min value was ignored, since
+  there's no need currently to vary any of the voltages at run-time.
+  DVFS might change this in the future.
+
+In most cases these sources all matched. Differences are:
+
+sm0: HW defaults and schematic match at 1.2v. marvin24's kernel had a max
+of 1.3v, but this higher voltage was only applied to HW by DVFS code,
+which isn't currently supported in mainline.
+
+sm1: HW defaults and schematic match at 1.0v. marvin24's kernel had a max
+of 1.125v, but this higher voltage was only applied to HW by DVFS code,
+which isn't currently supported in mainline.
+
+ldo3: The HW default is on. marvin24's kernel didn't specify always-on,
+but since the board wasn't marked as having fully constrained regulators,
+the rail was not turned off, so the difference had no effect. The rail
+is needed for USB.
+
+ldo6: The HW default is 2.85v. The schematics indicate 2.85v. However,
+since this regulator is used for the same purpose as on other boards that
+require 1.8v, this is set to 1.8v. Note that this regulator feeds the CRT
+VDAC on Tegra, and so in practice is unlikely to be used, even though it
+is actaully hooked up in HW.
+
+Portions based on work by Laxman Dewangan <ldewangan@nvidia.com>
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Tested-by: Marc Dietrich <marvin24@gmx.de> # v2
+---
+Laxman, note that I have similar patches for Seaboard and Ventana too, but
+since the structure of all 3 is basically the same, I figured I'd only send
+1 for review first to get any issues sorted, then post the other 2 later.
+
+v4:
+* Added supply properties for all TPS6586x regulators.
+* Made SM* supplied by the new SYS regulator.
+* Removed ldo0 configuration, since it isn't used. Clarified ldo6 usage in
+  commit description.
+v3:
+* Slight rewording of sm0/sm1 data source resolution description.
+* Adjusted ldo6 to 1.8v to match other boards using it for the same thing.
+* Enhanced all regulator-name properties to also list the Tegra20 pins
+  driven by the regulators. Thus, the regulator-name properties mostly match
+  Seaboard and Ventana. Note that the AC100 schematics don't actually name
+  the signals themselves after the pins, like Seaboard/Ventana do.
+* Added ldo_rtc regulator.
+v2:
+* Made all constraints specify a single voltage rather than different
+  min/max, per description above.
+* Removed vin-supply properties from LDO nodes; the driver and binding
+  need to be updated to support specifying the parent regulators before
+  we can put these into DT.
+---
+ arch/arm/boot/dts/tegra20-paz00.dts |  173 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 173 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/tegra20-paz00.dts b/arch/arm/boot/dts/tegra20-paz00.dts
+index 684a9e1..ddf287f 100644
+--- a/arch/arm/boot/dts/tegra20-paz00.dts
++++ b/arch/arm/boot/dts/tegra20-paz00.dts
+@@ -272,12 +272,170 @@
+ 		status = "okay";
+ 		clock-frequency = <400000>;
+ 
++		pmic: tps6586x at 34 {
++			compatible = "ti,tps6586x";
++			reg = <0x34>;
++			interrupts = <0 86 0x4>;
++
++			#gpio-cells = <2>;
++			gpio-controller;
++
++			sys-supply = <&p5valw_reg>;
++			vin-sm0-supply = <&sys_reg>;
++			vin-sm1-supply = <&sys_reg>;
++			vin-sm2-supply = <&sys_reg>;
++			vinldo01-supply = <&sm2_reg>;
++			vinldo23-supply = <&sm2_reg>;
++			vinldo4-supply = <&sm2_reg>;
++			vinldo678-supply = <&sm2_reg>;
++			vinldo9-supply = <&sm2_reg>;
++
++			regulators {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				sys_reg: regulator at 0 {
++					reg = <0>;
++					regulator-compatible = "sys";
++					regulator-name = "vdd_sys";
++					regulator-always-on;
++				};
++
++				regulator at 1 {
++					reg = <1>;
++					regulator-compatible = "sm0";
++					regulator-name = "+1.2vs_sm0,vdd_core";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++					regulator-always-on;
++				};
++
++				regulator at 2 {
++					reg = <2>;
++					regulator-compatible = "sm1";
++					regulator-name = "+1.0vs_sm1,vdd_cpu";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++				};
++
++				sm2_reg: regulator at 3 {
++					reg = <3>;
++					regulator-compatible = "sm2";
++					regulator-name = "+3.7vs_sm2,vin_ldo*";
++					regulator-min-microvolt = <3700000>;
++					regulator-max-microvolt = <3700000>;
++					regulator-always-on;
++				};
++
++				/* LDO0 is not connected to anything */
++
++				regulator at 5 {
++					reg = <5>;
++					regulator-compatible = "ldo1";
++					regulator-name = "+1.1vs_ldo1,avdd_pll*";
++					regulator-min-microvolt = <1100000>;
++					regulator-max-microvolt = <1100000>;
++					regulator-always-on;
++				};
++
++				regulator at 6 {
++					reg = <6>;
++					regulator-compatible = "ldo2";
++					regulator-name = "+1.2vs_ldo2,vdd_rtc";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++				};
++
++				regulator at 7 {
++					reg = <7>;
++					regulator-compatible = "ldo3";
++					regulator-name = "+3.3vs_ldo3,avdd_usb*";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++				};
++
++				regulator at 8 {
++					reg = <8>;
++					regulator-compatible = "ldo4";
++					regulator-name = "+1.8vs_ldo4,avdd_osc,vddio_sys";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				regulator at 9 {
++					reg = <9>;
++					regulator-compatible = "ldo5";
++					regulator-name = "+2.85vs_ldo5,vcore_mmc";
++					regulator-min-microvolt = <2850000>;
++					regulator-max-microvolt = <2850000>;
++					regulator-always-on;
++				};
++
++				regulator at 10 {
++					reg = <10>;
++					regulator-compatible = "ldo6";
++					/*
++					 * Research indicates this should be
++					 * 1.8v; other boards that use this
++					 * rail for the same purpose need it
++					 * set to 1.8v. The schematic signal
++					 * name is incorrect; perhaps copied
++					 * from an incorrect NVIDIA reference.
++					 */
++					regulator-name = "+2.85vs_ldo6,avdd_vdac";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++				};
++
++				regulator at 11 {
++					reg = <11>;
++					regulator-compatible = "ldo7";
++					regulator-name = "+3.3vs_ldo7,avdd_hdmi";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++				};
++
++				regulator at 12 {
++					reg = <12>;
++					regulator-compatible = "ldo8";
++					regulator-name = "+1.8vs_ldo8,avdd_hdmi_pll";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++				};
++
++				regulator at 13 {
++					reg = <13>;
++					regulator-compatible = "ldo9";
++					regulator-name = "+2.85vs_ldo9,vdd_ddr_rx";
++					regulator-min-microvolt = <2850000>;
++					regulator-max-microvolt = <2850000>;
++					regulator-always-on;
++				};
++
++				regulator at 14 {
++					reg = <14>;
++					regulator-compatible = "ldo_rtc";
++					regulator-name = "+3.3vs_rtc";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++				};
++			};
++		};
++
+ 		adt7461 at 4c {
+ 			compatible = "adi,adt7461";
+ 			reg = <0x4c>;
+ 		};
+ 	};
+ 
++	pmc {
++		nvidia,invert-interrupt;
++	};
++
+ 	usb at c5000000 {
+ 		status = "okay";
+ 	};
+@@ -325,6 +483,21 @@
+ 		};
+ 	};
+ 
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		p5valw_reg: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "+5valw";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-always-on;
++		};
++	};
++
+ 	sound {
+ 		compatible = "nvidia,tegra-audio-alc5632-paz00",
+ 			"nvidia,tegra-audio-alc5632";
+-- 
+1.7.0.4
