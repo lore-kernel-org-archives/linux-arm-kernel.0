@@ -1,22 +1,134 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 2 Aug 2012 09:39:50 +0200
-Subject: MMAP_MIN_ADDR problem/question
-Message-ID: <201208020939.50225.marek.vasut@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 2 Aug 2012 01:43:45 -0600 (MDT)
+Subject: [PATCH 3/3] ARM: OMAP: omap_device: expose hwmod assert/deassert
+ to omap devices
+In-Reply-To: <1342466485-1050-4-git-send-email-omar.luna@linaro.org>
+References: <1342466485-1050-1-git-send-email-omar.luna@linaro.org>
+ <1342466485-1050-4-git-send-email-omar.luna@linaro.org>
+Message-ID: <alpine.DEB.2.00.1208020141140.4177@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+Hi Omar
 
-Me and a coleague of mine recently ran into the issue [1]. The problem is, that 
-I set mmap_min_addr to 65536, making it unable for "su - user" command to work, 
-it crashes with SIGKILL. I now at least see a solution (set it to 32768). Though 
-I don't understand why. Can someone please exaplain me why it has to be 32768 an 
-not more?
+On Mon, 16 Jul 2012, Omar Ramirez Luna wrote:
 
-[1] http://ubuntu.5.n6.nabble.com/PATCH-DEFAULT-MMAP-MIN-ADDR-32768-for-arm-
-td1604723.html
+> This APIs are meant to be an interface to hwmod assert/deassert
+> function, omap devices can call them through their platform data
+> to control their reset lines, they are expected to know the name
+> of the reset line they are trying to control.
+> 
+> Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
 
-Thanks in advance!
+This one has been queued for 3.7 with a few changes. Some more detail was 
+added to the function documentationrovement.  Also the multiple 
+assignments were removed per Documentation/CodingStyle chapter 1:
 
-Best regards,
-Marek Vasut
+"Don't put multiple assignments on a single line either."
+
+Please let me know if you have any comments.
+
+
+- Paul
+
+From: Omar Ramirez Luna <omar.luna@linaro.org>
+Date: Mon, 16 Jul 2012 14:21:25 -0500
+Subject: [PATCH] ARM: OMAP2+: omap_device: expose hwmod assert/deassert to
+ omap devices
+
+This API is meant to be an interface to hwmod assert/deassert
+function, omap devices can call them through their platform data to
+control their reset lines, they are expected to know the name of the
+reset line they are trying to control.
+
+Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
+[paul at pwsan.com: tweaked some documentation; fixed CodingStyle issue]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/plat-omap/include/plat/omap_device.h |    4 ++
+ arch/arm/plat-omap/omap_device.c              |   55 +++++++++++++++++++++++++
+ 2 files changed, 59 insertions(+)
+
+diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
+index 4327b2c..27bcc24 100644
+--- a/arch/arm/plat-omap/include/plat/omap_device.h
++++ b/arch/arm/plat-omap/include/plat/omap_device.h
+@@ -118,6 +118,10 @@ int omap_device_get_context_loss_count(struct platform_device *pdev);
+ 
+ /* Other */
+ 
++int omap_device_assert_hardreset(struct platform_device *pdev,
++				 const char *name);
++int omap_device_deassert_hardreset(struct platform_device *pdev,
++				 const char *name);
+ int omap_device_idle_hwmods(struct omap_device *od);
+ int omap_device_enable_hwmods(struct omap_device *od);
+ 
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index c490240..3b02312 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -925,6 +925,61 @@ int omap_device_shutdown(struct platform_device *pdev)
+ }
+ 
+ /**
++ * omap_device_assert_hardreset - set a device's hardreset line
++ * @pdev: struct platform_device * to reset
++ * @name: const char * name of the reset line
++ *
++ * Set the hardreset line identified by @name on the IP blocks
++ * associated with the hwmods backing the platform_device @pdev.  All
++ * of the hwmods associated with @pdev must have the same hardreset
++ * line linked to them for this to work.  Passes along the return value
++ * of omap_hwmod_assert_hardreset() in the event of any failure, or
++ * returns 0 upon success.
++ */
++int omap_device_assert_hardreset(struct platform_device *pdev, const char *name)
++{
++	struct omap_device *od = to_omap_device(pdev);
++	int ret = 0;
++	int i;
++
++	for (i = 0; i < od->hwmods_cnt; i++) {
++		ret = omap_hwmod_assert_hardreset(od->hwmods[i], name);
++		if (ret)
++			break;
++	}
++
++	return ret;
++}
++
++/**
++ * omap_device_deassert_hardreset - release a device's hardreset line
++ * @pdev: struct platform_device * to reset
++ * @name: const char * name of the reset line
++ *
++ * Release the hardreset line identified by @name on the IP blocks
++ * associated with the hwmods backing the platform_device @pdev.  All
++ * of the hwmods associated with @pdev must have the same hardreset
++ * line linked to them for this to work.  Passes along the return
++ * value of omap_hwmod_deassert_hardreset() in the event of any
++ * failure, or returns 0 upon success.
++ */
++int omap_device_deassert_hardreset(struct platform_device *pdev,
++				   const char *name)
++{
++	struct omap_device *od = to_omap_device(pdev);
++	int ret = 0;
++	int i;
++
++	for (i = 0; i < od->hwmods_cnt; i++) {
++		ret = omap_hwmod_deassert_hardreset(od->hwmods[i], name);
++		if (ret)
++			break;
++	}
++
++	return ret;
++}
++
++/**
+  * omap_device_align_pm_lat - activate/deactivate device to match wakeup lat lim
+  * @od: struct omap_device *
+  *
+-- 
+1.7.10.4
