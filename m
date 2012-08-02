@@ -1,34 +1,56 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 2 Aug 2012 07:58:39 +0200
-Subject: [PATCH v3 12/32] PCI/ARM: use PCIe capabilities access functions
- to simplify implementation
-In-Reply-To: <5019654D.2000408@wwwdotorg.org>
-References: <1343836477-7287-1-git-send-email-jiang.liu@huawei.com>
- <1343836477-7287-13-git-send-email-jiang.liu@huawei.com>
- <5019654D.2000408@wwwdotorg.org>
-Message-ID: <20120802055839.GA12241@avionic-0098.adnet.avionic-design.de>
+Date: Thu, 2 Aug 2012 08:15:20 +0200
+Subject: [PATCH v3 00/10] ARM: tegra: Add PCIe device tree support
+In-Reply-To: <5019611A.2060804@wwwdotorg.org>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <50180547.9040603@wwwdotorg.org>
+ <20120801063545.GA26791@avionic-0098.adnet.avionic-design.de>
+ <5019611A.2060804@wwwdotorg.org>
+Message-ID: <20120802061520.GE12241@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 01, 2012 at 11:20:13AM -0600, Stephen Warren wrote:
-> On 08/01/2012 09:54 AM, Jiang Liu wrote:
-> > From: Jiang Liu <jiang.liu@huawei.com>
+On Wed, Aug 01, 2012 at 11:02:18AM -0600, Stephen Warren wrote:
+> On 08/01/2012 12:35 AM, Thierry Reding wrote:
+> > On Tue, Jul 31, 2012 at 10:18:15AM -0600, Stephen Warren wrote:
+> >> On 07/26/2012 01:55 PM, Thierry Reding wrote:
+> >>> This patch series adds support for device tree based probing of
+> >>> the PCIe controller found on Tegra SoCs.
+> >> 
+> >> Thierry,
+> >> 
+> >> I think one thing that would help here would be to split up this
+> >> series into one per subsystem, and to get all the dependencies
+> >> merged by the respective maintainers. Preferably, each subsystem
+> >> would export a stable branch (perhaps consisting of just these
+> >> patches) that I can then merge into the Tegra tree and use as a
+> >> basis for the PCIe driver itself. Hopefully this approach will
+> >> get more traction on all the non-Tegra changes. Does that sound
+> >> like a good plan?
 > > 
-> > Use PCIe capabilities access functions to simplify PCIe ARM implementation.
-> > 
-> > Signed-off-by: Jiang Liu <liuj97@gmail.com>
+> > I don't understand. The series is already split up into
+> > per-subsystem patches. I just didn't want to post them separately
+> > so everybody on Cc would be able to see the big picture and the
+> > reason why the patch was required.
 > 
-> This is probably fine from my perspective assuming the underlying PCI
-> API implementation is OKd by relevant people.
+> There are separate patches that touch the different subsystems, but
+> they're all scattered throughout the one series, rather than having e.g.:
 > 
-> Thierry, can you comment on whether this will conflict with your Tegra
-> PCIe driver series? If it doesn't, this patch can go through any
-> relevant PCI tree. If it does, we may have to take this through the
-> Tegra tree after merging the dependencies, or defer it to later.
+> * a series for the PCI tree
+> * a series for the ARM core tree
+> * a series for the OF/DT tree
+> * a series for the Tegra tree, which indicates it depends on all of those.
+> 
+> I'm wondering if the reason you haven't seen much discussion/Acks from
+> the maintainers of the non-Tegra trees is because this is a big scary
+> series that touches a lot of stuff, and it's not necessarily clear for
+> people unfamiliar with it why they're being CCd on it.
 
-I haven't touched those lines. tegra_pcie_relax_enable() only uses
-generic PCI functions so I don't expect any conflicts. git blame
-confirms that those lines haven't been changed in about 2 years.
+I see. If you think it'll help I can certainly split them up as you
+suggested. I just thought it might be useful for everybody to know the
+context. At least from my own experience I get annoyed when I'm Cc'ed
+on a single patch in a larger series because it means I need to look
+through other archives for the context.
 
 Thierry
 -------------- next part --------------
@@ -37,4 +59,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120802/eee09477/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120802/c440c02f/attachment.sig>
