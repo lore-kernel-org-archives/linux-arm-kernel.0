@@ -1,28 +1,24 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 2 Aug 2012 18:03:25 +0200
-Subject: [PATCH 06/10 V2] spi: Add SPI driver for mx233/mx28
-In-Reply-To: <20120802160016.GA4537@opensource.wolfsonmicro.com>
-References: <1343076052-27312-1-git-send-email-marex@denx.de>
- <201208021658.38237.marex@denx.de>
- <20120802160016.GA4537@opensource.wolfsonmicro.com>
-Message-ID: <201208021803.25460.marex@denx.de>
+From: jdzheng@broadcom.com (Jiandong Zheng)
+Date: Thu, 2 Aug 2012 10:03:45 -0700
+Subject: [PATCH] mtd: use %*ph[CN] to dump small buffers
+In-Reply-To: <1343912807-29355-1-git-send-email-andriy.shevchenko@linux.intel.com>
+References: <1343912807-29355-1-git-send-email-andriy.shevchenko@linux.intel.com>
+Message-ID: <501AB2F1.6060101@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mark Brown,
+On 8/2/2012 6:06 AM, Andy Shevchenko wrote:
+> There is new format specified that helps to dump small buffers. It makes the
+> code simplier and nicer.
+>
+> Signed-off-by: Andy Shevchenko<andriy.shevchenko@linux.intel.com>
+> Cc: David Woodhouse<dwmw2@infradead.org>
+> Cc: Jiandong Zheng<jdzheng@broadcom.com>
+> Cc: Ben Dooks<ben-linux@fluff.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> ---
 
-> On Thu, Aug 02, 2012 at 04:58:38PM +0200, Marek Vasut wrote:
-> > > It'd be nice to only keep the clocks enabled while doing transfers but
-> > > again totally non-essential.
-> > 
-> > Hm, this is spread across mxs. Shawn, is there any plan for PM
-> > implementation for MXS ?
-> 
-> Take a look at s3c64xx - I did something with runtime PM for this, it's
-> something that can reasonably be implemented in drivers and as far as I
-> can tell most framework implementations end up using runtime PM anyway.
-
-We don't even support runtime pm on mxs yet IIRC
-
-Best regards,
-Marek Vasut
+>   drivers/mtd/nand/bcm_umi_bch.c    |   17 ++++-------------
+>
+Acked-by: Jiandong Zheng <jdzheng@broadcom.com>
