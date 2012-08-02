@@ -1,50 +1,48 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Thu, 2 Aug 2012 15:10:16 +0530
-Subject: How to debug hard lockup issue
-In-Reply-To: <CAF1ivSbbPtr0F3dWPXZMcWrzubGCg4mudcLQ1DKHe_HX5HqQbg@mail.gmail.com>
-References: <CAF1ivSY=HsqrRypru55cYMBoyY75umkwrjbz5U0F85nL5mh3tw@mail.gmail.com>
- <20120802071530.GG10670@pengutronix.de>
- <CAF1ivSZ=mHqPOks9vdWhb--gKduWpM6UM77-mMj=1gAf8P6MUA@mail.gmail.com>
- <20120802083413.GH10670@pengutronix.de>
- <CAF1ivSbbPtr0F3dWPXZMcWrzubGCg4mudcLQ1DKHe_HX5HqQbg@mail.gmail.com>
-Message-ID: <CAJe_ZhezzWUOUNXx=nUx8BqTwcyy6C0Cq7FcNcSg-i0Q9otOKA@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 2 Aug 2012 10:59:00 +0100
+Subject: [PATCH 1/6] ASoC: dapm: If one widget fails, do not force all
+ subsequent widgets to fail too
+In-Reply-To: <003901cd7073$d49cacc0$7dd60640$@se>
+References: <20120731134214.GK4468@opensource.wolfsonmicro.com>
+ <5017EAC3.3080504@linaro.org>
+ <20120731142820.GW4468@opensource.wolfsonmicro.com>
+ <5017EDCA.4020601@linaro.org>
+ <20120731145443.GY4468@opensource.wolfsonmicro.com>
+ <5017F68B.3060400@linaro.org>
+ <20120731151819.GC4468@opensource.wolfsonmicro.com>
+ <5018D880.5090306@linaro.org>
+ <20120801132022.GS11892@opensource.wolfsonmicro.com>
+ <003901cd7073$d49cacc0$7dd60640$@se>
+Message-ID: <20120802095900.GC29157@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 August 2012 15:00, Lin Ming <minggr@gmail.com> wrote:
-> On Thu, Aug 2, 2012 at 4:34 PM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
->> On Thu, Aug 02, 2012 at 03:59:36PM +0800, Lin Ming wrote:
->>> On Thu, Aug 2, 2012 at 3:15 PM, Uwe Kleine-K?nig
->>> <u.kleine-koenig@pengutronix.de> wrote:
->>> > Hello,
->>> >
->>> > On Thu, Aug 02, 2012 at 11:03:31AM +0800, Lin Ming wrote:
->>> >> I encountered a hard lockup on a armv5 board with 2.6.32 kernel.
->>> >> There is no any message output since it is hard lockup.
->>> >>
->>> >> I tried watchdog, but watchdog can only reset the board. I still can't
->>> >> get any info.
->>> >>
->>> >> The hard lockup is possibly because kernel blocked/looped with
->>> >> interrupts disabled.
->>> >>
->>> >> Is there any non-maskable interrupt I can use to dump the kernel stack?
->>> >> Or any other hint?
->>> > Try enabling various debug options. The following come to (my) mind:
->>> >
->>> > CONFIG_DETECT_HUNG_TASK
->>> > CONFIG_PROVE_LOCKING
->>> > CONFIG_DEBUG_ATOMIC_SLEEP
->>> > CONFIG_MAGIC_SYSRQ
->>>
->>> These debug options are already enabled.
->>> But it doesn't help.
->> then if you don't have a hardware debugger handy you can try
->>
->>         https://lkml.org/lkml/2012/5/26/83
->
-> Will try pstore and PostMortem.
->
-If the hang is after bootup, pstore is a better option. If the hang is
-consistent and during boot, dumping __log_buf is the only option.
+On Thu, Aug 02, 2012 at 07:58:24AM +0200, Ola Lilja wrote:
+
+> Accusing me of having "no interest in fixing the driver" is just absurd
+> regarding the time I've spent on this. I'm also still driving for
+
+Sorry, this is more directed at the current round of fixes that are
+being sent than the driver itself - the patches to bodge around the
+issue are being pushed fairly aggressively as an urgent fix without
+even mentioning what the issue is.  I don't have any concerns with
+the driver, only with the way it's being fixed.
+
+> Regarding the problem with the failing DAPM-widget I can probably guess
+> What is going wrong when Lee is trying it out. There will be two failing
+> clock-supply widgets due to the fact that on the mainline-code these
+> clocks simply is not there yet. I have, of course, tested this driver
+> before submitting it, and I wouldn't dream on submitting a driver where
+> there were failing widgets/routes. Internally, I have put a patch with our
+> clock-tree for Ux500 on, but this is not mainline-quality code and that is
+
+This sort of reliance on out of tree patches which any real user of the
+device would be expected to have sounds like exactly the sort of thing
+I'd expect to have caused an issue like this, and obviously the fix here
+is to get the clocks in place (even if just as stubs, though I'd expect
+there to be a major impact on the functionality of the device if it's
+not clocked...) rather than to just bodge out the error checking.
+
+It does also suggest that the DT binding for this device will need to
+include the setup of these clocks (I believe the clock bindings for DT
+have just gone into mainline this merge window but I'd need to check).
