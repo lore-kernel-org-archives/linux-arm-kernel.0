@@ -1,78 +1,23 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu,  2 Aug 2012 21:51:37 +0200
-Subject: [PATCH RFC] ARM: omap2/am33xx: add hwmod for davinci_mdio
-Message-ID: <1343937097-30484-1-git-send-email-zonque@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Aug 2012 20:53:08 +0100
+Subject: [PATCH 1/2] net: davinci_mdio: enable and disable clock
+In-Reply-To: <1343936616-29318-1-git-send-email-zonque@gmail.com>
+References: <1343936616-29318-1-git-send-email-zonque@gmail.com>
+Message-ID: <20120802195308.GZ6802@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a hwmod entry for the davinci_mdio hardware block. This aliases the
-cpsw_125mhz_clkdm and re-uses am33xx_cpgmac0_hwmod_class.
+On Thu, Aug 02, 2012 at 09:43:35PM +0200, Daniel Mack wrote:
+> Make the driver control the device clocks. Appearantly, the Davinci
+> platform probes this driver with the clock all powered up, but on OMAP,
+> this isn't the case.
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
----
+Hmm, this looks like it could do with improvement, especially as we're
+moving everything over to a common clk API.
 
-I'm still not totally confident with the hwmod environment, so I'm not
-entirely sure whether sharing the hwmod_class is the right thing to do
-here. However, I can at least get ethernet to work on my board now.
+1. This driver could do with clk_prepare()/clk_unprepare() calls.
+2. This driver should not be making the assumption that NULL means
+   it can avoid clk_* calls.  It should instead be using
+	if (!IS_ERR(clk))
 
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c | 31 ++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index 5a4660b..637b6cc 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -684,6 +684,19 @@ static struct omap_hwmod am33xx_cpgmac0_hwmod = {
- 	},
- };
- 
-+static struct omap_hwmod am33xx_cpsw_mdio_hwmod = {
-+	.name		= "davinci_mdio",
-+	.class		= &am33xx_cpgmac0_hwmod_class,
-+	.clkdm_name	= "cpsw_125mhz_clkdm",
-+	.main_clk	= "cpsw_125mhz_gclk",
-+	.prcm		= {
-+		.omap4	= {
-+			.clkctrl_offs	= AM33XX_CM_PER_CPGMAC0_CLKCTRL_OFFSET,
-+			.modulemode	= MODULEMODE_SWCTRL,
-+		},
-+	},
-+};
-+
- /*
-  * dcan class
-  */
-@@ -2501,6 +2514,23 @@ static struct omap_hwmod_ocp_if am33xx_l4_hs__cpgmac0 = {
- 	.user		= OCP_USER_MPU,
- };
- 
-+static struct omap_hwmod_addr_space am33xx_cpsw_mdio_addr_space[] = {
-+	{
-+		.pa_start	= 0x4a101000,
-+		.pa_end		= 0x4a101000 + SZ_256 - 1,
-+		.flags		= ADDR_TYPE_RT,
-+	},
-+	{ }
-+};
-+
-+static struct omap_hwmod_ocp_if am33xx_l4_hs__cpsw_mdio = {
-+	.master		= &am33xx_l4_hs_hwmod,
-+	.slave		= &am33xx_cpsw_mdio_hwmod,
-+	.clk		= "cpsw_125mhz_gclk",
-+	.addr		= am33xx_cpsw_mdio_addr_space,
-+	.user		= OCP_USER_MPU,
-+};
-+
- static struct omap_hwmod_addr_space am33xx_elm_addr_space[] = {
- 	{
- 		.pa_start	= 0x48080000,
-@@ -3371,6 +3401,7 @@ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
- 	&am33xx_l3_main__tptc2,
- 	&am33xx_l3_s__usbss,
- 	&am33xx_l4_hs__cpgmac0,
-+	&am33xx_l4_hs__cpsw_mdio,
- 	NULL,
- };
- 
--- 
-1.7.11.2
+Thanks.
