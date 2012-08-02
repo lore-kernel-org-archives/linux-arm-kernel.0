@@ -1,36 +1,38 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 2 Aug 2012 09:15:30 +0200
-Subject: How to debug hard lockup issue
-In-Reply-To: <CAF1ivSY=HsqrRypru55cYMBoyY75umkwrjbz5U0F85nL5mh3tw@mail.gmail.com>
-References: <CAF1ivSY=HsqrRypru55cYMBoyY75umkwrjbz5U0F85nL5mh3tw@mail.gmail.com>
-Message-ID: <20120802071530.GG10670@pengutronix.de>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Thu, 2 Aug 2012 15:08:10 +0800
+Subject: [RFC PATCH 1/1] ASoC: soc-dapm: warn if no avaiable path found
+ for widget kcontrol
+In-Reply-To: <20120801121516.GO11892@opensource.wolfsonmicro.com>
+References: <1343387941-25266-1-git-send-email-b29396@freescale.com>
+ <20120729202219.GA4384@opensource.wolfsonmicro.com>
+ <20120801074952.GC30492@shlinux2.ap.freescale.net>
+ <20120801121516.GO11892@opensource.wolfsonmicro.com>
+Message-ID: <20120802070809.GD30492@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, Aug 02, 2012 at 11:03:31AM +0800, Lin Ming wrote:
-> I encountered a hard lockup on a armv5 board with 2.6.32 kernel.
-> There is no any message output since it is hard lockup.
+On Wed, Aug 01, 2012 at 08:15:16PM +0800, Mark Brown wrote:
+> On Wed, Aug 01, 2012 at 03:49:53PM +0800, Dong Aisheng wrote:
+> > On Mon, Jul 30, 2012 at 04:22:19AM +0800, Mark Brown wrote:
 > 
-> I tried watchdog, but watchdog can only reset the board. I still can't
-> get any info.
+> > > This isn't a good idea, it's fairly common for widgets to have a "None"
+> > > option which isn't expected to have an input.
 > 
-> The hard lockup is possibly because kernel blocked/looped with
-> interrupts disabled.
+> > What i changed is mux widgets, i'm wondering is it possible or correct
+> > the mux widget has no input path?
+> > If i understand correct, we may need set correct input path
+> > for mux widget, or why we still need a mux?
 > 
-> Is there any non-maskable interrupt I can use to dump the kernel stack?
-> Or any other hint?
-Try enabling various debug options. The following come to (my) mind:
+> > Or can you help give an example that no input needed for mux widget?
+> 
+> The above is the most common example - one of the inputs to a mux being
+> a "no input" option which shouldn't be connected to anything.  A mux
+> with no inputs at all would be silly, but having one (or sometimes a
+> couple for various reasons) that isn't connected isn't unusual.
+> 
 
-CONFIG_DETECT_HUNG_TASK
-CONFIG_PROVE_LOCKING
-CONFIG_DEBUG_ATOMIC_SLEEP
-CONFIG_MAGIC_SYSRQ
+Understand.
+Thanks for the info.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards
+Dong Aisheng
