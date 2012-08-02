@@ -1,150 +1,85 @@
-From: p.paneri@samsung.com (Praveen Paneri)
-Date: Thu, 2 Aug 2012 11:14:13 +0530
-Subject: [PATCH 0/5] usb: phy: samsung: Introducing usb phy driver for
- samsung SoCs
-In-Reply-To: <201208011520.02353.arnd@arndb.de>
-References: <1343826351-8756-1-git-send-email-p.paneri@samsung.com>
- <201208011520.02353.arnd@arndb.de>
-Message-ID: <CAD6zSYN-prJO=dp8tJT8+4qcC3TxCXyVTU6-Xf5p20650Zb-ow@mail.gmail.com>
+From: olalilja@yahoo.se (Ola Lilja)
+Date: Thu, 2 Aug 2012 07:58:24 +0200
+Subject: [PATCH 1/6] ASoC: dapm: If one widget fails,
+ do not force all subsequent widgets to fail too
+In-Reply-To: <20120801132022.GS11892@opensource.wolfsonmicro.com>
+References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
+ <1343741493-17671-3-git-send-email-lee.jones@linaro.org>
+ <20120731134214.GK4468@opensource.wolfsonmicro.com>
+ <5017EAC3.3080504@linaro.org>
+ <20120731142820.GW4468@opensource.wolfsonmicro.com>
+ <5017EDCA.4020601@linaro.org>
+ <20120731145443.GY4468@opensource.wolfsonmicro.com>
+ <5017F68B.3060400@linaro.org>
+ <20120731151819.GC4468@opensource.wolfsonmicro.com>
+ <5018D880.5090306@linaro.org>
+ <20120801132022.GS11892@opensource.wolfsonmicro.com>
+Message-ID: <003901cd7073$d49cacc0$7dd60640$@se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+> -----Original Message-----
+> From: Mark Brown [mailto:broonie at opensource.wolfsonmicro.com]
+> Sent: den 1 augusti 2012 15:20
+> To: Lee Jones
+> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> STEricsson_nomadik_linux at list.st.com; linus.walleij at stericsson.com;
+> arnd at arndb.de; olalilja at yahoo.se; ola.o.lilja at stericsson.com; alsa-
+> devel at alsa-project.org; lrg at ti.com
+> Subject: Re: [PATCH 1/6] ASoC: dapm: If one widget fails, do not force
+> all subsequent widgets to fail too
+> 
+> On Wed, Aug 01, 2012 at 08:19:28AM +0100, Lee Jones wrote:
+> > On 31/07/12 16:18, Mark Brown wrote:
+> 
+> > >I'm not going to apply this patch.  This isn't a vendor BSP, we
+> > >shouldn't be putting random hacks like this in core code.
+> 
+> > BSP kernel or otherwise, it still seems wrong to me to fail and
+> entire
+> > audio driver just because of a broken link.
+> 
+> No, really.  Random disconnections in the DAPM graph are just endless
+> pain from a support and debug point of view.  This isn't something that
+> randomly breaks on specific hardware where we'd expect random errors at
+> runtime, it's something that will never have worked - it seems clear
+> nobody tested the mainline submission.
+> 
+> It's very disappointing to see such an error exist, and even more
+> disappointing that there's no interest in fixing the driver.
 
-On Wed, Aug 1, 2012 at 8:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 01 August 2012, Praveen Paneri wrote:
->> This patch set introduces a phy driver for samsung SoCs. It uses the existing
->> transceiver infrastructure to provide phy control functions. Use of this driver
->> can be extended for usb host phy as well. Over the period of time all the phy
->> related code for most of the samsung SoCs can be integrated here.
->> Removing the existing phy code from mach-s3c64xx but not from other machine
->> code.This driver is tested with smdk6410 and Exynos4210(with DT).
->
-> This looks very nice overall, great work!
-Thank you!
->
-> We will still have to take care of the pmu isolation callback in the
-> long run, when we get to the point of removing all auxdata. Do you
-> have a plan on how to do that? If yes, it would be good to mention
-> that in the changelog.
-Yes! I understand this problem and this is the reason these patches
-were sitting in my system for couple of weeks. In a  discussion with
-Thomas an idea of using the existing regulator framework to
-enable/disable numerous PHYs came up. For example the PMU unit
-of Exynos4210 has a register set dedicated just to control USBD_PHY,
-HDMI_PHY, MIPI_PHY, DAC_PHY and more. If a regulator with
-each phy control register as LDO is written, the phy driver becomes a
-static consumer and will modify as below.
+(Yes, I know this mailer isn't configured correctly, but I'm on vacation
+and have no Linux-computer/community-mailer available. However I find it
+important to answer this)
+Mark, you very well know that I have put in a lot of effort in getting our
+Ux500-driver mainlined. This is something I have driven without really
+getting sanctioned directly at working, rendering it even harder to find
+time for it.
+Accusing me of having "no interest in fixing the driver" is just absurd
+regarding the time I've spent on this. I'm also still driving for
+mainlining our upcoming drivers, so there is no lack of interest, nor lack
+of activity at our side. I really think you could afford a bit more polite
+attitude when doing reviews. It is not easy to fulfill every single aspect
+of mainlining directly and there is (most likely) no one that purposely do
+break any community rules. At least not from my side.
 
-diff --git a/drivers/usb/phy/sec_usbphy.c b/drivers/usb/phy/sec_usbphy.c
-index 33119eb..4f69675 100644
---- a/drivers/usb/phy/sec_usbphy.c
-+++ b/drivers/usb/phy/sec_usbphy.c
-@@ -28,8 +28,8 @@
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/of.h>
-+#include <linux/regulator/consumer.h>
- #include <linux/usb/otg.h>
--#include <linux/platform_data/s3c-hsotg.h>
+Regarding the problem with the failing DAPM-widget I can probably guess
+What is going wrong when Lee is trying it out. There will be two failing
+clock-supply widgets due to the fact that on the mainline-code these
+clocks simply is not there yet. I have, of course, tested this driver
+before submitting it, and I wouldn't dream on submitting a driver where
+there were failing widgets/routes. Internally, I have put a patch with our
+clock-tree for Ux500 on, but this is not mainline-quality code and that is
+why it is not submitted with the other patches I sent. The clocks are in
+the moment of writing being worked on by other persons in ST-Ericsson, and
+I would not have had any time to be doing all this which is not in the
+scope of my responsibilities (which is the audio-domain).
+Before you told me to create the clock-supply widget-type, I had only
+warnings for these failing clocks, as an intermediate solution, before
+the clock-tree was submitted, but now they are implemented with the clock-
+supply-type and there will be route-errors instead.
+Linus W. could probably shed some light of when the missing clocks are to
+be submitted.
 
- #include "sec_usbphy.h"
-
-@@ -41,7 +41,7 @@ enum sec_cpu_type {
- /*
-  * struct sec_usbphy - transceiver driver state
-  * @phy: transceiver structure
-- * @plat: platform data
-+ * @vusbphy: PMU regulator for usb phy
-  * @dev: The parent device supplied to the probe function
-  * @clk: usb phy clock
-  * @regs: usb phy register memory base
-@@ -49,7 +49,7 @@ enum sec_cpu_type {
-  */
- struct sec_usbphy {
- 	struct usb_phy	phy;
--	struct s3c_usbphy_plat *plat;
-+	struct regulator *vusbphy;
- 	struct device	*dev;
- 	struct clk	*clk;
- 	void __iomem	*regs;
-@@ -187,8 +187,11 @@ static int sec_usbphy_init(struct usb_phy *phy)
- 	}
-
- 	/* Disable phy isolation */
--	if (sec->plat && sec->plat->pmu_isolation)
--		sec->plat->pmu_isolation(false);
-+	ret = regulator_enable(sec->vusbphy);
-+	if (ret) {
-+		dev_err(sec->dev, "Failed to enable regulator for USBPHY\n");
-+		return ret;
-+	}
-
- 	/* Initialize usb phy registers */
- 	sec_usbphy_enable(sec);
-@@ -208,8 +211,8 @@ static void sec_usbphy_shutdown(struct usb_phy *phy)
- 	sec_usbphy_disable(sec);
-
- 	/* Enable phy isolation */
--	if (sec->plat && sec->plat->pmu_isolation)
--		sec->plat->pmu_isolation(true);
-+	if (regulator_disable(sec->vusbphy))
-+		dev_err(sec->dev, "Failed to disable regulator for USBPHY\n");
-
- 	/* Disable the phy clock */
- 	sec_usbphy_clk_control(sec, false);
-@@ -263,7 +266,6 @@ static int __devinit sec_usbphy_probe(struct
-platform_device *pdev)
- 		return -ENOMEM;
-
- 	sec->dev		= &pdev->dev;
--	sec->plat		= pdata;
- 	sec->regs		= phy_base;
- 	sec->phy.dev		= sec->dev;
- 	sec->phy.label		= "sec-usbphy";
-@@ -271,6 +273,14 @@ static int __devinit sec_usbphy_probe(struct
-platform_device *pdev)
- 	sec->phy.shutdown	= sec_usbphy_shutdown;
- 	sec->cpu_type		= sec_usbphy_get_driver_data(pdev);
-
-+	/* acquire regulator */
-+	sec->vusbphy = regulator_get(sec->dev, "usbdphy");
-+	if (IS_ERR_OR_NULL(sec->vusbphy)) {
-+		dev_err(dev, "failed to get regulator 'usbdphy'\n");
-+		ret = -ENXIO;
-+		goto err;
-+	}
-+
- 	ret = usb_add_phy(&sec->phy, USB_PHY_TYPE_USB2);
- 	if (ret)
- 		goto err;
-@@ -292,6 +302,7 @@ static int __exit sec_usbphy_remove(struct
-platform_device *pdev)
- 		clk_put(sec->clk);
- 		sec->clk = NULL;
- 	}
-+	regulator_put(sec->vusbphy);
-
- 	return 0;
- }
-
-This kind of regulator, if generalised can be useful.
-Please comment.
->
-> My guess is that the PMU code should be moved into a higher-level
-> abstraction. I don't know if you would use one of those we already
-Could you please point out the location of the code.
-> have or whether you'd introduce a new subsystem for those. Apparently.
-Havent thought about it. Trying to work it out with the existing infra of the
-kernel.
-> other platforms have similar issues, so I'd suggest you leave the
-> callback for now, but we should at some point discuss what to to
-> about it.
->
->         Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-Praveen
+Regards,
+Ola
