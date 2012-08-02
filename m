@@ -1,33 +1,54 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Thu, 2 Aug 2012 12:56:37 -0500
-Subject: [PATCH 3/3] ARM: OMAP: omap_device: expose hwmod assert/deassert
- to omap devices
-In-Reply-To: <alpine.DEB.2.00.1208020141140.4177@utopia.booyaka.com>
-References: <1342466485-1050-1-git-send-email-omar.luna@linaro.org>
- <1342466485-1050-4-git-send-email-omar.luna@linaro.org>
- <alpine.DEB.2.00.1208020141140.4177@utopia.booyaka.com>
-Message-ID: <CALLhW=7JL64qaXKSTFsyR8sXPe-PSMZp=d2Rrkno_peSYGyvEg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Aug 2012 19:18:10 +0100
+Subject: [PATCH] ARM: makefile: work around toolchain bug in recent
+ versions of binutils
+In-Reply-To: <20120802155140.GF9838@mudshark.cambridge.arm.com>
+References: <1343910206-3684-1-git-send-email-will.deacon@arm.com>
+ <20120802130411.GU6802@n2100.arm.linux.org.uk>
+ <20120802150123.GE9838@mudshark.cambridge.arm.com>
+ <20120802153030.GV6802@n2100.arm.linux.org.uk>
+ <20120802155140.GF9838@mudshark.cambridge.arm.com>
+Message-ID: <20120802181810.GW6802@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 August 2012 02:43, Paul Walmsley <paul@pwsan.com> wrote:
->> This APIs are meant to be an interface to hwmod assert/deassert
->> function, omap devices can call them through their platform data
->> to control their reset lines, they are expected to know the name
->> of the reset line they are trying to control.
->>
->> Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
->
-> This one has been queued for 3.7 with a few changes. Some more detail was
-> added to the function documentationrovement.  Also the multiple
-> assignments were removed per Documentation/CodingStyle chapter 1:
->
-> "Don't put multiple assignments on a single line either."
->
-> Please let me know if you have any comments.
+On Thu, Aug 02, 2012 at 04:51:41PM +0100, Will Deacon wrote:
+> On Thu, Aug 02, 2012 at 04:30:30PM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Aug 02, 2012 at 04:01:23PM +0100, Will Deacon wrote:
+> > > On Thu, Aug 02, 2012 at 02:04:11PM +0100, Russell King - ARM Linux wrote:
+> > > > Maybe this needs to be a build-time test whether the assembler accepts it?
+> > > 
+> > > That could be tricky since gas still accepts the option, but fails later
+> > > with:
+> > > 
+> > > arch/arm/boot/compressed/head.S: Assembler messages:
+> > > arch/arm/boot/compressed/head.S:127: Error: selected processor does not support requested special purpose register -- `mrs r2,cpsr'
+> > > arch/arm/boot/compressed/head.S:134: Error: selected processor does not support requested special purpose register -- `mrs r2,cpsr'
+> > > arch/arm/boot/compressed/head.S:136: Error: selected processor does not support requested special purpose register -- `msr cpsr_c,r2'
+> > > 
+> > > How about grabbing the march from KBUILD_AFLAGS instead (see below)?
+> > 
+> > It might just be easier to specify something like -march=armv4 or
+> > something like that, and then use .arch armv6 where required.
+> 
+> We could do that, but I worry that it will become very messy if/when people
+> start adding things like virtualisation instructions (hvc and co) to the
+> entry code. Using the same march flag for kernel and decompressor also keeps
+> everything consistent.
 
-Agree.
+But you're missing a fundamental point: the decompressor is not designed
+to be built like that, it is designed to be built in such a way that it
+works unmodified on any CPU type we have to date, whether you're building
+a kernel for ARMv4 or ARMv7.
 
-Thanks,
+So, the code sequences which are architecture specific are only executed
+after we've checked the ID registers to determine what we should be doing
+for a particular CPU.
 
-Omar
+Hence, even if you're building for ARMv4, the decompressor will _still_
+contain all the support code for ARMv7 - and the assembler better accept
+those instructions too.
+
+The alternative is we scatter various places with lots of yucky ifdefs,
+and it won't be pretty because quite a number of CPUs share the same code
+(which leads to long #if defined(CPU_A) || defined(CPU_B) etc).
