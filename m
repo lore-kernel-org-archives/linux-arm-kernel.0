@@ -1,36 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 2 Aug 2012 08:34:25 +0800
-Subject: [PATCH 1/4] video: Add support for the Solomon SSD1307 OLED
- Controller
-In-Reply-To: <501904CB.9040104@free-electrons.com>
-References: <1343730576-20494-1-git-send-email-maxime.ripard@free-electrons.com>
- <1343730576-20494-2-git-send-email-maxime.ripard@free-electrons.com>
- <20120801052424.GD1672@S2100-06.ap.freescale.net>
- <501904CB.9040104@free-electrons.com>
-Message-ID: <20120802003422.GA2253@S2101-09.ap.freescale.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  1 Aug 2012 22:11:08 -0300
+Subject: [PATCH] ARM: imx6q-sabrelite: Setup CLKO IOMUX
+Message-ID: <1343869868-29490-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 01, 2012 at 12:28:27PM +0200, Maxime Ripard wrote:
-> Thanks for the tip.
-> However, I'm not sure this device will be mxs specific, since this
-> controller is used on some other devices as well (I know for example
-> that some uses it with the Arduino, even though it's not related to
-> Linux), so relying on mxs-specific capabilities here might not be that
-> great.
-> 
-Ok, agreed.  In that case, putting "1" in last cell of oled-reset-gpio
-does not make any point then.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-+Examples:
-+ssd1307: oled at 3c {
-+        compatible = "solomon,ssd1307fb-i2c";
-+        reg = <0x3c>;
-+        pwms = <&pwm 4 3000>;
-+        oled-reset-gpio = <&gpio2 7 1>;
-+        oled-reset-active-low;
-+};
+In order to have audio functional on mx6qsabrelite, it is necessary to setup
+the IOMUX for MX6Q_PAD_GPIO_0__CCM_CLKO pins as it provides the audio clock.
 
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6q-sabrelite.dts |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+index d42e851..1769f44 100644
+--- a/arch/arm/boot/dts/imx6q-sabrelite.dts
++++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+@@ -53,6 +53,7 @@
+ 						fsl,pins = <
+ 							   144  0x80000000	/* MX6Q_PAD_EIM_D22__GPIO_3_22 */
+ 							   121  0x80000000	/* MX6Q_PAD_EIM_D19__GPIO_3_19 */
++							   953  0x80000000	/* MX6Q_PAD_GPIO_0__CCM_CLKO */		
+ 							   >;
+ 					};
+ 				};
 -- 
-Regards,
-Shawn
+1.7.1
