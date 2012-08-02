@@ -1,48 +1,42 @@
-From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Thu, 02 Aug 2012 22:05:16 +0200
-Subject: doubts about switch_mm
-In-Reply-To: <501ADCBD.20907@xenomai.org>
-References: <501AD023.3020204@xenomai.org>
- <20120802194931.GY6802@n2100.arm.linux.org.uk> <501ADCBD.20907@xenomai.org>
-Message-ID: <501ADD7C.40607@xenomai.org>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 02 Aug 2012 22:17:56 +0200
+Subject: [PATCH 1/2] net: davinci_mdio: enable and disable clock
+In-Reply-To: <20120802195308.GZ6802@n2100.arm.linux.org.uk>
+References: <1343936616-29318-1-git-send-email-zonque@gmail.com>
+ <20120802195308.GZ6802@n2100.arm.linux.org.uk>
+Message-ID: <501AE074.8090906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/2012 10:02 PM, Gilles Chanteperdrix wrote:
+On 02.08.2012 21:53, Russell King - ARM Linux wrote:
+> On Thu, Aug 02, 2012 at 09:43:35PM +0200, Daniel Mack wrote:
+>> Make the driver control the device clocks. Appearantly, the Davinci
+>> platform probes this driver with the clock all powered up, but on OMAP,
+>> this isn't the case.
+> 
+> Hmm, this looks like it could do with improvement, especially as we're
+> moving everything over to a common clk API.
+> 
+> 1. This driver could do with clk_prepare()/clk_unprepare() calls.
 
-> On 08/02/2012 09:49 PM, Russell King - ARM Linux wrote:
-> 
->> On Thu, Aug 02, 2012 at 09:08:19PM +0200, Gilles Chanteperdrix wrote:
->>> switch_mm code, as of 3.5 contains:
->>>
->>> 1   if (!cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) || prev != next) {  
->>> 2           check_and_switch_context(next, tsk);                             
->>> 3           if (cache_is_vivt())                                             
->>> 4                   cpumask_clear_cpu(cpu, mm_cpumask(prev));                
->>> 5   }                                                                        
->>>
->>> Line 1 seems to mean that maybe switch_mm is called with prev == next.
->>> But then, what line 4 does is certainly wrong if prev == next.
->>
->> Look at it more carefully.
->>
->> If prev == next, then we're already running with *this* mm.  The bit
->> in the CPU mask for this CPU will be set.
->>
->> So, cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) will be true, and
->> because the condition is inverted, the first half of the if condition
->> is false.
->>
->> The second half is false, because prev == next.  So lines 2-4 will not
->> be executed.
->>
-> 
-> 
-> So, prev != next on line 1 is useless ?
-> 
-> 
+Ok, done.
 
-Ok, got it, sorry for the noise.
+> 2. This driver should not be making the assumption that NULL means
+>    it can avoid clk_* calls.  It should instead be using
+> 	if (!IS_ERR(clk))
 
--- 
-                                                                Gilles.
+Well spotted. Amended patch below.
+
+
+Thanks,
+Daniel
+
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-net-davinci_mdio-prepare-and-unprepare-clocks.patch
+Type: text/x-patch
+Size: 2045 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120802/2fa5d4e5/attachment.bin>
