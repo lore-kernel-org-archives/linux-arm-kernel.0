@@ -1,37 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 2 Aug 2012 16:51:41 +0100
-Subject: [PATCH] ARM: makefile: work around toolchain bug in recent
- versions of binutils
-In-Reply-To: <20120802153030.GV6802@n2100.arm.linux.org.uk>
-References: <1343910206-3684-1-git-send-email-will.deacon@arm.com>
- <20120802130411.GU6802@n2100.arm.linux.org.uk>
- <20120802150123.GE9838@mudshark.cambridge.arm.com>
- <20120802153030.GV6802@n2100.arm.linux.org.uk>
-Message-ID: <20120802155140.GF9838@mudshark.cambridge.arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 2 Aug 2012 12:52:27 -0300
+Subject: [PATCH 0/7] Add support for Freescale's mc34708 to mc13xxx driver
+In-Reply-To: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <CAOMZO5C0=eXYU8Vgnn0xGviXfLEjGgA0yn120NKpwL55m5rgbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 02, 2012 at 04:30:30PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Aug 02, 2012 at 04:01:23PM +0100, Will Deacon wrote:
-> > On Thu, Aug 02, 2012 at 02:04:11PM +0100, Russell King - ARM Linux wrote:
-> > > Maybe this needs to be a build-time test whether the assembler accepts it?
-> > 
-> > That could be tricky since gas still accepts the option, but fails later
-> > with:
-> > 
-> > arch/arm/boot/compressed/head.S: Assembler messages:
-> > arch/arm/boot/compressed/head.S:127: Error: selected processor does not support requested special purpose register -- `mrs r2,cpsr'
-> > arch/arm/boot/compressed/head.S:134: Error: selected processor does not support requested special purpose register -- `mrs r2,cpsr'
-> > arch/arm/boot/compressed/head.S:136: Error: selected processor does not support requested special purpose register -- `msr cpsr_c,r2'
-> > 
-> > How about grabbing the march from KBUILD_AFLAGS instead (see below)?
-> 
-> It might just be easier to specify something like -march=armv4 or
-> something like that, and then use .arch armv6 where required.
+Hi Uwe,
 
-We could do that, but I worry that it will become very messy if/when people
-start adding things like virtualisation instructions (hvc and co) to the
-entry code. Using the same march flag for kernel and decompressor also keeps
-everything consistent.
+On Thu, Jul 12, 2012 at 6:57 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Hello,
+>
+> This series was tested on a Phytec pcm038 (mc13783 on spi) using
+> traditional boot (i.e. not dt) and on a i.MX53 based machine (mc34708 on
+> i2c) using dt boot.
+>
+> Philippe's patches are already in next, they are just included here for
+> those who want to test the patches. The 'mfd/mc13xxx: drop modifying
+> driver's id_table in probe' was already sent out yesterday and is
+> included here because the last patch depends on it.
 
-Will
+Would you have a git tree with all these patches applied so that I can
+easily test it on a mx53loco board?
+
+Thanks,
+
+Fabio Estevam
