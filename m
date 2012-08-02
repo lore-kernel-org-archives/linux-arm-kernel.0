@@ -1,36 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  2 Aug 2012 13:23:26 +0100
-Subject: [PATCH] ARM: makefile: work around toolchain bug in recent versions
- of binutils
-Message-ID: <1343910206-3684-1-git-send-email-will.deacon@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 02 Aug 2012 13:45:32 +0100
+Subject: [PATCH 18/19] Documentation: Define the MSP Driver Device Tree
+ bindings
+In-Reply-To: <20120731151024.GA4468@opensource.wolfsonmicro.com>
+References: <1343741953-17828-1-git-send-email-lee.jones@linaro.org>
+ <1343741953-17828-19-git-send-email-lee.jones@linaro.org>
+ <20120731135539.GO4468@opensource.wolfsonmicro.com>
+ <5017F2E2.4040100@linaro.org>
+ <20120731151024.GA4468@opensource.wolfsonmicro.com>
+Message-ID: <501A766C.1060502@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent upstream versions of binutils fail to assembler compressed/head.S
-when passed the -march=all option:
+On 31/07/12 16:10, Mark Brown wrote:
+> On Tue, Jul 31, 2012 at 03:59:46PM +0100, Lee Jones wrote:
+>> On 31/07/12 14:55, Mark Brown wrote:
+>
+>>>> +Optional properties:
+>>>> + - interrupts       : The interrupt outputs from the device.
+>
+>>> If there's more than one interrupt then how are they ordered?
+>
+>> It doesn't matter. If there are any more than one (which there
+>> aren't in this case), we usually use the interrupt-names property
+>> then request them by name in the driver.
+>
+> So the binding therefore needs to say "The interrupt output from the
+> device" as there's only one output supported.  If we were using
+> interrupt-names then we'd need to document what the supported names are.
 
-http://lists.gnu.org/archive/html/bug-binutils/2011-04/msg00162.html
+Okay, I've changed 'outputs' to 'output'.
 
-The recommended workaround from the tools folks is not to pass the
-option, and instead let the assembler deduce the CPU type based on the
-features used by the code.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/boot/compressed/Makefile |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index bb26756..0f7f3f4 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -126,7 +126,6 @@ KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
- endif
- 
- ccflags-y := -fpic -fno-builtin -I$(obj)
--asflags-y := -Wa,-march=all
- 
- # Supply kernel BSS size to the decompressor via a linker symbol.
- KBSS_SZ = $(shell $(CROSS_COMPILE)size $(obj)/../../../../vmlinux | \
 -- 
-1.7.4.1
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
