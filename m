@@ -1,126 +1,75 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Thu,  2 Aug 2012 21:43:36 +0200
-Subject: [PATCH 2/2] net: davinci_mdio: add DT bindings
-In-Reply-To: <1343936616-29318-1-git-send-email-zonque@gmail.com>
-References: <1343936616-29318-1-git-send-email-zonque@gmail.com>
-Message-ID: <1343936616-29318-2-git-send-email-zonque@gmail.com>
+Date: Thu,  2 Aug 2012 21:43:35 +0200
+Subject: [PATCH 1/2] net: davinci_mdio: enable and disable clock
+Message-ID: <1343936616-29318-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Make the driver control the device clocks. Appearantly, the Davinci
+platform probes this driver with the clock all powered up, but on OMAP,
+this isn't the case.
+
 Signed-off-by: Daniel Mack <zonque@gmail.com>
 ---
- .../devicetree/bindings/net/davinci_mdio.txt       | 24 +++++++++++++
- drivers/net/ethernet/ti/davinci_mdio.c             | 39 ++++++++++++++++++++++
- 2 files changed, 63 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/davinci_mdio.txt
+ drivers/net/ethernet/ti/davinci_mdio.c | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/davinci_mdio.txt b/Documentation/devicetree/bindings/net/davinci_mdio.txt
-new file mode 100644
-index 0000000..03292a5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/davinci_mdio.txt
-@@ -0,0 +1,24 @@
-+Davinci MDIO DT bindings
-+
-+Required properties:
-+
-+ - compatible : should be "ti,davinci-mdio"
-+
-+Optional properties:
-+
-+ - bus-freq : an integer to specify the bus speed
-+
-+Examples:
-+
-+	mdio: davinci_mdio at 4a101000 {
-+		compatible = "ti,davinci-mdio";
-+		ti,hwmods = "davinci_mdio";
-+	};
-+
-+ or
-+
-+	mdio: davinci_mdio at 4a101000 {
-+		compatible = "ti,davinci-mdio";
-+		reg = <0x4a101000 0x100>;
-+	};
-+
 diff --git a/drivers/net/ethernet/ti/davinci_mdio.c b/drivers/net/ethernet/ti/davinci_mdio.c
-index b4b6015..2640cae 100644
+index cd7ee20..b4b6015 100644
 --- a/drivers/net/ethernet/ti/davinci_mdio.c
 +++ b/drivers/net/ethernet/ti/davinci_mdio.c
-@@ -36,6 +36,8 @@
- #include <linux/io.h>
- #include <linux/pm_runtime.h>
- #include <linux/davinci_emac.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
+@@ -332,6 +332,8 @@ static int __devinit davinci_mdio_probe(struct platform_device *pdev)
+ 		goto bail_out;
+ 	}
  
- /*
-  * This timeout definition is a worst-case ultra defensive measure against
-@@ -289,6 +291,37 @@ static int davinci_mdio_write(struct mii_bus *bus, int phy_id,
- 	return 0;
- }
++	clk_enable(data->clk);
++
+ 	dev_set_drvdata(dev, data);
+ 	data->dev = dev;
+ 	spin_lock_init(&data->lock);
+@@ -379,8 +381,11 @@ bail_out:
+ 	if (data->bus)
+ 		mdiobus_free(data->bus);
  
-+#ifdef CONFIG_OF
-+static const struct of_device_id davinci_mdio_dt_ids[] = {
-+	{ .compatible = "ti,davinci-mdio" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, davinci_mdio_dt_ids);
+-	if (data->clk)
++	if (data->clk) {
++		clk_disable(data->clk);
+ 		clk_put(data->clk);
++	}
 +
-+static inline int davinci_mdio_probe_dt(struct device *dev,
-+					struct mdio_platform_data *pdata)
-+{
-+	struct device_node *np = dev->of_node;
-+	const struct of_device_id *of_id =
-+			of_match_device(davinci_mdio_dt_ids, dev);
-+	u32 tmp;
-+
-+	if (!of_id)
-+		return 0;
-+
-+	if (of_property_read_u32(np, "bus-freq", &tmp) == 0)
-+		pdata->bus_freq = tmp;
-+
-+	return 0;
-+}
-+#else
-+static inline int davinci_mdio_probe_dt(struct device *dev,
-+					struct mdio_platform_data *pdata)
-+{
-+	return 0;
-+}
-+#endif
-+
- static int __devinit davinci_mdio_probe(struct platform_device *pdev)
- {
- 	struct mdio_platform_data *pdata = pdev->dev.platform_data;
-@@ -306,6 +339,10 @@ static int __devinit davinci_mdio_probe(struct platform_device *pdev)
- 
- 	data->pdata = pdata ? (*pdata) : default_pdata;
- 
-+	ret = davinci_mdio_probe_dt(dev, pdata);
-+	if (ret < 0)
-+		goto free_mem;
-+
- 	data->bus = mdiobus_alloc();
- 	if (!data->bus) {
- 		dev_err(dev, "failed to alloc mii bus\n");
-@@ -389,6 +426,7 @@ bail_out:
  	pm_runtime_put_sync(&pdev->dev);
  	pm_runtime_disable(&pdev->dev);
  
-+free_mem:
- 	kfree(data);
+@@ -397,8 +402,11 @@ static int __devexit davinci_mdio_remove(struct platform_device *pdev)
+ 	if (data->bus)
+ 		mdiobus_free(data->bus);
  
- 	return ret;
-@@ -471,6 +509,7 @@ static struct platform_driver davinci_mdio_driver = {
- 		.name	 = "davinci_mdio",
- 		.owner	 = THIS_MODULE,
- 		.pm	 = &davinci_mdio_pm_ops,
-+		.of_match_table = of_match_ptr(davinci_mdio_dt_ids),
- 	},
- 	.probe = davinci_mdio_probe,
- 	.remove = __devexit_p(davinci_mdio_remove),
+-	if (data->clk)
++	if (data->clk) {
++		clk_disable(data->clk);
+ 		clk_put(data->clk);
++	}
++
+ 	pm_runtime_put_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ 
+@@ -427,6 +435,8 @@ static int davinci_mdio_suspend(struct device *dev)
+ 	data->suspended = true;
+ 	spin_unlock(&data->lock);
+ 
++	clk_disable(data->clk);
++
+ 	return 0;
+ }
+ 
+@@ -435,6 +445,8 @@ static int davinci_mdio_resume(struct device *dev)
+ 	struct davinci_mdio_data *data = dev_get_drvdata(dev);
+ 	u32 ctrl;
+ 
++	clk_enable(data->clk);
++
+ 	spin_lock(&data->lock);
+ 	pm_runtime_put_sync(data->dev);
+ 
 -- 
 1.7.11.2
