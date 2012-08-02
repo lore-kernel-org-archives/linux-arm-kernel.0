@@ -1,31 +1,27 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  1 Aug 2012 22:11:08 -0300
-Subject: [PATCH] ARM: imx6q-sabrelite: Setup CLKO IOMUX
-Message-ID: <1343869868-29490-1-git-send-email-festevam@gmail.com>
+Date: Wed, 1 Aug 2012 22:16:44 -0300
+Subject: [RFC] ARM: imx6q-sabrelite: Add CLKO IOMUX
+In-Reply-To: <CAOMZO5A2g+UCFuiP7yqYkFQ36F=2yrqJA3ssujeYXE_Q0Sz5nQ@mail.gmail.com>
+References: <1343833836-14287-1-git-send-email-festevam@gmail.com>
+ <CAOMZO5A2g+UCFuiP7yqYkFQ36F=2yrqJA3ssujeYXE_Q0Sz5nQ@mail.gmail.com>
+Message-ID: <CAOMZO5AOfc675749bEqrZCxte6FTXm5VWob7hSDNmM3Q4Dj+QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Wed, Aug 1, 2012 at 5:17 PM, Fabio Estevam <festevam@gmail.com> wrote:
 
-In order to have audio functional on mx6qsabrelite, it is necessary to setup
-the IOMUX for MX6Q_PAD_GPIO_0__CCM_CLKO pins as it provides the audio clock.
+> I managed to get a board and tried it with current Linus' tree and
+> also linux-next. Both result in:
+>
+> sgtl5000 0-000a: Device with ID register ffff is not a sgtl5000
+> sgtl5000 0-000a: asoc: failed to probe CODEC sgtl5000.0-000a: -19
+> asoc: failed to instantiate card imx6q-sabrelite-sgtl5000: -19
+> imx-sgtl5000 sound.11: snd_soc_register_card failed (-19)
+>
+> Any ideas?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6q-sabrelite.dts |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Ok, I sent a new patch that fixes this problem.
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index d42e851..1769f44 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -53,6 +53,7 @@
- 						fsl,pins = <
- 							   144  0x80000000	/* MX6Q_PAD_EIM_D22__GPIO_3_22 */
- 							   121  0x80000000	/* MX6Q_PAD_EIM_D19__GPIO_3_19 */
-+							   953  0x80000000	/* MX6Q_PAD_GPIO_0__CCM_CLKO */		
- 							   >;
- 					};
- 				};
--- 
-1.7.1
+Also, I learned from Richard Zhao that audio can only be probed
+correctly if we power off/on the board. Pressing the reset button
+makes the audio probe to fail.
