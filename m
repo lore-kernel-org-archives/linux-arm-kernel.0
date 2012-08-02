@@ -1,59 +1,66 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Thu, 2 Aug 2012 15:24:44 +0800
-Subject: [PATCH 2/5] clk: mmp: add clock definition for pxa168
-In-Reply-To: <201207311154.42866.arnd@arndb.de>
-References: <1343716792-10399-1-git-send-email-xiechao.mail@gmail.com>
- <1343716792-10399-2-git-send-email-xiechao.mail@gmail.com>
- <201207311154.42866.arnd@arndb.de>
-Message-ID: <CADApbegvdRQ5swDrO-Y631K4AhsTigAG4=Mm82mT-smSA7XzJw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 2 Aug 2012 13:04:25 +0530
+Subject: [PATCH V2 08/10] ARM: OMAP4: Prevent EMU power domain
+ transitioning to OFF when in-use
+In-Reply-To: <alpine.DEB.2.00.1208010932270.21488@utopia.booyaka.com>
+References: <1339104132-26885-1-git-send-email-jon-hunter@ti.com>
+ <1339104132-26885-9-git-send-email-jon-hunter@ti.com>
+ <alpine.DEB.2.00.1207111441300.25585@utopia.booyaka.com>
+ <500028B3.1040309@ti.com>
+ <alpine.DEB.2.00.1207131418500.25585@utopia.booyaka.com>
+ <50045D17.9050704@ti.com>
+ <alpine.DEB.2.00.1207161228470.28834@utopia.booyaka.com>
+ <50171841.40309@ti.com> <501760BF.8070801@ti.com> <5018210A.1040902@ti.com>
+ <50187644.40308@ti.com>
+ <alpine.DEB.2.00.1208010932270.21488@utopia.booyaka.com>
+Message-ID: <CAMQu2gx_E2eZASK-Zj0A6D4tq0VMJXCPK5QMsp7w3GHVChAkXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 7:54 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 31 July 2012, Chao Xie wrote:
->> +#define APBC_RTC       APBC_REG(0x28)
->> +#define APBC_TWSI0     APBC_REG(0x2c)
->> +#define APBC_KPC       APBC_REG(0x30)
->> +#define APBC_UART0     APBC_REG(0x00)
->> +#define APBC_UART1     APBC_REG(0x04)
->> +#define APBC_GPIO      APBC_REG(0x08)
->> +#define APBC_PWM0      APBC_REG(0x0c)
->> +#define APBC_PWM1      APBC_REG(0x10)
->> +#define APBC_PWM2      APBC_REG(0x14)
->> +#define APBC_PWM3      APBC_REG(0x18)
->> +#define APBC_SSP0      APBC_REG(0x81c)
->> +#define APBC_SSP1      APBC_REG(0x820)
->> +#define APBC_SSP2      APBC_REG(0x84c)
->> +#define APBC_SSP3      APBC_REG(0x858)
->> +#define APBC_SSP4      APBC_REG(0x85c)
->> +#define APBC_TWSI1     APBC_REG(0x6c)
->> +#define APBC_UART2     APBC_REG(0x70)
->> +
->> +#define APMU_SDH0      APMU_REG(0x54)
->> +#define APMU_SDH1      APMU_REG(0x58)
->> +#define APMU_USB       APMU_REG(0x5c)
->> +#define APMU_DISP0     APMU_REG(0x4c)
->> +#define APMU_CCIC0     APMU_REG(0x50)
->> +#define APMU_DFC       APMU_REG(0x60)
+On Wed, Aug 1, 2012 at 9:06 PM, Paul Walmsley <paul@pwsan.com> wrote:
 >
-> Same comment as for patch 1: get the address from the device tree and just
-> define those macros to the offset, like:
+> Hi Jon et al,
 >
-> #define APBC_RTC       0x28
+> Here's what I'm planning to queue here.  The only changes from what Jon
+> posted are the patch changelog and some checkpatch fixes.  If anyone
+> has any final comments, please let me know.
 >
-> apbc_clks[rtc_clk] = mmp_clk_register_apbc(rtc_clk, clk32k, APBC_RTC, 10, APBC_POWER_CTRL, mmp_clk_lock);
-> clk_register_clkdev(apbc_clks[rtc_clk], NULL, "sa1100-rtc");
 >
->         Arnd
+> - Paul
 >
-hi
-I would like to keep the mmp_clk_register_apbc to receive the "reg
-base" not "reg offset".
-It will be aligned with other kind of clock register APIs.
-To read out APBC base register from device tree can be added at the
-clock-pxa168.c, and it can map the registers and pass to the
-mmp_clk_register_apbc.
-Now, i have talked to Haojian who is doing device tree maintainer in
-pxa/mmp. This kind of support is not added.
-I suggest that after device tree support in clock can be added later
-after other functionality of the clock framework is fine.
+> From: Paul Walmsley <paul@pwsan.com>
+> Date: Wed, 1 Aug 2012 09:11:20 -0600
+> Subject: [PATCH] ARM: OMAP2+: clockdomain/hwmod: add workaround for EMU
+>  clockdomain idle problems
+>
+> The idle status of the IP blocks and clocks inside the EMU clockdomain
+> isn't taken into account by the PRCM hardware when deciding whether
+> the clockdomain is idle.  Add a workaround flag in the clockdomain
+> code, CLKDM_MISSING_IDLE_REPORTING, to deal with this problem, and add
+> the code necessary to support it.
+>
+> If CLKDM_MISSING_IDLE_REPORTING is set on a clockdomain, the
+> clockdomain will be forced active whenever an IP block inside that
+> clockdomain is in use, even if the clockdomain supports
+> hardware-supervised idle.  When the kernel indicates that the last
+> active IP block inside the clockdomain is no longer used, the
+> clockdomain will be forced idle, or, if that mode is not supported in
+> the hardware, it will be placed into hardware-supervised idle.
+>
+> This patch is an equal collaboration with Jon Hunter
+> <jon-hunter@ti.com>.  Ming Lei <ming.lei@canonical.com>, Will Deacon
+> <will.deacon@arm.com>, Madhav Vij <mvij@ti.com>, Kevin Hilman
+> <khilman@ti.com>, Beno?t Cousson <b-cousson@ti.com>, and Santosh
+> Shilimkar <santosh.shilimkar@ti.com> all made essential contributions
+> to the understanding of EMU clockdomain power management on OMAP.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Jon Hunter <jon-hunter@ti.com>
+> Cc: Ming Lei <ming.lei@canonical.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Madhav Vij <mvij@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Beno?t Cousson <b-cousson@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
