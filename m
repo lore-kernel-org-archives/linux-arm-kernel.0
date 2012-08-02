@@ -1,37 +1,58 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 2 Aug 2012 23:01:51 +0800
-Subject: [PATCH 1/2] ARM: imx: enable emi_slow_gate clock for imx5
-Message-ID: <1343919712-6240-1-git-send-email-shawn.guo@linaro.org>
+Date: Thu, 2 Aug 2012 23:01:52 +0800
+Subject: [PATCH 2/2] ARM: dts: imx53-ard: add regulators for lan9220
+In-Reply-To: <1343919712-6240-1-git-send-email-shawn.guo@linaro.org>
+References: <1343919712-6240-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1343919712-6240-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx5 common clock migration causes a regression with smsc911x
-driver on imx53-ard board, where a smsc lan9220 controller gets
-connected on imx53 with EIM interface.  EIM needs clock emi_slow_gate
-to be functional.  In the new imx5 clock driver, there is no use count
-incremented for the clock by enabling it, so the framework closes the
-clock at late init time and makes EIM stop working then.
+Since commit c7e963f (net/smsc911x: Add regulator support), the lan9220
+device tree probe fails on imx53-ard board, because the commit makes
+VDD33A and VDDVARIO supplies mandatory for the driver.
 
-Enable emi_slow_gate in clock driver initialization to fix the
-regression.
+Add a fixed dummy 3V3 supplying lan9220 to fix the regression.
 
 Cc: stable at vger.kernel.org
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/clk-imx51-imx53.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx53-ard.dts |   20 ++++++++++++++++++++
+ 1 files changed, 20 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index f608669..6eee32a 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -303,6 +303,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk_prepare_enable(clk[aips_tz2]); /* fec */
- 	clk_prepare_enable(clk[spba]);
- 	clk_prepare_enable(clk[emi_fast_gate]); /* fec */
-+	clk_prepare_enable(clk[emi_slow_gate]);
- 	clk_prepare_enable(clk[tmax1]);
- 	clk_prepare_enable(clk[tmax2]); /* esdhc2, fec */
- 	clk_prepare_enable(clk[tmax3]); /* esdhc1, esdhc4 */
+diff --git a/arch/arm/boot/dts/imx53-ard.dts b/arch/arm/boot/dts/imx53-ard.dts
+index 5b8eafc..fa95f4a 100644
+--- a/arch/arm/boot/dts/imx53-ard.dts
++++ b/arch/arm/boot/dts/imx53-ard.dts
+@@ -66,10 +66,30 @@
+ 			interrupt-parent = <&gpio2>;
+ 			interrupts = <31>;
+ 			reg-io-width = <4>;
++			/*
++			 * VDD33A and VDDVARIO of LAN9220 are supplied by
++			 * SW4_3V3 of LTC3589.  Before the regulator driver
++			 * for this PMIC is available, we use a fixed dummy
++			 * 3V3 regulator to get LAN9220 driver probing work.
++			 */
++			vdd33a-supply = <&reg_3p3v>;
++			vddvario-supply = <&reg_3p3v>;
+ 			smsc,irq-push-pull;
+ 		};
+ 	};
+ 
++	regulators {
++		compatible = "simple-bus";
++
++		reg_3p3v: 3p3v {
++			compatible = "regulator-fixed";
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++	};
++
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
+ 
 -- 
 1.7.5.4
