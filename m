@@ -1,47 +1,61 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 2 Aug 2012 10:17:04 -0700
-Subject: [GIT PULL][for 3.6] pull request from board branch in pxa git tree
-In-Reply-To: <20120802171149.GA26795@quad.lixom.net>
-References: <CAN1soZxxZMy7iVx=r1XwaxfXVLAXBGd03t5rv7PM4A7dQm_HFA@mail.gmail.com>
- <20120802171149.GA26795@quad.lixom.net>
-Message-ID: <CAOesGMhmCveAjGnbMic7HgW4CX_L4g+2tmmOP3UPEF=NwtfxXA@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 02 Aug 2012 19:19:16 +0200
+Subject: Current state of AM33xx patches
+In-Reply-To: <98DC2F80-9AD6-4A65-8FA8-3B2AABF72692@dominion.thruhere.net>
+References: <4FD5BA4C.9070706@gmail.com> <4FE9A00B.6010908@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
+ <4FEC7394.9030208@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
+ <4FEDF54D.4030609@gmail.com>
+ <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
+ <4FEEC7F2.8070507@gmail.com>
+ <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA635DC@DBDE01.ent.ti.com>
+ <4FF42761.2000701@gmail.com>
+ <EB1619762EAF8B4E97A227FB77B7E0293E9C2548@DBDE01.ent.ti.com>
+ <500CEF97.4050207@gmail.com>
+ <EB1619762EAF8B4E97A227FB77B7E0293E9D04EB@DBDE01.ent.ti.com>
+ <501159C3.3020109@gmail.com>
+ <704C899A-606B-41A3-99E8-6D92C0EA5BC5@dominion.thruhere.net>
+ <50116926.4060309@gmail.com>
+ <587C7FB9-2DD3-48EE-B74D-BEBDF199BE23@dominion.thruhere.net>
+ <50118272.1050209@gmail.com>
+ <9F9237B3-55BD-471B-ADD1-1A18F3644387@dominion.thruhere.net>
+ <501A9D1C.8080305@gmail.com>
+ <98DC2F80-9AD6-4A65-8FA8-3B2AABF72692@dominion.thruhere.net>
+Message-ID: <501AB694.5090304@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 2, 2012 at 10:11 AM, Olof Johansson <olof@lixom.net> wrote:
-> Hi,
+On 02.08.2012 17:37, Koen Kooi wrote:
+> Not only that, it's actually missing params and other params are
+> wrong. See my non-constructive rant in the commit message:
+> http://dominion.thruhere.net/koen/angstrom/beaglebone/0001-beaglebone-add-broken-cpsw-DT.patch
 >
-> On Tue, Jul 31, 2012 at 09:39:55AM +0800, Haojian Zhuang wrote:
->> Hi Arnd & Olof,
->>
->> Please help to pull these from board branch of pxa git tree for v3.6
->>
->> Regards
->> Haojian
->>
->> The following changes since commit 28a33cbc24e4256c143dce96c7d93bf423229f92:
->>
->>   Linux 3.5 (2012-07-21 13:58:29 -0700)
->>
->> are available in the git repository at:
->>
->>   git://github.com/hzhuang1/linux.git board
->>
->
-> I'm not sure what to think of this branch. It contains one bugfix
-> (missing include) and one feature.
->
-> All features for a merge window should be in our tree by the time the
-> merge window opens.
->
-> I've pulled it in this time, but please don't send features this late
-> again -- queue them up for the next merge window instead.
+>  But I still can't get it working:
+> 
+> root at beaglebone:~# dmesg | grep -i cpsw [   13.504425] net eth0:
+> initializing cpsw version 1.12 (0)
+> 
+> root at beaglebone:~# dmesg | grep -i phy [    0.000000] Booting Linux
+> on physical CPU 0 [    0.228496] nop_usb_xceiv phy.17: transceiver
+> type USB2 PHY already exists [   13.512056] libphy: PHY
+> davinci_mdio-0:00 not found [   13.517168] net eth0: phy
+> davinci_mdio-0:00 not found on slave 0 [   13.523516] libphy: PHY
+> davinci_mdio-0:01 not found [   13.528675] net eth0: phy
+> davinci_mdio-0:01 not found on slave 1
+
+That is because the davinci_mdio driver is not yet probed from DT. I
+hooked up bindings to that driver and also had to augment the clock
+definitions, but that's giving me an "external abort on non-linefetch"
+at boot time. Most probably because there's something missing in the
+clock setup. Not sure whether I should debug that any further or if
+anyone has patches for that.
+
+Mugunthan, how did you test your DT bindings? Could you push your entire
+tree somewhere maybe for others to have a look at it? I have no problem
+helping you in any way, I just want to know where we currently are.
 
 
-Actually, on second throught (since I also noticed the second pull
-request after sending this reply), I cherry-picked the IRQ fix out of
-the branch instead. Please include the board platform_device change in
-your branches for 3.7 instead.
-
-
--Olof
+Thanks for you work,
+Daniel
