@@ -1,60 +1,43 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 02 Aug 2012 21:56:57 +0200
-Subject: Current state of AM33xx patches
-In-Reply-To: <98DC2F80-9AD6-4A65-8FA8-3B2AABF72692@dominion.thruhere.net>
-References: <4FD5BA4C.9070706@gmail.com> <4FE9A00B.6010908@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
- <4FEC7394.9030208@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
- <4FEDF54D.4030609@gmail.com>
- <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
- <4FEEC7F2.8070507@gmail.com>
- <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA635DC@DBDE01.ent.ti.com>
- <4FF42761.2000701@gmail.com>
- <EB1619762EAF8B4E97A227FB77B7E0293E9C2548@DBDE01.ent.ti.com>
- <500CEF97.4050207@gmail.com>
- <EB1619762EAF8B4E97A227FB77B7E0293E9D04EB@DBDE01.ent.ti.com>
- <501159C3.3020109@gmail.com>
- <704C899A-606B-41A3-99E8-6D92C0EA5BC5@dominion.thruhere.net>
- <50116926.4060309@gmail.com>
- <587C7FB9-2DD3-48EE-B74D-BEBDF199BE23@dominion.thruhere.net>
- <50118272.1050209@gmail.com>
- <9F9237B3-55BD-471B-ADD1-1A18F3644387@dominion.thruhere.net>
- <501A9D1C.8080305@gmail.com>
- <98DC2F80-9AD6-4A65-8FA8-3B2AABF72692@dominion.thruhere.net>
-Message-ID: <501ADB89.4030405@gmail.com>
+From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
+Date: Thu, 02 Aug 2012 22:02:05 +0200
+Subject: doubts about switch_mm
+In-Reply-To: <20120802194931.GY6802@n2100.arm.linux.org.uk>
+References: <501AD023.3020204@xenomai.org>
+ <20120802194931.GY6802@n2100.arm.linux.org.uk>
+Message-ID: <501ADCBD.20907@xenomai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.08.2012 17:37, Koen Kooi wrote:
->  But I still can't get it working:
+On 08/02/2012 09:49 PM, Russell King - ARM Linux wrote:
+
+> On Thu, Aug 02, 2012 at 09:08:19PM +0200, Gilles Chanteperdrix wrote:
+>> switch_mm code, as of 3.5 contains:
+>>
+>> 1   if (!cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) || prev != next) {  
+>> 2           check_and_switch_context(next, tsk);                             
+>> 3           if (cache_is_vivt())                                             
+>> 4                   cpumask_clear_cpu(cpu, mm_cpumask(prev));                
+>> 5   }                                                                        
+>>
+>> Line 1 seems to mean that maybe switch_mm is called with prev == next.
+>> But then, what line 4 does is certainly wrong if prev == next.
 > 
-> root at beaglebone:~# dmesg | grep -i cpsw [   13.504425] net eth0:
-> initializing cpsw version 1.12 (0)
+> Look at it more carefully.
 > 
-> root at beaglebone:~# dmesg | grep -i phy [    0.000000] Booting Linux
-> on physical CPU 0 [    0.228496] nop_usb_xceiv phy.17: transceiver
-> type USB2 PHY already exists [   13.512056] libphy: PHY
-> davinci_mdio-0:00 not found [   13.517168] net eth0: phy
-> davinci_mdio-0:00 not found on slave 0 [   13.523516] libphy: PHY
-> davinci_mdio-0:01 not found [   13.528675] net eth0: phy
-> davinci_mdio-0:01 not found on slave 1
+> If prev == next, then we're already running with *this* mm.  The bit
+> in the CPU mask for this CPU will be set.
 > 
-> root at beaglebone:~# ifconfig -a | grep eth eth0      Link
-> encap:Ethernet  HWaddr 00:04:9F:01:1B:B8
-
-Ok, I got it up and and running now on my board using the two
-davinci_mdio drivers and the hwmod addition I just posted.
-
-With those applied on top of Mugunthan work, I can link my cpsw slave
-with the phy id "davinci_mdio.18-:04", but the 18 is just the global
-device counter which will change again once I add more devices. That
-still needs some cleanup.
-
-Anyway, at least I can boot into my NFS root now :) Koen, can you try
-this on your board and see if that works for you as well?
+> So, cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) will be true, and
+> because the condition is inverted, the first half of the if condition
+> is false.
+> 
+> The second half is false, because prev == next.  So lines 2-4 will not
+> be executed.
+>
 
 
-Thanks,
-Daniel
+So, prev != next on line 1 is useless ?
+
+
+-- 
+                                                                Gilles.
