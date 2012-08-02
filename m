@@ -1,43 +1,48 @@
 From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Thu, 02 Aug 2012 22:02:05 +0200
+Date: Thu, 02 Aug 2012 22:05:16 +0200
 Subject: doubts about switch_mm
-In-Reply-To: <20120802194931.GY6802@n2100.arm.linux.org.uk>
+In-Reply-To: <501ADCBD.20907@xenomai.org>
 References: <501AD023.3020204@xenomai.org>
- <20120802194931.GY6802@n2100.arm.linux.org.uk>
-Message-ID: <501ADCBD.20907@xenomai.org>
+ <20120802194931.GY6802@n2100.arm.linux.org.uk> <501ADCBD.20907@xenomai.org>
+Message-ID: <501ADD7C.40607@xenomai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/2012 09:49 PM, Russell King - ARM Linux wrote:
+On 08/02/2012 10:02 PM, Gilles Chanteperdrix wrote:
 
-> On Thu, Aug 02, 2012 at 09:08:19PM +0200, Gilles Chanteperdrix wrote:
->> switch_mm code, as of 3.5 contains:
+> On 08/02/2012 09:49 PM, Russell King - ARM Linux wrote:
+> 
+>> On Thu, Aug 02, 2012 at 09:08:19PM +0200, Gilles Chanteperdrix wrote:
+>>> switch_mm code, as of 3.5 contains:
+>>>
+>>> 1   if (!cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) || prev != next) {  
+>>> 2           check_and_switch_context(next, tsk);                             
+>>> 3           if (cache_is_vivt())                                             
+>>> 4                   cpumask_clear_cpu(cpu, mm_cpumask(prev));                
+>>> 5   }                                                                        
+>>>
+>>> Line 1 seems to mean that maybe switch_mm is called with prev == next.
+>>> But then, what line 4 does is certainly wrong if prev == next.
 >>
->> 1   if (!cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) || prev != next) {  
->> 2           check_and_switch_context(next, tsk);                             
->> 3           if (cache_is_vivt())                                             
->> 4                   cpumask_clear_cpu(cpu, mm_cpumask(prev));                
->> 5   }                                                                        
+>> Look at it more carefully.
 >>
->> Line 1 seems to mean that maybe switch_mm is called with prev == next.
->> But then, what line 4 does is certainly wrong if prev == next.
+>> If prev == next, then we're already running with *this* mm.  The bit
+>> in the CPU mask for this CPU will be set.
+>>
+>> So, cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) will be true, and
+>> because the condition is inverted, the first half of the if condition
+>> is false.
+>>
+>> The second half is false, because prev == next.  So lines 2-4 will not
+>> be executed.
+>>
 > 
-> Look at it more carefully.
 > 
-> If prev == next, then we're already running with *this* mm.  The bit
-> in the CPU mask for this CPU will be set.
+> So, prev != next on line 1 is useless ?
 > 
-> So, cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) will be true, and
-> because the condition is inverted, the first half of the if condition
-> is false.
 > 
-> The second half is false, because prev == next.  So lines 2-4 will not
-> be executed.
->
 
-
-So, prev != next on line 1 is useless ?
-
+Ok, got it, sorry for the noise.
 
 -- 
                                                                 Gilles.
