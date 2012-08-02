@@ -1,58 +1,30 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 02 Aug 2012 22:28:48 +0200
-Subject: [PATCH 1/2] net: davinci_mdio: enable and disable clock
-In-Reply-To: <alpine.DEB.2.00.1208021416550.18867@utopia.booyaka.com>
-References: <1343936616-29318-1-git-send-email-zonque@gmail.com>
- <alpine.DEB.2.00.1208021416550.18867@utopia.booyaka.com>
-Message-ID: <501AE300.2090707@gmail.com>
+Date: Thu, 02 Aug 2012 22:32:06 +0200
+Subject: [alsa-devel] DT support for Davinci ASoC platform
+In-Reply-To: <4FF5733E.6000604@gmail.com>
+References: <1BAFE6F6C881BF42822005164F1491C33EA35352@DBDE01.ent.ti.com>
+ <4FF5733E.6000604@gmail.com>
+Message-ID: <501AE3C6.8040708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.08.2012 22:20, Paul Walmsley wrote:
-> Hi
+On 05.07.2012 12:58, Daniel Mack wrote:
+> Hi Gururaja,
 > 
-> On Thu, 2 Aug 2012, Daniel Mack wrote:
-> 
->> Make the driver control the device clocks. Appearantly, the Davinci
->> platform probes this driver with the clock all powered up, but on OMAP,
->> this isn't the case.
+> On 04.07.2012 14:48, Hebbar, Gururaja wrote:
+>> All,
 >>
->> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> 
->> ---
->>  drivers/net/ethernet/ti/davinci_mdio.c | 16 ++++++++++++++--
->>  1 file changed, 14 insertions(+), 2 deletions(-)
+>> Are there any plans or work going on for providing Device Tree Support for Davinci
+>> ASoC?
 >>
->> diff --git a/drivers/net/ethernet/ti/davinci_mdio.c b/drivers/net/ethernet/ti/davinci_mdio.c
->> index cd7ee20..b4b6015 100644
->> --- a/drivers/net/ethernet/ti/davinci_mdio.c
->> +++ b/drivers/net/ethernet/ti/davinci_mdio.c
->> @@ -332,6 +332,8 @@ static int __devinit davinci_mdio_probe(struct platform_device *pdev)
->>  		goto bail_out;
->>  	}
->>  
->> +	clk_enable(data->clk);
->> +
+>> I am planning to add DT support for TI AM335x (McASP) and I don't want to do duplicate
+>> task.
 > 
-> This doesn't look right.  This clock should be enabled by the
-> pm_runtime_get_sync() call just above this.  It shouldn't be necessary
-> to enable it again unless something isn't right with the integration
-> data. Likewise the pm_runtime_put_sync() calls should be superfluous.
+> That's good to know. But isn't there a dependency on the EDMA engine? Is
+> that part ported yet?
 
-Aah, thanks for the heads-up. To explain, I first worked with a dirty
-hack to alias the clock, and I definitely needed these extra calls then.
-
-> What hwmod data/device tree file are you using with this?
-
-Later, I added the hwmod to move away from these hacks, and indeed, that
-lets the pm runtime code handle the clock enabling. With that in place,
-the patch we're talking about here is in fact unnecessary.
-
-The second one though (the one that adds DT bindings) should go in.
-
-I will send a separate one later that fixes the IS_ERR(data->clk) error
-that Russell spotted. But that's now unrelated.
+May I ask whether you made any progress on that yet?
 
 
-Thanks for the review,
+Thanks,
 Daniel
