@@ -1,45 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Aug 2012 20:44:53 +0100
-Subject: [PATCH] ARM: makefile: work around toolchain bug in recent
- versions of binutils
-In-Reply-To: <20120802185033.GA2725@mudshark.cambridge.arm.com>
-References: <1343910206-3684-1-git-send-email-will.deacon@arm.com>
- <20120802130411.GU6802@n2100.arm.linux.org.uk>
- <20120802150123.GE9838@mudshark.cambridge.arm.com>
- <20120802153030.GV6802@n2100.arm.linux.org.uk>
- <20120802155140.GF9838@mudshark.cambridge.arm.com>
- <20120802181810.GW6802@n2100.arm.linux.org.uk>
- <20120802185033.GA2725@mudshark.cambridge.arm.com>
-Message-ID: <20120802194453.GX6802@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 2 Aug 2012 16:46:39 -0300
+Subject: [PATCH] ARM: dts: imx: fix gpio interrupts property
+In-Reply-To: <1343917434-4358-1-git-send-email-shawn.guo@linaro.org>
+References: <CAOMZO5D1oM0q2H=ZqNc3Jq9T5+kGypnDbFC8O1a5D6qQYy1ySA@mail.gmail.com>
+ <1343917434-4358-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAOMZO5A3hRp1f-244cPPE15Ur-V6stANrQ2QrS5j58J3BMRnXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 02, 2012 at 07:50:33PM +0100, Will Deacon wrote:
-> With recent tools, it looks like that's really hard to do... simply passing
-> the lowest common denominator of march=armv4 will cause the assembler to
-> barf on all the non-v4 code, which includes Thumb ("Error: selected processor
-> does not support THUMB opcodes"). It sounds like we want to pass the march
-> option corresponding to the highest architecture version supported by the
-> kernel being compiled (assuming we don't use anything that gets deprecated
-> by a later version of the architecture(!)).
+On Thu, Aug 2, 2012 at 11:23 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> Commit 88cde8b (ARM: dts: imx: update #interrupt-cells for gpio nodes)
+> changes gpio #interrupt-cells from 1 to 2 without updating the users.
+> It causes the gpio irq requesting call failing in client driver's probe
+> function.
+>
+> Add the irq type cell for those gpio interrupt users to fix their
+> driver probe failure.
+>
+> Reported-by: Fabio Estevam <festevam@gmail.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-This is where having an option of "create opcodes exactly from the
-assembly I specify in this file, I know what I'm doing, and I don't
-care that some instructions aren't present on various CPUs" becomes a
-requirement than a desire.
+Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-> > The alternative is we scatter various places with lots of yucky ifdefs,
-> > and it won't be pretty because quite a number of CPUs share the same code
-> > (which leads to long #if defined(CPU_A) || defined(CPU_B) etc).
-> 
-> That'll work, but let's keep it as a last resort. This is still a toolchain
-> issue we're dealing with here.
+Still see an issue with gpio-key, but I guess it is because
+http://patches.linaro.org/2743/
+is missing.
 
-Another possibility is to use .word for the instructions as refuses to
-use for us, which is also yuck.
+Thanks,
 
-The more the binutils folk decide that they should be gods and rule what
-code we can write, the more work-arounds we will have to find.  Maybe
-that even gets to the point of having to write our own assembler...  It
-wouldn't be the first time that something like that has been done because
-a mainstream project imposed too many silly conditions on their users.
+Fabio Estevam
