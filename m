@@ -1,124 +1,83 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 2 Aug 2012 10:46:31 -0700
-Subject: [GIT PULL 3/3] ARM: arm-soc Marvell Orion device-tree updates
-Message-ID: <CAOesGMjc0PBLEf_Ar=z9TX4bjHEMOVeshxQSmYpp9P=3G6_D_Q@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 2 Aug 2012 18:56:04 +0100
+Subject: [alsa-devel] [PATCH 1/6] ASoC: dapm: If one widget fails, do not
+ force all subsequent widgets to fail too
+In-Reply-To: <20120802074517.GA19231@gmail.com>
+References: <5017EDCA.4020601@linaro.org>
+ <20120731145443.GY4468@opensource.wolfsonmicro.com>
+ <5017F68B.3060400@linaro.org>
+ <20120731151819.GC4468@opensource.wolfsonmicro.com>
+ <5018D880.5090306@linaro.org>
+ <20120801132022.GS11892@opensource.wolfsonmicro.com>
+ <50193428.5000708@linaro.org>
+ <20120801160824.GB11892@opensource.wolfsonmicro.com>
+ <20120801194134.GA4103@sirena.org.uk>
+ <20120802074517.GA19231@gmail.com>
+Message-ID: <20120802175604.GF4537@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch contains a set of device-tree conversions for Marvell Orion
-platforms that were staged early but took a few tries to get the branch
-into a format where it was suitable for us to pick up.
+On Thu, Aug 02, 2012 at 08:45:18AM +0100, Lee Jones wrote:
 
-Given that most people working on these platforms are hobbyists with
-limited time, we were a bit more flexible with merging it even though
-it came in late.
+> Over time, the requests for Maintainers have Snowballed (pun intended). My 
+> task now seems to be enabling drivers for Device Tree _and_ fix all 
+> associated driver bugs, including any requested restructuring and API
 
-----------------------------------------------------------------
+One thing to bear in mind with device tree is that it's all about
+defining an ABI - it's supposed to be stable and OS agnostic so it puts
+a lot of pressure on to really address quality problems that become
+visible in the bindings.  This stuff is much less critical with platform
+data, it's relatively easy to change.
 
-The following changes since commit 4695ce021de2a3abdd593155bee291496e735cbf:
+> adoption. What you fail to notice is that I am only one person, and hopping
+> all over the code-base trying to do everyone's bidding is no mean feat. In
 
-  Merge tag 'pm2' into HEAD
+It's fairly obvious that it's only you, or at least only you posting
+stuff (I know sometimes there are bigger teams behind people) - the
+pressure you're under to get something in is very clear.  A big part of
+what I'm saying here is that it would be really helpful if could you
+slow down a bit, discuss problems more and avoid cutting corners so
+much.  This is likely to save you time overall, you'll have a much
+higher success rate and you'll get much better feedback if it's clear
+what's going on and that there's an interest in understanding the
+issues.
 
-are available in the git repository at:
+If you need to focus on device tree enablement and there are underlying
+problems in the subsystems you're looking at perhaps you need to push
+back on whoever's asking you to do the work and say you need the domain
+experts to pitch in and help you out.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/dt2
+> reality I am no more obliged to fix driver bugs than you are. In fact as
+> the Maintainer of some of these subsystems, perhaps you could even help out
+> a bit?
 
-for you to fetch changes up to 15a1e1bafe2c924db6d370ad892d7da6c7d83598:
+You're not telling us about the problems you see so it's very difficult
+for anyone to help you.
 
-  Merge branch 'marvell/dt' into late2/dt
+For example with this patch the only information you've sent is the
+patch and the fact that you're seeing the error you're ignoring going
+off on the system you're working with (which I had to ask to find out
+about...).  You've not shown the error message or provided any other
+hint which would help anyone understand why the error might be occuring
+and what a good solution to the problem is.  Ola's guess seems very
+likely but nobody's got enough information to confirm that unless
+there's been some off-list ST/Linaro communication.
 
-----------------------------------------------------------------
+Obviously with the stuff that's device specific you also have to contend
+with the fact that you're working on hardware which just isn't all that
+widely available and quite possibly has closed datasheets.
 
-Andrew Lunn (16):
-      Merge tag 'spi-3.6' into v3.5-rc7-dt-v3
-      Merge branch 'v3.5-rc7-fixes' into v3.5-rc7-dt-v3
-      ARM: Orion: DT support for IRQ and GPIO Controllers
-      ARM: Orion: Add arch support needed for I2C via DT.
-      ARM: Orion: DTify the watchdog timer.
-      ATA: sata_mv: Add device tree support
-      ARM: Kirkwood: Add basic device tree support for QNAP TS219.
-      ARM: Kirkwood: Use DT to configure SATA device.
-      ARM: Kirkwood: Describe DNS325 temperature sensor in DT.
-      ARM: Kirkwood: Describe IB62x0 gpio-keys in DT.
-      ARM: Kirkwood: Describe IB62x0 LEDs in DT.
-      ARM: Kirkwood: Describe iConnects temperature sensor in DT.
-      ARM: Kirkwood: Describe iConnects LEDs in DT.
-      ARM: Kirkwood: Describe Dreamplug LEDs in DT.
-      ARM: Kirkwood: Describe GoFlex Net LEDs and SATA in DT.
-      ARM: Kirkwood: Replace mrvl with marvell
+> We are all trying to do good things here. Please try not to be too over-
+> critical. We all know Mainlining is a good thing. Perhaps less people
+> would be so frightened of it, thus more people would do it if the reviews
+> weren't such a ball-ache ( for want of a better expression :) ).
 
-Jamie Lentin (3):
-      ARM: Kirkwood: Replace DNS-320/DNS-325 leds with dt bindings
-      ARM: Kirkwood: Move common portions into a kirkwood-dnskw.dtsi
-      ARM: Kirkwood: Describe DNS32? gpio-keys in DT.
+This is a two way thing - one of the tools that maintainers have to try
+to drive up the quality of the code is to push back on poor quality
+submissions and devote less bandwith to sources of those submissions.
 
-Josh Coombs (1):
-      ARM: Kirkwood: Initial DTS support for Kirkwood GoFlex Net
-
-Michael Walle (3):
-      ARM: kirkwood: use devicetree for orion-spi
-      ARM: kirkwood: Add LS-XHL and LS-CHLv2 support
-      ARM: kirkwood: use devicetree for SPI on dreamplug
-
-Olof Johansson (1):
-      Merge branch 'marvell/dt' into late2/dt
-
-
- .../devicetree/bindings/arm/mrvl/intc.txt       |  20 +++
- .../devicetree/bindings/ata/marvell.txt         |  16 ++
- .../devicetree/bindings/gpio/mrvl-gpio.txt      |  23 +++
-
- .../devicetree/bindings/watchdog/marvel.txt     |  14 ++
- arch/arm/Kconfig                                |   1 +
- arch/arm/boot/dts/kirkwood-dns320.dts           |  62 +++----
- arch/arm/boot/dts/kirkwood-dns325.dts           |  68 ++++----
- arch/arm/boot/dts/kirkwood-dnskw.dtsi           |  69 ++++++++
- arch/arm/boot/dts/kirkwood-dreamplug.dts        |  50 ++++++
- arch/arm/boot/dts/kirkwood-goflexnet.dts        |  99 +++++++++++
- arch/arm/boot/dts/kirkwood-ib62x0.dts           |  38 +++++
- arch/arm/boot/dts/kirkwood-iconnect.dts         |  42 +++++
- arch/arm/boot/dts/kirkwood-lschlv2.dts          |  20 +++
- arch/arm/boot/dts/kirkwood-lsxhl.dts            |  20 +++
- arch/arm/boot/dts/kirkwood-lsxl.dtsi            |  95 +++++++++++
- arch/arm/boot/dts/kirkwood-ts219-6281.dts       |  21 +++
- arch/arm/boot/dts/kirkwood-ts219-6282.dts       |  21 +++
- arch/arm/boot/dts/kirkwood-ts219.dtsi           |  78 +++++++++
- arch/arm/boot/dts/kirkwood.dtsi                 |  60 +++++++
- arch/arm/mach-dove/irq.c                        |  58 +++----
- arch/arm/mach-kirkwood/Kconfig                  |  29 ++++
- arch/arm/mach-kirkwood/Makefile                 |   3 +
- arch/arm/mach-kirkwood/Makefile.boot            |   4 +
- arch/arm/mach-kirkwood/board-dnskw.c            | 143 ----------------
- arch/arm/mach-kirkwood/board-dreamplug.c        |  80 ---------
- arch/arm/mach-kirkwood/board-dt.c               |  29 +++-
- arch/arm/mach-kirkwood/board-goflexnet.c        |  71 ++++++++
- arch/arm/mach-kirkwood/board-ib62x0.c           |  72 --------
- arch/arm/mach-kirkwood/board-iconnect.c         |  56 -------
- arch/arm/mach-kirkwood/board-lsxl.c             | 135 +++++++++++++++
- arch/arm/mach-kirkwood/board-ts219.c            |  82 +++++++++
- arch/arm/mach-kirkwood/common.c                 |   2 +
- arch/arm/mach-kirkwood/common.h                 |  17 ++
- arch/arm/mach-kirkwood/irq.c                    |  38 ++---
- arch/arm/mach-mv78xx0/irq.c                     |  22 +--
- arch/arm/mach-orion5x/irq.c                     |  22 +--
- arch/arm/plat-orion/common.c                    |   1 +
- arch/arm/plat-orion/gpio.c                      | 166 ++++++++++++++-----
- arch/arm/plat-orion/include/plat/gpio.h         |  16 +-
- arch/arm/plat-orion/include/plat/irq.h          |   3 +-
- arch/arm/plat-orion/irq.c                       |  40 +++++
- drivers/ata/sata_mv.c                           |  42 +++--
- drivers/watchdog/orion_wdt.c                    |   8 +
- 43 files changed, 1387 insertions(+), 569 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/ata/marvell.txt
- create mode 100644 Documentation/devicetree/bindings/watchdog/marvel.txt
- create mode 100644 arch/arm/boot/dts/kirkwood-dnskw.dtsi
- create mode 100644 arch/arm/boot/dts/kirkwood-goflexnet.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-lschlv2.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-lsxhl.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-lsxl.dtsi
- create mode 100644 arch/arm/boot/dts/kirkwood-ts219-6281.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-ts219-6282.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-ts219.dtsi
- create mode 100644 arch/arm/mach-kirkwood/board-goflexnet.c
- create mode 100644 arch/arm/mach-kirkwood/board-lsxl.c
- create mode 100644 arch/arm/mach-kirkwood/board-ts219.c
+It is true that there's a bunch of people who seem to view review as
+being just an annoying obstacle to be dealt with with the minimum
+possible effort but in practice all that does is make things more
+painful for everyone, they do tend to be more noticable because
+"applied, thanks" doesn't make for a big thread.
