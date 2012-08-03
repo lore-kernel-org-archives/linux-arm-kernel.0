@@ -1,30 +1,21 @@
-From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Fri, 3 Aug 2012 20:12:07 +0530
-Subject: [PATCH v6 09/11] drivers: usb: musb: Add device tree support for
- omap musb glue
-In-Reply-To: <20120803133431.GK8269@arwen.pp.htv.fi>
-References: <1343639400-28725-1-git-send-email-kishon@ti.com>
- <1343639400-28725-10-git-send-email-kishon@ti.com>
- <20120803133431.GK8269@arwen.pp.htv.fi>
-Message-ID: <CAAe_U6+fMyck-EyicDuwKx-HggMJFEbAHTO9+8PELgHNBL1nFA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 3 Aug 2012 22:43:28 +0800
+Subject: [PATCH] SPI: MXS: Allow to pass the SPI master bus number from
+ the device tree
+In-Reply-To: <1344004239-22868-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1343076052-27312-1-git-send-email-marex@denx.de>
+ <1344004239-22868-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20120803144326.GE23791@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Aug 03, 2012 at 04:30:39PM +0200, Maxime Ripard wrote:
+> If you don't do it, the bus number will be a bogus value, possibly used
+> for device file names in drivers like spidev.
+> 
+Do you see any problem with that?  Here is the take from Grant.
 
-On Fri, Aug 3, 2012 at 7:04 PM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
->
-> On Mon, Jul 30, 2012 at 02:39:58PM +0530, Kishon Vijay Abraham I wrote:
->> Added device tree support for omap musb driver and updated the
->> Documentation with device tree binding information.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->
-> This looks good and I think I can take this without any dependencies
-> again. Correct ?
+http://thread.gmane.org/gmane.linux.kernel.spi.devel/9839/focus=9863
 
-correct.
-
-Thanks
-Kishon
+Regards,
+Shawn
