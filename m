@@ -1,118 +1,62 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Fri, 3 Aug 2012 12:04:25 +0200
-Subject: [PATCH 1/3] ARM: OMAP: timer: allow gp timer clock-event to be
- used on both cpus
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA7F59B@DBDE01.ent.ti.com>
-References: <1333114048-26136-1-git-send-email-santosh.shilimkar@ti.com>
- <1333114048-26136-2-git-send-email-santosh.shilimkar@ti.com>
- <501B7AE6.8080405@gmail.com>
- <76308EBE-F802-411A-973A-7BBC7575FE5A@dominion.thruhere.net>
- <BDB76D4F-31B0-47D0-B1A1-64A743D091D3@dominion.thruhere.net>
- <CAMQu2gxLAVk-LN8R1xBeeL1=iZ-mLSRmtZe4wpQYQPTBsY5RMA@mail.gmail.com>
- <FF29FBF3-67EC-478E-9A74-65F8A2870BDC@dominion.thruhere.net>
- <79CD15C6BA57404B839C016229A409A83EA7F59B@DBDE01.ent.ti.com>
-Message-ID: <A6396D46-C6B9-44A4-A960-657668AF08E4@dominion.thruhere.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 3 Aug 2012 12:07:11 +0200
+Subject: [PATCH v2 2/3] mtd: nand: Let MTD_NAND_GPMI_NAND depend on MXS_DMA
+In-Reply-To: <1343215100-24005-2-git-send-email-festevam@gmail.com>
+References: <1343215100-24005-1-git-send-email-festevam@gmail.com>
+ <1343215100-24005-2-git-send-email-festevam@gmail.com>
+Message-ID: <20120803100711.GC24458@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Op 3 aug. 2012, om 11:42 heeft "Hiremath, Vaibhav" <hvaibhav@ti.com> het volgende geschreven:
-
-> On Fri, Aug 03, 2012 at 15:03:07, Koen Kooi wrote:
->> 
->> Op 3 aug. 2012, om 11:27 heeft "Shilimkar, Santosh" <santosh.shilimkar@ti.com> het volgende geschreven:
->> 
->>> On Fri, Aug 3, 2012 at 2:00 PM, Koen Kooi <koen@dominion.thruhere.net> wrote:
->>>> 
->>>> Op 3 aug. 2012, om 09:21 heeft Koen Kooi <koen@dominion.thruhere.net> het volgende geschreven:
->>>> 
->>>>> 
->>>>> Op 3 aug. 2012, om 09:16 heeft Daniel Mack <zonque@gmail.com> het volgende geschreven:
->>>>> 
->>>>>> On 30.03.2012 15:27, Santosh Shilimkar wrote:
->>>>>>> For coupled cpuidle to work when both cpus are active, it needs a global timer
->>>>>>> that can handle events for both cpus.  This timer is used as the broadcast
->>>>>>> clock-event when the per-cpu timer hardware stop in low power states.
->>>>>>> Set the cpumask of clockevent_gpt to all cpus, set the rating correctly, and
->>>>>>> set the irq to allow the clockevent core to determine the affinity of the
->>>>>>> timer.
->>>>>> 
->>>>>> These patches made it to mainline now, shortly befor 3.6-rc1, and it
->>>>>> breaks boot on my AM33xx board.
->>>>>> 
->>>>>> Once I revert 1/3, the board boots again but crashes with the Ooops
->>>>>> below. With the entire series reverted, everything works again as
->>>>>> expected. Any idea?
->>>>>> 
->>>>>> The upstream commit ids are
->>>>>> 
->>>>>> 11d6ec2e "ARM: OMAP: timer: allow gp timer clock-event to be used on
->>>>>> both cpus"
->>>>>> 5b4d5bcc "ARM: OMAP4: CPUidle: add synchronization for coupled idle states"
->>>>>> b93d70ae "ARM: OMAP4: CPUidle: Open broadcast clock-event device."
->>>>> 
->>>>> I've had boot problems with cpuidle enabled as well, what happens if you disable it? Is the revert still needed in that case?
->>>> 
->>>> To answer my own question: No, the reverts aren't needed if you disable cpuidle.
->>> 
->>> This is really strange since CPUIDLE code is really OMAP4 specific.
->>> obj-$(CONFIG_ARCH_OMAP4)                += cpuidle44xx.o
->>> 
->>> May be omap2plus build some how the code gets executed on AMXX
->>> 
->>> Can you try below and see if the boot with CPUIDLE enabled goes away on
->>> AMXX
->>> 
->>> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
->>> index ea24174..195e756 100644
->>> --- a/arch/arm/mach-omap2/pm44xx.c
->>> +++ b/arch/arm/mach-omap2/pm44xx.c
->>> @@ -147,6 +147,9 @@ int __init omap4_pm_init(void)
->>>       struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm, *l4wkup;
->>>       struct clockdomain *ducati_clkdm, *l3_2_clkdm, *l4_per_clkdm;
->>> 
->>> +       if (!cpu_is_omap44xx())
->>> +               return -ENODEV;
->>> +
->>>       if (omap_rev() == OMAP4430_REV_ES1_0) {
->>>               WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
->>>               return -ENODEV;
->> 
->> That does seem to fix it:
->> 
->> root at beaglebone:~# zcat /proc/config.gz | grep -i cpu_idle
->> CONFIG_CPU_IDLE=y
->> CONFIG_CPU_IDLE_GOV_LADDER=y
->> CONFIG_CPU_IDLE_GOV_MENU=y
->> CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED=y
->> root at beaglebone:~# zcat /proc/config.gz | grep -i omap4   
->> CONFIG_ARCH_OMAP4=y
->> CONFIG_MACH_OMAP4_PANDA=y
->> # CONFIG_OMAP4_ERRATA_I688 is not set
->> # CONFIG_KEYBOARD_OMAP4 is not set
->> CONFIG_OMAP4_DSS_HDMI=y
->> 
+On Wed, Jul 25, 2012 at 08:18:19AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> This patch is not required, Without this patch is works for me,
-
-I just retested and I don't need Santosh' patch, booting with cpuidle enable works now, after refreshing your patchset (and dropping the rtc commit, it conflicts with the other rtc patches out there).
-
+> MTD_NAND_GPMI_NAND driver depends on MXS_DMA to be selected, otherwise the following error happens
+> for imx_v6_v7_defconfig:
 > 
-> [root at arago /]# cat /proc/version
-> Linux version 3.6.0-rc1-next-20120803-00010-g5f6bf0f (a0393758 at psplinux064) (gcc version 4.5.3 20110311 (prerelease) (GCC) ) #1 SMP Fri Aug 3 15:06:57 IST 2012
-> [root at arago /]#
+> drivers/built-in.o: In function `gpmi_dma_filter':
+> clk-fixed-factor.c:(.text+0xb124c): undefined reference to `mxs_dma_is_apbh'
+> make: *** [vmlinux] Error 1
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+As mentioned elsewhere in this thread: We should not select user visible
+options, so this patch is the only thing we can do atm (apart from
+'fixing the tools' as David mentioned, but this is out of scope for an
+-rc kernel)
+
+Additionally the imx_v6_v7_defconfig should be adjusted so that the gpmi
+nand driver actually gets built.
+
+Sascha
+
+> ---
+> Changes since v1:
+> - Use 'depends' rather than 'select'
+>  drivers/mtd/nand/Kconfig |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+> index a5d8a1b..da52c7d 100644
+> --- a/drivers/mtd/nand/Kconfig
+> +++ b/drivers/mtd/nand/Kconfig
+> @@ -463,6 +463,7 @@ config MTD_NAND_NANDSIM
+>  config MTD_NAND_GPMI_NAND
+>          bool "GPMI NAND Flash Controller driver"
+>          depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28 || SOC_IMX6Q)
+> +	depends on MXS_DMA
+>          help
+>  	 Enables NAND Flash support for IMX23, IMX28 or IMX6.
+>  	 The GPMI controller is very powerful, with the help of BCH
+> -- 
+> 1.7.1
 > 
 > 
-> 
-> Do you have below patch??
-> ARM: OMAP: cpu: Make cpu_class_is_omap2 true for all non-omap1 platforms
-> 
-> 
-> Also I have pushed branch (based on linux-next/master) to 
-> https://github.com/hvaibhav/am335x-linux/tree/am335x-linux-next-master
 
-Thanks! Ajays USB work and AnilKumar's pinctrl work are there as branches, any plans to add da8xx-fb, rtc and networking branches? As you can see from the cpsw patches, they were impossible to test because the davinci_mdio ones were missing.
-
-regards,
-
-Koen
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
