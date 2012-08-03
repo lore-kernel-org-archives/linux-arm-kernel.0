@@ -1,51 +1,110 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Fri, 03 Aug 2012 15:44:33 +0530
-Subject: [PATCH/RFC 1/4] dma: add a function to request a DMA channel
- for a specific client
-In-Reply-To: <Pine.LNX.4.64.1208021101350.11412@axis700.grange>
-References: <Pine.LNX.4.64.1207171201550.11241@axis700.grange>
- <Pine.LNX.4.64.1207171242230.17060@axis700.grange>
- <1343284293.1726.8966.camel@vkoul-udesk3>
- <Pine.LNX.4.64.1208021101350.11412@axis700.grange>
-Message-ID: <1343988873.1726.14439.camel@vkoul-udesk3>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 3 Aug 2012 15:44:32 +0530
+Subject: [PATCH 1/3] ARM: OMAP: timer: allow gp timer clock-event to be
+ used on both cpus
+In-Reply-To: <A6396D46-C6B9-44A4-A960-657668AF08E4@dominion.thruhere.net>
+References: <1333114048-26136-1-git-send-email-santosh.shilimkar@ti.com>
+ <1333114048-26136-2-git-send-email-santosh.shilimkar@ti.com>
+ <501B7AE6.8080405@gmail.com>
+ <76308EBE-F802-411A-973A-7BBC7575FE5A@dominion.thruhere.net>
+ <BDB76D4F-31B0-47D0-B1A1-64A743D091D3@dominion.thruhere.net>
+ <CAMQu2gxLAVk-LN8R1xBeeL1=iZ-mLSRmtZe4wpQYQPTBsY5RMA@mail.gmail.com>
+ <FF29FBF3-67EC-478E-9A74-65F8A2870BDC@dominion.thruhere.net>
+ <79CD15C6BA57404B839C016229A409A83EA7F59B@DBDE01.ent.ti.com>
+ <A6396D46-C6B9-44A4-A960-657668AF08E4@dominion.thruhere.net>
+Message-ID: <CAMQu2gz-93W9zWD_v3m1nQkqmnvFwcWKDTxNsf0v39y9_rhQPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-08-02 at 11:11 +0200, Guennadi Liakhovetski wrote:
-> > > +           chan = device->mux->request_chan(device, dev, direction, name);
-> > NAK
-> > 
-> > 1. We dont want dmacs to have anything to do with filtering and
-> > allocating. That is role of dmaengien and we need to add stuff there
-> > only.
-> > 2. Even if we start using optional name argument here we still don't
-> > know out of 4 channels dmac supports which one to allocate.
-> 
-> I don't think we can be generic enough in the dmaengine core to identify 
-> which channels are suitable for all slave requests. This is why I proposed 
-> a concept of a DMA channel multiplexer driver, and this is exactly what 
-> this callback is. I tried to explain this in the patch description above. 
-> I thought we discussed this earlier in this thread and agreed, that a 
-> multiplexer API is the way to go with channel allocation. I think, I 
-> mentioned in one of my mails, that in the beginning I wanted to implement 
-> multiplexers as a proper (platform) device, but at least one problem with 
-> this is, that at least on my hardware the multiplexer and the DMAC share 
-> registers, and an MFD seems an overkill for this, but we can discuss this. 
-> I don't know, whether there are systems, where multiplexers are really 
-> separate hardware blocks, if there are, we can think of a way to handle 
-> those nicely too.
-I would disagree.
+On Fri, Aug 3, 2012 at 3:34 PM, Koen Kooi <koen@dominion.thruhere.net> wrote:
+>
+> Op 3 aug. 2012, om 11:42 heeft "Hiremath, Vaibhav" <hvaibhav@ti.com> het volgende geschreven:
+>
+>> On Fri, Aug 03, 2012 at 15:03:07, Koen Kooi wrote:
+>>>
+>>> Op 3 aug. 2012, om 11:27 heeft "Shilimkar, Santosh" <santosh.shilimkar@ti.com> het volgende geschreven:
+>>>
+>>>> On Fri, Aug 3, 2012 at 2:00 PM, Koen Kooi <koen@dominion.thruhere.net> wrote:
+>>>>>
+>>>>> Op 3 aug. 2012, om 09:21 heeft Koen Kooi <koen@dominion.thruhere.net> het volgende geschreven:
+>>>>>
+>>>>>>
+>>>>>> Op 3 aug. 2012, om 09:16 heeft Daniel Mack <zonque@gmail.com> het volgende geschreven:
+>>>>>>
+>>>>>>> On 30.03.2012 15:27, Santosh Shilimkar wrote:
+>>>>>>>> For coupled cpuidle to work when both cpus are active, it needs a global timer
+>>>>>>>> that can handle events for both cpus.  This timer is used as the broadcast
+>>>>>>>> clock-event when the per-cpu timer hardware stop in low power states.
+>>>>>>>> Set the cpumask of clockevent_gpt to all cpus, set the rating correctly, and
+>>>>>>>> set the irq to allow the clockevent core to determine the affinity of the
+>>>>>>>> timer.
+>>>>>>>
+>>>>>>> These patches made it to mainline now, shortly befor 3.6-rc1, and it
+>>>>>>> breaks boot on my AM33xx board.
+>>>>>>>
+>>>>>>> Once I revert 1/3, the board boots again but crashes with the Ooops
+>>>>>>> below. With the entire series reverted, everything works again as
+>>>>>>> expected. Any idea?
+>>>>>>>
+>>>>>>> The upstream commit ids are
+>>>>>>>
+>>>>>>> 11d6ec2e "ARM: OMAP: timer: allow gp timer clock-event to be used on
+>>>>>>> both cpus"
+>>>>>>> 5b4d5bcc "ARM: OMAP4: CPUidle: add synchronization for coupled idle states"
+>>>>>>> b93d70ae "ARM: OMAP4: CPUidle: Open broadcast clock-event device."
+>>>>>>
+>>>>>> I've had boot problems with cpuidle enabled as well, what happens if you disable it? Is the revert still needed in that case?
+>>>>>
+>>>>> To answer my own question: No, the reverts aren't needed if you disable cpuidle.
+>>>>
+>>>> This is really strange since CPUIDLE code is really OMAP4 specific.
+>>>> obj-$(CONFIG_ARCH_OMAP4)                += cpuidle44xx.o
+>>>>
+>>>> May be omap2plus build some how the code gets executed on AMXX
+>>>>
+>>>> Can you try below and see if the boot with CPUIDLE enabled goes away on
+>>>> AMXX
+>>>>
+>>>> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+>>>> index ea24174..195e756 100644
+>>>> --- a/arch/arm/mach-omap2/pm44xx.c
+>>>> +++ b/arch/arm/mach-omap2/pm44xx.c
+>>>> @@ -147,6 +147,9 @@ int __init omap4_pm_init(void)
+>>>>       struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm, *l4wkup;
+>>>>       struct clockdomain *ducati_clkdm, *l3_2_clkdm, *l4_per_clkdm;
+>>>>
+>>>> +       if (!cpu_is_omap44xx())
+>>>> +               return -ENODEV;
+>>>> +
+>>>>       if (omap_rev() == OMAP4430_REV_ES1_0) {
+>>>>               WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
+>>>>               return -ENODEV;
+>>>
+>>> That does seem to fix it:
+>>>
+>>> root at beaglebone:~# zcat /proc/config.gz | grep -i cpu_idle
+>>> CONFIG_CPU_IDLE=y
+>>> CONFIG_CPU_IDLE_GOV_LADDER=y
+>>> CONFIG_CPU_IDLE_GOV_MENU=y
+>>> CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED=y
+>>> root at beaglebone:~# zcat /proc/config.gz | grep -i omap4
+>>> CONFIG_ARCH_OMAP4=y
+>>> CONFIG_MACH_OMAP4_PANDA=y
+>>> # CONFIG_OMAP4_ERRATA_I688 is not set
+>>> # CONFIG_KEYBOARD_OMAP4 is not set
+>>> CONFIG_OMAP4_DSS_HDMI=y
+>>>
+>>
+>> This patch is not required, Without this patch is works for me,
+>
+> I just retested and I don't need Santosh' patch, booting with cpuidle enable works now, after refreshing your patchset (and dropping the rtc commit, it conflicts with the other rtc patches out there).
+>
+Thanks Koen for confirming. That means the issues was coming from
+additional patching on top of 3.6-rc1
+where some patches were not refreshed for AMXX.
 
-As I have said in past, we need the mapping information to be available
-with dmaengine for slave channels even before any slave allocation
-occurs. This way dmaengine knows what to do with a channel.
-I am planning to add the support in dmanegine for this...
+Regards
+Santosh
 
-The problem with this solution here is again how the hell will a dmac
-know what to do with alloc request. It doesn't and any current way it
-does is just a hack and nothing else. This also prevenrts us form
-building genric dmac driver which should only know how to deal with dmac
-only and nothing else.
-
--- 
-~Vinod
+Regards
+Santosh
