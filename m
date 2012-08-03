@@ -1,38 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 3 Aug 2012 14:07:08 +0000
-Subject: [PATCH v6 0/3] Updated Cortex-M3 series
-In-Reply-To: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <201208031407.09092.arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 3 Aug 2012 16:11:08 +0200
+Subject: [PATCH 1/2] ARM: imx: enable emi_slow_gate clock for imx5
+In-Reply-To: <1343919712-6240-1-git-send-email-shawn.guo@linaro.org>
+References: <1343919712-6240-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120803141108.GV1451@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 August 2012, Uwe Kleine-K?nig wrote:
-> Hello,
+On Thu, Aug 02, 2012 at 11:01:51PM +0800, Shawn Guo wrote:
+> The imx5 common clock migration causes a regression with smsc911x
+> driver on imx53-ard board, where a smsc lan9220 controller gets
+> connected on imx53 with EIM interface.  EIM needs clock emi_slow_gate
+> to be functional.  In the new imx5 clock driver, there is no use count
+> incremented for the clock by enabling it, so the framework closes the
+> clock at late init time and makes EIM stop working then.
 > 
-> the only changes compared to v5 (sent starting with Message-id:
-> 1341512035-8173-1-git-send-email-u.kleine-koenig at pengutronix.de)
-> are that several debug pr_infos were dropped that I missed to remove
-> before. Thanks to Will Deacon for pointing out that problem.
-> Furthermore I rebased (trivially) to v3.5.
+> Enable emi_slow_gate in clock driver initialization to fix the
+> regression.
 
-No objections to the code from my side, but I'd like to understand
-the big picture here. You introduce a new CPU_V7M configuration
-symbol in the code, but there is no Kconfig change that introduces
-that symbol. Is that another change that is still coming?
+Can we add a comment that emi_slow_gate is needed for the EIM interface?
+It's not obvious from the datasheet and this information might help
+people who want to clean up the now unconditionally enabled clocks.
 
-None of the code seems to be specific to Cortex-M3 rather than the
-ARMv7M architecture. Does that mean it is expected to run
-unmodifed on both M3 and M4, and possibly future ARMv-7M cores?
+Otherwise:
 
-Is it possible to build a NOMMU kernel that runs on both ARMv7-A
-amd ARMv7-M, in other words is ARMv7-M compatible with ARMv7-A
-(or ARMv7-R for that matter) if you don't use the MMU?
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-How does this relate to the ARMv6-M (Cortex-M0/M0+/M1) support
-that has been floating around [1]? Can we support both in
-the same kernel? 
+Sascha
 
-	Arnd
+> 
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/mach-imx/clk-imx51-imx53.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+> index f608669..6eee32a 100644
+> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
+> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+> @@ -303,6 +303,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+>  	clk_prepare_enable(clk[aips_tz2]); /* fec */
+>  	clk_prepare_enable(clk[spba]);
+>  	clk_prepare_enable(clk[emi_fast_gate]); /* fec */
+> +	clk_prepare_enable(clk[emi_slow_gate]);
+>  	clk_prepare_enable(clk[tmax1]);
+>  	clk_prepare_enable(clk[tmax2]); /* esdhc2, fec */
+>  	clk_prepare_enable(clk[tmax3]); /* esdhc1, esdhc4 */
+> -- 
+> 1.7.5.4
+> 
+> 
+> 
 
-[1] http://developer.petalogix.com/git/gitweb.cgi?p=linux-2.6.x-cortexm1.git;a=summary
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
