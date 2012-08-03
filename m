@@ -1,71 +1,29 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 3 Aug 2012 14:57:19 +0530
-Subject: [PATCH 1/3] ARM: OMAP: timer: allow gp timer clock-event to be
- used on both cpus
-In-Reply-To: <BDB76D4F-31B0-47D0-B1A1-64A743D091D3@dominion.thruhere.net>
-References: <1333114048-26136-1-git-send-email-santosh.shilimkar@ti.com>
- <1333114048-26136-2-git-send-email-santosh.shilimkar@ti.com>
- <501B7AE6.8080405@gmail.com>
- <76308EBE-F802-411A-973A-7BBC7575FE5A@dominion.thruhere.net>
- <BDB76D4F-31B0-47D0-B1A1-64A743D091D3@dominion.thruhere.net>
-Message-ID: <CAMQu2gxLAVk-LN8R1xBeeL1=iZ-mLSRmtZe4wpQYQPTBsY5RMA@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 3 Aug 2012 09:31:50 +0000
+Subject: am33xx: default to status = "disabled"?
+In-Reply-To: <201208022328.17095.arnd@arndb.de>
+References: <501B061A.6080008@gmail.com> <201208022328.17095.arnd@arndb.de>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA7F557@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 3, 2012 at 2:00 PM, Koen Kooi <koen@dominion.thruhere.net> wrote:
->
-> Op 3 aug. 2012, om 09:21 heeft Koen Kooi <koen@dominion.thruhere.net> het volgende geschreven:
->
->>
->> Op 3 aug. 2012, om 09:16 heeft Daniel Mack <zonque@gmail.com> het volgende geschreven:
->>
->>> On 30.03.2012 15:27, Santosh Shilimkar wrote:
->>>> For coupled cpuidle to work when both cpus are active, it needs a global timer
->>>> that can handle events for both cpus.  This timer is used as the broadcast
->>>> clock-event when the per-cpu timer hardware stop in low power states.
->>>> Set the cpumask of clockevent_gpt to all cpus, set the rating correctly, and
->>>> set the irq to allow the clockevent core to determine the affinity of the
->>>> timer.
->>>
->>> These patches made it to mainline now, shortly befor 3.6-rc1, and it
->>> breaks boot on my AM33xx board.
->>>
->>> Once I revert 1/3, the board boots again but crashes with the Ooops
->>> below. With the entire series reverted, everything works again as
->>> expected. Any idea?
->>>
->>> The upstream commit ids are
->>>
->>> 11d6ec2e "ARM: OMAP: timer: allow gp timer clock-event to be used on
->>> both cpus"
->>> 5b4d5bcc "ARM: OMAP4: CPUidle: add synchronization for coupled idle states"
->>> b93d70ae "ARM: OMAP4: CPUidle: Open broadcast clock-event device."
->>
->> I've had boot problems with cpuidle enabled as well, what happens if you disable it? Is the revert still needed in that case?
->
-> To answer my own question: No, the reverts aren't needed if you disable cpuidle.
+On Fri, Aug 03, 2012 at 04:58:16, Arnd Bergmann wrote:
+> On Thursday 02 August 2012, Daniel Mack wrote:
+> > currently, all devices in arch/arm/boot/dts/am33xx.dtsi are enabled by
+> > default. However, depending on the actual board dts, only some of the
+> > devices should actually be initialized, given that they only make sense
+> > if their pins are actually wired on the board.
+> > 
+> > On other platform, such devices are marked with status = "disabled", and
+> > the board files re-enable those they really use by overriding that
+> > status again. That approach seems to make sense - shouldn't the same be
+> > done in am33xx.dtsi or am I missing something?
+> 
+> I agree, they should be disabled, at least the serial ports, and probably
+> also the i2c controllers.
+> 
 
-This is really strange since CPUIDLE code is really OMAP4 specific.
-obj-$(CONFIG_ARCH_OMAP4)                += cpuidle44xx.o
+You are right, it needs to be disabled. I will create a patch and submit it.
 
-May be omap2plus build some how the code gets executed on AMXX
-
-Can you try below and see if the boot with CPUIDLE enabled goes away on
-AMXX
-
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index ea24174..195e756 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -147,6 +147,9 @@ int __init omap4_pm_init(void)
-        struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm, *l4wkup;
-        struct clockdomain *ducati_clkdm, *l3_2_clkdm, *l4_per_clkdm;
-
-+       if (!cpu_is_omap44xx())
-+               return -ENODEV;
-+
-        if (omap_rev() == OMAP4430_REV_ES1_0) {
-                WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
-                return -ENODEV;
-Regards
-Ssantosh
+Thanks,
+Vaibhav
