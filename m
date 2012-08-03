@@ -1,33 +1,31 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 3 Aug 2012 15:22:29 +0800
-Subject: [GIT PULL][for 3.7] pull request from board branch in pxa git tree
-Message-ID: <CAN1soZzRkozi3njrx5VJoXhP-o6H10knbDoWC=9xeQcjYNEbGw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 3 Aug 2012 09:58:07 +0200
+Subject: [PATCH v5 0/3] Updated Cortex-M3 series
+In-Reply-To: <1341512035-8173-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1341512035-8173-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20120803075807.GD2626@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof & Arnd,
+Hello,
 
-Please help to merge this board branch from pxa git tree.
+On Thu, Jul 05, 2012 at 08:13:52PM +0200, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> now that 3.5 is about to come I invested the time to update the
+> beginning of the Cortex-M3 support.
+> 
+> Over all I rebased to v3.5-rc5 and addressed the comments by Russell.
+> 
+> It would be great to get these patches into next early after the merge
+> window for 3.6 closes to get them into 3.7. But I won't argue if they
+> made it into 3.6 ;-)
+Now that v3.6-rc1 is out can these go into next for the next merge
+window?
 
-Regards
-Haojian
+Thanks
+Uwe
 
-
-The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
-
-  Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
-
-are available in the git repository at:
-
-  git://github.com/hzhuang1/linux.git board
-
-for you to fetch changes up to 0f74da3f4bd91da4f8d3f79c9dc39a781cc7ae82:
-
-  ARM: ttc_dkb: add nand support (2012-08-03 15:15:58 +0800)
-
-----------------------------------------------------------------
-Lei Wen (1):
-      ARM: ttc_dkb: add nand support
-
- arch/arm/mach-mmp/ttc_dkb.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
