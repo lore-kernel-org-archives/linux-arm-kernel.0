@@ -1,49 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Aug 2012 18:40:16 +0100
-Subject: [PATCH] MXS: Fix mxs_defconfig MMAP_MIN_ADDR
-In-Reply-To: <CAOMZO5AzaDcxJJV+Z-bHH58=xRq5RY6BanEjMd4uUhN+K9ZNZQ@mail.gmail.com>
-References: <1344009354-13249-1-git-send-email-marex@denx.de>
- <CAOMZO5DZui3x554WcHsseSfXDgYeaq1va-QzVy1CQajE3M3=kQ@mail.gmail.com>
- <CAOMZO5AzaDcxJJV+Z-bHH58=xRq5RY6BanEjMd4uUhN+K9ZNZQ@mail.gmail.com>
-Message-ID: <20120803174016.GE10335@n2100.arm.linux.org.uk>
+From: andi@firstfloor.org (Andi Kleen)
+Date: Fri, 03 Aug 2012 10:54:27 -0700
+Subject: [PATCH v3] printk: add option to print cpu id
+In-Reply-To: <1344013004-32211-1-git-send-email-vikram.pandita@ti.com> (Vikram
+ Pandita's message of "Fri, 3 Aug 2012 09:56:44 -0700")
+References: <1344013004-32211-1-git-send-email-vikram.pandita@ti.com>
+Message-ID: <m2628z6euk.fsf@firstfloor.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2012 at 01:54:07PM -0300, Fabio Estevam wrote:
-> On Fri, Aug 3, 2012 at 1:46 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> > Marek,
-> >
-> > On Fri, Aug 3, 2012 at 12:55 PM, Marek Vasut <marex@denx.de> wrote:
-> >> Initially reported by Detlev Zundel <dzu@denx.de>, this caused breakage
-> >> when "su - testuser" was called. "testuser" being a regular user account,
-> >> the command ended with SIGKILL.
-> >>
-> >> Signed-off-by: Marek Vasut <marex@denx.de>
-> >> Cc: Russell King <linux@arm.linux.org.uk>
-> >> Cc: Shawn Guo <shawn.guo@linaro.org>
-> >> Cc: Wolfgang Denk <wd@denx.de>
-> >> ---
-> >>  arch/arm/configs/mxs_defconfig |    2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-> >> index ccdb635..f212802 100644
-> >> --- a/arch/arm/configs/mxs_defconfig
-> >> +++ b/arch/arm/configs/mxs_defconfig
-> >> @@ -34,7 +34,7 @@ CONFIG_NO_HZ=y
-> >>  CONFIG_HIGH_RES_TIMERS=y
-> >>  CONFIG_PREEMPT_VOLUNTARY=y
-> >>  CONFIG_AEABI=y
-> >> -CONFIG_DEFAULT_MMAP_MIN_ADDR=65536
-> >> +CONFIG_DEFAULT_MMAP_MIN_ADDR=32768
-> >
-> > No need to set it to 32768.
-> >
-> > If you just remove the 'CONFIG_DEFAULT_MMAP_MIN_ADDR=65536' then this
-> > symbol will be 32768.
-> 
-> Sorry, ignore what I said. I just realized that the default is 4096.
+Vikram Pandita <vikram.pandita@ti.com> writes:
 
-4096 is also fine for ARM too.  There's not much point in having
-defconfigs change it - that would just be pure noise in the config
-files.
+> From: Vikram Pandita <vikram.pandita@ti.com>
+>
+> Introduce config option to enable CPU id reporting for printk() calls.
+
+What's wrong with using trace_printk for this? That's much faster
+anyways. Generally printk is so slow that it's typically useless for
+instrumenting races.
+
+And really: Wasting 1/3 of the 80 character line is too much.
+
+-Andi
+
+-- 
+ak at linux.intel.com -- Speaking for myself only
