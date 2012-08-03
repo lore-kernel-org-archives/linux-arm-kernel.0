@@ -1,33 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 3 Aug 2012 12:10:28 -0300
-Subject: [PATCH v2 1/2] hw_random: mxc-rnga: Adapt clocks to new i.mx
- clock framework
-In-Reply-To: <20120731064053.GW30009@pengutronix.de>
-References: <1343407672-27185-1-git-send-email-fabio.estevam@freescale.com>
- <20120731064053.GW30009@pengutronix.de>
-Message-ID: <CAOMZO5BSi7sfK+4mjPUn9j89CssyGBJkLXY_0aDekA5SRrXD-w@mail.gmail.com>
+From: shiraz.hashim@st.com (Shiraz Hashim)
+Date: Fri, 3 Aug 2012 20:47:40 +0530
+Subject: [PATCH v6 0/3] Updated Cortex-M3 series
+In-Reply-To: <20120803145035.GJ2626@pengutronix.de>
+References: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <201208031407.09092.arnd@arndb.de>
+ <20120803145035.GJ2626@pengutronix.de>
+Message-ID: <20120803151740.GZ2005@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Herbert,
+Hi Uwe,
 
-On Tue, Jul 31, 2012 at 3:40 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Fri, Jul 27, 2012 at 01:47:51PM -0300, Fabio Estevam wrote:
->> Adapt clocks to the new i.mx clock framework and fix the following warning:
->>
->> Cc: Theodore Ts'o <tytso@mit.edu>
->> Cc: Herbert Xu <herbert@gondor.apana.org.au>
->> Cc: <linux-kernel@vger.kernel.org>
->> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Aug 03, 2012 at 10:50:35PM +0800, Uwe Kleine-K?nig wrote:
+> On Fri, Aug 03, 2012 at 02:07:08PM +0000, Arnd Bergmann wrote:
+> > Is it possible to build a NOMMU kernel that runs on both
+> > ARMv7-A amd ARMv7-M, in other words is ARMv7-M compatible with
+> > ARMv7-A (or ARMv7-R for that matter) if you don't use the MMU?
 >
-> Both:
->
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> the instructions to enable and disable irqs are different, so
+> we'd need another indirection at least there. Also the whole
+> exception model is different. So I'd say it's too different to
+> target for a common kernel for the A, R and M profiles.
 
-Looks like git did not Cc'ed you in these patches.
+We are using standard Linux kernel (v3.3) with MMU disabled on
+a Cortex R4 system.
 
-Would it be OK to apply these two patches?
-
-Thanks,
-
-Fabio Estevam
+--
+regards
+Shiraz
