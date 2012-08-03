@@ -1,42 +1,33 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Fri, 3 Aug 2012 09:21:17 +0200
-Subject: [PATCH 1/3] ARM: OMAP: timer: allow gp timer clock-event to be
- used on both cpus
-In-Reply-To: <501B7AE6.8080405@gmail.com>
-References: <1333114048-26136-1-git-send-email-santosh.shilimkar@ti.com>
- <1333114048-26136-2-git-send-email-santosh.shilimkar@ti.com>
- <501B7AE6.8080405@gmail.com>
-Message-ID: <76308EBE-F802-411A-973A-7BBC7575FE5A@dominion.thruhere.net>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 3 Aug 2012 15:22:29 +0800
+Subject: [GIT PULL][for 3.7] pull request from board branch in pxa git tree
+Message-ID: <CAN1soZzRkozi3njrx5VJoXhP-o6H10knbDoWC=9xeQcjYNEbGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Olof & Arnd,
 
-Op 3 aug. 2012, om 09:16 heeft Daniel Mack <zonque@gmail.com> het volgende geschreven:
+Please help to merge this board branch from pxa git tree.
 
-> On 30.03.2012 15:27, Santosh Shilimkar wrote:
->> For coupled cpuidle to work when both cpus are active, it needs a global timer
->> that can handle events for both cpus.  This timer is used as the broadcast
->> clock-event when the per-cpu timer hardware stop in low power states.
->> Set the cpumask of clockevent_gpt to all cpus, set the rating correctly, and
->> set the irq to allow the clockevent core to determine the affinity of the
->> timer.
-> 
-> These patches made it to mainline now, shortly befor 3.6-rc1, and it
-> breaks boot on my AM33xx board.
-> 
-> Once I revert 1/3, the board boots again but crashes with the Ooops
-> below. With the entire series reverted, everything works again as
-> expected. Any idea?
-> 
-> The upstream commit ids are
-> 
-> 11d6ec2e "ARM: OMAP: timer: allow gp timer clock-event to be used on
-> both cpus"
-> 5b4d5bcc "ARM: OMAP4: CPUidle: add synchronization for coupled idle states"
-> b93d70ae "ARM: OMAP4: CPUidle: Open broadcast clock-event device."
+Regards
+Haojian
 
-I've had boot problems with cpuidle enabled as well, what happens if you disable it? Is the revert still needed in that case? I'd really want cpufreq and cpuidle to work properly, but right now I'll settle for "it boots".
 
-regards,
+The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
 
-Koen
+  Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hzhuang1/linux.git board
+
+for you to fetch changes up to 0f74da3f4bd91da4f8d3f79c9dc39a781cc7ae82:
+
+  ARM: ttc_dkb: add nand support (2012-08-03 15:15:58 +0800)
+
+----------------------------------------------------------------
+Lei Wen (1):
+      ARM: ttc_dkb: add nand support
+
+ arch/arm/mach-mmp/ttc_dkb.c |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
