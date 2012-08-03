@@ -1,38 +1,64 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 3 Aug 2012 15:59:56 +0200
-Subject: [PATCH 1/2] ARM: mx27pdk: Add audio support
-In-Reply-To: <CAOMZO5Am433CAWOWCLQ7QkEJRTF1qon+qM0RA2PPtC8uLPGUWA@mail.gmail.com>
-References: <1341341098-9510-1-git-send-email-fabio.estevam@freescale.com>
- <CAOMZO5BXQ2OQVC6nXeo_yJB=SBC=sv=ez9k6uo3gLNkWnC0Gyg@mail.gmail.com>
- <CAOMZO5Am433CAWOWCLQ7QkEJRTF1qon+qM0RA2PPtC8uLPGUWA@mail.gmail.com>
-Message-ID: <20120803135956.GT1451@pengutronix.de>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 3 Aug 2012 16:00:43 +0200
+Subject: [PATCH 06/10 V2] spi: Add SPI driver for mx233/mx28
+In-Reply-To: <CAOMZO5AQs1NzJBogcLPcKtY=QSaxpDmzUTvpfScY7P10FEoMJw@mail.gmail.com>
+References: <1343076052-27312-1-git-send-email-marex@denx.de>
+ <20120803153815.758dc064@skate>
+ <CAOMZO5AQs1NzJBogcLPcKtY=QSaxpDmzUTvpfScY7P10FEoMJw@mail.gmail.com>
+Message-ID: <201208031600.43816.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 09:49:13AM -0300, Fabio Estevam wrote:
-> Sascha,
+Dear Fabio Estevam,
+
+> On Fri, Aug 3, 2012 at 10:38 AM, Thomas Petazzoni
 > 
-> On 7/25/12, Fabio Estevam <festevam@gmail.com> wrote:
-> > Hi Sascha,
-> >
-> > On Tue, Jul 3, 2012 at 3:44 PM, Fabio Estevam
-> > <fabio.estevam@freescale.com> wrote:
-> >> mx27pdk has a mc13783 audio codec.
-> >>
-> >> Add support for it.
-> >>
-> >> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> >
-> > Is this patch OK? Can it be applied?
+> <thomas.petazzoni@free-electrons.com> wrote:
+> > It sounds really strange to manipulate WAIT_FOR_CMD and WAIT_FOR_IRQ
+> > bits to adjust the chip select, and when reading the driver, it seemed
+> > suspicious to me. After going through the datasheet, indeed those bits
+> > are the appropriate one to select between the SS0, SS1 and SS2 chip
+> > selects, but I find the code not really obvious. Would it be possible
+> > to make it more obvious either by adding or comment or doing something
+> > like:
+> > 
+> > /* Should be put in some header file */
+> > #define BM_SSP_CTRL0_SPI_CS_BITS (20)
+> > 
+> > +static void mxs_spi_set_cs(struct mxs_spi *spi, unsigned cs)
+> > +{
+> > +       struct mxs_ssp *ssp = &spi->ssp;
+> > +
+> > +       writel(0x3 << BM_SSP_CTRL0_SPI_CS_BITS,
+> > +              ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
+> > +       writel(cs,
+> > +              ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
+> > +}
 > 
-> Could this get into 3.6?
+> I agree with Thomas.
+> 
+> In U-boot I did the following in order to be able to select the
+> different chip selects:
+> http://git.denx.de/?p=u-boot.git;a=commitdiff;h=148ca64f327a89ef77e84756f5d
+> 351af33e59b64
 
-Applied now. Sorry, missed this one.
+I'll just add the following comment if it's ok with you:
 
-Sascha
+/*
+ * i.MX28 Datasheet: 17.10.1: HW_SSP_CTRL0
+ *
+ * The bits BM_SSP_CTRL0_WAIT_FOR_CMD and BM_SSP_CTRL0_WAIT_FOR_IRQ
+ * in HW_SSP_CTRL0 register do have multiple usage, please refer to
+ * the datasheet for further details. In SPI mode, they are used to
+ * toggle the chip-select lines (nCS pins).
+ */
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I hope it'll suffice. Recycling bits in registers is really crazy practice and 
+I'd like to avoid these getting out of scope of this flaw's location.
+
+> Thanks,
+> 
+> Fabio Estevam
+
+Best regards,
+Marek Vasut
