@@ -1,57 +1,53 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 3 Aug 2012 16:50:35 +0200
-Subject: [PATCH v6 0/3] Updated Cortex-M3 series
-In-Reply-To: <201208031407.09092.arnd@arndb.de>
-References: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <201208031407.09092.arnd@arndb.de>
-Message-ID: <20120803145035.GJ2626@pengutronix.de>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Fri, 3 Aug 2012 16:56:49 +0200
+Subject: [PATCH] hwmon: tmp102: Add device tree support
+In-Reply-To: <1343997350-676-1-git-send-email-sourav.poddar@ti.com>
+References: <1343997350-676-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <501BE6B1.9000100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Sourav,
 
-On Fri, Aug 03, 2012 at 02:07:08PM +0000, Arnd Bergmann wrote:
-> On Friday 03 August 2012, Uwe Kleine-K?nig wrote:
-> > Hello,
-> > 
-> > the only changes compared to v5 (sent starting with Message-id:
-> > 1341512035-8173-1-git-send-email-u.kleine-koenig at pengutronix.de)
-> > are that several debug pr_infos were dropped that I missed to remove
-> > before. Thanks to Will Deacon for pointing out that problem.
-> > Furthermore I rebased (trivially) to v3.5.
+On 08/03/2012 02:35 PM, Sourav Poddar wrote:
+> update tmp102 temperature sensor to also use device tree.
 > 
-> No objections to the code from my side, but I'd like to understand
-> the big picture here. You introduce a new CPU_V7M configuration
-> symbol in the code, but there is no Kconfig change that introduces
-> that symbol. Is that another change that is still coming?
-I need to rework irq support which is up to now a seperate driver (nvic)
-but it should be possible to integrate it into the gic driver. With this
-patch I intend to send the Kconfig and Makefile stuff to make the code
-actually do something.
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> ---
+>  drivers/hwmon/tmp102.c |   14 +++++++++++++-
+>  1 files changed, 13 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/hwmon/tmp102.c b/drivers/hwmon/tmp102.c
+> index 0d466b9..a8a9060 100644
+> --- a/drivers/hwmon/tmp102.c
+> +++ b/drivers/hwmon/tmp102.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/err.h>
+>  #include <linux/mutex.h>
+>  #include <linux/device.h>
+> +#include <linux/of.h>
+>  
+>  #define	DRIVER_NAME "tmp102"
+>  
+> @@ -284,8 +285,19 @@ static const struct i2c_device_id tmp102_id[] = {
+>  };
+>  MODULE_DEVICE_TABLE(i2c, tmp102_id);
+>  
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id temperature_dt_match[] = {
+> +	{ .compatible = "ti,tmp102" },
 
-> None of the code seems to be specific to Cortex-M3 rather than the
-> ARMv7M architecture. Does that mean it is expected to run
-> unmodifed on both M3 and M4, and possibly future ARMv-7M cores?
-I'd expect to have M4 working out of the box. But as I don't have an M4
-I cannot tell for sure.
- 
-> Is it possible to build a NOMMU kernel that runs on both ARMv7-A
-> amd ARMv7-M, in other words is ARMv7-M compatible with ARMv7-A
-> (or ARMv7-R for that matter) if you don't use the MMU?
-the instructions to enable and disable irqs are different, so we'd need
-another indirection at least there. Also the whole exception model is
-different. So I'd say it's too different to target for a common kernel
-for the A, R and M profiles.
- 
-> How does this relate to the ARMv6-M (Cortex-M0/M0+/M1) support
-> that has been floating around [1]? Can we support both in
-> the same kernel? 
-I don't know M0/M1 but from a quick look at the tree you pointed out I'd
-say they look reasonably similar.
+Are you sure this is needed for this device?
 
-Best regards
-Uwe
+There is an automatic binding done for I2C devices in the of_i2c core
+code. So in theory, DT will be able to bind to any I2C device using the
+already existing table: MODULE_DEVICE_TABLE(i2c, tmp102_id).
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+So I think this patch should not be needed.
+
+Regards,
+Benoit
