@@ -1,56 +1,55 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 3 Aug 2012 12:08:26 +0200
-Subject: [PATCH v5 0/3] imx: add usbmisc support
-In-Reply-To: <1343805141-5872-1-git-send-email-richard.zhao@freescale.com>
-References: <1343805141-5872-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120803100826.GL1451@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri,  3 Aug 2012 12:10:11 +0200
+Subject: [PATCH v6 0/3] Updated Cortex-M3 series
+Message-ID: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 01, 2012 at 03:12:18PM +0800, Richard Zhao wrote:
-> usbmisc driver handles the SoC specific non-core usb registers.
-> 
-> Changes since last version:
->  - add missing ci13xxx_imx.h
-> 
-> Changes v3 -> v4:
->  - rebase onto torvalds latest git tree
->  - use phandle linke usb controllers and usbmisc device.
->    It also make usbmisc driver possible to be kernel modules.
-> 
-> Richard Zhao (3):
->   USB: chipidea: add imx usbmisc support
->   ARM: imx6q: clk_register_clkdev usbmisc clock
->   ARM: dts: imx6q-sabrelite: add usbmisc device
+Hello,
 
-I think this is good enough to go now.
+the only changes compared to v5 (sent starting with Message-id:
+1341512035-8173-1-git-send-email-u.kleine-koenig at pengutronix.de)
+are that several debug pr_infos were dropped that I missed to remove
+before. Thanks to Will Deacon for pointing out that problem.
+Furthermore I rebased (trivially) to v3.5.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Best regards
+Uwe
 
+Catalin Marinas (1):
+  Cortex-M3: Add base support for Cortex-M3
 
-> 
->  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    5 +
->  .../devicetree/bindings/usb/usbmisc-imx.txt        |   14 ++
->  arch/arm/boot/dts/imx6q-sabrelite.dts              |    1 +
->  arch/arm/boot/dts/imx6q.dtsi                       |   10 ++
->  arch/arm/mach-imx/clk-imx6q.c                      |    1 +
->  drivers/usb/chipidea/Makefile                      |    2 +-
->  drivers/usb/chipidea/ci13xxx_imx.c                 |   64 ++++++++
->  drivers/usb/chipidea/ci13xxx_imx.h                 |   28 ++++
->  drivers/usb/chipidea/usbmisc_imx6q.c               |  162 ++++++++++++++++++++
->  9 files changed, 286 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/usb/usbmisc-imx.txt
->  create mode 100644 drivers/usb/chipidea/ci13xxx_imx.h
->  create mode 100644 drivers/usb/chipidea/usbmisc_imx6q.c
-> 
-> -- 
-> 1.7.9.5
-> 
-> 
-> 
+Uwe Kleine-K?nig (2):
+  ARM: make cr_alignment read-only #ifndef CONFIG_CPU_CP15
+  Cortex-M3: Add support for exception handling
+
+ arch/arm/include/asm/assembler.h   |   13 ++-
+ arch/arm/include/asm/cp15.h        |   11 ++-
+ arch/arm/include/asm/cputype.h     |    3 +
+ arch/arm/include/asm/glue-cache.h  |   24 ++++++
+ arch/arm/include/asm/glue-df.h     |    8 ++
+ arch/arm/include/asm/glue-proc.h   |    9 ++
+ arch/arm/include/asm/irqflags.h    |   22 +++--
+ arch/arm/include/asm/processor.h   |    7 ++
+ arch/arm/include/asm/ptrace.h      |   44 ++++++++--
+ arch/arm/include/asm/system_info.h |    1 +
+ arch/arm/kernel/asm-offsets.c      |    3 +
+ arch/arm/kernel/entry-common.S     |    4 +
+ arch/arm/kernel/entry-header.S     |  148 +++++++++++++++++++++++++++++++++
+ arch/arm/kernel/entry-v7m.S        |  134 ++++++++++++++++++++++++++++++
+ arch/arm/kernel/head-common.S      |    9 +-
+ arch/arm/kernel/head-nommu.S       |    9 +-
+ arch/arm/kernel/process.c          |    8 ++
+ arch/arm/kernel/ptrace.c           |    3 +
+ arch/arm/kernel/setup.c            |   13 ++-
+ arch/arm/kernel/traps.c            |    2 +
+ arch/arm/mm/alignment.c            |    2 +
+ arch/arm/mm/mmu.c                  |   17 ++++
+ arch/arm/mm/nommu.c                |    2 +
+ arch/arm/mm/proc-v7m.S             |  161 ++++++++++++++++++++++++++++++++++++
+ 24 files changed, 635 insertions(+), 22 deletions(-)
+ create mode 100644 arch/arm/kernel/entry-v7m.S
+ create mode 100644 arch/arm/mm/proc-v7m.S
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.10.4
