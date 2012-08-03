@@ -1,110 +1,116 @@
 From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 3 Aug 2012 05:53:37 +0000
-Subject: [PATCH 1/2] net: davinci_mdio: enable and disable clock
-In-Reply-To: <501B6020.7090502@gmail.com>
-References: <1343936616-29318-1-git-send-email-zonque@gmail.com>
- <501B5EC1.7010304@ti.com> <501B6020.7090502@gmail.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA7F04C@DBDE01.ent.ti.com>
+Date: Fri, 3 Aug 2012 06:26:24 +0000
+Subject: omap_device: query on "fck" clk alias created
+In-Reply-To: <20120802131250.GO7405@n2100.arm.linux.org.uk>
+References: <50191F00.1040501@ti.com>
+ <20120801141414.GM7405@n2100.arm.linux.org.uk>
+ <79CD15C6BA57404B839C016229A409A83EA7DF5C@DBDE01.ent.ti.com>
+ <20120802131250.GO7405@n2100.arm.linux.org.uk>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA7F0F2@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2012 at 10:52:40, Daniel Mack wrote:
-> On 03.08.2012 07:16, Vaibhav Hiremath wrote:
+On Thu, Aug 02, 2012 at 18:42:50, Russell King - ARM Linux wrote:
+> On Thu, Aug 02, 2012 at 01:04:37PM +0000, Hiremath, Vaibhav wrote:
+> > On Wed, Aug 01, 2012 at 19:44:14, Russell King - ARM Linux wrote:
+> > > On Wed, Aug 01, 2012 at 05:50:16PM +0530, Vaibhav Hiremath wrote:
+> > > > The clk_get() api will not work, unless we pass both the arguments (dev,
+> > > > con_id) properly. Now expecting driver to always label con_id with "fck"
+> > > > is undesirable, as the same driver can be reused on multiple platforms,
+> > > > which can be non-omap and/or non-ti platforms.
+> > > 
+> > > Why not?
+> > > 
+> > > The connection ID is defined by the driver, and the platform stuff is
+> > > expected to provide drivers with what they require.  It's not the other
+> > > way around (platforms don't tell drivers what they require.)
+> > > 
+> > > In other words, if the device has two clocks, one called ick and one called
+> > > fck, then the device _should_ use clk_get() specifying "ick" for one, and
+> > > "fck" for the other.
+> > > 
+> > > And platforms better provide an "ick" and a "fck" for the device, even if
+> > > they have no respresentation for one or other of them (in which case you
+> > > supply a dummy clock.)
+> > > 
 > > 
+> > Russell, I completely agree with you, infact I am on the same page.
+> > Let me give you a real example, which I am dealing with now,
 > > 
-> > On 8/3/2012 1:13 AM, Daniel Mack wrote:
-> >> Make the driver control the device clocks. Appearantly, the Davinci
-> >> platform probes this driver with the clock all powered up, but on OMAP,
-> >> this isn't the case.
-> >>
-> >> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> >> ---
-> >>  drivers/net/ethernet/ti/davinci_mdio.c | 16 ++++++++++++++--
-> >>  1 file changed, 14 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/drivers/net/ethernet/ti/davinci_mdio.c b/drivers/net/ethernet/ti/davinci_mdio.c
-> >> index cd7ee20..b4b6015 100644
-> >> --- a/drivers/net/ethernet/ti/davinci_mdio.c
-> >> +++ b/drivers/net/ethernet/ti/davinci_mdio.c
-> >> @@ -332,6 +332,8 @@ static int __devinit davinci_mdio_probe(struct platform_device *pdev)
-> >>  		goto bail_out;
-> >>  	}
-> >>  
-> >> +	clk_enable(data->clk);
-> >> +
-> >>  	dev_set_drvdata(dev, data);
-> >>  	data->dev = dev;
-> >>  	spin_lock_init(&data->lock);
-> >> @@ -379,8 +381,11 @@ bail_out:
-> >>  	if (data->bus)
-> >>  		mdiobus_free(data->bus);
-> >>  
-> >> -	if (data->clk)
-> >> +	if (data->clk) {
-> >> +		clk_disable(data->clk);
-> >>  		clk_put(data->clk);
-> >> +	}
-> >> +
-> >>  	pm_runtime_put_sync(&pdev->dev);
-> >>  	pm_runtime_disable(&pdev->dev);
-> >>  
-> >> @@ -397,8 +402,11 @@ static int __devexit davinci_mdio_remove(struct platform_device *pdev)
-> >>  	if (data->bus)
-> >>  		mdiobus_free(data->bus);
-> >>  
-> >> -	if (data->clk)
-> >> +	if (data->clk) {
-> >> +		clk_disable(data->clk);
-> >>  		clk_put(data->clk);
-> >> +	}
-> >> +
-> >>  	pm_runtime_put_sync(&pdev->dev);
-> >>  	pm_runtime_disable(&pdev->dev);
-> >>  
-> >> @@ -427,6 +435,8 @@ static int davinci_mdio_suspend(struct device *dev)
-> >>  	data->suspended = true;
-> >>  	spin_unlock(&data->lock);
-> >>  
-> >> +	clk_disable(data->clk);
-> >> +
-> >>  	return 0;
-> >>  }
-> >>  
-> >> @@ -435,6 +445,8 @@ static int davinci_mdio_resume(struct device *dev)
-> >>  	struct davinci_mdio_data *data = dev_get_drvdata(dev);
-> >>  	u32 ctrl;
-> >>  
-> >> +	clk_enable(data->clk);
-> >> +
+> > On AM335x device we have integrated DCAN, this IP is not from TI.
+> > IP is from Bosch and doesn't follow any of the TI IP standards, like 
+> > HighLander spec. The IP is just integrated with interconnect bus and given a 
+> > required clocksource (in this case its one clock). 
 > > 
-> > Danial,
-> > 
-> > I would request you to wait for this, its not that simple and straight.
-> > And once you migrate to runtime PM you don't need clk_enable/disable,
-> > this should get handled under runtime PM api's.
+> > The driver for this IP is generic, (drivers/net/can/c_can/c_can_platform.c) 
+> > obviously used across non-ti devices already and driver is implemented with,
+> >     clk_get(dev, NULL);
 > 
-> As I said, it can be dropped.
+> So, elsewhere it only has one clock.  Are there any other clocks it needs
+> on OMAP?
 > 
-> > Also have you read my another email post -
-> > 
-> > http://comments.gmane.org/gmane.linux.ports.arm.omap/80796
-> > 
-> > Certainly, with respect to CPSW & MDIO, this patch is not enough and
-> > requires further investigation. I have started looking at this and
-> > hopefully will have some solution soon...
+> If the answer is no, then the driver is doing the right thing, and OMAP's
+> clk stuff needs to be adjusted to suit the drivers requirements.
 > 
-> Ok, no problem. We certainly need the DT bindings for davinci_mdio. With
-> that applied, and the hwmod added (in the patch I posted yesterday), I
-> can at least mount the rootfs via NFS, which is all I currently need.
+> I've said many times over the years that clock connection IDs are defined
+> by the device or driver and *nothing* else - they're certainly *not* source
+> names.
 > 
+> That's why, when I modified OMAP drivers to fix them, and they take an
+> interface and function clock, they end up asking for "ick" and "fck" not
+> "blah_ick" and "blah_fck".
 > 
 
-I certainly understand your requirement here.
+I am in agreement with you and I believe I came to the solution for this 
+issue, I used "of_dev_auxdata" to manipulate dev_id and updated clock-tree 
+table with required clock entry and it works, I tried it on BeagleBone 
+platform.
 
-Actually this is not the only device we have, the same issue is applicable 
-to PWM subsystem available in AM335x. Hopefully I should have something soon 
-on this.
+Can you please review it?
 
 
-Thanks,
-Vaibhav
+
+
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 6f93a20..893cc0c 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -37,11 +37,24 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
+        { }
+ };
+
++/*
++ * Lookup table for attaching a specific name and platform_data        pointer to
++ * devices as they get created by of_platform_populate().  Ideally this table
++ * would not exist, but the current clock implementation depends on some devices
++ * having a specific name.
++ */
++static const struct of_dev_auxdata omap_auxdata_lookup[] __initconst = {
++       OF_DEV_AUXDATA("bosch,d_can", 0x481cc000, "d_can.0", NULL),
++       OF_DEV_AUXDATA("bosch,d_can", 0x481d0000, "d_can.1", NULL),
++       { },
++};
++
++
+ static void __init omap_generic_init(void)
+ {
+        omap_sdrc_init(NULL, NULL);
+
+-       of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
++       of_platform_populate(NULL, omap_dt_match_table, omap_auxdata_lookup, NULL);
+}
+
+ #ifdef CONFIG_SOC_OMAP2420
+diff --git a/arch/arm/mach-omap2/clock33xx_data.c b/arch/arm/mach-omap2/clock33xx_data.c
+index ae27de8..f061834 100644
+--- a/arch/arm/mach-omap2/clock33xx_data.c
++++ b/arch/arm/mach-omap2/clock33xx_data.c
+@@ -1028,6 +1028,8 @@ static struct omap_clk am33xx_clks[] = {
+        CLK(NULL,       "clkdiv32k_ick",        &clkdiv32k_ick, CK_AM33XX),
+        CLK(NULL,       "dcan0_fck",            &dcan0_fck,     CK_AM33XX),
+        CLK(NULL,       "dcan1_fck",            &dcan1_fck,     CK_AM33XX),
++       CLK("d_can.0",  NULL,           &dcan0_fck,     CK_AM33XX),
++       CLK("d_can.1",  NULL,           &dcan1_fck,     CK_AM33XX),
+        CLK(NULL,       "debugss_ick",          &debugss_ick,   CK_AM33XX),
+        CLK(NULL,       "pruss_ocp_gclk",       &pruss_ocp_gclk,        CK_AM33XX),
+        CLK("davinci-mcasp.0",  NULL,           &mcasp0_fck,    CK_AM33XX),
