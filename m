@@ -1,67 +1,123 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 3 Aug 2012 12:45:32 +0100
-Subject: kernel entry for thumb2-only cpus
-In-Reply-To: <20120803090452.GE2626@pengutronix.de>
-References: <20120803090452.GE2626@pengutronix.de>
-Message-ID: <20120803114532.GB26925@mudshark.cambridge.arm.com>
+From: javier.martin@vista-silicon.com (Javier Martin)
+Date: Fri,  3 Aug 2012 14:08:23 +0200
+Subject: [PATCH v2] Visstrim SM10: Use mo_version to decide board video mode.
+Message-ID: <1343995703-13578-1-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2012 at 10:04:52AM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
+If the mother board version number is odd, emmaprp() for
+format conversion + UVC camera will be used.
 
-Hi Uwe,
+Otherwise mx2_camera and m2m-deinterlacer will be registered.
 
-> in both arch/arm/kernel/head.S and arch/arm/kernel/head-nommu.S we have
-> 
-> 	.arm
->  THUMB( adr     r9, BSYM(1f)    )       @ Kernel is always entered in ARM.
->  THUMB( bx      r9              )       @ If this is a Thumb-2 kernel,
->  THUMB( .thumb                  )       @ switch to Thumb now.
->  THUMB(1:                       )
-> 
-> as first instructions at the entry point. This is a problem for
-> thumb2-only cpus (e.g. Cortex-M3).
+For both cases Coda video codec is registered.
 
-Yup, Documentation/arm/Booting mentions this too.
+Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+---
+Changes since v1:
+ - Add error message to emmaprp init function.
 
-> Up to now I commented out the first three lines for the Cortex-M3 port.
-> What should we do about that. There are two possibilities I see:
-> 
->  a) introduce a kconfig symbol for thumb2-only builds and #ifdef the
->     first three lines out if it is given.
->  b) expect the bootloader to directly jump to the label 1.
-> 
-> The downside of a) is that a boot loader on a cpu that is capable to
-> execute the tradtional instructions would need to detect if the switch
-> to thumb is there or not and react accordingly. (In fact it needs to
-> distringuish three cases:
-> 
->  - traditional kernel
->  - thumb2 kernel with ARM entry
->  - thumb2 kernel without ARM entry
-> 
-> .) So I think b) is the more sensible option in the long run.
-> 
-> What do you think?
+---
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   54 ++++++++++++++++++++++++---
+ 1 file changed, 49 insertions(+), 5 deletions(-)
 
-How about something like:
-
-
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 835898e..9f07be2 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -86,6 +86,7 @@
-        __HEAD
- ENTRY(stext)
+diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+index 176533e..dbb344a 100644
+--- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
++++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+@@ -49,6 +49,10 @@
+ #define OTG_PHY_CS_GPIO (GPIO_PORTF + 17)
+ #define SDHC1_IRQ IRQ_GPIOB(25)
  
-+ THUMB(        .inst   0xe200e004      )       @ ARM: and lr, r0, #4 T2: b 1f
-  THUMB(        adr     r9, BSYM(1f)    )       @ Kernel is always entered in ARM.
-  THUMB(        bx      r9              )       @ If this is a Thumb-2 kernel,
-  THUMB(        .thumb                  )       @ switch to Thumb now.
-
-
-[thanks to Leif Lindholm for doing this in one instruction]
-
-Will
++#define VERSION_MASK		0x7
++#define MOTHERBOARD_SHIFT	4
++#define EXPBOARD_SHIFT		0
++
+ #define MOTHERBOARD_BIT2	(GPIO_PORTD + 31)
+ #define MOTHERBOARD_BIT1	(GPIO_PORTD + 30)
+ #define MOTHERBOARD_BIT0	(GPIO_PORTD + 29)
+@@ -205,7 +209,7 @@ static struct mx2_camera_platform_data visstrim_camera = {
+ static phys_addr_t mx2_camera_base __initdata;
+ #define MX2_CAMERA_BUF_SIZE SZ_8M
+ 
+-static void __init visstrim_camera_init(void)
++static void __init visstrim_analog_camera_init(void)
+ {
+ 	struct platform_device *pdev;
+ 	int dma;
+@@ -442,6 +446,29 @@ static void __init visstrim_deinterlace_init(void)
+ 		return;
+ }
+ 
++/* Emma-PrP for format conversion */
++static void __init visstrim_emmaprp_init(void)
++{
++	struct platform_device *pdev;
++	int dma;
++
++	pdev = imx27_add_mx2_emmaprp();
++	if (IS_ERR(pdev))
++		return;
++
++	/*
++	 * Use the same memory area as the analog camera since both
++	 * devices are, by nature, exclusive.
++	 */
++	dma = dma_declare_coherent_memory(&pdev->dev,
++				mx2_camera_base, mx2_camera_base,
++				MX2_CAMERA_BUF_SIZE,
++				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
++	if (!(dma & DMA_MEMORY_MAP)) {
++		pr_err("Failed to declare memory for emmaprp\n");
++		return;
++	}
++}
+ 
+ static void __init visstrim_m10_revision(void)
+ {
+@@ -467,13 +494,14 @@ static void __init visstrim_m10_revision(void)
+ 	mo_version |= !gpio_get_value(MOTHERBOARD_BIT0);
+ 
+ 	system_rev = 0x27000;
+-	system_rev |= (mo_version << 4);
+-	system_rev |= exp_version;
++	system_rev |= (mo_version << MOTHERBOARD_SHIFT);
++	system_rev |= (exp_version << EXPBOARD_SHIFT);
+ }
+ 
+ static void __init visstrim_m10_board_init(void)
+ {
+ 	int ret;
++	int mo_version;
+ 
+ 	imx27_soc_init();
+ 	visstrim_m10_revision();
+@@ -505,8 +533,24 @@ static void __init visstrim_m10_board_init(void)
+ 	platform_device_register_resndata(NULL, "soc-camera-pdrv", 0, NULL, 0,
+ 				      &iclink_tvp5150, sizeof(iclink_tvp5150));
+ 	gpio_led_register_device(0, &visstrim_m10_led_data);
+-	visstrim_deinterlace_init();
+-	visstrim_camera_init();
++
++	/* Use mother board version to decide what video devices we shall use */
++	mo_version = (system_rev >> MOTHERBOARD_SHIFT) & VERSION_MASK;
++	if (mo_version & 0x1) {
++		visstrim_emmaprp_init();
++
++		/*
++		 * Despite not being used, tvp5150 must be
++		 * powered on to avoid I2C problems. To minimize
++		 * power consupmtion keep reset enabled.
++		 */
++		gpio_set_value(TVP5150_PWDN, 1);
++		ndelay(1);
++		gpio_set_value(TVP5150_RSTN, 0);
++	} else {
++		visstrim_deinterlace_init();
++		visstrim_analog_camera_init();
++	}
+ 	visstrim_coda_init();
+ }
+ 
+-- 
+1.7.9.5
