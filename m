@@ -1,58 +1,50 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 3 Aug 2012 16:59:39 +0800
-Subject: [PATCH v2 3/3] ARM: imx_v6_v7_defconfig: Select MXS_DMA
-In-Reply-To: <501B8E74.4030803@de.bosch.com>
-References: <1343215100-24005-1-git-send-email-festevam@gmail.com>
- <1343215100-24005-3-git-send-email-festevam@gmail.com>
- <501B8E74.4030803@de.bosch.com>
-Message-ID: <501B92FB.8040203@freescale.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 3 Aug 2012 10:02:35 +0100
+Subject: [PATCH v5 0/3] Updated Cortex-M3 series
+In-Reply-To: <20120803075807.GD2626@pengutronix.de>
+References: <1341512035-8173-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20120803075807.GD2626@pengutronix.de>
+Message-ID: <20120803090235.GA26925@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?08?03? 16:40, Dirk Behme ??:
-> On 25.07.2012 13:18, Fabio Estevam wrote:
->> From: Fabio Estevam <fabio.estevam@freescale.com>
->>
->> Let MXS_DMA be selected by default.
->>
->> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
->> ---
->> Changes since v1:
->> - No changes. Newly introduced in this series
->> arch/arm/configs/imx_v6_v7_defconfig | 1 +
->> 1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/configs/imx_v6_v7_defconfig 
->> b/arch/arm/configs/imx_v6_v7_defconfig
->> index f725b96..3c9f32f 100644
->> --- a/arch/arm/configs/imx_v6_v7_defconfig
->> +++ b/arch/arm/configs/imx_v6_v7_defconfig
->> @@ -192,6 +192,7 @@ CONFIG_RTC_DRV_MC13XXX=y
->> CONFIG_RTC_DRV_MXC=y
->> CONFIG_DMADEVICES=y
->> CONFIG_IMX_SDMA=y
->> +CONFIG_MXS_DMA=y
->> CONFIG_COMMON_CLK_DEBUG=y
->> # CONFIG_IOMMU_SUPPORT is not set
->> CONFIG_EXT2_FS=y
->
-> Building mainline 3.6-rc1 with imx_v6_v7_defconfig this is still 
-> broken due to
->
-> drivers/built-in.o: In function `gpmi_dma_filter':
-> clk-fixed-factor.c:(.text+0xab170): undefined reference to 
-> `mxs_dma_is_apbh'
->
-> Is any fix for this on its way to mainline? Either the above or any 
-> other one?
->
-> Best regards
->
-> Dirk
->
-Since the gpmi has been enabled in the config file, I think it's better 
-to select the mxs-dma in the config file too.
+On Fri, Aug 03, 2012 at 08:58:07AM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
 
-Acked-by: Huang Shijie <b32955@freescale.com>
+Hi Uwe,
 
-Huang Shijie
+> On Thu, Jul 05, 2012 at 08:13:52PM +0200, Uwe Kleine-K?nig wrote:
+> > Hello,
+> > 
+> > now that 3.5 is about to come I invested the time to update the
+> > beginning of the Cortex-M3 support.
+> > 
+> > Over all I rebased to v3.5-rc5 and addressed the comments by Russell.
+> > 
+> > It would be great to get these patches into next early after the merge
+> > window for 3.6 closes to get them into 3.7. But I won't argue if they
+> > made it into 3.6 ;-)
+> Now that v3.6-rc1 is out can these go into next for the next merge
+> window?
+
+Last time I looked at the code, patch 3/3 was adding some fairly noisy debug
+prints to various syscalls and pieces of signal handling. e.g.:
+
+
+diff --git a/arch/arm/kernel/sys_arm.c b/arch/arm/kernel/sys_arm.c
+index 76cbb05..ea207df 100644
+--- a/arch/arm/kernel/sys_arm.c
++++ b/arch/arm/kernel/sys_arm.c
+@@ -102,6 +102,7 @@ int kernel_execve(const char *filename,
+ 	 * We were successful.  We won't be returning to our caller, but
+ 	 * instead to user space by manipulating the kernel stack.
+ 	 */
++	pr_info("we were successful\n");
+ 	asm(	"add	r0, %0, %1\n\t"
+ 		"mov	r1, %2\n\t"
+ 		"mov	r2, %3\n\t"
+
+
+Can we drop these bits please?
+
+Will
