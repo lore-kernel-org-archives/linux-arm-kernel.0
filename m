@@ -1,72 +1,63 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Fri, 3 Aug 2012 10:54:47 +0530
-Subject: [PATCH 2/3] ARM: OMAP: hwmod: revise deassert sequence
-In-Reply-To: <CALLhW=6-b+kjfG-u3+uXiD64UwoNEdufjJKu0Mx-sGWp6n9csg@mail.gmail.com>
-References: <1342466485-1050-1-git-send-email-omar.luna@linaro.org>
- <1342466485-1050-3-git-send-email-omar.luna@linaro.org>
- <alpine.DEB.2.00.1208020150240.4177@utopia.booyaka.com>
- <CALLhW=6-b+kjfG-u3+uXiD64UwoNEdufjJKu0Mx-sGWp6n9csg@mail.gmail.com>
-Message-ID: <501B609F.9030403@ti.com>
+From: mugunthanvnm@ti.com (N, Mugunthan V)
+Date: Fri, 3 Aug 2012 05:25:47 +0000
+Subject: Current state of AM33xx patches
+In-Reply-To: <501A9D1C.8080305@gmail.com>
+References: <4FD5BA4C.9070706@gmail.com> <4FE326A8.8090807@gmail.com>
+ <4FE8AB37.7030907@gmail.com> <4FE9A00B.6010908@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
+ <4FEC7394.9030208@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
+ <4FEDF54D.4030609@gmail.com>
+ <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
+ <4FEEC7F2.8070507@gmail.com>
+ <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EA635DC@DBDE01.ent.ti.com>
+ <4FF42761.2000701@gmail.com>
+ <EB1619762EAF8B4E97A227FB77B7E0293E9C2548@DBDE01.ent.ti.com>
+ <500CEF97.4050207@gmail.com>
+ <EB1619762EAF8B4E97A227FB77B7E0293E9D04EB@DBDE01.ent.ti.com>
+ <501159C3.3020109@gmail.com>
+ <704C899A-606B-41A3-99E8-6D92C0EA5BC5@dominion.thruhere.net>
+ <50116926.4060309@gmail.com>
+ <587C7FB9-2DD3-48EE-B74D-BEBDF199BE23@dominion.thruhere.net>
+ <50118272.1050209@gmail.com>
+ <9F9237B3-55BD-471B-ADD1-1A18F3644387@dominion.thruhere.net>
+ <501A9D1C.8080305@gmail.com>
+Message-ID: <EB1619762EAF8B4E97A227FB77B7E0293E9D393A@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> -----Original Message-----
+> From: Daniel Mack [mailto:zonque at gmail.com]
+> Sent: Thursday, August 02, 2012 9:01 PM
+> To: Koen Kooi
+> Cc: N, Mugunthan V; Hiremath, Vaibhav; Paul Walmsley; Nori, Sekhar;
+> Jason Kridner; Tony Lindgren; Hilman, Kevin; Hernandez, Carlos; Maupin,
+> Chase; linux-omap at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Kridner, Jason
+> Subject: Re: Current state of AM33xx patches
+> 
+> On 31.07.2012 21:29, Koen Kooi wrote:
+> 
+> > 2/3 of the way there:
+> >
+> > http://patchwork.ozlabs.org/patch/174085/
+> > http://patchwork.ozlabs.org/patch/174086/
+> >
+> > I keep failing to create a .dts that doesn't upset the dtc, so I
+> don't have it working yet :(
+> 
+> Yes, that's because there are couple of sytax errors in the example
+> bindings. Mugunthan, could you repost these patches and at least copy
+> devicetree-discuss at lists.ozlabs.org and the ARM kernel mailing list? I
+> can't comment on the patches you sent to netdev at vger.kernel.org because
+> I'm not currently subscribed to that list.
+> 
+> 
+> Thanks,
+> Daniel
 
+I will repost the patch set including the device tree and arm kernel mailing list today.
 
-On 8/3/2012 3:50 AM, Omar Ramirez Luna wrote:
-> Hi.
-> 
-> On 2 August 2012 02:52, Paul Walmsley <paul@pwsan.com> wrote:
->> On Mon, 16 Jul 2012, Omar Ramirez Luna wrote:
->>
->>> For a reset sequence to complete cleanly, a module needs its
->>> associated clocks to be enabled, otherwise the timeout check
->>> in prcm code can print a false failure (failed to hardreset)
->>> that occurs because the clocks aren't powered ON and the status
->>> bit checked can't transition without them.
->>>
->>> Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
->>
->> Is enabling the clocks sufficient?
-> 
-> During my testing it seemed enough, besides it looks clk framework is
-> doing the same as _omap4_enable_module.
-> 
->> Or do we also need to enable the
->> IP block, e.g. by calling
->>
->>         if (soc_ops.enable_module)
->>                 soc_ops.enable_module(oh);
->>
->> as we do on OMAP4+ in _enable() ?
-> 
-> Basically this is a call to _omap4_enable_module, and the latter will
-> "Enable the modulemode inside CLKCTRL".
-> 
-> However, _enable_clocks path which ends calling omap2_dflt_clk_enable
-> does the same thing with its clk->enable_reg field.
-> 
-> So in _enable:
-> 
->         _enable_clocks(oh);
->         if (soc_ops.enable_module)
->                 soc_ops.enable_module(oh);
-> 
-> The enable_module part seems redundant to me, since the module should
-> be already enabled by the first call to _enable_clocks.
-> 
-
-Yes they do same thing, I believe the plan is to get rid of all clock
-leaf-nodes in the near future, and let hwmod handle module
-enable/disable part.
-
-Thanks,
-Vaibhav
-
-> Regards,
-> 
-> Omar
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Regards
+Mugunthan V N
