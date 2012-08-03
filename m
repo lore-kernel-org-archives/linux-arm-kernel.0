@@ -1,46 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 3 Aug 2012 16:27:41 +0200
-Subject: [PATCH] ARM: dts: imx27-3ds.dts: Fix serial console node
-In-Reply-To: <1343658196-24243-1-git-send-email-fabio.estevam@freescale.com>
-References: <1343658196-24243-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20120803142741.GZ1451@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri,  3 Aug 2012 16:30:39 +0200
+Subject: [PATCH] SPI: MXS: Allow to pass the SPI master bus number from the
+ device tree
+In-Reply-To: <1343076052-27312-1-git-send-email-marex@denx.de>
+References: <1343076052-27312-1-git-send-email-marex@denx.de>
+Message-ID: <1344004239-22868-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2012 at 11:23:16AM -0300, Fabio Estevam wrote:
-> Fix serial console node and allow the board to boot again.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/boot/dts/imx27-3ds.dts |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+If you don't do it, the bus number will be a bogus value, possibly used
+for device file names in drivers like spidev.
 
-Applied as fix, thanks
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/spi/spi-mxs.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Sascha
-
-> 
-> diff --git a/arch/arm/boot/dts/imx27-3ds.dts b/arch/arm/boot/dts/imx27-3ds.dts
-> index d3f8296..0a8978a 100644
-> --- a/arch/arm/boot/dts/imx27-3ds.dts
-> +++ b/arch/arm/boot/dts/imx27-3ds.dts
-> @@ -27,7 +27,7 @@
->  				status = "okay";
->  			};
->  
-> -			uart at 1000a000 {
-> +			uart1: serial at 1000a000 {
->  				fsl,uart-has-rtscts;
->  				status = "okay";
->  			};
-> -- 
-> 1.7.1
-> 
-> 
-> 
-
+diff --git a/drivers/spi/spi-mxs.c b/drivers/spi/spi-mxs.c
+index d6a80a1..d6a73ef 100644
+--- a/drivers/spi/spi-mxs.c
++++ b/drivers/spi/spi-mxs.c
+@@ -527,6 +527,15 @@ static int __devinit mxs_spi_probe(struct platform_device *pdev)
+ 	if (!master)
+ 		return -ENOMEM;
+ 
++	if (pdev->id != -1)
++		master->bus_num = pdev->id;
++	if (np) {
++		unsigned long prop;
++
++		of_property_read_u32(np, "cell-index", &prop);
++		master->bus_num = prop;
++	}
++
+ 	master->transfer_one_message = mxs_spi_transfer_one;
+ 	master->setup = mxs_spi_setup;
+ 	master->cleanup = mxs_spi_cleanup;
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
