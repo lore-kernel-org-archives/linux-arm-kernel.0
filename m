@@ -1,32 +1,30 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 3 Aug 2012 16:36:03 +0300
-Subject: [PATCH v6 11/11] arm: omap: phy: remove unused functions from
- omap-phy-internal.c
-In-Reply-To: <1343639400-28725-12-git-send-email-kishon@ti.com>
-References: <1343639400-28725-1-git-send-email-kishon@ti.com>
- <1343639400-28725-12-git-send-email-kishon@ti.com>
-Message-ID: <20120803133602.GM8269@arwen.pp.htv.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 3 Aug 2012 13:41:32 +0000
+Subject: [PATCH 2/4] arm: plat-orion: make bridge_virt_base non-const to
+ support DT use case
+In-Reply-To: <1343999430-31816-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1343999430-31816-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1343999430-31816-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <201208031341.32744.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Friday 03 August 2012, Thomas Petazzoni wrote:
+> diff --git a/arch/arm/plat-orion/include/plat/addr-map.h b/arch/arm/plat-orion/include/plat/addr-map.h
+> index fd556f7..aafdd79 100644
+> --- a/arch/arm/plat-orion/include/plat/addr-map.h
+> +++ b/arch/arm/plat-orion/include/plat/addr-map.h
+> @@ -16,7 +16,7 @@ extern struct mbus_dram_target_info orion_mbus_dram_info;
+>  struct orion_addr_map_cfg {
+>         const int num_wins;     /* Total number of windows */
+>         const int remappable_wins;
+> -       const u32 bridge_virt_base;
+> +       u32 bridge_virt_base;
+>  
+>         /* If NULL, the default cpu_win_can_remap will be used, using
+>            the value in remappable_wins */
 
-On Mon, Jul 30, 2012 at 02:40:00PM +0530, Kishon Vijay Abraham I wrote:
-> All the unnessary functions in omap-phy-internal is removed.
-> These functionality are now handled by omap-usb2 phy driver.
-> 
-> Cc: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
+It would be nice to also change the type of this to void __iomem*, since you are
+already touching the bridge_virt_base.
 
-Great stuff. I'll take this when we agree on the omap-usb2 phy driver.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120803/2ff867f0/attachment.sig>
+	Arnd
