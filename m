@@ -1,55 +1,126 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Fri, 3 Aug 2012 14:50:22 +0200
-Subject: [PATCH 3/4] arm/dts: omap5-evm: Add keypad data
-In-Reply-To: <1343997486-710-4-git-send-email-sourav.poddar@ti.com>
-References: <1343997486-710-1-git-send-email-sourav.poddar@ti.com>
- <1343997486-710-4-git-send-email-sourav.poddar@ti.com>
-Message-ID: <D32DBB77-844C-400A-9E3F-3F779431D1C7@dominion.thruhere.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 3 Aug 2012 15:05:09 +0200
+Subject: [PATCH 1/2] ARM: i.MX35: Add kernel oftree support
+In-Reply-To: <1343922986-32469-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1343922986-32469-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20120803130509.GO1451@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Op 3 aug. 2012, om 14:38 heeft Sourav Poddar <sourav.poddar@ti.com> het volgende geschreven:
-
-> Add keypad data node in omap5 device tree file.
-> Also fill the device tree binding parameters
-> with the required value in "omap5-evm" dts file.
+On Thu, Aug 02, 2012 at 05:56:25PM +0200, Uwe Kleine-K?nig wrote:
+> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 > 
-> Tested on omap5430 evm with 3.5 custom kernel.
+> This patch adds basic support for imx35-based devices to the kernel.
 > 
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > ---
-> arch/arm/boot/dts/omap5-evm.dts |   12 ++++++++++++
-> arch/arm/boot/dts/omap5.dtsi    |    5 +++++
-> 2 files changed, 17 insertions(+), 0 deletions(-)
+>  arch/arm/boot/dts/imx35.dtsi            |  246 +++++++++++++++++++++++++++++++
+>  arch/arm/configs/imx_v6_v7_defconfig    |    1 +
+>  arch/arm/mach-imx/Kconfig               |   13 ++
+>  arch/arm/mach-imx/Makefile              |    1 +
+>  arch/arm/mach-imx/imx35-dt.c            |  119 +++++++++++++++
+>  arch/arm/plat-mxc/include/mach/common.h |    2 +
+>  6 files changed, 382 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx35.dtsi
+>  create mode 100644 arch/arm/mach-imx/imx35-dt.c
 > 
-> diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
-> index 45a8aeb..09fe941 100644
-> --- a/arch/arm/boot/dts/omap5-evm.dts
-> +++ b/arch/arm/boot/dts/omap5-evm.dts
-> @@ -17,6 +17,18 @@
-> 		device_type = "memory";
-> 		reg = <0x80000000 0x40000000>; /* 1 GB */
-> 	};
+
+> diff --git a/arch/arm/mach-imx/imx35-dt.c b/arch/arm/mach-imx/imx35-dt.c
+> new file mode 100644
+> index 0000000..8b9cc84
+> --- /dev/null
+> +++ b/arch/arm/mach-imx/imx35-dt.c
+> @@ -0,0 +1,119 @@
+> +/*
+> + * Copyright 2012 Steffen Trumtrar, Pengutronix
+> + *
+> + * based on imx27-dt.c
+> + *
+> + * This program is free software; you can redistribute it and/or modify it under
+> + * the terms of the GNU General Public License version 2 as published by the
+> + * Free Software Foundation.
+> + */
+> +#include <linux/irq.h>
+> +#include <linux/irqdomain.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/pinctrl/machine.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/time.h>
+> +#include <mach/common.h>
+> +#include <mach/mx35.h>
 > +
-> +	keypad {
-> +		keypad,num-rows = <8>;
-> +		keypad,num-columns = <8>;
-> +		linux,keymap = < 0x02020073
-> +			0x02030072
-> +			0x020400e7
-> +			0x02050066
-> +			0x0206006b
-> +			0x020700d9 >;
-> +		linux,input-no-autorepeat;
-> +	};
+> +static const struct of_dev_auxdata imx35_auxdata_lookup[] __initconst = {
+> +	OF_DEV_AUXDATA("fsl,imx35-uart", MX35_UART1_BASE_ADDR, "imx21-uart.0", NULL),
+> +	OF_DEV_AUXDATA("fsl,imx35-uart", MX35_UART2_BASE_ADDR, "imx21-uart.1", NULL),
+> +	OF_DEV_AUXDATA("fsl,imx35-uart", MX35_UART3_BASE_ADDR, "imx21-uart.2", NULL),
+> +	OF_DEV_AUXDATA("fsl,imx35-fec", MX35_FEC_BASE_ADDR, "imx27-fec.0", NULL),
+> +	OF_DEV_AUXDATA("fsl,imx35-wdt", MX35_WDOG_BASE_ADDR, "imx2-wdt.0", NULL),
+> +	OF_DEV_AUXDATA("fsl,imx35-i2c", MX35_I2C1_BASE_ADDR, "imx-i2c.0", NULL),
+> +	OF_DEV_AUXDATA("fsl,imx35-i2c", MX35_I2C2_BASE_ADDR, "imx-i2c.1", NULL),
+> +	OF_DEV_AUXDATA("fsl,imx35-i2c", MX35_I2C3_BASE_ADDR, "imx-i2c.2", NULL),
+> +	OF_DEV_AUXDATA("fsl,imx35-sdhc", MX35_ESDHC1_BASE_ADDR, "sdhci-esdhc-imx35.0", NULL),
+> +	OF_DEV_AUXDATA("fsl,imx35-sdhc", MX35_ESDHC2_BASE_ADDR, "sdhci-esdhc-imx35.1", NULL),
+> +	OF_DEV_AUXDATA("fsl,imx35-sdhc", MX35_ESDHC3_BASE_ADDR, "sdhci-esdhc-imx35.2", NULL),
+> +	OF_DEV_AUXDATA("fsl,imx35-nand", MX35_NFC_BASE_ADDR, "mxc_nand.0", NULL),
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static int __init imx35_avic_add_irq_domain(struct device_node *np,
+> +				struct device_node *interrupt_parent)
+> +{
+> +	irq_domain_add_legacy(np, 64, 0, 0, &irq_domain_simple_ops, NULL);
+> +	return 0;
+> +}
+> +
+> +static int __init imx35_gpio_add_irq_domain(struct device_node *np,
+> +				struct device_node *interrupt_parent)
+> +{
+> +	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
+> +
+> +	gpio_irq_base -= 32;
+> +	irq_domain_add_legacy(np, 32, gpio_irq_base, 0, &irq_domain_simple_ops,
+> +				NULL);
+> +
+> +	return 0;
+> +}
 
-This not a criticism on your patch, but a generic question about DT: Is there no way to have nice constants for keys like we have in the kernel, like KEY_POWER, KEY_UP, etc? If no, does DT allow comments so I can look at a dts and see which keycodes are mapped instead of having to dig up the sources?
+The gpio/irq drivers now call irq_domain_add_legacy themselves.
 
-regards,
+> +
+> +static const struct of_device_id imx35_irq_match[] __initconst = {
+> +	{ .compatible = "fsl,imx35-avic", .data = imx35_avic_add_irq_domain, },
+> +	{ .compatible = "fsl,imx35-gpio", .data = imx35_gpio_add_irq_domain, },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static const struct of_device_id imx35_of_mixed_devices_match[] __initconst = {
+> +	{ /* END OF LIST */ }
+> +};
+> +
+> +static void __init of_mixed_device_hook(void)
+> +{
+> +	struct device_node *np;
+> +	const struct of_device_id *of_id;
+> +
+> +	np = of_find_matching_node(NULL, imx35_of_mixed_devices_match);
+> +	if (np) {
+> +		void (*func)(void);
+> +
+> +		of_id = of_match_node(imx35_of_mixed_devices_match, np);
+> +		func = of_id->data;
+> +		func();
+> +	}
+> +}
 
-Koen
+What is the intention of this? I suppose currently it does nothing,
+right?
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
