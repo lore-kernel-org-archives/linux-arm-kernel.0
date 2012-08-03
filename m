@@ -1,57 +1,51 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 3 Aug 2012 12:07:11 +0200
-Subject: [PATCH v2 2/3] mtd: nand: Let MTD_NAND_GPMI_NAND depend on MXS_DMA
-In-Reply-To: <1343215100-24005-2-git-send-email-festevam@gmail.com>
-References: <1343215100-24005-1-git-send-email-festevam@gmail.com>
- <1343215100-24005-2-git-send-email-festevam@gmail.com>
-Message-ID: <20120803100711.GC24458@pengutronix.de>
+Date: Fri, 3 Aug 2012 12:08:26 +0200
+Subject: [PATCH v5 0/3] imx: add usbmisc support
+In-Reply-To: <1343805141-5872-1-git-send-email-richard.zhao@freescale.com>
+References: <1343805141-5872-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120803100826.GL1451@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2012 at 08:18:19AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Wed, Aug 01, 2012 at 03:12:18PM +0800, Richard Zhao wrote:
+> usbmisc driver handles the SoC specific non-core usb registers.
 > 
-> MTD_NAND_GPMI_NAND driver depends on MXS_DMA to be selected, otherwise the following error happens
-> for imx_v6_v7_defconfig:
+> Changes since last version:
+>  - add missing ci13xxx_imx.h
 > 
-> drivers/built-in.o: In function `gpmi_dma_filter':
-> clk-fixed-factor.c:(.text+0xb124c): undefined reference to `mxs_dma_is_apbh'
-> make: *** [vmlinux] Error 1
+> Changes v3 -> v4:
+>  - rebase onto torvalds latest git tree
+>  - use phandle linke usb controllers and usbmisc device.
+>    It also make usbmisc driver possible to be kernel modules.
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Richard Zhao (3):
+>   USB: chipidea: add imx usbmisc support
+>   ARM: imx6q: clk_register_clkdev usbmisc clock
+>   ARM: dts: imx6q-sabrelite: add usbmisc device
+
+I think this is good enough to go now.
 
 Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-As mentioned elsewhere in this thread: We should not select user visible
-options, so this patch is the only thing we can do atm (apart from
-'fixing the tools' as David mentioned, but this is out of scope for an
--rc kernel)
 
-Additionally the imx_v6_v7_defconfig should be adjusted so that the gpmi
-nand driver actually gets built.
-
-Sascha
-
-> ---
-> Changes since v1:
-> - Use 'depends' rather than 'select'
->  drivers/mtd/nand/Kconfig |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
-> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-> index a5d8a1b..da52c7d 100644
-> --- a/drivers/mtd/nand/Kconfig
-> +++ b/drivers/mtd/nand/Kconfig
-> @@ -463,6 +463,7 @@ config MTD_NAND_NANDSIM
->  config MTD_NAND_GPMI_NAND
->          bool "GPMI NAND Flash Controller driver"
->          depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28 || SOC_IMX6Q)
-> +	depends on MXS_DMA
->          help
->  	 Enables NAND Flash support for IMX23, IMX28 or IMX6.
->  	 The GPMI controller is very powerful, with the help of BCH
+>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    5 +
+>  .../devicetree/bindings/usb/usbmisc-imx.txt        |   14 ++
+>  arch/arm/boot/dts/imx6q-sabrelite.dts              |    1 +
+>  arch/arm/boot/dts/imx6q.dtsi                       |   10 ++
+>  arch/arm/mach-imx/clk-imx6q.c                      |    1 +
+>  drivers/usb/chipidea/Makefile                      |    2 +-
+>  drivers/usb/chipidea/ci13xxx_imx.c                 |   64 ++++++++
+>  drivers/usb/chipidea/ci13xxx_imx.h                 |   28 ++++
+>  drivers/usb/chipidea/usbmisc_imx6q.c               |  162 ++++++++++++++++++++
+>  9 files changed, 286 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/usb/usbmisc-imx.txt
+>  create mode 100644 drivers/usb/chipidea/ci13xxx_imx.h
+>  create mode 100644 drivers/usb/chipidea/usbmisc_imx6q.c
+> 
 > -- 
-> 1.7.1
+> 1.7.9.5
+> 
 > 
 > 
 
