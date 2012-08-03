@@ -1,60 +1,46 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 3 Aug 2012 16:11:08 +0200
-Subject: [PATCH 1/2] ARM: imx: enable emi_slow_gate clock for imx5
-In-Reply-To: <1343919712-6240-1-git-send-email-shawn.guo@linaro.org>
-References: <1343919712-6240-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120803141108.GV1451@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri,  3 Aug 2012 16:13:52 +0200
+Subject: [v2] arm: mvebu: Add basic address decoding support for Marvell 370/XP
+Message-ID: <1344003237-13575-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 02, 2012 at 11:01:51PM +0800, Shawn Guo wrote:
-> The imx5 common clock migration causes a regression with smsc911x
-> driver on imx53-ard board, where a smsc lan9220 controller gets
-> connected on imx53 with EIM interface.  EIM needs clock emi_slow_gate
-> to be functional.  In the new imx5 clock driver, there is no use count
-> incremented for the clock by enabling it, so the framework closes the
-> clock at late init time and makes EIM stop working then.
-> 
-> Enable emi_slow_gate in clock driver initialization to fix the
-> regression.
+Andrew, Jason, Gr?gory,
 
-Can we add a comment that emi_slow_gate is needed for the EIM interface?
-It's not obvious from the datasheet and this information might help
-people who want to clean up the now unconditionally enabled clocks.
+Here is a small patch set that introduces basic support for address
+decoding on Armada 370 and Armada XP. The aim of this basic support is
+essentially to be able to configure a window to remap the BootROM,
+which is needed to startup the secondary CPUs for the SMP support.
 
-Otherwise:
+As we had discussed already, the address decoding configuration is not
+described in the Device Tree, it is for now hardcoded on a per-SoC
+basis. We might later discuss how to extend this to the Device Tree.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+This patch set has five patches:
 
-Sascha
+ (*) First patch reworks the addr-map code to use void __iomem * where
+     appropriate instead of u32, as per the suggestion of Arnd
+     Bergmann.
 
-> 
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/mach-imx/clk-imx51-imx53.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index f608669..6eee32a 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -303,6 +303,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
->  	clk_prepare_enable(clk[aips_tz2]); /* fec */
->  	clk_prepare_enable(clk[spba]);
->  	clk_prepare_enable(clk[emi_fast_gate]); /* fec */
-> +	clk_prepare_enable(clk[emi_slow_gate]);
->  	clk_prepare_enable(clk[tmax1]);
->  	clk_prepare_enable(clk[tmax2]); /* esdhc2, fec */
->  	clk_prepare_enable(clk[tmax3]); /* esdhc1, esdhc4 */
-> -- 
-> 1.7.5.4
-> 
-> 
-> 
+ (*) Second patch introducing PLAT_ORION_LEGACY, which allows the
+     Marvell 370/XP platforms to be part of PLAT_ORION, and therefore
+     re-use the existing address decoding code.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+ (*) Third patch making a small change to an address decoding
+     structure so that we can define at runtime the virtual address of
+     the configuration registers. This is needed as on Armada 370/XP
+     the address decoding "controller" is declared in the Device Tree.
+
+ (*) Fourth patch adding the 370/XP address decoding code itself. For
+     now, it only maps the BootROM on Armada XP.
+
+ (*) Fifth path adding the necessary DT code to instantiate the
+     address decoding "controller".
+
+Changes since v1:
+ * Use void __iomem * in addr-map code. Suggested by Arnd Bergmann.
+ * Add Acked-by on patches 2->5 from Gr?gory Cl?ment
+
+Thanks,
+
+Thomas Petazzoni
