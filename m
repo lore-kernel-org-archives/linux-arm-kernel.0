@@ -1,46 +1,41 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 3 Aug 2012 15:36:23 -0700
-Subject: [PATCH v3] printk: add option to print cpu id
-In-Reply-To: <CAFm5wm3ayofPD7oF1=z_jwE_wuqBxBHicAs=KOhjcUr7Jo0wDQ@mail.gmail.com>
-References: <1344013004-32211-1-git-send-email-vikram.pandita@ti.com>
- <m2628z6euk.fsf@firstfloor.org>
- <CAFm5wm3ScpUU5wa=ei3TY0zjU4kVbOgJMmE5_QDpwy7B-TJa+A@mail.gmail.com>
- <20120803200822.GC731@harshnoise.musicnaut.iki.fi>
- <CAFm5wm2sf9LnZNj9_BDYTF9G7XH32fOL3x5n=kZ-1ih0Cek2DQ@mail.gmail.com>
- <20120803215954.GA4489@kroah.com>
- <CAFm5wm1_-JP0xjDdBvAcqqpZPQvxJPsmNtUOFQyaNw=6H_JJcg@mail.gmail.com>
- <20120803221327.GA5102@kroah.com>
- <CAFm5wm3ayofPD7oF1=z_jwE_wuqBxBHicAs=KOhjcUr7Jo0wDQ@mail.gmail.com>
-Message-ID: <20120803223623.GB6156@kroah.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri,  3 Aug 2012 15:42:42 -0700
+Subject: [PATCH] ARM: Don't enable GENERIC_LOCKBREAK with ticket spinlocks
+Message-ID: <1344033762-3296-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2012 at 03:25:17PM -0700, Pandita, Vikram wrote:
-> >> This was something that got used internally and helped at times.
-> >
-> > Could you have used the trace point instead?
-> 
-> As i understood the trace_prink(), one would need to modify existing
-> printk -> trace_printk. Is my understanding correct?
+Now that ARM has implemented its spinlocks with tickets we don't
+need to use the generic lockbreak algorithm. Remove the Kconfig
+from ARM so that we use the arch_spin_is_contended() definition
+from the asm header. This also saves a word in each lock because
+we don't need the break_lock member anymore.
 
-No, you should just be able to watch the tracepoint, right?
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-> Most of the times the problem exhibits as a random hang, without having a clue
-> which code to modify. That time one generic defconfig global switch is
-> your first tool.
-> 
-> Other issue i found, using this patch, that on multi-core ARM systems,
-> almost 99% of times, IRQ's are handled by CPU0,
-> even if CPU0 was really busy and other CPU's were free. I am yet to
-> understand a good reason why.
+It seems we define the arch_spin_is_contended() macro but we don't
+use it on SMP && PREEMPT kernels?
 
-Can't you see that from /proc/interrupts today?
+ arch/arm/Kconfig | 5 -----
+ 1 file changed, 5 deletions(-)
 
-> this patch also helped in other areas as mentioned in the thread
-> http://marc.info/?l=linux-omap&m=134401269106619&w=2
-
-I still don't understand how adding the cpu number to printk enabled you
-to find any problem like this.  Can't you just add the cpu number to the
-printk messages you care about for your specific hardware?
-
-greg k-h
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e91c7cd..e4191cc 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -126,11 +126,6 @@ config TRACE_IRQFLAGS_SUPPORT
+ 	bool
+ 	default y
+ 
+-config GENERIC_LOCKBREAK
+-	bool
+-	default y
+-	depends on SMP && PREEMPT
+-
+ config RWSEM_GENERIC_SPINLOCK
+ 	bool
+ 	default y
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
