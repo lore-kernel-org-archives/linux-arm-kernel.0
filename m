@@ -1,82 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 3 Aug 2012 16:17:33 +0200
-Subject: [PATCH 2/2 v2] i.MX27: Visstrim_M10: Add support for
- deinterlacing driver.
-In-Reply-To: <1342092929-31590-2-git-send-email-javier.martin@vista-silicon.com>
-References: <1342092929-31590-1-git-send-email-javier.martin@vista-silicon.com>
- <1342092929-31590-2-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <20120803141733.GW1451@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 3 Aug 2012 22:23:04 +0800
+Subject: [PATCH 1/2] ARM: imx: enable emi_slow_gate clock for imx5
+In-Reply-To: <20120803141108.GV1451@pengutronix.de>
+References: <1343919712-6240-1-git-send-email-shawn.guo@linaro.org>
+ <20120803141108.GV1451@pengutronix.de>
+Message-ID: <20120803142302.GD23791@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2012 at 01:35:29PM +0200, Javier Martin wrote:
-> Visstrim_M10 have a tvp5150 whose video output must be deinterlaced.
-> The new mem2mem deinterlacing driver is very useful for that purpose.
+On Fri, Aug 03, 2012 at 04:11:08PM +0200, Sascha Hauer wrote:
+> Can we add a comment that emi_slow_gate is needed for the EIM interface?
+> It's not obvious from the datasheet and this information might help
+> people who want to clean up the now unconditionally enabled clocks.
 > 
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> ---
-> Changes since v1:
->  - Removed commented out code.
+Ok, will amend the following change.
+
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 6eee32a..4bdcaa9 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -303,7 +303,7 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+        clk_prepare_enable(clk[aips_tz2]); /* fec */
+        clk_prepare_enable(clk[spba]);
+        clk_prepare_enable(clk[emi_fast_gate]); /* fec */
+-       clk_prepare_enable(clk[emi_slow_gate]);
++       clk_prepare_enable(clk[emi_slow_gate]); /* eim */
+        clk_prepare_enable(clk[tmax1]);
+        clk_prepare_enable(clk[tmax2]); /* esdhc2, fec */
+        clk_prepare_enable(clk[tmax3]); /* esdhc1, esdhc4 */
+
+> Otherwise:
 > 
-> ---
->  arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   27 ++++++++++++++++++++++++++-
->  1 file changed, 26 insertions(+), 1 deletion(-)
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 > 
-> diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> index 214e4ff..dbef59d 100644
-> --- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> +++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> @@ -232,7 +232,7 @@ static void __init visstrim_camera_init(void)
->  static void __init visstrim_reserve(void)
->  {
->  	/* reserve 4 MiB for mx2-camera */
-> -	mx2_camera_base = arm_memblock_steal(2 * MX2_CAMERA_BUF_SIZE,
-> +	mx2_camera_base = arm_memblock_steal(3 * MX2_CAMERA_BUF_SIZE,
->  			MX2_CAMERA_BUF_SIZE);
->  }
->  
-> @@ -419,6 +419,30 @@ static void __init visstrim_coda_init(void)
->  		return;
->  }
->  
-> +/* DMA deinterlace */
-> +static struct platform_device visstrim_deinterlace = {
-> +	.name = "m2m-deinterlace",
-> +	.id = 0,
-> +};
-> +
-> +static void __init visstrim_deinterlace_init(void)
-> +{
-> +	int ret = -ENOMEM;
-> +	struct platform_device *pdev = &visstrim_deinterlace;
-> +	int dma;
-> +
-> +	ret = platform_device_register(pdev);
-
-ret is unused.
-
-Better use platform_device_register_simple().
-
-> +
-> +	dma = dma_declare_coherent_memory(&pdev->dev,
-> +					  mx2_camera_base + 2 * MX2_CAMERA_BUF_SIZE,
-> +					  mx2_camera_base + 2 * MX2_CAMERA_BUF_SIZE,
-> +					  MX2_CAMERA_BUF_SIZE,
-> +					  DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
-
-Shouldn't this be done before registering the device?
-
-> +	if (!(dma & DMA_MEMORY_MAP))
-> +		return;
-> +}
-
-if (!flag) return; else return ?
-
-Sascha
-
+Thanks.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Shawn
