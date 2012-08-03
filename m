@@ -1,39 +1,34 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Fri, 3 Aug 2012 10:52:09 -0500
-Subject: [PATCH 2/3] ARM: OMAP: hwmod: revise deassert sequence
-In-Reply-To: <501B609F.9030403@ti.com>
-References: <1342466485-1050-1-git-send-email-omar.luna@linaro.org>
- <1342466485-1050-3-git-send-email-omar.luna@linaro.org>
- <alpine.DEB.2.00.1208020150240.4177@utopia.booyaka.com>
- <CALLhW=6-b+kjfG-u3+uXiD64UwoNEdufjJKu0Mx-sGWp6n9csg@mail.gmail.com>
- <501B609F.9030403@ti.com>
-Message-ID: <CALLhW=7yJTq_cfB=KGY5VT8fNO1u_hrY118ysihFuQA+gVFRuQ@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri,  3 Aug 2012 17:55:54 +0200
+Subject: [PATCH] MXS: Fix mxs_defconfig MMAP_MIN_ADDR
+Message-ID: <1344009354-13249-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 August 2012 00:24, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
-> On 8/3/2012 3:50 AM, Omar Ramirez Luna wrote:
->> So in _enable:
->>
->>         _enable_clocks(oh);
->>         if (soc_ops.enable_module)
->>                 soc_ops.enable_module(oh);
->>
->> The enable_module part seems redundant to me, since the module should
->> be already enabled by the first call to _enable_clocks.
->
-> Yes they do same thing, I believe the plan is to get rid of all clock
-> leaf-nodes in the near future, and let hwmod handle module
-> enable/disable part.
+Initially reported by Detlev Zundel <dzu@denx.de>, this caused breakage
+when "su - testuser" was called. "testuser" being a regular user account,
+the command ended with SIGKILL.
 
-If this is the case then an enable_module call is needed in my patch
-for when these changes are made. The original works fine but only
-because currently clock framework does what enable_module is doing.
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Wolfgang Denk <wd@denx.de>
+---
+ arch/arm/configs/mxs_defconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Paul,
-
-Please let me know if you want me to resend with this change.
-
-Regards,
-
-Omar
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+index ccdb635..f212802 100644
+--- a/arch/arm/configs/mxs_defconfig
++++ b/arch/arm/configs/mxs_defconfig
+@@ -34,7 +34,7 @@ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_PREEMPT_VOLUNTARY=y
+ CONFIG_AEABI=y
+-CONFIG_DEFAULT_MMAP_MIN_ADDR=65536
++CONFIG_DEFAULT_MMAP_MIN_ADDR=32768
+ CONFIG_AUTO_ZRELADDR=y
+ CONFIG_FPE_NWFPE=y
+ CONFIG_NET=y
+-- 
+1.7.10.4
