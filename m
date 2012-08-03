@@ -1,61 +1,41 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Fri, 3 Aug 2012 18:37:08 +0300
-Subject: [PATCH v2] Visstrim SM10: Use mo_version to decide board video
- mode.
-In-Reply-To: <1343995703-13578-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1343995703-13578-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <20120803153708.GA3733@tarshish>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Fri, 03 Aug 2012 16:37:58 +0100
+Subject: [PATCH v6 0/3] Updated Cortex-M3 series
+In-Reply-To: <20120803145035.GJ2626@pengutronix.de>
+References: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <201208031407.09092.arnd@arndb.de> <20120803145035.GJ2626@pengutronix.de>
+Message-ID: <501BF056.5000801@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
-
-On Fri, Aug 03, 2012 at 02:08:23PM +0200, Javier Martin wrote:
-> If the mother board version number is odd, emmaprp() for
-> format conversion + UVC camera will be used.
-> 
-> Otherwise mx2_camera and m2m-deinterlacer will be registered.
-> 
-> For both cases Coda video codec is registered.
-> 
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> ---
-> Changes since v1:
->  - Add error message to emmaprp init function.
-> ---
+On 03/08/12 15:50, Uwe Kleine-K?nig wrote:
 
 ...
+>  
+>> How does this relate to the ARMv6-M (Cortex-M0/M0+/M1) support
+>> that has been floating around [1]? Can we support both in
+>> the same kernel? 
+> I don't know M0/M1 but from a quick look at the tree you pointed out I'd
+> say they look reasonably similar.
+> 
 
-> +/* Emma-PrP for format conversion */
-> +static void __init visstrim_emmaprp_init(void)
-> +{
-> +	struct platform_device *pdev;
-> +	int dma;
-> +
-> +	pdev = imx27_add_mx2_emmaprp();
-> +	if (IS_ERR(pdev))
-> +		return;
-> +
-> +	/*
-> +	 * Use the same memory area as the analog camera since both
-> +	 * devices are, by nature, exclusive.
-> +	 */
-> +	dma = dma_declare_coherent_memory(&pdev->dev,
-> +				mx2_camera_base, mx2_camera_base,
-> +				MX2_CAMERA_BUF_SIZE,
-> +				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
-> +	if (!(dma & DMA_MEMORY_MAP)) {
-> +		pr_err("Failed to declare memory for emmaprp\n");
-> +		return;
+I'm not so sure - M0/M0+/M1 don't use Thumb-2, they're a slightly
+extended version of Thumb-1, which we don't support in the kernel...
 
-Nitpick: the 'return' is redundant here.
+For the curious, here are the relevant bits from the ARM ARMs
 
-> +	}
-> +}
+>From the ARM (v6-M) ARM A4.1 - about the instruction set:
 
-baruch
+"ARMv6-M supports the Thumb instruction set including a small number of
+32-bit instructions introduced with Thumb-2 technology, see 32-bit Thumb
+instruction encoding on page A5-91. The 16-bit instruction
+support is equivalent to the Thumb instruction set support in ARMv6
+prior to the introduction of Thumb-2 technology."
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Whereas for V7-M, it says:
+"supports a large number of 32-bit instructions that Thumb-2 technology
+introduced into the Thumb instruction set. Much of the functionality
+available is identical to the ARM instruction set supported alongside
+the Thumb instruction set in ARMv6T2 and other ARMv7 profiles"
+
+Jonny
