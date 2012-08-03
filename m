@@ -1,74 +1,28 @@
 From: marex@denx.de (Marek Vasut)
-Date: Fri,  3 Aug 2012 17:26:15 +0200
-Subject: [PATCH 10/10] ARM: mx28: Add SPI pinmux into imx28.dtsi
-In-Reply-To: <1344007575-11448-1-git-send-email-marex@denx.de>
-References: <1344007575-11448-1-git-send-email-marex@denx.de>
-Message-ID: <1344007575-11448-11-git-send-email-marex@denx.de>
+Date: Fri,  3 Aug 2012 17:28:38 +0200
+Subject: [PATCH 0/3] i.MX28 LRADC driver
+Message-ID: <1344007721-11595-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Attila Kinali <attila@kinali.ch>
-Cc: Chris Ball <cjb@laptop.org>
-CC: Dong Aisheng <b29396@freescale.com>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-CC: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx28.dtsi |   39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+Introduce the i.MX28 LRADC driver and support tech that comes with it.
 
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index badc76a..4a0f12c 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -507,6 +507,45 @@
- 					fsl,voltage = <1>;
- 					fsl,pull-up = <0>;
- 				};
-+
-+				spi0_pins_a: spi0 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids =
-+						<0x2000 0x2010 0x2020 0x2030
-+						0x2040 0x2050 0x2060 0x2070
-+						0x2080 0x2090 0x20a0>;
-+					fsl,drive-strength = <1>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
-+				};
-+
-+				spi1_pins_a: spi1 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids =
-+						<0x20c0 0x20d0 0x20e0 0x20f0>;
-+					fsl,drive-strength = <1>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
-+				};
-+
-+				spi2_pins_a: spi2 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids =
-+						<0x2100 0x2110 0x2120
-+						0x2130 0x2140 0x2150>;
-+					fsl,drive-strength = <1>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
-+				};
-+
-+				spi3_pins_a: spi3 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids =
-+						<0x2180 0x2190 0x21a0 0x21b0>;
-+					fsl,drive-strength = <1>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
-+				};
- 			};
- 
- 			digctl at 8001c000 {
+Marek Vasut (3):
+  IIO: Add 4-byte unsigned reads into generic-buffer example
+  IIO: Add basic MXS LRADC driver
+  IIO: arm: Add LRADC to i.MX28 dts
+
+ arch/arm/boot/dts/imx28.dtsi                       |    3 +
+ drivers/staging/iio/Documentation/generic_buffer.c |   10 +
+ drivers/staging/iio/adc/Kconfig                    |   12 +
+ drivers/staging/iio/adc/Makefile                   |    1 +
+ drivers/staging/iio/adc/mxs-lradc.c                |  591 ++++++++++++++++++++
+ 5 files changed, 617 insertions(+)
+ create mode 100644 drivers/staging/iio/adc/mxs-lradc.c
+
+Cc: Jonathan Cameron <jic23@kernel.org>
+Cc: Juergen Beisert <jbe@pengutronix.de>
+Cc: Lars-Peter Clausen <lars@metafoo.de>
+Cc: Wolfgang Denk <wd@denx.de>
 -- 
 1.7.10.4
