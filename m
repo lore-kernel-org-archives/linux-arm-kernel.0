@@ -1,101 +1,72 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 03 Aug 2012 07:22:40 +0200
-Subject: [PATCH 1/2] net: davinci_mdio: enable and disable clock
-In-Reply-To: <501B5EC1.7010304@ti.com>
-References: <1343936616-29318-1-git-send-email-zonque@gmail.com>
- <501B5EC1.7010304@ti.com>
-Message-ID: <501B6020.7090502@gmail.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Fri, 3 Aug 2012 10:54:47 +0530
+Subject: [PATCH 2/3] ARM: OMAP: hwmod: revise deassert sequence
+In-Reply-To: <CALLhW=6-b+kjfG-u3+uXiD64UwoNEdufjJKu0Mx-sGWp6n9csg@mail.gmail.com>
+References: <1342466485-1050-1-git-send-email-omar.luna@linaro.org>
+ <1342466485-1050-3-git-send-email-omar.luna@linaro.org>
+ <alpine.DEB.2.00.1208020150240.4177@utopia.booyaka.com>
+ <CALLhW=6-b+kjfG-u3+uXiD64UwoNEdufjJKu0Mx-sGWp6n9csg@mail.gmail.com>
+Message-ID: <501B609F.9030403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.08.2012 07:16, Vaibhav Hiremath wrote:
+
+
+On 8/3/2012 3:50 AM, Omar Ramirez Luna wrote:
+> Hi.
 > 
-> 
-> On 8/3/2012 1:13 AM, Daniel Mack wrote:
->> Make the driver control the device clocks. Appearantly, the Davinci
->> platform probes this driver with the clock all powered up, but on OMAP,
->> this isn't the case.
+> On 2 August 2012 02:52, Paul Walmsley <paul@pwsan.com> wrote:
+>> On Mon, 16 Jul 2012, Omar Ramirez Luna wrote:
 >>
->> Signed-off-by: Daniel Mack <zonque@gmail.com>
->> ---
->>  drivers/net/ethernet/ti/davinci_mdio.c | 16 ++++++++++++++--
->>  1 file changed, 14 insertions(+), 2 deletions(-)
+>>> For a reset sequence to complete cleanly, a module needs its
+>>> associated clocks to be enabled, otherwise the timeout check
+>>> in prcm code can print a false failure (failed to hardreset)
+>>> that occurs because the clocks aren't powered ON and the status
+>>> bit checked can't transition without them.
+>>>
+>>> Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
 >>
->> diff --git a/drivers/net/ethernet/ti/davinci_mdio.c b/drivers/net/ethernet/ti/davinci_mdio.c
->> index cd7ee20..b4b6015 100644
->> --- a/drivers/net/ethernet/ti/davinci_mdio.c
->> +++ b/drivers/net/ethernet/ti/davinci_mdio.c
->> @@ -332,6 +332,8 @@ static int __devinit davinci_mdio_probe(struct platform_device *pdev)
->>  		goto bail_out;
->>  	}
->>  
->> +	clk_enable(data->clk);
->> +
->>  	dev_set_drvdata(dev, data);
->>  	data->dev = dev;
->>  	spin_lock_init(&data->lock);
->> @@ -379,8 +381,11 @@ bail_out:
->>  	if (data->bus)
->>  		mdiobus_free(data->bus);
->>  
->> -	if (data->clk)
->> +	if (data->clk) {
->> +		clk_disable(data->clk);
->>  		clk_put(data->clk);
->> +	}
->> +
->>  	pm_runtime_put_sync(&pdev->dev);
->>  	pm_runtime_disable(&pdev->dev);
->>  
->> @@ -397,8 +402,11 @@ static int __devexit davinci_mdio_remove(struct platform_device *pdev)
->>  	if (data->bus)
->>  		mdiobus_free(data->bus);
->>  
->> -	if (data->clk)
->> +	if (data->clk) {
->> +		clk_disable(data->clk);
->>  		clk_put(data->clk);
->> +	}
->> +
->>  	pm_runtime_put_sync(&pdev->dev);
->>  	pm_runtime_disable(&pdev->dev);
->>  
->> @@ -427,6 +435,8 @@ static int davinci_mdio_suspend(struct device *dev)
->>  	data->suspended = true;
->>  	spin_unlock(&data->lock);
->>  
->> +	clk_disable(data->clk);
->> +
->>  	return 0;
->>  }
->>  
->> @@ -435,6 +445,8 @@ static int davinci_mdio_resume(struct device *dev)
->>  	struct davinci_mdio_data *data = dev_get_drvdata(dev);
->>  	u32 ctrl;
->>  
->> +	clk_enable(data->clk);
->> +
+>> Is enabling the clocks sufficient?
 > 
-> Danial,
+> During my testing it seemed enough, besides it looks clk framework is
+> doing the same as _omap4_enable_module.
 > 
-> I would request you to wait for this, its not that simple and straight.
-> And once you migrate to runtime PM you don't need clk_enable/disable,
-> this should get handled under runtime PM api's.
-
-As I said, it can be dropped.
-
-> Also have you read my another email post -
+>> Or do we also need to enable the
+>> IP block, e.g. by calling
+>>
+>>         if (soc_ops.enable_module)
+>>                 soc_ops.enable_module(oh);
+>>
+>> as we do on OMAP4+ in _enable() ?
 > 
-> http://comments.gmane.org/gmane.linux.ports.arm.omap/80796
+> Basically this is a call to _omap4_enable_module, and the latter will
+> "Enable the modulemode inside CLKCTRL".
 > 
-> Certainly, with respect to CPSW & MDIO, this patch is not enough and
-> requires further investigation. I have started looking at this and
-> hopefully will have some solution soon...
+> However, _enable_clocks path which ends calling omap2_dflt_clk_enable
+> does the same thing with its clk->enable_reg field.
+> 
+> So in _enable:
+> 
+>         _enable_clocks(oh);
+>         if (soc_ops.enable_module)
+>                 soc_ops.enable_module(oh);
+> 
+> The enable_module part seems redundant to me, since the module should
+> be already enabled by the first call to _enable_clocks.
+> 
 
-Ok, no problem. We certainly need the DT bindings for davinci_mdio. With
-that applied, and the hwmod added (in the patch I posted yesterday), I
-can at least mount the rootfs via NFS, which is all I currently need.
+Yes they do same thing, I believe the plan is to get rid of all clock
+leaf-nodes in the near future, and let hwmod handle module
+enable/disable part.
 
+Thanks,
+Vaibhav
 
-Best regards,
-Daniel
+> Regards,
+> 
+> Omar
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
