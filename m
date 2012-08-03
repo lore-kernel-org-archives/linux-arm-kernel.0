@@ -1,48 +1,118 @@
 From: marex@denx.de (Marek Vasut)
-Date: Fri,  3 Aug 2012 17:26:05 +0200
-Subject: [PATCH 00/10 V3] MXS SPI driver
-Message-ID: <1344007575-11448-1-git-send-email-marex@denx.de>
+Date: Fri,  3 Aug 2012 17:26:07 +0200
+Subject: [PATCH 02/10] mmc: spi: Rename IMX2[38]_MMC to IMX2[38]_SSP
+In-Reply-To: <1344007575-11448-1-git-send-email-marex@denx.de>
+References: <1344007575-11448-1-git-send-email-marex@denx.de>
+Message-ID: <1344007575-11448-3-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds SPI master support for Freescale i.MX233/i.MX28.
-This is rebased on top of next-20120713. Please consider applying,
-bugs shall now be squashed during the previous two review rounds.
+Since the SSP controller can act as both SPI and MMC host,
+renaming the enum to properly reflect the naming seems
+appropriate.
 
-Marek Vasut (10):
-  mmc: spi: Move SSP register definitions into separate file
-  mmc: spi: Rename IMX2[38]_MMC to IMX2[38]_SSP
-  mmc: spi: Add necessary bits into mxs-spi.h
-  mmc: spi: Pull out parts shared between MMC and SPI
-  mmc: spi: Pull out the SSP clock configuration function
-  spi: Add SPI driver for mx233/mx28
-  mmc: spi: Pull out common DMA parts from MXS MMC
-  spi: Add DMA support into SPI driver
-  spi: Add SSP/SPI device tree documentation
-  ARM: mx28: Add SPI pinmux into imx28.dtsi
+Based on previous attempt by:
+Fabio Estevam <fabio.estevam@freescale.com>
 
- Documentation/devicetree/bindings/spi/mxs-spi.txt |   18 +
- arch/arm/boot/dts/imx28.dtsi                      |   39 ++
- drivers/clk/mxs/Makefile                          |    2 +-
- drivers/clk/mxs/clk-ssp.c                         |   62 ++
- drivers/mmc/host/mxs-mmc.c                        |  325 ++++-------
- drivers/spi/Kconfig                               |    7 +
- drivers/spi/Makefile                              |    1 +
- drivers/spi/spi-mxs.c                             |  631 +++++++++++++++++++++
- include/linux/spi/mxs-spi.h                       |  150 +++++
- 9 files changed, 1016 insertions(+), 219 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/spi/mxs-spi.txt
- create mode 100644 drivers/clk/mxs/clk-ssp.c
- create mode 100644 drivers/spi/spi-mxs.c
- create mode 100644 include/linux/spi/mxs-spi.h
-
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Attila Kinali <attila@kinali.ch>
 Cc: Chris Ball <cjb@laptop.org>
 CC: Dong Aisheng <b29396@freescale.com>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: Linux ARM kernel <linux-arm-kernel@lists.infradead.org>
 Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
+CC: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/mmc/host/mxs-mmc.c  |   18 +++++++++---------
+ include/linux/spi/mxs-spi.h |    8 ++++----
+ 2 files changed, 13 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+index 26c95dc..e80c2b6 100644
+--- a/drivers/mmc/host/mxs-mmc.c
++++ b/drivers/mmc/host/mxs-mmc.c
+@@ -78,7 +78,7 @@ struct mxs_mmc_host {
+ 	enum dma_transfer_direction	slave_dirn;
+ 	u32				ssp_pio_words[SSP_PIO_NUM];
+ 
+-	enum mxs_mmc_id			devid;
++	enum mxs_ssp_id			devid;
+ 	unsigned char			bus_width;
+ 	spinlock_t			lock;
+ 	int				sdio_irq_en;
+@@ -601,22 +601,22 @@ static bool mxs_mmc_dma_filter(struct dma_chan *chan, void *param)
+ 	return true;
+ }
+ 
+-static struct platform_device_id mxs_mmc_ids[] = {
++static struct platform_device_id mxs_ssp_ids[] = {
+ 	{
+ 		.name = "imx23-mmc",
+-		.driver_data = IMX23_MMC,
++		.driver_data = IMX23_SSP,
+ 	}, {
+ 		.name = "imx28-mmc",
+-		.driver_data = IMX28_MMC,
++		.driver_data = IMX28_SSP,
+ 	}, {
+ 		/* sentinel */
+ 	}
+ };
+-MODULE_DEVICE_TABLE(platform, mxs_mmc_ids);
++MODULE_DEVICE_TABLE(platform, mxs_ssp_ids);
+ 
+ static const struct of_device_id mxs_mmc_dt_ids[] = {
+-	{ .compatible = "fsl,imx23-mmc", .data = (void *) IMX23_MMC, },
+-	{ .compatible = "fsl,imx28-mmc", .data = (void *) IMX28_MMC, },
++	{ .compatible = "fsl,imx23-mmc", .data = (void *) IMX23_SSP, },
++	{ .compatible = "fsl,imx28-mmc", .data = (void *) IMX28_SSP, },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, mxs_mmc_dt_ids);
+@@ -655,7 +655,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	if (np) {
+-		host->devid = (enum mxs_mmc_id) of_id->data;
++		host->devid = (enum mxs_ssp_id) of_id->data;
+ 		/*
+ 		 * TODO: This is a temporary solution and should be changed
+ 		 * to use generic DMA binding later when the helpers get in.
+@@ -829,7 +829,7 @@ static const struct dev_pm_ops mxs_mmc_pm_ops = {
+ static struct platform_driver mxs_mmc_driver = {
+ 	.probe		= mxs_mmc_probe,
+ 	.remove		= mxs_mmc_remove,
+-	.id_table	= mxs_mmc_ids,
++	.id_table	= mxs_ssp_ids,
+ 	.driver		= {
+ 		.name	= DRIVER_NAME,
+ 		.owner	= THIS_MODULE,
+diff --git a/include/linux/spi/mxs-spi.h b/include/linux/spi/mxs-spi.h
+index b7ccd57..c08aef5 100644
+--- a/include/linux/spi/mxs-spi.h
++++ b/include/linux/spi/mxs-spi.h
+@@ -24,7 +24,7 @@
+ #ifndef __LINUX_SPI_MXS_SPI_H__
+ #define __LINUX_SPI_MXS_SPI_H__
+ 
+-#define ssp_is_old(host)	((host)->devid == IMX23_MMC)
++#define ssp_is_old(host)	((host)->devid == IMX23_SSP)
+ 
+ /* SSP registers */
+ #define HW_SSP_CTRL0				0x000
+@@ -101,9 +101,9 @@
+ 
+ #define SSP_PIO_NUM	3
+ 
+-enum mxs_mmc_id {
+-	IMX23_MMC,
+-	IMX28_MMC,
++enum mxs_ssp_id {
++	IMX23_SSP,
++	IMX28_SSP,
+ };
+ 
+ #endif	/* __LINUX_SPI_MXS_SPI_H__ */
 -- 
 1.7.10.4
