@@ -1,50 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 3 Aug 2012 10:02:35 +0100
-Subject: [PATCH v5 0/3] Updated Cortex-M3 series
-In-Reply-To: <20120803075807.GD2626@pengutronix.de>
-References: <1341512035-8173-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20120803075807.GD2626@pengutronix.de>
-Message-ID: <20120803090235.GA26925@mudshark.cambridge.arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 3 Aug 2012 11:04:52 +0200
+Subject: kernel entry for thumb2-only cpus
+Message-ID: <20120803090452.GE2626@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2012 at 08:58:07AM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
+Hello,
 
-Hi Uwe,
+in both arch/arm/kernel/head.S and arch/arm/kernel/head-nommu.S we have
 
-> On Thu, Jul 05, 2012 at 08:13:52PM +0200, Uwe Kleine-K?nig wrote:
-> > Hello,
-> > 
-> > now that 3.5 is about to come I invested the time to update the
-> > beginning of the Cortex-M3 support.
-> > 
-> > Over all I rebased to v3.5-rc5 and addressed the comments by Russell.
-> > 
-> > It would be great to get these patches into next early after the merge
-> > window for 3.6 closes to get them into 3.7. But I won't argue if they
-> > made it into 3.6 ;-)
-> Now that v3.6-rc1 is out can these go into next for the next merge
-> window?
+	.arm
+ THUMB( adr     r9, BSYM(1f)    )       @ Kernel is always entered in ARM.
+ THUMB( bx      r9              )       @ If this is a Thumb-2 kernel,
+ THUMB( .thumb                  )       @ switch to Thumb now.
+ THUMB(1:                       )
 
-Last time I looked at the code, patch 3/3 was adding some fairly noisy debug
-prints to various syscalls and pieces of signal handling. e.g.:
+as first instructions at the entry point. This is a problem for
+thumb2-only cpus (e.g. Cortex-M3).
 
+Up to now I commented out the first three lines for the Cortex-M3 port.
+What should we do about that. There are two possibilities I see:
 
-diff --git a/arch/arm/kernel/sys_arm.c b/arch/arm/kernel/sys_arm.c
-index 76cbb05..ea207df 100644
---- a/arch/arm/kernel/sys_arm.c
-+++ b/arch/arm/kernel/sys_arm.c
-@@ -102,6 +102,7 @@ int kernel_execve(const char *filename,
- 	 * We were successful.  We won't be returning to our caller, but
- 	 * instead to user space by manipulating the kernel stack.
- 	 */
-+	pr_info("we were successful\n");
- 	asm(	"add	r0, %0, %1\n\t"
- 		"mov	r1, %2\n\t"
- 		"mov	r2, %3\n\t"
+ a) introduce a kconfig symbol for thumb2-only builds and #ifdef the
+    first three lines out if it is given.
+ b) expect the bootloader to directly jump to the label 1.
 
+The downside of a) is that a boot loader on a cpu that is capable to
+execute the tradtional instructions would need to detect if the switch
+to thumb is there or not and react accordingly. (In fact it needs to
+distringuish three cases:
 
-Can we drop these bits please?
+ - traditional kernel
+ - thumb2 kernel with ARM entry
+ - thumb2 kernel without ARM entry
 
-Will
+.) So I think b) is the more sensible option in the long run.
+
+What do you think?
+
+If so I'd expand the comment with this expectation.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
