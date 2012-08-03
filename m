@@ -1,18 +1,36 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 2 Aug 2012 21:01:44 -0300
-Subject: Several crashes on imx_v6_v7_defconfig
-In-Reply-To: <CAOMZO5D1oM0q2H=ZqNc3Jq9T5+kGypnDbFC8O1a5D6qQYy1ySA@mail.gmail.com>
-References: <CAOMZO5D1oM0q2H=ZqNc3Jq9T5+kGypnDbFC8O1a5D6qQYy1ySA@mail.gmail.com>
-Message-ID: <CAOMZO5Boc7mMePGYjJV4ChzNkM8=xp4kSqnxGY3gaU7G_4qp6Q@mail.gmail.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Fri, 3 Aug 2012 09:04:58 +0800
+Subject: [PATCH 0/4] dmaengine: add support mmp-pdma
+In-Reply-To: <1343364382-16269-1-git-send-email-zhangfei.gao@marvell.com>
+References: <1343364382-16269-1-git-send-email-zhangfei.gao@marvell.com>
+Message-ID: <CAMj5Bkjy4w76h2Mh3zMRwzjczSXRkTOya87_U=zTLZrYLuLxhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 11:39 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi,
+On Fri, Jul 27, 2012 at 12:46 PM, Zhangfei Gao <zhangfei.gao@marvell.com> wrote:
+> v0->v1
+> Update dt member and desc according to Arnd's suggestion
+> Use dma_slave_config.slave_id to transfer drcmr followed Vinod's suggestion
 >
-> After manually fixing two build errors (patches already submitted, but
-> they were not applied into linux-next yet) on imx_v6_v7_defconfig and
-> booting a dt kernel on mx51evk I get:
+> Patch 4 is upload as example
+> mtd: pxa3xx-nand: replace pxa_request_dma with dmaengine
+> We would like hold this patch currently
+> since pdma will grab irq and disable pxa_init_dma.
+>
+> Any attempt of replacing pxa_request_dma with dmaengine on pxa3xx platform are welcome
+> Here are many replacing and verifying work to do.
+>
+>
+> mmp-pdma is added under dmaengine framework.
+> The final purpose is replacing arch/arm/plat-pxa/dma.c
+>
+> Test on pxa910 with pxa3xx-nand and dmatest.ko
+>
+> Zhangfei Gao (4):
+>   dmaengine: mmp-pdma support
+>   dmaengine: mmp_tdma: add dt support
+>   dmatest: add dmaengine_slave_config for DMA_MEMCPY
 
-Shawn's patch ([PATCH] ARM: dts: imx: fix gpio interrupts property)
-fixed these issues.
+Hi, Arnd & Vinod
+
+Would you mind taking look at the updated mmp-pdma patch, thanks for the help.
