@@ -1,53 +1,53 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 3 Aug 2012 16:56:49 +0200
-Subject: [PATCH] hwmon: tmp102: Add device tree support
-In-Reply-To: <1343997350-676-1-git-send-email-sourav.poddar@ti.com>
-References: <1343997350-676-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <501BE6B1.9000100@ti.com>
+From: wd@denx.de (Wolfgang Denk)
+Date: Fri, 03 Aug 2012 17:06:02 +0200
+Subject: MMAP_MIN_ADDR problem/question
+In-Reply-To: <201208020939.50225.marek.vasut@gmail.com>
+References: <201208020939.50225.marek.vasut@gmail.com>
+Message-ID: <20120803150602.687DF203B3D@gemini.denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sourav,
+Dear Wolfram,
 
-On 08/03/2012 02:35 PM, Sourav Poddar wrote:
-> update tmp102 temperature sensor to also use device tree.
+In message <201208020939.50225.marek.vasut@gmail.com> Marek Vasut wrote:
 > 
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> ---
->  drivers/hwmon/tmp102.c |   14 +++++++++++++-
->  1 files changed, 13 insertions(+), 1 deletions(-)
+> Me and a coleague of mine recently ran into the issue [1]. The problem is, that 
+> I set mmap_min_addr to 65536, making it unable for "su - user" command to work, 
+> it crashes with SIGKILL. I now at least see a solution (set it to 32768). Though 
+> I don't understand why. Can someone please exaplain me why it has to be 32768 an 
+> not more?
 > 
-> diff --git a/drivers/hwmon/tmp102.c b/drivers/hwmon/tmp102.c
-> index 0d466b9..a8a9060 100644
-> --- a/drivers/hwmon/tmp102.c
-> +++ b/drivers/hwmon/tmp102.c
-> @@ -26,6 +26,7 @@
->  #include <linux/err.h>
->  #include <linux/mutex.h>
->  #include <linux/device.h>
-> +#include <linux/of.h>
->  
->  #define	DRIVER_NAME "tmp102"
->  
-> @@ -284,8 +285,19 @@ static const struct i2c_device_id tmp102_id[] = {
->  };
->  MODULE_DEVICE_TABLE(i2c, tmp102_id);
->  
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id temperature_dt_match[] = {
-> +	{ .compatible = "ti,tmp102" },
+> [1] http://ubuntu.5.n6.nabble.com/PATCH-DEFAULT-MMAP-MIN-ADDR-32768-for-arm-td1604723.html
 
-Are you sure this is needed for this device?
 
-There is an automatic binding done for I2C devices in the of_i2c core
-code. So in theory, DT will be able to bind to any I2C device using the
-already existing table: MODULE_DEVICE_TABLE(i2c, tmp102_id).
+It appears the problem was introduced with commit cde7c41 "ARM:
+configs: add defconfig for mach-mxs" which sets the default for
+CONFIG_DEFAULT_MMAP_MIN_ADDR for MXS systems to 64 k.
 
-So I think this patch should not be needed.
+"security/Kconfig" has somewhat related documentation:
 
-Regards,
-Benoit
+	config LSM_MMAP_MIN_ADDR
+	...
+		default 32768 if ARM
+		default 65536
+		...
+		On arm and other archs it should not be higher than 32768.
+
+The reason is that on ARM the text segment of applications gets mapped
+to 32 k, which fails for non-root processes if MMAP_MIN_ADDR is higher.
+
+
+Is there any specific reason why you set it to 64 k for MXS ?
+
+Can you please check if non-root processes work for you with this
+configuration?
+
+Thanks.
+
+Wolfgang Denk
+
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+I used to be indecisive, now I'm not sure.
