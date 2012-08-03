@@ -1,41 +1,28 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Fri, 03 Aug 2012 16:37:58 +0100
-Subject: [PATCH v6 0/3] Updated Cortex-M3 series
-In-Reply-To: <20120803145035.GJ2626@pengutronix.de>
-References: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <201208031407.09092.arnd@arndb.de> <20120803145035.GJ2626@pengutronix.de>
-Message-ID: <501BF056.5000801@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Aug 2012 16:43:55 +0100
+Subject: MMAP_MIN_ADDR problem/question
+In-Reply-To: <201208020939.50225.marek.vasut@gmail.com>
+References: <201208020939.50225.marek.vasut@gmail.com>
+Message-ID: <20120803154355.GA6802@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/12 15:50, Uwe Kleine-K?nig wrote:
-
-...
->  
->> How does this relate to the ARMv6-M (Cortex-M0/M0+/M1) support
->> that has been floating around [1]? Can we support both in
->> the same kernel? 
-> I don't know M0/M1 but from a quick look at the tree you pointed out I'd
-> say they look reasonably similar.
+On Thu, Aug 02, 2012 at 09:39:50AM +0200, Marek Vasut wrote:
+> Hi guys,
 > 
+> Me and a coleague of mine recently ran into the issue [1]. The problem is, that 
+> I set mmap_min_addr to 65536, making it unable for "su - user" command to work, 
+> it crashes with SIGKILL. I now at least see a solution (set it to 32768). Though 
+> I don't understand why. Can someone please exaplain me why it has to be 32768 an 
+> not more?
+> 
+> [1] http://ubuntu.5.n6.nabble.com/PATCH-DEFAULT-MMAP-MIN-ADDR-32768-for-arm-
+> td1604723.html
 
-I'm not so sure - M0/M0+/M1 don't use Thumb-2, they're a slightly
-extended version of Thumb-1, which we don't support in the kernel...
+Looks to me like there's a reading exercise for someone in the MXS
+community who set the default to 64K.  The default in the Kconfig is
+already appropriately chosen, so for the defconfig to have the 64K
+value, someone must have _intentionally_ changed it without thinking
+about what they were doing.
 
-For the curious, here are the relevant bits from the ARM ARMs
-
->From the ARM (v6-M) ARM A4.1 - about the instruction set:
-
-"ARMv6-M supports the Thumb instruction set including a small number of
-32-bit instructions introduced with Thumb-2 technology, see 32-bit Thumb
-instruction encoding on page A5-91. The 16-bit instruction
-support is equivalent to the Thumb instruction set support in ARMv6
-prior to the introduction of Thumb-2 technology."
-
-Whereas for V7-M, it says:
-"supports a large number of 32-bit instructions that Thumb-2 technology
-introduced into the Thumb instruction set. Much of the functionality
-available is identical to the ARM instruction set supported alongside
-the Thumb instruction set in ARMv6T2 and other ARMv7 profiles"
-
-Jonny
+Just produce a patch to fix the defconfig.
