@@ -1,36 +1,49 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Fri, 3 Aug 2012 09:04:58 +0800
-Subject: [PATCH 0/4] dmaengine: add support mmp-pdma
-In-Reply-To: <1343364382-16269-1-git-send-email-zhangfei.gao@marvell.com>
-References: <1343364382-16269-1-git-send-email-zhangfei.gao@marvell.com>
-Message-ID: <CAMj5Bkjy4w76h2Mh3zMRwzjczSXRkTOya87_U=zTLZrYLuLxhw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu,  2 Aug 2012 18:23:14 -0700
+Subject: [PATCH] ARM: Fix XIP build due to PHYS_OFFSET definition moving
+Message-ID: <1343956994-27513-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2012 at 12:46 PM, Zhangfei Gao <zhangfei.gao@marvell.com> wrote:
-> v0->v1
-> Update dt member and desc according to Arnd's suggestion
-> Use dma_slave_config.slave_id to transfer drcmr followed Vinod's suggestion
->
-> Patch 4 is upload as example
-> mtd: pxa3xx-nand: replace pxa_request_dma with dmaengine
-> We would like hold this patch currently
-> since pdma will grab irq and disable pxa_init_dma.
->
-> Any attempt of replacing pxa_request_dma with dmaengine on pxa3xx platform are welcome
-> Here are many replacing and verifying work to do.
->
->
-> mmp-pdma is added under dmaengine framework.
-> The final purpose is replacing arch/arm/plat-pxa/dma.c
->
-> Test on pxa910 with pxa3xx-nand and dmatest.ko
->
-> Zhangfei Gao (4):
->   dmaengine: mmp-pdma support
->   dmaengine: mmp_tdma: add dt support
->   dmatest: add dmaengine_slave_config for DMA_MEMCPY
+During the p2v changes, the PHYS_OFFSET #define moved into a
+!__ASSEMBLY__ section. This causes a XIP build to fail with
 
-Hi, Arnd & Vinod
+ arch/arm/kernel/head.o: In function 'stext':
+ arch/arm/kernel/head.S:146: undefined reference to 'PHYS_OFFSET'
 
-Would you mind taking look at the updated mmp-pdma patch, thanks for the help.
+Momentarily leave the #ifndef __ASSEMBLY__ section so we can
+define PHYS_OFFSET for all compilation units.
+
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+
+I don't know if it's worth stable, seems that nobody has compiled XIP for
+a year (back to 2.6.39 days?).
+
+ arch/arm/include/asm/memory.h | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index fcb5757..3299b2d 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -187,6 +187,7 @@ static inline unsigned long __phys_to_virt(unsigned long x)
+ #define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
+ #endif
+ #endif
++#endif /* __ASSEMBLY__ */
+ 
+ #ifndef PHYS_OFFSET
+ #ifdef PLAT_PHYS_OFFSET
+@@ -196,6 +197,8 @@ static inline unsigned long __phys_to_virt(unsigned long x)
+ #endif
+ #endif
+ 
++#ifndef __ASSEMBLY__
++
+ /*
+  * PFNs are used to describe any physical page; this means
+  * PFN 0 == physical address 0.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
