@@ -1,21 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 3 Aug 2012 22:43:28 +0800
-Subject: [PATCH] SPI: MXS: Allow to pass the SPI master bus number from
- the device tree
-In-Reply-To: <1344004239-22868-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1343076052-27312-1-git-send-email-marex@denx.de>
- <1344004239-22868-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20120803144326.GE23791@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 3 Aug 2012 14:45:09 +0000
+Subject: [PATCH 4/5] arm: mvebu: add basic address decoding support to
+ Armada 370/XP
+In-Reply-To: <1344003237-13575-5-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1344003237-13575-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1344003237-13575-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <201208031445.10102.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2012 at 04:30:39PM +0200, Maxime Ripard wrote:
-> If you don't do it, the bus number will be a bogus value, possibly used
-> for device file names in drivers like spidev.
-> 
-Do you see any problem with that?  Here is the take from Grant.
+On Friday 03 August 2012, Thomas Petazzoni wrote:
+> +static void __iomem *
+> +armada_cfg_base(const struct orion_addr_map_cfg *cfg, int win)
+> +{
+> +       unsigned int offset;
+> +
+> +       /* The register layout is a bit annoying and the below code
+> +        * tries to cope with it.
+> +        * - At offset 0x0, there are the registers for the first 8
+> +        *   windows, with 4 registers of 32 bits per window (ctrl,
+> +        *   base, remap low, remap high)
+> +        * - Then at offset 0x80, there is a hole of 0x10 bytes for
+> +        *   the internal registers base address and internal units
+> +        *   sync barrier register.
+> +        * - Then at offset 0x90, there the registers for 12
+> +        *   windows, with only 2 registers of 32 bits per window
+> +        *   (ctrl, base).
+> +        */
+> +       if (win < 8)
+> +               offset = (win << 4);
+> +       else
+> +               offset = ARMADA_WINDOW_8_PLUS_OFFSET + (win << 3);
+> +
+> +       return (void __iomem *)(cfg->bridge_virt_base + offset);
+> +}
+> +
 
-http://thread.gmane.org/gmane.linux.kernel.spi.devel/9839/focus=9863
+This cast can go away now that the type is already correct. Other
+than that, the patch looks fine.
 
-Regards,
-Shawn
+	Arnd
