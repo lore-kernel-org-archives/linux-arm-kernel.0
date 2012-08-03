@@ -1,176 +1,88 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  3 Aug 2012 16:13:56 +0200
-Subject: [PATCH 4/5] arm: mvebu: add basic address decoding support to Armada
- 370/XP
-In-Reply-To: <1344003237-13575-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1344003237-13575-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1344003237-13575-5-git-send-email-thomas.petazzoni@free-electrons.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 3 Aug 2012 22:15:15 +0800
+Subject: [PATCH 2/2] ARM: imx/pcm043: add oftree support
+In-Reply-To: <1343922986-32469-2-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1343922986-32469-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1343922986-32469-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20120803141512.GC23791@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds basic support for address decoding configuration for
-the Armada 370 and Armada XP SoCs, re-using the infrastructure
-provided in plat-orion.
+On Thu, Aug 02, 2012 at 05:56:26PM +0200, Uwe Kleine-K?nig wrote:
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/phytec-pcm043.dtsi |   49 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 49 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/phytec-pcm043.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/phytec-pcm043.dtsi b/arch/arm/boot/dts/phytec-pcm043.dtsi
+> new file mode 100644
+> index 0000000..420627c
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/phytec-pcm043.dtsi
+> @@ -0,0 +1,49 @@
+> +/include/ "imx35.dtsi"
+> +
+> +/ {
+> +	soc {
+> +		aips at 40000000 { /* AIPS1 */
+> +			i2c at 43f80000 {
+> +				status = "okay";
+> +
+> +				tempsens at 4a {
+> +					compatible = "maxim,ds75";
+> +					reg = <0x4a>;
+> +				};
 
-For now, only a BootROM window is configured on Armada XP, which is
-needed to get the non-boot CPUs started and is therefore a requirement
-for SMP support.
+Again, please put a new line between nodes.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/mach-mvebu/Makefile   |    2 +-
- arch/arm/mach-mvebu/addr-map.c |  134 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 135 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-mvebu/addr-map.c
+> +				rtc8564 at 51 {
+> +					compatible = "nxp,pcf8563";
+> +					reg = <0x51>;
+> +				};
+> +				at24 at 52 {
+> +					compatible = "at,24c32";
+> +					reg = <0x52>;
+> +					pagesize = <32>;
+> +				};
+> +			};
+> +			uart at 43f90000 {
+> +				status = "okay";
+> +			};
+> +			uart at 43f94000 {
+> +				status = "okay";
+> +			};
+> +		};
+> +		spba at 50000000 {
+> +			uart at 5000c000 {
+> +				status = "okay";
+> +			};
+> +			fec at 50038000 {
+> +				status = "okay";
+> +			};
+> +		};
+> +
+> +		nor at a0000000 {
+> +			compatible = "cfi-flash";
+> +			reg = <0xa0000000 0x2000000>;
+> +			bank-width = <2>;
+> +		};
+> +
+We should be able to see how this device is connected to SoC with this
+node under proper interface and bus topology.
 
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index e61d2b8..2143558 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -1,2 +1,2 @@
- obj-y += system-controller.o
--obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o
-+obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o
-diff --git a/arch/arm/mach-mvebu/addr-map.c b/arch/arm/mach-mvebu/addr-map.c
-new file mode 100644
-index 0000000..4a371a3
---- /dev/null
-+++ b/arch/arm/mach-mvebu/addr-map.c
-@@ -0,0 +1,134 @@
-+/*
-+ * Address map functions for Marvell 370 / XP SoCs
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/mbus.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <plat/addr-map.h>
-+
-+/*
-+ * Generic Address Decode Windows bit settings
-+ */
-+#define ARMADA_XP_TARGET_DEV_BUS	1
-+#define   ARMADA_XP_ATTR_DEV_BOOTROM    0x1D
-+#define ARMADA_XP_TARGET_ETH1		3
-+#define ARMADA_XP_TARGET_PCIE_0_2	4
-+#define ARMADA_XP_TARGET_ETH0		7
-+#define ARMADA_XP_TARGET_PCIE_1_3	8
-+
-+#define ARMADA_370_TARGET_DEV_BUS       1
-+#define   ARMADA_370_ATTR_DEV_BOOTROM   0x1D
-+#define ARMADA_370_TARGET_PCIE_0        4
-+#define ARMADA_370_TARGET_PCIE_1        8
-+
-+#define ARMADA_WINDOW_8_PLUS_OFFSET       0x90
-+#define ARMADA_SDRAM_ADDR_DECODING_OFFSET 0x180
-+
-+static const struct __initdata orion_addr_map_info
-+armada_xp_addr_map_info[] = {
-+	/*
-+	 * Window for the BootROM, needed for SMP on Armada XP
-+	 */
-+	{ 0, 0xfff00000, SZ_1M, ARMADA_XP_TARGET_DEV_BUS,
-+	  ARMADA_XP_ATTR_DEV_BOOTROM, -1 },
-+	/* End marker */
-+	{ -1, 0, 0, 0, 0, 0 },
-+};
-+
-+static const struct __initdata orion_addr_map_info
-+armada_370_addr_map_info[] = {
-+	/* End marker */
-+	{ -1, 0, 0, 0, 0, 0 },
-+};
-+
-+static struct of_device_id of_addr_decoding_controller_table[] = {
-+	{ .compatible = "marvell,armada-addr-decoding-controller" },
-+	{ /* end of list */ },
-+};
-+
-+static void __iomem *
-+armada_cfg_base(const struct orion_addr_map_cfg *cfg, int win)
-+{
-+	unsigned int offset;
-+
-+	/* The register layout is a bit annoying and the below code
-+	 * tries to cope with it.
-+	 * - At offset 0x0, there are the registers for the first 8
-+	 *   windows, with 4 registers of 32 bits per window (ctrl,
-+	 *   base, remap low, remap high)
-+	 * - Then at offset 0x80, there is a hole of 0x10 bytes for
-+	 *   the internal registers base address and internal units
-+	 *   sync barrier register.
-+	 * - Then at offset 0x90, there the registers for 12
-+	 *   windows, with only 2 registers of 32 bits per window
-+	 *   (ctrl, base).
-+	 */
-+	if (win < 8)
-+		offset = (win << 4);
-+	else
-+		offset = ARMADA_WINDOW_8_PLUS_OFFSET + (win << 3);
-+
-+	return (void __iomem *)(cfg->bridge_virt_base + offset);
-+}
-+
-+static struct __initdata orion_addr_map_cfg addr_map_cfg = {
-+	.num_wins = 20,
-+	.remappable_wins = 8,
-+	.win_cfg_base = armada_cfg_base,
-+};
-+
-+static int __init armada_setup_cpu_mbus(void)
-+{
-+	struct device_node *np;
-+	void __iomem *mbus_unit_addr_decoding_base;
-+	void __iomem *sdram_addr_decoding_base;
-+
-+	np = of_find_matching_node(NULL, of_addr_decoding_controller_table);
-+	if (!np)
-+		return -ENODEV;
-+
-+	mbus_unit_addr_decoding_base = of_iomap(np, 0);
-+	BUG_ON(!mbus_unit_addr_decoding_base);
-+
-+	sdram_addr_decoding_base =
-+		mbus_unit_addr_decoding_base +
-+		ARMADA_SDRAM_ADDR_DECODING_OFFSET;
-+
-+	addr_map_cfg.bridge_virt_base = mbus_unit_addr_decoding_base;
-+
-+	/*
-+	 * Disable, clear and configure windows.
-+	 */
-+	if (of_machine_is_compatible("marvell,armadaxp"))
-+		orion_config_wins(&addr_map_cfg, armada_xp_addr_map_info);
-+	else if (of_machine_is_compatible("marvell,armada370"))
-+		orion_config_wins(&addr_map_cfg, armada_370_addr_map_info);
-+	else {
-+		pr_err("Unsupported SoC\n");
-+		return -EINVAL;
-+	}
-+
-+	/*
-+	 * Setup MBUS dram target info.
-+	 */
-+	orion_setup_cpu_mbus_target(&addr_map_cfg,
-+				    sdram_addr_decoding_base);
-+	return 0;
-+}
-+
-+/* Using a early_initcall is needed so that this initialization gets
-+ * done before the SMP initialization, which requires the BootROM to
-+ * be remapped. */
-+early_initcall(armada_setup_cpu_mbus);
+> +		nand at bb000000 {
+> +			status = "okay";
+> +		};
+
+Ditto.
+
+> +	};
+> +};
+> -- 
+> 1.7.10.4
+> 
+
 -- 
-1.7.9.5
+Regards,
+Shawn
