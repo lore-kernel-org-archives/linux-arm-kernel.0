@@ -1,56 +1,91 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 3 Aug 2012 11:32:54 +0200
-Subject: [PATCH v5 0/3] Updated Cortex-M3 series
-In-Reply-To: <20120803090235.GA26925@mudshark.cambridge.arm.com>
-References: <1341512035-8173-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20120803075807.GD2626@pengutronix.de>
- <20120803090235.GA26925@mudshark.cambridge.arm.com>
-Message-ID: <20120803093254.GF2626@pengutronix.de>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Fri, 3 Aug 2012 11:33:07 +0200
+Subject: [PATCH 1/3] ARM: OMAP: timer: allow gp timer clock-event to be
+ used on both cpus
+In-Reply-To: <CAMQu2gxLAVk-LN8R1xBeeL1=iZ-mLSRmtZe4wpQYQPTBsY5RMA@mail.gmail.com>
+References: <1333114048-26136-1-git-send-email-santosh.shilimkar@ti.com>
+ <1333114048-26136-2-git-send-email-santosh.shilimkar@ti.com>
+ <501B7AE6.8080405@gmail.com>
+ <76308EBE-F802-411A-973A-7BBC7575FE5A@dominion.thruhere.net>
+ <BDB76D4F-31B0-47D0-B1A1-64A743D091D3@dominion.thruhere.net>
+ <CAMQu2gxLAVk-LN8R1xBeeL1=iZ-mLSRmtZe4wpQYQPTBsY5RMA@mail.gmail.com>
+Message-ID: <FF29FBF3-67EC-478E-9A74-65F8A2870BDC@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Will,
 
-On Fri, Aug 03, 2012 at 10:02:35AM +0100, Will Deacon wrote:
-> On Fri, Aug 03, 2012 at 08:58:07AM +0100, Uwe Kleine-K?nig wrote:
-> > On Thu, Jul 05, 2012 at 08:13:52PM +0200, Uwe Kleine-K?nig wrote:
-> > > Hello,
-> > > 
-> > > now that 3.5 is about to come I invested the time to update the
-> > > beginning of the Cortex-M3 support.
-> > > 
-> > > Over all I rebased to v3.5-rc5 and addressed the comments by Russell.
-> > > 
-> > > It would be great to get these patches into next early after the merge
-> > > window for 3.6 closes to get them into 3.7. But I won't argue if they
-> > > made it into 3.6 ;-)
-> > Now that v3.6-rc1 is out can these go into next for the next merge
-> > window?
-> 
-> Last time I looked at the code, patch 3/3 was adding some fairly noisy debug
-> prints to various syscalls and pieces of signal handling. e.g.:
-> 
-> 
-> diff --git a/arch/arm/kernel/sys_arm.c b/arch/arm/kernel/sys_arm.c
-> index 76cbb05..ea207df 100644
-> --- a/arch/arm/kernel/sys_arm.c
-> +++ b/arch/arm/kernel/sys_arm.c
-> @@ -102,6 +102,7 @@ int kernel_execve(const char *filename,
->  	 * We were successful.  We won't be returning to our caller, but
->  	 * instead to user space by manipulating the kernel stack.
->  	 */
-> +	pr_info("we were successful\n");
->  	asm(	"add	r0, %0, %1\n\t"
->  		"mov	r1, %2\n\t"
->  		"mov	r2, %3\n\t"
-Huh, I removed them from arch/arm/kernel/signal.c and
-arch/arm/kernel/sys_arm.c now and will resend in a moment. Thanks for
-catching that.
-I saw them when testing on an arm11, but was sure they were introduced
-in a later patch on the stack.
+Op 3 aug. 2012, om 11:27 heeft "Shilimkar, Santosh" <santosh.shilimkar@ti.com> het volgende geschreven:
 
-Uwe
+> On Fri, Aug 3, 2012 at 2:00 PM, Koen Kooi <koen@dominion.thruhere.net> wrote:
+>> 
+>> Op 3 aug. 2012, om 09:21 heeft Koen Kooi <koen@dominion.thruhere.net> het volgende geschreven:
+>> 
+>>> 
+>>> Op 3 aug. 2012, om 09:16 heeft Daniel Mack <zonque@gmail.com> het volgende geschreven:
+>>> 
+>>>> On 30.03.2012 15:27, Santosh Shilimkar wrote:
+>>>>> For coupled cpuidle to work when both cpus are active, it needs a global timer
+>>>>> that can handle events for both cpus.  This timer is used as the broadcast
+>>>>> clock-event when the per-cpu timer hardware stop in low power states.
+>>>>> Set the cpumask of clockevent_gpt to all cpus, set the rating correctly, and
+>>>>> set the irq to allow the clockevent core to determine the affinity of the
+>>>>> timer.
+>>>> 
+>>>> These patches made it to mainline now, shortly befor 3.6-rc1, and it
+>>>> breaks boot on my AM33xx board.
+>>>> 
+>>>> Once I revert 1/3, the board boots again but crashes with the Ooops
+>>>> below. With the entire series reverted, everything works again as
+>>>> expected. Any idea?
+>>>> 
+>>>> The upstream commit ids are
+>>>> 
+>>>> 11d6ec2e "ARM: OMAP: timer: allow gp timer clock-event to be used on
+>>>> both cpus"
+>>>> 5b4d5bcc "ARM: OMAP4: CPUidle: add synchronization for coupled idle states"
+>>>> b93d70ae "ARM: OMAP4: CPUidle: Open broadcast clock-event device."
+>>> 
+>>> I've had boot problems with cpuidle enabled as well, what happens if you disable it? Is the revert still needed in that case?
+>> 
+>> To answer my own question: No, the reverts aren't needed if you disable cpuidle.
+> 
+> This is really strange since CPUIDLE code is really OMAP4 specific.
+> obj-$(CONFIG_ARCH_OMAP4)                += cpuidle44xx.o
+> 
+> May be omap2plus build some how the code gets executed on AMXX
+> 
+> Can you try below and see if the boot with CPUIDLE enabled goes away on
+> AMXX
+> 
+> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+> index ea24174..195e756 100644
+> --- a/arch/arm/mach-omap2/pm44xx.c
+> +++ b/arch/arm/mach-omap2/pm44xx.c
+> @@ -147,6 +147,9 @@ int __init omap4_pm_init(void)
+>        struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm, *l4wkup;
+>        struct clockdomain *ducati_clkdm, *l3_2_clkdm, *l4_per_clkdm;
+> 
+> +       if (!cpu_is_omap44xx())
+> +               return -ENODEV;
+> +
+>        if (omap_rev() == OMAP4430_REV_ES1_0) {
+>                WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
+>                return -ENODEV;
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+That does seem to fix it:
+
+root at beaglebone:~# zcat /proc/config.gz | grep -i cpu_idle
+CONFIG_CPU_IDLE=y
+CONFIG_CPU_IDLE_GOV_LADDER=y
+CONFIG_CPU_IDLE_GOV_MENU=y
+CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED=y
+root at beaglebone:~# zcat /proc/config.gz | grep -i omap4   
+CONFIG_ARCH_OMAP4=y
+CONFIG_MACH_OMAP4_PANDA=y
+# CONFIG_OMAP4_ERRATA_I688 is not set
+# CONFIG_KEYBOARD_OMAP4 is not set
+CONFIG_OMAP4_DSS_HDMI=y
+
+regards,
+
+Koen
