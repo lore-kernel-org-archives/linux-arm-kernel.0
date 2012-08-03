@@ -1,29 +1,49 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 3 Aug 2012 15:23:49 -0300
-Subject: [PATCH] MXS: Fix mxs_defconfig MMAP_MIN_ADDR
-In-Reply-To: <20120803174016.GE10335@n2100.arm.linux.org.uk>
-References: <1344009354-13249-1-git-send-email-marex@denx.de>
- <CAOMZO5DZui3x554WcHsseSfXDgYeaq1va-QzVy1CQajE3M3=kQ@mail.gmail.com>
- <CAOMZO5AzaDcxJJV+Z-bHH58=xRq5RY6BanEjMd4uUhN+K9ZNZQ@mail.gmail.com>
- <20120803174016.GE10335@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5D=L=H6bnsoFcvedzdrdTGUFL2Ztyr4tLy9wbxpZ7a9ww@mail.gmail.com>
+From: vikram.pandita@ti.com (Pandita, Vikram)
+Date: Fri, 3 Aug 2012 11:25:37 -0700
+Subject: [PATCH v3] printk: add option to print cpu id
+In-Reply-To: <m2628z6euk.fsf@firstfloor.org>
+References: <1344013004-32211-1-git-send-email-vikram.pandita@ti.com>
+ <m2628z6euk.fsf@firstfloor.org>
+Message-ID: <CAFm5wm3ScpUU5wa=ei3TY0zjU4kVbOgJMmE5_QDpwy7B-TJa+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 3, 2012 at 2:40 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On Fri, Aug 3, 2012 at 10:54 AM, Andi Kleen <andi@firstfloor.org> wrote:
+> Vikram Pandita <vikram.pandita@ti.com> writes:
+>
+>> From: Vikram Pandita <vikram.pandita@ti.com>
+>>
+>> Introduce config option to enable CPU id reporting for printk() calls.
+>
+> What's wrong with using trace_printk for this?
 
-> 4096 is also fine for ARM too.  There's not much point in having
-> defconfigs change it - that would just be pure noise in the config
-> files.
+trace_printk works only when you know the _exact_ path in code that
+you want to profile.
+When you have no idea of a random lockup, then it would be kind of
+touch and time consuming
+to put trace prints all around the code.
 
-Thanks for the clarification, Russell.
+> That's much faster
+> anyways. Generally printk is so slow that it's typically useless for
+> instrumenting races.
+>
 
-Marek, so maybe you can send a v2 of this patch with my previous
-suggestion (and also mentioning the offending commit).
+As stated in another thread, its found useful to debug some specific cases:
+Check thread: http://marc.info/?l=linux-omap&m=134401269106619&w=2
 
-I have also removed CONFIG_DEFAULT_MMAP_MIN_ADDR from imx_v6_v7_defconfig.
+> And really: Wasting 1/3 of the 80 character line is too much.
 
-Regards,
+You _WASTE_ 4 chars only if you are interested in this info by
+enabling: CONFIG_PRINTK_CPUID
+Just like you _WASTE_ 15 chars when you enable existing: CONFIG_PRINTK_TIME
 
-Fabio Estevam
+For general usecase, recommendation would be to keep these options disabled.
+Working on shipping products, i find almost all shipping with
+CONFIG_PRINTK_TIME enabled, so there must be some value.
+Same would hold for the use case being debugged for CPUID enabling.
+
+>
+> -Andi
+>
+> --
+> ak at linux.intel.com -- Speaking for myself only
