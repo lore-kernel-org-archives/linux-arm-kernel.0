@@ -1,49 +1,68 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu,  2 Aug 2012 18:23:14 -0700
-Subject: [PATCH] ARM: Fix XIP build due to PHYS_OFFSET definition moving
-Message-ID: <1343956994-27513-1-git-send-email-sboyd@codeaurora.org>
+From: minggr@gmail.com (Lin Ming)
+Date: Fri, 3 Aug 2012 09:23:30 +0800
+Subject: How to debug hard lockup issue
+In-Reply-To: <CAJe_ZhezzWUOUNXx=nUx8BqTwcyy6C0Cq7FcNcSg-i0Q9otOKA@mail.gmail.com>
+References: <CAF1ivSY=HsqrRypru55cYMBoyY75umkwrjbz5U0F85nL5mh3tw@mail.gmail.com>
+ <20120802071530.GG10670@pengutronix.de>
+ <CAF1ivSZ=mHqPOks9vdWhb--gKduWpM6UM77-mMj=1gAf8P6MUA@mail.gmail.com>
+ <20120802083413.GH10670@pengutronix.de>
+ <CAF1ivSbbPtr0F3dWPXZMcWrzubGCg4mudcLQ1DKHe_HX5HqQbg@mail.gmail.com>
+ <CAJe_ZhezzWUOUNXx=nUx8BqTwcyy6C0Cq7FcNcSg-i0Q9otOKA@mail.gmail.com>
+Message-ID: <CAF1ivSbEqrgJPFt-9d+hAnfVW3tjG1PC92H-qcGYnJA2wN7d9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During the p2v changes, the PHYS_OFFSET #define moved into a
-!__ASSEMBLY__ section. This causes a XIP build to fail with
+On Thu, Aug 2, 2012 at 5:40 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
+> On 2 August 2012 15:00, Lin Ming <minggr@gmail.com> wrote:
+>> On Thu, Aug 2, 2012 at 4:34 PM, Uwe Kleine-K?nig
+>> <u.kleine-koenig@pengutronix.de> wrote:
+>>> On Thu, Aug 02, 2012 at 03:59:36PM +0800, Lin Ming wrote:
+>>>> On Thu, Aug 2, 2012 at 3:15 PM, Uwe Kleine-K?nig
+>>>> <u.kleine-koenig@pengutronix.de> wrote:
+>>>> > Hello,
+>>>> >
+>>>> > On Thu, Aug 02, 2012 at 11:03:31AM +0800, Lin Ming wrote:
+>>>> >> I encountered a hard lockup on a armv5 board with 2.6.32 kernel.
+>>>> >> There is no any message output since it is hard lockup.
+>>>> >>
+>>>> >> I tried watchdog, but watchdog can only reset the board. I still can't
+>>>> >> get any info.
+>>>> >>
+>>>> >> The hard lockup is possibly because kernel blocked/looped with
+>>>> >> interrupts disabled.
+>>>> >>
+>>>> >> Is there any non-maskable interrupt I can use to dump the kernel stack?
+>>>> >> Or any other hint?
+>>>> > Try enabling various debug options. The following come to (my) mind:
+>>>> >
+>>>> > CONFIG_DETECT_HUNG_TASK
+>>>> > CONFIG_PROVE_LOCKING
+>>>> > CONFIG_DEBUG_ATOMIC_SLEEP
+>>>> > CONFIG_MAGIC_SYSRQ
+>>>>
+>>>> These debug options are already enabled.
+>>>> But it doesn't help.
+>>> then if you don't have a hardware debugger handy you can try
+>>>
+>>>         https://lkml.org/lkml/2012/5/26/83
+>>
+>> Will try pstore and PostMortem.
+>>
+> If the hang is after bootup, pstore is a better option. If the hang is
+> consistent and during boot, dumping __log_buf is the only option.
 
- arch/arm/kernel/head.o: In function 'stext':
- arch/arm/kernel/head.S:146: undefined reference to 'PHYS_OFFSET'
+It's after bootup.
 
-Momentarily leave the #ifndef __ASSEMBLY__ section so we can
-define PHYS_OFFSET for all compilation units.
+After running about 1 day, the system is hard lockup.
+That's possibly because kernel blocked/looped with interrupts
+disabled(local_irq_disable).
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+So soft lockup detector won't help because timer interrupt(and all
+other maskable interrupts) was disabled.
+And unfortunately, armv5 seems don't support hard lockup detector.
+Hard lockup detector needs non-maskable interrupt.
 
-I don't know if it's worth stable, seems that nobody has compiled XIP for
-a year (back to 2.6.39 days?).
+I'm going to try pstore to get the last function call when hard lockup happens.
 
- arch/arm/include/asm/memory.h | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index fcb5757..3299b2d 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -187,6 +187,7 @@ static inline unsigned long __phys_to_virt(unsigned long x)
- #define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
- #endif
- #endif
-+#endif /* __ASSEMBLY__ */
- 
- #ifndef PHYS_OFFSET
- #ifdef PLAT_PHYS_OFFSET
-@@ -196,6 +197,8 @@ static inline unsigned long __phys_to_virt(unsigned long x)
- #endif
- #endif
- 
-+#ifndef __ASSEMBLY__
-+
- /*
-  * PFNs are used to describe any physical page; this means
-  * PFN 0 == physical address 0.
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thanks,
+Lin Ming
