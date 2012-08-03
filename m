@@ -1,52 +1,49 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 3 Aug 2012 16:21:39 +0300
-Subject: [PATCH v2 2/2] arm/dts: omap4: Add ocp2scp data
-In-Reply-To: <1342593039-7728-3-git-send-email-kishon@ti.com>
-References: <1342593039-7728-1-git-send-email-kishon@ti.com>
- <1342593039-7728-3-git-send-email-kishon@ti.com>
-Message-ID: <20120803132137.GB8269@arwen.pp.htv.fi>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 03 Aug 2012 15:26:31 +0200
+Subject: [PATCH 1/4] arm: plat-orion: introduce PLAT_ORION_LEGACY hidden
+ config option
+In-Reply-To: <1343999430-31816-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1343999430-31816-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1343999430-31816-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <501BD187.70901@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2012 at 12:00:39PM +0530, Kishon Vijay Abraham I wrote:
-> Add ocp2scp data node in omap4 device tree file.
+On 08/03/2012 03:10 PM, Thomas Petazzoni wrote:
+> Until now, the PLAT_ORION configuration option was common to all the
+> Marvell EBU SoCs, and selecting this option had the effect of enabling
+> the MPP code, GPIO code, address decoding and PCIe code from
+> plat-orion, as well as providing access to driver-specific header
+> files from plat-orion/include.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> However, the Armada 370 and XP SoCs will not use the MPP and GPIO code
+> (instead some proper pinctrl and gpio drivers are in preparation), and
+> generally, we want to move away from plat-orion and instead have
+> everything in mach-mvebu.
+> 
+> That said, in the mean time, we want to leverage the driver-specific
+> headers as well as the address decoding code, so we introduce
+> PLAT_ORION_LEGACY. The older Marvell SoCs need to select
+> PLAT_ORION_LEGACY, while the newer Marvell SoCs need to select
+> PLAT_ORION. Of course, when PLAT_ORION_LEGACY is selected, it
+> automatically selects PLAT_ORION.
+> 
+> Then, with just PLAT_ORION, you have the address decoding code plus
+> the driver-specific headers. If you add PLAT_ORION_LEGACY to this, you
+> gain the old MPP, GPIO and PCIe code.
+> 
+> Again, this is only a temporary solution until we make all Marvell EBU
+> platforms converge into the mach-mvebu directory. This solution avoids
+> duplicating the existing address decoding code into mach-mvebu.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-> ---
->  arch/arm/boot/dts/omap4.dtsi |    8 ++++++++
->  1 files changed, 8 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> index 359c497..29c6243 100644
-> --- a/arch/arm/boot/dts/omap4.dtsi
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -272,5 +272,13 @@
->  			ti,hwmods = "mmc5";
->  			ti,needs-special-reset;
->  		};
-> +
-> +		ocp2scp {
-> +			compatible = "ti,omap-ocp2scp";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +			ti,hwmods = "ocp2scp_usb_phy";
-> +		};
->  	};
->  };
-> -- 
-> 1.7.5.4
-> 
+[...]
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120803/3356c810/attachment.sig>
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
