@@ -1,80 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 3 Aug 2012 15:07:55 +0200
-Subject: [PATCH 2/2] ARM: imx/pcm043: add oftree support
-In-Reply-To: <1343922986-32469-2-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1343922986-32469-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1343922986-32469-2-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20120803130755.GP1451@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri,  3 Aug 2012 15:10:26 +0200
+Subject: arm: mvebu: Add basic address decoding support for Marvell 370/XP
+Message-ID: <1343999430-31816-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 02, 2012 at 05:56:26PM +0200, Uwe Kleine-K?nig wrote:
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm/boot/dts/phytec-pcm043.dtsi |   49 ++++++++++++++++++++++++++++++++++
->  1 file changed, 49 insertions(+)
->  create mode 100644 arch/arm/boot/dts/phytec-pcm043.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/phytec-pcm043.dtsi b/arch/arm/boot/dts/phytec-pcm043.dtsi
-> new file mode 100644
-> index 0000000..420627c
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/phytec-pcm043.dtsi
-> @@ -0,0 +1,49 @@
-> +/include/ "imx35.dtsi"
-> +
-> +/ {
-> +	soc {
-> +		aips at 40000000 { /* AIPS1 */
-> +			i2c at 43f80000 {
-> +				status = "okay";
-> +
-> +				tempsens at 4a {
-> +					compatible = "maxim,ds75";
-> +					reg = <0x4a>;
-> +				};
-> +				rtc8564 at 51 {
-> +					compatible = "nxp,pcf8563";
-> +					reg = <0x51>;
-> +				};
-> +				at24 at 52 {
-> +					compatible = "at,24c32";
-> +					reg = <0x52>;
-> +					pagesize = <32>;
-> +				};
-> +			};
-> +			uart at 43f90000 {
-> +				status = "okay";
-> +			};
-> +			uart at 43f94000 {
-> +				status = "okay";
-> +			};
-> +		};
-> +		spba at 50000000 {
-> +			uart at 5000c000 {
-> +				status = "okay";
-> +			};
-> +			fec at 50038000 {
-> +				status = "okay";
-> +			};
-> +		};
-> +
-> +		nor at a0000000 {
-> +			compatible = "cfi-flash";
-> +			reg = <0xa0000000 0x2000000>;
-> +			bank-width = <2>;
-> +		};
-> +
-> +		nand at bb000000 {
-> +			status = "okay";
-> +		};
+Andrew, Jason, Gr?gory,
 
-Enable hardware ECC?
+Here is a small patch set that introduces basic support for address
+decoding on Armada 370 and Armada XP. The aim of this basic support is
+essentially to be able to configure a window to remap the BootROM,
+which is needed to startup the secondary CPUs for the SMP support.
 
-Sascha
+As we had discussed already, the address decoding configuration is not
+described in the Device Tree, it is for now hardcoded on a per-SoC
+basis. We might later discuss how to extend this to the Device Tree.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+This patch set has four patches:
+
+ (*) First patch introducing PLAT_ORION_LEGACY, which allows the
+     Marvell 370/XP platforms to be part of PLAT_ORION, and therefore
+     re-use the existing address decoding code.
+
+ (*) Second patch making a small change to an address decoding
+     structure so that we can define at runtime the virtual address of
+     the configuration registers. This is needed as on Armada 370/XP
+     the address decoding "controller" is declared in the Device Tree.
+
+ (*) Third patch adding the 370/XP address decoding code itself. For
+     now, it only maps the BootROM on Armada XP.
+
+ (*) Fourth path adding the necessary DT code to instantiate the
+     address decoding "controller".
+
+Thanks,
+
+Thomas Petazzoni
