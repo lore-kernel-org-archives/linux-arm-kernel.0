@@ -1,122 +1,176 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  3 Aug 2012 16:13:54 +0200
-Subject: [PATCH 2/5] arm: plat-orion: introduce PLAT_ORION_LEGACY hidden
- config option
+Date: Fri,  3 Aug 2012 16:13:56 +0200
+Subject: [PATCH 4/5] arm: mvebu: add basic address decoding support to Armada
+ 370/XP
 In-Reply-To: <1344003237-13575-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1344003237-13575-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1344003237-13575-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1344003237-13575-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now, the PLAT_ORION configuration option was common to all the
-Marvell EBU SoCs, and selecting this option had the effect of enabling
-the MPP code, GPIO code, address decoding and PCIe code from
-plat-orion, as well as providing access to driver-specific header
-files from plat-orion/include.
+This commit adds basic support for address decoding configuration for
+the Armada 370 and Armada XP SoCs, re-using the infrastructure
+provided in plat-orion.
 
-However, the Armada 370 and XP SoCs will not use the MPP and GPIO code
-(instead some proper pinctrl and gpio drivers are in preparation), and
-generally, we want to move away from plat-orion and instead have
-everything in mach-mvebu.
-
-That said, in the mean time, we want to leverage the driver-specific
-headers as well as the address decoding code, so we introduce
-PLAT_ORION_LEGACY. The older Marvell SoCs need to select
-PLAT_ORION_LEGACY, while the newer Marvell SoCs need to select
-PLAT_ORION. Of course, when PLAT_ORION_LEGACY is selected, it
-automatically selects PLAT_ORION.
-
-Then, with just PLAT_ORION, you have the address decoding code plus
-the driver-specific headers. If you add PLAT_ORION_LEGACY to this, you
-gain the old MPP, GPIO and PCIe code.
-
-Again, this is only a temporary solution until we make all Marvell EBU
-platforms converge into the mach-mvebu directory. This solution avoids
-duplicating the existing address decoding code into mach-mvebu.
+For now, only a BootROM window is configured on Armada XP, which is
+needed to get the non-boot CPUs started and is therefore a requirement
+for SMP support.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/Kconfig             |   13 +++++++++----
- arch/arm/plat-orion/Makefile |    9 ++++-----
- 2 files changed, 13 insertions(+), 9 deletions(-)
+ arch/arm/mach-mvebu/Makefile   |    2 +-
+ arch/arm/mach-mvebu/addr-map.c |  134 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 135 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-mvebu/addr-map.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 7980873..fc36a93 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -573,6 +573,7 @@ config ARCH_MVEBU
- 	select GENERIC_IRQ_CHIP
- 	select IRQ_DOMAIN
- 	select COMMON_CLK
-+	select PLAT_ORION
- 	help
- 	  Support for the Marvell SoC Family with device tree support
- 
-@@ -583,7 +584,7 @@ config ARCH_DOVE
- 	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_CLOCKEVENTS
- 	select NEED_MACH_IO_H
--	select PLAT_ORION
-+	select PLAT_ORION_LEGACY
- 	help
- 	  Support for the Marvell Dove SoC 88AP510
- 
-@@ -594,7 +595,7 @@ config ARCH_KIRKWOOD
- 	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_CLOCKEVENTS
- 	select NEED_MACH_IO_H
--	select PLAT_ORION
-+	select PLAT_ORION_LEGACY
- 	help
- 	  Support for the following Marvell Kirkwood series SoCs:
- 	  88F6180, 88F6192 and 88F6281.
-@@ -621,7 +622,7 @@ config ARCH_MV78XX0
- 	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_CLOCKEVENTS
- 	select NEED_MACH_IO_H
--	select PLAT_ORION
-+	select PLAT_ORION_LEGACY
- 	help
- 	  Support for the following Marvell MV78xx0 series SoCs:
- 	  MV781x0, MV782x0.
-@@ -634,7 +635,7 @@ config ARCH_ORION5X
- 	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_CLOCKEVENTS
- 	select NEED_MACH_IO_H
--	select PLAT_ORION
-+	select PLAT_ORION_LEGACY
- 	help
- 	  Support for the following Marvell Orion 5x series SoCs:
- 	  Orion-1 (5181), Orion-VoIP (5181L), Orion-NAS (5182),
-@@ -1153,6 +1154,10 @@ config PLAT_ORION
- 	select GENERIC_IRQ_CHIP
- 	select COMMON_CLK
- 
-+config PLAT_ORION_LEGACY
-+	bool
-+	select PLAT_ORION
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index e61d2b8..2143558 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -1,2 +1,2 @@
+ obj-y += system-controller.o
+-obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o
++obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o
+diff --git a/arch/arm/mach-mvebu/addr-map.c b/arch/arm/mach-mvebu/addr-map.c
+new file mode 100644
+index 0000000..4a371a3
+--- /dev/null
++++ b/arch/arm/mach-mvebu/addr-map.c
+@@ -0,0 +1,134 @@
++/*
++ * Address map functions for Marvell 370 / XP SoCs
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
- config PLAT_PXA
- 	bool
- 
-diff --git a/arch/arm/plat-orion/Makefile b/arch/arm/plat-orion/Makefile
-index c20ce0f..1251e5b 100644
---- a/arch/arm/plat-orion/Makefile
-+++ b/arch/arm/plat-orion/Makefile
-@@ -2,9 +2,8 @@
- # Makefile for the linux kernel.
- #
- 
--obj-y	:= irq.o pcie.o time.o common.o mpp.o addr-map.o
--obj-m	:=
--obj-n	:=
--obj-	:=
-+obj-y                             += addr-map.o
- 
--obj-$(CONFIG_GENERIC_GPIO) += gpio.o
-+orion-gpio-$(CONFIG_GENERIC_GPIO) += gpio.o
-+obj-$(CONFIG_PLAT_ORION_LEGACY)   += irq.o pcie.o time.o common.o mpp.o
-+obj-$(CONFIG_PLAT_ORION_LEGACY)   += $(orion-gpio-y)
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/mbus.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <plat/addr-map.h>
++
++/*
++ * Generic Address Decode Windows bit settings
++ */
++#define ARMADA_XP_TARGET_DEV_BUS	1
++#define   ARMADA_XP_ATTR_DEV_BOOTROM    0x1D
++#define ARMADA_XP_TARGET_ETH1		3
++#define ARMADA_XP_TARGET_PCIE_0_2	4
++#define ARMADA_XP_TARGET_ETH0		7
++#define ARMADA_XP_TARGET_PCIE_1_3	8
++
++#define ARMADA_370_TARGET_DEV_BUS       1
++#define   ARMADA_370_ATTR_DEV_BOOTROM   0x1D
++#define ARMADA_370_TARGET_PCIE_0        4
++#define ARMADA_370_TARGET_PCIE_1        8
++
++#define ARMADA_WINDOW_8_PLUS_OFFSET       0x90
++#define ARMADA_SDRAM_ADDR_DECODING_OFFSET 0x180
++
++static const struct __initdata orion_addr_map_info
++armada_xp_addr_map_info[] = {
++	/*
++	 * Window for the BootROM, needed for SMP on Armada XP
++	 */
++	{ 0, 0xfff00000, SZ_1M, ARMADA_XP_TARGET_DEV_BUS,
++	  ARMADA_XP_ATTR_DEV_BOOTROM, -1 },
++	/* End marker */
++	{ -1, 0, 0, 0, 0, 0 },
++};
++
++static const struct __initdata orion_addr_map_info
++armada_370_addr_map_info[] = {
++	/* End marker */
++	{ -1, 0, 0, 0, 0, 0 },
++};
++
++static struct of_device_id of_addr_decoding_controller_table[] = {
++	{ .compatible = "marvell,armada-addr-decoding-controller" },
++	{ /* end of list */ },
++};
++
++static void __iomem *
++armada_cfg_base(const struct orion_addr_map_cfg *cfg, int win)
++{
++	unsigned int offset;
++
++	/* The register layout is a bit annoying and the below code
++	 * tries to cope with it.
++	 * - At offset 0x0, there are the registers for the first 8
++	 *   windows, with 4 registers of 32 bits per window (ctrl,
++	 *   base, remap low, remap high)
++	 * - Then at offset 0x80, there is a hole of 0x10 bytes for
++	 *   the internal registers base address and internal units
++	 *   sync barrier register.
++	 * - Then at offset 0x90, there the registers for 12
++	 *   windows, with only 2 registers of 32 bits per window
++	 *   (ctrl, base).
++	 */
++	if (win < 8)
++		offset = (win << 4);
++	else
++		offset = ARMADA_WINDOW_8_PLUS_OFFSET + (win << 3);
++
++	return (void __iomem *)(cfg->bridge_virt_base + offset);
++}
++
++static struct __initdata orion_addr_map_cfg addr_map_cfg = {
++	.num_wins = 20,
++	.remappable_wins = 8,
++	.win_cfg_base = armada_cfg_base,
++};
++
++static int __init armada_setup_cpu_mbus(void)
++{
++	struct device_node *np;
++	void __iomem *mbus_unit_addr_decoding_base;
++	void __iomem *sdram_addr_decoding_base;
++
++	np = of_find_matching_node(NULL, of_addr_decoding_controller_table);
++	if (!np)
++		return -ENODEV;
++
++	mbus_unit_addr_decoding_base = of_iomap(np, 0);
++	BUG_ON(!mbus_unit_addr_decoding_base);
++
++	sdram_addr_decoding_base =
++		mbus_unit_addr_decoding_base +
++		ARMADA_SDRAM_ADDR_DECODING_OFFSET;
++
++	addr_map_cfg.bridge_virt_base = mbus_unit_addr_decoding_base;
++
++	/*
++	 * Disable, clear and configure windows.
++	 */
++	if (of_machine_is_compatible("marvell,armadaxp"))
++		orion_config_wins(&addr_map_cfg, armada_xp_addr_map_info);
++	else if (of_machine_is_compatible("marvell,armada370"))
++		orion_config_wins(&addr_map_cfg, armada_370_addr_map_info);
++	else {
++		pr_err("Unsupported SoC\n");
++		return -EINVAL;
++	}
++
++	/*
++	 * Setup MBUS dram target info.
++	 */
++	orion_setup_cpu_mbus_target(&addr_map_cfg,
++				    sdram_addr_decoding_base);
++	return 0;
++}
++
++/* Using a early_initcall is needed so that this initialization gets
++ * done before the SMP initialization, which requires the BootROM to
++ * be remapped. */
++early_initcall(armada_setup_cpu_mbus);
 -- 
 1.7.9.5
