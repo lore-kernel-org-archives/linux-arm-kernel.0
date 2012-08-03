@@ -1,44 +1,49 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 03 Aug 2012 21:22:19 +0400
-Subject: [PATCH 1/4] arm/dts: omap5-evm: Add I2C support
-In-Reply-To: <1343997486-710-2-git-send-email-sourav.poddar@ti.com>
-References: <1343997486-710-1-git-send-email-sourav.poddar@ti.com>
- <1343997486-710-2-git-send-email-sourav.poddar@ti.com>
-Message-ID: <501C08CB.3060701@mvista.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Aug 2012 18:40:16 +0100
+Subject: [PATCH] MXS: Fix mxs_defconfig MMAP_MIN_ADDR
+In-Reply-To: <CAOMZO5AzaDcxJJV+Z-bHH58=xRq5RY6BanEjMd4uUhN+K9ZNZQ@mail.gmail.com>
+References: <1344009354-13249-1-git-send-email-marex@denx.de>
+ <CAOMZO5DZui3x554WcHsseSfXDgYeaq1va-QzVy1CQajE3M3=kQ@mail.gmail.com>
+ <CAOMZO5AzaDcxJJV+Z-bHH58=xRq5RY6BanEjMd4uUhN+K9ZNZQ@mail.gmail.com>
+Message-ID: <20120803174016.GE10335@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Aug 03, 2012 at 01:54:07PM -0300, Fabio Estevam wrote:
+> On Fri, Aug 3, 2012 at 1:46 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> > Marek,
+> >
+> > On Fri, Aug 3, 2012 at 12:55 PM, Marek Vasut <marex@denx.de> wrote:
+> >> Initially reported by Detlev Zundel <dzu@denx.de>, this caused breakage
+> >> when "su - testuser" was called. "testuser" being a regular user account,
+> >> the command ended with SIGKILL.
+> >>
+> >> Signed-off-by: Marek Vasut <marex@denx.de>
+> >> Cc: Russell King <linux@arm.linux.org.uk>
+> >> Cc: Shawn Guo <shawn.guo@linaro.org>
+> >> Cc: Wolfgang Denk <wd@denx.de>
+> >> ---
+> >>  arch/arm/configs/mxs_defconfig |    2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+> >> index ccdb635..f212802 100644
+> >> --- a/arch/arm/configs/mxs_defconfig
+> >> +++ b/arch/arm/configs/mxs_defconfig
+> >> @@ -34,7 +34,7 @@ CONFIG_NO_HZ=y
+> >>  CONFIG_HIGH_RES_TIMERS=y
+> >>  CONFIG_PREEMPT_VOLUNTARY=y
+> >>  CONFIG_AEABI=y
+> >> -CONFIG_DEFAULT_MMAP_MIN_ADDR=65536
+> >> +CONFIG_DEFAULT_MMAP_MIN_ADDR=32768
+> >
+> > No need to set it to 32768.
+> >
+> > If you just remove the 'CONFIG_DEFAULT_MMAP_MIN_ADDR=65536' then this
+> > symbol will be 32768.
+> 
+> Sorry, ignore what I said. I just realized that the default is 4096.
 
-On 08/03/2012 04:38 PM, Sourav Poddar wrote:
-
-> Add I2C data node in omap5 device tree file.
-
-> Tested on omap5430 sdp.
-
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> ---
->  arch/arm/boot/dts/omap5.dtsi |   35 +++++++++++++++++++++++++++++++++++
->  1 files changed, 35 insertions(+), 0 deletions(-)
-
-> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> index 57e5270..6b68dfe 100644
-> --- a/arch/arm/boot/dts/omap5.dtsi
-> +++ b/arch/arm/boot/dts/omap5.dtsi
-> @@ -145,6 +145,41 @@
->  			#interrupt-cells = <1>;
->  		};
->  
-> +		i2c1: i2c at 48070000 {
-> +			compatible = "ti,omap4-i2c";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			ti,hwmods = "i2c1";
-
-   Address postfix in the node name and no "reg" property?
-
-WBR, Sergei
+4096 is also fine for ARM too.  There's not much point in having
+defconfigs change it - that would just be pure noise in the config
+files.
