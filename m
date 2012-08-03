@@ -1,34 +1,32 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri,  3 Aug 2012 17:55:54 +0200
-Subject: [PATCH] MXS: Fix mxs_defconfig MMAP_MIN_ADDR
-Message-ID: <1344009354-13249-1-git-send-email-marex@denx.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 03 Aug 2012 18:27:41 +0200
+Subject: [PATCH] SPI: MXS: Allow to pass the SPI master bus number from
+ the device tree
+In-Reply-To: <20120803144326.GE23791@S2101-09.ap.freescale.net>
+References: <1343076052-27312-1-git-send-email-marex@denx.de>
+ <1344004239-22868-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20120803144326.GE23791@S2101-09.ap.freescale.net>
+Message-ID: <501BFBFD.7060002@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initially reported by Detlev Zundel <dzu@denx.de>, this caused breakage
-when "su - testuser" was called. "testuser" being a regular user account,
-the command ended with SIGKILL.
+Le 03/08/2012 16:43, Shawn Guo a ?crit :
+> On Fri, Aug 03, 2012 at 04:30:39PM +0200, Maxime Ripard wrote:
+>> If you don't do it, the bus number will be a bogus value, possibly used
+>> for device file names in drivers like spidev.
+>>
+> Do you see any problem with that?  Here is the take from Grant.
+> 
+> http://thread.gmane.org/gmane.linux.kernel.spi.devel/9839/focus=9863
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Wolfgang Denk <wd@denx.de>
----
- arch/arm/configs/mxs_defconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Ok, I didn't see this thread, obviously.
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index ccdb635..f212802 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -34,7 +34,7 @@ CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_PREEMPT_VOLUNTARY=y
- CONFIG_AEABI=y
--CONFIG_DEFAULT_MMAP_MIN_ADDR=65536
-+CONFIG_DEFAULT_MMAP_MIN_ADDR=32768
- CONFIG_AUTO_ZRELADDR=y
- CONFIG_FPE_NWFPE=y
- CONFIG_NET=y
+Thanks,
+Maxime
+
+
 -- 
-1.7.10.4
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
