@@ -1,88 +1,82 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 3 Aug 2012 22:15:15 +0800
-Subject: [PATCH 2/2] ARM: imx/pcm043: add oftree support
-In-Reply-To: <1343922986-32469-2-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1343922986-32469-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1343922986-32469-2-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20120803141512.GC23791@S2101-09.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 3 Aug 2012 16:17:33 +0200
+Subject: [PATCH 2/2 v2] i.MX27: Visstrim_M10: Add support for
+ deinterlacing driver.
+In-Reply-To: <1342092929-31590-2-git-send-email-javier.martin@vista-silicon.com>
+References: <1342092929-31590-1-git-send-email-javier.martin@vista-silicon.com>
+ <1342092929-31590-2-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <20120803141733.GW1451@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 02, 2012 at 05:56:26PM +0200, Uwe Kleine-K?nig wrote:
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On Thu, Jul 12, 2012 at 01:35:29PM +0200, Javier Martin wrote:
+> Visstrim_M10 have a tvp5150 whose video output must be deinterlaced.
+> The new mem2mem deinterlacing driver is very useful for that purpose.
+> 
+> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 > ---
->  arch/arm/boot/dts/phytec-pcm043.dtsi |   49 ++++++++++++++++++++++++++++++++++
->  1 file changed, 49 insertions(+)
->  create mode 100644 arch/arm/boot/dts/phytec-pcm043.dtsi
+> Changes since v1:
+>  - Removed commented out code.
 > 
-> diff --git a/arch/arm/boot/dts/phytec-pcm043.dtsi b/arch/arm/boot/dts/phytec-pcm043.dtsi
-> new file mode 100644
-> index 0000000..420627c
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/phytec-pcm043.dtsi
-> @@ -0,0 +1,49 @@
-> +/include/ "imx35.dtsi"
-> +
-> +/ {
-> +	soc {
-> +		aips at 40000000 { /* AIPS1 */
-> +			i2c at 43f80000 {
-> +				status = "okay";
-> +
-> +				tempsens at 4a {
-> +					compatible = "maxim,ds75";
-> +					reg = <0x4a>;
-> +				};
-
-Again, please put a new line between nodes.
-
-> +				rtc8564 at 51 {
-> +					compatible = "nxp,pcf8563";
-> +					reg = <0x51>;
-> +				};
-> +				at24 at 52 {
-> +					compatible = "at,24c32";
-> +					reg = <0x52>;
-> +					pagesize = <32>;
-> +				};
-> +			};
-> +			uart at 43f90000 {
-> +				status = "okay";
-> +			};
-> +			uart at 43f94000 {
-> +				status = "okay";
-> +			};
-> +		};
-> +		spba at 50000000 {
-> +			uart at 5000c000 {
-> +				status = "okay";
-> +			};
-> +			fec at 50038000 {
-> +				status = "okay";
-> +			};
-> +		};
-> +
-> +		nor at a0000000 {
-> +			compatible = "cfi-flash";
-> +			reg = <0xa0000000 0x2000000>;
-> +			bank-width = <2>;
-> +		};
-> +
-We should be able to see how this device is connected to SoC with this
-node under proper interface and bus topology.
-
-> +		nand at bb000000 {
-> +			status = "okay";
-> +		};
-
-Ditto.
-
-> +	};
+> ---
+>  arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   27 ++++++++++++++++++++++++++-
+>  1 file changed, 26 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> index 214e4ff..dbef59d 100644
+> --- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> +++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+> @@ -232,7 +232,7 @@ static void __init visstrim_camera_init(void)
+>  static void __init visstrim_reserve(void)
+>  {
+>  	/* reserve 4 MiB for mx2-camera */
+> -	mx2_camera_base = arm_memblock_steal(2 * MX2_CAMERA_BUF_SIZE,
+> +	mx2_camera_base = arm_memblock_steal(3 * MX2_CAMERA_BUF_SIZE,
+>  			MX2_CAMERA_BUF_SIZE);
+>  }
+>  
+> @@ -419,6 +419,30 @@ static void __init visstrim_coda_init(void)
+>  		return;
+>  }
+>  
+> +/* DMA deinterlace */
+> +static struct platform_device visstrim_deinterlace = {
+> +	.name = "m2m-deinterlace",
+> +	.id = 0,
 > +};
-> -- 
-> 1.7.10.4
-> 
+> +
+> +static void __init visstrim_deinterlace_init(void)
+> +{
+> +	int ret = -ENOMEM;
+> +	struct platform_device *pdev = &visstrim_deinterlace;
+> +	int dma;
+> +
+> +	ret = platform_device_register(pdev);
+
+ret is unused.
+
+Better use platform_device_register_simple().
+
+> +
+> +	dma = dma_declare_coherent_memory(&pdev->dev,
+> +					  mx2_camera_base + 2 * MX2_CAMERA_BUF_SIZE,
+> +					  mx2_camera_base + 2 * MX2_CAMERA_BUF_SIZE,
+> +					  MX2_CAMERA_BUF_SIZE,
+> +					  DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
+
+Shouldn't this be done before registering the device?
+
+> +	if (!(dma & DMA_MEMORY_MAP))
+> +		return;
+> +}
+
+if (!flag) return; else return ?
+
+Sascha
+
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
