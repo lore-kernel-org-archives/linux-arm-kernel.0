@@ -1,68 +1,23 @@
-From: vikram.pandita@ti.com (Pandita, Vikram)
-Date: Fri, 3 Aug 2012 09:46:15 -0700
-Subject: [PATCH v2] printk: add option to print cpu id
-In-Reply-To: <20120803104212.GA6936@x1.osrc.amd.com>
-References: <1343985378-22330-1-git-send-email-vikram.pandita@ti.com>
- <D958900912E20642BCBC71664EFECE3E6DDCAC49AB@BGMAIL02.nvidia.com>
- <D958900912E20642BCBC71664EFECE3E6DDCAC49AE@BGMAIL02.nvidia.com>
- <CAFm5wm2Z+FyVqG5oMWiEmZ8Je88hJ-cyDXmJw0wp4mqA-X9eYg@mail.gmail.com>
- <CAPXgP13UBwQLs+m_aSk3Ljbktz8WrL+ZO_Tfhrt_+tRBCARyQQ@mail.gmail.com>
- <CAFm5wm0nf47bcTu7iiXA3geR_5dDTF1tnf81Lz7JzbWkKdhUtA@mail.gmail.com>
- <CAPXgP11A=QfOt4SL2GvhsepP8JiDFfdaAhi6-AhW++-AvOz+aw@mail.gmail.com>
- <20120803104212.GA6936@x1.osrc.amd.com>
-Message-ID: <CAFm5wm0rsvuBafMH+9PpKwfaBimbRrVzxYV0nD_pg1yisAYwxQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 3 Aug 2012 13:48:12 -0300
+Subject: [PATCH] MXS: Fix mxs_defconfig MMAP_MIN_ADDR
+In-Reply-To: <CAOMZO5DZui3x554WcHsseSfXDgYeaq1va-QzVy1CQajE3M3=kQ@mail.gmail.com>
+References: <1344009354-13249-1-git-send-email-marex@denx.de>
+ <CAOMZO5DZui3x554WcHsseSfXDgYeaq1va-QzVy1CQajE3M3=kQ@mail.gmail.com>
+Message-ID: <CAOMZO5Cg_YvJSCdnxWkW3K5Wk=o0DLa9kefgeeuQYpRWVMCPkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Borislav/Kay
+On Fri, Aug 3, 2012 at 1:46 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> Marek,
+>
+> On Fri, Aug 3, 2012 at 12:55 PM, Marek Vasut <marex@denx.de> wrote:
+>> Initially reported by Detlev Zundel <dzu@denx.de>, this caused breakage
+>> when "su - testuser" was called. "testuser" being a regular user account,
+>> the command ended with SIGKILL.
 
-On Fri, Aug 3, 2012 at 3:42 AM, Borislav Petkov <bp@alien8.de> wrote:
->
-> On Fri, Aug 03, 2012 at 12:09:15PM +0200, Kay Sievers wrote:
-> > That would be needed, I guess. We easily have server systems with more
-> > than 255 CPUs. It will only be a matter of time, that the number of
-> > CPUs will increase for everybody, I guess.
->
-> Actually, AFAICR, we already have SGI machines booting Linux on 4K cpus.
-> Now.
->
-> > > b) to put cpuid in struct cont and struct log - under the #ifdef
-> > > macro?
-> >
-> > As said, I really can't tell how generally useful it is, and if people
-> > think that it should be there unconditionally, should not be there at
-> > all, or as a compile time option. Others might have an opinion on
-> > that.
-> >
-> > I personally never missed the CPU-ID in the logs. I personally would
-> > find the PID/task ID more interesting, and even that I never really
-> > missed. :)
+Also, please point to the commit that introduced such breakage.
 
-I mostly work with ARM Soc - specifically on OMAP.
-SMP multi core systems in ARM-v7 world started to show up only few
-years back - unlike x86 world.
+Thanks,
 
-ARM systems are a bit unique when it comes to security( read trust
-zone ), and handling of FIQ's.
-Most of the ARM cortex-A series SoC's out there have some kind of
-affinity to CPU0 being the master.
-One use case has been, it has helped to know with this printk logging,
-if such constraints are honored.
-
-Sometimes, tracking of some lockup cases between cpu's because of bad
-code has also been helpful with this logging support.
-For now i will post v3 of the patch and add arm-list and linux-omap
-list, and there might be users there can benefit.
-
->
-> And even then you can add debugging code to dump the stuff you need.
->
-> And I have to agree with Kai here, having the cpu number in dmesg is
-> not something I'd wish for - printk timestampts OTOH has at least some
-> usecases.
->
-> Thanks.
->
-> --
-> Regards/Gruss,
-> Boris.
+Fabio Estevam
