@@ -1,28 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Aug 2012 16:43:55 +0100
-Subject: MMAP_MIN_ADDR problem/question
-In-Reply-To: <201208020939.50225.marek.vasut@gmail.com>
-References: <201208020939.50225.marek.vasut@gmail.com>
-Message-ID: <20120803154355.GA6802@n2100.arm.linux.org.uk>
+From: omar.luna@linaro.org (Omar Ramirez Luna)
+Date: Fri, 3 Aug 2012 10:52:09 -0500
+Subject: [PATCH 2/3] ARM: OMAP: hwmod: revise deassert sequence
+In-Reply-To: <501B609F.9030403@ti.com>
+References: <1342466485-1050-1-git-send-email-omar.luna@linaro.org>
+ <1342466485-1050-3-git-send-email-omar.luna@linaro.org>
+ <alpine.DEB.2.00.1208020150240.4177@utopia.booyaka.com>
+ <CALLhW=6-b+kjfG-u3+uXiD64UwoNEdufjJKu0Mx-sGWp6n9csg@mail.gmail.com>
+ <501B609F.9030403@ti.com>
+Message-ID: <CALLhW=7yJTq_cfB=KGY5VT8fNO1u_hrY118ysihFuQA+gVFRuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 02, 2012 at 09:39:50AM +0200, Marek Vasut wrote:
-> Hi guys,
-> 
-> Me and a coleague of mine recently ran into the issue [1]. The problem is, that 
-> I set mmap_min_addr to 65536, making it unable for "su - user" command to work, 
-> it crashes with SIGKILL. I now at least see a solution (set it to 32768). Though 
-> I don't understand why. Can someone please exaplain me why it has to be 32768 an 
-> not more?
-> 
-> [1] http://ubuntu.5.n6.nabble.com/PATCH-DEFAULT-MMAP-MIN-ADDR-32768-for-arm-
-> td1604723.html
+On 3 August 2012 00:24, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
+> On 8/3/2012 3:50 AM, Omar Ramirez Luna wrote:
+>> So in _enable:
+>>
+>>         _enable_clocks(oh);
+>>         if (soc_ops.enable_module)
+>>                 soc_ops.enable_module(oh);
+>>
+>> The enable_module part seems redundant to me, since the module should
+>> be already enabled by the first call to _enable_clocks.
+>
+> Yes they do same thing, I believe the plan is to get rid of all clock
+> leaf-nodes in the near future, and let hwmod handle module
+> enable/disable part.
 
-Looks to me like there's a reading exercise for someone in the MXS
-community who set the default to 64K.  The default in the Kconfig is
-already appropriately chosen, so for the defconfig to have the 64K
-value, someone must have _intentionally_ changed it without thinking
-about what they were doing.
+If this is the case then an enable_module call is needed in my patch
+for when these changes are made. The original works fine but only
+because currently clock framework does what enable_module is doing.
 
-Just produce a patch to fix the defconfig.
+Paul,
+
+Please let me know if you want me to resend with this change.
+
+Regards,
+
+Omar
