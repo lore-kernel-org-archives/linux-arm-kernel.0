@@ -1,49 +1,70 @@
-From: vikram.pandita@ti.com (Pandita, Vikram)
-Date: Fri, 3 Aug 2012 11:25:37 -0700
-Subject: [PATCH v3] printk: add option to print cpu id
-In-Reply-To: <m2628z6euk.fsf@firstfloor.org>
-References: <1344013004-32211-1-git-send-email-vikram.pandita@ti.com>
- <m2628z6euk.fsf@firstfloor.org>
-Message-ID: <CAFm5wm3ScpUU5wa=ei3TY0zjU4kVbOgJMmE5_QDpwy7B-TJa+A@mail.gmail.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Sat, 4 Aug 2012 00:02:36 +0530
+Subject: [PATCH] ARM: dt: tegra: paz00: add regulators
+In-Reply-To: <1343932593-999-1-git-send-email-swarren@wwwdotorg.org>
+References: <1343932593-999-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <501C1944.4030505@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 3, 2012 at 10:54 AM, Andi Kleen <andi@firstfloor.org> wrote:
-> Vikram Pandita <vikram.pandita@ti.com> writes:
+On Friday 03 August 2012 12:06 AM, Stephen Warren wrote:
+> From: Stephen Warren<swarren@nvidia.com>
 >
->> From: Vikram Pandita <vikram.pandita@ti.com>
->>
->> Introduce config option to enable CPU id reporting for printk() calls.
+> The Toshiba AC100/PAZ00 uses a TPS6586x regulator. Instantiate this.
 >
-> What's wrong with using trace_printk for this?
-
-trace_printk works only when you know the _exact_ path in code that
-you want to profile.
-When you have no idea of a random lockup, then it would be kind of
-touch and time consuming
-to put trace prints all around the code.
-
-> That's much faster
-> anyways. Generally printk is so slow that it's typically useless for
-> instrumenting races.
+> Three data sources were used for the data encoded here:
+> * The HW defaults, as extracted from real HW.
+> * The schematic, which specifies a voltage for each rail in the signal
+>    names.
+> * The AC100 kernel used by the Ubuntu port:
 >
+>    repo git://gitorious.org/~marvin24/ac100/marvin24s-kernel.git
+>    branch chromeos-ac100-3.0
+>    file arch/arm/mach-tegra/board-paz00-power.c
+>
+>    For many rails, the constraints in that tree specified differing min
+>    and max voltages. In all cases, the min value was ignored, since
+>    there's no need currently to vary any of the voltages at run-time.
+>    DVFS might change this in the future.
+>
+> In most cases these sources all matched. Differences are:
+>
+> sm0: HW defaults and schematic match at 1.2v. marvin24's kernel had a max
+> of 1.3v, but this higher voltage was only applied to HW by DVFS code,
+> which isn't currently supported in mainline.
+>
+> sm1: HW defaults and schematic match at 1.0v. marvin24's kernel had a max
+> of 1.125v, but this higher voltage was only applied to HW by DVFS code,
+> which isn't currently supported in mainline.
+>
+> ldo3: The HW default is on. marvin24's kernel didn't specify always-on,
+> but since the board wasn't marked as having fully constrained regulators,
+> the rail was not turned off, so the difference had no effect. The rail
+> is needed for USB.
+>
+> ldo6: The HW default is 2.85v. The schematics indicate 2.85v. However,
+> since this regulator is used for the same purpose as on other boards that
+> require 1.8v, this is set to 1.8v. Note that this regulator feeds the CRT
+> VDAC on Tegra, and so in practice is unlikely to be used, even though it
+> is actaully hooked up in HW.
+>
+> Portions based on work by Laxman Dewangan<ldewangan@nvidia.com>
+>
+> Signed-off-by: Stephen Warren<swarren@nvidia.com>
+> Tested-by: Marc Dietrich<marvin24@gmx.de>  # v2
+> ---
 
-As stated in another thread, its found useful to debug some specific cases:
-Check thread: http://marc.info/?l=linux-omap&m=134401269106619&w=2
+Acked-by: Laxman Dewangan <ldewangan@nvidia.com>
 
-> And really: Wasting 1/3 of the 80 character line is too much.
 
-You _WASTE_ 4 chars only if you are interested in this info by
-enabling: CONFIG_PRINTK_CPUID
-Just like you _WASTE_ 15 chars when you enable existing: CONFIG_PRINTK_TIME
-
-For general usecase, recommendation would be to keep these options disabled.
-Working on shipping products, i find almost all shipping with
-CONFIG_PRINTK_TIME enabled, so there must be some value.
-Same would hold for the use case being debugged for CPUID enabling.
 
 >
-> -Andi
->
-> --
-> ak at linux.intel.com -- Speaking for myself only
+> +	regulators {
+> +		compatible = "simple-bus";
+> +		#address-cells =<1>;
+> +		#size-cells =<0>;
+> +
+
+Is "simple-bus" accepted?
+Accordingly I need to update for the Cardhu  also to have regulator 
+support which I am going to send.
