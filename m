@@ -1,73 +1,80 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Fri, 3 Aug 2012 18:36:04 +0530
-Subject: [PATCH 3/4] arm/dts: omap5-evm: Add keypad data
-In-Reply-To: <D32DBB77-844C-400A-9E3F-3F779431D1C7@dominion.thruhere.net>
-References: <1343997486-710-1-git-send-email-sourav.poddar@ti.com>
- <1343997486-710-4-git-send-email-sourav.poddar@ti.com>
- <D32DBB77-844C-400A-9E3F-3F779431D1C7@dominion.thruhere.net>
-Message-ID: <CAKdam54HpC33Bk8gDjRRcB+9=O8Dh4UAKhY4mpHBdvk_uEj9uQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 3 Aug 2012 15:07:55 +0200
+Subject: [PATCH 2/2] ARM: imx/pcm043: add oftree support
+In-Reply-To: <1343922986-32469-2-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1343922986-32469-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1343922986-32469-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20120803130755.GP1451@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Aug 02, 2012 at 05:56:26PM +0200, Uwe Kleine-K?nig wrote:
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/phytec-pcm043.dtsi |   49 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 49 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/phytec-pcm043.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/phytec-pcm043.dtsi b/arch/arm/boot/dts/phytec-pcm043.dtsi
+> new file mode 100644
+> index 0000000..420627c
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/phytec-pcm043.dtsi
+> @@ -0,0 +1,49 @@
+> +/include/ "imx35.dtsi"
+> +
+> +/ {
+> +	soc {
+> +		aips at 40000000 { /* AIPS1 */
+> +			i2c at 43f80000 {
+> +				status = "okay";
+> +
+> +				tempsens at 4a {
+> +					compatible = "maxim,ds75";
+> +					reg = <0x4a>;
+> +				};
+> +				rtc8564 at 51 {
+> +					compatible = "nxp,pcf8563";
+> +					reg = <0x51>;
+> +				};
+> +				at24 at 52 {
+> +					compatible = "at,24c32";
+> +					reg = <0x52>;
+> +					pagesize = <32>;
+> +				};
+> +			};
+> +			uart at 43f90000 {
+> +				status = "okay";
+> +			};
+> +			uart at 43f94000 {
+> +				status = "okay";
+> +			};
+> +		};
+> +		spba at 50000000 {
+> +			uart at 5000c000 {
+> +				status = "okay";
+> +			};
+> +			fec at 50038000 {
+> +				status = "okay";
+> +			};
+> +		};
+> +
+> +		nor at a0000000 {
+> +			compatible = "cfi-flash";
+> +			reg = <0xa0000000 0x2000000>;
+> +			bank-width = <2>;
+> +		};
+> +
+> +		nand at bb000000 {
+> +			status = "okay";
+> +		};
 
-On Fri, Aug 3, 2012 at 6:20 PM, Koen Kooi <koen@dominion.thruhere.net> wrote:
->
-> Op 3 aug. 2012, om 14:38 heeft Sourav Poddar <sourav.poddar@ti.com> het volgende geschreven:
->
->> Add keypad data node in omap5 device tree file.
->> Also fill the device tree binding parameters
->> with the required value in "omap5-evm" dts file.
->>
->> Tested on omap5430 evm with 3.5 custom kernel.
->>
->> Cc: Benoit Cousson <b-cousson@ti.com>
->> Cc: Felipe Balbi <balbi@ti.com>
->> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Acked-by: Felipe Balbi <balbi@ti.com>
->> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
->> ---
->> arch/arm/boot/dts/omap5-evm.dts |   12 ++++++++++++
->> arch/arm/boot/dts/omap5.dtsi    |    5 +++++
->> 2 files changed, 17 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
->> index 45a8aeb..09fe941 100644
->> --- a/arch/arm/boot/dts/omap5-evm.dts
->> +++ b/arch/arm/boot/dts/omap5-evm.dts
->> @@ -17,6 +17,18 @@
->>               device_type = "memory";
->>               reg = <0x80000000 0x40000000>; /* 1 GB */
->>       };
->> +
->> +     keypad {
->> +             keypad,num-rows = <8>;
->> +             keypad,num-columns = <8>;
->> +             linux,keymap = < 0x02020073
->> +                     0x02030072
->> +                     0x020400e7
->> +                     0x02050066
->> +                     0x0206006b
->> +                     0x020700d9 >;
->> +             linux,input-no-autorepeat;
->> +     };
->
-> This not a criticism on your patch, but a generic question about DT: Is there no way to have nice constants for keys like we have in the kernel, like KEY_POWER, KEY_UP, etc?
-There is way, something like this ..
-               key_C {
-                       keypad,row = <2>;
-                       keypad,column = <1>;
-                       linux,code = <46>;
-               };
-But its not the preferred approach mainly because of the fact that
-it is too big. So suppose, if we have 100 key codes, we will have
-400 -500 lines of code in our dts file for the mapping only.
- If no, does DT allow comments so I can look at a dts and see which
-keycodes are mapped instead of having to dig up the sources?
-Yes, comments are allowed and seems to be better option to do.
+Enable hardware ECC?
 
-~Sourav
->
-> regards,
->
-> Koen
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
