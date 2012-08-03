@@ -1,37 +1,36 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 3 Aug 2012 20:46:27 +0200
-Subject: [PATCH] MXS: Fix mxs_defconfig MMAP_MIN_ADDR
-In-Reply-To: <20120803174016.GE10335@n2100.arm.linux.org.uk>
-References: <1344009354-13249-1-git-send-email-marex@denx.de>
- <CAOMZO5AzaDcxJJV+Z-bHH58=xRq5RY6BanEjMd4uUhN+K9ZNZQ@mail.gmail.com>
- <20120803174016.GE10335@n2100.arm.linux.org.uk>
-Message-ID: <201208032046.28211.marex@denx.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 03 Aug 2012 12:49:12 -0600
+Subject: [PATCH] ARM: dt: tegra: paz00: add regulators
+In-Reply-To: <501C1944.4030505@nvidia.com>
+References: <1343932593-999-1-git-send-email-swarren@wwwdotorg.org>
+ <501C1944.4030505@nvidia.com>
+Message-ID: <501C1D28.60804@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell King - ARM Linux,
+On 08/03/2012 12:32 PM, Laxman Dewangan wrote:
+> On Friday 03 August 2012 12:06 AM, Stephen Warren wrote:
+>> From: Stephen Warren<swarren@nvidia.com>
+>>
+>> The Toshiba AC100/PAZ00 uses a TPS6586x regulator. Instantiate this.
+...
+> Acked-by: Laxman Dewangan <ldewangan@nvidia.com>
 
-[...]
+Thanks.
 
-> > > No need to set it to 32768.
-> > > 
-> > > If you just remove the 'CONFIG_DEFAULT_MMAP_MIN_ADDR=65536' then this
-> > > symbol will be 32768.
-> > 
-> > Sorry, ignore what I said. I just realized that the default is 4096.
+>> +    regulators {
+>> +        compatible = "simple-bus";
+>> +        #address-cells =<1>;
+>> +        #size-cells =<0>;
+>> +
 > 
-> 4096 is also fine for ARM too.  There's not much point in having
-> defconfigs change it - that would just be pure noise in the config
-> files.
+> Is "simple-bus" accepted?
+> Accordingly I need to update for the Cardhu  also to have regulator
+> support which I am going to send.
 
-Wasn't there a security concern being the reason for setting this higher? Also, 
-I still don't completely understand why ARM has to set it lower than others, is 
-that an ABI thing?
+I believe so yes; the ability to use that bus type was the specific
+purpose of:
 
-Russell, do you happen to have some further reading for me I could study on this 
-topic please?
+https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-August/017963.html
 
-Thanks!
-
-Best regards,
-Marek Vasut
+... which Rob seems to find acceptable.
