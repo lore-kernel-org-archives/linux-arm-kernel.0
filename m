@@ -1,8 +1,8 @@
 From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 3 Aug 2012 10:23:25 +0000
+Date: Fri, 3 Aug 2012 10:32:01 +0000
 Subject: [PATCH 1/3] ARM: OMAP: timer: allow gp timer clock-event to be
  used on both cpus
-In-Reply-To: <A6396D46-C6B9-44A4-A960-657668AF08E4@dominion.thruhere.net>
+In-Reply-To: <CAMQu2gzgfbeB0D18fKhmOaKUkY8Q_px+k9dq+jKEHc3YEuMMVQ@mail.gmail.com>
 References: <1333114048-26136-1-git-send-email-santosh.shilimkar@ti.com>
  <1333114048-26136-2-git-send-email-santosh.shilimkar@ti.com>
  <501B7AE6.8080405@gmail.com>
@@ -11,117 +11,100 @@ References: <1333114048-26136-1-git-send-email-santosh.shilimkar@ti.com>
  <CAMQu2gxLAVk-LN8R1xBeeL1=iZ-mLSRmtZe4wpQYQPTBsY5RMA@mail.gmail.com>
  <FF29FBF3-67EC-478E-9A74-65F8A2870BDC@dominion.thruhere.net>
  <79CD15C6BA57404B839C016229A409A83EA7F59B@DBDE01.ent.ti.com>
- <A6396D46-C6B9-44A4-A960-657668AF08E4@dominion.thruhere.net>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA7F664@DBDE01.ent.ti.com>
+ <CAMQu2gzgfbeB0D18fKhmOaKUkY8Q_px+k9dq+jKEHc3YEuMMVQ@mail.gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA7F6AC@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2012 at 15:34:25, Koen Kooi wrote:
-> 
-> Op 3 aug. 2012, om 11:42 heeft "Hiremath, Vaibhav" <hvaibhav@ti.com> het volgende geschreven:
-> 
+On Fri, Aug 03, 2012 at 15:18:15, Shilimkar, Santosh wrote:
+> On Fri, Aug 3, 2012 at 3:12 PM, Hiremath, Vaibhav <hvaibhav@ti.com> wrote:
 > > On Fri, Aug 03, 2012 at 15:03:07, Koen Kooi wrote:
-> >> 
+> >>
 > >> Op 3 aug. 2012, om 11:27 heeft "Shilimkar, Santosh" <santosh.shilimkar@ti.com> het volgende geschreven:
-> >> 
-> >>> On Fri, Aug 3, 2012 at 2:00 PM, Koen Kooi <koen@dominion.thruhere.net> wrote:
-> >>>> 
-> >>>> Op 3 aug. 2012, om 09:21 heeft Koen Kooi <koen@dominion.thruhere.net> het volgende geschreven:
-> >>>> 
-> >>>>> 
-> >>>>> Op 3 aug. 2012, om 09:16 heeft Daniel Mack <zonque@gmail.com> het volgende geschreven:
-> >>>>> 
-> >>>>>> On 30.03.2012 15:27, Santosh Shilimkar wrote:
-> >>>>>>> For coupled cpuidle to work when both cpus are active, it needs a global timer
-> >>>>>>> that can handle events for both cpus.  This timer is used as the broadcast
-> >>>>>>> clock-event when the per-cpu timer hardware stop in low power states.
-> >>>>>>> Set the cpumask of clockevent_gpt to all cpus, set the rating correctly, and
-> >>>>>>> set the irq to allow the clockevent core to determine the affinity of the
-> >>>>>>> timer.
-> >>>>>> 
-> >>>>>> These patches made it to mainline now, shortly befor 3.6-rc1, and it
-> >>>>>> breaks boot on my AM33xx board.
-> >>>>>> 
-> >>>>>> Once I revert 1/3, the board boots again but crashes with the Ooops
-> >>>>>> below. With the entire series reverted, everything works again as
-> >>>>>> expected. Any idea?
-> >>>>>> 
-> >>>>>> The upstream commit ids are
-> >>>>>> 
-> >>>>>> 11d6ec2e "ARM: OMAP: timer: allow gp timer clock-event to be used on
-> >>>>>> both cpus"
-> >>>>>> 5b4d5bcc "ARM: OMAP4: CPUidle: add synchronization for coupled idle states"
-> >>>>>> b93d70ae "ARM: OMAP4: CPUidle: Open broadcast clock-event device."
-> >>>>> 
-> >>>>> I've had boot problems with cpuidle enabled as well, what happens if you disable it? Is the revert still needed in that case?
-> >>>> 
-> >>>> To answer my own question: No, the reverts aren't needed if you disable cpuidle.
-> >>> 
-> >>> This is really strange since CPUIDLE code is really OMAP4 specific.
-> >>> obj-$(CONFIG_ARCH_OMAP4)                += cpuidle44xx.o
-> >>> 
-> >>> May be omap2plus build some how the code gets executed on AMXX
-> >>> 
-> >>> Can you try below and see if the boot with CPUIDLE enabled goes away on
-> >>> AMXX
-> >>> 
-> >>> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-> >>> index ea24174..195e756 100644
-> >>> --- a/arch/arm/mach-omap2/pm44xx.c
-> >>> +++ b/arch/arm/mach-omap2/pm44xx.c
-> >>> @@ -147,6 +147,9 @@ int __init omap4_pm_init(void)
-> >>>       struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm, *l4wkup;
-> >>>       struct clockdomain *ducati_clkdm, *l3_2_clkdm, *l4_per_clkdm;
-> >>> 
-> >>> +       if (!cpu_is_omap44xx())
-> >>> +               return -ENODEV;
-> >>> +
-> >>>       if (omap_rev() == OMAP4430_REV_ES1_0) {
-> >>>               WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
-> >>>               return -ENODEV;
-> >> 
+> >>
+> >> > On Fri, Aug 3, 2012 at 2:00 PM, Koen Kooi <koen@dominion.thruhere.net> wrote:
+> >> >>
+> >> >> Op 3 aug. 2012, om 09:21 heeft Koen Kooi <koen@dominion.thruhere.net> het volgende geschreven:
+> >> >>
+> >> >>>
+> >> >>> Op 3 aug. 2012, om 09:16 heeft Daniel Mack <zonque@gmail.com> het volgende geschreven:
+> >> >>>
+> >> >>>> On 30.03.2012 15:27, Santosh Shilimkar wrote:
+> >> >>>>> For coupled cpuidle to work when both cpus are active, it needs a global timer
+> >> >>>>> that can handle events for both cpus.  This timer is used as the broadcast
+> >> >>>>> clock-event when the per-cpu timer hardware stop in low power states.
+> >> >>>>> Set the cpumask of clockevent_gpt to all cpus, set the rating correctly, and
+> >> >>>>> set the irq to allow the clockevent core to determine the affinity of the
+> >> >>>>> timer.
+> >> >>>>
+> >> >>>> These patches made it to mainline now, shortly befor 3.6-rc1, and it
+> >> >>>> breaks boot on my AM33xx board.
+> >> >>>>
+> >> >>>> Once I revert 1/3, the board boots again but crashes with the Ooops
+> >> >>>> below. With the entire series reverted, everything works again as
+> >> >>>> expected. Any idea?
+> >> >>>>
+> >> >>>> The upstream commit ids are
+> >> >>>>
+> >> >>>> 11d6ec2e "ARM: OMAP: timer: allow gp timer clock-event to be used on
+> >> >>>> both cpus"
+> >> >>>> 5b4d5bcc "ARM: OMAP4: CPUidle: add synchronization for coupled idle states"
+> >> >>>> b93d70ae "ARM: OMAP4: CPUidle: Open broadcast clock-event device."
+> >> >>>
+> >> >>> I've had boot problems with cpuidle enabled as well, what happens if you disable it? Is the revert still needed in that case?
+> >> >>
+> >> >> To answer my own question: No, the reverts aren't needed if you disable cpuidle.
+> >> >
+> >> > This is really strange since CPUIDLE code is really OMAP4 specific.
+> >> > obj-$(CONFIG_ARCH_OMAP4)                += cpuidle44xx.o
+> >> >
+> >> > May be omap2plus build some how the code gets executed on AMXX
+> >> >
+> >> > Can you try below and see if the boot with CPUIDLE enabled goes away on
+> >> > AMXX
+> >> >
+> >> > diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+> >> > index ea24174..195e756 100644
+> >> > --- a/arch/arm/mach-omap2/pm44xx.c
+> >> > +++ b/arch/arm/mach-omap2/pm44xx.c
+> >> > @@ -147,6 +147,9 @@ int __init omap4_pm_init(void)
+> >> >        struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm, *l4wkup;
+> >> >        struct clockdomain *ducati_clkdm, *l3_2_clkdm, *l4_per_clkdm;
+> >> >
+> >> > +       if (!cpu_is_omap44xx())
+> >> > +               return -ENODEV;
+> >> > +
+> >> >        if (omap_rev() == OMAP4430_REV_ES1_0) {
+> >> >                WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
+> >> >                return -ENODEV;
+> >>
 > >> That does seem to fix it:
-> >> 
+> >>
 > >> root at beaglebone:~# zcat /proc/config.gz | grep -i cpu_idle
 > >> CONFIG_CPU_IDLE=y
 > >> CONFIG_CPU_IDLE_GOV_LADDER=y
 > >> CONFIG_CPU_IDLE_GOV_MENU=y
 > >> CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED=y
-> >> root at beaglebone:~# zcat /proc/config.gz | grep -i omap4   
+> >> root at beaglebone:~# zcat /proc/config.gz | grep -i omap4
 > >> CONFIG_ARCH_OMAP4=y
 > >> CONFIG_MACH_OMAP4_PANDA=y
 > >> # CONFIG_OMAP4_ERRATA_I688 is not set
 > >> # CONFIG_KEYBOARD_OMAP4 is not set
 > >> CONFIG_OMAP4_DSS_HDMI=y
-> >> 
-> > 
+> >>
+> >
 > > This patch is not required, Without this patch is works for me,
+> >
+> Which is good news.Do you have CPUIDLE enabled in your build when you tested
+> it. Note that CPUIDLE is not enabled by-default in omap2plus build and as I see
+> from Koen's email, he did enable it in his testing.
 > 
-> I just retested and I don't need Santosh' patch, booting with cpuidle enable works now, after refreshing your patchset (and dropping the rtc commit, it conflicts with the other rtc patches out there).
-> 
-
-Thanks for conforming Koen.
-
-> > 
-> > [root at arago /]# cat /proc/version
-> > Linux version 3.6.0-rc1-next-20120803-00010-g5f6bf0f (a0393758 at psplinux064) (gcc version 4.5.3 20110311 (prerelease) (GCC) ) #1 SMP Fri Aug 3 15:06:57 IST 2012
-> > [root at arago /]#
-> > 
-> > 
-> > 
-> > Do you have below patch??
-> > ARM: OMAP: cpu: Make cpu_class_is_omap2 true for all non-omap1 platforms
-> > 
-> > 
-> > Also I have pushed branch (based on linux-next/master) to 
-> > https://github.com/hvaibhav/am335x-linux/tree/am335x-linux-next-master
-> 
-> Thanks! Ajays USB work and AnilKumar's pinctrl work are there as branches, any plans to add da8xx-fb, rtc and networking branches? As you can see from the cpsw patches, they were impossible to test because the davinci_mdio ones were missing.
+> Please confirm that 3.6-rc1 boots fine even with CPUIDLE enabled and
+> we don't need
+> the above mentioned patch. If it is not the case, I can post the fix.
 > 
 
-Yes that's the plan, I am in the process of updating it.
-Hopefully I will have branch for each major module.
-
+Just FYI, I have also tested with CPUIDLE enabled and it worked for me.
 
 Thanks,
 Vaibhav
