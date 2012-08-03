@@ -1,43 +1,228 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 3 Aug 2012 13:54:07 -0300
-Subject: [PATCH] MXS: Fix mxs_defconfig MMAP_MIN_ADDR
-In-Reply-To: <CAOMZO5DZui3x554WcHsseSfXDgYeaq1va-QzVy1CQajE3M3=kQ@mail.gmail.com>
-References: <1344009354-13249-1-git-send-email-marex@denx.de>
- <CAOMZO5DZui3x554WcHsseSfXDgYeaq1va-QzVy1CQajE3M3=kQ@mail.gmail.com>
-Message-ID: <CAOMZO5AzaDcxJJV+Z-bHH58=xRq5RY6BanEjMd4uUhN+K9ZNZQ@mail.gmail.com>
+From: vikram.pandita@ti.com (Vikram Pandita)
+Date: Fri, 3 Aug 2012 09:56:44 -0700
+Subject: [PATCH v3] printk: add option to print cpu id
+Message-ID: <1344013004-32211-1-git-send-email-vikram.pandita@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 3, 2012 at 1:46 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Marek,
->
-> On Fri, Aug 3, 2012 at 12:55 PM, Marek Vasut <marex@denx.de> wrote:
->> Initially reported by Detlev Zundel <dzu@denx.de>, this caused breakage
->> when "su - testuser" was called. "testuser" being a regular user account,
->> the command ended with SIGKILL.
->>
->> Signed-off-by: Marek Vasut <marex@denx.de>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Shawn Guo <shawn.guo@linaro.org>
->> Cc: Wolfgang Denk <wd@denx.de>
->> ---
->>  arch/arm/configs/mxs_defconfig |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
->> index ccdb635..f212802 100644
->> --- a/arch/arm/configs/mxs_defconfig
->> +++ b/arch/arm/configs/mxs_defconfig
->> @@ -34,7 +34,7 @@ CONFIG_NO_HZ=y
->>  CONFIG_HIGH_RES_TIMERS=y
->>  CONFIG_PREEMPT_VOLUNTARY=y
->>  CONFIG_AEABI=y
->> -CONFIG_DEFAULT_MMAP_MIN_ADDR=65536
->> +CONFIG_DEFAULT_MMAP_MIN_ADDR=32768
->
-> No need to set it to 32768.
->
-> If you just remove the 'CONFIG_DEFAULT_MMAP_MIN_ADDR=65536' then this
-> symbol will be 32768.
+From: Vikram Pandita <vikram.pandita@ti.com>
 
-Sorry, ignore what I said. I just realized that the default is 4096.
+Introduce config option to enable CPU id reporting for printk() calls.
+
+Example logs with this option enabled look like:
+[   0] [    0.063232] Mount-cache hash table entries: 512
+[   0] [    0.068054] CPU: Testing write buffer coherency: ok
+[   0] [    0.068939] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+[   0] [    0.069305] Setting up static identity map for 0x8046dc90 - 0x8046dd00
+[   0] [    0.069366] L310 cache controller enabled
+[   0] [    0.069396] l2x0: 16 ways, CACHE_ID 0x410000c7, AUX_CTRL 0x7e470000
+[   1] [    0.073211] CPU1: Booted secondary processor
+[   1] [    0.100463] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+[   1] [    0.100555] CPU1: Unknown IPI message 0x0
+[   0] [    0.101348] Brought up 2 CPUs
+
+Its sometimes very useful to have printk also print the CPU Identifier
+that executed the call. This has helped to debug various SMP issues on shipping
+products.
+
+Known limitation is if the system gets preempted between function call and
+actual printk, the reported cpu-id might not be accurate. But most of the
+times its seen to give a good feel of how the N cpu's in the system are
+getting loaded.
+
+Signed-off-by: Vikram Pandita <vikram.pandita@ti.com>
+Cc: Kay Sievers <kay@vrfy.org>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Vimarsh Zutshi <vimarsh.zutshi@gmail.com>
+Signed-off-by: Vikram Pandita <vikram.pandita@ti.com>
+---
+v1: initial version - had wrong cpuid logging mechanism
+v2: fixed as per review comments from Kay Sievers
+v3: allow cpuid to be u16 to support multi-core systems with 1000+ cores
+
+ kernel/printk.c   |   51 +++++++++++++++++++++++++++++++++++++++++----------
+ lib/Kconfig.debug |   13 +++++++++++++
+ 2 files changed, 54 insertions(+), 10 deletions(-)
+
+diff --git a/kernel/printk.c b/kernel/printk.c
+index 6a76ab9..90d49b2 100644
+--- a/kernel/printk.c
++++ b/kernel/printk.c
+@@ -208,6 +208,7 @@ struct log {
+ 	u8 facility;		/* syslog facility */
+ 	u8 flags:5;		/* internal record flags */
+ 	u8 level:3;		/* syslog level */
++	u16 cpuid;		/* cpu invoking the log */
+ };
+ 
+ /*
+@@ -305,7 +306,8 @@ static u32 log_next(u32 idx)
+ static void log_store(int facility, int level,
+ 		      enum log_flags flags, u64 ts_nsec,
+ 		      const char *dict, u16 dict_len,
+-		      const char *text, u16 text_len)
++		      const char *text, u16 text_len,
++		      const u16 cpuid)
+ {
+ 	struct log *msg;
+ 	u32 size, pad_len;
+@@ -356,6 +358,7 @@ static void log_store(int facility, int level,
+ 		msg->ts_nsec = local_clock();
+ 	memset(log_dict(msg) + dict_len, 0, pad_len);
+ 	msg->len = sizeof(struct log) + text_len + dict_len + pad_len;
++	msg->cpuid = cpuid;
+ 
+ 	/* insert message */
+ 	log_next_idx += msg->len;
+@@ -855,6 +858,25 @@ static size_t print_time(u64 ts, char *buf)
+ 		       (unsigned long)ts, rem_nsec / 1000);
+ }
+ 
++#if defined(CONFIG_PRINTK_CPUID)
++static bool printk_cpuid = 1;
++#else
++static bool printk_cpuid;
++#endif
++module_param_named(cpuid, printk_cpuid, bool, S_IRUGO | S_IWUSR);
++
++static size_t print_cpuid(u16 cpuid, char *buf)
++{
++
++	if (!printk_cpuid)
++		return 0;
++
++	if (!buf)
++		return 7;
++
++	return sprintf(buf, "[%4d] ", cpuid);
++}
++
+ static size_t print_prefix(const struct log *msg, bool syslog, char *buf)
+ {
+ 	size_t len = 0;
+@@ -874,6 +896,7 @@ static size_t print_prefix(const struct log *msg, bool syslog, char *buf)
+ 		}
+ 	}
+ 
++	len += print_cpuid(msg->cpuid, buf ? buf + len : NULL);
+ 	len += print_time(msg->ts_nsec, buf ? buf + len : NULL);
+ 	return len;
+ }
+@@ -1387,6 +1410,7 @@ static struct cont {
+ 	u64 ts_nsec;			/* time of first print */
+ 	u8 level;			/* log level of first message */
+ 	u8 facility;			/* log level of first message */
++	u16 cpuid;			/* cpu invoking the logging request */
+ 	enum log_flags flags;		/* prefix, newline flags */
+ 	bool flushed:1;			/* buffer sealed and committed */
+ } cont;
+@@ -1405,7 +1429,8 @@ static void cont_flush(enum log_flags flags)
+ 		 * line. LOG_NOCONS suppresses a duplicated output.
+ 		 */
+ 		log_store(cont.facility, cont.level, flags | LOG_NOCONS,
+-			  cont.ts_nsec, NULL, 0, cont.buf, cont.len);
++			  cont.ts_nsec, NULL, 0, cont.buf, cont.len,
++			  cont.cpuid);
+ 		cont.flags = flags;
+ 		cont.flushed = true;
+ 	} else {
+@@ -1414,12 +1439,14 @@ static void cont_flush(enum log_flags flags)
+ 		 * just submit it to the store and free the buffer.
+ 		 */
+ 		log_store(cont.facility, cont.level, flags, 0,
+-			  NULL, 0, cont.buf, cont.len);
++			  NULL, 0, cont.buf, cont.len,
++			  cont.cpuid);
+ 		cont.len = 0;
+ 	}
+ }
+ 
+-static bool cont_add(int facility, int level, const char *text, size_t len)
++static bool cont_add(int facility, int level, const char *text, size_t len,
++			const u16 cpuid)
+ {
+ 	if (cont.len && cont.flushed)
+ 		return false;
+@@ -1442,6 +1469,7 @@ static bool cont_add(int facility, int level, const char *text, size_t len)
+ 
+ 	memcpy(cont.buf + cont.len, text, len);
+ 	cont.len += len;
++	cont.cpuid = cpuid;
+ 
+ 	if (cont.len > (sizeof(cont.buf) * 80) / 100)
+ 		cont_flush(LOG_CONT);
+@@ -1455,7 +1483,8 @@ static size_t cont_print_text(char *text, size_t size)
+ 	size_t len;
+ 
+ 	if (cont.cons == 0 && (console_prev & LOG_NEWLINE)) {
+-		textlen += print_time(cont.ts_nsec, text);
++		textlen += print_cpuid(cont.cpuid, text);
++		textlen += print_time(cont.ts_nsec, text + textlen);
+ 		size -= textlen;
+ 	}
+ 
+@@ -1527,7 +1556,7 @@ asmlinkage int vprintk_emit(int facility, int level,
+ 		printed_len += strlen(recursion_msg);
+ 		/* emit KERN_CRIT message */
+ 		log_store(0, 2, LOG_PREFIX|LOG_NEWLINE, 0,
+-			  NULL, 0, recursion_msg, printed_len);
++			  NULL, 0, recursion_msg, printed_len, this_cpu);
+ 	}
+ 
+ 	/*
+@@ -1577,9 +1606,9 @@ asmlinkage int vprintk_emit(int facility, int level,
+ 			cont_flush(LOG_NEWLINE);
+ 
+ 		/* buffer line if possible, otherwise store it right away */
+-		if (!cont_add(facility, level, text, text_len))
++		if (!cont_add(facility, level, text, text_len, this_cpu))
+ 			log_store(facility, level, lflags | LOG_CONT, 0,
+-				  dict, dictlen, text, text_len);
++				  dict, dictlen, text, text_len, this_cpu);
+ 	} else {
+ 		bool stored = false;
+ 
+@@ -1591,13 +1620,15 @@ asmlinkage int vprintk_emit(int facility, int level,
+ 		 */
+ 		if (cont.len && cont.owner == current) {
+ 			if (!(lflags & LOG_PREFIX))
+-				stored = cont_add(facility, level, text, text_len);
++				stored = cont_add(facility, level, text, text_len,
++						this_cpu);
+ 			cont_flush(LOG_NEWLINE);
+ 		}
+ 
+ 		if (!stored)
+ 			log_store(facility, level, lflags, 0,
+-				  dict, dictlen, text, text_len);
++				  dict, dictlen, text, text_len,
++				  this_cpu);
+ 	}
+ 	printed_len += text_len;
+ 
+diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+index 2403a63..139b2b1 100644
+--- a/lib/Kconfig.debug
++++ b/lib/Kconfig.debug
+@@ -14,6 +14,19 @@ config PRINTK_TIME
+ 	  The behavior is also controlled by the kernel command line
+ 	  parameter printk.time=1. See Documentation/kernel-parameters.txt
+ 
++config PRINTK_CPUID
++	bool "Show cpu id information on printks"
++	depends on PRINTK
++	help
++	  Selecting this option causes cpu identifier to be added to the
++	  output of the syslog() system call and at the console.
++
++	  This flag just specifies if the cpu-id should
++	  be included.
++
++	  The behavior is also controlled by the kernel command line
++	  parameter printk.cpuid=1.
++
+ config DEFAULT_MESSAGE_LOGLEVEL
+ 	int "Default message log level (1-7)"
+ 	range 1 7
+-- 
+1.7.9.5
