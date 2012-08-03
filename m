@@ -1,56 +1,136 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 3 Aug 2012 15:38:15 +0200
-Subject: [PATCH 06/10 V2] spi: Add SPI driver for mx233/mx28
-In-Reply-To: <1343076052-27312-7-git-send-email-marex@denx.de>
-References: <1343076052-27312-1-git-send-email-marex@denx.de>
- <1343076052-27312-7-git-send-email-marex@denx.de>
-Message-ID: <20120803153815.758dc064@skate>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 3 Aug 2012 16:35:16 +0300
+Subject: [PATCH v6 10/11] arm/dts: omap: Add usb_otg and glue data
+In-Reply-To: <1343639400-28725-11-git-send-email-kishon@ti.com>
+References: <1343639400-28725-1-git-send-email-kishon@ti.com>
+ <1343639400-28725-11-git-send-email-kishon@ti.com>
+Message-ID: <20120803133514.GL8269@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek,
+On Mon, Jul 30, 2012 at 02:39:59PM +0530, Kishon Vijay Abraham I wrote:
+> Add usb otg data node in omap4/omap3 device tree file. Also update
+> the node with board specific setting in omapx-<board>.dts file.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-Le Mon, 23 Jul 2012 22:40:48 +0200,
-Marek Vasut <marex@denx.de> a ?crit :
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-> +static uint32_t mxs_spi_cs_to_reg(unsigned cs)
-> +{
-> +	uint32_t select = 0;
+> ---
+>  arch/arm/boot/dts/omap3-beagle.dts |    6 ++++++
+>  arch/arm/boot/dts/omap3-evm.dts    |    6 ++++++
+>  arch/arm/boot/dts/omap3.dtsi       |    8 ++++++++
+>  arch/arm/boot/dts/omap4-panda.dts  |    6 ++++++
+>  arch/arm/boot/dts/omap4-sdp.dts    |    6 ++++++
+>  arch/arm/boot/dts/omap4.dtsi       |    8 ++++++++
+>  6 files changed, 40 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+> index 5b4506c..f3d7076 100644
+> --- a/arch/arm/boot/dts/omap3-beagle.dts
+> +++ b/arch/arm/boot/dts/omap3-beagle.dts
+> @@ -67,3 +67,9 @@
+>  &mmc3 {
+>  	status = "disable";
+>  };
 > +
-> +	if (cs & 1)
-> +		select |= BM_SSP_CTRL0_WAIT_FOR_CMD;
-> +	if (cs & 2)
-> +		select |= BM_SSP_CTRL0_WAIT_FOR_IRQ;
+> +&usb_otg_hs {
+> +	interface_type = <0>;
+> +	mode = <3>;
+> +	power = <50>;
+> +};
+> diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
+> index 2eee16e..8963b3d 100644
+> --- a/arch/arm/boot/dts/omap3-evm.dts
+> +++ b/arch/arm/boot/dts/omap3-evm.dts
+> @@ -18,3 +18,9 @@
+>  		reg = <0x80000000 0x10000000>; /* 256 MB */
+>  	};
+>  };
 > +
-> +	return select;
-> +}
+> +&usb_otg_hs {
+> +	interface_type = <0>;
+> +	mode = <3>;
+> +	power = <50>;
+> +};
+> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+> index 99474fa..4b8c142 100644
+> --- a/arch/arm/boot/dts/omap3.dtsi
+> +++ b/arch/arm/boot/dts/omap3.dtsi
+> @@ -215,5 +215,13 @@
+>  			compatible = "ti,omap3-hsmmc";
+>  			ti,hwmods = "mmc3";
+>  		};
+> +
+> +		usb_otg_hs: usb_otg_hs {
+> +			compatible = "ti,omap3-musb";
+> +			ti,hwmods = "usb_otg_hs";
+> +			multipoint = <1>;
+> +			num_eps = <16>;
+> +			ram_bits = <12>;
+> +		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+> index 7052422..dd19370 100644
+> --- a/arch/arm/boot/dts/omap4-panda.dts
+> +++ b/arch/arm/boot/dts/omap4-panda.dts
+> @@ -93,3 +93,9 @@
+>  &twlusb {
+>  	usb-supply = <&vusb>;
+>  };
+> +
+> +&usb_otg_hs {
+> +	interface_type = <1>;
+> +	mode = <3>;
+> +	power = <50>;
+> +};
+> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+> index 6326d7c..0fc10d4 100644
+> --- a/arch/arm/boot/dts/omap4-sdp.dts
+> +++ b/arch/arm/boot/dts/omap4-sdp.dts
+> @@ -162,3 +162,9 @@
+>  &twlusb {
+>  	usb-supply = <&vusb>;
+>  };
+> +
+> +&usb_otg_hs {
+> +	interface_type = <1>;
+> +	mode = <3>;
+> +	power = <50>;
+> +};
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index 15f1890..7886518 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -285,5 +285,13 @@
+>  				      <0x4a002300 0x1>;
+>  			};
+>  		};
+> +
+> +		usb_otg_hs: usb_otg_hs {
+> +			compatible = "ti,omap4-musb";
+> +			ti,hwmods = "usb_otg_hs";
+> +			multipoint = <1>;
+> +			num_eps = <16>;
+> +			ram_bits = <12>;
+> +		};
+>  	};
+>  };
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-It sounds really strange to manipulate WAIT_FOR_CMD and WAIT_FOR_IRQ
-bits to adjust the chip select, and when reading the driver, it seemed
-suspicious to me. After going through the datasheet, indeed those bits
-are the appropriate one to select between the SS0, SS1 and SS2 chip
-selects, but I find the code not really obvious. Would it be possible
-to make it more obvious either by adding or comment or doing something
-like:
-
-/* Should be put in some header file */
-#define BM_SSP_CTRL0_SPI_CS_BITS (20)
-
-+static void mxs_spi_set_cs(struct mxs_spi *spi, unsigned cs)
-+{
-+	struct mxs_ssp *ssp = &spi->ssp;
-+
-+	writel(0x3 << BM_SSP_CTRL0_SPI_CS_BITS,
-+              ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
-+	writel(cs,
-+              ssp->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
-+}
-
-Regards,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120803/dcffa11d/attachment.sig>
