@@ -1,63 +1,110 @@
-From: mugunthanvnm@ti.com (N, Mugunthan V)
-Date: Fri, 3 Aug 2012 05:25:47 +0000
-Subject: Current state of AM33xx patches
-In-Reply-To: <501A9D1C.8080305@gmail.com>
-References: <4FD5BA4C.9070706@gmail.com> <4FE326A8.8090807@gmail.com>
- <4FE8AB37.7030907@gmail.com> <4FE9A00B.6010908@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA5B7FD@DBDE01.ent.ti.com>
- <4FEC7394.9030208@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA5FBC1@DBDE01.ent.ti.com>
- <4FEDF54D.4030609@gmail.com>
- <alpine.DEB.2.00.1206291938180.2338@utopia.booyaka.com>
- <4FEEC7F2.8070507@gmail.com>
- <alpine.DEB.2.00.1207040403010.6760@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA635DC@DBDE01.ent.ti.com>
- <4FF42761.2000701@gmail.com>
- <EB1619762EAF8B4E97A227FB77B7E0293E9C2548@DBDE01.ent.ti.com>
- <500CEF97.4050207@gmail.com>
- <EB1619762EAF8B4E97A227FB77B7E0293E9D04EB@DBDE01.ent.ti.com>
- <501159C3.3020109@gmail.com>
- <704C899A-606B-41A3-99E8-6D92C0EA5BC5@dominion.thruhere.net>
- <50116926.4060309@gmail.com>
- <587C7FB9-2DD3-48EE-B74D-BEBDF199BE23@dominion.thruhere.net>
- <50118272.1050209@gmail.com>
- <9F9237B3-55BD-471B-ADD1-1A18F3644387@dominion.thruhere.net>
- <501A9D1C.8080305@gmail.com>
-Message-ID: <EB1619762EAF8B4E97A227FB77B7E0293E9D393A@DBDE01.ent.ti.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 3 Aug 2012 05:53:37 +0000
+Subject: [PATCH 1/2] net: davinci_mdio: enable and disable clock
+In-Reply-To: <501B6020.7090502@gmail.com>
+References: <1343936616-29318-1-git-send-email-zonque@gmail.com>
+ <501B5EC1.7010304@ti.com> <501B6020.7090502@gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA7F04C@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Daniel Mack [mailto:zonque at gmail.com]
-> Sent: Thursday, August 02, 2012 9:01 PM
-> To: Koen Kooi
-> Cc: N, Mugunthan V; Hiremath, Vaibhav; Paul Walmsley; Nori, Sekhar;
-> Jason Kridner; Tony Lindgren; Hilman, Kevin; Hernandez, Carlos; Maupin,
-> Chase; linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Kridner, Jason
-> Subject: Re: Current state of AM33xx patches
+On Fri, Aug 03, 2012 at 10:52:40, Daniel Mack wrote:
+> On 03.08.2012 07:16, Vaibhav Hiremath wrote:
+> > 
+> > 
+> > On 8/3/2012 1:13 AM, Daniel Mack wrote:
+> >> Make the driver control the device clocks. Appearantly, the Davinci
+> >> platform probes this driver with the clock all powered up, but on OMAP,
+> >> this isn't the case.
+> >>
+> >> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> >> ---
+> >>  drivers/net/ethernet/ti/davinci_mdio.c | 16 ++++++++++++++--
+> >>  1 file changed, 14 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/drivers/net/ethernet/ti/davinci_mdio.c b/drivers/net/ethernet/ti/davinci_mdio.c
+> >> index cd7ee20..b4b6015 100644
+> >> --- a/drivers/net/ethernet/ti/davinci_mdio.c
+> >> +++ b/drivers/net/ethernet/ti/davinci_mdio.c
+> >> @@ -332,6 +332,8 @@ static int __devinit davinci_mdio_probe(struct platform_device *pdev)
+> >>  		goto bail_out;
+> >>  	}
+> >>  
+> >> +	clk_enable(data->clk);
+> >> +
+> >>  	dev_set_drvdata(dev, data);
+> >>  	data->dev = dev;
+> >>  	spin_lock_init(&data->lock);
+> >> @@ -379,8 +381,11 @@ bail_out:
+> >>  	if (data->bus)
+> >>  		mdiobus_free(data->bus);
+> >>  
+> >> -	if (data->clk)
+> >> +	if (data->clk) {
+> >> +		clk_disable(data->clk);
+> >>  		clk_put(data->clk);
+> >> +	}
+> >> +
+> >>  	pm_runtime_put_sync(&pdev->dev);
+> >>  	pm_runtime_disable(&pdev->dev);
+> >>  
+> >> @@ -397,8 +402,11 @@ static int __devexit davinci_mdio_remove(struct platform_device *pdev)
+> >>  	if (data->bus)
+> >>  		mdiobus_free(data->bus);
+> >>  
+> >> -	if (data->clk)
+> >> +	if (data->clk) {
+> >> +		clk_disable(data->clk);
+> >>  		clk_put(data->clk);
+> >> +	}
+> >> +
+> >>  	pm_runtime_put_sync(&pdev->dev);
+> >>  	pm_runtime_disable(&pdev->dev);
+> >>  
+> >> @@ -427,6 +435,8 @@ static int davinci_mdio_suspend(struct device *dev)
+> >>  	data->suspended = true;
+> >>  	spin_unlock(&data->lock);
+> >>  
+> >> +	clk_disable(data->clk);
+> >> +
+> >>  	return 0;
+> >>  }
+> >>  
+> >> @@ -435,6 +445,8 @@ static int davinci_mdio_resume(struct device *dev)
+> >>  	struct davinci_mdio_data *data = dev_get_drvdata(dev);
+> >>  	u32 ctrl;
+> >>  
+> >> +	clk_enable(data->clk);
+> >> +
+> > 
+> > Danial,
+> > 
+> > I would request you to wait for this, its not that simple and straight.
+> > And once you migrate to runtime PM you don't need clk_enable/disable,
+> > this should get handled under runtime PM api's.
 > 
-> On 31.07.2012 21:29, Koen Kooi wrote:
+> As I said, it can be dropped.
 > 
-> > 2/3 of the way there:
-> >
-> > http://patchwork.ozlabs.org/patch/174085/
-> > http://patchwork.ozlabs.org/patch/174086/
-> >
-> > I keep failing to create a .dts that doesn't upset the dtc, so I
-> don't have it working yet :(
+> > Also have you read my another email post -
+> > 
+> > http://comments.gmane.org/gmane.linux.ports.arm.omap/80796
+> > 
+> > Certainly, with respect to CPSW & MDIO, this patch is not enough and
+> > requires further investigation. I have started looking at this and
+> > hopefully will have some solution soon...
 > 
-> Yes, that's because there are couple of sytax errors in the example
-> bindings. Mugunthan, could you repost these patches and at least copy
-> devicetree-discuss at lists.ozlabs.org and the ARM kernel mailing list? I
-> can't comment on the patches you sent to netdev at vger.kernel.org because
-> I'm not currently subscribed to that list.
+> Ok, no problem. We certainly need the DT bindings for davinci_mdio. With
+> that applied, and the hwmod added (in the patch I posted yesterday), I
+> can at least mount the rootfs via NFS, which is all I currently need.
 > 
 > 
-> Thanks,
-> Daniel
 
-I will repost the patch set including the device tree and arm kernel mailing list today.
+I certainly understand your requirement here.
 
-Regards
-Mugunthan V N
+Actually this is not the only device we have, the same issue is applicable 
+to PWM subsystem available in AM335x. Hopefully I should have something soon 
+on this.
+
+
+Thanks,
+Vaibhav
