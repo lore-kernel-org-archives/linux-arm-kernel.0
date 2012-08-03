@@ -1,91 +1,67 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 3 Aug 2012 12:35:37 +0200 (CEST)
-Subject: [PATCH/RFC 1/4] dma: add a function to request a DMA channel
- for a specific client
-In-Reply-To: <1343988873.1726.14439.camel@vkoul-udesk3>
-References: <Pine.LNX.4.64.1207171201550.11241@axis700.grange>
- <Pine.LNX.4.64.1207171242230.17060@axis700.grange>
- <1343284293.1726.8966.camel@vkoul-udesk3>
- <Pine.LNX.4.64.1208021101350.11412@axis700.grange>
- <1343988873.1726.14439.camel@vkoul-udesk3>
-Message-ID: <Pine.LNX.4.64.1208031220460.5170@axis700.grange>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 3 Aug 2012 12:45:32 +0100
+Subject: kernel entry for thumb2-only cpus
+In-Reply-To: <20120803090452.GE2626@pengutronix.de>
+References: <20120803090452.GE2626@pengutronix.de>
+Message-ID: <20120803114532.GB26925@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 3 Aug 2012, Vinod Koul wrote:
+On Fri, Aug 03, 2012 at 10:04:52AM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
 
-> On Thu, 2012-08-02 at 11:11 +0200, Guennadi Liakhovetski wrote:
-> > > > +           chan = device->mux->request_chan(device, dev, direction, name);
-> > > NAK
-> > > 
-> > > 1. We dont want dmacs to have anything to do with filtering and
-> > > allocating. That is role of dmaengien and we need to add stuff there
-> > > only.
-> > > 2. Even if we start using optional name argument here we still don't
-> > > know out of 4 channels dmac supports which one to allocate.
-> > 
-> > I don't think we can be generic enough in the dmaengine core to identify 
-> > which channels are suitable for all slave requests. This is why I proposed 
-> > a concept of a DMA channel multiplexer driver, and this is exactly what 
-> > this callback is. I tried to explain this in the patch description above. 
-> > I thought we discussed this earlier in this thread and agreed, that a 
-> > multiplexer API is the way to go with channel allocation. I think, I 
-> > mentioned in one of my mails, that in the beginning I wanted to implement 
-> > multiplexers as a proper (platform) device, but at least one problem with 
-> > this is, that at least on my hardware the multiplexer and the DMAC share 
-> > registers, and an MFD seems an overkill for this, but we can discuss this. 
-> > I don't know, whether there are systems, where multiplexers are really 
-> > separate hardware blocks, if there are, we can think of a way to handle 
-> > those nicely too.
-> I would disagree.
+Hi Uwe,
+
+> in both arch/arm/kernel/head.S and arch/arm/kernel/head-nommu.S we have
 > 
-> As I have said in past, we need the mapping information to be available
-> with dmaengine for slave channels even before any slave allocation
-> occurs. This way dmaengine knows what to do with a channel.
-
-I think, this depends on our interpretation of what struct dma_chan 
-represents and who has control over it. If we think, that this is a 
-purely software object, which at allocation time has absolutely no 
-hardware association attached to it, then yes, only the dmaengine core 
-should manage them at least at that time. If, however, we define, that 
-struct dma_chan _can_ get hardware association already at allocation time 
-in the context of DMAC's .alloc_chan_resources() function, then it's 
-the DMAC that has to manage them.
-
-And, I think, there is one important aspect to this, that tells us, that 
-those channels cannot be absolutely hardware-agnostic: they are attached 
-to DMAC instances. So, they intrinsically have some hardware association.
-
-So, you have to take into account hardware limitations already at 
-allocation time. You can do this by either asking the DMAC, whether a 
-certain allocation can be performed (what we currently do with filters, 
-and what this patch proposed to do with the multiplexer callback), or you 
-can require some static information from DMACs, like a mapping that you 
-propose.
-
-Currently both approaches seem possible, however, a static mapping seems 
-less flexible to me, I don't know whether it can describe all available 
-hardware configurations. We shouldn't forget, that those mappings can be 
-many-to-many, as in the sh-dma example. On sh-dma it would suffice and be 
-optimal enough to have a pointer to a slave list in struct dma_chan. Would 
-this also suit everyone else? Is this what you're thinking about?
-
-Thanks
-Guennadi
-
-> I am planning to add the support in dmanegine for this...
+> 	.arm
+>  THUMB( adr     r9, BSYM(1f)    )       @ Kernel is always entered in ARM.
+>  THUMB( bx      r9              )       @ If this is a Thumb-2 kernel,
+>  THUMB( .thumb                  )       @ switch to Thumb now.
+>  THUMB(1:                       )
 > 
-> The problem with this solution here is again how the hell will a dmac
-> know what to do with alloc request. It doesn't and any current way it
-> does is just a hack and nothing else. This also prevenrts us form
-> building genric dmac driver which should only know how to deal with dmac
-> only and nothing else.
-> 
-> -- 
-> ~Vinod
-> 
+> as first instructions at the entry point. This is a problem for
+> thumb2-only cpus (e.g. Cortex-M3).
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Yup, Documentation/arm/Booting mentions this too.
+
+> Up to now I commented out the first three lines for the Cortex-M3 port.
+> What should we do about that. There are two possibilities I see:
+> 
+>  a) introduce a kconfig symbol for thumb2-only builds and #ifdef the
+>     first three lines out if it is given.
+>  b) expect the bootloader to directly jump to the label 1.
+> 
+> The downside of a) is that a boot loader on a cpu that is capable to
+> execute the tradtional instructions would need to detect if the switch
+> to thumb is there or not and react accordingly. (In fact it needs to
+> distringuish three cases:
+> 
+>  - traditional kernel
+>  - thumb2 kernel with ARM entry
+>  - thumb2 kernel without ARM entry
+> 
+> .) So I think b) is the more sensible option in the long run.
+> 
+> What do you think?
+
+How about something like:
+
+
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 835898e..9f07be2 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -86,6 +86,7 @@
+        __HEAD
+ ENTRY(stext)
+ 
++ THUMB(        .inst   0xe200e004      )       @ ARM: and lr, r0, #4 T2: b 1f
+  THUMB(        adr     r9, BSYM(1f)    )       @ Kernel is always entered in ARM.
+  THUMB(        bx      r9              )       @ If this is a Thumb-2 kernel,
+  THUMB(        .thumb                  )       @ switch to Thumb now.
+
+
+[thanks to Leif Lindholm for doing this in one instruction]
+
+Will
