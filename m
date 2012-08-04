@@ -1,30 +1,26 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 4 Aug 2012 03:04:56 -0400 (EDT)
-Subject: [PATCH 09/22] ARM: LPAE: use 64-bit pgd physical address in
- switch_mm()
-In-Reply-To: <1343775898-28345-10-git-send-email-cyril@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 4 Aug 2012 09:39:46 +0100
+Subject: [PATCH 00/22] Introducing the TI Keystone platform
+In-Reply-To: <1343775898-28345-1-git-send-email-cyril@ti.com>
 References: <1343775898-28345-1-git-send-email-cyril@ti.com>
- <1343775898-28345-10-git-send-email-cyril@ti.com>
-Message-ID: <alpine.LFD.2.02.1208040259200.5231@xanadu.home>
+Message-ID: <20120804083945.GB6802@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 31 Jul 2012, Cyril Chemparathy wrote:
-
-> This patch modifies the switch_mm() processor functions to use 64-bit
-> addresses.  We use u64 instead of phys_addr_t, in order to avoid having config
-> dependent register usage when calling into switch_mm assembly code.
+On Tue, Jul 31, 2012 at 07:04:36PM -0400, Cyril Chemparathy wrote:
+> This series is a follow on to the RFC series posted earlier (archived at [1]).
+> The major change introduced here is the modification to the kernel patching
+> mechanism for phys_to_virt/virt_to_phys, in order to support LPAE platforms
+> that require late patching.  In addition to these changes, we've updated the
+> series based on feedback from the earlier posting.
 > 
-> The changes in this patch are primarily adjustments for registers used for
-> arguments to switch_mm.  The few processor definitions that did use the second
-> argument have been modified accordingly.
-> 
-> Arguments and calling conventions aside, this patch should be a no-op on v6
-> and non-LPAE v7 processors. 
+> Most of the patches in this series are fixes and extensions to LPAE support on
+> ARM. The last three patches in this series are specific to the TI Keystone
+> platform, and are being provided here for the sake of completeness.  These
+> three patches are dependent on the smpops patch set (see [2]), and are not
+> ready to be merged in as yet.
 
-NAK.
-
-You just broke all big endian targets, LPAE or not.
-
-
-Nicolas
+Can you explain why you want the kernel loaded above the 4GB watermark?
+This seems silly to me, as the kernel needs to run at points with a 1:1
+physical to virtual mapping, and you can't do that if the kernel is
+stored in physical memory above the 4GB watermark.
