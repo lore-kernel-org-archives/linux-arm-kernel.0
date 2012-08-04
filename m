@@ -1,42 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 4 Aug 2012 22:54:47 +0800
-Subject: [GIT PULL] mxs fixes for 3.6
-In-Reply-To: <20120804144058.GB3405@S2101-09.ap.freescale.net>
-References: <20120804144058.GB3405@S2101-09.ap.freescale.net>
-Message-ID: <20120804145445.GD3405@S2101-09.ap.freescale.net>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Sat, 04 Aug 2012 17:47:17 +0200
+Subject: [PATCH] mtd: mxc_nand: Fix compiler warnings
+In-Reply-To: <20120730073454.GI1528@pengutronix.de>
+References: <1343466310-14584-1-git-send-email-dirk.behme@gmail.com>
+ <20120730073454.GI1528@pengutronix.de>
+Message-ID: <501D4405.6030900@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 04, 2012 at 10:41:00PM +0800, Shawn Guo wrote:
-> Hi Arnd, Olof,
-> 
-> Please pull the following mxs fixes for 3.6.
-> 
-One fix was missed there.  Updated request is below.
+On 30.07.2012 09:34, Uwe Kleine-K?nig wrote:
+> Hello,
+>
+> On Sat, Jul 28, 2012 at 11:05:10AM +0200, Dirk Behme wrote:
+>> From: Dirk Behme<dirk.behme@googlemail.com>
+>>
+>> Fix the compiler warnings
+>>
+>> drivers/mtd/nand/mxc_nand.c:1267: warning: initialization discards qualifiers from pointer target type
+>> drivers/mtd/nand/mxc_nand.c:1270: warning: initialization discards qualifiers from pointer target type
+>> drivers/mtd/nand/mxc_nand.c:1273: warning: initialization discards qualifiers from pointer target type
+>> drivers/mtd/nand/mxc_nand.c:1276: warning: initialization discards qualifiers from pointer target type
+> These should be gone in next already.
 
-Regards,
-Shawn
+Hmm, which next?
 
-The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
+I tried linux-next [1] from today (next-20120803, 55fa9961f) and still get
 
-  Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
+ > make drivers/mtd/nand/
+...
+  CC      drivers/mtd/nand/mxc_nand.o 
 
-are available in the git repository at:
-  git://git.linaro.org/people/shawnguo/linux-2.6.git mxs/fixes-for-3.6
+drivers/mtd/nand/mxc_nand.c:1298: warning: initialization discards 
+qualifiers from pointer target type
+drivers/mtd/nand/mxc_nand.c:1301: warning: initialization discards 
+qualifiers from pointer target type
+drivers/mtd/nand/mxc_nand.c:1304: warning: initialization discards 
+qualifiers from pointer target type
+drivers/mtd/nand/mxc_nand.c:1307: warning: initialization discards 
+qualifiers from pointer target type
+drivers/mtd/nand/mxc_nand.c:1310: warning: initialization discards 
+qualifiers from pointer target type
+   CC      drivers/mtd/nand/gpmi-nand/gpmi-nand.o
+...
 
-Fabio Estevam (2):
-      ARM: mx23: Fix registers range
-      ARM: mx28: Fix registers range
+Sorry if I missed something ;)
 
-Marc Kleine-Budde (1):
-      ARM: mxs: always build ocotp
+Best regards
 
-Marek Vasut (1):
-      ARM: mxs: Remove MMAP_MIN_ADDR setting from mxs_defconfig
+Dirk
 
- arch/arm/boot/dts/imx23.dtsi   |   52 ++++++++++++++--------------
- arch/arm/boot/dts/imx28.dtsi   |   74 ++++++++++++++++++++--------------------
- arch/arm/configs/mxs_defconfig |    1 -
- arch/arm/mach-mxs/Kconfig      |    6 ---
- arch/arm/mach-mxs/Makefile     |    3 +-
- 5 files changed, 64 insertions(+), 72 deletions(-)
+[1] 
+http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=shortlog;h=refs/heads/master
