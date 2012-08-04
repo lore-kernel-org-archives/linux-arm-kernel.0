@@ -1,52 +1,68 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 4 Aug 2012 11:27:20 -0700
-Subject: [GIT PULL][for 3.7] pull request from dt-mmp branch in pxa git
- tree
-In-Reply-To: <CAN1soZy-FBmywNLn9a0yanx9ojfB-jnqzYyXwAYr6F1_Khvacg@mail.gmail.com>
-References: <CAN1soZy-FBmywNLn9a0yanx9ojfB-jnqzYyXwAYr6F1_Khvacg@mail.gmail.com>
-Message-ID: <CAOesGMgwX+Use1wGOhgMe=63F1u8vPrft=FvysYNY+EbsUO5Zw@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 4 Aug 2012 22:59:38 +0200
+Subject: [PATCH] [RFC] arm: add documentation describing Marvell
+ families of SoC
+In-Reply-To: <CAMPhdO8jiTwfdk0DkhjdwMbH3Mt6=XXZKhwNH412UfNbodu7Ww@mail.gmail.com>
+References: <1342535201-12907-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAMPhdO8jiTwfdk0DkhjdwMbH3Mt6=XXZKhwNH412UfNbodu7Ww@mail.gmail.com>
+Message-ID: <20120804225938.6d44a9af@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Eric,
 
-Looking at your branch more in detail now, and there's a few things I
-would like to see changed. See below:
+Thanks for all those details! Some comments below.
 
+Le Wed, 18 Jul 2012 02:01:51 +0800,
+Eric Miao <eric.y.miao@gmail.com> a ?crit :
 
-> Daniel Mack (9):
->       RTC: add DT bindings to pxa-rtc
->       MMC: pxa-mci: add DT bindings
->       MTD: pxa3xx-nand: add devicetree bindings
->       GPIO: gpio-pxa: simplify pxa_gpio_to_irq() and pxa_irq_to_chip()
->       GPIO: gpio-pxa: fix devicetree functions
->       ARM: pxa: add devicetree code for irq handling
->       ARM: pxa3xx: skip default device initialization when booting via DT
->       ARM: pxa3xx: add generic DT machine code
->       ARM: pxa: add .dtsi files
->
-> Haojian Zhuang (6):
->       pinctrl: append new pins and groups in pxa910
->       pinctrl: add pinconf support in pxa3xx
->       pinctrl: support dt in pxa series
->       pinctrl: append new groups of mmp2
+> This is so useful to Marvell processor new comers, thanks everyone to
+> compile this.
+> 
+> The PXA side might need a bit modification though, so for historical
+> reason there is PXA series as originated back from Intel. So there
+> are really those legacy ones:
+> 
+>   PXA21x/PXA25x/PXA27x/PXA3xx/PXA93x
+> 
+> The new ones developed after Marvell acquired Intel's XScale biz are:
+> 
+>   PXA95x/PXA168/PXA910/MMP2
+> 
+> And among these, they are actually categorized into two flavors:
+> 
+>   AP with CP: PXA93x/PXA95X/PXA910
+>   AP only without CP: the rest of them
+> 
+> And the ARM cores used are also a bit different:
+> 
+>   XScale (Intel's ARMv5te compatible):
+> PXA21x/PXA25x/PXA27x/PXA3xx/PXA93x Marvell's PJ1 (Marvell's ARMv5te
+> compatible): PXA168/PXA910 Marvell's PJ4 (Marvell's ARMv7
+> compatible): PXA95x/MMP2
 
-None of these have acks from Linus Walleij. They should possibly even
-be merged through his tree. If you need them in both trees, or if you
-have dependencies on other changes done in this branch, then there's
-two options:
+Great, I included all those informations in some form. Will be part of
+v3.
 
-* Create one branch that gets pulled into both pinctrl and arm-soc
-trees, and we need to agree that neither of us will rebase it
-* Collect acks from Linus W and ask him if it's OK that you merge
-through arm-soc.
+> So these are really a bit complicated, by the end of the day, we
+> would still go the way as Arnd suggested, that to collapse PXA and
+> MMP series into one, so that will be simpler and easier to understand.
+> 
+> Considering the complications here, I would suggest to simply have a
+> single processor line as: PXA/MMP processor line, and list all the
+> processor flavors under, whether it's an AP or a AP+CP could be
+> individually indicated.
 
-I also don't see any devicetree bindings documented for the PXA
-pinctrl bindings?
+For now, I prefer to keep those as two separate families, so that it
+reflects the *current* state of the Linux mach-* directories. The
+current state may not be perfect, but it's the current state, so let's
+reflect it for now.
 
-There are also a bunch of other changes to the tauros2 code that is in
-this branch but was not in the pull request. Some of code should
-probably go in through Russell's tree since it touches core ARM code.
+Thanks again for your comments!
 
-
--Olof
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
