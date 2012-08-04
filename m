@@ -1,30 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 5 Aug 2012 01:20:04 +0200
-Subject: [PATCH 1/2] GPIO: gpio-pxa: simplify pxa_gpio_to_irq() and
- pxa_irq_to_chip()
-In-Reply-To: <201207251910.19088.arnd@arndb.de>
-References: <1343230539-7196-1-git-send-email-zonque@gmail.com>
- <201207251617.21735.arnd@arndb.de> <501036E1.5010309@gmail.com>
- <201207251910.19088.arnd@arndb.de>
-Message-ID: <CACRpkdZBzFVmXZZQboe0Thd-7qEZi5iKds4iV7kcVyhD=CX+Jw@mail.gmail.com>
+Date: Sun, 5 Aug 2012 01:40:50 +0200
+Subject: [PATCH v3 5/9] GPIO: gpio-pxa: fix devicetree functions
+In-Reply-To: <1343470061-16879-6-git-send-email-zonque@gmail.com>
+References: <1343470061-16879-1-git-send-email-zonque@gmail.com>
+ <1343470061-16879-6-git-send-email-zonque@gmail.com>
+Message-ID: <CACRpkdb+N+sP1yA+JRe9Gqh9bHt-Nmx_+fxZKwmddrCcd-1a4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2012 at 9:10 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 25 July 2012, Daniel Mack wrote:
->>
->> Thanks. I somehow lost track about the upstream pathes recently. Who
->> would queue them up now?
->
-> Haojian Zhuang is usually the person who picks up PXA patches these days.
-> If he prefers, you can also prepare a series and send them directly to
-> arm at kernel.org (that's Olof and me, for all practical purposes) for
-> integration into the arm-soc tree.
+On Sat, Jul 28, 2012 at 12:07 PM, Daniel Mack <zonque@gmail.com> wrote:
 
-Since these two are in drivers/gpio I can take them through the GPIO
-tree if desired, but still need some PXA maintainer to ACK them,
-however they haven't really listed themselves as maintainers for the
-GPIO driver in MAINTAINERS which would be preferable.
+> Provide an of_xlate function for the PXA GPIO chips and make it work for
+> devicetree environments.
+>
+> Successfully tested on a PXA3xx board.
+>
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+Are you planning to funnel these through say arm-soc?
 
 Yours,
 Linus Walleij
