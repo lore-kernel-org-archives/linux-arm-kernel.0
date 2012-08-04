@@ -1,120 +1,37 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sat,  4 Aug 2012 10:35:30 +0200
-Subject: [PATCH] drivers/dma/sirf-dma.c: fix usage of devm functions
-Message-ID: <1344069330-29569-1-git-send-email-Julia.Lawall@lip6.fr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 4 Aug 2012 09:51:42 +0100
+Subject: [PATCH v3] printk: add option to print cpu id
+In-Reply-To: <CAFm5wm3ayofPD7oF1=z_jwE_wuqBxBHicAs=KOhjcUr7Jo0wDQ@mail.gmail.com>
+References: <1344013004-32211-1-git-send-email-vikram.pandita@ti.com>
+ <m2628z6euk.fsf@firstfloor.org>
+ <CAFm5wm3ScpUU5wa=ei3TY0zjU4kVbOgJMmE5_QDpwy7B-TJa+A@mail.gmail.com>
+ <20120803200822.GC731@harshnoise.musicnaut.iki.fi>
+ <CAFm5wm2sf9LnZNj9_BDYTF9G7XH32fOL3x5n=kZ-1ih0Cek2DQ@mail.gmail.com>
+ <20120803215954.GA4489@kroah.com>
+ <CAFm5wm1_-JP0xjDdBvAcqqpZPQvxJPsmNtUOFQyaNw=6H_JJcg@mail.gmail.com>
+ <20120803221327.GA5102@kroah.com>
+ <CAFm5wm3ayofPD7oF1=z_jwE_wuqBxBHicAs=KOhjcUr7Jo0wDQ@mail.gmail.com>
+Message-ID: <20120804085142.GP7405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <Julia.Lawall@lip6.fr>
+On Fri, Aug 03, 2012 at 03:25:17PM -0700, Pandita, Vikram wrote:
+> Other issue i found, using this patch, that on multi-core ARM systems,
+> almost 99% of times, IRQ's are handled by CPU0,
+> even if CPU0 was really busy and other CPU's were free. I am yet to
+> understand a good reason why.
 
-Fix some problems with the use of devm_ functions.
+That is because you're probably not running irqbalanced on your platforms.
 
-devm_kzalloc: devm_kfree is not needed
+Firstly, the hardware does no IRQ balancing itself - you have to manually
+route IRQs to CPUs in the hardware, and if you ask for an IRQ to be
+delivered to several CPUs, all CPUs will get it each time it fires (unlike
+x86 IOAPIC which picks a CPU to route the IRQ to.)
 
-devm_ioremap: iounmap should not be used, no free is needed
+The ARM kernel does no IRQ balancing itself across CPUs, because when I
+tried to implement it, every algorithm I tried gave completely sub-optimal
+results, and irqbalanced existed to do the job in userspace.  So as there
+is a userspace solution which works, there was no point to doing this in
+the kernel.
 
-devm_request_irq: the devm_free_irq is followed by irq_dispose_mapping.  I
-don't know if it is safe to move the freeing of the irq in this case, so I
-have just un-devm'd this function, since the implicit freeing is never
-taken advantage of.
-
-In the original code failure of of_address_to_resource jumped to free_mem,
-but should have jumped to irq_dispose, since irq_of_parse_and_map has
-completed at this point.
-
-In the original code unmap_mem was after irq_dispose, but it should have
-been before, again since irq_of_parse_and_map has completed at this point.
-
-One of these problems was found using the following semantic match:
-(http://coccinelle.lip6.fr/)
-
-// <smpl>
-@@
-expression x;
-@@
-
-*x = devm_ioremap(...)
-...
-iounmap(x);
-// </smpl>
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
----
-Not compiled.  Does free_irq actually have to be called before
-irq_dispose_mapping?
-
- drivers/dma/sirf-dma.c |   23 +++++++----------------
- 1 file changed, 7 insertions(+), 16 deletions(-)
-
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index 434ad31..1af9e48 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -570,21 +570,19 @@ static int __devinit sirfsoc_dma_probe(struct platform_device *op)
- 
- 	if (of_property_read_u32(dn, "cell-index", &id)) {
- 		dev_err(dev, "Fail to get DMAC index\n");
--		ret = -ENODEV;
--		goto free_mem;
-+		return -ENODEV;
- 	}
- 
- 	sdma->irq = irq_of_parse_and_map(dn, 0);
- 	if (sdma->irq == NO_IRQ) {
- 		dev_err(dev, "Error mapping IRQ!\n");
--		ret = -EINVAL;
--		goto free_mem;
-+		return -EINVAL;
- 	}
- 
- 	ret = of_address_to_resource(dn, 0, &res);
- 	if (ret) {
- 		dev_err(dev, "Error parsing memory region!\n");
--		goto free_mem;
-+		goto irq_dispose;
- 	}
- 
- 	regs_start = res.start;
-@@ -597,12 +595,11 @@ static int __devinit sirfsoc_dma_probe(struct platform_device *op)
- 		goto irq_dispose;
- 	}
- 
--	ret = devm_request_irq(dev, sdma->irq, &sirfsoc_dma_irq, 0, DRV_NAME,
--		sdma);
-+	ret = request_irq(sdma->irq, &sirfsoc_dma_irq, 0, DRV_NAME, sdma);
- 	if (ret) {
- 		dev_err(dev, "Error requesting IRQ!\n");
- 		ret = -EINVAL;
--		goto unmap_mem;
-+		goto irq_dispose;
- 	}
- 
- 	dma = &sdma->dma;
-@@ -652,13 +649,9 @@ static int __devinit sirfsoc_dma_probe(struct platform_device *op)
- 	return 0;
- 
- free_irq:
--	devm_free_irq(dev, sdma->irq, sdma);
-+	free_irq(sdma->irq, sdma);
- irq_dispose:
- 	irq_dispose_mapping(sdma->irq);
--unmap_mem:
--	iounmap(sdma->base);
--free_mem:
--	devm_kfree(dev, sdma);
- 	return ret;
- }
- 
-@@ -668,10 +661,8 @@ static int __devexit sirfsoc_dma_remove(struct platform_device *op)
- 	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
- 
- 	dma_async_device_unregister(&sdma->dma);
--	devm_free_irq(dev, sdma->irq, sdma);
-+	free_irq(sdma->irq, sdma);
- 	irq_dispose_mapping(sdma->irq);
--	iounmap(sdma->base);
--	devm_kfree(dev, sdma);
- 	return 0;
- }
- 
+Please use the irqbalance daemon to spread IRQs across your CPUs.
