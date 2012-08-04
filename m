@@ -1,47 +1,44 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sat, 4 Aug 2012 12:13:13 +0800
-Subject: [PATCH 6/7] arm: mmp&dove: modify tauros2_init call
-In-Reply-To: <501786AB.5010608@free-electrons.com>
-References: <20120731070153.GA13777@lunn.ch>
- <CADApbehptEE++NoxBmTuPmbWY7q9Je_vXPxMv3Sq86_f_SpBCg@mail.gmail.com>
- <501786AB.5010608@free-electrons.com>
-Message-ID: <CAN1soZxrxgarm2yF1WMuapvNN-1Vh8PXW7_RVpGVByKhX96QEg@mail.gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Sat, 4 Aug 2012 07:16:08 +0200
+Subject: [PATCH v2] printk: add option to print cpu id
+In-Reply-To: <CAFm5wm0rsvuBafMH+9PpKwfaBimbRrVzxYV0nD_pg1yisAYwxQ@mail.gmail.com>
+References: <1343985378-22330-1-git-send-email-vikram.pandita@ti.com>
+ <D958900912E20642BCBC71664EFECE3E6DDCAC49AB@BGMAIL02.nvidia.com>
+ <D958900912E20642BCBC71664EFECE3E6DDCAC49AE@BGMAIL02.nvidia.com>
+ <CAFm5wm2Z+FyVqG5oMWiEmZ8Je88hJ-cyDXmJw0wp4mqA-X9eYg@mail.gmail.com>
+ <CAPXgP13UBwQLs+m_aSk3Ljbktz8WrL+ZO_Tfhrt_+tRBCARyQQ@mail.gmail.com>
+ <CAFm5wm0nf47bcTu7iiXA3geR_5dDTF1tnf81Lz7JzbWkKdhUtA@mail.gmail.com>
+ <CAPXgP11A=QfOt4SL2GvhsepP8JiDFfdaAhi6-AhW++-AvOz+aw@mail.gmail.com>
+ <20120803104212.GA6936@x1.osrc.amd.com>
+ <CAFm5wm0rsvuBafMH+9PpKwfaBimbRrVzxYV0nD_pg1yisAYwxQ@mail.gmail.com>
+Message-ID: <20120804051608.GB6728@liondog.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 3:18 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> On 07/31/2012 09:09 AM, Chao Xie wrote:
->> On Tue, Jul 31, 2012 at 3:01 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->>> Hi Chao
->>>
->>> When making changes to Dove, or any other Orion system, please could
->>> you CC: the orion maintainers:
->>>
->>> ARM/Marvell Dove/Kirkwood/MV78xx0/Orion SOC support
->>> M:      Jason Cooper <jason@lakedaemon.net>
->>> M:      Andrew Lunn <andrew@lunn.ch>
->>> L:      linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>> S:      Maintained
->>> F:      arch/arm/mach-dove/
->>> F:      arch/arm/mach-kirkwood/
->>> F:      arch/arm/mach-mv78xx0/
->>> F:      arch/arm/mach-orion5x/
->>> F:      arch/arm/plat-orion/
->>>
->>> Does this also affect Armada 370 and Armada XP SOC? I've no idea what
->>> cache it uses.
->>>
->>> Thanks
->>>         Andrew
->> It will impact Armada 370. The patch will make the user has choice to
->> enable extra features of tauros2
->
-> As far as I know it wouldn't impact the Armada370 as it use an other L2
-> called Aurora. We are currently working on it to submit it really soon.
-> The ArmadaXP also use the Aurora L2 cache controller.
->
-OK. I'll merge these patches.
+On Fri, Aug 03, 2012 at 09:46:15AM -0700, Pandita, Vikram wrote:
+> I mostly work with ARM Soc - specifically on OMAP. SMP multi core
+> systems in ARM-v7 world started to show up only few years back -
+> unlike x86 world.
 
-Regards
-Haojian
+This is exactly the thing: other SMP vendors have made it so far without
+emitting which core is doing what in dmesg.
+
+> ARM systems are a bit unique when it comes to security( read trust
+> zone ), and handling of FIQ's. Most of the ARM cortex-A series SoC's
+> out there have some kind of affinity to CPU0 being the master. One use
+> case has been, it has helped to know with this printk logging, if such
+> constraints are honored.
+>
+> Sometimes, tracking of some lockup cases between cpu's because of bad
+> code has also been helpful with this logging support. For now i will
+> post v3 of the patch and add arm-list and linux-omap list, and there
+> might be users there can benefit.
+
+Right, so if arm people need this thing, why not make it arm-only? I
+still fail to see the need for this (... at all, actually).
+
+Thanks.
+
+-- 
+Regards/Gruss,
+    Boris.
