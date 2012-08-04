@@ -1,33 +1,139 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Fri, 03 Aug 2012 19:52:51 -0400
-Subject: [PATCH v3 2/9] MMC: pxa-mci: add DT bindings
-In-Reply-To: <1343470061-16879-3-git-send-email-zonque@gmail.com> (Daniel
- Mack's message of "Sat, 28 Jul 2012 12:07:34 +0200")
-References: <1343470061-16879-1-git-send-email-zonque@gmail.com>
- <1343470061-16879-3-git-send-email-zonque@gmail.com>
-Message-ID: <87k3xf354c.fsf@octavius.laptop.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 4 Aug 2012 01:48:28 +0100
+Subject: [alsa-devel] [PATCH 1/6] ASoC: dapm: If one widget fails, do not
+ force all subsequent widgets to fail too
+In-Reply-To: <20120803083009.GC7416@gmail.com>
+References: <5017F68B.3060400@linaro.org>
+ <20120731151819.GC4468@opensource.wolfsonmicro.com>
+ <5018D880.5090306@linaro.org>
+ <20120801132022.GS11892@opensource.wolfsonmicro.com>
+ <50193428.5000708@linaro.org>
+ <20120801160824.GB11892@opensource.wolfsonmicro.com>
+ <20120801194134.GA4103@sirena.org.uk>
+ <20120802074517.GA19231@gmail.com>
+ <20120802175604.GF4537@opensource.wolfsonmicro.com>
+ <20120803083009.GC7416@gmail.com>
+Message-ID: <20120804004821.GG4515@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Aug 03, 2012 at 09:30:10AM +0100, Lee Jones wrote:
 
-On Sat, Jul 28 2012, Daniel Mack wrote:
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Cc: Chris Ball <cjb@laptop.org>
-> ---
->  Documentation/devicetree/bindings/mmc/pxa-mmc.txt | 25 +++++++++++
->  drivers/mmc/host/pxamci.c                         | 52 +++++++++++++++++++++++
->  2 files changed, 77 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mmc/pxa-mmc.txt
+> I do agree that it should be correct, but the difference between getting
+> it 90% correct and absolutely perfect increases the effort at least x2.
+> With so much left to do, I think it would be better to get everything in
+> and functioning, then fix the minor issues as we come across them later.
 
-Mind if I merge this via the MMC tree?  I prefer to take MMC patches
-there, and it doesn't look like there are any dependencies involved.
-I've pushed it to mmc-next now.
+If you're going to do this the usual way is to do it by leaving bits
+out, and see below.
 
-Thanks,
+> If only it were that easy. We're not bursting at the seems with resources
+> here. I'm working in a very customer focused ecosystem. If they don't 
+> request it, or file a bug about it, there's no resource allocation to fix
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Right, I work in the same industry - but this shouldn't be a problem,
+if it's not urgent for people to help it's probably not urgent to do
+whatever's blocked by it either.
+
+> > You're not telling us about the problems you see so it's very difficult
+> > for anyone to help you.
+
+> > For example with this patch the only information you've sent is the
+> > patch and the fact that you're seeing the error you're ignoring going
+> > off on the system you're working with (which I had to ask to find out
+
+> I only went off what I knew. Some objects (which wouldn't have
+> prevented playing audio) were failing. It seemed wrong to shut down the
+> entire audio system because for instance, 'headset mute' or the 'vibrator'
+> links were broken. As I said to you before, time is a big factor and I
+> have a massive TODO list. Fixing audio links a) isn't my subject of
+
+This isn't the point, and it's a *very* important point which is the
+main reason I'm replying here.
+
+The immediate point here is that you're not communicating about what
+you're trying to which is the source of a lot of problems.  Things would
+run a lot more smoothly if when you try to cut corners you were explicit
+about the corners you cut, and if when you run into problems you report
+those problems as well as sending whatever code you're using to work
+around things.  Set people's expecations about what they're seeing and
+provide them with context.
+
+Consider the patch that's in the subject line here - it took me a couple
+of goes before you even said you'd seen an issue on your system which
+you were working around (I still don't know what the actual errors are).
+As far as I could tell looking at the patch description it was something
+done for taste reasons which was being sent as a bug fix.
+
+The usual approach for things like this is a changelog or cover mail
+which says something like "I'm seeing this error, here's the code I'm
+using to get things working on my system and I think this is a good idea
+because..." (or "...but that can't be right", or whatever).  This works
+a whole lot better, it makes it clear what the underlying motivation for
+the change is and understand the submitter's expecation for the quality
+of the patch.
+
+Similarly with the missing device tree binding documentation, had you
+said something about the patches not being complete and writing the
+binding documentation later that'd have helped a lot.  Having it there
+is a basic checklist thing for new DT bindings which is easy to spot
+from a diffstat, it's really not something a reviewer should ever need
+to ask about especially from someone doing a lot of DT work and it's a
+big red flag for the quality of the code.
+
+Things like this are really important, especially for people doing lots
+of work, as they have such a big impact on communication and so much of
+what makes this thing tick is about communication.
+
+> expertise, so it would take me much longer to fix than someone with
+> a good knowledge of the system and b) isn't really my responsibility.
+
+That's fine, just tell people about the problem and move on to
+something else from what's probably a large task list if it's blocking
+you (and start nagging people if it doesn't get fixed and it seems
+important).  This happens fairly often, it works well most of the time.
+Sending a fix is of course ideal but it's not essential.
+
+> Well I know my submissions are not always 100% perfect, but I hope 
+> you're not implying that they're poor quality. Writing code and fixing
+> things you view as bugs in code you have no prior knowledge of isn't the 
+
+This is process stuff more than code stuff, it's all about communication.
+
+> easiest task in the world. All I can do is attempt to fix the issues that
+> I see, which get things off the ground or make drivers work again and
+> submit the changes. If they're wrong they're wrong, but I don't think this
+> should be viewed as poor quality code!
+
+What you can do here is to commmunicate about what you're doing more.
+Don't just think about the code, think about the communication
+surrounding the code - this is the core of the issue.
+
+> the experience. Some Maintainers say things like, "That's wrong. This
+> is wrong. Why are you doing this?" etc without explaining what the
+> issues are. That's not a good review, and will put people off trying
+> again.
+
+Like I said in my previous mail this is one of the tools people have
+available to them to drive up quality - if you watch a bit more closely
+you'll often see that the quality of the review is scaled to factors in
+the submission (and often the pattern of submissions from a contributor).
+It's often not something that's done conciously, a lot of this is just
+people conveying that they're annoyed.
+
+>        Equally being too overzealous and nit-picky about stuff that a)
+> really doesn't matter or b) can be changed really easily _if_ in the
+> rare case there's an issue. I've also submitted to some Maintainers
+
+This is a similar thing - it's part of the toolbox.
+
+> who are a pleasure to work with. They explain what's wrong and why
+> and encourage resubmission. I know Maintainers aren't school teachers,
+> or life coaches, but they should be encouraging more people to share
+> their good ( after some fixup ;) ) code and not playing the role of 
+> an incredibly hard to please boss, or impenetrable brick wall.
+
+Maintainer bandwidth is limited, and people will focus these efforts
+where they think it'd be useful.  What I'm spending time doing here is
+trying to convey that there's some fairly easily solvable process issues
+here which are making everyone's life harder here.
