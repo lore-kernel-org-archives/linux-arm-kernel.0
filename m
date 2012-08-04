@@ -1,37 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 4 Aug 2012 09:51:42 +0100
-Subject: [PATCH v3] printk: add option to print cpu id
-In-Reply-To: <CAFm5wm3ayofPD7oF1=z_jwE_wuqBxBHicAs=KOhjcUr7Jo0wDQ@mail.gmail.com>
-References: <1344013004-32211-1-git-send-email-vikram.pandita@ti.com>
- <m2628z6euk.fsf@firstfloor.org>
- <CAFm5wm3ScpUU5wa=ei3TY0zjU4kVbOgJMmE5_QDpwy7B-TJa+A@mail.gmail.com>
- <20120803200822.GC731@harshnoise.musicnaut.iki.fi>
- <CAFm5wm2sf9LnZNj9_BDYTF9G7XH32fOL3x5n=kZ-1ih0Cek2DQ@mail.gmail.com>
- <20120803215954.GA4489@kroah.com>
- <CAFm5wm1_-JP0xjDdBvAcqqpZPQvxJPsmNtUOFQyaNw=6H_JJcg@mail.gmail.com>
- <20120803221327.GA5102@kroah.com>
- <CAFm5wm3ayofPD7oF1=z_jwE_wuqBxBHicAs=KOhjcUr7Jo0wDQ@mail.gmail.com>
-Message-ID: <20120804085142.GP7405@n2100.arm.linux.org.uk>
+From: r.sricharan@ti.com (R, Sricharan)
+Date: Sat, 4 Aug 2012 15:34:00 +0530
+Subject: [PATCH 1/1] ARM: Fix mapping in alloc_init_section for unaligned
+ addresses.
+In-Reply-To: <20120804084439.GC6802@n2100.arm.linux.org.uk>
+References: <1344063622-11021-1-git-send-email-r.sricharan@ti.com>
+ <20120804084439.GC6802@n2100.arm.linux.org.uk>
+Message-ID: <CAJ7qFSdhjH+66kT_FF0LkiJmXL3Hp9wVKL7v-y3OoJk-LxzmzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2012 at 03:25:17PM -0700, Pandita, Vikram wrote:
-> Other issue i found, using this patch, that on multi-core ARM systems,
-> almost 99% of times, IRQ's are handled by CPU0,
-> even if CPU0 was really busy and other CPU's were free. I am yet to
-> understand a good reason why.
+Hi Russell,
 
-That is because you're probably not running irqbalanced on your platforms.
+On Sat, Aug 4, 2012 at 2:14 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Aug 04, 2012 at 12:30:22PM +0530, R Sricharan wrote:
+>> When either the start address or end address or physical address
+>> to be mapped is unaligned, alloc_init_section creates
+>> page granularity mappings. alloc_init_section calls
+>> alloc_init_pte which populates one pmd entry and sets up
+>> the ptes. But if the size is greater than what can be mapped
+>> by one pmd entry, then the rest remains unmapped.
+>>
+>> The issue becomes visible when LPAE is enabled, where we have
+>> the 3 levels with seperate pgd and pmd's.
+>> When a static mapping for 3MB is requested, only 2MB is mapped
+>> and the remaining 1MB is unmapped. Fixing this here, by looping
+>> in to map the entire unaligned address range.
+>
+> This doesn't look like a nice fix.  The implication above is that it's
+> only alloc_init_pte() which is affected - so why not add a loop there?
+>
+    Ok, will move the loop to alloc_init_pte instead.
 
-Firstly, the hardware does no IRQ balancing itself - you have to manually
-route IRQs to CPUs in the hardware, and if you ask for an IRQ to be
-delivered to several CPUs, all CPUs will get it each time it fires (unlike
-x86 IOAPIC which picks a CPU to route the IRQ to.)
+> Remember that pte's cover two sections, not one, so you need to use a
+> different increment to sections.
 
-The ARM kernel does no IRQ balancing itself across CPUs, because when I
-tried to implement it, every algorithm I tried gave completely sub-optimal
-results, and irqbalanced existed to do the job in userspace.  So as there
-is a userspace solution which works, there was no point to doing this in
-the kernel.
+     Yes, and that varies when LPAE is enabled. Will take care of this
+     as well in V2 post.
 
-Please use the irqbalance daemon to spread IRQs across your CPUs.
+Thanks,
+ Sricharan
