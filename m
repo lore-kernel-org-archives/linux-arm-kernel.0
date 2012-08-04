@@ -1,29 +1,120 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 4 Aug 2012 09:44:39 +0100
-Subject: [PATCH 1/1] ARM: Fix mapping in alloc_init_section for
- unaligned addresses.
-In-Reply-To: <1344063622-11021-1-git-send-email-r.sricharan@ti.com>
-References: <1344063622-11021-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <20120804084439.GC6802@n2100.arm.linux.org.uk>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Sat,  4 Aug 2012 10:35:30 +0200
+Subject: [PATCH] drivers/dma/sirf-dma.c: fix usage of devm functions
+Message-ID: <1344069330-29569-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 04, 2012 at 12:30:22PM +0530, R Sricharan wrote:
-> When either the start address or end address or physical address
-> to be mapped is unaligned, alloc_init_section creates
-> page granularity mappings. alloc_init_section calls
-> alloc_init_pte which populates one pmd entry and sets up
-> the ptes. But if the size is greater than what can be mapped
-> by one pmd entry, then the rest remains unmapped.
-> 
-> The issue becomes visible when LPAE is enabled, where we have
-> the 3 levels with seperate pgd and pmd's.
-> When a static mapping for 3MB is requested, only 2MB is mapped
-> and the remaining 1MB is unmapped. Fixing this here, by looping
-> in to map the entire unaligned address range.
+From: Julia Lawall <Julia.Lawall@lip6.fr>
 
-This doesn't look like a nice fix.  The implication above is that it's
-only alloc_init_pte() which is affected - so why not add a loop there?
+Fix some problems with the use of devm_ functions.
 
-Remember that pte's cover two sections, not one, so you need to use a
-different increment to sections.
+devm_kzalloc: devm_kfree is not needed
+
+devm_ioremap: iounmap should not be used, no free is needed
+
+devm_request_irq: the devm_free_irq is followed by irq_dispose_mapping.  I
+don't know if it is safe to move the freeing of the irq in this case, so I
+have just un-devm'd this function, since the implicit freeing is never
+taken advantage of.
+
+In the original code failure of of_address_to_resource jumped to free_mem,
+but should have jumped to irq_dispose, since irq_of_parse_and_map has
+completed at this point.
+
+In the original code unmap_mem was after irq_dispose, but it should have
+been before, again since irq_of_parse_and_map has completed at this point.
+
+One of these problems was found using the following semantic match:
+(http://coccinelle.lip6.fr/)
+
+// <smpl>
+@@
+expression x;
+@@
+
+*x = devm_ioremap(...)
+...
+iounmap(x);
+// </smpl>
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
+---
+Not compiled.  Does free_irq actually have to be called before
+irq_dispose_mapping?
+
+ drivers/dma/sirf-dma.c |   23 +++++++----------------
+ 1 file changed, 7 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+index 434ad31..1af9e48 100644
+--- a/drivers/dma/sirf-dma.c
++++ b/drivers/dma/sirf-dma.c
+@@ -570,21 +570,19 @@ static int __devinit sirfsoc_dma_probe(struct platform_device *op)
+ 
+ 	if (of_property_read_u32(dn, "cell-index", &id)) {
+ 		dev_err(dev, "Fail to get DMAC index\n");
+-		ret = -ENODEV;
+-		goto free_mem;
++		return -ENODEV;
+ 	}
+ 
+ 	sdma->irq = irq_of_parse_and_map(dn, 0);
+ 	if (sdma->irq == NO_IRQ) {
+ 		dev_err(dev, "Error mapping IRQ!\n");
+-		ret = -EINVAL;
+-		goto free_mem;
++		return -EINVAL;
+ 	}
+ 
+ 	ret = of_address_to_resource(dn, 0, &res);
+ 	if (ret) {
+ 		dev_err(dev, "Error parsing memory region!\n");
+-		goto free_mem;
++		goto irq_dispose;
+ 	}
+ 
+ 	regs_start = res.start;
+@@ -597,12 +595,11 @@ static int __devinit sirfsoc_dma_probe(struct platform_device *op)
+ 		goto irq_dispose;
+ 	}
+ 
+-	ret = devm_request_irq(dev, sdma->irq, &sirfsoc_dma_irq, 0, DRV_NAME,
+-		sdma);
++	ret = request_irq(sdma->irq, &sirfsoc_dma_irq, 0, DRV_NAME, sdma);
+ 	if (ret) {
+ 		dev_err(dev, "Error requesting IRQ!\n");
+ 		ret = -EINVAL;
+-		goto unmap_mem;
++		goto irq_dispose;
+ 	}
+ 
+ 	dma = &sdma->dma;
+@@ -652,13 +649,9 @@ static int __devinit sirfsoc_dma_probe(struct platform_device *op)
+ 	return 0;
+ 
+ free_irq:
+-	devm_free_irq(dev, sdma->irq, sdma);
++	free_irq(sdma->irq, sdma);
+ irq_dispose:
+ 	irq_dispose_mapping(sdma->irq);
+-unmap_mem:
+-	iounmap(sdma->base);
+-free_mem:
+-	devm_kfree(dev, sdma);
+ 	return ret;
+ }
+ 
+@@ -668,10 +661,8 @@ static int __devexit sirfsoc_dma_remove(struct platform_device *op)
+ 	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
+ 
+ 	dma_async_device_unregister(&sdma->dma);
+-	devm_free_irq(dev, sdma->irq, sdma);
++	free_irq(sdma->irq, sdma);
+ 	irq_dispose_mapping(sdma->irq);
+-	iounmap(sdma->base);
+-	devm_kfree(dev, sdma);
+ 	return 0;
+ }
+ 
