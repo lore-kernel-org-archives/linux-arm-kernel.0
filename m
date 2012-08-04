@@ -1,38 +1,53 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 4 Aug 2012 15:57:19 +0200
-Subject: [PATCH v6 0/3] Updated Cortex-M3 series
-In-Reply-To: <20120803151740.GZ2005@localhost.localdomain>
-References: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <201208031407.09092.arnd@arndb.de>
- <20120803145035.GJ2626@pengutronix.de>
- <20120803151740.GZ2005@localhost.localdomain>
-Message-ID: <20120804135719.GK2626@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 4 Aug 2012 22:09:02 +0800
+Subject: [PATCH V2] MXS: Remove MMAP_MIN_ADDR setting from mxs_defconfig
+In-Reply-To: <1344020088-8156-1-git-send-email-marex@denx.de>
+References: <1344020088-8156-1-git-send-email-marex@denx.de>
+Message-ID: <20120804140859.GA3405@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Again, patch subject should be like "ARM: mxs: ...".
 
-On Fri, Aug 03, 2012 at 08:47:40PM +0530, Shiraz Hashim wrote:
-> On Fri, Aug 03, 2012 at 10:50:35PM +0800, Uwe Kleine-K?nig wrote:
-> > On Fri, Aug 03, 2012 at 02:07:08PM +0000, Arnd Bergmann wrote:
-> > > Is it possible to build a NOMMU kernel that runs on both
-> > > ARMv7-A amd ARMv7-M, in other words is ARMv7-M compatible with
-> > > ARMv7-A (or ARMv7-R for that matter) if you don't use the MMU?
-> >
-> > the instructions to enable and disable irqs are different, so
-> > we'd need another indirection at least there. Also the whole
-> > exception model is different. So I'd say it's too different to
-> > target for a common kernel for the A, R and M profiles.
+On Fri, Aug 03, 2012 at 08:54:48PM +0200, Marek Vasut wrote:
+> The CONFIG_DEFAULT_MMAP_MIN_ADDR was set to 65536 in mxs_defconfig,
+> this caused severe breakage of userland applications since the upper
+> limit for ARM is 32768. By default CONFIG_DEFAULT_MMAP_MIN_ADDR is
+> set to 4096 and can also be changed via /proc/sys/vm/mmap_min_addr
+> if needed.
 > 
-> We are using standard Linux kernel (v3.3) with MMU disabled on
-> a Cortex R4 system.
-Yeah, I expected A and R to be similar enough. It's the difference
-between (A+R) and M that makes a common kernel for all three profiles
-hard.
+> Quoting Russell King [1]:
+> 
+> "4096 is also fine for ARM too. There's not much point in having
+> defconfigs change it - that would just be pure noise in the config
+> files."
+> 
+> the CONFIG_DEFAULT_MMAP_MIN_ADDR can be removed from the defconfig
+> altogether.
+> 
+> This problem was introduced by:
+> 
+> commit cde7c41feaa06cb6bfc748b2fc3c7d809091c2b0
+> Author: Wolfram Sang <w.sang@pengutronix.de>
+> Date:   Fri Apr 29 15:06:40 2011 +0200
+> 
+>     ARM: configs: add defconfig for mach-mxs
+> 
 
-Best regards
-Uwe
+We generally quote another commit in commit message like
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+cde7c41 (ARM: configs: add defconfig for mach-mxs)
+
+> [1] http://marc.info/?l=linux-arm-kernel&m=134401593807820&w=2
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Wolfgang Denk <wd@denx.de>
+
+We should Cc stable.
+
+I just fixed them and queued the patch for 3.6-rc.
+
+Regards,
+Shawn
