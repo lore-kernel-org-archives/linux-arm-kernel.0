@@ -1,41 +1,54 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 5 Aug 2012 02:12:26 +0200
-Subject: [PATCH v3 4/9] GPIO: gpio-pxa: simplify pxa_gpio_to_irq() and
- pxa_irq_to_chip()
-In-Reply-To: <1343470061-16879-5-git-send-email-zonque@gmail.com>
-References: <1343470061-16879-1-git-send-email-zonque@gmail.com>
- <1343470061-16879-5-git-send-email-zonque@gmail.com>
-Message-ID: <CACRpkdaJhzzckg12uZrgweoOgC44VNb=0AEdp96AV2O0UM+AnA@mail.gmail.com>
+Date: Sun, 5 Aug 2012 02:18:33 +0200
+Subject: [RFC v2] ARM: sched_clock: update epoch_cyc on resume
+In-Reply-To: <CAMbhsRSboLABOD8eX4czk8FsG3QmT60RTr+znVCqwWR6ZGhgaw@mail.gmail.com>
+References: <1343184588-20239-1-git-send-email-ccross@android.com>
+ <CACRpkdZv4p+QT3Y+=-xh5iJ=sr1_aahroxQ535QpzVD9e_ESJA@mail.gmail.com>
+ <20120727233829.GB14835@n2100.arm.linux.org.uk>
+ <CAMbhsRSGYmu=eyqik23cECsJPfpo6rUqZUa853nkY35XRo4Q_w@mail.gmail.com>
+ <CAMbhsRQg4pETrM7cx+aSBzGn3S1LV_x7vo8X3A300vCWTjkFng@mail.gmail.com>
+ <CAMbhsRSboLABOD8eX4czk8FsG3QmT60RTr+znVCqwWR6ZGhgaw@mail.gmail.com>
+Message-ID: <CACRpkdbY9E6R+fohGsrEHcmeQJUf3m4duVMC=N5=+Q15a6_gjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 28, 2012 at 12:07 PM, Daniel Mack <zonque@gmail.com> wrote:
-
-> Simplify the code in gpio-pxa.c and make them based on irq_base.
-> When not probed from devicetree, initialize irq_base from
-> PXA_GPIO_TO_IRQ() or MMP_GPIO_TO_IRQ(), respectively, so the non-DT case
-> still works.
+On Fri, Aug 3, 2012 at 3:28 AM, Colin Cross <ccross@android.com> wrote:
+> On Fri, Jul 27, 2012 at 8:30 PM, Colin Cross <ccross@android.com> wrote:
+>> On Fri, Jul 27, 2012 at 6:15 PM, Colin Cross <ccross@android.com> wrote:
+>>> That patch was merged in 3.4, and my patch is on top of it.  Your
+>>> patch updates epoch_cyc and epoch_ns in suspend, but if the first call
+>>> to cyc_to_sched_clock after resume gets cyc = 0, cyc - epoch_cyc can
+>>> be negative, although it will be cast back to a large positive number.
+>>>
+>>> With my patch, epoch_cyc is updated in resume to whatever
+>>> read_sched_clock() returns, and epoch_ns is still set to the suspend
+>>> value, so it appears that sched_clock has not changed between
+>>> sched_clock_suspend and sched_clock_resume.  It will work with any
+>>> timer behavior (reset to 0, reset to random value, or continuing
+>>> counting).  The old setup_sched_clock function maintains the old
+>>> behavior to appease those who like their 32kHz sched clock to continue
+>>> ticking in suspend, although I think it is more correct for all sched
+>>> clocks to be faster than 32 kHz (when possible) and stop in suspend.
+>>
+>> I think the existing code can cause sched_clock to go backwards if the
+>> register read by the read function resets to 0 in suspend:
+>>
+>> In sched_clock_suspend epoch_cyc is updated to 0x00002000.
+>>
+>> The first sched_clock call after resume gets cyc = 0, returning
+>> epoch_ns + cyc_to_ns(0xffffe000)
+>>
+>> Later, sched_clock gets cyc = 0x5000, returning epoch_ns +
+>> cyc_to_ns(0x3000), which will be much smaller than the previous
+>> sched_clock value.
 >
-> Only tested on PXA3xx.
->
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Russell, any update on this?  Should sched_clock.c handle read
+> functions that go backwards in suspend, or should I modify the read
+> function to track an offset in suspend and always return a
+> monotonically increasing value across suspend?
 
-OK:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-But:
-
-> +#ifdef CONFIG_ARCH_PXA
-> +               if (gpio_is_pxa_type(gpio_type))
-> +                       irq_base = PXA_GPIO_TO_IRQ(0);
-> +#endif
-> +#ifdef CONFIG_ARCH_MMP
-> +               if (gpio_is_mmp_type(gpio_type))
-> +                       irq_base = MMP_GPIO_TO_IRQ(0);
-> +#endif
-
-Grrr. Can we think of a way to get rid of these #ifdef:s?
+Colin, I suggest you put this into Russell's patch tracker so
+he can keep track of it from there.
 
 Yours,
 Linus Walleij
