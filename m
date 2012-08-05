@@ -1,80 +1,47 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 5 Aug 2012 11:55:28 +0200
-Subject: kernel entry for thumb2-only cpus
-In-Reply-To: <20120803114532.GB26925@mudshark.cambridge.arm.com>
-References: <20120803090452.GE2626@pengutronix.de>
- <20120803114532.GB26925@mudshark.cambridge.arm.com>
-Message-ID: <20120805095528.GO2626@pengutronix.de>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Sun, 05 Aug 2012 12:56:47 +0200
+Subject: [PATCH] mtd: mxc_nand: Fix compiler warnings
+In-Reply-To: <20120805083926.GL2626@pengutronix.de>
+References: <1343466310-14584-1-git-send-email-dirk.behme@gmail.com>
+ <20120730073454.GI1528@pengutronix.de> <501D4405.6030900@googlemail.com>
+ <20120805083926.GL2626@pengutronix.de>
+Message-ID: <501E516F.2020507@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2012 at 12:45:32PM +0100, Will Deacon wrote:
-> On Fri, Aug 03, 2012 at 10:04:52AM +0100, Uwe Kleine-K?nig wrote:
-> > Hello,
-> 
-> Hi Uwe,
-> 
-> > in both arch/arm/kernel/head.S and arch/arm/kernel/head-nommu.S we have
-> > 
-> > 	.arm
-> >  THUMB( adr     r9, BSYM(1f)    )       @ Kernel is always entered in ARM.
-> >  THUMB( bx      r9              )       @ If this is a Thumb-2 kernel,
-> >  THUMB( .thumb                  )       @ switch to Thumb now.
-> >  THUMB(1:                       )
-> > 
-> > as first instructions at the entry point. This is a problem for
-> > thumb2-only cpus (e.g. Cortex-M3).
-> 
-> Yup, Documentation/arm/Booting mentions this too.
-> 
-> > Up to now I commented out the first three lines for the Cortex-M3 port.
-> > What should we do about that. There are two possibilities I see:
-> > 
-> >  a) introduce a kconfig symbol for thumb2-only builds and #ifdef the
-> >     first three lines out if it is given.
-> >  b) expect the bootloader to directly jump to the label 1.
-> > 
-> > The downside of a) is that a boot loader on a cpu that is capable to
-> > execute the tradtional instructions would need to detect if the switch
-> > to thumb is there or not and react accordingly. (In fact it needs to
-> > distringuish three cases:
-> > 
-> >  - traditional kernel
-> >  - thumb2 kernel with ARM entry
-> >  - thumb2 kernel without ARM entry
-> > 
-> > .) So I think b) is the more sensible option in the long run.
-> > 
-> > What do you think?
-> 
-> How about something like:
-> 
-> 
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index 835898e..9f07be2 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -86,6 +86,7 @@
->         __HEAD
->  ENTRY(stext)
->  
-> + THUMB(        .inst   0xe200e004      )       @ ARM: and lr, r0, #4 T2: b 1f
->   THUMB(        adr     r9, BSYM(1f)    )       @ Kernel is always entered in ARM.
->   THUMB(        bx      r9              )       @ If this is a Thumb-2 kernel,
->   THUMB(        .thumb                  )       @ switch to Thumb now.
-Great idea, but it doesn't work as suggested. My compiler already barfs
-on the .arm above:
+On 05.08.2012 10:39, Uwe Kleine-K?nig wrote:
+> On Sat, Aug 04, 2012 at 05:47:17PM +0200, Dirk Behme wrote:
+>> On 30.07.2012 09:34, Uwe Kleine-K?nig wrote:
+>>> Hello,
+>>>
+>>> On Sat, Jul 28, 2012 at 11:05:10AM +0200, Dirk Behme wrote:
+>>>> From: Dirk Behme<dirk.behme@googlemail.com>
+>>>>
+>>>> Fix the compiler warnings
+>>>>
+>>>> drivers/mtd/nand/mxc_nand.c:1267: warning: initialization discards qualifiers from pointer target type
+>>>> drivers/mtd/nand/mxc_nand.c:1270: warning: initialization discards qualifiers from pointer target type
+>>>> drivers/mtd/nand/mxc_nand.c:1273: warning: initialization discards qualifiers from pointer target type
+>>>> drivers/mtd/nand/mxc_nand.c:1276: warning: initialization discards qualifiers from pointer target type
+>>> These should be gone in next already.
+>>
+>> Hmm, which next?
+>>
+>> I tried linux-next [1] from today (next-20120803, 55fa9961f) and still get
+> next-20120725 contained 98d7bbb9929bcc14e11ac8a55245a4f2dc174e17, don't
+> konw why it isn't included in the newer next snapshorts.
 
-	arch/arm/kernel/head-nommu.S:36: Error: selected processor does not support ARM opcodes
-	arch/arm/kernel/head-nommu.S:42: Error: attempt to use an ARM instruction on a Thumb-only processor -- `adr r9,1f+1'
-	arch/arm/kernel/head-nommu.S:43: Error: attempt to use an ARM instruction on a Thumb-only processor -- `bx r9'
+First, yes, it was part of next-20120725. Second, I can confirm that 
+the patch [1] fixes the compiler warnings I reported above. So my 
+patch is obsolete now.
 
-but something like that should be doable.
+And third, strange is the absence in next-20120803 and 3.6-rc1. Do we 
+a chance to find out what's ongoing here? It would be a shame if your 
+patch get lost.
 
-Best regards
-Uwe
+Many thanks
+
+Dirk
 
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+[1] https://patchwork.kernel.org/patch/1226851/
