@@ -1,47 +1,91 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 5 Aug 2012 14:01:27 +0800
-Subject: [PATCH 3/4] gpio/mxs: specify gpio base for device tree probe
+Date: Sun, 5 Aug 2012 14:01:28 +0800
+Subject: [PATCH 4/4] ARM: dts: imx: add alias for gpio
 In-Reply-To: <1344146488-9496-1-git-send-email-shawn.guo@linaro.org>
 References: <1344146488-9496-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1344146488-9496-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1344146488-9496-4-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, unlike the non-DT probe where the gpio base is specified
-with pdev->id, the DT probe uses the base dynamically allocated by
-gpio core, which uses a completely different numbering scheme.  This
-causes two issues to user space applications which access sysfs entry
-/sys/class/gpio/gpioN.
-
-* It breaks the compatibility with user space applications between
-  non-DT and DT kernels.
-
-* It's not intuitive and sometimes hard for users to map the Linux
-  gpio number to the actual hardware pin.
-
-Use alias to identify the gpio port/bank, and then the gpio base
-can be specified with port id to solve above issues.  If alias is not
-defined in device tree, the base number dynamically allocated by gpio
-core will be used.
+Add alias for gpio nodes, so that gpio driver can identify the port
+number and then specify a sensible gpio base rather than using the
+one dynamically allocated by gpio core.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/gpio/gpio-mxs.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ arch/arm/boot/dts/imx27.dtsi |    6 ++++++
+ arch/arm/boot/dts/imx51.dtsi |    4 ++++
+ arch/arm/boot/dts/imx53.dtsi |    7 +++++++
+ arch/arm/boot/dts/imx6q.dtsi |    7 +++++++
+ 4 files changed, 24 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-index 39e4956..09687ce 100644
---- a/drivers/gpio/gpio-mxs.c
-+++ b/drivers/gpio/gpio-mxs.c
-@@ -290,7 +290,8 @@ static int __devinit mxs_gpio_probe(struct platform_device *pdev)
- 		return err;
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index 00bae3a..5303ab6 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -19,6 +19,12 @@
+ 		serial3 = &uart4;
+ 		serial4 = &uart5;
+ 		serial5 = &uart6;
++		gpio0 = &gpio1;
++		gpio1 = &gpio2;
++		gpio2 = &gpio3;
++		gpio3 = &gpio4;
++		gpio4 = &gpio5;
++		gpio5 = &gpio6;
+ 	};
  
- 	port->bgc.gc.to_irq = mxs_gpio_to_irq;
--	port->bgc.gc.base = port->id * 32;
-+	port->bgc.gc.base = (pdev->id < 0) ? of_alias_get_id(np, "gpio") * 32 :
-+					     pdev->id * 32;
+ 	avic: avic-interrupt-controller at e0000000 {
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 53cbaa3..aba28dc 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -17,6 +17,10 @@
+ 		serial0 = &uart1;
+ 		serial1 = &uart2;
+ 		serial2 = &uart3;
++		gpio0 = &gpio1;
++		gpio1 = &gpio2;
++		gpio2 = &gpio3;
++		gpio3 = &gpio4;
+ 	};
  
- 	err = gpiochip_add(&port->bgc.gc);
- 	if (err) {
+ 	tzic: tz-interrupt-controller at e0000000 {
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index fc79cdc..cd37165 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -19,6 +19,13 @@
+ 		serial2 = &uart3;
+ 		serial3 = &uart4;
+ 		serial4 = &uart5;
++		gpio0 = &gpio1;
++		gpio1 = &gpio2;
++		gpio2 = &gpio3;
++		gpio3 = &gpio4;
++		gpio4 = &gpio5;
++		gpio5 = &gpio6;
++		gpio6 = &gpio7;
+ 	};
+ 
+ 	tzic: tz-interrupt-controller at 0fffc000 {
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 3d3c64b..fd57079 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -19,6 +19,13 @@
+ 		serial2 = &uart3;
+ 		serial3 = &uart4;
+ 		serial4 = &uart5;
++		gpio0 = &gpio1;
++		gpio1 = &gpio2;
++		gpio2 = &gpio3;
++		gpio3 = &gpio4;
++		gpio4 = &gpio5;
++		gpio5 = &gpio6;
++		gpio6 = &gpio7;
+ 	};
+ 
+ 	cpus {
 -- 
 1.7.5.4
