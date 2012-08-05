@@ -1,91 +1,74 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 5 Aug 2012 14:01:28 +0800
-Subject: [PATCH 4/4] ARM: dts: imx: add alias for gpio
-In-Reply-To: <1344146488-9496-1-git-send-email-shawn.guo@linaro.org>
-References: <1344146488-9496-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1344146488-9496-4-git-send-email-shawn.guo@linaro.org>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Sun, 05 Aug 2012 08:36:45 +0200
+Subject: [PATCH v2 2/3] mtd: nand: Let MTD_NAND_GPMI_NAND depend on MXS_DMA
+In-Reply-To: <20120803100711.GC24458@pengutronix.de>
+References: <1343215100-24005-1-git-send-email-festevam@gmail.com>
+ <1343215100-24005-2-git-send-email-festevam@gmail.com>
+ <20120803100711.GC24458@pengutronix.de>
+Message-ID: <501E147D.5050707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add alias for gpio nodes, so that gpio driver can identify the port
-number and then specify a sensible gpio base rather than using the
-one dynamically allocated by gpio core.
+On 03.08.2012 12:07, Sascha Hauer wrote:
+> On Wed, Jul 25, 2012 at 08:18:19AM -0300, Fabio Estevam wrote:
+>> From: Fabio Estevam<fabio.estevam@freescale.com>
+>>
+>> MTD_NAND_GPMI_NAND driver depends on MXS_DMA to be selected, otherwise the following error happens
+>> for imx_v6_v7_defconfig:
+>>
+>> drivers/built-in.o: In function `gpmi_dma_filter':
+>> clk-fixed-factor.c:(.text+0xb124c): undefined reference to `mxs_dma_is_apbh'
+>> make: *** [vmlinux] Error 1
+>>
+>> Signed-off-by: Fabio Estevam<fabio.estevam@freescale.com>
+>
+> Acked-by: Sascha Hauer<s.hauer@pengutronix.de>
+>
+> As mentioned elsewhere in this thread: We should not select user visible
+> options, so this patch is the only thing we can do atm (apart from
+> 'fixing the tools' as David mentioned, but this is out of scope for an
+> -rc kernel)
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx27.dtsi |    6 ++++++
- arch/arm/boot/dts/imx51.dtsi |    4 ++++
- arch/arm/boot/dts/imx53.dtsi |    7 +++++++
- arch/arm/boot/dts/imx6q.dtsi |    7 +++++++
- 4 files changed, 24 insertions(+), 0 deletions(-)
+I asked Shawn about this and it seems that this patch is the way to go 
+for the moment. So:
 
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 00bae3a..5303ab6 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -19,6 +19,12 @@
- 		serial3 = &uart4;
- 		serial4 = &uart5;
- 		serial5 = &uart6;
-+		gpio0 = &gpio1;
-+		gpio1 = &gpio2;
-+		gpio2 = &gpio3;
-+		gpio3 = &gpio4;
-+		gpio4 = &gpio5;
-+		gpio5 = &gpio6;
- 	};
- 
- 	avic: avic-interrupt-controller at e0000000 {
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 53cbaa3..aba28dc 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -17,6 +17,10 @@
- 		serial0 = &uart1;
- 		serial1 = &uart2;
- 		serial2 = &uart3;
-+		gpio0 = &gpio1;
-+		gpio1 = &gpio2;
-+		gpio2 = &gpio3;
-+		gpio3 = &gpio4;
- 	};
- 
- 	tzic: tz-interrupt-controller at e0000000 {
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index fc79cdc..cd37165 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -19,6 +19,13 @@
- 		serial2 = &uart3;
- 		serial3 = &uart4;
- 		serial4 = &uart5;
-+		gpio0 = &gpio1;
-+		gpio1 = &gpio2;
-+		gpio2 = &gpio3;
-+		gpio3 = &gpio4;
-+		gpio4 = &gpio5;
-+		gpio5 = &gpio6;
-+		gpio6 = &gpio7;
- 	};
- 
- 	tzic: tz-interrupt-controller at 0fffc000 {
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 3d3c64b..fd57079 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -19,6 +19,13 @@
- 		serial2 = &uart3;
- 		serial3 = &uart4;
- 		serial4 = &uart5;
-+		gpio0 = &gpio1;
-+		gpio1 = &gpio2;
-+		gpio2 = &gpio3;
-+		gpio3 = &gpio4;
-+		gpio4 = &gpio5;
-+		gpio5 = &gpio6;
-+		gpio6 = &gpio7;
- 	};
- 
- 	cpus {
--- 
-1.7.5.4
+Acked-by: Dirk Behme <dirk.behme@gmail.com>
+
+David: Artem: Building recent 3.6-rc1mainline with imx_v6_v7_defconfig 
+is broken. We need this patch to get it working, again.
+
+It would be nice if this patch could go as a fix into 3.6-rcX mainline 
+asap. Could you help with this?
+
+Many thanks and best regards
+
+Dirk
+
+> Additionally the imx_v6_v7_defconfig should be adjusted so that the gpmi
+> nand driver actually gets built.
+>
+> Sascha
+>
+>> ---
+>> Changes since v1:
+>> - Use 'depends' rather than 'select'
+>>   drivers/mtd/nand/Kconfig |    1 +
+>>   1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+>> index a5d8a1b..da52c7d 100644
+>> --- a/drivers/mtd/nand/Kconfig
+>> +++ b/drivers/mtd/nand/Kconfig
+>> @@ -463,6 +463,7 @@ config MTD_NAND_NANDSIM
+>>   config MTD_NAND_GPMI_NAND
+>>           bool "GPMI NAND Flash Controller driver"
+>>           depends on MTD_NAND&&  (SOC_IMX23 || SOC_IMX28 || SOC_IMX6Q)
+>> +	depends on MXS_DMA
+>>           help
+>>   	 Enables NAND Flash support for IMX23, IMX28 or IMX6.
+>>   	 The GPMI controller is very powerful, with the help of BCH
+>> --
+>> 1.7.1
+>>
+>>
+>
