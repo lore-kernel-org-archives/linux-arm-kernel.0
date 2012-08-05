@@ -1,10 +1,10 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 5 Aug 2012 11:47:21 +0200
-Subject: [PATCH 2/4] gpio/mxc: specify gpio base for device tree probe
-In-Reply-To: <1344146488-9496-2-git-send-email-shawn.guo@linaro.org>
+Date: Sun, 5 Aug 2012 11:48:24 +0200
+Subject: [PATCH 3/4] gpio/mxs: specify gpio base for device tree probe
+In-Reply-To: <1344146488-9496-3-git-send-email-shawn.guo@linaro.org>
 References: <1344146488-9496-1-git-send-email-shawn.guo@linaro.org>
- <1344146488-9496-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CACRpkdZFmfb-Fg_K1UPyx5Qw1XkODNo4aiNiOkoSXyOYRGMZ7g@mail.gmail.com>
+ <1344146488-9496-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CACRpkdZz+F8gUGJG+d2mGrt8Rp0NzYypGdLEUbxmh=X1Q1cFhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
