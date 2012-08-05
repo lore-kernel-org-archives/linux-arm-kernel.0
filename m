@@ -1,9 +1,9 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 5 Aug 2012 14:01:26 +0800
-Subject: [PATCH 2/4] gpio/mxc: specify gpio base for device tree probe
+Date: Sun, 5 Aug 2012 14:01:27 +0800
+Subject: [PATCH 3/4] gpio/mxs: specify gpio base for device tree probe
 In-Reply-To: <1344146488-9496-1-git-send-email-shawn.guo@linaro.org>
 References: <1344146488-9496-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1344146488-9496-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1344146488-9496-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,22 +26,22 @@ core will be used.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/gpio/gpio-mxc.c |    3 ++-
+ drivers/gpio/gpio-mxs.c |    3 ++-
  1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-index 76e8cda..80f44bb 100644
---- a/drivers/gpio/gpio-mxc.c
-+++ b/drivers/gpio/gpio-mxc.c
-@@ -465,7 +465,8 @@ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
- 		goto out_iounmap;
+diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
+index 39e4956..09687ce 100644
+--- a/drivers/gpio/gpio-mxs.c
++++ b/drivers/gpio/gpio-mxs.c
+@@ -290,7 +290,8 @@ static int __devinit mxs_gpio_probe(struct platform_device *pdev)
+ 		return err;
  
- 	port->bgc.gc.to_irq = mxc_gpio_to_irq;
--	port->bgc.gc.base = pdev->id * 32;
+ 	port->bgc.gc.to_irq = mxs_gpio_to_irq;
+-	port->bgc.gc.base = port->id * 32;
 +	port->bgc.gc.base = (pdev->id < 0) ? of_alias_get_id(np, "gpio") * 32 :
 +					     pdev->id * 32;
  
  	err = gpiochip_add(&port->bgc.gc);
- 	if (err)
+ 	if (err) {
 -- 
 1.7.5.4
