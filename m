@@ -1,32 +1,31 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sun, 5 Aug 2012 10:57:53 +0800
-Subject: [GIT PULL][for 3.7] pull request from dt-mmp branch in pxa git
- tree
-In-Reply-To: <CACRpkdavwK=PZjBsQ+FhJ75rx9nsuV6iae7Hp-sF0qmtnNGdSw@mail.gmail.com>
-References: <CAN1soZy-FBmywNLn9a0yanx9ojfB-jnqzYyXwAYr6F1_Khvacg@mail.gmail.com>
- <CAOesGMgwX+Use1wGOhgMe=63F1u8vPrft=FvysYNY+EbsUO5Zw@mail.gmail.com>
- <CACRpkdavwK=PZjBsQ+FhJ75rx9nsuV6iae7Hp-sF0qmtnNGdSw@mail.gmail.com>
-Message-ID: <CAN1soZwOuccKr-N4gRjKRkZ6yWG-767wGdPvDSvKnoecgUA1Dg@mail.gmail.com>
+Date: Sun, 5 Aug 2012 10:58:57 +0800
+Subject: [PATCH v3 5/9] GPIO: gpio-pxa: fix devicetree functions
+In-Reply-To: <CACRpkdb+N+sP1yA+JRe9Gqh9bHt-Nmx_+fxZKwmddrCcd-1a4g@mail.gmail.com>
+References: <1343470061-16879-1-git-send-email-zonque@gmail.com>
+ <1343470061-16879-6-git-send-email-zonque@gmail.com>
+ <CACRpkdb+N+sP1yA+JRe9Gqh9bHt-Nmx_+fxZKwmddrCcd-1a4g@mail.gmail.com>
+Message-ID: <CAN1soZywD8QcOn3W4z4n-E87_ZJhtufYDR6390T-zuqzv9T92Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 5, 2012 at 8:02 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Sat, Aug 4, 2012 at 8:27 PM, Olof Johansson <olof@lixom.net> wrote:
+On Sun, Aug 5, 2012 at 7:40 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sat, Jul 28, 2012 at 12:07 PM, Daniel Mack <zonque@gmail.com> wrote:
 >
->> None of these have acks from Linus Walleij. They should possibly even
->> be merged through his tree.
+>> Provide an of_xlate function for the PXA GPIO chips and make it work for
+>> devicetree environments.
+>>
+>> Successfully tested on a PXA3xx board.
+>>
+>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
 >
-> I haven't managed to look closer at them until now. It's a bit confusing
-> since there are several iterations of the patches and two authors
-> involved, point me to missed patches if I don't see them.
->
-> I will assume that you want to send this through the ARM SoC tree
-> and ACK the stuff that looks good to me.
+> Are you planning to funnel these through say arm-soc?
 >
 > Yours,
 > Linus Walleij
 
-Thanks. I'll append your Ack and send the pull quest again.
+Yes, Daniel plans to go through arm-soc. And I merged it into pxa git tree.
 
 Regards
 Haojian
