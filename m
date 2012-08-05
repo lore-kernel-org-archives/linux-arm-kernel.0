@@ -1,399 +1,71 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 5 Aug 2012 23:05:21 +0800
-Subject: [PATCH v2 4/4] cpufreq: Add a generic cpufreq-cpu0 driver
-In-Reply-To: <1344179121-17738-1-git-send-email-shawn.guo@linaro.org>
-References: <1344179121-17738-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1344179121-17738-5-git-send-email-shawn.guo@linaro.org>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Sun, 5 Aug 2012 11:10:34 -0400
+Subject: [PATCH 00/22] Introducing the TI Keystone platform
+In-Reply-To: <20120804083945.GB6802@n2100.arm.linux.org.uk>
+References: <1343775898-28345-1-git-send-email-cyril@ti.com>
+ <20120804083945.GB6802@n2100.arm.linux.org.uk>
+Message-ID: <501E8CEA.9050601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds a generic cpufreq driver for CPU0 frequency management based on
-clk, regulator, OPP and device tree support.  It can support both
-uniprocessor (UP) and those symmetric multiprocessor (SMP) systems which
-share clock and voltage across all CPUs.
+Hi Russell,
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |   55 ++++
- drivers/cpufreq/Kconfig                            |   11 +
- drivers/cpufreq/Makefile                           |    2 +
- drivers/cpufreq/cpufreq-cpu0.c                     |  271 ++++++++++++++++++++
- 4 files changed, 339 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
- create mode 100644 drivers/cpufreq/cpufreq-cpu0.c
+On 8/4/2012 4:39 AM, Russell King - ARM Linux wrote:
+> On Tue, Jul 31, 2012 at 07:04:36PM -0400, Cyril Chemparathy wrote:
+>> This series is a follow on to the RFC series posted earlier (archived at [1]).
+>> The major change introduced here is the modification to the kernel patching
+>> mechanism for phys_to_virt/virt_to_phys, in order to support LPAE platforms
+>> that require late patching.  In addition to these changes, we've updated the
+>> series based on feedback from the earlier posting.
+>>
+>> Most of the patches in this series are fixes and extensions to LPAE support on
+>> ARM. The last three patches in this series are specific to the TI Keystone
+>> platform, and are being provided here for the sake of completeness.  These
+>> three patches are dependent on the smpops patch set (see [2]), and are not
+>> ready to be merged in as yet.
+>
+> Can you explain why you want the kernel loaded above the 4GB watermark?
+> This seems silly to me, as the kernel needs to run at points with a 1:1
+> physical to virtual mapping, and you can't do that if the kernel is
+> stored in physical memory above the 4GB watermark.
+>
 
-diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-new file mode 100644
-index 0000000..4416ccc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-@@ -0,0 +1,55 @@
-+Generic CPU0 cpufreq driver
-+
-+It is a generic cpufreq driver for CPU0 frequency management.  It
-+supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
-+systems which share clock and voltage across all CPUs.
-+
-+Both required and optional properties listed below must be defined
-+under node /cpus/cpu at 0.
-+
-+Required properties:
-+- operating-points: Refer to Documentation/devicetree/bindings/power/opp.txt
-+  for details
-+
-+Optional properties:
-+- clock-latency: Specify the possible maximum transition latency for clock,
-+  in unit of nanoseconds.
-+- voltage-tolerance: Specify the CPU voltage tolerance in percentage.
-+
-+Examples:
-+
-+cpus {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	cpu at 0 {
-+		compatible = "arm,cortex-a9";
-+		reg = <0>;
-+		next-level-cache = <&L2>;
-+		operating-points = <
-+			/* kHz    uV */
-+			792000  1100000
-+			396000  950000
-+			198000  850000
-+		>;
-+		transition-latency = <61036>; /* two CLK32 periods */
-+	};
-+
-+	cpu at 1 {
-+		compatible = "arm,cortex-a9";
-+		reg = <1>;
-+		next-level-cache = <&L2>;
-+	};
-+
-+	cpu at 2 {
-+		compatible = "arm,cortex-a9";
-+		reg = <2>;
-+		next-level-cache = <&L2>;
-+	};
-+
-+	cpu at 3 {
-+		compatible = "arm,cortex-a9";
-+		reg = <3>;
-+		next-level-cache = <&L2>;
-+	};
-+};
-diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
-index e24a2a1..ea512f4 100644
---- a/drivers/cpufreq/Kconfig
-+++ b/drivers/cpufreq/Kconfig
-@@ -179,6 +179,17 @@ config CPU_FREQ_GOV_CONSERVATIVE
- 
- 	  If in doubt, say N.
- 
-+config GENERIC_CPUFREQ_CPU0
-+	bool "Generic CPU0 cpufreq driver"
-+	depends on HAVE_CLK && REGULATOR && PM_OPP && OF
-+	select CPU_FREQ_TABLE
-+	help
-+	  This adds a generic cpufreq driver for CPU0 frequency management.
-+	  It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
-+	  systems which share clock and voltage across all CPUs.
-+
-+	  If in doubt, say N.
-+
- menu "x86 CPU frequency scaling drivers"
- depends on X86
- source "drivers/cpufreq/Kconfig.x86"
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 9531fc2..a378ed2 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -13,6 +13,8 @@ obj-$(CONFIG_CPU_FREQ_GOV_CONSERVATIVE)	+= cpufreq_conservative.o
- # CPUfreq cross-arch helpers
- obj-$(CONFIG_CPU_FREQ_TABLE)		+= freq_table.o
- 
-+obj-$(CONFIG_GENERIC_CPUFREQ_CPU0)	+= cpufreq-cpu0.o
-+
- ##################################################################################
- # x86 drivers.
- # Link order matters. K8 is preferred to ACPI because of firmware bugs in early
-diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
-new file mode 100644
-index 0000000..fd3bac6
---- /dev/null
-+++ b/drivers/cpufreq/cpufreq-cpu0.c
-@@ -0,0 +1,271 @@
-+/*
-+ * Copyright (C) 2012 Freescale Semiconductor, Inc.
-+ *
-+ * Reuse some codes from drivers/cpufreq/omap-cpufreq.c
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
-+
-+#include <linux/clk.h>
-+#include <linux/cpu.h>
-+#include <linux/cpufreq.h>
-+#include <linux/err.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/opp.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/slab.h>
-+
-+static unsigned int transition_latency;
-+static unsigned int voltage_tolerance; /* in percentage */
-+
-+static struct device *cpu_dev;
-+static struct clk *cpu_clk;
-+static struct regulator *cpu_reg;
-+static struct cpufreq_frequency_table *freq_table;
-+
-+static int cpu0_verify_speed(struct cpufreq_policy *policy)
-+{
-+	return cpufreq_frequency_table_verify(policy, freq_table);
-+}
-+
-+static unsigned int cpu0_get_speed(unsigned int cpu)
-+{
-+	return clk_get_rate(cpu_clk) / 1000;
-+}
-+
-+static int cpu0_set_target(struct cpufreq_policy *policy,
-+			   unsigned int target_freq, unsigned int relation)
-+{
-+	struct cpufreq_freqs freqs;
-+	struct opp *opp;
-+	unsigned long freq_Hz, volt = 0, volt_old = 0, tol = 0;
-+	unsigned int index, cpu;
-+	int ret;
-+
-+	ret = cpufreq_frequency_table_target(policy, freq_table, target_freq,
-+					     relation, &index);
-+	if (ret) {
-+		pr_err("failed to match target freqency %d: %d\n",
-+		       target_freq, ret);
-+		return ret;
-+	}
-+
-+	freq_Hz = clk_round_rate(cpu_clk, freq_table[index].frequency * 1000);
-+	if (freq_Hz < 0)
-+		freq_Hz = freq_table[index].frequency * 1000;
-+	freqs.new = freq_Hz / 1000;
-+	freqs.old = clk_get_rate(cpu_clk) / 1000;
-+
-+	if (freqs.old == freqs.new)
-+		return 0;
-+
-+	for_each_online_cpu(cpu) {
-+		freqs.cpu = cpu;
-+		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-+	}
-+
-+	if (cpu_reg) {
-+		opp = opp_find_freq_ceil(cpu_dev, &freq_Hz);
-+		if (IS_ERR(opp)) {
-+			pr_err("failed to find OPP for %ld\n", freq_Hz);
-+			return PTR_ERR(opp);
-+		}
-+		volt = opp_get_voltage(opp);
-+		tol = volt * voltage_tolerance / 100;
-+		volt_old = regulator_get_voltage(cpu_reg);
-+	}
-+
-+	pr_debug("%u MHz, %ld mV --> %u MHz, %ld mV\n",
-+		 freqs.old / 1000, volt_old ? volt_old / 1000 : -1,
-+		 freqs.new / 1000, volt ? volt / 1000 : -1);
-+
-+	/* scaling up?  scale voltage before frequency */
-+	if (cpu_reg && freqs.new > freqs.old) {
-+		ret = regulator_set_voltage_tol(cpu_reg, volt, tol);
-+		if (ret) {
-+			pr_err("failed to scale voltage up: %d\n", ret);
-+			freqs.new = freqs.old;
-+			return ret;
-+		}
-+	}
-+
-+	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
-+	if (ret) {
-+		pr_err("failed to set clock rate: %d\n", ret);
-+		if (cpu_reg)
-+			regulator_set_voltage_tol(cpu_reg, volt_old, tol);
-+		return ret;
-+	}
-+
-+	/* scaling down?  scale voltage after frequency */
-+	if (cpu_reg && freqs.new < freqs.old) {
-+		ret = regulator_set_voltage_tol(cpu_reg, volt, tol);
-+		if (ret) {
-+			pr_err("failed to scale voltage down: %d\n", ret);
-+			clk_set_rate(cpu_clk, freqs.old * 1000);
-+			freqs.new = freqs.old;
-+			return ret;
-+		}
-+	}
-+
-+	for_each_online_cpu(cpu) {
-+		freqs.cpu = cpu;
-+		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-+	}
-+
-+	return 0;
-+}
-+
-+static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
-+{
-+	int ret;
-+
-+	if (policy->cpu != 0)
-+		return -EINVAL;
-+
-+	ret = cpufreq_frequency_table_cpuinfo(policy, freq_table);
-+	if (ret) {
-+		pr_err("invalid frequency table: %d\n", ret);
-+		return ret;
-+	}
-+
-+	policy->cpuinfo.transition_latency = transition_latency;
-+	policy->cur = clk_get_rate(cpu_clk) / 1000;
-+
-+	/*
-+	 * The driver only supports the SMP configuartion where all processors
-+	 * share the clock and voltage and clock.  Use cpufreq affected_cpus
-+	 * interface to have all CPUs scaled together.
-+	 */
-+	policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
-+	cpumask_setall(policy->cpus);
-+
-+	cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
-+
-+	return 0;
-+}
-+
-+static int cpu0_cpufreq_exit(struct cpufreq_policy *policy)
-+{
-+	cpufreq_frequency_table_put_attr(policy->cpu);
-+
-+	return 0;
-+}
-+
-+static struct freq_attr *cpu0_cpufreq_attr[] = {
-+	&cpufreq_freq_attr_scaling_available_freqs,
-+	NULL,
-+};
-+
-+static struct cpufreq_driver cpu0_cpufreq_driver = {
-+	.flags = CPUFREQ_STICKY,
-+	.verify = cpu0_verify_speed,
-+	.target = cpu0_set_target,
-+	.get = cpu0_get_speed,
-+	.init = cpu0_cpufreq_init,
-+	.exit = cpu0_cpufreq_exit,
-+	.name = "generic_cpu0",
-+	.attr = cpu0_cpufreq_attr,
-+};
-+
-+static int __devinit cpu0_cpufreq_driver_init(void)
-+{
-+	struct device_node *np;
-+	int ret;
-+
-+	np = of_find_node_by_path("/cpus/cpu at 0");
-+	if (!np) {
-+		pr_err("failed to find cpu0 node\n");
-+		return -ENOENT;
-+	}
-+
-+	cpu_dev = get_cpu_device(0);
-+	if (!cpu_dev) {
-+		pr_err("failed to get cpu0 device\n");
-+		ret = -ENODEV;
-+		goto out_put_node;
-+	}
-+
-+	cpu_dev->of_node = np;
-+
-+	cpu_clk = clk_get(cpu_dev, NULL);
-+	if (IS_ERR(cpu_clk)) {
-+		ret = PTR_ERR(cpu_clk);
-+		pr_err("failed to get cpu0 clock: %d\n", ret);
-+		goto out_put_node;
-+	}
-+
-+	cpu_reg = regulator_get(cpu_dev, "cpu0");
-+	if (IS_ERR(cpu_reg)) {
-+		pr_warn("failed to get cpu0 regulator\n");
-+		cpu_reg = NULL;
-+	}
-+
-+	ret = of_init_opp_table(cpu_dev);
-+	if (ret) {
-+		pr_err("failed to init OPP table: %d\n", ret);
-+		goto out_put_node;
-+	}
-+
-+	ret = opp_init_cpufreq_table(cpu_dev, &freq_table);
-+	if (ret) {
-+		pr_err("failed to init cpufreq table: %d\n", ret);
-+		goto out_put_node;
-+	}
-+
-+	of_property_read_u32(np, "voltage-tolerance", &voltage_tolerance);
-+
-+	if (of_property_read_u32(np, "clock-latency", &transition_latency))
-+		transition_latency = CPUFREQ_ETERNAL;
-+
-+	if (cpu_reg) {
-+		struct opp *opp;
-+		unsigned long min_uV, max_uV;
-+		int i;
-+
-+		/*
-+		 * OPP is maintained in order of increasing frequency, and
-+		 * freq_table initialised from OPP is therefore sorted in the
-+		 * same order.
-+		 */
-+		for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++)
-+			;
-+		opp = opp_find_freq_exact(cpu_dev,
-+				freq_table[0].frequency * 1000, true);
-+		min_uV = opp_get_voltage(opp);
-+		opp = opp_find_freq_exact(cpu_dev,
-+				freq_table[i-1].frequency * 1000, true);
-+		max_uV = opp_get_voltage(opp);
-+		ret = regulator_set_voltage_time(cpu_reg, min_uV, max_uV);
-+		if (ret > 0)
-+			transition_latency += ret * 1000;
-+	}
-+
-+	ret = cpufreq_register_driver(&cpu0_cpufreq_driver);
-+	if (ret) {
-+		pr_err("failed register driver: %d\n", ret);
-+		goto out_free_table;
-+	}
-+
-+	of_node_put(np);
-+	return 0;
-+
-+out_free_table:
-+	opp_free_cpufreq_table(cpu_dev, &freq_table);
-+out_put_node:
-+	of_node_put(np);
-+	return ret;
-+}
-+late_initcall(cpu0_cpufreq_driver_init);
-+
-+MODULE_AUTHOR("Shawn Guo <shawn.guo@linaro.org>");
-+MODULE_DESCRIPTION("Generic CPU0 cpufreq driver");
-+MODULE_LICENSE("GPL");
+The Keystone family of devices is built to run with large (>8G) physical 
+memory for certain use-cases.  From the CPUs perspective, this entire 
+range of physical memory is mapped in linearly at 08:0000:0000, i.e., 
+above the 4GB watermark.
+
+The interconnect provides an aliased view of the first 2GB of this 
+memory at the 8000:0000 offset.  This alias is intended primarily for 
+boot-time usage, and does not support DMA coherence.  We considered the 
+option of running with the first 2G of memory located under the 4GB 
+watermark, and the rest located at the native >4GB location, but this 
+would necessitate sparsemem, and would also break DMA coherence out of 
+lowmem.  Hence the need for the more complicated approach implemented in 
+this patch series.
+
+
+The posted patch series manages to get an SMP system running out of 
+memory beyond the 4GB watermark.  We identified a couple of places that 
+needed the 1:1 physical to virtual mapping, and for these we take 
+advantage of the alias view provided by the interconnect.  The two 
+places that we found the need for 1:1 mapping were:
+
+1. initial boot code in head.S:  here we've taken the approach of 
+initially running out of the alias space, and then switching over to the 
+high address space once we are safely in machine-specific territory.
+
+2. idmap for secondary CPU boot:  here we've added a virt_to_idmap() 
+facility that our sub-architecture then overrides to express the 
+interconnect supported alias view.
+
+
+We are well aware of the fact that we are barely scratching the surface 
+of the problem space here, and we'd be very thankful for a heads up on 
+issues that we may have missed so far.  We would similarly appreciate 
+other better ideas to solve this problem in light of the unique 
+constraints imposed here.
+
 -- 
-1.7.5.4
+Thanks
+- Cyril
