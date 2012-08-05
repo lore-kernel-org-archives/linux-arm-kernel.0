@@ -1,63 +1,72 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Sun, 05 Aug 2012 13:56:13 +0200
-Subject: [PATCH 1/2] GPIO: gpio-pxa: simplify pxa_gpio_to_irq() and
- pxa_irq_to_chip()
-In-Reply-To: <501E2F6C.4050507@compulab.co.il>
-References: <1343230539-7196-1-git-send-email-zonque@gmail.com>
- <501E2F6C.4050507@compulab.co.il>
-Message-ID: <501E5F5D.5070901@gmail.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sun,  5 Aug 2012 15:50:29 +0300
+Subject: [PATCH] ARM: dma-mapping: fix incorrect freeing of atomic allocations
+Message-ID: <1344171029-24804-1-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.08.2012 10:31, Igor Grinberg wrote:
-> Hi Daniel,
-> 
-> On 07/25/12 18:35, Daniel Mack wrote:
->> Simplify the code in gpio-pxa.c and make them based on irq_base.
->> When not probed from devicetree, initialize irq_base from
->> PXA_GPIO_TO_IRQ() or MMP_GPIO_TO_IRQ(), respectively, so the non-DT case
->> still works.
->>
->> Only tested on PXA3xx.
->>
->> Signed-off-by: Daniel Mack <zonque@gmail.com>
->> ---
->>  drivers/gpio/gpio-pxa.c |   70 +++++++++++------------------------------------
->>  1 file changed, 16 insertions(+), 54 deletions(-)
->>
->> diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
->> index 58a6a63..6d0cb9d 100644
->> --- a/drivers/gpio/gpio-pxa.c
->> +++ b/drivers/gpio/gpio-pxa.c
-> 
-> [...]
-> 
->> @@ -564,10 +516,20 @@ static int __devinit pxa_gpio_probe(struct platform_device *pdev)
->>  	int irq0 = 0, irq1 = 0, irq_mux, gpio_offset = 0;
->>  
->>  	ret = pxa_gpio_probe_dt(pdev);
->> -	if (ret < 0)
->> +	if (ret < 0) {
->>  		pxa_last_gpio = pxa_gpio_nums();
->> -	else
->> +#ifdef CONFIG_ARCH_PXA
->> +		if (gpio_is_pxa_type(gpio_type))
->> +			irq_base = PXA_GPIO_TO_IRQ(0);
->> +#endif
->> +#ifdef CONFIG_ARCH_MMP
->> +		if (gpio_is_mmp_type(gpio_type))
->> +			irq_base = MMP_GPIO_TO_IRQ(0);
->> +#endif
-> 
-> The ifdes above do not look essential.
+Commit e9da6e9905e639b0f842a244bc770b48ad0523e9 (ARM: dma-mapping:
+remove custom consistent dma region) changed the way atomic allocations
+are handled. However, arm_dma_free() was not modified accordingly, and
+as a result freeing of atomic allocations does not work correctly when
+CMA is disabled. Memory is leaked and following WARNINGs are seen:
 
-But they are. In case of !CONFIG_ARCH_MMP, MMP_GPIO_TO_IRQ is undefined.
-Same problem for !CONFIG_ARC_PXA.
+[   57.698911] ------------[ cut here ]------------
+[   57.753518] WARNING: at arch/arm/mm/dma-mapping.c:263 arm_dma_free+0x88/0xe4()
+[   57.811473] trying to free invalid coherent area: e0848000
+[   57.867398] Modules linked in: sata_mv(-)
+[   57.921373] [<c000d270>] (unwind_backtrace+0x0/0xf0) from [<c0015430>] (warn_slowpath_common+0x50/0x68)
+[   58.033924] [<c0015430>] (warn_slowpath_common+0x50/0x68) from [<c00154dc>] (warn_slowpath_fmt+0x30/0x40)
+[   58.152024] [<c00154dc>] (warn_slowpath_fmt+0x30/0x40) from [<c000dc18>] (arm_dma_free+0x88/0xe4)
+[   58.219592] [<c000dc18>] (arm_dma_free+0x88/0xe4) from [<c008fa30>] (dma_pool_destroy+0x100/0x148)
+[   58.345526] [<c008fa30>] (dma_pool_destroy+0x100/0x148) from [<c019a64c>] (release_nodes+0x144/0x218)
+[   58.475782] [<c019a64c>] (release_nodes+0x144/0x218) from [<c0197e10>] (__device_release_driver+0x60/0xb8)
+[   58.614260] [<c0197e10>] (__device_release_driver+0x60/0xb8) from [<c0198608>] (driver_detach+0xd8/0xec)
+[   58.756527] [<c0198608>] (driver_detach+0xd8/0xec) from [<c0197c54>] (bus_remove_driver+0x7c/0xc4)
+[   58.901648] [<c0197c54>] (bus_remove_driver+0x7c/0xc4) from [<c004bfac>] (sys_delete_module+0x19c/0x220)
+[   59.051447] [<c004bfac>] (sys_delete_module+0x19c/0x220) from [<c0009140>] (ret_fast_syscall+0x0/0x2c)
+[   59.207996] ---[ end trace 0745420412c0325a ]---
+[   59.287110] ------------[ cut here ]------------
+[   59.366324] WARNING: at arch/arm/mm/dma-mapping.c:263 arm_dma_free+0x88/0xe4()
+[   59.450511] trying to free invalid coherent area: e0847000
+[   59.534357] Modules linked in: sata_mv(-)
+[   59.616785] [<c000d270>] (unwind_backtrace+0x0/0xf0) from [<c0015430>] (warn_slowpath_common+0x50/0x68)
+[   59.790030] [<c0015430>] (warn_slowpath_common+0x50/0x68) from [<c00154dc>] (warn_slowpath_fmt+0x30/0x40)
+[   59.972322] [<c00154dc>] (warn_slowpath_fmt+0x30/0x40) from [<c000dc18>] (arm_dma_free+0x88/0xe4)
+[   60.070701] [<c000dc18>] (arm_dma_free+0x88/0xe4) from [<c008fa30>] (dma_pool_destroy+0x100/0x148)
+[   60.256817] [<c008fa30>] (dma_pool_destroy+0x100/0x148) from [<c019a64c>] (release_nodes+0x144/0x218)
+[   60.445201] [<c019a64c>] (release_nodes+0x144/0x218) from [<c0197e10>] (__device_release_driver+0x60/0xb8)
+[   60.634148] [<c0197e10>] (__device_release_driver+0x60/0xb8) from [<c0198608>] (driver_detach+0xd8/0xec)
+[   60.823623] [<c0198608>] (driver_detach+0xd8/0xec) from [<c0197c54>] (bus_remove_driver+0x7c/0xc4)
+[   61.013268] [<c0197c54>] (bus_remove_driver+0x7c/0xc4) from [<c004bfac>] (sys_delete_module+0x19c/0x220)
+[   61.203472] [<c004bfac>] (sys_delete_module+0x19c/0x220) from [<c0009140>] (ret_fast_syscall+0x0/0x2c)
+[   61.393390] ---[ end trace 0745420412c0325b ]---
 
-> Can't we drop them and just have else if ... else if?
+The patch fixes this.
 
-We can't do that either, as we might have a hybrid kernel that works on
-both PXA and MMP platforms, and then the condition is a runtime thing.
+Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+---
+ arch/arm/mm/dma-mapping.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-
-Daniel
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index c2cdf65..2cc77b7 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -648,12 +648,12 @@ void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+ 
+ 	if (arch_is_coherent() || nommu()) {
+ 		__dma_free_buffer(page, size);
++	} else if (__free_from_pool(cpu_addr, size)) {
++		return;
+ 	} else if (!IS_ENABLED(CONFIG_CMA)) {
+ 		__dma_free_remap(cpu_addr, size);
+ 		__dma_free_buffer(page, size);
+ 	} else {
+-		if (__free_from_pool(cpu_addr, size))
+-			return;
+ 		/*
+ 		 * Non-atomic allocations cannot be freed with IRQs disabled
+ 		 */
+-- 
+1.7.2.5
