@@ -1,32 +1,45 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 5 Aug 2012 14:01:25 +0800
-Subject: [PATCH 1/4] gpio/mxc: remove redundant shadow variables initialization
-Message-ID: <1344146488-9496-1-git-send-email-shawn.guo@linaro.org>
+Date: Sun, 5 Aug 2012 14:01:26 +0800
+Subject: [PATCH 2/4] gpio/mxc: specify gpio base for device tree probe
+In-Reply-To: <1344146488-9496-1-git-send-email-shawn.guo@linaro.org>
+References: <1344146488-9496-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1344146488-9496-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With commit 3e11f7b (gpio/generic: initialize basic_mmio_gpio shadow
-variables properly) in place, the shadow variables initialization is
-being done in generic driver bgpio_init call.
+Currently, unlike the non-DT probe where the gpio base is specified
+with pdev->id, the DT probe uses the base dynamically allocated by
+gpio core, which uses a completely different numbering scheme.  This
+causes two issues to user space applications which access sysfs entry
+/sys/class/gpio/gpioN.
 
-Remove the redundant shadow variables initialization from gpio-mxc
-driver.
+* It breaks the compatibility with user space applications between
+  non-DT and DT kernels.
+
+* It's not intuitive and sometimes hard for users to map the Linux
+  gpio number to the actual hardware pin.
+
+Use alias to identify the gpio port/bank, and then the gpio base
+can be specified with port id to solve above issues.  If alias is not
+defined in device tree, the base number dynamically allocated by gpio
+core will be used.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/gpio/gpio-mxc.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+ drivers/gpio/gpio-mxc.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-index 4db460b..76e8cda 100644
+index 76e8cda..80f44bb 100644
 --- a/drivers/gpio/gpio-mxc.c
 +++ b/drivers/gpio/gpio-mxc.c
-@@ -466,8 +466,6 @@ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
+@@ -465,7 +465,8 @@ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
+ 		goto out_iounmap;
  
  	port->bgc.gc.to_irq = mxc_gpio_to_irq;
- 	port->bgc.gc.base = pdev->id * 32;
--	port->bgc.dir = port->bgc.read_reg(port->bgc.reg_dir);
--	port->bgc.data = port->bgc.read_reg(port->bgc.reg_set);
+-	port->bgc.gc.base = pdev->id * 32;
++	port->bgc.gc.base = (pdev->id < 0) ? of_alias_get_id(np, "gpio") * 32 :
++					     pdev->id * 32;
  
  	err = gpiochip_add(&port->bgc.gc);
  	if (err)
