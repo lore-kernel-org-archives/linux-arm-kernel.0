@@ -1,74 +1,63 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Sun, 05 Aug 2012 08:36:45 +0200
-Subject: [PATCH v2 2/3] mtd: nand: Let MTD_NAND_GPMI_NAND depend on MXS_DMA
-In-Reply-To: <20120803100711.GC24458@pengutronix.de>
-References: <1343215100-24005-1-git-send-email-festevam@gmail.com>
- <1343215100-24005-2-git-send-email-festevam@gmail.com>
- <20120803100711.GC24458@pengutronix.de>
-Message-ID: <501E147D.5050707@gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Sun, 05 Aug 2012 11:31:40 +0300
+Subject: [PATCH 1/2] GPIO: gpio-pxa: simplify pxa_gpio_to_irq() and
+ pxa_irq_to_chip()
+In-Reply-To: <1343230539-7196-1-git-send-email-zonque@gmail.com>
+References: <1343230539-7196-1-git-send-email-zonque@gmail.com>
+Message-ID: <501E2F6C.4050507@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.08.2012 12:07, Sascha Hauer wrote:
-> On Wed, Jul 25, 2012 at 08:18:19AM -0300, Fabio Estevam wrote:
->> From: Fabio Estevam<fabio.estevam@freescale.com>
->>
->> MTD_NAND_GPMI_NAND driver depends on MXS_DMA to be selected, otherwise the following error happens
->> for imx_v6_v7_defconfig:
->>
->> drivers/built-in.o: In function `gpmi_dma_filter':
->> clk-fixed-factor.c:(.text+0xb124c): undefined reference to `mxs_dma_is_apbh'
->> make: *** [vmlinux] Error 1
->>
->> Signed-off-by: Fabio Estevam<fabio.estevam@freescale.com>
->
-> Acked-by: Sascha Hauer<s.hauer@pengutronix.de>
->
-> As mentioned elsewhere in this thread: We should not select user visible
-> options, so this patch is the only thing we can do atm (apart from
-> 'fixing the tools' as David mentioned, but this is out of scope for an
-> -rc kernel)
+Hi Daniel,
 
-I asked Shawn about this and it seems that this patch is the way to go 
-for the moment. So:
+On 07/25/12 18:35, Daniel Mack wrote:
+> Simplify the code in gpio-pxa.c and make them based on irq_base.
+> When not probed from devicetree, initialize irq_base from
+> PXA_GPIO_TO_IRQ() or MMP_GPIO_TO_IRQ(), respectively, so the non-DT case
+> still works.
+> 
+> Only tested on PXA3xx.
+> 
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> ---
+>  drivers/gpio/gpio-pxa.c |   70 +++++++++++------------------------------------
+>  1 file changed, 16 insertions(+), 54 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
+> index 58a6a63..6d0cb9d 100644
+> --- a/drivers/gpio/gpio-pxa.c
+> +++ b/drivers/gpio/gpio-pxa.c
 
-Acked-by: Dirk Behme <dirk.behme@gmail.com>
+[...]
 
-David: Artem: Building recent 3.6-rc1mainline with imx_v6_v7_defconfig 
-is broken. We need this patch to get it working, again.
+> @@ -564,10 +516,20 @@ static int __devinit pxa_gpio_probe(struct platform_device *pdev)
+>  	int irq0 = 0, irq1 = 0, irq_mux, gpio_offset = 0;
+>  
+>  	ret = pxa_gpio_probe_dt(pdev);
+> -	if (ret < 0)
+> +	if (ret < 0) {
+>  		pxa_last_gpio = pxa_gpio_nums();
+> -	else
+> +#ifdef CONFIG_ARCH_PXA
+> +		if (gpio_is_pxa_type(gpio_type))
+> +			irq_base = PXA_GPIO_TO_IRQ(0);
+> +#endif
+> +#ifdef CONFIG_ARCH_MMP
+> +		if (gpio_is_mmp_type(gpio_type))
+> +			irq_base = MMP_GPIO_TO_IRQ(0);
+> +#endif
 
-It would be nice if this patch could go as a fix into 3.6-rcX mainline 
-asap. Could you help with this?
+The ifdes above do not look essential.
+Can't we drop them and just have else if ... else if?
 
-Many thanks and best regards
+> +	} else {
+>  		use_of = 1;
+> +	}
+> +
+>  	if (!pxa_last_gpio)
+>  		return -EINVAL;
+>  
 
-Dirk
-
-> Additionally the imx_v6_v7_defconfig should be adjusted so that the gpmi
-> nand driver actually gets built.
->
-> Sascha
->
->> ---
->> Changes since v1:
->> - Use 'depends' rather than 'select'
->>   drivers/mtd/nand/Kconfig |    1 +
->>   1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
->> index a5d8a1b..da52c7d 100644
->> --- a/drivers/mtd/nand/Kconfig
->> +++ b/drivers/mtd/nand/Kconfig
->> @@ -463,6 +463,7 @@ config MTD_NAND_NANDSIM
->>   config MTD_NAND_GPMI_NAND
->>           bool "GPMI NAND Flash Controller driver"
->>           depends on MTD_NAND&&  (SOC_IMX23 || SOC_IMX28 || SOC_IMX6Q)
->> +	depends on MXS_DMA
->>           help
->>   	 Enables NAND Flash support for IMX23, IMX28 or IMX6.
->>   	 The GPMI controller is very powerful, with the help of BCH
->> --
->> 1.7.1
->>
->>
->
+-- 
+Regards,
+Igor.
