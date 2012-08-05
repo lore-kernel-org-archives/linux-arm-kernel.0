@@ -1,37 +1,93 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 5 Aug 2012 23:05:20 +0800
-Subject: [PATCH v2 3/4] regulator: add a new API regulator_set_voltage_tol()
+Date: Sun, 5 Aug 2012 23:05:18 +0800
+Subject: [PATCH v2 1/4] ARM: add cpufreq transiton notifier to adjust
+ loops_per_jiffy for smp
 In-Reply-To: <1344179121-17738-1-git-send-email-shawn.guo@linaro.org>
 References: <1344179121-17738-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1344179121-17738-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1344179121-17738-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some use cases where a voltage range could be reasonably
-specified by a target voltage and tolerance.  Add a new API
-regulator_set_voltage_tol() wrapping regulator_set_voltage() call
-to ease the users.
+From: Richard Zhao <richard.zhao@linaro.org>
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+If CONFIG_SMP, cpufreq skips loops_per_jiffy update, because different
+arch has different per-cpu loops_per_jiffy definition.
+
+Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- include/linux/regulator/consumer.h |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+ arch/arm/kernel/smp.c |   54 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 54 insertions(+), 0 deletions(-)
 
-diff --git a/include/linux/regulator/consumer.h b/include/linux/regulator/consumer.h
-index da339fd..2160352 100644
---- a/include/linux/regulator/consumer.h
-+++ b/include/linux/regulator/consumer.h
-@@ -352,4 +352,11 @@ static inline void regulator_set_drvdata(struct regulator *regulator,
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index ebd8ad2..8e03567 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -25,6 +25,7 @@
+ #include <linux/percpu.h>
+ #include <linux/clockchips.h>
+ #include <linux/completion.h>
++#include <linux/cpufreq.h>
  
- #endif
- 
-+static inline int regulator_set_voltage_tol(struct regulator *regulator,
-+					    int new_uV, int tol_uV)
+ #include <linux/atomic.h>
+ #include <asm/cacheflush.h>
+@@ -584,3 +585,56 @@ int setup_profiling_timer(unsigned int multiplier)
+ {
+ 	return -EINVAL;
+ }
++
++#ifdef CONFIG_CPU_FREQ
++
++static DEFINE_PER_CPU(unsigned long, l_p_j_ref);
++static DEFINE_PER_CPU(unsigned long, l_p_j_ref_freq);
++static unsigned long global_l_p_j_ref;
++static unsigned long global_l_p_j_ref_freq;
++
++static int cpufreq_callback(struct notifier_block *nb,
++					unsigned long val, void *data)
 +{
-+	return regulator_set_voltage(regulator,
-+				     new_uV - tol_uV, new_uV + tol_uV);
++	struct cpufreq_freqs *freq = data;
++	int cpu = freq->cpu;
++
++	if (freq->flags & CPUFREQ_CONST_LOOPS)
++		return NOTIFY_OK;
++
++	if (!per_cpu(l_p_j_ref, cpu)) {
++		per_cpu(l_p_j_ref, cpu) =
++			per_cpu(cpu_data, cpu).loops_per_jiffy;
++		per_cpu(l_p_j_ref_freq, cpu) = freq->old;
++		if (!global_l_p_j_ref) {
++			global_l_p_j_ref = loops_per_jiffy;
++			global_l_p_j_ref_freq = freq->old;
++		}
++	}
++
++	if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
++	    (val == CPUFREQ_POSTCHANGE && freq->old > freq->new) ||
++	    (val == CPUFREQ_RESUMECHANGE || val == CPUFREQ_SUSPENDCHANGE)) {
++		loops_per_jiffy = cpufreq_scale(global_l_p_j_ref,
++						global_l_p_j_ref_freq,
++						freq->new);
++		per_cpu(cpu_data, cpu).loops_per_jiffy =
++			cpufreq_scale(per_cpu(l_p_j_ref, cpu),
++					per_cpu(l_p_j_ref_freq, cpu),
++					freq->new);
++	}
++	return NOTIFY_OK;
 +}
 +
- #endif
++static struct notifier_block cpufreq_notifier = {
++	.notifier_call  = cpufreq_callback,
++};
++
++static int __init register_cpufreq_notifier(void)
++{
++	return cpufreq_register_notifier(&cpufreq_notifier,
++						CPUFREQ_TRANSITION_NOTIFIER);
++}
++core_initcall(register_cpufreq_notifier);
++
++#endif
 -- 
 1.7.5.4
