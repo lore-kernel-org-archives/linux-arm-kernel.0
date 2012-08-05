@@ -1,58 +1,30 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 5 Aug 2012 22:28:36 +0200
-Subject: [PATCH V2 5/6] x86: add CONFIG_ARM_AMBA, selected by STA2X11
-In-Reply-To: <20120703193403.GA26355@n2100.arm.linux.org.uk>
-References: <2b797c83-6a3c-4051-841a-a4cfa9d1cae1@email.android.com>
- <20120701104401.GA4352@mail.gnudd.com>
- <20120703130042.GA10007@mail.gnudd.com>
- <201207031319.40884.arnd@arndb.de>
- <20120703193403.GA26355@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdZLGhgpUJy_3QGYvGRqyxMkkPPSdyP==h5YurWqKnctBw@mail.gmail.com>
+Date: Sun,  5 Aug 2012 22:37:55 +0200
+Subject: [PATCH] ARM: integrator: use clk_prepare_enable() for timer
+Message-ID: <1344199075-4111-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 3, 2012 at 9:34 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jul 03, 2012 at 01:19:40PM +0000, Arnd Bergmann wrote:
->> On Tuesday 03 July 2012, Alessandro Rubini wrote:
->> >    drivers/dma/amba-pl08x.c: needs <asm/hardware/pl080.h>
->> >      proposed fix: move pl080.h to include/linux
->>
->> Note that there is already an include/linux/amba/pl08x.h.
->> I would just move the few parts of pl080.h that are actually
->> needed with global visibility there, and move the rest
->> to drivers/dma/.
->
-> NAK.  It's the entire register definitions for the PL08x, which we really
-> should not be exporting to common code.
+The Integrator timer is using the clock framework to get the
+timer frequency, but missed to prepare the clock before enabling.
 
-The major reason why that file is there is that there is *another*
-PL080 driver in arch/arm/mach-s3c64xx/dma.c which I repeatedly
-asked the Samsung people to replace with the
-drivers/dma/amba-pl08x.c driver. :-(
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-integrator/integrator_ap.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-When I worked on the PL08x driver in drivers/dma I reused
-this header to avoid code duplication.
-
-Now that thing is stranding in the way. Alim, Kukjin, what's happening?
-
-I feel tempted to update Alim's patch myself and push it on you
-soon...
-
-> Please wait until _after_ my DMA engine stuff (which is now in linux-next)
-> makes its way upstream before touching any of this stuff, otherwise there's
-> going to be conflicts.
-
-That stuff is in now, looking real good. Good work on this!
-
-> As part of my patch series, this gets rid of a number of uses of it in
-> arch/arm, but there's still the .cctl_memcpy initializer which does. I've
-> not yet checked whether all implementations use the same value (they
-> probably do), and if so then it should be eliminated from platform code
-> and moved into the driver.
-
-Sounds like a plan. If we just get rid of the duplicate implementation
-we're going somewhere.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 7b1055c..3b22675 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -456,7 +456,7 @@ static void __init ap_init_timer(void)
+ 
+ 	clk = clk_get_sys("ap_timer", NULL);
+ 	BUG_ON(IS_ERR(clk));
+-	clk_enable(clk);
++	clk_prepare_enable(clk);
+ 	rate = clk_get_rate(clk);
+ 
+ 	writel(0, TIMER0_VA_BASE + TIMER_CTRL);
+-- 
+1.7.11.2
