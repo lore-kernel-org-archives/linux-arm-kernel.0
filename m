@@ -1,39 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 5 Aug 2012 11:40:31 +0200
-Subject: [PATCH 2/2] GPIO: gpio-pxa: fix devicetree functions
-In-Reply-To: <CAN1soZxzGeJWbG9g_j1L=gG42SE6LUt_W1vJwu61OSMHdcgAbQ@mail.gmail.com>
-References: <1343230539-7196-1-git-send-email-zonque@gmail.com>
- <1343230539-7196-2-git-send-email-zonque@gmail.com>
- <CACRpkdY6zn+aigZituo37iq=Mttf9Bhn06nyH-A4zQ6mhsByow@mail.gmail.com>
- <CAN1soZxzGeJWbG9g_j1L=gG42SE6LUt_W1vJwu61OSMHdcgAbQ@mail.gmail.com>
-Message-ID: <CACRpkdYGPgy8s505_rom2tnKdL8rVwrd3N=rbRUJnRYnDj726A@mail.gmail.com>
+Date: Sun, 5 Aug 2012 11:45:56 +0200
+Subject: [PATCH 1/4] gpio/mxc: remove redundant shadow variables
+ initialization
+In-Reply-To: <1344146488-9496-1-git-send-email-shawn.guo@linaro.org>
+References: <1344146488-9496-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CACRpkdZhTFYLEmof9bRoYX0Erjpz+0k7y0wUhsmXtWroX=B3ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 5, 2012 at 5:52 AM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
-> On Sun, Aug 5, 2012 at 7:16 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Wed, Jul 25, 2012 at 5:35 PM, Daniel Mack <zonque@gmail.com> wrote:
->>
->>> Provide an of_xlate function for the PXA GPIO chips and make it work for
->>> devicetree environments.
->>>
->>> Successfully tested on a PXA3xx board.
->>>
->>> Signed-off-by: Daniel Mack <zonque@gmail.com>
->>
->> Could the PXA maintainers pls have a look at this patch, if you're working
->> on DT support especially...
->>
->> BTW: I guess this is not a fix for issues in the current kernel HEAD?
->> Is it OK to have this for the next (v3.7) cycle?
->>
-> It's a real fix. Since of_get_named_gpio_flags() needs to get flags of gpio.
-> This function is widely used in mmc/usb/... drivers. So it requires
-> vendor's gpio
-> driver to support parse flags from DT script.
+On Sun, Aug 5, 2012 at 8:01 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-OK I take that as an ACK so I've put it on my fixes branch with
-your Acked-by.
+> With commit 3e11f7b (gpio/generic: initialize basic_mmio_gpio shadow
+> variables properly) in place, the shadow variables initialization is
+> being done in generic driver bgpio_init call.
+>
+> Remove the redundant shadow variables initialization from gpio-mxc
+> driver.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+
+Applied.
 
 Thanks,
 Linus Walleij
