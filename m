@@ -1,40 +1,32 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sun, 5 Aug 2012 10:56:22 +0800
-Subject: [PATCH v3 4/9] GPIO: gpio-pxa: simplify pxa_gpio_to_irq() and
- pxa_irq_to_chip()
-In-Reply-To: <CACRpkdaJhzzckg12uZrgweoOgC44VNb=0AEdp96AV2O0UM+AnA@mail.gmail.com>
-References: <1343470061-16879-1-git-send-email-zonque@gmail.com>
- <1343470061-16879-5-git-send-email-zonque@gmail.com>
- <CACRpkdaJhzzckg12uZrgweoOgC44VNb=0AEdp96AV2O0UM+AnA@mail.gmail.com>
-Message-ID: <CAN1soZzOTMChr7WQzguH_CPQ8s=tyrsjwmAYNSBAVeMtwRE2uA@mail.gmail.com>
+Date: Sun, 5 Aug 2012 10:57:53 +0800
+Subject: [GIT PULL][for 3.7] pull request from dt-mmp branch in pxa git
+ tree
+In-Reply-To: <CACRpkdavwK=PZjBsQ+FhJ75rx9nsuV6iae7Hp-sF0qmtnNGdSw@mail.gmail.com>
+References: <CAN1soZy-FBmywNLn9a0yanx9ojfB-jnqzYyXwAYr6F1_Khvacg@mail.gmail.com>
+ <CAOesGMgwX+Use1wGOhgMe=63F1u8vPrft=FvysYNY+EbsUO5Zw@mail.gmail.com>
+ <CACRpkdavwK=PZjBsQ+FhJ75rx9nsuV6iae7Hp-sF0qmtnNGdSw@mail.gmail.com>
+Message-ID: <CAN1soZwOuccKr-N4gRjKRkZ6yWG-767wGdPvDSvKnoecgUA1Dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 5, 2012 at 8:12 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Sat, Jul 28, 2012 at 12:07 PM, Daniel Mack <zonque@gmail.com> wrote:
+On Sun, Aug 5, 2012 at 8:02 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sat, Aug 4, 2012 at 8:27 PM, Olof Johansson <olof@lixom.net> wrote:
 >
->> Simplify the code in gpio-pxa.c and make them based on irq_base.
->> When not probed from devicetree, initialize irq_base from
->> PXA_GPIO_TO_IRQ() or MMP_GPIO_TO_IRQ(), respectively, so the non-DT case
->> still works.
->>
->> +#ifdef CONFIG_ARCH_PXA
->> +               if (gpio_is_pxa_type(gpio_type))
->> +                       irq_base = PXA_GPIO_TO_IRQ(0);
->> +#endif
->> +#ifdef CONFIG_ARCH_MMP
->> +               if (gpio_is_mmp_type(gpio_type))
->> +                       irq_base = MMP_GPIO_TO_IRQ(0);
->> +#endif
+>> None of these have acks from Linus Walleij. They should possibly even
+>> be merged through his tree.
 >
-> Grrr. Can we think of a way to get rid of these #ifdef:s?
+> I haven't managed to look closer at them until now. It's a bit confusing
+> since there are several iterations of the patches and two authors
+> involved, point me to missed patches if I don't see them.
 >
+> I will assume that you want to send this through the ARM SoC tree
+> and ACK the stuff that looks good to me.
+>
+> Yours,
+> Linus Walleij
 
-It's used for non-DT mode. This driver is used in both arch-pxa
-and arch-mmp. Since we use static irq allocation in non-DT mode,
-we have to use this kind of code to get irq_base.
-
-What Daniel did is only simplifying the code.
+Thanks. I'll append your Ack and send the pull quest again.
 
 Regards
 Haojian
