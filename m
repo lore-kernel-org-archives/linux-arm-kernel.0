@@ -1,25 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 5 Aug 2012 02:02:53 +0200
-Subject: [GIT PULL][for 3.7] pull request from dt-mmp branch in pxa git
- tree
-In-Reply-To: <CAOesGMgwX+Use1wGOhgMe=63F1u8vPrft=FvysYNY+EbsUO5Zw@mail.gmail.com>
-References: <CAN1soZy-FBmywNLn9a0yanx9ojfB-jnqzYyXwAYr6F1_Khvacg@mail.gmail.com>
- <CAOesGMgwX+Use1wGOhgMe=63F1u8vPrft=FvysYNY+EbsUO5Zw@mail.gmail.com>
-Message-ID: <CACRpkdavwK=PZjBsQ+FhJ75rx9nsuV6iae7Hp-sF0qmtnNGdSw@mail.gmail.com>
+Date: Sun, 5 Aug 2012 02:04:23 +0200
+Subject: [PATCH 1/6] pinctrl: append new pins and groups in pxa910
+In-Reply-To: <1343458722-17127-2-git-send-email-haojian.zhuang@gmail.com>
+References: <1343458722-17127-1-git-send-email-haojian.zhuang@gmail.com>
+ <1343458722-17127-2-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <CACRpkda5B-vCGqER6-gTS70C8f6r3z2UOSbeW_GiVXbGbZZUYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 4, 2012 at 8:27 PM, Olof Johansson <olof@lixom.net> wrote:
+On Sat, Jul 28, 2012 at 8:58 AM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
 
-> None of these have acks from Linus Walleij. They should possibly even
-> be merged through his tree.
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> ---
+>  drivers/pinctrl/pinctrl-pxa910.c |    6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
 
-I haven't managed to look closer at them until now. It's a bit confusing
-since there are several iterations of the patches and two authors
-involved, point me to missed patches if I don't see them.
-
-I will assume that you want to send this through the ARM SoC tree
-and ACK the stuff that looks good to me.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
