@@ -1,63 +1,38 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 05 Aug 2012 11:31:40 +0300
-Subject: [PATCH 1/2] GPIO: gpio-pxa: simplify pxa_gpio_to_irq() and
- pxa_irq_to_chip()
-In-Reply-To: <1343230539-7196-1-git-send-email-zonque@gmail.com>
-References: <1343230539-7196-1-git-send-email-zonque@gmail.com>
-Message-ID: <501E2F6C.4050507@compulab.co.il>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 5 Aug 2012 10:39:26 +0200
+Subject: [PATCH] mtd: mxc_nand: Fix compiler warnings
+In-Reply-To: <501D4405.6030900@googlemail.com>
+References: <1343466310-14584-1-git-send-email-dirk.behme@gmail.com>
+ <20120730073454.GI1528@pengutronix.de>
+ <501D4405.6030900@googlemail.com>
+Message-ID: <20120805083926.GL2626@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-On 07/25/12 18:35, Daniel Mack wrote:
-> Simplify the code in gpio-pxa.c and make them based on irq_base.
-> When not probed from devicetree, initialize irq_base from
-> PXA_GPIO_TO_IRQ() or MMP_GPIO_TO_IRQ(), respectively, so the non-DT case
-> still works.
+On Sat, Aug 04, 2012 at 05:47:17PM +0200, Dirk Behme wrote:
+> On 30.07.2012 09:34, Uwe Kleine-K?nig wrote:
+> >Hello,
+> >
+> >On Sat, Jul 28, 2012 at 11:05:10AM +0200, Dirk Behme wrote:
+> >>From: Dirk Behme<dirk.behme@googlemail.com>
+> >>
+> >>Fix the compiler warnings
+> >>
+> >>drivers/mtd/nand/mxc_nand.c:1267: warning: initialization discards qualifiers from pointer target type
+> >>drivers/mtd/nand/mxc_nand.c:1270: warning: initialization discards qualifiers from pointer target type
+> >>drivers/mtd/nand/mxc_nand.c:1273: warning: initialization discards qualifiers from pointer target type
+> >>drivers/mtd/nand/mxc_nand.c:1276: warning: initialization discards qualifiers from pointer target type
+> >These should be gone in next already.
 > 
-> Only tested on PXA3xx.
+> Hmm, which next?
 > 
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> ---
->  drivers/gpio/gpio-pxa.c |   70 +++++++++++------------------------------------
->  1 file changed, 16 insertions(+), 54 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-> index 58a6a63..6d0cb9d 100644
-> --- a/drivers/gpio/gpio-pxa.c
-> +++ b/drivers/gpio/gpio-pxa.c
+> I tried linux-next [1] from today (next-20120803, 55fa9961f) and still get
+next-20120725 contained 98d7bbb9929bcc14e11ac8a55245a4f2dc174e17, don't
+konw why it isn't included in the newer next snapshorts.
 
-[...]
-
-> @@ -564,10 +516,20 @@ static int __devinit pxa_gpio_probe(struct platform_device *pdev)
->  	int irq0 = 0, irq1 = 0, irq_mux, gpio_offset = 0;
->  
->  	ret = pxa_gpio_probe_dt(pdev);
-> -	if (ret < 0)
-> +	if (ret < 0) {
->  		pxa_last_gpio = pxa_gpio_nums();
-> -	else
-> +#ifdef CONFIG_ARCH_PXA
-> +		if (gpio_is_pxa_type(gpio_type))
-> +			irq_base = PXA_GPIO_TO_IRQ(0);
-> +#endif
-> +#ifdef CONFIG_ARCH_MMP
-> +		if (gpio_is_mmp_type(gpio_type))
-> +			irq_base = MMP_GPIO_TO_IRQ(0);
-> +#endif
-
-The ifdes above do not look essential.
-Can't we drop them and just have else if ... else if?
-
-> +	} else {
->  		use_of = 1;
-> +	}
-> +
->  	if (!pxa_last_gpio)
->  		return -EINVAL;
->  
+Best regards
+Uwe
 
 -- 
-Regards,
-Igor.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
