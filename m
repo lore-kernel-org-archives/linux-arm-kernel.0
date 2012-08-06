@@ -1,73 +1,46 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Mon, 6 Aug 2012 15:39:50 -0500
-Subject: [PATCH 4/9] ASoC: imx: Don't use {en,dis}able_fiq() calls
-In-Reply-To: <20120806201609.GX25644@pengutronix.de>
-References: <20120805230238.GA1663@lizard>
- <1344207819-3415-4-git-send-email-anton.vorontsov@linaro.org>
- <CAKGA1bkiHj=zMJXSzoGp3fpLS3POnFXSV5y7sYYFAikqoUT9tQ@mail.gmail.com>
- <20120806154951.GQ16861@opensource.wolfsonmicro.com>
- <CAKGA1b=_AOub_pEJJGBTb6Y7wLZaSYKQjFTyMVFSr_=9VX4wpg@mail.gmail.com>
- <20120806193734.GA16199@opensource.wolfsonmicro.com>
- <20120806201609.GX25644@pengutronix.de>
-Message-ID: <CAKGA1bmMqyL4gyLYcanEH=R=HuBjRCNRLjUEWCj8wmpi3HuL0g@mail.gmail.com>
+From: ccross@google.com (Colin Cross)
+Date: Mon, 6 Aug 2012 13:41:06 -0700
+Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
+In-Reply-To: <037601cd6fc9$f6e5fe30$e4b1fa90$%kim@samsung.com>
+References: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
+ <20120611155716.GA18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111241470.23555@xanadu.home>
+ <20120611165115.GB18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
+ <4FD62DBB.8070407@codeaurora.org>
+ <20120611192519.GF18267@n2100.arm.linux.org.uk>
+ <4FE1FB15.3090305@codeaurora.org>
+ <0e0201cd5f2f$2c2f6e60$848e4b20$%kim@samsung.com>
+ <5016D03D.8010607@codeaurora.org>
+ <037601cd6fc9$f6e5fe30$e4b1fa90$%kim@samsung.com>
+Message-ID: <CAMbhsRRp429Fkk2-vEixt8OPW699ftVCaG+C83NWLvM2_jkOVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 6, 2012 at 3:16 PM, Robert Schwebel
-<r.schwebel@pengutronix.de> wrote:
-> On Mon, Aug 06, 2012 at 08:37:34PM +0100, Mark Brown wrote:
->> As far as I can tell nobody's really running much up to date mainline
->> on older i.MX processors, all the work is going on the new stuff and
->> most of the board are on either vendor BSPs or older kernels.
+On Wed, Aug 1, 2012 at 2:42 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Stephen Boyd wrote:
+>>
+>> On 07/10/12 23:34, Kukjin Kim wrote:
+>> > Stephen Boyd wrote:
+>> >> Great. Kukjin Kim, can exynos use SGI0? It looks like exynos is the
+>> only
+>> >> one left to move to SGI0.
+>> >>
+>> > Yeah, EXYNOS can use SGI0 instead of SGI1 :)
+>> >
+>> >
+>>
+>> Russell, can we apply something like this?
+>>
+> Please feel free to add my ack on following change.
 >
-> That's not true; we still run MX25, MX27, MX35, MX28 on mainline in
-> active projects.
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+>
 
-I think Shawn Guo (FSL/Linaro) would also disagree, since he's just
-posted a large amount of MXS patches to fix up the board for device
-trees, and Arnd is pulling them.
-
-Work is ongoing, it would be awful to delete something people really
-relied on or were in progress fixing (ahem). If they get up to audio
-in the near future the audio FIQ stuff would just end up being
-resubmitted almost verbatim... that seems like unnecessary churn.
-
-As far as I know, the FIQ usage is quite valid for the processor it
-needs to run on (MX21/27/28, right?) in the modes it runs in (AC97 on
-these processors, and maybe MX35 too), and I'm just trying to figure
-out what the steps are for
-
-* making sure it doesn't get built for architectures/variants it's
-certainly NOT required on (imx_v6_v7_defconfig, if it actually enabled
-audio, that is - in fact, audio should be enabled as more one of the
-boards supported defines it in the device tree) which would amount to
-two seperate patches, one for the defconfig, one for the CONFIG item.
-
-I did note that SND_SOC_EUKREA_TLV320 enables FIQ but it also depends
-on MX51 which makes me think this need to be split, too, so that MX51
-boards don't have it but MX2/MX3 do.
-
-* if it is built then it's built as ARM code (redundant, as previously
-stated, but would have stopped me from swearing at my build box when I
-hit the issue yet again) which could be a patch or could be ignored.
-I'd rather discuss this here than clutter the ML with several respins
-of a patch, let's get an opinion first - to .arm or no to .arm?
-
-* make sure there's no weird FIQ stuff floating around that has so far
-relied on SND_SOC_IMX_PCM_FIQ doing select FIQ before I make it not
-compile in for other boards (since otherwise no i.MX processor selects
-FIQ if they're not using that driver, it could be simply coincidence
-nobody noticed). I don't want to be the one submitting a patch I can't
-test which mysteriously breaks every MX28 on the planet (since Rob,
-Shawn, Sascha might be the ones swearing at me instead)
-
-* making sure someone's actually testing audio as above... and
-where/if/when the MX28 audio stuff is going in the future und so
-weiter..
-
-I guess I need Sascha to pipe up and tell me what the code is needed
-for exactly again.. and someone to test the result of the changes..
-
--- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+When testing coupled cpuidle on Exynos5, I found that sending an IPI
+does not successfully wake up CPU1.  CPU1 is in a wfe with interrupts
+masked, not a wfi, so an interrupt is not able to wake it up.  It
+tends to wake up anyways because the next time a spin lock is
+unlocked, often during a timer interrupt on CPU0, CPU0 executes an sev
+which wakes up CPU1.  You can see that the IPI is unnecessary by
+removing the gic_raise_softirq and replacing it with dsb_sev().
