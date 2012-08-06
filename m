@@ -1,50 +1,79 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 6 Aug 2012 10:06:58 +0800
-Subject: [PATCH 0/4] Remove Genesi Efika MX support
-In-Reply-To: <1343843371-14143-1-git-send-email-matt@genesi-usa.com>
-References: <1343843371-14143-1-git-send-email-matt@genesi-usa.com>
-Message-ID: <20120806020656.GA18471@S2101-09.ap.freescale.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sun, 5 Aug 2012 22:19:04 -0400 (EDT)
+Subject: [PATCH 04/22] ARM: LPAE: support 64-bit virt/phys patching
+In-Reply-To: <501E815D.1050707@ti.com>
+References: <1343775898-28345-1-git-send-email-cyril@ti.com>
+ <1343775898-28345-5-git-send-email-cyril@ti.com>
+ <alpine.LFD.2.02.1208040226060.5231@xanadu.home> <501E815D.1050707@ti.com>
+Message-ID: <alpine.LFD.2.02.1208052207040.5231@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 01, 2012 at 12:49:27PM -0500, Matt Sealey wrote:
-> In an effort to start afresh we are removing the "legacy" Efika MX support
-> from the tree in this patch series so as to break ties with any non-device-tree
-> code and minimize the possibility that there are two ways to build for our
-> boards.
-> 
-> Patches to support the board again with FDT (along with a matching U-Boot)
-> are not ready for submission, but that doesn't block *this* submission. The
-> number of users of 3.5 kernels on Genesi platforms is generally thought of
-> as zero and no significant work or support has been committed to the platform
-> in a long time. In our opinion, all efforts by external developers wishing to
-> run modern kernels on Genesi Efika MX boards should be directed at device tree
-> support for the MX51 platforms.
-> 
-> Matt Sealey (4):
->   efikamx: remove support for Genesi Efika MX from the build
->   efikamx: remove Genesi Efika MX from the i.MX v6/v7 defconfig
->   efikamx: remove Genesi Efika MX platform files from the tree
->   efikamx: remove Efika MX-specific CHRGVBUS hack from the USB driver
-> 
->  arch/arm/configs/imx_v6_v7_defconfig  |    2 -
->  arch/arm/mach-imx/Kconfig             |   26 --
->  arch/arm/mach-imx/Makefile            |    3 -
->  arch/arm/mach-imx/efika.h             |   10 -
->  arch/arm/mach-imx/mach-mx51_efikamx.c |  300 ----------------
->  arch/arm/mach-imx/mach-mx51_efikasb.c |  296 ---------------
->  arch/arm/mach-imx/mx51_efika.c        |  632 ---------------------------------
->  drivers/usb/host/ehci-mxc.c           |   20 --
->  8 files changed, 1289 deletions(-)
->  delete mode 100644 arch/arm/mach-imx/efika.h
->  delete mode 100644 arch/arm/mach-imx/mach-mx51_efikamx.c
->  delete mode 100644 arch/arm/mach-imx/mach-mx51_efikasb.c
->  delete mode 100644 arch/arm/mach-imx/mx51_efika.c
-> 
-I set up a branch imx/rm-boards and queued the series there.  I expect
-I will have some patches removing imx53 board files to be queued there
-for 3.7 too.
+On Sun, 5 Aug 2012, Cyril Chemparathy wrote:
 
--- 
-Regards,
-Shawn
+> Hi Nicolas,
+> 
+> On 8/4/2012 2:49 AM, Nicolas Pitre wrote:
+> > On Tue, 31 Jul 2012, Cyril Chemparathy wrote:
+> > 
+> > > This patch adds support for 64-bit physical addresses in virt_to_phys
+> > > patching.  This does not do real 64-bit add/sub, but instead patches in
+> > > the
+> > > upper 32-bits of the phys_offset directly into the output of virt_to_phys.
+> > 
+> > You should explain _why_ you do not a real aadd/sub.  I did deduce it
+> > but that might not be obvious to everyone.  Also this subtlety should be
+> > commented in the code as well.
+> > 
+> 
+> We could not do an ADDS + ADC here because the carry is not guaranteed to be
+> retained and passed into the ADC.  This is because the compiler is free to
+> insert all kinds of stuff between the two non-volatile asm blocks.
+> 
+> Is there another subtlety here that I have missed out on entirely?
+
+The high bits for the valid physical memory address range for which 
+virt_to_phys and phys_to_virt can be used are always the same.  
+Therefore no aadition at all is needed, fake or real.  Only providing 
+those bits in the top word for the value returned by virt_to_phys is 
+needed.
+
+> > > In addition to adding 64-bit support, this patch also adds a
+> > > set_phys_offset()
+> > > helper that is needed on architectures that need to modify PHYS_OFFSET
+> > > during
+> > > initialization.
+> > > 
+> > > Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+> > > ---
+> > >   arch/arm/include/asm/memory.h |   22 +++++++++++++++-------
+> > >   arch/arm/kernel/head.S        |    6 ++++++
+> > >   arch/arm/kernel/setup.c       |   14 ++++++++++++++
+> > >   3 files changed, 35 insertions(+), 7 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> > > index 4a0108f..110495c 100644
+> > > --- a/arch/arm/include/asm/memory.h
+> > > +++ b/arch/arm/include/asm/memory.h
+> > > @@ -153,23 +153,31 @@
+> > >   #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
+> > > 
+> > >   extern unsigned long __pv_phys_offset;
+> > > -#define PHYS_OFFSET __pv_phys_offset
+> > > -
+> > > +extern unsigned long __pv_phys_offset_high;
+> > 
+> > As mentioned previously, this is just too ugly.  Please make
+> > __pv_phys_offset into a phys_addr_t instead and mask the low/high parts
+> > as needed in __virt_to_phys().
+> > 
+> 
+> Maybe u64 instead of phys_addr_t to keep the sizing non-variable?
+
+No.  When not using LPAE, we don't have to pay the price of a u64 value.  
+That's why the phys_addr_t type is conditionally defined.  You already 
+do  extra processing in virt_to_phys when sizeof(phys_addr_t) > 4 which 
+is perfect for dealing with this issue.
+
+
+Nicolas
