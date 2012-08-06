@@ -1,103 +1,90 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 06 Aug 2012 10:49:13 +0200
-Subject: [PATCH 2/3 V2] IIO: Add basic MXS LRADC driver
-In-Reply-To: <1344007721-11595-3-git-send-email-marex@denx.de>
-References: <1344007721-11595-1-git-send-email-marex@denx.de>
- <1344007721-11595-3-git-send-email-marex@denx.de>
-Message-ID: <501F8509.1030903@metafoo.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 6 Aug 2012 10:52:26 +0200
+Subject: [PATCH] ARM: ux500: resurrect I2C platform data
+Message-ID: <1344243146-6598-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/2012 05:28 PM, Marek Vasut wrote:
-> This driver is very basic. It supports userland trigger, buffer and
-> raw access to channels. The support for delay channels is missing
-> altogether.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Looks mostly good to me. Some comments inline.
+Commit:
+98582d9562b4bea6b0eb6e2bfafcd3fab3b60ccb
+"ARM: ux500: Remove unused i2c platform_data initialisation code"
 
-I think you need to provide a documentation for the devicetree binding, even
-though it's a rather simple binding.
+Deleted platform data intialization code that was used,
+not unused as indicated in the commit. The boot log (without
+devicetree) now looks like this:
 
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Jonathan Cameron <jic23@kernel.org>
-> Cc: Juergen Beisert <jbe@pengutronix.de>
-> Cc: Lars-Peter Clausen <lars@metafoo.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Wolfgang Denk <wd@denx.de>
-> ---
->  drivers/staging/iio/adc/Kconfig     |   12 +
->  drivers/staging/iio/adc/Makefile    |    1 +
->  drivers/staging/iio/adc/mxs-lradc.c |  591 +++++++++++++++++++++++++++++++++++
->  3 files changed, 604 insertions(+)
->  create mode 100644 drivers/staging/iio/adc/mxs-lradc.c
-> 
-> V2: Use delay channel 0 in case of buffered sampling so the samples are deployed
->     continuously.
->     Disallow RAW sampling while buffered mode is enabled to simplify code.
-> 
-> diff --git a/drivers/staging/iio/adc/Kconfig b/drivers/staging/iio/adc/Kconfig
-> index 67711b7..97ca697 100644
-> --- a/drivers/staging/iio/adc/Kconfig
-> +++ b/drivers/staging/iio/adc/Kconfig
-[...]
-> + */
-> +static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
-> +			const struct iio_chan_spec *chan,
-> +			int *val, int *val2, long m)
-> +{
-> [...]
-> +
-> +	init_completion(&lradc->completion);
+nmk-i2c nmk-i2c.0: no platform data
+nmk-i2c nmk-i2c.1: no platform data
+nmk-i2c nmk-i2c.2: no platform data
+nmk-i2c nmk-i2c.3: no platform data
 
-This should rather be INIT_COMPLETION. init_completion should only called
-once in probe, since it will reinitialize the spinlock which opens up race
-conditions.
+And no I2C drivers register anymore.
 
-> [...]
-> +
-> +	/* Wait for completion on the channel, 1 second max. */
-> +	ret = wait_for_completion_killable_timeout(&lradc->completion,
-> +						msecs_to_jiffies(1000));
+Take this opportunity to bump the i2c bus speed to 400kHz.
+Some recent discussion revealed inconsistency in the board file
+for the MOP500 family. The board can very well do 400kHz on
+the I2C busses, so make it do that.
 
-msecs_to_jiffies(1000) = HZ, but I guess both is OK.
+Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Cc: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500.c | 39 ++++++++++++++++++++++++++++++++++----
+ 1 file changed, 35 insertions(+), 4 deletions(-)
 
-> [...]
-> +}
-[...]
-> +
-> +static int __devinit mxs_lradc_probe(struct platform_device *pdev)
-> +{
-> [...]
-> +
-> +	/* Grab all IRQ sources */
-> +	for (i = 0; i < 13; i++) {
-> +		lradc->irq[i] = platform_get_irq(pdev, i);
-> +		if (lradc->irq[i] < 0) {
-> +			ret = -EINVAL;
-> +			goto err_addr;
-> +		}
-> +
-> +		ret = devm_request_irq(dev, lradc->irq[i],
-> +					mxs_lradc_handle_irq, 0,
-> +					mxs_lradc_irq_name[i], iio);
-
-devm_request_irq is a bit dangerous as long we do not have a
-devm_iio_device_alloc. The IRQ will only be freed after the memory for the
-IIO device has been freed, which means there is a slight window where the
-IRQ could fire although the memory has already been freed.
-
-> +		if (ret)
-> +			goto err_addr;
-> +	}
-> +
-> +	dev_set_drvdata(&pdev->dev, iio);
-
-platform_set_drvdata
-
-> +
-> +	init_completion(&lradc->completion);
-> +	mutex_init(&lradc->lock);
-> +
-
-[...]
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 8674a89..dbb9946 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -327,12 +327,43 @@ static struct i2c_board_info __initdata mop500_i2c2_devices[] = {
+ 	},
+ };
+ 
++#define U8500_I2C_CONTROLLER(id, _slsu, _tft, _rft, clk, t_out, _sm)	\
++static struct nmk_i2c_controller u8500_i2c##id##_data = { \
++	/*				\
++	 * slave data setup time, which is	\
++	 * 250 ns,100ns,10ns which is 14,6,2	\
++	 * respectively for a 48 Mhz	\
++	 * i2c clock			\
++	 */				\
++	.slsu		= _slsu,	\
++	/* Tx FIFO threshold */		\
++	.tft		= _tft,		\
++	/* Rx FIFO threshold */		\
++	.rft		= _rft,		\
++	/* std. mode operation */	\
++	.clk_freq	= clk,		\
++	/* Slave response timeout(ms) */\
++	.timeout	= t_out,	\
++	.sm		= _sm,		\
++}
++
++/*
++ * The board uses 4 i2c controllers, initialize all of
++ * them with slave data setup time of 250 ns,
++ * Tx & Rx FIFO threshold values as 1 resp. 8 and fast
++ * mode of operation
++ */
++U8500_I2C_CONTROLLER(0, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
++U8500_I2C_CONTROLLER(1, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
++U8500_I2C_CONTROLLER(2,	0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
++U8500_I2C_CONTROLLER(3,	0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
++
+ static void __init mop500_i2c_init(struct device *parent)
+ {
+-	db8500_add_i2c0(parent, NULL);
+-	db8500_add_i2c1(parent, NULL);
+-	db8500_add_i2c2(parent, NULL);
+-	db8500_add_i2c3(parent, NULL);
++	db8500_add_i2c0(parent, &u8500_i2c0_data);
++	db8500_add_i2c1(parent, &u8500_i2c1_data);
++	db8500_add_i2c2(parent, &u8500_i2c2_data);
++	db8500_add_i2c3(parent, &u8500_i2c3_data);
+ }
+ 
+ static struct gpio_keys_button mop500_gpio_keys[] = {
+-- 
+1.7.11.3
