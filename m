@@ -1,47 +1,62 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Mon, 6 Aug 2012 13:38:42 +0200
-Subject: [PATCH 1/4] gpio/mxc: remove redundant shadow variables
- initialization
-In-Reply-To: <1344146488-9496-1-git-send-email-shawn.guo@linaro.org>
-References: <1344146488-9496-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <501FACC2.4010008@de.bosch.com>
+From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
+Date: Mon, 6 Aug 2012 17:13:51 +0530
+Subject: [PATCH 1/1] i2c: Add default configuration into the Nomadik
+ I2C driver
+In-Reply-To: <20120806102151.GB16996@gmail.com>
+References: <1344243146-6598-1-git-send-email-linus.walleij@stericsson.com>
+ <20120806102151.GB16996@gmail.com>
+Message-ID: <20120806114351.GA10412@bnru02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.08.2012 08:01, Shawn Guo wrote:
-> With commit 3e11f7b (gpio/generic: initialize basic_mmio_gpio shadow
-> variables properly) in place, the shadow variables initialization is
-> being done in generic driver bgpio_init call.
+On Mon, Aug 06, 2012 at 12:21:52 +0200, Lee Jones wrote:
+> From: Lee Jones <lee.jones@linaro.org>
+> Date: Mon, 6 Aug 2012 11:04:14 +0100
+> Subject: [PATCH 1/1] i2c: Add default configuration into the Nomadik I2C
+>  driver.
 > 
-> Remove the redundant shadow variables initialization from gpio-mxc
-> driver.
+> At this moment in time there is only one known configuration for the
+> Nomadik I2C driver. By not holding that configuration in the driver
+> adds some unnecessary overhead in platform code. The configuration
+> as already been removed from platform code, this patch checks for any
+> over-riding configurations. If there aren't any, the default is used.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-
-Whole series:
-
-Tested-by: Dirk Behme <dirk.behme@de.bosch.com>
-
-Looks good :)
-
-Many thanks
-
-Dirk
-
+> Cc: linux-i2c at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  drivers/gpio/gpio-mxc.c |    2 --
->  1 files changed, 0 insertions(+), 2 deletions(-)
+>  drivers/i2c/busses/i2c-nomadik.c |   24 ++++++++++++++++++------
+>  1 file changed, 18 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-> index 4db460b..76e8cda 100644
-> --- a/drivers/gpio/gpio-mxc.c
-> +++ b/drivers/gpio/gpio-mxc.c
-> @@ -466,8 +466,6 @@ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
+> diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+> index a92440d..86aa73d 100644
+> --- a/drivers/i2c/busses/i2c-nomadik.c
+> +++ b/drivers/i2c/busses/i2c-nomadik.c
+> @@ -333,10 +333,6 @@ static void setup_i2c_controller(struct nmk_i2c_dev *dev)
 >  
->  	port->bgc.gc.to_irq = mxc_gpio_to_irq;
->  	port->bgc.gc.base = pdev->id * 32;
-> -	port->bgc.dir = port->bgc.read_reg(port->bgc.reg_dir);
-> -	port->bgc.data = port->bgc.read_reg(port->bgc.reg_set);
+>  	i2c_clk = clk_get_rate(dev->clk);
 >  
->  	err = gpiochip_add(&port->bgc.gc);
->  	if (err)
+> -	/* fallback to std. mode if machine has not provided it */
+> -	if (dev->cfg.clk_freq == 0)
+> -		dev->cfg.clk_freq = 100000;
+> -
+>  	/*
+>  	 * The spec says, in case of std. mode the divider is
+>  	 * 2 whereas it is 3 for fast and fastplus mode of
+> @@ -899,15 +895,31 @@ static const struct i2c_algorithm nmk_i2c_algo = {
+>  	.functionality	= nmk_i2c_functionality
+>  };
+>  
+> +static struct nmk_i2c_controller u8500_i2c = {
+> +	/*
+> +	 * Slave data setup time; 250ns, 100ns, and 10ns, which
+> +	 * is 14, 6 and 2 respectively for a 48Mhz i2c clock.
+> +	 */
+> +	.slsu           = 0xe,
+> +	.tft            = 1,      /* Tx FIFO threshold */
+> +	.rft            = 8,      /* Rx FIFO threshold */
+> +	.clk_freq       = 400000, /* std. mode operation */
+"Fast mode operation" in comment, or use your favorite "upto" keyword.
+
+Otherwise it is Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+
+/srinidhi
