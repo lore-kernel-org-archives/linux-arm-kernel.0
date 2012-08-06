@@ -1,29 +1,48 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 06 Aug 2012 23:05:07 +0400
-Subject: [PATCH] initramfs: handle trailing junk after valid image
-In-Reply-To: <20120806093251.0528E77A0D@aristotle.killerwolves.net>
-References: <CAB9O=CMADa26benQCkEoLOKKTGNeExjvFeVkFe4HLVi-W=o=Jg@mail.gmail.com>,
- <501F8D75.8070108@killerwolves.net>
- <20120806093251.0528E77A0D@aristotle.killerwolves.net>
-Message-ID: <50201563.2020509@mvista.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 6 Aug 2012 20:08:56 +0100
+Subject: kernel entry for thumb2-only cpus
+In-Reply-To: <CAKGA1b=Pxif=4qSvK-Odmunbm_T6LjWP_CXid_v2VNmpuyHLDA@mail.gmail.com>
+References: <20120803090452.GE2626@pengutronix.de>
+ <20120803114532.GB26925@mudshark.cambridge.arm.com>
+ <20120805095528.GO2626@pengutronix.de>
+ <alpine.LFD.2.02.1208060026460.5231@xanadu.home>
+ <CAKGA1b=Pxif=4qSvK-Odmunbm_T6LjWP_CXid_v2VNmpuyHLDA@mail.gmail.com>
+Message-ID: <20120806190856.GA1120@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, Aug 06, 2012 at 01:40:26PM -0500, Matt Sealey wrote:
+> Maybe we could implement a shiny new zImage magic value, I'm not sure
+> if 0x016f2818 might have some sentimental value, but there's nothing
+> to say that 0x016f2819 wouldn't also be valid and indicate that it's
+> an ARM zImage with a Thumb2 entrypoint?
 
-On 08/06/2012 01:32 PM, Ben Peddell wrote:
+No.  That magic value is a bloody pain in the backside from my point
+of view.  I've had soo many problems with it with boot loaders its
+untrue.
 
-> The initramfs handling since commit df37bd15 has been rejecting
+For example, the Skiff (SA110 platform produced by Compaq) using
+bootldr.  It detects the value in the kernel image after loading
+the kernel at 0x8000 into RAM, and then proceeds to move the entire
+kernel image to RAM location 0, and then calls it at 0x8000 !
 
-   Please also specify the summary of that commit in parens.
+Naturally, that action corrupts the ATAG list etc.
 
-> valid images that have garbage after them.  For example, on an
-> architecture where the initramfs address and size are specified
-> as a kernel parameter (specifically unicore32 and arm), specifying
-> e.g. initrd=0x01000000,4M will not work unless the image is padded
-> with nulls to 4MiB.  This is unlikely to occur if the user is using
-> this parameter to work around a bug in the bootloader.
+To work around that, I've ended up doing some weird and wonderful
+tricks like pre-pending 32K of zeros, and copying the first 128
+bytes of the kernel image to the start of the image file to fool
+the boot loader.  Still results in a corrupted ATAG list but it is
+bootable.
 
-   You didn't sign off the patchs, so it can't br applied.
+There's other boot loaders around too which change their behaviour
+in weird and wonderful ways depending on magic values in the loaded
+image file.
 
-WBR, Sergei
+What this all means is that stuff like this is at the mercy of the
+boot loader folk, and when problems happen, it's hard to work around
+them, because you have no way to tell the boot loader to do something
+different.
+
+Instead, lets not continue this broken idea.  Instead, let's be able
+to _tell_ the boot loader what we want it to do, rather than have it
+magically decipher what _it_ thinks might be a good idea to do.
