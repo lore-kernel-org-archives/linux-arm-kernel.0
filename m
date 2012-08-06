@@ -1,82 +1,61 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 06 Aug 2012 13:08:25 +0300
-Subject: [PATCH 1/2] GPIO: gpio-pxa: simplify pxa_gpio_to_irq() and
- pxa_irq_to_chip()
-In-Reply-To: <501E5F5D.5070901@gmail.com>
-References: <1343230539-7196-1-git-send-email-zonque@gmail.com>
- <501E2F6C.4050507@compulab.co.il> <501E5F5D.5070901@gmail.com>
-Message-ID: <501F9799.5020400@compulab.co.il>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Mon, 6 Aug 2012 12:14:08 +0200
+Subject: [PATCHv4 4/8] ARM: OMAP3: add manual control for mpu / core pwrdm
+ usecounting
+In-Reply-To: <1343637607.9847.13.camel@sokoban>
+References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
+ <1342189185-5306-5-git-send-email-t-kristo@ti.com>
+ <878ve5j8se.fsf@ti.com> <1343637607.9847.13.camel@sokoban>
+Message-ID: <CAORVsuUDo7VB3FnbQWJo=zowrviNDNbPM4DtqQMNrYAmOOat4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/12 14:56, Daniel Mack wrote:
-> On 05.08.2012 10:31, Igor Grinberg wrote:
->> Hi Daniel,
+Hi Tero,
+
+On Mon, Jul 30, 2012 at 10:40 AM, Tero Kristo <t-kristo@ti.com> wrote:
+> On Fri, 2012-07-27 at 12:36 -0700, Kevin Hilman wrote:
+>> Tero Kristo <t-kristo@ti.com> writes:
 >>
->> On 07/25/12 18:35, Daniel Mack wrote:
->>> Simplify the code in gpio-pxa.c and make them based on irq_base.
->>> When not probed from devicetree, initialize irq_base from
->>> PXA_GPIO_TO_IRQ() or MMP_GPIO_TO_IRQ(), respectively, so the non-DT case
->>> still works.
->>>
->>> Only tested on PXA3xx.
->>>
->>> Signed-off-by: Daniel Mack <zonque@gmail.com>
->>> ---
->>>  drivers/gpio/gpio-pxa.c |   70 +++++++++++------------------------------------
->>>  1 file changed, 16 insertions(+), 54 deletions(-)
->>>
->>> diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
->>> index 58a6a63..6d0cb9d 100644
->>> --- a/drivers/gpio/gpio-pxa.c
->>> +++ b/drivers/gpio/gpio-pxa.c
+>> > mpu / core powerdomain usecounts are now statically increased
+>> > by 1 during MPU activity. This allows the domains to reflect
+>> > actual usage, and will allow the usecount to reach 0 just before
+>> > all CPUs are ready to idle. Proper powerdomain usecounts are
+>> > propageted to voltagedomain level also, and will allow vc
+>> > callbacks to be triggered at right point of time.
+>> >
+>> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>> > Cc: Paul Walmsley <paul@pwsan.com>
+>> > Cc: Kevin Hilman <khilman@ti.com>
 >>
->> [...]
+>> IMO, the idea is fine, but I'm not crazy about the implementation in
+>> powerdomain.c, which is meant for pwrdm generic code.   In particular,
+>> I'm not crazy about the pwrdm lookups in powerdomain.c.
 >>
->>> @@ -564,10 +516,20 @@ static int __devinit pxa_gpio_probe(struct platform_device *pdev)
->>>  	int irq0 = 0, irq1 = 0, irq_mux, gpio_offset = 0;
->>>  
->>>  	ret = pxa_gpio_probe_dt(pdev);
->>> -	if (ret < 0)
->>> +	if (ret < 0) {
->>>  		pxa_last_gpio = pxa_gpio_nums();
->>> -	else
->>> +#ifdef CONFIG_ARCH_PXA
->>> +		if (gpio_is_pxa_type(gpio_type))
->>> +			irq_base = PXA_GPIO_TO_IRQ(0);
->>> +#endif
->>> +#ifdef CONFIG_ARCH_MMP
->>> +		if (gpio_is_mmp_type(gpio_type))
->>> +			irq_base = MMP_GPIO_TO_IRQ(0);
->>> +#endif
->>
->> The ifdes above do not look essential.
-> 
-> But they are. In case of !CONFIG_ARCH_MMP, MMP_GPIO_TO_IRQ is undefined.
-> Same problem for !CONFIG_ARC_PXA.
+>> Since pm<soc>.c already has references to mpu_pwrdm and core_pwrdm, why
+>> not just add the pwrdm_clkdm_enable/disable calls directly in pm<soc>.c
+>
+> I think this was how the patch was in some earlier rev but I thought I'd
+> try to be more clever with this. :) I can revert the implementation back
+> to this.
+Furthermore after the changes in pre/post transitions [1], some more
+checks will be needed to identify the transitions on the mpu and core
+power domains.
 
-I see. Ok then. I'm not a huge fan of having the #ifdes inside
-the code (functions) and thinking of moving those outside of the function,
-I get pretty much the same solution it was before your patch.
+[1] http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commitdiff;h=e055548953355b6e69c56f9e54388845b29b4e97
 
-I really think that PXA|MMP_GPIO_TO_IRQ should be moved to some common
-location (say arch/arm/plat-pxa/) so both are available regardless
-of CONFIG_ARCH_MMP|PXA. That will simplify the code even more.
-But probably it is too much to ask for that simple patch...
-So, I'm fine with the patch.
-
-Thanks
-
-> 
->> Can't we drop them and just have else if ... else if?
-> 
-> We can't do that either, as we might have a hybrid kernel that works on
-> both PXA and MMP platforms, and then the condition is a runtime thing.
-
-Well, that is exactly what I mean...
-I mean, the if ... else ... if ... else without the #ifdefs...
-But again, it requires some more changes.
-
--- 
 Regards,
-Igor.
+Jean
+
+>
+>> Also, the changelog should be a bit more specific about why CORE
+>> powerdomain is also handled here when most of the code only talks about
+>> the CPU.
+>
+> Yea, I'll add some beef to this also.
+>
+> -Tero
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
