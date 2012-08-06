@@ -1,52 +1,73 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 6 Aug 2012 01:19:15 -0700
-Subject: [PATCH 1/1] Input: ab8500-ponkey: Make the distinction between
- DT and non-DT boots
-In-Reply-To: <1344256323-10484-1-git-send-email-lee.jones@linaro.org>
-References: <1344256323-10484-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120806081915.GA4518@core.coreip.homeip.net>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Mon, 6 Aug 2012 10:19:50 -0500
+Subject: [PATCH 4/9] ASoC: imx: Don't use {en,dis}able_fiq() calls
+In-Reply-To: <1344207819-3415-4-git-send-email-anton.vorontsov@linaro.org>
+References: <20120805230238.GA1663@lizard>
+ <1344207819-3415-4-git-send-email-anton.vorontsov@linaro.org>
+Message-ID: <CAKGA1bkiHj=zMJXSzoGp3fpLS3POnFXSV5y7sYYFAikqoUT9tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On Sun, Aug 5, 2012 at 6:03 PM, Anton Vorontsov
+<anton.vorontsov@linaro.org> wrote:
+> The driver uses platform-specific mxc_set_irq_fiq() with the VIRQ cookie
+> passed to it, so it's pretty clear that the driver is absolutely sure
+> that the FIQ is routed via platform-specific IC, and that the cookie can
+> be used to mask/unmask FIQs. So, let's switch to the genirq routines,
+> since we're about to remove FIQ-specific variants.
 
-On Mon, Aug 06, 2012 at 01:32:03PM +0100, Lee Jones wrote:
-> If we're booting with Device Tree enabled, we want the IRQ numbers to
-> be taken and translated from the Device Tree binary. If not, they
-> should be taken from the resource allocation defined in the AB8500 MFD
-> core driver.
-> 
-> Tested-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/input/misc/ab8500-ponkey.c |    6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
-> index 1a1d974..afcd87f 100644
-> --- a/drivers/input/misc/ab8500-ponkey.c
-> +++ b/drivers/input/misc/ab8500-ponkey.c
-> @@ -47,6 +47,7 @@ static irqreturn_t ab8500_ponkey_handler(int irq, void *data)
->  static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
->  {
->  	struct ab8500 *ab8500 = dev_get_drvdata(pdev->dev.parent);
-> +	struct device_node *np = pdev->dev.of_node;
->  	struct ab8500_ponkey *ponkey;
->  	struct input_dev *input;
->  	int irq_dbf, irq_dbr;
-> @@ -73,8 +74,9 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
->  
->  	ponkey->idev = input;
->  	ponkey->ab8500 = ab8500;
-> -	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, irq_dbf);
-> -	ponkey->irq_dbr = ab8500_irq_get_virq(ab8500, irq_dbr);
-> +
-> +	ponkey->irq_dbf = (np) ? ab8500_irq_get_virq(ab8500, irq_dbf) : irq_dbf;
-> +	ponkey->irq_dbr = (np) ? ab8500_irq_get_virq(ab8500, irq_dbr) : irq_dbr;
+I have a semi-related question about this;
 
-Why this isn't done inside ab8500_irq_get_virq()?
+Firstly, I was planning on (re-)submitting a patch for the
+arch/arm/plat-mxc/ssi-fiq.S code which made it build in ARM mode
+(since the code isn't Thumb compatible for various reasons) as it was
+a blocker for a Thumb2-compiled kernel. Since the code was only needed
+on ARM-capable processors it wouldn't cause a problem. Sascha signed
+off on this a long while back and I've been testing it on all my
+internal kernel versions, and I don't see any ill effects (that said I
+don't have an i.MX28 or so to really verify it, I can't see why it
+would not work). I realise this is redundant right now, anyway, since
+it's only really enabled on imx_v4_v5 configs and they don't support
+Thumb2 kernels anyway. What might be worth submitting is a switch to
+add the ".arm" directive anyway simply for correctness since it could
+never be compiled for Thumb anyway. We all know what gnu as is like.
 
-Thanks.
+Looking at it again on the back of these patches, I noticed the
+ssi-fiq.S code is compiled in when SND_IMX_SOC is enabled - of course,
+it's only needed in the kernel if SND_SOC_IMX_PCM_FIQ is enabled (the
+code that uses the FIQ stuff is only compiled then) but here on the
+Efika MX builds it's being built, and I noticed it when it broke my
+build because of the above. I'm therefore going to submit a patch
+which changes the ifdef SND_SOC_IMX to ifdef SND_SOC_IMX_PCM_FIQ so
+it's not compiled in unless absolutely necessary. However, there was a
+rumble that this code may disappear or be reworked in the future
+making this also quite redundant. Since it's not in the
+imx_v6_v7_defconfig anyway, I'm sure this only didn't get noticed
+because nobody's building Thumb2 kernels and nobody is trying configs
+with audio enabled anyway..
+
+This begs the question, could there be something somewhere hidden deep
+in the kernel that is enabled by default or in some config somewhere
+that requires "select FIQ" in it's Kconfig entry, but isn't being
+enabled? On i.MX the only thing turning it on is that code, but other
+ARM arch enable it by default. Since things have been moved to more
+generic routines I can't in my mind guarantee that such a patch would
+be well tested here since I would be relying on symbols missing or
+defines not there anymore.. I have no real way to ensure that it would
+work on boards I don't have.
+
+So, is the first patch (ssi-fiq.S .arm) worth it? I think the
+SND_SOC_IMX_PCM_FIQ patch is worth it for v6_v7 systems anyway, but
+maybe this should have been caught sooner, so should I update the
+defconfig to enable some kind of audio bus support (Babbage has it in
+the DT so is a needful thing for testing, I figure..)? And does anyone
+forsee any problems with that option changing and the only "user" of
+"FIQ" in the Kconfigs going away now all the FIQ-specific symbols went
+away outside of the generic irq subsystem?
+
+I will probably throw out all three today anyway, but I thought it
+would make a good discussion anyway.
 
 -- 
-Dmitry
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
