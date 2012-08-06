@@ -1,132 +1,40 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Mon, 6 Aug 2012 16:59:04 +0530
-Subject: [PATCH] arm/dts: AM33XX: Set the default status of module to
- "disabled" state
-Message-ID: <1344252544-26130-1-git-send-email-hvaibhav@ti.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 6 Aug 2012 13:37:04 +0200
+Subject: [PATCH] ARM: ux500: resurrect I2C platform data
+In-Reply-To: <20120806095144.GA16996@gmail.com>
+References: <1344243146-6598-1-git-send-email-linus.walleij@stericsson.com>
+ <20120806095144.GA16996@gmail.com>
+Message-ID: <501FAC60.1080600@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ideally in common SoC dtsi file we should set all modules
-to "disabled" state and it should get enabled in respective
-EVM/Board dts file as per usage.
+On 08/06/2012 11:51 AM, Lee Jones wrote:
+> On Mon, Aug 06, 2012 at 10:52:26AM +0200, Linus Walleij wrote:
+>> Commit:
+>> 98582d9562b4bea6b0eb6e2bfafcd3fab3b60ccb
+>> "ARM: ux500: Remove unused i2c platform_data initialisation code"
+>>
+>> Deleted platform data intialization code that was used,
+>> not unused as indicated in the commit. The boot log (without
+>> devicetree) now looks like this:
+> The aforementioned commit was part of a patch-set. One of its affiliates
+> moved this code into the Nomadik I2C driver; however, it was contested
+> because Device Tree support was also added and the maintainer thought
+> the properties introduced could be consolidated with other I2C driver's
+> DT properties. I don't think anyone has taken up the consolidation work
+> and for that reason it hasn't gone in.
 
-This patch sets default status of all modules to "disabled"
-state in am33xx.dtsi file, and as per board requirement, enabled
-in board dts file (like, bone, evm, etc...).
+Too bad it had to turn into a regression though :-P
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Arnd Bergmann <arnd@arndb.de>
-CC: Tony Lindgren <tony@atomide.com>
----
-This patch is tested on BeagleBone platform.
+> I think moving this stuff into the driver is the right thing to do.
+> Instead, I'll split out the configuration and DT enablement from the
+> patch and resubmit.
+>
+> Sound good to you?
 
- arch/arm/boot/dts/am335x-bone.dts |    6 ++++++
- arch/arm/boot/dts/am335x-evm.dts  |    6 ++++++
- arch/arm/boot/dts/am33xx.dtsi     |    9 +++++++++
- 3 files changed, 21 insertions(+), 0 deletions(-)
+Either way works with me, but the patch sent out need to be
+rebased and sent to Wolfram. Either he applies that to the I2C
+tree or I apply this to the ux500 tree. So it's for Wolfram to decide.
 
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index a9af4db..df672b4 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -17,4 +17,10 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x10000000>; /* 256 MB */
- 	};
-+
-+	ocp {
-+		uart1: serial at 44E09000 {
-+			       status = "okay";
-+		       };
-+	};
- };
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index d6a97d9..00bbae8 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -17,4 +17,10 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x10000000>; /* 256 MB */
- 	};
-+
-+	ocp {
-+		uart1: serial at 44E09000 {
-+			       status = "okay";
-+		       };
-+	};
- };
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 59509c4..5f6c8e3 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -102,36 +102,42 @@
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart1";
- 			clock-frequency = <48000000>;
-+			status = "disabled";
- 		};
-
- 		uart2: serial at 48022000 {
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart2";
- 			clock-frequency = <48000000>;
-+			status = "disabled";
- 		};
-
- 		uart3: serial at 48024000 {
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart3";
- 			clock-frequency = <48000000>;
-+			status = "disabled";
- 		};
-
- 		uart4: serial at 481A6000 {
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart4";
- 			clock-frequency = <48000000>;
-+			status = "disabled";
- 		};
-
- 		uart5: serial at 481A8000 {
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart5";
- 			clock-frequency = <48000000>;
-+			status = "disabled";
- 		};
-
- 		uart6: serial at 481AA000 {
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart6";
- 			clock-frequency = <48000000>;
-+			status = "disabled";
- 		};
-
- 		i2c1: i2c at 44E0B000 {
-@@ -139,6 +145,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			ti,hwmods = "i2c1";
-+			status = "disabled";
- 		};
-
- 		i2c2: i2c at 4802A000 {
-@@ -146,6 +153,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			ti,hwmods = "i2c2";
-+			status = "disabled";
- 		};
-
- 		i2c3: i2c at 4819C000 {
-@@ -153,6 +161,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			ti,hwmods = "i2c3";
-+			status = "disabled";
- 		};
- 	};
- };
---
-1.7.0.4
+Yours,
+Linus Walleij
