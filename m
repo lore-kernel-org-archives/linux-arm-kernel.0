@@ -1,114 +1,91 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 06 Aug 2012 14:31:48 -0700
-Subject: DSS and USBHOST powerdomains not entering low-power states on
- 37xx EVM
-In-Reply-To: <alpine.DEB.2.00.1208031355450.28888@utopia.booyaka.com> (Paul
- Walmsley's message of "Fri, 3 Aug 2012 14:05:55 -0600 (MDT)")
-References: <alpine.DEB.2.00.1208031355450.28888@utopia.booyaka.com>
-Message-ID: <877gtb6723.fsf@ti.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Mon, 6 Aug 2012 16:31:50 -0500
+Subject: [PATCH 2/2] ARM i.MX5: Hard reset the IPU during startup
+In-Reply-To: <20120605110834.GQ30400@pengutronix.de>
+References: <1338888630-25930-1-git-send-email-s.hauer@pengutronix.de>
+ <1338888630-25930-3-git-send-email-s.hauer@pengutronix.de>
+ <20429.57208.228315.164637@ipc1.ka-ro> <20120605110834.GQ30400@pengutronix.de>
+Message-ID: <CAKGA1bkA3eEHn4sM277mzcRT5OUyipW18-k-X0nK+T9rrotJNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Tue, Jun 5, 2012 at 6:08 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Tue, Jun 05, 2012 at 12:29:12PM +0200, Lothar Wa?mann wrote:
+>> Hi,
+>>
+>> Sascha Hauer writes:
+>> >
+>> How would you implement a seamless transition from a boot logo to the
+>> application display when resetting the IPU during startup?
+>
+> I usually say to Robert: Make the bootloader fast enough so that nobody
+> misses a splash from the bootloader. Robert is never happy with that
+> answer...
+>
+> Is there any mainline compatible way to take over an initialized
+> graphics core?
 
-Paul Walmsley <paul@pwsan.com> writes:
+No.
 
-> On v3.6-rc1 on 37xx EVM, DSS and USBHOST powerdomains aren't entering 
-> low-power states.  Test log is below.
+There used to be an ATAG for finding the linear framebuffer and it's
+details but it got removed. This
+was from a long forgotten time when you could initialize a VGA
+graphics card and never care that
+it had an interrupt or not, since it never got used for your average,
+simple linear framebuffer operations.
+A device tree would be able to define (based on seeding that
+information from the bootloader) this too,
+and we have sample code of this working on a PPC system (Pegasos II)
+which would initialize a
+VGA graphics card using x86 emulation, set up the framebuffer using
+faked BIOS calls and put that
+information in the device tree for Linux to pick up using ofwfb.
 
-Is this only happening on this 37xx platform?    Just curious, because
-it seems to be a problem on any OMAP3xxx SoC.
+Lothar;
 
-[...]
+The problem is on the IPU at least, having a running IDMAC channel
+kind of means breaking all kinds of
+good behavior in the transition between bootloader and kernel -
+usually you can assume that
+interrupts and caches are disabled, all DMA operations are halted/torn
+down, and strange effects
+happen obviously if this is not exactly true (on Pegasos II we had an
+old firmware which accidentally
+left USB running, and when Linux started.. all hell broke loose. At
+random.). It would also assume that
+the framebuffer memory was preserved, that the OS booting knew how to
+use that exact framebuffer
+format,
 
-> # echo mem > /sys/power/state
-> [   35.068359] PM: Syncing filesystems ... done.
-> [   35.083038] Freezing user space processes ... (elapsed 0.00 seconds) 
-> done.
-> [   35.090698] Freezing remaining freezable tasks ... (elapsed 0.02 
-> seconds) done.
-> [   35.122833] Suspending console(s) (use no_console_suspend to debug)
-> [   35.144409] PM: suspend of devices complete after 11.260 msecs
-> [   35.147369] PM: late suspend of devices complete after 2.929 msecs
-> [   35.152465] PM: noirq suspend of devices complete after 5.096 msecs
-> [   35.152526] Disabling non-boot CPUs ...
-> [   36.958343] Successfully put all powerdomains to target state
+So, unless your LCDC is extremely dumb, and your OS extremely smart,
+it can't be done. Robert and
+Lothar, you will have to live with it. What some people do is get
+clever inside the kernel, i.e. boot your
+kernel as fast as possible as you said and then use fancy features
+like precompiling the splash image
+into the kernel, then using DMA to fill the screen buffer with data so
+you have a working splash extremely
+early in boot - and while the kernel is probing devices after the bare
+minimum you architected, the DMA
+unit is putting your penguin on the screen. There's no reason to
+expect that display has to be configured
+after USB, for example, and you can make your "real" display driver
+hand-off much easier between initial
+kernel setup and real driver inside the kernel, than trying to handle
+it across the loader/kernel transitition.
+I saw an article on this (may have been published and peer reviewed,
+but also had a youtube video.. :)
+that did this exact thing, it was a response to all those "5 second
+boot" articles, on how to do it properly
+on embedded systems. I'll see if I can find it.
 
-According to the readback of prev pwrst, it seems they are hitting the
-target pwrst (retention by default), so...
+There are plenty of things that you could do in the bootloader like
+using DMA for instance (why not
+use SDMA for relocation of the kernel if required?) in ways other than
+accelerating the disk accesses,
+and the same stuff can be done in the kernel to get to the "put a nice
+screen up" stage even faster.
 
-> [   36.960662] PM: noirq resume of devices complete after 2.166 msecs
-> [   36.964050] PM: early resume of devices complete after 1.892 msecs
-> [   36.973388] PM: resume of devices complete after 9.185 msecs
-> [   37.025207] Restarting tasks ... done.
-> # cat  /debug/pm_debug/count
-> usbhost_pwrdm 
-> (ON),OFF:0,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-> sgx_pwrdm (OFF),OFF:1,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-> core_pwrdm 
-> (ON),OFF:0,RET:1,INA:0,ON:2,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
-> per_pwrdm (ON),OFF:0,RET:1,INA:0,ON:2,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-> dss_pwrdm (ON),OFF:0,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-> cam_pwrdm (RET),OFF:0,RET:1,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-> neon_pwrdm (ON),OFF:0,RET:673,INA:0,ON:674,RET-LOGIC-OFF:0
-> mpu_pwrdm (ON),OFF:0,RET:673,INA:0,ON:674,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-> iva2_pwrdm (RET),OFF:0,RET:1,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0,RET-MEMBANK3-OFF:0,RET-ME
-> MBANK4-OFF:0
-> usbhost_clkdm->usbhost_pwrdm (1)
-> sgx_clkdm->sgx_pwrdm (0)
-> per_clkdm->per_pwrdm (22)
-> cam_clkdm->cam_pwrdm (0)
-> dss_clkdm->dss_pwrdm (1)
-> d2d_clkdm->core_pwrdm (0)
-> iva2_clkdm->iva2_pwrdm (0)
-> mpu_clkdm->mpu_pwrdm (0)
-> core_l4_clkdm->core_pwrdm (24)
-> core_l3_clkdm->core_pwrdm (4)
-> neon_clkdm->neon_pwrdm (0)
-
-...it must be the usecounts that are not being updated.  This seems to
-be a side effect of the pre/post transition optimization I did.  A quick
-hack seems to indicate that that's indeed the case[1].  By default,
-omap_sram_idle() is now only calling the pre/post callbacks for MPU,
-NEON, PER, and CORE, and only if those domains are transitioning, so any
-other domains not explicitly managed by the idle path have lots their
-usecounting.  Oops.
-
-I guess Tero's usecounting series should fix this up.
-
-Kevin
-
-[1] 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index e4fc88c..d87416f 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -70,6 +70,7 @@ void (*omap3_do_wfi_sram)(void);
- 
- static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
- static struct powerdomain *core_pwrdm, *per_pwrdm;
-+static struct powerdomain *dss_pwrdm, *usbhost_pwrdm;
- 
- static void omap3_core_save_context(void)
- {
-@@ -393,7 +394,11 @@ static int omap3_pm_suspend(void)
- 
- 	omap3_intc_suspend();
- 
-+	pwrdm_pre_transition(dss_pwrdm);
-+	pwrdm_pre_transition(usbhost_pwrdm);
- 	omap_sram_idle();
-+	pwrdm_post_transition(usbhost_pwrdm);
-+	pwrdm_post_transition(dss_pwrdm);
- 
- restore:
- 	/* Restore next_pwrsts */
-@@ -718,6 +723,8 @@ int __init omap3_pm_init(void)
- 	neon_pwrdm = pwrdm_lookup("neon_pwrdm");
- 	per_pwrdm = pwrdm_lookup("per_pwrdm");
- 	core_pwrdm = pwrdm_lookup("core_pwrdm");
-+	dss_pwrdm = pwrdm_lookup("dss_pwrdm");
-+	usbhost_pwrdm = pwrdm_lookup("usbhost_pwrdm");
- 
- 	neon_clkdm = clkdm_lookup("neon_clkdm");
- 	mpu_clkdm = clkdm_lookup("mpu_clkdm");
+-- 
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
