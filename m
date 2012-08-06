@@ -1,30 +1,29 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 6 Aug 2012 22:32:25 +0300
-Subject: [PATCH 1/1] remoteproc: extend customized fw loader to cover
- request and release
-In-Reply-To: <CAEvN+1h5dVxX74YtBNwjiqzZNrpK56jBw9TaJjszf_-E3DY2gw@mail.gmail.com>
-References: <1344237865-32491-1-git-send-email-roylee17@gmail.com>
- <CAK=WgbbBHspN_LTUXH1kUugH8-Nr-G=p-G3Wj60tAmrqqfakmg@mail.gmail.com>
- <CAEvN+1h5dVxX74YtBNwjiqzZNrpK56jBw9TaJjszf_-E3DY2gw@mail.gmail.com>
-Message-ID: <CAK=WgbbaRMf+-1cS8E+8eK-X=571-nO1ot1ywEP3=-homfMWhg@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 6 Aug 2012 20:37:34 +0100
+Subject: [PATCH 4/9] ASoC: imx: Don't use {en,dis}able_fiq() calls
+In-Reply-To: <CAKGA1b=_AOub_pEJJGBTb6Y7wLZaSYKQjFTyMVFSr_=9VX4wpg@mail.gmail.com>
+References: <20120805230238.GA1663@lizard>
+ <1344207819-3415-4-git-send-email-anton.vorontsov@linaro.org>
+ <CAKGA1bkiHj=zMJXSzoGp3fpLS3POnFXSV5y7sYYFAikqoUT9tQ@mail.gmail.com>
+ <20120806154951.GQ16861@opensource.wolfsonmicro.com>
+ <CAKGA1b=_AOub_pEJJGBTb6Y7wLZaSYKQjFTyMVFSr_=9VX4wpg@mail.gmail.com>
+Message-ID: <20120806193734.GA16199@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roy,
+On Mon, Aug 06, 2012 at 01:09:26PM -0500, Matt Sealey wrote:
 
-On Mon, Aug 6, 2012 at 7:43 PM, Tzu-Jung Lee <roylee17@gmail.com> wrote:
-> That's what I'm trying to do, and it has two things needs to be address.
->
->   1)  Make the firmware loading step "optional" in the booting process.
->
->   2)  Allow the remoteproc use an customized handler to get the resource table.
+> So that needs to stay, the issue here is why did nobody catch
+> ssi-fiq.S breaking in testing MX51
+> Babbage and building a Thumb2 kernel, for example? Why did nobody
+> notice it was building when
+> configuring for MX3/5/6 boards (which do actually have working SSI and
+> DMA, as you assume, and
+> do not need this code, nor build the imx-pcm-dma-fiq part of the
+> driver anyway)? I'm willing to fix all
+> of the above, but if there's an obvious deficiency in testing at some
+> point we need to fix that too..
 
-Before we start digging into this, can you please tell which platform
-are you working with ? is it upstream yet ?
-
-Last we talked you couldn't yet disclose the platform identity. If
-it's not upstream yet, we might prefer to postpone these discussions
-until it is, to avoid unnecessary churn.
-
-Thanks,
-Ohad.
+As far as I can tell nobody's really running much up to date mainline on
+older i.MX processors, all the work is going on the new stuff and most
+of the board are on either vendor BSPs or older kernels.
