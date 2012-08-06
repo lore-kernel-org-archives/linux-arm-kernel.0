@@ -1,44 +1,117 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Mon, 6 Aug 2012 09:19:10 -0400
-Subject: [PATCH 01/22] ARM: add mechanism for late code patching
-In-Reply-To: <20120806111224.GA18957@n2100.arm.linux.org.uk>
-References: <1343775898-28345-1-git-send-email-cyril@ti.com>
- <1343775898-28345-2-git-send-email-cyril@ti.com>
- <20120806111224.GA18957@n2100.arm.linux.org.uk>
-Message-ID: <501FC44E.1040806@ti.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 6 Aug 2012 18:53:15 +0530
+Subject: [PATCH 4/4] arm/dts: omap: Add usb_otg and glue data
+In-Reply-To: <1344259395-4559-1-git-send-email-kishon@ti.com>
+References: <1344259395-4559-1-git-send-email-kishon@ti.com>
+Message-ID: <1344259395-4559-5-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/6/2012 7:12 AM, Russell King - ARM Linux wrote:
-> On Tue, Jul 31, 2012 at 07:04:37PM -0400, Cyril Chemparathy wrote:
->> +static void __init init_patch_kernel(void)
->> +{
->> +	const void *start = &__patch_table_begin;
->> +	const void *end   = &__patch_table_end;
->> +
->> +	BUG_ON(patch_kernel(start, end - start));
->> +	flush_icache_range(init_mm.start_code, init_mm.end_code);
->
-> Err.  You are asking the kernel to flush every single cache line
-> manually throughout the kernel code.  That's a flush every 32-bytes
-> over maybe a few megabytes of address space.
->
+Add usb otg data node in omap4/omap3 device tree file. Also update
+the node with board specific setting in omapx-<board>.dts file.
 
-With a flush_cache_all(), we could avoid having to operate a cacheline 
-at a time, but that clobbers way more than necessary.
+Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/omap3-beagle.dts |    6 ++++++
+ arch/arm/boot/dts/omap3-evm.dts    |    6 ++++++
+ arch/arm/boot/dts/omap3.dtsi       |    8 ++++++++
+ arch/arm/boot/dts/omap4-panda.dts  |    6 ++++++
+ arch/arm/boot/dts/omap4-sdp.dts    |    6 ++++++
+ arch/arm/boot/dts/omap4.dtsi       |    8 ++++++++
+ 6 files changed, 40 insertions(+)
 
-Maybe the better answer is to flush only the patched cachelines.
-
-> This is one of the reasons we do the patching in assembly code before
-> the caches are enabled - so we don't have to worry about the interaction
-> with the CPU caches, which for this kind of application would be very
-> expensive.
->
-
-Sure, flushing caches is expensive.  But then, so is running the 
-patching code with caches disabled.  I guess memory access latencies 
-drive the performance trade off here.
-
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index cdcb98c..6d6a7a4 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -67,3 +67,9 @@
+ &mmc3 {
+ 	status = "disabled";
+ };
++
++&usb_otg_hs {
++	interface_type = <0>;
++	mode = <3>;
++	power = <50>;
++};
+diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
+index f349ee9..c4ac75e 100644
+--- a/arch/arm/boot/dts/omap3-evm.dts
++++ b/arch/arm/boot/dts/omap3-evm.dts
+@@ -46,3 +46,9 @@
+ 		reg = <0x5c>;
+ 	};
+ };
++
++&usb_otg_hs {
++	interface_type = <0>;
++	mode = <3>;
++	power = <50>;
++};
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 8109471..2501416 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -220,5 +220,13 @@
+ 			compatible = "ti,omap3-wdt";
+ 			ti,hwmods = "wd_timer2";
+ 		};
++
++		usb_otg_hs: usb_otg_hs {
++			compatible = "ti,omap3-musb";
++			ti,hwmods = "usb_otg_hs";
++			multipoint = <1>;
++			num_eps = <16>;
++			ram_bits = <12>;
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+index 2999eba..8cded95 100644
+--- a/arch/arm/boot/dts/omap4-panda.dts
++++ b/arch/arm/boot/dts/omap4-panda.dts
+@@ -130,3 +130,9 @@
+ &twlusb {
+ 	usb-supply = <&vusb>;
+ };
++
++&usb_otg_hs {
++	interface_type = <1>;
++	mode = <3>;
++	power = <50>;
++};
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+index d8290c0..24f4bfd 100644
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -230,3 +230,9 @@
+ &twlusb {
+ 	usb-supply = <&vusb>;
+ };
++
++&usb_otg_hs {
++	interface_type = <1>;
++	mode = <3>;
++	power = <50>;
++};
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index d774733..a855d13 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -308,5 +308,13 @@
+ 				      <0x4a002300 0x1>;
+ 			};
+ 		};
++
++		usb_otg_hs: usb_otg_hs {
++			compatible = "ti,omap4-musb";
++			ti,hwmods = "usb_otg_hs";
++			multipoint = <1>;
++			num_eps = <16>;
++			ram_bits = <12>;
++		};
+ 	};
+ };
 -- 
-Thanks
-- Cyril
+1.7.9.5
