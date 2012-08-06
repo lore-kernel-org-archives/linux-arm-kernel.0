@@ -1,60 +1,28 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 6 Aug 2012 10:58:08 +0800
-Subject: [PATCH] ARM: mxs_defconfig: Enable USB host
-In-Reply-To: <1344186258-30841-1-git-send-email-festevam@gmail.com>
-References: <1344186258-30841-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120806025806.GA22302@S2101-09.ap.freescale.net>
+Date: Mon, 6 Aug 2012 11:00:16 +0800
+Subject: [PATCH] clk: mxs: Register USB clocks for mx23
+In-Reply-To: <CAOMZO5AaLKN9bhuPRLJkA8ytiwVi_yrpwzL0mJAzf6VS4PSRLQ@mail.gmail.com>
+References: <1340148392-9847-1-git-send-email-festevam@gmail.com>
+ <20120620143830.GF2253@S2101-09.ap.freescale.net>
+ <CAOMZO5AaLKN9bhuPRLJkA8ytiwVi_yrpwzL0mJAzf6VS4PSRLQ@mail.gmail.com>
+Message-ID: <20120806030014.GB22302@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 05, 2012 at 02:04:18PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Sun, Aug 05, 2012 at 02:08:07PM -0300, Fabio Estevam wrote:
+> On Wed, Jun 20, 2012 at 11:38 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> ...
+> >> +     clk_register_clkdev(clks[usb_pwr], NULL, "8007c000.usbphy");
+> >> +     clk_register_clkdev(clks[usb], NULL, "80080000.usb");
+> >
+> > It depends on the node name in device tree.  I would defer this
+> > a little bit to have the node name in dts settled down first.
 > 
-> Enable USB host.
+> Now that the mxs usb driver is in mainline, could this patch be applied?
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/configs/mxs_defconfig |   14 +++++++++++++-
->  1 files changed, 13 insertions(+), 1 deletions(-)
-> 
-I guess you did not run savedefconfig.  We do not need all those
-options explicitly added there.
+Probably, no, as I plan to freeze the addition to clkdev lookup table
+and replace it with DT clock lookup.
 
+-- 
 Regards,
 Shawn
-
-> diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-> index ccdb635..73842f9 100644
-> --- a/arch/arm/configs/mxs_defconfig
-> +++ b/arch/arm/configs/mxs_defconfig
-> @@ -95,7 +95,7 @@ CONFIG_GPIO_SYSFS=y
->  # CONFIG_MFD_SUPPORT is not set
->  CONFIG_DISPLAY_SUPPORT=m
->  # CONFIG_HID_SUPPORT is not set
-> -# CONFIG_USB_SUPPORT is not set
-> +CONFIG_USB_SUPPORT=y
->  CONFIG_SOUND=y
->  CONFIG_SND=y
->  CONFIG_SND_TIMER=y
-> @@ -110,6 +110,18 @@ CONFIG_SND_SOC_I2C_AND_SPI=y
->  CONFIG_SND_SOC_SGTL5000=y
->  CONFIG_REGULATOR=y
->  CONFIG_REGULATOR_FIXED_VOLTAGE=y
-> +CONFIG_USB_COMMON=y
-> +CONFIG_USB_ARCH_HAS_HCD=y
-> +CONFIG_USB=y
-> +CONFIG_USB_EHCI_ROOT_HUB_TT=y
-> +CONFIG_USB_EHCI_TT_NEWSCHED=y
-> +CONFIG_USB_STORAGE=y
-> +CONFIG_USB_OTG_UTILS=y
-> +CONFIG_USB_MXS_PHY=y
-> +CONFIG_USB_CHIPIDEA=y
-> +CONFIG_USB_CHIPIDEA_HOST=y
-> +CONFIG_SCSI=y
-> +CONFIG_BLK_DEV_SD=y
->  CONFIG_MMC=y
->  CONFIG_MMC_MXS=y
->  CONFIG_RTC_CLASS=y
-> -- 
-> 1.7.1
-> 
