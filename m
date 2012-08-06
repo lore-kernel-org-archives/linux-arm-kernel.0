@@ -1,36 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 6 Aug 2012 10:51:45 +0100
-Subject: [PATCH] ARM: ux500: resurrect I2C platform data
-In-Reply-To: <1344243146-6598-1-git-send-email-linus.walleij@stericsson.com>
-References: <1344243146-6598-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20120806095144.GA16996@gmail.com>
+From: hdk@igel.co.jp (Hideki EIRAKU)
+Date: Mon,  6 Aug 2012 18:55:20 +0900
+Subject: [PATCH v3 0/4] Use dma_mmap_coherent to support IOMMU mapper
+Message-ID: <1344246924-32620-1-git-send-email-hdk@igel.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2012 at 10:52:26AM +0200, Linus Walleij wrote:
-> Commit:
-> 98582d9562b4bea6b0eb6e2bfafcd3fab3b60ccb
-> "ARM: ux500: Remove unused i2c platform_data initialisation code"
-> 
-> Deleted platform data intialization code that was used,
-> not unused as indicated in the commit. The boot log (without
-> devicetree) now looks like this:
+There is a dma_mmap_coherent() API in some architectures.  This API
+provides a mmap function for memory allocated by dma_alloc_coherent().
+Some drivers mmap a dma_addr_t returned by dma_alloc_coherent() as a
+physical address.  But such drivers do not work correctly when IOMMU
+mapper is used.
 
-The aforementioned commit was part of a patch-set. One of its affiliates
-moved this code into the Nomadik I2C driver; however, it was contested
-because Device Tree support was also added and the maintainer thought 
-the properties introduced could be consolidated with other I2C driver's
-DT properties. I don't think anyone has taken up the consolidation work
-and for that reason it hasn't gone in.
+v3:
+- Remove an unnecessary line which sets page protection bits.
+v2:
+- Rebase on fbdev-next branch of
+  git://github.com/schandinat/linux-2.6.git.
+- Initialize .fb_mmap in both sh_mobile_lcdc_overlay_ops and
+  sh_mobile_lcdc_ops.
+- Add Laurent's clean up patch.
 
-I think moving this stuff into the driver is the right thing to do.
-Instead, I'll split out the configuration and DT enablement from the
-patch and resubmit.
+Hideki EIRAKU (3):
+  ARM: dma-mapping: define ARCH_HAS_DMA_MMAP_COHERENT
+  media: videobuf2-dma-contig: use dma_mmap_coherent if available
+  fbdev: sh_mobile_lcdc: use dma_mmap_coherent if available
 
-Sound good to you? 
+Laurent Pinchart (1):
+  ALSA: pcm - Don't define ARCH_HAS_DMA_MMAP_COHERENT privately for ARM
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+ arch/arm/include/asm/dma-mapping.h         |    1 +
+ drivers/media/video/videobuf2-dma-contig.c |   17 +++++++++++++++++
+ drivers/video/sh_mobile_lcdcfb.c           |   28 ++++++++++++++++++++++++++++
+ sound/core/pcm_native.c                    |    7 -------
+ 4 files changed, 46 insertions(+), 7 deletions(-)
