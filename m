@@ -1,60 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 05 Aug 2012 23:43:04 -0500
-Subject: [PATCH v2 2/4] PM / OPP: Initialize OPP table from device tree
-In-Reply-To: <20120806031916.GC22302@S2101-09.ap.freescale.net>
-References: <1344179121-17738-1-git-send-email-shawn.guo@linaro.org>
- <1344179121-17738-3-git-send-email-shawn.guo@linaro.org>
- <501F30F8.1040105@gmail.com>
- <20120806031916.GC22302@S2101-09.ap.freescale.net>
-Message-ID: <501F4B58.4020308@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon,  6 Aug 2012 01:43:19 -0300
+Subject: [PATCH v2] ARM: mxs_defconfig: Enable USB host
+Message-ID: <1344228199-16231-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2012 10:19 PM, Shawn Guo wrote:
-> On Sun, Aug 05, 2012 at 09:50:32PM -0500, Rob Herring wrote:
->>> +Properties:
->>> +- operating-points: An array of 3-tuples items, and each item consists
->>
->> 3 tuples?
->>
-> It's the case of v1, and I forgot updating it.  Thanks for spotting it.
-> 
->>> +  of frequency and voltage like <freq-kHz vol-uV>.
->>> +	freq: clock frequency in kHz
->>> +	vol: voltage in microvolt
->>
->> Although maybe 3 fields would be good for a flags field? I'm concerned
->> it's a pretty generic name and not very future proof. What about
->> transition times? Not sure how you would represent that as it probably
->> depends on which points you are changing between rather than a property
->> of the opp.
->>
-> This is a binding for OPP, which does not define transition times.
-> 
-> As for cpufreq, we only need to represent a possible maximum transition
-> latency.  The driver will ask regulator subsystem for voltage latency,
-> while the clock latency is defined in DT. 
-> 
->> I think this whole function can be written more concisely. Just iterate
->> over the property and avoid the intermediate array allocation.
->>
-> I'm not sure about that, since directly iterating over the property
-> means we have to take care of all these sanity checks done in API
-> of_property_read_u32_array().
-> 
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-This won't work?:
+Enable USB host.
 
-of_property_for_each_u32(...) {
-	if (i & 0x1) {
-		volt = val;
-		ret = opp_add(dev, freq, volt);
-		if (ret)
-			...
-	} else
-		freq = val * 1000;
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Use savedefconfig to generate a minimal config
+ arch/arm/configs/mxs_defconfig |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
-	i++;
-}
-
-Rob
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+index ccdb635..e3487e4 100644
+--- a/arch/arm/configs/mxs_defconfig
++++ b/arch/arm/configs/mxs_defconfig
+@@ -95,7 +95,6 @@ CONFIG_GPIO_SYSFS=y
+ # CONFIG_MFD_SUPPORT is not set
+ CONFIG_DISPLAY_SUPPORT=m
+ # CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+ CONFIG_SND_TIMER=y
+@@ -110,6 +109,13 @@ CONFIG_SND_SOC_I2C_AND_SPI=y
+ CONFIG_SND_SOC_SGTL5000=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_USB=y
++CONFIG_USB_CHIPIDEA=y
++CONFIG_USB_CHIPIDEA_HOST=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_MXS_PHY=y
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
+ CONFIG_MMC=y
+ CONFIG_MMC_MXS=y
+ CONFIG_RTC_CLASS=y
+-- 
+1.7.1
