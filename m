@@ -1,43 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 6 Aug 2012 14:26:42 +0100
-Subject: [PATCH 01/22] ARM: add mechanism for late code patching
-In-Reply-To: <501FC44E.1040806@ti.com>
-References: <1343775898-28345-1-git-send-email-cyril@ti.com>
- <1343775898-28345-2-git-send-email-cyril@ti.com>
- <20120806111224.GA18957@n2100.arm.linux.org.uk> <501FC44E.1040806@ti.com>
-Message-ID: <20120806132642.GC18957@n2100.arm.linux.org.uk>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Mon, 6 Aug 2012 15:29:38 +0200
+Subject: [PATCHv7 06/12] ARM: OMAP4: suspend: Program all domains to
+ retention
+In-Reply-To: <500816BB.3090809@mvista.com>
+References: <1342704392-23657-1-git-send-email-t-kristo@ti.com>
+ <1342704392-23657-7-git-send-email-t-kristo@ti.com>
+ <500816BB.3090809@mvista.com>
+Message-ID: <CAORVsuWvWDcK5fxGmXmbaHZQ48utRv6FoS2cOrYcP_8eFOLiBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2012 at 09:19:10AM -0400, Cyril Chemparathy wrote:
-> With a flush_cache_all(), we could avoid having to operate a cacheline  
-> at a time, but that clobbers way more than necessary.
+Hi!
 
-You can't do that, because flush_cache_all() on some CPUs requires the
-proper MMU mappings to be in place, and you can't get those mappings
-in place because you don't have the V:P offsets fixed up in the kernel.
-Welcome to the chicken and egg problem.
+On Thu, Jul 19, 2012 at 4:16 PM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
+> Hello.
+>
+> On 07/19/2012 05:26 PM, Tero Kristo wrote:
+>
+>> From: Rajendra Nayak <rnayak@ti.com>
+>
+>> Remove the FIXME's in the suspend sequence since
+>> we now intend to support system level RET support.
+>
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>> [Jean Pihet <j-pihet@ti.com>: ported on top of the functional power
+>> states]
+>
+>   Shouldn't Jean also have signed off?
+Sure! I am OK with this change, feel free to add:
+Acked-by: Jean Pihet <j-pihet@ti.com>
 
-> Sure, flushing caches is expensive.  But then, so is running the  
-> patching code with caches disabled.  I guess memory access latencies  
-> drive the performance trade off here.
+Regards,
+Jean
 
-There we disagree on a few orders of magnitude.  There are relatively
-few places that need updating.  According to the kernel I have here:
-
-   text    data     bss     dec     hex filename
-7644346  454320  212984 8311650  7ed362 vmlinux
-
-Idx Name          Size      VMA       LMA       File off  Algn
-  1 .text         004cd170  c00081c0  c00081c0  000081c0  2**5
- 16 .init.pv_table 00000300  c0753a24  c0753a24  00753a24  2**0
-
-That's about 7MB of text, and only 192 points in that code which need
-patching.  Even if we did this with caches on, that's still 192 places,
-and only 192 places we'd need to flush a cache line.
-
-Alternatively, with your approach and 7MB of text, you need to flush
-238885 cache lines to cover the entire kernel.
-
-It would be far _cheaper_ with your approach to flush the individual
-cache lines as you go.
+>
+>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>
+> WBR, Sergei
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
