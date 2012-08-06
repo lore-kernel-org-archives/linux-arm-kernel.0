@@ -1,51 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 6 Aug 2012 20:40:16 +0100
-Subject: kernel entry for thumb2-only cpus
-In-Reply-To: <CAKGA1b=Np8+RMwgQEzwxdJcL6AjC4qiv1Jyq0bTTa_dHCeLokA@mail.gmail.com>
-References: <20120803090452.GE2626@pengutronix.de>
- <20120803114532.GB26925@mudshark.cambridge.arm.com>
- <20120805095528.GO2626@pengutronix.de>
- <alpine.LFD.2.02.1208060026460.5231@xanadu.home>
- <CAKGA1b=Pxif=4qSvK-Odmunbm_T6LjWP_CXid_v2VNmpuyHLDA@mail.gmail.com>
- <20120806190856.GA1120@n2100.arm.linux.org.uk>
- <CAKGA1b=Np8+RMwgQEzwxdJcL6AjC4qiv1Jyq0bTTa_dHCeLokA@mail.gmail.com>
-Message-ID: <20120806194016.GB1120@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 06 Aug 2012 13:42:21 -0600
+Subject: [PATCH v3 00/10] ARM: tegra: Add PCIe device tree support
+In-Reply-To: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <50201E1D.5060200@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2012 at 02:30:48PM -0500, Matt Sealey wrote:
-> On Mon, Aug 6, 2012 at 2:08 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Mon, Aug 06, 2012 at 01:40:26PM -0500, Matt Sealey wrote:
-> >> Maybe we could implement a shiny new zImage magic value, I'm not sure
-> >> if 0x016f2818 might have some sentimental value, but there's nothing
-> >> to say that 0x016f2819 wouldn't also be valid and indicate that it's
-> >> an ARM zImage with a Thumb2 entrypoint?
-> >
-> > No.  That magic value is a bloody pain in the backside from my point
-> > of view.  I've had soo many problems with it with boot loaders its
-> > untrue.
-> 
-> [snip]
-> 
-> > Instead, lets not continue this broken idea.  Instead, let's be able
-> > to _tell_ the boot loader what we want it to do, rather than have it
-> > magically decipher what _it_ thinks might be a good idea to do.
-> 
-> Okay, so how about we just append an ELF header to the front of the
-> image so the entry point, and the architecture, instruction
-> set, ABI etc. is well defined in an industry standard manner?
-> 
-> e_entry would then have the LSB set which indicates the entry is
-> Thumb.. or not :)
+On 07/26/2012 01:55 PM, Thierry Reding wrote:
+> This patch series adds support for device tree based probing of the PCIe
+> controller found on Tegra SoCs.
 
-No.  Take a moment to think about what you're saying.  Are you really
-saying no to the single kernel image project?
+Thierry, I just tested all Tegra boards in v3.6-rc1, and noticed that
+PCIe doesn't work on TrimSlice when booting use device tree. I think I
+found the cause, and I can't see why the same problem doesn't affect
+this series. Perhaps you can enlighten me?
 
-Because anything that involves wrapping the kernel up in an "industry
-standard manner" like an ELF header places fixed addresses (like the
-entry point) into the kernel, and then we're back to the same problem
-that every SoC vendor places their RAM at different places in the
-system memory map.
+When booting TrimSlice (or Harmony) using board files, Tegra's PCIe is
+initialized using a subsys_initcall to tegra_pcie_init() directly (or
+for Harmony to harmony_pcie_init() which then calls tegra_pcie_init()).
 
-No.  Can't do that.  Sorry.
+The final thing tegra_pcie_init() does is call pci_common_init(). This
+calls pcibios_init_hw() which calls hw->scan() which calls
+pci_scan_root_bus() which adds a device object for each device on the
+PCIe bus. However, since this happens very early in the boot sequence, I
+believe the enumerated PCIe devices don't immediately get probed.
+Instead, control gets returned to pci_common_init() which I believe then
+calls pci_bus_assign_resources() which actually sets up the resources
+for those devices. Later, the PCIe devices actually get probed, and
+everything works.
+
+However, when booting using device tree, with the code currently in
+v3.6-rc1, tegra_pcie_init() is called late in the boot sequence, and so
+in the sequence described above, as soon as pci_scan_root_bus() adds a
+device, it gets probed, before the device object's resources have been
+set up, which results in the following failure:
+
+PCI: Device 0000:01:00.0 not available because of resource collisions
+
+... because of the following code in pcibios_enable_device():
+
+> 	for (idx = 0; idx < 6; idx++) {
+> 		/* Only set up the requested stuff */
+> 		if (!(mask & (1 << idx)))
+> 			continue;
+> 
+> 		r = dev->resource + idx;
+> 		if (!r->start && r->end) {
+> 			printk(KERN_ERR "PCI: Device %s not available because"
+> 			       " of resource collisions\n", pci_name(dev));
+
+Doesn't this same problem exist when instantiating the PCIe device
+itself from device tree as in your patch series? If not, can you explain
+why?
+
+Now, the obvious solution in v3.6 would be to simply have
+tegra_pcie_init() be called at the same early stage in the boot process
+when booting using device tree as it is when booting using board files.
+This works for TrimSlice.
+
+However, on Harmony, it doesn't work, because PCIe on Harmony depends on
+regulators, and the regulators are accessed using an I2C bus that is
+instantiated from DT, and the instantiation of the I2C bus happens
+fairly late in the boot process so can't be found early during the boot
+sequence. See harmony_regulator_init() for the failing code.
+
+Does anyone have any good ideas (small, self-contained patches) for
+solving this in v3.6 in such a way that PCIe works on both TrimSlice and
+Harmony?
+
+Thanks.
