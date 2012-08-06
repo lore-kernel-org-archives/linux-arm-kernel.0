@@ -1,49 +1,24 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 5 Aug 2012 22:35:33 -0400 (EDT)
-Subject: [PATCH 09/22] ARM: LPAE: use 64-bit pgd physical address in
- switch_mm()
-In-Reply-To: <501E8367.8070907@ti.com>
-References: <1343775898-28345-1-git-send-email-cyril@ti.com>
- <1343775898-28345-10-git-send-email-cyril@ti.com>
- <alpine.LFD.2.02.1208040259200.5231@xanadu.home> <501E8367.8070907@ti.com>
-Message-ID: <alpine.LFD.2.02.1208052220060.5231@xanadu.home>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 6 Aug 2012 10:37:45 +0800
+Subject: [PATCH 2/3 V2] IIO: Add basic MXS LRADC driver
+In-Reply-To: <1344007721-11595-3-git-send-email-marex@denx.de>
+References: <1344007721-11595-1-git-send-email-marex@denx.de>
+ <1344007721-11595-3-git-send-email-marex@denx.de>
+Message-ID: <20120806023743.GC18471@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 5 Aug 2012, Cyril Chemparathy wrote:
+On Fri, Aug 03, 2012 at 05:28:40PM +0200, Marek Vasut wrote:
+> --- /dev/null
+> +++ b/drivers/staging/iio/adc/mxs-lradc.c
 
-> On 8/4/2012 3:04 AM, Nicolas Pitre wrote:
-> > On Tue, 31 Jul 2012, Cyril Chemparathy wrote:
-> > 
-> > > This patch modifies the switch_mm() processor functions to use 64-bit
-> > > addresses.  We use u64 instead of phys_addr_t, in order to avoid having
-> > > config
-> > > dependent register usage when calling into switch_mm assembly code.
-> > > 
-> > > The changes in this patch are primarily adjustments for registers used for
-> > > arguments to switch_mm.  The few processor definitions that did use the
-> > > second
-> > > argument have been modified accordingly.
-> > > 
-> > > Arguments and calling conventions aside, this patch should be a no-op on
-> > > v6
-> > > and non-LPAE v7 processors.
-> > 
-> > NAK.
-> > 
-> > You just broke all big endian targets, LPAE or not.
-> > 
-> 
-> Indeed.  Thanks.
-> 
-> Would C-land word swappery on BE do?  Any other ideas on the best approach to
-> this?
+<snip>
 
-First, don't use a u64 unconditionally. A phys_addr_t is best for the 
-same arguments as before.  Since this is equivalent to a u64 only when 
-LPAE is defined, you then only have to care about endian issues in 
-proc-v7-3level.S.  And in there you can deal with the issue with 
-register aliases just as it is done in lib/div64.S.
+> +#include <mach/mxs.h>
+> +#include <mach/common.h>
+> +
+Why do you need these two mach headers?
 
-
-Nicolas
+-- 
+Regards,
+Shawn
