@@ -1,74 +1,88 @@
-From: r.sricharan@ti.com (R Sricharan)
-Date: Mon, 6 Aug 2012 13:11:25 +0530
-Subject: [PATCH v2 1/1] ARM: LPAE: Fix mapping in alloc_init_pte for unaligned
- addresses.
-Message-ID: <1344238885-13683-1-git-send-email-r.sricharan@ti.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 6 Aug 2012 09:52:52 +0200
+Subject: [PATCH] MAINTAINERS: update my entries
+Message-ID: <1344239572-23250-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With LPAE, When either the start address or end address
-or physical address to be mapped is unaligned,
-alloc_init_section creates page granularity mappings.
-alloc_init_section calls alloc_init_pte which populates
-one pmd entry and sets up the ptes. But if the size is
-greater than what can be mapped by one pmd entry,
-then the rest remains unmapped.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-The issue becomes visible when LPAE is enabled, where we have
-the 3 levels with seperate pgd and pmd's.
-When a static mapping for 3MB is requested, only 2MB is mapped
-and the remaining 1MB is unmapped. Fixing this here, by looping
-in to map the entire unaligned address range.
+I prefer to use the Linaro mail address for the MAINTAINERS
+entry due to heavy mail traffic. Take this opportunity to
+update the wildcards, including removing the stmpe* drivers
+from the ux500 entry since these are not specific to that
+machine.
 
-Boot tested on OMAP5 evm with both LPAE enabled/disabled
-and verified that static mappings with unaligned addresses
-are properly mapped.
-
-Signed-off-by: R Sricharan <r.sricharan@ti.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-[V2] Moved the loop to alloc_init_pte as per Russell's
-     feedback and changed the subject accordingly.
-     Using PMD_XXX instead of SECTION_XXX to avoid
-     different loop increments with/without LPAE.
+Arnd, Olof: This is another patch I'd appreciate if you just
+put into the fixes as a single thing.
+---
+ MAINTAINERS | 17 +++++++++++------
+ 1 file changed, 11 insertions(+), 6 deletions(-)
 
- arch/arm/mm/mmu.c |   22 ++++++++++++++++++----
- 1 file changed, 18 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index cf4528d..0ed8808 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -585,11 +585,25 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 				  unsigned long end, unsigned long pfn,
- 				  const struct mem_type *type)
- {
--	pte_t *pte = early_pte_alloc(pmd, addr, type->prot_l1);
-+	unsigned long next;
-+	pte_t *pte;
-+	phys_addr_t phys;
-+
- 	do {
--		set_pte_ext(pte, pfn_pte(pfn, __pgprot(type->prot_pte)), 0);
--		pfn++;
--	} while (pte++, addr += PAGE_SIZE, addr != end);
-+		if ((end-addr) & PMD_MASK)
-+			next = (addr + PMD_SIZE) & PMD_MASK;
-+		else
-+			next = end;
-+
-+		pte = early_pte_alloc(pmd, addr, type->prot_l1);
-+		do {
-+			set_pte_ext(pte, pfn_pte(pfn,
-+					__pgprot(type->prot_pte)), 0);
-+			pfn++;
-+		} while (pte++, addr += PAGE_SIZE, addr != next);
-+
-+		phys += next - addr;
-+	} while (pmd++, addr = next, addr != end);
- }
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 94b823f..b694a9d 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -925,14 +925,14 @@ S:	Maintained
  
- static void __init alloc_init_section(pud_t *pud, unsigned long addr,
+ ARM/NOMADIK ARCHITECTURE
+ M:	Alessandro Rubini <rubini@unipv.it>
+-M:	Linus Walleij <linus.walleij@stericsson.com>
++M:	Linus Walleij <linus.walleij@linaro.org>
+ M:	STEricsson <STEricsson_nomadik_linux@list.st.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/mach-nomadik/
+ F:	arch/arm/plat-nomadik/
+ F:	drivers/i2c/busses/i2c-nomadik.c
+-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+ 
+ ARM/OPENMOKO NEO FREERUNNER (GTA02) MACHINE SUPPORT
+ M:	Nelson Castillo <arhuaco@freaks-unidos.net>
+@@ -1146,7 +1146,7 @@ F:	drivers/usb/host/ehci-w90x900.c
+ F:	drivers/video/nuc900fb.c
+ 
+ ARM/U300 MACHINE SUPPORT
+-M:	Linus Walleij <linus.walleij@stericsson.com>
++M:	Linus Walleij <linus.walleij@linaro.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Supported
+ F:	arch/arm/mach-u300/
+@@ -1161,15 +1161,20 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+ 
+ ARM/Ux500 ARM ARCHITECTURE
+ M:	Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+-M:	Linus Walleij <linus.walleij@stericsson.com>
++M:	Linus Walleij <linus.walleij@linaro.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/mach-ux500/
++F:	drivers/clocksource/clksrc-dbx500-prcmu.c
+ F:	drivers/dma/ste_dma40*
++F:	drivers/hwspinlock/u8500_hsem.c
+ F:	drivers/mfd/abx500*
+ F:	drivers/mfd/ab8500*
+-F:	drivers/mfd/stmpe*
++F:	drivers/mfd/dbx500*
++F:	drivers/mfd/db8500*
++F:	drivers/pinctrl/pinctrl-nomadik*
+ F:	drivers/rtc/rtc-ab8500.c
++F:	drivers/rtc/rtc-pl031.c
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+ 
+ ARM/VFP SUPPORT
+@@ -3094,7 +3099,7 @@ F:	include/linux/gigaset_dev.h
+ 
+ GPIO SUBSYSTEM
+ M:	Grant Likely <grant.likely@secretlab.ca>
+-M:	Linus Walleij <linus.walleij@stericsson.com>
++M:	Linus Walleij <linus.walleij@linaro.org>
+ S:	Maintained
+ T:	git git://git.secretlab.ca/git/linux-2.6.git
+ F:	Documentation/gpio.txt
 -- 
-1.7.9.5
+1.7.11.3
