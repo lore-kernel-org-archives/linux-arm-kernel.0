@@ -1,151 +1,78 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Mon, 6 Aug 2012 20:35:57 +0530
-Subject: [PATCH 1/2] drivers: net: ethernet: davince_mdio: device tree
- implementation
-In-Reply-To: <1344265558-5724-1-git-send-email-mugunthanvnm@ti.com>
-References: <1344265558-5724-1-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <1344265558-5724-2-git-send-email-mugunthanvnm@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon,  6 Aug 2012 16:17:33 +0100
+Subject: [PATCH 1/1] i2c: Add default configuration into the Nomadik I2C
+ driver.
+Message-ID: <1344266253-14050-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-device tree implementation for davinci mdio driver
+At this moment in time there is only one known configuration for the
+Nomadik I2C driver. By not holding that configuration in the driver
+adds some unnecessary overhead in platform code. The configuration
+as already been removed from platform code, this patch checks for any
+over-riding configurations. If there aren't any, the default is used.
 
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+Cc: linux-i2c at vger.kernel.org
+Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- .../devicetree/bindings/net/davinci-mdio.txt       |   33 ++++++++++++++++
- drivers/net/ethernet/ti/davinci_mdio.c             |   41 ++++++++++++++++++--
- 2 files changed, 70 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/davinci-mdio.txt
+ drivers/i2c/busses/i2c-nomadik.c |   28 ++++++++++++++++++----------
+ 1 file changed, 18 insertions(+), 10 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/davinci-mdio.txt b/Documentation/devicetree/bindings/net/davinci-mdio.txt
-new file mode 100644
-index 0000000..72efaaf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/davinci-mdio.txt
-@@ -0,0 +1,33 @@
-+TI SoC Davinci MDIO Controller Device Tree Bindings
-+---------------------------------------------------
-+
-+Required properties:
-+- compatible		: Should be "ti,davinci_mdio"
-+- reg			: physical base address and size of the davinci mdio
-+			  registers map
-+- bus_freq		: Mdio Bus frequency
-+
-+Optional properties:
-+- ti,hwmods		: Must be "davinci_mdio"
-+
-+Note: "ti,hwmods" field is used to fetch the base address and irq
-+resources from TI, omap hwmod data base during device registration.
-+Future plan is to migrate hwmod data base contents into device tree
-+blob so that, all the required data will be used from device tree dts
-+file.
-+
-+Examples:
-+
-+	mdio: davinci_mdio at 4A101000 {
-+		compatible = "ti,cpsw";
-+		reg = <0x4A101000 0x1000>;
-+		bus_freq = <1000000>;
-+	};
-+
-+(or)
-+
-+	mdio: davinci_mdio at 4A101000 {
-+		compatible = "ti,cpsw";
-+		ti,hwmods = "davinci_mdio";
-+		bus_freq = <1000000>;
-+	};
-diff --git a/drivers/net/ethernet/ti/davinci_mdio.c b/drivers/net/ethernet/ti/davinci_mdio.c
-index cd7ee20..573f3be 100644
---- a/drivers/net/ethernet/ti/davinci_mdio.c
-+++ b/drivers/net/ethernet/ti/davinci_mdio.c
-@@ -36,6 +36,8 @@
- #include <linux/io.h>
- #include <linux/pm_runtime.h>
- #include <linux/davinci_emac.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
+diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+index 5e6f1ee..e42e526 100644
+--- a/drivers/i2c/busses/i2c-nomadik.c
++++ b/drivers/i2c/busses/i2c-nomadik.c
+@@ -350,10 +350,6 @@ static void setup_i2c_controller(struct nmk_i2c_dev *dev)
  
- /*
-  * This timeout definition is a worst-case ultra defensive measure against
-@@ -289,6 +291,25 @@ static int davinci_mdio_write(struct mii_bus *bus, int phy_id,
- 	return 0;
- }
+ 	i2c_clk = clk_get_rate(dev->clk);
  
-+static int davinci_mdio_probe_dt(struct mdio_platform_data *data,
-+			 struct platform_device *pdev)
-+{
-+	struct device_node *node = pdev->dev.of_node;
-+	u32 prop;
-+
-+	if (!node)
-+		return -EINVAL;
-+
-+	if (of_property_read_u32(node, "bus_freq", &prop)) {
-+		pr_err("Missing bus_freq property in the DT.\n");
-+		return -EINVAL;
-+	}
-+	data->bus_freq = prop;
-+
-+	return 0;
-+}
-+
-+
- static int __devinit davinci_mdio_probe(struct platform_device *pdev)
- {
- 	struct mdio_platform_data *pdata = pdev->dev.platform_data;
-@@ -304,8 +325,6 @@ static int __devinit davinci_mdio_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
--	data->pdata = pdata ? (*pdata) : default_pdata;
+-	/* fallback to std. mode if machine has not provided it */
+-	if (dev->cfg.clk_freq == 0)
+-		dev->cfg.clk_freq = 100000;
 -
- 	data->bus = mdiobus_alloc();
- 	if (!data->bus) {
- 		dev_err(dev, "failed to alloc mii bus\n");
-@@ -313,14 +332,22 @@ static int __devinit davinci_mdio_probe(struct platform_device *pdev)
- 		goto bail_out;
- 	}
- 
-+	if (dev->of_node) {
-+		if (davinci_mdio_probe_dt(&data->pdata, pdev))
-+			data->pdata = default_pdata;
-+		snprintf(data->bus->id, MII_BUS_ID_SIZE, "%s", pdev->name);
-+	} else {
-+		data->pdata = pdata ? (*pdata) : default_pdata;
-+		snprintf(data->bus->id, MII_BUS_ID_SIZE, "%s-%x",
-+			 pdev->name, pdev->id);
-+	}
-+
- 	data->bus->name		= dev_name(dev);
- 	data->bus->read		= davinci_mdio_read,
- 	data->bus->write	= davinci_mdio_write,
- 	data->bus->reset	= davinci_mdio_reset,
- 	data->bus->parent	= dev;
- 	data->bus->priv		= data;
--	snprintf(data->bus->id, MII_BUS_ID_SIZE, "%s-%x",
--		pdev->name, pdev->id);
- 
- 	pm_runtime_enable(&pdev->dev);
- 	pm_runtime_get_sync(&pdev->dev);
-@@ -454,11 +481,17 @@ static const struct dev_pm_ops davinci_mdio_pm_ops = {
- 	.resume		= davinci_mdio_resume,
+ 	/*
+ 	 * The spec says, in case of std. mode the divider is
+ 	 * 2 whereas it is 3 for fast and fastplus mode of
+@@ -911,20 +907,32 @@ static const struct i2c_algorithm nmk_i2c_algo = {
+ 	.functionality	= nmk_i2c_functionality
  };
  
-+static const struct of_device_id davinci_mdio_of_mtable[] = {
-+	{ .compatible = "ti,davinci_mdio", },
-+	{ /* sentinel */ },
++static struct nmk_i2c_controller u8500_i2c = {
++	/*
++	 * Slave data setup time; 250ns, 100ns, and 10ns, which
++	 * is 14, 6 and 2 respectively for a 48Mhz i2c clock.
++	 */
++	.slsu           = 0xe,
++	.tft            = 1,      /* Tx FIFO threshold */
++	.rft            = 8,      /* Rx FIFO threshold */
++	.clk_freq       = 400000, /* fast mode operation */
++	.timeout        = 200,    /* Slave response timeout(ms) */
++	.sm             = I2C_FREQ_MODE_FAST,
 +};
 +
- static struct platform_driver davinci_mdio_driver = {
- 	.driver = {
- 		.name	 = "davinci_mdio",
- 		.owner	 = THIS_MODULE,
- 		.pm	 = &davinci_mdio_pm_ops,
-+		.of_match_table = of_match_ptr(davinci_mdio_of_mtable),
- 	},
- 	.probe = davinci_mdio_probe,
- 	.remove = __devexit_p(davinci_mdio_remove),
+ static atomic_t adapter_id = ATOMIC_INIT(0);
+ 
+ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
+ {
+ 	int ret = 0;
+-	struct nmk_i2c_controller *pdata =
+-			adev->dev.platform_data;
++	struct nmk_i2c_controller *pdata = pdev->dev.platform_data;
+ 	struct nmk_i2c_dev	*dev;
+ 	struct i2c_adapter *adap;
+ 
+-	if (!pdata) {
+-		dev_warn(&adev->dev, "no platform data\n");
+-		return -ENODEV;
+-	}
++	if (!pdata)
++		/* No i2c configuration found, using the default. */
++		pdata = &u8500_i2c;
++
+ 	dev = kzalloc(sizeof(struct nmk_i2c_dev), GFP_KERNEL);
+ 	if (!dev) {
+ 		dev_err(&adev->dev, "cannot allocate memory\n");
 -- 
-1.7.0.4
+1.7.9.5
