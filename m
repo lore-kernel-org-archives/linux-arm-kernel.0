@@ -1,621 +1,184 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 6 Aug 2012 23:42:48 +0800
-Subject: [PATCH 5/6] ARM: mxs: remove platform device codes
+Date: Mon, 6 Aug 2012 23:42:46 +0800
+Subject: [PATCH 3/6] ARM: mxs: remove board files
 In-Reply-To: <1344267769-31166-1-git-send-email-shawn.guo@linaro.org>
 References: <1344267769-31166-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1344267769-31166-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1344267769-31166-4-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With all the board files removed, there is no user for those platform
-device code.  Remove them.
+Since DT kernel provides the equivalent support with those board
+files, we can remove them now.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+Cc: Marek Vasut <marex@denx.de>
+Cc: Lauri Hintsala <lauri.hintsala@bluegiga.com>
 ---
- arch/arm/mach-mxs/Kconfig                         |    2 -
- arch/arm/mach-mxs/Makefile                        |    4 +-
- arch/arm/mach-mxs/devices-mx23.h                  |   43 --------
- arch/arm/mach-mxs/devices-mx28.h                  |   63 -----------
- arch/arm/mach-mxs/devices.c                       |   87 ----------------
- arch/arm/mach-mxs/devices/Kconfig                 |   33 ------
- arch/arm/mach-mxs/devices/Makefile                |   12 --
- arch/arm/mach-mxs/devices/platform-auart.c        |   65 ------------
- arch/arm/mach-mxs/devices/platform-dma.c          |   31 ------
- arch/arm/mach-mxs/devices/platform-fec.c          |   52 ----------
- arch/arm/mach-mxs/devices/platform-flexcan.c      |   51 ---------
- arch/arm/mach-mxs/devices/platform-gpio-mxs.c     |   33 ------
- arch/arm/mach-mxs/devices/platform-gpmi-nand.c    |   81 ---------------
- arch/arm/mach-mxs/devices/platform-mxs-i2c.c      |   52 ----------
- arch/arm/mach-mxs/devices/platform-mxs-mmc.c      |   76 --------------
- arch/arm/mach-mxs/devices/platform-mxs-pwm.c      |   22 ----
- arch/arm/mach-mxs/devices/platform-mxs-saif.c     |   61 -----------
- arch/arm/mach-mxs/devices/platform-mxsfb.c        |   47 ---------
- arch/arm/mach-mxs/devices/platform-rtc-stmp3xxx.c |   51 ---------
- arch/arm/mach-mxs/include/mach/devices-common.h   |  114 ---------------------
- 20 files changed, 1 insertions(+), 979 deletions(-)
- delete mode 100644 arch/arm/mach-mxs/devices-mx23.h
- delete mode 100644 arch/arm/mach-mxs/devices-mx28.h
- delete mode 100644 arch/arm/mach-mxs/devices.c
- delete mode 100644 arch/arm/mach-mxs/devices/Kconfig
- delete mode 100644 arch/arm/mach-mxs/devices/Makefile
- delete mode 100644 arch/arm/mach-mxs/devices/platform-auart.c
- delete mode 100644 arch/arm/mach-mxs/devices/platform-dma.c
- delete mode 100644 arch/arm/mach-mxs/devices/platform-fec.c
- delete mode 100644 arch/arm/mach-mxs/devices/platform-flexcan.c
- delete mode 100644 arch/arm/mach-mxs/devices/platform-gpio-mxs.c
- delete mode 100644 arch/arm/mach-mxs/devices/platform-gpmi-nand.c
- delete mode 100644 arch/arm/mach-mxs/devices/platform-mxs-i2c.c
- delete mode 100644 arch/arm/mach-mxs/devices/platform-mxs-mmc.c
- delete mode 100644 arch/arm/mach-mxs/devices/platform-mxs-pwm.c
- delete mode 100644 arch/arm/mach-mxs/devices/platform-mxs-saif.c
- delete mode 100644 arch/arm/mach-mxs/devices/platform-mxsfb.c
- delete mode 100644 arch/arm/mach-mxs/devices/platform-rtc-stmp3xxx.c
- delete mode 100644 arch/arm/mach-mxs/include/mach/devices-common.h
+ arch/arm/configs/mxs_defconfig         |    6 -
+ arch/arm/mach-mxs/Kconfig              |   87 ------
+ arch/arm/mach-mxs/Makefile             |    7 -
+ arch/arm/mach-mxs/mach-apx4devkit.c    |  273 ------------------
+ arch/arm/mach-mxs/mach-m28evk.c        |  366 ------------------------
+ arch/arm/mach-mxs/mach-mx23evk.c       |  190 -------------
+ arch/arm/mach-mxs/mach-mx28evk.c       |  477 --------------------------------
+ arch/arm/mach-mxs/mach-stmp378x_devb.c |  123 --------
+ arch/arm/mach-mxs/mach-tx28.c          |  184 ------------
+ arch/arm/mach-mxs/module-tx28.c        |  160 -----------
+ arch/arm/mach-mxs/module-tx28.h        |   10 -
+ 11 files changed, 0 insertions(+), 1883 deletions(-)
+ delete mode 100644 arch/arm/mach-mxs/mach-apx4devkit.c
+ delete mode 100644 arch/arm/mach-mxs/mach-m28evk.c
+ delete mode 100644 arch/arm/mach-mxs/mach-mx23evk.c
+ delete mode 100644 arch/arm/mach-mxs/mach-mx28evk.c
+ delete mode 100644 arch/arm/mach-mxs/mach-stmp378x_devb.c
+ delete mode 100644 arch/arm/mach-mxs/mach-tx28.c
+ delete mode 100644 arch/arm/mach-mxs/module-tx28.c
+ delete mode 100644 arch/arm/mach-mxs/module-tx28.h
 
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+index ccdb635..e5fc6c2 100644
+--- a/arch/arm/configs/mxs_defconfig
++++ b/arch/arm/configs/mxs_defconfig
+@@ -23,12 +23,6 @@ CONFIG_BLK_DEV_INTEGRITY=y
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_MXS=y
+ CONFIG_MACH_MXS_DT=y
+-CONFIG_MACH_MX23EVK=y
+-CONFIG_MACH_MX28EVK=y
+-CONFIG_MACH_STMP378X_DEVB=y
+-CONFIG_MACH_TX28=y
+-CONFIG_MACH_M28EVK=y
+-CONFIG_MACH_APX4DEVKIT=y
+ # CONFIG_ARM_THUMB is not set
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
 diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-index 2e6cb6d..ecc4319 100644
+index 9a8bbda..2e6cb6d 100644
 --- a/arch/arm/mach-mxs/Kconfig
 +++ b/arch/arm/mach-mxs/Kconfig
-@@ -1,7 +1,5 @@
- if ARCH_MXS
+@@ -27,91 +27,4 @@ config MACH_MXS_DT
+ 	  Include support for Freescale MXS platforms(i.MX23 and i.MX28)
+ 	  using the device tree for discovery
  
--source "arch/arm/mach-mxs/devices/Kconfig"
+-config MACH_STMP378X_DEVB
+-	bool "Support STMP378x_devb Platform"
+-	select SOC_IMX23
+-	select MXS_HAVE_AMBA_DUART
+-	select MXS_HAVE_PLATFORM_AUART
+-	select MXS_HAVE_PLATFORM_MXS_MMC
+-	select MXS_HAVE_PLATFORM_RTC_STMP3XXX
+-	help
+-	  Include support for STMP378x-devb platform. This includes specific
+-	  configurations for the board and its peripherals.
 -
- config SOC_IMX23
- 	bool
- 	select ARM_AMBA
+-config MACH_MX23EVK
+-	bool "Support MX23EVK Platform"
+-	select SOC_IMX23
+-	select MXS_HAVE_AMBA_DUART
+-	select MXS_HAVE_PLATFORM_AUART
+-	select MXS_HAVE_PLATFORM_MXS_MMC
+-	select MXS_HAVE_PLATFORM_MXSFB
+-	select MXS_HAVE_PLATFORM_RTC_STMP3XXX
+-	help
+-	  Include support for MX23EVK platform. This includes specific
+-	  configurations for the board and its peripherals.
+-
+-config MACH_MX28EVK
+-	bool "Support MX28EVK Platform"
+-	select SOC_IMX28
+-	select LEDS_GPIO_REGISTER
+-	select MXS_HAVE_AMBA_DUART
+-	select MXS_HAVE_PLATFORM_AUART
+-	select MXS_HAVE_PLATFORM_FEC
+-	select MXS_HAVE_PLATFORM_FLEXCAN
+-	select MXS_HAVE_PLATFORM_MXS_MMC
+-	select MXS_HAVE_PLATFORM_MXSFB
+-	select MXS_HAVE_PLATFORM_MXS_SAIF
+-	select MXS_HAVE_PLATFORM_MXS_I2C
+-	select MXS_HAVE_PLATFORM_RTC_STMP3XXX
+-	help
+-	  Include support for MX28EVK platform. This includes specific
+-	  configurations for the board and its peripherals.
+-
+-config MODULE_TX28
+-	bool
+-	select SOC_IMX28
+-	select LEDS_GPIO_REGISTER
+-	select MXS_HAVE_AMBA_DUART
+-	select MXS_HAVE_PLATFORM_AUART
+-	select MXS_HAVE_PLATFORM_FEC
+-	select MXS_HAVE_PLATFORM_MXS_I2C
+-	select MXS_HAVE_PLATFORM_MXS_MMC
+-	select MXS_HAVE_PLATFORM_MXS_PWM
+-	select MXS_HAVE_PLATFORM_RTC_STMP3XXX
+-
+-config MODULE_M28
+-	bool
+-	select SOC_IMX28
+-	select LEDS_GPIO_REGISTER
+-	select MXS_HAVE_AMBA_DUART
+-	select MXS_HAVE_PLATFORM_AUART
+-	select MXS_HAVE_PLATFORM_FEC
+-	select MXS_HAVE_PLATFORM_FLEXCAN
+-	select MXS_HAVE_PLATFORM_MXS_I2C
+-	select MXS_HAVE_PLATFORM_MXS_MMC
+-	select MXS_HAVE_PLATFORM_MXSFB
+-
+-config MODULE_APX4
+-	bool
+-	select SOC_IMX28
+-	select LEDS_GPIO_REGISTER
+-	select MXS_HAVE_AMBA_DUART
+-	select MXS_HAVE_PLATFORM_AUART
+-	select MXS_HAVE_PLATFORM_FEC
+-	select MXS_HAVE_PLATFORM_MXS_I2C
+-	select MXS_HAVE_PLATFORM_MXS_MMC
+-	select MXS_HAVE_PLATFORM_MXS_SAIF
+-
+-config MACH_TX28
+-	bool "Ka-Ro TX28 module"
+-	select MODULE_TX28
+-
+-config MACH_M28EVK
+-	bool "Support DENX M28EVK Platform"
+-	select MODULE_M28
+-
+-config MACH_APX4DEVKIT
+-	bool "Support Bluegiga APX4 Development Kit"
+-	select MODULE_APX4
+-
+ endif
 diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
-index a7ace24..2480ce9 100644
+index fed3695..a7ace24 100644
 --- a/arch/arm/mach-mxs/Makefile
 +++ b/arch/arm/mach-mxs/Makefile
-@@ -1,8 +1,6 @@
- # Common support
--obj-y := devices.o icoll.o iomux.o ocotp.o system.o timer.o mm.o
-+obj-y := icoll.o iomux.o ocotp.o system.o timer.o mm.o
- 
+@@ -4,12 +4,5 @@ obj-y := devices.o icoll.o iomux.o ocotp.o system.o timer.o mm.o
  obj-$(CONFIG_PM) += pm.o
  
  obj-$(CONFIG_MACH_MXS_DT) += mach-mxs.o
--
--obj-y += devices/
-diff --git a/arch/arm/mach-mxs/devices-mx23.h b/arch/arm/mach-mxs/devices-mx23.h
+-obj-$(CONFIG_MACH_STMP378X_DEVB) += mach-stmp378x_devb.o
+-obj-$(CONFIG_MACH_MX23EVK) += mach-mx23evk.o
+-obj-$(CONFIG_MACH_MX28EVK) += mach-mx28evk.o
+-obj-$(CONFIG_MACH_M28EVK)    += mach-m28evk.o
+-obj-$(CONFIG_MACH_APX4DEVKIT) += mach-apx4devkit.o
+-obj-$(CONFIG_MODULE_TX28) += module-tx28.o
+-obj-$(CONFIG_MACH_TX28)    += mach-tx28.o
+ 
+ obj-y += devices/
+diff --git a/arch/arm/mach-mxs/mach-apx4devkit.c b/arch/arm/mach-mxs/mach-apx4devkit.c
 deleted file mode 100644
-index 9ee5ced..0000000
---- a/arch/arm/mach-mxs/devices-mx23.h
+index f5f0617..0000000
+--- a/arch/arm/mach-mxs/mach-apx4devkit.c
 +++ /dev/null
-@@ -1,43 +0,0 @@
+@@ -1,273 +0,0 @@
 -/*
-- * Copyright (C) 2010 Pengutronix
-- * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
+- * Copyright (C) 2011-2012
+- * Lauri Hintsala, Bluegiga, <lauri.hintsala@bluegiga.com>
+- * Veli-Pekka Peltola, Bluegiga, <veli-pekka.peltola@bluegiga.com>
 - *
+- * based on: mach-mx28evk.c
 - * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include <mach/mx23.h>
--#include <mach/devices-common.h>
--#include <linux/mxsfb.h>
--#include <linux/amba/bus.h>
--
--static inline int mx23_add_duart(void)
--{
--	struct amba_device *d;
--
--	d = amba_ahb_device_add(NULL, "duart", MX23_DUART_BASE_ADDR, SZ_8K,
--				MX23_INT_DUART, 0, 0, 0);
--	return IS_ERR(d) ? PTR_ERR(d) : 0;
--}
--
--extern const struct mxs_auart_data mx23_auart_data[] __initconst;
--#define mx23_add_auart(id)	mxs_add_auart(&mx23_auart_data[id])
--#define mx23_add_auart0()		mx23_add_auart(0)
--#define mx23_add_auart1()		mx23_add_auart(1)
--
--extern const struct mxs_gpmi_nand_data mx23_gpmi_nand_data __initconst;
--#define mx23_add_gpmi_nand(pdata)	\
--	mxs_add_gpmi_nand(pdata, &mx23_gpmi_nand_data)
--
--extern const struct mxs_mxs_mmc_data mx23_mxs_mmc_data[] __initconst;
--#define mx23_add_mxs_mmc(id, pdata) \
--	mxs_add_mxs_mmc(&mx23_mxs_mmc_data[id], pdata)
--
--#define mx23_add_mxs_pwm(id)		mxs_add_mxs_pwm(MX23_PWM_BASE_ADDR, id)
--
--struct platform_device *__init mx23_add_mxsfb(
--		const struct mxsfb_platform_data *pdata);
--
--struct platform_device *__init mx23_add_rtc_stmp3xxx(void);
-diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
-deleted file mode 100644
-index fcab431..0000000
---- a/arch/arm/mach-mxs/devices-mx28.h
-+++ /dev/null
-@@ -1,63 +0,0 @@
--/*
-- * Copyright (C) 2010 Pengutronix
-- * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-- *
-- * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include <mach/mx28.h>
--#include <mach/devices-common.h>
--#include <linux/mxsfb.h>
--#include <linux/amba/bus.h>
--
--static inline int mx28_add_duart(void)
--{
--	struct amba_device *d;
--
--	d = amba_ahb_device_add(NULL, "duart", MX28_DUART_BASE_ADDR, SZ_8K,
--				MX28_INT_DUART, 0, 0, 0);
--	return IS_ERR(d) ? PTR_ERR(d) : 0;
--}
--
--extern const struct mxs_auart_data mx28_auart_data[] __initconst;
--#define mx28_add_auart(id)	mxs_add_auart(&mx28_auart_data[id])
--#define mx28_add_auart0()		mx28_add_auart(0)
--#define mx28_add_auart1()		mx28_add_auart(1)
--#define mx28_add_auart2()		mx28_add_auart(2)
--#define mx28_add_auart3()		mx28_add_auart(3)
--#define mx28_add_auart4()		mx28_add_auart(4)
--
--extern const struct mxs_fec_data mx28_fec_data[] __initconst;
--#define mx28_add_fec(id, pdata) \
--	mxs_add_fec(&mx28_fec_data[id], pdata)
--
--extern const struct mxs_flexcan_data mx28_flexcan_data[] __initconst;
--#define mx28_add_flexcan(id, pdata)	\
--	mxs_add_flexcan(&mx28_flexcan_data[id], pdata)
--#define mx28_add_flexcan0(pdata)	mx28_add_flexcan(0, pdata)
--#define mx28_add_flexcan1(pdata)	mx28_add_flexcan(1, pdata)
--
--extern const struct mxs_gpmi_nand_data mx28_gpmi_nand_data __initconst;
--#define mx28_add_gpmi_nand(pdata)	\
--	mxs_add_gpmi_nand(pdata, &mx28_gpmi_nand_data)
--
--extern const struct mxs_mxs_i2c_data mx28_mxs_i2c_data[] __initconst;
--#define mx28_add_mxs_i2c(id)		mxs_add_mxs_i2c(&mx28_mxs_i2c_data[id])
--
--extern const struct mxs_mxs_mmc_data mx28_mxs_mmc_data[] __initconst;
--#define mx28_add_mxs_mmc(id, pdata) \
--	mxs_add_mxs_mmc(&mx28_mxs_mmc_data[id], pdata)
--
--#define mx28_add_mxs_pwm(id)		mxs_add_mxs_pwm(MX28_PWM_BASE_ADDR, id)
--
--struct platform_device *__init mx28_add_mxsfb(
--		const struct mxsfb_platform_data *pdata);
--
--extern const struct mxs_saif_data mx28_saif_data[] __initconst;
--#define mx28_add_saif(id, pdata) \
--	mxs_add_saif(&mx28_saif_data[id], pdata)
--
--struct platform_device *__init mx28_add_rtc_stmp3xxx(void);
-diff --git a/arch/arm/mach-mxs/devices.c b/arch/arm/mach-mxs/devices.c
-deleted file mode 100644
-index cf50b5a..0000000
---- a/arch/arm/mach-mxs/devices.c
-+++ /dev/null
-@@ -1,87 +0,0 @@
--/*
-- * Copyright 2008 Sascha Hauer, kernel at pengutronix.de
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version 2
-- * of the License, or (at your option) any later version.
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor,
-- * Boston, MA  02110-1301, USA.
-- */
--
--#include <linux/kernel.h>
--#include <linux/slab.h>
--#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/amba/bus.h>
--
--struct platform_device *__init mxs_add_platform_device_dmamask(
--		const char *name, int id,
--		const struct resource *res, unsigned int num_resources,
--		const void *data, size_t size_data, u64 dmamask)
--{
--	int ret = -ENOMEM;
--	struct platform_device *pdev;
--
--	pdev = platform_device_alloc(name, id);
--	if (!pdev)
--		goto err;
--
--	if (dmamask) {
--		/*
--		 * This memory isn't freed when the device is put,
--		 * I don't have a nice idea for that though.  Conceptually
--		 * dma_mask in struct device should not be a pointer.
--		 * See http://thread.gmane.org/gmane.linux.kernel.pci/9081
--		 */
--		pdev->dev.dma_mask =
--			kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
--		if (!pdev->dev.dma_mask)
--			/* ret is still -ENOMEM; */
--			goto err;
--
--		*pdev->dev.dma_mask = dmamask;
--		pdev->dev.coherent_dma_mask = dmamask;
--	}
--
--	if (res) {
--		ret = platform_device_add_resources(pdev, res, num_resources);
--		if (ret)
--			goto err;
--	}
--
--	if (data) {
--		ret = platform_device_add_data(pdev, data, size_data);
--		if (ret)
--			goto err;
--	}
--
--	ret = platform_device_add(pdev);
--	if (ret) {
--err:
--		if (dmamask)
--			kfree(pdev->dev.dma_mask);
--		platform_device_put(pdev);
--		return ERR_PTR(ret);
--	}
--
--	return pdev;
--}
--
--struct device mxs_apbh_bus = {
--	.init_name	= "mxs_apbh",
--	.parent         = &platform_bus,
--};
--
--static int __init mxs_device_init(void)
--{
--	return device_register(&mxs_apbh_bus);
--}
--core_initcall(mxs_device_init);
-diff --git a/arch/arm/mach-mxs/devices/Kconfig b/arch/arm/mach-mxs/devices/Kconfig
-deleted file mode 100644
-index 19659de..0000000
---- a/arch/arm/mach-mxs/devices/Kconfig
-+++ /dev/null
-@@ -1,33 +0,0 @@
--config MXS_HAVE_AMBA_DUART
--	bool
--
--config MXS_HAVE_PLATFORM_AUART
--	bool
--
--config MXS_HAVE_PLATFORM_FEC
--	bool
--
--config MXS_HAVE_PLATFORM_FLEXCAN
--	select HAVE_CAN_FLEXCAN if CAN
--	bool
--
--config MXS_HAVE_PLATFORM_GPMI_NAND
--	bool
--
--config MXS_HAVE_PLATFORM_MXS_I2C
--	bool
--
--config MXS_HAVE_PLATFORM_MXS_MMC
--	bool
--
--config MXS_HAVE_PLATFORM_MXS_PWM
--	bool
--
--config MXS_HAVE_PLATFORM_MXSFB
--	bool
--
--config MXS_HAVE_PLATFORM_MXS_SAIF
--	bool
--
--config MXS_HAVE_PLATFORM_RTC_STMP3XXX
--	bool
-diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
-deleted file mode 100644
-index 5f72d97..0000000
---- a/arch/arm/mach-mxs/devices/Makefile
-+++ /dev/null
-@@ -1,12 +0,0 @@
--obj-$(CONFIG_MXS_HAVE_PLATFORM_AUART) += platform-auart.o
--obj-y += platform-dma.o
--obj-$(CONFIG_MXS_HAVE_PLATFORM_FEC) += platform-fec.o
--obj-$(CONFIG_MXS_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
--obj-$(CONFIG_MXS_HAVE_PLATFORM_GPMI_NAND) += platform-gpmi-nand.o
--obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_I2C) += platform-mxs-i2c.o
--obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_MMC) += platform-mxs-mmc.o
--obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_PWM) += platform-mxs-pwm.o
--obj-y += platform-gpio-mxs.o
--obj-$(CONFIG_MXS_HAVE_PLATFORM_MXSFB) += platform-mxsfb.o
--obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_SAIF) += platform-mxs-saif.o
--obj-$(CONFIG_MXS_HAVE_PLATFORM_RTC_STMP3XXX) += platform-rtc-stmp3xxx.o
-diff --git a/arch/arm/mach-mxs/devices/platform-auart.c b/arch/arm/mach-mxs/devices/platform-auart.c
-deleted file mode 100644
-index 27608f5..0000000
---- a/arch/arm/mach-mxs/devices/platform-auart.c
-+++ /dev/null
-@@ -1,65 +0,0 @@
--/*
-- * Copyright (C) 2010 Pengutronix
-- * Sascha Hauer <s.hauer@pengutronix.de>
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include <linux/dma-mapping.h>
--#include <asm/sizes.h>
--#include <mach/mx23.h>
--#include <mach/mx28.h>
--#include <mach/devices-common.h>
--
--#define mxs_auart_data_entry_single(soc, _id, hwid)			\
--	{								\
--		.id = _id,						\
--		.iobase = soc ## _AUART ## hwid ## _BASE_ADDR,		\
--		.irq = soc ## _INT_AUART ## hwid,			\
--	}
--
--#define mxs_auart_data_entry(soc, _id, hwid)				\
--	[_id] = mxs_auart_data_entry_single(soc, _id, hwid)
--
--#ifdef CONFIG_SOC_IMX23
--const struct mxs_auart_data mx23_auart_data[] __initconst = {
--#define mx23_auart_data_entry(_id, hwid)				\
--	mxs_auart_data_entry(MX23, _id, hwid)
--	mx23_auart_data_entry(0, 1),
--	mx23_auart_data_entry(1, 2),
--};
--#endif
--
--#ifdef CONFIG_SOC_IMX28
--const struct mxs_auart_data mx28_auart_data[] __initconst = {
--#define mx28_auart_data_entry(_id)					\
--	mxs_auart_data_entry(MX28, _id, _id)
--	mx28_auart_data_entry(0),
--	mx28_auart_data_entry(1),
--	mx28_auart_data_entry(2),
--	mx28_auart_data_entry(3),
--	mx28_auart_data_entry(4),
--};
--#endif
--
--struct platform_device *__init mxs_add_auart(
--		const struct mxs_auart_data *data)
--{
--	struct resource res[] = {
--		{
--			.start = data->iobase,
--			.end = data->iobase + SZ_8K - 1,
--			.flags = IORESOURCE_MEM,
--		}, {
--			.start = data->irq,
--			.end = data->irq,
--			.flags = IORESOURCE_IRQ,
--		},
--	};
--
--	return mxs_add_platform_device_dmamask("mxs-auart", data->id,
--					res, ARRAY_SIZE(res), NULL, 0,
--					DMA_BIT_MASK(32));
--}
--
-diff --git a/arch/arm/mach-mxs/devices/platform-dma.c b/arch/arm/mach-mxs/devices/platform-dma.c
-deleted file mode 100644
-index 4682450..0000000
---- a/arch/arm/mach-mxs/devices/platform-dma.c
-+++ /dev/null
-@@ -1,31 +0,0 @@
--/*
-- * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include <linux/compiler.h>
--#include <linux/dma-mapping.h>
--#include <linux/err.h>
--#include <linux/init.h>
--
--#include <mach/mx23.h>
--#include <mach/mx28.h>
--#include <mach/devices-common.h>
--
--struct platform_device *__init mxs_add_dma(const char *devid,
--						resource_size_t base)
--{
--	struct resource res[] = {
--		{
--			.start = base,
--			.end = base + SZ_8K - 1,
--			.flags = IORESOURCE_MEM,
--		}
--	};
--
--	return mxs_add_platform_device_dmamask(devid, -1,
--				res, ARRAY_SIZE(res), NULL, 0,
--				DMA_BIT_MASK(32));
--}
-diff --git a/arch/arm/mach-mxs/devices/platform-fec.c b/arch/arm/mach-mxs/devices/platform-fec.c
-deleted file mode 100644
-index ae96a4f..0000000
---- a/arch/arm/mach-mxs/devices/platform-fec.c
-+++ /dev/null
-@@ -1,52 +0,0 @@
--/*
-- * Copyright (C) 2010 Pengutronix
-- * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include <linux/dma-mapping.h>
--#include <asm/sizes.h>
--#include <mach/mx28.h>
--#include <mach/devices-common.h>
--
--#define mxs_fec_data_entry_single(soc, _id)				\
--	{								\
--		.id = _id,						\
--		.iobase = soc ## _ENET_MAC ## _id ## _BASE_ADDR,	\
--		.irq = soc ## _INT_ENET_MAC ## _id,			\
--	}
--
--#define mxs_fec_data_entry(soc, _id)					\
--	[_id] = mxs_fec_data_entry_single(soc, _id)
--
--#ifdef CONFIG_SOC_IMX28
--const struct mxs_fec_data mx28_fec_data[] __initconst = {
--#define mx28_fec_data_entry(_id)					\
--	mxs_fec_data_entry(MX28, _id)
--	mx28_fec_data_entry(0),
--	mx28_fec_data_entry(1),
--};
--#endif
--
--struct platform_device *__init mxs_add_fec(
--		const struct mxs_fec_data *data,
--		const struct fec_platform_data *pdata)
--{
--	struct resource res[] = {
--		{
--			.start = data->iobase,
--			.end = data->iobase + SZ_16K - 1,
--			.flags = IORESOURCE_MEM,
--		}, {
--			.start = data->irq,
--			.end = data->irq,
--			.flags = IORESOURCE_IRQ,
--		},
--	};
--
--	return mxs_add_platform_device_dmamask("imx28-fec", data->id,
--			res, ARRAY_SIZE(res), pdata, sizeof(*pdata),
--			DMA_BIT_MASK(32));
--}
-diff --git a/arch/arm/mach-mxs/devices/platform-flexcan.c b/arch/arm/mach-mxs/devices/platform-flexcan.c
-deleted file mode 100644
-index 43a6b4b..0000000
---- a/arch/arm/mach-mxs/devices/platform-flexcan.c
-+++ /dev/null
-@@ -1,51 +0,0 @@
--/*
-- * Copyright (C) 2010, 2011 Pengutronix,
-- *                          Marc Kleine-Budde <kernel@pengutronix.de>
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include <asm/sizes.h>
--#include <mach/mx28.h>
--#include <mach/devices-common.h>
--
--#define mxs_flexcan_data_entry_single(soc, _id, _hwid, _size)		\
--	{								\
--		.id = _id,						\
--		.iobase = soc ## _CAN ## _hwid ## _BASE_ADDR,		\
--		.iosize = _size,					\
--		.irq = soc ## _INT_CAN ## _hwid,			\
--	}
--
--#define mxs_flexcan_data_entry(soc, _id, _hwid, _size)			\
--	[_id] = mxs_flexcan_data_entry_single(soc, _id, _hwid, _size)
--
--#ifdef CONFIG_SOC_IMX28
--const struct mxs_flexcan_data mx28_flexcan_data[] __initconst = {
--#define mx28_flexcan_data_entry(_id, _hwid)				\
--	mxs_flexcan_data_entry_single(MX28, _id, _hwid, SZ_8K)
--	mx28_flexcan_data_entry(0, 0),
--	mx28_flexcan_data_entry(1, 1),
--};
--#endif /* ifdef CONFIG_SOC_IMX28 */
--
--struct platform_device *__init mxs_add_flexcan(
--		const struct mxs_flexcan_data *data,
--		const struct flexcan_platform_data *pdata)
--{
--	struct resource res[] = {
--		{
--			.start = data->iobase,
--			.end = data->iobase + data->iosize - 1,
--			.flags = IORESOURCE_MEM,
--		}, {
--			.start = data->irq,
--			.end = data->irq,
--			.flags = IORESOURCE_IRQ,
--		},
--	};
--
--	return mxs_add_platform_device("flexcan", data->id,
--			res, ARRAY_SIZE(res), pdata, sizeof(*pdata));
--}
-diff --git a/arch/arm/mach-mxs/devices/platform-gpio-mxs.c b/arch/arm/mach-mxs/devices/platform-gpio-mxs.c
-deleted file mode 100644
-index cd99f19..0000000
---- a/arch/arm/mach-mxs/devices/platform-gpio-mxs.c
-+++ /dev/null
-@@ -1,33 +0,0 @@
--/*
-- * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include <linux/compiler.h>
--#include <linux/err.h>
--#include <linux/init.h>
--
--#include <mach/mx23.h>
--#include <mach/mx28.h>
--#include <mach/devices-common.h>
--
--struct platform_device *__init mxs_add_gpio(
--	char *name, int id, resource_size_t iobase, int irq)
--{
--	struct resource res[] = {
--		{
--			.start = iobase,
--			.end = iobase + SZ_8K - 1,
--			.flags = IORESOURCE_MEM,
--		}, {
--			.start = irq,
--			.end = irq,
--			.flags = IORESOURCE_IRQ,
--		},
--	};
--
--	return platform_device_register_resndata(&mxs_apbh_bus,
--			name, id, res, ARRAY_SIZE(res), NULL, 0);
--}
-diff --git a/arch/arm/mach-mxs/devices/platform-gpmi-nand.c b/arch/arm/mach-mxs/devices/platform-gpmi-nand.c
-deleted file mode 100644
-index 3e22df5..0000000
---- a/arch/arm/mach-mxs/devices/platform-gpmi-nand.c
-+++ /dev/null
-@@ -1,81 +0,0 @@
--/*
-- * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
@@ -626,539 +189,1813 @@ index 3e22df5..0000000
 - * but WITHOUT ANY WARRANTY; without even the implied warranty of
 - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 - * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License along
-- * with this program; if not, write to the Free Software Foundation, Inc.,
-- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-- */
--#include <asm/sizes.h>
--#include <mach/mx23.h>
--#include <mach/mx28.h>
--#include <mach/devices-common.h>
--#include <linux/dma-mapping.h>
--
--#ifdef CONFIG_SOC_IMX23
--const struct mxs_gpmi_nand_data mx23_gpmi_nand_data __initconst = {
--	.devid = "imx23-gpmi-nand",
--	.res = {
--		/* GPMI */
--		DEFINE_RES_MEM_NAMED(MX23_GPMI_BASE_ADDR, SZ_8K,
--					GPMI_NAND_GPMI_REGS_ADDR_RES_NAME),
--		DEFINE_RES_IRQ_NAMED(MX23_INT_GPMI_ATTENTION,
--					GPMI_NAND_GPMI_INTERRUPT_RES_NAME),
--		/* BCH */
--		DEFINE_RES_MEM_NAMED(MX23_BCH_BASE_ADDR, SZ_8K,
--					GPMI_NAND_BCH_REGS_ADDR_RES_NAME),
--		DEFINE_RES_IRQ_NAMED(MX23_INT_BCH,
--					GPMI_NAND_BCH_INTERRUPT_RES_NAME),
--		/* DMA */
--		DEFINE_RES_NAMED(MX23_DMA_GPMI0,
--					MX23_DMA_GPMI3 - MX23_DMA_GPMI0 + 1,
--					GPMI_NAND_DMA_CHANNELS_RES_NAME,
--					IORESOURCE_DMA),
--		DEFINE_RES_IRQ_NAMED(MX23_INT_GPMI_DMA,
--					GPMI_NAND_DMA_INTERRUPT_RES_NAME),
--	},
--};
--#endif
--
--#ifdef CONFIG_SOC_IMX28
--const struct mxs_gpmi_nand_data mx28_gpmi_nand_data __initconst = {
--	.devid = "imx28-gpmi-nand",
--	.res = {
--		/* GPMI */
--		DEFINE_RES_MEM_NAMED(MX28_GPMI_BASE_ADDR, SZ_8K,
--					GPMI_NAND_GPMI_REGS_ADDR_RES_NAME),
--		DEFINE_RES_IRQ_NAMED(MX28_INT_GPMI,
--					GPMI_NAND_GPMI_INTERRUPT_RES_NAME),
--		/* BCH */
--		DEFINE_RES_MEM_NAMED(MX28_BCH_BASE_ADDR, SZ_8K,
--					GPMI_NAND_BCH_REGS_ADDR_RES_NAME),
--		DEFINE_RES_IRQ_NAMED(MX28_INT_BCH,
--					GPMI_NAND_BCH_INTERRUPT_RES_NAME),
--		/* DMA */
--		DEFINE_RES_NAMED(MX28_DMA_GPMI0,
--					MX28_DMA_GPMI7 - MX28_DMA_GPMI0 + 1,
--					GPMI_NAND_DMA_CHANNELS_RES_NAME,
--					IORESOURCE_DMA),
--		DEFINE_RES_IRQ_NAMED(MX28_INT_GPMI_DMA,
--					GPMI_NAND_DMA_INTERRUPT_RES_NAME),
--	},
--};
--#endif
--
--struct platform_device *__init
--mxs_add_gpmi_nand(const struct gpmi_nand_platform_data *pdata,
--		const struct mxs_gpmi_nand_data *data)
--{
--	return mxs_add_platform_device_dmamask(data->devid, -1,
--				data->res, GPMI_NAND_RES_SIZE,
--				pdata, sizeof(*pdata), DMA_BIT_MASK(32));
--}
-diff --git a/arch/arm/mach-mxs/devices/platform-mxs-i2c.c b/arch/arm/mach-mxs/devices/platform-mxs-i2c.c
-deleted file mode 100644
-index 79222ec..0000000
---- a/arch/arm/mach-mxs/devices/platform-mxs-i2c.c
-+++ /dev/null
-@@ -1,52 +0,0 @@
--/*
-- * Copyright (C) 2011 Pengutronix
-- * Wolfram Sang <w.sang@pengutronix.de>
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include <asm/sizes.h>
--#include <mach/mx28.h>
--#include <mach/devices-common.h>
--
--#define mxs_i2c_data_entry_single(soc, _id)				\
--	{								\
--		.id = _id,						\
--		.iobase = soc ## _I2C ## _id ## _BASE_ADDR,		\
--		.errirq = soc ## _INT_I2C ## _id ## _ERROR,		\
--		.dmairq = soc ## _INT_I2C ## _id ## _DMA,		\
--	}
--
--#define mxs_i2c_data_entry(soc, _id)					\
--	[_id] = mxs_i2c_data_entry_single(soc, _id)
--
--#ifdef CONFIG_SOC_IMX28
--const struct mxs_mxs_i2c_data mx28_mxs_i2c_data[] __initconst = {
--	mxs_i2c_data_entry(MX28, 0),
--	mxs_i2c_data_entry(MX28, 1),
--};
--#endif
--
--struct platform_device *__init mxs_add_mxs_i2c(
--		const struct mxs_mxs_i2c_data *data)
--{
--	struct resource res[] = {
--		{
--			.start = data->iobase,
--			.end = data->iobase + SZ_8K - 1,
--			.flags = IORESOURCE_MEM,
--		}, {
--			.start = data->errirq,
--			.end = data->errirq,
--			.flags = IORESOURCE_IRQ,
--		}, {
--			.start = data->dmairq,
--			.end = data->dmairq,
--			.flags = IORESOURCE_IRQ,
--		},
--	};
--
--	return mxs_add_platform_device("mxs-i2c", data->id, res,
--					ARRAY_SIZE(res), NULL, 0);
--}
-diff --git a/arch/arm/mach-mxs/devices/platform-mxs-mmc.c b/arch/arm/mach-mxs/devices/platform-mxs-mmc.c
-deleted file mode 100644
-index b33c9d0..0000000
---- a/arch/arm/mach-mxs/devices/platform-mxs-mmc.c
-+++ /dev/null
-@@ -1,76 +0,0 @@
--/*
-- * Copyright (C) 2010 Pengutronix
-- * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-- *
-- * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
 - */
 -
--#include <linux/compiler.h>
--#include <linux/err.h>
--#include <linux/init.h>
--
--#include <mach/mx23.h>
--#include <mach/mx28.h>
--#include <mach/devices-common.h>
--
--#define mxs_mxs_mmc_data_entry_single(soc, _devid, _id, hwid)		\
--	{								\
--		.devid = _devid,					\
--		.id = _id,						\
--		.iobase = soc ## _SSP ## hwid ## _BASE_ADDR,		\
--		.dma = soc ## _DMA_SSP ## hwid,				\
--		.irq_err = soc ## _INT_SSP ## hwid ## _ERROR,		\
--		.irq_dma = soc ## _INT_SSP ## hwid ## _DMA,		\
--	}
--
--#define mxs_mxs_mmc_data_entry(soc, _devid, _id, hwid)			\
--	[_id] = mxs_mxs_mmc_data_entry_single(soc, _devid, _id, hwid)
--
--
--#ifdef CONFIG_SOC_IMX23
--const struct mxs_mxs_mmc_data mx23_mxs_mmc_data[] __initconst = {
--	mxs_mxs_mmc_data_entry(MX23, "imx23-mmc", 0, 1),
--	mxs_mxs_mmc_data_entry(MX23, "imx23-mmc", 1, 2),
--};
--#endif
--
--#ifdef CONFIG_SOC_IMX28
--const struct mxs_mxs_mmc_data mx28_mxs_mmc_data[] __initconst = {
--	mxs_mxs_mmc_data_entry(MX28, "imx28-mmc", 0, 0),
--	mxs_mxs_mmc_data_entry(MX28, "imx28-mmc", 1, 1),
--	mxs_mxs_mmc_data_entry(MX28, "imx28-mmc", 2, 2),
--	mxs_mxs_mmc_data_entry(MX28, "imx28-mmc", 3, 3),
--};
--#endif
--
--struct platform_device *__init mxs_add_mxs_mmc(
--		const struct mxs_mxs_mmc_data *data,
--		const struct mxs_mmc_platform_data *pdata)
--{
--	struct resource res[] = {
--		{
--			.start	= data->iobase,
--			.end	= data->iobase + SZ_8K - 1,
--			.flags	= IORESOURCE_MEM,
--		}, {
--			.start	= data->dma,
--			.end	= data->dma,
--			.flags	= IORESOURCE_DMA,
--		}, {
--			.start	= data->irq_err,
--			.end	= data->irq_err,
--			.flags	= IORESOURCE_IRQ,
--		}, {
--			.start	= data->irq_dma,
--			.end	= data->irq_dma,
--			.flags	= IORESOURCE_IRQ,
--		},
--	};
--
--	return mxs_add_platform_device(data->devid, data->id,
--			res, ARRAY_SIZE(res), pdata, sizeof(*pdata));
--}
-diff --git a/arch/arm/mach-mxs/devices/platform-mxs-pwm.c b/arch/arm/mach-mxs/devices/platform-mxs-pwm.c
-deleted file mode 100644
-index 680f5a9..0000000
---- a/arch/arm/mach-mxs/devices/platform-mxs-pwm.c
-+++ /dev/null
-@@ -1,22 +0,0 @@
--/*
-- * Copyright (C) 2010 Pengutronix
-- * Sascha Hauer <s.hauer@pengutronix.de>
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include <asm/sizes.h>
--#include <mach/devices-common.h>
--
--struct platform_device *__init mxs_add_mxs_pwm(resource_size_t iobase, int id)
--{
--	struct resource res = {
--		.flags = IORESOURCE_MEM,
--	};
--
--	res.start = iobase + 0x10 + 0x20 * id;
--	res.end = res.start + 0x1f;
--
--	return mxs_add_platform_device("mxs-pwm", id, &res, 1, NULL, 0);
--}
-diff --git a/arch/arm/mach-mxs/devices/platform-mxs-saif.c b/arch/arm/mach-mxs/devices/platform-mxs-saif.c
-deleted file mode 100644
-index f6e3a60..0000000
---- a/arch/arm/mach-mxs/devices/platform-mxs-saif.c
-+++ /dev/null
-@@ -1,61 +0,0 @@
--/*
-- * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include <linux/compiler.h>
--#include <linux/err.h>
--#include <linux/init.h>
--
--#include <mach/mx23.h>
--#include <mach/mx28.h>
--#include <mach/devices-common.h>
--
--#define mxs_saif_data_entry_single(soc, _id)				\
--	{								\
--		.id = _id,						\
--		.iobase = soc ## _SAIF ## _id ## _BASE_ADDR,		\
--		.irq = soc ## _INT_SAIF ## _id,				\
--		.dma = soc ## _DMA_SAIF ## _id,				\
--		.dmairq = soc ## _INT_SAIF ## _id ##_DMA,		\
--	}
--
--#define mxs_saif_data_entry(soc, _id)					\
--	[_id] = mxs_saif_data_entry_single(soc, _id)
--
--#ifdef CONFIG_SOC_IMX28
--const struct mxs_saif_data mx28_saif_data[] __initconst = {
--	mxs_saif_data_entry(MX28, 0),
--	mxs_saif_data_entry(MX28, 1),
--};
--#endif
--
--struct platform_device *__init mxs_add_saif(const struct mxs_saif_data *data,
--				const struct mxs_saif_platform_data *pdata)
--{
--	struct resource res[] = {
--		{
--			.start = data->iobase,
--			.end = data->iobase + SZ_4K - 1,
--			.flags = IORESOURCE_MEM,
--		}, {
--			.start = data->irq,
--			.end = data->irq,
--			.flags = IORESOURCE_IRQ,
--		}, {
--			.start = data->dma,
--			.end = data->dma,
--			.flags = IORESOURCE_DMA,
--		}, {
--			.start = data->dmairq,
--			.end = data->dmairq,
--			.flags = IORESOURCE_IRQ,
--		},
--
--	};
--
--	return mxs_add_platform_device("mxs-saif", data->id, res,
--				ARRAY_SIZE(res), pdata, sizeof(*pdata));
--}
-diff --git a/arch/arm/mach-mxs/devices/platform-mxsfb.c b/arch/arm/mach-mxs/devices/platform-mxsfb.c
-deleted file mode 100644
-index 76b53f73..0000000
---- a/arch/arm/mach-mxs/devices/platform-mxsfb.c
-+++ /dev/null
-@@ -1,47 +0,0 @@
--/*
-- * Copyright (C) 2011 Pengutronix, Sascha Hauer <s.hauer@pengutronix.de>
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include <linux/dma-mapping.h>
--#include <asm/sizes.h>
--#include <mach/mx23.h>
--#include <mach/mx28.h>
--#include <mach/devices-common.h>
--#include <linux/mxsfb.h>
--
--#ifdef CONFIG_SOC_IMX23
--struct platform_device *__init mx23_add_mxsfb(
--		const struct mxsfb_platform_data *pdata)
--{
--	struct resource res[] = {
--		{
--			.start = MX23_LCDIF_BASE_ADDR,
--			.end = MX23_LCDIF_BASE_ADDR + SZ_8K - 1,
--			.flags = IORESOURCE_MEM,
--		},
--	};
--
--	return mxs_add_platform_device_dmamask("imx23-fb", -1,
--			res, ARRAY_SIZE(res), pdata, sizeof(*pdata), DMA_BIT_MASK(32));
--}
--#endif /* ifdef CONFIG_SOC_IMX23 */
--
--#ifdef CONFIG_SOC_IMX28
--struct platform_device *__init mx28_add_mxsfb(
--		const struct mxsfb_platform_data *pdata)
--{
--	struct resource res[] = {
--		{
--			.start = MX28_LCDIF_BASE_ADDR,
--			.end = MX28_LCDIF_BASE_ADDR + SZ_8K - 1,
--			.flags = IORESOURCE_MEM,
--		},
--	};
--
--	return mxs_add_platform_device_dmamask("imx28-fb", -1,
--			res, ARRAY_SIZE(res), pdata, sizeof(*pdata), DMA_BIT_MASK(32));
--}
--#endif /* ifdef CONFIG_SOC_IMX28 */
-diff --git a/arch/arm/mach-mxs/devices/platform-rtc-stmp3xxx.c b/arch/arm/mach-mxs/devices/platform-rtc-stmp3xxx.c
-deleted file mode 100644
-index 639eaee..0000000
---- a/arch/arm/mach-mxs/devices/platform-rtc-stmp3xxx.c
-+++ /dev/null
-@@ -1,51 +0,0 @@
--/*
-- * Copyright (C) 2011 Pengutronix, Wolfram Sang <w.sang@pengutronix.de>
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include <asm/sizes.h>
--#include <mach/mx23.h>
--#include <mach/mx28.h>
--#include <mach/devices-common.h>
--
--#ifdef CONFIG_SOC_IMX23
--struct platform_device *__init mx23_add_rtc_stmp3xxx(void)
--{
--	struct resource res[] = {
--		{
--			.start = MX23_RTC_BASE_ADDR,
--			.end = MX23_RTC_BASE_ADDR + SZ_8K - 1,
--			.flags = IORESOURCE_MEM,
--		}, {
--			.start = MX23_INT_RTC_ALARM,
--			.end = MX23_INT_RTC_ALARM,
--			.flags = IORESOURCE_IRQ,
--		},
--	};
--
--	return mxs_add_platform_device("stmp3xxx-rtc", 0, res, ARRAY_SIZE(res),
--					NULL, 0);
--}
--#endif /* CONFIG_SOC_IMX23 */
--
--#ifdef CONFIG_SOC_IMX28
--struct platform_device *__init mx28_add_rtc_stmp3xxx(void)
--{
--	struct resource res[] = {
--		{
--			.start = MX28_RTC_BASE_ADDR,
--			.end = MX28_RTC_BASE_ADDR + SZ_8K - 1,
--			.flags = IORESOURCE_MEM,
--		}, {
--			.start = MX28_INT_RTC_ALARM,
--			.end = MX28_INT_RTC_ALARM,
--			.flags = IORESOURCE_IRQ,
--		},
--	};
--
--	return mxs_add_platform_device("stmp3xxx-rtc", 0, res, ARRAY_SIZE(res),
--					NULL, 0);
--}
--#endif /* CONFIG_SOC_IMX28 */
-diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
-deleted file mode 100644
-index e8b1d95..0000000
---- a/arch/arm/mach-mxs/include/mach/devices-common.h
-+++ /dev/null
-@@ -1,114 +0,0 @@
--/*
-- * Copyright (C) 2009-2010 Pengutronix
-- * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include <linux/kernel.h>
+-#include <linux/delay.h>
 -#include <linux/platform_device.h>
--#include <linux/init.h>
--#include <linux/amba/bus.h>
+-#include <linux/gpio.h>
+-#include <linux/leds.h>
+-#include <linux/clk.h>
+-#include <linux/i2c.h>
+-#include <linux/regulator/machine.h>
+-#include <linux/regulator/fixed.h>
+-#include <linux/micrel_phy.h>
 -
--extern struct device mxs_apbh_bus;
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
 -
--struct platform_device *mxs_add_platform_device_dmamask(
--		const char *name, int id,
--		const struct resource *res, unsigned int num_resources,
--		const void *data, size_t size_data, u64 dmamask);
+-#include <mach/common.h>
+-#include <mach/digctl.h>
+-#include <mach/iomux-mx28.h>
 -
--static inline struct platform_device *mxs_add_platform_device(
--		const char *name, int id,
--		const struct resource *res, unsigned int num_resources,
--		const void *data, size_t size_data)
+-#include "devices-mx28.h"
+-
+-#define APX4DEVKIT_GPIO_USERLED	MXS_GPIO_NR(3, 28)
+-
+-static const iomux_cfg_t apx4devkit_pads[] __initconst = {
+-	/* duart */
+-	MX28_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
+-	MX28_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
+-
+-	/* auart0 */
+-	MX28_PAD_AUART0_RX__AUART0_RX | MXS_PAD_CTRL,
+-	MX28_PAD_AUART0_TX__AUART0_TX | MXS_PAD_CTRL,
+-	MX28_PAD_AUART0_CTS__AUART0_CTS | MXS_PAD_CTRL,
+-	MX28_PAD_AUART0_RTS__AUART0_RTS | MXS_PAD_CTRL,
+-
+-	/* auart1 */
+-	MX28_PAD_AUART1_RX__AUART1_RX | MXS_PAD_CTRL,
+-	MX28_PAD_AUART1_TX__AUART1_TX | MXS_PAD_CTRL,
+-
+-	/* auart2 */
+-	MX28_PAD_SSP2_SCK__AUART2_RX | MXS_PAD_CTRL,
+-	MX28_PAD_SSP2_MOSI__AUART2_TX | MXS_PAD_CTRL,
+-
+-	/* auart3 */
+-	MX28_PAD_SSP2_MISO__AUART3_RX | MXS_PAD_CTRL,
+-	MX28_PAD_SSP2_SS0__AUART3_TX | MXS_PAD_CTRL,
+-
+-#define MXS_PAD_FEC	(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP)
+-	/* fec0 */
+-	MX28_PAD_ENET0_MDC__ENET0_MDC | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_MDIO__ENET0_MDIO | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_RXD0__ENET0_RXD0 | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_RXD1__ENET0_RXD1 | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_TXD0__ENET0_TXD0 | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_TXD1__ENET0_TXD1 | MXS_PAD_FEC,
+-	MX28_PAD_ENET_CLK__CLKCTRL_ENET | MXS_PAD_FEC,
+-
+-	/* i2c */
+-	MX28_PAD_I2C0_SCL__I2C0_SCL,
+-	MX28_PAD_I2C0_SDA__I2C0_SDA,
+-
+-	/* mmc0 */
+-	MX28_PAD_SSP0_DATA0__SSP0_D0 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA1__SSP0_D1 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA2__SSP0_D2 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA3__SSP0_D3 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA4__SSP0_D4 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA5__SSP0_D5 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA6__SSP0_D6 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA7__SSP0_D7 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_CMD__SSP0_CMD |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX28_PAD_SSP0_SCK__SSP0_SCK |
+-		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-
+-	/* led */
+-	MX28_PAD_PWM3__GPIO_3_28 | MXS_PAD_CTRL,
+-
+-	/* saif0 & saif1 */
+-	MX28_PAD_SAIF0_MCLK__SAIF0_MCLK |
+-		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SAIF0_LRCLK__SAIF0_LRCLK |
+-		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SAIF0_BITCLK__SAIF0_BITCLK |
+-		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SAIF0_SDATA0__SAIF0_SDATA0 |
+-		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SAIF1_SDATA0__SAIF1_SDATA0 |
+-		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-};
+-
+-/* led */
+-static const struct gpio_led apx4devkit_leds[] __initconst = {
+-	{
+-		.name = "user-led",
+-		.default_trigger = "heartbeat",
+-		.gpio = APX4DEVKIT_GPIO_USERLED,
+-	},
+-};
+-
+-static const struct gpio_led_platform_data apx4devkit_led_data __initconst = {
+-	.leds = apx4devkit_leds,
+-	.num_leds = ARRAY_SIZE(apx4devkit_leds),
+-};
+-
+-static const struct fec_platform_data mx28_fec_pdata __initconst = {
+-	.phy = PHY_INTERFACE_MODE_RMII,
+-};
+-
+-static const struct mxs_mmc_platform_data apx4devkit_mmc_pdata __initconst = {
+-	.wp_gpio = -EINVAL,
+-	.flags = SLOTF_4_BIT_CAPABLE,
+-};
+-
+-static const struct i2c_board_info apx4devkit_i2c_boardinfo[] __initconst = {
+-	{ I2C_BOARD_INFO("sgtl5000", 0x0a) }, /* ASoC */
+-	{ I2C_BOARD_INFO("pcf8563", 0x51) }, /* RTC */
+-};
+-
+-#if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || \
+-		defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
+-static struct regulator_consumer_supply apx4devkit_audio_consumer_supplies[] = {
+-	REGULATOR_SUPPLY("VDDA", "0-000a"),
+-	REGULATOR_SUPPLY("VDDIO", "0-000a"),
+-};
+-
+-static struct regulator_init_data apx4devkit_vdd_reg_init_data = {
+-	.constraints	= {
+-		.name	= "3V3",
+-		.always_on = 1,
+-	},
+-	.consumer_supplies = apx4devkit_audio_consumer_supplies,
+-	.num_consumer_supplies = ARRAY_SIZE(apx4devkit_audio_consumer_supplies),
+-};
+-
+-static struct fixed_voltage_config apx4devkit_vdd_pdata = {
+-	.supply_name	= "board-3V3",
+-	.microvolts	= 3300000,
+-	.gpio		= -EINVAL,
+-	.enabled_at_boot = 1,
+-	.init_data	= &apx4devkit_vdd_reg_init_data,
+-};
+-
+-static struct platform_device apx4devkit_voltage_regulator = {
+-	.name		= "reg-fixed-voltage",
+-	.id		= -1,
+-	.num_resources	= 0,
+-	.dev		= {
+-		.platform_data	= &apx4devkit_vdd_pdata,
+-	},
+-};
+-
+-static void __init apx4devkit_add_regulators(void)
 -{
--	return mxs_add_platform_device_dmamask(
--			name, id, res, num_resources, data, size_data, 0);
+-	platform_device_register(&apx4devkit_voltage_regulator);
+-}
+-#else
+-static void __init apx4devkit_add_regulators(void) {}
+-#endif
+-
+-static const struct mxs_saif_platform_data
+-			apx4devkit_mxs_saif_pdata[] __initconst = {
+-	/* working on EXTMSTR0 mode (saif0 master, saif1 slave) */
+-	{
+-		.master_mode = 1,
+-		.master_id = 0,
+-	}, {
+-		.master_mode = 0,
+-		.master_id = 0,
+-	},
+-};
+-
+-static int apx4devkit_phy_fixup(struct phy_device *phy)
+-{
+-	phy->dev_flags |= MICREL_PHY_50MHZ_CLK;
+-	return 0;
 -}
 -
--/* auart */
--struct mxs_auart_data {
--	int id;
--	resource_size_t iobase;
--	resource_size_t iosize;
--	resource_size_t irq;
+-static void __init apx4devkit_fec_phy_clk_enable(void)
+-{
+-	struct clk *clk;
+-
+-	/* Enable fec phy clock */
+-	clk = clk_get_sys("enet_out", NULL);
+-	if (!IS_ERR(clk))
+-		clk_prepare_enable(clk);
+-}
+-
+-static void __init apx4devkit_init(void)
+-{
+-	mx28_soc_init();
+-
+-	mxs_iomux_setup_multiple_pads(apx4devkit_pads,
+-			ARRAY_SIZE(apx4devkit_pads));
+-
+-	mx28_add_duart();
+-	mx28_add_auart0();
+-	mx28_add_auart1();
+-	mx28_add_auart2();
+-	mx28_add_auart3();
+-
+-	/*
+-	 * Register fixup for the Micrel KS8031 PHY clock
+-	 * (shares same ID with KS8051)
+-	 */
+-	phy_register_fixup_for_uid(PHY_ID_KS8051, MICREL_PHY_ID_MASK,
+-			apx4devkit_phy_fixup);
+-
+-	apx4devkit_fec_phy_clk_enable();
+-	mx28_add_fec(0, &mx28_fec_pdata);
+-
+-	mx28_add_mxs_mmc(0, &apx4devkit_mmc_pdata);
+-
+-	gpio_led_register_device(0, &apx4devkit_led_data);
+-
+-	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
+-	mx28_add_saif(0, &apx4devkit_mxs_saif_pdata[0]);
+-	mx28_add_saif(1, &apx4devkit_mxs_saif_pdata[1]);
+-
+-	apx4devkit_add_regulators();
+-
+-	mx28_add_mxs_i2c(0);
+-	i2c_register_board_info(0, apx4devkit_i2c_boardinfo,
+-			ARRAY_SIZE(apx4devkit_i2c_boardinfo));
+-
+-	mxs_add_platform_device("mxs-sgtl5000", 0, NULL, 0, NULL, 0);
+-}
+-
+-static void __init apx4devkit_timer_init(void)
+-{
+-	mx28_clocks_init();
+-}
+-
+-static struct sys_timer apx4devkit_timer = {
+-	.init	= apx4devkit_timer_init,
 -};
--struct platform_device *__init mxs_add_auart(
--		const struct mxs_auart_data *data);
+-
+-MACHINE_START(APX4DEVKIT, "Bluegiga APX4 Development Kit")
+-	.map_io		= mx28_map_io,
+-	.init_irq	= mx28_init_irq,
+-	.timer		= &apx4devkit_timer,
+-	.init_machine	= apx4devkit_init,
+-	.restart	= mxs_restart,
+-MACHINE_END
+diff --git a/arch/arm/mach-mxs/mach-m28evk.c b/arch/arm/mach-mxs/mach-m28evk.c
+deleted file mode 100644
+index 4c00c87..0000000
+--- a/arch/arm/mach-mxs/mach-m28evk.c
++++ /dev/null
+@@ -1,366 +0,0 @@
+-/*
+- * Copyright (C) 2011
+- * Stefano Babic, DENX Software Engineering, <sbabic@denx.de>
+- *
+- * based on: mach-mx28_evk.c
+- * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#include <linux/delay.h>
+-#include <linux/platform_device.h>
+-#include <linux/gpio.h>
+-#include <linux/leds.h>
+-#include <linux/irq.h>
+-#include <linux/clk.h>
+-#include <linux/i2c.h>
+-#include <linux/i2c/at24.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-
+-#include <mach/common.h>
+-#include <mach/iomux-mx28.h>
+-
+-#include "devices-mx28.h"
+-
+-#define M28EVK_GPIO_USERLED1	MXS_GPIO_NR(3, 16)
+-#define M28EVK_GPIO_USERLED2	MXS_GPIO_NR(3, 17)
+-
+-#define MX28EVK_BL_ENABLE	MXS_GPIO_NR(3, 18)
+-#define M28EVK_LCD_ENABLE	MXS_GPIO_NR(3, 28)
+-
+-#define MX28EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(2, 12)
+-#define MX28EVK_MMC1_WRITE_PROTECT	MXS_GPIO_NR(0, 28)
+-
+-static const iomux_cfg_t m28evk_pads[] __initconst = {
+-	/* duart */
+-	MX28_PAD_AUART0_CTS__DUART_RX | MXS_PAD_CTRL,
+-	MX28_PAD_AUART0_RTS__DUART_TX | MXS_PAD_CTRL,
+-
+-	/* auart0 */
+-	MX28_PAD_AUART0_RX__AUART0_RX | MXS_PAD_CTRL,
+-	MX28_PAD_AUART0_TX__AUART0_TX | MXS_PAD_CTRL,
+-
+-	/* auart3 */
+-	MX28_PAD_AUART3_RX__AUART3_RX | MXS_PAD_CTRL,
+-	MX28_PAD_AUART3_TX__AUART3_TX | MXS_PAD_CTRL,
+-	MX28_PAD_AUART3_CTS__AUART3_CTS | MXS_PAD_CTRL,
+-	MX28_PAD_AUART3_RTS__AUART3_RTS | MXS_PAD_CTRL,
+-
+-#define MXS_PAD_FEC	(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP)
+-	/* fec0 */
+-	MX28_PAD_ENET0_MDC__ENET0_MDC | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_MDIO__ENET0_MDIO | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_RXD0__ENET0_RXD0 | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_RXD1__ENET0_RXD1 | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_TXD0__ENET0_TXD0 | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_TXD1__ENET0_TXD1 | MXS_PAD_FEC,
+-	MX28_PAD_ENET_CLK__CLKCTRL_ENET | MXS_PAD_FEC,
+-	/* fec1 */
+-	MX28_PAD_ENET0_CRS__ENET1_RX_EN | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_RXD2__ENET1_RXD0 | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_RXD3__ENET1_RXD1 | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_COL__ENET1_TX_EN | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_TXD2__ENET1_TXD0 | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_TXD3__ENET1_TXD1 | MXS_PAD_FEC,
+-
+-	/* flexcan0 */
+-	MX28_PAD_GPMI_RDY2__CAN0_TX,
+-	MX28_PAD_GPMI_RDY3__CAN0_RX,
+-
+-	/* flexcan1 */
+-	MX28_PAD_GPMI_CE2N__CAN1_TX,
+-	MX28_PAD_GPMI_CE3N__CAN1_RX,
+-
+-	/* I2C */
+-	MX28_PAD_I2C0_SCL__I2C0_SCL,
+-	MX28_PAD_I2C0_SDA__I2C0_SDA,
+-
+-	/* mxsfb (lcdif) */
+-	MX28_PAD_LCD_D00__LCD_D0 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D01__LCD_D1 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D02__LCD_D2 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D03__LCD_D3 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D04__LCD_D4 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D05__LCD_D5 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D06__LCD_D6 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D07__LCD_D7 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D08__LCD_D8 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D09__LCD_D9 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D10__LCD_D10 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D11__LCD_D11 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D12__LCD_D12 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D13__LCD_D13 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D14__LCD_D14 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D15__LCD_D15 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D16__LCD_D16 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D17__LCD_D17 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D18__LCD_D18 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D19__LCD_D19 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D20__LCD_D20 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D21__LCD_D21 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D22__LCD_D22 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D23__LCD_D23 | MXS_PAD_CTRL,
+-
+-	MX28_PAD_LCD_ENABLE__LCD_ENABLE	| MXS_PAD_CTRL,
+-	MX28_PAD_LCD_DOTCLK__LCD_DOTCLK | MXS_PAD_CTRL,
+-
+-	/* mmc0 */
+-	MX28_PAD_SSP0_DATA0__SSP0_D0 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA1__SSP0_D1 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA2__SSP0_D2 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA3__SSP0_D3 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA4__SSP0_D4 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA5__SSP0_D5 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA6__SSP0_D6 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA7__SSP0_D7 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_CMD__SSP0_CMD |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX28_PAD_SSP0_SCK__SSP0_SCK |
+-		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-
+-	/* mmc1 */
+-	MX28_PAD_GPMI_D00__SSP1_D0 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_D01__SSP1_D1 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_D02__SSP1_D2 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_D03__SSP1_D3 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_D04__SSP1_D4 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_D05__SSP1_D5 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_D06__SSP1_D6 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_D07__SSP1_D7 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_RDY1__SSP1_CMD |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_RDY0__SSP1_CARD_DETECT |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX28_PAD_GPMI_WRN__SSP1_SCK |
+-		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	/* write protect */
+-	MX28_PAD_GPMI_RESETN__GPIO_0_28 |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	/* slot power enable */
+-	MX28_PAD_PWM4__GPIO_3_29 |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-
+-	/* led */
+-	MX28_PAD_PWM0__GPIO_3_16 | MXS_PAD_CTRL,
+-	MX28_PAD_PWM1__GPIO_3_17 | MXS_PAD_CTRL,
+-
+-	/* nand */
+-	MX28_PAD_GPMI_D00__GPMI_D0 |
+-		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
+-	MX28_PAD_GPMI_D01__GPMI_D1 |
+-		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
+-	MX28_PAD_GPMI_D02__GPMI_D2 |
+-		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
+-	MX28_PAD_GPMI_D03__GPMI_D3 |
+-		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
+-	MX28_PAD_GPMI_D04__GPMI_D4 |
+-		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
+-	MX28_PAD_GPMI_D05__GPMI_D5 |
+-		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
+-	MX28_PAD_GPMI_D06__GPMI_D6 |
+-		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
+-	MX28_PAD_GPMI_D07__GPMI_D7 |
+-		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
+-	MX28_PAD_GPMI_CE0N__GPMI_CE0N |
+-		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
+-	MX28_PAD_GPMI_RDY0__GPMI_READY0 |
+-		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
+-	MX28_PAD_GPMI_RDN__GPMI_RDN |
+-		(MXS_PAD_12MA | MXS_PAD_1V8 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_WRN__GPMI_WRN |
+-		(MXS_PAD_12MA | MXS_PAD_1V8 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_ALE__GPMI_ALE |
+-		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_CLE__GPMI_CLE |
+-		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_RESETN__GPMI_RESETN |
+-		(MXS_PAD_12MA | MXS_PAD_1V8 | MXS_PAD_PULLUP),
+-
+-	/* Backlight */
+-	MX28_PAD_PWM3__GPIO_3_28 | MXS_PAD_CTRL,
+-};
+-
+-/* led */
+-static const struct gpio_led m28evk_leds[] __initconst = {
+-	{
+-		.name = "user-led1",
+-		.default_trigger = "heartbeat",
+-		.gpio = M28EVK_GPIO_USERLED1,
+-	},
+-	{
+-		.name = "user-led2",
+-		.default_trigger = "heartbeat",
+-		.gpio = M28EVK_GPIO_USERLED2,
+-	},
+-};
+-
+-static const struct gpio_led_platform_data m28evk_led_data __initconst = {
+-	.leds = m28evk_leds,
+-	.num_leds = ARRAY_SIZE(m28evk_leds),
+-};
+-
+-static struct fec_platform_data mx28_fec_pdata[] __initdata = {
+-	{
+-		/* fec0 */
+-		.phy = PHY_INTERFACE_MODE_RMII,
+-	}, {
+-		/* fec1 */
+-		.phy = PHY_INTERFACE_MODE_RMII,
+-	},
+-};
+-
+-static int __init m28evk_fec_get_mac(void)
+-{
+-	int i;
+-	u32 val;
+-	const u32 *ocotp = mxs_get_ocotp();
+-
+-	if (!ocotp)
+-		return -ETIMEDOUT;
+-
+-	/*
+-	 * OCOTP only stores the last 4 octets for each mac address,
+-	 * so hard-code DENX OUI (C0:E5:4E) here.
+-	 */
+-	for (i = 0; i < 2; i++) {
+-		val = ocotp[i];
+-		mx28_fec_pdata[i].mac[0] = 0xC0;
+-		mx28_fec_pdata[i].mac[1] = 0xE5;
+-		mx28_fec_pdata[i].mac[2] = 0x4E;
+-		mx28_fec_pdata[i].mac[3] = (val >> 16) & 0xff;
+-		mx28_fec_pdata[i].mac[4] = (val >> 8) & 0xff;
+-		mx28_fec_pdata[i].mac[5] = (val >> 0) & 0xff;
+-	}
+-
+-	return 0;
+-}
+-
+-/* mxsfb (lcdif) */
+-static struct fb_videomode m28evk_video_modes[] = {
+-	{
+-		.name		= "Ampire AM-800480R2TMQW-T01H",
+-		.refresh	= 60,
+-		.xres		= 800,
+-		.yres		= 480,
+-		.pixclock	= 30066, /* picosecond (33.26 MHz) */
+-		.left_margin	= 0,
+-		.right_margin	= 256,
+-		.upper_margin	= 0,
+-		.lower_margin	= 45,
+-		.hsync_len	= 1,
+-		.vsync_len	= 1,
+-		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT,
+-	},
+-};
+-
+-static const struct mxsfb_platform_data m28evk_mxsfb_pdata __initconst = {
+-	.mode_list	= m28evk_video_modes,
+-	.mode_count	= ARRAY_SIZE(m28evk_video_modes),
+-	.default_bpp	= 16,
+-	.ld_intf_width	= STMLCDIF_18BIT,
+-};
+-
+-static struct at24_platform_data m28evk_eeprom = {
+-	.byte_len = 16384,
+-	.page_size = 32,
+-	.flags = AT24_FLAG_ADDR16,
+-};
+-
+-static struct i2c_board_info m28_stk5v3_i2c_boardinfo[] __initdata = {
+-	{
+-		I2C_BOARD_INFO("at24", 0x51),	/* E0=1, E1=0, E2=0 */
+-		.platform_data = &m28evk_eeprom,
+-	},
+-};
+-
+-static struct mxs_mmc_platform_data m28evk_mmc_pdata[] __initdata = {
+-	{
+-		/* mmc0 */
+-		.wp_gpio = MX28EVK_MMC0_WRITE_PROTECT,
+-		.flags = SLOTF_8_BIT_CAPABLE,
+-	}, {
+-		/* mmc1 */
+-		.wp_gpio = MX28EVK_MMC1_WRITE_PROTECT,
+-		.flags = SLOTF_8_BIT_CAPABLE,
+-	},
+-};
+-
+-static void __init m28evk_init(void)
+-{
+-	mx28_soc_init();
+-
+-	mxs_iomux_setup_multiple_pads(m28evk_pads, ARRAY_SIZE(m28evk_pads));
+-
+-	mx28_add_duart();
+-	mx28_add_auart0();
+-	mx28_add_auart3();
+-
+-	if (!m28evk_fec_get_mac()) {
+-		mx28_add_fec(0, &mx28_fec_pdata[0]);
+-		mx28_add_fec(1, &mx28_fec_pdata[1]);
+-	}
+-
+-	mx28_add_flexcan(0, NULL);
+-	mx28_add_flexcan(1, NULL);
+-
+-	mx28_add_mxsfb(&m28evk_mxsfb_pdata);
+-
+-	mx28_add_mxs_mmc(0, &m28evk_mmc_pdata[0]);
+-	mx28_add_mxs_mmc(1, &m28evk_mmc_pdata[1]);
+-
+-	gpio_led_register_device(0, &m28evk_led_data);
+-
+-	/* I2C */
+-	mx28_add_mxs_i2c(0);
+-	i2c_register_board_info(0, m28_stk5v3_i2c_boardinfo,
+-			ARRAY_SIZE(m28_stk5v3_i2c_boardinfo));
+-}
+-
+-static void __init m28evk_timer_init(void)
+-{
+-	mx28_clocks_init();
+-}
+-
+-static struct sys_timer m28evk_timer = {
+-	.init	= m28evk_timer_init,
+-};
+-
+-MACHINE_START(M28EVK, "DENX M28 EVK")
+-	.map_io		= mx28_map_io,
+-	.init_irq	= mx28_init_irq,
+-	.timer		= &m28evk_timer,
+-	.init_machine	= m28evk_init,
+-	.restart	= mxs_restart,
+-MACHINE_END
+diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+deleted file mode 100644
+index e7272a4..0000000
+--- a/arch/arm/mach-mxs/mach-mx23evk.c
++++ /dev/null
+@@ -1,190 +0,0 @@
+-/*
+- * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#include <linux/delay.h>
+-#include <linux/platform_device.h>
+-#include <linux/gpio.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-
+-#include <mach/common.h>
+-#include <mach/iomux-mx23.h>
+-
+-#include "devices-mx23.h"
+-
+-#define MX23EVK_LCD_ENABLE	MXS_GPIO_NR(1, 18)
+-#define MX23EVK_BL_ENABLE	MXS_GPIO_NR(1, 28)
+-#define MX23EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(1, 30)
+-#define MX23EVK_MMC0_SLOT_POWER		MXS_GPIO_NR(1, 29)
+-
+-static const iomux_cfg_t mx23evk_pads[] __initconst = {
+-	/* duart */
+-	MX23_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
+-	MX23_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
+-
+-	/* auart */
+-	MX23_PAD_AUART1_RX__AUART1_RX | MXS_PAD_CTRL,
+-	MX23_PAD_AUART1_TX__AUART1_TX | MXS_PAD_CTRL,
+-	MX23_PAD_AUART1_CTS__AUART1_CTS | MXS_PAD_CTRL,
+-	MX23_PAD_AUART1_RTS__AUART1_RTS | MXS_PAD_CTRL,
+-
+-	/* mxsfb (lcdif) */
+-	MX23_PAD_LCD_D00__LCD_D00 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_D01__LCD_D01 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_D02__LCD_D02 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_D03__LCD_D03 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_D04__LCD_D04 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_D05__LCD_D05 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_D06__LCD_D06 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_D07__LCD_D07 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_D08__LCD_D08 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_D09__LCD_D09 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_D10__LCD_D10 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_D11__LCD_D11 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_D12__LCD_D12 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_D13__LCD_D13 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_D14__LCD_D14 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_D15__LCD_D15 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_D16__LCD_D16 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_D17__LCD_D17 | MXS_PAD_CTRL,
+-	MX23_PAD_GPMI_D08__LCD_D18 | MXS_PAD_CTRL,
+-	MX23_PAD_GPMI_D09__LCD_D19 | MXS_PAD_CTRL,
+-	MX23_PAD_GPMI_D10__LCD_D20 | MXS_PAD_CTRL,
+-	MX23_PAD_GPMI_D11__LCD_D21 | MXS_PAD_CTRL,
+-	MX23_PAD_GPMI_D12__LCD_D22 | MXS_PAD_CTRL,
+-	MX23_PAD_GPMI_D13__LCD_D23 | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_VSYNC__LCD_VSYNC | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_HSYNC__LCD_HSYNC | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_DOTCK__LCD_DOTCK | MXS_PAD_CTRL,
+-	MX23_PAD_LCD_ENABLE__LCD_ENABLE | MXS_PAD_CTRL,
+-	/* LCD panel enable */
+-	MX23_PAD_LCD_RESET__GPIO_1_18 | MXS_PAD_CTRL,
+-	/* backlight control */
+-	MX23_PAD_PWM2__GPIO_1_28 | MXS_PAD_CTRL,
+-
+-	/* mmc */
+-	MX23_PAD_SSP1_DATA0__SSP1_DATA0 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX23_PAD_SSP1_DATA1__SSP1_DATA1 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX23_PAD_SSP1_DATA2__SSP1_DATA2 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX23_PAD_SSP1_DATA3__SSP1_DATA3 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX23_PAD_GPMI_D08__SSP1_DATA4 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX23_PAD_GPMI_D09__SSP1_DATA5 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX23_PAD_GPMI_D10__SSP1_DATA6 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX23_PAD_GPMI_D11__SSP1_DATA7 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX23_PAD_SSP1_CMD__SSP1_CMD |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX23_PAD_SSP1_DETECT__SSP1_DETECT |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX23_PAD_SSP1_SCK__SSP1_SCK |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	/* write protect */
+-	MX23_PAD_PWM4__GPIO_1_30 |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	/* slot power enable */
+-	MX23_PAD_PWM3__GPIO_1_29 |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-};
+-
+-/* mxsfb (lcdif) */
+-static struct fb_videomode mx23evk_video_modes[] = {
+-	{
+-		.name		= "Samsung-LMS430HF02",
+-		.refresh	= 60,
+-		.xres		= 480,
+-		.yres		= 272,
+-		.pixclock	= 108096, /* picosecond (9.2 MHz) */
+-		.left_margin	= 15,
+-		.right_margin	= 8,
+-		.upper_margin	= 12,
+-		.lower_margin	= 4,
+-		.hsync_len	= 1,
+-		.vsync_len	= 1,
+-		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT |
+-				  FB_SYNC_DOTCLK_FAILING_ACT,
+-	},
+-};
+-
+-static const struct mxsfb_platform_data mx23evk_mxsfb_pdata __initconst = {
+-	.mode_list	= mx23evk_video_modes,
+-	.mode_count	= ARRAY_SIZE(mx23evk_video_modes),
+-	.default_bpp	= 32,
+-	.ld_intf_width	= STMLCDIF_24BIT,
+-};
+-
+-static struct mxs_mmc_platform_data mx23evk_mmc_pdata __initdata = {
+-	.wp_gpio = MX23EVK_MMC0_WRITE_PROTECT,
+-	.flags = SLOTF_8_BIT_CAPABLE,
+-};
+-
+-static void __init mx23evk_init(void)
+-{
+-	int ret;
+-
+-	mx23_soc_init();
+-
+-	mxs_iomux_setup_multiple_pads(mx23evk_pads, ARRAY_SIZE(mx23evk_pads));
+-
+-	mx23_add_duart();
+-	mx23_add_auart0();
+-
+-	/* power on mmc slot by writing 0 to the gpio */
+-	ret = gpio_request_one(MX23EVK_MMC0_SLOT_POWER, GPIOF_OUT_INIT_LOW,
+-			       "mmc0-slot-power");
+-	if (ret)
+-		pr_warn("failed to request gpio mmc0-slot-power: %d\n", ret);
+-	mx23_add_mxs_mmc(0, &mx23evk_mmc_pdata);
+-
+-	ret = gpio_request_one(MX23EVK_LCD_ENABLE, GPIOF_DIR_OUT, "lcd-enable");
+-	if (ret)
+-		pr_warn("failed to request gpio lcd-enable: %d\n", ret);
+-	else
+-		gpio_set_value(MX23EVK_LCD_ENABLE, 1);
+-
+-	ret = gpio_request_one(MX23EVK_BL_ENABLE, GPIOF_DIR_OUT, "bl-enable");
+-	if (ret)
+-		pr_warn("failed to request gpio bl-enable: %d\n", ret);
+-	else
+-		gpio_set_value(MX23EVK_BL_ENABLE, 1);
+-
+-	mx23_add_mxsfb(&mx23evk_mxsfb_pdata);
+-	mx23_add_rtc_stmp3xxx();
+-}
+-
+-static void __init mx23evk_timer_init(void)
+-{
+-	mx23_clocks_init();
+-}
+-
+-static struct sys_timer mx23evk_timer = {
+-	.init	= mx23evk_timer_init,
+-};
+-
+-MACHINE_START(MX23EVK, "Freescale MX23 EVK")
+-	/* Maintainer: Freescale Semiconductor, Inc. */
+-	.map_io		= mx23_map_io,
+-	.init_irq	= mx23_init_irq,
+-	.timer		= &mx23evk_timer,
+-	.init_machine	= mx23evk_init,
+-	.restart	= mxs_restart,
+-MACHINE_END
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+deleted file mode 100644
+index dafd48e..0000000
+--- a/arch/arm/mach-mxs/mach-mx28evk.c
++++ /dev/null
+@@ -1,477 +0,0 @@
+-/*
+- * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#include <linux/delay.h>
+-#include <linux/platform_device.h>
+-#include <linux/gpio.h>
+-#include <linux/leds.h>
+-#include <linux/clk.h>
+-#include <linux/i2c.h>
+-#include <linux/regulator/machine.h>
+-#include <linux/regulator/fixed.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-
+-#include <mach/common.h>
+-#include <mach/iomux-mx28.h>
+-#include <mach/digctl.h>
+-
+-#include "devices-mx28.h"
+-
+-#define MX28EVK_FLEXCAN_SWITCH	MXS_GPIO_NR(2, 13)
+-#define MX28EVK_FEC_PHY_POWER	MXS_GPIO_NR(2, 15)
+-#define MX28EVK_GPIO_LED	MXS_GPIO_NR(3, 5)
+-#define MX28EVK_BL_ENABLE	MXS_GPIO_NR(3, 18)
+-#define MX28EVK_LCD_ENABLE	MXS_GPIO_NR(3, 30)
+-#define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
+-
+-#define MX28EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(2, 12)
+-#define MX28EVK_MMC1_WRITE_PROTECT	MXS_GPIO_NR(0, 28)
+-#define MX28EVK_MMC0_SLOT_POWER		MXS_GPIO_NR(3, 28)
+-#define MX28EVK_MMC1_SLOT_POWER		MXS_GPIO_NR(3, 29)
+-
+-static const iomux_cfg_t mx28evk_pads[] __initconst = {
+-	/* duart */
+-	MX28_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
+-	MX28_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
+-
+-	/* auart0 */
+-	MX28_PAD_AUART0_RX__AUART0_RX | MXS_PAD_CTRL,
+-	MX28_PAD_AUART0_TX__AUART0_TX | MXS_PAD_CTRL,
+-	MX28_PAD_AUART0_CTS__AUART0_CTS | MXS_PAD_CTRL,
+-	MX28_PAD_AUART0_RTS__AUART0_RTS | MXS_PAD_CTRL,
+-	/* auart3 */
+-	MX28_PAD_AUART3_RX__AUART3_RX | MXS_PAD_CTRL,
+-	MX28_PAD_AUART3_TX__AUART3_TX | MXS_PAD_CTRL,
+-	MX28_PAD_AUART3_CTS__AUART3_CTS | MXS_PAD_CTRL,
+-	MX28_PAD_AUART3_RTS__AUART3_RTS | MXS_PAD_CTRL,
+-
+-#define MXS_PAD_FEC	(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP)
+-	/* fec0 */
+-	MX28_PAD_ENET0_MDC__ENET0_MDC | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_MDIO__ENET0_MDIO | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_RXD0__ENET0_RXD0 | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_RXD1__ENET0_RXD1 | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_TXD0__ENET0_TXD0 | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_TXD1__ENET0_TXD1 | MXS_PAD_FEC,
+-	MX28_PAD_ENET_CLK__CLKCTRL_ENET | MXS_PAD_FEC,
+-	/* fec1 */
+-	MX28_PAD_ENET0_CRS__ENET1_RX_EN | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_RXD2__ENET1_RXD0 | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_RXD3__ENET1_RXD1 | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_COL__ENET1_TX_EN | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_TXD2__ENET1_TXD0 | MXS_PAD_FEC,
+-	MX28_PAD_ENET0_TXD3__ENET1_TXD1 | MXS_PAD_FEC,
+-	/* phy power line */
+-	MX28_PAD_SSP1_DATA3__GPIO_2_15 | MXS_PAD_CTRL,
+-	/* phy reset line */
+-	MX28_PAD_ENET0_RX_CLK__GPIO_4_13 | MXS_PAD_CTRL,
+-
+-	/* flexcan0 */
+-	MX28_PAD_GPMI_RDY2__CAN0_TX,
+-	MX28_PAD_GPMI_RDY3__CAN0_RX,
+-	/* flexcan1 */
+-	MX28_PAD_GPMI_CE2N__CAN1_TX,
+-	MX28_PAD_GPMI_CE3N__CAN1_RX,
+-	/* transceiver power control */
+-	MX28_PAD_SSP1_CMD__GPIO_2_13,
+-
+-	/* mxsfb (lcdif) */
+-	MX28_PAD_LCD_D00__LCD_D0 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D01__LCD_D1 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D02__LCD_D2 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D03__LCD_D3 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D04__LCD_D4 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D05__LCD_D5 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D06__LCD_D6 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D07__LCD_D7 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D08__LCD_D8 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D09__LCD_D9 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D10__LCD_D10 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D11__LCD_D11 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D12__LCD_D12 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D13__LCD_D13 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D14__LCD_D14 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D15__LCD_D15 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D16__LCD_D16 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D17__LCD_D17 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D18__LCD_D18 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D19__LCD_D19 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D20__LCD_D20 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D21__LCD_D21 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D22__LCD_D22 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_D23__LCD_D23 | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_RD_E__LCD_VSYNC | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_WR_RWN__LCD_HSYNC | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_RS__LCD_DOTCLK | MXS_PAD_CTRL,
+-	MX28_PAD_LCD_CS__LCD_ENABLE | MXS_PAD_CTRL,
+-	/* LCD panel enable */
+-	MX28_PAD_LCD_RESET__GPIO_3_30 | MXS_PAD_CTRL,
+-	/* backlight control */
+-	MX28_PAD_PWM2__GPIO_3_18 | MXS_PAD_CTRL,
+-	/* mmc0 */
+-	MX28_PAD_SSP0_DATA0__SSP0_D0 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA1__SSP0_D1 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA2__SSP0_D2 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA3__SSP0_D3 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA4__SSP0_D4 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA5__SSP0_D5 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA6__SSP0_D6 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA7__SSP0_D7 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_CMD__SSP0_CMD |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX28_PAD_SSP0_SCK__SSP0_SCK |
+-		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	/* write protect */
+-	MX28_PAD_SSP1_SCK__GPIO_2_12 |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	/* slot power enable */
+-	MX28_PAD_PWM3__GPIO_3_28 |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-
+-	/* mmc1 */
+-	MX28_PAD_GPMI_D00__SSP1_D0 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_D01__SSP1_D1 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_D02__SSP1_D2 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_D03__SSP1_D3 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_D04__SSP1_D4 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_D05__SSP1_D5 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_D06__SSP1_D6 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_D07__SSP1_D7 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_RDY1__SSP1_CMD |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_GPMI_RDY0__SSP1_CARD_DETECT |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX28_PAD_GPMI_WRN__SSP1_SCK |
+-		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	/* write protect */
+-	MX28_PAD_GPMI_RESETN__GPIO_0_28 |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	/* slot power enable */
+-	MX28_PAD_PWM4__GPIO_3_29 |
+-		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-
+-	/* led */
+-	MX28_PAD_AUART1_TX__GPIO_3_5 | MXS_PAD_CTRL,
+-
+-	/* I2C */
+-	MX28_PAD_I2C0_SCL__I2C0_SCL |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_I2C0_SDA__I2C0_SDA |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-
+-	/* saif0 & saif1 */
+-	MX28_PAD_SAIF0_MCLK__SAIF0_MCLK |
+-		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SAIF0_LRCLK__SAIF0_LRCLK |
+-		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SAIF0_BITCLK__SAIF0_BITCLK |
+-		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SAIF0_SDATA0__SAIF0_SDATA0 |
+-		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SAIF1_SDATA0__SAIF1_SDATA0 |
+-		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-};
+-
+-/* led */
+-static const struct gpio_led mx28evk_leds[] __initconst = {
+-	{
+-		.name = "GPIO-LED",
+-		.default_trigger = "heartbeat",
+-		.gpio = MX28EVK_GPIO_LED,
+-	},
+-};
+-
+-static const struct gpio_led_platform_data mx28evk_led_data __initconst = {
+-	.leds = mx28evk_leds,
+-	.num_leds = ARRAY_SIZE(mx28evk_leds),
+-};
 -
 -/* fec */
+-static void __init mx28evk_fec_reset(void)
+-{
+-	struct clk *clk;
+-
+-	/* Enable fec phy clock */
+-	clk = clk_get_sys("enet_out", NULL);
+-	if (!IS_ERR(clk))
+-		clk_prepare_enable(clk);
+-
+-	gpio_set_value(MX28EVK_FEC_PHY_RESET, 0);
+-	mdelay(1);
+-	gpio_set_value(MX28EVK_FEC_PHY_RESET, 1);
+-}
+-
+-static struct fec_platform_data mx28_fec_pdata[] __initdata = {
+-	{
+-		/* fec0 */
+-		.phy = PHY_INTERFACE_MODE_RMII,
+-	}, {
+-		/* fec1 */
+-		.phy = PHY_INTERFACE_MODE_RMII,
+-	},
+-};
+-
+-static int __init mx28evk_fec_get_mac(void)
+-{
+-	int i;
+-	u32 val;
+-	const u32 *ocotp = mxs_get_ocotp();
+-
+-	if (!ocotp)
+-		return -ETIMEDOUT;
+-
+-	/*
+-	 * OCOTP only stores the last 4 octets for each mac address,
+-	 * so hard-code Freescale OUI (00:04:9f) here.
+-	 */
+-	for (i = 0; i < 2; i++) {
+-		val = ocotp[i];
+-		mx28_fec_pdata[i].mac[0] = 0x00;
+-		mx28_fec_pdata[i].mac[1] = 0x04;
+-		mx28_fec_pdata[i].mac[2] = 0x9f;
+-		mx28_fec_pdata[i].mac[3] = (val >> 16) & 0xff;
+-		mx28_fec_pdata[i].mac[4] = (val >> 8) & 0xff;
+-		mx28_fec_pdata[i].mac[5] = (val >> 0) & 0xff;
+-	}
+-
+-	return 0;
+-}
+-
+-/*
+- * MX28EVK_FLEXCAN_SWITCH is shared between both flexcan controllers
+- */
+-static int flexcan0_en, flexcan1_en;
+-
+-static void mx28evk_flexcan_switch(void)
+-{
+-	if (flexcan0_en || flexcan1_en)
+-		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
+-	else
+-		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
+-}
+-
+-static void mx28evk_flexcan0_switch(int enable)
+-{
+-	flexcan0_en = enable;
+-	mx28evk_flexcan_switch();
+-}
+-
+-static void mx28evk_flexcan1_switch(int enable)
+-{
+-	flexcan1_en = enable;
+-	mx28evk_flexcan_switch();
+-}
+-
+-static const struct flexcan_platform_data
+-		mx28evk_flexcan_pdata[] __initconst = {
+-	{
+-		.transceiver_switch = mx28evk_flexcan0_switch,
+-	}, {
+-		.transceiver_switch = mx28evk_flexcan1_switch,
+-	}
+-};
+-
+-/* mxsfb (lcdif) */
+-static struct fb_videomode mx28evk_video_modes[] = {
+-	{
+-		.name		= "Seiko-43WVF1G",
+-		.refresh	= 60,
+-		.xres		= 800,
+-		.yres		= 480,
+-		.pixclock	= 29851, /* picosecond (33.5 MHz) */
+-		.left_margin	= 89,
+-		.right_margin	= 164,
+-		.upper_margin	= 23,
+-		.lower_margin	= 10,
+-		.hsync_len	= 10,
+-		.vsync_len	= 10,
+-		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT |
+-				  FB_SYNC_DOTCLK_FAILING_ACT,
+-	},
+-};
+-
+-static const struct mxsfb_platform_data mx28evk_mxsfb_pdata __initconst = {
+-	.mode_list	= mx28evk_video_modes,
+-	.mode_count	= ARRAY_SIZE(mx28evk_video_modes),
+-	.default_bpp	= 32,
+-	.ld_intf_width	= STMLCDIF_24BIT,
+-};
+-
+-static struct mxs_mmc_platform_data mx28evk_mmc_pdata[] __initdata = {
+-	{
+-		/* mmc0 */
+-		.wp_gpio = MX28EVK_MMC0_WRITE_PROTECT,
+-		.flags = SLOTF_8_BIT_CAPABLE,
+-	}, {
+-		/* mmc1 */
+-		.wp_gpio = MX28EVK_MMC1_WRITE_PROTECT,
+-		.flags = SLOTF_8_BIT_CAPABLE,
+-	},
+-};
+-
+-static struct i2c_board_info mxs_i2c0_board_info[] __initdata = {
+-	{
+-		I2C_BOARD_INFO("sgtl5000", 0x0a),
+-	},
+-};
+-
+-#if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
+-static struct regulator_consumer_supply mx28evk_audio_consumer_supplies[] = {
+-	REGULATOR_SUPPLY("VDDA", "0-000a"),
+-	REGULATOR_SUPPLY("VDDIO", "0-000a"),
+-};
+-
+-static struct regulator_init_data mx28evk_vdd_reg_init_data = {
+-	.constraints	= {
+-		.name	= "3V3",
+-		.always_on = 1,
+-	},
+-	.consumer_supplies = mx28evk_audio_consumer_supplies,
+-	.num_consumer_supplies = ARRAY_SIZE(mx28evk_audio_consumer_supplies),
+-};
+-
+-static struct fixed_voltage_config mx28evk_vdd_pdata = {
+-	.supply_name	= "board-3V3",
+-	.microvolts	= 3300000,
+-	.gpio		= -EINVAL,
+-	.enabled_at_boot = 1,
+-	.init_data	= &mx28evk_vdd_reg_init_data,
+-};
+-static struct platform_device mx28evk_voltage_regulator = {
+-	.name		= "reg-fixed-voltage",
+-	.id		= -1,
+-	.num_resources	= 0,
+-	.dev		= {
+-		.platform_data	= &mx28evk_vdd_pdata,
+-	},
+-};
+-static void __init mx28evk_add_regulators(void)
+-{
+-	platform_device_register(&mx28evk_voltage_regulator);
+-}
+-#else
+-static void __init mx28evk_add_regulators(void) {}
+-#endif
+-
+-static const struct gpio mx28evk_gpios[] __initconst = {
+-	{ MX28EVK_LCD_ENABLE, GPIOF_OUT_INIT_HIGH, "lcd-enable" },
+-	{ MX28EVK_BL_ENABLE, GPIOF_OUT_INIT_HIGH, "bl-enable" },
+-	{ MX28EVK_FLEXCAN_SWITCH, GPIOF_DIR_OUT, "flexcan-switch" },
+-	{ MX28EVK_MMC0_SLOT_POWER, GPIOF_OUT_INIT_LOW, "mmc0-slot-power" },
+-	{ MX28EVK_MMC1_SLOT_POWER, GPIOF_OUT_INIT_LOW, "mmc1-slot-power" },
+-	{ MX28EVK_FEC_PHY_POWER, GPIOF_OUT_INIT_LOW, "fec-phy-power" },
+-	{ MX28EVK_FEC_PHY_RESET, GPIOF_DIR_OUT, "fec-phy-reset" },
+-};
+-
+-static const struct mxs_saif_platform_data
+-			mx28evk_mxs_saif_pdata[] __initconst = {
+-	/* working on EXTMSTR0 mode (saif0 master, saif1 slave) */
+-	{
+-		.master_mode = 1,
+-		.master_id = 0,
+-	}, {
+-		.master_mode = 0,
+-		.master_id = 0,
+-	},
+-};
+-
+-static void __init mx28evk_init(void)
+-{
+-	int ret;
+-
+-	mx28_soc_init();
+-
+-	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
+-
+-	mx28_add_duart();
+-	mx28_add_auart0();
+-	mx28_add_auart3();
+-
+-	if (mx28evk_fec_get_mac())
+-		pr_warn("%s: failed on fec mac setup\n", __func__);
+-
+-	ret = gpio_request_array(mx28evk_gpios, ARRAY_SIZE(mx28evk_gpios));
+-	if (ret)
+-		pr_err("One or more GPIOs failed to be requested: %d\n", ret);
+-
+-	mx28evk_fec_reset();
+-	mx28_add_fec(0, &mx28_fec_pdata[0]);
+-	mx28_add_fec(1, &mx28_fec_pdata[1]);
+-
+-	mx28_add_flexcan(0, &mx28evk_flexcan_pdata[0]);
+-	mx28_add_flexcan(1, &mx28evk_flexcan_pdata[1]);
+-
+-	mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
+-
+-	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
+-	mx28_add_saif(0, &mx28evk_mxs_saif_pdata[0]);
+-	mx28_add_saif(1, &mx28evk_mxs_saif_pdata[1]);
+-
+-	mx28_add_mxs_i2c(0);
+-	i2c_register_board_info(0, mxs_i2c0_board_info,
+-				ARRAY_SIZE(mxs_i2c0_board_info));
+-
+-	mx28evk_add_regulators();
+-
+-	mxs_add_platform_device("mxs-sgtl5000", 0, NULL, 0,
+-			NULL, 0);
+-
+-	mx28_add_mxs_mmc(0, &mx28evk_mmc_pdata[0]);
+-	mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
+-
+-	mx28_add_rtc_stmp3xxx();
+-
+-	gpio_led_register_device(0, &mx28evk_led_data);
+-}
+-
+-static void __init mx28evk_timer_init(void)
+-{
+-	mx28_clocks_init();
+-}
+-
+-static struct sys_timer mx28evk_timer = {
+-	.init	= mx28evk_timer_init,
+-};
+-
+-MACHINE_START(MX28EVK, "Freescale MX28 EVK")
+-	/* Maintainer: Freescale Semiconductor, Inc. */
+-	.map_io		= mx28_map_io,
+-	.init_irq	= mx28_init_irq,
+-	.timer		= &mx28evk_timer,
+-	.init_machine	= mx28evk_init,
+-	.restart	= mxs_restart,
+-MACHINE_END
+diff --git a/arch/arm/mach-mxs/mach-stmp378x_devb.c b/arch/arm/mach-mxs/mach-stmp378x_devb.c
+deleted file mode 100644
+index 6548965..0000000
+--- a/arch/arm/mach-mxs/mach-stmp378x_devb.c
++++ /dev/null
+@@ -1,123 +0,0 @@
+-/*
+- * board setup for STMP378x-Development-Board
+- *
+- * based on mx23evk board setup and information gained form the original
+- * plat-stmp based board setup, now converted to mach-mxs.
+- *
+- * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright (C) 2011 Wolfram Sang, Pengutronix e.K.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; version 2 of the License.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#include <linux/platform_device.h>
+-#include <linux/gpio.h>
+-#include <linux/spi/spi.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-
+-#include <mach/common.h>
+-#include <mach/iomux-mx23.h>
+-
+-#include "devices-mx23.h"
+-
+-#define STMP378X_DEVB_MMC0_WRITE_PROTECT	MXS_GPIO_NR(1, 30)
+-#define STMP378X_DEVB_MMC0_SLOT_POWER		MXS_GPIO_NR(1, 29)
+-
+-#define STMP378X_DEVB_PAD_AUART (MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL)
+-
+-static const iomux_cfg_t stmp378x_dvb_pads[] __initconst = {
+-	/* duart (extended setup missing in old boardcode, too */
+-	MX23_PAD_PWM0__DUART_RX,
+-	MX23_PAD_PWM1__DUART_TX,
+-
+-	/* auart */
+-	MX23_PAD_AUART1_RX__AUART1_RX | STMP378X_DEVB_PAD_AUART,
+-	MX23_PAD_AUART1_TX__AUART1_TX | STMP378X_DEVB_PAD_AUART,
+-	MX23_PAD_AUART1_CTS__AUART1_CTS | STMP378X_DEVB_PAD_AUART,
+-	MX23_PAD_AUART1_RTS__AUART1_RTS | STMP378X_DEVB_PAD_AUART,
+-
+-	/* mmc */
+-	MX23_PAD_SSP1_DATA0__SSP1_DATA0 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX23_PAD_SSP1_DATA1__SSP1_DATA1 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX23_PAD_SSP1_DATA2__SSP1_DATA2 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX23_PAD_SSP1_DATA3__SSP1_DATA3 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX23_PAD_SSP1_CMD__SSP1_CMD |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX23_PAD_SSP1_DETECT__SSP1_DETECT |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX23_PAD_SSP1_SCK__SSP1_SCK |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX23_PAD_PWM4__GPIO_1_30 | MXS_PAD_CTRL, /* write protect */
+-	MX23_PAD_PWM3__GPIO_1_29 | MXS_PAD_CTRL, /* power enable */
+-};
+-
+-static struct mxs_mmc_platform_data stmp378x_dvb_mmc_pdata __initdata = {
+-	.wp_gpio = STMP378X_DEVB_MMC0_WRITE_PROTECT,
+-};
+-
+-static struct spi_board_info spi_board_info[] __initdata = {
+-#if defined(CONFIG_ENC28J60) || defined(CONFIG_ENC28J60_MODULE)
+-	{
+-		.modalias       = "enc28j60",
+-		.max_speed_hz   = 6 * 1000 * 1000,
+-		.bus_num	= 1,
+-		.chip_select    = 0,
+-		.platform_data  = NULL,
+-	},
+-#endif
+-};
+-
+-static void __init stmp378x_dvb_init(void)
+-{
+-	int ret;
+-
+-	mx23_soc_init();
+-
+-	mxs_iomux_setup_multiple_pads(stmp378x_dvb_pads,
+-			ARRAY_SIZE(stmp378x_dvb_pads));
+-
+-	mx23_add_duart();
+-	mx23_add_auart0();
+-	mx23_add_rtc_stmp3xxx();
+-
+-	/* power on mmc slot */
+-	ret = gpio_request_one(STMP378X_DEVB_MMC0_SLOT_POWER,
+-		GPIOF_OUT_INIT_LOW, "mmc0-slot-power");
+-	if (ret)
+-		pr_warn("could not power mmc (%d)\n", ret);
+-
+-	mx23_add_mxs_mmc(0, &stmp378x_dvb_mmc_pdata);
+-
+-	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
+-}
+-
+-static void __init stmp378x_dvb_timer_init(void)
+-{
+-	mx23_clocks_init();
+-}
+-
+-static struct sys_timer stmp378x_dvb_timer = {
+-	.init	= stmp378x_dvb_timer_init,
+-};
+-
+-MACHINE_START(STMP378X, "STMP378X")
+-	.map_io		= mx23_map_io,
+-	.init_irq	= mx23_init_irq,
+-	.timer		= &stmp378x_dvb_timer,
+-	.init_machine	= stmp378x_dvb_init,
+-	.restart	= mxs_restart,
+-MACHINE_END
+diff --git a/arch/arm/mach-mxs/mach-tx28.c b/arch/arm/mach-mxs/mach-tx28.c
+deleted file mode 100644
+index 8837029..0000000
+--- a/arch/arm/mach-mxs/mach-tx28.c
++++ /dev/null
+@@ -1,184 +0,0 @@
+-/*
+- * Copyright (C) 2010 <LW@KARO-electronics.de>
+- *
+- * based on: mach-mx28_evk.c
+- * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * version 2 as published by the Free Software Foundation
+- */
+-#include <linux/kernel.h>
+-#include <linux/gpio.h>
+-#include <linux/leds.h>
+-#include <linux/platform_device.h>
+-#include <linux/spi/spi.h>
+-#include <linux/spi/spi_gpio.h>
+-#include <linux/i2c.h>
+-
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-
+-#include <mach/common.h>
+-#include <mach/iomux-mx28.h>
+-
+-#include "devices-mx28.h"
+-#include "module-tx28.h"
+-
+-#define TX28_STK5_GPIO_LED		MXS_GPIO_NR(4, 10)
+-
+-static const iomux_cfg_t tx28_stk5v3_pads[] __initconst = {
+-	/* LED */
+-	MX28_PAD_ENET0_RXD3__GPIO_4_10 |
+-		MXS_PAD_3V3 | MXS_PAD_4MA | MXS_PAD_NOPULL,
+-
+-	/* framebuffer */
+-#define LCD_MODE (MXS_PAD_3V3 | MXS_PAD_4MA)
+-	MX28_PAD_LCD_D00__LCD_D0 | LCD_MODE,
+-	MX28_PAD_LCD_D01__LCD_D1 | LCD_MODE,
+-	MX28_PAD_LCD_D02__LCD_D2 | LCD_MODE,
+-	MX28_PAD_LCD_D03__LCD_D3 | LCD_MODE,
+-	MX28_PAD_LCD_D04__LCD_D4 | LCD_MODE,
+-	MX28_PAD_LCD_D05__LCD_D5 | LCD_MODE,
+-	MX28_PAD_LCD_D06__LCD_D6 | LCD_MODE,
+-	MX28_PAD_LCD_D07__LCD_D7 | LCD_MODE,
+-	MX28_PAD_LCD_D08__LCD_D8 | LCD_MODE,
+-	MX28_PAD_LCD_D09__LCD_D9 | LCD_MODE,
+-	MX28_PAD_LCD_D10__LCD_D10 | LCD_MODE,
+-	MX28_PAD_LCD_D11__LCD_D11 | LCD_MODE,
+-	MX28_PAD_LCD_D12__LCD_D12 | LCD_MODE,
+-	MX28_PAD_LCD_D13__LCD_D13 | LCD_MODE,
+-	MX28_PAD_LCD_D14__LCD_D14 | LCD_MODE,
+-	MX28_PAD_LCD_D15__LCD_D15 | LCD_MODE,
+-	MX28_PAD_LCD_D16__LCD_D16 | LCD_MODE,
+-	MX28_PAD_LCD_D17__LCD_D17 | LCD_MODE,
+-	MX28_PAD_LCD_D18__LCD_D18 | LCD_MODE,
+-	MX28_PAD_LCD_D19__LCD_D19 | LCD_MODE,
+-	MX28_PAD_LCD_D20__LCD_D20 | LCD_MODE,
+-	MX28_PAD_LCD_D21__LCD_D21 | LCD_MODE,
+-	MX28_PAD_LCD_D22__LCD_D22 | LCD_MODE,
+-	MX28_PAD_LCD_D23__LCD_D23 | LCD_MODE,
+-	MX28_PAD_LCD_RD_E__LCD_VSYNC | LCD_MODE,
+-	MX28_PAD_LCD_WR_RWN__LCD_HSYNC | LCD_MODE,
+-	MX28_PAD_LCD_RS__LCD_DOTCLK | LCD_MODE,
+-	MX28_PAD_LCD_CS__LCD_CS | LCD_MODE,
+-	MX28_PAD_LCD_VSYNC__LCD_VSYNC | LCD_MODE,
+-	MX28_PAD_LCD_HSYNC__LCD_HSYNC | LCD_MODE,
+-	MX28_PAD_LCD_DOTCLK__LCD_DOTCLK | LCD_MODE,
+-	MX28_PAD_LCD_ENABLE__GPIO_1_31 | LCD_MODE,
+-	MX28_PAD_LCD_RESET__GPIO_3_30 | LCD_MODE,
+-	MX28_PAD_PWM0__PWM_0 | LCD_MODE,
+-
+-	/* UART1 */
+-	MX28_PAD_AUART0_CTS__DUART_RX,
+-	MX28_PAD_AUART0_RTS__DUART_TX,
+-	MX28_PAD_AUART0_TX__DUART_RTS,
+-	MX28_PAD_AUART0_RX__DUART_CTS,
+-
+-	/* UART2 */
+-	MX28_PAD_AUART1_RX__AUART1_RX,
+-	MX28_PAD_AUART1_TX__AUART1_TX,
+-	MX28_PAD_AUART1_RTS__AUART1_RTS,
+-	MX28_PAD_AUART1_CTS__AUART1_CTS,
+-
+-	/* CAN */
+-	MX28_PAD_GPMI_RDY2__CAN0_TX,
+-	MX28_PAD_GPMI_RDY3__CAN0_RX,
+-
+-	/* I2C */
+-	MX28_PAD_I2C0_SCL__I2C0_SCL,
+-	MX28_PAD_I2C0_SDA__I2C0_SDA,
+-
+-	/* TSC2007 */
+-	MX28_PAD_SAIF0_MCLK__GPIO_3_20 | MXS_PAD_3V3 | MXS_PAD_4MA | MXS_PAD_PULLUP,
+-
+-	/* MMC0 */
+-	MX28_PAD_SSP0_DATA0__SSP0_D0 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA1__SSP0_D1 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA2__SSP0_D2 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DATA3__SSP0_D3 |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_CMD__SSP0_CMD |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+-	MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT |
+-		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-	MX28_PAD_SSP0_SCK__SSP0_SCK |
+-		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+-};
+-
+-static const struct gpio_led tx28_stk5v3_leds[] __initconst = {
+-	{
+-		.name = "GPIO-LED",
+-		.default_trigger = "heartbeat",
+-		.gpio = TX28_STK5_GPIO_LED,
+-	},
+-};
+-
+-static const struct gpio_led_platform_data tx28_stk5v3_led_data __initconst = {
+-	.leds = tx28_stk5v3_leds,
+-	.num_leds = ARRAY_SIZE(tx28_stk5v3_leds),
+-};
+-
+-static struct spi_board_info tx28_spi_board_info[] = {
+-	{
+-		.modalias = "spidev",
+-		.max_speed_hz = 20000000,
+-		.bus_num = 0,
+-		.chip_select = 1,
+-		.controller_data = (void *)SPI_GPIO_NO_CHIPSELECT,
+-		.mode = SPI_MODE_0,
+-	},
+-};
+-
+-static struct i2c_board_info tx28_stk5v3_i2c_boardinfo[] __initdata = {
+-	{
+-		I2C_BOARD_INFO("ds1339", 0x68),
+-	},
+-};
+-
+-static struct mxs_mmc_platform_data tx28_mmc0_pdata __initdata = {
+-       .wp_gpio = -EINVAL,
+-       .flags = SLOTF_4_BIT_CAPABLE,
+-};
+-
+-static void __init tx28_stk5v3_init(void)
+-{
+-	mx28_soc_init();
+-
+-	mxs_iomux_setup_multiple_pads(tx28_stk5v3_pads,
+-			ARRAY_SIZE(tx28_stk5v3_pads));
+-
+-	mx28_add_duart(); /* UART1 */
+-	mx28_add_auart(1); /* UART2 */
+-
+-	tx28_add_fec0();
+-	/* spi via ssp will be added when available */
+-	spi_register_board_info(tx28_spi_board_info,
+-			ARRAY_SIZE(tx28_spi_board_info));
+-	gpio_led_register_device(0, &tx28_stk5v3_led_data);
+-	mx28_add_mxs_i2c(0);
+-	i2c_register_board_info(0, tx28_stk5v3_i2c_boardinfo,
+-			ARRAY_SIZE(tx28_stk5v3_i2c_boardinfo));
+-	mx28_add_mxs_mmc(0, &tx28_mmc0_pdata);
+-	mx28_add_rtc_stmp3xxx();
+-}
+-
+-static void __init tx28_timer_init(void)
+-{
+-	mx28_clocks_init();
+-}
+-
+-static struct sys_timer tx28_timer = {
+-	.init = tx28_timer_init,
+-};
+-
+-MACHINE_START(TX28, "Ka-Ro electronics TX28 module")
+-	.map_io = mx28_map_io,
+-	.init_irq = mx28_init_irq,
+-	.timer = &tx28_timer,
+-	.init_machine = tx28_stk5v3_init,
+-	.restart	= mxs_restart,
+-MACHINE_END
+diff --git a/arch/arm/mach-mxs/module-tx28.c b/arch/arm/mach-mxs/module-tx28.c
+deleted file mode 100644
+index 0f71f82..0000000
+--- a/arch/arm/mach-mxs/module-tx28.c
++++ /dev/null
+@@ -1,160 +0,0 @@
+-/*
+- * Copyright (C) 2010 <LW@KARO-electronics.de>
+- *
+- * This program is free software; you can redistribute it and/or modify it under
+- * the terms of the GNU General Public License version 2 as published by the
+- * Free Software Foundation.
+- */
+-
+-#include <linux/delay.h>
 -#include <linux/fec.h>
--struct mxs_fec_data {
--	int id;
--	resource_size_t iobase;
--	resource_size_t iosize;
--	resource_size_t irq;
--};
--struct platform_device *__init mxs_add_fec(
--		const struct mxs_fec_data *data,
--		const struct fec_platform_data *pdata);
+-#include <linux/gpio.h>
 -
--/* flexcan */
--#include <linux/can/platform/flexcan.h>
--struct mxs_flexcan_data {
--	int id;
--	resource_size_t iobase;
--	resource_size_t iosize;
--	resource_size_t irq;
--};
--struct platform_device *__init mxs_add_flexcan(
--		const struct mxs_flexcan_data *data,
--		const struct flexcan_platform_data *pdata);
+-#include <mach/iomux-mx28.h>
+-#include "devices-mx28.h"
 -
--/* gpmi-nand */
--#include <linux/mtd/gpmi-nand.h>
--struct mxs_gpmi_nand_data {
--	const char *devid;
--	const struct resource res[GPMI_NAND_RES_SIZE];
--};
--struct platform_device *__init
--mxs_add_gpmi_nand(const struct gpmi_nand_platform_data *pdata,
--		const struct mxs_gpmi_nand_data *data);
+-#include "module-tx28.h"
 -
--/* i2c */
--struct mxs_mxs_i2c_data {
--	int id;
--	resource_size_t iobase;
--	resource_size_t errirq;
--	resource_size_t dmairq;
--};
--struct platform_device * __init mxs_add_mxs_i2c(
--		const struct mxs_mxs_i2c_data *data);
+-#define TX28_FEC_PHY_POWER	MXS_GPIO_NR(3, 29)
+-#define TX28_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
 -
--/* mmc */
--#include <linux/mmc/mxs-mmc.h>
--struct mxs_mxs_mmc_data {
--	const char *devid;
--	int id;
--	resource_size_t iobase;
--	resource_size_t dma;
--	resource_size_t irq_err;
--	resource_size_t irq_dma;
--};
--struct platform_device *__init mxs_add_mxs_mmc(
--		const struct mxs_mxs_mmc_data *data,
--		const struct mxs_mmc_platform_data *pdata);
+-static const iomux_cfg_t tx28_fec_gpio_pads[] __initconst = {
+-	/* PHY POWER */
+-	MX28_PAD_PWM4__GPIO_3_29 |
+-		MXS_PAD_4MA | MXS_PAD_NOPULL | MXS_PAD_3V3,
+-	/* PHY RESET */
+-	MX28_PAD_ENET0_RX_CLK__GPIO_4_13 |
+-		MXS_PAD_4MA | MXS_PAD_NOPULL | MXS_PAD_3V3,
+-	/* Mode strap pins 0-2 */
+-	MX28_PAD_ENET0_RXD0__GPIO_4_3 |
+-		MXS_PAD_8MA | MXS_PAD_PULLUP | MXS_PAD_3V3,
+-	MX28_PAD_ENET0_RXD1__GPIO_4_4 |
+-		MXS_PAD_8MA | MXS_PAD_PULLUP | MXS_PAD_3V3,
+-	MX28_PAD_ENET0_RX_EN__GPIO_4_2 |
+-		MXS_PAD_8MA | MXS_PAD_PULLUP | MXS_PAD_3V3,
+-	/* nINT */
+-	MX28_PAD_ENET0_TX_CLK__GPIO_4_5 |
+-		MXS_PAD_4MA | MXS_PAD_NOPULL | MXS_PAD_3V3,
 -
--/* pwm */
--struct platform_device *__init mxs_add_mxs_pwm(
--		resource_size_t iobase, int id);
--
--/* saif */
--#include <sound/saif.h>
--struct mxs_saif_data {
--	int id;
--	resource_size_t iobase;
--	resource_size_t irq;
--	resource_size_t dma;
--	resource_size_t dmairq;
+-	MX28_PAD_ENET0_MDC__GPIO_4_0,
+-	MX28_PAD_ENET0_MDIO__GPIO_4_1,
+-	MX28_PAD_ENET0_TX_EN__GPIO_4_6,
+-	MX28_PAD_ENET0_TXD0__GPIO_4_7,
+-	MX28_PAD_ENET0_TXD1__GPIO_4_8,
+-	MX28_PAD_ENET_CLK__GPIO_4_16,
 -};
 -
--struct platform_device *__init mxs_add_saif(
--		const struct mxs_saif_data *data,
--		const struct mxs_saif_platform_data *pdata);
+-#define FEC_MODE (MXS_PAD_8MA | MXS_PAD_PULLUP | MXS_PAD_3V3)
+-static const iomux_cfg_t tx28_fec0_pads[] __initconst = {
+-	MX28_PAD_ENET0_MDC__ENET0_MDC | FEC_MODE,
+-	MX28_PAD_ENET0_MDIO__ENET0_MDIO | FEC_MODE,
+-	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN | FEC_MODE,
+-	MX28_PAD_ENET0_RXD0__ENET0_RXD0 | FEC_MODE,
+-	MX28_PAD_ENET0_RXD1__ENET0_RXD1 | FEC_MODE,
+-	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN | FEC_MODE,
+-	MX28_PAD_ENET0_TXD0__ENET0_TXD0 | FEC_MODE,
+-	MX28_PAD_ENET0_TXD1__ENET0_TXD1 | FEC_MODE,
+-	MX28_PAD_ENET_CLK__CLKCTRL_ENET | FEC_MODE,
+-};
+-
+-static const iomux_cfg_t tx28_fec1_pads[] __initconst = {
+-	MX28_PAD_ENET0_RXD2__ENET1_RXD0,
+-	MX28_PAD_ENET0_RXD3__ENET1_RXD1,
+-	MX28_PAD_ENET0_TXD2__ENET1_TXD0,
+-	MX28_PAD_ENET0_TXD3__ENET1_TXD1,
+-	MX28_PAD_ENET0_COL__ENET1_TX_EN,
+-	MX28_PAD_ENET0_CRS__ENET1_RX_EN,
+-};
+-
+-static const struct fec_platform_data tx28_fec0_data __initconst = {
+-	.phy = PHY_INTERFACE_MODE_RMII,
+-};
+-
+-static const struct fec_platform_data tx28_fec1_data __initconst = {
+-	.phy = PHY_INTERFACE_MODE_RMII,
+-};
+-
+-int __init tx28_add_fec0(void)
+-{
+-	int i, ret;
+-
+-	pr_debug("%s: Switching FEC PHY power off\n", __func__);
+-	ret = mxs_iomux_setup_multiple_pads(tx28_fec_gpio_pads,
+-			ARRAY_SIZE(tx28_fec_gpio_pads));
+-	for (i = 0; i < ARRAY_SIZE(tx28_fec_gpio_pads); i++) {
+-		unsigned int gpio = MXS_GPIO_NR(PAD_BANK(tx28_fec_gpio_pads[i]),
+-			PAD_PIN(tx28_fec_gpio_pads[i]));
+-
+-		ret = gpio_request(gpio, "FEC");
+-		if (ret) {
+-			pr_err("Failed to request GPIO_%d_%d: %d\n",
+-				PAD_BANK(tx28_fec_gpio_pads[i]),
+-				PAD_PIN(tx28_fec_gpio_pads[i]), ret);
+-			goto free_gpios;
+-		}
+-		ret = gpio_direction_output(gpio, 0);
+-		if (ret) {
+-			pr_err("Failed to set direction of GPIO_%d_%d to output: %d\n",
+-					gpio / 32 + 1, gpio % 32, ret);
+-			goto free_gpios;
+-		}
+-	}
+-
+-	/* Power up fec phy */
+-	pr_debug("%s: Switching FEC PHY power on\n", __func__);
+-	ret = gpio_direction_output(TX28_FEC_PHY_POWER, 1);
+-	if (ret) {
+-		pr_err("Failed to power on PHY: %d\n", ret);
+-		goto free_gpios;
+-	}
+-	mdelay(26); /* 25ms according to data sheet */
+-
+-	/* nINT */
+-	gpio_direction_input(MXS_GPIO_NR(4, 5));
+-	/* Mode strap pins */
+-	gpio_direction_output(MXS_GPIO_NR(4, 2), 1);
+-	gpio_direction_output(MXS_GPIO_NR(4, 3), 1);
+-	gpio_direction_output(MXS_GPIO_NR(4, 4), 1);
+-
+-	udelay(100); /* minimum assertion time for nRST */
+-
+-	pr_debug("%s: Deasserting FEC PHY RESET\n", __func__);
+-	gpio_set_value(TX28_FEC_PHY_RESET, 1);
+-
+-	ret = mxs_iomux_setup_multiple_pads(tx28_fec0_pads,
+-			ARRAY_SIZE(tx28_fec0_pads));
+-	if (ret) {
+-		pr_debug("%s: mxs_iomux_setup_multiple_pads() failed with rc: %d\n",
+-				__func__, ret);
+-		goto free_gpios;
+-	}
+-	pr_debug("%s: Registering FEC0 device\n", __func__);
+-	mx28_add_fec(0, &tx28_fec0_data);
+-	return 0;
+-
+-free_gpios:
+-	while (--i >= 0) {
+-		unsigned int gpio = MXS_GPIO_NR(PAD_BANK(tx28_fec_gpio_pads[i]),
+-			PAD_PIN(tx28_fec_gpio_pads[i]));
+-
+-		gpio_free(gpio);
+-	}
+-
+-	return ret;
+-}
+-
+-int __init tx28_add_fec1(void)
+-{
+-	int ret;
+-
+-	ret = mxs_iomux_setup_multiple_pads(tx28_fec1_pads,
+-			ARRAY_SIZE(tx28_fec1_pads));
+-	if (ret) {
+-		pr_debug("%s: mxs_iomux_setup_multiple_pads() failed with rc: %d\n",
+-				__func__, ret);
+-		return ret;
+-	}
+-	pr_debug("%s: Registering FEC1 device\n", __func__);
+-	mx28_add_fec(1, &tx28_fec1_data);
+-	return 0;
+-}
+diff --git a/arch/arm/mach-mxs/module-tx28.h b/arch/arm/mach-mxs/module-tx28.h
+deleted file mode 100644
+index 8ed4254..0000000
+--- a/arch/arm/mach-mxs/module-tx28.h
++++ /dev/null
+@@ -1,10 +0,0 @@
+-/*
+- * Copyright (C) 2010 Pengutronix
+- *   Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
+- *
+- * This program is free software; you can redistribute it and/or modify it under
+- * the terms of the GNU General Public License version 2 as published by the
+- * Free Software Foundation.
+- */
+-int __init tx28_add_fec0(void);
+-int __init tx28_add_fec1(void);
 -- 
 1.7.5.4
