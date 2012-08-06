@@ -1,136 +1,46 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  6 Aug 2012 11:46:38 +0100
-Subject: [PATCH 2/6] mfd: Provide the PRCMU with its own IRQ domain
+Date: Mon,  6 Aug 2012 11:46:42 +0100
+Subject: [PATCH 6/6] Input: ab8500-ponkey: Make the distinction between DT and
+ non-DT boots
 In-Reply-To: <1344250002-6011-1-git-send-email-lee.jones@linaro.org>
 References: <1344250002-6011-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1344250002-6011-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1344250002-6011-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PRCMU has its own USB, Thermal, GPIO, Modem, HSI and RTC drivers,
-amongst other things. This patch allows those subordinate devices to
-use it as an interrupt controller as and when they are DT enabled.
+If we're booting with Device Tree enabled, we want the IRQ numbers to
+be taken and translated from the Device Tree binary. If not, they
+should be taken from the resource allocation defined in the AB8500 MFD
+core driver.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/db8500-prcmu.c       |   54 +++++++++++++++++++++++++++++---------
- include/linux/mfd/db8500-prcmu.h |    2 ++
- 2 files changed, 43 insertions(+), 13 deletions(-)
+ drivers/input/misc/ab8500-ponkey.c |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 7040a00..937ce3a 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -270,6 +270,8 @@ static struct {
- 	struct prcmu_fw_version version;
- } fw_info;
- 
-+struct irq_domain *db8500_irq_domain;
-+
- /*
-  * This vector maps irq numbers to the bits in the bit field used in
-  * communication with the PRCMU firmware.
-@@ -2583,7 +2585,7 @@ static void prcmu_irq_mask(struct irq_data *d)
- 
- 	spin_lock_irqsave(&mb0_transfer.dbb_irqs_lock, flags);
- 
--	mb0_transfer.req.dbb_irqs &= ~prcmu_irq_bit[d->irq - IRQ_PRCMU_BASE];
-+	mb0_transfer.req.dbb_irqs &= ~prcmu_irq_bit[d->hwirq];
- 
- 	spin_unlock_irqrestore(&mb0_transfer.dbb_irqs_lock, flags);
- 
-@@ -2597,7 +2599,7 @@ static void prcmu_irq_unmask(struct irq_data *d)
- 
- 	spin_lock_irqsave(&mb0_transfer.dbb_irqs_lock, flags);
- 
--	mb0_transfer.req.dbb_irqs |= prcmu_irq_bit[d->irq - IRQ_PRCMU_BASE];
-+	mb0_transfer.req.dbb_irqs |= prcmu_irq_bit[d->hwirq];
- 
- 	spin_unlock_irqrestore(&mb0_transfer.dbb_irqs_lock, flags);
- 
-@@ -2637,9 +2639,43 @@ static char *fw_project_name(u8 project)
- 	}
- }
- 
-+int db8500_irq_get_virq(int irq)
-+{
-+	return irq_create_mapping(db8500_irq_domain, irq);
-+}
-+EXPORT_SYMBOL_GPL(db8500_irq_get_virq);
-+
-+static int db8500_irq_map(struct irq_domain *d, unsigned int virq,
-+				irq_hw_number_t hwirq)
-+{
-+	irq_set_chip_and_handler(virq, &prcmu_irq_chip,
-+				handle_simple_irq);
-+	set_irq_flags(virq, IRQF_VALID);
-+
-+	return 0;
-+}
-+
-+static struct irq_domain_ops db8500_irq_ops = {
-+        .map    = db8500_irq_map,
-+        .xlate  = irq_domain_xlate_twocell,
-+};
-+
-+static int db8500_irq_init(struct device_node *np)
-+{
-+	db8500_irq_domain = irq_domain_add_legacy(
-+		np, NUM_PRCMU_WAKEUPS, IRQ_PRCMU_BASE,
-+		0, &db8500_irq_ops, NULL);
-+
-+	if (!db8500_irq_domain) {
-+		pr_err("Failed to create irqdomain\n");
-+		return -ENOSYS;
-+	}
-+
-+	return 0;
-+}
-+
- void __init db8500_prcmu_early_init(void)
+diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
+index 1a1d974..afcd87f 100644
+--- a/drivers/input/misc/ab8500-ponkey.c
++++ b/drivers/input/misc/ab8500-ponkey.c
+@@ -47,6 +47,7 @@ static irqreturn_t ab8500_ponkey_handler(int irq, void *data)
+ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
  {
--	unsigned int i;
- 	if (cpu_is_u8500v2()) {
- 		void *tcpm_base = ioremap_nocache(U8500_PRCMU_TCPM_BASE, SZ_4K);
+ 	struct ab8500 *ab8500 = dev_get_drvdata(pdev->dev.parent);
++	struct device_node *np = pdev->dev.of_node;
+ 	struct ab8500_ponkey *ponkey;
+ 	struct input_dev *input;
+ 	int irq_dbf, irq_dbr;
+@@ -73,8 +74,9 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
  
-@@ -2683,16 +2719,6 @@ void __init db8500_prcmu_early_init(void)
- 	init_completion(&mb5_transfer.work);
- 
- 	INIT_WORK(&mb0_transfer.mask_work, prcmu_mask_work);
--
--	/* Initalize irqs. */
--	for (i = 0; i < NUM_PRCMU_WAKEUPS; i++) {
--		unsigned int irq;
--
--		irq = IRQ_PRCMU_BASE + i;
--		irq_set_chip_and_handler(irq, &prcmu_irq_chip,
--					 handle_simple_irq);
--		set_irq_flags(irq, IRQF_VALID);
--	}
- }
- 
- static void __init init_prcm_registers(void)
-@@ -2999,6 +3025,8 @@ static int __devinit db8500_prcmu_probe(struct platform_device *pdev)
- 		goto no_irq_return;
- 	}
- 
-+	db8500_irq_init(np);
+ 	ponkey->idev = input;
+ 	ponkey->ab8500 = ab8500;
+-	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, irq_dbf);
+-	ponkey->irq_dbr = ab8500_irq_get_virq(ab8500, irq_dbr);
 +
- 	for (i = 0; i < ARRAY_SIZE(db8500_prcmu_devs); i++) {
- 		if (!strcmp(db8500_prcmu_devs[i].name, "ab8500-core")) {
- 			db8500_prcmu_devs[i].platform_data = ab8500_platdata;
-diff --git a/include/linux/mfd/db8500-prcmu.h b/include/linux/mfd/db8500-prcmu.h
-index b82f6ee..38494d9 100644
---- a/include/linux/mfd/db8500-prcmu.h
-+++ b/include/linux/mfd/db8500-prcmu.h
-@@ -571,6 +571,8 @@ u32 db8500_prcmu_read(unsigned int reg);
- void db8500_prcmu_write(unsigned int reg, u32 value);
- void db8500_prcmu_write_masked(unsigned int reg, u32 mask, u32 value);
++	ponkey->irq_dbf = (np) ? ab8500_irq_get_virq(ab8500, irq_dbf) : irq_dbf;
++	ponkey->irq_dbr = (np) ? ab8500_irq_get_virq(ab8500, irq_dbr) : irq_dbr;
  
-+int db8500_irq_get_virq(int irq);
-+
- #else /* !CONFIG_MFD_DB8500_PRCMU */
- 
- static inline void db8500_prcmu_early_init(void) {}
+ 	input->name = "AB8500 POn(PowerOn) Key";
+ 	input->dev.parent = &pdev->dev;
 -- 
 1.7.9.5
