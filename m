@@ -1,77 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 6 Aug 2012 11:21:52 +0100
-Subject: [PATCH 1/1] i2c: Add default configuration into the Nomadik I2C driver
-In-Reply-To: <1344243146-6598-1-git-send-email-linus.walleij@stericsson.com>
-References: <1344243146-6598-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20120806102151.GB16996@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 6 Aug 2012 08:44:28 +0000
+Subject: [PATCH 6/6] ARM: dts: add pinctrl in PXA DT files
+In-Reply-To: <1343458722-17127-7-git-send-email-haojian.zhuang@gmail.com>
+References: <1343458722-17127-1-git-send-email-haojian.zhuang@gmail.com>
+ <1343458722-17127-7-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <201208060844.29333.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lee Jones <lee.jones@linaro.org>
-Date: Mon, 6 Aug 2012 11:04:14 +0100
-Subject: [PATCH 1/1] i2c: Add default configuration into the Nomadik I2C
- driver.
+On Saturday 28 July 2012, Haojian Zhuang wrote:
+> +Required subnode-properties:
+> +- marvell,pins : An array of strings. Each string contains the name of a pin
+> +                 or group.
+> +- marvell,function     : A string containing the name of the function to mux to the
+> +                 pin or group.
+> +- marvell,drive-strength : An integer value that means the drive strength of a
+> +                        pin.
+> +- marvell,pull-up      : The property means a pin is pull up for input.
+> +- marvell,pull-down : The property means a pin is pull down for input.
+> +- marvell,lowpower-pull-up : The property means a pin is pull up for input in
+> +                         sleep state.
+> +- marvell,lowpower-pull-down : The property means a pin is pull down for input
+> +                           in sleep state.
+> +- marvell,lowpower-drive-high : The property means a pin is driving high for
+> +                            output in sleep state.
+> +- marvell,lowpower-drive-low : The property means a pin is driving low for
+> +                           output in sleep state.
+> +- marvell,lowpower-float : The property means a pin is float in sleep state.
+> +- marvell,lowpower-zero : The property means a pin is not configured in sleep
+> +                       state.
 
-At this moment in time there is only one known configuration for the
-Nomadik I2C driver. By not holding that configuration in the driver
-adds some unnecessary overhead in platform code. The configuration
-as already been removed from platform code, this patch checks for any
-over-riding configurations. If there aren't any, the default is used.
+These (or most of them) look like they are not very Marvell specific. Should
+we try to standardize the way they are set across different bindings?
 
-Cc: linux-i2c at vger.kernel.org
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/i2c/busses/i2c-nomadik.c |   24 ++++++++++++++++++------
- 1 file changed, 18 insertions(+), 6 deletions(-)
+On a side-node, you probably don't want to make all of the above properties
+"required" because some of them are mutually exclusive.
 
-diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index a92440d..86aa73d 100644
---- a/drivers/i2c/busses/i2c-nomadik.c
-+++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -333,10 +333,6 @@ static void setup_i2c_controller(struct nmk_i2c_dev *dev)
- 
- 	i2c_clk = clk_get_rate(dev->clk);
- 
--	/* fallback to std. mode if machine has not provided it */
--	if (dev->cfg.clk_freq == 0)
--		dev->cfg.clk_freq = 100000;
--
- 	/*
- 	 * The spec says, in case of std. mode the divider is
- 	 * 2 whereas it is 3 for fast and fastplus mode of
-@@ -899,15 +895,31 @@ static const struct i2c_algorithm nmk_i2c_algo = {
- 	.functionality	= nmk_i2c_functionality
- };
- 
-+static struct nmk_i2c_controller u8500_i2c = {
-+	/*
-+	 * Slave data setup time; 250ns, 100ns, and 10ns, which
-+	 * is 14, 6 and 2 respectively for a 48Mhz i2c clock.
-+	 */
-+	.slsu           = 0xe,
-+	.tft            = 1,      /* Tx FIFO threshold */
-+	.rft            = 8,      /* Rx FIFO threshold */
-+	.clk_freq       = 400000, /* std. mode operation */
-+	.timeout        = 200,    /* Slave response timeout(ms) */
-+	.sm             = I2C_FREQ_MODE_FAST,
-+};
-+
- static int __devinit nmk_i2c_probe(struct platform_device *pdev)
- {
- 	int ret = 0;
- 	struct resource *res;
--	struct nmk_i2c_controller *pdata =
--			pdev->dev.platform_data;
-+	struct nmk_i2c_controller *pdata = pdev->dev.platform_data;
- 	struct nmk_i2c_dev	*dev;
- 	struct i2c_adapter *adap;
- 
-+	if (!pdata)
-+		/* No i2c configuration found, using the default. */
-+		pdata = &u8500_i2c;
-+
- 	dev = kzalloc(sizeof(struct nmk_i2c_dev), GFP_KERNEL);
- 	if (!dev) {
- 		dev_err(&pdev->dev, "cannot allocate memory\n");
--- 
-1.7.9.5
+	Arnd
