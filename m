@@ -1,28 +1,35 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 6 Aug 2012 18:21:10 +0100
-Subject: [PATCH 4/6] mfd: Use interrupt-parent as IRQ controller if
- specified in DT
-In-Reply-To: <20120806155446.GD29272@sirena.org.uk>
+Date: Mon, 6 Aug 2012 18:22:05 +0100
+Subject: [PATCH 6/6] Input: ab8500-ponkey: Make the distinction between
+ DT and non-DT boots
+In-Reply-To: <20120806160039.GE29272@sirena.org.uk>
 References: <1344250002-6011-1-git-send-email-lee.jones@linaro.org>
- <1344250002-6011-5-git-send-email-lee.jones@linaro.org>
- <20120806155446.GD29272@sirena.org.uk>
-Message-ID: <20120806172109.GA31409@gmail.com>
+ <1344250002-6011-7-git-send-email-lee.jones@linaro.org>
+ <20120806160039.GE29272@sirena.org.uk>
+Message-ID: <20120806172204.GB31409@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2012 at 04:54:46PM +0100, Mark Brown wrote:
-> On Mon, Aug 06, 2012 at 11:46:40AM +0100, Lee Jones wrote:
+On Mon, Aug 06, 2012 at 05:00:39PM +0100, Mark Brown wrote:
+> On Mon, Aug 06, 2012 at 11:46:42AM +0100, Lee Jones wrote:
+> > If we're booting with Device Tree enabled, we want the IRQ numbers to
+> > be taken and translated from the Device Tree binary. If not, they
+> > should be taken from the resource allocation defined in the AB8500 MFD
+> > core driver.
 > 
-> > -				domain = irq_find_host(parent->of_node);
-> > +#ifdef CONFIG_OF
-> > +				parent_node = of_irq_find_parent(np);
-> > +#endif
+> >  	ponkey->ab8500 = ab8500;
+> > -	ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, irq_dbf);
+> > -	ponkey->irq_dbr = ab8500_irq_get_virq(ab8500, irq_dbr);
+> > +
+> > +	ponkey->irq_dbf = (np) ? ab8500_irq_get_virq(ab8500, irq_dbf) : irq_dbf;
+> > +	ponkey->irq_dbr = (np) ? ab8500_irq_get_virq(ab8500, irq_dbr) : irq_dbr;
 > 
-> Shouldn't of_irq_find_parent() be stubbed out by the header?  Every
-> single user of this is going to need it.  Indeed, shouldn't we be making
-> irq_find_host() just do this?
+> Shouldn't the irq domain be coping with this?  It seems like a massive
+> failure to have to do this in every single user, the irq domain should
+> be able to encapsulate all this stuff.
 
-Sounds reasonable. I'll look into it tomorrow.
+Already in hand.
+
 -- 
 Lee Jones
 Linaro ST-Ericsson Landing Team Lead
