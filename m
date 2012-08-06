@@ -1,92 +1,70 @@
 From: matt@genesi-usa.com (Matt Sealey)
-Date: Mon, 6 Aug 2012 18:14:33 -0500
-Subject: kernel entry for thumb2-only cpus
-In-Reply-To: <alpine.LFD.2.02.1208061829510.5231@xanadu.home>
-References: <20120803090452.GE2626@pengutronix.de>
- <20120803114532.GB26925@mudshark.cambridge.arm.com>
- <20120805095528.GO2626@pengutronix.de>
- <alpine.LFD.2.02.1208060026460.5231@xanadu.home>
- <CAKGA1b=Pxif=4qSvK-Odmunbm_T6LjWP_CXid_v2VNmpuyHLDA@mail.gmail.com>
- <20120806190856.GA1120@n2100.arm.linux.org.uk>
- <CAKGA1b=Np8+RMwgQEzwxdJcL6AjC4qiv1Jyq0bTTa_dHCeLokA@mail.gmail.com>
- <20120806194016.GB1120@n2100.arm.linux.org.uk>
- <CAKGA1b=hMZD3nd2sjXzR89-wX4BotxZwHOkkiLFoEL_CSS4zug@mail.gmail.com>
- <alpine.LFD.2.02.1208061829510.5231@xanadu.home>
-Message-ID: <CAKGA1bnJCSaVcErs3R8U3ZjQkhMmZAZPM=2P2R7udVc80ZmoDQ@mail.gmail.com>
+Date: Mon, 6 Aug 2012 18:26:34 -0500
+Subject: [PATCH 4/9] ASoC: imx: Don't use {en,dis}able_fiq() calls
+In-Reply-To: <20120806214121.GA26698@opensource.wolfsonmicro.com>
+References: <20120805230238.GA1663@lizard>
+ <1344207819-3415-4-git-send-email-anton.vorontsov@linaro.org>
+ <CAKGA1bkiHj=zMJXSzoGp3fpLS3POnFXSV5y7sYYFAikqoUT9tQ@mail.gmail.com>
+ <20120806154951.GQ16861@opensource.wolfsonmicro.com>
+ <CAKGA1b=_AOub_pEJJGBTb6Y7wLZaSYKQjFTyMVFSr_=9VX4wpg@mail.gmail.com>
+ <20120806193734.GA16199@opensource.wolfsonmicro.com>
+ <20120806201609.GX25644@pengutronix.de>
+ <CAKGA1bmMqyL4gyLYcanEH=R=HuBjRCNRLjUEWCj8wmpi3HuL0g@mail.gmail.com>
+ <20120806214121.GA26698@opensource.wolfsonmicro.com>
+Message-ID: <CAKGA1bma1T5NXZgY4XDko0r4o_m1b-JioVjjC8+c4-1PE+r1aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 6, 2012 at 5:36 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Mon, 6 Aug 2012, Matt Sealey wrote:
+On Mon, Aug 6, 2012 at 4:41 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Mon, Aug 06, 2012 at 03:39:50PM -0500, Matt Sealey wrote:
+>> On Mon, Aug 6, 2012 at 3:16 PM, Robert Schwebel
 >
->> Right now there's already a fixed entry point - ARM kernels are fixed
->> entry point of relative 0 to the start of the loaded image. Okay, so
->> we can't format a totally valid ELF header, but in the event that we
->> want to encode all this information yet again, why reinvent the wheel?
+>> > That's not true; we still run MX25, MX27, MX35, MX28 on mainline in
+>> > active projects.
 >
-> That's the point.  We do _not_ want to encode anything.
+>> I think Shawn Guo (FSL/Linaro) would also disagree, since he's just
+>> posted a large amount of MXS patches to fix up the board for device
+>> trees, and Arnd is pulling them.
 >
-> By convention, if your CPU is ARM mode capable, then it must call the
-> kernel in ARM mode, period.  Can't be simpler than that, right?  The
-> bootloader shouldn't care if the kernel is itself ARM or Thumb, and the
-> kernel shouldn't care if the bootloader is ARM or Thumb.
+> MXS != i.MX.
 >
-> If you have a real problem with this then let's hear it so it can be
-> addressed.
+>> As far as I know, the FIQ usage is quite valid for the processor it
+>> needs to run on (MX21/27/28, right?) in the modes it runs in (AC97 on
+>> these processors, and maybe MX35 too), and I'm just trying to figure
+>> out what the steps are for
+>
+> Oh, ick.  What is the problem that means people want to use the FIQ on
+> these processors?  There's been i.MX2x audio DMA since forever, it had
+> DMA in mainline before any of the later i.MXs due to them having SDMA.
+> The original mainline i.MX audio support was done on i.MX27 and didn't
+> have any issue here, this is the fist I've heard of a problem.
 
-I don't have a real *problem* with it, I just think since the kernel
-can be compiled in both modes, but you may have some kind of remit to
-not run ARM code (even if it's just a couple instructions at the
-start) or some toolchain requirement or.. something.. it would be
-entirely the bootloader's job to determine what mode it is in when it
-jumps into the kernel. If you boot a Thumb bootloader and load an ARM
-kernel, you'll get a crash. If you boot an ARM bootloader and a Thumb
-kernel (with the current ARM instructions in head.S), you'll get a
-crash. This is well defined, perfectly obvious, and I realise that..
+For SSI in I2S mode, I think it works great, AC97 not so much. It's
+the AC97 mode
+the FIQ stuff is there to fix. It seems a bunch of boards use AC97
+codecs (for no
+good reason)
 
-But if you would need to micromanage the system such that they both
-matched, or were perverse enough to build a Thumb bootloader and a
-Thumb kernel, you might be counfounded that you actually created a
-99.99% Thumb bootloader which switched to ARM mode before going into
-the kernel, and a 99.99% Thumb kernel but needed to jump into Thumb
-mode after the first part of the kernel code? It should be possible
-(with that kernel config switch it would be) if you're into that kind
-of configurability to build your Thumb bootloader, build your Thumb
-kernel and have it never exit Thumb mode for any reason, even if it is
-just for some few bytes of very minor bootstrapping.
+>> I did note that SND_SOC_EUKREA_TLV320 enables FIQ but it also depends
+>> on MX51 which makes me think this need to be split, too, so that MX51
+>> boards don't have it but MX2/MX3 do.
+>
+> Is that not bitrot due to it being there before SDMA support was?
 
-The same perfectly obvious caveats apply, but it's possible. The
-question is, if you could do it, how would you make sure bootloaders
-booted the right way? I would hazard a guess that given your opinion
-on it, it would be just as good if they all just crashed.
-
-So let's just patch out the ARM parts if you're building a Thumb
-kernel on a Thumb-only device, and assume it was in Thumb mode all
-along if another subordinate option was selected.. that way the kernel
-can automatically fulfill one side of the contract in that you
-configured "build thumb2 kernel" and it would contain 0% normal arm
-code for ARMv7-M (or -R) and be able to be prompted to do so if you
-were building for ARMv6k/ARMv7-A. Ordinary people would not turn it
-on.. whacky weirdos like you and me might do it for proof of concept
-;)
-
-All it needs is a bootloader able to fulfill it's side of the contract
-(build a thumb2 bootloader..) and jump while in Thumb mode, which I am
-100% certain exists. It'd be a 20 line patch maximum to make U-Boot do
-this (it already can build as Thumb2 I think.. if not, there are
-patches around) through an environment variable and distros that knew
-they built in Thumb mode could simply modify the variable in boot.scr
-or so, and the jump would end up being done in Thumb. That way you
-have to kick it, but no changes are required in the kernel format
-(just in the packaging of the kernel and configuration of the
-bootloader). Guessing would be a bad idea...
-
-I still say considering you thought of a workable solution and your
-problem is only the linker in use (seems like a bug report to the gas
-guys is in order..) and there are probably ways to get around that
-anyway, why not do it? I find it odd that Linux needs a "hard customer
-requirement" for it to need it to be capable of doing it, if it's just
-*possible*.
+Possibly. I'm going to wait for Sascha to explain it again.. if AC97
+was the predicate
+for FIQ being required, it doesn't make any sense for a codec that says in it's
+description that it's I2S. It may not be bitrot but pure,
+unadulterated zeal on the part
+of whoever wrote that Kconfig snippet - enable everything, in case it
+fails (actually
+that kind of thing is why I fear for nuking the building of this
+driver since if FIQ stuff
+is silently required by something else and all that kept it in there
+was some badly
+thought out or bitrotted Kconfig entries... I don't want to cause a
+world of hurt).
 
 -- 
 Matt Sealey <matt@genesi-usa.com>
