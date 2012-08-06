@@ -1,70 +1,91 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 6 Aug 2012 11:49:30 +0300
-Subject: [PATCH v6 01/11] drivers: usb: otg: add a new driver for omap
- usb2 phy
-In-Reply-To: <CAAe_U6K15Nm5aNs2Vn71G7ELZWka1zB2E3VGZWTc0VjyViJ6Yw@mail.gmail.com>
+Date: Mon, 6 Aug 2012 11:52:22 +0300
+Subject: [PATCH v6 00/11] omap: musb: Add device tree support
+In-Reply-To: <1343639400-28725-1-git-send-email-kishon@ti.com>
 References: <1343639400-28725-1-git-send-email-kishon@ti.com>
- <1343639400-28725-2-git-send-email-kishon@ti.com>
- <20120803132708.GC8269@arwen.pp.htv.fi>
- <CAAe_U6K15Nm5aNs2Vn71G7ELZWka1zB2E3VGZWTc0VjyViJ6Yw@mail.gmail.com>
-Message-ID: <20120806084928.GD17551@arwen.pp.htv.fi>
+Message-ID: <20120806085221.GE17551@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, Aug 03, 2012 at 08:01:44PM +0530, ABRAHAM, KISHON VIJAY wrote:
-> >> +     return 0;
-> >> +}
-> >> +
-> >> +#ifdef CONFIG_PM_RUNTIME
-> >> +
-> >> +static int omap_usb2_runtime_suspend(struct device *dev)
-> >> +{
-> >> +     struct platform_device  *pdev = to_platform_device(dev);
-> >> +     struct omap_usb *phy = platform_get_drvdata(pdev);
-> >> +
-> >> +     clk_disable(phy->wkupclk);
-> >
-> > weird. I would expect the wakeup clock to be enabled on suspend and
-> > disabled on resume. Isn't this causing any unbalanced disable warnings ?
+On Mon, Jul 30, 2012 at 02:39:49PM +0530, Kishon Vijay Abraham I wrote:
+> This patch series adds device tree support for MUSB and device
+> tree support for all the related modules to get MUSB working in
+> OMAP platform.
 > 
-> Even I was expecting the wakeup clock to be enabled on suspend but if
-> we have this enabled coreaon domain is never
-> gated and core does not hit low power state. btw Why do think this is
-> unbalanced?
-
-because you never do a clk_enable() on probe(), so on your first
-suspend, you will disable the clock without having enabled it before,
-no? Unless pm_runtime forces a runtime_resume() when you call
-pm_runtime_enable()...
-
-> >> +static int omap_usb2_runtime_resume(struct device *dev)
-> >> +{
-> >> +     u32 ret = 0;
-> >> +     struct platform_device  *pdev = to_platform_device(dev);
-> >> +     struct omap_usb *phy = platform_get_drvdata(pdev);
-> >> +
-> >> +     ret = clk_enable(phy->wkupclk);
-> >> +     if (ret < 0)
-> >> +             dev_err(phy->dev, "Failed to enable wkupclk %d\n", ret);
-> >> +
-> >> +     return ret;
-> >> +}
-> >> +
-> >> +static const struct dev_pm_ops omap_usb2_pm_ops = {
-> >> +     SET_RUNTIME_PM_OPS(omap_usb2_runtime_suspend, omap_usb2_runtime_resume,
-> >> +             NULL)
-> >
-> > only runtime ? What about static suspend ? We need this to work also
-> > after a traditional echo mem > /sys/power/state ;-)
+> A new omap-usb2 phy driver has been added (with only dt suppport)
+> to perform phy configurations. Previously this configuration was
+> performed by twl6030, using pdata function pointers.
 > 
-> The static suspend case is handled by users of this phy using
-> set_suspend hooks.
+> With the addition of omap-usb2 to perform phy configurations,
+> twl6030 is made as a comparator driver to detect VBUS and ID events
+> and notify it to the glue layer.
+> 
+> musb core is _NOT_ yet converted to support device tree support as it
+> would need lot of driver re-design because of its enormous use of
+> function pointers. That will be in _TO DO_ list.
+> 
+> Changes from v5:
+> minor cleanups like checking for return value in get_sync and few changes
+> in the documentation has been done.
+> 
+> Changes from v4:
+> duplicate getting of 'mode' property is removed in omap-musb glue.
+> 
+> Changes from v3:
+> remove the address in the node name of usb_otg_hs since the usb_otg_hs
+> node doesn't have a reg property. Thanks Ajay Gupta for finding this.
+> 
+> Changes from v2:
+> Fixed Sergei's comment to remove *0x* prefix in usb2phy at 0x4a0ad080
+> 
+> Changes from v1:
+> * Fixed Rajendra Nayak comments (regulator naming, compatible naming of
+> musb and other minor cleanups.)
+> * It's agreed to have ocp2scp in drivers/bus and usb2 phy is a child of
+> ocp2scp, the documentation is updated accordingly.
+> 
+> Changes from RFC:
+> Removed the dependency on [RFC PATCH 00/11] OMAP System Control Module.
+> Writing to control module register is now handled in otg driver itself.
+> Once the system control module driver get upstreamed, I'll send a patch
+> to make use of API's in control module driver to write to control
+> module register.
+> 
+> This series was developed on
+> git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git xceiv
+> 
+> This patch series depends on
+> [PATCH 0/2] omap: add ocp2scp as a bus driver
+> 
+> Performed MUSB device mode testing on OMAP4 panda, OMAP4 SDP
+> and OMAP3 beagle.
+> 
+> Kishon Vijay Abraham I (11):
+>   drivers: usb: otg: add a new driver for omap usb2 phy
+>   arm/dts: omap: Add omap-usb2 dt data
+>   drivers: usb: otg: make twl6030_usb as a comparator driver to
+>     omap_usb2
+>   arm: omap: hwmod: add a new addr space in otg for writing to control
+>     module
+>   drivers: usb: twl6030: Add dt support for twl6030 usb
+>   arm/dts: Add twl6030-usb data
+>   drivers: usb: twl4030: Add device tree support for twl4030 usb
+>   arm/dts: Add twl4030-usb data
+>   drivers: usb: musb: Add device tree support for omap musb glue
+>   arm/dts: omap: Add usb_otg and glue data
+>   arm: omap: phy: remove unused functions from omap-phy-internal.c
 
-I'm not sure if that's too wise, what if your user enabled USB, but
-for whatever reason loaded only the phy driver and not musb or dwc3. It
-will fail, right ?
+When you send your next series, can you please split the stuff based on
+their dependencies or at least note here what depends on what ? I mean,
+I cannot take the DT patches without an Acked-by Grant and Tony, but the
+drivers themselves I could take queue them since they're already in good
+shape ;-)
+
+Maybe just start the series with patches without dependencies on one
+another, and the rest of the series would be ones that need to go
+together, or something. That'll help me ;-)
 
 -- 
 balbi
@@ -74,4 +95,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120806/d9818cf0/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120806/c80e301c/attachment.sig>
