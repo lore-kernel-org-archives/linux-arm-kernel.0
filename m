@@ -1,107 +1,35 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 6 Aug 2012 12:17:10 +0100
-Subject: [PATCH 09/24] xen/arm: compile and run xenbus
-In-Reply-To: <20120801142840.GG7227@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-9-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120801142840.GG7227@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1208061200130.4645@kaball.uk.xensource.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 6 Aug 2012 13:17:56 +0200
+Subject: [PATCH 6/6] Input: ab8500-ponkey: Make the distinction between DT
+ and non-DT boots
+In-Reply-To: <1344250002-6011-7-git-send-email-lee.jones@linaro.org>
+References: <1344250002-6011-1-git-send-email-lee.jones@linaro.org>
+ <1344250002-6011-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZmZtQJ_tqp8=cC2NbRvNosN8rDwfwDxocw=a=WtH0sZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 1 Aug 2012, Konrad Rzeszutek Wilk wrote:
-> On Thu, Jul 26, 2012 at 04:33:51PM +0100, Stefano Stabellini wrote:
-> > bind_evtchn_to_irqhandler can legitimately return 0 (irq 0): it is not
-> > an error.
-> > 
-> > If Linux is running as an HVM domain and is running as Dom0, use
-> > xenstored_local_init to initialize the xenstore page and event channel.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > ---
-> >  drivers/xen/xenbus/xenbus_comms.c |    2 +-
-> >  drivers/xen/xenbus/xenbus_probe.c |   27 +++++++++++++++++----------
-> >  drivers/xen/xenbus/xenbus_xs.c    |    1 +
-> >  3 files changed, 19 insertions(+), 11 deletions(-)
-> > 
-> > diff --git a/drivers/xen/xenbus/xenbus_comms.c b/drivers/xen/xenbus/xenbus_comms.c
-> > index 52fe7ad..c5aa55c 100644
-> > --- a/drivers/xen/xenbus/xenbus_comms.c
-> > +++ b/drivers/xen/xenbus/xenbus_comms.c
-> > @@ -224,7 +224,7 @@ int xb_init_comms(void)
-> >  		int err;
-> >  		err = bind_evtchn_to_irqhandler(xen_store_evtchn, wake_waiting,
-> >  						0, "xenbus", &xb_waitq);
-> > -		if (err <= 0) {
-> > +		if (err < 0) {
-> >  			printk(KERN_ERR "XENBUS request irq failed %i\n", err);
-> >  			return err;
-> >  		}
-> > diff --git a/drivers/xen/xenbus/xenbus_probe.c b/drivers/xen/xenbus/xenbus_probe.c
-> > index b793723..3ae47c2 100644
-> > --- a/drivers/xen/xenbus/xenbus_probe.c
-> > +++ b/drivers/xen/xenbus/xenbus_probe.c
-> > @@ -729,16 +729,23 @@ static int __init xenbus_init(void)
-> >  	xenbus_ring_ops_init();
-> >  
-> >  	if (xen_hvm_domain()) {
-> > -		uint64_t v = 0;
-> > -		err = hvm_get_parameter(HVM_PARAM_STORE_EVTCHN, &v);
-> > -		if (err)
-> > -			goto out_error;
-> > -		xen_store_evtchn = (int)v;
-> > -		err = hvm_get_parameter(HVM_PARAM_STORE_PFN, &v);
-> > -		if (err)
-> > -			goto out_error;
-> > -		xen_store_mfn = (unsigned long)v;
-> > -		xen_store_interface = ioremap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
-> > +		if (xen_initial_domain()) {
-> > +			err = xenstored_local_init();
-> > +			xen_store_interface =
-> > +				phys_to_virt(xen_store_mfn << PAGE_SHIFT);
-> > +		} else {
-> > +			uint64_t v = 0;
-> > +			err = hvm_get_parameter(HVM_PARAM_STORE_EVTCHN, &v);
-> > +			if (err)
-> > +				goto out_error;
-> > +			xen_store_evtchn = (int)v;
-> > +			err = hvm_get_parameter(HVM_PARAM_STORE_PFN, &v);
-> > +			if (err)
-> > +				goto out_error;
-> > +			xen_store_mfn = (unsigned long)v;
-> > +			xen_store_interface =
-> > +				ioremap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
-> > +		}
-> 
-> This, and along with the Hybrid PV dom0 (not yet posted, but it was doing
-> similar manipulation here) is getting more and more like a rat-mess.
-> 
-> 
-> Any chance we can just abstract the three different XenStore access
-> ways and just have something like this:
-> 
-> 	enum {
-> 		USE_UNKNOWN
-> 		USE_HVM,
-> 		USE_PV,
-> 		USE_LOCAL
-> 		USE_ALREADY_INIT
-> 	};
-> 	int usage = USE_UNKNOWN;
-> 	if (xen_pv_domain())
-> 		usage = USE_PV;
-> 	if (xen_hvm_domain())
-> 		usage = USE_HVM;
-> 	if (xen_initial_domain())
-> 		usage = USE_LOCAL;
-> 
-> 	if (xen_start_info->store_evtchn)
-> 		usage = USE_ALREADY_INIT;
-> 	
-> 	.. other overwrites..
-> 
-> 	switch (usage) {
-> 		.. blah blah.
-> 	}
+On Mon, Aug 6, 2012 at 12:46 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-I'll give it a try.
+> If we're booting with Device Tree enabled, we want the IRQ numbers to
+> be taken and translated from the Device Tree binary. If not, they
+> should be taken from the resource allocation defined in the AB8500 MFD
+> core driver.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+
+Aha that's the missing patch.
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
+
+This one should be split off from the patch series and sent as a separate
+fix to Dmitry as it badly needs to go into the -rc series through the input
+tree.
+
+Can't see what it is doing as part of this series, it has no relation to the
+other patches.
+
+Dmitry, you can replace my revert with this patch as soon as Lee send
+it to linux-input.
+
+Yours,
+Linus Walleij
