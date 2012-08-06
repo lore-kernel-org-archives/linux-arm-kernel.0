@@ -1,61 +1,103 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 6 Aug 2012 11:38:45 +0300
-Subject: [PATCH 1/4] arm/dts: omap5-evm: Add I2C support
-In-Reply-To: <501C08CB.3060701@mvista.com>
-References: <1343997486-710-1-git-send-email-sourav.poddar@ti.com>
- <1343997486-710-2-git-send-email-sourav.poddar@ti.com>
- <501C08CB.3060701@mvista.com>
-Message-ID: <20120806083843.GA17612@arwen.pp.htv.fi>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 06 Aug 2012 10:49:13 +0200
+Subject: [PATCH 2/3 V2] IIO: Add basic MXS LRADC driver
+In-Reply-To: <1344007721-11595-3-git-send-email-marex@denx.de>
+References: <1344007721-11595-1-git-send-email-marex@denx.de>
+ <1344007721-11595-3-git-send-email-marex@denx.de>
+Message-ID: <501F8509.1030903@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 08/03/2012 05:28 PM, Marek Vasut wrote:
+> This driver is very basic. It supports userland trigger, buffer and
+> raw access to channels. The support for delay channels is missing
+> altogether.
 
-On Fri, Aug 03, 2012 at 09:22:19PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 08/03/2012 04:38 PM, Sourav Poddar wrote:
-> 
-> > Add I2C data node in omap5 device tree file.
-> 
-> > Tested on omap5430 sdp.
-> 
-> > Cc: Benoit Cousson <b-cousson@ti.com>
-> > Cc: Felipe Balbi <balbi@ti.com>
-> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Acked-by: Felipe Balbi <balbi@ti.com>
-> > Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> > ---
-> >  arch/arm/boot/dts/omap5.dtsi |   35 +++++++++++++++++++++++++++++++++++
-> >  1 files changed, 35 insertions(+), 0 deletions(-)
-> 
-> > diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> > index 57e5270..6b68dfe 100644
-> > --- a/arch/arm/boot/dts/omap5.dtsi
-> > +++ b/arch/arm/boot/dts/omap5.dtsi
-> > @@ -145,6 +145,41 @@
-> >  			#interrupt-cells = <1>;
-> >  		};
-> >  
-> > +		i2c1: i2c at 48070000 {
-> > +			compatible = "ti,omap4-i2c";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			ti,hwmods = "i2c1";
-> 
->    Address postfix in the node name and no "reg" property?
+Looks mostly good to me. Some comments inline.
 
-that's because of the ti,hwmods attribute. OMAP is still not entirely
-converted to DT and there's this weird ti,hwmods attribute. OMAP's hwmod
-framework will fill up register addresses, irqs, etc when the device is
-created. Oh well...
+I think you need to provide a documentation for the devicetree binding, even
+though it's a rather simple binding.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120806/56e58e13/attachment.sig>
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Jonathan Cameron <jic23@kernel.org>
+> Cc: Juergen Beisert <jbe@pengutronix.de>
+> Cc: Lars-Peter Clausen <lars@metafoo.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Wolfgang Denk <wd@denx.de>
+> ---
+>  drivers/staging/iio/adc/Kconfig     |   12 +
+>  drivers/staging/iio/adc/Makefile    |    1 +
+>  drivers/staging/iio/adc/mxs-lradc.c |  591 +++++++++++++++++++++++++++++++++++
+>  3 files changed, 604 insertions(+)
+>  create mode 100644 drivers/staging/iio/adc/mxs-lradc.c
+> 
+> V2: Use delay channel 0 in case of buffered sampling so the samples are deployed
+>     continuously.
+>     Disallow RAW sampling while buffered mode is enabled to simplify code.
+> 
+> diff --git a/drivers/staging/iio/adc/Kconfig b/drivers/staging/iio/adc/Kconfig
+> index 67711b7..97ca697 100644
+> --- a/drivers/staging/iio/adc/Kconfig
+> +++ b/drivers/staging/iio/adc/Kconfig
+[...]
+> + */
+> +static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
+> +			const struct iio_chan_spec *chan,
+> +			int *val, int *val2, long m)
+> +{
+> [...]
+> +
+> +	init_completion(&lradc->completion);
+
+This should rather be INIT_COMPLETION. init_completion should only called
+once in probe, since it will reinitialize the spinlock which opens up race
+conditions.
+
+> [...]
+> +
+> +	/* Wait for completion on the channel, 1 second max. */
+> +	ret = wait_for_completion_killable_timeout(&lradc->completion,
+> +						msecs_to_jiffies(1000));
+
+msecs_to_jiffies(1000) = HZ, but I guess both is OK.
+
+> [...]
+> +}
+[...]
+> +
+> +static int __devinit mxs_lradc_probe(struct platform_device *pdev)
+> +{
+> [...]
+> +
+> +	/* Grab all IRQ sources */
+> +	for (i = 0; i < 13; i++) {
+> +		lradc->irq[i] = platform_get_irq(pdev, i);
+> +		if (lradc->irq[i] < 0) {
+> +			ret = -EINVAL;
+> +			goto err_addr;
+> +		}
+> +
+> +		ret = devm_request_irq(dev, lradc->irq[i],
+> +					mxs_lradc_handle_irq, 0,
+> +					mxs_lradc_irq_name[i], iio);
+
+devm_request_irq is a bit dangerous as long we do not have a
+devm_iio_device_alloc. The IRQ will only be freed after the memory for the
+IIO device has been freed, which means there is a slight window where the
+IRQ could fire although the memory has already been freed.
+
+> +		if (ret)
+> +			goto err_addr;
+> +	}
+> +
+> +	dev_set_drvdata(&pdev->dev, iio);
+
+platform_set_drvdata
+
+> +
+> +	init_completion(&lradc->completion);
+> +	mutex_init(&lradc->lock);
+> +
+
+[...]
