@@ -1,90 +1,77 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 6 Aug 2012 10:52:26 +0200
-Subject: [PATCH] ARM: ux500: resurrect I2C platform data
-Message-ID: <1344243146-6598-1-git-send-email-linus.walleij@stericsson.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 6 Aug 2012 11:49:30 +0300
+Subject: [PATCH v6 01/11] drivers: usb: otg: add a new driver for omap
+ usb2 phy
+In-Reply-To: <CAAe_U6K15Nm5aNs2Vn71G7ELZWka1zB2E3VGZWTc0VjyViJ6Yw@mail.gmail.com>
+References: <1343639400-28725-1-git-send-email-kishon@ti.com>
+ <1343639400-28725-2-git-send-email-kishon@ti.com>
+ <20120803132708.GC8269@arwen.pp.htv.fi>
+ <CAAe_U6K15Nm5aNs2Vn71G7ELZWka1zB2E3VGZWTc0VjyViJ6Yw@mail.gmail.com>
+Message-ID: <20120806084928.GD17551@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Hi,
 
-Commit:
-98582d9562b4bea6b0eb6e2bfafcd3fab3b60ccb
-"ARM: ux500: Remove unused i2c platform_data initialisation code"
+On Fri, Aug 03, 2012 at 08:01:44PM +0530, ABRAHAM, KISHON VIJAY wrote:
+> >> +     return 0;
+> >> +}
+> >> +
+> >> +#ifdef CONFIG_PM_RUNTIME
+> >> +
+> >> +static int omap_usb2_runtime_suspend(struct device *dev)
+> >> +{
+> >> +     struct platform_device  *pdev = to_platform_device(dev);
+> >> +     struct omap_usb *phy = platform_get_drvdata(pdev);
+> >> +
+> >> +     clk_disable(phy->wkupclk);
+> >
+> > weird. I would expect the wakeup clock to be enabled on suspend and
+> > disabled on resume. Isn't this causing any unbalanced disable warnings ?
+> 
+> Even I was expecting the wakeup clock to be enabled on suspend but if
+> we have this enabled coreaon domain is never
+> gated and core does not hit low power state. btw Why do think this is
+> unbalanced?
 
-Deleted platform data intialization code that was used,
-not unused as indicated in the commit. The boot log (without
-devicetree) now looks like this:
+because you never do a clk_enable() on probe(), so on your first
+suspend, you will disable the clock without having enabled it before,
+no? Unless pm_runtime forces a runtime_resume() when you call
+pm_runtime_enable()...
 
-nmk-i2c nmk-i2c.0: no platform data
-nmk-i2c nmk-i2c.1: no platform data
-nmk-i2c nmk-i2c.2: no platform data
-nmk-i2c nmk-i2c.3: no platform data
+> >> +static int omap_usb2_runtime_resume(struct device *dev)
+> >> +{
+> >> +     u32 ret = 0;
+> >> +     struct platform_device  *pdev = to_platform_device(dev);
+> >> +     struct omap_usb *phy = platform_get_drvdata(pdev);
+> >> +
+> >> +     ret = clk_enable(phy->wkupclk);
+> >> +     if (ret < 0)
+> >> +             dev_err(phy->dev, "Failed to enable wkupclk %d\n", ret);
+> >> +
+> >> +     return ret;
+> >> +}
+> >> +
+> >> +static const struct dev_pm_ops omap_usb2_pm_ops = {
+> >> +     SET_RUNTIME_PM_OPS(omap_usb2_runtime_suspend, omap_usb2_runtime_resume,
+> >> +             NULL)
+> >
+> > only runtime ? What about static suspend ? We need this to work also
+> > after a traditional echo mem > /sys/power/state ;-)
+> 
+> The static suspend case is handled by users of this phy using
+> set_suspend hooks.
 
-And no I2C drivers register anymore.
+I'm not sure if that's too wise, what if your user enabled USB, but
+for whatever reason loaded only the phy driver and not musb or dwc3. It
+will fail, right ?
 
-Take this opportunity to bump the i2c bus speed to 400kHz.
-Some recent discussion revealed inconsistency in the board file
-for the MOP500 family. The board can very well do 400kHz on
-the I2C busses, so make it do that.
-
-Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/board-mop500.c | 39 ++++++++++++++++++++++++++++++++++----
- 1 file changed, 35 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 8674a89..dbb9946 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -327,12 +327,43 @@ static struct i2c_board_info __initdata mop500_i2c2_devices[] = {
- 	},
- };
- 
-+#define U8500_I2C_CONTROLLER(id, _slsu, _tft, _rft, clk, t_out, _sm)	\
-+static struct nmk_i2c_controller u8500_i2c##id##_data = { \
-+	/*				\
-+	 * slave data setup time, which is	\
-+	 * 250 ns,100ns,10ns which is 14,6,2	\
-+	 * respectively for a 48 Mhz	\
-+	 * i2c clock			\
-+	 */				\
-+	.slsu		= _slsu,	\
-+	/* Tx FIFO threshold */		\
-+	.tft		= _tft,		\
-+	/* Rx FIFO threshold */		\
-+	.rft		= _rft,		\
-+	/* std. mode operation */	\
-+	.clk_freq	= clk,		\
-+	/* Slave response timeout(ms) */\
-+	.timeout	= t_out,	\
-+	.sm		= _sm,		\
-+}
-+
-+/*
-+ * The board uses 4 i2c controllers, initialize all of
-+ * them with slave data setup time of 250 ns,
-+ * Tx & Rx FIFO threshold values as 1 resp. 8 and fast
-+ * mode of operation
-+ */
-+U8500_I2C_CONTROLLER(0, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
-+U8500_I2C_CONTROLLER(1, 0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
-+U8500_I2C_CONTROLLER(2,	0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
-+U8500_I2C_CONTROLLER(3,	0xe, 1, 8, 400000, 200, I2C_FREQ_MODE_FAST);
-+
- static void __init mop500_i2c_init(struct device *parent)
- {
--	db8500_add_i2c0(parent, NULL);
--	db8500_add_i2c1(parent, NULL);
--	db8500_add_i2c2(parent, NULL);
--	db8500_add_i2c3(parent, NULL);
-+	db8500_add_i2c0(parent, &u8500_i2c0_data);
-+	db8500_add_i2c1(parent, &u8500_i2c1_data);
-+	db8500_add_i2c2(parent, &u8500_i2c2_data);
-+	db8500_add_i2c3(parent, &u8500_i2c3_data);
- }
- 
- static struct gpio_keys_button mop500_gpio_keys[] = {
 -- 
-1.7.11.3
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120806/d9818cf0/attachment.sig>
