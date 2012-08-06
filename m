@@ -1,35 +1,53 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon,  6 Aug 2012 17:18:56 +0300
-Subject: [PATCH 3/4] i2c: omap: remove unnecessary pm_runtime_suspended check
+Date: Mon,  6 Aug 2012 17:18:57 +0300
+Subject: [PATCH 4/4] i2c: omap: switch over to autosuspend API
 In-Reply-To: <1344262737-6662-1-git-send-email-balbi@ti.com>
 References: <1344262737-6662-1-git-send-email-balbi@ti.com>
-Message-ID: <1344262737-6662-4-git-send-email-balbi@ti.com>
+Message-ID: <1344262737-6662-5-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-before starting any messages we call pm_runtime_get_sync()
-which will make sure that by the time we program a transfer
-and our IRQ handler gets called, we're not suspended
-anymore.
+this helps us reduce unnecessary pm transitions
+in case we have another i2c message been started
+soon.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/i2c/busses/i2c-omap.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index a3db053..60928f2 100644
+index 60928f2..22efaba 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -883,9 +883,6 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 	u16 stat;
- 	int err = 0, count = 0;
+@@ -645,7 +645,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
  
--	if (pm_runtime_suspended(dev->dev))
--		return IRQ_HANDLED;
--
- 	spin_lock_irqsave(&dev->lock, flags);
- 	do {
- 		bits = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
+ 	omap_i2c_wait_for_bb(dev);
+ out:
+-	pm_runtime_put(dev->dev);
++	pm_runtime_mark_last_busy(dev->dev);
++	pm_runtime_put_autosuspend(dev->dev);
+ 	return r;
+ }
+ 
+@@ -1113,6 +1114,9 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		dev->regs = (u8 *)reg_map_ip_v1;
+ 
+ 	pm_runtime_enable(dev->dev);
++	pm_runtime_set_autosuspend_delay(dev->dev, 1000);
++	pm_runtime_use_autosuspend(dev->dev);
++
+ 	r = pm_runtime_get_sync(dev->dev);
+ 	if (IS_ERR_VALUE(r))
+ 		goto err_free_mem;
+@@ -1189,7 +1193,7 @@ omap_i2c_probe(struct platform_device *pdev)
+ 
+ 	of_i2c_register_devices(adap);
+ 
+-	pm_runtime_put(dev->dev);
++	pm_runtime_put_autosuspend(dev->dev);
+ 
+ 	return 0;
+ 
 -- 
 1.7.12.rc0
