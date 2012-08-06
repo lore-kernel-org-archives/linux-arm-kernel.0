@@ -1,38 +1,50 @@
-From: klightspeed@killerwolves.net (Ben Peddell)
-Date: Mon,  6 Aug 2012 19:32:51 +1000 (EST)
-Subject: [PATCH] initramfs: handle trailing junk after valid image
-In-Reply-To: <501F8D75.8070108@killerwolves.net>
-References: <CAB9O=CMADa26benQCkEoLOKKTGNeExjvFeVkFe4HLVi-W=o=Jg@mail.gmail.com>,
- <501F8D75.8070108@killerwolves.net>
-Message-ID: <20120806093251.0528E77A0D@aristotle.killerwolves.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon,  6 Aug 2012 11:42:16 +0200
+Subject: [v3] Add basic address decoding support for Marvell 370/XP
+Message-ID: <1344246141-23931-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The initramfs handling since commit df37bd15 has been rejecting
-valid images that have garbage after them.  For example, on an
-architecture where the initramfs address and size are specified
-as a kernel parameter (specifically unicore32 and arm), specifying
-e.g. initrd=0x01000000,4M will not work unless the image is padded
-with nulls to 4MiB.  This is unlikely to occur if the user is using
-this parameter to work around a bug in the bootloader.
+Andrew, Jason, Gr?gory,
 
----
- init/initramfs.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+Here is a small patch set that introduces basic support for address
+decoding on Armada 370 and Armada XP. The aim of this basic support is
+essentially to be able to configure a window to remap the BootROM,
+which is needed to startup the secondary CPUs for the SMP support.
 
-diff --git a/init/initramfs.c b/init/initramfs.c
-index 84c6bf1..26c2cb1 100644
---- a/init/initramfs.c
-+++ b/init/initramfs.c
-@@ -467,6 +467,9 @@ static char * __init unpack_to_rootfs(char *buf, unsigned len)
- 					 compress_name);
- 				message = msg_buf;
- 			}
-+		} else if (state == Reset) {
-+			my_inptr = len;
-+			pr_warn("%s: junk at end of compressed archive\n", __func__);
- 		} else
- 			error("junk in compressed archive");
- 		if (state != Reset)
--- 
-1.7.3.4
+As we had discussed already, the address decoding configuration is not
+described in the Device Tree, it is for now hardcoded on a per-SoC
+basis. We might later discuss how to extend this to the Device Tree.
+
+This patch set has five patches:
+
+ (*) First patch reworks the addr-map code to use void __iomem * where
+     appropriate instead of u32, as per the suggestion of Arnd
+     Bergmann.
+
+ (*) Second patch introducing PLAT_ORION_LEGACY, which allows the
+     Marvell 370/XP platforms to be part of PLAT_ORION, and therefore
+     re-use the existing address decoding code.
+
+ (*) Third patch making a small change to an address decoding
+     structure so that we can define at runtime the virtual address of
+     the configuration registers. This is needed as on Armada 370/XP
+     the address decoding "controller" is declared in the Device Tree.
+
+ (*) Fourth patch adding the 370/XP address decoding code itself. For
+     now, it only maps the BootROM on Armada XP.
+
+ (*) Fifth path adding the necessary DT code to instantiate the
+     address decoding "controller".
+
+Changes since v2:
+ * Remove one more useless (void __iomem *) cast in the Armada 370/XP
+   addr-map.c file, as noticed by Arnd Bergmann.
+
+Changes since v1:
+ * Use void __iomem * in addr-map code. Suggested by Arnd Bergmann.
+ * Add Acked-by on patches 2->5 from Gr?gory Cl?ment
+
+Thanks,
+
+Thomas Petazzoni
