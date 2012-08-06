@@ -1,59 +1,43 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 6 Aug 2012 18:53:13 +0530
-Subject: [PATCH 2/4] arm/dts: Add twl6030-usb data
-In-Reply-To: <1344259395-4559-1-git-send-email-kishon@ti.com>
-References: <1344259395-4559-1-git-send-email-kishon@ti.com>
-Message-ID: <1344259395-4559-3-git-send-email-kishon@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 6 Aug 2012 14:26:42 +0100
+Subject: [PATCH 01/22] ARM: add mechanism for late code patching
+In-Reply-To: <501FC44E.1040806@ti.com>
+References: <1343775898-28345-1-git-send-email-cyril@ti.com>
+ <1343775898-28345-2-git-send-email-cyril@ti.com>
+ <20120806111224.GA18957@n2100.arm.linux.org.uk> <501FC44E.1040806@ti.com>
+Message-ID: <20120806132642.GC18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add twl6030-usb data node in twl6030 device tree file
+On Mon, Aug 06, 2012 at 09:19:10AM -0400, Cyril Chemparathy wrote:
+> With a flush_cache_all(), we could avoid having to operate a cacheline  
+> at a time, but that clobbers way more than necessary.
 
-Acked-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/omap4-panda.dts |    4 ++++
- arch/arm/boot/dts/omap4-sdp.dts   |    4 ++++
- arch/arm/boot/dts/twl6030.dtsi    |    5 +++++
- 3 files changed, 13 insertions(+)
+You can't do that, because flush_cache_all() on some CPUs requires the
+proper MMU mappings to be in place, and you can't get those mappings
+in place because you don't have the V:P offsets fixed up in the kernel.
+Welcome to the chicken and egg problem.
 
-diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-index 9880c12..2999eba 100644
---- a/arch/arm/boot/dts/omap4-panda.dts
-+++ b/arch/arm/boot/dts/omap4-panda.dts
-@@ -126,3 +126,7 @@
- 	ti,non-removable;
- 	bus-width = <4>;
- };
-+
-+&twlusb {
-+	usb-supply = <&vusb>;
-+};
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 72216e9..d8290c0 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -226,3 +226,7 @@
- 	bus-width = <4>;
- 	ti,non-removable;
- };
-+
-+&twlusb {
-+	usb-supply = <&vusb>;
-+};
-diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
-index 3b2f351..8e3aac9 100644
---- a/arch/arm/boot/dts/twl6030.dtsi
-+++ b/arch/arm/boot/dts/twl6030.dtsi
-@@ -83,4 +83,9 @@
- 	clk32kg: regulator at 12 {
- 		compatible = "ti,twl6030-clk32kg";
- 	};
-+
-+	twlusb: twl6030-usb {
-+		compatible = "ti,twl6030-usb";
-+		interrupts = < 4 10 >;
-+	};
- };
--- 
-1.7.9.5
+> Sure, flushing caches is expensive.  But then, so is running the  
+> patching code with caches disabled.  I guess memory access latencies  
+> drive the performance trade off here.
+
+There we disagree on a few orders of magnitude.  There are relatively
+few places that need updating.  According to the kernel I have here:
+
+   text    data     bss     dec     hex filename
+7644346  454320  212984 8311650  7ed362 vmlinux
+
+Idx Name          Size      VMA       LMA       File off  Algn
+  1 .text         004cd170  c00081c0  c00081c0  000081c0  2**5
+ 16 .init.pv_table 00000300  c0753a24  c0753a24  00753a24  2**0
+
+That's about 7MB of text, and only 192 points in that code which need
+patching.  Even if we did this with caches on, that's still 192 places,
+and only 192 places we'd need to flush a cache line.
+
+Alternatively, with your approach and 7MB of text, you need to flush
+238885 cache lines to cover the entire kernel.
+
+It would be far _cheaper_ with your approach to flush the individual
+cache lines as you go.
