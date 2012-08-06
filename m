@@ -1,113 +1,73 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon,  6 Aug 2012 23:22:15 +0300
-Subject: [PATCH] Revert "ARM: OMAP3530evm: set pendown_state and debounce time
- for ads7846"
-In-Reply-To: <876298iv9s.fsf@ti.com>
-References: <876298iv9s.fsf@ti.com>
-Message-ID: <1344284535-16717-1-git-send-email-grinberg@compulab.co.il>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Mon, 6 Aug 2012 15:39:50 -0500
+Subject: [PATCH 4/9] ASoC: imx: Don't use {en,dis}able_fiq() calls
+In-Reply-To: <20120806201609.GX25644@pengutronix.de>
+References: <20120805230238.GA1663@lizard>
+ <1344207819-3415-4-git-send-email-anton.vorontsov@linaro.org>
+ <CAKGA1bkiHj=zMJXSzoGp3fpLS3POnFXSV5y7sYYFAikqoUT9tQ@mail.gmail.com>
+ <20120806154951.GQ16861@opensource.wolfsonmicro.com>
+ <CAKGA1b=_AOub_pEJJGBTb6Y7wLZaSYKQjFTyMVFSr_=9VX4wpg@mail.gmail.com>
+ <20120806193734.GA16199@opensource.wolfsonmicro.com>
+ <20120806201609.GX25644@pengutronix.de>
+Message-ID: <CAKGA1bmMqyL4gyLYcanEH=R=HuBjRCNRLjUEWCj8wmpi3HuL0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1) The above commit introduced a common ->get_pendown_state() function
-into the generic code, but that function was board-specific for the
-OMAP3EVM and thus broke most other boards using this code.
+On Mon, Aug 6, 2012 at 3:16 PM, Robert Schwebel
+<r.schwebel@pengutronix.de> wrote:
+> On Mon, Aug 06, 2012 at 08:37:34PM +0100, Mark Brown wrote:
+>> As far as I can tell nobody's really running much up to date mainline
+>> on older i.MX processors, all the work is going on the new stuff and
+>> most of the board are on either vendor BSPs or older kernels.
+>
+> That's not true; we still run MX25, MX27, MX35, MX28 on mainline in
+> active projects.
 
-2) The above commit was mis-merged introducing another bug which
-prevents the ads7846 driver probe function to succeed.
-The omap_ads7846_init() function frees the pendown GPIO in case there is
-no ->get_pendown_state() function set by the caller (board specific
-code), so it can be requested later by the ads7846 driver.
-The above commit add a common ->get_pendown_state() function without
-removing the gpio_free() call and thus once the ads7846 driver tries
-to use the pendown GPIO, it crashes as the pendown GPIO has not been
-requested.
+I think Shawn Guo (FSL/Linaro) would also disagree, since he's just
+posted a large amount of MXS patches to fix up the board for device
+trees, and Arnd is pulling them.
 
-3) The above commit introduces NO new functionality as
-get_pendown_state() function is already implemented in a suitable way by
-the ads7846 driver and the debounce time handling has already been
-fixed by commit 97ee9f01 (ARM: OMAP: fix the ads7846 init code).
+Work is ongoing, it would be awful to delete something people really
+relied on or were in progress fixing (ahem). If they get up to audio
+in the near future the audio FIQ stuff would just end up being
+resubmitted almost verbatim... that seems like unnecessary churn.
 
-This reverts commit 16aced80f6739beb2a6ff7b6f96c83ba80d331e8.
+As far as I know, the FIQ usage is quite valid for the processor it
+needs to run on (MX21/27/28, right?) in the modes it runs in (AC97 on
+these processors, and maybe MX35 too), and I'm just trying to figure
+out what the steps are for
 
-Conflicts:
-	arch/arm/mach-omap2/common-board-devices.c
+* making sure it doesn't get built for architectures/variants it's
+certainly NOT required on (imx_v6_v7_defconfig, if it actually enabled
+audio, that is - in fact, audio should be enabled as more one of the
+boards supported defines it in the device tree) which would amount to
+two seperate patches, one for the defconfig, one for the CONFIG item.
 
-Solved by taking the working version prior to the above commit.
+I did note that SND_SOC_EUKREA_TLV320 enables FIQ but it also depends
+on MX51 which makes me think this need to be split, too, so that MX51
+boards don't have it but MX2/MX3 do.
 
-Cc: Zumeng Chen <zumeng.chen@windriver.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
----
-Kevin, sorry for the late reply.
-How about the above commit message and the below patch?
+* if it is built then it's built as ARM code (redundant, as previously
+stated, but would have stopped me from swearing at my build box when I
+hit the issue yet again) which could be a patch or could be ignored.
+I'd rather discuss this here than clutter the ML with several respins
+of a patch, let's get an opinion first - to .arm or no to .arm?
 
-The patch applies cleanly to Tony's master branch (6 Aug 2012)
-or Kevin's kevin-omap-pm/for_3.6/fixes/ads7846
-after resetting two top most commits.
+* make sure there's no weird FIQ stuff floating around that has so far
+relied on SND_SOC_IMX_PCM_FIQ doing select FIQ before I make it not
+compile in for other boards (since otherwise no i.MX processor selects
+FIQ if they're not using that driver, it could be simply coincidence
+nobody noticed). I don't want to be the one submitting a patch I can't
+test which mysteriously breaks every MX28 on the planet (since Rob,
+Shawn, Sascha might be the ones swearing at me instead)
 
-This patch has been tested on both above branches on cm-t3730.
-Any other board tested will be greately appreciated.
+* making sure someone's actually testing audio as above... and
+where/if/when the MX28 audio stuff is going in the future und so
+weiter..
 
-Also, if after all said in the commit message, you still don't
-want to revert the original patch, feel free to post your thoughts.
+I guess I need Sascha to pipe up and tell me what the code is needed
+for exactly again.. and someone to test the result of the changes..
 
- arch/arm/mach-omap2/board-omap3evm.c       |    1 +
- arch/arm/mach-omap2/common-board-devices.c |   11 -----------
- arch/arm/mach-omap2/common-board-devices.h |    1 -
- 3 files changed, 1 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index ef230a0..0d362e9 100644
---- a/arch/arm/mach-omap2/board-omap3evm.c
-+++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -58,6 +58,7 @@
- #include "hsmmc.h"
- #include "common-board-devices.h"
- 
-+#define OMAP3_EVM_TS_GPIO	175
- #define OMAP3_EVM_EHCI_VBUS	22
- #define OMAP3_EVM_EHCI_SELECT	61
- 
-diff --git a/arch/arm/mach-omap2/common-board-devices.c b/arch/arm/mach-omap2/common-board-devices.c
-index 1473474..c187586 100644
---- a/arch/arm/mach-omap2/common-board-devices.c
-+++ b/arch/arm/mach-omap2/common-board-devices.c
-@@ -35,16 +35,6 @@ static struct omap2_mcspi_device_config ads7846_mcspi_config = {
- 	.turbo_mode	= 0,
- };
- 
--/*
-- * ADS7846 driver maybe request a gpio according to the value
-- * of pdata->get_pendown_state, but we have done this. So set
-- * get_pendown_state to avoid twice gpio requesting.
-- */
--static int omap3_get_pendown_state(void)
--{
--	return !gpio_get_value(OMAP3_EVM_TS_GPIO);
--}
--
- static struct ads7846_platform_data ads7846_config = {
- 	.x_max			= 0x0fff,
- 	.y_max			= 0x0fff,
-@@ -55,7 +45,6 @@ static struct ads7846_platform_data ads7846_config = {
- 	.debounce_rep		= 1,
- 	.gpio_pendown		= -EINVAL,
- 	.keep_vref_on		= 1,
--	.get_pendown_state	= &omap3_get_pendown_state,
- };
- 
- static struct spi_board_info ads7846_spi_board_info __initdata = {
-diff --git a/arch/arm/mach-omap2/common-board-devices.h b/arch/arm/mach-omap2/common-board-devices.h
-index 4c4ef6a..a0b4a428 100644
---- a/arch/arm/mach-omap2/common-board-devices.h
-+++ b/arch/arm/mach-omap2/common-board-devices.h
-@@ -4,7 +4,6 @@
- #include "twl-common.h"
- 
- #define NAND_BLOCK_SIZE	SZ_128K
--#define OMAP3_EVM_TS_GPIO	175
- 
- struct mtd_partition;
- struct ads7846_platform_data;
 -- 
-1.7.3.4
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
