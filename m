@@ -1,37 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  6 Aug 2012 11:46:41 +0100
-Subject: [PATCH 5/6] ARM: ux500: Match-up compatible stings with associated
- MFD cell
-In-Reply-To: <1344250002-6011-1-git-send-email-lee.jones@linaro.org>
-References: <1344250002-6011-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1344250002-6011-6-git-send-email-lee.jones@linaro.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 6 Aug 2012 11:55:38 +0100
+Subject: [Xen-devel] [PATCH 01/24] arm: initial Xen support
+In-Reply-To: <20120801104237.GB7227@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120726163020.GB9222@phenom.dumpdata.com>
+ <alpine.DEB.2.02.1207271246080.26163@kaball.uk.xensource.com>
+ <20120801104237.GB7227@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1208061146480.4645@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now, we've either taken the IRQs listed in the MFD cell defined
-in the AB8500 driver, or the ones in Device Tree when we probed each
-AB8500 MFD device independently. However, now we make a logical choice
-based on whether we're running Device Tree or not. For this to happen
-we need the compatible stings in the AB8500 MFD cell and the DT to
-match-up. We do that here.
+On Wed, 1 Aug 2012, Konrad Rzeszutek Wilk wrote:
+> > > > +struct pvclock_wall_clock {
+> > > > +	u32   version;
+> > > > +	u32   sec;
+> > > > +	u32   nsec;
+> > > > +} __attribute__((__packed__));
+> > > 
+> > > That is weird. It is 4+4+4 = 12 bytes? Don't you want it to be 16 bytes?
+> > 
+> > I agree that 16 bytes would be a better choice, but it needs to match
+> > the struct in Xen that is defined as follow:
+> > 
+> >     uint32_t wc_version;      /* Version counter: see vcpu_time_info_t. */
+> >     uint32_t wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
+> >     uint32_t wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
+> 
+> Would it make sense to add some paddigin then at least? In both
+> cases? Or is it too late for this?
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/dbx5x0.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index 83229f7..0282353 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -355,7 +355,7 @@
- 				};
- 
- 				ab8500-ponkey {
--					compatible = "stericsson,ab8500-ponkey";
-+					compatible = "stericsson,ab8500-poweron-key";
- 					interrupts = <6 0x4
- 						      7 0x4>;
- 					interrupt-names = "ONKEY_DBF", "ONKEY_DBR";
--- 
-1.7.9.5
+I can see why adding some padding would be useful if the structs were
+not packed and we wanted to enforce 32/64 bit compatibility on x86.
+However on ARM the field alignments on 32 and 64 bits are the same for
+integer values so the padding wouldn't make a difference.
+In any case both structs are packed, so the alignment is forced to be the
+same by the compiler.
