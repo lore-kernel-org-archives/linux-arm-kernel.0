@@ -1,61 +1,77 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Mon, 6 Aug 2012 12:14:08 +0200
-Subject: [PATCHv4 4/8] ARM: OMAP3: add manual control for mpu / core pwrdm
- usecounting
-In-Reply-To: <1343637607.9847.13.camel@sokoban>
-References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
- <1342189185-5306-5-git-send-email-t-kristo@ti.com>
- <878ve5j8se.fsf@ti.com> <1343637607.9847.13.camel@sokoban>
-Message-ID: <CAORVsuUDo7VB3FnbQWJo=zowrviNDNbPM4DtqQMNrYAmOOat4w@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 6 Aug 2012 11:21:52 +0100
+Subject: [PATCH 1/1] i2c: Add default configuration into the Nomadik I2C driver
+In-Reply-To: <1344243146-6598-1-git-send-email-linus.walleij@stericsson.com>
+References: <1344243146-6598-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20120806102151.GB16996@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
+From: Lee Jones <lee.jones@linaro.org>
+Date: Mon, 6 Aug 2012 11:04:14 +0100
+Subject: [PATCH 1/1] i2c: Add default configuration into the Nomadik I2C
+ driver.
 
-On Mon, Jul 30, 2012 at 10:40 AM, Tero Kristo <t-kristo@ti.com> wrote:
-> On Fri, 2012-07-27 at 12:36 -0700, Kevin Hilman wrote:
->> Tero Kristo <t-kristo@ti.com> writes:
->>
->> > mpu / core powerdomain usecounts are now statically increased
->> > by 1 during MPU activity. This allows the domains to reflect
->> > actual usage, and will allow the usecount to reach 0 just before
->> > all CPUs are ready to idle. Proper powerdomain usecounts are
->> > propageted to voltagedomain level also, and will allow vc
->> > callbacks to be triggered at right point of time.
->> >
->> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> > Cc: Paul Walmsley <paul@pwsan.com>
->> > Cc: Kevin Hilman <khilman@ti.com>
->>
->> IMO, the idea is fine, but I'm not crazy about the implementation in
->> powerdomain.c, which is meant for pwrdm generic code.   In particular,
->> I'm not crazy about the pwrdm lookups in powerdomain.c.
->>
->> Since pm<soc>.c already has references to mpu_pwrdm and core_pwrdm, why
->> not just add the pwrdm_clkdm_enable/disable calls directly in pm<soc>.c
->
-> I think this was how the patch was in some earlier rev but I thought I'd
-> try to be more clever with this. :) I can revert the implementation back
-> to this.
-Furthermore after the changes in pre/post transitions [1], some more
-checks will be needed to identify the transitions on the mpu and core
-power domains.
+At this moment in time there is only one known configuration for the
+Nomadik I2C driver. By not holding that configuration in the driver
+adds some unnecessary overhead in platform code. The configuration
+as already been removed from platform code, this patch checks for any
+over-riding configurations. If there aren't any, the default is used.
 
-[1] http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commitdiff;h=e055548953355b6e69c56f9e54388845b29b4e97
+Cc: linux-i2c at vger.kernel.org
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/i2c/busses/i2c-nomadik.c |   24 ++++++++++++++++++------
+ 1 file changed, 18 insertions(+), 6 deletions(-)
 
-Regards,
-Jean
-
->
->> Also, the changelog should be a bit more specific about why CORE
->> powerdomain is also handled here when most of the code only talks about
->> the CPU.
->
-> Yea, I'll add some beef to this also.
->
-> -Tero
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+index a92440d..86aa73d 100644
+--- a/drivers/i2c/busses/i2c-nomadik.c
++++ b/drivers/i2c/busses/i2c-nomadik.c
+@@ -333,10 +333,6 @@ static void setup_i2c_controller(struct nmk_i2c_dev *dev)
+ 
+ 	i2c_clk = clk_get_rate(dev->clk);
+ 
+-	/* fallback to std. mode if machine has not provided it */
+-	if (dev->cfg.clk_freq == 0)
+-		dev->cfg.clk_freq = 100000;
+-
+ 	/*
+ 	 * The spec says, in case of std. mode the divider is
+ 	 * 2 whereas it is 3 for fast and fastplus mode of
+@@ -899,15 +895,31 @@ static const struct i2c_algorithm nmk_i2c_algo = {
+ 	.functionality	= nmk_i2c_functionality
+ };
+ 
++static struct nmk_i2c_controller u8500_i2c = {
++	/*
++	 * Slave data setup time; 250ns, 100ns, and 10ns, which
++	 * is 14, 6 and 2 respectively for a 48Mhz i2c clock.
++	 */
++	.slsu           = 0xe,
++	.tft            = 1,      /* Tx FIFO threshold */
++	.rft            = 8,      /* Rx FIFO threshold */
++	.clk_freq       = 400000, /* std. mode operation */
++	.timeout        = 200,    /* Slave response timeout(ms) */
++	.sm             = I2C_FREQ_MODE_FAST,
++};
++
+ static int __devinit nmk_i2c_probe(struct platform_device *pdev)
+ {
+ 	int ret = 0;
+ 	struct resource *res;
+-	struct nmk_i2c_controller *pdata =
+-			pdev->dev.platform_data;
++	struct nmk_i2c_controller *pdata = pdev->dev.platform_data;
+ 	struct nmk_i2c_dev	*dev;
+ 	struct i2c_adapter *adap;
+ 
++	if (!pdata)
++		/* No i2c configuration found, using the default. */
++		pdata = &u8500_i2c;
++
+ 	dev = kzalloc(sizeof(struct nmk_i2c_dev), GFP_KERNEL);
+ 	if (!dev) {
+ 		dev_err(&pdev->dev, "cannot allocate memory\n");
+-- 
+1.7.9.5
