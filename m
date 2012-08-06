@@ -1,39 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 6 Aug 2012 17:56:17 +0000
-Subject: [PATCH] ARM: integrator: use clk_prepare_enable() for timer
-In-Reply-To: <CACRpkdaqFqE5D5LkT0buof_5YZkpP_J_Y6qu0B5gKi4W3mFEkw@mail.gmail.com>
-References: <1344199075-4111-1-git-send-email-linus.walleij@linaro.org>
- <201208061437.52415.arnd@arndb.de>
- <CACRpkdaqFqE5D5LkT0buof_5YZkpP_J_Y6qu0B5gKi4W3mFEkw@mail.gmail.com>
-Message-ID: <201208061756.18147.arnd@arndb.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 6 Aug 2012 14:02:19 -0400 (EDT)
+Subject: [PATCH 01/22] ARM: add mechanism for late code patching
+In-Reply-To: <20120806132642.GC18957@n2100.arm.linux.org.uk>
+References: <1343775898-28345-1-git-send-email-cyril@ti.com>
+ <1343775898-28345-2-git-send-email-cyril@ti.com>
+ <20120806111224.GA18957@n2100.arm.linux.org.uk> <501FC44E.1040806@ti.com>
+ <20120806132642.GC18957@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1208061356480.5231@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 August 2012, Linus Walleij wrote:
-> On Mon, Aug 6, 2012 at 4:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Sunday 05 August 2012, Linus Walleij wrote:
-> >> On Sun, Aug 5, 2012 at 10:37 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> >> > The Integrator timer is using the clock framework to get the
-> >> > timer frequency, but missed to prepare the clock before enabling.
-> >> >
-> >> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> >>
-> >> Arnd, Olof,
-> >>
-> >> If this patch looks OK to you I request that you apply it alone, no pull
-> >> requests, too much hazzle for a single patch...
-> >>
-> >
-> > Applying a patch is fine, but please explain which version(s) to apply
-> > this to? Is it a regression in v3.6, or should it be backported to
-> > earlier versions too?
-> 
-> Ah sorry. This is for the v3.6 rc:s.
-> 
-> The migration to common clock makes the kernel spit warnings
-> unless you prepare all clocks.
-> 
+On Mon, 6 Aug 2012, Russell King - ARM Linux wrote:
 
-Ok, I've applied it to the fixes branch now.
+> On Mon, Aug 06, 2012 at 09:19:10AM -0400, Cyril Chemparathy wrote:
+> > With a flush_cache_all(), we could avoid having to operate a cacheline  
+> > at a time, but that clobbers way more than necessary.
+> 
+> You can't do that, because flush_cache_all() on some CPUs requires the
+> proper MMU mappings to be in place, and you can't get those mappings
+> in place because you don't have the V:P offsets fixed up in the kernel.
+> Welcome to the chicken and egg problem.
 
-	Arnd
+This problem is fixed in this case by having the p2v and v2p code sites 
+using an out-of-line non optimized computation until those sites are 
+runtime patched with the inlined optimized computation we have today.
+
+
+Nicolas
