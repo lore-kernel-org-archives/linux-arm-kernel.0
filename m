@@ -1,161 +1,44 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 6 Aug 2012 18:37:59 +0530
-Subject: [PATCH v7 6/7] drivers: usb: musb: Add device tree support for omap
- musb glue
-In-Reply-To: <1344258480-4304-1-git-send-email-kishon@ti.com>
-References: <1344258480-4304-1-git-send-email-kishon@ti.com>
-Message-ID: <1344258480-4304-7-git-send-email-kishon@ti.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Mon, 6 Aug 2012 09:19:10 -0400
+Subject: [PATCH 01/22] ARM: add mechanism for late code patching
+In-Reply-To: <20120806111224.GA18957@n2100.arm.linux.org.uk>
+References: <1343775898-28345-1-git-send-email-cyril@ti.com>
+ <1343775898-28345-2-git-send-email-cyril@ti.com>
+ <20120806111224.GA18957@n2100.arm.linux.org.uk>
+Message-ID: <501FC44E.1040806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added device tree support for omap musb driver and updated the
-Documentation with device tree binding information.
+On 8/6/2012 7:12 AM, Russell King - ARM Linux wrote:
+> On Tue, Jul 31, 2012 at 07:04:37PM -0400, Cyril Chemparathy wrote:
+>> +static void __init init_patch_kernel(void)
+>> +{
+>> +	const void *start = &__patch_table_begin;
+>> +	const void *end   = &__patch_table_end;
+>> +
+>> +	BUG_ON(patch_kernel(start, end - start));
+>> +	flush_icache_range(init_mm.start_code, init_mm.end_code);
+>
+> Err.  You are asking the kernel to flush every single cache line
+> manually throughout the kernel code.  That's a flush every 32-bytes
+> over maybe a few megabytes of address space.
+>
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- Documentation/devicetree/bindings/usb/omap-usb.txt |   34 +++++++++++-
- drivers/usb/musb/omap2430.c                        |   54 ++++++++++++++++++++
- 2 files changed, 87 insertions(+), 1 deletion(-)
+With a flush_cache_all(), we could avoid having to operate a cacheline 
+at a time, but that clobbers way more than necessary.
 
-diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt b/Documentation/devicetree/bindings/usb/omap-usb.txt
-index 52f503b..49a90fb 100644
---- a/Documentation/devicetree/bindings/usb/omap-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
-@@ -1,4 +1,4 @@
--OMAP USB PHY
-+OMAP USB PHY AND GLUE
- 
- OMAP USB2 PHY
- 
-@@ -15,3 +15,35 @@ usb2phy at 4a0ad080 {
- 	reg = <0x4a0ad080 0x58>,
- 		<0x4a002300 0x1>;
- };
-+
-+OMAP MUSB GLUE
-+ - compatible : Should be "ti,musb-omap2430"
-+ - ti,hwmods : must be "usb_otg_hs"
-+ - multipoint : Should be "1" indicating the musb controller supports
-+   multipoint. This is a MUSB configuration-specific setting.
-+ - num_eps : Specifies the number of endpoints. This is also a
-+   MUSB configuration-specific setting. Should be set to "16"
-+ - ram_bits : Specifies the ram address size. Should be set to "12"
-+ - interface_type : This is a board specific setting to describe the type of
-+   interface between the controller and the phy. It should be "0" or "1"
-+   specifying ULPI and UTMI respectively.
-+ - mode : Should be "3" to represent OTG. "1" signifies HOST and "2"
-+   represents PERIPHERAL.
-+ - power : Should be "50". This signifies the controller can supply upto
-+   100mA when operating in host mode.
-+
-+SOC specific device node entry
-+usb_otg_hs: usb_otg_hs at 4a0ab000 {
-+	compatible = "ti,musb-omap2430";
-+	ti,hwmods = "usb_otg_hs";
-+	multipoint = <1>;
-+	num_eps = <16>;
-+	ram_bits = <12>;
-+};
-+
-+Board specific device node entry
-+&usb_otg_hs {
-+	interface_type = <1>;
-+	mode = <3>;
-+	power = <50>;
-+};
-diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
-index 74dbd6f..8b1d7c0 100644
---- a/drivers/usb/musb/omap2430.c
-+++ b/drivers/usb/musb/omap2430.c
-@@ -30,6 +30,7 @@
- #include <linux/init.h>
- #include <linux/list.h>
- #include <linux/io.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
- #include <linux/pm_runtime.h>
-@@ -469,8 +470,11 @@ static u64 omap2430_dmamask = DMA_BIT_MASK(32);
- static int __devinit omap2430_probe(struct platform_device *pdev)
- {
- 	struct musb_hdrc_platform_data	*pdata = pdev->dev.platform_data;
-+	struct omap_musb_board_data	*data;
- 	struct platform_device		*musb;
- 	struct omap2430_glue		*glue;
-+	struct device_node		*np = pdev->dev.of_node;
-+	struct musb_hdrc_config		*config;
- 	struct resource			*res;
- 	int				ret = -ENOMEM;
- 
-@@ -500,6 +504,42 @@ static int __devinit omap2430_probe(struct platform_device *pdev)
- 	if (glue->control_otghs == NULL)
- 		dev_dbg(&pdev->dev, "Failed to obtain control memory\n");
- 
-+	if (np) {
-+		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+		if (!pdata) {
-+			dev_err(&pdev->dev,
-+				"failed to allocate musb platfrom data\n");
-+			ret = -ENOMEM;
-+			goto err1;
-+		}
-+
-+		data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+		if (!data) {
-+			dev_err(&pdev->dev,
-+					"failed to allocate musb board data\n");
-+			ret = -ENOMEM;
-+			goto err1;
-+		}
-+
-+		config = devm_kzalloc(&pdev->dev, sizeof(*config), GFP_KERNEL);
-+		if (!data) {
-+			dev_err(&pdev->dev,
-+				"failed to allocate musb hdrc config\n");
-+			goto err1;
-+		}
-+
-+		of_property_read_u32(np, "mode", (u32 *)&pdata->mode);
-+		of_property_read_u32(np, "interface_type",
-+						(u32 *)&data->interface_type);
-+		of_property_read_u32(np, "num_eps", (u32 *)&config->num_eps);
-+		of_property_read_u32(np, "ram_bits", (u32 *)&config->ram_bits);
-+		of_property_read_u32(np, "power", (u32 *)&pdata->power);
-+		config->multipoint = of_property_read_bool(np, "multipoint");
-+
-+		pdata->board_data	= data;
-+		pdata->config		= config;
-+	}
-+
- 	pdata->platform_ops		= &omap2430_ops;
- 
- 	platform_set_drvdata(pdev, glue);
-@@ -596,12 +636,26 @@ static struct dev_pm_ops omap2430_pm_ops = {
- #define DEV_PM_OPS	NULL
- #endif
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id omap2430_id_table[] = {
-+	{
-+		.compatible = "ti,omap4-musb"
-+	},
-+	{
-+		.compatible = "ti,omap3-musb"
-+	},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, omap2430_id_table);
-+#endif
-+
- static struct platform_driver omap2430_driver = {
- 	.probe		= omap2430_probe,
- 	.remove		= __devexit_p(omap2430_remove),
- 	.driver		= {
- 		.name	= "musb-omap2430",
- 		.pm	= DEV_PM_OPS,
-+		.of_match_table = of_match_ptr(omap2430_id_table),
- 	},
- };
- 
+Maybe the better answer is to flush only the patched cachelines.
+
+> This is one of the reasons we do the patching in assembly code before
+> the caches are enabled - so we don't have to worry about the interaction
+> with the CPU caches, which for this kind of application would be very
+> expensive.
+>
+
+Sure, flushing caches is expensive.  But then, so is running the 
+patching code with caches disabled.  I guess memory access latencies 
+drive the performance trade off here.
+
 -- 
-1.7.9.5
+Thanks
+- Cyril
