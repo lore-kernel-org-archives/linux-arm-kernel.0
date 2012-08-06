@@ -1,71 +1,80 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Mon, 6 Aug 2012 18:26:34 -0500
-Subject: [PATCH 4/9] ASoC: imx: Don't use {en,dis}able_fiq() calls
-In-Reply-To: <20120806214121.GA26698@opensource.wolfsonmicro.com>
-References: <20120805230238.GA1663@lizard>
- <1344207819-3415-4-git-send-email-anton.vorontsov@linaro.org>
- <CAKGA1bkiHj=zMJXSzoGp3fpLS3POnFXSV5y7sYYFAikqoUT9tQ@mail.gmail.com>
- <20120806154951.GQ16861@opensource.wolfsonmicro.com>
- <CAKGA1b=_AOub_pEJJGBTb6Y7wLZaSYKQjFTyMVFSr_=9VX4wpg@mail.gmail.com>
- <20120806193734.GA16199@opensource.wolfsonmicro.com>
- <20120806201609.GX25644@pengutronix.de>
- <CAKGA1bmMqyL4gyLYcanEH=R=HuBjRCNRLjUEWCj8wmpi3HuL0g@mail.gmail.com>
- <20120806214121.GA26698@opensource.wolfsonmicro.com>
-Message-ID: <CAKGA1bma1T5NXZgY4XDko0r4o_m1b-JioVjjC8+c4-1PE+r1aw@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 06 Aug 2012 16:31:10 -0700
+Subject: [PATCHv4 2/8] ARM: OMAP3+: voltage/pwrdm/clkdm/clock add
+ recursive usecount tracking
+In-Reply-To: <1342189185-5306-3-git-send-email-t-kristo@ti.com> (Tero Kristo's
+ message of "Fri, 13 Jul 2012 17:19:39 +0300")
+References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
+ <1342189185-5306-3-git-send-email-t-kristo@ti.com>
+Message-ID: <87ipcv4myp.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 6, 2012 at 4:41 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Aug 06, 2012 at 03:39:50PM -0500, Matt Sealey wrote:
->> On Mon, Aug 6, 2012 at 3:16 PM, Robert Schwebel
->
->> > That's not true; we still run MX25, MX27, MX35, MX28 on mainline in
->> > active projects.
->
->> I think Shawn Guo (FSL/Linaro) would also disagree, since he's just
->> posted a large amount of MXS patches to fix up the board for device
->> trees, and Arnd is pulling them.
->
-> MXS != i.MX.
->
->> As far as I know, the FIQ usage is quite valid for the processor it
->> needs to run on (MX21/27/28, right?) in the modes it runs in (AC97 on
->> these processors, and maybe MX35 too), and I'm just trying to figure
->> out what the steps are for
->
-> Oh, ick.  What is the problem that means people want to use the FIQ on
-> these processors?  There's been i.MX2x audio DMA since forever, it had
-> DMA in mainline before any of the later i.MXs due to them having SDMA.
-> The original mainline i.MX audio support was done on i.MX27 and didn't
-> have any issue here, this is the fist I've heard of a problem.
+Tero Kristo <t-kristo@ti.com> writes:
 
-For SSI in I2S mode, I think it works great, AC97 not so much. It's
-the AC97 mode
-the FIQ stuff is there to fix. It seems a bunch of boards use AC97
-codecs (for no
-good reason)
-
->> I did note that SND_SOC_EUKREA_TLV320 enables FIQ but it also depends
->> on MX51 which makes me think this need to be split, too, so that MX51
->> boards don't have it but MX2/MX3 do.
+> This patch fixes the usecount tracking for omap3+, previously the
+> usecount numbers were rather bogus and were not really useful for
+> any purpose. Now usecount numbers track the number of really active
+> clients on each domain. This patch also adds support for usecount
+> tracking on powerdomain level and autoidle flag for clocks that
+> are hardware controlled and should be skipped in usecount
+> calculations.
 >
-> Is that not bitrot due to it being there before SDMA support was?
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Kevin Hilman <khilman@ti.com>
 
-Possibly. I'm going to wait for Sascha to explain it again.. if AC97
-was the predicate
-for FIQ being required, it doesn't make any sense for a codec that says in it's
-description that it's I2S. It may not be bitrot but pure,
-unadulterated zeal on the part
-of whoever wrote that Kconfig snippet - enable everything, in case it
-fails (actually
-that kind of thing is why I fear for nuking the building of this
-driver since if FIQ stuff
-is silently required by something else and all that kept it in there
-was some badly
-thought out or bitrotted Kconfig entries... I don't want to cause a
-world of hurt).
+[...]
 
--- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+>  /* Clock control for DPLL outputs */
+> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+> index 9611490..68bdf36 100644
+> --- a/arch/arm/mach-omap2/powerdomain.c
+> +++ b/arch/arm/mach-omap2/powerdomain.c
+> @@ -981,6 +981,41 @@ int pwrdm_state_switch(struct powerdomain *pwrdm)
+>  	return ret;
+>  }
+>  
+> +/**
+> + * pwrdm_clkdm_enable - increment powerdomain usecount
+> + * @pwrdm: struct powerdomain *
+> + *
+> + * Increases the usecount for a powerdomain. Called from clockdomain
+> + * code once a clockdomain's usecount reaches zero, i.e. it is ready
+> + * to idle.
+> + */
+
+I think the comment here is wrong.
+
+> +void pwrdm_clkdm_enable(struct powerdomain *pwrdm)
+> +{
+> +	if (!pwrdm)
+> +		return;
+> +
+> +	atomic_inc(&pwrdm->usecount);
+> +}
+> +
+> +/**
+> + * pwrdm_clkdm_disable - decrease powerdomain usecount
+> + * @pwrdm: struct powerdomain *
+> + *
+> + * Decreases the usecount for a powerdomain. Called from clockdomain
+> + * code once a clockdomain becomes active.
+> + */
+
+Looks like these two comments need to be swapped?
+
+> +void pwrdm_clkdm_disable(struct powerdomain *pwrdm)
+> +{
+> +	int val;
+> +
+> +	if (!pwrdm)
+> +		return;
+> +
+> +	val = atomic_dec_return(&pwrdm->usecount);
+> +
+> +	BUG_ON(val < 0);
+> +}
+> +
+
+Kevin
