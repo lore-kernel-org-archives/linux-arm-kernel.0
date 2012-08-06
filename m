@@ -1,15 +1,15 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 06 Aug 2012 12:32:23 +0200
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 6 Aug 2012 18:33:52 +0800
 Subject: [PATCH 6/6] ARM: dts: add pinctrl in PXA DT files
 In-Reply-To: <201208060844.29333.arnd@arndb.de>
 References: <1343458722-17127-1-git-send-email-haojian.zhuang@gmail.com>
  <1343458722-17127-7-git-send-email-haojian.zhuang@gmail.com>
  <201208060844.29333.arnd@arndb.de>
-Message-ID: <501F9D37.9030809@gmail.com>
+Message-ID: <CAN1soZwy4DeHbvwKWZMyUqXjS6we0eT=Bbm7dpAuLDQ5JdeYEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.08.2012 10:44, Arnd Bergmann wrote:
+On Mon, Aug 6, 2012 at 4:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > On Saturday 28 July 2012, Haojian Zhuang wrote:
 >> +Required subnode-properties:
 >> +- marvell,pins : An array of strings. Each string contains the name of a pin
@@ -31,12 +31,11 @@ On 06.08.2012 10:44, Arnd Bergmann wrote:
 >> +- marvell,lowpower-float : The property means a pin is float in sleep state.
 >> +- marvell,lowpower-zero : The property means a pin is not configured in sleep
 >> +                       state.
-> 
+>
 > These (or most of them) look like they are not very Marvell specific. Should
 > we try to standardize the way they are set across different bindings?
-
-Yes please. That way we also have a higher chance that implementations
-on other platforms will be similar.
-
-
-Daniel
+>
+> On a side-node, you probably don't want to make all of the above properties
+> "required" because some of them are mutually exclusive.
+>
+OK, I'll handle it.
