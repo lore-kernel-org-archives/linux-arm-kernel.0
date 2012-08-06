@@ -1,45 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 6 Aug 2012 15:11:21 +0100
-Subject: [PATCH 1/1] i2c: Add default configuration into the Nomadik I2C
- driver.
-In-Reply-To: <CACRpkdZoJxyZX6SOcAvBP4NBmGyUEiyLH_n_RzSDTBsjS13zug@mail.gmail.com>
-References: <1344255947-10062-1-git-send-email-lee.jones@linaro.org>
- <CACRpkdZoJxyZX6SOcAvBP4NBmGyUEiyLH_n_RzSDTBsjS13zug@mail.gmail.com>
-Message-ID: <20120806141120.GE10524@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 6 Aug 2012 16:12:31 +0200
+Subject: [PATCH 2/4] gpio/mxc: specify gpio base for device tree probe
+In-Reply-To: <1344146488-9496-2-git-send-email-shawn.guo@linaro.org>
+References: <1344146488-9496-1-git-send-email-shawn.guo@linaro.org>
+ <1344146488-9496-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120806141231.GA9329@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2012 at 04:00:04PM +0200, Linus Walleij wrote:
-> On Mon, Aug 6, 2012 at 2:25 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Sun, Aug 05, 2012 at 02:01:26PM +0800, Shawn Guo wrote:
+> Currently, unlike the non-DT probe where the gpio base is specified
+> with pdev->id, the DT probe uses the base dynamically allocated by
+> gpio core, which uses a completely different numbering scheme.  This
+> causes two issues to user space applications which access sysfs entry
+> /sys/class/gpio/gpioN.
 > 
-> > At this moment in time there is only one known configuration for the
-> > Nomadik I2C driver. By not holding that configuration in the driver
-> > adds some unnecessary overhead in platform code. The configuration
-> > as already been removed from platform code, this patch checks for any
-> > over-riding configurations. If there aren't any, the default is used.
-> >
-> > Cc: linux-i2c at vger.kernel.org
-> > Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> * It breaks the compatibility with user space applications between
+>   non-DT and DT kernels.
 > 
-> This still does not apply for me on v3.6-rc1 what did you base
-> this patch on?
+> * It's not intuitive and sometimes hard for users to map the Linux
+>   gpio number to the actual hardware pin.
 > 
-> Applying: i2c: Add default configuration into the Nomadik I2C driver.
-> error: patch failed: drivers/i2c/busses/i2c-nomadik.c:899
-> error: drivers/i2c/busses/i2c-nomadik.c: patch does not apply
-> Patch failed at 0001 i2c: Add default configuration into the Nomadik I2C driver.
-> When you have resolved this problem run "git am --resolved".
-> If you would prefer to skip this patch, instead run "git am --skip".
-> To restore the original branch and stop patching run "git am --abort".
+> Use alias to identify the gpio port/bank, and then the gpio base
+> can be specified with port id to solve above issues.  If alias is not
+> defined in device tree, the base number dynamically allocated by gpio
+> core will be used.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+I applied patches 1, 2 and 4 to my imx35 dt tree and they work like a
+charm.
 
-Ah, my mistake.
+Tested-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-I'll rebase to latest and re-submit.
+for these three.
+
+Thanks
+Uwe
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
