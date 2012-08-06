@@ -1,34 +1,65 @@
-From: Ying.liu@freescale.com (Liu Ying)
-Date: Mon, 6 Aug 2012 14:02:08 +0800
-Subject: [PATCH 1/1] media: mx3_camera: Improve data bus width check code for
- probe
-Message-ID: <1344232928-17361-1-git-send-email-Ying.liu@freescale.com>
+From: sourav.poddar@ti.com (Poddar, Sourav)
+Date: Mon, 6 Aug 2012 13:05:34 +0530
+Subject: [PATCH] hwmon: tmp102: Add device tree support
+In-Reply-To: <501BE6B1.9000100@ti.com>
+References: <1343997350-676-1-git-send-email-sourav.poddar@ti.com>
+ <501BE6B1.9000100@ti.com>
+Message-ID: <CAKdam54Zshr-d502E_AS+vw5+vLQnTBrAGRPTy-9-hZy1QEFbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch contains code change only to use the present macro-
-MX3_CAMERA_DATAWIDTH_MASK to check valid camera platform data
-bus width instead of enumerating every possible data bus width.
+Hi Benoit,
 
-Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
----
- drivers/media/video/mx3_camera.c |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+On Fri, Aug 3, 2012 at 8:26 PM, Benoit Cousson <b-cousson@ti.com> wrote:
+> Hi Sourav,
+>
+> On 08/03/2012 02:35 PM, Sourav Poddar wrote:
+>> update tmp102 temperature sensor to also use device tree.
+>>
+>> Cc: Benoit Cousson <b-cousson@ti.com>
+>> Cc: Felipe Balbi <balbi@ti.com>
+>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Acked-by: Felipe Balbi <balbi@ti.com>
+>> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+>> ---
+>>  drivers/hwmon/tmp102.c |   14 +++++++++++++-
+>>  1 files changed, 13 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/drivers/hwmon/tmp102.c b/drivers/hwmon/tmp102.c
+>> index 0d466b9..a8a9060 100644
+>> --- a/drivers/hwmon/tmp102.c
+>> +++ b/drivers/hwmon/tmp102.c
+>> @@ -26,6 +26,7 @@
+>>  #include <linux/err.h>
+>>  #include <linux/mutex.h>
+>>  #include <linux/device.h>
+>> +#include <linux/of.h>
+>>
+>>  #define      DRIVER_NAME "tmp102"
+>>
+>> @@ -284,8 +285,19 @@ static const struct i2c_device_id tmp102_id[] = {
+>>  };
+>>  MODULE_DEVICE_TABLE(i2c, tmp102_id);
+>>
+>> +#ifdef CONFIG_OF
+>> +static const struct of_device_id temperature_dt_match[] = {
+>> +     { .compatible = "ti,tmp102" },
+>
+> Are you sure this is needed for this device?
+>
+> There is an automatic binding done for I2C devices in the of_i2c core
+> code. So in theory, DT will be able to bind to any I2C device using the
+> already existing table: MODULE_DEVICE_TABLE(i2c, tmp102_id).
+>
+> So I think this patch should not be needed.
+>
+Indeed. Checked it just now, this patch is not required and the already
+existing table is enough for the device to work fine.
 
-diff --git a/drivers/media/video/mx3_camera.c b/drivers/media/video/mx3_camera.c
-index f96f92f..346e2cd 100644
---- a/drivers/media/video/mx3_camera.c
-+++ b/drivers/media/video/mx3_camera.c
-@@ -1173,9 +1173,7 @@ static int __devinit mx3_camera_probe(struct platform_device *pdev)
- 
- 	mx3_cam->pdata = pdev->dev.platform_data;
- 	mx3_cam->platform_flags = mx3_cam->pdata->flags;
--	if (!(mx3_cam->platform_flags & (MX3_CAMERA_DATAWIDTH_4 |
--			MX3_CAMERA_DATAWIDTH_8 | MX3_CAMERA_DATAWIDTH_10 |
--			MX3_CAMERA_DATAWIDTH_15))) {
-+	if (!(mx3_cam->platform_flags & MX3_CAMERA_DATAWIDTH_MASK)) {
- 		/*
- 		 * Platform hasn't set available data widths. This is bad.
- 		 * Warn and use a default.
--- 
-1.7.1
+Thanks for the information.
+
+This patch is abandoned.
+~Sourav
+> Regards,
+> Benoit
+>
