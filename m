@@ -1,67 +1,40 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 6 Aug 2012 17:16:18 +0300
-Subject: [PATCH 1/1] remoteproc: extend customized fw loader to cover
- request and release
-In-Reply-To: <1344237865-32491-1-git-send-email-roylee17@gmail.com>
-References: <1344237865-32491-1-git-send-email-roylee17@gmail.com>
-Message-ID: <CAK=WgbbBHspN_LTUXH1kUugH8-Nr-G=p-G3Wj60tAmrqqfakmg@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 6 Aug 2012 16:16:57 +0200
+Subject: [PATCH 0/6] ARM: dove: DT support for Marvell Dove
+In-Reply-To: <201208061402.22815.arnd@arndb.de>
+References: <1344255815-4457-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <201208061402.22815.arnd@arndb.de>
+Message-ID: <CABJ1b_S6jRW9P7ygs7LPztbx1zW-u=gD1kk0UYbgBrHdvsaOeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tzu-Jung Lee,
+On 8/6/12, Arnd Bergmann <arnd@arndb.de> wrote:
+> This looks vert nice!
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-On Mon, Aug 6, 2012 at 10:24 AM, Tzu-Jung Lee <roylee17@gmail.com> wrote:
-> Previously, the remoteproc mandates an actual ELF firmware in order to
-> parse the resource table and boot the remoteproc.
->
-> An fw loader abstraction was added in v3.61-rc1 to make the ELF as a
-> "default" handler, and allows firmwares in other formats to be loaded.
->
-> However, in our use cases, we don't actually have a firmware for linux
-> to load. The remote processor always boots first, and then boots the
-> rest of processors that running linux.
+Hi Arnd,
 
-Can you describe your use case some more ?
+thanks for the ack!
 
-What parts in remoteproc are actually helpful for you (not much I
-guess if Linux doesn't control the life cycle of the remote processor
-in your case) ?
+> Has anyone tested it on cm-a510 and dove-db? Once we can reasonably
+> assume that there are no regressions compared to using the board
+> files, I think we can plan for removing the non-DT support in
+> mach-dove. If it's been tested positively, that can well be at
+> the same time as adding the DT support, otherwise I think we should
+> wait a couple of releases while having both simultaneously.
 
-Do you use rpmsg ?
+Unfortunately, I has not (yet) been tested on cm-a510 nor dove-db but
+from the status of the exisiting non-DT setup files I strongly doubt that
+anyone is using current mainline kernel for mach-dove.
 
-> In this case, forging an binary firmware just for the resource table
-> creates a burden for maintenence.
-> Allowing the firmware request/release function to be customized gives
-> developers to construct the reqource table in memory, instead of loading
-> one from filesystem.
+I suggest to keep non-DT support until we have pinctrl and gpiolib drivers
+done. Thomas Petazzoni and I have been working on pinctrl that will be
+posted in a few days and gpiolib driver needs some more cleanup but is
+basically working. Until then I guess most of the other orion drivers have
+DT support (eth and xor IIRC).
 
-I'm not sure this is an ideal abstraction though.
+After that I am definitely fine with removing non-DT support although
+there is neither DT support in u-boot installed on my CuBox nor
+mach-dove support in mainline u-boot.
 
-The problem you describe is architectural and not necessarily related
-with a specific binary format, which this patch ties it up with (by
-abstracting it away in rproc_fw_ops). It seems that a
-binary-format-agnostic solution is preferable, because it could then
-be utilized by any platform, regardless of the binary format it uses.
-
-In general we prefer not to adopt a solution that puts the resource
-table in the kernel, because that means redundant churn and
-compatibility issues, as the resource table is inherently coupled with
-the software running on the remote processor, and not with the Linux
-kernel.
-
-An easy solution is to allow loading an external stand-alone resource
-table from the filesystem. We've discussed this in the past and
-several parties showed interest. Will it help you ?
-
-Another possible solution is to allow the low level rproc driver to
-provide the remoteproc framework a pointer to an in-memory resource
-table. This may prove useful in case the remote processor is already
-up when Linux boots, and the resource table is already loaded to
-memory.
-
-> Change-Id: I0aa071dc1bd775eed6ea0822cff0fe2fc1b12b45
-
-PS - no need to provide these tags when sending patches upstream.
-
-Thanks,
-Ohad.
+Sebastian
