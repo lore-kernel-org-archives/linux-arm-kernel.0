@@ -1,75 +1,28 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Mon, 6 Aug 2012 15:00:15 -0500
-Subject: kernel entry for thumb2-only cpus
-In-Reply-To: <20120806194016.GB1120@n2100.arm.linux.org.uk>
-References: <20120803090452.GE2626@pengutronix.de>
- <20120803114532.GB26925@mudshark.cambridge.arm.com>
- <20120805095528.GO2626@pengutronix.de>
- <alpine.LFD.2.02.1208060026460.5231@xanadu.home>
- <CAKGA1b=Pxif=4qSvK-Odmunbm_T6LjWP_CXid_v2VNmpuyHLDA@mail.gmail.com>
- <20120806190856.GA1120@n2100.arm.linux.org.uk>
- <CAKGA1b=Np8+RMwgQEzwxdJcL6AjC4qiv1Jyq0bTTa_dHCeLokA@mail.gmail.com>
- <20120806194016.GB1120@n2100.arm.linux.org.uk>
-Message-ID: <CAKGA1b=hMZD3nd2sjXzR89-wX4BotxZwHOkkiLFoEL_CSS4zug@mail.gmail.com>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Mon, 6 Aug 2012 22:16:09 +0200
+Subject: [PATCH 4/9] ASoC: imx: Don't use {en,dis}able_fiq() calls
+In-Reply-To: <20120806193734.GA16199@opensource.wolfsonmicro.com>
+References: <20120805230238.GA1663@lizard>
+ <1344207819-3415-4-git-send-email-anton.vorontsov@linaro.org>
+ <CAKGA1bkiHj=zMJXSzoGp3fpLS3POnFXSV5y7sYYFAikqoUT9tQ@mail.gmail.com>
+ <20120806154951.GQ16861@opensource.wolfsonmicro.com>
+ <CAKGA1b=_AOub_pEJJGBTb6Y7wLZaSYKQjFTyMVFSr_=9VX4wpg@mail.gmail.com>
+ <20120806193734.GA16199@opensource.wolfsonmicro.com>
+Message-ID: <20120806201609.GX25644@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 6, 2012 at 2:40 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Aug 06, 2012 at 02:30:48PM -0500, Matt Sealey wrote:
->> On Mon, Aug 6, 2012 at 2:08 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Mon, Aug 06, 2012 at 01:40:26PM -0500, Matt Sealey wrote:
->> >> Maybe we could implement a shiny new zImage magic value, I'm not sure
->> >> if 0x016f2818 might have some sentimental value, but there's nothing
->> >> to say that 0x016f2819 wouldn't also be valid and indicate that it's
->> >> an ARM zImage with a Thumb2 entrypoint?
->> >
->> > No.  That magic value is a bloody pain in the backside from my point
->> > of view.  I've had soo many problems with it with boot loaders its
->> > untrue.
->>
->> [snip]
->>
->> > Instead, lets not continue this broken idea.  Instead, let's be able
->> > to _tell_ the boot loader what we want it to do, rather than have it
->> > magically decipher what _it_ thinks might be a good idea to do.
->>
->> Okay, so how about we just append an ELF header to the front of the
->> image so the entry point, and the architecture, instruction
->> set, ABI etc. is well defined in an industry standard manner?
->>
->> e_entry would then have the LSB set which indicates the entry is
->> Thumb.. or not :)
->
-> No.  Take a moment to think about what you're saying.  Are you really
-> saying no to the single kernel image project?
->
-> Because anything that involves wrapping the kernel up in an "industry
-> standard manner" like an ELF header places fixed addresses (like the
-> entry point) into the kernel, and then we're back to the same problem
-> that every SoC vendor places their RAM at different places in the
-> system memory map.
->
-> No.  Can't do that.  Sorry.
+On Mon, Aug 06, 2012 at 08:37:34PM +0100, Mark Brown wrote:
+> As far as I can tell nobody's really running much up to date mainline
+> on older i.MX processors, all the work is going on the new stuff and
+> most of the board are on either vendor BSPs or older kernels.
 
-Right now there's already a fixed entry point - ARM kernels are fixed
-entry point of relative 0 to the start of the loaded image. Okay, so
-we can't format a totally valid ELF header, but in the event that we
-want to encode all this information yet again, why reinvent the wheel?
+That's not true; we still run MX25, MX27, MX35, MX28 on mainline in
+active projects.
 
-Just reserve your bytes or so at the front of the image for head.S,
-and at the correct point (right where the zImage magic would be) sits
-an ELF magic and the rest of the ELF header. I realize you'd need to
-write another rudimentary ELF parser for U-Boot and one for very early
-init in the kernel to get the jump right, therefore reinventing the
-wheel in some respects, but I'm curious how anyone could do any better
-with another custom image header format. It's somewhat this way anyway
-(to my last recollection vmlinux is ELF so you can get gdb to load it)
-and the only better thing I can think of is to use PECOFF, because
-then it'd automatically be UEFI compatible (and we can all stop using
-grub-efi and directly boot a kernel).
-
+rsc
 -- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
