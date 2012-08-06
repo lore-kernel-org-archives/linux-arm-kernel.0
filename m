@@ -1,35 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 6 Aug 2012 17:54:34 +0000
-Subject: [GIT PULL] mxs fixes for 3.6
-In-Reply-To: <20120804144058.GB3405@S2101-09.ap.freescale.net>
-References: <20120804144058.GB3405@S2101-09.ap.freescale.net>
-Message-ID: <201208061754.34914.arnd@arndb.de>
+Date: Mon, 6 Aug 2012 17:56:17 +0000
+Subject: [PATCH] ARM: integrator: use clk_prepare_enable() for timer
+In-Reply-To: <CACRpkdaqFqE5D5LkT0buof_5YZkpP_J_Y6qu0B5gKi4W3mFEkw@mail.gmail.com>
+References: <1344199075-4111-1-git-send-email-linus.walleij@linaro.org>
+ <201208061437.52415.arnd@arndb.de>
+ <CACRpkdaqFqE5D5LkT0buof_5YZkpP_J_Y6qu0B5gKi4W3mFEkw@mail.gmail.com>
+Message-ID: <201208061756.18147.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 04 August 2012, Shawn Guo wrote:
-> Hi Arnd, Olof,
+On Monday 06 August 2012, Linus Walleij wrote:
+> On Mon, Aug 6, 2012 at 4:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Sunday 05 August 2012, Linus Walleij wrote:
+> >> On Sun, Aug 5, 2012 at 10:37 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> >> > The Integrator timer is using the clock framework to get the
+> >> > timer frequency, but missed to prepare the clock before enabling.
+> >> >
+> >> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> >>
+> >> Arnd, Olof,
+> >>
+> >> If this patch looks OK to you I request that you apply it alone, no pull
+> >> requests, too much hazzle for a single patch...
+> >>
+> >
+> > Applying a patch is fine, but please explain which version(s) to apply
+> > this to? Is it a regression in v3.6, or should it be backported to
+> > earlier versions too?
 > 
-> Please pull the following mxs fixes for 3.6.
+> Ah sorry. This is for the v3.6 rc:s.
 > 
-> Regards,
-> Shawn
-> 
-> The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
-> 
->   Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
-> 
-> are available in the git repository at:
->   git://git.linaro.org/people/shawnguo/linux-2.6.git mxs/fixes-for-3.6
-> 
-> Fabio Estevam (2):
->       ARM: mx23: Fix registers range
->       ARM: mx28: Fix registers range
-> 
-> Marek Vasut (1):
->       ARM: mxs: Remove MMAP_MIN_ADDR setting from mxs_defconfig
+> The migration to common clock makes the kernel spit warnings
+> unless you prepare all clocks.
 > 
 
-Pulled, thanks!
+Ok, I've applied it to the fixes branch now.
 
 	Arnd
