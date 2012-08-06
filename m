@@ -1,65 +1,74 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Mon, 6 Aug 2012 13:05:34 +0530
-Subject: [PATCH] hwmon: tmp102: Add device tree support
-In-Reply-To: <501BE6B1.9000100@ti.com>
-References: <1343997350-676-1-git-send-email-sourav.poddar@ti.com>
- <501BE6B1.9000100@ti.com>
-Message-ID: <CAKdam54Zshr-d502E_AS+vw5+vLQnTBrAGRPTy-9-hZy1QEFbA@mail.gmail.com>
+From: r.sricharan@ti.com (R Sricharan)
+Date: Mon, 6 Aug 2012 13:11:25 +0530
+Subject: [PATCH v2 1/1] ARM: LPAE: Fix mapping in alloc_init_pte for unaligned
+ addresses.
+Message-ID: <1344238885-13683-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+With LPAE, When either the start address or end address
+or physical address to be mapped is unaligned,
+alloc_init_section creates page granularity mappings.
+alloc_init_section calls alloc_init_pte which populates
+one pmd entry and sets up the ptes. But if the size is
+greater than what can be mapped by one pmd entry,
+then the rest remains unmapped.
 
-On Fri, Aug 3, 2012 at 8:26 PM, Benoit Cousson <b-cousson@ti.com> wrote:
-> Hi Sourav,
->
-> On 08/03/2012 02:35 PM, Sourav Poddar wrote:
->> update tmp102 temperature sensor to also use device tree.
->>
->> Cc: Benoit Cousson <b-cousson@ti.com>
->> Cc: Felipe Balbi <balbi@ti.com>
->> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Acked-by: Felipe Balbi <balbi@ti.com>
->> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
->> ---
->>  drivers/hwmon/tmp102.c |   14 +++++++++++++-
->>  1 files changed, 13 insertions(+), 1 deletions(-)
->>
->> diff --git a/drivers/hwmon/tmp102.c b/drivers/hwmon/tmp102.c
->> index 0d466b9..a8a9060 100644
->> --- a/drivers/hwmon/tmp102.c
->> +++ b/drivers/hwmon/tmp102.c
->> @@ -26,6 +26,7 @@
->>  #include <linux/err.h>
->>  #include <linux/mutex.h>
->>  #include <linux/device.h>
->> +#include <linux/of.h>
->>
->>  #define      DRIVER_NAME "tmp102"
->>
->> @@ -284,8 +285,19 @@ static const struct i2c_device_id tmp102_id[] = {
->>  };
->>  MODULE_DEVICE_TABLE(i2c, tmp102_id);
->>
->> +#ifdef CONFIG_OF
->> +static const struct of_device_id temperature_dt_match[] = {
->> +     { .compatible = "ti,tmp102" },
->
-> Are you sure this is needed for this device?
->
-> There is an automatic binding done for I2C devices in the of_i2c core
-> code. So in theory, DT will be able to bind to any I2C device using the
-> already existing table: MODULE_DEVICE_TABLE(i2c, tmp102_id).
->
-> So I think this patch should not be needed.
->
-Indeed. Checked it just now, this patch is not required and the already
-existing table is enough for the device to work fine.
+The issue becomes visible when LPAE is enabled, where we have
+the 3 levels with seperate pgd and pmd's.
+When a static mapping for 3MB is requested, only 2MB is mapped
+and the remaining 1MB is unmapped. Fixing this here, by looping
+in to map the entire unaligned address range.
 
-Thanks for the information.
+Boot tested on OMAP5 evm with both LPAE enabled/disabled
+and verified that static mappings with unaligned addresses
+are properly mapped.
 
-This patch is abandoned.
-~Sourav
-> Regards,
-> Benoit
->
+Signed-off-by: R Sricharan <r.sricharan@ti.com>
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+---
+[V2] Moved the loop to alloc_init_pte as per Russell's
+     feedback and changed the subject accordingly.
+     Using PMD_XXX instead of SECTION_XXX to avoid
+     different loop increments with/without LPAE.
+
+ arch/arm/mm/mmu.c |   22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index cf4528d..0ed8808 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -585,11 +585,25 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 				  unsigned long end, unsigned long pfn,
+ 				  const struct mem_type *type)
+ {
+-	pte_t *pte = early_pte_alloc(pmd, addr, type->prot_l1);
++	unsigned long next;
++	pte_t *pte;
++	phys_addr_t phys;
++
+ 	do {
+-		set_pte_ext(pte, pfn_pte(pfn, __pgprot(type->prot_pte)), 0);
+-		pfn++;
+-	} while (pte++, addr += PAGE_SIZE, addr != end);
++		if ((end-addr) & PMD_MASK)
++			next = (addr + PMD_SIZE) & PMD_MASK;
++		else
++			next = end;
++
++		pte = early_pte_alloc(pmd, addr, type->prot_l1);
++		do {
++			set_pte_ext(pte, pfn_pte(pfn,
++					__pgprot(type->prot_pte)), 0);
++			pfn++;
++		} while (pte++, addr += PAGE_SIZE, addr != next);
++
++		phys += next - addr;
++	} while (pmd++, addr = next, addr != end);
+ }
+ 
+ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
+-- 
+1.7.9.5
