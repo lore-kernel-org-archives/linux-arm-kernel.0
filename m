@@ -1,140 +1,114 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 06 Aug 2012 13:52:18 -0700
-Subject: [PATCH] Revert "ARM: OMAP3530evm: set pendown_state and debounce
- time for ads7846"
-In-Reply-To: <1344284535-16717-1-git-send-email-grinberg@compulab.co.il> (Igor
- Grinberg's message of "Mon, 6 Aug 2012 23:22:15 +0300")
-References: <876298iv9s.fsf@ti.com>
- <1344284535-16717-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <871ujj7ngd.fsf@ti.com>
+Date: Mon, 06 Aug 2012 14:31:48 -0700
+Subject: DSS and USBHOST powerdomains not entering low-power states on
+ 37xx EVM
+In-Reply-To: <alpine.DEB.2.00.1208031355450.28888@utopia.booyaka.com> (Paul
+ Walmsley's message of "Fri, 3 Aug 2012 14:05:55 -0600 (MDT)")
+References: <alpine.DEB.2.00.1208031355450.28888@utopia.booyaka.com>
+Message-ID: <877gtb6723.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Igor Grinberg <grinberg@compulab.co.il> writes:
+Hi Paul,
 
-> 1) The above commit introduced a common ->get_pendown_state() function
-> into the generic code, but that function was board-specific for the
-> OMAP3EVM and thus broke most other boards using this code.
->
-> 2) The above commit was mis-merged introducing another bug which
-> prevents the ads7846 driver probe function to succeed.
-> The omap_ads7846_init() function frees the pendown GPIO in case there is
-> no ->get_pendown_state() function set by the caller (board specific
-> code), so it can be requested later by the ads7846 driver.
-> The above commit add a common ->get_pendown_state() function without
-> removing the gpio_free() call and thus once the ads7846 driver tries
-> to use the pendown GPIO, it crashes as the pendown GPIO has not been
-> requested.
->
-> 3) The above commit introduces NO new functionality as
-> get_pendown_state() function is already implemented in a suitable way by
-> the ads7846 driver and the debounce time handling has already been
-> fixed by commit 97ee9f01 (ARM: OMAP: fix the ads7846 init code).
->
-> This reverts commit 16aced80f6739beb2a6ff7b6f96c83ba80d331e8.
->
-> Conflicts:
-> 	arch/arm/mach-omap2/common-board-devices.c
->
-> Solved by taking the working version prior to the above commit.
->
-> Cc: Zumeng Chen <zumeng.chen@windriver.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> ---
-> Kevin, sorry for the late reply.
-> How about the above commit message and the below patch?
->
-> The patch applies cleanly to Tony's master branch (6 Aug 2012)
-> or Kevin's kevin-omap-pm/for_3.6/fixes/ads7846
-> after resetting two top most commits.
+Paul Walmsley <paul@pwsan.com> writes:
 
-Now that v3.6-rc1 is out, it should probalby be applied on top of -rc1.
-I've taken care of that and tested as well.
+> On v3.6-rc1 on 37xx EVM, DSS and USBHOST powerdomains aren't entering 
+> low-power states.  Test log is below.
 
-> This patch has been tested on both above branches on cm-t3730.
-> Any other board tested will be greately appreciated.
->
-> Also, if after all said in the commit message, you still don't
-> want to revert the original patch, feel free to post your thoughts.
+Is this only happening on this 37xx platform?    Just curious, because
+it seems to be a problem on any OMAP3xxx SoC.
 
-After all the digging I did, I agree that the revert is the best
-solution.  
+[...]
 
-While it's a slightly different problem/bug, I think the gpio_free() in
-common-board-devices.c should still be unconditonal since the
-gpio_request() is now unconditional.  That can be a separate patch though.
+> # echo mem > /sys/power/state
+> [   35.068359] PM: Syncing filesystems ... done.
+> [   35.083038] Freezing user space processes ... (elapsed 0.00 seconds) 
+> done.
+> [   35.090698] Freezing remaining freezable tasks ... (elapsed 0.02 
+> seconds) done.
+> [   35.122833] Suspending console(s) (use no_console_suspend to debug)
+> [   35.144409] PM: suspend of devices complete after 11.260 msecs
+> [   35.147369] PM: late suspend of devices complete after 2.929 msecs
+> [   35.152465] PM: noirq suspend of devices complete after 5.096 msecs
+> [   35.152526] Disabling non-boot CPUs ...
+> [   36.958343] Successfully put all powerdomains to target state
 
-Acked-by: Kevin Hilman <khilman@ti.com>
-Tested-by: Kevin Hilman <khilman@ti.com>
+According to the readback of prev pwrst, it seems they are hitting the
+target pwrst (retention by default), so...
 
-Tested on 3430/n900, 3530/Overo, 3730/Overo STORM, 3730/BB-xM.
+> [   36.960662] PM: noirq resume of devices complete after 2.166 msecs
+> [   36.964050] PM: early resume of devices complete after 1.892 msecs
+> [   36.973388] PM: resume of devices complete after 9.185 msecs
+> [   37.025207] Restarting tasks ... done.
+> # cat  /debug/pm_debug/count
+> usbhost_pwrdm 
+> (ON),OFF:0,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+> sgx_pwrdm (OFF),OFF:1,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+> core_pwrdm 
+> (ON),OFF:0,RET:1,INA:0,ON:2,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+> per_pwrdm (ON),OFF:0,RET:1,INA:0,ON:2,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+> dss_pwrdm (ON),OFF:0,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+> cam_pwrdm (RET),OFF:0,RET:1,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+> neon_pwrdm (ON),OFF:0,RET:673,INA:0,ON:674,RET-LOGIC-OFF:0
+> mpu_pwrdm (ON),OFF:0,RET:673,INA:0,ON:674,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+> iva2_pwrdm (RET),OFF:0,RET:1,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0,RET-MEMBANK3-OFF:0,RET-ME
+> MBANK4-OFF:0
+> usbhost_clkdm->usbhost_pwrdm (1)
+> sgx_clkdm->sgx_pwrdm (0)
+> per_clkdm->per_pwrdm (22)
+> cam_clkdm->cam_pwrdm (0)
+> dss_clkdm->dss_pwrdm (1)
+> d2d_clkdm->core_pwrdm (0)
+> iva2_clkdm->iva2_pwrdm (0)
+> mpu_clkdm->mpu_pwrdm (0)
+> core_l4_clkdm->core_pwrdm (24)
+> core_l3_clkdm->core_pwrdm (4)
+> neon_clkdm->neon_pwrdm (0)
 
-The Overo boards were the ones that were crashing due to this bug since
-the pendown GPIO was the only one used in the bank.
+...it must be the usecounts that are not being updated.  This seems to
+be a side effect of the pre/post transition optimization I did.  A quick
+hack seems to indicate that that's indeed the case[1].  By default,
+omap_sram_idle() is now only calling the pre/post callbacks for MPU,
+NEON, PER, and CORE, and only if those domains are transitioning, so any
+other domains not explicitly managed by the idle path have lots their
+usecounting.  Oops.
 
-Tony, can you queue this up for v3.6-rc?  I have a version in my
-for_3.6/fixes/ads7846-2 branch with the tags above applied, based on v3.6-rc1.
-
-Thanks
+I guess Tero's usecounting series should fix this up.
 
 Kevin
 
->  arch/arm/mach-omap2/board-omap3evm.c       |    1 +
->  arch/arm/mach-omap2/common-board-devices.c |   11 -----------
->  arch/arm/mach-omap2/common-board-devices.h |    1 -
->  3 files changed, 1 insertions(+), 12 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-> index ef230a0..0d362e9 100644
-> --- a/arch/arm/mach-omap2/board-omap3evm.c
-> +++ b/arch/arm/mach-omap2/board-omap3evm.c
-> @@ -58,6 +58,7 @@
->  #include "hsmmc.h"
->  #include "common-board-devices.h"
->  
-> +#define OMAP3_EVM_TS_GPIO	175
->  #define OMAP3_EVM_EHCI_VBUS	22
->  #define OMAP3_EVM_EHCI_SELECT	61
->  
-> diff --git a/arch/arm/mach-omap2/common-board-devices.c b/arch/arm/mach-omap2/common-board-devices.c
-> index 1473474..c187586 100644
-> --- a/arch/arm/mach-omap2/common-board-devices.c
-> +++ b/arch/arm/mach-omap2/common-board-devices.c
-> @@ -35,16 +35,6 @@ static struct omap2_mcspi_device_config ads7846_mcspi_config = {
->  	.turbo_mode	= 0,
->  };
->  
-> -/*
-> - * ADS7846 driver maybe request a gpio according to the value
-> - * of pdata->get_pendown_state, but we have done this. So set
-> - * get_pendown_state to avoid twice gpio requesting.
-> - */
-> -static int omap3_get_pendown_state(void)
-> -{
-> -	return !gpio_get_value(OMAP3_EVM_TS_GPIO);
-> -}
-> -
->  static struct ads7846_platform_data ads7846_config = {
->  	.x_max			= 0x0fff,
->  	.y_max			= 0x0fff,
-> @@ -55,7 +45,6 @@ static struct ads7846_platform_data ads7846_config = {
->  	.debounce_rep		= 1,
->  	.gpio_pendown		= -EINVAL,
->  	.keep_vref_on		= 1,
-> -	.get_pendown_state	= &omap3_get_pendown_state,
->  };
->  
->  static struct spi_board_info ads7846_spi_board_info __initdata = {
-> diff --git a/arch/arm/mach-omap2/common-board-devices.h b/arch/arm/mach-omap2/common-board-devices.h
-> index 4c4ef6a..a0b4a428 100644
-> --- a/arch/arm/mach-omap2/common-board-devices.h
-> +++ b/arch/arm/mach-omap2/common-board-devices.h
-> @@ -4,7 +4,6 @@
->  #include "twl-common.h"
->  
->  #define NAND_BLOCK_SIZE	SZ_128K
-> -#define OMAP3_EVM_TS_GPIO	175
->  
->  struct mtd_partition;
->  struct ads7846_platform_data;
+[1] 
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index e4fc88c..d87416f 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -70,6 +70,7 @@ void (*omap3_do_wfi_sram)(void);
+ 
+ static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
+ static struct powerdomain *core_pwrdm, *per_pwrdm;
++static struct powerdomain *dss_pwrdm, *usbhost_pwrdm;
+ 
+ static void omap3_core_save_context(void)
+ {
+@@ -393,7 +394,11 @@ static int omap3_pm_suspend(void)
+ 
+ 	omap3_intc_suspend();
+ 
++	pwrdm_pre_transition(dss_pwrdm);
++	pwrdm_pre_transition(usbhost_pwrdm);
+ 	omap_sram_idle();
++	pwrdm_post_transition(usbhost_pwrdm);
++	pwrdm_post_transition(dss_pwrdm);
+ 
+ restore:
+ 	/* Restore next_pwrsts */
+@@ -718,6 +723,8 @@ int __init omap3_pm_init(void)
+ 	neon_pwrdm = pwrdm_lookup("neon_pwrdm");
+ 	per_pwrdm = pwrdm_lookup("per_pwrdm");
+ 	core_pwrdm = pwrdm_lookup("core_pwrdm");
++	dss_pwrdm = pwrdm_lookup("dss_pwrdm");
++	usbhost_pwrdm = pwrdm_lookup("usbhost_pwrdm");
+ 
+ 	neon_clkdm = clkdm_lookup("neon_clkdm");
+ 	mpu_clkdm = clkdm_lookup("mpu_clkdm");
