@@ -1,29 +1,35 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 6 Aug 2012 11:26:52 -0300
-Subject: [PATCH 1/1] mx27_3ds: Add sound support
-In-Reply-To: <501FD389.1050105@gmail.com>
-References: <1344258447-6162-1-git-send-email-gcembed@gmail.com>
- <CAOMZO5B9ZmTHrYjVc5a7j=uUgUEyfDva54cKxBP3UeCYZsUWRw@mail.gmail.com>
- <501FD389.1050105@gmail.com>
-Message-ID: <CAOMZO5B3i9NeSD-uqbjN6LLCR1UUhSYKs8g+D6yj7hs31kNJ6A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 6 Aug 2012 14:30:43 +0000
+Subject: [PATCH] arm: add documentation describing Marvell families of SoC
+In-Reply-To: <20120806112736.6d441561@skate>
+References: <1344115004-7886-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201208060813.01524.arnd@arndb.de> <20120806112736.6d441561@skate>
+Message-ID: <201208061430.43962.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 6, 2012 at 11:24 AM, Ga?tan Carlier <gcembed@gmail.com> wrote:
-> Hi Fabio,
-> Sorry, I have missed your patch in my email archive. I didn't search the
-> right keywords.
-> I applied your [patch 1/2] (2/2 is already merged) but I have same effect. I
-> use aplay with file k3b_error1.wav (Unsigned 8 bit, Rate 8000 Hz, Mono) and
-> alsa/Front_Left.wav (Signed 16 bit Little Endian, Rate 48000 Hz, Mono). Two
-> sounds are played too fast.
-> It is maybe a bad configuration of Alsa (but this is working with kernel
-> 2.6.22 from Freescale).
+On Monday 06 August 2012, Thomas Petazzoni wrote:
+> Le Mon, 6 Aug 2012 08:13:01 +0000,
+> Arnd Bergmann <arnd@arndb.de> a ?crit :
+> 
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Thanks. Am I supposed to resend this to Rob Landley <rob@landley.net>,
+> who is apparently the Documentation/ maintainer, or can you push it
+> through the arm-soc tree since it is Documentation/arm/ material?
 
-Ok, we will need to debug this problem then.
+Taking this through arm-soc is fine with me, and Russell's ARM
+tree would probably work as well.
 
-Can you please send me offline these two files?
+Should I apply the patch right away, or do you plan to send
+it as part of a set of pull requests? In general I would assume
+that I get a pull request unless you specifically ask for the
+patch to be applied to the arm-soc tree separately (which is
+ok for single patches).
 
-Regards,
+Also remember to send any requests for inclusion into arm-soc
+(pull or patch) to both Olof and me, since we are taking turns
+in the maintainance and you might not know who is doing it
+on any given day.
 
-Fabio Estevam
+	Arnd
