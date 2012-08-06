@@ -1,48 +1,90 @@
-From: pieterg@gmx.com (pieterg at gmx.com)
-Date: Mon,  6 Aug 2012 14:56:18 +0200
-Subject: [PATCH] pxafb: allow zero for smart panel timings
-Message-ID: <1344257778-25737-1-git-send-email-pieterg@gmx.com>
+From: gcembed@gmail.com (=?UTF-8?q?Ga=C3=ABtan=20Carlier?=)
+Date: Mon,  6 Aug 2012 15:07:27 +0200
+Subject: [PATCH 1/1] mx27_3ds: Add sound support
+Message-ID: <1344258447-6162-1-git-send-email-gcembed@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pieter Grimmerink <p.grimmerink@inepro.com>
+Hi,
+I have ported code "Enable sound on mx31_3ds" from Philippe R?tornaz to
+MX27 3DS platform on master branch of linux-next (tag next-20120806).
+I also applied patch "dma: imx-dma: Fix kernel crash due to missing clock
+conversion" of Fabio Estevam which is not yet merged in linux-next.
+Thanks to them, everything is working good on MX27 3DS platform except that
+sound is played too fast.
+Which parameter must be adjusted to have sound playing at normal speed ?
+In mc13783 codec driver, imx_add_imx_ssi(), clock configuration in
+mach-mx27_3ds file ?
 
-The LCCR1[BLW] description states:
-"For LCD panels with an internal frame buffer, BLW
-specifies the pulse width of the Write or Read signal
-(...) which is equal to (BLW+1)*LCD_CLK_PERIOD"
+Thanks for your help.
 
-And the LCD Smart Panel Timing Specifications states:
-"L_PCLK_WR pulse width duration:
-Min: 1
-Typical: LCCR1[BLW] + 1
-Max: 256
-Units: LCLK"
-
-The BLW field has a value range of 0 to 255, resulting in
-a write or read pulse width range of
-1*LCD_CLK_PERIOD..256*LCD_CLK_PERIOD
-
-So LCCR1[BLW] = 0 is a valid configuration.
-The same is the case for LCCR1[ELW] and LCCR3[PCD],
-the other two smart panel timing values.
+Signed-off-by: Ga?tan Carlier <gcembed@gmail.com>
 ---
- drivers/video/pxafb.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/mach-imx/Kconfig         |    1 +
+ arch/arm/mach-imx/mach-mx27_3ds.c |   19 ++++++++++++++++++-
+ 2 files changed, 19 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
-index 04c395a..7ea5e23 100644
---- a/drivers/video/pxafb.c
-+++ b/drivers/video/pxafb.c
-@@ -1223,8 +1223,7 @@ int pxafb_smart_queue(struct fb_info *info, uint16_t *cmds, int n_cmds)
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index afd542a..63f64f1 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -302,6 +302,7 @@ config MACH_MX27_3DS
+ 	select IMX_HAVE_PLATFORM_IMX2_WDT
+ 	select IMX_HAVE_PLATFORM_IMX_FB
+ 	select IMX_HAVE_PLATFORM_IMX_I2C
++	select IMX_HAVE_PLATFORM_IMX_SSI
+ 	select IMX_HAVE_PLATFORM_IMX_KEYPAD
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+ 	select IMX_HAVE_PLATFORM_MX2_CAMERA
+diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
+index 58c24c1..a5d4080 100644
+--- a/arch/arm/mach-imx/mach-mx27_3ds.c
++++ b/arch/arm/mach-imx/mach-mx27_3ds.c
+@@ -158,6 +158,11 @@ static const int mx27pdk_pins[] __initconst = {
+ 	PB21_PF_CSI_HSYNC,
+ 	CSI_PWRDWN | GPIO_GPIO | GPIO_OUT,
+ 	CSI_RESET | GPIO_GPIO | GPIO_OUT,
++	/* SSI */
++	PC16_PF_SSI4_FS,
++	PC17_PF_SSI4_RXD,
++	PC18_PF_SSI4_TXD,
++	PC19_PF_SSI4_CLK,
+ };
  
- static unsigned int __smart_timing(unsigned time_ns, unsigned long lcd_clk)
- {
--	unsigned int t = (time_ns * (lcd_clk / 1000000) / 1000);
--	return (t == 0) ? 1 : t;
-+	return time_ns * (lcd_clk / 1000000) / 1000;
+ static struct gpio mx27_3ds_camera_gpios[] = {
+@@ -329,13 +334,23 @@ static struct mc13xxx_regulator_init_data mx27_3ds_regulators[] = {
+ };
+ 
+ /* MC13783 */
++static struct mc13xxx_codec_platform_data mx27_3ds_codec = {
++	.dac_ssi_port = MC13783_SSI1_PORT,
++	.adc_ssi_port = MC13783_SSI1_PORT,
++};
++
+ static struct mc13xxx_platform_data mc13783_pdata = {
+ 	.regulators = {
+ 		.regulators = mx27_3ds_regulators,
+ 		.num_regulators = ARRAY_SIZE(mx27_3ds_regulators),
+ 
+ 	},
+-	.flags  = MC13XXX_USE_TOUCHSCREEN | MC13XXX_USE_RTC,
++	.codec = &mx27_3ds_codec,
++	.flags  = MC13XXX_USE_TOUCHSCREEN | MC13XXX_USE_RTC | MC13XXX_USE_CODEC,
++};
++
++static struct imx_ssi_platform_data mx27_3ds_ssi_pdata = {
++		.flags = IMX_SSI_DMA | IMX_SSI_NET,
+ };
+ 
+ /* SPI */
+@@ -512,6 +527,8 @@ static void __init mx27pdk_init(void)
+ 	}
+ 
+ 	imx27_add_mx2_camera(&mx27_3ds_cam_pdata);
++	imx27_add_imx_ssi(0, &mx27_3ds_ssi_pdata);
++	imx_add_platform_device("imx_mc13783", 0, NULL, 0, NULL, 0);
  }
  
- static void setup_smart_timing(struct pxafb_info *fbi,
+ static void __init mx27pdk_timer_init(void)
 -- 
-1.7.9.5
+1.7.7.4
