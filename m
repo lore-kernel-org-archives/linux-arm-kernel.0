@@ -1,41 +1,29 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 6 Aug 2012 18:24:07 +0100
-Subject: [PATCH 1/1] Input: ab8500-ponkey: Make the distinction between
- DT and non-DT boots
-In-Reply-To: <20120806160226.GF29272@sirena.org.uk>
-References: <1344256323-10484-1-git-send-email-lee.jones@linaro.org>
- <20120806081915.GA4518@core.coreip.homeip.net>
- <20120806153750.GI10524@gmail.com>
- <20120806160226.GF29272@sirena.org.uk>
-Message-ID: <20120806172406.GC31409@gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 6 Aug 2012 23:07:33 +0530
+Subject: [PATCH] ODROID-X: hkdk4412: Add new hardware based on Exynos4412
+In-Reply-To: <1344262254-14648-1-git-send-email-dongjin.kim@agreeyamobility.net>
+References: <1344262254-14648-1-git-send-email-dongjin.kim@agreeyamobility.net>
+Message-ID: <CAJuYYwSjnQ6z0iUaLCV9guC7yyKH3_pbd1QZe3ELKF-fYNfaqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2012 at 05:02:26PM +0100, Mark Brown wrote:
-> On Mon, Aug 06, 2012 at 04:37:52PM +0100, Lee Jones wrote:
-> > On Mon, Aug 06, 2012 at 01:19:15AM -0700, Dmitry Torokhov wrote:
-> 
-> > > > +	ponkey->irq_dbf = (np) ? ab8500_irq_get_virq(ab8500, irq_dbf) : irq_dbf;
-> > > > +	ponkey->irq_dbr = (np) ? ab8500_irq_get_virq(ab8500, irq_dbr) : irq_dbr;
-> 
-> > > Why this isn't done inside ab8500_irq_get_virq()?
-> 
-> > There's no reason why it can't be.
-> 
-> > My first version of the patch did just that in fact.
-> 
-> > Would that be your preference?
-> 
-> Restating my comment elsewhere...  why do we even need to do this in
-> _get_virq() - I'd *really* expect this to be handled by the irq domain
-> code.
+On 6 August 2012 19:40, Dongjin Kim <tobetter@gmail.com> wrote:
+> The HKDK4412 is the CPU module developed by Hardkernel which is based on
+> Exynos 4412.  mach_hkdk4412.c is to run on ODROID-X hardware and Machine ID
+> (4289) is registered.
+>
+> Change-Id: I3af02808c03b9acea916c310390a4904ad92d761
+> Signed-off-by: Dongjin Kim <dongjin.kim@agreeyamobility.net>
+> ---
+>  arch/arm/mach-exynos/Kconfig         |   23 +
+>  arch/arm/mach-exynos/Makefile        |    1 +
+>  arch/arm/mach-exynos/mach-hkdk4412.c |  979 ++++++++++++++++++++++++++++++++++
+>  arch/arm/tools/mach-types            |    1 +
+>  4 files changed, 1004 insertions(+)
+>  create mode 100644 arch/arm/mach-exynos/mach-hkdk4412.c
 
-I really should stop reading my emails backwards. :)
+How about looking at using device tree option for this board. That
+might require additional effort but would be helpful in the long run.
 
-I'll look into this tomorrow.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Thomas.
