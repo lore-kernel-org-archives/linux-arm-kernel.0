@@ -1,106 +1,47 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 6 Aug 2012 15:27:09 +0100
-Subject: [PATCH v2 06/23] xen: missing includes
-In-Reply-To: <alpine.DEB.2.02.1208061428060.4645@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1208061428060.4645@kaball.uk.xensource.com>
-Message-ID: <1344263246-28036-6-git-send-email-stefano.stabellini@eu.citrix.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 6 Aug 2012 16:35:35 +0200
+Subject: [PATCH] ARM: imx35: don't disable the uart clock when DEBUG_LL
+ is in use
+In-Reply-To: <20120806142406.GC9329@pengutronix.de>
+References: <1343742279-29570-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20120731174358.GC30009@pengutronix.de>
+ <20120731183206.GC10670@pengutronix.de>
+ <20120806142406.GC9329@pengutronix.de>
+Message-ID: <20120806143535.GC1451@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in v2:
-- remove pvclock hack;
-- remove include linux/types.h from xen/interface/xen.h.
+On Mon, Aug 06, 2012 at 04:24:06PM +0200, Uwe Kleine-K?nig wrote:
+> On Tue, Jul 31, 2012 at 08:32:06PM +0200, Uwe Kleine-K?nig wrote:
+> > Hello Sascha,
+> > 
+> > On Tue, Jul 31, 2012 at 07:43:58PM +0200, Sascha Hauer wrote:
+> > > On Tue, Jul 31, 2012 at 03:44:39PM +0200, Uwe Kleine-K?nig wrote:
+> > > > Otherwise printch et al. and printk with earlyprintk and keep_bootcon
+> > > > becomes unfunctional when the clk framework disables all unused clocks.
+> > > 
+> > > Why don't you use the regular console? Letting the clock framework
+> > > disable the clocks was pretty much intentional.
+> > I don't question that disabling unused clocks is sensible. But usually
+> > if you enable DEBUG_LL you want to use it even after the clock framework
+> > disabled all (apparently) unused clocks. And in my case the regular
+> > console didn't work yet and so I relied on earlyprintk.
+> > Even if the problem proved to be the result of my stupidity this patch
+> > asserts that earlyprintk just works as it should be for debug aids.
+> ping
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- arch/x86/include/asm/xen/interface.h       |    2 ++
- drivers/tty/hvc/hvc_xen.c                  |    2 ++
- drivers/xen/grant-table.c                  |    1 +
- drivers/xen/xenbus/xenbus_probe_frontend.c |    1 +
- include/xen/interface/xen.h                |    1 -
- include/xen/privcmd.h                      |    1 +
- 6 files changed, 7 insertions(+), 1 deletions(-)
+Honestly, I don't think this is a good idea. You fixed one UART on one
+SoC, so ARRAY_SIZE(i.MX1, i.MX21, i.MX25, i.MX27, i.MX31, i.MX35,
+i.MX51, i.MX53, i.MX6) * NUM_UARTS remain broken for this usecase. IMO
+DEBUG_LL is to get some stuff out of an otherwise silent board, nothing
+more.
 
-diff --git a/arch/x86/include/asm/xen/interface.h b/arch/x86/include/asm/xen/interface.h
-index cbf0c9d..a93db16 100644
---- a/arch/x86/include/asm/xen/interface.h
-+++ b/arch/x86/include/asm/xen/interface.h
-@@ -121,6 +121,8 @@ struct arch_shared_info {
- #include "interface_64.h"
- #endif
- 
-+#include <asm/pvclock-abi.h>
-+
- #ifndef __ASSEMBLY__
- /*
-  * The following is all CPU context. Note that the fpu_ctxt block is filled
-diff --git a/drivers/tty/hvc/hvc_xen.c b/drivers/tty/hvc/hvc_xen.c
-index 944eaeb..dc07f56 100644
---- a/drivers/tty/hvc/hvc_xen.c
-+++ b/drivers/tty/hvc/hvc_xen.c
-@@ -21,6 +21,7 @@
- #include <linux/console.h>
- #include <linux/delay.h>
- #include <linux/err.h>
-+#include <linux/irq.h>
- #include <linux/init.h>
- #include <linux/types.h>
- #include <linux/list.h>
-@@ -35,6 +36,7 @@
- #include <xen/page.h>
- #include <xen/events.h>
- #include <xen/interface/io/console.h>
-+#include <xen/interface/sched.h>
- #include <xen/hvc-console.h>
- #include <xen/xenbus.h>
- 
-diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
-index 0bfc1ef..1d0d95e 100644
---- a/drivers/xen/grant-table.c
-+++ b/drivers/xen/grant-table.c
-@@ -47,6 +47,7 @@
- #include <xen/interface/memory.h>
- #include <xen/hvc-console.h>
- #include <asm/xen/hypercall.h>
-+#include <asm/xen/interface.h>
- 
- #include <asm/pgtable.h>
- #include <asm/sync_bitops.h>
-diff --git a/drivers/xen/xenbus/xenbus_probe_frontend.c b/drivers/xen/xenbus/xenbus_probe_frontend.c
-index a31b54d..3159a37 100644
---- a/drivers/xen/xenbus/xenbus_probe_frontend.c
-+++ b/drivers/xen/xenbus/xenbus_probe_frontend.c
-@@ -21,6 +21,7 @@
- #include <xen/xenbus.h>
- #include <xen/events.h>
- #include <xen/page.h>
-+#include <xen/xen.h>
- 
- #include <xen/platform_pci.h>
- 
-diff --git a/include/xen/interface/xen.h b/include/xen/interface/xen.h
-index a890804..3871e47 100644
---- a/include/xen/interface/xen.h
-+++ b/include/xen/interface/xen.h
-@@ -10,7 +10,6 @@
- #define __XEN_PUBLIC_XEN_H__
- 
- #include <asm/xen/interface.h>
--#include <asm/pvclock-abi.h>
- 
- /*
-  * XEN "SYSTEM CALLS" (a.k.a. HYPERCALLS).
-diff --git a/include/xen/privcmd.h b/include/xen/privcmd.h
-index 17857fb..4d58881 100644
---- a/include/xen/privcmd.h
-+++ b/include/xen/privcmd.h
-@@ -35,6 +35,7 @@
- 
- #include <linux/types.h>
- #include <linux/compiler.h>
-+#include <xen/interface/xen.h>
- 
- typedef unsigned long xen_pfn_t;
- 
+Sascha
+
+
+
 -- 
-1.7.2.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
