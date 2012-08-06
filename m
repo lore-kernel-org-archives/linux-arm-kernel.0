@@ -1,2001 +1,1223 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 6 Aug 2012 23:42:46 +0800
-Subject: [PATCH 3/6] ARM: mxs: remove board files
+Date: Mon, 6 Aug 2012 23:42:49 +0800
+Subject: [PATCH 6/6] ARM: mxs: remove iomux driver
 In-Reply-To: <1344267769-31166-1-git-send-email-shawn.guo@linaro.org>
 References: <1344267769-31166-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1344267769-31166-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1344267769-31166-7-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since DT kernel provides the equivalent support with those board
-files, we can remove them now.
+With all board files removed, there is no user of iomux driver.
+Remove it.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-Cc: Marek Vasut <marex@denx.de>
-Cc: Lauri Hintsala <lauri.hintsala@bluegiga.com>
 ---
- arch/arm/configs/mxs_defconfig         |    6 -
- arch/arm/mach-mxs/Kconfig              |   87 ------
- arch/arm/mach-mxs/Makefile             |    7 -
- arch/arm/mach-mxs/mach-apx4devkit.c    |  273 ------------------
- arch/arm/mach-mxs/mach-m28evk.c        |  366 ------------------------
- arch/arm/mach-mxs/mach-mx23evk.c       |  190 -------------
- arch/arm/mach-mxs/mach-mx28evk.c       |  477 --------------------------------
- arch/arm/mach-mxs/mach-stmp378x_devb.c |  123 --------
- arch/arm/mach-mxs/mach-tx28.c          |  184 ------------
- arch/arm/mach-mxs/module-tx28.c        |  160 -----------
- arch/arm/mach-mxs/module-tx28.h        |   10 -
- 11 files changed, 0 insertions(+), 1883 deletions(-)
- delete mode 100644 arch/arm/mach-mxs/mach-apx4devkit.c
- delete mode 100644 arch/arm/mach-mxs/mach-m28evk.c
- delete mode 100644 arch/arm/mach-mxs/mach-mx23evk.c
- delete mode 100644 arch/arm/mach-mxs/mach-mx28evk.c
- delete mode 100644 arch/arm/mach-mxs/mach-stmp378x_devb.c
- delete mode 100644 arch/arm/mach-mxs/mach-tx28.c
- delete mode 100644 arch/arm/mach-mxs/module-tx28.c
- delete mode 100644 arch/arm/mach-mxs/module-tx28.h
+ arch/arm/mach-mxs/Makefile                  |    2 +-
+ arch/arm/mach-mxs/include/mach/iomux-mx23.h |  355 ------------------
+ arch/arm/mach-mxs/include/mach/iomux-mx28.h |  537 ---------------------------
+ arch/arm/mach-mxs/include/mach/iomux.h      |  168 ---------
+ arch/arm/mach-mxs/iomux.c                   |  101 -----
+ 5 files changed, 1 insertions(+), 1162 deletions(-)
+ delete mode 100644 arch/arm/mach-mxs/include/mach/iomux-mx23.h
+ delete mode 100644 arch/arm/mach-mxs/include/mach/iomux-mx28.h
+ delete mode 100644 arch/arm/mach-mxs/include/mach/iomux.h
+ delete mode 100644 arch/arm/mach-mxs/iomux.c
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index ccdb635..e5fc6c2 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -23,12 +23,6 @@ CONFIG_BLK_DEV_INTEGRITY=y
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_MXS=y
- CONFIG_MACH_MXS_DT=y
--CONFIG_MACH_MX23EVK=y
--CONFIG_MACH_MX28EVK=y
--CONFIG_MACH_STMP378X_DEVB=y
--CONFIG_MACH_TX28=y
--CONFIG_MACH_M28EVK=y
--CONFIG_MACH_APX4DEVKIT=y
- # CONFIG_ARM_THUMB is not set
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
-diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-index 9a8bbda..2e6cb6d 100644
---- a/arch/arm/mach-mxs/Kconfig
-+++ b/arch/arm/mach-mxs/Kconfig
-@@ -27,91 +27,4 @@ config MACH_MXS_DT
- 	  Include support for Freescale MXS platforms(i.MX23 and i.MX28)
- 	  using the device tree for discovery
- 
--config MACH_STMP378X_DEVB
--	bool "Support STMP378x_devb Platform"
--	select SOC_IMX23
--	select MXS_HAVE_AMBA_DUART
--	select MXS_HAVE_PLATFORM_AUART
--	select MXS_HAVE_PLATFORM_MXS_MMC
--	select MXS_HAVE_PLATFORM_RTC_STMP3XXX
--	help
--	  Include support for STMP378x-devb platform. This includes specific
--	  configurations for the board and its peripherals.
--
--config MACH_MX23EVK
--	bool "Support MX23EVK Platform"
--	select SOC_IMX23
--	select MXS_HAVE_AMBA_DUART
--	select MXS_HAVE_PLATFORM_AUART
--	select MXS_HAVE_PLATFORM_MXS_MMC
--	select MXS_HAVE_PLATFORM_MXSFB
--	select MXS_HAVE_PLATFORM_RTC_STMP3XXX
--	help
--	  Include support for MX23EVK platform. This includes specific
--	  configurations for the board and its peripherals.
--
--config MACH_MX28EVK
--	bool "Support MX28EVK Platform"
--	select SOC_IMX28
--	select LEDS_GPIO_REGISTER
--	select MXS_HAVE_AMBA_DUART
--	select MXS_HAVE_PLATFORM_AUART
--	select MXS_HAVE_PLATFORM_FEC
--	select MXS_HAVE_PLATFORM_FLEXCAN
--	select MXS_HAVE_PLATFORM_MXS_MMC
--	select MXS_HAVE_PLATFORM_MXSFB
--	select MXS_HAVE_PLATFORM_MXS_SAIF
--	select MXS_HAVE_PLATFORM_MXS_I2C
--	select MXS_HAVE_PLATFORM_RTC_STMP3XXX
--	help
--	  Include support for MX28EVK platform. This includes specific
--	  configurations for the board and its peripherals.
--
--config MODULE_TX28
--	bool
--	select SOC_IMX28
--	select LEDS_GPIO_REGISTER
--	select MXS_HAVE_AMBA_DUART
--	select MXS_HAVE_PLATFORM_AUART
--	select MXS_HAVE_PLATFORM_FEC
--	select MXS_HAVE_PLATFORM_MXS_I2C
--	select MXS_HAVE_PLATFORM_MXS_MMC
--	select MXS_HAVE_PLATFORM_MXS_PWM
--	select MXS_HAVE_PLATFORM_RTC_STMP3XXX
--
--config MODULE_M28
--	bool
--	select SOC_IMX28
--	select LEDS_GPIO_REGISTER
--	select MXS_HAVE_AMBA_DUART
--	select MXS_HAVE_PLATFORM_AUART
--	select MXS_HAVE_PLATFORM_FEC
--	select MXS_HAVE_PLATFORM_FLEXCAN
--	select MXS_HAVE_PLATFORM_MXS_I2C
--	select MXS_HAVE_PLATFORM_MXS_MMC
--	select MXS_HAVE_PLATFORM_MXSFB
--
--config MODULE_APX4
--	bool
--	select SOC_IMX28
--	select LEDS_GPIO_REGISTER
--	select MXS_HAVE_AMBA_DUART
--	select MXS_HAVE_PLATFORM_AUART
--	select MXS_HAVE_PLATFORM_FEC
--	select MXS_HAVE_PLATFORM_MXS_I2C
--	select MXS_HAVE_PLATFORM_MXS_MMC
--	select MXS_HAVE_PLATFORM_MXS_SAIF
--
--config MACH_TX28
--	bool "Ka-Ro TX28 module"
--	select MODULE_TX28
--
--config MACH_M28EVK
--	bool "Support DENX M28EVK Platform"
--	select MODULE_M28
--
--config MACH_APX4DEVKIT
--	bool "Support Bluegiga APX4 Development Kit"
--	select MODULE_APX4
--
- endif
 diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
-index fed3695..a7ace24 100644
+index 2480ce9..3d3c8a9 100644
 --- a/arch/arm/mach-mxs/Makefile
 +++ b/arch/arm/mach-mxs/Makefile
-@@ -4,12 +4,5 @@ obj-y := devices.o icoll.o iomux.o ocotp.o system.o timer.o mm.o
+@@ -1,5 +1,5 @@
+ # Common support
+-obj-y := icoll.o iomux.o ocotp.o system.o timer.o mm.o
++obj-y := icoll.o ocotp.o system.o timer.o mm.o
+ 
  obj-$(CONFIG_PM) += pm.o
  
- obj-$(CONFIG_MACH_MXS_DT) += mach-mxs.o
--obj-$(CONFIG_MACH_STMP378X_DEVB) += mach-stmp378x_devb.o
--obj-$(CONFIG_MACH_MX23EVK) += mach-mx23evk.o
--obj-$(CONFIG_MACH_MX28EVK) += mach-mx28evk.o
--obj-$(CONFIG_MACH_M28EVK)    += mach-m28evk.o
--obj-$(CONFIG_MACH_APX4DEVKIT) += mach-apx4devkit.o
--obj-$(CONFIG_MODULE_TX28) += module-tx28.o
--obj-$(CONFIG_MACH_TX28)    += mach-tx28.o
- 
- obj-y += devices/
-diff --git a/arch/arm/mach-mxs/mach-apx4devkit.c b/arch/arm/mach-mxs/mach-apx4devkit.c
+diff --git a/arch/arm/mach-mxs/include/mach/iomux-mx23.h b/arch/arm/mach-mxs/include/mach/iomux-mx23.h
 deleted file mode 100644
-index f5f0617..0000000
---- a/arch/arm/mach-mxs/mach-apx4devkit.c
+index b0190a4..0000000
+--- a/arch/arm/mach-mxs/include/mach/iomux-mx23.h
 +++ /dev/null
-@@ -1,273 +0,0 @@
+@@ -1,355 +0,0 @@
 -/*
-- * Copyright (C) 2011-2012
-- * Lauri Hintsala, Bluegiga, <lauri.hintsala@bluegiga.com>
-- * Veli-Pekka Peltola, Bluegiga, <veli-pekka.peltola@bluegiga.com>
+- * Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
+- * Copyright (C) 2010 Freescale Semiconductor, Inc.
 - *
-- * based on: mach-mx28evk.c
-- * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
 - *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
 - */
 -
--#include <linux/delay.h>
--#include <linux/platform_device.h>
--#include <linux/gpio.h>
--#include <linux/leds.h>
--#include <linux/clk.h>
--#include <linux/i2c.h>
--#include <linux/regulator/machine.h>
--#include <linux/regulator/fixed.h>
--#include <linux/micrel_phy.h>
+-#ifndef __MACH_IOMUX_MX23_H__
+-#define __MACH_IOMUX_MX23_H__
 -
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/time.h>
+-#include <mach/iomux.h>
 -
--#include <mach/common.h>
--#include <mach/digctl.h>
--#include <mach/iomux-mx28.h>
--
--#include "devices-mx28.h"
--
--#define APX4DEVKIT_GPIO_USERLED	MXS_GPIO_NR(3, 28)
--
--static const iomux_cfg_t apx4devkit_pads[] __initconst = {
--	/* duart */
--	MX28_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
--	MX28_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
--
--	/* auart0 */
--	MX28_PAD_AUART0_RX__AUART0_RX | MXS_PAD_CTRL,
--	MX28_PAD_AUART0_TX__AUART0_TX | MXS_PAD_CTRL,
--	MX28_PAD_AUART0_CTS__AUART0_CTS | MXS_PAD_CTRL,
--	MX28_PAD_AUART0_RTS__AUART0_RTS | MXS_PAD_CTRL,
--
--	/* auart1 */
--	MX28_PAD_AUART1_RX__AUART1_RX | MXS_PAD_CTRL,
--	MX28_PAD_AUART1_TX__AUART1_TX | MXS_PAD_CTRL,
--
--	/* auart2 */
--	MX28_PAD_SSP2_SCK__AUART2_RX | MXS_PAD_CTRL,
--	MX28_PAD_SSP2_MOSI__AUART2_TX | MXS_PAD_CTRL,
--
--	/* auart3 */
--	MX28_PAD_SSP2_MISO__AUART3_RX | MXS_PAD_CTRL,
--	MX28_PAD_SSP2_SS0__AUART3_TX | MXS_PAD_CTRL,
--
--#define MXS_PAD_FEC	(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP)
--	/* fec0 */
--	MX28_PAD_ENET0_MDC__ENET0_MDC | MXS_PAD_FEC,
--	MX28_PAD_ENET0_MDIO__ENET0_MDIO | MXS_PAD_FEC,
--	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN | MXS_PAD_FEC,
--	MX28_PAD_ENET0_RXD0__ENET0_RXD0 | MXS_PAD_FEC,
--	MX28_PAD_ENET0_RXD1__ENET0_RXD1 | MXS_PAD_FEC,
--	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN | MXS_PAD_FEC,
--	MX28_PAD_ENET0_TXD0__ENET0_TXD0 | MXS_PAD_FEC,
--	MX28_PAD_ENET0_TXD1__ENET0_TXD1 | MXS_PAD_FEC,
--	MX28_PAD_ENET_CLK__CLKCTRL_ENET | MXS_PAD_FEC,
--
--	/* i2c */
--	MX28_PAD_I2C0_SCL__I2C0_SCL,
--	MX28_PAD_I2C0_SDA__I2C0_SDA,
--
--	/* mmc0 */
--	MX28_PAD_SSP0_DATA0__SSP0_D0 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA1__SSP0_D1 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA2__SSP0_D2 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA3__SSP0_D3 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA4__SSP0_D4 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA5__SSP0_D5 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA6__SSP0_D6 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA7__SSP0_D7 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_CMD__SSP0_CMD |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--	MX28_PAD_SSP0_SCK__SSP0_SCK |
--		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--
--	/* led */
--	MX28_PAD_PWM3__GPIO_3_28 | MXS_PAD_CTRL,
--
--	/* saif0 & saif1 */
--	MX28_PAD_SAIF0_MCLK__SAIF0_MCLK |
--		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SAIF0_LRCLK__SAIF0_LRCLK |
--		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SAIF0_BITCLK__SAIF0_BITCLK |
--		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SAIF0_SDATA0__SAIF0_SDATA0 |
--		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SAIF1_SDATA0__SAIF1_SDATA0 |
--		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--};
--
--/* led */
--static const struct gpio_led apx4devkit_leds[] __initconst = {
--	{
--		.name = "user-led",
--		.default_trigger = "heartbeat",
--		.gpio = APX4DEVKIT_GPIO_USERLED,
--	},
--};
--
--static const struct gpio_led_platform_data apx4devkit_led_data __initconst = {
--	.leds = apx4devkit_leds,
--	.num_leds = ARRAY_SIZE(apx4devkit_leds),
--};
--
--static const struct fec_platform_data mx28_fec_pdata __initconst = {
--	.phy = PHY_INTERFACE_MODE_RMII,
--};
--
--static const struct mxs_mmc_platform_data apx4devkit_mmc_pdata __initconst = {
--	.wp_gpio = -EINVAL,
--	.flags = SLOTF_4_BIT_CAPABLE,
--};
--
--static const struct i2c_board_info apx4devkit_i2c_boardinfo[] __initconst = {
--	{ I2C_BOARD_INFO("sgtl5000", 0x0a) }, /* ASoC */
--	{ I2C_BOARD_INFO("pcf8563", 0x51) }, /* RTC */
--};
--
--#if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || \
--		defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
--static struct regulator_consumer_supply apx4devkit_audio_consumer_supplies[] = {
--	REGULATOR_SUPPLY("VDDA", "0-000a"),
--	REGULATOR_SUPPLY("VDDIO", "0-000a"),
--};
--
--static struct regulator_init_data apx4devkit_vdd_reg_init_data = {
--	.constraints	= {
--		.name	= "3V3",
--		.always_on = 1,
--	},
--	.consumer_supplies = apx4devkit_audio_consumer_supplies,
--	.num_consumer_supplies = ARRAY_SIZE(apx4devkit_audio_consumer_supplies),
--};
--
--static struct fixed_voltage_config apx4devkit_vdd_pdata = {
--	.supply_name	= "board-3V3",
--	.microvolts	= 3300000,
--	.gpio		= -EINVAL,
--	.enabled_at_boot = 1,
--	.init_data	= &apx4devkit_vdd_reg_init_data,
--};
--
--static struct platform_device apx4devkit_voltage_regulator = {
--	.name		= "reg-fixed-voltage",
--	.id		= -1,
--	.num_resources	= 0,
--	.dev		= {
--		.platform_data	= &apx4devkit_vdd_pdata,
--	},
--};
--
--static void __init apx4devkit_add_regulators(void)
--{
--	platform_device_register(&apx4devkit_voltage_regulator);
--}
--#else
--static void __init apx4devkit_add_regulators(void) {}
--#endif
--
--static const struct mxs_saif_platform_data
--			apx4devkit_mxs_saif_pdata[] __initconst = {
--	/* working on EXTMSTR0 mode (saif0 master, saif1 slave) */
--	{
--		.master_mode = 1,
--		.master_id = 0,
--	}, {
--		.master_mode = 0,
--		.master_id = 0,
--	},
--};
--
--static int apx4devkit_phy_fixup(struct phy_device *phy)
--{
--	phy->dev_flags |= MICREL_PHY_50MHZ_CLK;
--	return 0;
--}
--
--static void __init apx4devkit_fec_phy_clk_enable(void)
--{
--	struct clk *clk;
--
--	/* Enable fec phy clock */
--	clk = clk_get_sys("enet_out", NULL);
--	if (!IS_ERR(clk))
--		clk_prepare_enable(clk);
--}
--
--static void __init apx4devkit_init(void)
--{
--	mx28_soc_init();
--
--	mxs_iomux_setup_multiple_pads(apx4devkit_pads,
--			ARRAY_SIZE(apx4devkit_pads));
--
--	mx28_add_duart();
--	mx28_add_auart0();
--	mx28_add_auart1();
--	mx28_add_auart2();
--	mx28_add_auart3();
--
--	/*
--	 * Register fixup for the Micrel KS8031 PHY clock
--	 * (shares same ID with KS8051)
--	 */
--	phy_register_fixup_for_uid(PHY_ID_KS8051, MICREL_PHY_ID_MASK,
--			apx4devkit_phy_fixup);
--
--	apx4devkit_fec_phy_clk_enable();
--	mx28_add_fec(0, &mx28_fec_pdata);
--
--	mx28_add_mxs_mmc(0, &apx4devkit_mmc_pdata);
--
--	gpio_led_register_device(0, &apx4devkit_led_data);
--
--	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
--	mx28_add_saif(0, &apx4devkit_mxs_saif_pdata[0]);
--	mx28_add_saif(1, &apx4devkit_mxs_saif_pdata[1]);
--
--	apx4devkit_add_regulators();
--
--	mx28_add_mxs_i2c(0);
--	i2c_register_board_info(0, apx4devkit_i2c_boardinfo,
--			ARRAY_SIZE(apx4devkit_i2c_boardinfo));
--
--	mxs_add_platform_device("mxs-sgtl5000", 0, NULL, 0, NULL, 0);
--}
--
--static void __init apx4devkit_timer_init(void)
--{
--	mx28_clocks_init();
--}
--
--static struct sys_timer apx4devkit_timer = {
--	.init	= apx4devkit_timer_init,
--};
--
--MACHINE_START(APX4DEVKIT, "Bluegiga APX4 Development Kit")
--	.map_io		= mx28_map_io,
--	.init_irq	= mx28_init_irq,
--	.timer		= &apx4devkit_timer,
--	.init_machine	= apx4devkit_init,
--	.restart	= mxs_restart,
--MACHINE_END
-diff --git a/arch/arm/mach-mxs/mach-m28evk.c b/arch/arm/mach-mxs/mach-m28evk.c
-deleted file mode 100644
-index 4c00c87..0000000
---- a/arch/arm/mach-mxs/mach-m28evk.c
-+++ /dev/null
-@@ -1,366 +0,0 @@
 -/*
-- * Copyright (C) 2011
-- * Stefano Babic, DENX Software Engineering, <sbabic@denx.de>
+- * The naming convention for the pad modes is MX23_PAD_<padname>__<padmode>
+- * If <padname> or <padmode> refers to a GPIO, it is named GPIO_<unit>_<num>
+- * See also iomux.h
 - *
-- * based on: mach-mx28_evk.c
-- * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+- *									BANK	PIN	MUX
+- */
+-/* MUXSEL_0 */
+-#define MX23_PAD_GPMI_D00__GPMI_D00		MXS_IOMUX_PAD_NAKED(0,  0, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_D01__GPMI_D01		MXS_IOMUX_PAD_NAKED(0,  1, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_D02__GPMI_D02		MXS_IOMUX_PAD_NAKED(0,  2, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_D03__GPMI_D03		MXS_IOMUX_PAD_NAKED(0,  3, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_D04__GPMI_D04		MXS_IOMUX_PAD_NAKED(0,  4, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_D05__GPMI_D05		MXS_IOMUX_PAD_NAKED(0,  5, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_D06__GPMI_D06		MXS_IOMUX_PAD_NAKED(0,  6, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_D07__GPMI_D07		MXS_IOMUX_PAD_NAKED(0,  7, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_D08__GPMI_D08		MXS_IOMUX_PAD_NAKED(0,  8, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_D09__GPMI_D09		MXS_IOMUX_PAD_NAKED(0,  9, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_D10__GPMI_D10		MXS_IOMUX_PAD_NAKED(0, 10, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_D11__GPMI_D11		MXS_IOMUX_PAD_NAKED(0, 11, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_D12__GPMI_D12		MXS_IOMUX_PAD_NAKED(0, 12, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_D13__GPMI_D13		MXS_IOMUX_PAD_NAKED(0, 13, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_D14__GPMI_D14		MXS_IOMUX_PAD_NAKED(0, 14, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_D15__GPMI_D15		MXS_IOMUX_PAD_NAKED(0, 15, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_CLE__GPMI_CLE		MXS_IOMUX_PAD_NAKED(0, 16, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_ALE__GPMI_ALE		MXS_IOMUX_PAD_NAKED(0, 17, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_CE2N__GPMI_CE2N		MXS_IOMUX_PAD_NAKED(0, 18, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_RDY0__GPMI_RDY0		MXS_IOMUX_PAD_NAKED(0, 19, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_RDY1__GPMI_RDY1		MXS_IOMUX_PAD_NAKED(0, 20, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_RDY2__GPMI_RDY2		MXS_IOMUX_PAD_NAKED(0, 21, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_RDY3__GPMI_RDY3		MXS_IOMUX_PAD_NAKED(0, 22, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_WPN__GPMI_WPN		MXS_IOMUX_PAD_NAKED(0, 23, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_WRN__GPMI_WRN		MXS_IOMUX_PAD_NAKED(0, 24, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_RDN__GPMI_RDN		MXS_IOMUX_PAD_NAKED(0, 25, PAD_MUXSEL_0)
+-#define MX23_PAD_AUART1_CTS__AUART1_CTS		MXS_IOMUX_PAD_NAKED(0, 26, PAD_MUXSEL_0)
+-#define MX23_PAD_AUART1_RTS__AUART1_RTS		MXS_IOMUX_PAD_NAKED(0, 27, PAD_MUXSEL_0)
+-#define MX23_PAD_AUART1_RX__AUART1_RX		MXS_IOMUX_PAD_NAKED(0, 28, PAD_MUXSEL_0)
+-#define MX23_PAD_AUART1_TX__AUART1_TX		MXS_IOMUX_PAD_NAKED(0, 29, PAD_MUXSEL_0)
+-#define MX23_PAD_I2C_SCL__I2C_SCL		MXS_IOMUX_PAD_NAKED(0, 30, PAD_MUXSEL_0)
+-#define MX23_PAD_I2C_SDA__I2C_SDA		MXS_IOMUX_PAD_NAKED(0, 31, PAD_MUXSEL_0)
+-
+-#define MX23_PAD_LCD_D00__LCD_D00		MXS_IOMUX_PAD_NAKED(1,  0, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_D01__LCD_D01		MXS_IOMUX_PAD_NAKED(1,  1, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_D02__LCD_D02		MXS_IOMUX_PAD_NAKED(1,  2, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_D03__LCD_D03		MXS_IOMUX_PAD_NAKED(1,  3, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_D04__LCD_D04		MXS_IOMUX_PAD_NAKED(1,  4, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_D05__LCD_D05		MXS_IOMUX_PAD_NAKED(1,  5, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_D06__LCD_D06		MXS_IOMUX_PAD_NAKED(1,  6, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_D07__LCD_D07		MXS_IOMUX_PAD_NAKED(1,  7, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_D08__LCD_D08		MXS_IOMUX_PAD_NAKED(1,  8, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_D09__LCD_D09		MXS_IOMUX_PAD_NAKED(1,  9, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_D10__LCD_D10		MXS_IOMUX_PAD_NAKED(1, 10, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_D11__LCD_D11		MXS_IOMUX_PAD_NAKED(1, 11, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_D12__LCD_D12		MXS_IOMUX_PAD_NAKED(1, 12, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_D13__LCD_D13		MXS_IOMUX_PAD_NAKED(1, 13, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_D14__LCD_D14		MXS_IOMUX_PAD_NAKED(1, 14, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_D15__LCD_D15		MXS_IOMUX_PAD_NAKED(1, 15, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_D16__LCD_D16		MXS_IOMUX_PAD_NAKED(1, 16, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_D17__LCD_D17		MXS_IOMUX_PAD_NAKED(1, 17, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_RESET__LCD_RESET		MXS_IOMUX_PAD_NAKED(1, 18, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_RS__LCD_RS			MXS_IOMUX_PAD_NAKED(1, 19, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_WR__LCD_WR			MXS_IOMUX_PAD_NAKED(1, 20, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_CS__LCD_CS			MXS_IOMUX_PAD_NAKED(1, 21, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_DOTCK__LCD_DOTCK		MXS_IOMUX_PAD_NAKED(1, 22, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_ENABLE__LCD_ENABLE		MXS_IOMUX_PAD_NAKED(1, 23, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_HSYNC__LCD_HSYNC		MXS_IOMUX_PAD_NAKED(1, 24, PAD_MUXSEL_0)
+-#define MX23_PAD_LCD_VSYNC__LCD_VSYNC		MXS_IOMUX_PAD_NAKED(1, 25, PAD_MUXSEL_0)
+-#define MX23_PAD_PWM0__PWM0			MXS_IOMUX_PAD_NAKED(1, 26, PAD_MUXSEL_0)
+-#define MX23_PAD_PWM1__PWM1			MXS_IOMUX_PAD_NAKED(1, 27, PAD_MUXSEL_0)
+-#define MX23_PAD_PWM2__PWM2			MXS_IOMUX_PAD_NAKED(1, 28, PAD_MUXSEL_0)
+-#define MX23_PAD_PWM3__PWM3			MXS_IOMUX_PAD_NAKED(1, 29, PAD_MUXSEL_0)
+-#define MX23_PAD_PWM4__PWM4			MXS_IOMUX_PAD_NAKED(1, 30, PAD_MUXSEL_0)
+-
+-#define MX23_PAD_SSP1_CMD__SSP1_CMD		MXS_IOMUX_PAD_NAKED(2,  0, PAD_MUXSEL_0)
+-#define MX23_PAD_SSP1_DETECT__SSP1_DETECT	MXS_IOMUX_PAD_NAKED(2,  1, PAD_MUXSEL_0)
+-#define MX23_PAD_SSP1_DATA0__SSP1_DATA0		MXS_IOMUX_PAD_NAKED(2,  2, PAD_MUXSEL_0)
+-#define MX23_PAD_SSP1_DATA1__SSP1_DATA1		MXS_IOMUX_PAD_NAKED(2,  3, PAD_MUXSEL_0)
+-#define MX23_PAD_SSP1_DATA2__SSP1_DATA2		MXS_IOMUX_PAD_NAKED(2,  4, PAD_MUXSEL_0)
+-#define MX23_PAD_SSP1_DATA3__SSP1_DATA3		MXS_IOMUX_PAD_NAKED(2,  5, PAD_MUXSEL_0)
+-#define MX23_PAD_SSP1_SCK__SSP1_SCK		MXS_IOMUX_PAD_NAKED(2,  6, PAD_MUXSEL_0)
+-#define MX23_PAD_ROTARYA__ROTARYA		MXS_IOMUX_PAD_NAKED(2,  7, PAD_MUXSEL_0)
+-#define MX23_PAD_ROTARYB__ROTARYB		MXS_IOMUX_PAD_NAKED(2,  8, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_A00__EMI_A00		MXS_IOMUX_PAD_NAKED(2,  9, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_A01__EMI_A01		MXS_IOMUX_PAD_NAKED(2, 10, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_A02__EMI_A02		MXS_IOMUX_PAD_NAKED(2, 11, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_A03__EMI_A03		MXS_IOMUX_PAD_NAKED(2, 12, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_A04__EMI_A04		MXS_IOMUX_PAD_NAKED(2, 13, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_A05__EMI_A05		MXS_IOMUX_PAD_NAKED(2, 14, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_A06__EMI_A06		MXS_IOMUX_PAD_NAKED(2, 15, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_A07__EMI_A07		MXS_IOMUX_PAD_NAKED(2, 16, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_A08__EMI_A08		MXS_IOMUX_PAD_NAKED(2, 17, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_A09__EMI_A09		MXS_IOMUX_PAD_NAKED(2, 18, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_A10__EMI_A10		MXS_IOMUX_PAD_NAKED(2, 19, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_A11__EMI_A11		MXS_IOMUX_PAD_NAKED(2, 20, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_A12__EMI_A12		MXS_IOMUX_PAD_NAKED(2, 21, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_BA0__EMI_BA0		MXS_IOMUX_PAD_NAKED(2, 22, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_BA1__EMI_BA1		MXS_IOMUX_PAD_NAKED(2, 23, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_CASN__EMI_CASN		MXS_IOMUX_PAD_NAKED(2, 24, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_CE0N__EMI_CE0N		MXS_IOMUX_PAD_NAKED(2, 25, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_CE1N__EMI_CE1N		MXS_IOMUX_PAD_NAKED(2, 26, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_CE1N__GPMI_CE1N		MXS_IOMUX_PAD_NAKED(2, 27, PAD_MUXSEL_0)
+-#define MX23_PAD_GPMI_CE0N__GPMI_CE0N		MXS_IOMUX_PAD_NAKED(2, 28, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_CKE__EMI_CKE		MXS_IOMUX_PAD_NAKED(2, 29, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_RASN__EMI_RASN		MXS_IOMUX_PAD_NAKED(2, 30, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_WEN__EMI_WEN		MXS_IOMUX_PAD_NAKED(2, 31, PAD_MUXSEL_0)
+-
+-#define MX23_PAD_EMI_D00__EMI_D00		MXS_IOMUX_PAD_NAKED(3,  0, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_D01__EMI_D01		MXS_IOMUX_PAD_NAKED(3,  1, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_D02__EMI_D02		MXS_IOMUX_PAD_NAKED(3,  2, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_D03__EMI_D03		MXS_IOMUX_PAD_NAKED(3,  3, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_D04__EMI_D04		MXS_IOMUX_PAD_NAKED(3,  4, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_D05__EMI_D05		MXS_IOMUX_PAD_NAKED(3,  5, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_D06__EMI_D06		MXS_IOMUX_PAD_NAKED(3,  6, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_D07__EMI_D07		MXS_IOMUX_PAD_NAKED(3,  7, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_D08__EMI_D08		MXS_IOMUX_PAD_NAKED(3,  8, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_D09__EMI_D09		MXS_IOMUX_PAD_NAKED(3,  9, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_D10__EMI_D10		MXS_IOMUX_PAD_NAKED(3, 10, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_D11__EMI_D11		MXS_IOMUX_PAD_NAKED(3, 11, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_D12__EMI_D12		MXS_IOMUX_PAD_NAKED(3, 12, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_D13__EMI_D13		MXS_IOMUX_PAD_NAKED(3, 13, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_D14__EMI_D14		MXS_IOMUX_PAD_NAKED(3, 14, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_D15__EMI_D15		MXS_IOMUX_PAD_NAKED(3, 15, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_DQM0__EMI_DQM0		MXS_IOMUX_PAD_NAKED(3, 16, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_DQM1__EMI_DQM1		MXS_IOMUX_PAD_NAKED(3, 17, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_DQS0__EMI_DQS0		MXS_IOMUX_PAD_NAKED(3, 18, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_DQS1__EMI_DQS1		MXS_IOMUX_PAD_NAKED(3, 19, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_CLK__EMI_CLK		MXS_IOMUX_PAD_NAKED(3, 20, PAD_MUXSEL_0)
+-#define MX23_PAD_EMI_CLKN__EMI_CLKN		MXS_IOMUX_PAD_NAKED(3, 21, PAD_MUXSEL_0)
+-
+-/* MUXSEL_1 */
+-#define MX23_PAD_GPMI_D00__LCD_D8		MXS_IOMUX_PAD_NAKED(0,  0, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_D01__LCD_D9		MXS_IOMUX_PAD_NAKED(0,  1, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_D02__LCD_D10		MXS_IOMUX_PAD_NAKED(0,  2, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_D03__LCD_D11		MXS_IOMUX_PAD_NAKED(0,  3, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_D04__LCD_D12		MXS_IOMUX_PAD_NAKED(0,  4, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_D05__LCD_D13		MXS_IOMUX_PAD_NAKED(0,  5, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_D06__LCD_D14		MXS_IOMUX_PAD_NAKED(0,  6, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_D07__LCD_D15		MXS_IOMUX_PAD_NAKED(0,  7, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_D08__LCD_D18		MXS_IOMUX_PAD_NAKED(0,  8, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_D09__LCD_D19		MXS_IOMUX_PAD_NAKED(0,  9, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_D10__LCD_D20		MXS_IOMUX_PAD_NAKED(0, 10, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_D11__LCD_D21		MXS_IOMUX_PAD_NAKED(0, 11, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_D12__LCD_D22		MXS_IOMUX_PAD_NAKED(0, 12, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_D13__LCD_D23		MXS_IOMUX_PAD_NAKED(0, 13, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_D14__AUART2_RX		MXS_IOMUX_PAD_NAKED(0, 14, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_D15__AUART2_TX		MXS_IOMUX_PAD_NAKED(0, 15, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_CLE__LCD_D16		MXS_IOMUX_PAD_NAKED(0, 16, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_ALE__LCD_D17		MXS_IOMUX_PAD_NAKED(0, 17, PAD_MUXSEL_1)
+-#define MX23_PAD_GPMI_CE2N__ATA_A2		MXS_IOMUX_PAD_NAKED(0, 18, PAD_MUXSEL_1)
+-#define MX23_PAD_AUART1_RTS__IR_CLK		MXS_IOMUX_PAD_NAKED(0, 27, PAD_MUXSEL_1)
+-#define MX23_PAD_AUART1_RX__IR_RX		MXS_IOMUX_PAD_NAKED(0, 28, PAD_MUXSEL_1)
+-#define MX23_PAD_AUART1_TX__IR_TX		MXS_IOMUX_PAD_NAKED(0, 29, PAD_MUXSEL_1)
+-#define MX23_PAD_I2C_SCL__GPMI_RDY2		MXS_IOMUX_PAD_NAKED(0, 30, PAD_MUXSEL_1)
+-#define MX23_PAD_I2C_SDA__GPMI_CE2N		MXS_IOMUX_PAD_NAKED(0, 31, PAD_MUXSEL_1)
+-
+-#define MX23_PAD_LCD_D00__ETM_DA8		MXS_IOMUX_PAD_NAKED(1,  0, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_D01__ETM_DA9		MXS_IOMUX_PAD_NAKED(1,  1, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_D02__ETM_DA10		MXS_IOMUX_PAD_NAKED(1,  2, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_D03__ETM_DA11		MXS_IOMUX_PAD_NAKED(1,  3, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_D04__ETM_DA12		MXS_IOMUX_PAD_NAKED(1,  4, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_D05__ETM_DA13		MXS_IOMUX_PAD_NAKED(1,  5, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_D06__ETM_DA14		MXS_IOMUX_PAD_NAKED(1,  6, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_D07__ETM_DA15		MXS_IOMUX_PAD_NAKED(1,  7, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_D08__ETM_DA0		MXS_IOMUX_PAD_NAKED(1,  8, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_D09__ETM_DA1		MXS_IOMUX_PAD_NAKED(1,  9, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_D10__ETM_DA2		MXS_IOMUX_PAD_NAKED(1, 10, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_D11__ETM_DA3		MXS_IOMUX_PAD_NAKED(1, 11, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_D12__ETM_DA4		MXS_IOMUX_PAD_NAKED(1, 12, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_D13__ETM_DA5		MXS_IOMUX_PAD_NAKED(1, 13, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_D14__ETM_DA6		MXS_IOMUX_PAD_NAKED(1, 14, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_D15__ETM_DA7		MXS_IOMUX_PAD_NAKED(1, 15, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_RESET__ETM_TCTL		MXS_IOMUX_PAD_NAKED(1, 18, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_RS__ETM_TCLK		MXS_IOMUX_PAD_NAKED(1, 19, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_DOTCK__GPMI_RDY3		MXS_IOMUX_PAD_NAKED(1, 22, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_ENABLE__I2C_SCL		MXS_IOMUX_PAD_NAKED(1, 23, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_HSYNC__I2C_SDA		MXS_IOMUX_PAD_NAKED(1, 24, PAD_MUXSEL_1)
+-#define MX23_PAD_LCD_VSYNC__LCD_BUSY		MXS_IOMUX_PAD_NAKED(1, 25, PAD_MUXSEL_1)
+-#define MX23_PAD_PWM0__ROTARYA			MXS_IOMUX_PAD_NAKED(1, 26, PAD_MUXSEL_1)
+-#define MX23_PAD_PWM1__ROTARYB			MXS_IOMUX_PAD_NAKED(1, 27, PAD_MUXSEL_1)
+-#define MX23_PAD_PWM2__GPMI_RDY3		MXS_IOMUX_PAD_NAKED(1, 28, PAD_MUXSEL_1)
+-#define MX23_PAD_PWM3__ETM_TCTL			MXS_IOMUX_PAD_NAKED(1, 29, PAD_MUXSEL_1)
+-#define MX23_PAD_PWM4__ETM_TCLK			MXS_IOMUX_PAD_NAKED(1, 30, PAD_MUXSEL_1)
+-
+-#define MX23_PAD_SSP1_DETECT__GPMI_CE3N		MXS_IOMUX_PAD_NAKED(2,  1, PAD_MUXSEL_1)
+-#define MX23_PAD_SSP1_DATA1__I2C_SCL		MXS_IOMUX_PAD_NAKED(2,  3, PAD_MUXSEL_1)
+-#define MX23_PAD_SSP1_DATA2__I2C_SDA		MXS_IOMUX_PAD_NAKED(2,  4, PAD_MUXSEL_1)
+-#define MX23_PAD_ROTARYA__AUART2_RTS		MXS_IOMUX_PAD_NAKED(2,  7, PAD_MUXSEL_1)
+-#define MX23_PAD_ROTARYB__AUART2_CTS		MXS_IOMUX_PAD_NAKED(2,  8, PAD_MUXSEL_1)
+-
+-/* MUXSEL_2 */
+-#define MX23_PAD_GPMI_D00__SSP2_DATA0		MXS_IOMUX_PAD_NAKED(0,  0, PAD_MUXSEL_2)
+-#define MX23_PAD_GPMI_D01__SSP2_DATA1		MXS_IOMUX_PAD_NAKED(0,  1, PAD_MUXSEL_2)
+-#define MX23_PAD_GPMI_D02__SSP2_DATA2		MXS_IOMUX_PAD_NAKED(0,  2, PAD_MUXSEL_2)
+-#define MX23_PAD_GPMI_D03__SSP2_DATA3		MXS_IOMUX_PAD_NAKED(0,  3, PAD_MUXSEL_2)
+-#define MX23_PAD_GPMI_D04__SSP2_DATA4		MXS_IOMUX_PAD_NAKED(0,  4, PAD_MUXSEL_2)
+-#define MX23_PAD_GPMI_D05__SSP2_DATA5		MXS_IOMUX_PAD_NAKED(0,  5, PAD_MUXSEL_2)
+-#define MX23_PAD_GPMI_D06__SSP2_DATA6		MXS_IOMUX_PAD_NAKED(0,  6, PAD_MUXSEL_2)
+-#define MX23_PAD_GPMI_D07__SSP2_DATA7		MXS_IOMUX_PAD_NAKED(0,  7, PAD_MUXSEL_2)
+-#define MX23_PAD_GPMI_D08__SSP1_DATA4		MXS_IOMUX_PAD_NAKED(0,  8, PAD_MUXSEL_2)
+-#define MX23_PAD_GPMI_D09__SSP1_DATA5		MXS_IOMUX_PAD_NAKED(0,  9, PAD_MUXSEL_2)
+-#define MX23_PAD_GPMI_D10__SSP1_DATA6		MXS_IOMUX_PAD_NAKED(0, 10, PAD_MUXSEL_2)
+-#define MX23_PAD_GPMI_D11__SSP1_DATA7		MXS_IOMUX_PAD_NAKED(0, 11, PAD_MUXSEL_2)
+-#define MX23_PAD_GPMI_D15__GPMI_CE3N		MXS_IOMUX_PAD_NAKED(0, 15, PAD_MUXSEL_2)
+-#define MX23_PAD_GPMI_RDY0__SSP2_DETECT		MXS_IOMUX_PAD_NAKED(0, 19, PAD_MUXSEL_2)
+-#define MX23_PAD_GPMI_RDY1__SSP2_CMD		MXS_IOMUX_PAD_NAKED(0, 20, PAD_MUXSEL_2)
+-#define MX23_PAD_GPMI_WRN__SSP2_SCK		MXS_IOMUX_PAD_NAKED(0, 24, PAD_MUXSEL_2)
+-#define MX23_PAD_AUART1_CTS__SSP1_DATA4		MXS_IOMUX_PAD_NAKED(0, 26, PAD_MUXSEL_2)
+-#define MX23_PAD_AUART1_RTS__SSP1_DATA5		MXS_IOMUX_PAD_NAKED(0, 27, PAD_MUXSEL_2)
+-#define MX23_PAD_AUART1_RX__SSP1_DATA6		MXS_IOMUX_PAD_NAKED(0, 28, PAD_MUXSEL_2)
+-#define MX23_PAD_AUART1_TX__SSP1_DATA7		MXS_IOMUX_PAD_NAKED(0, 29, PAD_MUXSEL_2)
+-#define MX23_PAD_I2C_SCL__AUART1_TX		MXS_IOMUX_PAD_NAKED(0, 30, PAD_MUXSEL_2)
+-#define MX23_PAD_I2C_SDA__AUART1_RX		MXS_IOMUX_PAD_NAKED(0, 31, PAD_MUXSEL_2)
+-
+-#define MX23_PAD_LCD_D08__SAIF2_SDATA0		MXS_IOMUX_PAD_NAKED(1,  8, PAD_MUXSEL_2)
+-#define MX23_PAD_LCD_D09__SAIF1_SDATA0		MXS_IOMUX_PAD_NAKED(1,  9, PAD_MUXSEL_2)
+-#define MX23_PAD_LCD_D10__SAIF_MCLK_BITCLK	MXS_IOMUX_PAD_NAKED(1, 10, PAD_MUXSEL_2)
+-#define MX23_PAD_LCD_D11__SAIF_LRCLK		MXS_IOMUX_PAD_NAKED(1, 11, PAD_MUXSEL_2)
+-#define MX23_PAD_LCD_D12__SAIF2_SDATA1		MXS_IOMUX_PAD_NAKED(1, 12, PAD_MUXSEL_2)
+-#define MX23_PAD_LCD_D13__SAIF2_SDATA2		MXS_IOMUX_PAD_NAKED(1, 13, PAD_MUXSEL_2)
+-#define MX23_PAD_LCD_D14__SAIF1_SDATA2		MXS_IOMUX_PAD_NAKED(1, 14, PAD_MUXSEL_2)
+-#define MX23_PAD_LCD_D15__SAIF1_SDATA1		MXS_IOMUX_PAD_NAKED(1, 15, PAD_MUXSEL_2)
+-#define MX23_PAD_LCD_D16__SAIF_ALT_BITCLK	MXS_IOMUX_PAD_NAKED(1, 16, PAD_MUXSEL_2)
+-#define MX23_PAD_LCD_RESET__GPMI_CE3N		MXS_IOMUX_PAD_NAKED(1, 18, PAD_MUXSEL_2)
+-#define MX23_PAD_PWM0__DUART_RX			MXS_IOMUX_PAD_NAKED(1, 26, PAD_MUXSEL_2)
+-#define MX23_PAD_PWM1__DUART_TX			MXS_IOMUX_PAD_NAKED(1, 27, PAD_MUXSEL_2)
+-#define MX23_PAD_PWM3__AUART1_CTS		MXS_IOMUX_PAD_NAKED(1, 29, PAD_MUXSEL_2)
+-#define MX23_PAD_PWM4__AUART1_RTS		MXS_IOMUX_PAD_NAKED(1, 30, PAD_MUXSEL_2)
+-
+-#define MX23_PAD_SSP1_CMD__JTAG_TDO		MXS_IOMUX_PAD_NAKED(2,  0, PAD_MUXSEL_2)
+-#define MX23_PAD_SSP1_DETECT__USB_OTG_ID	MXS_IOMUX_PAD_NAKED(2,  1, PAD_MUXSEL_2)
+-#define MX23_PAD_SSP1_DATA0__JTAG_TDI		MXS_IOMUX_PAD_NAKED(2,  2, PAD_MUXSEL_2)
+-#define MX23_PAD_SSP1_DATA1__JTAG_TCLK		MXS_IOMUX_PAD_NAKED(2,  3, PAD_MUXSEL_2)
+-#define MX23_PAD_SSP1_DATA2__JTAG_RTCK		MXS_IOMUX_PAD_NAKED(2,  4, PAD_MUXSEL_2)
+-#define MX23_PAD_SSP1_DATA3__JTAG_TMS		MXS_IOMUX_PAD_NAKED(2,  5, PAD_MUXSEL_2)
+-#define MX23_PAD_SSP1_SCK__JTAG_TRST		MXS_IOMUX_PAD_NAKED(2,  6, PAD_MUXSEL_2)
+-#define MX23_PAD_ROTARYA__SPDIF			MXS_IOMUX_PAD_NAKED(2,  7, PAD_MUXSEL_2)
+-#define MX23_PAD_ROTARYB__GPMI_CE3N		MXS_IOMUX_PAD_NAKED(2,  8, PAD_MUXSEL_2)
+-
+-/* MUXSEL_GPIO */
+-#define MX23_PAD_GPMI_D00__GPIO_0_0		MXS_IOMUX_PAD_NAKED(0,  0, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_D01__GPIO_0_1		MXS_IOMUX_PAD_NAKED(0,  1, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_D02__GPIO_0_2		MXS_IOMUX_PAD_NAKED(0,  2, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_D03__GPIO_0_3		MXS_IOMUX_PAD_NAKED(0,  3, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_D04__GPIO_0_4		MXS_IOMUX_PAD_NAKED(0,  4, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_D05__GPIO_0_5		MXS_IOMUX_PAD_NAKED(0,  5, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_D06__GPIO_0_6		MXS_IOMUX_PAD_NAKED(0,  6, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_D07__GPIO_0_7		MXS_IOMUX_PAD_NAKED(0,  7, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_D08__GPIO_0_8		MXS_IOMUX_PAD_NAKED(0,  8, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_D09__GPIO_0_9		MXS_IOMUX_PAD_NAKED(0,  9, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_D10__GPIO_0_10		MXS_IOMUX_PAD_NAKED(0, 10, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_D11__GPIO_0_11		MXS_IOMUX_PAD_NAKED(0, 11, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_D12__GPIO_0_12		MXS_IOMUX_PAD_NAKED(0, 12, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_D13__GPIO_0_13		MXS_IOMUX_PAD_NAKED(0, 13, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_D14__GPIO_0_14		MXS_IOMUX_PAD_NAKED(0, 14, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_D15__GPIO_0_15		MXS_IOMUX_PAD_NAKED(0, 15, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_CLE__GPIO_0_16		MXS_IOMUX_PAD_NAKED(0, 16, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_ALE__GPIO_0_17		MXS_IOMUX_PAD_NAKED(0, 17, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_CE2N__GPIO_0_18		MXS_IOMUX_PAD_NAKED(0, 18, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_RDY0__GPIO_0_19		MXS_IOMUX_PAD_NAKED(0, 19, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_RDY1__GPIO_0_20		MXS_IOMUX_PAD_NAKED(0, 20, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_RDY2__GPIO_0_21		MXS_IOMUX_PAD_NAKED(0, 21, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_RDY3__GPIO_0_22		MXS_IOMUX_PAD_NAKED(0, 22, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_WPN__GPIO_0_23		MXS_IOMUX_PAD_NAKED(0, 23, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_WRN__GPIO_0_24		MXS_IOMUX_PAD_NAKED(0, 24, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_RDN__GPIO_0_25		MXS_IOMUX_PAD_NAKED(0, 25, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_AUART1_CTS__GPIO_0_26		MXS_IOMUX_PAD_NAKED(0, 26, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_AUART1_RTS__GPIO_0_27		MXS_IOMUX_PAD_NAKED(0, 27, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_AUART1_RX__GPIO_0_28		MXS_IOMUX_PAD_NAKED(0, 28, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_AUART1_TX__GPIO_0_29		MXS_IOMUX_PAD_NAKED(0, 29, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_I2C_SCL__GPIO_0_30		MXS_IOMUX_PAD_NAKED(0, 30, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_I2C_SDA__GPIO_0_31		MXS_IOMUX_PAD_NAKED(0, 31, PAD_MUXSEL_GPIO)
+-
+-#define MX23_PAD_LCD_D00__GPIO_1_0		MXS_IOMUX_PAD_NAKED(1,  0, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_D01__GPIO_1_1		MXS_IOMUX_PAD_NAKED(1,  1, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_D02__GPIO_1_2		MXS_IOMUX_PAD_NAKED(1,  2, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_D03__GPIO_1_3		MXS_IOMUX_PAD_NAKED(1,  3, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_D04__GPIO_1_4		MXS_IOMUX_PAD_NAKED(1,  4, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_D05__GPIO_1_5		MXS_IOMUX_PAD_NAKED(1,  5, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_D06__GPIO_1_6		MXS_IOMUX_PAD_NAKED(1,  6, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_D07__GPIO_1_7		MXS_IOMUX_PAD_NAKED(1,  7, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_D08__GPIO_1_8		MXS_IOMUX_PAD_NAKED(1,  8, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_D09__GPIO_1_9		MXS_IOMUX_PAD_NAKED(1,  9, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_D10__GPIO_1_10		MXS_IOMUX_PAD_NAKED(1, 10, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_D11__GPIO_1_11		MXS_IOMUX_PAD_NAKED(1, 11, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_D12__GPIO_1_12		MXS_IOMUX_PAD_NAKED(1, 12, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_D13__GPIO_1_13		MXS_IOMUX_PAD_NAKED(1, 13, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_D14__GPIO_1_14		MXS_IOMUX_PAD_NAKED(1, 14, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_D15__GPIO_1_15		MXS_IOMUX_PAD_NAKED(1, 15, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_D16__GPIO_1_16		MXS_IOMUX_PAD_NAKED(1, 16, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_D17__GPIO_1_17		MXS_IOMUX_PAD_NAKED(1, 17, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_RESET__GPIO_1_18		MXS_IOMUX_PAD_NAKED(1, 18, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_RS__GPIO_1_19		MXS_IOMUX_PAD_NAKED(1, 19, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_WR__GPIO_1_20		MXS_IOMUX_PAD_NAKED(1, 20, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_CS__GPIO_1_21		MXS_IOMUX_PAD_NAKED(1, 21, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_DOTCK__GPIO_1_22		MXS_IOMUX_PAD_NAKED(1, 22, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_ENABLE__GPIO_1_23		MXS_IOMUX_PAD_NAKED(1, 23, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_HSYNC__GPIO_1_24		MXS_IOMUX_PAD_NAKED(1, 24, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_LCD_VSYNC__GPIO_1_25		MXS_IOMUX_PAD_NAKED(1, 25, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_PWM0__GPIO_1_26		MXS_IOMUX_PAD_NAKED(1, 26, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_PWM1__GPIO_1_27		MXS_IOMUX_PAD_NAKED(1, 27, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_PWM2__GPIO_1_28		MXS_IOMUX_PAD_NAKED(1, 28, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_PWM3__GPIO_1_29		MXS_IOMUX_PAD_NAKED(1, 29, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_PWM4__GPIO_1_30		MXS_IOMUX_PAD_NAKED(1, 30, PAD_MUXSEL_GPIO)
+-
+-#define MX23_PAD_SSP1_CMD__GPIO_2_0		MXS_IOMUX_PAD_NAKED(2,  0, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_SSP1_DETECT__GPIO_2_1		MXS_IOMUX_PAD_NAKED(2,  1, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_SSP1_DATA0__GPIO_2_2		MXS_IOMUX_PAD_NAKED(2,  2, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_SSP1_DATA1__GPIO_2_3		MXS_IOMUX_PAD_NAKED(2,  3, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_SSP1_DATA2__GPIO_2_4		MXS_IOMUX_PAD_NAKED(2,  4, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_SSP1_DATA3__GPIO_2_5		MXS_IOMUX_PAD_NAKED(2,  5, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_SSP1_SCK__GPIO_2_6		MXS_IOMUX_PAD_NAKED(2,  6, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_ROTARYA__GPIO_2_7		MXS_IOMUX_PAD_NAKED(2,  7, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_ROTARYB__GPIO_2_8		MXS_IOMUX_PAD_NAKED(2,  8, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_A00__GPIO_2_9		MXS_IOMUX_PAD_NAKED(2,  9, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_A01__GPIO_2_10		MXS_IOMUX_PAD_NAKED(2, 10, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_A02__GPIO_2_11		MXS_IOMUX_PAD_NAKED(2, 11, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_A03__GPIO_2_12		MXS_IOMUX_PAD_NAKED(2, 12, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_A04__GPIO_2_13		MXS_IOMUX_PAD_NAKED(2, 13, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_A05__GPIO_2_14		MXS_IOMUX_PAD_NAKED(2, 14, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_A06__GPIO_2_15		MXS_IOMUX_PAD_NAKED(2, 15, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_A07__GPIO_2_16		MXS_IOMUX_PAD_NAKED(2, 16, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_A08__GPIO_2_17		MXS_IOMUX_PAD_NAKED(2, 17, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_A09__GPIO_2_18		MXS_IOMUX_PAD_NAKED(2, 18, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_A10__GPIO_2_19		MXS_IOMUX_PAD_NAKED(2, 19, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_A11__GPIO_2_20		MXS_IOMUX_PAD_NAKED(2, 20, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_A12__GPIO_2_21		MXS_IOMUX_PAD_NAKED(2, 21, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_BA0__GPIO_2_22		MXS_IOMUX_PAD_NAKED(2, 22, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_BA1__GPIO_2_23		MXS_IOMUX_PAD_NAKED(2, 23, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_CASN__GPIO_2_24		MXS_IOMUX_PAD_NAKED(2, 24, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_CE0N__GPIO_2_25		MXS_IOMUX_PAD_NAKED(2, 25, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_CE1N__GPIO_2_26		MXS_IOMUX_PAD_NAKED(2, 26, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_CE1N__GPIO_2_27		MXS_IOMUX_PAD_NAKED(2, 27, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_GPMI_CE0N__GPIO_2_28		MXS_IOMUX_PAD_NAKED(2, 28, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_CKE__GPIO_2_29		MXS_IOMUX_PAD_NAKED(2, 29, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_RASN__GPIO_2_30		MXS_IOMUX_PAD_NAKED(2, 30, PAD_MUXSEL_GPIO)
+-#define MX23_PAD_EMI_WEN__GPIO_2_31		MXS_IOMUX_PAD_NAKED(2, 31, PAD_MUXSEL_GPIO)
+-
+-#endif /* __MACH_IOMUX_MX23_H__ */
+diff --git a/arch/arm/mach-mxs/include/mach/iomux-mx28.h b/arch/arm/mach-mxs/include/mach/iomux-mx28.h
+deleted file mode 100644
+index f50fefd..0000000
+--- a/arch/arm/mach-mxs/include/mach/iomux-mx28.h
++++ /dev/null
+@@ -1,537 +0,0 @@
+-/*
+- * Copyright (C) 2009-2010 Amit Kucheria <amit.kucheria@canonical.com>
+- * Copyright (C) 2010 Freescale Semiconductor, Inc.
 - *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
 - *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
 - */
 -
--#include <linux/delay.h>
--#include <linux/platform_device.h>
--#include <linux/gpio.h>
--#include <linux/leds.h>
--#include <linux/irq.h>
--#include <linux/clk.h>
--#include <linux/i2c.h>
--#include <linux/i2c/at24.h>
+-#ifndef __MACH_IOMUX_MX28_H__
+-#define __MACH_IOMUX_MX28_H__
 -
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/time.h>
+-#include <mach/iomux.h>
 -
--#include <mach/common.h>
--#include <mach/iomux-mx28.h>
--
--#include "devices-mx28.h"
--
--#define M28EVK_GPIO_USERLED1	MXS_GPIO_NR(3, 16)
--#define M28EVK_GPIO_USERLED2	MXS_GPIO_NR(3, 17)
--
--#define MX28EVK_BL_ENABLE	MXS_GPIO_NR(3, 18)
--#define M28EVK_LCD_ENABLE	MXS_GPIO_NR(3, 28)
--
--#define MX28EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(2, 12)
--#define MX28EVK_MMC1_WRITE_PROTECT	MXS_GPIO_NR(0, 28)
--
--static const iomux_cfg_t m28evk_pads[] __initconst = {
--	/* duart */
--	MX28_PAD_AUART0_CTS__DUART_RX | MXS_PAD_CTRL,
--	MX28_PAD_AUART0_RTS__DUART_TX | MXS_PAD_CTRL,
--
--	/* auart0 */
--	MX28_PAD_AUART0_RX__AUART0_RX | MXS_PAD_CTRL,
--	MX28_PAD_AUART0_TX__AUART0_TX | MXS_PAD_CTRL,
--
--	/* auart3 */
--	MX28_PAD_AUART3_RX__AUART3_RX | MXS_PAD_CTRL,
--	MX28_PAD_AUART3_TX__AUART3_TX | MXS_PAD_CTRL,
--	MX28_PAD_AUART3_CTS__AUART3_CTS | MXS_PAD_CTRL,
--	MX28_PAD_AUART3_RTS__AUART3_RTS | MXS_PAD_CTRL,
--
--#define MXS_PAD_FEC	(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP)
--	/* fec0 */
--	MX28_PAD_ENET0_MDC__ENET0_MDC | MXS_PAD_FEC,
--	MX28_PAD_ENET0_MDIO__ENET0_MDIO | MXS_PAD_FEC,
--	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN | MXS_PAD_FEC,
--	MX28_PAD_ENET0_RXD0__ENET0_RXD0 | MXS_PAD_FEC,
--	MX28_PAD_ENET0_RXD1__ENET0_RXD1 | MXS_PAD_FEC,
--	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN | MXS_PAD_FEC,
--	MX28_PAD_ENET0_TXD0__ENET0_TXD0 | MXS_PAD_FEC,
--	MX28_PAD_ENET0_TXD1__ENET0_TXD1 | MXS_PAD_FEC,
--	MX28_PAD_ENET_CLK__CLKCTRL_ENET | MXS_PAD_FEC,
--	/* fec1 */
--	MX28_PAD_ENET0_CRS__ENET1_RX_EN | MXS_PAD_FEC,
--	MX28_PAD_ENET0_RXD2__ENET1_RXD0 | MXS_PAD_FEC,
--	MX28_PAD_ENET0_RXD3__ENET1_RXD1 | MXS_PAD_FEC,
--	MX28_PAD_ENET0_COL__ENET1_TX_EN | MXS_PAD_FEC,
--	MX28_PAD_ENET0_TXD2__ENET1_TXD0 | MXS_PAD_FEC,
--	MX28_PAD_ENET0_TXD3__ENET1_TXD1 | MXS_PAD_FEC,
--
--	/* flexcan0 */
--	MX28_PAD_GPMI_RDY2__CAN0_TX,
--	MX28_PAD_GPMI_RDY3__CAN0_RX,
--
--	/* flexcan1 */
--	MX28_PAD_GPMI_CE2N__CAN1_TX,
--	MX28_PAD_GPMI_CE3N__CAN1_RX,
--
--	/* I2C */
--	MX28_PAD_I2C0_SCL__I2C0_SCL,
--	MX28_PAD_I2C0_SDA__I2C0_SDA,
--
--	/* mxsfb (lcdif) */
--	MX28_PAD_LCD_D00__LCD_D0 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D01__LCD_D1 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D02__LCD_D2 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D03__LCD_D3 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D04__LCD_D4 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D05__LCD_D5 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D06__LCD_D6 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D07__LCD_D7 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D08__LCD_D8 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D09__LCD_D9 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D10__LCD_D10 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D11__LCD_D11 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D12__LCD_D12 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D13__LCD_D13 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D14__LCD_D14 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D15__LCD_D15 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D16__LCD_D16 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D17__LCD_D17 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D18__LCD_D18 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D19__LCD_D19 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D20__LCD_D20 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D21__LCD_D21 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D22__LCD_D22 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D23__LCD_D23 | MXS_PAD_CTRL,
--
--	MX28_PAD_LCD_ENABLE__LCD_ENABLE	| MXS_PAD_CTRL,
--	MX28_PAD_LCD_DOTCLK__LCD_DOTCLK | MXS_PAD_CTRL,
--
--	/* mmc0 */
--	MX28_PAD_SSP0_DATA0__SSP0_D0 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA1__SSP0_D1 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA2__SSP0_D2 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA3__SSP0_D3 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA4__SSP0_D4 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA5__SSP0_D5 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA6__SSP0_D6 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA7__SSP0_D7 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_CMD__SSP0_CMD |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--	MX28_PAD_SSP0_SCK__SSP0_SCK |
--		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--
--	/* mmc1 */
--	MX28_PAD_GPMI_D00__SSP1_D0 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_D01__SSP1_D1 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_D02__SSP1_D2 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_D03__SSP1_D3 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_D04__SSP1_D4 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_D05__SSP1_D5 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_D06__SSP1_D6 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_D07__SSP1_D7 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_RDY1__SSP1_CMD |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_RDY0__SSP1_CARD_DETECT |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--	MX28_PAD_GPMI_WRN__SSP1_SCK |
--		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--	/* write protect */
--	MX28_PAD_GPMI_RESETN__GPIO_0_28 |
--		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--	/* slot power enable */
--	MX28_PAD_PWM4__GPIO_3_29 |
--		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--
--	/* led */
--	MX28_PAD_PWM0__GPIO_3_16 | MXS_PAD_CTRL,
--	MX28_PAD_PWM1__GPIO_3_17 | MXS_PAD_CTRL,
--
--	/* nand */
--	MX28_PAD_GPMI_D00__GPMI_D0 |
--		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
--	MX28_PAD_GPMI_D01__GPMI_D1 |
--		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
--	MX28_PAD_GPMI_D02__GPMI_D2 |
--		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
--	MX28_PAD_GPMI_D03__GPMI_D3 |
--		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
--	MX28_PAD_GPMI_D04__GPMI_D4 |
--		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
--	MX28_PAD_GPMI_D05__GPMI_D5 |
--		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
--	MX28_PAD_GPMI_D06__GPMI_D6 |
--		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
--	MX28_PAD_GPMI_D07__GPMI_D7 |
--		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
--	MX28_PAD_GPMI_CE0N__GPMI_CE0N |
--		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
--	MX28_PAD_GPMI_RDY0__GPMI_READY0 |
--		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL),
--	MX28_PAD_GPMI_RDN__GPMI_RDN |
--		(MXS_PAD_12MA | MXS_PAD_1V8 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_WRN__GPMI_WRN |
--		(MXS_PAD_12MA | MXS_PAD_1V8 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_ALE__GPMI_ALE |
--		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_CLE__GPMI_CLE |
--		(MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_RESETN__GPMI_RESETN |
--		(MXS_PAD_12MA | MXS_PAD_1V8 | MXS_PAD_PULLUP),
--
--	/* Backlight */
--	MX28_PAD_PWM3__GPIO_3_28 | MXS_PAD_CTRL,
--};
--
--/* led */
--static const struct gpio_led m28evk_leds[] __initconst = {
--	{
--		.name = "user-led1",
--		.default_trigger = "heartbeat",
--		.gpio = M28EVK_GPIO_USERLED1,
--	},
--	{
--		.name = "user-led2",
--		.default_trigger = "heartbeat",
--		.gpio = M28EVK_GPIO_USERLED2,
--	},
--};
--
--static const struct gpio_led_platform_data m28evk_led_data __initconst = {
--	.leds = m28evk_leds,
--	.num_leds = ARRAY_SIZE(m28evk_leds),
--};
--
--static struct fec_platform_data mx28_fec_pdata[] __initdata = {
--	{
--		/* fec0 */
--		.phy = PHY_INTERFACE_MODE_RMII,
--	}, {
--		/* fec1 */
--		.phy = PHY_INTERFACE_MODE_RMII,
--	},
--};
--
--static int __init m28evk_fec_get_mac(void)
--{
--	int i;
--	u32 val;
--	const u32 *ocotp = mxs_get_ocotp();
--
--	if (!ocotp)
--		return -ETIMEDOUT;
--
--	/*
--	 * OCOTP only stores the last 4 octets for each mac address,
--	 * so hard-code DENX OUI (C0:E5:4E) here.
--	 */
--	for (i = 0; i < 2; i++) {
--		val = ocotp[i];
--		mx28_fec_pdata[i].mac[0] = 0xC0;
--		mx28_fec_pdata[i].mac[1] = 0xE5;
--		mx28_fec_pdata[i].mac[2] = 0x4E;
--		mx28_fec_pdata[i].mac[3] = (val >> 16) & 0xff;
--		mx28_fec_pdata[i].mac[4] = (val >> 8) & 0xff;
--		mx28_fec_pdata[i].mac[5] = (val >> 0) & 0xff;
--	}
--
--	return 0;
--}
--
--/* mxsfb (lcdif) */
--static struct fb_videomode m28evk_video_modes[] = {
--	{
--		.name		= "Ampire AM-800480R2TMQW-T01H",
--		.refresh	= 60,
--		.xres		= 800,
--		.yres		= 480,
--		.pixclock	= 30066, /* picosecond (33.26 MHz) */
--		.left_margin	= 0,
--		.right_margin	= 256,
--		.upper_margin	= 0,
--		.lower_margin	= 45,
--		.hsync_len	= 1,
--		.vsync_len	= 1,
--		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT,
--	},
--};
--
--static const struct mxsfb_platform_data m28evk_mxsfb_pdata __initconst = {
--	.mode_list	= m28evk_video_modes,
--	.mode_count	= ARRAY_SIZE(m28evk_video_modes),
--	.default_bpp	= 16,
--	.ld_intf_width	= STMLCDIF_18BIT,
--};
--
--static struct at24_platform_data m28evk_eeprom = {
--	.byte_len = 16384,
--	.page_size = 32,
--	.flags = AT24_FLAG_ADDR16,
--};
--
--static struct i2c_board_info m28_stk5v3_i2c_boardinfo[] __initdata = {
--	{
--		I2C_BOARD_INFO("at24", 0x51),	/* E0=1, E1=0, E2=0 */
--		.platform_data = &m28evk_eeprom,
--	},
--};
--
--static struct mxs_mmc_platform_data m28evk_mmc_pdata[] __initdata = {
--	{
--		/* mmc0 */
--		.wp_gpio = MX28EVK_MMC0_WRITE_PROTECT,
--		.flags = SLOTF_8_BIT_CAPABLE,
--	}, {
--		/* mmc1 */
--		.wp_gpio = MX28EVK_MMC1_WRITE_PROTECT,
--		.flags = SLOTF_8_BIT_CAPABLE,
--	},
--};
--
--static void __init m28evk_init(void)
--{
--	mx28_soc_init();
--
--	mxs_iomux_setup_multiple_pads(m28evk_pads, ARRAY_SIZE(m28evk_pads));
--
--	mx28_add_duart();
--	mx28_add_auart0();
--	mx28_add_auart3();
--
--	if (!m28evk_fec_get_mac()) {
--		mx28_add_fec(0, &mx28_fec_pdata[0]);
--		mx28_add_fec(1, &mx28_fec_pdata[1]);
--	}
--
--	mx28_add_flexcan(0, NULL);
--	mx28_add_flexcan(1, NULL);
--
--	mx28_add_mxsfb(&m28evk_mxsfb_pdata);
--
--	mx28_add_mxs_mmc(0, &m28evk_mmc_pdata[0]);
--	mx28_add_mxs_mmc(1, &m28evk_mmc_pdata[1]);
--
--	gpio_led_register_device(0, &m28evk_led_data);
--
--	/* I2C */
--	mx28_add_mxs_i2c(0);
--	i2c_register_board_info(0, m28_stk5v3_i2c_boardinfo,
--			ARRAY_SIZE(m28_stk5v3_i2c_boardinfo));
--}
--
--static void __init m28evk_timer_init(void)
--{
--	mx28_clocks_init();
--}
--
--static struct sys_timer m28evk_timer = {
--	.init	= m28evk_timer_init,
--};
--
--MACHINE_START(M28EVK, "DENX M28 EVK")
--	.map_io		= mx28_map_io,
--	.init_irq	= mx28_init_irq,
--	.timer		= &m28evk_timer,
--	.init_machine	= m28evk_init,
--	.restart	= mxs_restart,
--MACHINE_END
-diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
-deleted file mode 100644
-index e7272a4..0000000
---- a/arch/arm/mach-mxs/mach-mx23evk.c
-+++ /dev/null
-@@ -1,190 +0,0 @@
 -/*
-- * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+- * The naming convention for the pad modes is MX28_PAD_<padname>__<padmode>
+- * If <padname> or <padmode> refers to a GPIO, it is named GPIO_<unit>_<num>
+- * See also iomux.h
 - *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
+- *									BANK	PIN	MUX
 - */
+-/* MUXSEL_0 */
+-#define MX28_PAD_GPMI_D00__GPMI_D0			MXS_IOMUX_PAD_NAKED(0,  0, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_D01__GPMI_D1			MXS_IOMUX_PAD_NAKED(0,  1, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_D02__GPMI_D2			MXS_IOMUX_PAD_NAKED(0,  2, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_D03__GPMI_D3			MXS_IOMUX_PAD_NAKED(0,  3, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_D04__GPMI_D4			MXS_IOMUX_PAD_NAKED(0,  4, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_D05__GPMI_D5			MXS_IOMUX_PAD_NAKED(0,  5, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_D06__GPMI_D6			MXS_IOMUX_PAD_NAKED(0,  6, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_D07__GPMI_D7			MXS_IOMUX_PAD_NAKED(0,  7, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_CE0N__GPMI_CE0N			MXS_IOMUX_PAD_NAKED(0, 16, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_CE1N__GPMI_CE1N			MXS_IOMUX_PAD_NAKED(0, 17, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_CE2N__GPMI_CE2N			MXS_IOMUX_PAD_NAKED(0, 18, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_CE3N__GPMI_CE3N			MXS_IOMUX_PAD_NAKED(0, 19, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_RDY0__GPMI_READY0			MXS_IOMUX_PAD_NAKED(0, 20, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_RDY1__GPMI_READY1			MXS_IOMUX_PAD_NAKED(0, 21, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_RDY2__GPMI_READY2			MXS_IOMUX_PAD_NAKED(0, 22, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_RDY3__GPMI_READY3			MXS_IOMUX_PAD_NAKED(0, 23, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_RDN__GPMI_RDN			MXS_IOMUX_PAD_NAKED(0, 24, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_WRN__GPMI_WRN			MXS_IOMUX_PAD_NAKED(0, 25, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_ALE__GPMI_ALE			MXS_IOMUX_PAD_NAKED(0, 26, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_CLE__GPMI_CLE			MXS_IOMUX_PAD_NAKED(0, 27, PAD_MUXSEL_0)
+-#define MX28_PAD_GPMI_RESETN__GPMI_RESETN		MXS_IOMUX_PAD_NAKED(0, 28, PAD_MUXSEL_0)
 -
--#include <linux/delay.h>
--#include <linux/platform_device.h>
--#include <linux/gpio.h>
+-#define MX28_PAD_LCD_D00__LCD_D0			MXS_IOMUX_PAD_NAKED(1,  0, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D01__LCD_D1			MXS_IOMUX_PAD_NAKED(1,  1, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D02__LCD_D2			MXS_IOMUX_PAD_NAKED(1,  2, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D03__LCD_D3			MXS_IOMUX_PAD_NAKED(1,  3, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D04__LCD_D4			MXS_IOMUX_PAD_NAKED(1,  4, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D05__LCD_D5			MXS_IOMUX_PAD_NAKED(1,  5, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D06__LCD_D6			MXS_IOMUX_PAD_NAKED(1,  6, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D07__LCD_D7			MXS_IOMUX_PAD_NAKED(1,  7, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D08__LCD_D8			MXS_IOMUX_PAD_NAKED(1,  8, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D09__LCD_D9			MXS_IOMUX_PAD_NAKED(1,  9, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D10__LCD_D10			MXS_IOMUX_PAD_NAKED(1, 10, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D11__LCD_D11			MXS_IOMUX_PAD_NAKED(1, 11, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D12__LCD_D12			MXS_IOMUX_PAD_NAKED(1, 12, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D13__LCD_D13			MXS_IOMUX_PAD_NAKED(1, 13, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D14__LCD_D14			MXS_IOMUX_PAD_NAKED(1, 14, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D15__LCD_D15			MXS_IOMUX_PAD_NAKED(1, 15, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D16__LCD_D16			MXS_IOMUX_PAD_NAKED(1, 16, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D17__LCD_D17			MXS_IOMUX_PAD_NAKED(1, 17, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D18__LCD_D18			MXS_IOMUX_PAD_NAKED(1, 18, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D19__LCD_D19			MXS_IOMUX_PAD_NAKED(1, 19, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D20__LCD_D20			MXS_IOMUX_PAD_NAKED(1, 20, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D21__LCD_D21			MXS_IOMUX_PAD_NAKED(1, 21, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D22__LCD_D22			MXS_IOMUX_PAD_NAKED(1, 22, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_D23__LCD_D23			MXS_IOMUX_PAD_NAKED(1, 23, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_RD_E__LCD_RD_E			MXS_IOMUX_PAD_NAKED(1, 24, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_WR_RWN__LCD_WR_RWN			MXS_IOMUX_PAD_NAKED(1, 25, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_RS__LCD_RS				MXS_IOMUX_PAD_NAKED(1, 26, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_CS__LCD_CS				MXS_IOMUX_PAD_NAKED(1, 27, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_VSYNC__LCD_VSYNC			MXS_IOMUX_PAD_NAKED(1, 28, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_HSYNC__LCD_HSYNC			MXS_IOMUX_PAD_NAKED(1, 29, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_DOTCLK__LCD_DOTCLK			MXS_IOMUX_PAD_NAKED(1, 30, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_ENABLE__LCD_ENABLE			MXS_IOMUX_PAD_NAKED(1, 31, PAD_MUXSEL_0)
 -
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/time.h>
+-#define MX28_PAD_SSP0_DATA0__SSP0_D0			MXS_IOMUX_PAD_NAKED(2,  0, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP0_DATA1__SSP0_D1			MXS_IOMUX_PAD_NAKED(2,  1, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP0_DATA2__SSP0_D2			MXS_IOMUX_PAD_NAKED(2,  2, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP0_DATA3__SSP0_D3			MXS_IOMUX_PAD_NAKED(2,  3, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP0_DATA4__SSP0_D4			MXS_IOMUX_PAD_NAKED(2,  4, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP0_DATA5__SSP0_D5			MXS_IOMUX_PAD_NAKED(2,  5, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP0_DATA6__SSP0_D6			MXS_IOMUX_PAD_NAKED(2,  6, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP0_DATA7__SSP0_D7			MXS_IOMUX_PAD_NAKED(2,  7, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP0_CMD__SSP0_CMD			MXS_IOMUX_PAD_NAKED(2,  8, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT		MXS_IOMUX_PAD_NAKED(2,  9, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP0_SCK__SSP0_SCK			MXS_IOMUX_PAD_NAKED(2, 10, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP1_SCK__SSP1_SCK			MXS_IOMUX_PAD_NAKED(2, 12, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP1_CMD__SSP1_CMD			MXS_IOMUX_PAD_NAKED(2, 13, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP1_DATA0__SSP1_D0			MXS_IOMUX_PAD_NAKED(2, 14, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP1_DATA3__SSP1_D3			MXS_IOMUX_PAD_NAKED(2, 15, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP2_SCK__SSP2_SCK			MXS_IOMUX_PAD_NAKED(2, 16, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP2_MOSI__SSP2_CMD			MXS_IOMUX_PAD_NAKED(2, 17, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP2_MISO__SSP2_D0			MXS_IOMUX_PAD_NAKED(2, 18, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP2_SS0__SSP2_D3			MXS_IOMUX_PAD_NAKED(2, 19, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP2_SS1__SSP2_D4			MXS_IOMUX_PAD_NAKED(2, 20, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP2_SS2__SSP2_D5			MXS_IOMUX_PAD_NAKED(2, 21, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP3_SCK__SSP3_SCK			MXS_IOMUX_PAD_NAKED(2, 24, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP3_MOSI__SSP3_CMD			MXS_IOMUX_PAD_NAKED(2, 25, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP3_MISO__SSP3_D0			MXS_IOMUX_PAD_NAKED(2, 26, PAD_MUXSEL_0)
+-#define MX28_PAD_SSP3_SS0__SSP3_D3			MXS_IOMUX_PAD_NAKED(2, 27, PAD_MUXSEL_0)
 -
--#include <mach/common.h>
--#include <mach/iomux-mx23.h>
+-#define MX28_PAD_AUART0_RX__AUART0_RX			MXS_IOMUX_PAD_NAKED(3,  0, PAD_MUXSEL_0)
+-#define MX28_PAD_AUART0_TX__AUART0_TX			MXS_IOMUX_PAD_NAKED(3,  1, PAD_MUXSEL_0)
+-#define MX28_PAD_AUART0_CTS__AUART0_CTS			MXS_IOMUX_PAD_NAKED(3,  2, PAD_MUXSEL_0)
+-#define MX28_PAD_AUART0_RTS__AUART0_RTS			MXS_IOMUX_PAD_NAKED(3,  3, PAD_MUXSEL_0)
+-#define MX28_PAD_AUART1_RX__AUART1_RX			MXS_IOMUX_PAD_NAKED(3,  4, PAD_MUXSEL_0)
+-#define MX28_PAD_AUART1_TX__AUART1_TX			MXS_IOMUX_PAD_NAKED(3,  5, PAD_MUXSEL_0)
+-#define MX28_PAD_AUART1_CTS__AUART1_CTS			MXS_IOMUX_PAD_NAKED(3,  6, PAD_MUXSEL_0)
+-#define MX28_PAD_AUART1_RTS__AUART1_RTS			MXS_IOMUX_PAD_NAKED(3,  7, PAD_MUXSEL_0)
+-#define MX28_PAD_AUART2_RX__AUART2_RX			MXS_IOMUX_PAD_NAKED(3,  8, PAD_MUXSEL_0)
+-#define MX28_PAD_AUART2_TX__AUART2_TX			MXS_IOMUX_PAD_NAKED(3,  9, PAD_MUXSEL_0)
+-#define MX28_PAD_AUART2_CTS__AUART2_CTS			MXS_IOMUX_PAD_NAKED(3, 10, PAD_MUXSEL_0)
+-#define MX28_PAD_AUART2_RTS__AUART2_RTS			MXS_IOMUX_PAD_NAKED(3, 11, PAD_MUXSEL_0)
+-#define MX28_PAD_AUART3_RX__AUART3_RX			MXS_IOMUX_PAD_NAKED(3, 12, PAD_MUXSEL_0)
+-#define MX28_PAD_AUART3_TX__AUART3_TX			MXS_IOMUX_PAD_NAKED(3, 13, PAD_MUXSEL_0)
+-#define MX28_PAD_AUART3_CTS__AUART3_CTS			MXS_IOMUX_PAD_NAKED(3, 14, PAD_MUXSEL_0)
+-#define MX28_PAD_AUART3_RTS__AUART3_RTS			MXS_IOMUX_PAD_NAKED(3, 15, PAD_MUXSEL_0)
+-#define MX28_PAD_PWM0__PWM_0				MXS_IOMUX_PAD_NAKED(3, 16, PAD_MUXSEL_0)
+-#define MX28_PAD_PWM1__PWM_1				MXS_IOMUX_PAD_NAKED(3, 17, PAD_MUXSEL_0)
+-#define MX28_PAD_PWM2__PWM_2				MXS_IOMUX_PAD_NAKED(3, 18, PAD_MUXSEL_0)
+-#define MX28_PAD_SAIF0_MCLK__SAIF0_MCLK			MXS_IOMUX_PAD_NAKED(3, 20, PAD_MUXSEL_0)
+-#define MX28_PAD_SAIF0_LRCLK__SAIF0_LRCLK		MXS_IOMUX_PAD_NAKED(3, 21, PAD_MUXSEL_0)
+-#define MX28_PAD_SAIF0_BITCLK__SAIF0_BITCLK		MXS_IOMUX_PAD_NAKED(3, 22, PAD_MUXSEL_0)
+-#define MX28_PAD_SAIF0_SDATA0__SAIF0_SDATA0		MXS_IOMUX_PAD_NAKED(3, 23, PAD_MUXSEL_0)
+-#define MX28_PAD_I2C0_SCL__I2C0_SCL			MXS_IOMUX_PAD_NAKED(3, 24, PAD_MUXSEL_0)
+-#define MX28_PAD_I2C0_SDA__I2C0_SDA			MXS_IOMUX_PAD_NAKED(3, 25, PAD_MUXSEL_0)
+-#define MX28_PAD_SAIF1_SDATA0__SAIF1_SDATA0		MXS_IOMUX_PAD_NAKED(3, 26, PAD_MUXSEL_0)
+-#define MX28_PAD_SPDIF__SPDIF_TX			MXS_IOMUX_PAD_NAKED(3, 27, PAD_MUXSEL_0)
+-#define MX28_PAD_PWM3__PWM_3				MXS_IOMUX_PAD_NAKED(3, 28, PAD_MUXSEL_0)
+-#define MX28_PAD_PWM4__PWM_4				MXS_IOMUX_PAD_NAKED(3, 29, PAD_MUXSEL_0)
+-#define MX28_PAD_LCD_RESET__LCD_RESET			MXS_IOMUX_PAD_NAKED(3, 30, PAD_MUXSEL_0)
 -
--#include "devices-mx23.h"
+-#define MX28_PAD_ENET0_MDC__ENET0_MDC			MXS_IOMUX_PAD_NAKED(4,  0, PAD_MUXSEL_0)
+-#define MX28_PAD_ENET0_MDIO__ENET0_MDIO			MXS_IOMUX_PAD_NAKED(4,  1, PAD_MUXSEL_0)
+-#define MX28_PAD_ENET0_RX_EN__ENET0_RX_EN		MXS_IOMUX_PAD_NAKED(4,  2, PAD_MUXSEL_0)
+-#define MX28_PAD_ENET0_RXD0__ENET0_RXD0			MXS_IOMUX_PAD_NAKED(4,  3, PAD_MUXSEL_0)
+-#define MX28_PAD_ENET0_RXD1__ENET0_RXD1			MXS_IOMUX_PAD_NAKED(4,  4, PAD_MUXSEL_0)
+-#define MX28_PAD_ENET0_TX_CLK__ENET0_TX_CLK		MXS_IOMUX_PAD_NAKED(4,  5, PAD_MUXSEL_0)
+-#define MX28_PAD_ENET0_TX_EN__ENET0_TX_EN		MXS_IOMUX_PAD_NAKED(4,  6, PAD_MUXSEL_0)
+-#define MX28_PAD_ENET0_TXD0__ENET0_TXD0			MXS_IOMUX_PAD_NAKED(4,  7, PAD_MUXSEL_0)
+-#define MX28_PAD_ENET0_TXD1__ENET0_TXD1			MXS_IOMUX_PAD_NAKED(4,  8, PAD_MUXSEL_0)
+-#define MX28_PAD_ENET0_RXD2__ENET0_RXD2			MXS_IOMUX_PAD_NAKED(4,  9, PAD_MUXSEL_0)
+-#define MX28_PAD_ENET0_RXD3__ENET0_RXD3			MXS_IOMUX_PAD_NAKED(4, 10, PAD_MUXSEL_0)
+-#define MX28_PAD_ENET0_TXD2__ENET0_TXD2			MXS_IOMUX_PAD_NAKED(4, 11, PAD_MUXSEL_0)
+-#define MX28_PAD_ENET0_TXD3__ENET0_TXD3			MXS_IOMUX_PAD_NAKED(4, 12, PAD_MUXSEL_0)
+-#define MX28_PAD_ENET0_RX_CLK__ENET0_RX_CLK		MXS_IOMUX_PAD_NAKED(4, 13, PAD_MUXSEL_0)
+-#define MX28_PAD_ENET0_COL__ENET0_COL			MXS_IOMUX_PAD_NAKED(4, 14, PAD_MUXSEL_0)
+-#define MX28_PAD_ENET0_CRS__ENET0_CRS			MXS_IOMUX_PAD_NAKED(4, 15, PAD_MUXSEL_0)
+-#define MX28_PAD_ENET_CLK__CLKCTRL_ENET			MXS_IOMUX_PAD_NAKED(4, 16, PAD_MUXSEL_0)
+-#define MX28_PAD_JTAG_RTCK__JTAG_RTCK			MXS_IOMUX_PAD_NAKED(4, 20, PAD_MUXSEL_0)
 -
--#define MX23EVK_LCD_ENABLE	MXS_GPIO_NR(1, 18)
--#define MX23EVK_BL_ENABLE	MXS_GPIO_NR(1, 28)
--#define MX23EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(1, 30)
--#define MX23EVK_MMC0_SLOT_POWER		MXS_GPIO_NR(1, 29)
+-#define MX28_PAD_EMI_D00__EMI_DATA0			MXS_IOMUX_PAD_NAKED(5,  0, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_D01__EMI_DATA1			MXS_IOMUX_PAD_NAKED(5,  1, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_D02__EMI_DATA2			MXS_IOMUX_PAD_NAKED(5,  2, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_D03__EMI_DATA3			MXS_IOMUX_PAD_NAKED(5,  3, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_D04__EMI_DATA4			MXS_IOMUX_PAD_NAKED(5,  4, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_D05__EMI_DATA5			MXS_IOMUX_PAD_NAKED(5,  5, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_D06__EMI_DATA6			MXS_IOMUX_PAD_NAKED(5,  6, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_D07__EMI_DATA7			MXS_IOMUX_PAD_NAKED(5,  7, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_D08__EMI_DATA8			MXS_IOMUX_PAD_NAKED(5,  8, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_D09__EMI_DATA9			MXS_IOMUX_PAD_NAKED(5,  9, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_D10__EMI_DATA10			MXS_IOMUX_PAD_NAKED(5, 10, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_D11__EMI_DATA11			MXS_IOMUX_PAD_NAKED(5, 11, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_D12__EMI_DATA12			MXS_IOMUX_PAD_NAKED(5, 12, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_D13__EMI_DATA13			MXS_IOMUX_PAD_NAKED(5, 13, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_D14__EMI_DATA14			MXS_IOMUX_PAD_NAKED(5, 14, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_D15__EMI_DATA15			MXS_IOMUX_PAD_NAKED(5, 15, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_ODT0__EMI_ODT0			MXS_IOMUX_PAD_NAKED(5, 16, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_DQM0__EMI_DQM0			MXS_IOMUX_PAD_NAKED(5, 17, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_ODT1__EMI_ODT1			MXS_IOMUX_PAD_NAKED(5, 18, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_DQM1__EMI_DQM1			MXS_IOMUX_PAD_NAKED(5, 19, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_DDR_OPEN_FB__EMI_DDR_OPEN_FEEDBACK	MXS_IOMUX_PAD_NAKED(5, 20, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_CLK__EMI_CLK			MXS_IOMUX_PAD_NAKED(5, 21, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_DQS0__EMI_DQS0			MXS_IOMUX_PAD_NAKED(5, 22, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_DQS1__EMI_DQS1			MXS_IOMUX_PAD_NAKED(5, 23, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_DDR_OPEN__EMI_DDR_OPEN		MXS_IOMUX_PAD_NAKED(5, 26, PAD_MUXSEL_0)
 -
--static const iomux_cfg_t mx23evk_pads[] __initconst = {
--	/* duart */
--	MX23_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
--	MX23_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
+-#define MX28_PAD_EMI_A00__EMI_ADDR0			MXS_IOMUX_PAD_NAKED(6,  0, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_A01__EMI_ADDR1			MXS_IOMUX_PAD_NAKED(6,  1, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_A02__EMI_ADDR2			MXS_IOMUX_PAD_NAKED(6,  2, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_A03__EMI_ADDR3			MXS_IOMUX_PAD_NAKED(6,  3, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_A04__EMI_ADDR4			MXS_IOMUX_PAD_NAKED(6,  4, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_A05__EMI_ADDR5			MXS_IOMUX_PAD_NAKED(6,  5, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_A06__EMI_ADDR6			MXS_IOMUX_PAD_NAKED(6,  6, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_A07__EMI_ADDR7			MXS_IOMUX_PAD_NAKED(6,  7, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_A08__EMI_ADDR8			MXS_IOMUX_PAD_NAKED(6,  8, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_A09__EMI_ADDR9			MXS_IOMUX_PAD_NAKED(6,  9, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_A10__EMI_ADDR10			MXS_IOMUX_PAD_NAKED(6, 10, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_A11__EMI_ADDR11			MXS_IOMUX_PAD_NAKED(6, 11, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_A12__EMI_ADDR12			MXS_IOMUX_PAD_NAKED(6, 12, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_A13__EMI_ADDR13			MXS_IOMUX_PAD_NAKED(6, 13, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_A14__EMI_ADDR14			MXS_IOMUX_PAD_NAKED(6, 14, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_BA0__EMI_BA0			MXS_IOMUX_PAD_NAKED(6, 16, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_BA1__EMI_BA1			MXS_IOMUX_PAD_NAKED(6, 17, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_BA2__EMI_BA2			MXS_IOMUX_PAD_NAKED(6, 18, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_CASN__EMI_CASN			MXS_IOMUX_PAD_NAKED(6, 19, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_RASN__EMI_RASN			MXS_IOMUX_PAD_NAKED(6, 20, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_WEN__EMI_WEN			MXS_IOMUX_PAD_NAKED(6, 21, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_CE0N__EMI_CE0N			MXS_IOMUX_PAD_NAKED(6, 22, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_CE1N__EMI_CE1N			MXS_IOMUX_PAD_NAKED(6, 23, PAD_MUXSEL_0)
+-#define MX28_PAD_EMI_CKE__EMI_CKE			MXS_IOMUX_PAD_NAKED(6, 24, PAD_MUXSEL_0)
 -
--	/* auart */
--	MX23_PAD_AUART1_RX__AUART1_RX | MXS_PAD_CTRL,
--	MX23_PAD_AUART1_TX__AUART1_TX | MXS_PAD_CTRL,
--	MX23_PAD_AUART1_CTS__AUART1_CTS | MXS_PAD_CTRL,
--	MX23_PAD_AUART1_RTS__AUART1_RTS | MXS_PAD_CTRL,
+-/* MUXSEL_1 */
+-#define MX28_PAD_GPMI_D00__SSP1_D0			MXS_IOMUX_PAD_NAKED(0,  0, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_D01__SSP1_D1			MXS_IOMUX_PAD_NAKED(0,  1, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_D02__SSP1_D2			MXS_IOMUX_PAD_NAKED(0,  2, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_D03__SSP1_D3			MXS_IOMUX_PAD_NAKED(0,  3, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_D04__SSP1_D4			MXS_IOMUX_PAD_NAKED(0,  4, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_D05__SSP1_D5			MXS_IOMUX_PAD_NAKED(0,  5, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_D06__SSP1_D6			MXS_IOMUX_PAD_NAKED(0,  6, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_D07__SSP1_D7			MXS_IOMUX_PAD_NAKED(0,  7, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_CE0N__SSP3_D0			MXS_IOMUX_PAD_NAKED(0, 16, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_CE1N__SSP3_D3			MXS_IOMUX_PAD_NAKED(0, 17, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_CE2N__CAN1_TX			MXS_IOMUX_PAD_NAKED(0, 18, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_CE3N__CAN1_RX			MXS_IOMUX_PAD_NAKED(0, 19, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_RDY0__SSP1_CARD_DETECT		MXS_IOMUX_PAD_NAKED(0, 20, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_RDY1__SSP1_CMD			MXS_IOMUX_PAD_NAKED(0, 21, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_RDY2__CAN0_TX			MXS_IOMUX_PAD_NAKED(0, 22, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_RDY3__CAN0_RX			MXS_IOMUX_PAD_NAKED(0, 23, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_RDN__SSP3_SCK			MXS_IOMUX_PAD_NAKED(0, 24, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_WRN__SSP1_SCK			MXS_IOMUX_PAD_NAKED(0, 25, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_ALE__SSP3_D1			MXS_IOMUX_PAD_NAKED(0, 26, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_CLE__SSP3_D2			MXS_IOMUX_PAD_NAKED(0, 27, PAD_MUXSEL_1)
+-#define MX28_PAD_GPMI_RESETN__SSP3_CMD			MXS_IOMUX_PAD_NAKED(0, 28, PAD_MUXSEL_1)
 -
--	/* mxsfb (lcdif) */
--	MX23_PAD_LCD_D00__LCD_D00 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_D01__LCD_D01 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_D02__LCD_D02 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_D03__LCD_D03 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_D04__LCD_D04 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_D05__LCD_D05 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_D06__LCD_D06 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_D07__LCD_D07 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_D08__LCD_D08 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_D09__LCD_D09 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_D10__LCD_D10 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_D11__LCD_D11 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_D12__LCD_D12 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_D13__LCD_D13 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_D14__LCD_D14 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_D15__LCD_D15 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_D16__LCD_D16 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_D17__LCD_D17 | MXS_PAD_CTRL,
--	MX23_PAD_GPMI_D08__LCD_D18 | MXS_PAD_CTRL,
--	MX23_PAD_GPMI_D09__LCD_D19 | MXS_PAD_CTRL,
--	MX23_PAD_GPMI_D10__LCD_D20 | MXS_PAD_CTRL,
--	MX23_PAD_GPMI_D11__LCD_D21 | MXS_PAD_CTRL,
--	MX23_PAD_GPMI_D12__LCD_D22 | MXS_PAD_CTRL,
--	MX23_PAD_GPMI_D13__LCD_D23 | MXS_PAD_CTRL,
--	MX23_PAD_LCD_VSYNC__LCD_VSYNC | MXS_PAD_CTRL,
--	MX23_PAD_LCD_HSYNC__LCD_HSYNC | MXS_PAD_CTRL,
--	MX23_PAD_LCD_DOTCK__LCD_DOTCK | MXS_PAD_CTRL,
--	MX23_PAD_LCD_ENABLE__LCD_ENABLE | MXS_PAD_CTRL,
--	/* LCD panel enable */
--	MX23_PAD_LCD_RESET__GPIO_1_18 | MXS_PAD_CTRL,
--	/* backlight control */
--	MX23_PAD_PWM2__GPIO_1_28 | MXS_PAD_CTRL,
+-#define MX28_PAD_LCD_D03__ETM_DA8			MXS_IOMUX_PAD_NAKED(1,  3, PAD_MUXSEL_1)
+-#define MX28_PAD_LCD_D04__ETM_DA9			MXS_IOMUX_PAD_NAKED(1,  4, PAD_MUXSEL_1)
+-#define MX28_PAD_LCD_D08__ETM_DA3			MXS_IOMUX_PAD_NAKED(1,  8, PAD_MUXSEL_1)
+-#define MX28_PAD_LCD_D09__ETM_DA4			MXS_IOMUX_PAD_NAKED(1,  9, PAD_MUXSEL_1)
+-#define MX28_PAD_LCD_D20__ENET1_1588_EVENT2_OUT		MXS_IOMUX_PAD_NAKED(1, 20, PAD_MUXSEL_1)
+-#define MX28_PAD_LCD_D21__ENET1_1588_EVENT2_IN		MXS_IOMUX_PAD_NAKED(1, 21, PAD_MUXSEL_1)
+-#define MX28_PAD_LCD_D22__ENET1_1588_EVENT3_OUT		MXS_IOMUX_PAD_NAKED(1, 22, PAD_MUXSEL_1)
+-#define MX28_PAD_LCD_D23__ENET1_1588_EVENT3_IN		MXS_IOMUX_PAD_NAKED(1, 23, PAD_MUXSEL_1)
+-#define MX28_PAD_LCD_RD_E__LCD_VSYNC			MXS_IOMUX_PAD_NAKED(1, 24, PAD_MUXSEL_1)
+-#define MX28_PAD_LCD_WR_RWN__LCD_HSYNC			MXS_IOMUX_PAD_NAKED(1, 25, PAD_MUXSEL_1)
+-#define MX28_PAD_LCD_RS__LCD_DOTCLK			MXS_IOMUX_PAD_NAKED(1, 26, PAD_MUXSEL_1)
+-#define MX28_PAD_LCD_CS__LCD_ENABLE			MXS_IOMUX_PAD_NAKED(1, 27, PAD_MUXSEL_1)
+-#define MX28_PAD_LCD_VSYNC__SAIF1_SDATA0		MXS_IOMUX_PAD_NAKED(1, 28, PAD_MUXSEL_1)
+-#define MX28_PAD_LCD_HSYNC__SAIF1_SDATA1		MXS_IOMUX_PAD_NAKED(1, 29, PAD_MUXSEL_1)
+-#define MX28_PAD_LCD_DOTCLK__SAIF1_MCLK			MXS_IOMUX_PAD_NAKED(1, 30, PAD_MUXSEL_1)
 -
--	/* mmc */
--	MX23_PAD_SSP1_DATA0__SSP1_DATA0 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX23_PAD_SSP1_DATA1__SSP1_DATA1 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX23_PAD_SSP1_DATA2__SSP1_DATA2 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX23_PAD_SSP1_DATA3__SSP1_DATA3 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX23_PAD_GPMI_D08__SSP1_DATA4 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX23_PAD_GPMI_D09__SSP1_DATA5 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX23_PAD_GPMI_D10__SSP1_DATA6 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX23_PAD_GPMI_D11__SSP1_DATA7 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX23_PAD_SSP1_CMD__SSP1_CMD |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX23_PAD_SSP1_DETECT__SSP1_DETECT |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--	MX23_PAD_SSP1_SCK__SSP1_SCK |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--	/* write protect */
--	MX23_PAD_PWM4__GPIO_1_30 |
--		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--	/* slot power enable */
--	MX23_PAD_PWM3__GPIO_1_29 |
--		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--};
+-#define MX28_PAD_SSP0_DATA4__SSP2_D0			MXS_IOMUX_PAD_NAKED(2,  4, PAD_MUXSEL_1)
+-#define MX28_PAD_SSP0_DATA5__SSP2_D3			MXS_IOMUX_PAD_NAKED(2,  5, PAD_MUXSEL_1)
+-#define MX28_PAD_SSP0_DATA6__SSP2_CMD			MXS_IOMUX_PAD_NAKED(2,  6, PAD_MUXSEL_1)
+-#define MX28_PAD_SSP0_DATA7__SSP2_SCK			MXS_IOMUX_PAD_NAKED(2,  7, PAD_MUXSEL_1)
+-#define MX28_PAD_SSP1_SCK__SSP2_D1			MXS_IOMUX_PAD_NAKED(2, 12, PAD_MUXSEL_1)
+-#define MX28_PAD_SSP1_CMD__SSP2_D2			MXS_IOMUX_PAD_NAKED(2, 13, PAD_MUXSEL_1)
+-#define MX28_PAD_SSP1_DATA0__SSP2_D6			MXS_IOMUX_PAD_NAKED(2, 14, PAD_MUXSEL_1)
+-#define MX28_PAD_SSP1_DATA3__SSP2_D7			MXS_IOMUX_PAD_NAKED(2, 15, PAD_MUXSEL_1)
+-#define MX28_PAD_SSP2_SCK__AUART2_RX			MXS_IOMUX_PAD_NAKED(2, 16, PAD_MUXSEL_1)
+-#define MX28_PAD_SSP2_MOSI__AUART2_TX			MXS_IOMUX_PAD_NAKED(2, 17, PAD_MUXSEL_1)
+-#define MX28_PAD_SSP2_MISO__AUART3_RX			MXS_IOMUX_PAD_NAKED(2, 18, PAD_MUXSEL_1)
+-#define MX28_PAD_SSP2_SS0__AUART3_TX			MXS_IOMUX_PAD_NAKED(2, 19, PAD_MUXSEL_1)
+-#define MX28_PAD_SSP2_SS1__SSP2_D1			MXS_IOMUX_PAD_NAKED(2, 20, PAD_MUXSEL_1)
+-#define MX28_PAD_SSP2_SS2__SSP2_D2			MXS_IOMUX_PAD_NAKED(2, 21, PAD_MUXSEL_1)
+-#define MX28_PAD_SSP3_SCK__AUART4_TX			MXS_IOMUX_PAD_NAKED(2, 24, PAD_MUXSEL_1)
+-#define MX28_PAD_SSP3_MOSI__AUART4_RX			MXS_IOMUX_PAD_NAKED(2, 25, PAD_MUXSEL_1)
+-#define MX28_PAD_SSP3_MISO__AUART4_RTS			MXS_IOMUX_PAD_NAKED(2, 26, PAD_MUXSEL_1)
+-#define MX28_PAD_SSP3_SS0__AUART4_CTS			MXS_IOMUX_PAD_NAKED(2, 27, PAD_MUXSEL_1)
 -
--/* mxsfb (lcdif) */
--static struct fb_videomode mx23evk_video_modes[] = {
--	{
--		.name		= "Samsung-LMS430HF02",
--		.refresh	= 60,
--		.xres		= 480,
--		.yres		= 272,
--		.pixclock	= 108096, /* picosecond (9.2 MHz) */
--		.left_margin	= 15,
--		.right_margin	= 8,
--		.upper_margin	= 12,
--		.lower_margin	= 4,
--		.hsync_len	= 1,
--		.vsync_len	= 1,
--		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT |
--				  FB_SYNC_DOTCLK_FAILING_ACT,
--	},
--};
+-#define MX28_PAD_AUART0_RX__I2C0_SCL			MXS_IOMUX_PAD_NAKED(3,  0, PAD_MUXSEL_1)
+-#define MX28_PAD_AUART0_TX__I2C0_SDA			MXS_IOMUX_PAD_NAKED(3,  1, PAD_MUXSEL_1)
+-#define MX28_PAD_AUART0_CTS__AUART4_RX			MXS_IOMUX_PAD_NAKED(3,  2, PAD_MUXSEL_1)
+-#define MX28_PAD_AUART0_RTS__AUART4_TX			MXS_IOMUX_PAD_NAKED(3,  3, PAD_MUXSEL_1)
+-#define MX28_PAD_AUART1_RX__SSP2_CARD_DETECT		MXS_IOMUX_PAD_NAKED(3,  4, PAD_MUXSEL_1)
+-#define MX28_PAD_AUART1_TX__SSP3_CARD_DETECT		MXS_IOMUX_PAD_NAKED(3,  5, PAD_MUXSEL_1)
+-#define MX28_PAD_AUART1_CTS__USB0_OVERCURRENT		MXS_IOMUX_PAD_NAKED(3,  6, PAD_MUXSEL_1)
+-#define MX28_PAD_AUART1_RTS__USB0_ID			MXS_IOMUX_PAD_NAKED(3,  7, PAD_MUXSEL_1)
+-#define MX28_PAD_AUART2_RX__SSP3_D1			MXS_IOMUX_PAD_NAKED(3,  8, PAD_MUXSEL_1)
+-#define MX28_PAD_AUART2_TX__SSP3_D2			MXS_IOMUX_PAD_NAKED(3,  9, PAD_MUXSEL_1)
+-#define MX28_PAD_AUART2_CTS__I2C1_SCL			MXS_IOMUX_PAD_NAKED(3, 10, PAD_MUXSEL_1)
+-#define MX28_PAD_AUART2_RTS__I2C1_SDA			MXS_IOMUX_PAD_NAKED(3, 11, PAD_MUXSEL_1)
+-#define MX28_PAD_AUART3_RX__CAN0_TX			MXS_IOMUX_PAD_NAKED(3, 12, PAD_MUXSEL_1)
+-#define MX28_PAD_AUART3_TX__CAN0_RX			MXS_IOMUX_PAD_NAKED(3, 13, PAD_MUXSEL_1)
+-#define MX28_PAD_AUART3_CTS__CAN1_TX			MXS_IOMUX_PAD_NAKED(3, 14, PAD_MUXSEL_1)
+-#define MX28_PAD_AUART3_RTS__CAN1_RX			MXS_IOMUX_PAD_NAKED(3, 15, PAD_MUXSEL_1)
+-#define MX28_PAD_PWM0__I2C1_SCL				MXS_IOMUX_PAD_NAKED(3, 16, PAD_MUXSEL_1)
+-#define MX28_PAD_PWM1__I2C1_SDA				MXS_IOMUX_PAD_NAKED(3, 17, PAD_MUXSEL_1)
+-#define MX28_PAD_PWM2__USB0_ID				MXS_IOMUX_PAD_NAKED(3, 18, PAD_MUXSEL_1)
+-#define MX28_PAD_SAIF0_MCLK__PWM_3			MXS_IOMUX_PAD_NAKED(3, 20, PAD_MUXSEL_1)
+-#define MX28_PAD_SAIF0_LRCLK__PWM_4			MXS_IOMUX_PAD_NAKED(3, 21, PAD_MUXSEL_1)
+-#define MX28_PAD_SAIF0_BITCLK__PWM_5			MXS_IOMUX_PAD_NAKED(3, 22, PAD_MUXSEL_1)
+-#define MX28_PAD_SAIF0_SDATA0__PWM_6			MXS_IOMUX_PAD_NAKED(3, 23, PAD_MUXSEL_1)
+-#define MX28_PAD_I2C0_SCL__TIMROT_ROTARYA		MXS_IOMUX_PAD_NAKED(3, 24, PAD_MUXSEL_1)
+-#define MX28_PAD_I2C0_SDA__TIMROT_ROTARYB		MXS_IOMUX_PAD_NAKED(3, 25, PAD_MUXSEL_1)
+-#define MX28_PAD_SAIF1_SDATA0__PWM_7			MXS_IOMUX_PAD_NAKED(3, 26, PAD_MUXSEL_1)
+-#define MX28_PAD_LCD_RESET__LCD_VSYNC			MXS_IOMUX_PAD_NAKED(3, 30, PAD_MUXSEL_1)
 -
--static const struct mxsfb_platform_data mx23evk_mxsfb_pdata __initconst = {
--	.mode_list	= mx23evk_video_modes,
--	.mode_count	= ARRAY_SIZE(mx23evk_video_modes),
--	.default_bpp	= 32,
--	.ld_intf_width	= STMLCDIF_24BIT,
--};
+-#define MX28_PAD_ENET0_MDC__GPMI_CE4N			MXS_IOMUX_PAD_NAKED(4,  0, PAD_MUXSEL_1)
+-#define MX28_PAD_ENET0_MDIO__GPMI_CE5N			MXS_IOMUX_PAD_NAKED(4,  1, PAD_MUXSEL_1)
+-#define MX28_PAD_ENET0_RX_EN__GPMI_CE6N			MXS_IOMUX_PAD_NAKED(4,  2, PAD_MUXSEL_1)
+-#define MX28_PAD_ENET0_RXD0__GPMI_CE7N			MXS_IOMUX_PAD_NAKED(4,  3, PAD_MUXSEL_1)
+-#define MX28_PAD_ENET0_RXD1__GPMI_READY4		MXS_IOMUX_PAD_NAKED(4,  4, PAD_MUXSEL_1)
+-#define MX28_PAD_ENET0_TX_CLK__HSADC_TRIGGER		MXS_IOMUX_PAD_NAKED(4,  5, PAD_MUXSEL_1)
+-#define MX28_PAD_ENET0_TX_EN__GPMI_READY5		MXS_IOMUX_PAD_NAKED(4,  6, PAD_MUXSEL_1)
+-#define MX28_PAD_ENET0_TXD0__GPMI_READY6		MXS_IOMUX_PAD_NAKED(4,  7, PAD_MUXSEL_1)
+-#define MX28_PAD_ENET0_TXD1__GPMI_READY7		MXS_IOMUX_PAD_NAKED(4,  8, PAD_MUXSEL_1)
+-#define MX28_PAD_ENET0_RXD2__ENET1_RXD0			MXS_IOMUX_PAD_NAKED(4,  9, PAD_MUXSEL_1)
+-#define MX28_PAD_ENET0_RXD3__ENET1_RXD1			MXS_IOMUX_PAD_NAKED(4, 10, PAD_MUXSEL_1)
+-#define MX28_PAD_ENET0_TXD2__ENET1_TXD0			MXS_IOMUX_PAD_NAKED(4, 11, PAD_MUXSEL_1)
+-#define MX28_PAD_ENET0_TXD3__ENET1_TXD1			MXS_IOMUX_PAD_NAKED(4, 12, PAD_MUXSEL_1)
+-#define MX28_PAD_ENET0_RX_CLK__ENET0_RX_ER		MXS_IOMUX_PAD_NAKED(4, 13, PAD_MUXSEL_1)
+-#define MX28_PAD_ENET0_COL__ENET1_TX_EN			MXS_IOMUX_PAD_NAKED(4, 14, PAD_MUXSEL_1)
+-#define MX28_PAD_ENET0_CRS__ENET1_RX_EN			MXS_IOMUX_PAD_NAKED(4, 15, PAD_MUXSEL_1)
 -
--static struct mxs_mmc_platform_data mx23evk_mmc_pdata __initdata = {
--	.wp_gpio = MX23EVK_MMC0_WRITE_PROTECT,
--	.flags = SLOTF_8_BIT_CAPABLE,
--};
+-/* MUXSEL_2 */
+-#define MX28_PAD_GPMI_CE2N__ENET0_RX_ER			MXS_IOMUX_PAD_NAKED(0, 18, PAD_MUXSEL_2)
+-#define MX28_PAD_GPMI_CE3N__SAIF1_MCLK			MXS_IOMUX_PAD_NAKED(0, 19, PAD_MUXSEL_2)
+-#define MX28_PAD_GPMI_RDY0__USB0_ID			MXS_IOMUX_PAD_NAKED(0, 20, PAD_MUXSEL_2)
+-#define MX28_PAD_GPMI_RDY2__ENET0_TX_ER			MXS_IOMUX_PAD_NAKED(0, 22, PAD_MUXSEL_2)
+-#define MX28_PAD_GPMI_RDY3__HSADC_TRIGGER		MXS_IOMUX_PAD_NAKED(0, 23, PAD_MUXSEL_2)
+-#define MX28_PAD_GPMI_ALE__SSP3_D4			MXS_IOMUX_PAD_NAKED(0, 26, PAD_MUXSEL_2)
+-#define MX28_PAD_GPMI_CLE__SSP3_D5			MXS_IOMUX_PAD_NAKED(0, 27, PAD_MUXSEL_2)
 -
--static void __init mx23evk_init(void)
--{
--	int ret;
+-#define MX28_PAD_LCD_D00__ETM_DA0			MXS_IOMUX_PAD_NAKED(1,  0, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D01__ETM_DA1			MXS_IOMUX_PAD_NAKED(1,  1, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D02__ETM_DA2			MXS_IOMUX_PAD_NAKED(1,  2, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D03__ETM_DA3			MXS_IOMUX_PAD_NAKED(1,  3, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D04__ETM_DA4			MXS_IOMUX_PAD_NAKED(1,  4, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D05__ETM_DA5			MXS_IOMUX_PAD_NAKED(1,  5, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D06__ETM_DA6			MXS_IOMUX_PAD_NAKED(1,  6, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D07__ETM_DA7			MXS_IOMUX_PAD_NAKED(1,  7, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D08__ETM_DA8			MXS_IOMUX_PAD_NAKED(1,  8, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D09__ETM_DA9			MXS_IOMUX_PAD_NAKED(1,  9, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D10__ETM_DA10			MXS_IOMUX_PAD_NAKED(1, 10, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D11__ETM_DA11			MXS_IOMUX_PAD_NAKED(1, 11, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D12__ETM_DA12			MXS_IOMUX_PAD_NAKED(1, 12, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D13__ETM_DA13			MXS_IOMUX_PAD_NAKED(1, 13, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D14__ETM_DA14			MXS_IOMUX_PAD_NAKED(1, 14, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D15__ETM_DA15			MXS_IOMUX_PAD_NAKED(1, 15, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D16__ETM_DA7			MXS_IOMUX_PAD_NAKED(1, 16, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D17__ETM_DA6			MXS_IOMUX_PAD_NAKED(1, 17, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D18__ETM_DA5			MXS_IOMUX_PAD_NAKED(1, 18, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D19__ETM_DA4			MXS_IOMUX_PAD_NAKED(1, 19, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D20__ETM_DA3			MXS_IOMUX_PAD_NAKED(1, 20, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D21__ETM_DA2			MXS_IOMUX_PAD_NAKED(1, 21, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D22__ETM_DA1			MXS_IOMUX_PAD_NAKED(1, 22, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_D23__ETM_DA0			MXS_IOMUX_PAD_NAKED(1, 23, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_RD_E__ETM_TCTL			MXS_IOMUX_PAD_NAKED(1, 24, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_WR_RWN__ETM_TCLK			MXS_IOMUX_PAD_NAKED(1, 25, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_HSYNC__ETM_TCTL			MXS_IOMUX_PAD_NAKED(1, 29, PAD_MUXSEL_2)
+-#define MX28_PAD_LCD_DOTCLK__ETM_TCLK			MXS_IOMUX_PAD_NAKED(1, 30, PAD_MUXSEL_2)
 -
--	mx23_soc_init();
+-#define MX28_PAD_SSP1_SCK__ENET0_1588_EVENT2_OUT	MXS_IOMUX_PAD_NAKED(2, 12, PAD_MUXSEL_2)
+-#define MX28_PAD_SSP1_CMD__ENET0_1588_EVENT2_IN		MXS_IOMUX_PAD_NAKED(2, 13, PAD_MUXSEL_2)
+-#define MX28_PAD_SSP1_DATA0__ENET0_1588_EVENT3_OUT	MXS_IOMUX_PAD_NAKED(2, 14, PAD_MUXSEL_2)
+-#define MX28_PAD_SSP1_DATA3__ENET0_1588_EVENT3_IN	MXS_IOMUX_PAD_NAKED(2, 15, PAD_MUXSEL_2)
+-#define MX28_PAD_SSP2_SCK__SAIF0_SDATA1			MXS_IOMUX_PAD_NAKED(2, 16, PAD_MUXSEL_2)
+-#define MX28_PAD_SSP2_MOSI__SAIF0_SDATA2		MXS_IOMUX_PAD_NAKED(2, 17, PAD_MUXSEL_2)
+-#define MX28_PAD_SSP2_MISO__SAIF1_SDATA1		MXS_IOMUX_PAD_NAKED(2, 18, PAD_MUXSEL_2)
+-#define MX28_PAD_SSP2_SS0__SAIF1_SDATA2			MXS_IOMUX_PAD_NAKED(2, 19, PAD_MUXSEL_2)
+-#define MX28_PAD_SSP2_SS1__USB1_OVERCURRENT		MXS_IOMUX_PAD_NAKED(2, 20, PAD_MUXSEL_2)
+-#define MX28_PAD_SSP2_SS2__USB0_OVERCURRENT		MXS_IOMUX_PAD_NAKED(2, 21, PAD_MUXSEL_2)
+-#define MX28_PAD_SSP3_SCK__ENET1_1588_EVENT0_OUT	MXS_IOMUX_PAD_NAKED(2, 24, PAD_MUXSEL_2)
+-#define MX28_PAD_SSP3_MOSI__ENET1_1588_EVENT0_IN	MXS_IOMUX_PAD_NAKED(2, 25, PAD_MUXSEL_2)
+-#define MX28_PAD_SSP3_MISO__ENET1_1588_EVENT1_OUT	MXS_IOMUX_PAD_NAKED(2, 26, PAD_MUXSEL_2)
+-#define MX28_PAD_SSP3_SS0__ENET1_1588_EVENT1_IN		MXS_IOMUX_PAD_NAKED(2, 27, PAD_MUXSEL_2)
 -
--	mxs_iomux_setup_multiple_pads(mx23evk_pads, ARRAY_SIZE(mx23evk_pads));
+-#define MX28_PAD_AUART0_RX__DUART_CTS			MXS_IOMUX_PAD_NAKED(3,  0, PAD_MUXSEL_2)
+-#define MX28_PAD_AUART0_TX__DUART_RTS			MXS_IOMUX_PAD_NAKED(3,  1, PAD_MUXSEL_2)
+-#define MX28_PAD_AUART0_CTS__DUART_RX			MXS_IOMUX_PAD_NAKED(3,  2, PAD_MUXSEL_2)
+-#define MX28_PAD_AUART0_RTS__DUART_TX			MXS_IOMUX_PAD_NAKED(3,  3, PAD_MUXSEL_2)
+-#define MX28_PAD_AUART1_RX__PWM_0			MXS_IOMUX_PAD_NAKED(3,  4, PAD_MUXSEL_2)
+-#define MX28_PAD_AUART1_TX__PWM_1			MXS_IOMUX_PAD_NAKED(3,  5, PAD_MUXSEL_2)
+-#define MX28_PAD_AUART1_CTS__TIMROT_ROTARYA		MXS_IOMUX_PAD_NAKED(3,  6, PAD_MUXSEL_2)
+-#define MX28_PAD_AUART1_RTS__TIMROT_ROTARYB		MXS_IOMUX_PAD_NAKED(3,  7, PAD_MUXSEL_2)
+-#define MX28_PAD_AUART2_RX__SSP3_D4			MXS_IOMUX_PAD_NAKED(3,  8, PAD_MUXSEL_2)
+-#define MX28_PAD_AUART2_TX__SSP3_D5			MXS_IOMUX_PAD_NAKED(3,  9, PAD_MUXSEL_2)
+-#define MX28_PAD_AUART2_CTS__SAIF1_BITCLK		MXS_IOMUX_PAD_NAKED(3, 10, PAD_MUXSEL_2)
+-#define MX28_PAD_AUART2_RTS__SAIF1_LRCLK		MXS_IOMUX_PAD_NAKED(3, 11, PAD_MUXSEL_2)
+-#define MX28_PAD_AUART3_RX__ENET0_1588_EVENT0_OUT	MXS_IOMUX_PAD_NAKED(3, 12, PAD_MUXSEL_2)
+-#define MX28_PAD_AUART3_TX__ENET0_1588_EVENT0_IN	MXS_IOMUX_PAD_NAKED(3, 13, PAD_MUXSEL_2)
+-#define MX28_PAD_AUART3_CTS__ENET0_1588_EVENT1_OUT	MXS_IOMUX_PAD_NAKED(3, 14, PAD_MUXSEL_2)
+-#define MX28_PAD_AUART3_RTS__ENET0_1588_EVENT1_IN	MXS_IOMUX_PAD_NAKED(3, 15, PAD_MUXSEL_2)
+-#define MX28_PAD_PWM0__DUART_RX				MXS_IOMUX_PAD_NAKED(3, 16, PAD_MUXSEL_2)
+-#define MX28_PAD_PWM1__DUART_TX				MXS_IOMUX_PAD_NAKED(3, 17, PAD_MUXSEL_2)
+-#define MX28_PAD_PWM2__USB1_OVERCURRENT			MXS_IOMUX_PAD_NAKED(3, 18, PAD_MUXSEL_2)
+-#define MX28_PAD_SAIF0_MCLK__AUART4_CTS			MXS_IOMUX_PAD_NAKED(3, 20, PAD_MUXSEL_2)
+-#define MX28_PAD_SAIF0_LRCLK__AUART4_RTS		MXS_IOMUX_PAD_NAKED(3, 21, PAD_MUXSEL_2)
+-#define MX28_PAD_SAIF0_BITCLK__AUART4_RX		MXS_IOMUX_PAD_NAKED(3, 22, PAD_MUXSEL_2)
+-#define MX28_PAD_SAIF0_SDATA0__AUART4_TX		MXS_IOMUX_PAD_NAKED(3, 23, PAD_MUXSEL_2)
+-#define MX28_PAD_I2C0_SCL__DUART_RX			MXS_IOMUX_PAD_NAKED(3, 24, PAD_MUXSEL_2)
+-#define MX28_PAD_I2C0_SDA__DUART_TX			MXS_IOMUX_PAD_NAKED(3, 25, PAD_MUXSEL_2)
+-#define MX28_PAD_SAIF1_SDATA0__SAIF0_SDATA1		MXS_IOMUX_PAD_NAKED(3, 26, PAD_MUXSEL_2)
+-#define MX28_PAD_SPDIF__ENET1_RX_ER			MXS_IOMUX_PAD_NAKED(3, 27, PAD_MUXSEL_2)
 -
--	mx23_add_duart();
--	mx23_add_auart0();
+-#define MX28_PAD_ENET0_MDC__SAIF0_SDATA1		MXS_IOMUX_PAD_NAKED(4,  0, PAD_MUXSEL_2)
+-#define MX28_PAD_ENET0_MDIO__SAIF0_SDATA2		MXS_IOMUX_PAD_NAKED(4,  1, PAD_MUXSEL_2)
+-#define MX28_PAD_ENET0_RX_EN__SAIF1_SDATA1		MXS_IOMUX_PAD_NAKED(4,  2, PAD_MUXSEL_2)
+-#define MX28_PAD_ENET0_RXD0__SAIF1_SDATA2		MXS_IOMUX_PAD_NAKED(4,  3, PAD_MUXSEL_2)
+-#define MX28_PAD_ENET0_TX_CLK__ENET0_1588_EVENT2_OUT	MXS_IOMUX_PAD_NAKED(4,  5, PAD_MUXSEL_2)
+-#define MX28_PAD_ENET0_RXD2__ENET0_1588_EVENT0_OUT	MXS_IOMUX_PAD_NAKED(4,  9, PAD_MUXSEL_2)
+-#define MX28_PAD_ENET0_RXD3__ENET0_1588_EVENT0_IN	MXS_IOMUX_PAD_NAKED(4, 10, PAD_MUXSEL_2)
+-#define MX28_PAD_ENET0_TXD2__ENET0_1588_EVENT1_OUT	MXS_IOMUX_PAD_NAKED(4, 11, PAD_MUXSEL_2)
+-#define MX28_PAD_ENET0_TXD3__ENET0_1588_EVENT1_IN	MXS_IOMUX_PAD_NAKED(4, 12, PAD_MUXSEL_2)
+-#define MX28_PAD_ENET0_RX_CLK__ENET0_1588_EVENT2_IN	MXS_IOMUX_PAD_NAKED(4, 13, PAD_MUXSEL_2)
+-#define MX28_PAD_ENET0_COL__ENET0_1588_EVENT3_OUT	MXS_IOMUX_PAD_NAKED(4, 14, PAD_MUXSEL_2)
+-#define MX28_PAD_ENET0_CRS__ENET0_1588_EVENT3_IN	MXS_IOMUX_PAD_NAKED(4, 15, PAD_MUXSEL_2)
 -
--	/* power on mmc slot by writing 0 to the gpio */
--	ret = gpio_request_one(MX23EVK_MMC0_SLOT_POWER, GPIOF_OUT_INIT_LOW,
--			       "mmc0-slot-power");
--	if (ret)
--		pr_warn("failed to request gpio mmc0-slot-power: %d\n", ret);
--	mx23_add_mxs_mmc(0, &mx23evk_mmc_pdata);
+-/* MUXSEL_GPIO */
+-#define MX28_PAD_GPMI_D00__GPIO_0_0			MXS_IOMUX_PAD_NAKED(0,  0, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_D01__GPIO_0_1			MXS_IOMUX_PAD_NAKED(0,  1, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_D02__GPIO_0_2			MXS_IOMUX_PAD_NAKED(0,  2, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_D03__GPIO_0_3			MXS_IOMUX_PAD_NAKED(0,  3, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_D04__GPIO_0_4			MXS_IOMUX_PAD_NAKED(0,  4, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_D05__GPIO_0_5			MXS_IOMUX_PAD_NAKED(0,  5, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_D06__GPIO_0_6			MXS_IOMUX_PAD_NAKED(0,  6, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_D07__GPIO_0_7			MXS_IOMUX_PAD_NAKED(0,  7, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_CE0N__GPIO_0_16			MXS_IOMUX_PAD_NAKED(0, 16, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_CE1N__GPIO_0_17			MXS_IOMUX_PAD_NAKED(0, 17, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_CE2N__GPIO_0_18			MXS_IOMUX_PAD_NAKED(0, 18, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_CE3N__GPIO_0_19			MXS_IOMUX_PAD_NAKED(0, 19, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_RDY0__GPIO_0_20			MXS_IOMUX_PAD_NAKED(0, 20, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_RDY1__GPIO_0_21			MXS_IOMUX_PAD_NAKED(0, 21, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_RDY2__GPIO_0_22			MXS_IOMUX_PAD_NAKED(0, 22, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_RDY3__GPIO_0_23			MXS_IOMUX_PAD_NAKED(0, 23, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_RDN__GPIO_0_24			MXS_IOMUX_PAD_NAKED(0, 24, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_WRN__GPIO_0_25			MXS_IOMUX_PAD_NAKED(0, 25, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_ALE__GPIO_0_26			MXS_IOMUX_PAD_NAKED(0, 26, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_CLE__GPIO_0_27			MXS_IOMUX_PAD_NAKED(0, 27, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_GPMI_RESETN__GPIO_0_28			MXS_IOMUX_PAD_NAKED(0, 28, PAD_MUXSEL_GPIO)
 -
--	ret = gpio_request_one(MX23EVK_LCD_ENABLE, GPIOF_DIR_OUT, "lcd-enable");
--	if (ret)
--		pr_warn("failed to request gpio lcd-enable: %d\n", ret);
--	else
--		gpio_set_value(MX23EVK_LCD_ENABLE, 1);
+-#define MX28_PAD_LCD_D00__GPIO_1_0			MXS_IOMUX_PAD_NAKED(1,  0, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D01__GPIO_1_1			MXS_IOMUX_PAD_NAKED(1,  1, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D02__GPIO_1_2			MXS_IOMUX_PAD_NAKED(1,  2, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D03__GPIO_1_3			MXS_IOMUX_PAD_NAKED(1,  3, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D04__GPIO_1_4			MXS_IOMUX_PAD_NAKED(1,  4, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D05__GPIO_1_5			MXS_IOMUX_PAD_NAKED(1,  5, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D06__GPIO_1_6			MXS_IOMUX_PAD_NAKED(1,  6, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D07__GPIO_1_7			MXS_IOMUX_PAD_NAKED(1,  7, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D08__GPIO_1_8			MXS_IOMUX_PAD_NAKED(1,  8, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D09__GPIO_1_9			MXS_IOMUX_PAD_NAKED(1,  9, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D10__GPIO_1_10			MXS_IOMUX_PAD_NAKED(1, 10, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D11__GPIO_1_11			MXS_IOMUX_PAD_NAKED(1, 11, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D12__GPIO_1_12			MXS_IOMUX_PAD_NAKED(1, 12, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D13__GPIO_1_13			MXS_IOMUX_PAD_NAKED(1, 13, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D14__GPIO_1_14			MXS_IOMUX_PAD_NAKED(1, 14, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D15__GPIO_1_15			MXS_IOMUX_PAD_NAKED(1, 15, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D16__GPIO_1_16			MXS_IOMUX_PAD_NAKED(1, 16, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D17__GPIO_1_17			MXS_IOMUX_PAD_NAKED(1, 17, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D18__GPIO_1_18			MXS_IOMUX_PAD_NAKED(1, 18, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D19__GPIO_1_19			MXS_IOMUX_PAD_NAKED(1, 19, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D20__GPIO_1_20			MXS_IOMUX_PAD_NAKED(1, 20, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D21__GPIO_1_21			MXS_IOMUX_PAD_NAKED(1, 21, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D22__GPIO_1_22			MXS_IOMUX_PAD_NAKED(1, 22, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_D23__GPIO_1_23			MXS_IOMUX_PAD_NAKED(1, 23, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_RD_E__GPIO_1_24			MXS_IOMUX_PAD_NAKED(1, 24, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_WR_RWN__GPIO_1_25			MXS_IOMUX_PAD_NAKED(1, 25, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_RS__GPIO_1_26			MXS_IOMUX_PAD_NAKED(1, 26, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_CS__GPIO_1_27			MXS_IOMUX_PAD_NAKED(1, 27, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_VSYNC__GPIO_1_28			MXS_IOMUX_PAD_NAKED(1, 28, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_HSYNC__GPIO_1_29			MXS_IOMUX_PAD_NAKED(1, 29, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_DOTCLK__GPIO_1_30			MXS_IOMUX_PAD_NAKED(1, 30, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_ENABLE__GPIO_1_31			MXS_IOMUX_PAD_NAKED(1, 31, PAD_MUXSEL_GPIO)
 -
--	ret = gpio_request_one(MX23EVK_BL_ENABLE, GPIOF_DIR_OUT, "bl-enable");
--	if (ret)
--		pr_warn("failed to request gpio bl-enable: %d\n", ret);
--	else
--		gpio_set_value(MX23EVK_BL_ENABLE, 1);
+-#define MX28_PAD_SSP0_DATA0__GPIO_2_0			MXS_IOMUX_PAD_NAKED(2,  0, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP0_DATA1__GPIO_2_1			MXS_IOMUX_PAD_NAKED(2,  1, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP0_DATA2__GPIO_2_2			MXS_IOMUX_PAD_NAKED(2,  2, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP0_DATA3__GPIO_2_3			MXS_IOMUX_PAD_NAKED(2,  3, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP0_DATA4__GPIO_2_4			MXS_IOMUX_PAD_NAKED(2,  4, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP0_DATA5__GPIO_2_5			MXS_IOMUX_PAD_NAKED(2,  5, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP0_DATA6__GPIO_2_6			MXS_IOMUX_PAD_NAKED(2,  6, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP0_DATA7__GPIO_2_7			MXS_IOMUX_PAD_NAKED(2,  7, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP0_CMD__GPIO_2_8			MXS_IOMUX_PAD_NAKED(2,  8, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP0_DETECT__GPIO_2_9			MXS_IOMUX_PAD_NAKED(2,  9, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP0_SCK__GPIO_2_10			MXS_IOMUX_PAD_NAKED(2, 10, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP1_SCK__GPIO_2_12			MXS_IOMUX_PAD_NAKED(2, 12, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP1_CMD__GPIO_2_13			MXS_IOMUX_PAD_NAKED(2, 13, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP1_DATA0__GPIO_2_14			MXS_IOMUX_PAD_NAKED(2, 14, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP1_DATA3__GPIO_2_15			MXS_IOMUX_PAD_NAKED(2, 15, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP2_SCK__GPIO_2_16			MXS_IOMUX_PAD_NAKED(2, 16, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP2_MOSI__GPIO_2_17			MXS_IOMUX_PAD_NAKED(2, 17, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP2_MISO__GPIO_2_18			MXS_IOMUX_PAD_NAKED(2, 18, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP2_SS0__GPIO_2_19			MXS_IOMUX_PAD_NAKED(2, 19, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP2_SS1__GPIO_2_20			MXS_IOMUX_PAD_NAKED(2, 20, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP2_SS2__GPIO_2_21			MXS_IOMUX_PAD_NAKED(2, 21, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP3_SCK__GPIO_2_24			MXS_IOMUX_PAD_NAKED(2, 24, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP3_MOSI__GPIO_2_25			MXS_IOMUX_PAD_NAKED(2, 25, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP3_MISO__GPIO_2_26			MXS_IOMUX_PAD_NAKED(2, 26, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SSP3_SS0__GPIO_2_27			MXS_IOMUX_PAD_NAKED(2, 27, PAD_MUXSEL_GPIO)
 -
--	mx23_add_mxsfb(&mx23evk_mxsfb_pdata);
--	mx23_add_rtc_stmp3xxx();
--}
+-#define MX28_PAD_AUART0_RX__GPIO_3_0			MXS_IOMUX_PAD_NAKED(3,  0, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_AUART0_TX__GPIO_3_1			MXS_IOMUX_PAD_NAKED(3,  1, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_AUART0_CTS__GPIO_3_2			MXS_IOMUX_PAD_NAKED(3,  2, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_AUART0_RTS__GPIO_3_3			MXS_IOMUX_PAD_NAKED(3,  3, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_AUART1_RX__GPIO_3_4			MXS_IOMUX_PAD_NAKED(3,  4, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_AUART1_TX__GPIO_3_5			MXS_IOMUX_PAD_NAKED(3,  5, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_AUART1_CTS__GPIO_3_6			MXS_IOMUX_PAD_NAKED(3,  6, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_AUART1_RTS__GPIO_3_7			MXS_IOMUX_PAD_NAKED(3,  7, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_AUART2_RX__GPIO_3_8			MXS_IOMUX_PAD_NAKED(3,  8, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_AUART2_TX__GPIO_3_9			MXS_IOMUX_PAD_NAKED(3,  9, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_AUART2_CTS__GPIO_3_10			MXS_IOMUX_PAD_NAKED(3, 10, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_AUART2_RTS__GPIO_3_11			MXS_IOMUX_PAD_NAKED(3, 11, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_AUART3_RX__GPIO_3_12			MXS_IOMUX_PAD_NAKED(3, 12, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_AUART3_TX__GPIO_3_13			MXS_IOMUX_PAD_NAKED(3, 13, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_AUART3_CTS__GPIO_3_14			MXS_IOMUX_PAD_NAKED(3, 14, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_AUART3_RTS__GPIO_3_15			MXS_IOMUX_PAD_NAKED(3, 15, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_PWM0__GPIO_3_16			MXS_IOMUX_PAD_NAKED(3, 16, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_PWM1__GPIO_3_17			MXS_IOMUX_PAD_NAKED(3, 17, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_PWM2__GPIO_3_18			MXS_IOMUX_PAD_NAKED(3, 18, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SAIF0_MCLK__GPIO_3_20			MXS_IOMUX_PAD_NAKED(3, 20, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SAIF0_LRCLK__GPIO_3_21			MXS_IOMUX_PAD_NAKED(3, 21, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SAIF0_BITCLK__GPIO_3_22		MXS_IOMUX_PAD_NAKED(3, 22, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SAIF0_SDATA0__GPIO_3_23		MXS_IOMUX_PAD_NAKED(3, 23, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_I2C0_SCL__GPIO_3_24			MXS_IOMUX_PAD_NAKED(3, 24, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_I2C0_SDA__GPIO_3_25			MXS_IOMUX_PAD_NAKED(3, 25, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SAIF1_SDATA0__GPIO_3_26		MXS_IOMUX_PAD_NAKED(3, 26, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_SPDIF__GPIO_3_27			MXS_IOMUX_PAD_NAKED(3, 27, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_PWM3__GPIO_3_28			MXS_IOMUX_PAD_NAKED(3, 28, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_PWM4__GPIO_3_29			MXS_IOMUX_PAD_NAKED(3, 29, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_LCD_RESET__GPIO_3_30			MXS_IOMUX_PAD_NAKED(3, 30, PAD_MUXSEL_GPIO)
 -
--static void __init mx23evk_timer_init(void)
--{
--	mx23_clocks_init();
--}
+-#define MX28_PAD_ENET0_MDC__GPIO_4_0			MXS_IOMUX_PAD_NAKED(4,  0, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_ENET0_MDIO__GPIO_4_1			MXS_IOMUX_PAD_NAKED(4,  1, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_ENET0_RX_EN__GPIO_4_2			MXS_IOMUX_PAD_NAKED(4,  2, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_ENET0_RXD0__GPIO_4_3			MXS_IOMUX_PAD_NAKED(4,  3, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_ENET0_RXD1__GPIO_4_4			MXS_IOMUX_PAD_NAKED(4,  4, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_ENET0_TX_CLK__GPIO_4_5			MXS_IOMUX_PAD_NAKED(4,  5, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_ENET0_TX_EN__GPIO_4_6			MXS_IOMUX_PAD_NAKED(4,  6, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_ENET0_TXD0__GPIO_4_7			MXS_IOMUX_PAD_NAKED(4,  7, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_ENET0_TXD1__GPIO_4_8			MXS_IOMUX_PAD_NAKED(4,  8, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_ENET0_RXD2__GPIO_4_9			MXS_IOMUX_PAD_NAKED(4,  9, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_ENET0_RXD3__GPIO_4_10			MXS_IOMUX_PAD_NAKED(4, 10, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_ENET0_TXD2__GPIO_4_11			MXS_IOMUX_PAD_NAKED(4, 11, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_ENET0_TXD3__GPIO_4_12			MXS_IOMUX_PAD_NAKED(4, 12, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_ENET0_RX_CLK__GPIO_4_13		MXS_IOMUX_PAD_NAKED(4, 13, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_ENET0_COL__GPIO_4_14			MXS_IOMUX_PAD_NAKED(4, 14, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_ENET0_CRS__GPIO_4_15			MXS_IOMUX_PAD_NAKED(4, 15, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_ENET_CLK__GPIO_4_16			MXS_IOMUX_PAD_NAKED(4, 16, PAD_MUXSEL_GPIO)
+-#define MX28_PAD_JTAG_RTCK__GPIO_4_20			MXS_IOMUX_PAD_NAKED(4, 20, PAD_MUXSEL_GPIO)
 -
--static struct sys_timer mx23evk_timer = {
--	.init	= mx23evk_timer_init,
--};
--
--MACHINE_START(MX23EVK, "Freescale MX23 EVK")
--	/* Maintainer: Freescale Semiconductor, Inc. */
--	.map_io		= mx23_map_io,
--	.init_irq	= mx23_init_irq,
--	.timer		= &mx23evk_timer,
--	.init_machine	= mx23evk_init,
--	.restart	= mxs_restart,
--MACHINE_END
-diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+-#endif /* __MACH_IOMUX_MX28_H__ */
+diff --git a/arch/arm/mach-mxs/include/mach/iomux.h b/arch/arm/mach-mxs/include/mach/iomux.h
 deleted file mode 100644
-index dafd48e..0000000
---- a/arch/arm/mach-mxs/mach-mx28evk.c
+index 7abdf58..0000000
+--- a/arch/arm/mach-mxs/include/mach/iomux.h
 +++ /dev/null
-@@ -1,477 +0,0 @@
+@@ -1,168 +0,0 @@
 -/*
-- * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--#include <linux/delay.h>
--#include <linux/platform_device.h>
--#include <linux/gpio.h>
--#include <linux/leds.h>
--#include <linux/clk.h>
--#include <linux/i2c.h>
--#include <linux/regulator/machine.h>
--#include <linux/regulator/fixed.h>
--
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/time.h>
--
--#include <mach/common.h>
--#include <mach/iomux-mx28.h>
--#include <mach/digctl.h>
--
--#include "devices-mx28.h"
--
--#define MX28EVK_FLEXCAN_SWITCH	MXS_GPIO_NR(2, 13)
--#define MX28EVK_FEC_PHY_POWER	MXS_GPIO_NR(2, 15)
--#define MX28EVK_GPIO_LED	MXS_GPIO_NR(3, 5)
--#define MX28EVK_BL_ENABLE	MXS_GPIO_NR(3, 18)
--#define MX28EVK_LCD_ENABLE	MXS_GPIO_NR(3, 30)
--#define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
--
--#define MX28EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(2, 12)
--#define MX28EVK_MMC1_WRITE_PROTECT	MXS_GPIO_NR(0, 28)
--#define MX28EVK_MMC0_SLOT_POWER		MXS_GPIO_NR(3, 28)
--#define MX28EVK_MMC1_SLOT_POWER		MXS_GPIO_NR(3, 29)
--
--static const iomux_cfg_t mx28evk_pads[] __initconst = {
--	/* duart */
--	MX28_PAD_PWM0__DUART_RX | MXS_PAD_CTRL,
--	MX28_PAD_PWM1__DUART_TX | MXS_PAD_CTRL,
--
--	/* auart0 */
--	MX28_PAD_AUART0_RX__AUART0_RX | MXS_PAD_CTRL,
--	MX28_PAD_AUART0_TX__AUART0_TX | MXS_PAD_CTRL,
--	MX28_PAD_AUART0_CTS__AUART0_CTS | MXS_PAD_CTRL,
--	MX28_PAD_AUART0_RTS__AUART0_RTS | MXS_PAD_CTRL,
--	/* auart3 */
--	MX28_PAD_AUART3_RX__AUART3_RX | MXS_PAD_CTRL,
--	MX28_PAD_AUART3_TX__AUART3_TX | MXS_PAD_CTRL,
--	MX28_PAD_AUART3_CTS__AUART3_CTS | MXS_PAD_CTRL,
--	MX28_PAD_AUART3_RTS__AUART3_RTS | MXS_PAD_CTRL,
--
--#define MXS_PAD_FEC	(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP)
--	/* fec0 */
--	MX28_PAD_ENET0_MDC__ENET0_MDC | MXS_PAD_FEC,
--	MX28_PAD_ENET0_MDIO__ENET0_MDIO | MXS_PAD_FEC,
--	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN | MXS_PAD_FEC,
--	MX28_PAD_ENET0_RXD0__ENET0_RXD0 | MXS_PAD_FEC,
--	MX28_PAD_ENET0_RXD1__ENET0_RXD1 | MXS_PAD_FEC,
--	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN | MXS_PAD_FEC,
--	MX28_PAD_ENET0_TXD0__ENET0_TXD0 | MXS_PAD_FEC,
--	MX28_PAD_ENET0_TXD1__ENET0_TXD1 | MXS_PAD_FEC,
--	MX28_PAD_ENET_CLK__CLKCTRL_ENET | MXS_PAD_FEC,
--	/* fec1 */
--	MX28_PAD_ENET0_CRS__ENET1_RX_EN | MXS_PAD_FEC,
--	MX28_PAD_ENET0_RXD2__ENET1_RXD0 | MXS_PAD_FEC,
--	MX28_PAD_ENET0_RXD3__ENET1_RXD1 | MXS_PAD_FEC,
--	MX28_PAD_ENET0_COL__ENET1_TX_EN | MXS_PAD_FEC,
--	MX28_PAD_ENET0_TXD2__ENET1_TXD0 | MXS_PAD_FEC,
--	MX28_PAD_ENET0_TXD3__ENET1_TXD1 | MXS_PAD_FEC,
--	/* phy power line */
--	MX28_PAD_SSP1_DATA3__GPIO_2_15 | MXS_PAD_CTRL,
--	/* phy reset line */
--	MX28_PAD_ENET0_RX_CLK__GPIO_4_13 | MXS_PAD_CTRL,
--
--	/* flexcan0 */
--	MX28_PAD_GPMI_RDY2__CAN0_TX,
--	MX28_PAD_GPMI_RDY3__CAN0_RX,
--	/* flexcan1 */
--	MX28_PAD_GPMI_CE2N__CAN1_TX,
--	MX28_PAD_GPMI_CE3N__CAN1_RX,
--	/* transceiver power control */
--	MX28_PAD_SSP1_CMD__GPIO_2_13,
--
--	/* mxsfb (lcdif) */
--	MX28_PAD_LCD_D00__LCD_D0 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D01__LCD_D1 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D02__LCD_D2 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D03__LCD_D3 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D04__LCD_D4 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D05__LCD_D5 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D06__LCD_D6 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D07__LCD_D7 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D08__LCD_D8 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D09__LCD_D9 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D10__LCD_D10 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D11__LCD_D11 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D12__LCD_D12 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D13__LCD_D13 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D14__LCD_D14 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D15__LCD_D15 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D16__LCD_D16 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D17__LCD_D17 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D18__LCD_D18 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D19__LCD_D19 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D20__LCD_D20 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D21__LCD_D21 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D22__LCD_D22 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_D23__LCD_D23 | MXS_PAD_CTRL,
--	MX28_PAD_LCD_RD_E__LCD_VSYNC | MXS_PAD_CTRL,
--	MX28_PAD_LCD_WR_RWN__LCD_HSYNC | MXS_PAD_CTRL,
--	MX28_PAD_LCD_RS__LCD_DOTCLK | MXS_PAD_CTRL,
--	MX28_PAD_LCD_CS__LCD_ENABLE | MXS_PAD_CTRL,
--	/* LCD panel enable */
--	MX28_PAD_LCD_RESET__GPIO_3_30 | MXS_PAD_CTRL,
--	/* backlight control */
--	MX28_PAD_PWM2__GPIO_3_18 | MXS_PAD_CTRL,
--	/* mmc0 */
--	MX28_PAD_SSP0_DATA0__SSP0_D0 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA1__SSP0_D1 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA2__SSP0_D2 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA3__SSP0_D3 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA4__SSP0_D4 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA5__SSP0_D5 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA6__SSP0_D6 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA7__SSP0_D7 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_CMD__SSP0_CMD |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--	MX28_PAD_SSP0_SCK__SSP0_SCK |
--		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--	/* write protect */
--	MX28_PAD_SSP1_SCK__GPIO_2_12 |
--		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--	/* slot power enable */
--	MX28_PAD_PWM3__GPIO_3_28 |
--		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--
--	/* mmc1 */
--	MX28_PAD_GPMI_D00__SSP1_D0 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_D01__SSP1_D1 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_D02__SSP1_D2 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_D03__SSP1_D3 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_D04__SSP1_D4 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_D05__SSP1_D5 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_D06__SSP1_D6 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_D07__SSP1_D7 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_RDY1__SSP1_CMD |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_GPMI_RDY0__SSP1_CARD_DETECT |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--	MX28_PAD_GPMI_WRN__SSP1_SCK |
--		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--	/* write protect */
--	MX28_PAD_GPMI_RESETN__GPIO_0_28 |
--		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--	/* slot power enable */
--	MX28_PAD_PWM4__GPIO_3_29 |
--		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--
--	/* led */
--	MX28_PAD_AUART1_TX__GPIO_3_5 | MXS_PAD_CTRL,
--
--	/* I2C */
--	MX28_PAD_I2C0_SCL__I2C0_SCL |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_I2C0_SDA__I2C0_SDA |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--
--	/* saif0 & saif1 */
--	MX28_PAD_SAIF0_MCLK__SAIF0_MCLK |
--		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SAIF0_LRCLK__SAIF0_LRCLK |
--		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SAIF0_BITCLK__SAIF0_BITCLK |
--		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SAIF0_SDATA0__SAIF0_SDATA0 |
--		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SAIF1_SDATA0__SAIF1_SDATA0 |
--		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--};
--
--/* led */
--static const struct gpio_led mx28evk_leds[] __initconst = {
--	{
--		.name = "GPIO-LED",
--		.default_trigger = "heartbeat",
--		.gpio = MX28EVK_GPIO_LED,
--	},
--};
--
--static const struct gpio_led_platform_data mx28evk_led_data __initconst = {
--	.leds = mx28evk_leds,
--	.num_leds = ARRAY_SIZE(mx28evk_leds),
--};
--
--/* fec */
--static void __init mx28evk_fec_reset(void)
--{
--	struct clk *clk;
--
--	/* Enable fec phy clock */
--	clk = clk_get_sys("enet_out", NULL);
--	if (!IS_ERR(clk))
--		clk_prepare_enable(clk);
--
--	gpio_set_value(MX28EVK_FEC_PHY_RESET, 0);
--	mdelay(1);
--	gpio_set_value(MX28EVK_FEC_PHY_RESET, 1);
--}
--
--static struct fec_platform_data mx28_fec_pdata[] __initdata = {
--	{
--		/* fec0 */
--		.phy = PHY_INTERFACE_MODE_RMII,
--	}, {
--		/* fec1 */
--		.phy = PHY_INTERFACE_MODE_RMII,
--	},
--};
--
--static int __init mx28evk_fec_get_mac(void)
--{
--	int i;
--	u32 val;
--	const u32 *ocotp = mxs_get_ocotp();
--
--	if (!ocotp)
--		return -ETIMEDOUT;
--
--	/*
--	 * OCOTP only stores the last 4 octets for each mac address,
--	 * so hard-code Freescale OUI (00:04:9f) here.
--	 */
--	for (i = 0; i < 2; i++) {
--		val = ocotp[i];
--		mx28_fec_pdata[i].mac[0] = 0x00;
--		mx28_fec_pdata[i].mac[1] = 0x04;
--		mx28_fec_pdata[i].mac[2] = 0x9f;
--		mx28_fec_pdata[i].mac[3] = (val >> 16) & 0xff;
--		mx28_fec_pdata[i].mac[4] = (val >> 8) & 0xff;
--		mx28_fec_pdata[i].mac[5] = (val >> 0) & 0xff;
--	}
--
--	return 0;
--}
--
--/*
-- * MX28EVK_FLEXCAN_SWITCH is shared between both flexcan controllers
-- */
--static int flexcan0_en, flexcan1_en;
--
--static void mx28evk_flexcan_switch(void)
--{
--	if (flexcan0_en || flexcan1_en)
--		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
--	else
--		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
--}
--
--static void mx28evk_flexcan0_switch(int enable)
--{
--	flexcan0_en = enable;
--	mx28evk_flexcan_switch();
--}
--
--static void mx28evk_flexcan1_switch(int enable)
--{
--	flexcan1_en = enable;
--	mx28evk_flexcan_switch();
--}
--
--static const struct flexcan_platform_data
--		mx28evk_flexcan_pdata[] __initconst = {
--	{
--		.transceiver_switch = mx28evk_flexcan0_switch,
--	}, {
--		.transceiver_switch = mx28evk_flexcan1_switch,
--	}
--};
--
--/* mxsfb (lcdif) */
--static struct fb_videomode mx28evk_video_modes[] = {
--	{
--		.name		= "Seiko-43WVF1G",
--		.refresh	= 60,
--		.xres		= 800,
--		.yres		= 480,
--		.pixclock	= 29851, /* picosecond (33.5 MHz) */
--		.left_margin	= 89,
--		.right_margin	= 164,
--		.upper_margin	= 23,
--		.lower_margin	= 10,
--		.hsync_len	= 10,
--		.vsync_len	= 10,
--		.sync		= FB_SYNC_DATA_ENABLE_HIGH_ACT |
--				  FB_SYNC_DOTCLK_FAILING_ACT,
--	},
--};
--
--static const struct mxsfb_platform_data mx28evk_mxsfb_pdata __initconst = {
--	.mode_list	= mx28evk_video_modes,
--	.mode_count	= ARRAY_SIZE(mx28evk_video_modes),
--	.default_bpp	= 32,
--	.ld_intf_width	= STMLCDIF_24BIT,
--};
--
--static struct mxs_mmc_platform_data mx28evk_mmc_pdata[] __initdata = {
--	{
--		/* mmc0 */
--		.wp_gpio = MX28EVK_MMC0_WRITE_PROTECT,
--		.flags = SLOTF_8_BIT_CAPABLE,
--	}, {
--		/* mmc1 */
--		.wp_gpio = MX28EVK_MMC1_WRITE_PROTECT,
--		.flags = SLOTF_8_BIT_CAPABLE,
--	},
--};
--
--static struct i2c_board_info mxs_i2c0_board_info[] __initdata = {
--	{
--		I2C_BOARD_INFO("sgtl5000", 0x0a),
--	},
--};
--
--#if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
--static struct regulator_consumer_supply mx28evk_audio_consumer_supplies[] = {
--	REGULATOR_SUPPLY("VDDA", "0-000a"),
--	REGULATOR_SUPPLY("VDDIO", "0-000a"),
--};
--
--static struct regulator_init_data mx28evk_vdd_reg_init_data = {
--	.constraints	= {
--		.name	= "3V3",
--		.always_on = 1,
--	},
--	.consumer_supplies = mx28evk_audio_consumer_supplies,
--	.num_consumer_supplies = ARRAY_SIZE(mx28evk_audio_consumer_supplies),
--};
--
--static struct fixed_voltage_config mx28evk_vdd_pdata = {
--	.supply_name	= "board-3V3",
--	.microvolts	= 3300000,
--	.gpio		= -EINVAL,
--	.enabled_at_boot = 1,
--	.init_data	= &mx28evk_vdd_reg_init_data,
--};
--static struct platform_device mx28evk_voltage_regulator = {
--	.name		= "reg-fixed-voltage",
--	.id		= -1,
--	.num_resources	= 0,
--	.dev		= {
--		.platform_data	= &mx28evk_vdd_pdata,
--	},
--};
--static void __init mx28evk_add_regulators(void)
--{
--	platform_device_register(&mx28evk_voltage_regulator);
--}
--#else
--static void __init mx28evk_add_regulators(void) {}
--#endif
--
--static const struct gpio mx28evk_gpios[] __initconst = {
--	{ MX28EVK_LCD_ENABLE, GPIOF_OUT_INIT_HIGH, "lcd-enable" },
--	{ MX28EVK_BL_ENABLE, GPIOF_OUT_INIT_HIGH, "bl-enable" },
--	{ MX28EVK_FLEXCAN_SWITCH, GPIOF_DIR_OUT, "flexcan-switch" },
--	{ MX28EVK_MMC0_SLOT_POWER, GPIOF_OUT_INIT_LOW, "mmc0-slot-power" },
--	{ MX28EVK_MMC1_SLOT_POWER, GPIOF_OUT_INIT_LOW, "mmc1-slot-power" },
--	{ MX28EVK_FEC_PHY_POWER, GPIOF_OUT_INIT_LOW, "fec-phy-power" },
--	{ MX28EVK_FEC_PHY_RESET, GPIOF_DIR_OUT, "fec-phy-reset" },
--};
--
--static const struct mxs_saif_platform_data
--			mx28evk_mxs_saif_pdata[] __initconst = {
--	/* working on EXTMSTR0 mode (saif0 master, saif1 slave) */
--	{
--		.master_mode = 1,
--		.master_id = 0,
--	}, {
--		.master_mode = 0,
--		.master_id = 0,
--	},
--};
--
--static void __init mx28evk_init(void)
--{
--	int ret;
--
--	mx28_soc_init();
--
--	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
--
--	mx28_add_duart();
--	mx28_add_auart0();
--	mx28_add_auart3();
--
--	if (mx28evk_fec_get_mac())
--		pr_warn("%s: failed on fec mac setup\n", __func__);
--
--	ret = gpio_request_array(mx28evk_gpios, ARRAY_SIZE(mx28evk_gpios));
--	if (ret)
--		pr_err("One or more GPIOs failed to be requested: %d\n", ret);
--
--	mx28evk_fec_reset();
--	mx28_add_fec(0, &mx28_fec_pdata[0]);
--	mx28_add_fec(1, &mx28_fec_pdata[1]);
--
--	mx28_add_flexcan(0, &mx28evk_flexcan_pdata[0]);
--	mx28_add_flexcan(1, &mx28evk_flexcan_pdata[1]);
--
--	mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
--
--	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
--	mx28_add_saif(0, &mx28evk_mxs_saif_pdata[0]);
--	mx28_add_saif(1, &mx28evk_mxs_saif_pdata[1]);
--
--	mx28_add_mxs_i2c(0);
--	i2c_register_board_info(0, mxs_i2c0_board_info,
--				ARRAY_SIZE(mxs_i2c0_board_info));
--
--	mx28evk_add_regulators();
--
--	mxs_add_platform_device("mxs-sgtl5000", 0, NULL, 0,
--			NULL, 0);
--
--	mx28_add_mxs_mmc(0, &mx28evk_mmc_pdata[0]);
--	mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
--
--	mx28_add_rtc_stmp3xxx();
--
--	gpio_led_register_device(0, &mx28evk_led_data);
--}
--
--static void __init mx28evk_timer_init(void)
--{
--	mx28_clocks_init();
--}
--
--static struct sys_timer mx28evk_timer = {
--	.init	= mx28evk_timer_init,
--};
--
--MACHINE_START(MX28EVK, "Freescale MX28 EVK")
--	/* Maintainer: Freescale Semiconductor, Inc. */
--	.map_io		= mx28_map_io,
--	.init_irq	= mx28_init_irq,
--	.timer		= &mx28evk_timer,
--	.init_machine	= mx28evk_init,
--	.restart	= mxs_restart,
--MACHINE_END
-diff --git a/arch/arm/mach-mxs/mach-stmp378x_devb.c b/arch/arm/mach-mxs/mach-stmp378x_devb.c
-deleted file mode 100644
-index 6548965..0000000
---- a/arch/arm/mach-mxs/mach-stmp378x_devb.c
-+++ /dev/null
-@@ -1,123 +0,0 @@
--/*
-- * board setup for STMP378x-Development-Board
-- *
-- * based on mx23evk board setup and information gained form the original
-- * plat-stmp based board setup, now converted to mach-mxs.
-- *
-- * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright (C) 2011 Wolfram Sang, Pengutronix e.K.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--#include <linux/platform_device.h>
--#include <linux/gpio.h>
--#include <linux/spi/spi.h>
--
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/time.h>
--
--#include <mach/common.h>
--#include <mach/iomux-mx23.h>
--
--#include "devices-mx23.h"
--
--#define STMP378X_DEVB_MMC0_WRITE_PROTECT	MXS_GPIO_NR(1, 30)
--#define STMP378X_DEVB_MMC0_SLOT_POWER		MXS_GPIO_NR(1, 29)
--
--#define STMP378X_DEVB_PAD_AUART (MXS_PAD_4MA | MXS_PAD_1V8 | MXS_PAD_NOPULL)
--
--static const iomux_cfg_t stmp378x_dvb_pads[] __initconst = {
--	/* duart (extended setup missing in old boardcode, too */
--	MX23_PAD_PWM0__DUART_RX,
--	MX23_PAD_PWM1__DUART_TX,
--
--	/* auart */
--	MX23_PAD_AUART1_RX__AUART1_RX | STMP378X_DEVB_PAD_AUART,
--	MX23_PAD_AUART1_TX__AUART1_TX | STMP378X_DEVB_PAD_AUART,
--	MX23_PAD_AUART1_CTS__AUART1_CTS | STMP378X_DEVB_PAD_AUART,
--	MX23_PAD_AUART1_RTS__AUART1_RTS | STMP378X_DEVB_PAD_AUART,
--
--	/* mmc */
--	MX23_PAD_SSP1_DATA0__SSP1_DATA0 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX23_PAD_SSP1_DATA1__SSP1_DATA1 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX23_PAD_SSP1_DATA2__SSP1_DATA2 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX23_PAD_SSP1_DATA3__SSP1_DATA3 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX23_PAD_SSP1_CMD__SSP1_CMD |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX23_PAD_SSP1_DETECT__SSP1_DETECT |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--	MX23_PAD_SSP1_SCK__SSP1_SCK |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--	MX23_PAD_PWM4__GPIO_1_30 | MXS_PAD_CTRL, /* write protect */
--	MX23_PAD_PWM3__GPIO_1_29 | MXS_PAD_CTRL, /* power enable */
--};
--
--static struct mxs_mmc_platform_data stmp378x_dvb_mmc_pdata __initdata = {
--	.wp_gpio = STMP378X_DEVB_MMC0_WRITE_PROTECT,
--};
--
--static struct spi_board_info spi_board_info[] __initdata = {
--#if defined(CONFIG_ENC28J60) || defined(CONFIG_ENC28J60_MODULE)
--	{
--		.modalias       = "enc28j60",
--		.max_speed_hz   = 6 * 1000 * 1000,
--		.bus_num	= 1,
--		.chip_select    = 0,
--		.platform_data  = NULL,
--	},
--#endif
--};
--
--static void __init stmp378x_dvb_init(void)
--{
--	int ret;
--
--	mx23_soc_init();
--
--	mxs_iomux_setup_multiple_pads(stmp378x_dvb_pads,
--			ARRAY_SIZE(stmp378x_dvb_pads));
--
--	mx23_add_duart();
--	mx23_add_auart0();
--	mx23_add_rtc_stmp3xxx();
--
--	/* power on mmc slot */
--	ret = gpio_request_one(STMP378X_DEVB_MMC0_SLOT_POWER,
--		GPIOF_OUT_INIT_LOW, "mmc0-slot-power");
--	if (ret)
--		pr_warn("could not power mmc (%d)\n", ret);
--
--	mx23_add_mxs_mmc(0, &stmp378x_dvb_mmc_pdata);
--
--	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
--}
--
--static void __init stmp378x_dvb_timer_init(void)
--{
--	mx23_clocks_init();
--}
--
--static struct sys_timer stmp378x_dvb_timer = {
--	.init	= stmp378x_dvb_timer_init,
--};
--
--MACHINE_START(STMP378X, "STMP378X")
--	.map_io		= mx23_map_io,
--	.init_irq	= mx23_init_irq,
--	.timer		= &stmp378x_dvb_timer,
--	.init_machine	= stmp378x_dvb_init,
--	.restart	= mxs_restart,
--MACHINE_END
-diff --git a/arch/arm/mach-mxs/mach-tx28.c b/arch/arm/mach-mxs/mach-tx28.c
-deleted file mode 100644
-index 8837029..0000000
---- a/arch/arm/mach-mxs/mach-tx28.c
-+++ /dev/null
-@@ -1,184 +0,0 @@
--/*
-- * Copyright (C) 2010 <LW@KARO-electronics.de>
-- *
-- * based on: mach-mx28_evk.c
-- * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright (C) 2009 by Jan Weitzel Phytec Messtechnik GmbH,
+- *			<armlinux@phytec.de>
+- * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
 - *
 - * This program is free software; you can redistribute it and/or
 - * modify it under the terms of the GNU General Public License
-- * version 2 as published by the Free Software Foundation
-- */
--#include <linux/kernel.h>
--#include <linux/gpio.h>
--#include <linux/leds.h>
--#include <linux/platform_device.h>
--#include <linux/spi/spi.h>
--#include <linux/spi/spi_gpio.h>
--#include <linux/i2c.h>
--
--#include <asm/mach/arch.h>
--#include <asm/mach/time.h>
--
--#include <mach/common.h>
--#include <mach/iomux-mx28.h>
--
--#include "devices-mx28.h"
--#include "module-tx28.h"
--
--#define TX28_STK5_GPIO_LED		MXS_GPIO_NR(4, 10)
--
--static const iomux_cfg_t tx28_stk5v3_pads[] __initconst = {
--	/* LED */
--	MX28_PAD_ENET0_RXD3__GPIO_4_10 |
--		MXS_PAD_3V3 | MXS_PAD_4MA | MXS_PAD_NOPULL,
--
--	/* framebuffer */
--#define LCD_MODE (MXS_PAD_3V3 | MXS_PAD_4MA)
--	MX28_PAD_LCD_D00__LCD_D0 | LCD_MODE,
--	MX28_PAD_LCD_D01__LCD_D1 | LCD_MODE,
--	MX28_PAD_LCD_D02__LCD_D2 | LCD_MODE,
--	MX28_PAD_LCD_D03__LCD_D3 | LCD_MODE,
--	MX28_PAD_LCD_D04__LCD_D4 | LCD_MODE,
--	MX28_PAD_LCD_D05__LCD_D5 | LCD_MODE,
--	MX28_PAD_LCD_D06__LCD_D6 | LCD_MODE,
--	MX28_PAD_LCD_D07__LCD_D7 | LCD_MODE,
--	MX28_PAD_LCD_D08__LCD_D8 | LCD_MODE,
--	MX28_PAD_LCD_D09__LCD_D9 | LCD_MODE,
--	MX28_PAD_LCD_D10__LCD_D10 | LCD_MODE,
--	MX28_PAD_LCD_D11__LCD_D11 | LCD_MODE,
--	MX28_PAD_LCD_D12__LCD_D12 | LCD_MODE,
--	MX28_PAD_LCD_D13__LCD_D13 | LCD_MODE,
--	MX28_PAD_LCD_D14__LCD_D14 | LCD_MODE,
--	MX28_PAD_LCD_D15__LCD_D15 | LCD_MODE,
--	MX28_PAD_LCD_D16__LCD_D16 | LCD_MODE,
--	MX28_PAD_LCD_D17__LCD_D17 | LCD_MODE,
--	MX28_PAD_LCD_D18__LCD_D18 | LCD_MODE,
--	MX28_PAD_LCD_D19__LCD_D19 | LCD_MODE,
--	MX28_PAD_LCD_D20__LCD_D20 | LCD_MODE,
--	MX28_PAD_LCD_D21__LCD_D21 | LCD_MODE,
--	MX28_PAD_LCD_D22__LCD_D22 | LCD_MODE,
--	MX28_PAD_LCD_D23__LCD_D23 | LCD_MODE,
--	MX28_PAD_LCD_RD_E__LCD_VSYNC | LCD_MODE,
--	MX28_PAD_LCD_WR_RWN__LCD_HSYNC | LCD_MODE,
--	MX28_PAD_LCD_RS__LCD_DOTCLK | LCD_MODE,
--	MX28_PAD_LCD_CS__LCD_CS | LCD_MODE,
--	MX28_PAD_LCD_VSYNC__LCD_VSYNC | LCD_MODE,
--	MX28_PAD_LCD_HSYNC__LCD_HSYNC | LCD_MODE,
--	MX28_PAD_LCD_DOTCLK__LCD_DOTCLK | LCD_MODE,
--	MX28_PAD_LCD_ENABLE__GPIO_1_31 | LCD_MODE,
--	MX28_PAD_LCD_RESET__GPIO_3_30 | LCD_MODE,
--	MX28_PAD_PWM0__PWM_0 | LCD_MODE,
--
--	/* UART1 */
--	MX28_PAD_AUART0_CTS__DUART_RX,
--	MX28_PAD_AUART0_RTS__DUART_TX,
--	MX28_PAD_AUART0_TX__DUART_RTS,
--	MX28_PAD_AUART0_RX__DUART_CTS,
--
--	/* UART2 */
--	MX28_PAD_AUART1_RX__AUART1_RX,
--	MX28_PAD_AUART1_TX__AUART1_TX,
--	MX28_PAD_AUART1_RTS__AUART1_RTS,
--	MX28_PAD_AUART1_CTS__AUART1_CTS,
--
--	/* CAN */
--	MX28_PAD_GPMI_RDY2__CAN0_TX,
--	MX28_PAD_GPMI_RDY3__CAN0_RX,
--
--	/* I2C */
--	MX28_PAD_I2C0_SCL__I2C0_SCL,
--	MX28_PAD_I2C0_SDA__I2C0_SDA,
--
--	/* TSC2007 */
--	MX28_PAD_SAIF0_MCLK__GPIO_3_20 | MXS_PAD_3V3 | MXS_PAD_4MA | MXS_PAD_PULLUP,
--
--	/* MMC0 */
--	MX28_PAD_SSP0_DATA0__SSP0_D0 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA1__SSP0_D1 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA2__SSP0_D2 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DATA3__SSP0_D3 |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_CMD__SSP0_CMD |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
--	MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT |
--		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--	MX28_PAD_SSP0_SCK__SSP0_SCK |
--		(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
--};
--
--static const struct gpio_led tx28_stk5v3_leds[] __initconst = {
--	{
--		.name = "GPIO-LED",
--		.default_trigger = "heartbeat",
--		.gpio = TX28_STK5_GPIO_LED,
--	},
--};
--
--static const struct gpio_led_platform_data tx28_stk5v3_led_data __initconst = {
--	.leds = tx28_stk5v3_leds,
--	.num_leds = ARRAY_SIZE(tx28_stk5v3_leds),
--};
--
--static struct spi_board_info tx28_spi_board_info[] = {
--	{
--		.modalias = "spidev",
--		.max_speed_hz = 20000000,
--		.bus_num = 0,
--		.chip_select = 1,
--		.controller_data = (void *)SPI_GPIO_NO_CHIPSELECT,
--		.mode = SPI_MODE_0,
--	},
--};
--
--static struct i2c_board_info tx28_stk5v3_i2c_boardinfo[] __initdata = {
--	{
--		I2C_BOARD_INFO("ds1339", 0x68),
--	},
--};
--
--static struct mxs_mmc_platform_data tx28_mmc0_pdata __initdata = {
--       .wp_gpio = -EINVAL,
--       .flags = SLOTF_4_BIT_CAPABLE,
--};
--
--static void __init tx28_stk5v3_init(void)
--{
--	mx28_soc_init();
--
--	mxs_iomux_setup_multiple_pads(tx28_stk5v3_pads,
--			ARRAY_SIZE(tx28_stk5v3_pads));
--
--	mx28_add_duart(); /* UART1 */
--	mx28_add_auart(1); /* UART2 */
--
--	tx28_add_fec0();
--	/* spi via ssp will be added when available */
--	spi_register_board_info(tx28_spi_board_info,
--			ARRAY_SIZE(tx28_spi_board_info));
--	gpio_led_register_device(0, &tx28_stk5v3_led_data);
--	mx28_add_mxs_i2c(0);
--	i2c_register_board_info(0, tx28_stk5v3_i2c_boardinfo,
--			ARRAY_SIZE(tx28_stk5v3_i2c_boardinfo));
--	mx28_add_mxs_mmc(0, &tx28_mmc0_pdata);
--	mx28_add_rtc_stmp3xxx();
--}
--
--static void __init tx28_timer_init(void)
--{
--	mx28_clocks_init();
--}
--
--static struct sys_timer tx28_timer = {
--	.init = tx28_timer_init,
--};
--
--MACHINE_START(TX28, "Ka-Ro electronics TX28 module")
--	.map_io = mx28_map_io,
--	.init_irq = mx28_init_irq,
--	.timer = &tx28_timer,
--	.init_machine = tx28_stk5v3_init,
--	.restart	= mxs_restart,
--MACHINE_END
-diff --git a/arch/arm/mach-mxs/module-tx28.c b/arch/arm/mach-mxs/module-tx28.c
-deleted file mode 100644
-index 0f71f82..0000000
---- a/arch/arm/mach-mxs/module-tx28.c
-+++ /dev/null
-@@ -1,160 +0,0 @@
--/*
-- * Copyright (C) 2010 <LW@KARO-electronics.de>
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
 - *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+- * MA 02110-1301, USA.
 - */
 -
--#include <linux/delay.h>
--#include <linux/fec.h>
--#include <linux/gpio.h>
+-#ifndef __MACH_MXS_IOMUX_H__
+-#define __MACH_MXS_IOMUX_H__
 -
--#include <mach/iomux-mx28.h>
--#include "devices-mx28.h"
+-/*
+- * IOMUX/PAD Bit field definitions
+- *
+- * PAD_BANK:		 0..2	(3)
+- * PAD_PIN:		 3..7	(5)
+- * PAD_MUXSEL:		 8..9	(2)
+- * PAD_MA:		10..11	(2)
+- * PAD_MA_VALID:	12	(1)
+- * PAD_VOL:		13	(1)
+- * PAD_VOL_VALID:	14	(1)
+- * PAD_PULL:		15	(1)
+- * PAD_PULL_VALID:	16	(1)
+- * RESERVED:		17..31	(15)
+- */
+-typedef u32 iomux_cfg_t;
 -
--#include "module-tx28.h"
+-#define MXS_PAD_BANK_SHIFT	0
+-#define MXS_PAD_BANK_MASK	((iomux_cfg_t)0x7 << MXS_PAD_BANK_SHIFT)
+-#define MXS_PAD_PIN_SHIFT	3
+-#define MXS_PAD_PIN_MASK	((iomux_cfg_t)0x1f << MXS_PAD_PIN_SHIFT)
+-#define MXS_PAD_MUXSEL_SHIFT	8
+-#define MXS_PAD_MUXSEL_MASK	((iomux_cfg_t)0x3 << MXS_PAD_MUXSEL_SHIFT)
+-#define MXS_PAD_MA_SHIFT	10
+-#define MXS_PAD_MA_MASK		((iomux_cfg_t)0x3 << MXS_PAD_MA_SHIFT)
+-#define MXS_PAD_MA_VALID_SHIFT	12
+-#define MXS_PAD_MA_VALID_MASK	((iomux_cfg_t)0x1 << MXS_PAD_MA_VALID_SHIFT)
+-#define MXS_PAD_VOL_SHIFT	13
+-#define MXS_PAD_VOL_MASK	((iomux_cfg_t)0x1 << MXS_PAD_VOL_SHIFT)
+-#define MXS_PAD_VOL_VALID_SHIFT	14
+-#define MXS_PAD_VOL_VALID_MASK	((iomux_cfg_t)0x1 << MXS_PAD_VOL_VALID_SHIFT)
+-#define MXS_PAD_PULL_SHIFT	15
+-#define MXS_PAD_PULL_MASK	((iomux_cfg_t)0x1 << MXS_PAD_PULL_SHIFT)
+-#define MXS_PAD_PULL_VALID_SHIFT 16
+-#define MXS_PAD_PULL_VALID_MASK	((iomux_cfg_t)0x1 << MXS_PAD_PULL_VALID_SHIFT)
 -
--#define TX28_FEC_PHY_POWER	MXS_GPIO_NR(3, 29)
--#define TX28_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
+-#define PAD_MUXSEL_0		0
+-#define PAD_MUXSEL_1		1
+-#define PAD_MUXSEL_2		2
+-#define PAD_MUXSEL_GPIO		3
 -
--static const iomux_cfg_t tx28_fec_gpio_pads[] __initconst = {
--	/* PHY POWER */
--	MX28_PAD_PWM4__GPIO_3_29 |
--		MXS_PAD_4MA | MXS_PAD_NOPULL | MXS_PAD_3V3,
--	/* PHY RESET */
--	MX28_PAD_ENET0_RX_CLK__GPIO_4_13 |
--		MXS_PAD_4MA | MXS_PAD_NOPULL | MXS_PAD_3V3,
--	/* Mode strap pins 0-2 */
--	MX28_PAD_ENET0_RXD0__GPIO_4_3 |
--		MXS_PAD_8MA | MXS_PAD_PULLUP | MXS_PAD_3V3,
--	MX28_PAD_ENET0_RXD1__GPIO_4_4 |
--		MXS_PAD_8MA | MXS_PAD_PULLUP | MXS_PAD_3V3,
--	MX28_PAD_ENET0_RX_EN__GPIO_4_2 |
--		MXS_PAD_8MA | MXS_PAD_PULLUP | MXS_PAD_3V3,
--	/* nINT */
--	MX28_PAD_ENET0_TX_CLK__GPIO_4_5 |
--		MXS_PAD_4MA | MXS_PAD_NOPULL | MXS_PAD_3V3,
+-#define PAD_4MA			0
+-#define PAD_8MA			1
+-#define PAD_12MA		2
+-#define PAD_16MA		3
 -
--	MX28_PAD_ENET0_MDC__GPIO_4_0,
--	MX28_PAD_ENET0_MDIO__GPIO_4_1,
--	MX28_PAD_ENET0_TX_EN__GPIO_4_6,
--	MX28_PAD_ENET0_TXD0__GPIO_4_7,
--	MX28_PAD_ENET0_TXD1__GPIO_4_8,
--	MX28_PAD_ENET_CLK__GPIO_4_16,
--};
+-#define PAD_1V8			0
+-#define PAD_3V3			1
 -
--#define FEC_MODE (MXS_PAD_8MA | MXS_PAD_PULLUP | MXS_PAD_3V3)
--static const iomux_cfg_t tx28_fec0_pads[] __initconst = {
--	MX28_PAD_ENET0_MDC__ENET0_MDC | FEC_MODE,
--	MX28_PAD_ENET0_MDIO__ENET0_MDIO | FEC_MODE,
--	MX28_PAD_ENET0_RX_EN__ENET0_RX_EN | FEC_MODE,
--	MX28_PAD_ENET0_RXD0__ENET0_RXD0 | FEC_MODE,
--	MX28_PAD_ENET0_RXD1__ENET0_RXD1 | FEC_MODE,
--	MX28_PAD_ENET0_TX_EN__ENET0_TX_EN | FEC_MODE,
--	MX28_PAD_ENET0_TXD0__ENET0_TXD0 | FEC_MODE,
--	MX28_PAD_ENET0_TXD1__ENET0_TXD1 | FEC_MODE,
--	MX28_PAD_ENET_CLK__CLKCTRL_ENET | FEC_MODE,
--};
+-#define PAD_NOPULL		0
+-#define PAD_PULLUP		1
 -
--static const iomux_cfg_t tx28_fec1_pads[] __initconst = {
--	MX28_PAD_ENET0_RXD2__ENET1_RXD0,
--	MX28_PAD_ENET0_RXD3__ENET1_RXD1,
--	MX28_PAD_ENET0_TXD2__ENET1_TXD0,
--	MX28_PAD_ENET0_TXD3__ENET1_TXD1,
--	MX28_PAD_ENET0_COL__ENET1_TX_EN,
--	MX28_PAD_ENET0_CRS__ENET1_RX_EN,
--};
+-#define MXS_PAD_4MA	((PAD_4MA << MXS_PAD_MA_SHIFT) | \
+-					MXS_PAD_MA_VALID_MASK)
+-#define MXS_PAD_8MA	((PAD_8MA << MXS_PAD_MA_SHIFT) | \
+-					MXS_PAD_MA_VALID_MASK)
+-#define MXS_PAD_12MA	((PAD_12MA << MXS_PAD_MA_SHIFT) | \
+-					MXS_PAD_MA_VALID_MASK)
+-#define MXS_PAD_16MA	((PAD_16MA << MXS_PAD_MA_SHIFT) | \
+-					MXS_PAD_MA_VALID_MASK)
 -
--static const struct fec_platform_data tx28_fec0_data __initconst = {
--	.phy = PHY_INTERFACE_MODE_RMII,
--};
+-#define MXS_PAD_1V8	((PAD_1V8 << MXS_PAD_VOL_SHIFT) | \
+-					MXS_PAD_VOL_VALID_MASK)
+-#define MXS_PAD_3V3	((PAD_3V3 << MXS_PAD_VOL_SHIFT) | \
+-					MXS_PAD_VOL_VALID_MASK)
 -
--static const struct fec_platform_data tx28_fec1_data __initconst = {
--	.phy = PHY_INTERFACE_MODE_RMII,
--};
+-#define MXS_PAD_NOPULL	((PAD_NOPULL << MXS_PAD_PULL_SHIFT) | \
+-					MXS_PAD_PULL_VALID_MASK)
+-#define MXS_PAD_PULLUP	((PAD_PULLUP << MXS_PAD_PULL_SHIFT) | \
+-					MXS_PAD_PULL_VALID_MASK)
 -
--int __init tx28_add_fec0(void)
+-/* generic pad control used in most cases */
+-#define MXS_PAD_CTRL	(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL)
+-
+-#define MXS_IOMUX_PAD(_bank, _pin, _muxsel, _ma, _vol, _pull)		\
+-		(((iomux_cfg_t)(_bank) << MXS_PAD_BANK_SHIFT) |		\
+-		((iomux_cfg_t)(_pin) << MXS_PAD_PIN_SHIFT) |		\
+-		((iomux_cfg_t)(_muxsel) << MXS_PAD_MUXSEL_SHIFT) |	\
+-		((iomux_cfg_t)(_ma) << MXS_PAD_MA_SHIFT) |		\
+-		((iomux_cfg_t)(_vol) << MXS_PAD_VOL_SHIFT) |		\
+-		((iomux_cfg_t)(_pull) << MXS_PAD_PULL_SHIFT))
+-
+-/*
+- * A pad becomes naked, when none of mA, vol or pull
+- * validity bits is set.
+- */
+-#define MXS_IOMUX_PAD_NAKED(_bank, _pin, _muxsel) \
+-		MXS_IOMUX_PAD(_bank, _pin, _muxsel, 0, 0, 0)
+-
+-static inline unsigned int PAD_BANK(iomux_cfg_t pad)
 -{
--	int i, ret;
--
--	pr_debug("%s: Switching FEC PHY power off\n", __func__);
--	ret = mxs_iomux_setup_multiple_pads(tx28_fec_gpio_pads,
--			ARRAY_SIZE(tx28_fec_gpio_pads));
--	for (i = 0; i < ARRAY_SIZE(tx28_fec_gpio_pads); i++) {
--		unsigned int gpio = MXS_GPIO_NR(PAD_BANK(tx28_fec_gpio_pads[i]),
--			PAD_PIN(tx28_fec_gpio_pads[i]));
--
--		ret = gpio_request(gpio, "FEC");
--		if (ret) {
--			pr_err("Failed to request GPIO_%d_%d: %d\n",
--				PAD_BANK(tx28_fec_gpio_pads[i]),
--				PAD_PIN(tx28_fec_gpio_pads[i]), ret);
--			goto free_gpios;
--		}
--		ret = gpio_direction_output(gpio, 0);
--		if (ret) {
--			pr_err("Failed to set direction of GPIO_%d_%d to output: %d\n",
--					gpio / 32 + 1, gpio % 32, ret);
--			goto free_gpios;
--		}
--	}
--
--	/* Power up fec phy */
--	pr_debug("%s: Switching FEC PHY power on\n", __func__);
--	ret = gpio_direction_output(TX28_FEC_PHY_POWER, 1);
--	if (ret) {
--		pr_err("Failed to power on PHY: %d\n", ret);
--		goto free_gpios;
--	}
--	mdelay(26); /* 25ms according to data sheet */
--
--	/* nINT */
--	gpio_direction_input(MXS_GPIO_NR(4, 5));
--	/* Mode strap pins */
--	gpio_direction_output(MXS_GPIO_NR(4, 2), 1);
--	gpio_direction_output(MXS_GPIO_NR(4, 3), 1);
--	gpio_direction_output(MXS_GPIO_NR(4, 4), 1);
--
--	udelay(100); /* minimum assertion time for nRST */
--
--	pr_debug("%s: Deasserting FEC PHY RESET\n", __func__);
--	gpio_set_value(TX28_FEC_PHY_RESET, 1);
--
--	ret = mxs_iomux_setup_multiple_pads(tx28_fec0_pads,
--			ARRAY_SIZE(tx28_fec0_pads));
--	if (ret) {
--		pr_debug("%s: mxs_iomux_setup_multiple_pads() failed with rc: %d\n",
--				__func__, ret);
--		goto free_gpios;
--	}
--	pr_debug("%s: Registering FEC0 device\n", __func__);
--	mx28_add_fec(0, &tx28_fec0_data);
--	return 0;
--
--free_gpios:
--	while (--i >= 0) {
--		unsigned int gpio = MXS_GPIO_NR(PAD_BANK(tx28_fec_gpio_pads[i]),
--			PAD_PIN(tx28_fec_gpio_pads[i]));
--
--		gpio_free(gpio);
--	}
--
--	return ret;
+-	return (pad & MXS_PAD_BANK_MASK) >> MXS_PAD_BANK_SHIFT;
 -}
 -
--int __init tx28_add_fec1(void)
+-static inline unsigned int PAD_PIN(iomux_cfg_t pad)
 -{
+-	return (pad & MXS_PAD_PIN_MASK) >> MXS_PAD_PIN_SHIFT;
+-}
+-
+-static inline unsigned int PAD_MUXSEL(iomux_cfg_t pad)
+-{
+-	return (pad & MXS_PAD_MUXSEL_MASK) >> MXS_PAD_MUXSEL_SHIFT;
+-}
+-
+-static inline unsigned int PAD_MA(iomux_cfg_t pad)
+-{
+-	return (pad & MXS_PAD_MA_MASK) >> MXS_PAD_MA_SHIFT;
+-}
+-
+-static inline unsigned int PAD_MA_VALID(iomux_cfg_t pad)
+-{
+-	return (pad & MXS_PAD_MA_VALID_MASK) >> MXS_PAD_MA_VALID_SHIFT;
+-}
+-
+-static inline unsigned int PAD_VOL(iomux_cfg_t pad)
+-{
+-	return (pad & MXS_PAD_VOL_MASK) >> MXS_PAD_VOL_SHIFT;
+-}
+-
+-static inline unsigned int PAD_VOL_VALID(iomux_cfg_t pad)
+-{
+-	return (pad & MXS_PAD_VOL_VALID_MASK) >> MXS_PAD_VOL_VALID_SHIFT;
+-}
+-
+-static inline unsigned int PAD_PULL(iomux_cfg_t pad)
+-{
+-	return (pad & MXS_PAD_PULL_MASK) >> MXS_PAD_PULL_SHIFT;
+-}
+-
+-static inline unsigned int PAD_PULL_VALID(iomux_cfg_t pad)
+-{
+-	return (pad & MXS_PAD_PULL_VALID_MASK) >> MXS_PAD_PULL_VALID_SHIFT;
+-}
+-
+-/*
+- * configures a single pad in the iomuxer
+- */
+-int mxs_iomux_setup_pad(iomux_cfg_t pad);
+-
+-/*
+- * configures multiple pads
+- * convenient way to call the above function with tables
+- */
+-int mxs_iomux_setup_multiple_pads(const iomux_cfg_t *pad_list, unsigned count);
+-
+-#endif /* __MACH_MXS_IOMUX_H__*/
+diff --git a/arch/arm/mach-mxs/iomux.c b/arch/arm/mach-mxs/iomux.c
+deleted file mode 100644
+index 0e804e2..0000000
+--- a/arch/arm/mach-mxs/iomux.c
++++ /dev/null
+@@ -1,101 +0,0 @@
+-/*
+- * Copyright 2004-2006,2010 Freescale Semiconductor, Inc. All Rights Reserved.
+- * Copyright (C) 2008 by Sascha Hauer <kernel@pengutronix.de>
+- * Copyright (C) 2009 by Jan Weitzel Phytec Messtechnik GmbH,
+- *                       <armlinux@phytec.de>
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+- * MA 02110-1301, USA.
+- */
+-
+-#include <linux/errno.h>
+-#include <linux/init.h>
+-#include <linux/kernel.h>
+-#include <linux/module.h>
+-#include <linux/string.h>
+-#include <linux/gpio.h>
+-
+-#include <asm/mach/map.h>
+-
+-#include <mach/mxs.h>
+-#include <mach/iomux.h>
+-
+-/*
+- * configures a single pad in the iomuxer
+- */
+-int mxs_iomux_setup_pad(iomux_cfg_t pad)
+-{
+-	u32 reg, ofs, bp, bm;
+-	void __iomem *iomux_base = MXS_IO_ADDRESS(MXS_PINCTRL_BASE_ADDR);
+-
+-	/* muxsel */
+-	ofs = 0x100;
+-	ofs += PAD_BANK(pad) * 0x20 + PAD_PIN(pad) / 16 * 0x10;
+-	bp = PAD_PIN(pad) % 16 * 2;
+-	bm = 0x3 << bp;
+-	reg = __raw_readl(iomux_base + ofs);
+-	reg &= ~bm;
+-	reg |= PAD_MUXSEL(pad) << bp;
+-	__raw_writel(reg, iomux_base + ofs);
+-
+-	/* drive */
+-	ofs = cpu_is_mx23() ? 0x200 : 0x300;
+-	ofs += PAD_BANK(pad) * 0x40 + PAD_PIN(pad) / 8 * 0x10;
+-	/* mA */
+-	if (PAD_MA_VALID(pad)) {
+-		bp = PAD_PIN(pad) % 8 * 4;
+-		bm = 0x3 << bp;
+-		reg = __raw_readl(iomux_base + ofs);
+-		reg &= ~bm;
+-		reg |= PAD_MA(pad) << bp;
+-		__raw_writel(reg, iomux_base + ofs);
+-	}
+-	/* vol */
+-	if (PAD_VOL_VALID(pad)) {
+-		bp = PAD_PIN(pad) % 8 * 4 + 2;
+-		if (PAD_VOL(pad))
+-			__mxs_setl(1 << bp, iomux_base + ofs);
+-		else
+-			__mxs_clrl(1 << bp, iomux_base + ofs);
+-	}
+-
+-	/* pull */
+-	if (PAD_PULL_VALID(pad)) {
+-		ofs = cpu_is_mx23() ? 0x400 : 0x600;
+-		ofs += PAD_BANK(pad) * 0x10;
+-		bp = PAD_PIN(pad);
+-		if (PAD_PULL(pad))
+-			__mxs_setl(1 << bp, iomux_base + ofs);
+-		else
+-			__mxs_clrl(1 << bp, iomux_base + ofs);
+-	}
+-
+-	return 0;
+-}
+-
+-int mxs_iomux_setup_multiple_pads(const iomux_cfg_t *pad_list, unsigned count)
+-{
+-	const iomux_cfg_t *p = pad_list;
+-	int i;
 -	int ret;
 -
--	ret = mxs_iomux_setup_multiple_pads(tx28_fec1_pads,
--			ARRAY_SIZE(tx28_fec1_pads));
--	if (ret) {
--		pr_debug("%s: mxs_iomux_setup_multiple_pads() failed with rc: %d\n",
--				__func__, ret);
--		return ret;
+-	for (i = 0; i < count; i++) {
+-		ret = mxs_iomux_setup_pad(*p);
+-		if (ret)
+-			return ret;
+-		p++;
 -	}
--	pr_debug("%s: Registering FEC1 device\n", __func__);
--	mx28_add_fec(1, &tx28_fec1_data);
+-
 -	return 0;
 -}
-diff --git a/arch/arm/mach-mxs/module-tx28.h b/arch/arm/mach-mxs/module-tx28.h
-deleted file mode 100644
-index 8ed4254..0000000
---- a/arch/arm/mach-mxs/module-tx28.h
-+++ /dev/null
-@@ -1,10 +0,0 @@
--/*
-- * Copyright (C) 2010 Pengutronix
-- *   Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--int __init tx28_add_fec0(void);
--int __init tx28_add_fec1(void);
 -- 
 1.7.5.4
