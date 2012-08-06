@@ -1,189 +1,109 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 6 Aug 2012 23:42:44 +0800
-Subject: [PATCH 1/6] ARM: mxs: tx28: reset fec phy for device tree boot
+Date: Mon, 6 Aug 2012 23:42:47 +0800
+Subject: [PATCH 4/6] ARM: mxs: remove non-DT core functions
 In-Reply-To: <1344267769-31166-1-git-send-email-shawn.guo@linaro.org>
 References: <1344267769-31166-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1344267769-31166-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1344267769-31166-5-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For non-DT boot, function tx28_add_fec0 configures all ENET0 pins
-into gpio mode for resetting fec phy, and then reconfigures those pins
-into ENET function after that.
-
-For DT boot, all the pin configuration is done by pinctrl subsystem.
-Ideally, when gpio_requst gets called, GPIO subsystem should call
-pinctrl to configure pins into gpio mode automatically, and have pins
-freed up from pinctrl subsystem when gpio_free is called.  But right
-now, this cooperation between gpio and pinctrl hasn't been available.
-As the result, we have to explicitly call pinctrl_get_select and
-pinctrl_put for device tree boot.
+With all board files removed, those core functions used for non-DT
+boot only can be removed now.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx28-tx28.dts |   21 +++++++++-
- arch/arm/mach-mxs/mach-mxs.c     |   82 +++++++++++++++++++++++++++++++++++++-
- 2 files changed, 101 insertions(+), 2 deletions(-)
+ arch/arm/mach-mxs/include/mach/common.h |    9 -------
+ arch/arm/mach-mxs/mm.c                  |   39 -------------------------------
+ 2 files changed, 0 insertions(+), 48 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
-index 62bf767..a56ae05 100644
---- a/arch/arm/boot/dts/imx28-tx28.dts
-+++ b/arch/arm/boot/dts/imx28-tx28.dts
-@@ -34,6 +34,24 @@
- 					fsl,voltage = <1>;
- 					fsl,pull-up = <0>;
- 				};
-+
-+				mac0_pins_gpio: mac0-gpio-mode at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x4003 /* MX28_PAD_ENET0_MDC__GPIO_4_0 */
-+						0x4013 /* MX28_PAD_ENET0_MDIO__GPIO_4_1 */
-+						0x4023 /* MX28_PAD_ENET0_RX_EN__GPIO_4_2 */
-+						0x4033 /* MX28_PAD_ENET0_RXD0__GPIO_4_3 */
-+						0x4043 /* MX28_PAD_ENET0_RXD1__GPIO_4_4 */
-+						0x4063 /* MX28_PAD_ENET0_TX_EN__GPIO_4_6 */
-+						0x4073 /* MX28_PAD_ENET0_TXD0__GPIO_4_7 */
-+						0x4083 /* MX28_PAD_ENET0_TXD1__GPIO_4_8 */
-+						0x4103 /* MX28_PAD_ENET_CLK__GPIO_4_16 */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <0>;
-+				};
- 			};
- 		};
+diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
+index de6c7ba..4dec795 100644
+--- a/arch/arm/mach-mxs/include/mach/common.h
++++ b/arch/arm/mach-mxs/include/mach/common.h
+@@ -17,21 +17,12 @@ extern void mxs_timer_init(int);
+ extern void mxs_restart(char, const char *);
+ extern int mxs_saif_clkmux_select(unsigned int clkmux);
  
-@@ -72,8 +90,9 @@
- 	ahb at 80080000 {
- 		mac0: ethernet at 800f0000 {
- 			phy-mode = "rmii";
--			pinctrl-names = "default";
-+			pinctrl-names = "default", "gpio_mode";
- 			pinctrl-0 = <&mac0_pins_a>;
-+			pinctrl-1 = <&mac0_pins_gpio>;
- 			status = "okay";
- 		};
- 	};
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index 02d1ab2..6ba37df 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -12,8 +12,9 @@
+-extern void mx23_soc_init(void);
+ extern int mx23_clocks_init(void);
+ extern void mx23_map_io(void);
+-extern void mx23_init_irq(void);
  
- #include <linux/clk.h>
- #include <linux/clkdev.h>
-+#include <linux/delay.h>
- #include <linux/err.h>
--#include <linux/init.h>
-+#include <linux/gpio.h>
+-extern void mx28_soc_init(void);
+ extern int mx28_clocks_init(void);
+ extern void mx28_map_io(void);
+-extern void mx28_init_irq(void);
+ 
+ extern void icoll_init_irq(void);
+ 
+-extern struct platform_device *mxs_add_dma(const char *devid,
+-						resource_size_t base);
+-extern struct platform_device *mxs_add_gpio(char *name, int id,
+-					    resource_size_t iobase, int irq);
+-
+ #endif /* __MACH_MXS_COMMON_H__ */
+diff --git a/arch/arm/mach-mxs/mm.c b/arch/arm/mach-mxs/mm.c
+index dccb67a..a4294aa 100644
+--- a/arch/arm/mach-mxs/mm.c
++++ b/arch/arm/mach-mxs/mm.c
+@@ -13,14 +13,11 @@
+ 
+ #include <linux/mm.h>
  #include <linux/init.h>
- #include <linux/irqdomain.h>
- #include <linux/micrel_phy.h>
-@@ -21,10 +22,12 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/phy.h>
-+#include <linux/pinctrl/consumer.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- #include <mach/common.h>
- #include <mach/digctl.h>
-+#include <mach/mxs.h>
+-#include <linux/pinctrl/machine.h>
  
- static struct fb_videomode mx23evk_video_modes[] = {
- 	{
-@@ -273,6 +276,80 @@ static void __init apx4devkit_init(void)
- 	mxsfb_pdata.ld_intf_width = STMLCDIF_24BIT;
+ #include <asm/mach/map.h>
+ 
+ #include <mach/mx23.h>
+ #include <mach/mx28.h>
+-#include <mach/common.h>
+-#include <mach/iomux.h>
+ 
+ /*
+  * Define the MX23 memory map.
+@@ -48,43 +45,7 @@ void __init mx23_map_io(void)
+ 	iotable_init(mx23_io_desc, ARRAY_SIZE(mx23_io_desc));
  }
  
-+#define ENET0_MDC__GPIO_4_0	MXS_GPIO_NR(4, 0)
-+#define ENET0_MDIO__GPIO_4_1	MXS_GPIO_NR(4, 1)
-+#define ENET0_RX_EN__GPIO_4_2	MXS_GPIO_NR(4, 2)
-+#define ENET0_RXD0__GPIO_4_3	MXS_GPIO_NR(4, 3)
-+#define ENET0_RXD1__GPIO_4_4	MXS_GPIO_NR(4, 4)
-+#define ENET0_TX_EN__GPIO_4_6	MXS_GPIO_NR(4, 6)
-+#define ENET0_TXD0__GPIO_4_7	MXS_GPIO_NR(4, 7)
-+#define ENET0_TXD1__GPIO_4_8	MXS_GPIO_NR(4, 8)
-+#define ENET_CLK__GPIO_4_16	MXS_GPIO_NR(4, 16)
-+
-+#define TX28_FEC_PHY_POWER	MXS_GPIO_NR(3, 29)
-+#define TX28_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
-+#define TX28_FEC_nINT		MXS_GPIO_NR(4, 5)
-+
-+static const struct gpio tx28_gpios[] __initconst = {
-+	{ ENET0_MDC__GPIO_4_0, GPIOF_OUT_INIT_LOW, "GPIO_4_0" },
-+	{ ENET0_MDIO__GPIO_4_1, GPIOF_OUT_INIT_LOW, "GPIO_4_1" },
-+	{ ENET0_RX_EN__GPIO_4_2, GPIOF_OUT_INIT_LOW, "GPIO_4_2" },
-+	{ ENET0_RXD0__GPIO_4_3, GPIOF_OUT_INIT_LOW, "GPIO_4_3" },
-+	{ ENET0_RXD1__GPIO_4_4, GPIOF_OUT_INIT_LOW, "GPIO_4_4" },
-+	{ ENET0_TX_EN__GPIO_4_6, GPIOF_OUT_INIT_LOW, "GPIO_4_6" },
-+	{ ENET0_TXD0__GPIO_4_7, GPIOF_OUT_INIT_LOW, "GPIO_4_7" },
-+	{ ENET0_TXD1__GPIO_4_8, GPIOF_OUT_INIT_LOW, "GPIO_4_8" },
-+	{ ENET_CLK__GPIO_4_16, GPIOF_OUT_INIT_LOW, "GPIO_4_16" },
-+	{ TX28_FEC_PHY_POWER, GPIOF_OUT_INIT_LOW, "fec-phy-power" },
-+	{ TX28_FEC_PHY_RESET, GPIOF_OUT_INIT_LOW, "fec-phy-reset" },
-+	{ TX28_FEC_nINT, GPIOF_DIR_IN, "fec-int" },
-+};
-+
-+static void __init tx28_post_init(void)
-+{
-+	struct device_node *np;
-+	struct platform_device *pdev;
-+	struct pinctrl *pctl;
-+	int ret;
-+
-+	enable_clk_enet_out();
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx28-fec");
-+	pdev = of_find_device_by_node(np);
-+	if (!pdev) {
-+		pr_err("%s: failed to find fec device\n", __func__);
-+		return;
-+	}
-+
-+	pctl = pinctrl_get_select(&pdev->dev, "gpio_mode");
-+	if (IS_ERR(pctl)) {
-+		pr_err("%s: failed to get pinctrl state\n", __func__);
-+		return;
-+	}
-+
-+	ret = gpio_request_array(tx28_gpios, ARRAY_SIZE(tx28_gpios));
-+	if (ret) {
-+		pr_err("%s: failed to request gpios: %d\n", __func__, ret);
-+		return;
-+	}
-+
-+	/* Power up fec phy */
-+	gpio_set_value(TX28_FEC_PHY_POWER, 1);
-+	mdelay(26); /* 25ms according to data sheet */
-+
-+	/* Mode strap pins */
-+	gpio_set_value(ENET0_RX_EN__GPIO_4_2, 1);
-+	gpio_set_value(ENET0_RXD0__GPIO_4_3, 1);
-+	gpio_set_value(ENET0_RXD1__GPIO_4_4, 1);
-+
-+	udelay(100); /* minimum assertion time for nRST */
-+
-+	/* Deasserting FEC PHY RESET */
-+	gpio_set_value(TX28_FEC_PHY_RESET, 1);
-+
-+	pinctrl_put(pctl);
-+}
-+
- static void __init mxs_machine_init(void)
+-void __init mx23_init_irq(void)
+-{
+-	icoll_init_irq();
+-}
+-
+ void __init mx28_map_io(void)
  {
- 	if (of_machine_is_compatible("fsl,imx28-evk"))
-@@ -286,6 +363,9 @@ static void __init mxs_machine_init(void)
- 
- 	of_platform_populate(NULL, of_default_bus_match_table,
- 			     mxs_auxdata_lookup, NULL);
-+
-+	if (of_machine_is_compatible("karo,tx28"))
-+		tx28_post_init();
+ 	iotable_init(mx28_io_desc, ARRAY_SIZE(mx28_io_desc));
  }
- 
- static const char *imx23_dt_compat[] __initdata = {
+-
+-void __init mx28_init_irq(void)
+-{
+-	icoll_init_irq();
+-}
+-
+-void __init mx23_soc_init(void)
+-{
+-	pinctrl_provide_dummies();
+-
+-	mxs_add_dma("imx23-dma-apbh", MX23_APBH_DMA_BASE_ADDR);
+-	mxs_add_dma("imx23-dma-apbx", MX23_APBX_DMA_BASE_ADDR);
+-
+-	mxs_add_gpio("imx23-gpio", 0, MX23_PINCTRL_BASE_ADDR, MX23_INT_GPIO0);
+-	mxs_add_gpio("imx23-gpio", 1, MX23_PINCTRL_BASE_ADDR, MX23_INT_GPIO1);
+-	mxs_add_gpio("imx23-gpio", 2, MX23_PINCTRL_BASE_ADDR, MX23_INT_GPIO2);
+-}
+-
+-void __init mx28_soc_init(void)
+-{
+-	pinctrl_provide_dummies();
+-
+-	mxs_add_dma("imx28-dma-apbh", MX23_APBH_DMA_BASE_ADDR);
+-	mxs_add_dma("imx28-dma-apbx", MX23_APBX_DMA_BASE_ADDR);
+-
+-	mxs_add_gpio("imx28-gpio", 0, MX28_PINCTRL_BASE_ADDR, MX28_INT_GPIO0);
+-	mxs_add_gpio("imx28-gpio", 1, MX28_PINCTRL_BASE_ADDR, MX28_INT_GPIO1);
+-	mxs_add_gpio("imx28-gpio", 2, MX28_PINCTRL_BASE_ADDR, MX28_INT_GPIO2);
+-	mxs_add_gpio("imx28-gpio", 3, MX28_PINCTRL_BASE_ADDR, MX28_INT_GPIO3);
+-	mxs_add_gpio("imx28-gpio", 4, MX28_PINCTRL_BASE_ADDR, MX28_INT_GPIO4);
+-}
 -- 
 1.7.5.4
