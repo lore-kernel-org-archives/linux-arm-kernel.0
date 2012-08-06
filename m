@@ -1,56 +1,108 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Sun,  5 Aug 2012 16:03:39 -0700
-Subject: [PATCH 9/9] ARM: FIQ: Make show_fiq_list() return void
-In-Reply-To: <20120805230238.GA1663@lizard>
-References: <20120805230238.GA1663@lizard>
-Message-ID: <1344207819-3415-9-git-send-email-anton.vorontsov@linaro.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sun, 5 Aug 2012 22:06:30 -0400 (EDT)
+Subject: [PATCH 02/22] ARM: use late patch framework for phys-virt patching
+In-Reply-To: <501E7D41.8070303@ti.com>
+References: <1343775898-28345-1-git-send-email-cyril@ti.com>
+ <1343775898-28345-3-git-send-email-cyril@ti.com>
+ <alpine.LFD.2.02.1208040138560.5231@xanadu.home> <501E7D41.8070303@ti.com>
+Message-ID: <alpine.LFD.2.02.1208052153540.5231@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The return value is never checked, so we can turn show_fiq_list() into
-returning void.
+On Sun, 5 Aug 2012, Cyril Chemparathy wrote:
 
-Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
----
- arch/arm/include/asm/mach/irq.h |    4 ++--
- arch/arm/kernel/fiq.c           |    4 +---
- 2 files changed, 3 insertions(+), 5 deletions(-)
+> Hi Nicolas,
+> 
+> On 8/4/2012 2:15 AM, Nicolas Pitre wrote:
+> > On Tue, 31 Jul 2012, Cyril Chemparathy wrote:
+> > 
+> > > This patch replaces the original physical offset patching implementation
+> > > with one that uses the newly added patching framework.  In the process, we
+> > > now
+> > > unconditionally initialize the __pv_phys_offset and __pv_offset globals in
+> > > the
+> > > head.S code.
+> > 
+> > Why unconditionally initializing those?  There is no reason for that.
+> > 
+> 
+> We could keep this conditional on LPAE, but do you see any specific need for
+> keeping it conditional?
 
-diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
-index 420d211..8be5ba9 100644
---- a/arch/arm/include/asm/mach/irq.h
-+++ b/arch/arm/include/asm/mach/irq.h
-@@ -19,10 +19,10 @@ struct seq_file;
-  */
- #ifdef CONFIG_FIQ
- extern void init_FIQ(void);
--extern int show_fiq_list(struct seq_file *, int);
-+extern void show_fiq_list(struct seq_file *, int);
- #else
- static inline void init_FIQ(void) {}
--static inline int show_fiq_list(struct seq_file *p, int prec) { return 0; }
-+static inline void show_fiq_list(struct seq_file *p, int prec) {}
- #endif
- 
- #ifdef CONFIG_MULTI_IRQ_HANDLER
-diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-index 7be2e74..9bf3a60 100644
---- a/arch/arm/kernel/fiq.c
-+++ b/arch/arm/kernel/fiq.c
-@@ -69,13 +69,11 @@ static struct fiq_handler default_owner = {
- 
- static struct fiq_handler *current_fiq = &default_owner;
- 
--int show_fiq_list(struct seq_file *p, int prec)
-+void show_fiq_list(struct seq_file *p, int prec)
- {
- 	if (current_fiq != &default_owner)
- 		seq_printf(p, "%*s:              %s\n", prec, "FIQ",
- 			current_fiq->name);
--
--	return 0;
- }
- 
- void set_fiq_handler(void *start, unsigned int length)
--- 
-1.7.10.4
+This has nothing to do with LPAe.  This is about 
+CONFIG_ARM_PATCH_PHYS_VIRT only.  If not selected, those global 
+vaariables have no need to exist.
+
+> > Comments below.
+> > 
+> > > diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> > > index 835898e..d165896 100644
+> > > --- a/arch/arm/kernel/head.S
+> > > +++ b/arch/arm/kernel/head.S
+> > [...]
+> > >   	.data
+> > >   	.globl	__pv_phys_offset
+> > >   	.type	__pv_phys_offset, %object
+> > >   __pv_phys_offset:
+> > >   	.long	0
+> > >   	.size	__pv_phys_offset, . - __pv_phys_offset
+> > > +
+> > > +	.globl	__pv_offset
+> > > +	.type	__pv_offset, %object
+> > >   __pv_offset:
+> > >   	.long	0
+> > > -#endif
+> > > +	.size	__pv_offset, . - __pv_offset
+> > 
+> > Please move those to C code.  They aren't of much use in this file
+> > anymore.  This will allow you to use pphys_addr_t for them as well in
+> > your subsequent patch. And more importantly get rid of that ugly
+> > pv_offset_high that you introduced iin another patch.
+> > 
+> 
+> Moving it to C-code caused problems because these get filled in prior to BSS
+> being cleared.
+> 
+> We could potentially have this initialized in C with a mystery dummy value to
+> prevent it from landing in BSS.  Would that be acceptable?
+
+Just initialize them explicitly to zero.  They will end up in .ddata 
+section.
+> 
+> > > index df5e897..39f8fce 100644
+> > > --- a/arch/arm/kernel/module.c
+> > > +++ b/arch/arm/kernel/module.c
+> > > @@ -317,11 +317,6 @@ int module_finalize(const Elf32_Ehdr *hdr, const
+> > > Elf_Shdr *sechdrs,
+> > >   					         maps[i].txt_sec->sh_addr,
+> > >   					         maps[i].txt_sec->sh_size);
+> > >   #endif
+> > > -#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
+> > > -	s = find_mod_section(hdr, sechdrs, ".pv_table");
+> > > -	if (s)
+> > > -		fixup_pv_table((void *)s->sh_addr, s->sh_size);
+> > > -#endif
+> > >   	s = find_mod_section(hdr, sechdrs, ".patch.table");
+> > >   	if (s)
+> > >   		patch_kernel((void *)s->sh_addr, s->sh_size);
+> > 
+> > The patch_kernel code and its invokation should still be conditional on
+> > CONFIG_ARM_PATCH_PHYS_VIRT.  This ability may still be configured out
+> > irrespective of the implementation used.
+> > 
+> 
+> Maybe CONFIG_ARM_PATCH_PHYS_VIRT is not quite appropriate if this is used to
+> patch up other things in addition to phys-virt stuff?
+
+Maybe, but at the moment this is not the case.
+
+> I could have this dependent on CONFIG_ARM_INIT_PATCH (or whatever nomenclature
+> we chose for this) and have CONFIG_ARM_PATCH_PHYS_VIRT depend on it.
+
+Let's cross that bridge in time.
+
+FWIW, I don't like "init patch" much.  I feel like the "runtime" 
+qualifier more pricisely describe this code than "init".
+
+
+Nicolas
