@@ -1,109 +1,105 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 6 Aug 2012 23:42:47 +0800
-Subject: [PATCH 4/6] ARM: mxs: remove non-DT core functions
+Date: Mon, 6 Aug 2012 23:42:45 +0800
+Subject: [PATCH 2/6] ARM: mxs: use auxdata to pass flexcan_switch function hook
 In-Reply-To: <1344267769-31166-1-git-send-email-shawn.guo@linaro.org>
 References: <1344267769-31166-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1344267769-31166-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1344267769-31166-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With all board files removed, those core functions used for non-DT
-boot only can be removed now.
+There are some efforts going on to have flexcan_switch function
+implemented in flexcan driver, so that this platform function hook
+can be saved for device tree boot.  But due to the mx28evk board
+design oddness that two flexcan transceivers share one switch gpio,
+we have to come up a separate and generic gpio-switch driver to handle
+all these gpio switch use cases.
+
+Before that happens, we choose to use auxdata to pass flexcan_switch
+function hook, so that the DT conversion is not blocked there.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-mxs/include/mach/common.h |    9 -------
- arch/arm/mach-mxs/mm.c                  |   39 -------------------------------
- 2 files changed, 0 insertions(+), 48 deletions(-)
+ arch/arm/mach-mxs/mach-mxs.c |   44 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 44 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
-index de6c7ba..4dec795 100644
---- a/arch/arm/mach-mxs/include/mach/common.h
-+++ b/arch/arm/mach-mxs/include/mach/common.h
-@@ -17,21 +17,12 @@ extern void mxs_timer_init(int);
- extern void mxs_restart(char, const char *);
- extern int mxs_saif_clkmux_select(unsigned int clkmux);
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 6ba37df..1bfff30 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -12,6 +12,7 @@
  
--extern void mx23_soc_init(void);
- extern int mx23_clocks_init(void);
- extern void mx23_map_io(void);
--extern void mx23_init_irq(void);
+ #include <linux/clk.h>
+ #include <linux/clkdev.h>
++#include <linux/can/platform/flexcan.h>
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/gpio.h>
+@@ -103,9 +104,40 @@ static struct fb_videomode apx4devkit_video_modes[] = {
  
--extern void mx28_soc_init(void);
- extern int mx28_clocks_init(void);
- extern void mx28_map_io(void);
--extern void mx28_init_irq(void);
+ static struct mxsfb_platform_data mxsfb_pdata __initdata;
  
- extern void icoll_init_irq(void);
++/*
++ * MX28EVK_FLEXCAN_SWITCH is shared between both flexcan controllers
++ */
++#define MX28EVK_FLEXCAN_SWITCH	MXS_GPIO_NR(2, 13)
++
++static int flexcan0_en, flexcan1_en;
++
++static void mx28evk_flexcan_switch(void)
++{
++	if (flexcan0_en || flexcan1_en)
++		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
++	else
++		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
++}
++
++static void mx28evk_flexcan0_switch(int enable)
++{
++	flexcan0_en = enable;
++	mx28evk_flexcan_switch();
++}
++
++static void mx28evk_flexcan1_switch(int enable)
++{
++	flexcan1_en = enable;
++	mx28evk_flexcan_switch();
++}
++
++static struct flexcan_platform_data flexcan_pdata[2];
++
+ static struct of_dev_auxdata mxs_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("fsl,imx23-lcdif", 0x80030000, NULL, &mxsfb_pdata),
+ 	OF_DEV_AUXDATA("fsl,imx28-lcdif", 0x80030000, NULL, &mxsfb_pdata),
++	OF_DEV_AUXDATA("fsl,imx28-flexcan", 0x80032000, NULL, &flexcan_pdata[0]),
++	OF_DEV_AUXDATA("fsl,imx28-flexcan", 0x80034000, NULL, &flexcan_pdata[1]),
+ 	{ /* sentinel */ }
+ };
  
--extern struct platform_device *mxs_add_dma(const char *devid,
--						resource_size_t base);
--extern struct platform_device *mxs_add_gpio(char *name, int id,
--					    resource_size_t iobase, int irq);
--
- #endif /* __MACH_MXS_COMMON_H__ */
-diff --git a/arch/arm/mach-mxs/mm.c b/arch/arm/mach-mxs/mm.c
-index dccb67a..a4294aa 100644
---- a/arch/arm/mach-mxs/mm.c
-+++ b/arch/arm/mach-mxs/mm.c
-@@ -13,14 +13,11 @@
- 
- #include <linux/mm.h>
- #include <linux/init.h>
--#include <linux/pinctrl/machine.h>
- 
- #include <asm/mach/map.h>
- 
- #include <mach/mx23.h>
- #include <mach/mx28.h>
--#include <mach/common.h>
--#include <mach/iomux.h>
- 
- /*
-  * Define the MX23 memory map.
-@@ -48,43 +45,7 @@ void __init mx23_map_io(void)
- 	iotable_init(mx23_io_desc, ARRAY_SIZE(mx23_io_desc));
+@@ -245,6 +277,15 @@ static void __init imx28_evk_init(void)
+ 	mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
  }
  
--void __init mx23_init_irq(void)
--{
--	icoll_init_irq();
--}
--
- void __init mx28_map_io(void)
++static void __init imx28_evk_post_init(void)
++{
++	if (!gpio_request_one(MX28EVK_FLEXCAN_SWITCH, GPIOF_DIR_OUT,
++			      "flexcan-switch")) {
++		flexcan_pdata[0].transceiver_switch = mx28evk_flexcan0_switch;
++		flexcan_pdata[1].transceiver_switch = mx28evk_flexcan1_switch;
++	}
++}
++
+ static void __init m28evk_init(void)
  {
- 	iotable_init(mx28_io_desc, ARRAY_SIZE(mx28_io_desc));
+ 	enable_clk_enet_out();
+@@ -366,6 +407,9 @@ static void __init mxs_machine_init(void)
+ 
+ 	if (of_machine_is_compatible("karo,tx28"))
+ 		tx28_post_init();
++
++	if (of_machine_is_compatible("fsl,imx28-evk"))
++		imx28_evk_post_init();
  }
--
--void __init mx28_init_irq(void)
--{
--	icoll_init_irq();
--}
--
--void __init mx23_soc_init(void)
--{
--	pinctrl_provide_dummies();
--
--	mxs_add_dma("imx23-dma-apbh", MX23_APBH_DMA_BASE_ADDR);
--	mxs_add_dma("imx23-dma-apbx", MX23_APBX_DMA_BASE_ADDR);
--
--	mxs_add_gpio("imx23-gpio", 0, MX23_PINCTRL_BASE_ADDR, MX23_INT_GPIO0);
--	mxs_add_gpio("imx23-gpio", 1, MX23_PINCTRL_BASE_ADDR, MX23_INT_GPIO1);
--	mxs_add_gpio("imx23-gpio", 2, MX23_PINCTRL_BASE_ADDR, MX23_INT_GPIO2);
--}
--
--void __init mx28_soc_init(void)
--{
--	pinctrl_provide_dummies();
--
--	mxs_add_dma("imx28-dma-apbh", MX23_APBH_DMA_BASE_ADDR);
--	mxs_add_dma("imx28-dma-apbx", MX23_APBX_DMA_BASE_ADDR);
--
--	mxs_add_gpio("imx28-gpio", 0, MX28_PINCTRL_BASE_ADDR, MX28_INT_GPIO0);
--	mxs_add_gpio("imx28-gpio", 1, MX28_PINCTRL_BASE_ADDR, MX28_INT_GPIO1);
--	mxs_add_gpio("imx28-gpio", 2, MX28_PINCTRL_BASE_ADDR, MX28_INT_GPIO2);
--	mxs_add_gpio("imx28-gpio", 3, MX28_PINCTRL_BASE_ADDR, MX28_INT_GPIO3);
--	mxs_add_gpio("imx28-gpio", 4, MX28_PINCTRL_BASE_ADDR, MX28_INT_GPIO4);
--}
+ 
+ static const char *imx23_dt_compat[] __initdata = {
 -- 
 1.7.5.4
