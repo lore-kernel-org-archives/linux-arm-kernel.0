@@ -1,27 +1,48 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 6 Aug 2012 11:27:36 +0200
-Subject: [PATCH] arm: add documentation describing Marvell families of SoC
-In-Reply-To: <201208060813.01524.arnd@arndb.de>
-References: <1344115004-7886-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201208060813.01524.arnd@arndb.de>
-Message-ID: <20120806112736.6d441561@skate>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Mon, 6 Aug 2012 14:58:44 +0530
+Subject: [PATCH] driver: misc: bmp085: remove "of_match_table" property.
+Message-ID: <1344245324-16704-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Mon, 6 Aug 2012 08:13:01 +0000,
-Arnd Bergmann <arnd@arndb.de> a ?crit :
+There is an automatic binding done for I2C devices in the of_i2c core
+code. So, DT will be able to bind to any I2C device using the
+already existing table: MODULE_DEVICE_TABLE(i2c, bmp085_id).
 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+Tested on omap5430 evm.
 
-Thanks. Am I supposed to resend this to Rob Landley <rob@landley.net>,
-who is apparently the Documentation/ maintainer, or can you push it
-through the arm-soc tree since it is Documentation/arm/ material?
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+---
+ drivers/misc/bmp085-i2c.c |    7 -------
+ 1 files changed, 0 insertions(+), 7 deletions(-)
 
-Best regards,
-
-Thomas
+diff --git a/drivers/misc/bmp085-i2c.c b/drivers/misc/bmp085-i2c.c
+index 9943971..a4f33c9 100644
+--- a/drivers/misc/bmp085-i2c.c
++++ b/drivers/misc/bmp085-i2c.c
+@@ -57,12 +57,6 @@ static int bmp085_i2c_remove(struct i2c_client *client)
+ 	return bmp085_remove(&client->dev);
+ }
+ 
+-static const struct of_device_id bmp085_of_match[] = {
+-	{ .compatible = "bosch,bmp085", },
+-	{ },
+-};
+-MODULE_DEVICE_TABLE(of, bmp085_of_match);
+-
+ static const struct i2c_device_id bmp085_id[] = {
+ 	{ BMP085_NAME, 0 },
+ 	{ "bmp180", 0 },
+@@ -74,7 +68,6 @@ static struct i2c_driver bmp085_i2c_driver = {
+ 	.driver = {
+ 		.owner	= THIS_MODULE,
+ 		.name	= BMP085_NAME,
+-		.of_match_table = bmp085_of_match
+ 	},
+ 	.id_table	= bmp085_id,
+ 	.probe		= bmp085_i2c_probe,
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.1
