@@ -1,202 +1,42 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 6 Aug 2012 11:31:04 +0100
-Subject: [PATCH 15/24] xen/arm: receive Xen events on ARM
-In-Reply-To: <20120801144418.GM7227@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
- <1343316846-25860-15-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120801144418.GM7227@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1208061127440.4645@kaball.uk.xensource.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 06 Aug 2012 12:32:23 +0200
+Subject: [PATCH 6/6] ARM: dts: add pinctrl in PXA DT files
+In-Reply-To: <201208060844.29333.arnd@arndb.de>
+References: <1343458722-17127-1-git-send-email-haojian.zhuang@gmail.com>
+ <1343458722-17127-7-git-send-email-haojian.zhuang@gmail.com>
+ <201208060844.29333.arnd@arndb.de>
+Message-ID: <501F9D37.9030809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 1 Aug 2012, Konrad Rzeszutek Wilk wrote:
-> On Thu, Jul 26, 2012 at 04:33:57PM +0100, Stefano Stabellini wrote:
-> > Compile events.c on ARM.
-> > Parse, map and enable the IRQ to get event notifications from the device
-> > tree (node "/xen").
-> > 
-> > On ARM Linux irqs are not enabled by default:
-> > 
-> > - call enable_percpu_irq for xen_events_irq (drivers are supposed
-> > to call enable_irq after request_irq);
-> > 
-> > - reset the IRQ_NOAUTOEN and IRQ_NOREQUEST flags that are enabled by
-> > default on ARM. If IRQ_NOAUTOEN is set, __setup_irq doesn't call
-> > irq_startup, that is responsible for calling irq_unmask at startup time.
-> > As a result event channels remain masked.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > ---
-> >  arch/arm/xen/enlighten.c |   33 +++++++++++++++++++++++++++++++++
-> >  arch/x86/xen/enlighten.c |    1 +
-> >  arch/x86/xen/irq.c       |    1 +
-> >  arch/x86/xen/xen-ops.h   |    1 -
-> >  drivers/xen/events.c     |   18 +++++++++++++++---
-> >  include/xen/events.h     |    2 ++
-> >  6 files changed, 52 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> > index 854af1e..60d6d36 100644
-> > --- a/arch/arm/xen/enlighten.c
-> > +++ b/arch/arm/xen/enlighten.c
-> > @@ -7,8 +7,11 @@
-> >  #include <xen/grant_table.h>
-> >  #include <xen/hvm.h>
-> >  #include <xen/xenbus.h>
-> > +#include <xen/events.h>
-> >  #include <asm/xen/hypervisor.h>
-> >  #include <asm/xen/hypercall.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/irqreturn.h>
-> >  #include <linux/module.h>
-> >  #include <linux/of.h>
-> >  #include <linux/of_irq.h>
-> > @@ -33,6 +36,8 @@ EXPORT_SYMBOL_GPL(xen_have_vector_callback);
-> >  int xen_platform_pci_unplug = XEN_UNPLUG_ALL;
-> >  EXPORT_SYMBOL_GPL(xen_platform_pci_unplug);
-> >  
-> > +static __read_mostly int xen_events_irq = -1;
-> > +
-> >  int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
-> >  			       unsigned long addr,
-> >  			       unsigned long mfn, int nr,
-> > @@ -65,6 +70,9 @@ int __init xen_guest_init(void)
-> >  	if (of_address_to_resource(node, 0, &res))
-> >  		return -EINVAL;
-> >  	xen_hvm_resume_frames = res.start >> PAGE_SHIFT;
-> > +	xen_events_irq = irq_of_parse_and_map(node, 0);
-> > +	pr_info("Xen support found, events_irq=%d gnttab_frame_pfn=%lx\n",
-> > +			xen_events_irq, xen_hvm_resume_frames);
-> >  	xen_domain_type = XEN_HVM_DOMAIN;
-> >  
-> >  	xen_setup_features();
-> > @@ -114,3 +122,28 @@ int __init xen_guest_init(void)
-> >  }
-> >  EXPORT_SYMBOL_GPL(xen_guest_init);
-> >  core_initcall(xen_guest_init);
-> > +
-> > +static irqreturn_t xen_arm_callback(int irq, void *arg)
-> > +{
-> > +	xen_hvm_evtchn_do_upcall();
-> > +	return 0;
+On 06.08.2012 10:44, Arnd Bergmann wrote:
+> On Saturday 28 July 2012, Haojian Zhuang wrote:
+>> +Required subnode-properties:
+>> +- marvell,pins : An array of strings. Each string contains the name of a pin
+>> +                 or group.
+>> +- marvell,function     : A string containing the name of the function to mux to the
+>> +                 pin or group.
+>> +- marvell,drive-strength : An integer value that means the drive strength of a
+>> +                        pin.
+>> +- marvell,pull-up      : The property means a pin is pull up for input.
+>> +- marvell,pull-down : The property means a pin is pull down for input.
+>> +- marvell,lowpower-pull-up : The property means a pin is pull up for input in
+>> +                         sleep state.
+>> +- marvell,lowpower-pull-down : The property means a pin is pull down for input
+>> +                           in sleep state.
+>> +- marvell,lowpower-drive-high : The property means a pin is driving high for
+>> +                            output in sleep state.
+>> +- marvell,lowpower-drive-low : The property means a pin is driving low for
+>> +                           output in sleep state.
+>> +- marvell,lowpower-float : The property means a pin is float in sleep state.
+>> +- marvell,lowpower-zero : The property means a pin is not configured in sleep
+>> +                       state.
 > 
-> Um, IRQ_HANDLED?
+> These (or most of them) look like they are not very Marvell specific. Should
+> we try to standardize the way they are set across different bindings?
 
-Yep
-
-
-> > +}
-> > +
-> > +static int __init xen_init_events(void)
-> > +{
-> > +	if (!xen_domain() || xen_events_irq < 0)
-> > +		return -ENODEV;
-> > +
-> > +	xen_init_IRQ();
-> > +
-> > +	if (request_percpu_irq(xen_events_irq, xen_arm_callback,
-> > +			"events", xen_vcpu)) {
-> > +		pr_err("Error requesting IRQ %d\n", xen_events_irq);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	enable_percpu_irq(xen_events_irq, 0);
-> > +
-> > +	return 0;
-> > +}
-> > +postcore_initcall(xen_init_events);
-> > diff --git a/arch/x86/xen/enlighten.c b/arch/x86/xen/enlighten.c
-> > index 6131d43..5a30502 100644
-> > --- a/arch/x86/xen/enlighten.c
-> > +++ b/arch/x86/xen/enlighten.c
-> > @@ -33,6 +33,7 @@
-> >  #include <linux/memblock.h>
-> >  
-> >  #include <xen/xen.h>
-> > +#include <xen/events.h>
-> >  #include <xen/interface/xen.h>
-> >  #include <xen/interface/version.h>
-> >  #include <xen/interface/physdev.h>
-> > diff --git a/arch/x86/xen/irq.c b/arch/x86/xen/irq.c
-> > index 1573376..01a4dc0 100644
-> > --- a/arch/x86/xen/irq.c
-> > +++ b/arch/x86/xen/irq.c
-> > @@ -5,6 +5,7 @@
-> >  #include <xen/interface/xen.h>
-> >  #include <xen/interface/sched.h>
-> >  #include <xen/interface/vcpu.h>
-> > +#include <xen/events.h>
-> >  
-> >  #include <asm/xen/hypercall.h>
-> >  #include <asm/xen/hypervisor.h>
-> > diff --git a/arch/x86/xen/xen-ops.h b/arch/x86/xen/xen-ops.h
-> > index 202d4c1..2368295 100644
-> > --- a/arch/x86/xen/xen-ops.h
-> > +++ b/arch/x86/xen/xen-ops.h
-> > @@ -35,7 +35,6 @@ void xen_set_pat(u64);
-> >  
-> >  char * __init xen_memory_setup(void);
-> >  void __init xen_arch_setup(void);
-> > -void __init xen_init_IRQ(void);
-> >  void xen_enable_sysenter(void);
-> >  void xen_enable_syscall(void);
-> >  void xen_vcpu_restore(void);
-> > diff --git a/drivers/xen/events.c b/drivers/xen/events.c
-> > index 7da65d3..9b506b2 100644
-> > --- a/drivers/xen/events.c
-> > +++ b/drivers/xen/events.c
-> > @@ -31,14 +31,16 @@
-> >  #include <linux/irqnr.h>
-> >  #include <linux/pci.h>
-> >  
-> > +#ifdef CONFIG_X86
-> >  #include <asm/desc.h>
-> >  #include <asm/ptrace.h>
-> >  #include <asm/irq.h>
-> >  #include <asm/idle.h>
-> >  #include <asm/io_apic.h>
-> > -#include <asm/sync_bitops.h>
-> >  #include <asm/xen/page.h>
-> >  #include <asm/xen/pci.h>
-> > +#endif
-> > +#include <asm/sync_bitops.h>
-> >  #include <asm/xen/hypercall.h>
-> >  #include <asm/xen/hypervisor.h>
-> >  
-> > @@ -50,6 +52,9 @@
-> >  #include <xen/interface/event_channel.h>
-> >  #include <xen/interface/hvm/hvm_op.h>
-> >  #include <xen/interface/hvm/params.h>
-> > +#include <xen/interface/physdev.h>
-> > +#include <xen/interface/sched.h>
-> > +#include <asm/hw_irq.h>
-> >  
-> >  /*
-> >   * This lock protects updates to the following mapping and reference-count
-> > @@ -834,6 +839,7 @@ int bind_evtchn_to_irq(unsigned int evtchn)
-> >  		struct irq_info *info = info_for_irq(irq);
-> >  		WARN_ON(info == NULL || info->type != IRQT_EVTCHN);
-> >  	}
-> > +	irq_clear_status_flags(irq, IRQ_NOREQUEST|IRQ_NOAUTOEN);
-> 
-> I feel that this should be its own commit by itself. I am not certain
-> of the implication of this on x86 and I think it deserves some explanation.
-
-OK. It shouldn't have any effects on x86, considering that both
-IRQ_NOREQUEST and IRQ_NOAUTOEN are not set there.
+Yes please. That way we also have a higher chance that implementations
+on other platforms will be similar.
 
 
-> >  
-> >  out:
-> >  	mutex_unlock(&irq_mapping_update_lock);
-> > @@ -1377,7 +1383,9 @@ void xen_evtchn_do_upcall(struct pt_regs *regs)
-> >  {
-> >  	struct pt_regs *old_regs = set_irq_regs(regs);
-> >  
-> > +#ifdef CONFIG_X86
-> >  	exit_idle();
-> > +#endif
-> 
-> Doesn't exist? Or is that it does not need it?
-
-It does not exist.
+Daniel
