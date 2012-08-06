@@ -1,53 +1,32 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon,  6 Aug 2012 17:18:57 +0300
-Subject: [PATCH 4/4] i2c: omap: switch over to autosuspend API
+Date: Mon,  6 Aug 2012 17:18:54 +0300
+Subject: [PATCH 1/4] i2c: omap: always return IRQ_HANDLED
 In-Reply-To: <1344262737-6662-1-git-send-email-balbi@ti.com>
 References: <1344262737-6662-1-git-send-email-balbi@ti.com>
-Message-ID: <1344262737-6662-5-git-send-email-balbi@ti.com>
+Message-ID: <1344262737-6662-2-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this helps us reduce unnecessary pm transitions
-in case we have another i2c message been started
-soon.
+even if our clocks are disabled, we still
+handled the IRQ, so we should return IRQ_HANDLED.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/i2c/busses/i2c-omap.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 60928f2..22efaba 100644
+index 2dd2301..f5eafb7 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -645,7 +645,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+@@ -862,7 +862,7 @@ omap_i2c_isr(int this_irq, void *dev_id)
+ 	int err = 0, count = 0;
  
- 	omap_i2c_wait_for_bb(dev);
- out:
--	pm_runtime_put(dev->dev);
-+	pm_runtime_mark_last_busy(dev->dev);
-+	pm_runtime_put_autosuspend(dev->dev);
- 	return r;
- }
+ 	if (pm_runtime_suspended(dev->dev))
+-		return IRQ_NONE;
++		return IRQ_HANDLED;
  
-@@ -1113,6 +1114,9 @@ omap_i2c_probe(struct platform_device *pdev)
- 		dev->regs = (u8 *)reg_map_ip_v1;
- 
- 	pm_runtime_enable(dev->dev);
-+	pm_runtime_set_autosuspend_delay(dev->dev, 1000);
-+	pm_runtime_use_autosuspend(dev->dev);
-+
- 	r = pm_runtime_get_sync(dev->dev);
- 	if (IS_ERR_VALUE(r))
- 		goto err_free_mem;
-@@ -1189,7 +1193,7 @@ omap_i2c_probe(struct platform_device *pdev)
- 
- 	of_i2c_register_devices(adap);
- 
--	pm_runtime_put(dev->dev);
-+	pm_runtime_put_autosuspend(dev->dev);
- 
- 	return 0;
- 
+ 	do {
+ 		bits = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
 -- 
 1.7.12.rc0
