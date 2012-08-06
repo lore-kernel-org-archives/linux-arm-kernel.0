@@ -1,29 +1,31 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 6 Aug 2012 05:53:50 +0200
-Subject: [PATCH 2/3 V2] IIO: Add basic MXS LRADC driver
-In-Reply-To: <20120806023743.GC18471@S2101-09.ap.freescale.net>
-References: <1344007721-11595-1-git-send-email-marex@denx.de>
- <1344007721-11595-3-git-send-email-marex@denx.de>
- <20120806023743.GC18471@S2101-09.ap.freescale.net>
-Message-ID: <201208060553.50398.marex@denx.de>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 6 Aug 2012 05:55:08 +0200
+Subject: [PATCH] ARM: mxs_defconfig: Enable USB host
+In-Reply-To: <CAOMZO5CevtbEdch5v9jt5Gyis8o6C1-Vrm1p=289Gpx4zd_wxQ@mail.gmail.com>
+References: <1344186258-30841-1-git-send-email-festevam@gmail.com>
+ <20120806025806.GA22302@S2101-09.ap.freescale.net>
+ <CAOMZO5CevtbEdch5v9jt5Gyis8o6C1-Vrm1p=289Gpx4zd_wxQ@mail.gmail.com>
+Message-ID: <201208060555.08447.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+Dear Fabio Estevam,
 
-> On Fri, Aug 03, 2012 at 05:28:40PM +0200, Marek Vasut wrote:
-> > --- /dev/null
-> > +++ b/drivers/staging/iio/adc/mxs-lradc.c
+> On Sun, Aug 5, 2012 at 11:58 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > I guess you did not run savedefconfig.  We do not need all those
+> > options explicitly added there.
 > 
-> <snip>
-> 
-> > +#include <mach/mxs.h>
-> > +#include <mach/common.h>
-> > +
-> 
-> Why do you need these two mach headers?
+> No, I have not run savedefconfig. What is the correct way to use it?
 
-Might be just some remnant ... any further comments please?
+make mxs_config
+<edit>
+make savedefconfig
+
+I'd guess ...
+
+> Regards,
+> 
+> Fabio Estevam
 
 Best regards,
 Marek Vasut
