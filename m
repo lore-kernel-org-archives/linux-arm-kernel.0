@@ -1,40 +1,47 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 6 Aug 2012 13:37:04 +0200
-Subject: [PATCH] ARM: ux500: resurrect I2C platform data
-In-Reply-To: <20120806095144.GA16996@gmail.com>
-References: <1344243146-6598-1-git-send-email-linus.walleij@stericsson.com>
- <20120806095144.GA16996@gmail.com>
-Message-ID: <501FAC60.1080600@stericsson.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Mon, 6 Aug 2012 13:38:42 +0200
+Subject: [PATCH 1/4] gpio/mxc: remove redundant shadow variables
+ initialization
+In-Reply-To: <1344146488-9496-1-git-send-email-shawn.guo@linaro.org>
+References: <1344146488-9496-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <501FACC2.4010008@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/2012 11:51 AM, Lee Jones wrote:
-> On Mon, Aug 06, 2012 at 10:52:26AM +0200, Linus Walleij wrote:
->> Commit:
->> 98582d9562b4bea6b0eb6e2bfafcd3fab3b60ccb
->> "ARM: ux500: Remove unused i2c platform_data initialisation code"
->>
->> Deleted platform data intialization code that was used,
->> not unused as indicated in the commit. The boot log (without
->> devicetree) now looks like this:
-> The aforementioned commit was part of a patch-set. One of its affiliates
-> moved this code into the Nomadik I2C driver; however, it was contested
-> because Device Tree support was also added and the maintainer thought
-> the properties introduced could be consolidated with other I2C driver's
-> DT properties. I don't think anyone has taken up the consolidation work
-> and for that reason it hasn't gone in.
+On 05.08.2012 08:01, Shawn Guo wrote:
+> With commit 3e11f7b (gpio/generic: initialize basic_mmio_gpio shadow
+> variables properly) in place, the shadow variables initialization is
+> being done in generic driver bgpio_init call.
+> 
+> Remove the redundant shadow variables initialization from gpio-mxc
+> driver.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Too bad it had to turn into a regression though :-P
+Whole series:
 
-> I think moving this stuff into the driver is the right thing to do.
-> Instead, I'll split out the configuration and DT enablement from the
-> patch and resubmit.
->
-> Sound good to you?
+Tested-by: Dirk Behme <dirk.behme@de.bosch.com>
 
-Either way works with me, but the patch sent out need to be
-rebased and sent to Wolfram. Either he applies that to the I2C
-tree or I apply this to the ux500 tree. So it's for Wolfram to decide.
+Looks good :)
 
-Yours,
-Linus Walleij
+Many thanks
+
+Dirk
+
+> ---
+>  drivers/gpio/gpio-mxc.c |    2 --
+>  1 files changed, 0 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+> index 4db460b..76e8cda 100644
+> --- a/drivers/gpio/gpio-mxc.c
+> +++ b/drivers/gpio/gpio-mxc.c
+> @@ -466,8 +466,6 @@ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
+>  
+>  	port->bgc.gc.to_irq = mxc_gpio_to_irq;
+>  	port->bgc.gc.base = pdev->id * 32;
+> -	port->bgc.dir = port->bgc.read_reg(port->bgc.reg_dir);
+> -	port->bgc.data = port->bgc.read_reg(port->bgc.reg_set);
+>  
+>  	err = gpiochip_add(&port->bgc.gc);
+>  	if (err)
