@@ -1,35 +1,41 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Mon, 06 Aug 2012 13:58:32 +0200
-Subject: [PATCH 2/2] dma-buf: add helpers for attacher dma-parms
-In-Reply-To: <501F9C8E.4080002@samsung.com>
-References: <1342715014-5316-1-git-send-email-rob.clark@linaro.org>
- <1342715014-5316-3-git-send-email-rob.clark@linaro.org>
- <501F9C8E.4080002@samsung.com>
-Message-ID: <xa1tobmoxmdz.fsf@mina86.com>
+From: mchehab@redhat.com (Mauro Carvalho Chehab)
+Date: Mon, 06 Aug 2012 09:13:00 -0300
+Subject: Vacations.
+In-Reply-To: <Pine.LNX.4.64.1208031708200.5170@axis700.grange>
+References: <CACKLOr1Q6_xVhaaoWiy-kf9hViTW98aSa6hd5M2z7ogL-uwNVQ@mail.gmail.com>
+ <Pine.LNX.4.64.1208031708200.5170@axis700.grange>
+Message-ID: <501FB4CC.1060301@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Em 03-08-2012 12:09, Guennadi Liakhovetski escreveu:
+> Hi Javier
+> 
+> On Fri, 3 Aug 2012, javier Martin wrote:
+> 
+>> Hi,
+>> I will be out of the office until August the 19th.
+>>
+>> I just wanted to send a reminder of some patches that I have pending.
+>>
+>> For Mauro 3.7:
+>>
+>> [PULL] video_visstrim for 3.6
+>> [PATCH] media: i.MX27: Fix mx2_emmaprp mem2mem driver clocks.
 
-Tomasz Stanislawski <t.stanislaws@samsung.com> writes:
-> I recommend to change the semantics for unlimited number of segments
-> from 'value 0' to:
->
-> #define DMA_SEGMENTS_COUNT_UNLIMITED ((unsigned long)INT_MAX)
->
-> Using INT_MAX will allow using safe conversions between signed and
-> unsigned integers.
+Both got merged.
 
-LONG_MAX seems cleaner regardless.
+>>
+>> For Guennadi:
+>>
+>> [PATCH 1/4] i.MX27: Fix emma-prp and csi clocks.
+> 
+> As I mentioned several times, the above patch is not for me. Have a nice 
+> vacation.
 
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 835 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120806/977107ce/attachment.sig>
+It is an -arm patch, so it is not for me.
+
+Have nice vacations
+
+Regards,
+Mauro
