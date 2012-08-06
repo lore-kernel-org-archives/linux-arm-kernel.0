@@ -1,42 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 6 Aug 2012 13:23:13 +0200
-Subject: [PATCH 1/1] i2c: Add default configuration into the Nomadik I2C
- driver
-In-Reply-To: <20120806102151.GB16996@gmail.com>
-References: <1344243146-6598-1-git-send-email-linus.walleij@stericsson.com>
- <20120806102151.GB16996@gmail.com>
-Message-ID: <CACRpkdZRCJXFGAVaD2eFWDhRX_=1G=MzDp=-PB6C3HKUpqkkWA@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 6 Aug 2012 16:55:31 +0530
+Subject: [PATCH v3 2/2] arm/dts: omap4: Add ocp2scp data
+In-Reply-To: <1344252331-18456-1-git-send-email-kishon@ti.com>
+References: <1344252331-18456-1-git-send-email-kishon@ti.com>
+Message-ID: <1344252331-18456-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 6, 2012 at 12:21 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Add ocp2scp data node in omap4 device tree file.
 
-> From: Lee Jones <lee.jones@linaro.org>
-> Date: Mon, 6 Aug 2012 11:04:14 +0100
-> Subject: [PATCH 1/1] i2c: Add default configuration into the Nomadik I2C
->  driver.
->
-> At this moment in time there is only one known configuration for the
-> Nomadik I2C driver. By not holding that configuration in the driver
-> adds some unnecessary overhead in platform code. The configuration
-> as already been removed from platform code, this patch checks for any
-> over-riding configurations. If there aren't any, the default is used.
->
-> Cc: linux-i2c at vger.kernel.org
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/omap4.dtsi |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Ah, I created my own solution for this as well by reverting back
-some platform data.
-
-This works too, but the patch does not apply to v3.6-rc1.
-Please rebase and repost, then you can add my
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Please not that you need to send I2C patches for embedded
-to Wolfram Sang.
-
-Wolfram, please pick this for the -rc series because it's a regression
-in v3.6-rc1.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 04cbbcb..8a780b2 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -295,5 +295,13 @@
+ 			interrupt-parent = <&gic>;
+ 			ti,hwmods = "dmic";
+ 		};
++
++		ocp2scp {
++			compatible = "ti,omap-ocp2scp";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			ti,hwmods = "ocp2scp_usb_phy";
++		};
+ 	};
+ };
+-- 
+1.7.9.5
