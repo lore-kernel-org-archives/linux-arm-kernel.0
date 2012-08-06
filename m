@@ -1,43 +1,35 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 6 Aug 2012 18:53:11 +0530
-Subject: [PATCH 0/4] arm/dts: omap: add dt data for MUSB
-Message-ID: <1344259395-4559-1-git-send-email-kishon@ti.com>
+Date: Mon, 6 Aug 2012 18:53:12 +0530
+Subject: [PATCH 1/4] arm/dts: omap: Add omap-usb2 dt data
+In-Reply-To: <1344259395-4559-1-git-send-email-kishon@ti.com>
+References: <1344259395-4559-1-git-send-email-kishon@ti.com>
+Message-ID: <1344259395-4559-2-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds dt data for MUSB and related modules to
-get MUSB working
+Add omap-usb2 data node in omap4 device tree file.
 
-These patches were initially part of
-[PATCH v6 00/11] omap: musb: Add device tree support
+Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/omap4.dtsi |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-These patches can be tested by applying it over
-[PATCH v7 0/7] omap: musb: Add device tree support
-
-These patches were developed on
-git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git
-
-If it needs to be rebased on some other tree, pls let me
-know.
-
-Performed MUSB device mode testing on omap4 panda,
-omap4 sdp and omap3 beagle
-
-Kishon Vijay Abraham I (4):
-  arm/dts: omap: Add omap-usb2 dt data
-  arm/dts: Add twl6030-usb data
-  arm/dts: Add twl4030-usb data
-  arm/dts: omap: Add usb_otg and glue data
-
- arch/arm/boot/dts/omap3-beagle.dts |    6 ++++++
- arch/arm/boot/dts/omap3-evm.dts    |    6 ++++++
- arch/arm/boot/dts/omap3.dtsi       |    8 ++++++++
- arch/arm/boot/dts/omap4-panda.dts  |   10 ++++++++++
- arch/arm/boot/dts/omap4-sdp.dts    |   10 ++++++++++
- arch/arm/boot/dts/omap4.dtsi       |   13 +++++++++++++
- arch/arm/boot/dts/twl4030.dtsi     |   21 +++++++++++++++++++++
- arch/arm/boot/dts/twl6030.dtsi     |    5 +++++
- 8 files changed, 79 insertions(+)
-
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 8a780b2..d774733 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -302,6 +302,11 @@
+ 			#size-cells = <1>;
+ 			ranges;
+ 			ti,hwmods = "ocp2scp_usb_phy";
++			usb2phy at 4a0ad080 {
++				compatible = "ti,omap-usb2";
++				reg = <0x4a0ad080 0x58>,
++				      <0x4a002300 0x1>;
++			};
+ 		};
+ 	};
+ };
 -- 
 1.7.9.5
