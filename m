@@ -1,146 +1,60 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 05 Aug 2012 21:50:32 -0500
-Subject: [PATCH v2 2/4] PM / OPP: Initialize OPP table from device tree
-In-Reply-To: <1344179121-17738-3-git-send-email-shawn.guo@linaro.org>
-References: <1344179121-17738-1-git-send-email-shawn.guo@linaro.org>
- <1344179121-17738-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <501F30F8.1040105@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 6 Aug 2012 10:58:08 +0800
+Subject: [PATCH] ARM: mxs_defconfig: Enable USB host
+In-Reply-To: <1344186258-30841-1-git-send-email-festevam@gmail.com>
+References: <1344186258-30841-1-git-send-email-festevam@gmail.com>
+Message-ID: <20120806025806.GA22302@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2012 10:05 AM, Shawn Guo wrote:
-> With a lot of devices booting from device tree nowadays, it requires
-> that OPP table can be initialized from device tree.  The patch adds
-> a helper function of_init_opp_table together with a binding doc for
-> that purpose.
+On Sun, Aug 05, 2012 at 02:04:18PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Enable USB host.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
->  Documentation/devicetree/bindings/power/opp.txt |   25 +++++++++
->  drivers/base/power/opp.c                        |   65 +++++++++++++++++++++++
->  include/linux/opp.h                             |    8 +++
->  3 files changed, 98 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/power/opp.txt
+>  arch/arm/configs/mxs_defconfig |   14 +++++++++++++-
+>  1 files changed, 13 insertions(+), 1 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
-> new file mode 100644
-> index 0000000..2238520
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/opp.txt
-> @@ -0,0 +1,25 @@
-> +* Generic OPP Interface
-> +
-> +SoCs have a standard set of tuples consisting of frequency and
-> +voltage pairs that the device will support per voltage domain. These
-> +are called Operating Performance Points or OPPs.
-> +
-> +Properties:
-> +- operating-points: An array of 3-tuples items, and each item consists
+I guess you did not run savedefconfig.  We do not need all those
+options explicitly added there.
 
-3 tuples?
+Regards,
+Shawn
 
-> +  of frequency and voltage like <freq-kHz vol-uV>.
-> +	freq: clock frequency in kHz
-> +	vol: voltage in microvolt
-
-Although maybe 3 fields would be good for a flags field? I'm concerned
-it's a pretty generic name and not very future proof. What about
-transition times? Not sure how you would represent that as it probably
-depends on which points you are changing between rather than a property
-of the opp.
-
-I'm not saying we have to address that now, but just have some path in
-the future.
-
-> +
-> +Examples:
-> +
-> +cpu at 0 {
-> +	compatible = "arm,cortex-a9";
-> +	reg = <0>;
-> +	next-level-cache = <&L2>;
-> +	operating-points = <
-> +		/* kHz    uV */
-> +		792000  1100000
-> +		396000  950000
-> +		198000  850000
-> +	>;
-> +};
-> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-> index ac993ea..1bf1be8 100644
-> --- a/drivers/base/power/opp.c
-> +++ b/drivers/base/power/opp.c
-> @@ -22,6 +22,7 @@
->  #include <linux/rculist.h>
->  #include <linux/rcupdate.h>
->  #include <linux/opp.h>
-> +#include <linux/of.h>
->  
->  /*
->   * Internal data structure organization with the OPP layer library is as
-> @@ -674,3 +675,67 @@ struct srcu_notifier_head *opp_get_notifier(struct device *dev)
->  
->  	return &dev_opp->head;
->  }
-> +
-> +#ifdef CONFIG_OF
-> +/**
-> + * of_init_opp_table() - Initialize opp table from device tree
-> + * @dev:	device pointer used to lookup device OPPs.
-> + *
-> + * Register the initial OPP table with the OPP library for given device.
-> + */
-> +int of_init_opp_table(struct device *dev)
-> +{
-> +	struct device_node *np = dev->of_node;
-> +	const char *propname = "operating-points";
-> +	const struct property *pp;
-> +	u32 *opp;
-> +	int ret, i, nr;
-> +
-> +	pp = of_find_property(np, propname, NULL);
-> +	if (!pp) {
-> +		dev_err(dev, "%s: Unable to find property", __func__);
-> +		return -ENODEV;
-> +	}
-> +
-> +	opp = kzalloc(pp->length, GFP_KERNEL);
-> +	if (!opp) {
-> +		dev_err(dev, "%s: Unable to allocate array\n", __func__);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	nr = pp->length / sizeof(u32);
-> +	ret = of_property_read_u32_array(np, propname, opp, nr);
-> +	if (ret) {
-> +		dev_err(dev, "%s: Unable to read OPPs\n", __func__);
-> +		goto out;
-> +	}
-> +
-> +	if (nr % 2) {
-> +		dev_err(dev, "%s: Invalid OPP list\n", __func__);
-> +		ret = -EINVAL;
-> +		goto out;
-> +	}
-> +
-> +	nr /= 2;
-> +	for (i = 0; i < nr; i++) {
-> +		/*
-> +		 * Each OPP is a set of tuples consisting of frequency and
-> +		 * voltage like <freq-kHz vol-uV>.
-> +		 */
-> +		u32 *val = opp + i * 2;
-> +
-> +		val[0] *= 1000;
-> +		ret = opp_add(dev, val[0], val[1]);
-> +		if (ret) {
-> +			dev_warn(dev, "%s: Failed to add OPP %d: %d\n",
-> +				 __func__, val[0], ret);
-> +			continue;
-> +		}
-> +	}
-
-I think this whole function can be written more concisely. Just iterate
-over the property and avoid the intermediate array allocation.
-
-Rob
+> diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+> index ccdb635..73842f9 100644
+> --- a/arch/arm/configs/mxs_defconfig
+> +++ b/arch/arm/configs/mxs_defconfig
+> @@ -95,7 +95,7 @@ CONFIG_GPIO_SYSFS=y
+>  # CONFIG_MFD_SUPPORT is not set
+>  CONFIG_DISPLAY_SUPPORT=m
+>  # CONFIG_HID_SUPPORT is not set
+> -# CONFIG_USB_SUPPORT is not set
+> +CONFIG_USB_SUPPORT=y
+>  CONFIG_SOUND=y
+>  CONFIG_SND=y
+>  CONFIG_SND_TIMER=y
+> @@ -110,6 +110,18 @@ CONFIG_SND_SOC_I2C_AND_SPI=y
+>  CONFIG_SND_SOC_SGTL5000=y
+>  CONFIG_REGULATOR=y
+>  CONFIG_REGULATOR_FIXED_VOLTAGE=y
+> +CONFIG_USB_COMMON=y
+> +CONFIG_USB_ARCH_HAS_HCD=y
+> +CONFIG_USB=y
+> +CONFIG_USB_EHCI_ROOT_HUB_TT=y
+> +CONFIG_USB_EHCI_TT_NEWSCHED=y
+> +CONFIG_USB_STORAGE=y
+> +CONFIG_USB_OTG_UTILS=y
+> +CONFIG_USB_MXS_PHY=y
+> +CONFIG_USB_CHIPIDEA=y
+> +CONFIG_USB_CHIPIDEA_HOST=y
+> +CONFIG_SCSI=y
+> +CONFIG_BLK_DEV_SD=y
+>  CONFIG_MMC=y
+>  CONFIG_MMC_MXS=y
+>  CONFIG_RTC_CLASS=y
+> -- 
+> 1.7.1
+> 
