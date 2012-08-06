@@ -1,100 +1,208 @@
-From: roylee17@gmail.com (Tzu-Jung Lee)
-Date: Tue, 7 Aug 2012 00:43:12 +0800
-Subject: [PATCH 1/1] remoteproc: extend customized fw loader to cover
- request and release
-In-Reply-To: <CAK=WgbbBHspN_LTUXH1kUugH8-Nr-G=p-G3Wj60tAmrqqfakmg@mail.gmail.com>
-References: <1344237865-32491-1-git-send-email-roylee17@gmail.com>
- <CAK=WgbbBHspN_LTUXH1kUugH8-Nr-G=p-G3Wj60tAmrqqfakmg@mail.gmail.com>
-Message-ID: <CAEvN+1h5dVxX74YtBNwjiqzZNrpK56jBw9TaJjszf_-E3DY2gw@mail.gmail.com>
+From: otavio@ossystems.com.br (Otavio Salvador)
+Date: Mon, 6 Aug 2012 13:51:07 -0300
+Subject: [PATCH 1/6] ARM: mxs: tx28: reset fec phy for device tree boot
+In-Reply-To: <1344267769-31166-2-git-send-email-shawn.guo@linaro.org>
+References: <1344267769-31166-1-git-send-email-shawn.guo@linaro.org>
+ <1344267769-31166-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAP9ODKqLzfSRFMjg6yrmzTviNv4R3EyD0Sa2TMnWvKL0Djyj=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
-
-On Mon, Aug 6, 2012 at 10:16 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> Hi Tzu-Jung Lee,
+On Mon, Aug 6, 2012 at 12:42 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> For non-DT boot, function tx28_add_fec0 configures all ENET0 pins
+> into gpio mode for resetting fec phy, and then reconfigures those pins
+> into ENET function after that.
 >
-> On Mon, Aug 6, 2012 at 10:24 AM, Tzu-Jung Lee <roylee17@gmail.com> wrote:
->> Previously, the remoteproc mandates an actual ELF firmware in order to
->> parse the resource table and boot the remoteproc.
->>
->> An fw loader abstraction was added in v3.61-rc1 to make the ELF as a
->> "default" handler, and allows firmwares in other formats to be loaded.
->>
->> However, in our use cases, we don't actually have a firmware for linux
->> to load. The remote processor always boots first, and then boots the
->> rest of processors that running linux.
+> For DT boot, all the pin configuration is done by pinctrl subsystem.
+> Ideally, when gpio_requst gets called, GPIO subsystem should call
+
+                        ^ typo
+
+> pinctrl to configure pins into gpio mode automatically, and have pins
+> freed up from pinctrl subsystem when gpio_free is called.  But right
+> now, this cooperation between gpio and pinctrl hasn't been available.
+> As the result, we have to explicitly call pinctrl_get_select and
+> pinctrl_put for device tree boot.
 >
-> Can you describe your use case some more ?
-
-It's three processors AMP SoC, the first powered on processors runs
- an RTOS and boots up the other two which run linux.
-
-> What parts in remoteproc are actually helpful for you (not much I
-> guess if Linux doesn't control the life cycle of the remote processor
-> in your case) ?
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Acked-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> ---
+>  arch/arm/boot/dts/imx28-tx28.dts |   21 +++++++++-
+>  arch/arm/mach-mxs/mach-mxs.c     |   82 +++++++++++++++++++++++++++++++++++++-
+>  2 files changed, 101 insertions(+), 2 deletions(-)
 >
-> Do you use rpmsg ?
-
-Yes, I'm using rpmsg.
-And actually the remoteproc provides a good abstraction and the generic
-facilities sysfs/debugfs handling, resource format, vring allocation, etc...
-And the start/stop/kick API also serves as good place for handshaking
-with the remote processors. Overall, most of the framework works well with
-our platform, and the difference can be hidden in the platform priv
-data structure.
-
->> In this case, forging an binary firmware just for the resource table
->> creates a burden for maintenence.
->> Allowing the firmware request/release function to be customized gives
->> developers to construct the reqource table in memory, instead of loading
->> one from filesystem.
+> diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
+> index 62bf767..a56ae05 100644
+> --- a/arch/arm/boot/dts/imx28-tx28.dts
+> +++ b/arch/arm/boot/dts/imx28-tx28.dts
+> @@ -34,6 +34,24 @@
+>                                         fsl,voltage = <1>;
+>                                         fsl,pull-up = <0>;
+>                                 };
+> +
+> +                               mac0_pins_gpio: mac0-gpio-mode at 0 {
+> +                                       reg = <0>;
+> +                                       fsl,pinmux-ids = <
+> +                                               0x4003 /* MX28_PAD_ENET0_MDC__GPIO_4_0 */
+> +                                               0x4013 /* MX28_PAD_ENET0_MDIO__GPIO_4_1 */
+> +                                               0x4023 /* MX28_PAD_ENET0_RX_EN__GPIO_4_2 */
+> +                                               0x4033 /* MX28_PAD_ENET0_RXD0__GPIO_4_3 */
+> +                                               0x4043 /* MX28_PAD_ENET0_RXD1__GPIO_4_4 */
+> +                                               0x4063 /* MX28_PAD_ENET0_TX_EN__GPIO_4_6 */
+> +                                               0x4073 /* MX28_PAD_ENET0_TXD0__GPIO_4_7 */
+> +                                               0x4083 /* MX28_PAD_ENET0_TXD1__GPIO_4_8 */
+> +                                               0x4103 /* MX28_PAD_ENET_CLK__GPIO_4_16 */
+> +                                       >;
+> +                                       fsl,drive-strength = <0>;
+> +                                       fsl,voltage = <1>;
+> +                                       fsl,pull-up = <0>;
+> +                               };
+>                         };
+>                 };
 >
-> I'm not sure this is an ideal abstraction though.
+> @@ -72,8 +90,9 @@
+>         ahb at 80080000 {
+>                 mac0: ethernet at 800f0000 {
+>                         phy-mode = "rmii";
+> -                       pinctrl-names = "default";
+> +                       pinctrl-names = "default", "gpio_mode";
+>                         pinctrl-0 = <&mac0_pins_a>;
+> +                       pinctrl-1 = <&mac0_pins_gpio>;
+>                         status = "okay";
+>                 };
+>         };
+> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+> index 02d1ab2..6ba37df 100644
+> --- a/arch/arm/mach-mxs/mach-mxs.c
+> +++ b/arch/arm/mach-mxs/mach-mxs.c
+> @@ -12,8 +12,9 @@
+>
+>  #include <linux/clk.h>
+>  #include <linux/clkdev.h>
+> +#include <linux/delay.h>
+>  #include <linux/err.h>
+> -#include <linux/init.h>
+> +#include <linux/gpio.h>
+>  #include <linux/init.h>
+>  #include <linux/irqdomain.h>
+>  #include <linux/micrel_phy.h>
+> @@ -21,10 +22,12 @@
+>  #include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/phy.h>
+> +#include <linux/pinctrl/consumer.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/time.h>
+>  #include <mach/common.h>
+>  #include <mach/digctl.h>
+> +#include <mach/mxs.h>
+>
+>  static struct fb_videomode mx23evk_video_modes[] = {
+>         {
+> @@ -273,6 +276,80 @@ static void __init apx4devkit_init(void)
+>         mxsfb_pdata.ld_intf_width = STMLCDIF_24BIT;
+>  }
+>
+> +#define ENET0_MDC__GPIO_4_0    MXS_GPIO_NR(4, 0)
+> +#define ENET0_MDIO__GPIO_4_1   MXS_GPIO_NR(4, 1)
+> +#define ENET0_RX_EN__GPIO_4_2  MXS_GPIO_NR(4, 2)
+> +#define ENET0_RXD0__GPIO_4_3   MXS_GPIO_NR(4, 3)
+> +#define ENET0_RXD1__GPIO_4_4   MXS_GPIO_NR(4, 4)
+> +#define ENET0_TX_EN__GPIO_4_6  MXS_GPIO_NR(4, 6)
+> +#define ENET0_TXD0__GPIO_4_7   MXS_GPIO_NR(4, 7)
+> +#define ENET0_TXD1__GPIO_4_8   MXS_GPIO_NR(4, 8)
+> +#define ENET_CLK__GPIO_4_16    MXS_GPIO_NR(4, 16)
+> +
+> +#define TX28_FEC_PHY_POWER     MXS_GPIO_NR(3, 29)
+> +#define TX28_FEC_PHY_RESET     MXS_GPIO_NR(4, 13)
+> +#define TX28_FEC_nINT          MXS_GPIO_NR(4, 5)
+> +
+> +static const struct gpio tx28_gpios[] __initconst = {
+> +       { ENET0_MDC__GPIO_4_0, GPIOF_OUT_INIT_LOW, "GPIO_4_0" },
+> +       { ENET0_MDIO__GPIO_4_1, GPIOF_OUT_INIT_LOW, "GPIO_4_1" },
+> +       { ENET0_RX_EN__GPIO_4_2, GPIOF_OUT_INIT_LOW, "GPIO_4_2" },
+> +       { ENET0_RXD0__GPIO_4_3, GPIOF_OUT_INIT_LOW, "GPIO_4_3" },
+> +       { ENET0_RXD1__GPIO_4_4, GPIOF_OUT_INIT_LOW, "GPIO_4_4" },
+> +       { ENET0_TX_EN__GPIO_4_6, GPIOF_OUT_INIT_LOW, "GPIO_4_6" },
+> +       { ENET0_TXD0__GPIO_4_7, GPIOF_OUT_INIT_LOW, "GPIO_4_7" },
+> +       { ENET0_TXD1__GPIO_4_8, GPIOF_OUT_INIT_LOW, "GPIO_4_8" },
+> +       { ENET_CLK__GPIO_4_16, GPIOF_OUT_INIT_LOW, "GPIO_4_16" },
+> +       { TX28_FEC_PHY_POWER, GPIOF_OUT_INIT_LOW, "fec-phy-power" },
+> +       { TX28_FEC_PHY_RESET, GPIOF_OUT_INIT_LOW, "fec-phy-reset" },
+> +       { TX28_FEC_nINT, GPIOF_DIR_IN, "fec-int" },
+> +};
+> +
+> +static void __init tx28_post_init(void)
+> +{
+> +       struct device_node *np;
+> +       struct platform_device *pdev;
+> +       struct pinctrl *pctl;
+> +       int ret;
+> +
+> +       enable_clk_enet_out();
+> +
+> +       np = of_find_compatible_node(NULL, NULL, "fsl,imx28-fec");
+> +       pdev = of_find_device_by_node(np);
+> +       if (!pdev) {
+> +               pr_err("%s: failed to find fec device\n", __func__);
+> +               return;
+> +       }
+> +
+> +       pctl = pinctrl_get_select(&pdev->dev, "gpio_mode");
+> +       if (IS_ERR(pctl)) {
+> +               pr_err("%s: failed to get pinctrl state\n", __func__);
+> +               return;
+> +       }
+> +
+> +       ret = gpio_request_array(tx28_gpios, ARRAY_SIZE(tx28_gpios));
+> +       if (ret) {
+> +               pr_err("%s: failed to request gpios: %d\n", __func__, ret);
+> +               return;
+> +       }
+> +
+> +       /* Power up fec phy */
+> +       gpio_set_value(TX28_FEC_PHY_POWER, 1);
+> +       mdelay(26); /* 25ms according to data sheet */
+> +
+> +       /* Mode strap pins */
+> +       gpio_set_value(ENET0_RX_EN__GPIO_4_2, 1);
+> +       gpio_set_value(ENET0_RXD0__GPIO_4_3, 1);
+> +       gpio_set_value(ENET0_RXD1__GPIO_4_4, 1);
+> +
+> +       udelay(100); /* minimum assertion time for nRST */
+> +
+> +       /* Deasserting FEC PHY RESET */
+> +       gpio_set_value(TX28_FEC_PHY_RESET, 1);
+> +
+> +       pinctrl_put(pctl);
+> +}
+> +
+>  static void __init mxs_machine_init(void)
+>  {
+>         if (of_machine_is_compatible("fsl,imx28-evk"))
+> @@ -286,6 +363,9 @@ static void __init mxs_machine_init(void)
+>
+>         of_platform_populate(NULL, of_default_bus_match_table,
+>                              mxs_auxdata_lookup, NULL);
+> +
+> +       if (of_machine_is_compatible("karo,tx28"))
+> +               tx28_post_init();
+>  }
+>
+>  static const char *imx23_dt_compat[] __initdata = {
+> --
+> 1.7.5.4
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Agree.
-The patch may not solve this, but it should address some issues I'm having.
 
-> The problem you describe is architectural and not necessarily related
-> with a specific binary format, which this patch ties it up with (by
-> abstracting it away in rproc_fw_ops). It seems that a
-> binary-format-agnostic solution is preferable, because it could then
-> be utilized by any platform, regardless of the binary format it uses.
 
-> In general we prefer not to adopt a solution that puts the resource
-> table in the kernel, because that means redundant churn and
-> compatibility issues, as the resource table is inherently coupled with
-> the software running on the remote processor, and not with the Linux
-> kernel.
-
-Yes, that's the point.
-
-The format issue has been addressed by the fw format handler.
-But we still need to address where the data come from.
-Even it is in ELF format, it may not necessarily come from root file system.
-It can be loaded from MTD partition or constructed/derived from the cmdline.
-
-> An easy solution is to allow loading an external stand-alone resource
-> table from the filesystem. We've discussed this in the past and
-> several parties showed interest. Will it help you ?
-
-Actually, I've been using the this approach for the past few weeks.
-I forged an ELF file containing the resource table, and dummy loadable
-sections, otherwise it  failed the sanity checks. Until yesterday I merged
-and found the fw format handler support in v3.6-rc1, and wondered if we
-can just extend it a little bit to not load (bypass) the firmware at all.
-
-> Another possible solution is to allow the low level rproc driver to
-> provide the remoteproc framework a pointer to an in-memory resource
-> table. This may prove useful in case the remote processor is already
-> up when Linux boots, and the resource table is already loaded to
-> memory.
-
-That's what I'm trying to do, and it has two things needs to be address.
-
-  1)  Make the firmware loading step "optional" in the booting process.
-
-  2)  Allow the remoteproc use an customized handler to get the resource table.
-
-Thanks,
-Roy
+-- 
+Otavio Salvador                             O.S. Systems
+E-mail: otavio at ossystems.com.br  http://www.ossystems.com.br
+Mobile: +55 53 9981-7854              http://projetos.ossystems.com.br
