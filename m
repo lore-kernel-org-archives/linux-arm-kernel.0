@@ -1,26 +1,32 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 6 Aug 2012 16:23:45 +0200
-Subject: [PATCH] pinctrl: pinctrl-imx: add imx35 pinctrl driver
-In-Reply-To: <20120803122516.GA23791@S2101-09.ap.freescale.net>
-References: <1343921942-22079-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20120803122516.GA23791@S2101-09.ap.freescale.net>
-Message-ID: <20120806142345.GB9329@pengutronix.de>
+Date: Mon, 6 Aug 2012 16:24:06 +0200
+Subject: [PATCH] ARM: imx35: don't disable the uart clock when DEBUG_LL
+ is in use
+In-Reply-To: <20120731183206.GC10670@pengutronix.de>
+References: <1343742279-29570-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20120731174358.GC30009@pengutronix.de>
+ <20120731183206.GC10670@pengutronix.de>
+Message-ID: <20120806142406.GC9329@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, Aug 03, 2012 at 08:25:18PM +0800, Shawn Guo wrote:
-> On Thu, Aug 02, 2012 at 05:39:02PM +0200, Uwe Kleine-K?nig wrote:
-> > +enum imx35_pads {
-> > +	/* sed -r -n 's@^#define MX35_PAD_([0-9A-Z_]*)__([0-9A-Z_]*)\s+IOMUX_PAD\(\s*([0-9a-fx]*),\s+([0-9a-fx]*),\s+([0-9a-fx]*),\s+([0-9a-fx]*),\s+([0-9]*),\s*NO_PAD_CTRL\)@\tMX35_PAD_\1, at p' arch/arm/plat-mxc/include/mach/iomux-mx35.h | uniq */
+On Tue, Jul 31, 2012 at 08:32:06PM +0200, Uwe Kleine-K?nig wrote:
+> Hello Sascha,
 > 
-> I'm not sure we want to keep a reference to
-> arch/arm/plat-mxc/include/mach/iomux-mx35.h that is to be removed.
-ok for me to remove it. Will resend without that line and Stephen's Ack.
-
-Thanks
-Uwe
+> On Tue, Jul 31, 2012 at 07:43:58PM +0200, Sascha Hauer wrote:
+> > On Tue, Jul 31, 2012 at 03:44:39PM +0200, Uwe Kleine-K?nig wrote:
+> > > Otherwise printch et al. and printk with earlyprintk and keep_bootcon
+> > > becomes unfunctional when the clk framework disables all unused clocks.
+> > 
+> > Why don't you use the regular console? Letting the clock framework
+> > disable the clocks was pretty much intentional.
+> I don't question that disabling unused clocks is sensible. But usually
+> if you enable DEBUG_LL you want to use it even after the clock framework
+> disabled all (apparently) unused clocks. And in my case the regular
+> console didn't work yet and so I relied on earlyprintk.
+> Even if the problem proved to be the result of my stupidity this patch
+> asserts that earlyprintk just works as it should be for debug aids.
+ping
 
 -- 
 Pengutronix e.K.                           | Uwe Kleine-K?nig            |
