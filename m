@@ -1,241 +1,36 @@
-From: tobetter@gmail.com (Dongjin Kim)
-Date: Mon,  6 Aug 2012 22:57:41 +0900
-Subject: [PATCH] ARM: EXYNOS: Enable multiple cores on Exynos4
-In-Reply-To: <1344261462-14183-1-git-send-email-dongjin.kim@agreeyamobility.net>
-References: <1344261462-14183-1-git-send-email-dongjin.kim@agreeyamobility.net>
-Message-ID: <1344261462-14183-4-git-send-email-dongjin.kim@agreeyamobility.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 6 Aug 2012 16:00:04 +0200
+Subject: [PATCH 1/1] i2c: Add default configuration into the Nomadik I2C
+ driver.
+In-Reply-To: <1344255947-10062-1-git-send-email-lee.jones@linaro.org>
+References: <1344255947-10062-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZoJxyZX6SOcAvBP4NBmGyUEiyLH_n_RzSDTBsjS13zug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables CPU cores on Exynos4, on Exynos4412 secondary CPU cores
-are power-gated, therefore we must turn on the CPU cores on the system boot.
+On Mon, Aug 6, 2012 at 2:25 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Shows below log message on boot.
-[    0.045000] CPU: Testing write buffer coherency: ok
-[    0.045000] CPU0: thread -1, cpu 0, socket 10, mpidr 80000a00
-[    0.045000] hw perfevents: enabled with ARMv7 Cortex-A9 PMU driver, 7
-counters e
-[    0.045000] Setting up static identity map for 0x40370790 - 0x403707e8
-[    0.045000] L310 cache controller enabled
-[    0.045000] l2x0: 16 ways, CACHE_ID 0x4100c4c8, AUX_CTRL 0x7e470001, Cache
-sizeB
-[    0.070000] CPU1: Booted secondary processor
-[    0.090000] CPU1: thread -1, cpu 1, socket 10, mpidr 80000a01
-[    0.090000] CPU1: Unknown IPI message 0x1
-[    0.100000] CPU2: Booted secondary processor
-[    0.120000] CPU2: thread -1, cpu 2, socket 10, mpidr 80000a02
-[    0.120000] CPU2: Unknown IPI message 0x1
-[    0.130000] CPU3: Booted secondary processor
-[    0.150000] CPU3: thread -1, cpu 3, socket 10, mpidr 80000a03
-[    0.150000] CPU3: Unknown IPI message 0x1
-[    0.150000] Brought up 4 CPUs
-[    0.150000] SMP: Total of 4 processors activated (7969.17 BogoMIPS).
+> At this moment in time there is only one known configuration for the
+> Nomadik I2C driver. By not holding that configuration in the driver
+> adds some unnecessary overhead in platform code. The configuration
+> as already been removed from platform code, this patch checks for any
+> over-riding configurations. If there aren't any, the default is used.
+>
+> Cc: linux-i2c at vger.kernel.org
+> Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Change-Id: I61615c5b719d3646698f114fc3777eb304694099
-Signed-off-by: Dongjin Kim <dongjin.kim@agreeyamobility.net>
----
- arch/arm/mach-exynos/hotplug.c               |    4 +-
- arch/arm/mach-exynos/include/mach/regs-pmu.h |   11 ++-
- arch/arm/mach-exynos/platsmp.c               |  100 +++++++++++++++++---------
- 3 files changed, 76 insertions(+), 39 deletions(-)
+This still does not apply for me on v3.6-rc1 what did you base
+this patch on?
 
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index 9c17a0a..cd53497 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -66,8 +66,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
- 	for (;;) {
- 
- 		/* make cpu1 to be turned off at next WFI command */
--		if (cpu == 1)
--			__raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
-+		if ((cpu >= 1) && (cpu < num_possible_cpus()))
-+			__raw_writel(0, S5P_ARM_CORE_CONFIGURATION(cpu));
- 
- 		/*
- 		 * here's the WFI
-diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-index d4e392b..0bb21e2 100644
---- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
-+++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-@@ -123,10 +123,15 @@
- #define S5P_GPS_ALIVE_LOWPWR			S5P_PMUREG(0x13A0)
- 
- #define S5P_ARM_CORE0_CONFIGURATION		S5P_PMUREG(0x2000)
-+#define S5P_ARM_CORE0_STATUS			S5P_PMUREG(0x2004)
- #define S5P_ARM_CORE0_OPTION			S5P_PMUREG(0x2008)
--#define S5P_ARM_CORE1_CONFIGURATION		S5P_PMUREG(0x2080)
--#define S5P_ARM_CORE1_STATUS			S5P_PMUREG(0x2084)
--#define S5P_ARM_CORE1_OPTION			S5P_PMUREG(0x2088)
-+
-+#define S5P_ARM_CORE_OPTION(_nr)	(S5P_ARM_CORE0_OPTION + ((_nr) * 0x80))
-+#define S5P_ARM_CORE_STATUS(_nr)	(S5P_ARM_CORE0_STATUS + ((_nr) * 0x80))
-+#define S5P_ARM_CORE_CONFIGURATION(_nr)	\
-+				(S5P_ARM_CORE0_CONFIGURATION + ((_nr) * 0x80))
-+
-+#define S5P_CORE_OPTION_DIS                     (1 << 8)
- 
- #define S5P_ARM_COMMON_OPTION			S5P_PMUREG(0x2408)
- #define S5P_TOP_PWR_OPTION			S5P_PMUREG(0x2C48)
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 36c3984..68ca26f 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -34,9 +34,6 @@
- 
- extern void exynos4_secondary_startup(void);
- 
--#define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1 ? \
--				S5P_INFORM5 : S5P_VA_SYSRAM)
--
- /*
-  * control for which core is the next to come out of the secondary
-  * boot "holding pen"
-@@ -59,6 +56,9 @@ static void write_pen_release(int val)
- 
- static void __iomem *scu_base_addr(void)
- {
-+	if (soc_is_exynos5250())
-+		return 0;
-+
- 	return (void __iomem *)(S5P_VA_SCU);
- }
- 
-@@ -86,9 +86,41 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
- 	spin_unlock(&boot_lock);
- }
- 
-+static int exynos_power_up_cpu(unsigned int cpu)
-+{
-+	unsigned long timeout;
-+	unsigned int val;
-+	void __iomem *power_base = S5P_ARM_CORE_CONFIGURATION(cpu);
-+
-+	val = __raw_readl(power_base);
-+	if (!(val & S5P_CORE_LOCAL_PWR_EN)) {
-+		__raw_writel(S5P_CORE_LOCAL_PWR_EN, power_base);
-+
-+		timeout = 10;
-+
-+		/* wait max 10 ms until cpu is on */
-+		while ((__raw_readl(power_base + 0x4)
-+			& S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN) {
-+			if (timeout-- == 0)
-+				break;
-+
-+			mdelay(1);
-+		}
-+
-+		if (timeout == 0) {
-+			pr_err("cpu%d power enable failed", cpu);
-+			return -ETIMEDOUT;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
- int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	unsigned long timeout;
-+	void __iomem *boot_base;
-+	int ret;
- 
- 	/*
- 	 * Set synchronisation state between this boot processor
-@@ -96,6 +128,12 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	 */
- 	spin_lock(&boot_lock);
- 
-+	ret = exynos_power_up_cpu(cpu);
-+	if (ret) {
-+		spin_unlock(&boot_lock);
-+		return ret;
-+	}
-+
- 	/*
- 	 * The secondary processor is waiting to be released from
- 	 * the holding pen - release it, then wait for it to flag
-@@ -106,39 +144,33 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	 */
- 	write_pen_release(cpu_logical_map(cpu));
- 
--	if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
--		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
--			     S5P_ARM_CORE1_CONFIGURATION);
--
--		timeout = 10;
--
--		/* wait max 10 ms until cpu1 is on */
--		while ((__raw_readl(S5P_ARM_CORE1_STATUS)
--			& S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN) {
--			if (timeout-- == 0)
--				break;
--
--			mdelay(1);
--		}
--
--		if (timeout == 0) {
--			printk(KERN_ERR "cpu1 power enable failed");
--			spin_unlock(&boot_lock);
--			return -ETIMEDOUT;
--		}
--	}
- 	/*
- 	 * Send the secondary CPU a soft interrupt, thereby causing
- 	 * the boot monitor to read the system wide flags register,
- 	 * and branch to the address found there.
- 	 */
--
- 	timeout = jiffies + (1 * HZ);
- 	while (time_before(jiffies, timeout)) {
- 		smp_rmb();
- 
-+		if (soc_is_exynos4210() &&
-+				(samsung_rev() == EXYNOS4210_REV_1_1))
-+			boot_base = S5P_INFORM5;
-+		else
-+			boot_base = S5P_VA_SYSRAM;
-+
-+		if (soc_is_exynos4412())
-+			boot_base += (0x4 * cpu);
-+
-+		/*
-+		 * Write the address of secondary startup into the
-+		 * system-wide flags register. The boot monitor waits
-+		 * until it receives a soft interrupt, and then the
-+		 * secondary CPU branches to this address.
-+		 */
- 		__raw_writel(virt_to_phys(exynos4_secondary_startup),
--			CPU1_BOOT_REG);
-+				boot_base);
-+
- 		gic_raise_softirq(cpumask_of(cpu), 1);
- 
- 		if (pen_release == -1)
-@@ -186,15 +218,15 @@ void __init smp_init_cpus(void)
- 
- void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- {
--	if (!soc_is_exynos5250())
--		scu_enable(scu_base_addr());
-+	int i;
- 
- 	/*
--	 * Write the address of secondary startup into the
--	 * system-wide flags register. The boot monitor waits
--	 * until it receives a soft interrupt, and then the
--	 * secondary CPU branches to this address.
-+	 * Initialise the present map, which describes the set of CPUs
-+	 * actually populated@the present time.
- 	 */
--	__raw_writel(virt_to_phys(exynos4_secondary_startup),
--			CPU1_BOOT_REG);
-+	for (i = 0; i < max_cpus; i++)
-+		set_cpu_present(i, true);
-+
-+	if (!soc_is_exynos5250())
-+		scu_enable(scu_base_addr());
- }
--- 
-1.7.9.5
+Applying: i2c: Add default configuration into the Nomadik I2C driver.
+error: patch failed: drivers/i2c/busses/i2c-nomadik.c:899
+error: drivers/i2c/busses/i2c-nomadik.c: patch does not apply
+Patch failed at 0001 i2c: Add default configuration into the Nomadik I2C driver.
+When you have resolved this problem run "git am --resolved".
+If you would prefer to skip this patch, instead run "git am --skip".
+To restore the original branch and stop patching run "git am --abort".
+
+Yours,
+Linus Walleij
