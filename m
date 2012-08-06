@@ -1,24 +1,147 @@
 From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Mon, 6 Aug 2012 20:35:56 +0530
-Subject: [PATCH 0/2] Add device tree support for davinci_mdio driver and fix
- cpsw DT binding documentation
-Message-ID: <1344265558-5724-1-git-send-email-mugunthanvnm@ti.com>
+Date: Mon, 6 Aug 2012 20:35:58 +0530
+Subject: [PATCH 2/2] documentation: dt: bindings: cpsw: fixing the examples
+ for directly using it in dts file
+In-Reply-To: <1344265558-5724-1-git-send-email-mugunthanvnm@ti.com>
+References: <1344265558-5724-1-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <1344265558-5724-3-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds support for device tree for Davinci MDIO driver and fixes
-CPSW DT binding documentation to make it copy pastable to dts file.
+Fixing the cpsw device tree example to make it simpler to copy pastable to dts
+file and use it directly.
 
-This patch set is tested with the following git tree on AM335X Beagle Bone
-https://github.com/hvaibhav/am335x-linux/tree/am335x-upstream-staging-cpsw
+Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+---
+ Documentation/devicetree/bindings/net/cpsw.txt |  101 ++++++++++++-----------
+ 1 files changed, 53 insertions(+), 48 deletions(-)
 
-Mugunthan V N (2):
-  drivers: net: ethernet: davince_mdio: device tree implementation
-  documentation: dt: bindings: cpsw: fixing the examples for directly
-    using it in dts file
-
- Documentation/devicetree/bindings/net/cpsw.txt     |  101 ++++++++++---------
- .../devicetree/bindings/net/davinci-mdio.txt       |   33 +++++++
- drivers/net/ethernet/ti/davinci_mdio.c             |   41 +++++++-
- 3 files changed, 123 insertions(+), 52 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/davinci-mdio.txt
+diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
+index acca48c..dcaabe9 100644
+--- a/Documentation/devicetree/bindings/net/cpsw.txt
++++ b/Documentation/devicetree/bindings/net/cpsw.txt
+@@ -11,6 +11,7 @@ Required properties:
+ - cpdma_channels 	: Specifies number of channels in CPDMA
+ - host_port_no		: Specifies host port shift
+ - cpdma_reg_ofs		: Specifies CPDMA submodule register offset
++- cpdma_sram_ofs	: Specifies CPDMA SRAM offset
+ - ale_reg_ofs		: Specifies ALE submodule register offset
+ - ale_entries		: Specifies No of entries ALE can hold
+ - host_port_reg_ofs	: Specifies host port register offset
+@@ -43,62 +44,66 @@ Examples:
+ 		reg = <0x4A100000 0x1000>;
+ 		interrupts = <55 0x4>;
+ 		interrupt-parent = <&intc>;
+-		cpdma_channels = 8;
+-		host_port_no = 0;
+-		cpdma_reg_ofs = 0x800;
+-		ale_reg_ofs = 0xd00;
+-		ale_entries = 1024;
+-		host_port_reg_ofs = 0x108;
+-		hw_stats_reg_ofs = 0x900;
+-		bd_ram_ofs = 0x2000;
+-		bd_ram_size = 0x2000;
+-		no_bd_ram = 0;
+-		rx_descs = 64;
+-		mac_control = 0x20;
+-		slaves = 2;
+-		slave at 0 {
+-			slave_reg_ofs = 0x208;
+-			sliver_reg_ofs = 0xd80;
+-			phy_id = "davinci_mdio-0:00"
+-			mac-address = [00 04 9F 01 1B B8];
++		cpdma_channels = <8>;
++		host_port_no = <0>;
++		cpdma_reg_ofs = <0x800>;
++		cpdma_sram_ofs = <0xa00>;
++		ale_reg_ofs = <0xd00>;
++		ale_entries = <1024>;
++		host_port_reg_ofs = <0x108>;
++		hw_stats_reg_ofs = <0x900>;
++		bd_ram_ofs = <0x2000>;
++		bd_ram_size = <0x2000>;
++		no_bd_ram = <0>;
++		rx_descs = <64>;
++		mac_control = <0x20>;
++		slaves = <2>;
++		cpsw_emac0: slave at 0 {
++			slave_reg_ofs = <0x208>;
++			sliver_reg_ofs = <0xd80>;
++			phy_id = "davinci_mdio.16:00";
++			/* Filled in by U-Boot */
++			mac-address = [ 00 00 00 00 00 00 ];
+ 		};
+-		slave at 1 {
+-			slave_reg_ofs = 0x208;
+-			sliver_reg_ofs = 0xd80;
+-			phy_id = "davinci_mdio-0:01"
+-			mac-address = [00 04 9F 01 1B B9];
++		cpsw_emac1: slave at 1 {
++			slave_reg_ofs = <0x308>;
++			sliver_reg_ofs = <0xdc0>;
++			phy_id = "davinci_mdio.16:01";
++			/* Filled in by U-Boot */
++			mac-address = [ 00 00 00 00 00 00 ];
+ 		};
+ 	};
+ 
+ (or)
+-
+ 	mac: ethernet at 4A100000 {
+ 		compatible = "ti,cpsw";
+ 		ti,hwmods = "cpgmac0";
+-		cpdma_channels = 8;
+-		host_port_no = 0;
+-		cpdma_reg_ofs = 0x800;
+-		ale_reg_ofs = 0xd00;
+-		ale_entries = 1024;
+-		host_port_reg_ofs = 0x108;
+-		hw_stats_reg_ofs = 0x900;
+-		bd_ram_ofs = 0x2000;
+-		bd_ram_size = 0x2000;
+-		no_bd_ram = 0;
+-		rx_descs = 64;
+-		mac_control = 0x20;
+-		slaves = 2;
+-		slave at 0 {
+-			slave_reg_ofs = 0x208;
+-			sliver_reg_ofs = 0xd80;
+-			phy_id = "davinci_mdio-0:00"
+-			mac-address = [00 04 9F 01 1B B8];
++		cpdma_channels = <8>;
++		host_port_no = <0>;
++		cpdma_reg_ofs = <0x800>;
++		cpdma_sram_ofs = <0xa00>;
++		ale_reg_ofs = <0xd00>;
++		ale_entries = <1024>;
++		host_port_reg_ofs = <0x108>;
++		hw_stats_reg_ofs = <0x900>;
++		bd_ram_ofs = <0x2000>;
++		bd_ram_size = <0x2000>;
++		no_bd_ram = <0>;
++		rx_descs = <64>;
++		mac_control = <0x20>;
++		slaves = <2>;
++		cpsw_emac0: slave at 0 {
++			slave_reg_ofs = <0x208>;
++			sliver_reg_ofs = <0xd80>;
++			phy_id = "davinci_mdio.16:00";
++			/* Filled in by U-Boot */
++			mac-address = [ 00 00 00 00 00 00 ];
+ 		};
+-		slave at 1 {
+-			slave_reg_ofs = 0x208;
+-			sliver_reg_ofs = 0xd80;
+-			phy_id = "davinci_mdio-0:01"
+-			mac-address = [00 04 9F 01 1B B9];
++		cpsw_emac1: slave at 1 {
++			slave_reg_ofs = <0x308>;
++			sliver_reg_ofs = <0xdc0>;
++			phy_id = "davinci_mdio.16:01";
++			/* Filled in by U-Boot */
++			mac-address = [ 00 00 00 00 00 00 ];
+ 		};
+-
+ 	};
+-- 
+1.7.0.4
