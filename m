@@ -1,28 +1,20 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 6 Aug 2012 11:00:16 +0800
-Subject: [PATCH] clk: mxs: Register USB clocks for mx23
-In-Reply-To: <CAOMZO5AaLKN9bhuPRLJkA8ytiwVi_yrpwzL0mJAzf6VS4PSRLQ@mail.gmail.com>
-References: <1340148392-9847-1-git-send-email-festevam@gmail.com>
- <20120620143830.GF2253@S2101-09.ap.freescale.net>
- <CAOMZO5AaLKN9bhuPRLJkA8ytiwVi_yrpwzL0mJAzf6VS4PSRLQ@mail.gmail.com>
-Message-ID: <20120806030014.GB22302@S2101-09.ap.freescale.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 6 Aug 2012 00:14:52 -0300
+Subject: [PATCH] ARM: mxs_defconfig: Enable USB host
+In-Reply-To: <20120806025806.GA22302@S2101-09.ap.freescale.net>
+References: <1344186258-30841-1-git-send-email-festevam@gmail.com>
+ <20120806025806.GA22302@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5CevtbEdch5v9jt5Gyis8o6C1-Vrm1p=289Gpx4zd_wxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 05, 2012 at 02:08:07PM -0300, Fabio Estevam wrote:
-> On Wed, Jun 20, 2012 at 11:38 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> ...
-> >> +     clk_register_clkdev(clks[usb_pwr], NULL, "8007c000.usbphy");
-> >> +     clk_register_clkdev(clks[usb], NULL, "80080000.usb");
-> >
-> > It depends on the node name in device tree.  I would defer this
-> > a little bit to have the node name in dts settled down first.
-> 
-> Now that the mxs usb driver is in mainline, could this patch be applied?
-> 
-Probably, no, as I plan to freeze the addition to clkdev lookup table
-and replace it with DT clock lookup.
+On Sun, Aug 5, 2012 at 11:58 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
--- 
+> I guess you did not run savedefconfig.  We do not need all those
+> options explicitly added there.
+
+No, I have not run savedefconfig. What is the correct way to use it?
+
 Regards,
-Shawn
+
+Fabio Estevam
