@@ -1,87 +1,107 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 6 Aug 2012 12:14:13 +0100
-Subject: [PATCH 03/22] ARM: LPAE: use phys_addr_t on virt <--> phys
- conversion
-In-Reply-To: <1343775898-28345-4-git-send-email-cyril@ti.com>
-References: <1343775898-28345-1-git-send-email-cyril@ti.com>
- <1343775898-28345-4-git-send-email-cyril@ti.com>
-Message-ID: <20120806111413.GB18957@n2100.arm.linux.org.uk>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 6 Aug 2012 12:17:10 +0100
+Subject: [PATCH 09/24] xen/arm: compile and run xenbus
+In-Reply-To: <20120801142840.GG7227@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1207251741470.26163@kaball.uk.xensource.com>
+ <1343316846-25860-9-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120801142840.GG7227@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1208061200130.4645@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 07:04:39PM -0400, Cyril Chemparathy wrote:
-> This patch fixes up the types used when converting back and forth between
-> physical and virtual addresses.
+On Wed, 1 Aug 2012, Konrad Rzeszutek Wilk wrote:
+> On Thu, Jul 26, 2012 at 04:33:51PM +0100, Stefano Stabellini wrote:
+> > bind_evtchn_to_irqhandler can legitimately return 0 (irq 0): it is not
+> > an error.
+> > 
+> > If Linux is running as an HVM domain and is running as Dom0, use
+> > xenstored_local_init to initialize the xenstore page and event channel.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > ---
+> >  drivers/xen/xenbus/xenbus_comms.c |    2 +-
+> >  drivers/xen/xenbus/xenbus_probe.c |   27 +++++++++++++++++----------
+> >  drivers/xen/xenbus/xenbus_xs.c    |    1 +
+> >  3 files changed, 19 insertions(+), 11 deletions(-)
+> > 
+> > diff --git a/drivers/xen/xenbus/xenbus_comms.c b/drivers/xen/xenbus/xenbus_comms.c
+> > index 52fe7ad..c5aa55c 100644
+> > --- a/drivers/xen/xenbus/xenbus_comms.c
+> > +++ b/drivers/xen/xenbus/xenbus_comms.c
+> > @@ -224,7 +224,7 @@ int xb_init_comms(void)
+> >  		int err;
+> >  		err = bind_evtchn_to_irqhandler(xen_store_evtchn, wake_waiting,
+> >  						0, "xenbus", &xb_waitq);
+> > -		if (err <= 0) {
+> > +		if (err < 0) {
+> >  			printk(KERN_ERR "XENBUS request irq failed %i\n", err);
+> >  			return err;
+> >  		}
+> > diff --git a/drivers/xen/xenbus/xenbus_probe.c b/drivers/xen/xenbus/xenbus_probe.c
+> > index b793723..3ae47c2 100644
+> > --- a/drivers/xen/xenbus/xenbus_probe.c
+> > +++ b/drivers/xen/xenbus/xenbus_probe.c
+> > @@ -729,16 +729,23 @@ static int __init xenbus_init(void)
+> >  	xenbus_ring_ops_init();
+> >  
+> >  	if (xen_hvm_domain()) {
+> > -		uint64_t v = 0;
+> > -		err = hvm_get_parameter(HVM_PARAM_STORE_EVTCHN, &v);
+> > -		if (err)
+> > -			goto out_error;
+> > -		xen_store_evtchn = (int)v;
+> > -		err = hvm_get_parameter(HVM_PARAM_STORE_PFN, &v);
+> > -		if (err)
+> > -			goto out_error;
+> > -		xen_store_mfn = (unsigned long)v;
+> > -		xen_store_interface = ioremap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
+> > +		if (xen_initial_domain()) {
+> > +			err = xenstored_local_init();
+> > +			xen_store_interface =
+> > +				phys_to_virt(xen_store_mfn << PAGE_SHIFT);
+> > +		} else {
+> > +			uint64_t v = 0;
+> > +			err = hvm_get_parameter(HVM_PARAM_STORE_EVTCHN, &v);
+> > +			if (err)
+> > +				goto out_error;
+> > +			xen_store_evtchn = (int)v;
+> > +			err = hvm_get_parameter(HVM_PARAM_STORE_PFN, &v);
+> > +			if (err)
+> > +				goto out_error;
+> > +			xen_store_mfn = (unsigned long)v;
+> > +			xen_store_interface =
+> > +				ioremap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
+> > +		}
 > 
-> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-> ---
->  arch/arm/include/asm/memory.h |   17 +++++++++++------
->  1 file changed, 11 insertions(+), 6 deletions(-)
+> This, and along with the Hybrid PV dom0 (not yet posted, but it was doing
+> similar manipulation here) is getting more and more like a rat-mess.
 > 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 01c710d..4a0108f 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -157,22 +157,27 @@ extern unsigned long __pv_phys_offset;
->  
->  extern unsigned long __pv_offset;
->  
-> -static inline unsigned long __virt_to_phys(unsigned long x)
-> +static inline phys_addr_t __virt_to_phys(unsigned long x)
->  {
->  	unsigned long t;
->  	early_patch_imm8(x, t, "add", __pv_offset);
->  	return t;
->  }
->  
-> -static inline unsigned long __phys_to_virt(unsigned long x)
-> +static inline unsigned long __phys_to_virt(phys_addr_t x)
->  {
->  	unsigned long t;
->  	early_patch_imm8(x, t, "sub", __pv_offset);
->  	return t;
->  }
->  #else
-> -#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
-> -#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
-> +
-> +#define __virt_to_phys(x)		\
-> +	((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET)
-> +
-> +#define __phys_to_virt(x)		\
-> +	((unsigned long)((phys_addr_t)(x) - PHYS_OFFSET + PAGE_OFFSET))
-> +
->  #endif
->  #endif
->  
-> @@ -207,14 +212,14 @@ static inline phys_addr_t virt_to_phys(const volatile void *x)
->  
->  static inline void *phys_to_virt(phys_addr_t x)
->  {
-> -	return (void *)(__phys_to_virt((unsigned long)(x)));
-> +	return (void *)__phys_to_virt(x);
->  }
->  
->  /*
->   * Drivers should NOT use these either.
->   */
->  #define __pa(x)			__virt_to_phys((unsigned long)(x))
-> -#define __va(x)			((void *)__phys_to_virt((unsigned long)(x)))
-> +#define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
->  #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
+> 
+> Any chance we can just abstract the three different XenStore access
+> ways and just have something like this:
+> 
+> 	enum {
+> 		USE_UNKNOWN
+> 		USE_HVM,
+> 		USE_PV,
+> 		USE_LOCAL
+> 		USE_ALREADY_INIT
+> 	};
+> 	int usage = USE_UNKNOWN;
+> 	if (xen_pv_domain())
+> 		usage = USE_PV;
+> 	if (xen_hvm_domain())
+> 		usage = USE_HVM;
+> 	if (xen_initial_domain())
+> 		usage = USE_LOCAL;
+> 
+> 	if (xen_start_info->store_evtchn)
+> 		usage = USE_ALREADY_INIT;
+> 	
+> 	.. other overwrites..
+> 
+> 	switch (usage) {
+> 		.. blah blah.
+> 	}
 
-This as a whole does not fill me with a great amount of enthusiasm,
-because it breaks some of the typechecking that we have here.
-
-The whole point of __phys_to_virt() and __virt_to_phys() is that they work
-on integer types, and warn if you dare to use them with pointers.  Adding
-a cast into them breaks that.
-
-The whole point is that the typecasting is explicitly inside phys_to_virt()
-and virt_to_phys() and not their macro counterparts.
-
-Secondly, are you sure that this patch is correct on its own?  You're
-passing a u64 into assembly only expecting a 32-bit register.  Have you
-checked it does the right thing with a 64-bit phys_addr_t on both LE
-and BE?
+I'll give it a try.
