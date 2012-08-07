@@ -1,62 +1,39 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Tue, 07 Aug 2012 16:34:40 +0200
-Subject: [PATCH v6] ARM: mtd: nand: davinci: add OF support for davinci
- nand controller
-In-Reply-To: <1343632944-25971-1-git-send-email-hs@denx.de>
-References: <1343632944-25971-1-git-send-email-hs@denx.de>
-Message-ID: <50212780.5000809@denx.de>
+From: ian.molton@codethink.co.uk (Ian Molton)
+Date: Tue,  7 Aug 2012 15:34:47 +0100
+Subject: [PATCH v3 2/7] mv643xx.c: Remove magic numbers.
+In-Reply-To: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
+References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
+Message-ID: <1344350092-24050-3-git-send-email-ian.molton@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+replace magic number with RX_CSUM_WITH_HEADER.
 
-On 30.07.2012 09:22, Heiko Schocher wrote:
-> add OF support for the davinci nand controller.
->
-> Signed-off-by: Heiko Schocher<hs@denx.de>
-> Cc: davinci-linux-open-source at linux.davincidsp.com
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: linux-mtd at lists.infradead.org
-> Cc: David Woodhouse<dwmw2@infradead.org>
-> Cc: Grant Likely<grant.likely@secretlab.ca>
-> Cc: Sekhar Nori<nsekhar@ti.com>
-> Cc: Wolfgang Denk<wd@denx.de>
-> Cc: Scott Wood<scottwood@freescale.com>
->
-> ---
-> - changes for v2:
->    - add comments from Scott Wood:
->      - add "ti,davinci-" prefix
->      - Dashes are preferred to underscores
->      - rename "nandflash" to "nand"
->      - introduce new "ti,davinci" specific properties for setting
->        up ecc_mode, ecc_bits, options and bbt options, instead
->        using linux defines
->      - readme fixes
-> - no changes for v3
-> - changes for v4
->    remove "pinmux-handle" property as discussed here:
->    http://www.spinics.net/lists/arm-kernel/msg175701.html
->    with Nori Sekhar
-> - no changes for v5
->
-> - changes for v6:
->    add comments from Sekhar Nori:
->    - remove unnecessary includes
->    - use devm_kzalloc instead of kzalloc
->    - remove AEMIF timing specific bindings, as
->      this has to be done later.
->
->   .../devicetree/bindings/arm/davinci/nand.txt       |   51 ++++++++++++++
->   drivers/mtd/nand/davinci_nand.c                    |   72 +++++++++++++++++++-
->   2 files changed, 122 insertions(+), 1 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/arm/davinci/nand.txt
+Signed-off-by: Ian Molton <ian.molton@codethink.co.uk>
+---
+ drivers/net/ethernet/marvell/mv643xx_eth.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-ping ... any comments?
-
-bye,
-Heiko
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index 4fbba57..92497eb 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -86,6 +86,7 @@ static char mv643xx_eth_driver_version[] = "1.4";
+  * port #0, 0x0800 for port #1, and 0x0c00 for port #2.
+  */
+ #define PORT_CONFIG			0x0000
++#define  RX_CSUM_WITH_HEADER		0x02000000
+ #define  UNICAST_PROMISCUOUS_MODE	0x00000001
+ #define PORT_CONFIG_EXT			0x0004
+ #define MAC_ADDR_LOW			0x0014
+@@ -1607,7 +1608,7 @@ mv643xx_eth_set_features(struct net_device *dev, netdev_features_t features)
+ 	struct mv643xx_eth_private *mp = netdev_priv(dev);
+ 	bool rx_csum = features & NETIF_F_RXCSUM;
+ 
+-	wrlp(mp, PORT_CONFIG, rx_csum ? 0x02000000 : 0x00000000);
++	wrlp(mp, PORT_CONFIG, rx_csum ? RX_CSUM_WITH_HEADER : 0x00000000);
+ 
+ 	return 0;
+ }
 -- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+1.7.9.5
