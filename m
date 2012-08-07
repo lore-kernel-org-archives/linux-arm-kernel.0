@@ -1,301 +1,39 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Tue,  7 Aug 2012 16:46:18 -0500
-Subject: [PATCH] efikamx: reintroduce Genesi Efika MX Smarttop via device tree
-Message-ID: <1344375978-29981-1-git-send-email-matt@genesi-usa.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 07 Aug 2012 14:46:50 -0700
+Subject: nfsroot problems with v3.6-rc1 on 37xx EVM and dynamic off-mode
+In-Reply-To: <alpine.DEB.2.00.1208031340310.28888@utopia.booyaka.com> (Paul
+ Walmsley's message of "Fri, 3 Aug 2012 14:20:07 -0600 (MDT)")
+References: <alpine.DEB.2.00.1208031340310.28888@utopia.booyaka.com>
+Message-ID: <87boim1ik5.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This device tree only supports the final retail board ("TO3").
+Hi Paul,
 
-It is currently feature equivalent to the MX51 Babbage device tree. The
-following features have been tested and work as well as can be expected:
+Paul Walmsley <paul@pwsan.com> writes:
 
-* Serial port
-* SD card support
-* I2C bus
-* SGTL5000 audio support via the internal speaker
-* SDMA support (via audio)
-* SPI bus
-* NOR flash (at 25MHz bus speed)
-* MC13892 PMIC Regulator and Realtime clock functions
+> NFS is broken on 37xx EVM with v3.6-rc1 after return from off-mode with 
+> dynamic idle.  System suspend ("echo mem > /sys/power/state") with 
+> off-mode enabled seems to work fine.
+>
+> No obvious ideas here as to what could have broken this.  It worked in 
+> v3.5-rc2 + my omap_fixes_a_3.5rc at least:
+>
+> http://www.pwsan.com/omap/bootlogs/20120617/omap_fixes_a_3.5rc__52a5ae406dadef781bfcf3a641dae2064e9697ff/37xxevm_bootlog.txt
+>
+> After that, it's hard to tell when this problem started occurring, since 
+> CORE stopped entering low-power states on OMAP3 on >= v3.5-rc3.
 
-Since the board requires some extra work on the PMIC to power off, the system
-will instead just halt, however reboot works. Other missing features are due
-to a lack of drivers or device tree bindings currently.
+I see the same thing with vanilla v3.6-rc1, but it worked in my pm-cur
+branch which has a few fixes that I'm queuing for v3.6-rc.  Tracking it
+down, it seems the revert patch I just sent out[1] fixes this problem,
+but I'm still a bit puzzled as to why.
 
-Signed-off-by: Matt Sealey <matt@genesi-usa.com>
-Signed-off-by: Steev Klimaszewski <steev@genesi-usa.com>
----
- arch/arm/boot/dts/imx51-efikamx.dts |  247 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/Makefile.boot     |    2 +-
- 2 files changed, 248 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/imx51-efikamx.dts
+Can you try v3.6-rc1 + that revert[1] to see if that fixes the problem
+for you as well?
 
-diff --git a/arch/arm/boot/dts/imx51-efikamx.dts b/arch/arm/boot/dts/imx51-efikamx.dts
-new file mode 100644
-index 0000000..dd14f77
---- /dev/null
-+++ b/arch/arm/boot/dts/imx51-efikamx.dts
-@@ -0,0 +1,247 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ * Copyright 2012 Genesi USA, Inc.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+/include/ "imx51.dtsi"
-+
-+/ {
-+	model = "Genesi Efika MX (Smarttop)";
-+	compatible = "genesi,imx51-efikamx", "fsl,imx51";
-+
-+	memory {
-+		reg = <0x90000000 0x20000000>;
-+	};
-+
-+	soc {
-+		aips at 70000000 {
-+			spba at 70000000 {
-+				esdhc at 70004000 {
-+					cd-gpios = <&gpio1 0 0>;
-+					wp-gpios = <&gpio1 1 0>;
-+					status = "okay";
-+				};
-+
-+				ssi2: ssi at 70014000 {
-+				    fsl,mode = "i2s-slave";
-+				    status = "okay";
-+				};
-+
-+				ecspi at 70010000 {
-+					fsl,spi-num-chipselects = <2>;
-+					cs-gpios = <&gpio4 24 0>, <&gpio4 25 0>;
-+					status = "okay";
-+
-+					pmic: mc13892 at 0 {
-+						#address-cells = <1>;
-+						#size-cells = <0>;
-+						compatible = "fsl,mc13892";
-+						spi-max-frequency = <6000000>;
-+						reg = <0>;
-+						interrupt-parent = <&gpio1>;
-+						interrupts = <6 0x4>;
-+						fsl,mc13xxx-uses-rtc;
-+
-+						regulators {
-+							sw1_reg: sw1 {
-+								regulator-min-microvolt = <600000>;
-+								regulator-max-microvolt = <1375000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							sw2_reg: sw2 {
-+								regulator-min-microvolt = <900000>;
-+								regulator-max-microvolt = <1850000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							sw3_reg: sw3 {
-+								regulator-min-microvolt = <1100000>;
-+								regulator-max-microvolt = <1850000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							sw4_reg: sw4 {
-+								regulator-min-microvolt = <1100000>;
-+								regulator-max-microvolt = <1850000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							vpll_reg: vpll {
-+								regulator-min-microvolt = <1050000>;
-+								regulator-max-microvolt = <1800000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							vdig_reg: vdig {
-+								regulator-min-microvolt = <1650000>;
-+								regulator-max-microvolt = <1650000>;
-+								regulator-boot-on;
-+							};
-+
-+							vsd_reg: vsd {
-+								regulator-min-microvolt = <3150000>;
-+								regulator-max-microvolt = <3150000>;
-+							};
-+
-+							vusb2_reg: vusb2 {
-+								regulator-min-microvolt = <2400000>;
-+								regulator-max-microvolt = <2775000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							vvideo_reg: vvideo {
-+								regulator-min-microvolt = <2775000>;
-+								regulator-max-microvolt = <2775000>;
-+								regulator-boot-on;
-+							};
-+
-+							vaudio_reg: vaudio {
-+								regulator-min-microvolt = <2300000>;
-+								regulator-max-microvolt = <3000000>;
-+							};
-+
-+							vcam_reg: vcam {
-+								regulator-min-microvolt = <2500000>;
-+								regulator-max-microvolt = <3000000>;
-+							};
-+
-+							vgen1_reg: vgen1 {
-+								regulator-min-microvolt = <1200000>;
-+								regulator-max-microvolt = <3150000>;
-+							};
-+
-+							vgen2_reg: vgen2 {
-+								regulator-min-microvolt = <3150000>;
-+								regulator-max-microvolt = <3150000>;
-+								regulator-always-on;
-+							};
-+
-+							vgen3_reg: vgen3 {
-+								regulator-min-microvolt = <1800000>;
-+								regulator-max-microvolt = <2900000>;
-+								regulator-always-on;
-+							};
-+						};
-+					};
-+
-+					flash: sst25vf032b at 1 {
-+						#address-cells = <1>;
-+						#size-cells = <1>;
-+						compatible = "sst,sst25vf032b";
-+						spi-max-frequency = <25000000>;
-+						reg = <1>;
-+
-+						partition at 0 {
-+							label = "firmware";
-+							reg = <0x0 0x200000>;
-+						};
-+
-+						partition at 200000 {
-+							label = "user";
-+							reg = <0x200000 0x200000>;
-+						};
-+					};
-+				};
-+			};
-+
-+			wdog at 73f98000 {
-+				status = "okay";
-+			};
-+
-+			iomuxc at 73fa8000 {
-+				compatible = "fsl,imx51-iomuxc";
-+				reg = <0x73fa8000 0x4000>;
-+			};
-+
-+			uart1: serial at 73fbc000 {
-+				fsl,uart-has-rtscts;
-+				status = "okay";
-+			};
-+
-+		};
-+
-+		aips at 80000000 {
-+			sdma at 83fb0000 {
-+				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx51.bin";
-+			};
-+
-+			i2c at 83fc4000 {
-+				status = "okay";
-+
-+				codec: sgtl5000 at 0a {
-+					compatible = "fsl,sgtl5000";
-+					reg = <0x0a>;
-+					clock-frequency = <12288000>;
-+					VDDA-supply = <&vdig_reg>;
-+					VDDIO-supply = <&vvideo_reg>;
-+				};
-+			};
-+
-+			audmux at 83fd0000 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		power {
-+			label = "Power Button";
-+			gpios = <&gpio2 31 0>;
-+			linux,code = <116>; /* KEY_POWER */
-+			gpio-key,wakeup;
-+		};
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		red {
-+			label = "red";
-+			gpios = <&gpio3 13>;
-+			linux,default-trigger = "ide-disk";
-+		};
-+
-+		green {
-+			label = "green";
-+			gpios = <&gpio3 14>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		blue {
-+			label = "blue";
-+			gpios = <&gpio3 15>;
-+			linux,default-trigger = "mmc0";
-+		};
-+	};
-+
-+	sound {
-+		compatible = "fsl,imx-audio-sgtl5000";
-+		model = "efikamx-sgtl5000";
-+		ssi-controller = <&ssi2>;
-+		audio-routing =
-+			"MIC_IN", "Mic Jack",
-+			"Mic Jack", "Mic Bias",
-+			"Ext Spk", "LINE_OUT";
-+		audio-codec = <&codec>;
-+		mux-int-port = <2>;
-+		mux-ext-port = <3>;
-+	};
-+};
-diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
-index 05541cf..3ed7c9d 100644
---- a/arch/arm/mach-imx/Makefile.boot
-+++ b/arch/arm/mach-imx/Makefile.boot
-@@ -38,7 +38,7 @@ zreladdr-$(CONFIG_SOC_IMX6Q)	+= 0x10008000
- params_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10000100
- initrd_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10800000
- 
--dtb-$(CONFIG_MACH_IMX51_DT) += imx51-babbage.dtb
-+dtb-$(CONFIG_MACH_IMX51_DT) += imx51-babbage.dtb imx51-efikamx.dtb
- dtb-$(CONFIG_MACH_IMX53_DT) += imx53-ard.dtb imx53-evk.dtb \
- 			       imx53-qsb.dtb imx53-smd.dtb
- dtb-$(CONFIG_SOC_IMX6Q)	+= imx6q-arm2.dtb \
--- 
-1.7.9.5
+Thanks,
+
+Kevin
+
+[1] http://marc.info/?l=linux-omap&m=134437239010649&w=2
