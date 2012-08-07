@@ -1,63 +1,62 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue,  7 Aug 2012 15:38:07 +0300
-Subject: [PATCH v3] i2c: omap: switch over to autosuspend API
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EB3087D@DBDE01.ent.ti.com>
-References: <B5906170F1614E41A8A28DE3B8D121433EB3087D@DBDE01.ent.ti.com>
-Message-ID: <1344343087-8947-1-git-send-email-balbi@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 7 Aug 2012 14:47:01 +0200
+Subject: [PATCH 2/4] ARM: at91: gpio: implement gpio_free
+In-Reply-To: <1342359637-15325-2-git-send-email-plagnioj@jcrosoft.com>
+References: <20120715131618.GF4450@game.jcrosoft.org>
+ <1342359637-15325-1-git-send-email-plagnioj@jcrosoft.com>
+ <1342359637-15325-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <50210E45.9060605@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this helps us reduce unnecessary pm transitions
-in case we have another i2c message starting soon.
+On 07/15/2012 03:40 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> configure a gpio as input when freeing it to reduce power consumption
+> 
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> ---
+>  arch/arm/mach-at91/gpio.c |    7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+> index 994ed02..3833f82 100644
+> --- a/arch/arm/mach-at91/gpio.c
+> +++ b/arch/arm/mach-at91/gpio.c
+> @@ -45,6 +45,7 @@ struct at91_gpio_chip {
+>  #define to_at91_gpio_chip(c) container_of(c, struct at91_gpio_chip, chip)
+>  
+>  static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset);
+> +static void at91_gpiolib_free(struct gpio_chip *chip, unsigned offset);
+>  static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip);
+>  static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val);
+>  static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset);
+> @@ -59,6 +60,7 @@ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
+>  		.chip = {						\
+>  			.label		  = name,			\
+>  			.request	  = at91_gpiolib_request,	\
+> +			.free		  = at91_gpiolib_free,		\
+>  			.direction_input  = at91_gpiolib_direction_input, \
+>  			.direction_output = at91_gpiolib_direction_output, \
+>  			.get		  = at91_gpiolib_get,		\
+> @@ -863,7 +865,10 @@ void __init at91_gpio_irq_setup(void)
+>  }
+>  
+>  /* gpiolib support */
+> -
+> +static void at91_gpiolib_free(struct gpio_chip *chip, unsigned offset)
+> +{
+> +	at91_gpiolib_direction_input(chip, offset);
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- drivers/i2c/busses/i2c-omap.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+I know we talked about it, but now I am not sure.
+Maybe a safer solution would be to not touching the gpio configuration
+when freeing it...
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 60928f2..35e8207 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -55,6 +55,9 @@
- /* timeout waiting for the controller to respond */
- #define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
- 
-+/* timeout for pm runtime autosuspend */
-+#define OMAP_I2C_PM_TIMEOUT		1000	/* ms */
-+
- /* For OMAP3 I2C_IV has changed to I2C_WE (wakeup enable) */
- enum {
- 	OMAP_I2C_REV_REG = 0,
-@@ -645,7 +648,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
- 
- 	omap_i2c_wait_for_bb(dev);
- out:
--	pm_runtime_put(dev->dev);
-+	pm_runtime_mark_last_busy(dev->dev);
-+	pm_runtime_put_autosuspend(dev->dev);
- 	return r;
- }
- 
-@@ -1113,6 +1117,9 @@ omap_i2c_probe(struct platform_device *pdev)
- 		dev->regs = (u8 *)reg_map_ip_v1;
- 
- 	pm_runtime_enable(dev->dev);
-+	pm_runtime_set_autosuspend_delay(dev->dev, OMAP_I2C_PM_TIMEOUT);
-+	pm_runtime_use_autosuspend(dev->dev);
-+
- 	r = pm_runtime_get_sync(dev->dev);
- 	if (IS_ERR_VALUE(r))
- 		goto err_free_mem;
-@@ -1189,7 +1196,8 @@ omap_i2c_probe(struct platform_device *pdev)
- 
- 	of_i2c_register_devices(adap);
- 
--	pm_runtime_put(dev->dev);
-+	pm_runtime_mark_last_busy(dev->dev);
-+	pm_runtime_put_autosuspend(dev->dev);
- 
- 	return 0;
- 
+> +}
+>  
+>  static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset)
+>  {
+> 
+
+
 -- 
-1.7.12.rc0
+Nicolas Ferre
