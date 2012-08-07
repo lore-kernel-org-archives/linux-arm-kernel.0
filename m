@@ -1,53 +1,49 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 07 Aug 2012 11:21:40 -0700
-Subject: [PATCH] ARM: OMAP2+: Fix dmtimer set source clock failure
-In-Reply-To: <1342210323-2129-1-git-send-email-jon-hunter@ti.com> (Jon
- Hunter's message of "Fri, 13 Jul 2012 15:12:03 -0500")
-References: <1342210323-2129-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <87boim36mj.fsf@ti.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Tue, 7 Aug 2012 14:13:22 -0400
+Subject: [PATCH v2 03/23] xen/arm: page.h definitions
+In-Reply-To: <1344263246-28036-3-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1208061428060.4645@kaball.uk.xensource.com>
+ <1344263246-28036-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20120807181322.GG15053@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jon Hunter <jon-hunter@ti.com> writes:
+On Mon, Aug 06, 2012 at 03:27:06PM +0100, Stefano Stabellini wrote:
+> ARM Xen guests always use paging in hardware, like PV on HVM guests in
+> the X86 world.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-> Calling the dmtimer function omap_dm_timer_set_source() fails if following a
-> call to pm_runtime_put() to disable the timer. For example the following
-> sequence would fail to set the parent clock ...
->
-> 	omap_dm_timer_stop(gptimer);
-> 	omap_dm_timer_set_source(gptimer, OMAP_TIMER_SRC_32_KHZ);
->
-> The following error message would be seen ...
->
-> omap_dm_timer_set_source: failed to set timer_32k_ck as parent
->
-> The problem is that, by design, pm_runtime_put() simply decrements the usage
-> count and returns before the timer has actually been disabled. Therefore,
-> setting the parent clock failed because the timer was still active when the
-> trying to set the parent clock. Setting a parent clock will fail if the clock
-> you are setting the parent of has a non-zero usage count. To ensure that this
-> does not fail use pm_runtime_put_sync() when disabling the timer.
->
-> Note that this will not be seen on OMAP1 devices, because these devices do
-> not use the clock framework for dmtimers.
->
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Ack.. with one nitpick
 
-Acked-by: Kevin Hilman <khilman@ti.com>
+> +/* XXX: this shouldn't be here */
 
-> ---
->  arch/arm/plat-omap/dmtimer.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-> index 626ad8c..7b6689a 100644
-> --- a/arch/arm/plat-omap/dmtimer.c
-> +++ b/arch/arm/plat-omap/dmtimer.c
-> @@ -258,7 +258,7 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_enable);
->  
->  void omap_dm_timer_disable(struct omap_dm_timer *timer)
->  {
-> -	pm_runtime_put(&timer->pdev->dev);
-> +	pm_runtime_put_sync(&timer->pdev->dev);
->  }
->  EXPORT_SYMBOL_GPL(omap_dm_timer_disable);
+.. but its here b/c the frontend drivers are using it (its rolled in
+headers)- even though we won't hit the code path. So for right now
+just punt with this.
+
+> +static inline pte_t *lookup_address(unsigned long address, unsigned int *level)
+> +{
+> +	BUG();
+> +	return NULL;
+> +}
+> +
+> +static inline int m2p_add_override(unsigned long mfn, struct page *page,
+> +		struct gnttab_map_grant_ref *kmap_op)
+> +{
+> +	return 0;
+> +}
+> +
+> +static inline int m2p_remove_override(struct page *page, bool clear_pte)
+> +{
+> +	return 0;
+> +}
+> +
+> +static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+> +{
+> +	BUG();
+> +	return false;
+> +}
+> +#endif /* _ASM_ARM_XEN_PAGE_H */
+> -- 
+> 1.7.2.5
