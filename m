@@ -1,106 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  7 Aug 2012 16:49:47 +0100
-Subject: [PATCH 1/2] ARM: hw_breakpoint: don't rely on dfsr to show watchpoint
- access type
-Message-ID: <1344354588-28153-1-git-send-email-will.deacon@arm.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 7 Aug 2012 15:53:08 +0000
+Subject: [PATCH] ARM: AM33XX: board-generic: Add of_dev_auxdata to fix
+ dev_id for CAN module
+In-Reply-To: <50213214.7050505@gmail.com>
+References: <1344346636-28072-1-git-send-email-hvaibhav@ti.com>
+ <50213214.7050505@gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA88BDF@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From ARM debug architecture v7.1 onwards, a watchpoint exception causes
-the DFAR to be updated with the faulting data address. However, DFSR.WnR
-takes an UNKNOWN value and therefore cannot be used in general to
-determine the access type that triggered the watchpoint.
+On Tue, Aug 07, 2012 at 20:49:48, Rob Herring wrote:
+> On 08/07/2012 08:37 AM, Vaibhav Hiremath wrote:
+> > If the module requires only one clocksource to function, then
+> > driver can very well call clk_get() api with "con_id = NULL",
+> > 
+> >        clk = clk_get(dev, NULL);
+> > 
+> > And platform code should respect this and return valid clk handle.
+> > That means, now the clk_get() api would rely on dev_id, and platform
+> > code should either have clk node with matching dev_id (with con_id=NULL)
+> > or return dummy clk node.
+> > 
+> > With DT support, we can fix the dev_id for particular module
+> > using "struct of_dev_auxdata" to satisfy above clk framework requirement.
+> > 
+> > In case of AM33XX, we required this for the DCAN module, so this
+> > patch adds "of_dev_auxdata" for both DCAN_0/1 instances.
+> > 
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Benoit Cousson <b-cousson@ti.com>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > ---
+> > This patch is boot tested on BeagleBone platform, and checked for
+> > clk_get() return value in d_can module driver.
+> > 
+> >  arch/arm/mach-omap2/board-generic.c |   18 +++++++++++++++++-
+> >  1 files changed, 17 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> > index 6f93a20..c9b7903 100644
+> > --- a/arch/arm/mach-omap2/board-generic.c
+> > +++ b/arch/arm/mach-omap2/board-generic.c
+> > @@ -37,11 +37,27 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
+> >  	{ }
+> >  };
+> > 
+> > +/*
+> > + * Lookup table for attaching a specific name and platform_data pointer to
+> > + * devices as they get created by of_platform_populate(). Ideally this table
+> > + * would not exist, but the current clock implementation depends on some devices
+> > + * having a specific name OR to satisfy NULL con_id requirement from driver.
+> > + */
+> > +static const struct of_dev_auxdata am33xx_auxdata_lookup[] __initconst = {
+> > +	OF_DEV_AUXDATA("bosch,d_can", 0x481cc000, "d_can.0", NULL),
+> > +	OF_DEV_AUXDATA("bosch,d_can", 0x481d0000, "d_can.1", NULL),
+> > +	{ },
+> > +};
+> 
+> Adding an additional clkdev lookup accomplishes the same thing and is a
+> cleaner solution.
+> 
 
-This patch forbids watchpoints without an overflow handler from
-specifying a specific access type (load/store). Those with overflow
-handlers must be able to handle false positives potentially triggered by
-a watchpoint of a different access type on the same address. For
-SIGTRAP-based handlers (i.e. ptrace), this should have no impact.
+That is also required and I have submitted patch for the same -
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/hw_breakpoint.c |   54 ++++++++++++++++++++++++++++-----------
- 1 files changed, 39 insertions(+), 15 deletions(-)
+http://www.spinics.net/lists/arm-kernel/msg187998.html
 
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index ba386bd..418d980 100644
---- a/arch/arm/kernel/hw_breakpoint.c
-+++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -159,6 +159,12 @@ static int debug_arch_supported(void)
- 		arch >= ARM_DEBUG_ARCH_V7_1;
- }
- 
-+/* Can we determine the watchpoint access type from the fsr? */
-+static int debug_exception_updates_fsr(void)
-+{
-+	return 0;
-+}
-+
- /* Determine number of WRP registers available. */
- static int get_num_wrp_resources(void)
- {
-@@ -619,18 +625,34 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
- 	info->address &= ~alignment_mask;
- 	info->ctrl.len <<= offset;
- 
--	/*
--	 * Currently we rely on an overflow handler to take
--	 * care of single-stepping the breakpoint when it fires.
--	 * In the case of userspace breakpoints on a core with V7 debug,
--	 * we can use the mismatch feature as a poor-man's hardware
--	 * single-step, but this only works for per-task breakpoints.
--	 */
--	if (!bp->overflow_handler && (arch_check_bp_in_kernelspace(bp) ||
--	    !core_has_mismatch_brps() || !bp->hw.bp_target)) {
--		pr_warning("overflow handler required but none found\n");
--		ret = -EINVAL;
-+	if (!bp->overflow_handler) {
-+		/*
-+		 * Mismatch breakpoints are required for single-stepping
-+		 * breakpoints.
-+		 */
-+		if (!core_has_mismatch_brps())
-+			return -EINVAL;
-+
-+		/* We don't allow mismatch breakpoints in kernel space. */
-+		if (arch_check_bp_in_kernelspace(bp))
-+			return -EPERM;
-+
-+		/*
-+		 * Per-cpu breakpoints are not supported by our stepping
-+		 * mechanism. */
-+		if (!bp->hw.bp_target)
-+			return -EINVAL;
-+
-+		/*
-+		 * We only support specific access types if the fsr
-+		 * reports them.
-+		 */
-+		if (!debug_exception_updates_fsr() &&
-+		    (info->ctrl.type == ARM_BREAKPOINT_LOAD ||
-+		     info->ctrl.type == ARM_BREAKPOINT_STORE))
-+			return -EINVAL;
- 	}
-+
- out:
- 	return ret;
- }
-@@ -706,10 +728,12 @@ static void watchpoint_handler(unsigned long addr, unsigned int fsr,
- 				goto unlock;
- 
- 			/* Check that the access type matches. */
--			access = (fsr & ARM_FSR_ACCESS_MASK) ? HW_BREAKPOINT_W :
--				 HW_BREAKPOINT_R;
--			if (!(access & hw_breakpoint_type(wp)))
--				goto unlock;
-+			if (debug_exception_updates_fsr()) {
-+				access = (fsr & ARM_FSR_ACCESS_MASK) ?
-+					  HW_BREAKPOINT_W : HW_BREAKPOINT_R;
-+				if (!(access & hw_breakpoint_type(wp)))
-+					goto unlock;
-+			}
- 
- 			/* We have a winner. */
- 			info->trigger = addr;
--- 
-1.7.4.1
+
+With DT support, I am getting dev_id as -
+
+ - Without "reg" property: d_can.16 and d_can.17,
+   (I believe it changes dynamically here)
+
+ - With "reg" property: 481cc000.d_can and 481d0000.d_can
+
+Which is not so intuitive, I would like to see them as per Spec/TRM, so 
+doesn't this patch make sense?
+
+Similar thing has already been done for other platforms too.
+
+Thanks,
+Vaibhav
