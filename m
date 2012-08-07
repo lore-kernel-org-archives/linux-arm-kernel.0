@@ -1,55 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Aug 2012 20:25:22 +0000
-Subject: [PATCH v3 3/7] mv643xx.c: Add basic device tree support.
-In-Reply-To: <50213ACB.6040301@codethink.co.uk>
-References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
- <201208071456.41412.arnd@arndb.de> <50213ACB.6040301@codethink.co.uk>
-Message-ID: <201208072025.22871.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 07 Aug 2012 14:26:18 -0600
+Subject: [PATCH] pinctrl/nomadik: add ASIC DB8450 pinctrl driver
+In-Reply-To: <1344341538-32223-1-git-send-email-linus.walleij@stericsson.com>
+References: <1344341538-32223-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <502179EA.30301@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 August 2012, Ian Molton wrote:
-> > I think it documents some of the same thing,
+On 08/07/2012 06:12 AM, Linus Walleij wrote:
+> From: Patrice Chotard <patrice.chotard@stericsson.com>
 > 
-> Not really. It documents some godawful hack that recycled the platform
-> device -based driver and provided a DT binding for it, just for PPC.
-> 
-> I cant even find anything that implements code for whatever
-> "marvell,mv64360-mdio" might be. I'm sure it might exist somewhere.
+> This implements a subdriver for the DB8540 ASIC for the
+> Nomadik pin controller.
 
-The code dates back to when we had separate buses for platform devices
-and of devices, and then it was decided not to add support for both
-bus types to each of the marvell drivers. In hindsight it would have
-been better to do that, but that was impossible to tell back then.
+> diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
 
-> > We might also want to move some of the
-> > code from arch/powerpc/sysdev/mv64x60_dev.c to live in the same place
-> > as the device driver.
-> 
-> I hope not. I don't really want to touch that stuff at all. If it works
-> the way it
-> is, then it can stay that way. If the PPC folk want to send patches to
-> add the
-> properties they use to the driver, then they can do. I'll send an email
-> their
-> way and see if they want to join in.
-> 
-> From my perspective, the next thing that needs to happen to the driver is
-> for it to be broken up into ethernet and mdio drivers, so that we can
-> get rid
-> of all this shared_smi craziness... But that's for another patch series.
+> @@ -1722,6 +1722,8 @@ static int __devinit nmk_pinctrl_probe(struct platform_device *pdev)
+>  	/* Poke in other ASIC variants here */
+>  	if (version == PINCTRL_NMK_DB8500)
+>  		nmk_pinctrl_db8500_init(&npct->soc);
+> +	if (platid->driver_data == PINCTRL_NMK_DB8540)
+> +		nmk_pinctrl_db8540_init(&npct->soc);
 
-Adding devicetree-discuss and linuxppc-dev, as well as Dale Farnsworth,
-who initially added the bindings for mv643xx.
+I'm surprised one of those checks "version" and the other
+"platid->driver_data".
 
-I would hope that at least some of the properties that are used on
-powerpc can be reused in the same way for other architectures.
-The method to find the phy address on powerpc does indeed make
-more sense than the "port_number" property you suggested, and the
-phandle for the phy node is usually called "phy" not "mdio".
-
-I'm not sure if the ethernet-group is required on ARM as well, but
-it does sound a lot like what you actually want instead of the
-shared_smi property.
-
-	Arnd
+Aside from that, this looks fine.
