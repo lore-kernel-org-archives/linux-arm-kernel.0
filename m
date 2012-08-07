@@ -1,89 +1,71 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 7 Aug 2012 16:31:13 +0100
-Subject: [PATCH 1/1 v2] i2c: Add default configuration into the Nomadik
- I2C driver.
-In-Reply-To: <CACRpkdZjbyQbht+UpXrrVGhAzGYPjb=HRZhJ+TvsEXhGeviJLA@mail.gmail.com>
-References: <1344266253-14050-1-git-send-email-lee.jones@linaro.org>
- <20120806153503.GH10524@gmail.com>
- <CACRpkdZjbyQbht+UpXrrVGhAzGYPjb=HRZhJ+TvsEXhGeviJLA@mail.gmail.com>
-Message-ID: <20120807153112.GF10719@gmail.com>
+From: sourav.poddar@ti.com (Poddar, Sourav)
+Date: Tue, 7 Aug 2012 21:19:15 +0530
+Subject: [PATCH 3/4] arm/dts: omap5-evm: Add keypad data
+In-Reply-To: <2AE404CF-E456-408A-B7A2-D9B3D331C58E@dominion.thruhere.net>
+References: <1343997486-710-1-git-send-email-sourav.poddar@ti.com>
+ <1343997486-710-4-git-send-email-sourav.poddar@ti.com>
+ <2AE404CF-E456-408A-B7A2-D9B3D331C58E@dominion.thruhere.net>
+Message-ID: <CAKdam56BCGkfwM8XKnULJ0bXDu6UF+mZqcyMgdqDZJ=oLZp3Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lee Jones <lee.jones@linaro.org>
-Date: Tue, 7 Aug 2012 12:27:24 +0100
-Subject: [PATCH 1/1 v3] i2c: Add default configuration into the Nomadik I2C
- driver.
+Hi Koen,
 
-At this moment in time there is only one known configuration for the
-Nomadik I2C driver. By not holding that configuration in the driver
-adds some unnecessary overhead in platform code. The configuration
-as already been removed from platform code, this patch checks for any
-over-riding configurations. If there aren't any, the default is used.
+On Tue, Aug 7, 2012 at 6:24 PM, Koen Kooi <koen@dominion.thruhere.net> wrote:
+>
+> Op 3 aug. 2012, om 14:38 heeft Sourav Poddar <sourav.poddar@ti.com> het volgende geschreven:
+>
+>> Add keypad data node in omap5 device tree file.
+>> Also fill the device tree binding parameters
+>> with the required value in "omap5-evm" dts file.
+>>
+>> Tested on omap5430 evm with 3.5 custom kernel.
+>>
+>> Cc: Benoit Cousson <b-cousson@ti.com>
+>> Cc: Felipe Balbi <balbi@ti.com>
+>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Acked-by: Felipe Balbi <balbi@ti.com>
+>> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+>> ---
+>> arch/arm/boot/dts/omap5-evm.dts |   12 ++++++++++++
+>> arch/arm/boot/dts/omap5.dtsi    |    5 +++++
+>> 2 files changed, 17 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
+>> index 45a8aeb..09fe941 100644
+>> --- a/arch/arm/boot/dts/omap5-evm.dts
+>> +++ b/arch/arm/boot/dts/omap5-evm.dts
+>> @@ -17,6 +17,18 @@
+>>               device_type = "memory";
+>>               reg = <0x80000000 0x40000000>; /* 1 GB */
+>>       };
+>> +
+>> +     keypad {
+>> +             keypad,num-rows = <8>;
+>> +             keypad,num-columns = <8>;
+>> +             linux,keymap = < 0x02020073
+>> +                     0x02030072
+>> +                     0x020400e7
+>> +                     0x02050066
+>> +                     0x0206006b
+>> +                     0x020700d9 >;
+>> +             linux,input-no-autorepeat;
+>> +     };
+>
+> Again not a coment on your patch, but on DT:
+>
+> If DT bindings must be OS independent, what then, is that linux keycode doing there?
+>
+Currently, for all matrix connected keyboards the keymap are defined
+in the scope of the
+linux key code since that is a stable and standardized interface at this time.
 
-Cc: linux-i2c at vger.kernel.org
-Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+For the above reason , computation of the  keymap uses linux keycode
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/i2c/busses/i2c-nomadik.c |   28 ++++++++++++++++++----------
- 1 file changed, 18 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index 5e6f1ee..61b00ed 100644
---- a/drivers/i2c/busses/i2c-nomadik.c
-+++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -350,10 +350,6 @@ static void setup_i2c_controller(struct nmk_i2c_dev *dev)
- 
- 	i2c_clk = clk_get_rate(dev->clk);
- 
--	/* fallback to std. mode if machine has not provided it */
--	if (dev->cfg.clk_freq == 0)
--		dev->cfg.clk_freq = 100000;
--
- 	/*
- 	 * The spec says, in case of std. mode the divider is
- 	 * 2 whereas it is 3 for fast and fastplus mode of
-@@ -911,20 +907,32 @@ static const struct i2c_algorithm nmk_i2c_algo = {
- 	.functionality	= nmk_i2c_functionality
- };
- 
-+static struct nmk_i2c_controller u8500_i2c = {
-+	/*
-+	 * Slave data setup time; 250ns, 100ns, and 10ns, which
-+	 * is 14, 6 and 2 respectively for a 48Mhz i2c clock.
-+	 */
-+	.slsu           = 0xe,
-+	.tft            = 1,      /* Tx FIFO threshold */
-+	.rft            = 8,      /* Rx FIFO threshold */
-+	.clk_freq       = 400000, /* fast mode operation */
-+	.timeout        = 200,    /* Slave response timeout(ms) */
-+	.sm             = I2C_FREQ_MODE_FAST,
-+};
-+
- static atomic_t adapter_id = ATOMIC_INIT(0);
- 
- static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
- {
- 	int ret = 0;
--	struct nmk_i2c_controller *pdata =
--			adev->dev.platform_data;
-+	struct nmk_i2c_controller *pdata = adev->dev.platform_data;
- 	struct nmk_i2c_dev	*dev;
- 	struct i2c_adapter *adap;
- 
--	if (!pdata) {
--		dev_warn(&adev->dev, "no platform data\n");
--		return -ENODEV;
--	}
-+	if (!pdata)
-+		/* No i2c configuration found, using the default. */
-+		pdata = &u8500_i2c;
-+
- 	dev = kzalloc(sizeof(struct nmk_i2c_dev), GFP_KERNEL);
- 	if (!dev) {
- 		dev_err(&adev->dev, "cannot allocate memory\n");
--- 
-1.7.9.5
+  row << 24 | column << 16 | linux-key-code
+I think this is the primary reason for keeping "linux" prefix with this
+property.
+> regards,
+>
+> Koen
+>
