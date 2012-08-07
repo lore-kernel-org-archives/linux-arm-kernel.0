@@ -1,98 +1,64 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 7 Aug 2012 10:44:04 +0800
-Subject: [PATCH 1/2] ARM: i.MX35: Add kernel oftree support
-In-Reply-To: <20120806144100.GD9329@pengutronix.de>
-References: <1343922986-32469-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20120803131230.GB23791@S2101-09.ap.freescale.net>
- <20120806144100.GD9329@pengutronix.de>
-Message-ID: <20120807024401.GC24289@S2101-09.ap.freescale.net>
+From: Dongjin.Kim@agreeyamobility.net (Dongjin Kim)
+Date: Tue, 7 Aug 2012 02:56:06 +0000
+Subject: =?utf-8?B?7ZqM7IugOiDtmozsi6A6IO2ajOyLoDogW1BBVENIXSBPRFJPSUQtWDogaGtk?=
+ =?utf-8?Q?k4412:_Add_new_hardware_based_on_Exynos4412?=
+In-Reply-To: <CAOesGMj6BafLCpZjmtyn_ASbpeic_8E0CdYjQGOf3A4_NHfy=Q@mail.gmail.com>
+References: <1344262254-14648-1-git-send-email-dongjin.kim@agreeyamobility.net>
+ <CAJuYYwSjnQ6z0iUaLCV9guC7yyKH3_pbd1QZe3ELKF-fYNfaqQ@mail.gmail.com>
+ <A6A3B7488C419F488E5B13FFD03C08AD2F4362EE@SN2PRD0510MB370.namprd05.prod.outlook.com>
+ <CAOesGMh=6QrCmL4EqnSqTxi1nH+8Wn+x=z9BYq8QJCznH3a=zQ@mail.gmail.com>
+ <A6A3B7488C419F488E5B13FFD03C08AD2F43688D@SN2PRD0510MB370.namprd05.prod.outlook.com>,
+ <CAOesGMj6BafLCpZjmtyn_ASbpeic_8E0CdYjQGOf3A4_NHfy=Q@mail.gmail.com>
+Message-ID: <A6A3B7488C419F488E5B13FFD03C08AD2F4369FF@SN2PRD0510MB370.namprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2012 at 04:41:00PM +0200, Uwe Kleine-K?nig wrote:
-> > > +		nand at bb000000 {
-> > > +			#address-cells = <1>;
-> > > +			#size-cells = <1>;
-> > > +
-> > > +			compatible = "fsl,imx35-nand", "fsl,imx25-nand";
-> > > +			reg = <0xbb000000 0x2000>;
-> > > +			interrupts = <33>;
-> > > +			status = "disabled";
-> > > +		};
-> > 
-> > Why nand device isn't under any bus but soc directly?
-> I copied that from imx27.dtsi (where I introduced it myself before).
-> It's not obvious to me which bus this is a part of from reading the
-> hardware manual. Neither for i.MX27 nor i.MX35.
+Hi,
 
-See i.MX35 RM "Chapter 17 External Memory Interface (EMI)",
-"Memory Map/Register Definition" section.
+Thank you for your advice.
+Fortunately I got ODROID-X hardware earlier and am able to boot with mainline kernel.
 
-> > > +	select HAVE_CAN_FLEXCAN if CAN
-> > 
-> > Move it to "config SOC_IMX35".
-> hmm, do we want CAN_FLEXCAN to be selectable for machines that don't
-> have can although they are based on i.MX35?
-> 
-I just recall it has been done by commit 610578a (ARM: imx: enable
-flexcan on imx25, imx35, imx53, imx6q).
+I will try to do alternative way first with source code kernel 3.0.15, and hope you review the patch if ready.
 
-> > 
-> > > +	select IMX_HAVE_PLATFORM_MXC_NAND
-> > > +	select IMX_HAVE_PLATFORM_SPI_IMX
-> > > +	select IMX_HAVE_PLATFORM_IMX2_WDT
-> > 
-> > These are unreasonable.
-> These are needed to be able to select the corresponding drivers.
-> 
-The driver Kconfig needs fixing then.
-
-> > 
-> > > +	select PINCTRL
-> > 
-> > Need to select PINCTRL_IMX35 also?
-> good idea.
-> 
-> > And they should be under "config SOC_IMX35".
-> Even though currently the pincontrol driver isn't used for them?
->  
-No pressure for now.  But in the end, it will be like that.
-
-> > > +static const struct of_device_id imx35_of_mixed_devices_match[] __initconst = {
-> > > +	{ /* END OF LIST */ }
-> > > +};
-> > > +
-> > > +static void __init of_mixed_device_hook(void)
-> > > +{
-> > > +	struct device_node *np;
-> > > +	const struct of_device_id *of_id;
-> > > +
-> > > +	np = of_find_matching_node(NULL, imx35_of_mixed_devices_match);
-> > > +	if (np) {
-> > > +		void (*func)(void);
-> > > +
-> > > +		of_id = of_match_node(imx35_of_mixed_devices_match, np);
-> > > +		func = of_id->data;
-> > > +		func();
-> > > +	}
-> > > +}
-> > 
-> > We have this on other imx DT machines for hooking the IOMUX setup done
-> > in non-DT board files.  Since you have imx35 pinctrl support in place.
-> > What is above hook for then?
-> I need it to configure and export some gpios.
-> 
-Add it when you add users?  So that we can know it's really the only
-way to go.
-
-> > > +extern int mx35_clocks_init_dt(void);
-> > 
-> > It does not necessarily belong this driver.
-> I cannot parse this sentence. Can you please try to explain again your
-> objections here?
-> 
-I see neither the implementation nor the users for mx35_clocks_init_dt().
-
--- 
 Regards,
-Shawn
+Dongjin.
+________________________________________
+?? ??: Olof Johansson [olof at lixom.net]
+?? ??: 2012? 8? 7? ??? ?? 11:28
+?? ??: Dongjin Kim
+??: Thomas Abraham; Dongjin Kim; Kukjin Kim; Russell King; Tony Lindgren; Jon Medhurst; Shawn Guo; Uwe Kleine-K?nig; linux-arm-kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org; linux-kernel at vger.kernel.org
+??: Re: ??: ??: [PATCH] ODROID-X: hkdk4412: Add new hardware based on Exynos4412
+
+Hi,
+
+On Mon, Aug 6, 2012 at 7:05 PM, Dongjin Kim
+<Dongjin.Kim@agreeyamobility.net> wrote:
+> Hello,
+>
+> I am trying to understand what I have to do for device tree.
+>
+> In order to create dts file for ODROID-X hardware, it seems I may need dts file of EXYNOS4412 SoC.
+> But maybe exynos4412.dtsi is not merged yet or not exist, like exynos4210.dtsi or exynos5250.dtsi.
+> Obviously it seems not easy to create such a file without SoC datasheet, and I do not have it.
+>
+> So do I wait for the file to be merged by Samsung or better to create initial dts file cloned from exynos4210.dtsi and modify to have verified nodes with the source/header files?
+
+Ideally they already have one waiting to be submitted, but that might
+not be the case. Given that the origenboard design with 4412 is not
+yet shipping, I'm guessing the Linaro Samsung engineers might not have
+done much work on 4412 yet. Kukjin? Thomas?
+
+> What's your suggestion?
+
+The alternative is to use the data you have available -- i.e. sources
+and patches, and craft the device tree from there. The design of 4412
+is a derivative from 4210, so that's a good start. Next step would be
+to describe the board on top of the SoC, peripherals, etc. Take a look
+at how the origen board support was added, and so on.
+
+I ordered an odroid-x several weeks ago but I haven't have a confirmed
+shipping date yet. :( I'm not sure how long it'll be before I can help
+out, unfortunately.
+
+
+-Olof
