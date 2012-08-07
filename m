@@ -1,21 +1,29 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 7 Aug 2012 09:00:02 -0600 (MDT)
-Subject: [PATCH 1/2] ARM: OMAP: clean up some smatch warnings, fix some
- printk(KERN_ERR ...
-In-Reply-To: <20120807104023.GV11011@atomide.com>
-References: <20120807103009.8053.69389.stgit@dusk.lan>
- <20120807103439.8053.65054.stgit@dusk.lan>
- <20120807104023.GV11011@atomide.com>
-Message-ID: <alpine.DEB.2.00.1208070859190.23956@utopia.booyaka.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 07 Aug 2012 17:05:30 +0200
+Subject: [PATCH V4 0/2] arm: samsung: Move FIMD headers to	include/video/
+In-Reply-To: <20120807143342.GD18957@n2100.arm.linux.org.uk>
+References: <1344342872-7904-1-git-send-email-l.krishna@samsung.com>
+ <20120807143342.GD18957@n2100.arm.linux.org.uk>
+Message-ID: <50212EBA.5000600@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Aug 2012, Tony Lindgren wrote:
+On 08/07/2012 04:33 PM, Russell King - ARM Linux wrote:
+> On Tue, Aug 07, 2012 at 06:04:30PM +0530, Leela Krishna Amudala wrote:
+>>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h    |  159 --------------------
+>>  drivers/gpu/drm/exynos/exynos_drm_fimd.c           |    2 +-
+>>  drivers/video/s3c-fb.c                             |    2 +-
+>>  .../plat/regs-fb.h => include/video/samsung_fimd.h |  152 +++++++++++++++++--
+> 
+> Isn't include/video for framebuffer drivers?  Isn't this more a DRM thing?
+> Wouldn't include/drm therefore be more appropriate?
 
-> I think these will cause new randconfig warnings without CONFIG_BUG set.
+Those headers are now used by both: framebuffer and Exynos DRM
+driver. And probably the framebuffer driver has more users, as it
+also covers older FIMD devices than those found on exynos4/5 SoCs.
 
-Thanks for the comment.  Did not know BUG() could be disabled.  Will drop 
-those changes.
+So include/video seems equally right (or wrong) as include/drm.
 
-
-- Paul
+There have been some efforts, or at least requirements raised, to
+create some common low level API for framebuffer and DRM drivers,
+but nothing has clarified yet AFAICS.
