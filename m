@@ -1,91 +1,272 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Tue, 7 Aug 2012 19:42:23 +0200
-Subject: [PATCH] ARM: AM33XX: board-generic: Add of_dev_auxdata to fix
- dev_id for CAN module
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA88BDF@DBDE01.ent.ti.com>
-References: <1344346636-28072-1-git-send-email-hvaibhav@ti.com>
- <50213214.7050505@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA88BDF@DBDE01.ent.ti.com>
-Message-ID: <87D16BF2-6A3B-4B7D-AB61-EB606FA88A68@dominion.thruhere.net>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 7 Aug 2012 12:47:04 -0500
+Subject: [PATCH] ARM: ep93xx: clockevent support
+In-Reply-To: <5021122C.3000503@gmail.com>
+References: <1344338474.18237.6.camel@localhost> <5021122C.3000503@gmail.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F00206AAE96C18@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday, August 07, 2012 6:04 AM, Ryan Mallon wrote:
+> On 07/08/12 21:21, Yan Burman wrote:
+>
+>> ARM: ep93xx: clockevent support
+>> I have ported to 3.6-rc1 and slightly modified a previous patch for clockevent support for the ep93xx.
+>> The porting mainly consists of sched_clock support.
+>> Tested on 9302 based board.
+>> From: Ahmed Ammar <aammar <at> edge-techno.com>
+>> Signed-off-by: Yan Burman <burman.yan@gmail.com>
 
-Op 7 aug. 2012, om 17:53 heeft "Hiremath, Vaibhav" <hvaibhav@ti.com> het volgende geschreven:
+Hello Yan,
 
-> On Tue, Aug 07, 2012 at 20:49:48, Rob Herring wrote:
->> On 08/07/2012 08:37 AM, Vaibhav Hiremath wrote:
->>> If the module requires only one clocksource to function, then
->>> driver can very well call clk_get() api with "con_id = NULL",
->>> 
->>>       clk = clk_get(dev, NULL);
->>> 
->>> And platform code should respect this and return valid clk handle.
->>> That means, now the clk_get() api would rely on dev_id, and platform
->>> code should either have clk node with matching dev_id (with con_id=NULL)
->>> or return dummy clk node.
->>> 
->>> With DT support, we can fix the dev_id for particular module
->>> using "struct of_dev_auxdata" to satisfy above clk framework requirement.
->>> 
->>> In case of AM33XX, we required this for the DCAN module, so this
->>> patch adds "of_dev_auxdata" for both DCAN_0/1 instances.
->>> 
->>> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
->>> Cc: Tony Lindgren <tony@atomide.com>
->>> Cc: Paul Walmsley <paul@pwsan.com>
->>> Cc: Benoit Cousson <b-cousson@ti.com>
->>> Cc: Grant Likely <grant.likely@secretlab.ca>
->>> ---
->>> This patch is boot tested on BeagleBone platform, and checked for
->>> clk_get() return value in d_can module driver.
->>> 
->>> arch/arm/mach-omap2/board-generic.c |   18 +++++++++++++++++-
->>> 1 files changed, 17 insertions(+), 1 deletions(-)
->>> 
->>> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
->>> index 6f93a20..c9b7903 100644
->>> --- a/arch/arm/mach-omap2/board-generic.c
->>> +++ b/arch/arm/mach-omap2/board-generic.c
->>> @@ -37,11 +37,27 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
->>> 	{ }
->>> };
->>> 
->>> +/*
->>> + * Lookup table for attaching a specific name and platform_data pointer to
->>> + * devices as they get created by of_platform_populate(). Ideally this table
->>> + * would not exist, but the current clock implementation depends on some devices
->>> + * having a specific name OR to satisfy NULL con_id requirement from driver.
->>> + */
->>> +static const struct of_dev_auxdata am33xx_auxdata_lookup[] __initconst = {
->>> +	OF_DEV_AUXDATA("bosch,d_can", 0x481cc000, "d_can.0", NULL),
->>> +	OF_DEV_AUXDATA("bosch,d_can", 0x481d0000, "d_can.1", NULL),
->>> +	{ },
->>> +};
+> Hi Yan, some comments below.
+>
+> ~Ryan
+
+I have a couple minor comments as well...
+
+<snip>
+
+>> @@ -114,63 +117,129 @@ void __init ep93xx_map_io(void)
+>>  #define EP93XX_TIMER4_CLOCK		983040
+>>  
+>>  #define TIMER1_RELOAD			((EP93XX_TIMER123_CLOCK / HZ) - 1)
+>> -#define TIMER4_TICKS_PER_JIFFY		DIV_ROUND_CLOSEST(CLOCK_TICK_RATE, HZ)
+>> -
+>> -static unsigned int last_jiffy_time;
+>>  
+>>  static irqreturn_t ep93xx_timer_interrupt(int irq, void *dev_id)
+>>  {
+>> -	/* Writing any value clears the timer interrupt */
+
+Please leave this comment for the write to EP93XX_TIMER1_CLEAR
+below.
+
+>> -	__raw_writel(1, EP93XX_TIMER1_CLEAR);
+>> +	struct clock_event_device *evt = dev_id;
+>>  
+>> -	/* Recover lost jiffies */
+>> -	while ((signed long)
+>> -		(__raw_readl(EP93XX_TIMER4_VALUE_LOW) - last_jiffy_time)
+>> -						>= TIMER4_TICKS_PER_JIFFY) {
+>> -		last_jiffy_time += TIMER4_TICKS_PER_JIFFY;
+>> -		timer_tick();
+>> -	}
+>> +	__raw_writel(1, EP93XX_TIMER1_CLEAR);
+>> +	evt->event_handler(evt);
+>>  
+>>  	return IRQ_HANDLED;
+>>  }
+>>  
+>> +static int ep93xx_set_next_event(unsigned long evt,
+>> +				struct clock_event_device *unused)
+>> +{
+>> +	u32 tmode = __raw_readl(EP93XX_TIMER1_CONTROL);
+>> +
+>> +	/* stop timer */
+>> +	__raw_writel(tmode & ~EP93XX_TIMER123_CONTROL_ENABLE,
+>> +			EP93XX_TIMER1_CONTROL);
+>> +	/* program timer */
+>> +	__raw_writel(evt, EP93XX_TIMER1_LOAD);
+>> +	/* start timer */
+>> +	__raw_writel(tmode | EP93XX_TIMER123_CONTROL_ENABLE,
+>> +			EP93XX_TIMER1_CONTROL);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static void ep93xx_set_mode(enum clock_event_mode mode,
+>> +			    struct clock_event_device *evt)
+>> +{
+>> +	u32 tmode = EP93XX_TIMER123_CONTROL_CLKSEL;
+>> +	/* Disable timer */
+>
+>
+> Nitpick - blank line between variable declarations and code.
+>
+>> +	__raw_writel(tmode, EP93XX_TIMER1_CONTROL);
+>> +
+>> +	switch (mode) {
+>> +	case CLOCK_EVT_MODE_PERIODIC:
+>> +		/* Set timer period  */
+>> +		__raw_writel((508469 / HZ) - 1, EP93XX_TIMER1_LOAD);
+
+As Ryan mentions below.  There are defines already in this file
+for some of the magic values.
+
+The ((508469 / HZ) - 1) is TIMER1_RELOAD.
+
+>> +		tmode |= EP93XX_TIMER123_CONTROL_MODE;
+>> +
+
+
+Is the fall-through here intentional? If so, please put a comment
+to indicate that it is.
+
+>> +	case CLOCK_EVT_MODE_ONESHOT:
+>> +		tmode |= EP93XX_TIMER123_CONTROL_ENABLE;
+>> +		__raw_writel(tmode, EP93XX_TIMER1_CONTROL);
+>> +		break;
+>> +
+>> +	case CLOCK_EVT_MODE_SHUTDOWN:
+>> +	case CLOCK_EVT_MODE_UNUSED:
+>> +	case CLOCK_EVT_MODE_RESUME:
+>> +		return;
+>
+>
+> These cases can be removed.
+>
+>> +	}
+>> +}
+>> +
+>> +static struct clock_event_device clockevent_ep93xx = {
+
+Nitpick, rename this to ep93xx_clockevent please.
+
+>> +	.name		= "ep93xx-timer1",
+>> +	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
+>> +	.shift		= 32,
+>> +	.set_mode	= ep93xx_set_mode,
+>> +	.set_next_event	= ep93xx_set_next_event,
+>> +};
+>> +
+>>  static struct irqaction ep93xx_timer_irq = {
+>>  	.name		= "ep93xx timer",
+>>  	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+>>  	.handler	= ep93xx_timer_interrupt,
+>> +	.dev_id		= &clockevent_ep93xx,
+>>  };
+>>  
+>> -static void __init ep93xx_timer_init(void)
+>> +static void __init ep93xx_clockevent_init(void)
+>>  {
+
+Assuming the rename above, add:
+
+	struct clock_event_device *evt = &ep93xx_clockevent;
+
+Then you can use 'evt->' instead of the longer 'ep93xx_clockevent.'
+in the rest of this function. It makes the code a bit cleaner.
+
+>> -	u32 tmode = EP93XX_TIMER123_CONTROL_MODE |
+>> -		    EP93XX_TIMER123_CONTROL_CLKSEL;
+>> +	setup_irq(IRQ_EP93XX_TIMER1, &ep93xx_timer_irq);
+>> +	clockevent_ep93xx.mult = div_sc(508469, NSEC_PER_SEC,
+>> +					clockevent_ep93xx.shift);
+>
+>
+> core.c has:
+>
+>  #define EP93XX_TIMER123_CLOCK               508469
+>
+> Maybe we should move that to soc.h so you can use it here.
+
+No need to move the defines to soc.h. They are only used in this file.
+
+>> +	clockevent_ep93xx.max_delta_ns =
+>> +		clockevent_delta2ns(0xfffffffe, &clockevent_ep93xx);
+>> +	clockevent_ep93xx.min_delta_ns =
+>> +		clockevent_delta2ns(0xf, &clockevent_ep93xx);
+>> +	clockevent_ep93xx.cpumask = cpumask_of(0);
+>> +	clockevents_register_device(&clockevent_ep93xx);
+>> +}
+>>  
+>> -	/* Enable periodic HZ timer.  */
+>> -	__raw_writel(tmode, EP93XX_TIMER1_CONTROL);
+>> -	__raw_writel(TIMER1_RELOAD, EP93XX_TIMER1_LOAD);
+>> -	__raw_writel(tmode | EP93XX_TIMER123_CONTROL_ENABLE,
+>> -			EP93XX_TIMER1_CONTROL);
+>> +/*
+>> + * timer4 is a 40 Bit timer, separated in a 32bit and a 8 bit
+>> + * register, EP93XX_TIMER4_VALUE_LOW stores 32 bit word. The
+>> + * controlregister is in EP93XX_TIMER4_VALUE_HIGH
+
+I don't think this comment is needed.
+
+> Missing space between control and register.
+>
+>> + */
+>> +static cycle_t ep93xx_get_cycles(struct clocksource *unused)
+>> +{
+>> +	return __raw_readl(EP93XX_TIMER4_VALUE_LOW);
+>> +}
+>>  
+>> -	/* Enable lost jiffy timer.  */
+>> -	__raw_writel(EP93XX_TIMER4_VALUE_HIGH_ENABLE,
+>> -			EP93XX_TIMER4_VALUE_HIGH);
+>> +static struct clocksource clocksource_ep93xx = {
+
+Nitpick, rename this to ep93xx_clocksource.
+
+>> +	.name		= "ep93xx_timer4",
+
+Nitpick, use "ep93xx-timer4" for the name, the "-" is used
+consistently in this file for all the names.
+
+>> +	.rating		= 200,
+>> +	.read		= ep93xx_get_cycles,
+>> +	.mask		= 0xFFFFFFFF,
+>>
+>
+> Lower case for hex constant.
+>
+>> +	.shift		= 20,
+>> +	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+>> +};
+>>  
+>> -	setup_irq(IRQ_EP93XX_TIMER1, &ep93xx_timer_irq);
+>> +static void __init ep93xx_clocksource_init(void)
+
+Again, assuming the rename above, add:
+
+	struct clocksource *src = &ep93xx_clocksource;
+
+Then use the pointer instead of the actual variable.
+
+>> +{
+>> +	/* Reset time-stamp counter */
+>> +	__raw_writel(0x100, EP93XX_TIMER4_VALUE_HIGH);
+
+Again, the 0x100 magic value is defined as EP93XX_TIMER4_VALUE_HIGH_ENABLE.
+
+>> +	clocksource_ep93xx.mult =
+>> +		clocksource_hz2mult(983040, clocksource_ep93xx.shift);
+>
+>
+> core.c has define EP93XX_TIMER4_CLOCK 983040, probably should move
+> that to soc.h also.
+>
+>> +	clocksource_register(&clocksource_ep93xx);
+>>  }
+>>  
+>> -static unsigned long ep93xx_gettimeoffset(void)
+>> +static u32 notrace ep93xx_sched_clock(void)
+>>  {
+>> -	int offset;
+>> -
+>> -	offset = __raw_readl(EP93XX_TIMER4_VALUE_LOW) - last_jiffy_time;
+>> +	return __raw_readl(EP93XX_TIMER4_VALUE_LOW);
+>> +}
+>>  
+>> -	/* Calculate (1000000 / 983040) * offset.  */
+>> -	return offset + (53 * offset / 3072);
+>> +static void __init ep93xx_timer_init(void)
+>> +{
+>> +	ep93xx_clocksource_init();
+>> +	ep93xx_clockevent_init();
+>> +	setup_sched_clock(ep93xx_sched_clock, 32, CLOCK_TICK_RATE);
+>>  }
+>>  
+>>  struct sys_timer ep93xx_timer = {
+>>  	.init		= ep93xx_timer_init,
+>> -	.offset		= ep93xx_gettimeoffset,
+>>  };
+>>  
+>>  
 >> 
->> Adding an additional clkdev lookup accomplishes the same thing and is a
->> cleaner solution.
 >> 
-> 
-> That is also required and I have submitted patch for the same -
-> 
-> http://www.spinics.net/lists/arm-kernel/msg187998.html
-> 
-> 
-> With DT support, I am getting dev_id as -
-> 
-> - Without "reg" property: d_can.16 and d_can.17,
->   (I believe it changes dynamically here)
-> 
-> - With "reg" property: 481cc000.d_can and 481d0000.d_can
-> 
-> Which is not so intuitive, I would like to see them as per Spec/TRM, so 
-> doesn't this patch make sense?
-> 
-> Similar thing has already been done for other platforms too.
 
-Davinci-mdio has a similar problem
+Other than those comments, looks good. I'll try to test this later.
 
-regards,
-
-Koen
+Thanks,
+Hartley
