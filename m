@@ -1,124 +1,172 @@
 From: p.paneri@samsung.com (Praveen Paneri)
-Date: Tue, 07 Aug 2012 12:58:41 +0530
-Subject: [PATCH v2 2/5] usb: s3c-hsotg: Adding phy driver support
+Date: Tue, 07 Aug 2012 12:58:42 +0530
+Subject: [PATCH v2 3/5] ARM: S3C64XX: Removing old phy setup code
 In-Reply-To: <1344324524-2286-1-git-send-email-p.paneri@samsung.com>
 References: <1344324524-2286-1-git-send-email-p.paneri@samsung.com>
-Message-ID: <1344324524-2286-3-git-send-email-p.paneri@samsung.com>
+Message-ID: <1344324524-2286-4-git-send-email-p.paneri@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the transceiver to hsotg driver. Keeping the platform data
-for continuing the smooth operation for boards which still uses it
+This patch removes old phy code from platform side. 'setup-usb-phy.c'
+will be used for providing transceiver platform data in next
+patch. Not all of the platform data code is removed as there are others
+making use of platform_data defined for hsotg. That can be removed once
+all the SoCs start using the new transceiver for usb phy setup.
 
 Signed-off-by: Praveen Paneri <p.paneri@samsung.com>
 ---
- drivers/usb/gadget/s3c-hsotg.c |   38 ++++++++++++++++++++++++++++----------
- 1 files changed, 28 insertions(+), 10 deletions(-)
+ arch/arm/mach-s3c64xx/mach-crag6410.c |    2 -
+ arch/arm/mach-s3c64xx/mach-smartq.c   |    2 -
+ arch/arm/mach-s3c64xx/mach-smdk6410.c |    2 -
+ arch/arm/mach-s3c64xx/setup-usb-phy.c |   79 ---------------------------------
+ 4 files changed, 0 insertions(+), 85 deletions(-)
 
-diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
-index b13e0bb..f4ba9a3 100644
---- a/drivers/usb/gadget/s3c-hsotg.c
-+++ b/drivers/usb/gadget/s3c-hsotg.c
-@@ -32,6 +32,7 @@
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+index 09cd812..3bb0327 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+@@ -766,7 +766,6 @@ static const struct gpio_led_platform_data gpio_leds_pdata = {
+ 	.num_leds = ARRAY_SIZE(gpio_leds),
+ };
  
- #include <linux/usb/ch9.h>
- #include <linux/usb/gadget.h>
-+#include <linux/usb/otg.h>
- #include <linux/platform_data/s3c-hsotg.h>
+-static struct s3c_hsotg_plat crag6410_hsotg_pdata;
  
- #include <mach/map.h>
-@@ -133,7 +134,9 @@ struct s3c_hsotg_ep {
-  * struct s3c_hsotg - driver state.
-  * @dev: The parent device supplied to the probe function
-  * @driver: USB gadget driver
-- * @plat: The platform specific configuration data.
-+ * @phy: The otg phy transeiver structure for phy control.
-+ * @plat: The platform specific configuration data. This can be removed once
-+ * all SoCs support usb transceiver.
-  * @regs: The memory area mapped for accessing registers.
-  * @irq: The IRQ number we are using
-  * @supplies: Definition of USB power supplies
-@@ -153,6 +156,7 @@ struct s3c_hsotg_ep {
- struct s3c_hsotg {
- 	struct device		 *dev;
- 	struct usb_gadget_driver *driver;
-+	struct usb_phy		*phy;
- 	struct s3c_hsotg_plat	 *plat;
- 
- 	spinlock_t              lock;
-@@ -2854,7 +2858,10 @@ static void s3c_hsotg_phy_enable(struct s3c_hsotg *hsotg)
- 	struct platform_device *pdev = to_platform_device(hsotg->dev);
- 
- 	dev_dbg(hsotg->dev, "pdev 0x%p\n", pdev);
--	if (hsotg->plat->phy_init)
-+
-+	if (hsotg->phy)
-+		usb_phy_init(hsotg->phy);
-+	else if (hsotg->plat->phy_init)
- 		hsotg->plat->phy_init(pdev, hsotg->plat->phy_type);
- }
- 
-@@ -2869,7 +2876,9 @@ static void s3c_hsotg_phy_disable(struct s3c_hsotg *hsotg)
+ static void __init crag6410_machine_init(void)
  {
- 	struct platform_device *pdev = to_platform_device(hsotg->dev);
+@@ -792,7 +791,6 @@ static void __init crag6410_machine_init(void)
+ 	s3c_i2c0_set_platdata(&i2c0_pdata);
+ 	s3c_i2c1_set_platdata(&i2c1_pdata);
+ 	s3c_fb_set_platdata(&crag6410_lcd_pdata);
+-	s3c_hsotg_set_platdata(&crag6410_hsotg_pdata);
  
--	if (hsotg->plat->phy_exit)
-+	if (hsotg->phy)
-+		usb_phy_shutdown(hsotg->phy);
-+	else if (hsotg->plat->phy_exit)
- 		hsotg->plat->phy_exit(pdev, hsotg->plat->phy_type);
- }
+ 	i2c_register_board_info(0, i2c_devs0, ARRAY_SIZE(i2c_devs0));
+ 	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
+diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
+index ceeb1de..3647202 100644
+--- a/arch/arm/mach-s3c64xx/mach-smartq.c
++++ b/arch/arm/mach-s3c64xx/mach-smartq.c
+@@ -187,7 +187,6 @@ static struct s3c_hwmon_pdata smartq_hwmon_pdata __initdata = {
+ 	},
+ };
  
-@@ -3493,6 +3502,7 @@ static void s3c_hsotg_release(struct device *dev)
- static int __devinit s3c_hsotg_probe(struct platform_device *pdev)
+-static struct s3c_hsotg_plat smartq_hsotg_pdata;
+ 
+ static int __init smartq_lcd_setup_gpio(void)
  {
- 	struct s3c_hsotg_plat *plat = pdev->dev.platform_data;
-+	struct usb_phy *phy;
- 	struct device *dev = &pdev->dev;
- 	struct s3c_hsotg_ep *eps;
- 	struct s3c_hsotg *hsotg;
-@@ -3501,20 +3511,25 @@ static int __devinit s3c_hsotg_probe(struct platform_device *pdev)
- 	int ret;
- 	int i;
+@@ -385,7 +384,6 @@ void __init smartq_map_io(void)
+ void __init smartq_machine_init(void)
+ {
+ 	s3c_i2c0_set_platdata(NULL);
+-	s3c_hsotg_set_platdata(&smartq_hsotg_pdata);
+ 	s3c_hwmon_set_platdata(&smartq_hwmon_pdata);
+ 	s3c_sdhci1_set_platdata(&smartq_internal_hsmmc_pdata);
+ 	s3c_sdhci2_set_platdata(&smartq_internal_hsmmc_pdata);
+diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+index 0fe4f15..1a2db14 100644
+--- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
++++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+@@ -627,7 +627,6 @@ static struct platform_pwm_backlight_data smdk6410_bl_data = {
+ 	.pwm_id = 1,
+ };
  
--	plat = pdev->dev.platform_data;
--	if (!plat) {
--		dev_err(&pdev->dev, "no platform data defined\n");
--		return -EINVAL;
+-static struct s3c_hsotg_plat smdk6410_hsotg_pdata;
+ 
+ static void __init smdk6410_map_io(void)
+ {
+@@ -657,7 +656,6 @@ static void __init smdk6410_machine_init(void)
+ 	s3c_i2c0_set_platdata(NULL);
+ 	s3c_i2c1_set_platdata(NULL);
+ 	s3c_fb_set_platdata(&smdk6410_lcd_pdata);
+-	s3c_hsotg_set_platdata(&smdk6410_hsotg_pdata);
+ 
+ 	samsung_keypad_set_platdata(&smdk6410_keypad_data);
+ 
+diff --git a/arch/arm/mach-s3c64xx/setup-usb-phy.c b/arch/arm/mach-s3c64xx/setup-usb-phy.c
+index f6757e0..7a09553 100644
+--- a/arch/arm/mach-s3c64xx/setup-usb-phy.c
++++ b/arch/arm/mach-s3c64xx/setup-usb-phy.c
+@@ -9,82 +9,3 @@
+  *
+  */
+ 
+-#include <linux/clk.h>
+-#include <linux/delay.h>
+-#include <linux/err.h>
+-#include <linux/io.h>
+-#include <linux/platform_device.h>
+-#include <mach/map.h>
+-#include <mach/regs-sys.h>
+-#include <plat/cpu.h>
+-#include <plat/regs-usb-hsotg-phy.h>
+-#include <plat/usb-phy.h>
+-
+-static int s3c_usb_otgphy_init(struct platform_device *pdev)
+-{
+-	struct clk *xusbxti;
+-	u32 phyclk;
+-
+-	writel(readl(S3C64XX_OTHERS) | S3C64XX_OTHERS_USBMASK, S3C64XX_OTHERS);
+-
+-	/* set clock frequency for PLL */
+-	phyclk = readl(S3C_PHYCLK) & ~S3C_PHYCLK_CLKSEL_MASK;
+-
+-	xusbxti = clk_get(&pdev->dev, "xusbxti");
+-	if (xusbxti && !IS_ERR(xusbxti)) {
+-		switch (clk_get_rate(xusbxti)) {
+-		case 12 * MHZ:
+-			phyclk |= S3C_PHYCLK_CLKSEL_12M;
+-			break;
+-		case 24 * MHZ:
+-			phyclk |= S3C_PHYCLK_CLKSEL_24M;
+-			break;
+-		default:
+-		case 48 * MHZ:
+-			/* default reference clock */
+-			break;
+-		}
+-		clk_put(xusbxti);
 -	}
 -
- 	hsotg = devm_kzalloc(&pdev->dev, sizeof(struct s3c_hsotg), GFP_KERNEL);
- 	if (!hsotg) {
- 		dev_err(dev, "cannot get memory\n");
- 		return -ENOMEM;
- 	}
- 
-+	phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
-+	if (!phy) {
-+		/* Fallback for platform data */
-+		plat = pdev->dev.platform_data;
-+		if (!plat) {
-+			dev_err(&pdev->dev, "no platform data or transceiver defined\n");
-+			return -ENODEV;
-+		} else
-+			hsotg->plat = plat;
-+	} else
-+		hsotg->phy = phy;
-+
- 	hsotg->dev = dev;
--	hsotg->plat = plat;
- 
- 	hsotg->clk = clk_get(&pdev->dev, "otg");
- 	if (IS_ERR(hsotg->clk)) {
-@@ -3689,6 +3704,9 @@ static int __devexit s3c_hsotg_remove(struct platform_device *pdev)
- 	s3c_hsotg_phy_disable(hsotg);
- 	regulator_bulk_free(ARRAY_SIZE(hsotg->supplies), hsotg->supplies);
- 
-+	if (hsotg->phy)
-+		devm_usb_put_phy(&pdev->dev, hsotg->phy);
-+
- 	clk_disable_unprepare(hsotg->clk);
- 	clk_put(hsotg->clk);
- 
+-	/* TODO: select external clock/oscillator */
+-	writel(phyclk | S3C_PHYCLK_CLK_FORCE, S3C_PHYCLK);
+-
+-	/* set to normal OTG PHY */
+-	writel((readl(S3C_PHYPWR) & ~S3C_PHYPWR_NORMAL_MASK), S3C_PHYPWR);
+-	mdelay(1);
+-
+-	/* reset OTG PHY and Link */
+-	writel(S3C_RSTCON_PHY | S3C_RSTCON_HCLK | S3C_RSTCON_PHYCLK,
+-			S3C_RSTCON);
+-	udelay(20);	/* at-least 10uS */
+-	writel(0, S3C_RSTCON);
+-
+-	return 0;
+-}
+-
+-static int s3c_usb_otgphy_exit(struct platform_device *pdev)
+-{
+-	writel((readl(S3C_PHYPWR) | S3C_PHYPWR_ANALOG_POWERDOWN |
+-				S3C_PHYPWR_OTG_DISABLE), S3C_PHYPWR);
+-
+-	writel(readl(S3C64XX_OTHERS) & ~S3C64XX_OTHERS_USBMASK, S3C64XX_OTHERS);
+-
+-	return 0;
+-}
+-
+-int s5p_usb_phy_init(struct platform_device *pdev, int type)
+-{
+-	if (type == S5P_USB_PHY_DEVICE)
+-		return s3c_usb_otgphy_init(pdev);
+-
+-	return -EINVAL;
+-}
+-
+-int s5p_usb_phy_exit(struct platform_device *pdev, int type)
+-{
+-	if (type == S5P_USB_PHY_DEVICE)
+-		return s3c_usb_otgphy_exit(pdev);
+-
+-	return -EINVAL;
+-}
 -- 
 1.7.1
