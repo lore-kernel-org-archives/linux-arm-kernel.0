@@ -1,40 +1,17 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Aug 2012 14:28:56 +0000
-Subject: [PATCH V4 1/2] include/video: move fimd register headers from
- platform to include/video
-In-Reply-To: <1344342872-7904-2-git-send-email-l.krishna@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 7 Aug 2012 15:33:42 +0100
+Subject: [PATCH V4 0/2] arm: samsung: Move FIMD headers to include/video/
+In-Reply-To: <1344342872-7904-1-git-send-email-l.krishna@samsung.com>
 References: <1344342872-7904-1-git-send-email-l.krishna@samsung.com>
- <1344342872-7904-2-git-send-email-l.krishna@samsung.com>
-Message-ID: <201208071428.56290.arnd@arndb.de>
+Message-ID: <20120807143342.GD18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 August 2012, Leela Krishna Amudala wrote:
-> 
-> This patch moves the contents from regs-fb-v4.h and regs-fb.h to
-> include/video/samsung_fimd.h. Also updates the header inclusion in
-> machine files and driver files accordingly.
-> 
-> Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+On Tue, Aug 07, 2012 at 06:04:30PM +0530, Leela Krishna Amudala wrote:
+>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h    |  159 --------------------
+>  drivers/gpu/drm/exynos/exynos_drm_fimd.c           |    2 +-
+>  drivers/video/s3c-fb.c                             |    2 +-
+>  .../plat/regs-fb.h => include/video/samsung_fimd.h |  152 +++++++++++++++++--
 
-You are missing an explanation here about why the file is moved.
-It does seem like a good idea but please say why you do this.
-
-More importantly, I don't understany why you move regs-fb-v4.h
-but not regs-fb.h, which is included by the former. Also, the
-only identifiers used in arch/arm from either of the two headers
-are
-
-	VIDCON0_VIDOUT_RGB
-	VIDCON0_PNRMODE_RGBV
-	VIDCON0_CLKSEL_LCD
-
-	VIDCON1_INV_HSYNC
-	VIDCON1_INV_VSYNC
-	VIDCON1_INV_VCLK
-	VIDCON1_INV_VDEN
-
-and they are all in plat/regs-fb.h, so there is no need to
-include the entire header file.
-
-	Arnd
+Isn't include/video for framebuffer drivers?  Isn't this more a DRM thing?
+Wouldn't include/drm therefore be more appropriate?
