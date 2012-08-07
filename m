@@ -1,119 +1,58 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 07 Aug 2012 14:15:06 +0200
-Subject: [PATCH v3 4/4] fbdev: sh_mobile_lcdc: use dma_mmap_coherent if
- available
-In-Reply-To: <1854100.yBXTHaXkcr@avalon>
-References: <1344246924-32620-1-git-send-email-hdk@igel.co.jp>
- <1344246924-32620-5-git-send-email-hdk@igel.co.jp>
- <1854100.yBXTHaXkcr@avalon>
-Message-ID: <3107106.PmlicBoqLd@avalon>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Tue, 07 Aug 2012 18:04:30 +0530
+Subject: [PATCH V4 0/2] arm: samsung: Move FIMD headers to include/video/
+Message-ID: <1344342872-7904-1-git-send-email-l.krishna@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 August 2012 14:01:43 Laurent Pinchart wrote:
-> Hi Eiraku-san,
-> 
-> On Monday 06 August 2012 18:55:24 Hideki EIRAKU wrote:
-> > fb_mmap() implemented in fbmem.c uses smem_start as the physical
-> > address of the frame buffer.  In the sh_mobile_lcdc driver, the
-> > smem_start is a dma_addr_t that is not a physical address when IOMMU is
-> > enabled.  dma_mmap_coherent() maps the address correctly.  It is
-> > available on ARM platforms.
-> > 
-> > Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
-> 
-> Acked-by: Hideki EIRAKU <hdk@igel.co.jp>
+This patchset moves the contents of regs-fb-v4.h and regs-fb.h from arch side
+to include/video/samsung_fimd.h
 
-I obviously meant
+This patchset is created and rebased against master branch of torvalds tree.
+Tested on smdk5250 board, build tested for other boards.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Changes from version 3:
+	- Squashed 1st, 3rd, 4th and 5th patches from version 3
 
-> As this patch doesn't depend on any other patch in your series
-> (ARCH_HAS_DMA_MMAP_COHERENT will not be defined without 1/4, so this patch
-> will be a no-op until then), I've applied it to my tree and will push it to
-> avoid merge conflicts, unless you would prefer to push it yourself.
-> 
-> > ---
-> > 
-> >  drivers/video/sh_mobile_lcdcfb.c |   28 ++++++++++++++++++++++++++++
-> >  1 files changed, 28 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/video/sh_mobile_lcdcfb.c
-> > b/drivers/video/sh_mobile_lcdcfb.c index 8cb653b..c8cba7a 100644
-> > --- a/drivers/video/sh_mobile_lcdcfb.c
-> > +++ b/drivers/video/sh_mobile_lcdcfb.c
-> > @@ -1614,6 +1614,17 @@ static int sh_mobile_lcdc_overlay_blank(int blank,
-> > struct fb_info *info) return 1;
-> > 
-> >  }
-> > 
-> > +#ifdef ARCH_HAS_DMA_MMAP_COHERENT
-> > +static int
-> > +sh_mobile_lcdc_overlay_mmap(struct fb_info *info, struct vm_area_struct
-> > *vma) +{
-> > +	struct sh_mobile_lcdc_overlay *ovl = info->par;
-> > +
-> > +	return dma_mmap_coherent(ovl->channel->lcdc->dev, vma, ovl->fb_mem,
-> > +				 ovl->dma_handle, ovl->fb_size);
-> > +}
-> > +#endif
-> > +
-> > 
-> >  static struct fb_ops sh_mobile_lcdc_overlay_ops = {
-> >  
-> >  	.owner          = THIS_MODULE,
-> >  	.fb_read        = fb_sys_read,
-> > 
-> > @@ -1626,6 +1637,9 @@ static struct fb_ops sh_mobile_lcdc_overlay_ops = {
-> > 
-> >  	.fb_ioctl       = sh_mobile_lcdc_overlay_ioctl,
-> >  	.fb_check_var	= sh_mobile_lcdc_overlay_check_var,
-> >  	.fb_set_par	= sh_mobile_lcdc_overlay_set_par,
-> > 
-> > +#ifdef ARCH_HAS_DMA_MMAP_COHERENT
-> > +	.fb_mmap	= sh_mobile_lcdc_overlay_mmap,
-> > +#endif
-> > 
-> >  };
-> >  
-> >  static void
-> > 
-> > @@ -2093,6 +2107,17 @@ static int sh_mobile_lcdc_blank(int blank, struct
-> > fb_info *info) return 0;
-> > 
-> >  }
-> > 
-> > +#ifdef ARCH_HAS_DMA_MMAP_COHERENT
-> > +static int
-> > +sh_mobile_lcdc_mmap(struct fb_info *info, struct vm_area_struct *vma)
-> > +{
-> > +	struct sh_mobile_lcdc_chan *ch = info->par;
-> > +
-> > +	return dma_mmap_coherent(ch->lcdc->dev, vma, ch->fb_mem,
-> > +				 ch->dma_handle, ch->fb_size);
-> > +}
-> > +#endif
-> > +
-> > 
-> >  static struct fb_ops sh_mobile_lcdc_ops = {
-> >  
-> >  	.owner          = THIS_MODULE,
-> >  	.fb_setcolreg	= sh_mobile_lcdc_setcolreg,
-> > 
-> > @@ -2108,6 +2133,9 @@ static struct fb_ops sh_mobile_lcdc_ops = {
-> > 
-> >  	.fb_release	= sh_mobile_lcdc_release,
-> >  	.fb_check_var	= sh_mobile_lcdc_check_var,
-> >  	.fb_set_par	= sh_mobile_lcdc_set_par,
-> > 
-> > +#ifdef ARCH_HAS_DMA_MMAP_COHERENT
-> > +	.fb_mmap	= sh_mobile_lcdc_mmap,
-> > +#endif
-> > 
-> >  };
-> >  
-> >  static void
--- 
-Regards,
+Changes from version 2:
+	- Changed the EXYNOS5_xxx macro name to FIMD_V8_xxx
+	- Moved the header inclusion under same kind
 
-Laurent Pinchart
+Changes from version 1:
+	- Split the patches as per Sylwester comments
+	- Changed FIMD_V8_xxx macro to EXYNOS5_xxx	
+
+Leela Krishna Amudala (2):
+  include/video: move fimd register headers from platform to
+    include/video
+  include/video: Add register offsets for FIMD version 8
+
+ arch/arm/mach-exynos/mach-nuri.c                   |    2 +-
+ arch/arm/mach-exynos/mach-origen.c                 |    2 +-
+ arch/arm/mach-exynos/mach-smdk4x12.c               |    2 +-
+ arch/arm/mach-exynos/mach-smdkv310.c               |    2 +-
+ arch/arm/mach-exynos/mach-universal_c210.c         |    2 +-
+ arch/arm/mach-exynos/setup-fimd0.c                 |    2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2416.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-anw6410.c               |    2 +-
+ arch/arm/mach-s3c64xx/mach-crag6410.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-hmt.c                   |    2 +-
+ arch/arm/mach-s3c64xx/mach-mini6410.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-ncp.c                   |    2 +-
+ arch/arm/mach-s3c64xx/mach-real6410.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-smartq5.c               |    2 +-
+ arch/arm/mach-s3c64xx/mach-smartq7.c               |    2 +-
+ arch/arm/mach-s3c64xx/mach-smdk6410.c              |    2 +-
+ arch/arm/mach-s5p64x0/mach-smdk6440.c              |    2 +-
+ arch/arm/mach-s5p64x0/mach-smdk6450.c              |    2 +-
+ arch/arm/mach-s5pc100/mach-smdkc100.c              |    2 +-
+ arch/arm/mach-s5pv210/mach-aquila.c                |    2 +-
+ arch/arm/mach-s5pv210/mach-goni.c                  |    2 +-
+ arch/arm/mach-s5pv210/mach-smdkv210.c              |    2 +-
+ arch/arm/plat-samsung/include/plat/regs-fb-v4.h    |  159 --------------------
+ drivers/gpu/drm/exynos/exynos_drm_fimd.c           |    2 +-
+ drivers/video/s3c-fb.c                             |    2 +-
+ .../plat/regs-fb.h => include/video/samsung_fimd.h |  152 +++++++++++++++++--
+ 26 files changed, 165 insertions(+), 194 deletions(-)
+ delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+ rename arch/arm/plat-samsung/include/plat/regs-fb.h => include/video/samsung_fimd.h (73%)
