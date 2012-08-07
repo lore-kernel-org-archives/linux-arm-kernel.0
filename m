@@ -1,39 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Aug 2012 09:21:35 +0000
-Subject: [PATCH 1/1] ARM: kirkwood: fix typo in Makefile.boot
-In-Reply-To: <1344177932-6466-1-git-send-email-sebastian.hesselbarth@googlemail.com>
-References: <1344177932-6466-1-git-send-email-sebastian.hesselbarth@googlemail.com>
-Message-ID: <201208070921.35459.arnd@arndb.de>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Tue, 07 Aug 2012 15:07:54 +0530
+Subject: [PATCH V3 0/5] arm: samsung: Move FIMD headers to include/video/
+Message-ID: <1344332279-16736-1-git-send-email-l.krishna@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 05 August 2012, Sebastian Hesselbarth wrote:
-> Just a small typo fix to make lsxl dtbs compile
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@googlemail.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/mach-kirkwood/Makefile.boot |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-kirkwood/Makefile.boot b/arch/arm/mach-kirkwood/Makefile.boot
-> index 2a576ab..a571755 100644
-> --- a/arch/arm/mach-kirkwood/Makefile.boot
-> +++ b/arch/arm/mach-kirkwood/Makefile.boot
-> @@ -9,5 +9,5 @@ dtb-$(CONFIG_MACH_ICONNECT_DT) += kirkwood-iconnect.dtb
->  dtb-$(CONFIG_MACH_IB62X0_DT) += kirkwood-ib62x0.dtb
->  dtb-$(CONFIG_MACH_TS219_DT)	+= kirkwood-qnap-ts219.dtb
->  dtb-$(CONFIG_MACH_GOFLEXNET_DT) += kirkwood-goflexnet.dtb
-> -dbt-$(CONFIG_MACH_LSXL_DT) += kirkwood-lschlv2.dtb
-> -dbt-$(CONFIG_MACH_LSXL_DT) += kirkwood-lsxhl.dtb
-> +dtb-$(CONFIG_MACH_LSXL_DT) += kirkwood-lschlv2.dtb
-> +dtb-$(CONFIG_MACH_LSXL_DT) += kirkwood-lsxhl.dtb
+This patchset moves the contents of regs-fb-v4.h and regs-fb.h from arch side
+to include/video/samsung_fimd.h
 
-As Jason and Andrew are both currently unavailable, I'm applying this directly
-to the fixes branch in arm-soc.
+This patchset is created and rebased against master branch of torvalds tree.
+Tested on smdk5250 board, build tested for other boards.
 
-	Arnd
+Changes from version 2:
+	- Changed the EXYNOS5_xxx macro name to FIMD_V8_xxx
+	- Moved the header inclusion under same kind
+
+Changes from version 1:
+	- Split the patches as per Sylwester comments
+	- Changed FIMD_V8_xxx macro to EXYNOS5_xxx	
+
+Leela Krishna Amudala (5):
+  include/video: Add samsung FIMD register header
+  include/video: Add Exynos5 specific FIMD register offsets
+  arm: samsung: Include the modified FIMD header file
+  driver: Include the modified FIMD header file
+  arm: samsung: delete frame buffer header files from platform
+
+ arch/arm/mach-exynos/mach-nuri.c                |    2 +-
+ arch/arm/mach-exynos/mach-origen.c              |    2 +-
+ arch/arm/mach-exynos/mach-smdk4x12.c            |    2 +-
+ arch/arm/mach-exynos/mach-smdkv310.c            |    2 +-
+ arch/arm/mach-exynos/mach-universal_c210.c      |    2 +-
+ arch/arm/mach-exynos/setup-fimd0.c              |    2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2416.c           |    2 +-
+ arch/arm/mach-s3c64xx/mach-anw6410.c            |    2 +-
+ arch/arm/mach-s3c64xx/mach-crag6410.c           |    2 +-
+ arch/arm/mach-s3c64xx/mach-hmt.c                |    2 +-
+ arch/arm/mach-s3c64xx/mach-mini6410.c           |    2 +-
+ arch/arm/mach-s3c64xx/mach-ncp.c                |    2 +-
+ arch/arm/mach-s3c64xx/mach-real6410.c           |    2 +-
+ arch/arm/mach-s3c64xx/mach-smartq5.c            |    2 +-
+ arch/arm/mach-s3c64xx/mach-smartq7.c            |    2 +-
+ arch/arm/mach-s3c64xx/mach-smdk6410.c           |    2 +-
+ arch/arm/mach-s5p64x0/mach-smdk6440.c           |    2 +-
+ arch/arm/mach-s5p64x0/mach-smdk6450.c           |    2 +-
+ arch/arm/mach-s5pc100/mach-smdkc100.c           |    2 +-
+ arch/arm/mach-s5pv210/mach-aquila.c             |    2 +-
+ arch/arm/mach-s5pv210/mach-goni.c               |    2 +-
+ arch/arm/mach-s5pv210/mach-smdkv210.c           |    2 +-
+ arch/arm/plat-samsung/include/plat/regs-fb-v4.h |  159 -------
+ arch/arm/plat-samsung/include/plat/regs-fb.h    |  403 -----------------
+ drivers/gpu/drm/exynos/exynos_drm_fimd.c        |    2 +-
+ drivers/video/s3c-fb.c                          |    2 +-
+ include/video/samsung_fimd.h                    |  533 +++++++++++++++++++++++
+ 27 files changed, 557 insertions(+), 586 deletions(-)
+ delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb.h
+ create mode 100644 include/video/samsung_fimd.h
