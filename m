@@ -1,52 +1,45 @@
 From: Dongjin.Kim@agreeyamobility.net (Dongjin Kim)
-Date: Tue, 7 Aug 2012 19:50:11 +0000
-Subject: =?ks_c_5601-1987?B?yLi9xTogW1BBVENIIDEvNF0gYXJtL2R0czogbWF4Nzc2ODY6IEFk?=
- =?ks_c_5601-1987?Q?d_DTS_file_for_max77686_PMIC?=
-In-Reply-To: <20120807193413.GE14711@sirena.org.uk>
-References: <1344366267-18971-1-git-send-email-dongjin.kim@agreeyamobility.net>,
- <20120807193413.GE14711@sirena.org.uk>
-Message-ID: <A6A3B7488C419F488E5B13FFD03C08AD2F4372BC@SN2PRD0510MB370.namprd05.prod.outlook.com>
+Date: Tue, 7 Aug 2012 19:57:33 +0000
+Subject: =?ks_c_5601-1987?B?yLi9xTogW1BBVENIIDIvNF0gYXJtL2R0czogZXh5bm9zNDogQWRk?=
+ =?ks_c_5601-1987?Q?_DTS_files_derived_from_common_Exynos4?=
+In-Reply-To: <201208071938.26507.arnd@arndb.de>
+References: <1344366398-19022-1-git-send-email-dongjin.kim@agreeyamobility.net>,
+ <201208071938.26507.arnd@arndb.de>
+Message-ID: <A6A3B7488C419F488E5B13FFD03C08AD2F4372EB@SN2PRD0510MB370.namprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-Are you meaning VDD_MIF_1.0V, for example, would be replaced with another common name for other boards and my board file, exynos4412-odroidx.dts, describe the name again if necessary? Like below?
-
-max77686.dtsi:
-    buck1 {
-         regulator-compatible = "BUCK1";
-         regulator-name = "VDD_BUCK1_1.0V";
-         regulator-min-microvolt = <800000>;
-         regulator-max-microvolt = <1050000>;
-         regulator-always-on;
-         regulator-boot-on;
-    };
-
-my board's DTS file:
-    buck1 {
-        regulator-name = "VDD_MIF_1.0V";
-    }
+I didn't use -M and I couldn't see any difference with the it.
+Did I make something wrong on that patch?
 
 Thank you in advance.
 Dongjin.
 ________________________________________
-?? ??: Mark Brown [broonie at opensource.wolfsonmicro.com]
-?? ??: 2012? 8? 8? ??? ?? 4:34
+?? ??: Arnd Bergmann [arnd at arndb.de]
+?? ??: 2012? 8? 8? ??? ?? 4:38
 ?? ??: Dongjin Kim
-??: Russell King; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Dongjin Kim
-??: Re: [PATCH 1/4] arm/dts: max77686: Add DTS file for max77686 PMIC
+??: Dongjin Kim; Russell King; Thomas Abraham; Kukjin Kim; Grant Likely; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+??: Re: [PATCH 2/4] arm/dts: exynos4: Add DTS files derived from common Exynos4
 
-On Wed, Aug 08, 2012 at 04:04:11AM +0900, Dongjin Kim wrote:
+On Tuesday 07 August 2012, Dongjin Kim wrote:
+>
+> This patch creates a DTS file, exynos4.dtsi, for Exynos4210/4x12 and it
+> describes common device nodes. SoC specific device nodes are described in
+> another DTS file derived from this, exynos4210.dtsi and exynos4412.dtsi.
+>
+> exynos4412.dtsi is added new for Exynos4412 as well as exynos4210 is modified
+> for Exynos4210 specific device nodes.
+>
+> Signed-off-by: Dongjin Kim <dongjin.kim@agreeyamobility.net>
+> ---
+>  arch/arm/boot/dts/exynos4.dtsi    |  404 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos4210.dtsi |  374 +---------------------------------
+>  arch/arm/boot/dts/exynos4412.dtsi |  104 ++++++++++
+>  3 files changed, 510 insertions(+), 372 deletions(-)
 
-> +                     buck1 {
-> +                             regulator-compatible = "BUCK1";
-> +                             regulator-name = "VDD_MIF_1.0V";
-> +                             regulator-min-microvolt = <800000>;
-> +                             regulator-max-microvolt = <1050000>;
-> +                             regulator-always-on;
-> +                             regulator-boot-on;
-> +                     };
+Looks good in principle. I would hope that "git format-patch -M" can detect this
+mostly-moved filed. Did you use that?
 
-These settings for the regulators are clearly specific to the board
-rather than the device so should be in the board file.
+        Arnd
