@@ -1,84 +1,34 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 7 Aug 2012 17:48:22 +0100
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 7 Aug 2012 17:50:20 +0100
 Subject: [PATCH 4/9] ASoC: imx: Don't use {en,dis}able_fiq() calls
-In-Reply-To: <CAKGA1bkiHj=zMJXSzoGp3fpLS3POnFXSV5y7sYYFAikqoUT9tQ@mail.gmail.com>
+In-Reply-To: <20120807063558.GE1451@pengutronix.de>
 References: <20120805230238.GA1663@lizard>
  <1344207819-3415-4-git-send-email-anton.vorontsov@linaro.org>
  <CAKGA1bkiHj=zMJXSzoGp3fpLS3POnFXSV5y7sYYFAikqoUT9tQ@mail.gmail.com>
-Message-ID: <20120807164822.GA2135@linaro.org>
+ <20120806154951.GQ16861@opensource.wolfsonmicro.com>
+ <CAKGA1b=_AOub_pEJJGBTb6Y7wLZaSYKQjFTyMVFSr_=9VX4wpg@mail.gmail.com>
+ <20120806193734.GA16199@opensource.wolfsonmicro.com>
+ <20120806201609.GX25644@pengutronix.de>
+ <CAKGA1bmMqyL4gyLYcanEH=R=HuBjRCNRLjUEWCj8wmpi3HuL0g@mail.gmail.com>
+ <20120806214121.GA26698@opensource.wolfsonmicro.com>
+ <20120807063558.GE1451@pengutronix.de>
+Message-ID: <20120807165019.GT16861@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2012 at 10:19:50AM -0500, Matt Sealey wrote:
-> On Sun, Aug 5, 2012 at 6:03 PM, Anton Vorontsov
-> <anton.vorontsov@linaro.org> wrote:
-> > The driver uses platform-specific mxc_set_irq_fiq() with the VIRQ cookie
-> > passed to it, so it's pretty clear that the driver is absolutely sure
-> > that the FIQ is routed via platform-specific IC, and that the cookie can
-> > be used to mask/unmask FIQs. So, let's switch to the genirq routines,
-> > since we're about to remove FIQ-specific variants.
-> 
-> I have a semi-related question about this;
-> 
-> Firstly, I was planning on (re-)submitting a patch for the
-> arch/arm/plat-mxc/ssi-fiq.S code which made it build in ARM mode
-> (since the code isn't Thumb compatible for various reasons) as it was
-> a blocker for a Thumb2-compiled kernel. Since the code was only needed
-> on ARM-capable processors it wouldn't cause a problem. Sascha signed
-> off on this a long while back and I've been testing it on all my
-> internal kernel versions, and I don't see any ill effects (that said I
-> don't have an i.MX28 or so to really verify it, I can't see why it
-> would not work). I realise this is redundant right now, anyway, since
-> it's only really enabled on imx_v4_v5 configs and they don't support
-> Thumb2 kernels anyway. What might be worth submitting is a switch to
-> add the ".arm" directive anyway simply for correctness since it could
-> never be compiled for Thumb anyway. We all know what gnu as is like.
-> 
-> Looking at it again on the back of these patches, I noticed the
-> ssi-fiq.S code is compiled in when SND_IMX_SOC is enabled - of course,
-> it's only needed in the kernel if SND_SOC_IMX_PCM_FIQ is enabled (the
-> code that uses the FIQ stuff is only compiled then) but here on the
-> Efika MX builds it's being built, and I noticed it when it broke my
-> build because of the above. I'm therefore going to submit a patch
-> which changes the ifdef SND_SOC_IMX to ifdef SND_SOC_IMX_PCM_FIQ so
-> it's not compiled in unless absolutely necessary. However, there was a
-> rumble that this code may disappear or be reworked in the future
-> making this also quite redundant. Since it's not in the
-> imx_v6_v7_defconfig anyway, I'm sure this only didn't get noticed
-> because nobody's building Thumb2 kernels and nobody is trying configs
-> with audio enabled anyway..
-> 
-> This begs the question, could there be something somewhere hidden deep
-> in the kernel that is enabled by default or in some config somewhere
-> that requires "select FIQ" in it's Kconfig entry, but isn't being
-> enabled? On i.MX the only thing turning it on is that code, but other
-> ARM arch enable it by default. Since things have been moved to more
-> generic routines I can't in my mind guarantee that such a patch would
-> be well tested here since I would be relying on symbols missing or
-> defines not there anymore.. I have no real way to ensure that it would
-> work on boards I don't have.
-> 
-> So, is the first patch (ssi-fiq.S .arm) worth it? I think the
-> SND_SOC_IMX_PCM_FIQ patch is worth it for v6_v7 systems anyway, but
-> maybe this should have been caught sooner, so should I update the
-> defconfig to enable some kind of audio bus support (Babbage has it in
-> the DT so is a needful thing for testing, I figure..)? And does anyone
-> forsee any problems with that option changing and the only "user" of
-> "FIQ" in the Kconfigs going away now all the FIQ-specific symbols went
-> away outside of the generic irq subsystem?
+On Tue, Aug 07, 2012 at 08:35:58AM +0200, Sascha Hauer wrote:
 
-I hit this issue some time ago when I was trying to do a Thumb2 build
-of this kernel.
+> Nowadays the FIQ support is necessary only for AC97. The AC97 support in
+> the SSI unit is buggy: It does not allow you to select the slots you
+> want to receive. At least the wm9712 codec always sends (apart from the
+> stereo data) data in slot (I think it is) 12. You find this data mixed
+> in your audio stream. The FIQ driver skips this data to get a valid
+> audio stream.
 
-I don't remember having to fix the generic FIQ code just for this,
-but I had a patch somewhere to swap r13 with another register in
-ssi-fiq.S.  I think that use of r13 in ways not permitted for Thumb
-was the only problem I found.  I can try to dig it out if you want.
+Right, any device with GPIO support will do this - it's how GPIO works
+in AC'97.
 
-In any case, it didn't seem worth pushing at the time, because it
-seemed that the SSI FIQ code was not relevant to any v7 or later
-platform -- so building that code for Thumb presumably doesn't make
-sense.
+> One other way to solve this would be to use dma here and to filter out
+> the data afterwards.
 
-Cheers
----Dave
+Yup.  That's probably more sane but also more work to implement.
