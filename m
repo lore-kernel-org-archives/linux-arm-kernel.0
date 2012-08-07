@@ -1,26 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 7 Aug 2012 00:28:52 -0700
-Subject: [RFC 1/6] ARM: OMAP3: PRM: move prcm interrupt handlers to PRM
- driver code
-In-Reply-To: <87ipd4g4a5.fsf@ti.com>
-References: <1342197459-7920-1-git-send-email-t-kristo@ti.com>
- <1342197459-7920-2-git-send-email-t-kristo@ti.com>
- <87ipd4g4a5.fsf@ti.com>
-Message-ID: <20120807072852.GN11011@atomide.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Tue, 7 Aug 2012 07:29:06 +0000
+Subject: [GIT PULL 1/5] omap device tree changes for v3.6 merge window
+In-Reply-To: <20120807071351.GK11011@atomide.com>
+References: <pull-1341925556-888624>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9A8BE1@DBDE01.ent.ti.com>
+ <20120713064147.GG1122@atomide.com> <20120713075658.GQ1122@atomide.com>
+ <20120807071351.GK11011@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9B1B0C@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@ti.com> [120730 17:36]:
+On Tue, Aug 07, 2012 at 12:43:51, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [120713 01:01]:
+> > * Tony Lindgren <tony@atomide.com> [120712 23:46]:
+
+> > > my scripts when applying patches. We'll have to apply this as a fix.
+> > Arnd and Olof, let me know if you want me to resubmit a new branch instead
+> > of the already pulled devel-dt branch. That branch should not have other
+> > dependencies as it's based on -rc5. Of course is it's buried into other
+> > DT patches it's too late.
 > 
-> At first, I wasn't sure why this was happening on Overo boards and not
-> on the other boards, but then I notcied there was a *lot* more pm_wkup
-> interrupts during boot on Overo compared to the other boards.  This is
-> because of the GPIO IRQ for the network interface as well as the network
-> stack itself setting timers, resulting in a lot more pm_wkup events
-> during boot and making the race more likely.
+> Now with -rc1 out, I'll queue the following fix.
 
-Also happens if you may have somehow both edges selected for GPIO
-interrupts. Might be worth checking at least just in case of bugs
-somewhere..
+Thanks Tony
 
-Tony
+Regards
+Afzal
