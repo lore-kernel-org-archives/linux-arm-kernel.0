@@ -1,301 +1,237 @@
 From: ian.molton@codethink.co.uk (Ian Molton)
-Date: Tue,  7 Aug 2012 15:34:48 +0100
-Subject: [PATCH v3 3/7] mv643xx.c: Add basic device tree support.
+Date: Tue,  7 Aug 2012 15:34:52 +0100
+Subject: [PATCH v3 7/7] NET: mv643xx: remove device name macro.
 In-Reply-To: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
 References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
-Message-ID: <1344350092-24050-4-git-send-email-ian.molton@codethink.co.uk>
+Message-ID: <1344350092-24050-8-git-send-email-ian.molton@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-    This patch adds basic device tree support to the mv643xx ethernet driver.
+Coding style: remove the macros:
 
-    It should be enough for most current users of the device, and should allow
-    a painless migration.
+MV643XX_ETH_NAME and
+MV643XX_ETH_SHARED_NAME
 
-    Signed-off-by: Ian Molton <ian.molton@codethink.co.uk>
+Signed-off-by: Ian Molton <ian.molton@codethink.co.uk>
 ---
- Documentation/devicetree/bindings/net/mv643xx.txt |   75 +++++++++++++++++
- drivers/net/ethernet/marvell/mv643xx_eth.c        |   93 +++++++++++++++++++--
- 2 files changed, 161 insertions(+), 7 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/mv643xx.txt
+ arch/arm/mach-kirkwood/board-dt.c          |    4 ++--
+ arch/arm/mach-kirkwood/common.c            |    4 ++--
+ arch/arm/plat-orion/common.c               |   24 ++++++++++++------------
+ arch/powerpc/platforms/chrp/pegasos_eth.c  |    4 ++--
+ arch/powerpc/sysdev/mv64x60_dev.c          |    5 ++---
+ drivers/net/ethernet/marvell/mv643xx_eth.c |    8 ++++----
+ include/linux/mv643xx_eth.h                |    2 --
+ 7 files changed, 24 insertions(+), 27 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/mv643xx.txt b/Documentation/devicetree/bindings/net/mv643xx.txt
-new file mode 100644
-index 0000000..2727f79
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/mv643xx.txt
-@@ -0,0 +1,75 @@
-+mv643xx related nodes.
-+
-+marvell,mdio-mv643xx:
-+
-+Required properties:
-+
-+ - interrupts : <a> where a is the SMI interrupt number.
-+ - reg : the base address and size of the controllers register space.
-+
-+Optional properties:
-+ - shared_smi : on some chips, the second PHY is "shared", meaning it is
-+	really accessed via the first SMI controller. It is passed in this
-+	way due to the present structure of the driver, which requires the
-+	base address for the MAC to be passed in via the SMI controllers
-+	platform data.
-+ - tx_csum_limit : on some devices, this option is required for proper
-+	operation wrt. jumbo frames.
-+
-+
-+Example:
-+
-+smi0: mdio at 72000 {
-+	compatible = "marvell,mdio-mv643xx";
-+	reg = <0x72000 0x4000>;
-+	interrupts = <46>;
-+	tx_csum_limit = <1600>;
-+	status = "disabled";
-+};
-+
-+smi1: mdio at 76000 {
-+	compatible = "marvell,mdio-mv643xx";
-+	reg = <0x76000 0x4000>;
-+	interrupts = <47>;
-+	shared_smi = <&smi0>;
-+	tx_csum_limit = <1600>;
-+	status = "disabled";
-+};
-+
-+
-+
-+marvell,mv643xx-eth:
-+
-+Required properties:
-+ - interrupts : the port interrupt number.
-+ - mdio : phandle of the smi device as drescribed above
-+
-+Optional properties:
-+ - port_number : the port number on this bus.
-+ - phy_addr : the PHY address.
-+ - reg : should match the mdio reg this device is attached to.
-+	this is a required hack for now due to the way the
-+	driver is constructed. This allows the device clock to be
-+	kept running so that the MAC is not lost after boot.
-+
-+
-+Example:
-+
-+egiga0 {
-+	compatible = "marvell,mv643xx-eth";
-+	reg = <0x72000 0x4000>;
-+	mdio = <&smi0>;
-+	port_number = <0>;
-+	phy_addr = <0x80>;
-+	interrupts = <11>;
-+};
-+
-+egiga1 {
-+	compatible = "marvell,mv643xx-eth";
-+	reg = <0x76000 0x4000>;
-+	mdio = <&smi1>;
-+	port_number = <0>;
-+	phy_addr = <0x81>;
-+	interrupts = <15>;
-+};
-+
-diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-index 92497eb..bb80050 100644
---- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-+++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-@@ -48,6 +48,9 @@
- #include <linux/ethtool.h>
- #include <linux/platform_device.h>
- #include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_irq.h>
- #include <linux/kernel.h>
- #include <linux/spinlock.h>
- #include <linux/workqueue.h>
-@@ -2601,7 +2604,7 @@ static void infer_hw_params(struct mv643xx_eth_shared_private *msp)
- static int mv643xx_eth_shared_probe(struct platform_device *pdev)
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index aa213b6..91784d9 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -34,9 +34,9 @@ struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("marvell,orion-wdt", 0xf1020300, "orion_wdt", NULL),
+ 	OF_DEV_AUXDATA("marvell,orion-sata", 0xf1080000, "sata_mv.0", NULL),
+ 	OF_DEV_AUXDATA("marvell,orion-nand", 0xf4000000, "orion_nand", NULL),
+-	OF_DEV_AUXDATA("marvell,mv643xx", 0xf1072000, "mv643xx_eth_port.0",
++	OF_DEV_AUXDATA("marvell,mv643xx", 0xf1072000, "mv643xx_eth.0",
+ 			NULL),
+-	OF_DEV_AUXDATA("marvell,mv643xx", 0xf1076000, "mv643xx_eth_port.1",
++	OF_DEV_AUXDATA("marvell,mv643xx", 0xf1076000, "mv643xx_eth.1",
+ 			NULL),
+ 	{},
+ };
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index 57b91cf..eb0a253 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -264,8 +264,8 @@ void __init kirkwood_clk_init(void)
+ 	/* clkdev entries, mapping clks to devices */
+ 	orion_clkdev_add(NULL, "orion_spi.0", runit);
+ 	orion_clkdev_add(NULL, "orion_spi.1", runit);
+-	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".0", ge0);
+-	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".1", ge1);
++	orion_clkdev_add(NULL, "mv643xx_eth.0", ge0);
++	orion_clkdev_add(NULL, "mv643xx_eth.1", ge1);
+ 	orion_clkdev_add(NULL, "orion_wdt", tclk);
+ 	orion_clkdev_add("0", "sata_mv.0", sata0);
+ 	orion_clkdev_add("1", "sata_mv.0", sata1);
+diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+index d245a87..d4a6467 100644
+--- a/arch/arm/plat-orion/common.c
++++ b/arch/arm/plat-orion/common.c
+@@ -42,10 +42,10 @@ void __init orion_clkdev_init(struct clk *tclk)
  {
- 	static int mv643xx_eth_version_printed;
--	struct mv643xx_eth_shared_platform_data *pd = pdev->dev.platform_data;
-+	struct mv643xx_eth_shared_platform_data *pd;
- 	struct mv643xx_eth_shared_private *msp;
- 	const struct mbus_dram_target_info *dram;
- 	struct resource *res;
-@@ -2625,6 +2628,26 @@ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
- 	if (msp->base == NULL)
- 		goto out_free;
+ 	orion_clkdev_add(NULL, "orion_spi.0", tclk);
+ 	orion_clkdev_add(NULL, "orion_spi.1", tclk);
+-	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".0", tclk);
+-	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".1", tclk);
+-	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".2", tclk);
+-	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".3", tclk);
++	orion_clkdev_add(NULL, "mv643xx_eth.0", tclk);
++	orion_clkdev_add(NULL, "mv643xx_eth.1", tclk);
++	orion_clkdev_add(NULL, "mv643xx_eth.2", tclk);
++	orion_clkdev_add(NULL, "mv643xx_eth.3", tclk);
+ 	orion_clkdev_add(NULL, "orion_wdt", tclk);
+ 	orion_clkdev_add(NULL, MV64XXX_I2C_CTLR_NAME ".0", tclk);
+ }
+@@ -264,7 +264,7 @@ static struct resource orion_ge00_shared_resources[] = {
+ };
  
-+	if (pdev->dev.of_node) {
-+		struct device_node *np = NULL;
-+
-+		/* when all users of this driver use FDT, we can remove this */
-+		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
-+		if (!pd) {
-+			dev_dbg(&pdev->dev, "Could not allocate platform data\n");
-+			goto out_free;
-+		}
-+
-+		of_property_read_u32(pdev->dev.of_node,
-+			"tx_csum_limit", &pd->tx_csum_limit);
-+
-+		np = of_parse_phandle(pdev->dev.of_node, "shared_smi", 0);
-+		if (np)
-+			pd->shared_smi = of_find_device_by_node(np);
-+
-+	} else {
-+		pd = pdev->dev.platform_data;
-+	}
- 	/*
- 	 * Set up and register SMI bus.
- 	 */
-@@ -2657,7 +2680,6 @@ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
- 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
- 	if (res != NULL) {
- 		int err;
--
- 		err = request_irq(res->start, mv643xx_eth_err_irq,
- 				  IRQF_SHARED, "mv643xx_eth", msp);
- 		if (!err) {
-@@ -2675,6 +2697,10 @@ static int mv643xx_eth_shared_probe(struct platform_device *pdev)
+ static struct platform_device orion_ge00_shared = {
+-	.name		= MV643XX_ETH_SHARED_NAME,
++	.name		= "mdio-mv643xx",
+ 	.id		= 0,
+ 	.dev		= {
+ 		.platform_data	= &orion_ge00_shared_data,
+@@ -279,7 +279,7 @@ static struct resource orion_ge00_resources[] = {
+ };
  
- 	msp->tx_csum_limit = (pd != NULL && pd->tx_csum_limit) ?
- 					pd->tx_csum_limit : 9 * 1024;
-+
-+	if (pdev->dev.of_node)
-+		kfree(pd);  /* If we created a fake pd, free it now */
-+
- 	infer_hw_params(msp);
+ static struct platform_device orion_ge00 = {
+-	.name		= MV643XX_ETH_NAME,
++	.name		= "mv643xx_eth",
+ 	.id		= 0,
+ 	.num_resources	= 1,
+ 	.resource	= orion_ge00_resources,
+@@ -316,7 +316,7 @@ static struct resource orion_ge01_shared_resources[] = {
+ };
  
- 	platform_set_drvdata(pdev, msp);
-@@ -2708,12 +2734,21 @@ static int mv643xx_eth_shared_remove(struct platform_device *pdev)
- 	return 0;
+ static struct platform_device orion_ge01_shared = {
+-	.name		= MV643XX_ETH_SHARED_NAME,
++	.name		= "mdio-mv643xx",
+ 	.id		= 1,
+ 	.dev		= {
+ 		.platform_data	= &orion_ge01_shared_data,
+@@ -331,7 +331,7 @@ static struct resource orion_ge01_resources[] = {
+ };
+ 
+ static struct platform_device orion_ge01 = {
+-	.name		= MV643XX_ETH_NAME,
++	.name		= "mv643xx_eth",
+ 	.id		= 1,
+ 	.num_resources	= 1,
+ 	.resource	= orion_ge01_resources,
+@@ -368,7 +368,7 @@ static struct resource orion_ge10_shared_resources[] = {
+ };
+ 
+ static struct platform_device orion_ge10_shared = {
+-	.name		= MV643XX_ETH_SHARED_NAME,
++	.name		= "mdio-mv643xx",
+ 	.id		= 1,
+ 	.dev		= {
+ 		.platform_data	= &orion_ge10_shared_data,
+@@ -383,7 +383,7 @@ static struct resource orion_ge10_resources[] = {
+ };
+ 
+ static struct platform_device orion_ge10 = {
+-	.name		= MV643XX_ETH_NAME,
++	.name		= "mv643xx_eth",
+ 	.id		= 1,
+ 	.num_resources	= 2,
+ 	.resource	= orion_ge10_resources,
+@@ -420,7 +420,7 @@ static struct resource orion_ge11_shared_resources[] = {
+ };
+ 
+ static struct platform_device orion_ge11_shared = {
+-	.name		= MV643XX_ETH_SHARED_NAME,
++	.name		= "mdio-mv643xx",
+ 	.id		= 1,
+ 	.dev		= {
+ 		.platform_data	= &orion_ge11_shared_data,
+@@ -435,7 +435,7 @@ static struct resource orion_ge11_resources[] = {
+ };
+ 
+ static struct platform_device orion_ge11 = {
+-	.name		= MV643XX_ETH_NAME,
++	.name		= "mv643xx_eth",
+ 	.id		= 1,
+ 	.num_resources	= 2,
+ 	.resource	= orion_ge11_resources,
+diff --git a/arch/powerpc/platforms/chrp/pegasos_eth.c b/arch/powerpc/platforms/chrp/pegasos_eth.c
+index 039fc8e..1832127 100644
+--- a/arch/powerpc/platforms/chrp/pegasos_eth.c
++++ b/arch/powerpc/platforms/chrp/pegasos_eth.c
+@@ -41,7 +41,7 @@ static struct resource mv643xx_eth_shared_resources[] = {
+ };
+ 
+ static struct platform_device mv643xx_eth_shared_device = {
+-	.name		= MV643XX_ETH_SHARED_NAME,
++	.name		= "mdio-mv643xx",
+ 	.id		= 0,
+ 	.num_resources	= ARRAY_SIZE(mv643xx_eth_shared_resources),
+ 	.resource	= mv643xx_eth_shared_resources,
+@@ -71,7 +71,7 @@ static struct mv643xx_eth_platform_data eth_port1_pd = {
+ };
+ 
+ static struct platform_device eth_port1_device = {
+-	.name		= MV643XX_ETH_NAME,
++	.name		= "mv643xx_eth",
+ 	.id		= 1,
+ 	.num_resources	= ARRAY_SIZE(mv643xx_eth_port1_resources),
+ 	.resource	= mv643xx_eth_port1_resources,
+diff --git a/arch/powerpc/sysdev/mv64x60_dev.c b/arch/powerpc/sysdev/mv64x60_dev.c
+index 0f6af41..ca404ec 100644
+--- a/arch/powerpc/sysdev/mv64x60_dev.c
++++ b/arch/powerpc/sysdev/mv64x60_dev.c
+@@ -221,8 +221,7 @@ static struct platform_device * __init mv64x60_eth_register_shared_pdev(
+ 	if (err)
+ 		return ERR_PTR(err);
+ 
+-	pdev = platform_device_register_simple(MV643XX_ETH_SHARED_NAME, id,
+-					       r, 1);
++	pdev = platform_device_register_simple("mdio-mv643xx", id, i r, 1);
+ 	return pdev;
  }
  
-+#ifdef CONFIG_OF
-+static struct of_device_id mv_mdio_dt_ids[] __devinitdata = {
-+	{ .compatible = "marvell,mdio-mv643xx", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, mv_mdio_dt_ids);
-+#endif
-+
- static struct platform_driver mv643xx_eth_shared_driver = {
+@@ -296,7 +295,7 @@ static int __init mv64x60_eth_device_setup(struct device_node *np, int id,
+ 
+ 	of_node_put(phy);
+ 
+-	pdev = platform_device_alloc(MV643XX_ETH_NAME, id);
++	pdev = platform_device_alloc("mv643xx_eth", id);
+ 	if (!pdev)
+ 		return -ENOMEM;
+ 
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index bb80050..9371601 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -2746,7 +2746,7 @@ static struct platform_driver mv643xx_eth_shared_driver = {
  	.probe		= mv643xx_eth_shared_probe,
  	.remove		= mv643xx_eth_shared_remove,
  	.driver = {
- 		.name	= MV643XX_ETH_SHARED_NAME,
+-		.name	= MV643XX_ETH_SHARED_NAME,
++		.name	= "mdio-mv643xx",
  		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(mv_mdio_dt_ids),
+ 		.of_match_table = of_match_ptr(mv_mdio_dt_ids),
  	},
- };
- 
-@@ -2873,7 +2908,36 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	int err;
- 
--	pd = pdev->dev.platform_data;
-+	if (pdev->dev.of_node) {
-+		struct device_node *np = NULL;
-+
-+		/* when all users of this driver use FDT, we can remove this */
-+		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
-+		if (!pd) {
-+			dev_dbg(&pdev->dev, "Could not allocate platform data\n");
-+			return -ENOMEM;
-+		}
-+
-+		of_property_read_u32(pdev->dev.of_node,
-+			"port_number", &pd->port_number);
-+
-+		if (!of_property_read_u32(pdev->dev.of_node,
-+				"phy_addr", &pd->phy_addr))
-+			pd->phy_addr = MV643XX_ETH_PHY_ADDR(pd->phy_addr);
-+		else
-+			pd->phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT;
-+
-+		np = of_parse_phandle(pdev->dev.of_node, "mdio", 0);
-+		if (np) {
-+			pd->shared = of_find_device_by_node(np);
-+		} else {
-+			kfree(pd);
-+			return -ENODEV;
-+		}
-+	} else {
-+		pd = pdev->dev.platform_data;
-+	}
-+
- 	if (pd == NULL) {
- 		dev_err(&pdev->dev, "no mv643xx_eth_platform_data\n");
- 		return -ENODEV;
-@@ -2881,12 +2945,15 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
- 
- 	if (pd->shared == NULL) {
- 		dev_err(&pdev->dev, "no mv643xx_eth_platform_data->shared\n");
--		return -ENODEV;
-+		err = -ENODEV;
-+		goto out_free_pd;
- 	}
- 
- 	dev = alloc_etherdev_mq(sizeof(struct mv643xx_eth_private), 8);
--	if (!dev)
--		return -ENOMEM;
-+	if (!dev) {
-+		err = -ENOMEM;
-+		goto out_free_pd;
-+	}
- 
- 	mp = netdev_priv(dev);
- 	platform_set_drvdata(pdev, mp);
-@@ -2923,6 +2990,8 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
- 
- 	init_pscr(mp, pd->speed, pd->duplex);
- 
-+	if (pdev->dev.of_node)
-+		kfree(pd); /* If we created a fake pd, free it now */
- 
- 	mib_counters_clear(mp);
- 
-@@ -2942,7 +3011,6 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
- 	mp->rx_oom.data = (unsigned long)mp;
- 	mp->rx_oom.function = oom_timer_wrapper;
- 
--
- 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
- 	BUG_ON(!res);
- 	dev->irq = res->start;
-@@ -2991,6 +3059,8 @@ out:
- 	}
- #endif
- 	free_netdev(dev);
-+out_free_pd:
-+	kfree(pd);
- 
- 	return err;
- }
-@@ -3030,6 +3100,14 @@ static void mv643xx_eth_shutdown(struct platform_device *pdev)
- 		port_reset(mp);
- }
- 
-+#ifdef CONFIG_OF
-+static struct of_device_id mv_eth_dt_ids[] __devinitdata = {
-+	{ .compatible = "marvell,mv643xx-eth", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, mv_eth_dt_ids);
-+#endif
-+
- static struct platform_driver mv643xx_eth_driver = {
- 	.probe		= mv643xx_eth_probe,
+@@ -3113,7 +3113,7 @@ static struct platform_driver mv643xx_eth_driver = {
  	.remove		= mv643xx_eth_remove,
-@@ -3037,6 +3115,7 @@ static struct platform_driver mv643xx_eth_driver = {
+ 	.shutdown	= mv643xx_eth_shutdown,
  	.driver = {
- 		.name	= MV643XX_ETH_NAME,
+-		.name	= MV643XX_ETH_NAME,
++		.name	= "mv643xx_eth",
  		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(mv_eth_dt_ids),
+ 		.of_match_table = of_match_ptr(mv_eth_dt_ids),
  	},
- };
+@@ -3145,5 +3145,5 @@ MODULE_AUTHOR("Rabeeh Khoury, Assaf Hoffman, Matthew Dharm, "
+ 	      "Manish Lachwani, Dale Farnsworth and Lennert Buytenhek");
+ MODULE_DESCRIPTION("Ethernet driver for Marvell MV643XX");
+ MODULE_LICENSE("GPL");
+-MODULE_ALIAS("platform:" MV643XX_ETH_SHARED_NAME);
+-MODULE_ALIAS("platform:" MV643XX_ETH_NAME);
++MODULE_ALIAS("platform:" "mdio-mv643xx");
++MODULE_ALIAS("platform:" "mv643xx_eth");
+diff --git a/include/linux/mv643xx_eth.h b/include/linux/mv643xx_eth.h
+index 51bf8ad..33dc6f4 100644
+--- a/include/linux/mv643xx_eth.h
++++ b/include/linux/mv643xx_eth.h
+@@ -7,8 +7,6 @@
  
+ #include <linux/mbus.h>
+ 
+-#define MV643XX_ETH_SHARED_NAME		"mv643xx_eth"
+-#define MV643XX_ETH_NAME		"mv643xx_eth_port"
+ #define MV643XX_ETH_SHARED_REGS		0x2000
+ #define MV643XX_ETH_SHARED_REGS_SIZE	0x2000
+ #define MV643XX_ETH_BAR_4		0x2220
 -- 
 1.7.9.5
