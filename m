@@ -1,23 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 7 Aug 2012 03:58:47 -0700
-Subject: [PATCH] Revert "ARM: OMAP3530evm: set pendown_state and
- debounce time for ads7846"
-In-Reply-To: <871ujj7ngd.fsf@ti.com>
-References: <876298iv9s.fsf@ti.com>
- <1344284535-16717-1-git-send-email-grinberg@compulab.co.il>
- <871ujj7ngd.fsf@ti.com>
-Message-ID: <20120807105847.GX11011@atomide.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Tue, 07 Aug 2012 16:57:51 +0530
+Subject: [PATCH 0/4] i2c: omap: few more patches
+In-Reply-To: <1344262737-6662-1-git-send-email-balbi@ti.com>
+References: <1344262737-6662-1-git-send-email-balbi@ti.com>
+Message-ID: <5020FBB7.3030308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@ti.com> [120806 13:52]:
-> 
-> The Overo boards were the ones that were crashing due to this bug since
-> the pendown GPIO was the only one used in the bank.
-> 
-> Tony, can you queue this up for v3.6-rc?  I have a version in my
-> for_3.6/fixes/ads7846-2 branch with the tags above applied, based on v3.6-rc1.
+On Monday 06 August 2012 07:48 PM, Felipe Balbi wrote:
+> Just a few extra patches on top of the earlier series I sent.
+>
+> With these patches, we have threaded irq support and autosuspend support for
+> i2c-omap driver.
+Thanks for the patches.
+>
+> All patches boot tested with pandaboard.
+Tested-by: Shubhrajyoti <shubhrajyoti@ti.com>
 
-Yes thanks pulling into fixes.
-
-Tony
+On omap4sdp and omap3sdp
+also on omap3 did some basic power testing.
+> Felipe Balbi (4):
+>   i2c: omap: always return IRQ_HANDLED
+>   i2c: omap: switch to threaded IRQ support
+>   i2c: omap: remove unnecessary pm_runtime_suspended check
+>   i2c: omap: switch over to autosuspend API
+>
+>  drivers/i2c/busses/i2c-omap.c | 53 ++++++++++++++++++++++++++++++++++---------
+>  1 file changed, 42 insertions(+), 11 deletions(-)
+>
