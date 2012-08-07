@@ -1,42 +1,27 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 7 Aug 2012 09:21:51 +0200
-Subject: Vacations.
-In-Reply-To: <Pine.LNX.4.64.1208031708200.5170@axis700.grange>
-References: <CACKLOr1Q6_xVhaaoWiy-kf9hViTW98aSa6hd5M2z7ogL-uwNVQ@mail.gmail.com>
- <Pine.LNX.4.64.1208031708200.5170@axis700.grange>
-Message-ID: <20120807072151.GF24458@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 7 Aug 2012 00:23:01 -0700
+Subject: [PATCH] OMAP2+: Fix random config build break with
+ !ARM_CPU_SUSPEND
+In-Reply-To: <1342176307-6435-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1342176307-6435-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20120807072300.GM11011@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2012 at 05:09:15PM +0200, Guennadi Liakhovetski wrote:
-> Hi Javier
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [120713 03:50]:
+> The random config builds with PM and !ARM_CPU_SUSPEND breaks with below
+> error on omap2plus_defconfig.
 > 
-> On Fri, 3 Aug 2012, javier Martin wrote:
+> arch/arm/mach-omap2/sleep44xx.S:323: undefined reference to `cpu_resume'
+> arch/arm/mach-omap2/omap-mpuss-lowpower.c:278: undefined reference to `cpu_suspend'
 > 
-> > Hi,
-> > I will be out of the office until August the 19th.
-> > 
-> > I just wanted to send a reminder of some patches that I have pending.
-> > 
-> > For Mauro 3.7:
-> > 
-> > [PULL] video_visstrim for 3.6
-> > [PATCH] media: i.MX27: Fix mx2_emmaprp mem2mem driver clocks.
-> > 
-> > For Guennadi:
-> > 
-> > [PATCH 1/4] i.MX27: Fix emma-prp and csi clocks.
+> This is because recently merged OMAP5 platform shares the common files
+> with OMAP4 but doesn't select ARM_CPU_SUSPEND. Without the ARM_CPU_SUSPEND
+> the sleep code is meaningless.
 > 
-> As I mentioned several times, the above patch is not for me. Have a nice 
-> vacation.
+> Fix the same by adding ARM_CPU_SUSPEND for OMAP5. The suggestion came from
+> Russell King in an off-list discussion.
 
-Indeed it's for me. Queued this up.
+Thanks applying into fixes.
 
-Thanks
- Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Tony
