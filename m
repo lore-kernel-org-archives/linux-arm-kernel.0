@@ -1,74 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 7 Aug 2012 15:04:55 +0100
-Subject: RFC: mutex: hung tasks on SMP platforms with
- asm-generic/mutex-xchg.h
-In-Reply-To: <1344347322.27828.120.camel@twins>
-References: <20120807115647.GA12828@mudshark.cambridge.arm.com>
- <1344347322.27828.120.camel@twins>
-Message-ID: <20120807140455.GB12828@mudshark.cambridge.arm.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Tue, 7 Aug 2012 19:44:01 +0530
+Subject: [PATCH-V3] ARM: OMAP2+: cpu: Add am33xx device under
+ cpu_class_is_omap2
+Message-ID: <1344348841-19868-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 07, 2012 at 02:48:42PM +0100, Peter Zijlstra wrote:
-> On Tue, 2012-08-07 at 12:56 +0100, Will Deacon wrote:
-> > ARM recently moved to asm-generic/mutex-xchg.h for its mutex implementation
-> > after our previous implementation was found to be missing some crucial
-> > memory barriers. 
-> 
-> 
-> This is a76d7bd96d ("ARM: 7467/1: mutex: use generic xchg-based
-> implementation for ARMv6+"), right? Why do you use xchg and not dec
-> based? The changelog mumbles something about shorter critical sections,
-> but me not knowing anything about ARM wonders about the why of that.
+AM33XX device falls under omap2 class, so make cpu_class_is_omap2()
+macro true by adding soc_is_am33xx() to existing list of cpu/soc
+check.
+This is required to unblock the basic boot support on AM335x platform.
 
-Correct, that's the patch. We don't have atomic add/sub instructions on ARM,
-so instead we have to do:
+Having done that, we still need to sort out properly from
+common zImage point of view without having to maintain this
+cpu/soc_is_xxx list.
 
-1:	ldrex	...	@ Exclusive load
-	add/sub ...     @ Do the arithmetic
-	strex	...	@ Exclusive store
-	cmp	...	@ Check the store succeeded
-	bne	1b	@ Retry if we weren't atomic
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+This patch is boot tested on BeagleBone
+(using already accepted hwmod patches)
 
-So using dec adds a sub where we wouldn't need an instruction there for xchg.
-I suspect there's no measurable difference between the two, but we use the
-xchg-based implementation for CPUs prior to ARMv6 so it saves an ifdef as
-well. Some discussion on the original patch here:
+Changes from V2:
+	- This change is dropped now, since it breaks common zImage support.
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2012-July/109333.html
+Changes from V1:
+	- No code change, added detailed description for common zImage
+	  support.
 
-> >         Task A        Task B        Task C        Lock value
-> > 0                                                     1
-> > 1       lock()                                        0
-> > 2                     lock()                          0
-> > 3                     spin(A)                         0
-> > 4       unlock()                                      1
-> > 5                                   lock()            0
-> > 6                     cmpxchg(1,0)                    0
-> > 7                     contended()                    -1
-> > 8       lock()                                        0
-> > 9       spin(C)                                       0
-> > 10                                  unlock()          1
-> > 11      cmpxchg(1,0)                                  0
-> > 12      unlock()                                      1
-> > 
-> > 
-> > At this point, the lock is unlocked, but Task B is in an uninterruptible
-> > sleep with nobody to wake it up.
+ arch/arm/plat-omap/include/plat/cpu.h |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-[...]
+diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
+index 68b180e..bb5d08a 100644
+--- a/arch/arm/plat-omap/include/plat/cpu.h
++++ b/arch/arm/plat-omap/include/plat/cpu.h
+@@ -372,7 +372,8 @@ IS_OMAP_TYPE(3430, 0x3430)
+ #define cpu_class_is_omap1()	(cpu_is_omap7xx() || cpu_is_omap15xx() || \
+ 				cpu_is_omap16xx())
+ #define cpu_class_is_omap2()	(cpu_is_omap24xx() || cpu_is_omap34xx() || \
+-				cpu_is_omap44xx() || soc_is_omap54xx())
++				cpu_is_omap44xx() || soc_is_omap54xx() || \
++				soc_is_am33xx())
 
-> But in this case, either B is still spinning in our spin-loop, or it has
-> already passed the atomic_xchg(&lock->count, -1) when we fell out.
-
-Yes, it does that xchg on line 7 (see the lock value of -1)...
-
-> Since you say B is in UNINTERRUPTIBLE state, we'll assume it fell
-> through and so the lock count should be -1 (or less) to mark it
-> contended.
-
-... but then A sets it straight back to 0 in __mutex_fastpath_lock and falls
-down the slowpath due to it being contended. The problem is that it doesn't
-restore the -1 when it acquires the lock on line 11, so B is never woken up.
-
-Will
+ /* Various silicon revisions for omap2 */
+ #define OMAP242X_CLASS		0x24200024
+--
+1.7.0.4
