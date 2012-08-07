@@ -1,37 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 6 Aug 2012 23:50:55 -0700
-Subject: [PATCH 1/3] ARM: OMAP: timer: allow gp timer clock-event to be
- used on both cpus
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA7F6C3@DBDE01.ent.ti.com>
-References: <1333114048-26136-2-git-send-email-santosh.shilimkar@ti.com>
- <501B7AE6.8080405@gmail.com>
- <76308EBE-F802-411A-973A-7BBC7575FE5A@dominion.thruhere.net>
- <BDB76D4F-31B0-47D0-B1A1-64A743D091D3@dominion.thruhere.net>
- <CAMQu2gxLAVk-LN8R1xBeeL1=iZ-mLSRmtZe4wpQYQPTBsY5RMA@mail.gmail.com>
- <FF29FBF3-67EC-478E-9A74-65F8A2870BDC@dominion.thruhere.net>
- <79CD15C6BA57404B839C016229A409A83EA7F59B@DBDE01.ent.ti.com>
- <A6396D46-C6B9-44A4-A960-657668AF08E4@dominion.thruhere.net>
- <CAMQu2gz-93W9zWD_v3m1nQkqmnvFwcWKDTxNsf0v39y9_rhQPA@mail.gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA7F6C3@DBDE01.ent.ti.com>
-Message-ID: <20120807065054.GH11011@atomide.com>
+From: cmahapatra@ti.com (Chandrabhanu Mahapatra)
+Date: Tue, 7 Aug 2012 13:58:59 +0530
+Subject: [PATCH 5/6] ARM: OMAP: Disable venc for OMAP4
+In-Reply-To: <cover.1343912532.git.cmahapatra@ti.com>
+References: <cover.1343912532.git.cmahapatra@ti.com>
+Message-ID: <e99477f7030c655ef6f560adafcb30a7328f12cb.1343912533.git.cmahapatra@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hiremath, Vaibhav <hvaibhav@ti.com> [120803 03:34]:
-> 
-> Actually its not that.
-> AM335x needs to be added as part of cpu_class_is_omap2(), without this it 
-> gets into issues. 
-> The patch has been already submitted to the list, but still not merged by 
-> Tony.
+This is a alternative to "HACK: OMAP: DSS2: VENC: disable VENC on OMAP4 to
+prevent crash" (ba02fa37de) by Tomi Valkeinen <tomi.valkeinen@ti.com> to prevent
+VENC from crashing OMAP4 kernel. This prevents OMAPDSS from initial registration
+of a device for VENC on OMAP4.
 
-Let's just add it to the list of cpu_class_is_omap2() with a proper patch
-description for the fix. Then we still need to sort it out properly from
-common zImage point of view without having to maintain that list.
+Signed-off-by: Chandrabhanu Mahapatra <cmahapatra@ti.com>
+---
+ arch/arm/mach-omap2/display.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-Vaibhav, can you please post your original patch with the description
-updated for v3.6-rc1?
-
-Regards,
-
-Tony
+diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+index af1ed7d..ee40739 100644
+--- a/arch/arm/mach-omap2/display.c
++++ b/arch/arm/mach-omap2/display.c
+@@ -95,7 +95,6 @@ static const struct omap_dss_hwmod_data omap4_dss_hwmod_data[] __initdata = {
+ 	{ "dss_core", "omapdss_dss", -1 },
+ 	{ "dss_dispc", "omapdss_dispc", -1 },
+ 	{ "dss_rfbi", "omapdss_rfbi", -1 },
+-	{ "dss_venc", "omapdss_venc", -1 },
+ 	{ "dss_dsi1", "omapdss_dsi", 0 },
+ 	{ "dss_dsi2", "omapdss_dsi", 1 },
+ 	{ "dss_hdmi", "omapdss_hdmi", -1 },
+-- 
+1.7.10
