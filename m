@@ -1,64 +1,58 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 7 Aug 2012 15:07:29 +0300
-Subject: [PATCH 4/4] i2c: omap: switch over to autosuspend API
-In-Reply-To: <1344262737-6662-5-git-send-email-balbi@ti.com>
-References: <1344262737-6662-1-git-send-email-balbi@ti.com>
- <1344262737-6662-5-git-send-email-balbi@ti.com>
-Message-ID: <20120807120728.GW8468@arwen.pp.htv.fi>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Tue, 07 Aug 2012 17:56:45 +0530
+Subject: [PATCH V4 0/2] arm: samsung: Move FIMD headers to include/video/
+Message-ID: <1344342407-9970-1-git-send-email-l.krishna@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patchset moves the contents of regs-fb-v4.h and regs-fb.h from arch side
+to include/video/samsung_fimd.h
 
-On Mon, Aug 06, 2012 at 05:18:57PM +0300, Felipe Balbi wrote:
-> this helps us reduce unnecessary pm transitions
-> in case we have another i2c message been started
-> soon.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/i2c/busses/i2c-omap.c | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 60928f2..22efaba 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -645,7 +645,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
->  
->  	omap_i2c_wait_for_bb(dev);
->  out:
-> -	pm_runtime_put(dev->dev);
-> +	pm_runtime_mark_last_busy(dev->dev);
-> +	pm_runtime_put_autosuspend(dev->dev);
->  	return r;
->  }
->  
-> @@ -1113,6 +1114,9 @@ omap_i2c_probe(struct platform_device *pdev)
->  		dev->regs = (u8 *)reg_map_ip_v1;
->  
->  	pm_runtime_enable(dev->dev);
-> +	pm_runtime_set_autosuspend_delay(dev->dev, 1000);
-> +	pm_runtime_use_autosuspend(dev->dev);
-> +
->  	r = pm_runtime_get_sync(dev->dev);
->  	if (IS_ERR_VALUE(r))
->  		goto err_free_mem;
-> @@ -1189,7 +1193,7 @@ omap_i2c_probe(struct platform_device *pdev)
->  
->  	of_i2c_register_devices(adap);
->  
-> -	pm_runtime_put(dev->dev);
-> +	pm_runtime_put_autosuspend(dev->dev);
+This patchset is created and rebased against master branch of torvalds tree.
+Tested on smdk5250 board, build tested for other boards.
 
-Probably... nice catch. Will send v2
+Changes from version 3:
+	- Squashed 1st, 3rd, 4th and 5th patches from version 3
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120807/c737c871/attachment.sig>
+Changes from version 2:
+	- Changed the EXYNOS5_xxx macro name to FIMD_V8_xxx
+	- Moved the header inclusion under same kind
+
+Changes from version 1:
+	- Split the patches as per Sylwester comments
+	- Changed FIMD_V8_xxx macro to EXYNOS5_xxx	
+
+Leela Krishna Amudala (2):
+  include/video: move fimd register headers from platform to
+    include/video
+  include/video: Add register offsets for FIMD version 8
+
+ arch/arm/mach-exynos/mach-nuri.c                   |    2 +-
+ arch/arm/mach-exynos/mach-origen.c                 |    2 +-
+ arch/arm/mach-exynos/mach-smdk4x12.c               |    2 +-
+ arch/arm/mach-exynos/mach-smdkv310.c               |    2 +-
+ arch/arm/mach-exynos/mach-universal_c210.c         |    2 +-
+ arch/arm/mach-exynos/setup-fimd0.c                 |    2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2416.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-anw6410.c               |    2 +-
+ arch/arm/mach-s3c64xx/mach-crag6410.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-hmt.c                   |    2 +-
+ arch/arm/mach-s3c64xx/mach-mini6410.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-ncp.c                   |    2 +-
+ arch/arm/mach-s3c64xx/mach-real6410.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-smartq5.c               |    2 +-
+ arch/arm/mach-s3c64xx/mach-smartq7.c               |    2 +-
+ arch/arm/mach-s3c64xx/mach-smdk6410.c              |    2 +-
+ arch/arm/mach-s5p64x0/mach-smdk6440.c              |    2 +-
+ arch/arm/mach-s5p64x0/mach-smdk6450.c              |    2 +-
+ arch/arm/mach-s5pc100/mach-smdkc100.c              |    2 +-
+ arch/arm/mach-s5pv210/mach-aquila.c                |    2 +-
+ arch/arm/mach-s5pv210/mach-goni.c                  |    2 +-
+ arch/arm/mach-s5pv210/mach-smdkv210.c              |    2 +-
+ arch/arm/plat-samsung/include/plat/regs-fb-v4.h    |  159 --------------------
+ drivers/gpu/drm/exynos/exynos_drm_fimd.c           |    2 +-
+ drivers/video/s3c-fb.c                             |    2 +-
+ .../plat/regs-fb.h => include/video/samsung_fimd.h |  152 +++++++++++++++++--
+ 26 files changed, 165 insertions(+), 194 deletions(-)
+ delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+ rename arch/arm/plat-samsung/include/plat/regs-fb.h => include/video/samsung_fimd.h (73%)
