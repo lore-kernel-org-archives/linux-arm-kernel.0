@@ -1,28 +1,39 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 7 Aug 2012 18:03:34 +0100
-Subject: [PATCH 1/1] Input: ab8500-ponkey: Make the distinction between
- DT and non-DT boots
-In-Reply-To: <20120807170129.GA3759@gmail.com>
-References: <1344256323-10484-1-git-send-email-lee.jones@linaro.org>
- <20120806081915.GA4518@core.coreip.homeip.net>
- <20120806153750.GI10524@gmail.com>
- <20120806160226.GF29272@sirena.org.uk>
- <20120807170129.GA3759@gmail.com>
-Message-ID: <20120807170333.GV16861@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 7 Aug 2012 18:04:28 +0100
+Subject: [PATCH 2/2] ARM i.MX5: Hard reset the IPU during startup
+In-Reply-To: <CAKGA1bkA3eEHn4sM277mzcRT5OUyipW18-k-X0nK+T9rrotJNw@mail.gmail.com>
+References: <1338888630-25930-1-git-send-email-s.hauer@pengutronix.de>
+ <1338888630-25930-3-git-send-email-s.hauer@pengutronix.de>
+ <20429.57208.228315.164637@ipc1.ka-ro>
+ <20120605110834.GQ30400@pengutronix.de>
+ <CAKGA1bkA3eEHn4sM277mzcRT5OUyipW18-k-X0nK+T9rrotJNw@mail.gmail.com>
+Message-ID: <20120807170428.GI18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 07, 2012 at 06:01:30PM +0100, Lee Jones wrote:
+On Mon, Aug 06, 2012 at 04:31:50PM -0500, Matt Sealey wrote:
+> There used to be an ATAG for finding the linear framebuffer and it's
+> details but it got removed. This
+> was from a long forgotten time when you could initialize a VGA
+> graphics card and never care that
+> it had an interrupt or not, since it never got used for your average,
+> simple linear framebuffer operations.
 
-> Okay, so I've just spent a small amount of time looking at this. I think
-> the best place for this would be in *_get_virq(), using the same logic that
-> selected a *_legacy or *_linear domain in the first place. The only thing 
-> the domain can test for is the 'type' of domain and the requested IRQ. This
-> is where the issue lies. If a hwirq to virq conversion is requested, but a
-> virq is passed (which happens in the non-DT case) a WARN() is triggered
-> because the irq passed is bigger than first_irq + size. I think *_get_virq()
-> should ensure that only a hwirq is passed to irq_create_mapping().
+No ATAG definitions have been removed from the kernel.  The one you
+are referring to is:
 
-> Let me know if you had other ideas.
+#define ATAG_VIDEOLFB   0x54410008
 
-I'd expect your driver to always pass a hwirq into _get_virq() here.
+and the associated struct tag_videolfb, which is still in the kernel
+today.  What isn't there is the implementation which reads this data,
+because only a few boards supported it, and they passed over some data
+from this to their FB drivers.
+
+So, when the boards were updated such that this became unnecessary,
+unsurprisingly the users disappeared (because they were all in platform
+code.)
+
+We have never had a generic "framebuffer" driver which has used this
+ATAG.  Or if one was created, it never came anywhere near mainline.
+
+Either way, the situation is not as you describe above.
