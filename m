@@ -1,43 +1,33 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 07 Aug 2012 16:53:25 +0200
-Subject: [PATCH v3 3/4] media: videobuf2-dma-contig: use dma_mmap_coherent
- if available
-In-Reply-To: <1344246924-32620-4-git-send-email-hdk@igel.co.jp>
-References: <1344246924-32620-1-git-send-email-hdk@igel.co.jp>
- <1344246924-32620-4-git-send-email-hdk@igel.co.jp>
-Message-ID: <012701cd74ac$6a617060$3f245120$%szyprowski@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 7 Aug 2012 14:56:41 +0000
+Subject: [PATCH v3 3/7] mv643xx.c: Add basic device tree support.
+In-Reply-To: <1344350092-24050-4-git-send-email-ian.molton@codethink.co.uk>
+References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
+ <1344350092-24050-4-git-send-email-ian.molton@codethink.co.uk>
+Message-ID: <201208071456.41412.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Monday, August 06, 2012 11:55 AM Hideki EIRAKU wrote:
-
-> Previously the vb2_dma_contig_mmap() function was using a dma_addr_t as a
-> physical address.  The two addressses are not necessarily the same.
-> For example, when using the IOMMU funtion on certain platforms, dma_addr_t
-> addresses are not directly mappable physical address.
-> dma_mmap_coherent() maps the address correctly.
-> It is available on ARM platforms.
+On Tuesday 07 August 2012, Ian Molton wrote:
+>     This patch adds basic device tree support to the mv643xx ethernet driver.
 > 
-> Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
+>     It should be enough for most current users of the device, and should allow
+>     a painless migration.
+> 
+>     Signed-off-by: Ian Molton <ian.molton@codethink.co.uk>
+> ---
+>  Documentation/devicetree/bindings/net/mv643xx.txt |   75 +++++++++++++++++
+>  drivers/net/ethernet/marvell/mv643xx_eth.c        |   93 +++++++++++++++++++--
+>  2 files changed, 161 insertions(+), 7 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/net/mv643xx.txt
 
-I'm sorry for bringing this issue now, once you have already created v3 of your
-patches, but similar patch has been already proposed some time ago. It is already
-processed together with general videobuf2-dma-contig redesign and dma-buf extensions
-by Tomasz Stanislawski.
+Hi Ian,
 
-See post http://thread.gmane.org/gmane.comp.video.dri.devel/70402/focus=49461 and
-http://thread.gmane.org/gmane.linux.drivers.video-input-infrastructure/49438 
+Have you had a look at Documentation/devicetree/bindings/marvell.txt ?
 
-It doesn't use conditional code inside videobuf2 allocator and rely entirely on 
-dma-mapping subsystem to provide a working dma_mmap_coherent/writecombine/attrs() 
-function. When it was posted, it relied on the dma-mapping extensions, which now
-have been finally merged to v3.6-rc1. Now I wonder if there are any architectures, 
-which don't use dma_map_ops based dma-mapping framework, which might use 
-videobuf2-dma-conting module. 
+I think it documents some of the same thing, so it would be good
+to keep all of that in one place. We might also want to move
+some of the code from arch/powerpc/sysdev/mv64x60_dev.c
+to live in the same place as the device driver.
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+	Arnd
