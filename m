@@ -1,93 +1,85 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 7 Aug 2012 15:26:00 -0600 (MDT)
-Subject: [PATCH 1/3] ARM: OMAP: omap_device: keep track of driver bound
- status
-In-Reply-To: <1341961324-19657-1-git-send-email-khilman@ti.com>
-References: <1341961324-19657-1-git-send-email-khilman@ti.com>
-Message-ID: <alpine.DEB.2.00.1208071518370.28250@utopia.booyaka.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Tue,  7 Aug 2012 16:44:23 -0500
+Subject: [PATCH] ARM: print an early warning if the ATAG_CORE/OF_DT_MAGIC vet
+ did not pass
+Message-ID: <1344375863-29947-1-git-send-email-matt@genesi-usa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin
+When booting and passing either corrupted or missing device trees or ATAGs,
+the __vet_atags function in kernel/head-common.S will set r2 to 0, thus
+causing what might be seen as strange behavior.
 
-a couple of minor comments
+What happens is setup_machine_fdt is passed __atags_pointer which is NULL
+in the above situation, and it will immediately exit with NULL return
+value for the machine_desc. On NULL machine_desc, the implication is that
+it was not a device tree, and it falls back to setup_machine_tags. This
+function will also return NULL, and the list of supported boards will be
+printed out. Only much, much later in the kernel is any message reporting
+lack of ATAG_CORE or any other indicator present since they all rely on
+there being a valid pointer to get to them.
 
-On Tue, 10 Jul 2012, Kevin Hilman wrote:
+The following situations where this may happen are suggested:
 
-> Use the bus notifier to keep track of driver bound status by adding a
-> new internal field to struct omap_device: _driver_staus.
+1) Modification of the device tree blob is performed in the bootloader,
+and the tree is being corrupted for some reason.
+2) Something is overwriting the device tree magic (kernel decompression,
+perhaps) which is possibly more common.
+3) Something is overwriting the ATAG_CORE magic (as above)
+4) DTB address passed to bootloader is invalid
+5) Bootloader actually does boot setting r2 to 0 which either means it
+is ridiculously old or horrifically broken.
 
-"_driver_status"
+Several reads of Documentation/arm/Booting lead me to believe that passing
+tags in r2 is OPTIONAL, HIGHLY RECOMMENDED for old bootloaders, and
+MANDATORY for new bootloaders. The kernel can't tell which is in use, so 0
+might actually be valid. However, later it says that a bootloader must
+(lowercase) set r2 to "physical address of tagged list in system RAM, or
+physical address of device tree block (dtb) in system RAM." So it is not
+possible to define a behavior or print a definitive warning, and since we
+cannot fix these problems in the kernel we can at least provide more
+information about their occurrence at runtime rather than getting to the point
+where it seems something even more strange has happened. The pointer is lost
+at this point, though, so all we can do is report the event.
 
-> This will be useful for follow-up patches which need to know whether
-> or not a driver is bound in order to make intelligent omap_device
-> enable/idle decisions.
-> 
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
->  arch/arm/plat-omap/include/plat/omap_device.h |    2 ++
->  arch/arm/plat-omap/omap_device.c              |   14 +++++++++-----
->  2 files changed, 11 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
-> index 4327b2c..e0486cb 100644
-> --- a/arch/arm/plat-omap/include/plat/omap_device.h
-> +++ b/arch/arm/plat-omap/include/plat/omap_device.h
-> @@ -60,6 +60,7 @@ extern struct dev_pm_domain omap_device_pm_domain;
->   * @_dev_wakeup_lat_limit: dev wakeup latency limit in nsec - set by OMAP PM
->   * @_state: one of OMAP_DEVICE_STATE_* (see above)
->   * @flags: device flags
-> + * @_driver_status: one of BUS_NOTIFY_*_DRIVER from <linux/device.h>
->   *
->   * Integrates omap_hwmod data into Linux platform_device.
->   *
-> @@ -78,6 +79,7 @@ struct omap_device {
->  	u8				hwmods_cnt;
->  	u8				_state;
->  	u8                              flags;
-> +	u8				_driver_status;
->  };
->  
->  /* Device driver interface (call via platform_data fn ptrs) */
-> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-> index c490240..1d1b5ff 100644
-> --- a/arch/arm/plat-omap/omap_device.c
-> +++ b/arch/arm/plat-omap/omap_device.c
-> @@ -385,17 +385,21 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
->  				      unsigned long event, void *dev)
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
-> +	struct omap_device *od;
->  
->  	switch (event) {
-> -	case BUS_NOTIFY_ADD_DEVICE:
-> -		if (pdev->dev.of_node)
-> -			omap_device_build_from_dt(pdev);
-> -		break;
-> -
->  	case BUS_NOTIFY_DEL_DEVICE:
->  		if (pdev->archdata.od)
->  			omap_device_delete(pdev->archdata.od);
->  		break;
-> +	case BUS_NOTIFY_ADD_DEVICE:
-> +		if (pdev->dev.of_node)
-> +			omap_device_build_from_dt(pdev);
-> +		/* fall through */
-> +	default:
-> +		od = to_omap_device(pdev);
-> +		if (od)
-> +			od->_driver_status = event;
+Therefore, print a warning at the earliest opportunity to catch the r2=0
+case and reduce frustration with developers attempting to port to device
+tree or port new bootloaders, hopefully without worrying people with old
+bootloaders complying with the existing documentation.
 
-_driver_status is a u8, but event is an unsigned long.  Might be worth 
-adding a WARN() to complain if event is greater than (2^8)-1.
+Of course since this is very early in boot, DEBUG_LL needs to be enabled
+and a valid UART for the booting board needs to be configured for it to
+show any result, but this is true of all the above warnings anyway,
+otherwise all you get is Starting Kernel.... and a blinking terminal prompt.
 
->  	}
->  
->  	return NOTIFY_DONE;
-> -- 
-> 1.7.9.2
-> 
+Signed-off-by: Matt Sealey <matt@genesi-usa.com>
+Tested-by: Steev Klimaszewski <steev@genesi-usa.com>
+---
+ arch/arm/kernel/setup.c |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-
-- Paul
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index a81dcec..f788d44 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -942,6 +942,18 @@ void __init setup_arch(char **cmdline_p)
+ 	struct machine_desc *mdesc;
+ 
+ 	setup_processor();
++
++	if (__atags_pointer == 0L) {
++		early_print(
++			"Warning: ATAG_CORE/OF_DT_MAGIC pass failed or __atags_pointer NULL\n"
++			" Either r2 was NULL or __vet_atags set r2 to NULL on boot. This can be because\n"
++			" the bootloader is broken, the ATAGs or Device Tree have been overwritten by\n"
++			" other data during the boot process, the wrong address was supplied for the\n"
++			" Device Tree blob, or NULL was explicitly passed for some reason. Please check\n"
++			" into the situation as it is not usual to be able to boot a board with no ATAGs\n"
++			" or Device Tree.\n");
++	}
++
+ 	mdesc = setup_machine_fdt(__atags_pointer);
+ 	if (!mdesc)
+ 		mdesc = setup_machine_tags(machine_arch_type);
+-- 
+1.7.9.5
