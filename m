@@ -1,87 +1,43 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 07 Aug 2012 10:19:48 -0500
-Subject: [PATCH] ARM: AM33XX: board-generic: Add of_dev_auxdata to fix
- dev_id for CAN module
-In-Reply-To: <1344346636-28072-1-git-send-email-hvaibhav@ti.com>
-References: <1344346636-28072-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <50213214.7050505@gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 07 Aug 2012 17:22:02 +0200
+Subject: [PATCH v3 1/4] ARM: dma-mapping: define ARCH_HAS_DMA_MMAP_COHERENT
+In-Reply-To: <1344246924-32620-2-git-send-email-hdk@igel.co.jp>
+References: <1344246924-32620-1-git-send-email-hdk@igel.co.jp>
+ <1344246924-32620-2-git-send-email-hdk@igel.co.jp>
+Message-ID: <013301cd74b0$691eba60$3b5c2f20$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/2012 08:37 AM, Vaibhav Hiremath wrote:
-> If the module requires only one clocksource to function, then
-> driver can very well call clk_get() api with "con_id = NULL",
+Hi Hideki,
+
+On Monday, August 06, 2012 11:55 AM Hideki EIRAKU wrote:
+
+> ARCH_HAS_DMA_MMAP_COHERENT indicates that there is dma_mmap_coherent() API
+> in this architecture.  The name is already defined in PowerPC.
 > 
->        clk = clk_get(dev, NULL);
-> 
-> And platform code should respect this and return valid clk handle.
-> That means, now the clk_get() api would rely on dev_id, and platform
-> code should either have clk node with matching dev_id (with con_id=NULL)
-> or return dummy clk node.
-> 
-> With DT support, we can fix the dev_id for particular module
-> using "struct of_dev_auxdata" to satisfy above clk framework requirement.
-> 
-> In case of AM33XX, we required this for the DCAN module, so this
-> patch adds "of_dev_auxdata" for both DCAN_0/1 instances.
-> 
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
 > ---
-> This patch is boot tested on BeagleBone platform, and checked for
-> clk_get() return value in d_can module driver.
+>  arch/arm/include/asm/dma-mapping.h |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
->  arch/arm/mach-omap2/board-generic.c |   18 +++++++++++++++++-
->  1 files changed, 17 insertions(+), 1 deletions(-)
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index bbef15d..f41cd30 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -187,6 +187,7 @@ extern int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+>  			struct dma_attrs *attrs);
 > 
-> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> index 6f93a20..c9b7903 100644
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -37,11 +37,27 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
->  	{ }
->  };
+>  #define dma_mmap_coherent(d, v, c, h, s) dma_mmap_attrs(d, v, c, h, s, NULL)
+> +#define ARCH_HAS_DMA_MMAP_COHERENT
 > 
-> +/*
-> + * Lookup table for attaching a specific name and platform_data pointer to
-> + * devices as they get created by of_platform_populate(). Ideally this table
-> + * would not exist, but the current clock implementation depends on some devices
-> + * having a specific name OR to satisfy NULL con_id requirement from driver.
-> + */
-> +static const struct of_dev_auxdata am33xx_auxdata_lookup[] __initconst = {
-> +	OF_DEV_AUXDATA("bosch,d_can", 0x481cc000, "d_can.0", NULL),
-> +	OF_DEV_AUXDATA("bosch,d_can", 0x481d0000, "d_can.1", NULL),
-> +	{ },
-> +};
-
-Adding an additional clkdev lookup accomplishes the same thing and is a
-cleaner solution.
-
-Rob
-
-> +
->  static void __init omap_generic_init(void)
->  {
->  	omap_sdrc_init(NULL, NULL);
-> 
-> -	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
-> +	if (of_machine_is_compatible("ti,am33xx"))
-> +		of_platform_populate(NULL, omap_dt_match_table,
-> +				am33xx_auxdata_lookup, NULL);
-> +	else
-> +		of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
->  }
-> 
->  #ifdef CONFIG_SOC_OMAP2420
+>  static inline int dma_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+>  				  void *cpu_addr, dma_addr_t dma_addr,
 > --
 > 1.7.0.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+
+I will take this patch to my dma-mapping kernel tree, to the fixes branch.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
