@@ -1,143 +1,41 @@
-From: zumeng.chen@windriver.com (Zumeng Chen)
-Date: Tue, 7 Aug 2012 09:44:58 +0800
-Subject: [PATCH] Revert "ARM: OMAP3530evm: set pendown_state and debounce
- time for ads7846"
-In-Reply-To: <871ujj7ngd.fsf@ti.com>
-References: <876298iv9s.fsf@ti.com>
- <1344284535-16717-1-git-send-email-grinberg@compulab.co.il>
- <871ujj7ngd.fsf@ti.com>
-Message-ID: <5020731A.1040206@windriver.com>
+From: klightspeed@killerwolves.net (Ben Peddell)
+Date: Tue,  7 Aug 2012 12:02:54 +1000 (EST)
+Subject: [PATCH 1/1] initramfs: handle trailing junk after valid image (try 2)
+In-Reply-To: <50201563.2020509@mvista.com>
+References: <CAB9O=CMADa26benQCkEoLOKKTGNeExjvFeVkFe4HLVi-W=o=Jg@mail.gmail.com>,
+ <501F8D75.8070108@killerwolves.net>, <50201563.2020509@mvista.com>
+Message-ID: <20120807020254.BE00F77A0F@aristotle.killerwolves.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?08?07? 04:52, Kevin Hilman ??:
-> Igor Grinberg<grinberg@compulab.co.il>  writes:
->
->> 1) The above commit introduced a common ->get_pendown_state() function
->> into the generic code, but that function was board-specific for the
->> OMAP3EVM and thus broke most other boards using this code.
->>
->> 2) The above commit was mis-merged introducing another bug which
->> prevents the ads7846 driver probe function to succeed.
->> The omap_ads7846_init() function frees the pendown GPIO in case there is
->> no ->get_pendown_state() function set by the caller (board specific
->> code), so it can be requested later by the ads7846 driver.
->> The above commit add a common ->get_pendown_state() function without
->> removing the gpio_free() call and thus once the ads7846 driver tries
->> to use the pendown GPIO, it crashes as the pendown GPIO has not been
->> requested.
->>
->> 3) The above commit introduces NO new functionality as
->> get_pendown_state() function is already implemented in a suitable way by
->> the ads7846 driver and the debounce time handling has already been
->> fixed by commit 97ee9f01 (ARM: OMAP: fix the ads7846 init code).
->>
->> This reverts commit 16aced80f6739beb2a6ff7b6f96c83ba80d331e8.
->>
->> Conflicts:
->> 	arch/arm/mach-omap2/common-board-devices.c
->>
->> Solved by taking the working version prior to the above commit.
->>
->> Cc: Zumeng Chen<zumeng.chen@windriver.com>
->> Cc: Arnd Bergmann<arnd@arndb.de>
->> Signed-off-by: Igor Grinberg<grinberg@compulab.co.il>
->> ---
->> Kevin, sorry for the late reply.
->> How about the above commit message and the below patch?
->>
->> The patch applies cleanly to Tony's master branch (6 Aug 2012)
->> or Kevin's kevin-omap-pm/for_3.6/fixes/ads7846
->> after resetting two top most commits.
-> Now that v3.6-rc1 is out, it should probalby be applied on top of -rc1.
-> I've taken care of that and tested as well.
->
->> This patch has been tested on both above branches on cm-t3730.
->> Any other board tested will be greately appreciated.
->>
->> Also, if after all said in the commit message, you still don't
->> want to revert the original patch, feel free to post your thoughts.
-> After all the digging I did, I agree that the revert is the best
-> solution.
->
-> While it's a slightly different problem/bug, I think the gpio_free() in
-> common-board-devices.c should still be unconditonal since the
-> gpio_request() is now unconditional.  That can be a separate patch though.
-Absolutely right, acked this.
+The initramfs handling since commit df37bd15 (initramfs: handle 
+unrecognised decompressor when unpacking) has been rejecting
+valid images that have garbage after them.  For example, on an
+architecture where the initramfs address and size are specified
+as a kernel parameter (specifically unicore32 and arm), specifying
+e.g. initrd=0x01000000,4M will not work unless the image is padded
+with nulls to 4MiB.  This is unlikely to occur if the user is using
+this parameter to work around a bug in the bootloader.
 
-Regards,
-Zumeng
->
-> Acked-by: Kevin Hilman<khilman@ti.com>
-> Tested-by: Kevin Hilman<khilman@ti.com>
->
-> Tested on 3430/n900, 3530/Overo, 3730/Overo STORM, 3730/BB-xM.
->
-> The Overo boards were the ones that were crashing due to this bug since
-> the pendown GPIO was the only one used in the bank.
->
-> Tony, can you queue this up for v3.6-rc?  I have a version in my
-> for_3.6/fixes/ads7846-2 branch with the tags above applied, based on v3.6-rc1.
->
-> Thanks
->
-> Kevin
->
->>   arch/arm/mach-omap2/board-omap3evm.c       |    1 +
->>   arch/arm/mach-omap2/common-board-devices.c |   11 -----------
->>   arch/arm/mach-omap2/common-board-devices.h |    1 -
->>   3 files changed, 1 insertions(+), 12 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
->> index ef230a0..0d362e9 100644
->> --- a/arch/arm/mach-omap2/board-omap3evm.c
->> +++ b/arch/arm/mach-omap2/board-omap3evm.c
->> @@ -58,6 +58,7 @@
->>   #include "hsmmc.h"
->>   #include "common-board-devices.h"
->>
->> +#define OMAP3_EVM_TS_GPIO	175
->>   #define OMAP3_EVM_EHCI_VBUS	22
->>   #define OMAP3_EVM_EHCI_SELECT	61
->>
->> diff --git a/arch/arm/mach-omap2/common-board-devices.c b/arch/arm/mach-omap2/common-board-devices.c
->> index 1473474..c187586 100644
->> --- a/arch/arm/mach-omap2/common-board-devices.c
->> +++ b/arch/arm/mach-omap2/common-board-devices.c
->> @@ -35,16 +35,6 @@ static struct omap2_mcspi_device_config ads7846_mcspi_config = {
->>   	.turbo_mode	= 0,
->>   };
->>
->> -/*
->> - * ADS7846 driver maybe request a gpio according to the value
->> - * of pdata->get_pendown_state, but we have done this. So set
->> - * get_pendown_state to avoid twice gpio requesting.
->> - */
->> -static int omap3_get_pendown_state(void)
->> -{
->> -	return !gpio_get_value(OMAP3_EVM_TS_GPIO);
->> -}
->> -
->>   static struct ads7846_platform_data ads7846_config = {
->>   	.x_max			= 0x0fff,
->>   	.y_max			= 0x0fff,
->> @@ -55,7 +45,6 @@ static struct ads7846_platform_data ads7846_config = {
->>   	.debounce_rep		= 1,
->>   	.gpio_pendown		= -EINVAL,
->>   	.keep_vref_on		= 1,
->> -	.get_pendown_state	=&omap3_get_pendown_state,
->>   };
->>
->>   static struct spi_board_info ads7846_spi_board_info __initdata = {
->> diff --git a/arch/arm/mach-omap2/common-board-devices.h b/arch/arm/mach-omap2/common-board-devices.h
->> index 4c4ef6a..a0b4a428 100644
->> --- a/arch/arm/mach-omap2/common-board-devices.h
->> +++ b/arch/arm/mach-omap2/common-board-devices.h
->> @@ -4,7 +4,6 @@
->>   #include "twl-common.h"
->>
->>   #define NAND_BLOCK_SIZE	SZ_128K
->> -#define OMAP3_EVM_TS_GPIO	175
->>
->>   struct mtd_partition;
->>   struct ads7846_platform_data;
+Signed-off-by: Ben Peddell <klightspeed@killerwolves.net>
+
+---
+ init/initramfs.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/init/initramfs.c b/init/initramfs.c
+index 84c6bf1..26c2cb1 100644
+--- a/init/initramfs.c
++++ b/init/initramfs.c
+@@ -467,6 +467,9 @@ static char * __init unpack_to_rootfs(char *buf, unsigned len)
+ 					 compress_name);
+ 				message = msg_buf;
+ 			}
++		} else if (state == Reset) {
++			my_inptr = len;
++			pr_warn("%s: junk at end of compressed archive\n", __func__);
+ 		} else
+ 			error("junk in compressed archive");
+ 		if (state != Reset)
+-- 
+1.7.3.4
