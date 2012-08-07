@@ -1,57 +1,37 @@
-From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
-Date: Tue, 7 Aug 2012 10:11:22 +0200
-Subject: [PATCH v2 1/5] usb: phy: samsung: Introducing usb phy driver for
- hsotg
-In-Reply-To: <1344324524-2286-2-git-send-email-p.paneri@samsung.com>
-References: <1344324524-2286-1-git-send-email-p.paneri@samsung.com>
- <1344324524-2286-2-git-send-email-p.paneri@samsung.com>
-Message-ID: <201208071011.23558.heiko@sntech.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 6 Aug 2012 23:50:55 -0700
+Subject: [PATCH 1/3] ARM: OMAP: timer: allow gp timer clock-event to be
+ used on both cpus
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA7F6C3@DBDE01.ent.ti.com>
+References: <1333114048-26136-2-git-send-email-santosh.shilimkar@ti.com>
+ <501B7AE6.8080405@gmail.com>
+ <76308EBE-F802-411A-973A-7BBC7575FE5A@dominion.thruhere.net>
+ <BDB76D4F-31B0-47D0-B1A1-64A743D091D3@dominion.thruhere.net>
+ <CAMQu2gxLAVk-LN8R1xBeeL1=iZ-mLSRmtZe4wpQYQPTBsY5RMA@mail.gmail.com>
+ <FF29FBF3-67EC-478E-9A74-65F8A2870BDC@dominion.thruhere.net>
+ <79CD15C6BA57404B839C016229A409A83EA7F59B@DBDE01.ent.ti.com>
+ <A6396D46-C6B9-44A4-A960-657668AF08E4@dominion.thruhere.net>
+ <CAMQu2gz-93W9zWD_v3m1nQkqmnvFwcWKDTxNsf0v39y9_rhQPA@mail.gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA7F6C3@DBDE01.ent.ti.com>
+Message-ID: <20120807065054.GH11011@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 7. August 2012, 09:28:40 schrieb Praveen Paneri:
-> This driver uses usb_phy interface to interact with s3c-hsotg. Supports
-> phy_init and phy_shutdown functions to enable/disable phy. Tested with
-> smdk6410 and smdkv310. More SoCs can be brought under later.
->
-> Signed-off-by: Praveen Paneri <p.paneri@samsung.com>
-> ---
->  .../devicetree/bindings/usb/samsung-usbphy.txt     |    9 +
->  drivers/usb/phy/Kconfig                            |    8 +
->  drivers/usb/phy/Makefile                           |    1 +
->  drivers/usb/phy/samsung_usbphy.c                   |  355
-> ++++++++++++++++++++ drivers/usb/phy/samsung_usbphy.h                   | 
->  48 +++
->  include/linux/platform_data/s3c-hsotg.h            |    5 +
->  6 files changed, 426 insertions(+), 0 deletions(-)
->  create mode 100644
-> Documentation/devicetree/bindings/usb/samsung-usbphy.txt create mode
-> 100644 drivers/usb/phy/samsung_usbphy.c
->  create mode 100644 drivers/usb/phy/samsung_usbphy.h
+* Hiremath, Vaibhav <hvaibhav@ti.com> [120803 03:34]:
 > 
+> Actually its not that.
+> AM335x needs to be added as part of cpu_class_is_omap2(), without this it 
+> gets into issues. 
+> The patch has been already submitted to the list, but still not merged by 
+> Tony.
 
-[...]
+Let's just add it to the list of cpu_class_is_omap2() with a proper patch
+description for the fix. Then we still need to sort it out properly from
+common zImage point of view without having to maintain that list.
 
-> diff --git a/include/linux/platform_data/s3c-hsotg.h
-> b/include/linux/platform_data/s3c-hsotg.h index 8b79e09..25ed31e 100644
-> --- a/include/linux/platform_data/s3c-hsotg.h
-> +++ b/include/linux/platform_data/s3c-hsotg.h
-> @@ -35,6 +35,11 @@ struct s3c_hsotg_plat {
->  	int (*phy_exit)(struct platform_device *pdev, int type);
->  };
-> 
-> +struct s3c_usbphy_plat {
-> +	void (*pmu_isolation)(int on);
-> +};
-> +
->  extern void s3c_hsotg_set_platdata(struct s3c_hsotg_plat *pd);
-> +extern void s3c_usbphy_set_platdata(struct s3c_usbphy_plat *pd);
-> 
->  #endif /* __LINUX_USB_S3C_HSOTG_H */
+Vaibhav, can you please post your original patch with the description
+updated for v3.6-rc1?
 
-hmm, I'm not completely sure about this being in the s3c-hsotg header, as on 
-s3c2443/2416/2450 it's the s3c-hsudc that will be (hopefully) using the phy in 
-the future.
+Regards,
 
-
-Heiko
+Tony
