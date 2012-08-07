@@ -1,78 +1,32 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 07 Aug 2012 13:14:36 -0400 (EDT)
-Subject: RFC: mutex: hung tasks on SMP platforms with
- asm-generic/mutex-xchg.h
-In-Reply-To: <20120807115647.GA12828@mudshark.cambridge.arm.com>
-References: <20120807115647.GA12828@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1208071259270.5231@xanadu.home>
+From: imp@bsdimp.com (Warner Losh)
+Date: Tue, 7 Aug 2012 11:23:40 -0600
+Subject: [PATCH] driver: misc: bmp085: remove "of_match_table" property.
+In-Reply-To: <20120807105225.GT16861@opensource.wolfsonmicro.com>
+References: <1344245324-16704-1-git-send-email-sourav.poddar@ti.com>
+ <20120806093033.GH17551@arwen.pp.htv.fi>
+ <20120806154214.GC29272@sirena.org.uk>
+ <20120807054342.GF8468@arwen.pp.htv.fi>
+ <20120807105225.GT16861@opensource.wolfsonmicro.com>
+Message-ID: <4CEA7FE1-B4B7-4702-BD94-C04154014763@bsdimp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Aug 2012, Will Deacon wrote:
 
-> Hello,
-> 
-> ARM recently moved to asm-generic/mutex-xchg.h for its mutex implementation
-> after our previous implementation was found to be missing some crucial
-> memory barriers. However, I'm seeing some problems running hackbench on
-> SMP platforms due to the way in which the MUTEX_SPIN_ON_OWNER code operates.
-> 
-> The symptoms are that a bunch of hackbench tasks are left waiting on an
-> unlocked mutex and therefore never get woken up to claim it. I think this
-> boils down to the following sequence:
-> 
-> 
->         Task A        Task B        Task C        Lock value
-> 0                                                     1
-> 1       lock()                                        0
-> 2                     lock()                          0
-> 3                     spin(A)                         0
-> 4       unlock()                                      1
-> 5                                   lock()            0
-> 6                     cmpxchg(1,0)                    0
-> 7                     contended()                    -1
-> 8       lock()                                        0
-> 9       spin(C)                                       0
-> 10                                  unlock()          1
-> 11      cmpxchg(1,0)                                  0
-> 12      unlock()                                      1
-> 
-> 
-> At this point, the lock is unlocked, but Task B is in an uninterruptible
-> sleep with nobody to wake it up.
+On Aug 7, 2012, at 4:52 AM, Mark Brown wrote:
 
-I fail to see how the lock value would go from -1 to 0 on line 8.  How 
-does that happen?
-> The following patch fixes the problem by ensuring we put the lock into
-> the contended state if we acquire it from the spin loop on the slowpath
-> but I'd like to be sure that this won't cause problems with other mutex
-> implementations:
+> On Tue, Aug 07, 2012 at 08:43:44AM +0300, Felipe Balbi wrote:
+>> On Mon, Aug 06, 2012 at 04:42:14PM +0100, Mark Brown wrote:
 > 
+>>> It's good practice to have an explict compatible string even if the
+>>> default happens to work in order to avoid any name clashes.
 > 
-> diff --git a/kernel/mutex.c b/kernel/mutex.c
-> index a307cc9..27b7887 100644
-> --- a/kernel/mutex.c
-> +++ b/kernel/mutex.c
-> @@ -170,7 +170,7 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
->                 if (owner && !mutex_spin_on_owner(lock, owner))
->                         break;
->  
-> -               if (atomic_cmpxchg(&lock->count, 1, 0) == 1) {
-> +               if (atomic_cmpxchg(&lock->count, 1, -1) == 1) {
->                         lock_acquired(&lock->dep_map, ip);
->                         mutex_set_owner(lock);
->                         preempt_enable();
+>> of_i2c.c makes no use whatsoever of the compatible string. See that it
+>> will build an i2c_boardinfo and register a new device. That compatible
+> 
+> If that's all that's done it seems like a bug frankly, certainly based
+> on previous discussions it ought to be.  There are collisions out there,
+> they've just happened to not bite us yet
 
-This would force invokation of the slow path on unlock even if in most 
-cases the lock is unlikely to be contended.  The really slow path does 
-check if the waiting list is empty and sets the count to 0 before 
-exiting to avoid that.  I don't see how this could be done safely in the 
-spin_on_owner loop code as the lock->wait_lock isn't held (which appears 
-to be the point of this code in the first place).
+Also keep in mind that the device tree is supposed to be a description of the hardware, and different implementations of the device tree may use the compatible string.
 
-Yet, if the lock is heavily contended with a waiting task, the count 
-should never get back to 1 and the cmpxchg on line 11 would not set the 
-count to 0.  Hence my interrogation about line 8 above.
-
-
-Nicolas
+Warner
