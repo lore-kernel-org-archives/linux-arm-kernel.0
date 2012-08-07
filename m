@@ -1,60 +1,49 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 7 Aug 2012 08:35:58 +0200
-Subject: [PATCH 4/9] ASoC: imx: Don't use {en,dis}able_fiq() calls
-In-Reply-To: <20120806214121.GA26698@opensource.wolfsonmicro.com>
-References: <20120805230238.GA1663@lizard>
- <1344207819-3415-4-git-send-email-anton.vorontsov@linaro.org>
- <CAKGA1bkiHj=zMJXSzoGp3fpLS3POnFXSV5y7sYYFAikqoUT9tQ@mail.gmail.com>
- <20120806154951.GQ16861@opensource.wolfsonmicro.com>
- <CAKGA1b=_AOub_pEJJGBTb6Y7wLZaSYKQjFTyMVFSr_=9VX4wpg@mail.gmail.com>
- <20120806193734.GA16199@opensource.wolfsonmicro.com>
- <20120806201609.GX25644@pengutronix.de>
- <CAKGA1bmMqyL4gyLYcanEH=R=HuBjRCNRLjUEWCj8wmpi3HuL0g@mail.gmail.com>
- <20120806214121.GA26698@opensource.wolfsonmicro.com>
-Message-ID: <20120807063558.GE1451@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 7 Aug 2012 08:49:17 +0200
+Subject: [PATCH 6/6] ARM: dts: add pinctrl in PXA DT files
+In-Reply-To: <201208060844.29333.arnd@arndb.de>
+References: <1343458722-17127-1-git-send-email-haojian.zhuang@gmail.com>
+ <1343458722-17127-7-git-send-email-haojian.zhuang@gmail.com>
+ <201208060844.29333.arnd@arndb.de>
+Message-ID: <CACRpkdayqp0ptdURHtYWC6G5pk1rNaAiWZkc7bdhv2osY1MaHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2012 at 10:41:22PM +0100, Mark Brown wrote:
-> On Mon, Aug 06, 2012 at 03:39:50PM -0500, Matt Sealey wrote:
-> > On Mon, Aug 6, 2012 at 3:16 PM, Robert Schwebel
-> 
-> > > That's not true; we still run MX25, MX27, MX35, MX28 on mainline in
-> > > active projects.
-> 
-> > I think Shawn Guo (FSL/Linaro) would also disagree, since he's just
-> > posted a large amount of MXS patches to fix up the board for device
-> > trees, and Arnd is pulling them.
-> 
-> MXS != i.MX.
-> 
-> > As far as I know, the FIQ usage is quite valid for the processor it
-> > needs to run on (MX21/27/28, right?) in the modes it runs in (AC97 on
-> > these processors, and maybe MX35 too), and I'm just trying to figure
-> > out what the steps are for
-> 
-> Oh, ick.  What is the problem that means people want to use the FIQ on
-> these processors?  There's been i.MX2x audio DMA since forever, it had
-> DMA in mainline before any of the later i.MXs due to them having SDMA.
-> The original mainline i.MX audio support was done on i.MX27 and didn't
-> have any issue here, this is the fist I've heard of a problem.
+On Mon, Aug 6, 2012 at 10:44 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 28 July 2012, Haojian Zhuang wrote:
+>> +Required subnode-properties:
+>> +- marvell,pins : An array of strings. Each string contains the name of a pin
+>> +                 or group.
+>> +- marvell,function     : A string containing the name of the function to mux to the
+>> +                 pin or group.
+>> +- marvell,drive-strength : An integer value that means the drive strength of a
+>> +                        pin.
+>> +- marvell,pull-up      : The property means a pin is pull up for input.
+>> +- marvell,pull-down : The property means a pin is pull down for input.
+>> +- marvell,lowpower-pull-up : The property means a pin is pull up for input in
+>> +                         sleep state.
+>> +- marvell,lowpower-pull-down : The property means a pin is pull down for input
+>> +                           in sleep state.
+>> +- marvell,lowpower-drive-high : The property means a pin is driving high for
+>> +                            output in sleep state.
+>> +- marvell,lowpower-drive-low : The property means a pin is driving low for
+>> +                           output in sleep state.
+>> +- marvell,lowpower-float : The property means a pin is float in sleep state.
+>> +- marvell,lowpower-zero : The property means a pin is not configured in sleep
+>> +                       state.
+>
+> These (or most of them) look like they are not very Marvell specific. Should
+> we try to standardize the way they are set across different bindings?
 
-Originally the FIQ support was only used because there hasn't been SDMA
-support available at that time.
-Nowadays the FIQ support is necessary only for AC97. The AC97 support in
-the SSI unit is buggy: It does not allow you to select the slots you
-want to receive. At least the wm9712 codec always sends (apart from the
-stereo data) data in slot (I think it is) 12. You find this data mixed
-in your audio stream. The FIQ driver skips this data to get a valid
-audio stream.
+If the device tree properties are to be standardized, the driver should be
+moved over to using generic pin config (drivers/pinctrl/pinconf-generic.c,
+include/linux/pinctrl/pinconf-generic.h) too, or it makes no sense.
 
-One other way to solve this would be to use dma here and to filter out
-the data afterwards.
+So please augment the PXA driver to use these, then move the generic
+bindings to pinconf-generic.txt or something.
 
-Sascha
+If pinconf-generic needs extending/augmenting in the process, just do it,
+it's supposed to be generic...
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Yours,
+Linus Walleij
