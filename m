@@ -1,31 +1,43 @@
 From: matt@genesi-usa.com (Matt Sealey)
-Date: Tue,  7 Aug 2012 17:45:12 -0500
-Subject: [PATCH 0/2] ARM: imx: change building of SSI FIQ support for i.MX
- processors
-Message-ID: <1344379514-30076-1-git-send-email-matt@genesi-usa.com>
+Date: Tue,  7 Aug 2012 17:45:13 -0500
+Subject: [PATCH 1/2] ARM: build ssi-fiq.S in ARM mode to prevent
+ CONFIG_THUMB2_KERNEL build breakage
+In-Reply-To: <1344379514-30076-1-git-send-email-matt@genesi-usa.com>
+References: <1344379514-30076-1-git-send-email-matt@genesi-usa.com>
+Message-ID: <1344379514-30076-2-git-send-email-matt@genesi-usa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patches to fix Thumb2 kernel building and change the dependency for SSI FIQ
-support to a more specific option to prevent it from being needlessly built
-in the first place on more frugal kernel configurations.
+If i.MX SSI FIQ support is enabled then it is impossible to build a Thumb2
+kernel image due to the code not being written with Thumb2 in mind (over-use
+of registers). In order not to break Thumb2 kernels, compile this as ARM. All
+the processors which require this support will run ARM code so there is no
+problem at runtime in doing this, even if it does produce a strange mix of
+code that may not be desired.
 
-A better solution might be to rewrite the function in Thumb-compatible assembly
-but the target processors do not support Thumb2 kernels anyway, and the last
-time it was suggested the updated code was nacked by Russell. Since its built
-as a side-effect on ARMv6/v7 i.MX processors, these could be considered somewhat
-Needful Things(tm) by people wanting Thumb2 kernels based on imx_v6_v7_defconfig
-or wanting to remove certain boards from their configs.
+In theory this should only be needed on configs based on imx_v4_v5_defconfig
+where CONFIG_THUMB2_KERNEL cannot be selected anyway since these SoCs do not
+have ARM cores capable of running Thumb2 code. This also makes rewriting the
+code as Thumb-compatible kind of redundant. But since one Eukrea board audio
+driver needs it, and there is an i.MX51 CPU module for this board, it gets
+pulled in for imx_v6_v7_defconfig too, making this a necessity.
 
-Matt Sealey (2):
-  ARM: build ssi-fiq.S in ARM mode to prevent CONFIG_THUMB2_KERNEL
-    build breakage
-  ARM: only build ssi-fiq.S et al if CONFIG_SND_IMX_SOC_PCM_FIQ is
-    selected
-
- arch/arm/plat-mxc/Makefile  |    2 +-
+Signed-off-by: Matt Sealey <matt@genesi-usa.com>
+---
  arch/arm/plat-mxc/ssi-fiq.S |    1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ 1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm/plat-mxc/ssi-fiq.S b/arch/arm/plat-mxc/ssi-fiq.S
+index 8397a2d..ac09af8 100644
+--- a/arch/arm/plat-mxc/ssi-fiq.S
++++ b/arch/arm/plat-mxc/ssi-fiq.S
+@@ -28,6 +28,7 @@
+ #define SSI_SIER_RFF0_EN	(1 << 2)
+ 
+ 		.text
++		.arm
+ 		.global	imx_ssi_fiq_start
+ 		.global	imx_ssi_fiq_end
+ 		.global imx_ssi_fiq_base
 -- 
 1.7.9.5
