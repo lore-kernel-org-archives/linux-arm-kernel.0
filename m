@@ -1,28 +1,23 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 7 Aug 2012 11:52:26 +0100
-Subject: [PATCH] driver: misc: bmp085: remove "of_match_table" property.
-In-Reply-To: <20120807054342.GF8468@arwen.pp.htv.fi>
-References: <1344245324-16704-1-git-send-email-sourav.poddar@ti.com>
- <20120806093033.GH17551@arwen.pp.htv.fi>
- <20120806154214.GC29272@sirena.org.uk>
- <20120807054342.GF8468@arwen.pp.htv.fi>
-Message-ID: <20120807105225.GT16861@opensource.wolfsonmicro.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 7 Aug 2012 03:58:47 -0700
+Subject: [PATCH] Revert "ARM: OMAP3530evm: set pendown_state and
+ debounce time for ads7846"
+In-Reply-To: <871ujj7ngd.fsf@ti.com>
+References: <876298iv9s.fsf@ti.com>
+ <1344284535-16717-1-git-send-email-grinberg@compulab.co.il>
+ <871ujj7ngd.fsf@ti.com>
+Message-ID: <20120807105847.GX11011@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 07, 2012 at 08:43:44AM +0300, Felipe Balbi wrote:
-> On Mon, Aug 06, 2012 at 04:42:14PM +0100, Mark Brown wrote:
+* Kevin Hilman <khilman@ti.com> [120806 13:52]:
+> 
+> The Overo boards were the ones that were crashing due to this bug since
+> the pendown GPIO was the only one used in the bank.
+> 
+> Tony, can you queue this up for v3.6-rc?  I have a version in my
+> for_3.6/fixes/ads7846-2 branch with the tags above applied, based on v3.6-rc1.
 
-> > It's good practice to have an explict compatible string even if the
-> > default happens to work in order to avoid any name clashes.
+Yes thanks pulling into fixes.
 
-> of_i2c.c makes no use whatsoever of the compatible string. See that it
-> will build an i2c_boardinfo and register a new device. That compatible
-
-If that's all that's done it seems like a bug frankly, certainly based
-on previous discussions it ought to be.  There are collisions out there,
-they've just happened to not bite us yet
-
-> string is just churn and has no use at all.
-
-This is device tree we're talking about, there's a lot churn anyway.
+Tony
