@@ -1,74 +1,54 @@
 From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Tue, 7 Aug 2012 14:32:35 -0400
-Subject: [PATCH v2 20/23] xen/arm: compile netback
-In-Reply-To: <1344263246-28036-20-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Tue, 7 Aug 2012 14:33:06 -0400
+Subject: [PATCH v2 21/23] xen: update xen_add_to_physmap interface
+In-Reply-To: <1344263246-28036-21-git-send-email-stefano.stabellini@eu.citrix.com>
 References: <alpine.DEB.2.02.1208061428060.4645@kaball.uk.xensource.com>
- <1344263246-28036-20-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20120807183235.GW15053@phenom.dumpdata.com>
+ <1344263246-28036-21-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20120807183306.GX15053@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2012 at 03:27:23PM +0100, Stefano Stabellini wrote:
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-OK. Looks good.
-> ---
->  arch/arm/include/asm/xen/hypercall.h |   19 +++++++++++++++++++
->  drivers/net/xen-netback/netback.c    |    1 +
->  drivers/net/xen-netfront.c           |    1 +
->  3 files changed, 21 insertions(+), 0 deletions(-)
+On Mon, Aug 06, 2012 at 03:27:24PM +0100, Stefano Stabellini wrote:
+> Update struct xen_add_to_physmap to be in sync with Xen's version of the
+> structure.
+> The size field was introduced by:
 > 
-> diff --git a/arch/arm/include/asm/xen/hypercall.h b/arch/arm/include/asm/xen/hypercall.h
-> index 4ac0624..8a82325 100644
-> --- a/arch/arm/include/asm/xen/hypercall.h
-> +++ b/arch/arm/include/asm/xen/hypercall.h
-> @@ -47,4 +47,23 @@ unsigned long HYPERVISOR_hvm_op(int op, void *arg);
->  int HYPERVISOR_memory_op(unsigned int cmd, void *arg);
->  int HYPERVISOR_physdev_op(int cmd, void *arg);
+> changeset:   24164:707d27fe03e7
+> user:        Jean Guyader <jean.guyader@eu.citrix.com>
+> date:        Fri Nov 18 13:42:08 2011 +0000
+> summary:     mm: New XENMEM space, XENMAPSPACE_gmfn_range
+> 
+> According to the comment:
+> 
+> "This new field .size is located in the 16 bits padding between .domid
+> and .space in struct xen_add_to_physmap to stay compatible with older
+> versions."
+> 
+> Changes in v2:
+
+Looks good. Let me take this as in my tree to prep it for Mukesh's patches.
+
+> 
+> - remove erroneous comment in the commit message.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> ---
+>  include/xen/interface/memory.h |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
+> index b5c3098..b66d04c 100644
+> --- a/include/xen/interface/memory.h
+> +++ b/include/xen/interface/memory.h
+> @@ -163,6 +163,9 @@ struct xen_add_to_physmap {
+>      /* Which domain to change the mapping for. */
+>      domid_t domid;
 >  
-> +static inline void
-> +MULTI_update_va_mapping(struct multicall_entry *mcl, unsigned long va,
-> +			unsigned int new_val, unsigned long flags)
-> +{
-> +	BUG();
-> +}
+> +    /* Number of pages to go through for gmfn_range */
+> +    uint16_t    size;
 > +
-> +static inline void
-> +MULTI_mmu_update(struct multicall_entry *mcl, struct mmu_update *req,
-> +		 int count, int *success_count, domid_t domid)
-> +{
-> +	BUG();
-> +}
-> +
-> +static inline int
-> +HYPERVISOR_multicall(void *call_list, int nr_calls)
-> +{
-> +	BUG();
-> +}
->  #endif /* _ASM_ARM_XEN_HYPERCALL_H */
-> diff --git a/drivers/net/xen-netback/netback.c b/drivers/net/xen-netback/netback.c
-> index f4a6fca..ab4f81c 100644
-> --- a/drivers/net/xen-netback/netback.c
-> +++ b/drivers/net/xen-netback/netback.c
-> @@ -40,6 +40,7 @@
->  
->  #include <net/tcp.h>
->  
-> +#include <xen/xen.h>
->  #include <xen/events.h>
->  #include <xen/interface/memory.h>
->  
-> diff --git a/drivers/net/xen-netfront.c b/drivers/net/xen-netfront.c
-> index 3089990..bf4ba2b 100644
-> --- a/drivers/net/xen-netfront.c
-> +++ b/drivers/net/xen-netfront.c
-> @@ -43,6 +43,7 @@
->  #include <linux/slab.h>
->  #include <net/ip.h>
->  
-> +#include <asm/xen/page.h>
->  #include <xen/xen.h>
->  #include <xen/xenbus.h>
->  #include <xen/events.h>
+>      /* Source mapping space. */
+>  #define XENMAPSPACE_shared_info 0 /* shared info page */
+>  #define XENMAPSPACE_grant_table 1 /* grant table page */
 > -- 
 > 1.7.2.5
