@@ -1,66 +1,61 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 7 Aug 2012 14:34:54 +0200
-Subject: [PATCH 1/4] ARM: at91: gpio: implement request
-In-Reply-To: <1342359637-15325-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20120715131618.GF4450@game.jcrosoft.org>
- <1342359637-15325-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <50210B6E.70402@atmel.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue,  7 Aug 2012 15:37:16 +0300
+Subject: [PATCH v3] i2c: omap: switch over to autosuspend API
+Message-ID: <1344343036-8832-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2012 03:40 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> confire the pin as pio when requested
-> 
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+this helps us reduce unnecessary pm transitions
+in case we have another i2c message starting soon.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> ---
->  arch/arm/mach-at91/gpio.c |   14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-> index 325837a..994ed02 100644
-> --- a/arch/arm/mach-at91/gpio.c
-> +++ b/arch/arm/mach-at91/gpio.c
-> @@ -44,6 +44,7 @@ struct at91_gpio_chip {
->  
->  #define to_at91_gpio_chip(c) container_of(c, struct at91_gpio_chip, chip)
->  
-> +static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset);
->  static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip);
->  static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val);
->  static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset);
-> @@ -57,6 +58,7 @@ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
->  	{								\
->  		.chip = {						\
->  			.label		  = name,			\
-> +			.request	  = at91_gpiolib_request,	\
->  			.direction_input  = at91_gpiolib_direction_input, \
->  			.direction_output = at91_gpiolib_direction_output, \
->  			.get		  = at91_gpiolib_get,		\
-> @@ -861,6 +863,18 @@ void __init at91_gpio_irq_setup(void)
->  }
->  
->  /* gpiolib support */
-> +
-> +
-> +static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset)
-> +{
-> +	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
-> +	void __iomem *pio = at91_gpio->regbase;
-> +	unsigned mask = 1 << offset;
-> +
-> +	__raw_writel(mask, pio + PIO_PER);
-> +	return 0;
-> +}
-> +
->  static int at91_gpiolib_direction_input(struct gpio_chip *chip,
->  					unsigned offset)
->  {
-> 
-
-
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 60928f2..35e8207 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -55,6 +55,9 @@
+ /* timeout waiting for the controller to respond */
+ #define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
+ 
++/* timeout for pm runtime autosuspend */
++#define OMAP_I2C_PM_TIMEOUT		1000	/* ms */
++
+ /* For OMAP3 I2C_IV has changed to I2C_WE (wakeup enable) */
+ enum {
+ 	OMAP_I2C_REV_REG = 0,
+@@ -645,7 +648,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 
+ 	omap_i2c_wait_for_bb(dev);
+ out:
+-	pm_runtime_put(dev->dev);
++	pm_runtime_mark_last_busy(dev->dev);
++	pm_runtime_put_autosuspend(dev->dev);
+ 	return r;
+ }
+ 
+@@ -1113,6 +1117,9 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		dev->regs = (u8 *)reg_map_ip_v1;
+ 
+ 	pm_runtime_enable(dev->dev);
++	pm_runtime_set_autosuspend_delay(dev->dev, OMAP_I2C_PM_TIMEOUT);
++	pm_runtime_use_autosuspend(dev->dev);
++
+ 	r = pm_runtime_get_sync(dev->dev);
+ 	if (IS_ERR_VALUE(r))
+ 		goto err_free_mem;
+@@ -1189,7 +1196,8 @@ omap_i2c_probe(struct platform_device *pdev)
+ 
+ 	of_i2c_register_devices(adap);
+ 
+-	pm_runtime_put(dev->dev);
++	pm_runtime_mark_last_busy(dev->dev);
++	pm_runtime_put_autosuspend(dev->dev);
+ 
+ 	return 0;
+ 
 -- 
-Nicolas Ferre
+1.7.12.rc0
