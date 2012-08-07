@@ -1,85 +1,301 @@
 From: matt@genesi-usa.com (Matt Sealey)
-Date: Tue,  7 Aug 2012 16:44:23 -0500
-Subject: [PATCH] ARM: print an early warning if the ATAG_CORE/OF_DT_MAGIC vet
- did not pass
-Message-ID: <1344375863-29947-1-git-send-email-matt@genesi-usa.com>
+Date: Tue,  7 Aug 2012 16:46:18 -0500
+Subject: [PATCH] efikamx: reintroduce Genesi Efika MX Smarttop via device tree
+Message-ID: <1344375978-29981-1-git-send-email-matt@genesi-usa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting and passing either corrupted or missing device trees or ATAGs,
-the __vet_atags function in kernel/head-common.S will set r2 to 0, thus
-causing what might be seen as strange behavior.
+This device tree only supports the final retail board ("TO3").
 
-What happens is setup_machine_fdt is passed __atags_pointer which is NULL
-in the above situation, and it will immediately exit with NULL return
-value for the machine_desc. On NULL machine_desc, the implication is that
-it was not a device tree, and it falls back to setup_machine_tags. This
-function will also return NULL, and the list of supported boards will be
-printed out. Only much, much later in the kernel is any message reporting
-lack of ATAG_CORE or any other indicator present since they all rely on
-there being a valid pointer to get to them.
+It is currently feature equivalent to the MX51 Babbage device tree. The
+following features have been tested and work as well as can be expected:
 
-The following situations where this may happen are suggested:
+* Serial port
+* SD card support
+* I2C bus
+* SGTL5000 audio support via the internal speaker
+* SDMA support (via audio)
+* SPI bus
+* NOR flash (at 25MHz bus speed)
+* MC13892 PMIC Regulator and Realtime clock functions
 
-1) Modification of the device tree blob is performed in the bootloader,
-and the tree is being corrupted for some reason.
-2) Something is overwriting the device tree magic (kernel decompression,
-perhaps) which is possibly more common.
-3) Something is overwriting the ATAG_CORE magic (as above)
-4) DTB address passed to bootloader is invalid
-5) Bootloader actually does boot setting r2 to 0 which either means it
-is ridiculously old or horrifically broken.
-
-Several reads of Documentation/arm/Booting lead me to believe that passing
-tags in r2 is OPTIONAL, HIGHLY RECOMMENDED for old bootloaders, and
-MANDATORY for new bootloaders. The kernel can't tell which is in use, so 0
-might actually be valid. However, later it says that a bootloader must
-(lowercase) set r2 to "physical address of tagged list in system RAM, or
-physical address of device tree block (dtb) in system RAM." So it is not
-possible to define a behavior or print a definitive warning, and since we
-cannot fix these problems in the kernel we can at least provide more
-information about their occurrence at runtime rather than getting to the point
-where it seems something even more strange has happened. The pointer is lost
-at this point, though, so all we can do is report the event.
-
-Therefore, print a warning at the earliest opportunity to catch the r2=0
-case and reduce frustration with developers attempting to port to device
-tree or port new bootloaders, hopefully without worrying people with old
-bootloaders complying with the existing documentation.
-
-Of course since this is very early in boot, DEBUG_LL needs to be enabled
-and a valid UART for the booting board needs to be configured for it to
-show any result, but this is true of all the above warnings anyway,
-otherwise all you get is Starting Kernel.... and a blinking terminal prompt.
+Since the board requires some extra work on the PMIC to power off, the system
+will instead just halt, however reboot works. Other missing features are due
+to a lack of drivers or device tree bindings currently.
 
 Signed-off-by: Matt Sealey <matt@genesi-usa.com>
-Tested-by: Steev Klimaszewski <steev@genesi-usa.com>
+Signed-off-by: Steev Klimaszewski <steev@genesi-usa.com>
 ---
- arch/arm/kernel/setup.c |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/imx51-efikamx.dts |  247 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/Makefile.boot     |    2 +-
+ 2 files changed, 248 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/imx51-efikamx.dts
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index a81dcec..f788d44 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -942,6 +942,18 @@ void __init setup_arch(char **cmdline_p)
- 	struct machine_desc *mdesc;
+diff --git a/arch/arm/boot/dts/imx51-efikamx.dts b/arch/arm/boot/dts/imx51-efikamx.dts
+new file mode 100644
+index 0000000..dd14f77
+--- /dev/null
++++ b/arch/arm/boot/dts/imx51-efikamx.dts
+@@ -0,0 +1,247 @@
++/*
++ * Copyright 2011 Freescale Semiconductor, Inc.
++ * Copyright 2011 Linaro Ltd.
++ * Copyright 2012 Genesi USA, Inc.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "imx51.dtsi"
++
++/ {
++	model = "Genesi Efika MX (Smarttop)";
++	compatible = "genesi,imx51-efikamx", "fsl,imx51";
++
++	memory {
++		reg = <0x90000000 0x20000000>;
++	};
++
++	soc {
++		aips at 70000000 {
++			spba at 70000000 {
++				esdhc at 70004000 {
++					cd-gpios = <&gpio1 0 0>;
++					wp-gpios = <&gpio1 1 0>;
++					status = "okay";
++				};
++
++				ssi2: ssi at 70014000 {
++				    fsl,mode = "i2s-slave";
++				    status = "okay";
++				};
++
++				ecspi at 70010000 {
++					fsl,spi-num-chipselects = <2>;
++					cs-gpios = <&gpio4 24 0>, <&gpio4 25 0>;
++					status = "okay";
++
++					pmic: mc13892 at 0 {
++						#address-cells = <1>;
++						#size-cells = <0>;
++						compatible = "fsl,mc13892";
++						spi-max-frequency = <6000000>;
++						reg = <0>;
++						interrupt-parent = <&gpio1>;
++						interrupts = <6 0x4>;
++						fsl,mc13xxx-uses-rtc;
++
++						regulators {
++							sw1_reg: sw1 {
++								regulator-min-microvolt = <600000>;
++								regulator-max-microvolt = <1375000>;
++								regulator-boot-on;
++								regulator-always-on;
++							};
++
++							sw2_reg: sw2 {
++								regulator-min-microvolt = <900000>;
++								regulator-max-microvolt = <1850000>;
++								regulator-boot-on;
++								regulator-always-on;
++							};
++
++							sw3_reg: sw3 {
++								regulator-min-microvolt = <1100000>;
++								regulator-max-microvolt = <1850000>;
++								regulator-boot-on;
++								regulator-always-on;
++							};
++
++							sw4_reg: sw4 {
++								regulator-min-microvolt = <1100000>;
++								regulator-max-microvolt = <1850000>;
++								regulator-boot-on;
++								regulator-always-on;
++							};
++
++							vpll_reg: vpll {
++								regulator-min-microvolt = <1050000>;
++								regulator-max-microvolt = <1800000>;
++								regulator-boot-on;
++								regulator-always-on;
++							};
++
++							vdig_reg: vdig {
++								regulator-min-microvolt = <1650000>;
++								regulator-max-microvolt = <1650000>;
++								regulator-boot-on;
++							};
++
++							vsd_reg: vsd {
++								regulator-min-microvolt = <3150000>;
++								regulator-max-microvolt = <3150000>;
++							};
++
++							vusb2_reg: vusb2 {
++								regulator-min-microvolt = <2400000>;
++								regulator-max-microvolt = <2775000>;
++								regulator-boot-on;
++								regulator-always-on;
++							};
++
++							vvideo_reg: vvideo {
++								regulator-min-microvolt = <2775000>;
++								regulator-max-microvolt = <2775000>;
++								regulator-boot-on;
++							};
++
++							vaudio_reg: vaudio {
++								regulator-min-microvolt = <2300000>;
++								regulator-max-microvolt = <3000000>;
++							};
++
++							vcam_reg: vcam {
++								regulator-min-microvolt = <2500000>;
++								regulator-max-microvolt = <3000000>;
++							};
++
++							vgen1_reg: vgen1 {
++								regulator-min-microvolt = <1200000>;
++								regulator-max-microvolt = <3150000>;
++							};
++
++							vgen2_reg: vgen2 {
++								regulator-min-microvolt = <3150000>;
++								regulator-max-microvolt = <3150000>;
++								regulator-always-on;
++							};
++
++							vgen3_reg: vgen3 {
++								regulator-min-microvolt = <1800000>;
++								regulator-max-microvolt = <2900000>;
++								regulator-always-on;
++							};
++						};
++					};
++
++					flash: sst25vf032b at 1 {
++						#address-cells = <1>;
++						#size-cells = <1>;
++						compatible = "sst,sst25vf032b";
++						spi-max-frequency = <25000000>;
++						reg = <1>;
++
++						partition at 0 {
++							label = "firmware";
++							reg = <0x0 0x200000>;
++						};
++
++						partition at 200000 {
++							label = "user";
++							reg = <0x200000 0x200000>;
++						};
++					};
++				};
++			};
++
++			wdog at 73f98000 {
++				status = "okay";
++			};
++
++			iomuxc at 73fa8000 {
++				compatible = "fsl,imx51-iomuxc";
++				reg = <0x73fa8000 0x4000>;
++			};
++
++			uart1: serial at 73fbc000 {
++				fsl,uart-has-rtscts;
++				status = "okay";
++			};
++
++		};
++
++		aips at 80000000 {
++			sdma at 83fb0000 {
++				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx51.bin";
++			};
++
++			i2c at 83fc4000 {
++				status = "okay";
++
++				codec: sgtl5000 at 0a {
++					compatible = "fsl,sgtl5000";
++					reg = <0x0a>;
++					clock-frequency = <12288000>;
++					VDDA-supply = <&vdig_reg>;
++					VDDIO-supply = <&vvideo_reg>;
++				};
++			};
++
++			audmux at 83fd0000 {
++				status = "okay";
++			};
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++
++		power {
++			label = "Power Button";
++			gpios = <&gpio2 31 0>;
++			linux,code = <116>; /* KEY_POWER */
++			gpio-key,wakeup;
++		};
++	};
++
++	gpio-leds {
++		compatible = "gpio-leds";
++
++		red {
++			label = "red";
++			gpios = <&gpio3 13>;
++			linux,default-trigger = "ide-disk";
++		};
++
++		green {
++			label = "green";
++			gpios = <&gpio3 14>;
++			linux,default-trigger = "default-on";
++		};
++
++		blue {
++			label = "blue";
++			gpios = <&gpio3 15>;
++			linux,default-trigger = "mmc0";
++		};
++	};
++
++	sound {
++		compatible = "fsl,imx-audio-sgtl5000";
++		model = "efikamx-sgtl5000";
++		ssi-controller = <&ssi2>;
++		audio-routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"Ext Spk", "LINE_OUT";
++		audio-codec = <&codec>;
++		mux-int-port = <2>;
++		mux-ext-port = <3>;
++	};
++};
+diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
+index 05541cf..3ed7c9d 100644
+--- a/arch/arm/mach-imx/Makefile.boot
++++ b/arch/arm/mach-imx/Makefile.boot
+@@ -38,7 +38,7 @@ zreladdr-$(CONFIG_SOC_IMX6Q)	+= 0x10008000
+ params_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10000100
+ initrd_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10800000
  
- 	setup_processor();
-+
-+	if (__atags_pointer == 0L) {
-+		early_print(
-+			"Warning: ATAG_CORE/OF_DT_MAGIC pass failed or __atags_pointer NULL\n"
-+			" Either r2 was NULL or __vet_atags set r2 to NULL on boot. This can be because\n"
-+			" the bootloader is broken, the ATAGs or Device Tree have been overwritten by\n"
-+			" other data during the boot process, the wrong address was supplied for the\n"
-+			" Device Tree blob, or NULL was explicitly passed for some reason. Please check\n"
-+			" into the situation as it is not usual to be able to boot a board with no ATAGs\n"
-+			" or Device Tree.\n");
-+	}
-+
- 	mdesc = setup_machine_fdt(__atags_pointer);
- 	if (!mdesc)
- 		mdesc = setup_machine_tags(machine_arch_type);
+-dtb-$(CONFIG_MACH_IMX51_DT) += imx51-babbage.dtb
++dtb-$(CONFIG_MACH_IMX51_DT) += imx51-babbage.dtb imx51-efikamx.dtb
+ dtb-$(CONFIG_MACH_IMX53_DT) += imx53-ard.dtb imx53-evk.dtb \
+ 			       imx53-qsb.dtb imx53-smd.dtb
+ dtb-$(CONFIG_SOC_IMX6Q)	+= imx6q-arm2.dtb \
 -- 
 1.7.9.5
