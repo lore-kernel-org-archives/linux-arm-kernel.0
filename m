@@ -1,45 +1,55 @@
-From: Dongjin.Kim@agreeyamobility.net (Dongjin Kim)
-Date: Tue, 7 Aug 2012 19:57:33 +0000
-Subject: =?ks_c_5601-1987?B?yLi9xTogW1BBVENIIDIvNF0gYXJtL2R0czogZXh5bm9zNDogQWRk?=
- =?ks_c_5601-1987?Q?_DTS_files_derived_from_common_Exynos4?=
-In-Reply-To: <201208071938.26507.arnd@arndb.de>
-References: <1344366398-19022-1-git-send-email-dongjin.kim@agreeyamobility.net>,
- <201208071938.26507.arnd@arndb.de>
-Message-ID: <A6A3B7488C419F488E5B13FFD03C08AD2F4372EB@SN2PRD0510MB370.namprd05.prod.outlook.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 7 Aug 2012 20:25:22 +0000
+Subject: [PATCH v3 3/7] mv643xx.c: Add basic device tree support.
+In-Reply-To: <50213ACB.6040301@codethink.co.uk>
+References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
+ <201208071456.41412.arnd@arndb.de> <50213ACB.6040301@codethink.co.uk>
+Message-ID: <201208072025.22871.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tuesday 07 August 2012, Ian Molton wrote:
+> > I think it documents some of the same thing,
+> 
+> Not really. It documents some godawful hack that recycled the platform
+> device -based driver and provided a DT binding for it, just for PPC.
+> 
+> I cant even find anything that implements code for whatever
+> "marvell,mv64360-mdio" might be. I'm sure it might exist somewhere.
 
-I didn't use -M and I couldn't see any difference with the it.
-Did I make something wrong on that patch?
+The code dates back to when we had separate buses for platform devices
+and of devices, and then it was decided not to add support for both
+bus types to each of the marvell drivers. In hindsight it would have
+been better to do that, but that was impossible to tell back then.
 
-Thank you in advance.
-Dongjin.
-________________________________________
-?? ??: Arnd Bergmann [arnd at arndb.de]
-?? ??: 2012? 8? 8? ??? ?? 4:38
-?? ??: Dongjin Kim
-??: Dongjin Kim; Russell King; Thomas Abraham; Kukjin Kim; Grant Likely; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-??: Re: [PATCH 2/4] arm/dts: exynos4: Add DTS files derived from common Exynos4
+> > We might also want to move some of the
+> > code from arch/powerpc/sysdev/mv64x60_dev.c to live in the same place
+> > as the device driver.
+> 
+> I hope not. I don't really want to touch that stuff at all. If it works
+> the way it
+> is, then it can stay that way. If the PPC folk want to send patches to
+> add the
+> properties they use to the driver, then they can do. I'll send an email
+> their
+> way and see if they want to join in.
+> 
+> From my perspective, the next thing that needs to happen to the driver is
+> for it to be broken up into ethernet and mdio drivers, so that we can
+> get rid
+> of all this shared_smi craziness... But that's for another patch series.
 
-On Tuesday 07 August 2012, Dongjin Kim wrote:
->
-> This patch creates a DTS file, exynos4.dtsi, for Exynos4210/4x12 and it
-> describes common device nodes. SoC specific device nodes are described in
-> another DTS file derived from this, exynos4210.dtsi and exynos4412.dtsi.
->
-> exynos4412.dtsi is added new for Exynos4412 as well as exynos4210 is modified
-> for Exynos4210 specific device nodes.
->
-> Signed-off-by: Dongjin Kim <dongjin.kim@agreeyamobility.net>
-> ---
->  arch/arm/boot/dts/exynos4.dtsi    |  404 +++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos4210.dtsi |  374 +---------------------------------
->  arch/arm/boot/dts/exynos4412.dtsi |  104 ++++++++++
->  3 files changed, 510 insertions(+), 372 deletions(-)
+Adding devicetree-discuss and linuxppc-dev, as well as Dale Farnsworth,
+who initially added the bindings for mv643xx.
 
-Looks good in principle. I would hope that "git format-patch -M" can detect this
-mostly-moved filed. Did you use that?
+I would hope that at least some of the properties that are used on
+powerpc can be reused in the same way for other architectures.
+The method to find the phy address on powerpc does indeed make
+more sense than the "port_number" property you suggested, and the
+phandle for the phy node is usually called "phy" not "mdio".
 
-        Arnd
+I'm not sure if the ethernet-group is required on ARM as well, but
+it does sound a lot like what you actually want instead of the
+shared_smi property.
+
+	Arnd
