@@ -1,31 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 7 Aug 2012 00:20:42 -0700
-Subject: [PATCH v2] ARM: OMAP4: twl-common: Support for additional
- devices on i2c1 bus
-In-Reply-To: <500D0FA5.3020208@ti.com>
-References: <1342168682-15888-1-git-send-email-peter.ujfalusi@ti.com>
- <500D0FA5.3020208@ti.com>
-Message-ID: <20120807072041.GL11011@atomide.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 7 Aug 2012 09:21:51 +0200
+Subject: Vacations.
+In-Reply-To: <Pine.LNX.4.64.1208031708200.5170@axis700.grange>
+References: <CACKLOr1Q6_xVhaaoWiy-kf9hViTW98aSa6hd5M2z7ogL-uwNVQ@mail.gmail.com>
+ <Pine.LNX.4.64.1208031708200.5170@axis700.grange>
+Message-ID: <20120807072151.GF24458@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [120723 01:52]:
-> Hi Tony,
+On Fri, Aug 03, 2012 at 05:09:15PM +0200, Guennadi Liakhovetski wrote:
+> Hi Javier
 > 
-> On 07/13/2012 10:38 AM, Peter Ujfalusi wrote:
-> > On OMAP4 the i2c1 bus is dedicated for the PMIC and audio related devices.
-> > Manufacturers can opt to use different codec than twl6040 and also can add
-> > audio related IC to the bus (external amplifier for example on SDP4430).
+> On Fri, 3 Aug 2012, javier Martin wrote:
+> 
+> > Hi,
+> > I will be out of the office until August the 19th.
 > > 
-> > Make it possible to add differnet set of additional devices to i2c1 bus on
-> > OMAP4 boards.
+> > I just wanted to send a reminder of some patches that I have pending.
+> > 
+> > For Mauro 3.7:
+> > 
+> > [PULL] video_visstrim for 3.6
+> > [PATCH] media: i.MX27: Fix mx2_emmaprp mem2mem driver clocks.
+> > 
+> > For Guennadi:
+> > 
+> > [PATCH 1/4] i.MX27: Fix emma-prp and csi clocks.
 > 
-> Would it be possible to queue this patch for 3.6?
+> As I mentioned several times, the above patch is not for me. Have a nice 
+> vacation.
 
-Sorry things were getting already too complex for v3.6 merge window..
-So v3.7 it will be. Looks like this need to be updated against v3.6-rc1
-to apply.
+Indeed it's for me. Queued this up.
 
-Regards,
+Thanks
+ Sascha
 
-Tony
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
