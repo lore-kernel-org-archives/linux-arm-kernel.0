@@ -1,88 +1,76 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Tue, 7 Aug 2012 18:52:53 -0400
-Subject: [PATCH 01/22] ARM: add mechanism for late code patching
-In-Reply-To: <alpine.LFD.2.02.1208040045360.5231@xanadu.home>
-References: <1343775898-28345-1-git-send-email-cyril@ti.com>
- <1343775898-28345-2-git-send-email-cyril@ti.com>
- <alpine.LFD.2.02.1208040045360.5231@xanadu.home>
-Message-ID: <50219C45.7030601@ti.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Tue, 7 Aug 2012 18:06:27 -0500
+Subject: [PATCH 2/2] ARM i.MX5: Hard reset the IPU during startup
+In-Reply-To: <20120807170428.GI18957@n2100.arm.linux.org.uk>
+References: <1338888630-25930-1-git-send-email-s.hauer@pengutronix.de>
+ <1338888630-25930-3-git-send-email-s.hauer@pengutronix.de>
+ <20429.57208.228315.164637@ipc1.ka-ro> <20120605110834.GQ30400@pengutronix.de>
+ <CAKGA1bkA3eEHn4sM277mzcRT5OUyipW18-k-X0nK+T9rrotJNw@mail.gmail.com>
+ <20120807170428.GI18957@n2100.arm.linux.org.uk>
+Message-ID: <CAKGA1bn8AEWhX_ZwuzB28mej7Y3da5_dFz+aOXcBaqMsJx9SBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
-
-On 8/4/2012 1:38 AM, Nicolas Pitre wrote:
-[...]
->> extern unsigned __patch_table_begin, __patch_table_end;
+On Tue, Aug 7, 2012 at 12:04 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Aug 06, 2012 at 04:31:50PM -0500, Matt Sealey wrote:
+>> There used to be an ATAG for finding the linear framebuffer and it's
+>> details but it got removed. This
+>> was from a long forgotten time when you could initialize a VGA
+>> graphics card and never care that
+>> it had an interrupt or not, since it never got used for your average,
+>> simple linear framebuffer operations.
 >
-> You could use "exttern void __patch_table_begin" so those symbols don't
-> get any type that could be misused by mistake, while you still can take
-> their addresses.
+> No ATAG definitions have been removed from the kernel.  The one you
+> are referring to is:
 >
-
-Looks like we'll have to stick with a non-void type here.  The compiler 
-throws a warning when we try to take the address of a void.
-
-[...]
-> Did you verify with some test program that your patching routines do
-> produce the same opcodes as the assembled equivalent for all possible
-> shift values?  Especially for Thumb2 code which isn't as trivial to get
-> right as the ARM one.
+> #define ATAG_VIDEOLFB   0x54410008
 >
+> and the associated struct tag_videolfb, which is still in the kernel
+> today.  What isn't there is the implementation which reads this data,
+> because only a few boards supported it, and they passed over some data
+> from this to their FB drivers.
+>
+> So, when the boards were updated such that this became unnecessary,
+> unsurprisingly the users disappeared (because they were all in platform
+> code.)
+>
+> We have never had a generic "framebuffer" driver which has used this
+> ATAG.  Or if one was created, it never came anywhere near mainline.
+>
+> Either way, the situation is not as you describe above.
 
-We've refactored the patching code into separate functions as:
+That's funny, I was absolutely certain the complete removal was done
+in the kernel, especially since it
+was patched out of U-Boot (commit 47ea6ed) a long, long time ago based
+on it being unsupported in
+the ATAG parser.
 
-static int do_patch_imm8_arm(u32 insn, u32 imm, u32 *ninsn);
-static int do_patch_imm8_thumb(u32 insn, u32 imm, u32 *ninsn);
+I also saw a patch for OMAP which you nacked (violently :) long before
+that, because it was parsing
+ATAG_VIDEOLFB and passing it to it's display driver. Just found it again:
 
+http://www.spinics.net/lists/linux-omap/msg08287.html
 
-With this, the following test code has been used to verify the generated 
-instruction encoding:
+I must have just assumed that since the kernel doesn't pay attention
+to it, which caused it to be
+patched out of U-Boot since around June 2010, it would actually have
+completely gone away by now.
 
-u32 arm_check[] = {
-	0xe2810041, 0xe2810082, 0xe2810f41, 0xe2810f82, 0xe2810e41,
-	0xe2810e82, 0xe2810d41, 0xe2810d82, 0xe2810c41, 0xe2810c82,
-	0xe2810b41, 0xe2810b82, 0xe2810a41, 0xe2810a82, 0xe2810941,
-	0xe2810982, 0xe2810841, 0xe2810882, 0xe2810741, 0xe2810782,
-	0xe2810641, 0xe2810682, 0xe2810541, 0xe2810582, 0xe2810441,
-};
+Since no future boards use it (because you refuse to let them do it
+anymore, and also because the
+Device Tree is better anyway), no drivers use it anyway, wouldn't it
+be time to remove it completely,
+or is it there just for legacy's sake, a sepia-toned halcyon reminder
+of what we used to do to boot
+ARM boards? We are in 2012 though and the git history will always
+reflect the day it got removed.
+I think the only reason people haven't noticed it's still defined is
+because U-Boot doesn't pass it
+anymore and most of us are running U-Boots compiled much newer than June 2010.
 
-u32 thumb_check[] = {
-	0xf1010081, 0xf5017081, 0xf5017001, 0xf5016081, 0xf5016001,
-	0xf5015081, 0xf5015001, 0xf5014081, 0xf5014001, 0xf5013081,
-	0xf5013001, 0xf5012081, 0xf5012001, 0xf5011081, 0xf5011001,
-	0xf5010081, 0xf5010001, 0xf1017081, 0xf1017001, 0xf1016081,
-	0xf1016001, 0xf1015081, 0xf1015001, 0xf1014081, 0xf1014001,
-};
-
-int do_test(void)
-{
-	int i, ret;
-	u32 ninsn, insn;
-	
-	insn = arm_check[0];
-	for (i = 0; i < ARRAY_SIZE(arm_check); i++) {
-		ret = do_patch_imm8_arm(insn, 0x41 << i, &ninsn);
-		if (ret < 0)
-			pr_err("patch failed at shift %d\n", i);
-		if (ninsn != arm_check[i])
-			pr_err("mismatch at %d, expect %x, got %x\n",
-			       i, arm_check[i], ninsn);
-	}
-
-	insn = thumb_check[0];
-	for (i = 0; i < ARRAY_SIZE(thumb_check); i++) {
-		ret = do_patch_imm8_thumb(insn, 0x81 << i, &ninsn);
-		if (ret < 0)
-			pr_err("patch failed at shift %d\n", i);
-		if (ninsn != thumb_check[i])
-			pr_err("mismatch@%d, expect %x, got %x\n",
-			       i, thumb_check[i], ninsn);
-	}
-}
-
-Any ideas on improving these tests?
+Who's really going to miss it?
 
 -- 
-Thanks
-- Cyril
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
