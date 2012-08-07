@@ -1,26 +1,63 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 7 Aug 2012 15:38:05 +0300
+Date: Tue,  7 Aug 2012 15:38:07 +0300
 Subject: [PATCH v3] i2c: omap: switch over to autosuspend API
-In-Reply-To: <1344343036-8832-1-git-send-email-balbi@ti.com>
-References: <1344343036-8832-1-git-send-email-balbi@ti.com>
-Message-ID: <20120807123803.GB8468@arwen.pp.htv.fi>
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EB3087D@DBDE01.ent.ti.com>
+References: <B5906170F1614E41A8A28DE3B8D121433EB3087D@DBDE01.ent.ti.com>
+Message-ID: <1344343087-8947-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 07, 2012 at 03:37:16PM +0300, Felipe Balbi wrote:
-> this helps us reduce unnecessary pm transitions
-> in case we have another i2c message starting soon.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+this helps us reduce unnecessary pm transitions
+in case we have another i2c message starting soon.
 
-ignore this one. sorry
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 60928f2..35e8207 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -55,6 +55,9 @@
+ /* timeout waiting for the controller to respond */
+ #define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
+ 
++/* timeout for pm runtime autosuspend */
++#define OMAP_I2C_PM_TIMEOUT		1000	/* ms */
++
+ /* For OMAP3 I2C_IV has changed to I2C_WE (wakeup enable) */
+ enum {
+ 	OMAP_I2C_REV_REG = 0,
+@@ -645,7 +648,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 
+ 	omap_i2c_wait_for_bb(dev);
+ out:
+-	pm_runtime_put(dev->dev);
++	pm_runtime_mark_last_busy(dev->dev);
++	pm_runtime_put_autosuspend(dev->dev);
+ 	return r;
+ }
+ 
+@@ -1113,6 +1117,9 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		dev->regs = (u8 *)reg_map_ip_v1;
+ 
+ 	pm_runtime_enable(dev->dev);
++	pm_runtime_set_autosuspend_delay(dev->dev, OMAP_I2C_PM_TIMEOUT);
++	pm_runtime_use_autosuspend(dev->dev);
++
+ 	r = pm_runtime_get_sync(dev->dev);
+ 	if (IS_ERR_VALUE(r))
+ 		goto err_free_mem;
+@@ -1189,7 +1196,8 @@ omap_i2c_probe(struct platform_device *pdev)
+ 
+ 	of_i2c_register_devices(adap);
+ 
+-	pm_runtime_put(dev->dev);
++	pm_runtime_mark_last_busy(dev->dev);
++	pm_runtime_put_autosuspend(dev->dev);
+ 
+ 	return 0;
+ 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120807/baf82eb4/attachment.sig>
+1.7.12.rc0
