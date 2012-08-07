@@ -1,30 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Aug 2012 15:25:14 +0000
-Subject: [PATCH V4 1/2] include/video: move fimd register headers from
- platform to include/video
-In-Reply-To: <201208071428.56290.arnd@arndb.de>
-References: <1344342872-7904-1-git-send-email-l.krishna@samsung.com>
- <1344342872-7904-2-git-send-email-l.krishna@samsung.com>
- <201208071428.56290.arnd@arndb.de>
-Message-ID: <201208071525.15032.arnd@arndb.de>
+Date: Tue, 7 Aug 2012 19:15:25 +0000
+Subject: [PATCH 1/6] ARM: mxs: tx28: reset fec phy for device tree boot
+In-Reply-To: <1344267769-31166-2-git-send-email-shawn.guo@linaro.org>
+References: <1344267769-31166-1-git-send-email-shawn.guo@linaro.org>
+ <1344267769-31166-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201208071915.26932.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 August 2012, Arnd Bergmann wrote:
-> On Tuesday 07 August 2012, Leela Krishna Amudala wrote:
-> > 
-> > This patch moves the contents from regs-fb-v4.h and regs-fb.h to
-> > include/video/samsung_fimd.h. Also updates the header inclusion in
-> > machine files and driver files accordingly.
-> > 
-> > Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
-> 
-> You are missing an explanation here about why the file is moved.
-> It does seem like a good idea but please say why you do this.
-> 
-> More importantly, I don't understany why you move regs-fb-v4.h
-> but not regs-fb.h, which is included by the former.
+On Monday 06 August 2012, Shawn Guo wrote:
+> +static void __init tx28_post_init(void)
+> +{
+> +       struct device_node *np;
+> +       struct platform_device *pdev;
+> +       struct pinctrl *pctl;
+> +       int ret;
+> +
+> +       enable_clk_enet_out();
+> +
+> +       np = of_find_compatible_node(NULL, NULL, "fsl,imx28-fec");
+> +       pdev = of_find_device_by_node(np);
+> +       if (!pdev) {
+> +               pr_err("%s: failed to find fec device\n", __func__);
+> +               return;
+> +       }
+> +
+> +       pctl = pinctrl_get_select(&pdev->dev, "gpio_mode");
+> +       if (IS_ERR(pctl)) {
+> +               pr_err("%s: failed to get pinctrl state\n", __func__);
+> +               return;
+> +       }
+> +
+> +       ret = gpio_request_array(tx28_gpios, ARRAY_SIZE(tx28_gpios));
+> +       if (ret) {
+> +               pr_err("%s: failed to request gpios: %d\n", __func__, ret);
+> +               return;
+> +       }
+> +
+> +       /* Power up fec phy */
+> +       gpio_set_value(TX28_FEC_PHY_POWER, 1);
+> +       mdelay(26); /* 25ms according to data sheet */
 
-Nevermind, I should have read your text better.
+26 ms is a long time for a delay. I think you should use msleep here.
 
 	Arnd
