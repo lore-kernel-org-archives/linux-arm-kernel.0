@@ -1,39 +1,96 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 07 Aug 2012 14:46:50 -0700
-Subject: nfsroot problems with v3.6-rc1 on 37xx EVM and dynamic off-mode
-In-Reply-To: <alpine.DEB.2.00.1208031340310.28888@utopia.booyaka.com> (Paul
- Walmsley's message of "Fri, 3 Aug 2012 14:20:07 -0600 (MDT)")
-References: <alpine.DEB.2.00.1208031340310.28888@utopia.booyaka.com>
-Message-ID: <87boim1ik5.fsf@ti.com>
+Date: Tue, 07 Aug 2012 14:49:57 -0700
+Subject: [PATCH 1/3] ARM: OMAP: omap_device: keep track of driver bound
+ status
+In-Reply-To: <alpine.DEB.2.00.1208071518370.28250@utopia.booyaka.com> (Paul
+ Walmsley's message of "Tue, 7 Aug 2012 15:26:00 -0600 (MDT)")
+References: <1341961324-19657-1-git-send-email-khilman@ti.com>
+ <alpine.DEB.2.00.1208071518370.28250@utopia.booyaka.com>
+Message-ID: <871uji1iey.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
 Paul Walmsley <paul@pwsan.com> writes:
 
-> NFS is broken on 37xx EVM with v3.6-rc1 after return from off-mode with 
-> dynamic idle.  System suspend ("echo mem > /sys/power/state") with 
-> off-mode enabled seems to work fine.
+> Hi Kevin
 >
-> No obvious ideas here as to what could have broken this.  It worked in 
-> v3.5-rc2 + my omap_fixes_a_3.5rc at least:
+> a couple of minor comments
 >
-> http://www.pwsan.com/omap/bootlogs/20120617/omap_fixes_a_3.5rc__52a5ae406dadef781bfcf3a641dae2064e9697ff/37xxevm_bootlog.txt
+> On Tue, 10 Jul 2012, Kevin Hilman wrote:
 >
-> After that, it's hard to tell when this problem started occurring, since 
-> CORE stopped entering low-power states on OMAP3 on >= v3.5-rc3.
+>> Use the bus notifier to keep track of driver bound status by adding a
+>> new internal field to struct omap_device: _driver_staus.
+>
+> "_driver_status"
+>
+>> This will be useful for follow-up patches which need to know whether
+>> or not a driver is bound in order to make intelligent omap_device
+>> enable/idle decisions.
+>> 
+>> Cc: Paul Walmsley <paul@pwsan.com>
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>>  arch/arm/plat-omap/include/plat/omap_device.h |    2 ++
+>>  arch/arm/plat-omap/omap_device.c              |   14 +++++++++-----
+>>  2 files changed, 11 insertions(+), 5 deletions(-)
+>> 
+>> diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
+>> index 4327b2c..e0486cb 100644
+>> --- a/arch/arm/plat-omap/include/plat/omap_device.h
+>> +++ b/arch/arm/plat-omap/include/plat/omap_device.h
+>> @@ -60,6 +60,7 @@ extern struct dev_pm_domain omap_device_pm_domain;
+>>   * @_dev_wakeup_lat_limit: dev wakeup latency limit in nsec - set by OMAP PM
+>>   * @_state: one of OMAP_DEVICE_STATE_* (see above)
+>>   * @flags: device flags
+>> + * @_driver_status: one of BUS_NOTIFY_*_DRIVER from <linux/device.h>
+>>   *
+>>   * Integrates omap_hwmod data into Linux platform_device.
+>>   *
+>> @@ -78,6 +79,7 @@ struct omap_device {
+>>  	u8				hwmods_cnt;
+>>  	u8				_state;
+>>  	u8                              flags;
+>> +	u8				_driver_status;
+>>  };
+>>  
+>>  /* Device driver interface (call via platform_data fn ptrs) */
+>> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+>> index c490240..1d1b5ff 100644
+>> --- a/arch/arm/plat-omap/omap_device.c
+>> +++ b/arch/arm/plat-omap/omap_device.c
+>> @@ -385,17 +385,21 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
+>>  				      unsigned long event, void *dev)
+>>  {
+>>  	struct platform_device *pdev = to_platform_device(dev);
+>> +	struct omap_device *od;
+>>  
+>>  	switch (event) {
+>> -	case BUS_NOTIFY_ADD_DEVICE:
+>> -		if (pdev->dev.of_node)
+>> -			omap_device_build_from_dt(pdev);
+>> -		break;
+>> -
+>>  	case BUS_NOTIFY_DEL_DEVICE:
+>>  		if (pdev->archdata.od)
+>>  			omap_device_delete(pdev->archdata.od);
+>>  		break;
+>> +	case BUS_NOTIFY_ADD_DEVICE:
+>> +		if (pdev->dev.of_node)
+>> +			omap_device_build_from_dt(pdev);
+>> +		/* fall through */
+>> +	default:
+>> +		od = to_omap_device(pdev);
+>> +		if (od)
+>> +			od->_driver_status = event;
+>
+> _driver_status is a u8, but event is an unsigned long.  Might be worth 
+> adding a WARN() to complain if event is greater than (2^8)-1.
+>
 
-I see the same thing with vanilla v3.6-rc1, but it worked in my pm-cur
-branch which has a few fixes that I'm queuing for v3.6-rc.  Tracking it
-down, it seems the revert patch I just sent out[1] fixes this problem,
-but I'm still a bit puzzled as to why.
+It's probably more future proof if I just make _driver_status an
+unsigned long, in case the values of those events ever change in the
+driver core.
 
-Can you try v3.6-rc1 + that revert[1] to see if that fixes the problem
-for you as well?
-
-Thanks,
+Thanks for the review,
 
 Kevin
-
-[1] http://marc.info/?l=linux-omap&m=134437239010649&w=2
