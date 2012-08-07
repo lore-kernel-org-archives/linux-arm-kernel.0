@@ -1,41 +1,31 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 07 Aug 2012 15:44:47 -0700
-Subject: [PATCH] Revert "ARM: OMAP3: PM: call pre/post transition per
- powerdomain"
-In-Reply-To: <1344372107-17786-1-git-send-email-khilman@ti.com> (Kevin
- Hilman's message of "Tue, 7 Aug 2012 13:41:47 -0700")
-References: <1344372107-17786-1-git-send-email-khilman@ti.com>
-Message-ID: <87lihqz5i8.fsf@ti.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Tue,  7 Aug 2012 17:45:12 -0500
+Subject: [PATCH 0/2] ARM: imx: change building of SSI FIQ support for i.MX
+ processors
+Message-ID: <1344379514-30076-1-git-send-email-matt@genesi-usa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@ti.com> writes:
+Patches to fix Thumb2 kernel building and change the dependency for SSI FIQ
+support to a more specific option to prevent it from being needlessly built
+in the first place on more frugal kernel configurations.
 
-> This reverts commit 58f0829b7186150318c79515f0e0850c5e7a9c89.
->
-> Converstion to per-pwrdm per/post transition calls was a bit
-> premature.  Only tracking MPU, PER & CORE in the idle path means we
-> lose the accounting for all the other powerdomains which may also
-> transition in idle.  On OMAP3, due to autodeps, several powerdomains
-> transition along with MPU (e.g. DSS, USBHOST), and the accounting for
-> these was lost with this patch.
->
-> This patch should be revisited when the upcoming clkdm/pwrmdm/voltdm
-> use-counting seires is merged since then we can properly do accounting
-> without relying on a call in the idle path.
->
-> Cc: Jean Pihet <jean.pihet@newoldbits.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Reported-by: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
+A better solution might be to rewrite the function in Thumb-compatible assembly
+but the target processors do not support Thumb2 kernels anyway, and the last
+time it was suggested the updated code was nacked by Russell. Since its built
+as a side-effect on ARMv6/v7 i.MX processors, these could be considered somewhat
+Needful Things(tm) by people wanting Thumb2 kernels based on imx_v6_v7_defconfig
+or wanting to remove certain boards from their configs.
 
-After some debugging with Paul, I found that the patch being reverted
-here was the cause of another regression: GPIO context not being
-properly restored after off mode.  This caused the nfsroot problems in
-off-mode on boards with ethernet devices with GPIO IRQ lines (Overo,
-37xx EVM, ...)
+Matt Sealey (2):
+  ARM: build ssi-fiq.S in ARM mode to prevent CONFIG_THUMB2_KERNEL
+    build breakage
+  ARM: only build ssi-fiq.S et al if CONFIG_SND_IMX_SOC_PCM_FIQ is
+    selected
 
-Updating changelog, and will post v2 shortly.
+ arch/arm/plat-mxc/Makefile  |    2 +-
+ arch/arm/plat-mxc/ssi-fiq.S |    1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-Kevin
+-- 
+1.7.9.5
