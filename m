@@ -1,35 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 7 Aug 2012 18:00:26 +0100
-Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
-In-Reply-To: <CAMbhsRRp429Fkk2-vEixt8OPW699ftVCaG+C83NWLvM2_jkOVw@mail.gmail.com>
-References: <alpine.LFD.2.02.1206111241470.23555@xanadu.home>
- <20120611165115.GB18267@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
- <4FD62DBB.8070407@codeaurora.org>
- <20120611192519.GF18267@n2100.arm.linux.org.uk>
- <4FE1FB15.3090305@codeaurora.org>
- <0e0201cd5f2f$2c2f6e60$848e4b20$%kim@samsung.com>
- <5016D03D.8010607@codeaurora.org>
- <037601cd6fc9$f6e5fe30$e4b1fa90$%kim@samsung.com>
- <CAMbhsRRp429Fkk2-vEixt8OPW699ftVCaG+C83NWLvM2_jkOVw@mail.gmail.com>
-Message-ID: <20120807170026.GH18957@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 7 Aug 2012 18:01:30 +0100
+Subject: [PATCH 1/1] Input: ab8500-ponkey: Make the distinction between
+ DT and non-DT boots
+In-Reply-To: <20120806160226.GF29272@sirena.org.uk>
+References: <1344256323-10484-1-git-send-email-lee.jones@linaro.org>
+ <20120806081915.GA4518@core.coreip.homeip.net>
+ <20120806153750.GI10524@gmail.com>
+ <20120806160226.GF29272@sirena.org.uk>
+Message-ID: <20120807170129.GA3759@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2012 at 01:41:06PM -0700, Colin Cross wrote:
-> When testing coupled cpuidle on Exynos5, I found that sending an IPI
-> does not successfully wake up CPU1.  CPU1 is in a wfe with interrupts
-> masked, not a wfi, so an interrupt is not able to wake it up.  It
-> tends to wake up anyways because the next time a spin lock is
-> unlocked, often during a timer interrupt on CPU0, CPU0 executes an sev
-> which wakes up CPU1.  You can see that the IPI is unnecessary by
-> removing the gic_raise_softirq and replacing it with dsb_sev().
+On Mon, Aug 06, 2012 at 05:02:26PM +0100, Mark Brown wrote:
+> On Mon, Aug 06, 2012 at 04:37:52PM +0100, Lee Jones wrote:
+> > On Mon, Aug 06, 2012 at 01:19:15AM -0700, Dmitry Torokhov wrote:
+> 
+> > > > +	ponkey->irq_dbf = (np) ? ab8500_irq_get_virq(ab8500, irq_dbf) : irq_dbf;
+> > > > +	ponkey->irq_dbr = (np) ? ab8500_irq_get_virq(ab8500, irq_dbr) : irq_dbr;
+> 
+> > > Why this isn't done inside ab8500_irq_get_virq()?
+> 
+> > There's no reason why it can't be.
+> 
+> > My first version of the patch did just that in fact.
+> 
+> > Would that be your preference?
+> 
+> Restating my comment elsewhere...  why do we even need to do this in
+> _get_virq() - I'd *really* expect this to be handled by the irq domain
+> code.
 
-That's good news; that supports my assertion that the SMP bringup code
-we see on various platforms as copies from the Realview code was done
-without much thought about what is actually required.
+Okay, so I've just spent a small amount of time looking at this. I think
+the best place for this would be in *_get_virq(), using the same logic that
+selected a *_legacy or *_linear domain in the first place. The only thing 
+the domain can test for is the 'type' of domain and the requested IRQ. This
+is where the issue lies. If a hwirq to virq conversion is requested, but a
+virq is passed (which happens in the non-DT case) a WARN() is triggered
+because the irq passed is bigger than first_irq + size. I think *_get_virq()
+should ensure that only a hwirq is passed to irq_create_mapping().
 
-It's good that you're looking into this, and fixing the code on the CPUs
-you have access to.  I rather wish we'd made it a requirement for people
-to _document_ the actual bringup conditions in the kernel for their
-hardware before we accepted their SMP support code.
+Let me know if you had other ideas.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
