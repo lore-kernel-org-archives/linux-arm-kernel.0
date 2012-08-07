@@ -1,32 +1,58 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 7 Aug 2012 13:34:12 +0200
-Subject: [PATCH] pinctrl/nomadik: fix hsi function group list
-Message-ID: <1344339252-30978-1-git-send-email-linus.walleij@stericsson.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Tue, 07 Aug 2012 17:08:04 +0530
+Subject: [PATCH 4/4] i2c: omap: switch over to autosuspend API
+In-Reply-To: <1344262737-6662-5-git-send-email-balbi@ti.com>
+References: <1344262737-6662-1-git-send-email-balbi@ti.com>
+ <1344262737-6662-5-git-send-email-balbi@ti.com>
+Message-ID: <5020FE1C.2010005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@stericsson.com>
+Hi Felipe,
+On Monday 06 August 2012 07:48 PM, Felipe Balbi wrote:
+> this helps us reduce unnecessary pm transitions
+> in case we have another i2c message been started
+> soon.
+>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  drivers/i2c/busses/i2c-omap.c | 8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 60928f2..22efaba 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -645,7 +645,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>  
+>  	omap_i2c_wait_for_bb(dev);
+>  out:
+> -	pm_runtime_put(dev->dev);
+> +	pm_runtime_mark_last_busy(dev->dev);
+> +	pm_runtime_put_autosuspend(dev->dev);
+>  	return r;
+>  }
+>  
+> @@ -1113,6 +1114,9 @@ omap_i2c_probe(struct platform_device *pdev)
+>  		dev->regs = (u8 *)reg_map_ip_v1;
+>  
+>  	pm_runtime_enable(dev->dev);
+> +	pm_runtime_set_autosuspend_delay(dev->dev, 1000);
+> +	pm_runtime_use_autosuspend(dev->dev);
+> +
+>  	r = pm_runtime_get_sync(dev->dev);
+>  	if (IS_ERR_VALUE(r))
+>  		goto err_free_mem;
+> @@ -1189,7 +1193,7 @@ omap_i2c_probe(struct platform_device *pdev)
+>  
+>  	of_i2c_register_devices(adap);
+>  
+> -	pm_runtime_put(dev->dev);
+Should we mark it last busy stamp here here?
+Or it may not take effect till the first transaction.
 
-Tidy up a small typo in the HSI function group list.
 
-Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/pinctrl-nomadik-db8500.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/pinctrl-nomadik-db8500.c b/drivers/pinctrl/pinctrl-nomadik-db8500.c
-index 6f99769..5f3e9d0 100644
---- a/drivers/pinctrl/pinctrl-nomadik-db8500.c
-+++ b/drivers/pinctrl/pinctrl-nomadik-db8500.c
-@@ -766,7 +766,7 @@ DB8500_FUNC_GROUPS(ipgpio, "ipgpio0_a_1", "ipgpio1_a_1", "ipgpio7_b_1",
- DB8500_FUNC_GROUPS(msp2, "msp2sck_a_1", "msp2_a_1");
- DB8500_FUNC_GROUPS(mc4, "mc4_a_1", "mc4rstn_c_1");
- DB8500_FUNC_GROUPS(mc1, "mc1_a_1", "mc1dir_a_1");
--DB8500_FUNC_GROUPS(hsi, "hsir1_a_1", "hsit1_a_1", "hsit_a_2");
-+DB8500_FUNC_GROUPS(hsi, "hsir_a_1", "hsit_a_1", "hsit_a_2");
- DB8500_FUNC_GROUPS(clkout, "clkout_a_1", "clkout_a_2", "clkout_c_1");
- DB8500_FUNC_GROUPS(usb, "usb_a_1");
- DB8500_FUNC_GROUPS(trig, "trig_b_1");
--- 
-1.7.11.3
+> +	pm_runtime_put_autosuspend(dev->dev);
+>  
+>  	return 0;
+>  
