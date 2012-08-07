@@ -1,99 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 7 Aug 2012 15:31:08 +0200
-Subject: [GIT PULL] at91: soc update (for 3.6)
-Message-ID: <5021189C.2010107@atmel.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Tue, 7 Aug 2012 19:00:50 +0530
+Subject: [PATCH] arm: OMAP3+: am33xx: Add new clk node entry for d_can modules
+Message-ID: <1344346250-27606-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, hi Olof,
+The d_can0/1 module integrated with AM335x device, requires
+only one clock (fck) and driver expects clock to be available
+without specifying any connection id (con_id) -
 
-Here is an additional AT91 pull request that is 
-still related with the replacement of sd/mmc 
-platform data.
+  clk_get(&pdev->dev, NULL);
 
-(it doesn't merge seamlessly with current 
-Linus' tree: I can provide a resolution hint or
-rebase this work if necessary).
+This is acceptable as module has only one clock and platform
+code should respect this request, so create new clock nodes
+inside am33xx clock-tree table based on dev_id and "con_id = NULL"
+for both d_can0 and d_can1 instances.
 
-The following changes since commit 6887a4131da3adaab011613776d865f4bcfb5678:
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+This patch is boot tested on BeagleBone platform, and checked for
+clk_get() api return value.
 
-  Linux 3.5-rc5 (2012-06-30 16:08:57 -0700)
+ arch/arm/mach-omap2/clock33xx_data.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-for-next-soc
-
-for you to fetch changes up to 4cf3326ab5f34a333a46c59d0d3783db9cef13bf:
-
-  ARM: at91: add atmel-mci support for chips and boards which can use it (2012-07-02 18:03:01 +0200)
-
-----------------------------------------------------------------
-AT91 SoC related code modifications: a cleanup in defconfigs and
-a one liner in a board file.
-The most important is the move to atmel-mci driver in AT91 SoC & boards.
-The old at91_mci (marked as deprecated) will be removed in 3.7. So all
-platform data for this old driver are erased and replace by information
-needed by atmel-mci driver.
-
-----------------------------------------------------------------
-Ludovic Desroches (1):
-      ARM: at91: add atmel-mci support for chips and boards which can use it
-
-Nicolas Ferre (1):
-      ARM: at91/defconfig: change the MCI driver to use in defconfigs
-
-Paul Bolle (1):
-      ARM: at91: set i2c_board_info.type to "ds1339" directly
-
-Richard Genoud (1):
-      ARM: at91/defconfig: Remove unaffected config option
-
- arch/arm/configs/afeb9260_defconfig      |    1 -
- arch/arm/configs/at91rm9200_defconfig    |    2 +-
- arch/arm/configs/at91sam9261_defconfig   |    2 +-
- arch/arm/configs/at91sam9263_defconfig   |    3 +-
- arch/arm/configs/at91sam9g20_defconfig   |    2 +-
- arch/arm/configs/at91sam9rl_defconfig    |    2 +-
- arch/arm/configs/cpu9260_defconfig       |    2 +-
- arch/arm/configs/cpu9g20_defconfig       |    2 +-
- arch/arm/configs/qil-a9260_defconfig     |    3 +-
- arch/arm/configs/stamp9g20_defconfig     |    1 -
- arch/arm/configs/usb-a9260_defconfig     |    1 -
- arch/arm/mach-at91/at91rm9200_devices.c  |   92 ++++++++++++++++++++++++-----------------
- arch/arm/mach-at91/at91sam9260_devices.c |   84 +-------------------------------------
- arch/arm/mach-at91/at91sam9261_devices.c |   60 +++++++++++++--------------
- arch/arm/mach-at91/at91sam9263.c         |    4 +-
- arch/arm/mach-at91/at91sam9263_devices.c |  161 ++++++++++++++++++++++++++++++++++++++++++------------------------------
- arch/arm/mach-at91/at91sam9rl_devices.c  |   60 +++++++++++++--------------
- arch/arm/mach-at91/board-afeb-9260v1.c   |   14 +++----
- arch/arm/mach-at91/board-carmeva.c       |   14 +++----
- arch/arm/mach-at91/board-cpu9krea.c      |   17 ++++----
- arch/arm/mach-at91/board-cpuat91.c       |   13 +++---
- arch/arm/mach-at91/board-csb337.c        |   14 +++----
- arch/arm/mach-at91/board-eb9200.c        |   14 +++----
- arch/arm/mach-at91/board-ecbat91.c       |   14 +++----
- arch/arm/mach-at91/board-eco920.c        |   14 +++----
- arch/arm/mach-at91/board-flexibity.c     |   14 +++----
- arch/arm/mach-at91/board-foxg20.c        |   16 ++++----
- arch/arm/mach-at91/board-kb9202.c        |   14 +++----
- arch/arm/mach-at91/board-neocore926.c    |   13 +++---
- arch/arm/mach-at91/board-picotux200.c    |   14 +++----
- arch/arm/mach-at91/board-qil-a9260.c     |   14 +++----
- arch/arm/mach-at91/board-rm9200dk.c      |   14 +++----
- arch/arm/mach-at91/board-rm9200ek.c      |   14 +++----
- arch/arm/mach-at91/board-rsi-ews.c       |   13 +++---
- arch/arm/mach-at91/board-sam9-l9260.c    |   16 ++++----
- arch/arm/mach-at91/board-sam9260ek.c     |   16 ++++----
- arch/arm/mach-at91/board-sam9261ek.c     |   13 +++---
- arch/arm/mach-at91/board-sam9263ek.c     |   13 +++---
- arch/arm/mach-at91/board-sam9g20ek.c     |   16 +-------
- arch/arm/mach-at91/board-sam9rlek.c      |   13 +++---
- arch/arm/mach-at91/board-stamp9g20.c     |   14 -------
- arch/arm/mach-at91/board-usb-a926x.c     |    2 -
- arch/arm/mach-at91/board-yl-9200.c       |   13 +++---
- drivers/mtd/nand/Kconfig                 |   40 ------------------
- 44 files changed, 384 insertions(+), 494 deletions(-)
-
-Thanks, best regards,
--- 
-Nicolas Ferre
+diff --git a/arch/arm/mach-omap2/clock33xx_data.c b/arch/arm/mach-omap2/clock33xx_data.c
+index ae27de8..23251fa 100644
+--- a/arch/arm/mach-omap2/clock33xx_data.c
++++ b/arch/arm/mach-omap2/clock33xx_data.c
+@@ -1027,7 +1027,9 @@ static struct omap_clk am33xx_clks[] = {
+ 	CLK(NULL,	"cefuse_fck",		&cefuse_fck,	CK_AM33XX),
+ 	CLK(NULL,	"clkdiv32k_ick",	&clkdiv32k_ick,	CK_AM33XX),
+ 	CLK(NULL,	"dcan0_fck",		&dcan0_fck,	CK_AM33XX),
++	CLK("d_can.0",	NULL,			&dcan0_fck,	CK_AM33XX),
+ 	CLK(NULL,	"dcan1_fck",		&dcan1_fck,	CK_AM33XX),
++	CLK("d_can.1",	NULL,			&dcan1_fck,	CK_AM33XX),
+ 	CLK(NULL,	"debugss_ick",		&debugss_ick,	CK_AM33XX),
+ 	CLK(NULL,	"pruss_ocp_gclk",	&pruss_ocp_gclk,	CK_AM33XX),
+ 	CLK("davinci-mcasp.0",  NULL,           &mcasp0_fck,    CK_AM33XX),
+--
+1.7.0.4
