@@ -1,32 +1,21 @@
-From: imp@bsdimp.com (Warner Losh)
-Date: Tue, 7 Aug 2012 11:23:40 -0600
-Subject: [PATCH] driver: misc: bmp085: remove "of_match_table" property.
-In-Reply-To: <20120807105225.GT16861@opensource.wolfsonmicro.com>
-References: <1344245324-16704-1-git-send-email-sourav.poddar@ti.com>
- <20120806093033.GH17551@arwen.pp.htv.fi>
- <20120806154214.GC29272@sirena.org.uk>
- <20120807054342.GF8468@arwen.pp.htv.fi>
- <20120807105225.GT16861@opensource.wolfsonmicro.com>
-Message-ID: <4CEA7FE1-B4B7-4702-BD94-C04154014763@bsdimp.com>
+From: wade_farnsworth@mentor.com (Wade Farnsworth)
+Date: Tue, 7 Aug 2012 10:25:17 -0700
+Subject: Status of patch 7375/1
+Message-ID: <50214F7D.6040001@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Russell,
 
-On Aug 7, 2012, at 4:52 AM, Mark Brown wrote:
+I'm inquiring regarding the status of patch 7375/1 in the patch tracker:
 
-> On Tue, Aug 07, 2012 at 08:43:44AM +0300, Felipe Balbi wrote:
->> On Mon, Aug 06, 2012 at 04:42:14PM +0100, Mark Brown wrote:
-> 
->>> It's good practice to have an explict compatible string even if the
->>> default happens to work in order to avoid any name clashes.
-> 
->> of_i2c.c makes no use whatsoever of the compatible string. See that it
->> will build an i2c_boardinfo and register a new device. That compatible
-> 
-> If that's all that's done it seems like a bug frankly, certainly based
-> on previous discussions it ought to be.  There are collisions out there,
-> they've just happened to not bite us yet
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7375/1
 
-Also keep in mind that the device tree is supposed to be a description of the hardware, and different implementations of the device tree may use the compatible string.
+The other two patches in the series were approved and are now in Linus's 
+tree.  However this one never received approval, nor any comments 
+indicating that it was rejected.  What is the status of this patch?  Is 
+there anything I can do to help move it forward?
 
-Warner
+Thanks,
+
+Wade Farnsworth
