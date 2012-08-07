@@ -1,67 +1,42 @@
-From: p.paneri@samsung.com (Praveen Paneri)
-Date: Tue, 7 Aug 2012 15:35:43 +0530
-Subject: [PATCH v2 1/5] usb: phy: samsung: Introducing usb phy driver for
- hsotg
-In-Reply-To: <201208071011.23558.heiko@sntech.de>
-References: <1344324524-2286-1-git-send-email-p.paneri@samsung.com>
- <1344324524-2286-2-git-send-email-p.paneri@samsung.com>
- <201208071011.23558.heiko@sntech.de>
-Message-ID: <CAD6zSYMnBAQuoH3N2HtSKfnbhRg6c3Ac27kf=fRQY++_+12d5A@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 07 Aug 2012 19:06:37 +0900
+Subject: [PATCH V2 5/6] x86: add CONFIG_ARM_AMBA, selected by STA2X11
+In-Reply-To: <CACRpkdZLGhgpUJy_3QGYvGRqyxMkkPPSdyP==h5YurWqKnctBw@mail.gmail.com>
+References: <2b797c83-6a3c-4051-841a-a4cfa9d1cae1@email.android.com>
+ <20120701104401.GA4352@mail.gnudd.com> <20120703130042.GA10007@mail.gnudd.com>
+ <201207031319.40884.arnd@arndb.de>
+ <20120703193403.GA26355@n2100.arm.linux.org.uk>
+ <CACRpkdZLGhgpUJy_3QGYvGRqyxMkkPPSdyP==h5YurWqKnctBw@mail.gmail.com>
+Message-ID: <098e01cd7484$553871c0$ffa95540$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 7, 2012 at 1:41 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> Am Dienstag, 7. August 2012, 09:28:40 schrieb Praveen Paneri:
->> This driver uses usb_phy interface to interact with s3c-hsotg. Supports
->> phy_init and phy_shutdown functions to enable/disable phy. Tested with
->> smdk6410 and smdkv310. More SoCs can be brought under later.
->>
->> Signed-off-by: Praveen Paneri <p.paneri@samsung.com>
->> ---
->>  .../devicetree/bindings/usb/samsung-usbphy.txt     |    9 +
->>  drivers/usb/phy/Kconfig                            |    8 +
->>  drivers/usb/phy/Makefile                           |    1 +
->>  drivers/usb/phy/samsung_usbphy.c                   |  355
->> ++++++++++++++++++++ drivers/usb/phy/samsung_usbphy.h                   |
->>  48 +++
->>  include/linux/platform_data/s3c-hsotg.h            |    5 +
->>  6 files changed, 426 insertions(+), 0 deletions(-)
->>  create mode 100644
->> Documentation/devicetree/bindings/usb/samsung-usbphy.txt create mode
->> 100644 drivers/usb/phy/samsung_usbphy.c
->>  create mode 100644 drivers/usb/phy/samsung_usbphy.h
->>
->
-> [...]
->
->> diff --git a/include/linux/platform_data/s3c-hsotg.h
->> b/include/linux/platform_data/s3c-hsotg.h index 8b79e09..25ed31e 100644
->> --- a/include/linux/platform_data/s3c-hsotg.h
->> +++ b/include/linux/platform_data/s3c-hsotg.h
->> @@ -35,6 +35,11 @@ struct s3c_hsotg_plat {
->>       int (*phy_exit)(struct platform_device *pdev, int type);
->>  };
->>
->> +struct s3c_usbphy_plat {
->> +     void (*pmu_isolation)(int on);
->> +};
->> +
->>  extern void s3c_hsotg_set_platdata(struct s3c_hsotg_plat *pd);
->> +extern void s3c_usbphy_set_platdata(struct s3c_usbphy_plat *pd);
->>
->>  #endif /* __LINUX_USB_S3C_HSOTG_H */
->
-> hmm, I'm not completely sure about this being in the s3c-hsotg header, as on
-> s3c2443/2416/2450 it's the s3c-hsudc that will be (hopefully) using the phy in
-> the future.
-Okay then I will make a new header file for this. Not only hsudc, we
-intent to use it for usb host phy as well so it's a valid point.
+Linus Walleij wrote:
+> 
 
-Praveen
->
->
-> Heiko
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+[...]
+
+> The major reason why that file is there is that there is *another*
+> PL080 driver in arch/arm/mach-s3c64xx/dma.c which I repeatedly
+> asked the Samsung people to replace with the
+> drivers/dma/amba-pl08x.c driver. :-(
+> 
+> When I worked on the PL08x driver in drivers/dma I reused
+> this header to avoid code duplication.
+> 
+> Now that thing is stranding in the way. Alim, Kukjin, what's happening?
+> 
+Afaik, Alim was working on that but I'm not sure how long he needs more?
+
+Alim, please share the progress of the pl080 work?
+
+> I feel tempted to update Alim's patch myself and push it on you
+> soon...
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
