@@ -1,90 +1,93 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Tue, 7 Aug 2012 14:10:17 -0400
-Subject: [PATCH v2 01/23] arm: initial Xen support
-In-Reply-To: <1344263246-28036-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1208061428060.4645@kaball.uk.xensource.com>
- <1344263246-28036-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20120807181017.GF15053@phenom.dumpdata.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 7 Aug 2012 20:20:24 +0200
+Subject: [PATCH v3 00/10] ARM: tegra: Add PCIe device tree support
+In-Reply-To: <50201E1D.5060200@wwwdotorg.org>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <50201E1D.5060200@wwwdotorg.org>
+Message-ID: <20120807182024.GA11328@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2012 at 03:27:04PM +0100, Stefano Stabellini wrote:
-> - Basic hypervisor.h and interface.h definitions.
-> - Skeleton enlighten.c, set xen_start_info to an empty struct.
-> - Make xen_initial_domain dependent on the SIF_PRIVILIGED_BIT.
+On Mon, Aug 06, 2012 at 01:42:21PM -0600, Stephen Warren wrote:
+> On 07/26/2012 01:55 PM, Thierry Reding wrote:
+> > This patch series adds support for device tree based probing of the PCIe
+> > controller found on Tegra SoCs.
 > 
-> The new code only compiles when CONFIG_XEN is set, that is going to be
-> added to arch/arm/Kconfig in patch #11 "xen/arm: introduce CONFIG_XEN on
-> ARM".
+> Thierry, I just tested all Tegra boards in v3.6-rc1, and noticed that
+> PCIe doesn't work on TrimSlice when booting use device tree. I think I
+> found the cause, and I can't see why the same problem doesn't affect
+> this series. Perhaps you can enlighten me?
+> 
+> When booting TrimSlice (or Harmony) using board files, Tegra's PCIe is
+> initialized using a subsys_initcall to tegra_pcie_init() directly (or
+> for Harmony to harmony_pcie_init() which then calls tegra_pcie_init()).
+> 
+> The final thing tegra_pcie_init() does is call pci_common_init(). This
+> calls pcibios_init_hw() which calls hw->scan() which calls
+> pci_scan_root_bus() which adds a device object for each device on the
+> PCIe bus. However, since this happens very early in the boot sequence, I
+> believe the enumerated PCIe devices don't immediately get probed.
+> Instead, control gets returned to pci_common_init() which I believe then
+> calls pci_bus_assign_resources() which actually sets up the resources
+> for those devices. Later, the PCIe devices actually get probed, and
+> everything works.
+> 
+> However, when booting using device tree, with the code currently in
+> v3.6-rc1, tegra_pcie_init() is called late in the boot sequence, and so
+> in the sequence described above, as soon as pci_scan_root_bus() adds a
+> device, it gets probed, before the device object's resources have been
+> set up, which results in the following failure:
+> 
+> PCI: Device 0000:01:00.0 not available because of resource collisions
+> 
+> ... because of the following code in pcibios_enable_device():
+> 
+> > 	for (idx = 0; idx < 6; idx++) {
+> > 		/* Only set up the requested stuff */
+> > 		if (!(mask & (1 << idx)))
+> > 			continue;
+> > 
+> > 		r = dev->resource + idx;
+> > 		if (!r->start && r->end) {
+> > 			printk(KERN_ERR "PCI: Device %s not available because"
+> > 			       " of resource collisions\n", pci_name(dev));
+> 
+> Doesn't this same problem exist when instantiating the PCIe device
+> itself from device tree as in your patch series? If not, can you explain
+> why?
 
-You can add my Ack, but do one change pls:
+I think I've seen this before as well but hadn't had the time to
+investigate further. The devices that failed to initialize were serial
+ports I think. Perhaps the ordering here is the key. All the drivers
+that I use for the PCI devices are loaded as modules, so they'll probe
+the devices much later anyway. The serial driver is an exception here as
+it is builtin.
 
-> +/* XXX: Move pvclock definitions some place arch independent */
+> Now, the obvious solution in v3.6 would be to simply have
+> tegra_pcie_init() be called at the same early stage in the boot process
+> when booting using device tree as it is when booting using board files.
+> This works for TrimSlice.
+> 
+> However, on Harmony, it doesn't work, because PCIe on Harmony depends on
+> regulators, and the regulators are accessed using an I2C bus that is
+> instantiated from DT, and the instantiation of the I2C bus happens
+> fairly late in the boot process so can't be found early during the boot
+> sequence. See harmony_regulator_init() for the failing code.
+> 
+> Does anyone have any good ideas (small, self-contained patches) for
+> solving this in v3.6 in such a way that PCIe works on both TrimSlice and
+> Harmony?
 
-Just use 'TODO'
+To me this looks like a problem in the probing code. Drivers' .probe()
+shouldn't be called on devices that haven't had their resources assigned
+yet. Perhaps nobody has ever seen this before because the ordering
+always ensured that the PCI controller driver was loaded first.
 
-> +struct pvclock_vcpu_time_info {
-> +	u32   version;
-> +	u32   pad0;
-> +	u64   tsc_timestamp;
-> +	u64   system_time;
-> +	u32   tsc_to_system_mul;
-> +	s8    tsc_shift;
-> +	u8    flags;
-> +	u8    pad[2];
-> +} __attribute__((__packed__)); /* 32 bytes */
-> +
-> +struct pvclock_wall_clock {
-> +	u32   version;
-> +	u32   sec;
-> +	u32   nsec;
-> +} __attribute__((__packed__));
-
-Mention the size and why it is OK to have it be a weird
-size while the one above is nicely padded.
-
-> +#endif
-> +
-> +#endif /* _ASM_ARM_XEN_INTERFACE_H */
-> diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
-> new file mode 100644
-> index 0000000..0bad594
-> --- /dev/null
-> +++ b/arch/arm/xen/Makefile
-> @@ -0,0 +1 @@
-> +obj-y		:= enlighten.o
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> new file mode 100644
-> index 0000000..d27c2a6
-> --- /dev/null
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -0,0 +1,35 @@
-> +#include <xen/xen.h>
-> +#include <xen/interface/xen.h>
-> +#include <xen/interface/memory.h>
-> +#include <xen/platform_pci.h>
-> +#include <asm/xen/hypervisor.h>
-> +#include <asm/xen/hypercall.h>
-> +#include <linux/module.h>
-> +
-> +struct start_info _xen_start_info;
-> +struct start_info *xen_start_info = &_xen_start_info;
-> +EXPORT_SYMBOL_GPL(xen_start_info);
-> +
-> +enum xen_domain_type xen_domain_type = XEN_NATIVE;
-> +EXPORT_SYMBOL_GPL(xen_domain_type);
-> +
-> +struct shared_info xen_dummy_shared_info;
-> +struct shared_info *HYPERVISOR_shared_info = (void *)&xen_dummy_shared_info;
-> +
-> +DEFINE_PER_CPU(struct vcpu_info *, xen_vcpu);
-> +
-> +/* XXX: to be removed */
-
-s/XXX/TODO/ here, and mention pls why it needs to be removed.
-
-> +__read_mostly int xen_have_vector_callback;
-> +EXPORT_SYMBOL_GPL(xen_have_vector_callback);
-> +
-> +int xen_platform_pci_unplug = XEN_UNPLUG_ALL;
-> +EXPORT_SYMBOL_GPL(xen_platform_pci_unplug);
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120807/edcbb095/attachment.sig>
