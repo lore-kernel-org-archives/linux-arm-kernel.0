@@ -1,84 +1,46 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 7 Aug 2012 15:53:08 +0000
-Subject: [PATCH] ARM: AM33XX: board-generic: Add of_dev_auxdata to fix
- dev_id for CAN module
-In-Reply-To: <50213214.7050505@gmail.com>
-References: <1344346636-28072-1-git-send-email-hvaibhav@ti.com>
- <50213214.7050505@gmail.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA88BDF@DBDE01.ent.ti.com>
+From: ian.molton@codethink.co.uk (Ian Molton)
+Date: Tue, 07 Aug 2012 16:56:59 +0100
+Subject: [PATCH v3 3/7] mv643xx.c: Add basic device tree support.
+In-Reply-To: <201208071456.41412.arnd@arndb.de>
+References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
+ <1344350092-24050-4-git-send-email-ian.molton@codethink.co.uk>
+ <201208071456.41412.arnd@arndb.de>
+Message-ID: <50213ACB.6040301@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 07, 2012 at 20:49:48, Rob Herring wrote:
-> On 08/07/2012 08:37 AM, Vaibhav Hiremath wrote:
-> > If the module requires only one clocksource to function, then
-> > driver can very well call clk_get() api with "con_id = NULL",
-> > 
-> >        clk = clk_get(dev, NULL);
-> > 
-> > And platform code should respect this and return valid clk handle.
-> > That means, now the clk_get() api would rely on dev_id, and platform
-> > code should either have clk node with matching dev_id (with con_id=NULL)
-> > or return dummy clk node.
-> > 
-> > With DT support, we can fix the dev_id for particular module
-> > using "struct of_dev_auxdata" to satisfy above clk framework requirement.
-> > 
-> > In case of AM33XX, we required this for the DCAN module, so this
-> > patch adds "of_dev_auxdata" for both DCAN_0/1 instances.
-> > 
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > Cc: Benoit Cousson <b-cousson@ti.com>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > ---
-> > This patch is boot tested on BeagleBone platform, and checked for
-> > clk_get() return value in d_can module driver.
-> > 
-> >  arch/arm/mach-omap2/board-generic.c |   18 +++++++++++++++++-
-> >  1 files changed, 17 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> > index 6f93a20..c9b7903 100644
-> > --- a/arch/arm/mach-omap2/board-generic.c
-> > +++ b/arch/arm/mach-omap2/board-generic.c
-> > @@ -37,11 +37,27 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
-> >  	{ }
-> >  };
-> > 
-> > +/*
-> > + * Lookup table for attaching a specific name and platform_data pointer to
-> > + * devices as they get created by of_platform_populate(). Ideally this table
-> > + * would not exist, but the current clock implementation depends on some devices
-> > + * having a specific name OR to satisfy NULL con_id requirement from driver.
-> > + */
-> > +static const struct of_dev_auxdata am33xx_auxdata_lookup[] __initconst = {
-> > +	OF_DEV_AUXDATA("bosch,d_can", 0x481cc000, "d_can.0", NULL),
-> > +	OF_DEV_AUXDATA("bosch,d_can", 0x481d0000, "d_can.1", NULL),
-> > +	{ },
-> > +};
-> 
-> Adding an additional clkdev lookup accomplishes the same thing and is a
-> cleaner solution.
-> 
+On 07/08/12 15:56, Arnd Bergmann wrote:
 
-That is also required and I have submitted patch for the same -
+> Hi Ian,
+>
+> Have you had a look at Documentation/devicetree/bindings/marvell.txt
+> ?
 
-http://www.spinics.net/lists/arm-kernel/msg187998.html
+Nope. I had no idea it was hiding there.
 
+> I think it documents some of the same thing,
 
-With DT support, I am getting dev_id as -
+Not really. It documents some godawful hack that recycled the platform
+device -based driver and provided a DT binding for it, just for PPC.
 
- - Without "reg" property: d_can.16 and d_can.17,
-   (I believe it changes dynamically here)
+I cant even *find* anything that implements code for whatever
+"marvell,mv64360-mdio" might be. I'm sure it might exist somewhere.
 
- - With "reg" property: 481cc000.d_can and 481d0000.d_can
+> We might also want to move some of the
+> code from arch/powerpc/sysdev/mv64x60_dev.c to live in the same place
+> as the device driver.
 
-Which is not so intuitive, I would like to see them as per Spec/TRM, so 
-doesn't this patch make sense?
+I hope not. I don't really want to touch that stuff at all. If it works
+the way it
+is, then it can stay that way. If the PPC folk want to send patches to
+add the
+properties they use to the driver, then they can do. I'll send an email
+their
+way and see if they want to join in.
 
-Similar thing has already been done for other platforms too.
+>From my perspective, the next thing that needs to happen to the driver is
+for it to be broken up into ethernet and mdio drivers, so that we can
+get rid
+of all this shared_smi craziness... But that's for another patch series.
 
-Thanks,
-Vaibhav
+-Ian
