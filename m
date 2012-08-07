@@ -1,25 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Aug 2012 19:27:00 +0000
-Subject: [PATCH 0/6] ARM: mxs: remove board files
-In-Reply-To: <1344267769-31166-1-git-send-email-shawn.guo@linaro.org>
-References: <1344267769-31166-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201208071927.01071.arnd@arndb.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 07 Aug 2012 21:32:34 +0200
+Subject: [PATCH 0/6] ARM: dove: DT support for Marvell Dove
+In-Reply-To: <20120807165350.GG18957@n2100.arm.linux.org.uk>
+References: <1344255815-4457-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <201208061402.22815.arnd@arndb.de>
+ <CABJ1b_S6jRW9P7ygs7LPztbx1zW-u=gD1kk0UYbgBrHdvsaOeA@mail.gmail.com>
+ <20120807165350.GG18957@n2100.arm.linux.org.uk>
+Message-ID: <50216D52.3030402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 August 2012, Shawn Guo wrote:
-> 
-> The first two patches hack out the board oddness in DT boot for TX28
-> and MX28EVK, so that they do not block the whole progress of coverting
-> mxs platform over to DT.
-> 
-> The rest of the series removes board files and the codes only used in
-> non-DT boot, and make mxs a DT-only platform.
+On 08/07/2012 06:53 PM, Russell King - ARM Linux wrote:
+> I've recently pushed a fix into mainline (and stable) for VFP support
+> with Thumb instructions.  I noticed that the Cubox kernel had a different
+> fix, this "different" fix will need to be removed when Cubox folk update
+> to the next kernel from mainline.
 
-So it has come to this ;-)
+Russell,
 
-Great job Shawn and everyone else who was involved in this!
+I read about that fix but honestly, that is way to deep into ARM
+architecture for me. All I realized while having my Cubox is that the
+supplied kernel tree is very messy and on Debian wheezy/armhf almost
+all applications started over ssh -X fail with segfault. I was hoping
+that bringing the cubox into mainline kernel tree will help here -
+and luckily the (hacking) community is growing!
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Video support, not great.  The supplied Ubuntu Lucid stuff install
+> (including the latest dev kernel from the solid-run folk) doesn't work
+> with any of the tree HDMI devices I've tried it with:
 
-	Arnd
+HDMI is another topic that I want to work on as soon as the main SoC
+stuff is ported over to mainline. HDMI output actually is done by some
+nxp HDMI transmitter that translates the rgb 888 video from lcd controller
+on dove. AFAIR the HDMI transmitter code is "open", i.e. free to clean up
+and port. I haven't looked closely into lcd yet but on Cubox the lcd pixclk
+comes from an external clk chip (si5351a) that I have a quite ready driver
+for. The existing driver does a table based setup of the plls and does not
+hit 148.5 MHz precisely. The driver I wrote is based on an AN from SiLabs
+and is also already based on common clk framework.
+
+> . A LCD PC monitor with HDMI input.  If the monitor is disconnected, the
+>    Cubox booted, and the monitor connected, you get a picture, but you
+>    lose the top, left, bottom and right of the display off the side of the
+>    monitor.  No amount of adjusting on the monitor fixes this.
+
+There have been many reports of people no being able to get proper resolutions
+with the original kernel setup. I know there are people working on gfx support
+and xbmc. Maybe you hit the solid-run.com forums and have a look there.
+
+> What is obvious is that there is no HDMI hotplug support and reconfiguring
+> of the display.  So, I've been investigating the Linux DRM/DRI support -
+> both the kernel and X11 side, and I have something that is getting close
+> to being ready.  Last night I finally disabled the kernel dovefb driver,
+> and have X11 using solely my new DRM driver.
+
+Great, keep me posted and I ll be happy to test it.
+
+> However, this won't be using the on-chip mpeg decoding (yet).  CPU
+> usage sits at around 30% while vlc playback is running.
+
+The bad thing with GLES and video decoding is that it all relies on
+some dirty closed source user space libraries. But again, as I am not
+that familiar with gfx and decoding drivers, I didn't look into that.
+
+Sebastian
