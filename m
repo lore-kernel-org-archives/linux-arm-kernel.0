@@ -1,31 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Aug 2012 20:29:08 +0000
-Subject: =?euc-kr?q?=C8=B8=BD=C5=3A_=5BPATCH_2/4=5D_arm/dts=3A_exynos4=3A_Add_DTS?=
- =?euc-kr?q?_files_derived_from_common?= Exynos4
-In-Reply-To: <A6A3B7488C419F488E5B13FFD03C08AD2F4372EB@SN2PRD0510MB370.namprd05.prod.outlook.com>
-References: <1344366398-19022-1-git-send-email-dongjin.kim@agreeyamobility.net>
- <201208071938.26507.arnd@arndb.de>
- <A6A3B7488C419F488E5B13FFD03C08AD2F4372EB@SN2PRD0510MB370.namprd05.prod.outlook.com>
-Message-ID: <201208072029.08693.arnd@arndb.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue,  7 Aug 2012 13:41:47 -0700
+Subject: [PATCH] Revert "ARM: OMAP3: PM: call pre/post transition per
+ powerdomain"
+Message-ID: <1344372107-17786-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 August 2012, Dongjin Kim wrote:
-> Hi,
-> 
-> I didn't use -M and I couldn't see any difference with the it.
-> Did I make something wrong on that patch?
+This reverts commit 58f0829b7186150318c79515f0e0850c5e7a9c89.
 
-No, I think it's just git being less smart about file moves than I was hoping
-for. It might do the right thing if you do the patch in two steps:
+Converstion to per-pwrdm per/post transition calls was a bit
+premature.  Only tracking MPU, PER & CORE in the idle path means we
+lose the accounting for all the other powerdomains which may also
+transition in idle.  On OMAP3, due to autodeps, several powerdomains
+transition along with MPU (e.g. DSS, USBHOST), and the accounting for
+these was lost with this patch.
 
-1. rename exynos4210.dtsi to exynos4.dtsi and add a one-line exynos4210.dtsi
-file that just includes exynos4.dtsi.
+This patch should be revisited when the upcoming clkdm/pwrmdm/voltdm
+use-counting seires is merged since then we can properly do accounting
+without relying on a call in the idle path.
 
-2. do all the changes for moving contents back from exynos4.dtsi into
-exynos4210.dtsi and exynos4412.dtsi.
+Cc: Jean Pihet <jean.pihet@newoldbits.com>
+Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Reported-by: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/mach-omap2/pm34xx.c |   19 ++++---------------
+ 1 file changed, 4 insertions(+), 15 deletions(-)
 
-Not sure if it's worth it though. Your version is probably good enough
-if there are no tools to do a better job automatically.
-
-	Arnd
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index e4fc88c..05bd8f0 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -272,21 +272,16 @@ void omap_sram_idle(void)
+ 	per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
+ 	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
+ 
+-	if (mpu_next_state < PWRDM_POWER_ON) {
+-		pwrdm_pre_transition(mpu_pwrdm);
+-		pwrdm_pre_transition(neon_pwrdm);
+-	}
++	pwrdm_pre_transition(NULL);
+ 
+ 	/* PER */
+ 	if (per_next_state < PWRDM_POWER_ON) {
+-		pwrdm_pre_transition(per_pwrdm);
+ 		per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
+ 		omap2_gpio_prepare_for_idle(per_going_off);
+ 	}
+ 
+ 	/* CORE */
+ 	if (core_next_state < PWRDM_POWER_ON) {
+-		pwrdm_pre_transition(core_pwrdm);
+ 		if (core_next_state == PWRDM_POWER_OFF) {
+ 			omap3_core_save_context();
+ 			omap3_cm_save_context();
+@@ -339,20 +334,14 @@ void omap_sram_idle(void)
+ 			omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
+ 					       OMAP3430_GR_MOD,
+ 					       OMAP3_PRM_VOLTCTRL_OFFSET);
+-		pwrdm_post_transition(core_pwrdm);
+ 	}
+ 	omap3_intc_resume_idle();
+ 
++	pwrdm_post_transition(NULL);
++
+ 	/* PER */
+-	if (per_next_state < PWRDM_POWER_ON) {
++	if (per_next_state < PWRDM_POWER_ON)
+ 		omap2_gpio_resume_after_idle();
+-		pwrdm_post_transition(per_pwrdm);
+-	}
+-
+-	if (mpu_next_state < PWRDM_POWER_ON) {
+-		pwrdm_post_transition(mpu_pwrdm);
+-		pwrdm_post_transition(neon_pwrdm);
+-	}
+ }
+ 
+ static void omap3_pm_idle(void)
+-- 
+1.7.9.2
