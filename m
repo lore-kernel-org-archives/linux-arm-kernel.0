@@ -1,69 +1,64 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 7 Aug 2012 19:34:19 +0800
-Subject: [PATCH] pinctrl: pinctrl-imx: add imx35 pinctrl driver
-In-Reply-To: <20120807084904.GA9888@pengutronix.de>
-References: <1343921942-22079-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CAP1dx+wRZea8o8KTGRDCMtQkt7EjDRN5EoFek80OKqJgTxbvZA@mail.gmail.com>
- <20120807084904.GA9888@pengutronix.de>
-Message-ID: <20120807113418.GA13786@shlinux2.ap.freescale.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 7 Aug 2012 12:56:47 +0100
+Subject: RFC: mutex: hung tasks on SMP platforms with asm-generic/mutex-xchg.h
+Message-ID: <20120807115647.GA12828@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 07, 2012 at 10:49:04AM +0200, Uwe Kleine-K?nig wrote:
-...
-> > > +See below for available PIN_FUNC_ID for imx35:
-> > > +# grep '   IMX_PIN_REG' drivers/pinctrl/pinctrl-imx35.c | awk '{ print NR-1 " " $8 }'
-> > > +0 MX35_PAD_CAPTURE__GPT_CAPIN1
-> > > +1 MX35_PAD_CAPTURE__GPT_CMPOUT2
-> > I'm not sure if you can use the format as exist IMX PIN_FUNC_ID tables as:
-> > MX35_PAD_CAPTURE__GPT_CAPIN1        0
-> > MX35_PAD_CAPTURE__GPT_CMPOUT2    1
-> I choosed to switch the order here to have a more column like format.
-> the length of the numbers is more uniform. I can switch if you want.
-> 
-I think either is ok.
-You can do as you wish. :)
+Hello,
 
-> > Maybe the difficulty is the command (i did not know how to do it before),
-> > If you know, we can do like that.
-> > Anyway, it's not a big issue and does not block an ack.
-> > 
-> > > +enum imx35_pads {
-> > > +       /* sed -r -n 's@^#define MX35_PAD_([0-9A-Z_]*)__([0-9A-Z_]*)\s+IOMUX_PAD\(\s*([0-9a-fx]*),\s+([0-9a-fx]*),\s+([0-9a-fx]*),\s+([0-9a-fx]*),\s+([0-9]*),\s*NO_PAD_CTRL\)@\tMX35_PAD_\1, at p' arch/arm/plat-mxc/include/mach/iomux-mx35.h | uniq */
-> > > +       MX35_PAD_CAPTURE,
-> > > +       MX35_PAD_COMPARE,
-> > > +       MX35_PAD_WDOG_RST,
-> > > +       MX35_PAD_GPIO1_0,
-> > > +       MX35_PAD_GPIO1_1,
-> > > +       MX35_PAD_GPIO2_0,
-> > > +       MX35_PAD_GPIO3_0,
-> > Can we use the format as exist one?
-> > enum imx53_pads {
-> >         MX53_PAD_GPIO_19 = 1,
-> >         MX53_PAD_KEY_COL0 = 2,
-> >         MX53_PAD_KEY_ROW0 = 3,
-> >         MX53_PAD_KEY_COL1 = 4,
-> > .......
-> > }
-> > Then people can easy know its pin id.
-> > I'm wondering there may be still some debug info are using pin id
-> > then the above format helps.
-> I didn't see output referring to pin ids (which doesn't mean it doesn't
-> exist of course). I don't care much
-Right, it seems currently most places of debug information
-has a pin name going with pin id.
-So without id here seems not affect debug information a lot.
+ARM recently moved to asm-generic/mutex-xchg.h for its mutex implementation
+after our previous implementation was found to be missing some crucial
+memory barriers. However, I'm seeing some problems running hackbench on
+SMP platforms due to the way in which the MUTEX_SPIN_ON_OWNER code operates.
 
-But i'm not sure whether it won't be used in the future since it's a basic
-property of pin and should be nature to have.
-e.g. i formerly proposed pinctrl gpio binding uses the pin id like:
-<&gpio0 $gpio_offset $pin_id $count>
-So i think it may be better to also explicitly define it in driver.
-It does not harm and make things clear, especially it's not a big work. :)
+The symptoms are that a bunch of hackbench tasks are left waiting on an
+unlocked mutex and therefore never get woken up to claim it. I think this
+boils down to the following sequence:
 
-> and wondered why you started at 1 and not 0.
-It looks my mistake during the data transition before.:)
-It should be better 0. Thanks for the finding.
 
-Regards
-Dong Aisheng
+        Task A        Task B        Task C        Lock value
+0                                                     1
+1       lock()                                        0
+2                     lock()                          0
+3                     spin(A)                         0
+4       unlock()                                      1
+5                                   lock()            0
+6                     cmpxchg(1,0)                    0
+7                     contended()                    -1
+8       lock()                                        0
+9       spin(C)                                       0
+10                                  unlock()          1
+11      cmpxchg(1,0)                                  0
+12      unlock()                                      1
+
+
+At this point, the lock is unlocked, but Task B is in an uninterruptible
+sleep with nobody to wake it up.
+
+The following patch fixes the problem by ensuring we put the lock into
+the contended state if we acquire it from the spin loop on the slowpath
+but I'd like to be sure that this won't cause problems with other mutex
+implementations:
+
+
+diff --git a/kernel/mutex.c b/kernel/mutex.c
+index a307cc9..27b7887 100644
+--- a/kernel/mutex.c
++++ b/kernel/mutex.c
+@@ -170,7 +170,7 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
+                if (owner && !mutex_spin_on_owner(lock, owner))
+                        break;
+ 
+-               if (atomic_cmpxchg(&lock->count, 1, 0) == 1) {
++               if (atomic_cmpxchg(&lock->count, 1, -1) == 1) {
+                        lock_acquired(&lock->dep_map, ip);
+                        mutex_set_owner(lock);
+                        preempt_enable();
+
+
+All comments welcome.
+
+Cheers,
+
+Will
