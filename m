@@ -1,82 +1,63 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 7 Aug 2012 10:49:04 +0200
-Subject: [PATCH] pinctrl: pinctrl-imx: add imx35 pinctrl driver
-In-Reply-To: <CAP1dx+wRZea8o8KTGRDCMtQkt7EjDRN5EoFek80OKqJgTxbvZA@mail.gmail.com>
-References: <1343921942-22079-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CAP1dx+wRZea8o8KTGRDCMtQkt7EjDRN5EoFek80OKqJgTxbvZA@mail.gmail.com>
-Message-ID: <20120807084904.GA9888@pengutronix.de>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Tue, 7 Aug 2012 08:50:44 +0000
+Subject: [PATCH RESEND v2 1/2] arm/dts: Add AM33XX basic pinctrl support
+In-Reply-To: <20120807074348.GQ11011@atomide.com>
+References: <1343144719-26352-1-git-send-email-anilkumar@ti.com>
+ <1343144719-26352-2-git-send-email-anilkumar@ti.com>
+ <50125B1C.8000209@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA06E4B@DBDE01.ent.ti.com>
+ <20120807074348.GQ11011@atomide.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA0D156@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Tony,
 
-On Tue, Aug 07, 2012 at 04:04:01PM +0800, Dong Aisheng wrote:
-> Some minor format comment.
-> On 2 August 2012 23:39, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
-> ........
-> > +Required properties:
-> > +- compatible: "fsl,imx35-iomuxc"
-> > +- fsl,pins: two integers array, represents a group of pins mux and config
-> > +  setting. The format is fsl,pins = <PIN_FUNC_ID CONFIG>, PIN_FUNC_ID is a
-> > +  pin working on a specific function, CONFIG is the pad setting value like
-> > +  pull-up for this pin. Please refer to imx53 datasheet for the valid pad
-> s/imx53/imx35
-obviously.
-
-> > +See below for available PIN_FUNC_ID for imx35:
-> > +# grep '   IMX_PIN_REG' drivers/pinctrl/pinctrl-imx35.c | awk '{ print NR-1 " " $8 }'
-> > +0 MX35_PAD_CAPTURE__GPT_CAPIN1
-> > +1 MX35_PAD_CAPTURE__GPT_CMPOUT2
-> I'm not sure if you can use the format as exist IMX PIN_FUNC_ID tables as:
-> MX35_PAD_CAPTURE__GPT_CAPIN1        0
-> MX35_PAD_CAPTURE__GPT_CMPOUT2    1
-I choosed to switch the order here to have a more column like format.
-the length of the numbers is more uniform. I can switch if you want.
-
-> Maybe the difficulty is the command (i did not know how to do it before),
-> If you know, we can do like that.
-> Anyway, it's not a big issue and does not block an ack.
+On Tue, Aug 07, 2012 at 13:13:48, Tony Lindgren wrote:
+> * AnilKumar, Chimata <anilkumar@ti.com> [120731 06:37]:
+> > Hi Peter,
+> > 
+> > On Fri, Jul 27, 2012 at 14:40:52, Ujfalusi, Peter wrote:
+> > > Hi,
+> > > 
+> > > On 07/24/2012 06:45 PM, AnilKumar Ch wrote:
+> > > > Adds basic pinctrl support for AM33XX family of devices. This patch
+> > > > is based on the pinctrl-simple driver submitted by Tony Lindgren's
+> > > > here: http://lwn.net/Articles/496075/
+> > > > 
+> > > > Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> > > > ---
+> > > >  arch/arm/boot/dts/am33xx.dtsi |    9 +++++++++
+> > > >  1 file changed, 9 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> > > > index 59509c4..9b974dc 100644
+> > > > --- a/arch/arm/boot/dts/am33xx.dtsi
+> > > > +++ b/arch/arm/boot/dts/am33xx.dtsi
+> > > > @@ -40,6 +40,15 @@
+> > > >  		};
+> > > >  	};
+> > > >  
+> > > > +	am3358_pinmux: pinmux at 44E10800 {
+> > > > +		compatible = "pinctrl-single";
+> > > > +		reg = <0x44E10800 0x0338>;
+> > > 
+> > > I'm just curious about the size here: how it ended up as 0x0338?
+> > > While looking at the TRM of AM335x I can come up with 0x0238 (0x44e10800 -
+> > > 0x44e10a38), but I don't see any sings of the remaining 0x0100 to be
+> > > documented at least.
+> > 
+> > No, pinmux registers are available till 0x44E10B38, look at AM335x latest TRM
+> > or pinmux utility (we cannot find the exact offsets but pins we can find after
+> > 0x0A38, conf_ddr_resetn) at http://www.ti.com/tool/pinmuxtool
 > 
-> > +enum imx35_pads {
-> > +       /* sed -r -n 's@^#define MX35_PAD_([0-9A-Z_]*)__([0-9A-Z_]*)\s+IOMUX_PAD\(\s*([0-9a-fx]*),\s+([0-9a-fx]*),\s+([0-9a-fx]*),\s+([0-9a-fx]*),\s+([0-9]*),\s*NO_PAD_CTRL\)@\tMX35_PAD_\1, at p' arch/arm/plat-mxc/include/mach/iomux-mx35.h | uniq */
-> > +       MX35_PAD_CAPTURE,
-> > +       MX35_PAD_COMPARE,
-> > +       MX35_PAD_WDOG_RST,
-> > +       MX35_PAD_GPIO1_0,
-> > +       MX35_PAD_GPIO1_1,
-> > +       MX35_PAD_GPIO2_0,
-> > +       MX35_PAD_GPIO3_0,
-> Can we use the format as exist one?
-> enum imx53_pads {
->         MX53_PAD_GPIO_19 = 1,
->         MX53_PAD_KEY_COL0 = 2,
->         MX53_PAD_KEY_ROW0 = 3,
->         MX53_PAD_KEY_COL1 = 4,
-> .......
-> }
-> Then people can easy know its pin id.
-> I'm wondering there may be still some debug info are using pin id
-> then the above format helps.
-I didn't see output referring to pin ids (which doesn't mean it doesn't
-exist of course). I don't care much and wondered why you started at 1
-and not 0. All it all it was just lazyness on my side not to add the
-numers.
- 
-> > +module_exit(imx35_pinctrl_exit);
-> > +MODULE_AUTHOR("Dong Aisheng <dong.aisheng@linaro.org>");
-> Not your name?
-No, I only did
+> If you have a hole inbetween the registers it sounds like you also have core and
+> wkup domains? In that case those should be set up as separate controllers as other
+> SCM registers may be inbetween those domains.
+> 
 
-	cp drivers/pinctrl/pinctrl-imx{51,35}.c
+In case of AM33XX we have only one padconf domain and it do not have any holes
+in between.
 
-and fixed the tables and names for i.MX35. It's OK for me when you get
-the blame. :-)
-
-> Otherwise,
-> you can add my ACK.
-Thanks
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards
+AnilKumar
