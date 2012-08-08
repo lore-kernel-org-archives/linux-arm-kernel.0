@@ -1,53 +1,54 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  8 Aug 2012 23:27:54 +0200
-Subject: [PATCH 06/10] ARM: davinci: don't use broken ntosd2_init_i2c
+Date: Wed,  8 Aug 2012 23:27:53 +0200
+Subject: [PATCH 05/10] asm-generic: xor: mark static functions as
+ __maybe_unused
 In-Reply-To: <1344461278-28245-1-git-send-email-arnd@arndb.de>
 References: <1344461278-28245-1-git-send-email-arnd@arndb.de>
-Message-ID: <1344461278-28245-7-git-send-email-arnd@arndb.de>
+Message-ID: <1344461278-28245-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ntosd2_init_i2c walks the ntosd2_i2c_info array, which it expects to
-be populated with at least one member. gcc correctly warns about
-the out-of-bounds access here.
+The asm-generic/xor.h header file is nasty and defines static functions
+that are not inline. The header file is include by the ARM version of
+asm/xor.h, which uses some but not all of the symbols defined there.
 
-Without this patch, building davinci_all_defconfig results in:
+Marking the extraneous functions as __maybe_unused lets gcc drop them
+without complaining.
 
-arch/arm/mach-davinci/board-neuros-osd2.c: In function 'davinci_ntosd2_init':
-arch/arm/mach-davinci/board-neuros-osd2.c:187:20: warning: array subscript is above array bounds [-Warray-bounds]
+Without this patch, building iop13xx_defconfig results in:
+
+include/asm-generic/xor.h:696:34: warning: 'xor_block_8regs_p' defined but not used [-Wunused-variable]
+include/asm-generic/xor.h:704:34: warning: 'xor_block_32regs_p' defined but not used [-Wunused-variable]
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Andrey Porodko <panda@chelcom.ru>
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: Neil Brown <neilb@suse.de>
 ---
- arch/arm/mach-davinci/board-neuros-osd2.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+ include/asm-generic/xor.h |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
-index 5de69f2..9d40df9 100644
---- a/arch/arm/mach-davinci/board-neuros-osd2.c
-+++ b/arch/arm/mach-davinci/board-neuros-osd2.c
-@@ -162,6 +162,7 @@ static void __init davinci_ntosd2_map_io(void)
- 	dm644x_init();
- }
+diff --git a/include/asm-generic/xor.h b/include/asm-generic/xor.h
+index 6028fb8..b4d8432 100644
+--- a/include/asm-generic/xor.h
++++ b/include/asm-generic/xor.h
+@@ -693,7 +693,7 @@ static struct xor_block_template xor_block_32regs = {
+ 	.do_5 = xor_32regs_5,
+ };
  
-+#if 0
- /*
-  I2C initialization
- */
-@@ -193,6 +194,12 @@ static	int ntosd2_init_i2c(void)
- 	}
- 	return status;
- }
-+#else
-+static  int ntosd2_init_i2c(void)
-+{
-+	return 0;
-+}
-+#endif
+-static struct xor_block_template xor_block_8regs_p = {
++static struct xor_block_template xor_block_8regs_p __maybe_unused = {
+ 	.name = "8regs_prefetch",
+ 	.do_2 = xor_8regs_p_2,
+ 	.do_3 = xor_8regs_p_3,
+@@ -701,7 +701,7 @@ static struct xor_block_template xor_block_8regs_p = {
+ 	.do_5 = xor_8regs_p_5,
+ };
  
- static struct davinci_mmc_config davinci_ntosd2_mmc_config = {
- 	.wires		= 4,
+-static struct xor_block_template xor_block_32regs_p = {
++static struct xor_block_template xor_block_32regs_p __maybe_unused = {
+ 	.name = "32regs_prefetch",
+ 	.do_2 = xor_32regs_p_2,
+ 	.do_3 = xor_32regs_p_3,
 -- 
 1.7.10
