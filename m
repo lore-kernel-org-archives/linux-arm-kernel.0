@@ -1,72 +1,53 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 8 Aug 2012 15:52:12 +0900
-Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
-In-Reply-To: <5016D03D.8010607@codeaurora.org>
-References: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
- <20120611155716.GA18267@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1206111241470.23555@xanadu.home>
- <20120611165115.GB18267@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
- <4FD62DBB.8070407@codeaurora.org>
- <20120611192519.GF18267@n2100.arm.linux.org.uk>
- <4FE1FB15.3090305@codeaurora.org>
- <0e0201cd5f2f$2c2f6e60$848e4b20$%kim@samsung.com>
- <5016D03D.8010607@codeaurora.org>
-Message-ID: <CANqRtoQ9BCPhQPi38vK__61G2yAY=g9s17NG3LhSnrxdOYnkDg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 8 Aug 2012 08:52:41 +0200
+Subject: [PATCH 2/2] ARM: only build ssi-fiq.S et al if
+ CONFIG_SND_IMX_SOC_PCM_FIQ is selected
+In-Reply-To: <1344379514-30076-3-git-send-email-matt@genesi-usa.com>
+References: <1344379514-30076-1-git-send-email-matt@genesi-usa.com>
+ <1344379514-30076-3-git-send-email-matt@genesi-usa.com>
+Message-ID: <20120808065241.GG24458@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2012 at 3:19 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 07/10/12 23:34, Kukjin Kim wrote:
->> Stephen Boyd wrote:
->>> Great. Kukjin Kim, can exynos use SGI0? It looks like exynos is the only
->>> one left to move to SGI0.
->>>
->> Yeah, EXYNOS can use SGI0 instead of SGI1 :)
->>
->>
->
-> Russell, can we apply something like this?
->
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-> index 36c3984..090e32b 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -139,7 +139,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
->
->                 __raw_writel(virt_to_phys(exynos4_secondary_startup),
->                         CPU1_BOOT_REG);
-> -               gic_raise_softirq(cpumask_of(cpu), 1);
-> +               gic_raise_softirq(cpumask_of(cpu), 0);
->
->                 if (pen_release == -1)
->                         break;
->
->
-> I see we have another user of SGI1. Magnus/Rafael, can we move
-> smp-emev2.c to use SGI0 instead of SGI1?
+On Tue, Aug 07, 2012 at 05:45:14PM -0500, Matt Sealey wrote:
+> Further to the previous patch, a custom configuration may be used based on the
+> imx_v6_v7_defconfig which removes the board depending on the audio driver pulling
+> this support code. However, since it is built dependent on CONFIG_SND_IMX_SOC
+> it is enabled in the build for all i.MX processors which enable any audio drivers.
+> 
+> Correct this by only building the SSI FIQ support code when the more specific
+> CONFIG_SND_IMX_SOC_PCM_FIQ is enabled. Since it's enabled in the imx_v6_v7_defconfig
+> anyway by the Eukrea board, nothing changes using the defconfig, so this is just
+> a convenience for people reconfiguring their kernels more sparsely than the default.
+> 
+> Signed-off-by: Matt Sealey <matt@genesi-usa.com>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/plat-mxc/Makefile |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+> index 6ac7200..89927f5 100644
+> --- a/arch/arm/plat-mxc/Makefile
+> +++ b/arch/arm/plat-mxc/Makefile
+> @@ -16,7 +16,7 @@ obj-$(CONFIG_MXC_USE_EPIT) += epit.o
+>  obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
+>  obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
+>  obj-$(CONFIG_CPU_IDLE) += cpuidle.o
+> -ifdef CONFIG_SND_IMX_SOC
+> +ifdef CONFIG_SND_IMX_SOC_PCM_FIQ
+>  obj-y += ssi-fiq.o
+>  obj-y += ssi-fiq-ksym.o
+>  endif
 
-So I finally managed to try this out on my KZM9D board. The SMP bring
-up code continues to work as expected, so it seems that SGI0 can be
-used instead of SGI1 on EMEV2. Let's just say that the boot protocol
-implemented by the mask ROM is rather poorly documented. Anyway, to
-test I used the following patch on top of linux git 42a579a.
+Since you are here already, better do:
 
---- 0001/arch/arm/mach-shmobile/smp-emev2.c
-+++ work/arch/arm/mach-shmobile/smp-emev2.c	2012-08-08 15:42:54.000000000 +0900
-@@ -82,7 +82,7 @@ int __cpuinit emev2_boot_secondary(unsig
- 	/* Tell ROM loader about our vector (in headsmp.S) */
- 	emev2_set_boot_vector(__pa(shmobile_secondary_vector));
+obj-$(CONFIG_SND_IMX_SOC_PCM_FIQ) +) += ssi-fiq.o ssi-fiq-ksym.o
 
--	gic_raise_softirq(cpumask_of(cpu), 1);
-+	gic_raise_softirq(cpumask_of(cpu), 0);
- 	return 0;
- }
+Sascha
 
-So if/where needed, please add my:
-
-Acked-by: Magnus Damm <damm@opensource.se>
-
-Thanks,
-
-/ magnus
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
