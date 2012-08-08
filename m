@@ -1,27 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 8 Aug 2012 10:18:15 -0300
-Subject: [PATCH 6/6] ARM: imx: gpmi-nand depends on mxs-dma
-In-Reply-To: <50226409.1060800@de.bosch.com>
-References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
- <1344430493-5304-7-git-send-email-arnd@arndb.de>
- <CAOMZO5CZ7mJd89cN_S0KBS74mc5qTzvrfRbmHVX3nmEakx19ow@mail.gmail.com>
- <50226409.1060800@de.bosch.com>
-Message-ID: <CAOMZO5BtStkEWGRWi7LcVT_DK0C2WnjPiCOh2ZriVzrP+1NW3g@mail.gmail.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Wed, 8 Aug 2012 09:18:50 -0400
+Subject: [PATCH 01/22] ARM: add mechanism for late code patching
+In-Reply-To: <alpine.LFD.2.02.1208080106500.5231@xanadu.home>
+References: <1343775898-28345-1-git-send-email-cyril@ti.com>
+ <1343775898-28345-2-git-send-email-cyril@ti.com>
+ <alpine.LFD.2.02.1208040045360.5231@xanadu.home> <50219C45.7030601@ti.com>
+ <alpine.LFD.2.02.1208080106500.5231@xanadu.home>
+Message-ID: <5022673A.7060407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 8, 2012 at 10:05 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+On 08/08/12 01:56, Nicolas Pitre wrote:
+> On Tue, 7 Aug 2012, Cyril Chemparathy wrote:
+[...]
+>> u32 arm_check[] = {
+>> 	0xe2810041, 0xe2810082, 0xe2810f41, 0xe2810f82, 0xe2810e41,
+>> 	0xe2810e82, 0xe2810d41, 0xe2810d82, 0xe2810c41, 0xe2810c82,
+>> 	0xe2810b41, 0xe2810b82, 0xe2810a41, 0xe2810a82, 0xe2810941,
+>> 	0xe2810982, 0xe2810841, 0xe2810882, 0xe2810741, 0xe2810782,
+>> 	0xe2810641, 0xe2810682, 0xe2810541, 0xe2810582, 0xe2810441,
+>> };
+>
+> Instead of using this array you could let the assembler do it for you
+> like this:
+>
+> asm (" \n\
+> 	.arm \n\
+> arm_check: \n\
+>          .set shft, 0 \n\
+>          .rep 12 \n\
+>          add     r1, r2, #0x81 << \shft \n\
+>          .set shft, \shft + 2 \n\
+>          .endr \n\
+> ");
+>
 
-> Yes. But it seems it's not handled there? I'm trying since ~2 weeks to get
-> something like your patch applied to get the broken mainline fixed, but
-> unfortunately without success so far.
+Neat macro magic.  Are you thinking that we build this in as a self test 
+in the code?
 
-Let's try once again.
-
-Artem,
-
-Could https://patchwork.kernel.org/patch/1236551/ be applied?
-
-Thanks,
-
-Fabio Estevam
+Thanks
+-- Cyril.
