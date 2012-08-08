@@ -1,55 +1,68 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 08 Aug 2012 11:11:25 -0700
-Subject: [PATCH 11/11] pm/drivers: fix use of SIMPLE_DEV_PM_OPS
-In-Reply-To: <1344437248-20560-12-git-send-email-arnd@arndb.de> (Arnd
- Bergmann's message of "Wed, 8 Aug 2012 16:47:28 +0200")
-References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
- <1344437248-20560-12-git-send-email-arnd@arndb.de>
-Message-ID: <87obmluucy.fsf@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 08 Aug 2012 12:38:58 -0600
+Subject: [PATCH 8/8] ARM: vt8500: gpio: Devicetree support for arch-vt8500
+In-Reply-To: <1344389967-8465-9-git-send-email-linux@prisktech.co.nz>
+References: <1344389967-8465-1-git-send-email-linux@prisktech.co.nz>
+ <1344389967-8465-9-git-send-email-linux@prisktech.co.nz>
+Message-ID: <5022B242.1050001@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On 08/07/2012 07:39 PM, Tony Prisk wrote:
+> Converted the existing arch-vt8500 gpio to a platform_device.
+> Added support for WM8505 and WM8650 GPIO controllers.
 
-> A few drivers use a construct like
->
->  #ifdef CONFIG_PM
->  static int foo_suspend(struct device *pdev)
->  {
->     ...
->  }
->  static int foo_resume struct device *pdev)
->  {
->     ...
->  }
->  #endif
->  static SIMPLE_DEV_PM_OPS(foo_pm, foo_suspend, foo_resume);
->
-> which leaves the two functions unused if CONFIG_PM is enabled
-> but CONFIG_PM_SLEEP is disabled. I found this while building
-> all defconfig files on ARM. It's not clear to me if this is
-> the right solution, but at least it makes the code consistent
-> again.
->
-> Without this patch, building omap1_defconfig results in:
->
-> drivers/char/hw_random/omap-rng.c:165:12: warning: 'omap_rng_suspend' defined but not used [-Wunused-function]
-> drivers/char/hw_random/omap-rng.c:171:12: warning: 'omap_rng_resume' defined but not used [-Wunused-function]
-> sound/drivers/dummy.c:1068:12: warning: 'snd_dummy_suspend' defined but not used [-Wunused-function]
-> sound/drivers/dummy.c:1078:12: warning: 'snd_dummy_resume' defined but not used [-Wunused-function]
->
-> and building tegra_defconfig results in:
->
-> drivers/i2c/busses/i2c-tegra.c:716:12: warning: 'tegra_i2c_suspend' defined but not used [-Wunused-function]
-> drivers/i2c/busses/i2c-tegra.c:727:12: warning: 'tegra_i2c_resume' defined but not used [-Wunused-function]
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Rafael J. Wysocki <rjw@sisk.pl>
-> Cc: Takashi Iwai <tiwai@suse.de>
-> Cc: Laxman Dewangan <ldewangan@nvidia.com>
-> ---
->  drivers/char/hw_random/omap-rng.c |    2 +-
+> diff --git a/drivers/gpio/gpio-vt8500.c b/drivers/gpio/gpio-vt8500.c
 
-For the OMAP change,
+> +static struct of_device_id vt8500_gpio_dt_ids[] = {
+> +	{ .compatible = "via,vt8500-gpio", .data = &vt8500_data, },
+> +	{ .compatible = "wm,wm8505-gpio", .data = &wm8505_data, },
+> +	{ .compatible = "wm,wm8650-gpio", .data = &wm8650_data, },
+> +	{ /* Sentinel */ },
+> +};
+> +
+> +static int __devinit vt8500_gpio_probe(struct platform_device *pdev)
+> +{
+> +	void __iomem *gpio_base;
+> +	struct device_node *np;
+> +	const struct of_device_id *of_id =
+> +				of_match_device(vt8500_gpio_dt_ids, &pdev->dev);
+> +
+> +	if (!of_id) {
+> +		dev_err(&pdev->dev, "Failed to find gpio controller\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	np = of_find_matching_node(NULL, vt8500_gpio_dt_ids);
 
-Acked-by: Kevin Hilman <khilman@ti.com>
+Can't you use pdev->dev.of_node instead of searching for it again?
+
+...
+> +	of_node_put(np);
+
+If so, you could also remove that.
+
+> +static int __init vt8500_gpio_init(void)
+> +{
+> +	return platform_driver_probe(&vt8500_gpio_driver, &vt8500_gpio_probe);
+> +}
+> +
+> +static void __exit vt8500_gpio_exit(void)
+> +{
+> +	return platform_driver_unregister(&vt8500_gpio_driver);
+> +}
+> +
+> +module_init(vt8500_gpio_init);
+> +module_exit(vt8500_gpio_exit);
+
+I think that's all just:
+
+module_platform_driver(vt8500_gpio_driver);
+
+(except that _init uses platform_driver_probe() rather than
+platform_driver_register(), which seems unusual. I guess that explains
+the of_find_matching_node() above too.)
+
+> +MODULE_LICENSE("GPL");
+
+That should be "GPL v2" given the license header.
