@@ -1,51 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 08 Aug 2012 19:47:26 +0900
-Subject: [PATCH 2/9] ARM: plat-s3c24xx: Don't use FIQ_START
-In-Reply-To: <1344207819-3415-2-git-send-email-anton.vorontsov@linaro.org>
-References: <20120805230238.GA1663@lizard>
- <1344207819-3415-2-git-send-email-anton.vorontsov@linaro.org>
-Message-ID: <0af201cd7553$3346dd70$99d49850$%kim@samsung.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 8 Aug 2012 16:24:12 +0530
+Subject: [PATCH 0/2] OMAP cpufreq fixes
+Message-ID: <1344423254-3475-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Anton Vorontsov wrote:
-> 
-> We're about to remove FIQ_START mess, so move the platform-specific
-> detail inside platform-specific s3c24xx_set_fiq().
-> 
-> Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
+Hi Kevin,
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+While testing cpufreq on 3.6-rc1, I noticed strange issues on OMAP4,
+like a lockup when booting with 'performace' governer as default,
+and crashes when using 'usespace' (which booted up) and switching
+to higher OPPs.
+It took me a while to realise I was using a 4460 device. The OPPs
+registered though seemed to be for 4430 and hence were causing
+issues on the 4460 device. 
 
-BTW, how was going on the 'change FIQ_START to a variable' patch from Shawn
-Guo?
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/106486.html
+This series basically avoids registering the 4430 OPPs on other
+varients like 4460 and 4470 (and hence causing random issues)
+and also fixes a subsequent bug uncovered by doing this in
+OMAP cpufreq driver.
 
-Thanks.
+regards,
+Rajendra 
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Rajendra Nayak (2):
+  cpufreq: OMAP: Handle missing frequency table on SMP systems
+  ARM: OMAP4: Register the OPP table only for 4430 device
 
+ arch/arm/mach-omap2/opp4xxx_data.c |    2 +-
+ drivers/cpufreq/omap-cpufreq.c     |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-> ---
->  arch/arm/plat-s3c24xx/irq.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/plat-s3c24xx/irq.c b/arch/arm/plat-s3c24xx/irq.c
-> index fe57bbb..e4e9567 100644
-> --- a/arch/arm/plat-s3c24xx/irq.c
-> +++ b/arch/arm/plat-s3c24xx/irq.c
-> @@ -503,7 +503,7 @@ int s3c24xx_set_fiq(unsigned int irq, bool on)
->  	unsigned offs;
-> 
->  	if (on) {
-> -		offs = irq - FIQ_START;
-> +		offs = irq - IRQ_EINT0;
->  		if (offs > 31)
->  			return -EINVAL;
-> 
-> --
-> 1.7.10.4
+-- 
+1.7.9.5
