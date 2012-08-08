@@ -1,64 +1,60 @@
-From: vaibhav.bedia@ti.com (Vaibhav Bedia)
-Date: Wed, 8 Aug 2012 16:05:17 +0530
-Subject: [PATCH 1/1] ARM: OMAP2+: hwmod: Print an error message if no match
- exists for a hwmod class
-Message-ID: <1344422117-20707-1-git-send-email-vaibhav.bedia@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 08 Aug 2012 19:39:22 +0900
+Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
+In-Reply-To: <CAMbhsRRp429Fkk2-vEixt8OPW699ftVCaG+C83NWLvM2_jkOVw@mail.gmail.com>
+References: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
+ <20120611155716.GA18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111241470.23555@xanadu.home>
+ <20120611165115.GB18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
+ <4FD62DBB.8070407@codeaurora.org>
+ <20120611192519.GF18267@n2100.arm.linux.org.uk>
+ <4FE1FB15.3090305@codeaurora.org>
+ <0e0201cd5f2f$2c2f6e60$848e4b20$%kim@samsung.com>
+ <5016D03D.8010607@codeaurora.org>
+ <037601cd6fc9$f6e5fe30$e4b1fa90$%kim@samsung.com>
+ <CAMbhsRRp429Fkk2-vEixt8OPW699ftVCaG+C83NWLvM2_jkOVw@mail.gmail.com>
+Message-ID: <0af101cd7552$128bc3d0$37a34b70$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If no match is found for a hwmod class, omap_hwmod_for_each_by_class()
-currently does not spit out any error messages. To make debugging
-issues related to non-existent hwmod classes simpler make this function
-print an error message in case no match is found for the supplied hwmod
-class.
+Colin Cross wrote:
+> 
+> On Wed, Aug 1, 2012 at 2:42 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Stephen Boyd wrote:
+> >>
+> >> On 07/10/12 23:34, Kukjin Kim wrote:
+> >> > Stephen Boyd wrote:
+> >> >> Great. Kukjin Kim, can exynos use SGI0? It looks like exynos is the
+> >> only
+> >> >> one left to move to SGI0.
+> >> >>
+> >> > Yeah, EXYNOS can use SGI0 instead of SGI1 :)
+> >> >
+> >> >
+> >>
+> >> Russell, can we apply something like this?
+> >>
+> > Please feel free to add my ack on following change.
+> >
+> > Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> >
+> 
+> When testing coupled cpuidle on Exynos5, I found that sending an IPI
+> does not successfully wake up CPU1.  CPU1 is in a wfe with interrupts
+> masked, not a wfi, so an interrupt is not able to wake it up.  It
+> tends to wake up anyways because the next time a spin lock is
+> unlocked, often during a timer interrupt on CPU0, CPU0 executes an sev
+> which wakes up CPU1.  You can see that the IPI is unnecessary by
+> removing the gic_raise_softirq and replacing it with dsb_sev().
 
-Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |   11 ++++++++++-
- 1 files changed, 10 insertions(+), 1 deletions(-)
+Hmm...could be. Let me check you commented in detail. And if any updates,
+I'll let you know.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 6ca8e51..90e2306 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -3480,7 +3480,8 @@ int omap_hwmod_read_hardreset(struct omap_hwmod *oh, const char *name)
-  * If the callback function returns something other than
-  * zero, the iterator is terminated, and the callback function's return
-  * value is passed back to the caller.  Returns 0 upon success, -EINVAL
-- * if @classname or @fn are NULL, or passes back the error code from @fn.
-+ * if @classname or @fn are NULL or no match is found for @classname,
-+ * or passes back the error code from @fn.
-  */
- int omap_hwmod_for_each_by_class(const char *classname,
- 				 int (*fn)(struct omap_hwmod *oh,
-@@ -3489,6 +3490,7 @@ int omap_hwmod_for_each_by_class(const char *classname,
- {
- 	struct omap_hwmod *temp_oh;
- 	int ret = 0;
-+	bool found = false;
- 
- 	if (!classname || !fn)
- 		return -EINVAL;
-@@ -3498,6 +3500,7 @@ int omap_hwmod_for_each_by_class(const char *classname,
- 
- 	list_for_each_entry(temp_oh, &omap_hwmod_list, node) {
- 		if (!strcmp(temp_oh->class->name, classname)) {
-+			found = true;
- 			pr_debug("omap_hwmod: %s: %s: calling callback fn\n",
- 				 __func__, temp_oh->name);
- 			ret = (*fn)(temp_oh, user);
-@@ -3506,6 +3509,12 @@ int omap_hwmod_for_each_by_class(const char *classname,
- 		}
- 	}
- 
-+	if (!found) {
-+		pr_err("omap_hwmod: %s: no match for class %s\n",
-+			__func__, classname);
-+		return -EINVAL;
-+	}
-+
- 	if (ret)
- 		pr_debug("omap_hwmod: %s: iterator terminated early: %d\n",
- 			 __func__, ret);
--- 
-1.7.0.4
+Thanks for your information.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
