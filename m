@@ -1,19 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Aug 2012 14:01:12 +0000
-Subject: [PATCH 5/6] ARM: integrator: include <linux/export.h
-In-Reply-To: <CACRpkdYbHTtOg6inbemD2SG+XT9ZYN3pcFQjEPv7mbyecagawg@mail.gmail.com>
-References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
- <1344430493-5304-6-git-send-email-arnd@arndb.de>
- <CACRpkdYbHTtOg6inbemD2SG+XT9ZYN3pcFQjEPv7mbyecagawg@mail.gmail.com>
-Message-ID: <201208081401.12909.arnd@arndb.de>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 8 Aug 2012 19:33:12 +0530
+Subject: [PATCH v2] gpio/omap: add *remove* callback in platform_driver
+In-Reply-To: <1344434316-21141-1-git-send-email-tarun.kanti@ti.com>
+References: <1344434316-21141-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <CAMQu2gzi0_NS_W_DN=D=+3n6sNw_NTfkaNzaqV3QPG4mL+RoRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 August 2012, Linus Walleij wrote:
-> Missing a ">" at the end of the subject line, but whatever.
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+On Wed, Aug 8, 2012 at 7:28 PM, Tarun Kanti DebBarma <tarun.kanti@ti.com> wrote:
+> Add *remove* callback so that necessary cleanup operations are
+> performed when device is unregistered. The device is deleted
+> from the list and associated clock handle is released by
+> calling clk_put() and irq descriptor is released using the
+> irq_free_desc() api.
+>
+> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> Reported-by: Paul Walmsley <paul@pwsan.com>
+> Reviewed-by: Jon Hunter <jon-hunter@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Cousson, Benoit <b-cousson@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> ---
+> v2:
+> Baseline: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
+> Commit: 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee (Linux 3.6-rc1)
+>
+> (1) Use irq_free_descs() instead of irq_free_desc().
+>     Besides, irq_free_desc() was using wrong parameter,
+>     irq_base, instead of bank->irq.
+> (2) irq_free_descs() moved outside spin_lock/unlock_*()
+>     in order to avoid exception warnings.
+>
+> (3) pm_runtime_disable() added so that bind can happen successfully
+>
+> Test Detail:
+> Step 1: Unbind gpio.5 device in order to invoke the *remove* callback.
+> #echo "omap_gpio.5" > sys/bus/platform/drivers/omap_gpio/unbind
+>
+> Step 2: Bind gpio.5 device and confirm probe() for the device succeeds.
+> #echo "omap_gpio.5" > sys/bus/platform/drivers/omap_gpio/bind
+>
+> Step 3: Execute read/write GPIO test case.
+>
+Thanks details about test. Whe  you to "Unbind->bind", do
+you see that PM is not broken.
 
-Fixed the subject and added the Ack. Thanks!
+In other words, can you also test and ensure that the OMAP3 suspend and
+CPUIDLE are not broken because of this patch.
+PER and CORE domains should transition to low power states.
 
-	Arnd
+Regards
+Santosh
