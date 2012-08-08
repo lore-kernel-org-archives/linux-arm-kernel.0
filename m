@@ -1,55 +1,31 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 8 Aug 2012 17:33:09 +0100
-Subject: [PATCH v2 03/23] xen/arm: page.h definitions
-In-Reply-To: <20120807181322.GG15053@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1208061428060.4645@kaball.uk.xensource.com>
- <1344263246-28036-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120807181322.GG15053@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1208081732590.21096@kaball.uk.xensource.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Wed, 8 Aug 2012 16:34:15 +0000
+Subject: [PATCH 1/1] ARM: OMAP2+: hwmod: Print an error message if no
+ match exists for a hwmod class
+In-Reply-To: <alpine.DEB.2.00.1208080803560.5447@utopia.booyaka.com>
+References: <1344422117-20707-1-git-send-email-vaibhav.bedia@ti.com>
+ <alpine.DEB.2.00.1208080803560.5447@utopia.booyaka.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EB32ABA@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Aug 2012, Konrad Rzeszutek Wilk wrote:
-> On Mon, Aug 06, 2012 at 03:27:06PM +0100, Stefano Stabellini wrote:
-> > ARM Xen guests always use paging in hardware, like PV on HVM guests in
-> > the X86 world.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> 
-> Ack.. with one nitpick
-> 
-> > +/* XXX: this shouldn't be here */
-> 
-> .. but its here b/c the frontend drivers are using it (its rolled in
-> headers)- even though we won't hit the code path. So for right now
-> just punt with this.
+Hi Paul,
 
-Yep, I'll do that.
-
-
-> > +static inline pte_t *lookup_address(unsigned long address, unsigned int *level)
-> > +{
-> > +	BUG();
-> > +	return NULL;
-> > +}
-> > +
-> > +static inline int m2p_add_override(unsigned long mfn, struct page *page,
-> > +		struct gnttab_map_grant_ref *kmap_op)
-> > +{
-> > +	return 0;
-> > +}
-> > +
-> > +static inline int m2p_remove_override(struct page *page, bool clear_pte)
-> > +{
-> > +	return 0;
-> > +}
-> > +
-> > +static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
-> > +{
-> > +	BUG();
-> > +	return false;
-> > +}
-> > +#endif /* _ASM_ARM_XEN_PAGE_H */
-> > -- 
-> > 1.7.2.5
+On Wed, Aug 08, 2012 at 19:35:50, Paul Walmsley wrote:
+[...]
+> It doesn't seem to me that this would necessarily always be an error.  
+> Suppose some init code to create cpsw devices is running on an OMAP3430.  
+> Then a omap_hwmod_for_each_by_class() that doesn't locate anything 
+> wouldn't be an error, right?
 > 
+
+Well, I think a failed lookup operation will be a bit expensive since it
+iterates over the whole list of registered hwmods and hence put in the
+pr_err(). But I don't see how the SoC specific example that you pointed out
+could be handled without putting in cpu_is_* checks in the registration
+process itself :(
+
+Would a pr_debug() be ok?
+
+Regards,
+Vaibhav B.
