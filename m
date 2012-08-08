@@ -1,53 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 Aug 2012 07:05:07 -0700
-Subject: [PATCH v4 2/4] mfd: omap: control: core system control driver
-In-Reply-To: <500FD2EC.7060208@dev.rtsoft.ru>
-References: <500FD2EC.7060208@dev.rtsoft.ru>
-Message-ID: <20120808140507.GF11011@atomide.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 8 Aug 2012 08:05:50 -0600 (MDT)
+Subject: [PATCH 1/1] ARM: OMAP2+: hwmod: Print an error message if no
+ match exists for a hwmod class
+In-Reply-To: <1344422117-20707-1-git-send-email-vaibhav.bedia@ti.com>
+References: <1344422117-20707-1-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <alpine.DEB.2.00.1208080803560.5447@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Konstantin Baydarov <kbaidarov@dev.rtsoft.ru> [120725 04:10]:
-> +
-> +u32 omap_control_status_read(void)
-> +{
-> +	return __raw_readl(omap_control_base);
-> +}
+Hello Vaibhav,
 
-Ah OK it's changed here.. Sorry I was looking at the older
-version.
+On Wed, 8 Aug 2012, Vaibhav Bedia wrote:
 
-> +void __init of_omap_control_init(const struct of_device_id *matches)
-> +{
-> +	struct device_node *np;
-> +	struct property *pp = 0;
-> +
-> +	for_each_matching_node(np, matches) {
-> +		pp = of_find_property(np, "reg", NULL);
-> +		if(pp) {
-> +			omap_control_phys_base = (unsigned long)be32_to_cpup(pp->value);
-> +			omap_control_mapsize = (size_t)be32_to_cpup( (void*)((char*)pp->value + 4) );
-> +			/*
-> +			 * Map control module register CONTROL_STATUS register:
-> +			 * omap24xx - OMAP24XX_CONTROL_STATUS
-> +			 * am33xx   - AM33XX_CONTROL_STATUS
-> +			 * omap34xx - OMAP343X_CONTROL_STATUS
-> +			 * omap44xx - OMAP4_CTRL_MODULE_CORE_STATUS
-> +			 * omap54xx - OMAP5XXX_CONTROL_STATUS
-> +			 */
-> +			omap_control_base = ioremap(omap_control_phys_base, omap_control_mapsize);
-> +		}
-> +	}
-> +}
+> If no match is found for a hwmod class, omap_hwmod_for_each_by_class()
+> currently does not spit out any error messages. To make debugging
+> issues related to non-existent hwmod classes simpler make this function
+> print an error message in case no match is found for the supplied hwmod
+> class.
+> 
+> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
 
-You should probably add a function for setting omap_control_base
-separately from *set_globals* in arch/arm/mach-omap2/common.c.
-That way it's initialized early for id.c, and you can initialize
-everything else later as regular device drivers.
+It doesn't seem to me that this would necessarily always be an error.  
+Suppose some init code to create cpsw devices is running on an OMAP3430.  
+Then a omap_hwmod_for_each_by_class() that doesn't locate anything 
+wouldn't be an error, right?
 
-FYI, we want to initialize as much as possible late so we have
-proper debugging console set up in case things go wrong.
 
-Regards,
-
-Tony
+- Paul
