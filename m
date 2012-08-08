@@ -1,159 +1,186 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Wed, 8 Aug 2012 12:36:41 -0500
-Subject: Kernels on Bad Firmware (was Re: kernel entry for thumb2-only cpus)
-Message-ID: <CAKGA1b=8gZdgpSJ28Hff+1199J0GarLxZU-NAv7JJDuk+La0ew@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 8 Aug 2012 18:42:05 +0100
+Subject: [PATCH v2 10/23] xen/arm: compile and run xenbus
+In-Reply-To: <5022A303.709@tycho.nsa.gov>
+References: <alpine.DEB.2.02.1208061428060.4645@kaball.uk.xensource.com>
+ <1344263246-28036-10-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120807182157.GN15053@phenom.dumpdata.com> <50216228.7010407@tycho.nsa.gov>
+ <alpine.DEB.2.02.1208081743430.21096@kaball.uk.xensource.com>
+ <50229B70.3090507@tycho.nsa.gov>
+ <alpine.DEB.2.02.1208081805520.21096@kaball.uk.xensource.com>
+ <5022A303.709@tycho.nsa.gov>
+Message-ID: <alpine.DEB.2.02.1208081836050.21096@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 8, 2012 at 10:33 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Aug 07, 2012 at 05:34:15PM -0500, Matt Sealey wrote:
->> Just because there is a ton of absolutely awful, broken firmware code out there
->> doesn't mean it can and will always be the case, and Linux policy should not
->> be dictated on an architecture basis on a few bad eggs, especially if it means
->> developers in the big wide world have to jump through hoops. Surely it is just
->> as good for Linux to loudly advocate the correct solutions in firmware and
->> implement the workarounds anyway, like a device quirk, rather than just out and
->> out say "firmwares suck, ignore what they did, do it again. We don't trust them
->> and never will."
->
-> Sadly, firmware developers have taught us time and time and time and time
-> again that they can not be trusted.  You may be the single one who can be
-> trusted to validate their stuff properly, but you would be in a severe
-> minority if that is true.
->
-> Many firmware developers do the barest minimum that's required.  Once their
-> job is done, that's the end of the development cycle and nothing further
-> happens, not even for bugs.
->
-> We've seen this time and time again.  We see it with corrupted ATAG lists,
-> we see it with bad memory tags passed to the kernel that the kernel has to
-> then screw around with to fix up the broken firmware developers crap.
-> Let me show you the crappy workarounds that we have:
+On Wed, 8 Aug 2012, Daniel De Graaf wrote:
+> On 08/08/2012 01:19 PM, Stefano Stabellini wrote:
+> > On Wed, 8 Aug 2012, Daniel De Graaf wrote:
+> >> On 08/08/2012 12:51 PM, Stefano Stabellini wrote:
+> >>> On Tue, 7 Aug 2012, Daniel De Graaf wrote:
+> >>>> On 08/07/2012 02:21 PM, Konrad Rzeszutek Wilk wrote:
+> >>>>> On Mon, Aug 06, 2012 at 03:27:13PM +0100, Stefano Stabellini wrote:
+> >>>>>> bind_evtchn_to_irqhandler can legitimately return 0 (irq 0): it is not
+> >>>>>> an error.
+> >>>>>>
+> >>>>>> If Linux is running as an HVM domain and is running as Dom0, use
+> >>>>>> xenstored_local_init to initialize the xenstore page and event channel.
+> >>>>>>
+> >>>>>> Changes in v2:
+> >>>>>>
+> >>>>>> - refactor xenbus_init.
+> >>>>>
+> >>>>> Thank you. Lets also CC our friend at NSA who has been doing some work
+> >>>>> in that area. Daniel are you OK with this change - will it still make
+> >>>>> PV initial domain with with the MiniOS XenBus driver?
+> >>>>>
+> >>>>> Thanks.
+> >>>>
+> >>>> That case will work, but what this will break is launching the initial domain
+> >>>> with a Xenstore stub domain already running (see below).
+> >>>>
+> >>>>>>
+> >>>>>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> >>>>>> ---
+> >>>>>>  drivers/xen/xenbus/xenbus_comms.c |    2 +-
+> >>>>>>  drivers/xen/xenbus/xenbus_probe.c |   62 +++++++++++++++++++++++++-----------
+> >>>>>>  drivers/xen/xenbus/xenbus_xs.c    |    1 +
+> >>>>>>  3 files changed, 45 insertions(+), 20 deletions(-)
+> >>>>>>
+> >>>>>> diff --git a/drivers/xen/xenbus/xenbus_comms.c b/drivers/xen/xenbus/xenbus_comms.c
+> >>>>>> index 52fe7ad..c5aa55c 100644
+> >>>>>> --- a/drivers/xen/xenbus/xenbus_comms.c
+> >>>>>> +++ b/drivers/xen/xenbus/xenbus_comms.c
+> >>>>>> @@ -224,7 +224,7 @@ int xb_init_comms(void)
+> >>>>>>  		int err;
+> >>>>>>  		err = bind_evtchn_to_irqhandler(xen_store_evtchn, wake_waiting,
+> >>>>>>  						0, "xenbus", &xb_waitq);
+> >>>>>> -		if (err <= 0) {
+> >>>>>> +		if (err < 0) {
+> >>>>>>  			printk(KERN_ERR "XENBUS request irq failed %i\n", err);
+> >>>>>>  			return err;
+> >>>>>>  		}
+> >>>>>
+> >>>>>> diff --git a/drivers/xen/xenbus/xenbus_probe.c b/drivers/xen/xenbus/xenbus_probe.c
+> >>>>>> index b793723..a67ccc0 100644
+> >>>>>> --- a/drivers/xen/xenbus/xenbus_probe.c
+> >>>>>> +++ b/drivers/xen/xenbus/xenbus_probe.c
+> >>>>>> @@ -719,37 +719,61 @@ static int __init xenstored_local_init(void)
+> >>>>>>  	return err;
+> >>>>>>  }
+> >>>>>>  
+> >>>>>> +enum xenstore_init {
+> >>>>>> +	UNKNOWN,
+> >>>>>> +	PV,
+> >>>>>> +	HVM,
+> >>>>>> +	LOCAL,
+> >>>>>> +};
+> >>>>>>  static int __init xenbus_init(void)
+> >>>>>>  {
+> >>>>>>  	int err = 0;
+> >>>>>> +	enum xenstore_init usage = UNKNOWN;
+> >>>>>> +	uint64_t v = 0;
+> >>>>>>  
+> >>>>>>  	if (!xen_domain())
+> >>>>>>  		return -ENODEV;
+> >>>>>>  
+> >>>>>>  	xenbus_ring_ops_init();
+> >>>>>>  
+> >>>>>> -	if (xen_hvm_domain()) {
+> >>>>>> -		uint64_t v = 0;
+> >>>>>> -		err = hvm_get_parameter(HVM_PARAM_STORE_EVTCHN, &v);
+> >>>>>> -		if (err)
+> >>>>>> -			goto out_error;
+> >>>>>> -		xen_store_evtchn = (int)v;
+> >>>>>> -		err = hvm_get_parameter(HVM_PARAM_STORE_PFN, &v);
+> >>>>>> -		if (err)
+> >>>>>> -			goto out_error;
+> >>>>>> -		xen_store_mfn = (unsigned long)v;
+> >>>>>> -		xen_store_interface = ioremap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
+> >>>>>> -	} else {
+> >>>>>> -		xen_store_evtchn = xen_start_info->store_evtchn;
+> >>>>>> -		xen_store_mfn = xen_start_info->store_mfn;
+> >>>>>> -		if (xen_store_evtchn)
+> >>>>>> -			xenstored_ready = 1;
+> >>>>>> -		else {
+> >>>>>> +	if (xen_pv_domain())
+> >>>>>> +		usage = PV;
+> >>>>>> +	if (xen_hvm_domain())
+> >>>>>> +		usage = HVM;
+> >>>>
+> >>>> The above is correct for domUs, and is overridden for dom0s:
+> >>>>
+> >>>>>> +	if (xen_hvm_domain() && xen_initial_domain())
+> >>>>>> +		usage = LOCAL;
+> >>>>>> +	if (xen_pv_domain() && !xen_start_info->store_evtchn)
+> >>>>>> +		usage = LOCAL;
+> >>>>
+> >>>> Instead of these checks, I think it should just be:
+> >>>>
+> >>>> if (!xen_start_info->store_evtchn)
+> >>>> 	usage = LOCAL;
+> >>>>
+> >>>> Any domain started after xenstore will have store_evtchn set, so if you don't
+> >>>> have this set, you are either going to be running xenstore locally, or will
+> >>>> use the ioctl to change it later (and so should still set up everything as if
+> >>>> it will be running locally).
+> >>>
+> >>> That would be wrong for an HVM dom0 domain (at least on ARM), because
+> >>> we don't have a start_info page at all.
+> >>>
+> >>>
+> >>>>>> +	if (xen_pv_domain() && xen_start_info->store_evtchn)
+> >>>>>> +		xenstored_ready = 1;
+> >>>>
+> >>>> This part can now just be moved unconditionally into case PV.
+> >>>
+> >>> What about:
+> >>>
+> >>> if (xen_pv_domain())
+> >>>     usage = PV;
+> >>> if (xen_hvm_domain())
+> >>>     usage = HVM;
+> >>> if (!xen_store_evtchn)
+> >>>     usage = LOCAL;
+> >>>
+> >>> and moving xenstored_ready in case PV, like you suggested.
+> >>>
+> >>
+> >> That looks correct, but you'd need to split up the switch statement in
+> >> order to populate xen_store_evtchn before that last condition, which
+> >> ends up pretty much eliminating the usage variable.
+> > 
+> > Going back to what you wrote in the previous email, in what way this
+> > patch breaks the case when an initial domain is started after a Xenstore
+> > stub domain?
+> > 
+> > Assuming that we are talking about a PV initial domain on x86, the
+> > following check
+> > 
+> > if (xen_pv_domain() && !xen_start_info->store_evtchn)
+> >     usage = LOCAL;
+> > 
+> > will return false (because store_evtchn is set), therefore usage will
+> > remain set to PV.
+> > And the check:
+> > 
+> > if (xen_pv_domain() && xen_start_info->store_evtchn)
+> > 	xenstored_ready = 1;
+> > 
+> > will return true so xenstored_ready is going to be set to 1.
+> > 
+> 
+> Right, the original patch didn't break anything with PV domains. The case
+> it doesn't handle is an HVM initial domain with an already-running
+> Xenstore domain; I think this applies both to ARM and hybrid/PVH on x86.
+> In that case, usage would be set to LOCAL instead of HVM.
 
-No need, we're guilty of that too; line 2600 onwards of
-arch/powerpc/kernel/prom_init.c
 
-However we do provide a Forth script that can run the kernel that does
-all this, but nobody
-would accept removing the fixups from the kernel (an old patch is
-inside the zip archive..).
+Right, however if I am not mistaken there is no such thing as an HVM
+dom0 right now on x86 and hybrid/PVH is probably going to return true on
+xen_pv_domain() and false on xen_hvm_domain().
 
-http://www.powerdeveloper.org/platforms/efika/devicetree
-
-We definitely learned from our mistakes - nasty firmware shipped
-before Linux had
-properly implemented device trees for that SoC, and many many user problems that
-just caused support and update hassle.. it costs money to support bad code. Far
-more than just spending getting it right in the first place.
-
-The fact we could update it with a script was the awesome thing about
-using OpenFirmware -
-but U-Boot can do this too, since libfdt is there and it's one option
-to enable it to allow script
-based modification of the blob. If the DT is hardcoded into the firmware somehow
-(CONFIG_OF_CONTROL I think) then platforms can load "boot.scr" from
-the root filesystem
-(cram or jffs or ubifs if necessary) or similar and fix their device
-trees in-place, and if they're
-from filesystem and "known bad", fix them after loading them. Highly
-embedded platforms
-might make this clumsy, but it can ALL be done there.. one problem is,
-this is also way, way
-too late to do pin muxing :]
-
-On UEFI updates to device tree or ACPI DSDT could be done via a small
-EBC loader that
-chained to the next boot device.. did anyone make any inroads into
-what the real spec
-for booting from UEFI should be, by the way, I noticed the Beagle
-Tiano Core "only" supports
-zImage which is infuriating as this flaunts the existing EFI/UEFI
-standard. Wrapping the
-kernel in a PECOFF image would not be all that hard and then what you
-get is the ability
-to write the exact nature of the entry point into the architecture id
-field of the header (the
-latest spec from 2010 or so includes ARMv7 Thumb2).
-
-> Spot a pattern there?  The one which stands out to me is that boot loaders
-> can not get the trivial task of passing the simple information about where
-> the RAM is in the system to the kernel right.
->
-> Many boot loaders for _years_ have not been able to get the very very
-> trivially simple issue of passing the right machine ID value in r1 to the
-> kernel either.
-
-Also guilty although we inherited that problem from a large Taiwanese
-manufacturer
-who hacked U-Boot to load their machine ID from the filesystem
-(type_id.bin) before
-being able to boot. Otherwise it'd throw in a 0 and everything would
-break. We still
-have to ship that to update firmware on old machines. It never made
-any sense since
-you couldn't boot their boards from a common bootloader binary anyway where the
-machine_id would be that dynamic..
-
-> Have we tried to push the onus back on firmware people?  I've tried damned
-> hard to the extent of preventing some of these work-arounds getting into
-> mainline, but the sole result of that was that mainline would not work on
-> those platforms;
-
-> on the platforms.  It didn't magically cause the firmware to get fixed in
-> any way.  We just ended up with a detrimental situation to everyone because
-> mainline just didn't work on those platforms.
-
-I'm fairly sure you're not above saying "tough shit" to these guys, though?
-
-If their firmware is broken they don't get to boot mainline Linux. If
-they have to
-stick to BSPs, then, that is their problem. If BSPs get hard to maintain, maybe
-someone writing those BSPs will finally get up and implement some change.
-
-Worst case, they'd end up with a mainline tree in git somewhere with a couple
-patches that never got accepted to enable booting your board.
-
-This is one reason I'm fairly excited about the proposition of UEFI - it's very
-well defined on x86 right now and there's a chance to lock down everything
-absolutely necessary to perform boot on ARM and have it be there from the
-first consumer board, 100%.
-
-> order for that to change, they must change, and they must _earn_ our trust
-> that they _can_ be trusted to do a good job.  Until then...
-
-Until then I think what's missing is someone important kernel-side
-being involved
-in bootloader specifications. ePAPR was a nice try, since Grant Likely got to be
-the one to push it through, and we got a nice base for device tree, although we
-were on the technical committee for PAPR and ePAPR and founder members
-of Power.org at the time, they basically ignored us because what we wanted out
-of it was to change the status quo for something better - what they wanted to do
-was re-ratify the spec from 10 years ago and put a new trademark stamp on it.
-
-No offense intended to anyone on the list, but Linaro is kind of doing
-the same thing
-right now on a lot of things. It needs to be specified first then
-implemented, but the
-"Linux development model" is patch first, patch again, patch again,
-patch again and
-retrofit the binding to match. Right now it's possible there won't be
-a line of common
-code between the device tree I just pushed and the one required to
-boot the board
-in 2 years.. no wonder you can't trust the bootloader guys, they're on
-a train going
-east at 200kmh, Linux is on a train going west at 200kmh, and you're both trying
-to shoot each other. Moving targets are very hard to implement on a consumer
-device since you can't force Grandma to update her U-Boot every week and match
-a kernel to it. The only reason it's acceptable right now is because
-there are no
-consumer devices in the mainline Linux ARM tree (except, arguably, ours and the
-AlwaysInnovating Touchbook, but I would be happy to know there is
-someone running
-a phone or another tablet capable of booting a mainline Linux and a
-device tree),
-only reference designs and platform experiments.
-
--- 
-Matt Sealey <matt@genesi-usa.com>
+In the ARM case, given that we don't have a start_info page, we would
+need another way to figure out whether a xenstore stub domain is already
+running, so I think we can just postpone the solution of that problem
+for now.
