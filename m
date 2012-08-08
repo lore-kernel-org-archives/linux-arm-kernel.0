@@ -1,32 +1,20 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 8 Aug 2012 15:49:34 +0100
-Subject: [PATCH 04/11] MFD: twl4030-audio: Add DT support
-In-Reply-To: <50227837.10400@ti.com>
-References: <1344418887-5262-1-git-send-email-peter.ujfalusi@ti.com>
- <1344418887-5262-5-git-send-email-peter.ujfalusi@ti.com>
- <20120808131356.GS16861@opensource.wolfsonmicro.com>
- <50226CF4.1010202@ti.com>
- <20120808135253.GC16861@opensource.wolfsonmicro.com>
- <502274DA.9020204@ti.com>
- <20120808141849.GA24328@opensource.wolfsonmicro.com>
- <50227837.10400@ti.com>
-Message-ID: <20120808144933.GC24328@opensource.wolfsonmicro.com>
+Date: Wed, 8 Aug 2012 15:50:19 +0100
+Subject: [PATCH 09/11] regulator/twl: remove fixed resource handling
+In-Reply-To: <1344437248-20560-10-git-send-email-arnd@arndb.de>
+References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
+ <1344437248-20560-10-git-send-email-arnd@arndb.de>
+Message-ID: <20120808145018.GD24328@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2012 at 05:31:19PM +0300, Peter Ujfalusi wrote:
-> On 08/08/2012 05:18 PM, Mark Brown wrote:
+On Wed, Aug 08, 2012 at 04:47:26PM +0200, Arnd Bergmann wrote:
+> The recent patch 0e8e5c34cf "regulator: twl: Remove references to
+> 32kHz clock from DT bindings" removed the only use of the fake
+> "CLK32KG" regulator but not the TWL6030_FIXED_RESOURCE and
+> twl6030_fixed_resource definitions that are unused otherwise.
 
-> > I'm struggling to see any reason not to just hold the external mute on
-> > for the entire time the headset is powered off?
+I've already got a fix for this in my tree.
 
-> I think because it would mean in most cases that we keep a GPIO line enabled
-> during the time the HS is not in use, which burns power.
-> In most cases the mute is enabled when the GPIO line is up.
-
-That makes sense if the GPIO is actively driven, open drain should be
-better here, but it's still a generic thing which it'd be nice to
-extract.
-
-Still, the main thing here was the fact that we should be able to drop
-the flag for the feature in the first place.
+Please do also make an effort to use subject lines that match the style
+of the subsystem.
