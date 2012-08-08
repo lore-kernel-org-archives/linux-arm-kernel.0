@@ -1,60 +1,46 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Wed, 8 Aug 2012 15:00:20 +0200
-Subject: [PATCH 6/6] ARM: imx: gpmi-nand depends on mxs-dma
-In-Reply-To: <1344430493-5304-7-git-send-email-arnd@arndb.de>
-References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
- <1344430493-5304-7-git-send-email-arnd@arndb.de>
-Message-ID: <502262E4.9020303@de.bosch.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 08 Aug 2012 14:06:10 +0100
+Subject: [PATCH] clk: convert ARM RealView to common clk
+In-Reply-To: <CACRpkdYkoeH09H6c4WEw40hpP9+oRD4pa0-yBk1L02yfao2sgg@mail.gmail.com>
+References: <1344270728-7550-1-git-send-email-linus.walleij@stericsson.com>
+ <1344426500.2435.39.camel@hornet>	<1344426753.2435.40.camel@hornet>
+ <CACRpkdYkoeH09H6c4WEw40hpP9+oRD4pa0-yBk1L02yfao2sgg@mail.gmail.com>
+Message-ID: <1344431170.2435.47.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.08.2012 14:54, Arnd Bergmann wrote:
-> It is not currently possible to build the gpmi-nand driver without
-> also building the mxs-dma driver. Clarify this Kconfig and enable
-> both in the defconfig file so we can build it again with both enabled.
+On Wed, 2012-08-08 at 12:55 +0100, Linus Walleij wrote:
+> On Wed, Aug 8, 2012 at 1:52 PM, Pawel Moll <pawel.moll@arm.com> wrote:
 > 
-> drivers/built-in.o: In function `gpmi_dma_filter':
-> clk-fixed-factor.c:(.text+0xafc18): undefined reference to `mxs_dma_is_apbh'
-> make[1]: *** [vmlinux] Error 1
-> make: *** [sub-make] Error 2
+> >> ------------[ cut here ]------------
+> >> WARNING: at /home/pawmol01/src/kernel.org/linux/kernel/timer.c:1076 del_timer_sync+0x34/0x5c()
+> >
+> > Err. Ignore that. The same happens without your patch :-)
+> >
+> > Will try with 3.5.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Hm it boots like a charm on PB1176, what's so very different about the EB?
 
-Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
+It's configuration difference, I guess. You may try enabling
+CONFIG_LEDS_TRIGGERS (not that it makes much sense on Realview) if you
+want to see the same effect :-)
 
-Thanks
+It seems that a0193cbee0809d65362a0767b2d50306b145b2f5 "leds: use
+led_set_brightness in led_trigger_event" causes a problem when
+led_trigger_event() is called from an interrupt context. I'll let the
+LEDS people know.
 
-Dirk
+> Oh well. Are you maintaining RealView EB, BTW?
 
-> ---
->  arch/arm/configs/imx_v6_v7_defconfig |    1 +
->  drivers/mtd/nand/Kconfig             |    2 +-
->  2 files changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-> index f725b96..3c9f32f 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -192,6 +192,7 @@ CONFIG_RTC_DRV_MC13XXX=y
->  CONFIG_RTC_DRV_MXC=y
->  CONFIG_DMADEVICES=y
->  CONFIG_IMX_SDMA=y
-> +CONFIG_MXS_DMA=y
->  CONFIG_COMMON_CLK_DEBUG=y
->  # CONFIG_IOMMU_SUPPORT is not set
->  CONFIG_EXT2_FS=y
-> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-> index 31bb7e5..8ca4176 100644
-> --- a/drivers/mtd/nand/Kconfig
-> +++ b/drivers/mtd/nand/Kconfig
-> @@ -480,7 +480,7 @@ config MTD_NAND_NANDSIM
->  
->  config MTD_NAND_GPMI_NAND
->          bool "GPMI NAND Flash Controller driver"
-> -        depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28 || SOC_IMX6Q)
-> +        depends on MTD_NAND && MXS_DMA
->          help
->  	 Enables NAND Flash support for IMX23 or IMX28.
->  	 The GPMI controller is very powerful, with the help of BCH
+Not really. At least I didn't have any reason to do this so far. And the
+only Realview platforms I'm really interested in are the EB models. DT
+for Realview is on my todo list, but with really low priority (around
+"most likely will never happen").
+
+Anyway, after testing your change on EB model:
+
+Acked-by: Pawel Moll <pawel.moll@arm.com>
+
+Cheers!
+
+Pawe?
