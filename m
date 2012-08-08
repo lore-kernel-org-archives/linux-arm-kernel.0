@@ -1,56 +1,82 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 8 Aug 2012 21:27:07 +0200
-Subject: [PATCH 1/2] ARM: build ssi-fiq.S in ARM mode to prevent
- CONFIG_THUMB2_KERNEL build breakage
-In-Reply-To: <CAKGA1bmUuSZuWDM4QPTxmNR0+=uQ1RbFhw4u-sb9KaSPYwQiVw@mail.gmail.com>
-References: <1344379514-30076-1-git-send-email-matt@genesi-usa.com>
- <1344379514-30076-2-git-send-email-matt@genesi-usa.com>
- <20120808065502.GI1451@pengutronix.de>
- <CAKGA1bmUuSZuWDM4QPTxmNR0+=uQ1RbFhw4u-sb9KaSPYwQiVw@mail.gmail.com>
-Message-ID: <20120808192707.GL1451@pengutronix.de>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 8 Aug 2012 19:37:04 +0000
+Subject: [PATCH 6/8] arm: vt8500: Update arch-vt8500 to devicetree support.
+In-Reply-To: <5022B6EE.7060006@wwwdotorg.org>
+References: <1344389967-8465-1-git-send-email-linux@prisktech.co.nz>
+ <1344389967-8465-7-git-send-email-linux@prisktech.co.nz>,
+ <5022B6EE.7060006@wwwdotorg.org>
+Message-ID: <76F764B079F92A4E843589C893D0A022D1DCA8C1@SERVER.prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2012 at 12:32:39PM -0500, Matt Sealey wrote:
-> On Wed, Aug 8, 2012 at 1:55 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> >>               .text
-> >> +             .arm
-> >>               .global imx_ssi_fiq_start
-> >>               .global imx_ssi_fiq_end
-> >>               .global imx_ssi_fiq_base
-> >
-> > I think it would be better to add a depends on !THUMB2_KERNEL to
-> > SND_IMX_SOC_PCM_FIQ. The above may result in broken code in a thumb2
-> > kernel, so I'd rather keep the compile error instead.
-> 
-> I'm curious as to how/why would it result in broken code? It's not
-> possible that the processors relying on
-> the imx_ssi_fiq_* stuff cannot run ARM code (unless Freescale shipped
-> a weird version) so it should
-> magically enter and exit. I wonder if it needs some thumb-interworking
-> stuff wrapped around it though.
-> You'd know better than me..
+>On 08/07/2012 07:39 PM, Tony Prisk wrote:
+>> Merged existing board files to a single dt-capable file.
+>> Converted irq and timer code to devicetree.
+>> Removed existing device files that are no longer required with
+>> devicetree support.
+>>
+>> All existing platform devices are converted to devicetree nodes
+>> except GPIO and PWM.
 
-Currently I don't know if the code compiled in arm mode on an otherwise
-thumb2 kernel does work and I do not have a thumb2 capacle hardware with
-sound support to test this.
+>Perhaps that also explains what I was commenting on in the GPIO driver
+>patch. Why not convert GPIO too?
 
-> 
-> I'm a little worried that making it !CONFIG_THUMB2_KERNEL would
-> basically make more than
-> one of the boards in imx_v6_v7_defconfig suddenly lose audio support
-> for no other reason..
+GPIO was converted - I hadn't planned on doing it, but apparently I did it anyway :/
+Comment is now removed from the commit message.
 
-Obviously no v6_v7 board does use this code as it is, because it does
-not compile. So there's no risk of breaking something if we just disable
-FIQ support in thumb2 mode.
+>> diff --git a/arch/arm/mach-vt8500/irq.c b/arch/arm/mach-vt8500/irq.c
 
-Better disable an unused feature than add some untested code.
+>>  /*
+>> - *  arch/arm/mach-vt8500/irq.c
+>> + *  arch/arm/mach-vt8500/irq_dt.c
 
-Sascha
+>This file didn't get renamed?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Not sure what is going on here. I will take a look - it should just be renamed.
+
+>> diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
+
+>> +void __init vt8500_init(void)
+>> +{
+>> +     struct device_node *np, *fb;
+>> +     void __iomem *gpio_base;
+>> +
+>> +#ifdef CONFIG_FB_VT8500
+>> +     fb = of_find_compatible_node(NULL, NULL, "via,vt8500-fb");
+>> +     if (fb) {
+>> +             np = of_find_compatible_node(NULL, NULL, "via,vt8500-gpio");
+>> +             if (np) {
+>> +                     gpio_base = of_iomap(np, 0);
+>> +
+>> +                     if (!gpio_base)
+>> +                             pr_err("%s:of_iomap(gpio_mux) failed\n", __func__);
+>> +
+>> +                     of_node_put(np);
+>> +             } else {
+>> +                     gpio_base = ioremap(LEGACY_GPIO_BASE, 0x1000);
+>> +                     if (!gpio_base)
+>> +                             pr_err("%s:ioremap(legacy_gpio_mux) failed\n", __func__);
+>> +             }
+>> +             if (gpio_base) {
+>> +                     writel(readl(gpio_base + VT8500_GPIO_MUX_REG) | 1,
+>> +                             gpio_base + VT8500_GPIO_MUX_REG);
+>> +                     iounmap(gpio_base);
+>> +             } else
+>> +                     pr_err("%s: Could not remap GPIO mux\n", __func__);
+>> +
+>> +             of_node_put(fb);
+>> +     }
+>> +#endif
+
+>That looks quite suspicious. What's it doing? Is this something that
+>should be part of a pinctrl driver, or the GPIO driver?
+
+This code is carried over from the original implementation but converted for device
+tree. It should be part of a pinctrl driver, but we don't have one. It is basically selecting
+between CCIR or LCD. 
+
+Annoyingly, the bit-fields changed between models, so we have it twice, once for each
+framebuffer driver. It needs to check for compatible nodes so that it only applies the setting
+for the framebuffer type being requested by the dts because of the conflicting bit-fields.
+
+Tony Prisk
