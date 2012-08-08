@@ -1,36 +1,44 @@
-From: chris_brand@broadcom.com (chris_brand at broadcom.com)
-Date: Wed, 8 Aug 2012 14:04:30 -0700
-Subject: [PATCH] ARM: mm: MMU mapping of CMA regions
-Message-ID: <1344459870-12790-1-git-send-email-chris_brand@broadcom.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed,  8 Aug 2012 23:27:50 +0200
+Subject: [PATCH 02/10] ARM: ks8695: __arch_virt_to_dma type handling
+In-Reply-To: <1344461278-28245-1-git-send-email-arnd@arndb.de>
+References: <1344461278-28245-1-git-send-email-arnd@arndb.de>
+Message-ID: <1344461278-28245-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Brand <cbrand@broadcom.com>
+__arch_virt_to_dma expects a virtual address pointer, but
+the ks8695 implementation of this macro treats it as an
+integer. Adding a type cast avoids hundreds of identical
+warning messages.
 
-Fix dma_contiguous_remap() so that it continues through all the
-regions, even after encountering one that is outside lowmem.
-Without this change, if you have two CMA regions, the first outside
-lowmem and the second inside lowmem, neither will get
-set up in the MMU. Data written to the second region then doesn't get
-automatically flushed from the cache into memory.
+Without this patch, building acs5k_defconfig results in:
 
-Signed-off-by: Chris Brand <cbrand@broadcom.com>
+arch/arm/include/asm/dma-mapping.h: In function 'virt_to_dma':
+arch/arm/include/asm/dma-mapping.h:60:2: warning: passing argument 1 of '__virt_to_phys' makes integer from pointer without a cast [enabled by default]
+arch/arm/include/asm/memory.h:172:60: note: expected 'long unsigned int' but argument is of type 'void *'
+In file included from include/linux/dma-mapping.h:73:0,
+                 from include/linux/skbuff.h:33,
+                 from security/commoncap.c:21:
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mm/dma-mapping.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-ks8695/include/mach/memory.h |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 655878b..4a4f3f9 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -388,7 +388,7 @@ void __init dma_contiguous_remap(void)
- 		if (end > arm_lowmem_limit)
- 			end = arm_lowmem_limit;
- 		if (start >= end)
--			return;
-+			continue;
- 
- 		map.pfn = __phys_to_pfn(start);
- 		map.virtual = __phys_to_virt(start);
+diff --git a/arch/arm/mach-ks8695/include/mach/memory.h b/arch/arm/mach-ks8695/include/mach/memory.h
+index f7e1b9b..95e731a 100644
+--- a/arch/arm/mach-ks8695/include/mach/memory.h
++++ b/arch/arm/mach-ks8695/include/mach/memory.h
+@@ -34,7 +34,8 @@ extern struct bus_type platform_bus_type;
+ #define __arch_dma_to_virt(dev, x)	({ (void *) (is_lbus_device(dev) ? \
+ 					__phys_to_virt(x) : __bus_to_virt(x)); })
+ #define __arch_virt_to_dma(dev, x)	({ is_lbus_device(dev) ? \
+-					(dma_addr_t)__virt_to_phys(x) : (dma_addr_t)__virt_to_bus(x); })
++					(dma_addr_t)__virt_to_phys((unsigned long)x) \
++					: (dma_addr_t)__virt_to_bus(x); })
+ #define __arch_pfn_to_dma(dev, pfn)	\
+ 	({ dma_addr_t __dma = __pfn_to_phys(pfn); \
+ 	   if (!is_lbus_device(dev)) \
 -- 
-1.7.5.4
+1.7.10
