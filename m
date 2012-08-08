@@ -1,9 +1,9 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 8 Aug 2012 09:17:23 +0530
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 8 Aug 2012 09:34:42 +0530
 Subject: [PATCH 3/4] arm/dts: exynos4: Add DTS file for ODROID-X
 In-Reply-To: <1344366725-19153-1-git-send-email-dongjin.kim@agreeyamobility.net>
 References: <1344366725-19153-1-git-send-email-dongjin.kim@agreeyamobility.net>
-Message-ID: <CAJuYYwTp00RohqKkF6+4yxq3bqW1O6NWkab29PuyEUPYTjeqgw@mail.gmail.com>
+Message-ID: <CAK9yfHyc4Cc1JDCeyo38vHWtxzO28vVr=TDWq5UbWPf4_LVFoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -33,6 +33,10 @@ On 8 August 2012 00:42, Dongjin Kim <tobetter@gmail.com> wrote:
 > + *
 > + * Device tree source file for Insignal's Origen board which is based on
 > + * Samsung's Exynos4210 SoC.
+
+Don't you think you need to update this header?
+
+
 > + *
 > + * This program is free software; you can redistribute it and/or modify
 > + * it under the terms of the GNU General Public License version 2 as
@@ -46,13 +50,6 @@ On 8 August 2012 00:42, Dongjin Kim <tobetter@gmail.com> wrote:
 > +/ {
 > +       model = "Hardkernel ODROID-X evaluation board based on Exynos4412";
 > +       compatible = "hardkernel,odroidx", "samsung,exynos4412";
-
-The compatible value "samsung,exynos4412" can be added to the
-compatible list in mach-exynos4-dt.c file. Otherwise, this looks fine.
-
-Thanks,
-Thomas.
-
 > +
 > +       memory {
 > +               reg = <0x40000000 0x40000000>;
@@ -181,3 +178,14 @@ Thomas.
 > --
 > 1.7.9.5
 >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
+
+
+-- 
+With warm regards,
+Sachin
