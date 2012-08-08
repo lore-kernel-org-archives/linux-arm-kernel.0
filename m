@@ -1,67 +1,19 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 08 Aug 2012 17:00:36 +0300
-Subject: [alsa-devel] [PATCH 08/11] ARM: OMAP3: Remove callback for McBSP
- sidetone ICLK workaround
-In-Reply-To: <502268B1.9040506@bitmer.com>
-References: <1344417101-5015-1-git-send-email-peter.ujfalusi@ti.com>
- <1344417101-5015-9-git-send-email-peter.ujfalusi@ti.com>
- <502268B1.9040506@bitmer.com>
-Message-ID: <50227104.3040506@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 Aug 2012 14:01:12 +0000
+Subject: [PATCH 5/6] ARM: integrator: include <linux/export.h
+In-Reply-To: <CACRpkdYbHTtOg6inbemD2SG+XT9ZYN3pcFQjEPv7mbyecagawg@mail.gmail.com>
+References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
+ <1344430493-5304-6-git-send-email-arnd@arndb.de>
+ <CACRpkdYbHTtOg6inbemD2SG+XT9ZYN3pcFQjEPv7mbyecagawg@mail.gmail.com>
+Message-ID: <201208081401.12909.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jarkko,
-
-On 08/08/2012 04:25 PM, Jarkko Nikula wrote:
-> On 08/08/2012 12:11 PM, Peter Ujfalusi wrote:
->> We can achieve the same result with SIDLEMODE field within McBSP SYSCONFIG
->> register.
->> The ASoC driver has been modified to use this method and we can now remove
->> the workaround using the control module register.
->>
-> Are you sure it works without any changes to sidetone audio quality or
-> current consumption? What I remember idlemode was broken at least on
-> 3430 and caused bad sidetone audio if autoidle was set and a little bit
-> higher current consumption (something like 2-3 mA higher where reference
-> consumption was around 10 mA) when McBSP was set to no-idle.
-
-Yes, the idelmode settings are still broken in the sidetone block. However we
-are toggling the SIDLEMODE of the corresponding McBSP instance where the ST
-block is attached.
-This should have the same effect as doing the same down in PRCM level since
-the McBSP SIDLEMODE does work correctly preventing ICLK to be gated when it is
-set to no-idle.
-
-Unfortunately I can not get my BeagleBoard to start gating iclk even if I
-remove the ICLK gating prevention (on top of 3.6-rc1). So I can not really say
-for 100% this is equivalent to the the PRCM level workaround.
-However I have also spend long time hacking around in McBSP, and I know that
-the SIDLEMODE in McBSP is working correctly.
-Do you know how can I get OMAP3 to start gating the clocks (to idle)?
-
-> Here's the old thread:
+On Wednesday 08 August 2012, Linus Walleij wrote:
+> Missing a ">" at the end of the subject line, but whatever.
 > 
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg52024.html
-> 
-> I think I tested all of this by using arecord >/dev/null | aplay
-> /dev/zero with threshold based DMA transfers with all bells and whistles
-> set for dynamic retention idle in order to hear only McBSP sidetone
-> while measuring current consumption.
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-I'm doing the same test on BeagleBoard, but this thing does not want to hit
-retention despite all the effort :(
+Fixed the subject and added the Ack. Thanks!
 
-> But I guess 2-3 mA higher consumption is ok if it simplifies SW a lot
-> and base consumption is anyway much higher than 10 mA when sidetone is
-> in real use (my test above was artificial where actual use is under a
-> phone call with heavy consumption from cellular modem etc).
-
-Well 2-3 mA is quite big number in my book...
-I'm still not sure if I ever measured the difference between the PRCM level
-autoidle prevention compared to the McBSP SIDLEMODE(no_idle).
-
-Having said that, it is suspicious how we ended up doing the ICLK fixup in
-PRCM level...
-
--- 
-P?ter
+	Arnd
