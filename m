@@ -1,57 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 Aug 2012 07:10:51 -0700
-Subject: [linux-pm] [PATCH v4 2/4] mfd: omap: control: core system
- control driver
-In-Reply-To: <20120808140507.GF11011@atomide.com>
-References: <500FD2EC.7060208@dev.rtsoft.ru>
- <20120808140507.GF11011@atomide.com>
-Message-ID: <20120808141051.GG11011@atomide.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 08 Aug 2012 17:16:58 +0300
+Subject: [PATCH 04/11] MFD: twl4030-audio: Add DT support
+In-Reply-To: <20120808135253.GC16861@opensource.wolfsonmicro.com>
+References: <1344418887-5262-1-git-send-email-peter.ujfalusi@ti.com>
+ <1344418887-5262-5-git-send-email-peter.ujfalusi@ti.com>
+ <20120808131356.GS16861@opensource.wolfsonmicro.com>
+ <50226CF4.1010202@ti.com>
+ <20120808135253.GC16861@opensource.wolfsonmicro.com>
+Message-ID: <502274DA.9020204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120808 07:05]:
-> * Konstantin Baydarov <kbaidarov@dev.rtsoft.ru> [120725 04:10]:
-> > +
-> > +u32 omap_control_status_read(void)
-> > +{
-> > +	return __raw_readl(omap_control_base);
-> > +}
+On 08/08/2012 04:52 PM, Mark Brown wrote:
+>> The hs_extmute is used for reducing pop noise on the headset. The sequence is
+>> described in the TRM and it need to be done within the codec driver since it
+>> is within the sequence.
 > 
-> Ah OK it's changed here.. Sorry I was looking at the older
-> version.
-> 
-> > +void __init of_omap_control_init(const struct of_device_id *matches)
-> > +{
-> > +	struct device_node *np;
-> > +	struct property *pp = 0;
-> > +
-> > +	for_each_matching_node(np, matches) {
-> > +		pp = of_find_property(np, "reg", NULL);
-> > +		if(pp) {
-> > +			omap_control_phys_base = (unsigned long)be32_to_cpup(pp->value);
-> > +			omap_control_mapsize = (size_t)be32_to_cpup( (void*)((char*)pp->value + 4) );
-> > +			/*
-> > +			 * Map control module register CONTROL_STATUS register:
-> > +			 * omap24xx - OMAP24XX_CONTROL_STATUS
-> > +			 * am33xx   - AM33XX_CONTROL_STATUS
-> > +			 * omap34xx - OMAP343X_CONTROL_STATUS
-> > +			 * omap44xx - OMAP4_CTRL_MODULE_CORE_STATUS
-> > +			 * omap54xx - OMAP5XXX_CONTROL_STATUS
-> > +			 */
-> > +			omap_control_base = ioremap(omap_control_phys_base, omap_control_mapsize);
-> > +		}
-> > +	}
-> > +}
-> 
-> You should probably add a function for setting omap_control_base
-> separately from *set_globals* in arch/arm/mach-omap2/common.c.
-> That way it's initialized early for id.c, and you can initialize
-> everything else later as regular device drivers.
-> 
-> FYI, we want to initialize as much as possible late so we have
-> proper debugging console set up in case things go wrong.
+> Is the point it's at in the sequence the end?
 
-Hmm it seems that omap_control_base is now only initialized for DT boot
-case? This will break booting on almost all systems..
+On both ends :o
+On HS enable: the extmute has to be enabled, run the power on sequence for the
+HS, wait for ramp, disable the HS extmute.
 
-Tony
+On stop: enable the extmute, run the sequence, wait for ramp, release the extmute.
+
+> We can always add a patch stubbing it out as part of the series, or in a
+> branch in the OF tree that we can pull in.
+
+If you are OK with the hassle I can add a patch to the series for
+include/linux/of.h to handle this.
+
+-- 
+P?ter
