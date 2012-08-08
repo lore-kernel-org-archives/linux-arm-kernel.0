@@ -1,42 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  8 Aug 2012 16:47:21 +0200
-Subject: [PATCH 04/11] ARM: ux500: really kill snowball_of_platform_devs
+Date: Wed,  8 Aug 2012 16:47:24 +0200
+Subject: [PATCH 07/11] net/stmmac: mark probe function as __devinit
 In-Reply-To: <1344437248-20560-1-git-send-email-arnd@arndb.de>
 References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
-Message-ID: <1344437248-20560-5-git-send-email-arnd@arndb.de>
+Message-ID: <1344437248-20560-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit fc67a597a "ARM: ux500: Remove temporary snowball_of_platform_devs
-enablement structure" removed the only user of this variable, but did
-not actually remove the array itself.
+Driver probe functions are generally __devinit so they will be
+discarded after initialization for non-hotplug kernels.
+This was found by a new warning after patch 6a228452d "stmmac: Add
+device-tree support" adds a new __devinit function that is called
+from stmmac_pltfr_probe.
 
-Without this patch, building u8500_defconfig results in:
+Without this patch, building socfpga_defconfig results in:
 
-arch/arm/mach-ux500/board-mop500.c:729:32: warning: 'snowball_of_platform_devs' defined but not used [-Wunused-variable]
+WARNING: drivers/net/ethernet/stmicro/stmmac/stmmac.o(.text+0x5d4c): Section mismatch in reference from the function stmmac_pltfr_probe() to the function .devinit.text:stmmac_probe_config_dt()
+The function stmmac_pltfr_probe() references
+the function __devinit stmmac_probe_config_dt().
+This is often because stmmac_pltfr_probe lacks a __devinit
+annotation or the annotation of stmmac_probe_config_dt is wrong.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Stefan Roese <sr@denx.de>
+Cc: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: netdev at vger.kernel.org
 ---
- arch/arm/mach-ux500/board-mop500.c |    5 -----
- 1 file changed, 5 deletions(-)
+ drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 8674a89..2a732f7 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -726,11 +726,6 @@ MACHINE_END
- 
- #ifdef CONFIG_MACH_UX500_DT
- 
--static struct platform_device *snowball_of_platform_devs[] __initdata = {
--	&snowball_led_dev,
--	&snowball_key_dev,
--};
--
- struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	/* Requires DMA and call-back bindings. */
- 	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", &uart0_plat),
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+index cd01ee7..b93245c 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+@@ -74,7 +74,7 @@ static int __devinit stmmac_probe_config_dt(struct platform_device *pdev,
+  * the necessary resources and invokes the main to init
+  * the net device, register the mdio bus etc.
+  */
+-static int stmmac_pltfr_probe(struct platform_device *pdev)
++static int __devinit stmmac_pltfr_probe(struct platform_device *pdev)
+ {
+ 	int ret = 0;
+ 	struct resource *res;
 -- 
 1.7.10
