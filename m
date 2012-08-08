@@ -1,18 +1,37 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 8 Aug 2012 13:52:52 +0100
-Subject: [PATCH 04/11] MFD: twl4030-audio: Add DT support
-In-Reply-To: <5022529D.3090406@ti.com>
-References: <1344418887-5262-1-git-send-email-peter.ujfalusi@ti.com>
- <1344418887-5262-5-git-send-email-peter.ujfalusi@ti.com>
- <5022529D.3090406@ti.com>
-Message-ID: <20120808125252.GR16861@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed,  8 Aug 2012 14:54:50 +0200
+Subject: [PATCH 3/6] ARM: sa1100: include asm/io.h in hackkit leds code
+In-Reply-To: <1344430493-5304-1-git-send-email-arnd@arndb.de>
+References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
+Message-ID: <1344430493-5304-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2012 at 01:50:53PM +0200, Benoit Cousson wrote:
+The sa1100 definition of the io_p2v macro has changed in v3.6, and this one
+file stopped working because of that.
 
-> That being said, since we do have the clock binding now, maybe we should
-> create a clock provider at board level for the sys_clk and thus you will
-> just have to create a phandle to it in your audio description.
+Without this patch, building hackkit_defconfig results in:
 
-Yes, we should be doing this.
+arch/arm/mach-sa1100/leds-hackkit.c: In function 'hackkit_leds_event':
+arch/arm/mach-sa1100/leds-hackkit.c:39:4: error: implicit declaration of function 'IOMEM' [-Werror=implicit-function-declaration]
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+---
+ arch/arm/mach-sa1100/leds-hackkit.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-sa1100/leds-hackkit.c b/arch/arm/mach-sa1100/leds-hackkit.c
+index 6a23524..9c79674 100644
+--- a/arch/arm/mach-sa1100/leds-hackkit.c
++++ b/arch/arm/mach-sa1100/leds-hackkit.c
+@@ -13,6 +13,7 @@
+ 
+ #include <mach/hardware.h>
+ #include <asm/leds.h>
++#include <asm/io.h>
+ 
+ #include "leds.h"
+ 
+-- 
+1.7.10
