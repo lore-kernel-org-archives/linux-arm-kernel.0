@@ -1,62 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Aug 2012 17:26:21 +0000
-Subject: [PATCH 11/11] pm/drivers: fix use of SIMPLE_DEV_PM_OPS
-In-Reply-To: <s5hwr19fi6h.wl%tiwai@suse.de>
+Date: Wed, 8 Aug 2012 19:14:17 +0000
+Subject: [PATCH 01/11] ARM: topology: mark init_cpu_topology as __init
+In-Reply-To: <5022A79E.6050504@codeaurora.org>
 References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
- <201208081622.29777.arnd@arndb.de> <s5hwr19fi6h.wl%tiwai@suse.de>
-Message-ID: <201208081726.21878.arnd@arndb.de>
+ <1344437248-20560-2-git-send-email-arnd@arndb.de>
+ <5022A79E.6050504@codeaurora.org>
+Message-ID: <201208081914.17651.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 August 2012, Takashi Iwai wrote:
-> At Wed, 8 Aug 2012 16:22:29 +0000,
-> Arnd Bergmann wrote:
-> > > Laxman already posted a patch for this, which I'm hoping will make it
-> > > into 3.6, through the I2C tree.
-> > > 
-> > > http://www.spinics.net/lists/linux-i2c/msg09359.html
-> > 
-> > Ok, dropping this one then.
+On Wednesday 08 August 2012, Stephen Boyd wrote:
 > 
-> I'm going to fix the similar errors in sound tree tomorrow, too.
+> On 08/08/12 07:47, Arnd Bergmann wrote:
+> > The init_cpu_topology function can be put into the __init section
+> > and discarded after boot, because it is only called from
+> > smp_prepare_cpus, which is also marked __init. This was reported
+> > by gcc after Vincent Guittot added the parse_dt_topology function
+> > in 339ca09d7ada "ARM: 7463/1: topology: Update cpu_power according to DT
+> > information".
+> >
+> > Without this patch, building kzm9g_defconfig results in:
+> >
+> > WARNING: vmlinux.o(.text+0xb5a0): Section mismatch in reference from the function init_cpu_topology() to the function .init.text:parse_dt_topology()
+> > The function init_cpu_topology() references
+> > the function __init parse_dt_topology().
+> > This is often because init_cpu_topology lacks a __init
+> > annotation or the annotation of parse_dt_topology is wrong.
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Vincent Guittot <vincent.guittot@linaro.org>
+> > Cc: Namhyung Kim <namhyung@kernel.org>
+> > Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
 > 
+> This is already in the patch tracker
+> 
+> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7482/1
 
-Ok. this leaves the omap-rng driver, and my patch comes down to the below.
-Thanks!
+Ok, dropped here.
+
+> I also notice that store_cpu_topology() should be marked __cpuinit and
+> update_siblings_mask, middle_capacity, cpu_capacity, and
+> update_cpu_power should be static. We should probably also rename
+> update_cpu_power() so as to not conflict with the one in kernel/sched/fair.c
+
+Yes, all good points. 
 
 	Arnd
-
-8<----
-
->From d83e9e0e5c0e41a0ee2ba6293c8be21e54988f99 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Sat, 4 Aug 2012 07:11:34 +0000
-Subject: [PATCH] omap-rng: fix use of SIMPLE_DEV_PM_OPS
-
-omap_rng_suspend and omap_rng_resume are unused if CONFIG_PM is enabled
-but CONFIG_PM_SLEEP is disabled. I found this while building all defconfig
-files on ARM. It's not clear to me if this is the right solution, but
-at least it makes the code consistent again.
-
-Without this patch, building omap1_defconfig results in:
-
-drivers/char/hw_random/omap-rng.c:165:12: warning: 'omap_rng_suspend' defined but not used [-Wunused-function]
-drivers/char/hw_random/omap-rng.c:171:12: warning: 'omap_rng_resume' defined but not used [-Wunused-function]
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Rafael J. Wysocki <rjw@sisk.pl>
-Cc: Herbert Xu <herbert@gondor.apana.org.au>
-
-diff --git a/drivers/char/hw_random/omap-rng.c b/drivers/char/hw_random/omap-rng.c
-index d706bd0e..4fbdceb 100644
---- a/drivers/char/hw_random/omap-rng.c
-+++ b/drivers/char/hw_random/omap-rng.c
-@@ -160,7 +160,7 @@ static int __exit omap_rng_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--#ifdef CONFIG_PM
-+#ifdef CONFIG_PM_SLEEP
- 
- static int omap_rng_suspend(struct device *dev)
- {
