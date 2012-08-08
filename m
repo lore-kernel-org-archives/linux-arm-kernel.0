@@ -1,179 +1,197 @@
-From: tobetter@gmail.com (tobetter at gmail.com)
-Date: Wed,  8 Aug 2012 14:36:38 +0900
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 8 Aug 2012 11:10:25 +0530
 Subject: [PATCH v2] arm/dts: exynos4: Add DTS file for ODROID-X
-In-Reply-To: <[PATCH 3/4] arm/dts: exynos4: Add DTS file for ODROID-X>
-References: <[PATCH 3/4] arm/dts: exynos4: Add DTS file for ODROID-X>
-Message-ID: <1344404201-8641-1-git-send-email-dongjin.kim@agreeyamobility.net>
+In-Reply-To: <1344404201-8641-1-git-send-email-dongjin.kim@agreeyamobility.net>
+References: <1344404201-8641-1-git-send-email-dongjin.kim@agreeyamobility.net>
+Message-ID: <CAK9yfHz=Lg=cY88=rq+buTf_=h1HA4rahVSF5W2EHUM_SrYNXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dongjin Kim <dongjin.kim@agreeyamobility.net>
+On 8 August 2012 11:06,  <tobetter@gmail.com> wrote:
+> From: Dongjin Kim <dongjin.kim@agreeyamobility.net>
+>
+> This patch create a DTS file for ODROID-X, it desribes PMIC max77686 and LED
+> gpios base.
+>
+> Changes in V2:
+>     -. Banner changed
+>
+> Signed-off-by: Dongjin Kim <dongjin.kim@agreeyamobility.net>
+> ---
+>  arch/arm/boot/dts/exynos4412-odroidx.dts |  148 ++++++++++++++++++++++++++++++
+>  1 file changed, 148 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/exynos4412-odroidx.dts
+>
+> diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
+> new file mode 100644
+> index 0000000..1b8a7f8
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
+> @@ -0,0 +1,148 @@
+> +/*
+> + * Samsung's Exynos4210 based ODROID-X board device tree source
 
-This patch create a DTS file for ODROID-X, it desribes PMIC max77686 and LED
-gpios base.
+Exynos4210?
 
-Changes in V2:
-    -. Banner changed
 
-Signed-off-by: Dongjin Kim <dongjin.kim@agreeyamobility.net>
----
- arch/arm/boot/dts/exynos4412-odroidx.dts |  148 ++++++++++++++++++++++++++++++
- 1 file changed, 148 insertions(+)
- create mode 100644 arch/arm/boot/dts/exynos4412-odroidx.dts
 
-diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
-new file mode 100644
-index 0000000..1b8a7f8
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
-@@ -0,0 +1,148 @@
-+/*
-+ * Samsung's Exynos4210 based ODROID-X board device tree source
-+ *
-+ * Copyright (c) 2012 AgreeYa Mobility Co., Ltd.
-+ *		http://www.agreeyamobility.net
-+ * Copyright (c) 2012 Hardkernel Co., Ltd.
-+ *		http://www.hardkernel.com
-+ *
-+ * Device tree source file for Hardkernel's ODROID-X board which is based on
-+ * Samsung's Exynos4412 SoC.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+/dts-v1/;
-+/include/ "exynos4412.dtsi"
-+/include/ "max77686.dtsi"
-+
-+/ {
-+	model = "Hardkernel ODROID-X evaluation board based on Exynos4412";
-+	compatible = "hardkernel,odroidx", "samsung,exynos4412";
-+
-+	memory {
-+		reg = <0x40000000 0x40000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "root=/dev/mmcblk0p1 init=/sbin/init console=ttySAC1,115200 console=tty1 rootdalay=2";
-+	};
-+
-+	/* sdhci0 */
-+	sdhci at 12510000 {
-+		status = "disabled";
-+	};
-+
-+	/* sdhci1 */
-+	sdhci at 12520000 {
-+		status = "disabled";
-+	};
-+
-+	/* sdhci2 */
-+	sdhci at 12530000 {
-+		samsung,sdhci-bus-width = <4>;
-+		linux,mmc_cap_4_bit_data;
-+		samsung,sdhci-cd-internal;
-+		gpio-cd = <&gpk2 2 2 3 3>;
-+		gpios = <&gpk2 0 2 0 3>,
-+			<&gpk2 1 2 0 3>,
-+			<&gpk2 3 2 3 3>,
-+			<&gpk2 4 2 3 3>,
-+			<&gpk2 5 2 3 3>,
-+			<&gpk2 6 2 3 3>;
-+	};
-+
-+	/* sdhci3 */
-+	sdhci at 12540000 {
-+		samsung,sdhci-bus-width = <4>;
-+		linux,mmc_cap_4_bit_data;
-+		samsung,sdhci-cd-internal;
-+		gpio-cd	= <&gpk3 2 2 3 3>;
-+		gpios = <&gpk3 0 2 0 3>,
-+			<&gpk3 1 2 0 3>,
-+			<&gpk3 3 2 3 3>,
-+			<&gpk3 4 2 3 3>,
-+			<&gpk3 5 2 3 3>,
-+			<&gpk3 6 2 3 3>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		led1 {
-+			label	= "led1";
-+			gpios	= <&gpc1 0 1 0x10000 0>;
-+			linux,default-trigger	= "oneshot";
-+			default-state	= "off";
-+		};
-+
-+		led2 {
-+			label	= "led2";
-+			gpios	= <&gpc1 2 1 0x10000 0>;
-+			linux,default-trigger	= "heartbeat";
-+		};
-+	};
-+
-+	i2c at 13860000 {	/* i2c0 */
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		gpios = <&gpd1 0 2 0 0>,
-+			<&gpd1 1 2 0 0>;
-+		pmic at 9 {
-+			compatible = "maxim,max77686";
-+			reg = <9>;
-+		};
-+	};
-+
-+	i2c at 13870000 {	/* i2c1 */
-+		status = "disabled";
-+		gpios = <&gpd1 2 2 0 0>,
-+			<&gpd1 3 2 0 0>;
-+	};
-+
-+	i2c at 13880000 {	/* i2c2 */
-+		status = "disabled";
-+		gpios = <&gpa0 6 2 0 0>,
-+			<&gpa0 7 2 0 0>;
-+	};
-+
-+	i2c at 13890000 {	/* i2c3 */
-+		status = "disabled";
-+		gpios = <&gpa1 2 2 0 0>,
-+			<&gpa1 3 2 0 0>;
-+	};
-+
-+	i2c at 138A0000 {	/* i2c4 */
-+		status = "disabled";
-+	};
-+
-+	i2c at 138B0000 {	/* i2c5 */
-+		status = "disabled";
-+	};
-+
-+	i2c at 138C0000 {	/* i2c6 */
-+		status = "disabled";
-+	};
-+
-+	i2c at 138D0000 {	/* i2c7 */
-+		status = "disabled";
-+	};
-+
-+	keypad at 100A0000 {
-+		status = "disabled";
-+	};
-+
-+	spi_0: spi at 13920000 {
-+		status = "disabled";
-+	};
-+
-+	spi_1: spi at 13930000 {
-+		status = "disabled";
-+	};
-+
-+	spi_2: spi at 13940000 {
-+		status = "disabled";
-+	};
-+};
+> + *
+> + * Copyright (c) 2012 AgreeYa Mobility Co., Ltd.
+> + *             http://www.agreeyamobility.net
+> + * Copyright (c) 2012 Hardkernel Co., Ltd.
+> + *             http://www.hardkernel.com
+> + *
+> + * Device tree source file for Hardkernel's ODROID-X board which is based on
+> + * Samsung's Exynos4412 SoC.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +/dts-v1/;
+> +/include/ "exynos4412.dtsi"
+> +/include/ "max77686.dtsi"
+> +
+> +/ {
+> +       model = "Hardkernel ODROID-X evaluation board based on Exynos4412";
+> +       compatible = "hardkernel,odroidx", "samsung,exynos4412";
+> +
+> +       memory {
+> +               reg = <0x40000000 0x40000000>;
+> +       };
+> +
+> +       chosen {
+> +               bootargs = "root=/dev/mmcblk0p1 init=/sbin/init console=ttySAC1,115200 console=tty1 rootdalay=2";
+> +       };
+> +
+> +       /* sdhci0 */
+> +       sdhci at 12510000 {
+> +               status = "disabled";
+> +       };
+> +
+> +       /* sdhci1 */
+> +       sdhci at 12520000 {
+> +               status = "disabled";
+> +       };
+> +
+> +       /* sdhci2 */
+> +       sdhci at 12530000 {
+> +               samsung,sdhci-bus-width = <4>;
+> +               linux,mmc_cap_4_bit_data;
+> +               samsung,sdhci-cd-internal;
+> +               gpio-cd = <&gpk2 2 2 3 3>;
+> +               gpios = <&gpk2 0 2 0 3>,
+> +                       <&gpk2 1 2 0 3>,
+> +                       <&gpk2 3 2 3 3>,
+> +                       <&gpk2 4 2 3 3>,
+> +                       <&gpk2 5 2 3 3>,
+> +                       <&gpk2 6 2 3 3>;
+> +       };
+> +
+> +       /* sdhci3 */
+> +       sdhci at 12540000 {
+> +               samsung,sdhci-bus-width = <4>;
+> +               linux,mmc_cap_4_bit_data;
+> +               samsung,sdhci-cd-internal;
+> +               gpio-cd = <&gpk3 2 2 3 3>;
+> +               gpios = <&gpk3 0 2 0 3>,
+> +                       <&gpk3 1 2 0 3>,
+> +                       <&gpk3 3 2 3 3>,
+> +                       <&gpk3 4 2 3 3>,
+> +                       <&gpk3 5 2 3 3>,
+> +                       <&gpk3 6 2 3 3>;
+> +       };
+> +
+> +       leds {
+> +               compatible = "gpio-leds";
+> +
+> +               led1 {
+> +                       label   = "led1";
+> +                       gpios   = <&gpc1 0 1 0x10000 0>;
+> +                       linux,default-trigger   = "oneshot";
+> +                       default-state   = "off";
+> +               };
+> +
+> +               led2 {
+> +                       label   = "led2";
+> +                       gpios   = <&gpc1 2 1 0x10000 0>;
+> +                       linux,default-trigger   = "heartbeat";
+> +               };
+> +       };
+> +
+> +       i2c at 13860000 {  /* i2c0 */
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +               gpios = <&gpd1 0 2 0 0>,
+> +                       <&gpd1 1 2 0 0>;
+> +               pmic at 9 {
+> +                       compatible = "maxim,max77686";
+> +                       reg = <9>;
+> +               };
+> +       };
+> +
+> +       i2c at 13870000 {  /* i2c1 */
+> +               status = "disabled";
+> +               gpios = <&gpd1 2 2 0 0>,
+> +                       <&gpd1 3 2 0 0>;
+> +       };
+> +
+> +       i2c at 13880000 {  /* i2c2 */
+> +               status = "disabled";
+> +               gpios = <&gpa0 6 2 0 0>,
+> +                       <&gpa0 7 2 0 0>;
+> +       };
+> +
+> +       i2c at 13890000 {  /* i2c3 */
+> +               status = "disabled";
+> +               gpios = <&gpa1 2 2 0 0>,
+> +                       <&gpa1 3 2 0 0>;
+> +       };
+> +
+> +       i2c at 138A0000 {  /* i2c4 */
+> +               status = "disabled";
+> +       };
+> +
+> +       i2c at 138B0000 {  /* i2c5 */
+> +               status = "disabled";
+> +       };
+> +
+> +       i2c at 138C0000 {  /* i2c6 */
+> +               status = "disabled";
+> +       };
+> +
+> +       i2c at 138D0000 {  /* i2c7 */
+> +               status = "disabled";
+> +       };
+> +
+> +       keypad at 100A0000 {
+> +               status = "disabled";
+> +       };
+> +
+> +       spi_0: spi at 13920000 {
+> +               status = "disabled";
+> +       };
+> +
+> +       spi_1: spi at 13930000 {
+> +               status = "disabled";
+> +       };
+> +
+> +       spi_2: spi at 13940000 {
+> +               status = "disabled";
+> +       };
+> +};
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
+
+
 -- 
-1.7.9.5
+With warm regards,
+Sachin
