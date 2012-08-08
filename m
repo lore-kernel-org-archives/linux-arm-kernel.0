@@ -1,116 +1,63 @@
-From: kbaidarov@dev.rtsoft.ru (Konstantin Baydarov)
-Date: Wed, 08 Aug 2012 18:59:37 +0400
-Subject: [linux-pm] [PATCH v4 2/4] mfd: omap: control: core system control
- driver
-In-Reply-To: <20120808143929.GJ11011@atomide.com>
-References: <500FD2EC.7060208@dev.rtsoft.ru>
- <20120808140507.GF11011@atomide.com> <20120808141051.GG11011@atomide.com>
- <20120808143929.GJ11011@atomide.com>
-Message-ID: <50227ED9.3010508@dev.rtsoft.ru>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed,  8 Aug 2012 17:05:00 +0200
+Subject: [RFC] Add support for Aurora L2 Cache Controller
+Message-ID: <1344438307-8468-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Hi, Tony.
+Hello,
 
-On 08/08/2012 06:39 PM, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [120808 07:11]:
->> * Tony Lindgren <tony@atomide.com> [120808 07:05]:
->>> * Konstantin Baydarov <kbaidarov@dev.rtsoft.ru> [120725 04:10]:
->>>> +
->>>> +u32 omap_control_status_read(void)
->>>> +{
->>>> +	return __raw_readl(omap_control_base);
->>>> +}
->>> Ah OK it's changed here.. Sorry I was looking at the older
->>> version.
->>>
->>>> +void __init of_omap_control_init(const struct of_device_id *matches)
->>>> +{
->>>> +	struct device_node *np;
->>>> +	struct property *pp = 0;
->>>> +
->>>> +	for_each_matching_node(np, matches) {
->>>> +		pp = of_find_property(np, "reg", NULL);
->>>> +		if(pp) {
->>>> +			omap_control_phys_base = (unsigned long)be32_to_cpup(pp->value);
->>>> +			omap_control_mapsize = (size_t)be32_to_cpup( (void*)((char*)pp->value + 4) );
->>>> +			/*
->>>> +			 * Map control module register CONTROL_STATUS register:
->>>> +			 * omap24xx - OMAP24XX_CONTROL_STATUS
->>>> +			 * am33xx   - AM33XX_CONTROL_STATUS
->>>> +			 * omap34xx - OMAP343X_CONTROL_STATUS
->>>> +			 * omap44xx - OMAP4_CTRL_MODULE_CORE_STATUS
->>>> +			 * omap54xx - OMAP5XXX_CONTROL_STATUS
->>>> +			 */
->>>> +			omap_control_base = ioremap(omap_control_phys_base, omap_control_mapsize);
->>>> +		}
->>>> +	}
->>>> +}
->>> You should probably add a function for setting omap_control_base
->>> separately from *set_globals* in arch/arm/mach-omap2/common.c.
->>> That way it's initialized early for id.c, and you can initialize
->>> everything else later as regular device drivers.
->>>
->>> FYI, we want to initialize as much as possible late so we have
->>> proper debugging console set up in case things go wrong.
->> Hmm it seems that omap_control_base is now only initialized for DT boot
->> case? This will break booting on almost all systems..
-> Looking at things more, looks like omap_type() is getting called
-> early from timer.c. So maybe just let set_globals initialize
-> omap_control_base and let omap_type() read that directly. That way
-> the SCM core driver can behave like a regular device driver and it
-> does not need to be initialized early.
+The purpose of this patch set is to add support for Aurora L2 Cache
+Controller used by Armada 370 and Armada XP SoCs. As it was initially
+designed by Marvell engineer to be compatible with the ARM L2 Cache
+Controller, we chose to reuse the existing code and to just extend it
+to support the differences and improvements brought by the Aurora
+controller.The diffstat looks like:
 
-  Yes, omap_type() is called very early , that is why I'm using early_initcall for omap_control_base initialization.
+ Documentation/devicetree/bindings/arm/l2cc.txt  |    9 +
+ arch/arm/boot/dts/armada-370.dtsi               |    6 +
+ arch/arm/boot/dts/armada-xp.dtsi                |    7 +
+ arch/arm/include/asm/hardware/cache-aurora-l2.h |   51 ++++
+ arch/arm/include/asm/hardware/cache-l2x0.h      |    1 +
+ arch/arm/mach-mvebu/Kconfig                     |    1 +
+ arch/arm/mach-mvebu/irq-armada-370-xp.c         |    4 +
+ arch/arm/mm/cache-l2x0.c                        |  297 +++++++++++++++++++++--
+ 8 files changed, 362 insertions(+), 14 deletions(-)
 
-Do you mean following?:
-void __init omap2_set_globals_control(struct omap_globals *omap2_globals)
-{
-    if (omap2_globals->ctrl)
-        omap2_ctrl_base = omap2_globals->ctrl;
+The main differences and improvements are:
 
-    if (omap2_globals->ctrl_pad)
-        omap4_ctrl_pad_base = omap2_globals->ctrl_pad;
+- no cache id part number available through hardware (need to get it
+  by the DT).
+- always write through mode available.
+- two flavors of the controller 'outer cache' and 'system cache' (the
+  last one meaning maintenance operations on L1 are broadcasted to the
+  L2 and L2 performs the same operation).
+- in outer cache mode, the cache maintenance operations are improved
+  and can be done on a range inside a page and are not limited to a
+  cache line.
+- during resume the controller need to restore the ctrl register.
 
-    omap_control_base = omap2_ctrl_base;  // this line is added
-}
+The first patch adds some modifications in the driver
+infrastructure. As most of the outer cache functions can use the
+Aurora improvements, we had to introduce new functions. So we thought
+it was better to use a outer_cache_fns field inside l2x0_of_data and
+just memcopy it into outer_cache depending of the type of the l2x0
+cache.
 
-  Or you suggest to move
-void __init of_omap_control_init(const struct of_device_id *matches)
-{
-    struct device_node *np;
-    struct property *pp = 0;
+If the change we have made in the l2x0 driver are judged too invasive
+we are perfectly fine to submit a dedicated driver for the Aurora
+Cache Controller.
 
-    for_each_matching_node(np, matches) {
-        pp = of_find_property(np, "reg", NULL);
-        if(pp) {
-            omap_control_phys_base = (unsigned long)be32_to_cpup(pp->value);
-            omap_control_mapsize = (size_t)be32_to_cpup( (void*)((char*)pp->value + 4) );
-            /*
-             * Map control module register CONTROL_STATUS register:
-             * omap24xx - OMAP24XX_CONTROL_STATUS
-             * am33xx   - AM33XX_CONTROL_STATUS
-             * omap34xx - OMAP343X_CONTROL_STATUS
-             * omap44xx - OMAP4_CTRL_MODULE_CORE_STATUS
-             * omap54xx - OMAP5XXX_CONTROL_STATUS
-             */
-            omap_control_base = ioremap(omap_control_phys_base, omap_control_mapsize);
-        }
-    }
-}
+For interested people you can find the results of the cache benchmarks
+which was ran for validate the driver:
+htps://github.com/MISL-EBU-System-SW/mainline-public/wiki/Cache-bench-results-for-Aurora-L2-cache-controller-on-Armada-XP-and-Armada-370
 
-into omap2_set_globals_control() ?
+All the data related to this benchmark are hosted at:
+http://free-electrons.com/%7Egregory/pub/Armada-370-xp/cachebench-results/
 
-Also if we move omap_control_base initialization to omap2_set_globals_control(), than the initialization routine of drivers/mfd/omap-control-core.c become empty, because omap_control_base is the only thing that is initialized in omap-control-core driver.
+The git branch aurora-L2-cache-ctrl is visible at
+https://github.com/MISL-EBU-System-SW/mainline-public.git
 
-  BR,
-    Konstantin Baydarov.
+Regards,
 
->
-> Regards,
->
-> Tony
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Gregory
