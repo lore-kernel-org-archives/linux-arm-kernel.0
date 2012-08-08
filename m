@@ -1,58 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  8 Aug 2012 14:54:48 +0200
-Subject: [PATCH 1/6] ARM: pxa: remove irq_to_gpio from ezx-pcap driver
-In-Reply-To: <1344430493-5304-1-git-send-email-arnd@arndb.de>
-References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
-Message-ID: <1344430493-5304-2-git-send-email-arnd@arndb.de>
+Date: Wed,  8 Aug 2012 14:54:47 +0200
+Subject: [PATCH 0/6] ARM: defconfig build errors
+Message-ID: <1344430493-5304-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The irq_to_gpio function was removed from the pxa platform
-in linux-3.2, and this driver has been broken since.
+I'm dusting off my defconfig warning fixes. This is the most important
+bunch as these are actual build failures that happen in one of the
+defconfigs. I've put these into the "fixes" branch of the arm-soc
+tree already and will send them out for -r2 unless I hear objections.
 
-There is actually no in-tree user of this driver that adds
-this platform device, but the driver can and does get enabled
-on some platforms.
+Please take a look.
 
-Without this patch, building ezx_defconfig results in:
+	Arnd
 
-drivers/mfd/ezx-pcap.c: In function 'pcap_isr_work':
-drivers/mfd/ezx-pcap.c:205:2: error: implicit declaration of function 'irq_to_gpio' [-Werror=implicit-function-declaration]
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: stable at vger.kernel.org (v3.2+)
-Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Daniel Mack <zonque@gmail.com>
 Cc: Daniel Ribeiro <drwyrm@gmail.com>
 Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
----
- drivers/mfd/ezx-pcap.c       |    2 +-
- include/linux/mfd/ezx-pcap.h |    1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
 
-diff --git a/drivers/mfd/ezx-pcap.c b/drivers/mfd/ezx-pcap.c
-index 43a76c4..db662e2 100644
---- a/drivers/mfd/ezx-pcap.c
-+++ b/drivers/mfd/ezx-pcap.c
-@@ -202,7 +202,7 @@ static void pcap_isr_work(struct work_struct *work)
- 		}
- 		local_irq_enable();
- 		ezx_pcap_write(pcap, PCAP_REG_MSR, pcap->msr);
--	} while (gpio_get_value(irq_to_gpio(pcap->spi->irq)));
-+	} while (gpio_get_value(pdata->gpio));
- }
- 
- static void pcap_irq_handler(unsigned int irq, struct irq_desc *desc)
-diff --git a/include/linux/mfd/ezx-pcap.h b/include/linux/mfd/ezx-pcap.h
-index 40c37216..32a1b5c 100644
---- a/include/linux/mfd/ezx-pcap.h
-+++ b/include/linux/mfd/ezx-pcap.h
-@@ -16,6 +16,7 @@ struct pcap_subdev {
- struct pcap_platform_data {
- 	unsigned int irq_base;
- 	unsigned int config;
-+	int gpio;
- 	void (*init) (void *);	/* board specific init */
- 	int num_subdevs;
- 	struct pcap_subdev *subdevs;
+Arnd Bergmann (6):
+  ARM: pxa: remove irq_to_gpio from ezx-pcap driver
+  ARM: pxa remove irq_to_gpio from eeti_ts driver
+  ARM: sa1100: include asm/io.h in hackkit leds code
+  ARM: s3c24xx: use new PWM driver
+  ARM: integrator: include <linux/export.h
+  ARM: imx: gpmi-nand depends on mxs-dma
+
+ arch/arm/configs/imx_v6_v7_defconfig |    1 +
+ arch/arm/mach-integrator/core.c      |    1 +
+ arch/arm/mach-pxa/raumfeld.c         |    1 +
+ arch/arm/mach-s3c24xx/Kconfig        |    6 ++++--
+ arch/arm/mach-sa1100/leds-hackkit.c  |    1 +
+ drivers/input/touchscreen/eeti_ts.c  |    8 +++++---
+ drivers/mfd/ezx-pcap.c               |    2 +-
+ drivers/mtd/nand/Kconfig             |    2 +-
+ include/linux/input/eeti_ts.h        |    1 +
+ include/linux/mfd/ezx-pcap.h         |    1 +
+ 10 files changed, 17 insertions(+), 7 deletions(-)
+
 -- 
 1.7.10
