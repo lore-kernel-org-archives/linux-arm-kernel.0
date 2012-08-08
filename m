@@ -1,42 +1,39 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed, 8 Aug 2012 19:37:24 +0000
-Subject: [PATCH 5/8] video: vt8500: Add devicetree support for vt8500-fb
- and wm8505-fb
-In-Reply-To: <5022B444.2020501@wwwdotorg.org>
+Date: Wed, 8 Aug 2012 19:46:54 +0000
+Subject: [rtc-linux] [PATCH 8/8] ARM: vt8500: gpio: Devicetree support
+ for arch-vt8500
+In-Reply-To: <CACRpkdabUWpDsBhz4ZEJNhEuqw-U+v-HrX7NcWoNLeuenv5t9A@mail.gmail.com>
 References: <1344389967-8465-1-git-send-email-linux@prisktech.co.nz>
- <1344389967-8465-6-git-send-email-linux@prisktech.co.nz>,
- <5022B444.2020501@wwwdotorg.org>
-Message-ID: <76F764B079F92A4E843589C893D0A022D1DCA8D0@SERVER.prisktech.co.nz>
+ <1344389967-8465-9-git-send-email-linux@prisktech.co.nz>
+ <CACRpkdbYxpN9RCu8j8KMBgrb=-DsYZHq7hx-ifmHhJ0ZZcRYjw@mail.gmail.com>
+ <201208080919.52592.arnd@arndb.de>,
+ <CACRpkdabUWpDsBhz4ZEJNhEuqw-U+v-HrX7NcWoNLeuenv5t9A@mail.gmail.com>
+Message-ID: <76F764B079F92A4E843589C893D0A022D1DCA8E3@SERVER.prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->On 08/07/2012 07:39 PM, Tony Prisk wrote:
->> Update vt8500-fb, wm8505-fb and wmt-ge-rops to support device
->> tree bindings.
+>This needs to be named something intuitive like "vt8500_gpio_bank_regoffsets"
 
->> Small change in wm8505-fb.c to support WM8650 framebuffer color
->> format.
+>Some kerneldoc intsead of the opaque comment above will also improve
+>readability a lot:
 
->That might warrant a separate patch?
+>/**
+>  * struct vt8500_gpio_bank_regoffsets
+>  * @en: offset to enable register in the bank
+>  * ...
 
-The patch consisted of changing one value in one line and is commented in
-the source. I didn't think it justified a separate patch as it has been thoroughly
-tested and is unlikely to cause any problems.
+Changes made as requested.
 
->> diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
 
->> +     np = of_find_node_by_name(NULL, "display");
->> +     if (!np) {
->> +             pr_err("%s: No display description in Device Tree\n", __func__);
->> +             ret = -EINVAL;
->> +             goto failed_free_res;
->> +     }
+>My feeling however is that the "vt8500_chip->regoff" is wrong, which
+>would mean only the first bank works. The code adds the same offsets
+>per bank once more that it sets in this bank table.
 
->I believe that using hard-coded node names is frowned upon. Better would
->be to put a phandle into the display controller's node that points at
->the node representing the display, e.g.:
+>        Arnd
 
-Will do.
+Oh.. Thanks for picking that up Arnd. You are absolutely correct. I have removed
+the references for ->regoff. Left over from old code.
 
 Regards
+
 Tony Prisk
