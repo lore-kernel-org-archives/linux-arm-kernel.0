@@ -1,39 +1,19 @@
-From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Wed, 08 Aug 2012 16:25:05 +0300
-Subject: [PATCH 08/11] ARM: OMAP3: Remove callback for McBSP sidetone
- ICLK workaround
-In-Reply-To: <1344417101-5015-9-git-send-email-peter.ujfalusi@ti.com>
-References: <1344417101-5015-1-git-send-email-peter.ujfalusi@ti.com>
- <1344417101-5015-9-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <502268B1.9040506@bitmer.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 8 Aug 2012 14:27:41 +0100
+Subject: [PATCH 0/4] ASoC/OMAP: ASoC machine driver for simple SoC with
+ twl4030
+In-Reply-To: <1344419650-5389-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1344419650-5389-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120808132741.GX16861@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2012 12:11 PM, Peter Ujfalusi wrote:
-> We can achieve the same result with SIDLEMODE field within McBSP SYSCONFIG
-> register.
-> The ASoC driver has been modified to use this method and we can now remove
-> the workaround using the control module register.
-> 
-Are you sure it works without any changes to sidetone audio quality or
-current consumption? What I remember idlemode was broken at least on
-3430 and caused bad sidetone audio if autoidle was set and a little bit
-higher current consumption (something like 2-3 mA higher where reference
-consumption was around 10 mA) when McBSP was set to no-idle.
+On Wed, Aug 08, 2012 at 12:54:06PM +0300, Peter Ujfalusi wrote:
 
-Here's the old thread:
+> Changes under arch/arm/mach-omap2/ are trivial, I don't expect merge issues
+> later. If it is OK for the maintainers I would like this to go via audio tree
+> (with the McBSP and the twl4030-audio stack DT support).
 
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg52024.html
-
-I think I tested all of this by using arecord >/dev/null | aplay
-/dev/zero with threshold based DMA transfers with all bells and whistles
-set for dynamic retention idle in order to hear only McBSP sidetone
-while measuring current consumption.
-
-But I guess 2-3 mA higher consumption is ok if it simplifies SW a lot
-and base consumption is anyway much higher than 10 mA when sidetone is
-in real use (my test above was artificial where actual use is under a
-phone call with heavy consumption from cellular modem etc).
-
--- 
-Jarkko
+This all looks OK to me, again if it gets applied via ASoC I'll put it
+on a separate branch so if we do need to get into OMAP as well it's easy
+to do so.
