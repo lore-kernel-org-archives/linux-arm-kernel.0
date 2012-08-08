@@ -1,219 +1,109 @@
-From: ian.molton@codethink.co.uk (Ian Molton)
-Date: Wed, 08 Aug 2012 14:19:53 +0100
-Subject: [PATCH v3 0/7] mv643xx.c: Add basic device tree support.
-In-Reply-To: <201208081239.16778.arnd@arndb.de>
-References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
- <50223428.6030506@codethink.co.uk> <502252A6.4090409@codethink.co.uk>
- <201208081239.16778.arnd@arndb.de>
-Message-ID: <50226779.6060201@codethink.co.uk>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 08 Aug 2012 15:23:15 +0200
+Subject: [PATCH 2/6] ARM: pxa remove irq_to_gpio from eeti_ts driver
+In-Reply-To: <1344430493-5304-3-git-send-email-arnd@arndb.de>
+References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
+ <1344430493-5304-3-git-send-email-arnd@arndb.de>
+Message-ID: <50226843.4080508@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/12 13:39, Arnd Bergmann wrote:
-> On Wednesday 08 August 2012, Ian Molton wrote:
->> The SMI / PHY stuff should look very similar, so I'm happy with something
->> like:
->>
->> mdio at 2000 {
->>                 #address-cells = <1>;
->>                 #size-cells = <1>;
->>                 device_type = "mdio";
->>                 compatible = "marvell,mv643xx-mdio";
->>                 phy0: ethernet-phy at 0 {
->>                         device_type = "ethernet-phy";
->>                         compatible = "marvell,whatever";
->>                         interrupts = <76>;
->>                         interrupt-parent = <&mpic>;
->>                         reg = <0 32>;          // Auto probed phy addr
->>                 };
->>
->>                 phy1: ethernet-phy at 3 {
->>                         device_type = "ethernet-phy";
->>                         compatible = "marvell,whatever";
->>                         interrupts = <77>;
->>                         interrupt-parent = <&mpic>;
->>                         reg = <3 1>;            // specified phy addr
->>                 };
->>
->>                 ... and so on.
->> }
->>
->> Where we can use the reg parameter to allow auto-probing, by
->> specifying a size of 32 (32 phy addrs max).
-> I don't understand the auto-probed phy address. What is the purpose of that?
+On 08.08.2012 14:54, Arnd Bergmann wrote:
+> The irq_to_gpio function was removed from the pxa platform
+> in linux-3.2, and this driver has been broken since.
+> 
+> Without this patch, building raumfeld_defconfig results in:
+> 
+> drivers/input/touchscreen/eeti_ts.c: In function 'eeti_ts_irq_active':
+> drivers/input/touchscreen/eeti_ts.c:65:2: error: implicit declaration of function 'irq_to_gpio' [-Werror=implicit-function-declaration]
 
-Personally, I think it should die - but the existing driver and a number
-of its users actually scan the bus for their PHY.
+I've sent out a slightly different version of such a patch just
+yesterday. It deferres mainly in the fact that it uses gpio_to_irq() and
+ignores the i2c_client's irq line. That way, there can't be any
+inconsitency.
 
-I doubt the PHY really moves about or is hotplugged by any of them,
-and its actually quite a slow process.
+I've appended the patch again - I haven't heard back from Dmitry yet.
 
-> If possible, I think we should keep using #size-cells=<0>, which would
-> make the method you describe impossible. It might still work if you just
-> leave out the "reg" property for that node.
 
-I can certainly investigate that. I couldn't see any good evidence that
-it was a supported mechanism when I looked.
+Thanks,
+Daniel
 
-> I also don't understand how the phy driver would locate ethernet-phy at 0
-> on the bus if it does not know the address.
->
->> The ethernet driver itself is more complicated:
->>
->> We have the following considerations:
->>
->> * we have one MDIO bus, typically, shared between all the MACs / PHYs.
->> * each ethernet device can multiple ports (up to three), each with its
->>   own MAC/PHY.
->> * MAC <-> PHY mapping can be specified, probed (ugh!) or a (gah!)
->>   mix of the two.
->> * existing D-T users, albeit not well documented / code complete.
->> * some port address ranges overlap (MIB counters, MCAST / UNICAST
->>   tables, etc.
->>
->> The existing ethernet-group idea only works because the current
->> platform-device based driver doesnt really do proper resource
->> management, and thus the MAC registers are actually mapped by
->> the MDIO driver.
->>
->> I don't think that preserving this bad behaviour is a good idea, which
->> leaves us with two choices:
->>
->> 1) My preferred solution - allow each device to specify up to three
->> interrupts, MACs, and PHYs. This is clean in that it doesnt require
->> multiply instantiating a driver three times over the same address
->> space.
->>
->> ethernet at 2400 {
->>                 compatible = "marvell,mv643xx-eth";
->>                 reg = <0x2400 0x1c00>
->>                 interrupt_parent = <&mpic>;
->>                 ports = <3>;
->>                 interrupts = <4>, <5>, <6>;
->>                 phys = <&phy0>, <&phy1>, <&phy2>;
->> };
->>
->> ethernet at 6400 {
->>                 compatible = "marvell,mv643xx-eth";
->>                 reg = <0x6400 0x1c00>
->>                 interrupt_parent = <&mpic>;
->>                 ports = <1>;
->>                 interrupts = <4>;
->>                 phys = <&phy3>;
->> };
->>
->> Note that the address is 2400, not 2000 - since this driver no longer
->> would share its address range with the MDIO driver.
->>
->> This method would require a small amount of rework in the driver to
->> set up <n> ports, rather than just one.
-> This looks quite nice, but it is still very much incompatible with the
-> existing binding. Obviously we can abandon an existing binding and
-> introduce a second one for the same hardware, but that should not
-> be taken lightly.
 
-Fair, however the existing users aren't anywhere near as
-numerous as the new ones.
 
->> 2) Create some kind of pseudo-ethernet group device that manages
->> all the work for some sort of lightweight ethernet device, one per
->> port. This can never be done cleanly since the port address ranges
->> overlap:
->>
->> pseudo_eth at 2400 {
->>         #address-cells = <1>;
->>         #size-cells = <0>;
->>         compatible = "marvell,mv643xx-shared-eth"
->>         reg = <0x2400 0x1c00>;
->>
->>         ethernet at 0 {
->>                 compatible = "marvell,mv643xx-port";
->>                 interrupts = <4>;
->>                 interrupt_parent = <&mpic>;
->>                 phy = <&phy0>;
->>         };
->>
->>         ethernet at 1 {
->>                 compatible = "marvell,mv643xx-port";
->>                 interrupts = <5>;
->>                 interrupt_parent = <&mpic>;
->>                 phy = <&phy1>;
->>         };
->>
->>         ethernet at 2 {
->>                 compatible = "marvell,mv643xx-port";
->>                 interrupts = <6>;
->>                 interrupt_parent = <&mpic>;
->>                 phy = <&phy2>;
->>         };
->> }
->> pseudo_eth at 6400 {
->>         #address-cells = <1>;
->>         #size-cells = <0>;
->>         compatible = "marvell,mv643xx-shared-eth"
->>         reg = <0x6400 0x1c00>;
->>
->>         ethernet at 0 {
->>                 compatible = "marvell,mv643xx-port";
->>                 interrupts = <4>;
->>                 interrupt_parent = <&mpic>;
->>                 phy = <&phy3>;
->>         };
->> };
-> This looks almost compatible with the existing binding, which is
-> good.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: stable at vger.kernel.org (v3.2+)
+> Cc: Daniel Mack <zonque@gmail.com>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> ---
+>  arch/arm/mach-pxa/raumfeld.c        |    1 +
+>  drivers/input/touchscreen/eeti_ts.c |    8 +++++---
+>  include/linux/input/eeti_ts.h       |    1 +
+>  3 files changed, 7 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
+> index 5905ed1..9e1c4ea 100644
+> --- a/arch/arm/mach-pxa/raumfeld.c
+> +++ b/arch/arm/mach-pxa/raumfeld.c
+> @@ -953,6 +953,7 @@ static struct i2c_board_info raumfeld_connector_i2c_board_info __initdata = {
+>  
+>  static struct eeti_ts_platform_data eeti_ts_pdata = {
+>  	.irq_active_high = 1,
+> +	.gpio = GPIO_TOUCH_IRQ,
+>  };
+>  
+>  static struct i2c_board_info raumfeld_controller_i2c_board_info __initdata = {
+> diff --git a/drivers/input/touchscreen/eeti_ts.c b/drivers/input/touchscreen/eeti_ts.c
+> index 503c709..45dab18 100644
+> --- a/drivers/input/touchscreen/eeti_ts.c
+> +++ b/drivers/input/touchscreen/eeti_ts.c
+> @@ -48,7 +48,7 @@ struct eeti_ts_priv {
+>  	struct input_dev *input;
+>  	struct work_struct work;
+>  	struct mutex mutex;
+> -	int irq, irq_active_high;
+> +	int irq, gpio, irq_active_high;
+>  };
+>  
+>  #define EETI_TS_BITDEPTH	(11)
+> @@ -62,7 +62,7 @@ struct eeti_ts_priv {
+>  
+>  static inline int eeti_ts_irq_active(struct eeti_ts_priv *priv)
+>  {
+> -	return gpio_get_value(irq_to_gpio(priv->irq)) == priv->irq_active_high;
+> +	return gpio_get_value(priv->gpio) == priv->irq_active_high;
+>  }
+>  
+>  static void eeti_ts_read(struct work_struct *work)
+> @@ -203,8 +203,10 @@ static int __devinit eeti_ts_probe(struct i2c_client *client,
+>  
+>  	pdata = client->dev.platform_data;
+>  
+> -	if (pdata)
+> +	if (pdata) {
+> +		priv->gpio = pdata->gpio;
+>  		priv->irq_active_high = pdata->irq_active_high;
+> +	}
+>  
+>  	irq_flags = priv->irq_active_high ?
+>  		IRQF_TRIGGER_RISING : IRQF_TRIGGER_FALLING;
+> diff --git a/include/linux/input/eeti_ts.h b/include/linux/input/eeti_ts.h
+> index f875b31..3404504 100644
+> --- a/include/linux/input/eeti_ts.h
+> +++ b/include/linux/input/eeti_ts.h
+> @@ -3,6 +3,7 @@
+>  
+>  struct eeti_ts_platform_data {
+>  	unsigned int irq_active_high;
+> +	unsigned int gpio;
+>  };
+>  
+>  #endif /* LINUX_INPUT_EETI_TS_H */
+> 
 
-Well, I'm not sure about that - if the existing bindings are really
-baked into firmware, then "almost" wont be any use at all.
-
->  I would in fact recommend to use the actual "compatible"
-> strings from the binding. More generally speaking, you should not
-> use wildcards in those strings anyway, so always use
-> "marvell,mv64360-eth" instead of "marvell,mv64x60-eth" or
-> "marvell,mv643xx-eth". If you have multiple chips that are
-> completely compatible, put use the identifier for the older one.
-Noted.
-
-> I don't fully understand your concern with the overlapping
-> registers, mostly because I still don't know all the combinations
-> that are actually valid here. Let me try to say what I understood
-> so far, and you can correct me if that's wrong:
->
-> * A system can have multiple instances of an mv64360 ethernet
-> block, with a register area of 0x2000 bytes.
-> * Each such block can have three MACs and three PHYs.
-> * The first 0x400 bytes in the register space control the three
->   PHYs and the remaining registers control the MACs.
-> * While this is meant to be used in a way that you assign
->   the each of the three PHYs to one of the MACs, this is not
->   always done, and sometimes you use a different PHY (?), or
->   one from a different instance of the mv64360 ethernet block
->   on the same SoC?.
-
-Nearly - the whole block is 0x2000 in size, yes. And each one
-can have 3 MACs and PHYs, as you say.
-
-There is SMI @ 0x2000 - just one for all ports, and in many
-(all?) cases, for all all the other controllers on the SoC to
-share. On the armadaXP SoC, for example, each ethernet
-block has its own alias of the same bas SMI reg. (there are
-4 blocks)
-
-ethernet0@ 0x2400
-## regs in order: Main regs, MIB counters, Special mcast table, Mcast
-table, Unicast table.
-   port0 has regs at +0x0000 *0x1000 +0x1400 +0x1500 +0x1600
-   port1 has regs at +0x0400 *0x1080 +0x1800 +0x1900 +0x1a00
-   port2 has regs at +0x0800 *0x1100 +0x1c00 +0x1d00 +0x1e00
-ethernet1@ 0x6400
-  port0 has regs at +0x0000 *0x1000 +0x1400 +0x1500 +0x1600
-...
-
-As you can see, instead of putting port1 at +0x1700 or so,
-marvell have overlapped the register files - in fact, doubly
-so, since port1 + 0x1080 is right in the middle of
-(port0 + 0x1000) -> (port0 + 0x16ff), so one cant simply map two
-sets of regs like 0x0000->0x03ff and 0x1000->0x16ff for port one
-either.
-
--Ian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-Input-eeti_ts-pass-gpio-value-instead-of-IRQ.patch
+Type: text/x-patch
+Size: 3730 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120808/9725df93/attachment.bin>
