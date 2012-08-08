@@ -1,20 +1,46 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 8 Aug 2012 14:35:40 +0100
-Subject: [PATCH v2 3/4] regulator: add a new API
- regulator_set_voltage_tol()
-In-Reply-To: <1344179121-17738-4-git-send-email-shawn.guo@linaro.org>
-References: <1344179121-17738-1-git-send-email-shawn.guo@linaro.org>
- <1344179121-17738-4-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120808133540.GB16861@opensource.wolfsonmicro.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 08 Aug 2012 15:36:37 +0200
+Subject: [alsa-devel] DT support for Davinci ASoC platform
+In-Reply-To: <501B954C.3070606@ti.com>
+References: <1BAFE6F6C881BF42822005164F1491C33EA35352@DBDE01.ent.ti.com>
+ <4FF5733E.6000604@gmail.com> <501AE3C6.8040708@gmail.com>
+ <501B954C.3070606@ti.com>
+Message-ID: <50226B65.4090804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 05, 2012 at 11:05:20PM +0800, Shawn Guo wrote:
-> There are some use cases where a voltage range could be reasonably
-> specified by a target voltage and tolerance.  Add a new API
-> regulator_set_voltage_tol() wrapping regulator_set_voltage() call
-> to ease the users.
+Hi Serkar,
 
-Applied, thanks!  It's on a separate branch so can easily be either
-applied somewhere else or merged into another tree if required for
-dependencies, just let me know.
+On 03.08.2012 11:09, Sekhar Nori wrote:
+> On 8/3/2012 2:02 AM, Daniel Mack wrote:
+>> On 05.07.2012 12:58, Daniel Mack wrote:
+>>> Hi Gururaja,
+>>>
+>>> On 04.07.2012 14:48, Hebbar, Gururaja wrote:
+>>>> All,
+>>>>
+>>>> Are there any plans or work going on for providing Device Tree Support for Davinci
+>>>> ASoC?
+>>>>
+>>>> I am planning to add DT support for TI AM335x (McASP) and I don't want to do duplicate
+>>>> task.
+>>>
+>>> That's good to know. But isn't there a dependency on the EDMA engine? Is
+>>> that part ported yet?
+>>
+>> May I ask whether you made any progress on that yet?
+> 
+> Matt Porter from TI is working on DMA engine migration. This would still
+> be some time away since there is a bunch of work involved here.
+> 
+> To make progress on Audio DT conversion Gururaja is doing an up port of
+> AM335x EDMA support from TI release to mainline kernel. If you are
+> interested in it, he can probably share that with you once he posts his
+> DT patches.
+
+As the DMA engine is also a requirement for the MMC controller, I would
+be interested in helping, in case help is required. Is there any
+repository with code that I can have a look at?
+
+Thanks,
+Daniel
