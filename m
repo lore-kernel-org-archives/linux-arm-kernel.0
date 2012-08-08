@@ -1,145 +1,122 @@
-From: dgdegra@tycho.nsa.gov (Daniel De Graaf)
-Date: Wed, 08 Aug 2012 13:01:36 -0400
-Subject: [PATCH v2 10/23] xen/arm: compile and run xenbus
-In-Reply-To: <alpine.DEB.2.02.1208081743430.21096@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1208061428060.4645@kaball.uk.xensource.com>
- <1344263246-28036-10-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120807182157.GN15053@phenom.dumpdata.com> <50216228.7010407@tycho.nsa.gov>
- <alpine.DEB.2.02.1208081743430.21096@kaball.uk.xensource.com>
-Message-ID: <50229B70.3090507@tycho.nsa.gov>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 08 Aug 2012 10:06:54 -0700
+Subject: [PATCH v2] Revert "ARM: OMAP3: PM: call pre/post transition per
+ powerdomain"
+In-Reply-To: <CANOLnONQhqYcqW8ZAfn+5ceZQ_h2W_yKZVZrnrP5cUJDooTrQg@mail.gmail.com>
+ (Grazvydas Ignotas's message of "Wed, 8 Aug 2012 13:56:33 +0300")
+References: <1344379659-26152-1-git-send-email-khilman@ti.com>
+ <CANOLnONQhqYcqW8ZAfn+5ceZQ_h2W_yKZVZrnrP5cUJDooTrQg@mail.gmail.com>
+Message-ID: <87sjbxwbwx.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2012 12:51 PM, Stefano Stabellini wrote:
-> On Tue, 7 Aug 2012, Daniel De Graaf wrote:
->> On 08/07/2012 02:21 PM, Konrad Rzeszutek Wilk wrote:
->>> On Mon, Aug 06, 2012 at 03:27:13PM +0100, Stefano Stabellini wrote:
->>>> bind_evtchn_to_irqhandler can legitimately return 0 (irq 0): it is not
->>>> an error.
->>>>
->>>> If Linux is running as an HVM domain and is running as Dom0, use
->>>> xenstored_local_init to initialize the xenstore page and event channel.
->>>>
->>>> Changes in v2:
->>>>
->>>> - refactor xenbus_init.
->>>
->>> Thank you. Lets also CC our friend at NSA who has been doing some work
->>> in that area. Daniel are you OK with this change - will it still make
->>> PV initial domain with with the MiniOS XenBus driver?
->>>
->>> Thanks.
->>
->> That case will work, but what this will break is launching the initial domain
->> with a Xenstore stub domain already running (see below).
->>
->>>>
->>>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>>> ---
->>>>  drivers/xen/xenbus/xenbus_comms.c |    2 +-
->>>>  drivers/xen/xenbus/xenbus_probe.c |   62 +++++++++++++++++++++++++-----------
->>>>  drivers/xen/xenbus/xenbus_xs.c    |    1 +
->>>>  3 files changed, 45 insertions(+), 20 deletions(-)
->>>>
->>>> diff --git a/drivers/xen/xenbus/xenbus_comms.c b/drivers/xen/xenbus/xenbus_comms.c
->>>> index 52fe7ad..c5aa55c 100644
->>>> --- a/drivers/xen/xenbus/xenbus_comms.c
->>>> +++ b/drivers/xen/xenbus/xenbus_comms.c
->>>> @@ -224,7 +224,7 @@ int xb_init_comms(void)
->>>>  		int err;
->>>>  		err = bind_evtchn_to_irqhandler(xen_store_evtchn, wake_waiting,
->>>>  						0, "xenbus", &xb_waitq);
->>>> -		if (err <= 0) {
->>>> +		if (err < 0) {
->>>>  			printk(KERN_ERR "XENBUS request irq failed %i\n", err);
->>>>  			return err;
->>>>  		}
->>>
->>>> diff --git a/drivers/xen/xenbus/xenbus_probe.c b/drivers/xen/xenbus/xenbus_probe.c
->>>> index b793723..a67ccc0 100644
->>>> --- a/drivers/xen/xenbus/xenbus_probe.c
->>>> +++ b/drivers/xen/xenbus/xenbus_probe.c
->>>> @@ -719,37 +719,61 @@ static int __init xenstored_local_init(void)
->>>>  	return err;
->>>>  }
->>>>  
->>>> +enum xenstore_init {
->>>> +	UNKNOWN,
->>>> +	PV,
->>>> +	HVM,
->>>> +	LOCAL,
->>>> +};
->>>>  static int __init xenbus_init(void)
->>>>  {
->>>>  	int err = 0;
->>>> +	enum xenstore_init usage = UNKNOWN;
->>>> +	uint64_t v = 0;
->>>>  
->>>>  	if (!xen_domain())
->>>>  		return -ENODEV;
->>>>  
->>>>  	xenbus_ring_ops_init();
->>>>  
->>>> -	if (xen_hvm_domain()) {
->>>> -		uint64_t v = 0;
->>>> -		err = hvm_get_parameter(HVM_PARAM_STORE_EVTCHN, &v);
->>>> -		if (err)
->>>> -			goto out_error;
->>>> -		xen_store_evtchn = (int)v;
->>>> -		err = hvm_get_parameter(HVM_PARAM_STORE_PFN, &v);
->>>> -		if (err)
->>>> -			goto out_error;
->>>> -		xen_store_mfn = (unsigned long)v;
->>>> -		xen_store_interface = ioremap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
->>>> -	} else {
->>>> -		xen_store_evtchn = xen_start_info->store_evtchn;
->>>> -		xen_store_mfn = xen_start_info->store_mfn;
->>>> -		if (xen_store_evtchn)
->>>> -			xenstored_ready = 1;
->>>> -		else {
->>>> +	if (xen_pv_domain())
->>>> +		usage = PV;
->>>> +	if (xen_hvm_domain())
->>>> +		usage = HVM;
->>
->> The above is correct for domUs, and is overridden for dom0s:
->>
->>>> +	if (xen_hvm_domain() && xen_initial_domain())
->>>> +		usage = LOCAL;
->>>> +	if (xen_pv_domain() && !xen_start_info->store_evtchn)
->>>> +		usage = LOCAL;
->>
->> Instead of these checks, I think it should just be:
->>
->> if (!xen_start_info->store_evtchn)
->> 	usage = LOCAL;
->>
->> Any domain started after xenstore will have store_evtchn set, so if you don't
->> have this set, you are either going to be running xenstore locally, or will
->> use the ioctl to change it later (and so should still set up everything as if
->> it will be running locally).
-> 
-> That would be wrong for an HVM dom0 domain (at least on ARM), because
-> we don't have a start_info page at all.
-> 
-> 
->>>> +	if (xen_pv_domain() && xen_start_info->store_evtchn)
->>>> +		xenstored_ready = 1;
->>
->> This part can now just be moved unconditionally into case PV.
-> 
-> What about:
-> 
-> if (xen_pv_domain())
->     usage = PV;
-> if (xen_hvm_domain())
->     usage = HVM;
-> if (!xen_store_evtchn)
->     usage = LOCAL;
-> 
-> and moving xenstored_ready in case PV, like you suggested.
-> 
+Grazvydas Ignotas <notasas@gmail.com> writes:
 
-That looks correct, but you'd need to split up the switch statement in
-order to populate xen_store_evtchn before that last condition, which
-ends up pretty much eliminating the usage variable.
+> On Wed, Aug 8, 2012 at 1:47 AM, Kevin Hilman <khilman@ti.com> wrote:
+>> This reverts commit 58f0829b7186150318c79515f0e0850c5e7a9c89.
+>>
+>> Converstion to per-pwrdm per/post transition calls was a bit
+>> premature.  Only tracking MPU, PER & CORE in the idle path means we
+>> lose the accounting for all the other powerdomains which may also
+>> transition in idle.  On OMAP3, due to autodeps, several powerdomains
+>> transition along with MPU (e.g. DSS, USBHOST), and the accounting for
+>> these was lost with this patch.  Since the accounting includes the
+>> context loss counters, drivers for devices in those power domains
+>> would never notice context lost, so would likely hang after any
+>> off-mode transitions.
+>
+> That's a shame, pwrdm_pre_transition/pwrdm_post_transition are the
+> main contributors to idle latency and cause large performance loss on
+> small and frequent loads, like short DMAs. Could we perhaps only do it
+> when PM_DEBUG is on or when off transitions happen instead?
+
+Unfortunately, that's also where we're currently doing the accounting 
+for when power domains lose context.  Drivers rely on this to determine
+whether or not to restore context, so it's not a debug only feature.
+
+>> This patch should be revisited when the upcoming clkdm/pwrmdm/voltdm
+>> use-counting seires is merged since then we can properly do accounting
+>> without relying on a call in the idle path.
+>
+> So all hope of getting rid of those pre/post transition calls goes here then?
+> Small typo with 'seires'..
+
+Yes.  The goal of the use-counting series is so that proper accounting
+can be done when the usecount changes so that not all of them have to be
+done in the idle path.
+
+Kevin
+
+>> In addition, the original patch had another bug because the PER
+>> powerdomain accounting was not updated until after the GPIO resume
+>> hook is called.  Since gpio_resume_after_idle() checks the context
+>> loss count (which is not yet updated) it would not properly restore
+>> context, leaving the GPIO banks in an undefined state.
+>>
+>> Cc: Jean Pihet <jean.pihet@newoldbits.com>
+>> Cc: Tero Kristo <t-kristo@ti.com>
+>> Cc: Rajendra Nayak <rnayak@ti.com>
+>> Reported-by: Paul Walmsley <paul@pwsan.com>
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/pm34xx.c |   19 ++++---------------
+>>  1 file changed, 4 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+>> index e4fc88c..05bd8f0 100644
+>> --- a/arch/arm/mach-omap2/pm34xx.c
+>> +++ b/arch/arm/mach-omap2/pm34xx.c
+>> @@ -272,21 +272,16 @@ void omap_sram_idle(void)
+>>         per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
+>>         core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
+>>
+>> -       if (mpu_next_state < PWRDM_POWER_ON) {
+>> -               pwrdm_pre_transition(mpu_pwrdm);
+>> -               pwrdm_pre_transition(neon_pwrdm);
+>> -       }
+>> +       pwrdm_pre_transition(NULL);
+>>
+>>         /* PER */
+>>         if (per_next_state < PWRDM_POWER_ON) {
+>> -               pwrdm_pre_transition(per_pwrdm);
+>>                 per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
+>>                 omap2_gpio_prepare_for_idle(per_going_off);
+>>         }
+>>
+>>         /* CORE */
+>>         if (core_next_state < PWRDM_POWER_ON) {
+>> -               pwrdm_pre_transition(core_pwrdm);
+>>                 if (core_next_state == PWRDM_POWER_OFF) {
+>>                         omap3_core_save_context();
+>>                         omap3_cm_save_context();
+>> @@ -339,20 +334,14 @@ void omap_sram_idle(void)
+>>                         omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
+>>                                                OMAP3430_GR_MOD,
+>>                                                OMAP3_PRM_VOLTCTRL_OFFSET);
+>> -               pwrdm_post_transition(core_pwrdm);
+>>         }
+>>         omap3_intc_resume_idle();
+>>
+>> +       pwrdm_post_transition(NULL);
+>> +
+>>         /* PER */
+>> -       if (per_next_state < PWRDM_POWER_ON) {
+>> +       if (per_next_state < PWRDM_POWER_ON)
+>>                 omap2_gpio_resume_after_idle();
+>> -               pwrdm_post_transition(per_pwrdm);
+>> -       }
+>> -
+>> -       if (mpu_next_state < PWRDM_POWER_ON) {
+>> -               pwrdm_post_transition(mpu_pwrdm);
+>> -               pwrdm_post_transition(neon_pwrdm);
+>> -       }
+>>  }
+>>
+>>  static void omap3_pm_idle(void)
+>> --
+>> 1.7.9.2
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
