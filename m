@@ -1,75 +1,57 @@
-From: ian.molton@codethink.co.uk (Ian Molton)
-Date: Wed, 08 Aug 2012 10:40:56 +0100
-Subject: [PATCH v3 0/7] mv643xx.c: Add basic device tree support.
-In-Reply-To: <201208080816.29218.arnd@arndb.de>
-References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
- <20120807.162923.34400427265666163.davem@davemloft.net>
- <201208080816.29218.arnd@arndb.de>
-Message-ID: <50223428.6030506@codethink.co.uk>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed,  8 Aug 2012 12:41:16 +0300
+Subject: [PATCH 00/11] MFD/ASoC/Input: twl4030-audio submodule DT support
+Message-ID: <1344418887-5262-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/12 09:16, Arnd Bergmann wrote:
+Hello,
 
-> I'd prefer to take the entire series through the arm-soc tree from
-> the kirkwood maintainers. We first have to work out the bindings
-> though, since the current patch introduces a new one that is
-> incompatible with the one we were using on powerpc with open firmware
-> before.
+The following series adds DT support for the twl4030 audio submodule which
+provides audio codec and vibra functionality.
 
-Looking at the ethernet-group stuff, specifically from
-arch/powerpc/boot/dts/prpmc2800.dts, which I've taken as a base for the
-below:
+The MFD core driver is probed via DT, it will create the needed child devices
+based on the provided information in the DT blob.
+Child drivers (vibra, ASoC codec) will parse the core's node if needed to get
+the needed parameters for their configuration.
 
-I think we can (and should) do something similar.
+In the ASoC codec driver the hs_extmute callback (which was used to toggle a
+GPIO line) has been removed. The codec driver will receive the GPIO number
+(if it is needed on the platform) and also the level to disable the mute.
 
-Sadly, there is no code present to describe marvell,mv64360-mdio,
-however the device tree looks basically sane.
+If the series is OK (and no objections from the maintainers), it would be good
+if this can go via audio. Changed files are well contained within the
+twl4030-audio stack so I do not expect merge issues later.
 
+The series has been tested on BeagleBoard (with the McBSP DT series, and with
+the upcoming DT audio support for BeagleBoard).
 
+Regards,
+Peter
+---
+Peter Ujfalusi (11):
+  MFD: twl4030-audio: Clean up MODULE_* and platform_driver part
+  MFD: twl4030-audio: Convert to use devm_kzalloc
+  MFD: twl4030-audio: Rearange and clean-up the probe function
+  MFD: twl4030-audio: Add DT support
+  Input: twl4030-vibra: Support for DT booted kernel
+  ASoC: twl4030: Move hs_extmute GPIO handling to driver
+  ARM: OMAP/ASoC: Zoom2: Let the codec to handle the hs_extmute GPIO
+  ASoC/MFD: twl4030: Remove set_hs_extmute callback from platform data
+  ASoC: twl4030: Convert to use devm_kzalloc
+  ASoC: twl4030: Add pointer to pdata within the private data
+  ASoC: twl4030: Support for DT booted kernel
 
-        mdio at 2000 {
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-                        device_type = "mdio";
-                        compatible = "marvell,mv643xx-mdio";
-                        PHY0: ethernet-phy at 1 {
-                                device_type = "ethernet-phy";
-                                compatible = "broadcom,bcm5421";
-                                interrupts = <76>;      /* GPP 12 */
-                                interrupt-parent = <&PIC>;
-                                reg = <1>;
-                        };
-                        PHY1: ethernet-phy at 3 {
-                                device_type = "ethernet-phy";
-                                compatible = "broadcom,bcm5421";
-                                interrupts = <76>;      /* GPP 12 */
-                                interrupt-parent = <&PIC>;
-                                reg = <3>;
-                        };
-                };
+ .../devicetree/bindings/mfd/twl4030-audio.txt      |   51 +++++++++
+ arch/arm/mach-omap2/board-zoom-peripherals.c       |    9 +-
+ arch/arm/mach-omap2/include/mach/board-zoom.h      |    2 -
+ drivers/input/misc/twl4030-vibra.c                 |   20 +++-
+ drivers/mfd/twl4030-audio.c                        |  114 +++++++++++++------
+ include/linux/i2c/twl.h                            |    4 +-
+ sound/soc/codecs/twl4030.c                         |  117 ++++++++++++++++----
+ sound/soc/omap/zoom2.c                             |    4 -
+ 8 files changed, 250 insertions(+), 71 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/twl4030-audio.txt
 
-                ethernet-group at 2400 {
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-                        compatible = "marvell,mv64360-eth-group";
-                        reg = <0x2400 0x2000>;
-                        ethernet at 0 {
-                                device_type = "network";
-                                compatible = "marvell,mv64360-eth";
-                                reg = <0>;
-                                interrupts = <32>;
-                                interrupt-parent = <&mpic>;
-                                phy = <&phy0>;
-                                local-mac-address = [ 00 00 00 00 00 00 ];
-                        };
-                        ethernet at 1 {
-                                device_type = "network";
-                                compatible = "marvell,mv64360-eth";
-                                reg = <1>;
-                                interrupts = <33>;
-                                interrupt-parent = <&mpic>;
-                                phy = <&phy1>;
-                                local-mac-address = [ 00 00 00 00 00 00 ];
-                        };
-                };
+-- 
+1.7.8.6
