@@ -1,34 +1,28 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Wed, 8 Aug 2012 20:40:30 +0530
-Subject: [PATCH] ASoC: Davinci: McASP: remove unused header include
-Message-ID: <1344438632-2604-1-git-send-email-gururaja.hebbar@ti.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 8 Aug 2012 08:25:45 -0700
+Subject: [PATCH 03/11] usb/ohci-omap: remove unused variable
+In-Reply-To: <1344437248-20560-4-git-send-email-arnd@arndb.de>
+References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
+ <1344437248-20560-4-git-send-email-arnd@arndb.de>
+Message-ID: <20120808152545.GC15776@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Defines or parameters from <mach/mux.h> isn't used anywhere. Hence
-remove the header include.
+On Wed, Aug 08, 2012 at 04:47:20PM +0200, Arnd Bergmann wrote:
+> Commit c2e935a7d "USB: move transceiver from ehci_hcd and ohci_hcd to
+> hcd and rename it as phy" removed the last use of the "ohci" variable
+> in the usb_hcd_omap_remove function, but left the variable in place
+> unused.
+> 
+> Without this patch, building omap1_defconfig results in:
+> 
+> In file included from drivers/usb/host/ohci-hcd.c:1013:0:
+> drivers/usb/host/ohci-omap.c: In function 'usb_hcd_omap_remove':
+> drivers/usb/host/ohci-omap.c:406:19: warning: unused variable 'ohci' [-Wunused-variable]
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Richard Zhao <richard.zhao@freescale.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
----
-This patch was tested on AM18x Board and is based on repo at 
-http://git.kernel.org/?p=linux/kernel/git/broonie/sound.git;
-a=shortlog;h=refs/heads/for-3.6
-
-:100644 100644 10a2d8c... c80c20a... M	sound/soc/davinci/davinci-evm.c
- sound/soc/davinci/davinci-evm.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/sound/soc/davinci/davinci-evm.c b/sound/soc/davinci/davinci-evm.c
-index 10a2d8c..c80c20a 100644
---- a/sound/soc/davinci/davinci-evm.c
-+++ b/sound/soc/davinci/davinci-evm.c
-@@ -24,7 +24,6 @@
- 
- #include <mach/asp.h>
- #include <mach/edma.h>
--#include <mach/mux.h>
- 
- #include "davinci-pcm.h"
- #include "davinci-i2s.h"
--- 
-1.7.1
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
