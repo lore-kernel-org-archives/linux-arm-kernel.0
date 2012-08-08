@@ -1,50 +1,56 @@
-From: akhilesh.lxr@gmail.com (Akhilesh Kumar)
-Date: Fri, 03 Aug 2012 22:05:38 -0000
-Subject: [Memory leak]: memory leak in sys_oabi_semtimedo
-Message-ID: <CADArhcBEjbv-NUUvGJ5aDBe2_9JpKDt=2M0av9Ud8dpx9MwtLw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 08 Aug 2012 15:06:02 -0000
+Subject: [RFC 6/6] arm: l2x0: add aurora related properties to OF binding
+In-Reply-To: <1344438307-8468-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1344438307-8468-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1344438307-8468-7-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Aurora is a L2 Cache Controller designed to be compatible with the
+L2x0 Cache Controller. L2X0 OF bindings are extended to support some
+specificity of Aurora (no cache id part number available through
+hardware, always write through mode, choice between outer cache and
+system cache).
 
-I found some memory leak arch/arm/kernel/sys_oabi-compat.c file
-please review below patch for main line and share ur comments,
-
-Thanks,
-Akhilesh
-
-
-
-
->From 86acd014680ae7127cb504387bee1824669a4744 Mon Sep 17 00:00:00 2001
-From: Akhilesh Kumar <akhilesh.lxr@gmail.com>
-Date: SAT, 4 Aug 2012 03:15:16 +0530
-Subject: [Memory leak]: memory leak in sys_oabi_semtimedo
-
-if (err) {
-         err = -EFAULT;
-} // return without free the memory
-
-Signed-off-by: Akhilesh Kumar <akhilesh.lxr@gmail.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Barry Song <21cnbao@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
 ---
- arch/arm/kernel/sys_oabi-compat.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ Documentation/devicetree/bindings/arm/l2cc.txt |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/kernel/sys_oabi-compat.c
-b/arch/arm/kernel/sys_oabi-compat.c
-index 3e94811..e34f953 100644
---- a/arch/arm/kernel/sys_oabi-compat.c
-+++ b/arch/arm/kernel/sys_oabi-compat.c
-@@ -329,6 +329,7 @@ asmlinkage long sys_oabi_semtimedop(int semid,
-  timeout = &local_timeout;
-  }
-  if (err) {
-+ kfree(sops);
-  err = -EFAULT;
-  } else {
-  mm_segment_t fs = get_fs();
+diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+index 7ca5216..1e41b8e 100644
+--- a/Documentation/devicetree/bindings/arm/l2cc.txt
++++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+@@ -10,6 +10,12 @@ Required properties:
+ 	"arm,pl310-cache"
+ 	"arm,l220-cache"
+ 	"arm,l210-cache"
++	"marvell,aurora-cache-no-outer": Marvell Controller designed to be
++     compatible with the ARM one, with system cache mode (meaning
++     maintenance operations on L1 are broadcasted to the L2 and L2
++     performs the same operation).
++	"marvell,aurora-cache-with-outer": Marvell Controller designed to
++	be compatible with the ARM one with outer cache mode.
+ - cache-unified : Specifies the cache is a unified cache.
+ - cache-level : Should be set to 2 for a level 2 cache.
+ - reg : Physical base address and size of cache controller's memory mapped
+@@ -29,6 +35,9 @@ Optional properties:
+   filter. Addresses in the filter window are directed to the M1 port. Other
+   addresses will go to the M0 port.
+ - interrupts : 1 combined interrupt.
++- cache-id-part: cache id part number to be used if it is not present
++  on hardware
++- wt-override: If present then L2 is forced to Write through mode
+ 
+ Example:
+ 
 -- 
-1.7.8.4
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120803/ba3a8e47/attachment.html>
+1.7.9.5
