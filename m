@@ -1,23 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 8 Aug 2012 16:19:47 +0100
-Subject: [RFC 3/6] arm: cache-l2x0: add support for Aurora L2 cache ctrl
-In-Reply-To: <1344438307-8468-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1344438307-8468-1-git-send-email-gregory.clement@free-electrons.com>
- <1344438307-8468-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20120808151946.GE4579@mudshark.cambridge.arm.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 8 Aug 2012 23:24:40 +0800
+Subject: [PATCH 2/6] ARM: pxa remove irq_to_gpio from eeti_ts driver
+In-Reply-To: <1344430493-5304-3-git-send-email-arnd@arndb.de>
+References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
+ <1344430493-5304-3-git-send-email-arnd@arndb.de>
+Message-ID: <CAN1soZwzSVe2VrTOod0ZtwF9UUS7fPYSt6Vkqgg4-6csUB3mqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2012 at 04:05:03PM +0100, Gregory CLEMENT wrote:
-> +static void aurora_pa_range(unsigned long start, unsigned long end,
-> +                       unsigned long offset)
-> +{
+On Wed, Aug 8, 2012 at 8:54 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The irq_to_gpio function was removed from the pxa platform
+> in linux-3.2, and this driver has been broken since.
+>
+> Without this patch, building raumfeld_defconfig results in:
+>
+> drivers/input/touchscreen/eeti_ts.c: In function 'eeti_ts_irq_active':
+> drivers/input/touchscreen/eeti_ts.c:65:2: error: implicit declaration of function 'irq_to_gpio' [-Werror=implicit-function-declaration]
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: stable at vger.kernel.org (v3.2+)
+> Cc: Daniel Mack <zonque@gmail.com>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> ---
+>  arch/arm/mach-pxa/raumfeld.c        |    1 +
+>  drivers/input/touchscreen/eeti_ts.c |    8 +++++---
+>  include/linux/input/eeti_ts.h       |    1 +
+>  3 files changed, 7 insertions(+), 3 deletions(-)
+>
 
-This controller is used by Armada XP right? I think that SoC supports LPAE,
-so please tell me that the above is a mistake and the controller can support
-physical addresses > 32 bits!
-
-If so, you'll need to hack the cache-l2x0 driver to use phys_addr_t types
-instead of unsigned longs.
-
-Will
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
