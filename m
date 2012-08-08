@@ -1,36 +1,42 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 08 Aug 2012 12:43:14 -0600
-Subject: [PATCH 1/8] arm: vt8500: Add device tree files for VIA/Wondermedia
- SoC's
-In-Reply-To: <1344389967-8465-2-git-send-email-linux@prisktech.co.nz>
+Date: Wed, 08 Aug 2012 12:47:32 -0600
+Subject: [PATCH 5/8] video: vt8500: Add devicetree support for vt8500-fb
+ and wm8505-fb
+In-Reply-To: <1344389967-8465-6-git-send-email-linux@prisktech.co.nz>
 References: <1344389967-8465-1-git-send-email-linux@prisktech.co.nz>
- <1344389967-8465-2-git-send-email-linux@prisktech.co.nz>
-Message-ID: <5022B342.7080606@wwwdotorg.org>
+ <1344389967-8465-6-git-send-email-linux@prisktech.co.nz>
+Message-ID: <5022B444.2020501@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 08/07/2012 07:39 PM, Tony Prisk wrote:
-> Add device tree files for VT8500, WM8505 and WM8650 SoC's and
-> reference boards.
+> Update vt8500-fb, wm8505-fb and wmt-ge-rops to support device
+> tree bindings.
 
-> diff --git a/arch/arm/boot/dts/vt8500_ref.dts b/arch/arm/boot/dts/vt8500_ref.dts
+> Small change in wm8505-fb.c to support WM8650 framebuffer color
+> format.
 
-It appears more typical to use "-" rather than "_" in the filename to
-join SoC and board names.
+That might warrant a separate patch?
 
-I guess "_ref" means "reference". Is that how the boards are commonly
-known? Are you sure there will never be another reference board for
-these SoCs? Given the "model" values in the file, something more like
-vt8500-bv07.dts might be more appropriate?
+> diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
 
-> +	/*
-> +	 * Display node is based on Sascha Hauer's patch on dri-devel.
-> +	 * Added a bpp property to calculate the size of the framebuffer
-> +	 * until the binding is formalized.
-> +	 */
-> +	display {
+> +	np = of_find_node_by_name(NULL, "display");
+> +	if (!np) {
+> +		pr_err("%s: No display description in Device Tree\n", __func__);
+> +		ret = -EINVAL;
+> +		goto failed_free_res;
+> +	}
 
-Maybe it's better to just hold off on adding this node, to wait until
-the binding is complete so this file doesn't churn? Certainly it sounded
-like Sascha was going to change the binding a little in response to
-comments it received.
+I believe that using hard-coded node names is frowned upon. Better would
+be to put a phandle into the display controller's node that points at
+the node representing the display, e.g.:
+
+    fb at d800e400 {
+        compatible = "via,vt8500-fb";
+        reg = <0xd800e400 0x400>;
+        interrupts = <12>;
+        via,display = <&display>;
+    };
+    display: display {
+        ...
+    };
