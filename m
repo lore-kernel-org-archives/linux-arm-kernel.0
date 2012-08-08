@@ -1,19 +1,23 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 8 Aug 2012 16:16:11 +0100
-Subject: [RFC] Add support for Aurora L2 Cache Controller
-In-Reply-To: <1344438307-8468-1-git-send-email-gregory.clement@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 8 Aug 2012 16:19:47 +0100
+Subject: [RFC 3/6] arm: cache-l2x0: add support for Aurora L2 cache ctrl
+In-Reply-To: <1344438307-8468-4-git-send-email-gregory.clement@free-electrons.com>
 References: <1344438307-8468-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CAHkRjk4qPPktXsqnRaZLG0Z=VMH_Qf6xRdQBPMvxC20m6noc+A@mail.gmail.com>
+ <1344438307-8468-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20120808151946.GE4579@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 August 2012 16:05, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> - two flavors of the controller 'outer cache' and 'system cache' (the
->   last one meaning maintenance operations on L1 are broadcasted to the
->   L2 and L2 performs the same operation).
+On Wed, Aug 08, 2012 at 04:05:03PM +0100, Gregory CLEMENT wrote:
+> +static void aurora_pa_range(unsigned long start, unsigned long end,
+> +                       unsigned long offset)
+> +{
 
-BTW, is the DSB also transparently handled by the L2 in 'system cache' mode?
+This controller is used by Armada XP right? I think that SoC supports LPAE,
+so please tell me that the above is a mistake and the controller can support
+physical addresses > 32 bits!
 
--- 
-Catalin
+If so, you'll need to hack the cache-l2x0 driver to use phys_addr_t types
+instead of unsigned longs.
+
+Will
