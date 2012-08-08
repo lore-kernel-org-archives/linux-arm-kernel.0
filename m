@@ -1,44 +1,34 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 08 Aug 2012 15:43:29 +0300
-Subject: [PATCH 04/11] MFD: twl4030-audio: Add DT support
-In-Reply-To: <5022529D.3090406@ti.com>
-References: <1344418887-5262-1-git-send-email-peter.ujfalusi@ti.com>
- <1344418887-5262-5-git-send-email-peter.ujfalusi@ti.com>
- <5022529D.3090406@ti.com>
-Message-ID: <50225EF1.4010203@ti.com>
+From: prabhakar.lad@ti.com (Prabhakar Lad)
+Date: Wed, 8 Aug 2012 18:20:57 +0530
+Subject: [PATCH v4 0/2] ARM: davinci: add support for dm365 vpbe display
+Message-ID: <1344430259-23968-1-git-send-email-prabhakar.lad@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+This patch series enables VPBE display driver on DM365. 
 
-On 08/08/2012 02:50 PM, Benoit Cousson wrote:
->> +Required properties:
->> +- compatible : must be "ti,twl4030-audio"
->> +- ti,audio_mclk: Master clock frequency used on the board. Supported
->> +	         frequencies: 19200000, 26000000 and 38400000
-> 
-> Since you care about the frequency only you can use the generic
-> attribute: clock-frequency (in your example, I2C is using it).
+This patch series is dependent on this patches posted
+http://www.spinics.net/lists/arm-kernel/msg188234.html
 
-I see, I'll use replace the property with clock-frequency.
+Changes for v4:
+1: Replaced the obsolete preset API by timings API.
 
-> That being said, since we do have the clock binding now, maybe we should
-> create a clock provider at board level for the sys_clk and thus you will
-> just have to create a phandle to it in your audio description.
-> 
-> In theory OMAP and other components will thus have to use that sys_clock
-> reference as well.
+Changes for v3: 
+1: Removed VPSS clock alias for master and slave which was 
+   sent for VPSS driver. since this patch was dependent on 
+   patch[1]. I will revist this patch once MC(captrure driver) 
+   goes into mainline. 
+[1] http://www.spinics.net/lists/linux-media/msg50562.html
 
-And in the driver I would need to do for example:
-clkp = clk_get(NULL, "audio_mclk");
-clk_rate = clk_get_rate(clkp);
-clk_put(clkp);
+Changes for v2: 
+1: Added VPSS clock so that capture and display 
+   can work independent.
 
-to get the frequency in this way?
-Note that the twl4030-audio stack itself does not handle clocks at the moment
-since the clock needed for the audio module is always running (HFCLKIN ->
-HFCLKOUT -> AUDIO_MCLK (USB_MCLK)). All of this is within twl4030. Do we
-really want to model this?
+Manjunath Hadli (2):
+  ARM: davinci: dm365: add support for v4l2 video display
+  ARM: davinci: dm365 EVM: add support for VPBE display
 
--- 
-P?ter
+ arch/arm/mach-davinci/board-dm365-evm.c |  179 +++++++++++++++++++++++++++-
+ arch/arm/mach-davinci/davinci.h         |    2 +-
+ arch/arm/mach-davinci/dm365.c           |  203 +++++++++++++++++++++++++++++--
+ 3 files changed, 371 insertions(+), 13 deletions(-)
