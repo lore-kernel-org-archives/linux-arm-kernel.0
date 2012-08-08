@@ -1,181 +1,133 @@
-From: dgdegra@tycho.nsa.gov (Daniel De Graaf)
-Date: Wed, 08 Aug 2012 13:33:55 -0400
-Subject: [PATCH v2 10/23] xen/arm: compile and run xenbus
-In-Reply-To: <alpine.DEB.2.02.1208081805520.21096@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1208061428060.4645@kaball.uk.xensource.com>
- <1344263246-28036-10-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120807182157.GN15053@phenom.dumpdata.com> <50216228.7010407@tycho.nsa.gov>
- <alpine.DEB.2.02.1208081743430.21096@kaball.uk.xensource.com>
- <50229B70.3090507@tycho.nsa.gov>
- <alpine.DEB.2.02.1208081805520.21096@kaball.uk.xensource.com>
-Message-ID: <5022A303.709@tycho.nsa.gov>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 8 Aug 2012 23:05:35 +0530
+Subject: [PATCH v6 7/7] ARM: davinci: add support for the am1808 based
+ enbw_cmc board
+In-Reply-To: <1341492608-20597-1-git-send-email-hs@denx.de>
+References: <1341492608-20597-1-git-send-email-hs@denx.de>
+Message-ID: <5022A367.1070903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2012 01:19 PM, Stefano Stabellini wrote:
-> On Wed, 8 Aug 2012, Daniel De Graaf wrote:
->> On 08/08/2012 12:51 PM, Stefano Stabellini wrote:
->>> On Tue, 7 Aug 2012, Daniel De Graaf wrote:
->>>> On 08/07/2012 02:21 PM, Konrad Rzeszutek Wilk wrote:
->>>>> On Mon, Aug 06, 2012 at 03:27:13PM +0100, Stefano Stabellini wrote:
->>>>>> bind_evtchn_to_irqhandler can legitimately return 0 (irq 0): it is not
->>>>>> an error.
->>>>>>
->>>>>> If Linux is running as an HVM domain and is running as Dom0, use
->>>>>> xenstored_local_init to initialize the xenstore page and event channel.
->>>>>>
->>>>>> Changes in v2:
->>>>>>
->>>>>> - refactor xenbus_init.
->>>>>
->>>>> Thank you. Lets also CC our friend at NSA who has been doing some work
->>>>> in that area. Daniel are you OK with this change - will it still make
->>>>> PV initial domain with with the MiniOS XenBus driver?
->>>>>
->>>>> Thanks.
->>>>
->>>> That case will work, but what this will break is launching the initial domain
->>>> with a Xenstore stub domain already running (see below).
->>>>
->>>>>>
->>>>>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>>>>> ---
->>>>>>  drivers/xen/xenbus/xenbus_comms.c |    2 +-
->>>>>>  drivers/xen/xenbus/xenbus_probe.c |   62 +++++++++++++++++++++++++-----------
->>>>>>  drivers/xen/xenbus/xenbus_xs.c    |    1 +
->>>>>>  3 files changed, 45 insertions(+), 20 deletions(-)
->>>>>>
->>>>>> diff --git a/drivers/xen/xenbus/xenbus_comms.c b/drivers/xen/xenbus/xenbus_comms.c
->>>>>> index 52fe7ad..c5aa55c 100644
->>>>>> --- a/drivers/xen/xenbus/xenbus_comms.c
->>>>>> +++ b/drivers/xen/xenbus/xenbus_comms.c
->>>>>> @@ -224,7 +224,7 @@ int xb_init_comms(void)
->>>>>>  		int err;
->>>>>>  		err = bind_evtchn_to_irqhandler(xen_store_evtchn, wake_waiting,
->>>>>>  						0, "xenbus", &xb_waitq);
->>>>>> -		if (err <= 0) {
->>>>>> +		if (err < 0) {
->>>>>>  			printk(KERN_ERR "XENBUS request irq failed %i\n", err);
->>>>>>  			return err;
->>>>>>  		}
->>>>>
->>>>>> diff --git a/drivers/xen/xenbus/xenbus_probe.c b/drivers/xen/xenbus/xenbus_probe.c
->>>>>> index b793723..a67ccc0 100644
->>>>>> --- a/drivers/xen/xenbus/xenbus_probe.c
->>>>>> +++ b/drivers/xen/xenbus/xenbus_probe.c
->>>>>> @@ -719,37 +719,61 @@ static int __init xenstored_local_init(void)
->>>>>>  	return err;
->>>>>>  }
->>>>>>  
->>>>>> +enum xenstore_init {
->>>>>> +	UNKNOWN,
->>>>>> +	PV,
->>>>>> +	HVM,
->>>>>> +	LOCAL,
->>>>>> +};
->>>>>>  static int __init xenbus_init(void)
->>>>>>  {
->>>>>>  	int err = 0;
->>>>>> +	enum xenstore_init usage = UNKNOWN;
->>>>>> +	uint64_t v = 0;
->>>>>>  
->>>>>>  	if (!xen_domain())
->>>>>>  		return -ENODEV;
->>>>>>  
->>>>>>  	xenbus_ring_ops_init();
->>>>>>  
->>>>>> -	if (xen_hvm_domain()) {
->>>>>> -		uint64_t v = 0;
->>>>>> -		err = hvm_get_parameter(HVM_PARAM_STORE_EVTCHN, &v);
->>>>>> -		if (err)
->>>>>> -			goto out_error;
->>>>>> -		xen_store_evtchn = (int)v;
->>>>>> -		err = hvm_get_parameter(HVM_PARAM_STORE_PFN, &v);
->>>>>> -		if (err)
->>>>>> -			goto out_error;
->>>>>> -		xen_store_mfn = (unsigned long)v;
->>>>>> -		xen_store_interface = ioremap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
->>>>>> -	} else {
->>>>>> -		xen_store_evtchn = xen_start_info->store_evtchn;
->>>>>> -		xen_store_mfn = xen_start_info->store_mfn;
->>>>>> -		if (xen_store_evtchn)
->>>>>> -			xenstored_ready = 1;
->>>>>> -		else {
->>>>>> +	if (xen_pv_domain())
->>>>>> +		usage = PV;
->>>>>> +	if (xen_hvm_domain())
->>>>>> +		usage = HVM;
->>>>
->>>> The above is correct for domUs, and is overridden for dom0s:
->>>>
->>>>>> +	if (xen_hvm_domain() && xen_initial_domain())
->>>>>> +		usage = LOCAL;
->>>>>> +	if (xen_pv_domain() && !xen_start_info->store_evtchn)
->>>>>> +		usage = LOCAL;
->>>>
->>>> Instead of these checks, I think it should just be:
->>>>
->>>> if (!xen_start_info->store_evtchn)
->>>> 	usage = LOCAL;
->>>>
->>>> Any domain started after xenstore will have store_evtchn set, so if you don't
->>>> have this set, you are either going to be running xenstore locally, or will
->>>> use the ioctl to change it later (and so should still set up everything as if
->>>> it will be running locally).
->>>
->>> That would be wrong for an HVM dom0 domain (at least on ARM), because
->>> we don't have a start_info page at all.
->>>
->>>
->>>>>> +	if (xen_pv_domain() && xen_start_info->store_evtchn)
->>>>>> +		xenstored_ready = 1;
->>>>
->>>> This part can now just be moved unconditionally into case PV.
->>>
->>> What about:
->>>
->>> if (xen_pv_domain())
->>>     usage = PV;
->>> if (xen_hvm_domain())
->>>     usage = HVM;
->>> if (!xen_store_evtchn)
->>>     usage = LOCAL;
->>>
->>> and moving xenstored_ready in case PV, like you suggested.
->>>
->>
->> That looks correct, but you'd need to split up the switch statement in
->> order to populate xen_store_evtchn before that last condition, which
->> ends up pretty much eliminating the usage variable.
-> 
-> Going back to what you wrote in the previous email, in what way this
-> patch breaks the case when an initial domain is started after a Xenstore
-> stub domain?
-> 
-> Assuming that we are talking about a PV initial domain on x86, the
-> following check
-> 
-> if (xen_pv_domain() && !xen_start_info->store_evtchn)
->     usage = LOCAL;
-> 
-> will return false (because store_evtchn is set), therefore usage will
-> remain set to PV.
-> And the check:
-> 
-> if (xen_pv_domain() && xen_start_info->store_evtchn)
-> 	xenstored_ready = 1;
-> 
-> will return true so xenstored_ready is going to be set to 1.
-> 
+Hi Heiko,
 
-Right, the original patch didn't break anything with PV domains. The case
-it doesn't handle is an HVM initial domain with an already-running
-Xenstore domain; I think this applies both to ARM and hybrid/PVH on x86.
-In that case, usage would be set to LOCAL instead of HVM.
+On 7/5/2012 6:20 PM, Heiko Schocher wrote:
+> - AM1808 based board
+> - 64 MiB DDR ram
+> - 2 MiB Nor flash
+> - 128 MiB NAND flash
+> - use internal RTC
+> - I2C support
+> - hwmon lm75 support
+> - UBI/UBIFS support
+> - MMC support
+> - USB OTG support
+> 
+> Signed-off-by: Heiko Schocher <hs@denx.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: davinci-linux-open-source at linux.davincidsp.com
+> Cc: linux-mtd at lists.infradead.org
+> Cc: linux-i2c at vger.kernel.org
+> Cc: netdev at vger.kernel.org
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Wolfram Sang <w.sang@pengutronix.de>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Wolfgang Denk <wd@denx.de>
+> Cc: Scott Wood <scottwood@freescale.com>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> 
+> ---
+> - post this board support with USB support, even though
+>   USB is only working with the 10 ms "workaround", posted here:
+>   http://comments.gmane.org/gmane.linux.usb.general/54505
+>   I see this issue also on the AM1808 TMDXEXP1808L evalboard.
+> - MMC and USB are not using OF support yet, ideas how to port
+>   this are welcome. I need for USB and MMC boards board
+>   specific callbacks, how to solve this with OF support?
+> 
+> - changes for v2:
+>   - changes in the nand node due to comments from Scott Wood:
+>     - add "ti,davinci-" prefix
+>     - Dashes are preferred to underscores
+>     - rename "nandflash" to "nand"
+>     - introduce new "ti,davinci" specific properties for setting
+>       up ecc_mode, ecc_bits, options and bbt options, instead
+>       using linux defines
+>   - changes for i2c due to comments from Sylwester Nawrocki:
+>     - use "cell-index" instead "id"
+>     - OF_DEV_AUXDATA in the machine code, instead pre-define
+>       platform device name
+>   - add comment from Grant Likely for i2c:
+>     - removed "id" resp. "cell-index" completely
+>     - fixed documentation
+>     - use of_match_ptr()
+>     - use devm_kzalloc() for allocating plattform data mem
+>     - fixed a whitespace issue
+>   - add net comments from Grant Likely:
+>     - add prefix "ti,davinci-" to davinci specific property names
+>     - remove version property
+>     - use compatible name "ti,davinci-dm6460-emac"
+>   - add comment from Grant Likely:
+>     - rename compatible node
+>     - do not use cell-index
+>     - CONFIG_OF required for this board
+>     TODO:
+>     - create a generic board support file, as I got no
+>       answer to my ping to grant, maybe this could be done
+>       in a second step?
+> - changes for v3:
+>   - add comments from Sergei Shtylyov:
+>     - rename compatible" prop to "ti,cp_intc"
+>     - cp_intc_init now used for Interrupt controller init
+> - changes for v4:
+>   add comment from Nori Sekhar:
+>   - rename davinci emac compatible property to "ti,davinci-dm6467-emac"
+>   - remove "pinmux-handle" property as discussed here:
+>     http://www.spinics.net/lists/arm-kernel/msg175701.html
+>     with Nori Sekhar
+> 
+> - changes for v5:
+>   add comments from Grant Likely:
+>   - rename compatible" prop to "ti,cp-intc"
+> 
+> - changes for v6:
+>   rework this patch, as patch
+>   ARM: davinci: cp_intc: Add OF support for TI interrupt controller
+>   was changed from Nori Sekhar on Jul 03, 2012; 9:16pm
+>   Changes therefore in this patch:
+> 
+>   Call of_irq_init() in the generic DT board file and not in the
+>   interrupt controller code. See arch/arm/mach-at91/board-dt.c or
+>   arch/arm/mach-omap2/board-generic.c for examples.
+> 
+>   At this point the question raises, if we should rename this
+>   board port from arch/arm/mach-davinci/enbw_cmc.c to
+>   arch/arm/mach-davinci/board-dt.c ? Also the defconfig to
+>   davinci_of_defconfig ... ? The USB and MMC callbacks are
+>   currently board specific, but if other boards come in,
+>   that could be easily adapted for their needs ...
+> 
+>  arch/arm/boot/dts/enbw_cmc.dts                  |  183 +++++++++++
+>  arch/arm/configs/enbw_cmc_defconfig             |  126 ++++++++
+>  arch/arm/mach-davinci/Kconfig                   |    9 +
+>  arch/arm/mach-davinci/Makefile                  |    1 +
+>  arch/arm/mach-davinci/board-enbw-cmc.c          |  385 +++++++++++++++++++++++
+>  arch/arm/mach-davinci/include/mach/uncompress.h |    1 +
+>  6 files changed, 705 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/enbw_cmc.dts
+>  create mode 100644 arch/arm/configs/enbw_cmc_defconfig
+>  create mode 100644 arch/arm/mach-davinci/board-enbw-cmc.c
 
-As a side note: the value of xen_initial_domain() shouldn't be connected to
-determining if xenstore is running locally or not.
+With the move to DT, we are not going to add more board specific files
+and defconfigs. I am working on adding a generic dt board file for DA850
+(similar to what has been done for imx). That file is not going to do
+any platform device registrations. If you are OK with it, I will add the
+dts file for enbw_cmc board in the patch series I am planning to post.
 
--- 
-Daniel De Graaf
-National Security Agency
+Things like USB and MMC/SD will need to be converted to DT before they
+can be supported on new boards.
+
+Thanks,
+Sekhar
