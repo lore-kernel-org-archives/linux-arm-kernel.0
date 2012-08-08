@@ -1,32 +1,81 @@
-From: yliu.null@gmail.com (Yuanhan Liu)
-Date: Wed,  8 Aug 2012 17:02:08 +0800
-Subject: [PATCH] ARM: mmp: fix potential NULL dereference
-Message-ID: <1344416528-3586-1-git-send-email-yliu.null@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 8 Aug 2012 11:11:45 +0200
+Subject: [rtc-linux] [PATCH 8/8] ARM: vt8500: gpio: Devicetree support for
+ arch-vt8500
+In-Reply-To: <1344389967-8465-9-git-send-email-linux@prisktech.co.nz>
+References: <1344389967-8465-1-git-send-email-linux@prisktech.co.nz>
+ <1344389967-8465-9-git-send-email-linux@prisktech.co.nz>
+Message-ID: <CACRpkdbYxpN9RCu8j8KMBgrb=-DsYZHq7hx-ifmHhJ0ZZcRYjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the wrong logic: we should use || instead of &&
+On Wed, Aug 8, 2012 at 3:39 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
 
-Cc: Leo Yan <leoy@marvell.com>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Signed-off-by: Yuanhan Liu <yliu.null@gmail.com>
----
- arch/arm/mach-mmp/sram.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> Converted the existing arch-vt8500 gpio to a platform_device.
+> Added support for WM8505 and WM8650 GPIO controllers.
+(...)
+> +++ b/drivers/gpio/gpio-vt8500.c
 
-diff --git a/arch/arm/mach-mmp/sram.c b/arch/arm/mach-mmp/sram.c
-index 4304f95..7e8a5a2 100644
---- a/arch/arm/mach-mmp/sram.c
-+++ b/arch/arm/mach-mmp/sram.c
-@@ -68,7 +68,7 @@ static int __devinit sram_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	int ret = 0;
- 
--	if (!pdata && !pdata->pool_name)
-+	if (!pdata || !pdata->pool_name)
- 		return -ENODEV;
- 
- 	info = kzalloc(sizeof(*info), GFP_KERNEL);
--- 
-1.7.4.4
+This driver looks very one-bit-per-gpio typed. Are you sure you cannot
+just reuse drivers/gpio/gpio-generic.c? Make a compelling case please...
+
+> +struct vt8500_gpio_bank_regs {
+> +       int     en;
+> +       int     dir;
+> +       int     data_out;
+> +       int     data_in;
+
+Why are all these members int? They should be u8 from reading your code.
+
+> +       int     ngpio;
+> +};
+
+
+> +static struct vt8500_gpio_data vt8500_data = {
+> +       .num_banks      = 7,
+> +       .banks  = {
+> +               VT8500_BANK(0x00, 0x20, 0x40, 0x60, 26),
+> +               VT8500_BANK(0x04, 0x24, 0x44, 0x64, 28),
+> +               VT8500_BANK(0x08, 0x28, 0x48, 0x68, 31),
+> +               VT8500_BANK(0x0C, 0x2C, 0x4C, 0x6C, 19),
+> +               VT8500_BANK(0x10, 0x30, 0x50, 0x70, 19),
+> +               VT8500_BANK(0x14, 0x34, 0x54, 0x74, 23),
+> +               VT8500_BANK(-1, 0x3C, 0x5C, 0x7C, 9),    /* external gpio */
+
+What on earth are all those magic numbers?
+
+I *guess* they're enabling some default GPIO settings etc.
+
+But it really needs better structure, #defines for each one or
+atleast include <linux/bitops.h> and say:
+
+= BIT(4) | /* Enable GPIO pin 5 on this bank */
+   BIT(5); /* Enable GPIO pin 6 on this bank */
+
+However I suspect this is board specific and should
+be taken from device tree. Please elaborate on this...
+
+Ditto for the different instances.
+
+(...)
+> +       unsigned val;
+
+Looks like all of these should be u8.
+
+> +       val = readl(vt8500_chip->base + vt8500_chip->regs->en +
+> +                                                       vt8500_chip->regoff);
+
+val = (u8) readl(...);
+
+usw
+
+> +       val |= (1 << offset);
+
+Use <linux/bitops.h>
+
+val |= BIT(offset);
+
+Apart from these remarks it's looking good...
+
+Yours,
+Linus Walleij
