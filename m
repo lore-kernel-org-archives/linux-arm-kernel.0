@@ -1,78 +1,82 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 8 Aug 2012 01:56:41 -0400 (EDT)
-Subject: [PATCH 01/22] ARM: add mechanism for late code patching
-In-Reply-To: <50219C45.7030601@ti.com>
-References: <1343775898-28345-1-git-send-email-cyril@ti.com>
- <1343775898-28345-2-git-send-email-cyril@ti.com>
- <alpine.LFD.2.02.1208040045360.5231@xanadu.home> <50219C45.7030601@ti.com>
-Message-ID: <alpine.LFD.2.02.1208080106500.5231@xanadu.home>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 08 Aug 2012 15:20:16 +0900
+Subject: [PATCH V4 0/2] arm: samsung: Move FIMD headers to include/video/
+In-Reply-To: <1344342872-7904-1-git-send-email-l.krishna@samsung.com>
+References: <1344342872-7904-1-git-send-email-l.krishna@samsung.com>
+Message-ID: <0ab701cd752d$e0d1db00$a2759100$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Aug 2012, Cyril Chemparathy wrote:
-
-> Hi Nicolas,
+Leela Krishna Amudala wrote:
 > 
-> On 8/4/2012 1:38 AM, Nicolas Pitre wrote:
-> [...]
-> > > extern unsigned __patch_table_begin, __patch_table_end;
-> > 
-> > You could use "exttern void __patch_table_begin" so those symbols don't
-> > get any type that could be misused by mistake, while you still can take
-> > their addresses.
-> > 
+> This patchset moves the contents of regs-fb-v4.h and regs-fb.h from arch
+> side
+> to include/video/samsung_fimd.h
 > 
-> Looks like we'll have to stick with a non-void type here.  The compiler throws
-> a warning when we try to take the address of a void.
-
-Ah, I see. Bummer.  This used not to be the case with older gcc 
-versions.
-
-> [...]
-> > Did you verify with some test program that your patching routines do
-> > produce the same opcodes as the assembled equivalent for all possible
-> > shift values?  Especially for Thumb2 code which isn't as trivial to get
-> > right as the ARM one.
-> > 
+> This patchset is created and rebased against master branch of torvalds
+> tree.
+> Tested on smdk5250 board, build tested for other boards.
 > 
-> We've refactored the patching code into separate functions as:
+> Changes from version 3:
+> 	- Squashed 1st, 3rd, 4th and 5th patches from version 3
 > 
-> static int do_patch_imm8_arm(u32 insn, u32 imm, u32 *ninsn);
-> static int do_patch_imm8_thumb(u32 insn, u32 imm, u32 *ninsn);
+> Changes from version 2:
+> 	- Changed the EXYNOS5_xxx macro name to FIMD_V8_xxx
+> 	- Moved the header inclusion under same kind
 > 
+> Changes from version 1:
+> 	- Split the patches as per Sylwester comments
+> 	- Changed FIMD_V8_xxx macro to EXYNOS5_xxx
 > 
-> With this, the following test code has been used to verify the generated
-> instruction encoding:
+> Leela Krishna Amudala (2):
+>   include/video: move fimd register headers from platform to
+>     include/video
+>   include/video: Add register offsets for FIMD version 8
 > 
-> u32 arm_check[] = {
-> 	0xe2810041, 0xe2810082, 0xe2810f41, 0xe2810f82, 0xe2810e41,
-> 	0xe2810e82, 0xe2810d41, 0xe2810d82, 0xe2810c41, 0xe2810c82,
-> 	0xe2810b41, 0xe2810b82, 0xe2810a41, 0xe2810a82, 0xe2810941,
-> 	0xe2810982, 0xe2810841, 0xe2810882, 0xe2810741, 0xe2810782,
-> 	0xe2810641, 0xe2810682, 0xe2810541, 0xe2810582, 0xe2810441,
-> };
+>  arch/arm/mach-exynos/mach-nuri.c                   |    2 +-
+>  arch/arm/mach-exynos/mach-origen.c                 |    2 +-
+>  arch/arm/mach-exynos/mach-smdk4x12.c               |    2 +-
+>  arch/arm/mach-exynos/mach-smdkv310.c               |    2 +-
+>  arch/arm/mach-exynos/mach-universal_c210.c         |    2 +-
+>  arch/arm/mach-exynos/setup-fimd0.c                 |    2 +-
+>  arch/arm/mach-s3c24xx/mach-smdk2416.c              |    2 +-
+>  arch/arm/mach-s3c64xx/mach-anw6410.c               |    2 +-
+>  arch/arm/mach-s3c64xx/mach-crag6410.c              |    2 +-
+>  arch/arm/mach-s3c64xx/mach-hmt.c                   |    2 +-
+>  arch/arm/mach-s3c64xx/mach-mini6410.c              |    2 +-
+>  arch/arm/mach-s3c64xx/mach-ncp.c                   |    2 +-
+>  arch/arm/mach-s3c64xx/mach-real6410.c              |    2 +-
+>  arch/arm/mach-s3c64xx/mach-smartq5.c               |    2 +-
+>  arch/arm/mach-s3c64xx/mach-smartq7.c               |    2 +-
+>  arch/arm/mach-s3c64xx/mach-smdk6410.c              |    2 +-
+>  arch/arm/mach-s5p64x0/mach-smdk6440.c              |    2 +-
+>  arch/arm/mach-s5p64x0/mach-smdk6450.c              |    2 +-
+>  arch/arm/mach-s5pc100/mach-smdkc100.c              |    2 +-
+>  arch/arm/mach-s5pv210/mach-aquila.c                |    2 +-
+>  arch/arm/mach-s5pv210/mach-goni.c                  |    2 +-
+>  arch/arm/mach-s5pv210/mach-smdkv210.c              |    2 +-
+>  arch/arm/plat-samsung/include/plat/regs-fb-v4.h    |  159
+----------------
+> ----
+>  drivers/gpu/drm/exynos/exynos_drm_fimd.c           |    2 +-
+>  drivers/video/s3c-fb.c                             |    2 +-
+>  .../plat/regs-fb.h => include/video/samsung_fimd.h |  152
+> +++++++++++++++++--
+>  26 files changed, 165 insertions(+), 194 deletions(-)
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+>  rename arch/arm/plat-samsung/include/plat/regs-fb.h =>
+> include/video/samsung_fimd.h (73%)
 
-Instead of using this array you could let the assembler do it for you 
-like this:
+Looks OK to me. Will apply into topic branch, 'v3.7-for-florian' for
+Florian's pulling.
 
-asm (" \n\
-	.arm \n\
-arm_check: \n\
-        .set shft, 0 \n\
-        .rep 12 \n\
-        add     r1, r2, #0x81 << \shft \n\
-        .set shft, \shft + 2 \n\
-        .endr \n\
-");
+If there is no objection for a couple of days, I will merge this into
+for-next and send to Florian.
 
-> u32 thumb_check[] = {
-> 	0xf1010081, 0xf5017081, 0xf5017001, 0xf5016081, 0xf5016001,
-> 	0xf5015081, 0xf5015001, 0xf5014081, 0xf5014001, 0xf5013081,
-> 	0xf5013001, 0xf5012081, 0xf5012001, 0xf5011081, 0xf5011001,
-> 	0xf5010081, 0xf5010001, 0xf1017081, 0xf1017001, 0xf1016081,
-> 	0xf1016001, 0xf1015081, 0xf1015001, 0xf1014081, 0xf1014001,
+Thanks.
 
-Same idea here.
-
-
-Nicolas
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
