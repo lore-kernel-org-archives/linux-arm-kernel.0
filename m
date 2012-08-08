@@ -1,34 +1,27 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 8 Aug 2012 14:17:14 +0100
-Subject: [PATCH 1/1] Input: ab8500-ponkey: Make the distinction between
- DT and non-DT boots
-In-Reply-To: <20120808114037.GB8227@gmail.com>
-References: <20120807170333.GV16861@opensource.wolfsonmicro.com>
- <20120808080411.GB4728@gmail.com>
- <20120808094952.GH16861@opensource.wolfsonmicro.com>
- <20120808114037.GB8227@gmail.com>
-Message-ID: <20120808131714.GT16861@opensource.wolfsonmicro.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 8 Aug 2012 10:18:15 -0300
+Subject: [PATCH 6/6] ARM: imx: gpmi-nand depends on mxs-dma
+In-Reply-To: <50226409.1060800@de.bosch.com>
+References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
+ <1344430493-5304-7-git-send-email-arnd@arndb.de>
+ <CAOMZO5CZ7mJd89cN_S0KBS74mc5qTzvrfRbmHVX3nmEakx19ow@mail.gmail.com>
+ <50226409.1060800@de.bosch.com>
+Message-ID: <CAOMZO5BtStkEWGRWi7LcVT_DK0C2WnjPiCOh2ZriVzrP+1NW3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2012 at 12:40:38PM +0100, Lee Jones wrote:
-> On Wed, Aug 08, 2012 at 10:49:52AM +0100, Mark Brown wrote:
+On Wed, Aug 8, 2012 at 10:05 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
 
-> > >  - MFD adds the IRQ base to the hwirq and registers it as a virq
+> Yes. But it seems it's not handled there? I'm trying since ~2 weeks to get
+> something like your patch applied to get the broken mainline fixed, but
+> unfortunately without success so far.
 
-> > Just don't do this step - the only reason to do it is for mapping back
-> > into a linear domain but if you're going to do this...
+Let's try once again.
 
-> > >  - AB8500 child devices use *_get_virq() to convert virq to virq - *ERROR*
+Artem,
 
-> > ...then it's redundant.  The mapping functions in the domain code
-> > replace this functionality.
+Could https://patchwork.kernel.org/patch/1236551/ be applied?
 
-> No, the other way round. This is now required all the time.
+Thanks,
 
-> Now we force the use of hwirq, the driver needs to convert that into a
-> virq before requesting the resource. So we need to put *_get_virq()'s into
-> every child device that requests an IRQ.
-
-Yes, that's exactly what I said - and as a result of doing this the
-remapping in the MFD core becomes redundant.
+Fabio Estevam
