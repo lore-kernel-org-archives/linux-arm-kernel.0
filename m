@@ -1,39 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  8 Aug 2012 00:07:55 -0300
-Subject: [PATCH] ARM: mxs_defconfig: Add framebuffer support
-Message-ID: <1344395275-6275-1-git-send-email-festevam@gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 07 Aug 2012 23:14:23 -0400
+Subject: [PATCH RESEND v5 0/4] atmel-mci device tree support
+In-Reply-To: <1343136606-8874-1-git-send-email-ludovic.desroches@atmel.com>
+ (ludovic desroches's message of "Tue, 24 Jul 2012 15:30:02 +0200")
+References: <1343136606-8874-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <87hasexegg.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi,
 
-Add framebuffer support.
+On Tue, Jul 24 2012, ludovic.desroches at atmel.com wrote:
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+>
+> Hello,
+>
+> I resend this set of patches because patches 2, 3 and 4 were acked by
+> Jean-Christophe. Patch 1 was also acked by Jean-Christophe excepted for
+> cd-inverted property since it was redundant with gpio bindings.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Shawn,
+In future, it's helpful for me if you can add the Acked-by lines you
+receive into the patches when you resend them.  Thanks!
 
-I did not test it as I do not have an LCD for mx28evk handy.
+> I thought we were agree to go ahead since it was a common binding already
+> documented and it will concern all drivers.
 
- arch/arm/configs/mxs_defconfig |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+Agreed.  It's a documented core MMC binding, it's fine to use it.
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index 4cb6170..6166838 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -110,6 +110,12 @@ CONFIG_SND_SOC_I2C_AND_SPI=y
- CONFIG_SND_SOC_SGTL5000=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_FB=y
-+CONFIG_FB_MXS=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_FONTS=y
-+CONFIG_LOGO=y
- CONFIG_USB=y
- CONFIG_USB_CHIPIDEA=y
- CONFIG_USB_CHIPIDEA_HOST=y
+> Chris are you agree to take patch 1/4? Others patches may go to at91 tree,
+> isn't it?
+
+Yes, let's do that.  I've applied patch 1/4 to mmc-next for 3.7, and you
+can send the others via the at91 tree with the ACK that Arnd gave.
+
+Thanks,
+
+- Chris.
 -- 
-1.7.1
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
