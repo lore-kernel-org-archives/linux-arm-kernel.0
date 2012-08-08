@@ -1,84 +1,47 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 8 Aug 2012 14:11:59 +0100
-Subject: [PATCH 1/1 v4] i2c: Add default configuration into the Nomadik I2C
- driver.
-In-Reply-To: <1344266253-14050-1-git-send-email-lee.jones@linaro.org>
-References: <1344266253-14050-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120808131158.GD8227@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 8 Aug 2012 14:13:56 +0100
+Subject: [PATCH 04/11] MFD: twl4030-audio: Add DT support
+In-Reply-To: <1344418887-5262-5-git-send-email-peter.ujfalusi@ti.com>
+References: <1344418887-5262-1-git-send-email-peter.ujfalusi@ti.com>
+ <1344418887-5262-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120808131356.GS16861@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lee Jones <lee.jones@linaro.org>
-Date: Tue, 7 Aug 2012 12:27:24 +0100
-Subject: [PATCH 1/1 v4] i2c/nomadik: Add default configuration into the Nomadik I2C driver
+On Wed, Aug 08, 2012 at 12:41:20PM +0300, Peter Ujfalusi wrote:
 
-At this moment in time there is only one known configuration for the
-Nomadik I2C driver. By not holding that configuration in the driver
-adds some unnecessary overhead in platform code. The configuration
-as already been removed from platform code, this patch checks for any
-over-riding configurations. If there aren't any, the default is used.
+> +Required properties:
+> +- compatible : must be "ti,twl4030-audio"
 
-Cc: linux-i2c at vger.kernel.org
-Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/i2c/busses/i2c-nomadik.c |   28 ++++++++++++++++++----------
- 1 file changed, 18 insertions(+), 10 deletions(-)
+So, as I mentioned before I find this sort of direct mapping of the
+Linux device representation into the device tree really troubling.
+I'm just way too aware of the fact that even the Linux split of these
+things can change over time and often represents internal Linux
+considerations.
 
-diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index 5e6f1ee..61b00ed 100644
---- a/drivers/i2c/busses/i2c-nomadik.c
-+++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -350,10 +350,6 @@ static void setup_i2c_controller(struct nmk_i2c_dev *dev)
- 
- 	i2c_clk = clk_get_rate(dev->clk);
- 
--	/* fallback to std. mode if machine has not provided it */
--	if (dev->cfg.clk_freq == 0)
--		dev->cfg.clk_freq = 100000;
--
- 	/*
- 	 * The spec says, in case of std. mode the divider is
- 	 * 2 whereas it is 3 for fast and fastplus mode of
-@@ -911,20 +907,32 @@ static const struct i2c_algorithm nmk_i2c_algo = {
- 	.functionality	= nmk_i2c_functionality
- };
- 
-+static struct nmk_i2c_controller u8500_i2c = {
-+	/*
-+	 * Slave data setup time; 250ns, 100ns, and 10ns, which
-+	 * is 14, 6 and 2 respectively for a 48Mhz i2c clock.
-+	 */
-+	.slsu           = 0xe,
-+	.tft            = 1,      /* Tx FIFO threshold */
-+	.rft            = 8,      /* Rx FIFO threshold */
-+	.clk_freq       = 400000, /* fast mode operation */
-+	.timeout        = 200,    /* Slave response timeout(ms) */
-+	.sm             = I2C_FREQ_MODE_FAST,
-+};
-+
- static atomic_t adapter_id = ATOMIC_INIT(0);
- 
- static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
- {
- 	int ret = 0;
--	struct nmk_i2c_controller *pdata =
--			adev->dev.platform_data;
-+	struct nmk_i2c_controller *pdata = adev->dev.platform_data;
- 	struct nmk_i2c_dev	*dev;
- 	struct i2c_adapter *adap;
- 
--	if (!pdata) {
--		dev_warn(&adev->dev, "no platform data\n");
--		return -ENODEV;
--	}
-+	if (!pdata)
-+		/* No i2c configuration found, using the default. */
-+		pdata = &u8500_i2c;
-+
- 	dev = kzalloc(sizeof(struct nmk_i2c_dev), GFP_KERNEL);
- 	if (!dev) {
- 		dev_err(&adev->dev, "cannot allocate memory\n");
--- 
-1.7.9.5
+> +-ti,hs_extmute: Use external mute for HS pop reduction
+> +-ti,hs_extmute_gpio: Use external GPIO to control the external mute
+> +-ti,hs_extmute_disable_level: The desired level of the GPIO line when the
+> +			      external mute is disabled. valuse: 0 or 1
+
+This doesn't seem like something that should be in the CODEC driver
+really, there's a general need for something which can unmute controls
+at the end of the power up sequence and mute before power down.  Also,
+if this is going to be part of the binding shouldn't we just omit the
+first property and simply check for the presence of the property which
+specifies the GPIO?
+
+> +#ifdef CONFIG_OF
+> +	if (of_find_node_by_name(node, "codec"))
+> +		return true;
+> +#endif
+
+This really seems like we should be stubbing out of_find_node_by_name()
+to return false in non-OF cases.
+
+> +#ifdef CONFIG_OF
+> +	if (!of_property_read_u32(node, "ti,enable-vibra", &vibra) && vibra)
+> +		return true;
+> +#endif
+
+Similarly here.
