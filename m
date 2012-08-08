@@ -1,23 +1,19 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 8 Aug 2012 22:41:51 +0800
-Subject: [PATCH 1/6] ARM: mxs: tx28: reset fec phy for device tree boot
-In-Reply-To: <201208071915.26932.arnd@arndb.de>
-References: <1344267769-31166-1-git-send-email-shawn.guo@linaro.org>
- <1344267769-31166-2-git-send-email-shawn.guo@linaro.org>
- <201208071915.26932.arnd@arndb.de>
-Message-ID: <20120808144148.GC14718@S2101-09.ap.freescale.net>
+Date: Wed, 8 Aug 2012 22:43:39 +0800
+Subject: [PATCH 1/2] ARM: i.MX35: Add kernel oftree support
+In-Reply-To: <20120808085956.GB25520@pengutronix.de>
+References: <1343922986-32469-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20120803131230.GB23791@S2101-09.ap.freescale.net>
+ <20120808085956.GB25520@pengutronix.de>
+Message-ID: <20120808144337.GD14718@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 07, 2012 at 07:15:25PM +0000, Arnd Bergmann wrote:
-> > +       /* Power up fec phy */
-> > +       gpio_set_value(TX28_FEC_PHY_POWER, 1);
-> > +       mdelay(26); /* 25ms according to data sheet */
+On Wed, Aug 08, 2012 at 10:59:56AM +0200, Uwe Kleine-K?nig wrote:
+> $ git grep fsl,imx3[15]-gpio drivers/gpio
+> drivers/gpio/gpio-mxc.c:        { .compatible = "fsl,imx31-gpio", .data = &mxc_gpio_devtype[IMX31_GPIO], },
 > 
-> 26 ms is a long time for a delay. I think you should use msleep here.
-> 
-I copied this from TX28 board file.  But I just changed it per your
-comment.  Thanks.
+Try it on v3.6-rc1.
 
 -- 
 Regards,
