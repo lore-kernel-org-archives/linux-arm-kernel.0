@@ -1,47 +1,87 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  8 Aug 2012 14:54:47 +0200
-Subject: [PATCH 0/6] ARM: defconfig build errors
-Message-ID: <1344430493-5304-1-git-send-email-arnd@arndb.de>
+Date: Wed,  8 Aug 2012 14:54:49 +0200
+Subject: [PATCH 2/6] ARM: pxa remove irq_to_gpio from eeti_ts driver
+In-Reply-To: <1344430493-5304-1-git-send-email-arnd@arndb.de>
+References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
+Message-ID: <1344430493-5304-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm dusting off my defconfig warning fixes. This is the most important
-bunch as these are actual build failures that happen in one of the
-defconfigs. I've put these into the "fixes" branch of the arm-soc
-tree already and will send them out for -r2 unless I hear objections.
+The irq_to_gpio function was removed from the pxa platform
+in linux-3.2, and this driver has been broken since.
 
-Please take a look.
+Without this patch, building raumfeld_defconfig results in:
 
-	Arnd
+drivers/input/touchscreen/eeti_ts.c: In function 'eeti_ts_irq_active':
+drivers/input/touchscreen/eeti_ts.c:65:2: error: implicit declaration of function 'irq_to_gpio' [-Werror=implicit-function-declaration]
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: stable at vger.kernel.org (v3.2+)
 Cc: Daniel Mack <zonque@gmail.com>
-Cc: Daniel Ribeiro <drwyrm@gmail.com>
 Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-pxa/raumfeld.c        |    1 +
+ drivers/input/touchscreen/eeti_ts.c |    8 +++++---
+ include/linux/input/eeti_ts.h       |    1 +
+ 3 files changed, 7 insertions(+), 3 deletions(-)
 
-Arnd Bergmann (6):
-  ARM: pxa: remove irq_to_gpio from ezx-pcap driver
-  ARM: pxa remove irq_to_gpio from eeti_ts driver
-  ARM: sa1100: include asm/io.h in hackkit leds code
-  ARM: s3c24xx: use new PWM driver
-  ARM: integrator: include <linux/export.h
-  ARM: imx: gpmi-nand depends on mxs-dma
-
- arch/arm/configs/imx_v6_v7_defconfig |    1 +
- arch/arm/mach-integrator/core.c      |    1 +
- arch/arm/mach-pxa/raumfeld.c         |    1 +
- arch/arm/mach-s3c24xx/Kconfig        |    6 ++++--
- arch/arm/mach-sa1100/leds-hackkit.c  |    1 +
- drivers/input/touchscreen/eeti_ts.c  |    8 +++++---
- drivers/mfd/ezx-pcap.c               |    2 +-
- drivers/mtd/nand/Kconfig             |    2 +-
- include/linux/input/eeti_ts.h        |    1 +
- include/linux/mfd/ezx-pcap.h         |    1 +
- 10 files changed, 17 insertions(+), 7 deletions(-)
-
+diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
+index 5905ed1..9e1c4ea 100644
+--- a/arch/arm/mach-pxa/raumfeld.c
++++ b/arch/arm/mach-pxa/raumfeld.c
+@@ -953,6 +953,7 @@ static struct i2c_board_info raumfeld_connector_i2c_board_info __initdata = {
+ 
+ static struct eeti_ts_platform_data eeti_ts_pdata = {
+ 	.irq_active_high = 1,
++	.gpio = GPIO_TOUCH_IRQ,
+ };
+ 
+ static struct i2c_board_info raumfeld_controller_i2c_board_info __initdata = {
+diff --git a/drivers/input/touchscreen/eeti_ts.c b/drivers/input/touchscreen/eeti_ts.c
+index 503c709..45dab18 100644
+--- a/drivers/input/touchscreen/eeti_ts.c
++++ b/drivers/input/touchscreen/eeti_ts.c
+@@ -48,7 +48,7 @@ struct eeti_ts_priv {
+ 	struct input_dev *input;
+ 	struct work_struct work;
+ 	struct mutex mutex;
+-	int irq, irq_active_high;
++	int irq, gpio, irq_active_high;
+ };
+ 
+ #define EETI_TS_BITDEPTH	(11)
+@@ -62,7 +62,7 @@ struct eeti_ts_priv {
+ 
+ static inline int eeti_ts_irq_active(struct eeti_ts_priv *priv)
+ {
+-	return gpio_get_value(irq_to_gpio(priv->irq)) == priv->irq_active_high;
++	return gpio_get_value(priv->gpio) == priv->irq_active_high;
+ }
+ 
+ static void eeti_ts_read(struct work_struct *work)
+@@ -203,8 +203,10 @@ static int __devinit eeti_ts_probe(struct i2c_client *client,
+ 
+ 	pdata = client->dev.platform_data;
+ 
+-	if (pdata)
++	if (pdata) {
++		priv->gpio = pdata->gpio;
+ 		priv->irq_active_high = pdata->irq_active_high;
++	}
+ 
+ 	irq_flags = priv->irq_active_high ?
+ 		IRQF_TRIGGER_RISING : IRQF_TRIGGER_FALLING;
+diff --git a/include/linux/input/eeti_ts.h b/include/linux/input/eeti_ts.h
+index f875b31..3404504 100644
+--- a/include/linux/input/eeti_ts.h
++++ b/include/linux/input/eeti_ts.h
+@@ -3,6 +3,7 @@
+ 
+ struct eeti_ts_platform_data {
+ 	unsigned int irq_active_high;
++	unsigned int gpio;
+ };
+ 
+ #endif /* LINUX_INPUT_EETI_TS_H */
 -- 
 1.7.10
