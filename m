@@ -1,28 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 8 Aug 2012 10:43:06 +0200
-Subject: [PATCH] pinctrl/nomadik: add ASIC DB8450 pinctrl driver
-In-Reply-To: <502179EA.30301@wwwdotorg.org>
-References: <1344341538-32223-1-git-send-email-linus.walleij@stericsson.com>
- <502179EA.30301@wwwdotorg.org>
-Message-ID: <CACRpkdZ+SsMzAGotOVZ5HrOEQUDs-8ixBYwuLu1ff6Qe=84OdA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 8 Aug 2012 10:59:56 +0200
+Subject: [PATCH 1/2] ARM: i.MX35: Add kernel oftree support
+In-Reply-To: <20120803131230.GB23791@S2101-09.ap.freescale.net>
+References: <1343922986-32469-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20120803131230.GB23791@S2101-09.ap.freescale.net>
+Message-ID: <20120808085956.GB25520@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 7, 2012 at 10:26 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+Hello Shawn,
 
->> @@ -1722,6 +1722,8 @@ static int __devinit nmk_pinctrl_probe(struct platform_device *pdev)
->>       /* Poke in other ASIC variants here */
->>       if (version == PINCTRL_NMK_DB8500)
->>               nmk_pinctrl_db8500_init(&npct->soc);
->> +     if (platid->driver_data == PINCTRL_NMK_DB8540)
->> +             nmk_pinctrl_db8540_init(&npct->soc);
->
-> I'm surprised one of those checks "version" and the other
-> "platid->driver_data".
->
-> Aside from that, this looks fine.
+On Fri, Aug 03, 2012 at 09:12:32PM +0800, Shawn Guo wrote:
+> On Thu, Aug 02, 2012 at 05:56:25PM +0200, Uwe Kleine-K?nig wrote:
+> > +			gpio3: gpio at 0x53fa4000 {
+> > +				compatible = "fsl,imx35-gpio", "fsl,imx31-gpio";
+> 
+> compatible = "fsl,imx35-gpio";
+$ git grep fsl,imx3[15]-gpio drivers/gpio
+drivers/gpio/gpio-mxc.c:        { .compatible = "fsl,imx31-gpio", .data = &mxc_gpio_devtype[IMX31_GPIO], },
 
-Bah, I'll fix this, then add your ACK.
+I guess that means I have to keep "fsl,imx31-gpio", right?
 
-Yours,
-Linus Walleij
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
