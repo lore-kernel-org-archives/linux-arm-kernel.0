@@ -1,56 +1,58 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  8 Aug 2012 14:54:51 +0200
-Subject: [PATCH 4/6] ARM: s3c24xx: use new PWM driver
+Date: Wed,  8 Aug 2012 14:54:48 +0200
+Subject: [PATCH 1/6] ARM: pxa: remove irq_to_gpio from ezx-pcap driver
 In-Reply-To: <1344430493-5304-1-git-send-email-arnd@arndb.de>
 References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
-Message-ID: <1344430493-5304-5-git-send-email-arnd@arndb.de>
+Message-ID: <1344430493-5304-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The samsung PWM driver has moved to the new PWM subsystem, which
-changed the Kconfig symbol for that driver, but the rx1950 and
-gta02 boards still uses the old one.
+The irq_to_gpio function was removed from the pxa platform
+in linux-3.2, and this driver has been broken since.
 
-Without this patch, building s3c2410_defconfig results in:
+There is actually no in-tree user of this driver that adds
+this platform device, but the driver can and does get enabled
+on some platforms.
 
-arch/arm/mach-s3c24xx/built-in.o: In function `rx1950_lcd_power':
-arch/arm/mach-s3c24xx/mach-rx1950.c:430: undefined reference to `pwm_config'
-arch/arm/mach-s3c24xx/mach-rx1950.c:431: undefined reference to `pwm_disable'
-arch/arm/mach-s3c24xx/mach-rx1950.c:437: undefined reference to `pwm_config'
-arch/arm/mach-s3c24xx/mach-rx1950.c:438: undefined reference to `pwm_enable'
-arch/arm/mach-s3c24xx/built-in.o: In function `rx1950_backlight_exit':
-arch/arm/mach-s3c24xx/mach-rx1950.c:504: undefined reference to `pwm_free'
-arch/arm/mach-s3c24xx/built-in.o: In function `rx1950_backlight_init':
-arch/arm/mach-s3c24xx/mach-rx1950.c:487: undefined reference to `pwm_request'
+Without this patch, building ezx_defconfig results in:
+
+drivers/mfd/ezx-pcap.c: In function 'pcap_isr_work':
+drivers/mfd/ezx-pcap.c:205:2: error: implicit declaration of function 'irq_to_gpio' [-Werror=implicit-function-declaration]
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: stable at vger.kernel.org (v3.2+)
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Daniel Ribeiro <drwyrm@gmail.com>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
 ---
- arch/arm/mach-s3c24xx/Kconfig |    6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/mfd/ezx-pcap.c       |    2 +-
+ include/linux/mfd/ezx-pcap.h |    1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index e249611..422133a 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -483,7 +483,8 @@ config MACH_NEO1973_GTA02
- 	select I2C
- 	select POWER_SUPPLY
- 	select MACH_NEO1973
--	select S3C2410_PWM
-+	select PWM
-+	select PWM_SAMSUNG
- 	select S3C_DEV_USB_HOST
- 	help
- 	   Say Y here if you are using the Openmoko GTA02 / Freerunner GSM Phone
-@@ -493,7 +494,8 @@ config MACH_RX1950
- 	select S3C24XX_DCLK
- 	select PM_H1940 if PM
- 	select I2C
--	select S3C2410_PWM
-+	select PWM
-+	select PWM_SAMSUNG
- 	select S3C_DEV_NAND
- 	select S3C2410_IOTIMING if S3C2440_CPUFREQ
- 	select S3C2440_XTAL_16934400
+diff --git a/drivers/mfd/ezx-pcap.c b/drivers/mfd/ezx-pcap.c
+index 43a76c4..db662e2 100644
+--- a/drivers/mfd/ezx-pcap.c
++++ b/drivers/mfd/ezx-pcap.c
+@@ -202,7 +202,7 @@ static void pcap_isr_work(struct work_struct *work)
+ 		}
+ 		local_irq_enable();
+ 		ezx_pcap_write(pcap, PCAP_REG_MSR, pcap->msr);
+-	} while (gpio_get_value(irq_to_gpio(pcap->spi->irq)));
++	} while (gpio_get_value(pdata->gpio));
+ }
+ 
+ static void pcap_irq_handler(unsigned int irq, struct irq_desc *desc)
+diff --git a/include/linux/mfd/ezx-pcap.h b/include/linux/mfd/ezx-pcap.h
+index 40c37216..32a1b5c 100644
+--- a/include/linux/mfd/ezx-pcap.h
++++ b/include/linux/mfd/ezx-pcap.h
+@@ -16,6 +16,7 @@ struct pcap_subdev {
+ struct pcap_platform_data {
+ 	unsigned int irq_base;
+ 	unsigned int config;
++	int gpio;
+ 	void (*init) (void *);	/* board specific init */
+ 	int num_subdevs;
+ 	struct pcap_subdev *subdevs;
 -- 
 1.7.10
