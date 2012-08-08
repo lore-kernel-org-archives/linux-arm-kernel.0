@@ -1,52 +1,64 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 8 Aug 2012 08:55:02 +0200
-Subject: [PATCH 1/2] ARM: build ssi-fiq.S in ARM mode to prevent
- CONFIG_THUMB2_KERNEL build breakage
-In-Reply-To: <1344379514-30076-2-git-send-email-matt@genesi-usa.com>
-References: <1344379514-30076-1-git-send-email-matt@genesi-usa.com>
- <1344379514-30076-2-git-send-email-matt@genesi-usa.com>
-Message-ID: <20120808065502.GI1451@pengutronix.de>
+Date: Wed, 8 Aug 2012 08:57:13 +0200
+Subject: [PATCH 3/9] [media] mx1_camera: Don't use {en,dis}able_fiq() calls
+In-Reply-To: <1344207819-3415-3-git-send-email-anton.vorontsov@linaro.org>
+References: <20120805230238.GA1663@lizard>
+ <1344207819-3415-3-git-send-email-anton.vorontsov@linaro.org>
+Message-ID: <20120808065713.GJ1451@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 07, 2012 at 05:45:13PM -0500, Matt Sealey wrote:
-> If i.MX SSI FIQ support is enabled then it is impossible to build a Thumb2
-> kernel image due to the code not being written with Thumb2 in mind (over-use
-> of registers). In order not to break Thumb2 kernels, compile this as ARM. All
-> the processors which require this support will run ARM code so there is no
-> problem at runtime in doing this, even if it does produce a strange mix of
-> code that may not be desired.
+On Sun, Aug 05, 2012 at 04:03:33PM -0700, Anton Vorontsov wrote:
+> The driver uses platform-specific mxc_set_irq_fiq() with the VIRQ cookie
+> passed to it, so it's pretty clear that the driver is absolutely sure
+> that the FIQ is routed via platform-specific IC, and that the cookie can
+> be used to mask/unmask FIQs. So, let's switch to the genirq routines,
+> since we're about to remove FIQ-specific variants.
 > 
-> In theory this should only be needed on configs based on imx_v4_v5_defconfig
-> where CONFIG_THUMB2_KERNEL cannot be selected anyway since these SoCs do not
-> have ARM cores capable of running Thumb2 code. This also makes rewriting the
-> code as Thumb-compatible kind of redundant. But since one Eukrea board audio
-> driver needs it, and there is an i.MX51 CPU module for this board, it gets
-> pulled in for imx_v6_v7_defconfig too, making this a necessity.
-> 
-> Signed-off-by: Matt Sealey <matt@genesi-usa.com>
+> Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
+
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+
 > ---
->  arch/arm/plat-mxc/ssi-fiq.S |    1 +
->  1 file changed, 1 insertion(+)
+>  drivers/media/video/mx1_camera.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/plat-mxc/ssi-fiq.S b/arch/arm/plat-mxc/ssi-fiq.S
-> index 8397a2d..ac09af8 100644
-> --- a/arch/arm/plat-mxc/ssi-fiq.S
-> +++ b/arch/arm/plat-mxc/ssi-fiq.S
-> @@ -28,6 +28,7 @@
->  #define SSI_SIER_RFF0_EN	(1 << 2)
+> diff --git a/drivers/media/video/mx1_camera.c b/drivers/media/video/mx1_camera.c
+> index d2e6f82..1536d09 100644
+> --- a/drivers/media/video/mx1_camera.c
+> +++ b/drivers/media/video/mx1_camera.c
+> @@ -801,7 +801,7 @@ static int __init mx1_camera_probe(struct platform_device *pdev)
+>  	set_fiq_regs(&regs);
 >  
->  		.text
-> +		.arm
->  		.global	imx_ssi_fiq_start
->  		.global	imx_ssi_fiq_end
->  		.global imx_ssi_fiq_base
-
-I think it would be better to add a depends on !THUMB2_KERNEL to
-SND_IMX_SOC_PCM_FIQ. The above may result in broken code in a thumb2
-kernel, so I'd rather keep the compile error instead.
-
-Sascha
+>  	mxc_set_irq_fiq(irq, 1);
+> -	enable_fiq(irq);
+> +	enable_irq(irq);
+>  
+>  	pcdev->soc_host.drv_name	= DRIVER_NAME;
+>  	pcdev->soc_host.ops		= &mx1_soc_camera_host_ops;
+> @@ -817,7 +817,7 @@ static int __init mx1_camera_probe(struct platform_device *pdev)
+>  	return 0;
+>  
+>  exit_free_irq:
+> -	disable_fiq(irq);
+> +	disable_irq(irq);
+>  	mxc_set_irq_fiq(irq, 0);
+>  	release_fiq(&fh);
+>  exit_free_dma:
+> @@ -842,7 +842,7 @@ static int __exit mx1_camera_remove(struct platform_device *pdev)
+>  	struct resource *res;
+>  
+>  	imx_dma_free(pcdev->dma_chan);
+> -	disable_fiq(pcdev->irq);
+> +	disable_irq(pcdev->irq);
+>  	mxc_set_irq_fiq(pcdev->irq, 0);
+>  	release_fiq(&fh);
+>  
+> -- 
+> 1.7.10.4
+> 
+> 
 
 -- 
 Pengutronix e.K.                           |                             |
