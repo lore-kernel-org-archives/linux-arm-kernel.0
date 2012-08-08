@@ -1,176 +1,172 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Aug 2012 12:39:16 +0000
-Subject: [PATCH v3 0/7] mv643xx.c: Add basic device tree support.
-In-Reply-To: <502252A6.4090409@codethink.co.uk>
-References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
- <50223428.6030506@codethink.co.uk> <502252A6.4090409@codethink.co.uk>
-Message-ID: <201208081239.16778.arnd@arndb.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 8 Aug 2012 13:41:11 +0100
+Subject: [PATCH v2 02/23] xen/arm: hypercalls
+In-Reply-To: <1344263246-28036-2-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1208061428060.4645@kaball.uk.xensource.com>
+ <1344263246-28036-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20120808124111.GB2134@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 August 2012, Ian Molton wrote:
-> The SMI / PHY stuff should look very similar, so I'm happy with something
-> like:
+On Mon, Aug 06, 2012 at 03:27:05PM +0100, Stefano Stabellini wrote:
+> Use r12 to pass the hypercall number to the hypervisor.
 > 
-> mdio at 2000 {
->                 #address-cells = <1>;
->                 #size-cells = <1>;
->                 device_type = "mdio";
->                 compatible = "marvell,mv643xx-mdio";
->                 phy0: ethernet-phy at 0 {
->                         device_type = "ethernet-phy";
->                         compatible = "marvell,whatever";
->                         interrupts = <76>;
->                         interrupt-parent = <&mpic>;
->                         reg = <0 32>;          // Auto probed phy addr
->                 };
+> We need a register to pass the hypercall number because we might not
+> know it at compile time and HVC only takes an immediate argument.
 > 
->                 phy1: ethernet-phy at 3 {
->                         device_type = "ethernet-phy";
->                         compatible = "marvell,whatever";
->                         interrupts = <77>;
->                         interrupt-parent = <&mpic>;
->                         reg = <3 1>;            // specified phy addr
->                 };
+> Among the available registers r12 seems to be the best choice because it
+> is defined as "intra-procedure call scratch register".
 > 
->                 ... and so on.
-> }
+> Use the ISS to pass an hypervisor specific tag.
 > 
-> Where we can use the reg parameter to allow auto-probing, by
-> specifying a size of 32 (32 phy addrs max).
+> Changes in v2:
+> - define an HYPERCALL macro for 5 arguments hypercall wrappers, even if
+> at the moment is unused;
+> - use ldm instead of pop;
+> - fix up comments.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> ---
+>  arch/arm/include/asm/xen/hypercall.h |   50 ++++++++++++++++
+>  arch/arm/xen/Makefile                |    2 +-
+>  arch/arm/xen/hypercall.S             |  106 ++++++++++++++++++++++++++++++++++
+>  3 files changed, 157 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/include/asm/xen/hypercall.h
+>  create mode 100644 arch/arm/xen/hypercall.S
 
-I don't understand the auto-probed phy address. What is the purpose of that?
+[...]
 
-If possible, I think we should keep using #size-cells=<0>, which would
-make the method you describe impossible. It might still work if you just
-leave out the "reg" property for that node.
+> diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
+> new file mode 100644
+> index 0000000..074f5ed
+> --- /dev/null
+> +++ b/arch/arm/xen/hypercall.S
+> @@ -0,0 +1,106 @@
+> +/******************************************************************************
+> + * hypercall.S
+> + *
+> + * Xen hypercall wrappers
+> + *
+> + * Stefano Stabellini <stefano.stabellini@eu.citrix.com>, Citrix, 2012
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License version 2
+> + * as published by the Free Software Foundation; or, when distributed
+> + * separately from the Linux kernel or incorporated into other
+> + * software packages, subject to the following license:
+> + *
+> + * Permission is hereby granted, free of charge, to any person obtaining a copy
+> + * of this source file (the "Software"), to deal in the Software without
+> + * restriction, including without limitation the rights to use, copy, modify,
+> + * merge, publish, distribute, sublicense, and/or sell copies of the Software,
+> + * and to permit persons to whom the Software is furnished to do so, subject to
+> + * the following conditions:
+> + *
+> + * The above copyright notice and this permission notice shall be included in
+> + * all copies or substantial portions of the Software.
+> + *
+> + * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+> + * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> + * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+> + * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> + * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+> + * IN THE SOFTWARE.
+> + */
+> +
+> +/*
+> + * The Xen hypercall calling convention is very similar to the ARM
+> + * procedure calling convention: the first paramter is passed in r0, the
+> + * second in r1, the third in r2 and the fourth in r3. Considering that
+> + * Xen hypercalls have 5 arguments at most, the fifth paramter is passed
+> + * in r4, differently from the procedure calling convention of using the
+> + * stack for that case.
+> + *
+> + * The hypercall number is passed in r12.
+> + *
+> + * The return value is in r0.
+> + *
+> + * The hvc ISS is required to be 0xEA1, that is the Xen specific ARM
+> + * hypercall tag.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +#include <asm/assembler.h>
+> +#include <xen/interface/xen.h>
+> +
+> +
+> +/* HVC 0xEA1 */
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +#define xen_hvc .word 0xf7e08ea1
+> +#else
+> +#define xen_hvc .word 0xe140ea71
+> +#endif
 
-I also don't understand how the phy driver would locate ethernet-phy at 0
-on the bus if it does not know the address.
+Consider using my opcode injection helpers patch for this (see
+separate repost: [PATCH v2 REPOST 0/4] ARM: opcodes: Facilitate custom
+opcode injection), assuming that nobody objects to it.  This should mean
+that the right opcodes get generated when building a kernel for a big-
+endian target for example.
 
-> The ethernet driver itself is more complicated:
-> 
-> We have the following considerations:
-> 
-> * we have one MDIO bus, typically, shared between all the MACs / PHYs.
-> * each ethernet device can multiple ports (up to three), each with its
->   own MAC/PHY.
-> * MAC <-> PHY mapping can be specified, probed (ugh!) or a (gah!)
->   mix of the two.
-> * existing D-T users, albeit not well documented / code complete.
-> * some port address ranges overlap (MIB counters, MCAST / UNICAST
->   tables, etc.
-> 
-> The existing ethernet-group idea only works because the current
-> platform-device based driver doesnt really do proper resource
-> management, and thus the MAC registers are actually mapped by
-> the MDIO driver.
-> 
-> I don't think that preserving this bad behaviour is a good idea, which
-> leaves us with two choices:
-> 
-> 1) My preferred solution - allow each device to specify up to three
-> interrupts, MACs, and PHYs. This is clean in that it doesnt require
-> multiply instantiating a driver three times over the same address
-> space.
-> 
-> ethernet at 2400 {
->                 compatible = "marvell,mv643xx-eth";
->                 reg = <0x2400 0x1c00>
->                 interrupt_parent = <&mpic>;
->                 ports = <3>;
->                 interrupts = <4>, <5>, <6>;
->                 phys = <&phy0>, <&phy1>, <&phy2>;
-> };
-> 
-> ethernet at 6400 {
->                 compatible = "marvell,mv643xx-eth";
->                 reg = <0x6400 0x1c00>
->                 interrupt_parent = <&mpic>;
->                 ports = <1>;
->                 interrupts = <4>;
->                 phys = <&phy3>;
-> };
-> 
-> Note that the address is 2400, not 2000 - since this driver no longer
-> would share its address range with the MDIO driver.
-> 
-> This method would require a small amount of rework in the driver to
-> set up <n> ports, rather than just one.
+I believe the __HVC(imm) macro which I put in <asm/opcodes-virt.h> as an
+example should do what you need in this case.
 
-This looks quite nice, but it is still very much incompatible with the
-existing binding. Obviously we can abandon an existing binding and
-introduce a second one for the same hardware, but that should not
-be taken lightly.
+> +
+> +#define HYPERCALL_SIMPLE(hypercall)		\
+> +ENTRY(HYPERVISOR_##hypercall)			\
+> +	mov r12, #__HYPERVISOR_##hypercall;	\
+> +	xen_hvc;							\
+> +	mov pc, lr;							\
+> +ENDPROC(HYPERVISOR_##hypercall)
+> +
+> +#define HYPERCALL0 HYPERCALL_SIMPLE
+> +#define HYPERCALL1 HYPERCALL_SIMPLE
+> +#define HYPERCALL2 HYPERCALL_SIMPLE
+> +#define HYPERCALL3 HYPERCALL_SIMPLE
+> +#define HYPERCALL4 HYPERCALL_SIMPLE
+> +
+> +#define HYPERCALL5(hypercall)			\
+> +ENTRY(HYPERVISOR_##hypercall)			\
+> +	stmdb sp!, {r4}						\
+> +	ldr r4, [sp, #4]					\
+> +	mov r12, #__HYPERVISOR_##hypercall;	\
+> +	xen_hvc								\
+> +	ldm sp!, {r4}						\
+> +	mov pc, lr							\
+> +ENDPROC(HYPERVISOR_##hypercall)
+> +
+> +                .text
+> +
+> +HYPERCALL2(xen_version);
+> +HYPERCALL3(console_io);
+> +HYPERCALL3(grant_table_op);
+> +HYPERCALL2(sched_op);
+> +HYPERCALL2(event_channel_op);
+> +HYPERCALL2(hvm_op);
+> +HYPERCALL2(memory_op);
+> +HYPERCALL2(physdev_op);
+> +
+> +ENTRY(privcmd_call)
+> +	stmdb sp!, {r4}
+> +	mov r12, r0
+> +	mov r0, r1
+> +	mov r1, r2
+> +	mov r2, r3
+> +	ldr r3, [sp, #8]
+> +	ldr r4, [sp, #4]
+> +	xen_hvc
+> +	ldm sp!, {r4}
+> +	mov pc, lr
 
-> 2) Create some kind of pseudo-ethernet group device that manages
-> all the work for some sort of lightweight ethernet device, one per
-> port. This can never be done cleanly since the port address ranges
-> overlap:
-> 
-> pseudo_eth at 2400 {
->         #address-cells = <1>;
->         #size-cells = <0>;
->         compatible = "marvell,mv643xx-shared-eth"
->         reg = <0x2400 0x1c00>;
-> 
->         ethernet at 0 {
->                 compatible = "marvell,mv643xx-port";
->                 interrupts = <4>;
->                 interrupt_parent = <&mpic>;
->                 phy = <&phy0>;
->         };
-> 
->         ethernet at 1 {
->                 compatible = "marvell,mv643xx-port";
->                 interrupts = <5>;
->                 interrupt_parent = <&mpic>;
->                 phy = <&phy1>;
->         };
-> 
->         ethernet at 2 {
->                 compatible = "marvell,mv643xx-port";
->                 interrupts = <6>;
->                 interrupt_parent = <&mpic>;
->                 phy = <&phy2>;
->         };
-> }
-> pseudo_eth at 6400 {
->         #address-cells = <1>;
->         #size-cells = <0>;
->         compatible = "marvell,mv643xx-shared-eth"
->         reg = <0x6400 0x1c00>;
-> 
->         ethernet at 0 {
->                 compatible = "marvell,mv643xx-port";
->                 interrupts = <4>;
->                 interrupt_parent = <&mpic>;
->                 phy = <&phy3>;
->         };
-> };
+Note that the preferred entry/exit sequences in such cases are:
 
-This looks almost compatible with the existing binding, which is
-good. I would in fact recommend to use the actual "compatible"
-strings from the binding. More generally speaking, you should not
-use wildcards in those strings anyway, so always use
-"marvell,mv64360-eth" instead of "marvell,mv64x60-eth" or
-"marvell,mv643xx-eth". If you have multiple chips that are
-completely compatible, put use the identifier for the older one.
+	stmfd	sp!, {r4,lr}
+	...
+	ldmfd	sp!, {r4,pc}
 
-I don't fully understand your concern with the overlapping
-registers, mostly because I still don't know all the combinations
-that are actually valid here. Let me try to say what I understood
-so far, and you can correct me if that's wrong:
+...but it works either way.  I would bother to change it unless you
+have other changes to make too.
 
-* A system can have multiple instances of an mv64360 ethernet
-block, with a register area of 0x2000 bytes.
-* Each such block can have three MACs and three PHYs.
-* The first 0x400 bytes in the register space control the three
-  PHYs and the remaining registers control the MACs.
-* While this is meant to be used in a way that you assign
-  the each of the three PHYs to one of the MACs, this is not
-  always done, and sometimes you use a different PHY (?), or
-  one from a different instance of the mv64360 ethernet block
-  on the same SoC?.
 
-	Arnd
+Cheers
+---Dave
