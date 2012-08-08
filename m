@@ -1,29 +1,33 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 8 Aug 2012 10:59:56 +0200
-Subject: [PATCH 1/2] ARM: i.MX35: Add kernel oftree support
-In-Reply-To: <20120803131230.GB23791@S2101-09.ap.freescale.net>
-References: <1343922986-32469-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20120803131230.GB23791@S2101-09.ap.freescale.net>
-Message-ID: <20120808085956.GB25520@pengutronix.de>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 08 Aug 2012 01:59:51 -0700 (PDT)
+Subject: [PATCH v3 0/7] mv643xx.c: Add basic device tree support.
+In-Reply-To: <201208080816.29218.arnd@arndb.de>
+References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
+ <20120807.162923.34400427265666163.davem@davemloft.net>
+ <201208080816.29218.arnd@arndb.de>
+Message-ID: <20120808.015951.1224491744100458448.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 8 Aug 2012 08:16:28 +0000
 
-On Fri, Aug 03, 2012 at 09:12:32PM +0800, Shawn Guo wrote:
-> On Thu, Aug 02, 2012 at 05:56:25PM +0200, Uwe Kleine-K?nig wrote:
-> > +			gpio3: gpio at 0x53fa4000 {
-> > +				compatible = "fsl,imx35-gpio", "fsl,imx31-gpio";
+> On Tuesday 07 August 2012, David Miller wrote:
+>> From: Ian Molton <ian.molton@codethink.co.uk>
+>> Date: Tue,  7 Aug 2012 15:34:45 +0100
+>> 
+>> > Fixed all comments.
+>> > 
+>> > * Dropped csb1724 defconfig.
+>> > * Added patch to remove MV643XX_ETH_SHARED_NAME and MV643XX_ETH_NAME
+>> > * Dropped un-necessary D-T irq fixup code
+>> 
+>> Who is going to take this series?
 > 
-> compatible = "fsl,imx35-gpio";
-$ git grep fsl,imx3[15]-gpio drivers/gpio
-drivers/gpio/gpio-mxc.c:        { .compatible = "fsl,imx31-gpio", .data = &mxc_gpio_devtype[IMX31_GPIO], },
+> I'd prefer to take the entire series through the arm-soc tree from
+> the kirkwood maintainers. We first have to work out the bindings
+> though, since the current patch introduces a new one that is
+> incompatible with the one we were using on powerpc with
+> open firmware before.
 
-I guess that means I have to keep "fsl,imx31-gpio", right?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Ok.
