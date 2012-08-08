@@ -1,92 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  8 Aug 2012 16:47:28 +0200
-Subject: [PATCH 11/11] pm/drivers: fix use of SIMPLE_DEV_PM_OPS
+Date: Wed,  8 Aug 2012 16:47:20 +0200
+Subject: [PATCH 03/11] usb/ohci-omap: remove unused variable
 In-Reply-To: <1344437248-20560-1-git-send-email-arnd@arndb.de>
 References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
-Message-ID: <1344437248-20560-12-git-send-email-arnd@arndb.de>
+Message-ID: <1344437248-20560-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A few drivers use a construct like
-
- #ifdef CONFIG_PM
- static int foo_suspend(struct device *pdev)
- {
-    ...
- }
- static int foo_resume struct device *pdev)
- {
-    ...
- }
- #endif
- static SIMPLE_DEV_PM_OPS(foo_pm, foo_suspend, foo_resume);
-
-which leaves the two functions unused if CONFIG_PM is enabled
-but CONFIG_PM_SLEEP is disabled. I found this while building
-all defconfig files on ARM. It's not clear to me if this is
-the right solution, but at least it makes the code consistent
-again.
+Commit c2e935a7d "USB: move transceiver from ehci_hcd and ohci_hcd to
+hcd and rename it as phy" removed the last use of the "ohci" variable
+in the usb_hcd_omap_remove function, but left the variable in place
+unused.
 
 Without this patch, building omap1_defconfig results in:
 
-drivers/char/hw_random/omap-rng.c:165:12: warning: 'omap_rng_suspend' defined but not used [-Wunused-function]
-drivers/char/hw_random/omap-rng.c:171:12: warning: 'omap_rng_resume' defined but not used [-Wunused-function]
-sound/drivers/dummy.c:1068:12: warning: 'snd_dummy_suspend' defined but not used [-Wunused-function]
-sound/drivers/dummy.c:1078:12: warning: 'snd_dummy_resume' defined but not used [-Wunused-function]
-
-and building tegra_defconfig results in:
-
-drivers/i2c/busses/i2c-tegra.c:716:12: warning: 'tegra_i2c_suspend' defined but not used [-Wunused-function]
-drivers/i2c/busses/i2c-tegra.c:727:12: warning: 'tegra_i2c_resume' defined but not used [-Wunused-function]
+In file included from drivers/usb/host/ohci-hcd.c:1013:0:
+drivers/usb/host/ohci-omap.c: In function 'usb_hcd_omap_remove':
+drivers/usb/host/ohci-omap.c:406:19: warning: unused variable 'ohci' [-Wunused-variable]
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Rafael J. Wysocki <rjw@sisk.pl>
-Cc: Takashi Iwai <tiwai@suse.de>
-Cc: Laxman Dewangan <ldewangan@nvidia.com>
+Cc: Richard Zhao <richard.zhao@freescale.com>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
- drivers/char/hw_random/omap-rng.c |    2 +-
- drivers/i2c/busses/i2c-tegra.c    |    2 +-
- sound/drivers/dummy.c             |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/usb/host/ohci-omap.c |    2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/char/hw_random/omap-rng.c b/drivers/char/hw_random/omap-rng.c
-index d706bd0e..4fbdceb 100644
---- a/drivers/char/hw_random/omap-rng.c
-+++ b/drivers/char/hw_random/omap-rng.c
-@@ -160,7 +160,7 @@ static int __exit omap_rng_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--#ifdef CONFIG_PM
-+#ifdef CONFIG_PM_SLEEP
- 
- static int omap_rng_suspend(struct device *dev)
+diff --git a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
+index e7d75d2..f8b2d91 100644
+--- a/drivers/usb/host/ohci-omap.c
++++ b/drivers/usb/host/ohci-omap.c
+@@ -403,8 +403,6 @@ err0:
+ static inline void
+ usb_hcd_omap_remove (struct usb_hcd *hcd, struct platform_device *pdev)
  {
-diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
-index 66eb53f..9a08c57 100644
---- a/drivers/i2c/busses/i2c-tegra.c
-+++ b/drivers/i2c/busses/i2c-tegra.c
-@@ -712,7 +712,7 @@ static int __devexit tegra_i2c_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--#ifdef CONFIG_PM
-+#ifdef CONFIG_PM_SLEEP
- static int tegra_i2c_suspend(struct device *dev)
- {
- 	struct tegra_i2c_dev *i2c_dev = dev_get_drvdata(dev);
-diff --git a/sound/drivers/dummy.c b/sound/drivers/dummy.c
-index f7d3bfc..54bb664 100644
---- a/sound/drivers/dummy.c
-+++ b/sound/drivers/dummy.c
-@@ -1064,7 +1064,7 @@ static int __devexit snd_dummy_remove(struct platform_device *devptr)
- 	return 0;
- }
- 
--#ifdef CONFIG_PM
-+#ifdef CONFIG_PM_SLEEP
- static int snd_dummy_suspend(struct device *pdev)
- {
- 	struct snd_card *card = dev_get_drvdata(pdev);
+-	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
+-
+ 	usb_remove_hcd(hcd);
+ 	if (!IS_ERR_OR_NULL(hcd->phy)) {
+ 		(void) otg_set_host(hcd->phy->otg, 0);
 -- 
 1.7.10
