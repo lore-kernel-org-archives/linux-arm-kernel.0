@@ -1,30 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Aug 2012 17:19:40 +0000
-Subject: [PATCH 04/11] ARM: ux500: really kill snowball_of_platform_devs
-In-Reply-To: <20120808162200.GB30473@gmail.com>
-References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
- <1344437248-20560-5-git-send-email-arnd@arndb.de>
- <20120808162200.GB30473@gmail.com>
-Message-ID: <201208081719.40749.arnd@arndb.de>
+Date: Wed, 8 Aug 2012 17:17:47 +0000
+Subject: [PATCH 3/6] ARM: sa1100: include asm/io.h in hackkit leds code
+In-Reply-To: <20120808153655.GN18957@n2100.arm.linux.org.uk>
+References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
+ <1344430493-5304-4-git-send-email-arnd@arndb.de>
+ <20120808153655.GN18957@n2100.arm.linux.org.uk>
+Message-ID: <201208081717.47747.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 August 2012, Lee Jones wrote:
-> On Wed, Aug 08, 2012 at 04:47:21PM +0200, Arnd Bergmann wrote:
-> > Commit fc67a597a "ARM: ux500: Remove temporary snowball_of_platform_devs
-> > enablement structure" removed the only user of this variable, but did
-> > not actually remove the array itself.
+On Wednesday 08 August 2012, Russell King - ARM Linux wrote:
+> On Wed, Aug 08, 2012 at 02:54:50PM +0200, Arnd Bergmann wrote:
+> > The sa1100 definition of the io_p2v macro has changed in v3.6, and this one
+> > file stopped working because of that.
 > > 
-> > Without this patch, building u8500_defconfig results in:
+> > Without this patch, building hackkit_defconfig results in:
 > > 
-> > arch/arm/mach-ux500/board-mop500.c:729:32: warning: 'snowball_of_platform_devs' defined but not used [-Wunused-variable]
+> > arch/arm/mach-sa1100/leds-hackkit.c: In function 'hackkit_leds_event':
+> > arch/arm/mach-sa1100/leds-hackkit.c:39:4: error: implicit declaration of function 'IOMEM' [-Werror=implicit-function-declaration]
 > 
-> I've already sent a patch that does this:
-> 
-> https://lkml.org/lkml/2012/7/31/305
-> 
-> Just waiting on Linus to review the set.
+> NAK.  Should be linux/io.h
 
-Ok, I've removed my version.
+
+Right, fixed now.
+
+Thanks for having a look over this!
 
 	Arnd
