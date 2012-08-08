@@ -1,20 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Aug 2012 16:36:55 +0100
-Subject: [PATCH 3/6] ARM: sa1100: include asm/io.h in hackkit leds code
-In-Reply-To: <1344430493-5304-4-git-send-email-arnd@arndb.de>
-References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
- <1344430493-5304-4-git-send-email-arnd@arndb.de>
-Message-ID: <20120808153655.GN18957@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 08 Aug 2012 09:40:57 -0600
+Subject: [PATCH 11/11] pm/drivers: fix use of SIMPLE_DEV_PM_OPS
+In-Reply-To: <1344437248-20560-12-git-send-email-arnd@arndb.de>
+References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
+ <1344437248-20560-12-git-send-email-arnd@arndb.de>
+Message-ID: <50228889.5060709@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2012 at 02:54:50PM +0200, Arnd Bergmann wrote:
-> The sa1100 definition of the io_p2v macro has changed in v3.6, and this one
-> file stopped working because of that.
+On 08/08/2012 08:47 AM, Arnd Bergmann wrote:
+> A few drivers use a construct like
 > 
-> Without this patch, building hackkit_defconfig results in:
-> 
-> arch/arm/mach-sa1100/leds-hackkit.c: In function 'hackkit_leds_event':
-> arch/arm/mach-sa1100/leds-hackkit.c:39:4: error: implicit declaration of function 'IOMEM' [-Werror=implicit-function-declaration]
+>  #ifdef CONFIG_PM
+>  static int foo_suspend(struct device *pdev)
+>  {
+>     ...
+>  }
+>  static int foo_resume struct device *pdev)
+>  {
+>     ...
+>  }
+>  #endif
+>  static SIMPLE_DEV_PM_OPS(foo_pm, foo_suspend, foo_resume);
+...
+> drivers/i2c/busses/i2c-tegra.c:716:12: warning: 'tegra_i2c_suspend' defined but not used [-Wunused-function]
+> drivers/i2c/busses/i2c-tegra.c:727:12: warning: 'tegra_i2c_resume' defined but not used [-Wunused-function]
 
-NAK.  Should be linux/io.h
+Laxman already posted a patch for this, which I'm hoping will make it
+into 3.6, through the I2C tree.
+
+http://www.spinics.net/lists/linux-i2c/msg09359.html
