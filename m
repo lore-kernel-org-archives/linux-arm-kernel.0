@@ -1,146 +1,55 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 8 Aug 2012 11:43:25 +0000
-Subject: [PATCH] ARM: AM33XX: board-generic: Add of_dev_auxdata to fix
- dev_id for CAN module
-In-Reply-To: <5021CA01.2020206@gmail.com>
-References: <1344346636-28072-1-git-send-email-hvaibhav@ti.com>
- <50213214.7050505@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EA88BDF@DBDE01.ent.ti.com>
- <5021CA01.2020206@gmail.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA897EA@DBDE01.ent.ti.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 08 Aug 2012 12:48:20 +0100
+Subject: [PATCH] clk: convert ARM RealView to common clk
+In-Reply-To: <1344270728-7550-1-git-send-email-linus.walleij@stericsson.com>
+References: <1344270728-7550-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1344426500.2435.39.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2012 at 07:38:01, Rob Herring wrote:
-> On 08/07/2012 10:53 AM, Hiremath, Vaibhav wrote:
-> > On Tue, Aug 07, 2012 at 20:49:48, Rob Herring wrote:
-> >> On 08/07/2012 08:37 AM, Vaibhav Hiremath wrote:
-> >>> If the module requires only one clocksource to function, then
-> >>> driver can very well call clk_get() api with "con_id = NULL",
-> >>>
-> >>>        clk = clk_get(dev, NULL);
-> >>>
-> >>> And platform code should respect this and return valid clk handle.
-> >>> That means, now the clk_get() api would rely on dev_id, and platform
-> >>> code should either have clk node with matching dev_id (with con_id=NULL)
-> >>> or return dummy clk node.
-> >>>
-> >>> With DT support, we can fix the dev_id for particular module
-> >>> using "struct of_dev_auxdata" to satisfy above clk framework requirement.
-> >>>
-> >>> In case of AM33XX, we required this for the DCAN module, so this
-> >>> patch adds "of_dev_auxdata" for both DCAN_0/1 instances.
-> >>>
-> >>> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> >>> Cc: Tony Lindgren <tony@atomide.com>
-> >>> Cc: Paul Walmsley <paul@pwsan.com>
-> >>> Cc: Benoit Cousson <b-cousson@ti.com>
-> >>> Cc: Grant Likely <grant.likely@secretlab.ca>
-> >>> ---
-> >>> This patch is boot tested on BeagleBone platform, and checked for
-> >>> clk_get() return value in d_can module driver.
-> >>>
-> >>>  arch/arm/mach-omap2/board-generic.c |   18 +++++++++++++++++-
-> >>>  1 files changed, 17 insertions(+), 1 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> >>> index 6f93a20..c9b7903 100644
-> >>> --- a/arch/arm/mach-omap2/board-generic.c
-> >>> +++ b/arch/arm/mach-omap2/board-generic.c
-> >>> @@ -37,11 +37,27 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
-> >>>  	{ }
-> >>>  };
-> >>>
-> >>> +/*
-> >>> + * Lookup table for attaching a specific name and platform_data pointer to
-> >>> + * devices as they get created by of_platform_populate(). Ideally this table
-> >>> + * would not exist, but the current clock implementation depends on some devices
-> >>> + * having a specific name OR to satisfy NULL con_id requirement from driver.
-> >>> + */
-> >>> +static const struct of_dev_auxdata am33xx_auxdata_lookup[] __initconst = {
-> >>> +	OF_DEV_AUXDATA("bosch,d_can", 0x481cc000, "d_can.0", NULL),
-> >>> +	OF_DEV_AUXDATA("bosch,d_can", 0x481d0000, "d_can.1", NULL),
-> >>> +	{ },
-> >>> +};
-> >>
-> >> Adding an additional clkdev lookup accomplishes the same thing and is a
-> >> cleaner solution.
-> >>
-> > 
-> > That is also required and I have submitted patch for the same -
-> > 
-> > http://www.spinics.net/lists/arm-kernel/msg187998.html
-> 
-> That only adds the non-DT name. What I'm saying is you can have 2 lookup
-> names for the same clock.
-> 
-> > 
-> > With DT support, I am getting dev_id as -
-> > 
-> >  - Without "reg" property: d_can.16 and d_can.17,
-> >    (I believe it changes dynamically here)
-> > 
-> >  - With "reg" property: 481cc000.d_can and 481d0000.d_can
-> > 
-> > Which is not so intuitive, I would like to see them as per Spec/TRM, so 
-> > doesn't this patch make sense?
-> 
-> The spec doesn't have a base address for the module? This name is going
-> to get used in sysfs anyway, and the old name should be going away.
-> 
+On Mon, 2012-08-06 at 17:32 +0100, Linus Walleij wrote:
+> This converts the ARM RealView machine over to using the common
+> clock. The approach is similar to the one used for the Integrator,
+> and we're reusing the ICST wrapper code.
 
-This is certainly going to change user interface change, and I thought we 
-should not change the user interface irrespective of whether it is DT or 
-non-DT.
-Few points, which I do care about, are,
+I've just tried it with v3.6-rc1 and an EB Model and I get this:
 
-1. request_irq():
-   For the driver if I am using dev_name(dev) as for the 3rd argument, which 
-   will now different with DT support - brings change in user interface.
+------------[ cut here ]------------
+WARNING: at /home/pawmol01/src/kernel.org/linux/kernel/timer.c:1076 del_timer_sync+0x34/0x5c()
+Modules linked in:
+[<c0014054>] (unwind_backtrace+0x0/0xe0) from [<c001ca3c>] (warn_slowpath_common+0x4c/0x64)
+[<c001ca3c>] (warn_slowpath_common+0x4c/0x64) from [<c001ca6c>] (warn_slowpath_null+0x18/0x1c)
+[<c001ca6c>] (warn_slowpath_null+0x18/0x1c) from [<c00285b8>] (del_timer_sync+0x34/0x5c)
+[<c00285b8>] (del_timer_sync+0x34/0x5c) from [<c01d57e4>] (led_set_brightness+0x14/0x4c)
+[<c01d57e4>] (led_set_brightness+0x14/0x4c) from [<c01d6270>] (led_trigger_event+0x30/0x70)
+[<c01d6270>] (led_trigger_event+0x30/0x70) from [<c01c7ee8>] (mmc_request_done+0x68/0x90)
+[<c01c7ee8>] (mmc_request_done+0x68/0x90) from [<c01d5770>] (mmci_irq+0x274/0x2d4)
+[<c01d5770>] (mmci_irq+0x274/0x2d4) from [<c005a090>] (handle_irq_event_percpu+0x2c/0x170)
+[<c005a090>] (handle_irq_event_percpu+0x2c/0x170) from [<c005a22c>] (handle_irq_event+0x58/0x78)
+[<c005a22c>] (handle_irq_event+0x58/0x78) from [<c005ce68>] (handle_fasteoi_irq+0xcc/0x13c)
+[<c005ce68>] (handle_fasteoi_irq+0xcc/0x13c) from [<c0059ae8>] (generic_handle_irq+0x20/0x30)
+[<c0059ae8>] (generic_handle_irq+0x20/0x30) from [<c000eafc>] (handle_IRQ+0x78/0xb8)
+[<c000eafc>] (handle_IRQ+0x78/0xb8) from [<c0008468>] (gic_handle_irq+0x3c/0x60)
+[<c0008468>] (gic_handle_irq+0x3c/0x60) from [<c000d820>] (__irq_svc+0x40/0x54)
+Exception stack(0xcf83be20 to 0xcf83be68)
+be20: cfbfd26c 60000013 00130013 00000000 cf83be84 cfbfd000 00000000 cf83be94
+be40: cf83beb8 c01c989c 00000000 00000000 00000000 cf83be68 c01c7f80 c02aaac0
+be60: 40000013 ffffffff
+[<c000d820>] (__irq_svc+0x40/0x54) from [<c02aaac0>] (_raw_spin_unlock_irqrestore+0x2c/0x30)
+[<c02aaac0>] (_raw_spin_unlock_irqrestore+0x2c/0x30) from [<c01c7f80>] (mmc_wait_for_req_done+0x70/0x74)
+[<c01c7f80>] (mmc_wait_for_req_done+0x70/0x74) from [<c01c83b8>] (mmc_wait_for_cmd+0x64/0x74)        
+[<c01c83b8>] (mmc_wait_for_cmd+0x64/0x74) from [<c01cfcfc>] (mmc_send_io_op_cond+0x58/0xc4)
+[<c01cfcfc>] (mmc_send_io_op_cond+0x58/0xc4) from [<c01cf8b0>] (mmc_attach_sdio+0x3c/0x304)
+[<c01cf8b0>] (mmc_attach_sdio+0x3c/0x304) from [<c01c9ab0>] (mmc_rescan+0x214/0x290)
+[<c01c9ab0>] (mmc_rescan+0x214/0x290) from [<c00328f4>] (process_one_work+0x240/0x3b8)
+[<c00328f4>] (process_one_work+0x240/0x3b8) from [<c0032d70>] (worker_thread+0x2d8/0x434)
+[<c0032d70>] (worker_thread+0x2d8/0x434) from [<c00373b0>] (kthread+0x84/0x94)
+[<c00373b0>] (kthread+0x84/0x94) from [<c000ed44>] (kernel_thread_exit+0x0/0x8)
+---[ end trace 93fc2bf490575317 ]---
 
-   Non-DT:
-    #cat /proc/interrupts
-               CPU0
-    52:          0      INTC  xxx0
-    55:          0      INTC  xxx1
+I'm not sure who's fault it is (may be mine), will try to figure out
+what is going on...
 
-   DT:
-    #cat /proc/interrupts
-               CPU0
-    52:          0      INTC  481cc000.xxx
-    55:          0      INTC  481d0000.xxx
+Cheers!
 
-
-2. SYSFS:
-   For example,
-   Without auxdata:
-     /sys/devices/481cc000.xxx/
-     /sys/devices/481d0000.xxx/
-
-   With auxdata:
-     /sys/devices/xxx.0/
-     /sys/devices/xxx.1/
-
-   From user perspective, I still would not want to change the existing 
-   naming convention.
-
-3. Certainly I don't want user to go back to spec everytime to find out 
-   which address is mapped to which instance of module.
-   Also, in addition to that, in case of SoC's like AM33xx (for that matter, 
-   any embedded SoC) we have different domains and modules are placed in 
-   different domains as per use-cases.
-   For example, in this case, can0 is places in wakeup domain and can1 is 
-   placed in per-domain. Some boards might use only one instance or some 
-   board might use both of them.
-
-   I still would like to keep instance number wherever user interface comes 
-   into picture and populate base address as an additional info to user.
-
-
-I may be missing something, may be I am not able to see the bigger picture 
-here.
-
-Grant/Benoit, May be you can conform and put your opinion on this.
-
-Thanks,
-Vaibhav
+Pawe?
