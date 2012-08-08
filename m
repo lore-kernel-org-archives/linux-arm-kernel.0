@@ -1,45 +1,33 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 8 Aug 2012 11:34:47 -0400 (EDT)
-Subject: [PATCH 03/11] usb/ohci-omap: remove unused variable
-In-Reply-To: <1344437248-20560-4-git-send-email-arnd@arndb.de>
-Message-ID: <Pine.LNX.4.44L0.1208081134350.1701-100000@iolanthe.rowland.org>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 8 Aug 2012 17:41:47 +0200
+Subject: [PATCH 04/11] MFD: twl4030-audio: Add DT support
+In-Reply-To: <50227936.3040701@ti.com>
+References: <1344418887-5262-1-git-send-email-peter.ujfalusi@ti.com>
+ <1344418887-5262-5-git-send-email-peter.ujfalusi@ti.com>
+ <5022529D.3090406@ti.com>
+ <20120808125252.GR16861@opensource.wolfsonmicro.com>
+ <50227936.3040701@ti.com>
+Message-ID: <502288BB.6020709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 8 Aug 2012, Arnd Bergmann wrote:
-
-> Commit c2e935a7d "USB: move transceiver from ehci_hcd and ohci_hcd to
-> hcd and rename it as phy" removed the last use of the "ohci" variable
-> in the usb_hcd_omap_remove function, but left the variable in place
-> unused.
+On 08/08/2012 04:35 PM, Peter Ujfalusi wrote:
+> On 08/08/2012 03:52 PM, Mark Brown wrote:
+>> On Wed, Aug 08, 2012 at 01:50:53PM +0200, Benoit Cousson wrote:
+>>
+>>> That being said, since we do have the clock binding now, maybe we should
+>>> create a clock provider at board level for the sys_clk and thus you will
+>>> just have to create a phandle to it in your audio description.
+>>
+>> Yes, we should be doing this.
 > 
-> Without this patch, building omap1_defconfig results in:
-> 
-> In file included from drivers/usb/host/ohci-hcd.c:1013:0:
-> drivers/usb/host/ohci-omap.c: In function 'usb_hcd_omap_remove':
-> drivers/usb/host/ohci-omap.c:406:19: warning: unused variable 'ohci' [-Wunused-variable]
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Richard Zhao <richard.zhao@freescale.com>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> ---
->  drivers/usb/host/ohci-omap.c |    2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
-> index e7d75d2..f8b2d91 100644
-> --- a/drivers/usb/host/ohci-omap.c
-> +++ b/drivers/usb/host/ohci-omap.c
-> @@ -403,8 +403,6 @@ err0:
->  static inline void
->  usb_hcd_omap_remove (struct usb_hcd *hcd, struct platform_device *pdev)
->  {
-> -	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
-> -
->  	usb_remove_hcd(hcd);
->  	if (!IS_ERR_OR_NULL(hcd->phy)) {
->  		(void) otg_set_host(hcd->phy->otg, 0);
+> Does this needs the common clock framework on the platform? OMAP3 certainly
+> does not have it enabled since it has not been adopted.
 > 
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Yeah, good point, we are still not there yet. Rajendra is still working
+on it and I hope we can get something for 3.7, but let's avoid having a
+strong dependency on that migration for the moment.
+
+Regards,
+Benoit
