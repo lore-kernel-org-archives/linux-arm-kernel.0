@@ -1,54 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  8 Aug 2012 23:27:53 +0200
-Subject: [PATCH 05/10] asm-generic: xor: mark static functions as
- __maybe_unused
+Date: Wed,  8 Aug 2012 23:27:52 +0200
+Subject: [PATCH 04/10] ARM: pass -marm to gcc by default
 In-Reply-To: <1344461278-28245-1-git-send-email-arnd@arndb.de>
 References: <1344461278-28245-1-git-send-email-arnd@arndb.de>
-Message-ID: <1344461278-28245-6-git-send-email-arnd@arndb.de>
+Message-ID: <1344461278-28245-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The asm-generic/xor.h header file is nasty and defines static functions
-that are not inline. The header file is include by the ARM version of
-asm/xor.h, which uses some but not all of the symbols defined there.
+The Linaro cross toolchain and probably others nowadays default to
+building in THUMB2 mode. When building a kernel for a CPU that does
+not support THUMB2, the compiler complains about incorrect flags.
+We can work around this by setting -marm for all non-T2 builds.
 
-Marking the extraneous functions as __maybe_unused lets gcc drop them
-without complaining.
+Without this patch, building assabet_defconfig results in:
 
-Without this patch, building iop13xx_defconfig results in:
-
-include/asm-generic/xor.h:696:34: warning: 'xor_block_8regs_p' defined but not used [-Wunused-variable]
-include/asm-generic/xor.h:704:34: warning: 'xor_block_32regs_p' defined but not used [-Wunused-variable]
+usr/initramfs_data.S:1:0: warning: target CPU does not support THUMB instructions [enabled by default]
+arch/arm/nwfpe/entry.S:1:0: warning: target CPU does not support THUMB instructions [enabled by default]
+firmware/cis/PCMLM28.cis.gen.S:1:0: warning: target CPU does not support THUMB instructions [enabled by default]
+(and many more)
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Herbert Xu <herbert@gondor.apana.org.au>
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: Neil Brown <neilb@suse.de>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Dave Martin <dave.martin@linaro.org>
 ---
- include/asm-generic/xor.h |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/Makefile |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/include/asm-generic/xor.h b/include/asm-generic/xor.h
-index 6028fb8..b4d8432 100644
---- a/include/asm-generic/xor.h
-+++ b/include/asm-generic/xor.h
-@@ -693,7 +693,7 @@ static struct xor_block_template xor_block_32regs = {
- 	.do_5 = xor_32regs_5,
- };
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 30eae87..b4c2296 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -111,6 +111,9 @@ AFLAGS_THUMB2	:=$(CFLAGS_THUMB2) -Wa$(comma)-mthumb
+ ifeq ($(CONFIG_THUMB2_AVOID_R_ARM_THM_JUMP11),y)
+ CFLAGS_MODULE	+=-fno-optimize-sibling-calls
+ endif
++else
++CFLAGS_THUMB2  :=-marm
++AFLAGS_THUMB2	:=-marm
+ endif
  
--static struct xor_block_template xor_block_8regs_p = {
-+static struct xor_block_template xor_block_8regs_p __maybe_unused = {
- 	.name = "8regs_prefetch",
- 	.do_2 = xor_8regs_p_2,
- 	.do_3 = xor_8regs_p_3,
-@@ -701,7 +701,7 @@ static struct xor_block_template xor_block_8regs_p = {
- 	.do_5 = xor_8regs_p_5,
- };
- 
--static struct xor_block_template xor_block_32regs_p = {
-+static struct xor_block_template xor_block_32regs_p __maybe_unused = {
- 	.name = "32regs_prefetch",
- 	.do_2 = xor_32regs_p_2,
- 	.do_3 = xor_32regs_p_3,
+ # Need -Uarm for gcc < 3.x
 -- 
 1.7.10
