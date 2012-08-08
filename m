@@ -1,179 +1,78 @@
-From: tobetter@gmail.com (tobetter at gmail.com)
-Date: Wed,  8 Aug 2012 14:46:38 +0900
-Subject: [PATCH v3] arm/dts: exynos4: Add DTS file for ODROID-X
-In-Reply-To: <[PATCH v2] arm/dts: exynos4: Add DTS file for ODROID-X>
-References: <[PATCH v2] arm/dts: exynos4: Add DTS file for ODROID-X>
-Message-ID: <1344404802-9442-1-git-send-email-dongjin.kim@agreeyamobility.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 8 Aug 2012 01:56:41 -0400 (EDT)
+Subject: [PATCH 01/22] ARM: add mechanism for late code patching
+In-Reply-To: <50219C45.7030601@ti.com>
+References: <1343775898-28345-1-git-send-email-cyril@ti.com>
+ <1343775898-28345-2-git-send-email-cyril@ti.com>
+ <alpine.LFD.2.02.1208040045360.5231@xanadu.home> <50219C45.7030601@ti.com>
+Message-ID: <alpine.LFD.2.02.1208080106500.5231@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dongjin Kim <dongjin.kim@agreeyamobility.net>
+On Tue, 7 Aug 2012, Cyril Chemparathy wrote:
 
-This patch create a DTS file for ODROID-X, it desribes PMIC max77686 and LED
-gpios base.
+> Hi Nicolas,
+> 
+> On 8/4/2012 1:38 AM, Nicolas Pitre wrote:
+> [...]
+> > > extern unsigned __patch_table_begin, __patch_table_end;
+> > 
+> > You could use "exttern void __patch_table_begin" so those symbols don't
+> > get any type that could be misused by mistake, while you still can take
+> > their addresses.
+> > 
+> 
+> Looks like we'll have to stick with a non-void type here.  The compiler throws
+> a warning when we try to take the address of a void.
 
-Changes in V2 & V3:
-    -. Banner changed
+Ah, I see. Bummer.  This used not to be the case with older gcc 
+versions.
 
-Signed-off-by: Dongjin Kim <dongjin.kim@agreeyamobility.net>
----
- arch/arm/boot/dts/exynos4412-odroidx.dts |  148 ++++++++++++++++++++++++++++++
- 1 file changed, 148 insertions(+)
- create mode 100644 arch/arm/boot/dts/exynos4412-odroidx.dts
+> [...]
+> > Did you verify with some test program that your patching routines do
+> > produce the same opcodes as the assembled equivalent for all possible
+> > shift values?  Especially for Thumb2 code which isn't as trivial to get
+> > right as the ARM one.
+> > 
+> 
+> We've refactored the patching code into separate functions as:
+> 
+> static int do_patch_imm8_arm(u32 insn, u32 imm, u32 *ninsn);
+> static int do_patch_imm8_thumb(u32 insn, u32 imm, u32 *ninsn);
+> 
+> 
+> With this, the following test code has been used to verify the generated
+> instruction encoding:
+> 
+> u32 arm_check[] = {
+> 	0xe2810041, 0xe2810082, 0xe2810f41, 0xe2810f82, 0xe2810e41,
+> 	0xe2810e82, 0xe2810d41, 0xe2810d82, 0xe2810c41, 0xe2810c82,
+> 	0xe2810b41, 0xe2810b82, 0xe2810a41, 0xe2810a82, 0xe2810941,
+> 	0xe2810982, 0xe2810841, 0xe2810882, 0xe2810741, 0xe2810782,
+> 	0xe2810641, 0xe2810682, 0xe2810541, 0xe2810582, 0xe2810441,
+> };
 
-diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
-new file mode 100644
-index 0000000..7f63eaf
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
-@@ -0,0 +1,148 @@
-+/*
-+ * Samsung's Exynos4412 based ODROID-X board device tree source
-+ *
-+ * Copyright (c) 2012 AgreeYa Mobility Co., Ltd.
-+ *		http://www.agreeyamobility.net
-+ * Copyright (c) 2012 Hardkernel Co., Ltd.
-+ *		http://www.hardkernel.com
-+ *
-+ * Device tree source file for Hardkernel's ODROID-X board which is based on
-+ * Samsung's Exynos4412 SoC.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+/dts-v1/;
-+/include/ "exynos4412.dtsi"
-+/include/ "max77686.dtsi"
-+
-+/ {
-+	model = "Hardkernel ODROID-X evaluation board based on Exynos4412";
-+	compatible = "hardkernel,odroidx", "samsung,exynos4412";
-+
-+	memory {
-+		reg = <0x40000000 0x40000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "root=/dev/mmcblk0p1 init=/sbin/init console=ttySAC1,115200 console=tty1 rootdalay=2";
-+	};
-+
-+	/* sdhci0 */
-+	sdhci at 12510000 {
-+		status = "disabled";
-+	};
-+
-+	/* sdhci1 */
-+	sdhci at 12520000 {
-+		status = "disabled";
-+	};
-+
-+	/* sdhci2 */
-+	sdhci at 12530000 {
-+		samsung,sdhci-bus-width = <4>;
-+		linux,mmc_cap_4_bit_data;
-+		samsung,sdhci-cd-internal;
-+		gpio-cd = <&gpk2 2 2 3 3>;
-+		gpios = <&gpk2 0 2 0 3>,
-+			<&gpk2 1 2 0 3>,
-+			<&gpk2 3 2 3 3>,
-+			<&gpk2 4 2 3 3>,
-+			<&gpk2 5 2 3 3>,
-+			<&gpk2 6 2 3 3>;
-+	};
-+
-+	/* sdhci3 */
-+	sdhci at 12540000 {
-+		samsung,sdhci-bus-width = <4>;
-+		linux,mmc_cap_4_bit_data;
-+		samsung,sdhci-cd-internal;
-+		gpio-cd	= <&gpk3 2 2 3 3>;
-+		gpios = <&gpk3 0 2 0 3>,
-+			<&gpk3 1 2 0 3>,
-+			<&gpk3 3 2 3 3>,
-+			<&gpk3 4 2 3 3>,
-+			<&gpk3 5 2 3 3>,
-+			<&gpk3 6 2 3 3>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		led1 {
-+			label	= "led1";
-+			gpios	= <&gpc1 0 1 0x10000 0>;
-+			linux,default-trigger	= "oneshot";
-+			default-state	= "off";
-+		};
-+
-+		led2 {
-+			label	= "led2";
-+			gpios	= <&gpc1 2 1 0x10000 0>;
-+			linux,default-trigger	= "heartbeat";
-+		};
-+	};
-+
-+	i2c at 13860000 {	/* i2c0 */
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		gpios = <&gpd1 0 2 0 0>,
-+			<&gpd1 1 2 0 0>;
-+		pmic at 9 {
-+			compatible = "maxim,max77686";
-+			reg = <9>;
-+		};
-+	};
-+
-+	i2c at 13870000 {	/* i2c1 */
-+		status = "disabled";
-+		gpios = <&gpd1 2 2 0 0>,
-+			<&gpd1 3 2 0 0>;
-+	};
-+
-+	i2c at 13880000 {	/* i2c2 */
-+		status = "disabled";
-+		gpios = <&gpa0 6 2 0 0>,
-+			<&gpa0 7 2 0 0>;
-+	};
-+
-+	i2c at 13890000 {	/* i2c3 */
-+		status = "disabled";
-+		gpios = <&gpa1 2 2 0 0>,
-+			<&gpa1 3 2 0 0>;
-+	};
-+
-+	i2c at 138A0000 {	/* i2c4 */
-+		status = "disabled";
-+	};
-+
-+	i2c at 138B0000 {	/* i2c5 */
-+		status = "disabled";
-+	};
-+
-+	i2c at 138C0000 {	/* i2c6 */
-+		status = "disabled";
-+	};
-+
-+	i2c at 138D0000 {	/* i2c7 */
-+		status = "disabled";
-+	};
-+
-+	keypad at 100A0000 {
-+		status = "disabled";
-+	};
-+
-+	spi_0: spi at 13920000 {
-+		status = "disabled";
-+	};
-+
-+	spi_1: spi at 13930000 {
-+		status = "disabled";
-+	};
-+
-+	spi_2: spi at 13940000 {
-+		status = "disabled";
-+	};
-+};
--- 
-1.7.9.5
+Instead of using this array you could let the assembler do it for you 
+like this:
+
+asm (" \n\
+	.arm \n\
+arm_check: \n\
+        .set shft, 0 \n\
+        .rep 12 \n\
+        add     r1, r2, #0x81 << \shft \n\
+        .set shft, \shft + 2 \n\
+        .endr \n\
+");
+
+> u32 thumb_check[] = {
+> 	0xf1010081, 0xf5017081, 0xf5017001, 0xf5016081, 0xf5016001,
+> 	0xf5015081, 0xf5015001, 0xf5014081, 0xf5014001, 0xf5013081,
+> 	0xf5013001, 0xf5012081, 0xf5012001, 0xf5011081, 0xf5011001,
+> 	0xf5010081, 0xf5010001, 0xf1017081, 0xf1017001, 0xf1016081,
+> 	0xf1016001, 0xf1015081, 0xf1015001, 0xf1014081, 0xf1014001,
+
+Same idea here.
+
+
+Nicolas
