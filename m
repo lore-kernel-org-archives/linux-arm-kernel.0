@@ -1,29 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Aug 2012 08:16:28 +0000
-Subject: [PATCH v3 0/7] mv643xx.c: Add basic device tree support.
-In-Reply-To: <20120807.162923.34400427265666163.davem@davemloft.net>
-References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
- <20120807.162923.34400427265666163.davem@davemloft.net>
-Message-ID: <201208080816.29218.arnd@arndb.de>
+Date: Wed, 8 Aug 2012 08:28:35 +0000
+Subject: [PATCH 1/1] Input: ab8500-ponkey: Make the distinction between DT
+ and non-DT boots
+In-Reply-To: <20120808080411.GB4728@gmail.com>
+References: <20120807170333.GV16861@opensource.wolfsonmicro.com>
+ <20120808080411.GB4728@gmail.com>
+Message-ID: <201208080828.35451.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 August 2012, David Miller wrote:
-> From: Ian Molton <ian.molton@codethink.co.uk>
-> Date: Tue,  7 Aug 2012 15:34:45 +0100
+On Wednesday 08 August 2012, Lee Jones wrote:
+> Okay, actually this isn't so easy. Currently we have:
 > 
-> > Fixed all comments.
-> > 
-> > * Dropped csb1724 defconfig.
-> > * Added patch to remove MV643XX_ETH_SHARED_NAME and MV643XX_ETH_NAME
-> > * Dropped un-necessary D-T irq fixup code
+> During DT boot:
+>  - No platform data is passed, hence no IRQ base for AB8500 is either
+>  - No IRQ base means we register a Linear IRQ Domain
+>  - MFD sees there is no base and leaves the IRQ resource as a hwirq
+>  - AB8500 child devices use *_get_virq() to convert the hwirq to a virq
 > 
-> Who is going to take this series?
+> During non-DT boot:
+>  - Platform data is passed, which contains an IRQ base
+>  - If an IRQ base is requested we use it to register a Legacy IRQ Domain
+>  - MFD adds the IRQ base to the hwirq and registers it as a virq
+>  - AB8500 child devices use *_get_virq() to convert virq to virq - ERROR
+> 
+> I guess my suggestion falls-back to placing logic in *_get_virq() to only
+> call irq_create_mapping() when when !ab8500->irq_base.
 
-I'd prefer to take the entire series through the arm-soc tree from
-the kirkwood maintainers. We first have to work out the bindings
-though, since the current patch introduces a new one that is
-incompatible with the one we were using on powerpc with
-open firmware before.
+In general, it seems easier to use the same domain type for both cases.
+I don't think that MOP500_AB8500_VIR_GPIO_IRQ_BASE is used anywhere
+else besides the .irq_base definition in board-mop500.c, so I would guess
+that you can just remove that identifier and always use the linear
+domain.
 
 	Arnd
