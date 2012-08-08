@@ -1,60 +1,64 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 8 Aug 2012 18:18:20 +0800
-Subject: imx6q restart is broken
-Message-ID: <20120808101817.GA14718@S2101-09.ap.freescale.net>
+From: vaibhav.bedia@ti.com (Vaibhav Bedia)
+Date: Wed, 8 Aug 2012 16:05:17 +0530
+Subject: [PATCH 1/1] ARM: OMAP2+: hwmod: Print an error message if no match
+ exists for a hwmod class
+Message-ID: <1344422117-20707-1-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Dirk for reporting that imx6q restart (reboot command) is broken.
+If no match is found for a hwmod class, omap_hwmod_for_each_by_class()
+currently does not spit out any error messages. To make debugging
+issues related to non-existent hwmod classes simpler make this function
+print an error message in case no match is found for the supplied hwmod
+class.
 
-I tracked down the issue a little bit and found imx6q_restart hangs
-on the of_iomap/ioremap call.  The following change, moving the call
-somewhere else than imx6q_restart, will just fix the problem.
+Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |   11 ++++++++++-
+ 1 files changed, 10 insertions(+), 1 deletions(-)
 
-Does that mean ioremap call is not allowed in platform restart hook?
-I'm not sure about that, because I found it works just fine if I build
-imx_v6_v7_defconfig with V6 (imx3) platforms excluded (IOW, build a V7
-only kernel - imx5 and imx6), which is the case how I tested imx6q
-restart feature when I was adding it.
-
-To summarize, the imx6q_restart hangs at ioremap call on a V6 + V7
-kernel, while it works fine on a V7 only image.  I need some help to
-understand that.
-
-Regards,
-Shawn
-
---8<---
-
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 5ec0608..01e7489 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -37,14 +37,10 @@
- #include <mach/cpuidle.h>
- #include <mach/hardware.h>
-
-+static void __iomem *wdog_base;
-
- void imx6q_restart(char mode, const char *cmd)
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 6ca8e51..90e2306 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -3480,7 +3480,8 @@ int omap_hwmod_read_hardreset(struct omap_hwmod *oh, const char *name)
+  * If the callback function returns something other than
+  * zero, the iterator is terminated, and the callback function's return
+  * value is passed back to the caller.  Returns 0 upon success, -EINVAL
+- * if @classname or @fn are NULL, or passes back the error code from @fn.
++ * if @classname or @fn are NULL or no match is found for @classname,
++ * or passes back the error code from @fn.
+  */
+ int omap_hwmod_for_each_by_class(const char *classname,
+ 				 int (*fn)(struct omap_hwmod *oh,
+@@ -3489,6 +3490,7 @@ int omap_hwmod_for_each_by_class(const char *classname,
  {
--       struct device_node *np;
--       void __iomem *wdog_base;
--
--       np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-wdt");
--       wdog_base = of_iomap(np, 0);
-        if (!wdog_base)
-                goto soft;
-
-@@ -159,6 +155,11 @@ static void __init imx6q_usb_init(void)
-
- static void __init imx6q_init_machine(void)
- {
-+       struct device_node *np;
+ 	struct omap_hwmod *temp_oh;
+ 	int ret = 0;
++	bool found = false;
+ 
+ 	if (!classname || !fn)
+ 		return -EINVAL;
+@@ -3498,6 +3500,7 @@ int omap_hwmod_for_each_by_class(const char *classname,
+ 
+ 	list_for_each_entry(temp_oh, &omap_hwmod_list, node) {
+ 		if (!strcmp(temp_oh->class->name, classname)) {
++			found = true;
+ 			pr_debug("omap_hwmod: %s: %s: calling callback fn\n",
+ 				 __func__, temp_oh->name);
+ 			ret = (*fn)(temp_oh, user);
+@@ -3506,6 +3509,12 @@ int omap_hwmod_for_each_by_class(const char *classname,
+ 		}
+ 	}
+ 
++	if (!found) {
++		pr_err("omap_hwmod: %s: no match for class %s\n",
++			__func__, classname);
++		return -EINVAL;
++	}
 +
-+       np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-wdt");
-+       wdog_base = of_iomap(np, 0);
-+
-        /*
-         * This should be removed when all imx6q boards have pinctrl
-         * states for devices defined in device tree.
+ 	if (ret)
+ 		pr_debug("omap_hwmod: %s: iterator terminated early: %d\n",
+ 			 __func__, ret);
+-- 
+1.7.0.4
