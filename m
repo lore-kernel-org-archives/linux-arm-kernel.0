@@ -1,33 +1,32 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 08 Aug 2012 01:59:51 -0700 (PDT)
-Subject: [PATCH v3 0/7] mv643xx.c: Add basic device tree support.
-In-Reply-To: <201208080816.29218.arnd@arndb.de>
-References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
- <20120807.162923.34400427265666163.davem@davemloft.net>
- <201208080816.29218.arnd@arndb.de>
-Message-ID: <20120808.015951.1224491744100458448.davem@davemloft.net>
+From: yliu.null@gmail.com (Yuanhan Liu)
+Date: Wed,  8 Aug 2012 17:02:08 +0800
+Subject: [PATCH] ARM: mmp: fix potential NULL dereference
+Message-ID: <1344416528-3586-1-git-send-email-yliu.null@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed, 8 Aug 2012 08:16:28 +0000
+Fix the wrong logic: we should use || instead of &&
 
-> On Tuesday 07 August 2012, David Miller wrote:
->> From: Ian Molton <ian.molton@codethink.co.uk>
->> Date: Tue,  7 Aug 2012 15:34:45 +0100
->> 
->> > Fixed all comments.
->> > 
->> > * Dropped csb1724 defconfig.
->> > * Added patch to remove MV643XX_ETH_SHARED_NAME and MV643XX_ETH_NAME
->> > * Dropped un-necessary D-T irq fixup code
->> 
->> Who is going to take this series?
-> 
-> I'd prefer to take the entire series through the arm-soc tree from
-> the kirkwood maintainers. We first have to work out the bindings
-> though, since the current patch introduces a new one that is
-> incompatible with the one we were using on powerpc with
-> open firmware before.
+Cc: Leo Yan <leoy@marvell.com>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Signed-off-by: Yuanhan Liu <yliu.null@gmail.com>
+---
+ arch/arm/mach-mmp/sram.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Ok.
+diff --git a/arch/arm/mach-mmp/sram.c b/arch/arm/mach-mmp/sram.c
+index 4304f95..7e8a5a2 100644
+--- a/arch/arm/mach-mmp/sram.c
++++ b/arch/arm/mach-mmp/sram.c
+@@ -68,7 +68,7 @@ static int __devinit sram_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	int ret = 0;
+ 
+-	if (!pdata && !pdata->pool_name)
++	if (!pdata || !pdata->pool_name)
+ 		return -ENODEV;
+ 
+ 	info = kzalloc(sizeof(*info), GFP_KERNEL);
+-- 
+1.7.4.4
