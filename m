@@ -1,59 +1,43 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 08 Aug 2012 10:15:20 -0700
-Subject: [PATCH] ARM: OMAP4: sleep: Save the complete used register stack
- frame
-In-Reply-To: <1342183715-13734-1-git-send-email-santosh.shilimkar@ti.com>
- (Santosh Shilimkar's message of "Fri, 13 Jul 2012 18:18:34 +0530")
-References: <1342183715-13734-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <87d331wbiv.fsf@ti.com>
+Date: Wed, 08 Aug 2012 10:18:48 -0700
+Subject: [PATCH 2/2] ARM: OMAP4: Register the OPP table only for 4430
+ device
+In-Reply-To: <1344423254-3475-3-git-send-email-rnayak@ti.com> (Rajendra
+ Nayak's message of "Wed, 8 Aug 2012 16:24:14 +0530")
+References: <1344423254-3475-1-git-send-email-rnayak@ti.com>
+ <1344423254-3475-3-git-send-email-rnayak@ti.com>
+Message-ID: <87628twbd3.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+Rajendra Nayak <rnayak@ti.com> writes:
 
-> OMAP4 sleep entry code even though itself don't use many CPU registers
-> makes call to the v7_flush_dcache_all() which uses them. Since
-> v7_flush_dcache_all() doesn't make use of stack, the caller must take
-> care of the stack frame. Otherwise it will lead to corrupted stack frame.
+> The 4430 OPP table was being registered for all other OMAP4 variants
+> too, like 4460 and 4470 causing issues with cpufreq driver
+> enabled. 4460 and 4470 devices have different OPPs as compared to
+> 4430, and they should be populated seperately. As long as that
+> happens, let the OPP table registeration happen only on 4430 device.
 >
-> Fix it by saving used registers.
->
-> Reported-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 
-Please add a brief comment in the code as well explaining why the
-additional registers are saved/restored.
-
-After that, I'll add to my PM fixes queue for v3.6-rc.
-
-Thanks for the fix.
+Thanks, adding to PM fixes for v3.6-rc (branch: for_3.6/fixes/pm)
 
 Kevin
 
 > ---
->  arch/arm/mach-omap2/sleep44xx.S |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/mach-omap2/opp4xxx_data.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/arch/arm/mach-omap2/sleep44xx.S b/arch/arm/mach-omap2/sleep44xx.S
-> index 9f6b83d..b5823e9 100644
-> --- a/arch/arm/mach-omap2/sleep44xx.S
-> +++ b/arch/arm/mach-omap2/sleep44xx.S
-> @@ -58,7 +58,7 @@ ppa_por_params:
->   * CPU failed to transition to targeted OFF/DORMANT state.
->   */
->  ENTRY(omap4_finish_suspend)
-> -	stmfd	sp!, {lr}
-> +	stmfd	sp!, {r4-r12, lr}
->  	cmp	r0, #0x0
->  	beq	do_WFI				@ No lowpower state, jump to WFI
+> diff --git a/arch/arm/mach-omap2/opp4xxx_data.c b/arch/arm/mach-omap2/opp4xxx_data.c
+> index 2293ba2..c95415d 100644
+> --- a/arch/arm/mach-omap2/opp4xxx_data.c
+> +++ b/arch/arm/mach-omap2/opp4xxx_data.c
+> @@ -94,7 +94,7 @@ int __init omap4_opp_init(void)
+>  {
+>  	int r = -ENODEV;
 >  
-> @@ -226,7 +226,7 @@ scu_gp_clear:
->  skip_scu_gp_clear:
->  	isb
->  	dsb
-> -	ldmfd	sp!, {pc}
-> +	ldmfd	sp!, {r4-r12, pc}
->  ENDPROC(omap4_finish_suspend)
+> -	if (!cpu_is_omap44xx())
+> +	if (!cpu_is_omap443x())
+>  		return r;
 >  
->  /*
+>  	r = omap_init_opp_table(omap44xx_opp_def_list,
