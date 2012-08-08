@@ -1,71 +1,92 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  8 Aug 2012 16:47:17 +0200
-Subject: [PATCH 00/11] recently added ARM defconfig warnings
-Message-ID: <1344437248-20560-1-git-send-email-arnd@arndb.de>
+Date: Wed,  8 Aug 2012 16:47:28 +0200
+Subject: [PATCH 11/11] pm/drivers: fix use of SIMPLE_DEV_PM_OPS
+In-Reply-To: <1344437248-20560-1-git-send-email-arnd@arndb.de>
+References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
+Message-ID: <1344437248-20560-12-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches address problems that showed up in new warnings
-when building all ARM defconfig files in v3.6-rc1 compared
-with v3.5.
+A few drivers use a construct like
 
-I can merge them through the arm-soc tree or have subsystem
-maintainers pick them up if they prefer.
+ #ifdef CONFIG_PM
+ static int foo_suspend(struct device *pdev)
+ {
+    ...
+ }
+ static int foo_resume struct device *pdev)
+ {
+    ...
+ }
+ #endif
+ static SIMPLE_DEV_PM_OPS(foo_pm, foo_suspend, foo_resume);
 
-Arnd Bergmann (11):
-  ARM: topology: mark init_cpu_topology as __init
-  mfd/asic3: fix asic3_mfd_probe return value
-  usb/ohci-omap: remove unused variable
-  ARM: ux500: really kill snowball_of_platform_devs
-  ARM: exynos: exynos_pm_add_dev_to_genpd may be unused
-  gpio: em: do not discard em_gio_irq_domain_cleanup
-  net/stmmac: mark probe function as __devinit
-  mtd/omap2: fix dmaengine_slave_config error handling
-  regulator/twl: remove fixed resource handling
-  spi/s3c64xx: improve error handling
-  pm/drivers: fix use of SIMPLE_DEV_PM_OPS
+which leaves the two functions unused if CONFIG_PM is enabled
+but CONFIG_PM_SLEEP is disabled. I found this while building
+all defconfig files on ARM. It's not clear to me if this is
+the right solution, but at least it makes the code consistent
+again.
 
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: David S. Miller <davem@davemloft.net>
-Cc: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Grazvydas Ignotas <notasas@gmail.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jaswinder Singh <jaswinder.singh@linaro.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Laxman Dewangan <ldewangan@nvidia.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Magnus Damm <damm@opensource.se>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Paul Parsons <lost.distance@yahoo.com>
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Philipp Zabel <philipp.zabel@gmail.com>
+Without this patch, building omap1_defconfig results in:
+
+drivers/char/hw_random/omap-rng.c:165:12: warning: 'omap_rng_suspend' defined but not used [-Wunused-function]
+drivers/char/hw_random/omap-rng.c:171:12: warning: 'omap_rng_resume' defined but not used [-Wunused-function]
+sound/drivers/dummy.c:1068:12: warning: 'snd_dummy_suspend' defined but not used [-Wunused-function]
+sound/drivers/dummy.c:1078:12: warning: 'snd_dummy_resume' defined but not used [-Wunused-function]
+
+and building tegra_defconfig results in:
+
+drivers/i2c/busses/i2c-tegra.c:716:12: warning: 'tegra_i2c_suspend' defined but not used [-Wunused-function]
+drivers/i2c/busses/i2c-tegra.c:727:12: warning: 'tegra_i2c_resume' defined but not used [-Wunused-function]
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Cc: Rafael J. Wysocki <rjw@sisk.pl>
-Cc: Richard Zhao <richard.zhao@freescale.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Stefan Roese <sr@denx.de>
 Cc: Takashi Iwai <tiwai@suse.de>
-Cc: Thomas Abraham <thomas.abraham@linaro.org>
-Cc: Vincent Guittot <vincent.guittot@linaro.org>
-Cc: netdev at vger.kernel.org
+Cc: Laxman Dewangan <ldewangan@nvidia.com>
+---
+ drivers/char/hw_random/omap-rng.c |    2 +-
+ drivers/i2c/busses/i2c-tegra.c    |    2 +-
+ sound/drivers/dummy.c             |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
- arch/arm/kernel/topology.c                         |    2 +-
- arch/arm/mach-exynos/pm_domains.c                  |    2 +-
- arch/arm/mach-ux500/board-mop500.c                 |    5 -----
- drivers/char/hw_random/omap-rng.c                  |    2 +-
- drivers/gpio/gpio-em.c                             |    2 +-
- drivers/i2c/busses/i2c-tegra.c                     |    2 +-
- drivers/mfd/asic3.c                                |    1 +
- drivers/mtd/nand/omap2.c                           |    7 +++----
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |    2 +-
- drivers/regulator/twl-regulator.c                  |   21 --------------------
- drivers/spi/spi-s3c64xx.c                          |    2 +-
- drivers/usb/host/ohci-omap.c                       |    2 --
- sound/drivers/dummy.c                              |    2 +-
- 13 files changed, 12 insertions(+), 40 deletions(-)
-
+diff --git a/drivers/char/hw_random/omap-rng.c b/drivers/char/hw_random/omap-rng.c
+index d706bd0e..4fbdceb 100644
+--- a/drivers/char/hw_random/omap-rng.c
++++ b/drivers/char/hw_random/omap-rng.c
+@@ -160,7 +160,7 @@ static int __exit omap_rng_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM
++#ifdef CONFIG_PM_SLEEP
+ 
+ static int omap_rng_suspend(struct device *dev)
+ {
+diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
+index 66eb53f..9a08c57 100644
+--- a/drivers/i2c/busses/i2c-tegra.c
++++ b/drivers/i2c/busses/i2c-tegra.c
+@@ -712,7 +712,7 @@ static int __devexit tegra_i2c_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM
++#ifdef CONFIG_PM_SLEEP
+ static int tegra_i2c_suspend(struct device *dev)
+ {
+ 	struct tegra_i2c_dev *i2c_dev = dev_get_drvdata(dev);
+diff --git a/sound/drivers/dummy.c b/sound/drivers/dummy.c
+index f7d3bfc..54bb664 100644
+--- a/sound/drivers/dummy.c
++++ b/sound/drivers/dummy.c
+@@ -1064,7 +1064,7 @@ static int __devexit snd_dummy_remove(struct platform_device *devptr)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM
++#ifdef CONFIG_PM_SLEEP
+ static int snd_dummy_suspend(struct device *pdev)
+ {
+ 	struct snd_card *card = dev_get_drvdata(pdev);
 -- 
 1.7.10
