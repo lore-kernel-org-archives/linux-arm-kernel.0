@@ -1,47 +1,55 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  8 Aug 2012 16:47:24 +0200
-Subject: [PATCH 07/11] net/stmmac: mark probe function as __devinit
+Date: Wed,  8 Aug 2012 16:47:25 +0200
+Subject: [PATCH 08/11] mtd/omap2: fix dmaengine_slave_config error handling
 In-Reply-To: <1344437248-20560-1-git-send-email-arnd@arndb.de>
 References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
-Message-ID: <1344437248-20560-8-git-send-email-arnd@arndb.de>
+Message-ID: <1344437248-20560-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Driver probe functions are generally __devinit so they will be
-discarded after initialization for non-hotplug kernels.
-This was found by a new warning after patch 6a228452d "stmmac: Add
-device-tree support" adds a new __devinit function that is called
-from stmmac_pltfr_probe.
+The newly added dmaengine support in the omap2 nand driver
+potentially causes an undefined return value from the
+omap_nand_probe function when dmaengine_slave_config
+reports an error. Let's handle this by returning the
+same error back to the caller.
 
-Without this patch, building socfpga_defconfig results in:
+Without this patch, building omap2plus_defconfig results in:
 
-WARNING: drivers/net/ethernet/stmicro/stmmac/stmmac.o(.text+0x5d4c): Section mismatch in reference from the function stmmac_pltfr_probe() to the function .devinit.text:stmmac_probe_config_dt()
-The function stmmac_pltfr_probe() references
-the function __devinit stmmac_probe_config_dt().
-This is often because stmmac_pltfr_probe lacks a __devinit
-annotation or the annotation of stmmac_probe_config_dt is wrong.
+drivers/mtd/nand/omap2.c: In function 'omap_nand_probe':
+drivers/mtd/nand/omap2.c:1154:6: warning: 'err' may be used uninitialized in this function [-Wuninitialized]
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Stefan Roese <sr@denx.de>
-Cc: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-Cc: David S. Miller <davem@davemloft.net>
-Cc: netdev at vger.kernel.org
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Grazvydas Ignotas <notasas@gmail.com>
 ---
- drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mtd/nand/omap2.c |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-index cd01ee7..b93245c 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-@@ -74,7 +74,7 @@ static int __devinit stmmac_probe_config_dt(struct platform_device *pdev,
-  * the necessary resources and invokes the main to init
-  * the net device, register the mdio bus etc.
-  */
--static int stmmac_pltfr_probe(struct platform_device *pdev)
-+static int __devinit stmmac_pltfr_probe(struct platform_device *pdev)
- {
- 	int ret = 0;
- 	struct resource *res;
+diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+index e9309b3..ac4fd75 100644
+--- a/drivers/mtd/nand/omap2.c
++++ b/drivers/mtd/nand/omap2.c
+@@ -1245,7 +1245,6 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
+ 			goto out_release_mem_region;
+ 		} else {
+ 			struct dma_slave_config cfg;
+-			int rc;
+ 
+ 			memset(&cfg, 0, sizeof(cfg));
+ 			cfg.src_addr = info->phys_base;
+@@ -1254,10 +1253,10 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
+ 			cfg.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+ 			cfg.src_maxburst = 16;
+ 			cfg.dst_maxburst = 16;
+-			rc = dmaengine_slave_config(info->dma, &cfg);
+-			if (rc) {
++			err = dmaengine_slave_config(info->dma, &cfg);
++			if (err) {
+ 				dev_err(&pdev->dev, "DMA engine slave config failed: %d\n",
+-					rc);
++					err);
+ 				goto out_release_mem_region;
+ 			}
+ 			info->nand.read_buf   = omap_read_buf_dma_pref;
 -- 
 1.7.10
