@@ -1,80 +1,83 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 08 Aug 2012 10:28:50 -0700
-Subject: [PATCH 1/2] cpufreq: OMAP: Handle missing frequency table on SMP
- systems
-In-Reply-To: <CAMQu2gyooQ4x=ZGDZFg5BuBaEkgQx2kTAvtiGLEjXwOYvF_wMQ@mail.gmail.com>
- (Santosh Shilimkar's message of "Wed, 8 Aug 2012 17:00:10 +0530")
-References: <1344423254-3475-1-git-send-email-rnayak@ti.com>
- <1344423254-3475-2-git-send-email-rnayak@ti.com>
- <CAMQu2gyooQ4x=ZGDZFg5BuBaEkgQx2kTAvtiGLEjXwOYvF_wMQ@mail.gmail.com>
-Message-ID: <87wr19uwbx.fsf@ti.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Wed, 8 Aug 2012 12:32:39 -0500
+Subject: [PATCH 1/2] ARM: build ssi-fiq.S in ARM mode to prevent
+ CONFIG_THUMB2_KERNEL build breakage
+In-Reply-To: <20120808065502.GI1451@pengutronix.de>
+References: <1344379514-30076-1-git-send-email-matt@genesi-usa.com>
+ <1344379514-30076-2-git-send-email-matt@genesi-usa.com>
+ <20120808065502.GI1451@pengutronix.de>
+Message-ID: <CAKGA1bmUuSZuWDM4QPTxmNR0+=uQ1RbFhw4u-sb9KaSPYwQiVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
+On Wed, Aug 8, 2012 at 1:55 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>>               .text
+>> +             .arm
+>>               .global imx_ssi_fiq_start
+>>               .global imx_ssi_fiq_end
+>>               .global imx_ssi_fiq_base
+>
+> I think it would be better to add a depends on !THUMB2_KERNEL to
+> SND_IMX_SOC_PCM_FIQ. The above may result in broken code in a thumb2
+> kernel, so I'd rather keep the compile error instead.
 
-> On Wed, Aug 8, 2012 at 4:24 PM, Rajendra Nayak <rnayak@ti.com> wrote:
->>
->> On OMAP4, if the first CPU fails to get a valid frequency table (this
->> could happen if the platform does not register any OPP table), the
->> subsequent CPU instances end up dealing with a NULL freq_table and
->> crash. Add a check for a NULL freq_table to help error the rest
->> of the CPU instances out.
->>
->> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
->> Cc: <linux-pm@vger.kernel.org>
->> ---
->>  drivers/cpufreq/omap-cpufreq.c |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/cpufreq/omap-cpufreq.c
->> b/drivers/cpufreq/omap-cpufreq.c
->> index 17fa04d..0ee824c 100644
->> --- a/drivers/cpufreq/omap-cpufreq.c
->> +++ b/drivers/cpufreq/omap-cpufreq.c
->> @@ -221,7 +221,7 @@ static int __cpuinit omap_cpu_init(struct
->> cpufreq_policy *policy)
->>         if (atomic_inc_return(&freq_table_users) == 1)
->>                 result = opp_init_cpufreq_table(mpu_dev, &freq_table);
->>
->> -       if (result) {
->> +       if (result || !freq_table) {
->>                 dev_err(mpu_dev, "%s: cpu%d: failed creating freq
->> table[%d]\n",
->>                                 __func__, policy->cpu, result);
->>                 goto fail_ck;
->
-> The freq_table use count seems to be buggy in that case.
-> Something like below should fix the issue.
-> Feel free to update your patch with below if you agree.
->
-> diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-> index 17fa04d..fd97c3d 100644
-> --- a/drivers/cpufreq/omap-cpufreq.c
-> +++ b/drivers/cpufreq/omap-cpufreq.c
-> @@ -218,7 +218,7 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *po
->
->         policy->cur = policy->min = policy->max = omap_getspeed(policy->cpu);
->
-> -       if (atomic_inc_return(&freq_table_users) == 1)
-> +       if (freq_table)
+I'm curious as to how/why would it result in broken code? It's not
+possible that the processors relying on
+the imx_ssi_fiq_* stuff cannot run ARM code (unless Freescale shipped
+a weird version) so it should
+magically enter and exit. I wonder if it needs some thumb-interworking
+stuff wrapped around it though.
+You'd know better than me..
 
-I think you meant 'if (!freq_table)' ?
+I'm a little worried that making it !CONFIG_THUMB2_KERNEL would
+basically make more than
+one of the boards in imx_v6_v7_defconfig suddenly lose audio support
+for no other reason.. I don't
+like things just disappearing from the kernel by dependency magic.
+That said, a crash would be worse.
 
-Kevin
+I guess the eukrea tlv320 audio support should also be split, or
+looked at. This is the snippet that
+confuses me the most;
 
->                 result = opp_init_cpufreq_table(mpu_dev, &freq_table);
->
->         if (result) {
-> @@ -227,6 +227,7 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *po
->                 goto fail_ck;
->         }
->
-> +       atomic_inc_return(&freq_table_users);
->         result = cpufreq_frequency_table_cpuinfo(policy, freq_table);
->         if (result)
->                 goto fail_table;
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+config SND_SOC_EUKREA_TLV320
+        tristate "Eukrea TLV320"
+        depends on MACH_EUKREA_MBIMX27_BASEBOARD \
+                || MACH_EUKREA_MBIMXSD25_BASEBOARD \
+                || MACH_EUKREA_MBIMXSD35_BASEBOARD \
+                || MACH_EUKREA_MBIMXSD51_BASEBOARD
+        depends on I2C
+        select SND_SOC_TLV320AIC23
+        select SND_SOC_IMX_PCM_FIQ
+        select SND_SOC_IMX_AUDMUX
+        select SND_SOC_IMX_SSI
+        help
+          Enable I2S based access to the TLV320AIC23B codec attached
+          to the SSI interface
+
+.. Since you said I2S support doesn't require it, only AC97, this alone seems
+redundant, but since I wasn't the one to write it, test it, have no
+access to this
+board I have no idea. Mark's assertion that it's just not required now DMA works
+properly, could be true and this can be ditched, but I don't want to
+patch something
+I can't actually test.. my primary concern was fixing the build breakage.
+
+If that gets fixed, then the only dependencies are the WM1131_EV1 board
+which isn't in imx_v6_v7_defconfig, and the phyCORE support which needs it
+for AC97. That's one of your customers, right? I wouldn't want to disable a
+board, but I can justify to myself disabling the audio for *one* board based if
+it's just a caveat of a Thumb2 kernel.
+
+I'm going to do a trapse through and find where Russell nacked Dave's
+thumb-aware
+rewrite.. would you mind if you have any of these boards seeing if it
+really DOES
+cause broken code? The moment we noticed this was broken we quit designing
+with AC97 codecs, so there's no Genesi board of similar pedigree
+around that ever
+got to a PCB..
+
+-- 
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
