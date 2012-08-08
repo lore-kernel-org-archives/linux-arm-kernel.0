@@ -1,44 +1,96 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 08 Aug 2012 18:30:26 +0200
-Subject: [RFC 3/6] arm: cache-l2x0: add support for Aurora L2 cache ctrl
-In-Reply-To: <20120808151946.GE4579@mudshark.cambridge.arm.com>
-References: <1344438307-8468-1-git-send-email-gregory.clement@free-electrons.com>
- <1344438307-8468-4-git-send-email-gregory.clement@free-electrons.com>
- <20120808151946.GE4579@mudshark.cambridge.arm.com>
-Message-ID: <50229422.40305@free-electrons.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 8 Aug 2012 17:31:13 +0100
+Subject: [PATCH v2 01/23] arm: initial Xen support
+In-Reply-To: <20120807181017.GF15053@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1208061428060.4645@kaball.uk.xensource.com>
+ <1344263246-28036-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120807181017.GF15053@phenom.dumpdata.com>
+Message-ID: <alpine.DEB.2.02.1208081730560.21096@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2012 05:19 PM, Will Deacon wrote:
-> On Wed, Aug 08, 2012 at 04:05:03PM +0100, Gregory CLEMENT wrote:
->> +static void aurora_pa_range(unsigned long start, unsigned long end,
->> +                       unsigned long offset)
->> +{
+On Tue, 7 Aug 2012, Konrad Rzeszutek Wilk wrote:
+> On Mon, Aug 06, 2012 at 03:27:04PM +0100, Stefano Stabellini wrote:
+> > - Basic hypervisor.h and interface.h definitions.
+> > - Skeleton enlighten.c, set xen_start_info to an empty struct.
+> > - Make xen_initial_domain dependent on the SIF_PRIVILIGED_BIT.
+> > 
+> > The new code only compiles when CONFIG_XEN is set, that is going to be
+> > added to arch/arm/Kconfig in patch #11 "xen/arm: introduce CONFIG_XEN on
+> > ARM".
 > 
-> This controller is used by Armada XP right? I think that SoC supports LPAE,
-> so please tell me that the above is a mistake and the controller can support
-> physical addresses > 32 bits!
+> You can add my Ack, but do one change pls:
 
-Yes indeed this SoC support LPAE.
+Thanks! I'll make the changes.
 
+
+> > +/* XXX: Move pvclock definitions some place arch independent */
 > 
-> If so, you'll need to hack the cache-l2x0 driver to use phys_addr_t types
-> instead of unsigned longs.
-
-Ok I will look at this.
-
+> Just use 'TODO'
 > 
-> Will
+> > +struct pvclock_vcpu_time_info {
+> > +	u32   version;
+> > +	u32   pad0;
+> > +	u64   tsc_timestamp;
+> > +	u64   system_time;
+> > +	u32   tsc_to_system_mul;
+> > +	s8    tsc_shift;
+> > +	u8    flags;
+> > +	u8    pad[2];
+> > +} __attribute__((__packed__)); /* 32 bytes */
+> > +
+> > +struct pvclock_wall_clock {
+> > +	u32   version;
+> > +	u32   sec;
+> > +	u32   nsec;
+> > +} __attribute__((__packed__));
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Mention the size and why it is OK to have it be a weird
+> size while the one above is nicely padded.
 > 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> > +#endif
+> > +
+> > +#endif /* _ASM_ARM_XEN_INTERFACE_H */
+> > diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
+> > new file mode 100644
+> > index 0000000..0bad594
+> > --- /dev/null
+> > +++ b/arch/arm/xen/Makefile
+> > @@ -0,0 +1 @@
+> > +obj-y		:= enlighten.o
+> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > new file mode 100644
+> > index 0000000..d27c2a6
+> > --- /dev/null
+> > +++ b/arch/arm/xen/enlighten.c
+> > @@ -0,0 +1,35 @@
+> > +#include <xen/xen.h>
+> > +#include <xen/interface/xen.h>
+> > +#include <xen/interface/memory.h>
+> > +#include <xen/platform_pci.h>
+> > +#include <asm/xen/hypervisor.h>
+> > +#include <asm/xen/hypercall.h>
+> > +#include <linux/module.h>
+> > +
+> > +struct start_info _xen_start_info;
+> > +struct start_info *xen_start_info = &_xen_start_info;
+> > +EXPORT_SYMBOL_GPL(xen_start_info);
+> > +
+> > +enum xen_domain_type xen_domain_type = XEN_NATIVE;
+> > +EXPORT_SYMBOL_GPL(xen_domain_type);
+> > +
+> > +struct shared_info xen_dummy_shared_info;
+> > +struct shared_info *HYPERVISOR_shared_info = (void *)&xen_dummy_shared_info;
+> > +
+> > +DEFINE_PER_CPU(struct vcpu_info *, xen_vcpu);
+> > +
+> > +/* XXX: to be removed */
+> 
+> s/XXX/TODO/ here, and mention pls why it needs to be removed.
+> 
+> > +__read_mostly int xen_have_vector_callback;
+> > +EXPORT_SYMBOL_GPL(xen_have_vector_callback);
+> > +
+> > +int xen_platform_pci_unplug = XEN_UNPLUG_ALL;
+> > +EXPORT_SYMBOL_GPL(xen_platform_pci_unplug);
+> 
