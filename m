@@ -1,61 +1,80 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 8 Aug 2012 18:22:50 +0100
-Subject: [PATCH v2 21/23] xen: update xen_add_to_physmap interface
-In-Reply-To: <20120807183306.GX15053@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1208061428060.4645@kaball.uk.xensource.com>
- <1344263246-28036-21-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120807183306.GX15053@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1208081821380.21096@kaball.uk.xensource.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 08 Aug 2012 10:28:50 -0700
+Subject: [PATCH 1/2] cpufreq: OMAP: Handle missing frequency table on SMP
+ systems
+In-Reply-To: <CAMQu2gyooQ4x=ZGDZFg5BuBaEkgQx2kTAvtiGLEjXwOYvF_wMQ@mail.gmail.com>
+ (Santosh Shilimkar's message of "Wed, 8 Aug 2012 17:00:10 +0530")
+References: <1344423254-3475-1-git-send-email-rnayak@ti.com>
+ <1344423254-3475-2-git-send-email-rnayak@ti.com>
+ <CAMQu2gyooQ4x=ZGDZFg5BuBaEkgQx2kTAvtiGLEjXwOYvF_wMQ@mail.gmail.com>
+Message-ID: <87wr19uwbx.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Aug 2012, Konrad Rzeszutek Wilk wrote:
-> On Mon, Aug 06, 2012 at 03:27:24PM +0100, Stefano Stabellini wrote:
-> > Update struct xen_add_to_physmap to be in sync with Xen's version of the
-> > structure.
-> > The size field was introduced by:
-> > 
-> > changeset:   24164:707d27fe03e7
-> > user:        Jean Guyader <jean.guyader@eu.citrix.com>
-> > date:        Fri Nov 18 13:42:08 2011 +0000
-> > summary:     mm: New XENMEM space, XENMAPSPACE_gmfn_range
-> > 
-> > According to the comment:
-> > 
-> > "This new field .size is located in the 16 bits padding between .domid
-> > and .space in struct xen_add_to_physmap to stay compatible with older
-> > versions."
-> > 
-> > Changes in v2:
-> 
-> Looks good. Let me take this as in my tree to prep it for Mukesh's patches.
+"Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
 
-OK.
-Beware that patch #23 is going to modify xen_add_to_physmap again to
-replace .size with a union.
+> On Wed, Aug 8, 2012 at 4:24 PM, Rajendra Nayak <rnayak@ti.com> wrote:
+>>
+>> On OMAP4, if the first CPU fails to get a valid frequency table (this
+>> could happen if the platform does not register any OPP table), the
+>> subsequent CPU instances end up dealing with a NULL freq_table and
+>> crash. Add a check for a NULL freq_table to help error the rest
+>> of the CPU instances out.
+>>
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> Cc: <linux-pm@vger.kernel.org>
+>> ---
+>>  drivers/cpufreq/omap-cpufreq.c |    2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/cpufreq/omap-cpufreq.c
+>> b/drivers/cpufreq/omap-cpufreq.c
+>> index 17fa04d..0ee824c 100644
+>> --- a/drivers/cpufreq/omap-cpufreq.c
+>> +++ b/drivers/cpufreq/omap-cpufreq.c
+>> @@ -221,7 +221,7 @@ static int __cpuinit omap_cpu_init(struct
+>> cpufreq_policy *policy)
+>>         if (atomic_inc_return(&freq_table_users) == 1)
+>>                 result = opp_init_cpufreq_table(mpu_dev, &freq_table);
+>>
+>> -       if (result) {
+>> +       if (result || !freq_table) {
+>>                 dev_err(mpu_dev, "%s: cpu%d: failed creating freq
+>> table[%d]\n",
+>>                                 __func__, policy->cpu, result);
+>>                 goto fail_ck;
+>
+> The freq_table use count seems to be buggy in that case.
+> Something like below should fix the issue.
+> Feel free to update your patch with below if you agree.
+>
+> diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
+> index 17fa04d..fd97c3d 100644
+> --- a/drivers/cpufreq/omap-cpufreq.c
+> +++ b/drivers/cpufreq/omap-cpufreq.c
+> @@ -218,7 +218,7 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *po
+>
+>         policy->cur = policy->min = policy->max = omap_getspeed(policy->cpu);
+>
+> -       if (atomic_inc_return(&freq_table_users) == 1)
+> +       if (freq_table)
 
+I think you meant 'if (!freq_table)' ?
 
-> > - remove erroneous comment in the commit message.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > ---
-> >  include/xen/interface/memory.h |    3 +++
-> >  1 files changed, 3 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
-> > index b5c3098..b66d04c 100644
-> > --- a/include/xen/interface/memory.h
-> > +++ b/include/xen/interface/memory.h
-> > @@ -163,6 +163,9 @@ struct xen_add_to_physmap {
-> >      /* Which domain to change the mapping for. */
-> >      domid_t domid;
-> >  
-> > +    /* Number of pages to go through for gmfn_range */
-> > +    uint16_t    size;
-> > +
-> >      /* Source mapping space. */
-> >  #define XENMAPSPACE_shared_info 0 /* shared info page */
-> >  #define XENMAPSPACE_grant_table 1 /* grant table page */
-> > -- 
-> > 1.7.2.5
-> 
+Kevin
+
+>                 result = opp_init_cpufreq_table(mpu_dev, &freq_table);
+>
+>         if (result) {
+> @@ -227,6 +227,7 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *po
+>                 goto fail_ck;
+>         }
+>
+> +       atomic_inc_return(&freq_table_users);
+>         result = cpufreq_frequency_table_cpuinfo(policy, freq_table);
+>         if (result)
+>                 goto fail_table;
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
