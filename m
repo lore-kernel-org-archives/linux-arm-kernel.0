@@ -1,44 +1,62 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  8 Aug 2012 23:27:50 +0200
-Subject: [PATCH 02/10] ARM: ks8695: __arch_virt_to_dma type handling
+Date: Wed,  8 Aug 2012 23:27:56 +0200
+Subject: [PATCH 08/10] ARM: s3c24xx: enable CONFIG_BUG for tct_hammer
 In-Reply-To: <1344461278-28245-1-git-send-email-arnd@arndb.de>
 References: <1344461278-28245-1-git-send-email-arnd@arndb.de>
-Message-ID: <1344461278-28245-3-git-send-email-arnd@arndb.de>
+Message-ID: <1344461278-28245-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__arch_virt_to_dma expects a virtual address pointer, but
-the ks8695 implementation of this macro treats it as an
-integer. Adding a type cast avoids hundreds of identical
-warning messages.
+Disabling CONFIG_BUG creates an insane amount of build warnings, which
+makes it useless to check for building defconfigs to see if new
+warnings show up.
 
-Without this patch, building acs5k_defconfig results in:
+Without this patch, building tct_hammer_defconfig results in:
 
-arch/arm/include/asm/dma-mapping.h: In function 'virt_to_dma':
-arch/arm/include/asm/dma-mapping.h:60:2: warning: passing argument 1 of '__virt_to_phys' makes integer from pointer without a cast [enabled by default]
-arch/arm/include/asm/memory.h:172:60: note: expected 'long unsigned int' but argument is of type 'void *'
-In file included from include/linux/dma-mapping.h:73:0,
-                 from include/linux/skbuff.h:33,
-                 from security/commoncap.c:21:
+net/packet/af_packet.c: In function 'tpacket_rcv':
+net/packet/af_packet.c:1889:30: warning: 'hdrlen' may be used uninitialized in this function [-Wuninitialized]
+net/core/ethtool.c: In function 'ethtool_get_feature_mask':
+net/core/ethtool.c:213:1: warning: control reaches end of non-void function [-Wreturn-type]
+block/cfq-iosched.c: In function 'cfq_async_queue_prio':
+block/cfq-iosched.c:2914:1: warning: control reaches end of non-void function [-Wreturn-type]
+mm/bootmem.c: In function 'mark_bootmem':
+mm/bootmem.c:352:1: warning: control reaches end of non-void function [-Wreturn-type]
+net/core/dev.c: In function 'skb_warn_bad_offload':
+net/core/dev.c:1904:33: warning: unused variable 'null_features' [-Wunused-variable]
+drivers/mtd/chips/cfi_probe.c: In function 'cfi_chip_setup':
+include/linux/mtd/cfi.h:489:3: warning: 'r.x[0]' may be used uninitialized in this function [-Wuninitialized]
+include/linux/mtd/map.h:394:11: note: 'r.x[0]' was declared here
+include/linux/mtd/cfi.h:489:3: warning: 'r.x[0]' may be used uninitialized in this function [-Wuninitialized]
+(and many more)
+
+The size of vmlinux increases by 1.78% because of this:
+
+size obj-arm/vmlinux.nobug
+   text    data     bss     dec     hex filename
+   2108474  116916   55352 2280742  22cd26 obj-arm/vmlinux
+size obj-arm/vmlinux.bug
+   text    data     bss     dec     hex filename
+   2150804  116916   53696 2321416  236c08 obj-arm/vmlinux
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
 ---
- arch/arm/mach-ks8695/include/mach/memory.h |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/configs/tct_hammer_defconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ks8695/include/mach/memory.h b/arch/arm/mach-ks8695/include/mach/memory.h
-index f7e1b9b..95e731a 100644
---- a/arch/arm/mach-ks8695/include/mach/memory.h
-+++ b/arch/arm/mach-ks8695/include/mach/memory.h
-@@ -34,7 +34,8 @@ extern struct bus_type platform_bus_type;
- #define __arch_dma_to_virt(dev, x)	({ (void *) (is_lbus_device(dev) ? \
- 					__phys_to_virt(x) : __bus_to_virt(x)); })
- #define __arch_virt_to_dma(dev, x)	({ is_lbus_device(dev) ? \
--					(dma_addr_t)__virt_to_phys(x) : (dma_addr_t)__virt_to_bus(x); })
-+					(dma_addr_t)__virt_to_phys((unsigned long)x) \
-+					: (dma_addr_t)__virt_to_bus(x); })
- #define __arch_pfn_to_dma(dev, pfn)	\
- 	({ dma_addr_t __dma = __pfn_to_phys(pfn); \
- 	   if (!is_lbus_device(dev)) \
+diff --git a/arch/arm/configs/tct_hammer_defconfig b/arch/arm/configs/tct_hammer_defconfig
+index 1d24f84..71277a1 100644
+--- a/arch/arm/configs/tct_hammer_defconfig
++++ b/arch/arm/configs/tct_hammer_defconfig
+@@ -7,7 +7,7 @@ CONFIG_SYSFS_DEPRECATED_V2=y
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_EXPERT=y
+ # CONFIG_KALLSYMS is not set
+-# CONFIG_BUG is not set
++# CONFIG_BUGVERBOSE is not set
+ # CONFIG_ELF_CORE is not set
+ # CONFIG_SHMEM is not set
+ CONFIG_SLOB=y
 -- 
 1.7.10
