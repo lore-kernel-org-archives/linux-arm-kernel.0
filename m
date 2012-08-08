@@ -1,30 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 8 Aug 2012 17:22:01 +0100
-Subject: [PATCH 04/11] ARM: ux500: really kill snowball_of_platform_devs
-In-Reply-To: <1344437248-20560-5-git-send-email-arnd@arndb.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 Aug 2012 16:22:29 +0000
+Subject: [PATCH 11/11] pm/drivers: fix use of SIMPLE_DEV_PM_OPS
+In-Reply-To: <50228889.5060709@wwwdotorg.org>
 References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
- <1344437248-20560-5-git-send-email-arnd@arndb.de>
-Message-ID: <20120808162200.GB30473@gmail.com>
+ <1344437248-20560-12-git-send-email-arnd@arndb.de>
+ <50228889.5060709@wwwdotorg.org>
+Message-ID: <201208081622.29777.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2012 at 04:47:21PM +0200, Arnd Bergmann wrote:
-> Commit fc67a597a "ARM: ux500: Remove temporary snowball_of_platform_devs
-> enablement structure" removed the only user of this variable, but did
-> not actually remove the array itself.
+On Wednesday 08 August 2012, Stephen Warren wrote:
+> On 08/08/2012 08:47 AM, Arnd Bergmann wrote:
+> > A few drivers use a construct like
+> > 
+> >  #ifdef CONFIG_PM
+> >  static int foo_suspend(struct device *pdev)
+> >  {
+> >     ...
+> >  }
+> >  static int foo_resume struct device *pdev)
+> >  {
+> >     ...
+> >  }
+> >  #endif
+> >  static SIMPLE_DEV_PM_OPS(foo_pm, foo_suspend, foo_resume);
+> ...
+> > drivers/i2c/busses/i2c-tegra.c:716:12: warning: 'tegra_i2c_suspend' defined but not used [-Wunused-function]
+> > drivers/i2c/busses/i2c-tegra.c:727:12: warning: 'tegra_i2c_resume' defined but not used [-Wunused-function]
 > 
-> Without this patch, building u8500_defconfig results in:
+> Laxman already posted a patch for this, which I'm hoping will make it
+> into 3.6, through the I2C tree.
 > 
-> arch/arm/mach-ux500/board-mop500.c:729:32: warning: 'snowball_of_platform_devs' defined but not used [-Wunused-variable]
+> http://www.spinics.net/lists/linux-i2c/msg09359.html
 
-I've already sent a patch that does this:
+Ok, dropping this one then.
 
-https://lkml.org/lkml/2012/7/31/305
+Thanks,
 
-Just waiting on Linus to review the set.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+	Arnd
