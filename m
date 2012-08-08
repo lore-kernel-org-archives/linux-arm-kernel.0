@@ -1,309 +1,354 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed,  8 Aug 2012 13:39:22 +1200
-Subject: [PATCH 4/8] usb: vt8500: Add devicetree support for vt8500-ehci and
- -uhci.
+Date: Wed,  8 Aug 2012 13:39:25 +1200
+Subject: [PATCH 7/8] arm: vt8500: doc: Add device tree bindings for
+ arch-vt8500 devices
 In-Reply-To: <1344389967-8465-1-git-send-email-linux@prisktech.co.nz>
 References: <1344389967-8465-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1344389967-8465-5-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1344389967-8465-8-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devicetree support for vt8500-ehci.
-Convert vt8500-uhci to a generic non-pci platform-uhci with
-device tree support.
+Bindings for gpio, interrupt controller, power management controller,
+timer, realtime clock, serial uart, ehci and uhci controllers and
+framebuffer controllers used on the arch-vt8500 platform.
+
+Framebuffer binding also specifies a 'display' node which is required
+for determining the lcd panel data.
 
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
- drivers/usb/host/Kconfig         |    4 +-
- drivers/usb/host/ehci-vt8500.c   |   24 ++++--
- drivers/usb/host/uhci-hcd.c      |    5 ++
- drivers/usb/host/uhci-platform.c |  166 ++++++++++++++++++++++++++++++++++++++
- 4 files changed, 191 insertions(+), 8 deletions(-)
- create mode 100644 drivers/usb/host/uhci-platform.c
+ Documentation/devicetree/bindings/arm/vt8500.txt   |   15 +++++++
+ .../bindings/arm/vt8500/via,vt8500-intc.txt        |   16 +++++++
+ .../bindings/arm/vt8500/via,vt8500-pmc.txt         |   13 ++++++
+ .../bindings/arm/vt8500/via,vt8500-timer.txt       |   15 +++++++
+ .../devicetree/bindings/gpio/gpio_vt8500.txt       |   24 ++++++++++
+ .../devicetree/bindings/rtc/via,vt8500-rtc.txt     |   15 +++++++
+ .../bindings/tty/serial/via,vt8500-uart.txt        |   15 +++++++
+ .../devicetree/bindings/usb/platform-uhci.txt      |   15 +++++++
+ .../devicetree/bindings/usb/via,vt8500-ehci.txt    |   15 +++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |    2 +
+ .../devicetree/bindings/video/via,vt8500-fb.txt    |   46 ++++++++++++++++++++
+ .../devicetree/bindings/video/wm,prizm-ge-rops.txt |   13 ++++++
+ .../devicetree/bindings/video/wm,wm8505-fb.txt     |   20 +++++++++
+ 13 files changed, 224 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/vt8500.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/vt8500/via,vt8500-intc.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/vt8500/via,vt8500-pmc.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/vt8500/via,vt8500-timer.txt
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio_vt8500.txt
+ create mode 100644 Documentation/devicetree/bindings/rtc/via,vt8500-rtc.txt
+ create mode 100644 Documentation/devicetree/bindings/tty/serial/via,vt8500-uart.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/platform-uhci.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
+ create mode 100644 Documentation/devicetree/bindings/video/via,vt8500-fb.txt
+ create mode 100644 Documentation/devicetree/bindings/video/wm,prizm-ge-rops.txt
+ create mode 100644 Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index dcfaaa9..d7a6b10 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -450,7 +450,7 @@ config USB_OHCI_LITTLE_ENDIAN
- 
- config USB_UHCI_HCD
- 	tristate "UHCI HCD (most Intel and VIA) support"
--	depends on USB && (PCI || SPARC_LEON)
-+	depends on USB && (PCI || SPARC_LEON || ARCH_VT8500)
- 	---help---
- 	  The Universal Host Controller Interface is a standard by Intel for
- 	  accessing the USB hardware in the PC (which is also called the USB
-@@ -468,7 +468,7 @@ config USB_UHCI_HCD
- config USB_UHCI_SUPPORT_NON_PCI_HC
- 	bool
- 	depends on USB_UHCI_HCD
--	default y if SPARC_LEON
-+	default y if (SPARC_LEON  || ARCH_VT8500)
- 
- config USB_UHCI_BIG_ENDIAN_MMIO
- 	bool
-diff --git a/drivers/usb/host/ehci-vt8500.c b/drivers/usb/host/ehci-vt8500.c
-index c1eda73..52e9f92 100644
---- a/drivers/usb/host/ehci-vt8500.c
-+++ b/drivers/usb/host/ehci-vt8500.c
-@@ -16,6 +16,7 @@
-  *
-  */
- 
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- 
- static int ehci_update_device(struct usb_hcd *hcd, struct usb_device *udev)
-@@ -84,20 +85,23 @@ static const struct hc_driver vt8500_ehci_hc_driver = {
- 	.clear_tt_buffer_complete	= ehci_clear_tt_buffer_complete,
- };
- 
-+static u64 wmt_ehci_dma_mask = DMA_BIT_MASK(32);
-+
- static int vt8500_ehci_drv_probe(struct platform_device *pdev)
- {
- 	struct usb_hcd *hcd;
- 	struct ehci_hcd *ehci;
- 	struct resource *res;
-+	int irq;
- 	int ret;
- 
- 	if (usb_disabled())
- 		return -ENODEV;
- 
--	if (pdev->resource[1].flags != IORESOURCE_IRQ) {
--		pr_debug("resource[1] is not IORESOURCE_IRQ");
--		return -ENOMEM;
--	}
-+	/* devicetree created devices don't specify a dma mask */
-+	if (!pdev->dev.dma_mask)
-+		pdev->dev.dma_mask = &wmt_ehci_dma_mask;
-+
- 	hcd = usb_create_hcd(&vt8500_ehci_hc_driver, &pdev->dev, "VT8500");
- 	if (!hcd)
- 		return -ENOMEM;
-@@ -134,8 +138,9 @@ static int vt8500_ehci_drv_probe(struct platform_device *pdev)
- 
- 	ehci_reset(ehci);
- 
--	ret = usb_add_hcd(hcd, pdev->resource[1].start,
--			  IRQF_SHARED);
-+	irq = platform_get_irq(pdev, 0);
-+
-+	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
- 	if (ret == 0) {
- 		platform_set_drvdata(pdev, hcd);
- 		return ret;
-@@ -162,6 +167,11 @@ static int vt8500_ehci_drv_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id vt8500_ehci_ids[] = {
-+	{ .compatible = "via,vt8500-ehci", },
-+	{}
-+};
-+
- static struct platform_driver vt8500_ehci_driver = {
- 	.probe		= vt8500_ehci_drv_probe,
- 	.remove		= vt8500_ehci_drv_remove,
-@@ -169,7 +179,9 @@ static struct platform_driver vt8500_ehci_driver = {
- 	.driver = {
- 		.name	= "vt8500-ehci",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(vt8500_ehci_ids),
- 	}
- };
- 
- MODULE_ALIAS("platform:vt8500-ehci");
-+MODULE_DEVICE_TABLE(of, vt8500_ehci_ids);
-diff --git a/drivers/usb/host/uhci-hcd.c b/drivers/usb/host/uhci-hcd.c
-index e4db350..5da5c99 100644
---- a/drivers/usb/host/uhci-hcd.c
-+++ b/drivers/usb/host/uhci-hcd.c
-@@ -846,6 +846,11 @@ static const char hcd_name[] = "uhci_hcd";
- #define PLATFORM_DRIVER		uhci_grlib_driver
- #endif
- 
-+#ifdef CONFIG_ARCH_VT8500
-+#include "uhci-platform.c"
-+#define PLATFORM_DRIVER		uhci_platform_driver
-+#endif
-+
- #if !defined(PCI_DRIVER) && !defined(PLATFORM_DRIVER)
- #error "missing bus glue for uhci-hcd"
- #endif
-diff --git a/drivers/usb/host/uhci-platform.c b/drivers/usb/host/uhci-platform.c
+diff --git a/Documentation/devicetree/bindings/arm/vt8500.txt b/Documentation/devicetree/bindings/arm/vt8500.txt
 new file mode 100644
-index 0000000..1d7e522
+index 0000000..1b3b187
 --- /dev/null
-+++ b/drivers/usb/host/uhci-platform.c
-@@ -0,0 +1,166 @@
-+/*
-+ * Generic UHCI HCD (Host Controller Driver) for Platform Devices
-+ *
-+ * Copyright (c) 2011 Tony Prisk <linux@prisktech.co.nz>
-+ *
-+ * This file is based on uhci-grlib.c
-+ * (C) Copyright 2004-2007 Alan Stern, stern at rowland.harvard.edu
-+ */
++++ b/Documentation/devicetree/bindings/arm/vt8500.txt
+@@ -0,0 +1,15 @@
++VIA/Wondermedia VT8500 Platforms Device Tree Bindings
++---------------------------------------
 +
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
++Boards with the VIA VT8500 SoC shall have the following properties:
++Required root node property:
++compatible = "via,vt8500";
 +
-+static int uhci_platform_init(struct usb_hcd *hcd)
-+{
-+       struct uhci_hcd *uhci = hcd_to_uhci(hcd);
++Boards with the Wondermedia WM8505 SoC shall have the following properties:
++Required root node property:
++compatible = "wm,wm8505";
 +
-+       uhci->rh_numports = uhci_count_ports(hcd);
++Boards with the Wondermedia WM8650 SoC shall have the following properties:
++Required root node property:
++compatible = "wm,wm8650";
 +
-+       /* Set up pointers to to generic functions */
-+       uhci->reset_hc = uhci_generic_reset_hc;
-+       uhci->check_and_reset_hc = uhci_generic_check_and_reset_hc;
+diff --git a/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-intc.txt b/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-intc.txt
+new file mode 100644
+index 0000000..0a4ce10
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-intc.txt
+@@ -0,0 +1,16 @@
++VIA/Wondermedia VT8500 Interrupt Controller
++-----------------------------------------------------
 +
-+       /* No special actions need to be taken for the functions below */
-+       uhci->configure_hc = NULL;
-+       uhci->resume_detect_interrupts_are_broken = NULL;
-+       uhci->global_suspend_mode_is_broken = NULL;
++Required properties:
++- compatible : "via,vt8500-intc"
++- reg : Should contain 1 register ranges(address and length)
++- #interrupt-cells : should be <1>
 +
-+       /* Reset if the controller isn't already safely quiescent. */
-+       check_and_reset_hc(uhci);
-+       return 0;
-+}
++Example:
 +
-+static const struct hc_driver uhci_platform_hc_driver = {
-+       .description =          hcd_name,
-+       .product_desc =         "Generic UHCI Host Controller",
-+       .hcd_priv_size =        sizeof(struct uhci_hcd),
++	intc: interrupt-controller at d8140000 {
++		compatible = "via,vt8500-intc";
++		interrupt-controller;
++		reg = <0xd8140000 0x10000>;
++		#interrupt-cells = <1>;
++	};
+diff --git a/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-pmc.txt b/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-pmc.txt
+new file mode 100644
+index 0000000..521b9c7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-pmc.txt
+@@ -0,0 +1,13 @@
++VIA/Wondermedia VT8500 Power Management Controller
++-----------------------------------------------------
 +
-+       /* Generic hardware linkage */
-+       .irq =                  uhci_irq,
-+       .flags =                HCD_MEMORY | HCD_USB11,
++Required properties:
++- compatible : "via,vt8500-pmc"
++- reg : Should contain 1 register ranges(address and length)
 +
-+       /* Basic lifecycle operations */
-+       .reset =                uhci_platform_init,
-+       .start =                uhci_start,
-+#ifdef CONFIG_PM
-+       .pci_suspend =          NULL,
-+       .pci_resume =           NULL,
-+       .bus_suspend =          uhci_rh_suspend,
-+       .bus_resume =           uhci_rh_resume,
-+#endif
-+       .stop =                 uhci_stop,
++Example:
 +
-+       .urb_enqueue =          uhci_urb_enqueue,
-+       .urb_dequeue =          uhci_urb_dequeue,
++	pmc at d8130000 {
++		compatible = "via,vt8500-pmc";
++		reg = <0xd8130000 0x1000>;
++	};
+diff --git a/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-timer.txt b/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-timer.txt
+new file mode 100644
+index 0000000..901c73f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-timer.txt
+@@ -0,0 +1,15 @@
++VIA/Wondermedia VT8500 Timer
++-----------------------------------------------------
 +
-+       .endpoint_disable =     uhci_hcd_endpoint_disable,
-+       .get_frame_number =     uhci_hcd_get_frame_number,
++Required properties:
++- compatible : "via,vt8500-timer"
++- reg : Should contain 1 register ranges(address and length)
++- interrupts : interrupt for the timer
 +
-+       .hub_status_data =      uhci_hub_status_data,
-+       .hub_control =          uhci_hub_control,
-+};
++Example:
 +
-+static u64 platform_uhci_dma_mask = DMA_BIT_MASK(32);
++	timer at d8130100 {
++		compatible = "via,vt8500-timer";
++		reg = <0xd8130100 0x28>;
++		interrupts = <36>;
++	};
+diff --git a/Documentation/devicetree/bindings/gpio/gpio_vt8500.txt b/Documentation/devicetree/bindings/gpio/gpio_vt8500.txt
+new file mode 100644
+index 0000000..1a122bf
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio_vt8500.txt
+@@ -0,0 +1,24 @@
++VIA/Wondermedia VT8500 GPIO Controller
++-----------------------------------------------------
 +
-+static int __devinit uhci_hcd_platform_probe(struct platform_device *pdev)
-+{
-+       struct usb_hcd *hcd;
-+       struct uhci_hcd *uhci;
-+       struct resource *res;
-+       int ret;
++Required properties:
++- compatible : "via,vt8500-gpio", "wm,wm8505-gpio"
++	or "wm,wm8650-gpio" depending on your SoC
++- reg : Should contain 1 register range (address and length)
++- #gpio-cells : should be <3>.
++	1) bank
++	2) pin number
++	3) flags
 +
-+       if (usb_disabled())
-+               return -ENODEV;
++Example:
 +
-+	/* Right now device-tree probed devices don't get dma_mask set.
-+	 * Since shared usb code relies on it, set it here for now.
-+	 * Once we have dma capability bindings this can go away.
-+	 */
-+	if (!pdev->dev.dma_mask)
-+		pdev->dev.dma_mask = &platform_uhci_dma_mask;
++	gpio: gpio-controller at d8110000 {
++		compatible = "via,vt8500-gpio";
++		gpio-controller;
++		reg = <0xd8110000 0x10000>;
++		#gpio-cells = <3>;
++	};
 +
-+       hcd = usb_create_hcd(&uhci_platform_hc_driver, &pdev->dev,
-+                       pdev->name);
-+       if (!hcd)
-+               return -ENOMEM;
++	vibrate {
++		gpios = <&gpio 0 1 0>; /* Bank 0, Pin 1, No flags */
++	};
+diff --git a/Documentation/devicetree/bindings/rtc/via,vt8500-rtc.txt b/Documentation/devicetree/bindings/rtc/via,vt8500-rtc.txt
+new file mode 100644
+index 0000000..3c0484c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rtc/via,vt8500-rtc.txt
+@@ -0,0 +1,15 @@
++VIA/Wondermedia VT8500 Realtime Clock Controller
++-----------------------------------------------------
 +
-+       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+       hcd->rsrc_start = res->start;
-+       hcd->rsrc_len = resource_size(res);
++Required properties:
++- compatible : "via,vt8500-rtc"
++- reg : Should contain 1 register ranges(address and length)
++- interrupts : alarm interrupt
 +
-+       if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
-+               pr_err("%s: request_mem_region failed\n", __func__);
-+               ret = -EBUSY;
-+               goto err_rmr;
-+       }
++Example:
 +
-+       hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
-+       if (!hcd->regs) {
-+               pr_err("%s: ioremap failed\n", __func__);
-+               ret = -ENOMEM;
-+               goto err_irq;
-+       }
-+       uhci = hcd_to_uhci(hcd);
++	rtc at d8100000 {
++		compatible = "via,vt8500-rtc";
++		reg = <0xd8100000 0x10000>;
++		interrupts = <48>;
++	};
+diff --git a/Documentation/devicetree/bindings/tty/serial/via,vt8500-uart.txt b/Documentation/devicetree/bindings/tty/serial/via,vt8500-uart.txt
+new file mode 100644
+index 0000000..3222502
+--- /dev/null
++++ b/Documentation/devicetree/bindings/tty/serial/via,vt8500-uart.txt
+@@ -0,0 +1,15 @@
++VIA/Wondermedia VT8500 UART Controller
++-----------------------------------------------------
 +
-+       uhci->regs = hcd->regs;
++Required properties:
++- compatible : "via,vt8500-uart"
++- reg : Should contain 1 register ranges(address and length)
++- interrupts : UART interrupt
 +
-+       ret = usb_add_hcd(hcd, pdev->resource[1].start, IRQF_DISABLED |
-+                                                               IRQF_SHARED);
-+       if (ret)
-+               goto err_uhci;
++Example:
 +
-+       return 0;
++	uart at d8210000 {
++		compatible = "via,vt8500-uart";
++		reg = <0xd8210000 0x1040>;
++		interrupts = <47>;
++	};
+diff --git a/Documentation/devicetree/bindings/usb/platform-uhci.txt b/Documentation/devicetree/bindings/usb/platform-uhci.txt
+new file mode 100644
+index 0000000..a4fb071
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/platform-uhci.txt
+@@ -0,0 +1,15 @@
++Generic Platform UHCI Controller
++-----------------------------------------------------
 +
-+err_uhci:
-+       iounmap(hcd->regs);
-+err_irq:
-+       release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
-+err_rmr:
-+       usb_put_hcd(hcd);
++Required properties:
++- compatible : "platform-uhci"
++- reg : Should contain 1 register ranges(address and length)
++- interrupts : UHCI controller interrupt
 +
-+       return ret;
-+}
++Example:
 +
-+static int uhci_hcd_platform_remove(struct platform_device *pdev)
-+{
-+       struct usb_hcd *hcd = platform_get_drvdata(pdev);
++	uhci at d8007b00 {
++		compatible = "platform-uhci";
++		reg = <0xd8007b00 0x200>;
++		interrupts = <43>;
++	};
+diff --git a/Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt b/Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
+new file mode 100644
+index 0000000..17b3ad1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
+@@ -0,0 +1,15 @@
++VIA/Wondermedia VT8500 EHCI Controller
++-----------------------------------------------------
 +
-+       usb_remove_hcd(hcd);
-+       iounmap(hcd->regs);
-+       release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
-+       usb_put_hcd(hcd);
-+       platform_set_drvdata(pdev, NULL);
++Required properties:
++- compatible : "via,vt8500-ehci"
++- reg : Should contain 1 register ranges(address and length)
++- interrupts : ehci controller interrupt
 +
-+       return 0;
-+}
++Example:
 +
-+/* Make sure the controller is quiescent and that we're not using it
-+ * any more.  This is mainly for the benefit of programs which, like kexec,
-+ * expect the hardware to be idle: not doing DMA or generating IRQs.
-+ *
-+ * This routine may be called in a damaged or failing kernel.  Hence we
-+ * do not acquire the spinlock before shutting down the controller.
-+ */
-+static void uhci_hcd_platform_shutdown(struct platform_device *op)
-+{
-+       struct usb_hcd *hcd = dev_get_drvdata(&op->dev);
++	ehci at d8007900 {
++		compatible = "via,vt8500-ehci";
++		reg = <0xd8007900 0x200>;
++		interrupts = <43>;
++	};
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index db4d3af..5c63da2 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -47,5 +47,7 @@ sirf	SiRF Technology, Inc.
+ st	STMicroelectronics
+ stericsson	ST-Ericsson
+ ti	Texas Instruments
++via	VIA Technologies, Inc.
+ wlf	Wolfson Microelectronics
++wm	Wondermedia Technologies, Inc.
+ xlnx	Xilinx
+diff --git a/Documentation/devicetree/bindings/video/via,vt8500-fb.txt b/Documentation/devicetree/bindings/video/via,vt8500-fb.txt
+new file mode 100644
+index 0000000..ccd15b9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/video/via,vt8500-fb.txt
+@@ -0,0 +1,46 @@
++VIA VT8500 Framebuffer
++-----------------------------------------------------
 +
-+       uhci_hc_died(hcd_to_uhci(hcd));
-+}
++Required properties:
++- compatible : "via,vt8500-fb"
++- reg : Should contain 1 register ranges(address and length)
++- interrupts : framebuffer controller interrupt
 +
-+static const struct of_device_id platform_uhci_ids[] = {
-+       { .compatible = "platform-uhci", },
-+       {}
-+};
++Required nodes:
++- display: a display node is required to initialize the lcd panel
++	This should be in the board dts.
 +
-+static struct platform_driver uhci_platform_driver = {
-+       .probe          = uhci_hcd_platform_probe,
-+       .remove         = uhci_hcd_platform_remove,
-+       .shutdown       = uhci_hcd_platform_shutdown,
-+       .driver = {
-+               .name = "platform-uhci",
-+               .owner = THIS_MODULE,
-+               .of_match_table = of_match_ptr(platform_uhci_ids),
-+       },
-+};
++Example:
++
++	fb at d800e400 {
++		compatible = "via,vt8500-fb";
++		reg = <0xd800e400 0x400>;
++		interrupts = <12>;
++	};
++
++VIA VT8500 Display
++-----------------------------------------------------
++Required properties:
++- xres : lcd panel horizontal resolution
++- yres : lcd panel vertical resolution
++- left-margin,
++- right-margin,
++- hsync-len: lcd panel horizontal timings in pixels
++- upper-margin,
++- lower-margin,
++- vsync-len: lcd panel verticals timings in pixels
++- bpp: lcd panel bit-depth.
++	<16> for RGB565, <32> for RGB888
++
++Example:
++	display {
++		xres = <800>;
++		yres = <480>;
++		left-margin = <88>;
++		right-margin = <40>;
++		hsync-len = <0>;
++		upper-margin = <32>;
++		lower-margin = <11>;
++		vsync-len = <1>;
++		bpp = <16>;
++	};
+diff --git a/Documentation/devicetree/bindings/video/wm,prizm-ge-rops.txt b/Documentation/devicetree/bindings/video/wm,prizm-ge-rops.txt
+new file mode 100644
+index 0000000..a850fa0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/video/wm,prizm-ge-rops.txt
+@@ -0,0 +1,13 @@
++VIA/Wondermedia Graphics Engine Controller
++-----------------------------------------------------
++
++Required properties:
++- compatible : "wm,prizm-ge-rops"
++- reg : Should contain 1 register ranges(address and length)
++
++Example:
++
++	ge_rops at d8050400 {
++		compatible = "wm,prizm-ge-rops";
++		reg = <0xd8050400 0x100>;
++	};
+diff --git a/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt b/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
+new file mode 100644
+index 0000000..ab67382
+--- /dev/null
++++ b/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
+@@ -0,0 +1,20 @@
++Wondermedia WM8505 Framebuffer
++-----------------------------------------------------
++
++Required properties:
++- compatible : "wm,wm8505-fb"
++- reg : Should contain 1 register ranges(address and length)
++
++Required nodes:
++- display: a display node is required to initialize the lcd panel
++	This should be in the board dts. See definition in
++	Documentation/devicetree/bindings/video/via,vt8500-fb.txt
++
++
++Example:
++
++	fb at d8050800 {
++		compatible = "wm,wm8505-fb";
++		reg = <0xd8050800 0x200>;
++	};
 +
 -- 
 1.7.9.5
