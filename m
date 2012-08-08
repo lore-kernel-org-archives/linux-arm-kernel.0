@@ -1,53 +1,55 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 8 Aug 2012 21:57:20 +0200
-Subject: [Openpxa-users] pxa3x0 smart panel interface
-In-Reply-To: <20120806152551.4ec2cad0@laptoppieter>
-References: <20120806152551.4ec2cad0@laptoppieter>
-Message-ID: <201208082157.22064.marek.vasut@gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 8 Aug 2012 20:08:24 +0000
+Subject: [PATCH 1/8] arm: vt8500: Add device tree files for
+ VIA/Wondermedia SoC's
+In-Reply-To: <5022B342.7080606@wwwdotorg.org>
+References: <1344389967-8465-1-git-send-email-linux@prisktech.co.nz>
+ <1344389967-8465-2-git-send-email-linux@prisktech.co.nz>,
+ <5022B342.7080606@wwwdotorg.org>
+Message-ID: <76F764B079F92A4E843589C893D0A022D1DCA8F3@SERVER.prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear pieterg,
+>It appears more typical to use "-" rather than "_" in the filename to
+>join SoC and board names.
 
-CCing linux-arm-kernel and Haojian
+Fixed.
 
-> Hi all,
-> 
-> Does any of you have experience with interfacing smart lcd panels, with
-> a pxa3x0?
-> 
-> I'm interfacing an ILI9327DS smart panel controller, all commands
-> are handled correctly, however the SMART_CMD_WRITE_FRAME command (which
-> sends out all frame data) seems to produce an invalid number of output
-> bytes every now and then.
-> This results in a shifted display, every 10-100 updates (immediately
-> corrected by the next update)
-> 
-> The strange thing is that this does not occur with a pxa300, but it
-> occurs with the pxa310 and pxa320.
-> However running the 310/320 with the same ACCR as I'm running the 300
-> does not 'fix' it.
-> And I'm not sure it is even timing related, I've tried to configure
-> huge smart timing delay parameters, but the results remain the same.
-> (in fact I can even lower the parameters to way under the
-> controller specs, and the issue does not get worse).
-> I've also played with the drive strength of the LCD lines, which also
-> does not have an effect on the issue.
-> 
-> I do not think this is a controller bug, because before this ILI9327DS
-> controller, we had a display with a different controller chip, with
-> which I experienced the same thing, however at that time even with the
-> pxa300.
-> We switched to the ILI9327DS (for a different reason), and I was glad to
-> find that it worked fine with the pxa300.
-> Till I discovered it had the same issues, but then only with a
-> pxa310/320.
-> 
-> Does this sound familiar to anyone?
-> Is there anything else I might try to get rid of this issue?
-> 
-> Regards, Pieter
+>I guess "_ref" means "reference". Is that how the boards are commonly
+>known? Are you sure there will never be another reference board for
+>these SoCs? Given the "model" values in the file, something more like
+>vt8500-bv07.dts might be more appropriate?
 
+I'm fairly certain there will never be another reference board, as these
+SoC's seem to disappear after a few months and a new one comes out.
+Most of the models are chinese in origin with no real identifying names.
+Having said that, I have renamed the dts files to a less 'generic' name.
+vt8500-bv07.dts, wm8850-mid.dts.
+wm8505-ref is the same as I can't find any other identification for it, and
+everyone else I've had contact with who has one has the same board
+design.
 
-Best regards,
-Marek Vasut
+>> +     /*
+>> +      * Display node is based on Sascha Hauer's patch on dri-devel.
+>> +      * Added a bpp property to calculate the size of the framebuffer
+>> +      * until the binding is formalized.
+>> +      */
+>> +     display {
+
+>Maybe it's better to just hold off on adding this node, to wait until
+>the binding is complete so this file doesn't churn? Certainly it sounded
+>like Sascha was going to change the binding a little in response to
+>comments it received.
+
+My understanding with Sascha's patch is that it won't include a pixel
+format property and therefore we won't be able to use his binding properly
+until its revisited. Without this node, we have no display output available
+other than uart - and that's only available if you modify the hardware.
+
+This patchset will make arch-vt8500 nearly unusable without this node as
+we would have to leave the framebuffer code out as well.
+
+Always open to suggestions,
+
+Regards
+Tony Prisk
