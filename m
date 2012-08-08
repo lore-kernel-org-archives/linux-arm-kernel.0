@@ -1,126 +1,88 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed,  8 Aug 2012 12:41:22 +0300
-Subject: [PATCH 06/11] ASoC: twl4030: Move hs_extmute GPIO handling to driver
+Date: Wed,  8 Aug 2012 12:41:23 +0300
+Subject: [PATCH 07/11] ARM: OMAP/ASoC: Zoom2: Let the codec to handle the
+ hs_extmute GPIO
 In-Reply-To: <1344418887-5262-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1344418887-5262-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1344418887-5262-7-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1344418887-5262-8-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The external mute (if it is in use) is handled by a GPIO line. Prepare to
-remove the set_hs_extmute callback and replace it with two sets of platform
-data:
-hs_extmute_gpio: the GPIO number to use for external mute
-hs_extmute_disable_level: the GPIO level to use when the external mute is
-not enabled.
-
-The codec driver can handle the external mute functionality based on these
-parameters and when the users of set_hs_extmute has been converted the
-callback can be removed.
+Remove the use of set_hs_extmute callback and let the codec driver to
+handle the extmute GPIO.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- include/linux/i2c/twl.h    |    6 +++++-
- sound/soc/codecs/twl4030.c |   36 ++++++++++++++++++++++++++++++++++--
- 2 files changed, 39 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/board-zoom-peripherals.c  |    9 ++-------
+ arch/arm/mach-omap2/include/mach/board-zoom.h |    2 --
+ sound/soc/omap/zoom2.c                        |    4 ----
+ 3 files changed, 2 insertions(+), 13 deletions(-)
 
-diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
-index 7ea898c..75ce6d1 100644
---- a/include/linux/i2c/twl.h
-+++ b/include/linux/i2c/twl.h
-@@ -666,7 +666,11 @@ struct twl4030_codec_data {
- 	unsigned int check_defaults:1;
- 	unsigned int reset_registers:1;
- 	unsigned int hs_extmute:1;
--	void (*set_hs_extmute)(int mute);
-+	void (*set_hs_extmute)(int mute); /* Deprecated, use hs_extmute_gpio and
-+					     hs_extmute_disable_level */
-+	int hs_extmute_gpio;
-+	unsigned int hs_extmute_disable_level:1; /* the GPIO state to disable
-+						    the extmute */
- };
+diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
+index b797cb2..a7d3b04 100644
+--- a/arch/arm/mach-omap2/board-zoom-peripherals.c
++++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
+@@ -34,6 +34,7 @@
+ #include "common-board-devices.h"
  
- struct twl4030_vibra_data {
-diff --git a/sound/soc/codecs/twl4030.c b/sound/soc/codecs/twl4030.c
-index 391fcfc..0630040 100644
---- a/sound/soc/codecs/twl4030.c
-+++ b/sound/soc/codecs/twl4030.c
-@@ -28,6 +28,7 @@
- #include <linux/platform_device.h>
- #include <linux/i2c/twl.h>
- #include <linux/slab.h>
-+#include <linux/gpio.h>
- #include <sound/core.h>
- #include <sound/pcm.h>
- #include <sound/pcm_params.h>
-@@ -302,6 +303,24 @@ static void twl4030_init_chip(struct snd_soc_codec *codec)
- 	u8 reg, byte;
- 	int i = 0;
+ #define OMAP_ZOOM_WLAN_PMENA_GPIO	(101)
++#define ZOOM2_HEADSET_EXTMUTE_GPIO	(153)
+ #define OMAP_ZOOM_WLAN_IRQ_GPIO		(162)
  
-+	if (pdata && pdata->hs_extmute &&
-+	    gpio_is_valid(pdata->hs_extmute_gpio)) {
-+		int ret, level;
-+
-+		if (!pdata->hs_extmute_gpio)
-+			dev_warn(codec->dev,
-+				 "Extmute GPIO is 0 is this correct?\n");
-+
-+		level = pdata->hs_extmute_disable_level;
-+		ret = gpio_request_one(pdata->hs_extmute_gpio, level ?
-+				       GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW,
-+				       "hs_extmute");
-+		if (ret) {
-+			dev_err(codec->dev, "Failed to get hs_extmute GPIO\n");
-+			pdata->hs_extmute_gpio = -1;
-+		}
-+	}
-+
- 	/* Check defaults, if instructed before anything else */
- 	if (pdata && pdata->check_defaults)
- 		twl4030_check_defaults(codec);
-@@ -748,7 +767,11 @@ static void headset_ramp(struct snd_soc_codec *codec, int ramp)
- 	/* Enable external mute control, this dramatically reduces
- 	 * the pop-noise */
- 	if (pdata && pdata->hs_extmute) {
--		if (pdata->set_hs_extmute) {
-+		if (gpio_is_valid(pdata->hs_extmute_gpio)) {
-+			gpio_set_value(pdata->hs_extmute_gpio,
-+				       !pdata->hs_extmute_disable_level);
-+		} else if (pdata->set_hs_extmute) {
-+			dev_warn(codec->dev, "set_hs_extmute is deprecated\n");
- 			pdata->set_hs_extmute(1);
- 		} else {
- 			hs_pop |= TWL4030_EXTMUTE;
-@@ -786,7 +809,11 @@ static void headset_ramp(struct snd_soc_codec *codec, int ramp)
- 
- 	/* Disable external mute */
- 	if (pdata && pdata->hs_extmute) {
--		if (pdata->set_hs_extmute) {
-+		if (gpio_is_valid(pdata->hs_extmute_gpio)) {
-+			gpio_set_value(pdata->hs_extmute_gpio,
-+				       pdata->hs_extmute_disable_level);
-+		} else if (pdata->set_hs_extmute) {
-+			dev_warn(codec->dev, "set_hs_extmute is deprecated\n");
- 			pdata->set_hs_extmute(0);
- 		} else {
- 			hs_pop &= ~TWL4030_EXTMUTE;
-@@ -2230,12 +2257,17 @@ static int twl4030_soc_probe(struct snd_soc_codec *codec)
- 
- static int twl4030_soc_remove(struct snd_soc_codec *codec)
- {
-+	struct twl4030_codec_data *pdata = dev_get_platdata(codec->dev);
- 	struct twl4030_priv *twl4030 = snd_soc_codec_get_drvdata(codec);
- 
- 	/* Reset registers to their chip default before leaving */
- 	twl4030_reset_registers(codec);
- 	twl4030_set_bias_level(codec, SND_SOC_BIAS_OFF);
- 	kfree(twl4030);
-+
-+	if (pdata && pdata->hs_extmute && gpio_is_valid(pdata->hs_extmute_gpio))
-+		gpio_free(pdata->hs_extmute_gpio);
-+
- 	return 0;
+ #define LCD_PANEL_ENABLE_GPIO		(7 + OMAP_MAX_GPIO_LINES)
+@@ -244,12 +245,6 @@ static int zoom_twl_gpio_setup(struct device *dev,
+ 	return ret;
  }
  
+-/* EXTMUTE callback function */
+-static void zoom2_set_hs_extmute(int mute)
+-{
+-	gpio_set_value(ZOOM2_HEADSET_EXTMUTE_GPIO, mute);
+-}
+-
+ static struct twl4030_gpio_platform_data zoom_gpio_data = {
+ 	.gpio_base	= OMAP_MAX_GPIO_LINES,
+ 	.irq_base	= TWL4030_GPIO_IRQ_BASE,
+@@ -279,7 +274,7 @@ static int __init omap_i2c_init(void)
+ 
+ 		codec_data->ramp_delay_value = 3;	/* 161 ms */
+ 		codec_data->hs_extmute = 1;
+-		codec_data->set_hs_extmute = zoom2_set_hs_extmute;
++		codec_data->hs_extmute_gpio = ZOOM2_HEADSET_EXTMUTE_GPIO;
+ 	}
+ 	omap_pmic_init(1, 2400, "twl5030", INT_34XX_SYS_NIRQ, &zoom_twldata);
+ 	omap_register_i2c_bus(2, 400, NULL, 0);
+diff --git a/arch/arm/mach-omap2/include/mach/board-zoom.h b/arch/arm/mach-omap2/include/mach/board-zoom.h
+index 775fdc3..2e94869 100644
+--- a/arch/arm/mach-omap2/include/mach/board-zoom.h
++++ b/arch/arm/mach-omap2/include/mach/board-zoom.h
+@@ -8,5 +8,3 @@
+ extern int __init zoom_debugboard_init(void);
+ extern void __init zoom_peripherals_init(void);
+ extern void __init zoom_display_init(void);
+-
+-#define ZOOM2_HEADSET_EXTMUTE_GPIO	153
+diff --git a/sound/soc/omap/zoom2.c b/sound/soc/omap/zoom2.c
+index 920e0d9..df97a41 100644
+--- a/sound/soc/omap/zoom2.c
++++ b/sound/soc/omap/zoom2.c
+@@ -191,9 +191,6 @@ static int __init zoom2_soc_init(void)
+ 	BUG_ON(gpio_request(ZOOM2_HEADSET_MUX_GPIO, "hs_mux") < 0);
+ 	gpio_direction_output(ZOOM2_HEADSET_MUX_GPIO, 0);
+ 
+-	BUG_ON(gpio_request(ZOOM2_HEADSET_EXTMUTE_GPIO, "ext_mute") < 0);
+-	gpio_direction_output(ZOOM2_HEADSET_EXTMUTE_GPIO, 0);
+-
+ 	return 0;
+ 
+ err1:
+@@ -207,7 +204,6 @@ module_init(zoom2_soc_init);
+ static void __exit zoom2_soc_exit(void)
+ {
+ 	gpio_free(ZOOM2_HEADSET_MUX_GPIO);
+-	gpio_free(ZOOM2_HEADSET_EXTMUTE_GPIO);
+ 
+ 	platform_device_unregister(zoom2_snd_device);
+ }
 -- 
 1.7.8.6
