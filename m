@@ -1,41 +1,45 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 07 Aug 2012 23:14:23 -0400
-Subject: [PATCH RESEND v5 0/4] atmel-mci device tree support
-In-Reply-To: <1343136606-8874-1-git-send-email-ludovic.desroches@atmel.com>
- (ludovic desroches's message of "Tue, 24 Jul 2012 15:30:02 +0200")
-References: <1343136606-8874-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <87hasexegg.fsf@octavius.laptop.org>
+From: zhangfei.gao@marvell.com (Zhangfei Gao)
+Date: Wed,  8 Aug 2012 11:14:57 +0800
+Subject: [PATCH v2 0/4]  dmaengine: add support mmp-pdma
+Message-ID: <1344395701-30888-1-git-send-email-zhangfei.gao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+v1->v2
+Sync with Arnd and Haojoan, change compatible name to "marvell,pdma-1.0"
+Used platfroms: pxa25x, pxa27x, pxa3xx, pxa93x, pxa168, pxa910, pxa688.
+Use IP name rather than platform name
 
-On Tue, Jul 24 2012, ludovic.desroches at atmel.com wrote:
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->
-> Hello,
->
-> I resend this set of patches because patches 2, 3 and 4 were acked by
-> Jean-Christophe. Patch 1 was also acked by Jean-Christophe excepted for
-> cd-inverted property since it was redundant with gpio bindings.
+v0->v1
+Update dt member and desc according to Arnd's suggestion
+Use dma_slave_config.slave_id to transfer drcmr followed Vinod's suggestion
 
-In future, it's helpful for me if you can add the Acked-by lines you
-receive into the patches when you resend them.  Thanks!
+Patch 4 is upload as example
+mtd: pxa3xx-nand: replace pxa_request_dma with dmaengine
+We would like hold this patch currently
+since pdma will grab irq and disable pxa_init_dma. 
 
-> I thought we were agree to go ahead since it was a common binding already
-> documented and it will concern all drivers.
 
-Agreed.  It's a documented core MMC binding, it's fine to use it.
+mmp-pdma is added under dmaengine framework.
+The final purpose is replacing arch/arm/plat-pxa/dma.c
 
-> Chris are you agree to take patch 1/4? Others patches may go to at91 tree,
-> isn't it?
+Test on pxa910 with pxa3xx-nand and dmatest.ko
 
-Yes, let's do that.  I've applied patch 1/4 to mmc-next for 3.7, and you
-can send the others via the at91 tree with the ACK that Arnd gave.
+Zhangfei Gao (4):
+  dmaengine: mmp-pdma support
+  dmaengine: mmp_tdma: add dt support
+  dmatest: add dmaengine_slave_config for DMA_MEMCPY
+  mtd: pxa3xx-nand: replace pxa_request_dma with dmaengine
 
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+ Documentation/devicetree/bindings/dma/mmp-dma.txt |   75 ++
+ drivers/dma/Kconfig                               |    7 +
+ drivers/dma/Makefile                              |    1 +
+ drivers/dma/dmatest.c                             |    4 +
+ drivers/dma/mmp_pdma.c                            |  872 +++++++++++++++++++++
+ drivers/dma/mmp_tdma.c                            |   51 +-
+ drivers/mtd/nand/pxa3xx_nand.c                    |  113 ++--
+ include/linux/platform_data/mmp_dma.h             |   19 +
+ 8 files changed, 1072 insertions(+), 70 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/mmp-dma.txt
+ create mode 100644 drivers/dma/mmp_pdma.c
+ create mode 100644 include/linux/platform_data/mmp_dma.h
