@@ -1,37 +1,176 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 8 Aug 2012 14:38:23 +0200
-Subject: [PATCH 1/1 v2] i2c: Add default configuration into the Nomadik
- I2C driver.
-In-Reply-To: <20120807153112.GF10719@gmail.com>
-References: <1344266253-14050-1-git-send-email-lee.jones@linaro.org>
- <20120806153503.GH10524@gmail.com>
- <CACRpkdZjbyQbht+UpXrrVGhAzGYPjb=HRZhJ+TvsEXhGeviJLA@mail.gmail.com>
- <20120807153112.GF10719@gmail.com>
-Message-ID: <CACRpkdZj2LqFF_i6f3M2uzUkhG6og5n2cTzUgqRZA1_NmhWBNA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 Aug 2012 12:39:16 +0000
+Subject: [PATCH v3 0/7] mv643xx.c: Add basic device tree support.
+In-Reply-To: <502252A6.4090409@codethink.co.uk>
+References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
+ <50223428.6030506@codethink.co.uk> <502252A6.4090409@codethink.co.uk>
+Message-ID: <201208081239.16778.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 7, 2012 at 5:31 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Wednesday 08 August 2012, Ian Molton wrote:
+> The SMI / PHY stuff should look very similar, so I'm happy with something
+> like:
+> 
+> mdio at 2000 {
+>                 #address-cells = <1>;
+>                 #size-cells = <1>;
+>                 device_type = "mdio";
+>                 compatible = "marvell,mv643xx-mdio";
+>                 phy0: ethernet-phy at 0 {
+>                         device_type = "ethernet-phy";
+>                         compatible = "marvell,whatever";
+>                         interrupts = <76>;
+>                         interrupt-parent = <&mpic>;
+>                         reg = <0 32>;          // Auto probed phy addr
+>                 };
+> 
+>                 phy1: ethernet-phy at 3 {
+>                         device_type = "ethernet-phy";
+>                         compatible = "marvell,whatever";
+>                         interrupts = <77>;
+>                         interrupt-parent = <&mpic>;
+>                         reg = <3 1>;            // specified phy addr
+>                 };
+> 
+>                 ... and so on.
+> }
+> 
+> Where we can use the reg parameter to allow auto-probing, by
+> specifying a size of 32 (32 phy addrs max).
 
-> From: Lee Jones <lee.jones@linaro.org>
-> Date: Tue, 7 Aug 2012 12:27:24 +0100
-> Subject: [PATCH 1/1 v3] i2c: Add default configuration into the Nomadik I2C
->  driver.
+I don't understand the auto-probed phy address. What is the purpose of that?
 
-This has some bad whitespace damage, and the subject should
-be "i2c/nomadik:"
+If possible, I think we should keep using #size-cells=<0>, which would
+make the method you describe impossible. It might still work if you just
+leave out the "reg" property for that node.
 
-> Cc: linux-i2c at vger.kernel.org
-> Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+I also don't understand how the phy driver would locate ethernet-phy at 0
+on the bus if it does not know the address.
 
-Double sign-off.
+> The ethernet driver itself is more complicated:
+> 
+> We have the following considerations:
+> 
+> * we have one MDIO bus, typically, shared between all the MACs / PHYs.
+> * each ethernet device can multiple ports (up to three), each with its
+>   own MAC/PHY.
+> * MAC <-> PHY mapping can be specified, probed (ugh!) or a (gah!)
+>   mix of the two.
+> * existing D-T users, albeit not well documented / code complete.
+> * some port address ranges overlap (MIB counters, MCAST / UNICAST
+>   tables, etc.
+> 
+> The existing ethernet-group idea only works because the current
+> platform-device based driver doesnt really do proper resource
+> management, and thus the MAC registers are actually mapped by
+> the MDIO driver.
+> 
+> I don't think that preserving this bad behaviour is a good idea, which
+> leaves us with two choices:
+> 
+> 1) My preferred solution - allow each device to specify up to three
+> interrupts, MACs, and PHYs. This is clean in that it doesnt require
+> multiply instantiating a driver three times over the same address
+> space.
+> 
+> ethernet at 2400 {
+>                 compatible = "marvell,mv643xx-eth";
+>                 reg = <0x2400 0x1c00>
+>                 interrupt_parent = <&mpic>;
+>                 ports = <3>;
+>                 interrupts = <4>, <5>, <6>;
+>                 phys = <&phy0>, <&phy1>, <&phy2>;
+> };
+> 
+> ethernet at 6400 {
+>                 compatible = "marvell,mv643xx-eth";
+>                 reg = <0x6400 0x1c00>
+>                 interrupt_parent = <&mpic>;
+>                 ports = <1>;
+>                 interrupts = <4>;
+>                 phys = <&phy3>;
+> };
+> 
+> Note that the address is 2400, not 2000 - since this driver no longer
+> would share its address range with the MDIO driver.
+> 
+> This method would require a small amount of rework in the driver to
+> set up <n> ports, rather than just one.
 
-Unless Wolfram volunteers to fix this up I suggest you
-fix it nocheinmal und senden einer neues version.
+This looks quite nice, but it is still very much incompatible with the
+existing binding. Obviously we can abandon an existing binding and
+introduce a second one for the same hardware, but that should not
+be taken lightly.
 
-Ihre,
-Linus Walleij
+> 2) Create some kind of pseudo-ethernet group device that manages
+> all the work for some sort of lightweight ethernet device, one per
+> port. This can never be done cleanly since the port address ranges
+> overlap:
+> 
+> pseudo_eth at 2400 {
+>         #address-cells = <1>;
+>         #size-cells = <0>;
+>         compatible = "marvell,mv643xx-shared-eth"
+>         reg = <0x2400 0x1c00>;
+> 
+>         ethernet at 0 {
+>                 compatible = "marvell,mv643xx-port";
+>                 interrupts = <4>;
+>                 interrupt_parent = <&mpic>;
+>                 phy = <&phy0>;
+>         };
+> 
+>         ethernet at 1 {
+>                 compatible = "marvell,mv643xx-port";
+>                 interrupts = <5>;
+>                 interrupt_parent = <&mpic>;
+>                 phy = <&phy1>;
+>         };
+> 
+>         ethernet at 2 {
+>                 compatible = "marvell,mv643xx-port";
+>                 interrupts = <6>;
+>                 interrupt_parent = <&mpic>;
+>                 phy = <&phy2>;
+>         };
+> }
+> pseudo_eth at 6400 {
+>         #address-cells = <1>;
+>         #size-cells = <0>;
+>         compatible = "marvell,mv643xx-shared-eth"
+>         reg = <0x6400 0x1c00>;
+> 
+>         ethernet at 0 {
+>                 compatible = "marvell,mv643xx-port";
+>                 interrupts = <4>;
+>                 interrupt_parent = <&mpic>;
+>                 phy = <&phy3>;
+>         };
+> };
+
+This looks almost compatible with the existing binding, which is
+good. I would in fact recommend to use the actual "compatible"
+strings from the binding. More generally speaking, you should not
+use wildcards in those strings anyway, so always use
+"marvell,mv64360-eth" instead of "marvell,mv64x60-eth" or
+"marvell,mv643xx-eth". If you have multiple chips that are
+completely compatible, put use the identifier for the older one.
+
+I don't fully understand your concern with the overlapping
+registers, mostly because I still don't know all the combinations
+that are actually valid here. Let me try to say what I understood
+so far, and you can correct me if that's wrong:
+
+* A system can have multiple instances of an mv64360 ethernet
+block, with a register area of 0x2000 bytes.
+* Each such block can have three MACs and three PHYs.
+* The first 0x400 bytes in the register space control the three
+  PHYs and the remaining registers control the MACs.
+* While this is meant to be used in a way that you assign
+  the each of the three PHYs to one of the MACs, this is not
+  always done, and sometimes you use a different PHY (?), or
+  one from a different instance of the mv64360 ethernet block
+  on the same SoC?.
+
+	Arnd
