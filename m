@@ -1,40 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Aug 2012 16:22:29 +0000
-Subject: [PATCH 11/11] pm/drivers: fix use of SIMPLE_DEV_PM_OPS
-In-Reply-To: <50228889.5060709@wwwdotorg.org>
-References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
- <1344437248-20560-12-git-send-email-arnd@arndb.de>
- <50228889.5060709@wwwdotorg.org>
-Message-ID: <201208081622.29777.arnd@arndb.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 08 Aug 2012 18:22:58 +0200
+Subject: [RFC] Add support for Aurora L2 Cache Controller
+In-Reply-To: <1344438307-8468-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1344438307-8468-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <50229262.8020005@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 August 2012, Stephen Warren wrote:
-> On 08/08/2012 08:47 AM, Arnd Bergmann wrote:
-> > A few drivers use a construct like
-> > 
-> >  #ifdef CONFIG_PM
-> >  static int foo_suspend(struct device *pdev)
-> >  {
-> >     ...
-> >  }
-> >  static int foo_resume struct device *pdev)
-> >  {
-> >     ...
-> >  }
-> >  #endif
-> >  static SIMPLE_DEV_PM_OPS(foo_pm, foo_suspend, foo_resume);
-> ...
-> > drivers/i2c/busses/i2c-tegra.c:716:12: warning: 'tegra_i2c_suspend' defined but not used [-Wunused-function]
-> > drivers/i2c/busses/i2c-tegra.c:727:12: warning: 'tegra_i2c_resume' defined but not used [-Wunused-function]
+On 08/08/2012 05:05 PM, Gregory CLEMENT wrote:
+> Hello,
 > 
-> Laxman already posted a patch for this, which I'm hoping will make it
-> into 3.6, through the I2C tree.
-> 
-> http://www.spinics.net/lists/linux-i2c/msg09359.html
+> The purpose of this patch set is to add support for Aurora L2 Cache
 
-Ok, dropping this one then.
+I am surprised because all the patches are awaiting for moderator approval
+with the reason "Message has a suspicious header".
+As I used the same "git send-email" command as for my previous
+submissions I am puzzled.
 
-Thanks,
+I hope to receive an explanation soon to be able to fix it.
 
-	Arnd
+Now waiting for the arrivals of the patches, the commits are still
+available on branch aurora-L2-cache-ctrl located at
+https://github.com/MISL-EBU-System-SW/mainline-public.git
+
+regards,
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
