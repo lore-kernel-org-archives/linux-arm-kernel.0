@@ -1,35 +1,55 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 08 Aug 2012 16:44:16 -0600
-Subject: [PATCH] ARM: tegra: more regulator fixes for Harmony
-In-Reply-To: <1344037521-6157-1-git-send-email-swarren@wwwdotorg.org>
-References: <1344037521-6157-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <5022EBC0.5060102@wwwdotorg.org>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu, 09 Aug 2012 11:06:26 +1200
+Subject: Platform data from devicetree
+Message-ID: <1344467186.6707.6.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/2012 05:45 PM, Stephen Warren wrote:
-> Commit 3d55c29 "ARM: tegra: harmony: add regulator supply name and its
-> input supply" was supposed to fix all the problems with regulators on
-> Harmony. However, it appears that I only tested it when booting using
-> board files, not when booting using device tree. This change fixes two
-> problems with regulators when booting using device tree:
-> 
-> 1) That patch only created the vdd_sys regulator when booting using a
->    board file. Since this is the root of the whole regulator tree, this
->    caused no regulators to successfully initialize when booting using
->    device tree. The registration of vdd_sys is moved to fix this.
-> 
-> 2) When booting use DT, the regulator core sets has_full_constraints,
->    which in turn causes the core to turn off any regulators not marked
->    as always on. Some of the affected regulators are required for basic
->    system operation. To solve this, add always on constraints to all
->    relevant regulators. This doesn't affect booting using a board file
->    since nothing sets has_full_constraints in that case.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> This is a fix for v3.6.
+Quick question regarding platform_devices created from devicetree.
 
-Arnd, Olof, I don't see this in the arm-soc fixes tree, although do see
-you've applied a bunch of patches since I posted this. Did it drop
-through the cracks?
+At the moment, we do a of_match_device() against vt8500_gpio_dt_ids[] to
+get an of_device_id that contains the .data field to pass into the
+driver.
+
+Given that pdev is created from a match against vt8500_gpio_dt_ids[] as
+well, why does pdev->dev.of_node.data == NULL? Is this data not
+populated into this field? What data can be passed into this field?
+
+Regards
+
+Tony Prisk
+
+
+Example code below:
+
+static struct of_device_id vt8500_gpio_dt_ids[] = {
+	{ .compatible = "via,vt8500-gpio", .data = &vt8500_data, },
+	{ .compatible = "wm,wm8505-gpio", .data = &wm8505_data, },
+	{ .compatible = "wm,wm8650-gpio", .data = &wm8650_data, },
+	{ /* Sentinel */ },
+};
+
+static int __devinit vt8500_gpio_probe(struct platform_device *pdev)
+{
+	void __iomem *gpio_base;
+	struct device_node *np;
+	const struct of_device_id *of_id =
+			of_match_device(vt8500_gpio_dt_ids, &pdev->dev);
+
+	if (!of_id) {
+		dev_err(&pdev->dev, "Failed to find gpio controller\n");
+		return -ENODEV;
+	}
+
+	np = pdev->dev.of_node;
+	...
+}
+
+static struct platform_driver vt8500_gpio_driver = {
+	.probe		= vt8500_gpio_probe,
+	.driver		= {
+		.name	= "vt8500-gpio",
+		.owner	= THIS_MODULE,
+		.of_match_table = vt8500_gpio_dt_ids,
+	},
+};
