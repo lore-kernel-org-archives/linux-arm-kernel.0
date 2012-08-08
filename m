@@ -1,48 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 Aug 2012 06:50:00 -0700
-Subject: [PATCH v3 3/7] OMAP2+: use control module mfd driver in omap_type
-In-Reply-To: <4FEB4B4A.1040204@dev.rtsoft.ru>
-References: <4FEB4B4A.1040204@dev.rtsoft.ru>
-Message-ID: <20120808135000.GD11011@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 8 Aug 2012 14:52:53 +0100
+Subject: [PATCH 04/11] MFD: twl4030-audio: Add DT support
+In-Reply-To: <50226CF4.1010202@ti.com>
+References: <1344418887-5262-1-git-send-email-peter.ujfalusi@ti.com>
+ <1344418887-5262-5-git-send-email-peter.ujfalusi@ti.com>
+ <20120808131356.GS16861@opensource.wolfsonmicro.com>
+ <50226CF4.1010202@ti.com>
+Message-ID: <20120808135253.GC16861@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Konstantin Baydarov <kbaidarov@dev.rtsoft.ru> [120627 11:09]:
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-> @@ -18,6 +18,7 @@
->  #include <linux/kernel.h>
->  #include <linux/init.h>
->  #include <linux/io.h>
-> +#include <linux/mfd/omap_control.h>
->  
->  #include <asm/cputype.h>
->  
-> @@ -43,13 +44,13 @@ int omap_type(void)
->  	u32 val = 0;
->  
->  	if (cpu_is_omap24xx()) {
-> -		val = omap_ctrl_readl(OMAP24XX_CONTROL_STATUS);
-> +		val = omap_control_status_read(OMAP24XX_CONTROL_STATUS);
->  	} else if (cpu_is_am33xx()) {
-> -		val = omap_ctrl_readl(AM33XX_CONTROL_STATUS);
-> +		val = omap_control_status_read(AM33XX_CONTROL_STATUS);
->  	} else if (cpu_is_omap34xx()) {
-> -		val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
-> +		val = omap_control_status_read(OMAP343X_CONTROL_STATUS);
->  	} else if (cpu_is_omap44xx()) {
-> -		val = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STATUS);
-> +		val = omap_control_status_read(OMAP4_CTRL_MODULE_CORE_STATUS);
->  	} else {
->  		pr_err("Cannot detect omap type!\n");
->  		goto out;
+On Wed, Aug 08, 2012 at 04:43:16PM +0300, Peter Ujfalusi wrote:
+> On 08/08/2012 04:13 PM, Mark Brown wrote:
 
-I think I already commented on this.. This needs to become just:
+> > This doesn't seem like something that should be in the CODEC driver
+> > really, there's a general need for something which can unmute controls
+> > at the end of the power up sequence and mute before power down.  Also,
+> > if this is going to be part of the binding shouldn't we just omit the
+> > first property and simply check for the presence of the property which
+> > specifies the GPIO?
 
-val = omap_control_status_read();
+> The hs_extmute is used for reducing pop noise on the headset. The sequence is
+> described in the TRM and it need to be done within the codec driver since it
+> is within the sequence.
 
-with no need to pass the status register as a parameter.
+Is the point it's at in the sequence the end?
 
-Regards,
+> >> +#ifdef CONFIG_OF
+> >> +	if (of_find_node_by_name(node, "codec"))
+> >> +		return true;
+> >> +#endif
 
-Tony
+> > This really seems like we should be stubbing out of_find_node_by_name()
+> > to return false in non-OF cases.
+
+> Yes, most likely the of_find_node_by_name() deserves the same treatment as
+> some selected of_* function in case CONFIG_OF is not selected.
+> But at the moment this is not the case, we need to protect with ifdef since we
+> might break other randconfigs where CONFIG_OF is not set.
+
+We can always add a patch stubbing it out as part of the series, or in a
+branch in the OF tree that we can pull in.
+
+> 
+> >> +#ifdef CONFIG_OF
+> >> +	if (!of_property_read_u32(node, "ti,enable-vibra", &vibra) && vibra)
+> >> +		return true;
+> >> +#endif
+> > 
+> > Similarly here.
+> 
+> Here the ifdef is no needed. of_property_read_u32() return -ENOSYS in case
+> CONFIG_OF is not selected.
+> 
+> -- 
+> P?ter
