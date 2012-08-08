@@ -1,82 +1,44 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 8 Aug 2012 17:24:43 +0100
-Subject: [Xen-devel] [PATCH v2 07/23] xen/arm: Xen detection and
- shared_info page mapping
-In-Reply-To: <501FEF65.1000304@citrix.com>
-References: <alpine.DEB.2.02.1208061428060.4645@kaball.uk.xensource.com>
- <1344263246-28036-7-git-send-email-stefano.stabellini@eu.citrix.com>
- <501FEF65.1000304@citrix.com>
-Message-ID: <alpine.DEB.2.02.1208081715550.21096@kaball.uk.xensource.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 08 Aug 2012 18:30:26 +0200
+Subject: [RFC 3/6] arm: cache-l2x0: add support for Aurora L2 cache ctrl
+In-Reply-To: <20120808151946.GE4579@mudshark.cambridge.arm.com>
+References: <1344438307-8468-1-git-send-email-gregory.clement@free-electrons.com>
+ <1344438307-8468-4-git-send-email-gregory.clement@free-electrons.com>
+ <20120808151946.GE4579@mudshark.cambridge.arm.com>
+Message-ID: <50229422.40305@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 6 Aug 2012, David Vrabel wrote:
-> On 06/08/12 15:27, Stefano Stabellini wrote:
-> > Check for a "/xen" node in the device tree, if it is present set
-> > xen_domain_type to XEN_HVM_DOMAIN and continue initialization.
-> > 
-> > Map the real shared info page using XENMEM_add_to_physmap with
-> > XENMAPSPACE_shared_info.
-> > 
-> > Changes in v2:
-> > 
-> > - replace pr_info with pr_debug.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > ---
-> >  arch/arm/xen/enlighten.c |   52 ++++++++++++++++++++++++++++++++++++++++++++++
-> >  1 files changed, 52 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> > index d27c2a6..102d823 100644
-> > --- a/arch/arm/xen/enlighten.c
-> > +++ b/arch/arm/xen/enlighten.c
-> > @@ -5,6 +5,9 @@
-> >  #include <asm/xen/hypervisor.h>
-> >  #include <asm/xen/hypercall.h>
-> >  #include <linux/module.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_irq.h>
-> > +#include <linux/of_address.h>
-> >  
-> >  struct start_info _xen_start_info;
-> >  struct start_info *xen_start_info = &_xen_start_info;
-> > @@ -33,3 +36,52 @@ int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
-> >  	return -ENOSYS;
-> >  }
-> >  EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_range);
-> > +
-> > +/*
-> > + * == Xen Device Tree format ==
-> > + * - /xen node;
-> > + * - compatible "arm,xen";
-> > + * - one interrupt for Xen event notifications;
-> > + * - one memory region to map the grant_table.
-> > + */
+On 08/08/2012 05:19 PM, Will Deacon wrote:
+> On Wed, Aug 08, 2012 at 04:05:03PM +0100, Gregory CLEMENT wrote:
+>> +static void aurora_pa_range(unsigned long start, unsigned long end,
+>> +                       unsigned long offset)
+>> +{
 > 
-> These needs to be documented in Documentation/devicetree/bindings/ and
-> should be sent to the devicetree-discuss mailing list for review.
+> This controller is used by Armada XP right? I think that SoC supports LPAE,
+> so please tell me that the above is a mistake and the controller can support
+> physical addresses > 32 bits!
 
-That's a good idea.
+Yes indeed this SoC support LPAE.
 
-
-> The node should be called 'hypervisor' I think.
 > 
-> The first word of the compatible string is the vendor/organization that
-> defined the binding so should be "xen" here.  This does give a odd
-> looking "xen,xen" but we'll have to live with that.
+> If so, you'll need to hack the cache-l2x0 driver to use phys_addr_t types
+> instead of unsigned longs.
+
+Ok I will look at this.
+
 > 
-> I'd suggest that the DT provided by the hypervisor or tools give the
-> hypercall ABI version in the compatible string as well.  e.g.,
+> Will
 > 
-> hypervisor {
->     compatible = "xen,xen-4.3", "xen,xen"
-> };
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-It makes sense, I'll do that.
 
-
-> I missed the Xen patch that adds this node for dom0.  Can you point me
-> to it?
-
-Nope, you didn't miss it: I don't have a patch for Xen yet.
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
