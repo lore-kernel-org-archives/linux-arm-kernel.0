@@ -1,113 +1,130 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Wed, 8 Aug 2012 13:56:33 +0300
-Subject: [PATCH v2] Revert "ARM: OMAP3: PM: call pre/post transition per
- powerdomain"
-In-Reply-To: <1344379659-26152-1-git-send-email-khilman@ti.com>
-References: <1344379659-26152-1-git-send-email-khilman@ti.com>
-Message-ID: <CANOLnONQhqYcqW8ZAfn+5ceZQ_h2W_yKZVZrnrP5cUJDooTrQg@mail.gmail.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Wed, 8 Aug 2012 12:53:59 +0200
+Subject: imx6q restart is broken
+In-Reply-To: <20120808101817.GA14718@S2101-09.ap.freescale.net>
+References: <20120808101817.GA14718@S2101-09.ap.freescale.net>
+Message-ID: <50224547.9020000@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 8, 2012 at 1:47 AM, Kevin Hilman <khilman@ti.com> wrote:
-> This reverts commit 58f0829b7186150318c79515f0e0850c5e7a9c89.
->
-> Converstion to per-pwrdm per/post transition calls was a bit
-> premature.  Only tracking MPU, PER & CORE in the idle path means we
-> lose the accounting for all the other powerdomains which may also
-> transition in idle.  On OMAP3, due to autodeps, several powerdomains
-> transition along with MPU (e.g. DSS, USBHOST), and the accounting for
-> these was lost with this patch.  Since the accounting includes the
-> context loss counters, drivers for devices in those power domains
-> would never notice context lost, so would likely hang after any
-> off-mode transitions.
+On 08.08.2012 12:18, Shawn Guo wrote:
+> Thanks Dirk for reporting that imx6q restart (reboot command) is broken.
+> 
+> I tracked down the issue a little bit and found imx6q_restart hangs
+> on the of_iomap/ioremap call.  The following change, moving the call
+> somewhere else than imx6q_restart, will just fix the problem.
+> 
+> Does that mean ioremap call is not allowed in platform restart hook?
+> I'm not sure about that, because I found it works just fine if I build
+> imx_v6_v7_defconfig with V6 (imx3) platforms excluded (IOW, build a V7
+> only kernel - imx5 and imx6), which is the case how I tested imx6q
+> restart feature when I was adding it.
+> 
+> To summarize, the imx6q_restart hangs at ioremap call on a V6 + V7
+> kernel, while it works fine on a V7 only image.  I need some help to
+> understand that.
 
-That's a shame, pwrdm_pre_transition/pwrdm_post_transition are the
-main contributors to idle latency and cause large performance loss on
-small and frequent loads, like short DMAs. Could we perhaps only do it
-when PM_DEBUG is on or when off transitions happen instead?
+Some additional information from my debugging:
 
-> This patch should be revisited when the upcoming clkdm/pwrmdm/voltdm
-> use-counting seires is merged since then we can properly do accounting
-> without relying on a call in the idle path.
+a) Having a JTAG debugger attached to the i.MX6 SabreLite board I use 
+(kernel built with imx_v6_v7_defconfig) the reboot does work. No hang. 
+This does mean I can't debug the reboot hang with a JTAG debugger. 
+Therefore I added some printk debugging:
 
-So all hope of getting rid of those pre/post transition calls goes here then?
-Small typo with 'seires'..
+b) Adding some printk statements [1] in the of_iomap/ioremap call, it 
+looks to me that the system hangs in
 
-> In addition, the original patch had another bug because the PER
-> powerdomain accounting was not updated until after the GPIO resume
-> hook is called.  Since gpio_resume_after_idle() checks the context
-> loss count (which is not yet updated) it would not properly restore
-> context, leaving the GPIO banks in an undefined state.
->
-> Cc: Jean Pihet <jean.pihet@newoldbits.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Reported-by: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
->  arch/arm/mach-omap2/pm34xx.c |   19 ++++---------------
->  1 file changed, 4 insertions(+), 15 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index e4fc88c..05bd8f0 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -272,21 +272,16 @@ void omap_sram_idle(void)
->         per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
->         core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
->
-> -       if (mpu_next_state < PWRDM_POWER_ON) {
-> -               pwrdm_pre_transition(mpu_pwrdm);
-> -               pwrdm_pre_transition(neon_pwrdm);
-> -       }
-> +       pwrdm_pre_transition(NULL);
->
->         /* PER */
->         if (per_next_state < PWRDM_POWER_ON) {
-> -               pwrdm_pre_transition(per_pwrdm);
->                 per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
->                 omap2_gpio_prepare_for_idle(per_going_off);
->         }
->
->         /* CORE */
->         if (core_next_state < PWRDM_POWER_ON) {
-> -               pwrdm_pre_transition(core_pwrdm);
->                 if (core_next_state == PWRDM_POWER_OFF) {
->                         omap3_core_save_context();
->                         omap3_cm_save_context();
-> @@ -339,20 +334,14 @@ void omap_sram_idle(void)
->                         omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
->                                                OMAP3430_GR_MOD,
->                                                OMAP3_PRM_VOLTCTRL_OFFSET);
-> -               pwrdm_post_transition(core_pwrdm);
->         }
->         omap3_intc_resume_idle();
->
-> +       pwrdm_post_transition(NULL);
-> +
->         /* PER */
-> -       if (per_next_state < PWRDM_POWER_ON) {
-> +       if (per_next_state < PWRDM_POWER_ON)
->                 omap2_gpio_resume_after_idle();
-> -               pwrdm_post_transition(per_pwrdm);
-> -       }
+of_iomap() -> ... -> set_pte_at() -> set_pte_ext() / 
+cpu_v7_set_pte_ext() <= hang
+
+On our system, set_pte_ext() is translated to cpu_v7_set_pte_ext() in 
+proc-v7-2level.S.
+
+As cpu_v7_set_pte_ext() is assembly, I can't add additional printk's, 
+and JTAG doesn't work, so I don't have more details@the moment.
+
+ From this it looks like that cpu_v7_set_pte_ext() hangs if called from 
+within machine_restart() after machine_shutdown() was called (?).
+
+Best regards
+
+Dirk
+
+[1] To be able to add some printk's to set_pte_at() which is a inline 
+function in pgtable.h, I copied this to ioremap.c:
+
+--- a/lib/ioremap.c
++++ b/lib/ioremap.c
+@@ -13,6 +13,19 @@
+  #include <asm/cacheflush.h>
+  #include <asm/pgtable.h>
+
++void set_pte_debug(struct mm_struct *mm, unsigned long addr,
++                             pte_t *ptep, pte_t pteval)
++{
++       if (addr >= TASK_SIZE) {
++               printk("=> set_pte_debug #1\n");
++               set_pte_ext(ptep, pteval, 0);
++               printk("=> set_pte_debug #2\n");
++       } else {
++               __sync_icache_dcache(pteval);
++               set_pte_ext(ptep, pteval, PTE_EXT_NG);
++       }
++}
++
+  static int ioremap_pte_range(pmd_t *pmd, unsigned long addr,
+                 unsigned long end, phys_addr_t phys_addr, pgprot_t prot)
+  {
+@@ -25,7 +38,7 @@ static int ioremap_pte_range(pmd_t *pmd, unsigned long 
+addr,
+                 return -ENOMEM;
+         do {
+                 BUG_ON(!pte_none(*pte));
+-               set_pte_at(&init_mm, addr, pte, pfn_pte(pfn, prot));
++               set_pte_debug(&init_mm, addr, pte, pfn_pte(pfn, prot));
+                 pfn++;
+         } while (pte++, addr += PAGE_SIZE, addr != end);
+         return 0;
+
+With this I get:
+
+# reboot -f
+Restarting system.
+=> set_pte_debug #1
+
+-- no further output, hang, 'set_pte_debug #2' missing
+
+> --8<---
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index 5ec0608..01e7489 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -37,14 +37,10 @@
+>  #include <mach/cpuidle.h>
+>  #include <mach/hardware.h>
+> 
+> +static void __iomem *wdog_base;
+> 
+>  void imx6q_restart(char mode, const char *cmd)
+>  {
+> -       struct device_node *np;
+> -       void __iomem *wdog_base;
 > -
-> -       if (mpu_next_state < PWRDM_POWER_ON) {
-> -               pwrdm_post_transition(mpu_pwrdm);
-> -               pwrdm_post_transition(neon_pwrdm);
-> -       }
->  }
->
->  static void omap3_pm_idle(void)
-> --
-> 1.7.9.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
--- 
-Gra?vydas
+> -       np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-wdt");
+> -       wdog_base = of_iomap(np, 0);
+>         if (!wdog_base)
+>                 goto soft;
+> 
+> @@ -159,6 +155,11 @@ static void __init imx6q_usb_init(void)
+> 
+>  static void __init imx6q_init_machine(void)
+>  {
+> +       struct device_node *np;
+> +
+> +       np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-wdt");
+> +       wdog_base = of_iomap(np, 0);
+> +
+>         /*
+>          * This should be removed when all imx6q boards have pinctrl
+>          * states for devices defined in device tree.
