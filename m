@@ -1,36 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  8 Aug 2012 14:54:52 +0200
-Subject: [PATCH 5/6] ARM: integrator: include <linux/export.h
-In-Reply-To: <1344430493-5304-1-git-send-email-arnd@arndb.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 8 Aug 2012 10:01:26 -0300
+Subject: [PATCH 6/6] ARM: imx: gpmi-nand depends on mxs-dma
+In-Reply-To: <1344430493-5304-7-git-send-email-arnd@arndb.de>
 References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
-Message-ID: <1344430493-5304-6-git-send-email-arnd@arndb.de>
+ <1344430493-5304-7-git-send-email-arnd@arndb.de>
+Message-ID: <CAOMZO5CZ7mJd89cN_S0KBS74mc5qTzvrfRbmHVX3nmEakx19ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this patch, building integrator_defconfig results in:
+Hi Arnd,
 
-arch/arm/mach-integrator/core.c:150:1: warning: data definition has no type or storage class [enabled by default]
-arch/arm/mach-integrator/core.c:150:1: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL' [-Wimplicit-int]
-arch/arm/mach-integrator/core.c:150:1: warning: parameter names (without types) in function declaration [enabled by default]
+On Wed, Aug 8, 2012 at 9:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> It is not currently possible to build the gpmi-nand driver without
+> also building the mxs-dma driver. Clarify this Kconfig and enable
+> both in the defconfig file so we can build it again with both enabled.
+>
+> drivers/built-in.o: In function `gpmi_dma_filter':
+> clk-fixed-factor.c:(.text+0xafc18): undefined reference to `mxs_dma_is_apbh'
+> make[1]: *** [vmlinux] Error 1
+> make: *** [sub-make] Error 2
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
----
- arch/arm/mach-integrator/core.c |    1 +
- 1 file changed, 1 insertion(+)
+I have already sent a fix for this to the mtd list:
+https://patchwork.kernel.org/patch/1236551/
 
-diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
-index ebf680b..3fa6c51 100644
---- a/arch/arm/mach-integrator/core.c
-+++ b/arch/arm/mach-integrator/core.c
-@@ -11,6 +11,7 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/device.h>
-+#include <linux/export.h>
- #include <linux/spinlock.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
--- 
-1.7.10
+Regards,
+
+Fabio Estevam
