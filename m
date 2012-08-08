@@ -1,35 +1,29 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 08 Aug 2012 15:29:41 +0300
-Subject: [PATCH 3/4] ARM: OMAP3: Switch to use the unified audio driver
- (omap-twl4030) for selected boards
-In-Reply-To: <50225A84.5010008@compulab.co.il>
-References: <1344419650-5389-1-git-send-email-peter.ujfalusi@ti.com>
- <1344419650-5389-4-git-send-email-peter.ujfalusi@ti.com>
- <50225A84.5010008@compulab.co.il>
-Message-ID: <50225BB5.3000407@ti.com>
+From: prabhakar.lad@ti.com (Prabhakar Lad)
+Date: Wed, 8 Aug 2012 18:00:18 +0530
+Subject: [PATCH 0/2] Replace the obsolete preset API by timings API
+Message-ID: <1344429020-27616-1-git-send-email-prabhakar.lad@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Igor,
+This first patch replaces the obsolete preset API by timings
+API for davinci VPBE, appropriate chnages in machine file for
+dm644x in which VPBE is enabled. And the second patch adds support for 
+timings API for ths7303 driver. Sending them as s series 
+since VPBE uses the ths7303 driver.
 
-On 08/08/2012 03:24 PM, Igor Grinberg wrote:
->> diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
->> index 97d7190..b73fa5c 100644
->> --- a/arch/arm/mach-omap2/board-cm-t35.c
->> +++ b/arch/arm/mach-omap2/board-cm-t35.c
->> @@ -731,6 +731,7 @@ static void __init cm_t3x_common_init(void)
->>  	cm_t35_init_ethernet();
->>  	cm_t35_init_led();
->>  	cm_t35_init_display();
->> +	omap_twl4030_audio_init("overo", 26000000);
-> 
-> Can the card_name here be "cm-t3x" ?
+Hans Verkuil (1):
+  dm644x: replace the obsolete preset API by the timings API.
 
-I have used the "overo" as card name here since what I gathered is that cm-t35
-used the sound/soc/omap/overo.c machine driver for audio support.
-If the card name is changing your existing user space might get confused by
-the card name change.
-But sure, I can change the card name to "cm-t3x" if it is better for you.
+Manjunath Hadli (1):
+  ths7303: enable THS7303 for HD modes
 
--- 
-P?ter
+ arch/arm/mach-davinci/board-dm644x-evm.c   |   15 ++--
+ arch/arm/mach-davinci/dm644x.c             |   17 +---
+ drivers/media/video/davinci/vpbe.c         |  110 ++++++++++++----------------
+ drivers/media/video/davinci/vpbe_display.c |   60 +++++++--------
+ drivers/media/video/davinci/vpbe_venc.c    |   25 +++---
+ drivers/media/video/ths7303.c              |  107 +++++++++++++++++++++++----
+ include/media/davinci/vpbe.h               |   14 ++--
+ include/media/davinci/vpbe_types.h         |    8 +--
+ include/media/davinci/vpbe_venc.h          |    2 +-
+ 9 files changed, 202 insertions(+), 156 deletions(-)
