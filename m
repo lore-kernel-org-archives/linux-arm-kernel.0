@@ -1,26 +1,24 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 08 Aug 2012 17:35:34 +0300
-Subject: [PATCH 04/11] MFD: twl4030-audio: Add DT support
-In-Reply-To: <20120808125252.GR16861@opensource.wolfsonmicro.com>
-References: <1344418887-5262-1-git-send-email-peter.ujfalusi@ti.com>
- <1344418887-5262-5-git-send-email-peter.ujfalusi@ti.com>
- <5022529D.3090406@ti.com>
- <20120808125252.GR16861@opensource.wolfsonmicro.com>
-Message-ID: <50227936.3040701@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 Aug 2012 14:38:04 +0000
+Subject: [PATCH 2/6] ARM: pxa remove irq_to_gpio from eeti_ts driver
+In-Reply-To: <50227615.1090907@gmail.com>
+References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
+ <201208081419.17181.arnd@arndb.de> <50227615.1090907@gmail.com>
+Message-ID: <201208081438.04931.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2012 03:52 PM, Mark Brown wrote:
-> On Wed, Aug 08, 2012 at 01:50:53PM +0200, Benoit Cousson wrote:
+On Wednesday 08 August 2012, Daniel Mack wrote:
+> > 
+> > I've taken your patch instead now, 
 > 
->> That being said, since we do have the clock binding now, maybe we should
->> create a clock provider at board level for the sys_clk and thus you will
->> just have to create a phandle to it in your audio description.
-> 
-> Yes, we should be doing this.
+> Will that go to some other tree than linux-input now?
 
-Does this needs the common clock framework on the platform? OMAP3 certainly
-does not have it enabled since it has not been adopted.
+I have it in the arm-soc tree for now, but I don't really care
+which tree it goes through, as long as it does. I've kept a
+version of this patch in one branch with random fixes that
+I try to clear out now.
 
--- 
-P?ter
+Other than that, I'm fine with whatever Dmitry prefers.
+
+	Arnd
