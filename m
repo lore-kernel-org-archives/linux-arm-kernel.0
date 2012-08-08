@@ -1,14 +1,14 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 8 Aug 2012 08:57:13 +0200
-Subject: [PATCH 3/9] [media] mx1_camera: Don't use {en,dis}able_fiq() calls
-In-Reply-To: <1344207819-3415-3-git-send-email-anton.vorontsov@linaro.org>
+Date: Wed, 8 Aug 2012 08:57:24 +0200
+Subject: [PATCH 4/9] ASoC: imx: Don't use {en,dis}able_fiq() calls
+In-Reply-To: <1344207819-3415-4-git-send-email-anton.vorontsov@linaro.org>
 References: <20120805230238.GA1663@lizard>
- <1344207819-3415-3-git-send-email-anton.vorontsov@linaro.org>
-Message-ID: <20120808065713.GJ1451@pengutronix.de>
+ <1344207819-3415-4-git-send-email-anton.vorontsov@linaro.org>
+Message-ID: <20120808065724.GK1451@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 05, 2012 at 04:03:33PM -0700, Anton Vorontsov wrote:
+On Sun, Aug 05, 2012 at 04:03:34PM -0700, Anton Vorontsov wrote:
 > The driver uses platform-specific mxc_set_irq_fiq() with the VIRQ cookie
 > passed to it, so it's pretty clear that the driver is absolutely sure
 > that the FIQ is routed via platform-specific IC, and that the cookie can
@@ -19,42 +19,32 @@ On Sun, Aug 05, 2012 at 04:03:33PM -0700, Anton Vorontsov wrote:
 
 Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-
 > ---
->  drivers/media/video/mx1_camera.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>  sound/soc/fsl/imx-pcm-fiq.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/media/video/mx1_camera.c b/drivers/media/video/mx1_camera.c
-> index d2e6f82..1536d09 100644
-> --- a/drivers/media/video/mx1_camera.c
-> +++ b/drivers/media/video/mx1_camera.c
-> @@ -801,7 +801,7 @@ static int __init mx1_camera_probe(struct platform_device *pdev)
->  	set_fiq_regs(&regs);
+> diff --git a/sound/soc/fsl/imx-pcm-fiq.c b/sound/soc/fsl/imx-pcm-fiq.c
+> index ee27ba3..993e37d 100644
+> --- a/sound/soc/fsl/imx-pcm-fiq.c
+> +++ b/sound/soc/fsl/imx-pcm-fiq.c
+> @@ -139,7 +139,7 @@ static int snd_imx_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
+>  		hrtimer_start(&iprtd->hrt, ns_to_ktime(iprtd->poll_time_ns),
+>  		      HRTIMER_MODE_REL);
+>  		if (++fiq_enable == 1)
+> -			enable_fiq(imx_pcm_fiq);
+> +			enable_irq(imx_pcm_fiq);
 >  
->  	mxc_set_irq_fiq(irq, 1);
-> -	enable_fiq(irq);
-> +	enable_irq(irq);
+>  		break;
 >  
->  	pcdev->soc_host.drv_name	= DRIVER_NAME;
->  	pcdev->soc_host.ops		= &mx1_soc_camera_host_ops;
-> @@ -817,7 +817,7 @@ static int __init mx1_camera_probe(struct platform_device *pdev)
->  	return 0;
+> @@ -149,7 +149,7 @@ static int snd_imx_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
+>  		atomic_set(&iprtd->running, 0);
 >  
->  exit_free_irq:
-> -	disable_fiq(irq);
-> +	disable_irq(irq);
->  	mxc_set_irq_fiq(irq, 0);
->  	release_fiq(&fh);
->  exit_free_dma:
-> @@ -842,7 +842,7 @@ static int __exit mx1_camera_remove(struct platform_device *pdev)
->  	struct resource *res;
+>  		if (--fiq_enable == 0)
+> -			disable_fiq(imx_pcm_fiq);
+> +			disable_irq(imx_pcm_fiq);
 >  
->  	imx_dma_free(pcdev->dma_chan);
-> -	disable_fiq(pcdev->irq);
-> +	disable_irq(pcdev->irq);
->  	mxc_set_irq_fiq(pcdev->irq, 0);
->  	release_fiq(&fh);
->  
+>  		break;
+>  	default:
 > -- 
 > 1.7.10.4
 > 
