@@ -1,55 +1,46 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 8 Aug 2012 13:17:27 -0700
-Subject: Kernels on Bad Firmware (was Re: kernel entry for thumb2-only
- cpus)
-In-Reply-To: <5022A6F9.2000206@wwwdotorg.org>
-References: <CAKGA1b=8gZdgpSJ28Hff+1199J0GarLxZU-NAv7JJDuk+La0ew@mail.gmail.com>
- <5022A6F9.2000206@wwwdotorg.org>
-Message-ID: <CAOesGMiEt9hGE=WzDrNg4vkcfu+Z6Q9V42tzKE2ENq3ifcOEfg@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 8 Aug 2012 14:19:34 -0600 (MDT)
+Subject: [PATCH 1/1] ARM: OMAP2+: hwmod: Print an error message if no
+ match exists for a hwmod class
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EB32ABA@DBDE01.ent.ti.com>
+References: <1344422117-20707-1-git-send-email-vaibhav.bedia@ti.com>
+ <alpine.DEB.2.00.1208080803560.5447@utopia.booyaka.com>
+ <B5906170F1614E41A8A28DE3B8D121433EB32ABA@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1208081411010.6819@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 8, 2012 at 10:50 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 08/08/2012 11:36 AM, Matt Sealey wrote:
-> ...
->> The fact we could update it with a script was the awesome thing about
->> using OpenFirmware -
->> but U-Boot can do this too, since libfdt is there and it's one option
->> to enable it to allow script
->> based modification of the blob. If the DT is hardcoded into the firmware somehow
->> (CONFIG_OF_CONTROL I think) then platforms can load "boot.scr" from
->> the root filesystem ...
+Hi Vaibhav
+
+On Wed, 8 Aug 2012, Bedia, Vaibhav wrote:
+
+> On Wed, Aug 08, 2012 at 19:35:50, Paul Walmsley wrote:
 >
-> Just a comment on CONFIG_OF_CONTROL...
->
-> In U-Boot, CONFIG_OF_CONTROL determines whether U-Boot uses a device
-> tree to configure itself. This is completely orthogonal to whether a
-> device tree is passed to the kernel, and where the kernel DT comes from,
-> which is still controlled by the bootm/bootz command parameters.
->
-> The DT used to configure U-Boot isn't the same one passed to the kernel
-> typically. The one for U-Boot is typically appended to the U-Boot image,
-> whereas the one passed to the kernel is likely loaded from a file in
-> /boot alongside the uImage/zImage of the kernel. I suppose the U-Boot
-> script /could/ be written to encode the location of the appended DTB
-> used by U-Boot and so pass the same one to the kernel, I don't believe
-> anyone has done that. Besides, U-Boot's copy of the .dts files has
-> diverged a little from the kernel's...:-(
+> > It doesn't seem to me that this would necessarily always be an error.  
+> > Suppose some init code to create cpsw devices is running on an OMAP3430.  
+> > Then a omap_hwmod_for_each_by_class() that doesn't locate anything 
+> > wouldn't be an error, right?
+> 
+> Well, I think a failed lookup operation will be a bit expensive since it
+> iterates over the whole list of registered hwmods and hence put in the
+> pr_err().
 
-Right, OF_CONTROL was instigated around here, and I explicitly have
-kept them from attempting to do that. Why? Because the U-boot device
-tree is non-standard, and has a bunch of u-boot cruft in it. We quite
-frankly don't want to see it in the kernel.
+If performance is a serious problem there, we can maintain a list of hwmod 
+pointers inside each struct omap_hwmod_class, updated when the hwmods are 
+registered.  But as far as I know, performance hasn't been an issue here 
+yet.  If performance is the real motivation, I'd rather see an 
+implementation of per-class lists as described above.
 
-But the bigger argument is that the device tree bindings are still
-rapidly evolving together with the kernel, and until we reach a more
-stable state, it's a bad idea to provide a tree that is separate from
-the kernel (on ARM), since there will be no way to undo early
-mistakes.
+> But I don't see how the SoC specific example that you pointed out
+> could be handled without putting in cpu_is_* checks in the registration
+> process itself :(
 
-The plan is to, at some point in time, take the device tree bindings,
-as well as the DTS sources, out of the kernel tree and to a separate
-repo. But not until the bindings have settled down quite a bit more.
+Hmm, why not?
+
+To continue the earlier example, the init code in the platform code simply 
+calls omap_hwmod_for_each_by_class(), and creates the appropriate device 
+if anything was found.  If no cpsw IP blocks are present on a given SoC, 
+nothing would happen.  No cpu_is_*() would be needed.
 
 
--Olof
+- Paul
