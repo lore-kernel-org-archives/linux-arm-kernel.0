@@ -1,68 +1,36 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 08 Aug 2012 12:38:58 -0600
-Subject: [PATCH 8/8] ARM: vt8500: gpio: Devicetree support for arch-vt8500
-In-Reply-To: <1344389967-8465-9-git-send-email-linux@prisktech.co.nz>
+Date: Wed, 08 Aug 2012 12:43:14 -0600
+Subject: [PATCH 1/8] arm: vt8500: Add device tree files for VIA/Wondermedia
+ SoC's
+In-Reply-To: <1344389967-8465-2-git-send-email-linux@prisktech.co.nz>
 References: <1344389967-8465-1-git-send-email-linux@prisktech.co.nz>
- <1344389967-8465-9-git-send-email-linux@prisktech.co.nz>
-Message-ID: <5022B242.1050001@wwwdotorg.org>
+ <1344389967-8465-2-git-send-email-linux@prisktech.co.nz>
+Message-ID: <5022B342.7080606@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 08/07/2012 07:39 PM, Tony Prisk wrote:
-> Converted the existing arch-vt8500 gpio to a platform_device.
-> Added support for WM8505 and WM8650 GPIO controllers.
+> Add device tree files for VT8500, WM8505 and WM8650 SoC's and
+> reference boards.
 
-> diff --git a/drivers/gpio/gpio-vt8500.c b/drivers/gpio/gpio-vt8500.c
+> diff --git a/arch/arm/boot/dts/vt8500_ref.dts b/arch/arm/boot/dts/vt8500_ref.dts
 
-> +static struct of_device_id vt8500_gpio_dt_ids[] = {
-> +	{ .compatible = "via,vt8500-gpio", .data = &vt8500_data, },
-> +	{ .compatible = "wm,wm8505-gpio", .data = &wm8505_data, },
-> +	{ .compatible = "wm,wm8650-gpio", .data = &wm8650_data, },
-> +	{ /* Sentinel */ },
-> +};
-> +
-> +static int __devinit vt8500_gpio_probe(struct platform_device *pdev)
-> +{
-> +	void __iomem *gpio_base;
-> +	struct device_node *np;
-> +	const struct of_device_id *of_id =
-> +				of_match_device(vt8500_gpio_dt_ids, &pdev->dev);
-> +
-> +	if (!of_id) {
-> +		dev_err(&pdev->dev, "Failed to find gpio controller\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	np = of_find_matching_node(NULL, vt8500_gpio_dt_ids);
+It appears more typical to use "-" rather than "_" in the filename to
+join SoC and board names.
 
-Can't you use pdev->dev.of_node instead of searching for it again?
+I guess "_ref" means "reference". Is that how the boards are commonly
+known? Are you sure there will never be another reference board for
+these SoCs? Given the "model" values in the file, something more like
+vt8500-bv07.dts might be more appropriate?
 
-...
-> +	of_node_put(np);
+> +	/*
+> +	 * Display node is based on Sascha Hauer's patch on dri-devel.
+> +	 * Added a bpp property to calculate the size of the framebuffer
+> +	 * until the binding is formalized.
+> +	 */
+> +	display {
 
-If so, you could also remove that.
-
-> +static int __init vt8500_gpio_init(void)
-> +{
-> +	return platform_driver_probe(&vt8500_gpio_driver, &vt8500_gpio_probe);
-> +}
-> +
-> +static void __exit vt8500_gpio_exit(void)
-> +{
-> +	return platform_driver_unregister(&vt8500_gpio_driver);
-> +}
-> +
-> +module_init(vt8500_gpio_init);
-> +module_exit(vt8500_gpio_exit);
-
-I think that's all just:
-
-module_platform_driver(vt8500_gpio_driver);
-
-(except that _init uses platform_driver_probe() rather than
-platform_driver_register(), which seems unusual. I guess that explains
-the of_find_matching_node() above too.)
-
-> +MODULE_LICENSE("GPL");
-
-That should be "GPL v2" given the license header.
+Maybe it's better to just hold off on adding this node, to wait until
+the binding is complete so this file doesn't churn? Certainly it sounded
+like Sascha was going to change the binding a little in response to
+comments it received.
