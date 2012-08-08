@@ -1,25 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 8 Aug 2012 13:55:30 +0200
-Subject: [PATCH] clk: convert ARM RealView to common clk
-In-Reply-To: <1344426753.2435.40.camel@hornet>
-References: <1344270728-7550-1-git-send-email-linus.walleij@stericsson.com>
- <1344426500.2435.39.camel@hornet> <1344426753.2435.40.camel@hornet>
-Message-ID: <CACRpkdYkoeH09H6c4WEw40hpP9+oRD4pa0-yBk1L02yfao2sgg@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 08 Aug 2012 15:05:44 +0300
+Subject: [PATCH RESEND v2 1/2] arm/dts: Add AM33XX basic pinctrl support
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA06E4B@DBDE01.ent.ti.com>
+References: <1343144719-26352-1-git-send-email-anilkumar@ti.com>
+ <1343144719-26352-2-git-send-email-anilkumar@ti.com>
+ <50125B1C.8000209@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA06E4B@DBDE01.ent.ti.com>
+Message-ID: <50225618.9070501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 8, 2012 at 1:52 PM, Pawel Moll <pawel.moll@arm.com> wrote:
+On 07/31/2012 04:37 PM, AnilKumar, Chimata wrote:
+>> I'm just curious about the size here: how it ended up as 0x0338?
+>> While looking at the TRM of AM335x I can come up with 0x0238 (0x44e10800 -
+>> 0x44e10a38), but I don't see any sings of the remaining 0x0100 to be
+>> documented at least.
+> 
+> No, pinmux registers are available till 0x44E10B38, look at AM335x latest TRM
+> or pinmux utility (we cannot find the exact offsets but pins we can find after
+> 0x0A38, conf_ddr_resetn) at http://www.ti.com/tool/pinmuxtool
 
->> ------------[ cut here ]------------
->> WARNING: at /home/pawmol01/src/kernel.org/linux/kernel/timer.c:1076 del_timer_sync+0x34/0x5c()
->
-> Err. Ignore that. The same happens without your patch :-)
->
-> Will try with 3.5.
+I have looked at the latest TRM (Rev F, SPRUH73F -  public TRM) and there is
+not mention of registers between 0x0a34 and 0x0e00.
+I can not even find any reference of conf_ddr_resetn register either in the TRM.
+I can not check with the pinmuxtool since it is crashing with wine under Linux.
+There could be registers after 0x0a34, but they are not publicly documented...
 
-Hm it boots like a charm on PB1176, what's so very different about the EB?
-
-Oh well. Are you maintaining RealView EB, BTW?
-
-Yours,
-Linus Walleij
+-- 
+P?ter
