@@ -1,96 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  8 Aug 2012 23:27:49 +0200
-Subject: [PATCH 01/10] ARM: footbridge: nw_gpio_lock is raw_spin_lock
+Date: Wed,  8 Aug 2012 23:27:51 +0200
+Subject: [PATCH 03/10] ARM: mv78xx0: fix win_cfg_base prototype
 In-Reply-To: <1344461278-28245-1-git-send-email-arnd@arndb.de>
 References: <1344461278-28245-1-git-send-email-arnd@arndb.de>
-Message-ID: <1344461278-28245-2-git-send-email-arnd@arndb.de>
+Message-ID: <1344461278-28245-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-bd31b85960a "locking, ARM: Annotate low level hw locks as raw"
-made nw_gpio_lock a raw spinlock, but did not change all the
-users in device drivers. This fixes the remaining ones.
+Patch b6d1c33a31 "ARM: Orion: Consolidate the address map setup" tried
+to merge the address map for the four orion platforms, but apparently
+got it wrong for mv78xx0. Admittedly I don't understand what this
+code actually does, but it's clear that the current version is
+wrong.
 
-sound/oss/waveartist.c: In function 'vnc_mute_spkr':
-sound/oss/waveartist.c:1485:2: warning: passing argument 1 of 'spinlock_check' from incompatible pointer type [enabled by default]
-include/linux/spinlock.h:272:102: note: expected 'struct spinlock_t *' but argument is of type 'struct raw_spinlock_t *'
-drivers/char/ds1620.c: In function 'netwinder_lock':
-drivers/char/ds1620.c:77:2: warning: passing argument 1 of 'spinlock_check' from incompatible pointer type [enabled by default]
-include/linux/spinlock.h:272:102: note: expected 'struct spinlock_t *' but argument is of type 'struct raw_spinlock_t *'
-drivers/char/nwflash.c: In function 'kick_open':
-drivers/char/nwflash.c:620:2: warning: passing argument 1 of 'spinlock_check' from incompatible pointer type [enabled by default]
-include/linux/spinlock.h:272:102: note: expected 'struct spinlock_t *' but argument is of type 'struct raw_spinlock_t *'
+Without this patch, building mv78xx0_defconfig results in:
+
+arch/arm/mach-mv78xx0/addr-map.c:59:2: warning: initialization from incompatible pointer type [enabled by default]
+arch/arm/mach-mv78xx0/addr-map.c:59:2: warning: (near initialization for 'addr_map_cfg.win_cfg_base') [enabled by default]
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Michael Walle <michael@walle.cc>
+Cc: Nicolas Pitre <nico@linaro.org>
 ---
- drivers/char/ds1620.c  |    8 ++++----
- drivers/char/nwflash.c |    4 ++--
- sound/oss/waveartist.c |    4 ++--
- 3 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/mach-mv78xx0/addr-map.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/char/ds1620.c b/drivers/char/ds1620.c
-index aab9605..24ffd8c 100644
---- a/drivers/char/ds1620.c
-+++ b/drivers/char/ds1620.c
-@@ -74,21 +74,21 @@ static inline void netwinder_ds1620_reset(void)
+diff --git a/arch/arm/mach-mv78xx0/addr-map.c b/arch/arm/mach-mv78xx0/addr-map.c
+index 62b53d7..a9bc841 100644
+--- a/arch/arm/mach-mv78xx0/addr-map.c
++++ b/arch/arm/mach-mv78xx0/addr-map.c
+@@ -37,7 +37,7 @@
+ #define WIN0_OFF(n)		(BRIDGE_VIRT_BASE + 0x0000 + ((n) << 4))
+ #define WIN8_OFF(n)		(BRIDGE_VIRT_BASE + 0x0900 + (((n) - 8) << 4))
  
- static inline void netwinder_lock(unsigned long *flags)
+-static void __init __iomem *win_cfg_base(int win)
++static void __init __iomem *win_cfg_base(const struct orion_addr_map_cfg *cfg, int win)
  {
--	spin_lock_irqsave(&nw_gpio_lock, *flags);
-+	raw_spin_lock_irqsave(&nw_gpio_lock, *flags);
- }
- 
- static inline void netwinder_unlock(unsigned long *flags)
- {
--	spin_unlock_irqrestore(&nw_gpio_lock, *flags);
-+	raw_spin_unlock_irqrestore(&nw_gpio_lock, *flags);
- }
- 
- static inline void netwinder_set_fan(int i)
- {
- 	unsigned long flags;
- 
--	spin_lock_irqsave(&nw_gpio_lock, flags);
-+	raw_spin_lock_irqsave(&nw_gpio_lock, flags);
- 	nw_gpio_modify_op(GPIO_FAN, i ? GPIO_FAN : 0);
--	spin_unlock_irqrestore(&nw_gpio_lock, flags);
-+	raw_spin_unlock_irqrestore(&nw_gpio_lock, flags);
- }
- 
- static inline int netwinder_get_fan(void)
-diff --git a/drivers/char/nwflash.c b/drivers/char/nwflash.c
-index d45c334..04e2a94 100644
---- a/drivers/char/nwflash.c
-+++ b/drivers/char/nwflash.c
-@@ -617,9 +617,9 @@ static void kick_open(void)
- 	 * we want to write a bit pattern XXX1 to Xilinx to enable
- 	 * the write gate, which will be open for about the next 2ms.
- 	 */
--	spin_lock_irqsave(&nw_gpio_lock, flags);
-+	raw_spin_lock_irqsave(&nw_gpio_lock, flags);
- 	nw_cpld_modify(CPLD_FLASH_WR_ENABLE, CPLD_FLASH_WR_ENABLE);
--	spin_unlock_irqrestore(&nw_gpio_lock, flags);
-+	raw_spin_unlock_irqrestore(&nw_gpio_lock, flags);
- 
  	/*
- 	 * let the ISA bus to catch on...
-diff --git a/sound/oss/waveartist.c b/sound/oss/waveartist.c
-index 24c430f..672af8b 100644
---- a/sound/oss/waveartist.c
-+++ b/sound/oss/waveartist.c
-@@ -1482,9 +1482,9 @@ vnc_mute_spkr(wavnc_info *devc)
- {
- 	unsigned long flags;
- 
--	spin_lock_irqsave(&nw_gpio_lock, flags);
-+	raw_spin_lock_irqsave(&nw_gpio_lock, flags);
- 	nw_cpld_modify(CPLD_UNMUTE, devc->spkr_mute_state ? 0 : CPLD_UNMUTE);
--	spin_unlock_irqrestore(&nw_gpio_lock, flags);
-+	raw_spin_unlock_irqrestore(&nw_gpio_lock, flags);
- }
- 
- static void
+ 	 * Find the control register base address for this window.
 -- 
 1.7.10
