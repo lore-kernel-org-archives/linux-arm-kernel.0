@@ -1,118 +1,25 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed,  8 Aug 2012 12:41:27 +0300
-Subject: [PATCH 11/11] ASoC: twl4030: Support for DT booted kernel
-In-Reply-To: <1344418887-5262-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1344418887-5262-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1344418887-5262-12-git-send-email-peter.ujfalusi@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 8 Aug 2012 10:49:52 +0100
+Subject: [PATCH 1/1] Input: ab8500-ponkey: Make the distinction between
+ DT and non-DT boots
+In-Reply-To: <20120808080411.GB4728@gmail.com>
+References: <20120807170333.GV16861@opensource.wolfsonmicro.com>
+ <20120808080411.GB4728@gmail.com>
+Message-ID: <20120808094952.GH16861@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the kernel has been booted with DT blob the platform data is NULL for
-the driver.
-We need to construct the pdata based on the DT information for runtime use.
+On Wed, Aug 08, 2012 at 09:04:12AM +0100, Lee Jones wrote:
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- sound/soc/codecs/twl4030.c |   67 ++++++++++++++++++++++++++++++++++++++-----
- 1 files changed, 59 insertions(+), 8 deletions(-)
+> During non-DT boot:
+>  - Platform data is passed, which contains an IRQ base
+>  - If an IRQ base is requested we use it to register a Legacy IRQ Domain
+>  - MFD adds the IRQ base to the hwirq and registers it as a virq
 
-diff --git a/sound/soc/codecs/twl4030.c b/sound/soc/codecs/twl4030.c
-index bf0240d..68495a2 100644
---- a/sound/soc/codecs/twl4030.c
-+++ b/sound/soc/codecs/twl4030.c
-@@ -26,6 +26,7 @@
- #include <linux/pm.h>
- #include <linux/i2c.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
- #include <linux/i2c/twl.h>
- #include <linux/slab.h>
- #include <linux/gpio.h>
-@@ -295,13 +296,70 @@ static inline void twl4030_reset_registers(struct snd_soc_codec *codec)
- 
- }
- 
--static void twl4030_init_chip(struct snd_soc_codec *codec)
-+static void twl4030_setup_pdata_of(struct twl4030_codec_data *pdata,
-+				   struct device_node *node)
-+{
-+	int value;
-+
-+	of_property_read_u32(node, "ti,digimic_delay",
-+			     &pdata->digimic_delay);
-+	of_property_read_u32(node, "ti,ramp_delay_value",
-+			     &pdata->ramp_delay_value);
-+	of_property_read_u32(node, "ti,offset_cncl_path",
-+			     &pdata->offset_cncl_path);
-+	if (!of_property_read_u32(node, "ti,hs_extmute", &value))
-+		pdata->hs_extmute = value;
-+	else
-+		pdata->hs_extmute = 0;
-+
-+	if (pdata->hs_extmute) {
-+		int ret = of_property_read_u32(node, "ti,hs_extmute_gpio",
-+					       &pdata->hs_extmute_gpio);
-+		if (!ret) {
-+			if (!of_property_read_u32(node,
-+						  "ti,hs_extmute_disable_level",
-+						  &value)) {
-+				pdata->hs_extmute_disable_level = value;
-+			}
-+		} else {
-+			pdata->hs_extmute_gpio = -1;
-+		}
-+	}
-+}
-+
-+static struct twl4030_codec_data *twl4030_get_pdata(struct snd_soc_codec *codec)
- {
- 	struct twl4030_codec_data *pdata = dev_get_platdata(codec->dev);
-+	struct device_node *twl4030_codec_node = NULL;
-+
-+#ifdef CONFIG_OF
-+	twl4030_codec_node = of_find_node_by_name(codec->dev->parent->of_node,
-+						  "codec");
-+#endif
-+
-+	if (!pdata && twl4030_codec_node) {
-+		pdata = devm_kzalloc(codec->dev,
-+				     sizeof(struct twl4030_codec_data),
-+				     GFP_KERNEL);
-+		if (!pdata) {
-+			dev_err(codec->dev, "Can not allocate memory\n");
-+			return NULL;
-+		}
-+		twl4030_setup_pdata_of(pdata, twl4030_codec_node);
-+	}
-+
-+	return pdata;
-+}
-+
-+static void twl4030_init_chip(struct snd_soc_codec *codec)
-+{
-+	struct twl4030_codec_data *pdata;
- 	struct twl4030_priv *twl4030 = snd_soc_codec_get_drvdata(codec);
- 	u8 reg, byte;
- 	int i = 0;
- 
-+	pdata = twl4030_get_pdata(codec);
-+
- 	if (pdata && pdata->hs_extmute &&
- 	    gpio_is_valid(pdata->hs_extmute_gpio)) {
- 		int ret, level;
-@@ -2288,13 +2346,6 @@ static struct snd_soc_codec_driver soc_codec_dev_twl4030 = {
- 
- static int __devinit twl4030_codec_probe(struct platform_device *pdev)
- {
--	struct twl4030_codec_data *pdata = pdev->dev.platform_data;
--
--	if (!pdata) {
--		dev_err(&pdev->dev, "platform_data is missing\n");
--		return -EINVAL;
--	}
--
- 	return snd_soc_register_codec(&pdev->dev, &soc_codec_dev_twl4030,
- 			twl4030_dai, ARRAY_SIZE(twl4030_dai));
- }
--- 
-1.7.8.6
+Just don't do this step - the only reason to do it is for mapping back
+into a linear domain but if you're going to do this...
+
+>  - AB8500 child devices use *_get_virq() to convert virq to virq - *ERROR*
+
+...then it's redundant.  The mapping functions in the domain code
+replace this functionality.
