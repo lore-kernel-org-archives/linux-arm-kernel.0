@@ -1,117 +1,113 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 8 Aug 2012 11:54:36 +0100
-Subject: kernel entry for thumb2-only cpus
-In-Reply-To: <alpine.LFD.2.02.1208060026460.5231@xanadu.home>
-References: <20120803090452.GE2626@pengutronix.de>
- <20120803114532.GB26925@mudshark.cambridge.arm.com>
- <20120805095528.GO2626@pengutronix.de>
- <alpine.LFD.2.02.1208060026460.5231@xanadu.home>
-Message-ID: <20120808105436.GA2134@linaro.org>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Wed, 8 Aug 2012 13:56:33 +0300
+Subject: [PATCH v2] Revert "ARM: OMAP3: PM: call pre/post transition per
+ powerdomain"
+In-Reply-To: <1344379659-26152-1-git-send-email-khilman@ti.com>
+References: <1344379659-26152-1-git-send-email-khilman@ti.com>
+Message-ID: <CANOLnONQhqYcqW8ZAfn+5ceZQ_h2W_yKZVZrnrP5cUJDooTrQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2012 at 12:32:14AM -0400, Nicolas Pitre wrote:
-> On Sun, 5 Aug 2012, Uwe Kleine-K?nig wrote:
-> 
-> > On Fri, Aug 03, 2012 at 12:45:32PM +0100, Will Deacon wrote:
-> > > On Fri, Aug 03, 2012 at 10:04:52AM +0100, Uwe Kleine-K?nig wrote:
-> > > > Hello,
-> > > 
-> > > Hi Uwe,
-> > > 
-> > > > in both arch/arm/kernel/head.S and arch/arm/kernel/head-nommu.S we have
-> > > > 
-> > > > 	.arm
-> > > >  THUMB( adr     r9, BSYM(1f)    )       @ Kernel is always entered in ARM.
-> > > >  THUMB( bx      r9              )       @ If this is a Thumb-2 kernel,
-> > > >  THUMB( .thumb                  )       @ switch to Thumb now.
-> > > >  THUMB(1:                       )
-> > > > 
-> > > > as first instructions at the entry point. This is a problem for
-> > > > thumb2-only cpus (e.g. Cortex-M3).
-> > > 
-> > > Yup, Documentation/arm/Booting mentions this too.
-> > > 
-> > > > Up to now I commented out the first three lines for the Cortex-M3 port.
-> > > > What should we do about that. There are two possibilities I see:
-> > > > 
-> > > >  a) introduce a kconfig symbol for thumb2-only builds and #ifdef the
-> > > >     first three lines out if it is given.
-> > > >  b) expect the bootloader to directly jump to the label 1.
-> > > > 
-> > > > The downside of a) is that a boot loader on a cpu that is capable to
-> > > > execute the tradtional instructions would need to detect if the switch
-> > > > to thumb is there or not and react accordingly. (In fact it needs to
-> > > > distringuish three cases:
-> > > > 
-> > > >  - traditional kernel
-> > > >  - thumb2 kernel with ARM entry
-> > > >  - thumb2 kernel without ARM entry
-> > > > 
-> > > > .) So I think b) is the more sensible option in the long run.
-> > > > 
-> > > > What do you think?
-> > > 
-> > > How about something like:
-> > > 
-> > > 
-> > > diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> > > index 835898e..9f07be2 100644
-> > > --- a/arch/arm/kernel/head.S
-> > > +++ b/arch/arm/kernel/head.S
-> > > @@ -86,6 +86,7 @@
-> > >         __HEAD
-> > >  ENTRY(stext)
-> > >  
-> > > + THUMB(        .inst   0xe200e004      )       @ ARM: and lr, r0, #4 T2: b 1f
-> > >   THUMB(        adr     r9, BSYM(1f)    )       @ Kernel is always entered in ARM.
-> > >   THUMB(        bx      r9              )       @ If this is a Thumb-2 kernel,
-> > >   THUMB(        .thumb                  )       @ switch to Thumb now.
-> > Great idea, but it doesn't work as suggested. My compiler already barfs
-> > on the .arm above:
-> 
-> Let's stop splitting hairs.
-> 
-> A Cortex-M kernel simply won't run on anything else.  It certainly won't 
-> run on ARM mode capable processors.  So in this case just make the 
-> kernel entry point Thumb mode only by #ifdef'ing out the .arm part.
+On Wed, Aug 8, 2012 at 1:47 AM, Kevin Hilman <khilman@ti.com> wrote:
+> This reverts commit 58f0829b7186150318c79515f0e0850c5e7a9c89.
+>
+> Converstion to per-pwrdm per/post transition calls was a bit
+> premature.  Only tracking MPU, PER & CORE in the idle path means we
+> lose the accounting for all the other powerdomains which may also
+> transition in idle.  On OMAP3, due to autodeps, several powerdomains
+> transition along with MPU (e.g. DSS, USBHOST), and the accounting for
+> these was lost with this patch.  Since the accounting includes the
+> context loss counters, drivers for devices in those power domains
+> would never notice context lost, so would likely hang after any
+> off-mode transitions.
 
-This was exactly my view when originally adding that code.
+That's a shame, pwrdm_pre_transition/pwrdm_post_transition are the
+main contributors to idle latency and cause large performance loss on
+small and frequent loads, like short DMAs. Could we perhaps only do it
+when PM_DEBUG is on or when off transitions happen instead?
 
-Previously, there was no well-defined way for a bootloader to know
-whether the target kernel was ARM or Thumb and this had to be separately
-configured.  This just caused a compatibility mess.
+> This patch should be revisited when the upcoming clkdm/pwrmdm/voltdm
+> use-counting seires is merged since then we can properly do accounting
+> without relying on a call in the idle path.
 
-To fix this, we now have a fixed boot protocol: on a CPU supporting ARM
-state, you must enter the kernel in ARM state, period.  This means there
-is nothing for the bootloader to get wrong.  If a single bootloader
-image is required across CPUs with and without ARM state, the bootloader
-must detect the CPU and enter the kernel in the appropriate way.
+So all hope of getting rid of those pre/post transition calls goes here then?
+Small typo with 'seires'..
 
-The unconditionalness of the veneer sequence was an omission caused by
-the fact that there was no real upstream support for ARM-less v7 CPUs
-at the time.
+> In addition, the original patch had another bug because the PER
+> powerdomain accounting was not updated until after the GPIO resume
+> hook is called.  Since gpio_resume_after_idle() checks the context
+> loss count (which is not yet updated) it would not properly restore
+> context, leaving the GPIO banks in an undefined state.
+>
+> Cc: Jean Pihet <jean.pihet@newoldbits.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Reported-by: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+>  arch/arm/mach-omap2/pm34xx.c |   19 ++++---------------
+>  1 file changed, 4 insertions(+), 15 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> index e4fc88c..05bd8f0 100644
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -272,21 +272,16 @@ void omap_sram_idle(void)
+>         per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
+>         core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
+>
+> -       if (mpu_next_state < PWRDM_POWER_ON) {
+> -               pwrdm_pre_transition(mpu_pwrdm);
+> -               pwrdm_pre_transition(neon_pwrdm);
+> -       }
+> +       pwrdm_pre_transition(NULL);
+>
+>         /* PER */
+>         if (per_next_state < PWRDM_POWER_ON) {
+> -               pwrdm_pre_transition(per_pwrdm);
+>                 per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
+>                 omap2_gpio_prepare_for_idle(per_going_off);
+>         }
+>
+>         /* CORE */
+>         if (core_next_state < PWRDM_POWER_ON) {
+> -               pwrdm_pre_transition(core_pwrdm);
+>                 if (core_next_state == PWRDM_POWER_OFF) {
+>                         omap3_core_save_context();
+>                         omap3_cm_save_context();
+> @@ -339,20 +334,14 @@ void omap_sram_idle(void)
+>                         omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
+>                                                OMAP3430_GR_MOD,
+>                                                OMAP3_PRM_VOLTCTRL_OFFSET);
+> -               pwrdm_post_transition(core_pwrdm);
+>         }
+>         omap3_intc_resume_idle();
+>
+> +       pwrdm_post_transition(NULL);
+> +
+>         /* PER */
+> -       if (per_next_state < PWRDM_POWER_ON) {
+> +       if (per_next_state < PWRDM_POWER_ON)
+>                 omap2_gpio_resume_after_idle();
+> -               pwrdm_post_transition(per_pwrdm);
+> -       }
+> -
+> -       if (mpu_next_state < PWRDM_POWER_ON) {
+> -               pwrdm_post_transition(mpu_pwrdm);
+> -               pwrdm_post_transition(neon_pwrdm);
+> -       }
+>  }
+>
+>  static void omap3_pm_idle(void)
+> --
+> 1.7.9.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-For ARM-less CPUs, I would go for the #ifdef approach.
 
 
-The only potential problem comes from the fact that the boot protocol
-groups CPUs into two mutually exclusive sets: those with ARM state and
-those without.  I single image cannot therefore run on both:
-
- a) building a single image that is bootable on ARM-less (M class)
-    and AR class.  Those architecture families are just too different
-    for this to seem realistic.
-
- b) building a single image that is bootable on current -AR CPUs
-    (with ARM state) and hypothetical future -AR CPUs without ARM
-    state.
-
-Both of these seem pretty speculative.
-
-Unless we have a need for these right now I would much rather that a
-bootloader which does not follow arm/Booting fails instead of silently
-working.
-
-Cheers
----Dave
+-- 
+Gra?vydas
