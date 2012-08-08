@@ -1,43 +1,126 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 8 Aug 2012 16:28:24 +0200
-Subject: [rtc-linux] [PATCH 8/8] ARM: vt8500: gpio: Devicetree support for
- arch-vt8500
-In-Reply-To: <201208080919.52592.arnd@arndb.de>
-References: <1344389967-8465-1-git-send-email-linux@prisktech.co.nz>
- <1344389967-8465-9-git-send-email-linux@prisktech.co.nz>
- <CACRpkdbYxpN9RCu8j8KMBgrb=-DsYZHq7hx-ifmHhJ0ZZcRYjw@mail.gmail.com>
- <201208080919.52592.arnd@arndb.de>
-Message-ID: <CACRpkdabUWpDsBhz4ZEJNhEuqw-U+v-HrX7NcWoNLeuenv5t9A@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  8 Aug 2012 11:28:07 -0300
+Subject: [PATCH] ARM: dts: imx: Move SDMA firmware to SoC dtsi file
+Message-ID: <1344436087-5612-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 8, 2012 at 11:19 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
->> What on earth are all those magic numbers?
->>
->> I *guess* they're enabling some default GPIO settings etc.
->
-> No, they are the register offsets you quoted above, per bank.
+Instead of adding sdma-ram-script-name into each board dts file, move 
+it to the SoC dtsi file instead.
 
-Aha I was fooled by this:
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx51-babbage.dts |    4 ----
+ arch/arm/boot/dts/imx51.dtsi        |    1 +
+ arch/arm/boot/dts/imx53-ard.dts     |    6 ------
+ arch/arm/boot/dts/imx53-evk.dts     |    4 ----
+ arch/arm/boot/dts/imx53-qsb.dts     |    4 ----
+ arch/arm/boot/dts/imx53-smd.dts     |    4 ----
+ arch/arm/boot/dts/imx53.dtsi        |    1 +
+ 7 files changed, 2 insertions(+), 22 deletions(-)
 
-+struct vt8500_gpio_bank_regs {
-+       int     en;
-+       int     dir;
-+       int     data_out;
-+       int     data_in;
-+       int     ngpio;
-+};
-
-This needs to be named something intuitive like "vt8500_gpio_bank_regoffsets"
-
-Some kerneldoc intsead of the opaque comment above will also improve
-readability a lot:
-
-/**
-  * struct vt8500_gpio_bank_regoffsets
-  * @en: offset to enable register in the bank
-  * ...
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index de065b5..46d4c93 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -189,10 +189,6 @@
+ 		};
+ 
+ 		aips at 80000000 {	/* aips-2 */
+-			sdma at 83fb0000 {
+-				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx51.bin";
+-			};
+-
+ 			i2c at 83fc4000 { /* I2C2 */
+ 				status = "okay";
+ 
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index aaa0c0a..0bb5958 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -219,6 +219,7 @@
+ 				compatible = "fsl,imx51-sdma", "fsl,imx35-sdma";
+ 				reg = <0x83fb0000 0x4000>;
+ 				interrupts = <6>;
++				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx51.bin";
+ 			};
+ 
+ 			cspi at 83fc0000 {
+diff --git a/arch/arm/boot/dts/imx53-ard.dts b/arch/arm/boot/dts/imx53-ard.dts
+index 5b8eafc..dbe0353 100644
+--- a/arch/arm/boot/dts/imx53-ard.dts
++++ b/arch/arm/boot/dts/imx53-ard.dts
+@@ -44,12 +44,6 @@
+ 				status = "okay";
+ 			};
+ 		};
+-
+-		aips at 60000000 {	/* AIPS2 */
+-			sdma at 63fb0000 {
+-				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
+-			};
+-		};
+ 	};
+ 
+ 	eim-cs1 at f4000000 {
+diff --git a/arch/arm/boot/dts/imx53-evk.dts b/arch/arm/boot/dts/imx53-evk.dts
+index 9c79803..8e72f68 100644
+--- a/arch/arm/boot/dts/imx53-evk.dts
++++ b/arch/arm/boot/dts/imx53-evk.dts
+@@ -77,10 +77,6 @@
+ 		};
+ 
+ 		aips at 60000000 {	/* AIPS2 */
+-			sdma at 63fb0000 {
+-				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
+-			};
+-
+ 			i2c at 63fc4000 { /* I2C2 */
+ 				status = "okay";
+ 
+diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
+index 2d803a9..7153aa0 100644
+--- a/arch/arm/boot/dts/imx53-qsb.dts
++++ b/arch/arm/boot/dts/imx53-qsb.dts
+@@ -56,10 +56,6 @@
+ 		};
+ 
+ 		aips at 60000000 {	/* AIPS2 */
+-			sdma at 63fb0000 {
+-				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
+-			};
+-
+ 			i2c at 63fc4000 { /* I2C2 */
+ 				status = "okay";
+ 
+diff --git a/arch/arm/boot/dts/imx53-smd.dts b/arch/arm/boot/dts/imx53-smd.dts
+index 0809102..9baef00 100644
+--- a/arch/arm/boot/dts/imx53-smd.dts
++++ b/arch/arm/boot/dts/imx53-smd.dts
+@@ -96,10 +96,6 @@
+ 		};
+ 
+ 		aips at 60000000 {	/* AIPS2 */
+-			sdma at 63fb0000 {
+-				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
+-			};
+-
+ 			i2c at 63fc4000 { /* I2C2 */
+ 				status = "okay";
+ 
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index dc00c62..81abfad 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -277,6 +277,7 @@
+ 				compatible = "fsl,imx53-sdma", "fsl,imx35-sdma";
+ 				reg = <0x63fb0000 0x4000>;
+ 				interrupts = <6>;
++				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
+ 			};
+ 
+ 			cspi at 63fc0000 {
+-- 
+1.7.1
