@@ -1,23 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Aug 2012 15:06:24 +0000
-Subject: [PATCH 09/11] regulator/twl: remove fixed resource handling
-In-Reply-To: <20120808145018.GD24328@opensource.wolfsonmicro.com>
+From: sr@denx.de (Stefan Roese)
+Date: Wed, 08 Aug 2012 17:07:21 +0200
+Subject: [PATCH 07/11] net/stmmac: mark probe function as __devinit
+In-Reply-To: <1344437248-20560-8-git-send-email-arnd@arndb.de>
 References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
- <1344437248-20560-10-git-send-email-arnd@arndb.de>
- <20120808145018.GD24328@opensource.wolfsonmicro.com>
-Message-ID: <201208081506.24773.arnd@arndb.de>
+ <1344437248-20560-8-git-send-email-arnd@arndb.de>
+Message-ID: <502280A9.5070009@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 August 2012, Mark Brown wrote:
-> On Wed, Aug 08, 2012 at 04:47:26PM +0200, Arnd Bergmann wrote:
-> > The recent patch 0e8e5c34cf "regulator: twl: Remove references to
-> > 32kHz clock from DT bindings" removed the only use of the fake
-> > "CLK32KG" regulator but not the TWL6030_FIXED_RESOURCE and
-> > twl6030_fixed_resource definitions that are unused otherwise.
+On 08/08/2012 04:47 PM, Arnd Bergmann wrote:
+> Driver probe functions are generally __devinit so they will be
+> discarded after initialization for non-hotplug kernels.
+> This was found by a new warning after patch 6a228452d "stmmac: Add
+> device-tree support" adds a new __devinit function that is called
+> from stmmac_pltfr_probe.
 > 
-> I've already got a fix for this in my tree.
+> Without this patch, building socfpga_defconfig results in:
+> 
+> WARNING: drivers/net/ethernet/stmicro/stmmac/stmmac.o(.text+0x5d4c): Section mismatch in reference from the function stmmac_pltfr_probe() to the function .devinit.text:stmmac_probe_config_dt()
+> The function stmmac_pltfr_probe() references
+> the function __devinit stmmac_probe_config_dt().
+> This is often because stmmac_pltfr_probe lacks a __devinit
+> annotation or the annotation of stmmac_probe_config_dt is wrong.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Stefan Roese <sr@denx.de>
+> Cc: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> Cc: David S. Miller <davem@davemloft.net>
+> Cc: netdev at vger.kernel.org
 
-Ok, dropping it here.
+Acked-by: Stefan Roese <sr@denx.de>
 
-	Arnd
+Thanks,
+Stefan
