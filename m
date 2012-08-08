@@ -1,151 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Aug 2012 14:34:55 +0000
-Subject: [PATCH 4/6] ARM: s3c24xx: use new PWM driver
-In-Reply-To: <0b6801cd7567$29be48b0$7d3ada10$%kim@samsung.com>
-References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
- <1344430493-5304-5-git-send-email-arnd@arndb.de>
- <0b6801cd7567$29be48b0$7d3ada10$%kim@samsung.com>
-Message-ID: <201208081434.56198.arnd@arndb.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 08 Aug 2012 17:35:34 +0300
+Subject: [PATCH 04/11] MFD: twl4030-audio: Add DT support
+In-Reply-To: <20120808125252.GR16861@opensource.wolfsonmicro.com>
+References: <1344418887-5262-1-git-send-email-peter.ujfalusi@ti.com>
+ <1344418887-5262-5-git-send-email-peter.ujfalusi@ti.com>
+ <5022529D.3090406@ti.com>
+ <20120808125252.GR16861@opensource.wolfsonmicro.com>
+Message-ID: <50227936.3040701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 August 2012, Kukjin Kim wrote:
+On 08/08/2012 03:52 PM, Mark Brown wrote:
+> On Wed, Aug 08, 2012 at 01:50:53PM +0200, Benoit Cousson wrote:
+> 
+>> That being said, since we do have the clock binding now, maybe we should
+>> create a clock provider at board level for the sys_clk and thus you will
+>> just have to create a phandle to it in your audio description.
+> 
+> Yes, we should be doing this.
 
-> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-> index e249611..d56b0f7 100644
-> --- a/arch/arm/mach-s3c24xx/Kconfig
-> +++ b/arch/arm/mach-s3c24xx/Kconfig
-> @@ -483,7 +483,7 @@ config MACH_NEO1973_GTA02
->  	select I2C
->  	select POWER_SUPPLY
->  	select MACH_NEO1973
-> -	select S3C2410_PWM
-> +	select S3C24XX_PWM
->  	select S3C_DEV_USB_HOST
->  	help
->  	   Say Y here if you are using the Openmoko GTA02 / Freerunner GSM
-> Phone
-> @@ -493,7 +493,7 @@ config MACH_RX1950
->  	select S3C24XX_DCLK
->  	select PM_H1940 if PM
->  	select I2C
-> -	select S3C2410_PWM
-> +	select S3C24XX_PWM
->  	select S3C_DEV_NAND
->  	select S3C2410_IOTIMING if S3C2440_CPUFREQ
->  	select S3C2440_XTAL_16934400
-> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-> index 7aca31c..dcdfb77 100644
-> --- a/arch/arm/plat-samsung/Kconfig
-> +++ b/arch/arm/plat-samsung/Kconfig
-> @@ -403,7 +403,7 @@ config S5P_DEV_USB_EHCI
->  
->  config S3C24XX_PWM
->  	bool "PWM device support"
-> -	select HAVE_PWM
-> +	select PWM
->  	help
->  	  Support for exporting the PWM timer blocks via the pwm device
->  	  system
-> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> index 8fc3808..c74d055 100644
-> --- a/drivers/pwm/Kconfig
-> +++ b/drivers/pwm/Kconfig
-> @@ -58,14 +58,12 @@ config PWM_PXA
->  	  will be called pwm-pxa.
->  
->  config PWM_SAMSUNG
-> -	tristate "Samsung pwm support"
-> +	bool "Samsung PWM support"
->  	depends on PLAT_SAMSUNG
-> +	default y
->  	help
->  	  Generic PWM framework driver for Samsung.
->  
-> -	  To compile this driver as a module, choose M here: the module
-> -	  will be called pwm-samsung.
-> -
->  config PWM_TEGRA
->  	tristate "NVIDIA Tegra PWM support"
->  	depends on ARCH_TEGRA
+Does this needs the common clock framework on the platform? OMAP3 certainly
+does not have it enabled since it has not been adopted.
 
-This approach has two disadvantages compared to mine:
-
-* When building for the samsung platforms other than rx1950 or gta02,
-  you can no longer have the PWM driver as a loadable module, for no
-  good reason.
-
-* It is still possible to manually disable PWM_SAMSUNG, even on
-  rx1950 and gta02, because the Kconfig symbol is visible.
-
-I've added a "Reported-by: Tushar Behera <tushar.behera@linaro.org>"
-line to my version of the patch, but I would prefer to keep that
-approach. I have also changed the patch to use the S3C24XX_PWM
-symbol because that lets everyone migrate the defconfig files.
-
-Do you want to give this patch some more testing, or should I keep
-it in arm-soc?
-
-	Arnd
----
->From 438b0cf94adb2528bdeeb71314f7be16512ea5b1 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Sat, 4 Aug 2012 07:52:19 +0000
-Subject: [PATCH] ARM: s3c24xx: use new PWM driver
-
-The samsung PWM driver has moved to the new PWM subsystem, which
-changed the Kconfig symbol for that driver, but the rx1950 and
-gta02 boards still uses the old one.
-
-Without this patch, building s3c2410_defconfig results in:
-
-arch/arm/mach-s3c24xx/built-in.o: In function `rx1950_lcd_power':
-arch/arm/mach-s3c24xx/mach-rx1950.c:430: undefined reference to `pwm_config'
-arch/arm/mach-s3c24xx/mach-rx1950.c:431: undefined reference to `pwm_disable'
-arch/arm/mach-s3c24xx/mach-rx1950.c:437: undefined reference to `pwm_config'
-arch/arm/mach-s3c24xx/mach-rx1950.c:438: undefined reference to `pwm_enable'
-arch/arm/mach-s3c24xx/built-in.o: In function `rx1950_backlight_exit':
-arch/arm/mach-s3c24xx/mach-rx1950.c:504: undefined reference to `pwm_free'
-arch/arm/mach-s3c24xx/built-in.o: In function `rx1950_backlight_init':
-arch/arm/mach-s3c24xx/mach-rx1950.c:487: undefined reference to `pwm_request'
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Reported-by: Tushar Behera <tushar.behera@linaro.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index e249611..d56b0f7 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -483,7 +483,7 @@ config MACH_NEO1973_GTA02
- 	select I2C
- 	select POWER_SUPPLY
- 	select MACH_NEO1973
--	select S3C2410_PWM
-+	select S3C24XX_PWM
- 	select S3C_DEV_USB_HOST
- 	help
- 	   Say Y here if you are using the Openmoko GTA02 / Freerunner GSM Phone
-@@ -493,7 +493,7 @@ config MACH_RX1950
- 	select S3C24XX_DCLK
- 	select PM_H1940 if PM
- 	select I2C
--	select S3C2410_PWM
-+	select S3C24XX_PWM
- 	select S3C_DEV_NAND
- 	select S3C2410_IOTIMING if S3C2440_CPUFREQ
- 	select S3C2440_XTAL_16934400
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index 7aca31c..9c3b90c 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -403,7 +403,8 @@ config S5P_DEV_USB_EHCI
- 
- config S3C24XX_PWM
- 	bool "PWM device support"
--	select HAVE_PWM
-+	select PWM
-+	select PWM_SAMSUNG
- 	help
- 	  Support for exporting the PWM timer blocks via the pwm device
- 	  system
+-- 
+P?ter
