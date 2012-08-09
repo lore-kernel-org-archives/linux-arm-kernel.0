@@ -1,22 +1,165 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 09 Aug 2012 13:21:43 +0300
-Subject: [PATCH 3/4] ARM: OMAP3: Switch to use the unified audio driver
- (omap-twl4030) for selected boards
-In-Reply-To: <50226444.4060100@compulab.co.il>
-References: <1344419650-5389-1-git-send-email-peter.ujfalusi@ti.com>
- <1344419650-5389-4-git-send-email-peter.ujfalusi@ti.com>
- <50225A84.5010008@compulab.co.il> <50225BB5.3000407@ti.com>
- <50226444.4060100@compulab.co.il>
-Message-ID: <50238F37.2030302@ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 9 Aug 2012 11:24:14 +0100
+Subject: [PATCH 1/2] ARM: build ssi-fiq.S in ARM mode to prevent
+ CONFIG_THUMB2_KERNEL build breakage
+In-Reply-To: <CAKGA1bmUuSZuWDM4QPTxmNR0+=uQ1RbFhw4u-sb9KaSPYwQiVw@mail.gmail.com>
+References: <1344379514-30076-1-git-send-email-matt@genesi-usa.com>
+ <1344379514-30076-2-git-send-email-matt@genesi-usa.com>
+ <20120808065502.GI1451@pengutronix.de>
+ <CAKGA1bmUuSZuWDM4QPTxmNR0+=uQ1RbFhw4u-sb9KaSPYwQiVw@mail.gmail.com>
+Message-ID: <20120809102414.GA17588@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2012 04:06 PM, Igor Grinberg wrote:
-> Well, yes I know we will need to adjust the user space.
-> I wanted to change that for a long time and did not get to it...
-> Now, with your patches, it seems like the best time for doing this.
+On Wed, Aug 08, 2012 at 12:32:39PM -0500, Matt Sealey wrote:
 
-Done for the v2. You will have card named "cm-t3x".
+[...]
+ 
+> I'm going to do a trapse through and find where Russell nacked Dave's
+> thumb-aware
+> rewrite.. would you mind if you have any of these boards seeing if it
+> really DOES
 
--- 
-P?ter
+There was no NAK because I didn't get as far as posting the patch,
+mostly because of the doubt about whether this code is ever relevant
+on Thumb2-capable hardware.
+
+If somebody with some old imx hardware that definitely relies on this
+wants to pick it up and test it, it might still be useful.
+
+I don't know whether I still have the original patch, but I think the
+only think I did was to swap the roles of r13 and r12.  In the original
+code r12 is only used as a base register, which is permissible usage
+for r13 in Thumb-2.  Those two registers appear private to the fiq
+handler, so I don't think the change will break anything, but I'd be
+more confident is somebody is able to test it.
+
+Cheers
+---Dave
+
+diff --git a/arch/arm/plat-mxc/ssi-fiq.S b/arch/arm/plat-mxc/ssi-fiq.S
+index 8397a2d..3589afb 100644
+--- a/arch/arm/plat-mxc/ssi-fiq.S
++++ b/arch/arm/plat-mxc/ssi-fiq.S
+@@ -35,19 +35,19 @@
+ 		.global imx_ssi_fiq_tx_buffer
+ 
+ imx_ssi_fiq_start:
+-		ldr r12, imx_ssi_fiq_base
++		ldr r13, imx_ssi_fiq_base
+ 
+ 		/* TX */
+ 		ldr r11, imx_ssi_fiq_tx_buffer
+ 
+ 		/* shall we send? */
+-		ldr r13, [r12, #SSI_SIER]
+-		tst r13, #SSI_SIER_TFE0_EN
++		ldr r12, [r13, #SSI_SIER]
++		tst r12, #SSI_SIER_TFE0_EN
+ 		beq 1f
+ 
+ 		/* TX FIFO empty? */
+-		ldr r13, [r12, #SSI_SISR]
+-		tst r13, #SSI_SISR_TFE0
++		ldr r12, [r13, #SSI_SISR]
++		tst r12, #SSI_SISR_TFE0
+ 		beq 1f
+ 
+ 		mov r10, #0x10000
+@@ -56,34 +56,34 @@ imx_ssi_fiq_start:
+ 
+ 		add r11, r11, r10
+ 
+-		ldrh r13, [r11]
+-		strh r13, [r12, #SSI_STX0]
++		ldrh r12, [r11]
++		strh r12, [r13, #SSI_STX0]
+ 
+-		ldrh r13, [r11, #2]
+-		strh r13, [r12, #SSI_STX0]
++		ldrh r12, [r11, #2]
++		strh r12, [r13, #SSI_STX0]
+ 
+-		ldrh r13, [r11, #4]
+-		strh r13, [r12, #SSI_STX0]
++		ldrh r12, [r11, #4]
++		strh r12, [r13, #SSI_STX0]
+ 
+-		ldrh r13, [r11, #6]
+-		strh r13, [r12, #SSI_STX0]
++		ldrh r12, [r11, #6]
++		strh r12, [r13, #SSI_STX0]
+ 
+ 		add r10, #8
+-		lsr r13, r8, #16	/* r13: buffer size */
+-		cmp r10, r13
+-		lslgt r8, r13, #16
++		lsr r12, r8, #16	/* r12: buffer size */
++		cmp r10, r12
++		lslgt r8, r12, #16
+ 		addle r8, #8
+ 1:
+ 		/* RX */
+ 
+ 		/* shall we receive? */
+-		ldr r13, [r12, #SSI_SIER]
+-		tst r13, #SSI_SIER_RFF0_EN
++		ldr r12, [r13, #SSI_SIER]
++		tst r12, #SSI_SIER_RFF0_EN
+ 		beq 1f
+ 
+ 		/* RX FIFO full? */
+-		ldr r13, [r12, #SSI_SISR]
+-		tst r13, #SSI_SISR_RFF0
++		ldr r12, [r13, #SSI_SISR]
++		tst r12, #SSI_SISR_RFF0
+ 		beq 1f
+ 
+ 		ldr r11, imx_ssi_fiq_rx_buffer
+@@ -94,31 +94,31 @@ imx_ssi_fiq_start:
+ 
+ 		add r11, r11, r10
+ 
+-		ldr r13, [r12, #SSI_SACNT]
+-		tst r13, #SSI_SACNT_AC97EN
++		ldr r12, [r13, #SSI_SACNT]
++		tst r12, #SSI_SACNT_AC97EN
+ 
+-		ldr r13, [r12, #SSI_SRX0]
+-		strh r13, [r11]
++		ldr r12, [r13, #SSI_SRX0]
++		strh r12, [r11]
+ 
+-		ldr r13, [r12, #SSI_SRX0]
+-		strh r13, [r11, #2]
++		ldr r12, [r13, #SSI_SRX0]
++		strh r12, [r11, #2]
+ 
+ 		/* dummy read to skip slot 12 */
+-		ldrne r13, [r12, #SSI_SRX0]
++		ldrne r12, [r13, #SSI_SRX0]
+ 
+-		ldr r13, [r12, #SSI_SRX0]
+-		strh r13, [r11, #4]
++		ldr r12, [r13, #SSI_SRX0]
++		strh r12, [r11, #4]
+ 
+-		ldr r13, [r12, #SSI_SRX0]
+-		strh r13, [r11, #6]
++		ldr r12, [r13, #SSI_SRX0]
++		strh r12, [r11, #6]
+ 
+ 		/* dummy read to skip slot 12 */
+-		ldrne r13, [r12, #SSI_SRX0]
++		ldrne r12, [r13, #SSI_SRX0]
+ 
+ 		add r10, #8
+-		lsr r13, r9, #16	/* r13: buffer size */
+-		cmp r10, r13
+-		lslgt r9, r13, #16
++		lsr r12, r9, #16	/* r12: buffer size */
++		cmp r10, r12
++		lslgt r9, r12, #16
+ 		addle r9, #8
+ 
+ 1:
