@@ -1,62 +1,34 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 09 Aug 2012 14:09:02 -0400 (EDT)
-Subject: RFC: mutex: hung tasks on SMP platforms with
- asm-generic/mutex-xchg.h
-In-Reply-To: <20120809175019.GE18486@mudshark.cambridge.arm.com>
-References: <20120807115647.GA12828@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1208090029460.5231@xanadu.home>
- <20120809144953.GC18486@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1208091201380.5231@xanadu.home>
- <alpine.LFD.2.02.1208091243080.5231@xanadu.home>
- <20120809175019.GE18486@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1208091405340.5231@xanadu.home>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 9 Aug 2012 11:11:12 -0700
+Subject: [PATCH 2/2] msm: io: Change the default static iomappings to be
+ shared
+In-Reply-To: <1343696061-11445-1-git-send-email-rvaswani@codeaurora.org>
+References: <1343696061-11445-1-git-send-email-rvaswani@codeaurora.org>
+Message-ID: <20120809181112.GA24633@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Aug 2012, Will Deacon wrote:
-
-> On Thu, Aug 09, 2012 at 05:57:33PM +0100, Nicolas Pitre wrote:
-> > On Thu, 9 Aug 2012, Nicolas Pitre wrote:
-> > > Yes, that looks fine.  I'd remove that if (prev < 0) entirely though.  
-> > > We'll just swap a 0 for a 0 if the count wasn't < 0, or a 0 for a 1 if 
-> > > the mutex just got unlocked which is also fine.  This is especially 
-> > > beneficial when a native xchg processor instruction is used.
-> > 
-> > In fact, this suggestion isn't entirely correct either. The inner xchg 
-> > in this case should be -1 and not 'count'.  If 'count' is 0 and the 
-> > mutex becomes contended in the small window between the two xchg's then 
-> > the contention mark would be lost again.
-> > 
-> > In other words, I think this should look like this:
-> > 
-> > diff --git a/include/asm-generic/mutex-xchg.h b/include/asm-generic/mutex-xchg.h
-> > index 580a6d35c7..44a66c99c8 100644
-> > --- a/include/asm-generic/mutex-xchg.h
-> > +++ b/include/asm-generic/mutex-xchg.h
-> > @@ -25,8 +25,11 @@
-> >  static inline void
-> >  __mutex_fastpath_lock(atomic_t *count, void (*fail_fn)(atomic_t *))
-> >  {
-> > -	if (unlikely(atomic_xchg(count, 0) != 1))
-> > -		fail_fn(count);
-> > +	if (unlikely(atomic_xchg(count, 0) != 1)) {
-> > +		/* Mark lock contention explicitly */
-> > +		if (likely(atomic_xchg(count, -1) != 1))
-> > +			fail_fn(count);
-> > +	}
-> >  }
-> >  
-> >  /**
+On Mon, Jul 30, 2012 at 05:54:21PM -0700, Rohit Vaswani wrote:
+> With 3.4 kernel the static iomappings can be shared with the ioremap
+> mappings. If ioremap is called with an address for which a static
+> mapping already exists, then that mapping should be used instead
+> of creating a new one.
+> However, the MT_DEVICE_NONSHARED flag prevents this. Hence, get rid
+> of this flag. Some targets (7X00) that require the static iomappings
+> to be NONSHARED use the MSM_DEVICE_TYPE and MSM_CHIP_DEVICE_TYPE macros.
 > 
-> Doesn't this mean that we're no longer just swapping 0 for a 0 if the lock
-> was taken, therefore needlessly sending the current owner down the slowpath
-> on unlock?
+> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
+> ---
+>  arch/arm/mach-msm/io.c |   25 +++++++++++++++++--------
+>  1 files changed, 17 insertions(+), 8 deletions(-)
 
-If the lock was taken, this means the count was either 0 or -1.  If it 
-was 1 then we just put a 0 there and we own it.  But if the cound was 0 
-then we should store -1 instead, which is what the inner xchg does.  If 
-the count was already -1 then we store -1 back.  That more closely mimic 
-what the atomic dec does which is what we want.
+I don't seem to be able to find a tree that this change applies to.
+Can you apply this patch to a recent kernel tree (v3.5 is good), and
+resend.
 
+Thanks,
+David
 
-Nicolas
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
