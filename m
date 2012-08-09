@@ -1,50 +1,53 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 9 Aug 2012 18:36:28 +0100
-Subject: The curse of EPROBE_DEFER
-In-Reply-To: <20120809163105.GU18957@n2100.arm.linux.org.uk>
-References: <20120809163105.GU18957@n2100.arm.linux.org.uk>
-Message-ID: <20120809173628.GY24328@opensource.wolfsonmicro.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 9 Aug 2012 18:50:20 +0100
+Subject: RFC: mutex: hung tasks on SMP platforms with
+ asm-generic/mutex-xchg.h
+In-Reply-To: <alpine.LFD.2.02.1208091243080.5231@xanadu.home>
+References: <20120807115647.GA12828@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1208090029460.5231@xanadu.home>
+ <20120809144953.GC18486@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1208091201380.5231@xanadu.home>
+ <alpine.LFD.2.02.1208091243080.5231@xanadu.home>
+Message-ID: <20120809175019.GE18486@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 09, 2012 at 05:31:05PM +0100, Russell King - ARM Linux wrote:
+On Thu, Aug 09, 2012 at 05:57:33PM +0100, Nicolas Pitre wrote:
+> On Thu, 9 Aug 2012, Nicolas Pitre wrote:
+> > Yes, that looks fine.  I'd remove that if (prev < 0) entirely though.  
+> > We'll just swap a 0 for a 0 if the count wasn't < 0, or a 0 for a 1 if 
+> > the mutex just got unlocked which is also fine.  This is especially 
+> > beneficial when a native xchg processor instruction is used.
+> 
+> In fact, this suggestion isn't entirely correct either. The inner xchg 
+> in this case should be -1 and not 'count'.  If 'count' is 0 and the 
+> mutex becomes contended in the small window between the two xchg's then 
+> the contention mark would be lost again.
+> 
+> In other words, I think this should look like this:
+> 
+> diff --git a/include/asm-generic/mutex-xchg.h b/include/asm-generic/mutex-xchg.h
+> index 580a6d35c7..44a66c99c8 100644
+> --- a/include/asm-generic/mutex-xchg.h
+> +++ b/include/asm-generic/mutex-xchg.h
+> @@ -25,8 +25,11 @@
+>  static inline void
+>  __mutex_fastpath_lock(atomic_t *count, void (*fail_fn)(atomic_t *))
+>  {
+> -	if (unlikely(atomic_xchg(count, 0) != 1))
+> -		fail_fn(count);
+> +	if (unlikely(atomic_xchg(count, 0) != 1)) {
+> +		/* Mark lock contention explicitly */
+> +		if (likely(atomic_xchg(count, -1) != 1))
+> +			fail_fn(count);
+> +	}
+>  }
+>  
+>  /**
 
-> Okay, so we have this wonderful new feature called EPROBE_DEFER.  I
-> had in the back of my mind while at the meetup in Prague where this
-> was discussed that it would cause problems... of the type I'm now
-> having, which is:
+Doesn't this mean that we're no longer just swapping 0 for a 0 if the lock
+was taken, therefore needlessly sending the current owner down the slowpath
+on unlock? If we have the explicit test, that doesn't happen and the
+disassembly isn't much different (an additional cmp/conditional branch).
 
-Well, it's not really an issue in probe deferral per se - it's an issue
-in ASoC and something we have to watch out for in other users.
-
-> soc-audio soc-audio: Failed to register card
-
-This is bitrot, should be killed.  It was a bit more useful with our
-custom deferred probe but since we routinely fail it's completely
-useless now, as you say we need more specific logging.
-
-> repeated many times in the kernel messages, but there's _zero_ clue
-> as to why, and unless I enable debugging in sound/soc through a kernel
-> rebuild, there's little chance of finding out.
-
-There's also the option of doing a contrast and compare between the card
-definition and the lists of registered things in debugfs but that's
-obviously not something we should expect the general audience to work
-with.
-
-> This is idiotic, and fragile, and completely mad.  If we're going to
-> have EPROBE_DEFER at least have the curtesy to your users to say *why*
-> you're failing the probe, and *not* at the (by default) invisible debug
-> level.  I mean, saying that the probe failed but not saying *why* is
-> utterly stupid.
-
-The reason that the log messages are debug level is that back when
-nobody though probe deferral would ever be useful people complained
-about the log spam from probe deferral and didn't want to know that
-anyone might need it.  Obviously this no longer applies - not only do we
-now have probe deferral in the core but it's chatty anyway so we may as
-well add some diagnostic information on top of it.
-
-Anyway, thanks for noticing this.  I've just upgraded the severity of
-all the logs from probe deferral to dev_err(), a patch should show up on
-the list and in -next tomorrow or the day after.
+Will
