@@ -1,30 +1,22 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 9 Aug 2012 11:19:47 +0100
-Subject: [PATCH] efikamx: reintroduce Genesi Efika MX Smarttop via
- device tree
-In-Reply-To: <1344375978-29981-1-git-send-email-matt@genesi-usa.com>
-References: <1344375978-29981-1-git-send-email-matt@genesi-usa.com>
-Message-ID: <20120809101947.GA8474@sirena.org.uk>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 09 Aug 2012 13:21:43 +0300
+Subject: [PATCH 3/4] ARM: OMAP3: Switch to use the unified audio driver
+ (omap-twl4030) for selected boards
+In-Reply-To: <50226444.4060100@compulab.co.il>
+References: <1344419650-5389-1-git-send-email-peter.ujfalusi@ti.com>
+ <1344419650-5389-4-git-send-email-peter.ujfalusi@ti.com>
+ <50225A84.5010008@compulab.co.il> <50225BB5.3000407@ti.com>
+ <50226444.4060100@compulab.co.il>
+Message-ID: <50238F37.2030302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 07, 2012 at 04:46:18PM -0500, Matt Sealey wrote:
+On 08/08/2012 04:06 PM, Igor Grinberg wrote:
+> Well, yes I know we will need to adjust the user space.
+> I wanted to change that for a long time and did not get to it...
+> Now, with your patches, it seems like the best time for doing this.
 
-Yay for indentation!  It'd be good to rewrite your DT so you could cut
-down on that, at the minute it's not good for legibility.
+Done for the v2. You will have card named "cm-t3x".
 
-> +							sw1_reg: sw1 {
-> +								regulator-min-microvolt = <600000>;
-> +								regulator-max-microvolt = <1375000>;
-> +								regulator-boot-on;
-> +								regulator-always-on;
-> +							};
-
-This and many of your other regulators have voltage ranges specified but
-no consumers which doesn't make sense.  It looks awfully like you've
-just typed in the maximum range supported by the regulator which is most
-likely broken.
-
-You're also specifying both boot_on and always_on which again doesn't
-seem to make a lot of sense - boot_on mainly exists to help autoprobe,
-using it quite this routinely isn't too clever.
+-- 
+P?ter
