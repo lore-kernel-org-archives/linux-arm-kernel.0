@@ -1,81 +1,35 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 09 Aug 2012 12:57:33 -0400 (EDT)
-Subject: RFC: mutex: hung tasks on SMP platforms with
- asm-generic/mutex-xchg.h
-In-Reply-To: <alpine.LFD.2.02.1208091201380.5231@xanadu.home>
-References: <20120807115647.GA12828@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1208090029460.5231@xanadu.home>
- <20120809144953.GC18486@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1208091201380.5231@xanadu.home>
-Message-ID: <alpine.LFD.2.02.1208091243080.5231@xanadu.home>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Thu, 9 Aug 2012 12:54:24 -0400
+Subject: [PATCH v2 10/23] xen/arm: compile and run xenbus
+In-Reply-To: <alpine.DEB.2.02.1208081836050.21096@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1208061428060.4645@kaball.uk.xensource.com>
+ <1344263246-28036-10-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120807182157.GN15053@phenom.dumpdata.com>
+ <50216228.7010407@tycho.nsa.gov>
+ <alpine.DEB.2.02.1208081743430.21096@kaball.uk.xensource.com>
+ <50229B70.3090507@tycho.nsa.gov>
+ <alpine.DEB.2.02.1208081805520.21096@kaball.uk.xensource.com>
+ <5022A303.709@tycho.nsa.gov>
+ <alpine.DEB.2.02.1208081836050.21096@kaball.uk.xensource.com>
+Message-ID: <20120809165424.GA7220@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Aug 2012, Nicolas Pitre wrote:
-
-> On Thu, 9 Aug 2012, Will Deacon wrote:
+> > Right, the original patch didn't break anything with PV domains. The case
+> > it doesn't handle is an HVM initial domain with an already-running
+> > Xenstore domain; I think this applies both to ARM and hybrid/PVH on x86.
+> > In that case, usage would be set to LOCAL instead of HVM.
 > 
-> > I think we could actually fix this entirely in mutex-xchg.h by doing
-> > something in fastpath_lock similar to what we do for trylock:
-> > 
-> > 
-> > diff --git a/include/asm-generic/mutex-xchg.h b/include/asm-generic/mutex-xchg.h
-> > index 580a6d3..c082e99 100644
-> > --- a/include/asm-generic/mutex-xchg.h
-> > +++ b/include/asm-generic/mutex-xchg.h
-> > @@ -25,8 +25,19 @@
-> >  static inline void
-> >  __mutex_fastpath_lock(atomic_t *count, void (*fail_fn)(atomic_t *))
-> >  {
-> > -       if (unlikely(atomic_xchg(count, 0) != 1))
-> > -               fail_fn(count);
-> > +       int prev = atomic_xchg(count, 0);
-> > +
-> > +       if (unlikely(prev != 1)) {
-> > +               if (prev < 0)
-> > +                       /*
-> > +                        * The lock was contended, so we need to restore
-> > +                        * its original state to ensure that any waiting
-> > +                        * tasks are woken up by the unlock slow path.
-> > +                        */
-> > +                       prev = atomic_xchg(count, prev);
-> > +               if (prev != 1)
-> > +                       fail_fn(count);
-> > +       }
-> >  }
-> > 
-> > What do you reckon?
 > 
-> Yes, that looks fine.  I'd remove that if (prev < 0) entirely though.  
-> We'll just swap a 0 for a 0 if the count wasn't < 0, or a 0 for a 1 if 
-> the mutex just got unlocked which is also fine.  This is especially 
-> beneficial when a native xchg processor instruction is used.
+> Right, however if I am not mistaken there is no such thing as an HVM
+> dom0 right now on x86 and hybrid/PVH is probably going to return true on
+> xen_pv_domain() and false on xen_hvm_domain().
 
-In fact, this suggestion isn't entirely correct either. The inner xchg 
-in this case should be -1 and not 'count'.  If 'count' is 0 and the 
-mutex becomes contended in the small window between the two xchg's then 
-the contention mark would be lost again.
+The other way around.  HVM = true, PV = false.
 
-In other words, I think this should look like this:
-
-diff --git a/include/asm-generic/mutex-xchg.h b/include/asm-generic/mutex-xchg.h
-index 580a6d35c7..44a66c99c8 100644
---- a/include/asm-generic/mutex-xchg.h
-+++ b/include/asm-generic/mutex-xchg.h
-@@ -25,8 +25,11 @@
- static inline void
- __mutex_fastpath_lock(atomic_t *count, void (*fail_fn)(atomic_t *))
- {
--	if (unlikely(atomic_xchg(count, 0) != 1))
--		fail_fn(count);
-+	if (unlikely(atomic_xchg(count, 0) != 1)) {
-+		/* Mark lock contention explicitly */
-+		if (likely(atomic_xchg(count, -1) != 1))
-+			fail_fn(count);
-+	}
- }
- 
- /**
-
-
-Nicolas
+Mukesh, correct me if I am wrong pls.
+> 
+> In the ARM case, given that we don't have a start_info page, we would
+> need another way to figure out whether a xenstore stub domain is already
+> running, so I think we can just postpone the solution of that problem
+> for now.
