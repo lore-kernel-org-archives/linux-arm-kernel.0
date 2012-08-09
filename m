@@ -1,42 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  9 Aug 2012 16:53:48 +0100
-Subject: [PATCH 1/8] of/irq: Create stub for of_irq_find_parent when !CONFIG_OF
+Date: Thu,  9 Aug 2012 16:53:50 +0100
+Subject: [PATCH 3/8] ARM: ux500: Identify the PRCMU as an interrupt controller
 In-Reply-To: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
 References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1344527635-6163-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1344527635-6163-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_irq_find_parent is a handy function to use outside the confines of
-the Open Firmware subsystem. One such use-case is when the IRQ Domain
-wishes to find an IRQ domain for a given device node. Currently it can
-not take any notice of the 'interrupt-parent' property. Instead it
-just uses the first IRQ controller as it climbs the Device Tree. If
-we were to use this as a precursor the resultant controller is more
-likely to be correct.
+We're just about to provide the DB8500-PRCMU with its own IRQ domain,
+so that its subordinate drivers can use it as an interrupt controller.
+It's obligatory for all IRQ controllers to reference themselves as
+such from its own node in Device Tree. This patch does just that.
 
-CC: Rob Herring <rob.herring@calxeda.com>
-CC: devicetree-discuss at lists.ozlabs.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- include/linux/of_irq.h |    5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/dbx5x0.dtsi |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
-index 1717cd9..b8e2411 100644
---- a/include/linux/of_irq.h
-+++ b/include/linux/of_irq.h
-@@ -83,6 +83,11 @@ static inline unsigned int irq_of_parse_and_map(struct device_node *dev,
- {
- 	return 0;
- }
-+
-+static inline void *of_irq_find_parent(struct device_node *child)
-+{
-+	return NULL;
-+}
- #endif /* !CONFIG_OF */
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index 32e063d..6da7ccb 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -194,6 +194,8 @@
+ 			interrupts = <0 47 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			ranges;
  
- #endif /* __OF_IRQ_H */
+ 			prcmu-timer-4 at 80157450 {
 -- 
 1.7.9.5
