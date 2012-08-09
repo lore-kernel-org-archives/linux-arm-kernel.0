@@ -1,31 +1,57 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu,  9 Aug 2012 15:35:33 +0200
-Subject: [PATCH] ARM: imx/imx31-dt: drop selecting USE_OF
-Message-ID: <1344519333-6446-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Thu, 9 Aug 2012 08:40:36 -0500
+Subject: [PATCH] efikamx: reintroduce Genesi Efika MX Smarttop via device
+ tree
+In-Reply-To: <20120809101947.GA8474@sirena.org.uk>
+References: <1344375978-29981-1-git-send-email-matt@genesi-usa.com>
+ <20120809101947.GA8474@sirena.org.uk>
+Message-ID: <CAKGA1bkT2GDXXXAgjG4ySfTxwO=4O7o30BLzLHCMZKDrR318xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-since commit
-	3e62af8 (ARM: imx: select USE_OF)
-ARM_MXC already selects USE_OF, so there is no need to repeat it for
-MACH_IMX31_DT
+On Thu, Aug 9, 2012 at 5:19 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Aug 07, 2012 at 04:46:18PM -0500, Matt Sealey wrote:
+>
+> Yay for indentation!  It'd be good to rewrite your DT so you could cut
+> down on that, at the minute it's not good for legibility.
+>
+>> +                                                     sw1_reg: sw1 {
+>> +                                                             regulator-min-microvolt = <600000>;
+>> +                                                             regulator-max-microvolt = <1375000>;
+>> +                                                             regulator-boot-on;
+>> +                                                             regulator-always-on;
+>> +                                                     };
+>
+> This and many of your other regulators have voltage ranges specified but
+> no consumers which doesn't make sense.  It looks awfully like you've
+> just typed in the maximum range supported by the regulator which is most
+> likely broken.
+>
+> You're also specifying both boot_on and always_on which again doesn't
+> seem to make a lot of sense - boot_on mainly exists to help autoprobe,
+> using it quite this routinely isn't too clever.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-imx/Kconfig |    1 -
- 1 file changed, 1 deletion(-)
+The reason they're set like that is legacy - that's how they're set up
+in a kernel
+(pre-DT) that we know works. Most of those ranges are directly from the Babbage
+reference and stay like that in the Babbage DT too - so there's another broken
+one nobody noticed. I know what those voltages should be, but we're
+leaving that for another patch that restricts the range of voltages
+(it works right
+now, since there are no consumers, nothing CHANGES the voltages as
+configured at U-Boot time, and anything not boot-on is just not listed
+in the DT anyway, but some of them really need to stay on)
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 419c292..6152a84 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -561,7 +561,6 @@ config MACH_BUG
- config MACH_IMX31_DT
- 	bool "Support i.MX31 platforms from device tree"
- 	select SOC_IMX31
--	select USE_OF
- 	help
- 	  Include support for Freescale i.MX31 based platforms
- 	  using the device tree for discovery.
+There are few consumers because the primary ones out there are the display
+controllers and USB hubs and some other things. MMC should be a consumer
+but since on one board we share two MMC slots with one regulator we don't
+want anyone to change the voltage (it breaks spec anyway, since we can't
+provide more than 3.15V with FSL's PMIC and it should be 3.3V by default)
+and since you can't coordinate between MMC hosts on what the lowest voltage
+both cards can support actually is.. having someone change it would be
+bad.
+
 -- 
-1.7.10.4
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
