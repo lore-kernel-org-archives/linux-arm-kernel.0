@@ -1,92 +1,143 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  9 Aug 2012 16:47:32 +0100
-Subject: [PATCH 06/22] ASoC: Ux500: Enable ux500 MSP driver for Device Tree
+Date: Thu,  9 Aug 2012 16:47:33 +0100
+Subject: [PATCH 07/22] ASoC: Ux500: Initialise PCM from MSP probe rather than
+ as a device
 In-Reply-To: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
 References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1344527268-5964-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <1344527268-5964-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register both parts of the MSP driver from Device Tree so that they
-are probed when Device Tree is enabled. Also, as there is platform
-data involved, we ensure that there is allocated memory to place the
-configuration into and that the correct information is extracted from
-the DT binary.
+The PCM is a pseudo-device. It doesn't have any of it's own registers
+or hardware. It rather acts as a layer of abstraction for DMA
+transfers. Hence, instead of classifying it as a device in its own
+right, we call the initialisation from the MSP driver.
 
 CC: alsa-devel at alsa-project.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- sound/soc/ux500/ux500_msp_dai.c |    6 ++++++
- sound/soc/ux500/ux500_msp_i2s.c |   22 +++++++++++++++++++---
- 2 files changed, 25 insertions(+), 3 deletions(-)
+ sound/soc/ux500/mop500.c        |    4 ++--
+ sound/soc/ux500/ux500_msp_dai.c |   14 +++++++++++++-
+ sound/soc/ux500/ux500_pcm.c     |   19 ++++---------------
+ sound/soc/ux500/ux500_pcm.h     |    3 +++
+ 4 files changed, 22 insertions(+), 18 deletions(-)
 
+diff --git a/sound/soc/ux500/mop500.c b/sound/soc/ux500/mop500.c
+index 6840df7..fe6223a 100644
+--- a/sound/soc/ux500/mop500.c
++++ b/sound/soc/ux500/mop500.c
+@@ -33,7 +33,7 @@ struct snd_soc_dai_link mop500_dai_links[] = {
+ 		.stream_name = "ab8500_0",
+ 		.cpu_dai_name = "ux500-msp-i2s.1",
+ 		.codec_dai_name = "ab8500-codec-dai.0",
+-		.platform_name = "ux500-pcm.0",
++		.platform_name = "ux500-msp-i2s.1",
+ 		.codec_name = "ab8500-codec.0",
+ 		.init = mop500_ab8500_machine_init,
+ 		.ops = mop500_ab8500_ops,
+@@ -43,7 +43,7 @@ struct snd_soc_dai_link mop500_dai_links[] = {
+ 		.stream_name = "ab8500_1",
+ 		.cpu_dai_name = "ux500-msp-i2s.3",
+ 		.codec_dai_name = "ab8500-codec-dai.1",
+-		.platform_name = "ux500-pcm.0",
++		.platform_name = "ux500-msp-i2s.3",
+ 		.codec_name = "ab8500-codec.0",
+ 		.init = NULL,
+ 		.ops = mop500_ab8500_ops,
 diff --git a/sound/soc/ux500/ux500_msp_dai.c b/sound/soc/ux500/ux500_msp_dai.c
-index 772cb19..0f7dd49 100644
+index 0f7dd49..3476d6a 100644
 --- a/sound/soc/ux500/ux500_msp_dai.c
 +++ b/sound/soc/ux500/ux500_msp_dai.c
-@@ -833,10 +833,16 @@ static int __devexit ux500_msp_drv_remove(struct platform_device *pdev)
+@@ -28,6 +28,7 @@
+ 
+ #include "ux500_msp_i2s.h"
+ #include "ux500_msp_dai.h"
++#include "ux500_pcm.h"
+ 
+ static int setup_pcm_multichan(struct snd_soc_dai *dai,
+ 			struct ux500_msp_config *msp_config)
+@@ -806,11 +807,20 @@ static int __devinit ux500_msp_drv_probe(struct platform_device *pdev)
+ 		goto err_init_msp;
+ 	}
+ 
++	ret = ux500_pcm_register_platform(pdev);
++	if (ret < 0) {
++		dev_err(&pdev->dev,
++			"Error: %s: Failed to register PCM platform device!\n",
++			__func__);
++		goto err_reg_plat;
++	}
++
+ 	return 0;
+ 
++err_reg_plat:
++	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(ux500_msp_dai_drv));
+ err_init_msp:
+ 	clk_put(drvdata->clk);
+-
+ err_clk:
+ 	devm_regulator_put(drvdata->reg_vape);
+ 
+@@ -821,6 +831,8 @@ static int __devexit ux500_msp_drv_remove(struct platform_device *pdev)
+ {
+ 	struct ux500_msp_i2s_drvdata *drvdata = dev_get_drvdata(&pdev->dev);
+ 
++	ux500_pcm_unregister_platform(pdev);
++
+ 	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(ux500_msp_dai_drv));
+ 
+ 	devm_regulator_put(drvdata->reg_vape);
+diff --git a/sound/soc/ux500/ux500_pcm.c b/sound/soc/ux500/ux500_pcm.c
+index 1a04e24..894c9f4 100644
+--- a/sound/soc/ux500/ux500_pcm.c
++++ b/sound/soc/ux500/ux500_pcm.c
+@@ -282,7 +282,7 @@ static struct snd_soc_platform_driver ux500_pcm_soc_drv = {
+ 	.pcm_new        = ux500_pcm_new,
+ };
+ 
+-static int __devexit ux500_pcm_drv_probe(struct platform_device *pdev)
++int __devinit ux500_pcm_register_platform(struct platform_device *pdev)
+ {
+ 	int ret;
+ 
+@@ -296,23 +296,12 @@ static int __devexit ux500_pcm_drv_probe(struct platform_device *pdev)
+ 
  	return 0;
  }
++EXPORT_SYMBOL_GPL(ux500_pcm_register_platform);
  
-+static const struct of_device_id ux500_msp_i2c_match[] = {
-+	{ .compatible = "stericsson,ux500-msp-i2s", },
-+	{},
-+};
-+
- static struct platform_driver msp_i2s_driver = {
- 	.driver = {
- 		.name = "ux500-msp-i2s",
- 		.owner = THIS_MODULE,
-+		.of_match_table = ux500_msp_i2c_match,
- 	},
- 	.probe = ux500_msp_drv_probe,
- 	.remove = ux500_msp_drv_remove,
-diff --git a/sound/soc/ux500/ux500_msp_i2s.c b/sound/soc/ux500/ux500_msp_i2s.c
-index 2cbfc54..5e0bf8c 100644
---- a/sound/soc/ux500/ux500_msp_i2s.c
-+++ b/sound/soc/ux500/ux500_msp_i2s.c
-@@ -18,6 +18,7 @@
- #include <linux/pinctrl/consumer.h>
- #include <linux/delay.h>
- #include <linux/slab.h>
-+#include <linux/of.h>
+-static int __devinit ux500_pcm_drv_remove(struct platform_device *pdev)
++int __devexit ux500_pcm_unregister_platform(struct platform_device *pdev)
+ {
+ 	snd_soc_unregister_platform(&pdev->dev);
  
- #include <mach/hardware.h>
- #include <mach/msp.h>
-@@ -692,16 +693,31 @@ int ux500_msp_i2s_init_msp(struct platform_device *pdev,
- 	int ret = 0;
- 	struct resource *res = NULL;
- 	struct i2s_controller *i2s_cont;
-+	struct device_node *np = pdev->dev.of_node;
- 	struct ux500_msp *msp;
- 
--	dev_dbg(&pdev->dev, "%s: Enter (name: %s, id: %d).\n", __func__,
--		pdev->name, platform_data->id);
+ 	return 0;
+ }
 -
- 	*msp_p = devm_kzalloc(&pdev->dev, sizeof(struct ux500_msp), GFP_KERNEL);
- 	msp = *msp_p;
- 	if (!msp)
- 		return -ENOMEM;
+-static struct platform_driver ux500_pcm_driver = {
+-	.driver = {
+-		.name = "ux500-pcm",
+-		.owner = THIS_MODULE,
+-	},
+-
+-	.probe = ux500_pcm_drv_probe,
+-	.remove = __devexit_p(ux500_pcm_drv_remove),
+-};
+-module_platform_driver(ux500_pcm_driver);
+-
+-MODULE_LICENSE("GPL v2");
++EXPORT_SYMBOL_GPL(ux500_pcm_unregister_platform);
+diff --git a/sound/soc/ux500/ux500_pcm.h b/sound/soc/ux500/ux500_pcm.h
+index 77ed44d..76d3444 100644
+--- a/sound/soc/ux500/ux500_pcm.h
++++ b/sound/soc/ux500/ux500_pcm.h
+@@ -32,4 +32,7 @@
+ #define UX500_PLATFORM_PERIODS_MAX		48
+ #define UX500_PLATFORM_BUFFER_BYTES_MAX		(2048 * PAGE_SIZE)
  
-+	if (np) {
-+		if (!platform_data) {
-+			platform_data = devm_kzalloc(&pdev->dev,
-+				sizeof(struct msp_i2s_platform_data), GFP_KERNEL);
-+			if (!platform_data)
-+				ret = -ENOMEM;
-+		}
-+	} else
-+		if (!platform_data)
-+			ret = -EINVAL;
++int ux500_pcm_register_platform(struct platform_device *pdev);
++int ux500_pcm_unregister_platform(struct platform_device *pdev);
 +
-+	if (ret)
-+		goto err_res;
-+
-+	dev_dbg(&pdev->dev, "%s: Enter (name: %s, id: %d).\n", __func__,
-+		pdev->name, platform_data->id);
-+
- 	msp->id = platform_data->id;
- 	msp->dev = &pdev->dev;
- 	msp->dma_cfg_rx = platform_data->msp_i2s_dma_rx;
+ #endif
 -- 
 1.7.9.5
