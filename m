@@ -1,37 +1,28 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 9 Aug 2012 21:32:24 +0200
-Subject: [PATCH v2 1/2] cpufreq: OMAP: Handle missing frequency table on
- SMP systems
-In-Reply-To: <87d330glel.fsf@ti.com>
-References: <1344496102-24451-1-git-send-email-rnayak@ti.com>
- <201208091132.14992.rjw@sisk.pl> <87d330glel.fsf@ti.com>
-Message-ID: <201208092132.25141.rjw@sisk.pl>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 9 Aug 2012 20:40:46 +0100
+Subject: [PATCH 00/22] mop500 related Audio reorganisation and fixups
+In-Reply-To: <20120809185029.GC24328@opensource.wolfsonmicro.com>
+References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
+ <20120809185029.GC24328@opensource.wolfsonmicro.com>
+Message-ID: <20120809194044.GA9966@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 09, 2012, Kevin Hilman wrote:
-> "Rafael J. Wysocki" <rjw@sisk.pl> writes:
+On Thu, Aug 09, 2012 at 07:50:29PM +0100, Mark Brown wrote:
+> On Thu, Aug 09, 2012 at 04:47:26PM +0100, Lee Jones wrote:
+> > Another fine instalment of Audio fixes and Device Tree enablement
+> > surrounding the mop500 sound driver. Hopefully containing all of 
+> > the recommendations suggested by Mark Brown.
 > 
-> > On Thursday, August 09, 2012, Rajendra Nayak wrote:
-> >> On OMAP4, if the first CPU fails to get a valid frequency table (this
-> >> could happen if the platform does not register any OPP table), the
-> >> subsequent CPU instances end up dealing with a NULL freq_table and
-> >> crash.
-> >> 
-> >> Check for an already existing freq_table, before trying to create one,
-> >> and increment the freq_table_users only if the table is sucessfully
-> >> created.
-> >> 
-> >> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> >> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >> Cc: <linux-pm@vger.kernel.org>
-> >
-> > Kevin, are you going to merge this?
-> >
-> 
-> Yes, I plan to queue this with 2/2 for v3.6-rc.
+> Can we have some review of this from the ARM side please?  It's pretty
+> big...
 
-If you have any cpufreq patches for v3.7, can you please tell me where to
-pull them from (and when)?
+I don't expect Linus will do anything until he returns back from vacation.
 
-Rafael
+I'll speak to Arnd tomorrow and offer him some kind of liquid refreshment. :)
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
