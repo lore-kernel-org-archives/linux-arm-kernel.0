@@ -1,33 +1,49 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  9 Aug 2012 16:47:26 +0100
-Subject: [PATCH 00/22] mop500 related Audio reorganisation and fixups
-Message-ID: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
+Date: Thu,  9 Aug 2012 16:47:27 +0100
+Subject: [PATCH 01/22] ARM: ux500: Fix merge error,
+ no matching driver name for 'snd_soc_u8500'
+In-Reply-To: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
+References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1344527268-5964-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Another fine instalment of Audio fixes and Device Tree enablement
-surrounding the mop500 sound driver. Hopefully containing all of 
-the recommendations suggested by Mark Brown.
+The platform attempts to register platform device 'snd_soc_u8500'
+which doesn't actually exist. Here we change the reference to the
+correct one 'snd_soc_mop500'.
 
- Documentation/devicetree/bindings/mfd/ab8500.txt   |   15 +
- .../devicetree/bindings/sound/ux500-mop500.txt     |   39 ++
- .../devicetree/bindings/sound/ux500-msp.txt        |   43 ++
- arch/arm/boot/dts/db8500.dtsi                      |  627 ------------------
- arch/arm/boot/dts/dbx5x0.dtsi                      |  666 ++++++++++++++++++++
- arch/arm/boot/dts/snowball.dts                     |   18 +-
- arch/arm/mach-ux500/Makefile                       |    2 +-
- arch/arm/mach-ux500/board-mop500-audio.c           |  189 ++++++
- arch/arm/mach-ux500/board-mop500-msp.c             |  267 --------
- arch/arm/mach-ux500/board-mop500-msp.h             |   14 -
- arch/arm/mach-ux500/board-mop500.c                 |   18 +-
- arch/arm/mach-ux500/board-mop500.h                 |    6 +
- arch/arm/mach-ux500/include/mach/msp.h             |    2 -
- include/linux/mfd/abx500/ab8500-codec.h            |    6 +-
- sound/soc/codecs/ab8500-codec.c                    |   85 +++
- sound/soc/ux500/mop500.c                           |   44 +-
- sound/soc/ux500/ux500_msp_dai.c                    |   20 +-
- sound/soc/ux500/ux500_msp_i2s.c                    |   97 ++-
- sound/soc/ux500/ux500_msp_i2s.h                    |    2 -
- sound/soc/ux500/ux500_pcm.c                        |   19 +-
- sound/soc/ux500/ux500_pcm.h                        |    3 +
- 21 files changed, 1225 insertions(+), 957 deletions(-)
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500-msp.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-ux500/board-mop500-msp.c b/arch/arm/mach-ux500/board-mop500-msp.c
+index 9960480..df15646 100644
+--- a/arch/arm/mach-ux500/board-mop500-msp.c
++++ b/arch/arm/mach-ux500/board-mop500-msp.c
+@@ -191,9 +191,9 @@ static struct platform_device *db8500_add_msp_i2s(struct device *parent,
+ 	return pdev;
+ }
+ 
+-/* Platform device for ASoC U8500 machine */
+-static struct platform_device snd_soc_u8500 = {
+-		.name = "snd-soc-u8500",
++/* Platform device for ASoC MOP500 machine */
++static struct platform_device snd_soc_mop500 = {
++		.name = "snd-soc-mop500",
+ 		.id = 0,
+ 		.dev = {
+ 			.platform_data = NULL,
+@@ -227,8 +227,8 @@ int mop500_msp_init(struct device *parent)
+ {
+ 	struct platform_device *msp1;
+ 
+-	pr_info("%s: Register platform-device 'snd-soc-u8500'.\n", __func__);
+-	platform_device_register(&snd_soc_u8500);
++	pr_info("%s: Register platform-device 'snd-soc-mop500'.\n", __func__);
++	platform_device_register(&snd_soc_mop500);
+ 
+ 	pr_info("Initialize MSP I2S-devices.\n");
+ 	db8500_add_msp_i2s(parent, 0, U8500_MSP0_BASE, IRQ_DB8500_MSP0,
+-- 
+1.7.9.5
