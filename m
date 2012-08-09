@@ -1,72 +1,189 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 9 Aug 2012 10:57:37 +0530
-Subject: [PATCH 1/2] cpufreq: OMAP: Handle missing frequency table on SMP
- systems
-In-Reply-To: <87wr19uwbx.fsf@ti.com>
-References: <1344423254-3475-1-git-send-email-rnayak@ti.com>
- <1344423254-3475-2-git-send-email-rnayak@ti.com>
- <CAMQu2gyooQ4x=ZGDZFg5BuBaEkgQx2kTAvtiGLEjXwOYvF_wMQ@mail.gmail.com>
- <87wr19uwbx.fsf@ti.com>
-Message-ID: <CAMQu2gxo8gdvk1jYx_asw+R7iyE1OAqxaVFbDgJSc0ED_-y9xQ@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 09 Aug 2012 14:31:59 +0900
+Subject: [PATCH 4/6] ARM: s3c24xx: use new PWM driver
+In-Reply-To: <201208081434.56198.arnd@arndb.de>
+References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
+ <1344430493-5304-5-git-send-email-arnd@arndb.de>
+ <0b6801cd7567$29be48b0$7d3ada10$%kim@samsung.com>
+ <201208081434.56198.arnd@arndb.de>
+Message-ID: <0c3901cd75f0$4c26bb60$e4743220$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 8, 2012 at 10:58 PM, Kevin Hilman <khilman@ti.com> wrote:
->
-> "Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
->
-> > On Wed, Aug 8, 2012 at 4:24 PM, Rajendra Nayak <rnayak@ti.com> wrote:
-> >>
-> >> On OMAP4, if the first CPU fails to get a valid frequency table (this
-> >> could happen if the platform does not register any OPP table), the
-> >> subsequent CPU instances end up dealing with a NULL freq_table and
-> >> crash. Add a check for a NULL freq_table to help error the rest
-> >> of the CPU instances out.
-> >>
-> >> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> >> Cc: <linux-pm@vger.kernel.org>
-> >> ---
-> >>  drivers/cpufreq/omap-cpufreq.c |    2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/cpufreq/omap-cpufreq.c
-> >> b/drivers/cpufreq/omap-cpufreq.c
-> >> index 17fa04d..0ee824c 100644
-> >> --- a/drivers/cpufreq/omap-cpufreq.c
-> >> +++ b/drivers/cpufreq/omap-cpufreq.c
-> >> @@ -221,7 +221,7 @@ static int __cpuinit omap_cpu_init(struct
-> >> cpufreq_policy *policy)
-> >>         if (atomic_inc_return(&freq_table_users) == 1)
-> >>                 result = opp_init_cpufreq_table(mpu_dev, &freq_table);
-> >>
-> >> -       if (result) {
-> >> +       if (result || !freq_table) {
-> >>                 dev_err(mpu_dev, "%s: cpu%d: failed creating freq
-> >> table[%d]\n",
-> >>                                 __func__, policy->cpu, result);
-> >>                 goto fail_ck;
+Arnd Bergmann wrote:
+> 
+> On Wednesday 08 August 2012, Kukjin Kim wrote:
+> 
+> > diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-
+> s3c24xx/Kconfig
+> > index e249611..d56b0f7 100644
+> > --- a/arch/arm/mach-s3c24xx/Kconfig
+> > +++ b/arch/arm/mach-s3c24xx/Kconfig
+> > @@ -483,7 +483,7 @@ config MACH_NEO1973_GTA02
+> >  	select I2C
+> >  	select POWER_SUPPLY
+> >  	select MACH_NEO1973
+> > -	select S3C2410_PWM
+> > +	select S3C24XX_PWM
+> >  	select S3C_DEV_USB_HOST
+> >  	help
+> >  	   Say Y here if you are using the Openmoko GTA02 / Freerunner GSM
+> > Phone
+> > @@ -493,7 +493,7 @@ config MACH_RX1950
+> >  	select S3C24XX_DCLK
+> >  	select PM_H1940 if PM
+> >  	select I2C
+> > -	select S3C2410_PWM
+> > +	select S3C24XX_PWM
+> >  	select S3C_DEV_NAND
+> >  	select S3C2410_IOTIMING if S3C2440_CPUFREQ
+> >  	select S3C2440_XTAL_16934400
+> > diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-
+> samsung/Kconfig
+> > index 7aca31c..dcdfb77 100644
+> > --- a/arch/arm/plat-samsung/Kconfig
+> > +++ b/arch/arm/plat-samsung/Kconfig
+> > @@ -403,7 +403,7 @@ config S5P_DEV_USB_EHCI
 > >
-> > The freq_table use count seems to be buggy in that case.
-> > Something like below should fix the issue.
-> > Feel free to update your patch with below if you agree.
+> >  config S3C24XX_PWM
+> >  	bool "PWM device support"
+> > -	select HAVE_PWM
+> > +	select PWM
+> >  	help
+> >  	  Support for exporting the PWM timer blocks via the pwm device
+> >  	  system
+> > diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+> > index 8fc3808..c74d055 100644
+> > --- a/drivers/pwm/Kconfig
+> > +++ b/drivers/pwm/Kconfig
+> > @@ -58,14 +58,12 @@ config PWM_PXA
+> >  	  will be called pwm-pxa.
 > >
-> > diff --git a/drivers/cpufreq/omap-cpufreq.c
-> > b/drivers/cpufreq/omap-cpufreq.c
-> > index 17fa04d..fd97c3d 100644
-> > --- a/drivers/cpufreq/omap-cpufreq.c
-> > +++ b/drivers/cpufreq/omap-cpufreq.c
-> > @@ -218,7 +218,7 @@ static int __cpuinit omap_cpu_init(struct
-> > cpufreq_policy *po
+> >  config PWM_SAMSUNG
+> > -	tristate "Samsung pwm support"
+> > +	bool "Samsung PWM support"
+> >  	depends on PLAT_SAMSUNG
+> > +	default y
+> >  	help
+> >  	  Generic PWM framework driver for Samsung.
 > >
-> >         policy->cur = policy->min = policy->max =
-> > omap_getspeed(policy->cpu);
-> >
-> > -       if (atomic_inc_return(&freq_table_users) == 1)
-> > +       if (freq_table)
->
-> I think you meant 'if (!freq_table)' ?
->
-Right.
+> > -	  To compile this driver as a module, choose M here: the module
+> > -	  will be called pwm-samsung.
+> > -
+> >  config PWM_TEGRA
+> >  	tristate "NVIDIA Tegra PWM support"
+> >  	depends on ARCH_TEGRA
+> 
+> This approach has two disadvantages compared to mine:
+> 
+> * When building for the samsung platforms other than rx1950 or gta02,
+>   you can no longer have the PWM driver as a loadable module, for no
+>   good reason.
+> 
+OK I see, I'm still thinking the PWM driver can be selected in kernel
+menuconfig though.
 
-regards
-Santosh
+My concept is when PWM is selected on Samsung platforms by defconfig or
+manually enabling, PWM_SAMSUNG is selected automatically. In addition,
+current Samsung PWM driver cannot support module now because pwm_init() is
+called by arch_initcall().
+
+I think, we can remove S3C24XX_PWM and just select PWM (or using HAVE_PWM)
+and PWM_SAMSUNG can be selected by enabling PWM in samsung platform next
+time :-)
+
+> * It is still possible to manually disable PWM_SAMSUNG, even on
+>   rx1950 and gta02, because the Kconfig symbol is visible.
+> 
+Yeah you're right, makes sense.
+
+> I've added a "Reported-by: Tushar Behera <tushar.behera@linaro.org>"
+> line to my version of the patch, but I would prefer to keep that
+> approach. I have also changed the patch to use the S3C24XX_PWM
+> symbol because that lets everyone migrate the defconfig files.
+> 
+OK.
+
+> Do you want to give this patch some more testing, or should I keep
+> it in arm-soc?
+> 
+Looks good to me, please keep going on.
+
+> ---
+> From 438b0cf94adb2528bdeeb71314f7be16512ea5b1 Mon Sep 17 00:00:00 2001
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Sat, 4 Aug 2012 07:52:19 +0000
+> Subject: [PATCH] ARM: s3c24xx: use new PWM driver
+> 
+> The samsung PWM driver has moved to the new PWM subsystem, which
+> changed the Kconfig symbol for that driver, but the rx1950 and
+> gta02 boards still uses the old one.
+> 
+> Without this patch, building s3c2410_defconfig results in:
+> 
+> arch/arm/mach-s3c24xx/built-in.o: In function `rx1950_lcd_power':
+> arch/arm/mach-s3c24xx/mach-rx1950.c:430: undefined reference to
+> `pwm_config'
+> arch/arm/mach-s3c24xx/mach-rx1950.c:431: undefined reference to
+> `pwm_disable'
+> arch/arm/mach-s3c24xx/mach-rx1950.c:437: undefined reference to
+> `pwm_config'
+> arch/arm/mach-s3c24xx/mach-rx1950.c:438: undefined reference to
+> `pwm_enable'
+> arch/arm/mach-s3c24xx/built-in.o: In function `rx1950_backlight_exit':
+> arch/arm/mach-s3c24xx/mach-rx1950.c:504: undefined reference to `pwm_free'
+> arch/arm/mach-s3c24xx/built-in.o: In function `rx1950_backlight_init':
+> arch/arm/mach-s3c24xx/mach-rx1950.c:487: undefined reference to
+> `pwm_request'
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Reported-by: Tushar Behera <tushar.behera@linaro.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> 
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+> index e249611..d56b0f7 100644
+> --- a/arch/arm/mach-s3c24xx/Kconfig
+> +++ b/arch/arm/mach-s3c24xx/Kconfig
+> @@ -483,7 +483,7 @@ config MACH_NEO1973_GTA02
+>  	select I2C
+>  	select POWER_SUPPLY
+>  	select MACH_NEO1973
+> -	select S3C2410_PWM
+> +	select S3C24XX_PWM
+>  	select S3C_DEV_USB_HOST
+>  	help
+>  	   Say Y here if you are using the Openmoko GTA02 / Freerunner GSM
+> Phone
+> @@ -493,7 +493,7 @@ config MACH_RX1950
+>  	select S3C24XX_DCLK
+>  	select PM_H1940 if PM
+>  	select I2C
+> -	select S3C2410_PWM
+> +	select S3C24XX_PWM
+>  	select S3C_DEV_NAND
+>  	select S3C2410_IOTIMING if S3C2440_CPUFREQ
+>  	select S3C2440_XTAL_16934400
+> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+> index 7aca31c..9c3b90c 100644
+> --- a/arch/arm/plat-samsung/Kconfig
+> +++ b/arch/arm/plat-samsung/Kconfig
+> @@ -403,7 +403,8 @@ config S5P_DEV_USB_EHCI
+> 
+>  config S3C24XX_PWM
+>  	bool "PWM device support"
+> -	select HAVE_PWM
+> +	select PWM
+> +	select PWM_SAMSUNG
+>  	help
+>  	  Support for exporting the PWM timer blocks via the pwm device
+>  	  system
