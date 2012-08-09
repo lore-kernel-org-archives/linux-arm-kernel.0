@@ -1,137 +1,72 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 09 Aug 2012 01:12:15 -0400 (EDT)
-Subject: RFC: mutex: hung tasks on SMP platforms with
- asm-generic/mutex-xchg.h
-In-Reply-To: <20120807115647.GA12828@mudshark.cambridge.arm.com>
-References: <20120807115647.GA12828@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1208090029460.5231@xanadu.home>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 9 Aug 2012 10:57:37 +0530
+Subject: [PATCH 1/2] cpufreq: OMAP: Handle missing frequency table on SMP
+ systems
+In-Reply-To: <87wr19uwbx.fsf@ti.com>
+References: <1344423254-3475-1-git-send-email-rnayak@ti.com>
+ <1344423254-3475-2-git-send-email-rnayak@ti.com>
+ <CAMQu2gyooQ4x=ZGDZFg5BuBaEkgQx2kTAvtiGLEjXwOYvF_wMQ@mail.gmail.com>
+ <87wr19uwbx.fsf@ti.com>
+Message-ID: <CAMQu2gxo8gdvk1jYx_asw+R7iyE1OAqxaVFbDgJSc0ED_-y9xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Aug 2012, Will Deacon wrote:
+On Wed, Aug 8, 2012 at 10:58 PM, Kevin Hilman <khilman@ti.com> wrote:
+>
+> "Shilimkar, Santosh" <santosh.shilimkar@ti.com> writes:
+>
+> > On Wed, Aug 8, 2012 at 4:24 PM, Rajendra Nayak <rnayak@ti.com> wrote:
+> >>
+> >> On OMAP4, if the first CPU fails to get a valid frequency table (this
+> >> could happen if the platform does not register any OPP table), the
+> >> subsequent CPU instances end up dealing with a NULL freq_table and
+> >> crash. Add a check for a NULL freq_table to help error the rest
+> >> of the CPU instances out.
+> >>
+> >> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> >> Cc: <linux-pm@vger.kernel.org>
+> >> ---
+> >>  drivers/cpufreq/omap-cpufreq.c |    2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/cpufreq/omap-cpufreq.c
+> >> b/drivers/cpufreq/omap-cpufreq.c
+> >> index 17fa04d..0ee824c 100644
+> >> --- a/drivers/cpufreq/omap-cpufreq.c
+> >> +++ b/drivers/cpufreq/omap-cpufreq.c
+> >> @@ -221,7 +221,7 @@ static int __cpuinit omap_cpu_init(struct
+> >> cpufreq_policy *policy)
+> >>         if (atomic_inc_return(&freq_table_users) == 1)
+> >>                 result = opp_init_cpufreq_table(mpu_dev, &freq_table);
+> >>
+> >> -       if (result) {
+> >> +       if (result || !freq_table) {
+> >>                 dev_err(mpu_dev, "%s: cpu%d: failed creating freq
+> >> table[%d]\n",
+> >>                                 __func__, policy->cpu, result);
+> >>                 goto fail_ck;
+> >
+> > The freq_table use count seems to be buggy in that case.
+> > Something like below should fix the issue.
+> > Feel free to update your patch with below if you agree.
+> >
+> > diff --git a/drivers/cpufreq/omap-cpufreq.c
+> > b/drivers/cpufreq/omap-cpufreq.c
+> > index 17fa04d..fd97c3d 100644
+> > --- a/drivers/cpufreq/omap-cpufreq.c
+> > +++ b/drivers/cpufreq/omap-cpufreq.c
+> > @@ -218,7 +218,7 @@ static int __cpuinit omap_cpu_init(struct
+> > cpufreq_policy *po
+> >
+> >         policy->cur = policy->min = policy->max =
+> > omap_getspeed(policy->cpu);
+> >
+> > -       if (atomic_inc_return(&freq_table_users) == 1)
+> > +       if (freq_table)
+>
+> I think you meant 'if (!freq_table)' ?
+>
+Right.
 
-> Hello,
-> 
-> ARM recently moved to asm-generic/mutex-xchg.h for its mutex implementation
-> after our previous implementation was found to be missing some crucial
-> memory barriers. However, I'm seeing some problems running hackbench on
-> SMP platforms due to the way in which the MUTEX_SPIN_ON_OWNER code operates.
-> 
-> The symptoms are that a bunch of hackbench tasks are left waiting on an
-> unlocked mutex and therefore never get woken up to claim it. I think this
-> boils down to the following sequence:
-> 
-> 
->         Task A        Task B        Task C        Lock value
-> 0                                                     1
-> 1       lock()                                        0
-> 2                     lock()                          0
-> 3                     spin(A)                         0
-> 4       unlock()                                      1
-> 5                                   lock()            0
-> 6                     cmpxchg(1,0)                    0
-> 7                     contended()                    -1
-> 8       lock()                                        0
-> 9       spin(C)                                       0
-> 10                                  unlock()          1
-> 11      cmpxchg(1,0)                                  0
-> 12      unlock()                                      1
-> 
-> 
-> At this point, the lock is unlocked, but Task B is in an uninterruptible
-> sleep with nobody to wake it up.
-> 
-> The following patch fixes the problem by ensuring we put the lock into
-> the contended state if we acquire it from the spin loop on the slowpath
-> but I'd like to be sure that this won't cause problems with other mutex
-> implementations:
-> 
-> 
-> diff --git a/kernel/mutex.c b/kernel/mutex.c
-> index a307cc9..27b7887 100644
-> --- a/kernel/mutex.c
-> +++ b/kernel/mutex.c
-> @@ -170,7 +170,7 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
->                 if (owner && !mutex_spin_on_owner(lock, owner))
->                         break;
->  
-> -               if (atomic_cmpxchg(&lock->count, 1, 0) == 1) {
-> +               if (atomic_cmpxchg(&lock->count, 1, -1) == 1) {
->                         lock_acquired(&lock->dep_map, ip);
->                         mutex_set_owner(lock);
->                         preempt_enable();
-> 
-> 
-> All comments welcome.
-
-Well... after thinking about this for a while, I came to the conclusion 
-that the mutex_spin_on_owner code is indeed breaking the contract 
-between the xchg lock fast path and the slow path.  The xchg fast path 
-will always set the count to 0 and rely on the slow path to restore a 
-possible pre-existing negative count.  So the above change would be 
-needed for correctness in the xchg case, even if it always forces the 
-unlock into the slow path.
-
-As I mentioned previously, we don't want to force the slow path in all 
-cases though.  The atomic decrement based fast path doesn't need that, 
-so I'd suggest this fix instead:
-
-diff --git a/include/asm-generic/mutex-xchg.h b/include/asm-generic/mutex-xchg.h
-index 580a6d35c7..60964844c8 100644
---- a/include/asm-generic/mutex-xchg.h
-+++ b/include/asm-generic/mutex-xchg.h
-@@ -108,4 +108,6 @@ __mutex_fastpath_trylock(atomic_t *count, int (*fail_fn)(atomic_t *))
- 	return prev;
- }
- 
-+#define __MUTEX_XCHG_FAST_PATH
-+
- #endif
-diff --git a/kernel/mutex.c b/kernel/mutex.c
-index a307cc9c95..c6a26a4f1c 100644
---- a/kernel/mutex.c
-+++ b/kernel/mutex.c
-@@ -161,6 +161,7 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
- 
- 	for (;;) {
- 		struct task_struct *owner;
-+		int locked_val;
- 
- 		/*
- 		 * If there's an owner, wait for it to either
-@@ -170,7 +171,19 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
- 		if (owner && !mutex_spin_on_owner(lock, owner))
- 			break;
- 
--		if (atomic_cmpxchg(&lock->count, 1, 0) == 1) {
-+#ifdef __MUTEX_XCHG_FAST_PATH
-+		/*
-+		 * The fast path based on xchg sets a transient 0 count,
-+		 * relying on the slow path to restore a possible
-+		 * pre-existing contended count.  Without checking the
-+		 * waiters' list we must presume possible contension here.
-+		 */
-+		locked_val = -1;
-+#else
-+		locked_val = 0;
-+#endif
-+
-+		if (atomic_cmpxchg(&lock->count, 1, locked_val) == 1) {
- 			lock_acquired(&lock->dep_map, ip);
- 			mutex_set_owner(lock);
- 			preempt_enable();
-
-That would be needed for the stable tree as well.
-
-A further cleanup could remove all definitions of 
-__mutex_slowpath_needs_to_unlock() given that they're all set to 1 
-except for the xchg fast path, in which case __MUTEX_XCHG_FAST_PATH 
-could be reused instead.
-
-Of course that might tilt the balance towards using mutex-dec.h on ARM 
-v6 and above instead of mutex-xchg.h.  But that is an orthogonal issue, 
-and that doesn't remove the need for fixing the xchg based case for 
-correctness.
-
-
-Nicolas
+regards
+Santosh
