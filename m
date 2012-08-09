@@ -1,165 +1,54 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 9 Aug 2012 11:24:14 +0100
-Subject: [PATCH 1/2] ARM: build ssi-fiq.S in ARM mode to prevent
- CONFIG_THUMB2_KERNEL build breakage
-In-Reply-To: <CAKGA1bmUuSZuWDM4QPTxmNR0+=uQ1RbFhw4u-sb9KaSPYwQiVw@mail.gmail.com>
-References: <1344379514-30076-1-git-send-email-matt@genesi-usa.com>
- <1344379514-30076-2-git-send-email-matt@genesi-usa.com>
- <20120808065502.GI1451@pengutronix.de>
- <CAKGA1bmUuSZuWDM4QPTxmNR0+=uQ1RbFhw4u-sb9KaSPYwQiVw@mail.gmail.com>
-Message-ID: <20120809102414.GA17588@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 9 Aug 2012 11:36:00 +0100
+Subject: [PATCH 04/11] MFD: twl4030-audio: Add DT support
+In-Reply-To: <50238E8A.5030902@ti.com>
+References: <1344418887-5262-1-git-send-email-peter.ujfalusi@ti.com>
+ <1344418887-5262-5-git-send-email-peter.ujfalusi@ti.com>
+ <20120808131356.GS16861@opensource.wolfsonmicro.com>
+ <50226CF4.1010202@ti.com>
+ <20120808135253.GC16861@opensource.wolfsonmicro.com>
+ <502274DA.9020204@ti.com>
+ <20120808141849.GA24328@opensource.wolfsonmicro.com>
+ <50227837.10400@ti.com>
+ <20120808144933.GC24328@opensource.wolfsonmicro.com>
+ <50238E8A.5030902@ti.com>
+Message-ID: <20120809103600.GI24328@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2012 at 12:32:39PM -0500, Matt Sealey wrote:
+On Thu, Aug 09, 2012 at 01:18:50PM +0300, Peter Ujfalusi wrote:
+> On 08/08/2012 05:49 PM, Mark Brown wrote:
 
-[...]
- 
-> I'm going to do a trapse through and find where Russell nacked Dave's
-> thumb-aware
-> rewrite.. would you mind if you have any of these boards seeing if it
-> really DOES
+> > That makes sense if the GPIO is actively driven, open drain should be
+> > better here, but it's still a generic thing which it'd be nice to
+> > extract.
 
-There was no NAK because I didn't get as far as posting the patch,
-mostly because of the doubt about whether this code is ever relevant
-on Thumb2-capable hardware.
+> To cover all of this in a generic way is not that straight forward IMHO.
 
-If somebody with some old imx hardware that definitely relies on this
-wants to pick it up and test it, it might still be useful.
+The sequence is just:
 
-I don't know whether I still have the original patch, but I think the
-only think I did was to swap the roles of r13 and r12.  In the original
-code r12 is only used as a base register, which is permissible usage
-for r13 in Thumb-2.  Those two registers appear private to the fiq
-handler, so I don't think the change will break anything, but I'd be
-more confident is somebody is able to test it.
+  1. Enable mutes (at _PRE time)
+  2. Do whatever the device needs
+  3. Disable the mutes (at _POST time)
 
-Cheers
----Dave
+I'm not sure there's any reason for you not to use the internal mute
+even if the external mute is present but if there is that's the only
+thing that's weird here.  If there's no reason not to do it it just goes
+into step 2 and then it's fine, even if there is you can make it
+conditional in step 2.
 
-diff --git a/arch/arm/plat-mxc/ssi-fiq.S b/arch/arm/plat-mxc/ssi-fiq.S
-index 8397a2d..3589afb 100644
---- a/arch/arm/plat-mxc/ssi-fiq.S
-+++ b/arch/arm/plat-mxc/ssi-fiq.S
-@@ -35,19 +35,19 @@
- 		.global imx_ssi_fiq_tx_buffer
- 
- imx_ssi_fiq_start:
--		ldr r12, imx_ssi_fiq_base
-+		ldr r13, imx_ssi_fiq_base
- 
- 		/* TX */
- 		ldr r11, imx_ssi_fiq_tx_buffer
- 
- 		/* shall we send? */
--		ldr r13, [r12, #SSI_SIER]
--		tst r13, #SSI_SIER_TFE0_EN
-+		ldr r12, [r13, #SSI_SIER]
-+		tst r12, #SSI_SIER_TFE0_EN
- 		beq 1f
- 
- 		/* TX FIFO empty? */
--		ldr r13, [r12, #SSI_SISR]
--		tst r13, #SSI_SISR_TFE0
-+		ldr r12, [r13, #SSI_SISR]
-+		tst r12, #SSI_SISR_TFE0
- 		beq 1f
- 
- 		mov r10, #0x10000
-@@ -56,34 +56,34 @@ imx_ssi_fiq_start:
- 
- 		add r11, r11, r10
- 
--		ldrh r13, [r11]
--		strh r13, [r12, #SSI_STX0]
-+		ldrh r12, [r11]
-+		strh r12, [r13, #SSI_STX0]
- 
--		ldrh r13, [r11, #2]
--		strh r13, [r12, #SSI_STX0]
-+		ldrh r12, [r11, #2]
-+		strh r12, [r13, #SSI_STX0]
- 
--		ldrh r13, [r11, #4]
--		strh r13, [r12, #SSI_STX0]
-+		ldrh r12, [r11, #4]
-+		strh r12, [r13, #SSI_STX0]
- 
--		ldrh r13, [r11, #6]
--		strh r13, [r12, #SSI_STX0]
-+		ldrh r12, [r11, #6]
-+		strh r12, [r13, #SSI_STX0]
- 
- 		add r10, #8
--		lsr r13, r8, #16	/* r13: buffer size */
--		cmp r10, r13
--		lslgt r8, r13, #16
-+		lsr r12, r8, #16	/* r12: buffer size */
-+		cmp r10, r12
-+		lslgt r8, r12, #16
- 		addle r8, #8
- 1:
- 		/* RX */
- 
- 		/* shall we receive? */
--		ldr r13, [r12, #SSI_SIER]
--		tst r13, #SSI_SIER_RFF0_EN
-+		ldr r12, [r13, #SSI_SIER]
-+		tst r12, #SSI_SIER_RFF0_EN
- 		beq 1f
- 
- 		/* RX FIFO full? */
--		ldr r13, [r12, #SSI_SISR]
--		tst r13, #SSI_SISR_RFF0
-+		ldr r12, [r13, #SSI_SISR]
-+		tst r12, #SSI_SISR_RFF0
- 		beq 1f
- 
- 		ldr r11, imx_ssi_fiq_rx_buffer
-@@ -94,31 +94,31 @@ imx_ssi_fiq_start:
- 
- 		add r11, r11, r10
- 
--		ldr r13, [r12, #SSI_SACNT]
--		tst r13, #SSI_SACNT_AC97EN
-+		ldr r12, [r13, #SSI_SACNT]
-+		tst r12, #SSI_SACNT_AC97EN
- 
--		ldr r13, [r12, #SSI_SRX0]
--		strh r13, [r11]
-+		ldr r12, [r13, #SSI_SRX0]
-+		strh r12, [r11]
- 
--		ldr r13, [r12, #SSI_SRX0]
--		strh r13, [r11, #2]
-+		ldr r12, [r13, #SSI_SRX0]
-+		strh r12, [r11, #2]
- 
- 		/* dummy read to skip slot 12 */
--		ldrne r13, [r12, #SSI_SRX0]
-+		ldrne r12, [r13, #SSI_SRX0]
- 
--		ldr r13, [r12, #SSI_SRX0]
--		strh r13, [r11, #4]
-+		ldr r12, [r13, #SSI_SRX0]
-+		strh r12, [r11, #4]
- 
--		ldr r13, [r12, #SSI_SRX0]
--		strh r13, [r11, #6]
-+		ldr r12, [r13, #SSI_SRX0]
-+		strh r12, [r11, #6]
- 
- 		/* dummy read to skip slot 12 */
--		ldrne r13, [r12, #SSI_SRX0]
-+		ldrne r12, [r13, #SSI_SRX0]
- 
- 		add r10, #8
--		lsr r13, r9, #16	/* r13: buffer size */
--		cmp r10, r13
--		lslgt r9, r13, #16
-+		lsr r12, r9, #16	/* r12: buffer size */
-+		cmp r10, r12
-+		lslgt r9, r12, #16
- 		addle r9, #8
- 
- 1:
+> Sure I could do this:
+> hs_extmute: if only this is set we shall use the chip built in functionality
+> hs_extmute_gpio: if this is set we use the extmute feature but with external
+>                  GPIO.
+
+> But both need to be documented and supported.
+
+Is there any actual case where an external mute is supplied via a
+mechanism other than a GPIO, and if there is would it not either need
+its own DT property or already need to interact with the driver from
+code, making the DT property redundant?  My thinking here is that the
+flag should be redundant because we already need to specify how we do
+the mute, what I'd expect is that we activate the external mute
+functionality as a result of being given another way of doing it so we
+don't need to provide a flag.
