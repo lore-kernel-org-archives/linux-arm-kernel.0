@@ -1,38 +1,28 @@
-From: wni@nvidia.com (Wei Ni)
-Date: Thu, 9 Aug 2012 18:43:26 +0800
-Subject: How to get the irq flags from the dts file
-Message-ID: <1344509006.2295.148.camel@tegra-chromium-2>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 9 Aug 2012 11:53:50 +0100
+Subject: [PATCH v2 3/4] regulator: add a new API
+ regulator_set_voltage_tol()
+In-Reply-To: <20120808143004.GB14718@S2101-09.ap.freescale.net>
+References: <1344179121-17738-1-git-send-email-shawn.guo@linaro.org>
+ <1344179121-17738-4-git-send-email-shawn.guo@linaro.org>
+ <20120808133540.GB16861@opensource.wolfsonmicro.com>
+ <20120808143004.GB14718@S2101-09.ap.freescale.net>
+Message-ID: <20120809105349.GL24328@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, all
-I'm working on tegra wlan upstream issue.
-The tegra board use the Broadcom 4329 as wlan device, and the driver is
-the brcmfmac. 
+On Wed, Aug 08, 2012 at 10:30:07PM +0800, Shawn Guo wrote:
+> On Wed, Aug 08, 2012 at 02:35:40PM +0100, Mark Brown wrote:
 
-This wlan driver support out-band-interrupt (OOB), I want to add DT
-support to use this OOB.
-I can add following lines in the dts file to create platform device and
-pass the interrupt resource to the driver.
+> > Applied, thanks!  It's on a separate branch so can easily be either
+> > applied somewhere else or merged into another tree if required for
+> > dependencies, just let me know.
 
-wlan {
-        compatible = "broadcome, brcmf_sdio_pd";
-        interrupt-parten = <&gpio>;
-        interrupts = <144, 0x04>; /* IRQF_TRIGGER_HIGH */
-};
+> I intended to have the whole series go via cpufreq tree with your ack
+> on this patch.  But I could also ask Rafael to merge your branch to
+> resolve the dependency.
 
-In the wlan driver, it will use platform_get_resource() to get the
-res->irq, res->flags, the irq number is right, but the flags will be
-IORESOURCE_IRQ, not the 0x04 (IRQF_TRIGGER_HIGH).
-The wlan driver wish this flags include the IRQF_TRGGER_* information,
-and it will use this flags to configure other hw settings. If it is
-wrong, the wlan can't work.
-
-I checked drivers/of/irq.c, in function of_irq_to_resource(), it will
-set r->flags = IORESOURCE_IRQ directly, not read the flags from the dtb
-file. And I didn't find any of_xx api to get this flags.
-
-How can I get this flags, does anyone has suggestion?
-
-Thanks.
-Wei.
+I anticipate wanting the new API in other trees too (I have one likely
+use in mind) so having it only in the cpufreq tree would be inconvenient.
+The whole reason to have this in the regulator API is that it's
+something that's useful outside your cpufreq code!
