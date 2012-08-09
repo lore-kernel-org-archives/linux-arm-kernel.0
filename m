@@ -1,182 +1,33 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 9 Aug 2012 16:37:24 +0100
-Subject: [PATCH v2 02/23] xen/arm: hypercalls
-In-Reply-To: <20120808124111.GB2134@linaro.org>
-References: <alpine.DEB.2.02.1208061428060.4645@kaball.uk.xensource.com>
- <1344263246-28036-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120808124111.GB2134@linaro.org>
-Message-ID: <alpine.DEB.2.02.1208091046330.21096@kaball.uk.xensource.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu,  9 Aug 2012 16:47:26 +0100
+Subject: [PATCH 00/22] mop500 related Audio reorganisation and fixups
+Message-ID: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 8 Aug 2012, Dave Martin wrote:
-> On Mon, Aug 06, 2012 at 03:27:05PM +0100, Stefano Stabellini wrote:
-> > Use r12 to pass the hypercall number to the hypervisor.
-> > 
-> > We need a register to pass the hypercall number because we might not
-> > know it at compile time and HVC only takes an immediate argument.
-> > 
-> > Among the available registers r12 seems to be the best choice because it
-> > is defined as "intra-procedure call scratch register".
-> > 
-> > Use the ISS to pass an hypervisor specific tag.
-> > 
-> > Changes in v2:
-> > - define an HYPERCALL macro for 5 arguments hypercall wrappers, even if
-> > at the moment is unused;
-> > - use ldm instead of pop;
-> > - fix up comments.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > ---
-> >  arch/arm/include/asm/xen/hypercall.h |   50 ++++++++++++++++
-> >  arch/arm/xen/Makefile                |    2 +-
-> >  arch/arm/xen/hypercall.S             |  106 ++++++++++++++++++++++++++++++++++
-> >  3 files changed, 157 insertions(+), 1 deletions(-)
-> >  create mode 100644 arch/arm/include/asm/xen/hypercall.h
-> >  create mode 100644 arch/arm/xen/hypercall.S
-> 
-> [...]
-> 
-> > diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
-> > new file mode 100644
-> > index 0000000..074f5ed
-> > --- /dev/null
-> > +++ b/arch/arm/xen/hypercall.S
-> > @@ -0,0 +1,106 @@
-> > +/******************************************************************************
-> > + * hypercall.S
-> > + *
-> > + * Xen hypercall wrappers
-> > + *
-> > + * Stefano Stabellini <stefano.stabellini@eu.citrix.com>, Citrix, 2012
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > + * modify it under the terms of the GNU General Public License version 2
-> > + * as published by the Free Software Foundation; or, when distributed
-> > + * separately from the Linux kernel or incorporated into other
-> > + * software packages, subject to the following license:
-> > + *
-> > + * Permission is hereby granted, free of charge, to any person obtaining a copy
-> > + * of this source file (the "Software"), to deal in the Software without
-> > + * restriction, including without limitation the rights to use, copy, modify,
-> > + * merge, publish, distribute, sublicense, and/or sell copies of the Software,
-> > + * and to permit persons to whom the Software is furnished to do so, subject to
-> > + * the following conditions:
-> > + *
-> > + * The above copyright notice and this permission notice shall be included in
-> > + * all copies or substantial portions of the Software.
-> > + *
-> > + * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-> > + * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-> > + * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-> > + * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-> > + * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> > + * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-> > + * IN THE SOFTWARE.
-> > + */
-> > +
-> > +/*
-> > + * The Xen hypercall calling convention is very similar to the ARM
-> > + * procedure calling convention: the first paramter is passed in r0, the
-> > + * second in r1, the third in r2 and the fourth in r3. Considering that
-> > + * Xen hypercalls have 5 arguments at most, the fifth paramter is passed
-> > + * in r4, differently from the procedure calling convention of using the
-> > + * stack for that case.
-> > + *
-> > + * The hypercall number is passed in r12.
-> > + *
-> > + * The return value is in r0.
-> > + *
-> > + * The hvc ISS is required to be 0xEA1, that is the Xen specific ARM
-> > + * hypercall tag.
-> > + */
-> > +
-> > +#include <linux/linkage.h>
-> > +#include <asm/assembler.h>
-> > +#include <xen/interface/xen.h>
-> > +
-> > +
-> > +/* HVC 0xEA1 */
-> > +#ifdef CONFIG_THUMB2_KERNEL
-> > +#define xen_hvc .word 0xf7e08ea1
-> > +#else
-> > +#define xen_hvc .word 0xe140ea71
-> > +#endif
-> 
-> Consider using my opcode injection helpers patch for this (see
-> separate repost: [PATCH v2 REPOST 0/4] ARM: opcodes: Facilitate custom
-> opcode injection), assuming that nobody objects to it.  This should mean
-> that the right opcodes get generated when building a kernel for a big-
-> endian target for example.
-> 
-> I believe the __HVC(imm) macro which I put in <asm/opcodes-virt.h> as an
-> example should do what you need in this case.
+Another fine instalment of Audio fixes and Device Tree enablement
+surrounding the mop500 sound driver. Hopefully containing all of 
+the recommendations suggested by Mark Brown.
 
-Sure I can do that. Maybe I'll add another patch at the end of my series
-to replace xen_hvc with __HVC(0xEA1), so that it remains independent
-from your series.
-I have learned through experience that avoiding cross patch series
-dependencies help to reduce the amount of headaches during merge windows
-:)
-
-
-> > +
-> > +#define HYPERCALL_SIMPLE(hypercall)		\
-> > +ENTRY(HYPERVISOR_##hypercall)			\
-> > +	mov r12, #__HYPERVISOR_##hypercall;	\
-> > +	xen_hvc;							\
-> > +	mov pc, lr;							\
-> > +ENDPROC(HYPERVISOR_##hypercall)
-> > +
-> > +#define HYPERCALL0 HYPERCALL_SIMPLE
-> > +#define HYPERCALL1 HYPERCALL_SIMPLE
-> > +#define HYPERCALL2 HYPERCALL_SIMPLE
-> > +#define HYPERCALL3 HYPERCALL_SIMPLE
-> > +#define HYPERCALL4 HYPERCALL_SIMPLE
-> > +
-> > +#define HYPERCALL5(hypercall)			\
-> > +ENTRY(HYPERVISOR_##hypercall)			\
-> > +	stmdb sp!, {r4}						\
-> > +	ldr r4, [sp, #4]					\
-> > +	mov r12, #__HYPERVISOR_##hypercall;	\
-> > +	xen_hvc								\
-> > +	ldm sp!, {r4}						\
-> > +	mov pc, lr							\
-> > +ENDPROC(HYPERVISOR_##hypercall)
-> > +
-> > +                .text
-> > +
-> > +HYPERCALL2(xen_version);
-> > +HYPERCALL3(console_io);
-> > +HYPERCALL3(grant_table_op);
-> > +HYPERCALL2(sched_op);
-> > +HYPERCALL2(event_channel_op);
-> > +HYPERCALL2(hvm_op);
-> > +HYPERCALL2(memory_op);
-> > +HYPERCALL2(physdev_op);
-> > +
-> > +ENTRY(privcmd_call)
-> > +	stmdb sp!, {r4}
-> > +	mov r12, r0
-> > +	mov r0, r1
-> > +	mov r1, r2
-> > +	mov r2, r3
-> > +	ldr r3, [sp, #8]
-> > +	ldr r4, [sp, #4]
-> > +	xen_hvc
-> > +	ldm sp!, {r4}
-> > +	mov pc, lr
-> 
-> Note that the preferred entry/exit sequences in such cases are:
-> 
-> 	stmfd	sp!, {r4,lr}
-> 	...
-> 	ldmfd	sp!, {r4,pc}
-> 
-> ...but it works either way.  I would bother to change it unless you
-> have other changes to make too.
-
-Wouldn't this needlessly save and restore one more register (lr) to the
-stack?
-I would try to keep the hypercall wrappers as small as possible...
+ Documentation/devicetree/bindings/mfd/ab8500.txt   |   15 +
+ .../devicetree/bindings/sound/ux500-mop500.txt     |   39 ++
+ .../devicetree/bindings/sound/ux500-msp.txt        |   43 ++
+ arch/arm/boot/dts/db8500.dtsi                      |  627 ------------------
+ arch/arm/boot/dts/dbx5x0.dtsi                      |  666 ++++++++++++++++++++
+ arch/arm/boot/dts/snowball.dts                     |   18 +-
+ arch/arm/mach-ux500/Makefile                       |    2 +-
+ arch/arm/mach-ux500/board-mop500-audio.c           |  189 ++++++
+ arch/arm/mach-ux500/board-mop500-msp.c             |  267 --------
+ arch/arm/mach-ux500/board-mop500-msp.h             |   14 -
+ arch/arm/mach-ux500/board-mop500.c                 |   18 +-
+ arch/arm/mach-ux500/board-mop500.h                 |    6 +
+ arch/arm/mach-ux500/include/mach/msp.h             |    2 -
+ include/linux/mfd/abx500/ab8500-codec.h            |    6 +-
+ sound/soc/codecs/ab8500-codec.c                    |   85 +++
+ sound/soc/ux500/mop500.c                           |   44 +-
+ sound/soc/ux500/ux500_msp_dai.c                    |   20 +-
+ sound/soc/ux500/ux500_msp_i2s.c                    |   97 ++-
+ sound/soc/ux500/ux500_msp_i2s.h                    |    2 -
+ sound/soc/ux500/ux500_pcm.c                        |   19 +-
+ sound/soc/ux500/ux500_pcm.h                        |    3 +
+ 21 files changed, 1225 insertions(+), 957 deletions(-)
