@@ -1,71 +1,62 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu,  9 Aug 2012 19:05:48 +0100
-Subject: [PATCH 1/2] ARM: S3C64XX: Update configuration for WM5102 module on
- Cragganmore
-Message-ID: <1344535549-4371-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 09 Aug 2012 14:09:02 -0400 (EDT)
+Subject: RFC: mutex: hung tasks on SMP platforms with
+ asm-generic/mutex-xchg.h
+In-Reply-To: <20120809175019.GE18486@mudshark.cambridge.arm.com>
+References: <20120807115647.GA12828@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1208090029460.5231@xanadu.home>
+ <20120809144953.GC18486@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1208091201380.5231@xanadu.home>
+ <alpine.LFD.2.02.1208091243080.5231@xanadu.home>
+ <20120809175019.GE18486@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1208091405340.5231@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SPI is also connected on the board, use that instead of I2C as it's much
-faster. Also define platform data now the core driver is in mainline.
+On Thu, 9 Aug 2012, Will Deacon wrote:
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/mach-crag6410-module.c |   35 ++++++++++++++++++++++----
- 1 file changed, 30 insertions(+), 5 deletions(-)
+> On Thu, Aug 09, 2012 at 05:57:33PM +0100, Nicolas Pitre wrote:
+> > On Thu, 9 Aug 2012, Nicolas Pitre wrote:
+> > > Yes, that looks fine.  I'd remove that if (prev < 0) entirely though.  
+> > > We'll just swap a 0 for a 0 if the count wasn't < 0, or a 0 for a 1 if 
+> > > the mutex just got unlocked which is also fine.  This is especially 
+> > > beneficial when a native xchg processor instruction is used.
+> > 
+> > In fact, this suggestion isn't entirely correct either. The inner xchg 
+> > in this case should be -1 and not 'count'.  If 'count' is 0 and the 
+> > mutex becomes contended in the small window between the two xchg's then 
+> > the contention mark would be lost again.
+> > 
+> > In other words, I think this should look like this:
+> > 
+> > diff --git a/include/asm-generic/mutex-xchg.h b/include/asm-generic/mutex-xchg.h
+> > index 580a6d35c7..44a66c99c8 100644
+> > --- a/include/asm-generic/mutex-xchg.h
+> > +++ b/include/asm-generic/mutex-xchg.h
+> > @@ -25,8 +25,11 @@
+> >  static inline void
+> >  __mutex_fastpath_lock(atomic_t *count, void (*fail_fn)(atomic_t *))
+> >  {
+> > -	if (unlikely(atomic_xchg(count, 0) != 1))
+> > -		fail_fn(count);
+> > +	if (unlikely(atomic_xchg(count, 0) != 1)) {
+> > +		/* Mark lock contention explicitly */
+> > +		if (likely(atomic_xchg(count, -1) != 1))
+> > +			fail_fn(count);
+> > +	}
+> >  }
+> >  
+> >  /**
+> 
+> Doesn't this mean that we're no longer just swapping 0 for a 0 if the lock
+> was taken, therefore needlessly sending the current owner down the slowpath
+> on unlock?
 
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-index f81f089..22dd77b 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-@@ -192,9 +192,33 @@ static const struct i2c_board_info wm1277_devs[] = {
- 	},
- };
- 
--static const struct i2c_board_info wm5102_devs[] = {
--	{ I2C_BOARD_INFO("wm5102", 0x1a),
--	  .irq = GLENFARCLAS_PMIC_IRQ_BASE + WM831X_IRQ_GPIO_2, },
-+static struct arizona_pdata wm5102_pdata = {
-+	.ldoena = S3C64XX_GPN(7),
-+	.gpio_base = CODEC_GPIO_BASE,
-+	.irq_active_high = true,
-+	.micd_pol_gpio = CODEC_GPIO_BASE + 4,
-+	.gpio_defaults = {
-+		[2] = 0x10000, /* AIF3TXLRCLK */
-+		[3] = 0x4,     /* OPCLK */
-+	},
-+};
-+
-+static struct s3c64xx_spi_csinfo wm5102_spi_csinfo = {
-+	.line = S3C64XX_GPN(5),
-+};
-+
-+static struct spi_board_info wm5102_spi_devs[] = {
-+	[0] = {
-+		.modalias	= "wm5102",
-+		.max_speed_hz	= 10 * 1000 * 1000,
-+		.bus_num	= 0,
-+		.chip_select	= 0,
-+		.mode		= SPI_MODE_0,
-+		.irq            = GLENFARCLAS_PMIC_IRQ_BASE +
-+				  WM831X_IRQ_GPIO_2,
-+		.controller_data = &wm5102_spi_csinfo,
-+		.platform_data = &wm5102_pdata,
-+	},
- };
- 
- static const struct i2c_board_info wm6230_i2c_devs[] = {
-@@ -234,8 +258,9 @@ static __devinitdata const struct {
- 	{ .id = 0x3c, .name = "1273-EV1 Longmorn" },
- 	{ .id = 0x3d, .name = "1277-EV1 Littlemill",
- 	  .i2c_devs = wm1277_devs, .num_i2c_devs = ARRAY_SIZE(wm1277_devs) },
--	{ .id = 0x3e, .name = "WM5102-6271-EV1-CS127",
--	  .i2c_devs = wm5102_devs, .num_i2c_devs = ARRAY_SIZE(wm5102_devs) },
-+	{ .id = 0x3e, .name = "WM5102-6271-EV1-CS127 Amrut",
-+	  .spi_devs = wm5102_spi_devs,
-+	  .num_spi_devs = ARRAY_SIZE(wm5102_spi_devs) },
- };
- 
- static __devinit int wlf_gf_module_probe(struct i2c_client *i2c,
--- 
-1.7.10.4
+If the lock was taken, this means the count was either 0 or -1.  If it 
+was 1 then we just put a 0 there and we own it.  But if the cound was 0 
+then we should store -1 instead, which is what the inner xchg does.  If 
+the count was already -1 then we store -1 back.  That more closely mimic 
+what the atomic dec does which is what we want.
+
+
+Nicolas
