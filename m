@@ -1,14 +1,26 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 9 Aug 2012 14:06:20 +0100
-Subject: [PATCH] ASoC: Davinci: McASP: remove unused header include
-In-Reply-To: <1344438632-2604-1-git-send-email-gururaja.hebbar@ti.com>
-References: <1344438632-2604-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <20120809130620.GR24328@opensource.wolfsonmicro.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 09 Aug 2012 16:12:13 +0300
+Subject: [PATCH 3/4] ARM: OMAP3: Switch to use the unified audio driver
+ (omap-twl4030) for selected boards
+In-Reply-To: <50238F37.2030302@ti.com>
+References: <1344419650-5389-1-git-send-email-peter.ujfalusi@ti.com>
+ <1344419650-5389-4-git-send-email-peter.ujfalusi@ti.com>
+ <50225A84.5010008@compulab.co.il> <50225BB5.3000407@ti.com>
+ <50226444.4060100@compulab.co.il> <50238F37.2030302@ti.com>
+Message-ID: <5023B72D.9030005@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2012 at 08:40:30PM +0530, Hebbar, Gururaja wrote:
-> Defines or parameters from <mach/mux.h> isn't used anywhere. Hence
-> remove the header include.
+On 08/09/12 13:21, Peter Ujfalusi wrote:
+> On 08/08/2012 04:06 PM, Igor Grinberg wrote:
+>> Well, yes I know we will need to adjust the user space.
+>> I wanted to change that for a long time and did not get to it...
+>> Now, with your patches, it seems like the best time for doing this.
+> 
+> Done for the v2. You will have card named "cm-t3x".
 
-Applied all, thanks.
+Thanks!
+
+-- 
+Regards,
+Igor.
