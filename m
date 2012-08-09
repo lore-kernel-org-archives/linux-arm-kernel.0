@@ -1,53 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 9 Aug 2012 18:50:20 +0100
-Subject: RFC: mutex: hung tasks on SMP platforms with
- asm-generic/mutex-xchg.h
-In-Reply-To: <alpine.LFD.2.02.1208091243080.5231@xanadu.home>
-References: <20120807115647.GA12828@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1208090029460.5231@xanadu.home>
- <20120809144953.GC18486@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1208091201380.5231@xanadu.home>
- <alpine.LFD.2.02.1208091243080.5231@xanadu.home>
-Message-ID: <20120809175019.GE18486@mudshark.cambridge.arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 09 Aug 2012 12:04:14 -0600
+Subject: [PATCH V3] ARM: dt: tegra: ventana: add regulators
+In-Reply-To: <5023A716.50807@nvidia.com>
+References: <1344017356-29352-1-git-send-email-swarren@wwwdotorg.org>
+ <5023A716.50807@nvidia.com>
+Message-ID: <5023FB9E.4010904@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 09, 2012 at 05:57:33PM +0100, Nicolas Pitre wrote:
-> On Thu, 9 Aug 2012, Nicolas Pitre wrote:
-> > Yes, that looks fine.  I'd remove that if (prev < 0) entirely though.  
-> > We'll just swap a 0 for a 0 if the count wasn't < 0, or a 0 for a 1 if 
-> > the mutex just got unlocked which is also fine.  This is especially 
-> > beneficial when a native xchg processor instruction is used.
-> 
-> In fact, this suggestion isn't entirely correct either. The inner xchg 
-> in this case should be -1 and not 'count'.  If 'count' is 0 and the 
-> mutex becomes contended in the small window between the two xchg's then 
-> the contention mark would be lost again.
-> 
-> In other words, I think this should look like this:
-> 
-> diff --git a/include/asm-generic/mutex-xchg.h b/include/asm-generic/mutex-xchg.h
-> index 580a6d35c7..44a66c99c8 100644
-> --- a/include/asm-generic/mutex-xchg.h
-> +++ b/include/asm-generic/mutex-xchg.h
-> @@ -25,8 +25,11 @@
->  static inline void
->  __mutex_fastpath_lock(atomic_t *count, void (*fail_fn)(atomic_t *))
->  {
-> -	if (unlikely(atomic_xchg(count, 0) != 1))
-> -		fail_fn(count);
-> +	if (unlikely(atomic_xchg(count, 0) != 1)) {
-> +		/* Mark lock contention explicitly */
-> +		if (likely(atomic_xchg(count, -1) != 1))
-> +			fail_fn(count);
-> +	}
->  }
->  
->  /**
+On 08/09/2012 06:03 AM, Laxman Dewangan wrote:
+> On Friday 03 August 2012 11:39 PM, Stephen Warren wrote:
+>> Ventana uses a TPS6586x regulator. Instantiate this, and hook up a
+>> couple of fixed GPIO-controlled regulators too.
+...
 
-Doesn't this mean that we're no longer just swapping 0 for a 0 if the lock
-was taken, therefore needlessly sending the current owner down the slowpath
-on unlock? If we have the explicit test, that doesn't happen and the
-disassembly isn't much different (an additional cmp/conditional branch).
+Sorry, I didn't look below at your other comments. Now responding...
 
-Will
+>> +        pmic: tps6586x at 34 {
+>> +            compatible = "ti,tps6586x";
+>> +            reg =<0x34>;
+>> +            interrupts =<0 86 0x4>;
+> 
+> Should we say interrupt-controller also here?
+
+I don't think so; it looks like all the interrupts within this chip are
+for things that should be handled completely internally to to driver
+itself. Either way, there's certainly nothing attempting to use any
+interrupts from this chip right now, so if we did need that property, we
+could always add it if/when we added a client that needed it.
+
+>> +
+>> +            sys-supply =<&vdd_5v0_reg>;
+>> +            vin-sm0-supply =<&sys_reg>;
+>> +            vin-sm1-supply =<&sys_reg>;
+>> +            vin-sm2-supply =<&sys_reg>;
+> 
+> This depends on two changes on tps6586x regulator which are not merged yet.
+
+Yes, I'm waiting for those changes to be merged before actually applying
+this. However, there's no particular dependency; this patch simply won't
+end up enabling the regulators until it's merged with the other patches,
+so the .dts and regulator driver patches can go in through separate
+trees OK.
+
+>> +    pmc {
+> 
+> Should say status OK?
+
+The default status is OK. Since the PMC is useful on all boards, it
+isn't disabled in tegra30.dtsi; only board-specific things are disabled
+in tegra30.dtsi (e.g. which I2C, MMC, I2S, ... ports are used is board
+specific. Core SoC functionality isn't.)
