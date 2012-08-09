@@ -1,35 +1,59 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Thu, 9 Aug 2012 12:54:24 -0400
-Subject: [PATCH v2 10/23] xen/arm: compile and run xenbus
-In-Reply-To: <alpine.DEB.2.02.1208081836050.21096@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1208061428060.4645@kaball.uk.xensource.com>
- <1344263246-28036-10-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120807182157.GN15053@phenom.dumpdata.com>
- <50216228.7010407@tycho.nsa.gov>
- <alpine.DEB.2.02.1208081743430.21096@kaball.uk.xensource.com>
- <50229B70.3090507@tycho.nsa.gov>
- <alpine.DEB.2.02.1208081805520.21096@kaball.uk.xensource.com>
- <5022A303.709@tycho.nsa.gov>
- <alpine.DEB.2.02.1208081836050.21096@kaball.uk.xensource.com>
-Message-ID: <20120809165424.GA7220@phenom.dumpdata.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Thu, 9 Aug 2012 11:05:47 -0500
+Subject: [PATCH 1/2] ARM: build ssi-fiq.S in ARM mode to prevent
+ CONFIG_THUMB2_KERNEL build breakage
+In-Reply-To: <20120809145005.GB17588@linaro.org>
+References: <1344379514-30076-1-git-send-email-matt@genesi-usa.com>
+ <1344379514-30076-2-git-send-email-matt@genesi-usa.com>
+ <20120808065502.GI1451@pengutronix.de>
+ <CAKGA1bmUuSZuWDM4QPTxmNR0+=uQ1RbFhw4u-sb9KaSPYwQiVw@mail.gmail.com>
+ <20120809102414.GA17588@linaro.org>
+ <CAKGA1bniQK9DbZudrHk1mA7FyDZkQzBJbWNUFTFW3pc_2A2x4g@mail.gmail.com>
+ <20120809145005.GB17588@linaro.org>
+Message-ID: <CAKGA1bkzOEiMm8Uo=AiXdquhKHFhjgHE0qXaztcxRvMDSjkfaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Right, the original patch didn't break anything with PV domains. The case
-> > it doesn't handle is an HVM initial domain with an already-running
-> > Xenstore domain; I think this applies both to ARM and hybrid/PVH on x86.
-> > In that case, usage would be set to LOCAL instead of HVM.
-> 
-> 
-> Right, however if I am not mistaken there is no such thing as an HVM
-> dom0 right now on x86 and hybrid/PVH is probably going to return true on
-> xen_pv_domain() and false on xen_hvm_domain().
+On Thu, Aug 9, 2012 at 9:50 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> On Thu, Aug 09, 2012 at 09:32:59AM -0500, Matt Sealey wrote:
+>> Matt Sealey <matt@genesi-usa.com>
+>> Product Development Analyst, Genesi USA, Inc.
+>>
+>>
+>> On Thu, Aug 9, 2012 at 5:24 AM, Dave Martin <dave.martin@linaro.org> wrote:
+>> > On Wed, Aug 08, 2012 at 12:32:39PM -0500, Matt Sealey wrote:
+>> >
+>> > [...]
+>> >
+>> >> I'm going to do a trapse through and find where Russell nacked Dave's
+>> >> thumb-aware
+>> >> rewrite.. would you mind if you have any of these boards seeing if it
+>> >> really DOES
+>> >
+>> > There was no NAK because I didn't get as far as posting the patch,
+>>
+>> http://lists.arm.linux.org.uk/lurker/message/20111202.133911.393b6e28.en.html
+>>
+>> You did, twice :)
+>
+> Well, I meant that I had not posted it as a stand-alone patch for
+> inclusion; I only posted it when commenting on other threads.
+>
+>> > mostly because of the doubt about whether this code is ever relevant
+>> > on Thumb2-capable hardware.
+>>
+>> It's not, but it does break the build, and without disabling phyCORE boards for
+>> Thumb2 it will always break the build..
+>
+> If you want me to push it, let me know.  I don't think this should get
+> merged without some Tested-bys for hardware where the FIQ stuff actually
+> gets used.
 
-The other way around.  HVM = true, PV = false.
+Please, then all the Tested-by's should flood in, right? :)
 
-Mukesh, correct me if I am wrong pls.
-> 
-> In the ARM case, given that we don't have a start_info page, we would
-> need another way to figure out whether a xenstore stub domain is already
-> running, so I think we can just postpone the solution of that problem
-> for now.
+> The older post would be the one to use, since that at least got a
+> reasonable level of build testing.
+
+-- 
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
