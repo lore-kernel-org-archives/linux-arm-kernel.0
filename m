@@ -1,145 +1,78 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Thu, 09 Aug 2012 09:52:40 +0200
-Subject: [PATCH v6 7/7] ARM: davinci: add support for the am1808 based
- enbw_cmc board
-In-Reply-To: <5022A367.1070903@ti.com>
-References: <1341492608-20597-1-git-send-email-hs@denx.de>
- <5022A367.1070903@ti.com>
-Message-ID: <50236C48.3090108@denx.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 9 Aug 2012 09:06:48 +0100
+Subject: imx6q restart is broken
+In-Reply-To: <20120809044131.GF14718@S2101-09.ap.freescale.net>
+References: <20120808101817.GA14718@S2101-09.ap.freescale.net>
+ <50224547.9020000@de.bosch.com> <50232C17.9000700@gmail.com>
+ <20120809044131.GF14718@S2101-09.ap.freescale.net>
+Message-ID: <20120809080648.GB14102@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Nori,
+On Thu, Aug 09, 2012 at 05:41:38AM +0100, Shawn Guo wrote:
+> On Thu, Aug 09, 2012 at 11:18:47AM +0800, Hui Wang wrote:
+> > Dirk Behme wrote:
+> > >On 08.08.2012 12:18, Shawn Guo wrote:
+> > >>Thanks Dirk for reporting that imx6q restart (reboot command) is broken.
+> > >>
+> > >>I tracked down the issue a little bit and found imx6q_restart hangs
+> > >>on the of_iomap/ioremap call. The following change, moving the call
+> > >>somewhere else than imx6q_restart, will just fix the problem.
+> > >>
+> > >>Does that mean ioremap call is not allowed in platform restart hook?
+> > >>I'm not sure about that, because I found it works just fine if I build
+> > >>imx_v6_v7_defconfig with V6 (imx3) platforms excluded (IOW, build a V7
+> > >>only kernel - imx5 and imx6), which is the case how I tested imx6q
+> > >>restart feature when I was adding it.
+> > >>
+> > >>To summarize, the imx6q_restart hangs at ioremap call on a V6 + V7
+> > >>kernel, while it works fine on a V7 only image. I need some help to
+> > >>understand that.
+> > >
+> > >Some additional information from my debugging:
+> > >
+> > >a) Having a JTAG debugger attached to the i.MX6 SabreLite board I
+> > >use (kernel built with imx_v6_v7_defconfig) the reboot does work.
+> > >No hang. This does mean I can't debug the reboot hang with a JTAG
+> > >debugger. Therefore I added some printk debugging:
+> > >
+> > >b) Adding some printk statements [1] in the of_iomap/ioremap call,
+> > >it looks to me that the system hangs in
+> > >
+> > >of_iomap() -> ... -> set_pte_at() -> set_pte_ext() /
+> > >cpu_v7_set_pte_ext() <= hang
+> > >
+> > I noticed this problem several weeks ago, and did some debug, what i
+> > found is following:
+> > 
+> Thanks for these great findings.  I also just tracked it down to that
+> cpu_v7_set_pte_ext hangs on
+> 
+> 	mcr   p15, 0, r0, c7, c10, 1          @ flush_pte
+> 
+> > - at the last stage of reset, all non-boot cpus will call
+> > ipi_cpu_stop()->cpu_relax(), the cpu_relax() is defined to smp_mb()
+> > for V6, and smp_mb() is defined to dmb ("mcr p15, 0, %0, c7, c10,
+> > 5")
+> > 
+> > - the boot cpu will call cpu_v7_set_pte_ext() in the
+> > proc-v7-2level.S, at the end of this function, boot cpu will call
+> > flush_pte (mcr p15, 0, r0, c7, c10, 1), after executing this
+> > function, the system will hang. That is to say, all non-boot cpus
+> > repeatedly call ("mcr p15, 0, %0, c7, c10, 5"), if boot cpu call
+> > flush_pte (mcr p15, 0, r0, c7, c10, 1), the system will hang, this
+> > occurs on the cortexa9 r2p10 cpus (freescale i.MX6Q), i don't know
+> > the root cause for this problem, but if we split imx_v6_v7_defconfig
+> > into v7_only and use v7_only to build kernel image for imx6q, this
+> > problem will disappear, since the cpu_relax() will be defined to
+> > barrier().
 
-On 08.08.2012 19:35, Sekhar Nori wrote:
-> Hi Heiko,
->
-> On 7/5/2012 6:20 PM, Heiko Schocher wrote:
->> - AM1808 based board
->> - 64 MiB DDR ram
->> - 2 MiB Nor flash
->> - 128 MiB NAND flash
->> - use internal RTC
->> - I2C support
->> - hwmon lm75 support
->> - UBI/UBIFS support
->> - MMC support
->> - USB OTG support
->>
->> Signed-off-by: Heiko Schocher<hs@denx.de>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: devicetree-discuss at lists.ozlabs.org
->> Cc: davinci-linux-open-source at linux.davincidsp.com
->> Cc: linux-mtd at lists.infradead.org
->> Cc: linux-i2c at vger.kernel.org
->> Cc: netdev at vger.kernel.org
->> Cc: David Woodhouse<dwmw2@infradead.org>
->> Cc: Ben Dooks<ben-linux@fluff.org>
->> Cc: Wolfram Sang<w.sang@pengutronix.de>
->> Cc: Sekhar Nori<nsekhar@ti.com>
->> Cc: Kevin Hilman<khilman@ti.com>
->> Cc: Wolfgang Denk<wd@denx.de>
->> Cc: Scott Wood<scottwood@freescale.com>
->> Cc: Sylwester Nawrocki<s.nawrocki@samsung.com>
->>
->> ---
->> - post this board support with USB support, even though
->>    USB is only working with the 10 ms "workaround", posted here:
->>    http://comments.gmane.org/gmane.linux.usb.general/54505
->>    I see this issue also on the AM1808 TMDXEXP1808L evalboard.
->> - MMC and USB are not using OF support yet, ideas how to port
->>    this are welcome. I need for USB and MMC boards board
->>    specific callbacks, how to solve this with OF support?
->>
->> - changes for v2:
->>    - changes in the nand node due to comments from Scott Wood:
->>      - add "ti,davinci-" prefix
->>      - Dashes are preferred to underscores
->>      - rename "nandflash" to "nand"
->>      - introduce new "ti,davinci" specific properties for setting
->>        up ecc_mode, ecc_bits, options and bbt options, instead
->>        using linux defines
->>    - changes for i2c due to comments from Sylwester Nawrocki:
->>      - use "cell-index" instead "id"
->>      - OF_DEV_AUXDATA in the machine code, instead pre-define
->>        platform device name
->>    - add comment from Grant Likely for i2c:
->>      - removed "id" resp. "cell-index" completely
->>      - fixed documentation
->>      - use of_match_ptr()
->>      - use devm_kzalloc() for allocating plattform data mem
->>      - fixed a whitespace issue
->>    - add net comments from Grant Likely:
->>      - add prefix "ti,davinci-" to davinci specific property names
->>      - remove version property
->>      - use compatible name "ti,davinci-dm6460-emac"
->>    - add comment from Grant Likely:
->>      - rename compatible node
->>      - do not use cell-index
->>      - CONFIG_OF required for this board
->>      TODO:
->>      - create a generic board support file, as I got no
->>        answer to my ping to grant, maybe this could be done
->>        in a second step?
->> - changes for v3:
->>    - add comments from Sergei Shtylyov:
->>      - rename compatible" prop to "ti,cp_intc"
->>      - cp_intc_init now used for Interrupt controller init
->> - changes for v4:
->>    add comment from Nori Sekhar:
->>    - rename davinci emac compatible property to "ti,davinci-dm6467-emac"
->>    - remove "pinmux-handle" property as discussed here:
->>      http://www.spinics.net/lists/arm-kernel/msg175701.html
->>      with Nori Sekhar
->>
->> - changes for v5:
->>    add comments from Grant Likely:
->>    - rename compatible" prop to "ti,cp-intc"
->>
->> - changes for v6:
->>    rework this patch, as patch
->>    ARM: davinci: cp_intc: Add OF support for TI interrupt controller
->>    was changed from Nori Sekhar on Jul 03, 2012; 9:16pm
->>    Changes therefore in this patch:
->>
->>    Call of_irq_init() in the generic DT board file and not in the
->>    interrupt controller code. See arch/arm/mach-at91/board-dt.c or
->>    arch/arm/mach-omap2/board-generic.c for examples.
->>
->>    At this point the question raises, if we should rename this
->>    board port from arch/arm/mach-davinci/enbw_cmc.c to
->>    arch/arm/mach-davinci/board-dt.c ? Also the defconfig to
->>    davinci_of_defconfig ... ? The USB and MMC callbacks are
->>    currently board specific, but if other boards come in,
->>    that could be easily adapted for their needs ...
->>
->>   arch/arm/boot/dts/enbw_cmc.dts                  |  183 +++++++++++
->>   arch/arm/configs/enbw_cmc_defconfig             |  126 ++++++++
->>   arch/arm/mach-davinci/Kconfig                   |    9 +
->>   arch/arm/mach-davinci/Makefile                  |    1 +
->>   arch/arm/mach-davinci/board-enbw-cmc.c          |  385 +++++++++++++++++++++++
->>   arch/arm/mach-davinci/include/mach/uncompress.h |    1 +
->>   6 files changed, 705 insertions(+), 0 deletions(-)
->>   create mode 100644 arch/arm/boot/dts/enbw_cmc.dts
->>   create mode 100644 arch/arm/configs/enbw_cmc_defconfig
->>   create mode 100644 arch/arm/mach-davinci/board-enbw-cmc.c
->
-> With the move to DT, we are not going to add more board specific files
-> and defconfigs. I am working on adding a generic dt board file for DA850
-> (similar to what has been done for imx). That file is not going to do
-> any platform device registrations. If you are OK with it, I will add the
-> dts file for enbw_cmc board in the patch series I am planning to post.
+Does this work if you always define cpu_relax() to smp_mb() (even on
+ARMv7) and compile the kernel to v7-only? In this case, the smp_mb()
+would use the DMB instruction rather than the CP15 equivalent. It's not
+a solution, just trying to understand the problem better.
 
-I am fine with that. If you have a working version, you can sent it
-(if you want) to me, so I can test it on the enbw_cmc board.
+Thanks.
 
-> Things like USB and MMC/SD will need to be converted to DT before they
-> can be supported on new boards.
-
-Ok, understood.
-
-bye,
-Heiko
 -- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Catalin
