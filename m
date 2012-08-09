@@ -1,143 +1,155 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  9 Aug 2012 16:47:33 +0100
-Subject: [PATCH 07/22] ASoC: Ux500: Initialise PCM from MSP probe rather than
- as a device
+Date: Thu,  9 Aug 2012 16:47:34 +0100
+Subject: [PATCH 08/22] ASoC: codecs: Enable AB8500 CODEC for Device Tree
 In-Reply-To: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
 References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1344527268-5964-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1344527268-5964-9-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCM is a pseudo-device. It doesn't have any of it's own registers
-or hardware. It rather acts as a layer of abstraction for DMA
-transfers. Hence, instead of classifying it as a device in its own
-right, we call the initialisation from the MSP driver.
+We continue to allow the AB8500 CODEC to be registered via the AB8500
+Multi Functional Device API, only this time we extract its configuration
+from the Device Tree binary.
 
 CC: alsa-devel at alsa-project.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- sound/soc/ux500/mop500.c        |    4 ++--
- sound/soc/ux500/ux500_msp_dai.c |   14 +++++++++++++-
- sound/soc/ux500/ux500_pcm.c     |   19 ++++---------------
- sound/soc/ux500/ux500_pcm.h     |    3 +++
- 4 files changed, 22 insertions(+), 18 deletions(-)
+ include/linux/mfd/abx500/ab8500-codec.h |    6 ++-
+ sound/soc/codecs/ab8500-codec.c         |   81 +++++++++++++++++++++++++++++++
+ 2 files changed, 85 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/ux500/mop500.c b/sound/soc/ux500/mop500.c
-index 6840df7..fe6223a 100644
---- a/sound/soc/ux500/mop500.c
-+++ b/sound/soc/ux500/mop500.c
-@@ -33,7 +33,7 @@ struct snd_soc_dai_link mop500_dai_links[] = {
- 		.stream_name = "ab8500_0",
- 		.cpu_dai_name = "ux500-msp-i2s.1",
- 		.codec_dai_name = "ab8500-codec-dai.0",
--		.platform_name = "ux500-pcm.0",
-+		.platform_name = "ux500-msp-i2s.1",
- 		.codec_name = "ab8500-codec.0",
- 		.init = mop500_ab8500_machine_init,
- 		.ops = mop500_ab8500_ops,
-@@ -43,7 +43,7 @@ struct snd_soc_dai_link mop500_dai_links[] = {
- 		.stream_name = "ab8500_1",
- 		.cpu_dai_name = "ux500-msp-i2s.3",
- 		.codec_dai_name = "ab8500-codec-dai.1",
--		.platform_name = "ux500-pcm.0",
-+		.platform_name = "ux500-msp-i2s.3",
- 		.codec_name = "ab8500-codec.0",
- 		.init = NULL,
- 		.ops = mop500_ab8500_ops,
-diff --git a/sound/soc/ux500/ux500_msp_dai.c b/sound/soc/ux500/ux500_msp_dai.c
-index 0f7dd49..3476d6a 100644
---- a/sound/soc/ux500/ux500_msp_dai.c
-+++ b/sound/soc/ux500/ux500_msp_dai.c
-@@ -28,6 +28,7 @@
- 
- #include "ux500_msp_i2s.h"
- #include "ux500_msp_dai.h"
-+#include "ux500_pcm.h"
- 
- static int setup_pcm_multichan(struct snd_soc_dai *dai,
- 			struct ux500_msp_config *msp_config)
-@@ -806,11 +807,20 @@ static int __devinit ux500_msp_drv_probe(struct platform_device *pdev)
- 		goto err_init_msp;
- 	}
- 
-+	ret = ux500_pcm_register_platform(pdev);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev,
-+			"Error: %s: Failed to register PCM platform device!\n",
-+			__func__);
-+		goto err_reg_plat;
-+	}
-+
- 	return 0;
- 
-+err_reg_plat:
-+	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(ux500_msp_dai_drv));
- err_init_msp:
- 	clk_put(drvdata->clk);
--
- err_clk:
- 	devm_regulator_put(drvdata->reg_vape);
- 
-@@ -821,6 +831,8 @@ static int __devexit ux500_msp_drv_remove(struct platform_device *pdev)
- {
- 	struct ux500_msp_i2s_drvdata *drvdata = dev_get_drvdata(&pdev->dev);
- 
-+	ux500_pcm_unregister_platform(pdev);
-+
- 	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(ux500_msp_dai_drv));
- 
- 	devm_regulator_put(drvdata->reg_vape);
-diff --git a/sound/soc/ux500/ux500_pcm.c b/sound/soc/ux500/ux500_pcm.c
-index 1a04e24..894c9f4 100644
---- a/sound/soc/ux500/ux500_pcm.c
-+++ b/sound/soc/ux500/ux500_pcm.c
-@@ -282,7 +282,7 @@ static struct snd_soc_platform_driver ux500_pcm_soc_drv = {
- 	.pcm_new        = ux500_pcm_new,
+diff --git a/include/linux/mfd/abx500/ab8500-codec.h b/include/linux/mfd/abx500/ab8500-codec.h
+index dc65292..d707941 100644
+--- a/include/linux/mfd/abx500/ab8500-codec.h
++++ b/include/linux/mfd/abx500/ab8500-codec.h
+@@ -23,7 +23,8 @@ enum amic_type {
+ /* Mic-biases */
+ enum amic_micbias {
+ 	AMIC_MICBIAS_VAMIC1,
+-	AMIC_MICBIAS_VAMIC2
++	AMIC_MICBIAS_VAMIC2,
++	AMIC_MICBIAS_UNKNOWN
  };
  
--static int __devexit ux500_pcm_drv_probe(struct platform_device *pdev)
-+int __devinit ux500_pcm_register_platform(struct platform_device *pdev)
- {
- 	int ret;
+ /* Bias-voltage */
+@@ -31,7 +32,8 @@ enum ear_cm_voltage {
+ 	EAR_CMV_0_95V,
+ 	EAR_CMV_1_10V,
+ 	EAR_CMV_1_27V,
+-	EAR_CMV_1_58V
++	EAR_CMV_1_58V,
++	EAR_CMV_UNKNOWN
+ };
  
-@@ -296,23 +296,12 @@ static int __devexit ux500_pcm_drv_probe(struct platform_device *pdev)
+ /* Analog microphone settings */
+diff --git a/sound/soc/codecs/ab8500-codec.c b/sound/soc/codecs/ab8500-codec.c
+index 23b4018..fa80961 100644
+--- a/sound/soc/codecs/ab8500-codec.c
++++ b/sound/soc/codecs/ab8500-codec.c
+@@ -34,6 +34,7 @@
+ #include <linux/mfd/abx500/ab8500-sysctrl.h>
+ #include <linux/mfd/abx500/ab8500-codec.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/of.h>
  
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(ux500_pcm_register_platform);
+ #include <sound/core.h>
+ #include <sound/pcm.h>
+@@ -2394,9 +2395,65 @@ struct snd_soc_dai_driver ab8500_codec_dai[] = {
+ 	}
+ };
  
--static int __devinit ux500_pcm_drv_remove(struct platform_device *pdev)
-+int __devexit ux500_pcm_unregister_platform(struct platform_device *pdev)
- {
- 	snd_soc_unregister_platform(&pdev->dev);
- 
- 	return 0;
- }
--
--static struct platform_driver ux500_pcm_driver = {
--	.driver = {
--		.name = "ux500-pcm",
--		.owner = THIS_MODULE,
--	},
--
--	.probe = ux500_pcm_drv_probe,
--	.remove = __devexit_p(ux500_pcm_drv_remove),
--};
--module_platform_driver(ux500_pcm_driver);
--
--MODULE_LICENSE("GPL v2");
-+EXPORT_SYMBOL_GPL(ux500_pcm_unregister_platform);
-diff --git a/sound/soc/ux500/ux500_pcm.h b/sound/soc/ux500/ux500_pcm.h
-index 77ed44d..76d3444 100644
---- a/sound/soc/ux500/ux500_pcm.h
-+++ b/sound/soc/ux500/ux500_pcm.h
-@@ -32,4 +32,7 @@
- #define UX500_PLATFORM_PERIODS_MAX		48
- #define UX500_PLATFORM_BUFFER_BYTES_MAX		(2048 * PAGE_SIZE)
- 
-+int ux500_pcm_register_platform(struct platform_device *pdev);
-+int ux500_pcm_unregister_platform(struct platform_device *pdev);
++static void ab8500_codec_of_probe(struct device *dev, struct device_node *np,
++				struct ab8500_codec_platform_data *codec)
++{
++	u32 value;
 +
- #endif
++	if (of_get_property(np, "stericsson,amic1-type-single-ended", NULL))
++		codec->amics.mic1_type = AMIC_TYPE_SINGLE_ENDED;
++	else
++		codec->amics.mic1_type = AMIC_TYPE_DIFFERENTIAL;
++
++	if (of_get_property(np, "stericsson,amic2-type-single-ended", NULL))
++		codec->amics.mic2_type = AMIC_TYPE_SINGLE_ENDED;
++	else
++		codec->amics.mic2_type = AMIC_TYPE_DIFFERENTIAL;
++
++	/* Has a non-standard Vamic been requested? */
++	if (of_get_property(np, "stericsson,amic1a-bias-vamic2", NULL))
++		codec->amics.mic1a_micbias = AMIC_MICBIAS_VAMIC2;
++	else
++		codec->amics.mic1a_micbias = AMIC_MICBIAS_VAMIC1;
++
++	if (of_get_property(np, "stericsson,amic1b-bias-vamic2", NULL))
++		codec->amics.mic1b_micbias = AMIC_MICBIAS_VAMIC2;
++	else
++		codec->amics.mic1b_micbias = AMIC_MICBIAS_VAMIC1;
++
++	if (of_get_property(np, "stericsson,amic2-bias-vamic1", NULL))
++		codec->amics.mic2_micbias = AMIC_MICBIAS_VAMIC1;
++	else
++		codec->amics.mic2_micbias = AMIC_MICBIAS_VAMIC2;
++
++	if (!of_property_read_u32(np, "stericsson,earpeice-cmv", &value)) {
++		switch (value) {
++		case 950 :
++			codec->ear_cmv = EAR_CMV_0_95V;
++			break;
++		case 1100 :
++			codec->ear_cmv = EAR_CMV_1_10V;
++			break;
++		case 1270 :
++			codec->ear_cmv = EAR_CMV_1_27V;
++			break;
++		case 1580 :
++			codec->ear_cmv = EAR_CMV_1_58V;
++			break;
++		default :
++			codec->ear_cmv = EAR_CMV_UNKNOWN;
++			dev_err(dev, "Unsuitable earpiece voltage found in DT\n");
++		}
++	} else {
++		dev_warn(dev, "No earpiece voltage found in DT - using default\n");
++		codec->ear_cmv = EAR_CMV_0_95V;
++	}
++}
++
+ static int ab8500_codec_probe(struct snd_soc_codec *codec)
+ {
+ 	struct device *dev = codec->dev;
++	struct device_node *np = dev->of_node;
+ 	struct ab8500_codec_drvdata *drvdata = dev_get_drvdata(dev);
+ 	struct ab8500_platform_data *pdata;
+ 	struct filter_control *fc;
+@@ -2407,6 +2464,30 @@ static int ab8500_codec_probe(struct snd_soc_codec *codec)
+ 	/* Setup AB8500 according to board-settings */
+ 	pdata = (struct ab8500_platform_data *)dev_get_platdata(dev->parent);
+ 
++	if (np) {
++		if (!pdata)
++			pdata = devm_kzalloc(dev,
++					sizeof(struct ab8500_platform_data),
++					GFP_KERNEL);
++
++		if (!pdata->codec)
++			pdata->codec
++				= devm_kzalloc(dev,
++					sizeof(struct ab8500_codec_platform_data),
++					GFP_KERNEL);
++
++		if (!(pdata && pdata->codec))
++			return -ENOMEM;
++
++		ab8500_codec_of_probe(dev, np, pdata->codec);
++
++	} else {
++		if (!(pdata && pdata->codec)) {
++			dev_err(dev, "No codec platform data or DT found\n");
++			return -EINVAL;
++		}
++	}
++
+ 	/* Inform SoC Core that we have our own I/O arrangements. */
+ 	codec->control_data = (void *)true;
+ 
 -- 
 1.7.9.5
