@@ -1,74 +1,34 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Thu, 9 Aug 2012 08:29:15 +0200
-Subject: [PATCH] mmc: atmel-mci: not busy flag has also to be used for
- read operations
-In-Reply-To: <87lihqxev6.fsf@octavius.laptop.org>
-References: <1343122924-7799-1-git-send-email-ludovic.desroches@atmel.com>
- <87lihqxev6.fsf@octavius.laptop.org>
-Message-ID: <502358BB.8010801@atmel.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 9 Aug 2012 08:32:10 +0200
+Subject: imx6q restart is broken
+In-Reply-To: <20120809044131.GF14718@S2101-09.ap.freescale.net>
+References: <20120808101817.GA14718@S2101-09.ap.freescale.net>
+ <50224547.9020000@de.bosch.com> <50232C17.9000700@gmail.com>
+ <20120809044131.GF14718@S2101-09.ap.freescale.net>
+Message-ID: <20120809063209.GM1451@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 08/08/2012 05:05 AM, Chris Ball a ?crit :
-> Hi,
->
-> On Tue, Jul 24 2012, ludovic.desroches at atmel.com wrote:
->> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->>
->> Even if the datasheet says that the not busy flag has to be used only for
->> write operations, it's false excepted for version lesser than v2xx.
->> Not waiting the not busy flag for read operations can cause the controller to
->> hang-up during the initialization of some SD cards.
->>
->> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->> Cc: stable at vger.kernel.org
->>
->>
->> Hello,
->>
->> This is a fix for 3.5 and later.
->>
->> Due to the big changes into atmel-mci driver to support all atmel mci versions,
->> a bug was introduced.
->> With some SD cards (mainly micro) when using DMA, the controller hangs-up after
->> the first CMD6 command because the next command is sent too early.
->>
->> Regards
->>
->> Ludovic
->>
->>
->> ---
->>   drivers/mmc/host/atmel-mci.c |    6 +++++-
->>   1 files changed, 5 insertions(+), 1 deletions(-)
->
-> Thanks.  I've applied this for mmc-next now, but please put your patch
-> commentary *underneath* the "---" lines, so that it doesn't end up in
-> the git history itself.  I've rewritten the commit message to be:
+On Thu, Aug 09, 2012 at 12:41:38PM +0800, Shawn Guo wrote:
+> On Thu, Aug 09, 2012 at 11:18:47AM +0800, Hui Wang wrote:
+> > 
+> > - i think we should split imx_v6_v7_defconfig into v6_only and
+> > v7_only, since when we use imx_v6_v7_defconfig, we will introduce
+> > "-D__LINUX_ARM_ARCH__=6" unconditionally, this macro is OK for V6
+> > platforms (imx3), but it is not good for V7 platforms (imx5, imx6).
+> > lets grep "__LINUX_ARM_ARCH__" occurrence under the arch/arm, all
+> > (#if __LINUX_ARM_ARCH__ == 6) and (#if __LINUX_ARM_ARCH__ >= 7)
+> > occurrence will affect V7 platforms.
+> 
+> I just copied a few more people.  Let's hear their comments.
 
-Sorry for this error.
+As a last resort we could split the defconfigs, but before we should
+try to find a solution for this problem.
 
-Thanks
+Sascha
 
-Ludovic
-
->
->
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->
-> Even if the datasheet says that the not busy flag has to be used only
-> for write operations, it's false except for version lesser than v2xx.
->
-> Not waiting on the not busy flag for read operations can cause the
-> controller to hang-up during the initialization of some SD cards
-> with DMA after the first CMD6 -- the next command is sent too early.
->
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Cc: stable <stable@vger.kernel.org> [3.5, 3.6]
-> Signed-off-by: Chris Ball <cjb@laptop.org>
-> ---
-> <patch commentary can go here>
->
->   drivers/mmc/host/atmel-mci.c | 6 +++++-
->   1 file changed, 5 insertions(+), 1 deletion(-)
->
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
