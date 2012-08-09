@@ -1,53 +1,39 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  9 Aug 2012 16:53:49 +0100
-Subject: [PATCH 2/8] irqdomain: Take interrupt-parent property into account if
- specified
+Date: Thu,  9 Aug 2012 16:53:54 +0100
+Subject: [PATCH 7/8] mfd: Use the AB8500's IRQ domain to convert hwirq to virq
 In-Reply-To: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
 References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1344527635-6163-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1344527635-6163-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-irq_find_host() currently ignores the 'interrupt-parent' property
-even if it's specified in the Device Tree. Meaning that a node can
-match to a domain in its hierarchy even if it doesn't belong to it.
-By searching for the parent first using of_irq_find_parent() we
-insist that the 'interrupt-parent' property is taken into account
-ensuring a greater chance of returning the correct domain.
+Before the AB8500 had its own IRQ domain, the IRQ handler would take
+the fired local IRQ (hwirq) and add it to the irq_base to convert it
+to an IRQ number which Linux would understand (virq). However, the
+IRQ base is not always used anymore since we can make use of Linear
+domains. It's better to use the AB8500 hwirq -> virq mapping helper
+function to convert them instead. That's what we do here.
 
-CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-CC: Grant Likely <grant.likely@secretlab.ca>
+CC: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- kernel/irq/irqdomain.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/mfd/ab8500-core.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 49a7772..db63b9b 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -9,6 +9,7 @@
- #include <linux/module.h>
- #include <linux/mutex.h>
- #include <linux/of.h>
-+#include <linux/of_irq.h>
- #include <linux/of_address.h>
- #include <linux/topology.h>
- #include <linux/seq_file.h>
-@@ -323,8 +324,14 @@ EXPORT_SYMBOL_GPL(irq_domain_add_tree);
- struct irq_domain *irq_find_host(struct device_node *node)
- {
- 	struct irq_domain *h, *found = NULL;
-+	struct device_node *parent_node;
- 	int rc;
+diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+index 0c5b70f..71a7757 100644
+--- a/drivers/mfd/ab8500-core.c
++++ b/drivers/mfd/ab8500-core.c
+@@ -501,8 +501,9 @@ static irqreturn_t ab8500_irq(int irq, void *dev)
+ 		do {
+ 			int bit = __ffs(value);
+ 			int line = i * 8 + bit;
++			int virq = ab8500_irq_get_virq(ab8500, line);
  
-+	/* Take heed if an 'interrupt-parent' was specified. */
-+	parent_node = of_irq_find_parent(node);
-+	if (parent_node)
-+		node = parent_node;
-+
- 	/* We might want to match the legacy controller last since
- 	 * it might potentially be set to match all interrupts in
- 	 * the absence of a device node. This isn't a problem so far
+-			handle_nested_irq(ab8500->irq_base + line);
++			handle_nested_irq(virq);
+ 			value &= ~(1 << bit);
+ 
+ 		} while (value);
 -- 
 1.7.9.5
