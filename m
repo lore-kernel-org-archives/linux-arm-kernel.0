@@ -1,61 +1,201 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  9 Aug 2012 18:48:44 +0200
-Subject: LPAE for outer caches functiopns (was Re: [RFC 3/6] arm: cache-l2x0:
- add support for Aurora L2 cache ctrl)
-In-Reply-To: <20120808151946.GE4579@mudshark.cambridge.arm.com>
-References: <20120808151946.GE4579@mudshark.cambridge.arm.com>
-Message-ID: <1344530925-25857-1-git-send-email-gregory.clement@free-electrons.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 9 Aug 2012 17:50:26 +0100
+Subject: [PATCH v2 02/23] xen/arm: hypercalls
+In-Reply-To: <alpine.DEB.2.02.1208091046330.21096@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1208061428060.4645@kaball.uk.xensource.com>
+ <1344263246-28036-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120808124111.GB2134@linaro.org>
+ <alpine.DEB.2.02.1208091046330.21096@kaball.uk.xensource.com>
+Message-ID: <20120809165026.GC17588@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Thu, Aug 09, 2012 at 04:37:24PM +0100, Stefano Stabellini wrote:
+> On Wed, 8 Aug 2012, Dave Martin wrote:
+> > On Mon, Aug 06, 2012 at 03:27:05PM +0100, Stefano Stabellini wrote:
+> > > Use r12 to pass the hypercall number to the hypervisor.
+> > > 
+> > > We need a register to pass the hypercall number because we might not
+> > > know it at compile time and HVC only takes an immediate argument.
+> > > 
+> > > Among the available registers r12 seems to be the best choice because it
+> > > is defined as "intra-procedure call scratch register".
+> > > 
+> > > Use the ISS to pass an hypervisor specific tag.
+> > > 
+> > > Changes in v2:
+> > > - define an HYPERCALL macro for 5 arguments hypercall wrappers, even if
+> > > at the moment is unused;
+> > > - use ldm instead of pop;
+> > > - fix up comments.
+> > > 
+> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > ---
+> > >  arch/arm/include/asm/xen/hypercall.h |   50 ++++++++++++++++
+> > >  arch/arm/xen/Makefile                |    2 +-
+> > >  arch/arm/xen/hypercall.S             |  106 ++++++++++++++++++++++++++++++++++
+> > >  3 files changed, 157 insertions(+), 1 deletions(-)
+> > >  create mode 100644 arch/arm/include/asm/xen/hypercall.h
+> > >  create mode 100644 arch/arm/xen/hypercall.S
+> > 
+> > [...]
+> > 
+> > > diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
+> > > new file mode 100644
+> > > index 0000000..074f5ed
+> > > --- /dev/null
+> > > +++ b/arch/arm/xen/hypercall.S
+> > > @@ -0,0 +1,106 @@
+> > > +/******************************************************************************
+> > > + * hypercall.S
+> > > + *
+> > > + * Xen hypercall wrappers
+> > > + *
+> > > + * Stefano Stabellini <stefano.stabellini@eu.citrix.com>, Citrix, 2012
+> > > + *
+> > > + * This program is free software; you can redistribute it and/or
+> > > + * modify it under the terms of the GNU General Public License version 2
+> > > + * as published by the Free Software Foundation; or, when distributed
+> > > + * separately from the Linux kernel or incorporated into other
+> > > + * software packages, subject to the following license:
+> > > + *
+> > > + * Permission is hereby granted, free of charge, to any person obtaining a copy
+> > > + * of this source file (the "Software"), to deal in the Software without
+> > > + * restriction, including without limitation the rights to use, copy, modify,
+> > > + * merge, publish, distribute, sublicense, and/or sell copies of the Software,
+> > > + * and to permit persons to whom the Software is furnished to do so, subject to
+> > > + * the following conditions:
+> > > + *
+> > > + * The above copyright notice and this permission notice shall be included in
+> > > + * all copies or substantial portions of the Software.
+> > > + *
+> > > + * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+> > > + * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> > > + * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+> > > + * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> > > + * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> > > + * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+> > > + * IN THE SOFTWARE.
+> > > + */
+> > > +
+> > > +/*
+> > > + * The Xen hypercall calling convention is very similar to the ARM
+> > > + * procedure calling convention: the first paramter is passed in r0, the
+> > > + * second in r1, the third in r2 and the fourth in r3. Considering that
+> > > + * Xen hypercalls have 5 arguments at most, the fifth paramter is passed
+> > > + * in r4, differently from the procedure calling convention of using the
+> > > + * stack for that case.
+> > > + *
+> > > + * The hypercall number is passed in r12.
+> > > + *
+> > > + * The return value is in r0.
+> > > + *
+> > > + * The hvc ISS is required to be 0xEA1, that is the Xen specific ARM
+> > > + * hypercall tag.
+> > > + */
+> > > +
+> > > +#include <linux/linkage.h>
+> > > +#include <asm/assembler.h>
+> > > +#include <xen/interface/xen.h>
+> > > +
+> > > +
+> > > +/* HVC 0xEA1 */
+> > > +#ifdef CONFIG_THUMB2_KERNEL
+> > > +#define xen_hvc .word 0xf7e08ea1
+> > > +#else
+> > > +#define xen_hvc .word 0xe140ea71
+> > > +#endif
+> > 
+> > Consider using my opcode injection helpers patch for this (see
+> > separate repost: [PATCH v2 REPOST 0/4] ARM: opcodes: Facilitate custom
+> > opcode injection), assuming that nobody objects to it.  This should mean
+> > that the right opcodes get generated when building a kernel for a big-
+> > endian target for example.
+> > 
+> > I believe the __HVC(imm) macro which I put in <asm/opcodes-virt.h> as an
+> > example should do what you need in this case.
+> 
+> Sure I can do that. Maybe I'll add another patch at the end of my series
+> to replace xen_hvc with __HVC(0xEA1), so that it remains independent
+> from your series.
+> I have learned through experience that avoiding cross patch series
+> dependencies help to reduce the amount of headaches during merge windows
+> :)
 
-You will find an updated version of this patch with LPAE support. I've
-tested with and without LPAE selected.
+I agree.  I'll let you know when my patch gets merged -- in the meantime,
+it makes sense for you to keep your existing code.
 
-Now I get some warning during compilation: "initialization from
-incompatible pointer type [enabled by default]"
+> 
+> 
+> > > +
+> > > +#define HYPERCALL_SIMPLE(hypercall)		\
+> > > +ENTRY(HYPERVISOR_##hypercall)			\
+> > > +	mov r12, #__HYPERVISOR_##hypercall;	\
+> > > +	xen_hvc;							\
+> > > +	mov pc, lr;							\
+> > > +ENDPROC(HYPERVISOR_##hypercall)
+> > > +
+> > > +#define HYPERCALL0 HYPERCALL_SIMPLE
+> > > +#define HYPERCALL1 HYPERCALL_SIMPLE
+> > > +#define HYPERCALL2 HYPERCALL_SIMPLE
+> > > +#define HYPERCALL3 HYPERCALL_SIMPLE
+> > > +#define HYPERCALL4 HYPERCALL_SIMPLE
+> > > +
+> > > +#define HYPERCALL5(hypercall)			\
+> > > +ENTRY(HYPERVISOR_##hypercall)			\
+> > > +	stmdb sp!, {r4}						\
+> > > +	ldr r4, [sp, #4]					\
+> > > +	mov r12, #__HYPERVISOR_##hypercall;	\
+> > > +	xen_hvc								\
+> > > +	ldm sp!, {r4}						\
+> > > +	mov pc, lr							\
+> > > +ENDPROC(HYPERVISOR_##hypercall)
+> > > +
+> > > +                .text
+> > > +
+> > > +HYPERCALL2(xen_version);
+> > > +HYPERCALL3(console_io);
+> > > +HYPERCALL3(grant_table_op);
+> > > +HYPERCALL2(sched_op);
+> > > +HYPERCALL2(event_channel_op);
+> > > +HYPERCALL2(hvm_op);
+> > > +HYPERCALL2(memory_op);
+> > > +HYPERCALL2(physdev_op);
+> > > +
+> > > +ENTRY(privcmd_call)
+> > > +	stmdb sp!, {r4}
+> > > +	mov r12, r0
+> > > +	mov r0, r1
+> > > +	mov r1, r2
+> > > +	mov r2, r3
+> > > +	ldr r3, [sp, #8]
+> > > +	ldr r4, [sp, #4]
+> > > +	xen_hvc
+> > > +	ldm sp!, {r4}
+> > > +	mov pc, lr
+> > 
+> > Note that the preferred entry/exit sequences in such cases are:
+> > 
+> > 	stmfd	sp!, {r4,lr}
+> > 	...
+> > 	ldmfd	sp!, {r4,pc}
+> > 
+> > ...but it works either way.  I would bother to change it unless you
+> > have other changes to make too.
+> 
+> Wouldn't this needlessly save and restore one more register (lr) to the
+> stack?
+> I would try to keep the hypercall wrappers as small as possible...
 
-It is because the outer_cache_fns struct still embed functions with
-unsigned long for address instead of phys_addr_t. You are aware of
-it, as you started to work on it with your patch "ARM: 6671/1: LPAE:
-use phys_addr_t instead of unsigned long in outercache functions".
+Argh, ignore me -- I was hallucinating for some reason that we actually
+needed to save lr, but we don't.
 
-So a first step would be to update the definitions in struct
-outer_cache_fns and also in the files using this prototype, I found
-only 4 files:
+Using the stmfd/ldmfd mnemonics might still be nicer than stmdb/ldm, since
+the fd suffix makes the stack semantics more obvious, and the code
+looks more symmetrical.  This was the conventional way to write these
+mnemonics before the "push" and "pop" mnemonics existed.
 
-git grep -w  outer_.*_range arch/arm | grep = | cut -f 1| uniq
-arch/arm/mm/cache-feroceon-l2.c:
-arch/arm/mm/cache-l2x0.c:
-arch/arm/mm/cache-tauros2.c:
-arch/arm/mm/cache-xsc3l2.c:
+That's purely cosmetic, though.
 
-But it is not enough we also fixed the call to theses functions:
-git grep -w  outer_.*_range arch/arm | grep -v = | cut -f 1 -d: | uniq
-arch/arm/include/asm/outercache.h
-arch/arm/kernel/smp.c
-arch/arm/kernel/suspend.c
-arch/arm/mach-exynos/platsmp.c
-arch/arm/mach-highbank/highbank.c
-arch/arm/mach-msm/platsmp.c
-arch/arm/mach-omap2/omap-secure.c
-arch/arm/mach-ux500/platsmp.c
-arch/arm/mm/dma-mapping.c
-arch/arm/mm/fault-armv.c
-arch/arm/plat-versatile/platsmp.c
-
-Most of them use __pa or directly __virt_to_phys, so once the patch
-"[PATCH 03/22] ARM: LPAE: use phys_addr_t on virt <--> phys
-conversion" will be merged the correct type will be used.
-
-Finally the last file which need some change will be
-arch/arm/mm/dma-mapping.c.
-
-Does it sound correct?
-
-If it does, then I can prepare a patch for it.
-
-Regards,
-
-Gregory
+Cheers
+---Dave
