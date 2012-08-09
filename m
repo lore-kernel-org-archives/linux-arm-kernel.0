@@ -1,79 +1,180 @@
 From: matt@genesi-usa.com (Matt Sealey)
-Date: Thu, 9 Aug 2012 09:29:39 -0500
-Subject: [PATCH] efikamx: reintroduce Genesi Efika MX Smarttop via device
- tree
-In-Reply-To: <CAOMZO5DOEfV4wTSNW8ABaUhGwa_KG3Bkt0o-rs8k-cZk4P-=+A@mail.gmail.com>
-References: <1344375978-29981-1-git-send-email-matt@genesi-usa.com>
- <20120808151555.GE14718@S2101-09.ap.freescale.net>
- <CAKGA1bkbp8_z+HSr97cp_jeCrdTHkQxuZPFu0QPWwnXphWVdZA@mail.gmail.com>
- <CAOMZO5DOEfV4wTSNW8ABaUhGwa_KG3Bkt0o-rs8k-cZk4P-=+A@mail.gmail.com>
-Message-ID: <CAKGA1bkOo=En2P18FaBpq_KAZ88kisikXhNTabvnDknQ-EwFjA@mail.gmail.com>
+Date: Thu, 9 Aug 2012 09:32:59 -0500
+Subject: [PATCH 1/2] ARM: build ssi-fiq.S in ARM mode to prevent
+ CONFIG_THUMB2_KERNEL build breakage
+In-Reply-To: <20120809102414.GA17588@linaro.org>
+References: <1344379514-30076-1-git-send-email-matt@genesi-usa.com>
+ <1344379514-30076-2-git-send-email-matt@genesi-usa.com>
+ <20120808065502.GI1451@pengutronix.de>
+ <CAKGA1bmUuSZuWDM4QPTxmNR0+=uQ1RbFhw4u-sb9KaSPYwQiVw@mail.gmail.com>
+ <20120809102414.GA17588@linaro.org>
+Message-ID: <CAKGA1bniQK9DbZudrHk1mA7FyDZkQzBJbWNUFTFW3pc_2A2x4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 8, 2012 at 12:19 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Matt,
->
-> On Wed, Aug 8, 2012 at 1:55 PM, Matt Sealey <matt@genesi-usa.com> wrote:
->
-> ...
->> or any setup at all for this. What's stopping this right now is you
->> need a new U-Boot which we
->> didn't release or mainline because we are still testing it (old U-Boot
->> shipped on the boards
->> cannot boot device tree anyway). While the number of users of this is
->
-> Actually you can boot a device tree kernel even on old bootloaders
-> that do not support dt.
->
-> You need to select:
-> CONFIG_ARM_APPENDED_DTB=y
-> CONFIG_ARM_ATAG_DTB_COMPAT=y
->
-> Then,
->
-> make -j4 zImage
-> make imx51-babbage.dtb
-> cat arch/arm/boot/zImage arch/arm/boot/ imx51-babbage.dtb  >
-> arch/arm/boot/zImage_dtb
-> mkimage -A arm -O linux -T kernel -C none -a 0x90008000 -e 0x90008000
-> -n Linux -d arch/arm/boot/zImage_dtb arch/arm/boot/uImage
->
-> and boot this generated uImage the same way as you used to do in the
-> non-dt case.
-
-That's true, but we don't have our customers compile their own kernels
-if they can help it, and appending a dtb to the end of a kernel isn't
-part of distro packaging so it just doesn't get done yet... We'd need
-to update a bunch of scripts, test them, and then deal with the
-frightening scenario of appending a dtb to a kernel *and* passing the
-address of the filesystem version (usually the one appended!) - hoping
-either works. It's too much testing. We'd rather update everyone to a
-new U-Boot that works, and deal with a single point on that end, that
-can boot the legacy kernel (machine id matches, legacy boot works on
-old kernel) and the new kernel alike.
-
-All of this is coming from development branches we have here, and
-we're pushing it to mainline as a convenience for everyone concerned.
-
-What we've got on the test plan is;
-
-1) Old U-Boot, Old Kernel. This works already for years.
-2) New U-Boot, Old Kernel. This works, well tested.
-3) New U-Boot, New Kernel+DTB. This works or we wouldn't be sending patches.
-
-The Old U-Boot, New Kernel doesn't make sense for us if the New U-Boot
-is all that's required to retain functionality.
-
-The reason the new kernel depends on the new U-Boot is we're trying to
-do all pinmux configuration in U-Boot (and we do in-house, and it
-works). No pinctrl stuff in the kernel or device tree is required at
-this point. The Old Kernel will remux a few things redundantly or
-change drive strengths or whatever or add hysteresis to the UART port
-which is not board-burning but is not really necessary, but it will
-work. The new kernel will just be able to do what it does out of the
-box, which is how it should be (hence why I object to adding pinctrl
-setup...)
-
---
 Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
+
+
+On Thu, Aug 9, 2012 at 5:24 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> On Wed, Aug 08, 2012 at 12:32:39PM -0500, Matt Sealey wrote:
+>
+> [...]
+>
+>> I'm going to do a trapse through and find where Russell nacked Dave's
+>> thumb-aware
+>> rewrite.. would you mind if you have any of these boards seeing if it
+>> really DOES
+>
+> There was no NAK because I didn't get as far as posting the patch,
+
+http://lists.arm.linux.org.uk/lurker/message/20111202.133911.393b6e28.en.html
+
+You did, twice :)
+
+> mostly because of the doubt about whether this code is ever relevant
+> on Thumb2-capable hardware.
+
+It's not, but it does break the build, and without disabling phyCORE boards for
+Thumb2 it will always break the build..
+
+> If somebody with some old imx hardware that definitely relies on this
+> wants to pick it up and test it, it might still be useful.
+>
+> I don't know whether I still have the original patch, but I think the
+> only think I did was to swap the roles of r13 and r12.  In the original
+> code r12 is only used as a base register, which is permissible usage
+> for r13 in Thumb-2.  Those two registers appear private to the fiq
+> handler, so I don't think the change will break anything, but I'd be
+> more confident is somebody is able to test it.
+>
+> Cheers
+> ---Dave
+>
+> diff --git a/arch/arm/plat-mxc/ssi-fiq.S b/arch/arm/plat-mxc/ssi-fiq.S
+> index 8397a2d..3589afb 100644
+> --- a/arch/arm/plat-mxc/ssi-fiq.S
+> +++ b/arch/arm/plat-mxc/ssi-fiq.S
+> @@ -35,19 +35,19 @@
+>                 .global imx_ssi_fiq_tx_buffer
+>
+>  imx_ssi_fiq_start:
+> -               ldr r12, imx_ssi_fiq_base
+> +               ldr r13, imx_ssi_fiq_base
+>
+>                 /* TX */
+>                 ldr r11, imx_ssi_fiq_tx_buffer
+>
+>                 /* shall we send? */
+> -               ldr r13, [r12, #SSI_SIER]
+> -               tst r13, #SSI_SIER_TFE0_EN
+> +               ldr r12, [r13, #SSI_SIER]
+> +               tst r12, #SSI_SIER_TFE0_EN
+>                 beq 1f
+>
+>                 /* TX FIFO empty? */
+> -               ldr r13, [r12, #SSI_SISR]
+> -               tst r13, #SSI_SISR_TFE0
+> +               ldr r12, [r13, #SSI_SISR]
+> +               tst r12, #SSI_SISR_TFE0
+>                 beq 1f
+>
+>                 mov r10, #0x10000
+> @@ -56,34 +56,34 @@ imx_ssi_fiq_start:
+>
+>                 add r11, r11, r10
+>
+> -               ldrh r13, [r11]
+> -               strh r13, [r12, #SSI_STX0]
+> +               ldrh r12, [r11]
+> +               strh r12, [r13, #SSI_STX0]
+>
+> -               ldrh r13, [r11, #2]
+> -               strh r13, [r12, #SSI_STX0]
+> +               ldrh r12, [r11, #2]
+> +               strh r12, [r13, #SSI_STX0]
+>
+> -               ldrh r13, [r11, #4]
+> -               strh r13, [r12, #SSI_STX0]
+> +               ldrh r12, [r11, #4]
+> +               strh r12, [r13, #SSI_STX0]
+>
+> -               ldrh r13, [r11, #6]
+> -               strh r13, [r12, #SSI_STX0]
+> +               ldrh r12, [r11, #6]
+> +               strh r12, [r13, #SSI_STX0]
+>
+>                 add r10, #8
+> -               lsr r13, r8, #16        /* r13: buffer size */
+> -               cmp r10, r13
+> -               lslgt r8, r13, #16
+> +               lsr r12, r8, #16        /* r12: buffer size */
+> +               cmp r10, r12
+> +               lslgt r8, r12, #16
+>                 addle r8, #8
+>  1:
+>                 /* RX */
+>
+>                 /* shall we receive? */
+> -               ldr r13, [r12, #SSI_SIER]
+> -               tst r13, #SSI_SIER_RFF0_EN
+> +               ldr r12, [r13, #SSI_SIER]
+> +               tst r12, #SSI_SIER_RFF0_EN
+>                 beq 1f
+>
+>                 /* RX FIFO full? */
+> -               ldr r13, [r12, #SSI_SISR]
+> -               tst r13, #SSI_SISR_RFF0
+> +               ldr r12, [r13, #SSI_SISR]
+> +               tst r12, #SSI_SISR_RFF0
+>                 beq 1f
+>
+>                 ldr r11, imx_ssi_fiq_rx_buffer
+> @@ -94,31 +94,31 @@ imx_ssi_fiq_start:
+>
+>                 add r11, r11, r10
+>
+> -               ldr r13, [r12, #SSI_SACNT]
+> -               tst r13, #SSI_SACNT_AC97EN
+> +               ldr r12, [r13, #SSI_SACNT]
+> +               tst r12, #SSI_SACNT_AC97EN
+>
+> -               ldr r13, [r12, #SSI_SRX0]
+> -               strh r13, [r11]
+> +               ldr r12, [r13, #SSI_SRX0]
+> +               strh r12, [r11]
+>
+> -               ldr r13, [r12, #SSI_SRX0]
+> -               strh r13, [r11, #2]
+> +               ldr r12, [r13, #SSI_SRX0]
+> +               strh r12, [r11, #2]
+>
+>                 /* dummy read to skip slot 12 */
+> -               ldrne r13, [r12, #SSI_SRX0]
+> +               ldrne r12, [r13, #SSI_SRX0]
+>
+> -               ldr r13, [r12, #SSI_SRX0]
+> -               strh r13, [r11, #4]
+> +               ldr r12, [r13, #SSI_SRX0]
+> +               strh r12, [r11, #4]
+>
+> -               ldr r13, [r12, #SSI_SRX0]
+> -               strh r13, [r11, #6]
+> +               ldr r12, [r13, #SSI_SRX0]
+> +               strh r12, [r11, #6]
+>
+>                 /* dummy read to skip slot 12 */
+> -               ldrne r13, [r12, #SSI_SRX0]
+> +               ldrne r12, [r13, #SSI_SRX0]
+>
+>                 add r10, #8
+> -               lsr r13, r9, #16        /* r13: buffer size */
+> -               cmp r10, r13
+> -               lslgt r9, r13, #16
+> +               lsr r12, r9, #16        /* r12: buffer size */
+> +               cmp r10, r12
+> +               lslgt r9, r12, #16
+>                 addle r9, #8
+>
+>  1:
+>
