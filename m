@@ -1,96 +1,74 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 Aug 2012 23:18:13 -0700
-Subject: [linux-pm] [PATCH v4 2/4] mfd: omap: control: core system
- control driver
-In-Reply-To: <50227ED9.3010508@dev.rtsoft.ru>
-References: <500FD2EC.7060208@dev.rtsoft.ru>
- <20120808140507.GF11011@atomide.com>
- <20120808141051.GG11011@atomide.com>
- <20120808143929.GJ11011@atomide.com>
- <50227ED9.3010508@dev.rtsoft.ru>
-Message-ID: <20120809061813.GK11011@atomide.com>
+From: ludovic.desroches@atmel.com (ludovic.desroches)
+Date: Thu, 9 Aug 2012 08:29:15 +0200
+Subject: [PATCH] mmc: atmel-mci: not busy flag has also to be used for
+ read operations
+In-Reply-To: <87lihqxev6.fsf@octavius.laptop.org>
+References: <1343122924-7799-1-git-send-email-ludovic.desroches@atmel.com>
+ <87lihqxev6.fsf@octavius.laptop.org>
+Message-ID: <502358BB.8010801@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Konstantin Baydarov <kbaidarov@dev.rtsoft.ru> [120808 07:59]:
-> On 08/08/2012 06:39 PM, Tony Lindgren wrote:
-> 
-> Yes, omap_type() is called very early , that is why I'm using early_initcall
-> for omap_control_base initialization.
-> 
-> Do you mean following?:
-> void __init omap2_set_globals_control(struct omap_globals *omap2_globals)
-> {
->     if (omap2_globals->ctrl)
->         omap2_ctrl_base = omap2_globals->ctrl;
-> 
->     if (omap2_globals->ctrl_pad)
->         omap4_ctrl_pad_base = omap2_globals->ctrl_pad;
-> 
->     omap_control_base = omap2_ctrl_base;  // this line is added
-> }
+Le 08/08/2012 05:05 AM, Chris Ball a ?crit :
+> Hi,
+>
+> On Tue, Jul 24 2012, ludovic.desroches at atmel.com wrote:
+>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+>>
+>> Even if the datasheet says that the not busy flag has to be used only for
+>> write operations, it's false excepted for version lesser than v2xx.
+>> Not waiting the not busy flag for read operations can cause the controller to
+>> hang-up during the initialization of some SD cards.
+>>
+>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+>> Cc: stable at vger.kernel.org
+>>
+>>
+>> Hello,
+>>
+>> This is a fix for 3.5 and later.
+>>
+>> Due to the big changes into atmel-mci driver to support all atmel mci versions,
+>> a bug was introduced.
+>> With some SD cards (mainly micro) when using DMA, the controller hangs-up after
+>> the first CMD6 command because the next command is sent too early.
+>>
+>> Regards
+>>
+>> Ludovic
+>>
+>>
+>> ---
+>>   drivers/mmc/host/atmel-mci.c |    6 +++++-
+>>   1 files changed, 5 insertions(+), 1 deletions(-)
+>
+> Thanks.  I've applied this for mmc-next now, but please put your patch
+> commentary *underneath* the "---" lines, so that it doesn't end up in
+> the git history itself.  I've rewritten the commit message to be:
 
-OK so we already have set_globals_control, but we're not using it..
-No need for this line is added above.
+Sorry for this error.
 
-Let's do the attached clean-up patch and just leave omap_control_base
-out of the driver for now as it's not currently needed there.
+Thanks
 
-If omap_control_base is needed in the driver, then we need to pass
-it in the platform_data to the driver for the non-DT boot case, or
-parse it from DT like you're doing.
+Ludovic
 
-Regards,
-
-Tony
-
-
-From: Tony Lindgren <tony@atomide.com>
-Date: Wed, 8 Aug 2012 23:13:03 -0700
-Subject: [PATCH] ARM: OMAP2+: Change omap_type() to use omap_ctrl_base_get()
-
-We have the SoC specific ctrl_base already initialized in
-set_globals.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -42,28 +42,20 @@ int omap_type(void)
- {
- 	u32 val = 0;
- 
--	if (cpu_is_omap24xx()) {
--		val = omap_ctrl_readl(OMAP24XX_CONTROL_STATUS);
--	} else if (soc_is_am33xx()) {
--		val = omap_ctrl_readl(AM33XX_CONTROL_STATUS);
--	} else if (cpu_is_omap34xx()) {
--		val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
--	} else if (cpu_is_omap44xx()) {
--		val = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STATUS);
--	} else if (soc_is_omap54xx()) {
--		val = omap_ctrl_readl(OMAP5XXX_CONTROL_STATUS);
-+	val = __raw_readl(omap_ctrl_base_get());
-+	if (!val) {
-+		pr_err("Cannot detect omap type!\n");
-+		return 0;
-+	}
-+
-+	if (soc_is_omap54xx()) {
- 		val &= OMAP5_DEVICETYPE_MASK;
- 		val >>= 6;
--		goto out;
- 	} else {
--		pr_err("Cannot detect omap type!\n");
--		goto out;
-+		val &= OMAP2_DEVICETYPE_MASK;
-+		val >>= 8;
- 	}
- 
--	val &= OMAP2_DEVICETYPE_MASK;
--	val >>= 8;
--
--out:
- 	return val;
- }
- EXPORT_SYMBOL(omap_type);
+>
+>
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+>
+> Even if the datasheet says that the not busy flag has to be used only
+> for write operations, it's false except for version lesser than v2xx.
+>
+> Not waiting on the not busy flag for read operations can cause the
+> controller to hang-up during the initialization of some SD cards
+> with DMA after the first CMD6 -- the next command is sent too early.
+>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Cc: stable <stable@vger.kernel.org> [3.5, 3.6]
+> Signed-off-by: Chris Ball <cjb@laptop.org>
+> ---
+> <patch commentary can go here>
+>
+>   drivers/mmc/host/atmel-mci.c | 6 +++++-
+>   1 file changed, 5 insertions(+), 1 deletion(-)
+>
