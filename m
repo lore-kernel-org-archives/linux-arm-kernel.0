@@ -1,57 +1,75 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 9 Aug 2012 11:32:14 +0200
-Subject: [PATCH v2 1/2] cpufreq: OMAP: Handle missing frequency table on
- SMP systems
-In-Reply-To: <1344496102-24451-2-git-send-email-rnayak@ti.com>
-References: <1344496102-24451-1-git-send-email-rnayak@ti.com>
- <1344496102-24451-2-git-send-email-rnayak@ti.com>
-Message-ID: <201208091132.14992.rjw@sisk.pl>
+From: pieter@gmx.com (pieterg)
+Date: Thu, 9 Aug 2012 11:30:55 +0200
+Subject: [Openpxa-users] pxa3x0 smart panel interface
+In-Reply-To: <CAN1soZyf5m+n7F+=jiKhqCjEuxdzESq9Cft8oDUhD3t4UN75sA@mail.gmail.com>
+References: <20120806152551.4ec2cad0@laptoppieter>
+ <201208082157.22064.marek.vasut@gmail.com>
+ <CAN1soZyf5m+n7F+=jiKhqCjEuxdzESq9Cft8oDUhD3t4UN75sA@mail.gmail.com>
+Message-ID: <20120809113055.210f35e4@laptoppieter>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 09, 2012, Rajendra Nayak wrote:
-> On OMAP4, if the first CPU fails to get a valid frequency table (this
-> could happen if the platform does not register any OPP table), the
-> subsequent CPU instances end up dealing with a NULL freq_table and
-> crash.
+On Thu, 9 Aug 2012 15:10:40 +0800
+Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+> >> Does any of you have experience with interfacing smart lcd panels,
+> >> with a pxa3x0?
+> >>
 > 
-> Check for an already existing freq_table, before trying to create one,
-> and increment the freq_table_users only if the table is sucessfully
-> created.
+> We didn't try to connect smart lcd panel with pxa300 or pxa310.
 > 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: <linux-pm@vger.kernel.org>
-
-Kevin, are you going to merge this?
-
-Rafael
-
-
-> ---
->  drivers/cpufreq/omap-cpufreq.c |    4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+> >> I'm interfacing an ILI9327DS smart panel controller, all commands
+> >> are handled correctly, however the SMART_CMD_WRITE_FRAME command
+> >> (which sends out all frame data) seems to produce an invalid
+> >> number of output bytes every now and then.
+> >> This results in a shifted display, every 10-100 updates
+> >> (immediately corrected by the next update)
 > 
-> diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-> index 17fa04d..b47034e 100644
-> --- a/drivers/cpufreq/omap-cpufreq.c
-> +++ b/drivers/cpufreq/omap-cpufreq.c
-> @@ -218,7 +218,7 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
->  
->  	policy->cur = policy->min = policy->max = omap_getspeed(policy->cpu);
->  
-> -	if (atomic_inc_return(&freq_table_users) == 1)
-> +	if (!freq_table)
->  		result = opp_init_cpufreq_table(mpu_dev, &freq_table);
->  
->  	if (result) {
-> @@ -227,6 +227,8 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
->  		goto fail_ck;
->  	}
->  
-> +	atomic_inc_return(&freq_table_users);
-> +
->  	result = cpufreq_frequency_table_cpuinfo(policy, freq_table);
->  	if (result)
->  		goto fail_table;
+> Do you mean that you observe this behavior on oscilloscope? Are you
+> using LCD interface
+> or SMEM interface?
+
+I'm using the LCD interface (pxafb.c with CONFIG_FB_PXA_SMARTPANEL).
+
+It is hard to check the exact length of the data block on an
+oscilloscope (400 * 240 * 3 bytes of data is a bit too much). There is
+no noticable difference in transfer length, when the display shifts.
+I do not have the equipment to check the exact number of bytes being
+transferred.
+But when I configure the controller to wrap the write pointer around at
+the end of the visible area, and update using just the
+SMART_CMD_WRITE_FRAME command (no start command for the controller to
+reset the write pointer to the beginning of the frame), I can see the
+display image almost constantly shifting. A few columns forward, a few
+columns back. Therefore my conclusion that the number of data bytes
+sent (or received by the controller) must be fluctuating.
+And this effect is at the end (or the beginning) of the frame, never
+in the middle. Because the display image, though being shifted, is never
+distorted.
+
+> >> The strange thing is that this does not occur with a pxa300, but it
+> >> occurs with the pxa310 and pxa320.
+> >> However running the 310/320 with the same ACCR as I'm running the
+> >> 300 does not 'fix' it.
 > 
+> Do you change frequency while you are testing this smart panel?
+
+No, I'm keeping the frequencies constant, during the test.
+(and the smart panel timings are not yet recalculated after a frequency
+switch, so that would need some work)
+
+> >> And I'm not sure it is even timing related, I've tried to configure
+> >> huge smart timing delay parameters, but the results remain the
+> >> same. (in fact I can even lower the parameters to way under the
+> >> controller specs, and the issue does not get worse).
+> >> I've also played with the drive strength of the LCD lines, which
+> >> also does not have an effect on the issue.
+> >>
+> >> I do not think this is a controller bug, because before this
+> >> ILI9327DS controller, we had a display with a different controller
+> >> chip, with which I experienced the same thing, however at that
+> >> time even with the pxa300.
+> >> We switched to the ILI9327DS (for a different reason), and I was
+> >> glad to find that it worked fine with the pxa300.
+> >> Till I discovered it had the same issues, but then only with a
+> >> pxa310/320.
+> LCD controller between pxa300 and pxa310 is nearly same.
