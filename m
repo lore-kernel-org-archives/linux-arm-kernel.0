@@ -1,155 +1,71 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  9 Aug 2012 16:47:34 +0100
-Subject: [PATCH 08/22] ASoC: codecs: Enable AB8500 CODEC for Device Tree
+Date: Thu,  9 Aug 2012 16:47:36 +0100
+Subject: [PATCH 10/22] Documentation: Define the MSP Driver Device Tree
+ bindings
 In-Reply-To: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
 References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1344527268-5964-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1344527268-5964-11-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We continue to allow the AB8500 CODEC to be registered via the AB8500
-Multi Functional Device API, only this time we extract its configuration
-from the Device Tree binary.
+Here we add the required documentation for the new Device Tree
+bindings pertaining to the MSP CPU-side DAI Driver.
 
 CC: alsa-devel at alsa-project.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- include/linux/mfd/abx500/ab8500-codec.h |    6 ++-
- sound/soc/codecs/ab8500-codec.c         |   81 +++++++++++++++++++++++++++++++
- 2 files changed, 85 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/sound/ux500-msp.txt        |   43 ++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/ux500-msp.txt
 
-diff --git a/include/linux/mfd/abx500/ab8500-codec.h b/include/linux/mfd/abx500/ab8500-codec.h
-index dc65292..d707941 100644
---- a/include/linux/mfd/abx500/ab8500-codec.h
-+++ b/include/linux/mfd/abx500/ab8500-codec.h
-@@ -23,7 +23,8 @@ enum amic_type {
- /* Mic-biases */
- enum amic_micbias {
- 	AMIC_MICBIAS_VAMIC1,
--	AMIC_MICBIAS_VAMIC2
-+	AMIC_MICBIAS_VAMIC2,
-+	AMIC_MICBIAS_UNKNOWN
- };
- 
- /* Bias-voltage */
-@@ -31,7 +32,8 @@ enum ear_cm_voltage {
- 	EAR_CMV_0_95V,
- 	EAR_CMV_1_10V,
- 	EAR_CMV_1_27V,
--	EAR_CMV_1_58V
-+	EAR_CMV_1_58V,
-+	EAR_CMV_UNKNOWN
- };
- 
- /* Analog microphone settings */
-diff --git a/sound/soc/codecs/ab8500-codec.c b/sound/soc/codecs/ab8500-codec.c
-index 23b4018..fa80961 100644
---- a/sound/soc/codecs/ab8500-codec.c
-+++ b/sound/soc/codecs/ab8500-codec.c
-@@ -34,6 +34,7 @@
- #include <linux/mfd/abx500/ab8500-sysctrl.h>
- #include <linux/mfd/abx500/ab8500-codec.h>
- #include <linux/regulator/consumer.h>
-+#include <linux/of.h>
- 
- #include <sound/core.h>
- #include <sound/pcm.h>
-@@ -2394,9 +2395,65 @@ struct snd_soc_dai_driver ab8500_codec_dai[] = {
- 	}
- };
- 
-+static void ab8500_codec_of_probe(struct device *dev, struct device_node *np,
-+				struct ab8500_codec_platform_data *codec)
-+{
-+	u32 value;
+diff --git a/Documentation/devicetree/bindings/sound/ux500-msp.txt b/Documentation/devicetree/bindings/sound/ux500-msp.txt
+new file mode 100644
+index 0000000..99acd9c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/ux500-msp.txt
+@@ -0,0 +1,43 @@
++* ux500 MSP (CPU-side Digital Audio Interface)
 +
-+	if (of_get_property(np, "stericsson,amic1-type-single-ended", NULL))
-+		codec->amics.mic1_type = AMIC_TYPE_SINGLE_ENDED;
-+	else
-+		codec->amics.mic1_type = AMIC_TYPE_DIFFERENTIAL;
++Required properties:
++ - compatible       :"stericsson,ux500-msp-i2s"
++ - reg              : Physical base address and length of the device's registers.
 +
-+	if (of_get_property(np, "stericsson,amic2-type-single-ended", NULL))
-+		codec->amics.mic2_type = AMIC_TYPE_SINGLE_ENDED;
-+	else
-+		codec->amics.mic2_type = AMIC_TYPE_DIFFERENTIAL;
++Optional properties:
++ - interrupts       : The interrupt output from the device.
++ - interrupt-parent : The parent interrupt controller.
++ - <name>-supply    : Phandle to the regulator <name> supply
 +
-+	/* Has a non-standard Vamic been requested? */
-+	if (of_get_property(np, "stericsson,amic1a-bias-vamic2", NULL))
-+		codec->amics.mic1a_micbias = AMIC_MICBIAS_VAMIC2;
-+	else
-+		codec->amics.mic1a_micbias = AMIC_MICBIAS_VAMIC1;
++Example:
 +
-+	if (of_get_property(np, "stericsson,amic1b-bias-vamic2", NULL))
-+		codec->amics.mic1b_micbias = AMIC_MICBIAS_VAMIC2;
-+	else
-+		codec->amics.mic1b_micbias = AMIC_MICBIAS_VAMIC1;
++	sound {
++		compatible = "stericsson,snd-soc-mop500";
 +
-+	if (of_get_property(np, "stericsson,amic2-bias-vamic1", NULL))
-+		codec->amics.mic2_micbias = AMIC_MICBIAS_VAMIC1;
-+	else
-+		codec->amics.mic2_micbias = AMIC_MICBIAS_VAMIC2;
++		stericsson,platform-pcm-dma = <&pcm>;
++		stericsson,cpu-dai = <&msp1 &msp3>;
++		stericsson,audio-codec = <&codec>;
++	};
 +
-+	if (!of_property_read_u32(np, "stericsson,earpeice-cmv", &value)) {
-+		switch (value) {
-+		case 950 :
-+			codec->ear_cmv = EAR_CMV_0_95V;
-+			break;
-+		case 1100 :
-+			codec->ear_cmv = EAR_CMV_1_10V;
-+			break;
-+		case 1270 :
-+			codec->ear_cmv = EAR_CMV_1_27V;
-+			break;
-+		case 1580 :
-+			codec->ear_cmv = EAR_CMV_1_58V;
-+			break;
-+		default :
-+			codec->ear_cmv = EAR_CMV_UNKNOWN;
-+			dev_err(dev, "Unsuitable earpiece voltage found in DT\n");
-+		}
-+	} else {
-+		dev_warn(dev, "No earpiece voltage found in DT - using default\n");
-+		codec->ear_cmv = EAR_CMV_0_95V;
-+	}
-+}
++	pcm: ux500-pcm {
++		compatible = "stericsson,ux500-pcm";
++	};
 +
- static int ab8500_codec_probe(struct snd_soc_codec *codec)
- {
- 	struct device *dev = codec->dev;
-+	struct device_node *np = dev->of_node;
- 	struct ab8500_codec_drvdata *drvdata = dev_get_drvdata(dev);
- 	struct ab8500_platform_data *pdata;
- 	struct filter_control *fc;
-@@ -2407,6 +2464,30 @@ static int ab8500_codec_probe(struct snd_soc_codec *codec)
- 	/* Setup AB8500 according to board-settings */
- 	pdata = (struct ab8500_platform_data *)dev_get_platdata(dev->parent);
- 
-+	if (np) {
-+		if (!pdata)
-+			pdata = devm_kzalloc(dev,
-+					sizeof(struct ab8500_platform_data),
-+					GFP_KERNEL);
++	msp1: msp at 80124000 {
++		compatible = "stericsson,ux500-msp-i2s";
++		reg = <0x80124000 0x1000>;
++		interrupts = <0 62 0x4>;
++		v-ape-supply = <&db8500_vape_reg>;
++	};
 +
-+		if (!pdata->codec)
-+			pdata->codec
-+				= devm_kzalloc(dev,
-+					sizeof(struct ab8500_codec_platform_data),
-+					GFP_KERNEL);
++	msp3: msp at 80125000 {
++		compatible = "stericsson,ux500-msp-i2s";
++		reg = <0x80125000 0x1000>;
++		interrupts = <0 62 0x4>;
++		v-ape-supply = <&db8500_vape_reg>;
++	};
 +
-+		if (!(pdata && pdata->codec))
-+			return -ENOMEM;
-+
-+		ab8500_codec_of_probe(dev, np, pdata->codec);
-+
-+	} else {
-+		if (!(pdata && pdata->codec)) {
-+			dev_err(dev, "No codec platform data or DT found\n");
-+			return -EINVAL;
-+		}
-+	}
-+
- 	/* Inform SoC Core that we have our own I/O arrangements. */
- 	codec->control_data = (void *)true;
- 
++	codec: ab8500-codec {
++		compatible = "stericsson,ab8500-codec";
++		stericsson,earpeice-cmv = <950>; /* Units in mV. */
++	};
 -- 
 1.7.9.5
