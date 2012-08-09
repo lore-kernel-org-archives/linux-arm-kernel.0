@@ -1,53 +1,54 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu,  9 Aug 2012 13:54:55 +1200
-Subject: [PATCHv2 3/8] serial: vt8500: Add devicetree support for vt8500-serial
+Date: Thu,  9 Aug 2012 13:54:54 +1200
+Subject: [PATCHv2 2/8] rtc: vt8500: Add devicetree support for vt8500-rtc
 In-Reply-To: <1344477300-25251-1-git-send-email-linux@prisktech.co.nz>
 References: <1344477300-25251-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1344477300-25251-4-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1344477300-25251-3-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
- drivers/tty/serial/vt8500_serial.c |    9 ++++++++-
+ drivers/rtc/rtc-vt8500.c |    9 ++++++++-
  1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
-index 2be006f..dee6715 100644
---- a/drivers/tty/serial/vt8500_serial.c
-+++ b/drivers/tty/serial/vt8500_serial.c
-@@ -34,6 +34,7 @@
- #include <linux/slab.h>
- #include <linux/clk.h>
+diff --git a/drivers/rtc/rtc-vt8500.c b/drivers/rtc/rtc-vt8500.c
+index 9e94fb1..07bf193 100644
+--- a/drivers/rtc/rtc-vt8500.c
++++ b/drivers/rtc/rtc-vt8500.c
+@@ -23,6 +23,7 @@
+ #include <linux/bcd.h>
  #include <linux/platform_device.h>
+ #include <linux/slab.h>
 +#include <linux/of.h>
  
  /*
-  * UART Register offsets
-@@ -603,12 +604,18 @@ static int __devexit vt8500_serial_remove(struct platform_device *pdev)
+  * Register definitions
+@@ -302,12 +303,18 @@ static int __devexit vt8500_rtc_remove(struct platform_device *pdev)
  	return 0;
  }
  
 +static const struct of_device_id wmt_dt_ids[] = {
-+	{ .compatible = "via,vt8500-uart", },
++	{ .compatible = "via,vt8500-rtc", },
 +	{}
 +};
 +
- static struct platform_driver vt8500_platform_driver = {
- 	.probe  = vt8500_serial_probe,
- 	.remove = __devexit_p(vt8500_serial_remove),
- 	.driver = {
- 		.name = "vt8500_serial",
- 		.owner = THIS_MODULE,
+ static struct platform_driver vt8500_rtc_driver = {
+ 	.probe		= vt8500_rtc_probe,
+ 	.remove		= __devexit_p(vt8500_rtc_remove),
+ 	.driver		= {
+ 		.name	= "vt8500-rtc",
+ 		.owner	= THIS_MODULE,
 +		.of_match_table = of_match_ptr(wmt_dt_ids),
  	},
  };
  
-@@ -642,4 +649,4 @@ module_exit(vt8500_serial_exit);
+@@ -315,5 +322,5 @@ module_platform_driver(vt8500_rtc_driver);
  
  MODULE_AUTHOR("Alexey Charkov <alchark@gmail.com>");
- MODULE_DESCRIPTION("Driver for vt8500 serial device");
+ MODULE_DESCRIPTION("VIA VT8500 SoC Realtime Clock Driver (RTC)");
 -MODULE_LICENSE("GPL");
 +MODULE_LICENSE("GPL v2");
+ MODULE_ALIAS("platform:vt8500-rtc");
 -- 
 1.7.9.5
