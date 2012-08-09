@@ -1,59 +1,62 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Thu, 9 Aug 2012 11:05:47 -0500
-Subject: [PATCH 1/2] ARM: build ssi-fiq.S in ARM mode to prevent
- CONFIG_THUMB2_KERNEL build breakage
-In-Reply-To: <20120809145005.GB17588@linaro.org>
-References: <1344379514-30076-1-git-send-email-matt@genesi-usa.com>
- <1344379514-30076-2-git-send-email-matt@genesi-usa.com>
- <20120808065502.GI1451@pengutronix.de>
- <CAKGA1bmUuSZuWDM4QPTxmNR0+=uQ1RbFhw4u-sb9KaSPYwQiVw@mail.gmail.com>
- <20120809102414.GA17588@linaro.org>
- <CAKGA1bniQK9DbZudrHk1mA7FyDZkQzBJbWNUFTFW3pc_2A2x4g@mail.gmail.com>
- <20120809145005.GB17588@linaro.org>
-Message-ID: <CAKGA1bkzOEiMm8Uo=AiXdquhKHFhjgHE0qXaztcxRvMDSjkfaQ@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 09 Aug 2012 12:17:30 -0400 (EDT)
+Subject: RFC: mutex: hung tasks on SMP platforms with
+ asm-generic/mutex-xchg.h
+In-Reply-To: <20120809144953.GC18486@mudshark.cambridge.arm.com>
+References: <20120807115647.GA12828@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1208090029460.5231@xanadu.home>
+ <20120809144953.GC18486@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1208091201380.5231@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 9, 2012 at 9:50 AM, Dave Martin <dave.martin@linaro.org> wrote:
-> On Thu, Aug 09, 2012 at 09:32:59AM -0500, Matt Sealey wrote:
->> Matt Sealey <matt@genesi-usa.com>
->> Product Development Analyst, Genesi USA, Inc.
->>
->>
->> On Thu, Aug 9, 2012 at 5:24 AM, Dave Martin <dave.martin@linaro.org> wrote:
->> > On Wed, Aug 08, 2012 at 12:32:39PM -0500, Matt Sealey wrote:
->> >
->> > [...]
->> >
->> >> I'm going to do a trapse through and find where Russell nacked Dave's
->> >> thumb-aware
->> >> rewrite.. would you mind if you have any of these boards seeing if it
->> >> really DOES
->> >
->> > There was no NAK because I didn't get as far as posting the patch,
->>
->> http://lists.arm.linux.org.uk/lurker/message/20111202.133911.393b6e28.en.html
->>
->> You did, twice :)
->
-> Well, I meant that I had not posted it as a stand-alone patch for
-> inclusion; I only posted it when commenting on other threads.
->
->> > mostly because of the doubt about whether this code is ever relevant
->> > on Thumb2-capable hardware.
->>
->> It's not, but it does break the build, and without disabling phyCORE boards for
->> Thumb2 it will always break the build..
->
-> If you want me to push it, let me know.  I don't think this should get
-> merged without some Tested-bys for hardware where the FIQ stuff actually
-> gets used.
+On Thu, 9 Aug 2012, Will Deacon wrote:
 
-Please, then all the Tested-by's should flood in, right? :)
+> I think we could actually fix this entirely in mutex-xchg.h by doing
+> something in fastpath_lock similar to what we do for trylock:
+> 
+> 
+> diff --git a/include/asm-generic/mutex-xchg.h b/include/asm-generic/mutex-xchg.h
+> index 580a6d3..c082e99 100644
+> --- a/include/asm-generic/mutex-xchg.h
+> +++ b/include/asm-generic/mutex-xchg.h
+> @@ -25,8 +25,19 @@
+>  static inline void
+>  __mutex_fastpath_lock(atomic_t *count, void (*fail_fn)(atomic_t *))
+>  {
+> -       if (unlikely(atomic_xchg(count, 0) != 1))
+> -               fail_fn(count);
+> +       int prev = atomic_xchg(count, 0);
+> +
+> +       if (unlikely(prev != 1)) {
+> +               if (prev < 0)
+> +                       /*
+> +                        * The lock was contended, so we need to restore
+> +                        * its original state to ensure that any waiting
+> +                        * tasks are woken up by the unlock slow path.
+> +                        */
+> +                       prev = atomic_xchg(count, prev);
+> +               if (prev != 1)
+> +                       fail_fn(count);
+> +       }
+>  }
+> 
+> What do you reckon?
 
-> The older post would be the one to use, since that at least got a
-> reasonable level of build testing.
+Yes, that looks fine.  I'd remove that if (prev < 0) entirely though.  
+We'll just swap a 0 for a 0 if the count wasn't < 0, or a 0 for a 1 if 
+the mutex just got unlocked which is also fine.  This is especially 
+beneficial when a native xchg processor instruction is used.
 
--- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+> > Of course that might tilt the balance towards using mutex-dec.h on ARM 
+> > v6 and above instead of mutex-xchg.h.  But that is an orthogonal issue, 
+> > and that doesn't remove the need for fixing the xchg based case for 
+> > correctness.
+> 
+> I'll do some hackbench runs against mutex-dec once we've decided on the final
+> xchg code. If it's faster, I'll submit a patch for ARM.
+
+I don't think it would be faster.  It is just potentially more fair.
+
+
+Nicolas
