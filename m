@@ -1,39 +1,50 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 9 Aug 2012 12:38:20 +0530
-Subject: [PATCH v2 0/2] OMAP cpufreq fixes
-Message-ID: <1344496102-24451-1-git-send-email-rnayak@ti.com>
+Date: Thu, 9 Aug 2012 12:38:21 +0530
+Subject: [PATCH v2 1/2] cpufreq: OMAP: Handle missing frequency table on SMP
+ systems
+In-Reply-To: <1344496102-24451-1-git-send-email-rnayak@ti.com>
+References: <1344496102-24451-1-git-send-email-rnayak@ti.com>
+Message-ID: <1344496102-24451-2-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in v2:
-Fixed the handling of freq_table_users in Patch 1/2 as
-suggested by Santosh. Patch 2/2 is unchanged.
+On OMAP4, if the first CPU fails to get a valid frequency table (this
+could happen if the platform does not register any OPP table), the
+subsequent CPU instances end up dealing with a NULL freq_table and
+crash.
 
-Hi Kevin,
+Check for an already existing freq_table, before trying to create one,
+and increment the freq_table_users only if the table is sucessfully
+created.
 
-While testing cpufreq on 3.6-rc1, I noticed strange issues on OMAP4,
-like a lockup when booting with 'performace' governer as default,
-and crashes when using 'usespace' (which booted up) and switching
-to higher OPPs.
-It took me a while to realise I was using a 4460 device. The OPPs
-registered though seemed to be for 4430 and hence were causing
-issues on the 4460 device. 
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: <linux-pm@vger.kernel.org>
+---
+ drivers/cpufreq/omap-cpufreq.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-This series basically avoids registering the 4430 OPPs on other
-varients like 4460 and 4470 (and hence causing random issues)
-and also fixes a subsequent bug uncovered by doing this in
-OMAP cpufreq driver.
-
-regards,
-Rajendra 
-
-Rajendra Nayak (2):
-  cpufreq: OMAP: Handle missing frequency table on SMP systems
-  ARM: OMAP4: Register the OPP table only for 4430 device
-
- arch/arm/mach-omap2/opp4xxx_data.c |    2 +-
- drivers/cpufreq/omap-cpufreq.c     |    4 +++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
+index 17fa04d..b47034e 100644
+--- a/drivers/cpufreq/omap-cpufreq.c
++++ b/drivers/cpufreq/omap-cpufreq.c
+@@ -218,7 +218,7 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
+ 
+ 	policy->cur = policy->min = policy->max = omap_getspeed(policy->cpu);
+ 
+-	if (atomic_inc_return(&freq_table_users) == 1)
++	if (!freq_table)
+ 		result = opp_init_cpufreq_table(mpu_dev, &freq_table);
+ 
+ 	if (result) {
+@@ -227,6 +227,8 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
+ 		goto fail_ck;
+ 	}
+ 
++	atomic_inc_return(&freq_table_users);
++
+ 	result = cpufreq_frequency_table_cpuinfo(policy, freq_table);
+ 	if (result)
+ 		goto fail_table;
 -- 
 1.7.9.5
