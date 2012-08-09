@@ -1,9 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 08 Aug 2012 15:06:06 -0000
-Subject: [RFC 3/6] arm: cache-l2x0: add support for Aurora L2 cache ctrl
-In-Reply-To: <1344438307-8468-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1344438307-8468-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1344438307-8468-4-git-send-email-gregory.clement@free-electrons.com>
+Date: Thu, 09 Aug 2012 16:49:15 -0000
+Subject: [RFC 2 3/6] arm: cache-l2x0: add support for Aurora L2 cache ctrl
+In-Reply-To: <1344530925-25857-1-git-send-email-gregory.clement@free-electrons.com>
+References: <20120808151946.GE4579@mudshark.cambridge.arm.com>
+ <1344530925-25857-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1344530925-25857-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -29,8 +30,8 @@ Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Olof Johansson <olof@lixom.net>
 ---
  arch/arm/include/asm/hardware/cache-aurora-l2.h |   51 +++++
- arch/arm/mm/cache-l2x0.c                        |  259 ++++++++++++++++++++++-
- 2 files changed, 304 insertions(+), 6 deletions(-)
+ arch/arm/mm/cache-l2x0.c                        |  274 ++++++++++++++++++++++-
+ 2 files changed, 319 insertions(+), 6 deletions(-)
  create mode 100644 arch/arm/include/asm/hardware/cache-aurora-l2.h
 
 diff --git a/arch/arm/include/asm/hardware/cache-aurora-l2.h b/arch/arm/include/asm/hardware/cache-aurora-l2.h
@@ -91,10 +92,10 @@ index 0000000..65dad20
 +
 +#endif /* __ASM_ARM_HARDWARE_AURORA_L2_H */
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 3591940..25a41df 100644
+index 3591940..036ad71 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -25,6 +25,7 @@
+@@ -25,14 +25,33 @@
  
  #include <asm/cacheflush.h>
  #include <asm/hardware/cache-l2x0.h>
@@ -102,7 +103,21 @@ index 3591940..25a41df 100644
  
  #define CACHE_LINE_SIZE		32
  
-@@ -33,6 +34,11 @@ static DEFINE_RAW_SPINLOCK(l2x0_lock);
++#ifdef CONFIG_ARM_LPAE
++/*
++ * On Aurora if LPAE is activated then when writting in a 32bits
++ * adress in regsiter actual physical address is
++ * {bits[3:0],bits[31:5],00000}. And if not bits[4:0] must be set to
++ * 0x0.
++ */
++
++#define AURORA_LPAE(addr)   ((((addr)>>32)&0xf)|((addr)&~0xf))
++#else
++#define AURORA_LPAE(addr)   (addr)
++#endif
++
+ static void __iomem *l2x0_base;
+ static DEFINE_RAW_SPINLOCK(l2x0_lock);
  static u32 l2x0_way_mask;	/* Bitmask of active ways */
  static u32 l2x0_size;
  static unsigned long sync_reg_offset = L2X0_CACHE_SYNC;
@@ -114,7 +129,7 @@ index 3591940..25a41df 100644
  
  struct l2x0_regs l2x0_saved_regs;
  
-@@ -275,6 +281,130 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
+@@ -275,6 +294,132 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
  	cache_sync();
  	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
  }
@@ -123,9 +138,9 @@ index 3591940..25a41df 100644
 + * noninclusive, while the hardware cache range operations use
 + * inclusive start and end addresses.
 + */
-+static unsigned long calc_range_end(unsigned long start, unsigned long end)
++static phys_addr_t calc_range_end(phys_addr_t start, phys_addr_t end)
 +{
-+	unsigned long range_end;
++	phys_addr_t range_end;
 +
 +	BUG_ON(start & (CACHE_LINE_SIZE - 1));
 +	BUG_ON(end & (CACHE_LINE_SIZE - 1));
@@ -152,7 +167,7 @@ index 3591940..25a41df 100644
 +	return range_end;
 +}
 +
-+static void aurora_pa_range(unsigned long start, unsigned long end,
++static void aurora_pa_range(phys_addr_t start, phys_addr_t end,
 +			unsigned long offset)
 +{
 +	unsigned long flags;
@@ -164,20 +179,22 @@ index 3591940..25a41df 100644
 +	 */
 +	BUG_ON((start ^ end) & ~(PAGE_SIZE - 1));
 +	raw_spin_lock_irqsave(&l2x0_lock, flags);
-+	writel(start, l2x0_base + AURORA_RANGE_BASE_ADDR_REG);
-+	writel(end, l2x0_base + offset);
++
++
++	writel_relaxed(AURORA_LPAE(start), l2x0_base + AURORA_RANGE_BASE_ADDR_REG);
++	writel_relaxed(AURORA_LPAE(end), l2x0_base + offset);
 +	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
 +
 +	cache_sync();
 +}
 +
-+static void aurora_inv_range(unsigned long start, unsigned long end)
++static void aurora_inv_range(phys_addr_t start, phys_addr_t end)
 +{
 +	/*
 +	 * Clean and invalidate partial first cache line.
 +	 */
 +	if (start & (CACHE_LINE_SIZE - 1)) {
-+		writel((start & ~(CACHE_LINE_SIZE - 1)) & ~0x1f,
++		writel_relaxed(AURORA_LPAE((start & ~(CACHE_LINE_SIZE - 1)) & ~0x1f),
 +			l2x0_base + AURORA_FLUSH_PHY_ADDR_REG);
 +		cache_sync();
 +		start = (start | (CACHE_LINE_SIZE - 1)) + 1;
@@ -187,7 +204,7 @@ index 3591940..25a41df 100644
 +	 * Clean and invalidate partial last cache line.
 +	 */
 +	if (start < end && end & (CACHE_LINE_SIZE - 1)) {
-+		writel((end & ~(CACHE_LINE_SIZE - 1)) & ~0x1f,
++		writel_relaxed(AURORA_LPAE((end & ~(CACHE_LINE_SIZE - 1)) & ~0x1f),
 +			l2x0_base + AURORA_FLUSH_PHY_ADDR_REG);
 +		cache_sync();
 +		end &= ~(CACHE_LINE_SIZE - 1);
@@ -197,7 +214,7 @@ index 3591940..25a41df 100644
 +	 * Invalidate all full cache lines between 'start' and 'end'.
 +	 */
 +	while (start < end) {
-+		unsigned long range_end = calc_range_end(start, end);
++		phys_addr_t range_end = calc_range_end(start, end);
 +		aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
 +				AURORA_INVAL_RANGE_REG);
 +		start = range_end;
@@ -206,7 +223,7 @@ index 3591940..25a41df 100644
 +	dsb();
 +}
 +
-+static void aurora_clean_range(unsigned long start, unsigned long end)
++static void aurora_clean_range(phys_addr_t start, phys_addr_t end)
 +{
 +	/*
 +	 * If L2 is forced to WT, the L2 will always be clean and we
@@ -216,7 +233,7 @@ index 3591940..25a41df 100644
 +		start &= ~(CACHE_LINE_SIZE - 1);
 +		end = (end + CACHE_LINE_SIZE - 1) & ~(CACHE_LINE_SIZE - 1);
 +		while (start != end) {
-+			unsigned long range_end = calc_range_end(start, end);
++			phys_addr_t range_end = calc_range_end(start, end);
 +			aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
 +					AURORA_CLEAN_RANGE_REG);
 +			start = range_end;
@@ -226,13 +243,13 @@ index 3591940..25a41df 100644
 +	dsb();
 +}
 +
-+static void aurora_flush_range(unsigned long start, unsigned long end)
++static void aurora_flush_range(phys_addr_t start, phys_addr_t end)
 +{
 +	if (!l2_wt_override) {
 +		start &= ~(CACHE_LINE_SIZE - 1);
 +		end = (end + CACHE_LINE_SIZE - 1) & ~(CACHE_LINE_SIZE - 1);
 +		while (start != end) {
-+			unsigned long range_end = calc_range_end(start, end);
++			phys_addr_t range_end = calc_range_end(start, end);
 +			aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
 +					AURORA_FLUSH_RANGE_REG);
 +			start = range_end;
@@ -245,7 +262,7 @@ index 3591940..25a41df 100644
  
  static void l2x0_disable(void)
  {
-@@ -292,11 +422,18 @@ static void l2x0_unlock(u32 cache_id)
+@@ -292,11 +437,18 @@ static void l2x0_unlock(u32 cache_id)
  	int lockregs;
  	int i;
  
@@ -266,7 +283,7 @@ index 3591940..25a41df 100644
  
  	for (i = 0; i < lockregs; i++) {
  		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D_BASE +
-@@ -312,18 +449,22 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+@@ -312,18 +464,22 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
  	u32 cache_id;
  	u32 way_size = 0;
  	int ways;
@@ -292,7 +309,7 @@ index 3591940..25a41df 100644
  	case L2X0_CACHE_ID_PART_L310:
  		if (aux & (1 << 16))
  			ways = 16;
-@@ -340,6 +481,30 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+@@ -340,6 +496,30 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
  		ways = (aux >> 13) & 0xf;
  		type = "L210";
  		break;
@@ -323,7 +340,7 @@ index 3591940..25a41df 100644
  	default:
  		/* Assume unknown chips have 8 ways */
  		ways = 8;
-@@ -353,7 +518,8 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+@@ -353,7 +533,8 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
  	 * L2 cache Size =  Way size * Number of ways
  	 */
  	way_size = (aux & L2X0_AUX_CTRL_WAY_SIZE_MASK) >> 17;
@@ -333,7 +350,7 @@ index 3591940..25a41df 100644
  	l2x0_size = ways * way_size * SZ_1K;
  
  	/*
-@@ -489,6 +655,12 @@ static void __init pl310_save(void)
+@@ -489,6 +670,12 @@ static void __init pl310_save(void)
  	}
  }
  
@@ -346,7 +363,7 @@ index 3591940..25a41df 100644
  static void l2x0_resume(void)
  {
  	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
-@@ -534,6 +706,48 @@ static void pl310_resume(void)
+@@ -534,6 +721,48 @@ static void pl310_resume(void)
  	l2x0_resume();
  }
  
@@ -361,7 +378,7 @@ index 3591940..25a41df 100644
 +	}
 +}
 +
-+static void __init aurora_broadcast_l2_commands()
++static void __init aurora_broadcast_l2_commands(void)
 +{
 +	__u32 u;
 +	/* Enable Broadcasting of cache commands to L2*/
@@ -395,7 +412,7 @@ index 3591940..25a41df 100644
  static const struct l2x0_of_data pl310_data = {
  	.setup = pl310_of_setup,
  	.save  = pl310_save,
-@@ -565,10 +779,37 @@ static const struct l2x0_of_data l2x0_data = {
+@@ -565,10 +794,37 @@ static const struct l2x0_of_data l2x0_data = {
  	},
  };
  
@@ -433,7 +450,7 @@ index 3591940..25a41df 100644
  	{}
  };
  
-@@ -597,6 +838,12 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+@@ -597,6 +853,12 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
  	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
  		if (data->setup)
  			data->setup(np, &aux_val, &aux_mask);
