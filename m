@@ -1,49 +1,65 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 09 Aug 2012 14:53:23 -0500
-Subject: [PATCH 1/8] of/irq: Create stub for of_irq_find_parent when
- !CONFIG_OF
-In-Reply-To: <1344527635-6163-2-git-send-email-lee.jones@linaro.org>
-References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
- <1344527635-6163-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <50241533.3080709@gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 09 Aug 2012 16:05:24 -0400 (EDT)
+Subject: RFC: mutex: hung tasks on SMP platforms with
+ asm-generic/mutex-xchg.h
+In-Reply-To: <20120809181705.GG18486@mudshark.cambridge.arm.com>
+References: <20120807115647.GA12828@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1208090029460.5231@xanadu.home>
+ <20120809144953.GC18486@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1208091201380.5231@xanadu.home>
+ <alpine.LFD.2.02.1208091243080.5231@xanadu.home>
+ <20120809175019.GE18486@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1208091405340.5231@xanadu.home>
+ <20120809181705.GG18486@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1208091601570.5231@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/2012 10:53 AM, Lee Jones wrote:
-> of_irq_find_parent is a handy function to use outside the confines of
-> the Open Firmware subsystem. One such use-case is when the IRQ Domain
-> wishes to find an IRQ domain for a given device node. Currently it can
-> not take any notice of the 'interrupt-parent' property. Instead it
-> just uses the first IRQ controller as it climbs the Device Tree. If
-> we were to use this as a precursor the resultant controller is more
-> likely to be correct.
-> 
-> CC: Rob Herring <rob.herring@calxeda.com>
-> CC: devicetree-discuss at lists.ozlabs.org
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Thu, 9 Aug 2012, Will Deacon wrote:
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-
-Rob
-
-> ---
->  include/linux/of_irq.h |    5 +++++
->  1 file changed, 5 insertions(+)
+> On Thu, Aug 09, 2012 at 07:09:02PM +0100, Nicolas Pitre wrote:
+> > On Thu, 9 Aug 2012, Will Deacon wrote:
+> > > On Thu, Aug 09, 2012 at 05:57:33PM +0100, Nicolas Pitre wrote:
+> > > > On Thu, 9 Aug 2012, Nicolas Pitre wrote:
+> > > > diff --git a/include/asm-generic/mutex-xchg.h b/include/asm-generic/mutex-xchg.h
+> > > > index 580a6d35c7..44a66c99c8 100644
+> > > > --- a/include/asm-generic/mutex-xchg.h
+> > > > +++ b/include/asm-generic/mutex-xchg.h
+> > > > @@ -25,8 +25,11 @@
+> > > >  static inline void
+> > > >  __mutex_fastpath_lock(atomic_t *count, void (*fail_fn)(atomic_t *))
+> > > >  {
+> > > > -	if (unlikely(atomic_xchg(count, 0) != 1))
+> > > > -		fail_fn(count);
+> > > > +	if (unlikely(atomic_xchg(count, 0) != 1)) {
+> > > > +		/* Mark lock contention explicitly */
+> > > > +		if (likely(atomic_xchg(count, -1) != 1))
+> > > > +			fail_fn(count);
+> > > > +	}
+> > > >  }
+> > > >  
+> > > >  /**
+> > > 
+> > > Doesn't this mean that we're no longer just swapping 0 for a 0 if the lock
+> > > was taken, therefore needlessly sending the current owner down the slowpath
+> > > on unlock?
+> > 
+> > If the lock was taken, this means the count was either 0 or -1.  If it 
+> > was 1 then we just put a 0 there and we own it.  But if the cound was 0 
+> > then we should store -1 instead, which is what the inner xchg does.  If 
+> > the count was already -1 then we store -1 back.  That more closely mimic 
+> > what the atomic dec does which is what we want.
 > 
-> diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
-> index 1717cd9..b8e2411 100644
-> --- a/include/linux/of_irq.h
-> +++ b/include/linux/of_irq.h
-> @@ -83,6 +83,11 @@ static inline unsigned int irq_of_parse_and_map(struct device_node *dev,
->  {
->  	return 0;
->  }
-> +
-> +static inline void *of_irq_find_parent(struct device_node *child)
-> +{
-> +	return NULL;
-> +}
->  #endif /* !CONFIG_OF */
->  
->  #endif /* __OF_IRQ_H */
-> 
+> Ok, I just wasn't sure that marking the lock contended was required when it
+> was previously locked, given that we'll drop into spinning on the owner
+> anyway.
+
+That's fine, and the owner will put 1 back when it unlocks it as well as 
+processing the wait queue which is what we need.
+
+> I'll add a commit message to the above and re-post if that's ok?
+
+Sure.  Don't forget to update __mutex_fastpath_lock_retval() as well.
+
+
+Nicolas
