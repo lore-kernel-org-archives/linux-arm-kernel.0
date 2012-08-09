@@ -1,145 +1,81 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 9 Aug 2012 09:04:53 +0200
-Subject: [PATCH] ARM: dts: imx: Move SDMA firmware to SoC dtsi file
-In-Reply-To: <1344436087-5612-1-git-send-email-festevam@gmail.com>
-References: <1344436087-5612-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120809070453.GS1451@pengutronix.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 09 Aug 2012 10:05:50 +0300
+Subject: [alsa-devel] [PATCH 07/11] ASoC: omap-mcbsp: Sidetone: Use SIDLE
+ bits in SYSCONFIG register to select noidle mode
+In-Reply-To: <5022E46A.4010909@ti.com>
+References: <1344417101-5015-1-git-send-email-peter.ujfalusi@ti.com>
+ <1344417101-5015-8-git-send-email-peter.ujfalusi@ti.com>
+ <5022E46A.4010909@ti.com>
+Message-ID: <5023614E.3030308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2012 at 11:28:07AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Instead of adding sdma-ram-script-name into each board dts file, move 
-> it to the SoC dtsi file instead.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Ricardo,
 
-It's good to have a sane default for it. A board could still overwrite
-the property should it have to.
+On 08/09/2012 01:12 AM, Ricardo Neri wrote:
+> Is this another case in which it is required to change the idle-mode on a
+> per-use-case basis? In the past I was trying to do the same with HDMI [1]. In
+> that case it was decided to add the HWMOD_SWSUP_SIDLE to hwmod data with the
+> drawback of using no-idle/force-idle rather than smart-idle[2][3].
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+This only concerns use case on OMAP3 when the sidetone is in use. In all other
+use cases we want to use smart-idle (music playback, FM TX/RX, etc).
+The main problem here is that the sidetone block have broken sidle line, it
+can not prevent McBSP iclk to be gated.
+The sidetone block is using the ICLK of the McBSP port (OMAP3 has ST block
+attached to McBSP2 and 3 ports only).
 
-Sascha
 
-> ---
->  arch/arm/boot/dts/imx51-babbage.dts |    4 ----
->  arch/arm/boot/dts/imx51.dtsi        |    1 +
->  arch/arm/boot/dts/imx53-ard.dts     |    6 ------
->  arch/arm/boot/dts/imx53-evk.dts     |    4 ----
->  arch/arm/boot/dts/imx53-qsb.dts     |    4 ----
->  arch/arm/boot/dts/imx53-smd.dts     |    4 ----
->  arch/arm/boot/dts/imx53.dtsi        |    1 +
->  7 files changed, 2 insertions(+), 22 deletions(-)
+> [1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg60226.html
+> [2] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg70463.html
+> [3] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg70653.html
+>>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> ---
+>>   sound/soc/omap/mcbsp.c |   18 ++++++++++++++----
+>>   sound/soc/omap/mcbsp.h |    1 +
+>>   2 files changed, 15 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/sound/soc/omap/mcbsp.c b/sound/soc/omap/mcbsp.c
+>> index c870023..e008898 100644
+>> --- a/sound/soc/omap/mcbsp.c
+>> +++ b/sound/soc/omap/mcbsp.c
+>> @@ -257,8 +257,15 @@ static void omap_st_on(struct omap_mcbsp *mcbsp)
+>>   {
+>>       unsigned int w;
+>>
+>> -    if (mcbsp->pdata->enable_st_clock)
+>> -        mcbsp->pdata->enable_st_clock(mcbsp->id, 1);
+>> +    /*
+>> +     * Sidetone uses McBSP ICLK - which must not idle when sidetones
+>> +     * are enabled or sidetones start sounding ugly.
+>> +     */
+>> +    w = MCBSP_READ(mcbsp, SYSCON);
+>> +    mcbsp->st_data->mcbsp_sidle = (w >> 3) & 0x3;
+>> +    w &= ~SIDLEMODE(0x3);
+>> +    w |= SIDLEMODE(0x1);
+>> +    MCBSP_WRITE(mcbsp, SYSCON, w);
 > 
-> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-> index de065b5..46d4c93 100644
-> --- a/arch/arm/boot/dts/imx51-babbage.dts
-> +++ b/arch/arm/boot/dts/imx51-babbage.dts
-> @@ -189,10 +189,6 @@
->  		};
->  
->  		aips at 80000000 {	/* aips-2 */
-> -			sdma at 83fb0000 {
-> -				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx51.bin";
-> -			};
-> -
->  			i2c at 83fc4000 { /* I2C2 */
->  				status = "okay";
->  
-> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-> index aaa0c0a..0bb5958 100644
-> --- a/arch/arm/boot/dts/imx51.dtsi
-> +++ b/arch/arm/boot/dts/imx51.dtsi
-> @@ -219,6 +219,7 @@
->  				compatible = "fsl,imx51-sdma", "fsl,imx35-sdma";
->  				reg = <0x83fb0000 0x4000>;
->  				interrupts = <6>;
-> +				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx51.bin";
->  			};
->  
->  			cspi at 83fc0000 {
-> diff --git a/arch/arm/boot/dts/imx53-ard.dts b/arch/arm/boot/dts/imx53-ard.dts
-> index 5b8eafc..dbe0353 100644
-> --- a/arch/arm/boot/dts/imx53-ard.dts
-> +++ b/arch/arm/boot/dts/imx53-ard.dts
-> @@ -44,12 +44,6 @@
->  				status = "okay";
->  			};
->  		};
-> -
-> -		aips at 60000000 {	/* AIPS2 */
-> -			sdma at 63fb0000 {
-> -				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
-> -			};
-> -		};
->  	};
->  
->  	eim-cs1 at f4000000 {
-> diff --git a/arch/arm/boot/dts/imx53-evk.dts b/arch/arm/boot/dts/imx53-evk.dts
-> index 9c79803..8e72f68 100644
-> --- a/arch/arm/boot/dts/imx53-evk.dts
-> +++ b/arch/arm/boot/dts/imx53-evk.dts
-> @@ -77,10 +77,6 @@
->  		};
->  
->  		aips at 60000000 {	/* AIPS2 */
-> -			sdma at 63fb0000 {
-> -				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
-> -			};
-> -
->  			i2c at 63fc4000 { /* I2C2 */
->  				status = "okay";
->  
-> diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-> index 2d803a9..7153aa0 100644
-> --- a/arch/arm/boot/dts/imx53-qsb.dts
-> +++ b/arch/arm/boot/dts/imx53-qsb.dts
-> @@ -56,10 +56,6 @@
->  		};
->  
->  		aips at 60000000 {	/* AIPS2 */
-> -			sdma at 63fb0000 {
-> -				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
-> -			};
-> -
->  			i2c at 63fc4000 { /* I2C2 */
->  				status = "okay";
->  
-> diff --git a/arch/arm/boot/dts/imx53-smd.dts b/arch/arm/boot/dts/imx53-smd.dts
-> index 0809102..9baef00 100644
-> --- a/arch/arm/boot/dts/imx53-smd.dts
-> +++ b/arch/arm/boot/dts/imx53-smd.dts
-> @@ -96,10 +96,6 @@
->  		};
->  
->  		aips at 60000000 {	/* AIPS2 */
-> -			sdma at 63fb0000 {
-> -				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
-> -			};
-> -
->  			i2c at 63fc4000 { /* I2C2 */
->  				status = "okay";
->  
-> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> index dc00c62..81abfad 100644
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -277,6 +277,7 @@
->  				compatible = "fsl,imx53-sdma", "fsl,imx35-sdma";
->  				reg = <0x63fb0000 0x4000>;
->  				interrupts = <6>;
-> +				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx53.bin";
->  			};
->  
->  			cspi at 63fc0000 {
-> -- 
-> 1.7.1
-> 
-> 
+> Wouldn't this create a mismatch between the SYSCONFIG register and McBSP
+> omap_hwmod._sysc_cache?
+
+We modify the bits runtime (if the ST is enabled), after the hwmod already
+configured the McBSP port to s-idle. We change the McBSP port's s-idle mode
+back to it's original before pm_runtime_put().
+
+Previously we did the same thing in PRCM level which was as ugly as this
+workaround with the penalty of a callback function to mach-omap2 since we can
+only got access to PRCM register API there.
+
+> Perhaps this could be done with a future omap_hwmod API?
+
+But there's no such an API and I'm not aware any ongoing effort to have one.
+Still the issue mostly remains since we need to modify other block's s-idle
+mode. If sidetone block is enabled we need to change the McBSP port's s-idle
+mode to no-idle.
+
+In most of the use cases the McBSP need to be in smart-idle mode since it
+provides significant power saving.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+P?ter
