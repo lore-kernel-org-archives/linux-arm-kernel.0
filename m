@@ -1,61 +1,45 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Fri, 10 Aug 2012 07:02:41 +1000
-Subject: [PATCH] ARM: ep93xx: clockevent support
-In-Reply-To: <CANapsLQ6kCUN5UoaA3xejm24SGxCKmZEFgmR_+r7N-=DPz0TVA@mail.gmail.com>
-References: <1344338474.18237.6.camel@localhost>	<5021122C.3000503@gmail.com>
- <CANapsLQ6kCUN5UoaA3xejm24SGxCKmZEFgmR_+r7N-=DPz0TVA@mail.gmail.com>
-Message-ID: <50242571.70402@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Aug 2012 22:07:09 +0100
+Subject: imx6q restart is broken
+In-Reply-To: <CAKGA1b=--C_MEHgc4m2f4cQwkx-=njss7bpT+EzXgKZJ2v=+Hw@mail.gmail.com>
+References: <20120808101817.GA14718@S2101-09.ap.freescale.net>
+ <50224547.9020000@de.bosch.com> <50232C17.9000700@gmail.com>
+ <20120809092021.GQ18957@n2100.arm.linux.org.uk>
+ <CAKGA1b=--C_MEHgc4m2f4cQwkx-=njss7bpT+EzXgKZJ2v=+Hw@mail.gmail.com>
+Message-ID: <20120809210709.GV18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/12 18:54, Yan Burman wrote:
-
-> On 8/7/12, Ryan Mallon <rmallon@gmail.com> wrote:
->> On 07/08/12 21:21, Yan Burman wrote:
->>
->>> ARM: ep93xx: clockevent support
->>> I have ported to 3.6-rc1 and slightly modified a previous patch for
->>> clockevent support for the ep93xx.
->>> The porting mainly consists of sched_clock support.
->>> Tested on 9302 based board.
->>> From: Ahmed Ammar <aammar <at> edge-techno.com>
->>> Signed-off-by: Yan Burman <burman.yan@gmail.com>
->>
->>
->> Hi Yan, some comments below.
->>
->> ~Ryan
->>
->>> +	case CLOCK_EVT_MODE_ONESHOT:
->>> +		tmode |= EP93XX_TIMER123_CONTROL_ENABLE;
->>> +		__raw_writel(tmode, EP93XX_TIMER1_CONTROL);
->>> +		break;
->>> +
->>> +	case CLOCK_EVT_MODE_SHUTDOWN:
->>> +	case CLOCK_EVT_MODE_UNUSED:
->>> +	case CLOCK_EVT_MODE_RESUME:
->>> +		return;
->>
->>
->> These cases can be removed.
->>
+On Thu, Aug 09, 2012 at 02:03:13PM -0500, Matt Sealey wrote:
+> I have an irrelevant but possibly related question here; in
+> mm/proc-v7.S there's this snip of code;
 > 
-> This case is something that is present in most (if not all) other architectures.
-> I don't mind removing it, but it will have to be replaced with:
-> default:
->      ;
+> #ifdef CONFIG_SMP
+>         ALT_SMP(mrc     p15, 0, r0, c1, c0, 1)
+>         ALT_UP(mov      r0, #(1 << 6))          @ fake it for UP
+>         tst     r0, #(1 << 6)                   @ SMP/nAMP mode enabled?
+>         orreq   r0, r0, #(1 << 6)               @ Enable SMP/nAMP mode
+>         orreq   r0, r0, r10                     @ Enable CPU-specific SMP bits
+>         mcreq   p15, 0, r0, c1, c0, 1
+> #endif
 > 
-> Since GCC produces warnings otherwise.
+> Which I am reading as, read the SMP bit from cp15 and see if it's
+> enabled, or on UP set the SMP bit and then write it back
+> regardless.
+> 
+> On a system where !CONFIG_SMP but it's SMP-capable like i.MX6Q, ALT_UP
+> method will get used and the SMP bit will get
+> set regardless.
 
-Oh, I missed the fact the switch was on an enum. You are correct, we
-should keep the code consistent with other architectures, so this
-can be left as is.
+I got here and stopped reading any further.  No, it doesn't work like
+that; you don't understand the assembly.
 
-> Other than that I am going to wait a while more for more comments if
-> somebody has them,
-> and post a new version with style fixes as well as switch to
-> drivers/clocksource/mmio.c usage.
+Yes, you're right that the ALT_UP version will be used.  This sets r0
+to 1 << 6.  The very next instruction tests whether bit 6 is set in r0.
+The following three instructions will only be executed _if_ that bit
+was zero.
 
-
-Great, thanks,
-~Ryan
+I'm assuming that the rest of your email is therefore irrelevant; I
+have no desire to continue reading such a long message when the premise
+it's (presumably) based upon is false.  If you have any further questions
+please restate them succinctly after taking on board the above.  Thanks.
