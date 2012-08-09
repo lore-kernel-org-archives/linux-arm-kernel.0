@@ -1,53 +1,98 @@
-From: burman.yan@gmail.com (Yan Burman)
-Date: Thu, 9 Aug 2012 11:54:40 +0300
-Subject: [PATCH] ARM: ep93xx: clockevent support
-In-Reply-To: <5021122C.3000503@gmail.com>
-References: <1344338474.18237.6.camel@localhost> <5021122C.3000503@gmail.com>
-Message-ID: <CANapsLQ6kCUN5UoaA3xejm24SGxCKmZEFgmR_+r7N-=DPz0TVA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 9 Aug 2012 08:00:17 +0000
+Subject: [PATCH v2 06/10] ARM: davinci: don't use broken ntosd2_init_i2c
+In-Reply-To: <1344461278-28245-7-git-send-email-arnd@arndb.de>
+References: <1344461278-28245-1-git-send-email-arnd@arndb.de>
+ <1344461278-28245-7-git-send-email-arnd@arndb.de>
+Message-ID: <201208090800.18321.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/7/12, Ryan Mallon <rmallon@gmail.com> wrote:
-> On 07/08/12 21:21, Yan Burman wrote:
->
->> ARM: ep93xx: clockevent support
->> I have ported to 3.6-rc1 and slightly modified a previous patch for
->> clockevent support for the ep93xx.
->> The porting mainly consists of sched_clock support.
->> Tested on 9302 based board.
->> From: Ahmed Ammar <aammar <at> edge-techno.com>
->> Signed-off-by: Yan Burman <burman.yan@gmail.com>
->
->
-> Hi Yan, some comments below.
->
-> ~Ryan
->
->> +	case CLOCK_EVT_MODE_ONESHOT:
->> +		tmode |= EP93XX_TIMER123_CONTROL_ENABLE;
->> +		__raw_writel(tmode, EP93XX_TIMER1_CONTROL);
->> +		break;
->> +
->> +	case CLOCK_EVT_MODE_SHUTDOWN:
->> +	case CLOCK_EVT_MODE_UNUSED:
->> +	case CLOCK_EVT_MODE_RESUME:
->> +		return;
->
->
-> These cases can be removed.
->
+On second thought, there is probably no use in keeping the broken function
+around, and we can just kill it off. If someone wants to add an i2c
+device to the bus, they can always add the init code back as well.
 
-This case is something that is present in most (if not all) other architectures.
-I don't mind removing it, but it will have to be replaced with:
-default:
-     ;
+8<-----
+Subject: ARM: davinci: don't use broken ntosd2_init_i2c
 
-Since GCC produces warnings otherwise.
+ntosd2_init_i2c walks the ntosd2_i2c_info array, which it expects to
+be populated with at least one member. gcc correctly warns about
+the out-of-bounds access here.
 
-Other than that I am going to wait a while more for more comments if
-somebody has them,
-and post a new version with style fixes as well as switch to
-drivers/clocksource/mmio.c usage.
+Since this can not possibly work, it's better to disable i2c
+support entirely on this board.
 
-Regards,
-Yan
+Without this patch, building davinci_all_defconfig results in:
+
+arch/arm/mach-davinci/board-neuros-osd2.c: In function 'davinci_ntosd2_init':
+arch/arm/mach-davinci/board-neuros-osd2.c:187:20: warning: array subscript is above array bounds [-Warray-bounds]
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Andrey Porodko <panda@chelcom.ru>
+
+diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
+index 5de69f2..f6b9fc7 100644
+--- a/arch/arm/mach-davinci/board-neuros-osd2.c
++++ b/arch/arm/mach-davinci/board-neuros-osd2.c
+@@ -162,38 +162,6 @@ static void __init davinci_ntosd2_map_io(void)
+ 	dm644x_init();
+ }
+ 
+-/*
+- I2C initialization
+-*/
+-static struct davinci_i2c_platform_data ntosd2_i2c_pdata = {
+-	.bus_freq	= 20 /* kHz */,
+-	.bus_delay	= 100 /* usec */,
+-};
+-
+-static struct i2c_board_info __initdata ntosd2_i2c_info[] =  {
+-};
+-
+-static	int ntosd2_init_i2c(void)
+-{
+-	int	status;
+-
+-	davinci_init_i2c(&ntosd2_i2c_pdata);
+-	status = gpio_request(NTOSD2_MSP430_IRQ, ntosd2_i2c_info[0].type);
+-	if (status == 0) {
+-		status = gpio_direction_input(NTOSD2_MSP430_IRQ);
+-		if (status == 0) {
+-			status = gpio_to_irq(NTOSD2_MSP430_IRQ);
+-			if (status > 0) {
+-				ntosd2_i2c_info[0].irq = status;
+-				i2c_register_board_info(1,
+-					ntosd2_i2c_info,
+-					ARRAY_SIZE(ntosd2_i2c_info));
+-			}
+-		}
+-	}
+-	return status;
+-}
+-
+ static struct davinci_mmc_config davinci_ntosd2_mmc_config = {
+ 	.wires		= 4,
+ 	.version	= MMC_CTLR_VERSION_1
+@@ -218,7 +186,6 @@ static __init void davinci_ntosd2_init(void)
+ {
+ 	struct clk *aemif_clk;
+ 	struct davinci_soc_info *soc_info = &davinci_soc_info;
+-	int	status;
+ 
+ 	aemif_clk = clk_get(NULL, "aemif");
+ 	clk_enable(aemif_clk);
+@@ -242,12 +209,6 @@ static __init void davinci_ntosd2_init(void)
+ 	platform_add_devices(davinci_ntosd2_devices,
+ 				ARRAY_SIZE(davinci_ntosd2_devices));
+ 
+-	/* Initialize I2C interface specific for this board */
+-	status = ntosd2_init_i2c();
+-	if (status < 0)
+-		pr_warning("davinci_ntosd2_init: msp430 irq setup failed:"
+-						"	 %d\n", status);
+-
+ 	davinci_serial_init(&uart_config);
+ 	dm644x_init_asp(&dm644x_ntosd2_snd_data);
+ 
