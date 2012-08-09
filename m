@@ -1,23 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 9 Aug 2012 13:17:24 +0000
-Subject: [PATCH] ARM: tegra: more regulator fixes for Harmony
-In-Reply-To: <5022EBC0.5060102@wwwdotorg.org>
-References: <1344037521-6157-1-git-send-email-swarren@wwwdotorg.org>
- <5022EBC0.5060102@wwwdotorg.org>
-Message-ID: <201208091317.24816.arnd@arndb.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu,  9 Aug 2012 15:35:33 +0200
+Subject: [PATCH] ARM: imx/imx31-dt: drop selecting USE_OF
+Message-ID: <1344519333-6446-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 August 2012, Stephen Warren wrote:
-> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > ---
-> > This is a fix for v3.6.
-> 
-> Arnd, Olof, I don't see this in the arm-soc fixes tree, although do see
-> you've applied a bunch of patches since I posted this. Did it drop
-> through the cracks?
+since commit
+	3e62af8 (ARM: imx: select USE_OF)
+ARM_MXC already selects USE_OF, so there is no need to repeat it for
+MACH_IMX31_DT
 
-Yes, you are right. I'm sorry I missed it at first. Applied to the
-fixes branch now.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-imx/Kconfig |    1 -
+ 1 file changed, 1 deletion(-)
 
-	Arnd
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 419c292..6152a84 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -561,7 +561,6 @@ config MACH_BUG
+ config MACH_IMX31_DT
+ 	bool "Support i.MX31 platforms from device tree"
+ 	select SOC_IMX31
+-	select USE_OF
+ 	help
+ 	  Include support for Freescale i.MX31 based platforms
+ 	  using the device tree for discovery.
+-- 
+1.7.10.4
