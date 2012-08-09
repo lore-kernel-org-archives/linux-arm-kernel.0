@@ -1,67 +1,79 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 09 Aug 2012 16:28:51 +0200
-Subject: [PATCH 6/6] ARM: dts: add pinctrl in PXA DT files
-In-Reply-To: <CACRpkdayqp0ptdURHtYWC6G5pk1rNaAiWZkc7bdhv2osY1MaHA@mail.gmail.com>
-References: <1343458722-17127-1-git-send-email-haojian.zhuang@gmail.com>
- <1343458722-17127-7-git-send-email-haojian.zhuang@gmail.com>
- <201208060844.29333.arnd@arndb.de>
- <CACRpkdayqp0ptdURHtYWC6G5pk1rNaAiWZkc7bdhv2osY1MaHA@mail.gmail.com>
-Message-ID: <5023C923.3080808@gmail.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Thu, 9 Aug 2012 09:29:39 -0500
+Subject: [PATCH] efikamx: reintroduce Genesi Efika MX Smarttop via device
+ tree
+In-Reply-To: <CAOMZO5DOEfV4wTSNW8ABaUhGwa_KG3Bkt0o-rs8k-cZk4P-=+A@mail.gmail.com>
+References: <1344375978-29981-1-git-send-email-matt@genesi-usa.com>
+ <20120808151555.GE14718@S2101-09.ap.freescale.net>
+ <CAKGA1bkbp8_z+HSr97cp_jeCrdTHkQxuZPFu0QPWwnXphWVdZA@mail.gmail.com>
+ <CAOMZO5DOEfV4wTSNW8ABaUhGwa_KG3Bkt0o-rs8k-cZk4P-=+A@mail.gmail.com>
+Message-ID: <CAKGA1bkOo=En2P18FaBpq_KAZ88kisikXhNTabvnDknQ-EwFjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.08.2012 08:49, Linus Walleij wrote:
-> On Mon, Aug 6, 2012 at 10:44 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Saturday 28 July 2012, Haojian Zhuang wrote:
->>> +Required subnode-properties:
->>> +- marvell,pins : An array of strings. Each string contains the name of a pin
->>> +                 or group.
->>> +- marvell,function     : A string containing the name of the function to mux to the
->>> +                 pin or group.
->>> +- marvell,drive-strength : An integer value that means the drive strength of a
->>> +                        pin.
->>> +- marvell,pull-up      : The property means a pin is pull up for input.
->>> +- marvell,pull-down : The property means a pin is pull down for input.
->>> +- marvell,lowpower-pull-up : The property means a pin is pull up for input in
->>> +                         sleep state.
->>> +- marvell,lowpower-pull-down : The property means a pin is pull down for input
->>> +                           in sleep state.
->>> +- marvell,lowpower-drive-high : The property means a pin is driving high for
->>> +                            output in sleep state.
->>> +- marvell,lowpower-drive-low : The property means a pin is driving low for
->>> +                           output in sleep state.
->>> +- marvell,lowpower-float : The property means a pin is float in sleep state.
->>> +- marvell,lowpower-zero : The property means a pin is not configured in sleep
->>> +                       state.
->>
->> These (or most of them) look like they are not very Marvell specific. Should
->> we try to standardize the way they are set across different bindings?
-> 
-> If the device tree properties are to be standardized, the driver should be
-> moved over to using generic pin config (drivers/pinctrl/pinconf-generic.c,
-> include/linux/pinctrl/pinconf-generic.h) too, or it makes no sense.
-> 
-> So please augment the PXA driver to use these, then move the generic
-> bindings to pinconf-generic.txt or something.
-> 
-> If pinconf-generic needs extending/augmenting in the process, just do it,
-> it's supposed to be generic...
+On Wed, Aug 8, 2012 at 12:19 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> Matt,
+>
+> On Wed, Aug 8, 2012 at 1:55 PM, Matt Sealey <matt@genesi-usa.com> wrote:
+>
+> ...
+>> or any setup at all for this. What's stopping this right now is you
+>> need a new U-Boot which we
+>> didn't release or mainline because we are still testing it (old U-Boot
+>> shipped on the boards
+>> cannot boot device tree anyway). While the number of users of this is
+>
+> Actually you can boot a device tree kernel even on old bootloaders
+> that do not support dt.
+>
+> You need to select:
+> CONFIG_ARM_APPENDED_DTB=y
+> CONFIG_ARM_ATAG_DTB_COMPAT=y
+>
+> Then,
+>
+> make -j4 zImage
+> make imx51-babbage.dtb
+> cat arch/arm/boot/zImage arch/arm/boot/ imx51-babbage.dtb  >
+> arch/arm/boot/zImage_dtb
+> mkimage -A arm -O linux -T kernel -C none -a 0x90008000 -e 0x90008000
+> -n Linux -d arch/arm/boot/zImage_dtb arch/arm/boot/uImage
+>
+> and boot this generated uImage the same way as you used to do in the
+> non-dt case.
 
-I am looking at the generic pinctrl code right now and I wonder if the
-following approach would be ok:
+That's true, but we don't have our customers compile their own kernels
+if they can help it, and appending a dtb to the end of a kernel isn't
+part of distro packaging so it just doesn't get done yet... We'd need
+to update a bunch of scripts, test them, and then deal with the
+frightening scenario of appending a dtb to a kernel *and* passing the
+address of the filesystem version (usually the one appended!) - hoping
+either works. It's too much testing. We'd rather update everyone to a
+new U-Boot that works, and deal with a single point on that end, that
+can boot the legacy kernel (machine id matches, legacy boot works on
+old kernel) and the new kernel alike.
 
-- each driver that calls pinctrl_register() has its own dt_match_table
-entry, so the 'compatible' part of the bindings is specific to a pin
-controller chip.
-- introduce a pinctrl_parse_of(struct of_node *) and call that after the
-driver has added all its pins. That function walks all the children of
-the given node and uses the callbacks provided by the driver to do the
-actual work.
-- Unfortunately, we can't parse the node from pinctrl_register() as the
-gpio ranges are only added after that by the drivers.
+All of this is coming from development branches we have here, and
+we're pushing it to mainline as a convenience for everyone concerned.
 
-If that sounds good, I can come up with a patch.
+What we've got on the test plan is;
 
+1) Old U-Boot, Old Kernel. This works already for years.
+2) New U-Boot, Old Kernel. This works, well tested.
+3) New U-Boot, New Kernel+DTB. This works or we wouldn't be sending patches.
 
-Thanks,
-Daniel
+The Old U-Boot, New Kernel doesn't make sense for us if the New U-Boot
+is all that's required to retain functionality.
+
+The reason the new kernel depends on the new U-Boot is we're trying to
+do all pinmux configuration in U-Boot (and we do in-house, and it
+works). No pinctrl stuff in the kernel or device tree is required at
+this point. The Old Kernel will remux a few things redundantly or
+change drive strengths or whatever or add hysteresis to the UART port
+which is not board-burning but is not really necessary, but it will
+work. The new kernel will just be able to do what it does out of the
+box, which is how it should be (hence why I object to adding pinctrl
+setup...)
+
+--
+Matt Sealey <matt@genesi-usa.com>
