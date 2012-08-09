@@ -1,48 +1,40 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 9 Aug 2012 17:12:58 -0400 (EDT)
-Subject: [PATCH 04/10] ARM: pass -marm to gcc by default
-In-Reply-To: <1344461278-28245-5-git-send-email-arnd@arndb.de>
-References: <1344461278-28245-1-git-send-email-arnd@arndb.de>
- <1344461278-28245-5-git-send-email-arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1208091709010.5231@xanadu.home>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu,  9 Aug 2012 18:16:46 -0300
+Subject: [PATCH v2] ARM: mxs_defconfig: Add framebuffer support
+Message-ID: <1344547006-26738-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 8 Aug 2012, Arnd Bergmann wrote:
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-> The Linaro cross toolchain and probably others nowadays default to
-> building in THUMB2 mode. When building a kernel for a CPU that does
-> not support THUMB2, the compiler complains about incorrect flags.
-> We can work around this by setting -marm for all non-T2 builds.
-> 
-> Without this patch, building assabet_defconfig results in:
-> 
-> usr/initramfs_data.S:1:0: warning: target CPU does not support THUMB instructions [enabled by default]
-> arch/arm/nwfpe/entry.S:1:0: warning: target CPU does not support THUMB instructions [enabled by default]
-> firmware/cis/PCMLM28.cis.gen.S:1:0: warning: target CPU does not support THUMB instructions [enabled by default]
-> (and many more)
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Dave Martin <dave.martin@linaro.org>
-> ---
->  arch/arm/Makefile |    3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 30eae87..b4c2296 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -111,6 +111,9 @@ AFLAGS_THUMB2	:=$(CFLAGS_THUMB2) -Wa$(comma)-mthumb
->  ifeq ($(CONFIG_THUMB2_AVOID_R_ARM_THM_JUMP11),y)
->  CFLAGS_MODULE	+=-fno-optimize-sibling-calls
->  endif
-> +else
-> +CFLAGS_THUMB2  :=-marm
-> +AFLAGS_THUMB2	:=-marm
+Add framebuffer support.
 
-CFLAGS_THUMB2 should probably be renamed to something more appropriate 
-in this case, e.g. CFLAGS_MODE.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Add missing features and tested on a mx28evk
+ arch/arm/configs/mxs_defconfig |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-
-Nicolas
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+index 9e79125..67d5c05 100644
+--- a/arch/arm/configs/mxs_defconfig
++++ b/arch/arm/configs/mxs_defconfig
+@@ -109,6 +109,15 @@ CONFIG_SND_SOC_I2C_AND_SPI=y
+ CONFIG_SND_SOC_SGTL5000=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_FB=y
++CONFIG_FB_MXS=y
++CONFIG_BACKLIGHT_LCD_SUPPORT=y
++CONFIG_LCD_CLASS_DEVICE=y
++CONFIG_BACKLIGHT_CLASS_DEVICE=y
++CONFIG_BACKLIGHT_PWM=y
++CONFIG_FRAMEBUFFER_CONSOLE=y
++CONFIG_FONTS=y
++CONFIG_LOGO=y
+ CONFIG_USB=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+-- 
+1.7.1
