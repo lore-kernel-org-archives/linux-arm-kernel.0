@@ -1,70 +1,96 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Thu, 9 Aug 2012 14:15:29 +0800
-Subject: [PATCH 10/10] leds: renesas: fix error handling
-In-Reply-To: <1344461278-28245-11-git-send-email-arnd@arndb.de>
-References: <1344461278-28245-1-git-send-email-arnd@arndb.de>
- <1344461278-28245-11-git-send-email-arnd@arndb.de>
-Message-ID: <CAK5ve-LXaA1xi5NDWTUxeVnr6DpDFv4LMzx0knHvO=1bzJO9jQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 Aug 2012 23:18:13 -0700
+Subject: [linux-pm] [PATCH v4 2/4] mfd: omap: control: core system
+ control driver
+In-Reply-To: <50227ED9.3010508@dev.rtsoft.ru>
+References: <500FD2EC.7060208@dev.rtsoft.ru>
+ <20120808140507.GF11011@atomide.com>
+ <20120808141051.GG11011@atomide.com>
+ <20120808143929.GJ11011@atomide.com>
+ <50227ED9.3010508@dev.rtsoft.ru>
+Message-ID: <20120809061813.GK11011@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 9, 2012 at 5:27 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> bfe4c041 "leds: convert Renesas TPU LED driver to devm_kzalloc() and
-> cleanup error exit path" introduced a possible case in which r_tpu_probe
-> calls iounmap on a wild pointer. This changes the one case that was
-> missed in the same way as the other error paths.
->
-> Without this patch, building kota2_defconfig results in:
->
-> drivers/leds/leds-renesas-tpu.c: In function 'r_tpu_probe':
-> drivers/leds/leds-renesas-tpu.c:246:6: warning: 'ret' may be used uninitialized in this function [-Wuninitialized]
-> drivers/leds/leds-renesas-tpu.c:308:17: warning: 'p' may be used uninitialized in this function [-Wuninitialized]
->
+* Konstantin Baydarov <kbaidarov@dev.rtsoft.ru> [120808 07:59]:
+> On 08/08/2012 06:39 PM, Tony Lindgren wrote:
+> 
+> Yes, omap_type() is called very early , that is why I'm using early_initcall
+> for omap_control_base initialization.
+> 
+> Do you mean following?:
+> void __init omap2_set_globals_control(struct omap_globals *omap2_globals)
+> {
+>     if (omap2_globals->ctrl)
+>         omap2_ctrl_base = omap2_globals->ctrl;
+> 
+>     if (omap2_globals->ctrl_pad)
+>         omap4_ctrl_pad_base = omap2_globals->ctrl_pad;
+> 
+>     omap_control_base = omap2_ctrl_base;  // this line is added
+> }
 
-Thanks, Arnd. If you don't mind, I will apply this fixing through my led tree.
+OK so we already have set_globals_control, but we're not using it..
+No need for this line is added above.
 
--Bryan
+Let's do the attached clean-up patch and just leave omap_control_base
+out of the driver for now as it's not currently needed there.
 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Bryan Wu <bryan.wu@canonical.com>
-> Cc: Magnus Damm <damm@opensource.se>
->
-> --- a/drivers/leds/leds-renesas-tpu.c
-> +++ b/drivers/leds/leds-renesas-tpu.c
-> @@ -247,7 +247,7 @@ static int __devinit r_tpu_probe(struct platform_device *pdev)
->
->         if (!cfg) {
->                 dev_err(&pdev->dev, "missing platform data\n");
-> -               goto err0;
-> +               return -ENODEV;
->         }
->
->         p = devm_kzalloc(&pdev->dev, sizeof(*p), GFP_KERNEL);
-> ---
->  drivers/leds/leds-renesas-tpu.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/leds/leds-renesas-tpu.c b/drivers/leds/leds-renesas-tpu.c
-> index 9ee12c2..771ea06 100644
-> --- a/drivers/leds/leds-renesas-tpu.c
-> +++ b/drivers/leds/leds-renesas-tpu.c
-> @@ -247,7 +247,7 @@ static int __devinit r_tpu_probe(struct platform_device *pdev)
->
->         if (!cfg) {
->                 dev_err(&pdev->dev, "missing platform data\n");
-> -               goto err0;
-> +               return -ENODEV;
->         }
->
->         p = devm_kzalloc(&pdev->dev, sizeof(*p), GFP_KERNEL);
-> --
-> 1.7.10
->
+If omap_control_base is needed in the driver, then we need to pass
+it in the platform_data to the driver for the non-DT boot case, or
+parse it from DT like you're doing.
+
+Regards,
+
+Tony
 
 
+From: Tony Lindgren <tony@atomide.com>
+Date: Wed, 8 Aug 2012 23:13:03 -0700
+Subject: [PATCH] ARM: OMAP2+: Change omap_type() to use omap_ctrl_base_get()
 
--- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer    +86.186-168-78255 Mobile
-Canonical Ltd.      www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+We have the SoC specific ctrl_base already initialized in
+set_globals.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -42,28 +42,20 @@ int omap_type(void)
+ {
+ 	u32 val = 0;
+ 
+-	if (cpu_is_omap24xx()) {
+-		val = omap_ctrl_readl(OMAP24XX_CONTROL_STATUS);
+-	} else if (soc_is_am33xx()) {
+-		val = omap_ctrl_readl(AM33XX_CONTROL_STATUS);
+-	} else if (cpu_is_omap34xx()) {
+-		val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
+-	} else if (cpu_is_omap44xx()) {
+-		val = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STATUS);
+-	} else if (soc_is_omap54xx()) {
+-		val = omap_ctrl_readl(OMAP5XXX_CONTROL_STATUS);
++	val = __raw_readl(omap_ctrl_base_get());
++	if (!val) {
++		pr_err("Cannot detect omap type!\n");
++		return 0;
++	}
++
++	if (soc_is_omap54xx()) {
+ 		val &= OMAP5_DEVICETYPE_MASK;
+ 		val >>= 6;
+-		goto out;
+ 	} else {
+-		pr_err("Cannot detect omap type!\n");
+-		goto out;
++		val &= OMAP2_DEVICETYPE_MASK;
++		val >>= 8;
+ 	}
+ 
+-	val &= OMAP2_DEVICETYPE_MASK;
+-	val >>= 8;
+-
+-out:
+ 	return val;
+ }
+ EXPORT_SYMBOL(omap_type);
