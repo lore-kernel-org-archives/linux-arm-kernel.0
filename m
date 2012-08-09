@@ -1,355 +1,215 @@
-From: yuxu@marvell.com (Yu Xu)
-Date: Thu,  9 Aug 2012 11:33:23 +0800
-Subject: [PATCH] ARM: mmp: add USB3.0 PHY support
-Message-ID: <1344483203-17446-1-git-send-email-yuxu@marvell.com>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Thu, 9 Aug 2012 09:36:05 +0530
+Subject: [PATCH v2] gpio/omap: add *remove* callback in platform_driver
+In-Reply-To: <87k3x9wbrk.fsf@ti.com>
+References: <1344434316-21141-1-git-send-email-tarun.kanti@ti.com>
+ <87k3x9wbrk.fsf@ti.com>
+Message-ID: <CAC83ZvLKk71O=+9U16FoTUU_-ffg+iJsHPgnJx+bzbHhBDXzhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add USB 3.0 PHY support.
+On Wed, Aug 8, 2012 at 10:40 PM, Kevin Hilman <khilman@ti.com> wrote:
+> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+>
+>> Add *remove* callback so that necessary cleanup operations are
+>> performed when device is unregistered. The device is deleted
+>> from the list and associated clock handle is released by
+>> calling clk_put() and irq descriptor is released using the
+>> irq_free_desc() api.
+>>
+>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+>> Reported-by: Paul Walmsley <paul@pwsan.com>
+>> Reviewed-by: Jon Hunter <jon-hunter@ti.com>
+>> Cc: Kevin Hilman <khilman@ti.com>
+>> Cc: Rajendra Nayak <rnayak@ti.com>
+>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Cc: Cousson, Benoit <b-cousson@ti.com>
+>> Cc: Paul Walmsley <paul@pwsan.com>
+>> ---
+>> v2:
+>> Baseline: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
+>> Commit: 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee (Linux 3.6-rc1)
+>>
+>> (1) Use irq_free_descs() instead of irq_free_desc().
+>>     Besides, irq_free_desc() was using wrong parameter,
+>>     irq_base, instead of bank->irq.
+>> (2) irq_free_descs() moved outside spin_lock/unlock_*()
+>>     in order to avoid exception warnings.
+>>
+>> (3) pm_runtime_disable() added so that bind can happen successfully
+>>
+>> Test Detail:
+>> Step 1: Unbind gpio.5 device in order to invoke the *remove* callback.
+>> #echo "omap_gpio.5" > sys/bus/platform/drivers/omap_gpio/unbind
+>>
+>> Step 2: Bind gpio.5 device and confirm probe() for the device succeeds.
+>> #echo "omap_gpio.5" > sys/bus/platform/drivers/omap_gpio/bind
+>>
+>> Step 3: Execute read/write GPIO test case.
+>
+> What happens when GPIOs are in use (requested)?
+If I try to unbind a currently active GPIO bank then I see an exception
+after the irq descriptor is freed by the remove. I believe this is expected
+because interrupt raised by the system would not be handled.
 
-Signed-off-by: Yu Xu <yuxu@marvell.com>
+[   18.859405] irq_free_descs: calling free_desc(192)...
+[   18.866180] irq_free_descs: calling free_desc(192)...
+[   18.872680] irq_free_descs: calling free_desc(192)...
+[   18.877990] irq_free_descs: calling free_desc(192)...
+[   18.883270] irq_free_descs: calling free_desc(192)...
+[   18.888549] irq_free_descs: calling free_desc(192)...
+[   18.893859] irq_free_descs: calling free_desc(192)...
+[   18.899139] irq_free_descs: calling free_desc(192)...
+[   18.904418] irq_free_descs: calling free_desc(192)...
+[   18.909729] irq_free_descs: calling free_desc(192)...
+[   18.915008] irq_free_descs: calling free_desc(192)...
+[   18.920288] irq_free_descs: calling free_desc(192)...
+[   18.925598] irq_free_descs: calling free_desc(192)...
+[   18.930877] irq_free_descs: calling free_desc(192)...
+[   18.936157] irq_free_descs: calling free_desc(192)...
+[   18.941467] irq_free_descs: calling free_desc(192)...
+[   18.946746] irq_free_descs: calling free_desc(192)...
+[   18.952026] irq_free_descs: calling free_desc(192)...
+[   18.957336] irq_free_descs: calling free_desc(192)...
+[   18.962615] irq_free_descs: calling free_desc(192)...
+[   18.967895] irq_free_descs: calling free_desc(192)...
+[   18.973205] irq_free_descs: calling free_desc(192)...
+[   18.978485] irq_free_descs: calling free_desc(192)...
+[   18.983764] irq_free_descs: calling free_desc(192)...
+[   18.989074] irq_free_descs: calling free_desc(192)...
+[   18.994354] irq_free_descs: calling free_desc(192)...
+[   18.999633] irq_free_descs: calling free_desc(192)...
+[   19.004913] irq_free_descs: calling free_desc(192)...
+[   19.010223] irq_free_descs: calling free_desc(192)...
+[   19.015502] irq_free_descs: calling free_desc(192)...
+[   19.020782] irq_free_descs: calling free_desc(192)...
+[   19.026092] irq_free_descs: calling free_desc(192)...
+[   19.032440] irq 194, desc: c072f340, depth: 1, count: 0, unhandled: 0
+[   19.039154] ->handle_irq():  c00a3e08, handle_bad_irq+0x0/0x260
+[   19.045379] ->irq_data.chip(): c078ff7c, no_irq_chip+0x0/0x5c
+[   19.051391] ->action(): ef0d42c0
+[   19.054748] ->action->handler(): c0399ee0, ks8851_irq+0x0/0x1c
+[   19.060852]    IRQ_NOPROBE set
+[   19.064056]  IRQ_NOREQUEST set
+[   19.067230] Unable to handle kernel paging request at virtual address 203a6c9
+[   19.074768] pgd = c0004000
+[   19.077606] [203a6c99] *pgd=00000000
+[   19.081329] Internal error: Oops: 5 [#1] SMP ARM
+[   19.086151] Modules linked in:
+[   19.089355] CPU: 0    Not tainted  (3.6.0-rc1-00003-g43a916d-dirty #885)
+[   19.096374] PC is at gpio_irq_handler+0x7c/0x26c
+[   19.101165] LR is at handle_bad_irq+0x1cc/0x260
+[   19.105895] pc : [<c02e13b0>]    lr : [<c00a3fd4>]    psr: 60000093
+[   19.105895] sp : c0725df8  ip : 00006fc6  fp : 00000001
+[   19.117889] r10: 00000000  r9 : fa05502c  r8 : 00000020
+[   19.123352] r7 : 00000000  r6 : 00000000  r5 : 00000000  r4 : ef0bbe10
+[   19.130157] r3 : ef0c1980  r2 : 203a6c65  r1 : 00000034  r0 : 00000000
+[   19.136993] Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kel
+[   19.144714] Control: 10c53c7d  Table: ae89804a  DAC: 00000017
+[   19.150695] Process swapper/0 (pid: 0, stack limit = 0xc07242f8)
+[   19.156982] Stack: (0xc0725df8 to 0xc0726000)
+[   19.161529] 5de0:                                                       c0740
+[   19.170074] 5e00: c0724000 c0724000 c07440d8 c07224a4 0000003e 00000000 c0740
+[   19.178619] 5e20: c0725edc c00a3670 000001da c0015380 fa24010c c0742d30 c0720
+[   19.187164] 5e40: 00000001 c000846c c0746980 c04f8c74 20000013 ffffffff c0724
+[   19.195709] 5e60: 0005ebb2 00000001 00000000 c0746980 c1530ac0 ee8cfe00 c1530
+[   19.204223] 5e80: 00000001 c07440d8 ee8cfe00 c0725edc 00000001 c0725ea8 00054
+[   19.212768] 5ea0: 20000013 ffffffff c0724000 c007425c 00000002 00000000 c0077
+[   19.221313] 5ec0: ef320b00 c0746980 00000000 c1530ac0 ef320b00 c0722ac0 c0720
+[   19.229858] 5ee0: c152ec20 c00696cc 00000000 00000000 c0724000 c0724000 c1524
+[   19.238403] 5f00: c152ec20 c0015e14 c0722ac0 c0722ac0 c0722ac0 c0722ac0 c0720
+[   19.246948] 5f20: c0722ac0 c0722ac0 6e6b0f0d 00000004 00000000 00000000 c0080
+[   19.255493] 5f40: 00000001 00000000 00000000 501539bc 00000004 c0091654 c1528
+[   19.264038] 5f60: c07d55b8 5006c071 00000000 c008cab8 00000000 00000002 50064
+[   19.272552] 5f80: c0748078 c0724000 c07c0548 c0504510 c0747e60 00000000 411f8
+[   19.281097] 5fa0: 00000000 c0015e14 00000000 c0743e1c c07c0480 c07057dc bfffa
+[   19.289642] 5fc0: 00000000 c06d48d8 ffffffff ffffffff c06d4450 00000000 0000c
+[   19.298187] 5fe0: 00000000 10c53c7d c0742d08 c07057ac c0747e54 80008044 00000
+[   19.306732] [<c02e13b0>] (gpio_irq_handler+0x7c/0x26c) from [<c00a3670>] (ge)
+[   19.316558] [<c00a3670>] (generic_handle_irq+0x34/0x44) from [<c0015380>] (h)
+[   19.325744] [<c0015380>] (handle_IRQ+0x4c/0xac) from [<c000846c>] (gic_handl)
+[   19.334564] [<c000846c>] (gic_handle_irq+0x2c/0x60) from [<c04f8ee4>] (__irq)
+[   19.343292] Exception stack(0xc0725e60 to 0xc0725ea8)
+[   19.348571] 5e60: 0005ebb2 00000001 00000000 c0746980 c1530ac0 ee8cfe00 c1530
+[   19.357116] 5e80: 00000001 c07440d8 ee8cfe00 c0725edc 00000001 c0725ea8 00054
+[   19.365631] 5ea0: 20000013 ffffffff
+[   19.369293] [<c04f8ee4>] (__irq_svc+0x44/0x5c) from [<c04f8c74>] (_raw_spin_)
+[   19.378570] [<c04f8c74>] (_raw_spin_unlock_irq+0x28/0x2c) from [<c007425c>] )
+[   19.388732] [<c007425c>] (finish_task_switch+0x84/0x198) from [<c04f7760>] ()
+[   19.398193] [<c04f7760>] (__schedule+0x404/0x870) from [<c0015e14>] (cpu_idl)
+[   19.406768] [<c0015e14>] (cpu_idle+0xe8/0x114) from [<c06d48d8>] (start_kern)
+[   19.415466] Code: e59480e4 e1d311b4 e5d36034 e1a0a81b (e7920001)
+[   19.421844] ---[ end trace 3eb9bf4b81babe15 ]---
+[   19.426666] Kernel panic - not syncing: Fatal exception in interrupt
+[   19.433288] CPU1: stopping
+[   19.436157] [<c001beac>] (unwind_backtrace+0x0/0xf4) from [<c0019db4>] (hand)
+[   19.445220] [<c0019db4>] (handle_IPI+0x130/0x15c) from [<c0008498>] (gic_han)
+[   19.454223] [<c0008498>] (gic_handle_irq+0x58/0x60) from [<c04f8ee4>] (__irq)
+[   19.462951] Exception stack(0xef06ff88 to 0xef06ffd0)
+[   19.468231] ff80:                   c079f960 c079f960 00000000 00000000 ef068
+[   19.476745] ffa0: c0504510 c0747e60 00000000 411fc092 c0748078 00000000 00000
+[   19.485290] ffc0: c0015570 c0015574 60000113 ffffffff
+[   19.490570] [<c04f8ee4>] (__irq_svc+0x44/0x5c) from [<c0015574>] (default_id)
+[   19.499114] [<c0015574>] (default_idle+0x20/0x44) from [<c0015dc8>] (cpu_idl)
+[   19.507659] [<c0015dc8>] (cpu_idle+0x9c/0x114) from [<804f1d94>] (0x804f1d94)
 ---
- arch/arm/mach-mmp/devices.c               |  227 +++++++++++++++++++++++++++++
- arch/arm/mach-mmp/include/mach/regs-usb.h |   94 ++++++++++++
- 2 files changed, 321 insertions(+)
-
-diff --git a/arch/arm/mach-mmp/devices.c b/arch/arm/mach-mmp/devices.c
-index dd2d8b1..699522b 100644
---- a/arch/arm/mach-mmp/devices.c
-+++ b/arch/arm/mach-mmp/devices.c
-@@ -349,3 +349,230 @@ struct platform_device pxa168_device_u2ootg = {
- #endif /* CONFIG_USB_MV_OTG */
- 
- #endif
-+
-+#ifdef CONFIG_USB_MV_U3D
-+static u32 u3d_phy_read(u32 base, u32 reg)
-+{
-+	u32 addr, data;
-+	addr = base;
-+	data = base + 0x4;
-+
-+	writel_relaxed(reg, addr);
-+	return readl_relaxed(data);
-+}
-+
-+static void u3d_phy_set(u32 base, u32 reg, u32 value)
-+{
-+	u32 addr, data;
-+	u32 tmp;
-+	addr = base;
-+	data = base + 0x4;
-+
-+	writel_relaxed(reg, addr);
-+	tmp = readl_relaxed(data);
-+	tmp |= value;
-+	writel_relaxed(tmp, data);
-+}
-+
-+static void u3d_phy_clear(u32 base, u32 reg, u32 value)
-+{
-+	u32 addr, data;
-+	u32 tmp;
-+	addr = base;
-+	data = base + 0x4;
-+
-+	writel_relaxed(reg, addr);
-+	tmp = readl_relaxed(data);
-+	tmp &= ~value;
-+	writel_relaxed(tmp, data);
-+}
-+
-+static void u3d_phy_write(u32 base, u32 reg, u32 value)
-+{
-+	u32 addr, data;
-+	addr = base;
-+	data = base + 0x4;
-+
-+	writel_relaxed(reg, addr);
-+	writel_relaxed(value, data);
-+}
-+
-+static void u3d_phy_reg_print(u32 base, u32 reg)
-+{
-+	u32 data;
-+	data = u3d_phy_read(base, reg);
-+	pr_debug("phy reg 0x%x: phy data 0x%x\n", reg, data);
-+}
-+
-+void pxa_u3d_phy_deinit(void __iomem *usb3phy)
-+{
-+	u32 base, val;
-+
-+	pr_debug("%s\n", __func__);
-+
-+	base = (unsigned int)usb3phy;
-+
-+	/* Power down Reference Analog current, bit 15
-+	 * Power down PLL, bit 14
-+	 * Power down Receiver, bit 13
-+	 * Power down Transmitter, bit 12
-+	 * of USB3_POWER_PLL_CONTROL register
-+	 */
-+	val = u3d_phy_read(base, USB3_POWER_PLL_CONTROL);
-+	val &= ~(USB3_POWER_PLL_CONTROL_PU);
-+	u3d_phy_write(base, USB3_POWER_PLL_CONTROL, val);
-+}
-+
-+int pxa_u3d_phy_init(void __iomem *usb3phy)
-+{
-+	u32 count;
-+	u32 base, val;
-+
-+	pr_debug("%s\n", __func__);
-+
-+	/* enable usb3 phy */
-+	base = (unsigned int)usb3phy;
-+
-+	val = u3d_phy_read(base, USB3_POWER_PLL_CONTROL);
-+	val &= ~(USB3_POWER_PLL_CONTROL_PU_MASK);
-+	val |= 0xF << USB3_POWER_PLL_CONTROL_PU_SHIFT;
-+	u3d_phy_write(base, USB3_POWER_PLL_CONTROL, val);
-+	udelay(100);
-+
-+	u3d_phy_write(base, USB3_RESET_CONTROL, USB3_RESET_CONTROL_RESET_PIPE);
-+	udelay(100);
-+
-+	u3d_phy_write(base, USB3_RESET_CONTROL,
-+		USB3_RESET_CONTROL_RESET_PIPE | USB3_RESET_CONTROL_RESET_PHY);
-+	udelay(100);
-+
-+	val = u3d_phy_read(base, USB3_POWER_PLL_CONTROL);
-+	val &= ~(USB3_POWER_PLL_CONTROL_REF_FREF_SEL_MASK
-+		| USB3_POWER_PLL_CONTROL_PHY_MODE_MASK);
-+	val |=  (USB3_PLL_25MHZ << USB3_POWER_PLL_CONTROL_REF_FREF_SEL_SHIFT)
-+		| (0x5 << USB3_POWER_PLL_CONTROL_PHY_MODE_SHIFT);
-+	u3d_phy_write(base, USB3_POWER_PLL_CONTROL, val);
-+	udelay(100);
-+
-+	u3d_phy_clear(base, USB3_KVCO_CALI_CONTROL,
-+		USB3_KVCO_CALI_CONTROL_USE_MAX_PLL_RATE_MASK);
-+	udelay(100);
-+
-+	val = u3d_phy_read(base, USB3_SQUELCH_FFE);
-+	val &= ~(USB3_SQUELCH_FFE_FFE_CAP_SEL_MASK
-+		| USB3_SQUELCH_FFE_FFE_RES_SEL_MASK
-+		| USB3_SQUELCH_FFE_SQ_THRESH_IN_MASK);
-+	val |= ((0xD << USB3_SQUELCH_FFE_FFE_CAP_SEL_SHIFT)
-+		| (0x7 << USB3_SQUELCH_FFE_FFE_RES_SEL_SHIFT)
-+		| (0x8 << USB3_SQUELCH_FFE_SQ_THRESH_IN_SHIFT));
-+	u3d_phy_write(base, USB3_SQUELCH_FFE, val);
-+	udelay(100);
-+
-+	val = u3d_phy_read(base, USB3_GEN1_SET0);
-+	val &= ~USB3_GEN1_SET0_G1_TX_SLEW_CTRL_EN_MASK;
-+	val |= 1 << USB3_GEN1_SET0_G1_TX_EMPH_EN_SHIFT;
-+	u3d_phy_write(base, USB3_GEN1_SET0, val);
-+	udelay(100);
-+
-+	val = u3d_phy_read(base, USB3_GEN2_SET0);
-+	val &= ~(USB3_GEN2_SET0_G2_TX_AMP_MASK
-+		| USB3_GEN2_SET0_G2_TX_EMPH_AMP_MASK
-+		| USB3_GEN2_SET0_G2_TX_SLEW_CTRL_EN_MASK);
-+	val |= ((0x14 << USB3_GEN2_SET0_G2_TX_AMP_SHIFT)
-+		| (1 << USB3_GEN2_SET0_G2_TX_AMP_ADJ_SHIFT)
-+		| (0xA << USB3_GEN2_SET0_G2_TX_EMPH_AMP_SHIFT)
-+		| (1 << USB3_GEN2_SET0_G2_TX_EMPH_EN_SHIFT));
-+	u3d_phy_write(base, USB3_GEN2_SET0, val);
-+	udelay(100);
-+
-+	u3d_phy_read(base, USB3_TX_EMPPH);
-+	val &= ~(USB3_TX_EMPPH_AMP_MASK
-+		| USB3_TX_EMPPH_EN_MASK
-+		| USB3_TX_EMPPH_AMP_FORCE_MASK
-+		| USB3_TX_EMPPH_PAR1_MASK
-+		| USB3_TX_EMPPH_PAR2_MASK);
-+	val |= ((0xB << USB3_TX_EMPPH_AMP_SHIFT)
-+		| (1 << USB3_TX_EMPPH_EN_SHIFT)
-+		| (1 << USB3_TX_EMPPH_AMP_FORCE_SHIFT)
-+		| (0x1C << USB3_TX_EMPPH_PAR1_SHIFT)
-+		| (1 << USB3_TX_EMPPH_PAR2_SHIFT));
-+
-+	u3d_phy_write(base, USB3_TX_EMPPH, val);
-+	udelay(100);
-+
-+	val = u3d_phy_read(base, USB3_GEN2_SET1);
-+	val &= ~(USB3_GEN2_SET1_G2_RX_SELMUPI_MASK
-+		| USB3_GEN2_SET1_G2_RX_SELMUPF_MASK
-+		| USB3_GEN2_SET1_G2_RX_SELMUFI_MASK
-+		| USB3_GEN2_SET1_G2_RX_SELMUFF_MASK);
-+	val |= ((1 << USB3_GEN2_SET1_G2_RX_SELMUPI_SHIFT)
-+		| (1 << USB3_GEN2_SET1_G2_RX_SELMUPF_SHIFT)
-+		| (1 << USB3_GEN2_SET1_G2_RX_SELMUFI_SHIFT)
-+		| (1 << USB3_GEN2_SET1_G2_RX_SELMUFF_SHIFT));
-+	u3d_phy_write(base, USB3_GEN2_SET1, val);
-+	udelay(100);
-+
-+	val = u3d_phy_read(base, USB3_DIGITAL_LOOPBACK_EN);
-+	val &= ~USB3_DIGITAL_LOOPBACK_EN_SEL_BITS_MASK;
-+	val |= 1 << USB3_DIGITAL_LOOPBACK_EN_SEL_BITS_SHIFT;
-+	u3d_phy_write(base, USB3_DIGITAL_LOOPBACK_EN, val);
-+	udelay(100);
-+
-+	val = u3d_phy_read(base, USB3_IMPEDANCE_TX_SSC);
-+	val &= ~USB3_IMPEDANCE_TX_SSC_SSC_AMP_MASK;
-+	val |= 0xC << USB3_IMPEDANCE_TX_SSC_SSC_AMP_SHIFT;
-+	u3d_phy_write(base, USB3_IMPEDANCE_TX_SSC, val);
-+	udelay(100);
-+
-+	val = u3d_phy_read(base, USB3_IMPEDANCE_CALI_CTRL);
-+	val &= ~USB3_IMPEDANCE_CALI_CTRL_IMP_CAL_THR_MASK;
-+	val |= 0x4 << USB3_IMPEDANCE_CALI_CTRL_IMP_CAL_THR_SHIFT;
-+	u3d_phy_write(base, USB3_IMPEDANCE_CALI_CTRL, val);
-+	udelay(100);
-+
-+	val = u3d_phy_read(base, USB3_PHY_ISOLATION_MODE);
-+	val &= ~(USB3_PHY_ISOLATION_MODE_PHY_GEN_RX_MASK
-+		| USB3_PHY_ISOLATION_MODE_PHY_GEN_TX_MASK
-+		| USB3_PHY_ISOLATION_MODE_TX_DRV_IDLE_MASK);
-+	val |= ((1 << USB3_PHY_ISOLATION_MODE_PHY_GEN_RX_SHIFT)
-+		| (1 << USB3_PHY_ISOLATION_MODE_PHY_GEN_TX_SHIFT));
-+	u3d_phy_write(base, USB3_PHY_ISOLATION_MODE, val);
-+	udelay(100);
-+
-+	val = u3d_phy_read(base, USB3_TXDETRX);
-+	val &= ~(USB3_TXDETRX_VTHSEL_MASK);
-+	val |= 0x1 << USB3_TXDETRX_VTHSEL_SHIFT;
-+	u3d_phy_write(base, USB3_TXDETRX, val);
-+	udelay(100);
-+
-+	u3d_phy_reg_print(base, USB3_KVCO_CALI_CONTROL);
-+
-+	pr_debug("%s: start calibration", __func__);
-+
-+calstart:
-+	/* Perform Manual Calibration */
-+	u3d_phy_set(base, USB3_KVCO_CALI_CONTROL,
-+		1 << USB3_KVCO_CALI_CONTROL_CAL_START_SHIFT);
-+
-+	mdelay(1);
-+
-+	count = 0;
-+	while (1) {
-+		val = u3d_phy_read(base, USB3_KVCO_CALI_CONTROL);
-+		if (val & (1 << USB3_KVCO_CALI_CONTROL_CAL_DONE_SHIFT))
-+			break;
-+		else if (count > 50) {
-+			pr_debug("calibration failure, retry...\n");
-+			goto calstart;
-+		}
-+		count++;
-+		mdelay(1);
-+	}
-+
-+	/* active PIPE interface */
-+	u3d_phy_write(base, USB3_PIPE_SM_CTRL,
-+		1 << USB3_PIPE_SM_CTRL_PHY_INIT_DONE);
-+
-+	return 0;
-+}
-+#endif /* CONFIG_USB_MV_U3D */
-diff --git a/arch/arm/mach-mmp/include/mach/regs-usb.h b/arch/arm/mach-mmp/include/mach/regs-usb.h
-index b047bf4..5bac566 100644
---- a/arch/arm/mach-mmp/include/mach/regs-usb.h
-+++ b/arch/arm/mach-mmp/include/mach/regs-usb.h
-@@ -250,4 +250,98 @@
- #define	HSIC_USB_CLK_PHY		0x0
- #define HSIC_USB_CLK_PMU		0x1
- 
-+/* For USB3 PHY */
-+#define USB3_POWER_PLL_CONTROL		0x1
-+#define USB3_KVCO_CALI_CONTROL		0x2
-+#define USB3_IMPEDANCE_CALI_CTRL	0x3
-+#define USB3_IMPEDANCE_TX_SSC		0x4
-+#define USB3_SQUELCH_FFE		0x6
-+#define USB3_GEN1_SET0			0xD
-+#define USB3_GEN2_SET0			0xF
-+#define USB3_GEN2_SET1			0x10
-+#define USB3_DIGITAL_LOOPBACK_EN	0x23
-+#define USB3_PHY_ISOLATION_MODE		0x26
-+#define USB3_TXDETRX			0x48
-+#define USB3_TX_EMPPH			0x5E
-+#define USB3_RESET_CONTROL		0x90
-+#define USB3_PIPE_SM_CTRL		0x91
-+
-+#define USB3_RESET_CONTROL_RESET_PIPE			0x1
-+#define USB3_RESET_CONTROL_RESET_PHY			0x2
-+
-+#define USB3_POWER_PLL_CONTROL_REF_FREF_SEL_MASK	(0x1F << 0)
-+#define USB3_POWER_PLL_CONTROL_REF_FREF_SEL_SHIFT	0
-+#define USB3_PLL_25MHZ					0x2
-+#define USB3_PLL_26MHZ					0x5
-+#define USB3_POWER_PLL_CONTROL_PHY_MODE_MASK		(0x7 << 5)
-+#define USB3_POWER_PLL_CONTROL_PHY_MODE_SHIFT		5
-+#define USB3_POWER_PLL_CONTROL_PU_MASK			(0xF << 12)
-+#define USB3_POWER_PLL_CONTROL_PU_SHIFT			12
-+#define USB3_POWER_PLL_CONTROL_PU			(0xF << 12)
-+
-+#define USB3_KVCO_CALI_CONTROL_USE_MAX_PLL_RATE_MASK	(0x1 << 12)
-+#define USB3_KVCO_CALI_CONTROL_USE_MAX_PLL_RATE_SHIFT	12
-+#define USB3_KVCO_CALI_CONTROL_CAL_DONE_SHIFT		14
-+#define USB3_KVCO_CALI_CONTROL_CAL_START_SHIFT		15
-+
-+#define USB3_SQUELCH_FFE_FFE_CAP_SEL_MASK		0xF
-+#define USB3_SQUELCH_FFE_FFE_CAP_SEL_SHIFT		0
-+#define USB3_SQUELCH_FFE_FFE_RES_SEL_MASK		(0x7 << 4)
-+#define USB3_SQUELCH_FFE_FFE_RES_SEL_SHIFT		4
-+#define USB3_SQUELCH_FFE_SQ_THRESH_IN_MASK		(0x1F << 8)
-+#define USB3_SQUELCH_FFE_SQ_THRESH_IN_SHIFT		8
-+
-+#define USB3_GEN1_SET0_G1_TX_SLEW_CTRL_EN_MASK		(0x1 << 15)
-+#define USB3_GEN1_SET0_G1_TX_EMPH_EN_SHIFT		11
-+
-+#define USB3_GEN2_SET0_G2_TX_AMP_MASK			(0x1F << 1)
-+#define USB3_GEN2_SET0_G2_TX_AMP_SHIFT			1
-+#define USB3_GEN2_SET0_G2_TX_AMP_ADJ_SHIFT		6
-+#define USB3_GEN2_SET0_G2_TX_EMPH_AMP_MASK		(0xF << 7)
-+#define USB3_GEN2_SET0_G2_TX_EMPH_AMP_SHIFT		7
-+#define USB3_GEN2_SET0_G2_TX_EMPH_EN_MASK		(0x1 << 11)
-+#define USB3_GEN2_SET0_G2_TX_EMPH_EN_SHIFT		11
-+#define USB3_GEN2_SET0_G2_TX_SLEW_CTRL_EN_MASK		(0x1 << 15)
-+#define USB3_GEN2_SET0_G2_TX_SLEW_CTRL_EN_SHIFT		15
-+
-+#define USB3_GEN2_SET1_G2_RX_SELMUPI_MASK		(0x7 << 0)
-+#define USB3_GEN2_SET1_G2_RX_SELMUPI_SHIFT		0
-+#define USB3_GEN2_SET1_G2_RX_SELMUPF_MASK		(0x7 << 3)
-+#define USB3_GEN2_SET1_G2_RX_SELMUPF_SHIFT		3
-+#define USB3_GEN2_SET1_G2_RX_SELMUFI_MASK		(0x3 << 6)
-+#define USB3_GEN2_SET1_G2_RX_SELMUFI_SHIFT		6
-+#define USB3_GEN2_SET1_G2_RX_SELMUFF_MASK		(0x3 << 8)
-+#define USB3_GEN2_SET1_G2_RX_SELMUFF_SHIFT		8
-+
-+#define USB3_DIGITAL_LOOPBACK_EN_SEL_BITS_MASK		(0x3 << 10)
-+#define USB3_DIGITAL_LOOPBACK_EN_SEL_BITS_SHIFT		10
-+
-+#define USB3_IMPEDANCE_CALI_CTRL_IMP_CAL_THR_MASK	(0x7 << 12)
-+#define USB3_IMPEDANCE_CALI_CTRL_IMP_CAL_THR_SHIFT	12
-+
-+#define USB3_IMPEDANCE_TX_SSC_SSC_AMP_MASK		(0x3F << 0)
-+#define USB3_IMPEDANCE_TX_SSC_SSC_AMP_SHIFT		0
-+
-+#define USB3_PHY_ISOLATION_MODE_PHY_GEN_RX_MASK		0xF
-+#define USB3_PHY_ISOLATION_MODE_PHY_GEN_RX_SHIFT	0
-+#define USB3_PHY_ISOLATION_MODE_PHY_GEN_TX_MASK		(0xF << 4)
-+#define USB3_PHY_ISOLATION_MODE_PHY_GEN_TX_SHIFT	4
-+#define USB3_PHY_ISOLATION_MODE_TX_DRV_IDLE_MASK	(0x1 << 8)
-+
-+#define USB3_TXDETRX_VTHSEL_MASK			(0x3 << 4)
-+#define USB3_TXDETRX_VTHSEL_SHIFT			4
-+
-+#define USB3_TX_EMPPH_AMP_MASK				(0xF << 0)
-+#define USB3_TX_EMPPH_AMP_SHIFT				0
-+#define USB3_TX_EMPPH_EN_MASK				(0x1 << 6)
-+#define USB3_TX_EMPPH_EN_SHIFT				6
-+#define USB3_TX_EMPPH_AMP_FORCE_MASK			(0x1 << 7)
-+#define USB3_TX_EMPPH_AMP_FORCE_SHIFT			7
-+#define USB3_TX_EMPPH_PAR1_MASK				(0x1F << 8)
-+#define USB3_TX_EMPPH_PAR1_SHIFT			8
-+#define USB3_TX_EMPPH_PAR2_MASK				(0x1 << 13)
-+#define USB3_TX_EMPPH_PAR2_SHIFT			13
-+
-+#define USB3_PIPE_SM_CTRL_PHY_INIT_DONE			15
-+
- #endif /* __ASM_ARCH_PXA_U2O_H */
--- 
-1.7.9.5
+Tarun
+>
+> Kevin
+>
+>>  drivers/gpio/gpio-omap.c |   35 +++++++++++++++++++++++++++++++++++
+>>  1 files changed, 35 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>> index e6efd77..50de875 100644
+>> --- a/drivers/gpio/gpio-omap.c
+>> +++ b/drivers/gpio/gpio-omap.c
+>> @@ -1152,6 +1152,40 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+>>       return ret;
+>>  }
+>>
+>> +/**
+>> + * omap_gpio_remove - cleanup a registered gpio device
+>> + * @pdev:       pointer to current gpio platform device
+>> + *
+>> + * Called by driver framework whenever a gpio device is unregistered.
+>> + * GPIO is deleted from the list and associated clock handle freed.
+>> + */
+>> +static int __devexit omap_gpio_remove(struct platform_device *pdev)
+>> +{
+>> +     struct device *dev = &pdev->dev;
+>> +     struct gpio_bank *bank;
+>> +     unsigned long flags;
+>> +     int ret = -EINVAL;
+>> +
+>> +     list_for_each_entry(bank, &omap_gpio_list, node) {
+>> +             spin_lock_irqsave(&bank->lock, flags);
+>> +             if (bank->dev == dev) {
+>> +                     clk_put(bank->dbck);
+>> +                     list_del(&bank->node);
+>> +                     ret = 0;
+>> +                     spin_unlock_irqrestore(&bank->lock, flags);
+>> +                     break;
+>> +             }
+>> +             spin_unlock_irqrestore(&bank->lock, flags);
+>> +     }
+>> +
+>> +     if (!ret) {
+>> +             pm_runtime_disable(bank->dev);
+>> +             irq_free_descs(bank->irq_base, bank->width);
+>> +     }
+>> +
+>> +     return ret;
+>> +}
+>> +
+>>  #ifdef CONFIG_ARCH_OMAP2PLUS
+>>
+>>  #if defined(CONFIG_PM_RUNTIME)
+>> @@ -1478,6 +1512,7 @@ MODULE_DEVICE_TABLE(of, omap_gpio_match);
+>>
+>>  static struct platform_driver omap_gpio_driver = {
+>>       .probe          = omap_gpio_probe,
+>> +     .remove = __devexit_p(omap_gpio_remove),
+>>       .driver         = {
+>>               .name   = "omap_gpio",
+>>               .pm     = &gpio_pm_ops,
