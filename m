@@ -1,189 +1,204 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 09 Aug 2012 14:31:59 +0900
-Subject: [PATCH 4/6] ARM: s3c24xx: use new PWM driver
-In-Reply-To: <201208081434.56198.arnd@arndb.de>
-References: <1344430493-5304-1-git-send-email-arnd@arndb.de>
- <1344430493-5304-5-git-send-email-arnd@arndb.de>
- <0b6801cd7567$29be48b0$7d3ada10$%kim@samsung.com>
- <201208081434.56198.arnd@arndb.de>
-Message-ID: <0c3901cd75f0$4c26bb60$e4743220$%kim@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu,  9 Aug 2012 00:37:02 -0500
+Subject: [RFC PATCH] ARM: add coherent dma ops
+Message-ID: <1344490622-20029-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> 
-> On Wednesday 08 August 2012, Kukjin Kim wrote:
-> 
-> > diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-
-> s3c24xx/Kconfig
-> > index e249611..d56b0f7 100644
-> > --- a/arch/arm/mach-s3c24xx/Kconfig
-> > +++ b/arch/arm/mach-s3c24xx/Kconfig
-> > @@ -483,7 +483,7 @@ config MACH_NEO1973_GTA02
-> >  	select I2C
-> >  	select POWER_SUPPLY
-> >  	select MACH_NEO1973
-> > -	select S3C2410_PWM
-> > +	select S3C24XX_PWM
-> >  	select S3C_DEV_USB_HOST
-> >  	help
-> >  	   Say Y here if you are using the Openmoko GTA02 / Freerunner GSM
-> > Phone
-> > @@ -493,7 +493,7 @@ config MACH_RX1950
-> >  	select S3C24XX_DCLK
-> >  	select PM_H1940 if PM
-> >  	select I2C
-> > -	select S3C2410_PWM
-> > +	select S3C24XX_PWM
-> >  	select S3C_DEV_NAND
-> >  	select S3C2410_IOTIMING if S3C2440_CPUFREQ
-> >  	select S3C2440_XTAL_16934400
-> > diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-
-> samsung/Kconfig
-> > index 7aca31c..dcdfb77 100644
-> > --- a/arch/arm/plat-samsung/Kconfig
-> > +++ b/arch/arm/plat-samsung/Kconfig
-> > @@ -403,7 +403,7 @@ config S5P_DEV_USB_EHCI
-> >
-> >  config S3C24XX_PWM
-> >  	bool "PWM device support"
-> > -	select HAVE_PWM
-> > +	select PWM
-> >  	help
-> >  	  Support for exporting the PWM timer blocks via the pwm device
-> >  	  system
-> > diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> > index 8fc3808..c74d055 100644
-> > --- a/drivers/pwm/Kconfig
-> > +++ b/drivers/pwm/Kconfig
-> > @@ -58,14 +58,12 @@ config PWM_PXA
-> >  	  will be called pwm-pxa.
-> >
-> >  config PWM_SAMSUNG
-> > -	tristate "Samsung pwm support"
-> > +	bool "Samsung PWM support"
-> >  	depends on PLAT_SAMSUNG
-> > +	default y
-> >  	help
-> >  	  Generic PWM framework driver for Samsung.
-> >
-> > -	  To compile this driver as a module, choose M here: the module
-> > -	  will be called pwm-samsung.
-> > -
-> >  config PWM_TEGRA
-> >  	tristate "NVIDIA Tegra PWM support"
-> >  	depends on ARCH_TEGRA
-> 
-> This approach has two disadvantages compared to mine:
-> 
-> * When building for the samsung platforms other than rx1950 or gta02,
->   you can no longer have the PWM driver as a loadable module, for no
->   good reason.
-> 
-OK I see, I'm still thinking the PWM driver can be selected in kernel
-menuconfig though.
+From: Rob Herring <rob.herring@calxeda.com>
 
-My concept is when PWM is selected on Samsung platforms by defconfig or
-manually enabling, PWM_SAMSUNG is selected automatically. In addition,
-current Samsung PWM driver cannot support module now because pwm_init() is
-called by arch_initcall().
+arch_is_coherent is problematic as it is a global symbol. This
+doesn't work for multi-platform kernels or platforms which can support
+per device coherent DMA.
 
-I think, we can remove S3C24XX_PWM and just select PWM (or using HAVE_PWM)
-and PWM_SAMSUNG can be selected by enabling PWM in samsung platform next
-time :-)
+This adds arm_coherent_dma_ops to be used for devices which connected
+coherently (i.e. to the ACP port on Cortex-A9 or A15). The arm_dma_ops
+are modified at boot when arch_is_coherent is true.
 
-> * It is still possible to manually disable PWM_SAMSUNG, even on
->   rx1950 and gta02, because the Kconfig symbol is visible.
-> 
-Yeah you're right, makes sense.
+This does not address arch_is_coherent used in iommu dma ops.
 
-> I've added a "Reported-by: Tushar Behera <tushar.behera@linaro.org>"
-> line to my version of the patch, but I would prefer to keep that
-> approach. I have also changed the patch to use the S3C24XX_PWM
-> symbol because that lets everyone migrate the defconfig files.
-> 
-OK.
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+Compile tested only.
 
-> Do you want to give this patch some more testing, or should I keep
-> it in arm-soc?
-> 
-Looks good to me, please keep going on.
+ arch/arm/mm/dma-mapping.c |   89 +++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 77 insertions(+), 12 deletions(-)
 
-> ---
-> From 438b0cf94adb2528bdeeb71314f7be16512ea5b1 Mon Sep 17 00:00:00 2001
-> From: Arnd Bergmann <arnd@arndb.de>
-> Date: Sat, 4 Aug 2012 07:52:19 +0000
-> Subject: [PATCH] ARM: s3c24xx: use new PWM driver
-> 
-> The samsung PWM driver has moved to the new PWM subsystem, which
-> changed the Kconfig symbol for that driver, but the rx1950 and
-> gta02 boards still uses the old one.
-> 
-> Without this patch, building s3c2410_defconfig results in:
-> 
-> arch/arm/mach-s3c24xx/built-in.o: In function `rx1950_lcd_power':
-> arch/arm/mach-s3c24xx/mach-rx1950.c:430: undefined reference to
-> `pwm_config'
-> arch/arm/mach-s3c24xx/mach-rx1950.c:431: undefined reference to
-> `pwm_disable'
-> arch/arm/mach-s3c24xx/mach-rx1950.c:437: undefined reference to
-> `pwm_config'
-> arch/arm/mach-s3c24xx/mach-rx1950.c:438: undefined reference to
-> `pwm_enable'
-> arch/arm/mach-s3c24xx/built-in.o: In function `rx1950_backlight_exit':
-> arch/arm/mach-s3c24xx/mach-rx1950.c:504: undefined reference to `pwm_free'
-> arch/arm/mach-s3c24xx/built-in.o: In function `rx1950_backlight_init':
-> arch/arm/mach-s3c24xx/mach-rx1950.c:487: undefined reference to
-> `pwm_request'
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Reported-by: Tushar Behera <tushar.behera@linaro.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-> index e249611..d56b0f7 100644
-> --- a/arch/arm/mach-s3c24xx/Kconfig
-> +++ b/arch/arm/mach-s3c24xx/Kconfig
-> @@ -483,7 +483,7 @@ config MACH_NEO1973_GTA02
->  	select I2C
->  	select POWER_SUPPLY
->  	select MACH_NEO1973
-> -	select S3C2410_PWM
-> +	select S3C24XX_PWM
->  	select S3C_DEV_USB_HOST
->  	help
->  	   Say Y here if you are using the Openmoko GTA02 / Freerunner GSM
-> Phone
-> @@ -493,7 +493,7 @@ config MACH_RX1950
->  	select S3C24XX_DCLK
->  	select PM_H1940 if PM
->  	select I2C
-> -	select S3C2410_PWM
-> +	select S3C24XX_PWM
->  	select S3C_DEV_NAND
->  	select S3C2410_IOTIMING if S3C2440_CPUFREQ
->  	select S3C2440_XTAL_16934400
-> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-> index 7aca31c..9c3b90c 100644
-> --- a/arch/arm/plat-samsung/Kconfig
-> +++ b/arch/arm/plat-samsung/Kconfig
-> @@ -403,7 +403,8 @@ config S5P_DEV_USB_EHCI
-> 
->  config S3C24XX_PWM
->  	bool "PWM device support"
-> -	select HAVE_PWM
-> +	select PWM
-> +	select PWM_SAMSUNG
->  	help
->  	  Support for exporting the PWM timer blocks via the pwm device
->  	  system
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index c2cdf65..8875cd4 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -73,11 +73,18 @@ static dma_addr_t arm_dma_map_page(struct device *dev, struct page *page,
+ 	     unsigned long offset, size_t size, enum dma_data_direction dir,
+ 	     struct dma_attrs *attrs)
+ {
+-	if (!arch_is_coherent() && !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
++	if (!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+ 		__dma_page_cpu_to_dev(page, offset, size, dir);
+ 	return pfn_to_dma(dev, page_to_pfn(page)) + offset;
+ }
+ 
++static dma_addr_t arm_coherent_dma_map_page(struct device *dev, struct page *page,
++	     unsigned long offset, size_t size, enum dma_data_direction dir,
++	     struct dma_attrs *attrs)
++{
++	return pfn_to_dma(dev, page_to_pfn(page)) + offset;
++}
++
+ /**
+  * arm_dma_unmap_page - unmap a buffer previously mapped through dma_map_page()
+  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+@@ -96,7 +103,7 @@ static void arm_dma_unmap_page(struct device *dev, dma_addr_t handle,
+ 		size_t size, enum dma_data_direction dir,
+ 		struct dma_attrs *attrs)
+ {
+-	if (!arch_is_coherent() && !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
++	if (!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+ 		__dma_page_dev_to_cpu(pfn_to_page(dma_to_pfn(dev, handle)),
+ 				      handle & ~PAGE_MASK, size, dir);
+ }
+@@ -106,8 +113,7 @@ static void arm_dma_sync_single_for_cpu(struct device *dev,
+ {
+ 	unsigned int offset = handle & (PAGE_SIZE - 1);
+ 	struct page *page = pfn_to_page(dma_to_pfn(dev, handle-offset));
+-	if (!arch_is_coherent())
+-		__dma_page_dev_to_cpu(page, offset, size, dir);
++	__dma_page_dev_to_cpu(page, offset, size, dir);
+ }
+ 
+ static void arm_dma_sync_single_for_device(struct device *dev,
+@@ -115,8 +121,7 @@ static void arm_dma_sync_single_for_device(struct device *dev,
+ {
+ 	unsigned int offset = handle & (PAGE_SIZE - 1);
+ 	struct page *page = pfn_to_page(dma_to_pfn(dev, handle-offset));
+-	if (!arch_is_coherent())
+-		__dma_page_cpu_to_dev(page, offset, size, dir);
++	__dma_page_cpu_to_dev(page, offset, size, dir);
+ }
+ 
+ static int arm_dma_set_mask(struct device *dev, u64 dma_mask);
+@@ -138,6 +143,40 @@ struct dma_map_ops arm_dma_ops = {
+ };
+ EXPORT_SYMBOL(arm_dma_ops);
+ 
++static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
++	dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs);
++static void arm_coherent_dma_free(struct device *dev, size_t size, void *cpu_addr,
++				  dma_addr_t handle, struct dma_attrs *attrs);
++
++struct dma_map_ops arm_coherent_dma_ops = {
++	.alloc			= arm_coherent_dma_alloc,
++	.free			= arm_coherent_dma_free,
++	.mmap			= arm_dma_mmap,
++	.get_sgtable		= arm_dma_get_sgtable,
++	.map_page		= arm_coherent_dma_map_page,
++	.map_sg			= arm_dma_map_sg,
++	.set_dma_mask		= arm_dma_set_mask,
++};
++EXPORT_SYMBOL(arm_coherent_dma_ops);
++
++static int __init dma_map_init(void)
++{
++	if (!arch_is_coherent())
++		return 0;
++
++	arm_dma_ops.map_page = arm_coherent_dma_map_page;
++	arm_dma_ops.unmap_page = NULL;
++	arm_dma_ops.map_sg = NULL;
++	arm_dma_ops.unmap_sg = NULL;
++	arm_dma_ops.sync_single_for_cpu = NULL;
++	arm_dma_ops.sync_single_for_device = NULL;
++	arm_dma_ops.sync_sg_for_cpu = NULL;
++	arm_dma_ops.sync_sg_for_device = NULL;
++	arm_dma_ops.alloc = arm_coherent_dma_alloc;
++	arm_dma_ops.free = arm_coherent_dma_free;
++}
++core_initcall(dma_map_init);
++
+ static u64 get_coherent_dma_mask(struct device *dev)
+ {
+ 	u64 mask = (u64)arm_dma_limit;
+@@ -538,7 +577,7 @@ static void *__alloc_simple_buffer(struct device *dev, size_t size, gfp_t gfp,
+ 
+ 
+ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+-			 gfp_t gfp, pgprot_t prot, const void *caller)
++			 gfp_t gfp, pgprot_t prot, bool is_coherent, const void *caller)
+ {
+ 	u64 mask = get_coherent_dma_mask(dev);
+ 	struct page *page;
+@@ -571,7 +610,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+ 	*handle = DMA_ERROR_CODE;
+ 	size = PAGE_ALIGN(size);
+ 
+-	if (arch_is_coherent() || nommu())
++	if (is_coherent || nommu())
+ 		addr = __alloc_simple_buffer(dev, size, gfp, &page);
+ 	else if (gfp & GFP_ATOMIC)
+ 		addr = __alloc_from_pool(size, &page);
+@@ -599,7 +638,20 @@ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+ 	if (dma_alloc_from_coherent(dev, size, handle, &memory))
+ 		return memory;
+ 
+-	return __dma_alloc(dev, size, handle, gfp, prot,
++	return __dma_alloc(dev, size, handle, gfp, prot, false,
++			   __builtin_return_address(0));
++}
++
++static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
++	dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
++{
++	pgprot_t prot = __get_dma_pgprot(attrs, pgprot_kernel);
++	void *memory;
++
++	if (dma_alloc_from_coherent(dev, size, handle, &memory))
++		return memory;
++
++	return __dma_alloc(dev, size, handle, gfp, prot, true,
+ 			   __builtin_return_address(0));
+ }
+ 
+@@ -636,8 +688,9 @@ int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+ /*
+  * Free a buffer as defined by the above mapping.
+  */
+-void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+-		  dma_addr_t handle, struct dma_attrs *attrs)
++static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
++			   dma_addr_t handle, struct dma_attrs *attrs,
++			   bool is_coherent)
+ {
+ 	struct page *page = pfn_to_page(dma_to_pfn(dev, handle));
+ 
+@@ -646,7 +699,7 @@ void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+ 
+ 	size = PAGE_ALIGN(size);
+ 
+-	if (arch_is_coherent() || nommu()) {
++	if (is_coherent || nommu()) {
+ 		__dma_free_buffer(page, size);
+ 	} else if (!IS_ENABLED(CONFIG_CMA)) {
+ 		__dma_free_remap(cpu_addr, size);
+@@ -662,6 +715,18 @@ void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+ 	}
+ }
+ 
++void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
++		  dma_addr_t handle, struct dma_attrs *attrs)
++{
++	__arm_dma_free(dev, size, cpu_addr, handle, attrs, false);
++}
++
++static void arm_coherent_dma_free(struct device *dev, size_t size, void *cpu_addr,
++				  dma_addr_t handle, struct dma_attrs *attrs)
++{
++	__arm_dma_free(dev, size, cpu_addr, handle, attrs, true);
++}
++
+ int arm_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
+ 		 void *cpu_addr, dma_addr_t handle, size_t size,
+ 		 struct dma_attrs *attrs)
+-- 
+1.7.9.5
