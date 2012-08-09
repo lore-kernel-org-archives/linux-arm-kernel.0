@@ -1,65 +1,61 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 09 Aug 2012 16:05:24 -0400 (EDT)
-Subject: RFC: mutex: hung tasks on SMP platforms with
- asm-generic/mutex-xchg.h
-In-Reply-To: <20120809181705.GG18486@mudshark.cambridge.arm.com>
-References: <20120807115647.GA12828@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1208090029460.5231@xanadu.home>
- <20120809144953.GC18486@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1208091201380.5231@xanadu.home>
- <alpine.LFD.2.02.1208091243080.5231@xanadu.home>
- <20120809175019.GE18486@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1208091405340.5231@xanadu.home>
- <20120809181705.GG18486@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1208091601570.5231@xanadu.home>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Fri, 10 Aug 2012 07:02:41 +1000
+Subject: [PATCH] ARM: ep93xx: clockevent support
+In-Reply-To: <CANapsLQ6kCUN5UoaA3xejm24SGxCKmZEFgmR_+r7N-=DPz0TVA@mail.gmail.com>
+References: <1344338474.18237.6.camel@localhost>	<5021122C.3000503@gmail.com>
+ <CANapsLQ6kCUN5UoaA3xejm24SGxCKmZEFgmR_+r7N-=DPz0TVA@mail.gmail.com>
+Message-ID: <50242571.70402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Aug 2012, Will Deacon wrote:
+On 09/08/12 18:54, Yan Burman wrote:
 
-> On Thu, Aug 09, 2012 at 07:09:02PM +0100, Nicolas Pitre wrote:
-> > On Thu, 9 Aug 2012, Will Deacon wrote:
-> > > On Thu, Aug 09, 2012 at 05:57:33PM +0100, Nicolas Pitre wrote:
-> > > > On Thu, 9 Aug 2012, Nicolas Pitre wrote:
-> > > > diff --git a/include/asm-generic/mutex-xchg.h b/include/asm-generic/mutex-xchg.h
-> > > > index 580a6d35c7..44a66c99c8 100644
-> > > > --- a/include/asm-generic/mutex-xchg.h
-> > > > +++ b/include/asm-generic/mutex-xchg.h
-> > > > @@ -25,8 +25,11 @@
-> > > >  static inline void
-> > > >  __mutex_fastpath_lock(atomic_t *count, void (*fail_fn)(atomic_t *))
-> > > >  {
-> > > > -	if (unlikely(atomic_xchg(count, 0) != 1))
-> > > > -		fail_fn(count);
-> > > > +	if (unlikely(atomic_xchg(count, 0) != 1)) {
-> > > > +		/* Mark lock contention explicitly */
-> > > > +		if (likely(atomic_xchg(count, -1) != 1))
-> > > > +			fail_fn(count);
-> > > > +	}
-> > > >  }
-> > > >  
-> > > >  /**
-> > > 
-> > > Doesn't this mean that we're no longer just swapping 0 for a 0 if the lock
-> > > was taken, therefore needlessly sending the current owner down the slowpath
-> > > on unlock?
-> > 
-> > If the lock was taken, this means the count was either 0 or -1.  If it 
-> > was 1 then we just put a 0 there and we own it.  But if the cound was 0 
-> > then we should store -1 instead, which is what the inner xchg does.  If 
-> > the count was already -1 then we store -1 back.  That more closely mimic 
-> > what the atomic dec does which is what we want.
+> On 8/7/12, Ryan Mallon <rmallon@gmail.com> wrote:
+>> On 07/08/12 21:21, Yan Burman wrote:
+>>
+>>> ARM: ep93xx: clockevent support
+>>> I have ported to 3.6-rc1 and slightly modified a previous patch for
+>>> clockevent support for the ep93xx.
+>>> The porting mainly consists of sched_clock support.
+>>> Tested on 9302 based board.
+>>> From: Ahmed Ammar <aammar <at> edge-techno.com>
+>>> Signed-off-by: Yan Burman <burman.yan@gmail.com>
+>>
+>>
+>> Hi Yan, some comments below.
+>>
+>> ~Ryan
+>>
+>>> +	case CLOCK_EVT_MODE_ONESHOT:
+>>> +		tmode |= EP93XX_TIMER123_CONTROL_ENABLE;
+>>> +		__raw_writel(tmode, EP93XX_TIMER1_CONTROL);
+>>> +		break;
+>>> +
+>>> +	case CLOCK_EVT_MODE_SHUTDOWN:
+>>> +	case CLOCK_EVT_MODE_UNUSED:
+>>> +	case CLOCK_EVT_MODE_RESUME:
+>>> +		return;
+>>
+>>
+>> These cases can be removed.
+>>
 > 
-> Ok, I just wasn't sure that marking the lock contended was required when it
-> was previously locked, given that we'll drop into spinning on the owner
-> anyway.
+> This case is something that is present in most (if not all) other architectures.
+> I don't mind removing it, but it will have to be replaced with:
+> default:
+>      ;
+> 
+> Since GCC produces warnings otherwise.
 
-That's fine, and the owner will put 1 back when it unlocks it as well as 
-processing the wait queue which is what we need.
+Oh, I missed the fact the switch was on an enum. You are correct, we
+should keep the code consistent with other architectures, so this
+can be left as is.
 
-> I'll add a commit message to the above and re-post if that's ok?
+> Other than that I am going to wait a while more for more comments if
+> somebody has them,
+> and post a new version with style fixes as well as switch to
+> drivers/clocksource/mmio.c usage.
 
-Sure.  Don't forget to update __mutex_fastpath_lock_retval() as well.
 
-
-Nicolas
+Great, thanks,
+~Ryan
