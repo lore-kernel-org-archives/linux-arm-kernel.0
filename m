@@ -1,88 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 10 Aug 2012 15:22:09 +0100
-Subject: [PATCH] mutex: place lock in contended state after fastpath_lock
- failure
-Message-ID: <1344608529-2377-1-git-send-email-will.deacon@arm.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Fri, 10 Aug 2012 09:26:36 -0500
+Subject: [PATCH] efikamx: reintroduce Genesi Efika MX Smarttop via device
+ tree
+In-Reply-To: <20120810140406.GB3409@S2101-09.ap.freescale.net>
+References: <1344375978-29981-1-git-send-email-matt@genesi-usa.com>
+ <20120808151555.GE14718@S2101-09.ap.freescale.net>
+ <CAKGA1bkbp8_z+HSr97cp_jeCrdTHkQxuZPFu0QPWwnXphWVdZA@mail.gmail.com>
+ <CAOMZO5DOEfV4wTSNW8ABaUhGwa_KG3Bkt0o-rs8k-cZk4P-=+A@mail.gmail.com>
+ <CAKGA1bkOo=En2P18FaBpq_KAZ88kisikXhNTabvnDknQ-EwFjA@mail.gmail.com>
+ <20120810014119.GD19617@S2101-09.ap.freescale.net>
+ <CAKGA1bmd-53G=59F7Nsd3Sx2eEQgvcahnt3g5zxJAGawtc-gWQ@mail.gmail.com>
+ <20120810140406.GB3409@S2101-09.ap.freescale.net>
+Message-ID: <CAKGA1b=bcV2RKDvv=hTjfCo+uTXgcvsTPP0pM-vZYUHLMcrRvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM recently moved to asm-generic/mutex-xchg.h for its mutex
-implementation after the previous implementation was found to be missing
-some crucial memory barriers. However, this has revealed some problems
-running hackbench on SMP platforms due to the way in which the
-MUTEX_SPIN_ON_OWNER code operates.
+On Fri, Aug 10, 2012 at 9:04 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Fri, Aug 10, 2012 at 08:36:02AM -0500, Matt Sealey wrote:
+>> Requiring it breaks the entire concept of the device tree to describe running
+>> hardware. It is not a configuration script. pinctrl should be optional
+>> - built in
+>> always, but not necessary to turn a board on if it's already configured.
+>>
+> How would kernel know if it's already configured, correctly?
 
-The symptoms are that a bunch of hackbench tasks are left waiting on an
-unlocked mutex and therefore never get woken up to claim it. This boils
-down to the following sequence of events:
+Trust! When we release the new U-Boot, it will be already configured,
+every pin in the schematic, every
+pin from the old kernels (not mainline, some of that was wrong),
+exactly the way it should be. There's
+nothing new with the Efika MX.
 
-        Task A        Task B        Task C        Lock value
-0                                                     1
-1       lock()                                        0
-2                     lock()                          0
-3                     spin(A)                         0
-4       unlock()                                      1
-5                                   lock()            0
-6                     cmpxchg(1,0)                    0
-7                     contended()                    -1
-8       lock()                                        0
-9       spin(C)                                       0
-10                                  unlock()          1
-11      cmpxchg(1,0)                                  0
-12      unlock()                                      1
+If you try and boot it on the old Efika, it just won't work reliably
+for any peripheral U-Boot didn't
+already configure, but for the current version you'd get MMC, PATA,
+serial port, SPI (NOR/PMIC)
+which is all we configure in the DT right now anyway... this is only
+going to be an issue once we
+get to displays and USB (I2C isn't set up in the old one).
 
-At this point, the lock is unlocked, but Task B is in an uninterruptible
-sleep with nobody to wake it up.
+>> What would happen if a board were designed that only used the default ALT
+>> settings on i.MX53 or so? You'd have to redefine every default IOMUX pad
+>> just to get it to boot. That's intolerable.
+>
+> Come on, even the pad configuration are all the default?  Even if that's
+> the case, yes, we still need to do it.  How do we know if firmware has
+> changed the settings or not.
 
-This patch fixes the problem by ensuring we put the lock into the
-contended state if we fail to acquire it on the fastpath, ensuring that
-any blocked waiters are woken up when the mutex is released.
+TRUST...
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Chris Mason <chris.mason@fusionio.com>
-Cc: Ingo Molnar <mingo@elte.hu>
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+Maybe you can't rely on the development boards from Freescale, but we have to
+do unit testing at every stage of operation for consumer devices. Once U-Boot
+passes all tests, why bother re-testing the exact same configuration, now done
+twice, in the kernel? I don't want to debug pad settings twice, and we shouldn't
+need to.
 
-Nico: Can I add your S-o-B to this please? Also, preliminary benchmarks
-      are now showing a slight performance improvement on A15 if I use
-      the -dec variant rather than -xchg. I'll follow up with a patch
-      once I've got more numbers.
+If you really think it's necessary then fine, we'll do it.
 
- include/asm-generic/mutex-xchg.h |   11 +++++++++--
- 1 files changed, 9 insertions(+), 2 deletions(-)
-
-diff --git a/include/asm-generic/mutex-xchg.h b/include/asm-generic/mutex-xchg.h
-index 580a6d3..c04e0db 100644
---- a/include/asm-generic/mutex-xchg.h
-+++ b/include/asm-generic/mutex-xchg.h
-@@ -26,7 +26,13 @@ static inline void
- __mutex_fastpath_lock(atomic_t *count, void (*fail_fn)(atomic_t *))
- {
- 	if (unlikely(atomic_xchg(count, 0) != 1))
--		fail_fn(count);
-+		/*
-+		 * We failed to acquire the lock, so mark it contended
-+		 * to ensure that any waiting tasks are woken up by the
-+		 * unlock slow path.
-+		 */
-+		if (likely(atomic_xchg(count, -1) != 1))
-+			fail_fn(count);
- }
- 
- /**
-@@ -43,7 +49,8 @@ static inline int
- __mutex_fastpath_lock_retval(atomic_t *count, int (*fail_fn)(atomic_t *))
- {
- 	if (unlikely(atomic_xchg(count, 0) != 1))
--		return fail_fn(count);
-+		if (likely(atomic_xchg(count, -1) != 1))
-+			return fail_fn(count);
- 	return 0;
- }
- 
 -- 
-1.7.4.1
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
