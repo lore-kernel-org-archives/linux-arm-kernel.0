@@ -1,48 +1,63 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Fri, 10 Aug 2012 12:28:44 +0530
-Subject: [PATCH 10/11] spi/s3c64xx: improve error handling
-In-Reply-To: <1344437248-20560-11-git-send-email-arnd@arndb.de>
-References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
- <1344437248-20560-11-git-send-email-arnd@arndb.de>
-Message-ID: <CAJuYYwR9SnEUdQ_VUjmNzZZeshHjsdVKhj1scqCMXrjtG9zo=A@mail.gmail.com>
+From: p.paneri@samsung.com (Praveen Paneri)
+Date: Fri, 10 Aug 2012 12:40:26 +0530
+Subject: [PATCH v4 0/5] usb: phy: samsung: Introducing usb phy driver for
+ samsung SoCs
+Message-ID: <1344582631-13658-1-git-send-email-p.paneri@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 August 2012 20:17, Arnd Bergmann <arnd@arndb.de> wrote:
-> When a device tree definition os an s3c64xx SPI master is missing
-> a "controller-data" subnode, the newly added s3c64xx_get_slave_ctrldata
-> function might use uninitialized memory in place of that node,
-> which was correctly reported by gcc.
->
-> Without this patch, building s3c6400_defconfig results in:
->
-> drivers/spi/spi-s3c64xx.c: In function 's3c64xx_get_slave_ctrldata.isra.25':
-> drivers/spi/spi-s3c64xx.c:841:5: warning: 'data_np' may be used uninitialized in this function [-Wuninitialized]
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Thomas Abraham <thomas.abraham@linaro.org>
-> Cc: Jaswinder Singh <jaswinder.singh@linaro.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  drivers/spi/spi-s3c64xx.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-> index 646a765..cfa2c35 100644
-> --- a/drivers/spi/spi-s3c64xx.c
-> +++ b/drivers/spi/spi-s3c64xx.c
-> @@ -826,7 +826,7 @@ static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
->                                 struct spi_device *spi)
->  {
->         struct s3c64xx_spi_csinfo *cs;
-> -       struct device_node *slave_np, *data_np;
-> +       struct device_node *slave_np, *data_np = NULL;
->         u32 fb_delay = 0;
->
->         slave_np = spi->dev.of_node;
-> --
-> 1.7.10
->
+Changes from v3:
+Replaced susbsys_initcall()/module_exit() by module_platform_driver().
+Accordingly in the hsotg driver returned -EPROBE_DEFER until phy driver
+is registered
+Removed unnecessary devm_usb_put_phy() call from the hsotg driver remove.
 
-Acked-by: Thomas Abraham <thomas.abraham@linaro.org>
+Changes from v2:
+Changed the driver filenames to samsung-usbphy
+Changed 's3c' to 'samsung' for platform device as well as platform data
+Moved platform data structure to a separate file
+Rectified coding style related errors
+
+Changes from v1:
+Rebased patches to latest usb-next branch
+Changed the name 'sec_usbphy' to 'samsung_usbphy'
+
+This patch set introduces a phy driver for samsung SoCs. It uses the existing
+transceiver infrastructure to provide phy control functions. Use of this driver
+can be extended for usb host phy as well. Over the period of time all the phy
+related code for most of the samsung SoCs can be integrated here.
+Removing the existing phy code from mach-s3c64xx. Same can be done for other SoCs
+when they start supporting this phy driver. 
+This driver is tested with smdk6410 and Exynos4210(with DT).
+
+Praveen Paneri (5):
+  usb: phy: samsung: Introducing usb phy driver for hsotg
+  usb: s3c-hsotg: Adding phy driver support
+  ARM: S3C64XX: Removing old phy setup code
+  ARM: S3C64XX: Enabling samsung-usbphy driver
+  ARM: Exynos4210: Enabling samsung-usbphy driver
+
+ .../devicetree/bindings/usb/samsung-usbphy.txt     |    9 +
+ arch/arm/boot/dts/exynos4210.dtsi                  |    5 +
+ arch/arm/mach-exynos/include/mach/map.h            |    1 +
+ arch/arm/mach-exynos/mach-exynos4-dt.c             |    8 +
+ arch/arm/mach-exynos/setup-usb-phy.c               |   13 +
+ arch/arm/mach-s3c64xx/include/mach/map.h           |    2 +
+ arch/arm/mach-s3c64xx/mach-crag6410.c              |    7 +-
+ arch/arm/mach-s3c64xx/mach-smartq.c                |    8 +-
+ arch/arm/mach-s3c64xx/mach-smdk6410.c              |    7 +-
+ arch/arm/mach-s3c64xx/setup-usb-phy.c              |   79 +----
+ arch/arm/plat-samsung/devs.c                       |   33 ++
+ arch/arm/plat-samsung/include/plat/devs.h          |    1 +
+ arch/arm/plat-samsung/include/plat/usb-phy.h       |    1 +
+ drivers/usb/gadget/s3c-hsotg.c                     |   37 ++-
+ drivers/usb/phy/Kconfig                            |    8 +
+ drivers/usb/phy/Makefile                           |    1 +
+ drivers/usb/phy/samsung-usbphy.c                   |  345 ++++++++++++++++++++
+ drivers/usb/phy/samsung-usbphy.h                   |   48 +++
+ include/linux/platform_data/samsung-usbphy.h       |   27 ++
+ 19 files changed, 549 insertions(+), 91 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/samsung-usbphy.txt
+ create mode 100644 drivers/usb/phy/samsung-usbphy.c
+ create mode 100644 drivers/usb/phy/samsung-usbphy.h
+ create mode 100644 include/linux/platform_data/samsung-usbphy.h
