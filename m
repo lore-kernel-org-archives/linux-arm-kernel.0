@@ -1,35 +1,29 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 10 Aug 2012 10:44:01 +0200
-Subject: [PATCH 2/4] ARM: ux500: add a U8520 detection macro
-Message-ID: <1344588241-8633-1-git-send-email-linus.walleij@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 10 Aug 2012 10:48:39 +0200
+Subject: [PATCH 00/22] mop500 related Audio reorganisation and fixups
+In-Reply-To: <20120809194044.GA9966@gmail.com>
+References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
+ <20120809185029.GC24328@opensource.wolfsonmicro.com>
+ <20120809194044.GA9966@gmail.com>
+Message-ID: <CACRpkdZCKQCkWSPYby2rYd4Oas481nZE7eDmZRETovJOks2p0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Thu, Aug 9, 2012 at 9:40 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, Aug 09, 2012 at 07:50:29PM +0100, Mark Brown wrote:
+>> On Thu, Aug 09, 2012 at 04:47:26PM +0100, Lee Jones wrote:
+>> > Another fine instalment of Audio fixes and Device Tree enablement
+>> > surrounding the mop500 sound driver. Hopefully containing all of
+>> > the recommendations suggested by Mark Brown.
+>>
+>> Can we have some review of this from the ARM side please?  It's pretty
+>> big...
+>
+> I don't expect Linus will do anything until he returns back from vacation.
 
-In line with the other macros this detects the DB8520
-ASIC variant.
+I'm back from vacation, and catching up. Now there is a few different
+DT patch bombs from you in my inbox, which patchset shall I review
+first? This one? Or is there a more urgent one?
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/include/mach/id.h | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/mach-ux500/include/mach/id.h b/arch/arm/mach-ux500/include/mach/id.h
-index 87aa921..d1240e4 100644
---- a/arch/arm/mach-ux500/include/mach/id.h
-+++ b/arch/arm/mach-ux500/include/mach/id.h
-@@ -41,6 +41,11 @@ static inline bool __attribute_const__ cpu_is_u8500(void)
- 	return dbx500_partnumber() == 0x8500;
- }
- 
-+static inline bool __attribute_const__ cpu_is_u8520(void)
-+{
-+	return dbx500_partnumber() == 0x8520;
-+}
-+
- static inline bool __attribute_const__ cpu_is_u9540(void)
- {
- 	return dbx500_partnumber() == 0x9540;
--- 
-1.7.11.3
+Yours,
+Linus Walleij
