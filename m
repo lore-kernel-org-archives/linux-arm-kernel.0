@@ -1,9 +1,9 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Aug 2012 19:06:35 -0000
-Subject: [GIT PULL 2/3] arm-soc: late at91 changes
+Date: Fri, 10 Aug 2012 19:06:36 -0000
+Subject: [GIT PULL 1/3] arm-soc: bug fixes for v3.6-rc2
 In-Reply-To: <1344625575-27560-1-git-send-email-arnd@arndb.de>
 References: <1344625575-27560-1-git-send-email-arnd@arndb.de>
-Message-ID: <1344625575-27560-3-git-send-email-arnd@arndb.de>
+Message-ID: <1344625575-27560-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,86 +13,109 @@ The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/late-at91-mci
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
 
-for you to fetch changes up to b3ce167791c02da98f6e527be7d19213b3abddf0:
+for you to fetch changes up to de9234306bb28fe6c8c3bb908e3f9956f5276a02:
 
-  Merge tag 'at91-for-next-soc' of git://github.com/at91linux/linux-at91 into at91/mci (2012-08-10 12:34:18 +0200)
+  ARM: davinci: remove broken ntosd2_init_i2c (2012-08-10 13:14:36 +0200)
 
 ----------------------------------------------------------------
+arm-soc: bug fixes for v3.6-rc2
 
-arm-soc: late at91 changes
+These are a bunch of bug fixes that came in after the merge window and
+one update for the MAINTAINERS file. The largest part of the fixes
+are patches that address bugs found by building all the ARM defconfig
+files. There are a lot more warnings that we have patches for, but
+the others are either still under discussion or are harmless and
+do not cause actual problems besides making the build slightly noisy.
 
-This series was originally sent for inclusion in v3.5 but missed out
-twice, first time because it was late for v3.5 and we decided not to
-push it then, and this time because the maintainer was on a long
-vacation before the merge window and nobody noticed that it was missing
-from the v3.6 list.
-
-The main purpose of this series is to move over the at91 board files
-to use the atmel-mci driver instead of the old at91_mci that is
-scheduled for removal in v3.7.
-
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
 ----------------------------------------------------------------
-Arnd Bergmann (1):
-      Merge tag 'at91-for-next-soc' of git://github.com/at91linux/linux-at91 into at91/mci
+Arnd Bergmann (19):
+      Merge branch 'imx/fixes-for-3.6' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
+      Merge branch 'mxs/fixes-for-3.6' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
+      Merge tag 'imx-fixes' of git://git.pengutronix.de/git/imx/linux-2.6 into fixes
+      mfd/asic3: fix asic3_mfd_probe return value
+      usb/ohci-omap: remove unused variable
+      ARM: pxa: remove irq_to_gpio from ezx-pcap driver
+      Input: eeti_ts: pass gpio value instead of IRQ
+      ARM: sa1100: include linux/io.h in hackkit leds code
+      ARM: s3c24xx: use new PWM driver
+      ARM: integrator: include <linux/export.h>
+      ARM: imx: gpmi-nand depends on mxs-dma
+      ARM: exynos: exynos_pm_add_dev_to_genpd may be unused
+      gpio: em: do not discard em_gio_irq_domain_cleanup
+      mtd/omap2: fix dmaengine_slave_config error handling
+      spi/s3c64xx: improve error handling
+      omap-rng: fix use of SIMPLE_DEV_PM_OPS
+      Merge branch 'testing/new-warnings' into fixes
+      ARM: s3c24xx: enable CONFIG_BUG for tct_hammer
+      ARM: davinci: remove broken ntosd2_init_i2c
 
-Ludovic Desroches (1):
-      ARM: at91: add atmel-mci support for chips and boards which can use it
+Fabio Estevam (5):
+      ARM: dts: imx27-3ds.dts: Fix serial console node
+      ARM: imx6q-sabrelite: Setup CLKO IOMUX
+      ARM: mx23: Fix registers range
+      ARM: mx28: Fix registers range
+      ARM: clk-imx31: Fix the keypad clock name
 
-Nicolas Ferre (1):
-      ARM: at91/defconfig: change the MCI driver to use in defconfigs
+Javier Martin (1):
+      i.MX27: Fix emma-prp and csi clocks.
 
-Paul Bolle (1):
-      ARM: at91: set i2c_board_info.type to "ds1339" directly
+Linus Walleij (2):
+      MAINTAINERS: update entry for Linus Walleij
+      ARM: integrator: use clk_prepare_enable() for timer
 
-Richard Genoud (1):
-      ARM: at91/defconfig: Remove unaffected config option
+Marc Kleine-Budde (1):
+      ARM: mxs: always build ocotp
 
- arch/arm/configs/afeb9260_defconfig      |    1 -
- arch/arm/configs/at91rm9200_defconfig    |    2 +-
- arch/arm/configs/at91sam9261_defconfig   |    2 +-
- arch/arm/configs/at91sam9263_defconfig   |    3 +-
- arch/arm/configs/at91sam9g20_defconfig   |    2 +-
- arch/arm/configs/at91sam9rl_defconfig    |    2 +-
- arch/arm/configs/cpu9260_defconfig       |    2 +-
- arch/arm/configs/cpu9g20_defconfig       |    2 +-
- arch/arm/configs/qil-a9260_defconfig     |    3 +-
- arch/arm/configs/stamp9g20_defconfig     |    1 -
- arch/arm/configs/usb-a9260_defconfig     |    1 -
- arch/arm/mach-at91/at91rm9200_devices.c  |   92 ++++++++++-------
- arch/arm/mach-at91/at91sam9260_devices.c |   84 +---------------
- arch/arm/mach-at91/at91sam9261_devices.c |   60 +++++------
- arch/arm/mach-at91/at91sam9263.c         |    4 +-
- arch/arm/mach-at91/at91sam9263_devices.c |  161 +++++++++++++++++-------------
- arch/arm/mach-at91/at91sam9rl_devices.c  |   60 +++++------
- arch/arm/mach-at91/board-afeb-9260v1.c   |   14 +--
- arch/arm/mach-at91/board-carmeva.c       |   14 +--
- arch/arm/mach-at91/board-cpu9krea.c      |   17 ++--
- arch/arm/mach-at91/board-cpuat91.c       |   13 +--
- arch/arm/mach-at91/board-csb337.c        |   14 +--
- arch/arm/mach-at91/board-eb9200.c        |   14 +--
- arch/arm/mach-at91/board-ecbat91.c       |   14 +--
- arch/arm/mach-at91/board-eco920.c        |   14 +--
- arch/arm/mach-at91/board-flexibity.c     |   14 +--
- arch/arm/mach-at91/board-foxg20.c        |   16 +--
- arch/arm/mach-at91/board-kb9202.c        |   14 +--
- arch/arm/mach-at91/board-neocore926.c    |   13 +--
- arch/arm/mach-at91/board-picotux200.c    |   14 +--
- arch/arm/mach-at91/board-qil-a9260.c     |   14 +--
- arch/arm/mach-at91/board-rm9200dk.c      |   14 +--
- arch/arm/mach-at91/board-rm9200ek.c      |   14 +--
- arch/arm/mach-at91/board-rsi-ews.c       |   13 +--
- arch/arm/mach-at91/board-sam9-l9260.c    |   16 +--
- arch/arm/mach-at91/board-sam9260ek.c     |   16 +--
- arch/arm/mach-at91/board-sam9261ek.c     |   13 +--
- arch/arm/mach-at91/board-sam9263ek.c     |   13 +--
- arch/arm/mach-at91/board-sam9g20ek.c     |   16 +--
- arch/arm/mach-at91/board-sam9rlek.c      |   13 +--
- arch/arm/mach-at91/board-stamp9g20.c     |   14 ---
- arch/arm/mach-at91/board-usb-a926x.c     |    2 -
- arch/arm/mach-at91/board-yl-9200.c       |   13 +--
- drivers/mtd/nand/Kconfig                 |   40 --------
- 44 files changed, 384 insertions(+), 494 deletions(-)
+Marek Vasut (1):
+      ARM: mxs: Remove MMAP_MIN_ADDR setting from mxs_defconfig
+
+Sebastian Hesselbarth (1):
+      ARM: kirkwood: fix typo in Makefile.boot
+
+Shawn Guo (3):
+      ARM: imx: enable emi_slow_gate clock for imx5
+      ARM: dts: imx53-ard: add regulators for lan9220
+      ARM: dts: imx: fix gpio interrupts property
+
+Stephen Warren (1):
+      ARM: tegra: more regulator fixes for Harmony
+
+ MAINTAINERS                               |   17 ++++---
+ arch/arm/boot/dts/imx23.dtsi              |   52 ++++++++++----------
+ arch/arm/boot/dts/imx27-3ds.dts           |    2 +-
+ arch/arm/boot/dts/imx28.dtsi              |   74 ++++++++++++++---------------
+ arch/arm/boot/dts/imx51-babbage.dts       |    2 +-
+ arch/arm/boot/dts/imx53-ard.dts           |   22 ++++++++-
+ arch/arm/boot/dts/imx6q-sabrelite.dts     |    1 +
+ arch/arm/configs/imx_v6_v7_defconfig      |    1 +
+ arch/arm/configs/mxs_defconfig            |    1 -
+ arch/arm/configs/tct_hammer_defconfig     |    2 +-
+ arch/arm/mach-davinci/board-neuros-osd2.c |   39 ---------------
+ arch/arm/mach-exynos/pm_domains.c         |    2 +-
+ arch/arm/mach-imx/clk-imx27.c             |    8 ++--
+ arch/arm/mach-imx/clk-imx31.c             |    2 +-
+ arch/arm/mach-imx/clk-imx51-imx53.c       |    1 +
+ arch/arm/mach-integrator/core.c           |    1 +
+ arch/arm/mach-integrator/integrator_ap.c  |    2 +-
+ arch/arm/mach-kirkwood/Makefile.boot      |    4 +-
+ arch/arm/mach-mxs/Kconfig                 |    6 ---
+ arch/arm/mach-mxs/Makefile                |    3 +-
+ arch/arm/mach-pxa/raumfeld.c              |    2 +-
+ arch/arm/mach-s3c24xx/Kconfig             |    4 +-
+ arch/arm/mach-sa1100/leds-hackkit.c       |    1 +
+ arch/arm/mach-tegra/board-harmony-power.c |   32 +++++++------
+ arch/arm/plat-samsung/Kconfig             |    3 +-
+ drivers/char/hw_random/omap-rng.c         |    2 +-
+ drivers/gpio/gpio-em.c                    |    2 +-
+ drivers/input/touchscreen/eeti_ts.c       |   21 ++++----
+ drivers/mfd/asic3.c                       |    1 +
+ drivers/mfd/ezx-pcap.c                    |    2 +-
+ drivers/mtd/nand/Kconfig                  |    2 +-
+ drivers/mtd/nand/omap2.c                  |    7 ++-
+ drivers/spi/spi-s3c64xx.c                 |    2 +-
+ drivers/usb/host/ohci-omap.c              |    2 -
+ include/linux/input/eeti_ts.h             |    1 +
+ include/linux/mfd/ezx-pcap.h              |    1 +
+ 36 files changed, 160 insertions(+), 167 deletions(-)
