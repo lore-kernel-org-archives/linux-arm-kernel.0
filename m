@@ -1,23 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 10 Aug 2012 13:01:35 +0200
-Subject: [PATCH] pinctrl: pinctrl-imx: add imx35 pinctrl driver
-In-Reply-To: <20120809162742.GG25520@pengutronix.de>
-References: <1343921942-22079-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1344529412-18053-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20120809162742.GG25520@pengutronix.de>
-Message-ID: <CACRpkdaRLFzjq49pd=e7GzPmWuX5C2nWDWZitZV9e6AkHBK4DA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 10 Aug 2012 11:03:58 +0000
+Subject: [PATCH 09/10] ARM: rpc: Fix building RiscPC
+In-Reply-To: <20120809074754.GP18957@n2100.arm.linux.org.uk>
+References: <1344461278-28245-1-git-send-email-arnd@arndb.de>
+ <1344461278-28245-10-git-send-email-arnd@arndb.de>
+ <20120809074754.GP18957@n2100.arm.linux.org.uk>
+Message-ID: <201208101103.58808.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 9, 2012 at 6:27 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
+On Thursday 09 August 2012, Russell King - ARM Linux wrote:
+> On Wed, Aug 08, 2012 at 11:27:57PM +0200, Arnd Bergmann wrote:
+> > ARMv3 support was removed in 357c9c1f07 "ARM: Remove support for ARMv3
+> > ARM610 and ARM710 CPUs", which explicitly left parts of the CPU32v3
+> > support in place for building RiscPC. However, this does not actually
+> > build in my test setup.
+> > 
+> > This is probably not the right solution, but maybe someone has a better
+> > idea for how to deal with this.
+> 
+> This isn't the right solution.  The RiscPC bus does not support half-word
+> load/stores, so we must continue to build that target for the 32v3
+> architecture (which is why I carefully left that stuff behind.)
+> 
+> The mistake is in what I did with arch/arm/lib - the armv3 code in there
+> needs to be resurected instead.
 
->> +  pull-up for this pin. Please refer to imx53 datasheet for the valid pad
->
-> argh, I forgot to fix that (ie. s/53/35/). I won't resend just for that.
-> Linus, assuming you intend to take the patch now, can you fix it up
-> while commiting please?
+Ok, I'll drop my patch from the series then and wait for you to
+fix this properly.
 
-Sure, but I want an ACK from a Freescale maintainer first ...
-
-Linus Walleij
+	Arnd
