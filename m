@@ -1,112 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 10 Aug 2012 13:56:23 +0900
-Subject: [PATCH 1/2] ARM: S3C64XX: Update configuration for WM5102 module
- on Cragganmore
-In-Reply-To: <1344535549-4371-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1344535549-4371-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <0db901cd76b4$7daf1730$790d4590$%kim@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 10 Aug 2012 07:12:00 +0200
+Subject: [PATCH] ARM: imx/iomux-v3: allow pad_list to be const
+In-Reply-To: <20120810032217.GF19617@S2101-09.ap.freescale.net>
+References: <1344527835-32567-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20120810032217.GF19617@S2101-09.ap.freescale.net>
+Message-ID: <20120810051200.GI25520@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> SPI is also connected on the board, use that instead of I2C as it's much
-> faster. Also define platform data now the core driver is in mainline.
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/mach-crag6410-module.c |   35
-> ++++++++++++++++++++++----
->  1 file changed, 30 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-
-> s3c64xx/mach-crag6410-module.c
-> index f81f089..22dd77b 100644
-> --- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-> +++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-> @@ -192,9 +192,33 @@ static const struct i2c_board_info wm1277_devs[] = {
->  	},
->  };
-> 
-> -static const struct i2c_board_info wm5102_devs[] = {
-> -	{ I2C_BOARD_INFO("wm5102", 0x1a),
-> -	  .irq = GLENFARCLAS_PMIC_IRQ_BASE + WM831X_IRQ_GPIO_2, },
-> +static struct arizona_pdata wm5102_pdata = {
-> +	.ldoena = S3C64XX_GPN(7),
-> +	.gpio_base = CODEC_GPIO_BASE,
-> +	.irq_active_high = true,
-> +	.micd_pol_gpio = CODEC_GPIO_BASE + 4,
-> +	.gpio_defaults = {
-> +		[2] = 0x10000, /* AIF3TXLRCLK */
-> +		[3] = 0x4,     /* OPCLK */
-> +	},
-> +};
+Hello Shawn,
 
-Mark, happens error.
+On Fri, Aug 10, 2012 at 11:22:20AM +0800, Shawn Guo wrote:
+> On Thu, Aug 09, 2012 at 05:57:15PM +0200, Uwe Kleine-K?nig wrote:
+> > Also fix all machine files to make use of it and while at it also make
+> > the pad lists __init_const.
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> > Hello,
+> > 
+> > well, iomux-v3 is dying so I don't know how welcome this patch is.
+> > 
+> For me, it's not so welcomed at this point, as I have seen it's
+> patching a bunch of imx5 board files that are scheduled for removal
+> for this cycle.
+I can resend with the respective board files dropped when your changes
+hit next.
 
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:184: error: variable
-'wm5102_pdata' has initializer but incomplete type
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:185: error: unknown field
-'ldoena' specified in initializer
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:185: warning: excess elements
-in struct initializer
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:185: warning: (near
-initialization for 'wm5102_pdata')
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:186: error: unknown field
-'gpio_base' specified in initializer
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:186: warning: excess elements
-in struct initializer
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:186: warning: (near
-initialization for 'wm5102_pdata')
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:187: error: unknown field
-'irq_active_high' specified in initializer
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:187: warning: excess elements
-in struct initializer
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:187: warning: (near
-initialization for 'wm5102_pdata')
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:188: error: unknown field
-'micd_pol_gpio' specified in initializer
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:188: warning: excess elements
-in struct initializer
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:188: warning: (near
-initialization for 'wm5102_pdata')
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:189: error: unknown field
-'gpio_defaults' specified in initializer
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:189: error: extra brace group
-at end of initializer
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:189: error: (near
-initialization for 'wm5102_pdata')
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:192: warning: excess elements
-in struct initializer
-arch/arm/mach-s3c64xx/mach-crag6410-module.c:192: warning: (near
-initialization for 'wm5102_pdata')
-make[1]: *** [arch/arm/mach-s3c64xx/mach-crag6410-module.o] Error 1
-make: *** [arch/arm/mach-s3c64xx] Error 2
-make: *** Waiting for unfinished jobs....
+Best regards
+Uwe
 
-Probably, this patch needs following?
-
---
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-index c148384..7f4f9eb 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-@@ -16,6 +16,7 @@
- #include <linux/mfd/wm831x/irq.h>
- #include <linux/mfd/wm831x/gpio.h>
- #include <linux/mfd/wm8994/pdata.h>
-+#include <linux/mfd/arizona/pdata.h>
-
- #include <linux/regulator/machine.h>
---
-
-If you're ok, I will fix build error by above when I apply.
-
-[...]
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
