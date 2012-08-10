@@ -1,228 +1,199 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 10 Aug 2012 18:36:35 +0100
-Subject: [PATCH 9/9] ARM: perf: move irq registration into pmu implementation
+Date: Fri, 10 Aug 2012 18:36:29 +0100
+Subject: [PATCH 3/9] ARM: pmu: remove unused reservation mechanism
 In-Reply-To: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
 References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1344620195-22372-10-git-send-email-will.deacon@arm.com>
+Message-ID: <1344620195-22372-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
+The PMU reservation mechanism was originally intended to allow OProfile
+and perf-events to co-ordinate over access to the CPU PMU. Since then,
+OProfile for ARM has moved to using perf as its backend, so the
+reservation code is no longer used.
 
-This patch moves the CPU-specific IRQ registration and parsing code into
-the CPU PMU backend. This is required because a PMU may have more than
-one interrupt, which in turn can be either PPI (per-cpu) or SPI
-(requiring strict affinity setting at the interrupt distributor).
+This patch removes the reservation code for the CPU PMU on ARM.
 
-Signed-off-by: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
-[will: cosmetic edits and reworked interrupt dispatching]
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/pmu.h       |    2 +
- arch/arm/kernel/perf_event.c     |   72 ++++++-------------------------------
- arch/arm/kernel/perf_event_cpu.c |   66 ++++++++++++++++++++++++++++++++++-
- 3 files changed, 79 insertions(+), 61 deletions(-)
+ MAINTAINERS                  |    1 -
+ arch/arm/Kconfig             |    8 +-------
+ arch/arm/include/asm/pmu.h   |   34 ----------------------------------
+ arch/arm/kernel/Makefile     |    1 -
+ arch/arm/kernel/perf_event.c |    8 --------
+ arch/arm/kernel/pmu.c        |   36 ------------------------------------
+ 6 files changed, 1 insertions(+), 87 deletions(-)
+ delete mode 100644 arch/arm/kernel/pmu.c
 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 94b823f..9dcd1ae 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -595,7 +595,6 @@ M:	Will Deacon <will.deacon@arm.com>
+ S:	Maintained
+ F:	arch/arm/kernel/perf_event*
+ F:	arch/arm/oprofile/common.c
+-F:	arch/arm/kernel/pmu.c
+ F:	arch/arm/include/asm/pmu.h
+ F:	arch/arm/kernel/hw_breakpoint.c
+ F:	arch/arm/include/asm/hw_breakpoint.h
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e91c7cd..ca05a95 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1185,12 +1185,6 @@ config XSCALE_PMU
+ 	depends on CPU_XSCALE
+ 	default y
+ 
+-config CPU_HAS_PMU
+-	depends on (CPU_V6 || CPU_V6K || CPU_V7 || XSCALE_PMU) && \
+-		   (!ARCH_OMAP3 || OMAP3_EMU)
+-	default y
+-	bool
+-
+ config MULTI_IRQ_HANDLER
+ 	bool
+ 	help
+@@ -1763,7 +1757,7 @@ config HIGHPTE
+ 
+ config HW_PERF_EVENTS
+ 	bool "Enable hardware performance counter support for perf events"
+-	depends on PERF_EVENTS && CPU_HAS_PMU
++	depends on PERF_EVENTS
+ 	default y
+ 	help
+ 	  Enable hardware performance counter support for perf events. If
 diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-index a993ad6..a26170d 100644
+index 40d7dff..05e0401 100644
 --- a/arch/arm/include/asm/pmu.h
 +++ b/arch/arm/include/asm/pmu.h
-@@ -78,6 +78,8 @@ struct arm_pmu {
- 	void		(*start)(void);
- 	void		(*stop)(void);
- 	void		(*reset)(void *);
-+	int		(*request_irq)(irq_handler_t handler);
-+	void		(*free_irq)(void);
- 	int		(*map_event)(struct perf_event *event);
- 	int		num_events;
- 	atomic_t	active_events;
+@@ -49,40 +49,6 @@ struct arm_pmu_platdata {
+ 	int (*runtime_suspend)(struct device *dev);
+ };
+ 
+-#ifdef CONFIG_CPU_HAS_PMU
+-
+-/**
+- * reserve_pmu() - reserve the hardware performance counters
+- *
+- * Reserve the hardware performance counters in the system for exclusive use.
+- * Returns 0 on success or -EBUSY if the lock is already held.
+- */
+-extern int
+-reserve_pmu(enum arm_pmu_type type);
+-
+-/**
+- * release_pmu() - Relinquish control of the performance counters
+- *
+- * Release the performance counters and allow someone else to use them.
+- */
+-extern void
+-release_pmu(enum arm_pmu_type type);
+-
+-#else /* CONFIG_CPU_HAS_PMU */
+-
+-#include <linux/err.h>
+-
+-static inline int
+-reserve_pmu(enum arm_pmu_type type)
+-{
+-	return -ENODEV;
+-}
+-
+-static inline void
+-release_pmu(enum arm_pmu_type type)	{ }
+-
+-#endif /* CONFIG_CPU_HAS_PMU */
+-
+ #ifdef CONFIG_HW_PERF_EVENTS
+ 
+ /* The events for a given PMU register set. */
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 7ad2d5c..cfbe3b4 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -69,7 +69,6 @@ obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
+ obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
+ obj-$(CONFIG_CPU_PJ4)		+= pj4-cp0.o
+ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+-obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
+ obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+ AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+ obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
 diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 86fd399..93971b1 100644
+index 3aa3388..1ac1531 100644
 --- a/arch/arm/kernel/perf_event.c
 +++ b/arch/arm/kernel/perf_event.c
-@@ -297,87 +297,39 @@ validate_group(struct perf_event *event)
- 	return 0;
- }
+@@ -377,7 +377,6 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
+ 	}
  
--static irqreturn_t armpmu_platform_irq(int irq, void *dev)
-+static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
- {
- 	struct arm_pmu *armpmu = (struct arm_pmu *) dev;
- 	struct platform_device *plat_device = armpmu->plat_device;
- 	struct arm_pmu_platdata *plat = dev_get_platdata(&plat_device->dev);
- 
--	return plat->handle_irq(irq, dev, armpmu->handle_irq);
-+	if (plat && plat->handle_irq)
-+		return plat->handle_irq(irq, dev, armpmu->handle_irq);
-+	else
-+		return armpmu->handle_irq(irq, dev);
- }
- 
- static void
- armpmu_release_hardware(struct arm_pmu *armpmu)
- {
--	int i, irq, irqs;
--	struct platform_device *pmu_device = armpmu->plat_device;
--
--	irqs = min(pmu_device->num_resources, num_possible_cpus());
--
--	for (i = 0; i < irqs; ++i) {
--		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
--			continue;
--		irq = platform_get_irq(pmu_device, i);
--		if (irq >= 0)
--			free_irq(irq, armpmu);
--	}
--
--	pm_runtime_put_sync(&pmu_device->dev);
-+	armpmu->free_irq();
-+	pm_runtime_put_sync(&armpmu->plat_device->dev);
+ 	pm_runtime_put_sync(&pmu_device->dev);
+-	release_pmu(armpmu->type);
  }
  
  static int
- armpmu_reserve_hardware(struct arm_pmu *armpmu)
- {
--	struct arm_pmu_platdata *plat;
--	irq_handler_t handle_irq;
--	int i, err, irq, irqs;
-+	int err;
- 	struct platform_device *pmu_device = armpmu->plat_device;
- 
+@@ -391,12 +390,6 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
  	if (!pmu_device)
  		return -ENODEV;
  
--	plat = dev_get_platdata(&pmu_device->dev);
--	if (plat && plat->handle_irq)
--		handle_irq = armpmu_platform_irq;
--	else
--		handle_irq = armpmu->handle_irq;
--
--	irqs = min(pmu_device->num_resources, num_possible_cpus());
--	if (irqs < 1) {
--		pr_err("no irqs for PMUs defined\n");
--		return -ENODEV;
+-	err = reserve_pmu(armpmu->type);
+-	if (err) {
+-		pr_warning("unable to reserve pmu\n");
+-		return err;
 -	}
 -
- 	pm_runtime_get_sync(&pmu_device->dev);
--
--	for (i = 0; i < irqs; ++i) {
--		err = 0;
--		irq = platform_get_irq(pmu_device, i);
--		if (irq < 0)
--			continue;
--
--		/*
--		 * If we have a single PMU interrupt that we can't shift,
--		 * assume that we're running on a uniprocessor machine and
--		 * continue. Otherwise, continue without this interrupt.
--		 */
--		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
--			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
--				    irq, i);
--			continue;
--		}
--
--		err = request_irq(irq, handle_irq,
--				  IRQF_DISABLED | IRQF_NOBALANCING,
--				  "arm-pmu", armpmu);
--		if (err) {
--			pr_err("unable to request IRQ%d for ARM PMU counters\n",
--				irq);
--			armpmu_release_hardware(armpmu);
--			return err;
--		}
--
--		cpumask_set_cpu(i, &armpmu->active_irqs);
-+	err = armpmu->request_irq(armpmu_dispatch_irq);
-+	if (err) {
-+		armpmu_release_hardware(armpmu);
-+		return err;
- 	}
- 
- 	return 0;
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index 56ddc98..8d7d8d4 100644
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -70,6 +70,67 @@ static struct pmu_hw_events *cpu_pmu_get_cpu_events(void)
- 	return &__get_cpu_var(cpu_hw_events);
- }
- 
-+static void cpu_pmu_free_irq(void)
-+{
-+	int i, irq, irqs;
-+	struct platform_device *pmu_device = cpu_pmu->plat_device;
-+
-+	irqs = min(pmu_device->num_resources, num_possible_cpus());
-+
-+	for (i = 0; i < irqs; ++i) {
-+		if (!cpumask_test_and_clear_cpu(i, &cpu_pmu->active_irqs))
-+			continue;
-+		irq = platform_get_irq(pmu_device, i);
-+		if (irq >= 0)
-+			free_irq(irq, cpu_pmu);
-+	}
-+}
-+
-+static int cpu_pmu_request_irq(irq_handler_t handler)
-+{
-+	int i, err, irq, irqs;
-+	struct platform_device *pmu_device = cpu_pmu->plat_device;
-+
-+	if (!pmu_device)
-+		return -ENODEV;
-+
-+	irqs = min(pmu_device->num_resources, num_possible_cpus());
-+	if (irqs < 1) {
-+		pr_err("no irqs for PMUs defined\n");
-+		return -ENODEV;
-+	}
-+
-+	for (i = 0; i < irqs; ++i) {
-+		err = 0;
-+		irq = platform_get_irq(pmu_device, i);
-+		if (irq < 0)
-+			continue;
-+
-+		/*
-+		 * If we have a single PMU interrupt that we can't shift,
-+		 * assume that we're running on a uniprocessor machine and
-+		 * continue. Otherwise, continue without this interrupt.
-+		 */
-+		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
-+			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
-+				    irq, i);
-+			continue;
-+		}
-+
-+		err = request_irq(irq, handler, IRQF_NOBALANCING, "arm-pmu",
-+				  cpu_pmu);
-+		if (err) {
-+			pr_err("unable to request IRQ%d for ARM PMU counters\n",
-+				irq);
-+			return err;
-+		}
-+
-+		cpumask_set_cpu(i, &cpu_pmu->active_irqs);
-+	}
-+
-+	return 0;
-+}
-+
- static void __devinit cpu_pmu_init(struct arm_pmu *cpu_pmu)
- {
- 	int cpu;
-@@ -79,7 +140,10 @@ static void __devinit cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 		events->used_mask = per_cpu(used_mask, cpu);
+ 	plat = dev_get_platdata(&pmu_device->dev);
+ 	if (plat && plat->handle_irq)
+ 		handle_irq = armpmu_platform_irq;
+@@ -706,7 +699,6 @@ static void __init cpu_pmu_init(struct arm_pmu *armpmu)
  		raw_spin_lock_init(&events->pmu_lock);
  	}
--	cpu_pmu->get_hw_events = cpu_pmu_get_cpu_events;
-+
-+	cpu_pmu->get_hw_events	= cpu_pmu_get_cpu_events;
-+	cpu_pmu->request_irq	= cpu_pmu_request_irq;
-+	cpu_pmu->free_irq	= cpu_pmu_free_irq;
+ 	armpmu->get_hw_events = armpmu_get_cpu_events;
+-	armpmu->type = ARM_PMU_DEVICE_CPU;
+ }
  
- 	/* Ensure the PMU has sane values out of reset. */
- 	if (cpu_pmu && cpu_pmu->reset)
+ /*
+diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
+deleted file mode 100644
+index 2334bf8..0000000
+--- a/arch/arm/kernel/pmu.c
++++ /dev/null
+@@ -1,36 +0,0 @@
+-/*
+- *  linux/arch/arm/kernel/pmu.c
+- *
+- *  Copyright (C) 2009 picoChip Designs Ltd, Jamie Iles
+- *  Copyright (C) 2010 ARM Ltd, Will Deacon
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- */
+-
+-#include <linux/err.h>
+-#include <linux/kernel.h>
+-#include <linux/module.h>
+-
+-#include <asm/pmu.h>
+-
+-/*
+- * PMU locking to ensure mutual exclusion between different subsystems.
+- */
+-static unsigned long pmu_lock[BITS_TO_LONGS(ARM_NUM_PMU_DEVICES)];
+-
+-int
+-reserve_pmu(enum arm_pmu_type type)
+-{
+-	return test_and_set_bit_lock(type, pmu_lock) ? -EBUSY : 0;
+-}
+-EXPORT_SYMBOL_GPL(reserve_pmu);
+-
+-void
+-release_pmu(enum arm_pmu_type type)
+-{
+-	clear_bit_unlock(type, pmu_lock);
+-}
+-EXPORT_SYMBOL_GPL(release_pmu);
 -- 
 1.7.4.1
