@@ -1,35 +1,111 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 10 Aug 2012 22:04:08 +0800
-Subject: [PATCH] efikamx: reintroduce Genesi Efika MX Smarttop via device
- tree
-In-Reply-To: <CAKGA1bmd-53G=59F7Nsd3Sx2eEQgvcahnt3g5zxJAGawtc-gWQ@mail.gmail.com>
-References: <1344375978-29981-1-git-send-email-matt@genesi-usa.com>
- <20120808151555.GE14718@S2101-09.ap.freescale.net>
- <CAKGA1bkbp8_z+HSr97cp_jeCrdTHkQxuZPFu0QPWwnXphWVdZA@mail.gmail.com>
- <CAOMZO5DOEfV4wTSNW8ABaUhGwa_KG3Bkt0o-rs8k-cZk4P-=+A@mail.gmail.com>
- <CAKGA1bkOo=En2P18FaBpq_KAZ88kisikXhNTabvnDknQ-EwFjA@mail.gmail.com>
- <20120810014119.GD19617@S2101-09.ap.freescale.net>
- <CAKGA1bmd-53G=59F7Nsd3Sx2eEQgvcahnt3g5zxJAGawtc-gWQ@mail.gmail.com>
-Message-ID: <20120810140406.GB3409@S2101-09.ap.freescale.net>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 10 Aug 2012 17:05:58 +0300
+Subject: [PATCH] perf: Use pre-empt safe cpu_get/put insted of smp_processor_id
+Message-ID: <1344607558-15481-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2012 at 08:36:02AM -0500, Matt Sealey wrote:
-> Requiring it breaks the entire concept of the device tree to describe running
-> hardware. It is not a configuration script. pinctrl should be optional
-> - built in
-> always, but not necessary to turn a board on if it's already configured.
-> 
-How would kernel know if it's already configured, correctly?
+gets rid of below messages with CONFIG_DEBUG_PREEMPT enabled
 
-> What would happen if a board were designed that only used the default ALT
-> settings on i.MX53 or so? You'd have to redefine every default IOMUX pad
-> just to get it to boot. That's intolerable.
-> 
-Come on, even the pad configuration are all the default?  Even if that's
-the case, yes, we still need to do it.  How do we know if firmware has
-changed the settings or not.
+[   28.832916] debug_smp_processor_id: 18 callbacks suppressed
+[   28.832946] BUG: using smp_processor_id() in preemptible [00000000] code: modprobe/1763
+[   28.841491] caller is pwrdm_set_next_pwrst+0x54/0x120
 
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ arch/arm/mach-omap2/clock.c       |    9 ++++++---
+ arch/arm/mach-omap2/pm34xx.c      |   12 ++++++++----
+ arch/arm/mach-omap2/powerdomain.c |    6 ++++--
+ 3 files changed, 18 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index ea3f565..06747b6 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -285,7 +285,8 @@ void omap2_clk_disable(struct clk *clk)
+ 	pr_debug("clock: %s: disabling in hardware\n", clk->name);
+ 
+ 	if (clk->ops && clk->ops->disable) {
+-		trace_clock_disable(clk->name, 0, smp_processor_id());
++		trace_clock_disable(clk->name, 0, get_cpu());
++		put_cpu();
+ 		clk->ops->disable(clk);
+ 	}
+ 
+@@ -339,7 +340,8 @@ int omap2_clk_enable(struct clk *clk)
+ 	}
+ 
+ 	if (clk->ops && clk->ops->enable) {
+-		trace_clock_enable(clk->name, 1, smp_processor_id());
++		trace_clock_enable(clk->name, 1, get_cpu());
++		put_cpu();
+ 		ret = clk->ops->enable(clk);
+ 		if (ret) {
+ 			WARN(1, "clock: %s: could not enable: %d\n",
+@@ -380,7 +382,8 @@ int omap2_clk_set_rate(struct clk *clk, unsigned long rate)
+ 
+ 	/* dpll_ck, core_ck, virt_prcm_set; plus all clksel clocks */
+ 	if (clk->set_rate) {
+-		trace_clock_set_rate(clk->name, rate, smp_processor_id());
++		trace_clock_set_rate(clk->name, rate, get_cpu());
++		put_cpu();
+ 		ret = clk->set_rate(clk, rate);
+ 	}
+ 
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index e4fc88c..81fec2e 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -357,18 +357,22 @@ void omap_sram_idle(void)
+ 
+ static void omap3_pm_idle(void)
+ {
++	unsigned cpu;
++
+ 	local_fiq_disable();
+ 
+ 	if (omap_irq_pending())
+ 		goto out;
+ 
+-	trace_power_start(POWER_CSTATE, 1, smp_processor_id());
+-	trace_cpu_idle(1, smp_processor_id());
++	cpu = get_cpu();
++	trace_power_start(POWER_CSTATE, 1, cpu);
++	trace_cpu_idle(1, cpu);
+ 
+ 	omap_sram_idle();
+ 
+-	trace_power_end(smp_processor_id());
+-	trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
++	trace_power_end(cpu);
++	trace_cpu_idle(PWR_EVENT_EXIT, cpu);
++	put_cpu();
+ 
+ out:
+ 	local_fiq_enable();
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index 69b36e1..138bf86 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -169,7 +169,8 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+ 				       ((state & OMAP_POWERSTATE_MASK) << 8) |
+ 				       ((prev & OMAP_POWERSTATE_MASK) << 0));
+ 			trace_power_domain_target(pwrdm->name, trace_state,
+-						  smp_processor_id());
++						  get_cpu());
++			put_cpu();
+ 		}
+ 		break;
+ 	default:
+@@ -491,7 +492,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
+ 	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
+ 		/* Trace the pwrdm desired target state */
+ 		trace_power_domain_target(pwrdm->name, pwrst,
+-					  smp_processor_id());
++					  get_cpu());
++		put_cpu();
+ 		/* Program the pwrdm desired target state */
+ 		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
+ 	}
 -- 
-Regards,
-Shawn
+1.7.4.1
