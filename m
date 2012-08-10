@@ -1,47 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Aug 2012 16:37:05 +0100
-Subject: Why the region area don't decrease 1 in function
- sanity_check_meminfo?
-In-Reply-To: <5025253D.3010007@arm.com>
-References: <CAKvkGKeqzAiqRAj+H+E-eoN9SOOMP-aMhUJYmUb0UK4ei=jouA@mail.gmail.com>
- <5025253D.3010007@arm.com>
-Message-ID: <20120810153705.GZ18957@n2100.arm.linux.org.uk>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 10 Aug 2012 18:39:11 +0300
+Subject: [alsa-devel] [PATCH 08/11] ARM: OMAP3: Remove callback for McBSP
+ sidetone ICLK workaround
+In-Reply-To: <502505D4.2030308@bitmer.com>
+References: <1344417101-5015-1-git-send-email-peter.ujfalusi@ti.com>
+ <1344417101-5015-9-git-send-email-peter.ujfalusi@ti.com>
+ <502268B1.9040506@bitmer.com> <50227104.3040506@ti.com>
+ <502505D4.2030308@bitmer.com>
+Message-ID: <50252B1F.2040107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2012 at 04:14:05PM +0100, Jonathan Austin wrote:
-> From: Jonathan Austin <jonathan.austin@arm.com>
-> Date: Thu, 9 Aug 2012 15:59:16 +0100
-> Subject: [PATCH] arm: mm: Fix vmalloc overlap check for !HIGHMEM
+Hi Jarkko,
+
+On 08/10/2012 04:00 PM, Jarkko Nikula wrote:
+> I got some odd current consumption results from Beagle to really compare
+> different kernel versions but I was able get sensible results from N900.
+
+I still use my n900 as a main phone so I can not really hack on it :(
+
+> I tested your set on top of 196973c of sound.git.
 > 
-> With !HIGHMEM, sanity_check_meminfo checks for banks that completely or
-> partially overlap the vmalloc region. The check for partial overlap checks
-> __va(bank->start + bank->size) > vmalloc_min, but the last address of the
-> bank is (bank->start + bank->size -1).
+> First consumption when using threshold based transfer has remained the
+> same between 2.6.38-3.6.0-rc1 (wau!).
 
-Erm.
+Cool!
 
-Let's say you have a bank at 0x80000000, which maps to 0xc0000000 virtual.
-This is 512MB in size (so it's last byte address is 0x9fffffff).  That
-places it at at 0xdfffffff.  Now, let's say vmalloc_min is 0xe0000000.
+> Active sidetone under "arecord -f
+> dat >/dev/null |aplay -f dat /dev/zero" test increases consumption from
+> plain playback about 17 mA in 3.4 and 3.6.0-rc1.
+> 
+> With your set applied consumption increases 28 mA when the sidetone is
+> active (i.e. +11 mA higher than on top of 196973c). Plain threshold
+> based playback remains still the same.
 
-"bank->start + bank->size" would be 0xa0000000, right ?
+Oh. 11mA is huge... Really strange. I would expected smaller (actually zero)
+difference since in essence both workaround should be doing the same.
+Only if the OMAP pm core making different decisions runtime when it see that
+the no-idle is selected in the SYSCONFIG register of McBSP2. But the
+autogating of clocks should work without SW.
 
-So, "__va(bank->start + bank->size)" would be 0xe0000000.
+So it seams that we need to do this down at PRCM level?
 
-And "0xe0000000 > vmalloc_min" would be false.
+>> I'm doing the same test on BeagleBoard, but this thing does not want to hit
+>> retention despite all the effort :(
+>>
+> Could it be display subsystem which keeps it active? At least on N900 I
+> need to get DSS drivers activated in order to be able to blank the
+> display after bootloader and thus be able to reach the retention idle.
 
-> However, theoretically, if using using SPARSEMEM in a situation where the
-> physical to virtual address conversion is not monotonic increasing, the
-> incorrect test could result in a bank not being truncated when it should be.
+I tried that as well, but nothing helps. It must be something else which I
+have overlooked...
 
-Right, so what you're actually talking about is a non-linear translation
-by __va() and friends.  In that case, what you actually need is:
-
-	(__va(bank->start + bank->size - 1) + 1) > vmalloc_min
-or
-	__va(bank->start + bank->size - 1) >= vmalloc_min
-
-and not
-
-	__va(bank->start + bank->size - 1) > vmalloc_min
+-- 
+P?ter
