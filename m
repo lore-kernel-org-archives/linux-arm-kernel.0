@@ -1,26 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 10 Aug 2012 12:59:32 +0200
-Subject: [PATCH 06/11] gpio: em: do not discard em_gio_irq_domain_cleanup
-In-Reply-To: <1344437248-20560-7-git-send-email-arnd@arndb.de>
-References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
- <1344437248-20560-7-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdZnaH3RXHqif7wiA5bor4vOcBndnabG-7QNLnmUc3Oj3Q@mail.gmail.com>
+Date: Fri, 10 Aug 2012 13:01:35 +0200
+Subject: [PATCH] pinctrl: pinctrl-imx: add imx35 pinctrl driver
+In-Reply-To: <20120809162742.GG25520@pengutronix.de>
+References: <1343921942-22079-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1344529412-18053-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20120809162742.GG25520@pengutronix.de>
+Message-ID: <CACRpkdaRLFzjq49pd=e7GzPmWuX5C2nWDWZitZV9e6AkHBK4DA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 8, 2012 at 4:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Thu, Aug 9, 2012 at 6:27 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-> The newly added gpio-em driver marks its em_gio_irq_domain_cleanup
-> function as __devexit, which would lead to that function being
-> discarded in case CONFIG_HOTPLUG is disabled. However, the function
-> is also called by the error handling logic em_gio_probe, which
-> would cause a jump into a NULL pointer if it was removed from the
-> kernel or module.
+>> +  pull-up for this pin. Please refer to imx53 datasheet for the valid pad
+>
+> argh, I forgot to fix that (ie. s/53/35/). I won't resend just for that.
+> Linus, assuming you intend to take the patch now, can you fix it up
+> while commiting please?
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Sure, but I want an ACK from a Freescale maintainer first ...
 
-Will you push this through the ARM SoC tree or do you want me
-to apply it to my GPIO tree?
-
-Yours,
 Linus Walleij
