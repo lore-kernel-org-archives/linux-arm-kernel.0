@@ -1,47 +1,73 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 10 Aug 2012 17:13:41 +0200
-Subject: [RFC 3/6] arm: cache-l2x0: add support for Aurora L2 cache ctrl
-In-Reply-To: <20120810144922.GH2066@mudshark.cambridge.arm.com>
-References: <1344438307-8468-1-git-send-email-gregory.clement@free-electrons.com>
- <1344438307-8468-4-git-send-email-gregory.clement@free-electrons.com>
- <20120808151946.GE4579@mudshark.cambridge.arm.com>
- <50229422.40305@free-electrons.com> <50229944.60603@free-electrons.com>
- <20120810144922.GH2066@mudshark.cambridge.arm.com>
-Message-ID: <50252525.8050602@free-electrons.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Fri, 10 Aug 2012 16:14:05 +0100
+Subject: Why the region area don't decrease 1 in function
+ sanity_check_meminfo?
+In-Reply-To: <CAKvkGKeqzAiqRAj+H+E-eoN9SOOMP-aMhUJYmUb0UK4ei=jouA@mail.gmail.com>
+References: <CAKvkGKeqzAiqRAj+H+E-eoN9SOOMP-aMhUJYmUb0UK4ei=jouA@mail.gmail.com>
+Message-ID: <5025253D.3010007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2012 04:49 PM, Will Deacon wrote:
-> On Wed, Aug 08, 2012 at 05:52:20PM +0100, Gregory CLEMENT wrote:
->> On 08/08/2012 06:30 PM, Gregory CLEMENT wrote:
->>> Yes indeed this SoC support LPAE.
->>
->> Well Armada XP supports LPAE but don't use any outer cache functions, he works
->> with the Aurora cache controller on 'system cache'.
->> Armada 370 uses this outer cache functions but doesn't support LPAE.
-> 
-> Can the Armada 370 be configured to use the co-processor interface to the
-> L2, or does only the Armada XP support that feature? What happens if you
-> build a single zImage supporting both of the SoCs?
+On 24/07/12 11:54, ??? wrote:
 
-About L2 cache we already use the same kernel on Armada 370 and Armada XP
-and the differences are in the device tree.
+> I don't known why the memory region have not decrease 1, i think it
+> should be decreased(like this , (__va(bank->start + bank->size
+> -1))because in sparse memory system,  this address bank->start +
+> bank->size is belong to another bank, so this method is not correctly.
 
-Now if I understood correctly what the LPAE involved, I guess we can't have
-a kernel with LAPE running on Armada 370.
+I think you're right - we should have the '- 1' in there, although I 
+don't think there currently exist any situations where this will cause
+us grief. Here's a patch for correctness anyway...
 
-> 
-> Will
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> Please indicate whether my understanding is correct.
+ 
 
+As far as I can see in all existing situations, the worst effect of this
+will be truncating by a single byte a bank that doesn't actually need
+truncating.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+As you said in your following email, we would get trouble with this if
+using SPARSEMEM in a situation where the physical to virtual address
+conversion is not monotonic increasing.
+
+Jonny
+
+---8<---
+From: Jonathan Austin <jonathan.austin@arm.com>
+Date: Thu, 9 Aug 2012 15:59:16 +0100
+Subject: [PATCH] arm: mm: Fix vmalloc overlap check for !HIGHMEM
+
+With !HIGHMEM, sanity_check_meminfo checks for banks that completely or
+partially overlap the vmalloc region. The check for partial overlap checks
+__va(bank->start + bank->size) > vmalloc_min, but the last address of the
+bank is (bank->start + bank->size -1).
+
+This doesn't cause serious issues for existing platforms, except to
+truncate by a single byte a bank that doesn't actually need truncating if
+it happens to finish at vmalloc_min -1.
+
+However, theoretically, if using using SPARSEMEM in a situation where the
+physical to virtual address conversion is not monotonic increasing, the
+incorrect test could result in a bank not being truncated when it should be.
+
+Reported-by: ??? (Steve) <zhanzhenbo@gmail.com>
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+---
+ arch/arm/mm/mmu.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 4c2d045..29f7084 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -961,8 +961,8 @@ void __init sanity_check_meminfo(void)
+                 * Check whether this memory bank would partially overlap
+                 * the vmalloc area.
+                 */
+-               if (__va(bank->start + bank->size) > vmalloc_min ||
+-                   __va(bank->start + bank->size) < __va(bank->start)) {
++               if (__va(bank->start + bank->size - 1) > vmalloc_min ||
++                   __va(bank->start + bank->size - 1) < __va(bank->start)) {
+                        unsigned long newsize = vmalloc_min - __va(bank->start);
+                        printk(KERN_NOTICE "Truncating RAM at %.8llx-%.8llx "
+                               "to -%.8llx (vmalloc region overlap).\n",
