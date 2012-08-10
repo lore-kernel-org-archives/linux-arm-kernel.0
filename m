@@ -1,95 +1,58 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 10 Aug 2012 14:48:20 +0200
-Subject: [PATCH 00/14] ARM: at91: add pinctrl support
-Message-ID: <20120810124820.GA20557@game.jcrosoft.org>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Fri, 10 Aug 2012 16:00:04 +0300
+Subject: [alsa-devel] [PATCH 08/11] ARM: OMAP3: Remove callback for McBSP
+ sidetone ICLK workaround
+In-Reply-To: <50227104.3040506@ti.com>
+References: <1344417101-5015-1-git-send-email-peter.ujfalusi@ti.com>
+ <1344417101-5015-9-git-send-email-peter.ujfalusi@ti.com>
+ <502268B1.9040506@bitmer.com> <50227104.3040506@ti.com>
+Message-ID: <502505D4.2030308@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Peter
 
-	This patch series introduce the pinctrl on AT91 on all the DT Soc.
+On 08/08/2012 05:00 PM, Peter Ujfalusi wrote:
+>> Are you sure it works without any changes to sidetone audio quality or
+>> current consumption? What I remember idlemode was broken at least on
+>> 3430 and caused bad sidetone audio if autoidle was set and a little bit
+>> higher current consumption (something like 2-3 mA higher where reference
+>> consumption was around 10 mA) when McBSP was set to no-idle.
+> 
+> Yes, the idelmode settings are still broken in the sidetone block. However we
+> are toggling the SIDLEMODE of the corresponding McBSP instance where the ST
+> block is attached.
+> This should have the same effect as doing the same down in PRCM level since
+> the McBSP SIDLEMODE does work correctly preventing ICLK to be gated when it is
+> set to no-idle.
+> 
+> Unfortunately I can not get my BeagleBoard to start gating iclk even if I
+> remove the ICLK gating prevention (on top of 3.6-rc1). So I can not really say
+> for 100% this is equivalent to the the PRCM level workaround.
+> However I have also spend long time hacking around in McBSP, and I know that
+> the SIDLEMODE in McBSP is working correctly.
+> Do you know how can I get OMAP3 to start gating the clocks (to idle)?
+> 
+I got some odd current consumption results from Beagle to really compare
+different kernel versions but I was able get sensible results from N900.
 
-	THe pinctrl is limited to only the DT. Old code still use the custom
-	at91 pin mux api.
+I tested your set on top of 196973c of sound.git.
 
-The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
+First consumption when using threshold based transfer has remained the
+same between 2.6.38-3.6.0-rc1 (wau!). Active sidetone under "arecord -f
+dat >/dev/null |aplay -f dat /dev/zero" test increases consumption from
+plain playback about 17 mA in 3.4 and 3.6.0-rc1.
 
-  Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
+With your set applied consumption increases 28 mA when the sidetone is
+active (i.e. +11 mA higher than on top of 196973c). Plain threshold
+based playback remains still the same.
 
-are available in the git repository at:
+> I'm doing the same test on BeagleBoard, but this thing does not want to hit
+> retention despite all the effort :(
+> 
+Could it be display subsystem which keeps it active? At least on N900 I
+need to get DSS drivers activated in order to be able to blank the
+display after bootloader and thus be able to reach the retention idle.
 
-  git://github.com/at91linux/linux-at91.git j/pinctrl
-
-for you to fetch changes up to 7ff6e8b37d1f334ef24b87661c40aaa548dd93f6:
-
-  MTD: atmel_nand: add pinctrl consumer support (2012-08-10 20:46:24 +0800)
-
-----------------------------------------------------------------
-Jean-Christophe PLAGNIOL-VILLARD (14):
-      ARM: at91: gpio: implement request and free
-      at91: regroup gpio and pinctrl under a simple-bus
-      arm: at91: at91sam9x5: fix gpio number per bank
-      ARM: at91: add dummies pinctrl for non dt platform
-      ARM: at91: add pinctrl support
-      arm: at91: dt: at91sam9 add pinctrl support
-      arm: at91: dt: at91sam9 add serial pinctrl support
-      tty: atmel_serial: add pinctrl support
-      arm: at91: dt: sam9m10g45ek: use rts/cts pinctrl group for uart1
-      arm: at91: dt: sam9263ek: use rts/cts pinctrl group for uart0
-      arm: at91: dt: sam9g20ek: use rts/cts/dtr/dsr/dcd/ri pinctrl group for uart0
-      MTD: atmel nand: fix gpio missing request
-      arm: at91: dt: at91sam9 add nand pinctrl support
-      MTD: atmel_nand: add pinctrl consumer support
-
- Documentation/devicetree/bindings/gpio/gpio_atmel.txt            |    5 +
- Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt |   84 ++++++++
- arch/arm/Kconfig                                                 |    1 +
- arch/arm/boot/dts/at91sam9260.dtsi                               |  182 +++++++++++++---
- arch/arm/boot/dts/at91sam9263.dtsi                               |  164 +++++++++++----
- arch/arm/boot/dts/at91sam9263ek.dts                              |    1 +
- arch/arm/boot/dts/at91sam9g15.dtsi                               |   28 +++
- arch/arm/boot/dts/at91sam9g15ek.dts                              |   16 ++
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi                      |    6 +
- arch/arm/boot/dts/at91sam9g25.dtsi                               |   28 +++
- arch/arm/boot/dts/at91sam9g25ek.dts                              |   37 +---
- arch/arm/boot/dts/at91sam9g35.dtsi                               |   28 +++
- arch/arm/boot/dts/at91sam9g35ek.dts                              |   16 ++
- arch/arm/boot/dts/at91sam9g45.dtsi                               |  181 ++++++++++++----
- arch/arm/boot/dts/at91sam9m10g45ek.dts                           |    1 +
- arch/arm/boot/dts/at91sam9n12.dtsi                               |  173 +++++++++++++---
- arch/arm/boot/dts/at91sam9x25.dtsi                               |   28 +++
- arch/arm/boot/dts/at91sam9x25ek.dts                              |   16 ++
- arch/arm/boot/dts/at91sam9x35.dtsi                               |   28 +++
- arch/arm/boot/dts/at91sam9x35ek.dts                              |   16 ++
- arch/arm/boot/dts/at91sam9x5.dtsi                                |  179 +++++++++++++---
- arch/arm/boot/dts/at91sam9x5ek.dtsi                              |   47 +++++
- arch/arm/configs/at91_dt_defconfig                               |    1 +
- arch/arm/mach-at91/Makefile.boot                                 |    4 +
- arch/arm/mach-at91/at91sam9263.c                                 |    5 +
- arch/arm/mach-at91/at91sam9g45.c                                 |    6 +
- arch/arm/mach-at91/at91sam9n12.c                                 |    3 -
- arch/arm/mach-at91/at91sam9x5.c                                  |    7 -
- arch/arm/mach-at91/board-dt.c                                    |    2 -
- arch/arm/mach-at91/gpio.c                                        |  197 ++++--------------
- arch/arm/mach-at91/setup.c                                       |    6 +-
- drivers/mtd/nand/atmel_nand.c                                    |   65 +++++-
- drivers/pinctrl/Kconfig                                          |    9 +
- drivers/pinctrl/Makefile                                         |    1 +
- drivers/pinctrl/pinctrl-at91.c                                   | 1448 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- drivers/tty/serial/atmel_serial.c                                |    8 +
- 36 files changed, 2654 insertions(+), 373 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
- create mode 100644 arch/arm/boot/dts/at91sam9g15.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9g15ek.dts
- create mode 100644 arch/arm/boot/dts/at91sam9g25.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9g35.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9g35ek.dts
- create mode 100644 arch/arm/boot/dts/at91sam9x25.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9x25ek.dts
- create mode 100644 arch/arm/boot/dts/at91sam9x35.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9x35ek.dts
- create mode 100644 arch/arm/boot/dts/at91sam9x5ek.dtsi
- create mode 100644 drivers/pinctrl/pinctrl-at91.c
-
-Best Regards,
-J.
+-- 
+Jarkko
