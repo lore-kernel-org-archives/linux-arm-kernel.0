@@ -1,61 +1,172 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 10 Aug 2012 18:36:28 +0100
-Subject: [PATCH 2/9] ARM: perf: add devicetree bindings for 11MPcore, A5,
- A7 and A15 PMUs
+Date: Fri, 10 Aug 2012 18:36:27 +0100
+Subject: [PATCH 1/9] ARM: PMU: Add runtime PM Support
 In-Reply-To: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
 References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1344620195-22372-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1344620195-22372-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds separate devicetree bindings for 11MPcore and
-Cortex-{A5,A7,A15} PMUs in preparation for improved devicetree parsing
-in the ARM perf-event CPU PMU driver.
+From: Jon Hunter <jon-hunter@ti.com>
 
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
+Add runtime PM support to the ARM PMU driver so that devices such as OMAP
+supporting dynamic PM can use the platform->runtime_* hooks to initialise
+hardware at runtime. Without having these runtime PM hooks in place any
+configuration of the PMU hardware would be lost when low power states are
+entered and hence would prevent PMU from working.
+
+This change also replaces the PMU platform functions enable_irq and disable_irq
+added by Ming Lei with runtime_resume and runtime_suspend funtions. Ming had
+added the enable_irq and disable_irq functions as a method to configure the
+cross trigger interface on OMAP4 for routing the PMU interrupts. By adding
+runtime PM support, we can move the code called by enable_irq and disable_irq
+into the runtime PM callbacks runtime_resume and runtime_suspend.
+
+Cc: Ming Lei <ming.lei@canonical.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- Documentation/devicetree/bindings/arm/pmu.txt |    4 ++++
- arch/arm/kernel/perf_event.c                  |    6 +++++-
- 2 files changed, 9 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/pmu.h   |   20 ++++++++++++--------
+ arch/arm/kernel/perf_event.c |   41 +++++++++++++++++++++++++++++++++--------
+ 2 files changed, 45 insertions(+), 16 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-index 1c044eb..343781b 100644
---- a/Documentation/devicetree/bindings/arm/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/pmu.txt
-@@ -7,8 +7,12 @@ representation in the device tree should be done as under:-
- Required properties:
- 
- - compatible : should be one of
-+	"arm,cortex-a15-pmu"
- 	"arm,cortex-a9-pmu"
- 	"arm,cortex-a8-pmu"
-+	"arm,cortex-a7-pmu"
-+	"arm,cortex-a5-pmu"
-+	"arm,arm11mpcore-pmu"
- 	"arm,arm1176-pmu"
- 	"arm,arm1136-pmu"
- - interrupts : 1 combined interrupt or 1 per core.
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index c44647e..3aa3388 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -646,10 +646,14 @@ arch_initcall(cpu_pmu_reset);
-  * PMU platform driver and devicetree bindings.
+diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+index 4432305..40d7dff 100644
+--- a/arch/arm/include/asm/pmu.h
++++ b/arch/arm/include/asm/pmu.h
+@@ -31,18 +31,22 @@ enum arm_pmu_type {
+  *	interrupt and passed the address of the low level handler,
+  *	and can be used to implement any platform specific handling
+  *	before or after calling it.
+- * @enable_irq: an optional handler which will be called after
+- *	request_irq and be used to handle some platform specific
+- *	irq enablement
+- * @disable_irq: an optional handler which will be called before
+- *	free_irq and be used to handle some platform specific
+- *	irq disablement
++ * @runtime_resume: an optional handler which will be called by the
++ *	runtime PM framework following a call to pm_runtime_get().
++ *	Note that if pm_runtime_get() is called more than once in
++ *	succession this handler will only be called once.
++ * @runtime_suspend: an optional handler which will be called by the
++ *	runtime PM framework following a call to pm_runtime_put().
++ *	Note that if pm_runtime_get() is called more than once in
++ *	succession this handler will only be called following the
++ *	final call to pm_runtime_put() that actually disables the
++ *	hardware.
   */
- static struct of_device_id armpmu_of_device_ids[] = {
-+	{.compatible = "arm,cortex-a15-pmu"},
- 	{.compatible = "arm,cortex-a9-pmu"},
- 	{.compatible = "arm,cortex-a8-pmu"},
--	{.compatible = "arm,arm1136-pmu"},
-+	{.compatible = "arm,cortex-a7-pmu"},
-+	{.compatible = "arm,cortex-a5-pmu"},
-+	{.compatible = "arm,arm11mpcore-pmu"},
- 	{.compatible = "arm,arm1176-pmu"},
-+	{.compatible = "arm,arm1136-pmu"},
- 	{},
+ struct arm_pmu_platdata {
+ 	irqreturn_t (*handle_irq)(int irq, void *dev,
+ 				  irq_handler_t pmu_handler);
+-	void (*enable_irq)(int irq);
+-	void (*disable_irq)(int irq);
++	int (*runtime_resume)(struct device *dev);
++	int (*runtime_suspend)(struct device *dev);
  };
  
+ #ifdef CONFIG_CPU_HAS_PMU
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index ab243b8..c44647e 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -20,6 +20,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/spinlock.h>
+ #include <linux/uaccess.h>
++#include <linux/pm_runtime.h>
+ 
+ #include <asm/cputype.h>
+ #include <asm/irq.h>
+@@ -364,8 +365,6 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
+ {
+ 	int i, irq, irqs;
+ 	struct platform_device *pmu_device = armpmu->plat_device;
+-	struct arm_pmu_platdata *plat =
+-		dev_get_platdata(&pmu_device->dev);
+ 
+ 	irqs = min(pmu_device->num_resources, num_possible_cpus());
+ 
+@@ -373,13 +372,11 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
+ 		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
+ 			continue;
+ 		irq = platform_get_irq(pmu_device, i);
+-		if (irq >= 0) {
+-			if (plat && plat->disable_irq)
+-				plat->disable_irq(irq);
++		if (irq >= 0)
+ 			free_irq(irq, armpmu);
+-		}
+ 	}
+ 
++	pm_runtime_put_sync(&pmu_device->dev);
+ 	release_pmu(armpmu->type);
+ }
+ 
+@@ -412,6 +409,8 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
+ 		return -ENODEV;
+ 	}
+ 
++	pm_runtime_get_sync(&pmu_device->dev);
++
+ 	for (i = 0; i < irqs; ++i) {
+ 		err = 0;
+ 		irq = platform_get_irq(pmu_device, i);
+@@ -437,8 +436,7 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
+ 				irq);
+ 			armpmu_release_hardware(armpmu);
+ 			return err;
+-		} else if (plat && plat->enable_irq)
+-			plat->enable_irq(irq);
++		}
+ 
+ 		cpumask_set_cpu(i, &armpmu->active_irqs);
+ 	}
+@@ -581,6 +579,28 @@ static void armpmu_disable(struct pmu *pmu)
+ 	armpmu->stop();
+ }
+ 
++#ifdef CONFIG_PM_RUNTIME
++static int armpmu_runtime_resume(struct device *dev)
++{
++	struct arm_pmu_platdata *plat = dev_get_platdata(dev);
++
++	if (plat && plat->runtime_resume)
++		return plat->runtime_resume(dev);
++
++	return 0;
++}
++
++static int armpmu_runtime_suspend(struct device *dev)
++{
++	struct arm_pmu_platdata *plat = dev_get_platdata(dev);
++
++	if (plat && plat->runtime_suspend)
++		return plat->runtime_suspend(dev);
++
++	return 0;
++}
++#endif
++
+ static void __init armpmu_init(struct arm_pmu *armpmu)
+ {
+ 	atomic_set(&armpmu->active_events, 0);
+@@ -647,9 +667,14 @@ static int __devinit armpmu_device_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct dev_pm_ops armpmu_dev_pm_ops = {
++	SET_RUNTIME_PM_OPS(armpmu_runtime_suspend, armpmu_runtime_resume, NULL)
++};
++
+ static struct platform_driver armpmu_driver = {
+ 	.driver		= {
+ 		.name	= "arm-pmu",
++		.pm	= &armpmu_dev_pm_ops,
+ 		.of_match_table = armpmu_of_device_ids,
+ 	},
+ 	.probe		= armpmu_device_probe,
 -- 
 1.7.4.1
