@@ -1,22 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Aug 2012 21:06:12 +0200
-Subject: [GIT PULL 0/3] arm-soc updates
-Message-ID: <1344625575-27560-1-git-send-email-arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 10 Aug 2012 21:19:37 +0200
+Subject: [PATCH] ARM: plat-mxc: Remove unused imx_ioremap
+In-Reply-To: <1344431176-10486-1-git-send-email-festevam@gmail.com>
+References: <1344431176-10486-1-git-send-email-festevam@gmail.com>
+Message-ID: <20120810191937.GE1451@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, Aug 08, 2012 at 10:06:16AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> imx_ioremap is no longer used on imx platforms, so remove it.
+> 
+> As the EXPORT_SYMBOL_GPL is removed, it is also safe to remove the module.h header.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Here are three pull requests for you to consider for the next -rc.
+Applied, thanks
 
-The first one is our regular bug fix series, this time with a lot
-of patches fixing build regressions. Please pull at least this one.
+Sascha
 
-The other two are things that fell through the cracks in the v3.6
-merge window because of communication problems between the arm-soc
-team and our downstream maintainers. Neither of them is important,
-but applying them should also be harmless. If you feel like making
-an exception, please have a look and consider merging them as well,
-but don't worry about them otherwise.
+> ---
+>  arch/arm/plat-mxc/system.c |    4 ----
+>  1 files changed, 0 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/system.c b/arch/arm/plat-mxc/system.c
+> index 1996c3e..3da78cf 100644
+> --- a/arch/arm/plat-mxc/system.c
+> +++ b/arch/arm/plat-mxc/system.c
+> @@ -21,7 +21,6 @@
+>  #include <linux/io.h>
+>  #include <linux/err.h>
+>  #include <linux/delay.h>
+> -#include <linux/module.h>
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/common.h>
+> @@ -29,9 +28,6 @@
+>  #include <asm/proc-fns.h>
+>  #include <asm/mach-types.h>
+>  
+> -void __iomem *(*imx_ioremap)(unsigned long, size_t, unsigned int) = NULL;
+> -EXPORT_SYMBOL_GPL(imx_ioremap);
+> -
+>  static void __iomem *wdog_base;
+>  
+>  /*
+> -- 
+> 1.7.1
+> 
+> 
 
-	Arnd
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
