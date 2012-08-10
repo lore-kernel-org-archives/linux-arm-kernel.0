@@ -1,28 +1,56 @@
-From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Fri, 10 Aug 2012 16:15:26 +0300
-Subject: [PATCH 00/11] ARM/ASoC: OMAP McBSP device tree support
-In-Reply-To: <20120808112132.GN16861@opensource.wolfsonmicro.com>
-References: <1344417101-5015-1-git-send-email-peter.ujfalusi@ti.com>
- <20120808112132.GN16861@opensource.wolfsonmicro.com>
-Message-ID: <5025096E.8030300@bitmer.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Fri, 10 Aug 2012 18:33:02 +0530
+Subject: [PATCH] ARM: tegra: use IO_ADDRESS for getting virtual address
+Message-ID: <1344603782-2541-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2012 02:21 PM, Mark Brown wrote:
-> On Wed, Aug 08, 2012 at 12:11:30PM +0300, Peter Ujfalusi wrote:
-> 
->> The series changes McBSP related files mostly. It would be great if the whole
->> series could go via audio tree (if the patches are OK and it is fine by Tony).
-> 
-> I'm OK with all the patches, if Tony's happy with me applying them then
-> I'll put them in a separate branch so they can easily be merged into the
-> OMAP trees (or similarly if it's applied in an OMAP tree having a branch
-> I can merge if needed would be good).
+Use macro IO_ADDRESS for getting virtual address of
+corresponding physical address to make the consistency
+with rest of Tegra code-base.
+This macro calls the IO_TO_VIRT() which is defined in
+arch/arm/mach-tegra/include/mach/iomap.h
 
-I suppose we could apply 1/11, 3-6/11 and 9-10 right away (2/11 perhaps
-should go near 11/11?) and apply 7-8/11 (sidetone patches that increase
-consumption) later?
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+ arch/arm/mach-tegra/apbio.c |    4 ++--
+ arch/arm/mach-tegra/fuse.c  |    4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-My ack to patches 1, 3-6 and 9-10:
-
-Acked-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
+diff --git a/arch/arm/mach-tegra/apbio.c b/arch/arm/mach-tegra/apbio.c
+index dc0fe38..643a378 100644
+--- a/arch/arm/mach-tegra/apbio.c
++++ b/arch/arm/mach-tegra/apbio.c
+@@ -293,12 +293,12 @@ static apbio_write_fptr apbio_write;
+ 
+ static u32 tegra_apb_readl_direct(unsigned long offset)
+ {
+-	return readl(IO_TO_VIRT(offset));
++	return readl(IO_ADDRESS(offset));
+ }
+ 
+ static void tegra_apb_writel_direct(u32 value, unsigned long offset)
+ {
+-	writel(value, IO_TO_VIRT(offset));
++	writel(value, IO_ADDRESS(offset));
+ }
+ 
+ void tegra_apb_io_init(void)
+diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
+index f946d12..0b7db17 100644
+--- a/arch/arm/mach-tegra/fuse.c
++++ b/arch/arm/mach-tegra/fuse.c
+@@ -93,9 +93,9 @@ void tegra_init_fuse(void)
+ {
+ 	u32 id;
+ 
+-	u32 reg = readl(IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
++	u32 reg = readl(IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x48));
+ 	reg |= 1 << 28;
+-	writel(reg, IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
++	writel(reg, IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x48));
+ 
+ 	reg = tegra_fuse_readl(FUSE_SKU_INFO);
+ 	tegra_sku_id = reg & 0xFF;
+-- 
+1.7.1.1
