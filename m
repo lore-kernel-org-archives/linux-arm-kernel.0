@@ -1,36 +1,35 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 10 Aug 2012 15:58:29 +0200
-Subject: [PATCH v2 2/2] ARM: imx/pcm043: add oftree support
-In-Reply-To: <CAOMZO5D=1XfV==+VvgzsJccLPiGd6xDCjVSRYxrH0VMzEtX_gg@mail.gmail.com>
-References: <1344591170-13638-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1344591170-13638-2-git-send-email-u.kleine-koenig@pengutronix.de>
- <CAOMZO5D=1XfV==+VvgzsJccLPiGd6xDCjVSRYxrH0VMzEtX_gg@mail.gmail.com>
-Message-ID: <20120810135829.GK25520@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 10 Aug 2012 22:04:08 +0800
+Subject: [PATCH] efikamx: reintroduce Genesi Efika MX Smarttop via device
+ tree
+In-Reply-To: <CAKGA1bmd-53G=59F7Nsd3Sx2eEQgvcahnt3g5zxJAGawtc-gWQ@mail.gmail.com>
+References: <1344375978-29981-1-git-send-email-matt@genesi-usa.com>
+ <20120808151555.GE14718@S2101-09.ap.freescale.net>
+ <CAKGA1bkbp8_z+HSr97cp_jeCrdTHkQxuZPFu0QPWwnXphWVdZA@mail.gmail.com>
+ <CAOMZO5DOEfV4wTSNW8ABaUhGwa_KG3Bkt0o-rs8k-cZk4P-=+A@mail.gmail.com>
+ <CAKGA1bkOo=En2P18FaBpq_KAZ88kisikXhNTabvnDknQ-EwFjA@mail.gmail.com>
+ <20120810014119.GD19617@S2101-09.ap.freescale.net>
+ <CAKGA1bmd-53G=59F7Nsd3Sx2eEQgvcahnt3g5zxJAGawtc-gWQ@mail.gmail.com>
+Message-ID: <20120810140406.GB3409@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Fabio,
+On Fri, Aug 10, 2012 at 08:36:02AM -0500, Matt Sealey wrote:
+> Requiring it breaks the entire concept of the device tree to describe running
+> hardware. It is not a configuration script. pinctrl should be optional
+> - built in
+> always, but not necessary to turn a board on if it's already configured.
+> 
+How would kernel know if it's already configured, correctly?
 
-On Fri, Aug 10, 2012 at 10:38:02AM -0300, Fabio Estevam wrote:
-> On 8/10/12, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
-> > +			serial at 43f90000 {
-> > +				status = "okay";
-> > +			};
-> > +
-> > +			serial at 43f94000 {
-> > +				status = "okay";
+> What would happen if a board were designed that only used the default ALT
+> settings on i.MX53 or so? You'd have to redefine every default IOMUX pad
+> just to get it to boot. That's intolerable.
 > 
-> On other i.mx boards the format is:
-> 
-> uart1: serial at 43f90000
-> 
-> Should the same be done here?
-I don't care much, but I like to minimize duplication. As dtc bails out
-if you get it wrong it would be ok for me to keep the label.
-
-Best regards
-Uwe
+Come on, even the pad configuration are all the default?  Even if that's
+the case, yes, we still need to do it.  How do we know if firmware has
+changed the settings or not.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+Shawn
