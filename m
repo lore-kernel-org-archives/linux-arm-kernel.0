@@ -1,65 +1,47 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Fri, 10 Aug 2012 18:43:56 +0100
-Subject: Why the region area don't decrease 1 in function
- sanity_check_meminfo?
-In-Reply-To: <20120810153705.GZ18957@n2100.arm.linux.org.uk>
-References: <CAKvkGKeqzAiqRAj+H+E-eoN9SOOMP-aMhUJYmUb0UK4ei=jouA@mail.gmail.com>
- <5025253D.3010007@arm.com> <20120810153705.GZ18957@n2100.arm.linux.org.uk>
-Message-ID: <5025485C.80407@arm.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 10 Aug 2012 10:44:42 -0700
+Subject: [GIT PULL] ARM: OMAP: PM fixes for v3.6-rc
+Message-ID: <878vdmfxpx.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Tony,
 
-On 10/08/12 16:37, Russell King - ARM Linux wrote:
+Please pull the following PM related fixes for v3.6-rc.
 
->> With !HIGHMEM, sanity_check_meminfo checks for banks that completely or
->> partially overlap the vmalloc region. The check for partial overlap checks
->> __va(bank->start + bank->size) > vmalloc_min, but the last address of the
->> bank is (bank->start + bank->size -1).
+One of them is a fix for drivers/cpufreq/omap-cpufreq.c, but it needs to
+go along with the arch/arm change.  I'm listed in MAINTAINERS for the
+OMAP CPUfreq driver now, so this should be OK.
 
-> 
-> Erm.
-> 
-> Let's say you have a bank at 0x80000000, which maps to 0xc0000000 virtual.
-> This is 512MB in size (so it's last byte address is 0x9fffffff).  That
-> places it at at 0xdfffffff.  Now, let's say vmalloc_min is 0xe0000000.
-> 
-> "bank->start + bank->size" would be 0xa0000000, right ?
-> 
-> So, "__va(bank->start + bank->size)" would be 0xe0000000.
+Kevin
 
+The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
 
-Yep, except in our (hypothetical?) case below...
->
+  Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
 
-> And "0xe0000000 > vmalloc_min" would be false.
-> 
+are available in the git repository at:
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.6/fixes/pm
 
-Yup... My commit message is wrong. Sorry. The linear case is fine...
+for you to fetch changes up to 196449de0c886e64b48d01bd7ee153656db92884:
 
->> However, theoretically, if using using SPARSEMEM in a situation where the
->> physical to virtual address conversion is not monotonic increasing, the
->> incorrect test could result in a bank not being truncated when it should be.
-> 
-> Right, so what you're actually talking about is a non-linear translation
-> by __va() and friends.  In that case, what you actually need is:
-> 
-> 	(__va(bank->start + bank->size - 1) + 1) > vmalloc_min
-> or
-> 	__va(bank->start + bank->size - 1) >= vmalloc_min
-> 
-> and not
-> 
-> 	__va(bank->start + bank->size - 1) > vmalloc_min
-> 
+  ARM: OMAP4: Register the OPP table only for 4430 device (2012-08-09 08:07:54 -0700)
 
+----------------------------------------------------------------
+Kevin Hilman (2):
+      ARM: OMAP3: TWL4030: ensure sys_nirq1 is mux'd and wakeup enabled
+      Revert "ARM: OMAP3: PM: call pre/post transition per powerdomain"
 
-Agreed. I prefer the second form, and there seems to be a precedent for
-">=" further up in sanity_check_meminfo, too.
+Rajendra Nayak (2):
+      cpufreq: OMAP: Handle missing frequency table on SMP systems
+      ARM: OMAP4: Register the OPP table only for 4430 device
 
-If you think it is worth fixing for this case, I'll make the fixes,
-ensure the commit message is !wrong and submit this to the patch-system.
+Santosh Shilimkar (1):
+      ARM: OMAP4: sleep: Save the complete used register stack frame
 
-Jonny
+ arch/arm/mach-omap2/opp4xxx_data.c |    2 +-
+ arch/arm/mach-omap2/pm34xx.c       |   19 ++++---------------
+ arch/arm/mach-omap2/sleep44xx.S    |    8 ++++++--
+ arch/arm/mach-omap2/twl-common.c   |    1 +
+ drivers/cpufreq/omap-cpufreq.c     |    4 +++-
+ 5 files changed, 15 insertions(+), 19 deletions(-)
