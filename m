@@ -1,56 +1,72 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Fri, 10 Aug 2012 18:33:02 +0530
-Subject: [PATCH] ARM: tegra: use IO_ADDRESS for getting virtual address
-Message-ID: <1344603782-2541-1-git-send-email-ldewangan@nvidia.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Fri, 10 Aug 2012 08:33:06 -0500
+Subject: imx6q restart is broken
+In-Reply-To: <20120809210709.GV18957@n2100.arm.linux.org.uk>
+References: <20120808101817.GA14718@S2101-09.ap.freescale.net>
+ <50224547.9020000@de.bosch.com> <50232C17.9000700@gmail.com>
+ <20120809092021.GQ18957@n2100.arm.linux.org.uk>
+ <CAKGA1b=--C_MEHgc4m2f4cQwkx-=njss7bpT+EzXgKZJ2v=+Hw@mail.gmail.com>
+ <20120809210709.GV18957@n2100.arm.linux.org.uk>
+Message-ID: <CAKGA1bnh9tD5hey3E2j6XhUqOFV=FgU1W13oSMfpXxxnV_MSfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use macro IO_ADDRESS for getting virtual address of
-corresponding physical address to make the consistency
-with rest of Tegra code-base.
-This macro calls the IO_TO_VIRT() which is defined in
-arch/arm/mach-tegra/include/mach/iomap.h
+On Thu, Aug 9, 2012 at 4:07 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Aug 09, 2012 at 02:03:13PM -0500, Matt Sealey wrote:
+>> I have an irrelevant but possibly related question here; in
+>> mm/proc-v7.S there's this snip of code;
+>>
+>> #ifdef CONFIG_SMP
+>>         ALT_SMP(mrc     p15, 0, r0, c1, c0, 1)
+>>         ALT_UP(mov      r0, #(1 << 6))          @ fake it for UP
+>>         tst     r0, #(1 << 6)                   @ SMP/nAMP mode enabled?
+>>         orreq   r0, r0, #(1 << 6)               @ Enable SMP/nAMP mode
+>>         orreq   r0, r0, r10                     @ Enable CPU-specific SMP bits
+>>         mcreq   p15, 0, r0, c1, c0, 1
+>> #endif
+>>
+>> Which I am reading as, read the SMP bit from cp15 and see if it's
+>> enabled, or on UP set the SMP bit and then write it back
+>> regardless.
+>>
+>> On a system where !CONFIG_SMP but it's SMP-capable like i.MX6Q, ALT_UP
+>> method will get used and the SMP bit will get
+>> set regardless.
+>
+> I got here and stopped reading any further.  No, it doesn't work like
+> that; you don't understand the assembly.
+>
+> Yes, you're right that the ALT_UP version will be used.  This sets r0
+> to 1 << 6.  The very next instruction tests whether bit 6 is set in r0.
+> The following three instructions will only be executed _if_ that bit
+> was zero.
 
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
----
- arch/arm/mach-tegra/apbio.c |    4 ++--
- arch/arm/mach-tegra/fuse.c  |    4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+Right but, as I read it...
 
-diff --git a/arch/arm/mach-tegra/apbio.c b/arch/arm/mach-tegra/apbio.c
-index dc0fe38..643a378 100644
---- a/arch/arm/mach-tegra/apbio.c
-+++ b/arch/arm/mach-tegra/apbio.c
-@@ -293,12 +293,12 @@ static apbio_write_fptr apbio_write;
- 
- static u32 tegra_apb_readl_direct(unsigned long offset)
- {
--	return readl(IO_TO_VIRT(offset));
-+	return readl(IO_ADDRESS(offset));
- }
- 
- static void tegra_apb_writel_direct(u32 value, unsigned long offset)
- {
--	writel(value, IO_TO_VIRT(offset));
-+	writel(value, IO_ADDRESS(offset));
- }
- 
- void tegra_apb_io_init(void)
-diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
-index f946d12..0b7db17 100644
---- a/arch/arm/mach-tegra/fuse.c
-+++ b/arch/arm/mach-tegra/fuse.c
-@@ -93,9 +93,9 @@ void tegra_init_fuse(void)
- {
- 	u32 id;
- 
--	u32 reg = readl(IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
-+	u32 reg = readl(IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x48));
- 	reg |= 1 << 28;
--	writel(reg, IO_TO_VIRT(TEGRA_CLK_RESET_BASE + 0x48));
-+	writel(reg, IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x48));
- 
- 	reg = tegra_fuse_readl(FUSE_SKU_INFO);
- 	tegra_sku_id = reg & 0xFF;
+if (CONFIG_SMP)
+   read cp15
+else
+   set bit to one to hack it
+if (!smp)
+  set smp
+  write it back
+
+So who unsets the SMP bit? When the core goes down does it clear it,
+or are we just
+being safe for CPU startup? Does it still have an effect in the chip
+logic even if the core
+is 'not plugged'?
+
+What happens if you're in CONFIG_SMP and you say maxcpus=1?
+
+> I'm assuming that the rest of your email is therefore irrelevant; I
+> have no desire to continue reading such a long message when the premise
+> it's (presumably) based upon is false.  If you have any further questions
+> please restate them succinctly after taking on board the above.  Thanks.
+
+Please read the rest... I just didn't write first my question properly.
+
 -- 
-1.7.1.1
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
