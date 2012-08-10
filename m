@@ -1,37 +1,26 @@
-From: dong.aisheng@linaro.org (Dong Aisheng)
-Date: Fri, 10 Aug 2012 11:14:38 +0800
-Subject: [PATCH] pinctrl: pinctrl-imx: add imx35 pinctrl driver
-In-Reply-To: <1344529412-18053-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1343921942-22079-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1344529412-18053-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CAP1dx+y7hjPcCHzfL+Axjz-NK12Vq4YkU_UFcXnKhNP0_UT0vw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 10 Aug 2012 11:22:20 +0800
+Subject: [PATCH] ARM: imx/iomux-v3: allow pad_list to be const
+In-Reply-To: <1344527835-32567-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1344527835-32567-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20120810032217.GF19617@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 August 2012 00:23, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> This is mostly cut'n'paste from the imx51 pinctrl driver. The data was
-> generated using sed and awk on
-> arch/arm/plat-mxc/include/mach/iomux-mx35.h.
->
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+On Thu, Aug 09, 2012 at 05:57:15PM +0200, Uwe Kleine-K?nig wrote:
+> Also fix all machine files to make use of it and while at it also make
+> the pad lists __init_const.
+> 
 > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> --
-> Changes since (implicit) v1,
-> id:1343921942-22079-1-git-send-email-u.kleine-koenig at pengutronix.de
->
->  - remove references to file names in binding documentation
->  - remove sed commands from comments in driver
->  - add explicit numbers for pins and functions
->
-> @Stephen and Dong: I assumed your ack even though we didn't talk about
-> adding numbers for the functions. If you don't like these please scream
-> before the patch makes it in :-)
-Is that for align with the pin func ids in binding doc?
-It looks no harmful, so i'm ok with it.
+> ---
+> Hello,
+> 
+> well, iomux-v3 is dying so I don't know how welcome this patch is.
+> 
+For me, it's not so welcomed at this point, as I have seen it's
+patching a bunch of imx5 board files that are scheduled for removal
+for this cycle.
 
-Regards
-Dong Aisheng
+-- 
+Regards,
+Shawn
