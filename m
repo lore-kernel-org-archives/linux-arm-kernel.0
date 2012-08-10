@@ -1,172 +1,228 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 10 Aug 2012 18:36:27 +0100
-Subject: [PATCH 1/9] ARM: PMU: Add runtime PM Support
+Date: Fri, 10 Aug 2012 18:36:35 +0100
+Subject: [PATCH 9/9] ARM: perf: move irq registration into pmu implementation
 In-Reply-To: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
 References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1344620195-22372-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1344620195-22372-10-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Hunter <jon-hunter@ti.com>
+From: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
 
-Add runtime PM support to the ARM PMU driver so that devices such as OMAP
-supporting dynamic PM can use the platform->runtime_* hooks to initialise
-hardware at runtime. Without having these runtime PM hooks in place any
-configuration of the PMU hardware would be lost when low power states are
-entered and hence would prevent PMU from working.
+This patch moves the CPU-specific IRQ registration and parsing code into
+the CPU PMU backend. This is required because a PMU may have more than
+one interrupt, which in turn can be either PPI (per-cpu) or SPI
+(requiring strict affinity setting at the interrupt distributor).
 
-This change also replaces the PMU platform functions enable_irq and disable_irq
-added by Ming Lei with runtime_resume and runtime_suspend funtions. Ming had
-added the enable_irq and disable_irq functions as a method to configure the
-cross trigger interface on OMAP4 for routing the PMU interrupts. By adding
-runtime PM support, we can move the code called by enable_irq and disable_irq
-into the runtime PM callbacks runtime_resume and runtime_suspend.
-
-Cc: Ming Lei <ming.lei@canonical.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Signed-off-by: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
+[will: cosmetic edits and reworked interrupt dispatching]
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/pmu.h   |   20 ++++++++++++--------
- arch/arm/kernel/perf_event.c |   41 +++++++++++++++++++++++++++++++++--------
- 2 files changed, 45 insertions(+), 16 deletions(-)
+ arch/arm/include/asm/pmu.h       |    2 +
+ arch/arm/kernel/perf_event.c     |   72 ++++++-------------------------------
+ arch/arm/kernel/perf_event_cpu.c |   66 ++++++++++++++++++++++++++++++++++-
+ 3 files changed, 79 insertions(+), 61 deletions(-)
 
 diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-index 4432305..40d7dff 100644
+index a993ad6..a26170d 100644
 --- a/arch/arm/include/asm/pmu.h
 +++ b/arch/arm/include/asm/pmu.h
-@@ -31,18 +31,22 @@ enum arm_pmu_type {
-  *	interrupt and passed the address of the low level handler,
-  *	and can be used to implement any platform specific handling
-  *	before or after calling it.
-- * @enable_irq: an optional handler which will be called after
-- *	request_irq and be used to handle some platform specific
-- *	irq enablement
-- * @disable_irq: an optional handler which will be called before
-- *	free_irq and be used to handle some platform specific
-- *	irq disablement
-+ * @runtime_resume: an optional handler which will be called by the
-+ *	runtime PM framework following a call to pm_runtime_get().
-+ *	Note that if pm_runtime_get() is called more than once in
-+ *	succession this handler will only be called once.
-+ * @runtime_suspend: an optional handler which will be called by the
-+ *	runtime PM framework following a call to pm_runtime_put().
-+ *	Note that if pm_runtime_get() is called more than once in
-+ *	succession this handler will only be called following the
-+ *	final call to pm_runtime_put() that actually disables the
-+ *	hardware.
-  */
- struct arm_pmu_platdata {
- 	irqreturn_t (*handle_irq)(int irq, void *dev,
- 				  irq_handler_t pmu_handler);
--	void (*enable_irq)(int irq);
--	void (*disable_irq)(int irq);
-+	int (*runtime_resume)(struct device *dev);
-+	int (*runtime_suspend)(struct device *dev);
- };
- 
- #ifdef CONFIG_CPU_HAS_PMU
+@@ -78,6 +78,8 @@ struct arm_pmu {
+ 	void		(*start)(void);
+ 	void		(*stop)(void);
+ 	void		(*reset)(void *);
++	int		(*request_irq)(irq_handler_t handler);
++	void		(*free_irq)(void);
+ 	int		(*map_event)(struct perf_event *event);
+ 	int		num_events;
+ 	atomic_t	active_events;
 diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index ab243b8..c44647e 100644
+index 86fd399..93971b1 100644
 --- a/arch/arm/kernel/perf_event.c
 +++ b/arch/arm/kernel/perf_event.c
-@@ -20,6 +20,7 @@
- #include <linux/platform_device.h>
- #include <linux/spinlock.h>
- #include <linux/uaccess.h>
-+#include <linux/pm_runtime.h>
- 
- #include <asm/cputype.h>
- #include <asm/irq.h>
-@@ -364,8 +365,6 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
- {
- 	int i, irq, irqs;
- 	struct platform_device *pmu_device = armpmu->plat_device;
--	struct arm_pmu_platdata *plat =
--		dev_get_platdata(&pmu_device->dev);
- 
- 	irqs = min(pmu_device->num_resources, num_possible_cpus());
- 
-@@ -373,13 +372,11 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
- 		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
- 			continue;
- 		irq = platform_get_irq(pmu_device, i);
--		if (irq >= 0) {
--			if (plat && plat->disable_irq)
--				plat->disable_irq(irq);
-+		if (irq >= 0)
- 			free_irq(irq, armpmu);
--		}
- 	}
- 
-+	pm_runtime_put_sync(&pmu_device->dev);
- 	release_pmu(armpmu->type);
- }
- 
-@@ -412,6 +409,8 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
- 		return -ENODEV;
- 	}
- 
-+	pm_runtime_get_sync(&pmu_device->dev);
-+
- 	for (i = 0; i < irqs; ++i) {
- 		err = 0;
- 		irq = platform_get_irq(pmu_device, i);
-@@ -437,8 +436,7 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
- 				irq);
- 			armpmu_release_hardware(armpmu);
- 			return err;
--		} else if (plat && plat->enable_irq)
--			plat->enable_irq(irq);
-+		}
- 
- 		cpumask_set_cpu(i, &armpmu->active_irqs);
- 	}
-@@ -581,6 +579,28 @@ static void armpmu_disable(struct pmu *pmu)
- 	armpmu->stop();
- }
- 
-+#ifdef CONFIG_PM_RUNTIME
-+static int armpmu_runtime_resume(struct device *dev)
-+{
-+	struct arm_pmu_platdata *plat = dev_get_platdata(dev);
-+
-+	if (plat && plat->runtime_resume)
-+		return plat->runtime_resume(dev);
-+
-+	return 0;
-+}
-+
-+static int armpmu_runtime_suspend(struct device *dev)
-+{
-+	struct arm_pmu_platdata *plat = dev_get_platdata(dev);
-+
-+	if (plat && plat->runtime_suspend)
-+		return plat->runtime_suspend(dev);
-+
-+	return 0;
-+}
-+#endif
-+
- static void __init armpmu_init(struct arm_pmu *armpmu)
- {
- 	atomic_set(&armpmu->active_events, 0);
-@@ -647,9 +667,14 @@ static int __devinit armpmu_device_probe(struct platform_device *pdev)
+@@ -297,87 +297,39 @@ validate_group(struct perf_event *event)
  	return 0;
  }
  
-+static const struct dev_pm_ops armpmu_dev_pm_ops = {
-+	SET_RUNTIME_PM_OPS(armpmu_runtime_suspend, armpmu_runtime_resume, NULL)
-+};
+-static irqreturn_t armpmu_platform_irq(int irq, void *dev)
++static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+ {
+ 	struct arm_pmu *armpmu = (struct arm_pmu *) dev;
+ 	struct platform_device *plat_device = armpmu->plat_device;
+ 	struct arm_pmu_platdata *plat = dev_get_platdata(&plat_device->dev);
+ 
+-	return plat->handle_irq(irq, dev, armpmu->handle_irq);
++	if (plat && plat->handle_irq)
++		return plat->handle_irq(irq, dev, armpmu->handle_irq);
++	else
++		return armpmu->handle_irq(irq, dev);
+ }
+ 
+ static void
+ armpmu_release_hardware(struct arm_pmu *armpmu)
+ {
+-	int i, irq, irqs;
+-	struct platform_device *pmu_device = armpmu->plat_device;
+-
+-	irqs = min(pmu_device->num_resources, num_possible_cpus());
+-
+-	for (i = 0; i < irqs; ++i) {
+-		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
+-			continue;
+-		irq = platform_get_irq(pmu_device, i);
+-		if (irq >= 0)
+-			free_irq(irq, armpmu);
+-	}
+-
+-	pm_runtime_put_sync(&pmu_device->dev);
++	armpmu->free_irq();
++	pm_runtime_put_sync(&armpmu->plat_device->dev);
+ }
+ 
+ static int
+ armpmu_reserve_hardware(struct arm_pmu *armpmu)
+ {
+-	struct arm_pmu_platdata *plat;
+-	irq_handler_t handle_irq;
+-	int i, err, irq, irqs;
++	int err;
+ 	struct platform_device *pmu_device = armpmu->plat_device;
+ 
+ 	if (!pmu_device)
+ 		return -ENODEV;
+ 
+-	plat = dev_get_platdata(&pmu_device->dev);
+-	if (plat && plat->handle_irq)
+-		handle_irq = armpmu_platform_irq;
+-	else
+-		handle_irq = armpmu->handle_irq;
+-
+-	irqs = min(pmu_device->num_resources, num_possible_cpus());
+-	if (irqs < 1) {
+-		pr_err("no irqs for PMUs defined\n");
+-		return -ENODEV;
+-	}
+-
+ 	pm_runtime_get_sync(&pmu_device->dev);
+-
+-	for (i = 0; i < irqs; ++i) {
+-		err = 0;
+-		irq = platform_get_irq(pmu_device, i);
+-		if (irq < 0)
+-			continue;
+-
+-		/*
+-		 * If we have a single PMU interrupt that we can't shift,
+-		 * assume that we're running on a uniprocessor machine and
+-		 * continue. Otherwise, continue without this interrupt.
+-		 */
+-		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
+-			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
+-				    irq, i);
+-			continue;
+-		}
+-
+-		err = request_irq(irq, handle_irq,
+-				  IRQF_DISABLED | IRQF_NOBALANCING,
+-				  "arm-pmu", armpmu);
+-		if (err) {
+-			pr_err("unable to request IRQ%d for ARM PMU counters\n",
+-				irq);
+-			armpmu_release_hardware(armpmu);
+-			return err;
+-		}
+-
+-		cpumask_set_cpu(i, &armpmu->active_irqs);
++	err = armpmu->request_irq(armpmu_dispatch_irq);
++	if (err) {
++		armpmu_release_hardware(armpmu);
++		return err;
+ 	}
+ 
+ 	return 0;
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index 56ddc98..8d7d8d4 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -70,6 +70,67 @@ static struct pmu_hw_events *cpu_pmu_get_cpu_events(void)
+ 	return &__get_cpu_var(cpu_hw_events);
+ }
+ 
++static void cpu_pmu_free_irq(void)
++{
++	int i, irq, irqs;
++	struct platform_device *pmu_device = cpu_pmu->plat_device;
 +
- static struct platform_driver armpmu_driver = {
- 	.driver		= {
- 		.name	= "arm-pmu",
-+		.pm	= &armpmu_dev_pm_ops,
- 		.of_match_table = armpmu_of_device_ids,
- 	},
- 	.probe		= armpmu_device_probe,
++	irqs = min(pmu_device->num_resources, num_possible_cpus());
++
++	for (i = 0; i < irqs; ++i) {
++		if (!cpumask_test_and_clear_cpu(i, &cpu_pmu->active_irqs))
++			continue;
++		irq = platform_get_irq(pmu_device, i);
++		if (irq >= 0)
++			free_irq(irq, cpu_pmu);
++	}
++}
++
++static int cpu_pmu_request_irq(irq_handler_t handler)
++{
++	int i, err, irq, irqs;
++	struct platform_device *pmu_device = cpu_pmu->plat_device;
++
++	if (!pmu_device)
++		return -ENODEV;
++
++	irqs = min(pmu_device->num_resources, num_possible_cpus());
++	if (irqs < 1) {
++		pr_err("no irqs for PMUs defined\n");
++		return -ENODEV;
++	}
++
++	for (i = 0; i < irqs; ++i) {
++		err = 0;
++		irq = platform_get_irq(pmu_device, i);
++		if (irq < 0)
++			continue;
++
++		/*
++		 * If we have a single PMU interrupt that we can't shift,
++		 * assume that we're running on a uniprocessor machine and
++		 * continue. Otherwise, continue without this interrupt.
++		 */
++		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
++			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
++				    irq, i);
++			continue;
++		}
++
++		err = request_irq(irq, handler, IRQF_NOBALANCING, "arm-pmu",
++				  cpu_pmu);
++		if (err) {
++			pr_err("unable to request IRQ%d for ARM PMU counters\n",
++				irq);
++			return err;
++		}
++
++		cpumask_set_cpu(i, &cpu_pmu->active_irqs);
++	}
++
++	return 0;
++}
++
+ static void __devinit cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	int cpu;
+@@ -79,7 +140,10 @@ static void __devinit cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ 		events->used_mask = per_cpu(used_mask, cpu);
+ 		raw_spin_lock_init(&events->pmu_lock);
+ 	}
+-	cpu_pmu->get_hw_events = cpu_pmu_get_cpu_events;
++
++	cpu_pmu->get_hw_events	= cpu_pmu_get_cpu_events;
++	cpu_pmu->request_irq	= cpu_pmu_request_irq;
++	cpu_pmu->free_irq	= cpu_pmu_free_irq;
+ 
+ 	/* Ensure the PMU has sane values out of reset. */
+ 	if (cpu_pmu && cpu_pmu->reset)
 -- 
 1.7.4.1
