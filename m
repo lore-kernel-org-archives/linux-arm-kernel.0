@@ -1,48 +1,93 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Fri, 10 Aug 2012 12:27:27 +0530
-Subject: [PATCH 05/11] ARM: exynos: exynos_pm_add_dev_to_genpd may be
- unused
-In-Reply-To: <1344437248-20560-6-git-send-email-arnd@arndb.de>
-References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
- <1344437248-20560-6-git-send-email-arnd@arndb.de>
-Message-ID: <CAJuYYwRJqpPbrn-8FfQEhsdw1Vafr4MoH0hmfTObxdY8WRiHpQ@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 10 Aug 2012 12:27:49 +0530
+Subject: [PATCH v2] gpio/omap: add *remove* callback in platform_driver
+In-Reply-To: <CAC83Zv++4CO_0xsNbwMYX_5uEv56csprqrrCjshxfb+ay2gBQg@mail.gmail.com>
+References: <1344434316-21141-1-git-send-email-tarun.kanti@ti.com>
+ <87k3x9wbrk.fsf@ti.com>
+ <CAC83ZvLKk71O=+9U16FoTUU_-ffg+iJsHPgnJx+bzbHhBDXzhQ@mail.gmail.com>
+ <87hascgli3.fsf@ti.com>
+ <CAC83Zv++4CO_0xsNbwMYX_5uEv56csprqrrCjshxfb+ay2gBQg@mail.gmail.com>
+Message-ID: <CAMQu2gxzBSXrZ5s=ZJP-A+H=1RhzFJ-7FP=jAeBdPNHStYSCbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 August 2012 20:17, Arnd Bergmann <arnd@arndb.de> wrote:
-> exynos_pm_add_dev_to_genpd is used if one or more out of a large
-> number of Kconfig symbols are enabled. However the new
-> exynos_defconfig selects none of those, so the function becomes
-> unused. Marking it so lets the compiler automatically discard
-> it.
+On Fri, Aug 10, 2012 at 11:38 AM, DebBarma, Tarun Kanti
+<tarun.kanti@ti.com> wrote:
 >
-> Without this patch, building exynos_defconfig results in:
+> On Thu, Aug 9, 2012 at 8:28 PM, Kevin Hilman <khilman@ti.com> wrote:
+> > "DebBarma, Tarun Kanti" <tarun.kanti@ti.com> writes:
+> >
+> >> On Wed, Aug 8, 2012 at 10:40 PM, Kevin Hilman <khilman@ti.com> wrote:
+> >>> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+> >>>
+> >>>> Add *remove* callback so that necessary cleanup operations are
+> >>>> performed when device is unregistered. The device is deleted
+> >>>> from the list and associated clock handle is released by
+> >>>> calling clk_put() and irq descriptor is released using the
+> >>>> irq_free_desc() api.
+> >>>>
+> >>>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> >>>> Reported-by: Paul Walmsley <paul@pwsan.com>
+> >>>> Reviewed-by: Jon Hunter <jon-hunter@ti.com>
+> >>>> Cc: Kevin Hilman <khilman@ti.com>
+> >>>> Cc: Rajendra Nayak <rnayak@ti.com>
+> >>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >>>> Cc: Cousson, Benoit <b-cousson@ti.com>
+> >>>> Cc: Paul Walmsley <paul@pwsan.com>
+> >>>> ---
+> >>>> v2:
+> >>>> Baseline:
+> >>>> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
+> >>>> Commit: 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee (Linux 3.6-rc1)
+> >>>>
+> >>>> (1) Use irq_free_descs() instead of irq_free_desc().
+> >>>>     Besides, irq_free_desc() was using wrong parameter,
+> >>>>     irq_base, instead of bank->irq.
+> >>>> (2) irq_free_descs() moved outside spin_lock/unlock_*()
+> >>>>     in order to avoid exception warnings.
+> >>>>
+> >>>> (3) pm_runtime_disable() added so that bind can happen successfully
+> >>>>
+> >>>> Test Detail:
+> >>>> Step 1: Unbind gpio.5 device in order to invoke the *remove*
+> >>>> callback.
+> >>>> #echo "omap_gpio.5" > sys/bus/platform/drivers/omap_gpio/unbind
+> >>>>
+> >>>> Step 2: Bind gpio.5 device and confirm probe() for the device
+> >>>> succeeds.
+> >>>> #echo "omap_gpio.5" > sys/bus/platform/drivers/omap_gpio/bind
+> >>>>
+> >>>> Step 3: Execute read/write GPIO test case.
+> >>>
+> >>> What happens when GPIOs are in use (requested)?
+> >> If I try to unbind a currently active GPIO bank then I see an exception
+> >> after the irq descriptor is freed by the remove. I believe this is
+> >> expected
+> >> because interrupt raised by the system would not be handled.
+> >
+> > ... and the GPIO is still configured to trigger interrupts.
+> Right!
 >
-> arch/arm/mach-exynos/pm_domains.c:118:123: warning: 'exynos_pm_add_dev_to_genpd' defined but not used [-Wunused-function]
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Thomas Abraham <thomas.abraham@linaro.org>
-> Cc: Rafael J. Wysocki <rjw@sisk.pl>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/mach-exynos/pm_domains.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-> index 373c3c0..c0bc83a 100644
-> --- a/arch/arm/mach-exynos/pm_domains.c
-> +++ b/arch/arm/mach-exynos/pm_domains.c
-> @@ -115,7 +115,7 @@ static __init int exynos_pm_dt_parse_domains(void)
->  }
->  #endif /* CONFIG_OF */
->
-> -static __init void exynos_pm_add_dev_to_genpd(struct platform_device *pdev,
-> +static __init __maybe_unused void exynos_pm_add_dev_to_genpd(struct platform_device *pdev,
->                                                 struct exynos_pm_domain *pd)
->  {
->         if (pdev->dev.bus) {
-> --
-> 1.7.10
->
+> >
+> > The point is that there is lots to cleanup/unconfigure properly for this
+> > to work properly.
+> As far as I can think of, all active gpio requests done either in
+> board files or through DT
+> have to be freed. But if this is done then when we bind() the device
+> again initialization
+> done in omap_gpio_probe() would not restore the board/DT related
+> configuration.
+> So the point is are we supposed to do all these cleanup in *remove*
+> callback?
+> If yes, how do we manage board level gpio usage?
 
-Acked-by: Thomas Abraham <thomas.abraham@linaro.org>
+More and more I think of the .remove() for GPIO, the interface not seems to
+make sense. Being an infrastructure driver which can be used by many client
+drivers like Ethernet, MMC card detect, sensors etc etc. And hence it can
+not be made a loadable module.
+
+So I am in favor of dropping the $subject patch completely unless and until
+we need it genuinely.
+
+Regards
+Santosh
