@@ -1,32 +1,18 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 10 Aug 2012 10:59:11 +0100
-Subject: [PATCH 04/10] ARM: pass -marm to gcc by default
-In-Reply-To: <alpine.LFD.2.02.1208091721460.5231@xanadu.home>
-References: <1344461278-28245-1-git-send-email-arnd@arndb.de>
- <1344461278-28245-5-git-send-email-arnd@arndb.de>
- <alpine.LFD.2.02.1208091709010.5231@xanadu.home>
- <20120809211717.GW18957@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1208091721460.5231@xanadu.home>
-Message-ID: <20120810095911.GA2157@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 10 Aug 2012 11:07:13 +0100
+Subject: [PATCH 1/2] ARM: S3C64XX: Update configuration for WM5102 module
+ on Cragganmore
+In-Reply-To: <0db901cd76b4$7daf1730$790d4590$%kim@samsung.com>
+References: <1344535549-4371-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <0db901cd76b4$7daf1730$790d4590$%kim@samsung.com>
+Message-ID: <20120810100713.GH24328@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 09, 2012 at 05:22:30PM -0400, Nicolas Pitre wrote:
-> On Thu, 9 Aug 2012, Russell King - ARM Linux wrote:
-> 
-> > On Thu, Aug 09, 2012 at 05:12:58PM -0400, Nicolas Pitre wrote:
-> > > CFLAGS_THUMB2 should probably be renamed to something more appropriate 
-> > > in this case, e.g. CFLAGS_MODE.
-> > 
-> > CFLAGS_ISA would be more relevant to it, because it's selecting the
-> > instruction set.
-> 
-> Agreed.  This particular TLA escaped my mind somehow.
+On Fri, Aug 10, 2012 at 01:56:23PM +0900, Kukjin Kim wrote:
 
-Seems fair enough.  It doesn't quite match the official architectural
-terminology, but it clear enough what it means, and less cumbersome than
-the alternatives.
+> Probably, this patch needs following?
 
-Best not to use MODE though.  That word is way too overloaded.
+> If you're ok, I will fix build error by above when I apply.
 
----Dave
+Yes, thanks.
