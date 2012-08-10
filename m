@@ -1,76 +1,31 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Fri, 10 Aug 2012 10:33:50 +0900
-Subject: [PATCH v3 0/5] usb: phy: samsung: Introducing usb phy driver for
- samsung SoCs
-In-Reply-To: <1344411661-17821-1-git-send-email-p.paneri@samsung.com>
-References: <1344411661-17821-1-git-send-email-p.paneri@samsung.com>
-Message-ID: <502464FE.3000908@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 10 Aug 2012 09:41:22 +0800
+Subject: [PATCH] efikamx: reintroduce Genesi Efika MX Smarttop via device
+ tree
+In-Reply-To: <CAKGA1bkOo=En2P18FaBpq_KAZ88kisikXhNTabvnDknQ-EwFjA@mail.gmail.com>
+References: <1344375978-29981-1-git-send-email-matt@genesi-usa.com>
+ <20120808151555.GE14718@S2101-09.ap.freescale.net>
+ <CAKGA1bkbp8_z+HSr97cp_jeCrdTHkQxuZPFu0QPWwnXphWVdZA@mail.gmail.com>
+ <CAOMZO5DOEfV4wTSNW8ABaUhGwa_KG3Bkt0o-rs8k-cZk4P-=+A@mail.gmail.com>
+ <CAKGA1bkOo=En2P18FaBpq_KAZ88kisikXhNTabvnDknQ-EwFjA@mail.gmail.com>
+Message-ID: <20120810014119.GD19617@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Praveen.
+On Thu, Aug 09, 2012 at 09:29:39AM -0500, Matt Sealey wrote:
+> The reason the new kernel depends on the new U-Boot is we're trying to
+> do all pinmux configuration in U-Boot (and we do in-house, and it
+> works). No pinctrl stuff in the kernel or device tree is required at
+> this point. The Old Kernel will remux a few things redundantly or
+> change drive strengths or whatever or add hysteresis to the UART port
+> which is not board-burning but is not really necessary, but it will
+> work. The new kernel will just be able to do what it does out of the
+> box, which is how it should be (hence why I object to adding pinctrl
+> setup...)
+> 
+Then I will have to refuse to accept your patch, because I'm working on
+a series to remove pinctrl_provide_dummies() from imx51_dt_init().
 
-On 08/08/2012 04:40 PM, Praveen Paneri wrote:
-> Changes from v2:
-> Changed the driver filenames to samsung-usbphy
-> Changed 's3c' to 'samsung' for platform device as well as platform data
-> Moved platform data structure to a separate file
-> Rectified coding style related errors
->
-> Changes from v1:
-> Rebased patches to latest usb-next branch
-> Changed the name 'sec_usbphy' to 'samsung_usbphy'
->
-> This patch set introduces a phy driver for samsung SoCs. It uses the existing
-> transceiver infrastructure to provide phy control functions. Use of this driver
-> can be extended for usb host phy as well.
-
-How can you support usb host phy? I cannot choose to use which phy when
-call init or shutdown of phy at current phy framework.
-
-Thanks.
-
-> Over the period of time all the phy
-> related code for most of the samsung SoCs can be integrated here.
-> Removing the existing phy code from mach-s3c64xx. Same can be done for other SoCs
-> when they start supporting this phy driver.
-> This driver is tested with smdk6410 and Exynos4210(with DT).
->
-> Praveen Paneri (5):
->    usb: phy: samsung: Introducing usb phy driver for hsotg
->    usb: s3c-hsotg: Adding phy driver support
->    ARM: S3C64XX: Removing old phy setup code
->    ARM: S3C64XX: Enabling samsung-usbphy driver
->    ARM: Exynos4210: Enabling samsung-usbphy driver
->
->   .../devicetree/bindings/usb/samsung-usbphy.txt     |    9 +
->   arch/arm/boot/dts/exynos4210.dtsi                  |    5 +
->   arch/arm/mach-exynos/include/mach/map.h            |    1 +
->   arch/arm/mach-exynos/mach-exynos4-dt.c             |    8 +
->   arch/arm/mach-exynos/setup-usb-phy.c               |   13 +
->   arch/arm/mach-s3c64xx/include/mach/map.h           |    2 +
->   arch/arm/mach-s3c64xx/mach-crag6410.c              |    7 +-
->   arch/arm/mach-s3c64xx/mach-smartq.c                |    8 +-
->   arch/arm/mach-s3c64xx/mach-smdk6410.c              |    7 +-
->   arch/arm/mach-s3c64xx/setup-usb-phy.c              |   79 +----
->   arch/arm/plat-samsung/devs.c                       |   33 ++
->   arch/arm/plat-samsung/include/plat/devs.h          |    1 +
->   arch/arm/plat-samsung/include/plat/usb-phy.h       |    1 +
->   drivers/usb/gadget/s3c-hsotg.c                     |   40 ++-
->   drivers/usb/phy/Kconfig                            |    8 +
->   drivers/usb/phy/Makefile                           |    1 +
->   drivers/usb/phy/samsung-usbphy.c                   |  355 ++++++++++++++++++++
->   drivers/usb/phy/samsung-usbphy.h                   |   48 +++
->   include/linux/platform_data/samsung-usbphy.h       |   27 ++
->   19 files changed, 562 insertions(+), 91 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/usb/samsung-usbphy.txt
->   create mode 100644 drivers/usb/phy/samsung-usbphy.c
->   create mode 100644 drivers/usb/phy/samsung-usbphy.h
->   create mode 100644 include/linux/platform_data/samsung-usbphy.h
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+-- 
+Regards,
+Shawn
