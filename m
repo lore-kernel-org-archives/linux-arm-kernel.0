@@ -1,309 +1,351 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 10 Aug 2012 18:36:33 +0100
-Subject: [PATCH 7/9] ARM: perf: prepare for moving CPU PMU code into separate
- file
+Date: Fri, 10 Aug 2012 18:36:30 +0100
+Subject: [PATCH 4/9] ARM: pmu: remove arm_pmu_type enumeration
 In-Reply-To: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
 References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1344620195-22372-8-git-send-email-will.deacon@arm.com>
+Message-ID: <1344620195-22372-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPU PMU code is tightly coupled with generic ARM PMU handling code.
-This makes it cumbersome when trying to add support for other ARM PMUs
-(e.g. interconnect, L2 cache controller, bus) as the generic parts of
-the code are not readily reusable.
+From: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
 
-This patch cleans up perf_event.c so that reusable code is exposed via
-header files to other potential PMU drivers. The CPU code is
-consistently named to identify it as such and also to prepare for moving
-it into a separate file.
+The arm_pmu_type enumeration was initially introduced to identify
+different PMU types in the system, the usual one being that on the CPU
+(ARM_PMU_DEVICE_CPU). With the removal of the PMU reservation code and
+the introduction of devicetree bindings for the CPU PMU, the enumeration
+is no longer required.
 
+This patch removes the enumeration and updates the various CPU PMU
+platform devices so that they no longer pass an .id field referring
+to identify the PMU type.
+
+Cc: JD Zheng <jdzheng@broadcom.com>
+Cc: Jon Hunter <jon-hunter@ti.com>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Linus Walleij <linus.walleij@stericsson.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Signed-off-by: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
+[will: cosmetic edits and actual removal of the enum type]
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/perf_event.h   |    9 ++++-
- arch/arm/include/asm/pmu.h          |   11 +++++-
- arch/arm/kernel/perf_event.c        |   69 ++++++++++++++---------------------
- arch/arm/kernel/perf_event_v6.c     |    4 +-
- arch/arm/kernel/perf_event_v7.c     |   10 +++---
- arch/arm/kernel/perf_event_xscale.c |    2 +-
- 6 files changed, 53 insertions(+), 52 deletions(-)
+ arch/arm/include/asm/pmu.h               |   10 ----------
+ arch/arm/mach-bcmring/arch.c             |    3 +--
+ arch/arm/mach-omap2/devices.c            |    3 +--
+ arch/arm/mach-pxa/devices.c              |    3 +--
+ arch/arm/mach-realview/realview_eb.c     |    3 +--
+ arch/arm/mach-realview/realview_pb1176.c |    3 +--
+ arch/arm/mach-realview/realview_pb11mp.c |    3 +--
+ arch/arm/mach-realview/realview_pba8.c   |    3 +--
+ arch/arm/mach-realview/realview_pbx.c    |    3 +--
+ arch/arm/mach-tegra/devices.c            |    3 +--
+ arch/arm/mach-ux500/cpu-db8500.c         |    3 +--
+ arch/arm/mach-vexpress/ct-ca9x4.c        |    3 +--
+ arch/arm/plat-iop/pmu.c                  |    3 +--
+ arch/arm/plat-samsung/devs.c             |    3 +--
+ 14 files changed, 13 insertions(+), 36 deletions(-)
 
-diff --git a/arch/arm/include/asm/perf_event.h b/arch/arm/include/asm/perf_event.h
-index e074948..625cd62 100644
---- a/arch/arm/include/asm/perf_event.h
-+++ b/arch/arm/include/asm/perf_event.h
-@@ -12,6 +12,13 @@
- #ifndef __ARM_PERF_EVENT_H__
- #define __ARM_PERF_EVENT_H__
- 
--/* Nothing to see here... */
-+/*
-+ * The ARMv7 CPU PMU supports up to 32 event counters.
-+ */
-+#define ARMPMU_MAX_HWEVENTS		32
-+
-+#define HW_OP_UNSUPPORTED		0xFFFF
-+#define C(_x)				PERF_COUNT_HW_CACHE_##_x
-+#define CACHE_OP_UNSUPPORTED		0xFFFF
- 
- #endif /* __ARM_PERF_EVENT_H__ */
 diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-index fbec73a..a993ad6 100644
+index 05e0401..fbec73a 100644
 --- a/arch/arm/include/asm/pmu.h
 +++ b/arch/arm/include/asm/pmu.h
-@@ -89,7 +89,9 @@ struct arm_pmu {
- 
- #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
- 
--int __init armpmu_register(struct arm_pmu *armpmu, char *name, int type);
-+extern const struct dev_pm_ops armpmu_dev_pm_ops;
-+
-+int armpmu_register(struct arm_pmu *armpmu, char *name, int type);
- 
- u64 armpmu_event_update(struct perf_event *event,
- 			struct hw_perf_event *hwc,
-@@ -99,6 +101,13 @@ int armpmu_event_set_period(struct perf_event *event,
- 			    struct hw_perf_event *hwc,
- 			    int idx);
- 
-+int armpmu_map_event(struct perf_event *event,
-+		     const unsigned (*event_map)[PERF_COUNT_HW_MAX],
-+		     const unsigned (*cache_map)[PERF_COUNT_HW_CACHE_MAX]
-+						[PERF_COUNT_HW_CACHE_OP_MAX]
-+						[PERF_COUNT_HW_CACHE_RESULT_MAX],
-+		     u32 raw_event_mask);
-+
- #endif /* CONFIG_HW_PERF_EVENTS */
- 
- #endif /* __ARM_PMU_H__ */
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 7c29914..9e3afd1 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -29,26 +29,17 @@
- #include <asm/pmu.h>
- #include <asm/stacktrace.h>
- 
--/*
-- * ARMv6 supports a maximum of 3 events, starting from index 0. If we add
-- * another platform that supports more, we need to increase this to be the
-- * largest of all platforms.
-- *
-- * ARMv7 supports up to 32 events:
-- *  cycle counter CCNT + 31 events counters CNT0..30.
-- *  Cortex-A8 has 1+4 counters, Cortex-A9 has 1+6 counters.
-- */
--#define ARMPMU_MAX_HWEVENTS		32
-+/* Set at runtime when we know what CPU type we are. */
-+static struct arm_pmu *cpu_pmu;
- 
- static DEFINE_PER_CPU(struct perf_event * [ARMPMU_MAX_HWEVENTS], hw_events);
- static DEFINE_PER_CPU(unsigned long [BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)], used_mask);
- static DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
- 
--#define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
--
--/* Set at runtime when we know what CPU type we are. */
--static struct arm_pmu *cpu_pmu;
--
-+/*
-+ * Despite the names, these two functions are CPU-specific and are used
-+ * by the OProfile/perf code.
-+ */
- const char *perf_pmu_name(void)
- {
- 	if (!cpu_pmu)
-@@ -69,13 +60,6 @@ int perf_num_counters(void)
- }
- EXPORT_SYMBOL_GPL(perf_num_counters);
- 
--#define HW_OP_UNSUPPORTED		0xFFFF
--
--#define C(_x) \
--	PERF_COUNT_HW_CACHE_##_x
--
--#define CACHE_OP_UNSUPPORTED		0xFFFF
--
- static int
- armpmu_map_cache_event(const unsigned (*cache_map)
- 				      [PERF_COUNT_HW_CACHE_MAX]
-@@ -106,7 +90,7 @@ armpmu_map_cache_event(const unsigned (*cache_map)
- }
- 
- static int
--armpmu_map_event(const unsigned (*event_map)[PERF_COUNT_HW_MAX], u64 config)
-+armpmu_map_hw_event(const unsigned (*event_map)[PERF_COUNT_HW_MAX], u64 config)
- {
- 	int mapping = (*event_map)[config];
- 	return mapping == HW_OP_UNSUPPORTED ? -ENOENT : mapping;
-@@ -118,19 +102,20 @@ armpmu_map_raw_event(u32 raw_event_mask, u64 config)
- 	return (int)(config & raw_event_mask);
- }
- 
--static int map_cpu_event(struct perf_event *event,
--			 const unsigned (*event_map)[PERF_COUNT_HW_MAX],
--			 const unsigned (*cache_map)
--					[PERF_COUNT_HW_CACHE_MAX]
--					[PERF_COUNT_HW_CACHE_OP_MAX]
--					[PERF_COUNT_HW_CACHE_RESULT_MAX],
--			 u32 raw_event_mask)
-+int
-+armpmu_map_event(struct perf_event *event,
-+		 const unsigned (*event_map)[PERF_COUNT_HW_MAX],
-+		 const unsigned (*cache_map)
-+				[PERF_COUNT_HW_CACHE_MAX]
-+				[PERF_COUNT_HW_CACHE_OP_MAX]
-+				[PERF_COUNT_HW_CACHE_RESULT_MAX],
-+		 u32 raw_event_mask)
- {
- 	u64 config = event->attr.config;
- 
- 	switch (event->attr.type) {
- 	case PERF_TYPE_HARDWARE:
--		return armpmu_map_event(event_map, config);
-+		return armpmu_map_hw_event(event_map, config);
- 	case PERF_TYPE_HW_CACHE:
- 		return armpmu_map_cache_event(cache_map, config);
- 	case PERF_TYPE_RAW:
-@@ -594,6 +579,10 @@ static int armpmu_runtime_suspend(struct device *dev)
- }
- #endif
- 
-+const struct dev_pm_ops armpmu_dev_pm_ops = {
-+	SET_RUNTIME_PM_OPS(armpmu_runtime_suspend, armpmu_runtime_resume, NULL)
-+};
-+
- static void __init armpmu_init(struct arm_pmu *armpmu)
- {
- 	atomic_set(&armpmu->active_events, 0);
-@@ -624,7 +613,7 @@ int armpmu_register(struct arm_pmu *armpmu, char *name, int type)
- #include "perf_event_v6.c"
- #include "perf_event_v7.c"
- 
--static struct pmu_hw_events *armpmu_get_cpu_events(void)
-+static struct pmu_hw_events *cpu_pmu_get_cpu_events(void)
- {
- 	return &__get_cpu_var(cpu_hw_events);
- }
-@@ -638,7 +627,7 @@ static void __devinit cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 		events->used_mask = per_cpu(used_mask, cpu);
- 		raw_spin_lock_init(&events->pmu_lock);
- 	}
--	cpu_pmu->get_hw_events = armpmu_get_cpu_events;
-+	cpu_pmu->get_hw_events = cpu_pmu_get_cpu_events;
- 
- 	/* Ensure the PMU has sane values out of reset. */
- 	if (cpu_pmu && cpu_pmu->reset)
-@@ -651,8 +640,8 @@ static void __devinit cpu_pmu_init(struct arm_pmu *cpu_pmu)
-  * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
-  * junk values out of them.
-  */
--static int __cpuinit pmu_cpu_notify(struct notifier_block *b,
--					unsigned long action, void *hcpu)
-+static int __cpuinit cpu_pmu_notify(struct notifier_block *b,
-+				    unsigned long action, void *hcpu)
- {
- 	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
- 		return NOTIFY_DONE;
-@@ -663,12 +652,8 @@ static int __cpuinit pmu_cpu_notify(struct notifier_block *b,
- 	return NOTIFY_OK;
- }
- 
--static struct notifier_block __cpuinitdata pmu_cpu_notifier = {
--	.notifier_call = pmu_cpu_notify,
--};
--
--static const struct dev_pm_ops armpmu_dev_pm_ops = {
--	SET_RUNTIME_PM_OPS(armpmu_runtime_suspend, armpmu_runtime_resume, NULL)
-+static struct notifier_block __cpuinitdata cpu_pmu_hotplug_notifier = {
-+	.notifier_call = cpu_pmu_notify,
- };
+@@ -16,15 +16,6 @@
+ #include <linux/perf_event.h>
  
  /*
-@@ -771,7 +756,7 @@ static int __devinit cpu_pmu_device_probe(struct platform_device *pdev)
+- * Types of PMUs that can be accessed directly and require mutual
+- * exclusion between profiling tools.
+- */
+-enum arm_pmu_type {
+-	ARM_PMU_DEVICE_CPU	= 0,
+-	ARM_NUM_PMU_DEVICES,
+-};
+-
+-/*
+  * struct arm_pmu_platdata - ARM PMU platform data
+  *
+  * @handle_irq: an optional handler which will be called from the
+@@ -73,7 +64,6 @@ struct pmu_hw_events {
  
- 	cpu_pmu->plat_device = pdev;
- 	cpu_pmu_init(cpu_pmu);
--	register_cpu_notifier(&pmu_cpu_notifier);
-+	register_cpu_notifier(&cpu_pmu_hotplug_notifier);
- 	armpmu_register(cpu_pmu, cpu_pmu->name, PERF_TYPE_RAW);
+ struct arm_pmu {
+ 	struct pmu	pmu;
+-	enum arm_pmu_type type;
+ 	cpumask_t	active_irqs;
+ 	char		*name;
+ 	irqreturn_t	(*handle_irq)(int irq_num, void *dev);
+diff --git a/arch/arm/mach-bcmring/arch.c b/arch/arm/mach-bcmring/arch.c
+index 45c97b1..76e7953 100644
+--- a/arch/arm/mach-bcmring/arch.c
++++ b/arch/arm/mach-bcmring/arch.c
+@@ -29,7 +29,6 @@
+ #include <asm/setup.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/time.h>
+-#include <asm/pmu.h>
  
- 	return 0;
-diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
-index a4328b1..6ccc079 100644
---- a/arch/arm/kernel/perf_event_v6.c
-+++ b/arch/arm/kernel/perf_event_v6.c
-@@ -645,7 +645,7 @@ armv6mpcore_pmu_disable_event(struct hw_perf_event *hwc,
+ #include <asm/mach/arch.h>
+ #include <mach/dma.h>
+@@ -116,7 +115,7 @@ static struct resource pmu_resource = {
  
- static int armv6_map_event(struct perf_event *event)
- {
--	return map_cpu_event(event, &armv6_perf_map,
-+	return armpmu_map_event(event, &armv6_perf_map,
- 				&armv6_perf_cache_map, 0xFF);
- }
+ static struct platform_device pmu_device = {
+ 	.name		= "arm-pmu",
+-	.id		= ARM_PMU_DEVICE_CPU,
++	.id		= -1,
+ 	.resource	= &pmu_resource,
+ 	.num_resources	= 1,
+ };
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index c00c689..02b9478 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -23,7 +23,6 @@
+ #include <mach/irqs.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/map.h>
+-#include <asm/pmu.h>
  
-@@ -679,7 +679,7 @@ static struct arm_pmu *__devinit armv6pmu_init(void)
+ #include "iomap.h"
+ #include <plat/board.h>
+@@ -448,7 +447,7 @@ static struct resource omap3_pmu_resource = {
  
- static int armv6mpcore_map_event(struct perf_event *event)
- {
--	return map_cpu_event(event, &armv6mpcore_perf_map,
-+	return armpmu_map_event(event, &armv6mpcore_perf_map,
- 				&armv6mpcore_perf_cache_map, 0xFF);
- }
+ static struct platform_device omap_pmu_device = {
+ 	.name		= "arm-pmu",
+-	.id		= ARM_PMU_DEVICE_CPU,
++	.id		= -1,
+ 	.num_resources	= 1,
+ };
  
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index d65a1b8..bd4b090 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -1204,31 +1204,31 @@ static void armv7pmu_reset(void *info)
+diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
+index 166eee5..c1f3b12 100644
+--- a/arch/arm/mach-pxa/devices.c
++++ b/arch/arm/mach-pxa/devices.c
+@@ -6,7 +6,6 @@
+ #include <linux/spi/pxa2xx_spi.h>
+ #include <linux/i2c/pxa-i2c.h>
  
- static int armv7_a8_map_event(struct perf_event *event)
- {
--	return map_cpu_event(event, &armv7_a8_perf_map,
-+	return armpmu_map_event(event, &armv7_a8_perf_map,
- 				&armv7_a8_perf_cache_map, 0xFF);
- }
+-#include <asm/pmu.h>
+ #include <mach/udc.h>
+ #include <mach/pxa3xx-u2d.h>
+ #include <mach/pxafb.h>
+@@ -42,7 +41,7 @@ static struct resource pxa_resource_pmu = {
  
- static int armv7_a9_map_event(struct perf_event *event)
- {
--	return map_cpu_event(event, &armv7_a9_perf_map,
-+	return armpmu_map_event(event, &armv7_a9_perf_map,
- 				&armv7_a9_perf_cache_map, 0xFF);
- }
+ struct platform_device pxa_device_pmu = {
+ 	.name		= "arm-pmu",
+-	.id		= ARM_PMU_DEVICE_CPU,
++	.id		= -1,
+ 	.resource	= &pxa_resource_pmu,
+ 	.num_resources	= 1,
+ };
+diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
+index baf382c..d7a6e9c 100644
+--- a/arch/arm/mach-realview/realview_eb.c
++++ b/arch/arm/mach-realview/realview_eb.c
+@@ -32,7 +32,6 @@
+ #include <asm/irq.h>
+ #include <asm/leds.h>
+ #include <asm/mach-types.h>
+-#include <asm/pmu.h>
+ #include <asm/pgtable.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -297,7 +296,7 @@ static struct resource pmu_resources[] = {
  
- static int armv7_a5_map_event(struct perf_event *event)
- {
--	return map_cpu_event(event, &armv7_a5_perf_map,
-+	return armpmu_map_event(event, &armv7_a5_perf_map,
- 				&armv7_a5_perf_cache_map, 0xFF);
- }
+ static struct platform_device pmu_device = {
+ 	.name			= "arm-pmu",
+-	.id			= ARM_PMU_DEVICE_CPU,
++	.id			= -1,
+ 	.num_resources		= ARRAY_SIZE(pmu_resources),
+ 	.resource		= pmu_resources,
+ };
+diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
+index b1d7caf..361f898 100644
+--- a/arch/arm/mach-realview/realview_pb1176.c
++++ b/arch/arm/mach-realview/realview_pb1176.c
+@@ -34,7 +34,6 @@
+ #include <asm/irq.h>
+ #include <asm/leds.h>
+ #include <asm/mach-types.h>
+-#include <asm/pmu.h>
+ #include <asm/pgtable.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -280,7 +279,7 @@ static struct resource pmu_resource = {
  
- static int armv7_a15_map_event(struct perf_event *event)
- {
--	return map_cpu_event(event, &armv7_a15_perf_map,
-+	return armpmu_map_event(event, &armv7_a15_perf_map,
- 				&armv7_a15_perf_cache_map, 0xFF);
- }
+ static struct platform_device pmu_device = {
+ 	.name			= "arm-pmu",
+-	.id			= ARM_PMU_DEVICE_CPU,
++	.id			= -1,
+ 	.num_resources		= 1,
+ 	.resource		= &pmu_resource,
+ };
+diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
+index a98c536..c56bc8d 100644
+--- a/arch/arm/mach-realview/realview_pb11mp.c
++++ b/arch/arm/mach-realview/realview_pb11mp.c
+@@ -32,7 +32,6 @@
+ #include <asm/irq.h>
+ #include <asm/leds.h>
+ #include <asm/mach-types.h>
+-#include <asm/pmu.h>
+ #include <asm/pgtable.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -263,7 +262,7 @@ static struct resource pmu_resources[] = {
  
- static int armv7_a7_map_event(struct perf_event *event)
- {
--	return map_cpu_event(event, &armv7_a7_perf_map,
-+	return armpmu_map_event(event, &armv7_a7_perf_map,
- 				&armv7_a7_perf_cache_map, 0xFF);
- }
+ static struct platform_device pmu_device = {
+ 	.name			= "arm-pmu",
+-	.id			= ARM_PMU_DEVICE_CPU,
++	.id			= -1,
+ 	.num_resources		= ARRAY_SIZE(pmu_resources),
+ 	.resource		= pmu_resources,
+ };
+diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
+index 5965017..0409375 100644
+--- a/arch/arm/mach-realview/realview_pba8.c
++++ b/arch/arm/mach-realview/realview_pba8.c
+@@ -31,7 +31,6 @@
+ #include <asm/irq.h>
+ #include <asm/leds.h>
+ #include <asm/mach-types.h>
+-#include <asm/pmu.h>
+ #include <asm/pgtable.h>
+ #include <asm/hardware/gic.h>
  
-diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
-index dcc478c..426e19f 100644
---- a/arch/arm/kernel/perf_event_xscale.c
-+++ b/arch/arm/kernel/perf_event_xscale.c
-@@ -430,7 +430,7 @@ xscale1pmu_write_counter(int counter, u32 val)
+@@ -241,7 +240,7 @@ static struct resource pmu_resource = {
  
- static int xscale_map_event(struct perf_event *event)
- {
--	return map_cpu_event(event, &xscale_perf_map,
-+	return armpmu_map_event(event, &xscale_perf_map,
- 				&xscale_perf_cache_map, 0xFF);
- }
+ static struct platform_device pmu_device = {
+ 	.name			= "arm-pmu",
+-	.id			= ARM_PMU_DEVICE_CPU,
++	.id			= -1,
+ 	.num_resources		= 1,
+ 	.resource		= &pmu_resource,
+ };
+diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
+index 3f2f605..97885dc 100644
+--- a/arch/arm/mach-realview/realview_pbx.c
++++ b/arch/arm/mach-realview/realview_pbx.c
+@@ -30,7 +30,6 @@
+ #include <asm/irq.h>
+ #include <asm/leds.h>
+ #include <asm/mach-types.h>
+-#include <asm/pmu.h>
+ #include <asm/smp_twd.h>
+ #include <asm/pgtable.h>
+ #include <asm/hardware/gic.h>
+@@ -280,7 +279,7 @@ static struct resource pmu_resources[] = {
  
+ static struct platform_device pmu_device = {
+ 	.name			= "arm-pmu",
+-	.id			= ARM_PMU_DEVICE_CPU,
++	.id			= -1,
+ 	.num_resources		= ARRAY_SIZE(pmu_resources),
+ 	.resource		= pmu_resources,
+ };
+diff --git a/arch/arm/mach-tegra/devices.c b/arch/arm/mach-tegra/devices.c
+index c70e65f..61e9603 100644
+--- a/arch/arm/mach-tegra/devices.c
++++ b/arch/arm/mach-tegra/devices.c
+@@ -23,7 +23,6 @@
+ #include <linux/fsl_devices.h>
+ #include <linux/serial_8250.h>
+ #include <linux/i2c-tegra.h>
+-#include <asm/pmu.h>
+ #include <mach/irqs.h>
+ #include <mach/iomap.h>
+ #include <mach/dma.h>
+@@ -516,7 +515,7 @@ static struct resource tegra_pmu_resources[] = {
+ 
+ struct platform_device tegra_pmu_device = {
+ 	.name		= "arm-pmu",
+-	.id		= ARM_PMU_DEVICE_CPU,
++	.id		= -1,
+ 	.num_resources	= ARRAY_SIZE(tegra_pmu_resources),
+ 	.resource	= tegra_pmu_resources,
+ };
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index db3c52d..3ee761d 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -19,7 +19,6 @@
+ #include <linux/mfd/abx500/ab8500.h>
+ 
+ #include <asm/mach/map.h>
+-#include <asm/pmu.h>
+ #include <plat/gpio-nomadik.h>
+ #include <mach/hardware.h>
+ #include <mach/setup.h>
+@@ -122,7 +121,7 @@ struct arm_pmu_platdata db8500_pmu_platdata = {
+ 
+ static struct platform_device db8500_pmu_device = {
+ 	.name			= "arm-pmu",
+-	.id			= ARM_PMU_DEVICE_CPU,
++	.id			= -1,
+ 	.num_resources		= ARRAY_SIZE(db8500_pmu_resources),
+ 	.resource		= db8500_pmu_resources,
+ 	.dev.platform_data	= &db8500_pmu_platdata,
+diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
+index 61c4924..e4073a6 100644
+--- a/arch/arm/mach-vexpress/ct-ca9x4.c
++++ b/arch/arm/mach-vexpress/ct-ca9x4.c
+@@ -13,7 +13,6 @@
+ #include <asm/hardware/arm_timer.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/hardware/gic.h>
+-#include <asm/pmu.h>
+ #include <asm/smp_scu.h>
+ #include <asm/smp_twd.h>
+ 
+@@ -144,7 +143,7 @@ static struct resource pmu_resources[] = {
+ 
+ static struct platform_device pmu_device = {
+ 	.name		= "arm-pmu",
+-	.id		= ARM_PMU_DEVICE_CPU,
++	.id		= -1,
+ 	.num_resources	= ARRAY_SIZE(pmu_resources),
+ 	.resource	= pmu_resources,
+ };
+diff --git a/arch/arm/plat-iop/pmu.c b/arch/arm/plat-iop/pmu.c
+index a2024b8..ad9f974 100644
+--- a/arch/arm/plat-iop/pmu.c
++++ b/arch/arm/plat-iop/pmu.c
+@@ -9,7 +9,6 @@
+  */
+ 
+ #include <linux/platform_device.h>
+-#include <asm/pmu.h>
+ #include <mach/irqs.h>
+ 
+ static struct resource pmu_resource = {
+@@ -26,7 +25,7 @@ static struct resource pmu_resource = {
+ 
+ static struct platform_device pmu_device = {
+ 	.name		= "arm-pmu",
+-	.id		= ARM_PMU_DEVICE_CPU,
++	.id		= -1,
+ 	.resource	= &pmu_resource,
+ 	.num_resources	= 1,
+ };
+diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+index 74e31ce..8154fab 100644
+--- a/arch/arm/plat-samsung/devs.c
++++ b/arch/arm/plat-samsung/devs.c
+@@ -33,7 +33,6 @@
+ #include <linux/platform_data/s3c-hsotg.h>
+ 
+ #include <asm/irq.h>
+-#include <asm/pmu.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/irq.h>
+@@ -1105,7 +1104,7 @@ static struct resource s5p_pmu_resource[] = {
+ 
+ static struct platform_device s5p_device_pmu = {
+ 	.name		= "arm-pmu",
+-	.id		= ARM_PMU_DEVICE_CPU,
++	.id		= -1,
+ 	.num_resources	= ARRAY_SIZE(s5p_pmu_resource),
+ 	.resource	= s5p_pmu_resource,
+ };
 -- 
 1.7.4.1
