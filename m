@@ -1,35 +1,45 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 10 Aug 2012 21:56:38 +0200
-Subject: Lockups reading from i.MX51 SSI registers
-In-Reply-To: <20120810195005.GP24328@opensource.wolfsonmicro.com>
-References: <20120810195005.GP24328@opensource.wolfsonmicro.com>
-Message-ID: <20120810195638.GF1451@pengutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sat, 11 Aug 2012 01:27:11 +0530
+Subject: [PATCH v3 0/6] omap-am33xx rtc dt support
+In-Reply-To: <cover.1343383616.git.afzal@ti.com>
+References: <cover.1343383616.git.afzal@ti.com>
+Message-ID: <50256797.3020505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2012 at 08:50:08PM +0100, Mark Brown wrote:
+On 7/27/2012 5:53 PM, Afzal Mohammed wrote:
 > Hi,
 > 
-> I'm trying to use -next to test AC'97 register I/O on an i.MX51 board
-> but I'm seeing the CPU hang during probe at:
+> This series makes rtc-omap driver DT capable, adds AM33xx
+> RTC DT support along with a few enchancments to the driver.
 > 
-> 	lreg = (reg & 0x7f) <<  12 ;
-> 	writel(lreg, base + SSI_SACADD);
+> rtc-omap driver is made intelligent enough to handle kicker
+> mechanism. This helps in removing kicker mechanism support
+> done for DaVinci at platform level.
 > 
-> in imx_ssi_ac97_read().  I'm somewhat suspicious this might be because
-> the IP block isn't clocked properly, I do notice the recent conversion
-> to the clock API which looks rather involved but it's possible something
-> else broke.  Does anyone have any bright ideas what might be going on
-> here?  The board doesn't have the reste functions defined so this is the
-> first interaction with the hardware block AFAICT.
+> This has been tested on Beaglebone (AM33xx platform) and on
+> DaVinci DA850 EVM.
+> 
+> This series is based over linux-omap master and can be
+> directly applied over linux-next, except for
+> [PATCH 6/6] arm/dts: am33xx rtc node.
+> 
+> PATCH 6/6 should go through linux-omap tree and needs
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg71644.html
+> (arm/dts: am33xx wdt node) to get applied cleanly
 
-No idea currently, just adding Uwe to Cc because I think he has seen
-something similar on an i.MX35 board recently.
+I tested patches 1-5 on AM18x EVM using rtcwake and hwclock commands.
+Also tested on DT enabled AM18x EVM using hwclock.
 
-Sascha
+For patched 1-5:
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+
+Alessandro,
+
+I assume you would want me to queue 2/6 through DaVinci tree. That patch
+depends on 1/6 being accepted and merged by you. Let me know how you
+want to move forward here.
+
+Thanks,
+Sekhar
