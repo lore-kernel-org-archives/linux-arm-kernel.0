@@ -1,58 +1,32 @@
-From: p.paneri@samsung.com (Praveen Paneri)
-Date: Fri, 10 Aug 2012 13:04:48 +0530
-Subject: [PATCH v4 0/5] usb: phy: samsung: Introducing usb phy driver for
- samsung SoCs
-In-Reply-To: <20120810070623.GL1689@arwen.pp.htv.fi>
-References: <1344582631-13658-1-git-send-email-p.paneri@samsung.com>
- <20120810070623.GL1689@arwen.pp.htv.fi>
-Message-ID: <CAD6zSYPT_K9bTP=8k-Q+5N-yAVjDx86Haay27OLuPsqz38pczA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 10 Aug 2012 07:34:46 +0000
+Subject: [PATCH 10/11] spi/s3c64xx: improve error handling
+In-Reply-To: <0de501cd76c2$ea07dfd0$be179f70$%kim@samsung.com>
+References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
+ <1344437248-20560-11-git-send-email-arnd@arndb.de>
+ <0de501cd76c2$ea07dfd0$be179f70$%kim@samsung.com>
+Message-ID: <201208100734.47339.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2012 at 12:36 PM, Felipe Balbi <balbi@ti.com> wrote:
-> On Fri, Aug 10, 2012 at 12:40:26PM +0530, Praveen Paneri wrote:
->> Changes from v3:
->> Replaced susbsys_initcall()/module_exit() by module_platform_driver().
->> Accordingly in the hsotg driver returned -EPROBE_DEFER until phy driver
->> is registered
->> Removed unnecessary devm_usb_put_phy() call from the hsotg driver remove.
->>
->> Changes from v2:
->> Changed the driver filenames to samsung-usbphy
->> Changed 's3c' to 'samsung' for platform device as well as platform data
->> Moved platform data structure to a separate file
->> Rectified coding style related errors
->>
->> Changes from v1:
->> Rebased patches to latest usb-next branch
->> Changed the name 'sec_usbphy' to 'samsung_usbphy'
->>
->> This patch set introduces a phy driver for samsung SoCs. It uses the existing
->> transceiver infrastructure to provide phy control functions. Use of this driver
->> can be extended for usb host phy as well. Over the period of time all the phy
->> related code for most of the samsung SoCs can be integrated here.
->> Removing the existing phy code from mach-s3c64xx. Same can be done for other SoCs
->> when they start supporting this phy driver.
->> This driver is tested with smdk6410 and Exynos4210(with DT).
->>
->> Praveen Paneri (5):
->>   usb: phy: samsung: Introducing usb phy driver for hsotg
->>   usb: s3c-hsotg: Adding phy driver support
->>   ARM: S3C64XX: Removing old phy setup code
->>   ARM: S3C64XX: Enabling samsung-usbphy driver
->>   ARM: Exynos4210: Enabling samsung-usbphy driver
->
-> just one idea. It looks like after introducing the PHY, you converted
-> all users to create the phy device. I wonder if you should have a
-Not all
-> patch 6/6 which will remove pdata->init support from s3c_hsotg.c and
-> stick to using phy driver.
-This will make the hsotg driver unusable for others (in mach-s5pv210
-and mach-exynos) which are not supported in the phy driver as of now.
-My idea was to drop the pdata->init when the last user gets the phy
-support. Need some time for that :-)
+On Friday 10 August 2012, Kukjin Kim wrote:
 
-Praveen
->
-> --
-> balbi
+> BTW for same reason, probably, we need following fix?
+> 
+>  arch/arm/mach-tegra/tegra2_emc.c             |    4 ++--
+>  arch/c6x/kernel/setup.c                      |    2 +-
+>  arch/powerpc/kernel/ibmebus.c                |    2 +-
+>  arch/powerpc/kernel/pci_of_scan.c            |    2 +-
+>  arch/powerpc/kernel/prom.c                   |    2 +-
+>  arch/powerpc/kernel/rtas_pci.c               |    2 +-
+>  arch/powerpc/kernel/vio.c                    |    2 +-
+>  arch/powerpc/platforms/44x/warp.c            |    2 +-
+> ...
+
+Actually not. The difference is that only s3c64xx_get_slave_ctrldata
+accesses the node pointer outside of the look (after break).
+This fails when there are no child nodes at all. In the other
+cases, the only use of the node pointer is inside the loop,
+where it is guaranteed to be valid.
+
+	Arnd
