@@ -1,121 +1,86 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Aug 2012 19:06:36 -0000
-Subject: [GIT PULL 1/3] arm-soc: bug fixes for v3.6-rc2
+Date: Fri, 10 Aug 2012 19:06:48 -0000
+Subject: =?UTF-8?q?=5BGIT=20PULL=203/3=5D=20arm-soc=3A=20make=20of=5Fdevice=5Fid-=3Edata=20constant?=
 In-Reply-To: <1344625575-27560-1-git-send-email-arnd@arndb.de>
 References: <1344625575-27560-1-git-send-email-arnd@arndb.de>
-Message-ID: <1344625575-27560-2-git-send-email-arnd@arndb.de>
+Message-ID: <1344625575-27560-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
+The following changes since commit 28a33cbc24e4256c143dce96c7d93bf423229f92:
 
-  Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
+  Linux 3.5 (2012-07-21 13:58:29 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/late-warnings
 
-for you to fetch changes up to de9234306bb28fe6c8c3bb908e3f9956f5276a02:
+for you to fetch changes up to 100e8f5fda756fe71d21c0ea68d67e56f5f05167:
 
-  ARM: davinci: remove broken ntosd2_init_i2c (2012-08-10 13:14:36 +0200)
-
-----------------------------------------------------------------
-arm-soc: bug fixes for v3.6-rc2
-
-These are a bunch of bug fixes that came in after the merge window and
-one update for the MAINTAINERS file. The largest part of the fixes
-are patches that address bugs found by building all the ARM defconfig
-files. There are a lot more warnings that we have patches for, but
-the others are either still under discussion or are harmless and
-do not cause actual problems besides making the build slightly noisy.
+  Merge branch 'ofdeviceiddata' of git://git.pengutronix.de/git/ukl/linux into late/warnings (2012-07-24 16:58:51 +0200)
 
 ----------------------------------------------------------------
-Arnd Bergmann (19):
-      Merge branch 'imx/fixes-for-3.6' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
-      Merge branch 'mxs/fixes-for-3.6' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
-      Merge tag 'imx-fixes' of git://git.pengutronix.de/git/imx/linux-2.6 into fixes
-      mfd/asic3: fix asic3_mfd_probe return value
-      usb/ohci-omap: remove unused variable
-      ARM: pxa: remove irq_to_gpio from ezx-pcap driver
-      Input: eeti_ts: pass gpio value instead of IRQ
-      ARM: sa1100: include linux/io.h in hackkit leds code
-      ARM: s3c24xx: use new PWM driver
-      ARM: integrator: include <linux/export.h>
-      ARM: imx: gpmi-nand depends on mxs-dma
-      ARM: exynos: exynos_pm_add_dev_to_genpd may be unused
-      gpio: em: do not discard em_gio_irq_domain_cleanup
-      mtd/omap2: fix dmaengine_slave_config error handling
-      spi/s3c64xx: improve error handling
-      omap-rng: fix use of SIMPLE_DEV_PM_OPS
-      Merge branch 'testing/new-warnings' into fixes
-      ARM: s3c24xx: enable CONFIG_BUG for tct_hammer
-      ARM: davinci: remove broken ntosd2_init_i2c
 
-Fabio Estevam (5):
-      ARM: dts: imx27-3ds.dts: Fix serial console node
-      ARM: imx6q-sabrelite: Setup CLKO IOMUX
-      ARM: mx23: Fix registers range
-      ARM: mx28: Fix registers range
-      ARM: clk-imx31: Fix the keypad clock name
+arm-soc: make of_device_id->data constant
 
-Javier Martin (1):
-      i.MX27: Fix emma-prp and csi clocks.
+This patch series from Uwe Kleine-K?nigwas meant to go into
+the v3.6 merge window, but got lost in a small miscommunication
+between Olof and me. It gets rid of a (harmless) gcc warning
+by making the of_device_id->data pointer constant, which is
+generally considered to be a good idea.
 
-Linus Walleij (2):
-      MAINTAINERS: update entry for Linus Walleij
-      ARM: integrator: use clk_prepare_enable() for timer
+Cc: "Uwe Kleine-K?nig" <u.kleine-koenig@pengutronix.de>
+----------------------------------------------------------------
+Arnd Bergmann (7):
+      watchdog/mpc8xxx: add a const qualifier
+      powerpc/fsl_msi: drop unneeded cast to non-const pointer
+      mfd/da9052: make i2c_device_id array const
+      i2c/mpc: make data used as *of_device_id.data const
+      macintosh/mediabay: make data used as *of_device_id.data const
+      can: mpc5xxx_can: make data used as *of_device_id.data const
+      Merge branch 'ofdeviceiddata' of git://git.pengutronix.de/git/ukl/linux into late/warnings
 
 Marc Kleine-Budde (1):
-      ARM: mxs: always build ocotp
+      can: mpc5xxx_can: make data in mpc5xxx_can_probe const
 
-Marek Vasut (1):
-      ARM: mxs: Remove MMAP_MIN_ADDR setting from mxs_defconfig
+Uwe Kleine-K?nig (18):
+      spi/imx: make spi_imx_data.devtype_data member point to const data
+      spi/spi-omap2-mcspi: add a const qualifier
+      serial/imx: make imx_port.devdata member point to const data
+      serial/mpc52xx_uart: add a const qualifier
+      ARM: cache-l2x0: add a const qualifier
+      misc/atmel_tc: make atmel_tc.tcb_config member point to const data
+      gpio/gpio-omap.c: add a const qualifier
+      gpio/mpc8xxx: add a const qualifier
+      i2c/i2c-omap: add a const qualifier
+      i2c/mpc: add a const qualifier
+      dmaengine: at_hdmac: add a few const qualifiers
+      mmc/omap_hsmmc: add a const qualifier
+      macintosh/mediabay: add a const qualifier
+      powerpc/83xx: add a const qualifier
+      powerpc/fsl_msi: add a const qualifier
+      powerpc/celleb_pci: add a const qualifier
+      of: add const to struct *of_device_id.data
+      gpio/gpio-omap: make platformdata used as *of_device_id.data const
 
-Sebastian Hesselbarth (1):
-      ARM: kirkwood: fix typo in Makefile.boot
-
-Shawn Guo (3):
-      ARM: imx: enable emi_slow_gate clock for imx5
-      ARM: dts: imx53-ard: add regulators for lan9220
-      ARM: dts: imx: fix gpio interrupts property
-
-Stephen Warren (1):
-      ARM: tegra: more regulator fixes for Harmony
-
- MAINTAINERS                               |   17 ++++---
- arch/arm/boot/dts/imx23.dtsi              |   52 ++++++++++----------
- arch/arm/boot/dts/imx27-3ds.dts           |    2 +-
- arch/arm/boot/dts/imx28.dtsi              |   74 ++++++++++++++---------------
- arch/arm/boot/dts/imx51-babbage.dts       |    2 +-
- arch/arm/boot/dts/imx53-ard.dts           |   22 ++++++++-
- arch/arm/boot/dts/imx6q-sabrelite.dts     |    1 +
- arch/arm/configs/imx_v6_v7_defconfig      |    1 +
- arch/arm/configs/mxs_defconfig            |    1 -
- arch/arm/configs/tct_hammer_defconfig     |    2 +-
- arch/arm/mach-davinci/board-neuros-osd2.c |   39 ---------------
- arch/arm/mach-exynos/pm_domains.c         |    2 +-
- arch/arm/mach-imx/clk-imx27.c             |    8 ++--
- arch/arm/mach-imx/clk-imx31.c             |    2 +-
- arch/arm/mach-imx/clk-imx51-imx53.c       |    1 +
- arch/arm/mach-integrator/core.c           |    1 +
- arch/arm/mach-integrator/integrator_ap.c  |    2 +-
- arch/arm/mach-kirkwood/Makefile.boot      |    4 +-
- arch/arm/mach-mxs/Kconfig                 |    6 ---
- arch/arm/mach-mxs/Makefile                |    3 +-
- arch/arm/mach-pxa/raumfeld.c              |    2 +-
- arch/arm/mach-s3c24xx/Kconfig             |    4 +-
- arch/arm/mach-sa1100/leds-hackkit.c       |    1 +
- arch/arm/mach-tegra/board-harmony-power.c |   32 +++++++------
- arch/arm/plat-samsung/Kconfig             |    3 +-
- drivers/char/hw_random/omap-rng.c         |    2 +-
- drivers/gpio/gpio-em.c                    |    2 +-
- drivers/input/touchscreen/eeti_ts.c       |   21 ++++----
- drivers/mfd/asic3.c                       |    1 +
- drivers/mfd/ezx-pcap.c                    |    2 +-
- drivers/mtd/nand/Kconfig                  |    2 +-
- drivers/mtd/nand/omap2.c                  |    7 ++-
- drivers/spi/spi-s3c64xx.c                 |    2 +-
- drivers/usb/host/ohci-omap.c              |    2 -
- include/linux/input/eeti_ts.h             |    1 +
- include/linux/mfd/ezx-pcap.h              |    1 +
- 36 files changed, 160 insertions(+), 167 deletions(-)
+ arch/arm/mm/cache-l2x0.c                 |    2 +-
+ arch/powerpc/platforms/83xx/suspend.c    |    2 +-
+ arch/powerpc/platforms/cell/celleb_pci.c |    2 +-
+ arch/powerpc/sysdev/fsl_msi.c            |    8 ++++----
+ drivers/dma/at_hdmac.c                   |    4 ++--
+ drivers/gpio/gpio-mpc8xxx.c              |    2 +-
+ drivers/gpio/gpio-omap.c                 |    8 ++++----
+ drivers/i2c/busses/i2c-mpc.c             |   12 ++++++------
+ drivers/i2c/busses/i2c-omap.c            |    3 ++-
+ drivers/macintosh/mediabay.c             |    8 ++++----
+ drivers/mfd/da9052-i2c.c                 |    4 ++--
+ drivers/mmc/host/omap_hsmmc.c            |    2 +-
+ drivers/net/can/mscan/mpc5xxx_can.c      |    6 +++---
+ drivers/spi/spi-imx.c                    |    2 +-
+ drivers/spi/spi-omap2-mcspi.c            |    2 +-
+ drivers/tty/serial/imx.c                 |    2 +-
+ drivers/tty/serial/mpc52xx_uart.c        |    2 +-
+ drivers/watchdog/mpc8xxx_wdt.c           |    2 +-
+ include/linux/atmel_tc.h                 |    2 +-
+ include/linux/mod_devicetable.h          |    2 +-
+ 20 files changed, 39 insertions(+), 38 deletions(-)
