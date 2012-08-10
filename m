@@ -1,76 +1,61 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 10 Aug 2012 17:04:44 +0200
-Subject: [PATCH] mtd: gpmi: add NAND write verify support
-In-Reply-To: <CAMiH66FAVVPLZ9hCyRcNCm1Le2JrCc+55CUw7UCtPjw+31w5gw@mail.gmail.com>
-References: <1344568737-902-1-git-send-email-b32955@freescale.com>
- <201208101325.23075.marex@denx.de>
- <CAMiH66FAVVPLZ9hCyRcNCm1Le2JrCc+55CUw7UCtPjw+31w5gw@mail.gmail.com>
-Message-ID: <201208101704.44984.marex@denx.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 10 Aug 2012 09:49:37 -0600 (MDT)
+Subject: [PATCH 1/1] ARM: OMAP2+: hwmod: Print an error message if no
+ match exists for a hwmod class
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EB375A9@DBDE01.ent.ti.com>
+References: <1344422117-20707-1-git-send-email-vaibhav.bedia@ti.com>
+ <alpine.DEB.2.00.1208080803560.5447@utopia.booyaka.com>
+ <B5906170F1614E41A8A28DE3B8D121433EB32ABA@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1208081411010.6819@utopia.booyaka.com>
+ <B5906170F1614E41A8A28DE3B8D121433EB34624@DBDE01.ent.ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EB375A9@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1208100946340.11420@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Huang Shijie,
+Hello Vaibhav
 
-> On Fri, Aug 10, 2012 at 7:25 AM, Marek Vasut <marex@denx.de> wrote:
-> > Dear Huang Shijie,
-> > 
-> >> Add NAND write verify support in gpmi-nand driver.
-> >> 
-> >> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> >> ---
-> >> 
-> >>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |   17 +++++++++++++++++
-> >>  1 files changed, 17 insertions(+), 0 deletions(-)
-> >> 
-> >> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> >> b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c index 8c0d2f0..6394483 100644
-> >> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> >> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> >> @@ -1488,6 +1488,22 @@ static int gpmi_set_geometry(struct
-> >> gpmi_nand_data *this) return gpmi_alloc_dma_buffer(this);
-> >> 
-> >>  }
-> >> 
-> >> +#define MAX_PAGESIZE 8192
-> > 
-> > Use NAND_MAX_PAGESIZE, see include/linux/mtd/nand.h .
-> > 
-> >> +static uint8_t verify_buf[MAX_PAGESIZE];
+On Fri, 10 Aug 2012, Bedia, Vaibhav wrote:
+
+> > Ok. I'll try to do some profiling using a timer to see how much time we
+> > spend over here. On AM335x there are 2 such lookups, one for the dma
+> > and one for the mcbsp. I could get this done today but will get to it
+> > tomorrow. Based on how this goes I'll try out the omap_hwmod_class list
+> > like you suggested.
 > 
-> ok, thanks.
+> I used a dmtimer clocked at 24MHz (41ns resolution) to get the time
+> spent in the lookup. There are two failed lookups that happen in AM335x
+> and following are the times taken
 > 
-> > What will happen when you have two NANDs attached to GPMI controller and
-> > they hit this place both at once? Race condition, causing this function
-> > to fail for both?
+> Run1
+> Lookup for dma - 435 cycles -> 17.835 usecs
+> Lookup for mcbsp - 83 cycles -> 3.4 usecs
 > 
-> Even there are two nand chips, there is only one gpmi controller.
-
-For now ... yes.
-
-> And the current gpmi-nand does not support two nands now.
-> does the race occur with only one nand chip?
-
-With one chip and one GPMI controller, no ... but that's no reason to introduce 
-crappy and error prone code!
-
-> > Possibly devm_kmalloc() such buffer per-controller?
-> > 
-> >> +static int gpmi_verify_buf(struct mtd_info *mtd, const uint8_t *buf,
-> >> int len) +{
-> >> +     struct nand_chip *nand = mtd->priv;
-> >> +     int ret;
-> >> +
-> >> +     ret = gpmi_ecc_read_page(mtd, nand, verify_buf, 0, 0);
-> > 
-> > mtd->chip.ecc.read_page() ?
+> Run2
+> Lookup for dma - 503 cycles -> 20.623 usecs
+> Lookup for mcbsp - 90 cycles -> 3.69 usescs
 > 
-> In actually, they are the same.
-
-They are, but if you rename the function, this is one less place to care for.
-
+> Run3
+> Lookup for dma - 375 cycles -> 15.375 usecs
+> Lookup for mcbsp - 91 cycles -> 3.731 usecs
 > 
-> Best Regards
-> Huang Shijie
+> The 2nd lookup happens immediately after the 1st one so probably
+> the difference is coming due to the data sitting in the cache?
+> 
+> The average times don't look too high to me but I guess you already
+> knew that ;)
+> 
+> If you are ok with a pr_debug() instead of a pr_err() I'll resubmit
+> the patch with this change.
 
-Best regards,
-Marek Vasut
+Well I'd much rather see a patch that maintains a list of hwmods 
+pertaining to each class.  That would solve the performance issue at 
+fairly minimal cost (especially if those lists were freed after kernel 
+init). 
+
+It sounds like the basic difference in opinion is about whether an 
+omap_hwmod_for_each_by_class() that doesn't find anything is an error 
+condition or not.  My sense is that it is not.
+
+
+- Paul
