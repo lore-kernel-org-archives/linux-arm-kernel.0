@@ -1,55 +1,36 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 10 Aug 2012 11:05:22 +0200
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Remove
- CONFIG_DEFAULT_MMAP_MIN_ADDR
-In-Reply-To: <1344017554-4120-1-git-send-email-fabio.estevam@freescale.com>
-References: <1344017554-4120-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20120810090522.GX1451@pengutronix.de>
+From: wni@nvidia.com (Wei Ni)
+Date: Fri, 10 Aug 2012 17:11:56 +0800
+Subject: How to get the irq flags from the dts file
+In-Reply-To: <20120809120530.GC8474@sirena.org.uk>
+References: <1344509006.2295.148.camel@tegra-chromium-2>
+ <201208091148.42748.arnd@arndb.de>  <20120809120530.GC8474@sirena.org.uk>
+Message-ID: <1344589916.21467.1.camel@tegra-chromium-2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2012 at 03:12:34PM -0300, Fabio Estevam wrote:
-> By default CONFIG_DEFAULT_MMAP_MIN_ADDR is 4096 and can also be changed via
-> /proc/sys/vm/mmap_min_addr if needed.
+On Thu, 2012-08-09 at 20:05 +0800, Mark Brown wrote:
+> On Thu, Aug 09, 2012 at 11:48:42AM +0000, Arnd Bergmann wrote:
+> > On Thursday 09 August 2012, Wei Ni wrote:
 > 
-> Quoting Russell King (http://marc.info/?l=linux-arm-kernel&m=134401593807820&w=2):
+> > > The wlan driver wish this flags include the IRQF_TRGGER_* information,
+> > > and it will use this flags to configure other hw settings. If it is
+> > > wrong, the wlan can't work.
 > 
-> "4096 is also fine for ARM too.  There's not much point in having
-> defconfigs change it - that would just be pure noise in the config
-> files."
-> 
-> ,so remove CONFIG_DEFAULT_MMAP_MIN_ADDR from the defconfig file.
->  
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> You can read the configuration with irqd_get_trigger_type() - see the OF
+> code in sound/soc/codecs/wm8903.c for an example.
 
-Applied, thanks
+I tried it, it worked fine. thanks for your help.
 
-Sascha
-
-> ---
->  arch/arm/configs/imx_v6_v7_defconfig |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-> index f725b96..13bcfb1 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -42,7 +42,6 @@ CONFIG_VMSPLIT_2G=y
->  CONFIG_PREEMPT_VOLUNTARY=y
->  CONFIG_AEABI=y
->  # CONFIG_OABI_COMPAT is not set
-> -CONFIG_DEFAULT_MMAP_MIN_ADDR=32768
->  CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
->  CONFIG_VFP=y
->  CONFIG_NEON=y
-> -- 
-> 1.7.1
+> > The driver should not need to know about thie flag. It gets read
+> > by irq_create_of_mapping when calling teh xlate function and
+> > gets set using irq_set_irq_type from there too.
 > 
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> That only helps the interrupt controller, it doesn't help the interrupt
+> source.  A good proportion of embedded devices have a great deal of
+> flexibility in how they signal interrupts so they need to know what mode
+> to pick.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
