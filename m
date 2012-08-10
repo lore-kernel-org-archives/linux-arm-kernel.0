@@ -1,18 +1,28 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 9 Aug 2012 23:31:06 -0700
-Subject: [PATCH 3/4] ARM: OMAP3: Switch to use the unified audio driver
- (omap-twl4030) for selected boards
-In-Reply-To: <1344419650-5389-4-git-send-email-peter.ujfalusi@ti.com>
+Date: Thu, 9 Aug 2012 23:32:10 -0700
+Subject: [PATCH 0/4] ASoC/OMAP: ASoC machine driver for simple SoC with
+ twl4030
+In-Reply-To: <20120808132741.GX16861@opensource.wolfsonmicro.com>
 References: <1344419650-5389-1-git-send-email-peter.ujfalusi@ti.com>
- <1344419650-5389-4-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20120810063105.GQ11011@atomide.com>
+ <20120808132741.GX16861@opensource.wolfsonmicro.com>
+Message-ID: <20120810063209.GR11011@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [120808 02:54]:
-> These boards have similar audio setup and they can all use the same driver
-> for audio support if it is enabled in the kernel config.
+* Mark Brown <broonie@opensource.wolfsonmicro.com> [120808 06:27]:
+> On Wed, Aug 08, 2012 at 12:54:06PM +0300, Peter Ujfalusi wrote:
+> 
+> > Changes under arch/arm/mach-omap2/ are trivial, I don't expect merge issues
+> > later. If it is OK for the maintainers I would like this to go via audio tree
+> > (with the McBSP and the twl4030-audio stack DT support).
+> 
+> This all looks OK to me, again if it gets applied via ASoC I'll put it
+> on a separate branch so if we do need to get into OMAP as well it's easy
+> to do so.
 
-After the naming changes suggested by Igor:
+I've acked the omap related patches so when the other changes
+comments are dealt with, please feel free to merge via ASoC tree.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Regards,
+
+Tony
