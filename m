@@ -1,68 +1,30 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 10 Aug 2012 13:25:22 +0200
-Subject: [PATCH] mtd: gpmi: add NAND write verify support
-In-Reply-To: <1344568737-902-1-git-send-email-b32955@freescale.com>
-References: <1344568737-902-1-git-send-email-b32955@freescale.com>
-Message-ID: <201208101325.23075.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 10 Aug 2012 11:33:08 +0000
+Subject: [PATCH 06/11] gpio: em: do not discard em_gio_irq_domain_cleanup
+In-Reply-To: <CACRpkdZnaH3RXHqif7wiA5bor4vOcBndnabG-7QNLnmUc3Oj3Q@mail.gmail.com>
+References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
+ <1344437248-20560-7-git-send-email-arnd@arndb.de>
+ <CACRpkdZnaH3RXHqif7wiA5bor4vOcBndnabG-7QNLnmUc3Oj3Q@mail.gmail.com>
+Message-ID: <201208101133.08945.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Huang Shijie,
-
-> Add NAND write verify support in gpmi-nand driver.
+On Friday 10 August 2012, Linus Walleij wrote:
+> On Wed, Aug 8, 2012 at 4:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |   17 +++++++++++++++++
->  1 files changed, 17 insertions(+), 0 deletions(-)
+> > The newly added gpio-em driver marks its em_gio_irq_domain_cleanup
+> > function as __devexit, which would lead to that function being
+> > discarded in case CONFIG_HOTPLUG is disabled. However, the function
+> > is also called by the error handling logic em_gio_probe, which
+> > would cause a jump into a NULL pointer if it was removed from the
+> > kernel or module.
 > 
-> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c index 8c0d2f0..6394483 100644
-> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> @@ -1488,6 +1488,22 @@ static int gpmi_set_geometry(struct gpmi_nand_data
-> *this) return gpmi_alloc_dma_buffer(this);
->  }
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> +#define MAX_PAGESIZE 8192
+> Will you push this through the ARM SoC tree or do you want me
+> to apply it to my GPIO tree?
 
-Use NAND_MAX_PAGESIZE, see include/linux/mtd/nand.h .
+I'm about to send out the whole series to Torvalds, so I'll just
+keep it in now.
 
-> +static uint8_t verify_buf[MAX_PAGESIZE];
-
-What will happen when you have two NANDs attached to GPMI controller and they 
-hit this place both at once? Race condition, causing this function to fail for 
-both?
-
-Possibly devm_kmalloc() such buffer per-controller?
-
-> +static int gpmi_verify_buf(struct mtd_info *mtd, const uint8_t *buf, int
-> len) +{
-> +	struct nand_chip *nand = mtd->priv;
-> +	int ret;
-> +
-> +	ret = gpmi_ecc_read_page(mtd, nand, verify_buf, 0, 0);
-
-mtd->chip.ecc.read_page() ?
-
-> +	if (ret)
-> +		return -EFAULT;
-> +	if (memcmp(buf, verify_buf, len))
-> +		return -EFAULT;
-> +	return 0;
-> +}
-> +
->  static int gpmi_pre_bbt_scan(struct gpmi_nand_data  *this)
->  {
->  	int ret;
-> @@ -1556,6 +1572,7 @@ static int __devinit gpmi_nfc_init(struct
-> gpmi_nand_data *this) chip->read_byte		= gpmi_read_byte;
->  	chip->read_buf		= gpmi_read_buf;
->  	chip->write_buf		= gpmi_write_buf;
-> +	chip->verify_buf	= gpmi_verify_buf;
->  	chip->ecc.read_page	= gpmi_ecc_read_page;
->  	chip->ecc.write_page	= gpmi_ecc_write_page;
->  	chip->ecc.read_oob	= gpmi_ecc_read_oob;
-
-Best regards,
-Marek Vasut
+	Arnd
