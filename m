@@ -1,5 +1,5 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 10 Aug 2012 22:40:05 +0800
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Fri, 10 Aug 2012 09:42:57 -0500
 Subject: [PATCH] efikamx: reintroduce Genesi Efika MX Smarttop via device
  tree
 In-Reply-To: <CAKGA1b=bcV2RKDvv=hTjfCo+uTXgcvsTPP0pM-vZYUHLMcrRvg@mail.gmail.com>
@@ -12,15 +12,78 @@ References: <1344375978-29981-1-git-send-email-matt@genesi-usa.com>
  <CAKGA1bmd-53G=59F7Nsd3Sx2eEQgvcahnt3g5zxJAGawtc-gWQ@mail.gmail.com>
  <20120810140406.GB3409@S2101-09.ap.freescale.net>
  <CAKGA1b=bcV2RKDvv=hTjfCo+uTXgcvsTPP0pM-vZYUHLMcrRvg@mail.gmail.com>
-Message-ID: <20120810144003.GC3409@S2101-09.ap.freescale.net>
+Message-ID: <CAKGA1bkBtK4iWv-0sWHXBuNYeTOpPMZE=P-JCHBNe3_uwTYftQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2012 at 09:26:36AM -0500, Matt Sealey wrote:
-> If you really think it's necessary then fine, we'll do it.
-> 
-Yes, please do.
+By the way just as an example, a board with the following could be
+configured on i.MX53 without touching any IOMUX settings at all
+besides DDR (which would get done at boot rom time through the dcd);
+
+* Keypad (KPP)
+* 24-bit Parallel display on IPU DI0
+* GPIO6&7 pins 22 through 31, GPIO4 10 through 14, and a couple others
+* Parallel camera on CSI0
+* NAND
+* Certain configurations of Ethernet
+* PATA
+* SD1 and SD2
+* ESAI audio
+* EIM bus
+* CLKIH CLKIL and CLKO clocks
+
+With discrete power (no PMIC), bitbang I2C and SPI to control whatever
+minimal peripherals you need out there, this is basically a Smarttop.
+Sure, it's not as fun as using the real SPI, I2C buses and you don't
+get a UART, but it's possible.
 
 -- 
-Regards,
-Shawn
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
+
+
+On Fri, Aug 10, 2012 at 9:26 AM, Matt Sealey <matt@genesi-usa.com> wrote:
+> On Fri, Aug 10, 2012 at 9:04 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>> On Fri, Aug 10, 2012 at 08:36:02AM -0500, Matt Sealey wrote:
+>>> Requiring it breaks the entire concept of the device tree to describe running
+>>> hardware. It is not a configuration script. pinctrl should be optional
+>>> - built in
+>>> always, but not necessary to turn a board on if it's already configured.
+>>>
+>> How would kernel know if it's already configured, correctly?
+>
+> Trust! When we release the new U-Boot, it will be already configured,
+> every pin in the schematic, every
+> pin from the old kernels (not mainline, some of that was wrong),
+> exactly the way it should be. There's
+> nothing new with the Efika MX.
+>
+> If you try and boot it on the old Efika, it just won't work reliably
+> for any peripheral U-Boot didn't
+> already configure, but for the current version you'd get MMC, PATA,
+> serial port, SPI (NOR/PMIC)
+> which is all we configure in the DT right now anyway... this is only
+> going to be an issue once we
+> get to displays and USB (I2C isn't set up in the old one).
+>
+>>> What would happen if a board were designed that only used the default ALT
+>>> settings on i.MX53 or so? You'd have to redefine every default IOMUX pad
+>>> just to get it to boot. That's intolerable.
+>>
+>> Come on, even the pad configuration are all the default?  Even if that's
+>> the case, yes, we still need to do it.  How do we know if firmware has
+>> changed the settings or not.
+>
+> TRUST...
+>
+> Maybe you can't rely on the development boards from Freescale, but we have to
+> do unit testing at every stage of operation for consumer devices. Once U-Boot
+> passes all tests, why bother re-testing the exact same configuration, now done
+> twice, in the kernel? I don't want to debug pad settings twice, and we shouldn't
+> need to.
+>
+> If you really think it's necessary then fine, we'll do it.
+>
+> --
+> Matt Sealey <matt@genesi-usa.com>
+> Product Development Analyst, Genesi USA, Inc.
