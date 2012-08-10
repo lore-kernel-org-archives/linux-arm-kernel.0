@@ -1,1070 +1,1832 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 10 Aug 2012 15:02:04 +0200
-Subject: [PATCH 07/14] arm: at91: dt: at91sam9 add serial pinctrl support
+Date: Fri, 10 Aug 2012 15:02:02 +0200
+Subject: [PATCH 05/14] ARM: at91: add pinctrl support
 In-Reply-To: <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20120810124820.GA20557@game.jcrosoft.org>
  <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1344603731-32667-7-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1344603731-32667-5-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the dbgu pinctrl config by default as we have only one possible config
-For other uart set the rxd/txd by default.
+This is also include the gpio controller as the IP share both.
+Each soc will have to describe the SoC limitation and pin configuration via
+DT.
 
-For at91sam9x5ek create soc based dts as we need to include specific soc dtsi.
+This will allow to do not need to touch the C code when adding new SoC if the
+IP version is supported.
 
 Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- arch/arm/boot/dts/at91sam9260.dtsi                 |  109 ++++++++++++++++++++
- arch/arm/boot/dts/at91sam9263.dtsi                 |   57 ++++++++++
- arch/arm/boot/dts/at91sam9g15.dtsi                 |   28 +++++
- arch/arm/boot/dts/at91sam9g15ek.dts                |   16 +++
- arch/arm/boot/dts/at91sam9g25.dtsi                 |   28 +++++
- arch/arm/boot/dts/at91sam9g25ek.dts                |   65 +++---------
- arch/arm/boot/dts/at91sam9g35.dtsi                 |   28 +++++
- arch/arm/boot/dts/at91sam9g35ek.dts                |   16 +++
- arch/arm/boot/dts/at91sam9g45.dtsi                 |   73 +++++++++++++
- arch/arm/boot/dts/at91sam9n12.dtsi                 |   83 +++++++++++++++
- arch/arm/boot/dts/at91sam9x25.dtsi                 |   28 +++++
- arch/arm/boot/dts/at91sam9x25ek.dts                |   16 +++
- arch/arm/boot/dts/at91sam9x35.dtsi                 |   28 +++++
- arch/arm/boot/dts/at91sam9x35ek.dts                |   16 +++
- arch/arm/boot/dts/at91sam9x5.dtsi                  |   93 ++++++++++++++++-
- .../dts/{at91sam9g25ek.dts => at91sam9x5ek.dtsi}   |    8 +-
- arch/arm/mach-at91/Makefile.boot                   |    4 +
- 17 files changed, 639 insertions(+), 57 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91sam9g15.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9g15ek.dts
- create mode 100644 arch/arm/boot/dts/at91sam9g25.dtsi
- rewrite arch/arm/boot/dts/at91sam9g25ek.dts (62%)
- create mode 100644 arch/arm/boot/dts/at91sam9g35.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9g35ek.dts
- create mode 100644 arch/arm/boot/dts/at91sam9x25.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9x25ek.dts
- create mode 100644 arch/arm/boot/dts/at91sam9x35.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9x35ek.dts
- rename arch/arm/boot/dts/{at91sam9g25ek.dts => at91sam9x5ek.dtsi} (75%)
+ .../bindings/pinctrl/atmel,at91-pinctrl.txt        |   84 ++
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/mach-at91/board-dt.c                      |    2 -
+ arch/arm/mach-at91/gpio.c                          |  165 +--
+ drivers/pinctrl/Kconfig                            |    9 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/pinctrl-at91.c                     | 1448 ++++++++++++++++++++
+ 7 files changed, 1548 insertions(+), 162 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+ create mode 100644 drivers/pinctrl/pinctrl-at91.c
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index 353eb53..8ee7cd3 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -112,6 +112,101 @@
- 				      >;
- 
- 				/* shared pinctrl settings */
-+				dbgu {
-+					pinctrl_dbgu: dbgu-0 {
-+						atmel,pins =
-+							<1 14 0x1 0x0	/* PB14 periph A */
-+							 1 15 0x1 0x1>;	/* PB15 periph with pullup */
-+					};
-+				};
-+
-+				uart0 {
-+					pinctrl_uart0: uart0-0 {
-+						atmel,pins =
-+							<1 4 0x1 0x0	/* PB4 periph A */
-+							 1 5 0x1 0x0>;	/* PB5 periph A */
-+					};
-+
-+					pinctrl_uart0_rts_cts: uart0_rts_cts-0 {
-+						atmel,pins =
-+							<1 26 0x1 0x0	/* PB26 periph A */
-+							 1 27 0x1 0x0>;	/* PB27 periph A */
-+					};
-+
-+					pinctrl_uart0_dtr_dsr: uart0_dtr_dsr-0 {
-+						atmel,pins =
-+							<1 24 0x1 0x0	/* PB24 periph A */
-+							 1 22 0x1 0x0>;	/* PB22 periph A */
-+					};
-+
-+					pinctrl_uart0_dcd: uart0_dcd-0 {
-+						atmel,pins =
-+							<1 23 0x1 0x0>;	/* PB23 periph A */
-+					};
-+
-+					pinctrl_uart0_ri: uart0_ri-0 {
-+						atmel,pins =
-+							<1 25 0x1 0x0>;	/* PB25 periph A */
-+					};
-+				};
-+
-+				uart1 {
-+					pinctrl_uart1: uart1-0 {
-+						atmel,pins =
-+							<2 6 0x1 0x1	/* PB6 periph A with pullup */
-+							 2 7 0x1 0x0>;	/* PB7 periph A */
-+					};
-+
-+					pinctrl_uart1_rts_cts: uart1_rts_cts-0 {
-+						atmel,pins =
-+							<1 28 0x1 0x0	/* PB28 periph A */
-+							 1 29 0x1 0x0>;	/* PB29 periph A */
-+					};
-+				};
-+
-+				uart2 {
-+					pinctrl_uart2: uart2-0 {
-+						atmel,pins =
-+							<1 8 0x1 0x1	/* PB8 periph A with pullup */
-+							 1 9 0x1 0x0>;	/* PB9 periph A */
-+					};
-+
-+					pinctrl_uart2_rts_cts: uart2_rts_cts-0 {
-+						atmel,pins =
-+							<0 4 0x1 0x0	/* PA4 periph A */
-+							 0 5 0x1 0x0>;	/* PA5 periph A */
-+					};
-+				};
-+
-+				uart3 {
-+					pinctrl_uart3: uart3-0 {
-+						atmel,pins =
-+							<2 10 0x1 0x1	/* PB10 periph A with pullup */
-+							 2 11 0x1 0x0>;	/* PB11 periph A */
-+					};
-+
-+					pinctrl_uart3_rts_cts: uart3_rts_cts-0 {
-+						atmel,pins =
-+							<3 8 0x2 0x0	/* PB8 periph B */
-+							 3 10 0x2 0x0>;	/* PB10 periph B */
-+					};
-+				};
-+
-+				uart4 {
-+					pinctrl_uart4: uart4-0 {
-+						atmel,pins =
-+							<0 31 0x2 0x1	/* PA31 periph B with pullup */
-+							 0 30 0x2 0x0>;	/* PA30 periph B */
-+					};
-+				};
-+
-+				uart5 {
-+					pinctrl_uart5: uart5-0 {
-+						atmel,pins =
-+							<2 12 0x1 0x1	/* PB12 periph A with pullup */
-+							 2 13 0x1 0x0>;	/* PB13 periph A */
-+					};
-+				};
- 
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91rm9200-gpio";
-@@ -145,6 +240,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfffff200 0x200>;
- 				interrupts = <1 4 7>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_dbgu>;
- 				status = "disabled";
- 			};
- 
-@@ -154,6 +251,8 @@
- 				interrupts = <6 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart0>;
- 				status = "disabled";
- 			};
- 
-@@ -163,6 +262,8 @@
- 				interrupts = <7 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart1>;
- 				status = "disabled";
- 			};
- 
-@@ -172,6 +273,8 @@
- 				interrupts = <8 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart2>;
- 				status = "disabled";
- 			};
- 
-@@ -181,6 +284,8 @@
- 				interrupts = <23 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart3>;
- 				status = "disabled";
- 			};
- 
-@@ -190,6 +295,8 @@
- 				interrupts = <24 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart4>;
- 				status = "disabled";
- 			};
- 
-@@ -199,6 +306,8 @@
- 				interrupts = <25 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart5>;
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index e52d5f8..2d054c2 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -105,6 +105,55 @@
- 				      >;
- 
- 				/* shared pinctrl settings */
-+				dbgu {
-+					pinctrl_dbgu: dbgu-0 {
-+						atmel,pins =
-+							<2 30 0x1 0x0	/* PC30 periph A */
-+							 2 31 0x1 0x1>;	/* PC31 periph with pullup */
-+					};
-+				};
-+
-+				uart0 {
-+					pinctrl_uart0: uart0-0 {
-+						atmel,pins =
-+							<0 26 0x1 0x1	/* PA26 periph A with pullup */
-+							 0 27 0x1 0x0>;	/* PA27 periph A */
-+					};
-+
-+					pinctrl_uart0_rts_cts: uart0_rts_cts-0 {
-+						atmel,pins =
-+							<0 28 0x1 0x0	/* PA28 periph A */
-+							 0 29 0x1 0x0>;	/* PA29 periph A */
-+					};
-+				};
-+
-+				uart1 {
-+					pinctrl_uart1: uart1-0 {
-+						atmel,pins =
-+							<3 0 0x1 0x1	/* PD0 periph A with pullup */
-+							 3 1 0x1 0x0>;	/* PD1 periph A */
-+					};
-+
-+					pinctrl_uart1_rts_cts: uart1_rts_cts-0 {
-+						atmel,pins =
-+							<3 7 0x2 0x0	/* PD7 periph B */
-+							 3 8 0x2 0x0>;	/* PD8 periph B */
-+					};
-+				};
-+
-+				uart2 {
-+					pinctrl_uart2: uart2-0 {
-+						atmel,pins =
-+							<3 2 0x1 0x1	/* PD2 periph A with pullup */
-+							 3 3 0x1 0x0>;	/* PD3 periph A */
-+					};
-+
-+					pinctrl_uart2_rts_cts: uart2_rts_cts-0 {
-+						atmel,pins =
-+							<3 5 0x2 0x0	/* PD5 periph B */
-+							 4 6 0x2 0x0>;	/* PD6 periph B */
-+					};
-+				};
- 
- 				pioA: gpio at fffff200 {
- 					compatible = "atmel,at91rm9200-gpio";
-@@ -156,6 +205,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xffffee00 0x200>;
- 				interrupts = <1 4 7>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_dbgu>;
- 				status = "disabled";
- 			};
- 
-@@ -165,6 +216,8 @@
- 				interrupts = <7 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart0>;
- 				status = "disabled";
- 			};
- 
-@@ -174,6 +227,8 @@
- 				interrupts = <8 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart1>;
- 				status = "disabled";
- 			};
- 
-@@ -183,6 +238,8 @@
- 				interrupts = <9 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart2>;
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/at91sam9g15.dtsi b/arch/arm/boot/dts/at91sam9g15.dtsi
+diff --git a/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
 new file mode 100644
-index 0000000..b0a86ab
+index 0000000..0296ef4
 --- /dev/null
-+++ b/arch/arm/boot/dts/at91sam9g15.dtsi
-@@ -0,0 +1,28 @@
-+/*
-+ * at91sam9g15.dtsi - Device Tree Include file for AT91SAM9G15 SoC
-+ *
-+ * Copyright (C) 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-+ *
-+ * Licensed under GPLv2.
-+ */
++++ b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+@@ -0,0 +1,84 @@
++* Atmel AT91 Pinmux Controller
 +
-+/include/ "at91sam9x5.dtsi"
++The AT91 Pinmux Controler, enables the IC
++to share one PAD to several functional blocks. The sharing is done by
++multiplexing the PAD input/output signals. For each PAD there are up to
++8 muxing options (called periph modes). Since different modules require
++different PAD settings (like pull up, keeper, etc) the contoller controls
++also the PAD settings parameters.
 +
-+/ {
-+	model = "Atmel AT91SAM9G15 SoC";
-+	compatible = "atmel, at91sam9g15, atmel,at91sam9x5";
++Please refer to pinctrl-bindings.txt in this directory for details of the
++common pinctrl bindings used by client devices, including the meaning of the
++phrase "pin configuration node".
 +
-+	ahb {
-+		apb {
-+			pinctrl at fffff200 {
-+				atmel,mux-mask = <
-+				      /*    A         B          C     */
-+				       0xffffffff 0xffe0399f 0x00000000  /* pioA */
-+				       0x00040000 0x00047e3f 0x00000000  /* pioB */
-+				       0xfdffffff 0x00000000 0xb83fffff  /* pioC */
-+				       0x003fffff 0x003f8000 0x00000000  /* pioD */
-+				      >;
-+			};
++Atmel AT91 pin configuration node is a node of a group of pins which can be
++used for a specific device or function. This node represents both mux and config
++of the pins in that group. The 'pins' selects the function mode(also named pin
++mode) this pin can work on and the 'config' configures various pad settings
++such as pull-up, multi drive, etc.
++
++Required properties for iomux controller:
++- compatible: "atmel,at91rm9200-pinctrl"
++- atmel,mux-mask: array of mask (periph per bank) to describe if a pin can be
++  configured in this periph mode. All the periph and bank need to be describe.
++
++Required properties for pin configuration node:
++- atmel,pins: 4 integers array, represents a group of pins mux and config
++  setting. The format is atmel,pins = <PIN_BANK PIN_BANK_NUM PERIPH CONFIG>.
++  The PERIPH 0 means gpio.
++
++Bits used for CONFIG:
++PULL_UP(1 << 0): indicate this pin need a pull up.
++MULTIDRIVE(1 << 1): indicate this pin need to be configured as multidrive.
++
++NOTE:
++Some requirements for using atmel,at91rm9200-pinctrl binding:
++1. We have pin function node defined under at91 controller node to represent
++   what pinmux functions this SoC supports.
++2. The pin configuration node intends to work on a specific function should
++   to be defined under that specific function node.
++   The function node's name should represent well about what function
++   this group of pins in this pin configuration node are working on.
++3. The driver can use the function node's name and pin configuration node's
++   name describe the pin function and group hierarchy.
++   For example, Linux Iat91 pinctrl driver takes the function node's name
++   as the function name and pin configuration node's name as group name to
++   create the map table.
++4. Each pin configuration node should have a phandle, devices can set pins
++   configurations by referring to the phandle of that pin configuration node.
++5. The gpio controller must be describe in the pinctrl simple-bus.
++
++Examples:
++
++pinctrl@fffff400 {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges;
++	compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
++	reg = <0xfffff400 0x600>;
++
++	atmel,mux-mask = <
++	      /*    A         B     */
++	       0xffffffff 0xffc00c3b  /* pioA */
++	       0xffffffff 0x7fff3ccf  /* pioB */
++	       0xffffffff 0x007fffff  /* pioC */
++	      >;
++
++	/* shared pinctrl settings */
++	dbgu {
++		pinctrl_dbgu: dbgu-0 {
++			atmel,pins =
++				<1 14 0x1 0x0	/* PB14 periph A */
++				 1 15 0x1 0x1>;	/* PB15 periph with pullup */
 +		};
 +	};
 +};
-diff --git a/arch/arm/boot/dts/at91sam9g15ek.dts b/arch/arm/boot/dts/at91sam9g15ek.dts
-new file mode 100644
-index 0000000..86dd3f6
---- /dev/null
-+++ b/arch/arm/boot/dts/at91sam9g15ek.dts
-@@ -0,0 +1,16 @@
-+/*
-+ * at91sam9g15ek.dts - Device Tree file for AT91SAM9G15-EK board
-+ *
-+ *  Copyright (C) 2012 Atmel,
-+ *                2012 Nicolas Ferre <nicolas.ferre@atmel.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+/dts-v1/;
-+/include/ "at91sam9g15.dtsi"
-+/include/ "at91sam9x5ek.dtsi"
 +
-+/ {
-+	model = "Atmel AT91SAM9G25-EK";
-+	compatible = "atmel,at91sam9g15ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
++dbgu: serial at fffff200 {
++	compatible = "atmel,at91sam9260-usart";
++	reg = <0xfffff200 0x200>;
++	interrupts = <1 4 7>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_dbgu>;
++	status = "disabled";
 +};
-diff --git a/arch/arm/boot/dts/at91sam9g25.dtsi b/arch/arm/boot/dts/at91sam9g25.dtsi
-new file mode 100644
-index 0000000..5886ac2
---- /dev/null
-+++ b/arch/arm/boot/dts/at91sam9g25.dtsi
-@@ -0,0 +1,28 @@
-+/*
-+ * at91sam9g25.dtsi - Device Tree Include file for AT91SAM9G25 SoC
-+ *
-+ * Copyright (C) 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-+ *
-+ * Licensed under GPLv2.
-+ */
-+
-+/include/ "at91sam9x5.dtsi"
-+
-+/ {
-+	model = "Atmel AT91SAM9G25 SoC";
-+	compatible = "atmel, at91sam9g25, atmel,at91sam9x5";
-+
-+	ahb {
-+		apb {
-+			pinctrl at fffff200 {
-+				atmel,mux-mask = <
-+				      /*    A         B          C     */
-+				       0xffffffff 0xffe0399f 0xc000001c  /* pioA */
-+				       0x0007ffff 0x8000fe3f 0x00000000  /* pioB */
-+				       0x80000000 0x07c0ffff 0xb83fffff  /* pioC */
-+				       0x003fffff 0x003f8000 0x00000000  /* pioD */
-+				      >;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
-dissimilarity index 62%
-index 7829a4d..c5ab16f 100644
---- a/arch/arm/boot/dts/at91sam9g25ek.dts
-+++ b/arch/arm/boot/dts/at91sam9g25ek.dts
-@@ -1,49 +1,16 @@
--/*
-- * at91sam9g25ek.dts - Device Tree file for AT91SAM9G25-EK board
-- *
-- *  Copyright (C) 2012 Atmel,
-- *                2012 Nicolas Ferre <nicolas.ferre@atmel.com>
-- *
-- * Licensed under GPLv2 or later.
-- */
--/dts-v1/;
--/include/ "at91sam9x5.dtsi"
--/include/ "at91sam9x5cm.dtsi"
--
--/ {
--	model = "Atmel AT91SAM9G25-EK";
--	compatible = "atmel,at91sam9g25ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
--
--	chosen {
--		bootargs = "128M console=ttyS0,115200 root=/dev/mtdblock1 rw rootfstype=ubifs ubi.mtd=1 root=ubi0:rootfs";
--	};
--
--	ahb {
--		apb {
--			dbgu: serial at fffff200 {
--				status = "okay";
--			};
--
--			usart0: serial at f801c000 {
--				status = "okay";
--			};
--
--			macb0: ethernet at f802c000 {
--				phy-mode = "rmii";
--				status = "okay";
--			};
--		};
--
--		usb0: ohci at 00600000 {
--			status = "okay";
--			num-ports = <2>;
--			atmel,vbus-gpio = <&pioD 19 1
--					   &pioD 20 1
--					  >;
--		};
--
--		usb1: ehci at 00700000 {
--			status = "okay";
--		};
--	};
--};
-+/*
-+ * at91sam9g25ek.dts - Device Tree file for AT91SAM9G25-EK board
-+ *
-+ *  Copyright (C) 2012 Atmel,
-+ *                2012 Nicolas Ferre <nicolas.ferre@atmel.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+/dts-v1/;
-+/include/ "at91sam9g25.dtsi"
-+/include/ "at91sam9x5ek.dtsi"
-+
-+/ {
-+	model = "Atmel AT91SAM9G25-EK";
-+	compatible = "atmel,at91sam9g25ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
-+};
-diff --git a/arch/arm/boot/dts/at91sam9g35.dtsi b/arch/arm/boot/dts/at91sam9g35.dtsi
-new file mode 100644
-index 0000000..9cc9446
---- /dev/null
-+++ b/arch/arm/boot/dts/at91sam9g35.dtsi
-@@ -0,0 +1,28 @@
-+/*
-+ * at91sam9g35.dtsi - Device Tree Include file for AT91SAM9G35 SoC
-+ *
-+ * Copyright (C) 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-+ *
-+ * Licensed under GPLv2.
-+ */
-+
-+/include/ "at91sam9x5.dtsi"
-+
-+/ {
-+	model = "Atmel AT91SAM9rG5 SoC";
-+	compatible = "atmel, at91sam9g35, atmel,at91sam9x5";
-+
-+	ahb {
-+		apb {
-+			pinctrl at fffff200 {
-+				atmel,mux-mask = <
-+				      /*    A         B          C     */
-+				       0xffffffff 0xffe0399f 0xc000000c  /* pioA */
-+				       0x000406ff 0x00047e3f 0x00000000  /* pioB */
-+				       0xfdffffff 0x00000000 0xb83fffff  /* pioC */
-+				       0x003fffff 0x003f8000 0x00000000  /* pioD */
-+				      >;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/at91sam9g35ek.dts b/arch/arm/boot/dts/at91sam9g35ek.dts
-new file mode 100644
-index 0000000..95944bd
---- /dev/null
-+++ b/arch/arm/boot/dts/at91sam9g35ek.dts
-@@ -0,0 +1,16 @@
-+/*
-+ * at91sam9g35ek.dts - Device Tree file for AT91SAM9G35-EK board
-+ *
-+ *  Copyright (C) 2012 Atmel,
-+ *                2012 Nicolas Ferre <nicolas.ferre@atmel.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+/dts-v1/;
-+/include/ "at91sam9g35.dtsi"
-+/include/ "at91sam9x5ek.dtsi"
-+
-+/ {
-+	model = "Atmel AT91SAM9G35-EK";
-+	compatible = "atmel,at91sam9g35ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
-+};
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 0e64221..cfe197a 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -124,6 +124,69 @@
- 				      >;
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e91c7cd..178a619 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -352,6 +352,7 @@ config ARCH_AT91
+ 	select CLKDEV_LOOKUP
+ 	select IRQ_DOMAIN
+ 	select NEED_MACH_IO_H if PCCARD
++	select PINCTRL
+ 	help
+ 	  This enables support for systems based on Atmel
+ 	  AT91RM9200 and AT91SAM9* processors.
+diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
+index e8f45c4..3b6a948 100644
+--- a/arch/arm/mach-at91/board-dt.c
++++ b/arch/arm/mach-at91/board-dt.c
+@@ -30,8 +30,6 @@
+ static const struct of_device_id irq_of_match[] __initconst = {
  
- 				/* shared pinctrl settings */
-+				dbgu {
-+					pinctrl_dbgu: dbgu-0 {
-+						atmel,pins =
-+							<1 12 0x1 0x0	/* PB12 periph A */
-+							 1 13 0x1 0x0>;	/* PB13 periph A */
-+					};
-+				};
-+
-+				uart0 {
-+					pinctrl_uart0: uart0-0 {
-+						atmel,pins =
-+							<1 19 0x1 0x1	/* PB19 periph A with pullup */
-+							 1 18 0x1 0x0>;	/* PB18 periph A */
-+					};
-+
-+					pinctrl_uart0_rts_cts: uart0_rts_cts-0 {
-+						atmel,pins =
-+							<1 17 0x2 0x0	/* PB17 periph B */
-+							 1 15 0x2 0x0>;	/* PB15 periph B */
-+					};
-+				};
-+
-+				uart1 {
-+					pinctrl_uart1: uart1-0 {
-+						atmel,pins =
-+							<1 4 0x1 0x1	/* PB4 periph A with pullup */
-+							 1 5 0x1 0x0>;	/* PB5 periph A */
-+					};
-+
-+					pinctrl_uart1_rts_cts: uart1_rts_cts-0 {
-+						atmel,pins =
-+							<3 16 0x1 0x0	/* PD16 periph A */
-+							 3 17 0x1 0x0>;	/* PD17 periph A */
-+					};
-+				};
-+
-+				uart2 {
-+					pinctrl_uart2: uart2-0 {
-+						atmel,pins =
-+							<1 6 0x1 0x1	/* PB6 periph A with pullup */
-+							 1 7 0x1 0x0>;	/* PB7 periph A */
-+					};
-+
-+					pinctrl_uart2_rts_cts: uart2_rts_cts-0 {
-+						atmel,pins =
-+							<2 9 0x2 0x0	/* PC9 periph B */
-+							 2 11 0x2 0x0>;	/* PC11 periph B */
-+					};
-+				};
-+
-+				uart3 {
-+					pinctrl_uart3: uart3-0 {
-+						atmel,pins =
-+							<1 8 0x1 0x1	/* PB9 periph A with pullup */
-+							 1 9 0x1 0x0>;	/* PB8 periph A */
-+					};
-+
-+					pinctrl_uart3_rts_cts: uart3_rts_cts-0 {
-+						atmel,pins =
-+							<0 23 0x2 0x0	/* PA23 periph B */
-+							 0 24 0x2 0x0>;	/* PA24 periph B */
-+					};
-+				};
+ 	{ .compatible = "atmel,at91rm9200-aic", .data = at91_aic_of_init },
+-	{ .compatible = "atmel,at91rm9200-gpio", .data = at91_gpio_of_irq_setup },
+-	{ .compatible = "atmel,at91sam9x5-gpio", .data = at91_gpio_of_irq_setup },
+ 	{ /*sentinel*/ }
+ };
  
- 				pioA: gpio at fffff200 {
- 					compatible = "atmel,at91rm9200-gpio";
-@@ -175,6 +238,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xffffee00 0x200>;
- 				interrupts = <1 4 7>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_dbgu>;
- 				status = "disabled";
- 			};
+diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+index 8b476fd..67d7fab 100644
+--- a/arch/arm/mach-at91/gpio.c
++++ b/arch/arm/mach-at91/gpio.c
+@@ -23,8 +23,6 @@
+ #include <linux/io.h>
+ #include <linux/irqdomain.h>
+ #include <linux/of_address.h>
+-#include <linux/of_irq.h>
+-#include <linux/of_gpio.h>
  
-@@ -184,6 +249,8 @@
- 				interrupts = <7 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart0>;
- 				status = "disabled";
- 			};
+ #include <asm/mach/irq.h>
  
-@@ -193,6 +260,8 @@
- 				interrupts = <8 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart1>;
- 				status = "disabled";
- 			};
- 
-@@ -202,6 +271,8 @@
- 				interrupts = <9 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart2>;
- 				status = "disabled";
- 			};
- 
-@@ -211,6 +282,8 @@
- 				interrupts = <10 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart3>;
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index ae23a03..36a6ce0 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -116,6 +116,79 @@
- 				      >;
- 
- 				/* shared pinctrl settings */
-+				dbgu {
-+					pinctrl_dbgu: dbgu-0 {
-+						atmel,pins =
-+							<0 9 0x1 0x0	/* PA9 periph A */
-+							 0 10 0x1 0x1>;	/* PA10 periph with pullup */
-+					};
-+				};
-+
-+				uart0 {
-+					pinctrl_uart0: uart0-0 {
-+						atmel,pins =
-+							<0 1 0x1 0x1	/* PA1 periph A with pullup */
-+							 0 0 0x1 0x0>;	/* PA0 periph A */
-+					};
-+
-+					pinctrl_uart0_rts_cts: uart0_rts_cts-0 {
-+						atmel,pins =
-+							<0 2 0x1 0x0	/* PA2 periph A */
-+							 0 3 0x1 0x0>;	/* PA3 periph A */
-+					};
-+				};
-+
-+				uart1 {
-+					pinctrl_uart1: uart1-0 {
-+						atmel,pins =
-+							<0 6 0x1 0x1	/* PA6 periph A with pullup */
-+							 0 5 0x1 0x0>;	/* PA5 periph A */
-+					};
-+				};
-+
-+				uart2 {
-+					pinctrl_uart2: uart2-0 {
-+						atmel,pins =
-+							<0 8 0x1 0x1	/* PA8 periph A with pullup */
-+							 0 7 0x1 0x0>;	/* PA7 periph A */
-+					};
-+
-+					pinctrl_uart2_rts_cts: uart2_rts_cts-0 {
-+						atmel,pins =
-+							<1 0 0x2 0x0	/* PB0 periph B */
-+							 1 1 0x2 0x0>;	/* PB1 periph B */
-+					};
-+				};
-+
-+				uart3 {
-+					pinctrl_uart3: uart3-0 {
-+						atmel,pins =
-+							<2 23 0x2 0x1	/* PC23 periph B with pullup */
-+							 2 22 0x2 0x0>;	/* PC22 periph B */
-+					};
-+
-+					pinctrl_uart3_rts_cts: uart3_rts_cts-0 {
-+						atmel,pins =
-+							<2 24 0x2 0x0	/* PC24 periph B */
-+							 2 25 0x2 0x0>;	/* PC25 periph B */
-+					};
-+				};
-+
-+				usart0 {
-+					pinctrl_usart0: usart0-0 {
-+						atmel,pins =
-+							<2 9 0x3 0x1	/* PC9 periph C with pullup */
-+							 2 8 0x3 0x0>;	/* PC8 periph C */
-+					};
-+				};
-+
-+				usart1 {
-+					pinctrl_usart1: usart1-0 {
-+						atmel,pins =
-+							<2 16 0x3 0x1	/* PC17 periph C with pullup */
-+							 2 17 0x3 0x0>;	/* PC16 periph C */
-+					};
-+				};
- 
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
-@@ -158,6 +231,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfffff200 0x200>;
- 				interrupts = <1 4 7>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_dbgu>;
- 				status = "disabled";
- 			};
- 
-@@ -167,6 +242,8 @@
- 				interrupts = <5 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart0>;
- 				status = "disabled";
- 			};
- 
-@@ -176,6 +253,8 @@
- 				interrupts = <6 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart1>;
- 				status = "disabled";
- 			};
- 
-@@ -185,6 +264,8 @@
- 				interrupts = <7 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart2>;
- 				status = "disabled";
- 			};
- 
-@@ -194,6 +275,8 @@
- 				interrupts = <8 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart3>;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9x25.dtsi b/arch/arm/boot/dts/at91sam9x25.dtsi
-new file mode 100644
-index 0000000..d03d734
---- /dev/null
-+++ b/arch/arm/boot/dts/at91sam9x25.dtsi
-@@ -0,0 +1,28 @@
-+/*
-+ * at91sam9x25.dtsi - Device Tree Include file for AT91SAM9X25 SoC
-+ *
-+ * Copyright (C) 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-+ *
-+ * Licensed under GPLv2.
-+ */
-+
-+/include/ "at91sam9x5.dtsi"
-+
-+/ {
-+	model = "Atmel AT91SAM9X25 SoC";
-+	compatible = "atmel, at91sam9x25, atmel,at91sam9x5";
-+
-+	ahb {
-+		apb {
-+			pinctrl at fffff200 {
-+				atmel,mux-mask = <
-+				      /*    A         B          C     */
-+				       0xffffffff 0xffe03fff 0xc000001c  /* pioA */
-+				       0x0007ffff 0x00047e3f 0x00000000  /* pioB */
-+				       0x80000000 0xfffd0000 0xb83fffff  /* pioC */
-+				       0x003fffff 0x003f8000 0x00000000  /* pioD */
-+				      >;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/at91sam9x25ek.dts b/arch/arm/boot/dts/at91sam9x25ek.dts
-new file mode 100644
-index 0000000..af907ea
---- /dev/null
-+++ b/arch/arm/boot/dts/at91sam9x25ek.dts
-@@ -0,0 +1,16 @@
-+/*
-+ * at91sam9x25ek.dts - Device Tree file for AT91SAM9X25-EK board
-+ *
-+ *  Copyright (C) 2012 Atmel,
-+ *                2012 Nicolas Ferre <nicolas.ferre@atmel.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+/dts-v1/;
-+/include/ "at91sam9x25.dtsi"
-+/include/ "at91sam9x5ek.dtsi"
-+
-+/ {
-+	model = "Atmel AT91SAM9G25-EK";
-+	compatible = "atmel,at91sam9x25ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
-+};
-diff --git a/arch/arm/boot/dts/at91sam9x35.dtsi b/arch/arm/boot/dts/at91sam9x35.dtsi
-new file mode 100644
-index 0000000..139e67e
---- /dev/null
-+++ b/arch/arm/boot/dts/at91sam9x35.dtsi
-@@ -0,0 +1,28 @@
-+/*
-+ * at91sam9x35.dtsi - Device Tree Include file for AT91SAM9X35 SoC
-+ *
-+ * Copyright (C) 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-+ *
-+ * Licensed under GPLv2.
-+ */
-+
-+/include/ "at91sam9x5.dtsi"
-+
-+/ {
-+	model = "Atmel AT91SAM9X35 SoC";
-+	compatible = "atmel, at91sam9x35, atmel,at91sam9x5";
-+
-+	ahb {
-+		apb {
-+			pinctrl at fffff200 {
-+				atmel,mux-mask = <
-+				      /*    A         B          C     */
-+				       0xffffffff 0xffe03fff 0xc000000c  /* pioA */
-+				       0x000406ff 0x00047e3f 0x00000000  /* pioB */
-+				       0xfdffffff 0x00000000 0xb83fffff  /* pioC */
-+				       0x003fffff 0x003f8000 0x00000000  /* pioD */
-+				      >;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/at91sam9x35ek.dts b/arch/arm/boot/dts/at91sam9x35ek.dts
-new file mode 100644
-index 0000000..5ccb607
---- /dev/null
-+++ b/arch/arm/boot/dts/at91sam9x35ek.dts
-@@ -0,0 +1,16 @@
-+/*
-+ * at91sam9x35ek.dts - Device Tree file for AT91SAM9X35-EK board
-+ *
-+ *  Copyright (C) 2012 Atmel,
-+ *                2012 Nicolas Ferre <nicolas.ferre@atmel.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+/dts-v1/;
-+/include/ "at91sam9x35.dtsi"
-+/include/ "at91sam9x5ek.dtsi"
-+
-+/ {
-+	model = "Atmel AT91SAM9X35-EK";
-+	compatible = "atmel,at91sam9x35ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
-+};
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index d1df4ea..c585f04 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -118,12 +118,91 @@
- 				atmel,mux-mask = <
- 				      /*    A         B          C     */
- 				       0xffffffff 0xffe0399f 0xc000001c  /* pioA */
--				       0xffffffff 0xffc003ff 0xffc003ff  /* pioB */
--				       0xffffffff 0xffc003ff 0xffc003ff  /* pioC */
--				       0xffffffff 0xffc003ff 0xffc003ff  /* pioD */
-+				       0x0007ffff 0x8000fe3f 0x00000000  /* pioB */
-+				       0x80000000 0x07c0ffff 0xb83fffff  /* pioC */
-+				       0x003fffff 0x003f8000 0x00000000  /* pioD */
- 				      >;
- 
- 				/* shared pinctrl settings */
-+				dbgu {
-+					pinctrl_dbgu: dbgu-0 {
-+						atmel,pins =
-+							<0 9 0x1 0x0	/* PA9 periph A */
-+							 0 10 0x1 0x1>;	/* PA10 periph A with pullup */
-+					};
-+				};
-+
-+				uart0 {
-+					pinctrl_uart0: uart0-0 {
-+						atmel,pins =
-+							<0 0 0x1 0x1	/* PA0 periph A with pullup */
-+							 0 1 0x1 0x0>;	/* PA1 periph A */
-+					};
-+
-+					pinctrl_uart0_rts_cts: uart0_rts_cts-0 {
-+						atmel,pins =
-+							<0 2 0x1 0x0	/* PA2 periph A */
-+							 0 3 0x1 0x0>;	/* PA3 periph A */
-+					};
-+				};
-+
-+				uart1 {
-+					pinctrl_uart1: uart1-0 {
-+						atmel,pins =
-+							<0 5 0x1 0x1	/* PA5 periph A with pullup */
-+							 0 6 0x1 0x0>;	/* PA6 periph A */
-+					};
-+
-+					pinctrl_uart1_rts_cts: uart1_rts_cts-0 {
-+						atmel,pins =
-+							<3 27 0x3 0x0	/* PC27 periph C */
-+							 3 28 0x3 0x0>;	/* PC28 periph C */
-+					};
-+				};
-+
-+				uart2 {
-+					pinctrl_uart2: uart2-0 {
-+						atmel,pins =
-+							<0 7 0x1 0x1	/* PA7 periph A with pullup */
-+							 0 8 0x1 0x0>;	/* PA8 periph A */
-+					};
-+
-+					pinctrl_uart2_rts_cts: uart2_rts_cts-0 {
-+						atmel,pins =
-+							<0 0 0x2 0x0	/* PB0 periph B */
-+							 0 1 0x2 0x0>;	/* PB1 periph B */
-+					};
-+				};
-+
-+				uart3 {
-+					pinctrl_uart3: uart3-0 {
-+						atmel,pins =
-+							<3 23 0x2 0x1	/* PC22 periph B with pullup */
-+							 3 23 0x2 0x0>;	/* PC23 periph B */
-+					};
-+
-+					pinctrl_uart3_rts_cts: uart3_rts_cts-0 {
-+						atmel,pins =
-+							<3 24 0x2 0x0	/* PC24 periph B */
-+							 3 25 0x2 0x0>;	/* PC25 periph B */
-+					};
-+				};
-+
-+				usart0 {
-+					pinctrl_usart0: usart0-0 {
-+						atmel,pins =
-+							<3 8 0x3 0x0	/* PC8 periph C */
-+							 3 9 0x3 0x1>;	/* PC9 periph C with pullup */
-+					};
-+				};
-+
-+				usart1 {
-+					pinctrl_usart1: usart1-0 {
-+						atmel,pins =
-+							<3 16 0x3 0x0	/* PC16 periph C */
-+							 3 17 0x3 0x1>;	/* PC17 periph C with pullup */
-+					};
-+				};
- 
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
-@@ -168,6 +247,8 @@
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfffff200 0x200>;
- 				interrupts = <1 4 7>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_dbgu>;
- 				status = "disabled";
- 			};
- 
-@@ -177,6 +258,8 @@
- 				interrupts = <5 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart0>;
- 				status = "disabled";
- 			};
- 
-@@ -186,6 +269,8 @@
- 				interrupts = <6 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart1>;
- 				status = "disabled";
- 			};
- 
-@@ -195,6 +280,8 @@
- 				interrupts = <7 4 5>;
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart2>;
- 				status = "disabled";
- 			};
- 
-diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-similarity index 75%
-rename from arch/arm/boot/dts/at91sam9g25ek.dts
-rename to arch/arm/boot/dts/at91sam9x5ek.dtsi
-index 7829a4d..e5000a7 100644
---- a/arch/arm/boot/dts/at91sam9g25ek.dts
-+++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-@@ -1,18 +1,16 @@
- /*
-- * at91sam9g25ek.dts - Device Tree file for AT91SAM9G25-EK board
-+ * at91sam9x5ek.dtsi - Device Tree file for AT91SAM9x5CM Base board
-  *
-  *  Copyright (C) 2012 Atmel,
-  *                2012 Nicolas Ferre <nicolas.ferre@atmel.com>
-  *
-  * Licensed under GPLv2 or later.
+@@ -719,80 +717,6 @@ postcore_initcall(at91_gpio_debugfs_init);
   */
--/dts-v1/;
--/include/ "at91sam9x5.dtsi"
- /include/ "at91sam9x5cm.dtsi"
+ static struct lock_class_key gpio_lock_class;
  
- / {
--	model = "Atmel AT91SAM9G25-EK";
--	compatible = "atmel,at91sam9g25ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
-+	model = "Atmel AT91SAM9X5-EK";
-+	compatible = "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
+-#if defined(CONFIG_OF)
+-static int at91_gpio_irq_map(struct irq_domain *h, unsigned int virq,
+-							irq_hw_number_t hw)
+-{
+-	struct at91_gpio_chip	*at91_gpio = h->host_data;
+-
+-	irq_set_lockdep_class(virq, &gpio_lock_class);
+-
+-	/*
+-	 * Can use the "simple" and not "edge" handler since it's
+-	 * shorter, and the AIC handles interrupts sanely.
+-	 */
+-	irq_set_chip_and_handler(virq, &gpio_irqchip,
+-				 handle_simple_irq);
+-	set_irq_flags(virq, IRQF_VALID);
+-	irq_set_chip_data(virq, at91_gpio);
+-
+-	return 0;
+-}
+-
+-static struct irq_domain_ops at91_gpio_ops = {
+-	.map	= at91_gpio_irq_map,
+-	.xlate	= irq_domain_xlate_twocell,
+-};
+-
+-int __init at91_gpio_of_irq_setup(struct device_node *node,
+-				     struct device_node *parent)
+-{
+-	struct at91_gpio_chip	*prev = NULL;
+-	int			alias_idx = of_alias_get_id(node, "gpio");
+-	struct at91_gpio_chip	*at91_gpio = &gpio_chip[alias_idx];
+-
+-	/* Setup proper .irq_set_type function */
+-	if (has_pio3())
+-		gpio_irqchip.irq_set_type = alt_gpio_irq_type;
+-	else
+-		gpio_irqchip.irq_set_type = gpio_irq_type;
+-
+-	/* Disable irqs of this PIO controller */
+-	__raw_writel(~0, at91_gpio->regbase + PIO_IDR);
+-
+-	/* Setup irq domain */
+-	at91_gpio->domain = irq_domain_add_linear(node, at91_gpio->chip.ngpio,
+-						&at91_gpio_ops, at91_gpio);
+-	if (!at91_gpio->domain)
+-		panic("at91_gpio.%d: couldn't allocate irq domain (DT).\n",
+-			at91_gpio->pioc_idx);
+-
+-	/* Setup chained handler */
+-	if (at91_gpio->pioc_idx)
+-		prev = &gpio_chip[at91_gpio->pioc_idx - 1];
+-
+-	/* The toplevel handler handles one bank of GPIOs, except
+-	 * on some SoC it can handles up to three...
+-	 * We only set up the handler for the first of the list.
+-	 */
+-	if (prev && prev->next == at91_gpio)
+-		return 0;
+-
+-	at91_gpio->pioc_virq = irq_create_mapping(irq_find_host(parent),
+-							at91_gpio->pioc_hwirq);
+-	irq_set_chip_data(at91_gpio->pioc_virq, at91_gpio);
+-	irq_set_chained_handler(at91_gpio->pioc_virq, gpio_irq_handler);
+-
+-	return 0;
+-}
+-#else
+-int __init at91_gpio_of_irq_setup(struct device_node *node,
+-				     struct device_node *parent)
+-{
+-	return -EINVAL;
+-}
+-#endif
+-
+ /*
+  * irqdomain initialization: pile up irqdomains on top of AIC range
+  */
+@@ -996,85 +920,6 @@ err:
+ 	return -EINVAL;
+ }
  
- 	chosen {
- 		bootargs = "128M console=ttyS0,115200 root=/dev/mtdblock1 rw rootfstype=ubifs ubi.mtd=1 root=ubi0:rootfs";
-diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
-index 30bb733..0838d30 100644
---- a/arch/arm/mach-at91/Makefile.boot
-+++ b/arch/arm/mach-at91/Makefile.boot
-@@ -35,4 +35,8 @@ dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9m10g45ek.dtb
- # sam9n12
- dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9n12ek.dtb
- # sam9x5
-+dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9g15ek.dtb
- dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9g25ek.dtb
-+dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9g35ek.dtb
-+dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9x25ek.dtb
-+dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9x35ek.dtb
+-#ifdef CONFIG_OF_GPIO
+-static void __init of_at91_gpio_init_one(struct device_node *np)
+-{
+-	int alias_idx;
+-	struct at91_gpio_chip *at91_gpio;
+-	uint32_t ngpio;
+-
+-	if (!np)
+-		return;
+-
+-	alias_idx = of_alias_get_id(np, "gpio");
+-	if (alias_idx >= MAX_GPIO_BANKS) {
+-		pr_err("at91_gpio, failed alias idx(%d) > MAX_GPIO_BANKS(%d), ignoring.\n",
+-						alias_idx, MAX_GPIO_BANKS);
+-		return;
+-	}
+-
+-	at91_gpio = &gpio_chip[alias_idx];
+-	at91_gpio->chip.base = alias_idx * MAX_NB_GPIO_PER_BANK;
+-
+-	at91_gpio->regbase = of_iomap(np, 0);
+-	if (!at91_gpio->regbase) {
+-		pr_err("at91_gpio.%d, failed to map registers, ignoring.\n",
+-								alias_idx);
+-		return;
+-	}
+-
+-	/* Get the interrupts property */
+-	if (of_property_read_u32(np, "interrupts", &at91_gpio->pioc_hwirq)) {
+-		pr_err("at91_gpio.%d, failed to get interrupts property, ignoring.\n",
+-								alias_idx);
+-		goto ioremap_err;
+-	}
+-
+-	/* Get capabilities from compatibility property */
+-	if (of_device_is_compatible(np, "atmel,at91sam9x5-gpio"))
+-		at91_gpio_caps |= AT91_GPIO_CAP_PIO3;
+-
+-	if (!of_property_read_u32(np, "gpio-nb", &ngpio)) {
+-		if (ngpio >= MAX_NB_GPIO_PER_BANK)
+-			pr_err("at91_gpio.%d, gpio-nb >= %d failback to %d\n",
+-			       alias_idx, MAX_NB_GPIO_PER_BANK, MAX_NB_GPIO_PER_BANK);
+-		else
+-			at91_gpio->chip.ngpio = ngpio;
+-	}
+-
+-	/* Setup clock */
+-	if (at91_gpio_setup_clk(alias_idx))
+-		goto ioremap_err;
+-
+-	at91_gpio->chip.of_node = np;
+-	gpio_banks = max(gpio_banks, alias_idx + 1);
+-	at91_gpio->pioc_idx = alias_idx;
+-	return;
+-
+-ioremap_err:
+-	iounmap(at91_gpio->regbase);
+-}
+-
+-static int __init of_at91_gpio_init(void)
+-{
+-	struct device_node *np = NULL;
+-
+-	/*
+-	 * This isn't ideal, but it gets things hooked up until this
+-	 * driver is converted into a platform_device
+-	 */
+-	for_each_compatible_node(np, NULL, "atmel,at91rm9200-gpio")
+-		of_at91_gpio_init_one(np);
+-
+-	return gpio_banks > 0 ? 0 : -EINVAL;
+-}
+-#else
+-static int __init of_at91_gpio_init(void)
+-{
+-	return -EINVAL;
+-}
+-#endif
+-
+ static void __init at91_gpio_init_one(int idx, u32 regbase, int pioc_hwirq)
+ {
+ 	struct at91_gpio_chip *at91_gpio = &gpio_chip[idx];
+@@ -1109,11 +954,11 @@ void __init at91_gpio_init(struct at91_gpio_bank *data, int nr_banks)
+ 
+ 	BUG_ON(nr_banks > MAX_GPIO_BANKS);
+ 
+-	if (of_at91_gpio_init() < 0) {
+-		/* No GPIO controller found in device tree */
+-		for (i = 0; i < nr_banks; i++)
+-			at91_gpio_init_one(i, data[i].regbase, data[i].id);
+-	}
++	if (of_have_populated_dt())
++		return;
++
++	for (i = 0; i < nr_banks; i++)
++		at91_gpio_init_one(i, data[i].regbase, data[i].id);
+ 
+ 	for (i = 0; i < gpio_banks; i++) {
+ 		at91_gpio = &gpio_chip[i];
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index 54e3588..953932a 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -26,6 +26,15 @@ config DEBUG_PINCTRL
+ 	help
+ 	  Say Y here to add some extra checks and diagnostics to PINCTRL calls.
+ 
++config PINCTRL_AT91
++	bool "AT91 pinctrl driver"
++	depends on OF
++	depends on ARCH_AT91
++	select PINMUX
++	select PINCONF
++	help
++	  Say Y here to enable the at91 pinctrl driver
++
+ config PINCTRL_IMX
+ 	bool
+ 	select PINMUX
+diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+index f40b1f8..d3fda00 100644
+--- a/drivers/pinctrl/Makefile
++++ b/drivers/pinctrl/Makefile
+@@ -9,6 +9,7 @@ ifeq ($(CONFIG_OF),y)
+ obj-$(CONFIG_PINCTRL)		+= devicetree.o
+ endif
+ obj-$(CONFIG_GENERIC_PINCONF)	+= pinconf-generic.o
++obj-$(CONFIG_PINCTRL_AT91)	+= pinctrl-at91.o
+ obj-$(CONFIG_PINCTRL_IMX)	+= pinctrl-imx.o
+ obj-$(CONFIG_PINCTRL_IMX51)	+= pinctrl-imx51.o
+ obj-$(CONFIG_PINCTRL_IMX53)	+= pinctrl-imx53.o
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+new file mode 100644
+index 0000000..540943b
+--- /dev/null
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -0,0 +1,1448 @@
++/*
++ * at91 pinctrl driver based on at91 pinmux core
++ *
++ * Copyright (C) 2011-2012 Jean-Christophe PLAGNIOL-VILLARD
++ * <plagnioj@jcrosoft.com>
++ *
++ * Under GPLv2 only
++ */
++
++#define DEBUG
++
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/slab.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/irqdomain.h>
++#include <linux/io.h>
++#include <linux/gpio.h>
++#include <linux/irqdomain.h>
++#include <linux/pinctrl/machine.h>
++#include <linux/pinctrl/pinconf.h>
++#include <linux/pinctrl/pinctrl.h>
++#include <linux/pinctrl/pinmux.h>
++/* Since we request GPIOs from ourself */
++#include <linux/pinctrl/consumer.h>
++
++#include <asm/mach/irq.h>
++
++#include <mach/hardware.h>
++#include <mach/at91_pio.h>
++
++#include "core.h"
++
++#define MAX_NB_GPIO_PER_BANK	32
++
++struct at91_gpio_chip {
++	struct gpio_chip	chip;
++	struct pinctrl_gpio_range range;
++	struct at91_gpio_chip	*next;		/* Bank sharing same clock */
++	int			pioc_hwirq;	/* PIO bank interrupt identifier on AIC */
++	int			pioc_virq;	/* PIO bank Linux virtual interrupt */
++	int			pioc_idx;	/* PIO bank index */
++	void __iomem		*regbase;	/* PIO bank virtual address */
++	struct clk		*clock;		/* associated clock */
++	struct irq_domain	*domain;	/* associated irq domain */
++};
++
++#define to_at91_gpio_chip(c) container_of(c, struct at91_gpio_chip, chip)
++
++static struct at91_gpio_chip *gpio_chip[MAX_GPIO_BANKS];
++
++static int gpio_banks;
++static unsigned long at91_gpio_caps;
++
++/* All PIO controllers support PIO3 features */
++#define AT91_GPIO_CAP_PIO3	(1 <<  0)
++
++#define has_pio3()	(at91_gpio_caps & AT91_GPIO_CAP_PIO3)
++
++
++#define PULL_UP		(0 << 1)
++#define MULTI_DRIVE	(1 << 1)
++
++/**
++ * struct at91_pmx_func - describes AT91 pinmux functions
++ * @name: the name of this specific function
++ * @groups: corresponding pin groups
++ * @ngroups: the number of groups
++ */
++struct at91_pmx_func {
++	const char *name;
++	const char **groups;
++	unsigned ngroups;
++};
++
++struct at91_pmx_pin {
++	uint32_t bank;
++	uint32_t pin;
++	uint32_t mux;
++	uint32_t pullup;
++	unsigned long conf;
++};
++
++/**
++ * struct at91_pin_group - describes an At91 pin group
++ * @name: the name of this specific pin group
++ * @pins: an array of discrete physical pins used in this group, taken
++ *	from the driver-local pin enumeration space
++ * @npins: the number of pins in this group array, i.e. the number of
++ *	elements in .pins so we can iterate over that array
++ */
++struct at91_pin_group {
++	const char *name;
++	struct at91_pmx_pin *pins_conf;
++	unsigned int *pins;
++	unsigned npins;
++};
++
++struct at91_pinctrl {
++	struct device *dev;
++	struct pinctrl_dev *pctl;
++
++	int nbanks;
++
++	int nmux;
++	uint32_t *mux_mask;
++
++	struct at91_pmx_func *functions;
++	int nfunctions;
++
++	struct at91_pin_group *groups;
++	int ngroups;
++
++	void (*set_A_periph)(void __iomem *pio, unsigned mask);
++	void (*set_B_periph)(void __iomem *pio, unsigned mask);
++};
++
++static const inline struct at91_pin_group *at91_pinctrl_find_group_by_name(
++				const struct at91_pinctrl *info,
++				const char *name)
++{
++	const struct at91_pin_group *grp = NULL;
++	int i;
++
++	for (i = 0; i < info->ngroups; i++) {
++		if (strcmp(info->groups[i].name, name))
++			continue;
++
++		grp = &info->groups[i];
++		dev_dbg(info->dev, "%s: %d 0:%d\n", name, grp->npins, grp->pins[0]);
++		break;
++	}
++
++	return grp;
++}
++
++static int at91_get_groups_count(struct pinctrl_dev *pctldev)
++{
++	struct at91_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
++
++	return info->ngroups;
++}
++
++static const char *at91_get_group_name(struct pinctrl_dev *pctldev,
++				       unsigned selector)
++{
++	struct at91_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
++
++	return info->groups[selector].name;
++}
++
++static int at91_get_group_pins(struct pinctrl_dev *pctldev, unsigned selector,
++			       const unsigned **pins,
++			       unsigned *npins)
++{
++	struct at91_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
++
++	if (selector >= info->ngroups)
++		return -EINVAL;
++
++	*pins = info->groups[selector].pins;
++	*npins = info->groups[selector].npins;
++
++	return 0;
++}
++
++static void at91_pin_dbg_show(struct pinctrl_dev *pctldev, struct seq_file *s,
++		   unsigned offset)
++{
++	seq_printf(s, "%s", dev_name(pctldev->dev));
++}
++
++static int at91_dt_node_to_map(struct pinctrl_dev *pctldev,
++			struct device_node *np,
++			struct pinctrl_map **map, unsigned *num_maps)
++{
++	struct at91_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
++	const struct at91_pin_group *grp;
++	struct pinctrl_map *new_map;
++	struct device_node *parent;
++	int map_num = 1;
++	int i;
++	struct at91_pmx_pin *pin;
++
++	/*
++	 * first find the group of this node and check if we need create
++	 * config maps for pins
++	 */
++	grp = at91_pinctrl_find_group_by_name(info, np->name);
++	if (!grp) {
++		dev_err(info->dev, "unable to find group for node %s\n",
++			np->name);
++		return -EINVAL;
++	}
++
++	map_num += grp->npins;
++	new_map = kmalloc(sizeof(*new_map) * map_num, GFP_KERNEL);
++	if (!new_map)
++		return -ENOMEM;
++
++	*map = new_map;
++	*num_maps = map_num;
++
++	/* create mux map */
++	parent = of_get_parent(np);
++	if (!parent) {
++		kfree(new_map);
++		return -EINVAL;
++	}
++	new_map[0].type = PIN_MAP_TYPE_MUX_GROUP;
++	new_map[0].data.mux.function = parent->name;
++	new_map[0].data.mux.group = np->name;
++	of_node_put(parent);
++
++	/* create config map */
++	new_map++;
++	for (i = 0; i < grp->npins; i++) {
++		pin = &grp->pins_conf[i];
++
++		new_map[i].type = PIN_MAP_TYPE_CONFIGS_PIN;
++		new_map[i].data.configs.group_or_pin =
++				pin_get_name(pctldev, grp->pins[i]);
++		new_map[i].data.configs.configs = &grp->pins_conf[i].conf;
++		new_map[i].data.configs.num_configs = 1;
++	}
++
++	dev_dbg(pctldev->dev, "maps: function %s group %s num %d\n",
++		(*map)->data.mux.function, (*map)->data.mux.group, map_num);
++
++	return 0;
++}
++
++static void at91_dt_free_map(struct pinctrl_dev *pctldev,
++				struct pinctrl_map *map, unsigned num_maps)
++{
++	kfree(map);
++}
++
++static struct pinctrl_ops at91_pctrl_ops = {
++	.get_groups_count = at91_get_groups_count,
++	.get_group_name = at91_get_group_name,
++	.get_group_pins = at91_get_group_pins,
++	.pin_dbg_show = at91_pin_dbg_show,
++	.dt_node_to_map = at91_dt_node_to_map,
++	.dt_free_map = at91_dt_free_map,
++
++};
++
++static void __iomem * pin_to_controller(struct at91_pinctrl *info,
++				 unsigned int bank)
++{
++	return gpio_chip[bank]->regbase;
++}
++
++static inline int pin_to_bank(unsigned pin)
++{
++	return pin /= MAX_NB_GPIO_PER_BANK;
++}
++
++static unsigned pin_to_mask(unsigned int pin)
++{
++	return 1 << pin;
++}
++
++static void at91_mux_disable_interrupt(void __iomem *pio, unsigned mask)
++{
++	__raw_writel(mask, pio + PIO_IDR);
++}
++
++static unsigned at91_mux_get_pullup(void __iomem *pio, unsigned pin)
++{
++	return (__raw_readl(pio + PIO_PUSR) >> pin) & 0x1;
++}
++
++static void at91_mux_set_pullup(void __iomem *pio, unsigned mask, unsigned on)
++{
++	__raw_writel(mask, pio + (on ? PIO_PUER : PIO_PUDR));
++}
++
++static unsigned at91_mux_get_multidrive(void __iomem *pio, unsigned pin)
++{
++	return (__raw_readl(pio + PIO_MDSR) >> pin) & 0x1;
++}
++
++static void at91_mux_set_multidrive(void __iomem *pio, unsigned mask, unsigned on)
++{
++	__raw_writel(mask, pio + (on ? PIO_MDER : PIO_MDDR));
++}
++
++static void at91_mux_pio3_set_A_periph(void __iomem *pio, unsigned mask)
++{
++
++	__raw_writel(__raw_readl(pio + PIO_ABCDSR1) & ~mask,
++						pio + PIO_ABCDSR1);
++	__raw_writel(__raw_readl(pio + PIO_ABCDSR2) & ~mask,
++						pio + PIO_ABCDSR2);
++}
++
++static void at91_mux_pio3_set_B_periph(void __iomem *pio, unsigned mask)
++{
++	__raw_writel(__raw_readl(pio + PIO_ABCDSR1) | mask,
++						pio + PIO_ABCDSR1);
++	__raw_writel(__raw_readl(pio + PIO_ABCDSR2) & ~mask,
++						pio + PIO_ABCDSR2);
++}
++
++static void at91_mux_set_A_periph(void __iomem *pio, unsigned mask)
++{
++	__raw_writel(mask, pio + PIO_ASR);
++}
++
++static void at91_mux_set_B_periph(void __iomem *pio, unsigned mask)
++{
++	__raw_writel(mask, pio + PIO_BSR);
++}
++
++static void at91_mux_set_C_periph(void __iomem *pio, unsigned mask)
++{
++	__raw_writel(__raw_readl(pio + PIO_ABCDSR1) & ~mask, pio + PIO_ABCDSR1);
++	__raw_writel(__raw_readl(pio + PIO_ABCDSR2) | mask, pio + PIO_ABCDSR2);
++}
++
++static void at91_mux_set_D_periph(void __iomem *pio, unsigned mask)
++{
++	__raw_writel(__raw_readl(pio + PIO_ABCDSR1) | mask, pio + PIO_ABCDSR1);
++	__raw_writel(__raw_readl(pio + PIO_ABCDSR2) | mask, pio + PIO_ABCDSR2);
++}
++
++static void at91_pin_dbg(const struct device *dev, const struct at91_pmx_pin *pin)
++{
++	if (pin->mux) {
++		dev_dbg(dev, "pio%c%d configured as periph%c with conf = 0x%lu\n",
++			pin->bank + 'A', pin->pin, pin->mux - 1 + 'A', pin->conf);
++	} else {
++		dev_dbg(dev, "pio%c%d configured as gpio with conf = 0x%lu\n",
++			pin->bank + 'A', pin->pin, pin->conf);
++	}
++}
++
++static int pin_check_config(struct at91_pinctrl *info, const char* name,
++			    int index, const struct at91_pmx_pin *pin)
++{
++	int mux;
++
++	/* check if it's a valid config */
++	if (pin->bank >= info->nbanks) {
++		dev_err(info->dev, "%s: pin conf %d bank_id %d >= nbanks %d\n",
++			name, index, pin->bank, info->nbanks);
++		return -EINVAL;
++	}
++
++	if (pin->pin >= 32) {
++		dev_err(info->dev, "%s: pin conf %d pin_bank_id %d >= 32\n",
++			name, index, pin->pin);
++		return -EINVAL;
++	}
++
++	if (!pin->mux)
++		return 0;
++
++	mux = pin->mux - 1;
++
++	if (mux >= info->nmux) {
++		dev_err(info->dev, "%s: pin conf %d mux_id %d >= nmux %d\n",
++			name, index, mux, info->nmux);
++		return -EINVAL;
++	}
++
++	if (!(info->mux_mask[pin->bank * info->nmux + mux] & 1 << pin->pin)) {
++		dev_err(info->dev, "%s: pin conf %d mux_id %d not supported for pio%c%d\n",
++			name, index, mux, pin->bank + 'A', pin->pin);
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static void at91_mux_gpio_disable(void __iomem *pio, unsigned mask)
++{
++	__raw_writel(mask, pio + PIO_PDR);
++}
++
++static void at91_mux_gpio_enable(void __iomem *pio, unsigned mask, unsigned input)
++{
++	__raw_writel(mask, pio + PIO_PER);
++	__raw_writel(mask, pio + (input ? PIO_ODR : PIO_OER));
++}
++
++static int at91_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
++			   unsigned group)
++{
++	struct at91_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
++	const struct at91_pmx_pin *pins_conf = info->groups[group].pins_conf;
++	const struct at91_pmx_pin *pin;
++	uint32_t npins = info->groups[group].npins;
++	int i, ret;
++	unsigned mask;
++	void __iomem *pio;
++
++	dev_dbg(info->dev, "enable function %s group %s\n",
++		info->functions[selector].name, info->groups[group].name);
++
++	/* first check that all the pins of the group are valid with a valid
++	 * paramter */
++	for (i = 0; i < npins; i++) {
++		pin = &pins_conf[i];
++		ret = pin_check_config(info, info->groups[group].name, i, pin);
++		if (ret)
++			return ret;
++	}
++
++	for (i = 0; i < npins; i++) {
++		pin = &pins_conf[i];
++		at91_pin_dbg(info->dev, pin);
++		pio = pin_to_controller(info, pin->bank);
++		mask = pin_to_mask(pin->pin);
++		at91_mux_disable_interrupt(pio, mask);
++		switch(pin->mux) {
++		case 0:
++			at91_mux_gpio_enable(pio, mask, 1);
++			break;
++		case 1:
++			info->set_A_periph(pio, mask);
++			break;
++		case 2:
++			info->set_B_periph(pio, mask);
++			break;
++		case 3:
++			at91_mux_set_C_periph(pio, mask);
++			break;
++		case 4:
++			at91_mux_set_D_periph(pio, mask);
++			break;
++		}
++		if (pin->mux)
++			at91_mux_gpio_disable(pio, mask);
++	}
++
++	return 0;
++}
++
++static void at91_pmx_disable(struct pinctrl_dev *pctldev, unsigned selector,
++			   unsigned group)
++{
++	struct at91_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
++	const struct at91_pmx_pin *pins_conf = info->groups[group].pins_conf;
++	const struct at91_pmx_pin *pin;
++	uint32_t npins = info->groups[group].npins;
++	int i;
++	unsigned mask;
++	void __iomem *pio;
++
++	for (i = 0; i < npins; i++) {
++		pin = &pins_conf[i];
++		at91_pin_dbg(info->dev, pin);
++		pio = pin_to_controller(info, pin->bank);
++		mask = pin_to_mask(pin->pin);
++		at91_mux_gpio_enable(pio, mask, 1);
++	}
++}
++
++static int at91_pmx_get_funcs_count(struct pinctrl_dev *pctldev)
++{
++	struct at91_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
++
++	return info->nfunctions;
++}
++
++static const char *at91_pmx_get_func_name(struct pinctrl_dev *pctldev,
++					  unsigned selector)
++{
++	struct at91_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
++
++	return info->functions[selector].name;
++}
++
++static int at91_pmx_get_groups(struct pinctrl_dev *pctldev, unsigned selector,
++			       const char * const **groups,
++			       unsigned * const num_groups)
++{
++	struct at91_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
++
++	*groups = info->functions[selector].groups;
++	*num_groups = info->functions[selector].ngroups;
++
++	return 0;
++}
++
++int at91_gpio_request_enable(struct pinctrl_dev *pctldev,
++			    struct pinctrl_gpio_range *range,
++			    unsigned offset)
++{
++	struct at91_pinctrl *npct = pinctrl_dev_get_drvdata(pctldev);
++	struct at91_gpio_chip *at91_chip;
++	struct gpio_chip *chip;
++	unsigned mask;
++
++	if (!range) {
++		dev_err(npct->dev, "invalid range\n");
++		return -EINVAL;
++	}
++	if (!range->gc) {
++		dev_err(npct->dev, "missing GPIO chip in range\n");
++		return -EINVAL;
++	}
++	chip = range->gc;
++	at91_chip = container_of(chip, struct at91_gpio_chip, chip);
++
++	dev_dbg(npct->dev, "enable pin %u as GPIO\n", offset);
++
++	mask = 1 << (offset - chip->base);
++
++	dev_dbg(npct->dev, "enable pin %u as PIO%c%d 0x%x\n",
++		offset, 'A' + range->id, offset - chip->base, mask);
++
++	__raw_writel(mask, at91_chip->regbase + PIO_PER);
++
++	return 0;
++}
++
++void at91_gpio_disable_free(struct pinctrl_dev *pctldev,
++			   struct pinctrl_gpio_range *range,
++			   unsigned offset)
++{
++	struct at91_pinctrl *npct = pinctrl_dev_get_drvdata(pctldev);
++
++	dev_dbg(npct->dev, "disable pin %u as GPIO\n", offset);
++	/* Set the pin to some default state, GPIO is usually default */
++}
++
++static struct pinmux_ops at91_pmx_ops = {
++	.get_functions_count = at91_pmx_get_funcs_count,
++	.get_function_name = at91_pmx_get_func_name,
++	.get_function_groups = at91_pmx_get_groups,
++	.enable = at91_pmx_enable,
++	.disable = at91_pmx_disable,
++	.gpio_request_enable = at91_gpio_request_enable,
++	.gpio_disable_free = at91_gpio_disable_free,
++};
++
++static int at91_pinconf_get(struct pinctrl_dev *pctldev,
++			     unsigned pin_id, unsigned long *config)
++{
++	struct at91_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
++	void __iomem *pio;
++	unsigned pin;
++
++	dev_dbg(info->dev, "%s:%d, pin_id=%d, config=0x%lx", __func__, __LINE__, pin_id, *config);
++	pio = pin_to_controller(info, pin_to_bank(pin_id));
++	pin = pin_id % MAX_NB_GPIO_PER_BANK;
++
++	if (at91_mux_get_multidrive(pio, pin))
++		*config |= MULTI_DRIVE;
++
++	if (at91_mux_get_pullup(pio, pin))
++		*config |= PULL_UP;
++
++	return 0;
++}
++
++static int at91_pinconf_set(struct pinctrl_dev *pctldev,
++			     unsigned pin_id, unsigned long config)
++{
++	struct at91_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
++	unsigned mask;
++	void __iomem *pio;
++
++	dev_dbg(info->dev, "%s:%d, pin_id=%d, config=0x%lx", __func__, __LINE__, pin_id, config);
++	pio = pin_to_controller(info, pin_to_bank(pin_id));
++	mask = pin_to_mask(pin_id % MAX_NB_GPIO_PER_BANK);
++
++	at91_mux_set_pullup(pio, mask, config & PULL_UP);
++	at91_mux_set_multidrive(pio, mask, config & MULTI_DRIVE);
++	return 0;
++}
++
++static void at91_pinconf_dbg_show(struct pinctrl_dev *pctldev,
++				   struct seq_file *s, unsigned pin_id)
++{
++
++}
++
++static void at91_pinconf_group_dbg_show(struct pinctrl_dev *pctldev,
++					 struct seq_file *s, unsigned group)
++{
++}
++
++struct pinconf_ops at91_pinconf_ops = {
++	.pin_config_get = at91_pinconf_get,
++	.pin_config_set = at91_pinconf_set,
++	.pin_config_dbg_show = at91_pinconf_dbg_show,
++	.pin_config_group_dbg_show = at91_pinconf_group_dbg_show,
++};
++
++static struct pinctrl_desc at91_pinctrl_desc = {
++	.pctlops = &at91_pctrl_ops,
++	.pmxops = &at91_pmx_ops,
++	.confops = &at91_pinconf_ops,
++	.owner = THIS_MODULE,
++};
++
++static const char *gpio_compat = "atmel,at91rm9200-gpio";
++
++static void __devinit at91_pinctrl_child_count(struct at91_pinctrl *info,
++					      struct device_node *np)
++{
++	struct device_node *child;
++
++	for_each_child_of_node(np, child) {
++		if (of_device_is_compatible(child, gpio_compat)) {
++			info->nbanks++;
++		} else {
++			info->nfunctions++;
++			info->ngroups += of_get_child_count(child);
++		}
++	}
++}
++
++static int __devinit at91_pinctrl_mux_mask(struct at91_pinctrl *info,
++					  struct device_node *np)
++{
++	int ret = 0;
++	int size;
++	const const __be32 *list;
++
++	list = of_get_property(np, "atmel,mux-mask", &size);
++	if (!list) {
++		dev_err(info->dev, "can not read the mux-mask of %d\n", size);
++		return -EINVAL;
++	}
++
++	size /= sizeof(*list);
++	if (!size || size % info->nbanks) {
++		dev_err(info->dev, "wrong mux mask array should be by %d\n", info->nbanks);
++		return -EINVAL;
++	}
++	info->nmux = size / info->nbanks;
++
++	info->mux_mask = devm_kzalloc(info->dev, sizeof(u32) * size, GFP_KERNEL);
++	if (!info->mux_mask) {
++		dev_err(info->dev, "could not alloc mux_mask\n");
++		return -ENOMEM;
++	}
++
++	ret = of_property_read_u32_array(np, "atmel,mux-mask",
++					  info->mux_mask, size);
++	if (ret)
++		dev_err(info->dev, "can not read the mux-mask of %d\n", size);
++	return ret;
++}
++
++static int __devinit at91_pinctrl_parse_groups(struct device_node *np,
++				struct at91_pin_group *grp,
++				struct at91_pinctrl *info,
++				u32 index)
++{
++	struct at91_pmx_pin *pin;
++	int size;
++	const const __be32 *list;
++	int i, j;
++
++	dev_dbg(info->dev, "group(%d): %s\n", index, np->name);
++
++	/* Initialise group */
++	grp->name = np->name;
++
++	/*
++	 * the binding format is fsl,pins = <bank pin mux CONFIG ...>,
++	 * do sanity check and calculate pins number
++	 */
++	list = of_get_property(np, "atmel,pins", &size);
++	/* we do not check return since it's safe node passed down */
++	size /= sizeof(*list);
++	if (!size || size % 4) {
++		dev_err(info->dev, "wrong pins number or pins and configs should be by 4\n");
++		return -EINVAL;
++	}
++
++	grp->npins = size / 4;
++	pin = grp->pins_conf = devm_kzalloc(info->dev, grp->npins * sizeof(struct at91_pmx_pin),
++				GFP_KERNEL);
++	grp->pins = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned int),
++				GFP_KERNEL);
++	if (!grp->pins_conf || !grp->pins)
++		return -ENOMEM;
++
++	for (i = 0, j = 0; i < size; i += 4, j++) {
++		pin->bank = be32_to_cpu(*list++);
++		pin->pin = be32_to_cpu(*list++);
++		grp->pins[j] = pin->bank * MAX_NB_GPIO_PER_BANK + pin->pin;
++		pin->mux = be32_to_cpu(*list++);
++		pin->conf = be32_to_cpu(*list++);
++
++		at91_pin_dbg(info->dev, pin);
++		pin++;
++	}
++
++	return 0;
++}
++
++static int __devinit at91_pinctrl_parse_functions(struct device_node *np,
++			struct at91_pinctrl *info, u32 index)
++{
++	struct device_node *child;
++	struct at91_pmx_func *func;
++	struct at91_pin_group *grp;
++	int ret;
++	static u32 grp_index;
++	u32 i = 0;
++
++	dev_dbg(info->dev, "parse function(%d): %s\n", index, np->name);
++
++	func = &info->functions[index];
++
++	/* Initialise function */
++	func->name = np->name;
++	func->ngroups = of_get_child_count(np);
++	if (func->ngroups <= 0) {
++		dev_err(info->dev, "no groups defined\n");
++		return -EINVAL;
++	}
++	func->groups = devm_kzalloc(info->dev,
++			func->ngroups * sizeof(char *), GFP_KERNEL);
++	if (!func->groups)
++		return -ENOMEM;
++
++	for_each_child_of_node(np, child) {
++		func->groups[i] = child->name;
++		grp = &info->groups[grp_index++];
++		ret = at91_pinctrl_parse_groups(child, grp, info, i++);
++		if (ret)
++			return ret;
++	}
++
++	return 0;
++}
++
++static int __devinit at91_pinctrl_probe_dt(struct platform_device *pdev,
++					   struct at91_pinctrl *info)
++{
++	int ret = 0;
++	int i, j;
++	uint32_t *tmp;
++	struct device_node *np = pdev->dev.of_node;
++	struct device_node *child;
++
++	if (!np)
++		return -ENODEV;
++
++	info->dev = &pdev->dev;
++	at91_pinctrl_child_count(info, np);
++
++	if (info->nbanks < 1) {
++		dev_err(&pdev->dev, "you need to specify atleast one gpio-controller\n");
++		return -EINVAL;
++	}
++
++	ret = at91_pinctrl_mux_mask(info, np);
++	if (ret)
++		return ret;
++
++	dev_dbg(&pdev->dev, "nmux = %d\n", info->nmux);
++
++	dev_dbg(&pdev->dev, "mux-mask\n");
++	tmp = info->mux_mask;
++	for (i = 0; i < info->nbanks; i++) {
++		for (j = 0; j < info->nmux; j++, tmp++) {
++			dev_dbg(&pdev->dev, "%d:%d\t0x%x\n", i, j, tmp[0]);
++		}
++	}
++
++	dev_dbg(&pdev->dev, "nfunctions = %d\n", info->nfunctions);
++	dev_dbg(&pdev->dev, "ngroups = %d\n", info->ngroups);
++	info->functions = devm_kzalloc(&pdev->dev, info->nfunctions * sizeof(struct at91_pmx_func),
++					GFP_KERNEL);
++	if (!info->functions)
++		return -ENOMEM;
++
++	info->groups = devm_kzalloc(&pdev->dev, info->ngroups * sizeof(struct at91_pin_group),
++					GFP_KERNEL);
++	if (!info->groups)
++		return -ENOMEM;
++
++	dev_dbg(&pdev->dev, "nbanks = %d\n", info->nbanks);
++	dev_dbg(&pdev->dev, "nfunctions = %d\n", info->nfunctions);
++	dev_dbg(&pdev->dev, "ngroups = %d\n", info->ngroups);
++
++	i = 0;
++
++	for_each_child_of_node(np, child) {
++		if (of_device_is_compatible(child, gpio_compat))
++			continue;
++		ret = at91_pinctrl_parse_functions(child, info, i++);
++		if (ret) {
++			dev_err(&pdev->dev, "failed to parse function\n");
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
++static int __devinit at91_pinctrl_probe(struct platform_device *pdev)
++{
++	struct at91_pinctrl *info;
++	struct pinctrl_pin_desc *pdesc;
++	int ret, i, j ,k;
++
++	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
++	if (!info)
++		return -ENOMEM;
++
++	ret = at91_pinctrl_probe_dt(pdev, info);
++	if (ret)
++		return ret;
++
++	/*
++	 * We need all the GPIO drivers to probe FIRST, or we will not be able
++	 * to obtain references to the struct gpio_chip * for them, and we
++	 * need this to proceed.
++	 */
++	for (i = 0; i < info->nbanks; i++) {
++		if (!gpio_chip[i]) {
++			dev_warn(&pdev->dev, "GPIO chip %d not registered yet\n", i);
++			devm_kfree(&pdev->dev, info);
++			return -EPROBE_DEFER;
++		}
++	}
++
++	at91_pinctrl_desc.name = dev_name(&pdev->dev);
++	at91_pinctrl_desc.npins = info->nbanks * MAX_NB_GPIO_PER_BANK;
++	at91_pinctrl_desc.pins = pdesc =
++		devm_kzalloc(&pdev->dev, sizeof(*pdesc) * at91_pinctrl_desc.npins, GFP_KERNEL);
++
++	if (!at91_pinctrl_desc.pins)
++		return -ENOMEM;
++
++	for (i = 0 , k = 0; i < info->nbanks; i++) {
++		for (j = 0; j < 32; j++, k++) {
++			pdesc->number = k;
++			pdesc->name = kasprintf(GFP_KERNEL, "pio%c%d", i + 'A', j);
++			pdesc++;
++		}
++	}
++
++	info->set_A_periph = at91_mux_pio3_set_A_periph;
++	info->set_B_periph = at91_mux_pio3_set_B_periph;
++
++	if (has_pio3()) {
++		info->set_A_periph = at91_mux_set_A_periph;
++		info->set_B_periph = at91_mux_set_B_periph;
++	}
++
++	platform_set_drvdata(pdev, info);
++	info->pctl = pinctrl_register(&at91_pinctrl_desc, &pdev->dev, info);
++
++	if (!info->pctl) {
++		dev_err(&pdev->dev, "could not register AT91 pinctrl driver\n");
++		ret = -EINVAL;
++		goto err;
++	}
++
++	/* We will handle a range of GPIO pins */
++	for (i = 0; i < info->nbanks; i++)
++		pinctrl_add_gpio_range(info->pctl, &gpio_chip[i]->range);
++
++	dev_info(&pdev->dev, "initialized AT91 pinctrl driver\n");
++
++	return 0;
++
++err:
++	return ret;
++}
++
++int __devexit at91_pinctrl_remove(struct platform_device *pdev)
++{
++	struct at91_pinctrl *info = platform_get_drvdata(pdev);
++
++	pinctrl_unregister(info->pctl);
++
++	return 0;
++}
++
++static int at91_gpio_request(struct gpio_chip *chip, unsigned offset)
++{
++	/*
++	 * Map back to global GPIO space and request muxing, the direction
++	 * parameter does not matter for this controller.
++	 */
++	int gpio = chip->base + offset;
++	int bank = chip->base / chip->ngpio;
++
++	dev_dbg(chip->dev, "%s:%d pio%c%d(%d)\n", __func__, __LINE__,
++		 'A' + bank, offset, gpio);
++
++	return pinctrl_request_gpio(gpio);
++}
++
++static void at91_gpio_free(struct gpio_chip *chip, unsigned offset)
++{
++	int gpio = chip->base + offset;
++
++	pinctrl_free_gpio(gpio);
++}
++
++static int at91_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
++{
++	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
++	void __iomem *pio = at91_gpio->regbase;
++	unsigned mask = 1 << offset;
++
++	__raw_writel(mask, pio + PIO_ODR);
++	return 0;
++}
++
++static int at91_gpio_get(struct gpio_chip *chip, unsigned offset)
++{
++	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
++	void __iomem *pio = at91_gpio->regbase;
++	unsigned mask = 1 << offset;
++	u32 pdsr;
++
++	pdsr = __raw_readl(pio + PIO_PDSR);
++	return (pdsr & mask) != 0;
++}
++
++static void at91_gpio_set(struct gpio_chip *chip, unsigned offset,
++				int val)
++{
++	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
++	void __iomem *pio = at91_gpio->regbase;
++	unsigned mask = 1 << offset;
++
++	__raw_writel(mask, pio + (val ? PIO_SODR : PIO_CODR));
++}
++
++static int at91_gpio_direction_output(struct gpio_chip *chip, unsigned offset,
++				int val)
++{
++	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
++	void __iomem *pio = at91_gpio->regbase;
++	unsigned mask = 1 << offset;
++
++	__raw_writel(mask, pio + (val ? PIO_SODR : PIO_CODR));
++	__raw_writel(mask, pio + PIO_OER);
++
++	return 0;
++}
++
++static int at91_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
++{
++	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
++	int virq;
++
++	if (offset < chip->ngpio)
++		virq = irq_create_mapping(at91_gpio->domain, offset);
++	else
++		virq = -ENXIO;
++
++	dev_dbg(chip->dev, "%s: request IRQ for GPIO %d, return %d\n",
++				chip->label, offset + chip->base, virq);
++	return virq;
++}
++
++static char peripheral_function(void __iomem *pio, unsigned mask)
++{
++	char	ret = 'X';
++	u8	select;
++
++	if (!pio)
++		return ret;
++
++	if (has_pio3()) {
++		select = !!(__raw_readl(pio + PIO_ABCDSR1) & mask);
++		select |= (!!(__raw_readl(pio + PIO_ABCDSR2) & mask) << 1);
++		ret = 'A' + select;
++	} else {
++		ret = __raw_readl(pio + PIO_ABSR) & mask ?
++						'B' : 'A';
++	}
++
++	return ret;
++}
++
++#ifdef CONFIG_DEBUG_FS
++static void at91_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
++{
++	int i;
++	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
++	void __iomem *pio = at91_gpio->regbase;
++
++	for (i = 0; i < chip->ngpio; i++) {
++		unsigned pin = chip->base + i;
++		unsigned mask = pin_to_mask(pin);
++		const char *gpio_label;
++		u32 pdsr;
++
++		gpio_label = gpiochip_is_requested(chip, i);
++		if (!gpio_label)
++			continue;
++
++		seq_printf(s, "[%s] GPIO%s%d: ",
++			   gpio_label, chip->label, i);
++		if (__raw_readl(pio + PIO_PSR) & mask) {
++			pdsr = __raw_readl(pio + PIO_PDSR);
++
++			seq_printf(s, "[gpio] %s\n",
++				   pdsr & mask ?
++				   "set" : "clear");
++		} else {
++			seq_printf(s, "[periph %c]\n",
++				   peripheral_function(pio, mask));
++		}
++	}
++}
++#else
++#define at91_gpio_dbg_show	NULL
++#endif
++
++/* Several AIC controller irqs are dispatched through this GPIO handler.
++ * To use any AT91_PIN_* as an externally triggered IRQ, first call
++ * at91_set_gpio_input() then maybe enable its glitch filter.
++ * Then just request_irq() with the pin ID; it works like any ARM IRQ
++ * handler.
++ * First implementation always triggers on rising and falling edges
++ * whereas the newer PIO3 can be additionally configured to trigger on
++ * level, edge with any polarity.
++ *
++ * Alternatively, certain pins may be used directly as IRQ0..IRQ6 after
++ * configuring them with at91_set_a_periph() or at91_set_b_periph().
++ * IRQ0..IRQ6 should be configurable, e.g. level vs edge triggering.
++ */
++
++static void gpio_irq_mask(struct irq_data *d)
++{
++	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
++	void __iomem	*pio = at91_gpio->regbase;
++	unsigned	mask = 1 << d->hwirq;
++
++	if (pio)
++		__raw_writel(mask, pio + PIO_IDR);
++}
++
++static void gpio_irq_unmask(struct irq_data *d)
++{
++	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
++	void __iomem	*pio = at91_gpio->regbase;
++	unsigned	mask = 1 << d->hwirq;
++
++	if (pio)
++		__raw_writel(mask, pio + PIO_IER);
++}
++
++static int gpio_irq_type(struct irq_data *d, unsigned type)
++{
++	switch (type) {
++	case IRQ_TYPE_NONE:
++	case IRQ_TYPE_EDGE_BOTH:
++		return 0;
++	default:
++		return -EINVAL;
++	}
++}
++
++/* Alternate irq type for PIO3 support */
++static int alt_gpio_irq_type(struct irq_data *d, unsigned type)
++{
++	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
++	void __iomem	*pio = at91_gpio->regbase;
++	unsigned	mask = 1 << d->hwirq;
++
++	switch (type) {
++	case IRQ_TYPE_EDGE_RISING:
++		__raw_writel(mask, pio + PIO_ESR);
++		__raw_writel(mask, pio + PIO_REHLSR);
++		break;
++	case IRQ_TYPE_EDGE_FALLING:
++		__raw_writel(mask, pio + PIO_ESR);
++		__raw_writel(mask, pio + PIO_FELLSR);
++		break;
++	case IRQ_TYPE_LEVEL_LOW:
++		__raw_writel(mask, pio + PIO_LSR);
++		__raw_writel(mask, pio + PIO_FELLSR);
++		break;
++	case IRQ_TYPE_LEVEL_HIGH:
++		__raw_writel(mask, pio + PIO_LSR);
++		__raw_writel(mask, pio + PIO_REHLSR);
++		break;
++	case IRQ_TYPE_EDGE_BOTH:
++		/*
++		 * disable additional interrupt modes:
++		 * fall back to default behavior
++		 */
++		__raw_writel(mask, pio + PIO_AIMDR);
++		return 0;
++	case IRQ_TYPE_NONE:
++	default:
++		pr_warn("AT91: No type for irq %d\n", gpio_to_irq(d->irq));
++		return -EINVAL;
++	}
++
++	/* enable additional interrupt modes */
++	__raw_writel(mask, pio + PIO_AIMER);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM
++static u32 wakeups[MAX_GPIO_BANKS];
++
++static int gpio_irq_set_wake(struct irq_data *d, unsigned state)
++{
++	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
++	unsigned	mask = 1 << d->hwirq;
++	unsigned	bank = at91_gpio->pioc_idx;
++
++	if (unlikely(bank >= MAX_GPIO_BANKS))
++		return -EINVAL;
++
++	if (state)
++		wakeups[bank] |= mask;
++	else
++		wakeups[bank] &= ~mask;
++
++	irq_set_irq_wake(at91_gpio->pioc_virq, state);
++
++	return 0;
++}
++#else
++#define gpio_irq_set_wake	NULL
++#endif
++
++static struct irq_chip gpio_irqchip = {
++	.name		= "GPIO",
++	.irq_disable	= gpio_irq_mask,
++	.irq_mask	= gpio_irq_mask,
++	.irq_unmask	= gpio_irq_unmask,
++	/* .irq_set_type is set dynamically */
++	.irq_set_wake	= gpio_irq_set_wake,
++};
++
++static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
++{
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct irq_data *idata = irq_desc_get_irq_data(desc);
++	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(idata);
++	void __iomem	*pio = at91_gpio->regbase;
++	unsigned long	isr;
++	int		n;
++
++	chained_irq_enter(chip, desc);
++	for (;;) {
++		/* Reading ISR acks pending (edge triggered) GPIO interrupts.
++		 * When there none are pending, we're finished unless we need
++		 * to process multiple banks (like ID_PIOCDE on sam9263).
++		 */
++		isr = __raw_readl(pio + PIO_ISR) & __raw_readl(pio + PIO_IMR);
++		if (!isr) {
++			if (!at91_gpio->next)
++				break;
++			at91_gpio = at91_gpio->next;
++			pio = at91_gpio->regbase;
++			continue;
++		}
++
++		n = find_first_bit(&isr, BITS_PER_LONG);
++		while (n < BITS_PER_LONG) {
++			generic_handle_irq(irq_find_mapping(at91_gpio->domain, n));
++			n = find_next_bit(&isr, BITS_PER_LONG, n + 1);
++		}
++	}
++	chained_irq_exit(chip, desc);
++	/* now it may re-trigger */
++}
++
++/*
++ * This lock class tells lockdep that GPIO irqs are in a different
++ * category than their parents, so it won't report false recursion.
++ */
++static struct lock_class_key gpio_lock_class;
++
++static int at91_gpio_irq_map(struct irq_domain *h, unsigned int virq,
++							irq_hw_number_t hw)
++{
++	struct at91_gpio_chip	*at91_gpio = h->host_data;
++
++	irq_set_lockdep_class(virq, &gpio_lock_class);
++
++	/*
++	 * Can use the "simple" and not "edge" handler since it's
++	 * shorter, and the AIC handles interrupts sanely.
++	 */
++	irq_set_chip_and_handler(virq, &gpio_irqchip,
++				 handle_simple_irq);
++	set_irq_flags(virq, IRQF_VALID);
++	irq_set_chip_data(virq, at91_gpio);
++
++	return 0;
++}
++
++static struct irq_domain_ops at91_gpio_ops = {
++	.map	= at91_gpio_irq_map,
++	.xlate	= irq_domain_xlate_twocell,
++};
++
++static int at91_gpio_of_irq_setup(struct device_node *node,
++				  struct at91_gpio_chip *at91_gpio)
++{
++	struct at91_gpio_chip	*prev = NULL;
++	struct irq_data		*d = irq_get_irq_data(at91_gpio->pioc_virq);
++
++	at91_gpio->pioc_hwirq = irqd_to_hwirq(d);
++
++	/* Setup proper .irq_set_type function */
++	if (has_pio3())
++		gpio_irqchip.irq_set_type = alt_gpio_irq_type;
++	else
++		gpio_irqchip.irq_set_type = gpio_irq_type;
++
++	/* Disable irqs of this PIO controller */
++	__raw_writel(~0, at91_gpio->regbase + PIO_IDR);
++
++	/* Setup irq domain */
++	at91_gpio->domain = irq_domain_add_linear(node, at91_gpio->chip.ngpio,
++						&at91_gpio_ops, at91_gpio);
++	if (!at91_gpio->domain)
++		panic("at91_gpio.%d: couldn't allocate irq domain (DT).\n",
++			at91_gpio->pioc_idx);
++
++	/* Setup chained handler */
++	if (at91_gpio->pioc_idx)
++		prev = gpio_chip[at91_gpio->pioc_idx - 1];
++
++	/* The toplevel handler handles one bank of GPIOs, except
++	 * on some SoC it can handles up to three...
++	 * We only set up the handler for the first of the list.
++	 */
++	if (prev && prev->next == at91_gpio)
++		return 0;
++
++	irq_set_chip_data(at91_gpio->pioc_virq, at91_gpio);
++	irq_set_chained_handler(at91_gpio->pioc_virq, gpio_irq_handler);
++
++	return 0;
++}
++
++/* This structure is replicated for each GPIO block allocated at probe time */
++static struct gpio_chip at91_gpio_template = {
++	.request		= at91_gpio_request,
++	.free			= at91_gpio_free,
++	.direction_input	= at91_gpio_direction_input,
++	.get			= at91_gpio_get,
++	.direction_output	= at91_gpio_direction_output,
++	.set			= at91_gpio_set,
++	.to_irq			= at91_gpio_to_irq,
++	.dbg_show		= at91_gpio_dbg_show,
++	.can_sleep		= 0,
++	.ngpio			= 32,
++};
++
++static void __devinit at91_gpio_probe_fixup(void)
++{
++	unsigned i;
++	struct at91_gpio_chip *at91_gpio, *last = NULL;
++
++	for (i = 0; i < gpio_banks; i++) {
++		at91_gpio = gpio_chip[i];
++
++		/*
++		 * GPIO controller are grouped on some SoC:
++		 * PIOC, PIOD and PIOE can share the same IRQ line
++		 */
++		if (last && last->pioc_virq == at91_gpio->pioc_virq)
++			last->next = at91_gpio;
++		last = at91_gpio;
++	}
++}
++
++static int __devinit at91_gpio_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct resource *res;
++	struct at91_gpio_chip *at91_chip = NULL;
++	struct gpio_chip *chip;
++	struct pinctrl_gpio_range *range;
++	int ret = 0;
++	int irq;
++	int alias_idx = of_alias_get_id(np, "gpio");
++	uint32_t ngpio;
++
++	BUG_ON(alias_idx >= ARRAY_SIZE(gpio_chip));
++	if (gpio_chip[alias_idx]) {
++		ret = -EBUSY;
++		goto err;
++	}
++
++	at91_gpio_caps = (unsigned long)np->data;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		ret = -ENOENT;
++		goto err;
++	}
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		ret = irq;
++		goto err;
++	}
++
++	at91_chip = devm_kzalloc(&pdev->dev, sizeof(*at91_chip), GFP_KERNEL);
++	if (!at91_chip) {
++		ret = -ENOMEM;
++		goto err;
++	}
++
++	at91_chip->regbase = devm_request_and_ioremap(&pdev->dev, res);
++	if (!at91_chip->regbase) {
++		dev_err(&pdev->dev, "failed to map registers, ignoring.\n");
++		ret = -EBUSY;
++		goto err;
++	}
++
++	at91_chip->pioc_virq = irq;
++	at91_chip->pioc_idx = alias_idx;
++
++	at91_chip->clock = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(at91_chip->clock)) {
++		dev_err(&pdev->dev, "failed to get clock, ignoring.\n");
++		goto err;
++	}
++
++	if (clk_prepare(at91_chip->clock))
++		goto clk_prep_err;
++
++	/* enable PIO controller's clock */
++	if (clk_enable(at91_chip->clock)) {
++		dev_err(&pdev->dev, "failed to enable clock, ignoring.\n");
++		goto clk_err;
++	}
++
++	at91_chip->chip = at91_gpio_template;
++
++	chip = &at91_chip->chip;
++	chip->of_node = np;
++	chip->label = dev_name(&pdev->dev);
++	chip->dev = &pdev->dev;
++	chip->owner = THIS_MODULE;
++	chip->base = alias_idx * MAX_NB_GPIO_PER_BANK;
++
++	if (!of_property_read_u32(np, "gpio-nb", &ngpio)) {
++		if (ngpio >= MAX_NB_GPIO_PER_BANK)
++			pr_err("at91_gpio.%d, gpio-nb >= %d failback to %d\n",
++			       alias_idx, MAX_NB_GPIO_PER_BANK, MAX_NB_GPIO_PER_BANK);
++		else
++			chip->ngpio = ngpio;
++	}
++
++	range = &at91_chip->range;
++	range->name = chip->label;
++	range->id = alias_idx;
++	range->pin_base = range->base = range->id * MAX_NB_GPIO_PER_BANK;
++
++	range->npins = chip->ngpio;
++	range->gc = chip;
++
++	ret = gpiochip_add(chip);
++	if (ret)
++		goto clk_err;
++
++	gpio_chip[alias_idx] = at91_chip;
++	gpio_banks = max(gpio_banks, alias_idx + 1);
++
++	at91_gpio_probe_fixup();
++
++	at91_gpio_of_irq_setup(np, at91_chip);
++
++	dev_info(&pdev->dev, "at address %p\n", at91_chip->regbase);
++
++	return 0;
++
++clk_err:
++	clk_unprepare(at91_chip->clock);
++clk_prep_err:
++	clk_put(at91_chip->clock);
++err:
++	dev_err(&pdev->dev, "Failure %i for GPIO %i\n", ret, alias_idx);
++
++	return ret;
++}
++
++static struct of_device_id at91_gpio_of_match[] __devinitdata = {
++	{ .compatible = "atmel,at91rm9200-gpio", },
++	{ .compatible = "atmel,at91sam9x5-gpio", .data = (void*)AT91_GPIO_CAP_PIO3, },
++	{ /* sentinel */ }
++};
++
++static struct platform_driver at91_gpio_driver = {
++	.driver = {
++		.name = "gpio-at91",
++		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(at91_gpio_of_match),
++	},
++	.probe = at91_gpio_probe,
++};
++
++static struct of_device_id at91_pinctrl_of_match[] __devinitdata = {
++	{ .compatible = "atmel,at91rm9200-pinctrl", },
++	{ /* sentinel */ }
++};
++
++static struct platform_driver at91_pinctrl_driver = {
++	.driver = {
++		.name = "pinctrl-at91",
++		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(at91_pinctrl_of_match),
++	},
++	.probe = at91_pinctrl_probe,
++	.remove = __devexit_p(at91_pinctrl_remove),
++};
++
++static int __init at91_pinctrl_init(void)
++{
++	int ret;
++
++	ret = platform_driver_register(&at91_gpio_driver);
++	if (ret)
++		return ret;
++	return platform_driver_register(&at91_pinctrl_driver);
++}
++arch_initcall(at91_pinctrl_init);
++
++static void __exit at91_pinctrl_exit(void)
++{
++	platform_driver_unregister(&at91_pinctrl_driver);
++}
++
++module_exit(at91_pinctrl_exit);
++MODULE_AUTHOR("Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>");
++MODULE_DESCRIPTION("Atmel AT91 pinctrl driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.7.10.4
