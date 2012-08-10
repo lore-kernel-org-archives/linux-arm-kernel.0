@@ -1,31 +1,83 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 10 Aug 2012 10:38:02 -0300
-Subject: [PATCH v2 2/2] ARM: imx/pcm043: add oftree support
-In-Reply-To: <1344591170-13638-2-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1344591170-13638-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1344591170-13638-2-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CAOMZO5D=1XfV==+VvgzsJccLPiGd6xDCjVSRYxrH0VMzEtX_gg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Aug 2012 14:53:26 +0100
+Subject: imx6q restart is broken
+In-Reply-To: <CAKGA1bnh9tD5hey3E2j6XhUqOFV=FgU1W13oSMfpXxxnV_MSfA@mail.gmail.com>
+References: <20120808101817.GA14718@S2101-09.ap.freescale.net>
+ <50224547.9020000@de.bosch.com> <50232C17.9000700@gmail.com>
+ <20120809092021.GQ18957@n2100.arm.linux.org.uk>
+ <CAKGA1b=--C_MEHgc4m2f4cQwkx-=njss7bpT+EzXgKZJ2v=+Hw@mail.gmail.com>
+ <20120809210709.GV18957@n2100.arm.linux.org.uk>
+ <CAKGA1bnh9tD5hey3E2j6XhUqOFV=FgU1W13oSMfpXxxnV_MSfA@mail.gmail.com>
+Message-ID: <20120810135326.GY18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/10/12, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+On Fri, Aug 10, 2012 at 08:33:06AM -0500, Matt Sealey wrote:
+> On Thu, Aug 9, 2012 at 4:07 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Aug 09, 2012 at 02:03:13PM -0500, Matt Sealey wrote:
+> >> I have an irrelevant but possibly related question here; in
+> >> mm/proc-v7.S there's this snip of code;
+> >>
+> >> #ifdef CONFIG_SMP
+> >>         ALT_SMP(mrc     p15, 0, r0, c1, c0, 1)
+> >>         ALT_UP(mov      r0, #(1 << 6))          @ fake it for UP
+> >>         tst     r0, #(1 << 6)                   @ SMP/nAMP mode enabled?
+> >>         orreq   r0, r0, #(1 << 6)               @ Enable SMP/nAMP mode
+> >>         orreq   r0, r0, r10                     @ Enable CPU-specific SMP bits
+> >>         mcreq   p15, 0, r0, c1, c0, 1
+> >> #endif
+> >>
+> >> Which I am reading as, read the SMP bit from cp15 and see if it's
+> >> enabled, or on UP set the SMP bit and then write it back
+> >> regardless.
+> >>
+> >> On a system where !CONFIG_SMP but it's SMP-capable like i.MX6Q, ALT_UP
+> >> method will get used and the SMP bit will get
+> >> set regardless.
+> >
+> > I got here and stopped reading any further.  No, it doesn't work like
+> > that; you don't understand the assembly.
+> >
+> > Yes, you're right that the ALT_UP version will be used.  This sets r0
+> > to 1 << 6.  The very next instruction tests whether bit 6 is set in r0.
+> > The following three instructions will only be executed _if_ that bit
+> > was zero.
+> 
+> Right but, as I read it...
+> 
+> if (CONFIG_SMP)
+>    read cp15
+> else
+>    set bit to one to hack it
+> if (!smp)
+>   set smp
+>   write it back
 
-> +			serial at 43f90000 {
-> +				status = "okay";
-> +			};
-> +
-> +			serial at 43f94000 {
-> +				status = "okay";
+Thank you for not reading what I wrote (or maybe you can't write back
+what I said correctly, but either way, it's just making me think that
+replying is a waste of time.)
 
-On other i.mx boards the format is:
+> So who unsets the SMP bit? When the core goes down does it clear it,
+> or are we just
+> being safe for CPU startup? Does it still have an effect in the chip
+> logic even if the core
+> is 'not plugged'?
 
-uart1: serial at 43f90000
+Generally we don't.  Because on secure mode devices, we can't write the
+register, and if we tried to we'd get an abort.
 
-Should the same be done here?
+So, if we detect a SMP capable CPU, we will enable the SMP bit if it
+wasn't already enabled, and never ever attempt to disable it.
 
-This would allow to quickly recognize the port number without having
-to look at the datasheet or .dtsi file.
+> What happens if you're in CONFIG_SMP and you say maxcpus=1?
+> 
+> > I'm assuming that the rest of your email is therefore irrelevant; I
+> > have no desire to continue reading such a long message when the premise
+> > it's (presumably) based upon is false.  If you have any further questions
+> > please restate them succinctly after taking on board the above.  Thanks.
+> 
+> Please read the rest... I just didn't write first my question properly.
 
-Regards,
-
-Fabio Estevam
+No, unless you can say what you want more succinctly, I'm not going
+to bother reading your (apparantly regular) massive emails.
