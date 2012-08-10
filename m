@@ -1,104 +1,163 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 10 Aug 2012 15:02:09 +0200
-Subject: [PATCH 12/14] MTD: atmel nand: fix gpio missing request
+Date: Fri, 10 Aug 2012 15:02:10 +0200
+Subject: [PATCH 13/14] arm: at91: dt: at91sam9 add nand pinctrl support
 In-Reply-To: <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20120810124820.GA20557@game.jcrosoft.org>
  <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1344603731-32667-12-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1344603731-32667-13-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-without this the gpio will not be muxed as a gpio by the current custom pinmux
-or later by the pinctrl
-
 Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- drivers/mtd/nand/atmel_nand.c |   56 ++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 55 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/at91sam9260.dtsi |   10 ++++++++++
+ arch/arm/boot/dts/at91sam9263.dtsi |   10 ++++++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi |   10 ++++++++++
+ arch/arm/boot/dts/at91sam9n12.dtsi |   10 ++++++++++
+ arch/arm/boot/dts/at91sam9x5.dtsi  |   10 ++++++++++
+ 5 files changed, 50 insertions(+)
 
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 97ac671..eef9f80 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -583,8 +583,39 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
- 	nand_chip->IO_ADDR_W = host->io_base;
- 	nand_chip->cmd_ctrl = atmel_nand_cmd_ctrl;
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index 8ee7cd3..a4f4cba 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -208,6 +208,14 @@
+ 					};
+ 				};
  
--	if (gpio_is_valid(host->board.rdy_pin))
-+	if (gpio_is_valid(host->board.rdy_pin)) {
-+		res = gpio_request(host->board.rdy_pin, "nand_rdy");
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request rdy gpio %d\n", host->board.rdy_pin);
-+			goto err_ecc_ioremap;
-+		}
++				nand {
++					pinctrl_nand: nand-0 {
++						atmel,pins =
++							<2 13 0x0 0x1	/* PC13 gpio RDY pin pull_up */
++							 2 14 0x0 0x1>;	/* PC14 gpio enable pin pull_up */
++					};
++				};
 +
-+		res = gpio_direction_input(host->board.rdy_pin);
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request input direction rdy gpio %d\n", host->board.rdy_pin);
-+			goto err_ecc_ioremap;
-+		}
-+
- 		nand_chip->dev_ready = atmel_nand_device_ready;
-+	}
-+
-+	if (gpio_is_valid(host->board.enable_pin)) {
-+		res = gpio_request(host->board.enable_pin, "nand_enable");
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request enable gpio %d\n", host->board.enable_pin);
-+			goto err_ecc_ioremap;
-+		}
-+
-+		res = gpio_direction_output(host->board.enable_pin, 1);
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request output direction enable gpio %d\n", host->board.enable_pin);
-+			goto err_ecc_ioremap;
-+		}
-+	}
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+@@ -370,6 +378,8 @@
+ 			      >;
+ 			atmel,nand-addr-offset = <21>;
+ 			atmel,nand-cmd-offset = <22>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_nand>;
+ 			gpios = <&pioC 13 0
+ 				 &pioC 14 0
+ 				 0
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index 2d054c2..9314c32 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -155,6 +155,14 @@
+ 					};
+ 				};
  
- 	nand_chip->ecc.mode = host->board.ecc_mode;
- 
-@@ -622,6 +653,20 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
- 	atmel_nand_enable(host);
- 
- 	if (gpio_is_valid(host->board.det_pin)) {
-+		res = gpio_request(host->board.det_pin, "nand_det");
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request det gpio %d\n", host->board.det_pin);
-+			goto err_no_card;
-+		}
++				nand {
++					pinctrl_nand: nand-0 {
++						atmel,pins =
++							<0 22 0x0 0x1	/* PA22 gpio RDY pin pull_up*/
++							 3 15 0x0 0x1>;	/* PD15 gpio enable pin pull_up */
++					};
++				};
 +
-+		res = gpio_direction_input(host->board.det_pin);
-+		if (res < 0) {
-+			dev_err(&pdev->dev,
-+				"can't request input direction det gpio %d\n", host->board.det_pin);
-+			goto err_no_card;
-+		}
-+
- 		if (gpio_get_value(host->board.det_pin)) {
- 			printk(KERN_INFO "No SmartMedia card inserted.\n");
- 			res = -ENXIO;
-@@ -738,6 +783,15 @@ static int __exit atmel_nand_remove(struct platform_device *pdev)
+ 				pioA: gpio at fffff200 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff200 0x200>;
+@@ -267,6 +275,8 @@
+ 			      >;
+ 			atmel,nand-addr-offset = <21>;
+ 			atmel,nand-cmd-offset = <22>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_nand>;
+ 			gpios = <&pioA 22 0
+ 				 &pioD 15 0
+ 				 0
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index cfe197a..8863fd9 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -188,6 +188,14 @@
+ 					};
+ 				};
  
- 	atmel_nand_disable(host);
++				nand {
++					pinctrl_nand: nand-0 {
++						atmel,pins =
++							<2 8 0x0 0x1	/* PC8 gpio RDY pin pull_up*/
++							 2 14 0x0 0x1>;	/* PC14 gpio enable pin pull_up */
++					};
++				};
++
+ 				pioA: gpio at fffff200 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff200 0x200>;
+@@ -341,6 +349,8 @@
+ 			      >;
+ 			atmel,nand-addr-offset = <21>;
+ 			atmel,nand-cmd-offset = <22>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_nand>;
+ 			gpios = <&pioC 8 0
+ 				 &pioC 14 0
+ 				 0
+diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+index 36a6ce0..d1f5655 100644
+--- a/arch/arm/boot/dts/at91sam9n12.dtsi
++++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+@@ -190,6 +190,14 @@
+ 					};
+ 				};
  
-+	if (gpio_is_valid(host->board.det_pin))
-+		gpio_free(host->board.det_pin);
++				nand {
++					pinctrl_nand: nand-0 {
++						atmel,pins =
++							<3 5 0x0 0x1	/* PD5 gpio RDY pin pull_up*/
++							 3 4 0x0 0x1>;	/* PD4 gpio enable pin pull_up */
++					};
++				};
 +
-+	if (gpio_is_valid(host->board.enable_pin))
-+		gpio_free(host->board.enable_pin);
-+
-+	if (gpio_is_valid(host->board.rdy_pin))
-+		gpio_free(host->board.rdy_pin);
-+
- 	if (host->ecc)
- 		iounmap(host->ecc);
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+@@ -292,6 +300,8 @@
+ 			       >;
+ 			atmel,nand-addr-offset = <21>;
+ 			atmel,nand-cmd-offset = <22>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_nand>;
+ 			gpios = <&pioD 5 0
+ 				 &pioD 4 0
+ 				 0
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index c585f04..e58965d6 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -204,6 +204,14 @@
+ 					};
+ 				};
  
++				nand {
++					pinctrl_nand: nand-0 {
++						atmel,pins =
++							<3 4 0x0 0x1	/* PD5 gpio RDY pin pull_up */
++							 3 5 0x0 0x1>;	/* PD4 gpio enable pin pull_up */
++					};
++				};
++
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+@@ -346,6 +354,8 @@
+ 			      >;
+ 			atmel,nand-addr-offset = <21>;
+ 			atmel,nand-cmd-offset = <22>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_nand>;
+ 			gpios = <&pioD 5 0
+ 				 &pioD 4 0
+ 				 0
 -- 
 1.7.10.4
