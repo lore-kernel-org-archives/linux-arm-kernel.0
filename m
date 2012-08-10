@@ -1,87 +1,40 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 10 Aug 2012 11:32:50 +0200
-Subject: [PATCH v2 2/2] ARM: imx/pcm043: add oftree support
-In-Reply-To: <1344591170-13638-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1344591170-13638-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1344591170-13638-2-git-send-email-u.kleine-koenig@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 10 Aug 2012 10:37:29 +0100
+Subject: [PATCH 00/22] mop500 related Audio reorganisation and fixups
+In-Reply-To: <CACRpkdZCKQCkWSPYby2rYd4Oas481nZE7eDmZRETovJOks2p0Q@mail.gmail.com>
+References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
+ <20120809185029.GC24328@opensource.wolfsonmicro.com>
+ <20120809194044.GA9966@gmail.com>
+ <CACRpkdZCKQCkWSPYby2rYd4Oas481nZE7eDmZRETovJOks2p0Q@mail.gmail.com>
+Message-ID: <20120810093728.GD18708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On Fri, Aug 10, 2012 at 10:48:39AM +0200, Linus Walleij wrote:
+> On Thu, Aug 9, 2012 at 9:40 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Thu, Aug 09, 2012 at 07:50:29PM +0100, Mark Brown wrote:
+> >> On Thu, Aug 09, 2012 at 04:47:26PM +0100, Lee Jones wrote:
+> >> > Another fine instalment of Audio fixes and Device Tree enablement
+> >> > surrounding the mop500 sound driver. Hopefully containing all of
+> >> > the recommendations suggested by Mark Brown.
+> >>
+> >> Can we have some review of this from the ARM side please?  It's pretty
+> >> big...
+> >
+> > I don't expect Linus will do anything until he returns back from vacation.
+> 
+> I'm back from vacation, and catching up. Now there is a few different
+> DT patch bombs from you in my inbox, which patchset shall I review
+> first? This one? Or is there a more urgent one?
 
---
-changes since (implicit) v1
-(id:1343922986-32469-2-git-send-email-u.kleine-koenig at pengutronix.de)
+You can ignore all the ones from before yesterday.
 
- - add newlines between nodes
- - adapt to changes in patch 1
----
- arch/arm/boot/dts/phytec-pcm043.dtsi |   57 ++++++++++++++++++++++++++++++++++
- 1 file changed, 57 insertions(+)
- create mode 100644 arch/arm/boot/dts/phytec-pcm043.dtsi
+None are more important than the other, as I'm on vacation all next week.
 
-diff --git a/arch/arm/boot/dts/phytec-pcm043.dtsi b/arch/arm/boot/dts/phytec-pcm043.dtsi
-new file mode 100644
-index 0000000..e3b8690
---- /dev/null
-+++ b/arch/arm/boot/dts/phytec-pcm043.dtsi
-@@ -0,0 +1,57 @@
-+/include/ "imx35.dtsi"
-+
-+/ {
-+	soc {
-+		aips at 40000000 { /* AIPS1 */
-+			i2c at 43f80000 {
-+				status = "okay";
-+
-+				tempsens at 4a {
-+					compatible = "maxim,ds75";
-+					reg = <0x4a>;
-+				};
-+
-+				rtc8564 at 51 {
-+					compatible = "nxp,pcf8563";
-+					reg = <0x51>;
-+				};
-+
-+				at24 at 52 {
-+					compatible = "at,24c32";
-+					reg = <0x52>;
-+					pagesize = <32>;
-+				};
-+			};
-+
-+			serial at 43f90000 {
-+				status = "okay";
-+			};
-+
-+			serial at 43f94000 {
-+				status = "okay";
-+			};
-+		};
-+
-+		spba at 50000000 {
-+			serial at 5000c000 {
-+				status = "okay";
-+			};
-+
-+			fec at 50038000 {
-+				status = "okay";
-+			};
-+		};
-+
-+		emi at 80000000 {
-+			nor at a0000000 {
-+				compatible = "cfi-flash";
-+				reg = <0xa0000000 0x2000000>;
-+				bank-width = <2>;
-+			};
-+
-+			nand at bb000000 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
+Take your time and I'll see to the carnage when I return. :)
+
 -- 
-1.7.10.4
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
