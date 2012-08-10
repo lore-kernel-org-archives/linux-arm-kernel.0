@@ -1,77 +1,66 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 10 Aug 2012 11:39:11 -0700
-Subject: [PATCH v2 1/3] ARM: OMAP: omap_device: keep track of driver bound
- status
-In-Reply-To: <1344623953-26434-1-git-send-email-khilman@ti.com>
-References: <1344623953-26434-1-git-send-email-khilman@ti.com>
-Message-ID: <1344623953-26434-2-git-send-email-khilman@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 10 Aug 2012 13:42:17 -0500
+Subject: [PATCH 2/9] ARM: perf: add devicetree bindings for 11MPcore,
+ A5, A7 and A15 PMUs
+In-Reply-To: <1344620195-22372-3-git-send-email-will.deacon@arm.com>
+References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
+ <1344620195-22372-3-git-send-email-will.deacon@arm.com>
+Message-ID: <50255609.50009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the bus notifier to keep track of driver bound status by adding a
-new internal field to struct omap_device: _driver_status.
+On 08/10/2012 12:36 PM, Will Deacon wrote:
+> This patch adds separate devicetree bindings for 11MPcore and
+> Cortex-{A5,A7,A15} PMUs in preparation for improved devicetree parsing
+> in the ARM perf-event CPU PMU driver.
+> 
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
 
-This will be useful for follow-up patches which need to know whether
-or not a driver is bound in order to make intelligent omap_device
-enable/idle decisions.
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-Cc: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
- arch/arm/plat-omap/include/plat/omap_device.h |    2 ++
- arch/arm/plat-omap/omap_device.c              |   14 +++++++++-----
- 2 files changed, 11 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
-index 4327b2c..e7259c0 100644
---- a/arch/arm/plat-omap/include/plat/omap_device.h
-+++ b/arch/arm/plat-omap/include/plat/omap_device.h
-@@ -60,6 +60,7 @@ extern struct dev_pm_domain omap_device_pm_domain;
-  * @_dev_wakeup_lat_limit: dev wakeup latency limit in nsec - set by OMAP PM
-  * @_state: one of OMAP_DEVICE_STATE_* (see above)
-  * @flags: device flags
-+ * @_driver_status: one of BUS_NOTIFY_*_DRIVER from <linux/device.h>
-  *
-  * Integrates omap_hwmod data into Linux platform_device.
-  *
-@@ -73,6 +74,7 @@ struct omap_device {
- 	struct omap_device_pm_latency	*pm_lats;
- 	u32				dev_wakeup_lat;
- 	u32				_dev_wakeup_lat_limit;
-+	unsigned long			_driver_status;
- 	u8				pm_lats_cnt;
- 	s8				pm_lat_level;
- 	u8				hwmods_cnt;
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index c490240..1d1b5ff 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -385,17 +385,21 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
- 				      unsigned long event, void *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
-+	struct omap_device *od;
- 
- 	switch (event) {
--	case BUS_NOTIFY_ADD_DEVICE:
--		if (pdev->dev.of_node)
--			omap_device_build_from_dt(pdev);
--		break;
--
- 	case BUS_NOTIFY_DEL_DEVICE:
- 		if (pdev->archdata.od)
- 			omap_device_delete(pdev->archdata.od);
- 		break;
-+	case BUS_NOTIFY_ADD_DEVICE:
-+		if (pdev->dev.of_node)
-+			omap_device_build_from_dt(pdev);
-+		/* fall through */
-+	default:
-+		od = to_omap_device(pdev);
-+		if (od)
-+			od->_driver_status = event;
- 	}
- 
- 	return NOTIFY_DONE;
--- 
-1.7.9.2
+>  Documentation/devicetree/bindings/arm/pmu.txt |    4 ++++
+>  arch/arm/kernel/perf_event.c                  |    6 +++++-
+>  2 files changed, 9 insertions(+), 1 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+> index 1c044eb..343781b 100644
+> --- a/Documentation/devicetree/bindings/arm/pmu.txt
+> +++ b/Documentation/devicetree/bindings/arm/pmu.txt
+> @@ -7,8 +7,12 @@ representation in the device tree should be done as under:-
+>  Required properties:
+>  
+>  - compatible : should be one of
+> +	"arm,cortex-a15-pmu"
+>  	"arm,cortex-a9-pmu"
+>  	"arm,cortex-a8-pmu"
+> +	"arm,cortex-a7-pmu"
+> +	"arm,cortex-a5-pmu"
+> +	"arm,arm11mpcore-pmu"
+>  	"arm,arm1176-pmu"
+>  	"arm,arm1136-pmu"
+>  - interrupts : 1 combined interrupt or 1 per core.
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index c44647e..3aa3388 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -646,10 +646,14 @@ arch_initcall(cpu_pmu_reset);
+>   * PMU platform driver and devicetree bindings.
+>   */
+>  static struct of_device_id armpmu_of_device_ids[] = {
+> +	{.compatible = "arm,cortex-a15-pmu"},
+>  	{.compatible = "arm,cortex-a9-pmu"},
+>  	{.compatible = "arm,cortex-a8-pmu"},
+> -	{.compatible = "arm,arm1136-pmu"},
+> +	{.compatible = "arm,cortex-a7-pmu"},
+> +	{.compatible = "arm,cortex-a5-pmu"},
+> +	{.compatible = "arm,arm11mpcore-pmu"},
+>  	{.compatible = "arm,arm1176-pmu"},
+> +	{.compatible = "arm,arm1136-pmu"},
+>  	{},
+>  };
+>  
+> 
