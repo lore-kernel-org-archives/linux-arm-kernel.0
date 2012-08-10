@@ -1,111 +1,61 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 10 Aug 2012 17:05:58 +0300
-Subject: [PATCH] perf: Use pre-empt safe cpu_get/put insted of smp_processor_id
-Message-ID: <1344607558-15481-1-git-send-email-rogerq@ti.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Fri, 10 Aug 2012 10:15:01 -0400
+Subject: [PATCH] mtd: gpmi: add NAND write verify support
+In-Reply-To: <201208101325.23075.marex@denx.de>
+References: <1344568737-902-1-git-send-email-b32955@freescale.com>
+ <201208101325.23075.marex@denx.de>
+Message-ID: <CAMiH66FAVVPLZ9hCyRcNCm1Le2JrCc+55CUw7UCtPjw+31w5gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gets rid of below messages with CONFIG_DEBUG_PREEMPT enabled
+On Fri, Aug 10, 2012 at 7:25 AM, Marek Vasut <marex@denx.de> wrote:
+> Dear Huang Shijie,
+>
+>> Add NAND write verify support in gpmi-nand driver.
+>>
+>> Signed-off-by: Huang Shijie <b32955@freescale.com>
+>> ---
+>>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |   17 +++++++++++++++++
+>>  1 files changed, 17 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>> b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c index 8c0d2f0..6394483 100644
+>> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>> @@ -1488,6 +1488,22 @@ static int gpmi_set_geometry(struct gpmi_nand_data
+>> *this) return gpmi_alloc_dma_buffer(this);
+>>  }
+>>
+>> +#define MAX_PAGESIZE 8192
+>
+> Use NAND_MAX_PAGESIZE, see include/linux/mtd/nand.h .
+>
+>> +static uint8_t verify_buf[MAX_PAGESIZE];
 
-[   28.832916] debug_smp_processor_id: 18 callbacks suppressed
-[   28.832946] BUG: using smp_processor_id() in preemptible [00000000] code: modprobe/1763
-[   28.841491] caller is pwrdm_set_next_pwrst+0x54/0x120
+ok, thanks.
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/mach-omap2/clock.c       |    9 ++++++---
- arch/arm/mach-omap2/pm34xx.c      |   12 ++++++++----
- arch/arm/mach-omap2/powerdomain.c |    6 ++++--
- 3 files changed, 18 insertions(+), 9 deletions(-)
+>
+> What will happen when you have two NANDs attached to GPMI controller and they
+> hit this place both at once? Race condition, causing this function to fail for
+> both?
+>
+Even there are two nand chips, there is only one gpmi controller.
+And the current gpmi-nand does not support two nands now.
+does the race occur with only one nand chip?
 
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index ea3f565..06747b6 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -285,7 +285,8 @@ void omap2_clk_disable(struct clk *clk)
- 	pr_debug("clock: %s: disabling in hardware\n", clk->name);
- 
- 	if (clk->ops && clk->ops->disable) {
--		trace_clock_disable(clk->name, 0, smp_processor_id());
-+		trace_clock_disable(clk->name, 0, get_cpu());
-+		put_cpu();
- 		clk->ops->disable(clk);
- 	}
- 
-@@ -339,7 +340,8 @@ int omap2_clk_enable(struct clk *clk)
- 	}
- 
- 	if (clk->ops && clk->ops->enable) {
--		trace_clock_enable(clk->name, 1, smp_processor_id());
-+		trace_clock_enable(clk->name, 1, get_cpu());
-+		put_cpu();
- 		ret = clk->ops->enable(clk);
- 		if (ret) {
- 			WARN(1, "clock: %s: could not enable: %d\n",
-@@ -380,7 +382,8 @@ int omap2_clk_set_rate(struct clk *clk, unsigned long rate)
- 
- 	/* dpll_ck, core_ck, virt_prcm_set; plus all clksel clocks */
- 	if (clk->set_rate) {
--		trace_clock_set_rate(clk->name, rate, smp_processor_id());
-+		trace_clock_set_rate(clk->name, rate, get_cpu());
-+		put_cpu();
- 		ret = clk->set_rate(clk, rate);
- 	}
- 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index e4fc88c..81fec2e 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -357,18 +357,22 @@ void omap_sram_idle(void)
- 
- static void omap3_pm_idle(void)
- {
-+	unsigned cpu;
-+
- 	local_fiq_disable();
- 
- 	if (omap_irq_pending())
- 		goto out;
- 
--	trace_power_start(POWER_CSTATE, 1, smp_processor_id());
--	trace_cpu_idle(1, smp_processor_id());
-+	cpu = get_cpu();
-+	trace_power_start(POWER_CSTATE, 1, cpu);
-+	trace_cpu_idle(1, cpu);
- 
- 	omap_sram_idle();
- 
--	trace_power_end(smp_processor_id());
--	trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
-+	trace_power_end(cpu);
-+	trace_cpu_idle(PWR_EVENT_EXIT, cpu);
-+	put_cpu();
- 
- out:
- 	local_fiq_enable();
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 69b36e1..138bf86 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -169,7 +169,8 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
- 				       ((state & OMAP_POWERSTATE_MASK) << 8) |
- 				       ((prev & OMAP_POWERSTATE_MASK) << 0));
- 			trace_power_domain_target(pwrdm->name, trace_state,
--						  smp_processor_id());
-+						  get_cpu());
-+			put_cpu();
- 		}
- 		break;
- 	default:
-@@ -491,7 +492,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
- 	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
- 		/* Trace the pwrdm desired target state */
- 		trace_power_domain_target(pwrdm->name, pwrst,
--					  smp_processor_id());
-+					  get_cpu());
-+		put_cpu();
- 		/* Program the pwrdm desired target state */
- 		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
- 	}
--- 
-1.7.4.1
+
+> Possibly devm_kmalloc() such buffer per-controller?
+>
+>> +static int gpmi_verify_buf(struct mtd_info *mtd, const uint8_t *buf, int
+>> len) +{
+>> +     struct nand_chip *nand = mtd->priv;
+>> +     int ret;
+>> +
+>> +     ret = gpmi_ecc_read_page(mtd, nand, verify_buf, 0, 0);
+>
+> mtd->chip.ecc.read_page() ?
+In actually, they are the same.
+
+
+Best Regards
+Huang Shijie
