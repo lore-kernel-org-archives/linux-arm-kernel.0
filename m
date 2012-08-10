@@ -1,58 +1,470 @@
-From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Fri, 10 Aug 2012 16:00:04 +0300
-Subject: [alsa-devel] [PATCH 08/11] ARM: OMAP3: Remove callback for McBSP
- sidetone ICLK workaround
-In-Reply-To: <50227104.3040506@ti.com>
-References: <1344417101-5015-1-git-send-email-peter.ujfalusi@ti.com>
- <1344417101-5015-9-git-send-email-peter.ujfalusi@ti.com>
- <502268B1.9040506@bitmer.com> <50227104.3040506@ti.com>
-Message-ID: <502505D4.2030308@bitmer.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 10 Aug 2012 15:01:59 +0200
+Subject: [PATCH 02/14] at91: regroup gpio and pinctrl under a simple-bus
+In-Reply-To: <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
+References: <20120810124820.GA20557@game.jcrosoft.org>
+ <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1344603731-32667-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter
+Fix also the reg size as we have 512 bytes bank not 256 bytes per gpio/mux
+controller
 
-On 08/08/2012 05:00 PM, Peter Ujfalusi wrote:
->> Are you sure it works without any changes to sidetone audio quality or
->> current consumption? What I remember idlemode was broken at least on
->> 3430 and caused bad sidetone audio if autoidle was set and a little bit
->> higher current consumption (something like 2-3 mA higher where reference
->> consumption was around 10 mA) when McBSP was set to no-idle.
-> 
-> Yes, the idelmode settings are still broken in the sidetone block. However we
-> are toggling the SIDLEMODE of the corresponding McBSP instance where the ST
-> block is attached.
-> This should have the same effect as doing the same down in PRCM level since
-> the McBSP SIDLEMODE does work correctly preventing ICLK to be gated when it is
-> set to no-idle.
-> 
-> Unfortunately I can not get my BeagleBoard to start gating iclk even if I
-> remove the ICLK gating prevention (on top of 3.6-rc1). So I can not really say
-> for 100% this is equivalent to the the PRCM level workaround.
-> However I have also spend long time hacking around in McBSP, and I know that
-> the SIDLEMODE in McBSP is working correctly.
-> Do you know how can I get OMAP3 to start gating the clocks (to idle)?
-> 
-I got some odd current consumption results from Beagle to really compare
-different kernel versions but I was able get sensible results from N900.
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ arch/arm/boot/dts/at91sam9260.dtsi |   54 ++++++++++++---------
+ arch/arm/boot/dts/at91sam9263.dtsi |   93 +++++++++++++++++++-----------------
+ arch/arm/boot/dts/at91sam9g45.dtsi |   87 ++++++++++++++++++---------------
+ arch/arm/boot/dts/at91sam9n12.dtsi |   76 ++++++++++++++++-------------
+ arch/arm/boot/dts/at91sam9x5.dtsi  |   70 +++++++++++++++------------
+ 5 files changed, 210 insertions(+), 170 deletions(-)
 
-I tested your set on top of 196973c of sound.git.
-
-First consumption when using threshold based transfer has remained the
-same between 2.6.38-3.6.0-rc1 (wau!). Active sidetone under "arecord -f
-dat >/dev/null |aplay -f dat /dev/zero" test increases consumption from
-plain playback about 17 mA in 3.4 and 3.6.0-rc1.
-
-With your set applied consumption increases 28 mA when the sidetone is
-active (i.e. +11 mA higher than on top of 196973c). Plain threshold
-based playback remains still the same.
-
-> I'm doing the same test on BeagleBoard, but this thing does not want to hit
-> retention despite all the effort :(
-> 
-Could it be display subsystem which keeps it active? At least on N900 I
-need to get DSS drivers activated in order to be able to blank the
-display after bootloader and thus be able to reach the retention idle.
-
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index 66389c1..4aa155d 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -97,31 +97,39 @@
+ 				interrupts = <26 4 0 27 4 0 28 4 0>;
+ 			};
+ 
+-			pioA: gpio at fffff400 {
+-				compatible = "atmel,at91rm9200-gpio";
+-				reg = <0xfffff400 0x100>;
+-				interrupts = <2 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
+-			};
++			pinctrl at fffff400 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges;
++				compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
++				reg = <0xfffff400 0x600>;
++
++				pioA: gpio at fffff400 {
++					compatible = "atmel,at91rm9200-gpio";
++					reg = <0xfffff400 0x200>;
++					interrupts = <2 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
+ 
+-			pioB: gpio at fffff600 {
+-				compatible = "atmel,at91rm9200-gpio";
+-				reg = <0xfffff600 0x100>;
+-				interrupts = <3 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
+-			};
++				pioB: gpio at fffff600 {
++					compatible = "atmel,at91rm9200-gpio";
++					reg = <0xfffff600 0x200>;
++					interrupts = <3 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
+ 
+-			pioC: gpio at fffff800 {
+-				compatible = "atmel,at91rm9200-gpio";
+-				reg = <0xfffff800 0x100>;
+-				interrupts = <4 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
++				pioC: gpio at fffff800 {
++					compatible = "atmel,at91rm9200-gpio";
++					reg = <0xfffff800 0x200>;
++					interrupts = <4 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
+ 			};
+ 
+ 			dbgu: serial at fffff200 {
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index b460d6c..f1c838e 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -88,49 +88,56 @@
+ 				reg = <0xfffffd10 0x10>;
+ 			};
+ 
+-			pioA: gpio at fffff200 {
+-				compatible = "atmel,at91rm9200-gpio";
+-				reg = <0xfffff200 0x100>;
+-				interrupts = <2 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
+-			};
+-
+-			pioB: gpio at fffff400 {
+-				compatible = "atmel,at91rm9200-gpio";
+-				reg = <0xfffff400 0x100>;
+-				interrupts = <3 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
+-			};
+-
+-			pioC: gpio at fffff600 {
+-				compatible = "atmel,at91rm9200-gpio";
+-				reg = <0xfffff600 0x100>;
+-				interrupts = <4 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
+-			};
+-
+-			pioD: gpio at fffff800 {
+-				compatible = "atmel,at91rm9200-gpio";
+-				reg = <0xfffff800 0x100>;
+-				interrupts = <4 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
+-			};
+-
+-			pioE: gpio at fffffa00 {
+-				compatible = "atmel,at91rm9200-gpio";
+-				reg = <0xfffffa00 0x100>;
+-				interrupts = <4 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
++			pinctrl at fffff200 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges;
++				compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
++				reg = <0xfffff200 0xa00>;
++
++				pioA: gpio at fffff200 {
++					compatible = "atmel,at91rm9200-gpio";
++					reg = <0xfffff200 0x200>;
++					interrupts = <2 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
++
++				pioB: gpio at fffff400 {
++					compatible = "atmel,at91rm9200-gpio";
++					reg = <0xfffff400 0x200>;
++					interrupts = <3 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
++
++				pioC: gpio at fffff600 {
++					compatible = "atmel,at91rm9200-gpio";
++					reg = <0xfffff600 0x200>;
++					interrupts = <4 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
++
++				pioD: gpio at fffff800 {
++					compatible = "atmel,at91rm9200-gpio";
++					reg = <0xfffff800 0x200>;
++					interrupts = <4 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
++
++				pioE: gpio at fffffa00 {
++					compatible = "atmel,at91rm9200-gpio";
++					reg = <0xfffffa00 0x200>;
++					interrupts = <4 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
+ 			};
+ 
+ 			dbgu: serial at ffffee00 {
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index bafa880..f04bc8d 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -106,49 +106,58 @@
+ 				interrupts = <21 4 0>;
+ 			};
+ 
+-			pioA: gpio at fffff200 {
+-				compatible = "atmel,at91rm9200-gpio";
+-				reg = <0xfffff200 0x100>;
+-				interrupts = <2 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
+-			};
++			pinctrl at fffff200 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges;
++				compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
++
++				reg = <0xfffff200 0xa00>;
++
++				pioA: gpio at fffff200 {
++					compatible = "atmel,at91rm9200-gpio";
++					reg = <0xfffff200 0x200>;
++					interrupts = <2 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
+ 
+-			pioB: gpio at fffff400 {
+-				compatible = "atmel,at91rm9200-gpio";
+-				reg = <0xfffff400 0x100>;
+-				interrupts = <3 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
+-			};
++				pioB: gpio at fffff400 {
++					compatible = "atmel,at91rm9200-gpio";
++					reg = <0xfffff400 0x200>;
++					interrupts = <3 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
+ 
+-			pioC: gpio at fffff600 {
+-				compatible = "atmel,at91rm9200-gpio";
+-				reg = <0xfffff600 0x100>;
+-				interrupts = <4 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
+-			};
++				pioC: gpio at fffff600 {
++					compatible = "atmel,at91rm9200-gpio";
++					reg = <0xfffff600 0x200>;
++					interrupts = <4 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
+ 
+-			pioD: gpio at fffff800 {
+-				compatible = "atmel,at91rm9200-gpio";
+-				reg = <0xfffff800 0x100>;
+-				interrupts = <5 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
+-			};
++				pioD: gpio at fffff800 {
++					compatible = "atmel,at91rm9200-gpio";
++					reg = <0xfffff800 0x200>;
++					interrupts = <5 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
+ 
+-			pioE: gpio at fffffa00 {
+-				compatible = "atmel,at91rm9200-gpio";
+-				reg = <0xfffffa00 0x100>;
+-				interrupts = <5 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
++				pioE: gpio at fffffa00 {
++					compatible = "atmel,at91rm9200-gpio";
++					reg = <0xfffffa00 0x200>;
++					interrupts = <5 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
+ 			};
+ 
+ 			dbgu: serial at ffffee00 {
+diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+index bfac0df..575c891 100644
+--- a/arch/arm/boot/dts/at91sam9n12.dtsi
++++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+@@ -100,40 +100,48 @@
+ 				interrupts = <20 4 0>;
+ 			};
+ 
+-			pioA: gpio at fffff400 {
+-				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+-				reg = <0xfffff400 0x100>;
+-				interrupts = <2 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
+-			};
+-
+-			pioB: gpio at fffff600 {
+-				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+-				reg = <0xfffff600 0x100>;
+-				interrupts = <2 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
+-			};
+-
+-			pioC: gpio at fffff800 {
+-				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+-				reg = <0xfffff800 0x100>;
+-				interrupts = <3 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
+-			};
+-
+-			pioD: gpio at fffffa00 {
+-				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+-				reg = <0xfffffa00 0x100>;
+-				interrupts = <3 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
++			pinctrl at fffff400 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges;
++				compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
++				reg = <0xfffff400 0x800>;
++
++				pioA: gpio at fffff400 {
++					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
++					reg = <0xfffff400 0x200>;
++					interrupts = <2 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
++
++				pioB: gpio at fffff600 {
++					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
++					reg = <0xfffff600 0x200>;
++					interrupts = <2 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
++
++				pioC: gpio at fffff800 {
++					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
++					reg = <0xfffff800 0x200>;
++					interrupts = <3 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
++
++				pioD: gpio at fffffa00 {
++					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
++					reg = <0xfffffa00 0x200>;
++					interrupts = <3 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
+ 			};
+ 
+ 			dbgu: serial at fffff200 {
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 4a18c39..8c314d5 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -108,40 +108,48 @@
+ 				interrupts = <21 4 0>;
+ 			};
+ 
+-			pioA: gpio at fffff400 {
+-				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+-				reg = <0xfffff400 0x100>;
+-				interrupts = <2 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
+-			};
++			pinctrl at fffff200 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges;
++				compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
++				reg = <0xfffff400 0x800>;
++
++				pioA: gpio at fffff400 {
++					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
++					reg = <0xfffff400 0x200>;
++					interrupts = <2 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
+ 
+-			pioB: gpio at fffff600 {
+-				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+-				reg = <0xfffff600 0x100>;
+-				interrupts = <2 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
+-			};
++				pioB: gpio at fffff600 {
++					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
++					reg = <0xfffff600 0x200>;
++					interrupts = <2 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
+ 
+-			pioC: gpio at fffff800 {
+-				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+-				reg = <0xfffff800 0x100>;
+-				interrupts = <3 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
+-			};
++				pioC: gpio at fffff800 {
++					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
++					reg = <0xfffff800 0x200>;
++					interrupts = <3 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
+ 
+-			pioD: gpio at fffffa00 {
+-				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+-				reg = <0xfffffa00 0x100>;
+-				interrupts = <3 4 1>;
+-				#gpio-cells = <2>;
+-				gpio-controller;
+-				interrupt-controller;
++				pioD: gpio at fffffa00 {
++					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
++					reg = <0xfffffa00 0x200>;
++					interrupts = <3 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++				};
+ 			};
+ 
+ 			dbgu: serial at fffff200 {
 -- 
-Jarkko
+1.7.10.4
