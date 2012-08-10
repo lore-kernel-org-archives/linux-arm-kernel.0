@@ -1,70 +1,51 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Fri, 10 Aug 2012 15:21:57 +0000
-Subject: [PATCH 1/1] ARM: OMAP2+: hwmod: Print an error message if no
- match exists for a hwmod class
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EB34624@DBDE01.ent.ti.com>
-References: <1344422117-20707-1-git-send-email-vaibhav.bedia@ti.com>
- <alpine.DEB.2.00.1208080803560.5447@utopia.booyaka.com>
- <B5906170F1614E41A8A28DE3B8D121433EB32ABA@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1208081411010.6819@utopia.booyaka.com>
- <B5906170F1614E41A8A28DE3B8D121433EB34624@DBDE01.ent.ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EB375A9@DBDE01.ent.ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 10 Aug 2012 17:31:46 +0200
+Subject: [RFC 3/6] arm: cache-l2x0: add support for Aurora L2 cache ctrl
+In-Reply-To: <20120810152036.GK2066@mudshark.cambridge.arm.com>
+References: <1344438307-8468-1-git-send-email-gregory.clement@free-electrons.com>
+ <1344438307-8468-4-git-send-email-gregory.clement@free-electrons.com>
+ <20120808151946.GE4579@mudshark.cambridge.arm.com>
+ <50229422.40305@free-electrons.com> <50229944.60603@free-electrons.com>
+ <20120810144922.GH2066@mudshark.cambridge.arm.com>
+ <50252525.8050602@free-electrons.com>
+ <20120810152036.GK2066@mudshark.cambridge.arm.com>
+Message-ID: <50252962.5090107@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-[...]
-
-> > > On Wed, Aug 08, 2012 at 19:35:50, Paul Walmsley wrote:
-> > >
-> > > > It doesn't seem to me that this would necessarily always be an error.  
-> > > > Suppose some init code to create cpsw devices is running on an OMAP3430.  
-> > > > Then a omap_hwmod_for_each_by_class() that doesn't locate anything 
-> > > > wouldn't be an error, right?
-> > > 
-> > > Well, I think a failed lookup operation will be a bit expensive since it
-> > > iterates over the whole list of registered hwmods and hence put in the
-> > > pr_err().
-> > 
-> > If performance is a serious problem there, we can maintain a list of hwmod 
-> > pointers inside each struct omap_hwmod_class, updated when the hwmods are 
-> > registered.  But as far as I know, performance hasn't been an issue here 
-> > yet.  If performance is the real motivation, I'd rather see an 
-> > implementation of per-class lists as described above.
-> > 
+On 08/10/2012 05:20 PM, Will Deacon wrote:
+> On Fri, Aug 10, 2012 at 04:13:41PM +0100, Gregory CLEMENT wrote:
+>> On 08/10/2012 04:49 PM, Will Deacon wrote:
+>>> Can the Armada 370 be configured to use the co-processor interface to the
+>>> L2, or does only the Armada XP support that feature? What happens if you
+>>> build a single zImage supporting both of the SoCs?
+>>
+>> About L2 cache we already use the same kernel on Armada 370 and Armada XP
+>> and the differences are in the device tree.
 > 
-> Ok. I'll try to do some profiling using a timer to see how much time we
-> spend over here. On AM335x there are 2 such lookups, one for the dma
-> and one for the mcbsp. I could get this done today but will get to it
-> tomorrow. Based on how this goes I'll try out the omap_hwmod_class list
-> like you suggested.
+> Right, but I wonder whether you can end up using both the outer_cache
+> functions *and* the co-processor interface on the Armada XP by accident.
+
+Well from what I know it should be possible to have both in the same time.
+However we implement the support in a way that you won't have both in the
+same time: if we use the "system cache" mode then we don't use any outer_cache
+functions.
+
+> Ideally, we'd just use the co-processor interface on all platforms and
+> ignore the memory-mapped one. Is that possible on the 370?
+> 
+The 370 can't use the "system cache" mode (ie the co-processor).
+
+
+__________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
 
-I used a dmtimer clocked at 24MHz (41ns resolution) to get the time
-spent in the lookup. There are two failed lookups that happen in AM335x
-and following are the times taken
 
-Run1
-Lookup for dma - 435 cycles -> 17.835 usecs
-Lookup for mcbsp - 83 cycles -> 3.4 usecs
-
-Run2
-Lookup for dma - 503 cycles -> 20.623 usecs
-Lookup for mcbsp - 90 cycles -> 3.69 usescs
-
-Run3
-Lookup for dma - 375 cycles -> 15.375 usecs
-Lookup for mcbsp - 91 cycles -> 3.731 usecs
-
-The 2nd lookup happens immediately after the 1st one so probably
-the difference is coming due to the data sitting in the cache?
-
-The average times don't look too high to me but I guess you already
-knew that ;)
-
-If you are ok with a pr_debug() instead of a pr_err() I'll resubmit
-the patch with this change.
-
-Regards,
-Vaibhav B.
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
