@@ -1,30 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Aug 2012 11:33:08 +0000
-Subject: [PATCH 06/11] gpio: em: do not discard em_gio_irq_domain_cleanup
-In-Reply-To: <CACRpkdZnaH3RXHqif7wiA5bor4vOcBndnabG-7QNLnmUc3Oj3Q@mail.gmail.com>
-References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
- <1344437248-20560-7-git-send-email-arnd@arndb.de>
- <CACRpkdZnaH3RXHqif7wiA5bor4vOcBndnabG-7QNLnmUc3Oj3Q@mail.gmail.com>
-Message-ID: <201208101133.08945.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 10 Aug 2012 13:43:56 +0200
+Subject: [PATCH 1/6] ASoC: dapm: If one widget fails, do not force all
+ subsequent widgets to fail too
+In-Reply-To: <003901cd7073$d49cacc0$7dd60640$@se>
+References: <1343741493-17671-1-git-send-email-lee.jones@linaro.org>
+ <1343741493-17671-3-git-send-email-lee.jones@linaro.org>
+ <20120731134214.GK4468@opensource.wolfsonmicro.com>
+ <5017EAC3.3080504@linaro.org>
+ <20120731142820.GW4468@opensource.wolfsonmicro.com>
+ <5017EDCA.4020601@linaro.org>
+ <20120731145443.GY4468@opensource.wolfsonmicro.com>
+ <5017F68B.3060400@linaro.org>
+ <20120731151819.GC4468@opensource.wolfsonmicro.com>
+ <5018D880.5090306@linaro.org>
+ <20120801132022.GS11892@opensource.wolfsonmicro.com>
+ <003901cd7073$d49cacc0$7dd60640$@se>
+Message-ID: <CACRpkdZeYAnqg7HLi_bH51_=s60OZB7ySn1W+YQ=H9fz8xZUCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 August 2012, Linus Walleij wrote:
-> On Wed, Aug 8, 2012 at 4:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > The newly added gpio-em driver marks its em_gio_irq_domain_cleanup
-> > function as __devexit, which would lead to that function being
-> > discarded in case CONFIG_HOTPLUG is disabled. However, the function
-> > is also called by the error handling logic em_gio_probe, which
-> > would cause a jump into a NULL pointer if it was removed from the
-> > kernel or module.
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Will you push this through the ARM SoC tree or do you want me
-> to apply it to my GPIO tree?
+(As for the thread, which got flamy, let's put it to rest, and Ola:
+ we are all impressed with your work on the ux500 ALSA SoC
+ driver, no doubt about that, this was all ever about the DT
+ patch set.)
 
-I'm about to send out the whole series to Torvalds, so I'll just
-keep it in now.
+On Thu, Aug 2, 2012 at 7:58 AM, Ola Lilja <olalilja@yahoo.se> wrote:
 
-	Arnd
+> Linus W. could probably shed some light of when the missing clocks are to
+> be submitted.
+
+Ulf Hansson is working on this but he's on vacation FTM.
+However he has shown good progress and can probably present
+a prototype clock driver when he arrives back. IIRC there was
+some clock reparenting business left to sort out.
+
+Yours,
+Linus Walleij
