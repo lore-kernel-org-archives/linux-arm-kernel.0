@@ -1,45 +1,38 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Sat, 11 Aug 2012 01:27:11 +0530
-Subject: [PATCH v3 0/6] omap-am33xx rtc dt support
-In-Reply-To: <cover.1343383616.git.afzal@ti.com>
-References: <cover.1343383616.git.afzal@ti.com>
-Message-ID: <50256797.3020505@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 10 Aug 2012 22:14:56 +0200
+Subject: Lockups reading from i.MX51 SSI registers
+In-Reply-To: <20120810195638.GF1451@pengutronix.de>
+References: <20120810195005.GP24328@opensource.wolfsonmicro.com>
+ <20120810195638.GF1451@pengutronix.de>
+Message-ID: <20120810201456.GL25520@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/27/2012 5:53 PM, Afzal Mohammed wrote:
-> Hi,
+Hi,
+
+On Fri, Aug 10, 2012 at 09:56:38PM +0200, Sascha Hauer wrote:
+> On Fri, Aug 10, 2012 at 08:50:08PM +0100, Mark Brown wrote:
+> > I'm trying to use -next to test AC'97 register I/O on an i.MX51 board
+> > but I'm seeing the CPU hang during probe at:
+> > 
+> > 	lreg = (reg & 0x7f) <<  12 ;
+> > 	writel(lreg, base + SSI_SACADD);
+> > 
+> > in imx_ssi_ac97_read().  I'm somewhat suspicious this might be because
+> > the IP block isn't clocked properly, I do notice the recent conversion
+> > to the clock API which looks rather involved but it's possible something
+> > else broke.  Does anyone have any bright ideas what might be going on
+> > here?  The board doesn't have the reste functions defined so this is the
+> > first interaction with the hardware block AFAICT.
 > 
-> This series makes rtc-omap driver DT capable, adds AM33xx
-> RTC DT support along with a few enchancments to the driver.
-> 
-> rtc-omap driver is made intelligent enough to handle kicker
-> mechanism. This helps in removing kicker mechanism support
-> done for DaVinci at platform level.
-> 
-> This has been tested on Beaglebone (AM33xx platform) and on
-> DaVinci DA850 EVM.
-> 
-> This series is based over linux-omap master and can be
-> directly applied over linux-next, except for
-> [PATCH 6/6] arm/dts: am33xx rtc node.
-> 
-> PATCH 6/6 should go through linux-omap tree and needs
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg71644.html
-> (arm/dts: am33xx wdt node) to get applied cleanly
+> No idea currently, just adding Uwe to Cc because I think he has seen
+> something similar on an i.MX35 board recently.
+I havn't debugged that yet, but one issue I think needs to be solved is
+that since the clk conversion there are two ssi clocks. And from a quick
+look the ssi driver only handles one of them.
 
-I tested patches 1-5 on AM18x EVM using rtcwake and hwclock commands.
-Also tested on DT enabled AM18x EVM using hwclock.
+Uwe
 
-For patched 1-5:
-
-Acked-by: Sekhar Nori <nsekhar@ti.com>
-
-Alessandro,
-
-I assume you would want me to queue 2/6 through DaVinci tree. That patch
-depends on 1/6 being accepted and merged by you. Let me know how you
-want to move forward here.
-
-Thanks,
-Sekhar
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
