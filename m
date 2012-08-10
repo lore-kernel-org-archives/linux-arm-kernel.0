@@ -1,30 +1,38 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 09 Aug 2012 23:46:05 -0700
-Subject: [PATCH] ARM: Fix XIP build due to PHYS_OFFSET definition moving
-In-Reply-To: <1343956994-27513-1-git-send-email-sboyd@codeaurora.org>
-References: <1343956994-27513-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <5024AE2D.5050506@codeaurora.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 10 Aug 2012 15:48:40 +0900
+Subject: [PATCH 05/11] ARM: exynos: exynos_pm_add_dev_to_genpd may be
+ unused
+In-Reply-To: <1344437248-20560-6-git-send-email-arnd@arndb.de>
+References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
+ <1344437248-20560-6-git-send-email-arnd@arndb.de>
+Message-ID: <0de601cd76c4$2d5846c0$8808d440$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/2/2012 6:23 PM, Stephen Boyd wrote:
-> During the p2v changes, the PHYS_OFFSET #define moved into a
-> !__ASSEMBLY__ section. This causes a XIP build to fail with
->
->  arch/arm/kernel/head.o: In function 'stext':
->  arch/arm/kernel/head.S:146: undefined reference to 'PHYS_OFFSET'
->
-> Momentarily leave the #ifndef __ASSEMBLY__ section so we can
-> define PHYS_OFFSET for all compilation units.
->
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->
-> I don't know if it's worth stable, seems that nobody has compiled XIP for
-> a year (back to 2.6.39 days?).
+Arnd Bergmann wrote:
+> 
+> exynos_pm_add_dev_to_genpd is used if one or more out of a large
+> number of Kconfig symbols are enabled. However the new
+> exynos_defconfig selects none of those, so the function becomes
+> unused. Marking it so lets the compiler automatically discard
+> it.
+> 
+> Without this patch, building exynos_defconfig results in:
+> 
+> arch/arm/mach-exynos/pm_domains.c:118:123: warning:
+> 'exynos_pm_add_dev_to_genpd' defined but not used [-Wunused-function]
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+> Cc: Rafael J. Wysocki <rjw@sisk.pl>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
 
-Is this approach acceptable? Shall I put this in the patch tracker?
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
