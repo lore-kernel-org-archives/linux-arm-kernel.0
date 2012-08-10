@@ -1,51 +1,47 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 10 Aug 2012 17:31:46 +0200
-Subject: [RFC 3/6] arm: cache-l2x0: add support for Aurora L2 cache ctrl
-In-Reply-To: <20120810152036.GK2066@mudshark.cambridge.arm.com>
-References: <1344438307-8468-1-git-send-email-gregory.clement@free-electrons.com>
- <1344438307-8468-4-git-send-email-gregory.clement@free-electrons.com>
- <20120808151946.GE4579@mudshark.cambridge.arm.com>
- <50229422.40305@free-electrons.com> <50229944.60603@free-electrons.com>
- <20120810144922.GH2066@mudshark.cambridge.arm.com>
- <50252525.8050602@free-electrons.com>
- <20120810152036.GK2066@mudshark.cambridge.arm.com>
-Message-ID: <50252962.5090107@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Aug 2012 16:37:05 +0100
+Subject: Why the region area don't decrease 1 in function
+ sanity_check_meminfo?
+In-Reply-To: <5025253D.3010007@arm.com>
+References: <CAKvkGKeqzAiqRAj+H+E-eoN9SOOMP-aMhUJYmUb0UK4ei=jouA@mail.gmail.com>
+ <5025253D.3010007@arm.com>
+Message-ID: <20120810153705.GZ18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2012 05:20 PM, Will Deacon wrote:
-> On Fri, Aug 10, 2012 at 04:13:41PM +0100, Gregory CLEMENT wrote:
->> On 08/10/2012 04:49 PM, Will Deacon wrote:
->>> Can the Armada 370 be configured to use the co-processor interface to the
->>> L2, or does only the Armada XP support that feature? What happens if you
->>> build a single zImage supporting both of the SoCs?
->>
->> About L2 cache we already use the same kernel on Armada 370 and Armada XP
->> and the differences are in the device tree.
+On Fri, Aug 10, 2012 at 04:14:05PM +0100, Jonathan Austin wrote:
+> From: Jonathan Austin <jonathan.austin@arm.com>
+> Date: Thu, 9 Aug 2012 15:59:16 +0100
+> Subject: [PATCH] arm: mm: Fix vmalloc overlap check for !HIGHMEM
 > 
-> Right, but I wonder whether you can end up using both the outer_cache
-> functions *and* the co-processor interface on the Armada XP by accident.
+> With !HIGHMEM, sanity_check_meminfo checks for banks that completely or
+> partially overlap the vmalloc region. The check for partial overlap checks
+> __va(bank->start + bank->size) > vmalloc_min, but the last address of the
+> bank is (bank->start + bank->size -1).
 
-Well from what I know it should be possible to have both in the same time.
-However we implement the support in a way that you won't have both in the
-same time: if we use the "system cache" mode then we don't use any outer_cache
-functions.
+Erm.
 
-> Ideally, we'd just use the co-processor interface on all platforms and
-> ignore the memory-mapped one. Is that possible on the 370?
-> 
-The 370 can't use the "system cache" mode (ie the co-processor).
+Let's say you have a bank at 0x80000000, which maps to 0xc0000000 virtual.
+This is 512MB in size (so it's last byte address is 0x9fffffff).  That
+places it at at 0xdfffffff.  Now, let's say vmalloc_min is 0xe0000000.
 
+"bank->start + bank->size" would be 0xa0000000, right ?
 
-__________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+So, "__va(bank->start + bank->size)" would be 0xe0000000.
 
+And "0xe0000000 > vmalloc_min" would be false.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> However, theoretically, if using using SPARSEMEM in a situation where the
+> physical to virtual address conversion is not monotonic increasing, the
+> incorrect test could result in a bank not being truncated when it should be.
+
+Right, so what you're actually talking about is a non-linear translation
+by __va() and friends.  In that case, what you actually need is:
+
+	(__va(bank->start + bank->size - 1) + 1) > vmalloc_min
+or
+	__va(bank->start + bank->size - 1) >= vmalloc_min
+
+and not
+
+	__va(bank->start + bank->size - 1) > vmalloc_min
