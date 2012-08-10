@@ -1,39 +1,59 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 10 Aug 2012 09:46:22 +0200
-Subject: [GIT PULL] at91: platform data for atmel-mci (for 3.5)
-In-Reply-To: <201207252006.44523.arnd@arndb.de>
-References: <4FBE4FE7.3010005@atmel.com> <4FC722B7.10409@atmel.com>
- <201207252006.44523.arnd@arndb.de>
-Message-ID: <5024BC4E.9010709@atmel.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 10 Aug 2012 10:43:54 +0200
+Subject: [PATCH 1/4] ARM: ux500: delete remnant U5500 macros
+Message-ID: <1344588234-8597-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2012 10:06 PM, Arnd Bergmann :
-> On Thursday 31 May 2012, Nicolas Ferre wrote:
->>
->> On 05/24/2012 05:12 PM, Nicolas Ferre :
->>> Hi Arnd, hi Olof,
->>
->> Ping?
->>
->> (or maybe you will have a look at this after the merge window...)
->>
-> 
-> I've just gone through all old pull requests that I had somewhere in
-> my inbox and this turned out to be one that we never pulled.
-> 
-> It looks like it still applies and we should send it to Linus as as
-> late branch this time, given that we screwed up and it was there
-> all the time.
-> 
-> Nicolas, can you please confirm?
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Arnd,
+The code using these ASIC detection functions is now gone so
+we remove it.
 
-I have sent to you a pull-request covering this work several days ago
-([GIT PULL] at91: soc update (for 3.6)): what is your feeling about it:
-do you think that it will still go upstream for 3.6?
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/include/mach/id.h | 29 -----------------------------
+ 1 file changed, 29 deletions(-)
 
-Thanks, bye,
+diff --git a/arch/arm/mach-ux500/include/mach/id.h b/arch/arm/mach-ux500/include/mach/id.h
+index c6e2db9..87aa921 100644
+--- a/arch/arm/mach-ux500/include/mach/id.h
++++ b/arch/arm/mach-ux500/include/mach/id.h
+@@ -51,35 +51,6 @@ static inline bool cpu_is_u8500_family(void)
+ 	return cpu_is_u8500() || cpu_is_u9540();
+ }
+ 
+-static inline bool __attribute_const__ cpu_is_u5500(void)
+-{
+-	return dbx500_partnumber() == 0x5500;
+-}
+-
+-/*
+- * 5500 revisions
+- */
+-
+-static inline bool __attribute_const__ cpu_is_u5500v1(void)
+-{
+-	return cpu_is_u5500() && (dbx500_revision() & 0xf0) == 0xA0;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u5500v2(void)
+-{
+-	return (dbx500_id.revision & 0xf0) == 0xB0;
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u5500v20(void)
+-{
+-	return cpu_is_u5500() && ((dbx500_revision() & 0xf0) == 0xB0);
+-}
+-
+-static inline bool __attribute_const__ cpu_is_u5500v21(void)
+-{
+-	return cpu_is_u5500() && (dbx500_revision() == 0xB1);
+-}
+-
+ /*
+  * 8500 revisions
+  */
 -- 
-Nicolas Ferre
+1.7.11.3
