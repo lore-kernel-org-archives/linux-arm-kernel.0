@@ -1,18 +1,13 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 11 Aug 2012 14:56:47 +0200
-Subject: [PATCH 09/11] ARM: mvebu: adjust Armada XP evaluation board DTS
+Date: Sat, 11 Aug 2012 14:56:49 +0200
+Subject: [PATCH 11/11] arm: mvebu: add pinctrl support in defconfig
 In-Reply-To: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1344689809-6223-10-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1344689809-6223-12-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-The Armada XP evaluation board is based on the MV78460 Armava XP
-SoC. Now that we have separate .dtsi files for the three different
-SoCs of the Armada XP family, use the appropriate one as include for
-the Armada XP evaluation board .dts file.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
@@ -32,26 +27,21 @@ Cc: linux-doc at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm/boot/dts/armada-xp-db.dts |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/configs/mvebu_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index f97040d..b1fc728 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -14,11 +14,11 @@
-  */
- 
- /dts-v1/;
--/include/ "armada-xp.dtsi"
-+/include/ "armada-xp-mv78460.dtsi"
- 
- / {
- 	model = "Marvell Armada XP Evaluation Board";
--	compatible = "marvell,axp-db", "marvell,armadaxp", "marvell,armada-370-xp";
-+	compatible = "marvell,axp-db", "marvell,armadaxp-mv78460", "marvell,armadaxp", "marvell,armada-370-xp";
- 
- 	chosen {
- 		bootargs = "console=ttyS0,115200 earlyprintk";
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index 2e86b31..cb07e64 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -21,6 +21,8 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_PINCTRL_ARMADA_370=y
++CONFIG_PINCTRL_ARMADA_XP=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ # CONFIG_EXT3_FS_XATTR is not set
 -- 
 1.7.10.4
