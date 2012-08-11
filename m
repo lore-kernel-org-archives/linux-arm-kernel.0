@@ -1,47 +1,50 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 11 Aug 2012 12:36:37 -0400
-Subject: [PATCH 2/3] ARM: Kirkwood: ts219: fix Makefile.boot after dts
- was split in two
-In-Reply-To: <20120811075114.GD30947@lunn.ch>
+Date: Sat, 11 Aug 2012 12:47:45 -0400
+Subject: [PATCH 3/3] ARM: Kirkwood: add DT boards to defconfig
+In-Reply-To: <20120811062111.GA30947@lunn.ch>
 References: <cover.1344651264.git.jason@lakedaemon.net>
- <4b59ab4618c9b9c055831f6b96636741bda5d42f.1344651264.git.jason@lakedaemon.net>
- <20120811075114.GD30947@lunn.ch>
-Message-ID: <20120811163637.GD22226@titan.lakedaemon.net>
+ <a0e20df2d8ad6dbcf66fa9a14482a305c4a109fe.1344651264.git.jason@lakedaemon.net>
+ <20120811062111.GA30947@lunn.ch>
+Message-ID: <20120811164745.GE22226@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 11, 2012 at 09:51:14AM +0200, Andrew Lunn wrote:
-> On Sat, Aug 11, 2012 at 02:39:46AM +0000, Jason Cooper wrote:
+On Sat, Aug 11, 2012 at 08:21:11AM +0200, Andrew Lunn wrote:
+> On Sat, Aug 11, 2012 at 02:39:47AM +0000, Jason Cooper wrote:
+> > Also, disable DEBUG_KERNEL, enable SERIAL_OF_PLATFORM, and enable EMBEDDED
+> 
+> Why disable DEBUG_KERNEL. Most of the other defconfig files have it
+> enabled.
+
+I usually get burned on desktop kernels with ~90MB initrds filling up my
+/boot partition, so I'm in the habit of disabling it.  It appears the
+convention is to enable it for defconfigs (86 of 129 in v3.6-rc1), so
+I'll re-enable it.
+
+> > 
 > > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 > > ---
-> >  arch/arm/mach-kirkwood/Makefile.boot |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> >  arch/arm/configs/kirkwood_defconfig |   12 +++++++++++-
+> >  1 files changed, 11 insertions(+), 1 deletions(-)
 > > 
-> > diff --git a/arch/arm/mach-kirkwood/Makefile.boot b/arch/arm/mach-kirkwood/Makefile.boot
-> > index 2a576ab..2ad83e2 100644
-> > --- a/arch/arm/mach-kirkwood/Makefile.boot
-> > +++ b/arch/arm/mach-kirkwood/Makefile.boot
-> > @@ -7,7 +7,7 @@ dtb-$(CONFIG_MACH_DLINK_KIRKWOOD_DT) += kirkwood-dns320.dtb
-> >  dtb-$(CONFIG_MACH_DLINK_KIRKWOOD_DT) += kirkwood-dns325.dtb
-> >  dtb-$(CONFIG_MACH_ICONNECT_DT) += kirkwood-iconnect.dtb
-> >  dtb-$(CONFIG_MACH_IB62X0_DT) += kirkwood-ib62x0.dtb
-> > -dtb-$(CONFIG_MACH_TS219_DT)	+= kirkwood-qnap-ts219.dtb
-> > +dtb-$(CONFIG_MACH_TS219_DT)	+= kirkwood-ts219-6281.dtb kirkwood-ts219-6282.dtb
+> > diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
+> > index 5a494a3..0865d2e 100644
+> > --- a/arch/arm/configs/kirkwood_defconfig
+> > +++ b/arch/arm/configs/kirkwood_defconfig
+> > @@ -3,6 +3,9 @@ CONFIG_SYSVIPC=y
+> >  CONFIG_NO_HZ=y
+> >  CONFIG_HIGH_RES_TIMERS=y
+> >  CONFIG_LOG_BUF_SHIFT=19
+> > +CONFIG_NAMESPACES=y
+> > +CONFIG_BLK_DEV_INITRD=y
 > 
-> Hi Jason
-> 
-> There is the same fix from Arnaud Patard, which has been posted to the
-> list maybe a week ago.
+> Do we need these two as well? Namespaces seems a bit unusual for a
+> tiny embedded device.
 
-dabbit!  I even have that flagged to pull in as a 3.6 fix.  I'll drop
-mine, and use his.
+initrd is another thing I do out of habit.  I tend to use an initrd that
+drops to a shell for testing.
 
-> We seem quite good at breaking Makefile.boot and not noticing it. Who
-> maintains kisskb? We should ask for make dtbs to be added to the end
-> of the build scripts.
-
-I have it in my build tests here (that's how it came up), but we'll see
-if they are ammenable to adding 'make dtbs'.
+I'll disable both.  Time for v2.
 
 thx,
 
