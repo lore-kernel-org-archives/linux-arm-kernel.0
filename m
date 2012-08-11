@@ -1,38 +1,47 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 11 Aug 2012 09:51:14 +0200
-Subject: [PATCH 2/3] ARM: Kirkwood: ts219: fix Makefile.boot after dts
- was split in two
-In-Reply-To: <4b59ab4618c9b9c055831f6b96636741bda5d42f.1344651264.git.jason@lakedaemon.net>
-References: <cover.1344651264.git.jason@lakedaemon.net>
- <4b59ab4618c9b9c055831f6b96636741bda5d42f.1344651264.git.jason@lakedaemon.net>
-Message-ID: <20120811075114.GD30947@lunn.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 11 Aug 2012 09:04:29 +0100
+Subject: [GIT PULL] LED CPU trigger driver and ARM LED code
+ consolidation (v2)
+In-Reply-To: <CAK5ve-+hFRkbZ1bmfKodzjZEyP8vTyxZzU96LnhYjp1Vn7OWcw@mail.gmail.com>
+References: <CAK5ve-KjK2mU0qjdp2HK5CdrM=eQ-hN0nw-0cJj7HGuRyGjH8w@mail.gmail.com>
+ <CAK5ve-+wWWARGz4ky_VW2AK7hHLXENkw2ANToLztcDjsegubsw@mail.gmail.com>
+ <CAOesGMhK3bkk+86jDM7bd6rFUE_RuTGWiWsB7SYJ=i2NocOiLA@mail.gmail.com>
+ <CAK5ve-KuB=5evdiJDSQbN0N=56fofNeaof==GuRXFWhA44KcAw@mail.gmail.com>
+ <CAOesGMi8UeX8fLba4F+Jo0VNadcBHbUsnc0HHA=SNx0S7=EFJw@mail.gmail.com>
+ <CAK5ve-+hFRkbZ1bmfKodzjZEyP8vTyxZzU96LnhYjp1Vn7OWcw@mail.gmail.com>
+Message-ID: <20120811080429.GA18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 11, 2012 at 02:39:46AM +0000, Jason Cooper wrote:
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> ---
->  arch/arm/mach-kirkwood/Makefile.boot |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+On Sat, Aug 11, 2012 at 02:57:18PM +0800, Bryan Wu wrote:
+> On Wed, Aug 1, 2012 at 1:10 PM, Olof Johansson <olof@lixom.net> wrote:
+> > On Tue, Jul 31, 2012 at 9:59 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
+> >> On Wed, Aug 1, 2012 at 12:55 PM, Olof Johansson <olof@lixom.net> wrote:
+> >>> On Tue, Jul 31, 2012 at 9:48 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
+> >>>> On Tue, Jul 31, 2012 at 9:46 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
+> >>>>> Russell, Arnd and Olof,
+> >>>>>
+> >>>>
+> >>>> I felt very sorry about this issue, the email was archived
+> >>>> automatically in my Gmail account. I found the root cause of the issue
+> >>>> Russell met and actually that code about trigger_data is totally
+> >>>> useless, which was removed just now. I pushed an update version again
+> >>>> to the same branch of my git tree. Please consider a pull. If I did
+> >>>> something bad, please let me know, I will fix it as soon as possible.
+> >>>
+> >>> Hi,
+> >>>
+> >>> We'll pull this in for staging again once the merge window is done.
+> >>> It's definitely not 3.6 material at this time.
+> >>>
+> >>
+> >> OK, I will rebase to 3.6-rc1 after merge window close and send out
+> >> pull request again.
+> >
+> > No need to rebase unless there are large merge conflicts.
+> >
 > 
-> diff --git a/arch/arm/mach-kirkwood/Makefile.boot b/arch/arm/mach-kirkwood/Makefile.boot
-> index 2a576ab..2ad83e2 100644
-> --- a/arch/arm/mach-kirkwood/Makefile.boot
-> +++ b/arch/arm/mach-kirkwood/Makefile.boot
-> @@ -7,7 +7,7 @@ dtb-$(CONFIG_MACH_DLINK_KIRKWOOD_DT) += kirkwood-dns320.dtb
->  dtb-$(CONFIG_MACH_DLINK_KIRKWOOD_DT) += kirkwood-dns325.dtb
->  dtb-$(CONFIG_MACH_ICONNECT_DT) += kirkwood-iconnect.dtb
->  dtb-$(CONFIG_MACH_IB62X0_DT) += kirkwood-ib62x0.dtb
-> -dtb-$(CONFIG_MACH_TS219_DT)	+= kirkwood-qnap-ts219.dtb
-> +dtb-$(CONFIG_MACH_TS219_DT)	+= kirkwood-ts219-6281.dtb kirkwood-ts219-6282.dtb
+> Olof, could you please consider pull again this branch? I keep it
+> based on 3.5 release.
 
-Hi Jason
-
-There is the same fix from Arnaud Patard, which has been posted to the
-list maybe a week ago.
-
-We seem quite good at breaking Makefile.boot and not noticing it. Who
-maintains kisskb? We should ask for make dtbs to be added to the end
-of the build scripts.
-
-   Andrew
+So what's the fix you've applied?  I don't think you've posted any patches.
