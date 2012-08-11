@@ -1,50 +1,27 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 12 Aug 2012 00:06:45 +0200
-Subject: [PATCH 3/3] ARM: Kirkwood: add DT boards to defconfig
-In-Reply-To: <a0e20df2d8ad6dbcf66fa9a14482a305c4a109fe.1344651264.git.jason@lakedaemon.net>
-References: <cover.1344651264.git.jason@lakedaemon.net>
- <a0e20df2d8ad6dbcf66fa9a14482a305c4a109fe.1344651264.git.jason@lakedaemon.net>
-Message-ID: <20120811220645.GB2856@lunn.ch>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 11 Aug 2012 22:33:15 +0000
+Subject: [PATCH V2 0/3] ARM: Kirkwood: update defconfig, add dt boards
+In-Reply-To: <cover.1344651264.git.jason@lakedaemon.net>
+Message-ID: <cover.1344720707.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 11, 2012 at 02:39:47AM +0000, Jason Cooper wrote:
-> Also, disable DEBUG_KERNEL, enable SERIAL_OF_PLATFORM, and enable EMBEDDED
-> 
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> ---
->  arch/arm/configs/kirkwood_defconfig |   12 +++++++++++-
->  1 files changed, 11 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
-> index 5a494a3..0865d2e 100644
-> --- a/arch/arm/configs/kirkwood_defconfig
-> +++ b/arch/arm/configs/kirkwood_defconfig
-> @@ -3,6 +3,9 @@ CONFIG_SYSVIPC=y
->  CONFIG_NO_HZ=y
->  CONFIG_HIGH_RES_TIMERS=y
->  CONFIG_LOG_BUF_SHIFT=19
-> +CONFIG_NAMESPACES=y
-> +CONFIG_BLK_DEV_INITRD=y
-> +CONFIG_EMBEDDED=y
->  CONFIG_PROFILING=y
->  CONFIG_OPROFILE=y
->  CONFIG_KPROBES=y
-> @@ -17,6 +20,13 @@ CONFIG_MACH_MV88F6281GTW_GE=y
->  CONFIG_MACH_SHEEVAPLUG=y
->  CONFIG_MACH_ESATA_SHEEVAPLUG=y
->  CONFIG_MACH_GURUPLUG=y
-> +CONFIG_MACH_DREAMPLUG_DT=y
-> +CONFIG_MACH_ICONNECT_DT=y
-> +CONFIG_MACH_DLINK_KIRKWOOD_DT=y
-> +CONFIG_MACH_IB62X0_DT=y
-> +CONFIG_MACH_TS219_DT=y
-> +CONFIG_MACH_GOFLEXNET_DT=y
-> +CONFIG_MACH_LSXL_DT=y
+This is a small series to update kirkwood_defconfig to include all of the new
+DT boards.  And, finally, SERIAL_OF_PLATFORM is enabled. ;-)
 
-Hi Jason
+Changes from V1:
 
-Depending on the order things get merged, it would be good if
-Sebastians' and Ians' new boards are also enabled.
+  - dropped fix for arch/arm/mach-kirkwood/Makefile.boot since the same patch
+    was already posted.
+  - removed unneeded defconfig changes so it's purely adding DT boards and
+    SERIAL_OF_PLATFORM
 
-	    Andrew
+Jason Cooper (2):
+  ARM: Kirkwood: update defconfig
+  ARM: Kirkwood: add DT boards to defconfig
+
+ arch/arm/configs/kirkwood_defconfig |   33 ++++++++++++++-------------------
+ 1 files changed, 14 insertions(+), 19 deletions(-)
+
+-- 
+1.7.8.6
