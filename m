@@ -1,75 +1,73 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 11 Aug 2012 19:10:29 +0200
-Subject: [v2] gpio: mvebu: new gpio driver for mvebu platforms
-Message-ID: <1344705034-18173-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Sat, 11 Aug 2012 19:10:31 +0200
+Subject: [PATCH 2/5] Documentation: add description of DT binding for the
+ gpio-mvebu driver
+In-Reply-To: <1344705034-18173-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1344705034-18173-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1344705034-18173-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-This patch set adds a new GPIO driver for Marvell EBU SoCs, which aims
-at replacing the existing GPIO driver from plat-orion/gpio.c. The
-driver comes with the necessary DT changes to make it work on Armada
-370 and Armada XP, and it has been tested successfully by Sebastian
-Hesselbarth on Dove. It should also work flawlessly on other Marvell
-EBU SoCs (Kirkwood, Orion, Discovery), but this remains to be tested
-by the relevant maintainers.
-
-This new driver reuses a lot of code from the existing
-plat-orion/gpio.c driver, but has a number of advantages:
-
- *) Support for Armada 370 and Armada XP
- *) It is integrated with the mvebu pinctrl driver so that GPIO pins
-    are properly muxed, and the GPIO driver knows which GPIO pins are
-    output-only or input-only. This driver has been submitted by
-    Sebastian Hesselbarth today on the LAKML.
- *) Properly placed in drivers/gpio
- *) More extensible mechanism to support platform differences. The
-    plat-orion driver uses a simple mask-offset DT property, which
-    works fine for Discovery MV78200 but not for Armada XP. The new
-    driver uses different compatible strings to identify the different
-    variants of the GPIO controllers.
-
-Changes since v1:
- * Added fixes for Dove from Sebastian Hesselbarth, and his Tested-by
-   on the driver patch.
-
-Thanks,
-
-Thomas
-
-The following changes since commit 872b6be95abf9d57e0639d0345fa2b5a0e4fa0f4:
-
-  arm: mvebu: add pinctrl support in defconfig (2012-08-11 11:27:33 +0200)
-
-are available in the git repository at:
-
-  git://github.com/MISL-EBU-System-SW/mainline-public.git mvebu-gpio
-
-for you to fetch changes up to c6347492639521d79e541a90fe2dfeec07d9b1a2:
-
-  arm: mvebu: add gpio support in defconfig (2012-08-11 19:06:40 +0200)
-
-----------------------------------------------------------------
-Thomas Petazzoni (5):
-      gpio: introduce gpio-mvebu driver for Marvell SoCs
-      Documentation: add description of DT binding for the gpio-mvebu driver
-      arm: mvebu: use GPIO support now that a driver is available
-      arm: mvebu: add DT information for GPIO banks on Armada 370 and XP
-      arm: mvebu: add gpio support in defconfig
-
- .../devicetree/bindings/gpio/gpio-mvebu.txt        |   44 ++
- arch/arm/Kconfig                                   |    1 +
- arch/arm/boot/dts/armada-370.dtsi                  |   30 +
- arch/arm/boot/dts/armada-xp-mv78230.dtsi           |   22 +
- arch/arm/boot/dts/armada-xp-mv78260.dtsi           |   33 +
- arch/arm/boot/dts/armada-xp-mv78460.dtsi           |   33 +
- arch/arm/configs/mvebu_defconfig                   |    2 +
- arch/arm/mach-mvebu/include/mach/gpio.h            |    1 +
- drivers/gpio/Kconfig                               |    6 +
- drivers/gpio/Makefile                              |    1 +
- drivers/gpio/gpio-mvebu.c                          |  656 ++++++++++++++++++++
- 11 files changed, 829 insertions(+)
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Linus Walleij <linus.walleij@stericsson.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+---
+ .../devicetree/bindings/gpio/gpio-mvebu.txt        |   44 ++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
- create mode 100644 arch/arm/mach-mvebu/include/mach/gpio.h
- create mode 100644 drivers/gpio/gpio-mvebu.c
+
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
+new file mode 100644
+index 0000000..298436c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
+@@ -0,0 +1,44 @@
++* Marvell EBU GPIO controller
++
++Required properties:
++
++- compatible : Should be "marvell,orion-gpio", "marvell,mv78200-gpio"
++  or "marvell,armadaxp-gpio". "marvell,orion-gpio" should be used for
++  Orion, Kirkwood, Dove, Discovery (except MV78200) and Armada
++  370. "marvell,mv78200-gpio" should be used for the Discovery
++  MV78200. "marvel,armadaxp-gpio" should be used for all Armada XP
++  SoCs (MV78230, MV78260, MV78460).
++
++- reg: Address and length of the register set for the device. Only one
++  entry is expected, except for the "marvell,armadaxp-gpio" variant
++  for which two entries are expected: one for the general registers,
++  one for the per-cpu registers.
++
++- interrupts: The list of interrupts that are used for all the pins
++  managed by this GPIO bank. There can be more than one interrupt
++  (example: 1 interrupt per 8 pins on Armada XP, which means 4
++  interrupts per bank of 32 GPIOs).
++
++- interrupt-controller: identifies the node as an interrupt controller
++
++- #interrupt-cells: specifies the number of celles needed to encode an
++   interrupt source
++
++- gpio-controller: marks the device node as a gpio controller
++
++- ngpios: number of GPIOs this controller has
++
++- #gpio-cells: Should be one. It is the pin number.
++
++Example:
++
++		gpio0: gpio at d0018100 {
++			compatible = "marvell,armadaxp-gpio";
++			reg = <0xd0018100 0x40>,
++			    <0xd0018800 0x30>;
++			ngpios = <32>;
++			gpio-controller;
++			#gpio-cells = <1>;
++			interrupt-controller;
++			interrupts = <16>, <17>, <18>, <19>;
++		};
+-- 
+1.7.9.5
