@@ -1,86 +1,191 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Aug 2012 19:06:48 -0000
-Subject: =?UTF-8?q?=5BGIT=20PULL=203/3=5D=20arm-soc=3A=20make=20of=5Fdevice=5Fid-=3Edata=20constant?=
-In-Reply-To: <1344625575-27560-1-git-send-email-arnd@arndb.de>
-References: <1344625575-27560-1-git-send-email-arnd@arndb.de>
-Message-ID: <1344625575-27560-4-git-send-email-arnd@arndb.de>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Sat, 11 Aug 2012 01:25:40 -0000
+Subject: [RFC v2 21/22] ARM: keystone: enable SMP on Keystone machines
+In-Reply-To: <1344648306-15619-1-git-send-email-cyril@ti.com>
+References: <1344648306-15619-1-git-send-email-cyril@ti.com>
+Message-ID: <1344648306-15619-22-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 28a33cbc24e4256c143dce96c7d93bf423229f92:
+This patch adds basic SMP support for Keystone machines.  Nothing very fancy
+here, just enough to get 4 CPUs booted up.  This does not include support for
+hotplug, etc.
 
-  Linux 3.5 (2012-07-21 13:58:29 -0700)
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+---
+ arch/arm/Kconfig                    |    1 +
+ arch/arm/configs/keystone_defconfig |    2 +
+ arch/arm/mach-keystone/Makefile     |    1 +
+ arch/arm/mach-keystone/keystone.c   |    3 ++
+ arch/arm/mach-keystone/keystone.h   |   23 +++++++++++
+ arch/arm/mach-keystone/platsmp.c    |   74 +++++++++++++++++++++++++++++++++++
+ 6 files changed, 104 insertions(+)
+ create mode 100644 arch/arm/mach-keystone/keystone.h
+ create mode 100644 arch/arm/mach-keystone/platsmp.c
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/late-warnings
-
-for you to fetch changes up to 100e8f5fda756fe71d21c0ea68d67e56f5f05167:
-
-  Merge branch 'ofdeviceiddata' of git://git.pengutronix.de/git/ukl/linux into late/warnings (2012-07-24 16:58:51 +0200)
-
-----------------------------------------------------------------
-
-arm-soc: make of_device_id->data constant
-
-This patch series from Uwe Kleine-K?nigwas meant to go into
-the v3.6 merge window, but got lost in a small miscommunication
-between Olof and me. It gets rid of a (harmless) gcc warning
-by making the of_device_id->data pointer constant, which is
-generally considered to be a good idea.
-
-Cc: "Uwe Kleine-K?nig" <u.kleine-koenig@pengutronix.de>
-----------------------------------------------------------------
-Arnd Bergmann (7):
-      watchdog/mpc8xxx: add a const qualifier
-      powerpc/fsl_msi: drop unneeded cast to non-const pointer
-      mfd/da9052: make i2c_device_id array const
-      i2c/mpc: make data used as *of_device_id.data const
-      macintosh/mediabay: make data used as *of_device_id.data const
-      can: mpc5xxx_can: make data used as *of_device_id.data const
-      Merge branch 'ofdeviceiddata' of git://git.pengutronix.de/git/ukl/linux into late/warnings
-
-Marc Kleine-Budde (1):
-      can: mpc5xxx_can: make data in mpc5xxx_can_probe const
-
-Uwe Kleine-K?nig (18):
-      spi/imx: make spi_imx_data.devtype_data member point to const data
-      spi/spi-omap2-mcspi: add a const qualifier
-      serial/imx: make imx_port.devdata member point to const data
-      serial/mpc52xx_uart: add a const qualifier
-      ARM: cache-l2x0: add a const qualifier
-      misc/atmel_tc: make atmel_tc.tcb_config member point to const data
-      gpio/gpio-omap.c: add a const qualifier
-      gpio/mpc8xxx: add a const qualifier
-      i2c/i2c-omap: add a const qualifier
-      i2c/mpc: add a const qualifier
-      dmaengine: at_hdmac: add a few const qualifiers
-      mmc/omap_hsmmc: add a const qualifier
-      macintosh/mediabay: add a const qualifier
-      powerpc/83xx: add a const qualifier
-      powerpc/fsl_msi: add a const qualifier
-      powerpc/celleb_pci: add a const qualifier
-      of: add const to struct *of_device_id.data
-      gpio/gpio-omap: make platformdata used as *of_device_id.data const
-
- arch/arm/mm/cache-l2x0.c                 |    2 +-
- arch/powerpc/platforms/83xx/suspend.c    |    2 +-
- arch/powerpc/platforms/cell/celleb_pci.c |    2 +-
- arch/powerpc/sysdev/fsl_msi.c            |    8 ++++----
- drivers/dma/at_hdmac.c                   |    4 ++--
- drivers/gpio/gpio-mpc8xxx.c              |    2 +-
- drivers/gpio/gpio-omap.c                 |    8 ++++----
- drivers/i2c/busses/i2c-mpc.c             |   12 ++++++------
- drivers/i2c/busses/i2c-omap.c            |    3 ++-
- drivers/macintosh/mediabay.c             |    8 ++++----
- drivers/mfd/da9052-i2c.c                 |    4 ++--
- drivers/mmc/host/omap_hsmmc.c            |    2 +-
- drivers/net/can/mscan/mpc5xxx_can.c      |    6 +++---
- drivers/spi/spi-imx.c                    |    2 +-
- drivers/spi/spi-omap2-mcspi.c            |    2 +-
- drivers/tty/serial/imx.c                 |    2 +-
- drivers/tty/serial/mpc52xx_uart.c        |    2 +-
- drivers/watchdog/mpc8xxx_wdt.c           |    2 +-
- include/linux/atmel_tc.h                 |    2 +-
- include/linux/mod_devicetable.h          |    2 +-
- 20 files changed, 39 insertions(+), 38 deletions(-)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index f1b8aa0..37b4e9c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -416,6 +416,7 @@ config ARCH_KEYSTONE
+ 	select SPARSE_IRQ
+ 	select NEED_MACH_MEMORY_H
+ 	select HAVE_SCHED_CLOCK
++	select HAVE_SMP
+ 	help
+ 	  Support for boards based on the Texas Instruments Keystone family of
+ 	  SoCs.
+diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
+index 7f2a04b..5f71e66 100644
+--- a/arch/arm/configs/keystone_defconfig
++++ b/arch/arm/configs/keystone_defconfig
+@@ -1,7 +1,9 @@
+ CONFIG_EXPERIMENTAL=y
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_ARCH_KEYSTONE=y
++CONFIG_SMP=y
+ CONFIG_ARM_ARCH_TIMER=y
++CONFIG_NR_CPUS=4
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ CONFIG_VFP=y
+diff --git a/arch/arm/mach-keystone/Makefile b/arch/arm/mach-keystone/Makefile
+index d4671d5..3f6b8ab 100644
+--- a/arch/arm/mach-keystone/Makefile
++++ b/arch/arm/mach-keystone/Makefile
+@@ -1 +1,2 @@
+ obj-y					:= keystone.o
++obj-$(CONFIG_SMP)			+= platsmp.o
+diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+index 702c184..6a8ece9 100644
+--- a/arch/arm/mach-keystone/keystone.c
++++ b/arch/arm/mach-keystone/keystone.c
+@@ -26,6 +26,8 @@
+ #include <asm/arch_timer.h>
+ #include <asm/hardware/gic.h>
+ 
++#include "keystone.h"
++
+ static struct map_desc io_desc[] = {
+ 	{
+ 		.virtual        = 0xfe800000UL,
+@@ -73,6 +75,7 @@ static const char *keystone_match[] __initconst = {
+ };
+ 
+ DT_MACHINE_START(KEYSTONE, "Keystone")
++	smp_ops(keystone_smp_ops)
+ 	.map_io		= keystone_map_io,
+ 	.init_irq	= keystone_init_irq,
+ 	.timer		= &keystone_timer,
+diff --git a/arch/arm/mach-keystone/keystone.h b/arch/arm/mach-keystone/keystone.h
+new file mode 100644
+index 0000000..71bd0f4
+--- /dev/null
++++ b/arch/arm/mach-keystone/keystone.h
+@@ -0,0 +1,23 @@
++/*
++ * Copyright 2010-2012 Texas Instruments, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __KEYSTONE_H__
++#define __KEYSTONE_H__
++
++extern struct smp_ops keystone_smp_ops;
++extern void secondary_startup(void);
++
++#endif /* __KEYSTONE_H__ */
+diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
+new file mode 100644
+index 0000000..dbe7601
+--- /dev/null
++++ b/arch/arm/mach-keystone/platsmp.c
+@@ -0,0 +1,74 @@
++/*
++ * Copyright 2012 Texas Instruments, Inc.
++ *
++ * Based on platsmp.c, Copyright 2010-2011 Calxeda, Inc.
++ * Based on platsmp.c, Copyright (C) 2002 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <linux/init.h>
++#include <linux/smp.h>
++#include <linux/io.h>
++
++#include <asm/smp_plat.h>
++#include <asm/smp_ops.h>
++#include <asm/hardware/gic.h>
++#include <asm/cacheflush.h>
++#include <asm/memory.h>
++
++#include "keystone.h"
++
++static void __init keystone_smp_init_cpus(void)
++{
++	unsigned int i, ncores;
++
++	ncores = 4;
++
++	/* sanity check */
++	if (ncores > NR_CPUS) {
++		pr_warn("restricted to %d cpus\n", NR_CPUS);
++		ncores = NR_CPUS;
++	}
++
++	for (i = 0; i < ncores; i++)
++		set_cpu_possible(i, true);
++
++	set_smp_cross_call(gic_raise_softirq);
++}
++
++static void __init keystone_smp_prepare_cpus(unsigned int max_cpus)
++{
++	/* nothing for now */
++}
++
++static void __cpuinit keystone_secondary_init(unsigned int cpu)
++{
++	gic_secondary_init(0);
++}
++
++static int __cpuinit
++keystone_boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	unsigned long *ptr;
++	
++	ptr = phys_to_virt(0x800001f0);
++	ptr[cpu] = virt_to_idmap(&secondary_startup);
++	__cpuc_flush_dcache_area(ptr, sizeof(ptr) * 4);
++
++	return 0;
++}
++
++struct smp_ops keystone_smp_ops __initdata = {
++	smp_init_ops(keystone)
++	smp_secondary_ops(keystone)
++};
+-- 
+1.7.9.5
