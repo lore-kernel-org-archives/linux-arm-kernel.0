@@ -1,38 +1,41 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 11 Aug 2012 08:16:16 +0200
-Subject: [PATCH 2/3] ARM: Kirkwood: ts219: fix Makefile.boot after dts
- was split in two
-In-Reply-To: <4b59ab4618c9b9c055831f6b96636741bda5d42f.1344651264.git.jason@lakedaemon.net>
+Date: Sat, 11 Aug 2012 08:21:11 +0200
+Subject: [PATCH 3/3] ARM: Kirkwood: add DT boards to defconfig
+In-Reply-To: <a0e20df2d8ad6dbcf66fa9a14482a305c4a109fe.1344651264.git.jason@lakedaemon.net>
 References: <cover.1344651264.git.jason@lakedaemon.net>
- <4b59ab4618c9b9c055831f6b96636741bda5d42f.1344651264.git.jason@lakedaemon.net>
-Message-ID: <20120811061616.GA30869@lunn.ch>
+ <a0e20df2d8ad6dbcf66fa9a14482a305c4a109fe.1344651264.git.jason@lakedaemon.net>
+Message-ID: <20120811062111.GA30947@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 11, 2012 at 02:39:46AM +0000, Jason Cooper wrote:
+On Sat, Aug 11, 2012 at 02:39:47AM +0000, Jason Cooper wrote:
+> Also, disable DEBUG_KERNEL, enable SERIAL_OF_PLATFORM, and enable EMBEDDED
+
+Hi Jason
+
+Why disable DEBUG_KERNEL. Most of the other defconfig files have it
+enabled.
+
+
+
+> 
 > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 > ---
->  arch/arm/mach-kirkwood/Makefile.boot |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  arch/arm/configs/kirkwood_defconfig |   12 +++++++++++-
+>  1 files changed, 11 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/mach-kirkwood/Makefile.boot b/arch/arm/mach-kirkwood/Makefile.boot
-> index 2a576ab..2ad83e2 100644
-> --- a/arch/arm/mach-kirkwood/Makefile.boot
-> +++ b/arch/arm/mach-kirkwood/Makefile.boot
-> @@ -7,7 +7,7 @@ dtb-$(CONFIG_MACH_DLINK_KIRKWOOD_DT) += kirkwood-dns320.dtb
->  dtb-$(CONFIG_MACH_DLINK_KIRKWOOD_DT) += kirkwood-dns325.dtb
->  dtb-$(CONFIG_MACH_ICONNECT_DT) += kirkwood-iconnect.dtb
->  dtb-$(CONFIG_MACH_IB62X0_DT) += kirkwood-ib62x0.dtb
-> -dtb-$(CONFIG_MACH_TS219_DT)	+= kirkwood-qnap-ts219.dtb
-> +dtb-$(CONFIG_MACH_TS219_DT)	+= kirkwood-ts219-6281.dtb kirkwood-ts219-6282.dtb
+> diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
+> index 5a494a3..0865d2e 100644
+> --- a/arch/arm/configs/kirkwood_defconfig
+> +++ b/arch/arm/configs/kirkwood_defconfig
+> @@ -3,6 +3,9 @@ CONFIG_SYSVIPC=y
+>  CONFIG_NO_HZ=y
+>  CONFIG_HIGH_RES_TIMERS=y
+>  CONFIG_LOG_BUF_SHIFT=19
+> +CONFIG_NAMESPACES=y
+> +CONFIG_BLK_DEV_INITRD=y
 
-A fix for this has already been accepted into arm-soc for the next rc.
+Do we need these two as well? Namespaces seems a bit unusual for a
+tiny embedded device.
 
-  Andrew
-
->  dtb-$(CONFIG_MACH_GOFLEXNET_DT) += kirkwood-goflexnet.dtb
->  dbt-$(CONFIG_MACH_LSXL_DT) += kirkwood-lschlv2.dtb
->  dbt-$(CONFIG_MACH_LSXL_DT) += kirkwood-lsxhl.dtb
-> -- 
-> 1.7.8.6
-> 
+     Andrew
