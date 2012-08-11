@@ -1,57 +1,31 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 11 Aug 2012 12:17:14 +0200
-Subject: [PATCH 1/2] ARM: local timers: Unmask interrupt before new TVAL
- is set
-In-Reply-To: <1344635854-5033-1-git-send-email-rvaswani@codeaurora.org>
-References: <1344635854-5033-1-git-send-email-rvaswani@codeaurora.org>
-Message-ID: <cdb51f00bafa8151a880d8cc7898631e@localhost>
+Date: Sat, 11 Aug 2012 11:31:29 +0100
+Subject: [PATCH v2 0/2] arch_timers patches to enable KVM support
+Message-ID: <1344681091-12652-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Aug 2012 14:57:34 -0700, Rohit Vaswani
-<rvaswani@codeaurora.org>
-wrote:
-> Level triggered interrupt is deasserted when a new TVAL is written
-> only when the interrupt is unmasked. Make sure that the interrupt
-> is unmasked in CTL register before TVAL is written.
-> If this order is not followed, there are chances that on some
-> hardware you would not receive any timer interrupts.
-> 
-> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
-> ---
->  arch/arm/kernel/arch_timer.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-> index dd58035..1d0d9df 100644
-> --- a/arch/arm/kernel/arch_timer.c
-> +++ b/arch/arm/kernel/arch_timer.c
-> @@ -126,8 +126,8 @@ static int arch_timer_set_next_event(unsigned long
-evt,
->  	ctrl |= ARCH_TIMER_CTRL_ENABLE;
->  	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
->  
-> -	arch_timer_reg_write(ARCH_TIMER_REG_TVAL, evt);
->  	arch_timer_reg_write(ARCH_TIMER_REG_CTRL, ctrl);
-> +	arch_timer_reg_write(ARCH_TIMER_REG_TVAL, evt);
+This series is aimed at offering the minimum level of support that KVM
+needs when it comes to architected timers.
 
-But by doing so, you're opening a window where TVAL can be negative (from
-a previous timer trigger) and the interrupt unmasked, which would lead to
-an immediate trigger, before TVAL is updated with the new value.
+The first patch changes the driver to use the virtual timer by default
+instead of the physical one (access to the later is conditioned by the
+hypervisor settings, while the former is always available). This could
+be required even if the kernel is not running as a guest.
 
-Does your hardware deassert the interrupt even when the enable bit is not
-set? If so, would the following sequence work?
+The second patch exposes a clockcycle counter that can be used by
+other subsystems.
 
-        ctrl &= ~(ARCH_TIMER_CTRL_ENABLE | ARCH_TIMER_CTRL_IT_MASK);
-        arch_timer_reg_write(ARCH_TIMER_REG_CTRL, ctrl);
+Patches based on v3.6-rc1.
 
-	arch_timer_reg_write(ARCH_TIMER_REG_TVAL, evt);
 
-        ctrl |= ARCH_TIMER_CTRL_ENABLE;
-        arch_timer_reg_write(ARCH_TIMER_REG_CTRL, ctrl);
+Marc Zyngier (2):
+  ARM: arch_timers: enable the use of the virtual timer
+  ARM: arch_timers: register a time/cycle counter
 
-Thanks,
+ arch/arm/include/asm/arch_timer.h |    7 +
+ arch/arm/kernel/arch_timer.c      |  286 ++++++++++++++++++++++++++++--------
+ 2 files changed, 229 insertions(+), 64 deletions(-)
 
-        M.
 -- 
-Fast, cheap, reliable. Pick two.
+1.7.8.6
