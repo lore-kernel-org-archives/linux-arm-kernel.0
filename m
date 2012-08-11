@@ -1,15 +1,17 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 11 Aug 2012 12:35:25 +0200
-Subject: [PATCH v2 5/6] ARM: dove: add device tree descriptors
+Date: Sat, 11 Aug 2012 12:35:24 +0200
+Subject: [PATCH v2 4/6] ARM: dove: add device tree based machine descriptor
 In-Reply-To: <1344681326-17946-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1344255815-4457-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1344681326-17946-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1344681326-17946-6-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1344681326-17946-5-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree decriptors for dove SoC and currently
-supported boards.
+This adds a generic DT_MACHINE for mach-dove. As with other orion based
+SoCs there still is some glue code required to make all internal devices
+work, i.e. auxdata is provided to pass clocks to corresponding device
+drivers.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -24,262 +26,116 @@ Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Maen Suleiman <maen@marvell.com>
 Cc: Olof Johansson <olof@lixom.net>
 ---
- arch/arm/boot/dts/dove-cm-a510.dts |   38 ++++++++++
- arch/arm/boot/dts/dove-dove-db.dts |   38 ++++++++++
- arch/arm/boot/dts/dove.dtsi        |  143 ++++++++++++++++++++++++++++++++++++
- arch/arm/mach-dove/Makefile.boot   |    3 +
- 4 files changed, 222 insertions(+)
- create mode 100644 arch/arm/boot/dts/dove-cm-a510.dts
- create mode 100644 arch/arm/boot/dts/dove-dove-db.dts
- create mode 100644 arch/arm/boot/dts/dove.dtsi
+ arch/arm/mach-dove/Kconfig  |    7 +++++
+ arch/arm/mach-dove/common.c |   67 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 74 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dove-cm-a510.dts b/arch/arm/boot/dts/dove-cm-a510.dts
-new file mode 100644
-index 0000000..61a8062
---- /dev/null
-+++ b/arch/arm/boot/dts/dove-cm-a510.dts
-@@ -0,0 +1,38 @@
-+/dts-v1/;
+diff --git a/arch/arm/mach-dove/Kconfig b/arch/arm/mach-dove/Kconfig
+index dd937c5..00154e7 100644
+--- a/arch/arm/mach-dove/Kconfig
++++ b/arch/arm/mach-dove/Kconfig
+@@ -15,6 +15,13 @@ config MACH_CM_A510
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  CompuLab CM-A510 Board.
+ 
++config MACH_DOVE_DT
++	bool "Marvell Dove Flattened Device Tree"
++	select USE_OF
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  Marvell Dove using flattened device tree.
 +
-+/include/ "dove.dtsi"
+ endmenu
+ 
+ endif
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index 88e3d91..d860f3b 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -17,6 +17,8 @@
+ #include <linux/ata_platform.h>
+ #include <linux/gpio.h>
+ #include <linux/mv643xx_i2c.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
+ #include <asm/page.h>
+ #include <asm/setup.h>
+ #include <asm/timex.h>
+@@ -30,6 +32,7 @@
+ #include <asm/mach/arch.h>
+ #include <linux/irq.h>
+ #include <plat/time.h>
++#include <plat/irq.h>
+ #include <plat/ehci-orion.h>
+ #include <plat/common.h>
+ #include <plat/addr-map.h>
+@@ -381,3 +384,67 @@ void dove_restart(char mode, const char *cmd)
+ 	while (1)
+ 		;
+ }
 +
-+/ {
-+	model = "Compulab CM-A510";
-+	compatible = "compulab,cm-a510", "marvell,dove";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x40000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8 earlyprintk";
-+	};
++#if defined(CONFIG_MACH_DOVE_DT)
++/*
++ * Auxdata required until real OF clock provider
++ */
++struct of_dev_auxdata dove_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
++	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1014600, "orion_spi.1", NULL),
++	OF_DEV_AUXDATA("marvell,orion-wdt", 0xf1020300, "orion_wdt", NULL),
++	OF_DEV_AUXDATA("marvell,mv64xxx-i2c", 0xf1011000, "mv64xxx_i2c.0",
++		       NULL),
++	OF_DEV_AUXDATA("marvell,orion-sata", 0xf10a0000, "sata_mv.0", NULL),
++	OF_DEV_AUXDATA("marvell,dove-sdhci", 0xf1092000, "sdhci-dove.0", NULL),
++	OF_DEV_AUXDATA("marvell,dove-sdhci", 0xf1090000, "sdhci-dove.1", NULL),
++	{},
 +};
 +
-+&uart0 { status = "okay"; };
-+&uart1 { status = "okay"; };
-+&sdio0 { status = "okay"; };
-+&sdio1 { status = "okay"; };
-+&sata0 { status = "okay"; };
-+
-+&spi0 {
-+	status = "okay";
-+
-+	/* spi0.0: 4M Flash Winbond W25Q32BV */
-+	spi-flash at 0 {
-+		compatible = "st,w25q32";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+	};
++static struct mv643xx_eth_platform_data dove_dt_ge00_data = {
++	.phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT,
 +};
 +
-+&i2c0 {
-+	  status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/dove-dove-db.dts b/arch/arm/boot/dts/dove-dove-db.dts
-new file mode 100644
-index 0000000..e5a920b
---- /dev/null
-+++ b/arch/arm/boot/dts/dove-dove-db.dts
-@@ -0,0 +1,38 @@
-+/dts-v1/;
++static void __init dove_dt_init(void)
++{
++	pr_info("Dove 88AP510 SoC, TCLK = %d MHz.\n",
++		(dove_tclk + 499999) / 1000000);
 +
-+/include/ "dove.dtsi"
++#ifdef CONFIG_CACHE_TAUROS2
++	tauros2_init();
++#endif
++	dove_setup_cpu_mbus();
 +
-+/ {
-+	model = "Marvell DB-MV88AP510-BP Development Board";
-+	compatible = "marvell,dove-db", "marvell,dove";
++	/* Setup root of clk tree */
++	dove_clk_init();
 +
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x40000000>;
-+	};
++	/* Internal devices not ported to DT yet */
++	dove_rtc_init();
++	dove_xor0_init();
++	dove_xor1_init();
 +
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8 earlyprintk";
-+	};
-+};
++	dove_ge00_init(&dove_dt_ge00_data);
++	dove_ehci0_init();
++	dove_ehci1_init();
++	dove_pcie_init(1, 1);
++	dove_crypto_init();
 +
-+&uart0 { status = "okay"; };
-+&uart1 { status = "okay"; };
-+&sdio0 { status = "okay"; };
-+&sdio1 { status = "okay"; };
-+&sata0 { status = "okay"; };
++	of_platform_populate(NULL, of_default_bus_match_table,
++			     dove_auxdata_lookup, NULL);
++}
 +
-+&spi0 {
-+	status = "okay";
-+
-+	/* spi0.0: 4M Flash ST-M25P32-VMF6P */
-+	spi-flash at 0 {
-+		compatible = "st,m25p32";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+	};
++static const char * const dove_dt_board_compat[] = {
++	"marvell,dove",
++	NULL
 +};
 +
-+&i2c0 {
-+	  status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-new file mode 100644
-index 0000000..96fb824
---- /dev/null
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -0,0 +1,143 @@
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "marvell,dove";
-+	model = "Marvell Armada 88AP510 SoC";
-+
-+	interrupt-parent = <&intc>;
-+
-+	intc: interrupt-controller {
-+		compatible = "marvell,orion-intc";
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+		reg = <0xf1020204 0x04>,
-+		      <0xf1020214 0x04>;
-+	};
-+
-+	mbus at f1000000 {
-+		compatible = "simple-bus";
-+		ranges = <0 0xf1000000 0x4000000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		uart0: serial at 12000 {
-+			compatible = "ns16550a";
-+			reg = <0x12000 0x100>;
-+			reg-shift = <2>;
-+			interrupts = <7>;
-+			clock-frequency = <166666667>;
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 12100 {
-+			compatible = "ns16550a";
-+			reg = <0x12100 0x100>;
-+			reg-shift = <2>;
-+			interrupts = <8>;
-+			clock-frequency = <166666667>;
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at 12200 {
-+			compatible = "ns16550a";
-+			reg = <0x12000 0x100>;
-+			reg-shift = <2>;
-+			interrupts = <9>;
-+			clock-frequency = <166666667>;
-+			status = "disabled";
-+		};
-+
-+		uart3: serial at 12300 {
-+			compatible = "ns16550a";
-+			reg = <0x12100 0x100>;
-+			reg-shift = <2>;
-+			interrupts = <10>;
-+			clock-frequency = <166666667>;
-+			status = "disabled";
-+		};
-+
-+		wdt: wdt at 20300 {
-+			compatible = "marvell,orion-wdt";
-+			reg = <0x20300 0x28>;
-+		};
-+
-+		gpio0: gpio at d0400 {
-+			compatible = "marvell,orion-gpio";
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			reg = <0xd0400 0x20>;
-+			ngpio = <32>;
-+			interrupts = <12>, <13>, <14>, <60>;
-+		};
-+
-+		gpio1: gpio at d0420 {
-+			compatible = "marvell,orion-gpio";
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			reg = <0xd0420 0x20>;
-+			ngpio = <32>;
-+			interrupts = <61>;
-+		};
-+
-+		gpio2: gpio at e8400 {
-+			compatible = "marvell,orion-gpio";
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			reg = <0xe8400 0x0c>;
-+			ngpio = <8>;
-+		};
-+
-+		spi0: spi at 10600 {
-+			compatible = "marvell,orion-spi";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			cell-index = <0>;
-+			interrupts = <6>;
-+			reg = <0x10600 0x28>;
-+			status = "disabled";
-+		};
-+
-+		spi1: spi at 14600 {
-+			compatible = "marvell,orion-spi";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			cell-index = <1>;
-+			interrupts = <5>;
-+			reg = <0x14600 0x28>;
-+			status = "disabled";
-+		};
-+
-+		i2c0: i2c at 11000 {
-+			compatible = "marvell,mv64xxx-i2c";
-+			reg = <0x11000 0x20>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <11>;
-+			clock-frequency = <400000>;
-+			timeout-ms = <1000>;
-+			status = "disabled";
-+		};
-+
-+		sdio0: sdio at 92000 {
-+			compatible = "marvell,dove-sdhci";
-+			reg = <0x92000 0x100>;
-+			interrupts = <35>, <37>;
-+			status = "disabled";
-+		};
-+
-+		sdio1: sdio at 90000 {
-+			compatible = "marvell,dove-sdhci";
-+			reg = <0x90000 0x100>;
-+			interrupts = <36>, <38>;
-+			status = "disabled";
-+		};
-+
-+		sata0: sata at a0000 {
-+			compatible = "marvell,orion-sata";
-+			reg = <0xa0000 0x2400>;
-+			interrupts = <62>;
-+			nr-ports = <1>;
-+			status = "disabled";
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-dove/Makefile.boot b/arch/arm/mach-dove/Makefile.boot
-index 760a0ef..94ab6b3 100644
---- a/arch/arm/mach-dove/Makefile.boot
-+++ b/arch/arm/mach-dove/Makefile.boot
-@@ -1,3 +1,6 @@
-    zreladdr-y	+= 0x00008000
- params_phys-y	:= 0x00000100
- initrd_phys-y	:= 0x00800000
-+
-+dtb-$(CONFIG_MACH_DOVE_DT) += dove-dove-db.dtb
-+dtb-$(CONFIG_MACH_DOVE_DT) += dove-cm-a510.dtb
++DT_MACHINE_START(DOVE_DT, "Marvell Dove (Flattened Device Tree)")
++	.map_io		= dove_map_io,
++	.init_early	= dove_init_early,
++	.init_irq	= orion_dt_init_irq,
++	.timer		= &dove_timer,
++	.init_machine	= dove_dt_init,
++	.restart	= dove_restart,
++	.dt_compat	= dove_dt_board_compat,
++MACHINE_END
++#endif
 -- 
 1.7.10.4
