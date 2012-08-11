@@ -1,47 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 11 Aug 2012 09:04:29 +0100
-Subject: [GIT PULL] LED CPU trigger driver and ARM LED code
- consolidation (v2)
-In-Reply-To: <CAK5ve-+hFRkbZ1bmfKodzjZEyP8vTyxZzU96LnhYjp1Vn7OWcw@mail.gmail.com>
-References: <CAK5ve-KjK2mU0qjdp2HK5CdrM=eQ-hN0nw-0cJj7HGuRyGjH8w@mail.gmail.com>
- <CAK5ve-+wWWARGz4ky_VW2AK7hHLXENkw2ANToLztcDjsegubsw@mail.gmail.com>
- <CAOesGMhK3bkk+86jDM7bd6rFUE_RuTGWiWsB7SYJ=i2NocOiLA@mail.gmail.com>
- <CAK5ve-KuB=5evdiJDSQbN0N=56fofNeaof==GuRXFWhA44KcAw@mail.gmail.com>
- <CAOesGMi8UeX8fLba4F+Jo0VNadcBHbUsnc0HHA=SNx0S7=EFJw@mail.gmail.com>
- <CAK5ve-+hFRkbZ1bmfKodzjZEyP8vTyxZzU96LnhYjp1Vn7OWcw@mail.gmail.com>
-Message-ID: <20120811080429.GA18957@n2100.arm.linux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 11 Aug 2012 11:12:55 +0200
+Subject: [PATCH 1/6] ARM: dove: unify clock setup
+In-Reply-To: <1344255815-4457-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1344255815-4457-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1344255815-4457-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20120811091255.GA31809@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 11, 2012 at 02:57:18PM +0800, Bryan Wu wrote:
-> On Wed, Aug 1, 2012 at 1:10 PM, Olof Johansson <olof@lixom.net> wrote:
-> > On Tue, Jul 31, 2012 at 9:59 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
-> >> On Wed, Aug 1, 2012 at 12:55 PM, Olof Johansson <olof@lixom.net> wrote:
-> >>> On Tue, Jul 31, 2012 at 9:48 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
-> >>>> On Tue, Jul 31, 2012 at 9:46 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
-> >>>>> Russell, Arnd and Olof,
-> >>>>>
-> >>>>
-> >>>> I felt very sorry about this issue, the email was archived
-> >>>> automatically in my Gmail account. I found the root cause of the issue
-> >>>> Russell met and actually that code about trigger_data is totally
-> >>>> useless, which was removed just now. I pushed an update version again
-> >>>> to the same branch of my git tree. Please consider a pull. If I did
-> >>>> something bad, please let me know, I will fix it as soon as possible.
-> >>>
-> >>> Hi,
-> >>>
-> >>> We'll pull this in for staging again once the merge window is done.
-> >>> It's definitely not 3.6 material at this time.
-> >>>
-> >>
-> >> OK, I will rebase to 3.6-rc1 after merge window close and send out
-> >> pull request again.
-> >
-> > No need to rebase unless there are large merge conflicts.
-> >
-> 
-> Olof, could you please consider pull again this branch? I keep it
-> based on 3.5 release.
+Hi Sebastian
 
-So what's the fix you've applied?  I don't think you've posted any patches.
+> -static void __init clk_init(void)
+> +static void __init dove_clk_init(void)
+>  {
+>  	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, CLK_IS_ROOT,
+> -				       get_tclk());
+> +				       dove_tclk);
+>  
+>  	orion_clkdev_init(tclk);
+> +
+> +	/* Ensure tclk is always clocked */
+> +	clk_prepare_enable(tclk);
+>  }
+
+"ticking" would be better than clocked. 
+
+Since this is a root fixed clock, is it necessary to prepare_enable()
+it? I think prepare and enable become NOPs in this situation.
+
+    Andrew
