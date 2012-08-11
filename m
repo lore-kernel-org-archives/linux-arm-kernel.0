@@ -1,32 +1,78 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 11 Aug 2012 15:31:46 +0200
-Subject: [PATCH 5/5] arm: mvebu: add gpio support in defconfig
-In-Reply-To: <1344691906-15985-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1344691906-15985-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1344691906-15985-6-git-send-email-thomas.petazzoni@free-electrons.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Sat, 11 Aug 2012 09:37:54 -0400
+Subject: [PATCH v2 1/2] ARM: arch_timers: enable the use of the virtual
+ timer
+In-Reply-To: <1344681091-12652-2-git-send-email-marc.zyngier@arm.com>
+References: <1344681091-12652-1-git-send-email-marc.zyngier@arm.com>
+ <1344681091-12652-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <50266032.9070702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
----
- arch/arm/configs/mvebu_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+Marc,
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index cb07e64..8dbb0bf 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -23,6 +23,8 @@ CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_PINCTRL_ARMADA_370=y
- CONFIG_PINCTRL_ARMADA_XP=y
-+CONFIG_GPIOLIB=y
-+CONFIG_GPIO_SYSFS=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- # CONFIG_EXT3_FS_XATTR is not set
+On 8/11/2012 6:31 AM, Marc Zyngier wrote:
+> At the moment, the arch_timer driver only uses the physical timer,
+> which can cause problem if PL2 hasn't enabled PL1 access in CNTHCTL,
+> which is likely in a virtualized environment. Instead, the virtual
+> timer is always available.
+>
+> This patch enables the use of both the virtual timer, unless no
+> interrupt is provided in the DT for it, in which case is falls
+> back to the physical timer.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   arch/arm/kernel/arch_timer.c |  261 +++++++++++++++++++++++++++++++----------
+>   1 files changed, 197 insertions(+), 64 deletions(-)
+>
+> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+> index cf25880..4a64733 100644
+[...]
+> +	if (arch_timer_use_virtual) {
+> +		ppi = arch_timer_ppi[VIRT_PPI];
+> +		err = request_percpu_irq(ppi, arch_timer_handler,
+> +					 "arch_timer", arch_timer_evt);
+> +	} else {
+> +		ppi = arch_timer_ppi[PHYS_SECURE_PPI];
+> +		err = request_percpu_irq(ppi, arch_timer_handler,
+> +					 "arch_timer", arch_timer_evt);
+> +		if (!err) {
+> +			ppi = arch_timer_ppi[PHYS_NONSECURE_PPI];
+> +			err = request_percpu_irq(ppi, arch_timer_handler,
+> +						 "arch_timer", arch_timer_evt);
+> +			if (err)
+> +				free_percpu_irq(arch_timer_ppi[PHYS_SECURE_PPI],
+> +						arch_timer_evt);
+> +		}
+> +	}
+> +
+>   	if (err) {
+>   		pr_err("arch_timer: can't register interrupt %d (%d)\n",
+> -		       arch_timer_ppi, err);
+> +		       ppi, err);
+>   		goto out_free;
+>   	}
+>
+> -	if (arch_timer_ppi2) {
+> -		err = request_percpu_irq(arch_timer_ppi2, arch_timer_handler,
+> -					 "arch_timer", arch_timer_evt);
+> -		if (err) {
+> -			pr_err("arch_timer: can't register interrupt %d (%d)\n",
+> -			       arch_timer_ppi2, err);
+> -			arch_timer_ppi2 = 0;
+> -			goto out_free_irq;
+> -		}
+> -	}
+> -
+
+In the original code, arch_timer_ppi2 appears to have been entirely 
+optional.
+
+With this change, the code appears to mandate that both nonsecure and 
+secure PPIs be available (if !arch_timer_use_virtual).  Could you please 
+explain this change?
+
 -- 
-1.7.9.5
+Thanks
+- Cyril
