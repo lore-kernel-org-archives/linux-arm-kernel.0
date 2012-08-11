@@ -1,41 +1,43 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 11 Aug 2012 12:04:31 +0100
-Subject: [PATCH 1/7] ARM: opcodes: add __ERET/__MSR_ELR_HYP instruction
- encoding
+Date: Sat, 11 Aug 2012 12:04:37 +0100
+Subject: [PATCH 7/7] ARM: virt: arch_timers: enable access to physical timers
 In-Reply-To: <1344683077-12841-1-git-send-email-marc.zyngier@arm.com>
 References: <1344683077-12841-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1344683077-12841-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1344683077-12841-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling boot from HYP mode requires the use of some more
-virt-specific instructions ("eret" and "msr elr_hyp, reg").
-
-Add the necessary encoding to asm/opcode-virt.h.
+If booting in HYP mode, it makes sense to enable the use of the
+physical timers, so the kernel can use them directly.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/opcodes-virt.h |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/kernel/hyp-stub.S |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/opcodes-virt.h b/arch/arm/include/asm/opcodes-virt.h
-index b85665a..efcfdf9 100644
---- a/arch/arm/include/asm/opcodes-virt.h
-+++ b/arch/arm/include/asm/opcodes-virt.h
-@@ -26,4 +26,14 @@
- 	0xF7E08000 | (((imm16) & 0xF000) << 4) | ((imm16) & 0x0FFF)	\
- )
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index 4ff46fa..8c288ba 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -137,6 +137,19 @@ THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
+ 	mcr	p15, 4, r7, c1, c0, 0	@ HSCTLR
+ 	isb
  
-+#define __ERET	__inst_arm_thumb32(					\
-+	0xE160006E,							\
-+	0xF3DE8F00							\
-+)
++#if !defined(ZIMAGE) && defined(CONFIG_ARM_ARCH_TIMER)
++	@ make CNTP_* and CNTPCT accessible from PL1
++	mrc	p15, 0, r7, c0, c1, 1	@ ID_PFR1
++	lsr	r7, #16
++	and	r7, #0xf
++	cmp	r7, #1
++	bne	1f
++	mrc	p15, 4, r7, c14, c1, 0	@ CNTHCTL
++	orr	r7, r7, #3		@ PL1PCEN | PL1PCTEN
++	mcr	p15, 4, r7, c14, c1, 0	@ CNTHCTL
++1:
++#endif
 +
-+#define __MSR_ELR_HYP(regnum)	__inst_arm_thumb32(			\
-+	0xE12EF300 | regnum,						\
-+	0xF3808E30 | (regnum << 16)					\
-+)
-+
- #endif /* ! __ASM_ARM_OPCODES_VIRT_H */
+ 	bic	r7, r4, #MODE_MASK
+ 	orr	r7, r7, #SVC_MODE
+ THUMB(	orr	r7, r7, #PSR_T_BIT	)
 -- 
 1.7.8.6
