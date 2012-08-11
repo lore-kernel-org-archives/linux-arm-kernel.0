@@ -1,51 +1,31 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 11 Aug 2012 12:47:45 -0400
-Subject: [PATCH 3/3] ARM: Kirkwood: add DT boards to defconfig
-In-Reply-To: <20120811062111.GA30947@lunn.ch>
-References: <cover.1344651264.git.jason@lakedaemon.net>
- <a0e20df2d8ad6dbcf66fa9a14482a305c4a109fe.1344651264.git.jason@lakedaemon.net>
- <20120811062111.GA30947@lunn.ch>
-Message-ID: <20120811164745.GE22226@titan.lakedaemon.net>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sat, 11 Aug 2012 19:06:18 +0200
+Subject: AT91 RM9200 hangs on delay loop calibration
+Message-ID: <CAGhQ9Vyvr7bDU8cNirGuTkhsH1LhHPRjehftOwwSnox+i1b=5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 11, 2012 at 08:21:11AM +0200, Andrew Lunn wrote:
-> On Sat, Aug 11, 2012 at 02:39:47AM +0000, Jason Cooper wrote:
-> > Also, disable DEBUG_KERNEL, enable SERIAL_OF_PLATFORM, and enable EMBEDDED
-> 
-> Why disable DEBUG_KERNEL. Most of the other defconfig files have it
-> enabled.
+Hi,
 
-I usually get burned on desktop kernels with ~90MB initrds filling up my
-/boot partition, so I'm in the habit of disabling it.  It appears the
-convention is to enable it for defconfigs (86 of 129 in v3.6-rc1), so
-I'll re-enable it.
+My custom AT91 RM9200 board hangs on delay loop calibration. There it
+seems to be stuck and the last message printed is:
+[    0.000000] Calibrating delay loop...
 
-> > 
-> > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> > ---
-> >  arch/arm/configs/kirkwood_defconfig |   12 +++++++++++-
-> >  1 files changed, 11 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
-> > index 5a494a3..0865d2e 100644
-> > --- a/arch/arm/configs/kirkwood_defconfig
-> > +++ b/arch/arm/configs/kirkwood_defconfig
-> > @@ -3,6 +3,9 @@ CONFIG_SYSVIPC=y
-> >  CONFIG_NO_HZ=y
-> >  CONFIG_HIGH_RES_TIMERS=y
-> >  CONFIG_LOG_BUF_SHIFT=19
-> > +CONFIG_NAMESPACES=y
-> > +CONFIG_BLK_DEV_INITRD=y
-> 
-> Do we need these two as well? Namespaces seems a bit unusual for a
-> tiny embedded device.
+Doing a manual bisect I can get the board to boot again when I revert
+the following commits from Linus master:
+14070ade02cc378bc30dae383532768a94805988 - ARM: at91: fix new build errors
+c4b68520dc0ec96153bc0d87bca5ffba508edfcf - ARM: at91: add AIC5 support
+4c6971a6debb340d487cf6189f15a1332702330f - ARM: at91: remove mach/irqs.h
+8fe82a5550a8e97b3f59c74f994b88ed6b3544a3 - ARM: at91: sparse irq support
+3e135466745a62b1814edef74c7b4a25e6bda707 - ARM: at91: at91 based
+machines specify their own irq handler at run time
 
-initrd is another thing I do out of habit.  I tend to use an initrd that
-drops to a shell for testing.
+There may be some unnecessary reverts here but there are multiple
+build failures between the different commits (grrrrr) which makes it
+pain to filter it out.
 
-I'll disable both.  Time for v2.
+I suspect that right now all AT91 RM9200 machines are broken by these
+IRQ changes on AT91.
 
-thx,
-
-Jason.
+regards
+Joachim Eastwood
