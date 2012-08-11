@@ -1,79 +1,41 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Fri, 10 Aug 2012 21:24:59 -0400
-Subject: [PATCH v2 16/22] ARM: mm: cleanup checks for membank overlap with
- vmalloc area
+Date: Fri, 10 Aug 2012 21:24:50 -0400
+Subject: [PATCH v2 07/22] ARM: LPAE: use phys_addr_t in alloc_init_pud()
 In-Reply-To: <1344648306-15619-1-git-send-email-cyril@ti.com>
 References: <1344648306-15619-1-git-send-email-cyril@ti.com>
-Message-ID: <1344648306-15619-17-git-send-email-cyril@ti.com>
+Message-ID: <1344648306-15619-8-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Keystone platforms, physical memory is entirely outside the 32-bit
-addressible range.  Therefore, the (bank->start > ULONG_MAX) check below marks
-the entire system memory as highmem, and this causes unpleasentness all over.
+From: Vitaly Andrianov <vitalya@ti.com>
 
-This patch eliminates the extra bank start check (against ULONG_MAX) by
-checking bank->start against the physical address corresponding to vmalloc_min
-instead.
+This patch fixes the alloc_init_pud() function to use phys_addr_t instead of
+unsigned long when passing in the phys argument.
 
-In the process, this patch also cleans up parts of the highmem sanity check
-code by removing what has now become a redundant check for banks that entirely
-overlap with the vmalloc range.
+This is an extension to commit 97092e0c56830457af0639f6bd904537a150ea4a (ARM:
+pgtable: use phys_addr_t for physical addresses), which applied similar changes
+elsewhere in the ARM memory management code.
 
-Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/mm/mmu.c |   19 +------------------
- 1 file changed, 1 insertion(+), 18 deletions(-)
+ arch/arm/mm/mmu.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index f764c03..3d685c6 100644
+index 4c2d045..53eeeb8 100644
 --- a/arch/arm/mm/mmu.c
 +++ b/arch/arm/mm/mmu.c
-@@ -901,15 +901,12 @@ void __init sanity_check_meminfo(void)
- 		struct membank *bank = &meminfo.bank[j];
- 		*bank = meminfo.bank[i];
+@@ -622,7 +622,8 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
+ }
  
--		if (bank->start > ULONG_MAX)
--			highmem = 1;
--
--#ifdef CONFIG_HIGHMEM
- 		if (bank->start >= vmalloc_limit)
- 			highmem = 1;
- 
- 		bank->highmem = highmem;
- 
-+#ifdef CONFIG_HIGHMEM
- 		/*
- 		 * Split those memory banks which are partially overlapping
- 		 * the vmalloc area greatly simplifying things later.
-@@ -932,8 +929,6 @@ void __init sanity_check_meminfo(void)
- 			bank->size = vmalloc_limit - bank->start;
- 		}
- #else
--		bank->highmem = highmem;
--
- 		/*
- 		 * Highmem banks not allowed with !CONFIG_HIGHMEM.
- 		 */
-@@ -946,18 +941,6 @@ void __init sanity_check_meminfo(void)
- 		}
- 
- 		/*
--		 * Check whether this memory bank would entirely overlap
--		 * the vmalloc area.
--		 */
--		if (bank->start >= vmalloc_limit) {
--			printk(KERN_NOTICE "Ignoring RAM at %.8llx-%.8llx "
--			       "(vmalloc region overlap).\n",
--			       (unsigned long long)bank->start,
--			       (unsigned long long)bank->start + bank->size - 1);
--			continue;
--		}
--
--		/*
- 		 * Check whether this memory bank would partially overlap
- 		 * the vmalloc area.
- 		 */
+ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+-	unsigned long end, unsigned long phys, const struct mem_type *type)
++				  unsigned long end, phys_addr_t phys,
++				  const struct mem_type *type)
+ {
+ 	pud_t *pud = pud_offset(pgd, addr);
+ 	unsigned long next;
 -- 
 1.7.9.5
