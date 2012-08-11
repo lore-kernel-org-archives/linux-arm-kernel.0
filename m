@@ -1,43 +1,95 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 11 Aug 2012 14:47:17 +0200
-Subject: [PATCH v3] mtd: gpmi: add NAND write verify support
-In-Reply-To: <CAMiH66GbOYDpo-RDUct2nCixaf+9vhmT8Ouz+YPx95Z1+g2B1Q@mail.gmail.com>
-References: <1344700231-12624-1-git-send-email-shijie8@gmail.com>
- <201208110913.54479.marex@denx.de>
- <CAMiH66GbOYDpo-RDUct2nCixaf+9vhmT8Ouz+YPx95Z1+g2B1Q@mail.gmail.com>
-Message-ID: <201208111447.18076.marex@denx.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 11 Aug 2012 14:56:38 +0200
+Subject: [PATCH 00/11] pinctrl: mvebu: pinctrl driver
+Message-ID: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Huang Shijie,
+This patch set adds a core pinctrl driver for Marvell MVEBU SoCs and
+SoC specific stubs for Armada 370, Armada XP, Dove, and Kirkwood.
+The SoC specific stubs use the pinctrl-mvebu core driver that handles
+pinctrl API and register accesses for common pinctrl registers.
 
-> On Sat, Aug 11, 2012 at 3:13 PM, Marek Vasut <marex@denx.de> wrote:
-> > Dear Huang Shijie,
-> > 
-> > Please re-add credit to Fabio. Also, Fabio fixed the subject to be more
-> 
-> sorry. Should I add "Reported by : Fabio ...." to the patch?
+As especially Dove has some pinctrl registers that do not match the
+common pinctrl register layout the core driver has been extended by
+some callbacks to allow uncommon Dove pinctrl registers.
 
-Yes, at least.
+DT binding documentation is added for all supported SoCs but as
+Dove and Kirkwood are not yet ready for full DT support, the pinctrl
+driver is only activated for Armada 370 and XP.
 
-> I really appriaciate Fabio's work, but I do not think Fabio's patch is
-> more accurate.
-> The nand chips can be 2K page, 4K page and 8K page. But most of the
-> time, the nand chip is 4K page.
-> If we fix the verify_buf to 8K size as Fabio's patch does. It will
-> waste much memory.
-> This is my concern now. :)
+The driver has been tested on Dove, 88f6281 variant of Kirkwood,
+Armada 370, and XP.
 
-That's all right, but the rest of your patch is Fabio's work, correct me if I'm 
-wrong. Just give the guy some credit, he found the flaw and diag'd it.
+Sebastian Hesselbarth (3):
+  pinctrl: mvebu: pinctrl driver core
+  pinctrl: mvebu: dove pinctrl driver
+  pinctrl: mvebu: kirkwood pinctrl driver
 
-> My patch maybe not good. So If Fabio also sends out a new patch which
-> allocates the verify_buf with the mtd->writesize size.
-> I will ack it.
+Thomas Petazzoni (8):
+  pinctrl: mvebu: add pinctrl driver for Armada 370
+  pinctrl: mvebu: add pinctrl driver for Armada XP
+  ARM: mvebu: add pinctrl device in DT for Armada 370/XP SoCs
+  ARM: mvebu: Add pinctrl support to Armada XP SoCs
+  ARM: mvebu: Add pinctrl support to Armada 370 SoC
+  ARM: mvebu: adjust Armada XP evaluation board DTS
+  arm: mvebu: enable PINCTRL usage
+  arm: mvebu: add pinctrl support in defconfig
 
-Either way is OK.
+ .../pinctrl/marvell,armada-370-pinctrl.txt         |   95 +++
+ .../bindings/pinctrl/marvell,armada-xp-pinctrl.txt |  100 +++
+ .../bindings/pinctrl/marvell,dove-pinctrl.txt      |   71 ++
+ .../bindings/pinctrl/marvell,kirkwood-pinctrl.txt  |  279 +++++++
+ .../bindings/pinctrl/marvell,mvebu-pinctrl.txt     |   46 ++
+ arch/arm/Kconfig                                   |    3 +
+ arch/arm/boot/dts/armada-370-xp.dtsi               |    7 +
+ arch/arm/boot/dts/armada-370.dtsi                  |    4 +
+ arch/arm/boot/dts/armada-xp-db.dts                 |    4 +-
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi           |   27 +
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi           |   27 +
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi           |   27 +
+ arch/arm/configs/mvebu_defconfig                   |    2 +
+ drivers/pinctrl/Kconfig                            |   34 +
+ drivers/pinctrl/Makefile                           |    5 +
+ drivers/pinctrl/pinctrl-armada-370.c               |  421 +++++++++++
+ drivers/pinctrl/pinctrl-armada-xp.c                |  466 ++++++++++++
+ drivers/pinctrl/pinctrl-dove.c                     |  622 ++++++++++++++++
+ drivers/pinctrl/pinctrl-kirkwood.c                 |  460 ++++++++++++
+ drivers/pinctrl/pinctrl-mvebu.c                    |  758 ++++++++++++++++++++
+ drivers/pinctrl/pinctrl-mvebu.h                    |  175 +++++
+ 21 files changed, 3631 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,kirkwood-pinctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt
+ create mode 100644 arch/arm/boot/dts/armada-xp-mv78230.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-xp-mv78260.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-xp-mv78460.dtsi
+ create mode 100644 drivers/pinctrl/pinctrl-armada-370.c
+ create mode 100644 drivers/pinctrl/pinctrl-armada-xp.c
+ create mode 100644 drivers/pinctrl/pinctrl-dove.c
+ create mode 100644 drivers/pinctrl/pinctrl-kirkwood.c
+ create mode 100644 drivers/pinctrl/pinctrl-mvebu.c
+ create mode 100644 drivers/pinctrl/pinctrl-mvebu.h
 
-[...]
-
-> > Best regards,
-> > Marek Vasut
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Rob Landley <rob@landley.net>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Lior Amsalem <alior@marvell.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Ben Dooks <ben.dooks@codethink.co.uk>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: linux-doc at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+-- 
+1.7.10.4
