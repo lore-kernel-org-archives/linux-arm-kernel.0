@@ -1,30 +1,143 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 11 Aug 2012 02:39:46 +0000
-Subject: [PATCH 2/3] ARM: Kirkwood: ts219: fix Makefile.boot after dts was
- split in two
+Date: Sat, 11 Aug 2012 02:39:45 +0000
+Subject: [PATCH 1/3] ARM: Kirkwood: update defconfig
 In-Reply-To: <cover.1344651264.git.jason@lakedaemon.net>
 References: <cover.1344651264.git.jason@lakedaemon.net>
-Message-ID: <4b59ab4618c9b9c055831f6b96636741bda5d42f.1344651264.git.jason@lakedaemon.net>
+Message-ID: <8f635f63d0de5505ca735cfed2028cd9a2fece09.1344651264.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 ---
- arch/arm/mach-kirkwood/Makefile.boot |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/configs/kirkwood_defconfig |   25 ++++++-------------------
+ 1 files changed, 6 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-kirkwood/Makefile.boot b/arch/arm/mach-kirkwood/Makefile.boot
-index 2a576ab..2ad83e2 100644
---- a/arch/arm/mach-kirkwood/Makefile.boot
-+++ b/arch/arm/mach-kirkwood/Makefile.boot
-@@ -7,7 +7,7 @@ dtb-$(CONFIG_MACH_DLINK_KIRKWOOD_DT) += kirkwood-dns320.dtb
- dtb-$(CONFIG_MACH_DLINK_KIRKWOOD_DT) += kirkwood-dns325.dtb
- dtb-$(CONFIG_MACH_ICONNECT_DT) += kirkwood-iconnect.dtb
- dtb-$(CONFIG_MACH_IB62X0_DT) += kirkwood-ib62x0.dtb
--dtb-$(CONFIG_MACH_TS219_DT)	+= kirkwood-qnap-ts219.dtb
-+dtb-$(CONFIG_MACH_TS219_DT)	+= kirkwood-ts219-6281.dtb kirkwood-ts219-6282.dtb
- dtb-$(CONFIG_MACH_GOFLEXNET_DT) += kirkwood-goflexnet.dtb
- dbt-$(CONFIG_MACH_LSXL_DT) += kirkwood-lschlv2.dtb
- dbt-$(CONFIG_MACH_LSXL_DT) += kirkwood-lsxhl.dtb
+diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
+index aeb3af5..5a494a3 100644
+--- a/arch/arm/configs/kirkwood_defconfig
++++ b/arch/arm/configs/kirkwood_defconfig
+@@ -1,5 +1,7 @@
+ CONFIG_EXPERIMENTAL=y
+ CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_LOG_BUF_SHIFT=19
+ CONFIG_PROFILING=y
+ CONFIG_OPROFILE=y
+@@ -15,9 +17,9 @@ CONFIG_MACH_MV88F6281GTW_GE=y
+ CONFIG_MACH_SHEEVAPLUG=y
+ CONFIG_MACH_ESATA_SHEEVAPLUG=y
+ CONFIG_MACH_GURUPLUG=y
+-CONFIG_MACH_DOCKSTAR=y
+ CONFIG_MACH_TS219=y
+ CONFIG_MACH_TS41X=y
++CONFIG_MACH_DOCKSTAR=y
+ CONFIG_MACH_OPENRD_BASE=y
+ CONFIG_MACH_OPENRD_CLIENT=y
+ CONFIG_MACH_OPENRD_ULTIMATE=y
+@@ -29,8 +31,6 @@ CONFIG_MACH_NET2BIG_V2=y
+ CONFIG_MACH_NET5BIG_V2=y
+ CONFIG_MACH_T5325=y
+ # CONFIG_CPU_FEROCEON_OLD_ID is not set
+-CONFIG_NO_HZ=y
+-CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ # CONFIG_OABI_COMPAT is not set
+@@ -47,13 +47,11 @@ CONFIG_IP_PNP_DHCP=y
+ CONFIG_IP_PNP_BOOTP=y
+ # CONFIG_IPV6 is not set
+ CONFIG_NET_DSA=y
+-CONFIG_NET_DSA_MV88E6123_61_65=y
+ CONFIG_NET_PKTGEN=m
+ CONFIG_CFG80211=y
+ CONFIG_MAC80211=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_MTD=y
+-CONFIG_MTD_PARTITIONS=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+@@ -69,7 +67,6 @@ CONFIG_MTD_M25P80=y
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_ORION=y
+ CONFIG_BLK_DEV_LOOP=y
+-# CONFIG_MISC_DEVICES is not set
+ # CONFIG_SCSI_PROC_FS is not set
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_BLK_DEV_SR=m
+@@ -78,22 +75,20 @@ CONFIG_ATA=y
+ CONFIG_SATA_AHCI=y
+ CONFIG_SATA_MV=y
+ CONFIG_NETDEVICES=y
+-CONFIG_MARVELL_PHY=y
+-CONFIG_NET_ETHERNET=y
+ CONFIG_MII=y
+-CONFIG_NET_PCI=y
++CONFIG_NET_DSA_MV88E6123_61_65=y
+ CONFIG_MV643XX_ETH=y
+-# CONFIG_NETDEV_10000 is not set
++CONFIG_MARVELL_PHY=y
+ CONFIG_LIBERTAS=y
+ CONFIG_LIBERTAS_SDIO=y
+ CONFIG_INPUT_EVDEV=y
+ CONFIG_KEYBOARD_GPIO=y
+ # CONFIG_INPUT_MOUSE is not set
++CONFIG_LEGACY_PTY_COUNT=16
+ # CONFIG_DEVKMEM is not set
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_RUNTIME_UARTS=2
+-CONFIG_LEGACY_PTY_COUNT=16
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
+ # CONFIG_I2C_COMPAT is not set
+@@ -103,7 +98,6 @@ CONFIG_SPI=y
+ CONFIG_SPI_ORION=y
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
+-# CONFIG_VGA_CONSOLE is not set
+ CONFIG_HID_DRAGONRISE=y
+ CONFIG_HID_GYRATION=y
+ CONFIG_HID_TWINHAN=y
+@@ -119,10 +113,8 @@ CONFIG_HID_TOPSEED=y
+ CONFIG_HID_THRUSTMASTER=y
+ CONFIG_HID_ZEROPLUS=y
+ CONFIG_USB=y
+-CONFIG_USB_DEVICEFS=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_ROOT_HUB_TT=y
+-CONFIG_USB_EHCI_TT_NEWSCHED=y
+ CONFIG_USB_PRINTER=m
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_STORAGE_DATAFAB=y
+@@ -148,7 +140,6 @@ CONFIG_MV_XOR=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ # CONFIG_EXT3_FS_XATTR is not set
+-CONFIG_INOTIFY=y
+ CONFIG_ISO9660_FS=m
+ CONFIG_JOLIET=y
+ CONFIG_UDF_FS=m
+@@ -158,7 +149,6 @@ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
+ CONFIG_CRAMFS=y
+ CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+ CONFIG_ROOT_NFS=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_CODEPAGE_850=y
+@@ -171,11 +161,8 @@ CONFIG_DEBUG_KERNEL=y
+ # CONFIG_SCHED_DEBUG is not set
+ # CONFIG_DEBUG_PREEMPT is not set
+ CONFIG_DEBUG_INFO=y
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+-CONFIG_SYSCTL_SYSCALL_CHECK=y
+ # CONFIG_FTRACE is not set
+ CONFIG_DEBUG_USER=y
+-CONFIG_DEBUG_ERRORS=y
+ CONFIG_DEBUG_LL=y
+ CONFIG_CRYPTO_CBC=m
+ CONFIG_CRYPTO_PCBC=m
 -- 
 1.7.8.6
