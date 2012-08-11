@@ -1,78 +1,41 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Sat, 11 Aug 2012 09:37:54 -0400
-Subject: [PATCH v2 1/2] ARM: arch_timers: enable the use of the virtual
- timer
-In-Reply-To: <1344681091-12652-2-git-send-email-marc.zyngier@arm.com>
-References: <1344681091-12652-1-git-send-email-marc.zyngier@arm.com>
- <1344681091-12652-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <50266032.9070702@ti.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Sat, 11 Aug 2012 09:56:37 -0400
+Subject: [PATCH v3] mtd: gpmi: add NAND write verify support
+In-Reply-To: <201208111447.18076.marex@denx.de>
+References: <1344700231-12624-1-git-send-email-shijie8@gmail.com>
+ <201208110913.54479.marex@denx.de>
+ <CAMiH66GbOYDpo-RDUct2nCixaf+9vhmT8Ouz+YPx95Z1+g2B1Q@mail.gmail.com>
+ <201208111447.18076.marex@denx.de>
+Message-ID: <CAMiH66E+a=8cxj5wFwNVHRJ5DReEVQ0uwr5MBmdM6HqThbrbOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
-
-On 8/11/2012 6:31 AM, Marc Zyngier wrote:
-> At the moment, the arch_timer driver only uses the physical timer,
-> which can cause problem if PL2 hasn't enabled PL1 access in CNTHCTL,
-> which is likely in a virtualized environment. Instead, the virtual
-> timer is always available.
+On Sat, Aug 11, 2012 at 8:47 AM, Marek Vasut <marex@denx.de> wrote:
+> Dear Huang Shijie,
 >
-> This patch enables the use of both the virtual timer, unless no
-> interrupt is provided in the DT for it, in which case is falls
-> back to the physical timer.
+>> On Sat, Aug 11, 2012 at 3:13 PM, Marek Vasut <marex@denx.de> wrote:
+>> > Dear Huang Shijie,
+>> >
+>> > Please re-add credit to Fabio. Also, Fabio fixed the subject to be more
+>>
+>> sorry. Should I add "Reported by : Fabio ...." to the patch?
 >
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   arch/arm/kernel/arch_timer.c |  261 +++++++++++++++++++++++++++++++----------
->   1 files changed, 197 insertions(+), 64 deletions(-)
+> Yes, at least.
 >
-> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-> index cf25880..4a64733 100644
-[...]
-> +	if (arch_timer_use_virtual) {
-> +		ppi = arch_timer_ppi[VIRT_PPI];
-> +		err = request_percpu_irq(ppi, arch_timer_handler,
-> +					 "arch_timer", arch_timer_evt);
-> +	} else {
-> +		ppi = arch_timer_ppi[PHYS_SECURE_PPI];
-> +		err = request_percpu_irq(ppi, arch_timer_handler,
-> +					 "arch_timer", arch_timer_evt);
-> +		if (!err) {
-> +			ppi = arch_timer_ppi[PHYS_NONSECURE_PPI];
-> +			err = request_percpu_irq(ppi, arch_timer_handler,
-> +						 "arch_timer", arch_timer_evt);
-> +			if (err)
-> +				free_percpu_irq(arch_timer_ppi[PHYS_SECURE_PPI],
-> +						arch_timer_evt);
-> +		}
-> +	}
-> +
->   	if (err) {
->   		pr_err("arch_timer: can't register interrupt %d (%d)\n",
-> -		       arch_timer_ppi, err);
-> +		       ppi, err);
->   		goto out_free;
->   	}
+>> I really appriaciate Fabio's work, but I do not think Fabio's patch is
+>> more accurate.
+>> The nand chips can be 2K page, 4K page and 8K page. But most of the
+>> time, the nand chip is 4K page.
+>> If we fix the verify_buf to 8K size as Fabio's patch does. It will
+>> waste much memory.
+>> This is my concern now. :)
 >
-> -	if (arch_timer_ppi2) {
-> -		err = request_percpu_irq(arch_timer_ppi2, arch_timer_handler,
-> -					 "arch_timer", arch_timer_evt);
-> -		if (err) {
-> -			pr_err("arch_timer: can't register interrupt %d (%d)\n",
-> -			       arch_timer_ppi2, err);
-> -			arch_timer_ppi2 = 0;
-> -			goto out_free_irq;
-> -		}
-> -	}
-> -
+> That's all right, but the rest of your patch is Fabio's work, correct me if I'm
 
-In the original code, arch_timer_ppi2 appears to have been entirely 
-optional.
+Frankly speaking, this patch was finished after I read your comments,
+and before Fabio sent out his patch.
+I did not send it out, just because i did not test it on the imx6q-arm2 board.
 
-With this change, the code appears to mandate that both nonsecure and 
-secure PPIs be available (if !arch_timer_use_virtual).  Could you please 
-explain this change?
+thanks
 
--- 
-Thanks
-- Cyril
+Huang Shijie
