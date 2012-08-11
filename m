@@ -1,50 +1,92 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Fri, 10 Aug 2012 21:24:51 -0400
-Subject: [PATCH v2 08/22] ARM: LPAE: use phys_addr_t in free_memmap()
+Date: Fri, 10 Aug 2012 21:24:54 -0400
+Subject: [PATCH v2 11/22] ARM: LPAE: use 64-bit accessors for TTBR registers
 In-Reply-To: <1344648306-15619-1-git-send-email-cyril@ti.com>
 References: <1344648306-15619-1-git-send-email-cyril@ti.com>
-Message-ID: <1344648306-15619-9-git-send-email-cyril@ti.com>
+Message-ID: <1344648306-15619-12-git-send-email-cyril@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vitaly Andrianov <vitalya@ti.com>
+This patch adds TTBR accessor macros, and modifies cpu_get_pgd() and
+the LPAE version of cpu_set_reserved_ttbr0() to use these instead.
 
-The free_memmap() was mistakenly using unsigned long type to represent
-physical addresses.  This breaks on PAE systems where memory could be placed
-above the 32-bit addressible limit.
+In the process, we also fix these functions to correctly handle cases
+where the physical address lies beyond the 4G limit of 32-bit addressing.
 
-This patch fixes this function to properly use phys_addr_t instead.
-
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 ---
- arch/arm/mm/init.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/proc-fns.h |   24 +++++++++++++++++++-----
+ arch/arm/mm/context.c           |    9 ++-------
+ 2 files changed, 21 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 9aec41f..19ba70b 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -457,7 +457,7 @@ static inline void
- free_memmap(unsigned long start_pfn, unsigned long end_pfn)
+diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
+index 75b5f14..24224df 100644
+--- a/arch/arm/include/asm/proc-fns.h
++++ b/arch/arm/include/asm/proc-fns.h
+@@ -116,13 +116,27 @@ extern void cpu_resume(void);
+ #define cpu_switch_mm(pgd,mm) cpu_do_switch_mm(virt_to_phys(pgd),mm)
+ 
+ #ifdef CONFIG_ARM_LPAE
++
++#define cpu_get_ttbr(nr)					\
++	({							\
++		u64 ttbr;					\
++		__asm__("mrrc	p15, " #nr ", %Q0, %R0, c2"	\
++			: "=r" (ttbr)				\
++			: : "cc");				\
++		ttbr;						\
++	})
++
++#define cpu_set_ttbr(nr, val)					\
++	do {							\
++		u64 ttbr = val;					\
++		__asm__("mcrr	p15, " #nr ", %Q0, %R0, c2"	\
++			: : "r" (ttbr)				\
++			: "cc");				\
++	} while (0)
++
+ #define cpu_get_pgd()	\
+ 	({						\
+-		unsigned long pg, pg2;			\
+-		__asm__("mrrc	p15, 0, %0, %1, c2"	\
+-			: "=r" (pg), "=r" (pg2)		\
+-			:				\
+-			: "cc");			\
++		u64 pg = cpu_get_ttbr(0);		\
+ 		pg &= ~(PTRS_PER_PGD*sizeof(pgd_t)-1);	\
+ 		(pgd_t *)phys_to_virt(pg);		\
+ 	})
+diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
+index 119bc52..cd27f35 100644
+--- a/arch/arm/mm/context.c
++++ b/arch/arm/mm/context.c
+@@ -16,6 +16,7 @@
+ #include <asm/mmu_context.h>
+ #include <asm/thread_notify.h>
+ #include <asm/tlbflush.h>
++#include <asm/proc-fns.h>
+ 
+ static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
+ unsigned int cpu_last_asid = ASID_FIRST_VERSION;
+@@ -23,17 +24,11 @@ unsigned int cpu_last_asid = ASID_FIRST_VERSION;
+ #ifdef CONFIG_ARM_LPAE
+ void cpu_set_reserved_ttbr0(void)
  {
- 	struct page *start_pg, *end_pg;
--	unsigned long pg, pgend;
-+	phys_addr_t pg, pgend;
- 
+-	unsigned long ttbl = __pa(swapper_pg_dir);
+-	unsigned long ttbh = 0;
+-
  	/*
- 	 * Convert start_pfn/end_pfn to a struct page pointer.
-@@ -469,8 +469,8 @@ free_memmap(unsigned long start_pfn, unsigned long end_pfn)
- 	 * Convert to physical addresses, and
- 	 * round start upwards and end downwards.
+ 	 * Set TTBR0 to swapper_pg_dir which contains only global entries. The
+ 	 * ASID is set to 0.
  	 */
--	pg = (unsigned long)PAGE_ALIGN(__pa(start_pg));
--	pgend = (unsigned long)__pa(end_pg) & PAGE_MASK;
-+	pg = PAGE_ALIGN(__pa(start_pg));
-+	pgend = __pa(end_pg) & PAGE_MASK;
- 
- 	/*
- 	 * If there are free pages between these,
+-	asm volatile(
+-	"	mcrr	p15, 0, %0, %1, c2		@ set TTBR0\n"
+-	:
+-	: "r" (ttbl), "r" (ttbh));
++	cpu_set_ttbr(0, __pa(swapper_pg_dir));
+ 	isb();
+ }
+ #else
 -- 
 1.7.9.5
