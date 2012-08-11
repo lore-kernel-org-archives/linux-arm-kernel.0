@@ -1,119 +1,59 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 12 Aug 2012 01:11:51 +0200
-Subject: [PATCH 2/3 V2] IIO: Add basic MXS LRADC driver
-In-Reply-To: <501F8509.1030903@metafoo.de>
-References: <1344007721-11595-1-git-send-email-marex@denx.de>
- <1344007721-11595-3-git-send-email-marex@denx.de>
- <501F8509.1030903@metafoo.de>
-Message-ID: <201208120111.51639.marex@denx.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 11 Aug 2012 19:18:55 -0400
+Subject: [PATCH 3/3] ARM: Kirkwood: add DT boards to defconfig
+In-Reply-To: <20120811220645.GB2856@lunn.ch>
+References: <cover.1344651264.git.jason@lakedaemon.net>
+ <a0e20df2d8ad6dbcf66fa9a14482a305c4a109fe.1344651264.git.jason@lakedaemon.net>
+ <20120811220645.GB2856@lunn.ch>
+Message-ID: <20120811231855.GH22226@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Lars-Peter Clausen,
-
-> On 08/03/2012 05:28 PM, Marek Vasut wrote:
-> > This driver is very basic. It supports userland trigger, buffer and
-> > raw access to channels. The support for delay channels is missing
-> > altogether.
-> 
-> Looks mostly good to me. Some comments inline.
-> 
-> I think you need to provide a documentation for the devicetree binding,
-> even though it's a rather simple binding.
-
-Definitelly, will add it.
-
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Jonathan Cameron <jic23@kernel.org>
-> > Cc: Juergen Beisert <jbe@pengutronix.de>
-> > Cc: Lars-Peter Clausen <lars@metafoo.de>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Wolfgang Denk <wd@denx.de>
+On Sun, Aug 12, 2012 at 12:06:45AM +0200, Andrew Lunn wrote:
+> On Sat, Aug 11, 2012 at 02:39:47AM +0000, Jason Cooper wrote:
+> > Also, disable DEBUG_KERNEL, enable SERIAL_OF_PLATFORM, and enable EMBEDDED
+> > 
+> > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 > > ---
+> >  arch/arm/configs/kirkwood_defconfig |   12 +++++++++++-
+> >  1 files changed, 11 insertions(+), 1 deletions(-)
 > > 
-> >  drivers/staging/iio/adc/Kconfig     |   12 +
-> >  drivers/staging/iio/adc/Makefile    |    1 +
-> >  drivers/staging/iio/adc/mxs-lradc.c |  591
-> >  +++++++++++++++++++++++++++++++++++ 3 files changed, 604 insertions(+)
-> >  create mode 100644 drivers/staging/iio/adc/mxs-lradc.c
-> > 
-> > V2: Use delay channel 0 in case of buffered sampling so the samples are
-> > deployed
-> > 
-> >     continuously.
-> >     Disallow RAW sampling while buffered mode is enabled to simplify
-> >     code.
-> > 
-> > diff --git a/drivers/staging/iio/adc/Kconfig
-> > b/drivers/staging/iio/adc/Kconfig index 67711b7..97ca697 100644
-> > --- a/drivers/staging/iio/adc/Kconfig
-> > +++ b/drivers/staging/iio/adc/Kconfig
+> > diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
+> > index 5a494a3..0865d2e 100644
+> > --- a/arch/arm/configs/kirkwood_defconfig
+> > +++ b/arch/arm/configs/kirkwood_defconfig
+> > @@ -3,6 +3,9 @@ CONFIG_SYSVIPC=y
+> >  CONFIG_NO_HZ=y
+> >  CONFIG_HIGH_RES_TIMERS=y
+> >  CONFIG_LOG_BUF_SHIFT=19
+> > +CONFIG_NAMESPACES=y
+> > +CONFIG_BLK_DEV_INITRD=y
+> > +CONFIG_EMBEDDED=y
+> >  CONFIG_PROFILING=y
+> >  CONFIG_OPROFILE=y
+> >  CONFIG_KPROBES=y
+> > @@ -17,6 +20,13 @@ CONFIG_MACH_MV88F6281GTW_GE=y
+> >  CONFIG_MACH_SHEEVAPLUG=y
+> >  CONFIG_MACH_ESATA_SHEEVAPLUG=y
+> >  CONFIG_MACH_GURUPLUG=y
+> > +CONFIG_MACH_DREAMPLUG_DT=y
+> > +CONFIG_MACH_ICONNECT_DT=y
+> > +CONFIG_MACH_DLINK_KIRKWOOD_DT=y
+> > +CONFIG_MACH_IB62X0_DT=y
+> > +CONFIG_MACH_TS219_DT=y
+> > +CONFIG_MACH_GOFLEXNET_DT=y
+> > +CONFIG_MACH_LSXL_DT=y
 > 
-> [...]
-> 
-> > + */
-> > +static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
-> > +			const struct iio_chan_spec *chan,
-> > +			int *val, int *val2, long m)
-> > +{
-> > [...]
-> > +
-> > +	init_completion(&lradc->completion);
-> 
-> This should rather be INIT_COMPLETION. init_completion should only called
-> once in probe, since it will reinitialize the spinlock which opens up race
-> conditions.
-> 
-> > [...]
-> > +
-> > +	/* Wait for completion on the channel, 1 second max. */
-> > +	ret = wait_for_completion_killable_timeout(&lradc->completion,
-> > +						msecs_to_jiffies(1000));
-> 
-> msecs_to_jiffies(1000) = HZ, but I guess both is OK.
+> Depending on the order things get merged, it would be good if
+> Sebastians' and Ians' new boards are also enabled.
 
-Even on NOHZ kernel?
+Agreed, I'll hold off on this until we get theirs upstream, then I'll
+push v3 including their boards.
 
-> > [...]
-> > +}
-> 
-> [...]
-> 
-> > +
-> > +static int __devinit mxs_lradc_probe(struct platform_device *pdev)
-> > +{
-> > [...]
-> > +
-> > +	/* Grab all IRQ sources */
-> > +	for (i = 0; i < 13; i++) {
-> > +		lradc->irq[i] = platform_get_irq(pdev, i);
-> > +		if (lradc->irq[i] < 0) {
-> > +			ret = -EINVAL;
-> > +			goto err_addr;
-> > +		}
-> > +
-> > +		ret = devm_request_irq(dev, lradc->irq[i],
-> > +					mxs_lradc_handle_irq, 0,
-> > +					mxs_lradc_irq_name[i], iio);
-> 
-> devm_request_irq is a bit dangerous as long we do not have a
-> devm_iio_device_alloc. The IRQ will only be freed after the memory for the
-> IIO device has been freed, which means there is a slight window where the
-> IRQ could fire although the memory has already been freed.
+In the future, new boards should include a change to the appropriate
+defconfig to enable building them.  I'll make sure to mention it on
+anything new coming in.
 
-The IRQ is disabled, see mxs_lradc_hw_stop(), so it should be all right.
+thx,
 
-> > +		if (ret)
-> > +			goto err_addr;
-> > +	}
-> > +
-> > +	dev_set_drvdata(&pdev->dev, iio);
-> 
-> platform_set_drvdata
-> 
-> > +
-> > +	init_completion(&lradc->completion);
-> > +	mutex_init(&lradc->lock);
-> > +
-> 
-> [...]
+Jason.
