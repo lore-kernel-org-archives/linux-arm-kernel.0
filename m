@@ -1,72 +1,38 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 11 Aug 2012 14:08:09 +0900
-Subject: [PATCH 1/2] ARM: S3C64XX: Update configuration for WM5102 module
- on Cragganmore
-In-Reply-To: <20120810100713.GH24328@opensource.wolfsonmicro.com>
-References: <1344535549-4371-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <0db901cd76b4$7daf1730$790d4590$%kim@samsung.com>
- <20120810100713.GH24328@opensource.wolfsonmicro.com>
-Message-ID: <0eff01cd777f$4c9d1f90$e5d75eb0$%kim@samsung.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 11 Aug 2012 08:16:16 +0200
+Subject: [PATCH 2/3] ARM: Kirkwood: ts219: fix Makefile.boot after dts
+ was split in two
+In-Reply-To: <4b59ab4618c9b9c055831f6b96636741bda5d42f.1344651264.git.jason@lakedaemon.net>
+References: <cover.1344651264.git.jason@lakedaemon.net>
+ <4b59ab4618c9b9c055831f6b96636741bda5d42f.1344651264.git.jason@lakedaemon.net>
+Message-ID: <20120811061616.GA30869@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+On Sat, Aug 11, 2012 at 02:39:46AM +0000, Jason Cooper wrote:
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> ---
+>  arch/arm/mach-kirkwood/Makefile.boot |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> On Fri, Aug 10, 2012 at 01:56:23PM +0900, Kukjin Kim wrote:
+> diff --git a/arch/arm/mach-kirkwood/Makefile.boot b/arch/arm/mach-kirkwood/Makefile.boot
+> index 2a576ab..2ad83e2 100644
+> --- a/arch/arm/mach-kirkwood/Makefile.boot
+> +++ b/arch/arm/mach-kirkwood/Makefile.boot
+> @@ -7,7 +7,7 @@ dtb-$(CONFIG_MACH_DLINK_KIRKWOOD_DT) += kirkwood-dns320.dtb
+>  dtb-$(CONFIG_MACH_DLINK_KIRKWOOD_DT) += kirkwood-dns325.dtb
+>  dtb-$(CONFIG_MACH_ICONNECT_DT) += kirkwood-iconnect.dtb
+>  dtb-$(CONFIG_MACH_IB62X0_DT) += kirkwood-ib62x0.dtb
+> -dtb-$(CONFIG_MACH_TS219_DT)	+= kirkwood-qnap-ts219.dtb
+> +dtb-$(CONFIG_MACH_TS219_DT)	+= kirkwood-ts219-6281.dtb kirkwood-ts219-6282.dtb
+
+A fix for this has already been accepted into arm-soc for the next rc.
+
+  Andrew
+
+>  dtb-$(CONFIG_MACH_GOFLEXNET_DT) += kirkwood-goflexnet.dtb
+>  dbt-$(CONFIG_MACH_LSXL_DT) += kirkwood-lschlv2.dtb
+>  dbt-$(CONFIG_MACH_LSXL_DT) += kirkwood-lsxhl.dtb
+> -- 
+> 1.7.8.6
 > 
-> > Probably, this patch needs following?
-> 
-> > If you're ok, I will fix build error by above when I apply.
-> 
-> Yes, thanks.
-
-Applied.
-
-BTW, don't you need to enable your Cragganmore board in the defconfig?
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-
-From: Kukjin Kim <kgene.kim@samsung.com>
-Subject: [PATCH] ARM: s3c6400_defconfig: enable more boards in defconfig
-
-This enables all of s3c64xx boards in the s3c6400_defconfig.
-In this time, MINI6410, REAL6410, and WLF_CRAGG_6410 are
-added in the defconfig.
-
-Cc: Darius Augulis <augulis.darius@gmail.com>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/configs/s3c6400_defconfig |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/configs/s3c6400_defconfig
-b/arch/arm/configs/s3c6400_defconfig
-index ba6a515..3a186d6 100644
---- a/arch/arm/configs/s3c6400_defconfig
-+++ b/arch/arm/configs/s3c6400_defconfig
-@@ -9,11 +9,14 @@ CONFIG_ARCH_S3C64XX=y
- CONFIG_S3C_BOOT_ERROR_RESET=y
- CONFIG_MACH_SMDK6400=y
- CONFIG_MACH_ANW6410=y
-+CONFIG_MACH_MINI6410=y
-+CONFIG_MACH_REAL6410=y
- CONFIG_MACH_SMDK6410=y
- CONFIG_MACH_NCP=y
- CONFIG_MACH_HMT=y
- CONFIG_MACH_SMARTQ5=y
- CONFIG_MACH_SMARTQ7=y
-+CONFIG_MACH_WLF_CRAGG_6410=y
- CONFIG_CPU_32v6K=y
- CONFIG_AEABI=y
- CONFIG_CMDLINE="console=ttySAC0,115200 root=/dev/ram init=/linuxrc
-initrd=0x51000000,6M ramdisk_size=6144"
--- 
-1.7.4.1
