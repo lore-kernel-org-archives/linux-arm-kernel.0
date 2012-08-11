@@ -1,125 +1,158 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Sat, 11 Aug 2012 23:09:51 +0800
-Subject: [PATCH 1/9] ARM: PMU: Add runtime PM Support
-In-Reply-To: <1344620195-22372-2-git-send-email-will.deacon@arm.com>
-References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
- <1344620195-22372-2-git-send-email-will.deacon@arm.com>
-Message-ID: <CACVXFVMg5Acx4_KGT5jn1JgO3JsXAjZzU8virR=B3+pBrT4o_A@mail.gmail.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Sat, 11 Aug 2012 11:15:49 -0400
+Subject: [PATCH v4] mtd: gpmi: add NAND write verify support
+In-Reply-To: <201208111610.45107.marex@denx.de>
+References: <1344737275-18342-1-git-send-email-shijie8@gmail.com>
+ <201208111610.45107.marex@denx.de>
+Message-ID: <CAMiH66GopNVeKPRQn+KfwRHUoM-Lv8WitX0zAS=Vi=8QAvS-Pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 11, 2012 at 1:36 AM, Will Deacon <will.deacon@arm.com> wrote:
-> From: Jon Hunter <jon-hunter@ti.com>
+On Sat, Aug 11, 2012 at 10:10 AM, Marek Vasut <marex@denx.de> wrote:
+> Dear Huang Shijie,
 >
-> Add runtime PM support to the ARM PMU driver so that devices such as OMAP
-> supporting dynamic PM can use the platform->runtime_* hooks to initialise
-> hardware at runtime. Without having these runtime PM hooks in place any
-> configuration of the PMU hardware would be lost when low power states are
-> entered and hence would prevent PMU from working.
+>> Add NAND write verify support in gpmi-nand driver.
+>>
+>> This patch fixes a kernel crash when we select
+>> CONFIG_MTD_NAND_VERIFY_WRITE=y, and do some write tests:
+>>
+>> root at freescale /$ dd if=/dev/zero of=/dev/mtd0 bs=128k count=1
+>> [   41.070000] Unable to handle kernel NULL pointer dereference at virtual
+>> addr0 [   41.080000] pgd = c77ac000
+>> [   41.080000] [00000000] *pgd=4773c831, *pte=00000000, *ppte=00000000
+>> [   41.090000] Internal error: Oops: 17 [#1] ARM
+>> [   41.090000] Modules linked in:
+>> [   41.090000] CPU: 0    Not tainted
+>> (3.6.0-rc1-next-20120809-00002-ga25d017-d) [   41.090000] PC is at
+>> nand_verify_buf+0x18/0x5c
+>> [   41.090000] LR is at nand_write_page+0xc0/0x140
+>> [   41.090000] pc : [<c023e7d4>]    lr : [<c023fcfc>]    psr: 20000013
+>> [   41.090000] sp : c7779de4  ip : 00000000  fp : c6e60000
+>> [   41.090000] r10: 00000000  r9 : 00020000  r8 : 00000000
+>> [   41.090000] r7 : 00000000  r6 : c6e60000  r5 : c762cb10  r4 : 00000000
+>> [   41.090000] r3 : c762c8a8  r2 : 00000800  r1 : c6e60000  r0 : 00000000
+>> [   41.090000] Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment
+>> user [   41.090000] Control: 0005317f  Table: 477ac000  DAC: 00000015
+>> [   41.090000] Process dd (pid: 427, stack limit = 0xc7778270)
+>> [   41.090000] Stack: (0xc7779de4 to 0xc777a000)
+>>       ...
+>>
+>>       The crash log is fetched from Fabio's patch. thanks to Fabio's hard
+> work.
+>>
+>> Cc: <stable@vger.kernel.org>
+>> Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
+>> Signed-off-by: Huang Shijie <shijie8@gmail.com>
+>> ---
+>> v3 --> v4:
+>>     [1] add credit to Fabio.
+>>
+>> v2 --> v3:
+>>     [1] free the verify_buf when we exit.
+>>
+>> v1 --> v2:
+>>     [1] use the mtd->writesize to allocate the verify buffer.
+>>     [2] add new field `verify_buf` in gpmi_nand_data{}
+>>
+>>     tested this patch on imx6q-arm2 board.
+>> ---
+>>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |   25 +++++++++++++++++++++++++
+>>  drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    1 +
+>>  2 files changed, 26 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>> b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c index 8c0d2f0..e1e4c51 100644
+>> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>> @@ -1512,12 +1512,34 @@ static int gpmi_pre_bbt_scan(struct gpmi_nand_data
+>> *this) return nand_boot_init(this);
+>>  }
+>>
+>> +static int gpmi_verify_buf(struct mtd_info *mtd, const uint8_t *buf, int
+>> len) +{
+>> +     struct nand_chip *chip = mtd->priv;
+>> +     struct gpmi_nand_data *this = chip->priv;
+>> +     int ret;
+>> +
+>> +     ret = chip->ecc.read_page(mtd, chip, this->verify_buf, 0, 0);
+>> +     if (ret)
+>> +             return -EFAULT;
+>> +     if (memcmp(buf, this->verify_buf, len))
+>> +             return -EFAULT;
+>> +     return 0;
+>> +}
+>> +
+>>  static int gpmi_scan_bbt(struct mtd_info *mtd)
+>>  {
+>>       struct nand_chip *chip = mtd->priv;
+>>       struct gpmi_nand_data *this = chip->priv;
+>>       int ret;
+>>
+>> +     /*
+>> +      * We have gotten the right page size now, use it to allocate
+>> +      * the proper verify buffer.
+>> +      */
+>> +     this->verify_buf = kzalloc(mtd->writesize, GFP_KERNEL);
 >
-> This change also replaces the PMU platform functions enable_irq and disable_irq
-> added by Ming Lei with runtime_resume and runtime_suspend funtions. Ming had
-> added the enable_irq and disable_irq functions as a method to configure the
-> cross trigger interface on OMAP4 for routing the PMU interrupts. By adding
-> runtime PM support, we can move the code called by enable_irq and disable_irq
-> into the runtime PM callbacks runtime_resume and runtime_suspend.
->
-> Cc: Ming Lei <ming.lei@canonical.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/include/asm/pmu.h   |   20 ++++++++++++--------
->  arch/arm/kernel/perf_event.c |   41 +++++++++++++++++++++++++++++++++--------
->  2 files changed, 45 insertions(+), 16 deletions(-)
->
-> diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-> index 4432305..40d7dff 100644
-> --- a/arch/arm/include/asm/pmu.h
-> +++ b/arch/arm/include/asm/pmu.h
-> @@ -31,18 +31,22 @@ enum arm_pmu_type {
->   *     interrupt and passed the address of the low level handler,
->   *     and can be used to implement any platform specific handling
->   *     before or after calling it.
-> - * @enable_irq: an optional handler which will be called after
-> - *     request_irq and be used to handle some platform specific
-> - *     irq enablement
-> - * @disable_irq: an optional handler which will be called before
-> - *     free_irq and be used to handle some platform specific
-> - *     irq disablement
-> + * @runtime_resume: an optional handler which will be called by the
-> + *     runtime PM framework following a call to pm_runtime_get().
-> + *     Note that if pm_runtime_get() is called more than once in
-> + *     succession this handler will only be called once.
-> + * @runtime_suspend: an optional handler which will be called by the
-> + *     runtime PM framework following a call to pm_runtime_put().
-> + *     Note that if pm_runtime_get() is called more than once in
-> + *     succession this handler will only be called following the
-> + *     final call to pm_runtime_put() that actually disables the
-> + *     hardware.
->   */
->  struct arm_pmu_platdata {
->         irqreturn_t (*handle_irq)(int irq, void *dev,
->                                   irq_handler_t pmu_handler);
-> -       void (*enable_irq)(int irq);
-> -       void (*disable_irq)(int irq);
-> +       int (*runtime_resume)(struct device *dev);
-> +       int (*runtime_suspend)(struct device *dev);
->  };
->
->  #ifdef CONFIG_CPU_HAS_PMU
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index ab243b8..c44647e 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -20,6 +20,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/spinlock.h>
->  #include <linux/uaccess.h>
-> +#include <linux/pm_runtime.h>
->
->  #include <asm/cputype.h>
->  #include <asm/irq.h>
-> @@ -364,8 +365,6 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
->  {
->         int i, irq, irqs;
->         struct platform_device *pmu_device = armpmu->plat_device;
-> -       struct arm_pmu_platdata *plat =
-> -               dev_get_platdata(&pmu_device->dev);
->
->         irqs = min(pmu_device->num_resources, num_possible_cpus());
->
-> @@ -373,13 +372,11 @@ armpmu_release_hardware(struct arm_pmu *armpmu)
->                 if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
->                         continue;
->                 irq = platform_get_irq(pmu_device, i);
-> -               if (irq >= 0) {
-> -                       if (plat && plat->disable_irq)
-> -                               plat->disable_irq(irq);
-> +               if (irq >= 0)
->                         free_irq(irq, armpmu);
-> -               }
->         }
->
-> +       pm_runtime_put_sync(&pmu_device->dev);
+> devm_
 
-One question, each pmu is just inside one cpu core and should be
-suspended individually, but looks the above don't support it, do it?
+emm...
+The devm_kzalloc() is the wrong choose in this case. It may makes we
+waste much more memory when the NAND page is 8K.
 
->         release_pmu(armpmu->type);
->  }
->
-> @@ -412,6 +409,8 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
->                 return -ENODEV;
->         }
->
-> +       pm_runtime_get_sync(&pmu_device->dev);
+Assume the gpmi uses a 8K page nand chip.  The devm_kzalloc() will
+allocate (sizeof(struct devres) + 8K).
+It's obvious that the size is bigger then the SLUB_MAX_SIZE. So the
+kernel gets 2 with the
+get_order(sizeof(struct devres) + 8K) which means we have to use 4
+memory page for the verify_buf.
+But in actually, we only use 8K memory. So the rest nearly 8K(
+sizeof(struct devres) is very small) memory
+is wasted.
 
-Similar with above.
+So I prefer to use the kzalloc() here.
+
+thanks
+Huang Shijie
 
 
-Thanks,
---
-Ming Lei
+
+>
+>> +     if (!this->verify_buf)
+>> +             return -ENOMEM;
+>> +
+>>       /* Prepare for the BBT scan. */
+>>       ret = gpmi_pre_bbt_scan(this);
+>>       if (ret)
+>> @@ -1531,6 +1553,8 @@ void gpmi_nfc_exit(struct gpmi_nand_data *this)
+>>  {
+>>       nand_release(&this->mtd);
+>>       gpmi_free_dma_buffer(this);
+>> +     kfree(this->verify_buf);
+>> +     this->verify_buf = NULL;
+>
+> Then you won't have to care for this ... I told you at least once before.
+>
+>>  }
+>>
+>>  static int __devinit gpmi_nfc_init(struct gpmi_nand_data *this)
+>> @@ -1556,6 +1580,7 @@ static int __devinit gpmi_nfc_init(struct
+>> gpmi_nand_data *this) chip->read_byte         = gpmi_read_byte;
+>>       chip->read_buf          = gpmi_read_buf;
+>>       chip->write_buf         = gpmi_write_buf;
+>> +     chip->verify_buf        = gpmi_verify_buf;
+>>       chip->ecc.read_page     = gpmi_ecc_read_page;
+>>       chip->ecc.write_page    = gpmi_ecc_write_page;
+>>       chip->ecc.read_oob      = gpmi_ecc_read_oob;
+>> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+>> b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h index 1547a60..8ddf115 100644
+>> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+>> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+>> @@ -144,6 +144,7 @@ struct gpmi_nand_data {
+>>       /* MTD / NAND */
+>>       struct nand_chip        nand;
+>>       struct mtd_info         mtd;
+>> +     uint8_t                 *verify_buf;
+>>
+>>       /* General-use Variables */
+>>       int                     current_chip;
