@@ -1,21 +1,16 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 11 Aug 2012 14:56:44 +0200
-Subject: [PATCH 06/11] ARM: mvebu: add pinctrl device in DT for Armada 370/XP
- SoCs
+Date: Sat, 11 Aug 2012 14:56:46 +0200
+Subject: [PATCH 08/11] ARM: mvebu: Add pinctrl support to Armada 370 SoC
 In-Reply-To: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1344689809-6223-7-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1344689809-6223-9-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-The Armada 370 and XP SoCs have configurable muxing for a certain
-number of their pins, controlled through a pinctrl driver.
-
-The 'compatible' property is defined in the SoC-specific .dtsi files,
-since the compatible string identifies the number of pins and other
-SoC-specific properties.
+This commits adds the necessary device tree information to define the
+compatible property for the pinctrl driver instance of Armada 370 SoC.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
@@ -35,26 +30,22 @@ Cc: linux-doc at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm/boot/dts/armada-370-xp.dtsi |    7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/armada-370.dtsi |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 6b6b932..7c72a70 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -63,6 +63,13 @@
- 			       reg = <0xd0020300 0x30>;
- 			       interrupts = <37>, <38>, <39>, <40>;
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 3228ccc..875fcd8 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -31,5 +31,9 @@
+ 				compatible = "marvell,armada-370-xp-system-controller";
+ 				reg = <0xd0018200 0x100>;
  		};
 +
 +                pinctrl at d0018000 {
-+                               reg = <0xd0018000 0x38>;
-+                               #address-cells = <1>;
-+                               #size-cells = <1>;
-+                               ranges;
-+                };
++			        compatible = "marvell,mv88f6710-pinctrl";
++	        };
  	};
  };
- 
 -- 
 1.7.10.4
