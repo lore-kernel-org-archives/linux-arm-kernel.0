@@ -1,41 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 12 Aug 2012 11:57:08 +0100
-Subject: [PATCH] Allow memblock steal operations to remove memory from anywhere
-Message-ID: <20120812105708.GD18957@n2100.arm.linux.org.uk>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Sun, 12 Aug 2012 13:24:33 +0200
+Subject: [PATCH V3] CS89x0 : Use ioread16/iowrite16 on all platforms
+In-Reply-To: <20120517.190346.175685939436302276.davem@davemloft.net>
+References: <1337274702-19536-1-git-send-email-jaccon.bastiaansen@gmail.com>
+ <20120517.190346.175685939436302276.davem@davemloft.net>
+Message-ID: <20120812112433.GA31699@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Found this with the cubox, which wants to obtain large blocks of
-RAM for the GPU and VPU devices at boot time.  I don't believe
-any other platforms care where the memory comes from, so I think
-this is safe.
+On Thu, May 17, 2012 at 07:03:46PM -0400, David Miller wrote:
+> From: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
+> Date: Thu, 17 May 2012 19:11:42 +0200
+> 
+> > The use of the inw/outw functions by the cs89x0 platform driver
+> > results in NULL pointer references on ARM platforms and
+> > platforms that do not provide ISA-style programmed I/O accessors.
+> > 
+> > Using inw/outw also accesses the wrong address space on platforms
+> > that have a PCI I/O space that is not identity-mapped into the
+> > physical address space.
+> > 
+> > Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
+> 
+> I could nit-pick more on this patch, but it's such a significant
+> improvement I'm just going to apply this V3 as-is to net-next.
 
-However, OMAP and iMX folk should check this patch - thanks.
+Is this going into v3.6 or v3.7?
 
-8<===
-From: Russell King <rmk+kernel@arm.linux.org.uk>
-Subject: ARM: Allow arm_memblock_steal() to remove memory from any RAM region
-
-Allow arm_memblock_steal() to remove memory from any RAM region,
-including highmem areas.  This allows memory to be stolen from the
-very top of declared memory, including highmem areas, rather than
-our precious lowmem.
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mm/init.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index f54d592..04632f3 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -324,7 +324,7 @@ phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
- 
- 	BUG_ON(!arm_memblock_steal_permitted);
- 
--	phys = memblock_alloc(size, align);
-+	phys = memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ANYWHERE);
- 	memblock_free(phys, size);
- 	memblock_remove(phys, size);
- 
+cheers,
+Domenico
