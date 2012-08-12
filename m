@@ -1,91 +1,73 @@
 From: cyril@ti.com (Cyril Chemparathy)
-Date: Sun, 12 Aug 2012 12:32:47 -0400
-Subject: [PATCH v2 02/22] ARM: add self test for runtime patch mechanism
-In-Reply-To: <alpine.LFD.2.02.1208112226310.5231@xanadu.home>
+Date: Sun, 12 Aug 2012 13:34:06 -0400
+Subject: [PATCH v2 03/22] ARM: use late patch framework for phys-virt
+ patching
+In-Reply-To: <alpine.LFD.2.02.1208112238270.5231@xanadu.home>
 References: <1344648306-15619-1-git-send-email-cyril@ti.com>
- <1344648306-15619-3-git-send-email-cyril@ti.com>
- <alpine.LFD.2.02.1208112226310.5231@xanadu.home>
-Message-ID: <5027DAAF.2060406@ti.com>
+ <1344648306-15619-4-git-send-email-cyril@ti.com>
+ <alpine.LFD.2.02.1208112238270.5231@xanadu.home>
+Message-ID: <5027E90E.2000604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/12 22:35, Nicolas Pitre wrote:
+On 08/11/12 23:03, Nicolas Pitre wrote:
 > On Fri, 10 Aug 2012, Cyril Chemparathy wrote:
 >
->> This patch adds basic sanity tests to ensure that the instruction patching
->> results in valid instruction encodings.  This is done by verifying the output
->> of the patch process against a vector of assembler generated instructions at
->> init time.
->>
->> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
->> ---
-[...]
->> +	__asm__ __volatile__ (
->> +		"	.irp	shift1, 0, 6, 12, 18\n"
->> +		"	.irp	shift2, 0, 1, 2, 3, 4, 5\n"
->> +		"	add     r1, r2, #(0x41 << (\\shift1 + \\shift2))\n"
->> +		"	.endr\n"
->> +		"	.endr\n"
+>> This patch replaces the original physical offset patching implementation
+>> with one that uses the newly added patching framework.  In the process, we now
+>> unconditionally initialize the __pv_phys_offset and __pv_offset globals in the
+>> head.S code.
 >
->
-> Maybe adding a "add r1, r2 #0x81 << 24" here might be a good thing since
-> this is the most used case but missing from the above.
+> This last sentence is now wrong.
 >
 
-Indeed.  I've now replaced this with something a bit more extensive. 
-Does the following look better?
-
-+struct patch_test_imm8 {
-+       u16     imm;
-+       u16     shift;
-+       u32     insn;
-+};
-+
-+static void __init __used __naked __patch_test_code_imm8(void)
-+{
-+       __asm__ __volatile__ (
-+
-+               /* a single test case */
-+               "       .macro          test_one, imm, sft\n"
-+               "       .hword          \\imm\n"
-+               "       .hword          \\sft\n"
-+               "       add             r1, r2, #(\\imm << \\sft)\n"
-+               "       .endm\n"
-+
-+               /* a sequence of tests@'inc' increments of shift */
-+               "       .macro          test_seq, imm, sft, max, inc\n"
-+               "       test_one        \\imm, \\sft\n"
-+               "       .if             \\sft < \\max\n"
-+               "       test_seq        \\imm, (\\sft + \\inc), \\max, 
-\\inc\n"
-+               "       .endif\n"
-+               "       .endm\n"
-+
-+               /* an empty record to mark the end */
-+               "       .macro          test_end\n"
-+               "       .hword          0, 0\n"
-+               "       .word           0\n"
-+               "       .endm\n"
-+
-+               /* finally generate the test sequences */
-+               "       test_seq        0x41, 0, 24, 1\n"
-+               "       test_seq        0x81, 0, 24, 2\n"
-+               "       test_end\n"
-+               : : :
-+       );
-+}
-+
+Removed.
 
 [...]
->> +	u32 test_code_addr = (u32)(&__patch_test_code_imm8);
->> +	u32 *test_code = (u32 *)(test_code_addr & ~0x3);
+>> -extern unsigned long __pv_phys_offset;
+>> -#define PHYS_OFFSET __pv_phys_offset
+[...]
+>> +#define PHYS_OFFSET	__virt_to_phys(PAGE_OFFSET)
 >
-> Why this masking?  With Thumb2 you may find functions starting at
-> halfword aligned addresses.  Only the LSB (indicating thumb mode) should
-> be masked out.
+> What was wrong with the former PHYS_OFFSET = __pv_phys_offset ?
+>
+> If you really want to have it optimized at run time, you could simply
+> use your new stub to patch a mov instruction instead of going through
+> __virt_to_phys which uses and add on top of a constant.
 >
 
-Fixed.  Thanks.
+The intent was to optimize out the load(s) on references to PHYS_OFFSET, 
+but is it worth it?  If so, we could go with a patched mov (or two) with 
+the necessary endian fixups.  If not, we could revert to 
+__pv_phys_offset loads as before.
+
+[...]
+>>   	s = find_mod_section(hdr, sechdrs, ".runtime.patch.table");
+>>   	if (s)
+>>   		runtime_patch((void *)s->sh_addr, s->sh_size);
+>
+> I missed this in the previous patch, but could you fail the module
+> loading by returning an error if runtime_patch() fails?  That would take
+> care of not accepting modules that might have been compiled with future
+> runtime patching extensions that are not yet supported in an earlier
+> kernel.
+>
+
+Sure.  Thanks.
+
+> You also should remove the MODULE_ARCH_VERMAGIC_P2V definitions now that
+> the corresponding code is no longer there.
+>
+
+Hmm...
+
+"rt-patch" needs to be in vermagic to prevent modules built against the 
+new code from being loaded on older kernels that used the traditional 
+patch code.
+
+"p2v" needs to be in there as well, because it should be possible to 
+build without PATCH_PHYS_VIRT, but with RUNTIME_PATCH as and when there 
+are other users for this.
 
 Thanks
 -- Cyril.
