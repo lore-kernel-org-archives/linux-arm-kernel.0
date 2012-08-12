@@ -1,127 +1,91 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 12 Aug 2012 17:22:07 +0200
-Subject: [PATCH v2 2/6] ARM: dove: add clock gating control
-In-Reply-To: <1344681326-17946-3-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1344255815-4457-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1344681326-17946-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1344681326-17946-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20120812152207.GA6340@lunn.ch>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Sun, 12 Aug 2012 12:32:47 -0400
+Subject: [PATCH v2 02/22] ARM: add self test for runtime patch mechanism
+In-Reply-To: <alpine.LFD.2.02.1208112226310.5231@xanadu.home>
+References: <1344648306-15619-1-git-send-email-cyril@ti.com>
+ <1344648306-15619-3-git-send-email-cyril@ti.com>
+ <alpine.LFD.2.02.1208112226310.5231@xanadu.home>
+Message-ID: <5027DAAF.2060406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 11, 2012 at 12:35:22PM +0200, Sebastian Hesselbarth wrote:
-> This patch adds clock gates from the clock gating control register
-> available on dove. All clock gates are hooked up to tclk, except for
-> gigabit ethernet controller (ge) which is a child of gephy to allow
-> both enabled/disabled at the same time.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: Rabeeh Khoury <rabeeh@solid-run.com>
-> Cc: Ian Molton <ian.molton@codethink.co.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Maen Suleiman <maen@marvell.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> 
-> v2: adapted to removed clk_prepare_enable from patch 1
-> ---
->  arch/arm/mach-dove/common.c          |   59 +++++++++++++++++++++++++++++++++-
->  arch/arm/mach-dove/include/mach/pm.h |   54 ++++++++++++++++++++-----------
->  2 files changed, 94 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-> index b6f092c..7281591 100644
-> --- a/arch/arm/mach-dove/common.c
-> +++ b/arch/arm/mach-dove/common.c
-> @@ -16,6 +16,7 @@
->  #include <linux/clk-provider.h>
->  #include <linux/ata_platform.h>
->  #include <linux/gpio.h>
-> +#include <linux/mv643xx_i2c.h>
->  #include <asm/page.h>
->  #include <asm/setup.h>
->  #include <asm/timex.h>
-> @@ -24,6 +25,7 @@
->  #include <asm/mach/time.h>
->  #include <asm/mach/pci.h>
->  #include <mach/dove.h>
-> +#include <mach/pm.h>
->  #include <mach/bridge-regs.h>
->  #include <asm/mach/arch.h>
->  #include <linux/irq.h>
-> @@ -31,6 +33,7 @@
->  #include <plat/ehci-orion.h>
->  #include <plat/common.h>
->  #include <plat/addr-map.h>
-> +#include <plat/mv_xor.h>
->  #include "common.h"
->  
->  /*****************************************************************************
-> @@ -69,14 +72,68 @@ void __init dove_map_io(void)
->   * CLK tree
->   ****************************************************************************/
->  static int dove_tclk;
-> +
-> +static DEFINE_SPINLOCK(gating_lock);
->  static struct clk *tclk;
->  
-> +static struct clk __init *dove_register_gate(const char *name,
-> +					     const char *parent, u8 bit_idx)
-> +{
-> +	return clk_register_gate(NULL, name, parent, 0,
-> +				 (void __iomem *)CLOCK_GATING_CONTROL,
-> +				 bit_idx, 0, &gating_lock);
-> +}
-> +
->  static void __init dove_clk_init(void)
->  {
-> +	struct clk *usb0, *usb1, *sata, *pex0, *pex1, *sdio0, *sdio1;
-> +	struct clk *nand, *camera, *i2s0, *i2s1, *crypto, *ac97, *pdma;
-> +	struct clk *xor0, *xor1, *ge, *gephy;
-> +
->  	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, CLK_IS_ROOT,
->  				       dove_tclk);
->  
-> -	orion_clkdev_init(tclk);
-> +	usb0 = dove_register_gate("usb0", "tclk", CLOCK_GATING_BIT_USB0);
-> +	usb1 = dove_register_gate("usb1", "tclk", CLOCK_GATING_BIT_USB1);
-> +	sata = dove_register_gate("sata", "tclk", CLOCK_GATING_BIT_SATA);
-> +	pex0 = dove_register_gate("pex1", "tclk", CLOCK_GATING_BIT_PCIE0);
-> +	pex1 = dove_register_gate("pex1", "tclk", CLOCK_GATING_BIT_PCIE1);
-> +	sdio0 = dove_register_gate("sdio0", "tclk", CLOCK_GATING_BIT_SDIO0);
-> +	sdio1 = dove_register_gate("sdio1", "tclk", CLOCK_GATING_BIT_SDIO1);
-> +	nand = dove_register_gate("nand", "tclk", CLOCK_GATING_BIT_NAND);
-> +	camera = dove_register_gate("camera", "tclk", CLOCK_GATING_BIT_CAMERA);
-> +	i2s0 = dove_register_gate("i2s0", "tclk", CLOCK_GATING_BIT_I2S0);
-> +	i2s1 = dove_register_gate("i2s1", "tclk", CLOCK_GATING_BIT_I2S1);
-> +	crypto = dove_register_gate("crypto", "tclk", CLOCK_GATING_BIT_CRYPTO);
-> +	ac97 = dove_register_gate("ac97", "tclk", CLOCK_GATING_BIT_AC97);
-> +	pdma = dove_register_gate("pdma", "tclk", CLOCK_GATING_BIT_PDMA);
-> +	xor0 = dove_register_gate("xor0", "tclk", CLOCK_GATING_BIT_XOR0);
-> +	xor1 = dove_register_gate("xor1", "tclk", CLOCK_GATING_BIT_XOR1);
-> +	gephy = dove_register_gate("gephy", "tclk", CLOCK_GATING_BIT_GIGA_PHY);
-> +	ge = dove_register_gate("ge", "gephy", CLOCK_GATING_BIT_GBE);
-> +
-> +	orion_clkdev_add(NULL, "orion_spi.0", tclk);
-> +	orion_clkdev_add(NULL, "orion_spi.1", tclk);
-> +	orion_clkdev_add(NULL, "orion_wdt", tclk);
-> +	orion_clkdev_add(NULL, MV64XXX_I2C_CTLR_NAME ".0", tclk);
-> +
-> +	orion_clkdev_add(NULL, "orion-ehci.0", usb0);
-> +	orion_clkdev_add(NULL, "orion-ehci.1", usb1);
-> +	orion_clkdev_add(NULL, MV643XX_ETH_NAME ".0", ge);
+On 08/11/12 22:35, Nicolas Pitre wrote:
+> On Fri, 10 Aug 2012, Cyril Chemparathy wrote:
+>
+>> This patch adds basic sanity tests to ensure that the instruction patching
+>> results in valid instruction encodings.  This is done by verifying the output
+>> of the patch process against a vector of assembler generated instructions at
+>> init time.
+>>
+>> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+>> ---
+[...]
+>> +	__asm__ __volatile__ (
+>> +		"	.irp	shift1, 0, 6, 12, 18\n"
+>> +		"	.irp	shift2, 0, 1, 2, 3, 4, 5\n"
+>> +		"	add     r1, r2, #(0x41 << (\\shift1 + \\shift2))\n"
+>> +		"	.endr\n"
+>> +		"	.endr\n"
+>
+>
+> Maybe adding a "add r1, r2 #0x81 << 24" here might be a good thing since
+> this is the most used case but missing from the above.
+>
 
-Hi Sebastian
+Indeed.  I've now replaced this with something a bit more extensive. 
+Does the following look better?
 
-Take a look at the patch [PATCH v3 7/7] NET: mv643xx: remove device
-name macro, from Ian Molten, and the discussion around the macro
-MV643XX_ETH_NAME and its friend.
++struct patch_test_imm8 {
++       u16     imm;
++       u16     shift;
++       u32     insn;
++};
++
++static void __init __used __naked __patch_test_code_imm8(void)
++{
++       __asm__ __volatile__ (
++
++               /* a single test case */
++               "       .macro          test_one, imm, sft\n"
++               "       .hword          \\imm\n"
++               "       .hword          \\sft\n"
++               "       add             r1, r2, #(\\imm << \\sft)\n"
++               "       .endm\n"
++
++               /* a sequence of tests@'inc' increments of shift */
++               "       .macro          test_seq, imm, sft, max, inc\n"
++               "       test_one        \\imm, \\sft\n"
++               "       .if             \\sft < \\max\n"
++               "       test_seq        \\imm, (\\sft + \\inc), \\max, 
+\\inc\n"
++               "       .endif\n"
++               "       .endm\n"
++
++               /* an empty record to mark the end */
++               "       .macro          test_end\n"
++               "       .hword          0, 0\n"
++               "       .word           0\n"
++               "       .endm\n"
++
++               /* finally generate the test sequences */
++               "       test_seq        0x41, 0, 24, 1\n"
++               "       test_seq        0x81, 0, 24, 2\n"
++               "       test_end\n"
++               : : :
++       );
++}
++
 
-It is probably best to not use the I2C and XOR macro as well.
+[...]
+>> +	u32 test_code_addr = (u32)(&__patch_test_code_imm8);
+>> +	u32 *test_code = (u32 *)(test_code_addr & ~0x3);
+>
+> Why this masking?  With Thumb2 you may find functions starting at
+> halfword aligned addresses.  Only the LSB (indicating thumb mode) should
+> be masked out.
+>
 
-		 Andrew
+Fixed.  Thanks.
+
+Thanks
+-- Cyril.
