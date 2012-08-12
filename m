@@ -1,39 +1,110 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sun, 12 Aug 2012 00:51:40 -0400 (EDT)
-Subject: [GIT PULL] LED CPU trigger driver and ARM LED code consolidation
- (v2)
-In-Reply-To: <CAK5ve-LX_q154+BYxzns38yAZ9BcLxsA26negXo9K4XMNxcrWA@mail.gmail.com>
-References: <CAK5ve-KjK2mU0qjdp2HK5CdrM=eQ-hN0nw-0cJj7HGuRyGjH8w@mail.gmail.com>
- <CAK5ve-+wWWARGz4ky_VW2AK7hHLXENkw2ANToLztcDjsegubsw@mail.gmail.com>
- <CAOesGMhK3bkk+86jDM7bd6rFUE_RuTGWiWsB7SYJ=i2NocOiLA@mail.gmail.com>
- <CAK5ve-KuB=5evdiJDSQbN0N=56fofNeaof==GuRXFWhA44KcAw@mail.gmail.com>
- <CAOesGMi8UeX8fLba4F+Jo0VNadcBHbUsnc0HHA=SNx0S7=EFJw@mail.gmail.com>
- <CAK5ve-+hFRkbZ1bmfKodzjZEyP8vTyxZzU96LnhYjp1Vn7OWcw@mail.gmail.com>
- <20120811080429.GA18957@n2100.arm.linux.org.uk>
- <CAK5ve-LX_q154+BYxzns38yAZ9BcLxsA26negXo9K4XMNxcrWA@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1208120048390.5231@xanadu.home>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Sun, 12 Aug 2012 11:27:59 +0200
+Subject: [PATCH 2/3 V2] IIO: Add basic MXS LRADC driver
+In-Reply-To: <201208120111.51639.marex@denx.de>
+References: <1344007721-11595-1-git-send-email-marex@denx.de>
+ <1344007721-11595-3-git-send-email-marex@denx.de>
+ <501F8509.1030903@metafoo.de> <201208120111.51639.marex@denx.de>
+Message-ID: <5027771F.7060500@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 11 Aug 2012, Bryan Wu wrote:
-
-> On Sat, Aug 11, 2012 at 4:04 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Sat, Aug 11, 2012 at 02:57:18PM +0800, Bryan Wu wrote:
-> >> Olof, could you please consider pull again this branch? I keep it
-> >> based on 3.5 release.
-> >
-> > So what's the fix you've applied?  I don't think you've posted any patches.
+On 08/12/2012 01:11 AM, Marek Vasut wrote:
+> Dear Lars-Peter Clausen,
 > 
-> I assume I need update my branch instead of posting some incremental
-> patches, since my branch was dropped. So I prepared a new branch
-> including the fixing.
+>> On 08/03/2012 05:28 PM, Marek Vasut wrote:
+>>> This driver is very basic. It supports userland trigger, buffer and
+>>> raw access to channels. The support for delay channels is missing
+>>> altogether.
+>>
+>> Looks mostly good to me. Some comments inline.
+>>
+>> I think you need to provide a documentation for the devicetree binding,
+>> even though it's a rather simple binding.
 > 
-> Need I post my fix? But I don't keep the old version.
-> Olof and Arnd, maybe you guys keep my old version.
+> Definitelly, will add it.
+> 
+>>> Signed-off-by: Marek Vasut <marex@denx.de>
+>>> Cc: Jonathan Cameron <jic23@kernel.org>
+>>> Cc: Juergen Beisert <jbe@pengutronix.de>
+>>> Cc: Lars-Peter Clausen <lars@metafoo.de>
+>>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>>> Cc: Wolfgang Denk <wd@denx.de>
+>>> ---
+>>>
+>>>  drivers/staging/iio/adc/Kconfig     |   12 +
+>>>  drivers/staging/iio/adc/Makefile    |    1 +
+>>>  drivers/staging/iio/adc/mxs-lradc.c |  591
+>>>  +++++++++++++++++++++++++++++++++++ 3 files changed, 604 insertions(+)
+>>>  create mode 100644 drivers/staging/iio/adc/mxs-lradc.c
+>>>
+>>> V2: Use delay channel 0 in case of buffered sampling so the samples are
+>>> deployed
+>>>
+>>>     continuously.
+>>>     Disallow RAW sampling while buffered mode is enabled to simplify
+>>>     code.
+>>>
+>>> diff --git a/drivers/staging/iio/adc/Kconfig
+>>> b/drivers/staging/iio/adc/Kconfig index 67711b7..97ca697 100644
+>>> --- a/drivers/staging/iio/adc/Kconfig
+>>> +++ b/drivers/staging/iio/adc/Kconfig
+>>
+>> [...]
+>>
+>>> + */
+>>> +static int mxs_lradc_read_raw(struct iio_dev *iio_dev,
+>>> +			const struct iio_chan_spec *chan,
+>>> +			int *val, int *val2, long m)
+>>> +{
+>>> [...]
+>>> +
+>>> +	init_completion(&lradc->completion);
+>>
+>> This should rather be INIT_COMPLETION. init_completion should only called
+>> once in probe, since it will reinitialize the spinlock which opens up race
+>> conditions.
+>>
+>>> [...]
+>>> +
+>>> +	/* Wait for completion on the channel, 1 second max. */
+>>> +	ret = wait_for_completion_killable_timeout(&lradc->completion,
+>>> +						msecs_to_jiffies(1000));
+>>
+>> msecs_to_jiffies(1000) = HZ, but I guess both is OK.
+> 
+> Even on NOHZ kernel?
 
-You should post the new version of the patch that Russell previously 
-objected to.
+Yes HZ is always the number of jiffies per second.
 
+> 
+>>> [...]
+>>> +}
+>>
+>> [...]
+>>
+>>> +
+>>> +static int __devinit mxs_lradc_probe(struct platform_device *pdev)
+>>> +{
+>>> [...]
+>>> +
+>>> +	/* Grab all IRQ sources */
+>>> +	for (i = 0; i < 13; i++) {
+>>> +		lradc->irq[i] = platform_get_irq(pdev, i);
+>>> +		if (lradc->irq[i] < 0) {
+>>> +			ret = -EINVAL;
+>>> +			goto err_addr;
+>>> +		}
+>>> +
+>>> +		ret = devm_request_irq(dev, lradc->irq[i],
+>>> +					mxs_lradc_handle_irq, 0,
+>>> +					mxs_lradc_irq_name[i], iio);
+>>
+>> devm_request_irq is a bit dangerous as long we do not have a
+>> devm_iio_device_alloc. The IRQ will only be freed after the memory for the
+>> IIO device has been freed, which means there is a slight window where the
+>> IRQ could fire although the memory has already been freed.
+> 
+> The IRQ is disabled, see mxs_lradc_hw_stop(), so it should be all right.
 
-Nicolas
+Ok.
