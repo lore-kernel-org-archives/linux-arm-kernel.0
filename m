@@ -1,67 +1,58 @@
 From: bryan.wu@canonical.com (Bryan Wu)
-Date: Mon, 13 Aug 2012 13:51:32 +0800
-Subject: [PATCH 08/18] ARM: mach-integrator: retire custom LED code
+Date: Mon, 13 Aug 2012 13:51:33 +0800
+Subject: [PATCH 09/18] ARM: mach-clps711x: retire custom LED code of P720T
+ machine
 In-Reply-To: <1344837102-11850-1-git-send-email-bryan.wu@canonical.com>
 References: <1344837102-11850-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1344837102-11850-9-git-send-email-bryan.wu@canonical.com>
+Message-ID: <1344837102-11850-10-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the LED in core module for CPU activity and also enable 4
-debugging LEDs in baseboard.
-
-The CPU activity LED is now handled by the trigger in the leds
-subsystem, retire this old CONFIG_LEDS-based code.
+Add tigger based LED driver into board file of P720T.
+Remove old LED driver file.
 
 Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
 ---
- arch/arm/mach-integrator/Makefile |   3 +-
- arch/arm/mach-integrator/core.c   |   1 -
- arch/arm/mach-integrator/leds.c   | 161 +++++++++++++++++++++++---------------
- 3 files changed, 99 insertions(+), 66 deletions(-)
+ arch/arm/mach-clps711x/Makefile     |  2 --
+ arch/arm/mach-clps711x/common.c     |  1 -
+ arch/arm/mach-clps711x/p720t-leds.c | 63 -------------------------------------
+ arch/arm/mach-clps711x/p720t.c      | 61 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 61 insertions(+), 66 deletions(-)
+ delete mode 100644 arch/arm/mach-clps711x/p720t-leds.c
 
-diff --git a/arch/arm/mach-integrator/Makefile b/arch/arm/mach-integrator/Makefile
-index ebeef96..5521d18 100644
---- a/arch/arm/mach-integrator/Makefile
-+++ b/arch/arm/mach-integrator/Makefile
-@@ -4,11 +4,10 @@
- 
- # Object file lists.
- 
--obj-y					:= core.o lm.o
-+obj-y					:= core.o lm.o leds.o
- obj-$(CONFIG_ARCH_INTEGRATOR_AP)	+= integrator_ap.o
- obj-$(CONFIG_ARCH_INTEGRATOR_CP)	+= integrator_cp.o
- 
--obj-$(CONFIG_LEDS)			+= leds.o
- obj-$(CONFIG_PCI)			+= pci_v3.o pci.o
- obj-$(CONFIG_CPU_FREQ_INTEGRATOR)	+= cpu.o
- obj-$(CONFIG_INTEGRATOR_IMPD1)		+= impd1.o
-diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
-index 8c53562..0c7c4ef 100644
---- a/arch/arm/mach-integrator/core.c
-+++ b/arch/arm/mach-integrator/core.c
-@@ -28,7 +28,6 @@
- #include <mach/cm.h>
- #include <mach/irqs.h>
- 
+diff --git a/arch/arm/mach-clps711x/Makefile b/arch/arm/mach-clps711x/Makefile
+index f2f0256..5872b49 100644
+--- a/arch/arm/mach-clps711x/Makefile
++++ b/arch/arm/mach-clps711x/Makefile
+@@ -16,5 +16,3 @@ obj-$(CONFIG_ARCH_CLEP7312) += clep7312.o
+ obj-$(CONFIG_ARCH_EDB7211)  += edb7211-arch.o edb7211-mm.o
+ obj-$(CONFIG_ARCH_FORTUNET) += fortunet.o
+ obj-$(CONFIG_ARCH_P720T)    += p720t.o
+-leds-$(CONFIG_ARCH_P720T)   += p720t-leds.o
+-obj-$(CONFIG_LEDS)          += $(leds-y)
+diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
+index c965fd8..1e1ae48 100644
+--- a/arch/arm/mach-clps711x/common.c
++++ b/arch/arm/mach-clps711x/common.c
+@@ -31,7 +31,6 @@
+ #include <asm/sizes.h>
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
 -#include <asm/leds.h>
- #include <asm/mach-types.h>
- #include <asm/mach/time.h>
  #include <asm/pgtable.h>
-diff --git a/arch/arm/mach-integrator/leds.c b/arch/arm/mach-integrator/leds.c
-index 466defa..7a7f6d3 100644
---- a/arch/arm/mach-integrator/leds.c
-+++ b/arch/arm/mach-integrator/leds.c
-@@ -1,90 +1,125 @@
- /*
-- *  linux/arch/arm/mach-integrator/leds.c
-+ * Driver for the 4 user LEDs found on the Integrator AP/CP baseboard
-+ * Based on Versatile and RealView machine LED code
-  *
-- *  Integrator/AP and Integrator/CP LED control routines
+ #include <asm/page.h>
+ #include <asm/mach/map.h>
+diff --git a/arch/arm/mach-clps711x/p720t-leds.c b/arch/arm/mach-clps711x/p720t-leds.c
+deleted file mode 100644
+index bbc449f..0000000
+--- a/arch/arm/mach-clps711x/p720t-leds.c
++++ /dev/null
+@@ -1,63 +0,0 @@
+-/*
+- *  linux/arch/arm/mach-clps711x/leds.c
 - *
-- *  Copyright (C) 1999 ARM Limited
+- *  Integrator LED control routines
+- *
 - *  Copyright (C) 2000 Deep Blue Solutions Ltd
 - *
 - * This program is free software; you can redistribute it and/or modify
@@ -77,170 +68,131 @@ index 466defa..7a7f6d3 100644
 - * You should have received a copy of the GNU General Public License
 - * along with this program; if not, write to the Free Software
 - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ * License terms: GNU General Public License (GPL) version 2
-+ * Author: Bryan Wu <bryan.wu@canonical.com>
-  */
- #include <linux/kernel.h>
- #include <linux/init.h>
--#include <linux/smp.h>
--#include <linux/spinlock.h>
+- */
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/io.h>
+-
+-#include <mach/hardware.h>
+-#include <asm/leds.h>
+-#include <asm/mach-types.h>
+-
+-static void p720t_leds_event(led_event_t ledevt)
+-{
+-	unsigned long flags;
+-	u32 pddr;
+-
+-	local_irq_save(flags);
+-	switch(ledevt) {
+-	case led_idle_start:
+-		break;
+-
+-	case led_idle_end:
+-		break;
+-
+-	case led_timer:
+-		pddr = clps_readb(PDDR);
+-		clps_writeb(pddr ^ 1, PDDR);
+-		break;
+-
+-	default:
+-		break;
+-	}
+-
+-	local_irq_restore(flags);
+-}
+-
+-static int __init leds_init(void)
+-{
+-	if (machine_is_p720t())
+-		leds_event = p720t_leds_event;
+-
+-	return 0;
+-}
+-
+-arch_initcall(leds_init);
+diff --git a/arch/arm/mach-clps711x/p720t.c b/arch/arm/mach-clps711x/p720t.c
+index 42ee8f3..09113a9 100644
+--- a/arch/arm/mach-clps711x/p720t.c
++++ b/arch/arm/mach-clps711x/p720t.c
+@@ -23,6 +23,8 @@
+ #include <linux/string.h>
+ #include <linux/mm.h>
  #include <linux/io.h>
 +#include <linux/slab.h>
 +#include <linux/leds.h>
  
-+#include <mach/cm.h>
  #include <mach/hardware.h>
- #include <mach/platform.h>
--#include <asm/leds.h>
--#include <asm/mach-types.h>
--#include <mach/cm.h>
+ #include <asm/pgtable.h>
+@@ -34,6 +36,8 @@
+ #include <asm/mach/map.h>
+ #include <mach/syspld.h>
  
--static int saved_leds;
-+#if defined(CONFIG_NEW_LEDS) && defined(CONFIG_LEDS_CLASS)
++#include <asm/hardware/clps7111.h>
 +
-+#define ALPHA_REG __io_address(INTEGRATOR_DBG_BASE)
-+#define LEDREG	(__io_address(INTEGRATOR_DBG_BASE) + INTEGRATOR_DBG_LEDS_OFFSET)
+ #include "common.h"
  
--static void integrator_leds_event(led_event_t ledevt)
-+struct integrator_led {
-+	struct led_classdev	cdev;
-+	u8			mask;
-+};
-+
+ /*
+@@ -121,3 +125,60 @@ static int p720t_hw_init(void)
+ 
+ __initcall(p720t_hw_init);
+ 
 +/*
-+ * The triggers lines up below will only be used if the
-+ * LED triggers are compiled in.
++ * LED controled by CPLD
 + */
-+static const struct {
-+	const char *name;
-+	const char *trigger;
-+} integrator_leds[] = {
-+	{ "integrator:green0", "heartbeat", },
-+	{ "integrator:yellow", },
-+	{ "integrator:red", },
-+	{ "integrator:green1", },
-+	{ "integrator:core_module", "cpu0", },
-+};
-+
-+static void integrator_led_set(struct led_classdev *cdev,
-+			      enum led_brightness b)
- {
--	unsigned long flags;
--	const unsigned int dbg_base = IO_ADDRESS(INTEGRATOR_DBG_BASE);
--	unsigned int update_alpha_leds;
-+	struct integrator_led *led = container_of(cdev,
-+						 struct integrator_led, cdev);
-+	u32 reg = __raw_readl(LEDREG);
- 
--	// yup, change the LEDs
--	local_irq_save(flags);
--	update_alpha_leds = 0;
-+	if (b != LED_OFF)
-+		reg |= led->mask;
-+	else
-+		reg &= ~led->mask;
- 
--	switch(ledevt) {
--	case led_idle_start:
--		cm_control(CM_CTRL_LED, 0);
--		break;
-+	while (__raw_readl(ALPHA_REG) & 1)
-+		cpu_relax();
- 
--	case led_idle_end:
--		cm_control(CM_CTRL_LED, CM_CTRL_LED);
--		break;
-+	__raw_writel(reg, LEDREG);
-+}
- 
--	case led_timer:
--		saved_leds ^= GREEN_LED;
--		update_alpha_leds = 1;
--		break;
-+static enum led_brightness integrator_led_get(struct led_classdev *cdev)
-+{
-+	struct integrator_led *led = container_of(cdev,
-+						 struct integrator_led, cdev);
-+	u32 reg = __raw_readl(LEDREG);
- 
--	case led_red_on:
--		saved_leds |= RED_LED;
--		update_alpha_leds = 1;
--		break;
-+	return (reg & led->mask) ? LED_FULL : LED_OFF;
-+}
- 
--	case led_red_off:
--		saved_leds &= ~RED_LED;
--		update_alpha_leds = 1;
--		break;
-+static void cm_led_set(struct led_classdev *cdev,
++#if defined(CONFIG_NEW_LEDS) && defined(CONFIG_LEDS_CLASS)
++static void p720t_led_set(struct led_classdev *cdev,
 +			      enum led_brightness b)
 +{
++	u8 reg = clps_readb(PDDR);
++
 +	if (b != LED_OFF)
-+		cm_control(CM_CTRL_LED, CM_CTRL_LED);
++		reg |= 0x1;
 +	else
-+		cm_control(CM_CTRL_LED, 0);
++		reg &= ~0x1;
++
++	clps_writeb(reg, PDDR);
 +}
- 
--	default:
--		break;
--	}
-+static enum led_brightness cm_led_get(struct led_classdev *cdev)
++
++static enum led_brightness p720t_led_get(struct led_classdev *cdev)
 +{
-+	u32 reg = readl(CM_CTRL);
- 
--	if (update_alpha_leds) {
--		while (__raw_readl(dbg_base + INTEGRATOR_DBG_ALPHA_OFFSET) & 1);
--		__raw_writel(saved_leds, dbg_base + INTEGRATOR_DBG_LEDS_OFFSET);
--	}
--	local_irq_restore(flags);
-+	return (reg & CM_CTRL_LED) ? LED_FULL : LED_OFF;
- }
- 
--static int __init leds_init(void)
-+static int __init integrator_leds_init(void)
- {
--	if (machine_is_integrator() || machine_is_cintegrator())
--		leds_event = integrator_leds_event;
-+	int i;
++	u8 reg = clps_readb(PDDR);
 +
-+	for (i = 0; i < ARRAY_SIZE(integrator_leds); i++) {
-+		struct integrator_led *led;
++	return (reg & 0x1) ? LED_FULL : LED_OFF;
++}
 +
-+		led = kzalloc(sizeof(*led), GFP_KERNEL);
-+		if (!led)
-+			break;
++static int __init p720t_leds_init(void)
++{
 +
++	struct led_classdev *cdev;
++	int ret;
 +
-+		led->cdev.name = integrator_leds[i].name;
++	if (!machine_is_p720t())
++		return -ENODEV;
 +
-+		if (i == 4) { /* Setting for LED in core module */
-+			led->cdev.brightness_set = cm_led_set;
-+			led->cdev.brightness_get = cm_led_get;
-+		} else {
-+			led->cdev.brightness_set = integrator_led_set;
-+			led->cdev.brightness_get = integrator_led_get;
-+		}
++	cdev = kzalloc(sizeof(*cdev), GFP_KERNEL);
++	if (!cdev)
++		return -ENOMEM;
 +
-+		led->cdev.default_trigger = integrator_leds[i].trigger;
-+		led->mask = BIT(i);
++	cdev->name = "p720t:0";
++	cdev->brightness_set = p720t_led_set;
++	cdev->brightness_get = p720t_led_get;
++	cdev->default_trigger = "heartbeat";
 +
-+		if (led_classdev_register(NULL, &led->cdev) < 0) {
-+			kfree(led);
-+			break;
-+		}
++	ret = led_classdev_register(NULL, cdev);
++	if (ret	< 0) {
++		kfree(cdev);
++		return ret;
 +	}
- 
- 	return 0;
- }
- 
--core_initcall(leds_init);
++
++	return 0;
++}
++
 +/*
 + * Since we may have triggers on any subsystem, defer registration
 + * until after subsystem_init.
 + */
-+fs_initcall(integrator_leds_init);
++fs_initcall(p720t_leds_init);
 +#endif
 -- 
 1.7.11.4
