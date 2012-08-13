@@ -1,66 +1,43 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Mon, 13 Aug 2012 15:35:12 +0530
-Subject: [PATCH 3/4] arm/dts: omap5-evm: Add keypad data
-In-Reply-To: <1344852313-30484-1-git-send-email-sourav.poddar@ti.com>
-References: <1344852313-30484-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <1344852313-30484-4-git-send-email-sourav.poddar@ti.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 13 Aug 2012 13:20:27 +0300
+Subject: [PATCH v2] mtd: gpmi: add NAND write verify support
+In-Reply-To: <50288C0E.5060400@freescale.com>
+References: <1344698728-8709-1-git-send-email-shijie8@gmail.com>
+ <CAF4G-tKN683_EQCGcG4G8jMU5K6TamaHUv__3ugGUoEg_LPrcQ@mail.gmail.com>
+ <50288C0E.5060400@freescale.com>
+Message-ID: <1344853227.3393.7.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add keypad data node in omap5 device tree file.
-Also fill the device tree binding parameters
-with the required value in "omap5-evm" dts file.
+On Mon, 2012-08-13 at 13:09 +0800, Huang Shijie wrote:
+> ? 2012?08?13? 12:44, Artem Bityutskiy ??:
+> > On Sat, Aug 11, 2012 at 6:25 PM, Huang Shijie<shijie8@gmail.com>  wrote:
+> >> Add NAND write verify support in gpmi-nand driver.
+> >>
+> >> This patch fixes a kernel crash when we select
+> >> CONFIG_MTD_NAND_VERIFY_WRITE=y, and do some write tests:
+> > I would just kill ONFIG_MTD_NAND_VERIFY_WRITE entirely. Some drivers
+> > do not support it and it does not work for sub-pages for long time.
+> > Both UBI and JFFS2 are able to read verify what they wrote already.
+> > There are also MTD tests which do this verification. So I think there
+> > is no reason to keep this in the NAND layer, let alone wasting RAM in
+> > the driver to support this feature.
+> >
+> > I am also removing the -stable mailing list - ne need to spam it.
+> >
+> thanks a lot. Maybe we should send a patch to remove the 
+> CONFIG_MTD_NAND_VERIFY_WRITE feature entirely.
 
-Tested on omap5430 evm with 3.5 custom kernel.
+I'd suggest that instead. I have huge back-log, so wouldn't be able to
+process it quickly, but at some point I would take it to the l2 tree.
 
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
----
-v1->v2
-Add key names as comments
- arch/arm/boot/dts/omap5-evm.dts |   12 ++++++++++++
- arch/arm/boot/dts/omap5.dtsi    |    5 +++++
- 2 files changed, 17 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
-index 45a8aeb..c2ea189 100644
---- a/arch/arm/boot/dts/omap5-evm.dts
-+++ b/arch/arm/boot/dts/omap5-evm.dts
-@@ -17,6 +17,18 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x40000000>; /* 1 GB */
- 	};
-+
-+	keypad {
-+		keypad,num-rows = <8>;
-+		keypad,num-columns = <8>;
-+		linux,keymap = < 0x02020073  /* VOLUP */
-+			0x02030072  /* VOLDOWM */
-+			0x020400e7  /* SEND */
-+			0x02050066  /* HOME */
-+			0x0206006b  /* END */
-+			0x020700d9 >; /* SEARCH */
-+		linux,input-no-autorepeat;
-+	};
- };
- 
- &i2c4 {
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 6b68dfe..c38b823 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -216,4 +216,9 @@
- 			clock-frequency = <48000000>;
- 		};
- 	};
-+
-+	keypad {
-+		compatible = "ti,omap4-keypad";
-+		ti,hwmods = "kbd";
-+	};
- };
 -- 
-1.7.1
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120813/b1312dac/attachment.sig>
