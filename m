@@ -1,221 +1,81 @@
-From: m-karicheri2@ti.com (Karicheri, Muralidharan)
-Date: Mon, 13 Aug 2012 21:13:29 +0000
-Subject: [linux-keystone] Re: [PATCH] arm:davinci: clk - migrate to new
- common clock API
-In-Reply-To: <20120802212025.GI29410@gmail.com>
-References: <1343926428-5210-1-git-send-email-m-karicheri2@ti.com>
- <20120802212025.GI29410@gmail.com>
-Message-ID: <3E54258959B69E4282D79E01AB1F32B7041A0544@DFLE12.ent.ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 13 Aug 2012 14:13:55 -0700
+Subject: [GIT PULL 0/3] arm-soc updates
+In-Reply-To: <20120813185817.GA17342@pengutronix.de>
+References: <1344625575-27560-1-git-send-email-arnd@arndb.de>
+ <20120813185817.GA17342@pengutronix.de>
+Message-ID: <CAOesGMjcSw1vUJ8nn4TakrRxEonryc=Oo-uhRxML=HwJpZQ8hQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> -----Original Message-----
->> From: Turquette, Mike
->> Sent: Thursday, August 02, 2012 5:20 PM
->> To: Karicheri, Muralidharan
->> Cc: linux-arm-kernel at lists.infradead.org; davinci-linux-open-
->> source at linux.davincidsp.com; linux-keystone at list.ti.com - Linux developers for Keystone
->> family of devices (May contain non-TIers); Chemparathy, Cyril; Nori, Sekhar;
->> linux at arm.linux.org.uk
->> Subject: [linux-keystone] Re: [PATCH] arm:davinci: clk - migrate to new common clock
->> API
->> 
->> On 20120802-12:53, Murali Karicheri wrote:
->> > As a first step towards migrating davinci platforms to use common clock
->> > framework, replace all instances of clk_enable() with clk_prepare_enable()
->> > and clk_disable() with clk_disable_unprepare(). Until the platform is
->> > switched to use the CONFIG_HAVE_CLK_PREPARE Kconfig variable, this just
->> > adds a might_sleep() call and would work without any issues.
->> >
->> > This will make it easy later to switch to common clk based implementation
->> > of clk driver from DaVinci specific driver.
->> >
->> > Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> 
->> Murali,
->> 
->> The important thing to know about clk_prepare is that it might sleep.
->> All of the functions below look like initialization functions for code
->> that is never run in interrupt context.  If you can confirm that this is
->> true then feel free to add my,
->> 
+On Mon, Aug 13, 2012 at 11:58 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hi Arnd,
+>
+> On Fri, Aug 10, 2012 at 09:06:12PM +0200, Arnd Bergmann wrote:
+>> Hi Linus,
+>>
+>> Here are three pull requests for you to consider for the next -rc.
+>
+> How do you send multiple pull requests? Is there some git foo available
+> or do you do this manually?
 
-Mike,
+For truly trivial multi-branch pulls, I just generate each
+individually. For the merge windows we tend to have several branches
+touching the same files, so diffstats would be harder to compare that
+way.
 
-I believe they are. I will double check and then post the patch again. If they are called under
-interrupt context, basically I need to make two API calls instead as below right?
+So, this is my workflow. I think Arnd's is quite similar since my
+script is based on an early version of what I got from him:
 
-clk_prepare()
-clk_enable()
-
-Murali Karicheri
-Software Design Engineer
+* Start a dummy branch based on latest upstream version
+* For each branch to pull:
+  - Merge in the branch to make sure you document/resolve conflicts
+  - Generate pull request email (save to file)
+  - Push resolved branch (if you want to provide that)
+* Edit the saved pull requests to modify the x/y fields
+* Send them (with git send-mail --annotate for cover letter)
 
 
->> Reviewed-by: Mike Turquette <mturquette@linaro.org>
->> 
->> Regards,
->> Mike
->> 
->> > ---
->> >  arch/arm/mach-davinci/board-dm355-evm.c     |    2 +-
->> >  arch/arm/mach-davinci/board-dm355-leopard.c |    2 +-
->> >  arch/arm/mach-davinci/board-dm365-evm.c     |    4 ++--
->> >  arch/arm/mach-davinci/board-dm644x-evm.c    |    2 +-
->> >  arch/arm/mach-davinci/board-neuros-osd2.c   |    2 +-
->> >  arch/arm/mach-davinci/devices-da8xx.c       |    6 +++---
->> >  arch/arm/mach-davinci/serial.c              |    2 +-
->> >  arch/arm/mach-davinci/time.c                |    4 ++--
->> >  8 files changed, 12 insertions(+), 12 deletions(-)
->> >
->> > diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-
->> davinci/board-dm355-evm.c
->> > index 1c7b1f4..4821fba 100644
->> > --- a/arch/arm/mach-davinci/board-dm355-evm.c
->> > +++ b/arch/arm/mach-davinci/board-dm355-evm.c
->> > @@ -324,7 +324,7 @@ static __init void dm355_evm_init(void)
->> >  	if (IS_ERR(aemif))
->> >  		WARN("%s: unable to get AEMIF clock\n", __func__);
->> >  	else
->> > -		clk_enable(aemif);
->> > +		clk_prepare_enable(aemif);
->> >
->> >  	platform_add_devices(davinci_evm_devices,
->> >  			     ARRAY_SIZE(davinci_evm_devices));
->> > diff --git a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-
->> davinci/board-dm355-leopard.c
->> > index 8e77032..b754ccf 100644
->> > --- a/arch/arm/mach-davinci/board-dm355-leopard.c
->> > +++ b/arch/arm/mach-davinci/board-dm355-leopard.c
->> > @@ -246,7 +246,7 @@ static __init void dm355_leopard_init(void)
->> >  	if (IS_ERR(aemif))
->> >  		WARN("%s: unable to get AEMIF clock\n", __func__);
->> >  	else
->> > -		clk_enable(aemif);
->> > +		clk_prepare_enable(aemif);
->> >
->> >  	platform_add_devices(davinci_leopard_devices,
->> >  			     ARRAY_SIZE(davinci_leopard_devices));
->> > diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-
->> davinci/board-dm365-evm.c
->> > index 2830692..3a4743b 100644
->> > --- a/arch/arm/mach-davinci/board-dm365-evm.c
->> > +++ b/arch/arm/mach-davinci/board-dm365-evm.c
->> > @@ -481,7 +481,7 @@ static void __init evm_init_cpld(void)
->> >  	aemif_clk = clk_get(NULL, "aemif");
->> >  	if (IS_ERR(aemif_clk))
->> >  		return;
->> > -	clk_enable(aemif_clk);
->> > +	clk_prepare_enable(aemif_clk);
->> >
->> >  	if (request_mem_region(DM365_ASYNC_EMIF_DATA_CE1_BASE, SECTION_SIZE,
->> >  			"cpld") == NULL)
->> > @@ -492,7 +492,7 @@ static void __init evm_init_cpld(void)
->> >  				SECTION_SIZE);
->> >  fail:
->> >  		pr_err("ERROR: can't map CPLD\n");
->> > -		clk_disable(aemif_clk);
->> > +		clk_disable_unprepare(aemif_clk);
->> >  		return;
->> >  	}
->> >
->> > diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-
->> davinci/board-dm644x-evm.c
->> > index d34ed55..04ef708 100644
->> > --- a/arch/arm/mach-davinci/board-dm644x-evm.c
->> > +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
->> > @@ -775,7 +775,7 @@ static __init void davinci_evm_init(void)
->> >  	struct davinci_soc_info *soc_info = &davinci_soc_info;
->> >
->> >  	aemif_clk = clk_get(NULL, "aemif");
->> > -	clk_enable(aemif_clk);
->> > +	clk_prepare_enable(aemif_clk);
->> >
->> >  	if (HAS_ATA) {
->> >  		if (HAS_NAND || HAS_NOR)
->> > diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-
->> davinci/board-neuros-osd2.c
->> > index 5de69f2..7fdd0a7b 100644
->> > --- a/arch/arm/mach-davinci/board-neuros-osd2.c
->> > +++ b/arch/arm/mach-davinci/board-neuros-osd2.c
->> > @@ -221,7 +221,7 @@ static __init void davinci_ntosd2_init(void)
->> >  	int	status;
->> >
->> >  	aemif_clk = clk_get(NULL, "aemif");
->> > -	clk_enable(aemif_clk);
->> > +	clk_prepare_enable(aemif_clk);
->> >
->> >  	if (HAS_ATA) {
->> >  		if (HAS_NAND)
->> > diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-
->> da8xx.c
->> > index d1624a3..20141f5 100644
->> > --- a/arch/arm/mach-davinci/devices-da8xx.c
->> > +++ b/arch/arm/mach-davinci/devices-da8xx.c
->> > @@ -905,7 +905,7 @@ static int da850_sata_init(struct device *dev, void __iomem
->> *addr)
->> >  	if (IS_ERR(da850_sata_clk))
->> >  		return PTR_ERR(da850_sata_clk);
->> >
->> > -	ret = clk_enable(da850_sata_clk);
->> > +	ret = clk_prepare_enable(da850_sata_clk);
->> >  	if (ret)
->> >  		goto err0;
->> >
->> > @@ -936,7 +936,7 @@ static int da850_sata_init(struct device *dev, void __iomem
->> *addr)
->> >  	return 0;
->> >
->> >  err1:
->> > -	clk_disable(da850_sata_clk);
->> > +	clk_disable_unprepare(da850_sata_clk);
->> >  err0:
->> >  	clk_put(da850_sata_clk);
->> >  	return ret;
->> > @@ -944,7 +944,7 @@ err0:
->> >
->> >  static void da850_sata_exit(struct device *dev)
->> >  {
->> > -	clk_disable(da850_sata_clk);
->> > +	clk_disable_unprepare(da850_sata_clk);
->> >  	clk_put(da850_sata_clk);
->> >  }
->> >
->> > diff --git a/arch/arm/mach-davinci/serial.c b/arch/arm/mach-davinci/serial.c
->> > index 1875740..24ddb0d 100644
->> > --- a/arch/arm/mach-davinci/serial.c
->> > +++ b/arch/arm/mach-davinci/serial.c
->> > @@ -95,7 +95,7 @@ int __init davinci_serial_init(struct davinci_uart_config *info)
->> >  			continue;
->> >  		}
->> >
->> > -		clk_enable(uart_clk);
->> > +		clk_prepare_enable(uart_clk);
->> >  		p->uartclk = clk_get_rate(uart_clk);
->> >
->> >  		if (!p->membase && p->mapbase) {
->> > diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
->> > index 75da315..9847938 100644
->> > --- a/arch/arm/mach-davinci/time.c
->> > +++ b/arch/arm/mach-davinci/time.c
->> > @@ -379,7 +379,7 @@ static void __init davinci_timer_init(void)
->> >
->> >  	timer_clk = clk_get(NULL, "timer0");
->> >  	BUG_ON(IS_ERR(timer_clk));
->> > -	clk_enable(timer_clk);
->> > +	clk_prepare_enable(timer_clk);
->> >
->> >  	/* init timer hw */
->> >  	timer_init();
->> > @@ -429,7 +429,7 @@ void davinci_watchdog_reset(struct platform_device *pdev)
->> >  	wd_clk = clk_get(&pdev->dev, NULL);
->> >  	if (WARN_ON(IS_ERR(wd_clk)))
->> >  		return;
->> > -	clk_enable(wd_clk);
->> > +	clk_prepare_enable(wd_clk);
->> >
->> >  	/* disable, internal clock source */
->> >  	__raw_writel(0, base + TCR);
->> > --
->> > 1.7.9.5
->> >
+I have a script that generates the pull-request email in a format that
+git send-email accepts (i.e. it has a From/Subject header). It's not
+very pretty, but for reference I included a copy below.
+
+
+#!/bin/sh
+
+# Usage: my-request-pull <tagname>, run from a branch that is checked out
+# with the branch you wish to request pulled merged in as the top commit.
+
+echo "From: $(git config --get user.name) <$(git config --get user.email)>"
+echo -n Subject: [GIT PULL x/y]\
+git tag -n20 -l $1 | sed -e 's:^[-a-z0-9]* *::g'
+
+echo
+echo "----------------------------------------------------------------"
+echo
+
+SHA=$(git log --pretty=oneline -1 HEAD~ | cut -d' ' -f 1)
+DESC=$(git log --pretty=oneline -1 HEAD~ | cut -d' ' -f 1 --complement)
+
+echo "The following changes since commit $SHA:"
+echo
+echo "  $DESC"
+echo
+echo "are available in the git repository at:"
+echo
+echo "  git://EDIT_YOUR_URL_IN_HERE tags/$1"
+echo
+
+SHA=$(git log --pretty=oneline -1 $1 | cut -d' ' -f 1)
+DESC=$(git log --pretty=oneline -1 $1 | cut -d' ' -f 1 --complement)
+
+echo "for you to fetch changes up to $SHA:"
+echo
+echo "  $DESC"
+echo
+echo "----------------------------------------------------------------"
+echo
+
+git shortlog HEAD~..$1
+echo
+git diff -M --stat=75 --summary HEAD~ | cat
