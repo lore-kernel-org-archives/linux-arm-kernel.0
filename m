@@ -1,82 +1,45 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Mon, 13 Aug 2012 17:38:54 +0200
-Subject: [PATCH] ARM: at91: fix drivers broken because of sparse irq support
-In-Reply-To: <1344872334-1532-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1344872334-1532-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1344872334-1532-2-git-send-email-ludovic.desroches@atmel.com>
+From: ludovic.desroches@atmel.com (ludovic.desroches)
+Date: Mon, 13 Aug 2012 17:43:30 +0200
+Subject: AT91 RM9200 hangs on delay loop calibration
+In-Reply-To: <CAGhQ9Vyvr7bDU8cNirGuTkhsH1LhHPRjehftOwwSnox+i1b=5A@mail.gmail.com>
+References: <CAGhQ9Vyvr7bDU8cNirGuTkhsH1LhHPRjehftOwwSnox+i1b=5A@mail.gmail.com>
+Message-ID: <502920A2.9090100@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+Hi Joachim,
 
-Some drivers directly use AT91_ID_SYS as virq so they are broken because of
-the NR_IRQS_LEGACY virq offset introduced with sparse irq support.
+Le 08/11/2012 07:06 PM, Joachim Eastwood a ?crit :
+> Hi,
+>
+> My custom AT91 RM9200 board hangs on delay loop calibration. There it
+> seems to be stuck and the last message printed is:
+> [    0.000000] Calibrating delay loop...
+>
+> Doing a manual bisect I can get the board to boot again when I revert
+> the following commits from Linus master:
+> 14070ade02cc378bc30dae383532768a94805988 - ARM: at91: fix new build errors
+> c4b68520dc0ec96153bc0d87bca5ffba508edfcf - ARM: at91: add AIC5 support
+> 4c6971a6debb340d487cf6189f15a1332702330f - ARM: at91: remove mach/irqs.h
+> 8fe82a5550a8e97b3f59c74f994b88ed6b3544a3 - ARM: at91: sparse irq support
+> 3e135466745a62b1814edef74c7b4a25e6bda707 - ARM: at91: at91 based
+> machines specify their own irq handler at run time
+>
+> There may be some unnecessary reverts here but there are multiple
+> build failures between the different commits (grrrrr) which makes it
+> pain to filter it out.
+>
+> I suspect that right now all AT91 RM9200 machines are broken by these
+> IRQ changes on AT91.
+>
+> regards
+> Joachim Eastwood
+>
+>
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Cc: stable at vger.kernel.org
----
- arch/arm/mach-at91/at91rm9200_time.c |  2 +-
- drivers/rtc/rtc-at91sam9.c           | 11 ++++++-----
- 2 files changed, 7 insertions(+), 6 deletions(-)
+Thanks for this report. I have just sent a patch to correct the rm9200 
+breakage.
 
-diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
-index 104ca40..aaa443b 100644
---- a/arch/arm/mach-at91/at91rm9200_time.c
-+++ b/arch/arm/mach-at91/at91rm9200_time.c
-@@ -197,7 +197,7 @@ void __init at91rm9200_timer_init(void)
- 	at91_st_read(AT91_ST_SR);
- 
- 	/* Make IRQs happen for the system timer */
--	setup_irq(AT91_ID_SYS, &at91rm9200_timer_irq);
-+	setup_irq(NR_IRQS_LEGACY + AT91_ID_SYS, &at91rm9200_timer_irq);
- 
- 	/* The 32KiHz "Slow Clock" (tick every 30517.58 nanoseconds) is used
- 	 * directly for the clocksource and all clockevents, after adjusting
-diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-index 8318689..2969047 100644
---- a/drivers/rtc/rtc-at91sam9.c
-+++ b/drivers/rtc/rtc-at91sam9.c
-@@ -345,11 +345,12 @@ static int __devinit at91_rtc_probe(struct platform_device *pdev)
- 	}
- 
- 	/* register irq handler after we know what name we'll use */
--	ret = request_irq(AT91_ID_SYS, at91_rtc_interrupt,
-+	ret = request_irq(NR_IRQS_LEGACY + AT91_ID_SYS, at91_rtc_interrupt,
- 				IRQF_SHARED,
- 				dev_name(&rtc->rtcdev->dev), rtc);
- 	if (ret) {
--		dev_dbg(&pdev->dev, "can't share IRQ %d?\n", AT91_ID_SYS);
-+		dev_dbg(&pdev->dev, "can't share IRQ %d?\n",
-+			NR_IRQS_LEGACY + AT91_ID_SYS);
- 		rtc_device_unregister(rtc->rtcdev);
- 		goto fail_register;
- 	}
-@@ -386,7 +387,7 @@ static int __devexit at91_rtc_remove(struct platform_device *pdev)
- 
- 	/* disable all interrupts */
- 	rtt_writel(rtc, MR, mr & ~(AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN));
--	free_irq(AT91_ID_SYS, rtc);
-+	free_irq(NR_IRQS_LEGACY + AT91_ID_SYS, rtc);
- 
- 	rtc_device_unregister(rtc->rtcdev);
- 
-@@ -423,7 +424,7 @@ static int at91_rtc_suspend(struct platform_device *pdev,
- 	rtc->imr = mr & (AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN);
- 	if (rtc->imr) {
- 		if (device_may_wakeup(&pdev->dev) && (mr & AT91_RTT_ALMIEN)) {
--			enable_irq_wake(AT91_ID_SYS);
-+			enable_irq_wake(NR_IRQS_LEGACY + AT91_ID_SYS);
- 			/* don't let RTTINC cause wakeups */
- 			if (mr & AT91_RTT_RTTINCIEN)
- 				rtt_writel(rtc, MR, mr & ~AT91_RTT_RTTINCIEN);
-@@ -441,7 +442,7 @@ static int at91_rtc_resume(struct platform_device *pdev)
- 
- 	if (rtc->imr) {
- 		if (device_may_wakeup(&pdev->dev))
--			disable_irq_wake(AT91_ID_SYS);
-+			disable_irq_wake(NR_IRQS_LEGACY + AT91_ID_SYS);
- 		mr = rtt_readl(rtc, MR);
- 		rtt_writel(rtc, MR, mr | rtc->imr);
- 	}
--- 
-1.7.11.3
+Regards
+
+Ludovic
