@@ -1,48 +1,42 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 13 Aug 2012 15:09:56 -0700
-Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
-In-Reply-To: <CANqRtoQ9BCPhQPi38vK__61G2yAY=g9s17NG3LhSnrxdOYnkDg@mail.gmail.com>
-References: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
- <20120611155716.GA18267@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1206111241470.23555@xanadu.home>
- <20120611165115.GB18267@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
- <4FD62DBB.8070407@codeaurora.org>
- <20120611192519.GF18267@n2100.arm.linux.org.uk>
- <4FE1FB15.3090305@codeaurora.org>
- <0e0201cd5f2f$2c2f6e60$848e4b20$%kim@samsung.com>
- <5016D03D.8010607@codeaurora.org>
- <CANqRtoQ9BCPhQPi38vK__61G2yAY=g9s17NG3LhSnrxdOYnkDg@mail.gmail.com>
-Message-ID: <50297B34.5090504@codeaurora.org>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Mon, 13 Aug 2012 17:28:17 -0500
+Subject: [PATCH] ARM: mxc: ssi-fiq: Make ssi-fiq.S Thumb-2 compatible
+In-Reply-To: <20120813193517.GU1451@pengutronix.de>
+References: <1344599604-9623-1-git-send-email-dave.martin@linaro.org>
+ <20120813193517.GU1451@pengutronix.de>
+Message-ID: <CAKGA1bnRA61JT8tQoHBay+6BSxDO5egiagQm1v05L7Asf+qJ+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/12 23:52, Magnus Damm wrote:
-> So I finally managed to try this out on my KZM9D board. The SMP bring
-> up code continues to work as expected, so it seems that SGI0 can be
-> used instead of SGI1 on EMEV2. Let's just say that the boot protocol
-> implemented by the mask ROM is rather poorly documented. Anyway, to
-> test I used the following patch on top of linux git 42a579a.
->
-> --- 0001/arch/arm/mach-shmobile/smp-emev2.c
-> +++ work/arch/arm/mach-shmobile/smp-emev2.c	2012-08-08 15:42:54.000000000 +0900
-> @@ -82,7 +82,7 @@ int __cpuinit emev2_boot_secondary(unsig
->  	/* Tell ROM loader about our vector (in headsmp.S) */
->  	emev2_set_boot_vector(__pa(shmobile_secondary_vector));
->
-> -	gic_raise_softirq(cpumask_of(cpu), 1);
-> +	gic_raise_softirq(cpumask_of(cpu), 0);
->  	return 0;
->  }
->
-> So if/where needed, please add my:
->
-> Acked-by: Magnus Damm <damm@opensource.se>
->
+ IMX_PIN_REG(MX51_PAD_EIM_DA15, NO_PAD, 0x058, 0, 0x000, 0), /*
+MX51_PAD_EIM_DA15__EIM_DA15 */
 
-Thanks Magnus, would you be able to merge this through the shmobile
-tree? Otherwise I can put it in the patch tracker.
+
+
+On Mon, Aug 13, 2012 at 2:35 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hi Dave,
+>
+> On Fri, Aug 10, 2012 at 12:53:24PM +0100, Dave Martin wrote:
+>> Because FIQ handlers get copied straight into the vectors page to
+>> the FIQ vector entry point, FIQ handlers in a Thumb-2 kernel must
+>> start in Thumb-2.  A Thumb-2 kernel enters all exception vectors in
+>> Thumb-2.
+>
+> I finally came along testing this. I have no Thumb2 capable hardware
+> to test if it works in thumb2 mode, but at least in Arm mode it works.
+> This is enough to not introduce a regression, so we can go for this.
+
+This is the interesting dichotomy; the code is only required truly on
+devices where Thumb2 isn't available, right?
+
+What we're after here is a build fix more than anything due to an
+overzealous, over-inclusive configuration that can't be easily split.
+If the ARM code works on the devices it's intended for, excellent. We
+can fix the weird inclusions of the code later (and maybe if we're
+splitting v6_v7 into just v6 and v7 configs for some other reason, and
+all the users go away, maybe we should bump v7 to default to Thumb2?
+:)
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
