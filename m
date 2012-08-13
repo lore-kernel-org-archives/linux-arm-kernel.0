@@ -1,74 +1,57 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 13 Aug 2012 21:05:33 +0800
-Subject: [PATCH 13/17] ARM: imx53: decouple device tree boot from board files
-In-Reply-To: <1344863137-6112-1-git-send-email-shawn.guo@linaro.org>
-References: <1344863137-6112-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1344863137-6112-14-git-send-email-shawn.guo@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 13 Aug 2012 13:12:15 +0000
+Subject: [PATCH v2 1/4] dmaengine: mmp-pdma support
+In-Reply-To: <1344395701-30888-2-git-send-email-zhangfei.gao@marvell.com>
+References: <1344395701-30888-1-git-send-email-zhangfei.gao@marvell.com>
+ <1344395701-30888-2-git-send-email-zhangfei.gao@marvell.com>
+Message-ID: <201208131312.15180.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now, imx53 device tree kernel calls pinctrl to set up pins.  The
-functions used to hook up non-DT pin setup is not needed for DT boot
-any more.  Remove them from DT image.
+On Wednesday 08 August 2012, Zhangfei Gao wrote:
+> 1. virtual channel vs. physical channel
+> Virtual channel is managed by dmaengine
+> Physical channel handling resource, such as irq
+> Physical channel is alloced dynamically as descending priority,
+> freed immediately when irq done.
+> The availble highest priority physically channel will alwayes be alloced
+> 
+> Issue pending list -> alloc highest dma physically channel available -> dma done -> free physically channel
+> 
+> 2. list: running list & pending list
+> submit: desc list -> pending list
+> issue_pending_list: if (IDLE) pending list -> running list; free pending list (RUN)
+> irq: free running list (IDLE)
+>      check pendlist -> pending list -> running list; free pending list (RUN)
+> 
+> 3. irq:
+> Each list generate one irq, calling callback
+> One list may contain several desc chain, in such case, make sure only the last desc list generate irq.
+> 
+> 4. async
+> Submit will add desc chain to pending list, which can be multi-called
+> If multi desc chain is submitted, only the last desc would generate irq -> call back
+> If IDLE, issue_pending_list start pending_list, transforming pendlist to running list
+> If RUN, irq will start pending list
+> 
+> 5. test
+> 5.1 pxa3xx_nand on pxa910
+> 5.2 insmod dmatest.ko (threads_per_chan=y)
+> By default drivers/dma/dmatest.c test every channel and test memcpy with 1 threads per channel
+> 
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/imx53-dt.c            |   20 --------------------
- arch/arm/plat-mxc/include/mach/common.h |    4 ----
- 2 files changed, 0 insertions(+), 24 deletions(-)
+Looks all good to, the entire series, except one very small point:
 
-diff --git a/arch/arm/mach-imx/imx53-dt.c b/arch/arm/mach-imx/imx53-dt.c
-index 7f47391..f577b5d 100644
---- a/arch/arm/mach-imx/imx53-dt.c
-+++ b/arch/arm/mach-imx/imx53-dt.c
-@@ -50,14 +50,6 @@ static const struct of_dev_auxdata imx53_auxdata_lookup[] __initconst = {
- 	{ /* sentinel */ }
- };
- 
--static const struct of_device_id imx53_iomuxc_of_match[] __initconst = {
--	{ .compatible = "fsl,imx53-iomuxc-ard", .data = imx53_ard_common_init, },
--	{ .compatible = "fsl,imx53-iomuxc-evk", .data = imx53_evk_common_init, },
--	{ .compatible = "fsl,imx53-iomuxc-qsb", .data = imx53_qsb_common_init, },
--	{ .compatible = "fsl,imx53-iomuxc-smd", .data = imx53_smd_common_init, },
--	{ /* sentinel */ }
--};
--
- static void __init imx53_qsb_init(void)
- {
- 	struct clk *clk;
-@@ -73,18 +65,6 @@ static void __init imx53_qsb_init(void)
- 
- static void __init imx53_dt_init(void)
- {
--	struct device_node *node;
--	const struct of_device_id *of_id;
--	void (*func)(void);
--
--	node = of_find_matching_node(NULL, imx53_iomuxc_of_match);
--	if (node) {
--		of_id = of_match_node(imx53_iomuxc_of_match, node);
--		func = of_id->data;
--		func();
--		of_node_put(node);
--	}
--
- 	if (of_machine_is_compatible("fsl,imx53-qsb"))
- 		imx53_qsb_init();
- 
-diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-index 7128e97..96fa702 100644
---- a/arch/arm/plat-mxc/include/mach/common.h
-+++ b/arch/arm/plat-mxc/include/mach/common.h
-@@ -138,10 +138,6 @@ extern void imx_gpc_init(void);
- extern void imx_gpc_pre_suspend(void);
- extern void imx_gpc_post_resume(void);
- extern void imx51_babbage_common_init(void);
--extern void imx53_ard_common_init(void);
--extern void imx53_evk_common_init(void);
--extern void imx53_qsb_common_init(void);
--extern void imx53_smd_common_init(void);
- extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
- extern void imx6q_clock_map_io(void);
- 
--- 
-1.7.5.4
+> +Required properties:
+> +- compatible: Should be "marvell,pdma-1.0"
+> +- reg: Should contain DMA registers location and length.
+> +- interrupts: Either contain all of the per-channel DMA interrupts
+> +               or one irq for pdma device
+> +- dma-channels: Number of DMA channels supported by the controller.
+
+I think the last one should be "#dma-channels", not "dma-channels", since it's
+counting the channels. I think we use the "#" version in the preliminary binding
+for the generic dma channel assignment in DT.
+
+	Arnd
