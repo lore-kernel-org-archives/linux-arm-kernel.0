@@ -1,64 +1,30 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Mon, 13 Aug 2012 15:58:54 +0530
-Subject: [PATCHv2 3/4] arm/dts: omap5-evm: Add keypad data
-Message-ID: <1344853735-16313-1-git-send-email-sourav.poddar@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 13 Aug 2012 11:40:06 +0100
+Subject: [PATCH 1/9] ARM: PMU: Add runtime PM Support
+In-Reply-To: <CACVXFVMg5Acx4_KGT5jn1JgO3JsXAjZzU8virR=B3+pBrT4o_A@mail.gmail.com>
+References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
+ <1344620195-22372-2-git-send-email-will.deacon@arm.com>
+ <CACVXFVMg5Acx4_KGT5jn1JgO3JsXAjZzU8virR=B3+pBrT4o_A@mail.gmail.com>
+Message-ID: <20120813104006.GA20537@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add keypad data node in omap5 device tree file.
-Also fill the device tree binding parameters
-with the required value in "omap5-evm" dts file.
+On Sat, Aug 11, 2012 at 04:09:51PM +0100, Ming Lei wrote:
+> On Sat, Aug 11, 2012 at 1:36 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > +       pm_runtime_put_sync(&pmu_device->dev);
+> 
+> One question, each pmu is just inside one cpu core and should be
+> suspended individually, but looks the above don't support it, do it?
 
-Tested on omap5430 evm with 3.5 custom kernel.
+I'll let Jon elaborate, but I'm not sure that suspending the individual PMUs
+makes much sense if one of them is being used (other than taking the whole
+CPU offline). Given that tasks can migrate and perf-events can be across
+multiple CPUs, it makes it a lot easier to treat them as a single entity. It
+also allows us to implement mutual exclusion using the same hooks and to
+manage any common IP (e.g. CTI) at the same time, without having to keep
+track of things like the last man standing.
 
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
----
-v1->v2
-Add key names as comments
- arch/arm/boot/dts/omap5-evm.dts |   12 ++++++++++++
- arch/arm/boot/dts/omap5.dtsi    |    5 +++++
- 2 files changed, 17 insertions(+), 0 deletions(-)
+So, unless Jon has some ideas here, it's not something that I consider to be
+a real problem.
 
-diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
-index 45a8aeb..c2ea189 100644
---- a/arch/arm/boot/dts/omap5-evm.dts
-+++ b/arch/arm/boot/dts/omap5-evm.dts
-@@ -17,6 +17,18 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x40000000>; /* 1 GB */
- 	};
-+
-+	keypad {
-+		keypad,num-rows = <8>;
-+		keypad,num-columns = <8>;
-+		linux,keymap = < 0x02020073  /* VOLUP */
-+			0x02030072  /* VOLDOWM */
-+			0x020400e7  /* SEND */
-+			0x02050066  /* HOME */
-+			0x0206006b  /* END */
-+			0x020700d9 >; /* SEARCH */
-+		linux,input-no-autorepeat;
-+	};
- };
- 
- &i2c4 {
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 6b68dfe..c38b823 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -216,4 +216,9 @@
- 			clock-frequency = <48000000>;
- 		};
- 	};
-+
-+	keypad {
-+		compatible = "ti,omap4-keypad";
-+		ti,hwmods = "kbd";
-+	};
- };
--- 
-1.7.1
+Will
