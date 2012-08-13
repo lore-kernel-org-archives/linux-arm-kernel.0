@@ -1,45 +1,43 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Mon, 13 Aug 2012 17:43:30 +0200
-Subject: AT91 RM9200 hangs on delay loop calibration
-In-Reply-To: <CAGhQ9Vyvr7bDU8cNirGuTkhsH1LhHPRjehftOwwSnox+i1b=5A@mail.gmail.com>
-References: <CAGhQ9Vyvr7bDU8cNirGuTkhsH1LhHPRjehftOwwSnox+i1b=5A@mail.gmail.com>
-Message-ID: <502920A2.9090100@atmel.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Mon, 13 Aug 2012 10:42:58 -0500
+Subject: [PATCH] efikamx: reintroduce Genesi Efika MX Smarttop via device
+ tree
+In-Reply-To: <20120809101947.GA8474@sirena.org.uk>
+References: <1344375978-29981-1-git-send-email-matt@genesi-usa.com>
+ <20120809101947.GA8474@sirena.org.uk>
+Message-ID: <CAKGA1bkwMvDW7nMWxUbNm3_0ZTR2+uKs8UL_HuisJe7cd8POBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joachim,
+On Thu, Aug 9, 2012 at 5:19 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Tue, Aug 07, 2012 at 04:46:18PM -0500, Matt Sealey wrote:
+>
+> Yay for indentation!  It'd be good to rewrite your DT so you could cut
+> down on that, at the minute it's not good for legibility.
+>
+>> +                                                     sw1_reg: sw1 {
+>> +                                                             regulator-min-microvolt = <600000>;
+>> +                                                             regulator-max-microvolt = <1375000>;
+>> +                                                             regulator-boot-on;
+>> +                                                             regulator-always-on;
+>> +                                                     };
+>
+> This and many of your other regulators have voltage ranges specified but
+> no consumers which doesn't make sense.  It looks awfully like you've
+> just typed in the maximum range supported by the regulator which is most
+> likely broken.
 
-Le 08/11/2012 07:06 PM, Joachim Eastwood a ?crit :
-> Hi,
->
-> My custom AT91 RM9200 board hangs on delay loop calibration. There it
-> seems to be stuck and the last message printed is:
-> [    0.000000] Calibrating delay loop...
->
-> Doing a manual bisect I can get the board to boot again when I revert
-> the following commits from Linus master:
-> 14070ade02cc378bc30dae383532768a94805988 - ARM: at91: fix new build errors
-> c4b68520dc0ec96153bc0d87bca5ffba508edfcf - ARM: at91: add AIC5 support
-> 4c6971a6debb340d487cf6189f15a1332702330f - ARM: at91: remove mach/irqs.h
-> 8fe82a5550a8e97b3f59c74f994b88ed6b3544a3 - ARM: at91: sparse irq support
-> 3e135466745a62b1814edef74c7b4a25e6bda707 - ARM: at91: at91 based
-> machines specify their own irq handler at run time
->
-> There may be some unnecessary reverts here but there are multiple
-> build failures between the different commits (grrrrr) which makes it
-> pain to filter it out.
->
-> I suspect that right now all AT91 RM9200 machines are broken by these
-> IRQ changes on AT91.
->
-> regards
-> Joachim Eastwood
->
->
+Okay I have a question about this; some of the regulators (SW1
+especially) are obviously consumed by the CPU core complex so that
+when DVFS gives us a hint we can clock down and reduce voltage. How on
+earth do we implement that?
 
-Thanks for this report. I have just sent a patch to correct the rm9200 
-breakage.
+We can drop the maximum range to be better for the CPU (1.3V is too
+high, I think this is legacy from when we may have had a sorted 1GHz
+MX51 coming out) but I can't find any source for where this is hooked
+in.
 
-Regards
-
-Ludovic
+-- 
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
