@@ -1,34 +1,37 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 13 Aug 2012 17:18:14 +0200
-Subject: [PATCH 1/2] ARM: mach-imx: Remove board entries in dt_board_compat
-In-Reply-To: <20120813151509.GB27393@S2101-09.ap.freescale.net>
-References: <1339941856-2836-1-git-send-email-festevam@gmail.com>
- <20120705074623.GG10610@S2101-09.ap.freescale.net>
- <20120813151509.GB27393@S2101-09.ap.freescale.net>
-Message-ID: <201208131718.14546.marex@denx.de>
+From: cjb@laptop.org (Chris Ball)
+Date: Mon, 13 Aug 2012 11:23:38 -0400
+Subject: [PATCH 00/10 V3] MXS SPI driver
+In-Reply-To: <20120813140803.GB6407@S2101-09.ap.freescale.net> (Shawn Guo's
+ message of "Mon, 13 Aug 2012 22:08:05 +0800")
+References: <1344007575-11448-1-git-send-email-marex@denx.de>
+ <20120813125158.GE13446@opensource.wolfsonmicro.com>
+ <20120813140803.GB6407@S2101-09.ap.freescale.net>
+Message-ID: <87sjbqlssl.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+Hi,
 
-> On Thu, Jul 05, 2012 at 03:46:23PM +0800, Shawn Guo wrote:
-> > On Thu, Jul 05, 2012 at 09:13:18AM +0200, Sascha Hauer wrote:
-> > > Shawn,
-> > > 
-> > > Is this ok with you?
-> > 
-> > No.
-> > 
-> > http://thread.gmane.org/gmane.linux.ports.arm.kernel/172558/focus=172703
-> 
-> I change my mind.  Though it's really a pity to lose a concentrated
-> place maintaining a full list of compatible strings of all supported
-> board, I'm more concerned by the dt_board_compat matching efficiency
-> when the table gets longer.
-> 
-> So, Fabio, can you please resend the patches against v3.6-rc?
+On Mon, Aug 13 2012, Shawn Guo wrote:
+> On Mon, Aug 13, 2012 at 01:51:58PM +0100, Mark Brown wrote:
+>> Do we have any ETA for review from the MMC side?  I'd like to get these
+>> patches out of my queue one way or another, it seems like for the simple
+>> code motion bits at least we should be easy enough to get out of the
+>> way.
+>
+> For mxs-mmc part:
+>
+> Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+>
+> Chris,
+>
+> Can you take a look at the series and give your ACK to bless it go via
+> SPI tree?
 
-What about the board quirks that are present there?
+Thanks, looks good.  For the SPI tree:
 
-Best regards,
-Marek Vasut
+Acked-by: Chris Ball <cjb@laptop.org>
+
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
