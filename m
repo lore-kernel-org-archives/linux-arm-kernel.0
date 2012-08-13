@@ -1,57 +1,44 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 13 Aug 2012 21:05:23 +0800
-Subject: [PATCH 03/17] ARM: dts: imx6q: sort iomuxc sub-nodes in name
+Date: Mon, 13 Aug 2012 21:05:27 +0800
+Subject: [PATCH 07/17] ARM: imx6q: remove dummy pinctrl state
 In-Reply-To: <1344863137-6112-1-git-send-email-shawn.guo@linaro.org>
 References: <1344863137-6112-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1344863137-6112-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1344863137-6112-8-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sort iomuxc sub-nodes in name so that the node can be located a little
-bit easier.
+As all imx6q boards have pinctrl set up in device tree, it's time to
+remove the dummy pinctrl state.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx6q.dtsi |   20 ++++++++++----------
- 1 files changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/mach-imx/mach-imx6q.c |    7 -------
+ 1 files changed, 0 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index a078436..e8595fa 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -515,6 +515,16 @@
- 					};
- 				};
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 5ec0608..946cfcc 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -22,7 +22,6 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+-#include <linux/pinctrl/machine.h>
+ #include <linux/phy.h>
+ #include <linux/micrel_phy.h>
+ #include <linux/mfd/anatop.h>
+@@ -159,12 +158,6 @@ static void __init imx6q_usb_init(void)
  
-+				ecspi1 {
-+					pinctrl_ecspi1_1: ecspi1grp-1 {
-+						fsl,pins = <
-+							101 0x100b1	/* MX6Q_PAD_EIM_D17__ECSPI1_MISO */
-+							109 0x100b1	/* MX6Q_PAD_EIM_D18__ECSPI1_MOSI */
-+							94  0x100b1	/* MX6Q_PAD_EIM_D16__ECSPI1_SCLK */
-+						>;
-+					};
-+				};
-+
- 				gpmi-nand {
- 					pinctrl_gpmi_nand_1: gpmi-nand-1 {
- 						fsl,pins = <
-@@ -592,16 +602,6 @@
- 						>;
- 					};
- 				};
+ static void __init imx6q_init_machine(void)
+ {
+-	/*
+-	 * This should be removed when all imx6q boards have pinctrl
+-	 * states for devices defined in device tree.
+-	 */
+-	pinctrl_provide_dummies();
 -
--				ecspi1 {
--					pinctrl_ecspi1_1: ecspi1grp-1 {
--						fsl,pins = <
--							101 0x100b1	/* MX6Q_PAD_EIM_D17__ECSPI1_MISO */
--							109 0x100b1	/* MX6Q_PAD_EIM_D18__ECSPI1_MOSI */
--							94  0x100b1	/* MX6Q_PAD_EIM_D16__ECSPI1_SCLK */
--						>;
--					};
--				};
- 			};
+ 	if (of_machine_is_compatible("fsl,imx6q-sabrelite"))
+ 		imx6q_sabrelite_init();
  
- 			dcic at 020e4000 { /* DCIC1 */
 -- 
 1.7.5.4
