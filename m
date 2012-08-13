@@ -1,28 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 Aug 2012 16:17:53 +0200
-Subject: [PATCH 4/9] ARM: pmu: remove arm_pmu_type enumeration
-In-Reply-To: <1344620195-22372-5-git-send-email-will.deacon@arm.com>
-References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
- <1344620195-22372-5-git-send-email-will.deacon@arm.com>
-Message-ID: <CACRpkdYicRVoXb2VPDvHV4PwUfzYW7-JRSLQZh-nTswWWh7kVQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 13 Aug 2012 22:18:52 +0800
+Subject: [PATCH] pinctrl: imx51: fix .conf_reg of MX51_PAD_SD2_CMD__CSPI_MOSI
+Message-ID: <1344867532-27068-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2012 at 7:36 PM, Will Deacon <will.deacon@arm.com> wrote:
+The .conf_reg of MX51_PAD_SD2_CMD__CSPI_MOSI should be 0x7bc rather
+than NO_PAD.  This error will cause SD2 probe failure.
 
-> From: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
->
-> The arm_pmu_type enumeration was initially introduced to identify
-> different PMU types in the system, the usual one being that on the CPU
-> (ARM_PMU_DEVICE_CPU). With the removal of the PMU reservation code and
-> the introduction of devicetree bindings for the CPU PMU, the enumeration
-> is no longer required.
->
-> This patch removes the enumeration and updates the various CPU PMU
-> platform devices so that they no longer pass an .id field referring
-> to identify the PMU type.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+Hi Linus,
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Please send this fix for -rc, so that my imx51 pinctrl series can get
+a fixed base.
 
-Yours,
-Linus Walleij
+Regards,
+Shawn
+
+ drivers/pinctrl/pinctrl-imx51.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/pinctrl/pinctrl-imx51.c b/drivers/pinctrl/pinctrl-imx51.c
+index 689b3c8..9fd0216 100644
+--- a/drivers/pinctrl/pinctrl-imx51.c
++++ b/drivers/pinctrl/pinctrl-imx51.c
+@@ -974,7 +974,7 @@ static struct imx_pin_reg imx51_pin_regs[] = {
+ 	IMX_PIN_REG(MX51_PAD_EIM_DA13, NO_PAD, 0x050, 0, 0x000, 0), /* MX51_PAD_EIM_DA13__EIM_DA13 */
+ 	IMX_PIN_REG(MX51_PAD_EIM_DA14, NO_PAD, 0x054, 0, 0x000, 0), /* MX51_PAD_EIM_DA14__EIM_DA14 */
+ 	IMX_PIN_REG(MX51_PAD_EIM_DA15, NO_PAD, 0x058, 0, 0x000, 0), /* MX51_PAD_EIM_DA15__EIM_DA15 */
+-	IMX_PIN_REG(MX51_PAD_SD2_CMD, NO_PAD, 0x3b4, 2, 0x91c, 3), /* MX51_PAD_SD2_CMD__CSPI_MOSI */
++	IMX_PIN_REG(MX51_PAD_SD2_CMD, 0x7bc, 0x3b4, 2, 0x91c, 3), /* MX51_PAD_SD2_CMD__CSPI_MOSI */
+ 	IMX_PIN_REG(MX51_PAD_SD2_CMD, 0x7bc, 0x3b4, 1, 0x9b0, 2), /* MX51_PAD_SD2_CMD__I2C1_SCL */
+ 	IMX_PIN_REG(MX51_PAD_SD2_CMD, 0x7bc, 0x3b4, 0, 0x000, 0), /* MX51_PAD_SD2_CMD__SD2_CMD */
+ 	IMX_PIN_REG(MX51_PAD_SD2_CLK, 0x7c0, 0x3b8, 2, 0x914, 3), /* MX51_PAD_SD2_CLK__CSPI_SCLK */
+-- 
+1.7.5.4
