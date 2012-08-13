@@ -1,129 +1,120 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 13 Aug 2012 21:05:29 +0800
-Subject: [PATCH 09/17] ARM: dts: imx53-ard: add pinctrl settings
+Date: Mon, 13 Aug 2012 21:05:26 +0800
+Subject: [PATCH 06/17] ARM: dts: imx6q-sabresd: add pinctrl settings
 In-Reply-To: <1344863137-6112-1-git-send-email-shawn.guo@linaro.org>
 References: <1344863137-6112-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1344863137-6112-10-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1344863137-6112-7-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl settings for the exsiting devices in imx53-ard.dts.
+Add pinctrl settings for existing devices in imx6q-sabresd.dts.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx53-ard.dts |   49 +++++++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/imx53.dtsi    |   22 +++++++++++++++++
- 2 files changed, 69 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx6q-sabresd.dts |   25 ++++++++++++++++++++++++-
+ arch/arm/boot/dts/imx6q.dtsi        |   26 ++++++++++++++++++++++++++
+ 2 files changed, 50 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx53-ard.dts b/arch/arm/boot/dts/imx53-ard.dts
-index b548b9c..0433056 100644
---- a/arch/arm/boot/dts/imx53-ard.dts
-+++ b/arch/arm/boot/dts/imx53-ard.dts
-@@ -25,6 +25,8 @@
- 		aips at 50000000 { /* AIPS1 */
- 			spba at 50000000 {
- 				esdhc at 50004000 { /* ESDHC1 */
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&pinctrl_esdhc1_2>;
- 					cd-gpios = <&gpio1 1 0>;
- 					wp-gpios = <&gpio1 9 0>;
- 					status = "okay";
-@@ -32,11 +34,54 @@
- 			};
+diff --git a/arch/arm/boot/dts/imx6q-sabresd.dts b/arch/arm/boot/dts/imx6q-sabresd.dts
+index 07509a1..e596c28c 100644
+--- a/arch/arm/boot/dts/imx6q-sabresd.dts
++++ b/arch/arm/boot/dts/imx6q-sabresd.dts
+@@ -22,28 +22,51 @@
+ 	};
  
- 			iomuxc at 53fa8000 {
--				compatible = "fsl,imx53-iomuxc-ard";
--				reg = <0x53fa8000 0x4000>;
+ 	soc {
+-
+ 		aips-bus at 02000000 { /* AIPS1 */
+ 			spba-bus at 02000000 {
+ 				uart1: serial at 02020000 {
++					pinctrl-names = "default";
++					pinctrl-0 = <&pinctrl_uart1_1>;
+ 					status = "okay";
+ 				};
+ 			};
++
++			iomuxc at 020e0000 {
 +				pinctrl-names = "default";
 +				pinctrl-0 = <&pinctrl_hog>;
 +
 +				hog {
 +					pinctrl_hog: hoggrp {
 +						fsl,pins = <
-+							1077 0x80000000	/* MX53_PAD_GPIO_1__GPIO1_1 */
-+							1085 0x80000000	/* MX53_PAD_GPIO_9__GPIO1_9 */
-+							486  0x80000000	/* MX53_PAD_EIM_EB3__GPIO2_31 */
-+							739  0x80000000	/* MX53_PAD_GPIO_10__GPIO4_0 */
-+							218  0x80000000	/* MX53_PAD_DISP0_DAT16__GPIO5_10 */
-+							226  0x80000000	/* MX53_PAD_DISP0_DAT17__GPIO5_11 */
-+							233  0x80000000	/* MX53_PAD_DISP0_DAT18__GPIO5_12 */
-+							241  0x80000000	/* MX53_PAD_DISP0_DAT19__GPIO5_13 */
-+							429  0x80000000	/* MX53_PAD_EIM_D16__EMI_WEIM_D_16 */
-+							435  0x80000000	/* MX53_PAD_EIM_D17__EMI_WEIM_D_17 */
-+							441  0x80000000	/* MX53_PAD_EIM_D18__EMI_WEIM_D_18 */
-+							448  0x80000000	/* MX53_PAD_EIM_D19__EMI_WEIM_D_19 */
-+							456  0x80000000	/* MX53_PAD_EIM_D20__EMI_WEIM_D_20 */
-+							464  0x80000000	/* MX53_PAD_EIM_D21__EMI_WEIM_D_21 */
-+							471  0x80000000	/* MX53_PAD_EIM_D22__EMI_WEIM_D_22 */
-+							477  0x80000000	/* MX53_PAD_EIM_D23__EMI_WEIM_D_23 */
-+							492  0x80000000	/* MX53_PAD_EIM_D24__EMI_WEIM_D_24 */
-+							500  0x80000000	/* MX53_PAD_EIM_D25__EMI_WEIM_D_25 */
-+							508  0x80000000	/* MX53_PAD_EIM_D26__EMI_WEIM_D_26 */
-+							516  0x80000000	/* MX53_PAD_EIM_D27__EMI_WEIM_D_27 */
-+							524  0x80000000	/* MX53_PAD_EIM_D28__EMI_WEIM_D_28 */
-+							532  0x80000000	/* MX53_PAD_EIM_D29__EMI_WEIM_D_29 */
-+							540  0x80000000	/* MX53_PAD_EIM_D30__EMI_WEIM_D_30 */
-+							548  0x80000000	/* MX53_PAD_EIM_D31__EMI_WEIM_D_31 */
-+							637  0x80000000	/* MX53_PAD_EIM_DA0__EMI_NAND_WEIM_DA_0 */
-+							642  0x80000000	/* MX53_PAD_EIM_DA1__EMI_NAND_WEIM_DA_1 */
-+							647  0x80000000	/* MX53_PAD_EIM_DA2__EMI_NAND_WEIM_DA_2 */
-+							652  0x80000000	/* MX53_PAD_EIM_DA3__EMI_NAND_WEIM_DA_3 */
-+							657  0x80000000	/* MX53_PAD_EIM_DA4__EMI_NAND_WEIM_DA_4 */
-+							662  0x80000000	/* MX53_PAD_EIM_DA5__EMI_NAND_WEIM_DA_5 */
-+							667  0x80000000	/* MX53_PAD_EIM_DA6__EMI_NAND_WEIM_DA_6 */
-+							611  0x80000000	/* MX53_PAD_EIM_OE__EMI_WEIM_OE */
-+							616  0x80000000	/* MX53_PAD_EIM_RW__EMI_WEIM_RW */
-+							607  0x80000000	/* MX53_PAD_EIM_CS1__EMI_WEIM_CS_1 */
++							1402 0x80000000	/* MX6Q_PAD_NANDF_D0__GPIO_2_0 */
++							1410 0x80000000	/* MX6Q_PAD_NANDF_D1__GPIO_2_1 */
++							1418 0x80000000	/* MX6Q_PAD_NANDF_D2__GPIO_2_2 */
++							1426 0x80000000	/* MX6Q_PAD_NANDF_D3__GPIO_2_3 */
 +						>;
 +					};
 +				};
- 			};
++			};
+ 		};
  
- 			uart1: serial at 53fbc000 {
+ 		aips-bus at 02100000 { /* AIPS2 */
+ 			ethernet at 02188000 {
 +				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart1_2>;
++				pinctrl-0 = <&pinctrl_enet_1>;
+ 				phy-mode = "rgmii";
  				status = "okay";
  			};
- 		};
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 35d102d..9721e16 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -224,6 +224,21 @@
- 							1018 0x1d5	/* MX53_PAD_SD1_CLK__ESDHC1_CLK */
- 						>;
- 					};
-+
-+					pinctrl_esdhc1_2: esdhc1grp-2 {
-+						fsl,pins = <
-+							995  0x1d5	/* MX53_PAD_SD1_DATA0__ESDHC1_DAT0 */
-+							1000 0x1d5	/* MX53_PAD_SD1_DATA1__ESDHC1_DAT1 */
-+							1010 0x1d5	/* MX53_PAD_SD1_DATA2__ESDHC1_DAT2 */
-+							1024 0x1d5	/* MX53_PAD_SD1_DATA3__ESDHC1_DAT3 */
-+							941  0x1d5	/* MX53_PAD_PATA_DATA8__ESDHC1_DAT4 */
-+							948  0x1d5	/* MX53_PAD_PATA_DATA9__ESDHC1_DAT5 */
-+							955  0x1d5	/* MX53_PAD_PATA_DATA10__ESDHC1_DAT6 */
-+							962  0x1d5	/* MX53_PAD_PATA_DATA11__ESDHC1_DAT7 */
-+							1005 0x1d5	/* MX53_PAD_SD1_CMD__ESDHC1_CMD */
-+							1018 0x1d5	/* MX53_PAD_SD1_CLK__ESDHC1_CLK */
-+						>;
-+					};
- 				};
  
- 				esdhc3 {
-@@ -268,6 +283,13 @@
- 							354 0x1c5	/* MX53_PAD_CSI0_DAT11__UART1_RXD_MUX */
- 						>;
- 					};
-+
-+					pinctrl_uart1_2: uart1grp-2 {
-+						fsl,pins = <
-+							828 0x1c5	/* MX53_PAD_PATA_DIOW__UART1_TXD_MUX */
-+							832 0x1c5	/* MX53_PAD_PATA_DMACK__UART1_RXD_MUX */
-+						>;
-+					};
- 				};
+ 			usdhc at 02194000 { /* uSDHC2 */
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_usdhc2_1>;
+ 				cd-gpios = <&gpio2 2 0>;
+ 				wp-gpios = <&gpio2 3 0>;
+ 				status = "okay";
  			};
  
+ 			usdhc at 02198000 { /* uSDHC3 */
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_usdhc3_1>;
+ 				cd-gpios = <&gpio2 0 0>;
+ 				wp-gpios = <&gpio2 1 0>;
+ 				status = "okay";
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 23d680a..3b97212 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -602,6 +602,15 @@
+ 					};
+ 				};
+ 
++				uart1 {
++					pinctrl_uart1_1: uart1grp-1 {
++						fsl,pins = <
++							1140 0x1b0b1	/* MX6Q_PAD_CSI0_DAT10__UART1_TXD */
++							1148 0x1b0b1	/* MX6Q_PAD_CSI0_DAT11__UART1_RXD */
++						>;
++					};
++				};
++
+ 				uart2 {
+ 					pinctrl_uart2_1: uart2grp-1 {
+ 						fsl,pins = <
+@@ -620,6 +629,23 @@
+ 					};
+ 				};
+ 
++				usdhc2 {
++					pinctrl_usdhc2_1: usdhc2grp-1 {
++						fsl,pins = <
++							1577 0x17059	/* MX6Q_PAD_SD2_CMD__USDHC2_CMD */
++							1569 0x10059	/* MX6Q_PAD_SD2_CLK__USDHC2_CLK */
++							16   0x17059	/* MX6Q_PAD_SD2_DAT0__USDHC2_DAT0 */
++							0    0x17059	/* MX6Q_PAD_SD2_DAT1__USDHC2_DAT1 */
++							8    0x17059	/* MX6Q_PAD_SD2_DAT2__USDHC2_DAT2 */
++							1583 0x17059	/* MX6Q_PAD_SD2_DAT3__USDHC2_DAT3 */
++							1430 0x17059	/* MX6Q_PAD_NANDF_D4__USDHC2_DAT4 */
++							1438 0x17059	/* MX6Q_PAD_NANDF_D5__USDHC2_DAT5 */
++							1446 0x17059	/* MX6Q_PAD_NANDF_D6__USDHC2_DAT6 */
++							1454 0x17059	/* MX6Q_PAD_NANDF_D7__USDHC2_DAT7 */
++						>;
++					};
++				};
++
+ 				usdhc3 {
+ 					pinctrl_usdhc3_1: usdhc3grp-1 {
+ 						fsl,pins = <
 -- 
 1.7.5.4
