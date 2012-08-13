@@ -1,939 +1,225 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Mon, 13 Aug 2012 12:26:10 -0700
-Subject: [PATCH] pinctrl: imx5: start numbering pad from 0
-In-Reply-To: <1344869278-27334-1-git-send-email-shawn.guo@linaro.org>
-References: <1344869278-27334-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <502954D2.908@boundarydevices.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 13 Aug 2012 21:35:17 +0200
+Subject: [PATCH] ARM: mxc: ssi-fiq: Make ssi-fiq.S Thumb-2 compatible
+In-Reply-To: <1344599604-9623-1-git-send-email-dave.martin@linaro.org>
+References: <1344599604-9623-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <20120813193517.GU1451@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/13/2012 7:47 AM, Shawn Guo wrote:
-> Unlike imx6q pinctrl driver that starts nubmering pad from 0, imx5
-> pinctrl drivers number pad from 1.  It causes problem/confusion when
-> driver accesses imx51_pinctrl_pads array using pin ID as the index.
->
-> Change imx51_pads and imx53_pads numbering start from 0.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Hi Dave,
+
+On Fri, Aug 10, 2012 at 12:53:24PM +0100, Dave Martin wrote:
+> Because FIQ handlers get copied straight into the vectors page to
+> the FIQ vector entry point, FIQ handlers in a Thumb-2 kernel must
+> start in Thumb-2.  A Thumb-2 kernel enters all exception vectors in
+> Thumb-2.
+
+I finally came along testing this. I have no Thumb2 capable hardware
+to test if it works in thumb2 mode, but at least in Arm mode it works.
+This is enough to not introduce a regression, so we can go for this.
+I'll add it to my tree with a
+
+Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+Thanks
+ Sascha
+
+> 
+> This patch adapts the mxc SSI FIQ code suitable for a Thumb-2
+> kernel.
+> 
+> The code contained use of r13 (sp) which isn't allowed in Thumb-2.
+> r11 and r13 have been swapped throughout the file to work around
+> this.
+> 
+> Currently, the way that the function to be copied is located using
+> labels is a bit ugly: we cannot annotate the FIQ handler properly
+> as a Thumb-2 function, because this would set bit 0 of the label
+> address seen by the linker, causing off-by-one errors when copying
+> the function.  Ideally, the copy would be done with fncpy(), but
+> this would require changes to the common set_fiq_handler()
+> function.  For now, we don't touch this.
+> 
+> References to locally-defined global symbols with adr and ldr may
+> not be accepted by the assembler in Thumb-2.  Local shadow symbols
+> are added to work around this.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
 > ---
->   drivers/pinctrl/pinctrl-imx51.c |  490 +++++++++++++++++++-------------------
->   drivers/pinctrl/pinctrl-imx53.c |  402 ++++++++++++++++----------------
->   2 files changed, 446 insertions(+), 446 deletions(-)
->
-> diff --git a/drivers/pinctrl/pinctrl-imx51.c b/drivers/pinctrl/pinctrl-imx51.c
-> index 9fd0216..fb84689 100644
-> --- a/drivers/pinctrl/pinctrl-imx51.c
-> +++ b/drivers/pinctrl/pinctrl-imx51.c
-> @@ -23,251 +23,251 @@
->   #include "pinctrl-imx.h"
->   
->   enum imx51_pads {
-> -	MX51_PAD_EIM_D16 = 1,
-> -	MX51_PAD_EIM_D17 = 2,
-> -	MX51_PAD_EIM_D18 = 3,
-> -	MX51_PAD_EIM_D19 = 4,
-> -	MX51_PAD_EIM_D20 = 5,
-> -	MX51_PAD_EIM_D21 = 6,
-> -	MX51_PAD_EIM_D22 = 7,
-> -	MX51_PAD_EIM_D23 = 8,
-> -	MX51_PAD_EIM_D24 = 9,
-> -	MX51_PAD_EIM_D25 = 10,
-> -	MX51_PAD_EIM_D26 = 11,
-> -	MX51_PAD_EIM_D27 = 12,
-> -	MX51_PAD_EIM_D28 = 13,
-> -	MX51_PAD_EIM_D29 = 14,
-> -	MX51_PAD_EIM_D30 = 15,
-> -	MX51_PAD_EIM_D31 = 16,
-> -	MX51_PAD_EIM_A16 = 17,
-> -	MX51_PAD_EIM_A17 = 18,
-> -	MX51_PAD_EIM_A18 = 19,
-> -	MX51_PAD_EIM_A19 = 20,
-> -	MX51_PAD_EIM_A20 = 21,
-> -	MX51_PAD_EIM_A21 = 22,
-> -	MX51_PAD_EIM_A22 = 23,
-> -	MX51_PAD_EIM_A23 = 24,
-> -	MX51_PAD_EIM_A24 = 25,
-> -	MX51_PAD_EIM_A25 = 26,
-> -	MX51_PAD_EIM_A26 = 27,
-> -	MX51_PAD_EIM_A27 = 28,
-> -	MX51_PAD_EIM_EB0 = 29,
-> -	MX51_PAD_EIM_EB1 = 30,
-> -	MX51_PAD_EIM_EB2 = 31,
-> -	MX51_PAD_EIM_EB3 = 32,
-> -	MX51_PAD_EIM_OE = 33,
-> -	MX51_PAD_EIM_CS0 = 34,
-> -	MX51_PAD_EIM_CS1 = 35,
-> -	MX51_PAD_EIM_CS2 = 36,
-> -	MX51_PAD_EIM_CS3 = 37,
-> -	MX51_PAD_EIM_CS4 = 38,
-> -	MX51_PAD_EIM_CS5 = 39,
-> -	MX51_PAD_EIM_DTACK = 40,
-> -	MX51_PAD_EIM_LBA = 41,
-> -	MX51_PAD_EIM_CRE = 42,
-> -	MX51_PAD_DRAM_CS1 = 43,
-> -	MX51_PAD_NANDF_WE_B = 44,
-> -	MX51_PAD_NANDF_RE_B = 45,
-> -	MX51_PAD_NANDF_ALE = 46,
-> -	MX51_PAD_NANDF_CLE = 47,
-> -	MX51_PAD_NANDF_WP_B = 48,
-> -	MX51_PAD_NANDF_RB0 = 49,
-> -	MX51_PAD_NANDF_RB1 = 50,
-> -	MX51_PAD_NANDF_RB2 = 51,
-> -	MX51_PAD_NANDF_RB3 = 52,
-> -	MX51_PAD_GPIO_NAND = 53,
-> -	MX51_PAD_NANDF_CS0 = 54,
-> -	MX51_PAD_NANDF_CS1 = 55,
-> -	MX51_PAD_NANDF_CS2 = 56,
-> -	MX51_PAD_NANDF_CS3 = 57,
-> -	MX51_PAD_NANDF_CS4 = 58,
-> -	MX51_PAD_NANDF_CS5 = 59,
-> -	MX51_PAD_NANDF_CS6 = 60,
-> -	MX51_PAD_NANDF_CS7 = 61,
-> -	MX51_PAD_NANDF_RDY_INT = 62,
-> -	MX51_PAD_NANDF_D15 = 63,
-> -	MX51_PAD_NANDF_D14 = 64,
-> -	MX51_PAD_NANDF_D13 = 65,
-> -	MX51_PAD_NANDF_D12 = 66,
-> -	MX51_PAD_NANDF_D11 = 67,
-> -	MX51_PAD_NANDF_D10 = 68,
-> -	MX51_PAD_NANDF_D9 = 69,
-> -	MX51_PAD_NANDF_D8 = 70,
-> -	MX51_PAD_NANDF_D7 = 71,
-> -	MX51_PAD_NANDF_D6 = 72,
-> -	MX51_PAD_NANDF_D5 = 73,
-> -	MX51_PAD_NANDF_D4 = 74,
-> -	MX51_PAD_NANDF_D3 = 75,
-> -	MX51_PAD_NANDF_D2 = 76,
-> -	MX51_PAD_NANDF_D1 = 77,
-> -	MX51_PAD_NANDF_D0 = 78,
-> -	MX51_PAD_CSI1_D8 = 79,
-> -	MX51_PAD_CSI1_D9 = 80,
-> -	MX51_PAD_CSI1_D10 = 81,
-> -	MX51_PAD_CSI1_D11 = 82,
-> -	MX51_PAD_CSI1_D12 = 83,
-> -	MX51_PAD_CSI1_D13 = 84,
-> -	MX51_PAD_CSI1_D14 = 85,
-> -	MX51_PAD_CSI1_D15 = 86,
-> -	MX51_PAD_CSI1_D16 = 87,
-> -	MX51_PAD_CSI1_D17 = 88,
-> -	MX51_PAD_CSI1_D18 = 89,
-> -	MX51_PAD_CSI1_D19 = 90,
-> -	MX51_PAD_CSI1_VSYNC = 91,
-> -	MX51_PAD_CSI1_HSYNC = 92,
-> -	MX51_PAD_CSI1_PIXCLK = 93,
-> -	MX51_PAD_CSI1_MCLK = 94,
-> -	MX51_PAD_CSI2_D12 = 95,
-> -	MX51_PAD_CSI2_D13 = 96,
-> -	MX51_PAD_CSI2_D14 = 97,
-> -	MX51_PAD_CSI2_D15 = 98,
-> -	MX51_PAD_CSI2_D16 = 99,
-> -	MX51_PAD_CSI2_D17 = 100,
-> -	MX51_PAD_CSI2_D18 = 101,
-> -	MX51_PAD_CSI2_D19 = 102,
-> -	MX51_PAD_CSI2_VSYNC = 103,
-> -	MX51_PAD_CSI2_HSYNC = 104,
-> -	MX51_PAD_CSI2_PIXCLK = 105,
-> -	MX51_PAD_I2C1_CLK = 106,
-> -	MX51_PAD_I2C1_DAT = 107,
-> -	MX51_PAD_AUD3_BB_TXD = 108,
-> -	MX51_PAD_AUD3_BB_RXD = 109,
-> -	MX51_PAD_AUD3_BB_CK = 110,
-> -	MX51_PAD_AUD3_BB_FS = 111,
-> -	MX51_PAD_CSPI1_MOSI = 112,
-> -	MX51_PAD_CSPI1_MISO = 113,
-> -	MX51_PAD_CSPI1_SS0 = 114,
-> -	MX51_PAD_CSPI1_SS1 = 115,
-> -	MX51_PAD_CSPI1_RDY = 116,
-> -	MX51_PAD_CSPI1_SCLK = 117,
-> -	MX51_PAD_UART1_RXD = 118,
-> -	MX51_PAD_UART1_TXD = 119,
-> -	MX51_PAD_UART1_RTS = 120,
-> -	MX51_PAD_UART1_CTS = 121,
-> -	MX51_PAD_UART2_RXD = 122,
-> -	MX51_PAD_UART2_TXD = 123,
-> -	MX51_PAD_UART3_RXD = 124,
-> -	MX51_PAD_UART3_TXD = 125,
-> -	MX51_PAD_OWIRE_LINE = 126,
-> -	MX51_PAD_KEY_ROW0 = 127,
-> -	MX51_PAD_KEY_ROW1 = 128,
-> -	MX51_PAD_KEY_ROW2 = 129,
-> -	MX51_PAD_KEY_ROW3 = 130,
-> -	MX51_PAD_KEY_COL0 = 131,
-> -	MX51_PAD_KEY_COL1 = 132,
-> -	MX51_PAD_KEY_COL2 = 133,
-> -	MX51_PAD_KEY_COL3 = 134,
-> -	MX51_PAD_KEY_COL4 = 135,
-> -	MX51_PAD_KEY_COL5 = 136,
-> -	MX51_PAD_USBH1_CLK = 137,
-> -	MX51_PAD_USBH1_DIR = 138,
-> -	MX51_PAD_USBH1_STP = 139,
-> -	MX51_PAD_USBH1_NXT = 140,
-> -	MX51_PAD_USBH1_DATA0 = 141,
-> -	MX51_PAD_USBH1_DATA1 = 142,
-> -	MX51_PAD_USBH1_DATA2 = 143,
-> -	MX51_PAD_USBH1_DATA3 = 144,
-> -	MX51_PAD_USBH1_DATA4 = 145,
-> -	MX51_PAD_USBH1_DATA5 = 146,
-> -	MX51_PAD_USBH1_DATA6 = 147,
-> -	MX51_PAD_USBH1_DATA7 = 148,
-> -	MX51_PAD_DI1_PIN11 = 149,
-> -	MX51_PAD_DI1_PIN12 = 150,
-> -	MX51_PAD_DI1_PIN13 = 151,
-> -	MX51_PAD_DI1_D0_CS = 152,
-> -	MX51_PAD_DI1_D1_CS = 153,
-> -	MX51_PAD_DISPB2_SER_DIN = 154,
-> -	MX51_PAD_DISPB2_SER_DIO = 155,
-> -	MX51_PAD_DISPB2_SER_CLK = 156,
-> -	MX51_PAD_DISPB2_SER_RS = 157,
-> -	MX51_PAD_DISP1_DAT0 = 158,
-> -	MX51_PAD_DISP1_DAT1 = 159,
-> -	MX51_PAD_DISP1_DAT2 = 160,
-> -	MX51_PAD_DISP1_DAT3 = 161,
-> -	MX51_PAD_DISP1_DAT4 = 162,
-> -	MX51_PAD_DISP1_DAT5 = 163,
-> -	MX51_PAD_DISP1_DAT6 = 164,
-> -	MX51_PAD_DISP1_DAT7 = 165,
-> -	MX51_PAD_DISP1_DAT8 = 166,
-> -	MX51_PAD_DISP1_DAT9 = 167,
-> -	MX51_PAD_DISP1_DAT10 = 168,
-> -	MX51_PAD_DISP1_DAT11 = 169,
-> -	MX51_PAD_DISP1_DAT12 = 170,
-> -	MX51_PAD_DISP1_DAT13 = 171,
-> -	MX51_PAD_DISP1_DAT14 = 172,
-> -	MX51_PAD_DISP1_DAT15 = 173,
-> -	MX51_PAD_DISP1_DAT16 = 174,
-> -	MX51_PAD_DISP1_DAT17 = 175,
-> -	MX51_PAD_DISP1_DAT18 = 176,
-> -	MX51_PAD_DISP1_DAT19 = 177,
-> -	MX51_PAD_DISP1_DAT20 = 178,
-> -	MX51_PAD_DISP1_DAT21 = 179,
-> -	MX51_PAD_DISP1_DAT22 = 180,
-> -	MX51_PAD_DISP1_DAT23 = 181,
-> -	MX51_PAD_DI1_PIN3 = 182,
-> -	MX51_PAD_DI1_PIN2 = 183,
-> -	MX51_PAD_DI_GP2 = 184,
-> -	MX51_PAD_DI_GP3 = 185,
-> -	MX51_PAD_DI2_PIN4 = 186,
-> -	MX51_PAD_DI2_PIN2 = 187,
-> -	MX51_PAD_DI2_PIN3 = 188,
-> -	MX51_PAD_DI2_DISP_CLK = 189,
-> -	MX51_PAD_DI_GP4 = 190,
-> -	MX51_PAD_DISP2_DAT0 = 191,
-> -	MX51_PAD_DISP2_DAT1 = 192,
-> -	MX51_PAD_DISP2_DAT2 = 193,
-> -	MX51_PAD_DISP2_DAT3 = 194,
-> -	MX51_PAD_DISP2_DAT4 = 195,
-> -	MX51_PAD_DISP2_DAT5 = 196,
-> -	MX51_PAD_DISP2_DAT6 = 197,
-> -	MX51_PAD_DISP2_DAT7 = 198,
-> -	MX51_PAD_DISP2_DAT8 = 199,
-> -	MX51_PAD_DISP2_DAT9 = 200,
-> -	MX51_PAD_DISP2_DAT10 = 201,
-> -	MX51_PAD_DISP2_DAT11 = 202,
-> -	MX51_PAD_DISP2_DAT12 = 203,
-> -	MX51_PAD_DISP2_DAT13 = 204,
-> -	MX51_PAD_DISP2_DAT14 = 205,
-> -	MX51_PAD_DISP2_DAT15 = 206,
-> -	MX51_PAD_SD1_CMD = 207,
-> -	MX51_PAD_SD1_CLK = 208,
-> -	MX51_PAD_SD1_DATA0 = 209,
-> -	MX51_PAD_EIM_DA0 = 210,
-> -	MX51_PAD_EIM_DA1 = 211,
-> -	MX51_PAD_EIM_DA2 = 212,
-> -	MX51_PAD_EIM_DA3 = 213,
-> -	MX51_PAD_SD1_DATA1 = 214,
-> -	MX51_PAD_EIM_DA4 = 215,
-> -	MX51_PAD_EIM_DA5 = 216,
-> -	MX51_PAD_EIM_DA6 = 217,
-> -	MX51_PAD_EIM_DA7 = 218,
-> -	MX51_PAD_SD1_DATA2 = 219,
-> -	MX51_PAD_EIM_DA10 = 220,
-> -	MX51_PAD_EIM_DA11 = 221,
-> -	MX51_PAD_EIM_DA8 = 222,
-> -	MX51_PAD_EIM_DA9 = 223,
-> -	MX51_PAD_SD1_DATA3 = 224,
-> -	MX51_PAD_GPIO1_0 = 225,
-> -	MX51_PAD_GPIO1_1 = 226,
-> -	MX51_PAD_EIM_DA12 = 227,
-> -	MX51_PAD_EIM_DA13 = 228,
-> -	MX51_PAD_EIM_DA14 = 229,
-> -	MX51_PAD_EIM_DA15 = 230,
-> -	MX51_PAD_SD2_CMD = 231,
-> -	MX51_PAD_SD2_CLK = 232,
-> -	MX51_PAD_SD2_DATA0 = 233,
-> -	MX51_PAD_SD2_DATA1 = 234,
-> -	MX51_PAD_SD2_DATA2 = 235,
-> -	MX51_PAD_SD2_DATA3 = 236,
-> -	MX51_PAD_GPIO1_2 = 237,
-> -	MX51_PAD_GPIO1_3 = 238,
-> -	MX51_PAD_PMIC_INT_REQ = 239,
-> -	MX51_PAD_GPIO1_4 = 240,
-> -	MX51_PAD_GPIO1_5 = 241,
-> -	MX51_PAD_GPIO1_6 = 242,
-> -	MX51_PAD_GPIO1_7 = 243,
-> -	MX51_PAD_GPIO1_8 = 244,
-> -	MX51_PAD_GPIO1_9 = 245,
-> +	MX51_PAD_EIM_D16 = 0,
-> +	MX51_PAD_EIM_D17 = 1,
-> +	MX51_PAD_EIM_D18 = 2,
-> +	MX51_PAD_EIM_D19 = 3,
-> +	MX51_PAD_EIM_D20 = 4,
-> +	MX51_PAD_EIM_D21 = 5,
-> +	MX51_PAD_EIM_D22 = 6,
-> +	MX51_PAD_EIM_D23 = 7,
-> +	MX51_PAD_EIM_D24 = 8,
-> +	MX51_PAD_EIM_D25 = 9,
-> +	MX51_PAD_EIM_D26 = 10,
-> +	MX51_PAD_EIM_D27 = 11,
-> +	MX51_PAD_EIM_D28 = 12,
-> +	MX51_PAD_EIM_D29 = 13,
-> +	MX51_PAD_EIM_D30 = 14,
-> +	MX51_PAD_EIM_D31 = 15,
-> +	MX51_PAD_EIM_A16 = 16,
-> +	MX51_PAD_EIM_A17 = 17,
-> +	MX51_PAD_EIM_A18 = 18,
-> +	MX51_PAD_EIM_A19 = 19,
-> +	MX51_PAD_EIM_A20 = 20,
-> +	MX51_PAD_EIM_A21 = 21,
-> +	MX51_PAD_EIM_A22 = 22,
-> +	MX51_PAD_EIM_A23 = 23,
-> +	MX51_PAD_EIM_A24 = 24,
-> +	MX51_PAD_EIM_A25 = 25,
-> +	MX51_PAD_EIM_A26 = 26,
-> +	MX51_PAD_EIM_A27 = 27,
-> +	MX51_PAD_EIM_EB0 = 28,
-> +	MX51_PAD_EIM_EB1 = 29,
-> +	MX51_PAD_EIM_EB2 = 30,
-> +	MX51_PAD_EIM_EB3 = 31,
-> +	MX51_PAD_EIM_OE = 32,
-> +	MX51_PAD_EIM_CS0 = 33,
-> +	MX51_PAD_EIM_CS1 = 34,
-> +	MX51_PAD_EIM_CS2 = 35,
-> +	MX51_PAD_EIM_CS3 = 36,
-> +	MX51_PAD_EIM_CS4 = 37,
-> +	MX51_PAD_EIM_CS5 = 38,
-> +	MX51_PAD_EIM_DTACK = 39,
-> +	MX51_PAD_EIM_LBA = 40,
-> +	MX51_PAD_EIM_CRE = 41,
-> +	MX51_PAD_DRAM_CS1 = 42,
-> +	MX51_PAD_NANDF_WE_B = 43,
-> +	MX51_PAD_NANDF_RE_B = 44,
-> +	MX51_PAD_NANDF_ALE = 45,
-> +	MX51_PAD_NANDF_CLE = 46,
-> +	MX51_PAD_NANDF_WP_B = 47,
-> +	MX51_PAD_NANDF_RB0 = 48,
-> +	MX51_PAD_NANDF_RB1 = 49,
-> +	MX51_PAD_NANDF_RB2 = 50,
-> +	MX51_PAD_NANDF_RB3 = 51,
-> +	MX51_PAD_GPIO_NAND = 52,
-> +	MX51_PAD_NANDF_CS0 = 53,
-> +	MX51_PAD_NANDF_CS1 = 54,
-> +	MX51_PAD_NANDF_CS2 = 55,
-> +	MX51_PAD_NANDF_CS3 = 56,
-> +	MX51_PAD_NANDF_CS4 = 57,
-> +	MX51_PAD_NANDF_CS5 = 58,
-> +	MX51_PAD_NANDF_CS6 = 59,
-> +	MX51_PAD_NANDF_CS7 = 60,
-> +	MX51_PAD_NANDF_RDY_INT = 61,
-> +	MX51_PAD_NANDF_D15 = 62,
-> +	MX51_PAD_NANDF_D14 = 63,
-> +	MX51_PAD_NANDF_D13 = 64,
-> +	MX51_PAD_NANDF_D12 = 65,
-> +	MX51_PAD_NANDF_D11 = 66,
-> +	MX51_PAD_NANDF_D10 = 67,
-> +	MX51_PAD_NANDF_D9 = 68,
-> +	MX51_PAD_NANDF_D8 = 69,
-> +	MX51_PAD_NANDF_D7 = 70,
-> +	MX51_PAD_NANDF_D6 = 71,
-> +	MX51_PAD_NANDF_D5 = 72,
-> +	MX51_PAD_NANDF_D4 = 73,
-> +	MX51_PAD_NANDF_D3 = 74,
-> +	MX51_PAD_NANDF_D2 = 75,
-> +	MX51_PAD_NANDF_D1 = 76,
-> +	MX51_PAD_NANDF_D0 = 77,
-> +	MX51_PAD_CSI1_D8 = 78,
-> +	MX51_PAD_CSI1_D9 = 79,
-> +	MX51_PAD_CSI1_D10 = 80,
-> +	MX51_PAD_CSI1_D11 = 81,
-> +	MX51_PAD_CSI1_D12 = 82,
-> +	MX51_PAD_CSI1_D13 = 83,
-> +	MX51_PAD_CSI1_D14 = 84,
-> +	MX51_PAD_CSI1_D15 = 85,
-> +	MX51_PAD_CSI1_D16 = 86,
-> +	MX51_PAD_CSI1_D17 = 87,
-> +	MX51_PAD_CSI1_D18 = 88,
-> +	MX51_PAD_CSI1_D19 = 89,
-> +	MX51_PAD_CSI1_VSYNC = 90,
-> +	MX51_PAD_CSI1_HSYNC = 91,
-> +	MX51_PAD_CSI1_PIXCLK = 92,
-> +	MX51_PAD_CSI1_MCLK = 93,
-> +	MX51_PAD_CSI2_D12 = 94,
-> +	MX51_PAD_CSI2_D13 = 95,
-> +	MX51_PAD_CSI2_D14 = 96,
-> +	MX51_PAD_CSI2_D15 = 97,
-> +	MX51_PAD_CSI2_D16 = 98,
-> +	MX51_PAD_CSI2_D17 = 99,
-> +	MX51_PAD_CSI2_D18 = 100,
-> +	MX51_PAD_CSI2_D19 = 101,
-> +	MX51_PAD_CSI2_VSYNC = 102,
-> +	MX51_PAD_CSI2_HSYNC = 103,
-> +	MX51_PAD_CSI2_PIXCLK = 104,
-> +	MX51_PAD_I2C1_CLK = 105,
-> +	MX51_PAD_I2C1_DAT = 106,
-> +	MX51_PAD_AUD3_BB_TXD = 107,
-> +	MX51_PAD_AUD3_BB_RXD = 108,
-> +	MX51_PAD_AUD3_BB_CK = 109,
-> +	MX51_PAD_AUD3_BB_FS = 110,
-> +	MX51_PAD_CSPI1_MOSI = 111,
-> +	MX51_PAD_CSPI1_MISO = 112,
-> +	MX51_PAD_CSPI1_SS0 = 113,
-> +	MX51_PAD_CSPI1_SS1 = 114,
-> +	MX51_PAD_CSPI1_RDY = 115,
-> +	MX51_PAD_CSPI1_SCLK = 116,
-> +	MX51_PAD_UART1_RXD = 117,
-> +	MX51_PAD_UART1_TXD = 118,
-> +	MX51_PAD_UART1_RTS = 119,
-> +	MX51_PAD_UART1_CTS = 120,
-> +	MX51_PAD_UART2_RXD = 121,
-> +	MX51_PAD_UART2_TXD = 122,
-> +	MX51_PAD_UART3_RXD = 123,
-> +	MX51_PAD_UART3_TXD = 124,
-> +	MX51_PAD_OWIRE_LINE = 125,
-> +	MX51_PAD_KEY_ROW0 = 126,
-> +	MX51_PAD_KEY_ROW1 = 127,
-> +	MX51_PAD_KEY_ROW2 = 128,
-> +	MX51_PAD_KEY_ROW3 = 129,
-> +	MX51_PAD_KEY_COL0 = 130,
-> +	MX51_PAD_KEY_COL1 = 131,
-> +	MX51_PAD_KEY_COL2 = 132,
-> +	MX51_PAD_KEY_COL3 = 133,
-> +	MX51_PAD_KEY_COL4 = 134,
-> +	MX51_PAD_KEY_COL5 = 135,
-> +	MX51_PAD_USBH1_CLK = 136,
-> +	MX51_PAD_USBH1_DIR = 137,
-> +	MX51_PAD_USBH1_STP = 138,
-> +	MX51_PAD_USBH1_NXT = 139,
-> +	MX51_PAD_USBH1_DATA0 = 140,
-> +	MX51_PAD_USBH1_DATA1 = 141,
-> +	MX51_PAD_USBH1_DATA2 = 142,
-> +	MX51_PAD_USBH1_DATA3 = 143,
-> +	MX51_PAD_USBH1_DATA4 = 144,
-> +	MX51_PAD_USBH1_DATA5 = 145,
-> +	MX51_PAD_USBH1_DATA6 = 146,
-> +	MX51_PAD_USBH1_DATA7 = 147,
-> +	MX51_PAD_DI1_PIN11 = 148,
-> +	MX51_PAD_DI1_PIN12 = 149,
-> +	MX51_PAD_DI1_PIN13 = 150,
-> +	MX51_PAD_DI1_D0_CS = 151,
-> +	MX51_PAD_DI1_D1_CS = 152,
-> +	MX51_PAD_DISPB2_SER_DIN = 153,
-> +	MX51_PAD_DISPB2_SER_DIO = 154,
-> +	MX51_PAD_DISPB2_SER_CLK = 155,
-> +	MX51_PAD_DISPB2_SER_RS = 156,
-> +	MX51_PAD_DISP1_DAT0 = 157,
-> +	MX51_PAD_DISP1_DAT1 = 158,
-> +	MX51_PAD_DISP1_DAT2 = 159,
-> +	MX51_PAD_DISP1_DAT3 = 160,
-> +	MX51_PAD_DISP1_DAT4 = 161,
-> +	MX51_PAD_DISP1_DAT5 = 162,
-> +	MX51_PAD_DISP1_DAT6 = 163,
-> +	MX51_PAD_DISP1_DAT7 = 164,
-> +	MX51_PAD_DISP1_DAT8 = 165,
-> +	MX51_PAD_DISP1_DAT9 = 166,
-> +	MX51_PAD_DISP1_DAT10 = 167,
-> +	MX51_PAD_DISP1_DAT11 = 168,
-> +	MX51_PAD_DISP1_DAT12 = 169,
-> +	MX51_PAD_DISP1_DAT13 = 170,
-> +	MX51_PAD_DISP1_DAT14 = 171,
-> +	MX51_PAD_DISP1_DAT15 = 172,
-> +	MX51_PAD_DISP1_DAT16 = 173,
-> +	MX51_PAD_DISP1_DAT17 = 174,
-> +	MX51_PAD_DISP1_DAT18 = 175,
-> +	MX51_PAD_DISP1_DAT19 = 176,
-> +	MX51_PAD_DISP1_DAT20 = 177,
-> +	MX51_PAD_DISP1_DAT21 = 178,
-> +	MX51_PAD_DISP1_DAT22 = 179,
-> +	MX51_PAD_DISP1_DAT23 = 180,
-> +	MX51_PAD_DI1_PIN3 = 181,
-> +	MX51_PAD_DI1_PIN2 = 182,
-> +	MX51_PAD_DI_GP2 = 183,
-> +	MX51_PAD_DI_GP3 = 184,
-> +	MX51_PAD_DI2_PIN4 = 185,
-> +	MX51_PAD_DI2_PIN2 = 186,
-> +	MX51_PAD_DI2_PIN3 = 187,
-> +	MX51_PAD_DI2_DISP_CLK = 188,
-> +	MX51_PAD_DI_GP4 = 189,
-> +	MX51_PAD_DISP2_DAT0 = 190,
-> +	MX51_PAD_DISP2_DAT1 = 191,
-> +	MX51_PAD_DISP2_DAT2 = 192,
-> +	MX51_PAD_DISP2_DAT3 = 193,
-> +	MX51_PAD_DISP2_DAT4 = 194,
-> +	MX51_PAD_DISP2_DAT5 = 195,
-> +	MX51_PAD_DISP2_DAT6 = 196,
-> +	MX51_PAD_DISP2_DAT7 = 197,
-> +	MX51_PAD_DISP2_DAT8 = 198,
-> +	MX51_PAD_DISP2_DAT9 = 199,
-> +	MX51_PAD_DISP2_DAT10 = 200,
-> +	MX51_PAD_DISP2_DAT11 = 201,
-> +	MX51_PAD_DISP2_DAT12 = 202,
-> +	MX51_PAD_DISP2_DAT13 = 203,
-> +	MX51_PAD_DISP2_DAT14 = 204,
-> +	MX51_PAD_DISP2_DAT15 = 205,
-> +	MX51_PAD_SD1_CMD = 206,
-> +	MX51_PAD_SD1_CLK = 207,
-> +	MX51_PAD_SD1_DATA0 = 208,
-> +	MX51_PAD_EIM_DA0 = 209,
-> +	MX51_PAD_EIM_DA1 = 210,
-> +	MX51_PAD_EIM_DA2 = 211,
-> +	MX51_PAD_EIM_DA3 = 212,
-> +	MX51_PAD_SD1_DATA1 = 213,
-> +	MX51_PAD_EIM_DA4 = 214,
-> +	MX51_PAD_EIM_DA5 = 215,
-> +	MX51_PAD_EIM_DA6 = 216,
-> +	MX51_PAD_EIM_DA7 = 217,
-> +	MX51_PAD_SD1_DATA2 = 218,
-> +	MX51_PAD_EIM_DA10 = 219,
-> +	MX51_PAD_EIM_DA11 = 220,
-> +	MX51_PAD_EIM_DA8 = 221,
-> +	MX51_PAD_EIM_DA9 = 222,
-> +	MX51_PAD_SD1_DATA3 = 223,
-> +	MX51_PAD_GPIO1_0 = 224,
-> +	MX51_PAD_GPIO1_1 = 225,
-> +	MX51_PAD_EIM_DA12 = 226,
-> +	MX51_PAD_EIM_DA13 = 227,
-> +	MX51_PAD_EIM_DA14 = 228,
-> +	MX51_PAD_EIM_DA15 = 229,
-> +	MX51_PAD_SD2_CMD = 230,
-> +	MX51_PAD_SD2_CLK = 231,
-> +	MX51_PAD_SD2_DATA0 = 232,
-> +	MX51_PAD_SD2_DATA1 = 233,
-> +	MX51_PAD_SD2_DATA2 = 234,
-> +	MX51_PAD_SD2_DATA3 = 235,
-> +	MX51_PAD_GPIO1_2 = 236,
-> +	MX51_PAD_GPIO1_3 = 237,
-> +	MX51_PAD_PMIC_INT_REQ = 238,
-> +	MX51_PAD_GPIO1_4 = 239,
-> +	MX51_PAD_GPIO1_5 = 240,
-> +	MX51_PAD_GPIO1_6 = 241,
-> +	MX51_PAD_GPIO1_7 = 242,
-> +	MX51_PAD_GPIO1_8 = 243,
-> +	MX51_PAD_GPIO1_9 = 244,
->   };
->   
->   /* imx51 register maps */
-> diff --git a/drivers/pinctrl/pinctrl-imx53.c b/drivers/pinctrl/pinctrl-imx53.c
-> index 1f49e16..783feb1 100644
-> --- a/drivers/pinctrl/pinctrl-imx53.c
-> +++ b/drivers/pinctrl/pinctrl-imx53.c
-> @@ -23,207 +23,207 @@
->   #include "pinctrl-imx.h"
->   
->   enum imx53_pads {
-> -	MX53_PAD_GPIO_19 = 1,
-> -	MX53_PAD_KEY_COL0 = 2,
-> -	MX53_PAD_KEY_ROW0 = 3,
-> -	MX53_PAD_KEY_COL1 = 4,
-> -	MX53_PAD_KEY_ROW1 = 5,
-> -	MX53_PAD_KEY_COL2 = 6,
-> -	MX53_PAD_KEY_ROW2 = 7,
-> -	MX53_PAD_KEY_COL3 = 8,
-> -	MX53_PAD_KEY_ROW3 = 9,
-> -	MX53_PAD_KEY_COL4 = 10,
-> -	MX53_PAD_KEY_ROW4 = 11,
-> -	MX53_PAD_DI0_DISP_CLK = 12,
-> -	MX53_PAD_DI0_PIN15 = 13,
-> -	MX53_PAD_DI0_PIN2 = 14,
-> -	MX53_PAD_DI0_PIN3 = 15,
-> -	MX53_PAD_DI0_PIN4 = 16,
-> -	MX53_PAD_DISP0_DAT0 = 17,
-> -	MX53_PAD_DISP0_DAT1 = 18,
-> -	MX53_PAD_DISP0_DAT2 = 19,
-> -	MX53_PAD_DISP0_DAT3 = 20,
-> -	MX53_PAD_DISP0_DAT4 = 21,
-> -	MX53_PAD_DISP0_DAT5 = 22,
-> -	MX53_PAD_DISP0_DAT6 = 23,
-> -	MX53_PAD_DISP0_DAT7 = 24,
-> -	MX53_PAD_DISP0_DAT8 = 25,
-> -	MX53_PAD_DISP0_DAT9 = 26,
-> -	MX53_PAD_DISP0_DAT10 = 27,
-> -	MX53_PAD_DISP0_DAT11 = 28,
-> -	MX53_PAD_DISP0_DAT12 = 29,
-> -	MX53_PAD_DISP0_DAT13 = 30,
-> -	MX53_PAD_DISP0_DAT14 = 31,
-> -	MX53_PAD_DISP0_DAT15 = 32,
-> -	MX53_PAD_DISP0_DAT16 = 33,
-> -	MX53_PAD_DISP0_DAT17 = 34,
-> -	MX53_PAD_DISP0_DAT18 = 35,
-> -	MX53_PAD_DISP0_DAT19 = 36,
-> -	MX53_PAD_DISP0_DAT20 = 37,
-> -	MX53_PAD_DISP0_DAT21 = 38,
-> -	MX53_PAD_DISP0_DAT22 = 39,
-> -	MX53_PAD_DISP0_DAT23 = 40,
-> -	MX53_PAD_CSI0_PIXCLK = 41,
-> -	MX53_PAD_CSI0_MCLK = 42,
-> -	MX53_PAD_CSI0_DATA_EN = 43,
-> -	MX53_PAD_CSI0_VSYNC = 44,
-> -	MX53_PAD_CSI0_DAT4 = 45,
-> -	MX53_PAD_CSI0_DAT5 = 46,
-> -	MX53_PAD_CSI0_DAT6 = 47,
-> -	MX53_PAD_CSI0_DAT7 = 48,
-> -	MX53_PAD_CSI0_DAT8 = 49,
-> -	MX53_PAD_CSI0_DAT9 = 50,
-> -	MX53_PAD_CSI0_DAT10 = 51,
-> -	MX53_PAD_CSI0_DAT11 = 52,
-> -	MX53_PAD_CSI0_DAT12 = 53,
-> -	MX53_PAD_CSI0_DAT13 = 54,
-> -	MX53_PAD_CSI0_DAT14 = 55,
-> -	MX53_PAD_CSI0_DAT15 = 56,
-> -	MX53_PAD_CSI0_DAT16 = 57,
-> -	MX53_PAD_CSI0_DAT17 = 58,
-> -	MX53_PAD_CSI0_DAT18 = 59,
-> -	MX53_PAD_CSI0_DAT19 = 60,
-> -	MX53_PAD_EIM_A25 = 61,
-> -	MX53_PAD_EIM_EB2 = 62,
-> -	MX53_PAD_EIM_D16 = 63,
-> -	MX53_PAD_EIM_D17 = 64,
-> -	MX53_PAD_EIM_D18 = 65,
-> -	MX53_PAD_EIM_D19 = 66,
-> -	MX53_PAD_EIM_D20 = 67,
-> -	MX53_PAD_EIM_D21 = 68,
-> -	MX53_PAD_EIM_D22 = 69,
-> -	MX53_PAD_EIM_D23 = 70,
-> -	MX53_PAD_EIM_EB3 = 71,
-> -	MX53_PAD_EIM_D24 = 72,
-> -	MX53_PAD_EIM_D25 = 73,
-> -	MX53_PAD_EIM_D26 = 74,
-> -	MX53_PAD_EIM_D27 = 75,
-> -	MX53_PAD_EIM_D28 = 76,
-> -	MX53_PAD_EIM_D29 = 77,
-> -	MX53_PAD_EIM_D30 = 78,
-> -	MX53_PAD_EIM_D31 = 79,
-> -	MX53_PAD_EIM_A24 = 80,
-> -	MX53_PAD_EIM_A23 = 81,
-> -	MX53_PAD_EIM_A22 = 82,
-> -	MX53_PAD_EIM_A21 = 83,
-> -	MX53_PAD_EIM_A20 = 84,
-> -	MX53_PAD_EIM_A19 = 85,
-> -	MX53_PAD_EIM_A18 = 86,
-> -	MX53_PAD_EIM_A17 = 87,
-> -	MX53_PAD_EIM_A16 = 88,
-> -	MX53_PAD_EIM_CS0 = 89,
-> -	MX53_PAD_EIM_CS1 = 90,
-> -	MX53_PAD_EIM_OE = 91,
-> -	MX53_PAD_EIM_RW = 92,
-> -	MX53_PAD_EIM_LBA = 93,
-> -	MX53_PAD_EIM_EB0 = 94,
-> -	MX53_PAD_EIM_EB1 = 95,
-> -	MX53_PAD_EIM_DA0 = 96,
-> -	MX53_PAD_EIM_DA1 = 97,
-> -	MX53_PAD_EIM_DA2 = 98,
-> -	MX53_PAD_EIM_DA3 = 99,
-> -	MX53_PAD_EIM_DA4 = 100,
-> -	MX53_PAD_EIM_DA5 = 101,
-> -	MX53_PAD_EIM_DA6 = 102,
-> -	MX53_PAD_EIM_DA7 = 103,
-> -	MX53_PAD_EIM_DA8 = 104,
-> -	MX53_PAD_EIM_DA9 = 105,
-> -	MX53_PAD_EIM_DA10 = 106,
-> -	MX53_PAD_EIM_DA11 = 107,
-> -	MX53_PAD_EIM_DA12 = 108,
-> -	MX53_PAD_EIM_DA13 = 109,
-> -	MX53_PAD_EIM_DA14 = 110,
-> -	MX53_PAD_EIM_DA15 = 111,
-> -	MX53_PAD_NANDF_WE_B = 112,
-> -	MX53_PAD_NANDF_RE_B = 113,
-> -	MX53_PAD_EIM_WAIT = 114,
-> -	MX53_PAD_LVDS1_TX3_P = 115,
-> -	MX53_PAD_LVDS1_TX2_P = 116,
-> -	MX53_PAD_LVDS1_CLK_P = 117,
-> -	MX53_PAD_LVDS1_TX1_P = 118,
-> -	MX53_PAD_LVDS1_TX0_P = 119,
-> -	MX53_PAD_LVDS0_TX3_P = 120,
-> -	MX53_PAD_LVDS0_CLK_P = 121,
-> -	MX53_PAD_LVDS0_TX2_P = 122,
-> -	MX53_PAD_LVDS0_TX1_P = 123,
-> -	MX53_PAD_LVDS0_TX0_P = 124,
-> -	MX53_PAD_GPIO_10 = 125,
-> -	MX53_PAD_GPIO_11 = 126,
-> -	MX53_PAD_GPIO_12 = 127,
-> -	MX53_PAD_GPIO_13 = 128,
-> -	MX53_PAD_GPIO_14 = 129,
-> -	MX53_PAD_NANDF_CLE = 130,
-> -	MX53_PAD_NANDF_ALE = 131,
-> -	MX53_PAD_NANDF_WP_B = 132,
-> -	MX53_PAD_NANDF_RB0 = 133,
-> -	MX53_PAD_NANDF_CS0 = 134,
-> -	MX53_PAD_NANDF_CS1 = 135,
-> -	MX53_PAD_NANDF_CS2 = 136,
-> -	MX53_PAD_NANDF_CS3 = 137,
-> -	MX53_PAD_FEC_MDIO = 138,
-> -	MX53_PAD_FEC_REF_CLK = 139,
-> -	MX53_PAD_FEC_RX_ER = 140,
-> -	MX53_PAD_FEC_CRS_DV = 141,
-> -	MX53_PAD_FEC_RXD1 = 142,
-> -	MX53_PAD_FEC_RXD0 = 143,
-> -	MX53_PAD_FEC_TX_EN = 144,
-> -	MX53_PAD_FEC_TXD1 = 145,
-> -	MX53_PAD_FEC_TXD0 = 146,
-> -	MX53_PAD_FEC_MDC = 147,
-> -	MX53_PAD_PATA_DIOW = 148,
-> -	MX53_PAD_PATA_DMACK = 149,
-> -	MX53_PAD_PATA_DMARQ = 150,
-> -	MX53_PAD_PATA_BUFFER_EN = 151,
-> -	MX53_PAD_PATA_INTRQ = 152,
-> -	MX53_PAD_PATA_DIOR = 153,
-> -	MX53_PAD_PATA_RESET_B = 154,
-> -	MX53_PAD_PATA_IORDY = 155,
-> -	MX53_PAD_PATA_DA_0 = 156,
-> -	MX53_PAD_PATA_DA_1 = 157,
-> -	MX53_PAD_PATA_DA_2 = 158,
-> -	MX53_PAD_PATA_CS_0 = 159,
-> -	MX53_PAD_PATA_CS_1 = 160,
-> -	MX53_PAD_PATA_DATA0 = 161,
-> -	MX53_PAD_PATA_DATA1 = 162,
-> -	MX53_PAD_PATA_DATA2 = 163,
-> -	MX53_PAD_PATA_DATA3 = 164,
-> -	MX53_PAD_PATA_DATA4 = 165,
-> -	MX53_PAD_PATA_DATA5 = 166,
-> -	MX53_PAD_PATA_DATA6 = 167,
-> -	MX53_PAD_PATA_DATA7 = 168,
-> -	MX53_PAD_PATA_DATA8 = 169,
-> -	MX53_PAD_PATA_DATA9 = 170,
-> -	MX53_PAD_PATA_DATA10 = 171,
-> -	MX53_PAD_PATA_DATA11 = 172,
-> -	MX53_PAD_PATA_DATA12 = 173,
-> -	MX53_PAD_PATA_DATA13 = 174,
-> -	MX53_PAD_PATA_DATA14 = 175,
-> -	MX53_PAD_PATA_DATA15 = 176,
-> -	MX53_PAD_SD1_DATA0 = 177,
-> -	MX53_PAD_SD1_DATA1 = 178,
-> -	MX53_PAD_SD1_CMD = 179,
-> -	MX53_PAD_SD1_DATA2 = 180,
-> -	MX53_PAD_SD1_CLK = 181,
-> -	MX53_PAD_SD1_DATA3 = 182,
-> -	MX53_PAD_SD2_CLK = 183,
-> -	MX53_PAD_SD2_CMD = 184,
-> -	MX53_PAD_SD2_DATA3 = 185,
-> -	MX53_PAD_SD2_DATA2 = 186,
-> -	MX53_PAD_SD2_DATA1 = 187,
-> -	MX53_PAD_SD2_DATA0 = 188,
-> -	MX53_PAD_GPIO_0 = 189,
-> -	MX53_PAD_GPIO_1 = 190,
-> -	MX53_PAD_GPIO_9 = 191,
-> -	MX53_PAD_GPIO_3 = 192,
-> -	MX53_PAD_GPIO_6 = 193,
-> -	MX53_PAD_GPIO_2 = 194,
-> -	MX53_PAD_GPIO_4 = 195,
-> -	MX53_PAD_GPIO_5 = 196,
-> -	MX53_PAD_GPIO_7 = 197,
-> -	MX53_PAD_GPIO_8 = 198,
-> -	MX53_PAD_GPIO_16 = 199,
-> -	MX53_PAD_GPIO_17 = 200,
-> -	MX53_PAD_GPIO_18 = 201,
-> +	MX53_PAD_GPIO_19 = 0,
-> +	MX53_PAD_KEY_COL0 = 1,
+> 
+> Note that while this code builds, I don't know the hardware well enough 
+> to be confident testing it.  Review and testing from anyone with
+> experience of imx SoC audio would be appreciated.
+> 
+>  arch/arm/plat-mxc/ssi-fiq.S |   89 ++++++++++++++++++++++++-------------------
+>  1 files changed, 50 insertions(+), 39 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/ssi-fiq.S b/arch/arm/plat-mxc/ssi-fiq.S
+> index 8397a2d..a8b93c5 100644
+> --- a/arch/arm/plat-mxc/ssi-fiq.S
+> +++ b/arch/arm/plat-mxc/ssi-fiq.S
+> @@ -34,91 +34,98 @@
+>  		.global imx_ssi_fiq_rx_buffer
+>  		.global imx_ssi_fiq_tx_buffer
+>  
+> +/*
+> + * imx_ssi_fiq_start is _intentionally_ not marked as a function symbol
+> + * using ENDPROC().  imx_ssi_fiq_start and imx_ssi_fiq_end are used to
+> + * mark the function body so that it can be copied to the FIQ vector in
+> + * the vectors page.  imx_ssi_fiq_start should only be called as the result
+> + * of an FIQ: calling it directly will not work.
+> + */
+>  imx_ssi_fiq_start:
+> -		ldr r12, imx_ssi_fiq_base
+> +		ldr r12, .L_imx_ssi_fiq_base
+>  
+>  		/* TX */
+> -		ldr r11, imx_ssi_fiq_tx_buffer
+> +		ldr r13, .L_imx_ssi_fiq_tx_buffer
+>  
+>  		/* shall we send? */
+> -		ldr r13, [r12, #SSI_SIER]
+> -		tst r13, #SSI_SIER_TFE0_EN
+> +		ldr r11, [r12, #SSI_SIER]
+> +		tst r11, #SSI_SIER_TFE0_EN
+>  		beq 1f
+>  
+>  		/* TX FIFO empty? */
+> -		ldr r13, [r12, #SSI_SISR]
+> -		tst r13, #SSI_SISR_TFE0
+> +		ldr r11, [r12, #SSI_SISR]
+> +		tst r11, #SSI_SISR_TFE0
+>  		beq 1f
+>  
+>  		mov r10, #0x10000
+>  		sub r10, #1
+>  		and r10, r10, r8	/* r10: current buffer offset */
+>  
+> -		add r11, r11, r10
+> +		add r13, r13, r10
+>  
+> -		ldrh r13, [r11]
+> -		strh r13, [r12, #SSI_STX0]
+> +		ldrh r11, [r13]
+> +		strh r11, [r12, #SSI_STX0]
+>  
+> -		ldrh r13, [r11, #2]
+> -		strh r13, [r12, #SSI_STX0]
+> +		ldrh r11, [r13, #2]
+> +		strh r11, [r12, #SSI_STX0]
+>  
+> -		ldrh r13, [r11, #4]
+> -		strh r13, [r12, #SSI_STX0]
+> +		ldrh r11, [r13, #4]
+> +		strh r11, [r12, #SSI_STX0]
+>  
+> -		ldrh r13, [r11, #6]
+> -		strh r13, [r12, #SSI_STX0]
+> +		ldrh r11, [r13, #6]
+> +		strh r11, [r12, #SSI_STX0]
+>  
+>  		add r10, #8
+> -		lsr r13, r8, #16	/* r13: buffer size */
+> -		cmp r10, r13
+> -		lslgt r8, r13, #16
+> +		lsr r11, r8, #16	/* r11: buffer size */
+> +		cmp r10, r11
+> +		lslgt r8, r11, #16
+>  		addle r8, #8
+>  1:
+>  		/* RX */
+>  
+>  		/* shall we receive? */
+> -		ldr r13, [r12, #SSI_SIER]
+> -		tst r13, #SSI_SIER_RFF0_EN
+> +		ldr r11, [r12, #SSI_SIER]
+> +		tst r11, #SSI_SIER_RFF0_EN
+>  		beq 1f
+>  
+>  		/* RX FIFO full? */
+> -		ldr r13, [r12, #SSI_SISR]
+> -		tst r13, #SSI_SISR_RFF0
+> +		ldr r11, [r12, #SSI_SISR]
+> +		tst r11, #SSI_SISR_RFF0
+>  		beq 1f
+>  
+> -		ldr r11, imx_ssi_fiq_rx_buffer
+> +		ldr r13, .L_imx_ssi_fiq_rx_buffer
+>  
+>  		mov r10, #0x10000
+>  		sub r10, #1
+>  		and r10, r10, r9	/* r10: current buffer offset */
+>  
+> -		add r11, r11, r10
+> +		add r13, r13, r10
+>  
+> -		ldr r13, [r12, #SSI_SACNT]
+> -		tst r13, #SSI_SACNT_AC97EN
+> +		ldr r11, [r12, #SSI_SACNT]
+> +		tst r11, #SSI_SACNT_AC97EN
+>  
+> -		ldr r13, [r12, #SSI_SRX0]
+> -		strh r13, [r11]
+> +		ldr r11, [r12, #SSI_SRX0]
+> +		strh r11, [r13]
+>  
+> -		ldr r13, [r12, #SSI_SRX0]
+> -		strh r13, [r11, #2]
+> +		ldr r11, [r12, #SSI_SRX0]
+> +		strh r11, [r13, #2]
+>  
+>  		/* dummy read to skip slot 12 */
+> -		ldrne r13, [r12, #SSI_SRX0]
+> +		ldrne r11, [r12, #SSI_SRX0]
+>  
+> -		ldr r13, [r12, #SSI_SRX0]
+> -		strh r13, [r11, #4]
+> +		ldr r11, [r12, #SSI_SRX0]
+> +		strh r11, [r13, #4]
+>  
+> -		ldr r13, [r12, #SSI_SRX0]
+> -		strh r13, [r11, #6]
+> +		ldr r11, [r12, #SSI_SRX0]
+> +		strh r11, [r13, #6]
+>  
+>  		/* dummy read to skip slot 12 */
+> -		ldrne r13, [r12, #SSI_SRX0]
+> +		ldrne r11, [r12, #SSI_SRX0]
+>  
+>  		add r10, #8
+> -		lsr r13, r9, #16	/* r13: buffer size */
+> -		cmp r10, r13
+> -		lslgt r9, r13, #16
+> +		lsr r11, r9, #16	/* r11: buffer size */
+> +		cmp r10, r11
+> +		lslgt r9, r11, #16
+>  		addle r9, #8
+>  
+>  1:
+> @@ -126,11 +133,15 @@ imx_ssi_fiq_start:
+>  		subs	pc, lr, #4
+>  
+>  		.align
+> +.L_imx_ssi_fiq_base:
+>  imx_ssi_fiq_base:
+>  		.word 0x0
+> +.L_imx_ssi_fiq_rx_buffer:
+>  imx_ssi_fiq_rx_buffer:
+>  		.word 0x0
+> +.L_imx_ssi_fiq_tx_buffer:
+>  imx_ssi_fiq_tx_buffer:
+>  		.word 0x0
+> +.L_imx_ssi_fiq_end:
+>  imx_ssi_fiq_end:
+>  
+> -- 
+> 1.7.4.1
+> 
+> 
 
-Why not skip the = xx altogether??  The enum will auto-increment.
-
-> +	MX53_PAD_KEY_ROW0 = 2,
-> +	MX53_PAD_KEY_COL1 = 3,
-> +	MX53_PAD_KEY_ROW1 = 4,
-> +	MX53_PAD_KEY_COL2 = 5,
-> +	MX53_PAD_KEY_ROW2 = 6,
-> +	MX53_PAD_KEY_COL3 = 7,
-> +	MX53_PAD_KEY_ROW3 = 8,
-> +	MX53_PAD_KEY_COL4 = 9,
-> +	MX53_PAD_KEY_ROW4 = 10,
-> +	MX53_PAD_DI0_DISP_CLK = 11,
-> +	MX53_PAD_DI0_PIN15 = 12,
-> +	MX53_PAD_DI0_PIN2 = 13,
-> +	MX53_PAD_DI0_PIN3 = 14,
-> +	MX53_PAD_DI0_PIN4 = 15,
-> +	MX53_PAD_DISP0_DAT0 = 16,
-> +	MX53_PAD_DISP0_DAT1 = 17,
-> +	MX53_PAD_DISP0_DAT2 = 18,
-> +	MX53_PAD_DISP0_DAT3 = 19,
-> +	MX53_PAD_DISP0_DAT4 = 20,
-> +	MX53_PAD_DISP0_DAT5 = 21,
-> +	MX53_PAD_DISP0_DAT6 = 22,
-> +	MX53_PAD_DISP0_DAT7 = 23,
-> +	MX53_PAD_DISP0_DAT8 = 24,
-> +	MX53_PAD_DISP0_DAT9 = 25,
-> +	MX53_PAD_DISP0_DAT10 = 26,
-> +	MX53_PAD_DISP0_DAT11 = 27,
-> +	MX53_PAD_DISP0_DAT12 = 28,
-> +	MX53_PAD_DISP0_DAT13 = 29,
-> +	MX53_PAD_DISP0_DAT14 = 30,
-> +	MX53_PAD_DISP0_DAT15 = 31,
-> +	MX53_PAD_DISP0_DAT16 = 32,
-> +	MX53_PAD_DISP0_DAT17 = 33,
-> +	MX53_PAD_DISP0_DAT18 = 34,
-> +	MX53_PAD_DISP0_DAT19 = 35,
-> +	MX53_PAD_DISP0_DAT20 = 36,
-> +	MX53_PAD_DISP0_DAT21 = 37,
-> +	MX53_PAD_DISP0_DAT22 = 38,
-> +	MX53_PAD_DISP0_DAT23 = 39,
-> +	MX53_PAD_CSI0_PIXCLK = 40,
-> +	MX53_PAD_CSI0_MCLK = 41,
-> +	MX53_PAD_CSI0_DATA_EN = 42,
-> +	MX53_PAD_CSI0_VSYNC = 43,
-> +	MX53_PAD_CSI0_DAT4 = 44,
-> +	MX53_PAD_CSI0_DAT5 = 45,
-> +	MX53_PAD_CSI0_DAT6 = 46,
-> +	MX53_PAD_CSI0_DAT7 = 47,
-> +	MX53_PAD_CSI0_DAT8 = 48,
-> +	MX53_PAD_CSI0_DAT9 = 49,
-> +	MX53_PAD_CSI0_DAT10 = 50,
-> +	MX53_PAD_CSI0_DAT11 = 51,
-> +	MX53_PAD_CSI0_DAT12 = 52,
-> +	MX53_PAD_CSI0_DAT13 = 53,
-> +	MX53_PAD_CSI0_DAT14 = 54,
-> +	MX53_PAD_CSI0_DAT15 = 55,
-> +	MX53_PAD_CSI0_DAT16 = 56,
-> +	MX53_PAD_CSI0_DAT17 = 57,
-> +	MX53_PAD_CSI0_DAT18 = 58,
-> +	MX53_PAD_CSI0_DAT19 = 59,
-> +	MX53_PAD_EIM_A25 = 60,
-> +	MX53_PAD_EIM_EB2 = 61,
-> +	MX53_PAD_EIM_D16 = 62,
-> +	MX53_PAD_EIM_D17 = 63,
-> +	MX53_PAD_EIM_D18 = 64,
-> +	MX53_PAD_EIM_D19 = 65,
-> +	MX53_PAD_EIM_D20 = 66,
-> +	MX53_PAD_EIM_D21 = 67,
-> +	MX53_PAD_EIM_D22 = 68,
-> +	MX53_PAD_EIM_D23 = 69,
-> +	MX53_PAD_EIM_EB3 = 70,
-> +	MX53_PAD_EIM_D24 = 71,
-> +	MX53_PAD_EIM_D25 = 72,
-> +	MX53_PAD_EIM_D26 = 73,
-> +	MX53_PAD_EIM_D27 = 74,
-> +	MX53_PAD_EIM_D28 = 75,
-> +	MX53_PAD_EIM_D29 = 76,
-> +	MX53_PAD_EIM_D30 = 77,
-> +	MX53_PAD_EIM_D31 = 78,
-> +	MX53_PAD_EIM_A24 = 79,
-> +	MX53_PAD_EIM_A23 = 80,
-> +	MX53_PAD_EIM_A22 = 81,
-> +	MX53_PAD_EIM_A21 = 82,
-> +	MX53_PAD_EIM_A20 = 83,
-> +	MX53_PAD_EIM_A19 = 84,
-> +	MX53_PAD_EIM_A18 = 85,
-> +	MX53_PAD_EIM_A17 = 86,
-> +	MX53_PAD_EIM_A16 = 87,
-> +	MX53_PAD_EIM_CS0 = 88,
-> +	MX53_PAD_EIM_CS1 = 89,
-> +	MX53_PAD_EIM_OE = 90,
-> +	MX53_PAD_EIM_RW = 91,
-> +	MX53_PAD_EIM_LBA = 92,
-> +	MX53_PAD_EIM_EB0 = 93,
-> +	MX53_PAD_EIM_EB1 = 94,
-> +	MX53_PAD_EIM_DA0 = 95,
-> +	MX53_PAD_EIM_DA1 = 96,
-> +	MX53_PAD_EIM_DA2 = 97,
-> +	MX53_PAD_EIM_DA3 = 98,
-> +	MX53_PAD_EIM_DA4 = 99,
-> +	MX53_PAD_EIM_DA5 = 100,
-> +	MX53_PAD_EIM_DA6 = 101,
-> +	MX53_PAD_EIM_DA7 = 102,
-> +	MX53_PAD_EIM_DA8 = 103,
-> +	MX53_PAD_EIM_DA9 = 104,
-> +	MX53_PAD_EIM_DA10 = 105,
-> +	MX53_PAD_EIM_DA11 = 106,
-> +	MX53_PAD_EIM_DA12 = 107,
-> +	MX53_PAD_EIM_DA13 = 108,
-> +	MX53_PAD_EIM_DA14 = 109,
-> +	MX53_PAD_EIM_DA15 = 110,
-> +	MX53_PAD_NANDF_WE_B = 111,
-> +	MX53_PAD_NANDF_RE_B = 112,
-> +	MX53_PAD_EIM_WAIT = 113,
-> +	MX53_PAD_LVDS1_TX3_P = 114,
-> +	MX53_PAD_LVDS1_TX2_P = 115,
-> +	MX53_PAD_LVDS1_CLK_P = 116,
-> +	MX53_PAD_LVDS1_TX1_P = 117,
-> +	MX53_PAD_LVDS1_TX0_P = 118,
-> +	MX53_PAD_LVDS0_TX3_P = 119,
-> +	MX53_PAD_LVDS0_CLK_P = 120,
-> +	MX53_PAD_LVDS0_TX2_P = 121,
-> +	MX53_PAD_LVDS0_TX1_P = 122,
-> +	MX53_PAD_LVDS0_TX0_P = 123,
-> +	MX53_PAD_GPIO_10 = 124,
-> +	MX53_PAD_GPIO_11 = 125,
-> +	MX53_PAD_GPIO_12 = 126,
-> +	MX53_PAD_GPIO_13 = 127,
-> +	MX53_PAD_GPIO_14 = 128,
-> +	MX53_PAD_NANDF_CLE = 129,
-> +	MX53_PAD_NANDF_ALE = 130,
-> +	MX53_PAD_NANDF_WP_B = 131,
-> +	MX53_PAD_NANDF_RB0 = 132,
-> +	MX53_PAD_NANDF_CS0 = 133,
-> +	MX53_PAD_NANDF_CS1 = 134,
-> +	MX53_PAD_NANDF_CS2 = 135,
-> +	MX53_PAD_NANDF_CS3 = 136,
-> +	MX53_PAD_FEC_MDIO = 137,
-> +	MX53_PAD_FEC_REF_CLK = 138,
-> +	MX53_PAD_FEC_RX_ER = 139,
-> +	MX53_PAD_FEC_CRS_DV = 140,
-> +	MX53_PAD_FEC_RXD1 = 141,
-> +	MX53_PAD_FEC_RXD0 = 142,
-> +	MX53_PAD_FEC_TX_EN = 143,
-> +	MX53_PAD_FEC_TXD1 = 144,
-> +	MX53_PAD_FEC_TXD0 = 145,
-> +	MX53_PAD_FEC_MDC = 146,
-> +	MX53_PAD_PATA_DIOW = 147,
-> +	MX53_PAD_PATA_DMACK = 148,
-> +	MX53_PAD_PATA_DMARQ = 149,
-> +	MX53_PAD_PATA_BUFFER_EN = 150,
-> +	MX53_PAD_PATA_INTRQ = 151,
-> +	MX53_PAD_PATA_DIOR = 152,
-> +	MX53_PAD_PATA_RESET_B = 153,
-> +	MX53_PAD_PATA_IORDY = 154,
-> +	MX53_PAD_PATA_DA_0 = 155,
-> +	MX53_PAD_PATA_DA_1 = 156,
-> +	MX53_PAD_PATA_DA_2 = 157,
-> +	MX53_PAD_PATA_CS_0 = 158,
-> +	MX53_PAD_PATA_CS_1 = 159,
-> +	MX53_PAD_PATA_DATA0 = 160,
-> +	MX53_PAD_PATA_DATA1 = 161,
-> +	MX53_PAD_PATA_DATA2 = 162,
-> +	MX53_PAD_PATA_DATA3 = 163,
-> +	MX53_PAD_PATA_DATA4 = 164,
-> +	MX53_PAD_PATA_DATA5 = 165,
-> +	MX53_PAD_PATA_DATA6 = 166,
-> +	MX53_PAD_PATA_DATA7 = 167,
-> +	MX53_PAD_PATA_DATA8 = 168,
-> +	MX53_PAD_PATA_DATA9 = 169,
-> +	MX53_PAD_PATA_DATA10 = 170,
-> +	MX53_PAD_PATA_DATA11 = 171,
-> +	MX53_PAD_PATA_DATA12 = 172,
-> +	MX53_PAD_PATA_DATA13 = 173,
-> +	MX53_PAD_PATA_DATA14 = 174,
-> +	MX53_PAD_PATA_DATA15 = 175,
-> +	MX53_PAD_SD1_DATA0 = 176,
-> +	MX53_PAD_SD1_DATA1 = 177,
-> +	MX53_PAD_SD1_CMD = 178,
-> +	MX53_PAD_SD1_DATA2 = 179,
-> +	MX53_PAD_SD1_CLK = 180,
-> +	MX53_PAD_SD1_DATA3 = 181,
-> +	MX53_PAD_SD2_CLK = 182,
-> +	MX53_PAD_SD2_CMD = 183,
-> +	MX53_PAD_SD2_DATA3 = 184,
-> +	MX53_PAD_SD2_DATA2 = 185,
-> +	MX53_PAD_SD2_DATA1 = 186,
-> +	MX53_PAD_SD2_DATA0 = 187,
-> +	MX53_PAD_GPIO_0 = 188,
-> +	MX53_PAD_GPIO_1 = 189,
-> +	MX53_PAD_GPIO_9 = 190,
-> +	MX53_PAD_GPIO_3 = 191,
-> +	MX53_PAD_GPIO_6 = 192,
-> +	MX53_PAD_GPIO_2 = 193,
-> +	MX53_PAD_GPIO_4 = 194,
-> +	MX53_PAD_GPIO_5 = 195,
-> +	MX53_PAD_GPIO_7 = 196,
-> +	MX53_PAD_GPIO_8 = 197,
-> +	MX53_PAD_GPIO_16 = 198,
-> +	MX53_PAD_GPIO_17 = 199,
-> +	MX53_PAD_GPIO_18 = 200,
->   };
->   
->   /* imx53 register maps */
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
