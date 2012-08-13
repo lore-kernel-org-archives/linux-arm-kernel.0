@@ -1,358 +1,241 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Mon, 13 Aug 2012 13:51:42 +0800
-Subject: [PATCH 18/18] ARM: use new LEDS CPU trigger stub to replace old one
-In-Reply-To: <1344837102-11850-1-git-send-email-bryan.wu@canonical.com>
-References: <1344837102-11850-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1344837102-11850-19-git-send-email-bryan.wu@canonical.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 13 Aug 2012 08:15:22 +0200
+Subject: [RFC PATCH] ARM: add coherent dma ops
+In-Reply-To: <1344490622-20029-1-git-send-email-robherring2@gmail.com>
+References: <1344490622-20029-1-git-send-email-robherring2@gmail.com>
+Message-ID: <007b01cd791b$07adc900$17095b00$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc:  Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
----
- arch/arm/Kconfig            |  53 -------------------
- arch/arm/include/asm/leds.h |  50 ------------------
- arch/arm/kernel/Makefile    |   1 -
- arch/arm/kernel/leds.c      | 121 --------------------------------------------
- arch/arm/kernel/process.c   |   6 +--
- arch/arm/kernel/time.c      |  17 -------
- 6 files changed, 3 insertions(+), 245 deletions(-)
- delete mode 100644 arch/arm/include/asm/leds.h
- delete mode 100644 arch/arm/kernel/leds.c
+Hi Rob,
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a91009c..dc57d37 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1739,59 +1739,6 @@ config FORCE_MAX_ZONEORDER
- 	  This config option is actually maximum order plus one. For example,
- 	  a value of 11 means that the largest free memory block is 2^10 pages.
+On Thursday, August 09, 2012 7:37 AM Rob Herring wrote:
+
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> arch_is_coherent is problematic as it is a global symbol. This
+> doesn't work for multi-platform kernels or platforms which can support
+> per device coherent DMA.
+> 
+> This adds arm_coherent_dma_ops to be used for devices which connected
+> coherently (i.e. to the ACP port on Cortex-A9 or A15). The arm_dma_ops
+> are modified at boot when arch_is_coherent is true.
+
+Thanks for the patch. I had something similar on my TODO list, but had not enough time for
+it. I like this patch but I have some comments.
  
--config LEDS
--	bool "Timer and CPU usage LEDs"
--	depends on ARCH_CDB89712 || ARCH_EBSA110 || \
--		   ARCH_EBSA285 || ARCH_INTEGRATOR || \
--		   ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_NETWINDER || \
--		   ARCH_OMAP || ARCH_P720T || ARCH_PXA_IDP || \
--		   ARCH_SA1100 || ARCH_SHARK || ARCH_VERSATILE || \
--		   ARCH_AT91 || ARCH_DAVINCI || \
--		   ARCH_KS8695 || MACH_RD88F5182 || ARCH_REALVIEW
--	help
--	  If you say Y here, the LEDs on your machine will be used
--	  to provide useful information about your current system status.
--
--	  If you are compiling a kernel for a NetWinder or EBSA-285, you will
--	  be able to select which LEDs are active using the options below. If
--	  you are compiling a kernel for the EBSA-110 or the LART however, the
--	  red LED will simply flash regularly to indicate that the system is
--	  still functional. It is safe to say Y here if you have a CATS
--	  system, but the driver will do nothing.
--
--config LEDS_TIMER
--	bool "Timer LED" if (!ARCH_CDB89712 && !ARCH_OMAP) || \
--			    OMAP_OSK_MISTRAL || MACH_OMAP_H2 \
--			    || MACH_OMAP_PERSEUS2
--	depends on LEDS
--	depends on !GENERIC_CLOCKEVENTS
--	default y if ARCH_EBSA110
--	help
--	  If you say Y here, one of the system LEDs (the green one on the
--	  NetWinder, the amber one on the EBSA285, or the red one on the LART)
--	  will flash regularly to indicate that the system is still
--	  operational. This is mainly useful to kernel hackers who are
--	  debugging unstable kernels.
--
--	  The LART uses the same LED for both Timer LED and CPU usage LED
--	  functions. You may choose to use both, but the Timer LED function
--	  will overrule the CPU usage LED.
--
--config LEDS_CPU
--	bool "CPU usage LED" if (!ARCH_CDB89712 && !ARCH_EBSA110 && \
--			!ARCH_OMAP) \
--			|| OMAP_OSK_MISTRAL || MACH_OMAP_H2 \
--			|| MACH_OMAP_PERSEUS2
--	depends on LEDS
--	help
--	  If you say Y here, the red LED will be used to give a good real
--	  time indication of CPU usage, by lighting whenever the idle task
--	  is not currently executing.
--
--	  The LART uses the same LED for both Timer LED and CPU usage LED
--	  functions. You may choose to use both, but the Timer LED function
--	  will overrule the CPU usage LED.
--
- config ALIGNMENT_TRAP
- 	bool
- 	depends on CPU_CP15_MMU
-diff --git a/arch/arm/include/asm/leds.h b/arch/arm/include/asm/leds.h
-deleted file mode 100644
-index c545739..0000000
---- a/arch/arm/include/asm/leds.h
-+++ /dev/null
-@@ -1,50 +0,0 @@
--/*
-- *  arch/arm/include/asm/leds.h
-- *
-- *  Copyright (C) 1998 Russell King
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- *  Event-driven interface for LEDs on machines
-- *  Added led_start and led_stop- Alex Holden, 28th Dec 1998.
-- */
--#ifndef ASM_ARM_LEDS_H
--#define ASM_ARM_LEDS_H
--
--
--typedef enum {
--	led_idle_start,
--	led_idle_end,
--	led_timer,
--	led_start,
--	led_stop,
--	led_claim,		/* override idle & timer leds */
--	led_release,		/* restore idle & timer leds */
--	led_start_timer_mode,
--	led_stop_timer_mode,
--	led_green_on,
--	led_green_off,
--	led_amber_on,
--	led_amber_off,
--	led_red_on,
--	led_red_off,
--	led_blue_on,
--	led_blue_off,
--	/*
--	 * I want this between led_timer and led_start, but
--	 * someone has decided to export this to user space
--	 */
--	led_halted
--} led_event_t;
--
--/* Use this routine to handle LEDs */
--
--#ifdef CONFIG_LEDS
--extern void (*leds_event)(led_event_t);
--#else
--#define leds_event(e)
--#endif
--
--#endif
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 7ad2d5c..8951577 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -21,7 +21,6 @@ obj-y		:= elf.o entry-armv.o entry-common.o irq.o opcodes.o \
- 
- obj-$(CONFIG_DEPRECATED_PARAM_STRUCT) += compat.o
- 
--obj-$(CONFIG_LEDS)		+= leds.o
- obj-$(CONFIG_OC_ETM)		+= etm.o
- obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- obj-$(CONFIG_ISA_DMA_API)	+= dma.o
-diff --git a/arch/arm/kernel/leds.c b/arch/arm/kernel/leds.c
-deleted file mode 100644
-index 1911dae..0000000
---- a/arch/arm/kernel/leds.c
-+++ /dev/null
-@@ -1,121 +0,0 @@
--/*
-- * LED support code, ripped out of arch/arm/kernel/time.c
-- *
-- *  Copyright (C) 1994-2001 Russell King
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/export.h>
--#include <linux/init.h>
--#include <linux/device.h>
--#include <linux/syscore_ops.h>
--#include <linux/string.h>
--
--#include <asm/leds.h>
--
--static void dummy_leds_event(led_event_t evt)
--{
--}
--
--void (*leds_event)(led_event_t) = dummy_leds_event;
--
--struct leds_evt_name {
--	const char	name[8];
--	int		on;
--	int		off;
--};
--
--static const struct leds_evt_name evt_names[] = {
--	{ "amber", led_amber_on, led_amber_off },
--	{ "blue",  led_blue_on,  led_blue_off  },
--	{ "green", led_green_on, led_green_off },
--	{ "red",   led_red_on,   led_red_off   },
--};
--
--static ssize_t leds_store(struct device *dev,
--			struct device_attribute *attr,
--			const char *buf, size_t size)
--{
--	int ret = -EINVAL, len = strcspn(buf, " ");
--
--	if (len > 0 && buf[len] == '\0')
--		len--;
--
--	if (strncmp(buf, "claim", len) == 0) {
--		leds_event(led_claim);
--		ret = size;
--	} else if (strncmp(buf, "release", len) == 0) {
--		leds_event(led_release);
--		ret = size;
--	} else {
--		int i;
--
--		for (i = 0; i < ARRAY_SIZE(evt_names); i++) {
--			if (strlen(evt_names[i].name) != len ||
--			    strncmp(buf, evt_names[i].name, len) != 0)
--				continue;
--			if (strncmp(buf+len, " on", 3) == 0) {
--				leds_event(evt_names[i].on);
--				ret = size;
--			} else if (strncmp(buf+len, " off", 4) == 0) {
--				leds_event(evt_names[i].off);
--				ret = size;
--			}
--			break;
--		}
--	}
--	return ret;
--}
--
--static DEVICE_ATTR(event, 0200, NULL, leds_store);
--
--static struct bus_type leds_subsys = {
--	.name		= "leds",
--	.dev_name	= "leds",
--};
--
--static struct device leds_device = {
--	.id		= 0,
--	.bus		= &leds_subsys,
--};
--
--static int leds_suspend(void)
--{
--	leds_event(led_stop);
--	return 0;
--}
--
--static void leds_resume(void)
--{
--	leds_event(led_start);
--}
--
--static void leds_shutdown(void)
--{
--	leds_event(led_halted);
--}
--
--static struct syscore_ops leds_syscore_ops = {
--	.shutdown	= leds_shutdown,
--	.suspend	= leds_suspend,
--	.resume		= leds_resume,
--};
--
--static int __init leds_init(void)
--{
--	int ret;
--	ret = subsys_system_register(&leds_subsys, NULL);
--	if (ret == 0)
--		ret = device_register(&leds_device);
--	if (ret == 0)
--		ret = device_create_file(&leds_device, &dev_attr_event);
--	if (ret == 0)
--		register_syscore_ops(&leds_syscore_ops);
--	return ret;
--}
--
--device_initcall(leds_init);
--
--EXPORT_SYMBOL(leds_event);
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 19c95ea..864580a 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -31,9 +31,9 @@
- #include <linux/random.h>
- #include <linux/hw_breakpoint.h>
- #include <linux/cpuidle.h>
-+#include <linux/leds.h>
- 
- #include <asm/cacheflush.h>
--#include <asm/leds.h>
- #include <asm/processor.h>
- #include <asm/thread_notify.h>
- #include <asm/stacktrace.h>
-@@ -189,7 +189,7 @@ void cpu_idle(void)
- 	while (1) {
- 		tick_nohz_idle_enter();
- 		rcu_idle_enter();
--		leds_event(led_idle_start);
-+		ledtrig_cpu(CPU_LED_IDLE_START);
- 		while (!need_resched()) {
- #ifdef CONFIG_HOTPLUG_CPU
- 			if (cpu_is_offline(smp_processor_id()))
-@@ -220,7 +220,7 @@ void cpu_idle(void)
- 			} else
- 				local_irq_enable();
- 		}
--		leds_event(led_idle_end);
-+		ledtrig_cpu(CPU_LED_IDLE_END);
- 		rcu_idle_exit();
- 		tick_nohz_idle_exit();
- 		schedule_preempt_disabled();
-diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-index af2afb0..09be0c3 100644
---- a/arch/arm/kernel/time.c
-+++ b/arch/arm/kernel/time.c
-@@ -25,7 +25,6 @@
- #include <linux/timer.h>
- #include <linux/irq.h>
- 
--#include <asm/leds.h>
- #include <asm/thread_info.h>
- #include <asm/sched_clock.h>
- #include <asm/stacktrace.h>
-@@ -80,21 +79,6 @@ u32 arch_gettimeoffset(void)
- }
- #endif /* CONFIG_ARCH_USES_GETTIMEOFFSET */
- 
--#ifdef CONFIG_LEDS_TIMER
--static inline void do_leds(void)
--{
--	static unsigned int count = HZ/2;
--
--	if (--count == 0) {
--		count = HZ/2;
--		leds_event(led_timer);
--	}
--}
--#else
--#define	do_leds()
--#endif
--
--
- #ifndef CONFIG_GENERIC_CLOCKEVENTS
- /*
-  * Kernel system timer support.
-@@ -102,7 +86,6 @@ static inline void do_leds(void)
- void timer_tick(void)
- {
- 	profile_tick(CPU_PROFILING);
--	do_leds();
- 	xtime_update(1);
- #ifndef CONFIG_SMP
- 	update_process_times(user_mode(get_irq_regs()));
+> This does not address arch_is_coherent used in iommu dma ops.
+
+In the initial version we might get rid of arch_is_coherent() usage in iommu dma ops and
+implement it when a real coherent hw with iommu will be available.
+
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+> Compile tested only.
+
+>  arch/arm/mm/dma-mapping.c |   89 +++++++++++++++++++++++++++++++++++++++------
+>  1 file changed, 77 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index c2cdf65..8875cd4 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -73,11 +73,18 @@ static dma_addr_t arm_dma_map_page(struct device *dev, struct page *page,
+>  	     unsigned long offset, size_t size, enum dma_data_direction dir,
+>  	     struct dma_attrs *attrs)
+>  {
+> -	if (!arch_is_coherent() && !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+> +	if (!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+>  		__dma_page_cpu_to_dev(page, offset, size, dir);
+>  	return pfn_to_dma(dev, page_to_pfn(page)) + offset;
+>  }
+> 
+> +static dma_addr_t arm_coherent_dma_map_page(struct device *dev, struct page *page,
+> +	     unsigned long offset, size_t size, enum dma_data_direction dir,
+> +	     struct dma_attrs *attrs)
+> +{
+> +	return pfn_to_dma(dev, page_to_pfn(page)) + offset;
+> +}
+> +
+>  /**
+>   * arm_dma_unmap_page - unmap a buffer previously mapped through dma_map_page()
+>   * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+> @@ -96,7 +103,7 @@ static void arm_dma_unmap_page(struct device *dev, dma_addr_t handle,
+>  		size_t size, enum dma_data_direction dir,
+>  		struct dma_attrs *attrs)
+>  {
+> -	if (!arch_is_coherent() && !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+> +	if (!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+>  		__dma_page_dev_to_cpu(pfn_to_page(dma_to_pfn(dev, handle)),
+>  				      handle & ~PAGE_MASK, size, dir);
+>  }
+> @@ -106,8 +113,7 @@ static void arm_dma_sync_single_for_cpu(struct device *dev,
+>  {
+>  	unsigned int offset = handle & (PAGE_SIZE - 1);
+>  	struct page *page = pfn_to_page(dma_to_pfn(dev, handle-offset));
+> -	if (!arch_is_coherent())
+> -		__dma_page_dev_to_cpu(page, offset, size, dir);
+> +	__dma_page_dev_to_cpu(page, offset, size, dir);
+>  }
+> 
+>  static void arm_dma_sync_single_for_device(struct device *dev,
+> @@ -115,8 +121,7 @@ static void arm_dma_sync_single_for_device(struct device *dev,
+>  {
+>  	unsigned int offset = handle & (PAGE_SIZE - 1);
+>  	struct page *page = pfn_to_page(dma_to_pfn(dev, handle-offset));
+> -	if (!arch_is_coherent())
+> -		__dma_page_cpu_to_dev(page, offset, size, dir);
+> +	__dma_page_cpu_to_dev(page, offset, size, dir);
+>  }
+> 
+>  static int arm_dma_set_mask(struct device *dev, u64 dma_mask);
+> @@ -138,6 +143,40 @@ struct dma_map_ops arm_dma_ops = {
+>  };
+>  EXPORT_SYMBOL(arm_dma_ops);
+> 
+> +static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
+> +	dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs);
+> +static void arm_coherent_dma_free(struct device *dev, size_t size, void *cpu_addr,
+> +				  dma_addr_t handle, struct dma_attrs *attrs);
+> +
+> +struct dma_map_ops arm_coherent_dma_ops = {
+> +	.alloc			= arm_coherent_dma_alloc,
+> +	.free			= arm_coherent_dma_free,
+> +	.mmap			= arm_dma_mmap,
+> +	.get_sgtable		= arm_dma_get_sgtable,
+> +	.map_page		= arm_coherent_dma_map_page,
+> +	.map_sg			= arm_dma_map_sg,
+> +	.set_dma_mask		= arm_dma_set_mask,
+> +};
+> +EXPORT_SYMBOL(arm_coherent_dma_ops);
+> +
+> +static int __init dma_map_init(void)
+> +{
+> +	if (!arch_is_coherent())
+> +		return 0;
+> +
+> +	arm_dma_ops.map_page = arm_coherent_dma_map_page;
+> +	arm_dma_ops.unmap_page = NULL;
+> +	arm_dma_ops.map_sg = NULL;
+> +	arm_dma_ops.unmap_sg = NULL;
+> +	arm_dma_ops.sync_single_for_cpu = NULL;
+> +	arm_dma_ops.sync_single_for_device = NULL;
+> +	arm_dma_ops.sync_sg_for_cpu = NULL;
+> +	arm_dma_ops.sync_sg_for_device = NULL;
+> +	arm_dma_ops.alloc = arm_coherent_dma_alloc;
+> +	arm_dma_ops.free = arm_coherent_dma_free;
+> +}
+> +core_initcall(dma_map_init);
+
+I would implement it in a bit different way. Overwriting structure entries is not the 
+cleanest approach and might lead to some misunderstandings. I would rather change 
+get_dma_ops() function in arch/arm/include/asm/dma-mapping.h to something like this:
+
+static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+{
+        if (dev && dev->archdata.dma_ops)
+                return dev->archdata.dma_ops;
+        return !arch_is_coherent() ? &arm_dma_ops : &arm_coherent_dma_ops;
+}
+
+This way the code is easy to understand and compiler can easily optimize out the above 
+check for 99% of architectures which are either coherent or not. In case of partially 
+coherent architectures, arch_is_coherent() will probably return false and coherent 
+devices will get their dma_map_ops initialized by platform code.
+
+> +
+>  static u64 get_coherent_dma_mask(struct device *dev)
+>  {
+>  	u64 mask = (u64)arm_dma_limit;
+> @@ -538,7 +577,7 @@ static void *__alloc_simple_buffer(struct device *dev, size_t size, gfp_t
+> gfp,
+> 
+> 
+>  static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+> -			 gfp_t gfp, pgprot_t prot, const void *caller)
+> +			 gfp_t gfp, pgprot_t prot, bool is_coherent, const void *caller)
+>  {
+>  	u64 mask = get_coherent_dma_mask(dev);
+>  	struct page *page;
+> @@ -571,7 +610,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t
+> *handle,
+>  	*handle = DMA_ERROR_CODE;
+>  	size = PAGE_ALIGN(size);
+> 
+> -	if (arch_is_coherent() || nommu())
+> +	if (is_coherent || nommu())
+>  		addr = __alloc_simple_buffer(dev, size, gfp, &page);
+>  	else if (gfp & GFP_ATOMIC)
+>  		addr = __alloc_from_pool(size, &page);
+> @@ -599,7 +638,20 @@ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+>  	if (dma_alloc_from_coherent(dev, size, handle, &memory))
+>  		return memory;
+> 
+> -	return __dma_alloc(dev, size, handle, gfp, prot,
+> +	return __dma_alloc(dev, size, handle, gfp, prot, false,
+> +			   __builtin_return_address(0));
+> +}
+> +
+> +static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
+> +	dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
+> +{
+> +	pgprot_t prot = __get_dma_pgprot(attrs, pgprot_kernel);
+> +	void *memory;
+> +
+> +	if (dma_alloc_from_coherent(dev, size, handle, &memory))
+> +		return memory;
+> +
+> +	return __dma_alloc(dev, size, handle, gfp, prot, true,
+>  			   __builtin_return_address(0));
+>  }
+> 
+> @@ -636,8 +688,9 @@ int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+>  /*
+>   * Free a buffer as defined by the above mapping.
+>   */
+> -void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+> -		  dma_addr_t handle, struct dma_attrs *attrs)
+> +static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+> +			   dma_addr_t handle, struct dma_attrs *attrs,
+> +			   bool is_coherent)
+>  {
+>  	struct page *page = pfn_to_page(dma_to_pfn(dev, handle));
+> 
+> @@ -646,7 +699,7 @@ void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+> 
+>  	size = PAGE_ALIGN(size);
+> 
+> -	if (arch_is_coherent() || nommu()) {
+> +	if (is_coherent || nommu()) {
+>  		__dma_free_buffer(page, size);
+>  	} else if (!IS_ENABLED(CONFIG_CMA)) {
+>  		__dma_free_remap(cpu_addr, size);
+> @@ -662,6 +715,18 @@ void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+>  	}
+>  }
+> 
+> +void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+> +		  dma_addr_t handle, struct dma_attrs *attrs)
+> +{
+> +	__arm_dma_free(dev, size, cpu_addr, handle, attrs, false);
+> +}
+> +
+> +static void arm_coherent_dma_free(struct device *dev, size_t size, void *cpu_addr,
+> +				  dma_addr_t handle, struct dma_attrs *attrs)
+> +{
+> +	__arm_dma_free(dev, size, cpu_addr, handle, attrs, true);
+> +}
+> +
+>  int arm_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
+>  		 void *cpu_addr, dma_addr_t handle, size_t size,
+>  		 struct dma_attrs *attrs)
+> --
+> 1.7.9.5
+
+
+Best regards
 -- 
-1.7.11.4
+Marek Szyprowski
+Samsung Poland R&D Center
