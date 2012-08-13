@@ -1,105 +1,81 @@
-From: jdzheng@broadcom.com (Jiandong Zheng)
-Date: Mon, 13 Aug 2012 14:57:12 -0700
-Subject: [PATCH 4/9] ARM: pmu: remove arm_pmu_type enumeration
-In-Reply-To: <1344620195-22372-5-git-send-email-will.deacon@arm.com>
-References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
- <1344620195-22372-5-git-send-email-will.deacon@arm.com>
-Message-ID: <50297838.7080208@broadcom.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Mon, 13 Aug 2012 17:05:52 -0500
+Subject: [PATCH] efikamx: reintroduce Genesi Efika MX Smarttop via device
+ tree
+In-Reply-To: <20120813173847.GH13446@opensource.wolfsonmicro.com>
+References: <1344375978-29981-1-git-send-email-matt@genesi-usa.com>
+ <20120809101947.GA8474@sirena.org.uk>
+ <CAKGA1bkwMvDW7nMWxUbNm3_0ZTR2+uKs8UL_HuisJe7cd8POBA@mail.gmail.com>
+ <20120813173847.GH13446@opensource.wolfsonmicro.com>
+Message-ID: <CAKGA1b=ANojue-ZDxmocDhzTcQPuOVocs9yCjezhJrGqsOXEHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/10/2012 10:36 AM, Will Deacon wrote:
-> From: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
+On Mon, Aug 13, 2012 at 12:38 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Mon, Aug 13, 2012 at 10:42:58AM -0500, Matt Sealey wrote:
+>> On Thu, Aug 9, 2012 at 5:19 AM, Mark Brown
 >
-> The arm_pmu_type enumeration was initially introduced to identify
-> different PMU types in the system, the usual one being that on the CPU
-> (ARM_PMU_DEVICE_CPU). With the removal of the PMU reservation code and
-> the introduction of devicetree bindings for the CPU PMU, the enumeration
-> is no longer required.
+>> > This and many of your other regulators have voltage ranges specified but
+>> > no consumers which doesn't make sense.  It looks awfully like you've
+>> > just typed in the maximum range supported by the regulator which is most
+>> > likely broken.
 >
-> This patch removes the enumeration and updates the various CPU PMU
-> platform devices so that they no longer pass an .id field referring
-> to identify the PMU type.
+>> Okay I have a question about this; some of the regulators (SW1
+>> especially) are obviously consumed by the CPU core complex so that
+>> when DVFS gives us a hint we can clock down and reduce voltage. How on
+>> earth do we implement that?
 >
-> Cc: JD Zheng <jdzheng@broadcom.com>
-> Cc: Jon Hunter <jon-hunter@ti.com>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Linus Walleij <linus.walleij@stericsson.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Signed-off-by: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
-> [will: cosmetic edits and actual removal of the enum type]
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->   arch/arm/include/asm/pmu.h               |   10 ----------
->   arch/arm/mach-bcmring/arch.c             |    3 +--
->   arch/arm/mach-omap2/devices.c            |    3 +--
->   arch/arm/mach-pxa/devices.c              |    3 +--
->   arch/arm/mach-realview/realview_eb.c     |    3 +--
->   arch/arm/mach-realview/realview_pb1176.c |    3 +--
->   arch/arm/mach-realview/realview_pb11mp.c |    3 +--
->   arch/arm/mach-realview/realview_pba8.c   |    3 +--
->   arch/arm/mach-realview/realview_pbx.c    |    3 +--
->   arch/arm/mach-tegra/devices.c            |    3 +--
->   arch/arm/mach-ux500/cpu-db8500.c         |    3 +--
->   arch/arm/mach-vexpress/ct-ca9x4.c        |    3 +--
->   arch/arm/plat-iop/pmu.c                  |    3 +--
->   arch/arm/plat-samsung/devs.c             |    3 +--
->   14 files changed, 13 insertions(+), 36 deletions(-)
+>> We can drop the maximum range to be better for the CPU (1.3V is too
+>> high, I think this is legacy from when we may have had a sorted 1GHz
+>> MX51 coming out) but I can't find any source for where this is hooked
+>> in.
 >
-> diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-> index 05e0401..fbec73a 100644
-> --- a/arch/arm/include/asm/pmu.h
-> +++ b/arch/arm/include/asm/pmu.h
-> @@ -16,15 +16,6 @@
->   #include <linux/perf_event.h>
->   
->   /*
-> - * Types of PMUs that can be accessed directly and require mutual
-> - * exclusion between profiling tools.
-> - */
-> -enum arm_pmu_type {
-> -	ARM_PMU_DEVICE_CPU	= 0,
-> -	ARM_NUM_PMU_DEVICES,
-> -};
-> -
-> -/*
->    * struct arm_pmu_platdata - ARM PMU platform data
->    *
->    * @handle_irq: an optional handler which will be called from the
-> @@ -73,7 +64,6 @@ struct pmu_hw_events {
->   
->   struct arm_pmu {
->   	struct pmu	pmu;
-> -	enum arm_pmu_type type;
->   	cpumask_t	active_irqs;
->   	char		*name;
->   	irqreturn_t	(*handle_irq)(int irq_num, void *dev);
-> diff --git a/arch/arm/mach-bcmring/arch.c b/arch/arm/mach-bcmring/arch.c
-> index 45c97b1..76e7953 100644
-> --- a/arch/arm/mach-bcmring/arch.c
-> +++ b/arch/arm/mach-bcmring/arch.c
-> @@ -29,7 +29,6 @@
->   #include <asm/setup.h>
->   #include <asm/mach-types.h>
->   #include <asm/mach/time.h>
-> -#include <asm/pmu.h>
->   
->   #include <asm/mach/arch.h>
->   #include <mach/dma.h>
-> @@ -116,7 +115,7 @@ static struct resource pmu_resource = {
->   
->   static struct platform_device pmu_device = {
->   	.name		= "arm-pmu",
-> -	.id		= ARM_PMU_DEVICE_CPU,
-> +	.id		= -1,
->   	.resource	= &pmu_resource,
->   	.num_resources	= 1,
->   };
->
-Isn't it clearer to define a meaningful name for "-1", esp. if "-1" is 
-being checked somewhere else?
+> DVFS doesn't use the device model in Linux (yet!) so there's no device
+> node and it's all a bit messy.  Shawn Guo is working on some generic DT
+> bindings for it which should solve that problem but for now in the
+> specific case of CPU bindings it's OK to not have an consumer, it's
+> understandable what's going on there.
 
-Regards,
-JD
+Going over the regulators, what I have so far is every regulator
+properly specced with their fixed voltages where it never changes
+(which is everything but SW1 and SW2).
+
+There are still a lot of always-on and boot-on regulators since the
+design is pretty poor - some pmic regulators that should have specific
+consumers have been re-used in other places to supplement other
+regulators or derive other voltages for parts of the board you would
+usually have discrete logic to support. In this sense, a lot of the
+board remains powered or it will just act weird, and a couple of very
+specific ones can be turned on and off and don't need to be enabled
+for the boot process, but they will be referenced by a metric f&%@ton
+of devices as being a consumer so it's unlikely they'll ever actually
+power down. In this case I found one always-on and boot-on that
+actually doesn't need to be, but for the most part it stays as it is
+with refined voltages.
+
+I'm a little confused by the SW1 and SW2 ->VDDGP,VCC sourcing and what
+that's actually supplying and what the voltage ranges SHOULD be - as I
+think both need to be ranges. VDDGP should probably not be any more
+flexible than 0.85V-1.1V.
+
+That said, VCC seems to be only required to be a fixed 1.225V in the
+datasheet? 0.9V to 1.85V seems excessive, but it's actually dependent
+on load. I don't think anyone ever changes it, it was one of those
+things your average board designer would sit down and say, this is
+what it needs to be, and it might get bumped when it turns out
+something on the board needs more power than the spec. I have NO idea
+what this should be. I could just nail it to 1.225V and cover all
+bases at the cost of possibly burning a ton of power. I'm looking into
+what it's ACTUALLY running at in the old kernels.
+
+It'll take some digging through the old Freescale code about where
+they turn regulators on and off in the fixed board files to find this
+out and what the original intent was. In the meantime I might be able
+to refine the VDDGP/SW2 source. Shawn, any input? And does mainline
+care about MX51 TO2 enough that we'd need to implement the voltage
+bumps for that?
+
+-- 
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
