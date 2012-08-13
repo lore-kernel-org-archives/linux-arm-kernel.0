@@ -1,31 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 13 Aug 2012 15:11:57 +0100
-Subject: RFC: mutex: hung tasks on SMP platforms with
- asm-generic/mutex-xchg.h
-In-Reply-To: <1344866717.31459.32.camel@twins>
-References: <20120807115647.GA12828@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1208090029460.5231@xanadu.home>
- <20120809144953.GC18486@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1208091201380.5231@xanadu.home>
- <alpine.LFD.2.02.1208091243080.5231@xanadu.home>
- <1344845704.31459.11.camel@twins>
- <alpine.LFD.2.02.1208130931530.5231@xanadu.home>
- <1344866717.31459.32.camel@twins>
-Message-ID: <20120813141156.GC20537@mudshark.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 13 Aug 2012 16:17:53 +0200
+Subject: [PATCH 4/9] ARM: pmu: remove arm_pmu_type enumeration
+In-Reply-To: <1344620195-22372-5-git-send-email-will.deacon@arm.com>
+References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
+ <1344620195-22372-5-git-send-email-will.deacon@arm.com>
+Message-ID: <CACRpkdYicRVoXb2VPDvHV4PwUfzYW7-JRSLQZh-nTswWWh7kVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 13, 2012 at 03:05:17PM +0100, Peter Zijlstra wrote:
-> Acked-by: Peter Zijlstra <a.p.zijlstra@chello.nl>
+On Fri, Aug 10, 2012 at 7:36 PM, Will Deacon <will.deacon@arm.com> wrote:
 
-Thanks Peter.
+> From: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
+>
+> The arm_pmu_type enumeration was initially introduced to identify
+> different PMU types in the system, the usual one being that on the CPU
+> (ARM_PMU_DEVICE_CPU). With the removal of the PMU reservation code and
+> the introduction of devicetree bindings for the CPU PMU, the enumeration
+> is no longer required.
+>
+> This patch removes the enumeration and updates the various CPU PMU
+> platform devices so that they no longer pass an .id field referring
+> to identify the PMU type.
 
-> Will you carry this through the ARM tree or do you want me/Ingo to take
-> it?
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Please can you guys take it? The move to mutex-dec can go through the ARM
-tree but it's probably best if you take the core change.
-
-Cheers,
-
-Will
+Yours,
+Linus Walleij
