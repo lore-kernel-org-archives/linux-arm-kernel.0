@@ -1,32 +1,35 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 13 Aug 2012 19:37:54 +0200
-Subject: [PATCH] ARM: at91: fix drivers broken because of sparse irq
- support
-In-Reply-To: <1344872334-1532-2-git-send-email-ludovic.desroches@atmel.com>
-References: <1344872334-1532-1-git-send-email-ludovic.desroches@atmel.com>
- <1344872334-1532-2-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <CAGhQ9Vw_CvC71n=9Pr6SY0qsSmFVFTn76BVRbh64RP80G6pyZQ@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 13 Aug 2012 18:38:47 +0100
+Subject: [PATCH] efikamx: reintroduce Genesi Efika MX Smarttop via device
+ tree
+In-Reply-To: <CAKGA1bkwMvDW7nMWxUbNm3_0ZTR2+uKs8UL_HuisJe7cd8POBA@mail.gmail.com>
+References: <1344375978-29981-1-git-send-email-matt@genesi-usa.com>
+ <20120809101947.GA8474@sirena.org.uk>
+ <CAKGA1bkwMvDW7nMWxUbNm3_0ZTR2+uKs8UL_HuisJe7cd8POBA@mail.gmail.com>
+Message-ID: <20120813173847.GH13446@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic,
+On Mon, Aug 13, 2012 at 10:42:58AM -0500, Matt Sealey wrote:
+> On Thu, Aug 9, 2012 at 5:19 AM, Mark Brown
 
-On Mon, Aug 13, 2012 at 5:38 PM,  <ludovic.desroches@atmel.com> wrote:
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->
-> Some drivers directly use AT91_ID_SYS as virq so they are broken because of
-> the NR_IRQS_LEGACY virq offset introduced with sparse irq support.
+> > This and many of your other regulators have voltage ranges specified but
+> > no consumers which doesn't make sense.  It looks awfully like you've
+> > just typed in the maximum range supported by the regulator which is most
+> > likely broken.
 
-This patch makes my board boot again. Thanks.
+> Okay I have a question about this; some of the regulators (SW1
+> especially) are obviously consumed by the CPU core complex so that
+> when DVFS gives us a hint we can clock down and reduce voltage. How on
+> earth do we implement that?
 
-Feel free to add;
-Tested-by: Joachim Eastwood <joachim.eastwood@jotron.com>
+> We can drop the maximum range to be better for the CPU (1.3V is too
+> high, I think this is legacy from when we may have had a sorted 1GHz
+> MX51 coming out) but I can't find any source for where this is hooked
+> in.
 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Cc: stable at vger.kernel.org
-
-Why are you sending this to stable?
-This is a regression only in 3.6 and should go upstream ASAP.
-
-regards
-Joachim Eastwood
+DVFS doesn't use the device model in Linux (yet!) so there's no device
+node and it's all a bit messy.  Shawn Guo is working on some generic DT
+bindings for it which should solve that problem but for now in the
+specific case of CPU bindings it's OK to not have an consumer, it's
+understandable what's going on there.
