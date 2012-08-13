@@ -1,50 +1,40 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 13 Aug 2012 10:13:49 +0100
-Subject: RFC: mutex: hung tasks on SMP platforms with
- asm-generic/mutex-xchg.h
-In-Reply-To: <1344845704.31459.11.camel@twins>
-References: <20120807115647.GA12828@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1208090029460.5231@xanadu.home>
- <20120809144953.GC18486@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1208091201380.5231@xanadu.home>
- <alpine.LFD.2.02.1208091243080.5231@xanadu.home>
- <1344845704.31459.11.camel@twins>
-Message-ID: <20120813091349.GA19113@mudshark.cambridge.arm.com>
+Date: Mon, 13 Aug 2012 10:32:01 +0100
+Subject: [PATCH 0/9] ARM perf updates for 3.7
+In-Reply-To: <5028C4C9.6020002@gmail.com>
+References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
+ <5028C4C9.6020002@gmail.com>
+Message-ID: <20120813093201.GB19113@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Mon, Aug 13, 2012 at 10:11:37AM +0100, Hui Wang wrote:
+> Hi Will Deacon,
 
-On Mon, Aug 13, 2012 at 09:15:04AM +0100, Peter Zijlstra wrote:
-> On Thu, 2012-08-09 at 12:57 -0400, Nicolas Pitre wrote:
-> > 
-> > In other words, I think this should look like this:
-> > 
-> > diff --git a/include/asm-generic/mutex-xchg.h b/include/asm-generic/mutex-xchg.h
-> > index 580a6d35c7..44a66c99c8 100644
-> > --- a/include/asm-generic/mutex-xchg.h
-> > +++ b/include/asm-generic/mutex-xchg.h
-> > @@ -25,8 +25,11 @@
-> >  static inline void
-> >  __mutex_fastpath_lock(atomic_t *count, void (*fail_fn)(atomic_t *))
-> >  {
-> > -       if (unlikely(atomic_xchg(count, 0) != 1))
-> > -               fail_fn(count);
-> > +       if (unlikely(atomic_xchg(count, 0) != 1)) {
-> > +               /* Mark lock contention explicitly */
-> > +               if (likely(atomic_xchg(count, -1) != 1))
-> > +                       fail_fn(count);
-> > +       }
-> >  } 
-> 
-> OK, I like this.. Thanks guys! Will will you send a final and complete
-> patch?
+Hello,
 
-I sent one out on Friday but somehow managed to drop you from CC -- sorry
-about that:
+> For SMP platforms, each CPU core has an independent PMU, and each PMU 
+> has a dedicated irq (SPI or PPI). Current perf subsystem framework only 
+> supports each PMU to have a dedicated SPI irq, and it will support each 
+> PMU to have a PPI irq (i have seen someone has sent out the patches), 
+> but there is a situation the subsystem doesn't support yet, the 
+> situation is multi PMUs share one same SPI irq, e.g. the i.MX6Quad CPU 
+> has 4 cortex-a9 cores, each core has a PMU, all PMU irqs are routed 
+> (ORed) to one SPI irq, do you know how to support this situation?
 
-  http://thread.gmane.org/gmane.linux.kernel/1341305
+That's what I like to call a braindead, broken system. Seriously, CPU PMU
+interrupts *can only* be handled on the CPU which raised them -- ORing these
+things together means ping-ponging the interrupt affinity around until we
+find the right guy. There's also the fun case where multiple PMUs assert
+simultaneously and I've even heard about platforms where they OR in the
+bloody L2 PMU interrupt as well for good measure!
 
-Cheers,
+If you have to support such a device, take a look at the ux500 code
+(db8500_pmu_handler), but please take all of your profiling numbers with a
+pinch of salt. For a quad-core processor, the numbers will probably be even
+less accurate.
+
+Also, please go ahead and inflict sufficient injuries to your hardware guys
+that they stop this madness!
 
 Will
