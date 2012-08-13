@@ -1,66 +1,28 @@
-From: a.p.zijlstra@chello.nl (Peter Zijlstra)
-Date: Mon, 13 Aug 2012 16:05:17 +0200
-Subject: RFC: mutex: hung tasks on SMP platforms with
- asm-generic/mutex-xchg.h
-In-Reply-To: <alpine.LFD.2.02.1208130931530.5231@xanadu.home>
-References: <20120807115647.GA12828@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1208090029460.5231@xanadu.home>
- <20120809144953.GC18486@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1208091201380.5231@xanadu.home>
- <alpine.LFD.2.02.1208091243080.5231@xanadu.home>
- <1344845704.31459.11.camel@twins>
- <alpine.LFD.2.02.1208130931530.5231@xanadu.home>
-Message-ID: <1344866717.31459.32.camel@twins>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 13 Aug 2012 22:08:05 +0800
+Subject: [PATCH 00/10 V3] MXS SPI driver
+In-Reply-To: <20120813125158.GE13446@opensource.wolfsonmicro.com>
+References: <1344007575-11448-1-git-send-email-marex@denx.de>
+ <20120813125158.GE13446@opensource.wolfsonmicro.com>
+Message-ID: <20120813140803.GB6407@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-08-13 at 09:35 -0400, Nicolas Pitre wrote:
-> Date: Fri, 10 Aug 2012 15:22:09 +0100
-> From: Will Deacon <will.deacon@arm.com>
-> Subject: [PATCH] mutex: place lock in contended state after fastpath_lock failure
-> 
-> ARM recently moved to asm-generic/mutex-xchg.h for its mutex
-> implementation after the previous implementation was found to be missing
-> some crucial memory barriers. However, this has revealed some problems
-> running hackbench on SMP platforms due to the way in which the
-> MUTEX_SPIN_ON_OWNER code operates.
-> 
-> The symptoms are that a bunch of hackbench tasks are left waiting on an
-> unlocked mutex and therefore never get woken up to claim it. This boils
-> down to the following sequence of events:
-> 
->         Task A        Task B        Task C        Lock value
-> 0                                                     1
-> 1       lock()                                        0
-> 2                     lock()                          0
-> 3                     spin(A)                         0
-> 4       unlock()                                      1
-> 5                                   lock()            0
-> 6                     cmpxchg(1,0)                    0
-> 7                     contended()                    -1
-> 8       lock()                                        0
-> 9       spin(C)                                       0
-> 10                                  unlock()          1
-> 11      cmpxchg(1,0)                                  0
-> 12      unlock()                                      1
-> 
-> At this point, the lock is unlocked, but Task B is in an uninterruptible
-> sleep with nobody to wake it up.
-> 
-> This patch fixes the problem by ensuring we put the lock into the
-> contended state if we fail to acquire it on the fastpath, ensuring that
-> any blocked waiters are woken up when the mutex is released.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Chris Mason <chris.mason@fusionio.com>
-> Cc: Ingo Molnar <mingo@elte.hu>
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> Reviewed-by: Nicolas Pitre <nico@linaro.org> 
+On Mon, Aug 13, 2012 at 01:51:58PM +0100, Mark Brown wrote:
+> Do we have any ETA for review from the MMC side?  I'd like to get these
+> patches out of my queue one way or another, it seems like for the simple
+> code motion bits at least we should be easy enough to get out of the
+> way.
 
-Acked-by: Peter Zijlstra <a.p.zijlstra@chello.nl>
+For mxs-mmc part:
 
+Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
 
-Will you carry this through the ARM tree or do you want me/Ingo to take
-it?
+Chris,
+
+Can you take a look at the series and give your ACK to bless it go via
+SPI tree?
+
+-- 
+Regards,
+Shawn
