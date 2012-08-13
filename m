@@ -1,44 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 Aug 2012 13:38:10 +0200
-Subject: [GIT PULL] Ux500 ASIC ID patches
-Message-ID: <CACRpkdZ1+vjrTQC9-M9icO7p9POg-zcR_gUpkyemF4da3jny2w@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 13 Aug 2012 17:09:54 +0530
+Subject: [PATCHv2 0/4] Add device tree data for omap5
+In-Reply-To: <1344852313-30484-1-git-send-email-sourav.poddar@ti.com>
+References: <1344852313-30484-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <CAMQu2gwbG4XSBQvvbMJ8aKRy=LRG44dKv+feSo-mso_jju71oQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+Sourav,
 
-could you please pull the following patch set into ARM SoC as a first
-step for the
-next merge window. This cleans up, updates and structure the use of some ASIC ID
-detection macros so they are understandable and consistent.
+On Mon, Aug 13, 2012 at 3:35 PM, Sourav Poddar <sourav.poddar@ti.com> wrote:
+>
+> The following patch series add i2c support for omap5.
+> As well as enable I2C based devices like pressure and temperature
+> through device tree. Also add onchip keypad dts data.
+>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>
+> Sourav Poddar (4):
+>   arm/dts: omap5-evm: Add I2C support
+>   arm/dts: omap5-evm: Add tmp102 sensor support
+>   arm/dts: omap5-evm: Add keypad data
+>   arm/dts: omap5-evm: Add bmp085 sensor support
+>
+>  arch/arm/boot/dts/omap5-evm.dts |   30 +++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/omap5.dtsi    |   40
+> +++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 70 insertions(+), 0 deletions(-)
+>
+The entire series looks fine to me.
 
-The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
-
-  Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-ux500-core
-
-for you to fetch changes up to 1d3266ecca67066e537fe0e0669bed77d355f886:
-
-  ARM: ux500: add detection for DB8500 ASIC v2.2 (2012-08-09 17:48:45 +0200)
-
-----------------------------------------------------------------
-Linus Walleij (4):
-      ARM: ux500: delete remnant U5500 macros
-      ARM: ux500: add a U8520 detection macro
-      ARM: ux500: reform Ux500 family names
-      ARM: ux500: add detection for DB8500 ASIC v2.2
-
- arch/arm/mach-ux500/cache-l2x0.c      |  2 +-
- arch/arm/mach-ux500/cpu-db8500.c      |  2 +-
- arch/arm/mach-ux500/cpu.c             |  2 +-
- arch/arm/mach-ux500/include/mach/id.h | 44
-+++++++++++++++-----------------------------
- arch/arm/mach-ux500/platsmp.c         |  2 +-
- 5 files changed, 19 insertions(+), 33 deletions(-)
-
-Yours,
-Linus Walleij
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
