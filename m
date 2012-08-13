@@ -1,81 +1,48 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Mon, 13 Aug 2012 17:05:52 -0500
-Subject: [PATCH] efikamx: reintroduce Genesi Efika MX Smarttop via device
- tree
-In-Reply-To: <20120813173847.GH13446@opensource.wolfsonmicro.com>
-References: <1344375978-29981-1-git-send-email-matt@genesi-usa.com>
- <20120809101947.GA8474@sirena.org.uk>
- <CAKGA1bkwMvDW7nMWxUbNm3_0ZTR2+uKs8UL_HuisJe7cd8POBA@mail.gmail.com>
- <20120813173847.GH13446@opensource.wolfsonmicro.com>
-Message-ID: <CAKGA1b=ANojue-ZDxmocDhzTcQPuOVocs9yCjezhJrGqsOXEHA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 13 Aug 2012 15:09:56 -0700
+Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
+In-Reply-To: <CANqRtoQ9BCPhQPi38vK__61G2yAY=g9s17NG3LhSnrxdOYnkDg@mail.gmail.com>
+References: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
+ <20120611155716.GA18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111241470.23555@xanadu.home>
+ <20120611165115.GB18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
+ <4FD62DBB.8070407@codeaurora.org>
+ <20120611192519.GF18267@n2100.arm.linux.org.uk>
+ <4FE1FB15.3090305@codeaurora.org>
+ <0e0201cd5f2f$2c2f6e60$848e4b20$%kim@samsung.com>
+ <5016D03D.8010607@codeaurora.org>
+ <CANqRtoQ9BCPhQPi38vK__61G2yAY=g9s17NG3LhSnrxdOYnkDg@mail.gmail.com>
+Message-ID: <50297B34.5090504@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 13, 2012 at 12:38 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Aug 13, 2012 at 10:42:58AM -0500, Matt Sealey wrote:
->> On Thu, Aug 9, 2012 at 5:19 AM, Mark Brown
+On 08/07/12 23:52, Magnus Damm wrote:
+> So I finally managed to try this out on my KZM9D board. The SMP bring
+> up code continues to work as expected, so it seems that SGI0 can be
+> used instead of SGI1 on EMEV2. Let's just say that the boot protocol
+> implemented by the mask ROM is rather poorly documented. Anyway, to
+> test I used the following patch on top of linux git 42a579a.
 >
->> > This and many of your other regulators have voltage ranges specified but
->> > no consumers which doesn't make sense.  It looks awfully like you've
->> > just typed in the maximum range supported by the regulator which is most
->> > likely broken.
+> --- 0001/arch/arm/mach-shmobile/smp-emev2.c
+> +++ work/arch/arm/mach-shmobile/smp-emev2.c	2012-08-08 15:42:54.000000000 +0900
+> @@ -82,7 +82,7 @@ int __cpuinit emev2_boot_secondary(unsig
+>  	/* Tell ROM loader about our vector (in headsmp.S) */
+>  	emev2_set_boot_vector(__pa(shmobile_secondary_vector));
 >
->> Okay I have a question about this; some of the regulators (SW1
->> especially) are obviously consumed by the CPU core complex so that
->> when DVFS gives us a hint we can clock down and reduce voltage. How on
->> earth do we implement that?
+> -	gic_raise_softirq(cpumask_of(cpu), 1);
+> +	gic_raise_softirq(cpumask_of(cpu), 0);
+>  	return 0;
+>  }
 >
->> We can drop the maximum range to be better for the CPU (1.3V is too
->> high, I think this is legacy from when we may have had a sorted 1GHz
->> MX51 coming out) but I can't find any source for where this is hooked
->> in.
+> So if/where needed, please add my:
 >
-> DVFS doesn't use the device model in Linux (yet!) so there's no device
-> node and it's all a bit messy.  Shawn Guo is working on some generic DT
-> bindings for it which should solve that problem but for now in the
-> specific case of CPU bindings it's OK to not have an consumer, it's
-> understandable what's going on there.
+> Acked-by: Magnus Damm <damm@opensource.se>
+>
 
-Going over the regulators, what I have so far is every regulator
-properly specced with their fixed voltages where it never changes
-(which is everything but SW1 and SW2).
-
-There are still a lot of always-on and boot-on regulators since the
-design is pretty poor - some pmic regulators that should have specific
-consumers have been re-used in other places to supplement other
-regulators or derive other voltages for parts of the board you would
-usually have discrete logic to support. In this sense, a lot of the
-board remains powered or it will just act weird, and a couple of very
-specific ones can be turned on and off and don't need to be enabled
-for the boot process, but they will be referenced by a metric f&%@ton
-of devices as being a consumer so it's unlikely they'll ever actually
-power down. In this case I found one always-on and boot-on that
-actually doesn't need to be, but for the most part it stays as it is
-with refined voltages.
-
-I'm a little confused by the SW1 and SW2 ->VDDGP,VCC sourcing and what
-that's actually supplying and what the voltage ranges SHOULD be - as I
-think both need to be ranges. VDDGP should probably not be any more
-flexible than 0.85V-1.1V.
-
-That said, VCC seems to be only required to be a fixed 1.225V in the
-datasheet? 0.9V to 1.85V seems excessive, but it's actually dependent
-on load. I don't think anyone ever changes it, it was one of those
-things your average board designer would sit down and say, this is
-what it needs to be, and it might get bumped when it turns out
-something on the board needs more power than the spec. I have NO idea
-what this should be. I could just nail it to 1.225V and cover all
-bases at the cost of possibly burning a ton of power. I'm looking into
-what it's ACTUALLY running at in the old kernels.
-
-It'll take some digging through the old Freescale code about where
-they turn regulators on and off in the fixed board files to find this
-out and what the original intent was. In the meantime I might be able
-to refine the VDDGP/SW2 source. Shawn, any input? And does mainline
-care about MX51 TO2 enough that we'd need to implement the voltage
-bumps for that?
+Thanks Magnus, would you be able to merge this through the shmobile
+tree? Otherwise I can put it in the patch tracker.
 
 -- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
