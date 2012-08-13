@@ -1,37 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Aug 2012 11:52:45 +0100
-Subject: [PATCH 09/10] ARM: rpc: Fix building RiscPC
-In-Reply-To: <201208101103.58808.arnd@arndb.de>
-References: <1344461278-28245-1-git-send-email-arnd@arndb.de>
- <1344461278-28245-10-git-send-email-arnd@arndb.de>
- <20120809074754.GP18957@n2100.arm.linux.org.uk>
- <201208101103.58808.arnd@arndb.de>
-Message-ID: <20120813105245.GE18957@n2100.arm.linux.org.uk>
+From: gcembed@gmail.com (=?UTF-8?B?R2HDq3RhbiBDYXJsaWVy?=)
+Date: Mon, 13 Aug 2012 13:19:59 +0200
+Subject: [PATCH 1/2] ARM: mx27pdk: Add audio support
+In-Reply-To: <20120803135956.GT1451@pengutronix.de>
+References: <1341341098-9510-1-git-send-email-fabio.estevam@freescale.com>
+ <CAOMZO5BXQ2OQVC6nXeo_yJB=SBC=sv=ez9k6uo3gLNkWnC0Gyg@mail.gmail.com>
+ <CAOMZO5Am433CAWOWCLQ7QkEJRTF1qon+qM0RA2PPtC8uLPGUWA@mail.gmail.com>
+ <20120803135956.GT1451@pengutronix.de>
+Message-ID: <5028E2DF.6060409@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2012 at 11:03:58AM +0000, Arnd Bergmann wrote:
-> On Thursday 09 August 2012, Russell King - ARM Linux wrote:
-> > On Wed, Aug 08, 2012 at 11:27:57PM +0200, Arnd Bergmann wrote:
-> > > ARMv3 support was removed in 357c9c1f07 "ARM: Remove support for ARMv3
-> > > ARM610 and ARM710 CPUs", which explicitly left parts of the CPU32v3
-> > > support in place for building RiscPC. However, this does not actually
-> > > build in my test setup.
-> > > 
-> > > This is probably not the right solution, but maybe someone has a better
-> > > idea for how to deal with this.
-> > 
-> > This isn't the right solution.  The RiscPC bus does not support half-word
-> > load/stores, so we must continue to build that target for the 32v3
-> > architecture (which is why I carefully left that stuff behind.)
-> > 
-> > The mistake is in what I did with arch/arm/lib - the armv3 code in there
-> > needs to be resurected instead.
-> 
-> Ok, I'll drop my patch from the series then and wait for you to
-> fix this properly.
-
-I've just reverted the arch/arm/lib part of
-357c9c1f07d4546bc3fbc0fd1044d96b114d14ed (ARM: Remove support for ARMv3
-ARM610 and ARM710 CPUs) so when I push my fixes branch this should resolve
-your build error.
+Hi,
+On 08/03/2012 03:59 PM, Sascha Hauer wrote:
+> On Tue, Jul 31, 2012 at 09:49:13AM -0300, Fabio Estevam wrote:
+>> Sascha,
+>>
+>> On 7/25/12, Fabio Estevam <festevam@gmail.com> wrote:
+>>> Hi Sascha,
+>>>
+>>> On Tue, Jul 3, 2012 at 3:44 PM, Fabio Estevam
+>>> <fabio.estevam@freescale.com> wrote:
+>>>> mx27pdk has a mc13783 audio codec.
+>>>>
+>>>> Add support for it.
+>>>>
+>>>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>>>
+>>> Is this patch OK? Can it be applied?
+>>
+>> Could this get into 3.6?
+>
+> Applied now. Sorry, missed this one.
+>
+> Sascha
+>
+Is this patch will be applied on linux-next tree ?
+Newer patch "[PATCH v2] ASoC: imx-ssi: Remove mono support" is already 
+applied (I know that is not for the same branch) but not this one. Is 
+there a problem with this patch ?
+Best regards,
+Ga?tan Carlier
