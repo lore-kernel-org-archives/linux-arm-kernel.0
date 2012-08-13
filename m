@@ -1,62 +1,252 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 12 Aug 2012 23:32:44 -0400 (EDT)
-Subject: [PATCH v2 03/22] ARM: use late patch framework for phys-virt
- patching
-In-Reply-To: <5027E90E.2000604@ti.com>
+Date: Mon, 13 Aug 2012 00:03:47 -0400 (EDT)
+Subject: [PATCH v2 05/22] ARM: LPAE: support 64-bit virt_to_phys patching
+In-Reply-To: <50283BF5.1050908@ti.com>
 References: <1344648306-15619-1-git-send-email-cyril@ti.com>
- <1344648306-15619-4-git-send-email-cyril@ti.com>
- <alpine.LFD.2.02.1208112238270.5231@xanadu.home> <5027E90E.2000604@ti.com>
-Message-ID: <alpine.LFD.2.02.1208122320310.5231@xanadu.home>
+ <1344648306-15619-6-git-send-email-cyril@ti.com>
+ <alpine.LFD.2.02.1208112316560.5231@xanadu.home> <50283BF5.1050908@ti.com>
+Message-ID: <alpine.LFD.2.02.1208122336260.5231@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sun, 12 Aug 2012, Cyril Chemparathy wrote:
 
-> On 08/11/12 23:03, Nicolas Pitre wrote:
+> On 08/11/12 23:39, Nicolas Pitre wrote:
 > > On Fri, 10 Aug 2012, Cyril Chemparathy wrote:
 > > 
-> > > -extern unsigned long __pv_phys_offset;
-> > > -#define PHYS_OFFSET __pv_phys_offset
-> [...]
-> > > +#define PHYS_OFFSET	__virt_to_phys(PAGE_OFFSET)
+> > > This patch adds support for 64-bit physical addresses in virt_to_phys()
+> > > patching.  This does not do real 64-bit add/sub, but instead patches in
+> > > the
+> > > upper 32-bits of the phys_offset directly into the output of virt_to_phys.
+> > > 
+> > > There is no corresponding change on the phys_to_virt() side, because
+> > > computations on the upper 32-bits would be discarded anyway.
+> > > 
+> > > Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+> > > ---
+> > >   arch/arm/include/asm/memory.h |   22 ++++++++++++++++++----
+> > >   arch/arm/kernel/head.S        |    4 ++++
+> > >   arch/arm/kernel/setup.c       |    2 +-
+> > >   3 files changed, 23 insertions(+), 5 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> > > index 81e1714..dc5fbf3 100644
+> > > --- a/arch/arm/include/asm/memory.h
+> > > +++ b/arch/arm/include/asm/memory.h
+> > > @@ -154,14 +154,28 @@
+> > >   #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
+> > > 
+> > >   extern unsigned long	__pv_offset;
+> > > -extern unsigned long	__pv_phys_offset;
+> > > +extern phys_addr_t	__pv_phys_offset;
+> > >   #define PHYS_OFFSET	__virt_to_phys(PAGE_OFFSET)
+> > > 
+> > >   static inline phys_addr_t __virt_to_phys(unsigned long x)
+> > >   {
+> > > -	unsigned long t;
+> > > -	early_patch_imm8("add", t, x, __pv_offset, 0);
+> > > -	return t;
+> > > +	unsigned long tlo, thi;
+> > > +
+> > > +	early_patch_imm8("add", tlo, x, __pv_offset, 0);
+> > > +
+> > > +#ifdef CONFIG_ARM_LPAE
+> > > +	/*
+> > > +	 * On LPAE, we do not _need_ to do 64-bit arithmetic because the high
+> > > +	 * order 32 bits are never changed by the phys-virt offset.  We simply
+> > > +	 * patch in the high order physical address bits instead.
+> > > +	 */
+> > > +#ifdef __ARMEB__
+> > > +	early_patch_imm8_mov("mov", thi, __pv_phys_offset, 0);
+> > > +#else
+> > > +	early_patch_imm8_mov("mov", thi, __pv_phys_offset, 4);
+> > > +#endif
+> > > +#endif
+> > > +	return (u64)tlo | (u64)thi << 32;
+> > >   }
 > > 
-> > What was wrong with the former PHYS_OFFSET = __pv_phys_offset ?
-> > 
-> > If you really want to have it optimized at run time, you could simply
-> > use your new stub to patch a mov instruction instead of going through
-> > __virt_to_phys which uses and add on top of a constant.
+> > Hmmm...  I'm afraid this is going to be suboptimal when LPAE is not
+> > selected.
 > > 
 > 
-> The intent was to optimize out the load(s) on references to PHYS_OFFSET, but
-> is it worth it?  If so, we could go with a patched mov (or two) with the
-> necessary endian fixups.  If not, we could revert to __pv_phys_offset loads as
-> before.
+> I understand your concern, but I don't see the sub-optimality.  I tested the
+> following function with GCC versions 4.3.3 and 4.7.  This is after the other
+> changes that I mentioned in my previous email, but with the __virt_to_phys()
+> code itself unchanged:
+> 
+> phys_addr_t ____test_virt_to_phys(unsigned long addr)
+> {
+>         return __virt_to_phys(addr);
+> }
+> 
+> The resulting code in both cases looks like:
+> 
+> <____test_virt_to_phys>:
+> 	b       c04f0528
+> 	bx      lr
+> 
+> [the branch of course gets patched to an add]
 
-If you want to do better than the load, then you'd better go all the way 
-with the patched move.
+OK.  Please add such information and results in your commit log.
 
-> > You also should remove the MODULE_ARCH_VERMAGIC_P2V definitions now that
-> > the corresponding code is no longer there.
+> > First of all, you do not need to cast tlo to a u64 in the return value.
 > > 
 > 
-> Hmm...
+> True enough.
 > 
-> "rt-patch" needs to be in vermagic to prevent modules built against the new
-> code from being loaded on older kernels that used the traditional patch code.
+> > Then, I'm not sure if the compiler is smart enough to see that the
+> > returned value is a phys_addr_t which can be a u32, and in this case the
+> > (u64)thi << 32 is going to be truncated right away, and therefore there
+> > is no point in emiting the corresponding instructions.
+> > 
+> 
+> In this case, it appears to be smart enough.  However, I agree that relying on
+> compiler smarts is probably not the best thing for us to do.
 
-Right.
+Well, we do rely on a lot of compiler smarts in the kernel.  As long as 
+sufficiently old compiler versions do get it right then it should be 
+fine.
 
-> "p2v" needs to be in there as well, because it should be possible to build
-> without PATCH_PHYS_VIRT, but with RUNTIME_PATCH as and when there are other
-> users for this.
+> > Furthermore, if LPAE is not defined, then thi never gets initialized and
+> > should produce a warning. Did you test compilation of the code with LPAE
+> > turned off?
+> > 
+> 
+> Sure.  One of our test platforms is non-LPAE.  The compiler does not produce
+> warnings on this, and this is consistent across both compiler versions.
 
-That doesn't matter if there are other users.  As soon as there is a 
-.init.runtime_patch_table that needs to be processed then "rt-patch" 
-flags it.  Whether this is used for PATCH_PHYS_VIRT or other purposes is 
-irrelevant.
+That is odd.  I still prefer my version nevertheless so to avoid this 
+potential issue in the future.
 
-However there isn't any pv_table anymore, so "p2v" should go as there is 
-no more code to process those tables if they're ever encountered.
+> > I'd prefer something like this where more stuff is validated by the
+> > compiler:
+> > 
+> > static inline phys_addr_t __virt_to_phys(unsigned long x)
+> > {
+> > 	unsigned long tlo, thi;
+> > 	phys_addr_t ret;
+> > 
+> > 	early_patch_imm8("add", tlo, x, __pv_offset, 0);
+> > 	ret = tlo;
+> > 
+> > 	if (sizeof(phys_addr_t) > 4) {
+> > #ifdef __ARMEB__
+> > 		early_patch_imm8_mov("mov", thi, __pv_phys_offset, 0);
+> > #else
+> > 		early_patch_imm8_mov("mov", thi, __pv_phys_offset, 4);
+> > #endif
+> > 		ret |= ((u64)thi) << 32;
+> > 	}
+> > 
+> > 	return ret);
+> > }
+> > 
+> > This should let the compiler optimize things whether LPAE is enabledor
+> > not while validating both cases.
+> > 
+> 
+> Agreed on the principal, but more below...
+> 
+> 
+> I've meanwhile been chasing down another problem - the code generated for the
+> LPAE case.  The original code resulted in the following:
+> 
+> <____test_virt_to_phys>:
+>         mov     r2, #0
+>         b       c01bc800	# patch: add r1, r0, __pv_offset
+>         b       c01bc810	# patch: mov r0, __phys_offset_high
+>         orr     r2, r2, r1
+>         mov     r3, r0
+>         mov     r1, r3
+>         mov     r0, r2
+>         bx      lr
+> 
+> Yikes! This code does a bunch of futile register shuffling and a pointless or,
+> all in the name of generating the result in a 64-bit register-pair from the
+> 32-bit halves.
+> 
+> In order to get past this, I tried adding operand qualifiers (R = upper
+> 32-bits, Q = lower 32-bits) in the patch macros, in the hope that treating
+> these as native 64-bit register pairs would eliminate the need to shuffle them
+> around after the inline assembly blocks.  This then allows us to implement
+> __virt_to_phys() as follows:
+> 
+> static inline phys_addr_t __virt_to_phys(unsigned long x)
+> {
+>         phys_addr_t t;
+> 
+>         if (sizeof(t) == 4) {
+> 		t = x;
+>                 early_patch_imm8("add", t, "", t, __pv_offset, 0);
+>                 return t;
+>         }
+> 
+>         /*
+>          * On LPAE, we do not _need_ to do 64-bit arithmetic because
+>          * the high order 32 bits are never changed by the phys-virt
+>          * offset.  We simply patch in the high order physical address
+>          * bits instead.
+>          *
+>          * Note: the mov _must_ be first here.  From the compiler's
+>          * perspective, this is the initializer for the variable. The
+>          * mov itself initializes only the upper half. The subsequent
+>          * add treats t as a read/write operand and initializes the
+>          * lower half.
+>          */
+> #ifdef __ARMEB__
+>         early_patch_imm8_mov("mov", t, "R", __pv_phys_offset, 0);
+> #else
+>         early_patch_imm8_mov("mov", t, "R", __pv_phys_offset, 4);
+> #endif
+>         early_patch_imm8("add", t, "Q", x, __pv_offset, 0);
+> 
+>         return t;
+> }
+> 
+> With this, we get significantly better looking generated code:
+> 
+> <____test_virt_to_phys>:
+> 	b       c01d519c	# patch: mov r3, __phys_offset_high
+> 	b       c01d51ac	# patch: add r2, r0, __phys_offset_high
+> 	mov     r0, r2
+> 	mov     r1, r3
+> 	bx      lr
+> 
+> This is about as far along as I've been able to proceed.  I still haven't
+> figured out a way to get it to patch in place without an extra register pair.
+> 
+> Overall, this is still a bit too kludgy for my liking.  In particular, the
+> read/write operand forces add/sub/... users to initialize the result variable.
+> I am currently leaning towards adding native support for 64-bit operations in
+> the runtime patch code, instead of having to hack around it with 32-bit
+> primitives.  Better ideas, any one?
+
+The best I've come up with is this:
+
+//typedef unsigned long phys_addr_t;
+typedef unsigned long long phys_addr_t;
+
+phys_addr_t __virt_to_phys(unsigned long v)
+{
+	phys_addr_t p;
+
+	if (sizeof(phys_addr_t) > 4) {
+		asm ("add %Q0, %1, #PV_OFFSET" : "=r" (p) : "r" (v));
+		asm ("mov %R0, #PHYS_HIGHBITS" : "+r" (p));
+	} else {
+		asm ("add %0, %1, #PV_OFFSET" : "=r" (p) : "r" (v));
+	}
+
+	return p;
+}
+
+The add is done first as this reduce the life span of the v variable.  
+Because p is listed as an early clobber, then in theory the register 
+holding v could be used to store the low part of p right away.  If you 
+put the mov first then you can't do that especially on big endian.
+
+It seems that there is no clean way to combine the LPAE and non LPAE 
+cases.
 
 
 Nicolas
