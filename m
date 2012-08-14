@@ -1,98 +1,104 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 14 Aug 2012 15:59:26 +0100
-Subject: [PATCH] ARM: io: avoid writeback addressing modes for __raw_ accessors
-Message-ID: <1344956366-32574-1-git-send-email-will.deacon@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 14 Aug 2012 17:29:48 +0200
+Subject: [PATCH 00/23] work in progress: SPI controller w/DMA SAM9X5
+In-Reply-To: <1344952177-18385-1-git-send-email-richard.genoud@gmail.com>
+References: <1344952177-18385-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <502A6EEC.2010807@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Data aborts taken to hyp mode do not provide a valid instruction
-syndrome field in the HSR if the faulting instruction is a memory
-access using a writeback addressing mode.
+On 08/14/2012 03:49 PM, Richard Genoud :
+> Nicolas,
+> I said that I had some work done on sam9g35-ek, here is the spi part, based
+> on your and Jean-Christophe work.
+> You have to enable CONFIG_ARCH_AT91SAM9X5 to get it work.
+> 
+> The goal of this patchset is to share the work I've done, it's not ready
+> for upstream, but it may save some time.
+> 
+> It's based on 3.6-rc1 + Jean-Christophe's pinctrl patchset.
+> 
+> Best Regards,
 
-For hypervisors emulating MMIO accesses to virtual peripherals, taking
-such an exception requires disassembling the faulting instruction in
-order to determine the behaviour of the access. Since this requires
-manually walking the two stages of translation, the world must be
-stopped to prevent races against page aging in the guest, where the
-first-stage translation is invalidated after the hypervisor has
-translated to an IPA and the physical page is reused for something else.
+Richard,
 
-This patch avoids taking this heavy performance penalty when running
-Linux as a guest by ensuring that our I/O accessors do not make use of
-writeback addressing modes.
+Thanks a lot for updating this material: We really appreciate.
 
-Tested-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/io.h |   55 ++++++++++++++++++++++++++++++++++++++++-----
- 1 files changed, 49 insertions(+), 6 deletions(-)
+We will try to review this material together with Jean-Christophe and
+colleagues @ Atmel. I hope that we will go forward with this collected
+material in the near future.
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 815c669..b54d687 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -47,13 +47,56 @@ extern void __raw_readsb(const void __iomem *addr, void *data, int bytelen);
- extern void __raw_readsw(const void __iomem *addr, void *data, int wordlen);
- extern void __raw_readsl(const void __iomem *addr, void *data, int longlen);
- 
--#define __raw_writeb(v,a)	((void)(__chk_io_ptr(a), *(volatile unsigned char __force  *)(a) = (v)))
--#define __raw_writew(v,a)	((void)(__chk_io_ptr(a), *(volatile unsigned short __force *)(a) = (v)))
--#define __raw_writel(v,a)	((void)(__chk_io_ptr(a), *(volatile unsigned int __force   *)(a) = (v)))
-+#if __LINUX_ARM_ARCH__ < 6
-+/*
-+ * Half-word accesses are problematic with RiscPC due to limitations of
-+ * the bus. Rather than special-case the machine, just let the compiler
-+ * generate the access for CPUs prior to ARMv6.
-+ */
-+#define __raw_readw(a)         (__chk_io_ptr(a), *(volatile unsigned short __force *)(a))
-+#define __raw_writew(v,a)      ((void)(__chk_io_ptr(a), *(volatile unsigned short __force *)(a) = (v)))
-+#else
-+/*
-+ * When running under a hypervisor, we want to avoid I/O accesses with
-+ * writeback addressing modes as these incur a significant performance
-+ * overhead (the address generation must be emulated in software).
-+ */
-+static inline void __raw_writew(u16 val, volatile void __iomem *addr)
-+{
-+	asm volatile("strh %0, [%1]" : : "r" (val), "r" (addr));
-+}
-+
-+static inline u16 __raw_readw(const volatile void __iomem *addr)
-+{
-+	u16 val;
-+	asm volatile("ldrh %0, [%1]" : "=r" (val) : "r" (addr));
-+	return val;
-+}
-+#endif
- 
--#define __raw_readb(a)		(__chk_io_ptr(a), *(volatile unsigned char __force  *)(a))
--#define __raw_readw(a)		(__chk_io_ptr(a), *(volatile unsigned short __force *)(a))
--#define __raw_readl(a)		(__chk_io_ptr(a), *(volatile unsigned int __force   *)(a))
-+static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
-+{
-+	asm volatile("strb %0, [%1]" : : "r" (val), "r" (addr));
-+}
-+
-+static inline void __raw_writel(u32 val, volatile void __iomem *addr)
-+{
-+	asm volatile("str %0, [%1]" : : "r" (val), "r" (addr));
-+}
-+
-+static inline u8 __raw_readb(const volatile void __iomem *addr)
-+{
-+	u8 val;
-+	asm volatile("ldrb %0, [%1]" : "=r" (val) : "r" (addr));
-+	return val;
-+}
-+
-+static inline u32 __raw_readl(const volatile void __iomem *addr)
-+{
-+	u32 val;
-+	asm volatile("ldr %0, [%1]" : "=r" (val) : "r" (addr));
-+	return val;
-+}
- 
- /*
-  * Architecture ioremap implementation.
+Maybe DMA OF part will not be upstreamed as-is because of an ongoing
+initiative to build a generic dmaengine OF support.
+
+> Jean-Christophe PLAGNIOL-VILLARD (3):
+>   of: add dma-mask binding
+>   of_spi: add generic binding support to specify cs gpio
+
+I know that Jean-Christophe has had difficulties to have feedback on
+there parts...
+
+>   spi/atmel: add DT support
+> 
+> Nicolas Ferre (6):
+>   spi/atmel_spi: trivial: change some comments
+>   spi/atmel_spi: add physical base address
+>   spi/atmel_spi: call unmapping on transfers buffers
+>   spi/atmel_spi: status information passed through controller data
+>   spi/atmel_spi: add flag to controller data for lock operations
+>   spi/atmel_spi: add dmaengine support
+> 
+> Richard Genoud (14):
+>   spi-atmel: update with dmaengine interface
+
+This will certainly be squashed in previous path.
+
+>   spi-atmel: fix __init/__devinit sections mismatch
+
+This one also: but it is good to have them separated at fist.
+
+>   spi-atmel: Fix spi-atmel driver to adapt to slave_config changes
+>   AT91 DMA OF support
+>   add at91sam9x5 Kconfig ARCH/SOC link
+
+Is it fixup for a bug? Jean-Christophe, a though about this one?
+
+>   spi-atmel: add DMA OF support
+>   [BUG] SPI: array out of bound => no CS
+>   [BUG] atmel-spi && DMA: OOPS if buffer > 4400 bytes
+>   sam9x5: declare SPI clocks
+>   spi-atmel: add sam9x5 SPI in device tree
+>   spi-atmel: add dma support in sam9x5 device tree
+>   spi-atmel OF: complete documentation
+
+Maybe documentation has to be folded in the patch that actually adds the
+OF support.
+
+>   spi-atmel: complete DMA slave OF documentation
+>   sam9x5ek DTS: enable SPI dataflash
+> 
+>  Documentation/devicetree/bindings/spi/spi-bus.txt  |    6 +
+>  .../devicetree/bindings/spi/spi_atmel.txt          |   46 ++
+>  arch/arm/boot/dts/at91sam9x5.dtsi                  |   42 ++
+>  arch/arm/boot/dts/at91sam9x5ek.dtsi                |   10 +
+>  arch/arm/mach-at91/Kconfig                         |    4 +
+>  arch/arm/mach-at91/at91sam9x5.c                    |    3 +
+>  arch/arm/mach-at91/include/mach/at_hdmac.h         |    1 +
+>  drivers/of/Kconfig                                 |    4 +
+>  drivers/of/Makefile                                |    1 +
+>  drivers/of/of_atmel.c                              |  111 ++++
+>  drivers/of/platform.c                              |   23 +-
+>  drivers/spi/Kconfig                                |    9 +
+>  drivers/spi/spi-atmel.c                            |  611 ++++++++++++++++++--
+>  drivers/spi/spi.c                                  |   55 ++-
+>  include/linux/of_atmel.h                           |   29 +
+>  include/linux/spi/spi.h                            |    3 +
+>  16 files changed, 914 insertions(+), 44 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/spi/spi_atmel.txt
+>  create mode 100644 drivers/of/of_atmel.c
+>  create mode 100644 include/linux/of_atmel.h
+> 
+
+
 -- 
-1.7.4.1
+Nicolas Ferre
