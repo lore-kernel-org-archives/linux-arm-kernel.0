@@ -1,45 +1,35 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Aug 2012 18:52:27 +0100
-Subject: [PATCH v2 26/31] arm64: Miscellaneous library functions
+Date: Tue, 14 Aug 2012 18:52:23 +0100
+Subject: [PATCH v2 22/31] arm64: Floating point and SIMD
 In-Reply-To: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
 References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1344966752-16102-27-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1344966752-16102-23-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+This patch adds support for FP/ASIMD register bank saving and restoring
+during context switch and FP exception handling to generate SIGFPE.
+There are 32 128-bit registers and the context switching is currently
+done non-lazily. Benchmarks on real hardware are required before
+implementing lazy FP state saving/restoring.
 
-This patch adds udelay, memory and bit operations together with the
-ksyms exports.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/bitops.h  |   74 ++++++++++++++++++++++++++++
- arch/arm64/include/asm/syscall.h |  101 ++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/arm64ksyms.c   |   55 ++++++++++++++++++++
- arch/arm64/lib/Makefile          |    5 ++
- arch/arm64/lib/bitops.c          |   25 +++++++++
- arch/arm64/lib/clear_page.S      |   39 +++++++++++++++
- arch/arm64/lib/copy_page.S       |   46 +++++++++++++++++
- arch/arm64/lib/delay.c           |   55 ++++++++++++++++++++
- 8 files changed, 400 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/bitops.h
- create mode 100644 arch/arm64/include/asm/syscall.h
- create mode 100644 arch/arm64/kernel/arm64ksyms.c
- create mode 100644 arch/arm64/lib/Makefile
- create mode 100644 arch/arm64/lib/bitops.c
- create mode 100644 arch/arm64/lib/clear_page.S
- create mode 100644 arch/arm64/lib/copy_page.S
- create mode 100644 arch/arm64/lib/delay.c
+ arch/arm64/include/asm/fpsimd.h  |   64 +++++++++++++++++++++++
+ arch/arm64/kernel/entry-fpsimd.S |   80 ++++++++++++++++++++++++++++
+ arch/arm64/kernel/fpsimd.c       |  106 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 250 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm64/include/asm/fpsimd.h
+ create mode 100644 arch/arm64/kernel/entry-fpsimd.S
+ create mode 100644 arch/arm64/kernel/fpsimd.c
 
-diff --git a/arch/arm64/include/asm/bitops.h b/arch/arm64/include/asm/bitops.h
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
 new file mode 100644
-index 0000000..67df4d2
+index 0000000..7ea4711
 --- /dev/null
-+++ b/arch/arm64/include/asm/bitops.h
-@@ -0,0 +1,74 @@
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -0,0 +1,64 @@
 +/*
 + * Copyright (C) 2012 ARM Ltd.
 + *
@@ -55,283 +45,66 @@ index 0000000..67df4d2
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#ifndef __ASM_BITOPS_H
-+#define __ASM_BITOPS_H
++#ifndef __ASM_FP_H
++#define __ASM_FP_H
 +
-+#include <linux/compiler.h>
++#include <asm/ptrace.h>
 +
-+#include <asm/barrier.h>
-+
-+/*
-+ * clear_bit may not imply a memory barrier
-+ */
-+#ifndef smp_mb__before_clear_bit
-+#define smp_mb__before_clear_bit()	smp_mb()
-+#define smp_mb__after_clear_bit()	smp_mb()
-+#endif
++#ifndef __ASSEMBLY__
 +
 +/*
-+ * Use compiler builtins for simple inline operations.
++ * FP/SIMD storage area has:
++ *  - FPSR and FPCR
++ *  - 32 128-bit data registers
++ *
++ * Note that user_fp forms a prefix of this structure, which is relied
++ * upon in the ptrace FP/SIMD accessors. struct user_fpsimd_state must
++ * form a prefix of struct fpsimd_state.
 + */
-+static inline unsigned long __ffs(unsigned long word)
-+{
-+	return __builtin_ffsl(word) - 1;
-+}
-+
-+static inline int ffs(int x)
-+{
-+	return __builtin_ffs(x);
-+}
-+
-+static inline unsigned long __fls(unsigned long word)
-+{
-+	return BITS_PER_LONG - 1 - __builtin_clzl(word);
-+}
-+
-+static inline int fls(int x)
-+{
-+	return x ? sizeof(x) * BITS_PER_BYTE - __builtin_clz(x) : 0;
-+}
-+
-+/*
-+ * Mainly use the generic routines for now.
-+ */
-+#ifndef _LINUX_BITOPS_H
-+#error only <linux/bitops.h> can be included directly
-+#endif
-+
-+#include <asm-generic/bitops/ffz.h>
-+#include <asm-generic/bitops/fls64.h>
-+#include <asm-generic/bitops/find.h>
-+
-+#include <asm-generic/bitops/sched.h>
-+#include <asm-generic/bitops/hweight.h>
-+#include <asm-generic/bitops/lock.h>
-+
-+#include <asm-generic/bitops/atomic.h>
-+#include <asm-generic/bitops/non-atomic.h>
-+#include <asm-generic/bitops/le.h>
-+#include <asm-generic/bitops/ext2-atomic.h>
-+
-+#endif /* __ASM_BITOPS_H */
-diff --git a/arch/arm64/include/asm/syscall.h b/arch/arm64/include/asm/syscall.h
-new file mode 100644
-index 0000000..89c047f
---- /dev/null
-+++ b/arch/arm64/include/asm/syscall.h
-@@ -0,0 +1,101 @@
-+/*
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_SYSCALL_H
-+#define __ASM_SYSCALL_H
-+
-+#include <linux/err.h>
-+
-+
-+static inline int syscall_get_nr(struct task_struct *task,
-+				 struct pt_regs *regs)
-+{
-+	return regs->syscallno;
-+}
-+
-+static inline void syscall_rollback(struct task_struct *task,
-+				    struct pt_regs *regs)
-+{
-+	regs->regs[0] = regs->orig_x0;
-+}
-+
-+
-+static inline long syscall_get_error(struct task_struct *task,
-+				     struct pt_regs *regs)
-+{
-+	unsigned long error = regs->regs[0];
-+	return IS_ERR_VALUE(error) ? error : 0;
-+}
-+
-+static inline long syscall_get_return_value(struct task_struct *task,
-+					    struct pt_regs *regs)
-+{
-+	return regs->regs[0];
-+}
-+
-+static inline void syscall_set_return_value(struct task_struct *task,
-+					    struct pt_regs *regs,
-+					    int error, long val)
-+{
-+	regs->regs[0] = (long) error ? error : val;
-+}
-+
-+#define SYSCALL_MAX_ARGS 6
-+
-+static inline void syscall_get_arguments(struct task_struct *task,
-+					 struct pt_regs *regs,
-+					 unsigned int i, unsigned int n,
-+					 unsigned long *args)
-+{
-+	if (i + n > SYSCALL_MAX_ARGS) {
-+		unsigned long *args_bad = args + SYSCALL_MAX_ARGS - i;
-+		unsigned int n_bad = n + i - SYSCALL_MAX_ARGS;
-+		pr_warning("%s called with max args %d, handling only %d\n",
-+			   __func__, i + n, SYSCALL_MAX_ARGS);
-+		memset(args_bad, 0, n_bad * sizeof(args[0]));
-+	}
-+
-+	if (i == 0) {
-+		args[0] = regs->orig_x0;
-+		args++;
-+		i++;
-+		n--;
-+	}
-+
-+	memcpy(args, &regs->regs[i], n * sizeof(args[0]));
-+}
-+
-+static inline void syscall_set_arguments(struct task_struct *task,
-+					 struct pt_regs *regs,
-+					 unsigned int i, unsigned int n,
-+					 const unsigned long *args)
-+{
-+	if (i + n > SYSCALL_MAX_ARGS) {
-+		pr_warning("%s called with max args %d, handling only %d\n",
-+			   __func__, i + n, SYSCALL_MAX_ARGS);
-+		n = SYSCALL_MAX_ARGS - i;
-+	}
-+
-+	if (i == 0) {
-+		regs->orig_x0 = args[0];
-+		args++;
-+		i++;
-+		n--;
-+	}
-+
-+	memcpy(&regs->regs[i], args, n * sizeof(args[0]));
-+}
-+
-+#endif	/* __ASM_SYSCALL_H */
-diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
-new file mode 100644
-index 0000000..4631573
---- /dev/null
-+++ b/arch/arm64/kernel/arm64ksyms.c
-@@ -0,0 +1,55 @@
-+/*
-+ * Based on arch/arm/kernel/armksyms.c
-+ *
-+ * Copyright (C) 2000 Russell King
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/export.h>
-+#include <linux/sched.h>
-+#include <linux/string.h>
-+#include <linux/cryptohash.h>
-+#include <linux/delay.h>
-+#include <linux/in6.h>
-+#include <linux/syscalls.h>
-+#include <linux/uaccess.h>
-+#include <linux/io.h>
-+
-+#include <asm/checksum.h>
-+
-+	/* user mem (segment) */
-+EXPORT_SYMBOL(__strnlen_user);
-+EXPORT_SYMBOL(__strncpy_from_user);
-+
-+EXPORT_SYMBOL(copy_page);
-+
-+EXPORT_SYMBOL(__copy_from_user);
-+EXPORT_SYMBOL(__copy_to_user);
-+EXPORT_SYMBOL(__clear_user);
-+
-+EXPORT_SYMBOL(__get_user_1);
-+EXPORT_SYMBOL(__get_user_2);
-+EXPORT_SYMBOL(__get_user_4);
-+
-+EXPORT_SYMBOL(__put_user_1);
-+EXPORT_SYMBOL(__put_user_2);
-+EXPORT_SYMBOL(__put_user_4);
-+EXPORT_SYMBOL(__put_user_8);
-+
-+	/* bitops */
-+EXPORT_SYMBOL(__atomic_hash);
-+
-+	/* physical memory */
-+EXPORT_SYMBOL(memstart_addr);
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-new file mode 100644
-index 0000000..ae71bae
---- /dev/null
-+++ b/arch/arm64/lib/Makefile
-@@ -0,0 +1,5 @@
-+lib-y		:= bitops.o delay.o					\
-+		   strncpy_from_user.o strnlen_user.o			\
-+		   clear_user.o getuser.o putuser.o			\
-+		   copy_from_user.o copy_to_user.o copy_in_user.o	\
-+		   copy_page.o clear_page.o
-diff --git a/arch/arm64/lib/bitops.c b/arch/arm64/lib/bitops.c
-new file mode 100644
-index 0000000..aa4965e
---- /dev/null
-+++ b/arch/arm64/lib/bitops.c
-@@ -0,0 +1,25 @@
-+/*
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/spinlock.h>
-+#include <linux/atomic.h>
-+
-+#ifdef CONFIG_SMP
-+arch_spinlock_t __atomic_hash[ATOMIC_HASH_SIZE] __lock_aligned = {
-+       [0 ... (ATOMIC_HASH_SIZE-1)]  = __ARCH_SPIN_LOCK_UNLOCKED
++struct fpsimd_state {
++	union {
++		struct user_fpsimd_state user_fpsimd;
++		struct {
++			__uint128_t vregs[32];
++			u32 fpsr;
++			u32 fpcr;
++		};
++	};
 +};
++
++#if defined(__KERNEL__) && defined(CONFIG_AARCH32_EMULATION)
++/* Masks for extracting the FPSR and FPCR from the FPSCR */
++#define VFP_FPSCR_STAT_MASK	0xf800009f
++#define VFP_FPSCR_CTRL_MASK	0x07f79f00
++/*
++ * The VFP state has 32x64-bit registers and a single 32-bit
++ * control/status register.
++ */
++#define VFP_STATE_SIZE		((32 * 8) + 4)
 +#endif
-diff --git a/arch/arm64/lib/clear_page.S b/arch/arm64/lib/clear_page.S
++
++struct task_struct;
++
++extern void fpsimd_save_state(struct fpsimd_state *state);
++extern void fpsimd_load_state(struct fpsimd_state *state);
++
++extern void fpsimd_thread_switch(struct task_struct *next);
++extern void fpsimd_flush_thread(void);
++
++#endif
++
++#endif
+diff --git a/arch/arm64/kernel/entry-fpsimd.S b/arch/arm64/kernel/entry-fpsimd.S
 new file mode 100644
-index 0000000..ef08e90
+index 0000000..17988a6
 --- /dev/null
-+++ b/arch/arm64/lib/clear_page.S
-@@ -0,0 +1,39 @@
++++ b/arch/arm64/kernel/entry-fpsimd.S
+@@ -0,0 +1,80 @@
 +/*
++ * FP/SIMD state saving and restoring
++ *
 + * Copyright (C) 2012 ARM Ltd.
++ * Author: Catalin Marinas <catalin.marinas@arm.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -347,36 +120,77 @@ index 0000000..ef08e90
 + */
 +
 +#include <linux/linkage.h>
-+#include <linux/const.h>
++
 +#include <asm/assembler.h>
-+#include <asm/page.h>
 +
 +/*
-+ * Clear page @dest
++ * Save the FP registers.
 + *
-+ * Parameters:
-+ *	x0 - dest
++ * x0 - pointer to struct fpsimd_state
 + */
-+ENTRY(clear_page)
-+	mrs	x1, dczid_el0
-+	and	w1, w1, #0xf
-+	mov	x2, #4
-+	lsl	x1, x2, x1
-+
-+1:	dc	zva, x0
-+	add	x0, x0, x1
-+	tst	x0, #(PAGE_SIZE - 1)
-+	b.ne	1b
++ENTRY(fpsimd_save_state)
++	stp	q0, q1, [x0, #16 * 0]
++	stp	q2, q3, [x0, #16 * 2]
++	stp	q4, q5, [x0, #16 * 4]
++	stp	q6, q7, [x0, #16 * 6]
++	stp	q8, q9, [x0, #16 * 8]
++	stp	q10, q11, [x0, #16 * 10]
++	stp	q12, q13, [x0, #16 * 12]
++	stp	q14, q15, [x0, #16 * 14]
++	stp	q16, q17, [x0, #16 * 16]
++	stp	q18, q19, [x0, #16 * 18]
++	stp	q20, q21, [x0, #16 * 20]
++	stp	q22, q23, [x0, #16 * 22]
++	stp	q24, q25, [x0, #16 * 24]
++	stp	q26, q27, [x0, #16 * 26]
++	stp	q28, q29, [x0, #16 * 28]
++	stp	q30, q31, [x0, #16 * 30]!
++	mrs	x8, fpsr
++	str	w8, [x0, #16 * 2]
++	mrs	x8, fpcr
++	str	w8, [x0, #16 * 2 + 4]
 +	ret
-+ENDPROC(clear_page)
-diff --git a/arch/arm64/lib/copy_page.S b/arch/arm64/lib/copy_page.S
-new file mode 100644
-index 0000000..512b9a7
---- /dev/null
-+++ b/arch/arm64/lib/copy_page.S
-@@ -0,0 +1,46 @@
++ENDPROC(fpsimd_save_state)
++
 +/*
++ * Load the FP registers.
++ *
++ * x0 - pointer to struct fpsimd_state
++ */
++ENTRY(fpsimd_load_state)
++	ldp	q0, q1, [x0, #16 * 0]
++	ldp	q2, q3, [x0, #16 * 2]
++	ldp	q4, q5, [x0, #16 * 4]
++	ldp	q6, q7, [x0, #16 * 6]
++	ldp	q8, q9, [x0, #16 * 8]
++	ldp	q10, q11, [x0, #16 * 10]
++	ldp	q12, q13, [x0, #16 * 12]
++	ldp	q14, q15, [x0, #16 * 14]
++	ldp	q16, q17, [x0, #16 * 16]
++	ldp	q18, q19, [x0, #16 * 18]
++	ldp	q20, q21, [x0, #16 * 20]
++	ldp	q22, q23, [x0, #16 * 22]
++	ldp	q24, q25, [x0, #16 * 24]
++	ldp	q26, q27, [x0, #16 * 26]
++	ldp	q28, q29, [x0, #16 * 28]
++	ldp	q30, q31, [x0, #16 * 30]!
++	ldr	w8, [x0, #16 * 2]
++	ldr	w9, [x0, #16 * 2 + 4]
++	msr	fpsr, x8
++	msr	fpcr, x9
++	ret
++ENDPROC(fpsimd_load_state)
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+new file mode 100644
+index 0000000..e8b8357
+--- /dev/null
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -0,0 +1,106 @@
++/*
++ * FP/SIMD context switching and fault handling
++ *
 + * Copyright (C) 2012 ARM Ltd.
++ * Author: Catalin Marinas <catalin.marinas@arm.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -391,94 +205,90 @@ index 0000000..512b9a7
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/linkage.h>
-+#include <linux/const.h>
-+#include <asm/assembler.h>
-+#include <asm/page.h>
-+
-+/*
-+ * Copy a page from src to dest (both are page aligned)
-+ *
-+ * Parameters:
-+ *	x0 - dest
-+ *	x1 - src
-+ */
-+ENTRY(copy_page)
-+	/* Assume cache line size is 64 bytes. */
-+	prfm	pldl1strm, [x1, #64]
-+1:	ldp	x2, x3, [x1]
-+	ldp	x4, x5, [x1, #16]
-+	ldp	x6, x7, [x1, #32]
-+	ldp	x8, x9, [x1, #48]
-+	add	x1, x1, #64
-+	prfm	pldl1strm, [x1, #64]
-+	stnp	x2, x3, [x0]
-+	stnp	x4, x5, [x0, #16]
-+	stnp	x6, x7, [x0, #32]
-+	stnp	x8, x9, [x0, #48]
-+	add	x0, x0, #64
-+	tst	x1, #(PAGE_SIZE - 1)
-+	b.ne	1b
-+	ret
-+ENDPROC(copy_page)
-diff --git a/arch/arm64/lib/delay.c b/arch/arm64/lib/delay.c
-new file mode 100644
-index 0000000..dad4ec9
---- /dev/null
-+++ b/arch/arm64/lib/delay.c
-@@ -0,0 +1,55 @@
-+/*
-+ * Delay loops based on the OpenRISC implementation.
-+ *
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/init.h>
 +#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/timex.h>
++#include <linux/init.h>
++#include <linux/sched.h>
++#include <linux/signal.h>
 +
-+void __delay(unsigned long cycles)
++#include <asm/fpsimd.h>
++#include <asm/cputype.h>
++
++#define FPEXC_IOF	(1 << 0)
++#define FPEXC_DZF	(1 << 1)
++#define FPEXC_OFF	(1 << 2)
++#define FPEXC_UFF	(1 << 3)
++#define FPEXC_IXF	(1 << 4)
++#define FPEXC_IDF	(1 << 7)
++
++/*
++ * Trapped FP/ASIMD access.
++ */
++void do_fpsimd_acc(unsigned int esr, struct pt_regs *regs)
 +{
-+	cycles_t start = get_cycles();
-+
-+	while ((get_cycles() - start) < cycles)
-+		cpu_relax();
++	/* TODO: implement lazy context saving/restoring */
++	WARN_ON(1);
 +}
-+EXPORT_SYMBOL(__delay);
 +
-+inline void __const_udelay(unsigned long xloops)
++/*
++ * Raise a SIGFPE for the current process.
++ */
++void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
 +{
-+	unsigned long loops;
++	siginfo_t info;
++	unsigned int si_code = 0;
 +
-+	loops = xloops * loops_per_jiffy * HZ;
-+	__delay(loops >> 32);
++	if (esr & FPEXC_IOF)
++		si_code = FPE_FLTINV;
++	else if (esr & FPEXC_DZF)
++		si_code = FPE_FLTDIV;
++	else if (esr & FPEXC_OFF)
++		si_code = FPE_FLTOVF;
++	else if (esr & FPEXC_UFF)
++		si_code = FPE_FLTUND;
++	else if (esr & FPEXC_IXF)
++		si_code = FPE_FLTRES;
++
++	memset(&info, 0, sizeof(info));
++	info.si_signo = SIGFPE;
++	info.si_code = si_code;
++	info.si_addr = (void __user *)instruction_pointer(regs);
++
++	send_sig_info(SIGFPE, &info, current);
 +}
-+EXPORT_SYMBOL(__const_udelay);
 +
-+void __udelay(unsigned long usecs)
++void fpsimd_thread_switch(struct task_struct *next)
 +{
-+	__const_udelay(usecs * 0x10C7UL); /* 2**32 / 1000000 (rounded up) */
++	/* check if not kernel threads */
++	if (current->mm)
++		fpsimd_save_state(&current->thread.fpsimd_state);
++	if (next->mm)
++		fpsimd_load_state(&next->thread.fpsimd_state);
 +}
-+EXPORT_SYMBOL(__udelay);
 +
-+void __ndelay(unsigned long nsecs)
++void fpsimd_flush_thread(void)
 +{
-+	__const_udelay(nsecs * 0x5UL); /* 2**32 / 1000000000 (rounded up) */
++	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
++	fpsimd_load_state(&current->thread.fpsimd_state);
 +}
-+EXPORT_SYMBOL(__ndelay);
++
++/*
++ * FP/SIMD support code initialisation.
++ */
++static int __init fpsimd_init(void)
++{
++	u64 pfr = read_cpuid(ID_AA64PFR0_EL1);
++
++	if (pfr & (0xf << 16)) {
++		pr_notice("Floating-point is not implemented\n");
++		return 0;
++	}
++	elf_hwcap |= HWCAP_FP;
++
++	if (pfr & (0xf << 20))
++		pr_notice("Advanced SIMD is not implemented\n");
++	else
++		elf_hwcap |= HWCAP_ASIMD;
++
++	return 0;
++}
++late_initcall(fpsimd_init);
