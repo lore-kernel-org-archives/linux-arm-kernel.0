@@ -1,79 +1,56 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 14 Aug 2012 19:48:12 +0200
-Subject: [PATCH 00/23] work in progress: SPI controller w/DMA SAM9X5
-In-Reply-To: <20120814174425.GD8836@game.jcrosoft.org>
-References: <1344952177-18385-1-git-send-email-richard.genoud@gmail.com>
- <502A6EEC.2010807@atmel.com> <20120814174425.GD8836@game.jcrosoft.org>
-Message-ID: <502A8F5C.6000303@atmel.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Tue, 14 Aug 2012 12:49:43 -0500
+Subject: [PATCH] ARM: mxc: ssi-fiq: Make ssi-fiq.S Thumb-2 compatible
+In-Reply-To: <20120814114059.GX1451@pengutronix.de>
+References: <1344599604-9623-1-git-send-email-dave.martin@linaro.org>
+ <20120813193517.GU1451@pengutronix.de>
+ <CAKGA1bnRA61JT8tQoHBay+6BSxDO5egiagQm1v05L7Asf+qJ+Q@mail.gmail.com>
+ <20120814114059.GX1451@pengutronix.de>
+Message-ID: <CAKGA1bmk2TqDwxR=RT+z3y8XaSpcW+kHsaQfmdrHVqTD9Uxv5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2012 07:44 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> On 17:29 Tue 14 Aug     , Nicolas Ferre wrote:
->> On 08/14/2012 03:49 PM, Richard Genoud :
->>> Nicolas,
->>> I said that I had some work done on sam9g35-ek, here is the spi part, based
->>> on your and Jean-Christophe work.
->>> You have to enable CONFIG_ARCH_AT91SAM9X5 to get it work.
->>>
->>> The goal of this patchset is to share the work I've done, it's not ready
->>> for upstream, but it may save some time.
->>>
->>> It's based on 3.6-rc1 + Jean-Christophe's pinctrl patchset.
->>>
->>> Best Regards,
+On Tue, Aug 14, 2012 at 6:40 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Mon, Aug 13, 2012 at 05:28:17PM -0500, Matt Sealey wrote:
+>>  IMX_PIN_REG(MX51_PAD_EIM_DA15, NO_PAD, 0x058, 0, 0x000, 0), /*
+>> MX51_PAD_EIM_DA15__EIM_DA15 */
 >>
->> Richard,
 >>
->> Thanks a lot for updating this material: We really appreciate.
 >>
->> We will try to review this material together with Jean-Christophe and
->> colleagues @ Atmel. I hope that we will go forward with this collected
->> material in the near future.
+>> On Mon, Aug 13, 2012 at 2:35 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>> > Hi Dave,
+>> >
+>> > On Fri, Aug 10, 2012 at 12:53:24PM +0100, Dave Martin wrote:
+>> >> Because FIQ handlers get copied straight into the vectors page to
+>> >> the FIQ vector entry point, FIQ handlers in a Thumb-2 kernel must
+>> >> start in Thumb-2.  A Thumb-2 kernel enters all exception vectors in
+>> >> Thumb-2.
+>> >
+>> > I finally came along testing this. I have no Thumb2 capable hardware
+>> > to test if it works in thumb2 mode, but at least in Arm mode it works.
+>> > This is enough to not introduce a regression, so we can go for this.
 >>
->> Maybe DMA OF part will not be upstreamed as-is because of an ongoing
->> initiative to build a generic dmaengine OF support.
->>
->>> Jean-Christophe PLAGNIOL-VILLARD (3):
->>>   of: add dma-mask binding
->>>   of_spi: add generic binding support to specify cs gpio
->>
->> I know that Jean-Christophe has had difficulties to have feedback on
->> there parts...
-> yes I need to re-write it as suggest by Grant
-> 
-> will take a look later next week on this
->>
->>>   spi/atmel: add DT support
->>>
->>> Nicolas Ferre (6):
->>>   spi/atmel_spi: trivial: change some comments
->>>   spi/atmel_spi: add physical base address
->>>   spi/atmel_spi: call unmapping on transfers buffers
->>>   spi/atmel_spi: status information passed through controller data
->>>   spi/atmel_spi: add flag to controller data for lock operations
->>>   spi/atmel_spi: add dmaengine support
->>>
->>> Richard Genoud (14):
->>>   spi-atmel: update with dmaengine interface
->>
->> This will certainly be squashed in previous path.
->>
->>>   spi-atmel: fix __init/__devinit sections mismatch
->>
->> This one also: but it is good to have them separated at fist.
->>
->>>   spi-atmel: Fix spi-atmel driver to adapt to slave_config changes
->>>   AT91 DMA OF support
->>>   add at91sam9x5 Kconfig ARCH/SOC link
->>
->> Is it fixup for a bug? Jean-Christophe, a though about this one?
-> no the ARCH_xxx is old style can not be used on DT only soc
-> 
-> this patch need to be droped
+>> This is the interesting dichotomy; the code is only required truly on
+>> devices where Thumb2 isn't available, right?
+>
+> It is also used on the i.MX51 Eukrea board. I asked Eric (Cced) to test
+> it in thumb2 mode, no response so far. I don't know the reason why he
+> uses FIQ mode instead of SDMA, maybe simply historical reasons.
 
-That is what I suspected, thanks J.
+If we can lose that requirement then the only thing in the way is the
+phyCORE support, which goes away on a "pure" v7 config anyway,
+correct? I was just thinking, why not split v6_v7_defconfig into a
+v7_defconfig losing those boards anyway and enable Thumb2 by default
+while we're at it? It would mean more testing gets done and this error
+would crop up both more often, but be less surprising and won't take a
+year to revisit ;)
 
-Bye,
+Pure v7 config would still include Tegra, OMAP3/4, i.MX5 onwards and
+the newer chips. One zImage for v6_v7 is still possible but I don't
+know if anyone really has the idea in their heads that you'd want to
+boot the same kernel on i.MX3 as well as i.MX6Q even if they do share
+drivers to some degree.
+
 -- 
-Nicolas Ferre
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
