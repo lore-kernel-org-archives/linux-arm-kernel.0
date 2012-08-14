@@ -1,29 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Aug 2012 13:20:32 +0200
-Subject: [PATCH 18/22] ARM: ux500: Rename MSP board file to something more
- meaningful
-In-Reply-To: <1344527268-5964-19-git-send-email-lee.jones@linaro.org>
+Date: Tue, 14 Aug 2012 13:22:20 +0200
+Subject: [PATCH 19/22] ARM: ux500: Rename db8500.dtsi to dbx5x0.dtsi to
+ encompass the u9500, u8540 and u9540
+In-Reply-To: <1344527268-5964-20-git-send-email-lee.jones@linaro.org>
 References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
- <1344527268-5964-19-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdaJcfLNzZ4s4NOyBLROjNbNfP8m0EewFkwe6tTrCS-Hog@mail.gmail.com>
+ <1344527268-5964-20-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdYjEi7Kefc3wW-+d=RoFx4zT9j6BjqRHy5jr6RB_=fyzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Aug 9, 2012 at 5:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> The 'msp' board file does more than just register MSP devices. It
-> also registers some other components necessary to get audio working
-> on ux500 based platforms; such as the PCM and Machine Drivers. For
-> that reason we're changing the filename to be more encompassing -
-> 'audio'.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+This patch has nothing to do with the other patches in this series.
 
-Ideally I want Ola to confirm this but it looks OK to me.
+Send it to the ARM SoC maintainers as a separate patch and
+use git format-patch -m, because git is good at detecting renames.
+
+Atleast move it to the beginning of the patch series.
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Consider using git format-patch -m which detects renames
-and makes for much more compact patches.
 
 Yours,
 Linus Walleij
