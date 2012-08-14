@@ -1,45 +1,108 @@
 From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue, 14 Aug 2012 15:49:19 +0200
-Subject: [PATCH 05/23] spi/atmel_spi: call unmapping on transfers buffers
+Date: Tue, 14 Aug 2012 15:49:22 +0200
+Subject: [PATCH 08/23] spi/atmel: add DT support
 In-Reply-To: <1344952177-18385-1-git-send-email-richard.genoud@gmail.com>
 References: <1344952177-18385-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1344952177-18385-6-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1344952177-18385-9-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+The atmel_spi use only gpio for chip select.
+
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: spi-devel-general at lists.sourceforge.net
 ---
- drivers/spi/spi-atmel.c |    8 +++++---
- 1 files changed, 5 insertions(+), 3 deletions(-)
+ .../devicetree/bindings/spi/spi_atmel.txt          |    6 +++++
+ drivers/spi/spi-atmel.c                            |   21 ++++++++++++++++---
+ 2 files changed, 23 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi_atmel.txt
 
+diff --git a/Documentation/devicetree/bindings/spi/spi_atmel.txt b/Documentation/devicetree/bindings/spi/spi_atmel.txt
+new file mode 100644
+index 0000000..7ec3d8d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/spi/spi_atmel.txt
+@@ -0,0 +1,6 @@
++Atmel SPI device
++
++Required properties:
++- compatible : should be "atmel,at91rm9200-spi".
++- reg: Address and length of the register set for the device
++- interrupts: Should contain macb interrupt
 diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index a83f470..39285ef 100644
+index 70f7bfa..ad47b6d 100644
 --- a/drivers/spi/spi-atmel.c
 +++ b/drivers/spi/spi-atmel.c
-@@ -1011,6 +1011,7 @@ static int __devexit atmel_spi_remove(struct platform_device *pdev)
- 	struct spi_master	*master = platform_get_drvdata(pdev);
- 	struct atmel_spi	*as = spi_master_get_devdata(master);
- 	struct spi_message	*msg;
-+	struct spi_transfer	*xfer;
+@@ -19,6 +19,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/spi/spi.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
  
- 	/* reset the hardware and block queue progress */
- 	spin_lock_irq(&as->lock);
-@@ -1022,9 +1023,10 @@ static int __devexit atmel_spi_remove(struct platform_device *pdev)
+ #include <asm/io.h>
+ #include <mach/board.h>
+@@ -711,7 +712,7 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 	u32			scbr, csr;
+ 	unsigned int		bits = spi->bits_per_word;
+ 	unsigned long		bus_hz;
+-	unsigned int		npcs_pin;
++	int			npcs_pin;
+ 	int			ret;
  
- 	/* Terminate remaining queued transfers */
- 	list_for_each_entry(msg, &as->queue, queue) {
--		/* REVISIT unmapping the dma is a NOP on ARM and AVR32
--		 * but we shouldn't depend on that...
--		 */
-+		list_for_each_entry(xfer, &msg->transfers, transfer_list) {
-+			if (!msg->is_dma_mapped)
-+				atmel_spi_dma_unmap_xfer(master, xfer);
-+		}
- 		msg->status = -ESHUTDOWN;
- 		msg->complete(msg->context);
- 	}
+ 	as = spi_master_get_devdata(spi->master);
+@@ -783,7 +784,9 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 	csr |= SPI_BF(DLYBCT, 0);
+ 
+ 	/* chipselect must have been muxed as GPIO (e.g. in board setup) */
+-	npcs_pin = (unsigned int)spi->controller_data;
++	if (!gpio_is_valid(spi->cs_gpio))
++		spi->cs_gpio = (int)spi->controller_data;
++	npcs_pin = spi->cs_gpio;
+ 	asd = spi->controller_state;
+ 	if (!asd) {
+ 		asd = kzalloc(sizeof(struct atmel_spi_device), GFP_KERNEL);
+@@ -900,7 +903,7 @@ static void atmel_spi_cleanup(struct spi_device *spi)
+ {
+ 	struct atmel_spi	*as = spi_master_get_devdata(spi->master);
+ 	struct atmel_spi_device	*asd = spi->controller_state;
+-	unsigned		gpio = (unsigned) spi->controller_data;
++	unsigned		gpio = spi->cs_gpio;
+ 
+ 	if (!asd)
+ 		return;
+@@ -950,7 +953,8 @@ static int __devinit atmel_spi_probe(struct platform_device *pdev)
+ 	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
+ 
+ 	master->bus_num = pdev->id;
+-	master->num_chipselect = 4;
++	master->dev.of_node = pdev->dev.of_node;
++	master->num_chipselect = master->dev.of_node ? 0 : 4;
+ 	master->setup = atmel_spi_setup;
+ 	master->transfer = atmel_spi_transfer;
+ 	master->cleanup = atmel_spi_cleanup;
+@@ -1079,11 +1083,20 @@ static int atmel_spi_resume(struct platform_device *pdev)
+ #define	atmel_spi_resume	NULL
+ #endif
+ 
++#if defined(CONFIG_OF)
++static const struct of_device_id atmel_spi_dt_ids[] = {
++	{ .compatible = "atmel,at91rm9200-spi" },
++	{ /* sentinel */ }
++};
++
++MODULE_DEVICE_TABLE(of, atmel_spi_dt_ids);
++#endif
+ 
+ static struct platform_driver atmel_spi_driver = {
+ 	.driver		= {
+ 		.name	= "atmel_spi",
+ 		.owner	= THIS_MODULE,
++		.of_match_table	= of_match_ptr(atmel_spi_dt_ids),
+ 	},
+ 	.suspend	= atmel_spi_suspend,
+ 	.resume		= atmel_spi_resume,
 -- 
 1.7.2.5
