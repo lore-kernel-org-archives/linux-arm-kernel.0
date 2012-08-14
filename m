@@ -1,37 +1,61 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Aug 2012 18:52:20 +0100
-Subject: [PATCH v2 19/31] arm64: Signal handling support
+Date: Tue, 14 Aug 2012 18:52:16 +0100
+Subject: [PATCH v2 15/31] arm64: SMP support
 In-Reply-To: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
 References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1344966752-16102-20-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1344966752-16102-16-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for signal handling. The sigreturn is done via
-VDSO, introduced by a previous patch. The SA_RESTORER is still defined
-as it is required for 32-bit (compat) support but it is not to be used
-for 64-bit applications.
+This patch adds SMP initialisation and spinlocks implementation for
+AArch64. The spinlock support uses the new load-acquire/store-release
+instructions to avoid explicit barriers. The architecture also specifies
+that an event is automatically generated when clearing the exclusive
+monitor state to wake up processors in WFE, so there is no need for an
+explicit DSB/SEV instruction sequence. The SEVL instruction is used to
+set the exclusive monitor locally as there is no conditional WFE and a
+branch is more expensive.
+
+For the SMP booting protocol, see Documentation/arm64/booting.txt.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/sigcontext.h |   69 ++++++
- arch/arm64/include/asm/siginfo.h    |   23 ++
- arch/arm64/include/asm/signal.h     |   24 ++
- arch/arm64/include/asm/ucontext.h   |   30 +++
- arch/arm64/kernel/signal.c          |  436 +++++++++++++++++++++++++++++++++++
- 5 files changed, 582 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/sigcontext.h
- create mode 100644 arch/arm64/include/asm/siginfo.h
- create mode 100644 arch/arm64/include/asm/signal.h
- create mode 100644 arch/arm64/include/asm/ucontext.h
- create mode 100644 arch/arm64/kernel/signal.c
+ arch/arm64/include/asm/hardirq.h        |    5 +
+ arch/arm64/include/asm/smp.h            |   69 +++++
+ arch/arm64/include/asm/spinlock.h       |  199 +++++++++++++
+ arch/arm64/include/asm/spinlock_types.h |   38 +++
+ arch/arm64/kernel/smp.c                 |  469 +++++++++++++++++++++++++++++++
+ 5 files changed, 780 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm64/include/asm/smp.h
+ create mode 100644 arch/arm64/include/asm/spinlock.h
+ create mode 100644 arch/arm64/include/asm/spinlock_types.h
+ create mode 100644 arch/arm64/kernel/smp.c
 
-diff --git a/arch/arm64/include/asm/sigcontext.h b/arch/arm64/include/asm/sigcontext.h
+diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
+index c6c9514..5075463 100644
+--- a/arch/arm64/include/asm/hardirq.h
++++ b/arch/arm64/include/asm/hardirq.h
+@@ -20,8 +20,13 @@
+ #include <linux/threads.h>
+ #include <asm/irq.h>
+ 
++#define NR_IPI	4
++
+ typedef struct {
+ 	unsigned int __softirq_pending;
++#ifdef CONFIG_SMP
++	unsigned int ipi_irqs[NR_IPI];
++#endif
+ } ____cacheline_aligned irq_cpustat_t;
+ 
+ #include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
+diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
 new file mode 100644
-index 0000000..573cec7
+index 0000000..7e34295
 --- /dev/null
-+++ b/arch/arm64/include/asm/sigcontext.h
++++ b/arch/arm64/include/asm/smp.h
 @@ -0,0 +1,69 @@
 +/*
 + * Copyright (C) 2012 ARM Ltd.
@@ -48,66 +72,66 @@ index 0000000..573cec7
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#ifndef __ASM_SIGCONTEXT_H
-+#define __ASM_SIGCONTEXT_H
++#ifndef __ASM_SMP_H
++#define __ASM_SMP_H
 +
-+#include <linux/types.h>
++#include <linux/threads.h>
++#include <linux/cpumask.h>
++#include <linux/thread_info.h>
 +
-+/*
-+ * Signal context structure - contains all info to do with the state
-+ * before the signal handler was invoked.
-+ */
-+struct sigcontext {
-+	__u64 fault_address;
-+	/* AArch64 registers */
-+	__u64 regs[31];
-+	__u64 sp;
-+	__u64 pc;
-+	__u64 pstate;
-+	/* 4K reserved for FP/SIMD state and future expansion */
-+	__u8 __reserved[4096] __attribute__((__aligned__(16)));
-+};
-+
-+/*
-+ * Header to be used at the beginning of structures extending the user
-+ * context. Such structures must be placed after the rt_sigframe on the stack
-+ * and be 16-byte aligned. The last structure must be a dummy one with the
-+ * magic and size set to 0.
-+ */
-+struct _aarch64_ctx {
-+	__u32 magic;
-+	__u32 size;
-+};
-+
-+#define FPSIMD_MAGIC	0x46508001
-+
-+struct fpsimd_context {
-+	struct _aarch64_ctx head;
-+	__u32 fpsr;
-+	__u32 fpcr;
-+	__uint128_t vregs[32];
-+};
-+
-+#ifdef __KERNEL__
-+/*
-+ * Auxiliary context saved in the sigcontext.__reserved array. Not exported to
-+ * user space as it will change with the addition of new context. User space
-+ * should check the magic/size information.
-+ */
-+struct aux_context {
-+	struct fpsimd_context fpsimd;
-+	/* additional context to be added before "end" */
-+	struct _aarch64_ctx end;
-+};
++#ifndef CONFIG_SMP
++# error "<asm/smp.h> included in non-SMP build"
 +#endif
 +
-+#endif
-diff --git a/arch/arm64/include/asm/siginfo.h b/arch/arm64/include/asm/siginfo.h
++#define raw_smp_processor_id() (current_thread_info()->cpu)
++
++struct seq_file;
++
++/*
++ * generate IPI list text
++ */
++extern void show_ipi_list(struct seq_file *p, int prec);
++
++/*
++ * Called from C code, this handles an IPI.
++ */
++extern void handle_IPI(int ipinr, struct pt_regs *regs);
++
++/*
++ * Setup the set of possible CPUs (via set_cpu_possible)
++ */
++extern void smp_init_cpus(void);
++
++/*
++ * Provide a function to raise an IPI cross call on CPUs in callmap.
++ */
++extern void set_smp_cross_call(void (*)(const struct cpumask *, unsigned int));
++
++/*
++ * Called from the secondary holding pen, this is the secondary CPU entry point.
++ */
++asmlinkage void secondary_start_kernel(void);
++
++/*
++ * Initial data for bringing up a secondary CPU.
++ */
++struct secondary_data {
++	void *stack;
++};
++extern struct secondary_data secondary_data;
++extern void secondary_holding_pen(void);
++extern volatile unsigned long secondary_holding_pen_release;
++
++extern void arch_send_call_function_single_ipi(int cpu);
++extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
++
++#endif /* ifndef __ASM_SMP_H */
+diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
 new file mode 100644
-index 0000000..5a74a08
+index 0000000..34a37fb
 --- /dev/null
-+++ b/arch/arm64/include/asm/siginfo.h
-@@ -0,0 +1,23 @@
++++ b/arch/arm64/include/asm/spinlock.h
+@@ -0,0 +1,199 @@
 +/*
 + * Copyright (C) 2012 ARM Ltd.
 + *
@@ -123,90 +147,244 @@ index 0000000..5a74a08
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#ifndef __ASM_SIGINFO_H
-+#define __ASM_SIGINFO_H
++#ifndef __ASM_SPINLOCK_H
++#define __ASM_SPINLOCK_H
 +
-+#define __ARCH_SI_PREAMBLE_SIZE	(4 * sizeof(int))
++#include <asm/spinlock_types.h>
++#include <asm/processor.h>
 +
-+#include <asm-generic/siginfo.h>
++/*
++ * AArch64 Spin-locking.
++ *
++ * We exclusively read the old value.  If it is zero, we may have
++ * won the lock, so we try exclusively storing it.  A memory barrier
++ * is required after we get a lock, and before we release it, because
++ * V6 CPUs are assumed to have weakly ordered memory.
++ *
++ * Unlocked value: 0
++ * Locked value: 1
++ */
++
++#define arch_spin_is_locked(x)		((x)->lock != 0)
++#define arch_spin_unlock_wait(lock) \
++	do { while (arch_spin_is_locked(lock)) cpu_relax(); } while (0)
++
++#define arch_spin_lock_flags(lock, flags) arch_spin_lock(lock)
++
++static inline void arch_spin_lock(arch_spinlock_t *lock)
++{
++	unsigned int tmp;
++
++	asm volatile(
++	"	sevl\n"
++	"1:	wfe\n"
++	"2:	ldaxr	%w0, [%1]\n"
++	"	cbnz	%w0, 1b\n"
++	"	stxr	%w0, %w2, [%1]\n"
++	"	cbnz	%w0, 2b\n"
++	: "=&r" (tmp)
++	: "r" (&lock->lock), "r" (1)
++	: "memory");
++}
++
++static inline int arch_spin_trylock(arch_spinlock_t *lock)
++{
++	unsigned int tmp;
++
++	asm volatile(
++	"	ldaxr	%w0, [%1]\n"
++	"	cbnz	%w0, 1f\n"
++	"	stxr	%w0, %w2, [%1]\n"
++	"1:\n"
++	: "=&r" (tmp)
++	: "r" (&lock->lock), "r" (1)
++	: "memory");
++
++	return !tmp;
++}
++
++static inline void arch_spin_unlock(arch_spinlock_t *lock)
++{
++	asm volatile(
++	"	stlr	%w1, [%0]\n"
++	: : "r" (&lock->lock), "r" (0) : "memory");
++}
++
++/*
++ * RWLOCKS
++ *
++ *
++ * Write locks are easy - we just set bit 31.  When unlocking, we can
++ * just write zero since the lock is exclusively held.
++ */
++
++static inline void arch_write_lock(arch_rwlock_t *rw)
++{
++	unsigned int tmp;
++
++	asm volatile(
++	"	sevl\n"
++	"1:	wfe\n"
++	"2:	ldaxr	%w0, [%1]\n"
++	"	cbnz	%w0, 1b\n"
++	"	stxr	%w0, %w2, [%1]\n"
++	"	cbnz	%w0, 2b\n"
++	: "=&r" (tmp)
++	: "r" (&rw->lock), "r" (0x80000000)
++	: "memory");
++}
++
++static inline int arch_write_trylock(arch_rwlock_t *rw)
++{
++	unsigned int tmp;
++
++	asm volatile(
++	"	ldaxr	%w0, [%1]\n"
++	"	cbnz	%w0, 1f\n"
++	"	stxr	%w0, %w2, [%1]\n"
++	"1:\n"
++	: "=&r" (tmp)
++	: "r" (&rw->lock), "r" (0x80000000)
++	: "memory");
++
++	return !tmp;
++}
++
++static inline void arch_write_unlock(arch_rwlock_t *rw)
++{
++	asm volatile(
++	"	stlr	%w1, [%0]\n"
++	: : "r" (&rw->lock), "r" (0) : "memory");
++}
++
++/* write_can_lock - would write_trylock() succeed? */
++#define arch_write_can_lock(x)		((x)->lock == 0)
++
++/*
++ * Read locks are a bit more hairy:
++ *  - Exclusively load the lock value.
++ *  - Increment it.
++ *  - Store new lock value if positive, and we still own this location.
++ *    If the value is negative, we've already failed.
++ *  - If we failed to store the value, we want a negative result.
++ *  - If we failed, try again.
++ * Unlocking is similarly hairy.  We may have multiple read locks
++ * currently active.  However, we know we won't have any write
++ * locks.
++ */
++static inline void arch_read_lock(arch_rwlock_t *rw)
++{
++	unsigned int tmp, tmp2;
++
++	asm volatile(
++	"	sevl\n"
++	"1:	wfe\n"
++	"2:	ldaxr	%w0, [%2]\n"
++	"	add	%w0, %w0, #1\n"
++	"	tbnz	%w0, #31, 1b\n"
++	"	stxr	%w1, %w0, [%2]\n"
++	"	cbnz	%w1, 2b\n"
++	: "=&r" (tmp), "=&r" (tmp2)
++	: "r" (&rw->lock)
++	: "memory");
++}
++
++static inline void arch_read_unlock(arch_rwlock_t *rw)
++{
++	unsigned int tmp, tmp2;
++
++	asm volatile(
++	"1:	ldxr	%w0, [%2]\n"
++	"	sub	%w0, %w0, #1\n"
++	"	stlxr	%w1, %w0, [%2]\n"
++	"	cbnz	%w1, 1b\n"
++	: "=&r" (tmp), "=&r" (tmp2)
++	: "r" (&rw->lock)
++	: "memory");
++}
++
++static inline int arch_read_trylock(arch_rwlock_t *rw)
++{
++	unsigned int tmp, tmp2 = 1;
++
++	asm volatile(
++	"	ldaxr	%w0, [%2]\n"
++	"	add	%w0, %w0, #1\n"
++	"	tbnz	%w0, #31, 1f\n"
++	"	stxr	%w1, %w0, [%2]\n"
++	"1:\n"
++	: "=&r" (tmp), "+r" (tmp2)
++	: "r" (&rw->lock)
++	: "memory");
++
++	return !tmp2;
++}
++
++/* read_can_lock - would read_trylock() succeed? */
++#define arch_read_can_lock(x)		((x)->lock < 0x80000000)
++
++#define arch_read_lock_flags(lock, flags) arch_read_lock(lock)
++#define arch_write_lock_flags(lock, flags) arch_write_lock(lock)
++
++#define arch_spin_relax(lock)	cpu_relax()
++#define arch_read_relax(lock)	cpu_relax()
++#define arch_write_relax(lock)	cpu_relax()
++
++#endif /* __ASM_SPINLOCK_H */
+diff --git a/arch/arm64/include/asm/spinlock_types.h b/arch/arm64/include/asm/spinlock_types.h
+new file mode 100644
+index 0000000..9a49434
+--- /dev/null
++++ b/arch/arm64/include/asm/spinlock_types.h
+@@ -0,0 +1,38 @@
++/*
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_SPINLOCK_TYPES_H
++#define __ASM_SPINLOCK_TYPES_H
++
++#if !defined(__LINUX_SPINLOCK_TYPES_H) && !defined(__ASM_SPINLOCK_H)
++# error "please don't include this file directly"
++#endif
++
++/* We only require natural alignment for exclusive accesses. */
++#define __lock_aligned
++
++typedef struct {
++	volatile unsigned int lock;
++} arch_spinlock_t;
++
++#define __ARCH_SPIN_LOCK_UNLOCKED	{ 0 }
++
++typedef struct {
++	volatile unsigned int lock;
++} arch_rwlock_t;
++
++#define __ARCH_RW_LOCK_UNLOCKED		{ 0 }
 +
 +#endif
-diff --git a/arch/arm64/include/asm/signal.h b/arch/arm64/include/asm/signal.h
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
 new file mode 100644
-index 0000000..8d1e723
+index 0000000..0b03e77
 --- /dev/null
-+++ b/arch/arm64/include/asm/signal.h
-@@ -0,0 +1,24 @@
++++ b/arch/arm64/kernel/smp.c
+@@ -0,0 +1,469 @@
 +/*
-+ * Copyright (C) 2012 ARM Ltd.
++ * SMP initialisation and IPI support
++ * Based on arch/arm/kernel/smp.c
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_SIGNAL_H
-+#define __ASM_SIGNAL_H
-+
-+/* Required for AArch32 compatibility. */
-+#define SA_RESTORER	0x04000000
-+
-+#include <asm-generic/signal.h>
-+
-+#endif
-diff --git a/arch/arm64/include/asm/ucontext.h b/arch/arm64/include/asm/ucontext.h
-new file mode 100644
-index 0000000..bde9607
---- /dev/null
-+++ b/arch/arm64/include/asm/ucontext.h
-@@ -0,0 +1,30 @@
-+/*
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_UCONTEXT_H
-+#define __ASM_UCONTEXT_H
-+
-+struct ucontext {
-+	unsigned long	  uc_flags;
-+	struct ucontext	 *uc_link;
-+	stack_t		  uc_stack;
-+	sigset_t	  uc_sigmask;
-+	/* glibc uses a 1024-bit sigset_t */
-+	__u8		  __unused[(1024 - sizeof(sigset_t)) / 8];
-+	/* last for future expansion */
-+	struct sigcontext uc_mcontext;
-+};
-+
-+#endif /* __ASM_UCONTEXT_H */
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-new file mode 100644
-index 0000000..a8f29d2
---- /dev/null
-+++ b/arch/arm64/kernel/signal.c
-@@ -0,0 +1,436 @@
-+/*
-+ * Based on arch/arm/kernel/signal.c
-+ *
-+ * Copyright (C) 1995-2009 Russell King
 + * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -222,420 +400,453 @@ index 0000000..a8f29d2
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
++#include <linux/delay.h>
++#include <linux/init.h>
++#include <linux/spinlock.h>
++#include <linux/sched.h>
++#include <linux/interrupt.h>
++#include <linux/cache.h>
++#include <linux/profile.h>
 +#include <linux/errno.h>
-+#include <linux/signal.h>
-+#include <linux/personality.h>
-+#include <linux/freezer.h>
-+#include <linux/uaccess.h>
-+#include <linux/tracehook.h>
-+#include <linux/ratelimit.h>
++#include <linux/mm.h>
++#include <linux/err.h>
++#include <linux/cpu.h>
++#include <linux/smp.h>
++#include <linux/seq_file.h>
++#include <linux/irq.h>
++#include <linux/percpu.h>
++#include <linux/clockchips.h>
++#include <linux/completion.h>
++#include <linux/of.h>
 +
-+#include <asm/debug-monitors.h>
-+#include <asm/elf.h>
++#include <asm/atomic.h>
 +#include <asm/cacheflush.h>
-+#include <asm/ucontext.h>
-+#include <asm/unistd.h>
-+#include <asm/fpsimd.h>
-+#include <asm/signal32.h>
-+#include <asm/vdso.h>
++#include <asm/cputype.h>
++#include <asm/mmu_context.h>
++#include <asm/pgtable.h>
++#include <asm/pgalloc.h>
++#include <asm/processor.h>
++#include <asm/sections.h>
++#include <asm/tlbflush.h>
++#include <asm/ptrace.h>
++#include <asm/mmu_context.h>
 +
 +/*
-+ * Do a signal return; undo the signal stack. These are aligned to 128-bit.
++ * as from 2.5, kernels no longer have an init_tasks structure
++ * so we need some other way of telling a new secondary core
++ * where to place its SVC stack
 + */
-+struct rt_sigframe {
-+	struct siginfo info;
-+	struct ucontext uc;
++struct secondary_data secondary_data;
++volatile unsigned long secondary_holding_pen_release;
++
++enum ipi_msg_type {
++	IPI_RESCHEDULE,
++	IPI_CALL_FUNC,
++	IPI_CALL_FUNC_SINGLE,
++	IPI_CPU_STOP,
 +};
 +
-+static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
++static DEFINE_SPINLOCK(boot_lock);
++
++/*
++ * Write secondary_holding_pen_release in a way that is guaranteed to be
++ * visible to all observers, irrespective of whether they're taking part
++ * in coherency or not.  This is necessary for the hotplug code to work
++ * reliably.
++ */
++static void __cpuinit write_pen_release(int val)
 +{
-+	struct fpsimd_state *fpsimd = &current->thread.fpsimd_state;
-+	int err;
++	void *start = (void *)&secondary_holding_pen_release;
++	unsigned long size = sizeof(secondary_holding_pen_release);
 +
-+	/* dump the hardware registers to the fpsimd_state structure */
-+	fpsimd_save_state(fpsimd);
-+
-+	/* copy the FP and status/control registers */
-+	err = __copy_to_user(ctx->vregs, fpsimd->vregs, sizeof(fpsimd->vregs));
-+	__put_user_error(fpsimd->fpsr, &ctx->fpsr, err);
-+	__put_user_error(fpsimd->fpcr, &ctx->fpcr, err);
-+
-+	/* copy the magic/size information */
-+	__put_user_error(FPSIMD_MAGIC, &ctx->head.magic, err);
-+	__put_user_error(sizeof(struct fpsimd_context), &ctx->head.size, err);
-+
-+	return err ? -EFAULT : 0;
-+}
-+
-+static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
-+{
-+	struct fpsimd_state fpsimd;
-+	__u32 magic, size;
-+	int err = 0;
-+
-+	/* check the magic/size information */
-+	__get_user_error(magic, &ctx->head.magic, err);
-+	__get_user_error(size, &ctx->head.size, err);
-+	if (err)
-+		return -EFAULT;
-+	if (magic != FPSIMD_MAGIC || size != sizeof(struct fpsimd_context))
-+		return -EINVAL;
-+
-+	/* copy the FP and status/control registers */
-+	err = __copy_from_user(fpsimd.vregs, ctx->vregs,
-+			       sizeof(fpsimd.vregs));
-+	__get_user_error(fpsimd.fpsr, &ctx->fpsr, err);
-+	__get_user_error(fpsimd.fpcr, &ctx->fpcr, err);
-+
-+	/* load the hardware registers from the fpsimd_state structure */
-+	if (!err) {
-+		preempt_disable();
-+		fpsimd_load_state(&fpsimd);
-+		preempt_enable();
-+	}
-+
-+	return err ? -EFAULT : 0;
-+}
-+
-+static int restore_sigframe(struct pt_regs *regs,
-+			    struct rt_sigframe __user *sf)
-+{
-+	sigset_t set;
-+	int i, err;
-+	struct aux_context __user *aux =
-+		(struct aux_context __user *)sf->uc.uc_mcontext.__reserved;
-+
-+	err = __copy_from_user(&set, &sf->uc.uc_sigmask, sizeof(set));
-+	if (err == 0)
-+		set_current_blocked(&set);
-+
-+	for (i = 0; i < 31; i++)
-+		__get_user_error(regs->regs[i], &sf->uc.uc_mcontext.regs[i],
-+				 err);
-+	__get_user_error(regs->sp, &sf->uc.uc_mcontext.sp, err);
-+	__get_user_error(regs->pc, &sf->uc.uc_mcontext.pc, err);
-+	__get_user_error(regs->pstate, &sf->uc.uc_mcontext.pstate, err);
-+
-+	/*
-+	 * Avoid sys_rt_sigreturn() restarting.
-+	 */
-+	regs->syscallno = ~0UL;
-+
-+	err |= !valid_user_regs(&regs->user_regs);
-+
-+	if (err == 0)
-+		err |= restore_fpsimd_context(&aux->fpsimd);
-+
-+	return err;
-+}
-+
-+asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
-+{
-+	struct rt_sigframe __user *frame;
-+
-+	/* Always make any pending restarted system calls return -EINTR */
-+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
-+
-+	/*
-+	 * Since we stacked the signal on a 128-bit boundary, then 'sp' should
-+	 * be word aligned here.
-+	 */
-+	if (regs->sp & 15)
-+		goto badframe;
-+
-+	frame = (struct rt_sigframe __user *)regs->sp;
-+
-+	if (!access_ok(VERIFY_READ, frame, sizeof (*frame)))
-+		goto badframe;
-+
-+	if (restore_sigframe(regs, frame))
-+		goto badframe;
-+
-+	if (do_sigaltstack(&frame->uc.uc_stack,
-+			   NULL, regs->sp) == -EFAULT)
-+		goto badframe;
-+
-+	return regs->regs[0];
-+
-+badframe:
-+	if (show_unhandled_signals)
-+		printk_ratelimited(KERN_INFO "%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
-+				   current->comm, task_pid_nr(current), __func__,
-+				   regs->pc, regs->sp);
-+	force_sig(SIGSEGV, current);
-+	return 0;
-+}
-+
-+asmlinkage long sys_sigaltstack(const stack_t __user *uss, stack_t __user *uoss,
-+				unsigned long sp)
-+{
-+	return do_sigaltstack(uss, uoss, sp);
-+}
-+
-+static int setup_sigframe(struct rt_sigframe __user *sf,
-+			  struct pt_regs *regs, sigset_t *set)
-+{
-+	int i, err = 0;
-+	struct aux_context __user *aux =
-+		(struct aux_context __user *)sf->uc.uc_mcontext.__reserved;
-+
-+	for (i = 0; i < 31; i++)
-+		__put_user_error(regs->regs[i], &sf->uc.uc_mcontext.regs[i],
-+				 err);
-+	__put_user_error(regs->sp, &sf->uc.uc_mcontext.sp, err);
-+	__put_user_error(regs->pc, &sf->uc.uc_mcontext.pc, err);
-+	__put_user_error(regs->pstate, &sf->uc.uc_mcontext.pstate, err);
-+
-+	__put_user_error(current->thread.fault_address, &sf->uc.uc_mcontext.fault_address, err);
-+
-+	err |= __copy_to_user(&sf->uc.uc_sigmask, set, sizeof(*set));
-+
-+	if (err == 0)
-+		err |= preserve_fpsimd_context(&aux->fpsimd);
-+
-+	/* set the "end" magic */
-+	__put_user_error(0, &aux->end.magic, err);
-+	__put_user_error(0, &aux->end.size, err);
-+
-+	return err;
-+}
-+
-+static void __user *get_sigframe(struct k_sigaction *ka, struct pt_regs *regs,
-+				 int framesize)
-+{
-+	unsigned long sp, sp_top;
-+	void __user *frame;
-+
-+	sp = sp_top = regs->sp;
-+
-+	/*
-+	 * This is the X/Open sanctioned signal stack switching.
-+	 */
-+	if ((ka->sa.sa_flags & SA_ONSTACK) && !sas_ss_flags(sp))
-+		sp = sp_top = current->sas_ss_sp + current->sas_ss_size;
-+
-+	/* room for stack frame (FP, LR) */
-+	sp -= 16;
-+
-+	sp = (sp - framesize) & ~15;
-+	frame = (void __user *)sp;
-+
-+	/*
-+	 * Check that we can actually write to the signal frame.
-+	 */
-+	if (!access_ok(VERIFY_WRITE, frame, sp_top - sp))
-+		frame = NULL;
-+
-+	return frame;
-+}
-+
-+static int setup_return(struct pt_regs *regs, struct k_sigaction *ka,
-+			void __user *frame, int usig)
-+{
-+	int err = 0;
-+	__sigrestore_t sigtramp;
-+	unsigned long __user *sp = (unsigned long __user *)regs->sp;
-+
-+	/* set up the stack frame */
-+	__put_user_error(regs->regs[29], sp - 2, err);
-+	__put_user_error(regs->regs[30], sp - 1, err);
-+
-+	regs->regs[0] = usig;
-+	regs->regs[29] = regs->sp - 16;
-+	regs->sp = (unsigned long)frame;
-+	regs->pc = (unsigned long)ka->sa.sa_handler;
-+
-+	if (ka->sa.sa_flags & SA_RESTORER)
-+		sigtramp = ka->sa.sa_restorer;
-+	else
-+		sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp);
-+
-+	regs->regs[30] = (unsigned long)sigtramp;
-+
-+	return err;
-+}
-+
-+static int setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
-+			  sigset_t *set, struct pt_regs *regs)
-+{
-+	struct rt_sigframe __user *frame;
-+	stack_t stack;
-+	int err = 0;
-+
-+	frame = get_sigframe(ka, regs, sizeof(*frame));
-+	if (!frame)
-+		return 1;
-+
-+	__put_user_error(0, &frame->uc.uc_flags, err);
-+	__put_user_error(NULL, &frame->uc.uc_link, err);
-+
-+	memset(&stack, 0, sizeof(stack));
-+	stack.ss_sp = (void __user *)current->sas_ss_sp;
-+	stack.ss_flags = sas_ss_flags(regs->sp);
-+	stack.ss_size = current->sas_ss_size;
-+	err |= __copy_to_user(&frame->uc.uc_stack, &stack, sizeof(stack));
-+
-+	err |= setup_sigframe(frame, regs, set);
-+	if (err == 0)
-+		err = setup_return(regs, ka, frame, usig);
-+
-+	if (err == 0 && ka->sa.sa_flags & SA_SIGINFO) {
-+		err |= copy_siginfo_to_user(&frame->info, info);
-+		regs->regs[1] = (unsigned long)&frame->info;
-+		regs->regs[2] = (unsigned long)&frame->uc;
-+	}
-+
-+	return err;
-+}
-+
-+static void setup_restart_syscall(struct pt_regs *regs)
-+{
-+	if (test_thread_flag(TIF_32BIT))
-+		compat_setup_restart_syscall(regs);
-+	else
-+		regs->regs[8] = __NR_restart_syscall;
++	secondary_holding_pen_release = val;
++	__cpuc_flush_dcache_area(start, size);
 +}
 +
 +/*
-+ * OK, we're invoking a handler
++ * Boot a secondary CPU, and assign it the specified idle task.
++ * This also gives us the initial stack to use for this CPU.
 + */
-+static void handle_signal(unsigned long sig, struct k_sigaction *ka,
-+			  siginfo_t *info, struct pt_regs *regs)
++static int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 +{
-+	struct thread_info *thread = current_thread_info();
-+	struct task_struct *tsk = current;
-+	sigset_t *oldset = sigmask_to_save();
-+	int usig = sig;
++	unsigned long timeout;
++
++	/*
++	 * Set synchronisation state between this boot processor
++	 * and the secondary one
++	 */
++	spin_lock(&boot_lock);
++
++	/*
++	 * Update the pen release flag.
++	 */
++	write_pen_release(cpu);
++
++	/*
++	 * Send an event, causing the secondaries to read pen_release.
++	 */
++	sev();
++
++	timeout = jiffies + (1 * HZ);
++	while (time_before(jiffies, timeout)) {
++		if (secondary_holding_pen_release == -1UL)
++			break;
++		udelay(10);
++	}
++
++	/*
++	 * Now the secondary core is starting up let it run its
++	 * calibrations, then wait for it to finish
++	 */
++	spin_unlock(&boot_lock);
++
++	return secondary_holding_pen_release != -1 ? -ENOSYS : 0;
++}
++
++static DECLARE_COMPLETION(cpu_running);
++
++int __cpuinit __cpu_up(unsigned int cpu, struct task_struct *idle)
++{
 +	int ret;
 +
 +	/*
-+	 * translate the signal
++	 * We need to tell the secondary core where to find its stack and the
++	 * page tables.
 +	 */
-+	if (usig < 32 && thread->exec_domain && thread->exec_domain->signal_invmap)
-+		usig = thread->exec_domain->signal_invmap[usig];
++	secondary_data.stack = task_stack_page(idle) + THREAD_START_SP;
++	__cpuc_flush_dcache_area(&secondary_data, sizeof(secondary_data));
 +
 +	/*
-+	 * Set up the stack frame
++	 * Now bring the CPU into our world.
 +	 */
-+	if (test_thread_flag(TIF_32BIT)) {
-+		if (ka->sa.sa_flags & SA_SIGINFO)
-+			ret = compat_setup_rt_frame(usig, ka, info, oldset,
-+						    regs);
-+		else
-+			ret = compat_setup_frame(usig, ka, oldset, regs);
++	ret = boot_secondary(cpu, idle);
++	if (ret == 0) {
++		/*
++		 * CPU was successfully started, wait for it to come online or
++		 * time out.
++		 */
++		wait_for_completion_timeout(&cpu_running,
++					    msecs_to_jiffies(1000));
++
++		if (!cpu_online(cpu)) {
++			pr_crit("CPU%u: failed to come online\n", cpu);
++			ret = -EIO;
++		}
 +	} else {
-+		ret = setup_rt_frame(usig, ka, info, oldset, regs);
++		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
 +	}
 +
-+	/*
-+	 * Check that the resulting registers are actually sane.
-+	 */
-+	ret |= !valid_user_regs(&regs->user_regs);
++	secondary_data.stack = NULL;
 +
-+	if (ret != 0) {
-+		force_sigsegv(sig, tsk);
-+		return;
-+	}
-+
-+	/*
-+	 * Fast forward the stepping logic so we step into the signal
-+	 * handler.
-+	 */
-+	user_fastforward_single_step(tsk);
-+
-+	signal_delivered(sig, info, ka, regs, 0);
++	return ret;
 +}
 +
 +/*
-+ * Note that 'init' is a special process: it doesn't get signals it doesn't
-+ * want to handle. Thus you cannot kill init even with a SIGKILL even by
-+ * mistake.
-+ *
-+ * Note that we go through the signals twice: once to check the signals that
-+ * the kernel can handle, and then we build all the user-level signal handling
-+ * stack-frames in one go after that.
++ * This is the secondary CPU boot entry.  We're using this CPUs
++ * idle thread stack, but a set of temporary page tables.
 + */
-+static void do_signal(struct pt_regs *regs)
++asmlinkage void __cpuinit secondary_start_kernel(void)
 +{
-+	unsigned long continue_addr = 0, restart_addr = 0;
-+	struct k_sigaction ka;
-+	siginfo_t info;
-+	int signr, retval = 0;
-+	int syscall = (int)regs->syscallno;
++	struct mm_struct *mm = &init_mm;
++	unsigned int cpu = smp_processor_id();
++
++	printk("CPU%u: Booted secondary processor\n", cpu);
 +
 +	/*
-+	 * If we were from a system call, check for system call restarting...
++	 * All kernel threads share the same mm context; grab a
++	 * reference and switch to it.
 +	 */
-+	if (syscall >= 0) {
-+		continue_addr = regs->pc;
-+		restart_addr = continue_addr - (compat_thumb_mode(regs) ? 2 : 4);
-+		retval = regs->regs[0];
-+
-+		/*
-+		 * Avoid additional syscall restarting via ret_to_user.
-+		 */
-+		regs->syscallno = ~0UL;
-+
-+		/*
-+		 * Prepare for system call restart. We do this here so that a
-+		 * debugger will see the already changed PC.
-+		 */
-+		switch (retval) {
-+		case -ERESTARTNOHAND:
-+		case -ERESTARTSYS:
-+		case -ERESTARTNOINTR:
-+		case -ERESTART_RESTARTBLOCK:
-+			regs->regs[0] = regs->orig_x0;
-+			regs->pc = restart_addr;
-+			break;
-+		}
-+	}
++	atomic_inc(&mm->mm_count);
++	current->active_mm = mm;
++	cpumask_set_cpu(cpu, mm_cpumask(mm));
 +
 +	/*
-+	 * Get the signal to deliver. When running under ptrace, at this point
-+	 * the debugger may change all of our registers.
++	 * TTBR0 is only used for the identity mapping at this stage. Make it
++	 * point to zero page to avoid speculatively fetching new entries.
 +	 */
-+	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
-+	if (signr > 0) {
-+		/*
-+		 * Depending on the signal settings, we may need to revert the
-+		 * decision to restart the system call, but skip this if a
-+		 * debugger has chosen to restart at a different PC.
-+		 */
-+		if (regs->pc == restart_addr &&
-+		    (retval == -ERESTARTNOHAND ||
-+		     retval == -ERESTART_RESTARTBLOCK ||
-+		     (retval == -ERESTARTSYS &&
-+		      !(ka.sa.sa_flags & SA_RESTART)))) {
-+			regs->regs[0] = -EINTR;
-+			regs->pc = continue_addr;
-+		}
++	cpu_set_reserved_ttbr0();
++	flush_tlb_all();
 +
-+		handle_signal(signr, &ka, &info, regs);
-+		return;
-+	}
++	preempt_disable();
++	trace_hardirqs_off();
 +
 +	/*
-+	 * Handle restarting a different system call. As above, if a debugger
-+	 * has chosen to restart at a different PC, ignore the restart.
++	 * Let the primary processor know we're out of the
++	 * pen, then head off into the C entry point
 +	 */
-+	if (syscall >= 0 && regs->pc == restart_addr) {
-+		if (retval == -ERESTART_RESTARTBLOCK)
-+			setup_restart_syscall(regs);
-+		user_rewind_single_step(current);
-+	}
++	write_pen_release(-1);
 +
-+	restore_saved_sigmask();
++	/*
++	 * Synchronise with the boot thread.
++	 */
++	spin_lock(&boot_lock);
++	spin_unlock(&boot_lock);
++
++	/*
++	 * Enable local interrupts.
++	 */
++	notify_cpu_starting(cpu);
++	local_irq_enable();
++	local_fiq_enable();
++
++	/*
++	 * OK, now it's safe to let the boot CPU continue.  Wait for
++	 * the CPU migration code to notice that the CPU is online
++	 * before we continue.
++	 */
++	set_cpu_online(cpu, true);
++	while (!cpu_active(cpu))
++		cpu_relax();
++
++	/*
++	 * OK, it's off to the idle thread for us
++	 */
++	cpu_idle();
 +}
 +
-+asmlinkage void do_notify_resume(struct pt_regs *regs,
-+				 unsigned int thread_flags)
++void __init smp_cpus_done(unsigned int max_cpus)
 +{
-+	if (thread_flags & _TIF_SIGPENDING)
-+		do_signal(regs);
++	unsigned long bogosum = loops_per_jiffy * num_online_cpus();
 +
-+	if (thread_flags & _TIF_NOTIFY_RESUME) {
-+		clear_thread_flag(TIF_NOTIFY_RESUME);
-+		tracehook_notify_resume(regs);
++	pr_info("SMP: Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
++		num_online_cpus(), bogosum / (500000/HZ),
++		(bogosum / (5000/HZ)) % 100);
++}
++
++void __init smp_prepare_boot_cpu(void)
++{
++}
++
++static void (*smp_cross_call)(const struct cpumask *, unsigned int);
++static phys_addr_t cpu_release_addr[NR_CPUS];
++
++/*
++ * Enumerate the possible CPU set from the device tree.
++ */
++void __init smp_init_cpus(void)
++{
++	const char *enable_method;
++	struct device_node *dn = NULL;
++	int cpu = 0;
++
++	while ((dn = of_find_node_by_type(dn, "cpu"))) {
++		if (cpu >= NR_CPUS)
++			goto next;
++
++		/*
++		 * We currently support only the "spin-table" enable-method.
++		 */
++		enable_method = of_get_property(dn, "enable-method", NULL);
++		if (!enable_method || strcmp(enable_method, "spin-table")) {
++			pr_err("CPU %d: missing or invalid enable-method property: %s\n",
++			       cpu, enable_method);
++			goto next;
++		}
++
++		/*
++		 * Determine the address from which the CPU is polling.
++		 */
++		if (of_property_read_u64(dn, "cpu-release-addr",
++					 &cpu_release_addr[cpu])) {
++			pr_err("CPU %d: missing or invalid cpu-release-addr property\n",
++			       cpu);
++			goto next;
++		}
++
++		set_cpu_possible(cpu, true);
++next:
++		cpu++;
 +	}
++
++	/* sanity check */
++	if (cpu > NR_CPUS)
++		pr_warning("no. of cores (%d) greater than configured maximum of %d - clipping\n",
++			   cpu, NR_CPUS);
++}
++
++void __init smp_prepare_cpus(unsigned int max_cpus)
++{
++	int cpu;
++	void **release_addr;
++	unsigned int ncores = num_possible_cpus();
++
++	/*
++	 * are we trying to boot more cores than exist?
++	 */
++	if (max_cpus > ncores)
++		max_cpus = ncores;
++
++	/*
++	 * Initialise the present map (which describes the set of CPUs
++	 * actually populated at the present time) and release the
++	 * secondaries from the bootloader.
++	 */
++	for_each_possible_cpu(cpu) {
++		if (max_cpus == 0)
++			break;
++
++		if (!cpu_release_addr[cpu])
++			continue;
++
++		release_addr = __va(cpu_release_addr[cpu]);
++		release_addr[0] = (void *)__pa(secondary_holding_pen);
++		__cpuc_flush_dcache_area(release_addr, sizeof(release_addr[0]));
++
++		set_cpu_present(cpu, true);
++		max_cpus--;
++	}
++
++	/*
++	 * Send an event to wake up the secondaries.
++	 */
++	sev();
++}
++
++
++void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
++{
++	smp_cross_call = fn;
++}
++
++void arch_send_call_function_ipi_mask(const struct cpumask *mask)
++{
++	smp_cross_call(mask, IPI_CALL_FUNC);
++}
++
++void arch_send_call_function_single_ipi(int cpu)
++{
++	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
++}
++
++static const char *ipi_types[NR_IPI] = {
++#define S(x,s)	[x - IPI_RESCHEDULE] = s
++	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
++	S(IPI_CALL_FUNC, "Function call interrupts"),
++	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
++	S(IPI_CPU_STOP, "CPU stop interrupts"),
++};
++
++void show_ipi_list(struct seq_file *p, int prec)
++{
++	unsigned int cpu, i;
++
++	for (i = 0; i < NR_IPI; i++) {
++		seq_printf(p, "%*s%u:%s", prec - 1, "IPI", i + IPI_RESCHEDULE,
++			   prec >= 4 ? " " : "");
++		for_each_present_cpu(cpu)
++			seq_printf(p, "%10u ",
++				   __get_irq_stat(cpu, ipi_irqs[i]));
++		seq_printf(p, "      %s\n", ipi_types[i]);
++	}
++}
++
++u64 smp_irq_stat_cpu(unsigned int cpu)
++{
++	u64 sum = 0;
++	int i;
++
++	for (i = 0; i < NR_IPI; i++)
++		sum += __get_irq_stat(cpu, ipi_irqs[i]);
++
++	return sum;
++}
++
++static DEFINE_SPINLOCK(stop_lock);
++
++/*
++ * ipi_cpu_stop - handle IPI from smp_send_stop()
++ */
++static void ipi_cpu_stop(unsigned int cpu)
++{
++	if (system_state == SYSTEM_BOOTING ||
++	    system_state == SYSTEM_RUNNING) {
++		spin_lock(&stop_lock);
++		pr_crit("CPU%u: stopping\n", cpu);
++		dump_stack();
++		spin_unlock(&stop_lock);
++	}
++
++	set_cpu_online(cpu, false);
++
++	local_fiq_disable();
++	local_irq_disable();
++
++	while (1)
++		cpu_relax();
++}
++
++/*
++ * Main handler for inter-processor interrupts
++ */
++void handle_IPI(int ipinr, struct pt_regs *regs)
++{
++	unsigned int cpu = smp_processor_id();
++	struct pt_regs *old_regs = set_irq_regs(regs);
++
++	if (ipinr >= IPI_RESCHEDULE && ipinr < IPI_RESCHEDULE + NR_IPI)
++		__inc_irq_stat(cpu, ipi_irqs[ipinr - IPI_RESCHEDULE]);
++
++	switch (ipinr) {
++	case IPI_RESCHEDULE:
++		scheduler_ipi();
++		break;
++
++	case IPI_CALL_FUNC:
++		irq_enter();
++		generic_smp_call_function_interrupt();
++		irq_exit();
++		break;
++
++	case IPI_CALL_FUNC_SINGLE:
++		irq_enter();
++		generic_smp_call_function_single_interrupt();
++		irq_exit();
++		break;
++
++	case IPI_CPU_STOP:
++		irq_enter();
++		ipi_cpu_stop(cpu);
++		irq_exit();
++		break;
++
++	default:
++		pr_crit("CPU%u: Unknown IPI message 0x%x\n", cpu, ipinr);
++		break;
++	}
++	set_irq_regs(old_regs);
++}
++
++void smp_send_reschedule(int cpu)
++{
++	smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
++}
++
++void smp_send_stop(void)
++{
++	unsigned long timeout;
++
++	if (num_online_cpus() > 1) {
++		cpumask_t mask;
++
++		cpumask_copy(&mask, cpu_online_mask);
++		cpu_clear(smp_processor_id(), mask);
++
++		smp_cross_call(&mask, IPI_CPU_STOP);
++	}
++
++	/* Wait up to one second for other CPUs to stop */
++	timeout = USEC_PER_SEC;
++	while (num_online_cpus() > 1 && timeout--)
++		udelay(1);
++
++	if (num_online_cpus() > 1)
++		pr_warning("SMP: failed to stop secondary CPUs\n");
++}
++
++/*
++ * not supported here
++ */
++int setup_profiling_timer(unsigned int multiplier)
++{
++	return -EINVAL;
 +}
