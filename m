@@ -1,50 +1,76 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 14 Aug 2012 10:57:21 +0200
-Subject: [PATCH] pinctrl/nomadik: add kp_b_2 keyboard function group list
-Message-ID: <1344934641-16043-1-git-send-email-linus.walleij@stericsson.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 14 Aug 2012 12:07:55 +0300
+Subject: [PATCH v2 0/4] ASoC machine driver for simple SoC with twl4030
+Message-ID: <1344935279-32364-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@stericsson.com>
+Hello,
 
-There is yet another way to mux the keyboard, so fix up that
-group.
+Changes since v1:
+- Card name for cm-t35 is "cm-t3x"
+- Added Ack from Tony for the OMAP patch
+- Codec sysclock no longer needed by the machine driver
+  The codec itself must know the mclk since it needs it for initial
+  configuration and also in case only the vibra functionality is used.
+  The codec driver ignores the machine driver provided clock, it always uses the
+  mclk freq it got from the MFD core driver.
 
-Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Intro mail from v1:
+
+Create new unified ASoC machine driver (with DT support) for boards using simple
+configuration for audio and using the twl4030 codec.
+This driver will replace the following machine drivers (since they are basically
+the same):
+igep0020, omap3beagle, omap3evm and overo.
+
+This series will switch the boards I can identify to use the new unified ASoC
+machine driver.
+
+Changes under arch/arm/mach-omap2/ are trivial, I don't expect merge issues
+later. If it is OK for the maintainers I would like this to go via audio tree
+(with the McBSP and the twl4030-audio stack DT support).
+
+The series has been tested on BeagleBoard (with the McBSP and twl4030-audio DT
+support).
+
+Regards,
+Peter
 ---
- drivers/pinctrl/pinctrl-nomadik-db8500.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Peter Ujfalusi (4):
+  ASoC: omap-twl4030: Simple machine driver for TI SoC with twl4030
+    codec
+  ARM: OMAP: twl-common: Add helper function to register the
+    omap-twl4030 audio driver
+  ARM: OMAP3: Switch to use the unified audio driver (omap-twl4030) for
+    selected boards
+  ASoC: Remove obsolete OMAP3 machine drivers
 
-diff --git a/drivers/pinctrl/pinctrl-nomadik-db8500.c b/drivers/pinctrl/pinctrl-nomadik-db8500.c
-index 5f3e9d0..a39fb7a 100644
---- a/drivers/pinctrl/pinctrl-nomadik-db8500.c
-+++ b/drivers/pinctrl/pinctrl-nomadik-db8500.c
-@@ -505,6 +505,8 @@ static const unsigned kp_b_1_pins[] = { DB8500_PIN_F3, DB8500_PIN_F1,
- 	DB8500_PIN_J3, DB8500_PIN_H2, DB8500_PIN_J2, DB8500_PIN_H1,
- 	DB8500_PIN_F4, DB8500_PIN_E3, DB8500_PIN_E4, DB8500_PIN_D2,
- 	DB8500_PIN_C1, DB8500_PIN_D3, DB8500_PIN_C2, DB8500_PIN_D5 };
-+static const unsigned kp_b_2_pins[] = { DB8500_PIN_F3, DB8500_PIN_F1,
-+	DB8500_PIN_G3, DB8500_PIN_G2, DB8500_PIN_F4, DB8500_PIN_E3};
- static const unsigned sm_b_1_pins[] = { DB8500_PIN_C6, DB8500_PIN_B3,
- 	DB8500_PIN_C4, DB8500_PIN_E6, DB8500_PIN_A3, DB8500_PIN_B6,
- 	DB8500_PIN_D6, DB8500_PIN_B7, DB8500_PIN_D7, DB8500_PIN_D8,
-@@ -662,6 +664,7 @@ static const struct nmk_pingroup nmk_db8500_groups[] = {
- 	DB8500_PIN_GROUP(spi3_b_1, NMK_GPIO_ALT_B),
- 	DB8500_PIN_GROUP(msp1txrx_b_1, NMK_GPIO_ALT_B),
- 	DB8500_PIN_GROUP(kp_b_1, NMK_GPIO_ALT_B),
-+	DB8500_PIN_GROUP(kp_b_2, NMK_GPIO_ALT_B),
- 	DB8500_PIN_GROUP(sm_b_1, NMK_GPIO_ALT_B),
- 	DB8500_PIN_GROUP(smcs0_b_1, NMK_GPIO_ALT_B),
- 	DB8500_PIN_GROUP(smcs1_b_1, NMK_GPIO_ALT_B),
-@@ -751,7 +754,7 @@ DB8500_FUNC_GROUPS(msp1, "msp1txrx_a_1", "msp1_a_1", "msp1txrx_b_1");
- DB8500_FUNC_GROUPS(lcdb, "lcdb_a_1");
- DB8500_FUNC_GROUPS(lcd, "lcdvsi0_a_1", "lcdvsi1_a_1", "lcd_d0_d7_a_1",
- 	"lcd_d8_d11_a_1", "lcd_d12_d23_a_1", "lcd_b_1");
--DB8500_FUNC_GROUPS(kp, "kp_a_1", "kp_b_1", "kp_c_1", "kp_oc1_1");
-+DB8500_FUNC_GROUPS(kp, "kp_a_1", "kp_b_1", "kp_b_2", "kp_c_1", "kp_oc1_1");
- DB8500_FUNC_GROUPS(mc2, "mc2_a_1", "mc2rstn_c_1");
- DB8500_FUNC_GROUPS(ssp1, "ssp1_a_1");
- DB8500_FUNC_GROUPS(ssp0, "ssp0_a_1");
+ .../devicetree/bindings/sound/omap-twl4030.txt     |   17 ++
+ arch/arm/mach-omap2/board-cm-t35.c                 |    1 +
+ arch/arm/mach-omap2/board-devkit8000.c             |    1 +
+ arch/arm/mach-omap2/board-igep0020.c               |    1 +
+ arch/arm/mach-omap2/board-omap3beagle.c            |    1 +
+ arch/arm/mach-omap2/board-omap3evm.c               |    1 +
+ arch/arm/mach-omap2/board-overo.c                  |    1 +
+ arch/arm/mach-omap2/twl-common.c                   |   27 +++
+ arch/arm/mach-omap2/twl-common.h                   |    2 +
+ include/linux/platform_data/omap-twl4030.h         |   32 ++++
+ sound/soc/omap/Kconfig                             |   48 ++----
+ sound/soc/omap/Makefile                            |   10 +-
+ sound/soc/omap/igep0020.c                          |  120 -------------
+ sound/soc/omap/omap-twl4030.c                      |  188 ++++++++++++++++++++
+ sound/soc/omap/omap3beagle.c                       |  150 ----------------
+ sound/soc/omap/omap3evm.c                          |  118 ------------
+ sound/soc/omap/overo.c                             |  122 -------------
+ 17 files changed, 287 insertions(+), 553 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/omap-twl4030.txt
+ create mode 100644 include/linux/platform_data/omap-twl4030.h
+ delete mode 100644 sound/soc/omap/igep0020.c
+ create mode 100644 sound/soc/omap/omap-twl4030.c
+ delete mode 100644 sound/soc/omap/omap3beagle.c
+ delete mode 100644 sound/soc/omap/omap3evm.c
+ delete mode 100644 sound/soc/omap/overo.c
+
 -- 
-1.7.11.3
+1.7.8.6
