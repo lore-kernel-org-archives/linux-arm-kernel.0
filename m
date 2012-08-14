@@ -1,105 +1,160 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 13 Aug 2012 22:49:06 -0500
-Subject: [PATCH 3/4] ARM: kill off arch_is_coherent
+Date: Mon, 13 Aug 2012 22:49:07 -0500
+Subject: [PATCH 4/4] ARM: highbank: add coherent DMA setup
 In-Reply-To: <1344916147-13546-1-git-send-email-robherring2@gmail.com>
 References: <1344916147-13546-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1344916147-13546-4-git-send-email-robherring2@gmail.com>
+Message-ID: <1344916147-13546-5-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-With ixp2xxx removed, there are no platforms that define arch_is_coherent,
-so the last occurrences of arch_is_coherent can be removed. Any new
-platform with coherent i/o should use coherent dma mapping functions.
+Some highbank DMA masters can support coherent (ACP) or non-coherent DMA.
+This sets up dma_map_ops for masters which are configured for coherent DMA.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/include/asm/barrier.h |    7 +++----
- arch/arm/include/asm/memory.h  |    8 --------
- arch/arm/mm/mmu.c              |   17 +++--------------
- 3 files changed, 6 insertions(+), 26 deletions(-)
+ .../devicetree/bindings/ata/ahci-platform.txt      |    3 ++
+ .../devicetree/bindings/dma/arm-pl330.txt          |    3 ++
+ .../devicetree/bindings/net/calxeda-xgmac.txt      |    3 ++
+ arch/arm/boot/dts/highbank.dts                     |    1 +
+ arch/arm/mach-highbank/highbank.c                  |   52 ++++++++++++++++++++
+ 5 files changed, 62 insertions(+)
 
-diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
-index 0511238..8dcd9c7 100644
---- a/arch/arm/include/asm/barrier.h
-+++ b/arch/arm/include/asm/barrier.h
-@@ -44,10 +44,9 @@
- #define rmb()		dsb()
- #define wmb()		mb()
- #else
--#include <asm/memory.h>
--#define mb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
--#define rmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
--#define wmb()	do { if (arch_is_coherent()) dmb(); else barrier(); } while (0)
-+#define mb()		barrier()
-+#define rmb()		barrier()
-+#define wmb()		barrier()
- #endif
+diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+index 8bb8a76..6c1ad01 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
++++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+@@ -8,6 +8,9 @@ Required properties:
+ - interrupts        : <interrupt mapping for SATA IRQ>
+ - reg               : <registers mapping>
  
- #ifndef CONFIG_SMP
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index e965f1b..93ff0f1 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -272,14 +272,6 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
- #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
- #define virt_addr_valid(kaddr)	((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory)
++Optional properties:
++- dma-coherent      : Present if dma operations are coherent
++
+ Example:
+         sata at ffe08000 {
+ 		compatible = "calxeda,hb-ahci";
+diff --git a/Documentation/devicetree/bindings/dma/arm-pl330.txt b/Documentation/devicetree/bindings/dma/arm-pl330.txt
+index a4cd273..36e27d5 100644
+--- a/Documentation/devicetree/bindings/dma/arm-pl330.txt
++++ b/Documentation/devicetree/bindings/dma/arm-pl330.txt
+@@ -9,6 +9,9 @@ Required properties:
+     region.
+   - interrupts: interrupt number to the cpu.
  
--/*
-- * Optional coherency support.  Currently used only by selected
-- * Intel XSC3-based systems.
-- */
--#ifndef arch_is_coherent
--#define arch_is_coherent()		0
--#endif
--
- #endif
++Optional properties:
++- dma-coherent      : Present if dma operations are coherent
++
+ Example:
  
- #include <asm-generic/memory_model.h>
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 4c2d045..ee2a6f0 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -216,7 +216,7 @@ static struct mem_type mem_types[] = {
- 		.prot_l1	= PMD_TYPE_TABLE,
- 		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_WB,
- 		.domain		= DOMAIN_IO,
--	},	
-+	},
- 	[MT_DEVICE_WC] = {	/* ioremap_wc */
- 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_WC,
- 		.prot_l1	= PMD_TYPE_TABLE,
-@@ -422,17 +422,6 @@ static void __init build_mem_type_table(void)
- 	vecs_pgprot = kern_pgprot = user_pgprot = cp->pte;
+ 	pdma0: pdma at 12680000 {
+diff --git a/Documentation/devicetree/bindings/net/calxeda-xgmac.txt b/Documentation/devicetree/bindings/net/calxeda-xgmac.txt
+index 411727a..c8ae996 100644
+--- a/Documentation/devicetree/bindings/net/calxeda-xgmac.txt
++++ b/Documentation/devicetree/bindings/net/calxeda-xgmac.txt
+@@ -6,6 +6,9 @@ Required properties:
+ - interrupts : Should contain 3 xgmac interrupts. The 1st is main interrupt.
+   The 2nd is pwr mgt interrupt. The 3rd is low power state interrupt.
  
- 	/*
--	 * Enable CPU-specific coherency if supported.
--	 * (Only available on XSC3 at the moment.)
--	 */
--	if (arch_is_coherent() && cpu_is_xsc3()) {
--		mem_types[MT_MEMORY].prot_sect |= PMD_SECT_S;
--		mem_types[MT_MEMORY].prot_pte |= L_PTE_SHARED;
--		mem_types[MT_MEMORY_DMA_READY].prot_pte |= L_PTE_SHARED;
--		mem_types[MT_MEMORY_NONCACHED].prot_sect |= PMD_SECT_S;
--		mem_types[MT_MEMORY_NONCACHED].prot_pte |= L_PTE_SHARED;
--	}
--	/*
- 	 * ARMv6 and above have extended page tables.
- 	 */
- 	if (cpu_arch >= CPU_ARCH_ARMv6 && (cr & CR_XP)) {
-@@ -777,8 +766,8 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
- 		create_mapping(md);
- 		vm->addr = (void *)(md->virtual & PAGE_MASK);
- 		vm->size = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
--		vm->phys_addr = __pfn_to_phys(md->pfn); 
--		vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING; 
-+		vm->phys_addr = __pfn_to_phys(md->pfn);
-+		vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
- 		vm->flags |= VM_ARM_MTYPE(md->type);
- 		vm->caller = iotable_init;
- 		vm_area_add_early(vm++);
++Optional properties:
++- dma-coherent      : Present if dma operations are coherent
++
+ Example:
+ 
+ ethernet at fff50000 {
+diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
+index 9fecf1a..7414577 100644
+--- a/arch/arm/boot/dts/highbank.dts
++++ b/arch/arm/boot/dts/highbank.dts
+@@ -121,6 +121,7 @@
+ 			compatible = "calxeda,hb-ahci";
+ 			reg = <0xffe08000 0x10000>;
+ 			interrupts = <0 83 4>;
++			dma-coherent;
+ 		};
+ 
+ 		sdhci at ffe0e000 {
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index d75b0a7..93617d6 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -15,6 +15,7 @@
+  */
+ #include <linux/clk.h>
+ #include <linux/clkdev.h>
++#include <linux/dma-mapping.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
+@@ -23,6 +24,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/of_address.h>
+ #include <linux/smp.h>
++#include <linux/amba/bus.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+@@ -149,10 +151,60 @@ static void highbank_power_off(void)
+ 		cpu_do_idle();
+ }
+ 
++static int highbank_platform_notifier(struct notifier_block *nb,
++				  unsigned long event, void *__dev)
++{
++	struct resource *res;
++	int reg = -1;
++	struct device *dev = __dev;
++
++	if (event != BUS_NOTIFY_ADD_DEVICE)
++		return NOTIFY_DONE;
++
++	if (of_device_is_compatible(dev->of_node, "calxeda,hb-ahci"))
++		reg = 0xc;
++	else if (of_device_is_compatible(dev->of_node, "calxeda,hb-sdhci"))
++		reg = 0x18;
++	else if (of_device_is_compatible(dev->of_node, "arm,pl330"))
++		reg = 0x20;
++	else if (of_device_is_compatible(dev->of_node, "calxeda,hb-xgmac")) {
++		res = platform_get_resource(to_platform_device(dev),
++					    IORESOURCE_MEM, 0);
++		if (res) {
++			if (res->start == 0xfff50000)
++				reg = 0;
++			else if (res->start == 0xfff51000)
++				reg = 4;
++		}
++	}
++
++	if (reg < 0)
++		return NOTIFY_DONE;
++
++	if (of_property_read_bool(dev->of_node, "dma-coherent")) {
++		writel(0xff31, sregs_base + reg);
++		set_dma_ops(dev, &arm_coherent_dma_ops);
++	} else
++		writel(0, sregs_base + reg);
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block highbank_amba_nb = {
++	.notifier_call = highbank_platform_notifier,
++};
++
++static struct notifier_block highbank_platform_nb = {
++	.notifier_call = highbank_platform_notifier,
++};
++
+ static void __init highbank_init(void)
+ {
+ 	pm_power_off = highbank_power_off;
+ 
++	bus_register_notifier(&platform_bus_type, &highbank_platform_nb);
++	bus_register_notifier(&amba_bustype, &highbank_amba_nb);
++
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
 -- 
 1.7.9.5
