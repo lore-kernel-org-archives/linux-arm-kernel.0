@@ -1,66 +1,88 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 14 Aug 2012 19:49:04 +0530
-Subject: [PATCHv6 22/24] i2c: omap: switch over to autosuspend API
+Date: Tue, 14 Aug 2012 19:48:57 +0530
+Subject: [PATCHv6 15/24] i2c: omap: simplify IRQ exit path
 In-Reply-To: <1344953946-13005-1-git-send-email-shubhrajyoti@ti.com>
 References: <1344953946-13005-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1344953946-13005-23-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1344953946-13005-16-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-this helps us reduce unnecessary pm transitions
-in case we have another i2c message starting soon.
+instead of having multiple return points, use
+a goto statement to make that clearer.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   12 ++++++++++--
- 1 files changed, 10 insertions(+), 2 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   20 ++++++++------------
+ 1 files changed, 8 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 2d5db56..d81189a 100644
+index eb6898b..b0b1705 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -55,6 +55,9 @@
- /* timeout waiting for the controller to respond */
- #define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
+@@ -853,24 +853,21 @@ omap_i2c_isr(int this_irq, void *dev_id)
+ 		dev_dbg(dev->dev, "IRQ (ISR = 0x%04x)\n", stat);
+ 		if (count++ == 100) {
+ 			dev_warn(dev->dev, "Too much work in one IRQ\n");
+-			omap_i2c_complete_cmd(dev, err);
+-			return IRQ_HANDLED;
++			goto out;
+ 		}
  
-+/* timeout for pm runtime autosuspend */
-+#define OMAP_I2C_PM_TIMEOUT		1000	/* ms */
-+
- /* For OMAP3 I2C_IV has changed to I2C_WE (wakeup enable) */
- enum {
- 	OMAP_I2C_REV_REG = 0,
-@@ -645,7 +648,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ complete:
+ 		if (stat & OMAP_I2C_STAT_NACK) {
+ 			err |= OMAP_I2C_STAT_NACK;
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
+-			omap_i2c_complete_cmd(dev, err);
+-			return IRQ_HANDLED;
++			goto out;
+ 		}
  
- 	omap_i2c_wait_for_bb(dev);
- out:
--	pm_runtime_put(dev->dev);
-+	pm_runtime_mark_last_busy(dev->dev);
-+	pm_runtime_put_autosuspend(dev->dev);
- 	return r;
+ 		if (stat & OMAP_I2C_STAT_AL) {
+ 			dev_err(dev->dev, "Arbitration lost\n");
+ 			err |= OMAP_I2C_STAT_AL;
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_AL);
+-			omap_i2c_complete_cmd(dev, err);
+-			return IRQ_HANDLED;
++			goto out;
+ 		}
+ 
+ 		/*
+@@ -883,8 +880,7 @@ complete:
+ 						OMAP_I2C_STAT_XRDY |
+ 						OMAP_I2C_STAT_XDR |
+ 						OMAP_I2C_STAT_ARDY));
+-			omap_i2c_complete_cmd(dev, err);
+-			return IRQ_HANDLED;
++			goto out;
+ 		}
+ 
+ 		if (stat & OMAP_I2C_STAT_RDR) {
+@@ -949,19 +945,19 @@ complete:
+ 			dev_err(dev->dev, "Receive overrun\n");
+ 			err |= OMAP_I2C_STAT_ROVR;
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_ROVR);
+-			omap_i2c_complete_cmd(dev, err);
+-			return IRQ_HANDLED;
++			goto out;
+ 		}
+ 
+ 		if (stat & OMAP_I2C_STAT_XUDF) {
+ 			dev_err(dev->dev, "Transmit underflow\n");
+ 			err |= OMAP_I2C_STAT_XUDF;
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XUDF);
+-			omap_i2c_complete_cmd(dev, err);
+-			return IRQ_HANDLED;
++			goto out;
+ 		}
+ 	} while (stat);
+ 
++out:
++	omap_i2c_complete_cmd(dev, err);
+ 	return IRQ_HANDLED;
  }
- 
-@@ -1113,6 +1117,9 @@ omap_i2c_probe(struct platform_device *pdev)
- 		dev->regs = (u8 *)reg_map_ip_v1;
- 
- 	pm_runtime_enable(dev->dev);
-+	pm_runtime_set_autosuspend_delay(dev->dev, OMAP_I2C_PM_TIMEOUT);
-+	pm_runtime_use_autosuspend(dev->dev);
-+
- 	r = pm_runtime_get_sync(dev->dev);
- 	if (IS_ERR_VALUE(r))
- 		goto err_free_mem;
-@@ -1190,7 +1197,8 @@ omap_i2c_probe(struct platform_device *pdev)
- 
- 	of_i2c_register_devices(adap);
- 
--	pm_runtime_put(dev->dev);
-+	pm_runtime_mark_last_busy(dev->dev);
-+	pm_runtime_put_autosuspend(dev->dev);
- 
- 	return 0;
  
 -- 
 1.7.5.4
