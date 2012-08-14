@@ -1,44 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Aug 2012 09:33:25 +0000
-Subject: [PATCH v3 1/4] dmaengine: mmp-pdma support
-In-Reply-To: <1344917519-9505-2-git-send-email-zhangfei.gao@marvell.com>
+Date: Tue, 14 Aug 2012 09:34:11 +0000
+Subject: [PATCH v3 2/4] dmaengine: mmp_tdma: add dt support
+In-Reply-To: <1344917519-9505-3-git-send-email-zhangfei.gao@marvell.com>
 References: <1344917519-9505-1-git-send-email-zhangfei.gao@marvell.com>
- <1344917519-9505-2-git-send-email-zhangfei.gao@marvell.com>
-Message-ID: <201208140933.26061.arnd@arndb.de>
+ <1344917519-9505-3-git-send-email-zhangfei.gao@marvell.com>
+Message-ID: <201208140934.11774.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday 14 August 2012, Zhangfei Gao wrote:
-> 1. virtual channel vs. physical channel
-> Virtual channel is managed by dmaengine
-> Physical channel handling resource, such as irq
-> Physical channel is alloced dynamically as descending priority,
-> freed immediately when irq done.
-> The availble highest priority physically channel will alwayes be alloced
-> 
-> Issue pending list -> alloc highest dma physically channel available -> dma done -> free physically channel
-> 
-> 2. list: running list & pending list
-> submit: desc list -> pending list
-> issue_pending_list: if (IDLE) pending list -> running list; free pending list (RUN)
-> irq: free running list (IDLE)
->      check pendlist -> pending list -> running list; free pending list (RUN)
-> 
-> 3. irq:
-> Each list generate one irq, calling callback
-> One list may contain several desc chain, in such case, make sure only the last desc list generate irq.
-> 
-> 4. async
-> Submit will add desc chain to pending list, which can be multi-called
-> If multi desc chain is submitted, only the last desc would generate irq -> call back
-> If IDLE, issue_pending_list start pending_list, transforming pendlist to running list
-> If RUN, irq will start pending list
-> 
-> 5. test
-> 5.1 pxa3xx_nand on pxa910
-> 5.2 insmod dmatest.ko (threads_per_chan=y)
-> By default drivers/dma/dmatest.c test every channel and test memcpy with 1 threads per channel
-> 
 > Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
+> ---
+>  Documentation/devicetree/bindings/dma/mmp-dma.txt |   30 ++++++++++++
+>  drivers/dma/mmp_tdma.c                            |   51 +++++++++++++--------
+>  2 files changed, 61 insertions(+), 20 deletions(-)
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+but please add a changelog text for this patch and every other one you do.
