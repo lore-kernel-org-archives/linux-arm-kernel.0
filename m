@@ -1,87 +1,70 @@
-From: gerg@snapgear.com (gerg at snapgear.com)
-Date: Tue, 14 Aug 2012 15:48:43 +1000
-Subject: [PATCH] ARM: ixp4xx: move fixed mapping of internal devices into
- vmalloc region
-Message-ID: <1344923323-10327-1-git-send-email-gerg@snapgear.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 14 Aug 2012 07:55:42 +0200
+Subject: [PATCH v3 05/10] resource: add PCI configuration space support
+In-Reply-To: <CAErSpo4qg45brVRwEbw3=R04VsbnvUowSMWcT+M6VoAxbf3Cqg@mail.gmail.com>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <1343332512-28762-6-git-send-email-thierry.reding@avionic-design.de>
+ <CAErSpo4qg45brVRwEbw3=R04VsbnvUowSMWcT+M6VoAxbf3Cqg@mail.gmail.com>
+Message-ID: <20120814055542.GB16181@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Greg Ungerer <gerg@uclinux.org>
+On Mon, Aug 13, 2012 at 10:00:45PM -0700, Bjorn Helgaas wrote:
+> On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
+> <thierry.reding@avionic-design.de> wrote:
+> > This commit adds a new flag that allows marking resources as PCI
+> > configuration space.
+> >
+> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> > ---
+> > Changes in v3:
+> > - new patch
+> >
+> >  include/linux/ioport.h | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/include/linux/ioport.h b/include/linux/ioport.h
+> > index 589e0e7..3314843 100644
+> > --- a/include/linux/ioport.h
+> > +++ b/include/linux/ioport.h
+> > @@ -102,7 +102,7 @@ struct resource {
+> >
+> >  /* PCI control bits.  Shares IORESOURCE_BITS with above PCI ROM.  */
+> >  #define IORESOURCE_PCI_FIXED           (1<<4)  /* Do not move resource */
+> > -
+> > +#define IORESOURCE_PCI_CS              (1<<5)  /* PCI configuration space */
+> 
+> What is the purpose of this?  It seems that you are marking regions
+> that we call MMCONFIG on x86, or ECAM-type regions in the language of
+> the PCIe spec.  I see that you set it in several places, but I don't
+> see anything that ever looks for it.  Do you have plans to use it in
+> the future?  If it really does correspond to MMCONFIG/ECAM, we should
+> handle those regions consistently across all architectures.
 
-The current fixed physical/virtual mappings for the internal peripherals
-of the ixp4xx SoC devices is using a virtual address outside of the vmalloc
-region. This results in kernel warnings like this on the boot console:
+The purpose is ultimately to obtain the MMCONFIG/ECAM resources assigned
+to a PCI host controller. I've used this in the of_pci_parse_ranges()
+and in the static board setup code to mark ranges as such. Perhaps
+IORESOURCE_ECAM or IORESOURCE_MMCONFIG might have been better names. I
+also just noticed that I'm not using this anywhere, but the plan was to
+eventually use it with platform_get_resource(). However that doesn't
+seem to work either because the lower bits of the flags aren't use for
+comparison in that function.
 
-  BUG: mapping for 0xc8000000 at 0xffbeb000 out of vmalloc space
-  BUG: mapping for 0xc4000000 at 0xffbfe000 out of vmalloc space
-  BUG: mapping for 0xc0000000 at 0xffbff000 out of vmalloc space
+Any other ideas how that could be handled? Basically what I need is a
+way to mark a resource as an MMCONFIG/ECAM range so that it can be used
+to program the PCI host controller accordingly. I don't know how these
+are assigned on x86. I was under the impression that the MMCONFIG/ECAM
+space was accessed through a single single address/data register pair.
 
-The virtual kernel memory layout lists this for the vmalloc region:
+On Tegra 20 this region can be anywhere in the upper 1 GiB of the 4 GiB
+address space, while on Tegra 30 it can be anywhere in the lower 1 GiB,
+so they can be freely assigned.
 
-    ...
-    vmalloc : 0xc2800000 - 0xff000000   ( 968 MB)
-    ...
-
-With a little adjustment to the virtual address used we can map these
-internal devices in the vmalloc region.
-
-Signed-off-by: Greg Ungerer <gerg@uclinux.org>
----
- arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h |   14 +++++++-------
- 1 files changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h b/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
-index 97c530f..ad66605 100644
---- a/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
-@@ -32,11 +32,11 @@
-  *
-  * 0x6000000	0x00004000	ioremap'd	QMgr
-  *
-- * 0xC0000000	0x00001000	0xffbff000	PCI CFG
-+ * 0xC0000000	0x00001000	0xfebff000	PCI CFG
-  *
-- * 0xC4000000	0x00001000	0xffbfe000	EXP CFG
-+ * 0xC4000000	0x00001000	0xfebfe000	EXP CFG
-  *
-- * 0xC8000000	0x00013000	0xffbeb000	On-Chip Peripherals
-+ * 0xC8000000	0x00013000	0xfebeb000	On-Chip Peripherals
-  */
- 
- /*
-@@ -49,21 +49,21 @@
-  * Expansion BUS Configuration registers
-  */
- #define IXP4XX_EXP_CFG_BASE_PHYS	(0xC4000000)
--#define IXP4XX_EXP_CFG_BASE_VIRT	(0xFFBFE000)
-+#define IXP4XX_EXP_CFG_BASE_VIRT	(0xFEBFE000)
- #define IXP4XX_EXP_CFG_REGION_SIZE	(0x00001000)
- 
- /*
-  * PCI Config registers
-  */
- #define IXP4XX_PCI_CFG_BASE_PHYS	(0xC0000000)
--#define	IXP4XX_PCI_CFG_BASE_VIRT	(0xFFBFF000)
-+#define	IXP4XX_PCI_CFG_BASE_VIRT	(0xFEBFF000)
- #define IXP4XX_PCI_CFG_REGION_SIZE	(0x00001000)
- 
- /*
-  * Peripheral space
-  */
- #define IXP4XX_PERIPHERAL_BASE_PHYS	(0xC8000000)
--#define IXP4XX_PERIPHERAL_BASE_VIRT	(0xFFBEB000)
-+#define IXP4XX_PERIPHERAL_BASE_VIRT	(0xFEBEB000)
- #define IXP4XX_PERIPHERAL_REGION_SIZE	(0x00013000)
- 
- /*
-@@ -73,7 +73,7 @@
-  * aligned so that it * can be used with the low-level debug code.
-  */
- #define	IXP4XX_DEBUG_UART_BASE_PHYS	(0xC8000000)
--#define	IXP4XX_DEBUG_UART_BASE_VIRT	(0xffb00000)
-+#define	IXP4XX_DEBUG_UART_BASE_VIRT	(0xfeb00000)
- #define	IXP4XX_DEBUG_UART_REGION_SIZE	(0x00001000)
- 
- #define IXP4XX_EXP_CS0_OFFSET	0x00
--- 
-1.7.0.4
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120814/ab8cbdaa/attachment.sig>
