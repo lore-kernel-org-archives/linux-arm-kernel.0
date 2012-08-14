@@ -1,25 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Aug 2012 13:13:49 +0200
-Subject: [PATCH 13/22] ARM: ux500: Fork MSP platform registration for
- step-by-step DT enablement
-In-Reply-To: <1344527268-5964-14-git-send-email-lee.jones@linaro.org>
+Date: Tue, 14 Aug 2012 13:14:46 +0200
+Subject: [PATCH 14/22] ARM: ux500: Pass MSP DMA platform data though
+ AUXDATA
+In-Reply-To: <1344527268-5964-15-git-send-email-lee.jones@linaro.org>
 References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
- <1344527268-5964-14-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdaem6t3mvy-_9e=GEgwWoeBQSoX3Hf1L=hjWsvLJdsVAQ@mail.gmail.com>
+ <1344527268-5964-15-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdbA87mRK23=t0vXg4jXNw-cW3Pepz5J3brBtbtJAz0saQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Aug 9, 2012 at 5:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> We've done this before and it worked well last time. Here we're
-> duplicating a complex registration function to ease the process
-> of enabling it for Device Tree. As there are quite a few steps
-> taken during the registration process, it makes sense to break
-> them up into more manageable chunks. This patch will aid us.
+> It isn't currently possible to pass all platform specific configuration
+> though Device Tree. Thinks like device names used in the clock
+> infrastructure, call-backs and DMA information have to be passed in via
+> AUXDATA structures and the MSP is no exception. Here we're passing DMA
+> settings.
 >
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-I understand you have used this approach before so:
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
