@@ -1,23 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Aug 2012 11:50:13 +0200
-Subject: [PATCH] pinctrl: imx5: start numbering pad from 0
-In-Reply-To: <1344869278-27334-1-git-send-email-shawn.guo@linaro.org>
-References: <1344869278-27334-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CACRpkdZ22K9yyqVD0_ae7pQPpsBP1t2rVE50S2J7y1EW6LVNAQ@mail.gmail.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Tue, 14 Aug 2012 11:56:45 +0200
+Subject: [PATCHv2 2/4] arm/dts: omap5-evm: Add tmp102 sensor support
+In-Reply-To: <1344852313-30484-3-git-send-email-sourav.poddar@ti.com>
+References: <1344852313-30484-1-git-send-email-sourav.poddar@ti.com>
+ <1344852313-30484-3-git-send-email-sourav.poddar@ti.com>
+Message-ID: <502A20DD.5030707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 13, 2012 at 4:47 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On 08/13/2012 12:05 PM, Sourav Poddar wrote:
+> Add tmp102 temperature sensor data in omap5 evm dts file.
+> 
+> Tested on omap5430 evm with 3.5 custom kernel.
+> 
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> ---
+>  arch/arm/boot/dts/omap5-evm.dts |    9 +++++++++
+>  1 files changed, 9 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
+> index 200c39a..45a8aeb 100644
+> --- a/arch/arm/boot/dts/omap5-evm.dts
+> +++ b/arch/arm/boot/dts/omap5-evm.dts
+> @@ -18,3 +18,12 @@
+>  		reg = <0x80000000 0x40000000>; /* 1 GB */
+>  	};
+>  };
+> +
+> +&i2c4 {
+> +	clock-frequency = <400000>;
 
-> Unlike imx6q pinctrl driver that starts nubmering pad from 0, imx5
-> pinctrl drivers number pad from 1.  It causes problem/confusion when
-> driver accesses imx51_pinctrl_pads array using pin ID as the index.
->
-> Change imx51_pads and imx53_pads numbering start from 0.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Have you checked if we cannot run at faster speed? Reducing the speed
+will impact every devices on the bus.
+It might be needed, I just wanted to be sure.
 
-Applied.
+You should maybe just add a small comment to explain what the device is
+doing with potentially a link to the HW spec if available.
 
-Yours,
-Linus Walleij
+The same comments are applicable to the bmp085 patch.
+
+Regards,
+Benoit
