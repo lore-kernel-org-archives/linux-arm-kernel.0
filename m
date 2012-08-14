@@ -1,32 +1,50 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Wed, 15 Aug 2012 02:22:50 +0300
-Subject: [PATCH v2 11/31] arm64: IRQ handling
-In-Reply-To: <1344966752-16102-12-git-send-email-catalin.marinas@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 14 Aug 2012 16:29:07 -0700
+Subject: [PATCH v2 03/31] arm64: Exception handling
+In-Reply-To: <1344966752-16102-4-git-send-email-catalin.marinas@arm.com>
 References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-12-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20120814232250.GB747@harshnoise.musicnaut.iki.fi>
+ <1344966752-16102-4-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20120814232907.GB19607@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Aug 14, 2012 at 06:52:12PM +0100, Catalin Marinas wrote:
-> +void handle_IRQ(unsigned int irq, struct pt_regs *regs)
-> +{
-> +	struct pt_regs *old_regs = set_irq_regs(regs);
-> +
-> +	irq_enter();
-> +
+This one is a bit denser, so just a quick first pass with a couple of minor
+comments. I'll revisit the rest.
+
+On Tue, Aug 14, 2012 at 06:52:04PM +0100, Catalin Marinas wrote:
+
+> +el1_sp_pc:
 > +	/*
-> +	 * Some hardware gives randomly wrong interrupts.  Rather
-> +	 * than crashing, do something sensible.
+> +	 *Stack or PC alignment exception handling
 > +	 */
-> +	if (unlikely(irq >= nr_irqs)) {
-> +		if (printk_ratelimit())
-> +			pr_warning("Bad IRQ%u\n", irq);
+> +	mrs	x0, far_el1
+> +	mov	x1, x25
+> +	mov	x2, sp
+> +	b	do_sp_pc_abort
+> +el1_undef:
+> +	/*
+> +	 *Undefined instruction
+> +	 */
 
-I guess pr_warn_ratelimited() should be used for new code.
+Nit: Missing spaces in the comment here and the one above.
 
-(See include/linux/printk.h, "Please don't use printk_ratelimit()...")
+> +el0_undef:
+> +	/*
+> +	 *Undefined instruction
+> +	 */
+> +	mov	x0, sp
+> +	b	do_undefinstr
 
-A.
+Here too.
+
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> new file mode 100644
+> index 0000000..8712a8e
+> --- /dev/null
+> +++ b/arch/arm64/kernel/traps.c
+[...]
+> +DEFINE_SPINLOCK(die_lock);
+
+Should probably be static.
