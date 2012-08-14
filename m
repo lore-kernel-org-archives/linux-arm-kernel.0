@@ -1,37 +1,27 @@
 From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Tue, 14 Aug 2012 21:53:32 +0530
-Subject: [PATCH] Documentation: dt: hwmon: Update for tmp102
-Message-ID: <1344961412-13622-1-git-send-email-sourav.poddar@ti.com>
+Date: Tue, 14 Aug 2012 21:54:29 +0530
+Subject: [PATCHv3 0/4] Add device tree data for omap5
+Message-ID: <1344961473-13675-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Documentation for tmp102 temperature sensor.
+The following patch series add i2c support for omap5.
+As well as enable I2C based devices like pressure and temperature
+through device tree. Also add onchip keypad dts data.
 
 Cc: Benoit Cousson <b-cousson@ti.com>
 Cc: Felipe Balbi <balbi@ti.com>
 Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
----
- Documentation/devicetree/bindings/hwmon/tmp102.txt |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/hwmon/tmp102.txt
 
-diff --git a/Documentation/devicetree/bindings/hwmon/tmp102.txt b/Documentation/devicetree/bindings/hwmon/tmp102.txt
-new file mode 100644
-index 0000000..df1342b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/hwmon/tmp102.txt
-@@ -0,0 +1,11 @@
-+TMP102 Temperature sensor
-+
-+Required properties:
-+- compatible: ti,tmp102
-+
-+Example:
-+
-+tmp102 at 48 {
-+        compatible = "ti,tmp102";
-+        reg = <0x48>;
-+};
--- 
-1.7.1
+Sourav Poddar (4):
+  arm/dts: omap5-evm: Add I2C support
+  arm/dts: omap5-evm: Add tmp102 sensor support
+  arm/dts: omap5-evm: Add keypad data
+  arm/dts: omap5-evm: Add bmp085 sensor support
+
+v2->v3
+- Rebased on 3.6-rc1
+- Add comments for tmp102 and bmp085
+ arch/arm/boot/dts/omap5-evm.dts |   32 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap5.dtsi    |   40 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 72 insertions(+), 0 deletions(-)
