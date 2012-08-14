@@ -1,23 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Aug 2012 09:30:26 +0100
-Subject: [PATCH v3 1/4] dmaengine: mmp-pdma support
-In-Reply-To: <1344917519-9505-2-git-send-email-zhangfei.gao@marvell.com>
-References: <1344917519-9505-1-git-send-email-zhangfei.gao@marvell.com>
- <1344917519-9505-2-git-send-email-zhangfei.gao@marvell.com>
-Message-ID: <20120814083026.GG18957@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Aug 2012 10:31:08 +0200
+Subject: [PATCH 8/8] input: ab8500-ponkey: Rely on MFD core to convert
+ IRQs to virtual
+In-Reply-To: <1344527635-6163-9-git-send-email-lee.jones@linaro.org>
+References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
+ <1344527635-6163-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZ-HOGy_sdsCQSNOdYTDzHFszk0OySM88TjO-neSJUz0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please consider looking at the virtual dma channel support, which I've
-recently added.  This removes the burden of managing the descriptor
-lists from the driver, deals with the workqueues for completing
-descriptors, etc.
+On Thu, Aug 9, 2012 at 5:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-All you need to do is to build the descriptors for the DMA operation,
-manage the scheduling of virtual channels onto physical channels,
-calculate the position of DMA, and starting off and handling the DMA
-hardware.
+> There was a plan to place ab8500_irq_get_virq() calls in each AB8500
+> child device prior to requesting an IRQ, but as we're no longer using
+> Device Tree to collect our IRQ numbers, it's actually better to allow
+> the core to do this during device registration time. So the IRQ number
+> we pull from its resource has already been converted to a virtual IRQ.
+>
+> CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> CC: linux-input at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-"virtual dma channel support" is probably something of a misnomer though;
-it can also be used for situations where there's a 1:1 binding between
-virtual and physical dma channels (iow, no virtual channels at all.)
+This is looking good, I guess you need all patches to go in at the
+same time so Dmitry's ACK is required.
+
+FWIW:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+BTW: this makes me suspect that the public ab8500_irq_get_virq()
+interface can be *deleted* and the function made static in the
+AB8500 driver, right?
+
+Yours,
+Linus Walleij
