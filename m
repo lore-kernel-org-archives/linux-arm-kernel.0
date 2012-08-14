@@ -1,50 +1,29 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 14 Aug 2012 16:29:07 -0700
-Subject: [PATCH v2 03/31] arm64: Exception handling
-In-Reply-To: <1344966752-16102-4-git-send-email-catalin.marinas@arm.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-4-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20120814232907.GB19607@quad.lixom.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 14 Aug 2012 19:44:42 -0400
+Subject: [GIT PULL] orion/kirkwood fixes for v3.6
+Message-ID: <20120814234442.GZ22226@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
 
-This one is a bit denser, so just a quick first pass with a couple of minor
-comments. I'll revisit the rest.
+  Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
 
-On Tue, Aug 14, 2012 at 06:52:04PM +0100, Catalin Marinas wrote:
+are available in the git repository at:
+  git://git.infradead.org/users/jcooper/linux.git fixes-for-v3.6
 
-> +el1_sp_pc:
-> +	/*
-> +	 *Stack or PC alignment exception handling
-> +	 */
-> +	mrs	x0, far_el1
-> +	mov	x1, x25
-> +	mov	x2, sp
-> +	b	do_sp_pc_abort
-> +el1_undef:
-> +	/*
-> +	 *Undefined instruction
-> +	 */
+Arnaud Patard (3):
+      ARM: Orion: Set eth packet size csum offload limit
+      ARM: Kirkwood: Fix iconnect leds
+      ARM: Kirkwood: fix Makefile.boot
 
-Nit: Missing spaces in the comment here and the one above.
-
-> +el0_undef:
-> +	/*
-> +	 *Undefined instruction
-> +	 */
-> +	mov	x0, sp
-> +	b	do_undefinstr
-
-Here too.
-
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> new file mode 100644
-> index 0000000..8712a8e
-> --- /dev/null
-> +++ b/arch/arm64/kernel/traps.c
-[...]
-> +DEFINE_SPINLOCK(die_lock);
-
-Should probably be static.
+ arch/arm/boot/dts/kirkwood-iconnect.dts   |    6 +++++-
+ arch/arm/mach-dove/common.c               |    3 ++-
+ arch/arm/mach-kirkwood/Makefile.boot      |    3 ++-
+ arch/arm/mach-kirkwood/common.c           |    4 ++--
+ arch/arm/mach-mv78xx0/common.c            |    6 ++++--
+ arch/arm/mach-orion5x/common.c            |    3 ++-
+ arch/arm/plat-orion/common.c              |    8 ++++++--
+ arch/arm/plat-orion/include/plat/common.h |    6 ++++--
+ include/linux/mv643xx_eth.h               |    2 ++
+ 9 files changed, 29 insertions(+), 12 deletions(-)
