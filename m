@@ -1,46 +1,41 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Aug 2012 18:52:02 +0100
-Subject: [PATCH v2 01/31] arm64: Assembly macros and definitions
+Date: Tue, 14 Aug 2012 18:52:11 +0100
+Subject: [PATCH v2 10/31] arm64: TLB maintenance functionality
 In-Reply-To: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
 References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1344966752-16102-2-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1344966752-16102-11-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces several assembly macros and definitions used in
-the .S files across arch/arm64/ like IRQ disabling/enabling, together
-with asm-offsets.c.
+This patch adds the TLB maintenance functions. There is no distinction
+made between the I and D TLBs. TLB maintenance operations are
+automatically broadcast between CPUs in hardware. The inner-shareable
+operations are always present, even on UP systems.
+
+NOTE: Large part of this patch to be dropped once Peter Z's generic
+mmu_gather patches are merged.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/asm-offsets.h |    1 +
- arch/arm64/include/asm/assembler.h   |  109 ++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/asm-offsets.c      |  108 +++++++++++++++++++++++++++++++++
- arch/arm64/mm/proc-macros.S          |   55 +++++++++++++++++
- 4 files changed, 273 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/asm-offsets.h
- create mode 100644 arch/arm64/include/asm/assembler.h
- create mode 100644 arch/arm64/kernel/asm-offsets.c
- create mode 100644 arch/arm64/mm/proc-macros.S
+ arch/arm64/include/asm/tlb.h      |  190 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/tlbflush.h |  123 ++++++++++++++++++++++++
+ arch/arm64/mm/tlb.S               |   71 ++++++++++++++
+ 3 files changed, 384 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm64/include/asm/tlb.h
+ create mode 100644 arch/arm64/include/asm/tlbflush.h
+ create mode 100644 arch/arm64/mm/tlb.S
 
-diff --git a/arch/arm64/include/asm/asm-offsets.h b/arch/arm64/include/asm/asm-offsets.h
+diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
 new file mode 100644
-index 0000000..d370ee3
+index 0000000..654f096
 --- /dev/null
-+++ b/arch/arm64/include/asm/asm-offsets.h
-@@ -0,0 +1 @@
-+#include <generated/asm-offsets.h>
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-new file mode 100644
-index 0000000..da2a13e
---- /dev/null
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -0,0 +1,109 @@
++++ b/arch/arm64/include/asm/tlb.h
+@@ -0,0 +1,190 @@
 +/*
-+ * Based on arch/arm/include/asm/assembler.h
++ * Based on arch/arm/include/asm/tlb.h
 + *
-+ * Copyright (C) 1996-2000 Russell King
++ * Copyright (C) 2002 Russell King
 + * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -55,221 +50,319 @@ index 0000000..da2a13e
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
++#ifndef __ASM_TLB_H
++#define __ASM_TLB_H
++
++#include <linux/pagemap.h>
++#include <linux/swap.h>
++
++#include <asm/pgalloc.h>
++#include <asm/tlbflush.h>
++
++#define MMU_GATHER_BUNDLE	8
++
++/*
++ * TLB handling.  This allows us to remove pages from the page
++ * tables, and efficiently handle the TLB issues.
++ */
++struct mmu_gather {
++	struct mm_struct	*mm;
++	unsigned int		fullmm;
++	struct vm_area_struct	*vma;
++	unsigned long		range_start;
++	unsigned long		range_end;
++	unsigned int		nr;
++	unsigned int		max;
++	struct page		**pages;
++	struct page		*local[MMU_GATHER_BUNDLE];
++};
++
++/*
++ * This is unnecessarily complex.  There's three ways the TLB shootdown
++ * code is used:
++ *  1. Unmapping a range of vmas.  See zap_page_range(), unmap_region().
++ *     tlb->fullmm = 0, and tlb_start_vma/tlb_end_vma will be called.
++ *     tlb->vma will be non-NULL.
++ *  2. Unmapping all vmas.  See exit_mmap().
++ *     tlb->fullmm = 1, and tlb_start_vma/tlb_end_vma will be called.
++ *     tlb->vma will be non-NULL.  Additionally, page tables will be freed.
++ *  3. Unmapping argument pages.  See shift_arg_pages().
++ *     tlb->fullmm = 0, but tlb_start_vma/tlb_end_vma will not be called.
++ *     tlb->vma will be NULL.
++ */
++static inline void tlb_flush(struct mmu_gather *tlb)
++{
++	if (tlb->fullmm || !tlb->vma)
++		flush_tlb_mm(tlb->mm);
++	else if (tlb->range_end > 0) {
++		flush_tlb_range(tlb->vma, tlb->range_start, tlb->range_end);
++		tlb->range_start = TASK_SIZE;
++		tlb->range_end = 0;
++	}
++}
++
++static inline void tlb_add_flush(struct mmu_gather *tlb, unsigned long addr)
++{
++	if (!tlb->fullmm) {
++		if (addr < tlb->range_start)
++			tlb->range_start = addr;
++		if (addr + PAGE_SIZE > tlb->range_end)
++			tlb->range_end = addr + PAGE_SIZE;
++	}
++}
++
++static inline void __tlb_alloc_page(struct mmu_gather *tlb)
++{
++	unsigned long addr = __get_free_pages(GFP_NOWAIT | __GFP_NOWARN, 0);
++
++	if (addr) {
++		tlb->pages = (void *)addr;
++		tlb->max = PAGE_SIZE / sizeof(struct page *);
++	}
++}
++
++static inline void tlb_flush_mmu(struct mmu_gather *tlb)
++{
++	tlb_flush(tlb);
++	free_pages_and_swap_cache(tlb->pages, tlb->nr);
++	tlb->nr = 0;
++	if (tlb->pages == tlb->local)
++		__tlb_alloc_page(tlb);
++}
++
++static inline void
++tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm, unsigned int fullmm)
++{
++	tlb->mm = mm;
++	tlb->fullmm = fullmm;
++	tlb->vma = NULL;
++	tlb->max = ARRAY_SIZE(tlb->local);
++	tlb->pages = tlb->local;
++	tlb->nr = 0;
++	__tlb_alloc_page(tlb);
++}
++
++static inline void
++tlb_finish_mmu(struct mmu_gather *tlb, unsigned long start, unsigned long end)
++{
++	tlb_flush_mmu(tlb);
++
++	/* keep the page table cache within bounds */
++	check_pgt_cache();
++
++	if (tlb->pages != tlb->local)
++		free_pages((unsigned long)tlb->pages, 0);
++}
++
++/*
++ * Memorize the range for the TLB flush.
++ */
++static inline void
++tlb_remove_tlb_entry(struct mmu_gather *tlb, pte_t *ptep, unsigned long addr)
++{
++	tlb_add_flush(tlb, addr);
++}
++
++/*
++ * In the case of tlb vma handling, we can optimise these away in the
++ * case where we're doing a full MM flush.  When we're doing a munmap,
++ * the vmas are adjusted to only cover the region to be torn down.
++ */
++static inline void
++tlb_start_vma(struct mmu_gather *tlb, struct vm_area_struct *vma)
++{
++	if (!tlb->fullmm) {
++		tlb->vma = vma;
++		tlb->range_start = TASK_SIZE;
++		tlb->range_end = 0;
++	}
++}
++
++static inline void
++tlb_end_vma(struct mmu_gather *tlb, struct vm_area_struct *vma)
++{
++	if (!tlb->fullmm)
++		tlb_flush(tlb);
++}
++
++static inline int __tlb_remove_page(struct mmu_gather *tlb, struct page *page)
++{
++	tlb->pages[tlb->nr++] = page;
++	VM_BUG_ON(tlb->nr > tlb->max);
++	return tlb->max - tlb->nr;
++}
++
++static inline void tlb_remove_page(struct mmu_gather *tlb, struct page *page)
++{
++	if (!__tlb_remove_page(tlb, page))
++		tlb_flush_mmu(tlb);
++}
++
++static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
++	unsigned long addr)
++{
++	pgtable_page_dtor(pte);
++	tlb_add_flush(tlb, addr);
++	tlb_remove_page(tlb, pte);
++}
++
++#ifndef CONFIG_ARM64_64K_PAGES
++static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
++				  unsigned long addr)
++{
++	tlb_add_flush(tlb, addr);
++	tlb_remove_page(tlb, virt_to_page(pmdp));
++}
++#endif
++
++#define pte_free_tlb(tlb, ptep, addr)	__pte_free_tlb(tlb, ptep, addr)
++#define pmd_free_tlb(tlb, pmdp, addr)	__pmd_free_tlb(tlb, pmdp, addr)
++#define pud_free_tlb(tlb, pudp, addr)	pud_free((tlb)->mm, pudp)
++
++#define tlb_migrate_finish(mm)		do { } while (0)
++
++#endif
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+new file mode 100644
+index 0000000..615d131
+--- /dev/null
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -0,0 +1,123 @@
++/*
++ * Based on arch/arm/include/asm/tlbflush.h
++ *
++ * Copyright (C) 1999-2003 Russell King
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_TLBFLUSH_H
++#define __ASM_TLBFLUSH_H
++
 +#ifndef __ASSEMBLY__
-+#error "Only include this from assembly code"
-+#endif
-+
-+#include <asm/ptrace.h>
-+
-+/*
-+ * Stack pushing/popping (register pairs only). Equivalent to store decrement
-+ * before, load increment after.
-+ */
-+	.macro	push, xreg1, xreg2
-+	stp	\xreg1, \xreg2, [sp, #-16]!
-+	.endm
-+
-+	.macro	pop, xreg1, xreg2
-+	ldp	\xreg1, \xreg2, [sp], #16
-+	.endm
-+
-+/*
-+ * Enable and disable interrupts.
-+ */
-+	.macro	disable_irq
-+	msr	daifset, #2
-+	.endm
-+
-+	.macro	enable_irq
-+	msr	daifclr, #2
-+	.endm
-+
-+/*
-+ * Save/disable and restore interrupts.
-+ */
-+	.macro	save_and_disable_irqs, olddaif
-+	mrs	\olddaif, daif
-+	disable_irq
-+	.endm
-+
-+	.macro	restore_irqs, olddaif
-+	msr	daif, \olddaif
-+	.endm
-+
-+/*
-+ * Enable and disable debug exceptions.
-+ */
-+	.macro	disable_dbg
-+	msr	daifset, #8
-+	.endm
-+
-+	.macro	enable_dbg
-+	msr	daifclr, #8
-+	.endm
-+
-+	.macro	disable_step, tmp
-+	mrs	\tmp, mdscr_el1
-+	bic	\tmp, \tmp, #1
-+	msr	mdscr_el1, \tmp
-+	.endm
-+
-+	.macro	enable_step, tmp
-+	mrs	\tmp, mdscr_el1
-+	orr	\tmp, \tmp, #1
-+	msr	mdscr_el1, \tmp
-+	.endm
-+
-+	.macro	enable_dbg_if_not_stepping, tmp
-+	mrs	\tmp, mdscr_el1
-+	tbnz	\tmp, #1, 9990f
-+	enable_dbg
-+9990:
-+	.endm
-+
-+/*
-+ * SMP data memory barrier
-+ */
-+	.macro	smp_dmb, opt
-+#ifdef CONFIG_SMP
-+	dmb	\opt
-+#endif
-+	.endm
-+
-+#define USER(l, x...)				\
-+9999:	x;					\
-+	.section __ex_table,"a";		\
-+	.align	3;				\
-+	.quad	9999b,l;			\
-+	.previous
-+
-+/*
-+ * Register aliases.
-+ */
-+lr	.req	x30		// link register
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-new file mode 100644
-index 0000000..5120e51
---- /dev/null
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -0,0 +1,108 @@
-+/*
-+ * Based on arch/arm/kernel/asm-offsets.c
-+ *
-+ * Copyright (C) 1995-2003 Russell King
-+ *               2001-2002 Keith Owens
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
 +
 +#include <linux/sched.h>
-+#include <linux/mm.h>
-+#include <linux/dma-mapping.h>
-+#include <asm/thread_info.h>
-+#include <asm/memory.h>
-+#include <asm/procinfo.h>
-+#include <asm/vdso_datapage.h>
-+#include <linux/kbuild.h>
++#include <asm/cputype.h>
 +
-+int main(void)
-+{
-+  DEFINE(TSK_ACTIVE_MM,		offsetof(struct task_struct, active_mm));
-+  BLANK();
-+  DEFINE(TI_FLAGS,		offsetof(struct thread_info, flags));
-+  DEFINE(TI_PREEMPT,		offsetof(struct thread_info, preempt_count));
-+  DEFINE(TI_ADDR_LIMIT,		offsetof(struct thread_info, addr_limit));
-+  DEFINE(TI_TASK,		offsetof(struct thread_info, task));
-+  DEFINE(TI_EXEC_DOMAIN,	offsetof(struct thread_info, exec_domain));
-+  DEFINE(TI_CPU,		offsetof(struct thread_info, cpu));
-+  BLANK();
-+  DEFINE(THREAD_CPU_CONTEXT,	offsetof(struct task_struct, thread.cpu_context));
-+  BLANK();
-+  DEFINE(S_X0,			offsetof(struct pt_regs, regs[0]));
-+  DEFINE(S_X1,			offsetof(struct pt_regs, regs[1]));
-+  DEFINE(S_X2,			offsetof(struct pt_regs, regs[2]));
-+  DEFINE(S_X3,			offsetof(struct pt_regs, regs[3]));
-+  DEFINE(S_X4,			offsetof(struct pt_regs, regs[4]));
-+  DEFINE(S_X5,			offsetof(struct pt_regs, regs[5]));
-+  DEFINE(S_X6,			offsetof(struct pt_regs, regs[6]));
-+  DEFINE(S_X7,			offsetof(struct pt_regs, regs[7]));
-+  DEFINE(S_LR,			offsetof(struct pt_regs, regs[30]));
-+  DEFINE(S_SP,			offsetof(struct pt_regs, sp));
-+#ifdef CONFIG_AARCH32_EMULATION
-+  DEFINE(S_COMPAT_SP,		offsetof(struct pt_regs, compat_sp));
-+#endif
-+  DEFINE(S_PSTATE,		offsetof(struct pt_regs, pstate));
-+  DEFINE(S_PC,			offsetof(struct pt_regs, pc));
-+  DEFINE(S_ORIG_X0,		offsetof(struct pt_regs, orig_x0));
-+  DEFINE(S_SYSCALLNO,		offsetof(struct pt_regs, syscallno));
-+  DEFINE(S_FRAME_SIZE,		sizeof(struct pt_regs));
-+  BLANK();
-+  DEFINE(MM_CONTEXT_ID,		offsetof(struct mm_struct, context.id));
-+  BLANK();
-+  DEFINE(VMA_VM_MM,		offsetof(struct vm_area_struct, vm_mm));
-+  DEFINE(VMA_VM_FLAGS,		offsetof(struct vm_area_struct, vm_flags));
-+  BLANK();
-+  DEFINE(VM_EXEC,	       	VM_EXEC);
-+  BLANK();
-+  DEFINE(PAGE_SZ,	       	PAGE_SIZE);
-+  BLANK();
-+  DEFINE(PROC_INFO_SZ,		sizeof(struct proc_info_list));
-+  DEFINE(PROCINFO_INITFUNC,	offsetof(struct proc_info_list, __cpu_flush));
-+  BLANK();
-+  DEFINE(DMA_BIDIRECTIONAL,	DMA_BIDIRECTIONAL);
-+  DEFINE(DMA_TO_DEVICE,		DMA_TO_DEVICE);
-+  DEFINE(DMA_FROM_DEVICE,	DMA_FROM_DEVICE);
-+  BLANK();
-+  DEFINE(CLOCK_REALTIME,	CLOCK_REALTIME);
-+  DEFINE(CLOCK_MONOTONIC,	CLOCK_MONOTONIC);
-+  DEFINE(CLOCK_REALTIME_RES,	MONOTONIC_RES_NSEC);
-+  DEFINE(CLOCK_REALTIME_COARSE,	CLOCK_REALTIME_COARSE);
-+  DEFINE(CLOCK_MONOTONIC_COARSE,CLOCK_MONOTONIC_COARSE);
-+  DEFINE(CLOCK_COARSE_RES,	LOW_RES_NSEC);
-+  DEFINE(NSEC_PER_SEC,		NSEC_PER_SEC);
-+  BLANK();
-+  DEFINE(VDSO_CS_CYCLE_LAST,	offsetof(struct vdso_data, cs_cycle_last));
-+  DEFINE(VDSO_XTIME_CLK_SEC,	offsetof(struct vdso_data, xtime_clock_sec));
-+  DEFINE(VDSO_XTIME_CLK_NSEC,	offsetof(struct vdso_data, xtime_clock_nsec));
-+  DEFINE(VDSO_XTIME_CRS_SEC,	offsetof(struct vdso_data, xtime_coarse_sec));
-+  DEFINE(VDSO_XTIME_CRS_NSEC,	offsetof(struct vdso_data, xtime_coarse_nsec));
-+  DEFINE(VDSO_WTM_CLK_SEC,	offsetof(struct vdso_data, wtm_clock_sec));
-+  DEFINE(VDSO_WTM_CLK_NSEC,	offsetof(struct vdso_data, wtm_clock_nsec));
-+  DEFINE(VDSO_TB_SEQ_COUNT,	offsetof(struct vdso_data, tb_seq_count));
-+  DEFINE(VDSO_CS_MULT,		offsetof(struct vdso_data, cs_mult));
-+  DEFINE(VDSO_CS_SHIFT,		offsetof(struct vdso_data, cs_shift));
-+  DEFINE(VDSO_TZ_MINWEST,	offsetof(struct vdso_data, tz_minuteswest));
-+  DEFINE(VDSO_TZ_DSTTIME,	offsetof(struct vdso_data, tz_dsttime));
-+  DEFINE(VDSO_USE_SYSCALL,	offsetof(struct vdso_data, use_syscall));
-+  BLANK();
-+  DEFINE(TVAL_TV_SEC,		offsetof(struct timeval, tv_sec));
-+  DEFINE(TVAL_TV_USEC,		offsetof(struct timeval, tv_usec));
-+  DEFINE(TSPEC_TV_SEC,		offsetof(struct timespec, tv_sec));
-+  DEFINE(TSPEC_TV_NSEC,		offsetof(struct timespec, tv_nsec));
-+  BLANK();
-+  DEFINE(TZ_MINWEST,		offsetof(struct timezone, tz_minuteswest));
-+  DEFINE(TZ_DSTTIME,		offsetof(struct timezone, tz_dsttime));
-+  return 0;
-+}
-diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
-new file mode 100644
-index 0000000..8957b82
---- /dev/null
-+++ b/arch/arm64/mm/proc-macros.S
-@@ -0,0 +1,55 @@
++extern void __cpu_flush_user_tlb_range(unsigned long, unsigned long, struct vm_area_struct *);
++extern void __cpu_flush_kern_tlb_range(unsigned long, unsigned long);
++
++extern struct cpu_tlb_fns cpu_tlb;
++
 +/*
-+ * Based on arch/arm/mm/proc-macros.S
++ *	TLB Management
++ *	==============
 + *
++ *	The arch/arm/mm/tlb-*.S files implement these methods.
++ *
++ *	The TLB specific code is expected to perform whatever tests it
++ *	needs to determine if it should invalidate the TLB for each
++ *	call.  Start addresses are inclusive and end addresses are
++ *	exclusive; it is safe to round these addresses down.
++ *
++ *	flush_tlb_all()
++ *
++ *		Invalidate the entire TLB.
++ *
++ *	flush_tlb_mm(mm)
++ *
++ *		Invalidate all TLB entries in a particular address
++ *		space.
++ *		- mm	- mm_struct describing address space
++ *
++ *	flush_tlb_range(mm,start,end)
++ *
++ *		Invalidate a range of TLB entries in the specified
++ *		address space.
++ *		- mm	- mm_struct describing address space
++ *		- start - start address (may not be aligned)
++ *		- end	- end address (exclusive, may not be aligned)
++ *
++ *	flush_tlb_page(vaddr,vma)
++ *
++ *		Invalidate the specified page in the specified address range.
++ *		- vaddr - virtual address (may not be aligned)
++ *		- vma	- vma_struct describing address range
++ *
++ *	flush_kern_tlb_page(kaddr)
++ *
++ *		Invalidate the TLB entry for the specified page.  The address
++ *		will be in the kernels virtual memory space.  Current uses
++ *		only require the D-TLB to be invalidated.
++ *		- kaddr - Kernel virtual memory address
++ */
++static inline void flush_tlb_all(void)
++{
++	dsb();
++	asm("tlbi	vmalle1is");
++	dsb();
++	isb();
++}
++
++static inline void flush_tlb_mm(struct mm_struct *mm)
++{
++	unsigned long asid = (unsigned long)ASID(mm) << 48;
++
++	dsb();
++	asm("tlbi	aside1is, %0" : : "r" (asid));
++	dsb();
++}
++
++static inline void flush_tlb_page(struct vm_area_struct *vma,
++				  unsigned long uaddr)
++{
++	unsigned long addr = uaddr >> 12 |
++		((unsigned long)ASID(vma->vm_mm) << 48);
++
++	dsb();
++	asm("tlbi	vae1is, %0" : : "r" (addr));
++	dsb();
++}
++
++/*
++ * Convert calls to our calling convention.
++ */
++#define flush_tlb_range(vma,start,end)	__cpu_flush_user_tlb_range(start,end,vma)
++#define flush_tlb_kernel_range(s,e)	__cpu_flush_kern_tlb_range(s,e)
++
++/*
++ * On AArch64, the cache coherency is handled via the set_pte_at() function.
++ */
++static inline void update_mmu_cache(struct vm_area_struct *vma,
++				    unsigned long addr, pte_t *ptep)
++{
++	/*
++	 * set_pte() does not have a DSB, so make sure that the page table
++	 * write is visible.
++	 */
++	dsb();
++}
++
++#endif
++
++#endif
+diff --git a/arch/arm64/mm/tlb.S b/arch/arm64/mm/tlb.S
+new file mode 100644
+index 0000000..8ae80a1
+--- /dev/null
++++ b/arch/arm64/mm/tlb.S
+@@ -0,0 +1,71 @@
++/*
++ * Based on arch/arm/mm/tlb.S
++ *
++ * Copyright (C) 1997-2002 Russell King
 + * Copyright (C) 2012 ARM Ltd.
++ * Written by Catalin Marinas <catalin.marinas@arm.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -283,41 +376,55 @@ index 0000000..8957b82
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+
++#include <linux/linkage.h>
++#include <asm/assembler.h>
 +#include <asm/asm-offsets.h>
-+#include <asm/thread_info.h>
++#include <asm/page.h>
++#include <asm/tlbflush.h>
++#include "proc-macros.S"
 +
 +/*
-+ * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
++ *	__cpu_flush_user_tlb_range(start, end, vma)
++ *
++ *	Invalidate a range of TLB entries in the specified address space.
++ *
++ *	- start - start address (may not be aligned)
++ *	- end   - end address (exclusive, may not be aligned)
++ *	- vma   - vma_struct describing address range
 + */
-+	.macro	vma_vm_mm, rd, rn
-+	ldr	\rd, [\rn, #VMA_VM_MM]
-+	.endm
++ENTRY(__cpu_flush_user_tlb_range)
++	vma_vm_mm x3, x2			// get vma->vm_mm
++	mmid	x3, x3				// get vm_mm->context.id
++	dsb	sy
++	lsr	x0, x0, #12			// align address
++	lsr	x1, x1, #12
++	bfi	x0, x3, #48, #16		// start VA and ASID
++	bfi	x1, x3, #48, #16		// end VA and ASID
++1:	tlbi	vae1is, x0			// TLB invalidate by address and ASID
++	add	x0, x0, #1
++	cmp	x0, x1
++	b.lo	1b
++	dsb	sy
++	ret
++ENDPROC(__cpu_flush_user_tlb_range)
 +
 +/*
-+ * mmid - get context id from mm pointer (mm->context.id)
++ *	__cpu_flush_kern_tlb_range(start,end)
++ *
++ *	Invalidate a range of kernel TLB entries.
++ *
++ *	- start - start address (may not be aligned)
++ *	- end   - end address (exclusive, may not be aligned)
 + */
-+	.macro	mmid, rd, rn
-+	ldr	\rd, [\rn, #MM_CONTEXT_ID]
-+	.endm
-+
-+/*
-+ * dcache_line_size - get the minimum D-cache line size from the CTR register.
-+ */
-+	.macro	dcache_line_size, reg, tmp
-+	mrs	\tmp, ctr_el0			// read CTR
-+	lsr	\tmp, \tmp, #16
-+	and	\tmp, \tmp, #0xf		// cache line size encoding
-+	mov	\reg, #4			// bytes per word
-+	lsl	\reg, \reg, \tmp		// actual cache line size
-+	.endm
-+
-+/*
-+ * icache_line_size - get the minimum I-cache line size from the CTR register.
-+ */
-+	.macro	icache_line_size, reg, tmp
-+	mrs	\tmp, ctr_el0			// read CTR
-+	and	\tmp, \tmp, #0xf		// cache line size encoding
-+	mov	\reg, #4			// bytes per word
-+	lsl	\reg, \reg, \tmp		// actual cache line size
-+	.endm
++ENTRY(__cpu_flush_kern_tlb_range)
++	dsb	sy
++	lsr	x0, x0, #12			// align address
++	lsr	x1, x1, #12
++1:	tlbi	vaae1is, x0			// TLB invalidate by address
++	add	x0, x0, #1
++	cmp	x0, x1
++	b.lo	1b
++	dsb	sy
++	isb
++	ret
++ENDPROC(__cpu_flush_kern_tlb_range)
