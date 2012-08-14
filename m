@@ -1,24 +1,38 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 14 Aug 2012 09:28:08 +0800
-Subject: [PATCH 1/2] ARM: mach-imx: Remove board entries in dt_board_compat
-In-Reply-To: <CAOMZO5C4f11jyvk_5sHAfwUKmybmgX91de3Mv+jaEmTuSMGpnA@mail.gmail.com>
-References: <1339941856-2836-1-git-send-email-festevam@gmail.com>
- <20120705071318.GO30009@pengutronix.de>
- <20120705074623.GG10610@S2101-09.ap.freescale.net>
- <20120813151509.GB27393@S2101-09.ap.freescale.net>
- <CAOMZO5C4f11jyvk_5sHAfwUKmybmgX91de3Mv+jaEmTuSMGpnA@mail.gmail.com>
-Message-ID: <20120814012806.GB27792@S2101-09.ap.freescale.net>
+Date: Tue, 14 Aug 2012 09:35:19 +0800
+Subject: [PATCH v2 1/2] ARM: i.MX35: Add kernel oftree support
+In-Reply-To: <20120813153503.GC2232@pengutronix.de>
+References: <1344591170-13638-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20120813081518.GA27480@S2101-09.ap.freescale.net>
+ <20120813153503.GC2232@pengutronix.de>
+Message-ID: <20120814013517.GC27792@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 13, 2012 at 01:56:40PM -0300, Fabio Estevam wrote:
-> On Mon, Aug 13, 2012 at 12:15 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Mon, Aug 13, 2012 at 05:35:03PM +0200, Uwe Kleine-K?nig wrote:
+> Hi Shawn,
 > 
-> > So, Fabio, can you please resend the patches against v3.6-rc?
+> On Mon, Aug 13, 2012 at 04:15:21PM +0800, Shawn Guo wrote:
+> > On Fri, Aug 10, 2012 at 11:32:49AM +0200, Uwe Kleine-K?nig wrote:
+> > > +		emi at 80000000 { /* External Memory Interface */
+> > > +			compatible = "fsl,emi", "simple-bus";
+> > > +			#address-cells = <1>;
+> > > +			#size-cells = <1>;
+> > > +			reg = <0x80000000 0x40000000>;
+> > > +			ranges;
+> > > +
+> > > +			nand at bb000000 {
+> > > +				#address-cells = <1>;
+> > > +				#size-cells = <1>;
+> > > +
+> > These should not be needed, until you will have sub-nodes with "reg"
+> > property.
 > 
-> Which branch at git.linaro.org should I use it to rebase?
+> The obvious sub-nodes are partitions. I thought it sensible to already
+> add #address-cells and #size-cells because they are identical for all
+> users and so repeating is minimized.
 > 
-Just against mainline v3.6-rc.
+Yes, you are right.  How did I forget such an obvious use case?
 
 -- 
 Regards,
