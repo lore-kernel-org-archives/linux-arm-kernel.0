@@ -1,225 +1,98 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 14 Aug 2012 16:47:05 +0200
-Subject: [PATCH 13/23] AT91 DMA OF support
-In-Reply-To: <1344952177-18385-14-git-send-email-richard.genoud@gmail.com>
-References: <1344952177-18385-1-git-send-email-richard.genoud@gmail.com>
- <1344952177-18385-14-git-send-email-richard.genoud@gmail.com>
-Message-ID: <502A64E9.2050706@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 14 Aug 2012 15:59:26 +0100
+Subject: [PATCH] ARM: io: avoid writeback addressing modes for __raw_ accessors
+Message-ID: <1344956366-32574-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+Data aborts taken to hyp mode do not provide a valid instruction
+syndrome field in the HSR if the faulting instruction is a memory
+access using a writeback addressing mode.
 
-I am not sure that this one will go further: there is an initiative to
-build a pretty generic DMA OF support... It takes time but it is
-progressing...
+For hypervisors emulating MMIO accesses to virtual peripherals, taking
+such an exception requires disassembling the faulting instruction in
+order to determine the behaviour of the access. Since this requires
+manually walking the two stages of translation, the world must be
+stopped to prevent races against page aging in the guest, where the
+first-stage translation is invalidated after the hypervisor has
+translated to an IPA and the physical page is reused for something else.
 
-Anyway, there may have some bits to integrate in at_hdmac.c driver: I
-will have a closer look later.
+This patch avoids taking this heavy performance penalty when running
+Linux as a guest by ensuring that our I/O accessors do not make use of
+writeback addressing modes.
 
-Thanks,
+Tested-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/io.h |   55 ++++++++++++++++++++++++++++++++++++++++-----
+ 1 files changed, 49 insertions(+), 6 deletions(-)
 
-On 08/14/2012 03:49 PM, Richard Genoud :
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> ---
->  arch/arm/mach-at91/include/mach/at_hdmac.h |    1 +
->  drivers/of/Kconfig                         |    4 +
->  drivers/of/Makefile                        |    1 +
->  drivers/of/of_atmel.c                      |  112 ++++++++++++++++++++++++++++
->  include/linux/of_atmel.h                   |   29 +++++++
->  5 files changed, 147 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/of/of_atmel.c
->  create mode 100644 include/linux/of_atmel.h
-> 
-> diff --git a/arch/arm/mach-at91/include/mach/at_hdmac.h b/arch/arm/mach-at91/include/mach/at_hdmac.h
-> index cab0997..35667bd 100644
-> --- a/arch/arm/mach-at91/include/mach/at_hdmac.h
-> +++ b/arch/arm/mach-at91/include/mach/at_hdmac.h
-> @@ -52,6 +52,7 @@ struct at_dma_slave {
->  #define		ATC_LOCK_IF_L_CHUNK	(0x0 << 22)
->  #define		ATC_LOCK_IF_L_BUFFER	(0x1 << 22)
->  #define	ATC_AHB_PROT_MASK	(0x7 << 24)	/* AHB Protection */
-> +#define	ATC_AHB_PROT(h)		(((h) <<  24) && ATC_AHB_PROT_MASK)
->  #define	ATC_FIFOCFG_MASK	(0x3 << 28)	/* FIFO Request Configuration */
->  #define		ATC_FIFOCFG_LARGESTBURST	(0x0 << 28)
->  #define		ATC_FIFOCFG_HALFFIFO		(0x1 << 28)
-> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-> index dfba3e6..4667960 100644
-> --- a/drivers/of/Kconfig
-> +++ b/drivers/of/Kconfig
-> @@ -83,4 +83,8 @@ config OF_MTD
->  	depends on MTD
->  	def_bool y
->  
-> +config OF_ATMEL
-> +	depends on AT_HDMAC
-> +	def_bool y
-> +
->  endmenu # OF
-> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-> index e027f44..897de3b 100644
-> --- a/drivers/of/Makefile
-> +++ b/drivers/of/Makefile
-> @@ -11,3 +11,4 @@ obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
->  obj-$(CONFIG_OF_PCI)	+= of_pci.o
->  obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
->  obj-$(CONFIG_OF_MTD)	+= of_mtd.o
-> +obj-$(CONFIG_OF_ATMEL)	+= of_atmel.o
-> diff --git a/drivers/of/of_atmel.c b/drivers/of/of_atmel.c
-> new file mode 100644
-> index 0000000..bcd3c54a
-> --- /dev/null
-> +++ b/drivers/of/of_atmel.c
-> @@ -0,0 +1,112 @@
-> +/*
-> + * Copyright (C) 2012 Richard Genoud, Paratronic S.A.
-> + *                    <richard.genoud@gmail.com>
-> + *
-> + * Atmel specifics OF helpers
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/export.h>
-> +#include <linux/device.h>
-> +#include <linux/slab.h>
-> +#include <linux/printk.h>
-> +#include <linux/byteorder/generic.h>
-> +#include <mach/at_hdmac.h>
-> +#include <linux/of.h>
-> +
-> +static int of_dev_node_match(struct device *dev, void *data)
-> +{
-> +	return dev->of_node == data;
-> +}
-> +
-> +/**
-> + * of_create_at_dma_slave - Alloc and initialize the struct at_dma_slave
-> + * @np: pointer to node to create the struct for
-> + * @bus: pointer to the bus type of the DMA device.
-> + *
-> + * Returns pointer to created DMA slave structure, or NULL in case of error.
-> + */
-> +struct at_dma_slave *of_create_at_dma_slave(struct device_node *np,
-> +					    struct bus_type *bus)
-> +{
-> +	struct at_dma_slave *atslave;
-> +	struct device_node *n;
-> +	struct property *prop;
-> +	const __be32 *dma_list;
-> +	phandle phandle;
-> +	int size;
-> +	int err = -1;
-> +	u32 val;
-> +
-> +	atslave = kzalloc(sizeof(struct at_dma_slave), GFP_KERNEL);
-> +	if (unlikely(!atslave)) {
-> +		pr_err("cannot allocate memory\n");
-> +		goto error;
-> +	}
-> +
-> +	atslave->cfg |= of_property_read_bool(np, "atc_src_rep") ? ATC_SRC_REP : 0;
-> +	atslave->cfg |= of_property_read_bool(np, "atc_dst_rep") ? ATC_DST_REP : 0;
-> +	atslave->cfg |= of_property_read_bool(np, "atc_src_h2sel_hw") ? ATC_SRC_H2SEL_HW : 0;
-> +	atslave->cfg |= of_property_read_bool(np, "atc_dst_h2sel_hw") ? ATC_DST_H2SEL_HW : 0;
-> +	atslave->cfg |= of_property_read_bool(np, "atc_sod") ? ATC_SOD : 0;
-> +	atslave->cfg |= of_property_read_bool(np, "atc_lock_if") ? ATC_LOCK_IF : 0;
-> +	atslave->cfg |= of_property_read_bool(np, "atc_lock_b") ? ATC_LOCK_B : 0;
-> +	atslave->cfg |= of_property_read_bool(np, "atc_lock_if_l") ? ATC_LOCK_IF_L : 0;
-> +	atslave->cfg |= of_property_read_bool(np, "atc_lock_if_l_buffer") ? ATC_LOCK_IF_L_BUFFER : 0;
-> +	if (of_property_read_bool(np, "atc_fifocfg_halffifo"))
-> +		atslave->cfg = (atslave->cfg & ~ATC_FIFOCFG_MASK) | ATC_FIFOCFG_HALFFIFO;
-> +	if (of_property_read_bool(np, "atc_fifocfg_enoughspace"))
-> +		atslave->cfg = (atslave->cfg & ~ATC_FIFOCFG_MASK) | ATC_FIFOCFG_ENOUGHSPACE;
-> +	if (of_property_read_bool(np, "atc_fifocfg_largestburst"))
-> +		atslave->cfg = (atslave->cfg & ~ATC_FIFOCFG_MASK) | ATC_FIFOCFG_LARGESTBURST;
-> +	if (!of_property_read_u32(np, "atc_ahb_prot", &val))
-> +		atslave->cfg |= ATC_AHB_PROT(val);
-> +	if (!of_property_read_u32(np, "atc_src_per", &val))
-> +		atslave->cfg |= ATC_SRC_PER(val);
-> +	if (!of_property_read_u32(np, "atc_dst_per", &val))
-> +		atslave->cfg |= ATC_DST_PER(val);
-> +
-> +	/* we need to associate the wanted dma struct device to
-> +	 * atslave->dma_dev. This is needed when searching for
-> +	 * a free dma channel
-> +	 */
-> +	prop = of_find_property(np, "dma", &size);
-> +	if (!prop) {
-> +		pr_err("can't find the dma child node\n");
-> +		goto error;
-> +	}
-> +	dma_list = prop->value;
-> +	size /= sizeof(*dma_list);
-> +	if (size != 1) {
-> +		pr_err("only one dma handle is supported\n");
-> +		goto error;
-> +	}
-> +
-> +	phandle = be32_to_cpup(dma_list);
-> +	n = of_find_node_by_phandle(phandle);
-> +	if (!n) {
-> +		pr_err("unable to find dma device: invalid phandle %s\n",
-> +		       prop->name);
-> +		goto error;
-> +	}
-> +
-> +	atslave->dma_dev = bus_find_device(bus, NULL, n, of_dev_node_match);
-> +	if (!atslave->dma_dev) {
-> +		pr_err("can't find struct device for DMA %s\n", prop->name);
-> +		goto error;
-> +	}
-> +
-> +	pr_debug("DMA cfg register=0x%x DMA device path=%s\n",
-> +		 atslave->cfg, prop->name);
-> +	err = 0;
-> +error:
-> +	if (err)
-> +		kfree(atslave);
-> +	return atslave;
-> +}
-> +EXPORT_SYMBOL_GPL(of_create_at_dma_slave);
-> +
-> diff --git a/include/linux/of_atmel.h b/include/linux/of_atmel.h
-> new file mode 100644
-> index 0000000..256f336
-> --- /dev/null
-> +++ b/include/linux/of_atmel.h
-> @@ -0,0 +1,29 @@
-> +#ifndef _LINUX_OF_ATMEL_H
-> +#define _LINUX_OF_ATMEL_H
-> +/*
-> + * Copyright (C) 2012 Richard Genoud, Paratronic S.A.
-> + *                    <richard.genoud@gmail.com>
-> + *
-> + * Atmel specifics OF helpers
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +#include <linux/of.h>
-> +#include <linux/device.h>
-> +#include <mach/at_hdmac.h>
-> +
-> +#ifdef CONFIG_OF_ATMEL
-> +extern struct at_dma_slave *of_create_at_dma_slave(struct device_node *np,
-> +						   struct bus_type *bus);
-> +#else
-> +static struct at_dma_slave *of_create_at_dma_slave(struct device_node *np,
-> +						   struct bus_type *bus)
-> +{
-> +	return NULL;
-> +}
-> +#endif /* CONFIG_OF_ATMEL */
-> +
-> +#endif	/* _LINUX_OF_ATMEL_H */
-> 
-
-
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 815c669..b54d687 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -47,13 +47,56 @@ extern void __raw_readsb(const void __iomem *addr, void *data, int bytelen);
+ extern void __raw_readsw(const void __iomem *addr, void *data, int wordlen);
+ extern void __raw_readsl(const void __iomem *addr, void *data, int longlen);
+ 
+-#define __raw_writeb(v,a)	((void)(__chk_io_ptr(a), *(volatile unsigned char __force  *)(a) = (v)))
+-#define __raw_writew(v,a)	((void)(__chk_io_ptr(a), *(volatile unsigned short __force *)(a) = (v)))
+-#define __raw_writel(v,a)	((void)(__chk_io_ptr(a), *(volatile unsigned int __force   *)(a) = (v)))
++#if __LINUX_ARM_ARCH__ < 6
++/*
++ * Half-word accesses are problematic with RiscPC due to limitations of
++ * the bus. Rather than special-case the machine, just let the compiler
++ * generate the access for CPUs prior to ARMv6.
++ */
++#define __raw_readw(a)         (__chk_io_ptr(a), *(volatile unsigned short __force *)(a))
++#define __raw_writew(v,a)      ((void)(__chk_io_ptr(a), *(volatile unsigned short __force *)(a) = (v)))
++#else
++/*
++ * When running under a hypervisor, we want to avoid I/O accesses with
++ * writeback addressing modes as these incur a significant performance
++ * overhead (the address generation must be emulated in software).
++ */
++static inline void __raw_writew(u16 val, volatile void __iomem *addr)
++{
++	asm volatile("strh %0, [%1]" : : "r" (val), "r" (addr));
++}
++
++static inline u16 __raw_readw(const volatile void __iomem *addr)
++{
++	u16 val;
++	asm volatile("ldrh %0, [%1]" : "=r" (val) : "r" (addr));
++	return val;
++}
++#endif
+ 
+-#define __raw_readb(a)		(__chk_io_ptr(a), *(volatile unsigned char __force  *)(a))
+-#define __raw_readw(a)		(__chk_io_ptr(a), *(volatile unsigned short __force *)(a))
+-#define __raw_readl(a)		(__chk_io_ptr(a), *(volatile unsigned int __force   *)(a))
++static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
++{
++	asm volatile("strb %0, [%1]" : : "r" (val), "r" (addr));
++}
++
++static inline void __raw_writel(u32 val, volatile void __iomem *addr)
++{
++	asm volatile("str %0, [%1]" : : "r" (val), "r" (addr));
++}
++
++static inline u8 __raw_readb(const volatile void __iomem *addr)
++{
++	u8 val;
++	asm volatile("ldrb %0, [%1]" : "=r" (val) : "r" (addr));
++	return val;
++}
++
++static inline u32 __raw_readl(const volatile void __iomem *addr)
++{
++	u32 val;
++	asm volatile("ldr %0, [%1]" : "=r" (val) : "r" (addr));
++	return val;
++}
+ 
+ /*
+  * Architecture ioremap implementation.
 -- 
-Nicolas Ferre
+1.7.4.1
