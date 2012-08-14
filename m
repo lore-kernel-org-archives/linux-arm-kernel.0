@@ -1,515 +1,883 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Aug 2012 18:52:28 +0100
-Subject: [PATCH v2 27/31] arm64: Loadable modules
+Date: Tue, 14 Aug 2012 18:52:31 +0100
+Subject: [PATCH v2 30/31] arm64: Build infrastructure
 In-Reply-To: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
 References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1344966752-16102-28-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1344966752-16102-31-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
-
-This patch adds support for loadable modules. Loadable modules are
-loaded 64MB below the kernel image due to branch relocation restrictions
-(see Documentation/arm64/memory.txt).
+This patch adds Makefile and Kconfig files required for building an
+AArch64 kernel.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/module.h |   23 ++
- arch/arm64/kernel/module.c      |  456 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 479 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/module.h
- create mode 100644 arch/arm64/kernel/module.c
+ arch/arm64/Kconfig                   |  261 ++++++++++++++++++++++++++++++++++
+ arch/arm64/Kconfig.debug             |   27 ++++
+ arch/arm64/Makefile                  |   71 +++++++++
+ arch/arm64/boot/.gitignore           |    2 +
+ arch/arm64/boot/Makefile             |   38 +++++
+ arch/arm64/boot/install.sh           |   52 +++++++
+ arch/arm64/configs/generic_defconfig |   85 +++++++++++
+ arch/arm64/include/asm/prom.h        |    1 +
+ arch/arm64/kernel/.gitignore         |    1 +
+ arch/arm64/kernel/Makefile           |   27 ++++
+ arch/arm64/kernel/vmlinux.lds.S      |  146 +++++++++++++++++++
+ arch/arm64/mm/Kconfig                |    5 +
+ arch/arm64/mm/Makefile               |    6 +
+ init/Kconfig                         |    3 +-
+ lib/Kconfig.debug                    |    6 +-
+ 15 files changed, 728 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm64/Kconfig
+ create mode 100644 arch/arm64/Kconfig.debug
+ create mode 100644 arch/arm64/Makefile
+ create mode 100644 arch/arm64/boot/.gitignore
+ create mode 100644 arch/arm64/boot/Makefile
+ create mode 100644 arch/arm64/boot/install.sh
+ create mode 100644 arch/arm64/configs/generic_defconfig
+ create mode 100644 arch/arm64/include/asm/prom.h
+ create mode 100644 arch/arm64/kernel/.gitignore
+ create mode 100644 arch/arm64/kernel/Makefile
+ create mode 100644 arch/arm64/kernel/vmlinux.lds.S
+ create mode 100644 arch/arm64/mm/Kconfig
+ create mode 100644 arch/arm64/mm/Makefile
 
-diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
 new file mode 100644
-index 0000000..e80e232
+index 0000000..1ce3d04
 --- /dev/null
-+++ b/arch/arm64/include/asm/module.h
-@@ -0,0 +1,23 @@
-+/*
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_MODULE_H
-+#define __ASM_MODULE_H
++++ b/arch/arm64/Kconfig
+@@ -0,0 +1,261 @@
++config ARM64
++	def_bool y
++	select OF
++	select OF_EARLY_FLATTREE
++	select IRQ_DOMAIN
++	select HAVE_AOUT
++	select HAVE_DMA_ATTRS
++	select HAVE_DMA_API_DEBUG
++	select HAVE_IDE
++	select HAVE_MEMBLOCK
++	select RTC_LIB
++	select SYS_SUPPORTS_APM_EMULATION
++	select HAVE_GENERIC_DMA_COHERENT
++	select GENERIC_IOMAP
++	select HAVE_IRQ_WORK
++	select HAVE_PERF_EVENTS
++	select HAVE_ARCH_TRACEHOOK
++	select PERF_USE_VMALLOC
++	select HAVE_HW_BREAKPOINT if PERF_EVENTS
++	select HAVE_GENERIC_HARDIRQS
++	select GENERIC_HARDIRQS_NO_DEPRECATED
++	select HAVE_SPARSE_IRQ
++	select SPARSE_IRQ
++	select GENERIC_IRQ_SHOW
++	select GENERIC_SMP_IDLE_THREAD
++	select NO_BOOTMEM
++	help
++	  ARM 64-bit (AArch64) Linux support.
 +
-+#include <asm-generic/module.h>
++config 64BIT
++	def_bool y
 +
-+#define MODULE_ARCH_VERMAGIC	"aarch64"
++config ARCH_PHYS_ADDR_T_64BIT
++	def_bool y
 +
-+#endif /* __ASM_MODULE_H */
-diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
++config HAVE_PWM
++	bool
++
++config SYS_SUPPORTS_APM_EMULATION
++	bool
++
++config NO_IOPORT
++	def_bool y
++
++config GENERIC_GPIO
++	bool
++
++config GENERIC_TIME_VSYSCALL
++	def_bool y
++
++config GENERIC_CLOCKEVENTS
++	def_bool y
++
++config STACKTRACE_SUPPORT
++	def_bool y
++
++config LOCKDEP_SUPPORT
++	def_bool y
++
++config TRACE_IRQFLAGS_SUPPORT
++	def_bool y
++
++config HARDIRQS_SW_RESEND
++	def_bool y
++
++config GENERIC_IRQ_PROBE
++	def_bool y
++
++config GENERIC_LOCKBREAK
++	def_bool y
++	depends on SMP && PREEMPT
++
++config RWSEM_GENERIC_SPINLOCK
++	def_bool y
++
++config RWSEM_XCHGADD_ALGORITHM
++	bool
++
++config ARCH_HAS_ILOG2_U32
++	bool
++
++config ARCH_HAS_ILOG2_U64
++	bool
++
++config ARCH_HAS_CPUFREQ
++	bool
++	help
++	  Internal node to signify that the ARCH has CPUFREQ support
++	  and that the relevant menu configurations are displayed for
++	  it.
++
++config GENERIC_HWEIGHT
++	def_bool y
++
++config GENERIC_CSUM
++        def_bool y
++
++config GENERIC_CALIBRATE_DELAY
++	def_bool y
++
++config ZONE_DMA32
++	def_bool y
++
++config ARCH_DMA_ADDR_T_64BIT
++	def_bool y
++
++config NEED_DMA_MAP_STATE
++	def_bool y
++
++config NEED_SG_DMA_LENGTH
++	def_bool y
++
++config SWIOTLB
++	def_bool y
++
++config IOMMU_HELPER
++	def_bool SWIOTLB
++
++source "init/Kconfig"
++
++source "kernel/Kconfig.freezer"
++
++menu "System Type"
++
++source "arch/arm64/mm/Kconfig"
++
++endmenu
++
++menu "Bus support"
++
++config ARM_AMBA
++	bool
++
++endmenu
++
++menu "Kernel Features"
++
++source "kernel/time/Kconfig"
++
++config ARM64_64K_PAGES
++	bool "Enable 64KB pages support"
++	help
++	  This feature enables 64KB pages support (4KB by default)
++	  allowing only two levels of page tables and faster TLB
++	  look-up. AArch32 emulation is not available when this feature
++	  is enabled.
++
++config SMP
++	bool "Symmetric Multi-Processing"
++	depends on GENERIC_CLOCKEVENTS
++	select USE_GENERIC_SMP_HELPERS
++	help
++	  This enables support for systems with more than one CPU.  If
++	  you say N here, the kernel will run on single and
++	  multiprocessor machines, but will use only one CPU of a
++	  multiprocessor machine. If you say Y here, the kernel will run
++	  on many, but not all, single processor machines. On a single
++	  processor machine, the kernel will run faster if you say N
++	  here.
++
++	  If you don't know what to do here, say N.
++
++config NR_CPUS
++	int "Maximum number of CPUs (2-32)"
++	range 2 32
++	depends on SMP
++	default "4"
++
++source kernel/Kconfig.preempt
++
++config HZ
++	int
++	default 100
++
++config ARCH_HAS_HOLES_MEMORYMODEL
++	def_bool y if SPARSEMEM
++
++config ARCH_SPARSEMEM_ENABLE
++	def_bool y
++	select SPARSEMEM_VMEMMAP_ENABLE
++
++config ARCH_SPARSEMEM_DEFAULT
++	def_bool ARCH_SPARSEMEM_ENABLE
++
++config ARCH_SELECT_MEMORY_MODEL
++	def_bool ARCH_SPARSEMEM_ENABLE
++
++config HAVE_ARCH_PFN_VALID
++	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
++
++config HW_PERF_EVENTS
++	bool "Enable hardware performance counter support for perf events"
++	depends on PERF_EVENTS
++	default y
++	help
++	  Enable hardware performance counter support for perf events. If
++	  disabled, perf events will use software events only.
++
++source "mm/Kconfig"
++
++endmenu
++
++menu "Boot options"
++
++config CMDLINE
++	string "Default kernel command string"
++	default ""
++	help
++	  Provide a set of default command-line options at build time by
++	  entering them here. As a minimum, you should specify the the
++	  root device (e.g. root=/dev/nfs).
++
++config CMDLINE_FORCE
++	bool "Always use the default kernel command string"
++	help
++	  Always use the default kernel command string, even if the boot
++	  loader passes other arguments to the kernel.
++	  This is useful if you cannot or don't want to change the
++	  command-line options your boot loader passes to the kernel.
++
++endmenu
++
++menu "Userspace binary formats"
++
++source "fs/Kconfig.binfmt"
++
++config AARCH32_EMULATION
++	bool "Kernel support for 32-bit EL0"
++	depends on !ARM64_64K_PAGES
++	select COMPAT_BINFMT_ELF
++	help
++	  This option enables support for a 32-bit EL0 running under a 64-bit
++	  kernel at EL1. AArch32-specific components such as system calls,
++	  the user helper functions, VFP support and the ptrace interface are
++	  handled appropriately by the kernel.
++
++	  If you want to execute 32-bit userspace applications, say Y.
++
++config COMPAT
++	def_bool y
++	depends on AARCH32_EMULATION
++
++config SYSVIPC_COMPAT
++	def_bool y
++	depends on COMPAT && SYSVIPC
++
++endmenu
++
++source "net/Kconfig"
++
++source "drivers/Kconfig"
++
++source "fs/Kconfig"
++
++source "arch/arm64/Kconfig.debug"
++
++source "security/Kconfig"
++
++source "crypto/Kconfig"
++
++source "lib/Kconfig"
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
 new file mode 100644
-index 0000000..ca0e3d5
+index 0000000..d7553f2
 --- /dev/null
-+++ b/arch/arm64/kernel/module.c
-@@ -0,0 +1,456 @@
++++ b/arch/arm64/Kconfig.debug
+@@ -0,0 +1,27 @@
++menu "Kernel hacking"
++
++source "lib/Kconfig.debug"
++
++config FRAME_POINTER
++	bool
++	default y
++
++config DEBUG_ERRORS
++	bool "Verbose kernel error messages"
++	depends on DEBUG_KERNEL
++	help
++	  This option controls verbose debugging information which can be
++	  printed when the kernel detects an internal error. This debugging
++	  information is useful to kernel hackers when tracking down problems,
++	  but mostly meaningless to other people. It's safe to say Y unless
++	  you are concerned with the code size or don't want to see these
++	  messages.
++
++config DEBUG_STACK_USAGE
++	bool "Enable stack utilization instrumentation"
++	depends on DEBUG_KERNEL
++	help
++	  Enables the display of the minimum amount of free stack which each
++	  task has ever had available in the sysrq-T output.
++
++endmenu
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+new file mode 100644
+index 0000000..831bd41
+--- /dev/null
++++ b/arch/arm64/Makefile
+@@ -0,0 +1,71 @@
++#
++# arch/arm64/Makefile
++#
++# This file is included by the global makefile so that you can add your own
++# architecture-specific flags and dependencies.
++#
++# This file is subject to the terms and conditions of the GNU General Public
++# License.  See the file "COPYING" in the main directory of this archive
++# for more details.
++#
++# Copyright (C) 1995-2001 by Russell King
++
++LDFLAGS_vmlinux	:=-p --no-undefined -X
++CPPFLAGS_vmlinux.lds = -DTEXT_OFFSET=$(TEXT_OFFSET)
++OBJCOPYFLAGS	:=-O binary -R .note -R .note.gnu.build-id -R .comment -S
++GZFLAGS		:=-9
++
++LIBGCC 		:= $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name)
++
++KBUILD_DEFCONFIG := generic_defconfig
++
++KBUILD_CFLAGS	+= -mgeneral-regs-only
++KBUILD_CPPFLAGS	+= -mlittle-endian
++AS		+= -EL
++LD		+= -EL
++
++comma = ,
++
++CHECKFLAGS	+= -D__aarch64__
++
++# Default value
++head-y		:= arch/arm64/kernel/head.o
++
++# The byte offset of the kernel image in RAM from the start of RAM.
++TEXT_OFFSET := 0x00080000
++
++export	TEXT_OFFSET GZFLAGS
++
++core-y		+= arch/arm64/kernel/ arch/arm64/mm/
++libs-y		:= arch/arm64/lib/ $(libs-y)
++libs-y		+= $(LIBGCC)
++
++# Default target when executing plain make
++KBUILD_IMAGE := Image.gz
++
++all:	$(KBUILD_IMAGE)
++
++boot := arch/arm64/boot
++
++Image Image.gz: vmlinux
++	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
++
++zinstall install: vmlinux
++	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
++
++%.dtb:
++	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
++
++# We use MRPROPER_FILES and CLEAN_FILES now
++archclean:
++	$(Q)$(MAKE) $(clean)=$(boot)
++
++define archhelp
++  echo  '* Image.gz      - Compressed kernel image (arch/$(ARCH)/boot/Image.gz)'
++  echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
++  echo  '  install       - Install uncompressed kernel'
++  echo  '  zinstall      - Install compressed kernel'
++  echo  '                  Install using (your) ~/bin/installkernel or'
++  echo  '                  (distribution) /sbin/installkernel or'
++  echo  '                  install to $$(INSTALL_PATH) and run lilo'
++endef
+diff --git a/arch/arm64/boot/.gitignore b/arch/arm64/boot/.gitignore
+new file mode 100644
+index 0000000..8dab0bb
+--- /dev/null
++++ b/arch/arm64/boot/.gitignore
+@@ -0,0 +1,2 @@
++Image
++Image.gz
+diff --git a/arch/arm64/boot/Makefile b/arch/arm64/boot/Makefile
+new file mode 100644
+index 0000000..15a58a8
+--- /dev/null
++++ b/arch/arm64/boot/Makefile
+@@ -0,0 +1,38 @@
++#
++# arch/arm64/boot/Makefile
++#
++# This file is included by the global makefile so that you can add your own
++# architecture-specific flags and dependencies.
++#
++# This file is subject to the terms and conditions of the GNU General Public
++# License.  See the file "COPYING" in the main directory of this archive
++# for more details.
++#
++# Copyright (C) 2012, ARM Ltd.
++# Author: Will Deacon <will.deacon@arm.com>
++#
++# Based on the ia64 boot/Makefile.
++#
++
++targets := Image Image.gz
++
++$(obj)/Image: vmlinux FORCE
++	$(call if_changed,objcopy)
++	@echo '  Kernel: $@ is ready'
++
++$(obj)/Image.gz: $(obj)/Image FORCE
++	$(call if_changed,gzip)
++	@echo '  Kernel: $@ is ready'
++
++$(obj)/%.dtb: $(src)/dts/%.dts
++	$(call cmd,dtc)
++
++install: $(obj)/Image
++	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
++	$(obj)/Image System.map "$(INSTALL_PATH)"
++
++zinstall: $(obj)/Image.gz
++	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
++	$(obj)/Image.gz System.map "$(INSTALL_PATH)"
++
++clean-files += *.dtb
+diff --git a/arch/arm64/boot/install.sh b/arch/arm64/boot/install.sh
+new file mode 100644
+index 0000000..9151e21
+--- /dev/null
++++ b/arch/arm64/boot/install.sh
+@@ -0,0 +1,52 @@
++#!/bin/sh
++#
++# arch/arm64/boot/install.sh
++#
++# This file is subject to the terms and conditions of the GNU General Public
++# License.  See the file "COPYING" in the main directory of this archive
++# for more details.
++#
++# Copyright (C) 1995 by Linus Torvalds
++#
++# Adapted from code in arch/i386/boot/Makefile by H. Peter Anvin
++# Adapted from code in arch/i386/boot/install.sh by Russell King
++#
++# "make install" script for the AArch64 Linux port
++#
++# Arguments:
++#   $1 - kernel version
++#   $2 - kernel image file
++#   $3 - kernel map file
++#   $4 - default install path (blank if root directory)
++#
++
++# User may have a custom install script
++if [ -x ~/bin/${INSTALLKERNEL} ]; then exec ~/bin/${INSTALLKERNEL} "$@"; fi
++if [ -x /sbin/${INSTALLKERNEL} ]; then exec /sbin/${INSTALLKERNEL} "$@"; fi
++
++if [ "$(basename $2)" = "Image.gz" ]; then
++# Compressed install
++  echo "Installing compressed kernel"
++  base=vmlinuz
++else
++# Normal install
++  echo "Installing normal kernel"
++  base=vmlinux
++fi
++
++if [ -f $4/$base-$1 ]; then
++  mv $4/$base-$1 $4/$base-$1.old
++fi
++cat $2 > $4/$base-$1
++
++# Install system map file
++if [ -f $4/System.map-$1 ]; then
++  mv $4/System.map-$1 $4/System.map-$1.old
++fi
++cp $3 $4/System.map-$1
++
++if [ -x /sbin/loadmap ]; then
++  /sbin/loadmap
++else
++  echo "You have to install it yourself"
++fi
+diff --git a/arch/arm64/configs/generic_defconfig b/arch/arm64/configs/generic_defconfig
+new file mode 100644
+index 0000000..d9aac95
+--- /dev/null
++++ b/arch/arm64/configs/generic_defconfig
+@@ -0,0 +1,85 @@
++CONFIG_EXPERIMENTAL=y
++# CONFIG_LOCALVERSION_AUTO is not set
++# CONFIG_SWAP is not set
++CONFIG_SYSVIPC=y
++CONFIG_POSIX_MQUEUE=y
++CONFIG_BSD_PROCESS_ACCT=y
++CONFIG_BSD_PROCESS_ACCT_V3=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_LOG_BUF_SHIFT=14
++# CONFIG_UTS_NS is not set
++# CONFIG_IPC_NS is not set
++# CONFIG_PID_NS is not set
++# CONFIG_NET_NS is not set
++CONFIG_SCHED_AUTOGROUP=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_KALLSYMS_ALL=y
++# CONFIG_COMPAT_BRK is not set
++CONFIG_PROFILING=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++CONFIG_SMP=y
++CONFIG_PREEMPT_VOLUNTARY=y
++CONFIG_CMDLINE="console=ttyAMA0"
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_AARCH32_EMULATION=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++# CONFIG_INET_LRO is not set
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++# CONFIG_BLK_DEV is not set
++CONFIG_SCSI=y
++# CONFIG_SCSI_PROC_FS is not set
++CONFIG_BLK_DEV_SD=y
++# CONFIG_SCSI_LOWLEVEL is not set
++CONFIG_NETDEVICES=y
++CONFIG_MII=y
++# CONFIG_WLAN is not set
++CONFIG_INPUT_EVDEV=y
++# CONFIG_SERIO_I8042 is not set
++# CONFIG_SERIO_SERPORT is not set
++CONFIG_LEGACY_PTY_COUNT=16
++# CONFIG_HW_RANDOM is not set
++# CONFIG_HWMON is not set
++CONFIG_FB=y
++# CONFIG_VGA_CONSOLE is not set
++CONFIG_FRAMEBUFFER_CONSOLE=y
++CONFIG_LOGO=y
++# CONFIG_LOGO_LINUX_MONO is not set
++# CONFIG_LOGO_LINUX_VGA16 is not set
++# CONFIG_USB_SUPPORT is not set
++# CONFIG_IOMMU_SUPPORT is not set
++CONFIG_EXT2_FS=y
++CONFIG_EXT3_FS=y
++# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
++# CONFIG_EXT3_FS_XATTR is not set
++CONFIG_FUSE_FS=y
++CONFIG_CUSE=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++# CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_FS=y
++CONFIG_DEBUG_KERNEL=y
++# CONFIG_SCHED_DEBUG is not set
++CONFIG_DEBUG_INFO=y
++# CONFIG_FTRACE is not set
++CONFIG_ATOMIC64_SELFTEST=y
++CONFIG_DEBUG_ERRORS=y
+diff --git a/arch/arm64/include/asm/prom.h b/arch/arm64/include/asm/prom.h
+new file mode 100644
+index 0000000..68b90e6
+--- /dev/null
++++ b/arch/arm64/include/asm/prom.h
+@@ -0,0 +1 @@
++/* Empty for now */
+diff --git a/arch/arm64/kernel/.gitignore b/arch/arm64/kernel/.gitignore
+new file mode 100644
+index 0000000..c5f676c
+--- /dev/null
++++ b/arch/arm64/kernel/.gitignore
+@@ -0,0 +1 @@
++vmlinux.lds
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+new file mode 100644
+index 0000000..59fbdef
+--- /dev/null
++++ b/arch/arm64/kernel/Makefile
+@@ -0,0 +1,27 @@
++#
++# Makefile for the linux kernel.
++#
++
++CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
++AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
++
++# Object file lists.
++arm64-obj-y		:= debug-monitors.o elf.o entry.o irq.o	fpsimd.o	\
++			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
++			   sys.o stacktrace.o time.o traps.o io.o vdso.o
++
++arm64-obj-$(CONFIG_AARCH32_EMULATION)	+= sys32.o kuser32.o signal32.o 	\
++					   sys_compat.o
++arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
++arm64-obj-$(CONFIG_SMP)			+= smp.o
++arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
++arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
++
++obj-y					+= $(arm64-obj-y) vdso/
++obj-m					+= $(arm64-obj-m)
++head-y					:= head.o
++extra-y					:= $(head-y) vmlinux.lds
++
++# vDSO - this must be built first to generate the symbol offsets
++$(call objectify,$(arm64-obj-y)): $(obj)/vdso/vdso-offsets.h
++$(obj)/vdso/vdso-offsets.h: $(obj)/vdso
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+new file mode 100644
+index 0000000..5eab87b
+--- /dev/null
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -0,0 +1,146 @@
 +/*
-+ * AArch64 loadable module support.
-+ *
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
++ * ld script to make ARM Linux kernel
++ * taken from the i386 version by Russell King
++ * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>
 + */
 +
-+#include <linux/bitops.h>
-+#include <linux/elf.h>
-+#include <linux/gfp.h>
-+#include <linux/kernel.h>
-+#include <linux/mm.h>
-+#include <linux/moduleloader.h>
-+#include <linux/vmalloc.h>
++#include <asm-generic/vmlinux.lds.h>
++#include <asm/thread_info.h>
++#include <asm/memory.h>
++#include <asm/page.h>
 +
-+void *module_alloc(unsigned long size)
++#define PROC_INFO							\
++	VMLINUX_SYMBOL(__proc_info_begin) = .;				\
++	*(.proc.info.init)						\
++	VMLINUX_SYMBOL(__proc_info_end) = .;
++
++#define ARM_CPU_DISCARD(x)	x
++#define ARM_CPU_KEEP(x)
++
++#define ARM_EXIT_KEEP(x)
++#define ARM_EXIT_DISCARD(x)	x
++
++OUTPUT_ARCH(aarch64)
++ENTRY(stext)
++
++jiffies = jiffies_64;
++
++SECTIONS
 +{
-+	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
-+				    GFP_KERNEL, PAGE_KERNEL_EXEC, -1,
-+				    __builtin_return_address(0));
-+}
-+
-+enum aarch64_reloc_op {
-+	RELOC_OP_NONE,
-+	RELOC_OP_ABS,
-+	RELOC_OP_PREL,
-+	RELOC_OP_PAGE,
-+};
-+
-+static u64 do_reloc(enum aarch64_reloc_op reloc_op, void *place, u64 val)
-+{
-+	switch (reloc_op) {
-+	case RELOC_OP_ABS:
-+		return val;
-+	case RELOC_OP_PREL:
-+		return val - (u64)place;
-+	case RELOC_OP_PAGE:
-+		return (val & ~0xfff) - ((u64)place & ~0xfff);
-+	case RELOC_OP_NONE:
-+		return 0;
++	/*
++	 * XXX: The linker does not define how output sections are
++	 * assigned to input sections when there are multiple statements
++	 * matching the same input section name.  There is no documented
++	 * order of matching.
++	 */
++	/DISCARD/ : {
++		ARM_EXIT_DISCARD(EXIT_TEXT)
++		ARM_EXIT_DISCARD(EXIT_DATA)
++		EXIT_CALL
++		*(.discard)
++		*(.discard.*)
 +	}
 +
-+	pr_err("do_reloc: unknown relocation operation %d\n", reloc_op);
-+	return 0;
-+}
++	. = PAGE_OFFSET + TEXT_OFFSET;
 +
-+static int reloc_data(enum aarch64_reloc_op op, void *place, u64 val, int len)
-+{
-+	u64 imm_mask = (1 << len) - 1;
-+	s64 sval = do_reloc(op, place, val);
-+
-+	switch (len) {
-+	case 16:
-+		*(s16 *)place = sval;
-+		break;
-+	case 32:
-+		*(s32 *)place = sval;
-+		break;
-+	case 64:
-+		*(s64 *)place = sval;
-+		break;
-+	default:
-+		pr_err("Invalid length (%d) for data relocation\n", len);
-+		return 0;
++	.head.text : {
++		_text = .;
++		HEAD_TEXT
++	}
++	.text : {			/* Real text segment		*/
++		_stext = .;		/* Text and read-only data	*/
++			*(.smp.pen.text)
++			__exception_text_start = .;
++			*(.exception.text)
++			__exception_text_end = .;
++			IRQENTRY_TEXT
++			TEXT_TEXT
++			SCHED_TEXT
++			LOCK_TEXT
++			*(.fixup)
++			*(.gnu.warning)
++		. = ALIGN(16);
++		*(.got)			/* Global offset table		*/
++			ARM_CPU_KEEP(PROC_INFO)
 +	}
 +
-+	/*
-+	 * Extract the upper value bits (including the sign bit) and
-+	 * shift them to bit 0.
-+	 */
-+	sval = (s64)(sval & ~(imm_mask >> 1)) >> (len - 1);
++	RO_DATA(PAGE_SIZE)
 +
-+	/*
-+	 * Overflow has occurred if the value is not representable in
-+	 * len bits (i.e the bottom len bits are not sign-extended and
-+	 * the top bits are not all zero).
-+	 */
-+	if ((u64)(sval + 1) > 2)
-+		return -ERANGE;
++	_etext = .;			/* End of text and rodata section */
 +
-+	return 0;
-+}
++	. = ALIGN(PAGE_SIZE);
++	__init_begin = .;
 +
-+enum aarch64_imm_type {
-+	INSN_IMM_MOVNZ,
-+	INSN_IMM_MOVK,
-+	INSN_IMM_ADR,
-+	INSN_IMM_26,
-+	INSN_IMM_19,
-+	INSN_IMM_16,
-+	INSN_IMM_14,
-+	INSN_IMM_12,
-+	INSN_IMM_9,
-+};
++	INIT_TEXT_SECTION(8)
++	.exit.text : {
++		ARM_EXIT_KEEP(EXIT_TEXT)
++	}
++	. = ALIGN(16);
++	.init.proc.info : {
++		ARM_CPU_DISCARD(PROC_INFO)
++	}
++	. = ALIGN(16);
++	.init.data : {
++		INIT_DATA
++		INIT_SETUP(16)
++		INIT_CALLS
++		CON_INITCALL
++		SECURITY_INITCALL
++		INIT_RAM_FS
++	}
++	.exit.data : {
++		ARM_EXIT_KEEP(EXIT_DATA)
++	}
 +
-+static u32 encode_insn_immediate(enum aarch64_imm_type type, u32 insn, u64 imm)
-+{
-+	u32 immlo, immhi, lomask, himask, mask;
-+	int shift;
++	PERCPU_SECTION(64)
 +
-+	switch (type) {
-+	case INSN_IMM_MOVNZ:
++	__init_end = .;
++	. = ALIGN(THREAD_SIZE);
++	__data_loc = .;
++
++	.data : AT(__data_loc) {
++		_data = .;		/* address in memory */
++		_sdata = .;
++
 +		/*
-+		 * For signed MOVW relocations, we have to manipulate the
-+		 * instruction encoding depending on whether or not the
-+		 * immediate is less than zero.
++		 * first, the init task union, aligned
++		 * to an 8192 byte boundary.
 +		 */
-+		insn &= ~(3 << 29);
-+		if ((s64)imm >= 0) {
-+			/* >=0: Set the instruction to MOVZ (opcode 10b). */
-+			insn |= 2 << 29;
-+		} else {
-+			/*
-+			 * <0: Set the instruction to MOVN (opcode 00b).
-+			 *     Since we've masked the opcode already, we
-+			 *     don't need to do anything other than
-+			 *     inverting the new immediate field.
-+			 */
-+			imm = ~imm;
-+		}
-+	case INSN_IMM_MOVK:
-+		mask = BIT(16) - 1;
-+		shift = 5;
-+		break;
-+	case INSN_IMM_ADR:
-+		lomask = 0x3;
-+		himask = 0x7ffff;
-+		immlo = imm & lomask;
-+		imm >>= 2;
-+		immhi = imm & himask;
-+		imm = (immlo << 24) | (immhi);
-+		mask = (lomask << 24) | (himask);
-+		shift = 5;
-+		break;
-+	case INSN_IMM_26:
-+		mask = BIT(26) - 1;
-+		shift = 0;
-+		break;
-+	case INSN_IMM_19:
-+		mask = BIT(19) - 1;
-+		shift = 5;
-+		break;
-+	case INSN_IMM_16:
-+		mask = BIT(16) - 1;
-+		shift = 5;
-+		break;
-+	case INSN_IMM_14:
-+		mask = BIT(14) - 1;
-+		shift = 5;
-+		break;
-+	case INSN_IMM_12:
-+		mask = BIT(12) - 1;
-+		shift = 10;
-+		break;
-+	case INSN_IMM_9:
-+		mask = BIT(9) - 1;
-+		shift = 12;
-+		break;
-+	default:
-+		pr_err("encode_insn_immediate: unknown immediate encoding %d\n",
-+			type);
-+		return 0;
++		INIT_TASK_DATA(THREAD_SIZE)
++		NOSAVE_DATA
++		CACHELINE_ALIGNED_DATA(64)
++		READ_MOSTLY_DATA(64)
++
++		/*
++		 * The exception fixup table (might need resorting at runtime)
++		 */
++		. = ALIGN(32);
++		__start___ex_table = .;
++		*(__ex_table)
++		__stop___ex_table = .;
++
++		/*
++		 * and the usual data section
++		 */
++		DATA_DATA
++		CONSTRUCTORS
++
++		_edata = .;
 +	}
++	_edata_loc = __data_loc + SIZEOF(.data);
 +
-+	/* Update the immediate field. */
-+	insn &= ~(mask << shift);
-+	insn |= (imm & mask) << shift;
++	NOTES
 +
-+	return insn;
++	BSS_SECTION(0, 0, 0)
++	_end = .;
++
++	STABS_DEBUG
++	.comment 0 : { *(.comment) }
 +}
 +
-+static int reloc_insn_movw(enum aarch64_reloc_op op, void *place, u64 val,
-+			   int lsb, enum aarch64_imm_type imm_type)
-+{
-+	u64 imm, limit = 0;
-+	s64 sval;
-+	u32 insn = *(u32 *)place;
++/*
++ * These must never be empty
++ * If you have to comment these two assert statements out, your
++ * binutils is too old (for other reasons as well)
++ */
++ASSERT((__proc_info_end - __proc_info_begin), "missing CPU support")
+diff --git a/arch/arm64/mm/Kconfig b/arch/arm64/mm/Kconfig
+new file mode 100644
+index 0000000..8e94e52
+--- /dev/null
++++ b/arch/arm64/mm/Kconfig
+@@ -0,0 +1,5 @@
++config MMU
++	def_bool y
 +
-+	sval = do_reloc(op, place, val);
-+	sval >>= lsb;
-+	imm = sval & 0xffff;
++config CPU_64
++	def_bool y
+diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
+new file mode 100644
+index 0000000..81a9d8b
+--- /dev/null
++++ b/arch/arm64/mm/Makefile
+@@ -0,0 +1,6 @@
++obj-y				:= dma-mapping.o extable.o fault.o init.o \
++				   cache.o copypage.o flush.o \
++				   ioremap.o mmap.o pgd.o mmu.o \
++				   context.o tlb.o proc.o
 +
-+	/* Update the instruction with the new encoding. */
-+	*(u32 *)place = encode_insn_immediate(imm_type, insn, imm);
-+
-+	/* Shift out the immediate field. */
-+	sval >>= 16;
-+
-+	/*
-+	 * For unsigned immediates, the overflow check is straightforward.
-+	 * For signed immediates, the sign bit is actually the bit past the
-+	 * most significant bit of the field.
-+	 * The INSN_IMM_16 immediate type is unsigned.
-+	 */
-+	if (imm_type != INSN_IMM_16) {
-+		sval++;
-+		limit++;
-+	}
-+
-+	/* Check the upper bits depending on the sign of the immediate. */
-+	if ((u64)sval > limit)
-+		return -ERANGE;
-+
-+	return 0;
-+}
-+
-+static int reloc_insn_imm(enum aarch64_reloc_op op, void *place, u64 val,
-+			  int lsb, int len, enum aarch64_imm_type imm_type)
-+{
-+	u64 imm, imm_mask;
-+	s64 sval;
-+	u32 insn = *(u32 *)place;
-+
-+	/* Calculate the relocation value. */
-+	sval = do_reloc(op, place, val);
-+	sval >>= lsb;
-+
-+	/* Extract the value bits and shift them to bit 0. */
-+	imm_mask = (BIT(lsb + len) - 1) >> lsb;
-+	imm = sval & imm_mask;
-+
-+	/* Update the instruction's immediate field. */
-+	*(u32 *)place = encode_insn_immediate(imm_type, insn, imm);
-+
-+	/*
-+	 * Extract the upper value bits (including the sign bit) and
-+	 * shift them to bit 0.
-+	 */
-+	sval = (s64)(sval & ~(imm_mask >> 1)) >> (len - 1);
-+
-+	/*
-+	 * Overflow has occurred if the upper bits are not all equal to
-+	 * the sign bit of the value.
-+	 */
-+	if ((u64)(sval + 1) >= 2)
-+		return -ERANGE;
-+
-+	return 0;
-+}
-+
-+int apply_relocate_add(Elf64_Shdr *sechdrs,
-+		       const char *strtab,
-+		       unsigned int symindex,
-+		       unsigned int relsec,
-+		       struct module *me)
-+{
-+	unsigned int i;
-+	int ovf;
-+	bool overflow_check;
-+	Elf64_Sym *sym;
-+	void *loc;
-+	u64 val;
-+	Elf64_Rela *rel = (void *)sechdrs[relsec].sh_addr;
-+
-+	for (i = 0; i < sechdrs[relsec].sh_size / sizeof(*rel); i++) {
-+		/* loc corresponds to P in the AArch64 ELF document. */
-+		loc = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
-+			+ rel[i].r_offset;
-+
-+		/* sym is the ELF symbol we're referring to. */
-+		sym = (Elf64_Sym *)sechdrs[symindex].sh_addr
-+			+ ELF64_R_SYM(rel[i].r_info);
-+
-+		/* val corresponds to (S + A) in the AArch64 ELF document. */
-+		val = sym->st_value + rel[i].r_addend;
-+
-+		/* Check for overflow by default. */
-+		overflow_check = true;
-+
-+		/* Perform the static relocation. */
-+		switch (ELF64_R_TYPE(rel[i].r_info)) {
-+		/* Null relocations. */
-+		case R_ARM_NONE:
-+		case R_AARCH64_NONE:
-+			ovf = 0;
-+			break;
-+
-+		/* Data relocations. */
-+		case R_AARCH64_ABS64:
-+			overflow_check = false;
-+			ovf = reloc_data(RELOC_OP_ABS, loc, val, 64);
-+			break;
-+		case R_AARCH64_ABS32:
-+			ovf = reloc_data(RELOC_OP_ABS, loc, val, 32);
-+			break;
-+		case R_AARCH64_ABS16:
-+			ovf = reloc_data(RELOC_OP_ABS, loc, val, 16);
-+			break;
-+		case R_AARCH64_PREL64:
-+			overflow_check = false;
-+			ovf = reloc_data(RELOC_OP_PREL, loc, val, 64);
-+			break;
-+		case R_AARCH64_PREL32:
-+			ovf = reloc_data(RELOC_OP_PREL, loc, val, 32);
-+			break;
-+		case R_AARCH64_PREL16:
-+			ovf = reloc_data(RELOC_OP_PREL, loc, val, 16);
-+			break;
-+
-+		/* MOVW instruction relocations. */
-+		case R_AARCH64_MOVW_UABS_G0_NC:
-+			overflow_check = false;
-+		case R_AARCH64_MOVW_UABS_G0:
-+			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 0,
-+					      INSN_IMM_16);
-+			break;
-+		case R_AARCH64_MOVW_UABS_G1_NC:
-+			overflow_check = false;
-+		case R_AARCH64_MOVW_UABS_G1:
-+			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 16,
-+					      INSN_IMM_16);
-+			break;
-+		case R_AARCH64_MOVW_UABS_G2_NC:
-+			overflow_check = false;
-+		case R_AARCH64_MOVW_UABS_G2:
-+			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 32,
-+					      INSN_IMM_16);
-+			break;
-+		case R_AARCH64_MOVW_UABS_G3:
-+			/* We're using the top bits so we can't overflow. */
-+			overflow_check = false;
-+			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 48,
-+					      INSN_IMM_16);
-+			break;
-+		case R_AARCH64_MOVW_SABS_G0:
-+			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 0,
-+					      INSN_IMM_MOVNZ);
-+			break;
-+		case R_AARCH64_MOVW_SABS_G1:
-+			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 16,
-+					      INSN_IMM_MOVNZ);
-+			break;
-+		case R_AARCH64_MOVW_SABS_G2:
-+			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 32,
-+					      INSN_IMM_MOVNZ);
-+			break;
-+		case R_AARCH64_MOVW_PREL_G0_NC:
-+			overflow_check = false;
-+			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 0,
-+					      INSN_IMM_MOVK);
-+			break;
-+		case R_AARCH64_MOVW_PREL_G0:
-+			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 0,
-+					      INSN_IMM_MOVNZ);
-+			break;
-+		case R_AARCH64_MOVW_PREL_G1_NC:
-+			overflow_check = false;
-+			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 16,
-+					      INSN_IMM_MOVK);
-+			break;
-+		case R_AARCH64_MOVW_PREL_G1:
-+			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 16,
-+					      INSN_IMM_MOVNZ);
-+			break;
-+		case R_AARCH64_MOVW_PREL_G2_NC:
-+			overflow_check = false;
-+			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 32,
-+					      INSN_IMM_MOVK);
-+			break;
-+		case R_AARCH64_MOVW_PREL_G2:
-+			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 32,
-+					      INSN_IMM_MOVNZ);
-+			break;
-+		case R_AARCH64_MOVW_PREL_G3:
-+			/* We're using the top bits so we can't overflow. */
-+			overflow_check = false;
-+			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 48,
-+					      INSN_IMM_MOVNZ);
-+			break;
-+
-+		/* Immediate instruction relocations. */
-+		case R_AARCH64_LD_PREL_LO19:
-+			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 19,
-+					     INSN_IMM_19);
-+			break;
-+		case R_AARCH64_ADR_PREL_LO21:
-+			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 0, 21,
-+					     INSN_IMM_ADR);
-+			break;
-+		case R_AARCH64_ADR_PREL_PG_HI21_NC:
-+			overflow_check = false;
-+		case R_AARCH64_ADR_PREL_PG_HI21:
-+			ovf = reloc_insn_imm(RELOC_OP_PAGE, loc, val, 12, 21,
-+					     INSN_IMM_ADR);
-+			break;
-+		case R_AARCH64_ADD_ABS_LO12_NC:
-+		case R_AARCH64_LDST8_ABS_LO12_NC:
-+			overflow_check = false;
-+			ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 0, 12,
-+					     INSN_IMM_12);
-+			break;
-+		case R_AARCH64_LDST16_ABS_LO12_NC:
-+			overflow_check = false;
-+			ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 1, 11,
-+					     INSN_IMM_12);
-+			break;
-+		case R_AARCH64_LDST32_ABS_LO12_NC:
-+			overflow_check = false;
-+			ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 2, 10,
-+					     INSN_IMM_12);
-+			break;
-+		case R_AARCH64_LDST64_ABS_LO12_NC:
-+			overflow_check = false;
-+			ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 3, 9,
-+					     INSN_IMM_12);
-+			break;
-+		case R_AARCH64_LDST128_ABS_LO12_NC:
-+			overflow_check = false;
-+			ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 4, 8,
-+					     INSN_IMM_12);
-+			break;
-+		case R_AARCH64_TSTBR14:
-+			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 14,
-+					     INSN_IMM_14);
-+			break;
-+		case R_AARCH64_CONDBR19:
-+			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 19,
-+					     INSN_IMM_19);
-+			break;
-+		case R_AARCH64_JUMP26:
-+		case R_AARCH64_CALL26:
-+			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 26,
-+					     INSN_IMM_26);
-+			break;
-+
-+		default:
-+			pr_err("module %s: unsupported RELA relocation: %llu\n",
-+			       me->name, ELF64_R_TYPE(rel[i].r_info));
-+			return -ENOEXEC;
-+		}
-+
-+		if (overflow_check && ovf == -ERANGE)
-+			goto overflow;
-+
-+	}
-+
-+	return 0;
-+
-+overflow:
-+	pr_err("module %s: overflow in relocation type %d val %Lx\n",
-+	       me->name, (int)ELF64_R_TYPE(rel[i].r_info), val);
-+	return -ENOEXEC;
-+}
++obj-$(CONFIG_MODULES)		+= proc-syms.o
+diff --git a/init/Kconfig b/init/Kconfig
+index af6c7f8..8bfda46 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -1153,7 +1153,8 @@ menuconfig EXPERT
+ 
+ config UID16
+ 	bool "Enable 16-bit UID system calls" if EXPERT
+-	depends on ARM || BLACKFIN || CRIS || FRV || H8300 || X86_32 || M68K || (S390 && !64BIT) || SUPERH || SPARC32 || (SPARC64 && COMPAT) || UML || (X86_64 && IA32_EMULATION)
++	depends on ARM || BLACKFIN || CRIS || FRV || H8300 || X86_32 || M68K || (S390 && !64BIT) || SUPERH || SPARC32 || (SPARC64 && COMPAT) || UML || (X86_64 && IA32_EMULATION) \
++		|| AARCH32_EMULATION
+ 	default y
+ 	help
+ 	  This enables the legacy 16-bit UID syscall wrappers.
+diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+index 2403a63..cfb4578 100644
+--- a/lib/Kconfig.debug
++++ b/lib/Kconfig.debug
+@@ -452,7 +452,8 @@ config SLUB_STATS
+ config DEBUG_KMEMLEAK
+ 	bool "Kernel memory leak detector"
+ 	depends on DEBUG_KERNEL && EXPERIMENTAL && \
+-		(X86 || ARM || PPC || MIPS || S390 || SPARC64 || SUPERH || MICROBLAZE || TILE)
++		(X86 || ARM || PPC || MIPS || S390 || SPARC64 || SUPERH || \
++		 MICROBLAZE || TILE || ARM64)
+ 
+ 	select DEBUG_FS
+ 	select STACKTRACE if STACKTRACE_SUPPORT
+@@ -739,7 +740,8 @@ config DEBUG_BUGVERBOSE
+ 	bool "Verbose BUG() reporting (adds 70K)" if DEBUG_KERNEL && EXPERT
+ 	depends on BUG
+ 	depends on ARM || AVR32 || M32R || M68K || SPARC32 || SPARC64 || \
+-		   FRV || SUPERH || GENERIC_BUG || BLACKFIN || MN10300 || TILE
++		   FRV || SUPERH || GENERIC_BUG || BLACKFIN || MN10300 || \
++		   TILE || ARM64
+ 	default y
+ 	help
+ 	  Say Y here to make BUG() panics output the file name and line number
