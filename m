@@ -1,111 +1,66 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 14 Aug 2012 22:12:15 +0200
-Subject: [PATCH v3 10/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <1343332512-28762-11-git-send-email-thierry.reding@avionic-design.de>
-References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
- <1343332512-28762-11-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <20120814201215.GA10542@avionic-0098.mockup.avionic-design.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 14 Aug 2012 22:32:24 +0200
+Subject: [PATCH] ARM: mxc: ssi-fiq: Make ssi-fiq.S Thumb-2 compatible
+In-Reply-To: <CAKGA1bmk2TqDwxR=RT+z3y8XaSpcW+kHsaQfmdrHVqTD9Uxv5A@mail.gmail.com>
+References: <1344599604-9623-1-git-send-email-dave.martin@linaro.org>
+ <20120813193517.GU1451@pengutronix.de>
+ <CAKGA1bnRA61JT8tQoHBay+6BSxDO5egiagQm1v05L7Asf+qJ+Q@mail.gmail.com>
+ <20120814114059.GX1451@pengutronix.de>
+ <CAKGA1bmk2TqDwxR=RT+z3y8XaSpcW+kHsaQfmdrHVqTD9Uxv5A@mail.gmail.com>
+Message-ID: <20120814203224.GF1451@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2012 at 09:55:12PM +0200, Thierry Reding wrote:
-> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-> index a094c97..c886dff 100644
-> --- a/arch/arm/boot/dts/tegra20.dtsi
-> +++ b/arch/arm/boot/dts/tegra20.dtsi
-> @@ -199,6 +199,68 @@
->  		#size-cells = <0>;
->  	};
->  
-> +	pcie-controller {
-> +		compatible = "nvidia,tegra20-pcie";
-> +		reg = <0x80003000 0x00000800   /* PADS registers */
-> +		       0x80003800 0x00000200   /* AFI registers */
-> +		       0x81000000 0x01000000   /* configuration space */
-> +		       0x90000000 0x10000000>; /* extended configuration space */
-> +		interrupts = <0 98 0x04   /* controller interrupt */
-> +		              0 99 0x04>; /* MSI interrupt */
-> +		status = "disabled";
-> +
-> +		ranges = <0 0 0  0x80000000 0x00001000   /* root port 0 */
-> +			  0 1 0  0x81000000 0x00800000   /* port 0 config space */
-> +			  0 2 0  0x90000000 0x08000000   /* port 0 ext config space */
-> +			  0 3 0  0x82000000 0x00010000   /* port 0 downstream I/O */
-> +			  0 4 0  0xa0000000 0x08000000   /* port 0 non-prefetchable memory */
-> +			  0 5 0  0xb0000000 0x08000000   /* port 0 prefetchable memory */
-> +
-> +			  1 0 0  0x80001000 0x00001000   /* root port 1 */
-> +			  1 1 0  0x81800000 0x00800000   /* port 1 config space */
-> +			  1 2 0  0x98000000 0x08000000   /* port 1 ext config space */
-> +			  1 3 0  0x82010000 0x00010000   /* port 1 downstream I/O */
-> +			  1 4 0  0xa8000000 0x08000000   /* port 1 non-prefetchable memory */
-> +			  1 5 0  0xb8000000 0x08000000>; /* port 1 prefetchable memory */
+On Tue, Aug 14, 2012 at 12:49:43PM -0500, Matt Sealey wrote:
+> On Tue, Aug 14, 2012 at 6:40 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Mon, Aug 13, 2012 at 05:28:17PM -0500, Matt Sealey wrote:
+> >>  IMX_PIN_REG(MX51_PAD_EIM_DA15, NO_PAD, 0x058, 0, 0x000, 0), /*
+> >> MX51_PAD_EIM_DA15__EIM_DA15 */
+> >>
+> >>
+> >>
+> >> On Mon, Aug 13, 2012 at 2:35 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> >> > Hi Dave,
+> >> >
+> >> > On Fri, Aug 10, 2012 at 12:53:24PM +0100, Dave Martin wrote:
+> >> >> Because FIQ handlers get copied straight into the vectors page to
+> >> >> the FIQ vector entry point, FIQ handlers in a Thumb-2 kernel must
+> >> >> start in Thumb-2.  A Thumb-2 kernel enters all exception vectors in
+> >> >> Thumb-2.
+> >> >
+> >> > I finally came along testing this. I have no Thumb2 capable hardware
+> >> > to test if it works in thumb2 mode, but at least in Arm mode it works.
+> >> > This is enough to not introduce a regression, so we can go for this.
+> >>
+> >> This is the interesting dichotomy; the code is only required truly on
+> >> devices where Thumb2 isn't available, right?
+> >
+> > It is also used on the i.MX51 Eukrea board. I asked Eric (Cced) to test
+> > it in thumb2 mode, no response so far. I don't know the reason why he
+> > uses FIQ mode instead of SDMA, maybe simply historical reasons.
+> 
+> If we can lose that requirement then the only thing in the way is the
+> phyCORE support, which goes away on a "pure" v7 config anyway,
+> correct? I was just thinking, why not split v6_v7_defconfig into a
+> v7_defconfig losing those boards anyway and enable Thumb2 by default
+> while we're at it? It would mean more testing gets done and this error
+> would crop up both more often, but be less surprising and won't take a
+> year to revisit ;)
 
-I've been thinking about this some more. The translations for both the
-regular and extended configuration spaces are configured in the top-
-level PCIe controller. It is therefore wrong how they are passed to the
-PCI host bridges via the ranges property.
+It took a long time until all people have realized that their code may
+not only run on the SoC they are currently working on, but also on other
+SoCs. Having many SoCs in a single defconfig makes this fact more
+obvious and often breaks compilation if their code is not multi SoC
+safe. I don't really want to lose this.
 
-I remember Mitch saying that it should be passed down to the children
-because it is partitioned among them, but since the layout is compatible
-with ECAM, the partitioning isn't as simple as what's in the tree. In
-fact the partitions will be dependent on the number of devices attached
-to the host bridges.
+Hopefully we will soon only have a handfull of ARM defconfigs anyway.
+Until this is the case I vote for not splitting up defconfigs. Then we
+can have things like thumb2_defconfig, armv6_defconfig,...
 
-> +
-> +		#address-cells = <3>;
-> +		#size-cells = <1>;
-> +
-> +		pci at 0 {
-> +			device_type = "pciex";
-> +			reg = <0 0 0 0x1000>;
-> +			status = "disabled";
-> +
-> +			#address-cells = <3>;
-> +			#size-cells = <2>;
-> +
-> +			ranges = <0x80000000 0 0  0 1 0  0 0x00800000   /* config space */
-> +				  0x90000000 0 0  0 2 0  0 0x08000000   /* ext config space */
-> +				  0x81000000 0 0  0 3 0  0 0x00010000   /* I/O */
-> +				  0x82000000 0 0  0 4 0  0 0x08000000   /* non-prefetchable memory */
-> +				  0xc2000000 0 0  0 5 0  0 0x08000000>; /* prefetchable memory */
-> +
-> +			nvidia,num-lanes = <2>;
-> +		};
-> +
-> +		pci at 1 {
-> +			device_type = "pciex";
-> +			reg = <1 0 0 0x1000>;
-> +			status = "disabled";
-> +
-> +			#address-cells = <3>;
-> +			#size-cells = <2>;
-> +
-> +			ranges = <0x80000000 0 0  1 1 0  0 0x00800000   /* config space */
-> +				  0x90000000 0 0  1 2 0  0 0x08000000   /* ext config space */
-> +				  0x81000000 0 0  1 3 0  0 0x00010000   /* I/O */
-> +				  0x82000000 0 0  1 4 0  0 0x08000000   /* non-prefetchable memory */
-> +				  0xc2000000 0 0  1 5 0  0 0x08000000>; /* prefetchable memory */
-> +
-> +			nvidia,num-lanes = <2>;
-> +		};
-> +	};
+Sascha
 
-The same is true for the ranges properties of the PCI host bridge nodes.
-Which part of the configuration spaces maps to the children of the
-respective host bridge depends on the actual device hierarchy.
-
-Would it be possible to alternatively pass the complete range to the
-children without further partitioning?
-
-The driver doesn't actually care about the ranges property and only uses
-the values specified in the reg property of the pcie-controller node.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120814/fc1966f8/attachment-0001.sig>
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
