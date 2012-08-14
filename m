@@ -1,35 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Aug 2012 10:31:08 +0200
-Subject: [PATCH 8/8] input: ab8500-ponkey: Rely on MFD core to convert
- IRQs to virtual
-In-Reply-To: <1344527635-6163-9-git-send-email-lee.jones@linaro.org>
-References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
- <1344527635-6163-9-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdZ-HOGy_sdsCQSNOdYTDzHFszk0OySM88TjO-neSJUz0A@mail.gmail.com>
+Date: Tue, 14 Aug 2012 10:32:02 +0200
+Subject: [rtc-linux] [PATCH 1/1] drivers/rtc/rtc-ab8500.c: Revoke Device
+ Tree enablement
+In-Reply-To: <1344527828-6283-3-git-send-email-lee.jones@linaro.org>
+References: <1344527828-6283-1-git-send-email-lee.jones@linaro.org>
+ <1344527828-6283-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZa-72QogrZ-P5jbDHTTX64babZo3ydjzfgC-4LWUBfMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 9, 2012 at 5:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Thu, Aug 9, 2012 at 5:57 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> There was a plan to place ab8500_irq_get_virq() calls in each AB8500
-> child device prior to requesting an IRQ, but as we're no longer using
-> Device Tree to collect our IRQ numbers, it's actually better to allow
-> the core to do this during device registration time. So the IRQ number
-> we pull from its resource has already been converted to a virtual IRQ.
+> All AB8500 devices are now registered via MFD core, so Device Tree
+> capability is no longer required for probing. Here we pull the DT
+> match table to ensure we're no longer probed during Device Tree
+> start-up.
 >
-> CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> CC: linux-input at vger.kernel.org
+> CC: Alessandro Zummo <a.zummo@towertech.it>
+> CC: rtc-linux at googlegroups.com
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-This is looking good, I guess you need all patches to go in at the
-same time so Dmitry's ACK is required.
-
-FWIW:
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-BTW: this makes me suspect that the public ab8500_irq_get_virq()
-interface can be *deleted* and the function made static in the
-AB8500 driver, right?
 
 Yours,
 Linus Walleij
