@@ -1,34 +1,24 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 14 Aug 2012 12:00:17 +0530
-Subject: [PATCH] arm:davinci: clk - migrate to new common clock API
-In-Reply-To: <1343926428-5210-1-git-send-email-m-karicheri2@ti.com>
-References: <1343926428-5210-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <5029F079.8010901@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 14 Aug 2012 14:46:16 +0800
+Subject: How to define gpio irq with device tree
+In-Reply-To: <5029E646.5090900@gmail.com>
+References: <5024FF03.1070805@de.bosch.com>
+ <20120814041841.GA30782@S2101-09.ap.freescale.net>
+ <5029E646.5090900@gmail.com>
+Message-ID: <20120814064614.GA2734@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Murali,
-
-On 8/2/2012 10:23 PM, Murali Karicheri wrote:
-> As a first step towards migrating davinci platforms to use common clock
-> framework, replace all instances of clk_enable() with clk_prepare_enable()
-> and clk_disable() with clk_disable_unprepare(). Until the platform is
-> switched to use the CONFIG_HAVE_CLK_PREPARE Kconfig variable, this just
-> adds a might_sleep() call and would work without any issues.
+On Tue, Aug 14, 2012 at 01:46:46PM +0800, Hui Wang wrote:
+> I generated a similar patch on the last week, only the linux-input
+> part. please refer to https://patchwork.kernel.org/patch/1293451/
 > 
-> This will make it easy later to switch to common clk based implementation
-> of clk driver from DaVinci specific driver.
-> 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+Ok.  But can you rename property "irq-gpio" to "wakeup-gpios"?
+Firstly, the idiom of gpio naming in DT is *-gpios, even though
+most of time, it could be just one gpio.  Secondly, as the pin is
+accessed as a gpio only in egalax_wake_up_device for waking up the
+device, "wakeup-gpios" sounds better?
 
-Queuing this patch for v3.7. The subject line should have ARM in
-capitals for consistency. Also, you are not really migrating to new API
-in this patch - just preparing for migration so I prefer:
-
-"ARM: davinci: convert platform code to use clk_prepare/clk_unprepare"
-
-I will make this change while committing.
-
-Thanks,
-Sekhar
+-- 
+Regards,
+Shawn
