@@ -1,47 +1,50 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Aug 2012 18:52:04 +0100
-Subject: [PATCH v2 03/31] arm64: Exception handling
+Date: Tue, 14 Aug 2012 18:52:07 +0100
+Subject: [PATCH v2 06/31] arm64: MMU fault handling and page table management
 In-Reply-To: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
 References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1344966752-16102-4-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1344966752-16102-7-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch contains the exception entry code (kernel/entry.S), pt_regs
-structure and related accessors, undefined instruction trapping and
-stack tracing.
+This patch adds support for the handling of the MMU faults (exception
+entry code introduced by a previous patch) and page table management.
 
-AArch64 Linux kernel (including kernel threads) runs in EL1 mode using
-the SP1 stack. The vectors don't have a fixed address, only alignment
-(2^11) requirements.
+The user translation table is pointed to by TTBR0 and the kernel one
+(swapper_pg_dir) by TTBR1. There is no translation information shared or
+address space overlapping between user and kernel page tables.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/ptrace.h     |  206 +++++++++++
- arch/arm64/include/asm/stacktrace.h |   29 ++
- arch/arm64/include/asm/traps.h      |   30 ++
- arch/arm64/kernel/entry.S           |  695 +++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/stacktrace.c      |  127 +++++++
- arch/arm64/kernel/traps.c           |  357 ++++++++++++++++++
- 6 files changed, 1444 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/ptrace.h
- create mode 100644 arch/arm64/include/asm/stacktrace.h
- create mode 100644 arch/arm64/include/asm/traps.h
- create mode 100644 arch/arm64/kernel/entry.S
- create mode 100644 arch/arm64/kernel/stacktrace.c
- create mode 100644 arch/arm64/kernel/traps.c
+ arch/arm64/include/asm/page.h    |   67 +++++
+ arch/arm64/include/asm/pgalloc.h |  113 ++++++++
+ arch/arm64/mm/copypage.c         |   34 +++
+ arch/arm64/mm/extable.c          |   17 ++
+ arch/arm64/mm/fault.c            |  534 ++++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/mm.h               |    2 +
+ arch/arm64/mm/mmap.c             |  144 ++++++++++
+ arch/arm64/mm/pgd.c              |   49 ++++
+ 8 files changed, 960 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm64/include/asm/page.h
+ create mode 100644 arch/arm64/include/asm/pgalloc.h
+ create mode 100644 arch/arm64/mm/copypage.c
+ create mode 100644 arch/arm64/mm/extable.c
+ create mode 100644 arch/arm64/mm/fault.c
+ create mode 100644 arch/arm64/mm/mm.h
+ create mode 100644 arch/arm64/mm/mmap.c
+ create mode 100644 arch/arm64/mm/pgd.c
 
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
 new file mode 100644
-index 0000000..a9abace
+index 0000000..46bf666
 --- /dev/null
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -0,0 +1,206 @@
++++ b/arch/arm64/include/asm/page.h
+@@ -0,0 +1,67 @@
 +/*
-+ * Based on arch/arm/include/asm/ptrace.h
++ * Based on arch/arm/include/asm/page.h
 + *
-+ * Copyright (C) 1996-2003 Russell King
++ * Copyright (C) 1995-2003 Russell King
 + * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -56,201 +59,65 @@ index 0000000..a9abace
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#ifndef __ASM_PTRACE_H
-+#define __ASM_PTRACE_H
++#ifndef __ASM_PAGE_H
++#define __ASM_PAGE_H
 +
-+#include <linux/types.h>
++/* PAGE_SHIFT determines the page size */
++#ifdef CONFIG_ARM64_64K_PAGES
++#define PAGE_SHIFT		16
++#else
++#define PAGE_SHIFT		12
++#endif
++#define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
++#define PAGE_MASK		(~(PAGE_SIZE-1))
 +
-+#include <asm/hwcap.h>
-+
-+#define PTRACE_GETREGS		12
-+#define PTRACE_SETREGS		13
-+#define PTRACE_GETFPSIMDREGS	14
-+#define PTRACE_SETFPSIMDREGS	15
-+/* PTRACE_ATTACH is 16 */
-+/* PTRACE_DETACH is 17 */
-+#define PTRACE_GET_THREAD_AREA	22
-+#define PTRACE_SET_SYSCALL	23
-+#define PTRACE_GETHBPREGS	29
-+#define PTRACE_SETHBPREGS	30
-+
-+/* AArch32-specific ptrace requests */
-+#define COMPAT_PTRACE_GETVFPREGS	27
-+#define COMPAT_PTRACE_SETVFPREGS	28
-+
-+/*
-+ * PSR bits
-+ */
-+#define PSR_MODE_EL0t	0x00000000
-+#define PSR_MODE_EL1t	0x00000004
-+#define PSR_MODE_EL1h	0x00000005
-+#define PSR_MODE_EL2t	0x00000008
-+#define PSR_MODE_EL2h	0x00000009
-+#define PSR_MODE_EL3t	0x0000000c
-+#define PSR_MODE_EL3h	0x0000000d
-+#define PSR_MODE_MASK	0x0000000f
-+
-+/* AArch32 CPSR bits */
-+#define PSR_MODE32_BIT		0x00000010
-+#define COMPAT_PSR_MODE_USR	0x00000010
-+#define COMPAT_PSR_T_BIT	0x00000020
-+#define COMPAT_PSR_IT_MASK	0x0600fc00	/* If-Then execution state mask */
-+
-+/* AArch64 SPSR bits */
-+#define PSR_F_BIT	0x00000040
-+#define PSR_I_BIT	0x00000080
-+#define PSR_A_BIT	0x00000100
-+#define PSR_D_BIT	0x00000200
-+#define PSR_Q_BIT	0x08000000
-+#define PSR_V_BIT	0x10000000
-+#define PSR_C_BIT	0x20000000
-+#define PSR_Z_BIT	0x40000000
-+#define PSR_N_BIT	0x80000000
-+
-+/*
-+ * Groups of PSR bits
-+ */
-+#define PSR_f		0xff000000	/* Flags		*/
-+#define PSR_s		0x00ff0000	/* Status		*/
-+#define PSR_x		0x0000ff00	/* Extension		*/
-+#define PSR_c		0x000000ff	/* Control		*/
-+
-+/*
-+ * These are 'magic' values for PTRACE_PEEKUSR that return info about where a
-+ * process is located in memory.
-+ */
-+#define PT_TEXT_ADDR		0x10000
-+#define PT_DATA_ADDR		0x10004
-+#define PT_TEXT_END_ADDR	0x10008
++/* We do define AT_SYSINFO_EHDR but don't use the gate mechanism */
++#define __HAVE_ARCH_GATE_AREA		1
 +
 +#ifndef __ASSEMBLY__
 +
-+/*
-+ * User structures for general purpose and floating point registers.
-+ */
-+struct user_pt_regs {
-+	__u64		regs[31];
-+	__u64		sp;
-+	__u64		pc;
-+	__u64		pstate;
-+};
-+
-+struct user_fpsimd_state {
-+	__uint128_t	vregs[32];
-+	__u32		fpsr;
-+	__u32		fpcr;
-+};
-+
-+#ifdef __KERNEL__
-+
-+#ifdef CONFIG_AARCH32_EMULATION
-+/* sizeof(struct user) for AArch32 */
-+#define COMPAT_USER_SZ	296
-+/* AArch32 uses x13 as the stack pointer... */
-+#define compat_sp	regs[13]
-+/* ... and x14 as the link register. */
-+#define compat_lr	regs[14]
-+#endif
-+
-+/*
-+ * This struct defines the way the registers are stored on the stack during an
-+ * exception. Note that sizeof(struct pt_regs) has to be a multiple of 16 (for
-+ * stack alignment). struct user_pt_regs must form a prefix of struct pt_regs.
-+ */
-+struct pt_regs {
-+	union {
-+		struct user_pt_regs user_regs;
-+		struct {
-+			u64 regs[31];
-+			u64 sp;
-+			u64 pc;
-+			u64 pstate;
-+		};
-+	};
-+	u64 orig_x0;
-+	u64 syscallno;
-+};
-+
-+#define arch_has_single_step()	(1)
-+
-+#ifdef CONFIG_AARCH32_EMULATION
-+#define compat_thumb_mode(regs) \
-+	(((regs)->pstate & COMPAT_PSR_T_BIT))
++#ifdef CONFIG_ARM64_64K_PAGES
++#include <asm/pgtable-2level-types.h>
 +#else
-+#define compat_thumb_mode(regs) (0)
++#include <asm/pgtable-3level-types.h>
 +#endif
 +
-+#define user_mode(regs)	\
-+	(((regs)->pstate & PSR_MODE_MASK) == PSR_MODE_EL0t)
++extern void __cpu_clear_user_page(void *p, unsigned long user);
++extern void __cpu_copy_user_page(void *to, const void *from,
++				 unsigned long user);
++extern void copy_page(void *to, const void *from);
++extern void clear_page(void *to);
 +
-+#define compat_user_mode(regs)	\
-+	(((regs)->pstate & (PSR_MODE32_BIT | PSR_MODE_MASK)) == \
-+	 (PSR_MODE32_BIT | PSR_MODE_EL0t))
++#define clear_user_page(addr,vaddr,pg)  __cpu_clear_user_page(addr, vaddr)
++#define copy_user_page(to,from,vaddr,pg) __cpu_copy_user_page(to, from, vaddr)
 +
-+#define processor_mode(regs) \
-+	((regs)->pstate & PSR_MODE_MASK)
++typedef struct page *pgtable_t;
 +
-+#define interrupts_enabled(regs) \
-+	(!((regs)->pstate & PSR_I_BIT))
-+
-+#define fast_interrupts_enabled(regs) \
-+	(!((regs)->pstate & PSR_F_BIT))
-+
-+#define user_stack_pointer(regs) \
-+	((regs)->sp)
-+
-+/*
-+ * Are the current registers suitable for user mode? (used to maintain
-+ * security in signal handlers)
-+ */
-+static inline int valid_user_regs(struct user_pt_regs *regs)
-+{
-+	if (user_mode(regs) && (regs->pstate & PSR_I_BIT) == 0) {
-+		regs->pstate &= ~(PSR_F_BIT | PSR_A_BIT);
-+
-+		/* The T bit is reserved for AArch64 */
-+		if (!(regs->pstate & PSR_MODE32_BIT))
-+			regs->pstate &= ~COMPAT_PSR_T_BIT;
-+
-+		return 1;
-+	}
-+
-+	/*
-+	 * Force PSR to something logical...
-+	 */
-+	regs->pstate &= PSR_f | PSR_s | (PSR_x & ~PSR_A_BIT) | \
-+			COMPAT_PSR_T_BIT | PSR_MODE32_BIT;
-+
-+	if (!(regs->pstate & PSR_MODE32_BIT)) {
-+		regs->pstate &= ~COMPAT_PSR_T_BIT;
-+		regs->pstate |= PSR_MODE_EL0t;
-+	}
-+
-+	return 0;
-+}
-+
-+#define instruction_pointer(regs)	(regs)->pc
-+
-+#ifdef CONFIG_SMP
-+extern unsigned long profile_pc(struct pt_regs *regs);
-+#else
-+#define profile_pc(regs) instruction_pointer(regs)
++#ifdef CONFIG_HAVE_ARCH_PFN_VALID
++extern int pfn_valid(unsigned long);
 +#endif
 +
-+extern int aarch32_break_trap(struct pt_regs *regs);
++#include <asm/memory.h>
 +
-+#endif /* __KERNEL__ */
++#endif /* !__ASSEMBLY__ */
 +
-+#endif /* __ASSEMBLY__ */
++#define VM_DATA_DEFAULT_FLAGS \
++	(((current->personality & READ_IMPLIES_EXEC) ? VM_EXEC : 0) | \
++	 VM_READ | VM_WRITE | VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
++
++#include <asm-generic/getorder.h>
 +
 +#endif
-diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
+diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
 new file mode 100644
-index 0000000..7318f6d
+index 0000000..f214069
 --- /dev/null
-+++ b/arch/arm64/include/asm/stacktrace.h
-@@ -0,0 +1,29 @@
++++ b/arch/arm64/include/asm/pgalloc.h
+@@ -0,0 +1,113 @@
 +/*
++ * Based on arch/arm/include/asm/pgalloc.h
++ *
++ * Copyright (C) 2000-2001 Russell King
 + * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -265,900 +132,111 @@ index 0000000..7318f6d
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#ifndef __ASM_STACKTRACE_H
-+#define __ASM_STACKTRACE_H
++#ifndef __ASM_PGALLOC_H
++#define __ASM_PGALLOC_H
 +
-+struct stackframe {
-+	unsigned long fp;
-+	unsigned long sp;
-+	unsigned long pc;
-+};
++#include <asm/pgtable-hwdef.h>
++#include <asm/processor.h>
++#include <asm/cacheflush.h>
++#include <asm/tlbflush.h>
 +
-+extern int unwind_frame(struct stackframe *frame);
-+extern void walk_stackframe(struct stackframe *frame,
-+			    int (*fn)(struct stackframe *, void *), void *data);
++#define check_pgt_cache()		do { } while (0)
 +
-+#endif	/* __ASM_STACKTRACE_H */
-diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
++#ifndef CONFIG_ARM64_64K_PAGES
++
++static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
++{
++	return (pmd_t *)get_zeroed_page(GFP_KERNEL | __GFP_REPEAT);
++}
++
++static inline void pmd_free(struct mm_struct *mm, pmd_t *pmd)
++{
++	BUG_ON((unsigned long)pmd & (PAGE_SIZE-1));
++	free_page((unsigned long)pmd);
++}
++
++static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
++{
++	set_pud(pud, __pud(__pa(pmd) | PMD_TYPE_TABLE));
++}
++
++#endif	/* CONFIG_ARM64_64K_PAGES */
++
++extern pgd_t *pgd_alloc(struct mm_struct *mm);
++extern void pgd_free(struct mm_struct *mm, pgd_t *pgd);
++
++#define PGALLOC_GFP	(GFP_KERNEL | __GFP_NOTRACK | __GFP_REPEAT | __GFP_ZERO)
++
++static inline pte_t *
++pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
++{
++	return (pte_t *)__get_free_page(PGALLOC_GFP);
++}
++
++static inline pgtable_t
++pte_alloc_one(struct mm_struct *mm, unsigned long addr)
++{
++	struct page *pte;
++
++	pte = alloc_pages(PGALLOC_GFP, 0);
++	if (pte)
++		pgtable_page_ctor(pte);
++
++	return pte;
++}
++
++/*
++ * Free a PTE table.
++ */
++static inline void pte_free_kernel(struct mm_struct *mm, pte_t *pte)
++{
++	if (pte)
++		free_page((unsigned long)pte);
++}
++
++static inline void pte_free(struct mm_struct *mm, pgtable_t pte)
++{
++	pgtable_page_dtor(pte);
++	__free_page(pte);
++}
++
++static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
++				  pmdval_t prot)
++{
++	set_pmd(pmdp, __pmd(pte | prot));
++}
++
++/*
++ * Populate the pmdp entry with a pointer to the pte.  This pmd is part
++ * of the mm address space.
++ */
++static inline void
++pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
++{
++	/*
++	 * The pmd must be loaded with the physical address of the PTE table
++	 */
++	__pmd_populate(pmdp, __pa(ptep), PMD_TYPE_TABLE);
++}
++
++static inline void
++pmd_populate(struct mm_struct *mm, pmd_t *pmdp, pgtable_t ptep)
++{
++	__pmd_populate(pmdp, page_to_phys(ptep), PMD_TYPE_TABLE);
++}
++#define pmd_pgtable(pmd) pmd_page(pmd)
++
++#endif
+diff --git a/arch/arm64/mm/copypage.c b/arch/arm64/mm/copypage.c
 new file mode 100644
-index 0000000..10ca8ff
+index 0000000..9361662
 --- /dev/null
-+++ b/arch/arm64/include/asm/traps.h
-@@ -0,0 +1,30 @@
++++ b/arch/arm64/mm/copypage.c
+@@ -0,0 +1,34 @@
 +/*
-+ * Based on arch/arm/include/asm/traps.h
++ * Based on arch/arm/mm/copypage.c
 + *
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_TRAP_H
-+#define __ASM_TRAP_H
-+
-+static inline int in_exception_text(unsigned long ptr)
-+{
-+	extern char __exception_text_start[];
-+	extern char __exception_text_end[];
-+
-+	return ptr >= (unsigned long)&__exception_text_start &&
-+	       ptr < (unsigned long)&__exception_text_end;
-+}
-+
-+#endif
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-new file mode 100644
-index 0000000..32b96ab
---- /dev/null
-+++ b/arch/arm64/kernel/entry.S
-@@ -0,0 +1,695 @@
-+/*
-+ * Low-level exception handling code
-+ *
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Authors:	Catalin Marinas <catalin.marinas@arm.com>
-+ *		Will Deacon <will.deacon@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/linkage.h>
-+
-+#include <asm/assembler.h>
-+#include <asm/asm-offsets.h>
-+#include <asm/errno.h>
-+#include <asm/thread_info.h>
-+#include <asm/unistd.h>
-+
-+/*
-+ * Bad Abort numbers
-+ *-----------------
-+ */
-+#define BAD_SYNC	0
-+#define BAD_IRQ		1
-+#define BAD_FIQ		2
-+#define BAD_ERROR	3
-+
-+	.macro	kernel_entry, el, regsize = 64
-+	sub	sp, sp, #S_FRAME_SIZE - S_LR	// room for LR, SP, SPSR, ELR
-+	.if	\regsize == 32
-+	mov	w0, w0				// zero upper 32 bits of x0
-+	.endif
-+	push	x28, x29
-+	push	x26, x27
-+	push	x24, x25
-+	push	x22, x23
-+	push	x20, x21
-+	push	x18, x19
-+	push	x16, x17
-+	push	x14, x15
-+	push	x12, x13
-+	push	x10, x11
-+	push	x8, x9
-+	push	x6, x7
-+	push	x4, x5
-+	push	x2, x3
-+	push	x0, x1
-+	.if	\el == 0
-+	mrs	x21, sp_el0
-+	.else
-+	add	x21, sp, #S_FRAME_SIZE
-+	.endif
-+	mrs	x22, elr_el1
-+	mrs	x23, spsr_el1
-+	stp	lr, x21, [sp, #S_LR]
-+	stp	x22, x23, [sp, #S_PC]
-+
-+	/*
-+	 * Set syscallno to -1 by default (overridden later if real syscall).
-+	 */
-+	.if	\el == 0
-+	mvn	x21, xzr
-+	str	x21, [sp, #S_SYSCALLNO]
-+	.endif
-+
-+	/*
-+	 * Registers that may be useful after this macro is invoked:
-+	 *
-+	 * x21 - aborted SP
-+	 * x22 - aborted PC
-+	 * x23 - aborted PSTATE
-+	*/
-+	.endm
-+
-+	.macro	kernel_exit, el, ret = 0
-+	ldp	x21, x22, [sp, #S_PC]		// load ELR, SPSR
-+	.if	\el == 0
-+	ldr	x23, [sp, #S_SP]		// load return stack pointer
-+	.endif
-+	.if	\ret
-+	ldr	x1, [sp, #S_X1]			// preserve x0 (syscall return)
-+	add	sp, sp, S_X2
-+	.else
-+	pop	x0, x1
-+	.endif
-+	pop	x2, x3				// load the rest of the registers
-+	pop	x4, x5
-+	pop	x6, x7
-+	pop	x8, x9
-+	msr	elr_el1, x21			// set up the return data
-+	msr	spsr_el1, x22
-+	.if	\el == 0
-+	msr	sp_el0, x23
-+	.endif
-+	pop	x10, x11
-+	pop	x12, x13
-+	pop	x14, x15
-+	pop	x16, x17
-+	pop	x18, x19
-+	pop	x20, x21
-+	pop	x22, x23
-+	pop	x24, x25
-+	pop	x26, x27
-+	pop	x28, x29
-+	ldr	lr, [sp], #S_FRAME_SIZE - S_LR	// load LR and restore SP
-+	eret					// return to kernel
-+	.endm
-+
-+	.macro	get_thread_info, rd
-+	mov	\rd, sp
-+	and	\rd, \rd, #~((1 << 13) - 1)	// top of 8K stack
-+	.endm
-+
-+/*
-+ * These are the registers used in the syscall handler, and allow us to
-+ * have in theory up to 7 arguments to a function - x0 to x6.
-+ *
-+ * x7 is reserved for the system call number in 32-bit mode.
-+ */
-+sc_nr	.req	x25		// number of system calls
-+scno	.req	x26		// syscall number
-+stbl	.req	x27		// syscall table pointer
-+tsk	.req	x28		// current thread_info
-+
-+/*
-+ * Interrupt handling.
-+ */
-+	.macro	irq_handler
-+	ldr	x1, handle_arch_irq
-+	mov	x0, sp
-+	blr	x1
-+	.endm
-+
-+	.text
-+
-+/*
-+ * Exception vectors.
-+ */
-+	.macro	ventry	label
-+	.align	7
-+	b	\label
-+	.endm
-+
-+	.align	11
-+ENTRY(vectors)
-+	ventry	el1_sync_invalid		// Synchronous EL1t
-+	ventry	el1_irq_invalid			// IRQ EL1t
-+	ventry	el1_fiq_invalid			// FIQ EL1t
-+	ventry	el1_error_invalid		// Error EL1t
-+
-+	ventry	el1_sync			// Synchronous EL1h
-+	ventry	el1_irq				// IRQ EL1h
-+	ventry	el1_fiq_invalid			// FIQ EL1h
-+	ventry	el1_error_invalid		// Error EL1h
-+
-+	ventry	el0_sync			// Synchronous 64-bit EL0
-+	ventry	el0_irq				// IRQ 64-bit EL0
-+	ventry	el0_fiq_invalid			// FIQ 64-bit EL0
-+	ventry	el0_error_invalid		// Error 64-bit EL0
-+
-+#ifdef CONFIG_AARCH32_EMULATION
-+	ventry	el0_sync_compat			// Synchronous 32-bit EL0
-+	ventry	el0_irq_compat			// IRQ 32-bit EL0
-+	ventry	el0_fiq_invalid_compat		// FIQ 32-bit EL0
-+	ventry	el0_error_invalid_compat	// Error 32-bit EL0
-+#else
-+	ventry	el0_sync_invalid		// Synchronous 32-bit EL0
-+	ventry	el0_irq_invalid			// IRQ 32-bit EL0
-+	ventry	el0_fiq_invalid			// FIQ 32-bit EL0
-+	ventry	el0_error_invalid		// Error 32-bit EL0
-+#endif
-+END(vectors)
-+
-+/*
-+ * Invalid mode handlers
-+ */
-+	.macro	inv_entry, el, reason, regsize = 64
-+	kernel_entry el, \regsize
-+	mov	x0, sp
-+	mov	x1, #\reason
-+	mrs	x2, esr_el1
-+	b	bad_mode
-+	.endm
-+
-+el0_sync_invalid:
-+	inv_entry 0, BAD_SYNC
-+ENDPROC(el0_sync_invalid)
-+
-+el0_irq_invalid:
-+	inv_entry 0, BAD_IRQ
-+ENDPROC(el0_irq_invalid)
-+
-+el0_fiq_invalid:
-+	inv_entry 0, BAD_FIQ
-+ENDPROC(el0_fiq_invalid)
-+
-+el0_error_invalid:
-+	inv_entry 0, BAD_ERROR
-+ENDPROC(el0_error_invalid)
-+
-+#ifdef CONFIG_AARCH32_EMULATION
-+el0_fiq_invalid_compat:
-+	inv_entry 0, BAD_FIQ, 32
-+ENDPROC(el0_fiq_invalid_compat)
-+
-+el0_error_invalid_compat:
-+	inv_entry 0, BAD_ERROR, 32
-+ENDPROC(el0_error_invalid_compat)
-+#endif
-+
-+el1_sync_invalid:
-+	inv_entry 1, BAD_SYNC
-+ENDPROC(el1_sync_invalid)
-+
-+el1_irq_invalid:
-+	inv_entry 1, BAD_IRQ
-+ENDPROC(el1_irq_invalid)
-+
-+el1_fiq_invalid:
-+	inv_entry 1, BAD_FIQ
-+ENDPROC(el1_fiq_invalid)
-+
-+el1_error_invalid:
-+	inv_entry 1, BAD_ERROR
-+ENDPROC(el1_error_invalid)
-+
-+/*
-+ * EL1 mode handlers.
-+ */
-+	.align	6
-+el1_sync:
-+	kernel_entry 1
-+	mrs	x1, esr_el1			// read the syndrome register
-+	lsr	x24, x1, #26			// exception class
-+	cmp	x24, #0x25			// data abort in EL1
-+	b.eq	el1_da
-+	cmp	x24, #0x18			// configurable trap
-+	b.eq	el1_undef
-+	cmp	x24, #0x26			// stack alignment exception
-+	b.eq	el1_sp_pc
-+	cmp	x24, #0x22			// pc alignment exception
-+	b.eq	el1_sp_pc
-+	cmp	x24, #0x00			// unknown exception in EL1
-+	b.eq	el1_undef
-+	cmp	x24, #0x30			// debug exception in EL1
-+	b.ge	el1_dbg
-+	b	el1_inv
-+el1_da:
-+	/*
-+	 * Data abort handling
-+	 */
-+	mrs	x0, far_el1
-+	enable_dbg_if_not_stepping x2
-+	// re-enable interrupts if they were enabled in the aborted context
-+	tbnz	x23, #7, 1f			// PSR_I_BIT
-+	enable_irq
-+1:
-+	mov	x2, sp				// struct pt_regs
-+	bl	do_mem_abort
-+
-+	// disable interrupts before pulling preserved data off the stack
-+	disable_irq
-+	kernel_exit 1
-+el1_sp_pc:
-+	/*
-+	 *Stack or PC alignment exception handling
-+	 */
-+	mrs	x0, far_el1
-+	mov	x1, x25
-+	mov	x2, sp
-+	b	do_sp_pc_abort
-+el1_undef:
-+	/*
-+	 *Undefined instruction
-+	 */
-+	mov	x0, sp
-+	b	do_undefinstr
-+el1_dbg:
-+	/*
-+	 * Debug exception handling
-+	 */
-+	tbz	x24, #0, el1_inv		// EL1 only
-+	mrs	x0, far_el1
-+	mov	x2, sp				// struct pt_regs
-+	bl	do_debug_exception
-+
-+	kernel_exit 1
-+el1_inv:
-+	// TODO: add support for undefined instructions in kernel mode
-+	mov	x0, sp
-+	mov	x1, #BAD_SYNC
-+	mrs	x2, esr_el1
-+	b	bad_mode
-+ENDPROC(el1_sync)
-+
-+	.align	6
-+el1_irq:
-+	kernel_entry 1
-+	enable_dbg_if_not_stepping x0
-+#ifdef CONFIG_TRACE_IRQFLAGS
-+	bl	trace_hardirqs_off
-+#endif
-+#ifdef CONFIG_PREEMPT
-+	get_thread_info tsk
-+	ldr	x24, [tsk, #TI_PREEMPT]		// get preempt count
-+	add	x0, x24, #1			// increment it
-+	str	x0, [tsk, #TI_PREEMPT]
-+#endif
-+	irq_handler
-+#ifdef CONFIG_PREEMPT
-+	str	x24, [tsk, #TI_PREEMPT]		// restore preempt count
-+	cbnz	x24, 1f				// preempt count != 0
-+	ldr	x0, [tsk, #TI_FLAGS]		// get flags
-+	tbz	x0, #TIF_NEED_RESCHED, 1f	// needs rescheduling?
-+	bl	el1_preempt
-+1:
-+#endif
-+#ifdef CONFIG_TRACE_IRQFLAGS
-+	bl	trace_hardirqs_on
-+#endif
-+	kernel_exit 1
-+ENDPROC(el1_irq)
-+
-+#ifdef CONFIG_PREEMPT
-+el1_preempt:
-+	mov	x24, lr
-+1:	enable_dbg
-+	bl	preempt_schedule_irq		// irq en/disable is done inside
-+	ldr	x0, [tsk, #TI_FLAGS]		// get new tasks TI_FLAGS
-+	tbnz	x0, #TIF_NEED_RESCHED, 1b	// needs rescheduling?
-+	ret	x24
-+#endif
-+
-+/*
-+ * EL0 mode handlers.
-+ */
-+	.align	6
-+el0_sync:
-+	kernel_entry 0
-+	mrs	x25, esr_el1			// read the syndrome register
-+	lsr	x24, x25, #26			// exception class
-+	cmp	x24, #0x15			// SVC in 64-bit state
-+	b.eq	el0_svc
-+	adr	lr, ret_from_exception
-+	cmp	x24, #0x24			// data abort in EL0
-+	b.eq	el0_da
-+	cmp	x24, #0x20			// instruction abort in EL0
-+	b.eq	el0_ia
-+	cmp	x24, #0x07			// FP/ASIMD access
-+	b.eq	el0_fpsimd_acc
-+	cmp	x24, #0x2c			// FP/ASIMD exception
-+	b.eq	el0_fpsimd_exc
-+	cmp	x24, #0x18			// configurable trap
-+	b.eq	el0_undef
-+	cmp	x24, #0x26			// stack alignment exception
-+	b.eq	el0_sp_pc
-+	cmp	x24, #0x22			// pc alignment exception
-+	b.eq	el0_sp_pc
-+	cmp	x24, #0x00			// unknown exception in EL0
-+	b.eq	el0_undef
-+	cmp	x24, #0x30			// debug exception in EL0
-+	b.ge	el0_dbg
-+	b	el0_inv
-+
-+#ifdef CONFIG_AARCH32_EMULATION
-+	.align	6
-+el0_sync_compat:
-+	kernel_entry 0, 32
-+	mrs	x25, esr_el1			// read the syndrome register
-+	lsr	x24, x25, #26			// exception class
-+	cmp	x24, #0x11			// SVC in 32-bit state
-+	b.eq	el0_svc_compat
-+	adr	lr, ret_from_exception
-+	cmp	x24, #0x24			// data abort in EL0
-+	b.eq	el0_da
-+	cmp	x24, #0x20			// instruction abort in EL0
-+	b.eq	el0_ia
-+	cmp	x24, #0x07			// FP/ASIMD access
-+	b.eq	el0_fpsimd_acc
-+	cmp	x24, #0x28			// FP/ASIMD exception
-+	b.eq	el0_fpsimd_exc
-+	cmp	x24, #0x00			// unknown exception in EL0
-+	b.eq	el0_undef
-+	cmp	x24, #0x30			// debug exception in EL0
-+	b.ge	el0_dbg
-+	b	el0_inv
-+el0_svc_compat:
-+	/*
-+	 * AArch32 syscall handling
-+	 */
-+	adr	stbl, compat_sys_call_table	// load compat syscall table pointer
-+	uxtw	scno, w7			// syscall number in w7 (r7)
-+	mov     sc_nr, #__NR_compat_syscalls
-+	b	el0_svc_naked
-+
-+	.align	6
-+el0_irq_compat:
-+	kernel_entry 0, 32
-+	b	el0_irq_naked
-+#endif
-+
-+el0_da:
-+	/*
-+	 * Data abort handling
-+	 */
-+	mrs	x0, far_el1
-+	disable_step x1
-+	isb
-+	enable_dbg
-+	// enable interrupts before calling the main handler
-+	enable_irq
-+	mov	x1, x25
-+	mov	x2, sp
-+	b	do_mem_abort
-+el0_ia:
-+	/*
-+	 * Instruction abort handling
-+	 */
-+	mrs	x0, far_el1
-+	disable_step x1
-+	isb
-+	enable_dbg
-+	// enable interrupts before calling the main handler
-+	enable_irq
-+	orr	x1, x25, #1 << 24		// use reserved ISS bit for instruction aborts
-+	mov	x2, sp
-+	b	do_mem_abort
-+el0_fpsimd_acc:
-+	/*
-+	 * Floating Point or Advanced SIMD access
-+	 */
-+	mov	x0, x25
-+	mov	x1, sp
-+	b	do_fpsimd_acc
-+el0_fpsimd_exc:
-+	/*
-+	 * Floating Point or Advanced SIMD exception
-+	 */
-+	mov	x0, x25
-+	mov	x1, sp
-+	b	do_fpsimd_exc
-+el0_sp_pc:
-+	/*
-+	 * Stack or PC alignment exception handling
-+	 */
-+	mrs	x0, far_el1
-+	disable_step x1
-+	isb
-+	enable_dbg
-+	// enable interrupts before calling the main handler
-+	enable_irq
-+	mov	x1, x25
-+	mov	x2, sp
-+	b	do_sp_pc_abort
-+el0_undef:
-+	/*
-+	 *Undefined instruction
-+	 */
-+	mov	x0, sp
-+	b	do_undefinstr
-+el0_dbg:
-+	/*
-+	 * Debug exception handling
-+	 */
-+	tbnz	x24, #0, el0_inv		// EL0 only
-+	mrs	x0, far_el1
-+	disable_step x1
-+	mov	x1, x25
-+	mov	x2, sp
-+	b	do_debug_exception
-+el0_inv:
-+	mov	x0, sp
-+	mov	x1, #BAD_SYNC
-+	mrs	x2, esr_el1
-+	b	bad_mode
-+ENDPROC(el0_sync)
-+
-+	.align	6
-+el0_irq:
-+	kernel_entry 0
-+el0_irq_naked:
-+	disable_step x1
-+	isb
-+	enable_dbg
-+#ifdef CONFIG_TRACE_IRQFLAGS
-+	bl	trace_hardirqs_off
-+#endif
-+	get_thread_info tsk
-+#ifdef CONFIG_PREEMPT
-+	ldr	x24, [tsk, #TI_PREEMPT]		// get preempt count
-+	add	x23, x24, #1			// increment it
-+	str	x23, [tsk, #TI_PREEMPT]
-+#endif
-+	irq_handler
-+#ifdef CONFIG_PREEMPT
-+	ldr	x0, [tsk, #TI_PREEMPT]
-+	str	x24, [tsk, #TI_PREEMPT]
-+	cmp	x0, x23
-+	b.eq	1f
-+	mov	x1, #0
-+	str	x1, [x1]			// BUG
-+1:
-+#endif
-+#ifdef CONFIG_TRACE_IRQFLAGS
-+	bl	trace_hardirqs_on
-+#endif
-+	b	ret_to_user
-+ENDPROC(el0_irq)
-+
-+/*
-+ * This is the return code to user mode for abort handlers
-+ */
-+ENTRY(ret_from_exception)
-+	get_thread_info tsk
-+	b	ret_to_user
-+ENDPROC(ret_from_exception)
-+
-+/*
-+ * Register switch for AArch64. The callee-saved registers need to be saved
-+ * and restored. On entry:
-+ *   x0 = previous task_struct (must be preserved across the switch)
-+ *   x1 = next task_struct
-+ * Previous and next are guaranteed not to be the same.
-+ *
-+ */
-+ENTRY(cpu_switch_to)
-+	add	x8, x0, #THREAD_CPU_CONTEXT
-+	mov	x9, sp
-+	stp	x19, x20, [x8], #16		// store callee-saved registers
-+	stp	x21, x22, [x8], #16
-+	stp	x23, x24, [x8], #16
-+	stp	x25, x26, [x8], #16
-+	stp	x27, x28, [x8], #16
-+	stp	x29, x9, [x8], #16
-+	str	lr, [x8]
-+	add	x8, x1, #THREAD_CPU_CONTEXT
-+	ldp	x19, x20, [x8], #16		// restore callee-saved registers
-+	ldp	x21, x22, [x8], #16
-+	ldp	x23, x24, [x8], #16
-+	ldp	x25, x26, [x8], #16
-+	ldp	x27, x28, [x8], #16
-+	ldp	x29, x9, [x8], #16
-+	ldr	lr, [x8]
-+	mov	sp, x9
-+	ret
-+ENDPROC(cpu_switch_to)
-+
-+/*
-+ * This is the fast syscall return path.  We do as little as possible here,
-+ * and this includes saving x0 back into the kernel stack.
-+ */
-+ret_fast_syscall:
-+	disable_irq				// disable interrupts
-+	ldr	x1, [tsk, #TI_FLAGS]
-+	and	x2, x1, #_TIF_WORK_MASK
-+	cbnz	x2, fast_work_pending
-+	tbz	x1, #TIF_SINGLESTEP, fast_exit
-+	disable_dbg
-+	enable_step x2
-+fast_exit:
-+	kernel_exit 0, ret = 1
-+
-+/*
-+ * Ok, we need to do extra processing, enter the slow path.
-+ */
-+fast_work_pending:
-+	str	x0, [sp, #S_X0]			// returned x0
-+work_pending:
-+	tbnz	x1, #TIF_NEED_RESCHED, work_resched
-+	/* TIF_SIGPENDING or TIF_NOTIFY_RESUME case */
-+	ldr	x2, [sp, #S_PSTATE]
-+	mov	x0, sp				// 'regs'
-+	tst	x2, #PSR_MODE_MASK		// user mode regs?
-+	b.ne	no_work_pending			// returning to kernel
-+	bl	do_notify_resume
-+	b	ret_to_user
-+work_resched:
-+	enable_dbg
-+	bl	schedule
-+
-+/*
-+ * "slow" syscall return path.
-+ */
-+ENTRY(ret_to_user)
-+	disable_irq				// disable interrupts
-+	ldr	x1, [tsk, #TI_FLAGS]
-+	and	x2, x1, #_TIF_WORK_MASK
-+	cbnz	x2, work_pending
-+	tbz	x1, #TIF_SINGLESTEP, no_work_pending
-+	disable_dbg
-+	enable_step x2
-+no_work_pending:
-+	kernel_exit 0, ret = 0
-+ENDPROC(ret_to_user)
-+
-+/*
-+ * This is how we return from a fork.
-+ */
-+ENTRY(ret_from_fork)
-+	bl	schedule_tail
-+	get_thread_info tsk
-+	b	ret_to_user
-+ENDPROC(ret_from_fork)
-+
-+/*
-+ * SVC handler.
-+ */
-+	.align	6
-+ENTRY(el0_svc)
-+	adrp	stbl, sys_call_table		// load syscall table pointer
-+	uxtw	scno, w8			// syscall number in w8
-+	mov	sc_nr, #__NR_syscalls
-+el0_svc_naked:					// compat entry point
-+	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
-+	disable_step x16
-+	isb
-+	enable_dbg
-+	enable_irq
-+
-+	get_thread_info tsk
-+	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall tracing
-+	tbnz	x16, #TIF_SYSCALL_TRACE, __sys_trace // are we tracing syscalls?
-+	adr	lr, ret_fast_syscall		// return address
-+	cmp     scno, sc_nr                     // check upper syscall limit
-+	b.hs	ni_sys
-+	ldr	x16, [stbl, scno, lsl #3]	// address in the syscall table
-+	br	x16				// call sys_* routine
-+ni_sys:
-+	mov	x0, sp
-+	b	do_ni_syscall
-+ENDPROC(el0_svc)
-+
-+	/*
-+	 * This is the really slow path.  We're going to be doing context
-+	 * switches, and waiting for our parent to respond.
-+	 */
-+__sys_trace:
-+	mov	x1, sp
-+	mov	w0, #0				// trace entry
-+	bl	syscall_trace
-+	adr	lr, __sys_trace_return		// return address
-+	uxtw	scno, w0			// syscall number (possibly new)
-+	mov	x1, sp				// pointer to regs
-+	cmp	scno, sc_nr			// check upper syscall limit
-+	b.hs	ni_sys
-+	ldp	x0, x1, [sp]			// restore the syscall args
-+	ldp	x2, x3, [sp, #S_X2]
-+	ldp	x4, x5, [sp, #S_X4]
-+	ldp	x6, x7, [sp, #S_X6]
-+	ldr	x16, [stbl, scno, lsl #3]	// address in the syscall table
-+	br	x16				// call sys_* routine
-+
-+__sys_trace_return:
-+	str	x0, [sp]			// save returned x0
-+	mov	x1, sp
-+	mov	w0, #1				// trace exit
-+	bl	syscall_trace
-+	b	ret_to_user
-+
-+/*
-+ * Special system call wrappers.
-+ */
-+ENTRY(sys_execve_wrapper)
-+	mov	x3, sp
-+	b	sys_execve
-+ENDPROC(sys_execve_wrapper)
-+
-+ENTRY(sys_clone_wrapper)
-+	mov	x5, sp
-+	b	sys_clone
-+ENDPROC(sys_clone_wrapper)
-+
-+ENTRY(sys_rt_sigreturn_wrapper)
-+	mov	x0, sp
-+	b	sys_rt_sigreturn
-+ENDPROC(sys_rt_sigreturn_wrapper)
-+
-+ENTRY(sys_sigaltstack_wrapper)
-+	ldr	x2, [sp, #S_SP]
-+	b	sys_sigaltstack
-+ENDPROC(sys_sigaltstack_wrapper)
-+
-+ENTRY(handle_arch_irq)
-+	.quad	0
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-new file mode 100644
-index 0000000..d25459f
---- /dev/null
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -0,0 +1,127 @@
-+/*
-+ * Stack tracing support
-+ *
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/export.h>
-+#include <linux/sched.h>
-+#include <linux/stacktrace.h>
-+
-+#include <asm/stacktrace.h>
-+
-+/*
-+ * AArch64 PCS assigns the frame pointer to x29.
-+ *
-+ * A simple function prologue looks like this:
-+ * 	sub	sp, sp, #0x10
-+ *   	stp	x29, x30, [sp]
-+ *	mov	x29, sp
-+ *
-+ * A simple function epilogue looks like this:
-+ *	mov	sp, x29
-+ *	ldp	x29, x30, [sp]
-+ *	add	sp, sp, #0x10
-+ */
-+int unwind_frame(struct stackframe *frame)
-+{
-+	unsigned long high, low;
-+	unsigned long fp = frame->fp;
-+
-+	low  = frame->sp;
-+	high = ALIGN(low, THREAD_SIZE);
-+
-+	if (fp < low || fp > high || fp & 0xf)
-+		return -EINVAL;
-+
-+	frame->sp = fp + 0x10;
-+	frame->fp = *(unsigned long *)(fp);
-+	frame->pc = *(unsigned long *)(fp + 8);
-+
-+	return 0;
-+}
-+
-+void notrace walk_stackframe(struct stackframe *frame,
-+		     int (*fn)(struct stackframe *, void *), void *data)
-+{
-+	while (1) {
-+		int ret;
-+
-+		if (fn(frame, data))
-+			break;
-+		ret = unwind_frame(frame);
-+		if (ret < 0)
-+			break;
-+	}
-+}
-+EXPORT_SYMBOL(walk_stackframe);
-+
-+#ifdef CONFIG_STACKTRACE
-+struct stack_trace_data {
-+	struct stack_trace *trace;
-+	unsigned int no_sched_functions;
-+	unsigned int skip;
-+};
-+
-+static int save_trace(struct stackframe *frame, void *d)
-+{
-+	struct stack_trace_data *data = d;
-+	struct stack_trace *trace = data->trace;
-+	unsigned long addr = frame->pc;
-+
-+	if (data->no_sched_functions && in_sched_functions(addr))
-+		return 0;
-+	if (data->skip) {
-+		data->skip--;
-+		return 0;
-+	}
-+
-+	trace->entries[trace->nr_entries++] = addr;
-+
-+	return trace->nr_entries >= trace->max_entries;
-+}
-+
-+void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
-+{
-+	struct stack_trace_data data;
-+	struct stackframe frame;
-+
-+	data.trace = trace;
-+	data.skip = trace->skip;
-+
-+	if (tsk != current) {
-+		data.no_sched_functions = 1;
-+		frame.fp = thread_saved_fp(tsk);
-+		frame.sp = thread_saved_sp(tsk);
-+		frame.pc = thread_saved_pc(tsk);
-+	} else {
-+		register unsigned long current_sp asm("sp");
-+		data.no_sched_functions = 0;
-+		frame.fp = (unsigned long)__builtin_frame_address(0);
-+		frame.sp = current_sp;
-+		frame.pc = (unsigned long)save_stack_trace_tsk;
-+	}
-+
-+	walk_stackframe(&frame, save_trace, &data);
-+	if (trace->nr_entries < trace->max_entries)
-+		trace->entries[trace->nr_entries++] = ULONG_MAX;
-+}
-+
-+void save_stack_trace(struct stack_trace *trace)
-+{
-+	save_stack_trace_tsk(current, trace);
-+}
-+EXPORT_SYMBOL_GPL(save_stack_trace);
-+#endif
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-new file mode 100644
-index 0000000..8712a8e
---- /dev/null
-+++ b/arch/arm64/kernel/traps.c
-@@ -0,0 +1,357 @@
-+/*
-+ * Based on arch/arm/kernel/traps.c
-+ *
-+ * Copyright (C) 1995-2009 Russell King
++ * Copyright (C) 2002 Deep Blue Solutions Ltd, All Rights Reserved.
 + * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -1174,341 +252,794 @@ index 0000000..8712a8e
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/signal.h>
-+#include <linux/personality.h>
-+#include <linux/kallsyms.h>
-+#include <linux/spinlock.h>
-+#include <linux/uaccess.h>
-+#include <linux/hardirq.h>
-+#include <linux/kdebug.h>
++#include <linux/mm.h>
++
++#include <asm/page.h>
++#include <asm/cacheflush.h>
++
++void __cpu_copy_user_page(void *kto, const void *kfrom, unsigned long vaddr)
++{
++	copy_page(kto, kfrom);
++	__cpuc_flush_dcache_area(kto, PAGE_SIZE);
++}
++
++void __cpu_clear_user_page(void *kaddr, unsigned long vaddr)
++{
++	clear_page(kaddr);
++}
+diff --git a/arch/arm64/mm/extable.c b/arch/arm64/mm/extable.c
+new file mode 100644
+index 0000000..7944427
+--- /dev/null
++++ b/arch/arm64/mm/extable.c
+@@ -0,0 +1,17 @@
++/*
++ * Based on arch/arm/mm/extable.c
++ */
++
 +#include <linux/module.h>
-+#include <linux/kexec.h>
-+#include <linux/delay.h>
++#include <linux/uaccess.h>
++
++int fixup_exception(struct pt_regs *regs)
++{
++	const struct exception_table_entry *fixup;
++
++	fixup = search_exception_tables(instruction_pointer(regs));
++	if (fixup)
++		regs->pc = fixup->fixup;
++
++	return fixup != NULL;
++}
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+new file mode 100644
+index 0000000..1909a69
+--- /dev/null
++++ b/arch/arm64/mm/fault.c
+@@ -0,0 +1,534 @@
++/*
++ * Based on arch/arm/mm/fault.c
++ *
++ * Copyright (C) 1995  Linus Torvalds
++ * Copyright (C) 1995-2004 Russell King
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/module.h>
++#include <linux/signal.h>
++#include <linux/mm.h>
++#include <linux/hardirq.h>
 +#include <linux/init.h>
++#include <linux/kprobes.h>
++#include <linux/uaccess.h>
++#include <linux/page-flags.h>
 +#include <linux/sched.h>
-+#include <linux/syscalls.h>
++#include <linux/highmem.h>
++#include <linux/perf_event.h>
 +
-+#include <asm/atomic.h>
-+#include <asm/traps.h>
-+#include <asm/stacktrace.h>
 +#include <asm/exception.h>
++#include <asm/debug-monitors.h>
 +#include <asm/system_misc.h>
-+
-+static const char *handler[]= {
-+	"Synchronous Abort",
-+	"IRQ",
-+	"FIQ",
-+	"Error"
-+};
-+
-+int show_unhandled_signals = 1;
++#include <asm/pgtable.h>
++#include <asm/tlbflush.h>
 +
 +/*
-+ * Dump out the contents of some memory nicely...
++ * Dump out the page tables associated with 'addr' in mm 'mm'.
 + */
-+static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
-+		     unsigned long top)
++void show_pte(struct mm_struct *mm, unsigned long addr)
 +{
-+	unsigned long first;
-+	mm_segment_t fs;
-+	int i;
++	pgd_t *pgd;
 +
-+	/*
-+	 * We need to switch to kernel mode so that we can use __get_user
-+	 * to safely read from kernel space.  Note that we now dump the
-+	 * code first, just in case the backtrace kills us.
-+	 */
-+	fs = get_fs();
-+	set_fs(KERNEL_DS);
++	if (!mm)
++		mm = &init_mm;
 +
-+	printk("%s%s(0x%016lx to 0x%016lx)\n", lvl, str, bottom, top);
++	pr_alert("pgd = %p\n", mm->pgd);
++	pgd = pgd_offset(mm, addr);
++	pr_alert("[%08lx] *pgd=%016llx", addr, pgd_val(*pgd));
 +
-+	for (first = bottom & ~31; first < top; first += 32) {
-+		unsigned long p;
-+		char str[sizeof(" 12345678") * 8 + 1];
++	do {
++		pud_t *pud;
++		pmd_t *pmd;
++		pte_t *pte;
 +
-+		memset(str, ' ', sizeof(str));
-+		str[sizeof(str) - 1] = '\0';
-+
-+		for (p = first, i = 0; i < 8 && p < top; i++, p += 4) {
-+			if (p >= bottom && p < top) {
-+				unsigned int val;
-+				if (__get_user(val, (unsigned int *)p) == 0)
-+					sprintf(str + i * 9, " %08x", val);
-+				else
-+					sprintf(str + i * 9, " ????????");
-+			}
-+		}
-+		printk("%s%04lx:%s\n", lvl, first & 0xffff, str);
-+	}
-+
-+	set_fs(fs);
-+}
-+
-+static void dump_backtrace_entry(unsigned long where, unsigned long stack)
-+{
-+	print_ip_sym(where);
-+	if (in_exception_text(where))
-+		dump_mem("", "Exception stack", stack,
-+			 stack + sizeof(struct pt_regs));
-+}
-+
-+static void dump_instr(const char *lvl, struct pt_regs *regs)
-+{
-+	unsigned long addr = instruction_pointer(regs);
-+	mm_segment_t fs;
-+	char str[sizeof("00000000 ") * 5 + 2 + 1], *p = str;
-+	int i;
-+
-+	/*
-+	 * We need to switch to kernel mode so that we can use __get_user
-+	 * to safely read from kernel space.  Note that we now dump the
-+	 * code first, just in case the backtrace kills us.
-+	 */
-+	fs = get_fs();
-+	set_fs(KERNEL_DS);
-+
-+	for (i = -4; i < 1; i++) {
-+		unsigned int val, bad;
-+
-+		bad = __get_user(val, &((u32 *)addr)[i]);
-+
-+		if (!bad)
-+			p += sprintf(p, i == 0 ? "(%08x) " : "%08x ", val);
-+		else {
-+			p += sprintf(p, "bad PC value");
++		if (pgd_none_or_clear_bad(pgd))
 +			break;
-+		}
-+	}
-+	printk("%sCode: %s\n", lvl, str);
 +
-+	set_fs(fs);
++		pud = pud_offset(pgd, addr);
++		if (pud_none_or_clear_bad(pud))
++			break;
++
++		pmd = pmd_offset(pud, addr);
++		printk(", *pmd=%016llx", pmd_val(*pmd));
++		if (pmd_none_or_clear_bad(pmd))
++			break;
++
++		pte = pte_offset_map(pmd, addr);
++		printk(", *pte=%016llx", pte_val(*pte));
++		pte_unmap(pte);
++	} while(0);
++
++	printk("\n");
 +}
 +
-+static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
++/*
++ * The kernel tried to access some page that wasn't present.
++ */
++static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
++			      unsigned int esr, struct pt_regs *regs)
 +{
-+	struct stackframe frame;
-+	const register unsigned long current_sp asm ("sp");
++	/*
++	 * Are we prepared to handle this kernel fault?
++	 */
++	if (fixup_exception(regs))
++		return;
 +
-+	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
++	/*
++	 * No handler, we'll have to terminate things with extreme prejudice.
++	 */
++	bust_spinlocks(1);
++	pr_alert("Unable to handle kernel %s at virtual address %08lx\n",
++		 (addr < PAGE_SIZE) ? "NULL pointer dereference" :
++		 "paging request", addr);
 +
-+	if (!tsk)
-+		tsk = current;
++	show_pte(mm, addr);
++	die("Oops", regs, esr);
++	bust_spinlocks(0);
++	do_exit(SIGKILL);
++}
 +
-+	if (regs) {
-+		frame.fp = regs->regs[29];
-+		frame.sp = regs->sp;
-+		frame.pc = regs->pc;
-+	} else if (tsk == current) {
-+		frame.fp = (unsigned long)__builtin_frame_address(0);
-+		frame.sp = current_sp;
-+		frame.pc = (unsigned long)dump_backtrace;
++/*
++ * Something tried to access memory that isn't in our memory map. User mode
++ * accesses just cause a SIGSEGV
++ */
++static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
++			    unsigned int esr, unsigned int sig, int code,
++			    struct pt_regs *regs)
++{
++	struct siginfo si;
++
++	if (show_unhandled_signals) {
++		pr_info("%s[%d]: unhandled page fault (%d)@0x%08lx, code 0x%03x\n",
++			tsk->comm, task_pid_nr(tsk), sig, addr, esr);
++		show_pte(tsk->mm, addr);
++		show_regs(regs);
++	}
++
++	tsk->thread.fault_address = addr;
++	si.si_signo = sig;
++	si.si_errno = 0;
++	si.si_code = code;
++	si.si_addr = (void __user *)addr;
++	force_sig_info(sig, &si, tsk);
++}
++
++void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *regs)
++{
++	struct task_struct *tsk = current;
++	struct mm_struct *mm = tsk->active_mm;
++
++	/*
++	 * If we are in kernel mode at this point, we have no context to
++	 * handle this fault with.
++	 */
++	if (user_mode(regs))
++		__do_user_fault(tsk, addr, esr, SIGSEGV, SEGV_MAPERR, regs);
++	else
++		__do_kernel_fault(mm, addr, esr, regs);
++}
++
++#define VM_FAULT_BADMAP		0x010000
++#define VM_FAULT_BADACCESS	0x020000
++
++#define ESR_WRITE		(1 << 6)
++#define ESR_LNX_EXEC		(1 << 24)
++
++/*
++ * Check that the permissions on the VMA allow for the fault which occurred.
++ * If we encountered a write fault, we must have write permission, otherwise
++ * we allow any permission.
++ */
++static inline bool access_error(unsigned int esr, struct vm_area_struct *vma)
++{
++	unsigned int mask = VM_READ | VM_WRITE | VM_EXEC;
++
++	if (esr & ESR_WRITE)
++		mask = VM_WRITE;
++	if (esr & ESR_LNX_EXEC)
++		mask = VM_EXEC;
++
++	return vma->vm_flags & mask ? false : true;
++}
++
++static int __do_page_fault(struct mm_struct *mm, unsigned long addr,
++			   unsigned int esr, unsigned int flags,
++			   struct task_struct *tsk)
++{
++	struct vm_area_struct *vma;
++	int fault;
++
++	vma = find_vma(mm, addr);
++	fault = VM_FAULT_BADMAP;
++	if (unlikely(!vma))
++		goto out;
++	if (unlikely(vma->vm_start > addr))
++		goto check_stack;
++
++	/*
++	 * Ok, we have a good vm_area for this memory access, so we can handle
++	 * it.
++	 */
++good_area:
++	if (access_error(esr, vma)) {
++		fault = VM_FAULT_BADACCESS;
++		goto out;
++	}
++
++	return handle_mm_fault(mm, vma, addr & PAGE_MASK, flags);
++
++check_stack:
++	if (vma->vm_flags & VM_GROWSDOWN && !expand_stack(vma, addr))
++		goto good_area;
++out:
++	return fault;
++}
++
++static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
++				   struct pt_regs *regs)
++{
++	struct task_struct *tsk;
++	struct mm_struct *mm;
++	int fault, sig, code;
++	int write = esr & ESR_WRITE;
++	unsigned int flags = FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_KILLABLE |
++		(write ? FAULT_FLAG_WRITE : 0);
++
++	tsk = current;
++	mm  = tsk->mm;
++
++	/* Enable interrupts if they were enabled in the parent context. */
++	if (interrupts_enabled(regs))
++		local_irq_enable();
++
++	/*
++	 * If we're in an interrupt or have no user context, we must not take
++	 * the fault.
++	 */
++	if (in_atomic() || !mm)
++		goto no_context;
++
++	/*
++	 * As per x86, we may deadlock here. However, since the kernel only
++	 * validly references user space from well defined areas of the code,
++	 * we can bug out early if this is from code which shouldn't.
++	 */
++	if (!down_read_trylock(&mm->mmap_sem)) {
++		if (!user_mode(regs) && !search_exception_tables(regs->pc))
++			goto no_context;
++retry:
++		down_read(&mm->mmap_sem);
 +	} else {
 +		/*
-+		 * task blocked in __switch_to
++		 * The above down_read_trylock() might have succeeded in which
++		 * case, we'll have missed the might_sleep() from down_read().
 +		 */
-+		frame.fp = thread_saved_fp(tsk);
-+		frame.sp = thread_saved_sp(tsk);
-+		frame.pc = thread_saved_pc(tsk);
-+	}
-+
-+	printk("Call trace:\n");
-+	while (1) {
-+		unsigned long where = frame.pc;
-+		int ret;
-+
-+		ret = unwind_frame(&frame);
-+		if (ret < 0)
-+			break;
-+		dump_backtrace_entry(where, frame.sp);
-+	}
-+}
-+
-+void dump_stack(void)
-+{
-+	dump_backtrace(NULL, NULL);
-+}
-+
-+EXPORT_SYMBOL(dump_stack);
-+
-+void show_stack(struct task_struct *tsk, unsigned long *sp)
-+{
-+	dump_backtrace(NULL, tsk);
-+	barrier();
-+}
-+
-+#ifdef CONFIG_PREEMPT
-+#define S_PREEMPT " PREEMPT"
-+#else
-+#define S_PREEMPT ""
++		might_sleep();
++#ifdef CONFIG_DEBUG_VM
++		if (!user_mode(regs) && !search_exception_tables(regs->pc))
++			goto no_context;
 +#endif
-+#ifdef CONFIG_SMP
-+#define S_SMP " SMP"
-+#else
-+#define S_SMP ""
-+#endif
-+
-+static int __die(const char *str, int err, struct thread_info *thread,
-+		 struct pt_regs *regs)
-+{
-+	struct task_struct *tsk = thread->task;
-+	static int die_counter;
-+	int ret;
-+
-+	pr_emerg("Internal error: %s: %x [#%d]" S_PREEMPT S_SMP "\n",
-+		 str, err, ++die_counter);
-+
-+	/* trap and error numbers are mostly meaningless on ARM */
-+	ret = notify_die(DIE_OOPS, str, regs, err, 0, SIGSEGV);
-+	if (ret == NOTIFY_STOP)
-+		return ret;
-+
-+	print_modules();
-+	__show_regs(regs);
-+	pr_emerg("Process %.*s (pid: %d, stack limit = 0x%p)\n",
-+		 TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk), thread + 1);
-+
-+	if (!user_mode(regs) || in_interrupt()) {
-+		dump_mem(KERN_EMERG, "Stack: ", regs->sp,
-+			 THREAD_SIZE + (unsigned long)task_stack_page(tsk));
-+		dump_backtrace(regs, tsk);
-+		dump_instr(KERN_EMERG, regs);
 +	}
 +
-+	return ret;
-+}
++	fault = __do_page_fault(mm, addr, esr, flags, tsk);
 +
-+DEFINE_SPINLOCK(die_lock);
++	/*
++	 * If we need to retry but a fatal signal is pending, handle the
++	 * signal first. We do not need to release the mmap_sem because it
++	 * would already be released in __lock_page_or_retry in mm/filemap.c.
++	 */
++	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current))
++		return 0;
++
++	/*
++	 * Major/minor page fault accounting is only done on the initial
++	 * attempt. If we go through a retry, it is extremely likely that the
++	 * page will be found in page cache at that point.
++	 */
++
++	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, addr);
++	if (flags & FAULT_FLAG_ALLOW_RETRY) {
++		if (fault & VM_FAULT_MAJOR) {
++			tsk->maj_flt++;
++			perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS_MAJ, 1, regs,
++				      addr);
++		} else {
++			tsk->min_flt++;
++			perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS_MIN, 1, regs,
++				      addr);
++		}
++		if (fault & VM_FAULT_RETRY) {
++			/*
++			 * Clear FAULT_FLAG_ALLOW_RETRY to avoid any risk of
++			 * starvation.
++			 */
++			flags &= ~FAULT_FLAG_ALLOW_RETRY;
++			goto retry;
++		}
++	}
++
++	up_read(&mm->mmap_sem);
++
++	/*
++	 * Handle the "normal" case first - VM_FAULT_MAJOR / VM_FAULT_MINOR
++	 */
++	if (likely(!(fault & (VM_FAULT_ERROR | VM_FAULT_BADMAP |
++			      VM_FAULT_BADACCESS))))
++		return 0;
++
++	if (fault & VM_FAULT_OOM) {
++		/*
++		 * We ran out of memory, call the OOM killer, and return to
++		 * userspace (which will retry the fault, or kill us if we got
++		 * oom-killed).
++		 */
++		pagefault_out_of_memory();
++		return 0;
++	}
++
++	/*
++	 * If we are in kernel mode at this point, we have no context to
++	 * handle this fault with.
++	 */
++	if (!user_mode(regs))
++		goto no_context;
++
++	if (fault & VM_FAULT_SIGBUS) {
++		/*
++		 * We had some memory, but were unable to successfully fix up
++		 * this page fault.
++		 */
++		sig = SIGBUS;
++		code = BUS_ADRERR;
++	} else {
++		/*
++		 * Something tried to access memory that isn't in our memory
++		 * map.
++		 */
++		sig = SIGSEGV;
++		code = fault == VM_FAULT_BADACCESS ?
++			SEGV_ACCERR : SEGV_MAPERR;
++	}
++
++	__do_user_fault(tsk, addr, esr, sig, code, regs);
++	return 0;
++
++no_context:
++	__do_kernel_fault(mm, addr, esr, regs);
++	return 0;
++}
 +
 +/*
-+ * This function is protected against re-entrancy.
++ * First Level Translation Fault Handler
++ *
++ * We enter here because the first level page table doesn't contain a valid
++ * entry for the address.
++ *
++ * If the address is in kernel space (>= TASK_SIZE), then we are probably
++ * faulting in the vmalloc() area.
++ *
++ * If the init_task's first level page tables contains the relevant entry, we
++ * copy the it to this task.  If not, we send the process a signal, fixup the
++ * exception, or oops the kernel.
++ *
++ * NOTE! We MUST NOT take any locks for this case. We may be in an interrupt
++ * or a critical region, and should only copy the information from the master
++ * page table, nothing more.
 + */
-+void die(const char *str, struct pt_regs *regs, int err)
++static int __kprobes do_translation_fault(unsigned long addr,
++					  unsigned int esr,
++					  struct pt_regs *regs)
 +{
-+	struct thread_info *thread = current_thread_info();
-+	int ret;
++	if (addr < TASK_SIZE)
++		return do_page_fault(addr, esr, regs);
 +
-+	oops_enter();
-+
-+	spin_lock_irq(&die_lock);
-+	console_verbose();
-+	bust_spinlocks(1);
-+	ret = __die(str, err, thread, regs);
-+
-+	if (regs && kexec_should_crash(thread->task))
-+		crash_kexec(regs);
-+
-+	bust_spinlocks(0);
-+	add_taint(TAINT_DIE);
-+	spin_unlock_irq(&die_lock);
-+	oops_exit();
-+
-+	if (in_interrupt())
-+		panic("Fatal exception in interrupt");
-+	if (panic_on_oops)
-+		panic("Fatal exception");
-+	if (ret != NOTIFY_STOP)
-+		do_exit(SIGSEGV);
++	do_bad_area(addr, esr, regs);
++	return 0;
 +}
 +
-+void arm64_notify_die(const char *str, struct pt_regs *regs,
-+		      struct siginfo *info, int err)
++/*
++ * Some section permission faults need to be handled gracefully.  They can
++ * happen due to a __{get,put}_user during an oops.
++ */
++static int do_sect_fault(unsigned long addr, unsigned int esr,
++			 struct pt_regs *regs)
 +{
-+	if (user_mode(regs))
-+		force_sig_info(info->si_signo, info, current);
-+	else
-+		die(str, regs, err);
++	do_bad_area(addr, esr, regs);
++	return 0;
 +}
 +
-+asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
++/*
++ * This abort handler always returns "fault".
++ */
++static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
 +{
-+	siginfo_t info;
-+	void __user *pc = (void __user *)instruction_pointer(regs);
++	return 1;
++}
 +
-+#ifdef CONFIG_AARCH32_EMULATION
-+	/* check for AArch32 breakpoint instructions */
-+	if (compat_user_mode(regs) && aarch32_break_trap(regs) == 0)
++static struct fault_info {
++	int	(*fn)(unsigned long addr, unsigned int esr, struct pt_regs *regs);
++	int	sig;
++	int	code;
++	const char *name;
++} fault_info[] = {
++	{ do_bad,		SIGBUS,  0,		"ttbr address size fault"	},
++	{ do_bad,		SIGBUS,  0,		"level 1 address size fault"	},
++	{ do_bad,		SIGBUS,  0,		"level 2 address size fault"	},
++	{ do_bad,		SIGBUS,  0,		"level 3 address size fault"	},
++	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"input address range fault"	},
++	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 1 translation fault"	},
++	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 2 translation fault"	},
++	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"level 3 translation fault"	},
++	{ do_bad,		SIGBUS,  0,		"reserved access flag fault"	},
++	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 1 access flag fault"	},
++	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 2 access flag fault"	},
++	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 access flag fault"	},
++	{ do_bad,		SIGBUS,  0,		"reserved permission fault"	},
++	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
++	{ do_sect_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 permission fault"	},
++	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 permission fault"	},
++	{ do_bad,		SIGBUS,  0,		"synchronous external abort"	},
++	{ do_bad,		SIGBUS,  0,		"asynchronous external abort"	},
++	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
++	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
++	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
++	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
++	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
++	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
++	{ do_bad,		SIGBUS,  0,		"asynchronous parity error"	},
++	{ do_bad,		SIGBUS,  0,		"unknown 26"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 27"			},
++	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
++	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
++	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
++	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
++	{ do_bad,		SIGBUS,  0,		"unknown 32"			},
++	{ do_bad,		SIGBUS,  BUS_ADRALN,	"alignment fault"		},
++	{ do_bad,		SIGBUS,  0,		"debug event"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 35"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 36"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 37"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 38"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 39"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 40"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 41"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 42"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 43"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 44"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 45"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 46"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 47"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 48"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 49"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 50"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 51"			},
++	{ do_bad,		SIGBUS,  0,		"implementation fault (lockdown abort)" },
++	{ do_bad,		SIGBUS,  0,		"unknown 53"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 54"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 55"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 56"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 57"			},
++	{ do_bad,		SIGBUS,  0,		"implementation fault (coprocessor abort)" },
++	{ do_bad,		SIGBUS,  0,		"unknown 59"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 60"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 61"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 62"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 63"			},
++};
++
++/*
++ * Dispatch a data abort to the relevant handler.
++ */
++asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
++					 struct pt_regs *regs)
++{
++	const struct fault_info *inf = fault_info + (esr & 63);
++	struct siginfo info;
++
++	if (!inf->fn(addr, esr, regs))
 +		return;
-+#endif
 +
-+	if (show_unhandled_signals) {
-+		pr_info("%s[%d]: undefined instruction: pc=%p\n",
-+			current->comm, task_pid_nr(current), pc);
-+		dump_instr(KERN_INFO, regs);
-+	}
++	pr_alert("Unhandled fault: %s (0x%08x) at 0x%016lx\n",
++		 inf->name, esr, addr);
 +
-+	info.si_signo = SIGILL;
++	info.si_signo = inf->sig;
 +	info.si_errno = 0;
-+	info.si_code  = ILL_ILLOPC;
-+	info.si_addr  = pc;
-+
-+	arm64_notify_die("Oops - undefined instruction", regs, &info, 0);
-+}
-+
-+long compat_arm_syscall(struct pt_regs *regs);
-+
-+asmlinkage long do_ni_syscall(struct pt_regs *regs)
-+{
-+#ifdef CONFIG_AARCH32_EMULATION
-+	long ret;
-+	if (is_compat_task()) {
-+		ret = compat_arm_syscall(regs);
-+		if (ret != -ENOSYS)
-+			return ret;
-+	}
-+#endif
-+
-+	if (show_unhandled_signals) {
-+		pr_info("%s[%d]: syscall %d\n", current->comm,
-+			task_pid_nr(current), (int)regs->syscallno);
-+		dump_instr("", regs);
-+		if (user_mode(regs))
-+			__show_regs(regs);
-+	}
-+
-+	return sys_ni_syscall();
++	info.si_code  = inf->code;
++	info.si_addr  = (void __user *)addr;
++	arm64_notify_die("", regs, &info, esr);
 +}
 +
 +/*
-+ * bad_mode handles the impossible case in the exception vector.
++ * Handle stack alignment exceptions.
 + */
-+asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
++asmlinkage void __exception do_sp_pc_abort(unsigned long addr,
++					   unsigned int esr,
++					   struct pt_regs *regs)
 +{
-+	console_verbose();
++	struct siginfo info;
 +
-+	pr_crit("Bad mode in %s handler detected, code 0x%08x\n",
-+		handler[reason], esr);
-+
-+	die("Oops - bad mode", regs, 0);
-+	local_irq_disable();
-+	panic("bad mode");
++	info.si_signo = SIGBUS;
++	info.si_errno = 0;
++	info.si_code  = BUS_ADRALN;
++	info.si_addr  = (void __user *)addr;
++	arm64_notify_die("", regs, &info, esr);
 +}
 +
++static struct fault_info debug_fault_info[] = {
++	{ do_bad,	SIGTRAP,	TRAP_HWBKPT,	"hardware breakpoint"	},
++	{ do_bad,	SIGTRAP,	TRAP_HWBKPT,	"hardware single-step"	},
++	{ do_bad,	SIGTRAP,	TRAP_HWBKPT,	"hardware watchpoint"	},
++	{ do_bad,	SIGBUS,		0,		"unknown 3"		},
++	{ do_bad,	SIGTRAP,	TRAP_BRKPT,	"aarch32 BKPT"		},
++	{ do_bad,	SIGTRAP,	0,		"aarch32 vector catch"	},
++	{ do_bad,	SIGTRAP,	TRAP_BRKPT,	"aarch64 BRK"		},
++	{ do_bad,	SIGBUS,		0,		"unknown 7"		},
++};
 +
-+void __bad_xchg(volatile void *ptr, int size)
++void __init hook_debug_fault_code(int nr,
++				  int (*fn)(unsigned long, unsigned int, struct pt_regs *),
++				  int sig, int code, const char *name)
 +{
-+	printk("xchg: bad data size: pc 0x%p, ptr 0x%p, size %d\n",
-+		__builtin_return_address(0), ptr, size);
-+	BUG();
++	BUG_ON(nr < 0 || nr >= ARRAY_SIZE(debug_fault_info));
++
++	debug_fault_info[nr].fn		= fn;
++	debug_fault_info[nr].sig	= sig;
++	debug_fault_info[nr].code	= code;
++	debug_fault_info[nr].name	= name;
 +}
-+EXPORT_SYMBOL(__bad_xchg);
 +
-+void __pte_error(const char *file, int line, unsigned long val)
++asmlinkage int __exception do_debug_exception(unsigned long addr,
++					      unsigned int esr,
++					      struct pt_regs *regs)
 +{
-+	printk("%s:%d: bad pte %016lx.\n", file, line, val);
++	const struct fault_info *inf = debug_fault_info + DBG_ESR_EVT(esr);
++	struct siginfo info;
++
++	if (!inf->fn(addr, esr, regs))
++		return 1;
++
++	pr_alert("Unhandled debug exception: %s (0x%08x) at 0x%016lx\n",
++		 inf->name, esr, addr);
++
++	info.si_signo = inf->sig;
++	info.si_errno = 0;
++	info.si_code  = inf->code;
++	info.si_addr  = (void __user *)addr;
++	arm64_notify_die("", regs, &info, esr);
++
++	return 0;
++}
+diff --git a/arch/arm64/mm/mm.h b/arch/arm64/mm/mm.h
+new file mode 100644
+index 0000000..c84f68b
+--- /dev/null
++++ b/arch/arm64/mm/mm.h
+@@ -0,0 +1,2 @@
++extern void __flush_dcache_page(struct address_space *mapping, struct page *page);
++extern void __init bootmem_init(void);
+diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
+new file mode 100644
+index 0000000..7c7be78
+--- /dev/null
++++ b/arch/arm64/mm/mmap.c
+@@ -0,0 +1,144 @@
++/*
++ * Based on arch/arm/mm/mmap.c
++ *
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/elf.h>
++#include <linux/fs.h>
++#include <linux/mm.h>
++#include <linux/mman.h>
++#include <linux/export.h>
++#include <linux/shm.h>
++#include <linux/sched.h>
++#include <linux/io.h>
++#include <linux/personality.h>
++#include <linux/random.h>
++
++#include <asm/cputype.h>
++
++/*
++ * Leave enough space between the mmap area and the stack to honour ulimit in
++ * the face of randomisation.
++ */
++#define MIN_GAP (SZ_128M + ((STACK_RND_MASK << PAGE_SHIFT) + 1))
++#define MAX_GAP	(STACK_TOP/6*5)
++
++static int mmap_is_legacy(void)
++{
++	if (current->personality & ADDR_COMPAT_LAYOUT)
++		return 1;
++
++	if (rlimit(RLIMIT_STACK) == RLIM_INFINITY)
++		return 1;
++
++	return sysctl_legacy_va_layout;
 +}
 +
-+void __pmd_error(const char *file, int line, unsigned long val)
++/*
++ * Since get_random_int() returns the same value within a 1 jiffy window, we
++ * will almost always get the same randomisation for the stack and mmap
++ * region. This will mean the relative distance between stack and mmap will be
++ * the same.
++ *
++ * To avoid this we can shift the randomness by 1 bit.
++ */
++static unsigned long mmap_rnd(void)
 +{
-+	printk("%s:%d: bad pmd %016lx.\n", file, line, val);
++	unsigned long rnd = 0;
++
++	if (current->flags & PF_RANDOMIZE)
++		rnd = (long)get_random_int() & (STACK_RND_MASK >> 1);
++
++	return rnd << (PAGE_SHIFT + 1);
 +}
 +
-+void __pgd_error(const char *file, int line, unsigned long val)
++static unsigned long mmap_base(void)
 +{
-+	printk("%s:%d: bad pgd %016lx.\n", file, line, val);
++	unsigned long gap = rlimit(RLIMIT_STACK);
++
++	if (gap < MIN_GAP)
++		gap = MIN_GAP;
++	else if (gap > MAX_GAP)
++		gap = MAX_GAP;
++
++	return PAGE_ALIGN(STACK_TOP - gap - mmap_rnd());
 +}
 +
-+void __init trap_init(void)
++/*
++ * This function, called very early during the creation of a new process VM
++ * image, sets up which VM layout function to use:
++ */
++void arch_pick_mmap_layout(struct mm_struct *mm)
 +{
-+	return;
++	/*
++	 * Fall back to the standard layout if the personality bit is set, or
++	 * if the expected stack growth is unlimited:
++	 */
++	if (mmap_is_legacy()) {
++		mm->mmap_base = TASK_UNMAPPED_BASE;
++		mm->get_unmapped_area = arch_get_unmapped_area;
++		mm->unmap_area = arch_unmap_area;
++	} else {
++		mm->mmap_base = mmap_base();
++		mm->get_unmapped_area = arch_get_unmapped_area_topdown;
++		mm->unmap_area = arch_unmap_area_topdown;
++	}
++}
++EXPORT_SYMBOL_GPL(arch_pick_mmap_layout);
++
++
++/*
++ * You really shouldn't be using read() or write() on /dev/mem.  This might go
++ * away in the future.
++ */
++int valid_phys_addr_range(unsigned long addr, size_t size)
++{
++	if (addr < PHYS_OFFSET)
++		return 0;
++	if (addr + size > __pa(high_memory - 1) + 1)
++		return 0;
++
++	return 1;
++}
++
++/*
++ * Do not allow /dev/mem mappings beyond the supported physical range.
++ */
++int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
++{
++	return !(((pfn << PAGE_SHIFT) + size) & ~PHYS_MASK);
++}
++
++#ifdef CONFIG_STRICT_DEVMEM
++
++#include <linux/ioport.h>
++
++/*
++ * devmem_is_allowed() checks to see if /dev/mem access to a certain address
++ * is valid. The argument is a physical page number.  We mimic x86 here by
++ * disallowing access to system RAM as well as device-exclusive MMIO regions.
++ * This effectively disable read()/write() on /dev/mem.
++ */
++int devmem_is_allowed(unsigned long pfn)
++{
++	if (iomem_is_exclusive(pfn << PAGE_SHIFT))
++		return 0;
++	if (!page_is_ram(pfn))
++		return 1;
++	return 0;
++}
++
++#endif
+diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
+new file mode 100644
+index 0000000..7a7b0e9
+--- /dev/null
++++ b/arch/arm64/mm/pgd.c
+@@ -0,0 +1,49 @@
++/*
++ * PGD allocation/freeing
++ *
++ * Copyright (C) 2012 ARM Ltd.
++ * Author: Catalin Marinas <catalin.marinas@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/mm.h>
++#include <linux/gfp.h>
++#include <linux/highmem.h>
++#include <linux/slab.h>
++
++#include <asm/pgalloc.h>
++#include <asm/page.h>
++#include <asm/tlbflush.h>
++
++#include "mm.h"
++
++#define PGD_ORDER	0
++
++pgd_t *pgd_alloc(struct mm_struct *mm)
++{
++	pgd_t *new_pgd;
++
++	new_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL, PGD_ORDER);
++	if (!new_pgd)
++		return NULL;
++
++	memset(new_pgd, 0, PAGE_SIZE << PGD_ORDER);
++
++	return new_pgd;
++}
++
++void pgd_free(struct mm_struct *mm, pgd_t *pgd)
++{
++	free_pages((unsigned long)pgd, PGD_ORDER);
 +}
