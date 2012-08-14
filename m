@@ -1,132 +1,155 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Tue, 14 Aug 2012 11:53:18 +0530
-Subject: [PATCHv7] arm/dts: omap4-sdp: Add keypad data
-In-Reply-To: <1342780715-25618-1-git-send-email-sourav.poddar@ti.com>
-References: <1342780715-25618-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <CAKdam54ifAW=W86qLj3+JR6k7i00EjDSQgK5B1X--NCg18jJmw@mail.gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 14 Aug 2012 08:29:45 +0200
+Subject: [PATCH v3 00/10] ARM: tegra: Add PCIe device tree support
+In-Reply-To: <CAErSpo7og1XgOSv_mFCQ=hP7pq0j3gXWh2QFL2wBJjz7kcAq=g@mail.gmail.com>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <50201E1D.5060200@wwwdotorg.org>
+ <20120813174003.GA2527@avionic-0098.mockup.avionic-design.de>
+ <50294BCA.1070807@wwwdotorg.org>
+ <CAErSpo7og1XgOSv_mFCQ=hP7pq0j3gXWh2QFL2wBJjz7kcAq=g@mail.gmail.com>
+Message-ID: <20120814062945.GD16181@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Aug 13, 2012 at 04:18:16PM -0700, Bjorn Helgaas wrote:
+> On Mon, Aug 13, 2012 at 11:47 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> > On 08/13/2012 11:40 AM, Thierry Reding wrote:
+> >> On Mon, Aug 06, 2012 at 01:42:21PM -0600, Stephen Warren wrote:
+> >>> On 07/26/2012 01:55 PM, Thierry Reding wrote:
+> >>>> This patch series adds support for device tree based probing of
+> >>>> the PCIe controller found on Tegra SoCs.
+> >>>
+> >>> Thierry, I just tested all Tegra boards in v3.6-rc1, and noticed
+> >>> that PCIe doesn't work on TrimSlice when booting use device tree.
+> >>> I think I found the cause, and I can't see why the same problem
+> >>> doesn't affect this series. Perhaps you can enlighten me?
+> > ...
+> >>> PCI: Device 0000:01:00.0 not available because of resource
+> >>> collisions
+> > ...
+> >> I've looked into this a bit, and it seems like ARM is using an
+> >> open- coded version of the pci_enable_resources() function here,
+> >> with the only difference being the unconditional enabling of both
+> >> I/O and memory- mapped access for bridges. On Tegra there is
+> >> already a PCI fixup to do this, so pci_enable_resources() can be
+> >> used as-is.
+> 
+> I'd prefer that bridge I/O & memory access enabling be done in a
+> mainline path, not in a fixup.  Fixups are intended for working around
+> defects in specific devices, not for the normal path.  I know various
+> architectures have fixups that are used in the normal path, but I've
+> been working on eliminating them.
 
-On Fri, Jul 20, 2012 at 4:08 PM, Sourav Poddar <sourav.poddar@ti.com> wrote:
-> Add keypad data node in omap4 device tree file.
-> Also fill the device tree binding parameters
-> with the required value in "omap4-sdp" dts file.
->
-> Tested on omap4430 sdp with 3.5-rc6 kernel.
->
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> ---
-> Changes since v6:
-> -remove address from the node since reg property
-> is not used.
->  arch/arm/boot/dts/omap4-sdp.dts |   70 +++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap4.dtsi    |    5 +++
->  2 files changed, 75 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-> index 72216e9..80cd016 100644
-> --- a/arch/arm/boot/dts/omap4-sdp.dts
-> +++ b/arch/arm/boot/dts/omap4-sdp.dts
-> @@ -113,6 +113,76 @@
->                         "DMic", "Digital Mic",
->                         "Digital Mic", "Digital Mic1 Bias";
->         };
-> +
-> +       keypad {
-> +               keypad,num-rows = <8>;
-> +               keypad,num-columns = <8>;
-> +               linux,keymap = < 0x00000012
-> +                       0x00010013
-> +                       0x00020014
-> +                       0x00030066
-> +                       0x0004003f
-> +                       0x000500f0
-> +                       0x00060017
-> +                       0x0007002a
-> +                       0x01000020
-> +                       0x01010021
-> +                       0x01020022
-> +                       0x010300e7
-> +                       0x01040040
-> +                       0x010500f0
-> +                       0x01060025
-> +                       0x0107001c
-> +                       0x0200002d
-> +                       0x0201002e
-> +                       0x0202002f
-> +                       0x0203006b
-> +                       0x02040041
-> +                       0x020500f0
-> +                       0x02060034
-> +                       0x0207003a
-> +                       0x0300002c
-> +                       0x0301004e
-> +                       0x03020030
-> +                       0x0303003b
-> +                       0x03040042
-> +                       0x030500f0
-> +                       0x03060018
-> +                       0x03070039
-> +                       0x04000011
-> +                       0x04010015
-> +                       0x04020016
-> +                       0x0403003c
-> +                       0x04040073
-> +                       0x040500f0
-> +                       0x04060026
-> +                       0x04070069
-> +                       0x0500001f
-> +                       0x05010023
-> +                       0x05020024
-> +                       0x0503003d
-> +                       0x05040043
-> +                       0x05050072
-> +                       0x05060032
-> +                       0x0507006a
-> +                       0x06000010
-> +                       0x0601001e
-> +                       0x06020031
-> +                       0x0603009e
-> +                       0x0604000e
-> +                       0x060500f0
-> +                       0x06060019
-> +                       0x06070067
-> +                       0x07000094
-> +                       0x07010095
-> +                       0x070200ca
-> +                       0x070300cb
-> +                       0x0704003e
-> +                       0x070500f0
-> +                       0x07060160
-> +                       0x0707006c >;
-> +               linux,input-no-autorepeat;
-> +       };
->  };
->
->  &i2c1 {
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> index 04cbbcb..e78a1f1 100644
-> --- a/arch/arm/boot/dts/omap4.dtsi
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -296,4 +296,9 @@
->                         ti,hwmods = "dmic";
->                 };
->         };
-> +
-> +       keypad {
-> +               compatible = "ti,omap4-keypad";
-> +               ti,hwmods = "kbd";
-> +       };
->  };
-> --
-> 1.7.1
->
-Any more comments on this patch?
+I understand. Perhaps it should be added to the pci_enable_resources()
+function?
 
-~Sourav
+> > The patch did alter the behavior a little for TrimSlice, but didn't
+> > solve the problem. The old error messages:
+> >
+> >> [    2.173971] PCI: Device 0000:01:00.0 not available because of resource collisions
+> >> [    2.181453] r8169 0000:01:00.0: (unregistered net_device): enable failure
+> >> [    2.188254] r8169: probe of 0000:01:00.0 failed with error -22
+> >
+> > Were replaced with the following with your patch:
+> >
+> >> [    2.174010] r8169 0000:01:00.0: device not available (can't reserve [io  0x0000-0x00ff])
+> >> [    2.182098] r8169 0000:01:00.0: (unregistered net_device): enable failure
+> >> [    2.188900] r8169: probe of 0000:01:00.0 failed with error -22
+> >
+> > This message appears from drivers/pci/setup-res.c pci_enable_resources()
+> > due to:
+> >
+> >>               if (!r->parent) {
+> >>                       dev_err(&dev->dev, "device not available "
+> >>                               "(can't reserve %pR)\n", r);
+> >>                       return -EINVAL;
+> >>               }
+> >
+> > That check doesn't appear in ARM's custom pcibios_enable_device().
+> > Disabling that check yields:
+> >
+> >> [    2.174192] r8169 0000:01:00.0: enabling device (0140 -> 0143)
+> >> [    2.180041] r8169 0000:01:00.0: BAR 2: can't reserve [mem 0x00000000-0x00000fff 64bit pref]
+> >> [    2.188386] r8169 0000:01:00.0: (unregistered net_device): could not request regions
+> >> [    2.196140] r8169: probe of 0000:01:00.0 failed with error -16
+> >
+> > I think that's because the pci_dev's resources are initially assigned
+> > PCI-aperture-relative addresses, and then these are later patched up to
+> > take account of where the aperture is mapped into the CPU's address space.
+> 
+> We definitely shouldn't be calling the driver probe routine before the
+> device BARs are assigned.
+> 
+> > Boot log using board files:
+> >
+> >> [    1.146145] pci 0000:01:00.0: reg 10: [io  0x0000-0x00ff]
+> >> [    1.151745] pci 0000:01:00.0: reg 18: [mem 0x00000000-0x00000fff 64bit pref]
+> >> [    1.159007] pci 0000:01:00.0: reg 20: [mem 0x00000000-0x00003fff 64bit pref]
+> >> [    1.166270] pci 0000:01:00.0: reg 30: [mem 0x00000000-0x0001ffff pref]
+> > ...
+> >> [    1.217829] pci 0000:01:00.0: BAR 6: assigned [mem 0xa0000000-0xa001ffff pref]
+> >> [    1.225264] pci 0000:01:00.0: BAR 4: assigned [mem 0xa0020000-0xa0023fff 64bit pref]
+> >> [    1.233236] pci 0000:01:00.0: BAR 2: assigned [mem 0xa0024000-0xa0024fff 64bit pref]
+> >> [    1.241206] pci 0000:01:00.0: BAR 0: assigned [io  0x1000-0x10ff]
+> > ... (I added some extra printks:)
+> >> [    1.488007] r8169 0000:01:00.0: BAR 0: requesting [io  0x1000-0x10ff]
+> >> [    1.501483] r8169 0000:01:00.0: BAR 2: requesting [mem 0xa0024000-0xa0024fff 64bit pref]
+> >> [    1.516611] r8169 0000:01:00.0: BAR 4: requesting [mem 0xa0020000-0xa0023fff 64bit pref]
+> >
+> > whereas for a device tree boot:
+> >
+> > (same):
+> >> [    2.112217] pci 0000:01:00.0: reg 10: [io  0x0000-0x00ff]
+> >> [    2.117635] pci 0000:01:00.0: reg 18: [mem 0x00000000-0x00000fff 64bit pref]
+> >> [    2.124690] pci 0000:01:00.0: reg 20: [mem 0x00000000-0x00003fff 64bit pref]
+> >> [    2.131731] pci 0000:01:00.0: reg 30: [mem 0x00000000-0x0001ffff pref]
+> > ... (request region happens early)
+> >> [    2.179838] r8169 0000:01:00.0: BAR 0: requesting [io  0x0000-0x00ff]
+> >> [    2.193312] r8169 0000:01:00.0: BAR 2: requesting [mem 0x00000000-0x00000fff 64bit pref]
+> >> [    2.201397] r8169 0000:01:00.0: BAR 2: can't reserve [mem 0x00000000-0x00000fff 64bit pref]
+> >> [    2.209742] r8169 0000:01:00.0: (unregistered net_device): could not request regions
+> > ... (same, just happens too late)
+> >> [    2.236818] pci 0000:01:00.0: BAR 6: assigned [mem 0xa0000000-0xa001ffff pref]
+> >> [    2.244027] pci 0000:01:00.0: BAR 4: assigned [mem 0xa0020000-0xa0023fff 64bit pref]
+> >> [    2.251794] pci 0000:01:00.0: BAR 2: assigned [mem 0xa0024000-0xa0024fff 64bit pref]
+> >> [    2.259542] pci 0000:01:00.0: BAR 0: assigned [io  0x1000-0x10ff]
+> >
+> > I suspect this is all still related to the PCI devices themselves being
+> > probed much earlier in the overall PCI initialization sequence when the
+> > PCI controller is probed later in the boot sequence, whereas PCI device
+> > probe is deferred until the overall PCI initialization sequence is
+> > complete if the PCI controller is probed very early in the boot sequence.
+> 
+> I don't know what to apply your patches to (they don't apply cleanly
+> to v3.6-rc2), so I can't see exactly what you're doing.  But it looks
+> like you might be calling pci_bus_add_devices() before
+> pci_bus_assign_resource(), which isn't going to work.
+
+The patch was on top of this series, which in turn is based on -next.
+However the patch doesn't actually change anything in the ordering of
+the initialization sequence, it just replaces the ARM implementation
+of pcibios_enable_device() to reuse pci_enable_resources().
+
+ARM's main PCI entry point, arch/arm/kernel/bios32.c:pci_common_init(),
+does call the correct sequence: pci_bus_assign_resources() followed by
+pci_bus_add_devices(), so the sequence looks correct. However, judging
+by the logs Stephen posted, the BAR assignment is too late, after the
+driver has been probed.
+
+> I don't know what it means to probe PCI devices before probing the PCI
+> controller (the host bridge) -- that shouldn't happen either.  In
+> order to probe PCI devices, we have to first know about the host
+> bridge so we know how to do config accesses and what the bridge
+> apertures are.
+
+Right. I don't think this can happen. If the bridge hasn't been probed,
+then the devices shouldn't be there anyway.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120814/8c368b33/attachment.sig>
