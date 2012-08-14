@@ -1,53 +1,50 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Aug 2012 18:52:19 +0100
-Subject: [PATCH v2 18/31] arm64: VDSO support
+Date: Tue, 14 Aug 2012 18:52:21 +0100
+Subject: [PATCH v2 20/31] arm64: User access library functions
 In-Reply-To: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
 References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1344966752-16102-19-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1344966752-16102-21-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
-
-This patch adds VDSO support for 64-bit applications. The VDSO code is
-currently used for sys_rt_sigreturn() and optimised gettimeofday()
-(using the user-accessible generic counter).
+This patch add support for various user access functions. These
+functions use the standard LDR/STR instructions and not the LDRT/STRT
+variants in order to allow kernel addresses (after set_fs(KERNEL_DS)).
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/vdso.h              |   41 +++++
- arch/arm64/include/asm/vdso_datapage.h     |   43 +++++
- arch/arm64/kernel/vdso.c                   |  261 ++++++++++++++++++++++++++++
- arch/arm64/kernel/vdso/.gitignore          |    2 +
- arch/arm64/kernel/vdso/Makefile            |   63 +++++++
- arch/arm64/kernel/vdso/gen_vdso_offsets.sh |   15 ++
- arch/arm64/kernel/vdso/gettimeofday.S      |  242 ++++++++++++++++++++++++++
- arch/arm64/kernel/vdso/note.S              |   28 +++
- arch/arm64/kernel/vdso/sigreturn.S         |   37 ++++
- arch/arm64/kernel/vdso/vdso.S              |   33 ++++
- arch/arm64/kernel/vdso/vdso.lds.S          |  100 +++++++++++
- 11 files changed, 865 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/vdso.h
- create mode 100644 arch/arm64/include/asm/vdso_datapage.h
- create mode 100644 arch/arm64/kernel/vdso.c
- create mode 100644 arch/arm64/kernel/vdso/.gitignore
- create mode 100644 arch/arm64/kernel/vdso/Makefile
- create mode 100755 arch/arm64/kernel/vdso/gen_vdso_offsets.sh
- create mode 100644 arch/arm64/kernel/vdso/gettimeofday.S
- create mode 100644 arch/arm64/kernel/vdso/note.S
- create mode 100644 arch/arm64/kernel/vdso/sigreturn.S
- create mode 100644 arch/arm64/kernel/vdso/vdso.S
- create mode 100644 arch/arm64/kernel/vdso/vdso.lds.S
+ arch/arm64/include/asm/uaccess.h   |  377 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/lib/clear_user.S        |   58 ++++++
+ arch/arm64/lib/copy_from_user.S    |   66 +++++++
+ arch/arm64/lib/copy_in_user.S      |   63 ++++++
+ arch/arm64/lib/copy_to_user.S      |   61 ++++++
+ arch/arm64/lib/getuser.S           |   75 +++++++
+ arch/arm64/lib/putuser.S           |   73 +++++++
+ arch/arm64/lib/strncpy_from_user.S |   50 +++++
+ arch/arm64/lib/strnlen_user.S      |   47 +++++
+ 9 files changed, 870 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm64/include/asm/uaccess.h
+ create mode 100644 arch/arm64/lib/clear_user.S
+ create mode 100644 arch/arm64/lib/copy_from_user.S
+ create mode 100644 arch/arm64/lib/copy_in_user.S
+ create mode 100644 arch/arm64/lib/copy_to_user.S
+ create mode 100644 arch/arm64/lib/getuser.S
+ create mode 100644 arch/arm64/lib/putuser.S
+ create mode 100644 arch/arm64/lib/strncpy_from_user.S
+ create mode 100644 arch/arm64/lib/strnlen_user.S
 
-diff --git a/arch/arm64/include/asm/vdso.h b/arch/arm64/include/asm/vdso.h
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
 new file mode 100644
-index 0000000..839ce00
+index 0000000..09d7b53
 --- /dev/null
-+++ b/arch/arm64/include/asm/vdso.h
-@@ -0,0 +1,41 @@
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -0,0 +1,377 @@
 +/*
-+ * Copyright (C) 2012 ARM Limited
++ * Based on arch/arm/include/asm/uaccess.h
++ *
++ * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -61,91 +58,376 @@ index 0000000..839ce00
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#ifndef __ASM_VDSO_H
-+#define __ASM_VDSO_H
-+
-+#ifdef __KERNEL__
++#ifndef __ASM_UACCESS_H
++#define __ASM_UACCESS_H
 +
 +/*
-+ * Default link address for the vDSO.
-+ * Since we randomise the VDSO mapping, there's little point in trying
-+ * to prelink this.
++ * User space memory access functions
 + */
-+#define VDSO_LBASE	0x0
++#include <linux/string.h>
++#include <linux/thread_info.h>
 +
-+#ifndef __ASSEMBLY__
++#include <asm/ptrace.h>
++#include <asm/errno.h>
++#include <asm/memory.h>
++#include <asm/compiler.h>
 +
-+#include <generated/vdso-offsets.h>
++#define VERIFY_READ 0
++#define VERIFY_WRITE 1
 +
-+#define VDSO_SYMBOL(base, name)						   \
-+({									   \
-+	(void *)(vdso_offset_##name - VDSO_LBASE + (unsigned long)(base)); \
-+})
-+
-+#endif /* !__ASSEMBLY__ */
-+
-+#endif /* __KERNEL__ */
-+
-+#endif /* __ASM_VDSO_H */
-diff --git a/arch/arm64/include/asm/vdso_datapage.h b/arch/arm64/include/asm/vdso_datapage.h
-new file mode 100644
-index 0000000..de66199
---- /dev/null
-+++ b/arch/arm64/include/asm/vdso_datapage.h
-@@ -0,0 +1,43 @@
 +/*
-+ * Copyright (C) 2012 ARM Limited
++ * The exception table consists of pairs of addresses: the first is the
++ * address of an instruction that is allowed to fault, and the second is
++ * the address at which the program should continue.  No registers are
++ * modified, so it is entirely up to the continuation code to figure out
++ * what to do.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * All the routines below use bits of fixup code that are out of line
++ * with the main instruction path.  This means when everything is well,
++ * we don't even have to jump over them.  Further, they do not intrude
++ * on our cache or tlb entries.
 + */
-+#ifndef __ASM_VDSO_DATAPAGE_H
-+#define __ASM_VDSO_DATAPAGE_H
 +
-+#ifdef __KERNEL__
-+
-+#ifndef __ASSEMBLY__
-+
-+struct vdso_data {
-+	__u64 cs_cycle_last;	/* Timebase at clocksource init */
-+	__u64 xtime_clock_sec;	/* Kernel time */
-+	__u64 xtime_clock_nsec;
-+	__u64 xtime_coarse_sec;	/* Coarse time */
-+	__u64 xtime_coarse_nsec;
-+	__u64 wtm_clock_sec;	/* Wall to monotonic time */
-+	__u64 wtm_clock_nsec;
-+	__u32 tb_seq_count;	/* Timebase sequence counter */
-+	__u32 cs_mult;		/* Clocksource multiplier */
-+	__u32 cs_shift;		/* Clocksource shift */
-+	__u32 tz_minuteswest;	/* Whacky timezone stuff */
-+	__u32 tz_dsttime;
-+	__u32 use_syscall;
++struct exception_table_entry
++{
++	unsigned long insn, fixup;
 +};
 +
-+#endif /* !__ASSEMBLY__ */
++extern int fixup_exception(struct pt_regs *regs);
 +
-+#endif /* __KERNEL__ */
-+
-+#endif /* __ASM_VDSO_DATAPAGE_H */
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-new file mode 100644
-index 0000000..8d8a365
---- /dev/null
-+++ b/arch/arm64/kernel/vdso.c
-@@ -0,0 +1,261 @@
 +/*
-+ * VDSO implementation for AArch64 and vector page setup for AArch32.
++ * These two are intentionally not defined anywhere - if the kernel
++ * code generates any references to them, that's a bug.
++ */
++extern long __get_user_bad(void);
++extern long __put_user_bad(void);
++
++#define KERNEL_DS	(-1UL)
++#define get_ds()	(KERNEL_DS)
++
++#define USER_DS		TASK_SIZE_64
++#define get_fs()	(current_thread_info()->addr_limit)
++
++static inline void set_fs(mm_segment_t fs)
++{
++	current_thread_info()->addr_limit = fs;
++}
++
++#define segment_eq(a,b)	((a) == (b))
++
++/*
++ * Return 1 if addr < current->addr_limit, 0 otherwise.
++ */
++#define __addr_ok(addr)							\
++({									\
++	unsigned long flag;						\
++	asm("cmp %1, %0; cset %0, lo"				\
++		: "=&r" (flag)						\
++		: "r" (addr), "0" (current_thread_info()->addr_limit)	\
++		: "cc");						\
++	flag;								\
++})
++
++/*
++ * Test whether a block of memory is a valid user space address.
++ * Returns 1 if the range is valid, 0 otherwise.
 + *
-+ * Copyright (C) 2012 ARM Limited
++ * This is equivalent to the following test:
++ * (u65)addr + (u65)size < (u65)current->addr_limit
++ *
++ * This needs 65-bit arithmetic.
++ */
++#define __range_ok(addr,size)						\
++({									\
++	unsigned long flag, roksum;					\
++	__chk_user_ptr(addr);						\
++	asm("adds %1, %1, %3; ccmp %1, %4, #2, cc; cset %0, cc"	\
++		: "=&r" (flag), "=&r" (roksum)				\
++		: "1" (addr), "Ir" (size),				\
++		  "r" (current_thread_info()->addr_limit)		\
++		: "cc");						\
++	flag;								\
++})
++
++/*
++ * Single-value transfer routines.  They automatically use the right
++ * size if we just have the right pointer type.  Note that the functions
++ * which read from user space (*get_*) need to take care not to leak
++ * kernel data even if the calling code is buggy and fails to check
++ * the return value.  This means zeroing out the destination variable
++ * or buffer on error.  Normally this is done out of line by the
++ * fixup code, but there are a few places where it intrudes on the
++ * main code path.  When we only write to user space, there is no
++ * problem.
++ */
++extern long __get_user_1(void *);
++extern long __get_user_2(void *);
++extern long __get_user_4(void *);
++extern long __get_user_8(void *);
++
++#define __get_user_x(__r2,__p,__e,__s,__i...)				\
++	   asm volatile(						\
++		__asmeq("%0", "x0") __asmeq("%1", "x2")			\
++		"bl	__get_user_" #__s				\
++		: "=&r" (__e), "=r" (__r2)				\
++		: "0" (__p)						\
++		: __i, "cc")
++
++#define get_user(x,p)							\
++	({								\
++		register const typeof(*(p)) __user *__p asm("x0") = (p);\
++		register unsigned long __r2 asm("x2");			\
++		register long __e asm("x0");				\
++		switch (sizeof(*(__p))) {				\
++		case 1:							\
++			__get_user_x(__r2, __p, __e, 1, "x30");		\
++			break;						\
++		case 2:							\
++			__get_user_x(__r2, __p, __e, 2, "x3", "x30");	\
++			break;						\
++		case 4:							\
++			__get_user_x(__r2, __p, __e, 4, "x30");		\
++			break;						\
++		case 8:							\
++			__get_user_x(__r2, __p, __e, 8, "x30");		\
++			break;						\
++		default: __e = __get_user_bad(); break;			\
++		}							\
++		x = (typeof(*(p))) __r2;				\
++		__e;							\
++	})
++
++#define __get_user_unaligned __get_user
++
++extern long __put_user_1(void *, unsigned long);
++extern long __put_user_2(void *, unsigned long);
++extern long __put_user_4(void *, unsigned long);
++extern long __put_user_8(void *, unsigned long);
++
++#define __put_user_x(__r2,__p,__e,__s)					\
++	   asm volatile(						\
++		__asmeq("%0", "x0") __asmeq("%2", "x2")			\
++		"bl	__put_user_" #__s				\
++		: "=&r" (__e)						\
++		: "0" (__p), "r" (__r2)					\
++		: "x8", "x30", "cc")
++
++#define put_user(x,p)							\
++	({								\
++		register const typeof(*(p)) __r2 asm("x2") = (x);	\
++		register const typeof(*(p)) __user *__p asm("x0") = (p);\
++		register long __e asm("x0");				\
++		switch (sizeof(*(__p))) {				\
++		case 1:							\
++			__put_user_x(__r2, __p, __e, 1);		\
++			break;						\
++		case 2:							\
++			__put_user_x(__r2, __p, __e, 2);		\
++			break;						\
++		case 4:							\
++			__put_user_x(__r2, __p, __e, 4);		\
++			break;						\
++		case 8:							\
++			__put_user_x(__r2, __p, __e, 8);		\
++			break;						\
++		default: __e = __put_user_bad(); break;			\
++		}							\
++		__e;							\
++	})
++
++#define __put_user_unaligned __put_user
++
++#define access_ok(type,addr,size)	__range_ok(addr,size)
++
++/*
++ * The "__xxx" versions of the user access functions do not verify the
++ * address space - it must have been done previously with a separate
++ * "access_ok()" call.
++ *
++ * The "xxx_error" versions set the third argument to EFAULT if an
++ * error occurs, and leave it unchanged on success.  Note that these
++ * versions are void (ie, don't return a value as such).
++ */
++#define __get_user(x,ptr)						\
++({									\
++	long __gu_err = 0;						\
++	__get_user_err((x),(ptr),__gu_err);				\
++	__gu_err;							\
++})
++
++#define __get_user_error(x,ptr,err)					\
++({									\
++	__get_user_err((x),(ptr),err);					\
++	(void) 0;							\
++})
++
++#define __get_user_err(x,ptr,err)					\
++do {									\
++	unsigned long __gu_addr = (unsigned long)(ptr);			\
++	unsigned long __gu_val;						\
++	__chk_user_ptr(ptr);						\
++	switch (sizeof(*(ptr))) {					\
++	case 1:								\
++		__get_user_asm("ldrb", "%w", __gu_val, __gu_addr, err);	\
++		break;							\
++	case 2:								\
++		__get_user_asm("ldrh", "%w", __gu_val, __gu_addr, err);	\
++		break;							\
++	case 4:								\
++		__get_user_asm("ldr", "%w", __gu_val, __gu_addr, err);	\
++		break;							\
++	case 8:								\
++		__get_user_asm("ldr", "%",  __gu_val, __gu_addr, err);	\
++		break;							\
++	default:							\
++		(__gu_val) = __get_user_bad();				\
++	}								\
++	(x) = (__typeof__(*(ptr)))__gu_val;				\
++} while (0)
++
++#define __get_user_asm(instr, reg, x, addr, err)			\
++	asm volatile(							\
++	"1:	" instr "	" reg "1, [%2]\n"			\
++	"2:\n"								\
++	"	.section .fixup, \"ax\"\n"				\
++	"	.align	2\n"						\
++	"3:	mov	%0, %3\n"					\
++	"	mov	%1, #0\n"					\
++	"	b	2b\n"						\
++	"	.previous\n"						\
++	"	.section __ex_table,\"a\"\n"				\
++	"	.align	3\n"						\
++	"	.quad	1b, 3b\n"					\
++	"	.previous"						\
++	: "+r" (err), "=&r" (x)						\
++	: "r" (addr), "i" (-EFAULT)					\
++	: "cc")
++
++#define __put_user(x,ptr)						\
++({									\
++	long __pu_err = 0;						\
++	__put_user_err((x),(ptr),__pu_err);				\
++	__pu_err;							\
++})
++
++#define __put_user_error(x,ptr,err)					\
++({									\
++	__put_user_err((x),(ptr),err);					\
++	(void) 0;							\
++})
++
++#define __put_user_err(x,ptr,err)					\
++do {									\
++	unsigned long __pu_addr = (unsigned long)(ptr);			\
++	__typeof__(*(ptr)) __pu_val = (x);				\
++	__chk_user_ptr(ptr);						\
++	switch (sizeof(*(ptr))) {					\
++	case 1:								\
++		__put_user_asm("strb", "%w", __pu_val, __pu_addr, err);	\
++		break;							\
++	case 2:								\
++		__put_user_asm("strh", "%w", __pu_val, __pu_addr, err);	\
++		break;							\
++	case 4:								\
++		__put_user_asm("str",  "%w", __pu_val, __pu_addr, err);	\
++		break;							\
++	case 8:								\
++		__put_user_asm("str",  "%",  __pu_val, __pu_addr, err);	\
++		break;							\
++	default:							\
++		__put_user_bad();					\
++	}								\
++} while (0)
++
++#define __put_user_asm(instr, reg, x, __pu_addr, err)			\
++	asm volatile(							\
++	"1:	" instr "	" reg "1, [%2]\n"			\
++	"2:\n"								\
++	"	.section .fixup,\"ax\"\n"				\
++	"	.align	2\n"						\
++	"3:	mov	%0, %3\n"					\
++	"	b	2b\n"						\
++	"	.previous\n"						\
++	"	.section __ex_table,\"a\"\n"				\
++	"	.align	3\n"						\
++	"	.quad	1b, 3b\n"					\
++	"	.previous"						\
++	: "+r" (err)							\
++	: "r" (x), "r" (__pu_addr), "i" (-EFAULT)			\
++	: "cc")
++
++extern unsigned long __must_check __copy_from_user(void *to, const void __user *from, unsigned long n);
++extern unsigned long __must_check __copy_to_user(void __user *to, const void *from, unsigned long n);
++extern unsigned long __must_check __copy_in_user(void __user *to, const void __user *from, unsigned long n);
++extern unsigned long __must_check __clear_user(void __user *addr, unsigned long n);
++
++extern unsigned long __must_check __strncpy_from_user(char *to, const char __user *from, unsigned long count);
++extern unsigned long __must_check __strnlen_user(const char __user *s, long n);
++
++static inline unsigned long __must_check copy_from_user(void *to, const void __user *from, unsigned long n)
++{
++	if (access_ok(VERIFY_READ, from, n))
++		n = __copy_from_user(to, from, n);
++	else /* security hole - plug it */
++		memset(to, 0, n);
++	return n;
++}
++
++static inline unsigned long __must_check copy_to_user(void __user *to, const void *from, unsigned long n)
++{
++	if (access_ok(VERIFY_WRITE, to, n))
++		n = __copy_to_user(to, from, n);
++	return n;
++}
++
++static inline unsigned long __must_check copy_in_user(void __user *to, const void __user *from, unsigned long n)
++{
++	if (access_ok(VERIFY_READ, from, n) && access_ok(VERIFY_WRITE, to, n))
++		n = __copy_in_user(to, from, n);
++	return n;
++}
++
++#define __copy_to_user_inatomic __copy_to_user
++#define __copy_from_user_inatomic __copy_from_user
++
++static inline unsigned long __must_check clear_user(void __user *to, unsigned long n)
++{
++	if (access_ok(VERIFY_WRITE, to, n))
++		n = __clear_user(to, n);
++	return n;
++}
++
++static inline long __must_check strncpy_from_user(char *dst, const char __user *src, long count)
++{
++	long res = -EFAULT;
++	if (access_ok(VERIFY_READ, src, 1))
++		res = __strncpy_from_user(dst, src, count);
++	return res;
++}
++
++#define strlen_user(s)	strnlen_user(s, ~0UL >> 1)
++
++static inline long __must_check strnlen_user(const char __user *s, long n)
++{
++	unsigned long res = 0;
++
++	if (__addr_ok(s))
++		res = __strnlen_user(s, n);
++
++	return res;
++}
++
++#endif /* __ASM_UACCESS_H */
+diff --git a/arch/arm64/lib/clear_user.S b/arch/arm64/lib/clear_user.S
+new file mode 100644
+index 0000000..6e0ed93
+--- /dev/null
++++ b/arch/arm64/lib/clear_user.S
+@@ -0,0 +1,58 @@
++/*
++ * Based on arch/arm/lib/clear_user.S
++ *
++ * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -158,605 +440,56 @@ index 0000000..8d8a365
 + *
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
 + */
-+
-+#include <linux/kernel.h>
-+#include <linux/clocksource.h>
-+#include <linux/elf.h>
-+#include <linux/err.h>
-+#include <linux/errno.h>
-+#include <linux/gfp.h>
-+#include <linux/mm.h>
-+#include <linux/sched.h>
-+#include <linux/signal.h>
-+#include <linux/slab.h>
-+#include <linux/vmalloc.h>
-+
-+#include <asm/cacheflush.h>
-+#include <asm/signal32.h>
-+#include <asm/vdso.h>
-+#include <asm/vdso_datapage.h>
-+
-+extern char vdso_start, vdso_end;
-+static unsigned long vdso_pages;
-+static struct page **vdso_pagelist;
-+
-+/*
-+ * The vDSO data page.
-+ */
-+static union {
-+	struct vdso_data	data;
-+	u8			page[PAGE_SIZE];
-+} vdso_data_store __page_aligned_data;
-+struct vdso_data *vdso_data = &vdso_data_store.data;
-+
-+#ifdef CONFIG_AARCH32_EMULATION
-+/*
-+ * Create and map the vectors page for AArch32 tasks.
-+ */
-+static struct page *vectors_page[1];
-+
-+static int alloc_vectors_page(void)
-+{
-+	extern char __kuser_helper_start[], __kuser_helper_end[];
-+	int kuser_sz = __kuser_helper_end - __kuser_helper_start;
-+	unsigned long vpage;
-+
-+	vpage = get_zeroed_page(GFP_ATOMIC);
-+
-+	if (!vpage)
-+		return -ENOMEM;
-+
-+	/* kuser helpers */
-+	memcpy((void *)vpage + 0x1000 - kuser_sz, __kuser_helper_start,
-+		kuser_sz);
-+
-+	/* sigreturn code */
-+	memcpy((void *)vpage + AARCH32_KERN_SIGRET_CODE_OFFSET,
-+		aarch32_sigret_code, sizeof(aarch32_sigret_code));
-+
-+	flush_icache_range(vpage, vpage + PAGE_SIZE);
-+	vectors_page[0] = virt_to_page(vpage);
-+
-+	return 0;
-+}
-+arch_initcall(alloc_vectors_page);
-+
-+int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
-+{
-+	struct mm_struct *mm = current->mm;
-+	unsigned long addr = AARCH32_VECTORS_BASE;
-+	int ret;
-+
-+	down_write(&mm->mmap_sem);
-+	current->mm->context.vdso = (void *)addr;
-+
-+	/* Map vectors page at the high address. */
-+	ret = install_special_mapping(mm, addr, PAGE_SIZE,
-+				      VM_READ|VM_EXEC|VM_MAYREAD|VM_MAYEXEC,
-+				      vectors_page);
-+
-+	up_write(&mm->mmap_sem);
-+
-+	return ret;
-+}
-+#endif /* CONFIG_AARCH32_EMULATION */
-+
-+static int __init vdso_init(void)
-+{
-+	struct page *pg;
-+	char *vbase;
-+	int i, ret = 0;
-+
-+	vdso_pages = (&vdso_end - &vdso_start) >> PAGE_SHIFT;
-+	pr_info("vdso: %ld pages (%ld code, %ld data) at base %p\n",
-+		vdso_pages + 1, vdso_pages, 1L, &vdso_start);
-+
-+	/* Allocate the vDSO pagelist, plus a page for the data. */
-+	vdso_pagelist = kzalloc(sizeof(struct page *) * (vdso_pages + 1),
-+				GFP_KERNEL);
-+	if (vdso_pagelist == NULL) {
-+		pr_err("Failed to allocate vDSO pagelist!\n");
-+		return -ENOMEM;
-+	}
-+
-+	/* Grab the vDSO code pages. */
-+	for (i = 0; i < vdso_pages; i++) {
-+		pg = virt_to_page(&vdso_start + i*PAGE_SIZE);
-+		ClearPageReserved(pg);
-+		get_page(pg);
-+		vdso_pagelist[i] = pg;
-+	}
-+
-+	/* Sanity check the shared object header. */
-+	vbase = vmap(vdso_pagelist, 1, 0, PAGE_KERNEL);
-+	if (vbase == NULL) {
-+		pr_err("Failed to map vDSO pagelist!\n");
-+		return -ENOMEM;
-+	} else if (memcmp(vbase, "\177ELF", 4)) {
-+		pr_err("vDSO is not a valid ELF object!\n");
-+		ret = -EINVAL;
-+		goto unmap;
-+	}
-+
-+	/* Grab the vDSO data page. */
-+	pg = virt_to_page(vdso_data);
-+	get_page(pg);
-+	vdso_pagelist[i] = pg;
-+
-+unmap:
-+	vunmap(vbase);
-+	return ret;
-+}
-+arch_initcall(vdso_init);
-+
-+int arch_setup_additional_pages(struct linux_binprm *bprm,
-+				int uses_interp)
-+{
-+	struct mm_struct *mm = current->mm;
-+	unsigned long vdso_base, vdso_mapping_len;
-+	int ret;
-+
-+	/* Be sure to map the data page */
-+	vdso_mapping_len = (vdso_pages + 1) << PAGE_SHIFT;
-+
-+	down_write(&mm->mmap_sem);
-+	vdso_base = get_unmapped_area(NULL, 0, vdso_mapping_len, 0, 0);
-+	if (IS_ERR_VALUE(vdso_base)) {
-+		ret = vdso_base;
-+		goto up_fail;
-+	}
-+	mm->context.vdso = (void *)vdso_base;
-+
-+	ret = install_special_mapping(mm, vdso_base, vdso_mapping_len,
-+				      VM_READ|VM_EXEC|
-+				      VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
-+				      vdso_pagelist);
-+	if (ret) {
-+		mm->context.vdso = NULL;
-+		goto up_fail;
-+	}
-+
-+up_fail:
-+	up_write(&mm->mmap_sem);
-+
-+	return ret;
-+}
-+
-+const char *arch_vma_name(struct vm_area_struct *vma)
-+{
-+	/*
-+	 * We can re-use the vdso pointer in mm_context_t for identifying
-+	 * the vectors page for compat applications. The vDSO will always
-+	 * sit above TASK_UNMAPPED_BASE and so we don't need to worry about
-+	 * it conflicting with the vectors base.
-+	 */
-+	if (vma->vm_mm && vma->vm_start == (long)vma->vm_mm->context.vdso) {
-+#ifdef CONFIG_AARCH32_EMULATION
-+		if (vma->vm_start == AARCH32_VECTORS_BASE)
-+			return "[vectors]";
-+#endif
-+		return "[vdso]";
-+	}
-+
-+	return NULL;
-+}
-+
-+/*
-+ * We define AT_SYSINFO_EHDR, so we need these function stubs to keep
-+ * Linux happy.
-+ */
-+int in_gate_area_no_mm(unsigned long addr)
-+{
-+	return 0;
-+}
-+
-+int in_gate_area(struct mm_struct *mm, unsigned long addr)
-+{
-+	return 0;
-+}
-+
-+struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
-+{
-+	return NULL;
-+}
-+
-+/*
-+ * Update the vDSO data page to keep in sync with kernel timekeeping.
-+ */
-+void update_vsyscall(struct timespec *ts, struct timespec *wtm,
-+		     struct clocksource *clock, u32 mult)
-+{
-+	struct timespec xtime_coarse;
-+	u32 use_syscall = strcmp(clock->name, "arch_sys_counter");
-+
-+	++vdso_data->tb_seq_count;
-+	smp_wmb();
-+
-+	xtime_coarse = __current_kernel_time();
-+	vdso_data->use_syscall			= use_syscall;
-+	vdso_data->xtime_coarse_sec		= xtime_coarse.tv_sec;
-+	vdso_data->xtime_coarse_nsec		= xtime_coarse.tv_nsec;
-+
-+	if (!use_syscall) {
-+		vdso_data->cs_cycle_last	= clock->cycle_last;
-+		vdso_data->xtime_clock_sec	= ts->tv_sec;
-+		vdso_data->xtime_clock_nsec	= ts->tv_nsec;
-+		vdso_data->cs_mult		= mult;
-+		vdso_data->cs_shift		= clock->shift;
-+		vdso_data->wtm_clock_sec	= wtm->tv_sec;
-+		vdso_data->wtm_clock_nsec	= wtm->tv_nsec;
-+	}
-+
-+	smp_wmb();
-+	++vdso_data->tb_seq_count;
-+}
-+
-+void update_vsyscall_tz(void)
-+{
-+	++vdso_data->tb_seq_count;
-+	smp_wmb();
-+	vdso_data->tz_minuteswest	= sys_tz.tz_minuteswest;
-+	vdso_data->tz_dsttime		= sys_tz.tz_dsttime;
-+	smp_wmb();
-+	++vdso_data->tb_seq_count;
-+}
-diff --git a/arch/arm64/kernel/vdso/.gitignore b/arch/arm64/kernel/vdso/.gitignore
-new file mode 100644
-index 0000000..b8cc94e
---- /dev/null
-+++ b/arch/arm64/kernel/vdso/.gitignore
-@@ -0,0 +1,2 @@
-+vdso.lds
-+vdso-offsets.h
-diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
-new file mode 100644
-index 0000000..d8064af
---- /dev/null
-+++ b/arch/arm64/kernel/vdso/Makefile
-@@ -0,0 +1,63 @@
-+#
-+# Building a vDSO image for AArch64.
-+#
-+# Author: Will Deacon <will.deacon@arm.com>
-+# Heavily based on the vDSO Makefiles for other archs.
-+#
-+
-+obj-vdso := gettimeofday.o note.o sigreturn.o
-+
-+# Build rules
-+targets := $(obj-vdso) vdso.so vdso.so.dbg
-+obj-vdso := $(addprefix $(obj)/, $(obj-vdso))
-+
-+ccflags-y := -shared -fno-common -fno-builtin
-+ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 \
-+		$(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
-+
-+obj-y += vdso.o
-+extra-y += vdso.lds vdso-offsets.h
-+CPPFLAGS_vdso.lds += -P -C -U$(ARCH)
-+
-+# Force dependency (incbin is bad)
-+$(obj)/vdso.o : $(obj)/vdso.so
-+
-+# Link rule for the .so file, .lds has to be first
-+$(obj)/vdso.so.dbg: $(src)/vdso.lds $(obj-vdso)
-+	$(call if_changed,vdsold)
-+
-+# Strip rule for the .so file
-+$(obj)/%.so: OBJCOPYFLAGS := -S
-+$(obj)/%.so: $(obj)/%.so.dbg FORCE
-+	$(call if_changed,objcopy)
-+
-+# Generate VDSO offsets using helper script
-+gen-vdsosym := $(srctree)/$(src)/gen_vdso_offsets.sh
-+quiet_cmd_vdsosym = VDSOSYM $@
-+define cmd_vdsosym
-+	$(NM) $< | $(gen-vdsosym) | LC_ALL=C sort > $@ && \
-+	cp $@ include/generated/
-+endef
-+
-+$(obj)/vdso-offsets.h: $(obj)/vdso.so.dbg FORCE
-+	$(call if_changed,vdsosym)
-+
-+# Assembly rules for the .S files
-+$(obj-vdso): %.o: %.S
-+	$(call if_changed_dep,vdsoas)
-+
-+# Actual build commands
-+quiet_cmd_vdsold = VDSOL $@
-+      cmd_vdsold = $(CC) $(c_flags) -Wl,-T $^ -o $@
-+quiet_cmd_vdsoas = VDSOA $@
-+      cmd_vdsoas = $(CC) $(a_flags) -c -o $@ $<
-+
-+# Install commands for the unstripped file
-+quiet_cmd_vdso_install = INSTALL $@
-+      cmd_vdso_install = cp $(obj)/$@.dbg $(MODLIB)/vdso/$@
-+
-+vdso.so: $(obj)/vdso.so.dbg
-+	@mkdir -p $(MODLIB)/vdso
-+	$(call cmd,vdso_install)
-+
-+vdso_install: vdso.so
-diff --git a/arch/arm64/kernel/vdso/gen_vdso_offsets.sh b/arch/arm64/kernel/vdso/gen_vdso_offsets.sh
-new file mode 100755
-index 0000000..01924ff
---- /dev/null
-+++ b/arch/arm64/kernel/vdso/gen_vdso_offsets.sh
-@@ -0,0 +1,15 @@
-+#!/bin/sh
-+
-+#
-+# Match symbols in the DSO that look like VDSO_*; produce a header file
-+# of constant offsets into the shared object.
-+#
-+# Doing this inside the Makefile will break the $(filter-out) function,
-+# causing Kbuild to rebuild the vdso-offsets header file every time.
-+#
-+# Author: Will Deacon <will.deacon@arm.com
-+#
-+
-+LC_ALL=C
-+sed -n -e 's/^00*/0/' -e \
-+'s/^\([0-9a-fA-F]*\) . VDSO_\([a-zA-Z0-9_]*\)$/\#define vdso_offset_\2\t0x\1/p'
-diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
-new file mode 100644
-index 0000000..dcb8c20
---- /dev/null
-+++ b/arch/arm64/kernel/vdso/gettimeofday.S
-@@ -0,0 +1,242 @@
-+/*
-+ * Userspace implementations of gettimeofday() and friends.
-+ *
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ */
-+
 +#include <linux/linkage.h>
-+#include <asm/asm-offsets.h>
-+#include <asm/unistd.h>
-+
-+#define NSEC_PER_SEC_LO16	0xca00
-+#define NSEC_PER_SEC_HI16	0x3b9a
-+
-+vdso_data	.req	x6
-+use_syscall	.req	w7
-+seqcnt		.req	w8
-+
-+	.macro	seqcnt_acquire
-+9999:	ldr	seqcnt, [vdso_data, #VDSO_TB_SEQ_COUNT]
-+	tbnz	seqcnt, #0, 9999b
-+	dmb	ishld
-+	ldr	use_syscall, [vdso_data, #VDSO_USE_SYSCALL]
-+	.endm
-+
-+	.macro	seqcnt_read, cnt
-+	dmb	ishld
-+	ldr	\cnt, [vdso_data, #VDSO_TB_SEQ_COUNT]
-+	.endm
-+
-+	.macro	seqcnt_check, cnt, fail
-+	cmp	\cnt, seqcnt
-+	b.ne	\fail
-+	.endm
++#include <asm/assembler.h>
 +
 +	.text
 +
-+/* int __kernel_gettimeofday(struct timeval *tv, struct timezone *tz); */
-+ENTRY(__kernel_gettimeofday)
-+	.cfi_startproc
-+	mov	x2, x30
-+	.cfi_register x30, x2
-+
-+	/* Acquire the sequence counter and get the timespec. */
-+	adr	vdso_data, _vdso_data
-+1:	seqcnt_acquire
-+	cbnz	use_syscall, 4f
-+
-+	/* If tv is NULL, skip to the timezone code. */
-+	cbz	x0, 2f
-+	bl	__do_get_tspec
-+	seqcnt_check w13, 1b
-+
-+	/* Convert ns to us. */
-+	mov	x11, #1000
-+	udiv	x10, x10, x11
-+	stp	x9, x10, [x0, #TVAL_TV_SEC]
-+2:
-+	/* If tz is NULL, return 0. */
-+	cbz	x1, 3f
-+	ldp	w4, w5, [vdso_data, #VDSO_TZ_MINWEST]
-+	seqcnt_read w13
-+	seqcnt_check w13, 1b
-+	stp	w4, w5, [x1, #TZ_MINWEST]
-+3:
-+	mov	x0, xzr
-+	ret	x2
-+4:
-+	/* Syscall fallback. */
-+	mov	x8, #__NR_gettimeofday
-+	svc	#0
-+	ret	x2
-+	.cfi_endproc
-+ENDPROC(__kernel_gettimeofday)
-+
-+/* int __kernel_clock_gettime(clockid_t clock_id, struct timespec *tp); */
-+ENTRY(__kernel_clock_gettime)
-+	.cfi_startproc
-+	cmp	w0, #CLOCK_REALTIME
-+	ccmp	w0, #CLOCK_MONOTONIC, #0x4, ne
-+	b.ne	2f
-+
-+	mov	x2, x30
-+	.cfi_register x30, x2
-+
-+	/* Get kernel timespec. */
-+	adr	vdso_data, _vdso_data
-+1:	seqcnt_acquire
-+	cbnz	use_syscall, 7f
-+
-+	bl	__do_get_tspec
-+	seqcnt_check w13, 1b
-+
-+	cmp	w0, #CLOCK_MONOTONIC
-+	b.ne	6f
-+
-+	/* Get wtm timespec. */
-+	ldp	x14, x15, [vdso_data, #VDSO_WTM_CLK_SEC]
-+
-+	/* Check the sequence counter. */
-+	seqcnt_read w13
-+	seqcnt_check w13, 1b
-+	b	4f
-+2:
-+	cmp	w0, #CLOCK_REALTIME_COARSE
-+	ccmp	w0, #CLOCK_MONOTONIC_COARSE, #0x4, ne
-+	b.ne	8f
-+
-+	/* Get coarse timespec. */
-+	adr	vdso_data, _vdso_data
-+3:	seqcnt_acquire
-+	ldp	x9, x10, [vdso_data, #VDSO_XTIME_CRS_SEC]
-+
-+	cmp	w0, #CLOCK_MONOTONIC_COARSE
-+	b.ne	6f
-+
-+	/* Get wtm timespec. */
-+	ldp	x14, x15, [vdso_data, #VDSO_WTM_CLK_SEC]
-+
-+	/* Check the sequence counter. */
-+	seqcnt_read w13
-+	seqcnt_check w13, 3b
-+4:
-+	/* Add on wtm timespec. */
-+	add	x9, x9, x14
-+	add	x10, x10, x15
-+
-+	/* Normalise the new timespec. */
-+	mov	x14, #NSEC_PER_SEC_LO16
-+	movk	x14, #NSEC_PER_SEC_HI16, lsl #16
-+	cmp	x10, x14
-+	b.lt	5f
-+	sub	x10, x10, x14
-+	add	x9, x9, #1
-+5:
-+	cmp	x10, #0
-+	b.ge	6f
-+	add	x10, x10, x14
-+	sub	x9, x9, #1
-+
-+6:	/* Store to the user timespec. */
-+	stp	x9, x10, [x1, #TSPEC_TV_SEC]
-+	mov	x0, xzr
-+	ret	x2
-+7:
-+	mov	x30, x2
-+8:	/* Syscall fallback. */
-+	mov	x8, #__NR_clock_gettime
-+	svc	#0
-+	ret
-+	.cfi_endproc
-+ENDPROC(__kernel_clock_gettime)
-+
-+/* int __kernel_clock_getres(clockid_t clock_id, struct timespec *res); */
-+ENTRY(__kernel_clock_getres)
-+	.cfi_startproc
-+	cbz	w1, 3f
-+
-+	cmp	w0, #CLOCK_REALTIME
-+	ccmp	w0, #CLOCK_MONOTONIC, #0x4, ne
-+	b.ne	1f
-+
-+	ldr	x2, 5f
-+	b	2f
++/* Prototype: int __clear_user(void *addr, size_t sz)
++ * Purpose  : clear some user memory
++ * Params   : addr - user memory address to clear
++ *          : sz   - number of bytes to clear
++ * Returns  : number of bytes NOT cleared
++ *
++ * Alignment fixed up by hardware.
++ */
++ENTRY(__clear_user)
++	mov	x2, x1			// save the size for fixup return
++	subs	x1, x1, #8
++	b.mi	2f
 +1:
-+	cmp	w0, #CLOCK_REALTIME_COARSE
-+	ccmp	w0, #CLOCK_MONOTONIC_COARSE, #0x4, ne
-+	b.ne	4f
-+	ldr	x2, 6f
-+2:
-+	stp	xzr, x2, [x1]
-+
-+3:	/* res == NULL. */
-+	mov	w0, wzr
++USER(9f, str	xzr, [x0], #8	)
++	subs	x1, x1, #8
++	b.pl	1b
++2:	adds	x1, x1, #4
++	b.mi	3f
++USER(9f, str	wzr, [x0], #4	)
++	sub	x1, x1, #4
++3:	adds	x1, x1, #2
++	b.mi	4f
++USER(9f, strh	wzr, [x0], #2	)
++	sub	x1, x1, #2
++4:	adds	x1, x1, #1
++	b.mi	5f
++	strb	wzr, [x0]
++5:	mov	x0, #0
 +	ret
++ENDPROC(__clear_user)
 +
-+4:	/* Syscall fallback. */
-+	mov	x8, #__NR_clock_getres
-+	svc	#0
++	.section .fixup,"ax"
++	.align	2
++9:	mov	x0, x2			// return the original size
 +	ret
-+5:
-+	.quad	CLOCK_REALTIME_RES
-+6:
-+	.quad	CLOCK_COARSE_RES
-+	.cfi_endproc
-+ENDPROC(__kernel_clock_getres)
-+
-+/*
-+ * Read the current time from the architected counter.
-+ * Expects vdso_data to be initialised.
-+ * Clobbers the temporary registers (x9 - x15).
-+ * Returns:
-+ *  - (x9, x10) = (ts->tv_sec, ts->tv_nsec)
-+ *  - (x11, x12) = (xtime->tv_sec, xtime->tv_nsec)
-+ *  - w13 = vDSO sequence counter
-+ */
-+ENTRY(__do_get_tspec)
-+	.cfi_startproc
-+
-+	/* Read from the vDSO data page. */
-+	ldr	x10, [vdso_data, #VDSO_CS_CYCLE_LAST]
-+	ldp	x11, x12, [vdso_data, #VDSO_XTIME_CLK_SEC]
-+	ldp	w14, w15, [vdso_data, #VDSO_CS_MULT]
-+	seqcnt_read w13
-+
-+	/* Read the physical counter. */
-+	isb
-+	mrs	x9, cntpct_el0
-+
-+	/* Calculate cycle delta and convert to ns. */
-+	sub	x10, x9, x10
-+	/* We can only guarantee 56 bits of precision. */
-+	movn	x9, #0xff0, lsl #48
-+	and	x10, x9, x10
-+	mul	x10, x10, x14
-+	lsr	x10, x10, x15
-+
-+	/* Use the kernel time to calculate the new timespec. */
-+	add	x10, x12, x10
-+	mov	x14, #NSEC_PER_SEC_LO16
-+	movk	x14, #NSEC_PER_SEC_HI16, lsl #16
-+	udiv	x15, x10, x14
-+	add	x9, x15, x11
-+	mul	x14, x14, x15
-+	sub	x10, x10, x14
-+
-+	ret
-+	.cfi_endproc
-+ENDPROC(__do_get_tspec)
-diff --git a/arch/arm64/kernel/vdso/note.S b/arch/arm64/kernel/vdso/note.S
++	.previous
+diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
 new file mode 100644
-index 0000000..b82c85e
+index 0000000..5e27add
 --- /dev/null
-+++ b/arch/arm64/kernel/vdso/note.S
-@@ -0,0 +1,28 @@
++++ b/arch/arm64/lib/copy_from_user.S
+@@ -0,0 +1,66 @@
 +/*
-+ * Copyright (C) 2012 ARM Limited
++ * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -769,112 +502,421 @@ index 0000000..b82c85e
 + *
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ *
-+ * This supplies .note.* sections to go into the PT_NOTE inside the vDSO text.
-+ * Here we can supply some information useful to userland.
-+ */
-+
-+#include <linux/uts.h>
-+#include <linux/version.h>
-+#include <linux/elfnote.h>
-+
-+ELFNOTE_START(Linux, 0, "a")
-+	.long LINUX_VERSION_CODE
-+ELFNOTE_END
-diff --git a/arch/arm64/kernel/vdso/sigreturn.S b/arch/arm64/kernel/vdso/sigreturn.S
-new file mode 100644
-index 0000000..20d98ef
---- /dev/null
-+++ b/arch/arm64/kernel/vdso/sigreturn.S
-@@ -0,0 +1,37 @@
-+/*
-+ * Sigreturn trampoline for returning from a signal when the SA_RESTORER
-+ * flag is not set.
-+ *
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
 + */
 +
 +#include <linux/linkage.h>
-+#include <asm/unistd.h>
++#include <asm/assembler.h>
++
++/*
++ * Copy from user space to a kernel buffer (alignment handled by the hardware)
++ *
++ * Parameters:
++ *	x0 - to
++ *	x1 - from
++ *	x2 - n
++ * Returns:
++ *	x0 - bytes not copied
++ */
++ENTRY(__copy_from_user)
++	add	x4, x1, x2			// upper user buffer boundary
++	subs	x2, x2, #8
++	b.mi	2f
++1:
++USER(9f, ldr	x3, [x1], #8	)
++	subs	x2, x2, #8
++	str	x3, [x0], #8
++	b.pl	1b
++2:	adds	x2, x2, #4
++	b.mi	3f
++USER(9f, ldr	w3, [x1], #4	)
++	sub	x2, x2, #4
++	str	w3, [x0], #4
++3:	adds	x2, x2, #2
++	b.mi	4f
++USER(9f, ldrh	w3, [x1], #2	)
++	sub	x2, x2, #2
++	strh	w3, [x0], #2
++4:	adds	x2, x2, #1
++	b.mi	5f
++USER(9f, ldrb	w3, [x1]	)
++	strb	w3, [x0]
++5:	mov	x0, #0
++	ret
++ENDPROC(__copy_from_user)
++
++	.section .fixup,"ax"
++	.align	2
++9:	sub	x2, x4, x1
++	mov	x3, x2
++10:	strb	wzr, [x0], #1			// zero remaining buffer space
++	subs	x3, x3, #1
++	b.ne	10b
++	mov	x0, x2				// bytes not copied
++	ret
++	.previous
+diff --git a/arch/arm64/lib/copy_in_user.S b/arch/arm64/lib/copy_in_user.S
+new file mode 100644
+index 0000000..84b6c9b
+--- /dev/null
++++ b/arch/arm64/lib/copy_in_user.S
+@@ -0,0 +1,63 @@
++/*
++ * Copy from user space to user space
++ *
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++
++/*
++ * Copy from user space to user space (alignment handled by the hardware)
++ *
++ * Parameters:
++ *	x0 - to
++ *	x1 - from
++ *	x2 - n
++ * Returns:
++ *	x0 - bytes not copied
++ */
++ENTRY(__copy_in_user)
++	add	x4, x0, x2			// upper user buffer boundary
++	subs	x2, x2, #8
++	b.mi	2f
++1:
++USER(9f, ldr	x3, [x1], #8	)
++	subs	x2, x2, #8
++USER(9f, str	x3, [x0], #8	)
++	b.pl	1b
++2:	adds	x2, x2, #4
++	b.mi	3f
++USER(9f, ldr	w3, [x1], #4	)
++	sub	x2, x2, #4
++USER(9f, str	w3, [x0], #4	)
++3:	adds	x2, x2, #2
++	b.mi	4f
++USER(9f, ldrh	w3, [x1], #2	)
++	sub	x2, x2, #2
++USER(9f, strh	w3, [x0], #2	)
++4:	adds	x2, x2, #1
++	b.mi	5f
++USER(9f, ldrb	w3, [x1]	)
++USER(9f, strb	w3, [x0]	)
++5:	mov	x0, #0
++	ret
++ENDPROC(__copy_in_user)
++
++	.section .fixup,"ax"
++	.align	2
++9:	sub	x0, x4, x0			// bytes not copied
++	ret
++	.previous
+diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
+new file mode 100644
+index 0000000..a0aeeb9
+--- /dev/null
++++ b/arch/arm64/lib/copy_to_user.S
+@@ -0,0 +1,61 @@
++/*
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++
++/*
++ * Copy to user space from a kernel buffer (alignment handled by the hardware)
++ *
++ * Parameters:
++ *	x0 - to
++ *	x1 - from
++ *	x2 - n
++ * Returns:
++ *	x0 - bytes not copied
++ */
++ENTRY(__copy_to_user)
++	add	x4, x0, x2			// upper user buffer boundary
++	subs	x2, x2, #8
++	b.mi	2f
++1:
++	ldr	x3, [x1], #8
++	subs	x2, x2, #8
++USER(9f, str	x3, [x0], #8	)
++	b.pl	1b
++2:	adds	x2, x2, #4
++	b.mi	3f
++	ldr	w3, [x1], #4
++	sub	x2, x2, #4
++USER(9f, str	w3, [x0], #4	)
++3:	adds	x2, x2, #2
++	b.mi	4f
++	ldrh	w3, [x1], #2
++	sub	x2, x2, #2
++USER(9f, strh	w3, [x0], #2	)
++4:	adds	x2, x2, #1
++	b.mi	5f
++	ldrb	w3, [x1]
++USER(9f, strb	w3, [x0]	)
++5:	mov	x0, #0
++	ret
++ENDPROC(__copy_to_user)
++
++	.section .fixup,"ax"
++	.align	2
++9:	sub	x0, x4, x0			// bytes not copied
++	ret
++	.previous
+diff --git a/arch/arm64/lib/getuser.S b/arch/arm64/lib/getuser.S
+new file mode 100644
+index 0000000..1b4da22
+--- /dev/null
++++ b/arch/arm64/lib/getuser.S
+@@ -0,0 +1,75 @@
++/*
++ * Based on arch/arm/lib/getuser.S
++ *
++ * Copyright (C) 2012 ARM Ltd.
++ * Idea from x86 version, (C) Copyright 1998 Linus Torvalds
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ *
++ * These functions have a non-standard call interface to make them more
++ * efficient, especially as they return an error value in addition to
++ * the "real" return value.
++ *
++ * __get_user_X
++ *
++ * Inputs:	x0 contains the address
++ * Outputs:	x0 is the error code
++ *		x2, x3 contains the zero-extended value
++ *		lr corrupted
++ *
++ * No other registers must be altered.  (see <asm/uaccess.h>
++ * for specific ASM register usage).
++ *
++ * Note also that it is intended that __get_user_bad is not global.
++ */
++
++#include <linux/linkage.h>
++#include <asm/errno.h>
++
++ENTRY(__get_user_1)
++1:	ldrb	w2, [x0]
++	mov	x0, #0
++	ret
++ENDPROC(__get_user_1)
++
++ENTRY(__get_user_2)
++2:	ldrh	w2, [x0]
++	mov	x0, #0
++	ret
++ENDPROC(__get_user_2)
++
++ENTRY(__get_user_4)
++3:	ldr	w2, [x0]
++	mov	x0, #0
++	ret
++ENDPROC(__get_user_4)
++
++ENTRY(__get_user_8)
++4:	ldr	x2, [x0]
++	mov	x0, #0
++	ret
++ENDPROC(__get_user_4)
++
++__get_user_bad:
++	mov	x2, #0
++	mov	x0, #-EFAULT
++	ret
++ENDPROC(__get_user_bad)
++
++.section __ex_table, "a"
++	.quad	1b, __get_user_bad
++	.quad	2b, __get_user_bad
++	.quad	3b, __get_user_bad
++	.quad	4b, __get_user_bad
++.previous
+diff --git a/arch/arm64/lib/putuser.S b/arch/arm64/lib/putuser.S
+new file mode 100644
+index 0000000..62d4a42
+--- /dev/null
++++ b/arch/arm64/lib/putuser.S
+@@ -0,0 +1,73 @@
++/*
++ * Based on arch/arm/lib/putuser.S
++ *
++ * Copyright (C) 2012 ARM Ltd.
++ * Idea from x86 version, (C) Copyright 1998 Linus Torvalds
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * These functions have a non-standard call interface to make
++ * them more efficient, especially as they return an error
++ * value in addition to the "real" return value.
++ *
++ * __put_user_X
++ *
++ * Inputs:	x0 contains the address
++ *		x2, x3 contains the value
++ * Outputs:	x0 is the error code
++ *		lr corrupted
++ *
++ * No other registers must be altered.  (see <asm/uaccess.h>
++ * for specific ASM register usage).
++ *
++ * Note that it is intended that __put_user_bad is not global.
++ */
++
++#include <linux/linkage.h>
++#include <asm/errno.h>
++
++ENTRY(__put_user_1)
++1:	strb	w2, [x0]
++	mov	x0, #0
++	ret
++ENDPROC(__put_user_1)
++
++ENTRY(__put_user_2)
++2:	strh	w2, [x0]
++	mov	x0, #0
++	ret
++ENDPROC(__put_user_2)
++
++ENTRY(__put_user_4)
++3:	str	w2, [x0]
++	mov	x0, #0
++	ret
++ENDPROC(__put_user_4)
++
++ENTRY(__put_user_8)
++4:	str	x2, [x0]
++	mov	x0, #0
++	ret
++ENDPROC(__put_user_8)
++
++__put_user_bad:
++	mov	x0, #-EFAULT
++	ret
++ENDPROC(__put_user_bad)
++
++.section __ex_table, "a"
++	.quad	1b, __put_user_bad
++	.quad	2b, __put_user_bad
++	.quad	3b, __put_user_bad
++	.quad	4b, __put_user_bad
++.previous
+diff --git a/arch/arm64/lib/strncpy_from_user.S b/arch/arm64/lib/strncpy_from_user.S
+new file mode 100644
+index 0000000..56e448a
+--- /dev/null
++++ b/arch/arm64/lib/strncpy_from_user.S
+@@ -0,0 +1,50 @@
++/*
++ * Based on arch/arm/lib/strncpy_from_user.S
++ *
++ * Copyright (C) 1995-2000 Russell King
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++#include <asm/errno.h>
 +
 +	.text
++	.align	5
 +
-+	nop
-+ENTRY(__kernel_rt_sigreturn)
-+	.cfi_startproc
-+	.cfi_signal_frame
-+	.cfi_def_cfa	x29, 0
-+	.cfi_offset	x29, 0 * 8
-+	.cfi_offset	x30, 1 * 8
-+	mov	x8, #__NR_rt_sigreturn
-+	svc	#0
-+	.cfi_endproc
-+ENDPROC(__kernel_rt_sigreturn)
-diff --git a/arch/arm64/kernel/vdso/vdso.S b/arch/arm64/kernel/vdso/vdso.S
-new file mode 100644
-index 0000000..60c1db5
---- /dev/null
-+++ b/arch/arm64/kernel/vdso/vdso.S
-@@ -0,0 +1,33 @@
 +/*
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
++ * Copy a string from user space to kernel space.
++ *  x0 = dst, x1 = src, x2 = byte length
++ * returns the number of characters copied (strlen of copied string),
++ *  -EFAULT on exception, or "len" if we fill the whole buffer
 + */
++ENTRY(__strncpy_from_user)
++	mov	x4, x1
++1:	subs	x2, x2, #1
++	bmi	2f
++USER(9f, ldrb	w3, [x1], #1	)
++	strb	w3, [x0], #1
++	cbnz	w3, 1b
++	sub	x1, x1, #1	// take NUL character out of count
++2:	sub	x0, x1, x4
++	ret
++ENDPROC(__strncpy_from_user)
 +
-+#include <linux/init.h>
-+#include <linux/linkage.h>
-+#include <linux/const.h>
-+#include <asm/page.h>
-+
-+	__PAGE_ALIGNED_DATA
-+
-+	.globl vdso_start, vdso_end
-+	.balign PAGE_SIZE
-+vdso_start:
-+	.incbin "arch/arm64/kernel/vdso/vdso.so"
-+	.balign PAGE_SIZE
-+vdso_end:
-+
++	.section .fixup,"ax"
++	.align	0
++9:	strb	wzr, [x0]	// null terminate
++	mov	x0, #-EFAULT
++	ret
 +	.previous
-diff --git a/arch/arm64/kernel/vdso/vdso.lds.S b/arch/arm64/kernel/vdso/vdso.lds.S
+diff --git a/arch/arm64/lib/strnlen_user.S b/arch/arm64/lib/strnlen_user.S
 new file mode 100644
-index 0000000..8154b8d
+index 0000000..7f7b176
 --- /dev/null
-+++ b/arch/arm64/kernel/vdso/vdso.lds.S
-@@ -0,0 +1,100 @@
++++ b/arch/arm64/lib/strnlen_user.S
+@@ -0,0 +1,47 @@
 +/*
-+ * GNU linker script for the VDSO library.
-+*
-+ * Copyright (C) 2012 ARM Limited
++ * Based on arch/arm/lib/strnlen_user.S
++ *
++ * Copyright (C) 1995-2000 Russell King
++ * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -887,87 +929,33 @@ index 0000000..8154b8d
 + *
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ * Heavily based on the vDSO linker scripts for other archs.
 + */
 +
-+#include <linux/const.h>
-+#include <asm/page.h>
-+#include <asm/vdso.h>
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++#include <asm/errno.h>
 +
-+OUTPUT_FORMAT("elf64-littleaarch64", "elf64-bigaarch64", "elf64-littleaarch64")
-+OUTPUT_ARCH(aarch64)
++	.text
++	.align	5
 +
-+SECTIONS
-+{
-+	. = VDSO_LBASE + SIZEOF_HEADERS;
-+
-+	.hash		: { *(.hash) }			:text
-+	.gnu.hash	: { *(.gnu.hash) }
-+	.dynsym		: { *(.dynsym) }
-+	.dynstr		: { *(.dynstr) }
-+	.gnu.version	: { *(.gnu.version) }
-+	.gnu.version_d	: { *(.gnu.version_d) }
-+	.gnu.version_r	: { *(.gnu.version_r) }
-+
-+	.note		: { *(.note.*) }		:text	:note
-+
-+	. = ALIGN(16);
-+
-+	.text		: { *(.text*) }			:text	=0xd503201f
-+	PROVIDE (__etext = .);
-+	PROVIDE (_etext = .);
-+	PROVIDE (etext = .);
-+
-+	.eh_frame_hdr	: { *(.eh_frame_hdr) }		:text	:eh_frame_hdr
-+	.eh_frame	: { KEEP (*(.eh_frame)) }	:text
-+
-+	.dynamic	: { *(.dynamic) }		:text	:dynamic
-+
-+	.rodata		: { *(.rodata*) }		:text
-+
-+	_end = .;
-+	PROVIDE(end = .);
-+
-+	. = ALIGN(PAGE_SIZE);
-+	PROVIDE(_vdso_data = .);
-+
-+	/DISCARD/	: {
-+		*(.note.GNU-stack)
-+		*(.data .data.* .gnu.linkonce.d.* .sdata*)
-+		*(.bss .sbss .dynbss .dynsbss)
-+	}
-+}
-+
-+/*
-+ * We must supply the ELF program headers explicitly to get just one
-+ * PT_LOAD segment, and set the flags explicitly to make segments read-only.
++/* Prototype: unsigned long __strnlen_user(const char *str, long n)
++ * Purpose  : get length of a string in user memory
++ * Params   : str - address of string in user memory
++ * Returns  : length of string *including terminator*
++ *	      or zero on exception, or n if too long
 + */
-+PHDRS
-+{
-+	text		PT_LOAD		FLAGS(5) FILEHDR PHDRS; /* PF_R|PF_X */
-+	dynamic		PT_DYNAMIC	FLAGS(4);		/* PF_R */
-+	note		PT_NOTE		FLAGS(4);		/* PF_R */
-+	eh_frame_hdr	PT_GNU_EH_FRAME;
-+}
++ENTRY(__strnlen_user)
++	mov	x2, x0
++1:	subs	x1, x1, #1
++	b.mi	2f
++USER(9f, ldrb	w3, [x0], #1	)
++	cbnz	w3, 1b
++2:	sub	x0, x0, x2
++	ret
++ENDPROC(__strnlen_user)
 +
-+/*
-+ * This controls what symbols we export from the DSO.
-+ */
-+VERSION
-+{
-+	LINUX_2.6.39 {
-+	global:
-+		__kernel_rt_sigreturn;
-+		__kernel_gettimeofday;
-+		__kernel_clock_gettime;
-+		__kernel_clock_getres;
-+	local: *;
-+	};
-+}
-+
-+/*
-+ * Make the sigreturn code visible to the kernel.
-+ */
-+VDSO_sigtramp		= __kernel_rt_sigreturn;
++	.section .fixup,"ax"
++	.align	0
++9:	mov	x0, #0
++	ret
++	.previous
