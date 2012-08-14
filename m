@@ -1,36 +1,51 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 14 Aug 2012 09:43:12 +0100
-Subject: [PATCH 4/9] ARM: pmu: remove arm_pmu_type enumeration
-In-Reply-To: <50297838.7080208@broadcom.com>
-References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
- <1344620195-22372-5-git-send-email-will.deacon@arm.com>
- <50297838.7080208@broadcom.com>
-Message-ID: <502A0FA0.3010602@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Aug 2012 10:51:02 +0200
+Subject: [PATCH 04/22] ASoC: Ux500: Move MSP pinctrl setup into the MSP
+ driver
+In-Reply-To: <1344527268-5964-5-git-send-email-lee.jones@linaro.org>
+References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
+ <1344527268-5964-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkda_xOyu9BFGRK4xTsXOO9RCJu7BbU-kPGpttVkR6mDMZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jiandong,
+On Thu, Aug 9, 2012 at 5:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-On 13/08/12 22:57, Jiandong Zheng wrote:
-> On 8/10/2012 10:36 AM, Will Deacon wrote:
->> From: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
->>    static struct platform_device pmu_device = {
->>    	.name		= "arm-pmu",
->> -	.id		= ARM_PMU_DEVICE_CPU,
->> +	.id		= -1,
->>    	.resource	= &pmu_resource,
->>    	.num_resources	= 1,
->>    };
->>
-> Isn't it clearer to define a meaningful name for "-1", esp. if "-1" is
-> being checked somewhere else?
+> In the initial submission of the MSP driver msp1 and msp3's associated
+> pinctrl mechanism was passed back to platform code using a plat_init()
+> call-back routine, but it has no place in platform code. The MSP driver
+> should set this up for the appropriate ports. Instead we use a use_pinctrl
+> identifier which is passed from platform_data/Device Tree which indicates
+> which ports should use pinctrl.
+>
+> CC: alsa-devel at alsa-project.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-No platform_device->id is not being referred anywhere. 
-ARM_PMU_DEVICE_CPU was initially assigned to id to identify different 
-PMU types through platform_device->id variable but was never used.
+This is very good because it rids platform code and makes the driver
+self-contained without strange platform data hooks.
 
-Also for all new platforms that might support multiple PMUs, we can use 
-device tree to identify them.
+Now details...
 
-Regards,
-Sudeep
+> +/* MSP1/3 Tx/Rx usage protection */
+> +static DEFINE_SPINLOCK(msp_rxtx_lock);
+> +
+> +/* Pin modes */
+> +struct pinctrl *pinctrl_p;
+> +struct pinctrl_state *pinctrl_def;
+> +struct pinctrl_state *pinctrl_sleep;
+> +
+> +/* Reference Count */
+> +int pinctrl_rxtx_ref;
+
+
+But wait. These are just local statics. Surelty you can put these into
+struct ux500_msp instead? Here it looks like these will be used for
+all ports, so MSP2 will enable the pins requested by MSP1 etc
+completely broken. So put it into the struct ux500_msp state
+container from ux500_msp_i2s.h where it belongs.
+
+Refer to drivers/tty/serial/amba-pl011.c when in trouble. This
+one is a good pinctrl example.
+
+Yours,
+Linus Walleij
