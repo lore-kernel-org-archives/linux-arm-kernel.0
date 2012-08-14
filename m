@@ -1,64 +1,48 @@
-From: rvaswani@codeaurora.org (Rohit Vaswani)
-Date: Tue, 14 Aug 2012 11:49:01 -0700
-Subject: [PATCH 1/2] ARM: local timers: Unmask interrupt before new TVAL
- is set
-In-Reply-To: <cdb51f00bafa8151a880d8cc7898631e@localhost>
-References: <1344635854-5033-1-git-send-email-rvaswani@codeaurora.org>
- <cdb51f00bafa8151a880d8cc7898631e@localhost>
-Message-ID: <502A9D9D.7070901@codeaurora.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 14 Aug 2012 15:20:49 -0400
+Subject: [PATCH] arm: add documentation describing Marvell families of SoC
+In-Reply-To: <1344115004-7886-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1344115004-7886-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20120814192049.GR22226@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/11/2012 3:17 AM, Marc Zyngier wrote:
-> On Fri, 10 Aug 2012 14:57:34 -0700, Rohit Vaswani
-> <rvaswani@codeaurora.org>
-> wrote:
->> Level triggered interrupt is deasserted when a new TVAL is written
->> only when the interrupt is unmasked. Make sure that the interrupt
->> is unmasked in CTL register before TVAL is written.
->> If this order is not followed, there are chances that on some
->> hardware you would not receive any timer interrupts.
->>
->> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
->> ---
->>   arch/arm/kernel/arch_timer.c |    2 +-
->>   1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
->> index dd58035..1d0d9df 100644
->> --- a/arch/arm/kernel/arch_timer.c
->> +++ b/arch/arm/kernel/arch_timer.c
->> @@ -126,8 +126,8 @@ static int arch_timer_set_next_event(unsigned long
-> evt,
->>   	ctrl |= ARCH_TIMER_CTRL_ENABLE;
->>   	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
->>   
->> -	arch_timer_reg_write(ARCH_TIMER_REG_TVAL, evt);
->>   	arch_timer_reg_write(ARCH_TIMER_REG_CTRL, ctrl);
->> +	arch_timer_reg_write(ARCH_TIMER_REG_TVAL, evt);
-> But by doing so, you're opening a window where TVAL can be negative (from
-> a previous timer trigger) and the interrupt unmasked, which would lead to
-> an immediate trigger, before TVAL is updated with the new value.
->
-> Does your hardware deassert the interrupt even when the enable bit is not
-> set? If so, would the following sequence work?
->
->          ctrl &= ~(ARCH_TIMER_CTRL_ENABLE | ARCH_TIMER_CTRL_IT_MASK);
->          arch_timer_reg_write(ARCH_TIMER_REG_CTRL, ctrl);
->
-> 	arch_timer_reg_write(ARCH_TIMER_REG_TVAL, evt);
->
->          ctrl |= ARCH_TIMER_CTRL_ENABLE;
->          arch_timer_reg_write(ARCH_TIMER_REG_CTRL, ctrl);
->
-> Thanks,
->
->          M.
-Thanks Marc, this works. I will re-send the patch with these changes.
+On Sat, Aug 04, 2012 at 11:16:44PM +0200, Thomas Petazzoni wrote:
+> As stated in the introduction of the document, the families of ARM
+> SoCs at Marvell are very complicated, and it is difficult for
+> newcomers to understand the organization of this SoC family and how it
+> relates to the Linux kernel support for those hardware platforms.
+> 
+> This document is only at RFC stage for now, it requires reviews and
+> comments from the Marvell maintainers, the PXA maintainers and the MMP
+> maintainers. For correctness of course, but also to add any other
+> information that would be useful. For example, one of the thing that
+> wasn't clear how to detail in the documentation is how the SoCs relate
+> to each other in terms of hardware IP blocks. For example, most of the
+> Kirkwood/Dove/Armada 370-XP/etc. hardware IPs (I2C, SPI, USB, SATA,
+> etc.) are identical, while the PXA and MMP families are completely
+> separate.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Lior Amsalem <alior@marvell.com>
+> Cc: Maen Suleiman <maen@marvell.com>
+> Cc: Tawfik Bayouk <tawfik@marvell.com>
+> Cc: Shadi Ammouri <shadi@marvell.com>
+> Cc: Eran Ben-Avi <benavi@marvell.com>
 
-Thanks,
-Rohit Vaswani
+Added Arnd's Acked-by: and applied to:
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+git://git.infradead.org/users/jcooper/linux.git boards-for-v3.7
+
+thx,
+
+Jason.
