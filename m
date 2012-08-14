@@ -1,44 +1,80 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 14 Aug 2012 12:51:15 -0700
-Subject: [PATCH] Documentation: dt: hwmon: Update for tmp102
-In-Reply-To: <1344961412-13622-1-git-send-email-sourav.poddar@ti.com>
-References: <1344961412-13622-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <20120814195115.GA17168@roeck-us.net>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 14 Aug 2012 21:58:34 +0200
+Subject: [PATCH v3 00/10] ARM: tegra: Add PCIe device tree support
+In-Reply-To: <502AA96B.2050709@wwwdotorg.org>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <50201E1D.5060200@wwwdotorg.org>
+ <20120813174003.GA2527@avionic-0098.mockup.avionic-design.de>
+ <50294BCA.1070807@wwwdotorg.org>
+ <CAErSpo7og1XgOSv_mFCQ=hP7pq0j3gXWh2QFL2wBJjz7kcAq=g@mail.gmail.com>
+ <502AA96B.2050709@wwwdotorg.org>
+Message-ID: <20120814195834.GA10431@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 09:53:32PM +0530, Sourav Poddar wrote:
-> Add Documentation for tmp102 temperature sensor.
+On Tue, Aug 14, 2012 at 01:39:23PM -0600, Stephen Warren wrote:
+> On 08/13/2012 05:18 PM, Bjorn Helgaas wrote:
+> > On Mon, Aug 13, 2012 at 11:47 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> ...
+> >> whereas for a device tree boot:
+> >>
+> >> (same):
+> >>> [    2.112217] pci 0000:01:00.0: reg 10: [io  0x0000-0x00ff]
+> >>> [    2.117635] pci 0000:01:00.0: reg 18: [mem 0x00000000-0x00000fff 64bit pref]
+> >>> [    2.124690] pci 0000:01:00.0: reg 20: [mem 0x00000000-0x00003fff 64bit pref]
+> >>> [    2.131731] pci 0000:01:00.0: reg 30: [mem 0x00000000-0x0001ffff pref]
+> >> ... (request region happens early)
+> >>> [    2.179838] r8169 0000:01:00.0: BAR 0: requesting [io  0x0000-0x00ff]
+> >>> [    2.193312] r8169 0000:01:00.0: BAR 2: requesting [mem 0x00000000-0x00000fff 64bit pref]
+> >>> [    2.201397] r8169 0000:01:00.0: BAR 2: can't reserve [mem 0x00000000-0x00000fff 64bit pref]
+> >>> [    2.209742] r8169 0000:01:00.0: (unregistered net_device): could not request regions
+> >> ... (same, just happens too late)
+> >>> [    2.236818] pci 0000:01:00.0: BAR 6: assigned [mem 0xa0000000-0xa001ffff pref]
+> >>> [    2.244027] pci 0000:01:00.0: BAR 4: assigned [mem 0xa0020000-0xa0023fff 64bit pref]
+> >>> [    2.251794] pci 0000:01:00.0: BAR 2: assigned [mem 0xa0024000-0xa0024fff 64bit pref]
+> >>> [    2.259542] pci 0000:01:00.0: BAR 0: assigned [io  0x1000-0x10ff]
+> >>
+> >> I suspect this is all still related to the PCI devices themselves being
+> >> probed much earlier in the overall PCI initialization sequence when the
+> >> PCI controller is probed later in the boot sequence, whereas PCI device
+> >> probe is deferred until the overall PCI initialization sequence is
+> >> complete if the PCI controller is probed very early in the boot sequence.
+> > 
+> > I don't know what to apply your patches to (they don't apply cleanly
+> > to v3.6-rc2), so I can't see exactly what you're doing.  But it looks
+> > like you might be calling pci_bus_add_devices() before
+> > pci_bus_assign_resource(), which isn't going to work.
 > 
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> ---
->  Documentation/devicetree/bindings/hwmon/tmp102.txt |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/hwmon/tmp102.txt
+> Yes, that's exactly what is happening.
 > 
-> diff --git a/Documentation/devicetree/bindings/hwmon/tmp102.txt b/Documentation/devicetree/bindings/hwmon/tmp102.txt
-> new file mode 100644
-> index 0000000..df1342b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/hwmon/tmp102.txt
-> @@ -0,0 +1,11 @@
-> +TMP102 Temperature sensor
-> +
-> +Required properties:
-> +- compatible: ti,tmp102
-> +
-> +Example:
-> +
-> +tmp102 at 48 {
-> +        compatible = "ti,tmp102";
-> +        reg = <0x48>;
-> +};
-> -- 
+> PCIe initialization starts in arch/arm/mach-tegra/pci.e
+> tegra_pcie_init() which calls arch/arm/kernel/bios32.c
+> pci_common_init(). That function first calls pcibios_init_hw() (in the
+> same file, more about this later) and then loops over PCI buses, calling
+> amongst other things pci_bus_assign_resources() then pci_bus_add_devices().
+> 
+> The problem is that ARM's pcibios_init_hw() calls pci_scan_root_bus()
+> (or a host-driver-specific function which that also calls
+> pci_scan_root_bus() in Tegra's case) which in turn calls
+> pci_bus_add_devices() right at the end, before control has returned to
+> pci_common_init() and hence before pci_bus_assign_resources() has been
+> called.
+> 
+> If I modify pci_scan_root_bus() and remove the call to
+> pci_bus_add_devices(), everything works as expected.
+> 
+> So, I guess the question is: Should ARM's pcibios_init_hw() not be
+> calling pci_scan_root_bus(), or at least presumably the ARM PCI code
+> needs to do things in a slightly different order?
 
-It would be simpler to just add a single line to
-	Documentation/devicetree/bindings/i2c/trivial-devices.txt
+Maybe pci_scan_root_bus() should be calling pci_bus_assign_resources()?
+Or a new function could be added which also assigns the resources.
 
-Guenter
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120814/fff2b990/attachment.sig>
