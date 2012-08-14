@@ -1,64 +1,42 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Tue, 14 Aug 2012 21:54:32 +0530
-Subject: [PATCHv3 3/4] arm/dts: omap5-evm: Add keypad data
-In-Reply-To: <1344961473-13675-1-git-send-email-sourav.poddar@ti.com>
-References: <1344961473-13675-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <1344961473-13675-4-git-send-email-sourav.poddar@ti.com>
+From: jdzheng@broadcom.com (Jiandong Zheng)
+Date: Tue, 14 Aug 2012 09:53:54 -0700
+Subject: [PATCH 4/9] ARM: pmu: remove arm_pmu_type enumeration
+In-Reply-To: <502A0FA0.3010602@arm.com>
+References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
+ <1344620195-22372-5-git-send-email-will.deacon@arm.com>
+ <50297838.7080208@broadcom.com> <502A0FA0.3010602@arm.com>
+Message-ID: <502A82A2.9090307@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add keypad data node in omap5 device tree file.
-Also fill the device tree binding parameters
-with the required value in "omap5-evm" dts file.
+On 8/14/2012 1:43 AM, Sudeep KarkadaNagesha wrote:
+> Hi Jiandong,
+>
+> On 13/08/12 22:57, Jiandong Zheng wrote:
+>> On 8/10/2012 10:36 AM, Will Deacon wrote:
+>>> From: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
+>>>    static struct platform_device pmu_device = {
+>>>        .name        = "arm-pmu",
+>>> -    .id        = ARM_PMU_DEVICE_CPU,
+>>> +    .id        = -1,
+>>>        .resource    = &pmu_resource,
+>>>        .num_resources    = 1,
+>>>    };
+>>>
+>> Isn't it clearer to define a meaningful name for "-1", esp. if "-1" is
+>> being checked somewhere else?
+>
+> No platform_device->id is not being referred anywhere. 
+> ARM_PMU_DEVICE_CPU was initially assigned to id to identify different 
+> PMU types through platform_device->id variable but was never used.
+>
+> Also for all new platforms that might support multiple PMUs, we can 
+> use device tree to identify them.
+>
+Seems it is just a field not in use. Even though I still prefer 
+something like "ARM_PMU_DEFAULT_ID" to "-1", I am OK with "-1" as well.
 
-Tested on omap5430 evm with 3.5 custom kernel.
+Acked-by: Jiandong Zheng <jdzheng@broadcom.com>
 
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
----
- arch/arm/boot/dts/omap5-evm.dts |   12 ++++++++++++
- arch/arm/boot/dts/omap5.dtsi    |    5 +++++
- 2 files changed, 17 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
-index b302802..8835026 100644
---- a/arch/arm/boot/dts/omap5-evm.dts
-+++ b/arch/arm/boot/dts/omap5-evm.dts
-@@ -17,6 +17,18 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x40000000>; /* 1 GB */
- 	};
-+
-+	keypad {
-+		keypad,num-rows = <8>;
-+		keypad,num-columns = <8>;
-+		linux,keymap = < 0x02020073  /* VOLUP */
-+			0x02030072  /* VOLDOWM */
-+			0x020400e7  /* SEND */
-+			0x02050066  /* HOME */
-+			0x0206006b  /* END */
-+			0x020700d9 >; /* SEARCH */
-+		linux,input-no-autorepeat;
-+	};
- };
- 
- &i2c4 {
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 6b68dfe..c38b823 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -216,4 +216,9 @@
- 			clock-frequency = <48000000>;
- 		};
- 	};
-+
-+	keypad {
-+		compatible = "ti,omap4-keypad";
-+		ti,hwmods = "kbd";
-+	};
- };
--- 
-1.7.1
+Thanks,
+JD
