@@ -1,38 +1,38 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Aug 2012 18:52:14 +0100
-Subject: [PATCH v2 13/31] arm64: Device specific operations
+Date: Tue, 14 Aug 2012 18:52:10 +0100
+Subject: [PATCH v2 09/31] arm64: Cache maintenance routines
 In-Reply-To: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
 References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1344966752-16102-14-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1344966752-16102-10-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds several definitions for device communication, including
-I/O accessors and ioremap(). The __raw_* accessors are implemented as
-inline asm to avoid compiler generation of post-indexed accesses (less
-efficient to emulate in a virtualised environment).
+The patch adds functionality required for cache maintenance. The AArch64
+architecture mandates non-aliasing VIPT or PIPT D-cache and VIPT (may
+have aliases) or ASID-tagged VIVT I-cache. Cache maintenance operations
+are automatically broadcast in hardware between CPUs.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/device.h |   26 ++++
- arch/arm64/include/asm/fb.h     |   34 +++++
- arch/arm64/include/asm/io.h     |  263 +++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/io.c          |   64 ++++++++++
- arch/arm64/mm/ioremap.c         |   84 +++++++++++++
- 5 files changed, 471 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/device.h
- create mode 100644 arch/arm64/include/asm/fb.h
- create mode 100644 arch/arm64/include/asm/io.h
- create mode 100644 arch/arm64/kernel/io.c
- create mode 100644 arch/arm64/mm/ioremap.c
+ arch/arm64/include/asm/cache.h      |   32 ++++
+ arch/arm64/include/asm/cacheflush.h |  209 ++++++++++++++++++++++++++
+ arch/arm64/include/asm/cachetype.h  |   48 ++++++
+ arch/arm64/mm/cache.S               |  279 +++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/flush.c               |  132 +++++++++++++++++
+ 5 files changed, 700 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm64/include/asm/cache.h
+ create mode 100644 arch/arm64/include/asm/cacheflush.h
+ create mode 100644 arch/arm64/include/asm/cachetype.h
+ create mode 100644 arch/arm64/mm/cache.S
+ create mode 100644 arch/arm64/mm/flush.c
 
-diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
+diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
 new file mode 100644
-index 0000000..0d8453c
+index 0000000..390308a
 --- /dev/null
-+++ b/arch/arm64/include/asm/device.h
-@@ -0,0 +1,26 @@
++++ b/arch/arm64/include/asm/cache.h
+@@ -0,0 +1,32 @@
 +/*
 + * Copyright (C) 2012 ARM Ltd.
 + *
@@ -48,23 +48,244 @@ index 0000000..0d8453c
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#ifndef __ASM_DEVICE_H
-+#define __ASM_DEVICE_H
++#ifndef __ASM_CACHE_H
++#define __ASM_CACHE_H
 +
-+struct dev_archdata {
-+	struct dma_map_ops *dma_ops;
-+};
++#define L1_CACHE_SHIFT		6
++#define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
 +
-+struct pdev_archdata {
-+};
++/*
++ * Memory returned by kmalloc() may be used for DMA, so we must make
++ * sure that all such allocations are cache aligned. Otherwise,
++ * unrelated code may cause parts of the buffer to be read into the
++ * cache before the transfer is done, causing old data to be seen by
++ * the CPU.
++ */
++#define ARCH_DMA_MINALIGN	L1_CACHE_BYTES
++#define ARCH_SLAB_MINALIGN	8
 +
 +#endif
-diff --git a/arch/arm64/include/asm/fb.h b/arch/arm64/include/asm/fb.h
+diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
 new file mode 100644
-index 0000000..adb88a6
+index 0000000..93b5590
 --- /dev/null
-+++ b/arch/arm64/include/asm/fb.h
-@@ -0,0 +1,34 @@
++++ b/arch/arm64/include/asm/cacheflush.h
+@@ -0,0 +1,209 @@
++/*
++ * Based on arch/arm/include/asm/cacheflush.h
++ *
++ * Copyright (C) 1999-2002 Russell King.
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_CACHEFLUSH_H
++#define __ASM_CACHEFLUSH_H
++
++#include <linux/mm.h>
++
++/*
++ * This flag is used to indicate that the page pointed to by a pte is clean
++ * and does not require cleaning before returning it to the user.
++ */
++#define PG_dcache_clean PG_arch_1
++
++/*
++ *	MM Cache Management
++ *	===================
++ *
++ *	The arch/arm/mm/cache-*.S and arch/arm/mm/proc-*.S files
++ *	implement these methods.
++ *
++ *	Start addresses are inclusive and end addresses are exclusive;
++ *	start addresses should be rounded down, end addresses up.
++ *
++ *	See Documentation/cachetlb.txt for more information.
++ *	Please note that the implementation of these, and the required
++ *	effects are cache-type (VIVT/VIPT/PIPT) specific.
++ *
++ *	flush_cache_kern_all()
++ *
++ *		Unconditionally clean and invalidate the entire cache.
++ *
++ *	flush_cache_user_mm(mm)
++ *
++ *		Clean and invalidate all user space cache entries
++ *		before a change of page tables.
++ *
++ *	flush_cache_user_range(start, end, flags)
++ *
++ *		Clean and invalidate a range of cache entries in the
++ *		specified address space before a change of page tables.
++ *		- start - user start address (inclusive, page aligned)
++ *		- end   - user end address   (exclusive, page aligned)
++ *		- flags - vma->vm_flags field
++ *
++ *	coherent_kern_range(start, end)
++ *
++ *		Ensure coherency between the Icache and the Dcache in the
++ *		region described by start, end.  If you have non-snooping
++ *		Harvard caches, you need to implement this function.
++ *		- start  - virtual start address
++ *		- end    - virtual end address
++ *
++ *	coherent_user_range(start, end)
++ *
++ *		Ensure coherency between the Icache and the Dcache in the
++ *		region described by start, end.  If you have non-snooping
++ *		Harvard caches, you need to implement this function.
++ *		- start  - virtual start address
++ *		- end    - virtual end address
++ *
++ *	flush_kern_dcache_area(kaddr, size)
++ *
++ *		Ensure that the data held in page is written back.
++ *		- kaddr  - page address
++ *		- size   - region size
++ *
++ *	DMA Cache Coherency
++ *	===================
++ *
++ *	dma_flush_range(start, end)
++ *
++ *		Clean and invalidate the specified virtual address range.
++ *		- start  - virtual start address
++ *		- end    - virtual end address
++ */
++extern void __cpuc_flush_kern_all(void);
++extern void __cpuc_flush_user_all(void);
++extern void __cpuc_flush_user_range(unsigned long, unsigned long, unsigned int);
++extern void __cpuc_coherent_kern_range(unsigned long, unsigned long);
++extern void __cpuc_coherent_user_range(unsigned long, unsigned long);
++extern void __cpuc_flush_dcache_area(void *, size_t);
++
++/*
++ * These are private to the dma-mapping API.  Do not use directly.
++ * Their sole purpose is to ensure that data held in the cache
++ * is visible to DMA, or data written by DMA to system memory is
++ * visible to the CPU.
++ */
++extern void dmac_map_area(const void *, size_t, int);
++extern void dmac_unmap_area(const void *, size_t, int);
++extern void dmac_flush_range(const void *, const void *);
++
++/*
++ * Copy user data from/to a page which is mapped into a different
++ * processes address space.  Really, we want to allow our "user
++ * space" model to handle this.
++ */
++extern void copy_to_user_page(struct vm_area_struct *, struct page *,
++	unsigned long, void *, const void *, unsigned long);
++#define copy_from_user_page(vma, page, vaddr, dst, src, len) \
++	do {							\
++		memcpy(dst, src, len);				\
++	} while (0)
++
++/*
++ * Convert calls to our calling convention.
++ */
++#define flush_cache_all()		__cpuc_flush_kern_all()
++extern void flush_cache_mm(struct mm_struct *mm);
++extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
++extern void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsigned long pfn);
++
++#define flush_cache_dup_mm(mm) flush_cache_mm(mm)
++
++/*
++ * flush_cache_user_range is used when we want to ensure that the
++ * Harvard caches are synchronised for the user space address range.
++ * This is used for the ARM private sys_cacheflush system call.
++ */
++#define flush_cache_user_range(start, end) \
++	__cpuc_coherent_user_range((start) & PAGE_MASK, PAGE_ALIGN(end))
++
++/*
++ * Perform necessary cache operations to ensure that data previously
++ * stored within this range of addresses can be executed by the CPU.
++ */
++#define flush_icache_range(s,e)		__cpuc_coherent_kern_range(s,e)
++
++/*
++ * flush_dcache_page is used when the kernel has written to the page
++ * cache page at virtual address page->virtual.
++ *
++ * If this page isn't mapped (ie, page_mapping == NULL), or it might
++ * have userspace mappings, then we _must_ always clean + invalidate
++ * the dcache entries associated with the kernel mapping.
++ *
++ * Otherwise we can defer the operation, and clean the cache when we are
++ * about to change to user space.  This is the same method as used on SPARC64.
++ * See update_mmu_cache for the user space part.
++ */
++#define ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE 1
++extern void flush_dcache_page(struct page *);
++
++static inline void __flush_icache_all(void)
++{
++	asm("ic	ialluis");
++}
++
++#define ARCH_HAS_FLUSH_ANON_PAGE
++static inline void flush_anon_page(struct vm_area_struct *vma,
++			 struct page *page, unsigned long vmaddr)
++{
++	extern void __flush_anon_page(struct vm_area_struct *vma,
++				struct page *, unsigned long);
++	if (PageAnon(page))
++		__flush_anon_page(vma, page, vmaddr);
++}
++
++#define flush_dcache_mmap_lock(mapping) \
++	spin_lock_irq(&(mapping)->tree_lock)
++#define flush_dcache_mmap_unlock(mapping) \
++	spin_unlock_irq(&(mapping)->tree_lock)
++
++#define flush_icache_user_range(vma,page,addr,len) \
++	flush_dcache_page(page)
++
++/*
++ * We don't appear to need to do anything here.  In fact, if we did, we'd
++ * duplicate cache flushing elsewhere performed by flush_dcache_page().
++ */
++#define flush_icache_page(vma,page)	do { } while (0)
++
++/*
++ * flush_cache_vmap() is used when creating mappings (eg, via vmap,
++ * vmalloc, ioremap etc) in kernel space for pages.  On non-VIPT
++ * caches, since the direct-mappings of these pages may contain cached
++ * data, we need to do a full cache flush to ensure that writebacks
++ * don't corrupt data placed into these pages via the new mappings.
++ */
++static inline void flush_cache_vmap(unsigned long start, unsigned long end)
++{
++	/*
++	 * set_pte_at() called from vmap_pte_range() does not
++	 * have a DSB after cleaning the cache line.
++	 */
++	dsb();
++}
++
++static inline void flush_cache_vunmap(unsigned long start, unsigned long end)
++{
++}
++
++#endif
+diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
+new file mode 100644
+index 0000000..85f5f51
+--- /dev/null
++++ b/arch/arm64/include/asm/cachetype.h
+@@ -0,0 +1,48 @@
 +/*
 + * Copyright (C) 2012 ARM Ltd.
 + *
@@ -80,303 +301,49 @@ index 0000000..adb88a6
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#ifndef __ASM_FB_H_
-+#define __ASM_FB_H_
++#ifndef __ASM_CACHETYPE_H
++#define __ASM_CACHETYPE_H
 +
-+#include <linux/fb.h>
-+#include <linux/fs.h>
-+#include <asm/page.h>
++#include <asm/cputype.h>
 +
-+static inline void fb_pgprotect(struct file *file, struct vm_area_struct *vma,
-+				unsigned long off)
++#define CTR_L1IP_SHIFT		14
++#define CTR_L1IP_MASK		3
++
++#define ICACHE_POLICY_RESERVED	0
++#define ICACHE_POLICY_AIVIVT	1
++#define ICACHE_POLICY_VIPT	2
++#define ICACHE_POLICY_PIPT	3
++
++static inline u32 icache_policy(void)
 +{
-+	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
++	return (read_cpuid_cachetype() >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK;
 +}
 +
-+static inline int fb_is_primary_device(struct fb_info *info)
++/*
++ * Whilst the D-side always behaves as PIPT on AArch64, aliasing is
++ * permitted in the I-cache.
++ */
++static inline int icache_is_aliasing(void)
 +{
-+	return 0;
++	return icache_policy() != ICACHE_POLICY_PIPT;
 +}
 +
-+#endif /* __ASM_FB_H_ */
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
++static inline int icache_is_aivivt(void)
++{
++	return icache_policy() == ICACHE_POLICY_AIVIVT;
++}
++
++#endif	/* __ASM_CACHETYPE_H */
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
 new file mode 100644
-index 0000000..48fa83f
+index 0000000..f4efa04
 --- /dev/null
-+++ b/arch/arm64/include/asm/io.h
-@@ -0,0 +1,263 @@
++++ b/arch/arm64/mm/cache.S
+@@ -0,0 +1,279 @@
 +/*
-+ * Based on arch/arm/include/asm/io.h
++ * Cache maintenance
 + *
-+ * Copyright (C) 1996-2000 Russell King
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_IO_H
-+#define __ASM_IO_H
-+
-+#ifdef __KERNEL__
-+
-+#include <linux/types.h>
-+
-+#include <asm/byteorder.h>
-+#include <asm/barrier.h>
-+#include <asm/pgtable.h>
-+
-+/*
-+ * Generic IO read/write.  These perform native-endian accesses.
-+ */
-+static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
-+{
-+	asm volatile("strb %w0, [%1]" : : "r" (val), "r" (addr));
-+}
-+
-+static inline void __raw_writew(u16 val, volatile void __iomem *addr)
-+{
-+	asm volatile("strh %w0, [%1]" : : "r" (val), "r" (addr));
-+}
-+
-+static inline void __raw_writel(u32 val, volatile void __iomem *addr)
-+{
-+	asm volatile("str %w0, [%1]" : : "r" (val), "r" (addr));
-+}
-+
-+static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
-+{
-+	asm volatile("str %0, [%1]" : : "r" (val), "r" (addr));
-+}
-+
-+static inline u8 __raw_readb(const volatile void __iomem *addr)
-+{
-+	u8 val;
-+	asm volatile("ldrb %w0, [%1]" : "=r" (val) : "r" (addr));
-+	return val;
-+}
-+
-+static inline u16 __raw_readw(const volatile void __iomem *addr)
-+{
-+	u16 val;
-+	asm volatile("ldrh %w0, [%1]" : "=r" (val) : "r" (addr));
-+	return val;
-+}
-+
-+static inline u32 __raw_readl(const volatile void __iomem *addr)
-+{
-+	u32 val;
-+	asm volatile("ldr %w0, [%1]" : "=r" (val) : "r" (addr));
-+	return val;
-+}
-+
-+static inline u64 __raw_readq(const volatile void __iomem *addr)
-+{
-+	u64 val;
-+	asm volatile("ldr %0, [%1]" : "=r" (val) : "r" (addr));
-+	return val;
-+}
-+
-+/* IO barriers */
-+#define __iormb()		rmb()
-+#define __iowmb()		wmb()
-+
-+#define mmiowb()		do { } while (0)
-+
-+/*
-+ * Relaxed I/O memory access primitives. These follow the Device memory
-+ * ordering rules but do not guarantee any ordering relative to Normal memory
-+ * accesses.
-+ */
-+#define readb_relaxed(c)	({ u8  __v = __raw_readb(c); __v; })
-+#define readw_relaxed(c)	({ u16 __v = le16_to_cpu((__force __le16)__raw_readw(c)); __v; })
-+#define readl_relaxed(c)	({ u32 __v = le32_to_cpu((__force __le32)__raw_readl(c)); __v; })
-+
-+#define writeb_relaxed(v,c)	((void)__raw_writeb((v),(c)))
-+#define writew_relaxed(v,c)	((void)__raw_writew((__force u16)cpu_to_le16(v),(c)))
-+#define writel_relaxed(v,c)	((void)__raw_writel((__force u32)cpu_to_le32(v),(c)))
-+
-+/*
-+ * I/O memory access primitives. Reads are ordered relative to any
-+ * following Normal memory access. Writes are ordered relative to any prior
-+ * Normal memory access.
-+ */
-+#define readb(c)		({ u8  __v = readb_relaxed(c); __iormb(); __v; })
-+#define readw(c)		({ u16 __v = readw_relaxed(c); __iormb(); __v; })
-+#define readl(c)		({ u32 __v = readl_relaxed(c); __iormb(); __v; })
-+
-+#define writeb(v,c)		({ __iowmb(); writeb_relaxed((v),(c)); })
-+#define writew(v,c)		({ __iowmb(); writew_relaxed((v),(c)); })
-+#define writel(v,c)		({ __iowmb(); writel_relaxed((v),(c)); })
-+
-+/*
-+ *  I/O port access primitives.
-+ */
-+#define IO_SPACE_LIMIT		0xffff
-+
-+/*
-+ * We currently don't have any platform with PCI support, so just leave this
-+ * defined to 0 until needed.
-+ */
-+#define PCI_IOBASE		((void __iomem *)0)
-+
-+static inline u8 inb(unsigned long addr)
-+{
-+	return readb(addr + PCI_IOBASE);
-+}
-+
-+static inline u16 inw(unsigned long addr)
-+{
-+	return readw(addr + PCI_IOBASE);
-+}
-+
-+static inline u32 inl(unsigned long addr)
-+{
-+	return readl(addr + PCI_IOBASE);
-+}
-+
-+static inline void outb(u8 b, unsigned long addr)
-+{
-+	writeb(b, addr + PCI_IOBASE);
-+}
-+
-+static inline void outw(u16 b, unsigned long addr)
-+{
-+	writew(b, addr + PCI_IOBASE);
-+}
-+
-+static inline void outl(u32 b, unsigned long addr)
-+{
-+	writel(b, addr + PCI_IOBASE);
-+}
-+
-+#define inb_p(addr)	inb(addr)
-+#define inw_p(addr)	inw(addr)
-+#define inl_p(addr)	inl(addr)
-+
-+#define outb_p(x, addr)	outb((x), (addr))
-+#define outw_p(x, addr)	outw((x), (addr))
-+#define outl_p(x, addr)	outl((x), (addr))
-+
-+static inline void insb(unsigned long addr, void *buffer, int count)
-+{
-+	u8 *buf = buffer;
-+	while (count--)
-+		*buf++ = __raw_readb(addr + PCI_IOBASE);
-+}
-+
-+static inline void insw(unsigned long addr, void *buffer, int count)
-+{
-+	u16 *buf = buffer;
-+	while (count--)
-+		*buf++ = __raw_readw(addr + PCI_IOBASE);
-+}
-+
-+static inline void insl(unsigned long addr, void *buffer, int count)
-+{
-+	u32 *buf = buffer;
-+	while (count--)
-+		*buf++ = __raw_readl(addr + PCI_IOBASE);
-+}
-+
-+static inline void outsb(unsigned long addr, const void *buffer, int count)
-+{
-+	const u8 *buf = buffer;
-+	while (count--)
-+		__raw_writeb(*buf++, addr + PCI_IOBASE);
-+}
-+
-+static inline void outsw(unsigned long addr, const void *buffer, int count)
-+{
-+	const u16 *buf = buffer;
-+	while (count--)
-+		__raw_writew(*buf++, addr + PCI_IOBASE);
-+}
-+
-+static inline void outsl(unsigned long addr, const void *buffer, int count)
-+{
-+	const u32 *buf = buffer;
-+	while (count--)
-+		__raw_writel(*buf++, addr + PCI_IOBASE);
-+}
-+
-+#define insb_p(port,to,len)	insb(port,to,len)
-+#define insw_p(port,to,len)	insw(port,to,len)
-+#define insl_p(port,to,len)	insl(port,to,len)
-+
-+#define outsb_p(port,from,len)	outsb(port,from,len)
-+#define outsw_p(port,from,len)	outsw(port,from,len)
-+#define outsl_p(port,from,len)	outsl(port,from,len)
-+
-+/*
-+ * String version of I/O memory access operations.
-+ */
-+extern void __memcpy_fromio(void *, const volatile void __iomem *, size_t);
-+extern void __memcpy_toio(volatile void __iomem *, const void *, size_t);
-+extern void __memset_io(volatile void __iomem *, int, size_t);
-+
-+#define memset_io(c,v,l)	__memset_io((c),(v),(l))
-+#define memcpy_fromio(a,c,l)	__memcpy_fromio((a),(c),(l))
-+#define memcpy_toio(c,a,l)	__memcpy_toio((c),(a),(l))
-+
-+/*
-+ * I/O memory mapping functions.
-+ */
-+extern void __iomem *__ioremap(phys_addr_t phys_addr, size_t size, pgprot_t prot);
-+extern void __iounmap(volatile void __iomem *addr);
-+
-+#define PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_DIRTY)
-+#define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_XN | PTE_ATTRINDX(MT_DEVICE_nGnRE))
-+#define PROT_NORMAL_NC		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL_NC))
-+
-+#define ioremap(addr, size)		__ioremap((addr), (size), PROT_DEVICE_nGnRE)
-+#define ioremap_nocache(addr, size)	__ioremap((addr), (size), PROT_DEVICE_nGnRE)
-+#define ioremap_wc(addr, size)		__ioremap((addr), (size), PROT_NORMAL_NC)
-+#define iounmap				__iounmap
-+
-+#define ARCH_HAS_IOREMAP_WC
-+#include <asm-generic/iomap.h>
-+
-+/*
-+ * More restrictive address range checking than the default implementation
-+ * (PHYS_OFFSET and PHYS_MASK taken into account).
-+ */
-+#define ARCH_HAS_VALID_PHYS_ADDR_RANGE
-+extern int valid_phys_addr_range(unsigned long addr, size_t size);
-+extern int valid_mmap_phys_addr_range(unsigned long pfn, size_t size);
-+
-+extern int devmem_is_allowed(unsigned long pfn);
-+
-+/*
-+ * Convert a physical pointer to a virtual kernel pointer for /dev/mem
-+ * access
-+ */
-+#define xlate_dev_mem_ptr(p)	__va(p)
-+
-+/*
-+ * Convert a virtual cached pointer to an uncached pointer
-+ */
-+#define xlate_dev_kmem_ptr(p)	p
-+
-+#endif	/* __KERNEL__ */
-+#endif	/* __ASM_IO_H */
-diff --git a/arch/arm64/kernel/io.c b/arch/arm64/kernel/io.c
-new file mode 100644
-index 0000000..7d37ead
---- /dev/null
-+++ b/arch/arm64/kernel/io.c
-@@ -0,0 +1,64 @@
-+/*
-+ * Based on arch/arm/kernel/io.c
-+ *
++ * Copyright (C) 2001 Deep Blue Solutions Ltd.
 + * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -392,65 +359,276 @@ index 0000000..7d37ead
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/export.h>
-+#include <linux/types.h>
-+#include <linux/io.h>
++#include <linux/linkage.h>
++#include <linux/init.h>
++#include <asm/assembler.h>
++
++#include "proc-macros.S"
 +
 +/*
-+ * Copy data from IO memory space to "real" memory space.
-+ */
-+void __memcpy_fromio(void *to, const volatile void __iomem *from, size_t count)
-+{
-+	unsigned char *t = to;
-+	while (count) {
-+		count--;
-+		*t = readb(from);
-+		t++;
-+		from++;
-+	}
-+}
-+EXPORT_SYMBOL(__memcpy_fromio);
-+
-+/*
-+ * Copy data from "real" memory space to IO memory space.
-+ */
-+void __memcpy_toio(volatile void __iomem *to, const void *from, size_t count)
-+{
-+	const unsigned char *f = from;
-+	while (count) {
-+		count--;
-+		writeb(*f, to);
-+		f++;
-+		to++;
-+	}
-+}
-+EXPORT_SYMBOL(__memcpy_toio);
-+
-+/*
-+ * "memset" on IO memory space.
-+ */
-+void __memset_io(volatile void __iomem *dst, int c, size_t count)
-+{
-+	while (count) {
-+		count--;
-+		writeb(c, dst);
-+		dst++;
-+	}
-+}
-+EXPORT_SYMBOL(__memset_io);
-diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-new file mode 100644
-index 0000000..1725cd6
---- /dev/null
-+++ b/arch/arm64/mm/ioremap.c
-@@ -0,0 +1,84 @@
-+/*
-+ * Based on arch/arm/mm/ioremap.c
++ *	__cpuc_flush_dcache_all()
 + *
-+ * (C) Copyright 1995 1996 Linus Torvalds
-+ * Hacked for ARM by Phil Blundell <philb@gnu.org>
-+ * Hacked to allow all architectures to build, and various cleanups
-+ * by Russell King
++ *	Flush the whole D-cache.
++ *
++ *	Corrupted registers: x0-x7, x9-x11
++ */
++ENTRY(__cpuc_flush_dcache_all)
++	dsb	sy				// ensure ordering with previous memory accesses
++	mrs	x0, clidr_el1			// read clidr
++	and	x3, x0, #0x7000000		// extract loc from clidr
++	lsr	x3, x3, #23			// left align loc bit field
++	cbz	x3, finished			// if loc is 0, then no need to clean
++	mov	x10, #0				// start clean at cache level 0
++loop1:
++	add	x2, x10, x10, lsr #1		// work out 3x current cache level
++	lsr	x1, x0, x2			// extract cache type bits from clidr
++	and	x1, x1, #7			// mask of the bits for current cache only
++	cmp	x1, #2				// see what cache we have at this level
++	b.lt	skip				// skip if no cache, or just i-cache
++	save_and_disable_irqs x9		// make CSSELR and CCSIDR access atomic
++	msr	csselr_el1, x10			// select current cache level in csselr
++	isb					// isb to sych the new cssr&csidr
++	mrs	x1, ccsidr_el1			// read the new ccsidr
++	restore_irqs x9
++	and	x2, x1, #7			// extract the length of the cache lines
++	add	x2, x2, #4			// add 4 (line length offset)
++	mov	x4, #0x3ff
++	and	x4, x4, x1, lsr #3		// find maximum number on the way size
++	clz	x5, x4				// find bit position of way size increment
++	mov	x7, #0x7fff
++	and	x7, x7, x1, lsr #13		// extract max number of the index size
++loop2:
++	mov	x9, x4				// create working copy of max way size
++loop3:
++	lsl	x6, x9, x5
++	orr	x11, x10, x6			// factor way and cache number into x11
++	lsl	x6, x7, x2
++	orr	x11, x11, x6			// factor index number into x11
++	dc	cisw, x11			// clean & invalidate by set/way
++	subs	x9, x9, #1			// decrement the way
++	b.ge	loop3
++	subs	x7, x7, #1			// decrement the index
++	b.ge	loop2
++skip:
++	add	x10, x10, #2			// increment cache number
++	cmp	x3, x10
++	b.gt	loop1
++finished:
++	mov	x10, #0				// swith back to cache level 0
++	msr	csselr_el1, x10			// select current cache level in csselr
++	dsb	sy
++	isb
++	ret
++ENDPROC(__cpuc_flush_dcache_all)
++
++/*
++ *	__cpuc_flush_cache_all()
++ *
++ *	Flush the entire cache system.  The data cache flush is now achieved
++ *	using atomic clean / invalidates working outwards from L1 cache. This
++ *	is done using Set/Way based cache maintainance instructions.  The
++ *	instruction cache can still be invalidated back to the point of
++ *	unification in a single instruction.
++ */
++ENTRY(__cpuc_flush_kern_all)
++	mov	x12, lr
++	bl	__cpuc_flush_dcache_all
++	mov	x0, #0
++	ic	ialluis				// I+BTB cache invalidate
++	ret	x12
++ENDPROC(__cpuc_flush_kern_all)
++
++/*
++ *	__cpuc_flush_cache_all()
++ *
++ *	Flush all TLB entries in a particular address space
++ */
++ENTRY(__cpuc_flush_user_all)
++	/*FALLTHROUGH*/
++
++/*
++ *	__cpuc_flush_cache_range(start, end, flags)
++ *
++ *	Flush a range of TLB entries in the specified address space.
++ *
++ *	- start - start address (may not be aligned)
++ *	- end   - end address (exclusive, may not be aligned)
++ *	- flags	- vm_area_struct flags describing address space
++ */
++ENTRY(__cpuc_flush_user_range)
++	ret
++ENDPROC(__cpuc_flush_user_all)
++ENDPROC(__cpuc_flush_user_range)
++
++/*
++ *	__cpuc_coherent_kern_range(start,end)
++ *
++ *	Ensure that the I and D caches are coherent within specified region.
++ *	This is typically used when code has been written to a memory region,
++ *	and will be executed.
++ *
++ *	- start   - virtual start address of region
++ *	- end     - virtual end address of region
++ */
++ENTRY(__cpuc_coherent_kern_range)
++	/* FALLTHROUGH */
++
++/*
++ *	__cpuc_coherent_user_range(start,end)
++ *
++ *	Ensure that the I and D caches are coherent within specified region.
++ *	This is typically used when code has been written to a memory region,
++ *	and will be executed.
++ *
++ *	- start   - virtual start address of region
++ *	- end     - virtual end address of region
++ */
++ENTRY(__cpuc_coherent_user_range)
++	dcache_line_size x2, x3
++	sub	x3, x2, #1
++	bic	x4, x0, x3
++1:
++USER(9f, dc	cvau, x4	)		// clean D line to PoU
++	add	x4, x4, x2
++	cmp	x4, x1
++	b.lo	1b
++	dsb	sy
++
++	icache_line_size x2, x3
++	sub	x3, x2, #1
++	bic	x4, x0, x3
++1:
++USER(9f, ic	ivau, x4	)		// invalidate I line PoU
++	add	x4, x4, x2
++	cmp	x4, x1
++	b.lo	1b
++9:						// ignore any faulting cache operation
++	dsb	sy
++	isb
++	ret
++ENDPROC(__cpuc_coherent_kern_range)
++ENDPROC(__cpuc_coherent_user_range)
++
++	.section .fixup,"ax"
++	.align	0
++9001:	ret
++	.previous
++
++
++/*
++ *	__cpuc_flush_kern_dcache_page(kaddr)
++ *
++ *	Ensure that the data held in the page kaddr is written back to the
++ *	page in question.
++ *
++ *	- kaddr   - kernel address
++ *	- size    - size in question
++ */
++ENTRY(__cpuc_flush_dcache_area)
++	dcache_line_size x2, x3
++	add	x1, x0, x1
++	sub	x3, x2, #1
++	bic	x0, x0, x3
++1:	dc	civac, x0			// clean & invalidate D line / unified line
++	add	x0, x0, x2
++	cmp	x0, x1
++	b.lo	1b
++	dsb	sy
++	ret
++ENDPROC(__cpuc_flush_dcache_area)
++
++/*
++ *	dmac_inv_range(start,end)
++ *
++ *	Invalidate the data cache within the specified region; we will be
++ *	performing a DMA operation in this region and we want to purge old
++ *	data in the cache.
++ *
++ *	- start   - virtual start address of region
++ *	- end     - virtual end address of region
++ */
++ENTRY(dmac_inv_range)
++	dcache_line_size x2, x3
++	sub	x3, x2, #1
++	bic	x0, x0, x3
++	bic	x1, x1, x3
++1:	dc	ivac, x0			// invalidate D / U line
++	add	x0, x0, x2
++	cmp	x0, x1
++	b.lo	1b
++	dsb	sy
++	ret
++ENDPROC(dmac_inv_range)
++
++/*
++ *	dmac_clean_range(start,end)
++ *	- start   - virtual start address of region
++ *	- end     - virtual end address of region
++ */
++ENTRY(dmac_clean_range)
++	dcache_line_size x2, x3
++	sub	x3, x2, #1
++	bic	x0, x0, x3
++1:	dc	cvac, x0			// clean D / U line
++	add	x0, x0, x2
++	cmp	x0, x1
++	b.lo	1b
++	dsb	sy
++	ret
++ENDPROC(dmac_clean_range)
++
++/*
++ *	dmac_flush_range(start,end)
++ *	- start   - virtual start address of region
++ *	- end     - virtual end address of region
++ */
++ENTRY(dmac_flush_range)
++	dcache_line_size x2, x3
++	sub	x3, x2, #1
++	bic	x0, x0, x3
++1:	dc	civac, x0			// clean & invalidate D / U line
++	add	x0, x0, x2
++	cmp	x0, x1
++	b.lo	1b
++	dsb	sy
++	ret
++ENDPROC(dmac_flush_range)
++
++/*
++ *	dmac_map_area(start, size, dir)
++ *	- start	- kernel virtual start address
++ *	- size	- size of region
++ *	- dir	- DMA direction
++ */
++ENTRY(dmac_map_area)
++	add	x1, x1, x0
++	cmp	x2, #DMA_FROM_DEVICE
++	b.eq	dmac_inv_range
++	b	dmac_clean_range
++ENDPROC(dmac_map_area)
++
++/*
++ *	dmac_unmap_area(start, size, dir)
++ *	- start	- kernel virtual start address
++ *	- size	- size of region
++ *	- dir	- DMA direction
++ */
++ENTRY(dmac_unmap_area)
++	add	x1, x1, x0
++	cmp	x2, #DMA_TO_DEVICE
++	b.ne	dmac_inv_range
++	ret
++ENDPROC(dmac_unmap_area)
+diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+new file mode 100644
+index 0000000..44f9e5c
+--- /dev/null
++++ b/arch/arm64/mm/flush.c
+@@ -0,0 +1,132 @@
++/*
++ * Based on arch/arm/mm/flush.c
++ *
++ * Copyright (C) 1995-2002 Russell King
 + * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -468,63 +646,114 @@ index 0000000..1725cd6
 +
 +#include <linux/export.h>
 +#include <linux/mm.h>
-+#include <linux/vmalloc.h>
-+#include <linux/io.h>
++#include <linux/pagemap.h>
 +
-+static void __iomem *__ioremap_caller(phys_addr_t phys_addr, size_t size,
-+				      pgprot_t prot, void *caller)
++#include <asm/cacheflush.h>
++#include <asm/cachetype.h>
++#include <asm/tlbflush.h>
++
++#include "mm.h"
++
++void flush_cache_mm(struct mm_struct *mm)
 +{
-+	unsigned long last_addr;
-+	unsigned long offset = phys_addr & ~PAGE_MASK;
-+	int err;
-+	unsigned long addr;
-+	struct vm_struct *area;
++}
 +
-+	/*
-+	 * Page align the mapping address and size, taking account of any
-+	 * offset.
-+	 */
-+	phys_addr &= PAGE_MASK;
-+	size = PAGE_ALIGN(size + offset);
++void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
++		       unsigned long end)
++{
++	if (vma->vm_flags & VM_EXEC)
++		__flush_icache_all();
++}
 +
-+	/*
-+	 * Don't allow wraparound, zero size or outside PHYS_MASK.
-+	 */
-+	last_addr = phys_addr + size - 1;
-+	if (!size || last_addr < phys_addr || (last_addr & ~PHYS_MASK))
-+		return NULL;
++void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr,
++		      unsigned long pfn)
++{
++}
 +
-+	/*
-+	 * Don't allow RAM to be mapped.
-+	 */
-+	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
-+		return NULL;
-+
-+	area = get_vm_area_caller(size, VM_IOREMAP, caller);
-+	if (!area)
-+		return NULL;
-+	addr = (unsigned long)area->addr;
-+
-+	err = ioremap_page_range(addr, addr + size, phys_addr, prot);
-+	if (err) {
-+		vunmap((void *)addr);
-+		return NULL;
++static void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
++				unsigned long uaddr, void *kaddr,
++				unsigned long len)
++{
++	if (vma->vm_flags & VM_EXEC) {
++		unsigned long addr = (unsigned long)kaddr;
++		if (icache_is_aliasing()) {
++			__cpuc_flush_dcache_area(kaddr, len);
++			__flush_icache_all();
++		} else {
++			__cpuc_coherent_kern_range(addr, addr + len);
++		}
 +	}
-+
-+	return (void __iomem *)(offset + addr);
 +}
 +
-+void __iomem *__ioremap(phys_addr_t phys_addr, size_t size, pgprot_t prot)
++/*
++ * Copy user data from/to a page which is mapped into a different processes
++ * address space.  Really, we want to allow our "user space" model to handle
++ * this.
++ *
++ * Note that this code needs to run on the current CPU.
++ */
++void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
++		       unsigned long uaddr, void *dst, const void *src,
++		       unsigned long len)
 +{
-+	return __ioremap_caller(phys_addr, size, prot,
-+				__builtin_return_address(0));
++#ifdef CONFIG_SMP
++	preempt_disable();
++#endif
++	memcpy(dst, src, len);
++	flush_ptrace_access(vma, page, uaddr, dst, len);
++#ifdef CONFIG_SMP
++	preempt_enable();
++#endif
 +}
-+EXPORT_SYMBOL(__ioremap);
 +
-+void __iounmap(volatile void __iomem *io_addr)
++void __flush_dcache_page(struct address_space *mapping, struct page *page)
 +{
-+	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
-+
-+	vunmap(addr);
++	__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
 +}
-+EXPORT_SYMBOL(__iounmap);
++
++void __sync_icache_dcache(pte_t pte)
++{
++	unsigned long pfn;
++	struct page *page;
++
++	pfn = pte_pfn(pte);
++	if (!pfn_valid(pfn))
++		return;
++
++	page = pfn_to_page(pfn);
++	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
++		__flush_dcache_page(NULL, page);
++	__flush_icache_all();
++}
++
++/*
++ * Ensure cache coherency between kernel mapping and userspace mapping of this
++ * page.
++ */
++void flush_dcache_page(struct page *page)
++{
++	struct address_space *mapping;
++
++	/*
++	 * The zero page is never written to, so never has any dirty cache
++	 * lines, and therefore never needs to be flushed.
++	 */
++	if (page == ZERO_PAGE(0))
++		return;
++
++	mapping = page_mapping(page);
++
++	if (mapping && !mapping_mapped(mapping))
++		clear_bit(PG_dcache_clean, &page->flags);
++	else {
++		__flush_dcache_page(mapping, page);
++		if (mapping)
++			__flush_icache_all();
++		set_bit(PG_dcache_clean, &page->flags);
++	}
++}
++EXPORT_SYMBOL(flush_dcache_page);
++
++void __flush_anon_page(struct vm_area_struct *vma, struct page *page, unsigned long vmaddr)
++{
++}
