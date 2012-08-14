@@ -1,42 +1,94 @@
-From: jdzheng@broadcom.com (Jiandong Zheng)
-Date: Tue, 14 Aug 2012 09:53:54 -0700
-Subject: [PATCH 4/9] ARM: pmu: remove arm_pmu_type enumeration
-In-Reply-To: <502A0FA0.3010602@arm.com>
-References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
- <1344620195-22372-5-git-send-email-will.deacon@arm.com>
- <50297838.7080208@broadcom.com> <502A0FA0.3010602@arm.com>
-Message-ID: <502A82A2.9090307@broadcom.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 14 Aug 2012 10:38:08 -0700
+Subject: [PATCH v3 05/10] resource: add PCI configuration space support
+In-Reply-To: <20120814055542.GB16181@avionic-0098.mockup.avionic-design.de>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <1343332512-28762-6-git-send-email-thierry.reding@avionic-design.de>
+ <CAErSpo4qg45brVRwEbw3=R04VsbnvUowSMWcT+M6VoAxbf3Cqg@mail.gmail.com>
+ <20120814055542.GB16181@avionic-0098.mockup.avionic-design.de>
+Message-ID: <CAErSpo6LYpkC5wop53S1r1z3ov4+w4soqrQARzbbouVs1trzUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/14/2012 1:43 AM, Sudeep KarkadaNagesha wrote:
-> Hi Jiandong,
+On Mon, Aug 13, 2012 at 10:55 PM, Thierry Reding
+<thierry.reding@avionic-design.de> wrote:
+> On Mon, Aug 13, 2012 at 10:00:45PM -0700, Bjorn Helgaas wrote:
+>> On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
+>> <thierry.reding@avionic-design.de> wrote:
+>> > This commit adds a new flag that allows marking resources as PCI
+>> > configuration space.
+>> >
+>> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+>> > ---
+>> > Changes in v3:
+>> > - new patch
+>> >
+>> >  include/linux/ioport.h | 2 +-
+>> >  1 file changed, 1 insertion(+), 1 deletion(-)
+>> >
+>> > diff --git a/include/linux/ioport.h b/include/linux/ioport.h
+>> > index 589e0e7..3314843 100644
+>> > --- a/include/linux/ioport.h
+>> > +++ b/include/linux/ioport.h
+>> > @@ -102,7 +102,7 @@ struct resource {
+>> >
+>> >  /* PCI control bits.  Shares IORESOURCE_BITS with above PCI ROM.  */
+>> >  #define IORESOURCE_PCI_FIXED           (1<<4)  /* Do not move resource */
+>> > -
+>> > +#define IORESOURCE_PCI_CS              (1<<5)  /* PCI configuration space */
+>>
+>> What is the purpose of this?  It seems that you are marking regions
+>> that we call MMCONFIG on x86, or ECAM-type regions in the language of
+>> the PCIe spec.  I see that you set it in several places, but I don't
+>> see anything that ever looks for it.  Do you have plans to use it in
+>> the future?  If it really does correspond to MMCONFIG/ECAM, we should
+>> handle those regions consistently across all architectures.
 >
-> On 13/08/12 22:57, Jiandong Zheng wrote:
->> On 8/10/2012 10:36 AM, Will Deacon wrote:
->>> From: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
->>>    static struct platform_device pmu_device = {
->>>        .name        = "arm-pmu",
->>> -    .id        = ARM_PMU_DEVICE_CPU,
->>> +    .id        = -1,
->>>        .resource    = &pmu_resource,
->>>        .num_resources    = 1,
->>>    };
->>>
->> Isn't it clearer to define a meaningful name for "-1", esp. if "-1" is
->> being checked somewhere else?
+> The purpose is ultimately to obtain the MMCONFIG/ECAM resources assigned
+> to a PCI host controller. I've used this in the of_pci_parse_ranges()
+> and in the static board setup code to mark ranges as such. Perhaps
+> IORESOURCE_ECAM or IORESOURCE_MMCONFIG might have been better names. I
+> also just noticed that I'm not using this anywhere, but the plan was to
+> eventually use it with platform_get_resource(). However that doesn't
+> seem to work either because the lower bits of the flags aren't use for
+> comparison in that function.
 >
-> No platform_device->id is not being referred anywhere. 
-> ARM_PMU_DEVICE_CPU was initially assigned to id to identify different 
-> PMU types through platform_device->id variable but was never used.
->
-> Also for all new platforms that might support multiple PMUs, we can 
-> use device tree to identify them.
->
-Seems it is just a field not in use. Even though I still prefer 
-something like "ARM_PMU_DEFAULT_ID" to "-1", I am OK with "-1" as well.
+> Any other ideas how that could be handled? Basically what I need is a
+> way to mark a resource as an MMCONFIG/ECAM range so that it can be used
+> to program the PCI host controller accordingly. I don't know how these
+> are assigned on x86. I was under the impression that the MMCONFIG/ECAM
+> space was accessed through a single single address/data register pair.
 
-Acked-by: Jiandong Zheng <jdzheng@broadcom.com>
+The legacy config access mechanism (CF8h/CFCh registers described in
+PCI 3.0 spec sec 3.2.2.3.2) is a single address/data pair, but this is
+mostly x86-specific.  The ECAM mechanism (described in the PCIe 3.0
+spec sec 7.2.2) is not a single address/data pair; instead, each byte
+of config space is directly mapped into the host's MMIO space.
 
-Thanks,
-JD
+Here's what we do on x86 (omitting some historical grunge that
+complicates things):
+
+  - Discover the host bridge via a PNP0A08 device in the ACPI namespace.
+  - Discover the bus number range behind the bridge using a _CRS
+method in the PNP0A08 device.
+  - Discover the ECAM space for those buses via a _CBA method in the
+PNP0A08 device.
+  - Tell the config accessors (struct pci_ops) that the ECAM space for
+buses A-B is at address X.
+  - Enumerate the devices behind the host bridge by calling
+pci_scan_root_bus(), passing the config accessors.
+
+It sounds like you want a way to parse the resources at one point,
+saving them and marking the ECAM region, then at a later point, look
+up the ECAM from a saved list.  We don't do that on x86 because the
+config accessors keep an internal list of the ECAM area for each bus.
+
+We do of course want to put this ECAM space in the IORESOURCE_MEM tree
+because it consumes address space and we have to make sure we don't
+put anything else on top of it.  But we don't have any reason to
+describe the MMIO -> config space function in that tree.  From the
+point of view of the rest of the system, it's just MMIO space that's
+consumed by the PCI host bridge, just like any other device-specific
+MMIO area.
+
+Bjorn
