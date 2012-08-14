@@ -1,72 +1,72 @@
 From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue, 14 Aug 2012 15:49:14 +0200
-Subject: [PATCH 00/23] work in progress: SPI controller w/DMA SAM9X5
-Message-ID: <1344952177-18385-1-git-send-email-richard.genoud@gmail.com>
+Date: Tue, 14 Aug 2012 15:49:15 +0200
+Subject: [PATCH 01/23] of: add dma-mask binding
+In-Reply-To: <1344952177-18385-1-git-send-email-richard.genoud@gmail.com>
+References: <1344952177-18385-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1344952177-18385-2-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas,
-I said that I had some work done on sam9g35-ek, here is the spi part, based
-on your and Jean-Christophe work.
-You have to enable CONFIG_ARCH_AT91SAM9X5 to get it work.
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-The goal of this patchset is to share the work I've done, it's not ready
-for upstream, but it may save some time.
+This will allow each device to specify its dma-mask for this we use the
+coherent_dma_mask as pointer. By default the dma-mask will be set to
+DMA_BIT_MASK(32).
+The microblaze architecture hook is drop
 
-It's based on 3.6-rc1 + Jean-Christophe's pinctrl patchset.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ drivers/of/platform.c |   23 ++++++++++++++++-------
+ 1 files changed, 16 insertions(+), 7 deletions(-)
 
-Best Regards,
-Richard.
-
-Jean-Christophe PLAGNIOL-VILLARD (3):
-  of: add dma-mask binding
-  of_spi: add generic binding support to specify cs gpio
-  spi/atmel: add DT support
-
-Nicolas Ferre (6):
-  spi/atmel_spi: trivial: change some comments
-  spi/atmel_spi: add physical base address
-  spi/atmel_spi: call unmapping on transfers buffers
-  spi/atmel_spi: status information passed through controller data
-  spi/atmel_spi: add flag to controller data for lock operations
-  spi/atmel_spi: add dmaengine support
-
-Richard Genoud (14):
-  spi-atmel: update with dmaengine interface
-  spi-atmel: fix __init/__devinit sections mismatch
-  spi-atmel: Fix spi-atmel driver to adapt to slave_config changes
-  AT91 DMA OF support
-  add at91sam9x5 Kconfig ARCH/SOC link
-  spi-atmel: add DMA OF support
-  [BUG] SPI: array out of bound => no CS
-  [BUG] atmel-spi && DMA: OOPS if buffer > 4400 bytes
-  sam9x5: declare SPI clocks
-  spi-atmel: add sam9x5 SPI in device tree
-  spi-atmel: add dma support in sam9x5 device tree
-  spi-atmel OF: complete documentation
-  spi-atmel: complete DMA slave OF documentation
-  sam9x5ek DTS: enable SPI dataflash
-
- Documentation/devicetree/bindings/spi/spi-bus.txt  |    6 +
- .../devicetree/bindings/spi/spi_atmel.txt          |   46 ++
- arch/arm/boot/dts/at91sam9x5.dtsi                  |   42 ++
- arch/arm/boot/dts/at91sam9x5ek.dtsi                |   10 +
- arch/arm/mach-at91/Kconfig                         |    4 +
- arch/arm/mach-at91/at91sam9x5.c                    |    3 +
- arch/arm/mach-at91/include/mach/at_hdmac.h         |    1 +
- drivers/of/Kconfig                                 |    4 +
- drivers/of/Makefile                                |    1 +
- drivers/of/of_atmel.c                              |  111 ++++
- drivers/of/platform.c                              |   23 +-
- drivers/spi/Kconfig                                |    9 +
- drivers/spi/spi-atmel.c                            |  611 ++++++++++++++++++--
- drivers/spi/spi.c                                  |   55 ++-
- include/linux/of_atmel.h                           |   29 +
- include/linux/spi/spi.h                            |    3 +
- 16 files changed, 914 insertions(+), 44 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/spi/spi_atmel.txt
- create mode 100644 drivers/of/of_atmel.c
- create mode 100644 include/linux/of_atmel.h
-
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index e44f8c2..11c765c 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -121,6 +121,21 @@ void of_device_make_bus_id(struct device *dev)
+ 	dev_set_name(dev, "%s.%d", node->name, magic - 1);
+ }
+ 
++static void of_get_dma_mask(struct device *dev, struct device_node *np)
++{
++	const __be32 *prop;
++	int len;
++
++	prop = of_get_property(np, "dma-mask", &len);
++
++	dev->dma_mask = &dev->coherent_dma_mask;
++
++	if (!prop)
++		dev->coherent_dma_mask = DMA_BIT_MASK(32);
++	else
++		dev->coherent_dma_mask = of_read_number(prop, len / 4);
++}
++
+ /**
+  * of_device_alloc - Allocate and initialize an of_device
+  * @np: device node to assign to device
+@@ -161,10 +176,8 @@ struct platform_device *of_device_alloc(struct device_node *np,
+ 		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
+ 	}
+ 
++	of_get_dma_mask(&dev->dev, np);
+ 	dev->dev.of_node = of_node_get(np);
+-#if defined(CONFIG_MICROBLAZE)
+-	dev->dev.dma_mask = &dev->archdata.dma_mask;
+-#endif
+ 	dev->dev.parent = parent;
+ 
+ 	if (bus_id)
+@@ -201,10 +214,6 @@ struct platform_device *of_platform_device_create_pdata(
+ 	if (!dev)
+ 		return NULL;
+ 
+-#if defined(CONFIG_MICROBLAZE)
+-	dev->archdata.dma_mask = 0xffffffffUL;
+-#endif
+-	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+ 	dev->dev.bus = &platform_bus_type;
+ 	dev->dev.platform_data = platform_data;
+ 
 -- 
 1.7.2.5
