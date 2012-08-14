@@ -1,39 +1,44 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Aug 2012 18:52:17 +0100
-Subject: [PATCH v2 16/31] arm64: ELF definitions
+Date: Tue, 14 Aug 2012 18:52:29 +0100
+Subject: [PATCH v2 28/31] arm64: Generic timers support
 In-Reply-To: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
 References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1344966752-16102-17-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1344966752-16102-29-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds definitions for the ELF format, including personality
-personality setting and EXEC_PAGESIZE. The are only two hwcap
-definitions for 64-bit applications - HWCAP_FP and HWCAP_ASIMD.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
+This patch adds support for the ARM generic timers with A64 instructions
+for accessing the timer registers. It uses the physical counter as the
+clock source and the virtual counter as sched_clock.
+
+The timer frequency can be specified via DT or read from the CNTFRQ_EL0
+register. The physical counter is also accessible from user space
+allowing fast gettimeofday() implementation.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/auxvec.h   |   22 +++++
- arch/arm64/include/asm/elf.h      |  176 +++++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/hwcap.h    |   57 ++++++++++++
- arch/arm64/include/asm/param.h    |   23 +++++
- arch/arm64/include/asm/shmparam.h |   28 ++++++
- arch/arm64/kernel/elf.c           |   41 +++++++++
- 6 files changed, 347 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/auxvec.h
- create mode 100644 arch/arm64/include/asm/elf.h
- create mode 100644 arch/arm64/include/asm/hwcap.h
- create mode 100644 arch/arm64/include/asm/param.h
- create mode 100644 arch/arm64/include/asm/shmparam.h
- create mode 100644 arch/arm64/kernel/elf.c
+ arch/arm64/include/asm/timex.h    |   32 ++++
+ arch/arm64/kernel/time.c          |   65 ++++++++
+ drivers/clocksource/Kconfig       |    5 +
+ drivers/clocksource/Makefile      |    1 +
+ drivers/clocksource/arm_generic.c |  309 +++++++++++++++++++++++++++++++++++++
+ include/clocksource/arm_generic.h |   21 +++
+ 6 files changed, 433 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm64/include/asm/timex.h
+ create mode 100644 arch/arm64/kernel/time.c
+ create mode 100644 drivers/clocksource/arm_generic.c
+ create mode 100644 include/clocksource/arm_generic.h
 
-diff --git a/arch/arm64/include/asm/auxvec.h b/arch/arm64/include/asm/auxvec.h
+diff --git a/arch/arm64/include/asm/timex.h b/arch/arm64/include/asm/timex.h
 new file mode 100644
-index 0000000..22d6d88
+index 0000000..88f74de
 --- /dev/null
-+++ b/arch/arm64/include/asm/auxvec.h
-@@ -0,0 +1,22 @@
++++ b/arch/arm64/include/asm/timex.h
+@@ -0,0 +1,32 @@
 +/*
 + * Copyright (C) 2012 ARM Ltd.
 + *
@@ -49,20 +54,34 @@ index 0000000..22d6d88
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#ifndef __ASM_AUXVEC_H
-+#define __ASM_AUXVEC_H
++#ifndef __ASM_TIMEX_H
++#define __ASM_TIMEX_H
 +
-+/* vDSO location */
-+#define AT_SYSINFO_EHDR	33
++/*
++ * Use the current timer as a cycle counter since this is what we use for
++ * the delay loop.
++ */
++#define get_cycles()	({ cycles_t c; read_current_timer(&c); c; })
++
++#include <asm-generic/timex.h>
++
++#define ARCH_HAS_READ_CURRENT_TIMER
++
++/* This isn't really used any more */
++#define CLOCK_TICK_RATE 1000
 +
 +#endif
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
 new file mode 100644
-index 0000000..9d62a7a
+index 0000000..3b4b725
 --- /dev/null
-+++ b/arch/arm64/include/asm/elf.h
-@@ -0,0 +1,176 @@
++++ b/arch/arm64/kernel/time.c
+@@ -0,0 +1,65 @@
 +/*
++ * Based on arch/arm/kernel/time.c
++ *
++ * Copyright (C) 1991, 1992, 1995  Linus Torvalds
++ * Modifications for ARM (C) 1994-2001 Russell King
 + * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -77,337 +96,413 @@ index 0000000..9d62a7a
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#ifndef __ASM_ELF_H
-+#define __ASM_ELF_H
 +
-+#include <asm/hwcap.h>
-+
-+/*
-+ * ELF register definitions..
-+ */
-+#include <asm/ptrace.h>
-+#include <asm/user.h>
-+
-+typedef unsigned long elf_greg_t;
-+typedef unsigned long elf_freg_t[3];
-+
-+#define ELF_NGREG (sizeof (struct pt_regs) / sizeof(elf_greg_t))
-+typedef elf_greg_t elf_gregset_t[ELF_NGREG];
-+
-+typedef struct user_fp elf_fpregset_t;
-+
-+#define EM_AARCH64		183
-+
-+/*
-+ * AArch64 static relocation types.
-+ */
-+
-+/* Miscellaneous. */
-+#define R_ARM_NONE			0
-+#define R_AARCH64_NONE			256
-+
-+/* Data. */
-+#define R_AARCH64_ABS64			257
-+#define R_AARCH64_ABS32			258
-+#define R_AARCH64_ABS16			259
-+#define R_AARCH64_PREL64		260
-+#define R_AARCH64_PREL32		261
-+#define R_AARCH64_PREL16		262
-+
-+/* Instructions. */
-+#define R_AARCH64_MOVW_UABS_G0		263
-+#define R_AARCH64_MOVW_UABS_G0_NC	264
-+#define R_AARCH64_MOVW_UABS_G1		265
-+#define R_AARCH64_MOVW_UABS_G1_NC	266
-+#define R_AARCH64_MOVW_UABS_G2		267
-+#define R_AARCH64_MOVW_UABS_G2_NC	268
-+#define R_AARCH64_MOVW_UABS_G3		269
-+
-+#define R_AARCH64_MOVW_SABS_G0		270
-+#define R_AARCH64_MOVW_SABS_G1		271
-+#define R_AARCH64_MOVW_SABS_G2		272
-+
-+#define R_AARCH64_LD_PREL_LO19		273
-+#define R_AARCH64_ADR_PREL_LO21		274
-+#define R_AARCH64_ADR_PREL_PG_HI21	275
-+#define R_AARCH64_ADR_PREL_PG_HI21_NC	276
-+#define R_AARCH64_ADD_ABS_LO12_NC	277
-+#define R_AARCH64_LDST8_ABS_LO12_NC	278
-+
-+#define R_AARCH64_TSTBR14		279
-+#define R_AARCH64_CONDBR19		280
-+#define R_AARCH64_JUMP26		282
-+#define R_AARCH64_CALL26		283
-+#define R_AARCH64_LDST16_ABS_LO12_NC	284
-+#define R_AARCH64_LDST32_ABS_LO12_NC	285
-+#define R_AARCH64_LDST64_ABS_LO12_NC	286
-+#define R_AARCH64_LDST128_ABS_LO12_NC	299
-+
-+#define R_AARCH64_MOVW_PREL_G0		287
-+#define R_AARCH64_MOVW_PREL_G0_NC	288
-+#define R_AARCH64_MOVW_PREL_G1		289
-+#define R_AARCH64_MOVW_PREL_G1_NC	290
-+#define R_AARCH64_MOVW_PREL_G2		291
-+#define R_AARCH64_MOVW_PREL_G2_NC	292
-+#define R_AARCH64_MOVW_PREL_G3		293
-+
-+
-+/*
-+ * These are used to set parameters in the core dumps.
-+ */
-+#define ELF_CLASS	ELFCLASS64
-+#define ELF_DATA	ELFDATA2LSB
-+#define ELF_ARCH	EM_AARCH64
-+
-+#define ELF_PLATFORM_SIZE	16
-+#define ELF_PLATFORM		("aarch64")
-+
-+/*
-+ * This is used to ensure we don't load something for the wrong architecture.
-+ */
-+#define elf_check_arch(x)		((x)->e_machine == EM_AARCH64)
-+
-+#define elf_read_implies_exec(ex,stk)	(stk != EXSTACK_DISABLE_X)
-+
-+#define CORE_DUMP_USE_REGSET
-+#define ELF_EXEC_PAGESIZE	PAGE_SIZE
-+
-+/*
-+ * This is the location that an ET_DYN program is loaded if exec'ed.  Typical
-+ * use of this is to invoke "./ld.so someprog" to test out a new version of
-+ * the loader.  We need to make sure that it is out of the way of the program
-+ * that it will "exec", and that there is sufficient room for the brk.
-+ */
-+extern unsigned long randomize_et_dyn(unsigned long base);
-+#define ELF_ET_DYN_BASE	(randomize_et_dyn(2 * TASK_SIZE_64 / 3))
-+
-+/*
-+ * When the program starts, a1 contains a pointer to a function to be
-+ * registered with atexit, as per the SVR4 ABI.  A value of 0 means we have no
-+ * such handler.
-+ */
-+#define ELF_PLAT_INIT(_r, load_addr)	(_r)->regs[0] = 0
-+
-+extern void				elf_set_personality(int personality);
-+#define SET_PERSONALITY(ex)		elf_set_personality(PER_LINUX)
-+
-+#define ARCH_DLINFO							\
-+do {									\
-+	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
-+		    (elf_addr_t)current->mm->context.vdso);		\
-+} while (0)
-+
-+#define ARCH_HAS_SETUP_ADDITIONAL_PAGES
-+struct linux_binprm;
-+extern int arch_setup_additional_pages(struct linux_binprm *bprm,
-+				       int uses_interp);
-+
-+/* 1GB of VA */
-+#define STACK_RND_MASK			(test_thread_flag(TIF_32BIT) ? \
-+						0x7ff >> (PAGE_SHIFT - 12) : \
-+						0x3ffff >> (PAGE_SHIFT - 12))
-+
-+struct mm_struct;
-+extern unsigned long arch_randomize_brk(struct mm_struct *mm);
-+#define arch_randomize_brk arch_randomize_brk
-+
-+#ifdef CONFIG_AARCH32_EMULATION
-+#define EM_ARM				40
-+#define COMPAT_ELF_PLATFORM		("v8l")
-+
-+#define COMPAT_ELF_ET_DYN_BASE		(randomize_et_dyn(2 * TASK_SIZE_32 / 3))
-+
-+/* AArch32 registers. */
-+#define COMPAT_ELF_NGREG		18
-+typedef unsigned int			compat_elf_greg_t;
-+typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
-+
-+/* AArch32 EABI. */
-+#define EF_ARM_EABI_MASK		0xff000000
-+#define compat_elf_check_arch(x)	(((x)->e_machine == EM_ARM) && \
-+					 ((x)->e_flags & EF_ARM_EABI_MASK))
-+
-+#define compat_start_thread		compat_start_thread
-+#define COMPAT_SET_PERSONALITY(ex)	elf_set_personality(PER_LINUX32)
-+#define COMPAT_ARCH_DLINFO
-+extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
-+				      int uses_interp);
-+#define compat_arch_setup_additional_pages \
-+					aarch32_setup_vectors_page
-+
-+#endif /* CONFIG_AARCH32_EMULATION */
-+
-+#endif
-diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
-new file mode 100644
-index 0000000..0cc7c03
---- /dev/null
-+++ b/arch/arm64/include/asm/hwcap.h
-@@ -0,0 +1,57 @@
-+/*
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_HWCAP_H
-+#define __ASM_HWCAP_H
-+
-+/*
-+ * HWCAP flags - for elf_hwcap (in kernel) and AT_HWCAP
-+ */
-+#define HWCAP_FP		(1 << 0)
-+#define HWCAP_ASIMD		(1 << 1)
-+
-+#ifdef CONFIG_AARCH32_EMULATION
-+#define COMPAT_HWCAP_HALF	(1 << 1)
-+#define COMPAT_HWCAP_THUMB	(1 << 2)
-+#define COMPAT_HWCAP_FAST_MULT	(1 << 4)
-+#define COMPAT_HWCAP_VFP	(1 << 6)
-+#define COMPAT_HWCAP_EDSP	(1 << 7)
-+#define COMPAT_HWCAP_NEON	(1 << 12)
-+#define COMPAT_HWCAP_VFPv3	(1 << 13)
-+#define COMPAT_HWCAP_TLS	(1 << 15)
-+#define COMPAT_HWCAP_VFPv4	(1 << 16)
-+#define COMPAT_HWCAP_IDIVA	(1 << 17)
-+#define COMPAT_HWCAP_IDIVT	(1 << 18)
-+#define COMPAT_HWCAP_IDIV	(COMPAT_HWCAP_IDIVA|COMPAT_HWCAP_IDIVT)
-+
-+#endif /* CONFIG_AARCH32_EMULATION */
-+
-+#if defined(__KERNEL__) && !defined(__ASSEMBLY__)
-+/*
-+ * This yields a mask that user programs can use to figure out what
-+ * instruction set this cpu supports.
-+ */
-+#define ELF_HWCAP		(elf_hwcap)
-+#ifdef CONFIG_AARCH32_EMULATION
-+#define COMPAT_ELF_HWCAP	(COMPAT_HWCAP_HALF|COMPAT_HWCAP_THUMB|\
-+				 COMPAT_HWCAP_FAST_MULT|COMPAT_HWCAP_EDSP|\
-+				 COMPAT_HWCAP_TLS|COMPAT_HWCAP_VFP|\
-+				 COMPAT_HWCAP_VFPv3|COMPAT_HWCAP_VFPv4|\
-+				 COMPAT_HWCAP_NEON|COMPAT_HWCAP_IDIV)
-+#endif
-+extern unsigned int elf_hwcap;
-+#endif
-+
-+#endif
-diff --git a/arch/arm64/include/asm/param.h b/arch/arm64/include/asm/param.h
-new file mode 100644
-index 0000000..8e3a281
---- /dev/null
-+++ b/arch/arm64/include/asm/param.h
-@@ -0,0 +1,23 @@
-+/*
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_PARAM_H
-+#define __ASM_PARAM_H
-+
-+#define EXEC_PAGESIZE	65536
-+
-+#include <asm-generic/param.h>
-+
-+#endif
-diff --git a/arch/arm64/include/asm/shmparam.h b/arch/arm64/include/asm/shmparam.h
-new file mode 100644
-index 0000000..4df608a
---- /dev/null
-+++ b/arch/arm64/include/asm/shmparam.h
-@@ -0,0 +1,28 @@
-+/*
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_SHMPARAM_H
-+#define __ASM_SHMPARAM_H
-+
-+/*
-+ * For IPC syscalls from compat tasks, we need to use the legacy 16k
-+ * alignment value. Since we don't have aliasing D-caches, the rest of
-+ * the time we can safely use PAGE_SIZE.
-+ */
-+#define COMPAT_SHMLBA	0x4000
-+
-+#include <asm-generic/shmparam.h>
-+
-+#endif /* __ASM_SHMPARAM_H */
-diff --git a/arch/arm64/kernel/elf.c b/arch/arm64/kernel/elf.c
-new file mode 100644
-index 0000000..6f98076
---- /dev/null
-+++ b/arch/arm64/kernel/elf.c
-@@ -0,0 +1,41 @@
-+/*
-+ * ELF personality setting
-+ *
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
 +#include <linux/export.h>
++#include <linux/kernel.h>
++#include <linux/interrupt.h>
++#include <linux/time.h>
++#include <linux/init.h>
 +#include <linux/sched.h>
-+#include <linux/personality.h>
-+#include <linux/binfmts.h>
-+#include <linux/elf.h>
++#include <linux/smp.h>
++#include <linux/timex.h>
++#include <linux/errno.h>
++#include <linux/profile.h>
++#include <linux/syscore_ops.h>
++#include <linux/timer.h>
++#include <linux/irq.h>
 +
-+void elf_set_personality(int personality)
++#include <clocksource/arm_generic.h>
++
++#include <asm/thread_info.h>
++#include <asm/stacktrace.h>
++
++#ifdef CONFIG_SMP
++unsigned long profile_pc(struct pt_regs *regs)
 +{
-+	switch (personality & PER_MASK) {
-+	case PER_LINUX:
-+		clear_thread_flag(TIF_32BIT);
++	struct stackframe frame;
++
++	if (!in_lock_functions(regs->pc))
++		return regs->pc;
++
++	frame.fp = regs->regs[29];
++	frame.sp = regs->sp;
++	frame.pc = regs->pc;
++	do {
++		int ret = unwind_frame(&frame);
++		if (ret < 0)
++			return 0;
++	} while (in_lock_functions(frame.pc));
++
++	return frame.pc;
++}
++EXPORT_SYMBOL(profile_pc);
++#endif
++
++void __init time_init(void)
++{
++	arm_generic_timer_init();
++}
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index d53cd0a..6a78073 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -35,3 +35,8 @@ config CLKSRC_DBX500_PRCMU_SCHED_CLOCK
+ 	default y
+ 	help
+ 	  Use the always on PRCMU Timer as sched_clock
++
++config CLKSRC_ARM_GENERIC
++	def_bool y if ARM64
++	help
++	  This option enables support for the ARM generic timer.
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index b65d0c5..6591990 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -13,3 +13,4 @@ obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
+ obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
+ obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
+ obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
++obj-$(CONFIG_CLKSRC_ARM_GENERIC)	+= arm_generic.o
+diff --git a/drivers/clocksource/arm_generic.c b/drivers/clocksource/arm_generic.c
+new file mode 100644
+index 0000000..05c898c
+--- /dev/null
++++ b/drivers/clocksource/arm_generic.c
+@@ -0,0 +1,309 @@
++/*
++ * Generic timers support
++ *
++ * Copyright (C) 2012 ARM Ltd.
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/smp.h>
++#include <linux/cpu.h>
++#include <linux/jiffies.h>
++#include <linux/interrupt.h>
++#include <linux/clockchips.h>
++#include <linux/of_irq.h>
++#include <linux/io.h>
++
++#include <clocksource/arm_generic.h>
++
++static u32 arch_timer_rate;
++static u64 sched_clock_mult __read_mostly;
++static DEFINE_PER_CPU(struct clock_event_device, arch_timer_evt);
++static int arch_timer_ppi;
++
++/*
++ * Architected system timer support.
++ */
++
++#define ARCH_TIMER_CTRL_ENABLE		(1 << 0)
++#define ARCH_TIMER_CTRL_IT_MASK		(1 << 1)
++
++#define ARCH_TIMER_REG_CTRL		0
++#define ARCH_TIMER_REG_FREQ		1
++#define ARCH_TIMER_REG_TVAL		2
++
++static void arch_timer_reg_write(int reg, u32 val)
++{
++	switch (reg) {
++	case ARCH_TIMER_REG_CTRL:
++		asm volatile("msr cntp_ctl_el0,  %0" : : "r" (val));
 +		break;
-+	case PER_LINUX32:
-+		set_thread_flag(TIF_32BIT);
++	case ARCH_TIMER_REG_TVAL:
++		asm volatile("msr cntp_tval_el0, %0" : : "r" (val));
 +		break;
 +	default:
-+		pr_warning("Process %s tried to assume unknown personality %d\n",
-+			   current->comm, personality);
-+		return;
++		BUG();
 +	}
 +
-+	current->personality = personality;
++	isb();
 +}
-+EXPORT_SYMBOL(elf_set_personality);
++
++static u32 arch_timer_reg_read(int reg)
++{
++	u32 val;
++
++	switch (reg) {
++	case ARCH_TIMER_REG_CTRL:
++		asm volatile("mrs %0,  cntp_ctl_el0" : "=r" (val));
++		break;
++	case ARCH_TIMER_REG_FREQ:
++		asm volatile("mrs %0,   cntfrq_el0" : "=r" (val));
++		break;
++	case ARCH_TIMER_REG_TVAL:
++		asm volatile("mrs %0, cntp_tval_el0" : "=r" (val));
++		break;
++	default:
++		BUG();
++	}
++
++	return val;
++}
++
++static irqreturn_t arch_timer_handle_irq(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++	unsigned long ctrl;
++
++	ctrl = arch_timer_reg_read(ARCH_TIMER_REG_CTRL);
++	if (ctrl & 0x4) {
++		ctrl |= ARCH_TIMER_CTRL_IT_MASK;
++		arch_timer_reg_write(ARCH_TIMER_REG_CTRL, ctrl);
++		evt->event_handler(evt);
++		return IRQ_HANDLED;
++	}
++
++	return IRQ_NONE;
++}
++
++static void arch_timer_stop(void)
++{
++	unsigned long ctrl;
++
++	ctrl = arch_timer_reg_read(ARCH_TIMER_REG_CTRL);
++	ctrl &= ~ARCH_TIMER_CTRL_ENABLE;
++	arch_timer_reg_write(ARCH_TIMER_REG_CTRL, ctrl);
++}
++
++static void arch_timer_set_mode(enum clock_event_mode mode,
++				struct clock_event_device *clk)
++{
++	switch (mode) {
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_SHUTDOWN:
++		arch_timer_stop();
++		break;
++	default:
++		break;
++	}
++}
++
++static int arch_timer_set_next_event(unsigned long evt,
++				     struct clock_event_device *unused)
++{
++	unsigned long ctrl;
++
++	ctrl = arch_timer_reg_read(ARCH_TIMER_REG_CTRL);
++	ctrl |= ARCH_TIMER_CTRL_ENABLE;
++	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
++
++	arch_timer_reg_write(ARCH_TIMER_REG_TVAL, evt);
++	arch_timer_reg_write(ARCH_TIMER_REG_CTRL, ctrl);
++
++	return 0;
++}
++
++static void __cpuinit arch_counter_enable_user_access(void)
++{
++	u32 cntkctl;
++
++	/* Disable user access to the timers and the virtual counter. */
++	asm volatile("mrs	%0, cntkctl_el1" : "=r" (cntkctl));
++	cntkctl &= ~((3 << 8) | (1 << 1));
++
++	/* Enable user access to the physical counter and frequency. */
++	cntkctl |= 1;
++	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
++}
++
++static void __cpuinit arch_timer_setup(struct clock_event_device *clk)
++{
++	/* Let's make sure the timer is off before doing anything else */
++	arch_timer_stop();
++
++	clk->features = CLOCK_EVT_FEAT_ONESHOT;
++	clk->name = "arch_sys_timer";
++	clk->rating = 400;
++	clk->set_mode = arch_timer_set_mode;
++	clk->set_next_event = arch_timer_set_next_event;
++	clk->irq = arch_timer_ppi;
++	clk->cpumask = cpumask_of(smp_processor_id());
++
++	clockevents_config_and_register(clk, arch_timer_rate,
++					0xf, 0x7fffffff);
++
++	enable_percpu_irq(clk->irq, 0);
++
++	/* Ensure the physical counter is visible to userspace for the vDSO. */
++	arch_counter_enable_user_access();
++}
++
++static void __init arch_timer_calibrate(void)
++{
++	if (arch_timer_rate == 0) {
++		arch_timer_reg_write(ARCH_TIMER_REG_CTRL, 0);
++		arch_timer_rate = arch_timer_reg_read(ARCH_TIMER_REG_FREQ);
++
++		/* Check the timer frequency. */
++		if (arch_timer_rate == 0)
++			panic("Architected timer frequency is set to zero.\n"
++			      "You must set this in your .dts file\n");
++	}
++
++	/* Cache the sched_clock multiplier to save a divide in the hot path. */
++
++	sched_clock_mult = NSEC_PER_SEC / arch_timer_rate;
++
++	pr_info("Architected local timer running at %u.%02uMHz.\n",
++		 arch_timer_rate / 1000000, (arch_timer_rate / 10000) % 100);
++}
++
++static inline cycle_t arch_counter_get_cntpct(void)
++{
++	cycle_t cval;
++
++	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
++
++	return cval;
++}
++
++static inline cycle_t arch_counter_get_cntvct(void)
++{
++	cycle_t cval;
++
++	asm volatile("mrs %0, cntvct_el0" : "=r" (cval));
++
++	return cval;
++}
++
++static cycle_t arch_counter_read(struct clocksource *cs)
++{
++	return arch_counter_get_cntpct();
++}
++
++static struct clocksource clocksource_counter = {
++	.name	= "arch_sys_counter",
++	.rating	= 400,
++	.read	= arch_counter_read,
++	.mask	= CLOCKSOURCE_MASK(56),
++	.flags	= (CLOCK_SOURCE_IS_CONTINUOUS | CLOCK_SOURCE_VALID_FOR_HRES),
++};
++
++int read_current_timer(unsigned long *timer_value)
++{
++	*timer_value = arch_counter_get_cntpct();
++	return 0;
++}
++
++unsigned long long notrace sched_clock(void)
++{
++	return arch_counter_get_cntvct() * sched_clock_mult;
++}
++
++static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
++					   unsigned long action, void *hcpu)
++{
++	int cpu = (long)hcpu;
++	struct clock_event_device *clk = per_cpu_ptr(&arch_timer_evt, cpu);
++
++	switch(action) {
++	case CPU_STARTING:
++	case CPU_STARTING_FROZEN:
++		arch_timer_setup(clk);
++		break;
++
++	case CPU_DYING:
++	case CPU_DYING_FROZEN:
++		pr_debug("arch_timer_teardown disable IRQ%d cpu #%d\n",
++			 clk->irq, cpu);
++		disable_percpu_irq(clk->irq);
++		arch_timer_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
++		break;
++	}
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block __cpuinitdata arch_timer_cpu_nb = {
++	.notifier_call = arch_timer_cpu_notify,
++};
++
++static const struct of_device_id arch_timer_of_match[] __initconst = {
++	{ .compatible = "arm,armv8-timer" },
++	{},
++};
++
++int __init arm_generic_timer_init(void)
++{
++	struct device_node *np;
++	int err;
++	u32 freq;
++
++	np = of_find_matching_node(NULL, arch_timer_of_match);
++	if (!np) {
++		pr_err("arch_timer: can't find DT node\n");
++		return -ENODEV;
++	}
++
++	/* Try to determine the frequency from the device tree or CNTFRQ */
++	if (!of_property_read_u32(np, "clock-frequency", &freq))
++		arch_timer_rate = freq;
++	arch_timer_calibrate();
++
++	arch_timer_ppi = irq_of_parse_and_map(np, 0);
++	pr_info("arch_timer: found %s irq %d\n", np->name, arch_timer_ppi);
++
++	err = request_percpu_irq(arch_timer_ppi, arch_timer_handle_irq,
++				 np->name, &arch_timer_evt);
++	if (err) {
++		pr_err("arch_timer: can't register interrupt %d (%d)\n",
++		       arch_timer_ppi, err);
++		return err;
++	}
++
++	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
++
++	/* Calibrate the delay loop directly */
++	lpj_fine = arch_timer_rate / HZ;
++
++	/* Immediately configure the timer on the boot CPU */
++	arch_timer_setup(per_cpu_ptr(&arch_timer_evt, smp_processor_id()));
++
++	register_cpu_notifier(&arch_timer_cpu_nb);
++
++	return 0;
++}
+diff --git a/include/clocksource/arm_generic.h b/include/clocksource/arm_generic.h
+new file mode 100644
+index 0000000..5b41b0d
+--- /dev/null
++++ b/include/clocksource/arm_generic.h
+@@ -0,0 +1,21 @@
++/*
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __CLKSOURCE_ARM_GENERIC_H
++#define __CLKSOURCE_ARM_GENERIC_H
++
++extern int arm_generic_timer_init(void);
++
++#endif
