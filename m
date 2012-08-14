@@ -1,39 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Aug 2012 01:29:12 -0700
-Subject: [PATCH-V3] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data
-In-Reply-To: <alpine.DEB.2.00.1207261359500.14468@utopia.booyaka.com>
-References: <1343214422-28718-1-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1207251438210.23542@utopia.booyaka.com>
- <alpine.DEB.2.00.1207261359500.14468@utopia.booyaka.com>
-Message-ID: <20120814082911.GG11011@atomide.com>
+From: js@sig21.net (Johannes Stezenbach)
+Date: Tue, 14 Aug 2012 14:39:37 +0200
+Subject: [GIT PULL] Update LZO compression
+In-Reply-To: <50299142.2030504@oberhumer.com>
+References: <50299142.2030504@oberhumer.com>
+Message-ID: <20120814123937.GA14756@sig21.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Aug 14, 2012 at 01:44:02AM +0200, Markus F.X.J. Oberhumer wrote:
+> On 2012-07-16 20:30, Markus F.X.J. Oberhumer wrote:
+> >
+> > As stated in the README this version is significantly faster (typically more
+> > than 2 times faster!) than the current version, has been thoroughly tested on
+> > x86_64/i386/powerpc platforms and is intended to get included into the
+> > official Linux 3.6 or 3.7 release.
+> >
+> > I encourage all compression users to test and benchmark this new version,
+> > and I also would ask some official LZO maintainer to convert the updated
+> > source files into a GIT commit and possibly push it to Linus or linux-next.
 
-* Paul Walmsley <paul@pwsan.com> [120726 13:07]:
-> On Wed, 25 Jul 2012, Paul Walmsley wrote:
-> 
-> > These IP blocks and the ECAP IP blocks have periods in their names.
-> > The rest of the IP block named in the file don't use periods -- which
-> > is also the style used by the rest of the OMAP SoCs.  Is there
-> > some reason that these have periods in their names?
-> 
-> I've changed those to match the rest of the names, and queued the 
-> following for 3.7.
-> 
-> Thanks again for all the hard work you all put into this.  I realize that 
-> with all the upstream changes, this was probably a little painful for you. 
-> But from my perspective you've been a pleasure to work with through the 
-> process.
+Sorry for not reporting earlier, but I didn't have time to do real
+benchmarks, just a quick test on ARM926EJ-S using barebox,
+and found in the new version decompression is slower:
+http://lists.infradead.org/pipermail/barebox/2012-July/008268.html
 
-As am33xx and omap5 are DT only, we should start moving towards getting
-rid of grep -E "irq|pa_start|pa_end|dma" in this patch and get the standard
-data from .dtsi files instead.
+BTW, do you have userspace code matching the old and new
+lzo versions?  It would be easier to benchmark.
 
-Alternatively we could get rid of the names and match the module based on
-pa_start and pa_end.
+Unfortunately I cannot claim high confidence in my benchmark results
+due to missing time to do it properly, it would be useful if
+someone else could do some benchmarks on ARM before merging this.
 
-Regards,
 
-Tony
+Johannes
