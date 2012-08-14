@@ -1,22 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Aug 2012 11:48:02 +0200
+Date: Tue, 14 Aug 2012 11:50:13 +0200
 Subject: [PATCH] pinctrl: imx5: start numbering pad from 0
-In-Reply-To: <CAAQ0ZWSuAguQwZkQzkUPqJF5ZBSc5Ekiq6mvtwvp98tuu5noLg@mail.gmail.com>
+In-Reply-To: <1344869278-27334-1-git-send-email-shawn.guo@linaro.org>
 References: <1344869278-27334-1-git-send-email-shawn.guo@linaro.org>
- <CACRpkdZL6efwvUyW1+2j8253WRXm3WYyDUw8rN_o9QE=HER4wA@mail.gmail.com>
- <CAAQ0ZWSuAguQwZkQzkUPqJF5ZBSc5Ekiq6mvtwvp98tuu5noLg@mail.gmail.com>
-Message-ID: <CACRpkdZn5DFNssCNPvBwXt3AYhXnn6qi1+DXEwjCbqUL65gPOw@mail.gmail.com>
+Message-ID: <CACRpkdZ22K9yyqVD0_ae7pQPpsBP1t2rVE50S2J7y1EW6LVNAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 10:22 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On 14 August 2012 16:13, Linus Walleij <linus.walleij@linaro.org> wrote:
->> Since I just merged the imx53 driver which *again* start numbering on
->> 1, can I have a patch that fixes that driver also?
->>
-> What Uwe added is imx35 (vs. imx53 :) driver, which already numbers pad from 0.
+On Mon, Aug 13, 2012 at 4:47 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-Yes I was confused... I mixed up imx35 and imx53 again.
+> Unlike imx6q pinctrl driver that starts nubmering pad from 0, imx5
+> pinctrl drivers number pad from 1.  It causes problem/confusion when
+> driver accesses imx51_pinctrl_pads array using pin ID as the index.
+>
+> Change imx51_pads and imx53_pads numbering start from 0.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+
+Applied.
 
 Yours,
 Linus Walleij
