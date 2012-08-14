@@ -1,94 +1,75 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 14 Aug 2012 10:38:08 -0700
-Subject: [PATCH v3 05/10] resource: add PCI configuration space support
-In-Reply-To: <20120814055542.GB16181@avionic-0098.mockup.avionic-design.de>
-References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
- <1343332512-28762-6-git-send-email-thierry.reding@avionic-design.de>
- <CAErSpo4qg45brVRwEbw3=R04VsbnvUowSMWcT+M6VoAxbf3Cqg@mail.gmail.com>
- <20120814055542.GB16181@avionic-0098.mockup.avionic-design.de>
-Message-ID: <CAErSpo6LYpkC5wop53S1r1z3ov4+w4soqrQARzbbouVs1trzUg@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 14 Aug 2012 19:44:25 +0200
+Subject: [PATCH 00/23] work in progress: SPI controller w/DMA SAM9X5
+In-Reply-To: <502A6EEC.2010807@atmel.com>
+References: <1344952177-18385-1-git-send-email-richard.genoud@gmail.com>
+ <502A6EEC.2010807@atmel.com>
+Message-ID: <20120814174425.GD8836@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 13, 2012 at 10:55 PM, Thierry Reding
-<thierry.reding@avionic-design.de> wrote:
-> On Mon, Aug 13, 2012 at 10:00:45PM -0700, Bjorn Helgaas wrote:
->> On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
->> <thierry.reding@avionic-design.de> wrote:
->> > This commit adds a new flag that allows marking resources as PCI
->> > configuration space.
->> >
->> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
->> > ---
->> > Changes in v3:
->> > - new patch
->> >
->> >  include/linux/ioport.h | 2 +-
->> >  1 file changed, 1 insertion(+), 1 deletion(-)
->> >
->> > diff --git a/include/linux/ioport.h b/include/linux/ioport.h
->> > index 589e0e7..3314843 100644
->> > --- a/include/linux/ioport.h
->> > +++ b/include/linux/ioport.h
->> > @@ -102,7 +102,7 @@ struct resource {
->> >
->> >  /* PCI control bits.  Shares IORESOURCE_BITS with above PCI ROM.  */
->> >  #define IORESOURCE_PCI_FIXED           (1<<4)  /* Do not move resource */
->> > -
->> > +#define IORESOURCE_PCI_CS              (1<<5)  /* PCI configuration space */
->>
->> What is the purpose of this?  It seems that you are marking regions
->> that we call MMCONFIG on x86, or ECAM-type regions in the language of
->> the PCIe spec.  I see that you set it in several places, but I don't
->> see anything that ever looks for it.  Do you have plans to use it in
->> the future?  If it really does correspond to MMCONFIG/ECAM, we should
->> handle those regions consistently across all architectures.
->
-> The purpose is ultimately to obtain the MMCONFIG/ECAM resources assigned
-> to a PCI host controller. I've used this in the of_pci_parse_ranges()
-> and in the static board setup code to mark ranges as such. Perhaps
-> IORESOURCE_ECAM or IORESOURCE_MMCONFIG might have been better names. I
-> also just noticed that I'm not using this anywhere, but the plan was to
-> eventually use it with platform_get_resource(). However that doesn't
-> seem to work either because the lower bits of the flags aren't use for
-> comparison in that function.
->
-> Any other ideas how that could be handled? Basically what I need is a
-> way to mark a resource as an MMCONFIG/ECAM range so that it can be used
-> to program the PCI host controller accordingly. I don't know how these
-> are assigned on x86. I was under the impression that the MMCONFIG/ECAM
-> space was accessed through a single single address/data register pair.
+On 17:29 Tue 14 Aug     , Nicolas Ferre wrote:
+> On 08/14/2012 03:49 PM, Richard Genoud :
+> > Nicolas,
+> > I said that I had some work done on sam9g35-ek, here is the spi part, based
+> > on your and Jean-Christophe work.
+> > You have to enable CONFIG_ARCH_AT91SAM9X5 to get it work.
+> > 
+> > The goal of this patchset is to share the work I've done, it's not ready
+> > for upstream, but it may save some time.
+> > 
+> > It's based on 3.6-rc1 + Jean-Christophe's pinctrl patchset.
+> > 
+> > Best Regards,
+> 
+> Richard,
+> 
+> Thanks a lot for updating this material: We really appreciate.
+> 
+> We will try to review this material together with Jean-Christophe and
+> colleagues @ Atmel. I hope that we will go forward with this collected
+> material in the near future.
+> 
+> Maybe DMA OF part will not be upstreamed as-is because of an ongoing
+> initiative to build a generic dmaengine OF support.
+> 
+> > Jean-Christophe PLAGNIOL-VILLARD (3):
+> >   of: add dma-mask binding
+> >   of_spi: add generic binding support to specify cs gpio
+> 
+> I know that Jean-Christophe has had difficulties to have feedback on
+> there parts...
+yes I need to re-write it as suggest by Grant
 
-The legacy config access mechanism (CF8h/CFCh registers described in
-PCI 3.0 spec sec 3.2.2.3.2) is a single address/data pair, but this is
-mostly x86-specific.  The ECAM mechanism (described in the PCIe 3.0
-spec sec 7.2.2) is not a single address/data pair; instead, each byte
-of config space is directly mapped into the host's MMIO space.
+will take a look later next week on this
+> 
+> >   spi/atmel: add DT support
+> > 
+> > Nicolas Ferre (6):
+> >   spi/atmel_spi: trivial: change some comments
+> >   spi/atmel_spi: add physical base address
+> >   spi/atmel_spi: call unmapping on transfers buffers
+> >   spi/atmel_spi: status information passed through controller data
+> >   spi/atmel_spi: add flag to controller data for lock operations
+> >   spi/atmel_spi: add dmaengine support
+> > 
+> > Richard Genoud (14):
+> >   spi-atmel: update with dmaengine interface
+> 
+> This will certainly be squashed in previous path.
+> 
+> >   spi-atmel: fix __init/__devinit sections mismatch
+> 
+> This one also: but it is good to have them separated at fist.
+> 
+> >   spi-atmel: Fix spi-atmel driver to adapt to slave_config changes
+> >   AT91 DMA OF support
+> >   add at91sam9x5 Kconfig ARCH/SOC link
+> 
+> Is it fixup for a bug? Jean-Christophe, a though about this one?
+no the ARCH_xxx is old style can not be used on DT only soc
 
-Here's what we do on x86 (omitting some historical grunge that
-complicates things):
+this patch need to be droped
 
-  - Discover the host bridge via a PNP0A08 device in the ACPI namespace.
-  - Discover the bus number range behind the bridge using a _CRS
-method in the PNP0A08 device.
-  - Discover the ECAM space for those buses via a _CBA method in the
-PNP0A08 device.
-  - Tell the config accessors (struct pci_ops) that the ECAM space for
-buses A-B is at address X.
-  - Enumerate the devices behind the host bridge by calling
-pci_scan_root_bus(), passing the config accessors.
-
-It sounds like you want a way to parse the resources at one point,
-saving them and marking the ECAM region, then at a later point, look
-up the ECAM from a saved list.  We don't do that on x86 because the
-config accessors keep an internal list of the ECAM area for each bus.
-
-We do of course want to put this ECAM space in the IORESOURCE_MEM tree
-because it consumes address space and we have to make sure we don't
-put anything else on top of it.  But we don't have any reason to
-describe the MMIO -> config space function in that tree.  From the
-point of view of the rest of the system, it's just MMIO space that's
-consumed by the PCI host bridge, just like any other device-specific
-MMIO area.
-
-Bjorn
+Best Regards,
+J.
