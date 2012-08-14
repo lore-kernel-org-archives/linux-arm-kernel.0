@@ -1,883 +1,1017 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Aug 2012 18:52:31 +0100
-Subject: [PATCH v2 30/31] arm64: Build infrastructure
+Date: Tue, 14 Aug 2012 18:52:05 +0100
+Subject: [PATCH v2 04/31] arm64: MMU definitions
 In-Reply-To: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
 References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1344966752-16102-31-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1344966752-16102-5-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds Makefile and Kconfig files required for building an
-AArch64 kernel.
+The virtual memory layout is described in
+Documentation/arm64/memory.txt. This patch adds the MMU definitions for
+the 4KB and 64KB translation table configurations. The SECTION_SIZE is
+2MB with 4KB page and 512MB with 64KB page configuration.
+
+PHYS_OFFSET is calculated at run-time and stored in a variable (no
+run-time code patching at this stage).
+
+On the current implementation, both user and kernel address spaces are
+512G (39-bit) each with a maximum of 256G for the RAM linear mapping.
+Linux uses 3 levels of translation tables with the 4K page configuration
+and 2 levels with the 64K configuration. Extending the memory space
+beyond 39-bit with the 4K pages or 42-bit with 64K pages requires an
+additional level of translation tables.
+
+The SPARSEMEM configuration is global to all AArch64 platforms and
+allows for 1GB sections with SPARSEMEM_VMEMMAP enabled by default.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/Kconfig                   |  261 ++++++++++++++++++++++++++++++++++
- arch/arm64/Kconfig.debug             |   27 ++++
- arch/arm64/Makefile                  |   71 +++++++++
- arch/arm64/boot/.gitignore           |    2 +
- arch/arm64/boot/Makefile             |   38 +++++
- arch/arm64/boot/install.sh           |   52 +++++++
- arch/arm64/configs/generic_defconfig |   85 +++++++++++
- arch/arm64/include/asm/prom.h        |    1 +
- arch/arm64/kernel/.gitignore         |    1 +
- arch/arm64/kernel/Makefile           |   27 ++++
- arch/arm64/kernel/vmlinux.lds.S      |  146 +++++++++++++++++++
- arch/arm64/mm/Kconfig                |    5 +
- arch/arm64/mm/Makefile               |    6 +
- init/Kconfig                         |    3 +-
- lib/Kconfig.debug                    |    6 +-
- 15 files changed, 728 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm64/Kconfig
- create mode 100644 arch/arm64/Kconfig.debug
- create mode 100644 arch/arm64/Makefile
- create mode 100644 arch/arm64/boot/.gitignore
- create mode 100644 arch/arm64/boot/Makefile
- create mode 100644 arch/arm64/boot/install.sh
- create mode 100644 arch/arm64/configs/generic_defconfig
- create mode 100644 arch/arm64/include/asm/prom.h
- create mode 100644 arch/arm64/kernel/.gitignore
- create mode 100644 arch/arm64/kernel/Makefile
- create mode 100644 arch/arm64/kernel/vmlinux.lds.S
- create mode 100644 arch/arm64/mm/Kconfig
- create mode 100644 arch/arm64/mm/Makefile
+ Documentation/arm64/memory.txt                |   69 +++++
+ arch/arm64/include/asm/memory.h               |  144 +++++++++++
+ arch/arm64/include/asm/mmu.h                  |   27 ++
+ arch/arm64/include/asm/pgtable-2level-hwdef.h |   43 ++++
+ arch/arm64/include/asm/pgtable-2level-types.h |   60 +++++
+ arch/arm64/include/asm/pgtable-3level-hwdef.h |   50 ++++
+ arch/arm64/include/asm/pgtable-3level-types.h |   66 +++++
+ arch/arm64/include/asm/pgtable-hwdef.h        |   94 +++++++
+ arch/arm64/include/asm/pgtable.h              |  328 +++++++++++++++++++++++++
+ arch/arm64/include/asm/sparsemem.h            |   24 ++
+ 10 files changed, 905 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/arm64/memory.txt
+ create mode 100644 arch/arm64/include/asm/memory.h
+ create mode 100644 arch/arm64/include/asm/mmu.h
+ create mode 100644 arch/arm64/include/asm/pgtable-2level-hwdef.h
+ create mode 100644 arch/arm64/include/asm/pgtable-2level-types.h
+ create mode 100644 arch/arm64/include/asm/pgtable-3level-hwdef.h
+ create mode 100644 arch/arm64/include/asm/pgtable-3level-types.h
+ create mode 100644 arch/arm64/include/asm/pgtable-hwdef.h
+ create mode 100644 arch/arm64/include/asm/pgtable.h
+ create mode 100644 arch/arm64/include/asm/sparsemem.h
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
 new file mode 100644
-index 0000000..1ce3d04
+index 0000000..7210af7
 --- /dev/null
-+++ b/arch/arm64/Kconfig
-@@ -0,0 +1,261 @@
-+config ARM64
-+	def_bool y
-+	select OF
-+	select OF_EARLY_FLATTREE
-+	select IRQ_DOMAIN
-+	select HAVE_AOUT
-+	select HAVE_DMA_ATTRS
-+	select HAVE_DMA_API_DEBUG
-+	select HAVE_IDE
-+	select HAVE_MEMBLOCK
-+	select RTC_LIB
-+	select SYS_SUPPORTS_APM_EMULATION
-+	select HAVE_GENERIC_DMA_COHERENT
-+	select GENERIC_IOMAP
-+	select HAVE_IRQ_WORK
-+	select HAVE_PERF_EVENTS
-+	select HAVE_ARCH_TRACEHOOK
-+	select PERF_USE_VMALLOC
-+	select HAVE_HW_BREAKPOINT if PERF_EVENTS
-+	select HAVE_GENERIC_HARDIRQS
-+	select GENERIC_HARDIRQS_NO_DEPRECATED
-+	select HAVE_SPARSE_IRQ
-+	select SPARSE_IRQ
-+	select GENERIC_IRQ_SHOW
-+	select GENERIC_SMP_IDLE_THREAD
-+	select NO_BOOTMEM
-+	help
-+	  ARM 64-bit (AArch64) Linux support.
++++ b/Documentation/arm64/memory.txt
+@@ -0,0 +1,69 @@
++		     Memory Layout on AArch64 Linux
++		     ==============================
 +
-+config 64BIT
-+	def_bool y
++Author: Catalin Marinas <catalin.marinas@arm.com>
++Date  : 20 February 2012
 +
-+config ARCH_PHYS_ADDR_T_64BIT
-+	def_bool y
++This document describes the virtual memory layout used by the AArch64
++Linux kernel. The architecture allows up to 4 levels of translation
++tables with a 4KB page size and up to 3 levels with a 64KB page size.
 +
-+config HAVE_PWM
-+	bool
++AArch64 Linux uses 3 levels of translation tables with the 4KB page
++configuration, allowing 39-bit (512GB) virtual addresses for both user
++and kernel. With 64KB pages, only 2 levels of translation tables are
++used but the memory layout is the same.
 +
-+config SYS_SUPPORTS_APM_EMULATION
-+	bool
++User addresses have bits 63:39 set to 0 while the kernel addresses have
++the same bits set to 1. TTBRx selection is given by bit 63 of the
++virtual address. The swapper_pg_dir contains only kernel (global)
++mappings while the user pgd contains only user (non-global) mappings.
++The swapper_pgd_dir address is written to TTBR1 and never written to
++TTBR0.
 +
-+config NO_IOPORT
-+	def_bool y
 +
-+config GENERIC_GPIO
-+	bool
++AArch64 Linux memory layout:
 +
-+config GENERIC_TIME_VSYSCALL
-+	def_bool y
++Start			End			Size		Use
++-----------------------------------------------------------------------
++0000000000000000	0000007fffffffff	 512GB		user
 +
-+config GENERIC_CLOCKEVENTS
-+	def_bool y
++ffffff8000000000	ffffffbbfffeffff	~240GB		vmalloc
 +
-+config STACKTRACE_SUPPORT
-+	def_bool y
++ffffffbbffff0000	ffffffbcffffffff	  64KB		[guard page]
 +
-+config LOCKDEP_SUPPORT
-+	def_bool y
++ffffffbc00000000	ffffffbdffffffff	   8GB		vmemmap
 +
-+config TRACE_IRQFLAGS_SUPPORT
-+	def_bool y
++ffffffbe00000000	ffffffbffbffffff	  ~8GB		[guard, future vmmemap]
 +
-+config HARDIRQS_SW_RESEND
-+	def_bool y
++ffffffbffc000000	ffffffbfffffffff	  64MB		modules
 +
-+config GENERIC_IRQ_PROBE
-+	def_bool y
-+
-+config GENERIC_LOCKBREAK
-+	def_bool y
-+	depends on SMP && PREEMPT
++ffffffc000000000	ffffffffffffffff	 256GB		memory
 +
-+config RWSEM_GENERIC_SPINLOCK
-+	def_bool y
 +
-+config RWSEM_XCHGADD_ALGORITHM
-+	bool
++Translation table lookup with 4KB pages:
 +
-+config ARCH_HAS_ILOG2_U32
-+	bool
+++--------+--------+--------+--------+--------+--------+--------+--------+
++|63    56|55    48|47    40|39    32|31    24|23    16|15     8|7      0|
+++--------+--------+--------+--------+--------+--------+--------+--------+
++ |                 |         |         |         |         |
++ |                 |         |         |         |         v
++ |                 |         |         |         |   [11:0]  in-page offset
++ |                 |         |         |         +-> [20:12] L3 index
++ |                 |         |         +-----------> [29:21] L2 index
++ |                 |         +---------------------> [38:30] L1 index
++ |                 +-------------------------------> [47:39] L0 index (not used)
++ +-------------------------------------------------> [63] TTBR0/1
 +
-+config ARCH_HAS_ILOG2_U64
-+	bool
 +
-+config ARCH_HAS_CPUFREQ
-+	bool
-+	help
-+	  Internal node to signify that the ARCH has CPUFREQ support
-+	  and that the relevant menu configurations are displayed for
-+	  it.
++Translation table lookup with 64KB pages:
 +
-+config GENERIC_HWEIGHT
-+	def_bool y
-+
-+config GENERIC_CSUM
-+        def_bool y
-+
-+config GENERIC_CALIBRATE_DELAY
-+	def_bool y
-+
-+config ZONE_DMA32
-+	def_bool y
-+
-+config ARCH_DMA_ADDR_T_64BIT
-+	def_bool y
-+
-+config NEED_DMA_MAP_STATE
-+	def_bool y
-+
-+config NEED_SG_DMA_LENGTH
-+	def_bool y
-+
-+config SWIOTLB
-+	def_bool y
-+
-+config IOMMU_HELPER
-+	def_bool SWIOTLB
-+
-+source "init/Kconfig"
-+
-+source "kernel/Kconfig.freezer"
-+
-+menu "System Type"
-+
-+source "arch/arm64/mm/Kconfig"
-+
-+endmenu
-+
-+menu "Bus support"
-+
-+config ARM_AMBA
-+	bool
-+
-+endmenu
-+
-+menu "Kernel Features"
-+
-+source "kernel/time/Kconfig"
-+
-+config ARM64_64K_PAGES
-+	bool "Enable 64KB pages support"
-+	help
-+	  This feature enables 64KB pages support (4KB by default)
-+	  allowing only two levels of page tables and faster TLB
-+	  look-up. AArch32 emulation is not available when this feature
-+	  is enabled.
-+
-+config SMP
-+	bool "Symmetric Multi-Processing"
-+	depends on GENERIC_CLOCKEVENTS
-+	select USE_GENERIC_SMP_HELPERS
-+	help
-+	  This enables support for systems with more than one CPU.  If
-+	  you say N here, the kernel will run on single and
-+	  multiprocessor machines, but will use only one CPU of a
-+	  multiprocessor machine. If you say Y here, the kernel will run
-+	  on many, but not all, single processor machines. On a single
-+	  processor machine, the kernel will run faster if you say N
-+	  here.
-+
-+	  If you don't know what to do here, say N.
-+
-+config NR_CPUS
-+	int "Maximum number of CPUs (2-32)"
-+	range 2 32
-+	depends on SMP
-+	default "4"
-+
-+source kernel/Kconfig.preempt
-+
-+config HZ
-+	int
-+	default 100
-+
-+config ARCH_HAS_HOLES_MEMORYMODEL
-+	def_bool y if SPARSEMEM
-+
-+config ARCH_SPARSEMEM_ENABLE
-+	def_bool y
-+	select SPARSEMEM_VMEMMAP_ENABLE
-+
-+config ARCH_SPARSEMEM_DEFAULT
-+	def_bool ARCH_SPARSEMEM_ENABLE
-+
-+config ARCH_SELECT_MEMORY_MODEL
-+	def_bool ARCH_SPARSEMEM_ENABLE
-+
-+config HAVE_ARCH_PFN_VALID
-+	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
-+
-+config HW_PERF_EVENTS
-+	bool "Enable hardware performance counter support for perf events"
-+	depends on PERF_EVENTS
-+	default y
-+	help
-+	  Enable hardware performance counter support for perf events. If
-+	  disabled, perf events will use software events only.
-+
-+source "mm/Kconfig"
-+
-+endmenu
-+
-+menu "Boot options"
-+
-+config CMDLINE
-+	string "Default kernel command string"
-+	default ""
-+	help
-+	  Provide a set of default command-line options at build time by
-+	  entering them here. As a minimum, you should specify the the
-+	  root device (e.g. root=/dev/nfs).
-+
-+config CMDLINE_FORCE
-+	bool "Always use the default kernel command string"
-+	help
-+	  Always use the default kernel command string, even if the boot
-+	  loader passes other arguments to the kernel.
-+	  This is useful if you cannot or don't want to change the
-+	  command-line options your boot loader passes to the kernel.
-+
-+endmenu
-+
-+menu "Userspace binary formats"
-+
-+source "fs/Kconfig.binfmt"
-+
-+config AARCH32_EMULATION
-+	bool "Kernel support for 32-bit EL0"
-+	depends on !ARM64_64K_PAGES
-+	select COMPAT_BINFMT_ELF
-+	help
-+	  This option enables support for a 32-bit EL0 running under a 64-bit
-+	  kernel at EL1. AArch32-specific components such as system calls,
-+	  the user helper functions, VFP support and the ptrace interface are
-+	  handled appropriately by the kernel.
-+
-+	  If you want to execute 32-bit userspace applications, say Y.
-+
-+config COMPAT
-+	def_bool y
-+	depends on AARCH32_EMULATION
-+
-+config SYSVIPC_COMPAT
-+	def_bool y
-+	depends on COMPAT && SYSVIPC
-+
-+endmenu
-+
-+source "net/Kconfig"
-+
-+source "drivers/Kconfig"
-+
-+source "fs/Kconfig"
-+
-+source "arch/arm64/Kconfig.debug"
-+
-+source "security/Kconfig"
-+
-+source "crypto/Kconfig"
-+
-+source "lib/Kconfig"
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+++--------+--------+--------+--------+--------+--------+--------+--------+
++|63    56|55    48|47    40|39    32|31    24|23    16|15     8|7      0|
+++--------+--------+--------+--------+--------+--------+--------+--------+
++ |                 |    |               |              |
++ |                 |    |               |              v
++ |                 |    |               |            [15:0]  in-page offset
++ |                 |    |               +----------> [28:16] L3 index
++ |                 |    +--------------------------> [41:29] L2 index (only 38:29 used)
++ |                 +-------------------------------> [47:42] L1 index (not used)
++ +-------------------------------------------------> [63] TTBR0/1
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
 new file mode 100644
-index 0000000..d7553f2
+index 0000000..3cfdc4b
 --- /dev/null
-+++ b/arch/arm64/Kconfig.debug
-@@ -0,0 +1,27 @@
-+menu "Kernel hacking"
-+
-+source "lib/Kconfig.debug"
-+
-+config FRAME_POINTER
-+	bool
-+	default y
-+
-+config DEBUG_ERRORS
-+	bool "Verbose kernel error messages"
-+	depends on DEBUG_KERNEL
-+	help
-+	  This option controls verbose debugging information which can be
-+	  printed when the kernel detects an internal error. This debugging
-+	  information is useful to kernel hackers when tracking down problems,
-+	  but mostly meaningless to other people. It's safe to say Y unless
-+	  you are concerned with the code size or don't want to see these
-+	  messages.
-+
-+config DEBUG_STACK_USAGE
-+	bool "Enable stack utilization instrumentation"
-+	depends on DEBUG_KERNEL
-+	help
-+	  Enables the display of the minimum amount of free stack which each
-+	  task has ever had available in the sysrq-T output.
-+
-+endmenu
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-new file mode 100644
-index 0000000..831bd41
---- /dev/null
-+++ b/arch/arm64/Makefile
-@@ -0,0 +1,71 @@
-+#
-+# arch/arm64/Makefile
-+#
-+# This file is included by the global makefile so that you can add your own
-+# architecture-specific flags and dependencies.
-+#
-+# This file is subject to the terms and conditions of the GNU General Public
-+# License.  See the file "COPYING" in the main directory of this archive
-+# for more details.
-+#
-+# Copyright (C) 1995-2001 by Russell King
-+
-+LDFLAGS_vmlinux	:=-p --no-undefined -X
-+CPPFLAGS_vmlinux.lds = -DTEXT_OFFSET=$(TEXT_OFFSET)
-+OBJCOPYFLAGS	:=-O binary -R .note -R .note.gnu.build-id -R .comment -S
-+GZFLAGS		:=-9
-+
-+LIBGCC 		:= $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name)
-+
-+KBUILD_DEFCONFIG := generic_defconfig
-+
-+KBUILD_CFLAGS	+= -mgeneral-regs-only
-+KBUILD_CPPFLAGS	+= -mlittle-endian
-+AS		+= -EL
-+LD		+= -EL
-+
-+comma = ,
-+
-+CHECKFLAGS	+= -D__aarch64__
-+
-+# Default value
-+head-y		:= arch/arm64/kernel/head.o
-+
-+# The byte offset of the kernel image in RAM from the start of RAM.
-+TEXT_OFFSET := 0x00080000
-+
-+export	TEXT_OFFSET GZFLAGS
-+
-+core-y		+= arch/arm64/kernel/ arch/arm64/mm/
-+libs-y		:= arch/arm64/lib/ $(libs-y)
-+libs-y		+= $(LIBGCC)
-+
-+# Default target when executing plain make
-+KBUILD_IMAGE := Image.gz
-+
-+all:	$(KBUILD_IMAGE)
-+
-+boot := arch/arm64/boot
-+
-+Image Image.gz: vmlinux
-+	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
-+
-+zinstall install: vmlinux
-+	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
-+
-+%.dtb:
-+	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
-+
-+# We use MRPROPER_FILES and CLEAN_FILES now
-+archclean:
-+	$(Q)$(MAKE) $(clean)=$(boot)
-+
-+define archhelp
-+  echo  '* Image.gz      - Compressed kernel image (arch/$(ARCH)/boot/Image.gz)'
-+  echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
-+  echo  '  install       - Install uncompressed kernel'
-+  echo  '  zinstall      - Install compressed kernel'
-+  echo  '                  Install using (your) ~/bin/installkernel or'
-+  echo  '                  (distribution) /sbin/installkernel or'
-+  echo  '                  install to $$(INSTALL_PATH) and run lilo'
-+endef
-diff --git a/arch/arm64/boot/.gitignore b/arch/arm64/boot/.gitignore
-new file mode 100644
-index 0000000..8dab0bb
---- /dev/null
-+++ b/arch/arm64/boot/.gitignore
-@@ -0,0 +1,2 @@
-+Image
-+Image.gz
-diff --git a/arch/arm64/boot/Makefile b/arch/arm64/boot/Makefile
-new file mode 100644
-index 0000000..15a58a8
---- /dev/null
-+++ b/arch/arm64/boot/Makefile
-@@ -0,0 +1,38 @@
-+#
-+# arch/arm64/boot/Makefile
-+#
-+# This file is included by the global makefile so that you can add your own
-+# architecture-specific flags and dependencies.
-+#
-+# This file is subject to the terms and conditions of the GNU General Public
-+# License.  See the file "COPYING" in the main directory of this archive
-+# for more details.
-+#
-+# Copyright (C) 2012, ARM Ltd.
-+# Author: Will Deacon <will.deacon@arm.com>
-+#
-+# Based on the ia64 boot/Makefile.
-+#
-+
-+targets := Image Image.gz
-+
-+$(obj)/Image: vmlinux FORCE
-+	$(call if_changed,objcopy)
-+	@echo '  Kernel: $@ is ready'
-+
-+$(obj)/Image.gz: $(obj)/Image FORCE
-+	$(call if_changed,gzip)
-+	@echo '  Kernel: $@ is ready'
-+
-+$(obj)/%.dtb: $(src)/dts/%.dts
-+	$(call cmd,dtc)
-+
-+install: $(obj)/Image
-+	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
-+	$(obj)/Image System.map "$(INSTALL_PATH)"
-+
-+zinstall: $(obj)/Image.gz
-+	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
-+	$(obj)/Image.gz System.map "$(INSTALL_PATH)"
-+
-+clean-files += *.dtb
-diff --git a/arch/arm64/boot/install.sh b/arch/arm64/boot/install.sh
-new file mode 100644
-index 0000000..9151e21
---- /dev/null
-+++ b/arch/arm64/boot/install.sh
-@@ -0,0 +1,52 @@
-+#!/bin/sh
-+#
-+# arch/arm64/boot/install.sh
-+#
-+# This file is subject to the terms and conditions of the GNU General Public
-+# License.  See the file "COPYING" in the main directory of this archive
-+# for more details.
-+#
-+# Copyright (C) 1995 by Linus Torvalds
-+#
-+# Adapted from code in arch/i386/boot/Makefile by H. Peter Anvin
-+# Adapted from code in arch/i386/boot/install.sh by Russell King
-+#
-+# "make install" script for the AArch64 Linux port
-+#
-+# Arguments:
-+#   $1 - kernel version
-+#   $2 - kernel image file
-+#   $3 - kernel map file
-+#   $4 - default install path (blank if root directory)
-+#
-+
-+# User may have a custom install script
-+if [ -x ~/bin/${INSTALLKERNEL} ]; then exec ~/bin/${INSTALLKERNEL} "$@"; fi
-+if [ -x /sbin/${INSTALLKERNEL} ]; then exec /sbin/${INSTALLKERNEL} "$@"; fi
-+
-+if [ "$(basename $2)" = "Image.gz" ]; then
-+# Compressed install
-+  echo "Installing compressed kernel"
-+  base=vmlinuz
-+else
-+# Normal install
-+  echo "Installing normal kernel"
-+  base=vmlinux
-+fi
-+
-+if [ -f $4/$base-$1 ]; then
-+  mv $4/$base-$1 $4/$base-$1.old
-+fi
-+cat $2 > $4/$base-$1
-+
-+# Install system map file
-+if [ -f $4/System.map-$1 ]; then
-+  mv $4/System.map-$1 $4/System.map-$1.old
-+fi
-+cp $3 $4/System.map-$1
-+
-+if [ -x /sbin/loadmap ]; then
-+  /sbin/loadmap
-+else
-+  echo "You have to install it yourself"
-+fi
-diff --git a/arch/arm64/configs/generic_defconfig b/arch/arm64/configs/generic_defconfig
-new file mode 100644
-index 0000000..d9aac95
---- /dev/null
-+++ b/arch/arm64/configs/generic_defconfig
-@@ -0,0 +1,85 @@
-+CONFIG_EXPERIMENTAL=y
-+# CONFIG_LOCALVERSION_AUTO is not set
-+# CONFIG_SWAP is not set
-+CONFIG_SYSVIPC=y
-+CONFIG_POSIX_MQUEUE=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+CONFIG_BSD_PROCESS_ACCT_V3=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_LOG_BUF_SHIFT=14
-+# CONFIG_UTS_NS is not set
-+# CONFIG_IPC_NS is not set
-+# CONFIG_PID_NS is not set
-+# CONFIG_NET_NS is not set
-+CONFIG_SCHED_AUTOGROUP=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_KALLSYMS_ALL=y
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_PROFILING=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_DEADLINE is not set
-+CONFIG_SMP=y
-+CONFIG_PREEMPT_VOLUNTARY=y
-+CONFIG_CMDLINE="console=ttyAMA0"
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_AARCH32_EMULATION=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_PNP_BOOTP=y
-+# CONFIG_INET_LRO is not set
-+# CONFIG_IPV6 is not set
-+# CONFIG_WIRELESS is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+# CONFIG_BLK_DEV is not set
-+CONFIG_SCSI=y
-+# CONFIG_SCSI_PROC_FS is not set
-+CONFIG_BLK_DEV_SD=y
-+# CONFIG_SCSI_LOWLEVEL is not set
-+CONFIG_NETDEVICES=y
-+CONFIG_MII=y
-+# CONFIG_WLAN is not set
-+CONFIG_INPUT_EVDEV=y
-+# CONFIG_SERIO_I8042 is not set
-+# CONFIG_SERIO_SERPORT is not set
-+CONFIG_LEGACY_PTY_COUNT=16
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_HWMON is not set
-+CONFIG_FB=y
-+# CONFIG_VGA_CONSOLE is not set
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_LOGO=y
-+# CONFIG_LOGO_LINUX_MONO is not set
-+# CONFIG_LOGO_LINUX_VGA16 is not set
-+# CONFIG_USB_SUPPORT is not set
-+# CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-+# CONFIG_EXT3_FS_XATTR is not set
-+CONFIG_FUSE_FS=y
-+CONFIG_CUSE=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+# CONFIG_MISC_FILESYSTEMS is not set
-+CONFIG_NFS_FS=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_DEBUG_KERNEL=y
-+# CONFIG_SCHED_DEBUG is not set
-+CONFIG_DEBUG_INFO=y
-+# CONFIG_FTRACE is not set
-+CONFIG_ATOMIC64_SELFTEST=y
-+CONFIG_DEBUG_ERRORS=y
-diff --git a/arch/arm64/include/asm/prom.h b/arch/arm64/include/asm/prom.h
-new file mode 100644
-index 0000000..68b90e6
---- /dev/null
-+++ b/arch/arm64/include/asm/prom.h
-@@ -0,0 +1 @@
-+/* Empty for now */
-diff --git a/arch/arm64/kernel/.gitignore b/arch/arm64/kernel/.gitignore
-new file mode 100644
-index 0000000..c5f676c
---- /dev/null
-+++ b/arch/arm64/kernel/.gitignore
-@@ -0,0 +1 @@
-+vmlinux.lds
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-new file mode 100644
-index 0000000..59fbdef
---- /dev/null
-+++ b/arch/arm64/kernel/Makefile
-@@ -0,0 +1,27 @@
-+#
-+# Makefile for the linux kernel.
-+#
-+
-+CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
-+AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
-+
-+# Object file lists.
-+arm64-obj-y		:= debug-monitors.o elf.o entry.o irq.o	fpsimd.o	\
-+			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
-+			   sys.o stacktrace.o time.o traps.o io.o vdso.o
-+
-+arm64-obj-$(CONFIG_AARCH32_EMULATION)	+= sys32.o kuser32.o signal32.o 	\
-+					   sys_compat.o
-+arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
-+arm64-obj-$(CONFIG_SMP)			+= smp.o
-+arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
-+arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
-+
-+obj-y					+= $(arm64-obj-y) vdso/
-+obj-m					+= $(arm64-obj-m)
-+head-y					:= head.o
-+extra-y					:= $(head-y) vmlinux.lds
-+
-+# vDSO - this must be built first to generate the symbol offsets
-+$(call objectify,$(arm64-obj-y)): $(obj)/vdso/vdso-offsets.h
-+$(obj)/vdso/vdso-offsets.h: $(obj)/vdso
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-new file mode 100644
-index 0000000..5eab87b
---- /dev/null
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -0,0 +1,146 @@
++++ b/arch/arm64/include/asm/memory.h
+@@ -0,0 +1,144 @@
 +/*
-+ * ld script to make ARM Linux kernel
-+ * taken from the i386 version by Russell King
-+ * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>
++ * Based on arch/arm/include/asm/memory.h
++ *
++ * Copyright (C) 2000-2002 Russell King
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Note: this file should not be included by non-asm/.h files
 + */
++#ifndef __ASM_MEMORY_H
++#define __ASM_MEMORY_H
 +
-+#include <asm-generic/vmlinux.lds.h>
-+#include <asm/thread_info.h>
-+#include <asm/memory.h>
-+#include <asm/page.h>
++#include <linux/compiler.h>
++#include <linux/const.h>
++#include <linux/types.h>
++#include <asm/sizes.h>
 +
-+#define PROC_INFO							\
-+	VMLINUX_SYMBOL(__proc_info_begin) = .;				\
-+	*(.proc.info.init)						\
-+	VMLINUX_SYMBOL(__proc_info_end) = .;
++/*
++ * Allow for constants defined here to be used from assembly code
++ * by prepending the UL suffix only with actual C code compilation.
++ */
++#define UL(x) _AC(x, UL)
 +
-+#define ARM_CPU_DISCARD(x)	x
-+#define ARM_CPU_KEEP(x)
++/*
++ * PAGE_OFFSET - the virtual address of the start of the kernel image.
++ * VA_BITS - the maximum number of bits for virtual addresses.
++ * TASK_SIZE - the maximum size of a user space task.
++ * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
++ * The module space lives between the addresses given by TASK_SIZE
++ * and PAGE_OFFSET - it must be within 128MB of the kernel text.
++ */
++#define PAGE_OFFSET		UL(0xffffffc000000000)
++#define MODULES_END		(PAGE_OFFSET)
++#define MODULES_VADDR		(MODULES_END - SZ_64M)
++#define VA_BITS			(39)
++#define TASK_SIZE_64		(UL(1) << VA_BITS)
 +
-+#define ARM_EXIT_KEEP(x)
-+#define ARM_EXIT_DISCARD(x)	x
++#ifdef CONFIG_AARCH32_EMULATION
++#define TASK_SIZE_32		UL(0x100000000)
++#define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
++				TASK_SIZE_32 : TASK_SIZE_64)
++#else
++#define TASK_SIZE		TASK_SIZE_64
++#endif /* CONFIG_AARCH32_EMULATION */
 +
-+OUTPUT_ARCH(aarch64)
-+ENTRY(stext)
++#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
 +
-+jiffies = jiffies_64;
++#if TASK_SIZE_64 > MODULES_VADDR
++#error Top of 64-bit user space clashes with start of module space
++#endif
 +
-+SECTIONS
++/*
++ * Physical vs virtual RAM address space conversion.  These are
++ * private definitions which should NOT be used outside memory.h
++ * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
++ */
++#define __virt_to_phys(x)	(((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
++#define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
++
++/*
++ * Convert a physical address to a Page Frame Number and back
++ */
++#define	__phys_to_pfn(paddr)	((unsigned long)((paddr) >> PAGE_SHIFT))
++#define	__pfn_to_phys(pfn)	((phys_addr_t)(pfn) << PAGE_SHIFT)
++
++/*
++ * Convert a page to/from a physical address
++ */
++#define page_to_phys(page)	(__pfn_to_phys(page_to_pfn(page)))
++#define phys_to_page(phys)	(pfn_to_page(__phys_to_pfn(phys)))
++
++/*
++ * Memory types available.
++ */
++#define MT_DEVICE_nGnRnE	0
++#define MT_DEVICE_nGnRE		1
++#define MT_DEVICE_GRE		2
++#define MT_NORMAL_NC		3
++#define MT_NORMAL		4
++
++#ifndef __ASSEMBLY__
++
++extern phys_addr_t		memstart_addr;
++/* PHYS_OFFSET - the physical address of the start of memory. */
++#define PHYS_OFFSET		({ memstart_addr; })
++
++/*
++ * PFNs are used to describe any physical page; this means
++ * PFN 0 == physical address 0.
++ *
++ * This is the PFN of the first RAM page in the kernel
++ * direct-mapped view.  We assume this is the first page
++ * of RAM in the mem_map as well.
++ */
++#define PHYS_PFN_OFFSET	(PHYS_OFFSET >> PAGE_SHIFT)
++
++/*
++ * Note: Drivers should NOT use these.  They are the wrong
++ * translation for translating DMA addresses.  Use the driver
++ * DMA support - see dma-mapping.h.
++ */
++static inline phys_addr_t virt_to_phys(const volatile void *x)
 +{
-+	/*
-+	 * XXX: The linker does not define how output sections are
-+	 * assigned to input sections when there are multiple statements
-+	 * matching the same input section name.  There is no documented
-+	 * order of matching.
-+	 */
-+	/DISCARD/ : {
-+		ARM_EXIT_DISCARD(EXIT_TEXT)
-+		ARM_EXIT_DISCARD(EXIT_DATA)
-+		EXIT_CALL
-+		*(.discard)
-+		*(.discard.*)
-+	}
++	return __virt_to_phys((unsigned long)(x));
++}
 +
-+	. = PAGE_OFFSET + TEXT_OFFSET;
-+
-+	.head.text : {
-+		_text = .;
-+		HEAD_TEXT
-+	}
-+	.text : {			/* Real text segment		*/
-+		_stext = .;		/* Text and read-only data	*/
-+			*(.smp.pen.text)
-+			__exception_text_start = .;
-+			*(.exception.text)
-+			__exception_text_end = .;
-+			IRQENTRY_TEXT
-+			TEXT_TEXT
-+			SCHED_TEXT
-+			LOCK_TEXT
-+			*(.fixup)
-+			*(.gnu.warning)
-+		. = ALIGN(16);
-+		*(.got)			/* Global offset table		*/
-+			ARM_CPU_KEEP(PROC_INFO)
-+	}
-+
-+	RO_DATA(PAGE_SIZE)
-+
-+	_etext = .;			/* End of text and rodata section */
-+
-+	. = ALIGN(PAGE_SIZE);
-+	__init_begin = .;
-+
-+	INIT_TEXT_SECTION(8)
-+	.exit.text : {
-+		ARM_EXIT_KEEP(EXIT_TEXT)
-+	}
-+	. = ALIGN(16);
-+	.init.proc.info : {
-+		ARM_CPU_DISCARD(PROC_INFO)
-+	}
-+	. = ALIGN(16);
-+	.init.data : {
-+		INIT_DATA
-+		INIT_SETUP(16)
-+		INIT_CALLS
-+		CON_INITCALL
-+		SECURITY_INITCALL
-+		INIT_RAM_FS
-+	}
-+	.exit.data : {
-+		ARM_EXIT_KEEP(EXIT_DATA)
-+	}
-+
-+	PERCPU_SECTION(64)
-+
-+	__init_end = .;
-+	. = ALIGN(THREAD_SIZE);
-+	__data_loc = .;
-+
-+	.data : AT(__data_loc) {
-+		_data = .;		/* address in memory */
-+		_sdata = .;
-+
-+		/*
-+		 * first, the init task union, aligned
-+		 * to an 8192 byte boundary.
-+		 */
-+		INIT_TASK_DATA(THREAD_SIZE)
-+		NOSAVE_DATA
-+		CACHELINE_ALIGNED_DATA(64)
-+		READ_MOSTLY_DATA(64)
-+
-+		/*
-+		 * The exception fixup table (might need resorting at runtime)
-+		 */
-+		. = ALIGN(32);
-+		__start___ex_table = .;
-+		*(__ex_table)
-+		__stop___ex_table = .;
-+
-+		/*
-+		 * and the usual data section
-+		 */
-+		DATA_DATA
-+		CONSTRUCTORS
-+
-+		_edata = .;
-+	}
-+	_edata_loc = __data_loc + SIZEOF(.data);
-+
-+	NOTES
-+
-+	BSS_SECTION(0, 0, 0)
-+	_end = .;
-+
-+	STABS_DEBUG
-+	.comment 0 : { *(.comment) }
++static inline void *phys_to_virt(phys_addr_t x)
++{
++	return (void *)(__phys_to_virt(x));
 +}
 +
 +/*
-+ * These must never be empty
-+ * If you have to comment these two assert statements out, your
-+ * binutils is too old (for other reasons as well)
++ * Drivers should NOT use these either.
 + */
-+ASSERT((__proc_info_end - __proc_info_begin), "missing CPU support")
-diff --git a/arch/arm64/mm/Kconfig b/arch/arm64/mm/Kconfig
-new file mode 100644
-index 0000000..8e94e52
---- /dev/null
-+++ b/arch/arm64/mm/Kconfig
-@@ -0,0 +1,5 @@
-+config MMU
-+	def_bool y
++#define __pa(x)			__virt_to_phys((unsigned long)(x))
++#define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
++#define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
 +
-+config CPU_64
-+	def_bool y
-diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
-new file mode 100644
-index 0000000..81a9d8b
---- /dev/null
-+++ b/arch/arm64/mm/Makefile
-@@ -0,0 +1,6 @@
-+obj-y				:= dma-mapping.o extable.o fault.o init.o \
-+				   cache.o copypage.o flush.o \
-+				   ioremap.o mmap.o pgd.o mmu.o \
-+				   context.o tlb.o proc.o
++/*
++ *  virt_to_page(k)	convert a _valid_ virtual address to struct page *
++ *  virt_addr_valid(k)	indicates whether a virtual address is valid
++ */
++#define ARCH_PFN_OFFSET		PHYS_PFN_OFFSET
 +
-+obj-$(CONFIG_MODULES)		+= proc-syms.o
-diff --git a/init/Kconfig b/init/Kconfig
-index af6c7f8..8bfda46 100644
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -1153,7 +1153,8 @@ menuconfig EXPERT
- 
- config UID16
- 	bool "Enable 16-bit UID system calls" if EXPERT
--	depends on ARM || BLACKFIN || CRIS || FRV || H8300 || X86_32 || M68K || (S390 && !64BIT) || SUPERH || SPARC32 || (SPARC64 && COMPAT) || UML || (X86_64 && IA32_EMULATION)
-+	depends on ARM || BLACKFIN || CRIS || FRV || H8300 || X86_32 || M68K || (S390 && !64BIT) || SUPERH || SPARC32 || (SPARC64 && COMPAT) || UML || (X86_64 && IA32_EMULATION) \
-+		|| AARCH32_EMULATION
- 	default y
- 	help
- 	  This enables the legacy 16-bit UID syscall wrappers.
-diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-index 2403a63..cfb4578 100644
---- a/lib/Kconfig.debug
-+++ b/lib/Kconfig.debug
-@@ -452,7 +452,8 @@ config SLUB_STATS
- config DEBUG_KMEMLEAK
- 	bool "Kernel memory leak detector"
- 	depends on DEBUG_KERNEL && EXPERIMENTAL && \
--		(X86 || ARM || PPC || MIPS || S390 || SPARC64 || SUPERH || MICROBLAZE || TILE)
-+		(X86 || ARM || PPC || MIPS || S390 || SPARC64 || SUPERH || \
-+		 MICROBLAZE || TILE || ARM64)
- 
- 	select DEBUG_FS
- 	select STACKTRACE if STACKTRACE_SUPPORT
-@@ -739,7 +740,8 @@ config DEBUG_BUGVERBOSE
- 	bool "Verbose BUG() reporting (adds 70K)" if DEBUG_KERNEL && EXPERT
- 	depends on BUG
- 	depends on ARM || AVR32 || M32R || M68K || SPARC32 || SPARC64 || \
--		   FRV || SUPERH || GENERIC_BUG || BLACKFIN || MN10300 || TILE
-+		   FRV || SUPERH || GENERIC_BUG || BLACKFIN || MN10300 || \
-+		   TILE || ARM64
- 	default y
- 	help
- 	  Say Y here to make BUG() panics output the file name and line number
++#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
++#define	virt_addr_valid(kaddr)	(((void *)(kaddr) >= (void *)PAGE_OFFSET) && \
++				 ((void *)(kaddr) < (void *)high_memory))
++
++#endif
++
++#include <asm-generic/memory_model.h>
++
++#endif
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+new file mode 100644
+index 0000000..981498a
+--- /dev/null
++++ b/arch/arm64/include/asm/mmu.h
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_MMU_H
++#define __ASM_MMU_H
++
++typedef struct {
++	unsigned int id;
++	spinlock_t id_lock;
++	void *vdso;
++} mm_context_t;
++
++#define ASID(mm)	((mm)->context.id & 0xffff)
++
++#endif
+diff --git a/arch/arm64/include/asm/pgtable-2level-hwdef.h b/arch/arm64/include/asm/pgtable-2level-hwdef.h
+new file mode 100644
+index 0000000..0a8ed3f
+--- /dev/null
++++ b/arch/arm64/include/asm/pgtable-2level-hwdef.h
+@@ -0,0 +1,43 @@
++/*
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_PGTABLE_2LEVEL_HWDEF_H
++#define __ASM_PGTABLE_2LEVEL_HWDEF_H
++
++/*
++ * With LPAE and 64KB pages, there are 2 levels of page tables. Each level has
++ * 8192 entries of 8 bytes each, occupying a 64KB page. Levels 0 and 1 are not
++ * used. The 2nd level table (PGD for Linux) can cover a range of 4TB, each
++ * entry representing 512MB. The user and kernel address spaces are limited to
++ * 512GB and therefore we only use 1024 entries in the PGD.
++ */
++#define PTRS_PER_PTE		8192
++#define PTRS_PER_PGD		1024
++
++/*
++ * PGDIR_SHIFT determines the size a top-level page table entry can map.
++ */
++#define PGDIR_SHIFT		29
++#define PGDIR_SIZE		(_AC(1, UL) << PGDIR_SHIFT)
++#define PGDIR_MASK		(~(PGDIR_SIZE-1))
++
++/*
++ * section address mask and size definitions.
++ */
++#define SECTION_SHIFT		29
++#define SECTION_SIZE		(_AC(1, UL) << SECTION_SHIFT)
++#define SECTION_MASK		(~(SECTION_SIZE-1))
++
++#endif
+diff --git a/arch/arm64/include/asm/pgtable-2level-types.h b/arch/arm64/include/asm/pgtable-2level-types.h
+new file mode 100644
+index 0000000..3c3ca7d
+--- /dev/null
++++ b/arch/arm64/include/asm/pgtable-2level-types.h
+@@ -0,0 +1,60 @@
++/*
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_PGTABLE_2LEVEL_TYPES_H
++#define __ASM_PGTABLE_2LEVEL_TYPES_H
++
++typedef u64 pteval_t;
++typedef u64 pgdval_t;
++typedef pgdval_t pmdval_t;
++
++#undef STRICT_MM_TYPECHECKS
++
++#ifdef STRICT_MM_TYPECHECKS
++
++/*
++ * These are used to make use of C type-checking..
++ */
++typedef struct { pteval_t pte; } pte_t;
++typedef struct { pgdval_t pgd; } pgd_t;
++typedef struct { pteval_t pgprot; } pgprot_t;
++
++#define pte_val(x)      ((x).pte)
++#define pgd_val(x)	((x).pgd)
++#define pgprot_val(x)   ((x).pgprot)
++
++#define __pte(x)        ((pte_t) { (x) } )
++#define __pgd(x)	((pgd_t) { (x) } )
++#define __pgprot(x)     ((pgprot_t) { (x) } )
++
++#else	/* !STRICT_MM_TYPECHECKS */
++
++typedef pteval_t pte_t;
++typedef pgdval_t pgd_t;
++typedef pteval_t pgprot_t;
++
++#define pte_val(x)	(x)
++#define pgd_val(x)	(x)
++#define pgprot_val(x)	(x)
++
++#define __pte(x)	(x)
++#define __pgd(x)	(x)
++#define __pgprot(x)	(x)
++
++#endif	/* STRICT_MM_TYPECHECKS */
++
++#include <asm-generic/pgtable-nopmd.h>
++
++#endif	/* __ASM_PGTABLE_2LEVEL_TYPES_H */
+diff --git a/arch/arm64/include/asm/pgtable-3level-hwdef.h b/arch/arm64/include/asm/pgtable-3level-hwdef.h
+new file mode 100644
+index 0000000..3dbf941
+--- /dev/null
++++ b/arch/arm64/include/asm/pgtable-3level-hwdef.h
+@@ -0,0 +1,50 @@
++/*
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_PGTABLE_3LEVEL_HWDEF_H
++#define __ASM_PGTABLE_3LEVEL_HWDEF_H
++
++/*
++ * With LPAE and 4KB pages, there are 3 levels of page tables. Each level has
++ * 512 entries of 8 bytes each, occupying a 4K page. The first level table
++ * covers a range of 512GB, each entry representing 1GB. The user and kernel
++ * address spaces are limited to 512GB each.
++ */
++#define PTRS_PER_PTE		512
++#define PTRS_PER_PMD		512
++#define PTRS_PER_PGD		512
++
++/*
++ * PGDIR_SHIFT determines the size a top-level page table entry can map.
++ */
++#define PGDIR_SHIFT		30
++#define PGDIR_SIZE		(_AC(1, UL) << PGDIR_SHIFT)
++#define PGDIR_MASK		(~(PGDIR_SIZE-1))
++
++/*
++ * PMD_SHIFT determines the size a middle-level page table entry can map.
++ */
++#define PMD_SHIFT		21
++#define PMD_SIZE		(_AC(1, UL) << PMD_SHIFT)
++#define PMD_MASK		(~(PMD_SIZE-1))
++
++/*
++ * section address mask and size definitions.
++ */
++#define SECTION_SHIFT		21
++#define SECTION_SIZE		(_AC(1, UL) << SECTION_SHIFT)
++#define SECTION_MASK		(~(SECTION_SIZE-1))
++
++#endif
+diff --git a/arch/arm64/include/asm/pgtable-3level-types.h b/arch/arm64/include/asm/pgtable-3level-types.h
+new file mode 100644
+index 0000000..4489615
+--- /dev/null
++++ b/arch/arm64/include/asm/pgtable-3level-types.h
+@@ -0,0 +1,66 @@
++/*
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_PGTABLE_3LEVEL_TYPES_H
++#define __ASM_PGTABLE_3LEVEL_TYPES_H
++
++typedef u64 pteval_t;
++typedef u64 pmdval_t;
++typedef u64 pgdval_t;
++
++#undef STRICT_MM_TYPECHECKS
++
++#ifdef STRICT_MM_TYPECHECKS
++
++/*
++ * These are used to make use of C type-checking..
++ */
++typedef struct { pteval_t pte; } pte_t;
++typedef struct { pmdval_t pmd; } pmd_t;
++typedef struct { pgdval_t pgd; } pgd_t;
++typedef struct { pteval_t pgprot; } pgprot_t;
++
++#define pte_val(x)      ((x).pte)
++#define pmd_val(x)      ((x).pmd)
++#define pgd_val(x)	((x).pgd)
++#define pgprot_val(x)   ((x).pgprot)
++
++#define __pte(x)        ((pte_t) { (x) } )
++#define __pmd(x)        ((pmd_t) { (x) } )
++#define __pgd(x)	((pgd_t) { (x) } )
++#define __pgprot(x)     ((pgprot_t) { (x) } )
++
++#else	/* !STRICT_MM_TYPECHECKS */
++
++typedef pteval_t pte_t;
++typedef pmdval_t pmd_t;
++typedef pgdval_t pgd_t;
++typedef pteval_t pgprot_t;
++
++#define pte_val(x)	(x)
++#define pmd_val(x)	(x)
++#define pgd_val(x)	(x)
++#define pgprot_val(x)	(x)
++
++#define __pte(x)	(x)
++#define __pmd(x)	(x)
++#define __pgd(x)	(x)
++#define __pgprot(x)	(x)
++
++#endif	/* STRICT_MM_TYPECHECKS */
++
++#include <asm-generic/pgtable-nopud.h>
++
++#endif	/* __ASM_PGTABLE_3LEVEL_TYPES_H */
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+new file mode 100644
+index 0000000..561fb08
+--- /dev/null
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -0,0 +1,94 @@
++/*
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_PGTABLE_HWDEF_H
++#define __ASM_PGTABLE_HWDEF_H
++
++#ifdef CONFIG_ARM64_64K_PAGES
++#include <asm/pgtable-2level-hwdef.h>
++#else
++#include <asm/pgtable-3level-hwdef.h>
++#endif
++
++/*
++ * Hardware page table definitions.
++ *
++ * Level 2 descriptor (PMD).
++ */
++#define PMD_TYPE_MASK		(_AT(pmdval_t, 3) << 0)
++#define PMD_TYPE_FAULT		(_AT(pmdval_t, 0) << 0)
++#define PMD_TYPE_TABLE		(_AT(pmdval_t, 3) << 0)
++#define PMD_TYPE_SECT		(_AT(pmdval_t, 1) << 0)
++
++/*
++ * Section
++ */
++#define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
++#define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
++#define PMD_SECT_NG		(_AT(pmdval_t, 1) << 11)
++#define PMD_SECT_XN		(_AT(pmdval_t, 1) << 54)
++
++/*
++ * AttrIndx[2:0] encoding (mapping attributes defined in the MAIR* registers).
++ */
++#define PMD_ATTRINDX(t)		(_AT(pmdval_t, (t)) << 2)
++#define PMD_ATTRINDX_MASK	(_AT(pmdval_t, 7) << 2)
++
++/*
++ * Level 3 descriptor (PTE).
++ */
++#define PTE_TYPE_MASK		(_AT(pteval_t, 3) << 0)
++#define PTE_TYPE_FAULT		(_AT(pteval_t, 0) << 0)
++#define PTE_TYPE_PAGE		(_AT(pteval_t, 3) << 0)
++#define PTE_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
++#define PTE_RDONLY		(_AT(pteval_t, 1) << 7)		/* AP[2] */
++#define PTE_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
++#define PTE_AF			(_AT(pteval_t, 1) << 10)	/* Access Flag */
++#define PTE_NG			(_AT(pteval_t, 1) << 11)	/* nG */
++#define PTE_XN			(_AT(pteval_t, 1) << 54)	/* XN */
++
++/*
++ * AttrIndx[2:0] encoding (mapping attributes defined in the MAIR* registers).
++ */
++#define PTE_ATTRINDX(t)		(_AT(pteval_t, (t)) << 2)
++#define PTE_ATTRINDX_MASK	(_AT(pteval_t, 7) << 2)
++
++/*
++ * 40-bit physical address supported.
++ */
++#define PHYS_MASK_SHIFT		(40)
++#define PHYS_MASK		((1UL << PHYS_MASK_SHIFT) - 1)
++
++/*
++ * TCR flags.
++ */
++#define TCR_TxSZ(x)		(((64 - (x)) << 16) | ((64 - (x)) << 0))
++#define TCR_IRGN_NC		((0 << 8) | (0 << 24))
++#define TCR_IRGN_WBWA		((1 << 8) | (1 << 24))
++#define TCR_IRGN_WT		((2 << 8) | (2 << 24))
++#define TCR_IRGN_WBnWA		((3 << 8) | (3 << 24))
++#define TCR_IRGN_MASK		((3 << 8) | (3 << 24))
++#define TCR_ORGN_NC		((0 << 10) | (0 << 26))
++#define TCR_ORGN_WBWA		((1 << 10) | (1 << 26))
++#define TCR_ORGN_WT		((2 << 10) | (2 << 26))
++#define TCR_ORGN_WBnWA		((3 << 10) | (3 << 26))
++#define TCR_ORGN_MASK		((3 << 10) | (3 << 26))
++#define TCR_SHARED		((3 << 12) | (3 << 28))
++#define TCR_TG0_64K		(1 << 14)
++#define TCR_TG1_64K		(1 << 30)
++#define TCR_IPS_40BIT		(2 << 32)
++#define TCR_ASID16		(1 << 36)
++
++#endif
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+new file mode 100644
+index 0000000..6981da0
+--- /dev/null
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -0,0 +1,328 @@
++/*
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_PGTABLE_H
++#define __ASM_PGTABLE_H
++
++#include <asm/proc-fns.h>
++
++#include <asm/memory.h>
++#include <asm/pgtable-hwdef.h>
++
++/*
++ * Software defined PTE bits definition.
++ */
++#define PTE_VALID		(_AT(pteval_t, 1) << 0)	/* pte_present() check */
++#define PTE_FILE		(_AT(pteval_t, 1) << 2)	/* only when !pte_present() */
++#define PTE_DIRTY		(_AT(pteval_t, 1) << 55)
++#define PTE_SPECIAL		(_AT(pteval_t, 1) << 56)
++
++/*
++ * VMALLOC and SPARSEMEM_VMEMMAP ranges.
++ */
++#define VMALLOC_START		UL(0xffffff8000000000)
++#define VMALLOC_END		(PAGE_OFFSET - UL(0x400000000) - SZ_64K)
++
++#define vmemmap			((struct page *)(VMALLOC_END + SZ_64K))
++
++#define FIRST_USER_ADDRESS	0
++
++#ifndef __ASSEMBLY__
++extern void __pte_error(const char *file, int line, unsigned long val);
++extern void __pmd_error(const char *file, int line, unsigned long val);
++extern void __pgd_error(const char *file, int line, unsigned long val);
++
++#define pte_ERROR(pte)		__pte_error(__FILE__, __LINE__, pte_val(pte))
++#ifndef CONFIG_ARM64_64K_PAGES
++#define pmd_ERROR(pmd)		__pmd_error(__FILE__, __LINE__, pmd_val(pmd))
++#endif
++#define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
++
++/*
++ * The pgprot_* and protection_map entries will be fixed up@runtime to
++ * include the cachable and bufferable bits based on memory policy, as well as
++ * any architecture dependent bits like global/ASID and SMP shared mapping
++ * bits.
++ */
++#define _PAGE_DEFAULT		PTE_TYPE_PAGE | PTE_AF
++
++extern pgprot_t pgprot_default;
++
++#define _MOD_PROT(p, b)	__pgprot(pgprot_val(p) | (b))
++
++#define PAGE_NONE		_MOD_PROT(pgprot_default, PTE_NG | PTE_XN | PTE_RDONLY)
++#define PAGE_SHARED		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_XN)
++#define PAGE_SHARED_EXEC	_MOD_PROT(pgprot_default, PTE_USER | PTE_NG)
++#define PAGE_COPY		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_XN | PTE_RDONLY)
++#define PAGE_COPY_EXEC		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_RDONLY)
++#define PAGE_READONLY		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_XN | PTE_RDONLY)
++#define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_RDONLY)
++#define PAGE_KERNEL		_MOD_PROT(pgprot_default, PTE_XN | PTE_DIRTY)
++#define PAGE_KERNEL_EXEC	_MOD_PROT(pgprot_default, PTE_DIRTY)
++
++#define __PAGE_NONE		__pgprot(_PAGE_DEFAULT | PTE_NG | PTE_XN | PTE_RDONLY)
++#define __PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_XN)
++#define __PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG)
++#define __PAGE_COPY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_XN | PTE_RDONLY)
++#define __PAGE_COPY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_RDONLY)
++#define __PAGE_READONLY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_XN | PTE_RDONLY)
++#define __PAGE_READONLY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_RDONLY)
++
++#endif /* __ASSEMBLY__ */
++
++#define __P000  __PAGE_NONE
++#define __P001  __PAGE_READONLY
++#define __P010  __PAGE_COPY
++#define __P011  __PAGE_COPY
++#define __P100  __PAGE_READONLY_EXEC
++#define __P101  __PAGE_READONLY_EXEC
++#define __P110  __PAGE_COPY_EXEC
++#define __P111  __PAGE_COPY_EXEC
++
++#define __S000  __PAGE_NONE
++#define __S001  __PAGE_READONLY
++#define __S010  __PAGE_SHARED
++#define __S011  __PAGE_SHARED
++#define __S100  __PAGE_READONLY_EXEC
++#define __S101  __PAGE_READONLY_EXEC
++#define __S110  __PAGE_SHARED_EXEC
++#define __S111  __PAGE_SHARED_EXEC
++
++#ifndef __ASSEMBLY__
++/*
++ * ZERO_PAGE is a global shared page that is always zero: used
++ * for zero-mapped memory areas etc..
++ */
++extern struct page *empty_zero_page;
++#define ZERO_PAGE(vaddr)	(empty_zero_page)
++
++#define pte_pfn(pte)		((pte_val(pte) & PHYS_MASK) >> PAGE_SHIFT)
++
++#define pfn_pte(pfn,prot)	(__pte(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
++
++#define pte_none(pte)		(!pte_val(pte))
++#define pte_clear(mm,addr,ptep)	set_pte(ptep, __pte(0))
++#define pte_page(pte)		(pfn_to_page(pte_pfn(pte)))
++#define pte_offset_kernel(dir,addr)	(pmd_page_vaddr(*(dir)) + __pte_index(addr))
++
++#define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
++#define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
++#define pte_unmap(pte)			do { } while (0)
++#define pte_unmap_nested(pte)		do { } while (0)
++
++/*
++ * The following only work if pte_present(). Undefined behaviour otherwise.
++ */
++#define pte_present(pte)	(pte_val(pte) & PTE_VALID)
++#define pte_dirty(pte)		(pte_val(pte) & PTE_DIRTY)
++#define pte_young(pte)		(pte_val(pte) & PTE_AF)
++#define pte_special(pte)	(pte_val(pte) & PTE_SPECIAL)
++#define pte_write(pte)		(!(pte_val(pte) & PTE_RDONLY))
++#define pte_exec(pte)		(!(pte_val(pte) & PTE_XN))
++
++#define pte_present_exec_user(pte) \
++	((pte_val(pte) & (PTE_VALID | PTE_USER | PTE_XN)) == \
++	 (PTE_VALID | PTE_USER))
++
++#define PTE_BIT_FUNC(fn,op) \
++static inline pte_t pte_##fn(pte_t pte) { pte_val(pte) op; return pte; }
++
++PTE_BIT_FUNC(wrprotect, |= PTE_RDONLY);
++PTE_BIT_FUNC(mkwrite,   &= ~PTE_RDONLY);
++PTE_BIT_FUNC(mkclean,   &= ~PTE_DIRTY);
++PTE_BIT_FUNC(mkdirty,   |= PTE_DIRTY);
++PTE_BIT_FUNC(mkold,     &= ~PTE_AF);
++PTE_BIT_FUNC(mkyoung,   |= PTE_AF);
++PTE_BIT_FUNC(mkspecial, |= PTE_SPECIAL);
++
++static inline void set_pte(pte_t *ptep, pte_t pte)
++{
++	*ptep = pte;
++}
++
++extern void __sync_icache_dcache(pte_t pteval);
++
++static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
++			      pte_t *ptep, pte_t pte)
++{
++	if (pte_present_exec_user(pte))
++		__sync_icache_dcache(pte);
++	set_pte(ptep, pte);
++}
++
++/*
++ * Huge pte definitions.
++ */
++#define pte_huge(pte)		((pte_val(pte) & PTE_TYPE_MASK) == PTE_TYPE_HUGEPAGE)
++#define pte_mkhuge(pte)		(__pte((pte_val(pte) & ~PTE_TYPE_MASK) | PTE_TYPE_HUGEPAGE))
++
++#define __pgprot_modify(prot,mask,bits)		\
++	__pgprot((pgprot_val(prot) & ~(mask)) | (bits))
++
++#define __HAVE_ARCH_PTE_SPECIAL
++
++/*
++ * Mark the prot value as uncacheable and unbufferable.
++ */
++#define pgprot_noncached(prot) \
++	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_DEVICE_nGnRnE))
++#define pgprot_writecombine(prot) \
++	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_DEVICE_GRE))
++#define pgprot_dmacoherent(prot) \
++	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_NORMAL_NC))
++#define __HAVE_PHYS_MEM_ACCESS_PROT
++struct file;
++extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
++				     unsigned long size, pgprot_t vma_prot);
++
++#define pmd_none(pmd)		(!pmd_val(pmd))
++#define pmd_present(pmd)	(pmd_val(pmd))
++
++#define pmd_bad(pmd)		(!(pmd_val(pmd) & 2))
++
++static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
++{
++	*pmdp = pmd;
++	dsb();
++}
++
++static inline void pmd_clear(pmd_t *pmdp)
++{
++	set_pmd(pmdp, __pmd(0));
++}
++
++static inline pte_t *pmd_page_vaddr(pmd_t pmd)
++{
++	return __va(pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK);
++}
++
++#define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
++
++/*
++ * Conversion functions: convert a page and protection to a page entry,
++ * and a page entry and page directory to the page they refer to.
++ */
++#define mk_pte(page,prot)	pfn_pte(page_to_pfn(page),prot)
++
++#ifndef CONFIG_ARM64_64K_PAGES
++
++#define pud_none(pud)		(!pud_val(pud))
++#define pud_bad(pud)		(!(pud_val(pud) & 2))
++#define pud_present(pud)	(pud_val(pud))
++
++static inline void set_pud(pud_t *pudp, pud_t pud)
++{
++	*pudp = pud;
++	dsb();
++}
++
++static inline void pud_clear(pud_t *pudp)
++{
++	set_pud(pudp, __pud(0));
++}
++
++static inline pmd_t *pud_page_vaddr(pud_t pud)
++{
++	return __va(pud_val(pud) & PHYS_MASK & (s32)PAGE_MASK);
++}
++
++#endif	/* CONFIG_ARM64_64K_PAGES */
++
++/* to find an entry in a page-table-directory */
++#define pgd_index(addr)		(((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
++
++#define pgd_offset(mm, addr)	((mm)->pgd+pgd_index(addr))
++
++/* to find an entry in a kernel page-table-directory */
++#define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
++
++/* Find an entry in the second-level page table.. */
++#ifndef CONFIG_ARM64_64K_PAGES
++#define pmd_index(addr)		(((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
++static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
++{
++	return (pmd_t *)pud_page_vaddr(*pud) + pmd_index(addr);
++}
++#endif
++
++/* Find an entry in the third-level page table.. */
++#define __pte_index(addr)	(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
++
++static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
++{
++	const pteval_t mask = PTE_USER | PTE_XN | PTE_RDONLY;
++	pte_val(pte) = (pte_val(pte) & ~mask) | (pgprot_val(newprot) & mask);
++	return pte;
++}
++
++extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
++extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
++
++#define SWAPPER_DIR_SIZE	(3 * PAGE_SIZE)
++#define IDMAP_DIR_SIZE		(2 * PAGE_SIZE)
++
++/*
++ * Encode and decode a swap entry:
++ *	bits 0-1:	present (must be zero)
++ *	bit  2:		PTE_FILE
++ *	bits 3-8:	swap type
++ *	bits 9-63:	swap offset
++ */
++#define __SWP_TYPE_SHIFT	3
++#define __SWP_TYPE_BITS		6
++#define __SWP_TYPE_MASK		((1 << __SWP_TYPE_BITS) - 1)
++#define __SWP_OFFSET_SHIFT	(__SWP_TYPE_BITS + __SWP_TYPE_SHIFT)
++
++#define __swp_type(x)		(((x).val >> __SWP_TYPE_SHIFT) & __SWP_TYPE_MASK)
++#define __swp_offset(x)		((x).val >> __SWP_OFFSET_SHIFT)
++#define __swp_entry(type,offset) ((swp_entry_t) { ((type) << __SWP_TYPE_SHIFT) | ((offset) << __SWP_OFFSET_SHIFT) })
++
++#define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
++#define __swp_entry_to_pte(swp)	((pte_t) { (swp).val })
++
++/*
++ * Ensure that there are not more swap files than can be encoded in the kernel
++ * the PTEs.
++ */
++#define MAX_SWAPFILES_CHECK() BUILD_BUG_ON(MAX_SWAPFILES_SHIFT > __SWP_TYPE_BITS)
++
++/*
++ * Encode and decode a file entry:
++ *	bits 0-1:	present (must be zero)
++ *	bit  2:		PTE_FILE
++ *	bits 3-63:	file offset / PAGE_SIZE
++ */
++#define pte_file(pte)		(pte_val(pte) & PTE_FILE)
++#define pte_to_pgoff(x)		(pte_val(x) >> 3)
++#define pgoff_to_pte(x)		__pte(((x) << 3) | PTE_FILE)
++
++#define PTE_FILE_MAX_BITS	61
++
++extern int kern_addr_valid(unsigned long addr);
++
++#include <asm-generic/pgtable.h>
++
++/*
++ * remap a physical page `pfn' of size `size' with page protection `prot'
++ * into virtual address `from'
++ */
++#define io_remap_pfn_range(vma,from,pfn,size,prot) \
++		remap_pfn_range(vma, from, pfn, size, prot)
++
++#define pgtable_cache_init() do { } while (0)
++
++#endif /* !__ASSEMBLY__ */
++
++#endif /* __ASM_PGTABLE_H */
+diff --git a/arch/arm64/include/asm/sparsemem.h b/arch/arm64/include/asm/sparsemem.h
+new file mode 100644
+index 0000000..1be62bc
+--- /dev/null
++++ b/arch/arm64/include/asm/sparsemem.h
+@@ -0,0 +1,24 @@
++/*
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_SPARSEMEM_H
++#define __ASM_SPARSEMEM_H
++
++#ifdef CONFIG_SPARSEMEM
++#define MAX_PHYSMEM_BITS	40
++#define SECTION_SIZE_BITS	30
++#endif
++
++#endif
