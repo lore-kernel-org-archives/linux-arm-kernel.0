@@ -1,86 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 14 Aug 2012 16:15:56 +0800
-Subject: [PATCH] ARM: imx6q: register fixed clocks in the common way
-Message-ID: <1344932156-8275-1-git-send-email-shawn.guo@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Aug 2012 10:17:08 +0200
+Subject: [PATCH 1/8] of/irq: Create stub for of_irq_find_parent when
+ !CONFIG_OF
+In-Reply-To: <1344527635-6163-2-git-send-email-lee.jones@linaro.org>
+References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
+ <1344527635-6163-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdb2MKgaoknHcWjrQqXPr6dXRsPjDxCwzNvGahJ48wMzdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With DT clock support in place, we can register fixed clocks in DT
-standard way.
+On Thu, Aug 9, 2012 at 5:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx6q.dtsi  |   11 +++++++----
- arch/arm/mach-imx/clk-imx6q.c |   21 +++++++--------------
- 2 files changed, 14 insertions(+), 18 deletions(-)
+> of_irq_find_parent is a handy function to use outside the confines of
+> the Open Firmware subsystem. One such use-case is when the IRQ Domain
+> wishes to find an IRQ domain for a given device node. Currently it can
+> not take any notice of the 'interrupt-parent' property. Instead it
+> just uses the first IRQ controller as it climbs the Device Tree. If
+> we were to use this as a precursor the resultant controller is more
+> likely to be correct.
+>
+> CC: Rob Herring <rob.herring@calxeda.com>
+> CC: devicetree-discuss at lists.ozlabs.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 3d3c64b..0052fe7 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -65,17 +65,20 @@
- 		#size-cells = <0>;
- 
- 		ckil {
--			compatible = "fsl,imx-ckil", "fixed-clock";
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
- 			clock-frequency = <32768>;
- 		};
- 
--		ckih1 {
--			compatible = "fsl,imx-ckih1", "fixed-clock";
-+		ckih {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
- 			clock-frequency = <0>;
- 		};
- 
- 		osc {
--			compatible = "fsl,imx-osc", "fixed-clock";
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
- 			clock-frequency = <24000000>;
- 		};
- 	};
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index ea89520..475bc93 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -162,27 +162,20 @@ static enum mx6q_clks const clks_init_on[] __initconst = {
- 	mmdc_ch0_axi, rom,
- };
- 
-+static const struct of_device_id clk_match[] __initconst = {
-+	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
-+	{ /* sentinel */ }
-+};
-+
- int __init mx6q_clocks_init(void)
- {
- 	struct device_node *np;
- 	void __iomem *base;
- 	int i, irq;
- 
--	clk[dummy] = imx_clk_fixed("dummy", 0);
-+	of_clk_init(clk_match);
- 
--	/* retrieve the freqency of fixed clocks from device tree */
--	for_each_compatible_node(np, NULL, "fixed-clock") {
--		u32 rate;
--		if (of_property_read_u32(np, "clock-frequency", &rate))
--			continue;
--
--		if (of_device_is_compatible(np, "fsl,imx-ckil"))
--			clk[ckil] = imx_clk_fixed("ckil", rate);
--		else if (of_device_is_compatible(np, "fsl,imx-ckih1"))
--			clk[ckih] = imx_clk_fixed("ckih", rate);
--		else if (of_device_is_compatible(np, "fsl,imx-osc"))
--			clk[osc] = imx_clk_fixed("osc", rate);
--	}
-+	clk[dummy] = imx_clk_fixed("dummy", 0);
- 
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
- 	base = of_iomap(np, 0);
--- 
-1.7.5.4
+This is clever.
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
