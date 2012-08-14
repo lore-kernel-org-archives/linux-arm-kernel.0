@@ -1,54 +1,51 @@
-From: jason77.wang@gmail.com (Hui Wang)
-Date: Tue, 14 Aug 2012 09:46:04 +0800
-Subject: [PATCH 0/9] ARM perf updates for 3.7
-In-Reply-To: <20120813093201.GB19113@mudshark.cambridge.arm.com>
-References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
- <5028C4C9.6020002@gmail.com>
- <20120813093201.GB19113@mudshark.cambridge.arm.com>
-Message-ID: <5029ADDC.10908@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 14 Aug 2012 04:28:30 +0200
+Subject: [PATCH] ARM: at91: fix drivers broken because of sparse irq
+ support
+In-Reply-To: <1344872334-1532-2-git-send-email-ludovic.desroches@atmel.com>
+References: <1344872334-1532-1-git-send-email-ludovic.desroches@atmel.com>
+ <1344872334-1532-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20120814022830.GB8836@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon wrote:
-> On Mon, Aug 13, 2012 at 10:11:37AM +0100, Hui Wang wrote:
->   
->> Hi Will Deacon,
->>     
->
-> Hello,
->
->   
->> For SMP platforms, each CPU core has an independent PMU, and each PMU 
->> has a dedicated irq (SPI or PPI). Current perf subsystem framework only 
->> supports each PMU to have a dedicated SPI irq, and it will support each 
->> PMU to have a PPI irq (i have seen someone has sent out the patches), 
->> but there is a situation the subsystem doesn't support yet, the 
->> situation is multi PMUs share one same SPI irq, e.g. the i.MX6Quad CPU 
->> has 4 cortex-a9 cores, each core has a PMU, all PMU irqs are routed 
->> (ORed) to one SPI irq, do you know how to support this situation?
->>     
->
-> That's what I like to call a braindead, broken system. Seriously, CPU PMU
-> interrupts *can only* be handled on the CPU which raised them -- ORing these
-> things together means ping-ponging the interrupt affinity around until we
-> find the right guy. There's also the fun case where multiple PMUs assert
-> simultaneously and I've even heard about platforms where they OR in the
-> bloody L2 PMU interrupt as well for good measure!
->
-> If you have to support such a device, take a look at the ux500 code
-> (db8500_pmu_handler), but please take all of your profiling numbers with a
-> pinch of salt. For a quad-core processor, the numbers will probably be even
-> less accurate.
->
-> Also, please go ahead and inflict sufficient injuries to your hardware guys
-> that they stop this madness!
->   
-Got it, thanks for the information, it is very useful.
+On 17:38 Mon 13 Aug     , ludovic.desroches at atmel.com wrote:
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> Some drivers directly use AT91_ID_SYS as virq so they are broken because of
+> the NR_IRQS_LEGACY virq offset introduced with sparse irq support.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Cc: stable at vger.kernel.org
+> ---
+>  arch/arm/mach-at91/at91rm9200_time.c |  2 +-
+>  drivers/rtc/rtc-at91sam9.c           | 11 ++++++-----
+>  2 files changed, 7 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
+> index 104ca40..aaa443b 100644
+> --- a/arch/arm/mach-at91/at91rm9200_time.c
+> +++ b/arch/arm/mach-at91/at91rm9200_time.c
+> @@ -197,7 +197,7 @@ void __init at91rm9200_timer_init(void)
+>  	at91_st_read(AT91_ST_SR);
+>  
+>  	/* Make IRQs happen for the system timer */
+> -	setup_irq(AT91_ID_SYS, &at91rm9200_timer_irq);
+> +	setup_irq(NR_IRQS_LEGACY + AT91_ID_SYS, &at91rm9200_timer_irq);
+>  
+>  	/* The 32KiHz "Slow Clock" (tick every 30517.58 nanoseconds) is used
+>  	 * directly for the clocksource and all clockevents, after adjusting
+> diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+> index 8318689..2969047 100644
+> --- a/drivers/rtc/rtc-at91sam9.c
+> +++ b/drivers/rtc/rtc-at91sam9.c
+> @@ -345,11 +345,12 @@ static int __devinit at91_rtc_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	/* register irq handler after we know what name we'll use */
+> -	ret = request_irq(AT91_ID_SYS, at91_rtc_interrupt,
+> +	ret = request_irq(NR_IRQS_LEGACY + AT91_ID_SYS, at91_rtc_interrupt,
+the irq need to be pass by resources and not hardcoded
 
-Regards,
-Hui.
-
-
-> Will
->
->   
+Best Regrds,
+J.
