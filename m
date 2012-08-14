@@ -1,19 +1,19 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Aug 2012 10:32:38 +0200
-Subject: [PATCH 1/1] ARM: ux500: Match Power-On-Key MFD and DTS compatible
- strings
-In-Reply-To: <1344527828-6283-1-git-send-email-lee.jones@linaro.org>
+Date: Tue, 14 Aug 2012 10:33:09 +0200
+Subject: [PATCH 1/1] ARM: ux500: Remove unused snowball_of_platform_devs
+ struct
+In-Reply-To: <1344527828-6283-2-git-send-email-lee.jones@linaro.org>
 References: <1344527828-6283-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdb2O4wTei75dnDnszzg7u1JMJZkkH3xs_34rVaQxW1zYw@mail.gmail.com>
+ <1344527828-6283-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdbaXHqPUDYFHWgMwu-g3kHyZsHWvGq3_dR_wjQddgeUoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Aug 9, 2012 at 5:57 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> The compatible string found in the Power-On-Key's MFD cell matches
-> the device name provided in the driver. Keeping this naming convention
-> seems like a good idea, so we're changing the one found in the DTS
-> file to match.
+> This was left over during a recent clean-up which removed Device Tree
+> helper structs. There is no longer a requirement for it, so we can just
+> remove it.
 >
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
