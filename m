@@ -1,60 +1,27 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Tue, 14 Aug 2012 11:09:58 -0700
-Subject: [PATCH] pinctrl: imx5: start numbering pad from 0
-In-Reply-To: <CAP1dx+wm=Lj6WXWTiRk3JfqAomr8_mfjZpmToht2bb4paEYXjQ@mail.gmail.com>
-References: <1344869278-27334-1-git-send-email-shawn.guo@linaro.org>
- <502954D2.908@boundarydevices.com>
- <CAP1dx+wm=Lj6WXWTiRk3JfqAomr8_mfjZpmToht2bb4paEYXjQ@mail.gmail.com>
-Message-ID: <502A9476.1040500@boundarydevices.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 14 Aug 2012 14:23:24 -0400
+Subject: [patch v2 1/1] ARM: Orion: Set eth packet size csum offload limit
+In-Reply-To: <20120726101601.284809510@rtp-net.org>
+References: <20120726101601.284809510@rtp-net.org>
+Message-ID: <20120814182324.GO22226@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/14/2012 12:30 AM, Dong Aisheng wrote:
-> On 14 August 2012 03:26, Troy Kisky <troy.kisky@boundarydevices.com> wrote:
->> On 8/13/2012 7:47 AM, Shawn Guo wrote:
->>> Unlike imx6q pinctrl driver that starts nubmering pad from 0, imx5
->>> pinctrl drivers number pad from 1.  It causes problem/confusion when
->>> driver accesses imx51_pinctrl_pads array using pin ID as the index.
->>>
->>> Change imx51_pads and imx53_pads numbering start from 0.
->>>
->>> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->>> ---
->>>    drivers/pinctrl/pinctrl-imx51.c |  490
->>> +++++++++++++++++++-------------------
->>>    drivers/pinctrl/pinctrl-imx53.c |  402 ++++++++++++++++----------------
->>>    2 files changed, 446 insertions(+), 446 deletions(-)
->>>
->>> diff --git a/drivers/pinctrl/pinctrl-imx51.c
->>> b/drivers/pinctrl/pinctrl-imx51.c
->>> index 9fd0216..fb84689 100644
->>> --- a/drivers/pinctrl/pinctrl-imx51.c
->>> +++ b/drivers/pinctrl/pinctrl-imx51.c
->>> @@ -23,251 +23,251 @@
->>>    #include "pinctrl-imx.h"
->>>      enum imx51_pads {
->>> -       MX51_PAD_EIM_D16 = 1,
->>> -       MX51_PAD_EIM_D17 = 2,
-> ...
->>> +       MX53_PAD_GPIO_19 = 0,
->>> +       MX53_PAD_KEY_COL0 = 1,
->>
->> Why not skip the = xx altogether??  The enum will auto-increment.
-> Personally i'd like to keep it.
-> The reason is that pin id is basic property of a pin per pinctrl
-> subsystem's design
-> so explicitly define it looks more clear to me and i'm not sure but
-> it's possible that
-> the pin id may be used in device tree in the future(maybe some other
-> soc already uses it),
-> And defining it has no big harming.
->
-> Regards
-> Dong Aisheng
-> .
->
-Then maybe #defines should be used, so that device tree can include this 
-file and be run through C pre-processor?
+On Thu, Jul 26, 2012 at 12:15:46PM +0200, Arnaud Patard wrote:
+> The mv643xx ethernet controller limits the packet size for the TX
+> checksum offloading. This patch sets this limits for Kirkwood and
+> Dove which have smaller limits that the default.
+> 
+> As a side note, this patch is an updated version of a patch sent some years
+> ago: http://lists.infradead.org/pipermail/linux-arm-kernel/2010-June/017320.html
+> which seems to have been lost.
+> 
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
 
-Thanks
-Troy
+Applied to:
+
+git://git.infradead.org/users/jcooper/linux.git fixes-for-v3.6
+
+thx,
+
+Jason.
