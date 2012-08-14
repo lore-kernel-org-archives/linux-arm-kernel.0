@@ -1,28 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Aug 2012 13:34:22 +0200
-Subject: [PATCH 00/22] mop500 related Audio reorganisation and fixups
-In-Reply-To: <20120809185029.GC24328@opensource.wolfsonmicro.com>
-References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
- <20120809185029.GC24328@opensource.wolfsonmicro.com>
-Message-ID: <CACRpkdZMyR3FXcoRHEAuoyx8B6+4sMuKjeRdg9+TD14XzqO7Yg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 14 Aug 2012 13:40:59 +0200
+Subject: [PATCH] ARM: mxc: ssi-fiq: Make ssi-fiq.S Thumb-2 compatible
+In-Reply-To: <CAKGA1bnRA61JT8tQoHBay+6BSxDO5egiagQm1v05L7Asf+qJ+Q@mail.gmail.com>
+References: <1344599604-9623-1-git-send-email-dave.martin@linaro.org>
+ <20120813193517.GU1451@pengutronix.de>
+ <CAKGA1bnRA61JT8tQoHBay+6BSxDO5egiagQm1v05L7Asf+qJ+Q@mail.gmail.com>
+Message-ID: <20120814114059.GX1451@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 9, 2012 at 8:50 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
+On Mon, Aug 13, 2012 at 05:28:17PM -0500, Matt Sealey wrote:
+>  IMX_PIN_REG(MX51_PAD_EIM_DA15, NO_PAD, 0x058, 0, 0x000, 0), /*
+> MX51_PAD_EIM_DA15__EIM_DA15 */
+> 
+> 
+> 
+> On Mon, Aug 13, 2012 at 2:35 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > Hi Dave,
+> >
+> > On Fri, Aug 10, 2012 at 12:53:24PM +0100, Dave Martin wrote:
+> >> Because FIQ handlers get copied straight into the vectors page to
+> >> the FIQ vector entry point, FIQ handlers in a Thumb-2 kernel must
+> >> start in Thumb-2.  A Thumb-2 kernel enters all exception vectors in
+> >> Thumb-2.
+> >
+> > I finally came along testing this. I have no Thumb2 capable hardware
+> > to test if it works in thumb2 mode, but at least in Arm mode it works.
+> > This is enough to not introduce a regression, so we can go for this.
+> 
+> This is the interesting dichotomy; the code is only required truly on
+> devices where Thumb2 isn't available, right?
 
-> On Thu, Aug 09, 2012 at 04:47:26PM +0100, Lee Jones wrote:
->> Another fine instalment of Audio fixes and Device Tree enablement
->> surrounding the mop500 sound driver. Hopefully containing all of
->> the recommendations suggested by Mark Brown.
->
-> Can we have some review of this from the ARM side please?  It's pretty
-> big...
+It is also used on the i.MX51 Eukrea board. I asked Eric (Cced) to test
+it in thumb2 mode, no response so far. I don't know the reason why he
+uses FIQ mode instead of SDMA, maybe simply historical reasons.
 
-I looked over it, merged two patches to ux500 fixes and ACKed these
-I understand. For the patches mainly dealing with ALSA SoC I get
-confused so would prefer to have Ola Lilja comment on those once
-he's available.
+Sascha
 
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
