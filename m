@@ -1,56 +1,267 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Tue, 14 Aug 2012 12:49:43 -0500
-Subject: [PATCH] ARM: mxc: ssi-fiq: Make ssi-fiq.S Thumb-2 compatible
-In-Reply-To: <20120814114059.GX1451@pengutronix.de>
-References: <1344599604-9623-1-git-send-email-dave.martin@linaro.org>
- <20120813193517.GU1451@pengutronix.de>
- <CAKGA1bnRA61JT8tQoHBay+6BSxDO5egiagQm1v05L7Asf+qJ+Q@mail.gmail.com>
- <20120814114059.GX1451@pengutronix.de>
-Message-ID: <CAKGA1bmk2TqDwxR=RT+z3y8XaSpcW+kHsaQfmdrHVqTD9Uxv5A@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 14 Aug 2012 18:52:01 +0100
+Subject: [PATCH v2 00/31] AArch64 Linux kernel port
+Message-ID: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 6:40 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Mon, Aug 13, 2012 at 05:28:17PM -0500, Matt Sealey wrote:
->>  IMX_PIN_REG(MX51_PAD_EIM_DA15, NO_PAD, 0x058, 0, 0x000, 0), /*
->> MX51_PAD_EIM_DA15__EIM_DA15 */
->>
->>
->>
->> On Mon, Aug 13, 2012 at 2:35 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->> > Hi Dave,
->> >
->> > On Fri, Aug 10, 2012 at 12:53:24PM +0100, Dave Martin wrote:
->> >> Because FIQ handlers get copied straight into the vectors page to
->> >> the FIQ vector entry point, FIQ handlers in a Thumb-2 kernel must
->> >> start in Thumb-2.  A Thumb-2 kernel enters all exception vectors in
->> >> Thumb-2.
->> >
->> > I finally came along testing this. I have no Thumb2 capable hardware
->> > to test if it works in thumb2 mode, but at least in Arm mode it works.
->> > This is enough to not introduce a regression, so we can go for this.
->>
->> This is the interesting dichotomy; the code is only required truly on
->> devices where Thumb2 isn't available, right?
->
-> It is also used on the i.MX51 Eukrea board. I asked Eric (Cced) to test
-> it in thumb2 mode, no response so far. I don't know the reason why he
-> uses FIQ mode instead of SDMA, maybe simply historical reasons.
+This is the 2nd version of the set of patches implementing Linux kernel
+support for the 64-bit ARM architecture (AArch64). Thanks to all who
+provided feedback on the previous version.
 
-If we can lose that requirement then the only thing in the way is the
-phyCORE support, which goes away on a "pure" v7 config anyway,
-correct? I was just thinking, why not split v6_v7_defconfig into a
-v7_defconfig losing those boards anyway and enable Thumb2 by default
-while we're at it? It would mean more testing gets done and this error
-would crop up both more often, but be less surprising and won't take a
-year to revisit ;)
+The Linux kernel patches are available on this tree:
 
-Pure v7 config would still include Tegra, OMAP3/4, i.MX5 onwards and
-the newer chips. One zImage for v6_v7 is still possible but I don't
-know if anyone really has the idea in their heads that you'd want to
-boot the same kernel on i.MX3 as well as i.MX6Q even if they do share
-drivers to some degree.
+git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git upstream
 
--- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+The "master" branch in the above repository tracks the development
+history.
+
+Main changes from the previous version (for the full log see the
+"master" branch above):
+
+- Kernel port directory and related functions renamed to "arm64".
+  "uname -m" reports "aarch64" as per the official name.
+- NO_BOOTMEM enabled.
+- "mem=" is now used for limiting the amount of memory rather than
+  specifying the memory banks (already done via FDT).
+- struct mem_type removed as static definitions are enough for
+  ioremap().
+- Support for ZONE_DMA32.
+- Replaced "user_debug" with "/proc/sys/debug/exception-trace".
+- Added a generic defconfig file.
+- More clean-up (comments, code) and bug-fixes.
+
+The generic patches were dropped from this series as they have been pushed
+separately (and most of them already merged into mainline).
+
+
+Background to the 64-bit ARM architecture:
+
+ARM introduced AArch64 as part of the ARMv8 architecture and consists of
+a substantially revised exception model (with 4 exception levels: EL0 -
+user, EL1 - kernel, EL2 - hypervisor, EL3 - secure monitor), new A64
+instruction set based on larger register file, new FP/SIMD instructions.
+The new ABI is LP64 and takes advantage of the larger register file. It
+also mandates FP.
+
+AArch64 documentation currently available (publicly, though
+click-through agreement required):
+
+- Instruction Set Overview:
+http://infocenter.arm.com/help/topic/com.arm.doc.genc010197a/index.html
+
+- ABI (PCS, ELF, DWARF, C++):
+http://infocenter.arm.com/help/topic/com.arm.doc.ihi0059a/index.html
+
+
+Regards,
+
+Catalin
+
+
+Catalin Marinas (23):
+  arm64: Assembly macros and definitions
+  arm64: Kernel booting and initialisation
+  arm64: Exception handling
+  arm64: MMU definitions
+  arm64: MMU initialisation
+  arm64: MMU fault handling and page table management
+  arm64: Process management
+  arm64: CPU support
+  arm64: Cache maintenance routines
+  arm64: TLB maintenance functionality
+  arm64: Atomic operations
+  arm64: Device specific operations
+  arm64: DMA mapping API
+  arm64: SMP support
+  arm64: ELF definitions
+  arm64: System calls handling
+  arm64: Signal handling support
+  arm64: User access library functions
+  arm64: Floating point and SIMD
+  arm64: Add support for /proc/sys/debug/exception-trace
+  arm64: Miscellaneous header files
+  arm64: Build infrastructure
+  arm64: MAINTAINERS update
+
+Marc Zyngier (3):
+  arm64: IRQ handling
+  arm64: Miscellaneous library functions
+  arm64: Generic timers support
+
+Will Deacon (5):
+  arm64: VDSO support
+  arm64: 32-bit (compat) applications support
+  arm64: Debugging support
+  arm64: Performance counters support
+  arm64: Loadable modules
+
+ Documentation/arm64/booting.txt               |  141 +++
+ Documentation/arm64/memory.txt                |   69 ++
+ MAINTAINERS                                   |    6 +
+ arch/arm64/Kconfig                            |  261 +++++
+ arch/arm64/Kconfig.debug                      |   27 +
+ arch/arm64/Makefile                           |   71 ++
+ arch/arm64/boot/.gitignore                    |    2 +
+ arch/arm64/boot/Makefile                      |   38 +
+ arch/arm64/boot/install.sh                    |   52 +
+ arch/arm64/configs/generic_defconfig          |   85 ++
+ arch/arm64/include/asm/Kbuild                 |   51 +
+ arch/arm64/include/asm/asm-offsets.h          |    1 +
+ arch/arm64/include/asm/assembler.h            |  109 ++
+ arch/arm64/include/asm/atomic.h               |  306 ++++++
+ arch/arm64/include/asm/auxvec.h               |   22 +
+ arch/arm64/include/asm/barrier.h              |   52 +
+ arch/arm64/include/asm/bitops.h               |   74 ++
+ arch/arm64/include/asm/bitsperlong.h          |   23 +
+ arch/arm64/include/asm/byteorder.h            |   21 +
+ arch/arm64/include/asm/cache.h                |   32 +
+ arch/arm64/include/asm/cacheflush.h           |  209 ++++
+ arch/arm64/include/asm/cachetype.h            |   48 +
+ arch/arm64/include/asm/cmpxchg.h              |  180 ++++
+ arch/arm64/include/asm/compat.h               |  232 +++++
+ arch/arm64/include/asm/compiler.h             |   30 +
+ arch/arm64/include/asm/cputype.h              |   49 +
+ arch/arm64/include/asm/debug-monitors.h       |   88 ++
+ arch/arm64/include/asm/device.h               |   26 +
+ arch/arm64/include/asm/dma-mapping.h          |  124 +++
+ arch/arm64/include/asm/elf.h                  |  176 ++++
+ arch/arm64/include/asm/exception.h            |   23 +
+ arch/arm64/include/asm/exec.h                 |   23 +
+ arch/arm64/include/asm/fb.h                   |   34 +
+ arch/arm64/include/asm/fcntl.h                |   29 +
+ arch/arm64/include/asm/fpsimd.h               |   64 ++
+ arch/arm64/include/asm/futex.h                |  134 +++
+ arch/arm64/include/asm/hardirq.h              |   52 +
+ arch/arm64/include/asm/hw_breakpoint.h        |  137 +++
+ arch/arm64/include/asm/hwcap.h                |   57 +
+ arch/arm64/include/asm/io.h                   |  263 +++++
+ arch/arm64/include/asm/irq.h                  |    8 +
+ arch/arm64/include/asm/irqflags.h             |   91 ++
+ arch/arm64/include/asm/memblock.h             |   21 +
+ arch/arm64/include/asm/memory.h               |  144 +++
+ arch/arm64/include/asm/mmu.h                  |   27 +
+ arch/arm64/include/asm/mmu_context.h          |  152 +++
+ arch/arm64/include/asm/module.h               |   23 +
+ arch/arm64/include/asm/page.h                 |   67 ++
+ arch/arm64/include/asm/param.h                |   23 +
+ arch/arm64/include/asm/perf_event.h           |   22 +
+ arch/arm64/include/asm/pgalloc.h              |  113 ++
+ arch/arm64/include/asm/pgtable-2level-hwdef.h |   43 +
+ arch/arm64/include/asm/pgtable-2level-types.h |   60 ++
+ arch/arm64/include/asm/pgtable-3level-hwdef.h |   50 +
+ arch/arm64/include/asm/pgtable-3level-types.h |   66 ++
+ arch/arm64/include/asm/pgtable-hwdef.h        |   94 ++
+ arch/arm64/include/asm/pgtable.h              |  328 ++++++
+ arch/arm64/include/asm/pmu.h                  |   82 ++
+ arch/arm64/include/asm/proc-fns.h             |   51 +
+ arch/arm64/include/asm/processor.h            |  174 ++++
+ arch/arm64/include/asm/procinfo.h             |   44 +
+ arch/arm64/include/asm/prom.h                 |    1 +
+ arch/arm64/include/asm/ptrace.h               |  206 ++++
+ arch/arm64/include/asm/setup.h                |   26 +
+ arch/arm64/include/asm/shmparam.h             |   28 +
+ arch/arm64/include/asm/sigcontext.h           |   69 ++
+ arch/arm64/include/asm/siginfo.h              |   23 +
+ arch/arm64/include/asm/signal.h               |   24 +
+ arch/arm64/include/asm/signal32.h             |   54 +
+ arch/arm64/include/asm/smp.h                  |   69 ++
+ arch/arm64/include/asm/sparsemem.h            |   24 +
+ arch/arm64/include/asm/spinlock.h             |  199 ++++
+ arch/arm64/include/asm/spinlock_types.h       |   38 +
+ arch/arm64/include/asm/stacktrace.h           |   29 +
+ arch/arm64/include/asm/stat.h                 |   63 ++
+ arch/arm64/include/asm/statfs.h               |   23 +
+ arch/arm64/include/asm/syscall.h              |  101 ++
+ arch/arm64/include/asm/syscalls.h             |   40 +
+ arch/arm64/include/asm/system_misc.h          |   54 +
+ arch/arm64/include/asm/thread_info.h          |  124 +++
+ arch/arm64/include/asm/timex.h                |   32 +
+ arch/arm64/include/asm/tlb.h                  |  190 ++++
+ arch/arm64/include/asm/tlbflush.h             |  123 +++
+ arch/arm64/include/asm/traps.h                |   30 +
+ arch/arm64/include/asm/uaccess.h              |  377 +++++++
+ arch/arm64/include/asm/ucontext.h             |   30 +
+ arch/arm64/include/asm/unistd.h               |   27 +
+ arch/arm64/include/asm/unistd32.h             |  758 ++++++++++++++
+ arch/arm64/include/asm/vdso.h                 |   41 +
+ arch/arm64/include/asm/vdso_datapage.h        |   43 +
+ arch/arm64/kernel/.gitignore                  |    1 +
+ arch/arm64/kernel/Makefile                    |   27 +
+ arch/arm64/kernel/arm64ksyms.c                |   55 +
+ arch/arm64/kernel/asm-offsets.c               |  108 ++
+ arch/arm64/kernel/debug-monitors.c            |  288 ++++++
+ arch/arm64/kernel/elf.c                       |   41 +
+ arch/arm64/kernel/entry-fpsimd.S              |   80 ++
+ arch/arm64/kernel/entry.S                     |  695 +++++++++++++
+ arch/arm64/kernel/fpsimd.c                    |  106 ++
+ arch/arm64/kernel/head.S                      |  521 ++++++++++
+ arch/arm64/kernel/hw_breakpoint.c             |  880 ++++++++++++++++
+ arch/arm64/kernel/io.c                        |   64 ++
+ arch/arm64/kernel/irq.c                       |   84 ++
+ arch/arm64/kernel/kuser32.S                   |   77 ++
+ arch/arm64/kernel/module.c                    |  456 ++++++++
+ arch/arm64/kernel/perf_event.c                | 1368 +++++++++++++++++++++++++
+ arch/arm64/kernel/process.c                   |  416 ++++++++
+ arch/arm64/kernel/ptrace.c                    |  834 +++++++++++++++
+ arch/arm64/kernel/setup.c                     |  357 +++++++
+ arch/arm64/kernel/signal.c                    |  436 ++++++++
+ arch/arm64/kernel/signal32.c                  |  876 ++++++++++++++++
+ arch/arm64/kernel/smp.c                       |  469 +++++++++
+ arch/arm64/kernel/stacktrace.c                |  127 +++
+ arch/arm64/kernel/sys.c                       |  138 +++
+ arch/arm64/kernel/sys32.S                     |  283 +++++
+ arch/arm64/kernel/sys_compat.c                |  177 ++++
+ arch/arm64/kernel/time.c                      |   65 ++
+ arch/arm64/kernel/traps.c                     |  357 +++++++
+ arch/arm64/kernel/vdso.c                      |  261 +++++
+ arch/arm64/kernel/vdso/.gitignore             |    2 +
+ arch/arm64/kernel/vdso/Makefile               |   63 ++
+ arch/arm64/kernel/vdso/gen_vdso_offsets.sh    |   15 +
+ arch/arm64/kernel/vdso/gettimeofday.S         |  242 +++++
+ arch/arm64/kernel/vdso/note.S                 |   28 +
+ arch/arm64/kernel/vdso/sigreturn.S            |   37 +
+ arch/arm64/kernel/vdso/vdso.S                 |   33 +
+ arch/arm64/kernel/vdso/vdso.lds.S             |  100 ++
+ arch/arm64/kernel/vmlinux.lds.S               |  146 +++
+ arch/arm64/lib/Makefile                       |    5 +
+ arch/arm64/lib/bitops.c                       |   25 +
+ arch/arm64/lib/clear_page.S                   |   39 +
+ arch/arm64/lib/clear_user.S                   |   58 ++
+ arch/arm64/lib/copy_from_user.S               |   66 ++
+ arch/arm64/lib/copy_in_user.S                 |   63 ++
+ arch/arm64/lib/copy_page.S                    |   46 +
+ arch/arm64/lib/copy_to_user.S                 |   61 ++
+ arch/arm64/lib/delay.c                        |   55 +
+ arch/arm64/lib/getuser.S                      |   75 ++
+ arch/arm64/lib/putuser.S                      |   73 ++
+ arch/arm64/lib/strncpy_from_user.S            |   50 +
+ arch/arm64/lib/strnlen_user.S                 |   47 +
+ arch/arm64/mm/Kconfig                         |    5 +
+ arch/arm64/mm/Makefile                        |    6 +
+ arch/arm64/mm/cache.S                         |  279 +++++
+ arch/arm64/mm/context.c                       |  159 +++
+ arch/arm64/mm/copypage.c                      |   34 +
+ arch/arm64/mm/dma-mapping.c                   |  208 ++++
+ arch/arm64/mm/extable.c                       |   17 +
+ arch/arm64/mm/fault.c                         |  534 ++++++++++
+ arch/arm64/mm/flush.c                         |  132 +++
+ arch/arm64/mm/init.c                          |  416 ++++++++
+ arch/arm64/mm/ioremap.c                       |   84 ++
+ arch/arm64/mm/mm.h                            |    2 +
+ arch/arm64/mm/mmap.c                          |  144 +++
+ arch/arm64/mm/mmu.c                           |  395 +++++++
+ arch/arm64/mm/pgd.c                           |   49 +
+ arch/arm64/mm/proc-macros.S                   |   55 +
+ arch/arm64/mm/proc-syms.c                     |   31 +
+ arch/arm64/mm/proc.S                          |  193 ++++
+ arch/arm64/mm/tlb.S                           |   71 ++
+ drivers/clocksource/Kconfig                   |    5 +
+ drivers/clocksource/Makefile                  |    1 +
+ drivers/clocksource/arm_generic.c             |  309 ++++++
+ include/clocksource/arm_generic.h             |   21 +
+ init/Kconfig                                  |    3 +-
+ kernel/sysctl.c                               |    2 +-
+ lib/Kconfig.debug                             |    6 +-
+ tools/perf/perf.h                             |    6 +
+ 168 files changed, 22089 insertions(+), 4 deletions(-)
