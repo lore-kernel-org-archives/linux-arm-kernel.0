@@ -1,103 +1,151 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 14 Aug 2012 22:43:42 +0200
-Subject: [PATCH v2 2/2] ARM: kirkwood: DT descriptor for Seagate FreeAgent
- Dockstar
-In-Reply-To: <1344977022-29037-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <20120814193613.GS22226@titan.lakedaemon.net>
- <1344977022-29037-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1344977022-29037-2-git-send-email-sebastian.hesselbarth@gmail.com>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Tue, 14 Aug 2012 23:01:02 +0200
+Subject: [PATCH v2 30/31] arm64: Build infrastructure
+In-Reply-To: <1344966752-16102-31-git-send-email-catalin.marinas@arm.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-31-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20120814210102.GA4386@merkur.ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the corresponding device tree descriptor for the
-Seagate FreeAgent Dockstar based on Kirkwood DT.
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> new file mode 100644
+> index 0000000..1ce3d04
+> --- /dev/null
+> +++ b/arch/arm64/Kconfig
+> @@ -0,0 +1,261 @@
+> +config ARM64
+> +	def_bool y
+> +	select OF
+> +	select OF_EARLY_FLATTREE
+> +	select IRQ_DOMAIN
+> +	select HAVE_AOUT
+> +	select HAVE_DMA_ATTRS
+> +	select HAVE_DMA_API_DEBUG
+> +	select HAVE_IDE
+> +	select HAVE_MEMBLOCK
+> +	select RTC_LIB
+> +	select SYS_SUPPORTS_APM_EMULATION
+> +	select HAVE_GENERIC_DMA_COHERENT
+> +	select GENERIC_IOMAP
+> +	select HAVE_IRQ_WORK
+> +	select HAVE_PERF_EVENTS
+> +	select HAVE_ARCH_TRACEHOOK
+> +	select PERF_USE_VMALLOC
+> +	select HAVE_HW_BREAKPOINT if PERF_EVENTS
+> +	select HAVE_GENERIC_HARDIRQS
+> +	select GENERIC_HARDIRQS_NO_DEPRECATED
+> +	select HAVE_SPARSE_IRQ
+> +	select SPARSE_IRQ
+> +	select GENERIC_IRQ_SHOW
+> +	select GENERIC_SMP_IDLE_THREAD
+> +	select NO_BOOTMEM
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
+If you keep this list sorted then merge conflicts are less likely.
 
-v2: rebased on git://git.infradead.org/users/jcooper/linux.git fixes-for-v3.6
 
- arch/arm/boot/dts/kirkwood-dockstar.dts |   57 +++++++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/Makefile.boot    |    1 +
- 2 files changed, 58 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-dockstar.dts
+> +	help
+> +	  ARM 64-bit (AArch64) Linux support.
+> +
+> +config 64BIT
+> +	def_bool y
+> +
+> +config ARCH_PHYS_ADDR_T_64BIT
+> +	def_bool y
+> +
+> +config HAVE_PWM
+> +	bool
+> +
+> +config SYS_SUPPORTS_APM_EMULATION
+> +	bool
+> +
+> +config NO_IOPORT
+> +	def_bool y
+> +
+> +config GENERIC_GPIO
+> +	bool
+> +
+> +config GENERIC_TIME_VSYSCALL
+> +	def_bool y
+Please use select like all other archs do.
 
-diff --git a/arch/arm/boot/dts/kirkwood-dockstar.dts b/arch/arm/boot/dts/kirkwood-dockstar.dts
-new file mode 100644
-index 0000000..08a5824
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-dockstar.dts
-@@ -0,0 +1,57 @@
-+/dts-v1/;
-+
-+/include/ "kirkwood.dtsi"
-+
-+/ {
-+	model = "Seagate FreeAgent Dockstar";
-+	compatible = "seagate,dockstar", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x8000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8 earlyprintk root=/dev/sda1 rootdelay=10";
-+	};
-+
-+	ocp at f1000000 {
-+		serial at 12000 {
-+			clock-frequency = <200000000>;
-+			status = "ok";
-+		};
-+
-+		nand at 3000000 {
-+			status = "okay";
-+
-+			partition at 0 {
-+				label = "u-boot";
-+				reg = <0x0000000 0x100000>;
-+				read-only;
-+			};
-+
-+			partition at 100000 {
-+				label = "uImage";
-+				reg = <0x0100000 0x400000>;
-+			};
-+
-+			partition at 500000 {
-+				label = "data";
-+				reg = <0x0500000 0xfb00000>;
-+			};
-+		};
-+	};
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		health {
-+			label = "status:green:health";
-+			gpios = <&gpio1 14 1>;
-+			linux,default-trigger = "default-on";
-+		};
-+		fault {
-+			label = "status:orange:fault";
-+			gpios = <&gpio1 15 1>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-kirkwood/Makefile.boot b/arch/arm/mach-kirkwood/Makefile.boot
-index e2ad358..ce1a285 100644
---- a/arch/arm/mach-kirkwood/Makefile.boot
-+++ b/arch/arm/mach-kirkwood/Makefile.boot
-@@ -12,3 +12,4 @@ dtb-$(CONFIG_MACH_TS219_DT)	+= kirkwood-ts219-6282.dtb
- dtb-$(CONFIG_MACH_GOFLEXNET_DT) += kirkwood-goflexnet.dtb
- dbt-$(CONFIG_MACH_LSXL_DT) += kirkwood-lschlv2.dtb
- dbt-$(CONFIG_MACH_LSXL_DT) += kirkwood-lsxhl.dtb
-+dtb-$(CONFIG_MACH_DOCKSTAR_DT) += kirkwood-dockstar.dtb
--- 
-1.7.10.4
+
+> +
+> +config GENERIC_CLOCKEVENTS
+> +	def_bool y
+Again - please use select.
+
+> +
+> +config STACKTRACE_SUPPORT
+> +	def_bool y
+> +
+> +config LOCKDEP_SUPPORT
+> +	def_bool y
+> +
+> +config TRACE_IRQFLAGS_SUPPORT
+> +	def_bool y
+> +
+> +config HARDIRQS_SW_RESEND
+> +	def_bool y
+Please use select.
+
+> +
+> +config GENERIC_IRQ_PROBE
+> +	def_bool y
+Please use select.
+
+> +
+> +config GENERIC_LOCKBREAK
+> +	def_bool y
+> +	depends on SMP && PREEMPT
+> +
+> +config RWSEM_GENERIC_SPINLOCK
+> +	def_bool y
+> +
+> +config RWSEM_XCHGADD_ALGORITHM
+> +	bool
+> +
+> +config ARCH_HAS_ILOG2_U32
+> +	bool
+> +
+> +config ARCH_HAS_ILOG2_U64
+> +	bool
+> +
+> +config ARCH_HAS_CPUFREQ
+> +	bool
+> +	help
+> +	  Internal node to signify that the ARCH has CPUFREQ support
+> +	  and that the relevant menu configurations are displayed for
+> +	  it.
+> +
+> +config GENERIC_HWEIGHT
+> +	def_bool y
+> +
+> +config GENERIC_CSUM
+> +        def_bool y
+> +
+> +config GENERIC_CALIBRATE_DELAY
+> +	def_bool y
+> +
+> +config ZONE_DMA32
+> +	def_bool y
+> +
+> +config ARCH_DMA_ADDR_T_64BIT
+> +	def_bool y
+> +
+> +config NEED_DMA_MAP_STATE
+> +	def_bool y
+> +
+> +config NEED_SG_DMA_LENGTH
+> +	def_bool y
+> +
+> +config SWIOTLB
+> +	def_bool y
+> +
+> +config IOMMU_HELPER
+> +	def_bool SWIOTLB
+> +
+
+
+	Sam
