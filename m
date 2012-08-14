@@ -1,309 +1,72 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 14 Aug 2012 18:30:43 +0530
-Subject: [PATCH 2/2] ARM: da850/omap-l138: Add EVM specific code for VPIF
- to work
-In-Reply-To: <1343115786-15801-3-git-send-email-prabhakar.lad@ti.com>
-References: <1343115786-15801-1-git-send-email-prabhakar.lad@ti.com>
- <1343115786-15801-3-git-send-email-prabhakar.lad@ti.com>
-Message-ID: <502A4BFB.9020407@ti.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 14 Aug 2012 15:49:14 +0200
+Subject: [PATCH 00/23] work in progress: SPI controller w/DMA SAM9X5
+Message-ID: <1344952177-18385-1-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prabhakar,
+Nicolas,
+I said that I had some work done on sam9g35-ek, here is the spi part, based
+on your and Jean-Christophe work.
+You have to enable CONFIG_ARCH_AT91SAM9X5 to get it work.
 
-On 7/24/2012 1:13 PM, Prabhakar Lad wrote:
-> From: Manjunath Hadli <manjunath.hadli@ti.com>
-> 
-> Include the expander settings to select VPIF peripheral on
-> UI card and add registration call in EVM init. Also add platform
-> data to configure display and capture devices.
-> 
-> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> ---
->  arch/arm/mach-davinci/Kconfig           |    9 ++
->  arch/arm/mach-davinci/board-da850-evm.c |  195 +++++++++++++++++++++++++++++++
->  2 files changed, 204 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-> index 32d837d..19ee4ee 100644
-> --- a/arch/arm/mach-davinci/Kconfig
-> +++ b/arch/arm/mach-davinci/Kconfig
-> @@ -190,6 +190,15 @@ config DA850_UI_RMII
->  	  NOTE: Please take care while choosing this option, MII PHY will
->  	  not be functional if RMII mode is selected.
->  
-> +config DA850_UI_SD_VIDEO_PORT
-> +	bool "Video Port Interface"
-> +	help
-> +	  Say Y if you want to use Video Port Interface (VPIF) on the
-> +	  DA850/OMAP-L138 EVM. The Video decoders/encoders are found on the
-> +	  UI daughter card that is supplied with the EVM.
-> +	  NOTE: Please make sure to disable RMII and CLCD options when you
-> +	  select Video Port Interface.
+The goal of this patchset is to share the work I've done, it's not ready
+for upstream, but it may save some time.
 
-RMII is in the same choice block as this so it is not possible to have
-RMII enabled along with video port selection. On the CLCD, it will be
-good to register only one of CLCD or video and print a warning if user
-enabled both. davinci_evm_init() in
-arch/arm/mach-davinci/board-dm644x-evm.c has an example of this.
+It's based on 3.6-rc1 + Jean-Christophe's pinctrl patchset.
 
-> +
->  endchoice
->  
->  config DA850_WL12XX
-> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> index 0149fb4..1f5d2c1 100644
-> --- a/arch/arm/mach-davinci/board-da850-evm.c
-> +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> @@ -45,6 +45,8 @@
->  #include <mach/aemif.h>
->  #include <mach/spi.h>
->  
-> +#include <media/tvp514x.h>
-> +
->  #define DA850_EVM_PHY_ID		"davinci_mdio-0:00"
->  #define DA850_LCD_PWR_PIN		GPIO_TO_PIN(2, 8)
->  #define DA850_LCD_BL_PIN		GPIO_TO_PIN(2, 15)
-> @@ -121,6 +123,12 @@ static struct spi_board_info da850evm_spi_info[] = {
->  	},
->  };
->  
-> +#define TVP5147_CH0		"tvp514x-0"
-> +#define TVP5147_CH1		"tvp514x-1"
-> +
-> +#define VPIF_STATUS		0x002c
-> +#define VPIF_STATUS_CLR		0x0030
-> +
->  #ifdef CONFIG_MTD
->  static void da850_evm_m25p80_notify_add(struct mtd_info *mtd)
->  {
-> @@ -452,6 +460,15 @@ static void da850_evm_ui_keys_init(unsigned gpio)
->  	}
->  }
->  
-> +#ifdef CONFIG_DA850_UI_SD_VIDEO_PORT
-> +static inline void da850_evm_setup_video_port(int video_sel)
-> +{
-> +	gpio_set_value_cansleep(video_sel, 0);
-> +}
-> +#else
-> +static inline void da850_evm_setup_video_port(int video_sel) { }
-> +#endif
-> +
->  static int da850_evm_ui_expander_setup(struct i2c_client *client, unsigned gpio,
->  						unsigned ngpio, void *c)
->  {
-> @@ -497,6 +514,8 @@ static int da850_evm_ui_expander_setup(struct i2c_client *client, unsigned gpio,
->  
->  	da850_evm_setup_emac_rmii(sel_a);
->  
-> +	da850_evm_setup_video_port(sel_c);
-> +
->  	return 0;
->  
->  exp_setup_keys_fail:
-> @@ -1149,6 +1168,151 @@ static __init int da850_evm_init_cpufreq(void)
->  static __init int da850_evm_init_cpufreq(void) { return 0; }
->  #endif
->  
-> +/* Retaining these APIs, since the VPIF drivers do not check NULL handlers */
-> +static int da850_set_vpif_clock(int mux_mode, int hd)
-> +{
-> +	return 0;
-> +}
-> +
-> +static int da850_setup_vpif_input_channel_mode(int mux_mode)
-> +{
-> +	return 0;
-> +}
-> +
-> +int da850_vpif_setup_input_path(int ch, const char *name)
-> +{
-> +	return 0;
-> +}
+Best Regards,
+Richard.
 
-Why not enhance the VPIF driver to handle NULL values for these instead?
+Jean-Christophe PLAGNIOL-VILLARD (3):
+  of: add dma-mask binding
+  of_spi: add generic binding support to specify cs gpio
+  spi/atmel: add DT support
 
-> +
-> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
-> +/* VPIF capture configuration */
-> +static struct tvp514x_platform_data tvp5146_pdata = {
-> +	.clk_polarity = 0,
-> +	.hs_polarity = 1,
-> +	.vs_polarity = 1
-> +};
-> +#endif
-> +
-> +#define TVP514X_STD_ALL (V4L2_STD_NTSC | V4L2_STD_PAL)
-> +
-> +static struct vpif_subdev_info da850_vpif_capture_sdev_info[] = {
-> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
+Nicolas Ferre (6):
+  spi/atmel_spi: trivial: change some comments
+  spi/atmel_spi: add physical base address
+  spi/atmel_spi: call unmapping on transfers buffers
+  spi/atmel_spi: status information passed through controller data
+  spi/atmel_spi: add flag to controller data for lock operations
+  spi/atmel_spi: add dmaengine support
 
-Why not just continue with the previous #ifdef
-CONFIG_DA850_UI_SD_VIDEO_PORT?
+Richard Genoud (14):
+  spi-atmel: update with dmaengine interface
+  spi-atmel: fix __init/__devinit sections mismatch
+  spi-atmel: Fix spi-atmel driver to adapt to slave_config changes
+  AT91 DMA OF support
+  add at91sam9x5 Kconfig ARCH/SOC link
+  spi-atmel: add DMA OF support
+  [BUG] SPI: array out of bound => no CS
+  [BUG] atmel-spi && DMA: OOPS if buffer > 4400 bytes
+  sam9x5: declare SPI clocks
+  spi-atmel: add sam9x5 SPI in device tree
+  spi-atmel: add dma support in sam9x5 device tree
+  spi-atmel OF: complete documentation
+  spi-atmel: complete DMA slave OF documentation
+  sam9x5ek DTS: enable SPI dataflash
 
-> +	{
-> +		.name	= TVP5147_CH0,
-> +		.board_info = {
-> +			I2C_BOARD_INFO("tvp5146", 0x5d),
-> +			.platform_data = &tvp5146_pdata,
-> +		},
-> +		.input = INPUT_CVBS_VI2B,
-> +		.output = OUTPUT_10BIT_422_EMBEDDED_SYNC,
-> +		.can_route = 1,
-> +		.vpif_if = {
-> +			.if_type = VPIF_IF_BT656,
-> +			.hd_pol = 1,
-> +			.vd_pol = 1,
-> +			.fid_pol = 0,
-> +		},
-> +	},
-> +	{
-> +		.name	= TVP5147_CH1,
-> +		.board_info = {
-> +			I2C_BOARD_INFO("tvp5146", 0x5c),
-> +			.platform_data = &tvp5146_pdata,
-> +		},
-> +		.input = INPUT_SVIDEO_VI2C_VI1C,
-> +		.output = OUTPUT_10BIT_422_EMBEDDED_SYNC,
-> +		.can_route = 1,
-> +		.vpif_if = {
-> +			.if_type = VPIF_IF_BT656,
-> +			.hd_pol = 1,
-> +			.vd_pol = 1,
-> +			.fid_pol = 0,
-> +		},
-> +	},
-> +#endif
-> +};
-> +
-> +static const struct vpif_input da850_ch0_inputs[] = {
-> +	{
-> +		.input = {
-> +			.index = 0,
-> +			.name = "Composite",
-> +			.type = V4L2_INPUT_TYPE_CAMERA,
-> +			.std = TVP514X_STD_ALL,
-> +		},
-> +		.subdev_name = TVP5147_CH0,
-> +	},
-> +};
-> +
-> +static const struct vpif_input da850_ch1_inputs[] = {
-> +	{
-> +		.input = {
-> +			.index = 0,
-> +			.name = "S-Video",
-> +			.type = V4L2_INPUT_TYPE_CAMERA,
-> +			.std = TVP514X_STD_ALL,
-> +		},
-> +		.subdev_name = TVP5147_CH1,
-> +	},
-> +};
-> +
-> +static struct vpif_capture_config da850_vpif_capture_config = {
-> +	.setup_input_channel_mode = da850_setup_vpif_input_channel_mode,
-> +	.setup_input_path = da850_vpif_setup_input_path,
-> +	.subdev_info = da850_vpif_capture_sdev_info,
-> +	.subdev_count = ARRAY_SIZE(da850_vpif_capture_sdev_info),
-> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
+ Documentation/devicetree/bindings/spi/spi-bus.txt  |    6 +
+ .../devicetree/bindings/spi/spi_atmel.txt          |   46 ++
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |   42 ++
+ arch/arm/boot/dts/at91sam9x5ek.dtsi                |   10 +
+ arch/arm/mach-at91/Kconfig                         |    4 +
+ arch/arm/mach-at91/at91sam9x5.c                    |    3 +
+ arch/arm/mach-at91/include/mach/at_hdmac.h         |    1 +
+ drivers/of/Kconfig                                 |    4 +
+ drivers/of/Makefile                                |    1 +
+ drivers/of/of_atmel.c                              |  111 ++++
+ drivers/of/platform.c                              |   23 +-
+ drivers/spi/Kconfig                                |    9 +
+ drivers/spi/spi-atmel.c                            |  611 ++++++++++++++++++--
+ drivers/spi/spi.c                                  |   55 ++-
+ include/linux/of_atmel.h                           |   29 +
+ include/linux/spi/spi.h                            |    3 +
+ 16 files changed, 914 insertions(+), 44 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi_atmel.txt
+ create mode 100644 drivers/of/of_atmel.c
+ create mode 100644 include/linux/of_atmel.h
 
-Same here.
-
-> +	.chan_config[0] = {
-> +		.inputs = da850_ch0_inputs,
-> +		.input_count = ARRAY_SIZE(da850_ch0_inputs),
-> +	},
-> +	.chan_config[1] = {
-> +		.inputs = da850_ch1_inputs,
-> +		.input_count = ARRAY_SIZE(da850_ch1_inputs),
-> +	},
-> +#endif
-> +	.card_name      = "DA850/OMAP-L138 Video Capture",
-> +};
-> +
-> +/* VPIF display configuration */
-> +static struct vpif_subdev_info da850_vpif_subdev[] = {
-> +	{
-> +		.name	= "adv7343",
-> +		.board_info = {
-> +			I2C_BOARD_INFO("adv7343", 0x2a),
-> +		},
-> +	},
-> +};
-> +
-> +static const char const *vpif_output[] = {
-> +	"Composite",
-> +	"Component",
-> +	"S-Video",
-> +};
-> +
-> +static struct vpif_display_config da850_vpif_display_config = {
-> +	.set_clock	= da850_set_vpif_clock,
-> +	.subdevinfo	= da850_vpif_subdev,
-> +	.subdev_count	= ARRAY_SIZE(da850_vpif_subdev),
-> +	.output		= vpif_output,
-> +	.output_count	= ARRAY_SIZE(vpif_output),
-> +	.card_name	= "DA850/OMAP-L138 Video Display",
-> +};
-> +
-> +#if defined(CONFIG_VIDEO_DAVINCI_VPIF_DISPLAY) ||\
-> +		defined(CONFIG_VIDEO_DAVINCI_VPIF_DISPLAY_MODULE)
-> +#define HAS_VPIF_DISPLAY 1
-> +#else
-> +#define HAS_VPIF_DISPLAY 0
-> +#endif
-> +
-> +#if defined(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) ||\
-> +		defined(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE_MODULE)
-> +#define HAS_VPIF_CAPTURE 1
-> +#else
-> +#define HAS_VPIF_CAPTURE 0
-> +#endif
-> +
->  #ifdef CONFIG_DA850_WL12XX
->  
->  static void wl12xx_set_power(int index, bool power_on)
-> @@ -1375,6 +1539,37 @@ static __init void da850_evm_init(void)
->  		pr_warning("da850_evm_init: suspend registration failed: %d\n",
->  				ret);
->  
-> +	if (HAS_VPIF_DISPLAY || HAS_VPIF_CAPTURE) {
-> +		ret = da850_register_vpif();
-> +		if (ret)
-> +			pr_warn("da850_evm_init: VPIF setup failed: %d\n",
-> +				   ret);
-> +	}
-> +
-> +	if (HAS_VPIF_CAPTURE) {
-> +		ret = davinci_cfg_reg_list(da850_vpif_capture_pins);
-> +		if (ret)
-> +			pr_warn("da850_evm_init: VPIF capture mux failed:%d\n",
-> +					ret);
-> +
-> +		ret = da850_register_vpif_capture(&da850_vpif_capture_config);
-> +		if (ret)
-> +			pr_warn("da850_evm_init: VPIF capture setup" \
-> +			" failed: %d\n", ret);
-
-Please don't break print messages.
-
-> +	}
-> +
-> +	if (HAS_VPIF_DISPLAY) {
-> +		ret = davinci_cfg_reg_list(da850_vpif_display_pins);
-> +		if (ret)
-> +			pr_warn("da850_evm_init : VPIF capture mux failed" \
-> +			": %d\n", ret);
-> +
-> +		ret = da850_register_vpif_display(&da850_vpif_display_config);
-> +		if (ret)
-> +			pr_warn("da850_evm_init: VPIF display setup" \
-> +			" failed: %d\n", ret);
-
-Same here.
-
-Thanks,
-Sekhar
+-- 
+1.7.2.5
