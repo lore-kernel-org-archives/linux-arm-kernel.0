@@ -1,111 +1,35 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 14 Aug 2012 19:48:47 +0530
-Subject: [PATCHv6 05/24] i2c: omap: simplify omap_i2c_ack_stat()
+Date: Tue, 14 Aug 2012 19:48:56 +0530
+Subject: [PATCHv6 14/24] i2c: omap: always return IRQ_HANDLED
 In-Reply-To: <1344953946-13005-1-git-send-email-shubhrajyoti@ti.com>
 References: <1344953946-13005-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1344953946-13005-6-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1344953946-13005-15-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-stat & BIT(1) is the same as BIT(1), so let's
-simplify things a bit by removing "stat &" from
-all omap_i2c_ack_stat() calls.
-
-Code snippet (extremely simplified):
-
-if (stat & NACK) {
-        ...
-        omap_i2c_ack_stat(dev, stat & NACK);
-}
-
-if (stat & RDR) {
-        ...
-        omap_i2c_ack_stat(dev, stat & RDR);
-}
-
-and so on. The tricky place is only WRT errata handling, for example:
-
-if (*stat & (NACK | AL)) {
-        omap_i2c_ack_stat(dev, *stat & (XRDY | XDR));
-        ...
-}
-
-but in this case, the errata says we must clear XRDY and XDR if that
-errata triggers, so if they just got enabled or not, it doesn't matter.
-
-Another tricky place is RDR | RRDY (likewise for XDR | XRDY):
-
-if (stat & (RDR | RRDY)) {
-        ...
-        omap_i2c_ack_stat(dev, stat & (RDR | RRDY));
-}
-
-again here there will be no issues because those IRQs never fire
-simultaneously and one will only after after we have handled the
-previous, that's because the same FIFO is used anyway and we won't shift
-data into FIFO until we tell the IP "hey, I'm done with the FIFO, you
-can shift more data"
+otherwise we could get our IRQ line disabled due
+to many spurious IRQs.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
-Reviewed-by : Santosh Shilimkar <santosh.shilimkar@ti.com>
-[Added the explaination from the discurssion to the commit logs]
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   19 ++++++++++---------
- 1 files changed, 10 insertions(+), 9 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index dbc5a3c..8009095 100644
+index 80ebcf5..eb6898b 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -731,7 +731,7 @@ static int errata_omap3_i462(struct omap_i2c_dev *dev, u16 *stat, int *err)
- 
- 	while (--timeout && !(*stat & OMAP_I2C_STAT_XUDF)) {
- 		if (*stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
--			omap_i2c_ack_stat(dev, *stat & (OMAP_I2C_STAT_XRDY |
-+			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_XRDY |
- 							OMAP_I2C_STAT_XDR));
- 			return -ETIMEDOUT;
+@@ -962,7 +962,7 @@ complete:
  		}
-@@ -792,10 +792,11 @@ complete:
- 		 */
- 		if (stat & (OMAP_I2C_STAT_ARDY | OMAP_I2C_STAT_NACK |
- 					OMAP_I2C_STAT_AL)) {
--			omap_i2c_ack_stat(dev, stat &
--				(OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR |
--				OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR |
--				OMAP_I2C_STAT_ARDY));
-+			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_RRDY |
-+						OMAP_I2C_STAT_RDR |
-+						OMAP_I2C_STAT_XRDY |
-+						OMAP_I2C_STAT_XDR |
-+						OMAP_I2C_STAT_ARDY));
- 			omap_i2c_complete_cmd(dev, err);
- 			return IRQ_HANDLED;
- 		}
-@@ -842,8 +843,8 @@ complete:
- 					}
- 				}
- 			}
--			omap_i2c_ack_stat(dev,
--				stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR));
-+			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_RRDY |
-+						OMAP_I2C_STAT_RDR));
- 			continue;
- 		}
+ 	} while (stat);
  
-@@ -890,8 +891,8 @@ complete:
+-	return count ? IRQ_HANDLED : IRQ_NONE;
++	return IRQ_HANDLED;
+ }
  
- 				omap_i2c_write_reg(dev, OMAP_I2C_DATA_REG, w);
- 			}
--			omap_i2c_ack_stat(dev,
--				stat & (OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR));
-+			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_XRDY |
-+						OMAP_I2C_STAT_XDR));
- 			continue;
- 		}
- 
+ static const struct i2c_algorithm omap_i2c_algo = {
 -- 
 1.7.5.4
