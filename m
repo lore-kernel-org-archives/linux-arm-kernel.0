@@ -1,160 +1,32 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Aug 2012 18:52:30 +0100
-Subject: [PATCH v2 29/31] arm64: Miscellaneous header files
+Date: Tue, 14 Aug 2012 18:52:28 +0100
+Subject: [PATCH v2 27/31] arm64: Loadable modules
 In-Reply-To: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
 References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1344966752-16102-30-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1344966752-16102-28-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces a few AArch64-specific header files together with
-Kbuild entries for generic headers.
+From: Will Deacon <will.deacon@arm.com>
+
+This patch adds support for loadable modules. Loadable modules are
+loaded 64MB below the kernel image due to branch relocation restrictions
+(see Documentation/arm64/memory.txt).
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/Kbuild        |   51 ++++++++++
- arch/arm64/include/asm/barrier.h     |   52 ++++++++++
- arch/arm64/include/asm/bitsperlong.h |   23 +++++
- arch/arm64/include/asm/byteorder.h   |   21 ++++
- arch/arm64/include/asm/cmpxchg.h     |  180 ++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/compiler.h    |   30 ++++++
- arch/arm64/include/asm/exception.h   |   23 +++++
- arch/arm64/include/asm/exec.h        |   23 +++++
- arch/arm64/include/asm/fcntl.h       |   29 ++++++
- arch/arm64/include/asm/system_misc.h |   54 ++++++++++
- 10 files changed, 486 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/Kbuild
- create mode 100644 arch/arm64/include/asm/barrier.h
- create mode 100644 arch/arm64/include/asm/bitsperlong.h
- create mode 100644 arch/arm64/include/asm/byteorder.h
- create mode 100644 arch/arm64/include/asm/cmpxchg.h
- create mode 100644 arch/arm64/include/asm/compiler.h
- create mode 100644 arch/arm64/include/asm/exception.h
- create mode 100644 arch/arm64/include/asm/exec.h
- create mode 100644 arch/arm64/include/asm/fcntl.h
- create mode 100644 arch/arm64/include/asm/system_misc.h
+ arch/arm64/include/asm/module.h |   23 ++
+ arch/arm64/kernel/module.c      |  456 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 479 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm64/include/asm/module.h
+ create mode 100644 arch/arm64/kernel/module.c
 
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
 new file mode 100644
-index 0000000..35924a5
+index 0000000..e80e232
 --- /dev/null
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -0,0 +1,51 @@
-+include include/asm-generic/Kbuild.asm
-+
-+header-y += hwcap.h
-+
-+generic-y += bug.h
-+generic-y += bugs.h
-+generic-y += checksum.h
-+generic-y += cputime.h
-+generic-y += current.h
-+generic-y += delay.h
-+generic-y += div64.h
-+generic-y += dma.h
-+generic-y += emergency-restart.h
-+generic-y += errno.h
-+generic-y += ftrace.h
-+generic-y += hw_irq.h
-+generic-y += ioctl.h
-+generic-y += ioctls.h
-+generic-y += ipcbuf.h
-+generic-y += irq_regs.h
-+generic-y += kdebug.h
-+generic-y += kmap_types.h
-+generic-y += linkage.h
-+generic-y += local.h
-+generic-y += local64.h
-+generic-y += mman.h
-+generic-y += msgbuf.h
-+generic-y += mutex.h
-+generic-y += pci.h
-+generic-y += percpu.h
-+generic-y += poll.h
-+generic-y += posix_types.h
-+generic-y += resource.h
-+generic-y += scatterlist.h
-+generic-y += sections.h
-+generic-y += segment.h
-+generic-y += sembuf.h
-+generic-y += serial.h
-+generic-y += shmbuf.h
-+generic-y += sizes.h
-+generic-y += socket.h
-+generic-y += sockios.h
-+generic-y += string.h
-+generic-y += switch_to.h
-+generic-y += swab.h
-+generic-y += termbits.h
-+generic-y += termios.h
-+generic-y += topology.h
-+generic-y += types.h
-+generic-y += unaligned.h
-+generic-y += user.h
-diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-new file mode 100644
-index 0000000..d4a6333
---- /dev/null
-+++ b/arch/arm64/include/asm/barrier.h
-@@ -0,0 +1,52 @@
-+/*
-+ * Based on arch/arm/include/asm/barrier.h
-+ *
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_BARRIER_H
-+#define __ASM_BARRIER_H
-+
-+#ifndef __ASSEMBLY__
-+
-+#define sev()		asm volatile("sev" : : : "memory")
-+#define wfe()		asm volatile("wfe" : : : "memory")
-+#define wfi()		asm volatile("wfi" : : : "memory")
-+
-+#define isb()		asm volatile("isb" : : : "memory")
-+#define dsb()		asm volatile("dsb sy" : : : "memory")
-+
-+#define mb()		dsb()
-+#define rmb()		asm volatile("dsb ld" : : : "memory")
-+#define wmb()		asm volatile("dsb st" : : : "memory")
-+
-+#ifndef CONFIG_SMP
-+#define smp_mb()	barrier()
-+#define smp_rmb()	barrier()
-+#define smp_wmb()	barrier()
-+#else
-+#define smp_mb()	asm volatile("dmb ish" : : : "memory")
-+#define smp_rmb()	asm volatile("dmb ishld" : : : "memory")
-+#define smp_wmb()	asm volatile("dmb ishst" : : : "memory")
-+#endif
-+
-+#define read_barrier_depends()		do { } while(0)
-+#define smp_read_barrier_depends()	do { } while(0)
-+
-+#define set_mb(var, value)	do { var = value; smp_mb(); } while (0)
-+#define nop()		asm volatile("nop");
-+
-+#endif	/* __ASSEMBLY__ */
-+
-+#endif	/* __ASM_BARRIER_H */
-diff --git a/arch/arm64/include/asm/bitsperlong.h b/arch/arm64/include/asm/bitsperlong.h
-new file mode 100644
-index 0000000..fce9c29
---- /dev/null
-+++ b/arch/arm64/include/asm/bitsperlong.h
++++ b/arch/arm64/include/asm/module.h
 @@ -0,0 +1,23 @@
 +/*
 + * Copyright (C) 2012 ARM Ltd.
@@ -171,22 +43,24 @@ index 0000000..fce9c29
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#ifndef __ASM_BITSPERLONG_H
-+#define __ASM_BITSPERLONG_H
++#ifndef __ASM_MODULE_H
++#define __ASM_MODULE_H
 +
-+#define __BITS_PER_LONG 64
++#include <asm-generic/module.h>
 +
-+#include <asm-generic/bitsperlong.h>
++#define MODULE_ARCH_VERMAGIC	"aarch64"
 +
-+#endif	/* __ASM_BITSPERLONG_H */
-diff --git a/arch/arm64/include/asm/byteorder.h b/arch/arm64/include/asm/byteorder.h
++#endif /* __ASM_MODULE_H */
+diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
 new file mode 100644
-index 0000000..2b92046
+index 0000000..ca0e3d5
 --- /dev/null
-+++ b/arch/arm64/include/asm/byteorder.h
-@@ -0,0 +1,21 @@
++++ b/arch/arm64/kernel/module.c
+@@ -0,0 +1,456 @@
 +/*
-+ * Copyright (C) 2012 ARM Ltd.
++ * AArch64 loadable module support.
++ *
++ * Copyright (C) 2012 ARM Limited
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -199,385 +73,443 @@ index 0000000..2b92046
 + *
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Author: Will Deacon <will.deacon@arm.com>
 + */
-+#ifndef __ASM_BYTEORDER_H
-+#define __ASM_BYTEORDER_H
 +
-+#include <linux/byteorder/little_endian.h>
++#include <linux/bitops.h>
++#include <linux/elf.h>
++#include <linux/gfp.h>
++#include <linux/kernel.h>
++#include <linux/mm.h>
++#include <linux/moduleloader.h>
++#include <linux/vmalloc.h>
 +
-+#endif	/* __ASM_BYTEORDER_H */
-diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
-new file mode 100644
-index 0000000..dc50de7
---- /dev/null
-+++ b/arch/arm64/include/asm/cmpxchg.h
-@@ -0,0 +1,180 @@
-+/*
-+ * Based on arch/arm/include/asm/cmpxchg.h
-+ *
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_CMPXCHG_H
-+#define __ASM_CMPXCHG_H
-+
-+#include <linux/irqflags.h>
-+#include <asm/barrier.h>
-+
-+static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
++void *module_alloc(unsigned long size)
 +{
-+	extern void __bad_xchg(volatile void *, int);
-+	unsigned long ret, tmp;
++	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
++				    GFP_KERNEL, PAGE_KERNEL_EXEC, -1,
++				    __builtin_return_address(0));
++}
 +
-+	switch (size) {
-+	case 1:
-+		asm volatile("//	__xchg1\n"
-+		"1:	ldaxrb	%w0, [%3]\n"
-+		"	stlxrb	%w1, %w2, [%3]\n"
-+		"	cbnz	%w1, 1b\n"
-+			: "=&r" (ret), "=&r" (tmp)
-+			: "r" (x), "r" (ptr)
-+			: "memory", "cc");
-+		break;
-+	case 2:
-+		asm volatile("//	__xchg2\n"
-+		"1:	ldaxrh	%w0, [%3]\n"
-+		"	stlxrh	%w1, %w2, [%3]\n"
-+		"	cbnz	%w1, 1b\n"
-+			: "=&r" (ret), "=&r" (tmp)
-+			: "r" (x), "r" (ptr)
-+			: "memory", "cc");
-+		break;
-+	case 4:
-+		asm volatile("//	__xchg4\n"
-+		"1:	ldaxr	%w0, [%3]\n"
-+		"	stlxr	%w1, %w2, [%3]\n"
-+		"	cbnz	%w1, 1b\n"
-+			: "=&r" (ret), "=&r" (tmp)
-+			: "r" (x), "r" (ptr)
-+			: "memory", "cc");
-+		break;
-+	case 8:
-+		asm volatile("//	__xchg8\n"
-+		"1:	ldaxr	%0, [%3]\n"
-+		"	stlxr	%w1, %2, [%3]\n"
-+		"	cbnz	%w1, 1b\n"
-+			: "=&r" (ret), "=&r" (tmp)
-+			: "r" (x), "r" (ptr)
-+			: "memory", "cc");
-+		break;
-+	default:
-+		__bad_xchg(ptr, size), ret = 0;
-+		break;
++enum aarch64_reloc_op {
++	RELOC_OP_NONE,
++	RELOC_OP_ABS,
++	RELOC_OP_PREL,
++	RELOC_OP_PAGE,
++};
++
++static u64 do_reloc(enum aarch64_reloc_op reloc_op, void *place, u64 val)
++{
++	switch (reloc_op) {
++	case RELOC_OP_ABS:
++		return val;
++	case RELOC_OP_PREL:
++		return val - (u64)place;
++	case RELOC_OP_PAGE:
++		return (val & ~0xfff) - ((u64)place & ~0xfff);
++	case RELOC_OP_NONE:
++		return 0;
 +	}
 +
-+	return ret;
++	pr_err("do_reloc: unknown relocation operation %d\n", reloc_op);
++	return 0;
 +}
 +
-+#define xchg(ptr,x) \
-+	((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
-+
-+/*
-+ * cmpxchg operations.
-+ */
-+extern void __bad_cmpxchg(volatile void *ptr, int size);
-+
-+static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
-+				      unsigned long new, int size)
++static int reloc_data(enum aarch64_reloc_op op, void *place, u64 val, int len)
 +{
-+	unsigned long oldval, res;
++	u64 imm_mask = (1 << len) - 1;
++	s64 sval = do_reloc(op, place, val);
 +
-+	switch (size) {
-+	case 1:
-+		do {
-+			asm volatile("// __cmpxchg1\n"
-+			"	ldxrb	%w1, [%2]\n"
-+			"	mov	%w0, #0\n"
-+			"	cmp	%w1, %w3\n"
-+			"	b.ne	1f\n"
-+			"	stxrb	%w0, %w4, [%2]\n"
-+			"1:\n"
-+				: "=&r" (res), "=&r" (oldval)
-+				: "r" (ptr), "Ir" (old), "r" (new)
-+				: "cc");
-+		} while (res);
++	switch (len) {
++	case 16:
++		*(s16 *)place = sval;
 +		break;
-+
-+	case 2:
-+		do {
-+			asm volatile("// __cmpxchg2\n"
-+			"	ldxrh	%w1, [%2]\n"
-+			"	mov	%w0, #0\n"
-+			"	cmp	%w1, %w3\n"
-+			"	b.ne	1f\n"
-+			"	stxrh	%w0, %w4, [%2]\n"
-+			"1:\n"
-+				: "=&r" (res), "=&r" (oldval)
-+				: "r" (ptr), "Ir" (old), "r" (new)
-+				: "memory", "cc");
-+		} while (res);
++	case 32:
++		*(s32 *)place = sval;
 +		break;
-+
-+	case 4:
-+		do {
-+			asm volatile("// __cmpxchg4\n"
-+			"	ldxr	%w1, [%2]\n"
-+			"	mov	%w0, #0\n"
-+			"	cmp	%w1, %w3\n"
-+			"	b.ne	1f\n"
-+			"	stxr	%w0, %w4, [%2]\n"
-+			"1:\n"
-+				: "=&r" (res), "=&r" (oldval)
-+				: "r" (ptr), "Ir" (old), "r" (new)
-+				: "cc");
-+		} while (res);
++	case 64:
++		*(s64 *)place = sval;
 +		break;
-+
-+	case 8:
-+		do {
-+			asm volatile("// __cmpxchg8\n"
-+			"	ldxr	%1, [%2]\n"
-+			"	mov	%w0, #0\n"
-+			"	cmp	%1, %3\n"
-+			"	b.ne	1f\n"
-+			"	stxr	%w0, %4, [%2]\n"
-+			"1:\n"
-+				: "=&r" (res), "=&r" (oldval)
-+				: "r" (ptr), "Ir" (old), "r" (new)
-+				: "cc");
-+		} while (res);
-+		break;
-+
 +	default:
-+		__bad_cmpxchg(ptr, size);
-+		oldval = 0;
++		pr_err("Invalid length (%d) for data relocation\n", len);
++		return 0;
 +	}
 +
-+	return oldval;
++	/*
++	 * Extract the upper value bits (including the sign bit) and
++	 * shift them to bit 0.
++	 */
++	sval = (s64)(sval & ~(imm_mask >> 1)) >> (len - 1);
++
++	/*
++	 * Overflow has occurred if the value is not representable in
++	 * len bits (i.e the bottom len bits are not sign-extended and
++	 * the top bits are not all zero).
++	 */
++	if ((u64)(sval + 1) > 2)
++		return -ERANGE;
++
++	return 0;
 +}
 +
-+static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
-+					 unsigned long new, int size)
++enum aarch64_imm_type {
++	INSN_IMM_MOVNZ,
++	INSN_IMM_MOVK,
++	INSN_IMM_ADR,
++	INSN_IMM_26,
++	INSN_IMM_19,
++	INSN_IMM_16,
++	INSN_IMM_14,
++	INSN_IMM_12,
++	INSN_IMM_9,
++};
++
++static u32 encode_insn_immediate(enum aarch64_imm_type type, u32 insn, u64 imm)
 +{
-+	unsigned long ret;
++	u32 immlo, immhi, lomask, himask, mask;
++	int shift;
 +
-+	smp_mb();
-+	ret = __cmpxchg(ptr, old, new, size);
-+	smp_mb();
++	switch (type) {
++	case INSN_IMM_MOVNZ:
++		/*
++		 * For signed MOVW relocations, we have to manipulate the
++		 * instruction encoding depending on whether or not the
++		 * immediate is less than zero.
++		 */
++		insn &= ~(3 << 29);
++		if ((s64)imm >= 0) {
++			/* >=0: Set the instruction to MOVZ (opcode 10b). */
++			insn |= 2 << 29;
++		} else {
++			/*
++			 * <0: Set the instruction to MOVN (opcode 00b).
++			 *     Since we've masked the opcode already, we
++			 *     don't need to do anything other than
++			 *     inverting the new immediate field.
++			 */
++			imm = ~imm;
++		}
++	case INSN_IMM_MOVK:
++		mask = BIT(16) - 1;
++		shift = 5;
++		break;
++	case INSN_IMM_ADR:
++		lomask = 0x3;
++		himask = 0x7ffff;
++		immlo = imm & lomask;
++		imm >>= 2;
++		immhi = imm & himask;
++		imm = (immlo << 24) | (immhi);
++		mask = (lomask << 24) | (himask);
++		shift = 5;
++		break;
++	case INSN_IMM_26:
++		mask = BIT(26) - 1;
++		shift = 0;
++		break;
++	case INSN_IMM_19:
++		mask = BIT(19) - 1;
++		shift = 5;
++		break;
++	case INSN_IMM_16:
++		mask = BIT(16) - 1;
++		shift = 5;
++		break;
++	case INSN_IMM_14:
++		mask = BIT(14) - 1;
++		shift = 5;
++		break;
++	case INSN_IMM_12:
++		mask = BIT(12) - 1;
++		shift = 10;
++		break;
++	case INSN_IMM_9:
++		mask = BIT(9) - 1;
++		shift = 12;
++		break;
++	default:
++		pr_err("encode_insn_immediate: unknown immediate encoding %d\n",
++			type);
++		return 0;
++	}
 +
-+	return ret;
++	/* Update the immediate field. */
++	insn &= ~(mask << shift);
++	insn |= (imm & mask) << shift;
++
++	return insn;
 +}
 +
-+#define cmpxchg(ptr,o,n)						\
-+	((__typeof__(*(ptr)))__cmpxchg_mb((ptr),			\
-+					  (unsigned long)(o),		\
-+					  (unsigned long)(n),		\
-+					  sizeof(*(ptr))))
++static int reloc_insn_movw(enum aarch64_reloc_op op, void *place, u64 val,
++			   int lsb, enum aarch64_imm_type imm_type)
++{
++	u64 imm, limit = 0;
++	s64 sval;
++	u32 insn = *(u32 *)place;
 +
-+#define cmpxchg_local(ptr,o,n)						\
-+	((__typeof__(*(ptr)))__cmpxchg((ptr),				\
-+				       (unsigned long)(o),		\
-+				       (unsigned long)(n),		\
-+				       sizeof(*(ptr))))
++	sval = do_reloc(op, place, val);
++	sval >>= lsb;
++	imm = sval & 0xffff;
 +
-+#endif	/* __ASM_CMPXCHG_H */
-diff --git a/arch/arm64/include/asm/compiler.h b/arch/arm64/include/asm/compiler.h
-new file mode 100644
-index 0000000..ee35fd0
---- /dev/null
-+++ b/arch/arm64/include/asm/compiler.h
-@@ -0,0 +1,30 @@
-+/*
-+ * Based on arch/arm/include/asm/compiler.h
-+ *
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_COMPILER_H
-+#define __ASM_COMPILER_H
++	/* Update the instruction with the new encoding. */
++	*(u32 *)place = encode_insn_immediate(imm_type, insn, imm);
 +
-+/*
-+ * This is used to ensure the compiler did actually allocate the register we
-+ * asked it for some inline assembly sequences.  Apparently we can't trust the
-+ * compiler from one version to another so a bit of paranoia won't hurt.  This
-+ * string is meant to be concatenated with the inline asm string and will
-+ * cause compilation to stop on mismatch.  (for details, see gcc PR 15089)
-+ */
-+#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
++	/* Shift out the immediate field. */
++	sval >>= 16;
 +
-+#endif	/* __ASM_COMPILER_H */
-diff --git a/arch/arm64/include/asm/exception.h b/arch/arm64/include/asm/exception.h
-new file mode 100644
-index 0000000..ac63519
---- /dev/null
-+++ b/arch/arm64/include/asm/exception.h
-@@ -0,0 +1,23 @@
-+/*
-+ * Based on arch/arm/include/asm/exception.h
-+ *
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_EXCEPTION_H
-+#define __ASM_EXCEPTION_H
++	/*
++	 * For unsigned immediates, the overflow check is straightforward.
++	 * For signed immediates, the sign bit is actually the bit past the
++	 * most significant bit of the field.
++	 * The INSN_IMM_16 immediate type is unsigned.
++	 */
++	if (imm_type != INSN_IMM_16) {
++		sval++;
++		limit++;
++	}
 +
-+#define __exception	__attribute__((section(".exception.text")))
++	/* Check the upper bits depending on the sign of the immediate. */
++	if ((u64)sval > limit)
++		return -ERANGE;
 +
-+#endif	/* __ASM_EXCEPTION_H */
-diff --git a/arch/arm64/include/asm/exec.h b/arch/arm64/include/asm/exec.h
-new file mode 100644
-index 0000000..db0563c
---- /dev/null
-+++ b/arch/arm64/include/asm/exec.h
-@@ -0,0 +1,23 @@
-+/*
-+ * Based on arch/arm/include/asm/exec.h
-+ *
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_EXEC_H
-+#define __ASM_EXEC_H
++	return 0;
++}
 +
-+extern unsigned long arch_align_stack(unsigned long sp);
++static int reloc_insn_imm(enum aarch64_reloc_op op, void *place, u64 val,
++			  int lsb, int len, enum aarch64_imm_type imm_type)
++{
++	u64 imm, imm_mask;
++	s64 sval;
++	u32 insn = *(u32 *)place;
 +
-+#endif	/* __ASM_EXEC_H */
-diff --git a/arch/arm64/include/asm/fcntl.h b/arch/arm64/include/asm/fcntl.h
-new file mode 100644
-index 0000000..cd2e630
---- /dev/null
-+++ b/arch/arm64/include/asm/fcntl.h
-@@ -0,0 +1,29 @@
-+/*
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_FCNTL_H
-+#define __ASM_FCNTL_H
++	/* Calculate the relocation value. */
++	sval = do_reloc(op, place, val);
++	sval >>= lsb;
 +
-+/*
-+ * Using our own definitions for AArch32 (compat) support.
-+ */
-+#define O_DIRECTORY	 040000	/* must be a directory */
-+#define O_NOFOLLOW	0100000	/* don't follow links */
-+#define O_DIRECT	0200000	/* direct disk access hint - currently ignored */
-+#define O_LARGEFILE	0400000
++	/* Extract the value bits and shift them to bit 0. */
++	imm_mask = (BIT(lsb + len) - 1) >> lsb;
++	imm = sval & imm_mask;
 +
-+#include <asm-generic/fcntl.h>
++	/* Update the instruction's immediate field. */
++	*(u32 *)place = encode_insn_immediate(imm_type, insn, imm);
 +
-+#endif
-diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-new file mode 100644
-index 0000000..95e4072
---- /dev/null
-+++ b/arch/arm64/include/asm/system_misc.h
-@@ -0,0 +1,54 @@
-+/*
-+ * Based on arch/arm/include/asm/system_misc.h
-+ *
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_SYSTEM_MISC_H
-+#define __ASM_SYSTEM_MISC_H
++	/*
++	 * Extract the upper value bits (including the sign bit) and
++	 * shift them to bit 0.
++	 */
++	sval = (s64)(sval & ~(imm_mask >> 1)) >> (len - 1);
 +
-+#ifndef __ASSEMBLY__
++	/*
++	 * Overflow has occurred if the upper bits are not all equal to
++	 * the sign bit of the value.
++	 */
++	if ((u64)(sval + 1) >= 2)
++		return -ERANGE;
 +
-+#include <linux/compiler.h>
-+#include <linux/linkage.h>
-+#include <linux/irqflags.h>
++	return 0;
++}
 +
-+struct pt_regs;
++int apply_relocate_add(Elf64_Shdr *sechdrs,
++		       const char *strtab,
++		       unsigned int symindex,
++		       unsigned int relsec,
++		       struct module *me)
++{
++	unsigned int i;
++	int ovf;
++	bool overflow_check;
++	Elf64_Sym *sym;
++	void *loc;
++	u64 val;
++	Elf64_Rela *rel = (void *)sechdrs[relsec].sh_addr;
 +
-+void die(const char *msg, struct pt_regs *regs, int err);
++	for (i = 0; i < sechdrs[relsec].sh_size / sizeof(*rel); i++) {
++		/* loc corresponds to P in the AArch64 ELF document. */
++		loc = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
++			+ rel[i].r_offset;
 +
-+struct siginfo;
-+void arm64_notify_die(const char *str, struct pt_regs *regs,
-+		      struct siginfo *info, int err);
++		/* sym is the ELF symbol we're referring to. */
++		sym = (Elf64_Sym *)sechdrs[symindex].sh_addr
++			+ ELF64_R_SYM(rel[i].r_info);
 +
-+void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
-+					     struct pt_regs *),
-+			   int sig, int code, const char *name);
++		/* val corresponds to (S + A) in the AArch64 ELF document. */
++		val = sym->st_value + rel[i].r_addend;
 +
-+struct mm_struct;
-+extern void show_pte(struct mm_struct *mm, unsigned long addr);
-+extern void __show_regs(struct pt_regs *);
++		/* Check for overflow by default. */
++		overflow_check = true;
 +
-+void soft_restart(unsigned long);
-+extern void (*pm_restart)(const char *cmd);
++		/* Perform the static relocation. */
++		switch (ELF64_R_TYPE(rel[i].r_info)) {
++		/* Null relocations. */
++		case R_ARM_NONE:
++		case R_AARCH64_NONE:
++			ovf = 0;
++			break;
 +
-+#define UDBG_UNDEFINED	(1 << 0)
-+#define UDBG_SYSCALL	(1 << 1)
-+#define UDBG_BADABORT	(1 << 2)
-+#define UDBG_SEGV	(1 << 3)
-+#define UDBG_BUS	(1 << 4)
++		/* Data relocations. */
++		case R_AARCH64_ABS64:
++			overflow_check = false;
++			ovf = reloc_data(RELOC_OP_ABS, loc, val, 64);
++			break;
++		case R_AARCH64_ABS32:
++			ovf = reloc_data(RELOC_OP_ABS, loc, val, 32);
++			break;
++		case R_AARCH64_ABS16:
++			ovf = reloc_data(RELOC_OP_ABS, loc, val, 16);
++			break;
++		case R_AARCH64_PREL64:
++			overflow_check = false;
++			ovf = reloc_data(RELOC_OP_PREL, loc, val, 64);
++			break;
++		case R_AARCH64_PREL32:
++			ovf = reloc_data(RELOC_OP_PREL, loc, val, 32);
++			break;
++		case R_AARCH64_PREL16:
++			ovf = reloc_data(RELOC_OP_PREL, loc, val, 16);
++			break;
 +
-+#endif	/* __ASSEMBLY__ */
++		/* MOVW instruction relocations. */
++		case R_AARCH64_MOVW_UABS_G0_NC:
++			overflow_check = false;
++		case R_AARCH64_MOVW_UABS_G0:
++			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 0,
++					      INSN_IMM_16);
++			break;
++		case R_AARCH64_MOVW_UABS_G1_NC:
++			overflow_check = false;
++		case R_AARCH64_MOVW_UABS_G1:
++			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 16,
++					      INSN_IMM_16);
++			break;
++		case R_AARCH64_MOVW_UABS_G2_NC:
++			overflow_check = false;
++		case R_AARCH64_MOVW_UABS_G2:
++			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 32,
++					      INSN_IMM_16);
++			break;
++		case R_AARCH64_MOVW_UABS_G3:
++			/* We're using the top bits so we can't overflow. */
++			overflow_check = false;
++			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 48,
++					      INSN_IMM_16);
++			break;
++		case R_AARCH64_MOVW_SABS_G0:
++			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 0,
++					      INSN_IMM_MOVNZ);
++			break;
++		case R_AARCH64_MOVW_SABS_G1:
++			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 16,
++					      INSN_IMM_MOVNZ);
++			break;
++		case R_AARCH64_MOVW_SABS_G2:
++			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 32,
++					      INSN_IMM_MOVNZ);
++			break;
++		case R_AARCH64_MOVW_PREL_G0_NC:
++			overflow_check = false;
++			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 0,
++					      INSN_IMM_MOVK);
++			break;
++		case R_AARCH64_MOVW_PREL_G0:
++			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 0,
++					      INSN_IMM_MOVNZ);
++			break;
++		case R_AARCH64_MOVW_PREL_G1_NC:
++			overflow_check = false;
++			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 16,
++					      INSN_IMM_MOVK);
++			break;
++		case R_AARCH64_MOVW_PREL_G1:
++			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 16,
++					      INSN_IMM_MOVNZ);
++			break;
++		case R_AARCH64_MOVW_PREL_G2_NC:
++			overflow_check = false;
++			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 32,
++					      INSN_IMM_MOVK);
++			break;
++		case R_AARCH64_MOVW_PREL_G2:
++			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 32,
++					      INSN_IMM_MOVNZ);
++			break;
++		case R_AARCH64_MOVW_PREL_G3:
++			/* We're using the top bits so we can't overflow. */
++			overflow_check = false;
++			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 48,
++					      INSN_IMM_MOVNZ);
++			break;
 +
-+#endif	/* __ASM_SYSTEM_MISC_H */
++		/* Immediate instruction relocations. */
++		case R_AARCH64_LD_PREL_LO19:
++			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 19,
++					     INSN_IMM_19);
++			break;
++		case R_AARCH64_ADR_PREL_LO21:
++			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 0, 21,
++					     INSN_IMM_ADR);
++			break;
++		case R_AARCH64_ADR_PREL_PG_HI21_NC:
++			overflow_check = false;
++		case R_AARCH64_ADR_PREL_PG_HI21:
++			ovf = reloc_insn_imm(RELOC_OP_PAGE, loc, val, 12, 21,
++					     INSN_IMM_ADR);
++			break;
++		case R_AARCH64_ADD_ABS_LO12_NC:
++		case R_AARCH64_LDST8_ABS_LO12_NC:
++			overflow_check = false;
++			ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 0, 12,
++					     INSN_IMM_12);
++			break;
++		case R_AARCH64_LDST16_ABS_LO12_NC:
++			overflow_check = false;
++			ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 1, 11,
++					     INSN_IMM_12);
++			break;
++		case R_AARCH64_LDST32_ABS_LO12_NC:
++			overflow_check = false;
++			ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 2, 10,
++					     INSN_IMM_12);
++			break;
++		case R_AARCH64_LDST64_ABS_LO12_NC:
++			overflow_check = false;
++			ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 3, 9,
++					     INSN_IMM_12);
++			break;
++		case R_AARCH64_LDST128_ABS_LO12_NC:
++			overflow_check = false;
++			ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 4, 8,
++					     INSN_IMM_12);
++			break;
++		case R_AARCH64_TSTBR14:
++			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 14,
++					     INSN_IMM_14);
++			break;
++		case R_AARCH64_CONDBR19:
++			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 19,
++					     INSN_IMM_19);
++			break;
++		case R_AARCH64_JUMP26:
++		case R_AARCH64_CALL26:
++			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 26,
++					     INSN_IMM_26);
++			break;
++
++		default:
++			pr_err("module %s: unsupported RELA relocation: %llu\n",
++			       me->name, ELF64_R_TYPE(rel[i].r_info));
++			return -ENOEXEC;
++		}
++
++		if (overflow_check && ovf == -ERANGE)
++			goto overflow;
++
++	}
++
++	return 0;
++
++overflow:
++	pr_err("module %s: overflow in relocation type %d val %Lx\n",
++	       me->name, (int)ELF64_R_TYPE(rel[i].r_info), val);
++	return -ENOEXEC;
++}
