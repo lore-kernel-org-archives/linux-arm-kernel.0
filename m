@@ -1,46 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Aug 2012 09:37:46 +0000
-Subject: [GIT PULL] io.h clean-up for PCI
-In-Reply-To: <20120814091407.GB26070@mudshark.cambridge.arm.com>
-References: <50049285.1060100@gmail.com>
- <CAOesGMiWuqqprQ8GGzAgpFNE7k=qvPJpsx7MiVv2CKsSqyiQiw@mail.gmail.com>
- <20120814091407.GB26070@mudshark.cambridge.arm.com>
-Message-ID: <201208140937.46974.arnd@arndb.de>
+Date: Tue, 14 Aug 2012 09:42:54 +0000
+Subject: [PATCH 5/8] mfd: Provide the PRCMU with its own IRQ domain
+In-Reply-To: <CACRpkdZ7bMBytyDppV2sB1d1sUbDpPRqAQVOq8k4UOYdmg+Mkw@mail.gmail.com>
+References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
+ <1344527635-6163-6-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZ7bMBytyDppV2sB1d1sUbDpPRqAQVOq8k4UOYdmg+Mkw@mail.gmail.com>
+Message-ID: <201208140942.54773.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 August 2012, Will Deacon wrote:
-> On Mon, Jul 30, 2012 at 12:07:56AM +0100, Olof Johansson wrote:
-> > > On 07/16/2012 05:15 PM, Rob Herring wrote:
-> > > The following changes since commit 84a1caf1453c3d44050bd22db958af4a7f99315c:
-> > >
-> > >   Linux 3.5-rc7 (2012-07-14 15:40:28 -0700)
-> > >
-> > > are available in the git repository at:
-> > >
-> > >   git://sources.calxeda.com/kernel/linux.git io-cleanup-pci-v2
-> > 
-> > I have replaced the current staging/io-cleanup-pci contents with the
-> > above branch. Ideally I'd like to see a fix to the issues on
-> > integrator before we send it up though.
+On Tuesday 14 August 2012, Linus Walleij wrote:
 > 
-> I finally got to the bottom of the issues I was seeing on my integrator
-> board with these patches. The ATX PSU I was using doesn't have a thumping
-> great resistor across it and, since the board draws very little current, the
-> voltage is all over the shop. Of the 3 PCI slots, this made one completely
-> unusable, one slightly temperamental and the other `rock solid'.
+> On Thu, Aug 9, 2012 at 5:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> I was using the temperamental slot and the probing of the VGA console
-> combined with the later PCI initialisation somehow pushes it over the edge
-> and locks up the board. Swapping the PSU for one with an artifical load
-> across it makes all of the slots jump into life.
+> > +static struct irq_domain *db8500_irq_domain;
 > 
-> Late in the day, but I worked for this!:
+> So this is a good idea.
 > 
-> Tested-by: Will Deacon <will.deacon@arm.com>
+> > +int db8500_irq_get_virq(int irq);
+> 
+> And I'm sceptic about this business. Why isn't this physical-to virtual
+> mapping business confined to the core MFD driver? But enlighten me.
+> 
 
-Just to let you know, I've started getting the arm-soc tree into shape
-for v3.7, and the series is now scheduled for integration in the next
-merge window as a regular branch.
+I believe MFD does not (yet) know about IRQ domains. The wm8994
+and 88pm80x drivers do this slightly different by exporting
+a foo_request_irq() function that performs the mapping.
+
+Traditionally, an MFD would add an offset to the local IRQ number
+to put the VIRQ into the IRQ resource, but this doesn't work when
+you have domains other than legacy.
 
 	Arnd
