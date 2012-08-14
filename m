@@ -1,78 +1,56 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 14 Aug 2012 19:48:52 +0530
-Subject: [PATCHv6 10/24] i2c: omap: ack IRQ in parts
+Date: Tue, 14 Aug 2012 19:48:54 +0530
+Subject: [PATCHv6 12/24] i2c: omap: bus: add a receiver flag
 In-Reply-To: <1344953946-13005-1-git-send-email-shubhrajyoti@ti.com>
 References: <1344953946-13005-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1344953946-13005-11-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1344953946-13005-13-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-According to flow diagrams on OMAP TRMs,
-we should ACK the IRQ as they happen.
+that way we can ignore TX IRQs while in receiver
+mode and ignore RX IRQs while in transmitter mode.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
-[Ack the stat OMAP_I2C_STAT_AL in case of arbitration lost]
+[Remove unnecessary braces]
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   28 ++++++++++++++++------------
- 1 files changed, 16 insertions(+), 12 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 8b80799..0adbfb1 100644
+index e9907b5..fa54d41 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -850,21 +850,19 @@ omap_i2c_isr(int this_irq, void *dev_id)
- 		}
+@@ -199,6 +199,7 @@ struct omap_i2c_dev {
+ 						 */
+ 	u8			rev;
+ 	unsigned		b_hw:1;		/* bad h/w fixes */
++	unsigned		receiver:1;	/* true when we're in receiver mode */
+ 	u16			iestate;	/* Saved interrupt register */
+ 	u16			pscstate;
+ 	u16			scllstate;
+@@ -492,6 +493,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
  
- complete:
--		/*
--		 * Ack the stat in one go, but [R/X]DR and [R/X]RDY should be
--		 * acked after the data operation is complete.
--		 * Ref: TRM SWPU114Q Figure 18-31
--		 */
--		omap_i2c_write_reg(dev, OMAP_I2C_STAT_REG, stat &
--				~(OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR |
--				OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR));
--
--		if (stat & OMAP_I2C_STAT_NACK)
-+		if (stat & OMAP_I2C_STAT_NACK) {
- 			err |= OMAP_I2C_STAT_NACK;
-+			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
-+			omap_i2c_complete_cmd(dev, err);
-+			return IRQ_HANDLED;
-+		}
+ 	INIT_COMPLETION(dev->cmd_complete);
+ 	dev->cmd_err = 0;
++	dev->receiver = !!(msg->flags & I2C_M_RD);
  
- 		if (stat & OMAP_I2C_STAT_AL) {
- 			dev_err(dev->dev, "Arbitration lost\n");
- 			err |= OMAP_I2C_STAT_AL;
-+			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_AL);
-+			omap_i2c_complete_cmd(dev, err);
-+			return IRQ_HANDLED;
- 		}
+ 	w = OMAP_I2C_CON_EN | OMAP_I2C_CON_MST | OMAP_I2C_CON_STT;
  
- 		/*
-@@ -941,12 +939,18 @@ complete:
+@@ -837,6 +839,12 @@ omap_i2c_isr(int this_irq, void *dev_id)
+ 		stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+ 		stat &= bits;
  
- 		if (stat & OMAP_I2C_STAT_ROVR) {
- 			dev_err(dev->dev, "Receive overrun\n");
--			dev->cmd_err |= OMAP_I2C_STAT_ROVR;
-+			err |= OMAP_I2C_STAT_ROVR;
-+			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_ROVR);
-+			omap_i2c_complete_cmd(dev, err);
-+			return IRQ_HANDLED;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_XUDF) {
- 			dev_err(dev->dev, "Transmit underflow\n");
--			dev->cmd_err |= OMAP_I2C_STAT_XUDF;
-+			err |= OMAP_I2C_STAT_XUDF;
-+			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XUDF);
-+			omap_i2c_complete_cmd(dev, err);
-+			return IRQ_HANDLED;
- 		}
- 	} while (stat);
- 
++		/* If we're in receiver mode, ignore XDR/XRDY */
++		if (dev->receiver)
++			stat &= ~(OMAP_I2C_STAT_XDR | OMAP_I2C_STAT_XRDY);
++		else
++			stat &= ~(OMAP_I2C_STAT_RDR | OMAP_I2C_STAT_RRDY);
++
+ 		if (!stat) {
+ 			/* my work here is done */
+ 			return IRQ_HANDLED;
 -- 
 1.7.5.4
