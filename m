@@ -1,108 +1,49 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 14 Aug 2012 17:22:42 +0300
-Subject: [PATCH v2 14/14] ASoC: twl4030: Support for DT booted kernel
-In-Reply-To: <1344954162-7985-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1344954162-7985-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1344954162-7985-15-git-send-email-peter.ujfalusi@ti.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Tue, 14 Aug 2012 14:25:11 +0000
+Subject: [PATCH v2 0/4] Add AM33XX regulators device tree data
+In-Reply-To: <1343110735-10640-1-git-send-email-anilkumar@ti.com>
+References: <1343110735-10640-1-git-send-email-anilkumar@ti.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA12932@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the kernel has been booted with DT blob the platform data is NULL for
-the driver.
-We need to construct the pdata based on the DT information for runtime use.
+Hi Mark,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- sound/soc/codecs/twl4030.c |   57 +++++++++++++++++++++++++++++++++++++------
- 1 files changed, 49 insertions(+), 8 deletions(-)
+On Tue, Jul 24, 2012 at 11:48:51, AnilKumar, Chimata wrote:
+> This patch series add AM33XX regulators (tps65910/tps65217) device
+> tree data to am335x-evm and am335x-bone dts files. These patches
+> are based on Tony L "devel-dt" tree and tested on AM335x EVM and
+> Bone devices.
+> 
+> Changes from v1:
+> 	- Incorporated all Mark Brown's review comments on v1 by
+> 	  * moving all the regulator constraints to corresponding
+> 	    DTS file
+> 	  * Regulator constraints are added according to board.
+> 	- regulator name is added.
+> 
+> AnilKumar Ch (4):
+>   ARM: OMAP2+: AM33XX: Add tps65910 device tree data
+>   ARM: OMAP2+: AM33XX: Add tps65217 device tree data
+>   arm/dts: Add tps65910 regulator DT data to am335x-evm.dts
+>   arm/dts: Add tps65217 regulator DT data to am335x-bone.dts
+> 
+>  arch/arm/boot/dts/am335x-bone.dts |   28 ++++++++++++
+>  arch/arm/boot/dts/am335x-evm.dts  |   28 ++++++++++++
+>  arch/arm/boot/dts/tps65217.dtsi   |   56 ++++++++++++++++++++++++
+>  arch/arm/boot/dts/tps65910.dtsi   |   86 +++++++++++++++++++++++++++++++++++++
+>  4 files changed, 198 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/tps65217.dtsi
+>  create mode 100644 arch/arm/boot/dts/tps65910.dtsi
+> 
+> -- 
+> 1.7.9.5
 
-diff --git a/sound/soc/codecs/twl4030.c b/sound/soc/codecs/twl4030.c
-index 8b13d50..f13c91a 100644
---- a/sound/soc/codecs/twl4030.c
-+++ b/sound/soc/codecs/twl4030.c
-@@ -26,6 +26,8 @@
- #include <linux/pm.h>
- #include <linux/i2c.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
-+#include <linux/of_gpio.h>
- #include <linux/i2c/twl.h>
- #include <linux/slab.h>
- #include <linux/gpio.h>
-@@ -295,13 +297,59 @@ static inline void twl4030_reset_registers(struct snd_soc_codec *codec)
- 
- }
- 
--static void twl4030_init_chip(struct snd_soc_codec *codec)
-+static void twl4030_setup_pdata_of(struct twl4030_codec_data *pdata,
-+				   struct device_node *node)
-+{
-+	int value;
-+
-+	of_property_read_u32(node, "ti,digimic_delay",
-+			     &pdata->digimic_delay);
-+	of_property_read_u32(node, "ti,ramp_delay_value",
-+			     &pdata->ramp_delay_value);
-+	of_property_read_u32(node, "ti,offset_cncl_path",
-+			     &pdata->offset_cncl_path);
-+	if (!of_property_read_u32(node, "ti,hs_extmute", &value))
-+		pdata->hs_extmute = value;
-+
-+	pdata->hs_extmute_gpio = of_get_named_gpio(node,
-+						   "ti,hs_extmute_gpio", 0);
-+	if (gpio_is_valid(pdata->hs_extmute_gpio))
-+		pdata->hs_extmute = 1;
-+}
-+
-+static struct twl4030_codec_data *twl4030_get_pdata(struct snd_soc_codec *codec)
- {
- 	struct twl4030_codec_data *pdata = dev_get_platdata(codec->dev);
-+	struct device_node *twl4030_codec_node = NULL;
-+
-+#ifdef CONFIG_OF
-+	twl4030_codec_node = of_find_node_by_name(codec->dev->parent->of_node,
-+						  "codec");
-+#endif
-+
-+	if (!pdata && twl4030_codec_node) {
-+		pdata = devm_kzalloc(codec->dev,
-+				     sizeof(struct twl4030_codec_data),
-+				     GFP_KERNEL);
-+		if (!pdata) {
-+			dev_err(codec->dev, "Can not allocate memory\n");
-+			return NULL;
-+		}
-+		twl4030_setup_pdata_of(pdata, twl4030_codec_node);
-+	}
-+
-+	return pdata;
-+}
-+
-+static void twl4030_init_chip(struct snd_soc_codec *codec)
-+{
-+	struct twl4030_codec_data *pdata;
- 	struct twl4030_priv *twl4030 = snd_soc_codec_get_drvdata(codec);
- 	u8 reg, byte;
- 	int i = 0;
- 
-+	pdata = twl4030_get_pdata(codec);
-+
- 	if (pdata && pdata->hs_extmute &&
- 	    gpio_is_valid(pdata->hs_extmute_gpio)) {
- 		int ret;
-@@ -2284,13 +2332,6 @@ static struct snd_soc_codec_driver soc_codec_dev_twl4030 = {
- 
- static int __devinit twl4030_codec_probe(struct platform_device *pdev)
- {
--	struct twl4030_codec_data *pdata = pdev->dev.platform_data;
--
--	if (!pdata) {
--		dev_err(&pdev->dev, "platform_data is missing\n");
--		return -EINVAL;
--	}
--
- 	return snd_soc_register_codec(&pdev->dev, &soc_codec_dev_twl4030,
- 			twl4030_dai, ARRAY_SIZE(twl4030_dai));
- }
--- 
-1.7.8.6
+With the recent changes in the regulator core driver which disables all
+the regulators if always-on flag is not present. So I have to update
+these patch to add all the regulator nodes with always-on flag.
+
+I will submit the updated version of patch series.
+
+Regards
+AnilKumar
