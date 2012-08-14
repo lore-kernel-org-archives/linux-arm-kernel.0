@@ -1,1098 +1,225 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Tue, 14 Aug 2012 22:38:45 -0400
-Subject: [PATCH] mtd: kill MTD_NAND_VERIFY_WRITE
-Message-ID: <1344998325-3279-1-git-send-email-shijie8@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 14 Aug 2012 16:47:05 +0200
+Subject: [PATCH 13/23] AT91 DMA OF support
+In-Reply-To: <1344952177-18385-14-git-send-email-richard.genoud@gmail.com>
+References: <1344952177-18385-1-git-send-email-richard.genoud@gmail.com>
+ <1344952177-18385-14-git-send-email-richard.genoud@gmail.com>
+Message-ID: <502A64E9.2050706@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just as Artem suggested:
+Hi Richard,
 
-"Both UBI and JFFS2 are able to read verify what they wrote already.
-There are also MTD tests which do this verification. So I think there
-is no reason to keep this in the NAND layer, let alone wasting RAM in
-the driver to support this feature."
+I am not sure that this one will go further: there is an initiative to
+build a pretty generic DMA OF support... It takes time but it is
+progressing...
 
-So kill MTD_NAND_VERIFY_WRITE entirely.
+Anyway, there may have some bits to integrate in at_hdmac.c driver: I
+will have a closer look later.
 
-Signed-off-by: Huang Shijie <shijie8@gmail.com>
----
- drivers/mtd/nand/Kconfig         |    9 -----
- drivers/mtd/nand/ams-delta.c     |   13 --------
- drivers/mtd/nand/au1550nd.c      |   46 ---------------------------
- drivers/mtd/nand/bcm_umi_nand.c  |   22 -------------
- drivers/mtd/nand/cafe_nand.c     |    7 ----
- drivers/mtd/nand/cmx270_nand.c   |   13 --------
- drivers/mtd/nand/diskonchip.c    |   63 --------------------------------------
- drivers/mtd/nand/fsl_elbc_nand.c |   36 ---------------------
- drivers/mtd/nand/fsl_ifc_nand.c  |   41 ------------------------
- drivers/mtd/nand/gpio.c          |   39 -----------------------
- drivers/mtd/nand/lpc32xx_slc.c   |   19 -----------
- drivers/mtd/nand/mpc5121_nfc.c   |   22 -------------
- drivers/mtd/nand/mxc_nand.c      |    9 -----
- drivers/mtd/nand/nand_base.c     |   53 --------------------------------
- drivers/mtd/nand/nandsim.c       |   16 ---------
- drivers/mtd/nand/ndfc.c          |   13 --------
- drivers/mtd/nand/nuc900_nand.c   |   17 ----------
- drivers/mtd/nand/omap2.c         |   23 --------------
- drivers/mtd/nand/pxa3xx_nand.c   |    7 ----
- drivers/mtd/nand/r852.c          |   22 -------------
- drivers/mtd/nand/sh_flctl.c      |   11 ------
- drivers/mtd/nand/socrates_nand.c |   19 -----------
- drivers/mtd/nand/tmio_nand.c     |   13 --------
- drivers/mtd/nand/txx9ndfmc.c     |   13 --------
- include/linux/mtd/nand.h         |    3 --
- 25 files changed, 0 insertions(+), 549 deletions(-)
+Thanks,
 
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 588e989..0ca7257 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -22,15 +22,6 @@ menuconfig MTD_NAND
- 
- if MTD_NAND
- 
--config MTD_NAND_VERIFY_WRITE
--	bool "Verify NAND page writes"
--	help
--	  This adds an extra check when data is written to the flash. The
--	  NAND flash device internally checks only bits transitioning
--	  from 1 to 0. There is a rare possibility that even though the
--	  device thinks the write was successful, a bit could have been
--	  flipped accidentally due to device wear or something else.
--
- config MTD_NAND_BCH
- 	tristate
- 	select BCH
-diff --git a/drivers/mtd/nand/ams-delta.c b/drivers/mtd/nand/ams-delta.c
-index 861ca8f..2d73f23 100644
---- a/drivers/mtd/nand/ams-delta.c
-+++ b/drivers/mtd/nand/ams-delta.c
-@@ -103,18 +103,6 @@ static void ams_delta_read_buf(struct mtd_info *mtd, u_char *buf, int len)
- 		buf[i] = ams_delta_read_byte(mtd);
- }
- 
--static int ams_delta_verify_buf(struct mtd_info *mtd, const u_char *buf,
--				int len)
--{
--	int i;
--
--	for (i=0; i<len; i++)
--		if (buf[i] != ams_delta_read_byte(mtd))
--			return -EFAULT;
--
--	return 0;
--}
--
- /*
-  * Command control function
-  *
-@@ -233,7 +221,6 @@ static int __devinit ams_delta_init(struct platform_device *pdev)
- 	this->read_byte = ams_delta_read_byte;
- 	this->write_buf = ams_delta_write_buf;
- 	this->read_buf = ams_delta_read_buf;
--	this->verify_buf = ams_delta_verify_buf;
- 	this->cmd_ctrl = ams_delta_hwcontrol;
- 	if (gpio_request(AMS_DELTA_GPIO_PIN_NAND_RB, "nand_rdy") == 0) {
- 		this->dev_ready = ams_delta_nand_ready;
-diff --git a/drivers/mtd/nand/au1550nd.c b/drivers/mtd/nand/au1550nd.c
-index 9f609d2..5c47b20 100644
---- a/drivers/mtd/nand/au1550nd.c
-+++ b/drivers/mtd/nand/au1550nd.c
-@@ -141,28 +141,6 @@ static void au_read_buf(struct mtd_info *mtd, u_char *buf, int len)
- }
- 
- /**
-- * au_verify_buf -  Verify chip data against buffer
-- * @mtd:	MTD device structure
-- * @buf:	buffer containing the data to compare
-- * @len:	number of bytes to compare
-- *
-- * verify function for 8bit buswidth
-- */
--static int au_verify_buf(struct mtd_info *mtd, const u_char *buf, int len)
--{
--	int i;
--	struct nand_chip *this = mtd->priv;
--
--	for (i = 0; i < len; i++) {
--		if (buf[i] != readb(this->IO_ADDR_R))
--			return -EFAULT;
--		au_sync();
--	}
--
--	return 0;
--}
--
--/**
-  * au_write_buf16 -  write buffer to chip
-  * @mtd:	MTD device structure
-  * @buf:	data buffer
-@@ -205,29 +183,6 @@ static void au_read_buf16(struct mtd_info *mtd, u_char *buf, int len)
- 	}
- }
- 
--/**
-- * au_verify_buf16 -  Verify chip data against buffer
-- * @mtd:	MTD device structure
-- * @buf:	buffer containing the data to compare
-- * @len:	number of bytes to compare
-- *
-- * verify function for 16bit buswidth
-- */
--static int au_verify_buf16(struct mtd_info *mtd, const u_char *buf, int len)
--{
--	int i;
--	struct nand_chip *this = mtd->priv;
--	u16 *p = (u16 *) buf;
--	len >>= 1;
--
--	for (i = 0; i < len; i++) {
--		if (p[i] != readw(this->IO_ADDR_R))
--			return -EFAULT;
--		au_sync();
--	}
--	return 0;
--}
--
- /* Select the chip by setting nCE to low */
- #define NAND_CTL_SETNCE		1
- /* Deselect the chip by setting nCE to high */
-@@ -516,7 +471,6 @@ static int __devinit au1550nd_probe(struct platform_device *pdev)
- 	this->read_word = au_read_word;
- 	this->write_buf = (pd->devwidth) ? au_write_buf16 : au_write_buf;
- 	this->read_buf = (pd->devwidth) ? au_read_buf16 : au_read_buf;
--	this->verify_buf = (pd->devwidth) ? au_verify_buf16 : au_verify_buf;
- 
- 	ret = nand_scan(&ctx->info, 1);
- 	if (ret) {
-diff --git a/drivers/mtd/nand/bcm_umi_nand.c b/drivers/mtd/nand/bcm_umi_nand.c
-index c855e7c..3fcbcbc 100644
---- a/drivers/mtd/nand/bcm_umi_nand.c
-+++ b/drivers/mtd/nand/bcm_umi_nand.c
-@@ -332,27 +332,6 @@ static void bcm_umi_nand_read_buf(struct mtd_info *mtd, u_char * buf, int len)
- #endif
- }
- 
--static uint8_t readbackbuf[NAND_MAX_PAGESIZE];
--static int bcm_umi_nand_verify_buf(struct mtd_info *mtd, const u_char * buf,
--				   int len)
--{
--	/*
--	 * Try to readback page with ECC correction. This is necessary
--	 * for MLC parts which may have permanently stuck bits.
--	 */
--	struct nand_chip *chip = mtd->priv;
--	int ret = chip->ecc.read_page(mtd, chip, readbackbuf, 0, 0);
--	if (ret < 0)
--		return -EFAULT;
--	else {
--		if (memcmp(readbackbuf, buf, len) == 0)
--			return 0;
--
--		return -EFAULT;
--	}
--	return 0;
--}
--
- static int __devinit bcm_umi_nand_probe(struct platform_device *pdev)
- {
- 	struct nand_chip *this;
-@@ -416,7 +395,6 @@ static int __devinit bcm_umi_nand_probe(struct platform_device *pdev)
- 
- 	this->write_buf = bcm_umi_nand_write_buf;
- 	this->read_buf = bcm_umi_nand_read_buf;
--	this->verify_buf = bcm_umi_nand_verify_buf;
- 
- 	this->cmd_ctrl = bcm_umi_nand_hwcontrol;
- 	this->ecc.mode = NAND_ECC_HW;
-diff --git a/drivers/mtd/nand/cafe_nand.c b/drivers/mtd/nand/cafe_nand.c
-index 08248a0..2bb7170 100644
---- a/drivers/mtd/nand/cafe_nand.c
-+++ b/drivers/mtd/nand/cafe_nand.c
-@@ -576,13 +576,6 @@ static int cafe_nand_write_page(struct mtd_info *mtd, struct nand_chip *chip,
- 		status = chip->waitfunc(mtd, chip);
- 	}
- 
--#ifdef CONFIG_MTD_NAND_VERIFY_WRITE
--	/* Send command to read back the data */
--	chip->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
--
--	if (chip->verify_buf(mtd, buf, mtd->writesize))
--		return -EIO;
--#endif
- 	return 0;
- }
- 
-diff --git a/drivers/mtd/nand/cmx270_nand.c b/drivers/mtd/nand/cmx270_nand.c
-index 1024bfc..39b2ef8 100644
---- a/drivers/mtd/nand/cmx270_nand.c
-+++ b/drivers/mtd/nand/cmx270_nand.c
-@@ -76,18 +76,6 @@ static void cmx270_read_buf(struct mtd_info *mtd, u_char *buf, int len)
- 		*buf++ = readl(this->IO_ADDR_R) >> 16;
- }
- 
--static int cmx270_verify_buf(struct mtd_info *mtd, const u_char *buf, int len)
--{
--	int i;
--	struct nand_chip *this = mtd->priv;
--
--	for (i=0; i<len; i++)
--		if (buf[i] != (u_char)(readl(this->IO_ADDR_R) >> 16))
--			return -EFAULT;
--
--	return 0;
--}
--
- static inline void nand_cs_on(void)
- {
- 	gpio_set_value(GPIO_NAND_CS, 0);
-@@ -209,7 +197,6 @@ static int __init cmx270_init(void)
- 	this->read_byte = cmx270_read_byte;
- 	this->read_buf = cmx270_read_buf;
- 	this->write_buf = cmx270_write_buf;
--	this->verify_buf = cmx270_verify_buf;
- 
- 	/* Scan to find existence of the device */
- 	if (nand_scan (cmx270_nand_mtd, 1)) {
-diff --git a/drivers/mtd/nand/diskonchip.c b/drivers/mtd/nand/diskonchip.c
-index e2ca067..256eb30 100644
---- a/drivers/mtd/nand/diskonchip.c
-+++ b/drivers/mtd/nand/diskonchip.c
-@@ -376,19 +376,6 @@ static void doc2000_readbuf_dword(struct mtd_info *mtd, u_char *buf, int len)
- 	}
- }
- 
--static int doc2000_verifybuf(struct mtd_info *mtd, const u_char *buf, int len)
--{
--	struct nand_chip *this = mtd->priv;
--	struct doc_priv *doc = this->priv;
--	void __iomem *docptr = doc->virtadr;
--	int i;
--
--	for (i = 0; i < len; i++)
--		if (buf[i] != ReadDOC(docptr, 2k_CDSN_IO))
--			return -EFAULT;
--	return 0;
--}
--
- static uint16_t __init doc200x_ident_chip(struct mtd_info *mtd, int nr)
- {
- 	struct nand_chip *this = mtd->priv;
-@@ -526,26 +513,6 @@ static void doc2001_readbuf(struct mtd_info *mtd, u_char *buf, int len)
- 	buf[i] = ReadDOC(docptr, LastDataRead);
- }
- 
--static int doc2001_verifybuf(struct mtd_info *mtd, const u_char *buf, int len)
--{
--	struct nand_chip *this = mtd->priv;
--	struct doc_priv *doc = this->priv;
--	void __iomem *docptr = doc->virtadr;
--	int i;
--
--	/* Start read pipeline */
--	ReadDOC(docptr, ReadPipeInit);
--
--	for (i = 0; i < len - 1; i++)
--		if (buf[i] != ReadDOC(docptr, Mil_CDSN_IO)) {
--			ReadDOC(docptr, LastDataRead);
--			return i;
--		}
--	if (buf[i] != ReadDOC(docptr, LastDataRead))
--		return i;
--	return 0;
--}
--
- static u_char doc2001plus_read_byte(struct mtd_info *mtd)
- {
- 	struct nand_chip *this = mtd->priv;
-@@ -610,33 +577,6 @@ static void doc2001plus_readbuf(struct mtd_info *mtd, u_char *buf, int len)
- 		printk("\n");
- }
- 
--static int doc2001plus_verifybuf(struct mtd_info *mtd, const u_char *buf, int len)
--{
--	struct nand_chip *this = mtd->priv;
--	struct doc_priv *doc = this->priv;
--	void __iomem *docptr = doc->virtadr;
--	int i;
--
--	if (debug)
--		printk("verifybuf of %d bytes: ", len);
--
--	/* Start read pipeline */
--	ReadDOC(docptr, Mplus_ReadPipeInit);
--	ReadDOC(docptr, Mplus_ReadPipeInit);
--
--	for (i = 0; i < len - 2; i++)
--		if (buf[i] != ReadDOC(docptr, Mil_CDSN_IO)) {
--			ReadDOC(docptr, Mplus_LastDataRead);
--			ReadDOC(docptr, Mplus_LastDataRead);
--			return i;
--		}
--	if (buf[len - 2] != ReadDOC(docptr, Mplus_LastDataRead))
--		return len - 2;
--	if (buf[len - 1] != ReadDOC(docptr, Mplus_LastDataRead))
--		return len - 1;
--	return 0;
--}
--
- static void doc2001plus_select_chip(struct mtd_info *mtd, int chip)
- {
- 	struct nand_chip *this = mtd->priv;
-@@ -1432,7 +1372,6 @@ static inline int __init doc2000_init(struct mtd_info *mtd)
- 	this->read_byte = doc2000_read_byte;
- 	this->write_buf = doc2000_writebuf;
- 	this->read_buf = doc2000_readbuf;
--	this->verify_buf = doc2000_verifybuf;
- 	this->scan_bbt = nftl_scan_bbt;
- 
- 	doc->CDSNControl = CDSN_CTRL_FLASH_IO | CDSN_CTRL_ECC_IO;
-@@ -1449,7 +1388,6 @@ static inline int __init doc2001_init(struct mtd_info *mtd)
- 	this->read_byte = doc2001_read_byte;
- 	this->write_buf = doc2001_writebuf;
- 	this->read_buf = doc2001_readbuf;
--	this->verify_buf = doc2001_verifybuf;
- 
- 	ReadDOC(doc->virtadr, ChipID);
- 	ReadDOC(doc->virtadr, ChipID);
-@@ -1480,7 +1418,6 @@ static inline int __init doc2001plus_init(struct mtd_info *mtd)
- 	this->read_byte = doc2001plus_read_byte;
- 	this->write_buf = doc2001plus_writebuf;
- 	this->read_buf = doc2001plus_readbuf;
--	this->verify_buf = doc2001plus_verifybuf;
- 	this->scan_bbt = inftl_scan_bbt;
- 	this->cmd_ctrl = NULL;
- 	this->select_chip = doc2001plus_select_chip;
-diff --git a/drivers/mtd/nand/fsl_elbc_nand.c b/drivers/mtd/nand/fsl_elbc_nand.c
-index 8143873..cc1480a 100644
---- a/drivers/mtd/nand/fsl_elbc_nand.c
-+++ b/drivers/mtd/nand/fsl_elbc_nand.c
-@@ -614,41 +614,6 @@ static void fsl_elbc_read_buf(struct mtd_info *mtd, u8 *buf, int len)
- 		        len, avail);
- }
- 
--/*
-- * Verify buffer against the FCM Controller Data Buffer
-- */
--static int fsl_elbc_verify_buf(struct mtd_info *mtd, const u_char *buf, int len)
--{
--	struct nand_chip *chip = mtd->priv;
--	struct fsl_elbc_mtd *priv = chip->priv;
--	struct fsl_elbc_fcm_ctrl *elbc_fcm_ctrl = priv->ctrl->nand;
--	int i;
--
--	if (len < 0) {
--		dev_err(priv->dev, "write_buf of %d bytes", len);
--		return -EINVAL;
--	}
--
--	if ((unsigned int)len >
--			elbc_fcm_ctrl->read_bytes - elbc_fcm_ctrl->index) {
--		dev_err(priv->dev,
--			"verify_buf beyond end of buffer "
--			"(%d requested, %u available)\n",
--			len, elbc_fcm_ctrl->read_bytes - elbc_fcm_ctrl->index);
--
--		elbc_fcm_ctrl->index = elbc_fcm_ctrl->read_bytes;
--		return -EINVAL;
--	}
--
--	for (i = 0; i < len; i++)
--		if (in_8(&elbc_fcm_ctrl->addr[elbc_fcm_ctrl->index + i])
--				!= buf[i])
--			break;
--
--	elbc_fcm_ctrl->index += len;
--	return i == len && elbc_fcm_ctrl->status == LTESR_CC ? 0 : -EIO;
--}
--
- /* This function is called after Program and Erase Operations to
-  * check for success or failure.
-  */
-@@ -798,7 +763,6 @@ static int fsl_elbc_chip_init(struct fsl_elbc_mtd *priv)
- 	chip->read_byte = fsl_elbc_read_byte;
- 	chip->write_buf = fsl_elbc_write_buf;
- 	chip->read_buf = fsl_elbc_read_buf;
--	chip->verify_buf = fsl_elbc_verify_buf;
- 	chip->select_chip = fsl_elbc_select_chip;
- 	chip->cmdfunc = fsl_elbc_cmdfunc;
- 	chip->waitfunc = fsl_elbc_wait;
-diff --git a/drivers/mtd/nand/fsl_ifc_nand.c b/drivers/mtd/nand/fsl_ifc_nand.c
-index 1f71b54..e92d223 100644
---- a/drivers/mtd/nand/fsl_ifc_nand.c
-+++ b/drivers/mtd/nand/fsl_ifc_nand.c
-@@ -627,46 +627,6 @@ static void fsl_ifc_read_buf(struct mtd_info *mtd, u8 *buf, int len)
- }
- 
- /*
-- * Verify buffer against the IFC Controller Data Buffer
-- */
--static int fsl_ifc_verify_buf(struct mtd_info *mtd,
--			       const u_char *buf, int len)
--{
--	struct nand_chip *chip = mtd->priv;
--	struct fsl_ifc_mtd *priv = chip->priv;
--	struct fsl_ifc_ctrl *ctrl = priv->ctrl;
--	struct fsl_ifc_nand_ctrl *nctrl = ifc_nand_ctrl;
--	int i;
--
--	if (len < 0) {
--		dev_err(priv->dev, "%s: write_buf of %d bytes", __func__, len);
--		return -EINVAL;
--	}
--
--	if ((unsigned int)len > nctrl->read_bytes - nctrl->index) {
--		dev_err(priv->dev,
--			"%s: beyond end of buffer (%d requested, %u available)\n",
--			__func__, len, nctrl->read_bytes - nctrl->index);
--
--		nctrl->index = nctrl->read_bytes;
--		return -EINVAL;
--	}
--
--	for (i = 0; i < len; i++)
--		if (in_8(&nctrl->addr[nctrl->index + i]) != buf[i])
--			break;
--
--	nctrl->index += len;
--
--	if (i != len)
--		return -EIO;
--	if (ctrl->nand_stat != IFC_NAND_EVTER_STAT_OPC)
--		return -EIO;
--
--	return 0;
--}
--
--/*
-  * This function is called after Program and Erase Operations to
-  * check for success or failure.
-  */
-@@ -796,7 +756,6 @@ static int fsl_ifc_chip_init(struct fsl_ifc_mtd *priv)
- 
- 	chip->write_buf = fsl_ifc_write_buf;
- 	chip->read_buf = fsl_ifc_read_buf;
--	chip->verify_buf = fsl_ifc_verify_buf;
- 	chip->select_chip = fsl_ifc_select_chip;
- 	chip->cmdfunc = fsl_ifc_cmdfunc;
- 	chip->waitfunc = fsl_ifc_wait;
-diff --git a/drivers/mtd/nand/gpio.c b/drivers/mtd/nand/gpio.c
-index 27000a5..ce6a284 100644
---- a/drivers/mtd/nand/gpio.c
-+++ b/drivers/mtd/nand/gpio.c
-@@ -100,23 +100,6 @@ static void gpio_nand_readbuf(struct mtd_info *mtd, u_char *buf, int len)
- 	readsb(this->IO_ADDR_R, buf, len);
- }
- 
--static int gpio_nand_verifybuf(struct mtd_info *mtd, const u_char *buf, int len)
--{
--	struct nand_chip *this = mtd->priv;
--	unsigned char read, *p = (unsigned char *) buf;
--	int i, err = 0;
--
--	for (i = 0; i < len; i++) {
--		read = readb(this->IO_ADDR_R);
--		if (read != p[i]) {
--			pr_debug("%s: err at %d (read %04x vs %04x)\n",
--			       __func__, i, read, p[i]);
--			err = -EFAULT;
--		}
--	}
--	return err;
--}
--
- static void gpio_nand_writebuf16(struct mtd_info *mtd, const u_char *buf,
- 				 int len)
- {
-@@ -148,26 +131,6 @@ static void gpio_nand_readbuf16(struct mtd_info *mtd, u_char *buf, int len)
- 	}
- }
- 
--static int gpio_nand_verifybuf16(struct mtd_info *mtd, const u_char *buf,
--				 int len)
--{
--	struct nand_chip *this = mtd->priv;
--	unsigned short read, *p = (unsigned short *) buf;
--	int i, err = 0;
--	len >>= 1;
--
--	for (i = 0; i < len; i++) {
--		read = readw(this->IO_ADDR_R);
--		if (read != p[i]) {
--			pr_debug("%s: err at %d (read %04x vs %04x)\n",
--			       __func__, i, read, p[i]);
--			err = -EFAULT;
--		}
--	}
--	return err;
--}
--
--
- static int gpio_nand_devready(struct mtd_info *mtd)
- {
- 	struct gpiomtd *gpiomtd = gpio_nand_getpriv(mtd);
-@@ -391,11 +354,9 @@ static int __devinit gpio_nand_probe(struct platform_device *dev)
- 	if (this->options & NAND_BUSWIDTH_16) {
- 		this->read_buf   = gpio_nand_readbuf16;
- 		this->write_buf  = gpio_nand_writebuf16;
--		this->verify_buf = gpio_nand_verifybuf16;
- 	} else {
- 		this->read_buf   = gpio_nand_readbuf;
- 		this->write_buf  = gpio_nand_writebuf;
--		this->verify_buf = gpio_nand_verifybuf;
- 	}
- 
- 	/* set the mtd private data for the nand driver */
-diff --git a/drivers/mtd/nand/lpc32xx_slc.c b/drivers/mtd/nand/lpc32xx_slc.c
-index c8c1d06..6d7d3cb 100644
---- a/drivers/mtd/nand/lpc32xx_slc.c
-+++ b/drivers/mtd/nand/lpc32xx_slc.c
-@@ -368,24 +368,6 @@ static void lpc32xx_nand_write_buf(struct mtd_info *mtd, const uint8_t *buf, int
- }
- 
- /*
-- * Verify data in buffer to data on device
-- */
--static int lpc32xx_verify_buf(struct mtd_info *mtd, const uint8_t *buf, int len)
--{
--	struct nand_chip *chip = mtd->priv;
--	struct lpc32xx_nand_host *host = chip->priv;
--	int i;
--
--	/* DATA register must be read as 32 bits or it will fail */
--	for (i = 0; i < len; i++) {
--		if (buf[i] != (uint8_t)readl(SLC_DATA(host->io_base)))
--			return -EFAULT;
--	}
--
--	return 0;
--}
--
--/*
-  * Read the OOB data from the device without ECC using FIFO method
-  */
- static int lpc32xx_nand_read_oob_syndrome(struct mtd_info *mtd,
-@@ -862,7 +844,6 @@ static int __devinit lpc32xx_nand_probe(struct platform_device *pdev)
- 	chip->ecc.correct = nand_correct_data;
- 	chip->ecc.strength = 1;
- 	chip->ecc.hwctl = lpc32xx_nand_ecc_enable;
--	chip->verify_buf = lpc32xx_verify_buf;
- 
- 	/* bitflip_threshold's default is defined as ecc_strength anyway.
- 	 * Unfortunately, it is set only later at add_mtd_device(). Meanwhile
-diff --git a/drivers/mtd/nand/mpc5121_nfc.c b/drivers/mtd/nand/mpc5121_nfc.c
-index c259c24..f776c85 100644
---- a/drivers/mtd/nand/mpc5121_nfc.c
-+++ b/drivers/mtd/nand/mpc5121_nfc.c
-@@ -506,27 +506,6 @@ static void mpc5121_nfc_write_buf(struct mtd_info *mtd,
- 	mpc5121_nfc_buf_copy(mtd, (u_char *)buf, len, 1);
- }
- 
--/* Compare buffer with NAND flash */
--static int mpc5121_nfc_verify_buf(struct mtd_info *mtd,
--						const u_char *buf, int len)
--{
--	u_char tmp[256];
--	uint bsize;
--
--	while (len) {
--		bsize = min(len, 256);
--		mpc5121_nfc_read_buf(mtd, tmp, bsize);
--
--		if (memcmp(buf, tmp, bsize))
--			return 1;
--
--		buf += bsize;
--		len -= bsize;
--	}
--
--	return 0;
--}
--
- /* Read byte from NFC buffers */
- static u8 mpc5121_nfc_read_byte(struct mtd_info *mtd)
- {
-@@ -732,7 +711,6 @@ static int __devinit mpc5121_nfc_probe(struct platform_device *op)
- 	chip->read_word = mpc5121_nfc_read_word;
- 	chip->read_buf = mpc5121_nfc_read_buf;
- 	chip->write_buf = mpc5121_nfc_write_buf;
--	chip->verify_buf = mpc5121_nfc_verify_buf;
- 	chip->select_chip = mpc5121_nfc_select_chip;
- 	chip->bbt_options = NAND_BBT_USE_FLASH;
- 	chip->ecc.mode = NAND_ECC_SOFT;
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 3f94e1f..bfee9eb 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -746,14 +746,6 @@ static void mxc_nand_read_buf(struct mtd_info *mtd, u_char *buf, int len)
- 	host->buf_start += n;
- }
- 
--/* Used by the upper layer to verify the data in NAND Flash
-- * with the data in the buf. */
--static int mxc_nand_verify_buf(struct mtd_info *mtd,
--				const u_char *buf, int len)
--{
--	return -EFAULT;
--}
--
- /* This function is used by upper layer for select and
-  * deselect of the NAND chip */
- static void mxc_nand_select_chip_v1_v3(struct mtd_info *mtd, int chip)
-@@ -1406,7 +1398,6 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 	this->read_word = mxc_nand_read_word;
- 	this->write_buf = mxc_nand_write_buf;
- 	this->read_buf = mxc_nand_read_buf;
--	this->verify_buf = mxc_nand_verify_buf;
- 
- 	host->clk = devm_clk_get(&pdev->dev, "nfc");
- 	if (IS_ERR(host->clk))
-diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-index ead301a..5a1689a 100644
---- a/drivers/mtd/nand/nand_base.c
-+++ b/drivers/mtd/nand/nand_base.c
-@@ -243,25 +243,6 @@ static void nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
- }
- 
- /**
-- * nand_verify_buf - [DEFAULT] Verify chip data against buffer
-- * @mtd: MTD device structure
-- * @buf: buffer containing the data to compare
-- * @len: number of bytes to compare
-- *
-- * Default verify function for 8bit buswidth.
-- */
--static int nand_verify_buf(struct mtd_info *mtd, const uint8_t *buf, int len)
--{
--	int i;
--	struct nand_chip *chip = mtd->priv;
--
--	for (i = 0; i < len; i++)
--		if (buf[i] != readb(chip->IO_ADDR_R))
--			return -EFAULT;
--	return 0;
--}
--
--/**
-  * nand_write_buf16 - [DEFAULT] write buffer to chip
-  * @mtd: MTD device structure
-  * @buf: data buffer
-@@ -301,28 +282,6 @@ static void nand_read_buf16(struct mtd_info *mtd, uint8_t *buf, int len)
- }
- 
- /**
-- * nand_verify_buf16 - [DEFAULT] Verify chip data against buffer
-- * @mtd: MTD device structure
-- * @buf: buffer containing the data to compare
-- * @len: number of bytes to compare
-- *
-- * Default verify function for 16bit buswidth.
-- */
--static int nand_verify_buf16(struct mtd_info *mtd, const uint8_t *buf, int len)
--{
--	int i;
--	struct nand_chip *chip = mtd->priv;
--	u16 *p = (u16 *) buf;
--	len >>= 1;
--
--	for (i = 0; i < len; i++)
--		if (p[i] != readw(chip->IO_ADDR_R))
--			return -EFAULT;
--
--	return 0;
--}
--
--/**
-  * nand_block_bad - [DEFAULT] Read bad block marker from the chip
-  * @mtd: MTD device structure
-  * @ofs: offset from device start
-@@ -2120,16 +2079,6 @@ static int nand_write_page(struct mtd_info *mtd, struct nand_chip *chip,
- 		status = chip->waitfunc(mtd, chip);
- 	}
- 
--#ifdef CONFIG_MTD_NAND_VERIFY_WRITE
--	/* Send command to read back the data */
--	chip->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
--
--	if (chip->verify_buf(mtd, buf, mtd->writesize))
--		return -EIO;
--
--	/* Make sure the next page prog is preceded by a status read */
--	chip->cmdfunc(mtd, NAND_CMD_STATUS, -1, -1);
--#endif
- 	return 0;
- }
- 
-@@ -2804,8 +2753,6 @@ static void nand_set_defaults(struct nand_chip *chip, int busw)
- 		chip->write_buf = busw ? nand_write_buf16 : nand_write_buf;
- 	if (!chip->read_buf)
- 		chip->read_buf = busw ? nand_read_buf16 : nand_read_buf;
--	if (!chip->verify_buf)
--		chip->verify_buf = busw ? nand_verify_buf16 : nand_verify_buf;
- 	if (!chip->scan_bbt)
- 		chip->scan_bbt = nand_default_bbt;
- 
-diff --git a/drivers/mtd/nand/nandsim.c b/drivers/mtd/nand/nandsim.c
-index cf0cd31..21e64b5 100644
---- a/drivers/mtd/nand/nandsim.c
-+++ b/drivers/mtd/nand/nandsim.c
-@@ -447,8 +447,6 @@ static unsigned int rptwear_cnt = 0;
- /* MTD structure for NAND controller */
- static struct mtd_info *nsmtd;
- 
--static u_char ns_verify_buf[NS_LARGEST_PAGE_SIZE];
--
- /*
-  * Allocate array of page pointers, create slab allocation for an array
-  * and initialize the array by NULL pointers.
-@@ -2189,19 +2187,6 @@ static void ns_nand_read_buf(struct mtd_info *mtd, u_char *buf, int len)
- 	return;
- }
- 
--static int ns_nand_verify_buf(struct mtd_info *mtd, const u_char *buf, int len)
--{
--	ns_nand_read_buf(mtd, (u_char *)&ns_verify_buf[0], len);
--
--	if (!memcmp(buf, &ns_verify_buf[0], len)) {
--		NS_DBG("verify_buf: the buffer is OK\n");
--		return 0;
--	} else {
--		NS_DBG("verify_buf: the buffer is wrong\n");
--		return -EFAULT;
--	}
--}
--
- /*
-  * Module initialization function
-  */
-@@ -2236,7 +2221,6 @@ static int __init ns_init_module(void)
- 	chip->dev_ready  = ns_device_ready;
- 	chip->write_buf  = ns_nand_write_buf;
- 	chip->read_buf   = ns_nand_read_buf;
--	chip->verify_buf = ns_nand_verify_buf;
- 	chip->read_word  = ns_nand_read_word;
- 	chip->ecc.mode   = NAND_ECC_SOFT;
- 	/* The NAND_SKIP_BBTSCAN option is necessary for 'overridesize' */
-diff --git a/drivers/mtd/nand/ndfc.c b/drivers/mtd/nand/ndfc.c
-index 2b6f632..5fd3f01 100644
---- a/drivers/mtd/nand/ndfc.c
-+++ b/drivers/mtd/nand/ndfc.c
-@@ -140,18 +140,6 @@ static void ndfc_write_buf(struct mtd_info *mtd, const uint8_t *buf, int len)
- 		out_be32(ndfc->ndfcbase + NDFC_DATA, *p++);
- }
- 
--static int ndfc_verify_buf(struct mtd_info *mtd, const uint8_t *buf, int len)
--{
--	struct nand_chip *chip = mtd->priv;
--	struct ndfc_controller *ndfc = chip->priv;
--	uint32_t *p = (uint32_t *) buf;
--
--	for(;len > 0; len -= 4)
--		if (*p++ != in_be32(ndfc->ndfcbase + NDFC_DATA))
--			return -EFAULT;
--	return 0;
--}
--
- /*
-  * Initialize chip structure
-  */
-@@ -172,7 +160,6 @@ static int ndfc_chip_init(struct ndfc_controller *ndfc,
- 	chip->controller = &ndfc->ndfc_control;
- 	chip->read_buf = ndfc_read_buf;
- 	chip->write_buf = ndfc_write_buf;
--	chip->verify_buf = ndfc_verify_buf;
- 	chip->ecc.correct = nand_correct_data;
- 	chip->ecc.hwctl = ndfc_enable_hwecc;
- 	chip->ecc.calculate = ndfc_calculate_ecc;
-diff --git a/drivers/mtd/nand/nuc900_nand.c b/drivers/mtd/nand/nuc900_nand.c
-index 8febe46..94dc46b 100644
---- a/drivers/mtd/nand/nuc900_nand.c
-+++ b/drivers/mtd/nand/nuc900_nand.c
-@@ -112,22 +112,6 @@ static void nuc900_nand_write_buf(struct mtd_info *mtd,
- 		write_data_reg(nand, buf[i]);
- }
- 
--static int nuc900_verify_buf(struct mtd_info *mtd,
--			     const unsigned char *buf, int len)
--{
--	int i;
--	struct nuc900_nand *nand;
--
--	nand = container_of(mtd, struct nuc900_nand, mtd);
--
--	for (i = 0; i < len; i++) {
--		if (buf[i] != (unsigned char)read_data_reg(nand))
--			return -EFAULT;
--	}
--
--	return 0;
--}
--
- static int nuc900_check_rb(struct nuc900_nand *nand)
- {
- 	unsigned int val;
-@@ -292,7 +276,6 @@ static int __devinit nuc900_nand_probe(struct platform_device *pdev)
- 	chip->read_byte		= nuc900_nand_read_byte;
- 	chip->write_buf		= nuc900_nand_write_buf;
- 	chip->read_buf		= nuc900_nand_read_buf;
--	chip->verify_buf	= nuc900_verify_buf;
- 	chip->chip_delay	= 50;
- 	chip->options		= 0;
- 	chip->ecc.mode		= NAND_ECC_SOFT;
-diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-index ac4fd75..1c46300 100644
---- a/drivers/mtd/nand/omap2.c
-+++ b/drivers/mtd/nand/omap2.c
-@@ -614,27 +614,6 @@ out_copy:
- }
- 
- /**
-- * omap_verify_buf - Verify chip data against buffer
-- * @mtd: MTD device structure
-- * @buf: buffer containing the data to compare
-- * @len: number of bytes to compare
-- */
--static int omap_verify_buf(struct mtd_info *mtd, const u_char * buf, int len)
--{
--	struct omap_nand_info *info = container_of(mtd, struct omap_nand_info,
--							mtd);
--	u16 *p = (u16 *) buf;
--
--	len >>= 1;
--	while (len--) {
--		if (*p++ != cpu_to_le16(readw(info->nand.IO_ADDR_R)))
--			return -EFAULT;
--	}
--
--	return 0;
--}
--
--/**
-  * gen_true_ecc - This function will generate true ECC value
-  * @ecc_buf: buffer to store ecc code
-  *
-@@ -1285,8 +1264,6 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
- 		goto out_release_mem_region;
- 	}
- 
--	info->nand.verify_buf = omap_verify_buf;
--
- 	/* selsect the ecc type */
- 	if (pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_DEFAULT)
- 		info->nand.ecc.mode = NAND_ECC_SOFT;
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index e8a1ae9..5df91d5 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -771,12 +771,6 @@ static void pxa3xx_nand_write_buf(struct mtd_info *mtd,
- 	info->buf_start += real_len;
- }
- 
--static int pxa3xx_nand_verify_buf(struct mtd_info *mtd,
--		const uint8_t *buf, int len)
--{
--	return 0;
--}
--
- static void pxa3xx_nand_select_chip(struct mtd_info *mtd, int chip)
- {
- 	return;
-@@ -1069,7 +1063,6 @@ static int alloc_nand_resource(struct platform_device *pdev)
- 		chip->read_byte		= pxa3xx_nand_read_byte;
- 		chip->read_buf		= pxa3xx_nand_read_buf;
- 		chip->write_buf		= pxa3xx_nand_write_buf;
--		chip->verify_buf	= pxa3xx_nand_verify_buf;
- 	}
- 
- 	spin_lock_init(&chip->controller->lock);
-diff --git a/drivers/mtd/nand/r852.c b/drivers/mtd/nand/r852.c
-index 8cb6277..4495f85 100644
---- a/drivers/mtd/nand/r852.c
-+++ b/drivers/mtd/nand/r852.c
-@@ -309,27 +309,6 @@ static uint8_t r852_read_byte(struct mtd_info *mtd)
- 	return r852_read_reg(dev, R852_DATALINE);
- }
- 
--
--/*
-- * Readback the buffer to verify it
-- */
--int r852_verify_buf(struct mtd_info *mtd, const uint8_t *buf, int len)
--{
--	struct r852_device *dev = r852_get_dev(mtd);
--
--	/* We can't be sure about anything here... */
--	if (dev->card_unstable)
--		return -1;
--
--	/* This will never happen, unless you wired up a nand chip
--		with > 512 bytes page size to the reader */
--	if (len > SM_SECTOR_SIZE)
--		return 0;
--
--	r852_read_buf(mtd, dev->tmp_buffer, len);
--	return memcmp(buf, dev->tmp_buffer, len);
--}
--
- /*
-  * Control several chip lines & send commands
-  */
-@@ -882,7 +861,6 @@ int  r852_probe(struct pci_dev *pci_dev, const struct pci_device_id *id)
- 	chip->read_byte = r852_read_byte;
- 	chip->read_buf = r852_read_buf;
- 	chip->write_buf = r852_write_buf;
--	chip->verify_buf = r852_verify_buf;
- 
- 	/* ecc */
- 	chip->ecc.mode = NAND_ECC_HW_SYNDROME;
-diff --git a/drivers/mtd/nand/sh_flctl.c b/drivers/mtd/nand/sh_flctl.c
-index 0b798fb..319ffb4 100644
---- a/drivers/mtd/nand/sh_flctl.c
-+++ b/drivers/mtd/nand/sh_flctl.c
-@@ -788,16 +788,6 @@ static void flctl_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
- 	flctl->index += len;
- }
- 
--static int flctl_verify_buf(struct mtd_info *mtd, const u_char *buf, int len)
--{
--	int i;
--
--	for (i = 0; i < len; i++)
--		if (buf[i] != flctl_read_byte(mtd))
--			return -EFAULT;
--	return 0;
--}
--
- static int flctl_chip_init_tail(struct mtd_info *mtd)
- {
- 	struct sh_flctl *flctl = mtd_to_flctl(mtd);
-@@ -931,7 +921,6 @@ static int __devinit flctl_probe(struct platform_device *pdev)
- 	nand->read_byte = flctl_read_byte;
- 	nand->write_buf = flctl_write_buf;
- 	nand->read_buf = flctl_read_buf;
--	nand->verify_buf = flctl_verify_buf;
- 	nand->select_chip = flctl_select_chip;
- 	nand->cmdfunc = flctl_cmdfunc;
- 
-diff --git a/drivers/mtd/nand/socrates_nand.c b/drivers/mtd/nand/socrates_nand.c
-index e02b08b..f3f28fa 100644
---- a/drivers/mtd/nand/socrates_nand.c
-+++ b/drivers/mtd/nand/socrates_nand.c
-@@ -98,24 +98,6 @@ static uint16_t socrates_nand_read_word(struct mtd_info *mtd)
- 	return word;
- }
- 
--/**
-- * socrates_nand_verify_buf -  Verify chip data against buffer
-- * @mtd:	MTD device structure
-- * @buf:	buffer containing the data to compare
-- * @len:	number of bytes to compare
-- */
--static int socrates_nand_verify_buf(struct mtd_info *mtd, const u8 *buf,
--		int len)
--{
--	int i;
--
--	for (i = 0; i < len; i++) {
--		if (buf[i] != socrates_nand_read_byte(mtd))
--			return -EFAULT;
--	}
--	return 0;
--}
--
- /*
-  * Hardware specific access to control-lines
-  */
-@@ -201,7 +183,6 @@ static int __devinit socrates_nand_probe(struct platform_device *ofdev)
- 	nand_chip->read_word = socrates_nand_read_word;
- 	nand_chip->write_buf = socrates_nand_write_buf;
- 	nand_chip->read_buf = socrates_nand_read_buf;
--	nand_chip->verify_buf = socrates_nand_verify_buf;
- 	nand_chip->dev_ready = socrates_nand_device_ready;
- 
- 	nand_chip->ecc.mode = NAND_ECC_SOFT;	/* enable ECC */
-diff --git a/drivers/mtd/nand/tmio_nand.c b/drivers/mtd/nand/tmio_nand.c
-index 5aa5180..508e9e0 100644
---- a/drivers/mtd/nand/tmio_nand.c
-+++ b/drivers/mtd/nand/tmio_nand.c
-@@ -256,18 +256,6 @@ static void tmio_nand_read_buf(struct mtd_info *mtd, u_char *buf, int len)
- 	tmio_ioread16_rep(tmio->fcr + FCR_DATA, buf, len >> 1);
- }
- 
--static int
--tmio_nand_verify_buf(struct mtd_info *mtd, const u_char *buf, int len)
--{
--	struct tmio_nand *tmio = mtd_to_tmio(mtd);
--	u16				*p = (u16 *) buf;
--
--	for (len >>= 1; len; len--)
--		if (*(p++) != tmio_ioread16(tmio->fcr + FCR_DATA))
--			return -EFAULT;
--	return 0;
--}
--
- static void tmio_nand_enable_hwecc(struct mtd_info *mtd, int mode)
- {
- 	struct tmio_nand *tmio = mtd_to_tmio(mtd);
-@@ -424,7 +412,6 @@ static int tmio_probe(struct platform_device *dev)
- 	nand_chip->read_byte = tmio_nand_read_byte;
- 	nand_chip->write_buf = tmio_nand_write_buf;
- 	nand_chip->read_buf = tmio_nand_read_buf;
--	nand_chip->verify_buf = tmio_nand_verify_buf;
- 
- 	/* set eccmode using hardware ECC */
- 	nand_chip->ecc.mode = NAND_ECC_HW;
-diff --git a/drivers/mtd/nand/txx9ndfmc.c b/drivers/mtd/nand/txx9ndfmc.c
-index 26398dc..e3d7266 100644
---- a/drivers/mtd/nand/txx9ndfmc.c
-+++ b/drivers/mtd/nand/txx9ndfmc.c
-@@ -131,18 +131,6 @@ static void txx9ndfmc_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
- 		*buf++ = __raw_readl(ndfdtr);
- }
- 
--static int txx9ndfmc_verify_buf(struct mtd_info *mtd, const uint8_t *buf,
--				int len)
--{
--	struct platform_device *dev = mtd_to_platdev(mtd);
--	void __iomem *ndfdtr = ndregaddr(dev, TXX9_NDFDTR);
--
--	while (len--)
--		if (*buf++ != (uint8_t)__raw_readl(ndfdtr))
--			return -EFAULT;
--	return 0;
--}
--
- static void txx9ndfmc_cmd_ctrl(struct mtd_info *mtd, int cmd,
- 			       unsigned int ctrl)
- {
-@@ -346,7 +334,6 @@ static int __init txx9ndfmc_probe(struct platform_device *dev)
- 		chip->read_byte = txx9ndfmc_read_byte;
- 		chip->read_buf = txx9ndfmc_read_buf;
- 		chip->write_buf = txx9ndfmc_write_buf;
--		chip->verify_buf = txx9ndfmc_verify_buf;
- 		chip->cmd_ctrl = txx9ndfmc_cmd_ctrl;
- 		chip->dev_ready = txx9ndfmc_dev_ready;
- 		chip->ecc.calculate = txx9ndfmc_calculate_ecc;
-diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-index 6dce5a7..9be3873 100644
---- a/include/linux/mtd/nand.h
-+++ b/include/linux/mtd/nand.h
-@@ -397,8 +397,6 @@ struct nand_buffers {
-  * @read_word:		[REPLACEABLE] read one word from the chip
-  * @write_buf:		[REPLACEABLE] write data from the buffer to the chip
-  * @read_buf:		[REPLACEABLE] read data from the chip into the buffer
-- * @verify_buf:		[REPLACEABLE] verify buffer contents against the chip
-- *			data.
-  * @select_chip:	[REPLACEABLE] select chip nr
-  * @block_bad:		[REPLACEABLE] check, if the block is bad
-  * @block_markbad:	[REPLACEABLE] mark the block bad
-@@ -481,7 +479,6 @@ struct nand_chip {
- 	u16 (*read_word)(struct mtd_info *mtd);
- 	void (*write_buf)(struct mtd_info *mtd, const uint8_t *buf, int len);
- 	void (*read_buf)(struct mtd_info *mtd, uint8_t *buf, int len);
--	int (*verify_buf)(struct mtd_info *mtd, const uint8_t *buf, int len);
- 	void (*select_chip)(struct mtd_info *mtd, int chip);
- 	int (*block_bad)(struct mtd_info *mtd, loff_t ofs, int getchip);
- 	int (*block_markbad)(struct mtd_info *mtd, loff_t ofs);
+On 08/14/2012 03:49 PM, Richard Genoud :
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> ---
+>  arch/arm/mach-at91/include/mach/at_hdmac.h |    1 +
+>  drivers/of/Kconfig                         |    4 +
+>  drivers/of/Makefile                        |    1 +
+>  drivers/of/of_atmel.c                      |  112 ++++++++++++++++++++++++++++
+>  include/linux/of_atmel.h                   |   29 +++++++
+>  5 files changed, 147 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/of/of_atmel.c
+>  create mode 100644 include/linux/of_atmel.h
+> 
+> diff --git a/arch/arm/mach-at91/include/mach/at_hdmac.h b/arch/arm/mach-at91/include/mach/at_hdmac.h
+> index cab0997..35667bd 100644
+> --- a/arch/arm/mach-at91/include/mach/at_hdmac.h
+> +++ b/arch/arm/mach-at91/include/mach/at_hdmac.h
+> @@ -52,6 +52,7 @@ struct at_dma_slave {
+>  #define		ATC_LOCK_IF_L_CHUNK	(0x0 << 22)
+>  #define		ATC_LOCK_IF_L_BUFFER	(0x1 << 22)
+>  #define	ATC_AHB_PROT_MASK	(0x7 << 24)	/* AHB Protection */
+> +#define	ATC_AHB_PROT(h)		(((h) <<  24) && ATC_AHB_PROT_MASK)
+>  #define	ATC_FIFOCFG_MASK	(0x3 << 28)	/* FIFO Request Configuration */
+>  #define		ATC_FIFOCFG_LARGESTBURST	(0x0 << 28)
+>  #define		ATC_FIFOCFG_HALFFIFO		(0x1 << 28)
+> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+> index dfba3e6..4667960 100644
+> --- a/drivers/of/Kconfig
+> +++ b/drivers/of/Kconfig
+> @@ -83,4 +83,8 @@ config OF_MTD
+>  	depends on MTD
+>  	def_bool y
+>  
+> +config OF_ATMEL
+> +	depends on AT_HDMAC
+> +	def_bool y
+> +
+>  endmenu # OF
+> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+> index e027f44..897de3b 100644
+> --- a/drivers/of/Makefile
+> +++ b/drivers/of/Makefile
+> @@ -11,3 +11,4 @@ obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
+>  obj-$(CONFIG_OF_PCI)	+= of_pci.o
+>  obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
+>  obj-$(CONFIG_OF_MTD)	+= of_mtd.o
+> +obj-$(CONFIG_OF_ATMEL)	+= of_atmel.o
+> diff --git a/drivers/of/of_atmel.c b/drivers/of/of_atmel.c
+> new file mode 100644
+> index 0000000..bcd3c54a
+> --- /dev/null
+> +++ b/drivers/of/of_atmel.c
+> @@ -0,0 +1,112 @@
+> +/*
+> + * Copyright (C) 2012 Richard Genoud, Paratronic S.A.
+> + *                    <richard.genoud@gmail.com>
+> + *
+> + * Atmel specifics OF helpers
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +#include <linux/kernel.h>
+> +#include <linux/export.h>
+> +#include <linux/device.h>
+> +#include <linux/slab.h>
+> +#include <linux/printk.h>
+> +#include <linux/byteorder/generic.h>
+> +#include <mach/at_hdmac.h>
+> +#include <linux/of.h>
+> +
+> +static int of_dev_node_match(struct device *dev, void *data)
+> +{
+> +	return dev->of_node == data;
+> +}
+> +
+> +/**
+> + * of_create_at_dma_slave - Alloc and initialize the struct at_dma_slave
+> + * @np: pointer to node to create the struct for
+> + * @bus: pointer to the bus type of the DMA device.
+> + *
+> + * Returns pointer to created DMA slave structure, or NULL in case of error.
+> + */
+> +struct at_dma_slave *of_create_at_dma_slave(struct device_node *np,
+> +					    struct bus_type *bus)
+> +{
+> +	struct at_dma_slave *atslave;
+> +	struct device_node *n;
+> +	struct property *prop;
+> +	const __be32 *dma_list;
+> +	phandle phandle;
+> +	int size;
+> +	int err = -1;
+> +	u32 val;
+> +
+> +	atslave = kzalloc(sizeof(struct at_dma_slave), GFP_KERNEL);
+> +	if (unlikely(!atslave)) {
+> +		pr_err("cannot allocate memory\n");
+> +		goto error;
+> +	}
+> +
+> +	atslave->cfg |= of_property_read_bool(np, "atc_src_rep") ? ATC_SRC_REP : 0;
+> +	atslave->cfg |= of_property_read_bool(np, "atc_dst_rep") ? ATC_DST_REP : 0;
+> +	atslave->cfg |= of_property_read_bool(np, "atc_src_h2sel_hw") ? ATC_SRC_H2SEL_HW : 0;
+> +	atslave->cfg |= of_property_read_bool(np, "atc_dst_h2sel_hw") ? ATC_DST_H2SEL_HW : 0;
+> +	atslave->cfg |= of_property_read_bool(np, "atc_sod") ? ATC_SOD : 0;
+> +	atslave->cfg |= of_property_read_bool(np, "atc_lock_if") ? ATC_LOCK_IF : 0;
+> +	atslave->cfg |= of_property_read_bool(np, "atc_lock_b") ? ATC_LOCK_B : 0;
+> +	atslave->cfg |= of_property_read_bool(np, "atc_lock_if_l") ? ATC_LOCK_IF_L : 0;
+> +	atslave->cfg |= of_property_read_bool(np, "atc_lock_if_l_buffer") ? ATC_LOCK_IF_L_BUFFER : 0;
+> +	if (of_property_read_bool(np, "atc_fifocfg_halffifo"))
+> +		atslave->cfg = (atslave->cfg & ~ATC_FIFOCFG_MASK) | ATC_FIFOCFG_HALFFIFO;
+> +	if (of_property_read_bool(np, "atc_fifocfg_enoughspace"))
+> +		atslave->cfg = (atslave->cfg & ~ATC_FIFOCFG_MASK) | ATC_FIFOCFG_ENOUGHSPACE;
+> +	if (of_property_read_bool(np, "atc_fifocfg_largestburst"))
+> +		atslave->cfg = (atslave->cfg & ~ATC_FIFOCFG_MASK) | ATC_FIFOCFG_LARGESTBURST;
+> +	if (!of_property_read_u32(np, "atc_ahb_prot", &val))
+> +		atslave->cfg |= ATC_AHB_PROT(val);
+> +	if (!of_property_read_u32(np, "atc_src_per", &val))
+> +		atslave->cfg |= ATC_SRC_PER(val);
+> +	if (!of_property_read_u32(np, "atc_dst_per", &val))
+> +		atslave->cfg |= ATC_DST_PER(val);
+> +
+> +	/* we need to associate the wanted dma struct device to
+> +	 * atslave->dma_dev. This is needed when searching for
+> +	 * a free dma channel
+> +	 */
+> +	prop = of_find_property(np, "dma", &size);
+> +	if (!prop) {
+> +		pr_err("can't find the dma child node\n");
+> +		goto error;
+> +	}
+> +	dma_list = prop->value;
+> +	size /= sizeof(*dma_list);
+> +	if (size != 1) {
+> +		pr_err("only one dma handle is supported\n");
+> +		goto error;
+> +	}
+> +
+> +	phandle = be32_to_cpup(dma_list);
+> +	n = of_find_node_by_phandle(phandle);
+> +	if (!n) {
+> +		pr_err("unable to find dma device: invalid phandle %s\n",
+> +		       prop->name);
+> +		goto error;
+> +	}
+> +
+> +	atslave->dma_dev = bus_find_device(bus, NULL, n, of_dev_node_match);
+> +	if (!atslave->dma_dev) {
+> +		pr_err("can't find struct device for DMA %s\n", prop->name);
+> +		goto error;
+> +	}
+> +
+> +	pr_debug("DMA cfg register=0x%x DMA device path=%s\n",
+> +		 atslave->cfg, prop->name);
+> +	err = 0;
+> +error:
+> +	if (err)
+> +		kfree(atslave);
+> +	return atslave;
+> +}
+> +EXPORT_SYMBOL_GPL(of_create_at_dma_slave);
+> +
+> diff --git a/include/linux/of_atmel.h b/include/linux/of_atmel.h
+> new file mode 100644
+> index 0000000..256f336
+> --- /dev/null
+> +++ b/include/linux/of_atmel.h
+> @@ -0,0 +1,29 @@
+> +#ifndef _LINUX_OF_ATMEL_H
+> +#define _LINUX_OF_ATMEL_H
+> +/*
+> + * Copyright (C) 2012 Richard Genoud, Paratronic S.A.
+> + *                    <richard.genoud@gmail.com>
+> + *
+> + * Atmel specifics OF helpers
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +#include <linux/of.h>
+> +#include <linux/device.h>
+> +#include <mach/at_hdmac.h>
+> +
+> +#ifdef CONFIG_OF_ATMEL
+> +extern struct at_dma_slave *of_create_at_dma_slave(struct device_node *np,
+> +						   struct bus_type *bus);
+> +#else
+> +static struct at_dma_slave *of_create_at_dma_slave(struct device_node *np,
+> +						   struct bus_type *bus)
+> +{
+> +	return NULL;
+> +}
+> +#endif /* CONFIG_OF_ATMEL */
+> +
+> +#endif	/* _LINUX_OF_ATMEL_H */
+> 
+
+
 -- 
-1.7.4.4
+Nicolas Ferre
