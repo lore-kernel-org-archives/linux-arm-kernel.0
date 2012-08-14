@@ -1,34 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Aug 2012 09:42:54 +0000
-Subject: [PATCH 5/8] mfd: Provide the PRCMU with its own IRQ domain
-In-Reply-To: <CACRpkdZ7bMBytyDppV2sB1d1sUbDpPRqAQVOq8k4UOYdmg+Mkw@mail.gmail.com>
-References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
- <1344527635-6163-6-git-send-email-lee.jones@linaro.org>
- <CACRpkdZ7bMBytyDppV2sB1d1sUbDpPRqAQVOq8k4UOYdmg+Mkw@mail.gmail.com>
-Message-ID: <201208140942.54773.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Aug 2012 11:48:02 +0200
+Subject: [PATCH] pinctrl: imx5: start numbering pad from 0
+In-Reply-To: <CAAQ0ZWSuAguQwZkQzkUPqJF5ZBSc5Ekiq6mvtwvp98tuu5noLg@mail.gmail.com>
+References: <1344869278-27334-1-git-send-email-shawn.guo@linaro.org>
+ <CACRpkdZL6efwvUyW1+2j8253WRXm3WYyDUw8rN_o9QE=HER4wA@mail.gmail.com>
+ <CAAQ0ZWSuAguQwZkQzkUPqJF5ZBSc5Ekiq6mvtwvp98tuu5noLg@mail.gmail.com>
+Message-ID: <CACRpkdZn5DFNssCNPvBwXt3AYhXnn6qi1+DXEwjCbqUL65gPOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 August 2012, Linus Walleij wrote:
-> 
-> On Thu, Aug 9, 2012 at 5:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > +static struct irq_domain *db8500_irq_domain;
-> 
-> So this is a good idea.
-> 
-> > +int db8500_irq_get_virq(int irq);
-> 
-> And I'm sceptic about this business. Why isn't this physical-to virtual
-> mapping business confined to the core MFD driver? But enlighten me.
-> 
+On Tue, Aug 14, 2012 at 10:22 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On 14 August 2012 16:13, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> Since I just merged the imx53 driver which *again* start numbering on
+>> 1, can I have a patch that fixes that driver also?
+>>
+> What Uwe added is imx35 (vs. imx53 :) driver, which already numbers pad from 0.
 
-I believe MFD does not (yet) know about IRQ domains. The wm8994
-and 88pm80x drivers do this slightly different by exporting
-a foo_request_irq() function that performs the mapping.
+Yes I was confused... I mixed up imx35 and imx53 again.
 
-Traditionally, an MFD would add an offset to the local IRQ number
-to put the VIRQ into the IRQ resource, but this doesn't work when
-you have domains other than legacy.
-
-	Arnd
+Yours,
+Linus Walleij
