@@ -1,79 +1,36 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 14 Aug 2012 17:22:32 +0300
-Subject: [PATCH v2 04/14] MFD: twl-core: Add API to query the HFCLK rate
+Date: Tue, 14 Aug 2012 17:22:34 +0300
+Subject: [PATCH v2 06/14] dt: Add empty of_find_node_by_name() function
 In-Reply-To: <1344954162-7985-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1344954162-7985-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1344954162-7985-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1344954162-7985-7-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CFG_BOOT register's HFCLK_FREQ field hold information about the used HFCLK
-frequency.
-Add possibility for users to get the configured rate based on this
-register.
-This register was configured during boot, without it the chip would not
-operate correctly, so we can trust on this information.
+This commit adds an empty of_find_node_by_name() function for !CONFIG_OF
+builds.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/mfd/twl-core.c  |   32 ++++++++++++++++++++++++++++++++
- include/linux/i2c/twl.h |    1 +
- 2 files changed, 33 insertions(+), 0 deletions(-)
+ include/linux/of.h |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
-index 1c32afe..f162b68 100644
---- a/drivers/mfd/twl-core.c
-+++ b/drivers/mfd/twl-core.c
-@@ -552,6 +552,38 @@ int twl_get_version(void)
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 5919ee3..c90e59a 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -308,6 +308,12 @@ static inline const char* of_node_full_name(struct device_node *np)
+ 	return "<no-node>";
  }
- EXPORT_SYMBOL_GPL(twl_get_version);
  
-+/**
-+ * twl_get_hfclk_rate - API to get TWL external HFCLK clock rate.
-+ *
-+ * Api to get the TWL HFCLK rate based on BOOT_CFG register.
-+ */
-+int twl_get_hfclk_rate(void)
++static inline device_node *of_find_node_by_name(struct device_node *from,
++	const char *name)
 +{
-+	u8 ctrl;
-+	int rate;
-+
-+	twl_i2c_read_u8(TWL_MODULE_PM_MASTER, &ctrl, R_CFG_BOOT);
-+
-+	switch (ctrl & 0x3) {
-+	case HFCLK_FREQ_19p2_MHZ:
-+		rate = 19200000;
-+		break;
-+	case HFCLK_FREQ_26_MHZ:
-+		rate = 26000000;
-+		break;
-+	case HFCLK_FREQ_38p4_MHZ:
-+		rate = 38400000;
-+		break;
-+	default:
-+		pr_err("TWL4030: HFCLK is not configured\n");
-+		rate = -EINVAL;
-+		break;
-+	}
-+
-+	return rate;
++	return NULL;
 +}
-+EXPORT_SYMBOL_GPL(twl_get_hfclk_rate);
 +
- static struct device *
- add_numbered_child(unsigned chip, const char *name, int num,
- 		void *pdata, unsigned pdata_len,
-diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
-index 7ea898c..ac6488c 100644
---- a/include/linux/i2c/twl.h
-+++ b/include/linux/i2c/twl.h
-@@ -188,6 +188,7 @@ int twl_i2c_read(u8 mod_no, u8 *value, u8 reg, unsigned num_bytes);
- 
- int twl_get_type(void);
- int twl_get_version(void);
-+int twl_get_hfclk_rate(void);
- 
- int twl6030_interrupt_unmask(u8 bit_mask, u8 offset);
- int twl6030_interrupt_mask(u8 bit_mask, u8 offset);
+ static inline bool of_have_populated_dt(void)
+ {
+ 	return false;
 -- 
 1.7.8.6
