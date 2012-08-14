@@ -1,231 +1,309 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Tue, 14 Aug 2012 18:12:02 +0530
-Subject: [PATCH 2/5] ASoC: Davinci: McASP: add device tree support for McASP
-In-Reply-To: <1344948125-5649-1-git-send-email-gururaja.hebbar@ti.com>
-References: <1344948125-5649-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <1344948125-5649-3-git-send-email-gururaja.hebbar@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 14 Aug 2012 18:30:43 +0530
+Subject: [PATCH 2/2] ARM: da850/omap-l138: Add EVM specific code for VPIF
+ to work
+In-Reply-To: <1343115786-15801-3-git-send-email-prabhakar.lad@ti.com>
+References: <1343115786-15801-1-git-send-email-prabhakar.lad@ti.com>
+ <1343115786-15801-3-git-send-email-prabhakar.lad@ti.com>
+Message-ID: <502A4BFB.9020407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree probe for McASP driver.
+Hi Prabhakar,
 
-Note:
-DMA parameters are not populated from DT and will be done later.
+On 7/24/2012 1:13 PM, Prabhakar Lad wrote:
+> From: Manjunath Hadli <manjunath.hadli@ti.com>
+> 
+> Include the expander settings to select VPIF peripheral on
+> UI card and add registration call in EVM init. Also add platform
+> data to configure display and capture devices.
+> 
+> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> ---
+>  arch/arm/mach-davinci/Kconfig           |    9 ++
+>  arch/arm/mach-davinci/board-da850-evm.c |  195 +++++++++++++++++++++++++++++++
+>  2 files changed, 204 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+> index 32d837d..19ee4ee 100644
+> --- a/arch/arm/mach-davinci/Kconfig
+> +++ b/arch/arm/mach-davinci/Kconfig
+> @@ -190,6 +190,15 @@ config DA850_UI_RMII
+>  	  NOTE: Please take care while choosing this option, MII PHY will
+>  	  not be functional if RMII mode is selected.
+>  
+> +config DA850_UI_SD_VIDEO_PORT
+> +	bool "Video Port Interface"
+> +	help
+> +	  Say Y if you want to use Video Port Interface (VPIF) on the
+> +	  DA850/OMAP-L138 EVM. The Video decoders/encoders are found on the
+> +	  UI daughter card that is supplied with the EVM.
+> +	  NOTE: Please make sure to disable RMII and CLCD options when you
+> +	  select Video Port Interface.
 
-Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
----
-:000000 100644 0000000... 692659e... A	Documentation/devicetree/bindings/sound/davinci-mcasp-audio.txt
-:100644 100644 6a2c54c... db7756a... M	sound/soc/davinci/davinci-mcasp.c
- .../bindings/sound/davinci-mcasp-audio.txt         |   43 ++++++++
- sound/soc/davinci/davinci-mcasp.c                  |  113 +++++++++++++++++++-
- 2 files changed, 155 insertions(+), 1 deletions(-)
+RMII is in the same choice block as this so it is not possible to have
+RMII enabled along with video port selection. On the CLCD, it will be
+good to register only one of CLCD or video and print a warning if user
+enabled both. davinci_evm_init() in
+arch/arm/mach-davinci/board-dm644x-evm.c has an example of this.
 
-diff --git a/Documentation/devicetree/bindings/sound/davinci-mcasp-audio.txt b/Documentation/devicetree/bindings/sound/davinci-mcasp-audio.txt
-new file mode 100644
-index 0000000..692659e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/davinci-mcasp-audio.txt
-@@ -0,0 +1,43 @@
-+Texas Instruments McASP controller
-+
-+Required properties:
-+- compatible :
-+	"ti,dm646x-mcasp-audio"	: for DM646x platforms
-+	"ti,da830-mcasp-audio"	: for both DA830 & DA850 platforms
-+
-+- reg : Should contain McASP registers offset and length
-+- interrupts : Interrupt number for McASP
-+- op-mode : I2S/DIT ops mode.
-+- tdm-slots : Slots for TDM operation.
-+- num-serializer : Serializers used by McASP.
-+- serial-dir : A list of serializer pin mode. The list number should be equal
-+		to "num-serializer" parameter. Each entry is a number indication
-+		serializer pin direction. (0 - INACTIVE, 1 - TX, 2 - RX)
-+
-+
-+Optional properties:
-+
-+- ti,hwmods : Must be "mcasp<n>", n is controller instance starting 0
-+- tx-num-evt : FIFO levels.
-+- rx-num-evt : FIFO levels.
-+
-+
-+Example:
-+
-+mcasp0: mcasp0 at 1d00000 {
-+	compatible = "ti,da830-mcasp-audio";
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	reg = <0x100000 0x3000>;
-+	interrupts = <82 83>;
-+	op-mode = <0>;		/* MCASP_IIS_MODE */
-+	tdm-slots = <2>;
-+	num-serializer = <16>;
-+	serial-dir = <
-+			0 0 0 0	/* 0: INACTIVE, 1: TX, 2: RX */
-+			0 0 0 0
-+			0 0 0 1
-+			2 0 0 0 >;
-+	tx-num-evt = <1>;
-+	rx-num-evt = <1>;
-+};
-diff --git a/sound/soc/davinci/davinci-mcasp.c b/sound/soc/davinci/davinci-mcasp.c
-index 6a2c54c..db7756a 100644
---- a/sound/soc/davinci/davinci-mcasp.c
-+++ b/sound/soc/davinci/davinci-mcasp.c
-@@ -22,6 +22,9 @@
- #include <linux/delay.h>
- #include <linux/io.h>
- #include <linux/pm_runtime.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_device.h>
- 
- #include <sound/core.h>
- #include <sound/pcm.h>
-@@ -862,19 +865,127 @@ static struct snd_soc_dai_driver davinci_mcasp_dai[] = {
- 
- };
- 
-+static const struct of_device_id mcasp_dt_ids[] = {
-+	{
-+		.compatible = "ti,dm646x-mcasp-audio",
-+		.data = (void *)MCASP_VERSION_1,
-+	},
-+	{
-+		.compatible = "ti,da830-mcasp-audio",
-+		.data = (void *)MCASP_VERSION_2,
-+	},
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mcasp_dt_ids);
-+
-+static u8 of_serial_dir[16];
-+
-+static struct snd_platform_data *davinci_mcasp_set_pdata_from_of(
-+						struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct snd_platform_data *pdata = NULL;
-+	const struct of_device_id *match =
-+			of_match_device(of_match_ptr(mcasp_dt_ids), &pdev->dev);
-+
-+	const u32 *of_serial_dir32;
-+	u32 val;
-+	int i, ret = 0;
-+
-+	if (pdev->dev.platform_data) {
-+		pdata = pdev->dev.platform_data;
-+		return pdata;
-+	} else if (match) {
-+		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+		if (!pdata) {
-+			ret = -ENOMEM;
-+			goto nodata;
-+		}
-+	} else {
-+		/* control shouldn't reach here. something is wrong */
-+		ret = -EINVAL;
-+		goto nodata;
-+	}
-+
-+	if (match->data)
-+		pdata->version = (u8)((int)match->data);
-+
-+	ret = of_property_read_u32(np, "op-mode", &val);
-+	if (ret < 0)
-+		goto nodata;
-+	pdata->op_mode = val;
-+
-+	ret = of_property_read_u32(np, "tdm-slots", &pdata->tdm_slots);
-+	if (ret < 0)
-+		goto nodata;
-+
-+	ret = of_property_read_u32(np, "num-serializer", &val);
-+	if (ret < 0)
-+		goto nodata;
-+	pdata->num_serializer = val;
-+
-+	of_serial_dir32 = of_get_property(np, "serial-dir", &val);
-+	val /= sizeof(u32);
-+	if (val != pdata->num_serializer) {
-+		ret = -EINVAL;
-+		goto nodata;
-+	}
-+
-+	if (of_serial_dir32) {
-+		for (i = 0; i < pdata->num_serializer; i++)
-+			of_serial_dir[i] = be32_to_cpup(&of_serial_dir32[i]);
-+
-+		pdata->serial_dir = of_serial_dir;
-+	}
-+
-+	ret = of_property_read_u32(np, "tx-num-evt", &val);
-+	if (ret >= 0)
-+		pdata->txnumevt = val;
-+
-+	ret = of_property_read_u32(np, "rx-num-evt", &val);
-+	if (ret >= 0)
-+		pdata->rxnumevt = val;
-+
-+	ret = of_property_read_u32(np, "sram-size-playback", &val);
-+	if (ret >= 0)
-+		pdata->sram_size_playback = val;
-+
-+	ret = of_property_read_u32(np, "sram-size-capture", &val);
-+	if (ret >= 0)
-+		pdata->sram_size_capture = val;
-+
-+nodata:
-+	if (ret < 0)
-+		dev_err(&pdev->dev, "Error populating platform data, err %d\n",
-+			ret);
-+	return  pdata;
-+}
-+
- static int davinci_mcasp_probe(struct platform_device *pdev)
- {
- 	struct davinci_pcm_dma_params *dma_data;
- 	struct resource *mem, *ioarea, *res;
- 	struct snd_platform_data *pdata;
- 	struct davinci_audio_dev *dev;
-+
- 	int ret;
- 
-+	if (!pdev->dev.platform_data && !pdev->dev.of_node) {
-+		dev_err(&pdev->dev, "No platform data supplied\n");
-+		return -EINVAL;
-+	}
-+
- 	dev = devm_kzalloc(&pdev->dev, sizeof(struct davinci_audio_dev),
- 			   GFP_KERNEL);
- 	if (!dev)
- 		return	-ENOMEM;
- 
-+	pdata = davinci_mcasp_set_pdata_from_of(pdev);
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "no platform data\n");
-+		return -EINVAL;
-+	}
-+
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!mem) {
- 		dev_err(&pdev->dev, "no mem resource?\n");
-@@ -888,7 +999,6 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
- 		return -EBUSY;
- 	}
- 
--	pdata = pdev->dev.platform_data;
- 	pm_runtime_enable(&pdev->dev);
- 
- 	ret = pm_runtime_get_sync(&pdev->dev);
-@@ -976,6 +1086,7 @@ static struct platform_driver davinci_mcasp_driver = {
- 	.driver		= {
- 		.name	= "davinci-mcasp",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(mcasp_dt_ids),
- 	},
- };
- 
--- 
-1.7.1
+> +
+>  endchoice
+>  
+>  config DA850_WL12XX
+> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> index 0149fb4..1f5d2c1 100644
+> --- a/arch/arm/mach-davinci/board-da850-evm.c
+> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> @@ -45,6 +45,8 @@
+>  #include <mach/aemif.h>
+>  #include <mach/spi.h>
+>  
+> +#include <media/tvp514x.h>
+> +
+>  #define DA850_EVM_PHY_ID		"davinci_mdio-0:00"
+>  #define DA850_LCD_PWR_PIN		GPIO_TO_PIN(2, 8)
+>  #define DA850_LCD_BL_PIN		GPIO_TO_PIN(2, 15)
+> @@ -121,6 +123,12 @@ static struct spi_board_info da850evm_spi_info[] = {
+>  	},
+>  };
+>  
+> +#define TVP5147_CH0		"tvp514x-0"
+> +#define TVP5147_CH1		"tvp514x-1"
+> +
+> +#define VPIF_STATUS		0x002c
+> +#define VPIF_STATUS_CLR		0x0030
+> +
+>  #ifdef CONFIG_MTD
+>  static void da850_evm_m25p80_notify_add(struct mtd_info *mtd)
+>  {
+> @@ -452,6 +460,15 @@ static void da850_evm_ui_keys_init(unsigned gpio)
+>  	}
+>  }
+>  
+> +#ifdef CONFIG_DA850_UI_SD_VIDEO_PORT
+> +static inline void da850_evm_setup_video_port(int video_sel)
+> +{
+> +	gpio_set_value_cansleep(video_sel, 0);
+> +}
+> +#else
+> +static inline void da850_evm_setup_video_port(int video_sel) { }
+> +#endif
+> +
+>  static int da850_evm_ui_expander_setup(struct i2c_client *client, unsigned gpio,
+>  						unsigned ngpio, void *c)
+>  {
+> @@ -497,6 +514,8 @@ static int da850_evm_ui_expander_setup(struct i2c_client *client, unsigned gpio,
+>  
+>  	da850_evm_setup_emac_rmii(sel_a);
+>  
+> +	da850_evm_setup_video_port(sel_c);
+> +
+>  	return 0;
+>  
+>  exp_setup_keys_fail:
+> @@ -1149,6 +1168,151 @@ static __init int da850_evm_init_cpufreq(void)
+>  static __init int da850_evm_init_cpufreq(void) { return 0; }
+>  #endif
+>  
+> +/* Retaining these APIs, since the VPIF drivers do not check NULL handlers */
+> +static int da850_set_vpif_clock(int mux_mode, int hd)
+> +{
+> +	return 0;
+> +}
+> +
+> +static int da850_setup_vpif_input_channel_mode(int mux_mode)
+> +{
+> +	return 0;
+> +}
+> +
+> +int da850_vpif_setup_input_path(int ch, const char *name)
+> +{
+> +	return 0;
+> +}
+
+Why not enhance the VPIF driver to handle NULL values for these instead?
+
+> +
+> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
+> +/* VPIF capture configuration */
+> +static struct tvp514x_platform_data tvp5146_pdata = {
+> +	.clk_polarity = 0,
+> +	.hs_polarity = 1,
+> +	.vs_polarity = 1
+> +};
+> +#endif
+> +
+> +#define TVP514X_STD_ALL (V4L2_STD_NTSC | V4L2_STD_PAL)
+> +
+> +static struct vpif_subdev_info da850_vpif_capture_sdev_info[] = {
+> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
+
+Why not just continue with the previous #ifdef
+CONFIG_DA850_UI_SD_VIDEO_PORT?
+
+> +	{
+> +		.name	= TVP5147_CH0,
+> +		.board_info = {
+> +			I2C_BOARD_INFO("tvp5146", 0x5d),
+> +			.platform_data = &tvp5146_pdata,
+> +		},
+> +		.input = INPUT_CVBS_VI2B,
+> +		.output = OUTPUT_10BIT_422_EMBEDDED_SYNC,
+> +		.can_route = 1,
+> +		.vpif_if = {
+> +			.if_type = VPIF_IF_BT656,
+> +			.hd_pol = 1,
+> +			.vd_pol = 1,
+> +			.fid_pol = 0,
+> +		},
+> +	},
+> +	{
+> +		.name	= TVP5147_CH1,
+> +		.board_info = {
+> +			I2C_BOARD_INFO("tvp5146", 0x5c),
+> +			.platform_data = &tvp5146_pdata,
+> +		},
+> +		.input = INPUT_SVIDEO_VI2C_VI1C,
+> +		.output = OUTPUT_10BIT_422_EMBEDDED_SYNC,
+> +		.can_route = 1,
+> +		.vpif_if = {
+> +			.if_type = VPIF_IF_BT656,
+> +			.hd_pol = 1,
+> +			.vd_pol = 1,
+> +			.fid_pol = 0,
+> +		},
+> +	},
+> +#endif
+> +};
+> +
+> +static const struct vpif_input da850_ch0_inputs[] = {
+> +	{
+> +		.input = {
+> +			.index = 0,
+> +			.name = "Composite",
+> +			.type = V4L2_INPUT_TYPE_CAMERA,
+> +			.std = TVP514X_STD_ALL,
+> +		},
+> +		.subdev_name = TVP5147_CH0,
+> +	},
+> +};
+> +
+> +static const struct vpif_input da850_ch1_inputs[] = {
+> +	{
+> +		.input = {
+> +			.index = 0,
+> +			.name = "S-Video",
+> +			.type = V4L2_INPUT_TYPE_CAMERA,
+> +			.std = TVP514X_STD_ALL,
+> +		},
+> +		.subdev_name = TVP5147_CH1,
+> +	},
+> +};
+> +
+> +static struct vpif_capture_config da850_vpif_capture_config = {
+> +	.setup_input_channel_mode = da850_setup_vpif_input_channel_mode,
+> +	.setup_input_path = da850_vpif_setup_input_path,
+> +	.subdev_info = da850_vpif_capture_sdev_info,
+> +	.subdev_count = ARRAY_SIZE(da850_vpif_capture_sdev_info),
+> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
+
+Same here.
+
+> +	.chan_config[0] = {
+> +		.inputs = da850_ch0_inputs,
+> +		.input_count = ARRAY_SIZE(da850_ch0_inputs),
+> +	},
+> +	.chan_config[1] = {
+> +		.inputs = da850_ch1_inputs,
+> +		.input_count = ARRAY_SIZE(da850_ch1_inputs),
+> +	},
+> +#endif
+> +	.card_name      = "DA850/OMAP-L138 Video Capture",
+> +};
+> +
+> +/* VPIF display configuration */
+> +static struct vpif_subdev_info da850_vpif_subdev[] = {
+> +	{
+> +		.name	= "adv7343",
+> +		.board_info = {
+> +			I2C_BOARD_INFO("adv7343", 0x2a),
+> +		},
+> +	},
+> +};
+> +
+> +static const char const *vpif_output[] = {
+> +	"Composite",
+> +	"Component",
+> +	"S-Video",
+> +};
+> +
+> +static struct vpif_display_config da850_vpif_display_config = {
+> +	.set_clock	= da850_set_vpif_clock,
+> +	.subdevinfo	= da850_vpif_subdev,
+> +	.subdev_count	= ARRAY_SIZE(da850_vpif_subdev),
+> +	.output		= vpif_output,
+> +	.output_count	= ARRAY_SIZE(vpif_output),
+> +	.card_name	= "DA850/OMAP-L138 Video Display",
+> +};
+> +
+> +#if defined(CONFIG_VIDEO_DAVINCI_VPIF_DISPLAY) ||\
+> +		defined(CONFIG_VIDEO_DAVINCI_VPIF_DISPLAY_MODULE)
+> +#define HAS_VPIF_DISPLAY 1
+> +#else
+> +#define HAS_VPIF_DISPLAY 0
+> +#endif
+> +
+> +#if defined(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) ||\
+> +		defined(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE_MODULE)
+> +#define HAS_VPIF_CAPTURE 1
+> +#else
+> +#define HAS_VPIF_CAPTURE 0
+> +#endif
+> +
+>  #ifdef CONFIG_DA850_WL12XX
+>  
+>  static void wl12xx_set_power(int index, bool power_on)
+> @@ -1375,6 +1539,37 @@ static __init void da850_evm_init(void)
+>  		pr_warning("da850_evm_init: suspend registration failed: %d\n",
+>  				ret);
+>  
+> +	if (HAS_VPIF_DISPLAY || HAS_VPIF_CAPTURE) {
+> +		ret = da850_register_vpif();
+> +		if (ret)
+> +			pr_warn("da850_evm_init: VPIF setup failed: %d\n",
+> +				   ret);
+> +	}
+> +
+> +	if (HAS_VPIF_CAPTURE) {
+> +		ret = davinci_cfg_reg_list(da850_vpif_capture_pins);
+> +		if (ret)
+> +			pr_warn("da850_evm_init: VPIF capture mux failed:%d\n",
+> +					ret);
+> +
+> +		ret = da850_register_vpif_capture(&da850_vpif_capture_config);
+> +		if (ret)
+> +			pr_warn("da850_evm_init: VPIF capture setup" \
+> +			" failed: %d\n", ret);
+
+Please don't break print messages.
+
+> +	}
+> +
+> +	if (HAS_VPIF_DISPLAY) {
+> +		ret = davinci_cfg_reg_list(da850_vpif_display_pins);
+> +		if (ret)
+> +			pr_warn("da850_evm_init : VPIF capture mux failed" \
+> +			": %d\n", ret);
+> +
+> +		ret = da850_register_vpif_display(&da850_vpif_display_config);
+> +		if (ret)
+> +			pr_warn("da850_evm_init: VPIF display setup" \
+> +			" failed: %d\n", ret);
+
+Same here.
+
+Thanks,
+Sekhar
