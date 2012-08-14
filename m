@@ -1,39 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 14 Aug 2012 09:35:19 +0800
-Subject: [PATCH v2 1/2] ARM: i.MX35: Add kernel oftree support
-In-Reply-To: <20120813153503.GC2232@pengutronix.de>
-References: <1344591170-13638-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20120813081518.GA27480@S2101-09.ap.freescale.net>
- <20120813153503.GC2232@pengutronix.de>
-Message-ID: <20120814013517.GC27792@S2101-09.ap.freescale.net>
+From: jason77.wang@gmail.com (Hui Wang)
+Date: Tue, 14 Aug 2012 09:46:04 +0800
+Subject: [PATCH 0/9] ARM perf updates for 3.7
+In-Reply-To: <20120813093201.GB19113@mudshark.cambridge.arm.com>
+References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
+ <5028C4C9.6020002@gmail.com>
+ <20120813093201.GB19113@mudshark.cambridge.arm.com>
+Message-ID: <5029ADDC.10908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 13, 2012 at 05:35:03PM +0200, Uwe Kleine-K?nig wrote:
-> Hi Shawn,
-> 
-> On Mon, Aug 13, 2012 at 04:15:21PM +0800, Shawn Guo wrote:
-> > On Fri, Aug 10, 2012 at 11:32:49AM +0200, Uwe Kleine-K?nig wrote:
-> > > +		emi at 80000000 { /* External Memory Interface */
-> > > +			compatible = "fsl,emi", "simple-bus";
-> > > +			#address-cells = <1>;
-> > > +			#size-cells = <1>;
-> > > +			reg = <0x80000000 0x40000000>;
-> > > +			ranges;
-> > > +
-> > > +			nand at bb000000 {
-> > > +				#address-cells = <1>;
-> > > +				#size-cells = <1>;
-> > > +
-> > These should not be needed, until you will have sub-nodes with "reg"
-> > property.
-> 
-> The obvious sub-nodes are partitions. I thought it sensible to already
-> add #address-cells and #size-cells because they are identical for all
-> users and so repeating is minimized.
-> 
-Yes, you are right.  How did I forget such an obvious use case?
+Will Deacon wrote:
+> On Mon, Aug 13, 2012 at 10:11:37AM +0100, Hui Wang wrote:
+>   
+>> Hi Will Deacon,
+>>     
+>
+> Hello,
+>
+>   
+>> For SMP platforms, each CPU core has an independent PMU, and each PMU 
+>> has a dedicated irq (SPI or PPI). Current perf subsystem framework only 
+>> supports each PMU to have a dedicated SPI irq, and it will support each 
+>> PMU to have a PPI irq (i have seen someone has sent out the patches), 
+>> but there is a situation the subsystem doesn't support yet, the 
+>> situation is multi PMUs share one same SPI irq, e.g. the i.MX6Quad CPU 
+>> has 4 cortex-a9 cores, each core has a PMU, all PMU irqs are routed 
+>> (ORed) to one SPI irq, do you know how to support this situation?
+>>     
+>
+> That's what I like to call a braindead, broken system. Seriously, CPU PMU
+> interrupts *can only* be handled on the CPU which raised them -- ORing these
+> things together means ping-ponging the interrupt affinity around until we
+> find the right guy. There's also the fun case where multiple PMUs assert
+> simultaneously and I've even heard about platforms where they OR in the
+> bloody L2 PMU interrupt as well for good measure!
+>
+> If you have to support such a device, take a look at the ux500 code
+> (db8500_pmu_handler), but please take all of your profiling numbers with a
+> pinch of salt. For a quad-core processor, the numbers will probably be even
+> less accurate.
+>
+> Also, please go ahead and inflict sufficient injuries to your hardware guys
+> that they stop this madness!
+>   
+Got it, thanks for the information, it is very useful.
 
--- 
 Regards,
-Shawn
+Hui.
+
+
+> Will
+>
+>   
