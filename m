@@ -1,46 +1,63 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 13 Aug 2012 22:00:45 -0700
-Subject: [PATCH v3 05/10] resource: add PCI configuration space support
-In-Reply-To: <1343332512-28762-6-git-send-email-thierry.reding@avionic-design.de>
+Date: Mon, 13 Aug 2012 22:06:38 -0700
+Subject: [PATCH v3 01/10] PCI: Keep pci_fixup_irqs() around after init
+In-Reply-To: <1343332512-28762-2-git-send-email-thierry.reding@avionic-design.de>
 References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
- <1343332512-28762-6-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <CAErSpo4qg45brVRwEbw3=R04VsbnvUowSMWcT+M6VoAxbf3Cqg@mail.gmail.com>
+ <1343332512-28762-2-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <CAErSpo5YDwstHv7B7LEbDQmnHnuVsMA2ibTFNLkiCKmkkeE4Zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
 <thierry.reding@avionic-design.de> wrote:
-> This commit adds a new flag that allows marking resources as PCI
-> configuration space.
->
+> When using deferred driver probing, PCI host controller drivers may
+> actually require this function after the init stage.
+
+Yes, this is a bug.  Actually, there's still another bug here: if we
+hot-add a device, we won't do pdev_fixup_irq() for it.  But your
+change is worthwhile even without fixing that other bug.
+
+Normally I would include this in my PCI tree since it's under
+drivers/pci.  That would make it easier for somebody to fix the
+hotplug problem in this cycle.  Would having it in my PCI tree make
+things harder for you?
+
 > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+
 > ---
 > Changes in v3:
-> - new patch
+> - none
 >
->  include/linux/ioport.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Changes in v2:
+> - use __devinit annotations
 >
-> diff --git a/include/linux/ioport.h b/include/linux/ioport.h
-> index 589e0e7..3314843 100644
-> --- a/include/linux/ioport.h
-> +++ b/include/linux/ioport.h
-> @@ -102,7 +102,7 @@ struct resource {
+>  drivers/pci/setup-irq.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 >
->  /* PCI control bits.  Shares IORESOURCE_BITS with above PCI ROM.  */
->  #define IORESOURCE_PCI_FIXED           (1<<4)  /* Do not move resource */
-> -
-> +#define IORESOURCE_PCI_CS              (1<<5)  /* PCI configuration space */
-
-What is the purpose of this?  It seems that you are marking regions
-that we call MMCONFIG on x86, or ECAM-type regions in the language of
-the PCIe spec.  I see that you set it in several places, but I don't
-see anything that ever looks for it.  Do you have plans to use it in
-the future?  If it really does correspond to MMCONFIG/ECAM, we should
-handle those regions consistently across all architectures.
-
->  /* helpers to define resources */
->  #define DEFINE_RES_NAMED(_start, _size, _name, _flags)                 \
+> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
+> index eb219a1..f0bcd56 100644
+> --- a/drivers/pci/setup-irq.c
+> +++ b/drivers/pci/setup-irq.c
+> @@ -18,7 +18,7 @@
+>  #include <linux/cache.h>
+>
+>
+> -static void __init
+> +static void __devinit
+>  pdev_fixup_irq(struct pci_dev *dev,
+>                u8 (*swizzle)(struct pci_dev *, u8 *),
+>                int (*map_irq)(const struct pci_dev *, u8, u8))
+> @@ -54,7 +54,7 @@ pdev_fixup_irq(struct pci_dev *dev,
+>         pcibios_update_irq(dev, irq);
+>  }
+>
+> -void __init
+> +void __devinit
+>  pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *, u8 *),
+>                int (*map_irq)(const struct pci_dev *, u8, u8))
+>  {
 > --
 > 1.7.11.2
 >
