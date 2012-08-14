@@ -1,56 +1,51 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 14 Aug 2012 19:48:54 +0530
-Subject: [PATCHv6 12/24] i2c: omap: bus: add a receiver flag
+Date: Tue, 14 Aug 2012 19:48:44 +0530
+Subject: [PATCHv6 02/24] i2c: omap: simplify num_bytes handling
 In-Reply-To: <1344953946-13005-1-git-send-email-shubhrajyoti@ti.com>
 References: <1344953946-13005-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1344953946-13005-13-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1344953946-13005-3-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-that way we can ignore TX IRQs while in receiver
-mode and ignore RX IRQs while in transmitter mode.
+trivial patch, no functional changes
+
+If the fifo is disabled or fifo_size is 0 the num_bytes
+is set to 1. Else it is set to fifo_size or in case of a
+draining interrupt the remaining bytes in the buff stat.
+So the zero check is redundant and can be safely optimised.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
-[Remove unnecessary braces]
+Reviewed-by : Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index e9907b5..fa54d41 100644
+index 6449383..9b003a3 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -199,6 +199,7 @@ struct omap_i2c_dev {
- 						 */
- 	u8			rev;
- 	unsigned		b_hw:1;		/* bad h/w fixes */
-+	unsigned		receiver:1;	/* true when we're in receiver mode */
- 	u16			iestate;	/* Saved interrupt register */
- 	u16			pscstate;
- 	u16			scllstate;
-@@ -492,6 +493,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
- 
- 	INIT_COMPLETION(dev->cmd_complete);
- 	dev->cmd_err = 0;
-+	dev->receiver = !!(msg->flags & I2C_M_RD);
- 
- 	w = OMAP_I2C_CON_EN | OMAP_I2C_CON_MST | OMAP_I2C_CON_STT;
- 
-@@ -837,6 +839,12 @@ omap_i2c_isr(int this_irq, void *dev_id)
- 		stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
- 		stat &= bits;
- 
-+		/* If we're in receiver mode, ignore XDR/XRDY */
-+		if (dev->receiver)
-+			stat &= ~(OMAP_I2C_STAT_XDR | OMAP_I2C_STAT_XRDY);
-+		else
-+			stat &= ~(OMAP_I2C_STAT_RDR | OMAP_I2C_STAT_RRDY);
-+
- 		if (!stat) {
- 			/* my work here is done */
- 			return IRQ_HANDLED;
+@@ -812,8 +812,7 @@ complete:
+ 							OMAP_I2C_BUFSTAT_REG)
+ 							>> 8) & 0x3F;
+ 			}
+-			while (num_bytes) {
+-				num_bytes--;
++			while (num_bytes--) {
+ 				w = omap_i2c_read_reg(dev, OMAP_I2C_DATA_REG);
+ 				if (dev->buf_len) {
+ 					*dev->buf++ = w;
+@@ -855,8 +854,7 @@ complete:
+ 							OMAP_I2C_BUFSTAT_REG)
+ 							& 0x3F;
+ 			}
+-			while (num_bytes) {
+-				num_bytes--;
++			while (num_bytes--) {
+ 				w = 0;
+ 				if (dev->buf_len) {
+ 					w = *dev->buf++;
 -- 
 1.7.5.4
