@@ -1,41 +1,35 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Aug 2012 18:52:08 +0100
-Subject: [PATCH v2 07/31] arm64: Process management
+Date: Tue, 14 Aug 2012 18:52:26 +0100
+Subject: [PATCH v2 25/31] arm64: Performance counters support
 In-Reply-To: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
 References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1344966752-16102-8-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1344966752-16102-26-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds support for thread creation and context switching. The
-context switching CPU specific code is introduced with the CPU support
-patch (part of the arch/arm64/mm/proc.S file). AArch64 supports
-ASID-tagged TLBs and the ASID can be either 8 or 16-bit wide (detectable
-via the ID_AA64AFR0_EL1 register).
+From: Will Deacon <will.deacon@arm.com>
+
+This patch adds support for the AArch64 performance counters.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/mmu_context.h |  152 +++++++++++++
- arch/arm64/include/asm/thread_info.h |  124 ++++++++++
- arch/arm64/kernel/process.c          |  416 ++++++++++++++++++++++++++++++++++
- arch/arm64/mm/context.c              |  159 +++++++++++++
- 4 files changed, 851 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/mmu_context.h
- create mode 100644 arch/arm64/include/asm/thread_info.h
- create mode 100644 arch/arm64/kernel/process.c
- create mode 100644 arch/arm64/mm/context.c
+ arch/arm64/include/asm/perf_event.h |   22 +
+ arch/arm64/include/asm/pmu.h        |   82 +++
+ arch/arm64/kernel/perf_event.c      | 1368 +++++++++++++++++++++++++++++++++++
+ tools/perf/perf.h                   |    6 +
+ 4 files changed, 1478 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm64/include/asm/perf_event.h
+ create mode 100644 arch/arm64/include/asm/pmu.h
+ create mode 100644 arch/arm64/kernel/perf_event.c
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
 new file mode 100644
-index 0000000..f68465d
+index 0000000..a6fffd5
 --- /dev/null
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -0,0 +1,152 @@
++++ b/arch/arm64/include/asm/perf_event.h
+@@ -0,0 +1,22 @@
 +/*
-+ * Based on arch/arm/include/asm/mmu_context.h
-+ *
-+ * Copyright (C) 1996 Russell King.
 + * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -50,282 +44,114 @@ index 0000000..f68465d
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#ifndef __ASM_MMU_CONTEXT_H
-+#define __ASM_MMU_CONTEXT_H
 +
-+#include <linux/compiler.h>
-+#include <linux/sched.h>
++#ifndef __ASM_PERF_EVENT_H
++#define __ASM_PERF_EVENT_H
 +
-+#include <asm/cacheflush.h>
-+#include <asm/proc-fns.h>
-+#include <asm-generic/mm_hooks.h>
-+#include <asm/cputype.h>
-+#include <asm/pgtable.h>
++/* It's quiet around here... */
 +
-+#define MAX_ASID_BITS	16
-+
-+extern unsigned int cpu_last_asid;
-+
-+void __init_new_context(struct task_struct *tsk, struct mm_struct *mm);
-+void __new_context(struct mm_struct *mm);
-+
++#endif
+diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
+new file mode 100644
+index 0000000..e6f0878
+--- /dev/null
++++ b/arch/arm64/include/asm/pmu.h
+@@ -0,0 +1,82 @@
 +/*
-+ * Set TTBR0 to empty_zero_page. No translations will be possible via TTBR0.
++ * Based on arch/arm/include/asm/pmu.h
++ *
++ * Copyright (C) 2009 picoChip Designs Ltd, Jamie Iles
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+static inline void cpu_set_reserved_ttbr0(void)
-+{
-+	unsigned long ttbr = page_to_phys(empty_zero_page);
++#ifndef __ASM_PMU_H
++#define __ASM_PMU_H
 +
-+	asm(
-+	"	msr	ttbr0_el1, %0			// set TTBR0\n"
-+	"	isb"
-+	:
-+	: "r" (ttbr));
-+}
++#ifdef CONFIG_HW_PERF_EVENTS
 +
-+static inline void switch_new_context(struct mm_struct *mm)
-+{
-+	unsigned long flags;
-+
-+	__new_context(mm);
-+
-+	local_irq_save(flags);
-+	cpu_switch_mm(mm->pgd, mm);
-+	local_irq_restore(flags);
-+}
-+
-+static inline void check_and_switch_context(struct mm_struct *mm,
-+					    struct task_struct *tsk)
-+{
++/* The events for a given PMU register set. */
++struct pmu_hw_events {
 +	/*
-+	 * Required during context switch to avoid speculative page table
-+	 * walking with the wrong TTBR.
++	 * The events that are active on the PMU for the given index.
 +	 */
-+	cpu_set_reserved_ttbr0();
++	struct perf_event	**events;
 +
-+	if (!((mm->context.id ^ cpu_last_asid) >> MAX_ASID_BITS))
-+		/*
-+		 * The ASID is from the current generation, just switch to the
-+		 * new pgd. This condition is only true for calls from
-+		 * context_switch() and interrupts are already disabled.
-+		 */
-+		cpu_switch_mm(mm->pgd, mm);
-+	else if (irqs_disabled())
-+		/*
-+		 * Defer the new ASID allocation until after the context
-+		 * switch critical region since __new_context() cannot be
-+		 * called with interrupts disabled.
-+		 */
-+		set_ti_thread_flag(task_thread_info(tsk), TIF_SWITCH_MM);
-+	else
-+		/*
-+		 * That is a direct call to switch_mm() or activate_mm() with
-+		 * interrupts enabled and a new context.
-+		 */
-+		switch_new_context(mm);
-+}
++	/*
++	 * A 1 bit for an index indicates that the counter is being used for
++	 * an event. A 0 means that the counter can be used.
++	 */
++	unsigned long           *used_mask;
 +
-+#define init_new_context(tsk,mm)	(__init_new_context(tsk,mm),0)
-+#define destroy_context(mm)		do { } while(0)
-+
-+#define finish_arch_post_lock_switch \
-+	finish_arch_post_lock_switch
-+static inline void finish_arch_post_lock_switch(void)
-+{
-+	if (test_and_clear_thread_flag(TIF_SWITCH_MM)) {
-+		struct mm_struct *mm = current->mm;
-+		unsigned long flags;
-+
-+		__new_context(mm);
-+
-+		local_irq_save(flags);
-+		cpu_switch_mm(mm->pgd, mm);
-+		local_irq_restore(flags);
-+	}
-+}
-+
-+/*
-+ * This is called when "tsk" is about to enter lazy TLB mode.
-+ *
-+ * mm:  describes the currently active mm context
-+ * tsk: task which is entering lazy tlb
-+ * cpu: cpu number which is entering lazy tlb
-+ *
-+ * tsk->mm will be NULL
-+ */
-+static inline void
-+enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
-+{
-+}
-+
-+/*
-+ * This is the actual mm switch as far as the scheduler
-+ * is concerned.  No registers are touched.  We avoid
-+ * calling the CPU specific function when the mm hasn't
-+ * actually changed.
-+ */
-+static inline void
-+switch_mm(struct mm_struct *prev, struct mm_struct *next,
-+	  struct task_struct *tsk)
-+{
-+	unsigned int cpu = smp_processor_id();
-+
-+#ifdef CONFIG_SMP
-+	/* check for possible thread migration */
-+	if (!cpumask_empty(mm_cpumask(next)) &&
-+	    !cpumask_test_cpu(cpu, mm_cpumask(next)))
-+		__flush_icache_all();
-+#endif
-+	if (!cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) || prev != next)
-+		check_and_switch_context(next, tsk);
-+}
-+
-+#define deactivate_mm(tsk,mm)	do { } while (0)
-+#define activate_mm(prev,next)	switch_mm(prev, next, NULL)
-+
-+#endif
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-new file mode 100644
-index 0000000..4f909a3
---- /dev/null
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -0,0 +1,124 @@
-+/*
-+ * Based on arch/arm/include/asm/thread_info.h
-+ *
-+ * Copyright (C) 2002 Russell King.
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_THREAD_INFO_H
-+#define __ASM_THREAD_INFO_H
-+
-+#ifdef __KERNEL__
-+
-+#include <linux/compiler.h>
-+
-+#define THREAD_SIZE_ORDER	1
-+#define THREAD_SIZE		8192
-+#define THREAD_START_SP		(THREAD_SIZE - 16)
-+
-+#ifndef __ASSEMBLY__
-+
-+struct task_struct;
-+struct exec_domain;
-+
-+#include <asm/types.h>
-+
-+typedef unsigned long mm_segment_t;
-+
-+/*
-+ * low level task data that entry.S needs immediate access to.
-+ * __switch_to() assumes cpu_context follows immediately after cpu_domain.
-+ */
-+struct thread_info {
-+	unsigned long		flags;		/* low level flags */
-+	mm_segment_t		addr_limit;	/* address limit */
-+	struct task_struct	*task;		/* main task structure */
-+	struct exec_domain	*exec_domain;	/* execution domain */
-+	struct restart_block	restart_block;
-+	int			preempt_count;	/* 0 => preemptable, <0 => bug */
-+	int			cpu;		/* cpu */
++	/*
++	 * Hardware lock to serialize accesses to PMU registers. Needed for the
++	 * read/modify/write sequences.
++	 */
++	raw_spinlock_t		pmu_lock;
 +};
 +
-+#define INIT_THREAD_INFO(tsk)						\
-+{									\
-+	.task		= &tsk,						\
-+	.exec_domain	= &default_exec_domain,				\
-+	.flags		= 0,						\
-+	.preempt_count	= INIT_PREEMPT_COUNT,				\
-+	.addr_limit	= KERNEL_DS,					\
-+	.restart_block	= {						\
-+		.fn	= do_no_restart_syscall,			\
-+	},								\
-+}
++struct arm_pmu {
++	struct pmu		pmu;
++	cpumask_t		active_irqs;
++	const char		*name;
++	irqreturn_t		(*handle_irq)(int irq_num, void *dev);
++	void			(*enable)(struct hw_perf_event *evt, int idx);
++	void			(*disable)(struct hw_perf_event *evt, int idx);
++	int			(*get_event_idx)(struct pmu_hw_events *hw_events,
++						 struct hw_perf_event *hwc);
++	int			(*set_event_filter)(struct hw_perf_event *evt,
++						    struct perf_event_attr *attr);
++	u32			(*read_counter)(int idx);
++	void			(*write_counter)(int idx, u32 val);
++	void			(*start)(void);
++	void			(*stop)(void);
++	void			(*reset)(void *);
++	int			(*map_event)(struct perf_event *event);
++	int			num_events;
++	atomic_t		active_events;
++	struct mutex		reserve_mutex;
++	u64			max_period;
++	struct platform_device	*plat_device;
++	struct pmu_hw_events	*(*get_hw_events)(void);
++};
 +
-+#define init_thread_info	(init_thread_union.thread_info)
-+#define init_stack		(init_thread_union.stack)
++#define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
 +
-+/*
-+ * how to get the thread information struct from C
-+ */
-+static inline struct thread_info *current_thread_info(void) __attribute_const__;
++int __init armpmu_register(struct arm_pmu *armpmu, char *name, int type);
 +
-+static inline struct thread_info *current_thread_info(void)
-+{
-+	register unsigned long sp asm ("sp");
-+	return (struct thread_info *)(sp & ~(THREAD_SIZE - 1));
-+}
++u64 armpmu_event_update(struct perf_event *event,
++			struct hw_perf_event *hwc,
++			int idx);
 +
-+#define thread_saved_pc(tsk)	\
-+	((unsigned long)(tsk->thread.cpu_context.pc))
-+#define thread_saved_sp(tsk)	\
-+	((unsigned long)(tsk->thread.cpu_context.sp))
-+#define thread_saved_fp(tsk)	\
-+	((unsigned long)(tsk->thread.cpu_context.fp))
++int armpmu_event_set_period(struct perf_event *event,
++			    struct hw_perf_event *hwc,
++			    int idx);
 +
-+#endif
-+
-+/*
-+ * We use bit 30 of the preempt_count to indicate that kernel
-+ * preemption is occurring.  See <asm/hardirq.h>.
-+ */
-+#define PREEMPT_ACTIVE	0x40000000
-+
-+/*
-+ * thread information flags:
-+ *  TIF_SYSCALL_TRACE	- syscall trace active
-+ *  TIF_SIGPENDING	- signal pending
-+ *  TIF_NEED_RESCHED	- rescheduling necessary
-+ *  TIF_NOTIFY_RESUME	- callback before returning to user
-+ *  TIF_USEDFPU		- FPU was used by this task this quantum (SMP)
-+ *  TIF_POLLING_NRFLAG	- true if poll_idle() is polling TIF_NEED_RESCHED
-+ */
-+#define TIF_SIGPENDING		0
-+#define TIF_NEED_RESCHED	1
-+#define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
-+#define TIF_SYSCALL_TRACE	8
-+#define TIF_POLLING_NRFLAG	16
-+#define TIF_MEMDIE		18	/* is terminating due to OOM killer */
-+#define TIF_FREEZE		19
-+#define TIF_RESTORE_SIGMASK	20
-+#define TIF_SINGLESTEP		21
-+#define TIF_32BIT		22	/* 32bit process */
-+#define TIF_SWITCH_MM		23	/* deferred switch_mm */
-+
-+#define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
-+#define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
-+#define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
-+#define _TIF_32BIT		(1 << TIF_32BIT)
-+
-+#define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
-+				 _TIF_NOTIFY_RESUME)
-+
-+#endif /* __KERNEL__ */
-+#endif /* __ASM_THREAD_INFO_H */
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
++#endif /* CONFIG_HW_PERF_EVENTS */
++#endif /* __ASM_PMU_H */
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
 new file mode 100644
-index 0000000..c4a4e1c
+index 0000000..ecbf2d8
 --- /dev/null
-+++ b/arch/arm64/kernel/process.c
-@@ -0,0 +1,416 @@
++++ b/arch/arm64/kernel/perf_event.c
+@@ -0,0 +1,1368 @@
 +/*
-+ * Based on arch/arm/kernel/process.c
++ * PMU support
 + *
-+ * Original Copyright (C) 1995  Linus Torvalds
-+ * Copyright (C) 1996-2000 Russell King - Converted to ARM.
-+ * Copyright (C) 2012 ARM Ltd.
++ * Copyright (C) 2012 ARM Limited
++ * Author: Will Deacon <will.deacon@arm.com>
++ *
++ * This code is based heavily on the ARMv7 perf event code.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -339,565 +165,1368 @@ index 0000000..c4a4e1c
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
++#define pr_fmt(fmt) "hw perfevents: " fmt
 +
-+#include <stdarg.h>
-+
-+#include <linux/export.h>
-+#include <linux/sched.h>
-+#include <linux/kernel.h>
-+#include <linux/mm.h>
-+#include <linux/stddef.h>
-+#include <linux/unistd.h>
-+#include <linux/user.h>
-+#include <linux/delay.h>
-+#include <linux/reboot.h>
++#include <linux/bitmap.h>
 +#include <linux/interrupt.h>
-+#include <linux/kallsyms.h>
-+#include <linux/init.h>
-+#include <linux/cpu.h>
-+#include <linux/elfcore.h>
-+#include <linux/pm.h>
-+#include <linux/tick.h>
-+#include <linux/utsname.h>
++#include <linux/kernel.h>
++#include <linux/export.h>
++#include <linux/perf_event.h>
++#include <linux/platform_device.h>
++#include <linux/spinlock.h>
 +#include <linux/uaccess.h>
-+#include <linux/random.h>
-+#include <linux/hw_breakpoint.h>
-+#include <linux/personality.h>
-+#include <linux/notifier.h>
 +
-+#include <asm/cacheflush.h>
-+#include <asm/processor.h>
++#include <asm/cputype.h>
++#include <asm/irq.h>
++#include <asm/irq_regs.h>
++#include <asm/pmu.h>
 +#include <asm/stacktrace.h>
-+#include <asm/fpsimd.h>
 +
-+extern void setup_mm_for_reboot(void);
++/*
++ * ARMv8 supports a maximum of 32 events.
++ * The cycle counter is included in this total.
++ */
++#define ARMPMU_MAX_HWEVENTS		32
 +
-+static void setup_restart(void)
++static DEFINE_PER_CPU(struct perf_event * [ARMPMU_MAX_HWEVENTS], hw_events);
++static DEFINE_PER_CPU(unsigned long [BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)], used_mask);
++static DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
++
++#define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
++
++/* Set at runtime when we know what CPU type we are. */
++static struct arm_pmu *cpu_pmu;
++
++int
++armpmu_get_max_events(void)
 +{
++	int max_events = 0;
++
++	if (cpu_pmu != NULL)
++		max_events = cpu_pmu->num_events;
++
++	return max_events;
++}
++EXPORT_SYMBOL_GPL(armpmu_get_max_events);
++
++int perf_num_counters(void)
++{
++	return armpmu_get_max_events();
++}
++EXPORT_SYMBOL_GPL(perf_num_counters);
++
++#define HW_OP_UNSUPPORTED		0xFFFF
++
++#define C(_x) \
++	PERF_COUNT_HW_CACHE_##_x
++
++#define CACHE_OP_UNSUPPORTED		0xFFFF
++
++static int
++armpmu_map_cache_event(const unsigned (*cache_map)
++				      [PERF_COUNT_HW_CACHE_MAX]
++				      [PERF_COUNT_HW_CACHE_OP_MAX]
++				      [PERF_COUNT_HW_CACHE_RESULT_MAX],
++		       u64 config)
++{
++	unsigned int cache_type, cache_op, cache_result, ret;
++
++	cache_type = (config >>  0) & 0xff;
++	if (cache_type >= PERF_COUNT_HW_CACHE_MAX)
++		return -EINVAL;
++
++	cache_op = (config >>  8) & 0xff;
++	if (cache_op >= PERF_COUNT_HW_CACHE_OP_MAX)
++		return -EINVAL;
++
++	cache_result = (config >> 16) & 0xff;
++	if (cache_result >= PERF_COUNT_HW_CACHE_RESULT_MAX)
++		return -EINVAL;
++
++	ret = (int)(*cache_map)[cache_type][cache_op][cache_result];
++
++	if (ret == CACHE_OP_UNSUPPORTED)
++		return -ENOENT;
++
++	return ret;
++}
++
++static int
++armpmu_map_event(const unsigned (*event_map)[PERF_COUNT_HW_MAX], u64 config)
++{
++	int mapping = (*event_map)[config];
++	return mapping == HW_OP_UNSUPPORTED ? -ENOENT : mapping;
++}
++
++static int
++armpmu_map_raw_event(u32 raw_event_mask, u64 config)
++{
++	return (int)(config & raw_event_mask);
++}
++
++static int map_cpu_event(struct perf_event *event,
++			 const unsigned (*event_map)[PERF_COUNT_HW_MAX],
++			 const unsigned (*cache_map)
++					[PERF_COUNT_HW_CACHE_MAX]
++					[PERF_COUNT_HW_CACHE_OP_MAX]
++					[PERF_COUNT_HW_CACHE_RESULT_MAX],
++			 u32 raw_event_mask)
++{
++	u64 config = event->attr.config;
++
++	switch (event->attr.type) {
++	case PERF_TYPE_HARDWARE:
++		return armpmu_map_event(event_map, config);
++	case PERF_TYPE_HW_CACHE:
++		return armpmu_map_cache_event(cache_map, config);
++	case PERF_TYPE_RAW:
++		return armpmu_map_raw_event(raw_event_mask, config);
++	}
++
++	return -ENOENT;
++}
++
++int
++armpmu_event_set_period(struct perf_event *event,
++			struct hw_perf_event *hwc,
++			int idx)
++{
++	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
++	s64 left = local64_read(&hwc->period_left);
++	s64 period = hwc->sample_period;
++	int ret = 0;
++
++	if (unlikely(left <= -period)) {
++		left = period;
++		local64_set(&hwc->period_left, left);
++		hwc->last_period = period;
++		ret = 1;
++	}
++
++	if (unlikely(left <= 0)) {
++		left += period;
++		local64_set(&hwc->period_left, left);
++		hwc->last_period = period;
++		ret = 1;
++	}
++
++	if (left > (s64)armpmu->max_period)
++		left = armpmu->max_period;
++
++	local64_set(&hwc->prev_count, (u64)-left);
++
++	armpmu->write_counter(idx, (u64)(-left) & 0xffffffff);
++
++	perf_event_update_userpage(event);
++
++	return ret;
++}
++
++u64
++armpmu_event_update(struct perf_event *event,
++		    struct hw_perf_event *hwc,
++		    int idx)
++{
++	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
++	u64 delta, prev_raw_count, new_raw_count;
++
++again:
++	prev_raw_count = local64_read(&hwc->prev_count);
++	new_raw_count = armpmu->read_counter(idx);
++
++	if (local64_cmpxchg(&hwc->prev_count, prev_raw_count,
++			     new_raw_count) != prev_raw_count)
++		goto again;
++
++	delta = (new_raw_count - prev_raw_count) & armpmu->max_period;
++
++	local64_add(delta, &event->count);
++	local64_sub(delta, &hwc->period_left);
++
++	return new_raw_count;
++}
++
++static void
++armpmu_read(struct perf_event *event)
++{
++	struct hw_perf_event *hwc = &event->hw;
++
++	/* Don't read disabled counters! */
++	if (hwc->idx < 0)
++		return;
++
++	armpmu_event_update(event, hwc, hwc->idx);
++}
++
++static void
++armpmu_stop(struct perf_event *event, int flags)
++{
++	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
++
 +	/*
-+	 * Tell the mm system that we are going to reboot -
-+	 * we may need it to insert some 1:1 mappings so that
-+	 * soft boot works.
++	 * ARM pmu always has to update the counter, so ignore
++	 * PERF_EF_UPDATE, see comments in armpmu_start().
 +	 */
-+	setup_mm_for_reboot();
-+
-+	/* Clean and invalidate caches */
-+	flush_cache_all();
-+
-+	/* Turn off caching */
-+	cpu_proc_fin();
-+
-+	/* Push out any further dirty data, and ensure cache is empty */
-+	flush_cache_all();
-+}
-+
-+void soft_restart(unsigned long addr)
-+{
-+	setup_restart();
-+	cpu_reset(addr);
-+}
-+
-+/*
-+ * Function pointers to optional machine specific functions
-+ */
-+void (*pm_power_off)(void);
-+EXPORT_SYMBOL(pm_power_off);
-+
-+void (*pm_restart)(const char *cmd);
-+EXPORT_SYMBOL_GPL(pm_restart);
-+
-+
-+/*
-+ * This is our default idle handler.
-+ */
-+static void default_idle(void)
-+{
-+	/*
-+	 * This should do all the clock switching and wait for interrupt
-+	 * tricks
-+	 */
-+	cpu_do_idle();
-+	local_irq_enable();
-+}
-+
-+void (*pm_idle)(void) = default_idle;
-+EXPORT_SYMBOL(pm_idle);
-+
-+/*
-+ * The idle thread, has rather strange semantics for calling pm_idle,
-+ * but this is what x86 does and we need to do the same, so that
-+ * things like cpuidle get called in the same way.  The only difference
-+ * is that we always respect 'hlt_counter' to prevent low power idle.
-+ */
-+void cpu_idle(void)
-+{
-+	local_fiq_enable();
-+
-+	/* endless idle loop with no priority at all */
-+	while (1) {
-+		tick_nohz_idle_enter();
-+		rcu_idle_enter();
-+		while (!need_resched()) {
-+			/*
-+			 * We need to disable interrupts here to ensure
-+			 * we don't miss a wakeup call.
-+			 */
-+			local_irq_disable();
-+			if (!need_resched()) {
-+				stop_critical_timings();
-+				pm_idle();
-+				start_critical_timings();
-+				/*
-+				 * pm_idle functions should always return
-+				 * with IRQs enabled.
-+				 */
-+				WARN_ON(irqs_disabled());
-+			} else {
-+				local_irq_enable();
-+			}
-+		}
-+		rcu_idle_exit();
-+		tick_nohz_idle_exit();
-+		preempt_enable_no_resched();
-+		schedule();
-+		preempt_disable();
++	if (!(hwc->state & PERF_HES_STOPPED)) {
++		armpmu->disable(hwc, hwc->idx);
++		barrier(); /* why? */
++		armpmu_event_update(event, hwc, hwc->idx);
++		hwc->state |= PERF_HES_STOPPED | PERF_HES_UPTODATE;
 +	}
 +}
 +
-+void machine_shutdown(void)
++static void
++armpmu_start(struct perf_event *event, int flags)
 +{
-+#ifdef CONFIG_SMP
-+	smp_send_stop();
-+#endif
-+}
-+
-+void machine_halt(void)
-+{
-+	machine_shutdown();
-+	while (1);
-+}
-+
-+void machine_power_off(void)
-+{
-+	machine_shutdown();
-+	if (pm_power_off)
-+		pm_power_off();
-+}
-+
-+void machine_restart(char *cmd)
-+{
-+	machine_shutdown();
-+
-+	/* Disable interrupts first */
-+	local_irq_disable();
-+	local_fiq_disable();
-+
-+	/* Now call the architecture specific reboot code. */
-+	if (pm_restart)
-+		pm_restart(cmd);
++	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
 +
 +	/*
-+	 * Whoops - the architecture was unable to reboot.
-+	 * Tell the user!
++	 * ARM pmu always has to reprogram the period, so ignore
++	 * PERF_EF_RELOAD, see the comment below.
 +	 */
-+	mdelay(1000);
-+	printk("Reboot failed -- System halted\n");
-+	while (1);
++	if (flags & PERF_EF_RELOAD)
++		WARN_ON_ONCE(!(hwc->state & PERF_HES_UPTODATE));
++
++	hwc->state = 0;
++	/*
++	 * Set the period again. Some counters can't be stopped, so when we
++	 * were stopped we simply disabled the IRQ source and the counter
++	 * may have been left counting. If we don't do this step then we may
++	 * get an interrupt too soon or *way* too late if the overflow has
++	 * happened since disabling.
++	 */
++	armpmu_event_set_period(event, hwc, hwc->idx);
++	armpmu->enable(hwc, hwc->idx);
 +}
 +
-+void __show_regs(struct pt_regs *regs)
++static void
++armpmu_del(struct perf_event *event, int flags)
 +{
-+	int i;
++	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
++	struct pmu_hw_events *hw_events = armpmu->get_hw_events();
++	struct hw_perf_event *hwc = &event->hw;
++	int idx = hwc->idx;
 +
-+	printk("CPU: %d    %s  (%s %.*s)\n",
-+		raw_smp_processor_id(), print_tainted(),
-+		init_utsname()->release,
-+		(int)strcspn(init_utsname()->version, " "),
-+		init_utsname()->version);
-+	print_symbol("PC is at %s\n", instruction_pointer(regs));
-+	print_symbol("LR is at %s\n", regs->regs[30]);
-+	printk("pc : [<%016llx>] lr : [<%016llx>] pstate: %08llx\n",
-+	       regs->pc, regs->regs[30], regs->pstate);
-+	printk("sp : %016llx\n", regs->sp);
-+	for (i = 29; i >= 0; i--) {
-+		printk("x%-2d: %016llx ", i, regs->regs[i]);
-+		if (i % 2 == 0)
-+			printk("\n");
++	WARN_ON(idx < 0);
++
++	armpmu_stop(event, PERF_EF_UPDATE);
++	hw_events->events[idx] = NULL;
++	clear_bit(idx, hw_events->used_mask);
++
++	perf_event_update_userpage(event);
++}
++
++static int
++armpmu_add(struct perf_event *event, int flags)
++{
++	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
++	struct pmu_hw_events *hw_events = armpmu->get_hw_events();
++	struct hw_perf_event *hwc = &event->hw;
++	int idx;
++	int err = 0;
++
++	perf_pmu_disable(event->pmu);
++
++	/* If we don't have a space for the counter then finish early. */
++	idx = armpmu->get_event_idx(hw_events, hwc);
++	if (idx < 0) {
++		err = idx;
++		goto out;
 +	}
-+	printk("\n");
++
++	/*
++	 * If there is an event in the counter we are going to use then make
++	 * sure it is disabled.
++	 */
++	event->hw.idx = idx;
++	armpmu->disable(hwc, idx);
++	hw_events->events[idx] = event;
++
++	hwc->state = PERF_HES_STOPPED | PERF_HES_UPTODATE;
++	if (flags & PERF_EF_START)
++		armpmu_start(event, PERF_EF_RELOAD);
++
++	/* Propagate our changes to the userspace mapping. */
++	perf_event_update_userpage(event);
++
++out:
++	perf_pmu_enable(event->pmu);
++	return err;
 +}
 +
-+void show_regs(struct pt_regs * regs)
++static int
++validate_event(struct pmu_hw_events *hw_events,
++	       struct perf_event *event)
 +{
-+	printk("\n");
-+	printk("Pid: %d, comm: %20s\n", task_pid_nr(current), current->comm);
-+	__show_regs(regs);
++	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event fake_event = event->hw;
++	struct pmu *leader_pmu = event->group_leader->pmu;
++
++	if (event->pmu != leader_pmu || event->state <= PERF_EVENT_STATE_OFF)
++		return 1;
++
++	return armpmu->get_event_idx(hw_events, &fake_event) >= 0;
 +}
 +
-+/*
-+ * Free current thread data structures etc..
-+ */
-+void exit_thread(void)
++static int
++validate_group(struct perf_event *event)
 +{
-+}
++	struct perf_event *sibling, *leader = event->group_leader;
++	struct pmu_hw_events fake_pmu;
++	DECLARE_BITMAP(fake_used_mask, ARMPMU_MAX_HWEVENTS);
 +
-+void flush_thread(void)
-+{
-+	fpsimd_flush_thread();
-+	flush_ptrace_hw_breakpoint(current);
-+}
++	/*
++	 * Initialise the fake PMU. We only need to populate the
++	 * used_mask for the purposes of validation.
++	 */
++	memset(fake_used_mask, 0, sizeof(fake_used_mask));
++	fake_pmu.used_mask = fake_used_mask;
 +
-+void release_thread(struct task_struct *dead_task)
-+{
-+}
++	if (!validate_event(&fake_pmu, leader))
++		return -EINVAL;
 +
-+int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
-+{
-+	fpsimd_save_state(&current->thread.fpsimd_state);
-+	*dst = *src;
++	list_for_each_entry(sibling, &leader->sibling_list, group_entry) {
++		if (!validate_event(&fake_pmu, sibling))
++			return -EINVAL;
++	}
++
++	if (!validate_event(&fake_pmu, event))
++		return -EINVAL;
++
 +	return 0;
 +}
 +
-+asmlinkage void ret_from_fork(void) asm("ret_from_fork");
-+
-+int copy_thread(unsigned long clone_flags, unsigned long stack_start,
-+		unsigned long stk_sz, struct task_struct *p,
-+		struct pt_regs *regs)
++static void
++armpmu_release_hardware(struct arm_pmu *armpmu)
 +{
-+	struct pt_regs *childregs = task_pt_regs(p);
-+	unsigned long tls = p->thread.tp_value;
++	int i, irq, irqs;
++	struct platform_device *pmu_device = armpmu->plat_device;
 +
-+	*childregs = *regs;
-+	childregs->regs[0] = 0;
++	irqs = min(pmu_device->num_resources, num_possible_cpus());
 +
-+#ifdef CONFIG_AARCH32_EMULATION
-+	if (test_ti_thread_flag(task_thread_info(p), TIF_32BIT))
-+		childregs->compat_sp = stack_start;
-+	else
-+#endif
-+	{
++	for (i = 0; i < irqs; ++i) {
++		if (!cpumask_test_and_clear_cpu(i, &armpmu->active_irqs))
++			continue;
++		irq = platform_get_irq(pmu_device, i);
++		if (irq >= 0)
++			free_irq(irq, armpmu);
++	}
++}
++
++static int
++armpmu_reserve_hardware(struct arm_pmu *armpmu)
++{
++	int i, err, irq, irqs;
++	struct platform_device *pmu_device = armpmu->plat_device;
++
++	if (!pmu_device) {
++		pr_err("no PMU device registered\n");
++		return -ENODEV;
++	}
++
++	irqs = min(pmu_device->num_resources, num_possible_cpus());
++	if (irqs < 1) {
++		pr_err("no irqs for PMUs defined\n");
++		return -ENODEV;
++	}
++
++	for (i = 0; i < irqs; ++i) {
++		err = 0;
++		irq = platform_get_irq(pmu_device, i);
++		if (irq < 0)
++			continue;
++
 +		/*
-+		 * Read the current TLS pointer from tpidr_el0 as it may be
-+		 * out-of-sync with the saved value.
++		 * If we have a single PMU interrupt that we can't shift,
++		 * assume that we're running on a uniprocessor machine and
++		 * continue. Otherwise, continue without this interrupt.
 +		 */
-+		asm("mrs %0, tpidr_el0" : "=r" (tls));
-+		childregs->sp = stack_start;
++		if (irq_set_affinity(irq, cpumask_of(i)) && irqs > 1) {
++			pr_warning("unable to set irq affinity (irq=%d, cpu=%u)\n",
++				    irq, i);
++			continue;
++		}
++
++		err = request_irq(irq, armpmu->handle_irq,
++				  IRQF_NOBALANCING,
++				  "arm-pmu", armpmu);
++		if (err) {
++			pr_err("unable to request IRQ%d for ARM PMU counters\n",
++				irq);
++			armpmu_release_hardware(armpmu);
++			return err;
++		}
++
++		cpumask_set_cpu(i, &armpmu->active_irqs);
 +	}
-+
-+	memset(&p->thread.cpu_context, 0, sizeof(struct cpu_context));
-+	p->thread.cpu_context.sp = (unsigned long)childregs;
-+	p->thread.cpu_context.pc = (unsigned long)ret_from_fork;
-+
-+	/* If a TLS pointer was passed to clone, use that for the new thread. */
-+	if (clone_flags & CLONE_SETTLS)
-+		tls = regs->regs[3];
-+	p->thread.tp_value = tls;
-+
-+	ptrace_hw_copy_thread(p);
 +
 +	return 0;
 +}
 +
-+static void tls_thread_switch(struct task_struct *next)
++static void
++hw_perf_event_destroy(struct perf_event *event)
 +{
-+	unsigned long tpidr, tpidrro;
++	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
++	atomic_t *active_events	 = &armpmu->active_events;
++	struct mutex *pmu_reserve_mutex = &armpmu->reserve_mutex;
 +
-+	if (!test_thread_flag(TIF_32BIT)) {
-+		asm("mrs %0, tpidr_el0" : "=r" (tpidr));
-+		current->thread.tp_value = tpidr;
++	if (atomic_dec_and_mutex_lock(active_events, pmu_reserve_mutex)) {
++		armpmu_release_hardware(armpmu);
++		mutex_unlock(pmu_reserve_mutex);
++	}
++}
++
++static int
++event_requires_mode_exclusion(struct perf_event_attr *attr)
++{
++	return attr->exclude_idle || attr->exclude_user ||
++	       attr->exclude_kernel || attr->exclude_hv;
++}
++
++static int
++__hw_perf_event_init(struct perf_event *event)
++{
++	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
++	int mapping, err;
++
++	mapping = armpmu->map_event(event);
++
++	if (mapping < 0) {
++		pr_debug("event %x:%llx not supported\n", event->attr.type,
++			 event->attr.config);
++		return mapping;
 +	}
 +
-+	if (test_ti_thread_flag(task_thread_info(next), TIF_32BIT)) {
-+		tpidr = 0;
-+		tpidrro = next->thread.tp_value;
++	/*
++	 * We don't assign an index until we actually place the event onto
++	 * hardware. Use -1 to signify that we haven't decided where to put it
++	 * yet. For SMP systems, each core has it's own PMU so we can't do any
++	 * clever allocation or constraints checking at this point.
++	 */
++	hwc->idx		= -1;
++	hwc->config_base	= 0;
++	hwc->config		= 0;
++	hwc->event_base		= 0;
++
++	/*
++	 * Check whether we need to exclude the counter from certain modes.
++	 */
++	if ((!armpmu->set_event_filter ||
++	     armpmu->set_event_filter(hwc, &event->attr)) &&
++	     event_requires_mode_exclusion(&event->attr)) {
++		pr_debug("ARM performance counters do not support mode exclusion\n");
++		return -EPERM;
++	}
++
++	/*
++	 * Store the event encoding into the config_base field.
++	 */
++	hwc->config_base	    |= (unsigned long)mapping;
++
++	if (!hwc->sample_period) {
++		/*
++		 * For non-sampling runs, limit the sample_period to half
++		 * of the counter width. That way, the new counter value
++		 * is far less likely to overtake the previous one unless
++		 * you have some serious IRQ latency issues.
++		 */
++		hwc->sample_period  = armpmu->max_period >> 1;
++		hwc->last_period    = hwc->sample_period;
++		local64_set(&hwc->period_left, hwc->sample_period);
++	}
++
++	err = 0;
++	if (event->group_leader != event) {
++		err = validate_group(event);
++		if (err)
++			return -EINVAL;
++	}
++
++	return err;
++}
++
++static int armpmu_event_init(struct perf_event *event)
++{
++	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
++	int err = 0;
++	atomic_t *active_events = &armpmu->active_events;
++
++	if (armpmu->map_event(event) == -ENOENT)
++		return -ENOENT;
++
++	event->destroy = hw_perf_event_destroy;
++
++	if (!atomic_inc_not_zero(active_events)) {
++		mutex_lock(&armpmu->reserve_mutex);
++		if (atomic_read(active_events) == 0)
++			err = armpmu_reserve_hardware(armpmu);
++
++		if (!err)
++			atomic_inc(active_events);
++		mutex_unlock(&armpmu->reserve_mutex);
++	}
++
++	if (err)
++		return err;
++
++	err = __hw_perf_event_init(event);
++	if (err)
++		hw_perf_event_destroy(event);
++
++	return err;
++}
++
++static void armpmu_enable(struct pmu *pmu)
++{
++	struct arm_pmu *armpmu = to_arm_pmu(pmu);
++	struct pmu_hw_events *hw_events = armpmu->get_hw_events();
++	int enabled = bitmap_weight(hw_events->used_mask, armpmu->num_events);
++
++	if (enabled)
++		armpmu->start();
++}
++
++static void armpmu_disable(struct pmu *pmu)
++{
++	struct arm_pmu *armpmu = to_arm_pmu(pmu);
++	armpmu->stop();
++}
++
++static void __init armpmu_init(struct arm_pmu *armpmu)
++{
++	atomic_set(&armpmu->active_events, 0);
++	mutex_init(&armpmu->reserve_mutex);
++
++	armpmu->pmu = (struct pmu) {
++		.pmu_enable	= armpmu_enable,
++		.pmu_disable	= armpmu_disable,
++		.event_init	= armpmu_event_init,
++		.add		= armpmu_add,
++		.del		= armpmu_del,
++		.start		= armpmu_start,
++		.stop		= armpmu_stop,
++		.read		= armpmu_read,
++	};
++}
++
++int __init armpmu_register(struct arm_pmu *armpmu, char *name, int type)
++{
++	armpmu_init(armpmu);
++	return perf_pmu_register(&armpmu->pmu, name, type);
++}
++
++/*
++ * ARMv8 PMUv3 Performance Events handling code.
++ * Common event types.
++ */
++enum armv8_pmuv3_perf_types {
++	/* Required events. */
++	ARMV8_PMUV3_PERFCTR_PMNC_SW_INCR			= 0x00,
++	ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL			= 0x03,
++	ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS			= 0x04,
++	ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED			= 0x10,
++	ARMV8_PMUV3_PERFCTR_CLOCK_CYCLES			= 0x11,
++	ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED			= 0x12,
++
++	/* At least one of the following is required. */
++	ARMV8_PMUV3_PERFCTR_INSTR_EXECUTED			= 0x08,
++	ARMV8_PMUV3_PERFCTR_OP_SPEC				= 0x1B,
++
++	/* Common architectural events. */
++	ARMV8_PMUV3_PERFCTR_MEM_READ				= 0x06,
++	ARMV8_PMUV3_PERFCTR_MEM_WRITE				= 0x07,
++	ARMV8_PMUV3_PERFCTR_EXC_TAKEN				= 0x09,
++	ARMV8_PMUV3_PERFCTR_EXC_EXECUTED			= 0x0A,
++	ARMV8_PMUV3_PERFCTR_CID_WRITE				= 0x0B,
++	ARMV8_PMUV3_PERFCTR_PC_WRITE				= 0x0C,
++	ARMV8_PMUV3_PERFCTR_PC_IMM_BRANCH			= 0x0D,
++	ARMV8_PMUV3_PERFCTR_PC_PROC_RETURN			= 0x0E,
++	ARMV8_PMUV3_PERFCTR_MEM_UNALIGNED_ACCESS		= 0x0F,
++	ARMV8_PMUV3_PERFCTR_TTBR_WRITE				= 0x1C,
++
++	/* Common microarchitectural events. */
++	ARMV8_PMUV3_PERFCTR_L1_ICACHE_REFILL			= 0x01,
++	ARMV8_PMUV3_PERFCTR_ITLB_REFILL				= 0x02,
++	ARMV8_PMUV3_PERFCTR_DTLB_REFILL				= 0x05,
++	ARMV8_PMUV3_PERFCTR_MEM_ACCESS				= 0x13,
++	ARMV8_PMUV3_PERFCTR_L1_ICACHE_ACCESS			= 0x14,
++	ARMV8_PMUV3_PERFCTR_L1_DCACHE_WB			= 0x15,
++	ARMV8_PMUV3_PERFCTR_L2_CACHE_ACCESS			= 0x16,
++	ARMV8_PMUV3_PERFCTR_L2_CACHE_REFILL			= 0x17,
++	ARMV8_PMUV3_PERFCTR_L2_CACHE_WB				= 0x18,
++	ARMV8_PMUV3_PERFCTR_BUS_ACCESS				= 0x19,
++	ARMV8_PMUV3_PERFCTR_MEM_ERROR				= 0x1A,
++	ARMV8_PMUV3_PERFCTR_BUS_CYCLES				= 0x1D,
++
++	/*
++	 * This isn't an architected event.
++	 * We detect this event number and use the cycle counter instead.
++	 */
++	ARMV8_PMUV3_PERFCTR_CPU_CYCLES				= 0xFF,
++};
++
++/* PMUv3 HW events mapping. */
++static const unsigned armv8_pmuv3_perf_map[PERF_COUNT_HW_MAX] = {
++	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV8_PMUV3_PERFCTR_CPU_CYCLES,
++	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV8_PMUV3_PERFCTR_INSTR_EXECUTED,
++	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
++	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
++	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
++	[PERF_COUNT_HW_BUS_CYCLES]		= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= HW_OP_UNSUPPORTED,
++};
++
++static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
++						[PERF_COUNT_HW_CACHE_OP_MAX]
++						[PERF_COUNT_HW_CACHE_RESULT_MAX] = {
++	[C(L1D)] = {
++		[C(OP_READ)] = {
++			[C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
++			[C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
++		},
++		[C(OP_WRITE)] = {
++			[C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
++			[C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
++		},
++		[C(OP_PREFETCH)] = {
++			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
++			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
++		},
++	},
++	[C(L1I)] = {
++		[C(OP_READ)] = {
++			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
++			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
++		},
++		[C(OP_WRITE)] = {
++			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
++			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
++		},
++		[C(OP_PREFETCH)] = {
++			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
++			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
++		},
++	},
++	[C(LL)] = {
++		[C(OP_READ)] = {
++			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
++			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
++		},
++		[C(OP_WRITE)] = {
++			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
++			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
++		},
++		[C(OP_PREFETCH)] = {
++			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
++			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
++		},
++	},
++	[C(DTLB)] = {
++		[C(OP_READ)] = {
++			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
++			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
++		},
++		[C(OP_WRITE)] = {
++			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
++			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
++		},
++		[C(OP_PREFETCH)] = {
++			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
++			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
++		},
++	},
++	[C(ITLB)] = {
++		[C(OP_READ)] = {
++			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
++			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
++		},
++		[C(OP_WRITE)] = {
++			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
++			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
++		},
++		[C(OP_PREFETCH)] = {
++			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
++			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
++		},
++	},
++	[C(BPU)] = {
++		[C(OP_READ)] = {
++			[C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
++			[C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
++		},
++		[C(OP_WRITE)] = {
++			[C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
++			[C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
++		},
++		[C(OP_PREFETCH)] = {
++			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
++			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
++		},
++	},
++	[C(NODE)] = {
++		[C(OP_READ)] = {
++			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
++			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
++		},
++		[C(OP_WRITE)] = {
++			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
++			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
++		},
++		[C(OP_PREFETCH)] = {
++			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
++			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
++		},
++	},
++};
++
++/*
++ * Perf Events' indices
++ */
++#define	ARMV8_IDX_CYCLE_COUNTER	0
++#define	ARMV8_IDX_COUNTER0	1
++#define	ARMV8_IDX_COUNTER_LAST	(ARMV8_IDX_CYCLE_COUNTER + cpu_pmu->num_events - 1)
++
++#define	ARMV8_MAX_COUNTERS	32
++#define	ARMV8_COUNTER_MASK	(ARMV8_MAX_COUNTERS - 1)
++
++/*
++ * ARMv8 low level PMU access
++ */
++
++/*
++ * Perf Event to low level counters mapping
++ */
++#define	ARMV8_IDX_TO_COUNTER(x)	\
++	(((x) - ARMV8_IDX_COUNTER0) & ARMV8_COUNTER_MASK)
++
++/*
++ * Per-CPU PMCR: config reg
++ */
++#define ARMV8_PMCR_E		(1 << 0) /* Enable all counters */
++#define ARMV8_PMCR_P		(1 << 1) /* Reset all counters */
++#define ARMV8_PMCR_C		(1 << 2) /* Cycle counter reset */
++#define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
++#define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
++#define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
++#define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
++#define	ARMV8_PMCR_N_MASK	0x1f
++#define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
++
++/*
++ * PMOVSR: counters overflow flag status reg
++ */
++#define	ARMV8_OVSR_MASK		0xffffffff	/* Mask for writable bits */
++#define	ARMV8_OVERFLOWED_MASK	ARMV8_OVSR_MASK
++
++/*
++ * PMXEVTYPER: Event selection reg
++ */
++#define	ARMV8_EVTYPE_MASK	0xc00000ff	/* Mask for writable bits */
++#define	ARMV8_EVTYPE_EVENT	0xff		/* Mask for EVENT bits */
++
++/*
++ * Event filters for PMUv3
++ */
++#define	ARMV8_EXCLUDE_EL1	(1 << 31)
++#define	ARMV8_EXCLUDE_EL0	(1 << 30)
++#define	ARMV8_INCLUDE_EL2	(1 << 27)
++
++static inline u32 armv8pmu_pmcr_read(void)
++{
++	u32 val;
++	asm volatile("mrs %0, pmcr_el0" : "=r" (val));
++	return val;
++}
++
++static inline void armv8pmu_pmcr_write(u32 val)
++{
++	val &= ARMV8_PMCR_MASK;
++	isb();
++	asm volatile("msr pmcr_el0, %0" :: "r" (val));
++}
++
++static inline int armv8pmu_has_overflowed(u32 pmovsr)
++{
++	return pmovsr & ARMV8_OVERFLOWED_MASK;
++}
++
++static inline int armv8pmu_counter_valid(int idx)
++{
++	return idx >= ARMV8_IDX_CYCLE_COUNTER && idx <= ARMV8_IDX_COUNTER_LAST;
++}
++
++static inline int armv8pmu_counter_has_overflowed(u32 pmnc, int idx)
++{
++	int ret = 0;
++	u32 counter;
++
++	if (!armv8pmu_counter_valid(idx)) {
++		pr_err("CPU%u checking wrong counter %d overflow status\n",
++			smp_processor_id(), idx);
 +	} else {
-+		tpidr = next->thread.tp_value;
-+		tpidrro = 0;
++		counter = ARMV8_IDX_TO_COUNTER(idx);
++		ret = pmnc & BIT(counter);
 +	}
 +
-+	asm(
-+	"	msr	tpidr_el0, %0\n"
-+	"	msr	tpidrro_el0, %1"
-+	: : "r" (tpidr), "r" (tpidrro));
++	return ret;
 +}
 +
-+/*
-+ * Thread switching.
-+ */
-+struct task_struct *__switch_to(struct task_struct *prev,
-+				struct task_struct *next)
++static inline int armv8pmu_select_counter(int idx)
 +{
-+	struct task_struct *last;
++	u32 counter;
 +
-+	fpsimd_thread_switch(next);
-+	tls_thread_switch(next);
-+	hw_breakpoint_thread_switch(next);
++	if (!armv8pmu_counter_valid(idx)) {
++		pr_err("CPU%u selecting wrong PMNC counter %d\n",
++			smp_processor_id(), idx);
++		return -EINVAL;
++	}
 +
-+	/* the actual thread switch */
-+	last = cpu_switch_to(prev, next);
++	counter = ARMV8_IDX_TO_COUNTER(idx);
++	asm volatile("msr pmselr_el0, %0" :: "r" (counter));
++	isb();
 +
-+	return last;
++	return idx;
 +}
 +
-+/*
-+ * Fill in the task's elfregs structure for a core dump.
-+ */
-+int dump_task_regs(struct task_struct *t, elf_gregset_t *elfregs)
++static inline u32 armv8pmu_read_counter(int idx)
 +{
-+	elf_core_copy_regs(elfregs, task_pt_regs(t));
-+	return 1;
++	u32 value = 0;
++
++	if (!armv8pmu_counter_valid(idx))
++		pr_err("CPU%u reading wrong counter %d\n",
++			smp_processor_id(), idx);
++	else if (idx == ARMV8_IDX_CYCLE_COUNTER)
++		asm volatile("mrs %0, pmccntr_el0" : "=r" (value));
++	else if (armv8pmu_select_counter(idx) == idx)
++		asm volatile("mrs %0, pmxevcntr_el0" : "=r" (value));
++
++	return value;
 +}
 +
-+/*
-+ * fill in the fpe structure for a core dump...
-+ */
-+int dump_fpu (struct pt_regs *regs, struct user_fp *fp)
++static inline void armv8pmu_write_counter(int idx, u32 value)
 +{
-+	return 0;
++	if (!armv8pmu_counter_valid(idx))
++		pr_err("CPU%u writing wrong counter %d\n",
++			smp_processor_id(), idx);
++	else if (idx == ARMV8_IDX_CYCLE_COUNTER)
++		asm volatile("msr pmccntr_el0, %0" :: "r" (value));
++	else if (armv8pmu_select_counter(idx) == idx)
++		asm volatile("msr pmxevcntr_el0, %0" :: "r" (value));
 +}
-+EXPORT_SYMBOL(dump_fpu);
 +
-+/*
-+ * Shuffle the argument into the correct register before calling the
-+ * thread function.  x1 is the thread argument, x2 is the pointer to
-+ * the thread function, and x3 points to the exit function.
-+ */
-+extern void kernel_thread_helper(void);
-+asm(	".section .text\n"
-+"	.align\n"
-+"	.type	kernel_thread_helper, #function\n"
-+"kernel_thread_helper:\n"
-+"	mov	x0, x1\n"
-+"	mov	x30, x3\n"
-+"	br	x2\n"
-+"	.size	kernel_thread_helper, . - kernel_thread_helper\n"
-+"	.previous");
-+
-+#define kernel_thread_exit	do_exit
-+
-+/*
-+ * Create a kernel thread.
-+ */
-+pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
++static inline void armv8pmu_write_evtype(int idx, u32 val)
 +{
-+	struct pt_regs regs;
-+
-+	memset(&regs, 0, sizeof(regs));
-+
-+	regs.regs[1] = (unsigned long)arg;
-+	regs.regs[2] = (unsigned long)fn;
-+	regs.regs[3] = (unsigned long)kernel_thread_exit;
-+	regs.pc = (unsigned long)kernel_thread_helper;
-+	regs.pstate = PSR_MODE_EL1h;
-+
-+	return do_fork(flags|CLONE_VM|CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
++	if (armv8pmu_select_counter(idx) == idx) {
++		val &= ARMV8_EVTYPE_MASK;
++		asm volatile("msr pmxevtyper_el0, %0" :: "r" (val));
++	}
 +}
-+EXPORT_SYMBOL(kernel_thread);
 +
-+unsigned long get_wchan(struct task_struct *p)
++static inline int armv8pmu_enable_counter(int idx)
 +{
-+	struct stackframe frame;
-+	int count = 0;
-+	if (!p || p == current || p->state == TASK_RUNNING)
-+		return 0;
++	u32 counter;
 +
-+	frame.fp = thread_saved_fp(p);
-+	frame.sp = thread_saved_sp(p);
-+	frame.pc = thread_saved_pc(p);
-+	do {
-+		int ret = unwind_frame(&frame);
-+		if (ret < 0)
-+			return 0;
-+		if (!in_sched_functions(frame.pc))
-+			return frame.pc;
-+	} while (count ++ < 16);
-+	return 0;
++	if (!armv8pmu_counter_valid(idx)) {
++		pr_err("CPU%u enabling wrong PMNC counter %d\n",
++			smp_processor_id(), idx);
++		return -EINVAL;
++	}
++
++	counter = ARMV8_IDX_TO_COUNTER(idx);
++	asm volatile("msr pmcntenset_el0, %0" :: "r" (BIT(counter)));
++	return idx;
 +}
 +
-+unsigned long arch_align_stack(unsigned long sp)
++static inline int armv8pmu_disable_counter(int idx)
 +{
-+	if (!(current->personality & ADDR_NO_RANDOMIZE) && randomize_va_space)
-+		sp -= get_random_int() & ~PAGE_MASK;
-+	return sp & ~0xf;
++	u32 counter;
++
++	if (!armv8pmu_counter_valid(idx)) {
++		pr_err("CPU%u disabling wrong PMNC counter %d\n",
++			smp_processor_id(), idx);
++		return -EINVAL;
++	}
++
++	counter = ARMV8_IDX_TO_COUNTER(idx);
++	asm volatile("msr pmcntenclr_el0, %0" :: "r" (BIT(counter)));
++	return idx;
 +}
 +
-+static unsigned long randomize_base(unsigned long base)
++static inline int armv8pmu_enable_intens(int idx)
 +{
-+	unsigned long range_end = base + (STACK_RND_MASK << PAGE_SHIFT) + 1;
-+	return randomize_range(base, range_end, 0) ? : base;
++	u32 counter;
++
++	if (!armv8pmu_counter_valid(idx)) {
++		pr_err("CPU%u enabling wrong PMNC counter IRQ enable %d\n",
++			smp_processor_id(), idx);
++		return -EINVAL;
++	}
++
++	counter = ARMV8_IDX_TO_COUNTER(idx);
++	asm volatile("msr pmintenset_el1, %0" :: "r" (BIT(counter)));
++	return idx;
 +}
 +
-+unsigned long arch_randomize_brk(struct mm_struct *mm)
++static inline int armv8pmu_disable_intens(int idx)
 +{
-+	return randomize_base(mm->brk);
++	u32 counter;
++
++	if (!armv8pmu_counter_valid(idx)) {
++		pr_err("CPU%u disabling wrong PMNC counter IRQ enable %d\n",
++			smp_processor_id(), idx);
++		return -EINVAL;
++	}
++
++	counter = ARMV8_IDX_TO_COUNTER(idx);
++	asm volatile("msr pmintenclr_el1, %0" :: "r" (BIT(counter)));
++	isb();
++	/* Clear the overflow flag in case an interrupt is pending. */
++	asm volatile("msr pmovsclr_el0, %0" :: "r" (BIT(counter)));
++	isb();
++	return idx;
 +}
 +
-+unsigned long randomize_et_dyn(unsigned long base)
++static inline u32 armv8pmu_getreset_flags(void)
 +{
-+	return randomize_base(base);
-+}
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-new file mode 100644
-index 0000000..e06f47a
---- /dev/null
-+++ b/arch/arm64/mm/context.c
-@@ -0,0 +1,159 @@
-+/*
-+ * Based on arch/arm/mm/context.c
-+ *
-+ * Copyright (C) 2002-2003 Deep Blue Solutions Ltd, all rights reserved.
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
++	u32 value;
 +
-+#include <linux/init.h>
-+#include <linux/sched.h>
-+#include <linux/mm.h>
-+#include <linux/smp.h>
-+#include <linux/percpu.h>
++	/* Read */
++	asm volatile("mrs %0, pmovsclr_el0" : "=r" (value));
 +
-+#include <asm/mmu_context.h>
-+#include <asm/tlbflush.h>
-+#include <asm/cachetype.h>
++	/* Write to clear flags */
++	value &= ARMV8_OVSR_MASK;
++	asm volatile("msr pmovsclr_el0, %0" :: "r" (value));
 +
-+#define asid_bits(reg) \
-+	(((read_cpuid(ID_AA64MMFR0_EL1) & 0xf0) >> 2) + 8)
-+
-+#define ASID_FIRST_VERSION	(1 << MAX_ASID_BITS)
-+
-+static DEFINE_SPINLOCK(cpu_asid_lock);
-+unsigned int cpu_last_asid = ASID_FIRST_VERSION;
-+
-+/*
-+ * We fork()ed a process, and we need a new context for the child to run in.
-+ */
-+void __init_new_context(struct task_struct *tsk, struct mm_struct *mm)
-+{
-+	mm->context.id = 0;
-+	spin_lock_init(&mm->context.id_lock);
++	return value;
 +}
 +
-+static void flush_context(void)
-+{
-+	/* set the reserved TTBR0 before flushing the TLB */
-+	cpu_set_reserved_ttbr0();
-+	flush_tlb_all();
-+	if (icache_is_aivivt())
-+		__flush_icache_all();
-+}
-+
-+#ifdef CONFIG_SMP
-+
-+static void set_mm_context(struct mm_struct *mm, unsigned int asid)
++static void armv8pmu_enable_event(struct hw_perf_event *hwc, int idx)
 +{
 +	unsigned long flags;
++	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
 +
 +	/*
-+	 * Locking needed for multi-threaded applications where the same
-+	 * mm->context.id could be set from different CPUs during the
-+	 * broadcast. This function is also called via IPI so the
-+	 * mm->context.id_lock has to be IRQ-safe.
++	 * Enable counter and interrupt, and set the counter to count
++	 * the event that we're interested in.
 +	 */
-+	spin_lock_irqsave(&mm->context.id_lock, flags);
-+	if (likely((mm->context.id ^ cpu_last_asid) >> MAX_ASID_BITS)) {
++	raw_spin_lock_irqsave(&events->pmu_lock, flags);
++
++	/*
++	 * Disable counter
++	 */
++	armv8pmu_disable_counter(idx);
++
++	/*
++	 * Set event (if destined for PMNx counters).
++	 */
++	armv8pmu_write_evtype(idx, hwc->config_base);
++
++	/*
++	 * Enable interrupt for this counter
++	 */
++	armv8pmu_enable_intens(idx);
++
++	/*
++	 * Enable counter
++	 */
++	armv8pmu_enable_counter(idx);
++
++	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
++}
++
++static void armv8pmu_disable_event(struct hw_perf_event *hwc, int idx)
++{
++	unsigned long flags;
++	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
++
++	/*
++	 * Disable counter and interrupt
++	 */
++	raw_spin_lock_irqsave(&events->pmu_lock, flags);
++
++	/*
++	 * Disable counter
++	 */
++	armv8pmu_disable_counter(idx);
++
++	/*
++	 * Disable interrupt for this counter
++	 */
++	armv8pmu_disable_intens(idx);
++
++	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
++}
++
++static irqreturn_t armv8pmu_handle_irq(int irq_num, void *dev)
++{
++	u32 pmovsr;
++	struct perf_sample_data data;
++	struct pmu_hw_events *cpuc;
++	struct pt_regs *regs;
++	int idx;
++
++	/*
++	 * Get and reset the IRQ flags
++	 */
++	pmovsr = armv8pmu_getreset_flags();
++
++	/*
++	 * Did an overflow occur?
++	 */
++	if (!armv8pmu_has_overflowed(pmovsr))
++		return IRQ_NONE;
++
++	/*
++	 * Handle the counter(s) overflow(s)
++	 */
++	regs = get_irq_regs();
++
++	cpuc = &__get_cpu_var(cpu_hw_events);
++	for (idx = 0; idx < cpu_pmu->num_events; ++idx) {
++		struct perf_event *event = cpuc->events[idx];
++		struct hw_perf_event *hwc;
++
++		/* Ignore if we don't have an event. */
++		if (!event)
++			continue;
++
 +		/*
-+		 * Old version of ASID found. Set the new one and reset
-+		 * mm_cpumask(mm).
++		 * We have a single interrupt for all counters. Check that
++		 * each counter has overflowed before we process it.
 +		 */
-+		mm->context.id = asid;
-+		cpumask_clear(mm_cpumask(mm));
++		if (!armv8pmu_counter_has_overflowed(pmovsr, idx))
++			continue;
++
++		hwc = &event->hw;
++		armpmu_event_update(event, hwc, idx);
++		perf_sample_data_init(&data, 0, hwc->last_period);
++		if (!armpmu_event_set_period(event, hwc, idx))
++			continue;
++
++		if (perf_event_overflow(event, &data, regs))
++			cpu_pmu->disable(hwc, idx);
 +	}
-+	spin_unlock_irqrestore(&mm->context.id_lock, flags);
 +
 +	/*
-+	 * Set the mm_cpumask(mm) bit for the current CPU.
++	 * Handle the pending perf events.
++	 *
++	 * Note: this call *must* be run with interrupts disabled. For
++	 * platforms that can have the PMU interrupts raised as an NMI, this
++	 * will not work.
 +	 */
-+	cpumask_set_cpu(smp_processor_id(), mm_cpumask(mm));
++	irq_work_run();
++
++	return IRQ_HANDLED;
++}
++
++static void armv8pmu_start(void)
++{
++	unsigned long flags;
++	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
++
++	raw_spin_lock_irqsave(&events->pmu_lock, flags);
++	/* Enable all counters */
++	armv8pmu_pmcr_write(armv8pmu_pmcr_read() | ARMV8_PMCR_E);
++	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
++}
++
++static void armv8pmu_stop(void)
++{
++	unsigned long flags;
++	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
++
++	raw_spin_lock_irqsave(&events->pmu_lock, flags);
++	/* Disable all counters */
++	armv8pmu_pmcr_write(armv8pmu_pmcr_read() & ~ARMV8_PMCR_E);
++	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
++}
++
++static int armv8pmu_get_event_idx(struct pmu_hw_events *cpuc,
++				  struct hw_perf_event *event)
++{
++	int idx;
++	unsigned long evtype = event->config_base & ARMV8_EVTYPE_EVENT;
++
++	/* Always place a cycle counter into the cycle counter. */
++	if (evtype == ARMV8_PMUV3_PERFCTR_CPU_CYCLES) {
++		if (test_and_set_bit(ARMV8_IDX_CYCLE_COUNTER, cpuc->used_mask))
++			return -EAGAIN;
++
++		return ARMV8_IDX_CYCLE_COUNTER;
++	}
++
++	/*
++	 * For anything other than a cycle counter, try and use
++	 * the events counters
++	 */
++	for (idx = ARMV8_IDX_COUNTER0; idx < cpu_pmu->num_events; ++idx) {
++		if (!test_and_set_bit(idx, cpuc->used_mask))
++			return idx;
++	}
++
++	/* The counters are all in use. */
++	return -EAGAIN;
 +}
 +
 +/*
-+ * Reset the ASID on the current CPU. This function call is broadcast from the
-+ * CPU handling the ASID rollover and holding cpu_asid_lock.
++ * Add an event filter to a given event. This will only work for PMUv2 PMUs.
 + */
-+static void reset_context(void *info)
++static int armv8pmu_set_event_filter(struct hw_perf_event *event,
++				     struct perf_event_attr *attr)
 +{
-+	unsigned int asid;
-+	unsigned int cpu = smp_processor_id();
-+	struct mm_struct *mm = current->active_mm;
++	unsigned long config_base = 0;
 +
-+	smp_rmb();
-+	asid = cpu_last_asid + cpu;
++	if (attr->exclude_idle)
++		return -EPERM;
++	if (attr->exclude_user)
++		config_base |= ARMV8_EXCLUDE_EL0;
++	if (attr->exclude_kernel)
++		config_base |= ARMV8_EXCLUDE_EL1;
++	if (!attr->exclude_hv)
++		config_base |= ARMV8_INCLUDE_EL2;
 +
-+	flush_context();
-+	set_mm_context(mm, asid);
-+
-+	/* set the new ASID */
-+	cpu_switch_mm(mm->pgd, mm);
-+}
-+
-+#else
-+
-+static inline void set_mm_context(struct mm_struct *mm, unsigned int asid)
-+{
-+	mm->context.id = asid;
-+	cpumask_copy(mm_cpumask(mm), cpumask_of(smp_processor_id()));
-+}
-+
-+#endif
-+
-+void __new_context(struct mm_struct *mm)
-+{
-+	unsigned int asid;
-+	unsigned int bits = asid_bits();
-+
-+	spin_lock(&cpu_asid_lock);
-+#ifdef CONFIG_SMP
 +	/*
-+	 * Check the ASID again, in case the change was broadcast from another
-+	 * CPU before we acquired the lock.
++	 * Install the filter into config_base as this is used to
++	 * construct the event type.
 +	 */
-+	if (!unlikely((mm->context.id ^ cpu_last_asid) >> MAX_ASID_BITS)) {
-+		cpumask_set_cpu(smp_processor_id(), mm_cpumask(mm));
-+		spin_unlock(&cpu_asid_lock);
-+		return;
++	event->config_base = config_base;
++
++	return 0;
++}
++
++static void armv8pmu_reset(void *info)
++{
++	u32 idx, nb_cnt = cpu_pmu->num_events;
++
++	/* The counter and interrupt enable registers are unknown at reset. */
++	for (idx = ARMV8_IDX_CYCLE_COUNTER; idx < nb_cnt; ++idx)
++		armv8pmu_disable_event(NULL, idx);
++
++	/* Initialize & Reset PMNC: C and P bits. */
++	armv8pmu_pmcr_write(ARMV8_PMCR_P | ARMV8_PMCR_C);
++
++	/* Disable access from userspace. */
++	asm volatile("msr pmuserenr_el0, %0" :: "r" (0));
++}
++
++static int armv8_pmuv3_map_event(struct perf_event *event)
++{
++	return map_cpu_event(event, &armv8_pmuv3_perf_map,
++				&armv8_pmuv3_perf_cache_map, 0xFF);
++}
++
++static struct arm_pmu armv8pmu = {
++	.handle_irq		= armv8pmu_handle_irq,
++	.enable			= armv8pmu_enable_event,
++	.disable		= armv8pmu_disable_event,
++	.read_counter		= armv8pmu_read_counter,
++	.write_counter		= armv8pmu_write_counter,
++	.get_event_idx		= armv8pmu_get_event_idx,
++	.start			= armv8pmu_start,
++	.stop			= armv8pmu_stop,
++	.reset			= armv8pmu_reset,
++	.max_period		= (1LLU << 32) - 1,
++};
++
++static u32 __init armv8pmu_read_num_pmnc_events(void)
++{
++	u32 nb_cnt;
++
++	/* Read the nb of CNTx counters supported from PMNC */
++	nb_cnt = (armv8pmu_pmcr_read() >> ARMV8_PMCR_N_SHIFT) & ARMV8_PMCR_N_MASK;
++
++	/* Add the CPU cycles counter and return */
++	return nb_cnt + 1;
++}
++
++static struct arm_pmu *__init armv8_pmuv3_pmu_init(void)
++{
++	armv8pmu.name			= "arm/armv8-pmuv3";
++	armv8pmu.map_event		= armv8_pmuv3_map_event;
++	armv8pmu.num_events		= armv8pmu_read_num_pmnc_events();
++	armv8pmu.set_event_filter	= armv8pmu_set_event_filter;
++	return &armv8pmu;
++}
++
++/*
++ * Ensure the PMU has sane values out of reset.
++ * This requires SMP to be available, so exists as a separate initcall.
++ */
++static int __init
++cpu_pmu_reset(void)
++{
++	if (cpu_pmu && cpu_pmu->reset)
++		return on_each_cpu(cpu_pmu->reset, NULL, 1);
++	return 0;
++}
++arch_initcall(cpu_pmu_reset);
++
++/*
++ * PMU platform driver and devicetree bindings.
++ */
++static struct of_device_id armpmu_of_device_ids[] = {
++	{.compatible = "arm,armv8-pmuv3"},
++	{},
++};
++
++static int __devinit armpmu_device_probe(struct platform_device *pdev)
++{
++	if (!cpu_pmu)
++		return -ENODEV;
++
++	cpu_pmu->plat_device = pdev;
++	return 0;
++}
++
++static struct platform_driver armpmu_driver = {
++	.driver		= {
++		.name	= "arm-pmu",
++		.of_match_table = armpmu_of_device_ids,
++	},
++	.probe		= armpmu_device_probe,
++};
++
++static int __init register_pmu_driver(void)
++{
++	return platform_driver_register(&armpmu_driver);
++}
++device_initcall(register_pmu_driver);
++
++static struct pmu_hw_events *armpmu_get_cpu_events(void)
++{
++	return &__get_cpu_var(cpu_hw_events);
++}
++
++static void __init cpu_pmu_init(struct arm_pmu *armpmu)
++{
++	int cpu;
++	for_each_possible_cpu(cpu) {
++		struct pmu_hw_events *events = &per_cpu(cpu_hw_events, cpu);
++		events->events = per_cpu(hw_events, cpu);
++		events->used_mask = per_cpu(used_mask, cpu);
++		raw_spin_lock_init(&events->pmu_lock);
 +	}
-+#endif
-+	/*
-+	 * At this point, it is guaranteed that the current mm (with an old
-+	 * ASID) isn't active on any other CPU since the ASIDs are changed
-+	 * simultaneously via IPI.
-+	 */
-+	asid = ++cpu_last_asid;
++	armpmu->get_hw_events = armpmu_get_cpu_events;
++}
 +
-+	/*
-+	 * If we've used up all our ASIDs, we need to start a new version and
-+	 * flush the TLB.
-+	 */
-+	if (unlikely((asid & ((1 << bits) - 1)) == 0)) {
-+		/* increment the ASID version */
-+		cpu_last_asid += (1 << MAX_ASID_BITS) - (1 << bits);
-+		if (cpu_last_asid == 0)
-+			cpu_last_asid = ASID_FIRST_VERSION;
-+		asid = cpu_last_asid + smp_processor_id();
-+		flush_context();
-+#ifdef CONFIG_SMP
-+		smp_wmb();
-+		smp_call_function(reset_context, NULL, 1);
-+#endif
-+		cpu_last_asid += NR_CPUS - 1;
++static int __init init_hw_perf_events(void)
++{
++	u64 dfr = read_cpuid(ID_AA64DFR0_EL1);
++
++	switch ((dfr >> 8) & 0xf) {
++	case 0x1:	/* PMUv3 */
++		cpu_pmu = armv8_pmuv3_pmu_init();
++		break;
 +	}
 +
-+	set_mm_context(mm, asid);
-+	spin_unlock(&cpu_asid_lock);
++	if (cpu_pmu) {
++		pr_info("enabled with %s PMU driver, %d counters available\n",
++			cpu_pmu->name, cpu_pmu->num_events);
++		cpu_pmu_init(cpu_pmu);
++		armpmu_register(cpu_pmu, "cpu", PERF_TYPE_RAW);
++	} else {
++		pr_info("no hardware support available\n");
++	}
++
++	return 0;
 +}
++early_initcall(init_hw_perf_events);
++
++/*
++ * Callchain handling code.
++ */
++struct frame_tail {
++	struct frame_tail   __user *fp;
++	unsigned long	    lr;
++} __attribute__((packed));
++
++/*
++ * Get the return address for a single stackframe and return a pointer to the
++ * next frame tail.
++ */
++static struct frame_tail __user *
++user_backtrace(struct frame_tail __user *tail,
++	       struct perf_callchain_entry *entry)
++{
++	struct frame_tail buftail;
++	unsigned long err;
++
++	/* Also check accessibility of one struct frame_tail beyond */
++	if (!access_ok(VERIFY_READ, tail, sizeof(buftail)))
++		return NULL;
++
++	pagefault_disable();
++	err = __copy_from_user_inatomic(&buftail, tail, sizeof(buftail));
++	pagefault_enable();
++
++	if (err)
++		return NULL;
++
++	perf_callchain_store(entry, buftail.lr);
++
++	/*
++	 * Frame pointers should strictly progress back up the stack
++	 * (towards higher addresses).
++	 */
++	if (tail >= buftail.fp)
++		return NULL;
++
++	return buftail.fp;
++}
++
++void perf_callchain_user(struct perf_callchain_entry *entry,
++			 struct pt_regs *regs)
++{
++	struct frame_tail __user *tail;
++
++	tail = (struct frame_tail __user *)regs->regs[29];
++
++	while (entry->nr < PERF_MAX_STACK_DEPTH &&
++	       tail && !((unsigned long)tail & 0xf))
++		tail = user_backtrace(tail, entry);
++}
++
++/*
++ * Gets called by walk_stackframe() for every stackframe. This will be called
++ * whist unwinding the stackframe and is like a subroutine return so we use
++ * the PC.
++ */
++static int callchain_trace(struct stackframe *frame, void *data)
++{
++	struct perf_callchain_entry *entry = data;
++	perf_callchain_store(entry, frame->pc);
++	return 0;
++}
++
++void perf_callchain_kernel(struct perf_callchain_entry *entry,
++			   struct pt_regs *regs)
++{
++	struct stackframe frame;
++
++	frame.fp = regs->regs[29];
++	frame.sp = regs->sp;
++	frame.pc = regs->pc;
++	walk_stackframe(&frame, callchain_trace, entry);
++}
+diff --git a/tools/perf/perf.h b/tools/perf/perf.h
+index f960ccb..8c36763 100644
+--- a/tools/perf/perf.h
++++ b/tools/perf/perf.h
+@@ -88,6 +88,12 @@ void get_term_dimensions(struct winsize *ws);
+ #define CPUINFO_PROC	"Processor"
+ #endif
+ 
++#ifdef __aarch64__
++#include "../../arch/arm64/include/asm/unistd.h"
++#define rmb()		asm volatile("dmb ld" ::: "memory")
++#define cpu_relax()	asm volatile("yield" ::: "memory")
++#endif
++
+ #ifdef __mips__
+ #include "../../arch/mips/include/asm/unistd.h"
+ #define rmb()		asm volatile(					\
