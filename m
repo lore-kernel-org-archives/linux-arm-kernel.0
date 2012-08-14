@@ -1,44 +1,31 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Tue, 14 Aug 2012 16:04:16 +0530
-Subject: [PATCHv2 0/4] Add device tree data for omap5
-In-Reply-To: <502A2740.9000206@ti.com>
-References: <1344852313-30484-1-git-send-email-sourav.poddar@ti.com>
- <502A2740.9000206@ti.com>
-Message-ID: <CAKdam56A+Fa2pLT2fnV3sHq--PUwjdUX1U4_4JM=_g9KWoW3kw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Aug 2012 12:44:37 +0200
+Subject: [PATCH 5/8] mfd: Provide the PRCMU with its own IRQ domain
+In-Reply-To: <201208140942.54773.arnd@arndb.de>
+References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
+ <1344527635-6163-6-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZ7bMBytyDppV2sB1d1sUbDpPRqAQVOq8k4UOYdmg+Mkw@mail.gmail.com>
+ <201208140942.54773.arnd@arndb.de>
+Message-ID: <CACRpkdYbOBEPNbCdfi+=gupdqS8_7t7MpOgXs7VCVTs8Y3j_mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On Tue, Aug 14, 2012 at 11:42 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 14 August 2012, Linus Walleij wrote:
+>> On Thu, Aug 9, 2012 at 5:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>>
+>> > +int db8500_irq_get_virq(int irq);
+>>
+>> And I'm sceptic about this business. Why isn't this physical-to virtual
+>> mapping business confined to the core MFD driver? But enlighten me.
+>
+> Traditionally, an MFD would add an offset to the local IRQ number
+> to put the VIRQ into the IRQ resource, but this doesn't work when
+> you have domains other than legacy.
 
-On Tue, Aug 14, 2012 at 3:54 PM, Benoit Cousson <b-cousson@ti.com> wrote:
-> Hi Sourav,
->
-> On 08/13/2012 12:05 PM, Sourav Poddar wrote:
->> The following patch series add i2c support for omap5.
->> As well as enable I2C based devices like pressure and temperature
->> through device tree. Also add onchip keypad dts data.
->
-> That series does not seems to apply on top of 3.6-rc1, what based did
-> you use?
->
-My Bad. Send it on top of the testing branch (3.5-rc7).
-Will rebase and send it on a 3.6-rc1.
-> Benoit
->
->
->>
->> Cc: Benoit Cousson <b-cousson@ti.com>
->> Cc: Felipe Balbi <balbi@ti.com>
->> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>
->> Sourav Poddar (4):
->>   arm/dts: omap5-evm: Add I2C support
->>   arm/dts: omap5-evm: Add tmp102 sensor support
->>   arm/dts: omap5-evm: Add keypad data
->>   arm/dts: omap5-evm: Add bmp085 sensor support
->>
->>  arch/arm/boot/dts/omap5-evm.dts |   30 +++++++++++++++++++++++++++++
->>  arch/arm/boot/dts/omap5.dtsi    |   40 +++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 70 insertions(+), 0 deletions(-)
->>
->
+Yes but I think I saw this other patch set from Lee, hitting
+irqdomain, OF and MFD to actually fix this ... or did I get
+it wrong?
+
+Yours,
+Linus Walleij
