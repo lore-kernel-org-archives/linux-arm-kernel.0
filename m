@@ -1,128 +1,66 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Tue, 14 Aug 2012 19:49:05 +0530
-Subject: [PATCHv6 23/24] i2c: omap: sanitize exit path
+Date: Tue, 14 Aug 2012 19:49:04 +0530
+Subject: [PATCHv6 22/24] i2c: omap: switch over to autosuspend API
 In-Reply-To: <1344953946-13005-1-git-send-email-shubhrajyoti@ti.com>
 References: <1344953946-13005-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1344953946-13005-24-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1344953946-13005-23-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-move the goto out label one line down, so that
-it can be used when stat is read as zero. All
-other exits, can be done with a break statement.
-
-While at that, also break out as soon as we
-complete draining IRQ, since at that time
-we know we transferred everything there was
-to be transferred.
+this helps us reduce unnecessary pm transitions
+in case we have another i2c message starting soon.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   26 +++++++++++++-------------
- 1 files changed, 13 insertions(+), 13 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   12 ++++++++++--
+ 1 files changed, 10 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index d81189a..3df6f92 100644
+index 2d5db56..d81189a 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -901,27 +901,26 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
+@@ -55,6 +55,9 @@
+ /* timeout waiting for the controller to respond */
+ #define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
  
- 		if (!stat) {
- 			/* my work here is done */
--			spin_unlock_irqrestore(&dev->lock, flags);
--			return IRQ_HANDLED;
-+			goto out;
- 		}
- 
- 		dev_dbg(dev->dev, "IRQ (ISR = 0x%04x)\n", stat);
- 		if (count++ == 100) {
- 			dev_warn(dev->dev, "Too much work in one IRQ\n");
--			goto out;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_NACK) {
- 			err |= OMAP_I2C_STAT_NACK;
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
--			goto out;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_AL) {
- 			dev_err(dev->dev, "Arbitration lost\n");
- 			err |= OMAP_I2C_STAT_AL;
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_AL);
--			goto out;
-+			break;
- 		}
- 
- 		/*
-@@ -934,7 +933,7 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 						OMAP_I2C_STAT_XRDY |
- 						OMAP_I2C_STAT_XDR |
- 						OMAP_I2C_STAT_ARDY));
--			goto out;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_RDR) {
-@@ -949,7 +948,7 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 				i2c_omap_errata_i207(dev, stat);
- 
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_RDR);
--			continue;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_RRDY) {
-@@ -972,10 +971,10 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 
- 			ret = omap_i2c_transmit_data(dev, num_bytes, true);
- 			if (ret < 0)
--				goto out;
-+				break;
- 
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XDR);
--			continue;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_XRDY) {
-@@ -987,7 +986,7 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 
- 			ret = omap_i2c_transmit_data(dev, num_bytes, false);
- 			if (ret < 0)
--				goto out;
-+				break;
- 
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XRDY);
- 			continue;
-@@ -997,19 +996,20 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 			dev_err(dev->dev, "Receive overrun\n");
- 			err |= OMAP_I2C_STAT_ROVR;
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_ROVR);
--			goto out;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_XUDF) {
- 			dev_err(dev->dev, "Transmit underflow\n");
- 			err |= OMAP_I2C_STAT_XUDF;
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XUDF);
--			goto out;
-+			break;
- 		}
- 	} while (stat);
- 
--out:
- 	omap_i2c_complete_cmd(dev, err);
++/* timeout for pm runtime autosuspend */
++#define OMAP_I2C_PM_TIMEOUT		1000	/* ms */
 +
-+out:
- 	spin_unlock_irqrestore(&dev->lock, flags);
+ /* For OMAP3 I2C_IV has changed to I2C_WE (wakeup enable) */
+ enum {
+ 	OMAP_I2C_REV_REG = 0,
+@@ -645,7 +648,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
  
- 	return IRQ_HANDLED;
+ 	omap_i2c_wait_for_bb(dev);
+ out:
+-	pm_runtime_put(dev->dev);
++	pm_runtime_mark_last_busy(dev->dev);
++	pm_runtime_put_autosuspend(dev->dev);
+ 	return r;
+ }
+ 
+@@ -1113,6 +1117,9 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		dev->regs = (u8 *)reg_map_ip_v1;
+ 
+ 	pm_runtime_enable(dev->dev);
++	pm_runtime_set_autosuspend_delay(dev->dev, OMAP_I2C_PM_TIMEOUT);
++	pm_runtime_use_autosuspend(dev->dev);
++
+ 	r = pm_runtime_get_sync(dev->dev);
+ 	if (IS_ERR_VALUE(r))
+ 		goto err_free_mem;
+@@ -1190,7 +1197,8 @@ omap_i2c_probe(struct platform_device *pdev)
+ 
+ 	of_i2c_register_devices(adap);
+ 
+-	pm_runtime_put(dev->dev);
++	pm_runtime_mark_last_busy(dev->dev);
++	pm_runtime_put_autosuspend(dev->dev);
+ 
+ 	return 0;
+ 
 -- 
 1.7.5.4
