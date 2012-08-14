@@ -1,72 +1,33 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 14 Aug 2012 17:22:36 +0300
-Subject: [PATCH v2 08/14] Input: twl4030-vibra: Support for DT booted kernel
+Date: Tue, 14 Aug 2012 17:22:33 +0300
+Subject: [PATCH v2 05/14] MFD: twl4030-audio: Get audio MCLK via twl-core API
+ instead of pdata
 In-Reply-To: <1344954162-7985-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1344954162-7985-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1344954162-7985-9-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1344954162-7985-6-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support when the kernel has been booted with DT blob. In this case the
-pdata is NULL, we need to reach up to the core node and check if the codec
-part has been enabled to determine if we need to coexist with the codec or
-not.
+twl-core has API to get the boot time configured HFCLK rate which has the
+same rate as the audio MCLK.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/input/misc/twl4030-vibra.c |   20 ++++++++++++++++++--
- 1 files changed, 18 insertions(+), 2 deletions(-)
+ drivers/mfd/twl4030-audio.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/input/misc/twl4030-vibra.c b/drivers/input/misc/twl4030-vibra.c
-index d1e1a7e..2cfc6c7 100644
---- a/drivers/input/misc/twl4030-vibra.c
-+++ b/drivers/input/misc/twl4030-vibra.c
-@@ -26,6 +26,7 @@
- #include <linux/module.h>
- #include <linux/jiffies.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
- #include <linux/workqueue.h>
- #include <linux/i2c/twl.h>
- #include <linux/mfd/twl4030-audio.h>
-@@ -194,13 +195,28 @@ static int twl4030_vibra_resume(struct device *dev)
- static SIMPLE_DEV_PM_OPS(twl4030_vibra_pm_ops,
- 			 twl4030_vibra_suspend, twl4030_vibra_resume);
- 
-+static bool twl4030_vibra_check_coexist(struct twl4030_vibra_data *pdata,
-+			      struct device_node *node)
-+{
-+	if (pdata && pdata->coexist)
-+		return true;
-+
-+#ifdef CONFIG_OF
-+	if (of_find_node_by_name(node, "codec"))
-+		return true;
-+#endif
-+
-+	return false;
-+}
-+
- static int __devinit twl4030_vibra_probe(struct platform_device *pdev)
- {
- 	struct twl4030_vibra_data *pdata = pdev->dev.platform_data;
-+	struct device_node *twl4030_core_node = pdev->dev.parent->of_node;
- 	struct vibra_info *info;
- 	int ret;
- 
--	if (!pdata) {
-+	if (!pdata && !twl4030_core_node) {
- 		dev_dbg(&pdev->dev, "platform_data not available\n");
- 		return -EINVAL;
- 	}
-@@ -210,7 +226,7 @@ static int __devinit twl4030_vibra_probe(struct platform_device *pdev)
+diff --git a/drivers/mfd/twl4030-audio.c b/drivers/mfd/twl4030-audio.c
+index ca2d669..a48bf3a 100644
+--- a/drivers/mfd/twl4030-audio.c
++++ b/drivers/mfd/twl4030-audio.c
+@@ -175,7 +175,7 @@ static int __devinit twl4030_audio_probe(struct platform_device *pdev)
  		return -ENOMEM;
  
- 	info->dev = &pdev->dev;
--	info->coexist = pdata->coexist;
-+	info->coexist = twl4030_vibra_check_coexist(pdata, twl4030_core_node);
- 	INIT_WORK(&info->play_work, vibra_play_work);
+ 	mutex_init(&audio->mutex);
+-	audio->audio_mclk = pdata->audio_mclk;
++	audio->audio_mclk = twl_get_hfclk_rate();
  
- 	info->input_dev = input_allocate_device();
+ 	/* Configure APLL_INFREQ and disable APLL if enabled */
+ 	switch (audio->audio_mclk) {
 -- 
 1.7.8.6
