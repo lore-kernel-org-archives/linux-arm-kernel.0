@@ -1,160 +1,32 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 13 Aug 2012 22:49:07 -0500
-Subject: [PATCH 4/4] ARM: highbank: add coherent DMA setup
-In-Reply-To: <1344916147-13546-1-git-send-email-robherring2@gmail.com>
-References: <1344916147-13546-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1344916147-13546-5-git-send-email-robherring2@gmail.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Tue, 14 Aug 2012 12:02:32 +0800
+Subject: [PATCH v2 1/4] dmaengine: mmp-pdma support
+In-Reply-To: <201208131312.15180.arnd@arndb.de>
+References: <1344395701-30888-1-git-send-email-zhangfei.gao@marvell.com>
+ <1344395701-30888-2-git-send-email-zhangfei.gao@marvell.com>
+ <201208131312.15180.arnd@arndb.de>
+Message-ID: <CAMj5Bkh0VvWLXdfgtOVcKudv+FdRDYJoR1=+V-EeJLRA5Aox6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+>
+>> +Required properties:
+>> +- compatible: Should be "marvell,pdma-1.0"
+>> +- reg: Should contain DMA registers location and length.
+>> +- interrupts: Either contain all of the per-channel DMA interrupts
+>> +               or one irq for pdma device
+>> +- dma-channels: Number of DMA channels supported by the controller.
+>
+> I think the last one should be "#dma-channels", not "dma-channels", since it's
+> counting the channels. I think we use the "#" version in the preliminary binding
+> for the generic dma channel assignment in DT.
+>
+>         Arnd
+>
 
-Some highbank DMA masters can support coherent (ACP) or non-coherent DMA.
-This sets up dma_map_ops for masters which are configured for coherent DMA.
+Thanks Arnd for careful review, will update with "#dma-channels" in v3.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- .../devicetree/bindings/ata/ahci-platform.txt      |    3 ++
- .../devicetree/bindings/dma/arm-pl330.txt          |    3 ++
- .../devicetree/bindings/net/calxeda-xgmac.txt      |    3 ++
- arch/arm/boot/dts/highbank.dts                     |    1 +
- arch/arm/mach-highbank/highbank.c                  |   52 ++++++++++++++++++++
- 5 files changed, 62 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-index 8bb8a76..6c1ad01 100644
---- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-+++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-@@ -8,6 +8,9 @@ Required properties:
- - interrupts        : <interrupt mapping for SATA IRQ>
- - reg               : <registers mapping>
- 
-+Optional properties:
-+- dma-coherent      : Present if dma operations are coherent
-+
- Example:
-         sata at ffe08000 {
- 		compatible = "calxeda,hb-ahci";
-diff --git a/Documentation/devicetree/bindings/dma/arm-pl330.txt b/Documentation/devicetree/bindings/dma/arm-pl330.txt
-index a4cd273..36e27d5 100644
---- a/Documentation/devicetree/bindings/dma/arm-pl330.txt
-+++ b/Documentation/devicetree/bindings/dma/arm-pl330.txt
-@@ -9,6 +9,9 @@ Required properties:
-     region.
-   - interrupts: interrupt number to the cpu.
- 
-+Optional properties:
-+- dma-coherent      : Present if dma operations are coherent
-+
- Example:
- 
- 	pdma0: pdma at 12680000 {
-diff --git a/Documentation/devicetree/bindings/net/calxeda-xgmac.txt b/Documentation/devicetree/bindings/net/calxeda-xgmac.txt
-index 411727a..c8ae996 100644
---- a/Documentation/devicetree/bindings/net/calxeda-xgmac.txt
-+++ b/Documentation/devicetree/bindings/net/calxeda-xgmac.txt
-@@ -6,6 +6,9 @@ Required properties:
- - interrupts : Should contain 3 xgmac interrupts. The 1st is main interrupt.
-   The 2nd is pwr mgt interrupt. The 3rd is low power state interrupt.
- 
-+Optional properties:
-+- dma-coherent      : Present if dma operations are coherent
-+
- Example:
- 
- ethernet at fff50000 {
-diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
-index 9fecf1a..7414577 100644
---- a/arch/arm/boot/dts/highbank.dts
-+++ b/arch/arm/boot/dts/highbank.dts
-@@ -121,6 +121,7 @@
- 			compatible = "calxeda,hb-ahci";
- 			reg = <0xffe08000 0x10000>;
- 			interrupts = <0 83 4>;
-+			dma-coherent;
- 		};
- 
- 		sdhci at ffe0e000 {
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index d75b0a7..93617d6 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -15,6 +15,7 @@
-  */
- #include <linux/clk.h>
- #include <linux/clkdev.h>
-+#include <linux/dma-mapping.h>
- #include <linux/io.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
-@@ -23,6 +24,7 @@
- #include <linux/of_platform.h>
- #include <linux/of_address.h>
- #include <linux/smp.h>
-+#include <linux/amba/bus.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/smp_plat.h>
-@@ -149,10 +151,60 @@ static void highbank_power_off(void)
- 		cpu_do_idle();
- }
- 
-+static int highbank_platform_notifier(struct notifier_block *nb,
-+				  unsigned long event, void *__dev)
-+{
-+	struct resource *res;
-+	int reg = -1;
-+	struct device *dev = __dev;
-+
-+	if (event != BUS_NOTIFY_ADD_DEVICE)
-+		return NOTIFY_DONE;
-+
-+	if (of_device_is_compatible(dev->of_node, "calxeda,hb-ahci"))
-+		reg = 0xc;
-+	else if (of_device_is_compatible(dev->of_node, "calxeda,hb-sdhci"))
-+		reg = 0x18;
-+	else if (of_device_is_compatible(dev->of_node, "arm,pl330"))
-+		reg = 0x20;
-+	else if (of_device_is_compatible(dev->of_node, "calxeda,hb-xgmac")) {
-+		res = platform_get_resource(to_platform_device(dev),
-+					    IORESOURCE_MEM, 0);
-+		if (res) {
-+			if (res->start == 0xfff50000)
-+				reg = 0;
-+			else if (res->start == 0xfff51000)
-+				reg = 4;
-+		}
-+	}
-+
-+	if (reg < 0)
-+		return NOTIFY_DONE;
-+
-+	if (of_property_read_bool(dev->of_node, "dma-coherent")) {
-+		writel(0xff31, sregs_base + reg);
-+		set_dma_ops(dev, &arm_coherent_dma_ops);
-+	} else
-+		writel(0, sregs_base + reg);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block highbank_amba_nb = {
-+	.notifier_call = highbank_platform_notifier,
-+};
-+
-+static struct notifier_block highbank_platform_nb = {
-+	.notifier_call = highbank_platform_notifier,
-+};
-+
- static void __init highbank_init(void)
- {
- 	pm_power_off = highbank_power_off;
- 
-+	bus_register_notifier(&platform_bus_type, &highbank_platform_nb);
-+	bus_register_notifier(&amba_bustype, &highbank_amba_nb);
-+
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
--- 
-1.7.9.5
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
