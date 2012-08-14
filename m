@@ -1,47 +1,39 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 14 Aug 2012 15:20:49 -0400
-Subject: [PATCH] arm: add documentation describing Marvell families of SoC
-In-Reply-To: <1344115004-7886-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1344115004-7886-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20120814192049.GR22226@titan.lakedaemon.net>
+Date: Tue, 14 Aug 2012 15:36:13 -0400
+Subject: [PATCH 2/2] ARM: kirkwood: DT descriptor for Seagate FreeAgent
+ Dockstar
+In-Reply-To: <1344177973-6505-2-git-send-email-sebastian.hesselbarth@googlemail.com>
+References: <1344177973-6505-1-git-send-email-sebastian.hesselbarth@googlemail.com>
+ <1344177973-6505-2-git-send-email-sebastian.hesselbarth@googlemail.com>
+Message-ID: <20120814193613.GS22226@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 04, 2012 at 11:16:44PM +0200, Thomas Petazzoni wrote:
-> As stated in the introduction of the document, the families of ARM
-> SoCs at Marvell are very complicated, and it is difficult for
-> newcomers to understand the organization of this SoC family and how it
-> relates to the Linux kernel support for those hardware platforms.
+On Sun, Aug 05, 2012 at 04:46:13PM +0200, Sebastian Hesselbarth wrote:
+> This adds the corresponding device tree descriptor for the
+> Seagate FreeAgent Dockstar based on Kirkwood DT.
 > 
-> This document is only at RFC stage for now, it requires reviews and
-> comments from the Marvell maintainers, the PXA maintainers and the MMP
-> maintainers. For correctness of course, but also to add any other
-> information that would be useful. For example, one of the thing that
-> wasn't clear how to detail in the documentation is how the SoCs relate
-> to each other in terms of hardware IP blocks. For example, most of the
-> Kirkwood/Dove/Armada 370-XP/etc. hardware IPs (I2C, SPI, USB, SATA,
-> etc.) are identical, while the PXA and MMP families are completely
-> separate.
+> Please note that this patch requires the mach-kirkwood Makefile.boot typo
+> fix to fully apply.
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@googlemail.com>
 > Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Andrew Lunn <andrew@lunn.ch>
 > Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Lior Amsalem <alior@marvell.com>
-> Cc: Maen Suleiman <maen@marvell.com>
-> Cc: Tawfik Bayouk <tawfik@marvell.com>
-> Cc: Shadi Ammouri <shadi@marvell.com>
-> Cc: Eran Ben-Avi <benavi@marvell.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+...
+> diff --git a/arch/arm/mach-kirkwood/Makefile.boot b/arch/arm/mach-kirkwood/Makefile.boot
+> index a571755..2c2edfb 100644
+> --- a/arch/arm/mach-kirkwood/Makefile.boot
+> +++ b/arch/arm/mach-kirkwood/Makefile.boot
+> @@ -11,3 +11,4 @@ dtb-$(CONFIG_MACH_TS219_DT)	+= kirkwood-qnap-ts219.dtb
 
-Added Arnd's Acked-by: and applied to:
+This series looks great, but will go in after the above line is fixed.
+Can you correct and resubmit so we don't get a conflict down the road?
 
-git://git.infradead.org/users/jcooper/linux.git boards-for-v3.7
+You can just do a v2 of this patch in-reply-to this one.
 
 thx,
 
