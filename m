@@ -1,66 +1,168 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 14 Aug 2012 22:32:24 +0200
-Subject: [PATCH] ARM: mxc: ssi-fiq: Make ssi-fiq.S Thumb-2 compatible
-In-Reply-To: <CAKGA1bmk2TqDwxR=RT+z3y8XaSpcW+kHsaQfmdrHVqTD9Uxv5A@mail.gmail.com>
-References: <1344599604-9623-1-git-send-email-dave.martin@linaro.org>
- <20120813193517.GU1451@pengutronix.de>
- <CAKGA1bnRA61JT8tQoHBay+6BSxDO5egiagQm1v05L7Asf+qJ+Q@mail.gmail.com>
- <20120814114059.GX1451@pengutronix.de>
- <CAKGA1bmk2TqDwxR=RT+z3y8XaSpcW+kHsaQfmdrHVqTD9Uxv5A@mail.gmail.com>
-Message-ID: <20120814203224.GF1451@pengutronix.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 14 Aug 2012 22:43:41 +0200
+Subject: [PATCH v2 1/2] ARM: kirkwood: DT board setup for Seagate FreeAgent
+ Dockstar
+In-Reply-To: <20120814193613.GS22226@titan.lakedaemon.net>
+References: <20120814193613.GS22226@titan.lakedaemon.net>
+Message-ID: <1344977022-29037-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 12:49:43PM -0500, Matt Sealey wrote:
-> On Tue, Aug 14, 2012 at 6:40 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > On Mon, Aug 13, 2012 at 05:28:17PM -0500, Matt Sealey wrote:
-> >>  IMX_PIN_REG(MX51_PAD_EIM_DA15, NO_PAD, 0x058, 0, 0x000, 0), /*
-> >> MX51_PAD_EIM_DA15__EIM_DA15 */
-> >>
-> >>
-> >>
-> >> On Mon, Aug 13, 2012 at 2:35 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> >> > Hi Dave,
-> >> >
-> >> > On Fri, Aug 10, 2012 at 12:53:24PM +0100, Dave Martin wrote:
-> >> >> Because FIQ handlers get copied straight into the vectors page to
-> >> >> the FIQ vector entry point, FIQ handlers in a Thumb-2 kernel must
-> >> >> start in Thumb-2.  A Thumb-2 kernel enters all exception vectors in
-> >> >> Thumb-2.
-> >> >
-> >> > I finally came along testing this. I have no Thumb2 capable hardware
-> >> > to test if it works in thumb2 mode, but at least in Arm mode it works.
-> >> > This is enough to not introduce a regression, so we can go for this.
-> >>
-> >> This is the interesting dichotomy; the code is only required truly on
-> >> devices where Thumb2 isn't available, right?
-> >
-> > It is also used on the i.MX51 Eukrea board. I asked Eric (Cced) to test
-> > it in thumb2 mode, no response so far. I don't know the reason why he
-> > uses FIQ mode instead of SDMA, maybe simply historical reasons.
-> 
-> If we can lose that requirement then the only thing in the way is the
-> phyCORE support, which goes away on a "pure" v7 config anyway,
-> correct? I was just thinking, why not split v6_v7_defconfig into a
-> v7_defconfig losing those boards anyway and enable Thumb2 by default
-> while we're at it? It would mean more testing gets done and this error
-> would crop up both more often, but be less surprising and won't take a
-> year to revisit ;)
+This add a DT compatible board specific setup for the Seagate
+FreeAgent Dockstar.
 
-It took a long time until all people have realized that their code may
-not only run on the SoC they are currently working on, but also on other
-SoCs. Having many SoCs in a single defconfig makes this fact more
-obvious and often breaks compilation if their code is not multi SoC
-safe. I don't really want to lose this.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
 
-Hopefully we will soon only have a handfull of ARM defconfigs anyway.
-Until this is the case I vote for not splitting up defconfigs. Then we
-can have things like thumb2_defconfig, armv6_defconfig,...
+v2: rebased on git://git.infradead.org/users/jcooper/linux.git fixes-for-v3.6
 
-Sascha
+ arch/arm/mach-kirkwood/Kconfig          |    7 ++++
+ arch/arm/mach-kirkwood/Makefile         |    1 +
+ arch/arm/mach-kirkwood/board-dockstar.c |   61 +++++++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-dt.c       |    4 ++
+ arch/arm/mach-kirkwood/common.h         |    6 +++
+ 5 files changed, 79 insertions(+)
+ create mode 100644 arch/arm/mach-kirkwood/board-dockstar.c
 
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index ca5c15a..4eaeb93 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -94,6 +94,13 @@ config MACH_TS219_DT
+ 	  or MV6282. If you have the wrong one, the buttons will not
+ 	  work.
+ 
++config MACH_DOCKSTAR_DT
++	bool "Seagate FreeAgent Dockstar (Flattened Device Tree)"
++	select ARCH_KIRKWOOD_DT
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  Seagate FreeAgent Dockstar (Flattened Device Tree).
++
+ config MACH_GOFLEXNET_DT
+ 	bool "Seagate GoFlex Net (Flattened Device Tree)"
+ 	select ARCH_KIRKWOOD_DT
+diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+index 055c85a..42e48cf 100644
+--- a/arch/arm/mach-kirkwood/Makefile
++++ b/arch/arm/mach-kirkwood/Makefile
+@@ -26,5 +26,6 @@ obj-$(CONFIG_MACH_ICONNECT_DT)		+= board-iconnect.o
+ obj-$(CONFIG_MACH_DLINK_KIRKWOOD_DT)	+= board-dnskw.o
+ obj-$(CONFIG_MACH_IB62X0_DT)		+= board-ib62x0.o
+ obj-$(CONFIG_MACH_TS219_DT)		+= board-ts219.o tsx1x-common.o
++obj-$(CONFIG_MACH_DOCKSTAR_DT)		+= board-dockstar.o
+ obj-$(CONFIG_MACH_GOFLEXNET_DT)		+= board-goflexnet.o
+ obj-$(CONFIG_MACH_LSXL_DT)		+= board-lsxl.o
+diff --git a/arch/arm/mach-kirkwood/board-dockstar.c b/arch/arm/mach-kirkwood/board-dockstar.c
+new file mode 100644
+index 0000000..6b9560b
+--- /dev/null
++++ b/arch/arm/mach-kirkwood/board-dockstar.c
+@@ -0,0 +1,61 @@
++/*
++ * arch/arm/mach-kirkwood/board-dockstar.c
++ *
++ * Seagate FreeAgent Dockstar Board Init for drivers not converted to
++ * flattened device tree yet.
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ *
++ * Copied and modified for Seagate GoFlex Net support by
++ * Joshua Coombs <josh.coombs@gmail.com> based on ArchLinux ARM's
++ * GoFlex kernel patches.
++ *
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/ata_platform.h>
++#include <linux/mv643xx_eth.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_fdt.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <linux/gpio.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <mach/kirkwood.h>
++#include <mach/bridge-regs.h>
++#include <plat/mvsdio.h>
++#include "common.h"
++#include "mpp.h"
++
++static struct mv643xx_eth_platform_data dockstar_ge00_data = {
++	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
++};
++
++static unsigned int dockstar_mpp_config[] __initdata = {
++	MPP29_GPIO,	/* USB Power Enable */
++	MPP46_GPIO,	/* LED green */
++	MPP47_GPIO,	/* LED orange */
++	0
++};
++
++void __init dockstar_init(void)
++{
++	/*
++	 * Basic setup. Needs to be called early.
++	 */
++	kirkwood_mpp_conf(dockstar_mpp_config);
++
++	if (gpio_request(29, "USB Power Enable") != 0 ||
++	    gpio_direction_output(29, 1) != 0)
++		pr_err("can't setup GPIO 29 (USB Power Enable)\n");
++	kirkwood_ehci_init();
++
++	kirkwood_ge00_init(&dockstar_ge00_data);
++}
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index e4eb450..4693fad 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -81,6 +81,9 @@ static void __init kirkwood_dt_init(void)
+ 	if (of_machine_is_compatible("qnap,ts219"))
+ 		qnap_dt_ts219_init();
+ 
++	if (of_machine_is_compatible("seagate,dockstar"))
++		dockstar_init();
++
+ 	if (of_machine_is_compatible("seagate,goflexnet"))
+ 		goflexnet_init();
+ 
+@@ -98,6 +101,7 @@ static const char *kirkwood_dt_board_compat[] = {
+ 	"iom,iconnect",
+ 	"raidsonic,ib-nas62x0",
+ 	"qnap,ts219",
++	"seagate,dockstar",
+ 	"seagate,goflexnet",
+ 	"buffalo,lsxl",
+ 	NULL
+diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
+index 304dd1a..dc73ff3 100644
+--- a/arch/arm/mach-kirkwood/common.h
++++ b/arch/arm/mach-kirkwood/common.h
+@@ -82,6 +82,12 @@ void ib62x0_init(void);
+ static inline void ib62x0_init(void) {};
+ #endif
+ 
++#ifdef CONFIG_MACH_DOCKSTAR_DT
++void dockstar_init(void);
++#else
++static inline void dockstar_init(void) {};
++#endif
++
+ #ifdef CONFIG_MACH_GOFLEXNET_DT
+ void goflexnet_init(void);
+ #else
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.10.4
