@@ -1,23 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Aug 2012 10:29:14 +0200
-Subject: [PATCH 5/8] mfd: Provide the PRCMU with its own IRQ domain
-In-Reply-To: <1344527635-6163-6-git-send-email-lee.jones@linaro.org>
-References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
- <1344527635-6163-6-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdZ7bMBytyDppV2sB1d1sUbDpPRqAQVOq8k4UOYdmg+Mkw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 14 Aug 2012 09:30:26 +0100
+Subject: [PATCH v3 1/4] dmaengine: mmp-pdma support
+In-Reply-To: <1344917519-9505-2-git-send-email-zhangfei.gao@marvell.com>
+References: <1344917519-9505-1-git-send-email-zhangfei.gao@marvell.com>
+ <1344917519-9505-2-git-send-email-zhangfei.gao@marvell.com>
+Message-ID: <20120814083026.GG18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 9, 2012 at 5:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Please consider looking at the virtual dma channel support, which I've
+recently added.  This removes the burden of managing the descriptor
+lists from the driver, deals with the workqueues for completing
+descriptors, etc.
 
-> +static struct irq_domain *db8500_irq_domain;
+All you need to do is to build the descriptors for the DMA operation,
+manage the scheduling of virtual channels onto physical channels,
+calculate the position of DMA, and starting off and handling the DMA
+hardware.
 
-So this is a good idea.
-
-> +int db8500_irq_get_virq(int irq);
-
-And I'm sceptic about this business. Why isn't this physical-to virtual
-mapping business confined to the core MFD driver? But enlighten me.
-
-Yours,
-Linus Walleij
+"virtual dma channel support" is probably something of a misnomer though;
+it can also be used for situations where there's a 1:1 binding between
+virtual and physical dma channels (iow, no virtual channels at all.)
