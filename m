@@ -1,64 +1,40 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 14 Aug 2012 04:37:58 +0200
-Subject: [PATCH 05/14] ARM: at91: add pinctrl support
-In-Reply-To: <CACQ1gAjPGcnOGh9iMxKUH1FA6rHBcuOzgR_A+wkbFWYkazQPxw@mail.gmail.com>
-References: <20120810124820.GA20557@game.jcrosoft.org>
- <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
- <1344603731-32667-5-git-send-email-plagnioj@jcrosoft.com>
- <CACQ1gAjPGcnOGh9iMxKUH1FA6rHBcuOzgR_A+wkbFWYkazQPxw@mail.gmail.com>
-Message-ID: <20120814023758.GC8836@game.jcrosoft.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 13 Aug 2012 22:49:03 -0500
+Subject: [PATCH 0/4] Per device coherent DMA map ops
+Message-ID: <1344916147-13546-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +
-> > +dbgu: serial at fffff200 {
-> > +       compatible = "atmel,at91sam9260-usart";
-> > +       reg = <0xfffff200 0x200>;
-> > +       interrupts = <1 4 7>;
-> > +       pinctrl-names = "default";
-> > +       pinctrl-0 = <&pinctrl_dbgu>;
-> > +       status = "disabled";
-> > +};
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index e91c7cd..178a619 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -352,6 +352,7 @@ config ARCH_AT91
-> >         select CLKDEV_LOOKUP
-> >         select IRQ_DOMAIN
-> >         select NEED_MACH_IO_H if PCCARD
-> > +       select PINCTRL
-> >         help
-> >           This enables support for systems based on Atmel
-> >           AT91RM9200 and AT91SAM9* processors.
-> There's a problem with this: if CONFIG_PINCRTL is forced on ARCH_AT91
-> and PINCTRL_AT91 is not selected,
-> all calls to devm_pinctrl_get_select_default() will fail. => no
-> serial, no nand etc..
-> IMHO, CONFIG_PINCTRL should not be forced, otherwise it will break
-> configs that don't want pinctrl
-> Or, if pinctrl is the new and only way, PINCTRL_AT91 should also be
-> forced on ARCH_AT91
-no pinctrl MUST be forced as we provide pinctrl dummies
-which will provide dummy config so not break
+From: Rob Herring <rob.herring@calxeda.com>
 
-and if you want the gpio you need to enable the pinctrl on at91 otherwise you
-not have it we can force PINCRTL_AT91 on DT but now the pinctrl need to always
-be enabled
-> > --
-> > 1.7.10.4
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
-> I tested it with a at91sam9g35-ek board, and it hangs before the dbgu
-> line is configured.
-> ( with at91_dt_defconfig and at91sam9g35ek.dts )
-did you update you dtb before booting?
+This is series adds coherent DMA map operations which can be set per device.
+Expanding on the first RFC[1], this version adds iommu ops and implements
+support on highbank platform.
 
-Best Regards,
-J.
+arch_is_coherent is never defined true since removing ixp2xxx, so we can 
+remove it altogether.
+
+Rob
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-August/113921.html
+
+Rob Herring (4):
+  ARM: add coherent dma ops
+  ARM: add coherent iommu dma ops
+  ARM: kill off arch_is_coherent
+  ARM: highbank: add coherent DMA setup
+
+ .../devicetree/bindings/ata/ahci-platform.txt      |    3 +
+ .../devicetree/bindings/dma/arm-pl330.txt          |    3 +
+ .../devicetree/bindings/net/calxeda-xgmac.txt      |    3 +
+ arch/arm/boot/dts/highbank.dts                     |    1 +
+ arch/arm/include/asm/barrier.h                     |    7 +-
+ arch/arm/include/asm/dma-mapping.h                 |    1 +
+ arch/arm/include/asm/memory.h                      |    8 -
+ arch/arm/mach-highbank/highbank.c                  |   52 ++++
+ arch/arm/mm/dma-mapping.c                          |  254 ++++++++++++++++----
+ arch/arm/mm/mmu.c                                  |   17 +-
+ 10 files changed, 271 insertions(+), 78 deletions(-)
+
+-- 
+1.7.9.5
