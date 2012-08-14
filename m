@@ -1,151 +1,133 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Tue, 14 Aug 2012 23:01:02 +0200
-Subject: [PATCH v2 30/31] arm64: Build infrastructure
-In-Reply-To: <1344966752-16102-31-git-send-email-catalin.marinas@arm.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-31-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20120814210102.GA4386@merkur.ravnborg.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 14 Aug 2012 14:44:24 -0700
+Subject: [PATCH v3 05/10] resource: add PCI configuration space support
+In-Reply-To: <20120814180142.GA9430@avionic-0098.mockup.avionic-design.de>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <1343332512-28762-6-git-send-email-thierry.reding@avionic-design.de>
+ <CAErSpo4qg45brVRwEbw3=R04VsbnvUowSMWcT+M6VoAxbf3Cqg@mail.gmail.com>
+ <20120814055542.GB16181@avionic-0098.mockup.avionic-design.de>
+ <CAErSpo6LYpkC5wop53S1r1z3ov4+w4soqrQARzbbouVs1trzUg@mail.gmail.com>
+ <20120814180142.GA9430@avionic-0098.mockup.avionic-design.de>
+Message-ID: <CAErSpo4Efy-Dt67rktzNiYfZfOTSu=pmYtyGd3tR-zZQ3jDGtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> new file mode 100644
-> index 0000000..1ce3d04
-> --- /dev/null
-> +++ b/arch/arm64/Kconfig
-> @@ -0,0 +1,261 @@
-> +config ARM64
-> +	def_bool y
-> +	select OF
-> +	select OF_EARLY_FLATTREE
-> +	select IRQ_DOMAIN
-> +	select HAVE_AOUT
-> +	select HAVE_DMA_ATTRS
-> +	select HAVE_DMA_API_DEBUG
-> +	select HAVE_IDE
-> +	select HAVE_MEMBLOCK
-> +	select RTC_LIB
-> +	select SYS_SUPPORTS_APM_EMULATION
-> +	select HAVE_GENERIC_DMA_COHERENT
-> +	select GENERIC_IOMAP
-> +	select HAVE_IRQ_WORK
-> +	select HAVE_PERF_EVENTS
-> +	select HAVE_ARCH_TRACEHOOK
-> +	select PERF_USE_VMALLOC
-> +	select HAVE_HW_BREAKPOINT if PERF_EVENTS
-> +	select HAVE_GENERIC_HARDIRQS
-> +	select GENERIC_HARDIRQS_NO_DEPRECATED
-> +	select HAVE_SPARSE_IRQ
-> +	select SPARSE_IRQ
-> +	select GENERIC_IRQ_SHOW
-> +	select GENERIC_SMP_IDLE_THREAD
-> +	select NO_BOOTMEM
+On Tue, Aug 14, 2012 at 11:01 AM, Thierry Reding
+<thierry.reding@avionic-design.de> wrote:
+> On Tue, Aug 14, 2012 at 10:38:08AM -0700, Bjorn Helgaas wrote:
+>> On Mon, Aug 13, 2012 at 10:55 PM, Thierry Reding
+>> <thierry.reding@avionic-design.de> wrote:
+>> > On Mon, Aug 13, 2012 at 10:00:45PM -0700, Bjorn Helgaas wrote:
+>> >> On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
+>> >> <thierry.reding@avionic-design.de> wrote:
+>> >> > This commit adds a new flag that allows marking resources as PCI
+>> >> > configuration space.
+>> >> >
+>> >> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+>> >> > ---
+>> >> > Changes in v3:
+>> >> > - new patch
+>> >> >
+>> >> >  include/linux/ioport.h | 2 +-
+>> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
+>> >> >
+>> >> > diff --git a/include/linux/ioport.h b/include/linux/ioport.h
+>> >> > index 589e0e7..3314843 100644
+>> >> > --- a/include/linux/ioport.h
+>> >> > +++ b/include/linux/ioport.h
+>> >> > @@ -102,7 +102,7 @@ struct resource {
+>> >> >
+>> >> >  /* PCI control bits.  Shares IORESOURCE_BITS with above PCI ROM.  */
+>> >> >  #define IORESOURCE_PCI_FIXED           (1<<4)  /* Do not move resource */
+>> >> > -
+>> >> > +#define IORESOURCE_PCI_CS              (1<<5)  /* PCI configuration space */
+>> >>
+>> >> What is the purpose of this?  It seems that you are marking regions
+>> >> that we call MMCONFIG on x86, or ECAM-type regions in the language of
+>> >> the PCIe spec.  I see that you set it in several places, but I don't
+>> >> see anything that ever looks for it.  Do you have plans to use it in
+>> >> the future?  If it really does correspond to MMCONFIG/ECAM, we should
+>> >> handle those regions consistently across all architectures.
+>> >
+>> > The purpose is ultimately to obtain the MMCONFIG/ECAM resources assigned
+>> > to a PCI host controller. I've used this in the of_pci_parse_ranges()
+>> > and in the static board setup code to mark ranges as such. Perhaps
+>> > IORESOURCE_ECAM or IORESOURCE_MMCONFIG might have been better names. I
+>> > also just noticed that I'm not using this anywhere, but the plan was to
+>> > eventually use it with platform_get_resource(). However that doesn't
+>> > seem to work either because the lower bits of the flags aren't use for
+>> > comparison in that function.
+>> >
+>> > Any other ideas how that could be handled? Basically what I need is a
+>> > way to mark a resource as an MMCONFIG/ECAM range so that it can be used
+>> > to program the PCI host controller accordingly. I don't know how these
+>> > are assigned on x86. I was under the impression that the MMCONFIG/ECAM
+>> > space was accessed through a single single address/data register pair.
+>>
+>> The legacy config access mechanism (CF8h/CFCh registers described in
+>> PCI 3.0 spec sec 3.2.2.3.2) is a single address/data pair, but this is
+>> mostly x86-specific.  The ECAM mechanism (described in the PCIe 3.0
+>> spec sec 7.2.2) is not a single address/data pair; instead, each byte
+>> of config space is directly mapped into the host's MMIO space.
+>>
+>> Here's what we do on x86 (omitting some historical grunge that
+>> complicates things):
+>>
+>>   - Discover the host bridge via a PNP0A08 device in the ACPI namespace.
+>>   - Discover the bus number range behind the bridge using a _CRS
+>> method in the PNP0A08 device.
+>>   - Discover the ECAM space for those buses via a _CBA method in the
+>> PNP0A08 device.
+>>   - Tell the config accessors (struct pci_ops) that the ECAM space for
+>> buses A-B is at address X.
+>>   - Enumerate the devices behind the host bridge by calling
+>> pci_scan_root_bus(), passing the config accessors.
+>>
+>> It sounds like you want a way to parse the resources at one point,
+>> saving them and marking the ECAM region, then at a later point, look
+>> up the ECAM from a saved list.  We don't do that on x86 because the
+>> config accessors keep an internal list of the ECAM area for each bus.
+>>
+>> We do of course want to put this ECAM space in the IORESOURCE_MEM tree
+>> because it consumes address space and we have to make sure we don't
+>> put anything else on top of it.  But we don't have any reason to
+>> describe the MMIO -> config space function in that tree.  From the
+>> point of view of the rest of the system, it's just MMIO space that's
+>> consumed by the PCI host bridge, just like any other device-specific
+>> MMIO area.
+>
+> What I currently do is pass the ECAM space as a resource to the PCI host
+> bridge platform device. Regular and extended configuration spaces are
+> given by the third and fourth resources, respectively. If I understand
+> correctly, you're saying that nothing beyond that needs to be encoded.
+> In other words it is enough for the PCI host bridge driver to know where
+> to take the data from.
 
-If you keep this list sorted then merge conflicts are less likely.
+Yes, I think so.
 
+I'd like to someday make ECAM support generic, since it's specified by
+the PCIe spec.  The spec doesn't differentiate between PCI
+configuration space (offsets 0-0xff) and PCI Express *extended*
+configuration space (offsets 0x100-0xfff).  But it sounds like Tegra
+might have a memory-mapped configuration mechanism that is similar to
+ECAM but with a different address map, since you mention two resources
+(third and fourth).  That's not a problem, since you're doing a
+Tegra-specific solution right now anyway, but something to keep in the
+back of your mind if we ever do make a generic ECAM solution.
 
-> +	help
-> +	  ARM 64-bit (AArch64) Linux support.
-> +
-> +config 64BIT
-> +	def_bool y
-> +
-> +config ARCH_PHYS_ADDR_T_64BIT
-> +	def_bool y
-> +
-> +config HAVE_PWM
-> +	bool
-> +
-> +config SYS_SUPPORTS_APM_EMULATION
-> +	bool
-> +
-> +config NO_IOPORT
-> +	def_bool y
-> +
-> +config GENERIC_GPIO
-> +	bool
-> +
-> +config GENERIC_TIME_VSYSCALL
-> +	def_bool y
-Please use select like all other archs do.
+> I'll have to see what this means for the DT binding. There are other
+> issues that I need to think about, like for example how to pass the ECAM
+> space from the PCI host controller to each of the two bridges via the
+> ranges property. This no longer makes sense in the current form, as the
+> ECAM covers the configuration spaces for devices of both bridges and
+> cannot really be split among them.
 
+We have the same situation on x86.  Part of the historical grunge that
+I omitted is that there's a static ACPI table (MCFG) that can tell you
+the ECAM range for a bus number range.  Often that bus number range
+includes several host bridges.  On x86, we have a single set of ECAM
+config accessors (see pci_mmcfg), and they maintain a list of "bus
+number -> ECAM addr" mappings internally, independent of which host
+bridge leads to the buses.
 
-> +
-> +config GENERIC_CLOCKEVENTS
-> +	def_bool y
-Again - please use select.
-
-> +
-> +config STACKTRACE_SUPPORT
-> +	def_bool y
-> +
-> +config LOCKDEP_SUPPORT
-> +	def_bool y
-> +
-> +config TRACE_IRQFLAGS_SUPPORT
-> +	def_bool y
-> +
-> +config HARDIRQS_SW_RESEND
-> +	def_bool y
-Please use select.
-
-> +
-> +config GENERIC_IRQ_PROBE
-> +	def_bool y
-Please use select.
-
-> +
-> +config GENERIC_LOCKBREAK
-> +	def_bool y
-> +	depends on SMP && PREEMPT
-> +
-> +config RWSEM_GENERIC_SPINLOCK
-> +	def_bool y
-> +
-> +config RWSEM_XCHGADD_ALGORITHM
-> +	bool
-> +
-> +config ARCH_HAS_ILOG2_U32
-> +	bool
-> +
-> +config ARCH_HAS_ILOG2_U64
-> +	bool
-> +
-> +config ARCH_HAS_CPUFREQ
-> +	bool
-> +	help
-> +	  Internal node to signify that the ARCH has CPUFREQ support
-> +	  and that the relevant menu configurations are displayed for
-> +	  it.
-> +
-> +config GENERIC_HWEIGHT
-> +	def_bool y
-> +
-> +config GENERIC_CSUM
-> +        def_bool y
-> +
-> +config GENERIC_CALIBRATE_DELAY
-> +	def_bool y
-> +
-> +config ZONE_DMA32
-> +	def_bool y
-> +
-> +config ARCH_DMA_ADDR_T_64BIT
-> +	def_bool y
-> +
-> +config NEED_DMA_MAP_STATE
-> +	def_bool y
-> +
-> +config NEED_SG_DMA_LENGTH
-> +	def_bool y
-> +
-> +config SWIOTLB
-> +	def_bool y
-> +
-> +config IOMMU_HELPER
-> +	def_bool SWIOTLB
-> +
-
-
-	Sam
+Bjorn
