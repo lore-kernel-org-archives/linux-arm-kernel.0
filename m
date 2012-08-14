@@ -1,104 +1,117 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 14 Aug 2012 17:29:48 +0200
-Subject: [PATCH 00/23] work in progress: SPI controller w/DMA SAM9X5
-In-Reply-To: <1344952177-18385-1-git-send-email-richard.genoud@gmail.com>
-References: <1344952177-18385-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <502A6EEC.2010807@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 14 Aug 2012 17:11:57 +0100
+Subject: [PATCH] ARM: support syscall tracing
+In-Reply-To: <5029336B.2050305@mentor.com>
+References: <5029336B.2050305@mentor.com>
+Message-ID: <20120814161157.GJ26070@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2012 03:49 PM, Richard Genoud :
-> Nicolas,
-> I said that I had some work done on sam9g35-ek, here is the spi part, based
-> on your and Jean-Christophe work.
-> You have to enable CONFIG_ARCH_AT91SAM9X5 to get it work.
-> 
-> The goal of this patchset is to share the work I've done, it's not ready
-> for upstream, but it may save some time.
-> 
-> It's based on 3.6-rc1 + Jean-Christophe's pinctrl patchset.
-> 
-> Best Regards,
+Hi Wade,
 
-Richard,
+Thanks for the new patch. A few comments inline.
 
-Thanks a lot for updating this material: We really appreciate.
+On Mon, Aug 13, 2012 at 06:03:39PM +0100, Wade Farnsworth wrote:
+> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+> index af7b0bd..d3e4410 100644
+> --- a/arch/arm/include/asm/thread_info.h
+> +++ b/arch/arm/include/asm/thread_info.h
+> @@ -154,6 +154,7 @@ extern int vfp_restore_user_hwstate(struct user_vfp __user *,
+>  #define TIF_RESTORE_SIGMASK	20
+>  #define TIF_SECCOMP		21
+>  #define TIF_SWITCH_MM		22	/* deferred switch_mm */
+> +#define TIF_SYSCALL_TRACEPOINT	23
+>  
+>  #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
+>  #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
+> @@ -163,6 +164,7 @@ extern int vfp_restore_user_hwstate(struct user_vfp __user *,
+>  #define _TIF_POLLING_NRFLAG	(1 << TIF_POLLING_NRFLAG)
+>  #define _TIF_USING_IWMMXT	(1 << TIF_USING_IWMMXT)
+>  #define _TIF_SECCOMP		(1 << TIF_SECCOMP)
+> +#define _TIF_SYSCALL_TRACEPOINT	(1 << TIF_SYSCALL_TRACEPOINT)
 
-We will try to review this material together with Jean-Christophe and
-colleagues @ Atmel. I hope that we will go forward with this collected
-material in the near future.
+Can you add this to the definition of _TIF_SYSCALL_WORK as well please?
 
-Maybe DMA OF part will not be upstreamed as-is because of an ongoing
-initiative to build a generic dmaengine OF support.
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index 978eac5..51b64c1 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -94,6 +94,15 @@ ENDPROC(ret_from_fork)
+>  	.equ NR_syscalls,0
+>  #define CALL(x) .equ NR_syscalls,NR_syscalls+1
+>  #include "calls.S"
+> +
+> +/*
+> + * Ensure that the system call table is equal to __NR_syscalls,
+> + * which is the value the rest of the system sees
+> + */
+> +.ifne NR_syscalls - __NR_syscalls
+> +.error "__NR_syscalls is not equal to the size of the syscall table"
+> +.endif
+> +
+>  #undef CALL
+>  #define CALL(x) .long x
+>  
+> @@ -415,7 +424,8 @@ local_restart:
+>  1:
+>  #endif
+>  
+> -	tst	r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
+> +	tst     r10, #_TIF_SYSCALL_WORK
+> +	tsteq   r10, #_TIF_SYSCALL_TRACEPOINT
+>  	bne	__sys_trace
 
-> Jean-Christophe PLAGNIOL-VILLARD (3):
->   of: add dma-mask binding
->   of_spi: add generic binding support to specify cs gpio
+Then we don't need this hunk.
 
-I know that Jean-Christophe has had difficulties to have feedback on
-there parts...
+> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+> index 3e0fc5f..a2d46ed 100644
+> --- a/arch/arm/kernel/ptrace.c
+> +++ b/arch/arm/kernel/ptrace.c
+> @@ -30,6 +30,9 @@
+>  #include <asm/pgtable.h>
+>  #include <asm/traps.h>
+>  
+> +#define CREATE_TRACE_POINTS
+> +#include <trace/events/syscalls.h>
+> +
+>  #define REG_PC	15
+>  #define REG_PSR	16
+>  /*
+> @@ -918,7 +921,8 @@ static int ptrace_syscall_trace(struct pt_regs *regs, int scno,
+>  {
+>  	unsigned long ip;
+>  
+> -	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+> +	if (!test_thread_flag(TIF_SYSCALL_TRACE) &&
+> +	    !test_thread_flag(TIF_SYSCALL_TRACEPOINT))
+>  		return scno;
+>  
+>  	current_thread_info()->syscall = scno;
+> @@ -930,10 +934,19 @@ static int ptrace_syscall_trace(struct pt_regs *regs, int scno,
+>  	ip = regs->ARM_ip;
+>  	regs->ARM_ip = dir;
+>  
+> -	if (dir == PTRACE_SYSCALL_EXIT)
+> -		tracehook_report_syscall_exit(regs, 0);
+> -	else if (tracehook_report_syscall_entry(regs))
+> -		current_thread_info()->syscall = -1;
+> +	if (test_thread_flag(TIF_SYSCALL_TRACE)) {
+> +		if (dir == PTRACE_SYSCALL_EXIT)
+> +			tracehook_report_syscall_exit(regs, 0);
+> +		else if (tracehook_report_syscall_entry(regs))
+> +			current_thread_info()->syscall = -1;
+> +	}
+> +
+> +	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT)) {
+> +		if (dir == PTRACE_SYSCALL_EXIT)
+> +			trace_sys_exit(regs, scno);
+> +		else
+> +			trace_sys_enter(regs, scno);
+> +	}
 
->   spi/atmel: add DT support
-> 
-> Nicolas Ferre (6):
->   spi/atmel_spi: trivial: change some comments
->   spi/atmel_spi: add physical base address
->   spi/atmel_spi: call unmapping on transfers buffers
->   spi/atmel_spi: status information passed through controller data
->   spi/atmel_spi: add flag to controller data for lock operations
->   spi/atmel_spi: add dmaengine support
-> 
-> Richard Genoud (14):
->   spi-atmel: update with dmaengine interface
+I reckon the TRACEPOINT stuff would be better off inside the
+syscall_trace_{enter,exit} functions. They don't modify the syscall number,
+so they can just use the return value from ptrace_syscall_trace before the
+audit hook invoked.
 
-This will certainly be squashed in previous path.
-
->   spi-atmel: fix __init/__devinit sections mismatch
-
-This one also: but it is good to have them separated at fist.
-
->   spi-atmel: Fix spi-atmel driver to adapt to slave_config changes
->   AT91 DMA OF support
->   add at91sam9x5 Kconfig ARCH/SOC link
-
-Is it fixup for a bug? Jean-Christophe, a though about this one?
-
->   spi-atmel: add DMA OF support
->   [BUG] SPI: array out of bound => no CS
->   [BUG] atmel-spi && DMA: OOPS if buffer > 4400 bytes
->   sam9x5: declare SPI clocks
->   spi-atmel: add sam9x5 SPI in device tree
->   spi-atmel: add dma support in sam9x5 device tree
->   spi-atmel OF: complete documentation
-
-Maybe documentation has to be folded in the patch that actually adds the
-OF support.
-
->   spi-atmel: complete DMA slave OF documentation
->   sam9x5ek DTS: enable SPI dataflash
-> 
->  Documentation/devicetree/bindings/spi/spi-bus.txt  |    6 +
->  .../devicetree/bindings/spi/spi_atmel.txt          |   46 ++
->  arch/arm/boot/dts/at91sam9x5.dtsi                  |   42 ++
->  arch/arm/boot/dts/at91sam9x5ek.dtsi                |   10 +
->  arch/arm/mach-at91/Kconfig                         |    4 +
->  arch/arm/mach-at91/at91sam9x5.c                    |    3 +
->  arch/arm/mach-at91/include/mach/at_hdmac.h         |    1 +
->  drivers/of/Kconfig                                 |    4 +
->  drivers/of/Makefile                                |    1 +
->  drivers/of/of_atmel.c                              |  111 ++++
->  drivers/of/platform.c                              |   23 +-
->  drivers/spi/Kconfig                                |    9 +
->  drivers/spi/spi-atmel.c                            |  611 ++++++++++++++++++--
->  drivers/spi/spi.c                                  |   55 ++-
->  include/linux/of_atmel.h                           |   29 +
->  include/linux/spi/spi.h                            |    3 +
->  16 files changed, 914 insertions(+), 44 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/spi/spi_atmel.txt
->  create mode 100644 drivers/of/of_atmel.c
->  create mode 100644 include/linux/of_atmel.h
-> 
-
-
--- 
-Nicolas Ferre
+Will
