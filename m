@@ -1,133 +1,89 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 14 Aug 2012 14:44:24 -0700
-Subject: [PATCH v3 05/10] resource: add PCI configuration space support
-In-Reply-To: <20120814180142.GA9430@avionic-0098.mockup.avionic-design.de>
+Date: Tue, 14 Aug 2012 14:55:07 -0700
+Subject: [PATCH v3 00/10] ARM: tegra: Add PCIe device tree support
+In-Reply-To: <20120814195834.GA10431@avionic-0098.mockup.avionic-design.de>
 References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
- <1343332512-28762-6-git-send-email-thierry.reding@avionic-design.de>
- <CAErSpo4qg45brVRwEbw3=R04VsbnvUowSMWcT+M6VoAxbf3Cqg@mail.gmail.com>
- <20120814055542.GB16181@avionic-0098.mockup.avionic-design.de>
- <CAErSpo6LYpkC5wop53S1r1z3ov4+w4soqrQARzbbouVs1trzUg@mail.gmail.com>
- <20120814180142.GA9430@avionic-0098.mockup.avionic-design.de>
-Message-ID: <CAErSpo4Efy-Dt67rktzNiYfZfOTSu=pmYtyGd3tR-zZQ3jDGtA@mail.gmail.com>
+ <50201E1D.5060200@wwwdotorg.org>
+ <20120813174003.GA2527@avionic-0098.mockup.avionic-design.de>
+ <50294BCA.1070807@wwwdotorg.org>
+ <CAErSpo7og1XgOSv_mFCQ=hP7pq0j3gXWh2QFL2wBJjz7kcAq=g@mail.gmail.com>
+ <502AA96B.2050709@wwwdotorg.org>
+ <20120814195834.GA10431@avionic-0098.mockup.avionic-design.de>
+Message-ID: <CAErSpo4Bm_Ryx=OK+svjqAwD4N8v0vrheLVdc-N1ijx8i_-N3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 11:01 AM, Thierry Reding
+On Tue, Aug 14, 2012 at 12:58 PM, Thierry Reding
 <thierry.reding@avionic-design.de> wrote:
-> On Tue, Aug 14, 2012 at 10:38:08AM -0700, Bjorn Helgaas wrote:
->> On Mon, Aug 13, 2012 at 10:55 PM, Thierry Reding
->> <thierry.reding@avionic-design.de> wrote:
->> > On Mon, Aug 13, 2012 at 10:00:45PM -0700, Bjorn Helgaas wrote:
->> >> On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
->> >> <thierry.reding@avionic-design.de> wrote:
->> >> > This commit adds a new flag that allows marking resources as PCI
->> >> > configuration space.
->> >> >
->> >> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
->> >> > ---
->> >> > Changes in v3:
->> >> > - new patch
->> >> >
->> >> >  include/linux/ioport.h | 2 +-
->> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
->> >> >
->> >> > diff --git a/include/linux/ioport.h b/include/linux/ioport.h
->> >> > index 589e0e7..3314843 100644
->> >> > --- a/include/linux/ioport.h
->> >> > +++ b/include/linux/ioport.h
->> >> > @@ -102,7 +102,7 @@ struct resource {
->> >> >
->> >> >  /* PCI control bits.  Shares IORESOURCE_BITS with above PCI ROM.  */
->> >> >  #define IORESOURCE_PCI_FIXED           (1<<4)  /* Do not move resource */
->> >> > -
->> >> > +#define IORESOURCE_PCI_CS              (1<<5)  /* PCI configuration space */
+> On Tue, Aug 14, 2012 at 01:39:23PM -0600, Stephen Warren wrote:
+>> On 08/13/2012 05:18 PM, Bjorn Helgaas wrote:
+>> > On Mon, Aug 13, 2012 at 11:47 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> ...
+>> >> whereas for a device tree boot:
 >> >>
->> >> What is the purpose of this?  It seems that you are marking regions
->> >> that we call MMCONFIG on x86, or ECAM-type regions in the language of
->> >> the PCIe spec.  I see that you set it in several places, but I don't
->> >> see anything that ever looks for it.  Do you have plans to use it in
->> >> the future?  If it really does correspond to MMCONFIG/ECAM, we should
->> >> handle those regions consistently across all architectures.
+>> >> (same):
+>> >>> [    2.112217] pci 0000:01:00.0: reg 10: [io  0x0000-0x00ff]
+>> >>> [    2.117635] pci 0000:01:00.0: reg 18: [mem 0x00000000-0x00000fff 64bit pref]
+>> >>> [    2.124690] pci 0000:01:00.0: reg 20: [mem 0x00000000-0x00003fff 64bit pref]
+>> >>> [    2.131731] pci 0000:01:00.0: reg 30: [mem 0x00000000-0x0001ffff pref]
+>> >> ... (request region happens early)
+>> >>> [    2.179838] r8169 0000:01:00.0: BAR 0: requesting [io  0x0000-0x00ff]
+>> >>> [    2.193312] r8169 0000:01:00.0: BAR 2: requesting [mem 0x00000000-0x00000fff 64bit pref]
+>> >>> [    2.201397] r8169 0000:01:00.0: BAR 2: can't reserve [mem 0x00000000-0x00000fff 64bit pref]
+>> >>> [    2.209742] r8169 0000:01:00.0: (unregistered net_device): could not request regions
+>> >> ... (same, just happens too late)
+>> >>> [    2.236818] pci 0000:01:00.0: BAR 6: assigned [mem 0xa0000000-0xa001ffff pref]
+>> >>> [    2.244027] pci 0000:01:00.0: BAR 4: assigned [mem 0xa0020000-0xa0023fff 64bit pref]
+>> >>> [    2.251794] pci 0000:01:00.0: BAR 2: assigned [mem 0xa0024000-0xa0024fff 64bit pref]
+>> >>> [    2.259542] pci 0000:01:00.0: BAR 0: assigned [io  0x1000-0x10ff]
+>> >>
+>> >> I suspect this is all still related to the PCI devices themselves being
+>> >> probed much earlier in the overall PCI initialization sequence when the
+>> >> PCI controller is probed later in the boot sequence, whereas PCI device
+>> >> probe is deferred until the overall PCI initialization sequence is
+>> >> complete if the PCI controller is probed very early in the boot sequence.
 >> >
->> > The purpose is ultimately to obtain the MMCONFIG/ECAM resources assigned
->> > to a PCI host controller. I've used this in the of_pci_parse_ranges()
->> > and in the static board setup code to mark ranges as such. Perhaps
->> > IORESOURCE_ECAM or IORESOURCE_MMCONFIG might have been better names. I
->> > also just noticed that I'm not using this anywhere, but the plan was to
->> > eventually use it with platform_get_resource(). However that doesn't
->> > seem to work either because the lower bits of the flags aren't use for
->> > comparison in that function.
->> >
->> > Any other ideas how that could be handled? Basically what I need is a
->> > way to mark a resource as an MMCONFIG/ECAM range so that it can be used
->> > to program the PCI host controller accordingly. I don't know how these
->> > are assigned on x86. I was under the impression that the MMCONFIG/ECAM
->> > space was accessed through a single single address/data register pair.
+>> > I don't know what to apply your patches to (they don't apply cleanly
+>> > to v3.6-rc2), so I can't see exactly what you're doing.  But it looks
+>> > like you might be calling pci_bus_add_devices() before
+>> > pci_bus_assign_resource(), which isn't going to work.
 >>
->> The legacy config access mechanism (CF8h/CFCh registers described in
->> PCI 3.0 spec sec 3.2.2.3.2) is a single address/data pair, but this is
->> mostly x86-specific.  The ECAM mechanism (described in the PCIe 3.0
->> spec sec 7.2.2) is not a single address/data pair; instead, each byte
->> of config space is directly mapped into the host's MMIO space.
+>> Yes, that's exactly what is happening.
 >>
->> Here's what we do on x86 (omitting some historical grunge that
->> complicates things):
+>> PCIe initialization starts in arch/arm/mach-tegra/pci.e
+>> tegra_pcie_init() which calls arch/arm/kernel/bios32.c
+>> pci_common_init(). That function first calls pcibios_init_hw() (in the
+>> same file, more about this later) and then loops over PCI buses, calling
+>> amongst other things pci_bus_assign_resources() then pci_bus_add_devices().
 >>
->>   - Discover the host bridge via a PNP0A08 device in the ACPI namespace.
->>   - Discover the bus number range behind the bridge using a _CRS
->> method in the PNP0A08 device.
->>   - Discover the ECAM space for those buses via a _CBA method in the
->> PNP0A08 device.
->>   - Tell the config accessors (struct pci_ops) that the ECAM space for
->> buses A-B is at address X.
->>   - Enumerate the devices behind the host bridge by calling
->> pci_scan_root_bus(), passing the config accessors.
+>> The problem is that ARM's pcibios_init_hw() calls pci_scan_root_bus()
+>> (or a host-driver-specific function which that also calls
+>> pci_scan_root_bus() in Tegra's case) which in turn calls
+>> pci_bus_add_devices() right at the end, before control has returned to
+>> pci_common_init() and hence before pci_bus_assign_resources() has been
+>> called.
 >>
->> It sounds like you want a way to parse the resources at one point,
->> saving them and marking the ECAM region, then at a later point, look
->> up the ECAM from a saved list.  We don't do that on x86 because the
->> config accessors keep an internal list of the ECAM area for each bus.
+>> If I modify pci_scan_root_bus() and remove the call to
+>> pci_bus_add_devices(), everything works as expected.
 >>
->> We do of course want to put this ECAM space in the IORESOURCE_MEM tree
->> because it consumes address space and we have to make sure we don't
->> put anything else on top of it.  But we don't have any reason to
->> describe the MMIO -> config space function in that tree.  From the
->> point of view of the rest of the system, it's just MMIO space that's
->> consumed by the PCI host bridge, just like any other device-specific
->> MMIO area.
->
-> What I currently do is pass the ECAM space as a resource to the PCI host
-> bridge platform device. Regular and extended configuration spaces are
-> given by the third and fourth resources, respectively. If I understand
-> correctly, you're saying that nothing beyond that needs to be encoded.
-> In other words it is enough for the PCI host bridge driver to know where
-> to take the data from.
+>> So, I guess the question is: Should ARM's pcibios_init_hw() not be
+>> calling pci_scan_root_bus(), or at least presumably the ARM PCI code
+>> needs to do things in a slightly different order?
 
-Yes, I think so.
+I think you need to do something like this instead of using pci_scan_root_bus():
 
-I'd like to someday make ECAM support generic, since it's specified by
-the PCIe spec.  The spec doesn't differentiate between PCI
-configuration space (offsets 0-0xff) and PCI Express *extended*
-configuration space (offsets 0x100-0xfff).  But it sounds like Tegra
-might have a memory-mapped configuration mechanism that is similar to
-ECAM but with a different address map, since you mention two resources
-(third and fourth).  That's not a problem, since you're doing a
-Tegra-specific solution right now anyway, but something to keep in the
-back of your mind if we ever do make a generic ECAM solution.
+    pci_create_root_bus()
+    pci_scan_child_bus()
+    pci_bus_assign_resources()
+    pci_bus_add_devices()
 
-> I'll have to see what this means for the DT binding. There are other
-> issues that I need to think about, like for example how to pass the ECAM
-> space from the PCI host controller to each of the two bridges via the
-> ranges property. This no longer makes sense in the current form, as the
-> ECAM covers the configuration spaces for devices of both bridges and
-> cannot really be split among them.
+This is the effective order used by most of the pci_create_root_bus() callers.
 
-We have the same situation on x86.  Part of the historical grunge that
-I omitted is that there's a static ACPI table (MCFG) that can tell you
-the ECAM range for a bus number range.  Often that bus number range
-includes several host bridges.  On x86, we have a single set of ECAM
-config accessors (see pci_mmcfg), and they maintain a list of "bus
-number -> ECAM addr" mappings internally, independent of which host
-bridge leads to the buses.
+> Maybe pci_scan_root_bus() should be calling pci_bus_assign_resources()?
+> Or a new function could be added which also assigns the resources.
+
+Yes, it probably should.  I'm nervous about just throwing it in there
+without quite a bit more analysis, but that's definitely the direction
+I think we should be heading.
 
 Bjorn
