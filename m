@@ -1,117 +1,60 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 14 Aug 2012 20:01:42 +0200
-Subject: [PATCH v3 05/10] resource: add PCI configuration space support
-In-Reply-To: <CAErSpo6LYpkC5wop53S1r1z3ov4+w4soqrQARzbbouVs1trzUg@mail.gmail.com>
-References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
- <1343332512-28762-6-git-send-email-thierry.reding@avionic-design.de>
- <CAErSpo4qg45brVRwEbw3=R04VsbnvUowSMWcT+M6VoAxbf3Cqg@mail.gmail.com>
- <20120814055542.GB16181@avionic-0098.mockup.avionic-design.de>
- <CAErSpo6LYpkC5wop53S1r1z3ov4+w4soqrQARzbbouVs1trzUg@mail.gmail.com>
-Message-ID: <20120814180142.GA9430@avionic-0098.mockup.avionic-design.de>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Tue, 14 Aug 2012 11:09:58 -0700
+Subject: [PATCH] pinctrl: imx5: start numbering pad from 0
+In-Reply-To: <CAP1dx+wm=Lj6WXWTiRk3JfqAomr8_mfjZpmToht2bb4paEYXjQ@mail.gmail.com>
+References: <1344869278-27334-1-git-send-email-shawn.guo@linaro.org>
+ <502954D2.908@boundarydevices.com>
+ <CAP1dx+wm=Lj6WXWTiRk3JfqAomr8_mfjZpmToht2bb4paEYXjQ@mail.gmail.com>
+Message-ID: <502A9476.1040500@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 10:38:08AM -0700, Bjorn Helgaas wrote:
-> On Mon, Aug 13, 2012 at 10:55 PM, Thierry Reding
-> <thierry.reding@avionic-design.de> wrote:
-> > On Mon, Aug 13, 2012 at 10:00:45PM -0700, Bjorn Helgaas wrote:
-> >> On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
-> >> <thierry.reding@avionic-design.de> wrote:
-> >> > This commit adds a new flag that allows marking resources as PCI
-> >> > configuration space.
-> >> >
-> >> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> >> > ---
-> >> > Changes in v3:
-> >> > - new patch
-> >> >
-> >> >  include/linux/ioport.h | 2 +-
-> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >> >
-> >> > diff --git a/include/linux/ioport.h b/include/linux/ioport.h
-> >> > index 589e0e7..3314843 100644
-> >> > --- a/include/linux/ioport.h
-> >> > +++ b/include/linux/ioport.h
-> >> > @@ -102,7 +102,7 @@ struct resource {
-> >> >
-> >> >  /* PCI control bits.  Shares IORESOURCE_BITS with above PCI ROM.  */
-> >> >  #define IORESOURCE_PCI_FIXED           (1<<4)  /* Do not move resource */
-> >> > -
-> >> > +#define IORESOURCE_PCI_CS              (1<<5)  /* PCI configuration space */
-> >>
-> >> What is the purpose of this?  It seems that you are marking regions
-> >> that we call MMCONFIG on x86, or ECAM-type regions in the language of
-> >> the PCIe spec.  I see that you set it in several places, but I don't
-> >> see anything that ever looks for it.  Do you have plans to use it in
-> >> the future?  If it really does correspond to MMCONFIG/ECAM, we should
-> >> handle those regions consistently across all architectures.
-> >
-> > The purpose is ultimately to obtain the MMCONFIG/ECAM resources assigned
-> > to a PCI host controller. I've used this in the of_pci_parse_ranges()
-> > and in the static board setup code to mark ranges as such. Perhaps
-> > IORESOURCE_ECAM or IORESOURCE_MMCONFIG might have been better names. I
-> > also just noticed that I'm not using this anywhere, but the plan was to
-> > eventually use it with platform_get_resource(). However that doesn't
-> > seem to work either because the lower bits of the flags aren't use for
-> > comparison in that function.
-> >
-> > Any other ideas how that could be handled? Basically what I need is a
-> > way to mark a resource as an MMCONFIG/ECAM range so that it can be used
-> > to program the PCI host controller accordingly. I don't know how these
-> > are assigned on x86. I was under the impression that the MMCONFIG/ECAM
-> > space was accessed through a single single address/data register pair.
-> 
-> The legacy config access mechanism (CF8h/CFCh registers described in
-> PCI 3.0 spec sec 3.2.2.3.2) is a single address/data pair, but this is
-> mostly x86-specific.  The ECAM mechanism (described in the PCIe 3.0
-> spec sec 7.2.2) is not a single address/data pair; instead, each byte
-> of config space is directly mapped into the host's MMIO space.
-> 
-> Here's what we do on x86 (omitting some historical grunge that
-> complicates things):
-> 
->   - Discover the host bridge via a PNP0A08 device in the ACPI namespace.
->   - Discover the bus number range behind the bridge using a _CRS
-> method in the PNP0A08 device.
->   - Discover the ECAM space for those buses via a _CBA method in the
-> PNP0A08 device.
->   - Tell the config accessors (struct pci_ops) that the ECAM space for
-> buses A-B is at address X.
->   - Enumerate the devices behind the host bridge by calling
-> pci_scan_root_bus(), passing the config accessors.
-> 
-> It sounds like you want a way to parse the resources at one point,
-> saving them and marking the ECAM region, then at a later point, look
-> up the ECAM from a saved list.  We don't do that on x86 because the
-> config accessors keep an internal list of the ECAM area for each bus.
-> 
-> We do of course want to put this ECAM space in the IORESOURCE_MEM tree
-> because it consumes address space and we have to make sure we don't
-> put anything else on top of it.  But we don't have any reason to
-> describe the MMIO -> config space function in that tree.  From the
-> point of view of the rest of the system, it's just MMIO space that's
-> consumed by the PCI host bridge, just like any other device-specific
-> MMIO area.
+On 8/14/2012 12:30 AM, Dong Aisheng wrote:
+> On 14 August 2012 03:26, Troy Kisky <troy.kisky@boundarydevices.com> wrote:
+>> On 8/13/2012 7:47 AM, Shawn Guo wrote:
+>>> Unlike imx6q pinctrl driver that starts nubmering pad from 0, imx5
+>>> pinctrl drivers number pad from 1.  It causes problem/confusion when
+>>> driver accesses imx51_pinctrl_pads array using pin ID as the index.
+>>>
+>>> Change imx51_pads and imx53_pads numbering start from 0.
+>>>
+>>> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+>>> ---
+>>>    drivers/pinctrl/pinctrl-imx51.c |  490
+>>> +++++++++++++++++++-------------------
+>>>    drivers/pinctrl/pinctrl-imx53.c |  402 ++++++++++++++++----------------
+>>>    2 files changed, 446 insertions(+), 446 deletions(-)
+>>>
+>>> diff --git a/drivers/pinctrl/pinctrl-imx51.c
+>>> b/drivers/pinctrl/pinctrl-imx51.c
+>>> index 9fd0216..fb84689 100644
+>>> --- a/drivers/pinctrl/pinctrl-imx51.c
+>>> +++ b/drivers/pinctrl/pinctrl-imx51.c
+>>> @@ -23,251 +23,251 @@
+>>>    #include "pinctrl-imx.h"
+>>>      enum imx51_pads {
+>>> -       MX51_PAD_EIM_D16 = 1,
+>>> -       MX51_PAD_EIM_D17 = 2,
+> ...
+>>> +       MX53_PAD_GPIO_19 = 0,
+>>> +       MX53_PAD_KEY_COL0 = 1,
+>>
+>> Why not skip the = xx altogether??  The enum will auto-increment.
+> Personally i'd like to keep it.
+> The reason is that pin id is basic property of a pin per pinctrl
+> subsystem's design
+> so explicitly define it looks more clear to me and i'm not sure but
+> it's possible that
+> the pin id may be used in device tree in the future(maybe some other
+> soc already uses it),
+> And defining it has no big harming.
+>
+> Regards
+> Dong Aisheng
+> .
+>
+Then maybe #defines should be used, so that device tree can include this 
+file and be run through C pre-processor?
 
-What I currently do is pass the ECAM space as a resource to the PCI host
-bridge platform device. Regular and extended configuration spaces are
-given by the third and fourth resources, respectively. If I understand
-correctly, you're saying that nothing beyond that needs to be encoded.
-In other words it is enough for the PCI host bridge driver to know where
-to take the data from.
-
-I'll have to see what this means for the DT binding. There are other
-issues that I need to think about, like for example how to pass the ECAM
-space from the PCI host controller to each of the two bridges via the
-ranges property. This no longer makes sense in the current form, as the
-ECAM covers the configuration spaces for devices of both bridges and
-cannot really be split among them.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120814/f2443c66/attachment.sig>
+Thanks
+Troy
