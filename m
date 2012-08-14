@@ -1,156 +1,44 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Tue, 14 Aug 2012 14:53:48 +0530
-Subject: [PATCHv7] arm/dts: omap4-sdp: Add keypad data
-In-Reply-To: <502A1873.90304@ti.com>
-References: <1342780715-25618-1-git-send-email-sourav.poddar@ti.com>
- <CAKdam54ifAW=W86qLj3+JR6k7i00EjDSQgK5B1X--NCg18jJmw@mail.gmail.com>
- <502A1873.90304@ti.com>
-Message-ID: <CAKdam54MCq8CNn0Vnd1ZV1MPTuuTmCMJ1LO1q083X18TsTswZg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Aug 2012 09:33:25 +0000
+Subject: [PATCH v3 1/4] dmaengine: mmp-pdma support
+In-Reply-To: <1344917519-9505-2-git-send-email-zhangfei.gao@marvell.com>
+References: <1344917519-9505-1-git-send-email-zhangfei.gao@marvell.com>
+ <1344917519-9505-2-git-send-email-zhangfei.gao@marvell.com>
+Message-ID: <201208140933.26061.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On Tuesday 14 August 2012, Zhangfei Gao wrote:
+> 1. virtual channel vs. physical channel
+> Virtual channel is managed by dmaengine
+> Physical channel handling resource, such as irq
+> Physical channel is alloced dynamically as descending priority,
+> freed immediately when irq done.
+> The availble highest priority physically channel will alwayes be alloced
+> 
+> Issue pending list -> alloc highest dma physically channel available -> dma done -> free physically channel
+> 
+> 2. list: running list & pending list
+> submit: desc list -> pending list
+> issue_pending_list: if (IDLE) pending list -> running list; free pending list (RUN)
+> irq: free running list (IDLE)
+>      check pendlist -> pending list -> running list; free pending list (RUN)
+> 
+> 3. irq:
+> Each list generate one irq, calling callback
+> One list may contain several desc chain, in such case, make sure only the last desc list generate irq.
+> 
+> 4. async
+> Submit will add desc chain to pending list, which can be multi-called
+> If multi desc chain is submitted, only the last desc would generate irq -> call back
+> If IDLE, issue_pending_list start pending_list, transforming pendlist to running list
+> If RUN, irq will start pending list
+> 
+> 5. test
+> 5.1 pxa3xx_nand on pxa910
+> 5.2 insmod dmatest.ko (threads_per_chan=y)
+> By default drivers/dma/dmatest.c test every channel and test memcpy with 1 threads per channel
+> 
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
 
-On Tue, Aug 14, 2012 at 2:50 PM, Benoit Cousson <b-cousson@ti.com> wrote:
-> Hi Sourav
->
-> On 08/14/2012 08:23 AM, Poddar, Sourav wrote:
->> Hi,
->>
->> On Fri, Jul 20, 2012 at 4:08 PM, Sourav Poddar <sourav.poddar@ti.com> wrote:
->>> Add keypad data node in omap4 device tree file.
->>> Also fill the device tree binding parameters
->>> with the required value in "omap4-sdp" dts file.
->>>
->>> Tested on omap4430 sdp with 3.5-rc6 kernel.
->>>
->>> Cc: Benoit Cousson <b-cousson@ti.com>
->>> Cc: Rob Herring <rob.herring@calxeda.com>
->>> Cc: Grant Likely <grant.likely@secretlab.ca>
->>> Cc: Felipe Balbi <balbi@ti.com>
->>> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
->>> ---
->>> Changes since v6:
->>> -remove address from the node since reg property
->>> is not used.
->>>  arch/arm/boot/dts/omap4-sdp.dts |   70 +++++++++++++++++++++++++++++++++++++++
->>>  arch/arm/boot/dts/omap4.dtsi    |    5 +++
->>>  2 files changed, 75 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
->>> index 72216e9..80cd016 100644
->>> --- a/arch/arm/boot/dts/omap4-sdp.dts
->>> +++ b/arch/arm/boot/dts/omap4-sdp.dts
->>> @@ -113,6 +113,76 @@
->>>                         "DMic", "Digital Mic",
->>>                         "Digital Mic", "Digital Mic1 Bias";
->>>         };
->>> +
->>> +       keypad {
->>> +               keypad,num-rows = <8>;
->>> +               keypad,num-columns = <8>;
->>> +               linux,keymap = < 0x00000012
->>> +                       0x00010013
->>> +                       0x00020014
->>> +                       0x00030066
->>> +                       0x0004003f
->>> +                       0x000500f0
->>> +                       0x00060017
->>> +                       0x0007002a
->>> +                       0x01000020
->>> +                       0x01010021
->>> +                       0x01020022
->>> +                       0x010300e7
->>> +                       0x01040040
->>> +                       0x010500f0
->>> +                       0x01060025
->>> +                       0x0107001c
->>> +                       0x0200002d
->>> +                       0x0201002e
->>> +                       0x0202002f
->>> +                       0x0203006b
->>> +                       0x02040041
->>> +                       0x020500f0
->>> +                       0x02060034
->>> +                       0x0207003a
->>> +                       0x0300002c
->>> +                       0x0301004e
->>> +                       0x03020030
->>> +                       0x0303003b
->>> +                       0x03040042
->>> +                       0x030500f0
->>> +                       0x03060018
->>> +                       0x03070039
->>> +                       0x04000011
->>> +                       0x04010015
->>> +                       0x04020016
->>> +                       0x0403003c
->>> +                       0x04040073
->>> +                       0x040500f0
->>> +                       0x04060026
->>> +                       0x04070069
->>> +                       0x0500001f
->>> +                       0x05010023
->>> +                       0x05020024
->>> +                       0x0503003d
->>> +                       0x05040043
->>> +                       0x05050072
->>> +                       0x05060032
->>> +                       0x0507006a
->>> +                       0x06000010
->>> +                       0x0601001e
->>> +                       0x06020031
->>> +                       0x0603009e
->>> +                       0x0604000e
->>> +                       0x060500f0
->>> +                       0x06060019
->>> +                       0x06070067
->>> +                       0x07000094
->>> +                       0x07010095
->>> +                       0x070200ca
->>> +                       0x070300cb
->>> +                       0x0704003e
->>> +                       0x070500f0
->>> +                       0x07060160
->>> +                       0x0707006c >;
->
-> I know that the hex value are faster to parse than the explicit
-> information, but maybe you could at least comment each entry?
->
-Yes, will add the comment and post a new version.
-
-Thanks,
-Sourav
-> Otherwise is looks fine to me.
->
-
-> Thanks,
-> Benoit
->
->>> +               linux,input-no-autorepeat;
->>> +       };
->>>  };
->>>
->>>  &i2c1 {
->>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
->>> index 04cbbcb..e78a1f1 100644
->>> --- a/arch/arm/boot/dts/omap4.dtsi
->>> +++ b/arch/arm/boot/dts/omap4.dtsi
->>> @@ -296,4 +296,9 @@
->>>                         ti,hwmods = "dmic";
->>>                 };
->>>         };
->>> +
->>> +       keypad {
->>> +               compatible = "ti,omap4-keypad";
->>> +               ti,hwmods = "kbd";
->>> +       };
->>>  };
->>> --
->>> 1.7.1
->>>
->> Any more comments on this patch?
->>
->> ~Sourav
->>
->
+Acked-by: Arnd Bergmann <arnd@arndb.de>
