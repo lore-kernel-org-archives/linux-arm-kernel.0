@@ -1,36 +1,72 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 14 Aug 2012 17:22:34 +0300
-Subject: [PATCH v2 06/14] dt: Add empty of_find_node_by_name() function
+Date: Tue, 14 Aug 2012 17:22:36 +0300
+Subject: [PATCH v2 08/14] Input: twl4030-vibra: Support for DT booted kernel
 In-Reply-To: <1344954162-7985-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1344954162-7985-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1344954162-7985-7-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1344954162-7985-9-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds an empty of_find_node_by_name() function for !CONFIG_OF
-builds.
+Add support when the kernel has been booted with DT blob. In this case the
+pdata is NULL, we need to reach up to the core node and check if the codec
+part has been enabled to determine if we need to coexist with the codec or
+not.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- include/linux/of.h |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ drivers/input/misc/twl4030-vibra.c |   20 ++++++++++++++++++--
+ 1 files changed, 18 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 5919ee3..c90e59a 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -308,6 +308,12 @@ static inline const char* of_node_full_name(struct device_node *np)
- 	return "<no-node>";
- }
+diff --git a/drivers/input/misc/twl4030-vibra.c b/drivers/input/misc/twl4030-vibra.c
+index d1e1a7e..2cfc6c7 100644
+--- a/drivers/input/misc/twl4030-vibra.c
++++ b/drivers/input/misc/twl4030-vibra.c
+@@ -26,6 +26,7 @@
+ #include <linux/module.h>
+ #include <linux/jiffies.h>
+ #include <linux/platform_device.h>
++#include <linux/of.h>
+ #include <linux/workqueue.h>
+ #include <linux/i2c/twl.h>
+ #include <linux/mfd/twl4030-audio.h>
+@@ -194,13 +195,28 @@ static int twl4030_vibra_resume(struct device *dev)
+ static SIMPLE_DEV_PM_OPS(twl4030_vibra_pm_ops,
+ 			 twl4030_vibra_suspend, twl4030_vibra_resume);
  
-+static inline device_node *of_find_node_by_name(struct device_node *from,
-+	const char *name)
++static bool twl4030_vibra_check_coexist(struct twl4030_vibra_data *pdata,
++			      struct device_node *node)
 +{
-+	return NULL;
++	if (pdata && pdata->coexist)
++		return true;
++
++#ifdef CONFIG_OF
++	if (of_find_node_by_name(node, "codec"))
++		return true;
++#endif
++
++	return false;
 +}
 +
- static inline bool of_have_populated_dt(void)
+ static int __devinit twl4030_vibra_probe(struct platform_device *pdev)
  {
- 	return false;
+ 	struct twl4030_vibra_data *pdata = pdev->dev.platform_data;
++	struct device_node *twl4030_core_node = pdev->dev.parent->of_node;
+ 	struct vibra_info *info;
+ 	int ret;
+ 
+-	if (!pdata) {
++	if (!pdata && !twl4030_core_node) {
+ 		dev_dbg(&pdev->dev, "platform_data not available\n");
+ 		return -EINVAL;
+ 	}
+@@ -210,7 +226,7 @@ static int __devinit twl4030_vibra_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	info->dev = &pdev->dev;
+-	info->coexist = pdata->coexist;
++	info->coexist = twl4030_vibra_check_coexist(pdata, twl4030_core_node);
+ 	INIT_WORK(&info->play_work, vibra_play_work);
+ 
+ 	info->input_dev = input_allocate_device();
 -- 
 1.7.8.6
