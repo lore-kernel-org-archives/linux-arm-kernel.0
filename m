@@ -1,265 +1,146 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Tue, 14 Aug 2012 11:19:22 +0200
-Subject: [PATCH v2 2/2] ARM: at91: fix rtc-at91sam9 irq issue due to sparse
- irq support
-In-Reply-To: <1344935962-18871-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1344935962-18871-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1344935962-18871-3-git-send-email-ludovic.desroches@atmel.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Tue, 14 Aug 2012 11:20:51 +0200
+Subject: [PATCHv7] arm/dts: omap4-sdp: Add keypad data
+In-Reply-To: <CAKdam54ifAW=W86qLj3+JR6k7i00EjDSQgK5B1X--NCg18jJmw@mail.gmail.com>
+References: <1342780715-25618-1-git-send-email-sourav.poddar@ti.com>
+ <CAKdam54ifAW=W86qLj3+JR6k7i00EjDSQgK5B1X--NCg18jJmw@mail.gmail.com>
+Message-ID: <502A1873.90304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+Hi Sourav
 
-AT91_ID_SYS as virq is incorrect because of spare irq support which
-introduces NR_IRQS_LEGACY offset. It modifies rtc-at91sam9 driver in
-order to get irq from resources.
+On 08/14/2012 08:23 AM, Poddar, Sourav wrote:
+> Hi,
+> 
+> On Fri, Jul 20, 2012 at 4:08 PM, Sourav Poddar <sourav.poddar@ti.com> wrote:
+>> Add keypad data node in omap4 device tree file.
+>> Also fill the device tree binding parameters
+>> with the required value in "omap4-sdp" dts file.
+>>
+>> Tested on omap4430 sdp with 3.5-rc6 kernel.
+>>
+>> Cc: Benoit Cousson <b-cousson@ti.com>
+>> Cc: Rob Herring <rob.herring@calxeda.com>
+>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>> Cc: Felipe Balbi <balbi@ti.com>
+>> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+>> ---
+>> Changes since v6:
+>> -remove address from the node since reg property
+>> is not used.
+>>  arch/arm/boot/dts/omap4-sdp.dts |   70 +++++++++++++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/omap4.dtsi    |    5 +++
+>>  2 files changed, 75 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+>> index 72216e9..80cd016 100644
+>> --- a/arch/arm/boot/dts/omap4-sdp.dts
+>> +++ b/arch/arm/boot/dts/omap4-sdp.dts
+>> @@ -113,6 +113,76 @@
+>>                         "DMic", "Digital Mic",
+>>                         "Digital Mic", "Digital Mic1 Bias";
+>>         };
+>> +
+>> +       keypad {
+>> +               keypad,num-rows = <8>;
+>> +               keypad,num-columns = <8>;
+>> +               linux,keymap = < 0x00000012
+>> +                       0x00010013
+>> +                       0x00020014
+>> +                       0x00030066
+>> +                       0x0004003f
+>> +                       0x000500f0
+>> +                       0x00060017
+>> +                       0x0007002a
+>> +                       0x01000020
+>> +                       0x01010021
+>> +                       0x01020022
+>> +                       0x010300e7
+>> +                       0x01040040
+>> +                       0x010500f0
+>> +                       0x01060025
+>> +                       0x0107001c
+>> +                       0x0200002d
+>> +                       0x0201002e
+>> +                       0x0202002f
+>> +                       0x0203006b
+>> +                       0x02040041
+>> +                       0x020500f0
+>> +                       0x02060034
+>> +                       0x0207003a
+>> +                       0x0300002c
+>> +                       0x0301004e
+>> +                       0x03020030
+>> +                       0x0303003b
+>> +                       0x03040042
+>> +                       0x030500f0
+>> +                       0x03060018
+>> +                       0x03070039
+>> +                       0x04000011
+>> +                       0x04010015
+>> +                       0x04020016
+>> +                       0x0403003c
+>> +                       0x04040073
+>> +                       0x040500f0
+>> +                       0x04060026
+>> +                       0x04070069
+>> +                       0x0500001f
+>> +                       0x05010023
+>> +                       0x05020024
+>> +                       0x0503003d
+>> +                       0x05040043
+>> +                       0x05050072
+>> +                       0x05060032
+>> +                       0x0507006a
+>> +                       0x06000010
+>> +                       0x0601001e
+>> +                       0x06020031
+>> +                       0x0603009e
+>> +                       0x0604000e
+>> +                       0x060500f0
+>> +                       0x06060019
+>> +                       0x06070067
+>> +                       0x07000094
+>> +                       0x07010095
+>> +                       0x070200ca
+>> +                       0x070300cb
+>> +                       0x0704003e
+>> +                       0x070500f0
+>> +                       0x07060160
+>> +                       0x0707006c >;
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- arch/arm/mach-at91/at91sam9260_devices.c |  6 +++++-
- arch/arm/mach-at91/at91sam9261_devices.c |  6 +++++-
- arch/arm/mach-at91/at91sam9263_devices.c | 10 ++++++++--
- arch/arm/mach-at91/at91sam9g45_devices.c |  6 +++++-
- arch/arm/mach-at91/at91sam9rl_devices.c  |  6 +++++-
- drivers/rtc/rtc-at91sam9.c               | 22 +++++++++++++++-------
- 6 files changed, 43 insertions(+), 13 deletions(-)
+I know that the hex value are faster to parse than the explicit
+information, but maybe you could at least comment each entry?
 
-diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index 7b9c2ba..bce572a 100644
---- a/arch/arm/mach-at91/at91sam9260_devices.c
-+++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -726,6 +726,8 @@ static struct resource rtt_resources[] = {
- 		.flags	= IORESOURCE_MEM,
- 	}, {
- 		.flags	= IORESOURCE_MEM,
-+	}, {
-+		.flags  = IORESOURCE_IRQ,
- 	},
- };
- 
-@@ -744,10 +746,12 @@ static void __init at91_add_device_rtt_rtc(void)
- 	 * The second resource is needed:
- 	 * GPBR will serve as the storage for RTC time offset
- 	 */
--	at91sam9260_rtt_device.num_resources = 2;
-+	at91sam9260_rtt_device.num_resources = 3;
- 	rtt_resources[1].start = AT91SAM9260_BASE_GPBR +
- 				 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
- 	rtt_resources[1].end = rtt_resources[1].start + 3;
-+	rtt_resources[2].start = NR_IRQS_LEGACY + AT91_ID_SYS;
-+	rtt_resources[2].end = NR_IRQS_LEGACY + AT91_ID_SYS;
- }
- #else
- static void __init at91_add_device_rtt_rtc(void)
-diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-index 8df5c1b..bc2590d 100644
---- a/arch/arm/mach-at91/at91sam9261_devices.c
-+++ b/arch/arm/mach-at91/at91sam9261_devices.c
-@@ -609,6 +609,8 @@ static struct resource rtt_resources[] = {
- 		.flags	= IORESOURCE_MEM,
- 	}, {
- 		.flags	= IORESOURCE_MEM,
-+	}, {
-+		.flags  = IORESOURCE_IRQ,
- 	}
- };
- 
-@@ -626,10 +628,12 @@ static void __init at91_add_device_rtt_rtc(void)
- 	 * The second resource is needed:
- 	 * GPBR will serve as the storage for RTC time offset
- 	 */
--	at91sam9261_rtt_device.num_resources = 2;
-+	at91sam9261_rtt_device.num_resources = 3;
- 	rtt_resources[1].start = AT91SAM9261_BASE_GPBR +
- 				 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
- 	rtt_resources[1].end = rtt_resources[1].start + 3;
-+	rtt_resources[2].start = NR_IRQS_LEGACY + AT91_ID_SYS;
-+	rtt_resources[2].end = NR_IRQS_LEGACY + AT91_ID_SYS;
- }
- #else
- static void __init at91_add_device_rtt_rtc(void)
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index eb6bbf8..9b6ca73 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -990,6 +990,8 @@ static struct resource rtt0_resources[] = {
- 		.flags	= IORESOURCE_MEM,
- 	}, {
- 		.flags	= IORESOURCE_MEM,
-+	}, {
-+		.flags  = IORESOURCE_IRQ,
- 	}
- };
- 
-@@ -1006,6 +1008,8 @@ static struct resource rtt1_resources[] = {
- 		.flags	= IORESOURCE_MEM,
- 	}, {
- 		.flags	= IORESOURCE_MEM,
-+	}, {
-+		.flags  = IORESOURCE_IRQ,
- 	}
- };
- 
-@@ -1027,14 +1031,14 @@ static void __init at91_add_device_rtt_rtc(void)
- 		 * The second resource is needed only for the chosen RTT:
- 		 * GPBR will serve as the storage for RTC time offset
- 		 */
--		at91sam9263_rtt0_device.num_resources = 2;
-+		at91sam9263_rtt0_device.num_resources = 3;
- 		at91sam9263_rtt1_device.num_resources = 1;
- 		pdev = &at91sam9263_rtt0_device;
- 		r = rtt0_resources;
- 		break;
- 	case 1:
- 		at91sam9263_rtt0_device.num_resources = 1;
--		at91sam9263_rtt1_device.num_resources = 2;
-+		at91sam9263_rtt1_device.num_resources = 3;
- 		pdev = &at91sam9263_rtt1_device;
- 		r = rtt1_resources;
- 		break;
-@@ -1047,6 +1051,8 @@ static void __init at91_add_device_rtt_rtc(void)
- 	pdev->name = "rtc-at91sam9";
- 	r[1].start = AT91SAM9263_BASE_GPBR + 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
- 	r[1].end = r[1].start + 3;
-+	r[2].start = NR_IRQS_LEGACY + AT91_ID_SYS;
-+	r[2].end = NR_IRQS_LEGACY + AT91_ID_SYS;
- }
- #else
- static void __init at91_add_device_rtt_rtc(void)
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 0607399..1b47319 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -1293,6 +1293,8 @@ static struct resource rtt_resources[] = {
- 		.flags	= IORESOURCE_MEM,
- 	}, {
- 		.flags	= IORESOURCE_MEM,
-+	}, {
-+		.flags  = IORESOURCE_IRQ,
- 	}
- };
- 
-@@ -1310,10 +1312,12 @@ static void __init at91_add_device_rtt_rtc(void)
- 	 * The second resource is needed:
- 	 * GPBR will serve as the storage for RTC time offset
- 	 */
--	at91sam9g45_rtt_device.num_resources = 2;
-+	at91sam9g45_rtt_device.num_resources = 3;
- 	rtt_resources[1].start = AT91SAM9G45_BASE_GPBR +
- 				 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
- 	rtt_resources[1].end = rtt_resources[1].start + 3;
-+	rtt_resources[2].start = NR_IRQS_LEGACY + AT91_ID_SYS;
-+	rtt_resources[2].end = NR_IRQS_LEGACY + AT91_ID_SYS;
- }
- #else
- static void __init at91_add_device_rtt_rtc(void)
-diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index f09fff9..b3d365d 100644
---- a/arch/arm/mach-at91/at91sam9rl_devices.c
-+++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -688,6 +688,8 @@ static struct resource rtt_resources[] = {
- 		.flags	= IORESOURCE_MEM,
- 	}, {
- 		.flags	= IORESOURCE_MEM,
-+	}, {
-+		.flags  = IORESOURCE_IRQ,
- 	}
- };
- 
-@@ -705,10 +707,12 @@ static void __init at91_add_device_rtt_rtc(void)
- 	 * The second resource is needed:
- 	 * GPBR will serve as the storage for RTC time offset
- 	 */
--	at91sam9rl_rtt_device.num_resources = 2;
-+	at91sam9rl_rtt_device.num_resources = 3;
- 	rtt_resources[1].start = AT91SAM9RL_BASE_GPBR +
- 				 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
- 	rtt_resources[1].end = rtt_resources[1].start + 3;
-+	rtt_resources[2].start = NR_IRQS_LEGACY + AT91_ID_SYS;
-+	rtt_resources[2].end = NR_IRQS_LEGACY + AT91_ID_SYS;
- }
- #else
- static void __init at91_add_device_rtt_rtc(void)
-diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-index 8318689..1dd61f4 100644
---- a/drivers/rtc/rtc-at91sam9.c
-+++ b/drivers/rtc/rtc-at91sam9.c
-@@ -58,6 +58,7 @@ struct sam9_rtc {
- 	struct rtc_device	*rtcdev;
- 	u32			imr;
- 	void __iomem		*gpbr;
-+	int 			irq;
- };
- 
- #define rtt_readl(rtc, field) \
-@@ -292,7 +293,7 @@ static int __devinit at91_rtc_probe(struct platform_device *pdev)
- {
- 	struct resource	*r, *r_gpbr;
- 	struct sam9_rtc	*rtc;
--	int		ret;
-+	int		ret, irq;
- 	u32		mr;
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -302,10 +303,18 @@ static int __devinit at91_rtc_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		dev_err(&pdev->dev, "failed to get interrupt resource\n");
-+		return irq;
-+	}
-+
- 	rtc = kzalloc(sizeof *rtc, GFP_KERNEL);
- 	if (!rtc)
- 		return -ENOMEM;
- 
-+	rtc->irq = irq;
-+
- 	/* platform setup code should have handled this; sigh */
- 	if (!device_can_wakeup(&pdev->dev))
- 		device_init_wakeup(&pdev->dev, 1);
-@@ -345,11 +354,10 @@ static int __devinit at91_rtc_probe(struct platform_device *pdev)
- 	}
- 
- 	/* register irq handler after we know what name we'll use */
--	ret = request_irq(AT91_ID_SYS, at91_rtc_interrupt,
--				IRQF_SHARED,
-+	ret = request_irq(rtc->irq, at91_rtc_interrupt, IRQF_SHARED,
- 				dev_name(&rtc->rtcdev->dev), rtc);
- 	if (ret) {
--		dev_dbg(&pdev->dev, "can't share IRQ %d?\n", AT91_ID_SYS);
-+		dev_dbg(&pdev->dev, "can't share IRQ %d?\n", rtc->irq);
- 		rtc_device_unregister(rtc->rtcdev);
- 		goto fail_register;
- 	}
-@@ -386,7 +394,7 @@ static int __devexit at91_rtc_remove(struct platform_device *pdev)
- 
- 	/* disable all interrupts */
- 	rtt_writel(rtc, MR, mr & ~(AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN));
--	free_irq(AT91_ID_SYS, rtc);
-+	free_irq(rtc->irq, rtc);
- 
- 	rtc_device_unregister(rtc->rtcdev);
- 
-@@ -423,7 +431,7 @@ static int at91_rtc_suspend(struct platform_device *pdev,
- 	rtc->imr = mr & (AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN);
- 	if (rtc->imr) {
- 		if (device_may_wakeup(&pdev->dev) && (mr & AT91_RTT_ALMIEN)) {
--			enable_irq_wake(AT91_ID_SYS);
-+			enable_irq_wake(rtc->irq);
- 			/* don't let RTTINC cause wakeups */
- 			if (mr & AT91_RTT_RTTINCIEN)
- 				rtt_writel(rtc, MR, mr & ~AT91_RTT_RTTINCIEN);
-@@ -441,7 +449,7 @@ static int at91_rtc_resume(struct platform_device *pdev)
- 
- 	if (rtc->imr) {
- 		if (device_may_wakeup(&pdev->dev))
--			disable_irq_wake(AT91_ID_SYS);
-+			disable_irq_wake(rtc->irq);
- 		mr = rtt_readl(rtc, MR);
- 		rtt_writel(rtc, MR, mr | rtc->imr);
- 	}
--- 
-1.7.11.3
+Otherwise is looks fine to me.
+
+Thanks,
+Benoit
+
+>> +               linux,input-no-autorepeat;
+>> +       };
+>>  };
+>>
+>>  &i2c1 {
+>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+>> index 04cbbcb..e78a1f1 100644
+>> --- a/arch/arm/boot/dts/omap4.dtsi
+>> +++ b/arch/arm/boot/dts/omap4.dtsi
+>> @@ -296,4 +296,9 @@
+>>                         ti,hwmods = "dmic";
+>>                 };
+>>         };
+>> +
+>> +       keypad {
+>> +               compatible = "ti,omap4-keypad";
+>> +               ti,hwmods = "kbd";
+>> +       };
+>>  };
+>> --
+>> 1.7.1
+>>
+> Any more comments on this patch?
+> 
+> ~Sourav
+> 
