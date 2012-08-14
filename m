@@ -1,38 +1,32 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 14 Aug 2012 19:22:56 -0400
-Subject: [PATCH v2 1/2] ARM: kirkwood: DT board setup for Seagate
- FreeAgent Dockstar
-In-Reply-To: <1344977022-29037-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <20120814193613.GS22226@titan.lakedaemon.net>
- <1344977022-29037-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20120814232256.GX22226@titan.lakedaemon.net>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Wed, 15 Aug 2012 02:22:50 +0300
+Subject: [PATCH v2 11/31] arm64: IRQ handling
+In-Reply-To: <1344966752-16102-12-git-send-email-catalin.marinas@arm.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-12-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20120814232250.GB747@harshnoise.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 10:43:41PM +0200, Sebastian Hesselbarth wrote:
-> This add a DT compatible board specific setup for the Seagate
-> FreeAgent Dockstar.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> 
-> v2: rebased on git://git.infradead.org/users/jcooper/linux.git fixes-for-v3.6
+Hi,
 
-patches [1/2] and [2/2] of this series applied to:
+On Tue, Aug 14, 2012 at 06:52:12PM +0100, Catalin Marinas wrote:
+> +void handle_IRQ(unsigned int irq, struct pt_regs *regs)
+> +{
+> +	struct pt_regs *old_regs = set_irq_regs(regs);
+> +
+> +	irq_enter();
+> +
+> +	/*
+> +	 * Some hardware gives randomly wrong interrupts.  Rather
+> +	 * than crashing, do something sensible.
+> +	 */
+> +	if (unlikely(irq >= nr_irqs)) {
+> +		if (printk_ratelimit())
+> +			pr_warning("Bad IRQ%u\n", irq);
 
-  git://git.infradead.org/users/jcooper/linux.git boards-for-v3.7
+I guess pr_warn_ratelimited() should be used for new code.
 
-patch [2/2] depends upon:
+(See include/linux/printk.h, "Please don't use printk_ratelimit()...")
 
-  bda63c1 ARM: Kirkwood: fix Makefile.boot
-
-which should be in an upcoming v3.6-rc
-
-thx,
-
-Jason.
+A.
