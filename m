@@ -1,143 +1,199 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 14 Aug 2012 17:08:33 -0700
-Subject: [PATCH v3 00/10] ARM: tegra: Add PCIe device tree support
-In-Reply-To: <502AD82F.3080702@wwwdotorg.org>
-References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
- <50201E1D.5060200@wwwdotorg.org>
- <20120813174003.GA2527@avionic-0098.mockup.avionic-design.de>
- <50294BCA.1070807@wwwdotorg.org>
- <CAErSpo7og1XgOSv_mFCQ=hP7pq0j3gXWh2QFL2wBJjz7kcAq=g@mail.gmail.com>
- <502AA96B.2050709@wwwdotorg.org>
- <20120814195834.GA10431@avionic-0098.mockup.avionic-design.de>
- <CAErSpo4Bm_Ryx=OK+svjqAwD4N8v0vrheLVdc-N1ijx8i_-N3w@mail.gmail.com>
- <502AD82F.3080702@wwwdotorg.org>
-Message-ID: <CAErSpo40sydj+ufaqXu_iGFncJWuQGAkc-+ucesXJasb7js5-g@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 14 Aug 2012 17:10:43 -0700
+Subject: [PATCH v2 08/31] arm64: CPU support
+In-Reply-To: <1344966752-16102-9-git-send-email-catalin.marinas@arm.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-9-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20120815001043.GD19607@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 3:58 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 08/14/2012 03:55 PM, Bjorn Helgaas wrote:
->> On Tue, Aug 14, 2012 at 12:58 PM, Thierry Reding
->> <thierry.reding@avionic-design.de> wrote:
->>> On Tue, Aug 14, 2012 at 01:39:23PM -0600, Stephen Warren wrote:
->>>> On 08/13/2012 05:18 PM, Bjorn Helgaas wrote:
->>>>> On Mon, Aug 13, 2012 at 11:47 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>> ...
->>>>>> whereas for a device tree boot:
->>>>>>
->>>>>> (same):
->>>>>>> [    2.112217] pci 0000:01:00.0: reg 10: [io  0x0000-0x00ff]
->>>>>>> [    2.117635] pci 0000:01:00.0: reg 18: [mem 0x00000000-0x00000fff 64bit pref]
->>>>>>> [    2.124690] pci 0000:01:00.0: reg 20: [mem 0x00000000-0x00003fff 64bit pref]
->>>>>>> [    2.131731] pci 0000:01:00.0: reg 30: [mem 0x00000000-0x0001ffff pref]
->>>>>> ... (request region happens early)
->>>>>>> [    2.179838] r8169 0000:01:00.0: BAR 0: requesting [io  0x0000-0x00ff]
->>>>>>> [    2.193312] r8169 0000:01:00.0: BAR 2: requesting [mem 0x00000000-0x00000fff 64bit pref]
->>>>>>> [    2.201397] r8169 0000:01:00.0: BAR 2: can't reserve [mem 0x00000000-0x00000fff 64bit pref]
->>>>>>> [    2.209742] r8169 0000:01:00.0: (unregistered net_device): could not request regions
->>>>>> ... (same, just happens too late)
->>>>>>> [    2.236818] pci 0000:01:00.0: BAR 6: assigned [mem 0xa0000000-0xa001ffff pref]
->>>>>>> [    2.244027] pci 0000:01:00.0: BAR 4: assigned [mem 0xa0020000-0xa0023fff 64bit pref]
->>>>>>> [    2.251794] pci 0000:01:00.0: BAR 2: assigned [mem 0xa0024000-0xa0024fff 64bit pref]
->>>>>>> [    2.259542] pci 0000:01:00.0: BAR 0: assigned [io  0x1000-0x10ff]
->>>>>>
->>>>>> I suspect this is all still related to the PCI devices themselves being
->>>>>> probed much earlier in the overall PCI initialization sequence when the
->>>>>> PCI controller is probed later in the boot sequence, whereas PCI device
->>>>>> probe is deferred until the overall PCI initialization sequence is
->>>>>> complete if the PCI controller is probed very early in the boot sequence.
->>>>>
->>>>> I don't know what to apply your patches to (they don't apply cleanly
->>>>> to v3.6-rc2), so I can't see exactly what you're doing.  But it looks
->>>>> like you might be calling pci_bus_add_devices() before
->>>>> pci_bus_assign_resource(), which isn't going to work.
->>>>
->>>> Yes, that's exactly what is happening.
->>>>
->>>> PCIe initialization starts in arch/arm/mach-tegra/pci.e
->>>> tegra_pcie_init() which calls arch/arm/kernel/bios32.c
->>>> pci_common_init(). That function first calls pcibios_init_hw() (in the
->>>> same file, more about this later) and then loops over PCI buses, calling
->>>> amongst other things pci_bus_assign_resources() then pci_bus_add_devices().
->>>>
->>>> The problem is that ARM's pcibios_init_hw() calls pci_scan_root_bus()
->>>> (or a host-driver-specific function which that also calls
->>>> pci_scan_root_bus() in Tegra's case) which in turn calls
->>>> pci_bus_add_devices() right at the end, before control has returned to
->>>> pci_common_init() and hence before pci_bus_assign_resources() has been
->>>> called.
->>>>
->>>> If I modify pci_scan_root_bus() and remove the call to
->>>> pci_bus_add_devices(), everything works as expected.
->>>>
->>>> So, I guess the question is: Should ARM's pcibios_init_hw() not be
->>>> calling pci_scan_root_bus(), or at least presumably the ARM PCI code
->>>> needs to do things in a slightly different order?
->>
->> I think you need to do something like this instead of using pci_scan_root_bus():
->>
->>     pci_create_root_bus()
->>     pci_scan_child_bus()
->>     pci_bus_assign_resources()
->>     pci_bus_add_devices()
->>
->> This is the effective order used by most of the pci_create_root_bus() callers.
->
-> That would pretty much duplicate everything in pci_scan_root_bus(). That
-> might cause divergence down the road.
+Hi,
 
-That's true, but it is what most other architectures do, and if you do
-it the same way, we'll be able to converge things more easily later.
+On Tue, Aug 14, 2012 at 06:52:09PM +0100, Catalin Marinas wrote:
 
-> Can't we make the call to pci_bus_add_devices() optional in
-> pci_scan_root_bus() somehow; one of:
->
-> * Add a parameter to pci_scan_root_bus() controlling this.
->
-> (rather a large patch)
->
-> * Split pci_scan_root_bus() into pci_scan_root_bus() and
-> pci_scan_root_bus_no_add(), such that pci_scan_root_bus() is just a
-> wrapper that calls pci_scan_root_bus_no_add() then pci_bus_add_devices().
->
-> (very simple patch, and the new function can easily be used as/when it's
-> needed, e.g. enabled just for Tegra in 3.6 to reduce risk of regressions)
->
-> * Add a flag to struct pci_bus that requests pci_scan_root_bus() skip
-> the call to pci_bus_add_devices().
->
-> (a flag in the bus struct just for one function seems a little
-> circuitous, but perhaps OK)
->
-> * ifdef out the call to pci_bus_add_devices(), if building for ARM.
->
-> (very simple, and probably correct)
+> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+> new file mode 100644
+> index 0000000..ef54125
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/cputype.h
+> @@ -0,0 +1,49 @@
+> +/*
+> + * Copyright (C) 2012 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef __ASM_CPUTYPE_H
+> +#define __ASM_CPUTYPE_H
+> +
+> +#define ID_MIDR_EL1		"midr_el1"
+> +#define ID_CTR_EL0		"ctr_el0"
+> +
+> +#define ID_AA64PFR0_EL1		"id_aa64pfr0_el1"
+> +#define ID_AA64DFR0_EL1		"id_aa64dfr0_el1"
+> +#define ID_AA64AFR0_EL1		"id_aa64afr0_el1"
+> +#define ID_AA64ISAR0_EL1	"id_aa64isar0_el1"
+> +#define ID_AA64MMFR0_EL1	"id_aa64mmfr0_el1"
+> +
+> +#define read_cpuid(reg) ({						\
+> +	u64 __val;							\
+> +	asm("mrs	%0, " reg : "=r" (__val));			\
+> +	__val;								\
+> +})
+> +
+> +/*
+> + * The CPU ID never changes at run time, so we might as well tell the
+> + * compiler that it's constant.  Use this function to read the CPU ID
+> + * rather than directly reading processor_id or read_cpuid() directly.
+> + */
+> +static inline u32 __attribute_const__ read_cpuid_id(void)
+> +{
+> +	return read_cpuid(ID_MIDR_EL1);
+> +}
+> +
+> +static inline u32 __attribute_const__ read_cpuid_cachetype(void)
+> +{
+> +	return read_cpuid(ID_CTR_EL0);
+> +}
 
-I'd rather not add more variants of pci_scan_root_bus().  We already
-have several very similar things in drivers/pci/probe.c:
+Is this perhaps a carry-over from arch/arm? Abstracting out read_cpuid()
+doesn't seem to buy anything here, just opencode the one-line assembly
+in each.
 
-  pci_scan_bus()
-  pci_scan_bus_parented()
-  pci_scan_root_bus()
+Might as well cleanup the naming a little too while you're at it, i.e.
+read_cpu_id() and read_cpu_cachetype().
 
-And in addition, we have many callers of pci_create_root_bus() that
-look very much like one of these.  I'm trying to consolidate all this,
-but there's a fair amount of work, and I think the simplest thing is
-to just use pci_create_root_bus() for now.
 
-> Actually, I'm not totally convinced some other archs shouldn't skip this
-> too; while I couldn't find any other arch that explicitly calls
-> pci_bus_assign_resources() and pci_bus_add_devices() after
-> pci_scan_root_bus(), I did see some that call
-> pci_assign_unassigned_resources() which seems like it might be due to a
-> similar situation?
+> diff --git a/arch/arm64/include/asm/procinfo.h b/arch/arm64/include/asm/procinfo.h
+> new file mode 100644
+> index 0000000..81fece9
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/procinfo.h
+> @@ -0,0 +1,44 @@
+> +/*
+> + * Based on arch/arm/include/asm/procinfo.h
+> + *
+> + * Copyright (C) 1996-1999 Russell King
+> + * Copyright (C) 2012 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef __ASM_PROCINFO_H
+> +#define __ASM_PROCINFO_H
+> +
+> +#ifdef __KERNEL__
+> +
+> +/*
+> + * Note!  struct processor is always defined if we're
+> + * using MULTI_CPU, otherwise this entry is unused,
+> + * but still exists.
 
-Yes, that does sound like a similar problem.  In the past, resource
-assignment has been pretty much separate from enumeration, with the
-arch having the responsibility to enumerate, assign, then add devices.
- But that is error-prone and needlessly arch-specific, and I'd like to
-pull it into generic code.  It's just not done yet :)
+Stale comment?
 
-> * Add another pcibios_*() callback that pci_scan_root_bus() calls to
-> determine whether to call pci_bus_add_devices(), with default
-> implementation.
+> + *
+> + * NOTE! The following structure is defined by assembly
+> + * language, NOT C code.  For more information, check:
+> + *  arch/arm/mm/proc-*.S and arch/arm/kernel/head.S
+
+Stale references. Also, no current arm64 implementation uses this. Premature
+abstraction perhaps?
+
+> +struct proc_info_list {
+> +	unsigned int		cpu_val;
+> +	unsigned int		cpu_mask;
+> +	unsigned long		__cpu_flush;		/* used by head.S */
+> +	const char		*cpu_name;
+> +};
+> +
+> +#else	/* __KERNEL__ */
+> +#include <asm/elf.h>
+> +#warning "Please include asm/elf.h instead"
+> +#endif	/* __KERNEL__ */
+> +#endif
+> diff --git a/arch/arm64/mm/proc-syms.c b/arch/arm64/mm/proc-syms.c
+> new file mode 100644
+> index 0000000..2d99ef9
+> --- /dev/null
+> +++ b/arch/arm64/mm/proc-syms.c
+> @@ -0,0 +1,31 @@
+> +/*
+> + * Based on arch/arm/mm/proc-syms.c
+> + *
+> + * Copyright (C) 2000-2002 Russell King
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/export.h>
+> +#include <linux/mm.h>
+> +
+> +#include <asm/cacheflush.h>
+> +#include <asm/proc-fns.h>
+> +#include <asm/tlbflush.h>
+> +#include <asm/page.h>
+> +
+> +EXPORT_SYMBOL(__cpuc_flush_kern_all);
+> +EXPORT_SYMBOL(__cpuc_flush_user_all);
+> +EXPORT_SYMBOL(__cpuc_flush_user_range);
+> +EXPORT_SYMBOL(__cpuc_coherent_kern_range);
+> +EXPORT_SYMBOL(__cpuc_flush_dcache_area);
+
+See comment on other email about putting function pointers in a struct
+instead.
+
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> new file mode 100644
+> index 0000000..453f517
+> --- /dev/null
+> +++ b/arch/arm64/mm/proc.S
+> @@ -0,0 +1,193 @@
+> +	.section ".proc.info.init", #alloc, #execinstr
+> +
+> +	.type	__v8_proc_info, #object
+> +__v8_proc_info:
+> +	.long	0x000f0000			// Required ID value
+> +	.long	0x000f0000			// Mask for ID
+> +	b	__cpu_setup
+> +	nop
+> +	.quad	cpu_name
+> +	.long	0
+> +	.size	__v8_proc_info, . - __v8_proc_info
+
+I know this is a carry-over from arch/arm, but how about moving this
+to more of a C construct similar to arch/powerpc/kernel/cputable.c
+instead? It's considerably easier to read that way, and it's convenient
+to have the definitions all in one place, making it easier to share some
+of the functions, etc.
+
+
+-Olof
