@@ -1,88 +1,179 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 15 Aug 2012 19:41:59 -0400
-Subject: PATCH Add support for the Iomega IX2-200 Device Tree
-In-Reply-To: <CADhrpJ7=5QbivftpcuVdhmcKxp3rjiuKQ4Lrf3NckBwL6YNmPQ@mail.gmail.com>
-References: <20120815211517.GA15830@lunn.ch>
- <CADhrpJ7+MoKF9qbeh9RBHo3j-m22574pi=cuHfQ9-KeVNX=mzw@mail.gmail.com>
- <20120815213221.GE15830@lunn.ch>
- <CADhrpJ4eAUdDaLF8OXvjRf6oA6ya0na-SHYs43eoNwdoEJETpA@mail.gmail.com>
- <20120815215237.GF15830@lunn.ch>
- <CADhrpJ7ANwD4asN4-D9OeicGA_V5-9DZoV9G6dDFZ9taN7AZsg@mail.gmail.com>
- <20120815221613.GH15830@lunn.ch>
- <CADhrpJ66ncpT74ATyvJDXTuJC-zrmh8vQ99RPg0t=XuQ_2RcVA@mail.gmail.com>
- <CADhrpJ4sH9krkrWSoFjCg5jrkompgFY=G8iiXo0xy8_iCKeKxA@mail.gmail.com>
- <CADhrpJ7=5QbivftpcuVdhmcKxp3rjiuKQ4Lrf3NckBwL6YNmPQ@mail.gmail.com>
-Message-ID: <20120815234159.GK22226@titan.lakedaemon.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 15 Aug 2012 16:43:33 -0700
+Subject: [PATCH v2 3/4] [RFC] cpufreq: omap: scale regulator from clk notifier
+In-Reply-To: <1345074214-17531-1-git-send-email-mturquette@linaro.org>
+References: <1345074214-17531-1-git-send-email-mturquette@linaro.org>
+Message-ID: <1345074214-17531-4-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 16, 2012 at 12:34:46AM +0100, alan butler wrote:
-> On 16 August 2012 00:12, alan butler <alanbutty12@gmail.com> wrote:
-> > On 16 August 2012 00:02, alan butler <alanbutty12@gmail.com> wrote:
-> >> On 15 August 2012 23:16, Andrew Lunn <andrew@lunn.ch> wrote:
-> >>> On Wed, Aug 15, 2012 at 10:57:27PM +0100, alan butler wrote:
-> >>>> On 15 August 2012 22:52, Andrew Lunn <andrew@lunn.ch> wrote:
-> >>>> >> That would be great i just need to recreate the patch with those
-> >>>> >> changes but i was talking with jason cooper i believe and he said to
-> >>>> >> put the buttons for the device in the dts file and im working on that
-> >>>> >> but the kernel panics
-> >>>> >
-> >>>> > Please show us the panic.
-> >>>> >
-> >>>> >        Andrew
-> >>>>
-> >>>> i sent it to jason a lil bit earlier but i guess i must of forgotten
-> >>>> to cc the list on the last message or 2 but here is the panic again:
-> >>>>
-> >>>> [    5.976074] Key type dns_resolver registered
-> >>>> [    5.981782] Unable to handle kernel NULL pointer dereference at
-> >>>> virtual address 00000004
-> >>>> [    5.989932] pgd = c0004000
-> >>>> [    5.992649] [00000004] *pgd=00000000
-> >>>> [    5.996247] Internal error: Oops: 805 [#1] ARM
-> >>>> [    6.000707] Modules linked in:
-> >>>> [    6.003780] CPU: 0    Not tainted  (3.6.0-rc1-next-20120814 #13)
-> >>>> [    6.009822] PC is at gpio_keys_probe+0x110/0x6d4
-> >>>
-> >>> You might want to scatter some printk() in gpio_keys_probe() and see
-> >>> where it panics. It will probably then be clear what is wrong.
-> >>>
-> >>>       Andrew
-> >>
-> >> where do i find the gpio_keys_probe() ?
-> >
-> > i found the gpio_keys_probe() and it seems that it is failing in this
-> > piece of code i put a printk() before and after it and it didnt reach
-> > the printk after it:
-> >
-> > if (!pdata) {
-> >                 pdata = gpio_keys_get_devtree_pdata(dev);
-> >                 if (IS_ERR(pdata))
-> >                         return PTR_ERR(pdata);
-> >         }
-> >
-> >         ddata = kzalloc(sizeof(struct gpio_keys_drvdata) +
-> >                         pdata->nbuttons * sizeof(struct gpio_button_data),
-> >                         GFP_KERNEL);
-> >         input = input_allocate_device();
-> >         if (!ddata || !input) {
-> >                 dev_err(dev, "failed to allocate state\n");
-> >                 error = -ENOMEM;
-> >                 goto fail1;
-> >         }
-> 
-> actualy it seems to not be getting past this piece of code in what i
-> posted before:
-> 
-> if (!pdata) {
-> 		pdata = gpio_keys_get_devtree_pdata(dev);
-> 		if (IS_ERR(pdata))
-> 			return PTR_ERR(pdata);
-> 	}
+This patch moves direct control of the MPU voltage regulator out of the
+cpufreq driver .target callback and instead uses the common dvfs clk
+rate-change notifier infrastructure.
 
-That means gpio_keys_get_devtree_pdata() is returning an error.  Have
-you tried 'linux,input-type = <0x05>;' ?
+Ideally it would be nice to reduce the .target callback for omap's
+cpufreq driver to a simple call to clk_set_rate.  For now there is still
+some other stuff needed there (jiffies per loop, rounding the rate, etc
+etc).
 
-thx,
+Signed-off-by: Mike Turquette <mturquette@linaro.org>
+---
+ drivers/cpufreq/omap-cpufreq.c |   85 +++++++++++-----------------------------
+ 1 file changed, 22 insertions(+), 63 deletions(-)
 
-Jason.
+diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
+index 17fa04d..2f7de30 100644
+--- a/drivers/cpufreq/omap-cpufreq.c
++++ b/drivers/cpufreq/omap-cpufreq.c
+@@ -55,7 +55,7 @@ static atomic_t freq_table_users = ATOMIC_INIT(0);
+ static struct clk *mpu_clk;
+ static char *mpu_clk_name;
+ static struct device *mpu_dev;
+-static struct regulator *mpu_reg;
++static struct dvfs_info *di;
+ 
+ static int omap_verify_speed(struct cpufreq_policy *policy)
+ {
+@@ -80,10 +80,9 @@ static int omap_target(struct cpufreq_policy *policy,
+ 		       unsigned int relation)
+ {
+ 	unsigned int i;
+-	int r, ret = 0;
++	int ret = 0;
+ 	struct cpufreq_freqs freqs;
+-	struct opp *opp;
+-	unsigned long freq, volt = 0, volt_old = 0, tol = 0;
++	unsigned long freq;
+ 
+ 	if (!freq_table) {
+ 		dev_err(mpu_dev, "%s: cpu%d: no freq table!\n", __func__,
+@@ -119,47 +118,11 @@ static int omap_target(struct cpufreq_policy *policy,
+ 
+ 	freq = freqs.new * 1000;
+ 
+-	if (mpu_reg) {
+-		opp = opp_find_freq_ceil(mpu_dev, &freq);
+-		if (IS_ERR(opp)) {
+-			dev_err(mpu_dev, "%s: unable to find MPU OPP for %d\n",
+-				__func__, freqs.new);
+-			return -EINVAL;
+-		}
+-		volt = opp_get_voltage(opp);
+-		tol = volt * OPP_TOLERANCE / 100;
+-		volt_old = regulator_get_voltage(mpu_reg);
+-	}
+-
+-	dev_dbg(mpu_dev, "cpufreq-omap: %u MHz, %ld mV --> %u MHz, %ld mV\n", 
+-		freqs.old / 1000, volt_old ? volt_old / 1000 : -1,
+-		freqs.new / 1000, volt ? volt / 1000 : -1);
+-
+-	/* scaling up?  scale voltage before frequency */
+-	if (mpu_reg && (freqs.new > freqs.old)) {
+-		r = regulator_set_voltage(mpu_reg, volt - tol, volt + tol);
+-		if (r < 0) {
+-			dev_warn(mpu_dev, "%s: unable to scale voltage up.\n",
+-				 __func__);
+-			freqs.new = freqs.old;
+-			goto done;
+-		}
+-	}
++	dev_dbg(mpu_dev, "cpufreq-omap: %u MHz --> %u MHz\n",
++			freqs.old / 1000, freqs.new / 1000); 
+ 
+ 	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
+ 
+-	/* scaling down?  scale voltage after frequency */
+-	if (mpu_reg && (freqs.new < freqs.old)) {
+-		r = regulator_set_voltage(mpu_reg, volt - tol, volt + tol);
+-		if (r < 0) {
+-			dev_warn(mpu_dev, "%s: unable to scale voltage down.\n",
+-				 __func__);
+-			ret = clk_set_rate(mpu_clk, freqs.old * 1000);
+-			freqs.new = freqs.old;
+-			goto done;
+-		}
+-	}
+-
+ 	freqs.new = omap_getspeed(policy->cpu);
+ #ifdef CONFIG_SMP
+ 	/*
+@@ -187,7 +150,6 @@ static int omap_target(struct cpufreq_policy *policy,
+ 					freqs.new);
+ #endif
+ 
+-done:
+ 	/* notifiers */
+ 	for_each_cpu(i, policy->cpus) {
+ 		freqs.cpu = i;
+@@ -207,10 +169,6 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
+ {
+ 	int result = 0;
+ 
+-	mpu_clk = clk_get(NULL, mpu_clk_name);
+-	if (IS_ERR(mpu_clk))
+-		return PTR_ERR(mpu_clk);
+-
+ 	if (policy->cpu >= NR_CPUS) {
+ 		result = -EINVAL;
+ 		goto fail_ck;
+@@ -286,6 +244,8 @@ static struct cpufreq_driver omap_driver = {
+ 
+ static int __init omap_cpufreq_init(void)
+ {
++	struct dvfs_info_init dii;
++
+ 	if (cpu_is_omap24xx())
+ 		mpu_clk_name = "virt_prcm_set";
+ 	else if (cpu_is_omap34xx())
+@@ -298,34 +258,33 @@ static int __init omap_cpufreq_init(void)
+ 		return -EINVAL;
+ 	}
+ 
++	mpu_clk = clk_get(NULL, mpu_clk_name);
++	if (IS_ERR(mpu_clk))
++		return PTR_ERR(mpu_clk);
++
+ 	mpu_dev = omap_device_get_by_hwmod_name("mpu");
+ 	if (!mpu_dev) {
+ 		pr_warning("%s: unable to get the mpu device\n", __func__);
+-		return -EINVAL;
++		goto out;
+ 	}
+ 
+-	mpu_reg = regulator_get(mpu_dev, "vcc");
+-	if (IS_ERR(mpu_reg)) {
+-		pr_warning("%s: unable to get MPU regulator\n", __func__);
+-		mpu_reg = NULL;
+-	} else {
+-		/* 
+-		 * Ensure physical regulator is present.
+-		 * (e.g. could be dummy regulator.)
+-		 */
+-		if (regulator_get_voltage(mpu_reg) < 0) {
+-			pr_warn("%s: physical regulator not present for MPU\n",
++	dii.dev = mpu_dev;
++	dii.con_id = mpu_clk_name;
++	dii.reg_id = "vcc";
++	dii.tol = OPP_TOLERANCE;
++
++	di = dvfs_clk_notifier_register(&dii);
++	if (IS_ERR(di))
++		pr_warning("%s: failed to register dvfs clk notifier\n",
+ 				__func__);
+-			regulator_put(mpu_reg);
+-			mpu_reg = NULL;
+-		}
+-	}
+ 
++out:
+ 	return cpufreq_register_driver(&omap_driver);
+ }
+ 
+ static void __exit omap_cpufreq_exit(void)
+ {
++	dvfs_clk_notifier_unregister(di);
+ 	cpufreq_unregister_driver(&omap_driver);
+ }
+ 
+-- 
+1.7.9.5
