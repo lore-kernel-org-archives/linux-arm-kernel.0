@@ -1,42 +1,89 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 15 Aug 2012 13:04:20 -0600
-Subject: [PATCH v3 00/10] ARM: tegra: Add PCIe device tree support
-In-Reply-To: <502AE485.8060307@wwwdotorg.org>
-References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
- <50201E1D.5060200@wwwdotorg.org>
- <20120813174003.GA2527@avionic-0098.mockup.avionic-design.de>
- <50294BCA.1070807@wwwdotorg.org>
- <CAErSpo7og1XgOSv_mFCQ=hP7pq0j3gXWh2QFL2wBJjz7kcAq=g@mail.gmail.com>
- <502AA96B.2050709@wwwdotorg.org>
- <20120814195834.GA10431@avionic-0098.mockup.avionic-design.de>
- <CAErSpo4Bm_Ryx=OK+svjqAwD4N8v0vrheLVdc-N1ijx8i_-N3w@mail.gmail.com>
- <502AD82F.3080702@wwwdotorg.org> <502AE485.8060307@wwwdotorg.org>
-Message-ID: <502BF2B4.9030401@wwwdotorg.org>
+From: msb@chromium.org (Mandeep Singh Baines)
+Date: Wed, 15 Aug 2012 12:16:27 -0700
+Subject: [PATCH] ARM: SAMSUNG: use spin_lock_irqsave() in clk_set_parent
+Message-ID: <1345058187-18843-1-git-send-email-msb@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2012 05:51 PM, Stephen Warren wrote:
-> On 08/14/2012 04:58 PM, Stephen Warren wrote:
-...
->> Can't we make the call to pci_bus_add_devices() optional in
->> pci_scan_root_bus() somehow; one of:
-> 
-> Sigh, that turns out not to work correctly; it solves at least this part
-> of the problem when booting using device tree, but when booting using a
-> board file, it causes the IRQ number passed to the PCIe device to be
-> bogus:-(
-> 
-> I give up for now.
+>From 0cdf3aff, "ARM: SAMSUNG: use spin_lock_irqsave() in
+clk_{enable,disable}":
 
-I think the appropriate workaround for Tegra in 3.6 is to simply make
-any drivers for PCIe-based devices be modules instead of built-in, as
-Thierry hinted at much earlier in the thread. I've validated that the
-Ethernet works just fine on TrimSlice with that change, booting v3.6-rc1
-using either board files or device tree.
+  The clk_enable()and clk_disable() can be used process and ISR either.
+  And actually it is used for real product and other platforms use it
+  now. So spin_lock_irqsave() should be used instead.
 
-For 3.7, we should continue the discussion about a real fix; I'll look
-into the change Bjorn requested and see if it works, although given that
-hacking pci_scan_root_bus as described immediately previously in this
-thread caused a regression when booting using a board file, and the fact
-that board files are no longer supported on Tegra, I'm not too confident
-in the outcome...
+We need to make a similar change in clk_set_parent(). Otherwise,
+you can potentially get spinlock recursion:
+
+BUG: spinlock recursion on CPU#0, kinteractive/68
+ lock: 807832a8, .magic: dead4ead, .owner: kinteractive/68, .owner_cpu: 0
+[<80015f54>] (unwind_backtrace+0x0/0x128) from [<804f2914>] (dump_stack+0x20/0x24)
+[<804f2914>] (dump_stack+0x20/0x24) from [<804f57b8>] (spin_dump+0x80/0x94)
+[<804f57b8>] (spin_dump+0x80/0x94) from [<804f57f8>] (spin_bug+0x2c/0x30)
+[<804f57f8>] (spin_bug+0x2c/0x30) from [<80222730>] (do_raw_spin_lock+0x54/0x150)
+[<80222730>] (do_raw_spin_lock+0x54/0x150) from [<804f96ec>] (_raw_spin_lock_irqsave+0x20/0x28)
+[<804f96ec>] (_raw_spin_lock_irqsave+0x20/0x28) from [<80022ea4>] (clk_enable+0x3c/0x84)
+[<80022ea4>] (clk_enable+0x3c/0x84) from [<8038336c>] (s5p_mfc_clock_on+0x60/0x74)
+[<8038336c>] (s5p_mfc_clock_on+0x60/0x74) from [<8038645c>] (s5p_mfc_read_info+0x20/0x38)
+[<8038645c>] (s5p_mfc_read_info+0x20/0x38) from [<8037ca3c>] (s5p_mfc_handle_frame+0x2e4/0x4bc)
+[<8037ca3c>] (s5p_mfc_handle_frame+0x2e4/0x4bc) from [<8037d420>] (s5p_mfc_irq+0x1ec/0x6cc)
+[<8037d420>] (s5p_mfc_irq+0x1ec/0x6cc) from [<8007fc74>] (handle_irq_event_percpu+0x8c/0x244)
+[<8007fc74>] (handle_irq_event_percpu+0x8c/0x244) from [<8007fe78>] (handle_irq_event+0x4c/0x6c)
+[<8007fe78>] (handle_irq_event+0x4c/0x6c) from [<80082dd8>] (handle_fasteoi_irq+0xe4/0x150)
+[<80082dd8>] (handle_fasteoi_irq+0xe4/0x150) from [<8007f424>] (generic_handle_irq+0x3c/0x50)
+[<8007f424>] (generic_handle_irq+0x3c/0x50) from [<8000f7c4>] (handle_IRQ+0x88/0xc8)
+[<8000f7c4>] (handle_IRQ+0x88/0xc8) from [<80008564>] (gic_handle_irq+0x44/0x68)
+[<80008564>] (gic_handle_irq+0x44/0x68) from [<8000e400>] (__irq_svc+0x40/0x60)
+Exception stack(0xef3cbe68 to 0xef3cbeb0)
+[<8000e400>] (__irq_svc+0x40/0x60) from [<80022cfc>] (clk_set_parent+0x30/0x74)
+[<80022cfc>] (clk_set_parent+0x30/0x74) from [<803ac7f8>] (set_apll.isra.0+0x28/0xb0)
+[<803ac7f8>] (set_apll.isra.0+0x28/0xb0) from [<803ac8e4>] (exynos5250_set_frequency+0x64/0xb8)
+[<803ac8e4>] (exynos5250_set_frequency+0x64/0xb8) from [<803ac280>] (exynos_target+0x1b0/0x220)
+[<803ac280>] (exynos_target+0x1b0/0x220) from [<803a4a0c>] (__cpufreq_driver_target+0xb0/0xd4)
+[<803a4a0c>] (__cpufreq_driver_target+0xb0/0xd4) from [<803aab80>] (cpufreq_interactive_updown_task+0x214/0x264)
+[<803aab80>] (cpufreq_interactive_updown_task+0x214/0x264) from [<80047d04>] (kthread+0x9c/0xa8)
+[<80047d04>] (kthread+0x9c/0xa8) from [<8000fa48>] (kernel_thread_exit+0x0/0x8)
+
+Signed-off-by: Mandeep Singh Baines <msb@chromium.org>
+Suggested-by: Sunil Mazhavanchery <sunilm@samsung.com>
+CC: linux-arm-kernel at lists.infradead.org
+CC: linux-samsung-soc at vger.kernel.org
+CC: Ben Dooks <ben-linux@fluff.org>
+CC: Kukjin Kim <kgene.kim@samsung.com>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: Minho Ban <mhban@samsung.com>
+CC: Jaecheol Lee <jc.lee@samsung.com>
+CC: Sunyoung Kang <sy0816.kang@samsung.com>
+CC: Kukjin Kim <kgene.kim@samsung.com>
+CC: Olof Johansson <olofj@chromium.org>
+---
+ arch/arm/plat-samsung/clock.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
+index 65c5eca..80eacca 100644
+--- a/arch/arm/plat-samsung/clock.c
++++ b/arch/arm/plat-samsung/clock.c
+@@ -173,17 +173,18 @@ struct clk *clk_get_parent(struct clk *clk)
+ 
+ int clk_set_parent(struct clk *clk, struct clk *parent)
+ {
++	unsigned long flags;
+ 	int ret = 0;
+ 
+ 	if (IS_ERR(clk))
+ 		return -EINVAL;
+ 
+-	spin_lock(&clocks_lock);
++	spin_lock_irqsave(&clocks_lock, flags);
+ 
+ 	if (clk->ops && clk->ops->set_parent)
+ 		ret = (clk->ops->set_parent)(clk, parent);
+ 
+-	spin_unlock(&clocks_lock);
++	spin_unlock_irqrestore(&clocks_lock, flags);
+ 
+ 	return ret;
+ }
+-- 
+1.7.7.3
