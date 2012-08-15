@@ -1,74 +1,34 @@
-From: markus@oberhumer.com (Markus F.X.J. Oberhumer)
-Date: Wed, 15 Aug 2012 14:02:43 +0200
-Subject: [GIT PULL] Update LZO compression
-In-Reply-To: <20120814123937.GA14756@sig21.net>
-References: <50299142.2030504@oberhumer.com> <20120814123937.GA14756@sig21.net>
-Message-ID: <502B8FE3.7080501@oberhumer.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Aug 2012 12:37:56 +0000
+Subject: [GIT PULL] orion/kirkwood fixes for v3.6
+In-Reply-To: <20120814234442.GZ22226@titan.lakedaemon.net>
+References: <20120814234442.GZ22226@titan.lakedaemon.net>
+Message-ID: <201208151237.56639.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Johannes,
-
-On 2012-08-14 14:39, Johannes Stezenbach wrote:
-> On Tue, Aug 14, 2012 at 01:44:02AM +0200, Markus F.X.J. Oberhumer wrote:
->> On 2012-07-16 20:30, Markus F.X.J. Oberhumer wrote:
->>>
->>> As stated in the README this version is significantly faster (typically more
->>> than 2 times faster!) than the current version, has been thoroughly tested on
->>> x86_64/i386/powerpc platforms and is intended to get included into the
->>> official Linux 3.6 or 3.7 release.
->>>
->>> I encourage all compression users to test and benchmark this new version,
->>> and I also would ask some official LZO maintainer to convert the updated
->>> source files into a GIT commit and possibly push it to Linus or linux-next.
+On Tuesday 14 August 2012, Jason Cooper wrote:
+> The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
 > 
-> Sorry for not reporting earlier, but I didn't have time to do real
-> benchmarks, just a quick test on ARM926EJ-S using barebox,
-> and found in the new version decompression is slower:
-> http://lists.infradead.org/pipermail/barebox/2012-July/008268.html
-
-I can only guess, but maybe your ARM cpu does not have an efficient
-implementation of {get,put}_unaligned().
-
-Could you please try the following patch and test if you can see
-any significant speed difference?
-
-Thanks,
-Markus
-
-
-diff --git a/lib/lzo/lzodefs.h b/lib/lzo/lzodefs.h
-index ddc8db5..efc5714 100644
---- a/lib/lzo/lzodefs.h
-+++ b/lib/lzo/lzodefs.h
-@@ -12,8 +12,15 @@
-  */
-
-
-+#if defined(__arm__)
-+#define COPY4(dst, src)        \
-+               (dst)[0] = (src)[0]; (dst)[1] = (src)[1]; \
-+               (dst)[2] = (src)[2]; (dst)[3] = (src)[3]
-+#endif
-+#ifndef COPY4
- #define COPY4(dst, src)        \
-                put_unaligned(get_unaligned((const u32 *)(src)), (u32 *)(dst))
-+#endif
- #if defined(__x86_64__)
- #define COPY8(dst, src)        \
-                put_unaligned(get_unaligned((const u64 *)(src)), (u64 *)(dst))
-
-
+>   Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
 > 
-> BTW, do you have userspace code matching the old and new
-> lzo versions?  It would be easier to benchmark.
+> are available in the git repository at:
+>   git://git.infradead.org/users/jcooper/linux.git fixes-for-v3.6
 > 
-> Unfortunately I cannot claim high confidence in my benchmark results
-> due to missing time to do it properly, it would be useful if
-> someone else could do some benchmarks on ARM before merging this.
-> 
-> 
-> Johannes 
 
--- 
-Markus Oberhumer, <markus@oberhumer.com>, http://www.oberhumer.com/
+Pulled, thanks!
+
+As soon as you have a pgp key that is signed by other maintainers,
+I think you should start sending signed tags instead of branches,
+and include a short description for what is in the branch you are
+sending. I've started adding descriptions for every merge I do
+and it's easier for me if I don't have to write it myself.
+
+The first patch in your series (ARM: Orion: Set eth packet size
+csum offload limit) looks like it should apply to older kernels
+as well. In those cases, please add "Cc: stable at vger.kernel.org"
+below the Signed-off-by lines (but not in the email submission)
+so it can get picked up by Greg for the longterm and stable
+releases.
+
+	Arnd
