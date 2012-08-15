@@ -1,24 +1,33 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 16 Aug 2012 01:40:40 +0530
-Subject: [PATCH 0/2] Enable pinctrl driver support for Exynos4210 based
- platforms
-Message-ID: <1345061442-32378-1-git-send-email-thomas.abraham@linaro.org>
+Date: Thu, 16 Aug 2012 01:40:42 +0530
+Subject: [PATCH 2/2] ARM: EXYNOS: Enable PINCTRL config option for Exynos4
+ device tree enabled platform
+In-Reply-To: <1345061442-32378-1-git-send-email-thomas.abraham@linaro.org>
+References: <1345061442-32378-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1345061442-32378-3-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series enables support for pin controller driver for Exynos4210 SoC
-based device tree enabled platforms. The first patch in this series adds the
-pin group nodes for each of the three pin controller instances, but it is not
-a exhaustive list of all possible pin group nodes. As the coverage of pinctrl
-driver is extended device drivers used on Exynos4210 platforms, additional
-pin group nodes can be added as required.
+This enables support for Samsung and Exynos4 pinctrl driver for device
+tree enabled Exynos4 platforms.
 
-Thomas Abraham (2):
-  ARM: dts: Add pinctrl node entries for Samsung Exynos4210 SoC
-  ARM: EXYNOS: Enable PINCTRL config option for Exynos4 device tree enabled platform
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
+ arch/arm/mach-exynos/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
- arch/arm/boot/dts/exynos4210-pinctrl.dtsi |  457 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos4210.dtsi         |   37 +++
- arch/arm/mach-exynos/Kconfig              |    1 +
- 3 files changed, 495 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/exynos4210-pinctrl.dtsi
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index b5b4c8c..ad96c59 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -405,6 +405,7 @@ config MACH_EXYNOS4_DT
+ 	select USE_OF
+ 	select ARM_AMBA
+ 	select HAVE_SAMSUNG_KEYPAD if INPUT_KEYBOARD
++	select PINCTRL
+ 	help
+ 	  Machine support for Samsung Exynos4 machine with device tree enabled.
+ 	  Select this if a fdt blob is available for the Exynos4 SoC based board.
+-- 
+1.6.6.rc2
