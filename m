@@ -1,74 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 Aug 2012 10:10:54 +0200
-Subject: [GIT PULL] U300 cleanups and sparseirq
-Message-ID: <CACRpkdb6wB1QVNqn8_sHB8LH0To=aP_8+iocE8JZ2jKC5f_bYg@mail.gmail.com>
+From: alanbutty12@gmail.com (Alan M Butler)
+Date: Wed, 15 Aug 2012 09:36:57 +0100
+Subject: PATCH Add support for the Iomega IX2-200 Device Tree
+In-Reply-To: <20120814235653.GA22226@titan.lakedaemon.net>
+References: <3CAEA3DD-9D2C-4052-957D-D09E6EB9B64E@gmail.com>
+ <20120814235653.GA22226@titan.lakedaemon.net>
+Message-ID: <95D5BE56-A79F-4422-B1CE-7AD010A9D70E@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
 
-could you please pull the following patch set sent out for review the other day
-doing a number of cleanups and a minor improvement to U300, paving the
-way for single zImage and device tree:
+On 15 Aug 2012, at 00:56, Jason Cooper <jason@lakedaemon.net> wrote:
 
-- Deprecate ancient platforms to make the following patches easier to
-  make...
-- Move out one header to platform data and one to the mach-u300 proper
-  to depopulate <mach/*>
-- Consolidate core machine files
-- Convert to sparse IRQs
+> On Tue, Aug 14, 2012 at 09:06:16PM +0100, Ownerx35 wrote:
+>> I have created a patch and have tested it myself that create a board
+>> setup file for the Iomega StoreCenter IX2-200, create a dts file and
+>> insert the appropriate lines into the common.h, makefile,
+>> makefile.boot, kconfig and board-ft files.
+> 
+> Awesome!
+> 
+>> But am unsure how to properly submit it should i just post it here? or
+>> is there a specific place i should post?
+> 
+> Take a look at /path/to/linux_src/Documentation/SubmittingPatches .
+> 
+> If you prefer working with git, the two commands I use are format-patch
+> and then send-email.
+> 
+> Assuming the board is ARM based (most likely), then you've found the
+> correct list.
+> 
+> Just post the series here and we'll offer helpful comments ;-)
+> 
+> Also, please check MAINTAINERS for the directories you are changing and
+> include the maintainers in the CC: or TO:.  Most likely, that'll be
+> myself and Andrew Lunn (kirkwood / orion boards).
+> 
+> hth,
+> 
+> Jason.
 
-Please pull! Thanks.
+Sorry i meant board-dt in the previous message and the name just getting used to the mail program on os x aswel. I have run through the checkpatch.pl script and it tells me there are no errors but i just found out a few minutes ago theres a fix for the 2 sata ports not working (on all kirkwood devices as far as i know) so i am going to test that now as it envolves modifying a line in the dts file.
 
-The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
+Also it is defiantly an arm kirkwood device. My patch also does not modify any driver's or anything else just create's the appropriate file in the arch/am/boot/dts directory and the board config in the arch/arm/mach-kirkwood directory along with adding the lines to the appropriate files in that directory. So do i need to inform anyone else? the maintainers file is pretty long and i am unsure of what / who i am looking for in it.
 
-  Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-u300-cleanup
-
-for you to fetch changes up to a4fe292fa75baaa9cfb1a7224614f31fcd0d9a7b:
-
-  ARM: u300: convert to sparse IRQs (2012-08-13 13:53:07 +0200)
-
-----------------------------------------------------------------
-Linus Walleij (7):
-      ARM: u300: retire ancient platforms
-      pinctrl/coh901: retire ancient GPIO block versions
-      pinctrl/coh901: move header to platform data dir
-      ARM: u300: merge u300.c into core.c and rid headers
-      ARM: u300: delete remnant clkdev.h file
-      ARM: u300: move DMA channel header into mach-u300
-      ARM: u300: convert to sparse IRQs
-
- arch/arm/Kconfig                                   |   1 +
- arch/arm/mach-u300/Kconfig                         |  43 +---
- arch/arm/mach-u300/Makefile                        |   1 -
- arch/arm/mach-u300/core.c                          | 100 +++-------
- .../mach-u300/{include/mach => }/dma_channels.h    |  11 +-
- arch/arm/mach-u300/i2c.c                           |   6 +-
- arch/arm/mach-u300/include/mach/clkdev.h           |   7 -
- arch/arm/mach-u300/include/mach/irqs.h             |  36 +---
- arch/arm/mach-u300/include/mach/platform.h         |  20 --
- arch/arm/mach-u300/include/mach/syscon.h           |  32 +--
- arch/arm/mach-u300/include/mach/u300-regs.h        |  19 +-
- arch/arm/mach-u300/spi.c                           |   2 +-
- arch/arm/mach-u300/timer.c                         |   5 +-
- arch/arm/mach-u300/timer.h                         |   1 +
- arch/arm/mach-u300/u300-gpio.h                     |  46 +----
- arch/arm/mach-u300/u300.c                          |  57 ------
- drivers/pinctrl/pinctrl-coh901.c                   | 220 ++++-----------------
- .../linux/platform_data/pinctrl-coh901.h           |  13 +-
- 18 files changed, 87 insertions(+), 533 deletions(-)
- rename arch/arm/mach-u300/{include/mach => }/dma_channels.h (88%)
- delete mode 100644 arch/arm/mach-u300/include/mach/clkdev.h
- delete mode 100644 arch/arm/mach-u300/include/mach/platform.h
- create mode 100644 arch/arm/mach-u300/timer.h
- delete mode 100644 arch/arm/mach-u300/u300.c
- rename arch/arm/mach-u300/include/mach/gpio-u300.h =>
-include/linux/platform_data/pinctrl-coh901.h (72%)
-
-Yours,
-Linus Walleij
+It's also a single patch so i just copy and paste the patch text into a reply like this and send it?
