@@ -1,280 +1,184 @@
-From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
-Date: Wed, 15 Aug 2012 13:37:49 +0300
-Subject: [PATCH 1/2] mtd: lpc32xx_slc: Adjust to pl08x DMA interface
- changes
-In-Reply-To: <1342095778-13403-2-git-send-email-stigge@antcom.de>
-References: <1342095778-13403-1-git-send-email-stigge@antcom.de>
- <1342095778-13403-2-git-send-email-stigge@antcom.de>
-Message-ID: <1345027069.3393.124.camel@sauron.fi.intel.com>
+From: dong.aisheng@linaro.org (Dong Aisheng)
+Date: Wed, 15 Aug 2012 18:33:28 +0800
+Subject: [PATCH] pinctrl: imx5: start numbering pad from 0
+In-Reply-To: <20120815092539.GH19681@shlinux2.ap.freescale.net>
+References: <1344869278-27334-1-git-send-email-shawn.guo@linaro.org>
+ <CAKGA1b=DqyZvSre3C4YQ3GM6RuFtFsGWDkF784iKggrNzwiKpg@mail.gmail.com>
+ <CAP1dx+zQvBurT9oCmfJ0dGHHV3rbgdy+0Yh_hoPL9jQB8QNxKw@mail.gmail.com>
+ <CAKGA1bmHqyDGyvZjEcQ+RO1jHiZNZKNu3BGkyUXzYfwVaySYEQ@mail.gmail.com>
+ <CAP1dx+x0_j_f3Pj+9+YHcwoTqjGLXouf7t+SoCCMVGKJNOHCPw@mail.gmail.com>
+ <20120815054436.GK2232@pengutronix.de>
+ <20120815065526.GG19681@shlinux2.ap.freescale.net>
+ <20120815075117.GL2232@pengutronix.de>
+ <20120815092539.GH19681@shlinux2.ap.freescale.net>
+Message-ID: <CAP1dx+zgyvaCYHkFekK1W=J3Vcy-5Xu35wANK5JgtM69GK1xBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-07-12 at 14:22 +0200, Roland Stigge wrote:
-> This patch adjusts the LPC32xx SLC NAND driver to the new pl08x DMA interface,
-> fixing the compile error resulting from changed pl08x structures.
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
+On 15 August 2012 17:25, Dong Aisheng <b29396@freescale.com> wrote:
+> On Wed, Aug 15, 2012 at 03:51:17PM +0800, Uwe Kleine-K?nig wrote:
+>> Hello,
+>>
+>> On Wed, Aug 15, 2012 at 02:55:27PM +0800, Dong Aisheng wrote:
+>> > On Wed, Aug 15, 2012 at 07:44:36AM +0200, Uwe Kleine-K?nig wrote:
+>> > > Hello,
+>> > >
+>> > > (Cc += devicetree-discuss at lists.ozlabs.org)
+>> > >
+>> > > On Wed, Aug 15, 2012 at 11:59:18AM +0800, Dong Aisheng wrote:
+>> > > > On 15 August 2012 03:37, Matt Sealey <matt@genesi-usa.com> wrote:
+>> > > > > On Tue, Aug 14, 2012 at 2:20 AM, Dong Aisheng <dong.aisheng@linaro.org> wrote:
+>> > > > >> On 13 August 2012 23:12, Matt Sealey <matt@genesi-usa.com> wrote:
+>> > > > >>> I have a minor nit; while renumbering the pinctrl definitions is
+>> > > > >>> laudable and device trees can match, there are 16 other pin controls
+>> > > > >>> below EIM_D16 - this makes the start of the IOMUXC pin definitions
+>> > > > >>> actually be the value calculated by (iomuxc_base + 0x300 + (4*16) +
+>> > > > >>> (pin_id*4)).
+>> > > > >>
+>> > > > >> What do you mean of this value calculated?
+>> > > > >
+>> > > > > Well, it just seems the datasheet has been read from the point of view
+>> > > > > of the SW_CTRL settings (pad pullups, drive strength etc.) to define
+>> > > > > the enums; every pin setting in order from IOMUXC_BASE + 0x3f0 (sorry
+>> > > > > I mistyped) has been entered as an enum into this list. Then a table
+>> > > > > has been generated using these enums to supply a pin id. Then this pin
+>> > > > > id is not relevant anymore; it actually gets referenced by it's
+>> > > > > *offset into the table*.
+>> > > > >
+>> > > > Not exactly, probably.
+>> > > > Basically we follow the mux reigster offset to define pin id, however,
+>> > > > there're also some pads may not have mux function but only config
+>> > > > which also has a pin id
+>> > > > and vice versa.
+>> > > > Those pins are not ordered by it's mux regsiter offset.
+>> > > >
+>> > > > Actually I did not manually search all those pins, instead, i just
+>> > > > using the exist ones:
+>> > > > arch/arm/plat-mxc/include/mach/iomux-mx51.h
+>> > > > Since this exist headfile already covers this case.
+>> > > >
+>> > > > > In this case, basically the code misses a few pins which have ALT
+>> > > > > settings but perhaps not always the ability to change pad control -
+>> > > > > EIM_DA5 to 15 are a good example.
+>> > > > >
+>> > > > As i said, we already defined those pin ids.
+>> > > >
+>> > > > > Probably better would be to define the binding almost exactly as it
+>> > > > > was done in the old method; iomux_v3_cfg_t took into account the three
+>> > > > > register offsets possible for the pin (SW_MUX_CTL, SW_PAD_CTL and IPP)
+>> > > > > and the three values to be put into those registers.
+>> > > > >
+>> > > > > This has been reduced down in pinctrl to what I find quite strange,
+>> > > > > which is a completely arbitrary pin "id" mapping, which indirectly
+>> > > > > references an entry in a table by index which is why pin 1 as a start
+>> > > > > looks odd.
+>> > > > >
+>> > > > Start with pin 1 is a bug which caused by my mistake during the early
+>> > > > data conversion.
+>> > > >
+>> > > > > If the binding is entirely i.MX-specific or even i.MX51-specific then
+>> > > > > why not define the pins in the device tree the "old" iomux_v3_cfg_t
+>> > > > > way, which is the way they are in the table of imx_pin_regs;
+>> > > > >
+>> > > > >       IMX_PIN_REG(MX51_PAD_EIM_D16, 0x3f0, 0x05c, 5, 0x000, 0), /*
+>> > > > > MX51_PAD_EIM_D16__AUD4_RXFS */
+>> > > > >
+>> > > > > 0x3f0 is the SW_PAD_CTL, 0x05c is the SW_MUX_CTL, 5 is the ALT mode,
+>> > > > > 0x000 is the IPP reg, and 0 the IPP value.
+>> > > > >
+>> > > > > So fsl,iomux-pins = <0x3f0 0x85 0x05c 5 0 0 ... > (PAD, settings, MUX,
+>> > > > > mode/sion, IPP, select - in that order) would be a valid pin
+>> > > > > definition and require no table. Sure, the offsets are device specific
+>> > > > > but then the arbitrary numbering is too.
+>> > > > > This way old iomux controls
+>> > > > > can be re-derived for people who use the old method in old kernels, or
+>> > > > > use U-Boot with iomux-v3.h taken from Linux (MX6 got ported, I am
+>> > > > > porting the Efika to it on MX5 for U-Boot right now). Also that huge
+>> > > > > table goes away - it can be built at runtime, along with the
+>> > > > > PAD_NAME__ALT_MODE_NAME description.
+>> > > > >
+>> > > > I can't agree this is better than the exist one now.
+>> > > > It's hard to use in device tree.
+>> > > > And how would you parse the pin id from this data array?
+>> > > I admit I didn't follow completely the calculation suggestion by Matt,
+>> > > but I think in general he has a point. This is more or less what I
+>> > > thought when I built the imx35 pinctrl driver.
+>> > >
+>> > > With the current approach (i.e. put the pinfuncs in some order that
+>> > > seems sensible today and then referencing them by index according to
+>> > > that ordering) you really get into troubles if you have to add a new
+>> > > function. You have to add it to the end to not break existing device
+>> > > trees and so the ordering is broken.
+>> > >
+>> > Actually, we do not mean to maintain the ordering in driver.
+>> > It just needs to be align with the pin func ids definitions in binding
+>> > doc. So the ordering broken in driver is not an issue, it just looks
+>> > not so better if we really have to add a new pin function to the end
+>> > due to mistake but this does not break anything to work.
+>> Well, if you add a function between say current function 11 and 12 all
+>> device trees need fixing, i.e. increase all function ids >= 12 by one.
+>> You obviously cannot fix out-of-tree users and even fixing the in-tree
+>> users is ugly.
+>>
+> For such case, we should add it to the end since the exist ids are already
+> taken. It will not break any user.
+>
+>> > > Also "11" has no obvious relation to MX35_PAD_COMPARE__SDMA_EXTDMA_2
+>> > > other than a match if you grep over the binding docs (or the driver).
+>> > > While "0x32c, 0x008, 7, 0x0, 0" is longer and looks more ugly the
+>> > > mapping is obvious and so IMHO preferable.
+>> > >
+>> > Also, don't you think this is hard to use for devicetree?
+>> Not harder than the current approach. Obviously macro support would be
+>> nice, but this applies to both approaches.
+>>
+>> > And we need to reference datasheet to fill these values.
+>> I'd list the explicit values in the binding docs as the indexes are
+>> documented there now. So the difference for a device-tree writer is just
+>> the content that is copy-and-pasted.
+>>
+>> > I just keep using as the old way at best and i remember Sascha also suggested
+>> > before that we don't want to lose using the macro way as
+>> > MX35_PAD_COMPARE__SDMA_EXTDMA_2 to make easy use.
+>> > In the future, we will switch to macro when dt supports.
+>> > For the way "0x32c, 0x008, 7, 0x0, 0", it's very unconveniently to use macro.
+>> That is just
+>>
+>>       #define MX35_PAD_COMPARE__SDMA_EXTDMA_2 11
+>>
+>> vs.
+>>
+>>       #define MX35_PAD_COMPARE__SDMA_EXTDMA_2 0x32c, 0x008, 7, 0x0, 0
+>>
+>> isn't it? (Actually I'd not go for cpp as preprocessor, but that's a
+>> different story.)
+>>
+> Hmm, not sure if dt macro may support this kind of syntax but yes if it supports.
+> Grant,
+> Do you know if dt macro can support it?
+>
+Sorry, forget to add Grant.
+Cc Grant.
 
-This patch breaks compilation:
+Regards
+Dong Aisheng
 
-ERROR: "pl08x_filter_id" [drivers/mtd/nand/lpc32xx_slc.ko] undefined!
-
-Please, send a fix. The defconfig I used is attached.
-
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-CONFIG_EXPERIMENTAL=y
-CONFIG_SYSVIPC=y
-CONFIG_NO_HZ=y
-CONFIG_HIGH_RES_TIMERS=y
-CONFIG_IKCONFIG=y
-CONFIG_IKCONFIG_PROC=y
-CONFIG_LOG_BUF_SHIFT=16
-CONFIG_SYSFS_DEPRECATED=y
-CONFIG_SYSFS_DEPRECATED_V2=y
-CONFIG_BLK_DEV_INITRD=y
-CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-CONFIG_SYSCTL_SYSCALL=y
-CONFIG_EMBEDDED=y
-CONFIG_SLAB=y
-CONFIG_JUMP_LABEL=y
-CONFIG_MODULES=y
-CONFIG_MODULE_UNLOAD=y
-# CONFIG_BLK_DEV_BSG is not set
-CONFIG_PARTITION_ADVANCED=y
-CONFIG_ARCH_LPC32XX=y
-CONFIG_PREEMPT=y
-CONFIG_AEABI=y
-CONFIG_ZBOOT_ROM_TEXT=0x0
-CONFIG_ZBOOT_ROM_BSS=0x0
-CONFIG_ARM_APPENDED_DTB=y
-CONFIG_ARM_ATAG_DTB_COMPAT=y
-CONFIG_CMDLINE="console=ttyS0,115200n81 root=/dev/ram0"
-CONFIG_CPU_IDLE=y
-CONFIG_FPE_NWFPE=y
-CONFIG_VFP=y
-# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-CONFIG_BINFMT_AOUT=y
-CONFIG_NET=y
-CONFIG_PACKET=y
-CONFIG_UNIX=y
-CONFIG_INET=y
-CONFIG_IP_MULTICAST=y
-CONFIG_IP_PNP=y
-CONFIG_IP_PNP_DHCP=y
-CONFIG_IP_PNP_BOOTP=y
-# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-# CONFIG_INET_XFRM_MODE_BEET is not set
-# CONFIG_INET_LRO is not set
-# CONFIG_INET_DIAG is not set
-CONFIG_IPV6=y
-CONFIG_IPV6_PRIVACY=y
-# CONFIG_WIRELESS is not set
-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-# CONFIG_FW_LOADER is not set
-CONFIG_MTD=m
-CONFIG_MTD_TESTS=m
-CONFIG_MTD_REDBOOT_PARTS=m
-CONFIG_MTD_REDBOOT_DIRECTORY_BLOCK=10000
-CONFIG_MTD_AFS_PARTS=m
-CONFIG_MTD_AR7_PARTS=m
-CONFIG_MTD_CHAR=m
-CONFIG_MTD_BLOCK=m
-CONFIG_FTL=m
-CONFIG_NFTL=m
-CONFIG_NFTL_RW=y
-CONFIG_INFTL=m
-CONFIG_RFD_FTL=m
-CONFIG_SSFDC=m
-CONFIG_SM_FTL=m
-CONFIG_MTD_OOPS=m
-CONFIG_MTD_SWAP=m
-CONFIG_MTD_CFI=m
-CONFIG_MTD_JEDECPROBE=m
-CONFIG_MTD_CFI_INTELEXT=m
-CONFIG_MTD_CFI_AMDSTD=m
-CONFIG_MTD_CFI_STAA=m
-CONFIG_MTD_ROM=m
-CONFIG_MTD_ABSENT=m
-CONFIG_MTD_COMPLEX_MAPPINGS=y
-CONFIG_MTD_PHYSMAP=m
-CONFIG_MTD_PHYSMAP_COMPAT=y
-CONFIG_MTD_PHYSMAP_OF=m
-CONFIG_MTD_IMPA7=m
-CONFIG_MTD_GPIO_ADDR=m
-CONFIG_MTD_PLATRAM=m
-CONFIG_MTD_LATCH_ADDR=m
-CONFIG_MTD_DATAFLASH=m
-CONFIG_MTD_DATAFLASH_WRITE_VERIFY=y
-CONFIG_MTD_DATAFLASH_OTP=y
-CONFIG_MTD_M25P80=m
-# CONFIG_M25PXX_USE_FAST_READ is not set
-CONFIG_MTD_SST25L=m
-CONFIG_MTD_SLRAM=m
-CONFIG_MTD_PHRAM=m
-CONFIG_MTD_MTDRAM=m
-CONFIG_MTD_BLOCK2MTD=m
-CONFIG_MTD_DOC2000=m
-CONFIG_MTD_DOC2001=m
-CONFIG_MTD_DOC2001PLUS=m
-CONFIG_MTD_DOCG3=m
-CONFIG_MTD_DOCPROBE_ADVANCED=y
-CONFIG_MTD_NAND_ECC_SMC=y
-CONFIG_MTD_NAND=m
-CONFIG_MTD_NAND_MUSEUM_IDS=y
-CONFIG_MTD_NAND_GPIO=m
-CONFIG_MTD_NAND_DISKONCHIP=m
-CONFIG_MTD_NAND_DISKONCHIP_PROBE_ADVANCED=y
-CONFIG_MTD_NAND_DISKONCHIP_BBTWRITE=y
-CONFIG_MTD_NAND_DOCG4=m
-CONFIG_MTD_NAND_SLC_LPC32XX=m
-CONFIG_MTD_NAND_MLC_LPC32XX=m
-CONFIG_MTD_NAND_NANDSIM=m
-CONFIG_MTD_NAND_PLATFORM=m
-CONFIG_MTD_ALAUDA=m
-CONFIG_MTD_ONENAND=m
-CONFIG_MTD_ONENAND_VERIFY_WRITE=y
-CONFIG_MTD_ONENAND_GENERIC=m
-CONFIG_MTD_ONENAND_OTP=y
-CONFIG_MTD_ONENAND_2X_PROGRAM=y
-CONFIG_MTD_ONENAND_SIM=m
-CONFIG_MTD_LPDDR=m
-CONFIG_MTD_UBI=m
-CONFIG_MTD_UBI_GLUEBI=m
-CONFIG_BLK_DEV_LOOP=y
-CONFIG_BLK_DEV_CRYPTOLOOP=y
-CONFIG_BLK_DEV_RAM=y
-CONFIG_BLK_DEV_RAM_COUNT=1
-CONFIG_BLK_DEV_RAM_SIZE=16384
-CONFIG_EEPROM_AT25=y
-CONFIG_SCSI=y
-CONFIG_BLK_DEV_SD=y
-CONFIG_NETDEVICES=y
-CONFIG_MII=y
-# CONFIG_NET_VENDOR_BROADCOM is not set
-# CONFIG_NET_VENDOR_CHELSIO is not set
-# CONFIG_NET_VENDOR_CIRRUS is not set
-# CONFIG_NET_VENDOR_FARADAY is not set
-# CONFIG_NET_VENDOR_INTEL is not set
-# CONFIG_NET_VENDOR_MARVELL is not set
-# CONFIG_NET_VENDOR_MICREL is not set
-# CONFIG_NET_VENDOR_MICROCHIP is not set
-# CONFIG_NET_VENDOR_NATSEMI is not set
-CONFIG_LPC_ENET=y
-# CONFIG_NET_VENDOR_SEEQ is not set
-# CONFIG_NET_VENDOR_SMSC is not set
-# CONFIG_NET_VENDOR_STMICRO is not set
-CONFIG_SMSC_PHY=y
-# CONFIG_WLAN is not set
-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-CONFIG_INPUT_MOUSEDEV_SCREEN_X=240
-CONFIG_INPUT_MOUSEDEV_SCREEN_Y=320
-CONFIG_INPUT_EVDEV=y
-# CONFIG_INPUT_MOUSE is not set
-CONFIG_INPUT_TOUCHSCREEN=y
-CONFIG_TOUCHSCREEN_LPC32XX=y
-# CONFIG_LEGACY_PTYS is not set
-CONFIG_SERIAL_8250=y
-CONFIG_SERIAL_8250_CONSOLE=y
-# CONFIG_HW_RANDOM is not set
-CONFIG_I2C=y
-CONFIG_I2C_CHARDEV=y
-CONFIG_I2C_PNX=y
-CONFIG_SPI=y
-CONFIG_SPI_PL022=y
-CONFIG_GPIO_SYSFS=y
-# CONFIG_HWMON is not set
-CONFIG_WATCHDOG=y
-CONFIG_PNX4008_WATCHDOG=y
-CONFIG_FB=y
-CONFIG_FB_ARMCLCD=y
-CONFIG_FRAMEBUFFER_CONSOLE=y
-CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
-CONFIG_LOGO=y
-# CONFIG_LOGO_LINUX_MONO is not set
-# CONFIG_LOGO_LINUX_VGA16 is not set
-CONFIG_SOUND=y
-CONFIG_SND=y
-CONFIG_SND_SEQUENCER=y
-CONFIG_SND_MIXER_OSS=y
-CONFIG_SND_PCM_OSS=y
-CONFIG_SND_SEQUENCER_OSS=y
-# CONFIG_SND_SUPPORT_OLD_API is not set
-# CONFIG_SND_VERBOSE_PROCFS is not set
-CONFIG_SND_DEBUG=y
-CONFIG_SND_DEBUG_VERBOSE=y
-# CONFIG_SND_DRIVERS is not set
-# CONFIG_SND_ARM is not set
-# CONFIG_SND_SPI is not set
-CONFIG_SND_SOC=y
-# CONFIG_HID_SUPPORT is not set
-CONFIG_USB=y
-CONFIG_USB_OHCI_HCD=y
-CONFIG_USB_STORAGE=y
-CONFIG_USB_GADGET=y
-CONFIG_USB_LPC32XX=y
-CONFIG_USB_MASS_STORAGE=m
-CONFIG_USB_G_SERIAL=m
-CONFIG_MMC=y
-# CONFIG_MMC_BLOCK_BOUNCE is not set
-CONFIG_MMC_ARMMMCI=y
-CONFIG_NEW_LEDS=y
-CONFIG_LEDS_CLASS=y
-CONFIG_LEDS_GPIO=y
-CONFIG_LEDS_TRIGGERS=y
-CONFIG_LEDS_TRIGGER_TIMER=y
-CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-CONFIG_LEDS_TRIGGER_BACKLIGHT=y
-CONFIG_LEDS_TRIGGER_GPIO=y
-CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
-CONFIG_RTC_CLASS=y
-CONFIG_RTC_INTF_DEV_UIE_EMUL=y
-CONFIG_RTC_DRV_DS1374=y
-CONFIG_RTC_DRV_PCF8563=y
-CONFIG_RTC_DRV_LPC32XX=y
-CONFIG_DMADEVICES=y
-CONFIG_AMBA_PL08X=y
-CONFIG_STAGING=y
-CONFIG_LPC32XX_ADC=y
-CONFIG_IIO=y
-CONFIG_EXT2_FS=y
-CONFIG_AUTOFS4_FS=y
-CONFIG_MSDOS_FS=y
-CONFIG_VFAT_FS=y
-CONFIG_TMPFS=y
-CONFIG_JFFS2_FS=m
-CONFIG_JFFS2_FS_WBUF_VERIFY=y
-CONFIG_JFFS2_FS_XATTR=y
-# CONFIG_JFFS2_FS_POSIX_ACL is not set
-# CONFIG_JFFS2_FS_SECURITY is not set
-CONFIG_UBIFS_FS=m
-CONFIG_UBIFS_FS_ADVANCED_COMPR=y
-# CONFIG_UBIFS_FS_LZO is not set
-# CONFIG_UBIFS_FS_ZLIB is not set
-CONFIG_LOGFS=y
-CONFIG_NFS_FS=y
-CONFIG_ROOT_NFS=y
-CONFIG_NLS_CODEPAGE_437=y
-CONFIG_NLS_ASCII=y
-CONFIG_NLS_ISO8859_1=y
-CONFIG_NLS_UTF8=y
-# CONFIG_SCHED_DEBUG is not set
-# CONFIG_DEBUG_PREEMPT is not set
-CONFIG_DEBUG_INFO=y
-# CONFIG_FTRACE is not set
-# CONFIG_ARM_UNWIND is not set
-CONFIG_DEBUG_LL=y
-CONFIG_EARLY_PRINTK=y
-CONFIG_CRYPTO_ANSI_CPRNG=y
-# CONFIG_CRYPTO_HW is not set
-CONFIG_CRC_CCITT=y
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120815/164c2601/attachment-0001.sig>
+> Now I'm a bit intend to admit that we probably could do like that if it supports.
+> The benefit i see is that it could save much code lines in driver while having
+> no using experience downgrade.
+>
+> The left question is that how do we get the pin id from this kind of format data
+> (0x32c, 0x008, 7, 0x0, 0), probably one way may be:
+> For normal pads and NO_CONFIG pads, we could get it via:
+> mux_reg_offset / 4
+> for NO_MUX pads but have CONFIG pads, we may get it via:
+> mux_reg_offset / 4 + PIN_NO_MUX_ID_BASE + config_reg_offset /4
+> That may fix getting pin id issue from dt.
+>
+> Another known issue is that via this way, that means the pinctrl subsystem
+> can only see the using pads, this is a bit not align with the pinctrl
+> subsystem design. No sure if Linus would like to see it.
+>
+> Regards
+> Dong Aisheng
+>
