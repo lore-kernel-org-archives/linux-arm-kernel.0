@@ -1,74 +1,280 @@
-From: jason77.wang@gmail.com (Hui Wang)
-Date: Wed, 15 Aug 2012 18:31:48 +0800
-Subject: [PATCH v3 3/3] ARM: dts: imx6q-sabrelite: add eeti egalax
-In-Reply-To: <1345026708-14139-3-git-send-email-jason77.wang@gmail.com>
-References: <1345026708-14139-1-git-send-email-jason77.wang@gmail.com>
- <1345026708-14139-2-git-send-email-jason77.wang@gmail.com>
- <1345026708-14139-3-git-send-email-jason77.wang@gmail.com>
-Message-ID: <1345026708-14139-4-git-send-email-jason77.wang@gmail.com>
+From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
+Date: Wed, 15 Aug 2012 13:37:49 +0300
+Subject: [PATCH 1/2] mtd: lpc32xx_slc: Adjust to pl08x DMA interface
+ changes
+In-Reply-To: <1342095778-13403-2-git-send-email-stigge@antcom.de>
+References: <1342095778-13403-1-git-send-email-stigge@antcom.de>
+ <1342095778-13403-2-git-send-email-stigge@antcom.de>
+Message-ID: <1345027069.3393.124.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6Q sabrelite board uses i2c3 to connect an eeti egalax
-touchscreen controller, add it as an i2c slave device in the dts.
+On Thu, 2012-07-12 at 14:22 +0200, Roland Stigge wrote:
+> This patch adjusts the LPC32xx SLC NAND driver to the new pl08x DMA interface,
+> fixing the compile error resulting from changed pl08x structures.
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Signed-off-by: Hui Wang <jason77.wang@gmail.com>
----
- arch/arm/boot/dts/imx6q-sabrelite.dts |   16 ++++++++++++++++
- arch/arm/boot/dts/imx6q.dtsi          |    7 +++++++
- 2 files changed, 23 insertions(+), 0 deletions(-)
+This patch breaks compilation:
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index 72f30f3..4a68e1f 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -54,6 +54,7 @@
- 							   144  0x80000000	/* MX6Q_PAD_EIM_D22__GPIO_3_22 */
- 							   121  0x80000000	/* MX6Q_PAD_EIM_D19__GPIO_3_19 */
- 							   953  0x80000000	/* MX6Q_PAD_GPIO_0__CCM_CLKO */
-+							   972  0x10		/* MX6Q_PAD_GPIO_9__GPIO_1_9 */
- 							   >;
- 					};
- 				};
-@@ -115,6 +116,21 @@
- 					VDDIO-supply = <&reg_3p3v>;
- 				};
- 			};
-+
-+			i2c at 021a8000 { /* I2C3 */
-+				status = "okay";
-+				clock-frequency = <100000>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_i2c3_1>;
-+
-+				egalax_ts at 04 {
-+					compatible = "eeti,egalax_ts";
-+					reg = <0x04>;
-+					interrupt-parent = <&gpio1>;
-+					interrupts = <9 2>;
-+					wakeup-gpios = <&gpio1 9 0>;
-+				};
-+			};
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index fd57079..6f833b3 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -552,6 +552,13 @@
- 					};
- 				};
- 
-+				i2c3 {
-+					pinctrl_i2c3_1: i2c3grp-1 {
-+						fsl,pins = <1013 0x4001b8b1	/* MX6Q_PAD_GPIO_5__I2C3_SCL */
-+							    1037 0x4001b8b1>;	/* MX6Q_PAD_GPIO_16__I2C3_SDA */
-+					};
-+				};
-+
- 				serial2 {
- 					pinctrl_serial2_1: serial2grp-1 {
- 						fsl,pins = <183 0x1b0b1		/* MX6Q_PAD_EIM_D26__UART2_TXD */
+ERROR: "pl08x_filter_id" [drivers/mtd/nand/lpc32xx_slc.ko] undefined!
+
+Please, send a fix. The defconfig I used is attached.
+
 -- 
-1.7.6
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+CONFIG_EXPERIMENTAL=y
+CONFIG_SYSVIPC=y
+CONFIG_NO_HZ=y
+CONFIG_HIGH_RES_TIMERS=y
+CONFIG_IKCONFIG=y
+CONFIG_IKCONFIG_PROC=y
+CONFIG_LOG_BUF_SHIFT=16
+CONFIG_SYSFS_DEPRECATED=y
+CONFIG_SYSFS_DEPRECATED_V2=y
+CONFIG_BLK_DEV_INITRD=y
+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+CONFIG_SYSCTL_SYSCALL=y
+CONFIG_EMBEDDED=y
+CONFIG_SLAB=y
+CONFIG_JUMP_LABEL=y
+CONFIG_MODULES=y
+CONFIG_MODULE_UNLOAD=y
+# CONFIG_BLK_DEV_BSG is not set
+CONFIG_PARTITION_ADVANCED=y
+CONFIG_ARCH_LPC32XX=y
+CONFIG_PREEMPT=y
+CONFIG_AEABI=y
+CONFIG_ZBOOT_ROM_TEXT=0x0
+CONFIG_ZBOOT_ROM_BSS=0x0
+CONFIG_ARM_APPENDED_DTB=y
+CONFIG_ARM_ATAG_DTB_COMPAT=y
+CONFIG_CMDLINE="console=ttyS0,115200n81 root=/dev/ram0"
+CONFIG_CPU_IDLE=y
+CONFIG_FPE_NWFPE=y
+CONFIG_VFP=y
+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+CONFIG_BINFMT_AOUT=y
+CONFIG_NET=y
+CONFIG_PACKET=y
+CONFIG_UNIX=y
+CONFIG_INET=y
+CONFIG_IP_MULTICAST=y
+CONFIG_IP_PNP=y
+CONFIG_IP_PNP_DHCP=y
+CONFIG_IP_PNP_BOOTP=y
+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
+# CONFIG_INET_XFRM_MODE_BEET is not set
+# CONFIG_INET_LRO is not set
+# CONFIG_INET_DIAG is not set
+CONFIG_IPV6=y
+CONFIG_IPV6_PRIVACY=y
+# CONFIG_WIRELESS is not set
+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+# CONFIG_FW_LOADER is not set
+CONFIG_MTD=m
+CONFIG_MTD_TESTS=m
+CONFIG_MTD_REDBOOT_PARTS=m
+CONFIG_MTD_REDBOOT_DIRECTORY_BLOCK=10000
+CONFIG_MTD_AFS_PARTS=m
+CONFIG_MTD_AR7_PARTS=m
+CONFIG_MTD_CHAR=m
+CONFIG_MTD_BLOCK=m
+CONFIG_FTL=m
+CONFIG_NFTL=m
+CONFIG_NFTL_RW=y
+CONFIG_INFTL=m
+CONFIG_RFD_FTL=m
+CONFIG_SSFDC=m
+CONFIG_SM_FTL=m
+CONFIG_MTD_OOPS=m
+CONFIG_MTD_SWAP=m
+CONFIG_MTD_CFI=m
+CONFIG_MTD_JEDECPROBE=m
+CONFIG_MTD_CFI_INTELEXT=m
+CONFIG_MTD_CFI_AMDSTD=m
+CONFIG_MTD_CFI_STAA=m
+CONFIG_MTD_ROM=m
+CONFIG_MTD_ABSENT=m
+CONFIG_MTD_COMPLEX_MAPPINGS=y
+CONFIG_MTD_PHYSMAP=m
+CONFIG_MTD_PHYSMAP_COMPAT=y
+CONFIG_MTD_PHYSMAP_OF=m
+CONFIG_MTD_IMPA7=m
+CONFIG_MTD_GPIO_ADDR=m
+CONFIG_MTD_PLATRAM=m
+CONFIG_MTD_LATCH_ADDR=m
+CONFIG_MTD_DATAFLASH=m
+CONFIG_MTD_DATAFLASH_WRITE_VERIFY=y
+CONFIG_MTD_DATAFLASH_OTP=y
+CONFIG_MTD_M25P80=m
+# CONFIG_M25PXX_USE_FAST_READ is not set
+CONFIG_MTD_SST25L=m
+CONFIG_MTD_SLRAM=m
+CONFIG_MTD_PHRAM=m
+CONFIG_MTD_MTDRAM=m
+CONFIG_MTD_BLOCK2MTD=m
+CONFIG_MTD_DOC2000=m
+CONFIG_MTD_DOC2001=m
+CONFIG_MTD_DOC2001PLUS=m
+CONFIG_MTD_DOCG3=m
+CONFIG_MTD_DOCPROBE_ADVANCED=y
+CONFIG_MTD_NAND_ECC_SMC=y
+CONFIG_MTD_NAND=m
+CONFIG_MTD_NAND_MUSEUM_IDS=y
+CONFIG_MTD_NAND_GPIO=m
+CONFIG_MTD_NAND_DISKONCHIP=m
+CONFIG_MTD_NAND_DISKONCHIP_PROBE_ADVANCED=y
+CONFIG_MTD_NAND_DISKONCHIP_BBTWRITE=y
+CONFIG_MTD_NAND_DOCG4=m
+CONFIG_MTD_NAND_SLC_LPC32XX=m
+CONFIG_MTD_NAND_MLC_LPC32XX=m
+CONFIG_MTD_NAND_NANDSIM=m
+CONFIG_MTD_NAND_PLATFORM=m
+CONFIG_MTD_ALAUDA=m
+CONFIG_MTD_ONENAND=m
+CONFIG_MTD_ONENAND_VERIFY_WRITE=y
+CONFIG_MTD_ONENAND_GENERIC=m
+CONFIG_MTD_ONENAND_OTP=y
+CONFIG_MTD_ONENAND_2X_PROGRAM=y
+CONFIG_MTD_ONENAND_SIM=m
+CONFIG_MTD_LPDDR=m
+CONFIG_MTD_UBI=m
+CONFIG_MTD_UBI_GLUEBI=m
+CONFIG_BLK_DEV_LOOP=y
+CONFIG_BLK_DEV_CRYPTOLOOP=y
+CONFIG_BLK_DEV_RAM=y
+CONFIG_BLK_DEV_RAM_COUNT=1
+CONFIG_BLK_DEV_RAM_SIZE=16384
+CONFIG_EEPROM_AT25=y
+CONFIG_SCSI=y
+CONFIG_BLK_DEV_SD=y
+CONFIG_NETDEVICES=y
+CONFIG_MII=y
+# CONFIG_NET_VENDOR_BROADCOM is not set
+# CONFIG_NET_VENDOR_CHELSIO is not set
+# CONFIG_NET_VENDOR_CIRRUS is not set
+# CONFIG_NET_VENDOR_FARADAY is not set
+# CONFIG_NET_VENDOR_INTEL is not set
+# CONFIG_NET_VENDOR_MARVELL is not set
+# CONFIG_NET_VENDOR_MICREL is not set
+# CONFIG_NET_VENDOR_MICROCHIP is not set
+# CONFIG_NET_VENDOR_NATSEMI is not set
+CONFIG_LPC_ENET=y
+# CONFIG_NET_VENDOR_SEEQ is not set
+# CONFIG_NET_VENDOR_SMSC is not set
+# CONFIG_NET_VENDOR_STMICRO is not set
+CONFIG_SMSC_PHY=y
+# CONFIG_WLAN is not set
+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+CONFIG_INPUT_MOUSEDEV_SCREEN_X=240
+CONFIG_INPUT_MOUSEDEV_SCREEN_Y=320
+CONFIG_INPUT_EVDEV=y
+# CONFIG_INPUT_MOUSE is not set
+CONFIG_INPUT_TOUCHSCREEN=y
+CONFIG_TOUCHSCREEN_LPC32XX=y
+# CONFIG_LEGACY_PTYS is not set
+CONFIG_SERIAL_8250=y
+CONFIG_SERIAL_8250_CONSOLE=y
+# CONFIG_HW_RANDOM is not set
+CONFIG_I2C=y
+CONFIG_I2C_CHARDEV=y
+CONFIG_I2C_PNX=y
+CONFIG_SPI=y
+CONFIG_SPI_PL022=y
+CONFIG_GPIO_SYSFS=y
+# CONFIG_HWMON is not set
+CONFIG_WATCHDOG=y
+CONFIG_PNX4008_WATCHDOG=y
+CONFIG_FB=y
+CONFIG_FB_ARMCLCD=y
+CONFIG_FRAMEBUFFER_CONSOLE=y
+CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
+CONFIG_LOGO=y
+# CONFIG_LOGO_LINUX_MONO is not set
+# CONFIG_LOGO_LINUX_VGA16 is not set
+CONFIG_SOUND=y
+CONFIG_SND=y
+CONFIG_SND_SEQUENCER=y
+CONFIG_SND_MIXER_OSS=y
+CONFIG_SND_PCM_OSS=y
+CONFIG_SND_SEQUENCER_OSS=y
+# CONFIG_SND_SUPPORT_OLD_API is not set
+# CONFIG_SND_VERBOSE_PROCFS is not set
+CONFIG_SND_DEBUG=y
+CONFIG_SND_DEBUG_VERBOSE=y
+# CONFIG_SND_DRIVERS is not set
+# CONFIG_SND_ARM is not set
+# CONFIG_SND_SPI is not set
+CONFIG_SND_SOC=y
+# CONFIG_HID_SUPPORT is not set
+CONFIG_USB=y
+CONFIG_USB_OHCI_HCD=y
+CONFIG_USB_STORAGE=y
+CONFIG_USB_GADGET=y
+CONFIG_USB_LPC32XX=y
+CONFIG_USB_MASS_STORAGE=m
+CONFIG_USB_G_SERIAL=m
+CONFIG_MMC=y
+# CONFIG_MMC_BLOCK_BOUNCE is not set
+CONFIG_MMC_ARMMMCI=y
+CONFIG_NEW_LEDS=y
+CONFIG_LEDS_CLASS=y
+CONFIG_LEDS_GPIO=y
+CONFIG_LEDS_TRIGGERS=y
+CONFIG_LEDS_TRIGGER_TIMER=y
+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+CONFIG_LEDS_TRIGGER_BACKLIGHT=y
+CONFIG_LEDS_TRIGGER_GPIO=y
+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+CONFIG_RTC_CLASS=y
+CONFIG_RTC_INTF_DEV_UIE_EMUL=y
+CONFIG_RTC_DRV_DS1374=y
+CONFIG_RTC_DRV_PCF8563=y
+CONFIG_RTC_DRV_LPC32XX=y
+CONFIG_DMADEVICES=y
+CONFIG_AMBA_PL08X=y
+CONFIG_STAGING=y
+CONFIG_LPC32XX_ADC=y
+CONFIG_IIO=y
+CONFIG_EXT2_FS=y
+CONFIG_AUTOFS4_FS=y
+CONFIG_MSDOS_FS=y
+CONFIG_VFAT_FS=y
+CONFIG_TMPFS=y
+CONFIG_JFFS2_FS=m
+CONFIG_JFFS2_FS_WBUF_VERIFY=y
+CONFIG_JFFS2_FS_XATTR=y
+# CONFIG_JFFS2_FS_POSIX_ACL is not set
+# CONFIG_JFFS2_FS_SECURITY is not set
+CONFIG_UBIFS_FS=m
+CONFIG_UBIFS_FS_ADVANCED_COMPR=y
+# CONFIG_UBIFS_FS_LZO is not set
+# CONFIG_UBIFS_FS_ZLIB is not set
+CONFIG_LOGFS=y
+CONFIG_NFS_FS=y
+CONFIG_ROOT_NFS=y
+CONFIG_NLS_CODEPAGE_437=y
+CONFIG_NLS_ASCII=y
+CONFIG_NLS_ISO8859_1=y
+CONFIG_NLS_UTF8=y
+# CONFIG_SCHED_DEBUG is not set
+# CONFIG_DEBUG_PREEMPT is not set
+CONFIG_DEBUG_INFO=y
+# CONFIG_FTRACE is not set
+# CONFIG_ARM_UNWIND is not set
+CONFIG_DEBUG_LL=y
+CONFIG_EARLY_PRINTK=y
+CONFIG_CRYPTO_ANSI_CPRNG=y
+# CONFIG_CRYPTO_HW is not set
+CONFIG_CRC_CCITT=y
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120815/164c2601/attachment-0001.sig>
