@@ -1,31 +1,22 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 15 Aug 2012 17:54:32 +0100
-Subject: [PATCH v2 3/4] arm/dts: Add tps65910 regulator DT data to
- am335x-evm.dts
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA13118@DBDE01.ent.ti.com>
-References: <1343110735-10640-1-git-send-email-anilkumar@ti.com>
- <1343110735-10640-4-git-send-email-anilkumar@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA1293E@DBDE01.ent.ti.com>
- <20120815125338.GA13544@opensource.wolfsonmicro.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA13118@DBDE01.ent.ti.com>
-Message-ID: <20120815165431.GF15365@opensource.wolfsonmicro.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 15 Aug 2012 10:58:45 -0600
+Subject: [PATCH] ARM: dt: tegra: whistler: add regulators
+In-Reply-To: <1344017484-29395-1-git-send-email-swarren@wwwdotorg.org>
+References: <1344017484-29395-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <502BD545.1010300@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2012 at 04:47:02PM +0000, AnilKumar, Chimata wrote:
-> On Wed, Aug 15, 2012 at 18:23:39, Mark Brown wrote:
+On 08/03/2012 12:11 PM, Stephen Warren wrote:
+> Whistler uses a Maxim 8907 regulator. Instantiate this.
+> 
+> The voltage settings were derived from the schematic. The only exception
+> is the BBAT voltage; the schematic says 1.2v, but the HW can't go that
+> low, so use the HW default of 2.4v instead.
+> 
+> Almost all regulators list all driven supply signal names in their
+> regulator-names property. The exception is nvvdd_sv3, which is in turn
+> named 12 more different names on the schematic, so these were omitted
+> for brevity.
 
-> > If you have all these unrelated supplies in the system then your device
-> > tree should accurately reflect that.  However this would be a very
-
-> In that case I have to add all these fixed regulators.
-
-Why?  You then immediately go on to say...
-
-> > unusual hardware design.  Usually there would be a very small set of
-> > system supply rails, frequently only one.
-
-> In case of AM335X-EVM one dedicated supply (5v) feeding to all the input
-> supplies (vcc1-7 and vccio) of the regulators.
-
-...that they all map onto the same physical supply?
+Applied to Tegra's for-3.7/dt branch.
