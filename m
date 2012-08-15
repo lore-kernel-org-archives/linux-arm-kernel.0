@@ -1,61 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Aug 2012 15:07:36 +0000
-Subject: [PATCH v2 23/31] arm64: Debugging support
-In-Reply-To: <1344966752-16102-24-git-send-email-catalin.marinas@arm.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-24-git-send-email-catalin.marinas@arm.com>
-Message-ID: <201208151507.36174.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 15 Aug 2012 10:07:47 -0500
+Subject: imx6q restart is broken
+In-Reply-To: <20120809092021.GQ18957@n2100.arm.linux.org.uk>
+References: <20120808101817.GA14718@S2101-09.ap.freescale.net>
+ <50224547.9020000@de.bosch.com> <50232C17.9000700@gmail.com>
+ <20120809092021.GQ18957@n2100.arm.linux.org.uk>
+Message-ID: <502BBB43.5010403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 August 2012, Catalin Marinas wrote:
+On 08/09/2012 04:20 AM, Russell King - ARM Linux wrote:
+> On Thu, Aug 09, 2012 at 11:18:47AM +0800, Hui Wang wrote:
+>> - at the last stage of reset, all non-boot cpus will call  
+>> ipi_cpu_stop()->cpu_relax(), the cpu_relax() is defined to smp_mb() for  
+>> V6, and smp_mb() is defined to dmb ("mcr p15, 0, %0, c7, c10, 5")
+> 
+> I suspect having this dmb inside cpu_relax() is flooding the
+> interconnects with traffic, which then prevents other CPUs getting
+> a look-in (maybe there's no fairness when it comes to dmb's.
+> 
+> If I'm right, you'll find is that even converting this to the ARMv7
+> DMB instruction won't fix the problem.  It does, however, point
+> towards a more serious problem - it means that any tight loop using
+> dmb is detremental.  I have heard some people mention that even on
+> various ARM SMP platforms, they have see quite an amount of
+> interaction between the individual CPU cores, and I'm beginning
+> to wonder whether this is why.
+> 
+> I think a useful test would be to only execute the DMB maybe once
+> in 50 or 100 loops - the DMB is there to work around a different
+> problem with the temporal locality of stores on the local CPU.  So,
+> the only requirement is that we issue a DMB at some point while
+> spinning waiting for another CPU to respond to our previous writes.
 
-> +const struct user_regset_view *task_user_regset_view(struct task_struct *task)
-> +{
-> +#ifdef CONFIG_AARCH32_EMULATION
-> +	if (test_tsk_thread_flag(task, TIF_32BIT))
-> +		return &user_aarch32_view;
-> +#endif
-> +	return &user_aarch64_view;
-> +}
+I think I am seeing a similar problem on highbank with a v7 only build.
 
-Ah, nice. So you support 64 bit debuggers debugging 32 bit processes, right?
+>From what I've debugged, restart hangs for me on the L2x0 spinlock
+during a writel. Changing the writel to writel_relaxed in the restart
+hook fixes the problem. This skips barriers in the writel and for the
+spinlock. However, I'm still puzzled as cpu_relax on the secondary cores
+should not be doing a dmb in my case on a v7 only build.
 
->From what I can tell, there is no support for 32 bit processes debugging
-64 bit ones. Is that something you plan to add in the future, or do you
-consider that out of scope? In either case, a comment would be helpful.
+Rob
 
-> +long arch_ptrace(struct task_struct *child, long request,
-> +		 unsigned long addr, unsigned long data)
-> +{
-> +	int ret;
-> +	unsigned long *datap = (unsigned long __user *)data;
-> +
-> +	switch (request) {
-> +		case PTRACE_GET_THREAD_AREA:
-> +			ret = put_user(child->thread.tp_value, datap);
-> +			break;
-> +
-> +#ifdef CONFIG_HAVE_HW_BREAKPOINT
-> +		case PTRACE_GETHBPREGS:
-> +			ret = ptrace_gethbpregs(child, addr, datap);
-> +			break;
-> +
-> +		case PTRACE_SETHBPREGS:
-> +			ret = ptrace_sethbpregs(child, addr, datap);
-> +			break;
-> +#endif
-> +
-> +		default:
-> +			ret = ptrace_request(child, request, addr, data);
-> +			break;
-> +	}
-> +
-> +	return ret;
-> +}
-
-Is there a reaons why these are not regsets but have their own ptrace
-commands? I believe new architectures should generally not add ptrace
-commands any more.
-
-	Arnd
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
