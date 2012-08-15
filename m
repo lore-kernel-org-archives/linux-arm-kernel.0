@@ -1,25 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Aug 2012 16:19:08 +0000
-Subject: [GIT PULL V2] orion/kirkwood fixes for v3.6
-In-Reply-To: <20120815140223.GG22226@titan.lakedaemon.net>
-References: <20120814234442.GZ22226@titan.lakedaemon.net>
- <201208151335.47964.arnd@arndb.de>
- <20120815140223.GG22226@titan.lakedaemon.net>
-Message-ID: <201208151619.09191.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 15 Aug 2012 17:21:57 +0100
+Subject: [PATCH v2] ARM: support syscall tracing
+In-Reply-To: <502BBCCC.1020006@mentor.com>
+References: <502BBCCC.1020006@mentor.com>
+Message-ID: <20120815162157.GJ29448@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 August 2012, Jason Cooper wrote:
-> The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
-> 
->   Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
-> 
-> are available in the git repository at:
->   git://git.infradead.org/users/jcooper/linux.git fixes-for-v3.6
-> 
+Hi Wade,
 
-Ok, pulled that version now.
+On Wed, Aug 15, 2012 at 04:14:20PM +0100, Wade Farnsworth wrote:
+> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+> index 3e0fc5f..4e82fc1 100644
+> --- a/arch/arm/kernel/ptrace.c
+> +++ b/arch/arm/kernel/ptrace.c
+> @@ -30,6 +30,9 @@
+>  #include <asm/pgtable.h>
+>  #include <asm/traps.h>
+>  
+> +#define CREATE_TRACE_POINTS
+> +#include <trace/events/syscalls.h>
+> +
+>  #define REG_PC	15
+>  #define REG_PSR	16
+>  /*
+> @@ -918,7 +921,8 @@ static int ptrace_syscall_trace(struct pt_regs *regs, int scno,
+>  {
+>  	unsigned long ip;
+>  
+> -	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+> +	if (!test_thread_flag(TIF_SYSCALL_TRACE) &&
+> +	    !test_thread_flag(TIF_SYSCALL_TRACEPOINT))
+>  		return scno;
 
-Thanks,
+Can we now remove this hunk?
 
-	Arnd
+>  	current_thread_info()->syscall = scno;
+> @@ -930,10 +934,12 @@ static int ptrace_syscall_trace(struct pt_regs *regs, int scno,
+>  	ip = regs->ARM_ip;
+>  	regs->ARM_ip = dir;
+>  
+> -	if (dir == PTRACE_SYSCALL_EXIT)
+> -		tracehook_report_syscall_exit(regs, 0);
+> -	else if (tracehook_report_syscall_entry(regs))
+> -		current_thread_info()->syscall = -1;
+> +	if (test_thread_flag(TIF_SYSCALL_TRACE)) {
+> +		if (dir == PTRACE_SYSCALL_EXIT)
+> +			tracehook_report_syscall_exit(regs, 0);
+> +		else if (tracehook_report_syscall_entry(regs))
+> +			current_thread_info()->syscall = -1;
+> +	}
+
+and also this one?
+
+Will
