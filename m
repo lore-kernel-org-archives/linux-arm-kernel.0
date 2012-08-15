@@ -1,51 +1,96 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 15 Aug 2012 12:00:16 +0200
-Subject: [PATCH] ARM i.MX6q: Add virtual 1/3.5 dividers in the LDB clock path
-Message-ID: <1345024816-6368-1-git-send-email-s.trumtrar@pengutronix.de>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 15 Aug 2012 12:02:40 +0200
+Subject: [PATCH v5 0/8] ARM: OMAP2+: PM: introduce the power domains
+ functional states
+Message-ID: <1345024968-28951-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Zabel <p.zabel@pengutronix.de>
+Here is a re-spin after some comments and suggestions after review.
 
-The ldb_di[01]_podf is implemented as a clk-divider that
-divides by 1 or 2. In reality, the ldb_di[01]_ipu_div
-dividers divide by either 3.5 or 7. Adding a fixed factor
-of 1/3.5 fixes their children's clock rates.
+Implement the functional states for the power domains:
+- unify the API to use the functional states. pwrdm_set_next_fpwrst
+  now is the function to control the power domains power and logic
+  states,
+- reorganize the powerdomain API in internal and external parts,
+  in powerdomain.h [1]
+- protect the power domain state change by a lock in
+  pwrdm_set_next_fpwrst,
+- introduce the functional states for power domains power states and
+  logic power states, and the conversion functions between the
+  functional and internal states,
+- program the logic power state of power domains from the functional
+  states, in pwrdm_set_next_fpwrst
+- convert the OMAP2/3/4 PM code to use the updated API,
+- provide the power domains statistics by functional states,
+- provide ftrace tracepoints with the functional state,
+- provide error logs in critical code, which makes the development
+  easier.
 
-This should probably be converted to rate table based dividers,
-once available.
+Note: [1] the physical split of internal and external APIs into
+      different header files is not part of this series, it comes as
+      a separate patch set.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
- arch/arm/mach-imx/clk-imx6q.c |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index ea89520..4233d9e 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -152,7 +152,7 @@ enum mx6q_clks {
- 	ssi2, ssi3, uart_ipg, uart_serial, usboh3, usdhc1, usdhc2, usdhc3,
- 	usdhc4, vdo_axi, vpu_axi, cko1, pll1_sys, pll2_bus, pll3_usb_otg,
- 	pll4_audio, pll5_video, pll6_mlb, pll7_usb_host, pll8_enet, ssi1_ipg,
--	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2,
-+	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
- 	clk_max
- };
- 
-@@ -288,8 +288,10 @@ int __init mx6q_clocks_init(void)
- 	clk[gpu3d_shader]     = imx_clk_divider("gpu3d_shader",     "gpu3d_shader_sel",  base + 0x18, 29, 3);
- 	clk[ipu1_podf]        = imx_clk_divider("ipu1_podf",        "ipu1_sel",          base + 0x3c, 11, 3);
- 	clk[ipu2_podf]        = imx_clk_divider("ipu2_podf",        "ipu2_sel",          base + 0x3c, 16, 3);
--	clk[ldb_di0_podf]     = imx_clk_divider("ldb_di0_podf",     "ldb_di0_sel",       base + 0x20, 10, 1);
--	clk[ldb_di1_podf]     = imx_clk_divider("ldb_di1_podf",     "ldb_di1_sel",       base + 0x20, 11, 1);
-+	clk[ldb_di0_div_3_5]  = imx_clk_fixed_factor("ldb_di0_div_3_5", "ldb_di0_sel", 2, 7);
-+	clk[ldb_di0_podf]     = imx_clk_divider("ldb_di0_podf",     "ldb_di0_div_3_5",       base + 0x20, 10, 1);
-+	clk[ldb_di1_div_3_5]  = imx_clk_fixed_factor("ldb_di1_div_3_5", "ldb_di1_sel", 2, 7);
-+	clk[ldb_di1_podf]     = imx_clk_divider("ldb_di1_podf",     "ldb_di1_div_3_5",   base + 0x20, 11, 1);
- 	clk[ipu1_di0_pre]     = imx_clk_divider("ipu1_di0_pre",     "ipu1_di0_pre_sel",  base + 0x34, 3,  3);
- 	clk[ipu1_di1_pre]     = imx_clk_divider("ipu1_di1_pre",     "ipu1_di1_pre_sel",  base + 0x34, 12, 3);
- 	clk[ipu2_di0_pre]     = imx_clk_divider("ipu2_di0_pre",     "ipu2_di0_pre_sel",  base + 0x38, 3,  3);
+Based on mainline kernel 3.6.0-rc1.
+
+Tested on OMAP3 Beagleboard, with suspend and cpuidle in RET and
+OFF modes.
+
+
+History:
+ v5:
+ - complete rework after review and suggestions,
+ - improved locking on next state read/write; spinlock instead of mutex
+ - added more error logging in critical code,
+
+ v4:
+ - reworked the code after internal review and testing with OMAP3&4 device
+   OFF,
+ - fixed the tracepoints generation code,
+ - introduce a function that returns power domains achievable functional
+   states, in order to return a valid state for power domains that only
+   support some of the power states. Although it has been tested OK the
+   code is in RFC state.
+
+ v3:
+ - fix a bug in OMAP3 cpuidle which prevented the IO wake-ups in PER
+
+ v2:
+ - add the logic power states,
+ - provide the power domains statistics by functional states
+
+ v1:
+ - initial implementation, in RFC state
+
+
+Jean Pihet (7):
+  ARM: OMAP2+: PM: introduce power domains functional states
+  ARM: OMAP2+: PM: introduce power domains achievable functional states
+  ARM: OMAP2+: PM: add a lock to protect the powerdomains next state
+  ARM: OMAP2+: PM: use the functional power states API
+  ARM: OMAP2+: PM: use power domain functional state in stats counters
+  ARM: OMAP2+: PM debug: trace the functional power domains states
+  ARM: OMAP2+: PM: reorganize the powerdomain API in public and private
+    parts
+
+Nishanth Menon (1):
+  ARM: OMAP2+: powerdomain: add error logs
+
+ arch/arm/mach-omap2/cpuidle34xx.c          |   58 ++--
+ arch/arm/mach-omap2/cpuidle44xx.c          |   24 +-
+ arch/arm/mach-omap2/omap-hotplug.c         |    2 +-
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c  |   39 ++--
+ arch/arm/mach-omap2/pm-debug.c             |   15 +-
+ arch/arm/mach-omap2/pm24xx.c               |   14 +-
+ arch/arm/mach-omap2/pm34xx.c               |   79 +++---
+ arch/arm/mach-omap2/pm44xx.c               |   24 +-
+ arch/arm/mach-omap2/powerdomain-common.c   |   99 ++++++
+ arch/arm/mach-omap2/powerdomain.c          |  456 +++++++++++++++++++++++++---
+ arch/arm/mach-omap2/powerdomain.h          |  152 ++++++---
+ arch/arm/mach-omap2/powerdomain2xxx_3xxx.c |    6 +
+ arch/arm/mach-omap2/powerdomain44xx.c      |    3 +
+ 13 files changed, 753 insertions(+), 218 deletions(-)
+
 -- 
-1.7.10.4
+1.7.7.6
