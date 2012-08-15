@@ -1,106 +1,135 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 15 Aug 2012 07:12:09 -0400
-Subject: PATCH Add support for the Iomega IX2-200 Device Tree
-In-Reply-To: <95D5BE56-A79F-4422-B1CE-7AD010A9D70E@gmail.com>
-References: <3CAEA3DD-9D2C-4052-957D-D09E6EB9B64E@gmail.com>
- <20120814235653.GA22226@titan.lakedaemon.net>
- <95D5BE56-A79F-4422-B1CE-7AD010A9D70E@gmail.com>
-Message-ID: <20120815111209.GB22226@titan.lakedaemon.net>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Wed, 15 Aug 2012 16:53:25 +0530
+Subject: [PATCH-V2] arm/dts: AM33XX: Set the default status of module to
+ "disabled" state
+Message-ID: <1345029805-27987-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2012 at 09:36:57AM +0100, Alan M Butler wrote:
-> 
-> On 15 Aug 2012, at 00:56, Jason Cooper <jason@lakedaemon.net> wrote:
-> 
-> > On Tue, Aug 14, 2012 at 09:06:16PM +0100, Ownerx35 wrote:
-> >> I have created a patch and have tested it myself that create a board
-> >> setup file for the Iomega StoreCenter IX2-200, create a dts file and
-> >> insert the appropriate lines into the common.h, makefile,
-> >> makefile.boot, kconfig and board-ft files.
-> > 
-> > Awesome!
-> > 
-> >> But am unsure how to properly submit it should i just post it here? or
-> >> is there a specific place i should post?
-> > 
-> > Take a look at /path/to/linux_src/Documentation/SubmittingPatches .
-> > 
-> > If you prefer working with git, the two commands I use are format-patch
-> > and then send-email.
-> > 
-> > Assuming the board is ARM based (most likely), then you've found the
-> > correct list.
-> > 
-> > Just post the series here and we'll offer helpful comments ;-)
-> > 
-> > Also, please check MAINTAINERS for the directories you are changing and
-> > include the maintainers in the CC: or TO:.  Most likely, that'll be
-> > myself and Andrew Lunn (kirkwood / orion boards).
-> > 
-> > hth,
-> > 
-> > Jason.
-> 
-> Sorry i meant board-dt in the previous message and the name just
-> getting used to the mail program on os x aswel. I have run through the
-> checkpatch.pl script and it tells me there are no errors but i just
-> found out a few minutes ago theres a fix for the 2 sata ports not
-> working (on all kirkwood devices as far as i know) so i am going to
-> test that now as it envolves modifying a line in the dts file.
+Ideally in common SoC dtsi file should set all modules
+to "disabled" state and it should get enabled in respective
+EVM/Board dts file as per usage.
 
-Ok.  Please let everyone know in the comment portion of the patch (after
-the --- line) that your patch depends on this fix.  I haven't seen the
-patch you're referring to yet.  I'll keep my eye out for it.
+This patch sets default status of all modules to "disabled"
+state in am33xx.dtsi file. Currently there are no modules
+supported as part of Bone and EVM dts support, so care
+to add entry "status = "okay"" while adding support for any
+module.
 
-> Also it is defiantly an arm kirkwood device. My patch also does not
-> modify any driver's or anything else just create's the appropriate
-> file in the arch/am/boot/dts directory and the board config in the
-> arch/arm/mach-kirkwood directory along with adding the lines to the
-> appropriate files in that directory. So do i need to inform anyone
-> else? the maintainers file is pretty long and i am unsure of what /
-> who i am looking for in it.
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+Changes from V1:
+	- Fixed indentation issue caused due to extra spaces.
 
-Nope, sounds like you can just send it to the list, myself, and Andrew
-Lunn.  Are you using git to generate the patch?  If not, I highly
-recommend it.  I'm not sure about Apple Mail in particular, but most
-graphical mail clients tend to mangle patches.
+ arch/arm/boot/dts/am335x-bone.dts |    6 ++++++
+ arch/arm/boot/dts/am335x-evm.dts  |    6 ++++++
+ arch/arm/boot/dts/am33xx.dtsi     |    9 +++++++++
+ 3 files changed, 21 insertions(+), 0 deletions(-)
 
-Here's a quick and dirty on what I do with git:
+diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+index a9af4db..a7906cb 100644
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone.dts
+@@ -17,4 +17,10 @@
+ 		device_type = "memory";
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
+ 	};
++
++	ocp {
++		uart1: serial at 44E09000 {
++			status = "okay";
++		};
++	};
+ };
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index d6a97d9..5dd8a6b 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -17,4 +17,10 @@
+ 		device_type = "memory";
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
+ 	};
++
++	ocp {
++		uart1: serial at 44E09000 {
++			status = "okay";
++		};
++	};
+ };
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 59509c4..5f6c8e3 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -102,36 +102,42 @@
+ 			compatible = "ti,omap3-uart";
+ 			ti,hwmods = "uart1";
+ 			clock-frequency = <48000000>;
++			status = "disabled";
+ 		};
 
-git clone \
-git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+ 		uart2: serial at 48022000 {
+ 			compatible = "ti,omap3-uart";
+ 			ti,hwmods = "uart2";
+ 			clock-frequency = <48000000>;
++			status = "disabled";
+ 		};
 
-cd linux
+ 		uart3: serial at 48024000 {
+ 			compatible = "ti,omap3-uart";
+ 			ti,hwmods = "uart3";
+ 			clock-frequency = <48000000>;
++			status = "disabled";
+ 		};
 
-git checkout -b my_new_board v3.6-rc1
+ 		uart4: serial at 481A6000 {
+ 			compatible = "ti,omap3-uart";
+ 			ti,hwmods = "uart4";
+ 			clock-frequency = <48000000>;
++			status = "disabled";
+ 		};
 
-hack, hack, hack
+ 		uart5: serial at 481A8000 {
+ 			compatible = "ti,omap3-uart";
+ 			ti,hwmods = "uart5";
+ 			clock-frequency = <48000000>;
++			status = "disabled";
+ 		};
 
-mkdir /tmp/patches
+ 		uart6: serial at 481AA000 {
+ 			compatible = "ti,omap3-uart";
+ 			ti,hwmods = "uart6";
+ 			clock-frequency = <48000000>;
++			status = "disabled";
+ 		};
 
-git format-patch -o /tmp/patches/ --thread=shallow --cover-letter \
-v3.6-rc1..HEAD
+ 		i2c1: i2c at 44E0B000 {
+@@ -139,6 +145,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c1";
++			status = "disabled";
+ 		};
 
-# edit /tmp/patches/0000-cover-letter.patch
+ 		i2c2: i2c at 4802A000 {
+@@ -146,6 +153,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c2";
++			status = "disabled";
+ 		};
 
-./scripts/checkpatch.pl /tmp/patches/*.patch
-	# ignore errors about patch 0000-cover-letter.patch
-	# it's not a patch.
-
-git send-email --to="$MY_EMAIL_ADDR" --smtp-server=$EMAIL_SRV \
---no-chain-reply-to --from="$MY_EMAIL_ADDR" /tmp/patches/*.patch
-	# send to yourself first to make sure it looks correct,
-	# applies properly from your email client, and is threaded
-	# properly
-
-# if it looks good, change the --to and --cc's in the above command to
-# send it to me and Andrew, and cc the linux-arm-kernel list.
-
-that's it.  If the list suggests any changes it's a lot easier to make
-those changes once you have git set up.  Especially with a series of
-patches.
-
-hth,
-
-Jason.
+ 		i2c3: i2c at 4819C000 {
+@@ -153,6 +161,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c3";
++			status = "disabled";
+ 		};
+ 	};
+ };
+--
+1.7.0.4
