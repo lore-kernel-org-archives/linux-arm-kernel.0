@@ -1,40 +1,107 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 15 Aug 2012 10:05:18 -0600
-Subject: [PATCH V2 0/6] ARM: tegra: add CPU hotplug support
-In-Reply-To: <1345022554-26292-1-git-send-email-josephl@nvidia.com>
-References: <1345022554-26292-1-git-send-email-josephl@nvidia.com>
-Message-ID: <502BC8BE.8060800@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Aug 2012 16:07:55 +0000
+Subject: [PATCH v2 30/31] arm64: Build infrastructure
+In-Reply-To: <1344966752-16102-31-git-send-email-catalin.marinas@arm.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-31-git-send-email-catalin.marinas@arm.com>
+Message-ID: <201208151607.55669.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2012 03:22 AM, Joseph Lo wrote:
-> This patch set adds CPU hotplug support for Tegra20 and Tegra30 SoCs.
-> 
-> The first 3 patches make the CPU clock and reset control be a module and
-> the abstraction APIs for TegraXX SoCs. And clean up some codes for later
-> usage. Then add CPU hotplug support for Tegra20 and Tegra30.
-> 
-> Verified on Seaboard(Tegra20) and Cardhu(Tegra30)
-> 
-> V2:
-> * add one more patch for enable HOTPLUG_CPU [6/6]
+On Tuesday 14 August 2012, Catalin Marinas wrote:
 
-The build problem when HOTPLUG_CPU is disabled is still present. The
-kernel needs to build with this option disabled.
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> new file mode 100644
+> index 0000000..1ce3d04
+> --- /dev/null
+> +++ b/arch/arm64/Kconfig
+> @@ -0,0 +1,261 @@
+> +config ARM64
+> +	def_bool y
+> +	select OF
+> +	select OF_EARLY_FLATTREE
+> +	select IRQ_DOMAIN
+> +	select HAVE_AOUT
+> +	select HAVE_DMA_ATTRS
+> +	select HAVE_DMA_API_DEBUG
+> +	select HAVE_IDE
 
-Enabling HOTPLUG_CPU in defconfig doesn't force everyone to enable that
-configuration option; not everyone uses tegra_defconfig, people don't
-always update to the latest defconfig, people should be free to disable
-functionality they don't need and still get a buildable & working
-kernel, etc.
+Please remove HAVE_AOUT and HAVE_IDE
 
-Besides, even if defconfig were a legitimate solution to this problem,
-this series still wouldn't work with "git bisect", since the defconfig
-patch comes after the patch that causes the build failure.
+> +	select HAVE_MEMBLOCK
+> +	select RTC_LIB
+> +	select SYS_SUPPORTS_APM_EMULATION
 
-> * move all the SoC specific CPU shutdown code into platform_cpu_die [4/6]
+APM_EMULATION can probably go too
 
-The reboot problem is indeed solved.
+> +
+> +config ARCH_PHYS_ADDR_T_64BIT
+> +	def_bool y
+> +
+> +config HAVE_PWM
+> +	bool
 
-P.S. It'd be nice to include a summary of what changed in each affected
-patch, as well as in the cover letter.
+HAVE_PWM is going away soon.
+
+> +config AARCH32_EMULATION
+> +	bool "Kernel support for 32-bit EL0"
+> +	depends on !ARM64_64K_PAGES
+> +	select COMPAT_BINFMT_ELF
+> +	help
+> +	  This option enables support for a 32-bit EL0 running under a 64-bit
+> +	  kernel at EL1. AArch32-specific components such as system calls,
+> +	  the user helper functions, VFP support and the ptrace interface are
+> +	  handled appropriately by the kernel.
+> +
+> +	  If you want to execute 32-bit userspace applications, say Y.
+> +
+> +config COMPAT
+> +	def_bool y
+> +	depends on AARCH32_EMULATION
+
+As mentioned, you can just merge the two into CONFIG_COMPAT.
+
+> +targets := Image Image.gz
+> +
+> +$(obj)/Image: vmlinux FORCE
+> +	$(call if_changed,objcopy)
+> +	@echo '  Kernel: $@ is ready'
+> +
+> +$(obj)/Image.gz: $(obj)/Image FORCE
+> +	$(call if_changed,gzip)
+> +	@echo '  Kernel: $@ is ready'
+
+Drop the useless output, at least when building with make -s.
+
+> +if [ -x /sbin/loadmap ]; then
+> +  /sbin/loadmap
+> +else
+> +  echo "You have to install it yourself"
+> +fi
+
+What is loadmap?
+
+> diff --git a/arch/arm64/configs/generic_defconfig b/arch/arm64/configs/generic_defconfig
+> new file mode 100644
+> index 0000000..d9aac95
+> --- /dev/null
+> +++ b/arch/arm64/configs/generic_defconfig
+
+I think it can just be called "defconfig".
+
+> diff --git a/arch/arm64/mm/Kconfig b/arch/arm64/mm/Kconfig
+> new file mode 100644
+> index 0000000..8e94e52
+> --- /dev/null
+> +++ b/arch/arm64/mm/Kconfig
+> @@ -0,0 +1,5 @@
+> +config MMU
+> +	def_bool y
+> +
+> +config CPU_64
+> +	def_bool y
+
+This file can be dropped. You can unconditionally enable CONFIG_MMU,
+and the CPU_64 symbol is pointless, just use CONFIG_64BIT.
+
+	Arnd
