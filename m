@@ -1,70 +1,61 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 15 Aug 2012 10:06:13 -0700
-Subject: [PATCH v2 02/31] arm64: Kernel booting and initialisation
-In-Reply-To: <201208151320.02313.arnd@arndb.de>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-3-git-send-email-catalin.marinas@arm.com>
- <201208151320.02313.arnd@arndb.de>
-Message-ID: <20120815170613.GA2892@quad.lixom.net>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 15 Aug 2012 10:06:27 -0700
+Subject: [PATCH v3 01/10] PCI: Keep pci_fixup_irqs() around after init
+In-Reply-To: <1343332512-28762-2-git-send-email-thierry.reding@avionic-design.de>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <1343332512-28762-2-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <CAErSpo7v+i8i=mXCs7ZW8DtGTDN_4AEntwYLqGG8FcCzweySFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2012 at 01:20:02PM +0000, Arnd Bergmann wrote:
-> On Tuesday 14 August 2012, Catalin Marinas wrote:
-> 
-> > +The AArch64 exception model is made up of a number of exception levels
-> > +(EL0 - EL3), with EL0 and EL1 having a secure and a non-secure
-> > +counterpart.  EL2 is the hypervisor level and exists only in non-secure
-> > +mode. EL3 is the highest priority level and exists only in secure mode.
-> 
-> I'm always confused by a description like this. It sounds like you cannot
-> have a hypervisor if you have code running in secure mode in EL3. What
-> I instead understand is that you enter non-secure mode by going from
-> EL3 into EL2.
-> 
-> > +2. Setup the device tree
-> > +-------------------------
-> > +
-> > +Requirement: MANDATORY
-> > +
-> > +The device tree blob (dtb) must be no bigger than 2 megabytes in size
-> > +and placed at a 2-megabyte boundary within the first 512 megabytes from
-> > +the start of the kernel image. This is to allow the kernel to map the
-> > +blob using a single section mapping in the initial page tables.
-> 
-> I've seen people put firmware for some peripherals into the device tree,
-> so that a device driver can grab a blob from there and load it into the
-> device, rather than calling request_firmware() which would fail if the
-> OS running on the system does not contain the blob. If such firmware is
-> too large, you end up violating the 2 MB limit you impose here.
-> 
-> Should we keep that limit and declare those use cases as invalid, or
-> should we try to make the boot protocol more flexible?
-> 
-> > diff --git a/arch/arm64/include/asm/setup.h b/arch/arm64/include/asm/setup.h
-> > new file mode 100644
-> > index 0000000..d766493
-> > --- /dev/null
-> > +++ b/arch/arm64/include/asm/setup.h
-> > @@ -0,0 +1,26 @@
-> > +#ifndef __ASM_SETUP_H
-> > +#define __ASM_SETUP_H
-> > +
-> > +#include <linux/types.h>
-> > +
-> > +#define COMMAND_LINE_SIZE 1024
-> > +
-> > +#endif
-> 
-> Is this necessary? The asm-generic version of this file allows 512 bytes,
-> which seems plenty.
+On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
+<thierry.reding@avionic-design.de> wrote:
+> When using deferred driver probing, PCI host controller drivers may
+> actually require this function after the init stage.
+>
+> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> ---
+> Changes in v3:
+> - none
+>
+> Changes in v2:
+> - use __devinit annotations
 
-Chrome OS on my system today uses a 553 character cmdline, in particular
-because some of the device mapper arguments are in there (since we boot without
-ramdisk). It adds up quickly.
+Your original patch removed __init completely.  Here you change it to
+__devinit.  That means we decide whether to discard the function based
+on whether CONFIG_HOTPLUG is supported.  But I think your point is not
+about hotplug; it's merely that we should be able to scan a PCI bus
+after init-time.  We ought to be able to do a late PCI scan even if
+hotplug is not supported.
 
-I suggest keeping it common with x86 since those limits are what people
-will be used to (2048).
+Therefore, I'd be inclined to remove __init completely unless you have
+another reason for preferring __devinit.
 
-
--Olof
+>  drivers/pci/setup-irq.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
+> index eb219a1..f0bcd56 100644
+> --- a/drivers/pci/setup-irq.c
+> +++ b/drivers/pci/setup-irq.c
+> @@ -18,7 +18,7 @@
+>  #include <linux/cache.h>
+>
+>
+> -static void __init
+> +static void __devinit
+>  pdev_fixup_irq(struct pci_dev *dev,
+>                u8 (*swizzle)(struct pci_dev *, u8 *),
+>                int (*map_irq)(const struct pci_dev *, u8, u8))
+> @@ -54,7 +54,7 @@ pdev_fixup_irq(struct pci_dev *dev,
+>         pcibios_update_irq(dev, irq);
+>  }
+>
+> -void __init
+> +void __devinit
+>  pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *, u8 *),
+>                int (*map_irq)(const struct pci_dev *, u8, u8))
+>  {
+> --
+> 1.7.11.2
+>
