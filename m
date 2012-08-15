@@ -1,13 +1,11 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 15 Aug 2012 11:26:31 -0300
-Subject: [PATCH v2 2/2] ARM: mach-mxs: Remove board entries in dt_board_compat
-In-Reply-To: <1345040791-3000-1-git-send-email-festevam@gmail.com>
-References: <1345040791-3000-1-git-send-email-festevam@gmail.com>
-Message-ID: <1345040791-3000-2-git-send-email-festevam@gmail.com>
+Date: Wed, 15 Aug 2012 11:29:00 -0300
+Subject: [PATCH v3 2/2] ARM: mach-mxs: Remove board entries in dt_board_compat
+Message-ID: <1345040940-3045-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: fabio <fabio@fabio-Latitude-E6410.(none)>
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
 There is no need for adding board related entries into dt_board_compat.
 
@@ -17,6 +15,8 @@ This way we do not need to patch a C file when adding dt support for a new board
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 --
+Changes since v2:
+- Fix From field
 Changes since v1:
 - Rebased against 3.6-rc1
  arch/arm/mach-mxs/mach-mxs.c |    8 --------
