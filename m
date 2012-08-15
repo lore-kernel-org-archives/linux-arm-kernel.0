@@ -1,21 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 15 Aug 2012 13:23:32 -0600
-Subject: [PATCHv2 0/8] *** ARM: Update arch-vt8500 to Devicetree ***
-In-Reply-To: <1344477300-25251-1-git-send-email-linux@prisktech.co.nz>
-References: <1344477300-25251-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <502BF734.9000608@wwwdotorg.org>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Wed, 15 Aug 2012 21:28:14 +0200
+Subject: [PATCH v3 01/10] PCI: Keep pci_fixup_irqs() around after init
+In-Reply-To: <CAErSpo7v+i8i=mXCs7ZW8DtGTDN_4AEntwYLqGG8FcCzweySFg@mail.gmail.com>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <1343332512-28762-2-git-send-email-thierry.reding@avionic-design.de>
+ <CAErSpo7v+i8i=mXCs7ZW8DtGTDN_4AEntwYLqGG8FcCzweySFg@mail.gmail.com>
+Message-ID: <20120815192814.GA12870@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2012 07:54 PM, Tony Prisk wrote:
-> This patchset updates arch-vt8500 to devicetree and removes all the old-style
-> code. Support for WM8650 has also been added.
+On Wed, Aug 15, 2012 at 10:06:27AM -0700, Bjorn Helgaas wrote:
+> On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
+> <thierry.reding@avionic-design.de> wrote:
+> > When using deferred driver probing, PCI host controller drivers may
+> > actually require this function after the init stage.
+> >
+> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> > ---
+> > Changes in v3:
+> > - none
+> >
+> > Changes in v2:
+> > - use __devinit annotations
+> 
+> Your original patch removed __init completely.  Here you change it to
+> __devinit.  That means we decide whether to discard the function based
+> on whether CONFIG_HOTPLUG is supported.  But I think your point is not
+> about hotplug; it's merely that we should be able to scan a PCI bus
+> after init-time.  We ought to be able to do a late PCI scan even if
+> hotplug is not supported.
+> 
+> Therefore, I'd be inclined to remove __init completely unless you have
+> another reason for preferring __devinit.
 
-Sorry for taking such a long time to re-review this.
+I thought __devinit would resolve to nothing if HOTPLUG is defined and
+__init otherwise. That seemed more appropriate. However you are right
+that it is useful to always have it available, so I'm fine with removing
+the annotations altogether. Do you want me to follow up with a patch? Or
+can you just take the first version? I'm not sure if it still applies.
 
-I scanned the series looking for just the changes to the issues I raised
-on v1, and I do see almost everything has been fixed up OK, except for
-the one issue I just commented on. So, aside from that, this series is
-fine by me. I'll defer to others about whether it's necessary to fix the
-display node-name-vs.-phandle issue I pointed out, or defer that until
-later.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120815/74a964da/attachment-0001.sig>
