@@ -1,66 +1,152 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 15 Aug 2012 12:02:46 +0200
-Subject: [PATCH 6/8] ARM: OMAP2+: PM debug: trace the functional power domains
- states
+Date: Wed, 15 Aug 2012 12:02:45 +0200
+Subject: [PATCH 5/8] ARM: OMAP2+: PM: use power domain functional state in
+ stats counters
 In-Reply-To: <1345024968-28951-1-git-send-email-j-pihet@ti.com>
 References: <1345024968-28951-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1345024968-28951-7-git-send-email-j-pihet@ti.com>
+Message-ID: <1345024968-28951-6-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Trace the power domain transitions using the functional power states,
-which include the power and logic states.
+The PM code uses some counters to keep track of the power domains
+transitions, in order to provide the information to drivers (in
+pwrdm_get_context_loss_count) and to expose the information to
+sysfs for debug purpose.
 
-While at it, fix the trace in the case a power domain did not hit
-the desired state, as reported by Paul Walmsley.
+This patch provides the information for each functional state.
 
-Reported-by: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
 ---
- arch/arm/mach-omap2/powerdomain.c |   15 +++++----------
- 1 files changed, 5 insertions(+), 10 deletions(-)
+ arch/arm/mach-omap2/pm-debug.c    |   15 ++++++++-------
+ arch/arm/mach-omap2/powerdomain.c |   12 ++++++------
+ arch/arm/mach-omap2/powerdomain.h |    4 ++--
+ 3 files changed, 16 insertions(+), 15 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+index 814bcd9..8eaa3f2 100644
+--- a/arch/arm/mach-omap2/pm-debug.c
++++ b/arch/arm/mach-omap2/pm-debug.c
+@@ -53,9 +53,10 @@ enum {
+ 	DEBUG_FILE_TIMERS,
+ };
+ 
+-static const char pwrdm_state_names[][PWRDM_MAX_PWRSTS] = {
++static const char pwrdm_state_names[][PWRDM_MAX_FUNC_PWRSTS] = {
+ 	"OFF",
+-	"RET",
++	"OSWR",
++	"CSWR",
+ 	"INA",
+ 	"ON"
+ };
+@@ -102,13 +103,13 @@ static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
+ 		strncmp(pwrdm->name, "dpll", 4) == 0)
+ 		return 0;
+ 
+-	if (pwrdm->state != pwrdm_read_pwrst(pwrdm))
++	if (pwrdm->state != pwrdm_read_fpwrst(pwrdm))
+ 		printk(KERN_ERR "pwrdm state mismatch(%s) %d != %d\n",
+-			pwrdm->name, pwrdm->state, pwrdm_read_pwrst(pwrdm));
++		       pwrdm->name, pwrdm->state, pwrdm_read_fpwrst(pwrdm));
+ 
+ 	seq_printf(s, "%s (%s)", pwrdm->name,
+ 			pwrdm_state_names[pwrdm->state]);
+-	for (i = 0; i < PWRDM_MAX_PWRSTS; i++)
++	for (i = 0; i < PWRDM_MAX_FUNC_PWRSTS; i++)
+ 		seq_printf(s, ",%s:%d", pwrdm_state_names[i],
+ 			pwrdm->state_counter[i]);
+ 
+@@ -137,7 +138,7 @@ static int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *user)
+ 	seq_printf(s, "%s (%s)", pwrdm->name,
+ 		pwrdm_state_names[pwrdm->state]);
+ 
+-	for (i = 0; i < 4; i++)
++	for (i = 0; i < PWRDM_MAX_FUNC_PWRSTS; i++)
+ 		seq_printf(s, ",%s:%lld", pwrdm_state_names[i],
+ 			pwrdm->state_timer[i]);
+ 
+@@ -211,7 +212,7 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *dir)
+ 
+ 	t = sched_clock();
+ 
+-	for (i = 0; i < 4; i++)
++	for (i = 0; i < PWRDM_MAX_FUNC_PWRSTS; i++)
+ 		pwrdm->state_timer[i] = 0;
+ 
+ 	pwrdm->timer = t;
 diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 6b8580b..06a566b 100644
+index 1f9ed2c..6b8580b 100644
 --- a/arch/arm/mach-omap2/powerdomain.c
 +++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -144,7 +144,7 @@ static void _update_logic_membank_counters(struct powerdomain *pwrdm)
- static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
- {
+@@ -106,7 +106,7 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
+ 	list_add(&pwrdm->node, &pwrdm_list);
  
--	int prev, state, trace_state = 0;
-+	int prev, next, state, trace_state;
+ 	/* Initialize the powerdomain's state counter */
+-	for (i = 0; i < PWRDM_MAX_PWRSTS; i++)
++	for (i = 0; i < PWRDM_MAX_FUNC_PWRSTS; i++)
+ 		pwrdm->state_counter[i] = 0;
  
+ 	pwrdm->ret_logic_off_counter = 0;
+@@ -114,7 +114,7 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
+ 		pwrdm->ret_mem_off_counter[i] = 0;
+ 
+ 	pwrdm_wait_transition(pwrdm);
+-	pwrdm->state = pwrdm_read_pwrst(pwrdm);
++	pwrdm->state = pwrdm_read_fpwrst(pwrdm);
+ 	pwrdm->state_counter[pwrdm->state] = 1;
+ 
+ 	pr_debug("powerdomain: registered %s\n", pwrdm->name);
+@@ -149,17 +149,17 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
  	if (pwrdm == NULL)
  		return -EINVAL;
-@@ -165,10 +165,10 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+ 
+-	state = pwrdm_read_pwrst(pwrdm);
++	state = pwrdm_read_fpwrst(pwrdm);
+ 
+ 	switch (flag) {
+ 	case PWRDM_STATE_NOW:
+ 		prev = pwrdm->state;
+ 		break;
+ 	case PWRDM_STATE_PREV:
+-		prev = pwrdm_read_prev_pwrst(pwrdm);
++		prev = pwrdm_read_prev_fpwrst(pwrdm);
+ 		if (pwrdm->state != prev)
+ 			pwrdm->state_counter[prev]++;
+-		if (prev == PWRDM_POWER_RET)
++		if (prev == PWRDM_FUNC_PWRST_OSWR)
+ 			_update_logic_membank_counters(pwrdm);
+ 		/*
  		 * If the power domain did not hit the desired state,
- 		 * generate a trace event with both the desired and hit states
- 		 */
--		if (state != prev) {
-+		next = pwrdm_read_next_fpwrst(pwrdm);
-+		if (next != prev) {
- 			trace_state = (PWRDM_TRACE_STATES_FLAG |
--				       ((state & OMAP_POWERSTATE_MASK) << 8) |
--				       ((prev & OMAP_POWERSTATE_MASK) << 0));
-+				       (next << 8) | (prev << 0));
- 			trace_power_domain_target(pwrdm->name, trace_state,
- 						  smp_processor_id());
- 		}
-@@ -781,13 +781,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
- 	pr_debug("powerdomain: setting next powerstate for %s to %0x\n",
- 		 pwrdm->name, pwrst);
+@@ -1367,7 +1367,7 @@ int pwrdm_get_context_loss_count(struct powerdomain *pwrdm)
+ 		return -ENODEV;
+ 	}
  
--	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
--		/* Trace the pwrdm desired target state */
--		trace_power_domain_target(pwrdm->name, pwrst,
--					  smp_processor_id());
--		/* Program the pwrdm desired target state */
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst)
- 		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
--	}
+-	count = pwrdm->state_counter[PWRDM_POWER_OFF];
++	count = pwrdm->state_counter[PWRDM_FUNC_PWRST_OFF];
+ 	count += pwrdm->ret_logic_off_counter;
  
- 	return ret;
- }
+ 	for (i = 0; i < pwrdm->banks; i++)
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index 23b9da9..df83c7c 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -146,7 +146,7 @@ struct powerdomain {
+ 	struct list_head voltdm_node;
+ 	spinlock_t lock;
+ 	int state;
+-	unsigned state_counter[PWRDM_MAX_PWRSTS];
++	unsigned state_counter[PWRDM_MAX_FUNC_PWRSTS];
+ 	unsigned ret_logic_off_counter;
+ 	unsigned ret_mem_off_counter[PWRDM_MAX_MEM_BANKS];
+ 
+@@ -160,7 +160,7 @@ struct powerdomain {
+ 
+ #ifdef CONFIG_PM_DEBUG
+ 	s64 timer;
+-	s64 state_timer[PWRDM_MAX_PWRSTS];
++	s64 state_timer[PWRDM_MAX_FUNC_PWRSTS];
+ #endif
+ };
+ 
 -- 
 1.7.7.6
