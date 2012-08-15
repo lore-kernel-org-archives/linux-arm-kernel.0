@@ -1,73 +1,73 @@
-From: josh.coombs@gmail.com (Josh Coombs)
-Date: Tue, 14 Aug 2012 20:47:32 -0400
-Subject: Potential Regression in 3.6-rc1 - Kirkwood SATA
-In-Reply-To: <20120815002536.GC747@harshnoise.musicnaut.iki.fi>
-References: <CAMW5UfZ_kVz_b4_98zPdY2RFjTMN9H2OzjYcRQrCTgA1xqdmPw@mail.gmail.com>
- <20120815002536.GC747@harshnoise.musicnaut.iki.fi>
-Message-ID: <CAMW5Ufa8YwhVbCtQwswVBi8VXiTDWFPz9Kfj3NYxF7VrWz5t=w@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 14 Aug 2012 17:49:14 -0700
+Subject: [PATCH v2 15/31] arm64: SMP support
+In-Reply-To: <1344966752-16102-16-git-send-email-catalin.marinas@arm.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-16-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20120815004914.GH19607@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 8:25 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-> Him
->
-> On Tue, Aug 14, 2012 at 07:59:00PM -0400, Josh Coombs wrote:
->> I finally got a chance to test 3.6-rc1 after having my GoFlex Net
->> support patch accepted for the 3.6 release train.  Included in 3.6-rc1
->> was an update for Kirkwoods switching SATA to DT which was not part of
->> my original testing.  It seems something with this change has
->> partially broken the GoFlex and a couple other Kirkwood based devices.
->>
->> The key factor is the number of SATA ports defined in the dts:
->>
->>               sata at 80000 {
->>                       status = "okay";
->>                       nr-ports = <2>;
->>               };
->>
->> If set at the correct number for my device, 2, my GFN does not
->> complete kernel init, hanging here:
->>
->> <SNIP>
->> [   15.287832] Dquot-cache hash table entries: 1024 (order 0, 4096 bytes)
->> [   15.296545] jffs2: version 2.2. (NAND) ?? 2001-2006 Red Hat, Inc.
->> [   15.303202] msgmni has been set to 240
->> [   15.308503] Block layer SCSI generic (bsg) driver version 0.4 loaded (major )
->> [   15.316021] io scheduler noop registered
->> [   15.320149] io scheduler deadline registered
->> [   15.324558] io scheduler cfq registered (default)
->> [   15.329462] mv_xor_shared mv_xor_shared.0: Marvell shared XOR driver
->> [   15.335962] mv_xor_shared mv_xor_shared.1: Marvell shared XOR driver
->> [   15.376751] mv_xor mv_xor.0: Marvell XOR: ( xor cpy )
->> [   15.416736] mv_xor mv_xor.1: Marvell XOR: ( xor fill cpy )
->> [   15.456735] mv_xor mv_xor.2: Marvell XOR: ( xor cpy )
->> [   15.496734] mv_xor mv_xor.3: Marvell XOR: ( xor fill cpy )
->> [   15.506309] Serial: 8250/16550 driver, 2 ports, IRQ sharing disabled
->> [   15.509111] serial8250.0: ttyS0 at MMIO 0xf1012000 (irq = 33) is a 16550A
->> [   15.509141] console [ttyS0] enabled, bootconsole disabled
->> [   15.518967] brd: module loaded
->> [   15.524991] loop: module loaded
->> [   15.528584] sata_mv sata_mv.0: cannot get optional clkdev
->> [   15.534180] sata_mv sata_mv.0: slots 32 ports 2
->>
->> If you set nr-ports to 1 the unit boots cleanly, save for only
->> detecting one functional SATA port.  Another user has confirmed this
->> behavior on an Iomega IX2-200.
->
-> Try booting with "coherent_pool=1M" (or bigger) kernel parameter. I think
-> with the recent DMA mapping changes, the default 256 KB coherent pool may
-> be too small, mv_xor and sata_mv together needs more. (I'm not sure how
-> it actually worked before commit e9da6e9905e639b0f842a244bc770b48ad0523e9,
-> but it seems this is the cuase).
->
-> It should be noted that dma_pool_alloc() uses GFP_ATOMIC always, and if
-> drivers exhaust the coherent pool already during the boot that function
-> just keeps looping forever. Users only see boot hanging with no clue
-> what to do. I would say it's quite a poor error handling...
->
-> A.
+Hi,
 
-I can confirm that fixes my GoFlex.  Would this justify raising the
-default for Kirkwoods, or just for specific devices within the family?
+On Tue, Aug 14, 2012 at 06:52:16PM +0100, Catalin Marinas wrote:
+> This patch adds SMP initialisation and spinlocks implementation for
+> AArch64. The spinlock support uses the new load-acquire/store-release
+> instructions to avoid explicit barriers. The architecture also specifies
+> that an event is automatically generated when clearing the exclusive
+> monitor state to wake up processors in WFE, so there is no need for an
+> explicit DSB/SEV instruction sequence. The SEVL instruction is used to
+> set the exclusive monitor locally as there is no conditional WFE and a
+> branch is more expensive.
+> 
+> For the SMP booting protocol, see Documentation/arm64/booting.txt.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
 
-Josh C
+> diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
+> new file mode 100644
+> index 0000000..34a37fb
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/spinlock.h
+> @@ -0,0 +1,199 @@
+> +/*
+> + * Copyright (C) 2012 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef __ASM_SPINLOCK_H
+> +#define __ASM_SPINLOCK_H
+> +
+> +#include <asm/spinlock_types.h>
+> +#include <asm/processor.h>
+> +
+> +/*
+> + * AArch64 Spin-locking.
+> + *
+> + * We exclusively read the old value.  If it is zero, we may have
+> + * won the lock, so we try exclusively storing it.  A memory barrier
+> + * is required after we get a lock, and before we release it, because
+> + * V6 CPUs are assumed to have weakly ordered memory.
+
+This comment should be updated, to mention the implicit locking and remove the
+reference to V6?
+
+Also, ignore previous questions on another reply about need for barriers,
+obviously not needed given the load-acquire/store-release semantics.
+
+
+
+-Olof
