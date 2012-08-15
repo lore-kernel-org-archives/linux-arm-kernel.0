@@ -1,18 +1,22 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 15 Aug 2012 17:10:31 +0100
-Subject: [PATCH v2 0/4] ASoC machine driver for simple SoC with twl4030
-In-Reply-To: <1344935279-32364-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1344935279-32364-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20120815161031.GA15365@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Aug 2012 16:13:57 +0000
+Subject: [PATCH v2 13/31] arm64: Device specific operations
+In-Reply-To: <1344966752-16102-14-git-send-email-catalin.marinas@arm.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-14-git-send-email-catalin.marinas@arm.com>
+Message-ID: <201208151613.57400.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 12:07:55PM +0300, Peter Ujfalusi wrote:
+On Tuesday 14 August 2012, Catalin Marinas wrote:
+> 
+> This patch adds several definitions for device communication, including
+> I/O accessors and ioremap(). The __raw_* accessors are implemented as
+> inline asm to avoid compiler generation of post-indexed accesses (less
+> efficient to emulate in a virtualised environment).
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 
-> Create new unified ASoC machine driver (with DT support) for boards using simple
-> configuration for audio and using the twl4030 codec.
-> This driver will replace the following machine drivers (since they are basically
-> the same):
-> igep0020, omap3beagle, omap3evm and overo.
 
-Applied, thanks.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
