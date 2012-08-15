@@ -1,25 +1,81 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 15 Aug 2012 22:49:25 +0800
-Subject: [PATCH v2 1/2] ARM: mach-imx: Remove board entries in
- dt_board_compat
-In-Reply-To: <1345040791-3000-1-git-send-email-festevam@gmail.com>
-References: <1345040791-3000-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120815144922.GD2258@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Aug 2012 14:49:54 +0000
+Subject: [PATCH v2 20/31] arm64: User access library function
+In-Reply-To: <1344966752-16102-21-git-send-email-catalin.marinas@arm.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-21-git-send-email-catalin.marinas@arm.com>
+Message-ID: <201208151449.54834.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2012 at 11:26:30AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> There is no need for adding board related entries into dt_board_compat.
-> 
-> Leave only the SoC entry.
-> 
-> This way we do not need to patch a C file when adding dt support for a new board.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Tuesday 14 August 2012, Catalin Marinas wrote:
 
-Applied, thanks.
+> +/*
+> + * Single-value transfer routines.  They automatically use the right
+> + * size if we just have the right pointer type.  Note that the functions
+> + * which read from user space (*get_*) need to take care not to leak
+> + * kernel data even if the calling code is buggy and fails to check
+> + * the return value.  This means zeroing out the destination variable
+> + * or buffer on error.  Normally this is done out of line by the
+> + * fixup code, but there are a few places where it intrudes on the
+> + * main code path.  When we only write to user space, there is no
+> + * problem.
+> + */
+> +extern long __get_user_1(void *);
+> +extern long __get_user_2(void *);
+> +extern long __get_user_4(void *);
+> +extern long __get_user_8(void *);
+> +
+> +#define __get_user_x(__r2,__p,__e,__s,__i...)				\
+> +	   asm volatile(						\
+> +		__asmeq("%0", "x0") __asmeq("%1", "x2")			\
+> +		"bl	__get_user_" #__s				\
+> +		: "=&r" (__e), "=r" (__r2)				\
+> +		: "0" (__p)						\
+> +		: __i, "cc")
+> +
+> +#define get_user(x,p)							\
+> +	({								\
+> +		register const typeof(*(p)) __user *__p asm("x0") = (p);\
+> +		register unsigned long __r2 asm("x2");			\
+> +		register long __e asm("x0");				\
+> +		switch (sizeof(*(__p))) {				\
+> +		case 1:							\
+> +			__get_user_x(__r2, __p, __e, 1, "x30");		\
+> +			break;						\
+> +		case 2:							\
+> +			__get_user_x(__r2, __p, __e, 2, "x3", "x30");	\
+> +			break;						\
+> +		case 4:							\
+> +			__get_user_x(__r2, __p, __e, 4, "x30");		\
+> +			break;						\
+> +		case 8:							\
+> +			__get_user_x(__r2, __p, __e, 8, "x30");		\
+> +			break;						\
+> +		default: __e = __get_user_bad(); break;			\
+> +		}							\
+> +		x = (typeof(*(p))) __r2;				\
+> +		__e;							\
+> +	})
 
-Regards,
-Shawn
+It's fairly unusual to have out of line get_user/put_user functions.
+What is the reason for this, other than copying from ARM?
+
+> +
+> +__get_user_bad:
+> +	mov	x2, #0
+> +	mov	x0, #-EFAULT
+> +	ret
+> +ENDPROC(__get_user_bad)
+
+> +__put_user_bad:
+> +	mov	x0, #-EFAULT
+> +	ret
+> +ENDPROC(__put_user_bad)
+> +
+
+The purpose of these symbols is to provoke a link error when you
+pass the wrong data into get_user/put_user. Actually defining them
+completely breaks this logic, so you should remove these!
+
+	Arnd
