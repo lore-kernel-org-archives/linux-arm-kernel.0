@@ -1,175 +1,51 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 15 Aug 2012 17:25:40 +0800
-Subject: [PATCH] pinctrl: imx5: start numbering pad from 0
-In-Reply-To: <20120815075117.GL2232@pengutronix.de>
-References: <1344869278-27334-1-git-send-email-shawn.guo@linaro.org>
- <CAKGA1b=DqyZvSre3C4YQ3GM6RuFtFsGWDkF784iKggrNzwiKpg@mail.gmail.com>
- <CAP1dx+zQvBurT9oCmfJ0dGHHV3rbgdy+0Yh_hoPL9jQB8QNxKw@mail.gmail.com>
- <CAKGA1bmHqyDGyvZjEcQ+RO1jHiZNZKNu3BGkyUXzYfwVaySYEQ@mail.gmail.com>
- <CAP1dx+x0_j_f3Pj+9+YHcwoTqjGLXouf7t+SoCCMVGKJNOHCPw@mail.gmail.com>
- <20120815054436.GK2232@pengutronix.de>
- <20120815065526.GG19681@shlinux2.ap.freescale.net>
- <20120815075117.GL2232@pengutronix.de>
-Message-ID: <20120815092539.GH19681@shlinux2.ap.freescale.net>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Wed, 15 Aug 2012 12:00:16 +0200
+Subject: [PATCH] ARM i.MX6q: Add virtual 1/3.5 dividers in the LDB clock path
+Message-ID: <1345024816-6368-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2012 at 03:51:17PM +0800, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Wed, Aug 15, 2012 at 02:55:27PM +0800, Dong Aisheng wrote:
-> > On Wed, Aug 15, 2012 at 07:44:36AM +0200, Uwe Kleine-K?nig wrote:
-> > > Hello,
-> > > 
-> > > (Cc += devicetree-discuss at lists.ozlabs.org)
-> > > 
-> > > On Wed, Aug 15, 2012 at 11:59:18AM +0800, Dong Aisheng wrote:
-> > > > On 15 August 2012 03:37, Matt Sealey <matt@genesi-usa.com> wrote:
-> > > > > On Tue, Aug 14, 2012 at 2:20 AM, Dong Aisheng <dong.aisheng@linaro.org> wrote:
-> > > > >> On 13 August 2012 23:12, Matt Sealey <matt@genesi-usa.com> wrote:
-> > > > >>> I have a minor nit; while renumbering the pinctrl definitions is
-> > > > >>> laudable and device trees can match, there are 16 other pin controls
-> > > > >>> below EIM_D16 - this makes the start of the IOMUXC pin definitions
-> > > > >>> actually be the value calculated by (iomuxc_base + 0x300 + (4*16) +
-> > > > >>> (pin_id*4)).
-> > > > >>
-> > > > >> What do you mean of this value calculated?
-> > > > >
-> > > > > Well, it just seems the datasheet has been read from the point of view
-> > > > > of the SW_CTRL settings (pad pullups, drive strength etc.) to define
-> > > > > the enums; every pin setting in order from IOMUXC_BASE + 0x3f0 (sorry
-> > > > > I mistyped) has been entered as an enum into this list. Then a table
-> > > > > has been generated using these enums to supply a pin id. Then this pin
-> > > > > id is not relevant anymore; it actually gets referenced by it's
-> > > > > *offset into the table*.
-> > > > >
-> > > > Not exactly, probably.
-> > > > Basically we follow the mux reigster offset to define pin id, however,
-> > > > there're also some pads may not have mux function but only config
-> > > > which also has a pin id
-> > > > and vice versa.
-> > > > Those pins are not ordered by it's mux regsiter offset.
-> > > > 
-> > > > Actually I did not manually search all those pins, instead, i just
-> > > > using the exist ones:
-> > > > arch/arm/plat-mxc/include/mach/iomux-mx51.h
-> > > > Since this exist headfile already covers this case.
-> > > > 
-> > > > > In this case, basically the code misses a few pins which have ALT
-> > > > > settings but perhaps not always the ability to change pad control -
-> > > > > EIM_DA5 to 15 are a good example.
-> > > > >
-> > > > As i said, we already defined those pin ids.
-> > > > 
-> > > > > Probably better would be to define the binding almost exactly as it
-> > > > > was done in the old method; iomux_v3_cfg_t took into account the three
-> > > > > register offsets possible for the pin (SW_MUX_CTL, SW_PAD_CTL and IPP)
-> > > > > and the three values to be put into those registers.
-> > > > >
-> > > > > This has been reduced down in pinctrl to what I find quite strange,
-> > > > > which is a completely arbitrary pin "id" mapping, which indirectly
-> > > > > references an entry in a table by index which is why pin 1 as a start
-> > > > > looks odd.
-> > > > >
-> > > > Start with pin 1 is a bug which caused by my mistake during the early
-> > > > data conversion.
-> > > > 
-> > > > > If the binding is entirely i.MX-specific or even i.MX51-specific then
-> > > > > why not define the pins in the device tree the "old" iomux_v3_cfg_t
-> > > > > way, which is the way they are in the table of imx_pin_regs;
-> > > > >
-> > > > >       IMX_PIN_REG(MX51_PAD_EIM_D16, 0x3f0, 0x05c, 5, 0x000, 0), /*
-> > > > > MX51_PAD_EIM_D16__AUD4_RXFS */
-> > > > >
-> > > > > 0x3f0 is the SW_PAD_CTL, 0x05c is the SW_MUX_CTL, 5 is the ALT mode,
-> > > > > 0x000 is the IPP reg, and 0 the IPP value.
-> > > > >
-> > > > > So fsl,iomux-pins = <0x3f0 0x85 0x05c 5 0 0 ... > (PAD, settings, MUX,
-> > > > > mode/sion, IPP, select - in that order) would be a valid pin
-> > > > > definition and require no table. Sure, the offsets are device specific
-> > > > > but then the arbitrary numbering is too.
-> > > > > This way old iomux controls
-> > > > > can be re-derived for people who use the old method in old kernels, or
-> > > > > use U-Boot with iomux-v3.h taken from Linux (MX6 got ported, I am
-> > > > > porting the Efika to it on MX5 for U-Boot right now). Also that huge
-> > > > > table goes away - it can be built at runtime, along with the
-> > > > > PAD_NAME__ALT_MODE_NAME description.
-> > > > >
-> > > > I can't agree this is better than the exist one now.
-> > > > It's hard to use in device tree.
-> > > > And how would you parse the pin id from this data array?
-> > > I admit I didn't follow completely the calculation suggestion by Matt,
-> > > but I think in general he has a point. This is more or less what I
-> > > thought when I built the imx35 pinctrl driver.
-> > > 
-> > > With the current approach (i.e. put the pinfuncs in some order that
-> > > seems sensible today and then referencing them by index according to
-> > > that ordering) you really get into troubles if you have to add a new
-> > > function. You have to add it to the end to not break existing device
-> > > trees and so the ordering is broken.
-> > > 
-> > Actually, we do not mean to maintain the ordering in driver.
-> > It just needs to be align with the pin func ids definitions in binding
-> > doc. So the ordering broken in driver is not an issue, it just looks
-> > not so better if we really have to add a new pin function to the end
-> > due to mistake but this does not break anything to work.
-> Well, if you add a function between say current function 11 and 12 all
-> device trees need fixing, i.e. increase all function ids >= 12 by one.
-> You obviously cannot fix out-of-tree users and even fixing the in-tree
-> users is ugly.
->  
-For such case, we should add it to the end since the exist ids are already
-taken. It will not break any user.
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
-> > > Also "11" has no obvious relation to MX35_PAD_COMPARE__SDMA_EXTDMA_2
-> > > other than a match if you grep over the binding docs (or the driver).
-> > > While "0x32c, 0x008, 7, 0x0, 0" is longer and looks more ugly the
-> > > mapping is obvious and so IMHO preferable.
-> > > 
-> > Also, don't you think this is hard to use for devicetree?
-> Not harder than the current approach. Obviously macro support would be
-> nice, but this applies to both approaches.
-> 
-> > And we need to reference datasheet to fill these values.
-> I'd list the explicit values in the binding docs as the indexes are
-> documented there now. So the difference for a device-tree writer is just
-> the content that is copy-and-pasted.
-> 
-> > I just keep using as the old way at best and i remember Sascha also suggested
-> > before that we don't want to lose using the macro way as
-> > MX35_PAD_COMPARE__SDMA_EXTDMA_2 to make easy use.
-> > In the future, we will switch to macro when dt supports.
-> > For the way "0x32c, 0x008, 7, 0x0, 0", it's very unconveniently to use macro.
-> That is just
-> 
-> 	#define MX35_PAD_COMPARE__SDMA_EXTDMA_2 11
-> 
-> vs.
-> 
-> 	#define MX35_PAD_COMPARE__SDMA_EXTDMA_2 0x32c, 0x008, 7, 0x0, 0
-> 
-> isn't it? (Actually I'd not go for cpp as preprocessor, but that's a
-> different story.)
-> 
-Hmm, not sure if dt macro may support this kind of syntax but yes if it supports.
-Grant,
-Do you know if dt macro can support it?
+The ldb_di[01]_podf is implemented as a clk-divider that
+divides by 1 or 2. In reality, the ldb_di[01]_ipu_div
+dividers divide by either 3.5 or 7. Adding a fixed factor
+of 1/3.5 fixes their children's clock rates.
 
-Now I'm a bit intend to admit that we probably could do like that if it supports.
-The benefit i see is that it could save much code lines in driver while having
-no using experience downgrade.
+This should probably be converted to rate table based dividers,
+once available.
 
-The left question is that how do we get the pin id from this kind of format data
-(0x32c, 0x008, 7, 0x0, 0), probably one way may be:
-For normal pads and NO_CONFIG pads, we could get it via:
-mux_reg_offset / 4
-for NO_MUX pads but have CONFIG pads, we may get it via:
-mux_reg_offset / 4 + PIN_NO_MUX_ID_BASE + config_reg_offset /4
-That may fix getting pin id issue from dt.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+ arch/arm/mach-imx/clk-imx6q.c |    8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-Another known issue is that via this way, that means the pinctrl subsystem
-can only see the using pads, this is a bit not align with the pinctrl
-subsystem design. No sure if Linus would like to see it.
-
-Regards
-Dong Aisheng
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index ea89520..4233d9e 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -152,7 +152,7 @@ enum mx6q_clks {
+ 	ssi2, ssi3, uart_ipg, uart_serial, usboh3, usdhc1, usdhc2, usdhc3,
+ 	usdhc4, vdo_axi, vpu_axi, cko1, pll1_sys, pll2_bus, pll3_usb_otg,
+ 	pll4_audio, pll5_video, pll6_mlb, pll7_usb_host, pll8_enet, ssi1_ipg,
+-	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2,
++	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
+ 	clk_max
+ };
+ 
+@@ -288,8 +288,10 @@ int __init mx6q_clocks_init(void)
+ 	clk[gpu3d_shader]     = imx_clk_divider("gpu3d_shader",     "gpu3d_shader_sel",  base + 0x18, 29, 3);
+ 	clk[ipu1_podf]        = imx_clk_divider("ipu1_podf",        "ipu1_sel",          base + 0x3c, 11, 3);
+ 	clk[ipu2_podf]        = imx_clk_divider("ipu2_podf",        "ipu2_sel",          base + 0x3c, 16, 3);
+-	clk[ldb_di0_podf]     = imx_clk_divider("ldb_di0_podf",     "ldb_di0_sel",       base + 0x20, 10, 1);
+-	clk[ldb_di1_podf]     = imx_clk_divider("ldb_di1_podf",     "ldb_di1_sel",       base + 0x20, 11, 1);
++	clk[ldb_di0_div_3_5]  = imx_clk_fixed_factor("ldb_di0_div_3_5", "ldb_di0_sel", 2, 7);
++	clk[ldb_di0_podf]     = imx_clk_divider("ldb_di0_podf",     "ldb_di0_div_3_5",       base + 0x20, 10, 1);
++	clk[ldb_di1_div_3_5]  = imx_clk_fixed_factor("ldb_di1_div_3_5", "ldb_di1_sel", 2, 7);
++	clk[ldb_di1_podf]     = imx_clk_divider("ldb_di1_podf",     "ldb_di1_div_3_5",   base + 0x20, 11, 1);
+ 	clk[ipu1_di0_pre]     = imx_clk_divider("ipu1_di0_pre",     "ipu1_di0_pre_sel",  base + 0x34, 3,  3);
+ 	clk[ipu1_di1_pre]     = imx_clk_divider("ipu1_di1_pre",     "ipu1_di1_pre_sel",  base + 0x34, 12, 3);
+ 	clk[ipu2_di0_pre]     = imx_clk_divider("ipu2_di0_pre",     "ipu2_di0_pre_sel",  base + 0x38, 3,  3);
+-- 
+1.7.10.4
