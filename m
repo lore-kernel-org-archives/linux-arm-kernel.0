@@ -1,59 +1,52 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 16 Aug 2012 01:27:36 +0530
-Subject: [PATCH v2 4/4] ARM: EXYNOS: skip wakeup interrupt setup if pinctrl
- driver is used
-In-Reply-To: <1345060656-32201-1-git-send-email-thomas.abraham@linaro.org>
-References: <1345060656-32201-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1345060656-32201-5-git-send-email-thomas.abraham@linaro.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 15 Aug 2012 13:42:39 -0600
+Subject: [PATCH v3 01/10] PCI: Keep pci_fixup_irqs() around after init
+In-Reply-To: <20120815192814.GA12870@avionic-0098.mockup.avionic-design.de>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <1343332512-28762-2-git-send-email-thierry.reding@avionic-design.de>
+ <CAErSpo7v+i8i=mXCs7ZW8DtGTDN_4AEntwYLqGG8FcCzweySFg@mail.gmail.com>
+ <20120815192814.GA12870@avionic-0098.mockup.avionic-design.de>
+Message-ID: <CAErSpo6cjOzJegJqXzmk59DChExcbLK1sOhwyAyQL4FZkTN21A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pinctrl driver includes support for configuring the external wakeup
-interrupts. On exynos platforms that use pinctrl driver, the setup
-of wakeup interrupts in the exynos platform code can be skipped.
+On Wed, Aug 15, 2012 at 1:28 PM, Thierry Reding
+<thierry.reding@avionic-design.de> wrote:
+> On Wed, Aug 15, 2012 at 10:06:27AM -0700, Bjorn Helgaas wrote:
+>> On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
+>> <thierry.reding@avionic-design.de> wrote:
+>> > When using deferred driver probing, PCI host controller drivers may
+>> > actually require this function after the init stage.
+>> >
+>> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+>> > ---
+>> > Changes in v3:
+>> > - none
+>> >
+>> > Changes in v2:
+>> > - use __devinit annotations
+>>
+>> Your original patch removed __init completely.  Here you change it to
+>> __devinit.  That means we decide whether to discard the function based
+>> on whether CONFIG_HOTPLUG is supported.  But I think your point is not
+>> about hotplug; it's merely that we should be able to scan a PCI bus
+>> after init-time.  We ought to be able to do a late PCI scan even if
+>> hotplug is not supported.
+>>
+>> Therefore, I'd be inclined to remove __init completely unless you have
+>> another reason for preferring __devinit.
+>
+> I thought __devinit would resolve to nothing if HOTPLUG is defined and
+> __init otherwise. That seemed more appropriate. However you are right
+> that it is useful to always have it available, so I'm fine with removing
+> the annotations altogether. Do you want me to follow up with a patch? Or
+> can you just take the first version? I'm not sure if it still applies.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- arch/arm/mach-exynos/common.c |   26 ++++++++++++++++++++++++++
- 1 files changed, 26 insertions(+), 0 deletions(-)
+You're right about how __devinit works.  It's just that I don't think
+hotplug is actually relevant here.  We're trying to make
+pci_fixup_irqs() work after init, whether it's because of hotplug or
+simply because the arch scans host bridges after init.
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 4eb39cd..ea3a85a 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -980,6 +980,32 @@ static int __init exynos_init_irq_eint(void)
- {
- 	int irq;
- 
-+#ifdef CONFIG_OF
-+	/*
-+	 * The Samsung pinctrl driver provides an integrated gpio/pinmux/pinconf
-+	 * functionality along with support for external gpio and wakeup
-+	 * interrupts. If the samsung pinctrl driver is enabled and includes
-+	 * the wakeup interrupt support, then the setting up external wakeup
-+	 * interrupts here can be skipped. This check here is temporary to
-+	 * allow exynos4 platforms that do not use Samsung pinctrl driver to
-+	 * co-exist with platforms that do. When all of the Samsung Exynos4
-+	 * platforms switch over to using the pinctrl driver, the wakeup
-+	 * interrupt support code here can be completely removed.
-+	 */
-+	struct device_node *pctrl_np, *wkup_np;
-+	const char *pctrl_compat = "samsung,pinctrl-exynos4210";
-+	const char *wkup_compat = "samsung,exynos4210-wakeup-eint";
-+
-+	for_each_compatible_node(pctrl_np, NULL, pctrl_compat) {
-+		if (of_device_is_available(pctrl_np)) {
-+			wkup_np = of_find_compatible_node(pctrl_np, NULL,
-+							wkup_compat);
-+			if (wkup_np)
-+				return -ENODEV;
-+		}
-+	}
-+#endif
-+
- 	if (soc_is_exynos5250())
- 		exynos_eint_base = ioremap(EXYNOS5_PA_GPIO1, SZ_4K);
- 	else
--- 
-1.6.6.rc2
+I applied this to my "next" branch.  Thanks!
+
+Bjorn
