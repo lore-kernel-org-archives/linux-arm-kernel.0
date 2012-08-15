@@ -1,43 +1,70 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 15 Aug 2012 09:13:17 -0400
-Subject: [GIT PULL] orion/kirkwood fixes for v3.6
-In-Reply-To: <201208151237.56639.arnd@arndb.de>
-References: <20120814234442.GZ22226@titan.lakedaemon.net>
- <201208151237.56639.arnd@arndb.de>
-Message-ID: <20120815131317.GE22226@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Aug 2012 13:20:02 +0000
+Subject: [PATCH v2 02/31] arm64: Kernel booting and initialisation
+In-Reply-To: <1344966752-16102-3-git-send-email-catalin.marinas@arm.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-3-git-send-email-catalin.marinas@arm.com>
+Message-ID: <201208151320.02313.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2012 at 12:37:56PM +0000, Arnd Bergmann wrote:
-> On Tuesday 14 August 2012, Jason Cooper wrote:
-> > The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
-> > 
-> >   Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
-> > 
-> > are available in the git repository at:
-> >   git://git.infradead.org/users/jcooper/linux.git fixes-for-v3.6
-> > 
-> 
-> Pulled, thanks!
-> 
-> As soon as you have a pgp key that is signed by other maintainers,
-> I think you should start sending signed tags instead of branches,
-> and include a short description for what is in the branch you are
-> sending. I've started adding descriptions for every merge I do
-> and it's easier for me if I don't have to write it myself.
+On Tuesday 14 August 2012, Catalin Marinas wrote:
 
-No problem. I have one and we can do the key signing at the mini-summit.
+> +The AArch64 exception model is made up of a number of exception levels
+> +(EL0 - EL3), with EL0 and EL1 having a secure and a non-secure
+> +counterpart.  EL2 is the hypervisor level and exists only in non-secure
+> +mode. EL3 is the highest priority level and exists only in secure mode.
 
-> The first patch in your series (ARM: Orion: Set eth packet size
-> csum offload limit) looks like it should apply to older kernels
-> as well. In those cases, please add "Cc: stable at vger.kernel.org"
-> below the Signed-off-by lines (but not in the email submission)
-> so it can get picked up by Greg for the longterm and stable
-> releases.
+I'm always confused by a description like this. It sounds like you cannot
+have a hypervisor if you have code running in secure mode in EL3. What
+I instead understand is that you enter non-secure mode by going from
+EL3 into EL2.
 
-Gah!  I missed that, sorry.  Did you forward it already or would you
-like me to handle it?
+> +2. Setup the device tree
+> +-------------------------
+> +
+> +Requirement: MANDATORY
+> +
+> +The device tree blob (dtb) must be no bigger than 2 megabytes in size
+> +and placed at a 2-megabyte boundary within the first 512 megabytes from
+> +the start of the kernel image. This is to allow the kernel to map the
+> +blob using a single section mapping in the initial page tables.
 
-thx,
+I've seen people put firmware for some peripherals into the device tree,
+so that a device driver can grab a blob from there and load it into the
+device, rather than calling request_firmware() which would fail if the
+OS running on the system does not contain the blob. If such firmware is
+too large, you end up violating the 2 MB limit you impose here.
 
-Jason.
+Should we keep that limit and declare those use cases as invalid, or
+should we try to make the boot protocol more flexible?
+
+> diff --git a/arch/arm64/include/asm/setup.h b/arch/arm64/include/asm/setup.h
+> new file mode 100644
+> index 0000000..d766493
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/setup.h
+> @@ -0,0 +1,26 @@
+> +#ifndef __ASM_SETUP_H
+> +#define __ASM_SETUP_H
+> +
+> +#include <linux/types.h>
+> +
+> +#define COMMAND_LINE_SIZE 1024
+> +
+> +#endif
+
+Is this necessary? The asm-generic version of this file allows 512 bytes,
+which seems plenty.
+
+> +unsigned int processor_id;
+> +EXPORT_SYMBOL(processor_id);
+> +
+> +unsigned int elf_hwcap __read_mostly;
+> +EXPORT_SYMBOL(elf_hwcap);
+
+EXPORT_SYMBOL_GPL?
+
+Neither of these looks like they should be used in drivers.
+
+	Arnd
