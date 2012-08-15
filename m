@@ -1,69 +1,51 @@
-From: wade_farnsworth@mentor.com (Wade Farnsworth)
-Date: Wed, 15 Aug 2012 09:58:44 -0700
-Subject: [PATCH v2] ARM: support syscall tracing
-In-Reply-To: <20120815162157.GJ29448@mudshark.cambridge.arm.com>
-References: <502BBCCC.1020006@mentor.com>
- <20120815162157.GJ29448@mudshark.cambridge.arm.com>
-Message-ID: <502BD544.70903@mentor.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 15 Aug 2012 18:05:55 +0100
+Subject: [PATCH 0/3] New algorithm for ASID allocation and rollover
+In-Reply-To: <1345049642-29704-1-git-send-email-will.deacon@arm.com>
+References: <1345049642-29704-1-git-send-email-will.deacon@arm.com>
+Message-ID: <502BD6F3.9080909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon wrote:
-> Hi Wade,
->
-> On Wed, Aug 15, 2012 at 04:14:20PM +0100, Wade Farnsworth wrote:
->> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
->> index 3e0fc5f..4e82fc1 100644
->> --- a/arch/arm/kernel/ptrace.c
->> +++ b/arch/arm/kernel/ptrace.c
->> @@ -30,6 +30,9 @@
->>   #include<asm/pgtable.h>
->>   #include<asm/traps.h>
->>
->> +#define CREATE_TRACE_POINTS
->> +#include<trace/events/syscalls.h>
->> +
->>   #define REG_PC	15
->>   #define REG_PSR	16
->>   /*
->> @@ -918,7 +921,8 @@ static int ptrace_syscall_trace(struct pt_regs *regs, int scno,
->>   {
->>   	unsigned long ip;
->>
->> -	if (!test_thread_flag(TIF_SYSCALL_TRACE))
->> +	if (!test_thread_flag(TIF_SYSCALL_TRACE)&&
->> +	    !test_thread_flag(TIF_SYSCALL_TRACEPOINT))
->>   		return scno;
->
-> Can we now remove this hunk?
->
->>   	current_thread_info()->syscall = scno;
->> @@ -930,10 +934,12 @@ static int ptrace_syscall_trace(struct pt_regs *regs, int scno,
->>   	ip = regs->ARM_ip;
->>   	regs->ARM_ip = dir;
->>
->> -	if (dir == PTRACE_SYSCALL_EXIT)
->> -		tracehook_report_syscall_exit(regs, 0);
->> -	else if (tracehook_report_syscall_entry(regs))
->> -		current_thread_info()->syscall = -1;
->> +	if (test_thread_flag(TIF_SYSCALL_TRACE)) {
->> +		if (dir == PTRACE_SYSCALL_EXIT)
->> +			tracehook_report_syscall_exit(regs, 0);
->> +		else if (tracehook_report_syscall_entry(regs))
->> +			current_thread_info()->syscall = -1;
->> +	}
->
-> and also this one?
->
+On 15/08/12 17:53, Will Deacon wrote:
+> Hello,
+> 
+> Following some investigation into preempt-rt Linux, it became apparent
+> that ASID rollover can happen fairly regularly under certain heavy
+> scheduling workloads. Each time this happens, we broadcast an interrupt
+> to the secondary CPUs so that we can reset the global ASID numberspace
+> without assigning duplicate ASIDs to different tasks or accidentally
+> assigning different ASIDs to threads of the same process.
+> 
+> This leads to a large number of expensive IPIs between cores:
+> 
+>            CPU0       CPU1
+> IPI0:          0          0  Timer broadcast interrupts
+> IPI1:      23165     115888  Rescheduling interrupts
+> IPI2:          0          0  Function call interrupts
+> IPI3:       6619       1123  Single function call interrupts <---- IPIs
+> IPI4:          0          0  CPU stop interrupts
+> 
+> Digging deeper, this also leads to an extremely varied waittime on the
+> cpu_asid_lock. Granted this is only contended for <1% of the time, but
+> the waittime varies between 0.5 and 734 us!
+> 
+> After some discussion, it became apparent that tracking the ASIDs
+> currently active on the cores in the system means that, on rollover, we
+> can automatically reserve those that are in use without having to stop
+> the world.
+> 
+> This patch series develops that idea so that:
+> 
+>   - We can support cores without hardware broadcasting of TLB maintenance
+>     operations without resorting to IPIs.
 
-We need to set current_thread_info()->syscall, since it's used in the 
-call to syscall_get_nr() in perf_syscall_{enter,exit}.
+This particular bit should benefit even more to virtual machines, as it
+avoids trapping back to the host to handle a write to the (emulated) GIC
+distributor, and the corresponding interrupt injection on the target vcpus.
 
-What about moving the setting of ->syscall to 
-syscall_trace_{enter,exit}?  That would preserve ptrace_syscall_trace() 
-for the TIF_SYSCALL_TRACE case only, but ensure that the field is set 
-the TRACEPOINT case as well.  Thoughts?
+I'll give it a spin on KVM.
 
-Thanks for the feedback!
-
-Wade
+	M.
+-- 
+Jazz is not dead. It just smells funny...
