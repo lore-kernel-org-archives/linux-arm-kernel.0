@@ -1,59 +1,25 @@
-From: wade_farnsworth@mentor.com (Wade Farnsworth)
-Date: Wed, 15 Aug 2012 13:21:35 -0700
-Subject: [PATCH v2] ARM: support syscall tracing
-In-Reply-To: <502BFA08.6010708@mentor.com>
-References: <502BBCCC.1020006@mentor.com>
- <20120815162157.GJ29448@mudshark.cambridge.arm.com>
- <502BD544.70903@mentor.com>
- <20120815172731.GL29448@mudshark.cambridge.arm.com>
- <502BFA08.6010708@mentor.com>
-Message-ID: <502C04CF.2080409@mentor.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Aug 2012 20:25:25 +0000
+Subject: [PATCH v3 10/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <20120815145708.GA11331@avionic-0098.mockup.avionic-design.de>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <CAErSpo7c4L=Ny=CtZwLB_XWTcN8tVWs_quuE_T+XLEGyhWwHkg@mail.gmail.com>
+ <20120815145708.GA11331@avionic-0098.mockup.avionic-design.de>
+Message-ID: <201208152025.25252.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wade Farnsworth wrote:
-> Will Deacon wrote:
->> On Wed, Aug 15, 2012 at 05:58:44PM +0100, Wade Farnsworth wrote:
->>> We need to set current_thread_info()->syscall, since it's used in the
->>> call to syscall_get_nr() in perf_syscall_{enter,exit}.
->>
->> Damn. I think that also means we have a bug, given that the SYSCALL_TRACE
->> code can set this to -1, which gets used as an index into a bitmap by the
->> looks of it. Considering that we have to pass the syscall number to
->> trace_sys_enter anyway, it also seems broken.
->>
->
-> I agree. Looking at the other architectures, it seems the analogous
-> function to ptrace_syscall_trace can return -1 under certain
-> circumstances, but the original syscall value should be passed onto
-> trace_sys_enter and returned from syscall_get_nr(). So, I'm thinking
-> that we should modify our behavior accordingly. What this means for us
-> is that we never store -1 in the thread_info syscall field, and then
-> pass that into trace_sys_enter instead of the ptrace_syscall_trace
-> return value. Do you see any problems with this approach?
->
+On Wednesday 15 August 2012, Thierry Reding wrote:
+> Yes, that was my understanding as well. So currently I haven't seen any
+> problems with this because I only use one of the two host bridges. But I
+> suppose I should add code to initialize the bus number aperture properly
+> either via platform device resources (for the non-DT case) and the
+> device tree otherwise.
 
-Hmm, on closer inspection it looks that perf_syscall_enter is broken. 
-ftrace_syscall_enter correctly returns if result of a syscall_get_nr is 
-negative.  The perf version omits the check for negative values. 
-Furthermore, the value of syscall_get_nr() should be -1 if it's not 
-called when not in a syscall.  So storing the -1 in the thread_info 
-syscall field is not necessarily wrong.  Still, I think the value we 
-pass into trace_sys_enter should be the actual syscall number, i.e. the 
-value of scno.
+I think when we last discussed this, the assumption was that each
+root port has its own config space range and its own pci domain,
+so you don't have to worry about bus apertures because each root port
+can then have all 255 bus numbers. Has that turned out to be incorrect
+now?
 
->>> What about moving the setting of ->syscall to
->>> syscall_trace_{enter,exit}? That would preserve ptrace_syscall_trace()
->>> for the TIF_SYSCALL_TRACE case only, but ensure that the field is set
->>> the TRACEPOINT case as well. Thoughts?
->>
->> I'd be tempted to set the thing unconditionally before checking the
->> thread
->> flag at the top of ptrace_syscall_trace. This hangs off the slowpath
->> anyway
->> and it makes everything a lot more readable.
->>
->
-> OK, I'll make that change.
->
-> Wade
+	Arnd
