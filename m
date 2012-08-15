@@ -1,244 +1,66 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 14 Aug 2012 17:21:30 -0700
-Subject: [PATCH v2 12/31] arm64: Atomic operations
-In-Reply-To: <1344966752-16102-13-git-send-email-catalin.marinas@arm.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-13-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20120815002130.GE19607@quad.lixom.net>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Wed, 15 Aug 2012 03:25:36 +0300
+Subject: Potential Regression in 3.6-rc1 - Kirkwood SATA
+In-Reply-To: <CAMW5UfZ_kVz_b4_98zPdY2RFjTMN9H2OzjYcRQrCTgA1xqdmPw@mail.gmail.com>
+References: <CAMW5UfZ_kVz_b4_98zPdY2RFjTMN9H2OzjYcRQrCTgA1xqdmPw@mail.gmail.com>
+Message-ID: <20120815002536.GC747@harshnoise.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Him
 
-On Tue, Aug 14, 2012 at 06:52:13PM +0100, Catalin Marinas wrote:
-> This patch introduces the atomic, mutex and futex operations. Many
-> atomic operations use the load-acquire and store-release operations
-> which imply barriers, avoiding the need for explicit DMB.
+On Tue, Aug 14, 2012 at 07:59:00PM -0400, Josh Coombs wrote:
+> I finally got a chance to test 3.6-rc1 after having my GoFlex Net
+> support patch accepted for the 3.6 release train.  Included in 3.6-rc1
+> was an update for Kirkwoods switching SATA to DT which was not part of
+> my original testing.  It seems something with this change has
+> partially broken the GoFlex and a couple other Kirkwood based devices.
 > 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  arch/arm64/include/asm/atomic.h |  306 +++++++++++++++++++++++++++++++++++++++
->  arch/arm64/include/asm/futex.h  |  134 +++++++++++++++++
->  2 files changed, 440 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm64/include/asm/atomic.h
->  create mode 100644 arch/arm64/include/asm/futex.h
+> The key factor is the number of SATA ports defined in the dts:
 > 
-> diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
-> new file mode 100644
-> index 0000000..fa60c8b
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/atomic.h
-> @@ -0,0 +1,306 @@
-> +/*
-> + * Based on arch/arm/include/asm/atomic.h
-> + *
-> + * Copyright (C) 1996 Russell King.
-> + * Copyright (C) 2002 Deep Blue Solutions Ltd.
-> + * Copyright (C) 2012 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef __ASM_ATOMIC_H
-> +#define __ASM_ATOMIC_H
-> +
-> +#include <linux/compiler.h>
-> +#include <linux/types.h>
-> +
-> +#include <asm/barrier.h>
-> +#include <asm/cmpxchg.h>
-> +
-> +#define ATOMIC_INIT(i)	{ (i) }
-> +
-> +#ifdef __KERNEL__
-> +
-> +/*
-> + * On ARM, ordinary assignment (str instruction) doesn't clear the local
-> + * strex/ldrex monitor on some implementations. The reason we can use it for
-> + * atomic_set() is the clrex or dummy strex done on every exception return.
-> + */
-> +#define atomic_read(v)	(*(volatile int *)&(v)->counter)
-> +#define atomic_set(v,i)	(((v)->counter) = (i))
-> +
-> +/*
-> + * AArch64 UP and SMP safe atomic ops.  We use load exclusive and
-> + * store exclusive to ensure that these are atomic.  We may loop
-> + * to ensure that the update happens.
-> + */
-> +static inline void atomic_add(int i, atomic_t *v)
-> +{
-> +	unsigned long tmp;
-> +	int result;
-> +
-> +	asm volatile("// atomic_add\n"
-> +"1:	ldxr	%w0, [%3]\n"
-> +"	add	%w0, %w0, %w4\n"
-> +"	stxr	%w1, %w0, [%3]\n"
-> +"	cbnz	%w1,1b"
+> 		sata at 80000 {
+> 			status = "okay";
+> 			nr-ports = <2>;
+> 		};
+> 
+> If set at the correct number for my device, 2, my GFN does not
+> complete kernel init, hanging here:
+> 
+> <SNIP>
+> [   15.287832] Dquot-cache hash table entries: 1024 (order 0, 4096 bytes)
+> [   15.296545] jffs2: version 2.2. (NAND) ?? 2001-2006 Red Hat, Inc.
+> [   15.303202] msgmni has been set to 240
+> [   15.308503] Block layer SCSI generic (bsg) driver version 0.4 loaded (major )
+> [   15.316021] io scheduler noop registered
+> [   15.320149] io scheduler deadline registered
+> [   15.324558] io scheduler cfq registered (default)
+> [   15.329462] mv_xor_shared mv_xor_shared.0: Marvell shared XOR driver
+> [   15.335962] mv_xor_shared mv_xor_shared.1: Marvell shared XOR driver
+> [   15.376751] mv_xor mv_xor.0: Marvell XOR: ( xor cpy )
+> [   15.416736] mv_xor mv_xor.1: Marvell XOR: ( xor fill cpy )
+> [   15.456735] mv_xor mv_xor.2: Marvell XOR: ( xor cpy )
+> [   15.496734] mv_xor mv_xor.3: Marvell XOR: ( xor fill cpy )
+> [   15.506309] Serial: 8250/16550 driver, 2 ports, IRQ sharing disabled
+> [   15.509111] serial8250.0: ttyS0 at MMIO 0xf1012000 (irq = 33) is a 16550A
+> [   15.509141] console [ttyS0] enabled, bootconsole disabled
+> [   15.518967] brd: module loaded
+> [   15.524991] loop: module loaded
+> [   15.528584] sata_mv sata_mv.0: cannot get optional clkdev
+> [   15.534180] sata_mv sata_mv.0: slots 32 ports 2
+> 
+> If you set nr-ports to 1 the unit boots cleanly, save for only
+> detecting one functional SATA port.  Another user has confirmed this
+> behavior on an Iomega IX2-200.
 
-Nit: space before 1b
+Try booting with "coherent_pool=1M" (or bigger) kernel parameter. I think
+with the recent DMA mapping changes, the default 256 KB coherent pool may
+be too small, mv_xor and sata_mv together needs more. (I'm not sure how
+it actually worked before commit e9da6e9905e639b0f842a244bc770b48ad0523e9,
+but it seems this is the cuase).
 
-[...]
+It should be noted that dma_pool_alloc() uses GFP_ATOMIC always, and if
+drivers exhaust the coherent pool already during the boot that function
+just keeps looping forever. Users only see boot hanging with no clue
+what to do. I would say it's quite a poor error handling...
 
-> diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
-> new file mode 100644
-> index 0000000..0745e82
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/futex.h
-> @@ -0,0 +1,134 @@
-> +/*
-> + * Copyright (C) 2012 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef __ASM_FUTEX_H
-> +#define __ASM_FUTEX_H
-> +
-> +#ifdef __KERNEL__
-> +
-> +#include <linux/futex.h>
-> +#include <linux/uaccess.h>
-> +#include <asm/errno.h>
-> +
-> +#define __futex_atomic_op(insn, ret, oldval, uaddr, tmp, oparg)		\
-> +	asm volatile(							\
-> +"1:	ldaxr	%w1, %2\n"						\
-> +	insn "\n"							\
-> +"2:	stlxr	%w3, %w0, %2\n"						\
-> +"	cbnz	%w3, 1b\n"						\
-> +"3:	.pushsection __ex_table,\"a\"\n"				\
-> +"	.align	3\n"							\
-> +"	.quad	1b, 4f, 2b, 4f\n"					\
-> +"	.popsection\n"							\
-> +"	.pushsection .fixup,\"ax\"\n"					\
-
-Moving the exception table below the body of the code makes the flow easier to
-read, please do that.
-
-Also, don't you need a barrier here?
-
-> +"4:	mov	%w0, %w5\n"						\
-> +"	b	3b\n"							\
-> +"	.popsection"							\
-> +	: "=&r" (ret), "=&r" (oldval), "+Q" (*uaddr), "=&r" (tmp)	\
-> +	: "r" (oparg), "Ir" (-EFAULT)					\
-> +	: "cc")
-> +
-> +static inline int
-> +futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
-> +{
-> +	int op = (encoded_op >> 28) & 7;
-> +	int cmp = (encoded_op >> 24) & 15;
-> +	int oparg = (encoded_op << 8) >> 20;
-> +	int cmparg = (encoded_op << 20) >> 20;
-> +	int oldval = 0, ret, tmp;
-> +
-> +	if (encoded_op & (FUTEX_OP_OPARG_SHIFT << 28))
-> +		oparg = 1 << oparg;
-> +
-> +	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
-> +		return -EFAULT;
-> +
-> +	pagefault_disable();	/* implies preempt_disable() */
-> +
-> +	switch (op) {
-> +	case FUTEX_OP_SET:
-> +		__futex_atomic_op("mov	%w0, %w4",
-> +				  ret, oldval, uaddr, tmp, oparg);
-> +		break;
-> +	case FUTEX_OP_ADD:
-> +		__futex_atomic_op("add	%w0, %w1, %w4",
-> +				  ret, oldval, uaddr, tmp, oparg);
-> +		break;
-> +	case FUTEX_OP_OR:
-> +		__futex_atomic_op("orr	%w0, %w1, %w4",
-> +				  ret, oldval, uaddr, tmp, oparg);
-> +		break;
-> +	case FUTEX_OP_ANDN:
-> +		__futex_atomic_op("and	%w0, %w1, %w4",
-> +				  ret, oldval, uaddr, tmp, ~oparg);
-> +		break;
-> +	case FUTEX_OP_XOR:
-> +		__futex_atomic_op("eor	%w0, %w1, %w4",
-> +				  ret, oldval, uaddr, tmp, oparg);
-> +		break;
-> +	default:
-> +		ret = -ENOSYS;
-> +	}
-> +
-> +	pagefault_enable();	/* subsumes preempt_enable() */
-> +
-> +	if (!ret) {
-> +		switch (cmp) {
-> +		case FUTEX_OP_CMP_EQ: ret = (oldval == cmparg); break;
-> +		case FUTEX_OP_CMP_NE: ret = (oldval != cmparg); break;
-> +		case FUTEX_OP_CMP_LT: ret = (oldval < cmparg); break;
-> +		case FUTEX_OP_CMP_GE: ret = (oldval >= cmparg); break;
-> +		case FUTEX_OP_CMP_LE: ret = (oldval <= cmparg); break;
-> +		case FUTEX_OP_CMP_GT: ret = (oldval > cmparg); break;
-> +		default: ret = -ENOSYS;
-> +		}
-> +	}
-> +	return ret;
-> +}
-> +
-> +static inline int
-> +futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
-> +			      u32 oldval, u32 newval)
-> +{
-> +	int ret = 0;
-> +	u32 val, tmp;
-> +
-> +	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
-> +		return -EFAULT;
-> +
-> +	asm volatile("// futex_atomic_cmpxchg_inatomic\n"
-> +"1:	ldaxr	%w1, %2\n"
-> +"	sub	%w3, %w1, %w4\n"
-> +"	cbnz	%w3, 3f\n"
-> +"2:	stlxr	%w3, %w5, %2\n"
-> +"	cbnz	%w3, 1b\n"
-> +"3:	.pushsection __ex_table,\"a\"\n"
-> +"	.align	3\n"
-> +"	.quad	1b, 4f, 2b, 4f\n"
-> +"	.popsection\n"
-> +"	.pushsection .fixup,\"ax\"\n"
-
-Same here w.r.t. exception table location and barrier.
-
-> +"4:	mov	%w0, %w6\n"
-> +"	b	3b\n"
-> +"	.popsection"
-> +	: "+r" (ret), "=&r" (val), "+Q" (*uaddr), "=&r" (tmp)
-> +	: "r" (oldval), "r" (newval), "Ir" (-EFAULT)
-> +	: "cc", "memory");
-> +
-> +	*uval = val;
-> +	return ret;
-> +}
-> +
-> +#endif /* __KERNEL__ */
-> +#endif /* __ASM_FUTEX_H */
-
-
--Olof
+A.
