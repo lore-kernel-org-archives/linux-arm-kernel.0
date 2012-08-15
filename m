@@ -1,56 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 15 Aug 2012 17:21:57 +0100
-Subject: [PATCH v2] ARM: support syscall tracing
-In-Reply-To: <502BBCCC.1020006@mentor.com>
-References: <502BBCCC.1020006@mentor.com>
-Message-ID: <20120815162157.GJ29448@mudshark.cambridge.arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 15 Aug 2012 18:34:46 +0200
+Subject: [PATCH v2 04/31] arm64: MMU definitions
+In-Reply-To: <201208151330.02112.arnd@arndb.de>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-5-git-send-email-catalin.marinas@arm.com>
+ <201208151330.02112.arnd@arndb.de>
+Message-ID: <CAMuHMdUEKNYFAU4N8KnJ0DPYgW7BRtaaJQSARDJCVjQOU2bFBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wade,
+On Wed, Aug 15, 2012 at 3:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> +#define TCR_IPS_40BIT                (2 << 32)
 
-On Wed, Aug 15, 2012 at 04:14:20PM +0100, Wade Farnsworth wrote:
-> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-> index 3e0fc5f..4e82fc1 100644
-> --- a/arch/arm/kernel/ptrace.c
-> +++ b/arch/arm/kernel/ptrace.c
-> @@ -30,6 +30,9 @@
->  #include <asm/pgtable.h>
->  #include <asm/traps.h>
->  
-> +#define CREATE_TRACE_POINTS
-> +#include <trace/events/syscalls.h>
-> +
->  #define REG_PC	15
->  #define REG_PSR	16
->  /*
-> @@ -918,7 +921,8 @@ static int ptrace_syscall_trace(struct pt_regs *regs, int scno,
->  {
->  	unsigned long ip;
->  
-> -	if (!test_thread_flag(TIF_SYSCALL_TRACE))
-> +	if (!test_thread_flag(TIF_SYSCALL_TRACE) &&
-> +	    !test_thread_flag(TIF_SYSCALL_TRACEPOINT))
->  		return scno;
+By default, constants are int, i.e. 32-bit. So you must write
 
-Can we now remove this hunk?
+2ULL << 32
 
->  	current_thread_info()->syscall = scno;
-> @@ -930,10 +934,12 @@ static int ptrace_syscall_trace(struct pt_regs *regs, int scno,
->  	ip = regs->ARM_ip;
->  	regs->ARM_ip = dir;
->  
-> -	if (dir == PTRACE_SYSCALL_EXIT)
-> -		tracehook_report_syscall_exit(regs, 0);
-> -	else if (tracehook_report_syscall_entry(regs))
-> -		current_thread_info()->syscall = -1;
-> +	if (test_thread_flag(TIF_SYSCALL_TRACE)) {
-> +		if (dir == PTRACE_SYSCALL_EXIT)
-> +			tracehook_report_syscall_exit(regs, 0);
-> +		else if (tracehook_report_syscall_entry(regs))
-> +			current_thread_info()->syscall = -1;
-> +	}
+>> +#define TCR_ASID16           (1 << 36)
 
-and also this one?
+1ULL
 
-Will
+> As a matter of coding style, I would much prefer tables like this to be
+> written as
+>
+> #define TCR_IRGN_MASK           0x0000000003000300
+
+0x0000000003000300ULL, to be safe
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
