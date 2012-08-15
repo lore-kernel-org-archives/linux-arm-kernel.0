@@ -1,167 +1,126 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 15 Aug 2012 08:49:02 +0200
-Subject: [PATCH v3 05/10] resource: add PCI configuration space support
-In-Reply-To: <CAErSpo4Efy-Dt67rktzNiYfZfOTSu=pmYtyGd3tR-zZQ3jDGtA@mail.gmail.com>
-References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
- <1343332512-28762-6-git-send-email-thierry.reding@avionic-design.de>
- <CAErSpo4qg45brVRwEbw3=R04VsbnvUowSMWcT+M6VoAxbf3Cqg@mail.gmail.com>
- <20120814055542.GB16181@avionic-0098.mockup.avionic-design.de>
- <CAErSpo6LYpkC5wop53S1r1z3ov4+w4soqrQARzbbouVs1trzUg@mail.gmail.com>
- <20120814180142.GA9430@avionic-0098.mockup.avionic-design.de>
- <CAErSpo4Efy-Dt67rktzNiYfZfOTSu=pmYtyGd3tR-zZQ3jDGtA@mail.gmail.com>
-Message-ID: <20120815064902.GB15665@avionic-0098.mockup.avionic-design.de>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 15 Aug 2012 14:55:27 +0800
+Subject: [PATCH] pinctrl: imx5: start numbering pad from 0
+In-Reply-To: <20120815054436.GK2232@pengutronix.de>
+References: <1344869278-27334-1-git-send-email-shawn.guo@linaro.org>
+ <CAKGA1b=DqyZvSre3C4YQ3GM6RuFtFsGWDkF784iKggrNzwiKpg@mail.gmail.com>
+ <CAP1dx+zQvBurT9oCmfJ0dGHHV3rbgdy+0Yh_hoPL9jQB8QNxKw@mail.gmail.com>
+ <CAKGA1bmHqyDGyvZjEcQ+RO1jHiZNZKNu3BGkyUXzYfwVaySYEQ@mail.gmail.com>
+ <CAP1dx+x0_j_f3Pj+9+YHcwoTqjGLXouf7t+SoCCMVGKJNOHCPw@mail.gmail.com>
+ <20120815054436.GK2232@pengutronix.de>
+Message-ID: <20120815065526.GG19681@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 02:44:24PM -0700, Bjorn Helgaas wrote:
-> On Tue, Aug 14, 2012 at 11:01 AM, Thierry Reding
-> <thierry.reding@avionic-design.de> wrote:
-> > On Tue, Aug 14, 2012 at 10:38:08AM -0700, Bjorn Helgaas wrote:
-> >> On Mon, Aug 13, 2012 at 10:55 PM, Thierry Reding
-> >> <thierry.reding@avionic-design.de> wrote:
-> >> > On Mon, Aug 13, 2012 at 10:00:45PM -0700, Bjorn Helgaas wrote:
-> >> >> On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
-> >> >> <thierry.reding@avionic-design.de> wrote:
-> >> >> > This commit adds a new flag that allows marking resources as PCI
-> >> >> > configuration space.
-> >> >> >
-> >> >> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> >> >> > ---
-> >> >> > Changes in v3:
-> >> >> > - new patch
-> >> >> >
-> >> >> >  include/linux/ioport.h | 2 +-
-> >> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >> >> >
-> >> >> > diff --git a/include/linux/ioport.h b/include/linux/ioport.h
-> >> >> > index 589e0e7..3314843 100644
-> >> >> > --- a/include/linux/ioport.h
-> >> >> > +++ b/include/linux/ioport.h
-> >> >> > @@ -102,7 +102,7 @@ struct resource {
-> >> >> >
-> >> >> >  /* PCI control bits.  Shares IORESOURCE_BITS with above PCI ROM.  */
-> >> >> >  #define IORESOURCE_PCI_FIXED           (1<<4)  /* Do not move resource */
-> >> >> > -
-> >> >> > +#define IORESOURCE_PCI_CS              (1<<5)  /* PCI configuration space */
-> >> >>
-> >> >> What is the purpose of this?  It seems that you are marking regions
-> >> >> that we call MMCONFIG on x86, or ECAM-type regions in the language of
-> >> >> the PCIe spec.  I see that you set it in several places, but I don't
-> >> >> see anything that ever looks for it.  Do you have plans to use it in
-> >> >> the future?  If it really does correspond to MMCONFIG/ECAM, we should
-> >> >> handle those regions consistently across all architectures.
-> >> >
-> >> > The purpose is ultimately to obtain the MMCONFIG/ECAM resources assigned
-> >> > to a PCI host controller. I've used this in the of_pci_parse_ranges()
-> >> > and in the static board setup code to mark ranges as such. Perhaps
-> >> > IORESOURCE_ECAM or IORESOURCE_MMCONFIG might have been better names. I
-> >> > also just noticed that I'm not using this anywhere, but the plan was to
-> >> > eventually use it with platform_get_resource(). However that doesn't
-> >> > seem to work either because the lower bits of the flags aren't use for
-> >> > comparison in that function.
-> >> >
-> >> > Any other ideas how that could be handled? Basically what I need is a
-> >> > way to mark a resource as an MMCONFIG/ECAM range so that it can be used
-> >> > to program the PCI host controller accordingly. I don't know how these
-> >> > are assigned on x86. I was under the impression that the MMCONFIG/ECAM
-> >> > space was accessed through a single single address/data register pair.
-> >>
-> >> The legacy config access mechanism (CF8h/CFCh registers described in
-> >> PCI 3.0 spec sec 3.2.2.3.2) is a single address/data pair, but this is
-> >> mostly x86-specific.  The ECAM mechanism (described in the PCIe 3.0
-> >> spec sec 7.2.2) is not a single address/data pair; instead, each byte
-> >> of config space is directly mapped into the host's MMIO space.
-> >>
-> >> Here's what we do on x86 (omitting some historical grunge that
-> >> complicates things):
-> >>
-> >>   - Discover the host bridge via a PNP0A08 device in the ACPI namespace.
-> >>   - Discover the bus number range behind the bridge using a _CRS
-> >> method in the PNP0A08 device.
-> >>   - Discover the ECAM space for those buses via a _CBA method in the
-> >> PNP0A08 device.
-> >>   - Tell the config accessors (struct pci_ops) that the ECAM space for
-> >> buses A-B is at address X.
-> >>   - Enumerate the devices behind the host bridge by calling
-> >> pci_scan_root_bus(), passing the config accessors.
-> >>
-> >> It sounds like you want a way to parse the resources at one point,
-> >> saving them and marking the ECAM region, then at a later point, look
-> >> up the ECAM from a saved list.  We don't do that on x86 because the
-> >> config accessors keep an internal list of the ECAM area for each bus.
-> >>
-> >> We do of course want to put this ECAM space in the IORESOURCE_MEM tree
-> >> because it consumes address space and we have to make sure we don't
-> >> put anything else on top of it.  But we don't have any reason to
-> >> describe the MMIO -> config space function in that tree.  From the
-> >> point of view of the rest of the system, it's just MMIO space that's
-> >> consumed by the PCI host bridge, just like any other device-specific
-> >> MMIO area.
-> >
-> > What I currently do is pass the ECAM space as a resource to the PCI host
-> > bridge platform device. Regular and extended configuration spaces are
-> > given by the third and fourth resources, respectively. If I understand
-> > correctly, you're saying that nothing beyond that needs to be encoded.
-> > In other words it is enough for the PCI host bridge driver to know where
-> > to take the data from.
+On Wed, Aug 15, 2012 at 07:44:36AM +0200, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> Yes, I think so.
+> (Cc += devicetree-discuss at lists.ozlabs.org)
 > 
-> I'd like to someday make ECAM support generic, since it's specified by
-> the PCIe spec.  The spec doesn't differentiate between PCI
-> configuration space (offsets 0-0xff) and PCI Express *extended*
-> configuration space (offsets 0x100-0xfff).  But it sounds like Tegra
-> might have a memory-mapped configuration mechanism that is similar to
-> ECAM but with a different address map, since you mention two resources
-> (third and fourth).  That's not a problem, since you're doing a
-> Tegra-specific solution right now anyway, but something to keep in the
-> back of your mind if we ever do make a generic ECAM solution.
-
-Something that's kept me wondering is why there actually need to be two
-separate regions. Since the extended configuration space is a superset
-of the regular configuration space it should be possible to access the
-regular registers via the extended configuration space as well.
-
-Stephen: Could you try to find out whether the regular configuration
-space translation can just be omitted if we already set up the one for
-the extended configuration space? In tegra_pcie_setup_translations(),
-BAR 0 is setup for regular configuration space (which requires a 16 MiB
-region), while BAR 1 is setup for the extended configuration space
-(requiring a full 256 MiB region). However, if I understand correctly,
-each of the registers that can be accessed via the BAR 0 translation can
-also be accessed via the BAR 1 translation. That seems like we're
-wasting the 16 MiB set aside for the BAR 0 mapping.
-
-> > I'll have to see what this means for the DT binding. There are other
-> > issues that I need to think about, like for example how to pass the ECAM
-> > space from the PCI host controller to each of the two bridges via the
-> > ranges property. This no longer makes sense in the current form, as the
-> > ECAM covers the configuration spaces for devices of both bridges and
-> > cannot really be split among them.
+> On Wed, Aug 15, 2012 at 11:59:18AM +0800, Dong Aisheng wrote:
+> > On 15 August 2012 03:37, Matt Sealey <matt@genesi-usa.com> wrote:
+> > > On Tue, Aug 14, 2012 at 2:20 AM, Dong Aisheng <dong.aisheng@linaro.org> wrote:
+> > >> On 13 August 2012 23:12, Matt Sealey <matt@genesi-usa.com> wrote:
+> > >>> I have a minor nit; while renumbering the pinctrl definitions is
+> > >>> laudable and device trees can match, there are 16 other pin controls
+> > >>> below EIM_D16 - this makes the start of the IOMUXC pin definitions
+> > >>> actually be the value calculated by (iomuxc_base + 0x300 + (4*16) +
+> > >>> (pin_id*4)).
+> > >>
+> > >> What do you mean of this value calculated?
+> > >
+> > > Well, it just seems the datasheet has been read from the point of view
+> > > of the SW_CTRL settings (pad pullups, drive strength etc.) to define
+> > > the enums; every pin setting in order from IOMUXC_BASE + 0x3f0 (sorry
+> > > I mistyped) has been entered as an enum into this list. Then a table
+> > > has been generated using these enums to supply a pin id. Then this pin
+> > > id is not relevant anymore; it actually gets referenced by it's
+> > > *offset into the table*.
+> > >
+> > Not exactly, probably.
+> > Basically we follow the mux reigster offset to define pin id, however,
+> > there're also some pads may not have mux function but only config
+> > which also has a pin id
+> > and vice versa.
+> > Those pins are not ordered by it's mux regsiter offset.
+> > 
+> > Actually I did not manually search all those pins, instead, i just
+> > using the exist ones:
+> > arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> > Since this exist headfile already covers this case.
+> > 
+> > > In this case, basically the code misses a few pins which have ALT
+> > > settings but perhaps not always the ability to change pad control -
+> > > EIM_DA5 to 15 are a good example.
+> > >
+> > As i said, we already defined those pin ids.
+> > 
+> > > Probably better would be to define the binding almost exactly as it
+> > > was done in the old method; iomux_v3_cfg_t took into account the three
+> > > register offsets possible for the pin (SW_MUX_CTL, SW_PAD_CTL and IPP)
+> > > and the three values to be put into those registers.
+> > >
+> > > This has been reduced down in pinctrl to what I find quite strange,
+> > > which is a completely arbitrary pin "id" mapping, which indirectly
+> > > references an entry in a table by index which is why pin 1 as a start
+> > > looks odd.
+> > >
+> > Start with pin 1 is a bug which caused by my mistake during the early
+> > data conversion.
+> > 
+> > > If the binding is entirely i.MX-specific or even i.MX51-specific then
+> > > why not define the pins in the device tree the "old" iomux_v3_cfg_t
+> > > way, which is the way they are in the table of imx_pin_regs;
+> > >
+> > >       IMX_PIN_REG(MX51_PAD_EIM_D16, 0x3f0, 0x05c, 5, 0x000, 0), /*
+> > > MX51_PAD_EIM_D16__AUD4_RXFS */
+> > >
+> > > 0x3f0 is the SW_PAD_CTL, 0x05c is the SW_MUX_CTL, 5 is the ALT mode,
+> > > 0x000 is the IPP reg, and 0 the IPP value.
+> > >
+> > > So fsl,iomux-pins = <0x3f0 0x85 0x05c 5 0 0 ... > (PAD, settings, MUX,
+> > > mode/sion, IPP, select - in that order) would be a valid pin
+> > > definition and require no table. Sure, the offsets are device specific
+> > > but then the arbitrary numbering is too.
+> > > This way old iomux controls
+> > > can be re-derived for people who use the old method in old kernels, or
+> > > use U-Boot with iomux-v3.h taken from Linux (MX6 got ported, I am
+> > > porting the Efika to it on MX5 for U-Boot right now). Also that huge
+> > > table goes away - it can be built at runtime, along with the
+> > > PAD_NAME__ALT_MODE_NAME description.
+> > >
+> > I can't agree this is better than the exist one now.
+> > It's hard to use in device tree.
+> > And how would you parse the pin id from this data array?
+> I admit I didn't follow completely the calculation suggestion by Matt,
+> but I think in general he has a point. This is more or less what I
+> thought when I built the imx35 pinctrl driver.
 > 
-> We have the same situation on x86.  Part of the historical grunge that
-> I omitted is that there's a static ACPI table (MCFG) that can tell you
-> the ECAM range for a bus number range.  Often that bus number range
-> includes several host bridges.  On x86, we have a single set of ECAM
-> config accessors (see pci_mmcfg), and they maintain a list of "bus
-> number -> ECAM addr" mappings internally, independent of which host
-> bridge leads to the buses.
+> With the current approach (i.e. put the pinfuncs in some order that
+> seems sensible today and then referencing them by index according to
+> that ordering) you really get into troubles if you have to add a new
+> function. You have to add it to the end to not break existing device
+> trees and so the ordering is broken.
+> 
+Actually, we do not mean to maintain the ordering in driver.
+It just needs to be align with the pin func ids definitions in binding
+doc. So the ordering broken in driver is not an issue, it just looks
+not so better if we really have to add a new pin function to the end
+due to mistake but this does not break anything to work.
 
-That's very similar to how things work on Tegra. Configuration space
-accesses to the host bridges are done via their respective memory-mapped
-register spaces. All other accesses use either the BAR 0 or BAR 1
-translations as I described above. These translations however are unique
-and only a single set of accessors are provided.
+> Also "11" has no obvious relation to MX35_PAD_COMPARE__SDMA_EXTDMA_2
+> other than a match if you grep over the binding docs (or the driver).
+> While "0x32c, 0x008, 7, 0x0, 0" is longer and looks more ugly the
+> mapping is obvious and so IMHO preferable.
+> 
+Also, don't you think this is hard to use for devicetree?
+And we need to reference datasheet to fill these values.
 
-Given that and what I said in the other mail about the implementation of
-ECAM on Tegra any CS range we pass to the host bridges via the DT ranges
-property is actually wrong.
+I just keep using as the old way at best and i remember Sascha also suggested
+before that we don't want to lose using the macro way as
+MX35_PAD_COMPARE__SDMA_EXTDMA_2 to make easy use.
+In the future, we will switch to macro when dt supports.
+For the way "0x32c, 0x008, 7, 0x0, 0", it's very unconveniently to use macro.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120815/c7b07907/attachment.sig>
+Regards
+Dong Aisheng
