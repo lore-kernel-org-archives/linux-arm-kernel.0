@@ -1,221 +1,175 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 15 Aug 2012 17:12:10 +0800
-Subject: [PATCH] kconfig: remove CONFIG_MTD_NAND_VERIFY_WRITE
-Message-ID: <1345021930-5033-1-git-send-email-b32955@freescale.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 15 Aug 2012 17:25:40 +0800
+Subject: [PATCH] pinctrl: imx5: start numbering pad from 0
+In-Reply-To: <20120815075117.GL2232@pengutronix.de>
+References: <1344869278-27334-1-git-send-email-shawn.guo@linaro.org>
+ <CAKGA1b=DqyZvSre3C4YQ3GM6RuFtFsGWDkF784iKggrNzwiKpg@mail.gmail.com>
+ <CAP1dx+zQvBurT9oCmfJ0dGHHV3rbgdy+0Yh_hoPL9jQB8QNxKw@mail.gmail.com>
+ <CAKGA1bmHqyDGyvZjEcQ+RO1jHiZNZKNu3BGkyUXzYfwVaySYEQ@mail.gmail.com>
+ <CAP1dx+x0_j_f3Pj+9+YHcwoTqjGLXouf7t+SoCCMVGKJNOHCPw@mail.gmail.com>
+ <20120815054436.GK2232@pengutronix.de>
+ <20120815065526.GG19681@shlinux2.ap.freescale.net>
+ <20120815075117.GL2232@pengutronix.de>
+Message-ID: <20120815092539.GH19681@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just as Artem suggested:
+On Wed, Aug 15, 2012 at 03:51:17PM +0800, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> On Wed, Aug 15, 2012 at 02:55:27PM +0800, Dong Aisheng wrote:
+> > On Wed, Aug 15, 2012 at 07:44:36AM +0200, Uwe Kleine-K?nig wrote:
+> > > Hello,
+> > > 
+> > > (Cc += devicetree-discuss at lists.ozlabs.org)
+> > > 
+> > > On Wed, Aug 15, 2012 at 11:59:18AM +0800, Dong Aisheng wrote:
+> > > > On 15 August 2012 03:37, Matt Sealey <matt@genesi-usa.com> wrote:
+> > > > > On Tue, Aug 14, 2012 at 2:20 AM, Dong Aisheng <dong.aisheng@linaro.org> wrote:
+> > > > >> On 13 August 2012 23:12, Matt Sealey <matt@genesi-usa.com> wrote:
+> > > > >>> I have a minor nit; while renumbering the pinctrl definitions is
+> > > > >>> laudable and device trees can match, there are 16 other pin controls
+> > > > >>> below EIM_D16 - this makes the start of the IOMUXC pin definitions
+> > > > >>> actually be the value calculated by (iomuxc_base + 0x300 + (4*16) +
+> > > > >>> (pin_id*4)).
+> > > > >>
+> > > > >> What do you mean of this value calculated?
+> > > > >
+> > > > > Well, it just seems the datasheet has been read from the point of view
+> > > > > of the SW_CTRL settings (pad pullups, drive strength etc.) to define
+> > > > > the enums; every pin setting in order from IOMUXC_BASE + 0x3f0 (sorry
+> > > > > I mistyped) has been entered as an enum into this list. Then a table
+> > > > > has been generated using these enums to supply a pin id. Then this pin
+> > > > > id is not relevant anymore; it actually gets referenced by it's
+> > > > > *offset into the table*.
+> > > > >
+> > > > Not exactly, probably.
+> > > > Basically we follow the mux reigster offset to define pin id, however,
+> > > > there're also some pads may not have mux function but only config
+> > > > which also has a pin id
+> > > > and vice versa.
+> > > > Those pins are not ordered by it's mux regsiter offset.
+> > > > 
+> > > > Actually I did not manually search all those pins, instead, i just
+> > > > using the exist ones:
+> > > > arch/arm/plat-mxc/include/mach/iomux-mx51.h
+> > > > Since this exist headfile already covers this case.
+> > > > 
+> > > > > In this case, basically the code misses a few pins which have ALT
+> > > > > settings but perhaps not always the ability to change pad control -
+> > > > > EIM_DA5 to 15 are a good example.
+> > > > >
+> > > > As i said, we already defined those pin ids.
+> > > > 
+> > > > > Probably better would be to define the binding almost exactly as it
+> > > > > was done in the old method; iomux_v3_cfg_t took into account the three
+> > > > > register offsets possible for the pin (SW_MUX_CTL, SW_PAD_CTL and IPP)
+> > > > > and the three values to be put into those registers.
+> > > > >
+> > > > > This has been reduced down in pinctrl to what I find quite strange,
+> > > > > which is a completely arbitrary pin "id" mapping, which indirectly
+> > > > > references an entry in a table by index which is why pin 1 as a start
+> > > > > looks odd.
+> > > > >
+> > > > Start with pin 1 is a bug which caused by my mistake during the early
+> > > > data conversion.
+> > > > 
+> > > > > If the binding is entirely i.MX-specific or even i.MX51-specific then
+> > > > > why not define the pins in the device tree the "old" iomux_v3_cfg_t
+> > > > > way, which is the way they are in the table of imx_pin_regs;
+> > > > >
+> > > > >       IMX_PIN_REG(MX51_PAD_EIM_D16, 0x3f0, 0x05c, 5, 0x000, 0), /*
+> > > > > MX51_PAD_EIM_D16__AUD4_RXFS */
+> > > > >
+> > > > > 0x3f0 is the SW_PAD_CTL, 0x05c is the SW_MUX_CTL, 5 is the ALT mode,
+> > > > > 0x000 is the IPP reg, and 0 the IPP value.
+> > > > >
+> > > > > So fsl,iomux-pins = <0x3f0 0x85 0x05c 5 0 0 ... > (PAD, settings, MUX,
+> > > > > mode/sion, IPP, select - in that order) would be a valid pin
+> > > > > definition and require no table. Sure, the offsets are device specific
+> > > > > but then the arbitrary numbering is too.
+> > > > > This way old iomux controls
+> > > > > can be re-derived for people who use the old method in old kernels, or
+> > > > > use U-Boot with iomux-v3.h taken from Linux (MX6 got ported, I am
+> > > > > porting the Efika to it on MX5 for U-Boot right now). Also that huge
+> > > > > table goes away - it can be built at runtime, along with the
+> > > > > PAD_NAME__ALT_MODE_NAME description.
+> > > > >
+> > > > I can't agree this is better than the exist one now.
+> > > > It's hard to use in device tree.
+> > > > And how would you parse the pin id from this data array?
+> > > I admit I didn't follow completely the calculation suggestion by Matt,
+> > > but I think in general he has a point. This is more or less what I
+> > > thought when I built the imx35 pinctrl driver.
+> > > 
+> > > With the current approach (i.e. put the pinfuncs in some order that
+> > > seems sensible today and then referencing them by index according to
+> > > that ordering) you really get into troubles if you have to add a new
+> > > function. You have to add it to the end to not break existing device
+> > > trees and so the ordering is broken.
+> > > 
+> > Actually, we do not mean to maintain the ordering in driver.
+> > It just needs to be align with the pin func ids definitions in binding
+> > doc. So the ordering broken in driver is not an issue, it just looks
+> > not so better if we really have to add a new pin function to the end
+> > due to mistake but this does not break anything to work.
+> Well, if you add a function between say current function 11 and 12 all
+> device trees need fixing, i.e. increase all function ids >= 12 by one.
+> You obviously cannot fix out-of-tree users and even fixing the in-tree
+> users is ugly.
+>  
+For such case, we should add it to the end since the exist ids are already
+taken. It will not break any user.
 
-"Both UBI and JFFS2 are able to read verify what they wrote already.
-There are also MTD tests which do this verification. So I think there
-is no reason to keep this in the NAND layer, let alone wasting RAM in
-the driver to support this feature."
+> > > Also "11" has no obvious relation to MX35_PAD_COMPARE__SDMA_EXTDMA_2
+> > > other than a match if you grep over the binding docs (or the driver).
+> > > While "0x32c, 0x008, 7, 0x0, 0" is longer and looks more ugly the
+> > > mapping is obvious and so IMHO preferable.
+> > > 
+> > Also, don't you think this is hard to use for devicetree?
+> Not harder than the current approach. Obviously macro support would be
+> nice, but this applies to both approaches.
+> 
+> > And we need to reference datasheet to fill these values.
+> I'd list the explicit values in the binding docs as the indexes are
+> documented there now. So the difference for a device-tree writer is just
+> the content that is copy-and-pasted.
+> 
+> > I just keep using as the old way at best and i remember Sascha also suggested
+> > before that we don't want to lose using the macro way as
+> > MX35_PAD_COMPARE__SDMA_EXTDMA_2 to make easy use.
+> > In the future, we will switch to macro when dt supports.
+> > For the way "0x32c, 0x008, 7, 0x0, 0", it's very unconveniently to use macro.
+> That is just
+> 
+> 	#define MX35_PAD_COMPARE__SDMA_EXTDMA_2 11
+> 
+> vs.
+> 
+> 	#define MX35_PAD_COMPARE__SDMA_EXTDMA_2 0x32c, 0x008, 7, 0x0, 0
+> 
+> isn't it? (Actually I'd not go for cpp as preprocessor, but that's a
+> different story.)
+> 
+Hmm, not sure if dt macro may support this kind of syntax but yes if it supports.
+Grant,
+Do you know if dt macro can support it?
 
-So kill MTD_NAND_VERIFY_WRITE entirely. Please see the patch:
-http://lists.infradead.org/pipermail/linux-mtd/2012-August/043189.html
-  
-This patch removes the CONFIG_MTD_NAND_VERIFY_WRITE in the defconfigs.
+Now I'm a bit intend to admit that we probably could do like that if it supports.
+The benefit i see is that it could save much code lines in driver while having
+no using experience downgrade.
 
+The left question is that how do we get the pin id from this kind of format data
+(0x32c, 0x008, 7, 0x0, 0), probably one way may be:
+For normal pads and NO_CONFIG pads, we could get it via:
+mux_reg_offset / 4
+for NO_MUX pads but have CONFIG pads, we may get it via:
+mux_reg_offset / 4 + PIN_NO_MUX_ID_BASE + config_reg_offset /4
+That may fix getting pin id issue from dt.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- arch/arm/configs/bcmring_defconfig              |    1 -
- arch/arm/configs/cam60_defconfig                |    1 -
- arch/arm/configs/corgi_defconfig                |    1 -
- arch/arm/configs/ep93xx_defconfig               |    1 -
- arch/arm/configs/mini2440_defconfig             |    1 -
- arch/arm/configs/mv78xx0_defconfig              |    1 -
- arch/arm/configs/nhk8815_defconfig              |    1 -
- arch/arm/configs/orion5x_defconfig              |    1 -
- arch/arm/configs/pxa3xx_defconfig               |    1 -
- arch/arm/configs/spitz_defconfig                |    1 -
- arch/blackfin/configs/BF561-ACVILON_defconfig   |    1 -
- arch/mips/configs/rb532_defconfig               |    1 -
- arch/powerpc/configs/83xx/mpc8313_rdb_defconfig |    1 -
- arch/powerpc/configs/83xx/mpc8315_rdb_defconfig |    1 -
- arch/powerpc/configs/mpc83xx_defconfig          |    1 -
- 15 files changed, 0 insertions(+), 15 deletions(-)
+Another known issue is that via this way, that means the pinctrl subsystem
+can only see the using pads, this is a bit not align with the pinctrl
+subsystem design. No sure if Linus would like to see it.
 
-diff --git a/arch/arm/configs/bcmring_defconfig b/arch/arm/configs/bcmring_defconfig
-index 9e6a8fe..6c389d9 100644
---- a/arch/arm/configs/bcmring_defconfig
-+++ b/arch/arm/configs/bcmring_defconfig
-@@ -44,7 +44,6 @@ CONFIG_MTD_CFI_ADV_OPTIONS=y
- CONFIG_MTD_CFI_GEOMETRY=y
- # CONFIG_MTD_CFI_I2 is not set
- CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_VERIFY_WRITE=y
- CONFIG_MTD_NAND_BCM_UMI=y
- CONFIG_MTD_NAND_BCM_UMI_HWCS=y
- # CONFIG_MISC_DEVICES is not set
-diff --git a/arch/arm/configs/cam60_defconfig b/arch/arm/configs/cam60_defconfig
-index cedc92e..1457971 100644
---- a/arch/arm/configs/cam60_defconfig
-+++ b/arch/arm/configs/cam60_defconfig
-@@ -49,7 +49,6 @@ CONFIG_MTD_COMPLEX_MAPPINGS=y
- CONFIG_MTD_PLATRAM=m
- CONFIG_MTD_DATAFLASH=y
- CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_VERIFY_WRITE=y
- CONFIG_MTD_NAND_ATMEL=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
-diff --git a/arch/arm/configs/corgi_defconfig b/arch/arm/configs/corgi_defconfig
-index e53c475..4b8a25d 100644
---- a/arch/arm/configs/corgi_defconfig
-+++ b/arch/arm/configs/corgi_defconfig
-@@ -97,7 +97,6 @@ CONFIG_MTD_BLOCK=y
- CONFIG_MTD_ROM=y
- CONFIG_MTD_COMPLEX_MAPPINGS=y
- CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_VERIFY_WRITE=y
- CONFIG_MTD_NAND_SHARPSL=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_IDE=y
-diff --git a/arch/arm/configs/ep93xx_defconfig b/arch/arm/configs/ep93xx_defconfig
-index 8e97b2f..806005a 100644
---- a/arch/arm/configs/ep93xx_defconfig
-+++ b/arch/arm/configs/ep93xx_defconfig
-@@ -61,7 +61,6 @@ CONFIG_MTD_CFI_STAA=y
- CONFIG_MTD_ROM=y
- CONFIG_MTD_PHYSMAP=y
- CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_VERIFY_WRITE=y
- CONFIG_BLK_DEV_NBD=y
- CONFIG_EEPROM_LEGACY=y
- CONFIG_SCSI=y
-diff --git a/arch/arm/configs/mini2440_defconfig b/arch/arm/configs/mini2440_defconfig
-index 082175c..00630e6 100644
---- a/arch/arm/configs/mini2440_defconfig
-+++ b/arch/arm/configs/mini2440_defconfig
-@@ -102,7 +102,6 @@ CONFIG_MTD_CFI_STAA=y
- CONFIG_MTD_RAM=y
- CONFIG_MTD_ROM=y
- CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_VERIFY_WRITE=y
- CONFIG_MTD_NAND_S3C2410=y
- CONFIG_MTD_NAND_PLATFORM=y
- CONFIG_MTD_LPDDR=y
-diff --git a/arch/arm/configs/mv78xx0_defconfig b/arch/arm/configs/mv78xx0_defconfig
-index 7305ebd..1f08219 100644
---- a/arch/arm/configs/mv78xx0_defconfig
-+++ b/arch/arm/configs/mv78xx0_defconfig
-@@ -49,7 +49,6 @@ CONFIG_MTD_CFI_INTELEXT=y
- CONFIG_MTD_CFI_AMDSTD=y
- CONFIG_MTD_PHYSMAP=y
- CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_VERIFY_WRITE=y
- CONFIG_MTD_NAND_ORION=y
- CONFIG_BLK_DEV_LOOP=y
- # CONFIG_SCSI_PROC_FS is not set
-diff --git a/arch/arm/configs/nhk8815_defconfig b/arch/arm/configs/nhk8815_defconfig
-index bf123c5..240b25e 100644
---- a/arch/arm/configs/nhk8815_defconfig
-+++ b/arch/arm/configs/nhk8815_defconfig
-@@ -57,7 +57,6 @@ CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_ECC_SMC=y
--CONFIG_MTD_NAND_VERIFY_WRITE=y
- CONFIG_MTD_NAND_NOMADIK=y
- CONFIG_MTD_ONENAND=y
- CONFIG_MTD_ONENAND_VERIFY_WRITE=y
-diff --git a/arch/arm/configs/orion5x_defconfig b/arch/arm/configs/orion5x_defconfig
-index a288d70..cd5e6ba 100644
---- a/arch/arm/configs/orion5x_defconfig
-+++ b/arch/arm/configs/orion5x_defconfig
-@@ -72,7 +72,6 @@ CONFIG_MTD_CFI_INTELEXT=y
- CONFIG_MTD_CFI_AMDSTD=y
- CONFIG_MTD_PHYSMAP=y
- CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_VERIFY_WRITE=y
- CONFIG_MTD_NAND_PLATFORM=y
- CONFIG_MTD_NAND_ORION=y
- CONFIG_BLK_DEV_LOOP=y
-diff --git a/arch/arm/configs/pxa3xx_defconfig b/arch/arm/configs/pxa3xx_defconfig
-index 1677a06..60e3138 100644
---- a/arch/arm/configs/pxa3xx_defconfig
-+++ b/arch/arm/configs/pxa3xx_defconfig
-@@ -36,7 +36,6 @@ CONFIG_MTD_CONCAT=y
- CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_VERIFY_WRITE=y
- CONFIG_MTD_NAND_PXA3xx=y
- CONFIG_MTD_NAND_PXA3xx_BUILTIN=y
- CONFIG_MTD_ONENAND=y
-diff --git a/arch/arm/configs/spitz_defconfig b/arch/arm/configs/spitz_defconfig
-index 7015827..df77931 100644
---- a/arch/arm/configs/spitz_defconfig
-+++ b/arch/arm/configs/spitz_defconfig
-@@ -94,7 +94,6 @@ CONFIG_MTD_BLOCK=y
- CONFIG_MTD_ROM=y
- CONFIG_MTD_COMPLEX_MAPPINGS=y
- CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_VERIFY_WRITE=y
- CONFIG_MTD_NAND_SHARPSL=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_IDE=y
-diff --git a/arch/blackfin/configs/BF561-ACVILON_defconfig b/arch/blackfin/configs/BF561-ACVILON_defconfig
-index 0fdc4ec..9198837 100644
---- a/arch/blackfin/configs/BF561-ACVILON_defconfig
-+++ b/arch/blackfin/configs/BF561-ACVILON_defconfig
-@@ -57,7 +57,6 @@ CONFIG_MTD_PLATRAM=y
- CONFIG_MTD_PHRAM=y
- CONFIG_MTD_BLOCK2MTD=y
- CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_VERIFY_WRITE=y
- CONFIG_MTD_NAND_PLATFORM=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
-diff --git a/arch/mips/configs/rb532_defconfig b/arch/mips/configs/rb532_defconfig
-index 55902d9..b85b121 100644
---- a/arch/mips/configs/rb532_defconfig
-+++ b/arch/mips/configs/rb532_defconfig
-@@ -119,7 +119,6 @@ CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_BLOCK2MTD=y
- CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_VERIFY_WRITE=y
- CONFIG_MTD_NAND_PLATFORM=y
- CONFIG_ATA=y
- # CONFIG_ATA_VERBOSE_ERROR is not set
-diff --git a/arch/powerpc/configs/83xx/mpc8313_rdb_defconfig b/arch/powerpc/configs/83xx/mpc8313_rdb_defconfig
-index 126ef1b..e4ad2e2 100644
---- a/arch/powerpc/configs/83xx/mpc8313_rdb_defconfig
-+++ b/arch/powerpc/configs/83xx/mpc8313_rdb_defconfig
-@@ -38,7 +38,6 @@ CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_AMDSTD=y
- CONFIG_MTD_PHYSMAP_OF=y
- CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_VERIFY_WRITE=y
- CONFIG_MTD_NAND_FSL_ELBC=y
- CONFIG_PROC_DEVICETREE=y
- CONFIG_BLK_DEV_LOOP=y
-diff --git a/arch/powerpc/configs/83xx/mpc8315_rdb_defconfig b/arch/powerpc/configs/83xx/mpc8315_rdb_defconfig
-index abcf00a..34ff568 100644
---- a/arch/powerpc/configs/83xx/mpc8315_rdb_defconfig
-+++ b/arch/powerpc/configs/83xx/mpc8315_rdb_defconfig
-@@ -37,7 +37,6 @@ CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_AMDSTD=y
- CONFIG_MTD_PHYSMAP_OF=y
- CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_VERIFY_WRITE=y
- CONFIG_PROC_DEVICETREE=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
-diff --git a/arch/powerpc/configs/mpc83xx_defconfig b/arch/powerpc/configs/mpc83xx_defconfig
-index 5aac9a8..f6fc66c 100644
---- a/arch/powerpc/configs/mpc83xx_defconfig
-+++ b/arch/powerpc/configs/mpc83xx_defconfig
-@@ -52,7 +52,6 @@ CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_AMDSTD=y
- CONFIG_MTD_PHYSMAP_OF=y
- CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_VERIFY_WRITE=y
- CONFIG_MTD_NAND_FSL_ELBC=y
- CONFIG_PROC_DEVICETREE=y
- CONFIG_BLK_DEV_LOOP=y
--- 
-1.7.0.4
+Regards
+Dong Aisheng
