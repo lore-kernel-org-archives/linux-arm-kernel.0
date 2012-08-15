@@ -1,61 +1,69 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 15 Aug 2012 10:06:27 -0700
-Subject: [PATCH v3 01/10] PCI: Keep pci_fixup_irqs() around after init
-In-Reply-To: <1343332512-28762-2-git-send-email-thierry.reding@avionic-design.de>
-References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
- <1343332512-28762-2-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <CAErSpo7v+i8i=mXCs7ZW8DtGTDN_4AEntwYLqGG8FcCzweySFg@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 15 Aug 2012 19:07:29 +0200
+Subject: [PATCH v3 0/6] ARM: dove: DT support for Marvell Dove
+In-Reply-To: <1344681326-17946-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1344681326-17946-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1345050455-32643-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
-<thierry.reding@avionic-design.de> wrote:
-> When using deferred driver probing, PCI host controller drivers may
-> actually require this function after the init stage.
->
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> ---
-> Changes in v3:
-> - none
->
-> Changes in v2:
-> - use __devinit annotations
+This patch set adds DT support for Marvell Dove SoC and three boards
+equipped with this SoC. The work is based on device tree support for
+Marvell Orion based SoCs introduced in 3.6-rc1.
 
-Your original patch removed __init completely.  Here you change it to
-__devinit.  That means we decide whether to discard the function based
-on whether CONFIG_HOTPLUG is supported.  But I think your point is not
-about hotplug; it's merely that we should be able to scan a PCI bus
-after init-time.  We ought to be able to do a late PCI scan even if
-hotplug is not supported.
+The first three patches move mach-dove closer to Marvell Kirkwood's
+setup code by unifying the clock setup routines, adding clock gating
+control, and support for Marvell's crypto engine to mach-dove.
 
-Therefore, I'd be inclined to remove __init completely unless you have
-another reason for preferring __devinit.
+Patches 4 and 5 add a generic DT machine descriptor to mach-dove and
+corresponding DT descriptors for the SoC and already supported boards.
 
->  drivers/pci/setup-irq.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
-> index eb219a1..f0bcd56 100644
-> --- a/drivers/pci/setup-irq.c
-> +++ b/drivers/pci/setup-irq.c
-> @@ -18,7 +18,7 @@
->  #include <linux/cache.h>
->
->
-> -static void __init
-> +static void __devinit
->  pdev_fixup_irq(struct pci_dev *dev,
->                u8 (*swizzle)(struct pci_dev *, u8 *),
->                int (*map_irq)(const struct pci_dev *, u8, u8))
-> @@ -54,7 +54,7 @@ pdev_fixup_irq(struct pci_dev *dev,
->         pcibios_update_irq(dev, irq);
->  }
->
-> -void __init
-> +void __devinit
->  pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *, u8 *),
->                int (*map_irq)(const struct pci_dev *, u8, u8))
->  {
-> --
-> 1.7.11.2
->
+Finally, the last patch adds a DT descriptor for the SolidRun CuBox,
+a plug computer based on Marvell Dove.
+
+This patch set relies on a DT support patch for sdhci-dove that has
+been accepted on mmc-next for 3.7 as commit
+b2293055c1e1200acbb46523976852d1686fdfa4.
+
+Changes:
+v2: removed clk_prepare_enable for tclk and updated subsequent patches
+v3: fixed a typo in clk_gate name for pex0
+    removed device name macros from clk gate names
+
+Sebastian Hesselbarth (6):
+  ARM: dove: unify clock setup
+  ARM: dove: add clock gating control
+  ARM: dove: add crypto engine
+  ARM: dove: add device tree based machine descriptor
+  ARM: dove: add device tree descriptors
+  ARM: dove: SolidRun CuBox DT
+
+ arch/arm/boot/dts/dove-cm-a510.dts   |   38 +++++++++
+ arch/arm/boot/dts/dove-cubox.dts     |   42 +++++++++
+ arch/arm/boot/dts/dove-dove-db.dts   |   38 +++++++++
+ arch/arm/boot/dts/dove.dtsi          |  143 +++++++++++++++++++++++++++++++
+ arch/arm/mach-dove/Kconfig           |    7 ++
+ arch/arm/mach-dove/Makefile.boot     |    4 +
+ arch/arm/mach-dove/common.c          |  156 +++++++++++++++++++++++++++++++---
+ arch/arm/mach-dove/include/mach/pm.h |   54 ++++++++----
+ 8 files changed, 452 insertions(+), 30 deletions(-)
+ create mode 100644 arch/arm/boot/dts/dove-cm-a510.dts
+ create mode 100644 arch/arm/boot/dts/dove-cubox.dts
+ create mode 100644 arch/arm/boot/dts/dove-dove-db.dts
+ create mode 100644 arch/arm/boot/dts/dove.dtsi
+
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: Rabeeh Khoury <rabeeh@solid-run.com>
+Cc: Ian Molton <ian.molton@codethink.co.uk>
+Cc: Maen Suleiman <maen@marvell.com>
+Cc: Olof Johansson <olof@lixom.net>
+
+-- 
+1.7.10.4
