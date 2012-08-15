@@ -1,30 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Aug 2012 12:49:41 +0000
-Subject: [GIT PULL] U300 cleanups and sparseirq
-In-Reply-To: <201208151243.40386.arnd@arndb.de>
-References: <CACRpkdb6wB1QVNqn8_sHB8LH0To=aP_8+iocE8JZ2jKC5f_bYg@mail.gmail.com>
- <201208151243.40386.arnd@arndb.de>
-Message-ID: <201208151249.42011.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 15 Aug 2012 13:53:39 +0100
+Subject: [PATCH v2 3/4] arm/dts: Add tps65910 regulator DT data to
+ am335x-evm.dts
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA1293E@DBDE01.ent.ti.com>
+References: <1343110735-10640-1-git-send-email-anilkumar@ti.com>
+ <1343110735-10640-4-git-send-email-anilkumar@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA1293E@DBDE01.ent.ti.com>
+Message-ID: <20120815125338.GA13544@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 August 2012, Arnd Bergmann wrote:
-> On Wednesday 15 August 2012, Linus Walleij wrote:
-> > Hi ARM SoC maintainers,
-> > 
-> > could you please pull the following patch set sent out for review the other day
-> > doing a number of cleanups and a minor improvement to U300, paving the
-> > way for single zImage and device tree:
-> > 
-> > - Deprecate ancient platforms to make the following patches easier to
-> >   make...
-> > - Move out one header to platform data and one to the mach-u300 proper
-> >   to depopulate <mach/*>
-> > - Consolidate core machine files
-> > - Convert to sparse IRQs
-> 
-> Pulled into next/soc.
+On Tue, Aug 14, 2012 at 02:25:18PM +0000, AnilKumar, Chimata wrote:
 
-On second thought, I've changed that and put it into next/cleanup instead.
+> AM335x EVM have one dedicated input supply which provide supplies to all
+> the PMIC regulators. According to tps65910 "VDD1 regulator" input supply
+> is from vcc1 so we have to create a dummy/parent/some node to handle this.
+> Example below has the details.
 
-	Arnd
+Your device tree should accurately reflect the hardware.
+
+> Similarly we have to add 7 more fixed regulators entries to provide input
+> supply to different PMIC regulators.
+
+If you have all these unrelated supplies in the system then your device
+tree should accurately reflect that.  However this would be a very
+unusual hardware design.  Usually there would be a very small set of
+system supply rails, frequently only one.
