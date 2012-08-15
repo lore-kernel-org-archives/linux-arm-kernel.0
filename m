@@ -1,135 +1,32 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Wed, 15 Aug 2012 16:53:25 +0530
-Subject: [PATCH-V2] arm/dts: AM33XX: Set the default status of module to
- "disabled" state
-Message-ID: <1345029805-27987-1-git-send-email-hvaibhav@ti.com>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Wed, 15 Aug 2012 07:55:42 -0400
+Subject: PATCH Add support for the Iomega IX2-200 Device Tree
+In-Reply-To: <20120815111209.GB22226@titan.lakedaemon.net>
+References: <3CAEA3DD-9D2C-4052-957D-D09E6EB9B64E@gmail.com>
+ <20120814235653.GA22226@titan.lakedaemon.net>
+ <95D5BE56-A79F-4422-B1CE-7AD010A9D70E@gmail.com>
+ <20120815111209.GB22226@titan.lakedaemon.net>
+Message-ID: <CAMW5Ufb-8NrWu6vsJ+RezrLEGj-Wfm5Tc+0BK9_2qzn671FrpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ideally in common SoC dtsi file should set all modules
-to "disabled" state and it should get enabled in respective
-EVM/Board dts file as per usage.
+>> Sorry i meant board-dt in the previous message and the name just
+>> getting used to the mail program on os x aswel. I have run through the
+>> checkpatch.pl script and it tells me there are no errors but i just
+>> found out a few minutes ago theres a fix for the 2 sata ports not
+>> working (on all kirkwood devices as far as i know) so i am going to
+>> test that now as it envolves modifying a line in the dts file.
+>
+> Ok.  Please let everyone know in the comment portion of the patch (after
+> the --- line) that your patch depends on this fix.  I haven't seen the
+> patch you're referring to yet.  I'll keep my eye out for it.
 
-This patch sets default status of all modules to "disabled"
-state in am33xx.dtsi file. Currently there are no modules
-supported as part of Bone and EVM dts support, so care
-to add entry "status = "okay"" while adding support for any
-module.
+What he's referring to is needing to up the coherent_pool size to get
+a Kirkwood device with two SATA ports to init completely.  I brought
+the topic up on arm-kernel under the subject 'Potential Regression in
+3.6-rc1 - Kirkwood SATA' and Aaro Koskinen suggested the root cause
+and potential fix of adding coherent_pool=1M to the bootargs.  I
+didn't think to cc you in the discussion, sorry about that.  So there
+isn't a pending patch yet, just a suggestion of altered bootargs.
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Tony Lindgren <tony@atomide.com>
----
-Changes from V1:
-	- Fixed indentation issue caused due to extra spaces.
-
- arch/arm/boot/dts/am335x-bone.dts |    6 ++++++
- arch/arm/boot/dts/am335x-evm.dts  |    6 ++++++
- arch/arm/boot/dts/am33xx.dtsi     |    9 +++++++++
- 3 files changed, 21 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index a9af4db..a7906cb 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -17,4 +17,10 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x10000000>; /* 256 MB */
- 	};
-+
-+	ocp {
-+		uart1: serial at 44E09000 {
-+			status = "okay";
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index d6a97d9..5dd8a6b 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -17,4 +17,10 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x10000000>; /* 256 MB */
- 	};
-+
-+	ocp {
-+		uart1: serial at 44E09000 {
-+			status = "okay";
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 59509c4..5f6c8e3 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -102,36 +102,42 @@
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart1";
- 			clock-frequency = <48000000>;
-+			status = "disabled";
- 		};
-
- 		uart2: serial at 48022000 {
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart2";
- 			clock-frequency = <48000000>;
-+			status = "disabled";
- 		};
-
- 		uart3: serial at 48024000 {
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart3";
- 			clock-frequency = <48000000>;
-+			status = "disabled";
- 		};
-
- 		uart4: serial at 481A6000 {
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart4";
- 			clock-frequency = <48000000>;
-+			status = "disabled";
- 		};
-
- 		uart5: serial at 481A8000 {
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart5";
- 			clock-frequency = <48000000>;
-+			status = "disabled";
- 		};
-
- 		uart6: serial at 481AA000 {
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart6";
- 			clock-frequency = <48000000>;
-+			status = "disabled";
- 		};
-
- 		i2c1: i2c at 44E0B000 {
-@@ -139,6 +145,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			ti,hwmods = "i2c1";
-+			status = "disabled";
- 		};
-
- 		i2c2: i2c at 4802A000 {
-@@ -146,6 +153,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			ti,hwmods = "i2c2";
-+			status = "disabled";
- 		};
-
- 		i2c3: i2c at 4819C000 {
-@@ -153,6 +161,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			ti,hwmods = "i2c3";
-+			status = "disabled";
- 		};
- 	};
- };
---
-1.7.0.4
+Josh Coombs
