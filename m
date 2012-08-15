@@ -1,30 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Aug 2012 09:04:16 +0100
-Subject: [PATCH v3 1/4] dmaengine: mmp-pdma support
-In-Reply-To: <CAMj5Bkhu2r_R6q3g2aJk1r9Ytz+1eK7gfy6vWuAg1+OPUN7z8Q@mail.gmail.com>
-References: <1344917519-9505-1-git-send-email-zhangfei.gao@marvell.com>
- <1344917519-9505-2-git-send-email-zhangfei.gao@marvell.com>
- <20120814083026.GG18957@n2100.arm.linux.org.uk>
- <CAMj5Bkhu2r_R6q3g2aJk1r9Ytz+1eK7gfy6vWuAg1+OPUN7z8Q@mail.gmail.com>
-Message-ID: <20120815080416.GH18957@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 15 Aug 2012 10:10:54 +0200
+Subject: [GIT PULL] U300 cleanups and sparseirq
+Message-ID: <CACRpkdb6wB1QVNqn8_sHB8LH0To=aP_8+iocE8JZ2jKC5f_bYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2012 at 03:44:35PM +0800, zhangfei gao wrote:
-> Still have one question.
-> vchan_tx_submit is sending vd node to submitted list.
-> list_add_tail(&vd->node, &vc->desc_submitted);
-> 
-> While what we want is send the desc chain, including many nodes,
-> and the first desc will have call back.
-> chain 1: first -> desc -> desc -> desc
-> chain 2: first -> desc -> desc -> desc
-> Once the dma chain done, irq happen and call back from first desc.
+Hi ARM SoC maintainers,
 
-I don't understand why you want a DMA engine descriptor to represent
-one single DMA hardware scatterlist entry.  This makes much more
-difficult when reporting status, especially the DMA residue (which
-your existing driver does not support.)
+could you please pull the following patch set sent out for review the other day
+doing a number of cleanups and a minor improvement to U300, paving the
+way for single zImage and device tree:
 
-Why not hang several DMA hardware scatterlist entries off the same
-DMA engine descriptor?
+- Deprecate ancient platforms to make the following patches easier to
+  make...
+- Move out one header to platform data and one to the mach-u300 proper
+  to depopulate <mach/*>
+- Consolidate core machine files
+- Convert to sparse IRQs
+
+Please pull! Thanks.
+
+The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
+
+  Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+u300-cleanup
+
+for you to fetch changes up to a4fe292fa75baaa9cfb1a7224614f31fcd0d9a7b:
+
+  ARM: u300: convert to sparse IRQs (2012-08-13 13:53:07 +0200)
+
+----------------------------------------------------------------
+Linus Walleij (7):
+      ARM: u300: retire ancient platforms
+      pinctrl/coh901: retire ancient GPIO block versions
+      pinctrl/coh901: move header to platform data dir
+      ARM: u300: merge u300.c into core.c and rid headers
+      ARM: u300: delete remnant clkdev.h file
+      ARM: u300: move DMA channel header into mach-u300
+      ARM: u300: convert to sparse IRQs
+
+ arch/arm/Kconfig                                   |   1 +
+ arch/arm/mach-u300/Kconfig                         |  43 +---
+ arch/arm/mach-u300/Makefile                        |   1 -
+ arch/arm/mach-u300/core.c                          | 100 +++-------
+ .../mach-u300/{include/mach => }/dma_channels.h    |  11 +-
+ arch/arm/mach-u300/i2c.c                           |   6 +-
+ arch/arm/mach-u300/include/mach/clkdev.h           |   7 -
+ arch/arm/mach-u300/include/mach/irqs.h             |  36 +---
+ arch/arm/mach-u300/include/mach/platform.h         |  20 --
+ arch/arm/mach-u300/include/mach/syscon.h           |  32 +--
+ arch/arm/mach-u300/include/mach/u300-regs.h        |  19 +-
+ arch/arm/mach-u300/spi.c                           |   2 +-
+ arch/arm/mach-u300/timer.c                         |   5 +-
+ arch/arm/mach-u300/timer.h                         |   1 +
+ arch/arm/mach-u300/u300-gpio.h                     |  46 +----
+ arch/arm/mach-u300/u300.c                          |  57 ------
+ drivers/pinctrl/pinctrl-coh901.c                   | 220 ++++-----------------
+ .../linux/platform_data/pinctrl-coh901.h           |  13 +-
+ 18 files changed, 87 insertions(+), 533 deletions(-)
+ rename arch/arm/mach-u300/{include/mach => }/dma_channels.h (88%)
+ delete mode 100644 arch/arm/mach-u300/include/mach/clkdev.h
+ delete mode 100644 arch/arm/mach-u300/include/mach/platform.h
+ create mode 100644 arch/arm/mach-u300/timer.h
+ delete mode 100644 arch/arm/mach-u300/u300.c
+ rename arch/arm/mach-u300/include/mach/gpio-u300.h =>
+include/linux/platform_data/pinctrl-coh901.h (72%)
+
+Yours,
+Linus Walleij
