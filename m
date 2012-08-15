@@ -1,45 +1,62 @@
-From: wade_farnsworth@mentor.com (Wade Farnsworth)
-Date: Wed, 15 Aug 2012 12:35:36 -0700
-Subject: [PATCH v2] ARM: support syscall tracing
-In-Reply-To: <20120815172731.GL29448@mudshark.cambridge.arm.com>
-References: <502BBCCC.1020006@mentor.com>
- <20120815162157.GJ29448@mudshark.cambridge.arm.com>
- <502BD544.70903@mentor.com>
- <20120815172731.GL29448@mudshark.cambridge.arm.com>
-Message-ID: <502BFA08.6010708@mentor.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 16 Aug 2012 01:27:32 +0530
+Subject: [PATCH v2 0/4] pinctrl: add support for samsung pinctrl driver
+Message-ID: <1345060656-32201-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon wrote:
-> On Wed, Aug 15, 2012 at 05:58:44PM +0100, Wade Farnsworth wrote:
->> We need to set current_thread_info()->syscall, since it's used in the
->> call to syscall_get_nr() in perf_syscall_{enter,exit}.
->
-> Damn. I think that also means we have a bug, given that the SYSCALL_TRACE
-> code can set this to -1, which gets used as an index into a bitmap by the
-> looks of it. Considering that we have to pass the syscall number to
-> trace_sys_enter anyway, it also seems broken.
->
+Changes since v1:
+- Added support for external gpio and wakeup interrupts for Exynos4.
 
-I agree.  Looking at the other architectures, it seems the analogous 
-function to ptrace_syscall_trace can return -1 under certain 
-circumstances, but the original syscall value should be passed onto 
-trace_sys_enter and returned from syscall_get_nr().  So, I'm thinking 
-that we should modify our behavior accordingly.  What this means for us 
-is that we never store -1 in the thread_info syscall field, and then 
-pass that into trace_sys_enter instead of the ptrace_syscall_trace 
-return value. Do you see any problems with this approach?
+This patch series adds a common pinctrl driver for all Samsung platforms and
+enables the pinctrl driver support for Exynos4210 based device tree enabled
+platforms. The scope of this driver is limited to only device tree enabled
+platforms.
 
->> What about moving the setting of ->syscall to
->> syscall_trace_{enter,exit}?  That would preserve ptrace_syscall_trace()
->> for the TIF_SYSCALL_TRACE case only, but ensure that the field is set
->> the TRACEPOINT case as well.  Thoughts?
->
-> I'd be tempted to set the thing unconditionally before checking the thread
-> flag at the top of ptrace_syscall_trace. This hangs off the slowpath anyway
-> and it makes everything a lot more readable.
->
+The intention of this driver is to replace the existing gpiolib driver and
+provide pinctrl subsystem interface to configure the pins/mux instead
+of existing platform callbacks.
 
-OK, I'll make that change.
+Note that, the Samsung pinctrl driver is usable only on device tree enabled
+Samsung platforms. Legacy platforms would still continue to use the older
+gpiolib driver and hence updates to device drivers to use the pinctrl api
+should ensure that support for legacy platforms is maintained.
 
-Wade
+The first patch adds a new pinctrl driver for Samsung. It provides interfaces
+to the pinctrl and gpiolib subsystems. This driver provides a common framework
+for all Samsung SoC's to enable the pinctrl and gpiolib support. The driver
+accepts the information about pins, groups and functions from the device tree
+and the information about gpio banks is supplied using driver data.
+
+The second patch adds the driver data required to operate the pinctrl driver
+on Exynos4210 based platforms. It allows includes support for Exynos4210
+specific external gpio and wakeup interrupts which are provides to the Samsung
+pinctrl driver as extensions.
+
+The third patch modifies the existing gpiolib driver to skip the gpio pin
+registrations if pinctrl driver support is found to be enabled. The fourth
+patch skips the external wakeup interrupt configuration process in the
+Exynos4 platform code if the external wakeup interrupt support is provided
+by the pin-control driver.
+
+Thomas Abraham (4):
+  pinctrl: add samsung pinctrl and gpiolib driver
+  pinctrl: add exynos4210 specific extensions for samsung pinctrl driver
+  gpio: exynos4: skip gpiolib registration if pinctrl driver is used
+  ARM: EXYNOS: skip wakeup interrupt setup if pinctrl driver is used
+
+.../bindings/pinctrl/samsung-pinctrl.txt           |  176 ++++
+ arch/arm/mach-exynos/common.c                      |   26 +
+ drivers/gpio/gpio-samsung.c                        |   21 +
+ drivers/pinctrl/Kconfig                            |   11 +
+ drivers/pinctrl/Makefile                           |    2 +
+ drivers/pinctrl/pinctrl-exynos.c                   |  555 +++++++++++++
+ drivers/pinctrl/pinctrl-exynos.h                   |  213 +++++
+ drivers/pinctrl/pinctrl-samsung.c                  |  873 ++++++++++++++++++++
+ drivers/pinctrl/pinctrl-samsung.h                  |  215 +++++
+ 9 files changed, 2092 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+ create mode 100644 drivers/pinctrl/pinctrl-exynos.c
+ create mode 100644 drivers/pinctrl/pinctrl-exynos.h
+ create mode 100644 drivers/pinctrl/pinctrl-samsung.c
+ create mode 100644 drivers/pinctrl/pinctrl-samsung.h
