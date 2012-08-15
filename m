@@ -1,60 +1,94 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 15 Aug 2012 09:03:13 +0300
-Subject: [PATCHv6 24/24] i2c: omap: Prevent NULL pointer dereference in
- remove
-In-Reply-To: <1344953946-13005-25-git-send-email-shubhrajyoti@ti.com>
-References: <1344953946-13005-1-git-send-email-shubhrajyoti@ti.com>
- <1344953946-13005-25-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20120815060312.GE23637@arwen.pp.htv.fi>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Wed, 15 Aug 2012 08:37:18 +0200
+Subject: [PATCH v3 10/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <CAErSpo6Awbx9-DWM3V02HUg7Xv4tWAhcLO7UKuT_0uXbpZ+nKw@mail.gmail.com>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <1343332512-28762-11-git-send-email-thierry.reding@avionic-design.de>
+ <20120814201215.GA10542@avionic-0098.mockup.avionic-design.de>
+ <CAErSpo6Awbx9-DWM3V02HUg7Xv4tWAhcLO7UKuT_0uXbpZ+nKw@mail.gmail.com>
+Message-ID: <20120815063718.GA15665@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 07:49:06PM +0530, Shubhrajyoti D wrote:
-> Prevent the NULL pointer access by moving the platform_set_drvdata function
-> after the access of the pdev.
+On Tue, Aug 14, 2012 at 04:50:26PM -0700, Bjorn Helgaas wrote:
+> On Tue, Aug 14, 2012 at 1:12 PM, Thierry Reding
+> <thierry.reding@avionic-design.de> wrote:
+> > On Thu, Jul 26, 2012 at 09:55:12PM +0200, Thierry Reding wrote:
+> >> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> >> index a094c97..c886dff 100644
+> >> --- a/arch/arm/boot/dts/tegra20.dtsi
+> >> +++ b/arch/arm/boot/dts/tegra20.dtsi
+> >> @@ -199,6 +199,68 @@
+> >>               #size-cells = <0>;
+> >>       };
+> >>
+> >> +     pcie-controller {
+> >> +             compatible = "nvidia,tegra20-pcie";
+> >> +             reg = <0x80003000 0x00000800   /* PADS registers */
+> >> +                    0x80003800 0x00000200   /* AFI registers */
+> >> +                    0x81000000 0x01000000   /* configuration space */
+> >> +                    0x90000000 0x10000000>; /* extended configuration space */
+> >> +             interrupts = <0 98 0x04   /* controller interrupt */
+> >> +                           0 99 0x04>; /* MSI interrupt */
+> >> +             status = "disabled";
+> >> +
+> >> +             ranges = <0 0 0  0x80000000 0x00001000   /* root port 0 */
+> >> +                       0 1 0  0x81000000 0x00800000   /* port 0 config space */
+> >> +                       0 2 0  0x90000000 0x08000000   /* port 0 ext config space */
+> >> +                       0 3 0  0x82000000 0x00010000   /* port 0 downstream I/O */
+> >> +                       0 4 0  0xa0000000 0x08000000   /* port 0 non-prefetchable memory */
+> >> +                       0 5 0  0xb0000000 0x08000000   /* port 0 prefetchable memory */
+> >> +
+> >> +                       1 0 0  0x80001000 0x00001000   /* root port 1 */
+> >> +                       1 1 0  0x81800000 0x00800000   /* port 1 config space */
+> >> +                       1 2 0  0x98000000 0x08000000   /* port 1 ext config space */
+> >> +                       1 3 0  0x82010000 0x00010000   /* port 1 downstream I/O */
+> >> +                       1 4 0  0xa8000000 0x08000000   /* port 1 non-prefetchable memory */
+> >> +                       1 5 0  0xb8000000 0x08000000>; /* port 1 prefetchable memory */
+> >
+> > I've been thinking about this some more. The translations for both the
+> > regular and extended configuration spaces are configured in the top-
+> > level PCIe controller. It is therefore wrong how they are passed to the
+> > PCI host bridges via the ranges property.
+> >
+> > I remember Mitch saying that it should be passed down to the children
+> > because it is partitioned among them, but since the layout is compatible
+> > with ECAM, the partitioning isn't as simple as what's in the tree. In
+> > fact the partitions will be dependent on the number of devices attached
+> > to the host bridges.
 > 
-> [  654.961761] Unable to handle kernel NULL pointer dereference at virtual address 00000070
-> [  654.970611] pgd = df254000
-> [  654.973480] [00000070] *pgd=9f1da831, *pte=00000000, *ppte=00000000
-> [  654.980163] Internal error: Oops: 17 [#1] SMP ARM
-> [  654.985076] Modules linked in:
-> [  654.988281] CPU: 1    Not tainted  (3.6.0-rc1-00031-ge547de1-dirty #339)
-> [  654.995330] PC is at omap_i2c_runtime_resume+0x8/0x148
-> [  655.000732] LR is at omap_i2c_runtime_resume+0x8/0x148
-> 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
->  drivers/i2c/busses/i2c-omap.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 3df6f92..49dbff1 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -1217,8 +1217,6 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
->  	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
->  	int ret;
->  
-> -	platform_set_drvdata(pdev, NULL);
-> -
->  	i2c_del_adapter(&dev->adapter);
->  	ret = pm_runtime_get_sync(&pdev->dev);
->  	if (IS_ERR_VALUE(ret))
-> @@ -1227,6 +1225,8 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
->  	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
->  	pm_runtime_put(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
-> +	platform_set_drvdata(pdev, NULL);
+> I don't understand this last bit about the number of devices attached
+> to the host bridges.  Logically, the host bridge has a bus number
+> aperture that you can know up front, even before you know anything
+> about what devices are below it.  On x86, for example, the ACPI _CRS
+> method has something like "[bus 00-7f]" in it, which means that any
+> buses in that range are below this bridge.  That doesn't tell us
+> anything about which buses actually have devices on them, of course;
+> it's just analogous to the secondary and subordinate bus number
+> registers in a P2P bridge.
 
-in fact this platform_set_drvdata(pdev, NULL) can be removed. The
-platform_device object will be destroyed anyway.
+That's one of the issues I still need to take care of. Currently no bus
+resource is attached to the individual bridges (nor the PCI controller
+for that matter), so the PCI core will assign them dynamically. If this
+range is known at boot time we could assign ECAM ranges based on the bus
+numbers. Standard ECAM ranges, that is. On Tegra this won't work because
+as Stephen mentioned in a previous mail, the bus field is not the top
+field in the ECAM addresses. Basically what you have is this:
 
--- 
-balbi
+	[27:24] upper 4 bits of the register address for extended
+	        configuration space
+	[23:16] bus number
+	[15:11] device number
+	[10: 8] device function
+	[ 8: 0] register
+
+So the ECAM space cannot be partitioned by bus number.
+
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120815/2049d19c/attachment-0001.sig>
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120815/97fdcb5f/attachment.sig>
