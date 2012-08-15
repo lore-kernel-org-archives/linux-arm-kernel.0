@@ -1,56 +1,162 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 15 Aug 2012 17:14:51 +0800
-Subject: [PATCH 0/5] ARM: tegra: add CPU hotplug support
-In-Reply-To: <502A99CD.3060400@wwwdotorg.org>
-References: <1344931644-3927-1-git-send-email-josephl@nvidia.com>
- <502A99CD.3060400@wwwdotorg.org>
-Message-ID: <1345022091.25319.158.camel@jlo-ubuntu-64.nvidia.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Wed, 15 Aug 2012 14:51:27 +0530
+Subject: [PATCH] ARM: AM33XX: board-generic: Add of_dev_auxdata to fix
+ dev_id for CAN module
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA897EA@DBDE01.ent.ti.com>
+References: <1344346636-28072-1-git-send-email-hvaibhav@ti.com>
+ <50213214.7050505@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA88BDF@DBDE01.ent.ti.com>
+ <5021CA01.2020206@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EA897EA@DBDE01.ent.ti.com>
+Message-ID: <502B6A17.7040800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
 
-Thanks for your review.
 
-On Wed, 2012-08-15 at 02:32 +0800, Stephen Warren wrote:
-> On 08/14/2012 02:07 AM, Joseph Lo wrote:
-> > This patch set adds CPU hotplug support for Tegra20 and Tegra30 SoCs.
-> > 
-> > The first 3 patches make the CPU clock and reset control be a module and
-> > the abstraction APIs for TegraXX SoCs. And clean up some codes for later
-> > usage. Then add CPU hotplug support for Tegra20 and Tegra30.
-> > 
-> > Verified on Seaboard(Tegra20) and Cardhu(Tegra30)
+On 8/8/2012 5:13 PM, Hiremath, Vaibhav wrote:
+> On Wed, Aug 08, 2012 at 07:38:01, Rob Herring wrote:
+>> On 08/07/2012 10:53 AM, Hiremath, Vaibhav wrote:
+>>> On Tue, Aug 07, 2012 at 20:49:48, Rob Herring wrote:
+>>>> On 08/07/2012 08:37 AM, Vaibhav Hiremath wrote:
+>>>>> If the module requires only one clocksource to function, then
+>>>>> driver can very well call clk_get() api with "con_id = NULL",
+>>>>>
+>>>>>        clk = clk_get(dev, NULL);
+>>>>>
+>>>>> And platform code should respect this and return valid clk handle.
+>>>>> That means, now the clk_get() api would rely on dev_id, and platform
+>>>>> code should either have clk node with matching dev_id (with con_id=NULL)
+>>>>> or return dummy clk node.
+>>>>>
+>>>>> With DT support, we can fix the dev_id for particular module
+>>>>> using "struct of_dev_auxdata" to satisfy above clk framework requirement.
+>>>>>
+>>>>> In case of AM33XX, we required this for the DCAN module, so this
+>>>>> patch adds "of_dev_auxdata" for both DCAN_0/1 instances.
+>>>>>
+>>>>> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+>>>>> Cc: Tony Lindgren <tony@atomide.com>
+>>>>> Cc: Paul Walmsley <paul@pwsan.com>
+>>>>> Cc: Benoit Cousson <b-cousson@ti.com>
+>>>>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>>>>> ---
+>>>>> This patch is boot tested on BeagleBone platform, and checked for
+>>>>> clk_get() return value in d_can module driver.
+>>>>>
+>>>>>  arch/arm/mach-omap2/board-generic.c |   18 +++++++++++++++++-
+>>>>>  1 files changed, 17 insertions(+), 1 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+>>>>> index 6f93a20..c9b7903 100644
+>>>>> --- a/arch/arm/mach-omap2/board-generic.c
+>>>>> +++ b/arch/arm/mach-omap2/board-generic.c
+>>>>> @@ -37,11 +37,27 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
+>>>>>  	{ }
+>>>>>  };
+>>>>>
+>>>>> +/*
+>>>>> + * Lookup table for attaching a specific name and platform_data pointer to
+>>>>> + * devices as they get created by of_platform_populate(). Ideally this table
+>>>>> + * would not exist, but the current clock implementation depends on some devices
+>>>>> + * having a specific name OR to satisfy NULL con_id requirement from driver.
+>>>>> + */
+>>>>> +static const struct of_dev_auxdata am33xx_auxdata_lookup[] __initconst = {
+>>>>> +	OF_DEV_AUXDATA("bosch,d_can", 0x481cc000, "d_can.0", NULL),
+>>>>> +	OF_DEV_AUXDATA("bosch,d_can", 0x481d0000, "d_can.1", NULL),
+>>>>> +	{ },
+>>>>> +};
+>>>>
+>>>> Adding an additional clkdev lookup accomplishes the same thing and is a
+>>>> cleaner solution.
+>>>>
+>>>
+>>> That is also required and I have submitted patch for the same -
+>>>
+>>> http://www.spinics.net/lists/arm-kernel/msg187998.html
+>>
+>> That only adds the non-DT name. What I'm saying is you can have 2 lookup
+>> names for the same clock.
+>>
+>>>
+>>> With DT support, I am getting dev_id as -
+>>>
+>>>  - Without "reg" property: d_can.16 and d_can.17,
+>>>    (I believe it changes dynamically here)
+>>>
+>>>  - With "reg" property: 481cc000.d_can and 481d0000.d_can
+>>>
+>>> Which is not so intuitive, I would like to see them as per Spec/TRM, so 
+>>> doesn't this patch make sense?
+>>
+>> The spec doesn't have a base address for the module? This name is going
+>> to get used in sysfs anyway, and the old name should be going away.
+>>
 > 
-> There are two problems with this series:
+> This is certainly going to change user interface change, and I thought we 
+> should not change the user interface irrespective of whether it is DT or 
+> non-DT.
+> Few points, which I do care about, are,
 > 
-> 1) It doesn't compile if CONFIG_HOTPLUG_CPU isn't enabled. Please also
-> make sure that Tegra20-only and Tegra30-only kernels compile (I didn't
-> check this, so it may well already be the case).
-
-I will add one more patch to enable HOTPLUG_CPU in this patch set.
-
-I also verified the compiling and functionality of the Tegra20-only and
-Tegra30-only kernels. It's OK.
+> 1. request_irq():
+>    For the driver if I am using dev_name(dev) as for the 3rd argument, which 
+>    will now different with DT support - brings change in user interface.
 > 
-> 2) It prevents the "reboot" from working; the kernel hangs as it
-> attempts to do the reboot. I've confirmed this isn't the case without
-> this patch series, even if CONFIG_HOTPLUG_CPU is enabled.
-
-I just found during the reboot process. It will call to
-"platfor_cpu_kill" before assert the reset. But in this patch, the
-"platform_cpu_kill" can't just be called along. It must be called after
-"platform_cpu_die". So I will move all the SoC specific CPU shutdown
-code into "platform_cpu_die" not separate into two functions. It will
-prevent the system hang when calling to "smp_send_stop". (the flow for
-your reference,
-sys_reboot->machine_restart->smp_send_stop->smp_kill_cpus->platform_cpu_kill.)
+>    Non-DT:
+>     #cat /proc/interrupts
+>                CPU0
+>     52:          0      INTC  xxx0
+>     55:          0      INTC  xxx1
 > 
-> I assume we'll want to enable CONFIG_HOTPLUG_CPU in tegra_defconfig once
-> this is checked in?
+>    DT:
+>     #cat /proc/interrupts
+>                CPU0
+>     52:          0      INTC  481cc000.xxx
+>     55:          0      INTC  481d0000.xxx
+> 
+> 
+> 2. SYSFS:
+>    For example,
+>    Without auxdata:
+>      /sys/devices/481cc000.xxx/
+>      /sys/devices/481d0000.xxx/
+> 
+>    With auxdata:
+>      /sys/devices/xxx.0/
+>      /sys/devices/xxx.1/
+> 
+>    From user perspective, I still would not want to change the existing 
+>    naming convention.
+> 
+> 3. Certainly I don't want user to go back to spec everytime to find out 
+>    which address is mapped to which instance of module.
+>    Also, in addition to that, in case of SoC's like AM33xx (for that matter, 
+>    any embedded SoC) we have different domains and modules are placed in 
+>    different domains as per use-cases.
+>    For example, in this case, can0 is places in wakeup domain and can1 is 
+>    placed in per-domain. Some boards might use only one instance or some 
+>    board might use both of them.
+> 
+>    I still would like to keep instance number wherever user interface comes 
+>    into picture and populate base address as an additional info to user.
+> 
+> 
+> I may be missing something, may be I am not able to see the bigger picture 
+> here.
+> 
+> Grant/Benoit, May be you can conform and put your opinion on this.
+> 
+
+Rob,
+
+I think we do not have any conclusion on this, so here should I assume
+that I should just simply add another clk node entry in clock-tree, like
+below -
+
+CLK("481cc000.d_can",   NULL,           &dcan0_fck,     CK_AM33XX),
+CLK("481d0000.d_can",   NULL,           &dcan1_fck,     CK_AM33XX),
+
+
 
 Thanks,
-Joseph
-
---
-nvpublic
+Vaibhav
