@@ -1,248 +1,66 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 15 Aug 2012 12:02:42 +0200
-Subject: [PATCH 2/8] ARM: OMAP2+: PM: introduce power domains achievable
- functional states
+Date: Wed, 15 Aug 2012 12:02:46 +0200
+Subject: [PATCH 6/8] ARM: OMAP2+: PM debug: trace the functional power domains
+ states
 In-Reply-To: <1345024968-28951-1-git-send-email-j-pihet@ti.com>
 References: <1345024968-28951-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1345024968-28951-3-git-send-email-j-pihet@ti.com>
+Message-ID: <1345024968-28951-7-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Note: the patch is in RFC state because the state machine for setting
-the next power domain states needs more discussion. Validated on OMAP3&4
-with cpuidle and suspend/resume, though.
+Trace the power domain transitions using the functional power states,
+which include the power and logic states.
 
-Power domains have varied capabilities. When attempting a low power
-state such as OFF/RET, a specific min requested state may not be
-supported on the power domain. This is because a combination
-of system power states where the parent PD's state is not in line
-with expectation can result in system instabilities.
+While at it, fix the trace in the case a power domain did not hit
+the desired state, as reported by Paul Walmsley.
 
-This patch provides a function that returns the achievable functional
-power state for a power domain and its use by pwrdm_set_next_fpwrst.
-The achievable power state is first looked for in the lower power
-states in order to maximize the power savings, then if not found
-in the higher power states.
-
-Inspired from Tero's work on OMAP4 device OFF support, generalized
-to the functional power states and reworked as per Nishant's
-suggestions.
-
+Reported-by: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
-Cc: Tero Kristo <t-kristo@ti.com>
-Cc: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/powerdomain.c |  152 +++++++++++++++++++++++++++++++------
- arch/arm/mach-omap2/powerdomain.h |    1 +
- 2 files changed, 130 insertions(+), 23 deletions(-)
+ arch/arm/mach-omap2/powerdomain.c |   15 +++++----------
+ 1 files changed, 5 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 6fc3c84..3a1f56c 100644
+index 6b8580b..06a566b 100644
 --- a/arch/arm/mach-omap2/powerdomain.c
 +++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -199,6 +199,53 @@ static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
- 	return 0;
- }
+@@ -144,7 +144,7 @@ static void _update_logic_membank_counters(struct powerdomain *pwrdm)
+ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+ {
  
-+/**
-+ * Search down then up for a valid state from a list of allowed states.
-+ * Used by pwrdm_get_achievable_fpwrst to look for allowed power and
-+ * logic states for a powerdomain.
-+ *
-+ * @pwrsts: list of allowed states, defined as a bitmask
-+ * @pwrst: initial state to be used as a starting point
-+ * @min: minimum allowed state
-+ * @max: maximum allowed state
-+ *
-+ * Returns the matching allowed state.
-+ */
-+static inline int _match_pwrst(u32 pwrsts, int pwrst, int min, int max)
-+{
-+	int found = 1, new_pwrst = pwrst;
-+
-+	/*
-+	 * Search lower: if the requested state is not supported
-+	 * try the lower states, stopping at the minimum allowed
-+	 * state
-+	 */
-+	while (!(pwrsts & (1 << new_pwrst))) {
-+		if (new_pwrst <= min) {
-+			found = 0;
-+			break;
-+		}
-+		new_pwrst--;
-+	}
-+
-+	/*
-+	 * Search higher: if no lower state found fallback to the higher
-+	 * states, stopping@the maximum allowed state
-+	 */
-+	if (!found) {
-+		new_pwrst = pwrst;
-+		while (!(pwrsts & (1 << new_pwrst))) {
-+			if (new_pwrst >= max) {
-+				new_pwrst = max;
-+				break;
-+			}
-+			new_pwrst++;
-+		}
-+	}
-+
-+	return new_pwrst;
-+}
-+
- /* Public functions */
+-	int prev, state, trace_state = 0;
++	int prev, next, state, trace_state;
  
- /**
-@@ -553,6 +600,57 @@ int pwrdm_pwrst_to_fpwrst(struct powerdomain *pwrdm, u8 pwrst, u8 logic)
+ 	if (pwrdm == NULL)
+ 		return -EINVAL;
+@@ -165,10 +165,10 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+ 		 * If the power domain did not hit the desired state,
+ 		 * generate a trace event with both the desired and hit states
+ 		 */
+-		if (state != prev) {
++		next = pwrdm_read_next_fpwrst(pwrdm);
++		if (next != prev) {
+ 			trace_state = (PWRDM_TRACE_STATES_FLAG |
+-				       ((state & OMAP_POWERSTATE_MASK) << 8) |
+-				       ((prev & OMAP_POWERSTATE_MASK) << 0));
++				       (next << 8) | (prev << 0));
+ 			trace_power_domain_target(pwrdm->name, trace_state,
+ 						  smp_processor_id());
+ 		}
+@@ -781,13 +781,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
+ 	pr_debug("powerdomain: setting next powerstate for %s to %0x\n",
+ 		 pwrdm->name, pwrst);
+ 
+-	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
+-		/* Trace the pwrdm desired target state */
+-		trace_power_domain_target(pwrdm->name, pwrst,
+-					  smp_processor_id());
+-		/* Program the pwrdm desired target state */
++	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst)
+ 		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
+-	}
+ 
  	return ret;
  }
- 
-+/**
-+ * pwrdm_get_achievable_fpwrst() - Provide achievable functional state
-+ * @pwrdm: struct powerdomain * to set
-+ * @fpwrst: minimum functional state we would like to hit
-+ * (one of the PWRDM_FUNC_* macros)
-+ *
-+ * Power domains have varied capabilities. When attempting a low power
-+ * state such as OFF/RET, a specific min requested state may not be
-+ * supported on the power domain. This is because a combination
-+ * of system power states where the parent PD's state is not in line
-+ * with expectation can result in system instabilities.
-+ *
-+ * The achievable power state is first looked for in the lower power
-+ * states in order to maximize the power savings, then if not found
-+ * in the higher power states.
-+ *
-+ * Returns the achievable functional power state, or -EINVAL in case of
-+ * invalid parameters.
-+ */
-+int pwrdm_get_achievable_fpwrst(struct powerdomain *pwrdm, u8 fpwrst)
-+{
-+	int pwrst = pwrdm_fpwrst_to_pwrst(pwrdm, fpwrst);
-+	int logic = pwrdm_fpwrst_to_logic_pwrst(pwrdm, fpwrst);
-+	int new_fpwrst, new_pwrst, new_logic;
-+
-+	if (!pwrdm || IS_ERR(pwrdm)) {
-+		pr_debug("%s: invalid params: pwrdm=%p, fpwrst=%0x\n",
-+			 __func__, pwrdm, fpwrst);
-+		return -EINVAL;
-+	}
-+
-+	if ((pwrst < 0) || (logic < 0)) {
-+		pr_debug("%s: invalid params for pwrdm %s, fpwrst=%0x\n",
-+			 __func__, pwrdm->name, fpwrst);
-+		return PWRDM_FUNC_PWRST_ON;
-+	}
-+
-+	new_pwrst = _match_pwrst(pwrdm->pwrsts, pwrst, PWRDM_POWER_OFF,
-+				 PWRDM_POWER_ON);
-+	new_logic = _match_pwrst(pwrdm->pwrsts_logic_ret, logic,
-+				 PWRDM_LOGIC_MEM_PWRST_OFF,
-+				 PWRDM_LOGIC_MEM_PWRST_RET);
-+
-+	new_fpwrst = pwrdm_pwrst_to_fpwrst(pwrdm, new_pwrst, new_logic);
-+
-+	pr_debug("%s(%s, fpwrst=%0x) returns %0x\n", __func__,
-+		 pwrdm->name, fpwrst, new_fpwrst);
-+
-+	return new_fpwrst;
-+}
-+
- /* Types of sleep_switch used in pwrdm_set_next_fpwrst */
- #define FORCEWAKEUP_SWITCH	0
- #define LOWPOWERSTATE_SWITCH	1
-@@ -562,34 +660,30 @@ int pwrdm_pwrst_to_fpwrst(struct powerdomain *pwrdm, u8 pwrst, u8 logic)
-  * @pwrdm: struct powerdomain * to set
-  * @fpwrst: power domain functional state, one of the PWRDM_FUNC_* macros
-  *
-- * This programs the pwrdm next functional state, sets the dependencies
-- * and waits for the state to be applied.
-+ * This looks for the more suited (or achievable) next functional power
-+ * state, programs it, sets the dependencies and waits for the state to
-+ * be applied to the power domain.
-  */
- int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm,
- 			  enum pwrdm_func_state fpwrst)
- {
--	u8 curr_pwrst, next_pwrst;
--	int pwrst = pwrdm_fpwrst_to_pwrst(pwrdm, fpwrst);
--	int logic = pwrdm_fpwrst_to_logic_pwrst(pwrdm, fpwrst);
- 	int sleep_switch = -1, ret = 0, hwsup = 0;
-+	int new_fpwrst, next_fpwrst, pwrst, logic;
-+	u8 curr_pwrst;
- 
--	if (!pwrdm || IS_ERR(pwrdm) || (pwrst < 0) || (logic < 0)) {
--		pr_debug("%s: invalid params: pwrdm=%p, fpwrst=%0x\n",
--			 __func__, pwrdm, fpwrst);
-+	if (!pwrdm || IS_ERR(pwrdm)) {
-+		pr_debug("%s: invalid params: pwrdm=%p\n", __func__, pwrdm);
- 		return -EINVAL;
- 	}
- 
--	pr_debug("%s: set fpwrst %0x to pwrdm %s\n",
--		 __func__, fpwrst, pwrdm->name);
-+	pr_debug("%s(%s, fpwrst=%0x)\n", __func__, pwrdm->name, fpwrst);
- 
--	while (!(pwrdm->pwrsts & (1 << pwrst))) {
--		if (pwrst == PWRDM_POWER_OFF)
--			return ret;
--		pwrst--;
--	}
-+	new_fpwrst = pwrdm_get_achievable_fpwrst(pwrdm, fpwrst);
-+	pwrst = pwrdm_fpwrst_to_pwrst(pwrdm, new_fpwrst);
-+	logic = pwrdm_fpwrst_to_logic_pwrst(pwrdm, new_fpwrst);
- 
--	next_pwrst = pwrdm_read_next_pwrst(pwrdm);
--	if (next_pwrst == pwrst)
-+	next_fpwrst = pwrdm_read_next_fpwrst(pwrdm);
-+	if (new_fpwrst == next_fpwrst)
- 		return ret;
- 
- 	curr_pwrst = pwrdm_read_pwrst(pwrdm);
-@@ -604,13 +698,25 @@ int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm,
- 		}
- 	}
- 
--	if (logic != pwrdm_read_logic_retst(pwrdm))
--		pwrdm_set_logic_retst(pwrdm, logic);
-+	pr_debug("%s: set fpwrst %0x (%0x,%0x) to pwrdm %s\n",
-+		 __func__, new_fpwrst, pwrst, logic, pwrdm->name);
-+
-+	/* Trace the pwrdm desired target state */
-+	trace_power_domain_target(pwrdm->name, new_fpwrst,
-+				  smp_processor_id());
-+
-+	/* Program next power state */
-+	if (pwrst != pwrdm_fpwrst_to_pwrst(pwrdm, next_fpwrst)) {
-+		ret = pwrdm_set_next_pwrst(pwrdm, pwrst);
-+		if (ret)
-+			pr_err("%s: unable to set power state of powerdomain: %s\n",
-+			       __func__, pwrdm->name);
-+	}
- 
--	ret = pwrdm_set_next_pwrst(pwrdm, pwrst);
--	if (ret)
--		pr_err("%s: unable to set power state of powerdomain: %s\n",
--		       __func__, pwrdm->name);
-+	/* Program RET logic state */
-+	if ((pwrst == PWRDM_POWER_RET) &&
-+	    (logic != pwrdm_fpwrst_to_logic_pwrst(pwrdm, next_fpwrst)))
-+		pwrdm_set_logic_retst(pwrdm, logic);
- 
- 	switch (sleep_switch) {
- 	case FORCEWAKEUP_SWITCH:
-diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index aa9f9b9..45c449d 100644
---- a/arch/arm/mach-omap2/powerdomain.h
-+++ b/arch/arm/mach-omap2/powerdomain.h
-@@ -239,6 +239,7 @@ int pwrdm_set_next_fpwrst(struct powerdomain *pwrdm,
- int pwrdm_read_prev_fpwrst(struct powerdomain *pwrdm);
- int pwrdm_read_fpwrst(struct powerdomain *pwrdm);
- int pwrdm_read_next_fpwrst(struct powerdomain *pwrdm);
-+int pwrdm_get_achievable_fpwrst(struct powerdomain *pwrdm, u8 fpwrst);
- int omap2_pwrdm_fpwrst_to_pwrst(struct powerdomain *pwrdm, u8 fpwrst);
- int omap2_pwrdm_fpwrst_to_logic_pwrst(struct powerdomain *pwrdm, u8 fpwrst);
- int omap2_pwrdm_pwrst_to_fpwrst(struct powerdomain *pwrdm, u8 pwrst, u8 logic);
 -- 
 1.7.7.6
