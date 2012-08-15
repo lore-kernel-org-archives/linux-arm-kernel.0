@@ -1,26 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Aug 2012 13:35:47 +0000
-Subject: [GIT PULL] orion/kirkwood fixes for v3.6
-In-Reply-To: <20120815131317.GE22226@titan.lakedaemon.net>
-References: <20120814234442.GZ22226@titan.lakedaemon.net>
- <201208151237.56639.arnd@arndb.de>
- <20120815131317.GE22226@titan.lakedaemon.net>
-Message-ID: <201208151335.47964.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 15 Aug 2012 14:39:23 +0100
+Subject: [PATCH v2 04/31] arm64: MMU definitions
+In-Reply-To: <201208151330.02112.arnd@arndb.de>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-5-git-send-email-catalin.marinas@arm.com>
+ <201208151330.02112.arnd@arndb.de>
+Message-ID: <20120815133923.GA12596@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 August 2012, Jason Cooper wrote:
-> > The first patch in your series (ARM: Orion: Set eth packet size
-> > csum offload limit) looks like it should apply to older kernels
-> > as well. In those cases, please add "Cc: stable at vger.kernel.org"
-> > below the Signed-off-by lines (but not in the email submission)
-> > so it can get picked up by Greg for the longterm and stable
-> > releases.
+Hi Arnd,
+
+On Wed, Aug 15, 2012 at 02:30:01PM +0100, Arnd Bergmann wrote:
+> On Tuesday 14 August 2012, Catalin Marinas wrote:
+> > +/*
+> > + * TCR flags.
+> > + */
+> > +#define TCR_TxSZ(x)		(((64 - (x)) << 16) | ((64 - (x)) << 0))
+> > +#define TCR_IRGN_NC		((0 << 8) | (0 << 24))
+> > +#define TCR_IRGN_WBWA		((1 << 8) | (1 << 24))
+> > +#define TCR_IRGN_WT		((2 << 8) | (2 << 24))
+> > +#define TCR_IRGN_WBnWA		((3 << 8) | (3 << 24))
+> > +#define TCR_IRGN_MASK		((3 << 8) | (3 << 24))
+> > +#define TCR_ORGN_NC		((0 << 10) | (0 << 26))
+> > +#define TCR_ORGN_WBWA		((1 << 10) | (1 << 26))
+> > +#define TCR_ORGN_WT		((2 << 10) | (2 << 26))
+> > +#define TCR_ORGN_WBnWA		((3 << 10) | (3 << 26))
+> > +#define TCR_ORGN_MASK		((3 << 10) | (3 << 26))
+> > +#define TCR_SHARED		((3 << 12) | (3 << 28))
+> > +#define TCR_TG0_64K		(1 << 14)
+> > +#define TCR_TG1_64K		(1 << 30)
+> > +#define TCR_IPS_40BIT		(2 << 32)
+> > +#define TCR_ASID16		(1 << 36)
+> > +
 > 
-> Gah!  I missed that, sorry.  Did you forward it already or would you
-> like me to handle it?
+> As a matter of coding style, I would much prefer tables like this to be
+> written as
+> 
+> #define TCR_IRGN_MASK		0x0000000003000300
+> #define TCR_IRGN_WBnWA		0x0000000003000300
+> #define TCR_IRGN_WT		0x0000000002000200
+> #define TCR_IRGN_WBWA		0x0000000001000100
+> #define TCR_IRGN_NC		0x0000000000000000
+> 
+> #define TCR_ORGN_MASK		0x000000000c000c00
+> #define TCR_ORGN_WBnWA		0x000000000c000c00
+> #define TCR_ORGN_WT		0x0000000008000800
+> #define TCR_ORGN_WBWA		0x0000000004000400
+> #define TCR_ORGN_NC		0x0000000000000000
+> 
+> The advantage of this is that you can visually compare the bitmasks
+> to a hex dump, and if you are suffering from endian-confused documentation
+> authors, there is no ambiguity about which end of the word is bit zero.
 
-I haven't forwarded it yet. I'll just add the tag myself if you
-don't mind your patches getting rebased.
+That depends on the case, in some places it's more readable like this.
+In the above case, I find it easier to compare against the documentation
+which, for example, has groups of 2 bits at position 8 and 24 or 10 and
+26 (for TTBR0 and TTBR1). The meaning of a group of 2 bits is described
+separately as 0b00 (NC), 0b01(WBWA) etc. Same goes for the shareability
+bits (12 and 28).
 
-	Arnd
+So I think at least for code writing it's less error-prone to write the
+explicit bit position than a magic long hex.
+
+-- 
+Catalin
