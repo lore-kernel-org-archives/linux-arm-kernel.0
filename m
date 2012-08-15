@@ -1,71 +1,127 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 15 Aug 2012 22:16:10 +0800
-Subject: [rtc-linux] [PATCH v3] rtc: snvs: add Freescale rtc-snvs driver
-In-Reply-To: <20120814170300.8f97afcf.akpm@linux-foundation.org>
-References: <1342164663-31351-1-git-send-email-shawn.guo@linaro.org>
- <20120814170300.8f97afcf.akpm@linux-foundation.org>
-Message-ID: <20120815141606.GA2457@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Aug 2012 14:22:16 +0000
+Subject: [PATCH v2 17/31] arm64: System calls handling
+In-Reply-To: <1344966752-16102-18-git-send-email-catalin.marinas@arm.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-18-git-send-email-catalin.marinas@arm.com>
+Message-ID: <201208151422.16335.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for looking at the patch, Andrew.
+On Tuesday 14 August 2012, Catalin Marinas wrote:
 
-On Tue, Aug 14, 2012 at 05:03:00PM -0700, Andrew Morton wrote:
-> On Fri, 13 Jul 2012 15:31:03 +0800
-> Shawn Guo <shawn.guo@linaro.org> wrote:
-> 
-> > +static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
-> > +{
-> > +	unsigned long timeout = jiffies + msecs_to_jiffies(1);
-> > +	unsigned long flags;
-> > +	u32 lpcr;
-> > +
-> > +	spin_lock_irqsave(&data->lock, flags);
-> > +
-> > +	lpcr = readl(data->ioaddr + SNVS_LPCR);
-> > +	if (enable)
-> > +		lpcr |= SNVS_LPCR_SRTC_ENV;
-> > +	else
-> > +		lpcr &= ~SNVS_LPCR_SRTC_ENV;
-> > +	writel(lpcr, data->ioaddr + SNVS_LPCR);
-> > +
-> > +	spin_unlock_irqrestore(&data->lock, flags);
-> > +
-> > +	while (1) {
-> > +		lpcr = readl(data->ioaddr + SNVS_LPCR);
-> > +
-> > +		if (enable) {
-> > +			if (lpcr & SNVS_LPCR_SRTC_ENV)
-> > +				break;
-> > +		} else {
-> > +			if (!(lpcr & SNVS_LPCR_SRTC_ENV))
-> > +				break;
-> > +		}
-> > +
-> > +		if (time_after(jiffies, timeout))
-> > +			return -ETIMEDOUT;
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> 
-> The timeout code here is fragile.  If acquiring the spinlock takes more
-> than a millisecond or if this thread gets interrupted or preempted then
-> we could easily execute that loop just a single time, and fail.
-> 
-So what about moving the timeout initialization to right above the
-while(1) loop?
+> +
+> +/* This matches struct stat64 in glibc2.1, hence the absolutely
+> + * insane amounts of padding around dev_t's.
+> + * Note: The kernel zero's the padded region because glibc might read them
+> + * in the hope that the kernel has stretched to using larger sizes.
+> + */
+> +struct stat64 {
+> +	compat_u64	st_dev;
+> +	unsigned char   __pad0[4];
+> +
+> +#define STAT64_HAS_BROKEN_ST_INO	1
+> +	compat_ulong_t	__st_ino;
+> +	compat_uint_t	st_mode;
+> +	compat_uint_t	st_nlink;
+> +
+> +	compat_ulong_t	st_uid;
+> +	compat_ulong_t	st_gid;
+> +
+> +	compat_u64	st_rdev;
+> +	unsigned char   __pad3[4];
+> +
+> +	compat_s64	st_size;
+> +	compat_ulong_t	st_blksize;
+> +	compat_u64	st_blocks;	/* Number 512-byte blocks allocated. */
+> +
+> +	compat_ulong_t	st_atime;
+> +	compat_ulong_t	st_atime_nsec;
+> +
+> +	compat_ulong_t	st_mtime;
+> +	compat_ulong_t	st_mtime_nsec;
+> +
+> +	compat_ulong_t	st_ctime;
+> +	compat_ulong_t	st_ctime_nsec;
+> +
+> +	compat_u64	st_ino;
+> +};
 
-> It would be better to retry a fixed number of times, say 1000?  That
-> would take around 1 millisecond, but might be overkill.
-> 
-How long a 1000 times loop takes really depends on the cpu frequency,
-right?
+The comment above struct stat64 is completely irrelevant here. I would instead
+explain why you need your own stat64 in the first place.
 
-BTW, I have received the notification telling that the patch has been
-applied on -mm tree.  So should I just send you an incremental patch
-to address the comment?
+> +int kernel_execve(const char *filename,
+> +		  const char *const argv[],
+> +		  const char *const envp[])
+> +{
+> +	struct pt_regs regs;
+> +	int ret;
+> +
+> +	memset(&regs, 0, sizeof(struct pt_regs));
+> +	ret = do_execve(filename,
+> +			(const char __user *const __user *)argv,
+> +			(const char __user *const __user *)envp, &regs);
+> +	if (ret < 0)
+> +		goto out;
+> +
+> +	/*
+> +	 * Save argc to the register structure for userspace.
+> +	 */
+> +	regs.regs[0] = ret;
+> +
+> +	/*
+> +	 * We were successful.  We won't be returning to our caller, but
+> +	 * instead to user space by manipulating the kernel stack.
+> +	 */
+> +	asm(	"add	x0, %0, %1\n\t"
+> +		"mov	x1, %2\n\t"
+> +		"mov	x2, %3\n\t"
+> +		"bl	memmove\n\t"	/* copy regs to top of stack */
+> +		"mov	x27, #0\n\t"	/* not a syscall */
+> +		"mov	x28, %0\n\t"	/* thread structure */
+> +		"mov	sp, x0\n\t"	/* reposition stack pointer */
+> +		"b	ret_to_user"
+> +		:
+> +		: "r" (current_thread_info()),
+> +		  "Ir" (THREAD_START_SP - sizeof(regs)),
+> +		  "r" (&regs),
+> +		  "Ir" (sizeof(regs))
+> +		: "x0", "x1", "x2", "x27", "x28", "x30", "memory");
+> +
+> + out:
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL(kernel_execve);
 
--- 
-Regards,
-Shawn
+Al Viro was recently talking about a generic implementation of execve.
+I can't find that now, but I think you should use that.
+
+> +
+> +asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
+> +			 unsigned long prot, unsigned long flags,
+> +			 unsigned long fd, off_t off)
+> +{
+> +	if (offset_in_page(off) != 0)
+> +		return -EINVAL;
+> +
+> +	return sys_mmap_pgoff(addr, len, prot, flags, fd, off >> PAGE_SHIFT);
+> +}
+> +
+> +/*
+> + * Wrappers to pass the pt_regs argument.
+> + */
+> +#define sys_execve		sys_execve_wrapper
+> +#define sys_clone		sys_clone_wrapper
+> +#define sys_rt_sigreturn	sys_rt_sigreturn_wrapper
+> +#define sys_sigaltstack		sys_sigaltstack_wrapper
+
+I think
+
+#define sys_mmap sys_mmap_pgoff 
+
+would be more appropriate than defining your own sys_mmap function here.
+We should probably make that the default in asm-generic/unistd.h and
+change the architectures that have their own implementation to override
+it.
+
+	Arnd
