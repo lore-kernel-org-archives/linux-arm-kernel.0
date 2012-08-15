@@ -1,49 +1,45 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 15 Aug 2012 21:28:14 +0200
-Subject: [PATCH v3 01/10] PCI: Keep pci_fixup_irqs() around after init
-In-Reply-To: <CAErSpo7v+i8i=mXCs7ZW8DtGTDN_4AEntwYLqGG8FcCzweySFg@mail.gmail.com>
-References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
- <1343332512-28762-2-git-send-email-thierry.reding@avionic-design.de>
- <CAErSpo7v+i8i=mXCs7ZW8DtGTDN_4AEntwYLqGG8FcCzweySFg@mail.gmail.com>
-Message-ID: <20120815192814.GA12870@avionic-0098.mockup.avionic-design.de>
+From: wade_farnsworth@mentor.com (Wade Farnsworth)
+Date: Wed, 15 Aug 2012 12:35:36 -0700
+Subject: [PATCH v2] ARM: support syscall tracing
+In-Reply-To: <20120815172731.GL29448@mudshark.cambridge.arm.com>
+References: <502BBCCC.1020006@mentor.com>
+ <20120815162157.GJ29448@mudshark.cambridge.arm.com>
+ <502BD544.70903@mentor.com>
+ <20120815172731.GL29448@mudshark.cambridge.arm.com>
+Message-ID: <502BFA08.6010708@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2012 at 10:06:27AM -0700, Bjorn Helgaas wrote:
-> On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
-> <thierry.reding@avionic-design.de> wrote:
-> > When using deferred driver probing, PCI host controller drivers may
-> > actually require this function after the init stage.
-> >
-> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> > ---
-> > Changes in v3:
-> > - none
-> >
-> > Changes in v2:
-> > - use __devinit annotations
-> 
-> Your original patch removed __init completely.  Here you change it to
-> __devinit.  That means we decide whether to discard the function based
-> on whether CONFIG_HOTPLUG is supported.  But I think your point is not
-> about hotplug; it's merely that we should be able to scan a PCI bus
-> after init-time.  We ought to be able to do a late PCI scan even if
-> hotplug is not supported.
-> 
-> Therefore, I'd be inclined to remove __init completely unless you have
-> another reason for preferring __devinit.
+Will Deacon wrote:
+> On Wed, Aug 15, 2012 at 05:58:44PM +0100, Wade Farnsworth wrote:
+>> We need to set current_thread_info()->syscall, since it's used in the
+>> call to syscall_get_nr() in perf_syscall_{enter,exit}.
+>
+> Damn. I think that also means we have a bug, given that the SYSCALL_TRACE
+> code can set this to -1, which gets used as an index into a bitmap by the
+> looks of it. Considering that we have to pass the syscall number to
+> trace_sys_enter anyway, it also seems broken.
+>
 
-I thought __devinit would resolve to nothing if HOTPLUG is defined and
-__init otherwise. That seemed more appropriate. However you are right
-that it is useful to always have it available, so I'm fine with removing
-the annotations altogether. Do you want me to follow up with a patch? Or
-can you just take the first version? I'm not sure if it still applies.
+I agree.  Looking at the other architectures, it seems the analogous 
+function to ptrace_syscall_trace can return -1 under certain 
+circumstances, but the original syscall value should be passed onto 
+trace_sys_enter and returned from syscall_get_nr().  So, I'm thinking 
+that we should modify our behavior accordingly.  What this means for us 
+is that we never store -1 in the thread_info syscall field, and then 
+pass that into trace_sys_enter instead of the ptrace_syscall_trace 
+return value. Do you see any problems with this approach?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120815/74a964da/attachment-0001.sig>
+>> What about moving the setting of ->syscall to
+>> syscall_trace_{enter,exit}?  That would preserve ptrace_syscall_trace()
+>> for the TIF_SYSCALL_TRACE case only, but ensure that the field is set
+>> the TRACEPOINT case as well.  Thoughts?
+>
+> I'd be tempted to set the thing unconditionally before checking the thread
+> flag at the top of ptrace_syscall_trace. This hangs off the slowpath anyway
+> and it makes everything a lot more readable.
+>
+
+OK, I'll make that change.
+
+Wade
