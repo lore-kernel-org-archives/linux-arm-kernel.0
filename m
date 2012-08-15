@@ -1,17 +1,17 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 15 Aug 2012 19:07:32 +0200
-Subject: [PATCH v3 3/6] ARM: dove: add crypto engine
+Date: Wed, 15 Aug 2012 19:07:33 +0200
+Subject: [PATCH v3 4/6] ARM: dove: add device tree based machine descriptor
 In-Reply-To: <1345050455-32643-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1344681326-17946-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1345050455-32643-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1345050455-32643-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1345050455-32643-5-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a dove specific setup function for the Marvell CESA
-crypto engine available on orion based SoCs. Dove setup was just
-missing a function to call orion_crypto_init with dove specific
-setup.
+This adds a generic DT_MACHINE for mach-dove. As with other orion based
+SoCs there still is some glue code required to make all internal devices
+work, i.e. auxdata is provided to pass clocks to corresponding device
+drivers.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -25,28 +25,116 @@ Cc: Ian Molton <ian.molton@codethink.co.uk>
 Cc: Maen Suleiman <maen@marvell.com>
 Cc: Olof Johansson <olof@lixom.net>
 ---
- arch/arm/mach-dove/common.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/mach-dove/Kconfig  |    7 +++++
+ arch/arm/mach-dove/common.c |   67 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 74 insertions(+)
 
+diff --git a/arch/arm/mach-dove/Kconfig b/arch/arm/mach-dove/Kconfig
+index dd937c5..00154e7 100644
+--- a/arch/arm/mach-dove/Kconfig
++++ b/arch/arm/mach-dove/Kconfig
+@@ -15,6 +15,13 @@ config MACH_CM_A510
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  CompuLab CM-A510 Board.
+ 
++config MACH_DOVE_DT
++	bool "Marvell Dove Flattened Device Tree"
++	select USE_OF
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  Marvell Dove using flattened device tree.
++
+ endmenu
+ 
+ endif
 diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-index 9b2f961..66689ce 100644
+index 66689ce..810ea15 100644
 --- a/arch/arm/mach-dove/common.c
 +++ b/arch/arm/mach-dove/common.c
-@@ -258,6 +258,15 @@ struct sys_timer dove_timer = {
- };
- 
- /*****************************************************************************
-+ * Cryptographic Engines and Security Accelerator (CESA)
-+ ****************************************************************************/
-+void __init dove_crypto_init(void)
+@@ -16,6 +16,8 @@
+ #include <linux/clk-provider.h>
+ #include <linux/ata_platform.h>
+ #include <linux/gpio.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
+ #include <asm/page.h>
+ #include <asm/setup.h>
+ #include <asm/timex.h>
+@@ -29,6 +31,7 @@
+ #include <asm/mach/arch.h>
+ #include <linux/irq.h>
+ #include <plat/time.h>
++#include <plat/irq.h>
+ #include <plat/ehci-orion.h>
+ #include <plat/common.h>
+ #include <plat/addr-map.h>
+@@ -379,3 +382,67 @@ void dove_restart(char mode, const char *cmd)
+ 	while (1)
+ 		;
+ }
++
++#if defined(CONFIG_MACH_DOVE_DT)
++/*
++ * Auxdata required until real OF clock provider
++ */
++struct of_dev_auxdata dove_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
++	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1014600, "orion_spi.1", NULL),
++	OF_DEV_AUXDATA("marvell,orion-wdt", 0xf1020300, "orion_wdt", NULL),
++	OF_DEV_AUXDATA("marvell,mv64xxx-i2c", 0xf1011000, "mv64xxx_i2c.0",
++		       NULL),
++	OF_DEV_AUXDATA("marvell,orion-sata", 0xf10a0000, "sata_mv.0", NULL),
++	OF_DEV_AUXDATA("marvell,dove-sdhci", 0xf1092000, "sdhci-dove.0", NULL),
++	OF_DEV_AUXDATA("marvell,dove-sdhci", 0xf1090000, "sdhci-dove.1", NULL),
++	{},
++};
++
++static struct mv643xx_eth_platform_data dove_dt_ge00_data = {
++	.phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT,
++};
++
++static void __init dove_dt_init(void)
 +{
-+	orion_crypto_init(DOVE_CRYPT_PHYS_BASE, DOVE_CESA_PHYS_BASE,
-+			  DOVE_CESA_SIZE, IRQ_DOVE_CRYPTO);
++	pr_info("Dove 88AP510 SoC, TCLK = %d MHz.\n",
++		(dove_tclk + 499999) / 1000000);
++
++#ifdef CONFIG_CACHE_TAUROS2
++	tauros2_init();
++#endif
++	dove_setup_cpu_mbus();
++
++	/* Setup root of clk tree */
++	dove_clk_init();
++
++	/* Internal devices not ported to DT yet */
++	dove_rtc_init();
++	dove_xor0_init();
++	dove_xor1_init();
++
++	dove_ge00_init(&dove_dt_ge00_data);
++	dove_ehci0_init();
++	dove_ehci1_init();
++	dove_pcie_init(1, 1);
++	dove_crypto_init();
++
++	of_platform_populate(NULL, of_default_bus_match_table,
++			     dove_auxdata_lookup, NULL);
 +}
 +
-+/*****************************************************************************
-  * XOR 0
-  ****************************************************************************/
- void __init dove_xor0_init(void)
++static const char * const dove_dt_board_compat[] = {
++	"marvell,dove",
++	NULL
++};
++
++DT_MACHINE_START(DOVE_DT, "Marvell Dove (Flattened Device Tree)")
++	.map_io		= dove_map_io,
++	.init_early	= dove_init_early,
++	.init_irq	= orion_dt_init_irq,
++	.timer		= &dove_timer,
++	.init_machine	= dove_dt_init,
++	.restart	= dove_restart,
++	.dt_compat	= dove_dt_board_compat,
++MACHINE_END
++#endif
 -- 
 1.7.10.4
