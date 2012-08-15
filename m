@@ -1,50 +1,94 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 15 Aug 2012 11:29:00 -0300
-Subject: [PATCH v3 2/2] ARM: mach-mxs: Remove board entries in dt_board_compat
-Message-ID: <1345040940-3045-1-git-send-email-festevam@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Aug 2012 14:34:04 +0000
+Subject: [PATCH v2 21/31] arm64: 32-bit (compat) applications support
+In-Reply-To: <1344966752-16102-22-git-send-email-catalin.marinas@arm.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-22-git-send-email-catalin.marinas@arm.com>
+Message-ID: <201208151434.05145.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Tuesday 14 August 2012, Catalin Marinas wrote:
 
-There is no need for adding board related entries into dt_board_compat.
+> +#ifdef CONFIG_AARCH32_EMULATION
+> +#include <linux/compat.h>
+> +
+> +#define AARCH32_KERN_SIGRET_CODE_OFFSET	0x500
+> +
+> +extern const compat_ulong_t aarch32_sigret_code[6];
+> +
+> +int compat_setup_frame(int usig, struct k_sigaction *ka, sigset_t *set,
+> +		       struct pt_regs *regs);
+> +int compat_setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
+> +			  sigset_t *set, struct pt_regs *regs);
+> +
+> +void compat_setup_restart_syscall(struct pt_regs *regs);
+> +#else
+> +
+> +static inline int compat_setup_frame(int usid, struct k_sigaction *ka,
+> +				     sigset_t *set, struct pt_regs *regs)
+> +{
+> +	BUG();
+> +}
 
-Leave only the SoC entry.
+What good is the run-time BUG() here? Nothing should be calling these
+when CONFIG_COMPAT is disabled, so I think you should just remove
+the #ifdef around the declarations, and the entire #else case.
 
-This way we do not need to patch a C file when adding dt support for a new board.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
---
-Changes since v2:
-- Fix From field
-Changes since v1:
-- Rebased against 3.6-rc1
- arch/arm/mach-mxs/mach-mxs.c |    8 --------
- 1 file changed, 8 deletions(-)
+> +asmlinkage int compat_sys_sched_rr_get_interval(compat_pid_t pid,
+> +						struct compat_timespec __user *interval)
+> +{
+> +	struct timespec t;
+> +	int ret;
+> +	mm_segment_t old_fs = get_fs();
+> +
+> +	set_fs(KERNEL_DS);
+> +	ret = sys_sched_rr_get_interval(pid, (struct timespec __user *)&t);
+> +	set_fs(old_fs);
+> +	if (put_compat_timespec(&t, interval))
+> +		return -EFAULT;
+> +	return ret;
+> +}
+> +
+> +asmlinkage int compat_sys_sendfile(int out_fd, int in_fd,
+> +				   compat_off_t __user *offset, s32 count)
+> +{
+> +	mm_segment_t old_fs = get_fs();
+> +	int ret;
+> +	off_t of;
+> +
+> +	if (offset && get_user(of, offset))
+> +		return -EFAULT;
+> +
+> +	set_fs(KERNEL_DS);
+> +	ret = sys_sendfile(out_fd, in_fd, offset ? (off_t __user *)&of : NULL,
+> +			   count);
+> +	set_fs(old_fs);
+> +
+> +	if (offset && put_user(of, offset))
+> +		return -EFAULT;
+> +	return ret;
+> +}
 
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index 8dabfe8..fb453fd 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -286,19 +286,11 @@ static void __init mxs_machine_init(void)
- }
- 
- static const char *imx23_dt_compat[] __initdata = {
--	"fsl,imx23-evk",
--	"fsl,stmp378x_devb"
--	"olimex,imx23-olinuxino",
- 	"fsl,imx23",
- 	NULL,
- };
- 
- static const char *imx28_dt_compat[] __initdata = {
--	"bluegiga,apx4devkit",
--	"crystalfontz,cfa10036",
--	"denx,m28evk",
--	"fsl,imx28-evk",
--	"karo,tx28",
- 	"fsl,imx28",
- 	NULL,
- };
--- 
-1.7.9.5
+I guess it's time to move these two into common code. They look like they should
+be shared across most architectures that have compat support.
+
+> +asmlinkage int compat_sys_personality(compat_ulong_t personality)
+> +{
+> +	int ret;
+> +
+> +	if (personality(current->personality) == PER_LINUX32 &&
+> +		personality == PER_LINUX)
+> +		personality = PER_LINUX32;
+> +	ret = sys_personality(personality);
+> +	if (ret == PER_LINUX32)
+> +		ret = PER_LINUX;
+> +	return ret;
+> +}
+
+Where did you get this from?
+
+You should not need compat_sys_personality, just call the native function.
+
+	Arnd
