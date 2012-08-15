@@ -1,70 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Aug 2012 09:57:09 +0100
-Subject: [PATCH] ARM: Dove: allow PCI to be disabled
-Message-ID: <20120815085709.GI18957@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 15 Aug 2012 10:57:58 +0200
+Subject: [PATCH 06/14] arm: at91: dt: at91sam9 add pinctrl support
+In-Reply-To: <1344603731-32667-6-git-send-email-plagnioj@jcrosoft.com>
+References: <20120810124820.GA20557@game.jcrosoft.org>
+ <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
+ <1344603731-32667-6-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <CACRpkdY2HjwOBy7P8mZ81f8bYU4V2=taXzqv03q9NWqbfMVQ4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow PCI support for Dove to be disabled.  Some platforms do not have
-anything connected to the PCIe ports, so requiring PCI support to be
-built into the kernel just wastes space, and presents a lot more config
-options than are necessary.
+On Fri, Aug 10, 2012 at 3:02 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
 
-However, select USB_ARCH_HAS_EHCI so that we can still have EHCI
-support.
+> +                               atmel,mux-mask = <
+> +                                     /*    A         B     */
+> +                                      0xffffffff 0xffc00c3b  /* pioA */
+> +                                      0xffffffff 0x7fff3ccf  /* pioB */
+> +                                      0xffffffff 0x007fffff  /* pioC */
+> +                                     >;
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/Kconfig            |    3 ++-
- arch/arm/mach-dove/Makefile |    3 ++-
- arch/arm/mach-dove/common.h |    4 ++++
- 3 files changed, 8 insertions(+), 2 deletions(-)
+If I read a devcie tree like this it will be a bit hard to understand what is
+happening. But again Nicolas is maintaining the AT91 DT.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 27f5b2c..344d40e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -536,14 +536,15 @@ config ARCH_IXP4XX
- config ARCH_DOVE
- 	bool "Marvell Dove"
- 	select CPU_V7
--	select PCI
- 	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_CLOCKEVENTS
-+	select MIGHT_HAVE_PCI
- 	select NEED_MACH_IO_H
- 	select PLAT_ORION
- 	select CLKDEV_LOOKUP
- 	select NEED_MACH_MEMORY_H
- 	select COMMON_CLK
-+	select USB_ARCH_HAS_EHCI
- 	help
- 	  Support for the Marvell Dove SoC 88AP510
- 
-diff --git a/arch/arm/mach-dove/Makefile b/arch/arm/mach-dove/Makefile
-index 7d89269..b5a5773 100644
---- a/arch/arm/mach-dove/Makefile
-+++ b/arch/arm/mach-dove/Makefile
-@@ -1,4 +1,5 @@
--obj-y				+= common.o addr-map.o irq.o pcie.o mpp.o clock.o dump_cp15_regs.o
-+obj-y				+= common.o addr-map.o irq.o mpp.o clock.o dump_cp15_regs.o
-+obj-$(CONFIG_PCI)		+= pcie.o
- 
- obj-$(CONFIG_MACH_DOVE_DB)	+= dove-db-setup.o
- obj-$(CONFIG_MACH_CM_A510)	+= cm-a510.o
-diff --git a/arch/arm/mach-dove/common.h b/arch/arm/mach-dove/common.h
-index 2ea271d..17404a0 100644
---- a/arch/arm/mach-dove/common.h
-+++ b/arch/arm/mach-dove/common.h
-@@ -29,7 +29,11 @@ void dove_setup_cpu_mbus(void);
- void dove_ge00_init(struct mv643xx_eth_platform_data *eth_data);
- void dove_hwmon_init(void);
- void dove_sata_init(struct mv_sata_platform_data *sata_data);
-+#ifdef CONfig_PCI
- void dove_pcie_init(int init_port0, int init_port1);
-+#else
-+static inline void dove_pcie_init(int init_port0, int init_port1) { }
-+#endif
- void dove_ehci0_init(void);
- void dove_ehci1_init(void);
- void dove_uart0_init(void);
+Yours,
+Linus Walleij
