@@ -1,34 +1,21 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 15 Aug 2012 13:21:30 -0600
-Subject: [PATCH 5/8] video: vt8500: Add devicetree support for vt8500-fb
- and wm8505-fb
-In-Reply-To: <76F764B079F92A4E843589C893D0A022D1DCA8D0@SERVER.prisktech.co.nz>
-References: <1344389967-8465-1-git-send-email-linux@prisktech.co.nz>
- <1344389967-8465-6-git-send-email-linux@prisktech.co.nz>,
- <5022B444.2020501@wwwdotorg.org>
- <76F764B079F92A4E843589C893D0A022D1DCA8D0@SERVER.prisktech.co.nz>
-Message-ID: <502BF6BA.9060407@wwwdotorg.org>
+Date: Wed, 15 Aug 2012 13:23:32 -0600
+Subject: [PATCHv2 0/8] *** ARM: Update arch-vt8500 to Devicetree ***
+In-Reply-To: <1344477300-25251-1-git-send-email-linux@prisktech.co.nz>
+References: <1344477300-25251-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <502BF734.9000608@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2012 01:37 PM, Tony Prisk wrote:
->> On 08/07/2012 07:39 PM, Tony Prisk wrote:
->>> Update vt8500-fb, wm8505-fb and wmt-ge-rops to support device
->>> tree bindings.
+On 08/08/2012 07:54 PM, Tony Prisk wrote:
+> This patchset updates arch-vt8500 to devicetree and removes all the old-style
+> code. Support for WM8650 has also been added.
 
->>> diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
-> 
->>> +     np = of_find_node_by_name(NULL, "display");
->>> +     if (!np) {
->>> +             pr_err("%s: No display description in Device Tree\n", __func__);
->>> +             ret = -EINVAL;
->>> +             goto failed_free_res;
->>> +     }
-> 
->> I believe that using hard-coded node names is frowned upon. Better would
->> be to put a phandle into the display controller's node that points at
->> the node representing the display, e.g.:
-> 
-> Will do.
+Sorry for taking such a long time to re-review this.
 
-I don't think this change made it into v2?
+I scanned the series looking for just the changes to the issues I raised
+on v1, and I do see almost everything has been fixed up OK, except for
+the one issue I just commented on. So, aside from that, this series is
+fine by me. I'll defer to others about whether it's necessary to fix the
+display node-name-vs.-phandle issue I pointed out, or defer that until
+later.
