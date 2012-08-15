@@ -1,66 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Aug 2012 13:56:05 +0000
-Subject: [PATCH v2 08/31] arm64: CPU support
-In-Reply-To: <1344966752-16102-9-git-send-email-catalin.marinas@arm.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-9-git-send-email-catalin.marinas@arm.com>
-Message-ID: <201208151356.05416.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 15 Aug 2012 21:59:50 +0800
+Subject: [PATCH] pinctrl: imx5: start numbering pad from 0
+In-Reply-To: <20120815092539.GH19681@shlinux2.ap.freescale.net>
+References: <1344869278-27334-1-git-send-email-shawn.guo@linaro.org>
+ <CAKGA1b=DqyZvSre3C4YQ3GM6RuFtFsGWDkF784iKggrNzwiKpg@mail.gmail.com>
+ <CAP1dx+zQvBurT9oCmfJ0dGHHV3rbgdy+0Yh_hoPL9jQB8QNxKw@mail.gmail.com>
+ <CAKGA1bmHqyDGyvZjEcQ+RO1jHiZNZKNu3BGkyUXzYfwVaySYEQ@mail.gmail.com>
+ <CAP1dx+x0_j_f3Pj+9+YHcwoTqjGLXouf7t+SoCCMVGKJNOHCPw@mail.gmail.com>
+ <20120815054436.GK2232@pengutronix.de>
+ <20120815065526.GG19681@shlinux2.ap.freescale.net>
+ <20120815075117.GL2232@pengutronix.de>
+ <20120815092539.GH19681@shlinux2.ap.freescale.net>
+Message-ID: <20120815135947.GC2258@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 August 2012, Catalin Marinas wrote:
+On Wed, Aug 15, 2012 at 05:25:40PM +0800, Dong Aisheng wrote:
+> On Wed, Aug 15, 2012 at 03:51:17PM +0800, Uwe Kleine-K?nig wrote:
+> > That is just
+> > 
+> > 	#define MX35_PAD_COMPARE__SDMA_EXTDMA_2 11
+> > 
+> > vs.
+> > 
+> > 	#define MX35_PAD_COMPARE__SDMA_EXTDMA_2 0x32c, 0x008, 7, 0x0, 0
+> > 
+> > isn't it? (Actually I'd not go for cpp as preprocessor, but that's a
+> > different story.)
+> > 
+> Hmm, not sure if dt macro may support this kind of syntax but yes if it supports.
+> Grant,
+> Do you know if dt macro can support it?
+> 
+I have the same doubt there.  Copied Stephen who might have a better
+insight on this.
 
-> diff --git a/arch/arm64/include/asm/procinfo.h b/arch/arm64/include/asm/procinfo.h
-> new file mode 100644
-> index 0000000..81fece9
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/procinfo.h
-> @@ -0,0 +1,44 @@
-> +/*
-> + * Based on arch/arm/include/asm/procinfo.h
-> + *
-> + * Copyright (C) 1996-1999 Russell King
-> + * Copyright (C) 2012 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef __ASM_PROCINFO_H
-> +#define __ASM_PROCINFO_H
-> +
-> +#ifdef __KERNEL__
-> +
-> +/*
-> + * Note!  struct processor is always defined if we're
-> + * using MULTI_CPU, otherwise this entry is unused,
-> + * but still exists.
-> + *
-> + * NOTE! The following structure is defined by assembly
-> + * language, NOT C code.  For more information, check:
-> + *  arch/arm/mm/proc-*.S and arch/arm/kernel/head.S
-> + */
-> +struct proc_info_list {
-> +	unsigned int		cpu_val;
-> +	unsigned int		cpu_mask;
-> +	unsigned long		__cpu_flush;		/* used by head.S */
-> +	const char		*cpu_name;
-> +};
-> +
-> +#else	/* __KERNEL__ */
-> +#include <asm/elf.h>
-> +#warning "Please include asm/elf.h instead"
-> +#endif	/* __KERNEL__ */
-> +#endif
+> Now I'm a bit intend to admit that we probably could do like that if it supports.
+> The benefit i see is that it could save much code lines in driver while having
+> no using experience downgrade.
+> 
+> The left question is that how do we get the pin id from this kind of format data
+> (0x32c, 0x008, 7, 0x0, 0), probably one way may be:
+> For normal pads and NO_CONFIG pads, we could get it via:
+> mux_reg_offset / 4
+> for NO_MUX pads but have CONFIG pads, we may get it via:
+> mux_reg_offset / 4 + PIN_NO_MUX_ID_BASE + config_reg_offset /4
 
-I think you forgot to remove this file when you removed MULTI_CPU.
+In case of NO_MUX, mux_reg_offset is 0, so the formula becomes:
 
-	Arnd
+	PIN_NO_MUX_ID_BASE + config_reg_offset / 4
+
+The question comes to how PIN_NO_MUX_ID_BASE gets determined?
+
+> That may fix getting pin id issue from dt.
+> 
+> Another known issue is that via this way, that means the pinctrl subsystem
+> can only see the using pads, this is a bit not align with the pinctrl
+> subsystem design. No sure if Linus would like to see it.
+> 
+I do not quite follow on this.  The "enum imx51_pads" will still be
+there, so all the pads will still be visible to the pinctrl system.
+
+-- 
+Regards,
+Shawn
