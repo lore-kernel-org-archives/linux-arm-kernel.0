@@ -1,34 +1,33 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 15 Aug 2012 15:10:51 +0200
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 15 Aug 2012 09:13:17 -0400
 Subject: [GIT PULL] orion/kirkwood fixes for v3.6
-In-Reply-To: <201208151237.56639.arnd@arndb.de> (Arnd Bergmann's message of
- "Wed, 15 Aug 2012 12:37:56 +0000")
+In-Reply-To: <201208151237.56639.arnd@arndb.de>
 References: <20120814234442.GZ22226@titan.lakedaemon.net>
  <201208151237.56639.arnd@arndb.de>
-Message-ID: <87boicwbac.fsf@lebrac.rtp-net.org>
+Message-ID: <20120815131317.GE22226@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
-Hi,
-
+On Wed, Aug 15, 2012 at 12:37:56PM +0000, Arnd Bergmann wrote:
 > On Tuesday 14 August 2012, Jason Cooper wrote:
->> The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
->> 
->>   Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
->> 
->> are available in the git repository at:
->>   git://git.infradead.org/users/jcooper/linux.git fixes-for-v3.6
->> 
->
+> > The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
+> > 
+> >   Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
+> > 
+> > are available in the git repository at:
+> >   git://git.infradead.org/users/jcooper/linux.git fixes-for-v3.6
+> > 
+> 
 > Pulled, thanks!
->
+> 
 > As soon as you have a pgp key that is signed by other maintainers,
 > I think you should start sending signed tags instead of branches,
 > and include a short description for what is in the branch you are
 > sending. I've started adding descriptions for every merge I do
 > and it's easier for me if I don't have to write it myself.
->
+
+No problem. I have one and we can do the key signing at the mini-summit.
+
 > The first patch in your series (ARM: Orion: Set eth packet size
 > csum offload limit) looks like it should apply to older kernels
 > as well. In those cases, please add "Cc: stable at vger.kernel.org"
@@ -36,7 +35,9 @@ Hi,
 > so it can get picked up by Greg for the longterm and stable
 > releases.
 
-I've not added stable@ in Cc: because it won't apply on most other
-kernels. fwiw, I plan to send a backport for 3.2.
+Gah!  I missed that, sorry.  Did you forward it already or would you
+like me to handle it?
 
-Arnaud
+thx,
+
+Jason.
