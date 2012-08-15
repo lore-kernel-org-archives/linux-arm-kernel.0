@@ -1,28 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Aug 2012 12:32:36 +0000
-Subject: [GIT PULL] omap fixes for v3.6-rc1
-In-Reply-To: <20120814084314.GH11011@atomide.com>
-References: <20120814084314.GH11011@atomide.com>
-Message-ID: <201208151232.36587.arnd@arndb.de>
+From: markus@oberhumer.com (Markus F.X.J. Oberhumer)
+Date: Wed, 15 Aug 2012 14:02:43 +0200
+Subject: [GIT PULL] Update LZO compression
+In-Reply-To: <20120814123937.GA14756@sig21.net>
+References: <50299142.2030504@oberhumer.com> <20120814123937.GA14756@sig21.net>
+Message-ID: <502B8FE3.7080501@oberhumer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 August 2012, Tony Lindgren wrote:
-> Here are some omap fixes, these are probably too late for -rc1,
-> we're fine getting them in for -rc2 as well.
-> 
-> The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
-> 
->   Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-for-v3.6-rc1
-> 
+Hi Johannes,
 
-Applied, thanks!
+On 2012-08-14 14:39, Johannes Stezenbach wrote:
+> On Tue, Aug 14, 2012 at 01:44:02AM +0200, Markus F.X.J. Oberhumer wrote:
+>> On 2012-07-16 20:30, Markus F.X.J. Oberhumer wrote:
+>>>
+>>> As stated in the README this version is significantly faster (typically more
+>>> than 2 times faster!) than the current version, has been thoroughly tested on
+>>> x86_64/i386/powerpc platforms and is intended to get included into the
+>>> official Linux 3.6 or 3.7 release.
+>>>
+>>> I encourage all compression users to test and benchmark this new version,
+>>> and I also would ask some official LZO maintainer to convert the updated
+>>> source files into a GIT commit and possibly push it to Linus or linux-next.
+> 
+> Sorry for not reporting earlier, but I didn't have time to do real
+> benchmarks, just a quick test on ARM926EJ-S using barebox,
+> and found in the new version decompression is slower:
+> http://lists.infradead.org/pipermail/barebox/2012-July/008268.html
 
-I'll probably send these out in the next few days, whichever -rc that
-ends up being.
+I can only guess, but maybe your ARM cpu does not have an efficient
+implementation of {get,put}_unaligned().
 
-	Arnd
+Could you please try the following patch and test if you can see
+any significant speed difference?
+
+Thanks,
+Markus
+
+
+diff --git a/lib/lzo/lzodefs.h b/lib/lzo/lzodefs.h
+index ddc8db5..efc5714 100644
+--- a/lib/lzo/lzodefs.h
++++ b/lib/lzo/lzodefs.h
+@@ -12,8 +12,15 @@
+  */
+
+
++#if defined(__arm__)
++#define COPY4(dst, src)        \
++               (dst)[0] = (src)[0]; (dst)[1] = (src)[1]; \
++               (dst)[2] = (src)[2]; (dst)[3] = (src)[3]
++#endif
++#ifndef COPY4
+ #define COPY4(dst, src)        \
+                put_unaligned(get_unaligned((const u32 *)(src)), (u32 *)(dst))
++#endif
+ #if defined(__x86_64__)
+ #define COPY8(dst, src)        \
+                put_unaligned(get_unaligned((const u64 *)(src)), (u64 *)(dst))
+
+
+> 
+> BTW, do you have userspace code matching the old and new
+> lzo versions?  It would be easier to benchmark.
+> 
+> Unfortunately I cannot claim high confidence in my benchmark results
+> due to missing time to do it properly, it would be useful if
+> someone else could do some benchmarks on ARM before merging this.
+> 
+> 
+> Johannes 
+
+-- 
+Markus Oberhumer, <markus@oberhumer.com>, http://www.oberhumer.com/
