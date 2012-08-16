@@ -1,26 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Aug 2012 13:45:46 +0000
-Subject: [PATCH 1/6] ARM: integrator: call common init function from
- machine
-In-Reply-To: <1345119339-22638-1-git-send-email-linus.walleij@linaro.org>
-References: <1345119339-22638-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201208161345.46346.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 16 Aug 2012 09:47:49 -0400
+Subject: [PATCH v2 1/2] ARM: kirkwood: DT board setup for Seagate
+ FreeAgent Dockstar
+In-Reply-To: <CABJ1b_Q0TuhoUvM_hGVecLWnPn9pWf_UvUPyyUscK1yf8g7Q-g@mail.gmail.com>
+References: <20120814193613.GS22226@titan.lakedaemon.net>
+ <1344977022-29037-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20120814232256.GX22226@titan.lakedaemon.net>
+ <20120816133521.GP22226@titan.lakedaemon.net>
+ <CABJ1b_Q0TuhoUvM_hGVecLWnPn9pWf_UvUPyyUscK1yf8g7Q-g@mail.gmail.com>
+Message-ID: <20120816134749.GR22226@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 August 2012, Linus Walleij wrote:
-> There is currently a common integrator_init() function set up
-> to be called from an arch_initcall(). The problem is that it is
-> using machine_is_integrator() which is not working with device
-> tree, let's call this from respective machine initilization
-> function and add a parameter to tell whether it's the
-> Integrator/AP or Integrator/CP instead.
+On Thu, Aug 16, 2012 at 03:45:00PM +0200, Sebastian Hesselbarth wrote:
+> On 8/16/12, Jason Cooper <jason@lakedaemon.net> wrote:
+> > Unless I hear otherwise from you in the next day or so, I'm going to
+> > collapse the fix into your patch and push it that way.
 > 
-> There are still machine_is*() calls in the Integrator
-> machines directory, but this one needs to be fixed lest we
-> don't even get a UART console on the Integrator/AP after a
-> Device Tree boot.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> please feel free to fix the patch. I am behind corporate firewall ATM
+> and cannot update the patch quickly.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Done.
+
+thx,
+
+Jason.
