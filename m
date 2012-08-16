@@ -1,83 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 16 Aug 2012 14:40:06 +0200
-Subject: [PATCH v2 28/31] arm64: Generic timers support
-In-Reply-To: <1344966752-16102-29-git-send-email-catalin.marinas@arm.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-29-git-send-email-catalin.marinas@arm.com>
-Message-ID: <CACRpkdYJngvG92BJ_jMyx5KZcr2WmMwGtat6=wKsq+RLk3ECgA@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 16 Aug 2012 08:43:44 -0400
+Subject: PATCH Add support for the Iomega IX2-200 Device Tree
+In-Reply-To: <CADhrpJ4EMCuvuynF9x+q-PkNPRBaCD_G_YWbcYVj0UrGRQk5dg@mail.gmail.com>
+References: <20120815213221.GE15830@lunn.ch>
+ <CADhrpJ4eAUdDaLF8OXvjRf6oA6ya0na-SHYs43eoNwdoEJETpA@mail.gmail.com>
+ <20120815215237.GF15830@lunn.ch>
+ <CADhrpJ7ANwD4asN4-D9OeicGA_V5-9DZoV9G6dDFZ9taN7AZsg@mail.gmail.com>
+ <20120815221613.GH15830@lunn.ch>
+ <CADhrpJ66ncpT74ATyvJDXTuJC-zrmh8vQ99RPg0t=XuQ_2RcVA@mail.gmail.com>
+ <CADhrpJ4sH9krkrWSoFjCg5jrkompgFY=G8iiXo0xy8_iCKeKxA@mail.gmail.com>
+ <CADhrpJ7=5QbivftpcuVdhmcKxp3rjiuKQ4Lrf3NckBwL6YNmPQ@mail.gmail.com>
+ <20120815234159.GK22226@titan.lakedaemon.net>
+ <CADhrpJ4EMCuvuynF9x+q-PkNPRBaCD_G_YWbcYVj0UrGRQk5dg@mail.gmail.com>
+Message-ID: <20120816124344.GM22226@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 7:52 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
+On Thu, Aug 16, 2012 at 12:52:18AM +0100, alan butler wrote:
+> On 16 August 2012 00:41, Jason Cooper <jason@lakedaemon.net> wrote:
+...
+> > That means gpio_keys_get_devtree_pdata() is returning an error.  Have
+> > you tried 'linux,input-type = <0x05>;' ?
+> 
+> 'inux,input-type = <0x05>' instead of 'linux,code = <...>' in the dts?
+> no i havent tried will give it a try now.
 
-> From: Marc Zyngier <marc.zyngier@arm.com>
-(...)
-> +static void __init arch_timer_calibrate(void)
+no, use both.  Look at the original gpio code you had.  It specified
+both the type and the code in the struct.  gpio_keys.txt says when
+input-type isn't specified it defaults to EV_KEY, whereas your code set
+it to EV_SW (0x05 in include/linux/inputh:181).
 
-I think you wrot in the last review thread that this should be renamed
-"arch_timer_get_freq()".
+hth,
 
-> +{
-> +       if (arch_timer_rate == 0) {
-> +               arch_timer_reg_write(ARCH_TIMER_REG_CTRL, 0);
-> +               arch_timer_rate = arch_timer_reg_read(ARCH_TIMER_REG_FREQ);
-> +
-> +               /* Check the timer frequency. */
-> +               if (arch_timer_rate == 0)
-> +                       panic("Architected timer frequency is set to zero.\n"
-> +                             "You must set this in your .dts file\n");
-
-This comment about the .dts file is completely out-of-place.
-The error message should be about the register containing 0, right?
-
-Also, at this very point in the code, I think you should convert that panic()
-to pr_err() and insert:
-
-#include <linux/clk.h>
-
-struct clk *clk;
-
-clk = clk_get_sys("arm_generic_timer", NULL);
-if (IS_ERR(clk))
-               panic("Not even a clk to get freq off! Giving up.\n");
-err = clk_prepare_enable(clk);
-if (err) {
-           pr_err("smp_twd: clock failed to prepare: %d\n", err);
-           clk_put(clk);
-           panic("Not even a clk to get freq off! Giving up.\n");
-}
-arch_timer_rate = clk_get_rate(clk);
-
-Possibly the clk should even be able to override the register value,
-then it's the other way around.
-
-> +       }
-> +
-> +       /* Cache the sched_clock multiplier to save a divide in the hot path. */
-> +
-> +       sched_clock_mult = NSEC_PER_SEC / arch_timer_rate;
-> +
-> +       pr_info("Architected local timer running at %u.%02uMHz.\n",
-> +                arch_timer_rate / 1000000, (arch_timer_rate / 10000) % 100);
-
-This multiplier and print should be moved below the call site since
-the DT frequency
-overrides it and then you get no print which is sad, and incorrect
-sched_clock_mult
-which is a bug.
-
-> +}
-
-(...)
-> +       /* Try to determine the frequency from the device tree or CNTFRQ */
-> +       if (!of_property_read_u32(np, "clock-frequency", &freq))
-> +               arch_timer_rate = freq;
-> +       arch_timer_calibrate();
-
-rename arch_timer_get_freq()
-
-And move that print here.
-
-Yours,
-Linus Walleij
+Jason.
