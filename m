@@ -1,138 +1,70 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 16 Aug 2012 14:15:13 +0200
-Subject: [PATCH v3 10/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <CAErSpo7Y9ADYHwZMjQjDwd7m8jtwgcxsE-NE_K5X_Z+PuV=C4w@mail.gmail.com>
-References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
- <1343332512-28762-11-git-send-email-thierry.reding@avionic-design.de>
- <20120814201215.GA10542@avionic-0098.mockup.avionic-design.de>
- <CAErSpo6Awbx9-DWM3V02HUg7Xv4tWAhcLO7UKuT_0uXbpZ+nKw@mail.gmail.com>
- <20120815063718.GA15665@avionic-0098.mockup.avionic-design.de>
- <CAErSpo7Y9ADYHwZMjQjDwd7m8jtwgcxsE-NE_K5X_Z+PuV=C4w@mail.gmail.com>
-Message-ID: <20120816121513.GA10175@avionic-0098.adnet.avionic-design.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 16 Aug 2012 14:15:17 +0200
+Subject: [PATCH 0/6] Integrator devicetree support
+Message-ID: <1345119317-22600-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2012 at 05:18:04AM -0700, Bjorn Helgaas wrote:
-> On Tue, Aug 14, 2012 at 11:37 PM, Thierry Reding
-> <thierry.reding@avionic-design.de> wrote:
-> > On Tue, Aug 14, 2012 at 04:50:26PM -0700, Bjorn Helgaas wrote:
-> >> On Tue, Aug 14, 2012 at 1:12 PM, Thierry Reding
-> >> <thierry.reding@avionic-design.de> wrote:
-> >> > On Thu, Jul 26, 2012 at 09:55:12PM +0200, Thierry Reding wrote:
-> >> >> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-> >> >> index a094c97..c886dff 100644
-> >> >> --- a/arch/arm/boot/dts/tegra20.dtsi
-> >> >> +++ b/arch/arm/boot/dts/tegra20.dtsi
-> >> >> @@ -199,6 +199,68 @@
-> >> >>               #size-cells = <0>;
-> >> >>       };
-> >> >>
-> >> >> +     pcie-controller {
-> >> >> +             compatible = "nvidia,tegra20-pcie";
-> >> >> +             reg = <0x80003000 0x00000800   /* PADS registers */
-> >> >> +                    0x80003800 0x00000200   /* AFI registers */
-> >> >> +                    0x81000000 0x01000000   /* configuration space */
-> >> >> +                    0x90000000 0x10000000>; /* extended configuration space */
-> >> >> +             interrupts = <0 98 0x04   /* controller interrupt */
-> >> >> +                           0 99 0x04>; /* MSI interrupt */
-> >> >> +             status = "disabled";
-> >> >> +
-> >> >> +             ranges = <0 0 0  0x80000000 0x00001000   /* root port 0 */
-> >> >> +                       0 1 0  0x81000000 0x00800000   /* port 0 config space */
-> >> >> +                       0 2 0  0x90000000 0x08000000   /* port 0 ext config space */
-> >> >> +                       0 3 0  0x82000000 0x00010000   /* port 0 downstream I/O */
-> >> >> +                       0 4 0  0xa0000000 0x08000000   /* port 0 non-prefetchable memory */
-> >> >> +                       0 5 0  0xb0000000 0x08000000   /* port 0 prefetchable memory */
-> >> >> +
-> >> >> +                       1 0 0  0x80001000 0x00001000   /* root port 1 */
-> >> >> +                       1 1 0  0x81800000 0x00800000   /* port 1 config space */
-> >> >> +                       1 2 0  0x98000000 0x08000000   /* port 1 ext config space */
-> >> >> +                       1 3 0  0x82010000 0x00010000   /* port 1 downstream I/O */
-> >> >> +                       1 4 0  0xa8000000 0x08000000   /* port 1 non-prefetchable memory */
-> >> >> +                       1 5 0  0xb8000000 0x08000000>; /* port 1 prefetchable memory */
-> >> >
-> >> > I've been thinking about this some more. The translations for both the
-> >> > regular and extended configuration spaces are configured in the top-
-> >> > level PCIe controller. It is therefore wrong how they are passed to the
-> >> > PCI host bridges via the ranges property.
-> >> >
-> >> > I remember Mitch saying that it should be passed down to the children
-> >> > because it is partitioned among them, but since the layout is compatible
-> >> > with ECAM, the partitioning isn't as simple as what's in the tree. In
-> >> > fact the partitions will be dependent on the number of devices attached
-> >> > to the host bridges.
-> >>
-> >> I don't understand this last bit about the number of devices attached
-> >> to the host bridges.  Logically, the host bridge has a bus number
-> >> aperture that you can know up front, even before you know anything
-> >> about what devices are below it.  On x86, for example, the ACPI _CRS
-> >> method has something like "[bus 00-7f]" in it, which means that any
-> >> buses in that range are below this bridge.  That doesn't tell us
-> >> anything about which buses actually have devices on them, of course;
-> >> it's just analogous to the secondary and subordinate bus number
-> >> registers in a P2P bridge.
-> >
-> > That's one of the issues I still need to take care of. Currently no bus
-> > resource is attached to the individual bridges (nor the PCI controller
-> > for that matter), so the PCI core will assign them dynamically.
-> 
-> So your PCI controller driver knows how to program the controller bus
-> number aperture?  Sometimes people start by assuming that two host
-> bridges both have [bus 00-ff] apertures, then they enumerate below the
-> first and adjust the bus number apertures based on what they found.
-> For example, if they found buses 00-12 behind the first bridge, they
-> make the apertures [bus 00-12] for the first bridge and [bus 13-ff]
-> for the second.  That might be the case, depending on what firmware
-> set up, but it seems like a dubious way to do it, and of course it
-> precludes a lot of hot-plug scenarios.
-> 
-> > If this
-> > range is known at boot time we could assign ECAM ranges based on the bus
-> > numbers. Standard ECAM ranges, that is. On Tegra this won't work because
-> > as Stephen mentioned in a previous mail, the bus field is not the top
-> > field in the ECAM addresses. Basically what you have is this:
-> >
-> >         [27:24] upper 4 bits of the register address for extended
-> >                 configuration space
-> >         [23:16] bus number
-> >         [15:11] device number
-> >         [10: 8] device function
-> >         [ 8: 0] register
-> >
-> > So the ECAM space cannot be partitioned by bus number.
-> 
-> Ah, OK, so definitely not standard PCIe ECAM.
+This is a patch set for devicetree on the Integrator/AP and
+Integrator/CP I've been cooking. I did some stepwise development
+in recent kernels moving to sparse IRQs, per-system clock
+source then common clk. Now we can do single zImage and
+also devicetree on this platform, so this is a first patch
+set.
 
-I had an idea about how we could maybe implement a generic ECAM
-mechanism that provides for this kind of mapping as well. Basically,
-every mechanism that can be covered by such an implementation would in
-one way or another specify the above five fields, so how about designing
-it in a way that the driver could define the fields that encode the
-information, so for Tegra, something along these lines:
+In case you're wondering why, take down your Torvalds
+autobiography and read the title. It was also a bit of
+learning exercise, plus it's fun to run devicetree on this
+ARMv4 system.
 
-	struct pci_ecam_map pci_ecam_tegra = {
-		.register = {  0,  7 },
-		.extended = { 24, 27 },
-		.function = {  8, 10 },
-		.device   = { 11, 15 },
-		.bus      = { 16, 23 },
-	}
+This patch set moves all the non-DT platform code into
+#ifndef CONFIG_OF sections for clarity. The plan is to
+delete them after deprecation.
 
-For standard ECAM, something like this:
+Remaining roadblocks to deleting non-DT code altogether.
 
-	struct pci_ecam_map pci_ecam_standard = {
-		.register = {  0,  7 },
-		.extended = {  8, 11 },
-		.function = { 12, 14 },
-		.device   = { 15, 19 },
-		.bus      = { 20, 27 },
-	};
+- Uncertain about how to do the fpga-irq DT binding so
+  please review closely.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120816/5b473c13/attachment.sig>
+- The Integrator/AP ARM core tiles have add-on logic modules
+  called Integrator/IM-PD1 with a load of PrimeCells and
+  stuff. These spawn off a special bus called "lm" in
+  arch/arm/mach-integrator/lm.c, and the core module support
+  is in impd1.c. It'd probably be pretty easy to create
+  device tree bindings for these, but I have no such module
+  and no clue on where to get one. Is anyone actually using
+  it? Russell?
+
+- The special PCI adapter in the Integrator has to be DT:ed,
+  but AFAICT there is still a problem with how to represent
+  these things in DT. Any hints/examples, Arnd, Rob?
+  arch/arm/mach-integrator/pci_v3.c
+
+Yours,
+Linus Walleij
+
+Linus Walleij (6):
+  ARM: integrator: call common init function from machine
+  ARM: integrator: check PL010 device name rather than base address
+  ARM: plat-versatile: add DT support to FPGA IRQ controller
+  ARM: integrator: initial device tree support
+  ARM: integrator: convert AMBA devices to device tree
+  ARM: integrator: convert platform devices to Device Tree
+
+ Documentation/devicetree/bindings/arm/arm-boards   |  12 +
+ .../devicetree/bindings/arm/versatile-fpga-irq.txt |  35 +++
+ arch/arm/boot/dts/integratorap.dts                 |  78 ++++++
+ arch/arm/boot/dts/integratorcp.dts                 | 122 +++++++++
+ arch/arm/mach-integrator/common.h                  |   3 +
+ arch/arm/mach-integrator/core.c                    |  14 +-
+ arch/arm/mach-integrator/integrator_ap.c           | 214 ++++++++++-----
+ arch/arm/mach-integrator/integrator_cp.c           | 296 +++++++++++++--------
+ arch/arm/plat-versatile/fpga-irq.c                 |  41 +++
+ arch/arm/plat-versatile/include/plat/fpga-irq.h    |   2 +
+ 10 files changed, 640 insertions(+), 177 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/versatile-fpga-irq.txt
+ create mode 100644 arch/arm/boot/dts/integratorap.dts
+ create mode 100644 arch/arm/boot/dts/integratorcp.dts
+
+-- 
+1.7.11.2
