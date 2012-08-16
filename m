@@ -1,36 +1,23 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 16 Aug 2012 16:41:01 +0300
-Subject: [PATCH v3 2/9] ARM: OMAP: mcbsp: Enable FIFO use for OMAP2430
-In-Reply-To: <1345124468-8876-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1345124468-8876-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1345124468-8876-3-git-send-email-peter.ujfalusi@ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 16 Aug 2012 15:45:00 +0200
+Subject: [PATCH v2 1/2] ARM: kirkwood: DT board setup for Seagate
+ FreeAgent Dockstar
+In-Reply-To: <20120816133521.GP22226@titan.lakedaemon.net>
+References: <20120814193613.GS22226@titan.lakedaemon.net>
+ <1344977022-29037-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20120814232256.GX22226@titan.lakedaemon.net>
+ <20120816133521.GP22226@titan.lakedaemon.net>
+Message-ID: <CABJ1b_Q0TuhoUvM_hGVecLWnPn9pWf_UvUPyyUscK1yf8g7Q-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP2430 all McBSP ports have 128 word long buffer, enable the use of
-the FIFO for the audio stack.
+On 8/16/12, Jason Cooper <jason@lakedaemon.net> wrote:
+> Unless I hear otherwise from you in the next day or so, I'm going to
+> collapse the fix into your patch and push it that way.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Acked-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
----
- arch/arm/mach-omap2/mcbsp.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+Jason,
 
-diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
-index ebc801e..6e046e1 100644
---- a/arch/arm/mach-omap2/mcbsp.c
-+++ b/arch/arm/mach-omap2/mcbsp.c
-@@ -151,7 +151,10 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
- 	if (id == 4 && oh->class->rev == MCBSP_CONFIG_TYPE4)
- 		pdata->mux_signal = omap4_mcbsp4_mux_rx_clk;
- 
--	if (oh->class->rev == MCBSP_CONFIG_TYPE3) {
-+	if (oh->class->rev == MCBSP_CONFIG_TYPE2) {
-+		/* The FIFO has 128 locations */
-+		pdata->buffer_size = 0x80;
-+	} else if (oh->class->rev == MCBSP_CONFIG_TYPE3) {
- 		if (id == 2)
- 			/* The FIFO has 1024 + 256 locations */
- 			pdata->buffer_size = 0x500;
--- 
-1.7.8.6
+please feel free to fix the patch. I am behind corporate firewall ATM
+and cannot update the patch quickly.
+
+Sebastian
