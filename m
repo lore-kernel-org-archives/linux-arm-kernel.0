@@ -1,51 +1,109 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 16 Aug 2012 19:33:33 +0530
-Subject: [PATCHv7 02/24] i2c: omap: simplify num_bytes handling
+Date: Thu, 16 Aug 2012 19:33:38 +0530
+Subject: [PATCHv7 07/24] i2c: omap: improve i462 errata handling
 In-Reply-To: <1345125835-15524-1-git-send-email-shubhrajyoti@ti.com>
 References: <1345125835-15524-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1345125835-15524-3-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1345125835-15524-8-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-trivial patch, no functional changes
-
-If the fifo is disabled or fifo_size is 0 the num_bytes
-is set to 1. Else it is set to fifo_size or in case of a
-draining interrupt the remaining bytes in the buff stat.
-So the zero check is redundant and can be safely optimised.
+Make it not depend on ISR's local variables
+in order to make it easier to re-factor the
+transmit data loop.
+Also since we are waiting for XUDF(Transmitter underflow) just before
+writing data lets not flag the underflow.
+This is anyways going to go once we write
+the data.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
-Reviewed-by : Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |    6 ++----
- 1 files changed, 2 insertions(+), 4 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   43 ++++++++++++++++++++++++++++------------
+ 1 files changed, 30 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 6449383..9b003a3 100644
+index 139602f..0067875 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -812,8 +812,7 @@ complete:
- 							OMAP_I2C_BUFSTAT_REG)
- 							>> 8) & 0x3F;
+@@ -725,27 +725,30 @@ omap_i2c_omap1_isr(int this_irq, void *dev_id)
+  * data to DATA_REG. Otherwise some data bytes can be lost while transferring
+  * them from the memory to the I2C interface.
+  */
+-static int errata_omap3_i462(struct omap_i2c_dev *dev, u16 *stat, int *err)
++static int errata_omap3_i462(struct omap_i2c_dev *dev)
+ {
+ 	unsigned long timeout = 10000;
++	u16 stat;
+ 
+-	while (--timeout && !(*stat & OMAP_I2C_STAT_XUDF)) {
+-		if (*stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
++	do {
++		stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
++		if (stat & OMAP_I2C_STAT_XUDF)
++			break;
++
++		if (stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
+ 			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_XRDY |
+ 							OMAP_I2C_STAT_XDR));
+-			return -ETIMEDOUT;
++			return -EIO;
+ 		}
+ 
+ 		cpu_relax();
+-		*stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+-	}
++	} while (--timeout);
+ 
+ 	if (!timeout) {
+ 		dev_err(dev->dev, "timeout waiting on XUDF bit\n");
+ 		return 0;
+ 	}
+ 
+-	*err |= OMAP_I2C_STAT_XUDF;
+ 	return 0;
+ }
+ 
+@@ -903,9 +906,16 @@ complete:
+ 					}
+ 				}
+ 
+-				if ((dev->errata & I2C_OMAP_ERRATA_I462) &&
+-				    errata_omap3_i462(dev, &stat, &err))
+-					goto complete;
++				if (dev->errata & I2C_OMAP_ERRATA_I462) {
++					int ret;
++
++					ret = errata_omap3_i462(dev);
++					stat = omap_i2c_read_reg(dev,
++							OMAP_I2C_STAT_REG);
++
++					if (ret < 0)
++						goto complete;
++				}
+ 
+ 				omap_i2c_write_reg(dev, OMAP_I2C_DATA_REG, w);
  			}
--			while (num_bytes) {
--				num_bytes--;
-+			while (num_bytes--) {
- 				w = omap_i2c_read_reg(dev, OMAP_I2C_DATA_REG);
- 				if (dev->buf_len) {
- 					*dev->buf++ = w;
-@@ -855,8 +854,7 @@ complete:
- 							OMAP_I2C_BUFSTAT_REG)
- 							& 0x3F;
+@@ -943,9 +953,16 @@ complete:
+ 					}
+ 				}
+ 
+-				if ((dev->errata & I2C_OMAP_ERRATA_I462) &&
+-				    errata_omap3_i462(dev, &stat, &err))
+-					goto complete;
++				if (dev->errata & I2C_OMAP_ERRATA_I462) {
++					int ret;
++
++					ret = errata_omap3_i462(dev);
++					stat = omap_i2c_read_reg(dev,
++							OMAP_I2C_STAT_REG);
++
++					if (ret < 0)
++						goto complete;
++				}
+ 
+ 				omap_i2c_write_reg(dev, OMAP_I2C_DATA_REG, w);
  			}
--			while (num_bytes) {
--				num_bytes--;
-+			while (num_bytes--) {
- 				w = 0;
- 				if (dev->buf_len) {
- 					w = *dev->buf++;
 -- 
 1.7.5.4
