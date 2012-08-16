@@ -1,40 +1,51 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Thu, 16 Aug 2012 17:19:11 +0200
-Subject: [PATCH 13/14] arm: at91: dt: at91sam9 add nand pinctrl support
-In-Reply-To: <CACRpkdZXjFE7UsRneskNqnN7DFERHxgAt-FCXtL2A52xKgEA=w@mail.gmail.com>
-References: <20120810124820.GA20557@game.jcrosoft.org>
- <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
- <1344603731-32667-13-git-send-email-plagnioj@jcrosoft.com>
- <CACRpkdZXjFE7UsRneskNqnN7DFERHxgAt-FCXtL2A52xKgEA=w@mail.gmail.com>
-Message-ID: <CACQ1gAhWdwrXEkicy4ij=rukzS-v98bZRr433Qq5M_Dan5JAog@mail.gmail.com>
+From: jgarzik@pobox.com (Jeff Garzik)
+Date: Thu, 16 Aug 2012 11:21:49 -0400
+Subject: [GIT PULL] Update LZO compression
+In-Reply-To: <502C92C3.7090701@oberhumer.com>
+References: <50299142.2030504@oberhumer.com>
+ <20120814123937.GA14756@sig21.net> <502B8FE3.7080501@oberhumer.com>
+ <20120815144539.GA8300@sig21.net> <502C92C3.7090701@oberhumer.com>
+Message-ID: <502D100D.2030609@pobox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/8/15 Linus Walleij <linus.walleij@linaro.org>:
-> On Fri, Aug 10, 2012 at 3:02 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
+On 08/16/2012 02:27 AM, Markus F.X.J. Oberhumer wrote:
+> On 2012-08-15 16:45, Johannes Stezenbach wrote:
+>> On Wed, Aug 15, 2012 at 02:02:43PM +0200, Markus F.X.J. Oberhumer wrote:
+>>> On 2012-08-14 14:39, Johannes Stezenbach wrote:
+>>>> On Tue, Aug 14, 2012 at 01:44:02AM +0200, Markus F.X.J. Oberhumer wrote:
+>>>>> On 2012-07-16 20:30, Markus F.X.J. Oberhumer wrote:
+>>>>>>
+>>>>>> As stated in the README this version is significantly faster (typically more
+>>>>>> than 2 times faster!) than the current version, has been thoroughly tested on
+>>>>>> x86_64/i386/powerpc platforms and is intended to get included into the
+>>>>>> official Linux 3.6 or 3.7 release.
+>>>>>>
+>>>>>> I encourage all compression users to test and benchmark this new version,
+>>>>>> and I also would ask some official LZO maintainer to convert the updated
+>>>>>> source files into a GIT commit and possibly push it to Linus or linux-next.
+>>>>
+>>>> Sorry for not reporting earlier, but I didn't have time to do real
+>>>> benchmarks, just a quick test on ARM926EJ-S using barebox,
+>>>> and found in the new version decompression is slower:
+>>>> http://lists.infradead.org/pipermail/barebox/2012-July/008268.html
+>>>
+>>> I can only guess, but maybe your ARM cpu does not have an efficient
+>>> implementation of {get,put}_unaligned().
+>>
+>> Yes, ARMv5 cannot do unaligned access.  ARMv6+ could, but
+>> I think the Linux kernel normally traps it for debug,
+>> all ARM seem to use generic {get,put}_unaligned() implementation
+>> which use byte access and shift.
 >
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> (...)
->> +                               nand {
->> +                                       pinctrl_nand: nand-0 {
->> +                                               atmel,pins =
->> +                                                       <2 13 0x0 0x1   /* PC13 gpio RDY pin pull_up */
->> +                                                        2 14 0x0 0x1>; /* PC14 gpio enable pin pull_up */
->> +                                       };
->> +                               };
->
-> Again magic hex I don't understand so skipping this patch -> Nicolas.
+> Hmm - I could imagine that we're wasting a lot of possible speed gain
+> by not exploiting that feature on ARMv6+.
 
-Maybe it will be more readable if we use something like :
-atmel,pull-up;
-atmel,multidrive;
-atmel,mux="GPIO"
-atmel,mux="A"
-...
-just my 2 cents...
+Or you could just realize that unaligned accesses are slow in the best 
+case, and are simply not supported on some processors.
 
+If you think a little bit, I bet you could come up with a solution that 
+operates at cacheline-aligned granularity, something that would be _even 
+faster_ than simply fixing the code to do aligned accesses.
 
-Richard.
+	Jeff
