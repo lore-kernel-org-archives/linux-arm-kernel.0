@@ -1,60 +1,51 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 16 Aug 2012 16:36:10 +0100
-Subject: [PATCH v3 18/25] xen: allow privcmd for HVM guests
+Date: Thu, 16 Aug 2012 16:36:11 +0100
+Subject: [PATCH v3 19/25] xen/arm: compile blkfront and blkback
 In-Reply-To: <alpine.DEB.2.02.1208161618550.4850@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1208161618550.4850@kaball.uk.xensource.com>
-Message-ID: <1345131377-14713-18-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1345131377-14713-19-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-This patch removes the "return -ENOSYS" for auto_translated_physmap
-guests from privcmd_mmap, thus it allows ARM guests to issue privcmd
-mmap calls. However privcmd mmap calls are still going to fail for HVM
-and hybrid guests on x86 because the xen_remap_domain_mfn_range
-implementation is currently PV only.
-
-Changes in v2:
-
-- better commit message;
-- return -EINVAL from xen_remap_domain_mfn_range if
-  auto_translated_physmap.
-
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 ---
- arch/x86/xen/mmu.c    |    3 +++
- drivers/xen/privcmd.c |    4 ----
- 2 files changed, 3 insertions(+), 4 deletions(-)
+ drivers/block/xen-blkback/blkback.c  |    1 +
+ include/xen/interface/io/protocols.h |    3 +++
+ 2 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/arch/x86/xen/mmu.c b/arch/x86/xen/mmu.c
-index 3a73785..885a223 100644
---- a/arch/x86/xen/mmu.c
-+++ b/arch/x86/xen/mmu.c
-@@ -2310,6 +2310,9 @@ int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
- 	unsigned long range;
- 	int err = 0;
+diff --git a/drivers/block/xen-blkback/blkback.c b/drivers/block/xen-blkback/blkback.c
+index 73f196c..63dd5b9 100644
+--- a/drivers/block/xen-blkback/blkback.c
++++ b/drivers/block/xen-blkback/blkback.c
+@@ -42,6 +42,7 @@
  
-+	if (xen_feature(XENFEAT_auto_translated_physmap))
-+		return -EINVAL;
-+
- 	prot = __pgprot(pgprot_val(prot) | _PAGE_IOMAP);
+ #include <xen/events.h>
+ #include <xen/page.h>
++#include <xen/xen.h>
+ #include <asm/xen/hypervisor.h>
+ #include <asm/xen/hypercall.h>
+ #include "common.h"
+diff --git a/include/xen/interface/io/protocols.h b/include/xen/interface/io/protocols.h
+index 01fc8ae..0eafaf2 100644
+--- a/include/xen/interface/io/protocols.h
++++ b/include/xen/interface/io/protocols.h
+@@ -5,6 +5,7 @@
+ #define XEN_IO_PROTO_ABI_X86_64     "x86_64-abi"
+ #define XEN_IO_PROTO_ABI_IA64       "ia64-abi"
+ #define XEN_IO_PROTO_ABI_POWERPC64  "powerpc64-abi"
++#define XEN_IO_PROTO_ABI_ARM        "arm-abi"
  
- 	BUG_ON(!((vma->vm_flags & (VM_PFNMAP | VM_RESERVED | VM_IO)) ==
-diff --git a/drivers/xen/privcmd.c b/drivers/xen/privcmd.c
-index ccee0f1..85226cb 100644
---- a/drivers/xen/privcmd.c
-+++ b/drivers/xen/privcmd.c
-@@ -380,10 +380,6 @@ static struct vm_operations_struct privcmd_vm_ops = {
- 
- static int privcmd_mmap(struct file *file, struct vm_area_struct *vma)
- {
--	/* Unsupported for auto-translate guests. */
--	if (xen_feature(XENFEAT_auto_translated_physmap))
--		return -ENOSYS;
--
- 	/* DONTCOPY is essential for Xen because copy_page_range doesn't know
- 	 * how to recreate these mappings */
- 	vma->vm_flags |= VM_RESERVED | VM_IO | VM_DONTCOPY | VM_PFNMAP;
+ #if defined(__i386__)
+ # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_X86_32
+@@ -14,6 +15,8 @@
+ # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_IA64
+ #elif defined(__powerpc64__)
+ # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_POWERPC64
++#elif defined(__arm__)
++# define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_ARM
+ #else
+ # error arch fixup needed here
+ #endif
 -- 
 1.7.2.5
