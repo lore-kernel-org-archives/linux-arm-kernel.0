@@ -1,45 +1,105 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 16 Aug 2012 06:55:39 +0200
-Subject: [PATCH v3 10/10] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <201208152025.25252.arnd@arndb.de>
-References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
- <CAErSpo7c4L=Ny=CtZwLB_XWTcN8tVWs_quuE_T+XLEGyhWwHkg@mail.gmail.com>
- <20120815145708.GA11331@avionic-0098.mockup.avionic-design.de>
- <201208152025.25252.arnd@arndb.de>
-Message-ID: <20120816045539.GA17067@avionic-0098.mockup.avionic-design.de>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 16 Aug 2012 11:20:07 +0530
+Subject: [PATCH v5 0/8] ARM: OMAP2+: PM: introduce the power domains
+ functional states
+In-Reply-To: <alpine.DEB.2.00.1208151842380.8833@utopia.booyaka.com>
+References: <1345024968-28951-1-git-send-email-j-pihet@ti.com>
+ <CAMQu2gxznhsbK3--nyQmYdHqyGjwpCSa3CJx8aYpF4wwR1qBSg@mail.gmail.com>
+ <alpine.DEB.2.00.1208151842380.8833@utopia.booyaka.com>
+Message-ID: <CAMQu2gyV6gX=KFjMZ1r_BwsJXmgjuLMAWHrrLCYLgKEBRne0Ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2012 at 08:25:25PM +0000, Arnd Bergmann wrote:
-> On Wednesday 15 August 2012, Thierry Reding wrote:
-> > Yes, that was my understanding as well. So currently I haven't seen any
-> > problems with this because I only use one of the two host bridges. But I
-> > suppose I should add code to initialize the bus number aperture properly
-> > either via platform device resources (for the non-DT case) and the
-> > device tree otherwise.
-> 
-> I think when we last discussed this, the assumption was that each
-> root port has its own config space range and its own pci domain,
-> so you don't have to worry about bus apertures because each root port
-> can then have all 255 bus numbers. Has that turned out to be incorrect
-> now?
+Paul,
 
-At least for the config space this is incorrect. There's a single region
-to access the configuration space for all devices below the PCIe
-controller. So it is shared by both (Tegra20) or all three (Tegra30)
-root ports.
+On Thu, Aug 16, 2012 at 6:18 AM, Paul Walmsley <paul@pwsan.com> wrote:
+>
+> Hi Santosh,
+>
+> On Wed, 15 Aug 2012, Shilimkar, Santosh wrote:
+>
+> > On Wed, Aug 15, 2012 at 3:32 PM, Jean Pihet <jean.pihet@newoldbits.com>
+> > wrote:
+> >
+> > I didn't find any mention here about why are we going in this path and
+> > not
+> > in the direction proposed in another RFC [1]
+> > I have already given my comments[2] against the introduction of another
+> > PD
+> > layer which can be avoided easily as demonstrated by the RFC[1]. The
+> > comments
+> > are still applicable for this series too.
+> >
+> > We really need to reduce OMAP specific framework overhead and
+> > move towards more generic PM frameworks. For me, this series is
+> > a step back-ward from that direction. Am really sorry for being critical
+> > again but I remain unconvinced about this series and the problem it
+> > is trying to solve.
+> >
+> > May be you have valid reasons not to follow the approach in [1] and in
+> > that case, it will be good to clarify that so that some of us get
+> > to know your rationale.
+>
+> I've asked Jean to handle the work of evaluating and/or integrating any
+> feedback from you and Rajendra into this series.  Jean, has this latest
+> series fully considered those issues?  Or are there still some areas of
+> misalignment / lack of clarity?
+>
+Thanks for the information. The main objection to this series was to
+not add un-necessary glue layer which still remains.
 
-I'm not sure about PCI domains. Do you have any good pointers as to
-where I could read up on them? If they need special hardware support,
-then I think Tegra doesn't support them either. At least I haven't come
-across any mention of domains while going through the, admittedly some-
-what sparse on PCIe, Tegra documentation.
+>From our discussion in past on and off list, your main intention for such
+a series was -
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120816/6f0fb24f/attachment.sig>
+1. Need a way to support OSWR.
+- OSWR by definition is a RET with configurable logic and memory states.
+Its a true power state from PD point of view and its not a logical state.
+Now since we have agreed to make the OSWR as a static definition
+(in all products so far OSWR is used as a static definition with logic
+lost, memory retained kind of configuration.)
+
+- The above requirement can be easily fixed by adding the OSWR
+as an additional basic power state as demonstrated in RFC.
+
+- There is no need to add another glue layer for above.
+
+2. Locking so that the low level APIs don't race and henec abstracting the
+exported API to 1 or 2 and making rest as private functions.
+
+-- Even before this series, except low level PM code, only one
+common API was used to set the PD low power state.
+int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
+
+-- Once we make OSWR as basic power state, we also avoid usage of
+pwrdm_set_logic_retst() API.
+
+-- We implement lock at this API and export only above API +
+may be omap_get_pwrdm_state() kind of API based on need.
+
+-- This solves the second requirement too.
+
+Even if we have more requirement, they can be addressed
+too without need of another layer.
+
+If you look at the diffstat alone between two approaches, it is
+evident how small piece of code is needed to support above.
+Am not too much into the lines of code but basic objection we
+have is not to add another glue layer.
+
+Thinking bit loud, for the logical layer for power domain
+we should move towards common device power domain
+APIs and if needed add/enhance them to support OMAP.
+   drivers/base/power/domain.c
+May be this though is bit premature but the intetion is
+to move towards generic linux framework.
+
+> Anyway.  If there's a problem with this process, it sounds like you,
+> Rajendra, Jean, Beno?t and I should schedule some time to talk over the
+> same issues that you discussed with me on the phone.  Perhaps next week?
+>
+We can surely do a call if needed. But the comments given so far and the
+RFC makes things more or less clear the contention point against the
+$subject series.
+
+Regards
+Santosh
