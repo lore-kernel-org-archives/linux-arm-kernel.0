@@ -1,31 +1,52 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Thu, 16 Aug 2012 17:50:06 +0530
-Subject: [PATCH 0/4] Add device tree data for AM33XX devices
-Message-ID: <1345119610-5247-1-git-send-email-anilkumar@ti.com>
+Date: Thu, 16 Aug 2012 17:50:09 +0530
+Subject: [PATCH v3 3/4] arm/dts: AM33XX: Configure pinmuxs for D_CAN1 on
+ AM335x-EVM
+In-Reply-To: <1345119610-5247-1-git-send-email-anilkumar@ti.com>
+References: <1345119610-5247-1-git-send-email-anilkumar@ti.com>
+Message-ID: <1345119610-5247-4-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl and d_can device tree data to AM33XX family of devices.
-First two patches add support for pinctrl DT data and rest adds
-dcan DT data.
+Add D_CAN1 pinctrl node to am3358_pinmux master node to export
+D_CAN functionality on AM335x EVM according to pinctrl-single
+driver.
 
-Reason behind combining these patches is to apply cleanly on
-linux-omap devel-dt tree because these are sequential patches.
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+Changes from v2:
+	- Incorporated Vaibhav H's comments on v2
+	  * Added dcan0 instances to am33xx.dtsi file
 
-These patches were tested on AM335x-Bone and AM335x-EVM apply
-on linux-omap:devel-dt tree with this patch
-http://lkml.org/lkml/2012/8/15/106
+Changes from v1:
+	- These two patches separated from c_can DT support
+	  patch series.
 
-AnilKumar Ch (4):
-  arm/dts: AM33XX: Add basic pinctrl device tree data
-  arm/dts: AM33XX: Configure pinmuxs for user leds control on Bone
-  arm/dts: AM33XX: Configure pinmuxs for D_CAN1 on AM335x-EVM
-  arm/dts: AM33XX: Add D_CAN device tree data
+ arch/arm/boot/dts/am335x-evm.dts |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
- arch/arm/boot/dts/am335x-bone.dts |   14 ++++++++++++++
- arch/arm/boot/dts/am335x-evm.dts  |   16 ++++++++++++++++
- arch/arm/boot/dts/am33xx.dtsi     |   27 +++++++++++++++++++++++++++
- 3 files changed, 57 insertions(+)
-
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index 5dd8a6b..a64c30a 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -18,6 +18,18 @@
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
+ 	};
+ 
++	am3358_pinmux: pinmux at 44E10800 {
++		pinctrl-names = "default";
++		pinctrl-0 = <&d_can1_pins>;
++
++		d_can1_pins: pinmux_d_can_pins {
++			pinctrl-single,pins = <
++				0x168 0x2	/* uart0_ctsn.d_can1_tx, OUTPUT | MODE2 */
++				0x16C 0x32	/* uart0_rtsn.d_can1_rx, INPUT_PULLUP | MODE2 */
++			>;
++		};
++	};
++
+ 	ocp {
+ 		uart1: serial at 44E09000 {
+ 			status = "okay";
 -- 
 1.7.9.5
