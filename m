@@ -1,144 +1,63 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 16 Aug 2012 23:05:54 +0200
-Subject: [PATCH v3 2/3] PM / OPP: Initialize OPP table from device tree
-In-Reply-To: <1344577046-14847-3-git-send-email-shawn.guo@linaro.org>
-References: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
- <1344577046-14847-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201208162305.55114.rjw@sisk.pl>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 16 Aug 2012 15:12:10 -0600
+Subject: [PATCH] pinctrl: imx5: start numbering pad from 0
+In-Reply-To: <20120816033006.GA11999@shlinux2.ap.freescale.net>
+References: <1344869278-27334-1-git-send-email-shawn.guo@linaro.org>
+ <CAKGA1b=DqyZvSre3C4YQ3GM6RuFtFsGWDkF784iKggrNzwiKpg@mail.gmail.com>
+ <CAP1dx+zQvBurT9oCmfJ0dGHHV3rbgdy+0Yh_hoPL9jQB8QNxKw@mail.gmail.com>
+ <CAKGA1bmHqyDGyvZjEcQ+RO1jHiZNZKNu3BGkyUXzYfwVaySYEQ@mail.gmail.com>
+ <CAP1dx+x0_j_f3Pj+9+YHcwoTqjGLXouf7t+SoCCMVGKJNOHCPw@mail.gmail.com>
+ <20120815054436.GK2232@pengutronix.de>
+ <20120815065526.GG19681@shlinux2.ap.freescale.net>
+ <20120815075117.GL2232@pengutronix.de>
+ <20120815092539.GH19681@shlinux2.ap.freescale.net>
+ <20120815135947.GC2258@S2101-09.ap.freescale.net>
+ <20120816033006.GA11999@shlinux2.ap.freescale.net>
+Message-ID: <502D622A.1030104@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, August 10, 2012, Shawn Guo wrote:
-> With a lot of devices booting from device tree nowadays, it requires
-> that OPP table can be initialized from device tree.  The patch adds
-> a helper function of_init_opp_table together with a binding doc for
-> that purpose.
+On 08/15/2012 09:30 PM, Dong Aisheng wrote:
+> On Wed, Aug 15, 2012 at 09:59:50PM +0800, Shawn Guo wrote:
+> ...
+>>> Another known issue is that via this way, that means the pinctrl subsystem
+>>> can only see the using pads, this is a bit not align with the pinctrl
+>>> subsystem design. No sure if Linus would like to see it.
+>>>
+>> I do not quite follow on this.  The "enum imx51_pads" will still be
+>> there, so all the pads will still be visible to the pinctrl system.
+>>
+> Sorry, i did not describe it accurately.
+> The problem is that those pins are visible to pinctrl subystem, but the pinctrl
+> subsystem can not manage them all.
+> Not sure this meet Linus's original design purpose.
+> Because for the way proposed, all the pin's basic properties like mux_reg, config_reg
+> are parsed from device tree at runtime.
+> If a pin is not used in device tree, the driver can not know this pin's
+> corresponding registers.
+> Thus, for those unused pins, we can not manage it on mux or config in pinctrl
+> subsystem and driver.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> For example, the pin_config_get/pin_config_set API in
+> include/linux/pinctrl/consumer.h can not work for such pins.
 
-I need an ACK from whoever maintains the DT bindings for that.
+Hmmm. Given we support all pin mux/config options from the mapping
+table, I'd question whether that API should even exist any more...
 
-Thanks,
-Rafael
+> Then imx_pinconf_dbg_show in current driver may need change since it does not
+> support show all pins's config value.
 
+The pinctrl core assumes that the pin numbering space could be sparse.
+For example, see that pinconf.c:pinconf_pins_show() "continues" the loop
+if pin_desc_get() fails for a particular pin number. So just based on
+what I've read in this one email, I think this is fine.
 
-> ---
->  Documentation/devicetree/bindings/power/opp.txt |   25 ++++++++++++
->  drivers/base/power/opp.c                        |   47 +++++++++++++++++++++++
->  include/linux/opp.h                             |    8 ++++
->  3 files changed, 80 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/power/opp.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
-> new file mode 100644
-> index 0000000..74499e5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/opp.txt
-> @@ -0,0 +1,25 @@
-> +* Generic OPP Interface
-> +
-> +SoCs have a standard set of tuples consisting of frequency and
-> +voltage pairs that the device will support per voltage domain. These
-> +are called Operating Performance Points or OPPs.
-> +
-> +Properties:
-> +- operating-points: An array of 2-tuples items, and each item consists
-> +  of frequency and voltage like <freq-kHz vol-uV>.
-> +	freq: clock frequency in kHz
-> +	vol: voltage in microvolt
-> +
-> +Examples:
-> +
-> +cpu at 0 {
-> +	compatible = "arm,cortex-a9";
-> +	reg = <0>;
-> +	next-level-cache = <&L2>;
-> +	operating-points = <
-> +		/* kHz    uV */
-> +		792000  1100000
-> +		396000  950000
-> +		198000  850000
-> +	>;
-> +};
-> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-> index ac993ea..d946864 100644
-> --- a/drivers/base/power/opp.c
-> +++ b/drivers/base/power/opp.c
-> @@ -22,6 +22,7 @@
->  #include <linux/rculist.h>
->  #include <linux/rcupdate.h>
->  #include <linux/opp.h>
-> +#include <linux/of.h>
->  
->  /*
->   * Internal data structure organization with the OPP layer library is as
-> @@ -674,3 +675,49 @@ struct srcu_notifier_head *opp_get_notifier(struct device *dev)
->  
->  	return &dev_opp->head;
->  }
-> +
-> +#ifdef CONFIG_OF
-> +/**
-> + * of_init_opp_table() - Initialize opp table from device tree
-> + * @dev:	device pointer used to lookup device OPPs.
-> + *
-> + * Register the initial OPP table with the OPP library for given device.
-> + */
-> +int of_init_opp_table(struct device *dev)
-> +{
-> +	const struct property *prop;
-> +	const __be32 *val;
-> +	int nr;
-> +
-> +	prop = of_find_property(dev->of_node, "operating-points", NULL);
-> +	if (!prop)
-> +		return -ENODEV;
-> +	if (!prop->value)
-> +		return -ENODATA;
-> +
-> +	/*
-> +	 * Each OPP is a set of tuples consisting of frequency and
-> +	 * voltage like <freq-kHz vol-uV>.
-> +	 */
-> +	nr = prop->length / sizeof(u32);
-> +	if (nr % 2) {
-> +		dev_err(dev, "%s: Invalid OPP list\n", __func__);
-> +		return -EINVAL;
-> +	}
-> +
-> +	val = prop->value;
-> +	while (nr) {
-> +		unsigned long freq = be32_to_cpup(val++) * 1000;
-> +		unsigned long volt = be32_to_cpup(val++);
-> +
-> +		if (opp_add(dev, freq, volt)) {
-> +			dev_warn(dev, "%s: Failed to add OPP %ld\n",
-> +				 __func__, freq);
-> +			continue;
-> +		}
-> +		nr -= 2;
-> +	}
-> +
-> +	return 0;
-> +}
-> +#endif
-> diff --git a/include/linux/opp.h b/include/linux/opp.h
-> index 2a4e5fa..214e0eb 100644
-> --- a/include/linux/opp.h
-> +++ b/include/linux/opp.h
-> @@ -48,6 +48,14 @@ int opp_disable(struct device *dev, unsigned long freq);
->  
->  struct srcu_notifier_head *opp_get_notifier(struct device *dev);
->  
-> +#ifdef CONFIG_OF
-> +int of_init_opp_table(struct device *dev);
-> +#else
-> +static inline int of_init_opp_table(struct device *dev)
-> +{
-> +	return -EINVAL;
-> +}
-> +#endif /* CONFIG_OF */
->  #else
->  static inline unsigned long opp_get_voltage(struct opp *opp)
->  {
-> 
+> It looks like not a big issue currently since i did not see any client driver
+> using this API.
+> But i'm not sure if we may have this requirement in the future.
+> For example, is it possible that pinctrl subsystem may support configure pins
+> via sysfs dynamically?
+
+I can't comment on sysfs specifically, but I believe it would be
+generally true that a pin that isn't know to the pinctrl subsystem can't
+be manipulated in any way.
