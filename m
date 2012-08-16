@@ -1,28 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Aug 2012 13:59:21 +0000
-Subject: [PATCH] ARM: LPC32xx: Provide DMA filter callbacks via platform
- data
-In-Reply-To: <1345122935-22115-1-git-send-email-stigge@antcom.de>
-References: <1345122935-22115-1-git-send-email-stigge@antcom.de>
-Message-ID: <201208161359.21276.arnd@arndb.de>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 16 Aug 2012 08:59:47 -0500
+Subject: [PATCH 4/9] ARM: pmu: remove arm_pmu_type enumeration
+In-Reply-To: <1344620195-22372-5-git-send-email-will.deacon@arm.com>
+References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
+ <1344620195-22372-5-git-send-email-will.deacon@arm.com>
+Message-ID: <502CFCD3.9010603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 August 2012, Roland Stigge wrote:
-> The SLC and MLC NAND drivers now need their dma_filter callbacks via platform
-> data to make them independent of single DMA engine drivers.
+
+On 08/10/2012 12:36 PM, Will Deacon wrote:
+> From: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
 > 
-> (This also helps fixing build errors of the SLC and MLC drivers when building
-> as modules because direct access to AMBA dma filter functions isn't available
-> via export.)
+> The arm_pmu_type enumeration was initially introduced to identify
+> different PMU types in the system, the usual one being that on the CPU
+> (ARM_PMU_DEVICE_CPU). With the removal of the PMU reservation code and
+> the introduction of devicetree bindings for the CPU PMU, the enumeration
+> is no longer required.
 > 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> This patch removes the enumeration and updates the various CPU PMU
+> platform devices so that they no longer pass an .id field referring
+> to identify the PMU type.
 
-Yes, this looks right.
+Acked-by: Jon Hunter <jon-hunter@ti.com>
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-Once we have proper DT bindings for the DMA channels, we can hopefully
-get rid of the auxdata again.
-
-	Arnd
+Cheers
+Jon
