@@ -1,66 +1,70 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 16 Aug 2012 19:33:53 +0530
-Subject: [PATCHv7 22/24] i2c: omap: switch over to autosuspend API
+Date: Thu, 16 Aug 2012 19:33:48 +0530
+Subject: [PATCHv7 17/24] i2c: omap: get rid of the "complete" label
 In-Reply-To: <1345125835-15524-1-git-send-email-shubhrajyoti@ti.com>
 References: <1345125835-15524-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1345125835-15524-23-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1345125835-15524-18-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-this helps us reduce unnecessary pm transitions
-in case we have another i2c message starting soon.
+we can ack stat and complete the command from
+the errata handling itself.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   12 ++++++++++--
- 1 files changed, 10 insertions(+), 2 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   16 +++++++++++++---
+ 1 files changed, 13 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 2d5db56..d81189a 100644
+index dfbf667..dfdcc2b 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -55,6 +55,9 @@
- /* timeout waiting for the controller to respond */
- #define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
- 
-+/* timeout for pm runtime autosuspend */
-+#define OMAP_I2C_PM_TIMEOUT		1000	/* ms */
+@@ -775,6 +775,17 @@ static int errata_omap3_i462(struct omap_i2c_dev *dev)
+ 		if (stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
+ 			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_XRDY |
+ 							OMAP_I2C_STAT_XDR));
++			if (stat & OMAP_I2C_STAT_NACK) {
++				dev->cmd_err |= OMAP_I2C_STAT_NACK;
++				omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
++			}
 +
- /* For OMAP3 I2C_IV has changed to I2C_WE (wakeup enable) */
- enum {
- 	OMAP_I2C_REV_REG = 0,
-@@ -645,7 +648,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
- 
- 	omap_i2c_wait_for_bb(dev);
- out:
--	pm_runtime_put(dev->dev);
-+	pm_runtime_mark_last_busy(dev->dev);
-+	pm_runtime_put_autosuspend(dev->dev);
- 	return r;
- }
- 
-@@ -1113,6 +1117,9 @@ omap_i2c_probe(struct platform_device *pdev)
- 		dev->regs = (u8 *)reg_map_ip_v1;
- 
- 	pm_runtime_enable(dev->dev);
-+	pm_runtime_set_autosuspend_delay(dev->dev, OMAP_I2C_PM_TIMEOUT);
-+	pm_runtime_use_autosuspend(dev->dev);
++			if (stat & OMAP_I2C_STAT_AL) {
++				dev_err(dev->dev, "Arbitration lost\n");
++				dev->cmd_err |= OMAP_I2C_STAT_AL;
++				omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
++			}
 +
- 	r = pm_runtime_get_sync(dev->dev);
- 	if (IS_ERR_VALUE(r))
- 		goto err_free_mem;
-@@ -1190,7 +1197,8 @@ omap_i2c_probe(struct platform_device *pdev)
+ 			return -EIO;
+ 		}
  
- 	of_i2c_register_devices(adap);
+@@ -875,7 +886,6 @@ omap_i2c_isr(int this_irq, void *dev_id)
+ 			goto out;
+ 		}
  
--	pm_runtime_put(dev->dev);
-+	pm_runtime_mark_last_busy(dev->dev);
-+	pm_runtime_put_autosuspend(dev->dev);
+-complete:
+ 		if (stat & OMAP_I2C_STAT_NACK) {
+ 			err |= OMAP_I2C_STAT_NACK;
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
+@@ -938,7 +948,7 @@ complete:
+ 			ret = omap_i2c_transmit_data(dev, num_bytes, true);
+ 			stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+ 			if (ret < 0)
+-				goto complete;
++				goto out;
  
- 	return 0;
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XDR);
+ 			continue;
+@@ -954,7 +964,7 @@ complete:
+ 			ret = omap_i2c_transmit_data(dev, num_bytes, false);
+ 			stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+ 			if (ret < 0)
+-				goto complete;
++				goto out;
  
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XRDY);
+ 			continue;
 -- 
 1.7.5.4
