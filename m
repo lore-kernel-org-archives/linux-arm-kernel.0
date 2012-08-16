@@ -1,24 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Aug 2012 10:00:41 +0100
-Subject: [PATCH] dma: amba-pl08x: Export pl08x_filter_id
-In-Reply-To: <1345107396-27079-1-git-send-email-stigge@antcom.de>
-References: <1345107396-27079-1-git-send-email-stigge@antcom.de>
-Message-ID: <20120816090041.GK18957@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Aug 2012 09:03:29 +0000
+Subject: [GIT PULL][for 3.7] pull request from dt branch in pxa git tree
+In-Reply-To: <CAN1soZwJMbr-9T-7qhh_qfmfjJ+WmTstkhFmZ=yewoJxs+MGqA@mail.gmail.com>
+References: <CAN1soZwJMbr-9T-7qhh_qfmfjJ+WmTstkhFmZ=yewoJxs+MGqA@mail.gmail.com>
+Message-ID: <201208160903.29386.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 16, 2012 at 10:56:36AM +0200, Roland Stigge wrote:
-> This patch fixes the following when compiling a driver module that uses
-> amba-pl08x:
+On Thursday 16 August 2012, Haojian Zhuang wrote:
+> The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
 > 
-> ERROR: "pl08x_filter_id" [drivers/mtd/nand/lpc32xx_slc.ko] undefined!
-> ERROR: "pl08x_filter_id" [drivers/mtd/nand/lpc32xx_mlc.ko] undefined!
+>   Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
 > 
-> (drivers/mtd/nand/lpc32xx_* are still in l2-mtd.git)
+> are available in the git repository at:
+> 
+>   git://github.com/hzhuang1/linux.git dt
 
-It is currently intended that this be passed from platform code into
-drivers via platform data, so that drivers can decide which DMA engine
-they wish to make use of.
+Pulled into next/dt, thanks!
 
-See how all the AMBA drivers work in this regard (because they need to
-support more than just a single DMA engine implementation.)
+	Arnd
