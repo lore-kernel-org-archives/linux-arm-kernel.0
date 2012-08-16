@@ -1,27 +1,23 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 16 Aug 2012 09:47:49 -0400
-Subject: [PATCH v2 1/2] ARM: kirkwood: DT board setup for Seagate
- FreeAgent Dockstar
-In-Reply-To: <CABJ1b_Q0TuhoUvM_hGVecLWnPn9pWf_UvUPyyUscK1yf8g7Q-g@mail.gmail.com>
-References: <20120814193613.GS22226@titan.lakedaemon.net>
- <1344977022-29037-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20120814232256.GX22226@titan.lakedaemon.net>
- <20120816133521.GP22226@titan.lakedaemon.net>
- <CABJ1b_Q0TuhoUvM_hGVecLWnPn9pWf_UvUPyyUscK1yf8g7Q-g@mail.gmail.com>
-Message-ID: <20120816134749.GR22226@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Aug 2012 13:50:48 +0000
+Subject: [PATCH 3/6] ARM: plat-versatile: add DT support to FPGA IRQ
+ controller
+In-Reply-To: <1345119357-22702-1-git-send-email-linus.walleij@linaro.org>
+References: <1345119357-22702-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <201208161350.49063.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 16, 2012 at 03:45:00PM +0200, Sebastian Hesselbarth wrote:
-> On 8/16/12, Jason Cooper <jason@lakedaemon.net> wrote:
-> > Unless I hear otherwise from you in the next day or so, I'm going to
-> > collapse the fix into your patch and push it that way.
-> 
-> please feel free to fix the patch. I am behind corporate firewall ATM
-> and cannot update the patch quickly.
+On Thursday 16 August 2012, Linus Walleij wrote:
+> +- irq-start: the u32 hardware IRQ number of the first interrupt handled by
+> +  this FPGA IRQ instance - since there may be many FPGA IRQ controller
+> +  instances, each will have its unique hardware offset number.
 
-Done.
+The irq-start value is a Linux specific invention, the hardware doesn't
+know anything about these. As long as you depend on specific IRQ numbers
+to get assigned, I would use something like auxdata to find the
+start number. When all devices get their IRQ numbers from the device
+tree, you can move to linear IRQ domains instead of legacy, and let
+the irq domain code pick the numbers.
 
-thx,
-
-Jason.
+	Arnd
