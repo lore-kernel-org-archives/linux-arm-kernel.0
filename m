@@ -1,31 +1,27 @@
-From: ian.molton@codethink.co.uk (Ian Molton)
-Date: Thu, 16 Aug 2012 17:30:22 +0100
-Subject: [PATCH v3 0/7] mv643xx.c: Add basic device tree support.
-In-Reply-To: <5028D040.60604@codethink.co.uk>
-References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
- <201208091143.32972.arnd@arndb.de> <5023D577.8090001@codethink.co.uk>
- <201208101049.57586.arnd@arndb.de> <5028D040.60604@codethink.co.uk>
-Message-ID: <502D201E.9030304@codethink.co.uk>
+From: jgarzik@pobox.com (Jeff Garzik)
+Date: Thu, 16 Aug 2012 12:48:49 -0400
+Subject: [GIT PULL] Update LZO compression
+In-Reply-To: <20120816162051.GK11413@one.firstfloor.org>
+References: <50299142.2030504@oberhumer.com>
+ <20120814123937.GA14756@sig21.net> <502B8FE3.7080501@oberhumer.com>
+ <20120815144539.GA8300@sig21.net> <502C92C3.7090701@oberhumer.com>
+ <502D100D.2030609@pobox.com> <20120816162051.GK11413@one.firstfloor.org>
+Message-ID: <502D2471.407@pobox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping :)
+On 08/16/2012 12:20 PM, Andi Kleen wrote:
+>> If you think a little bit, I bet you could come up with a solution that
+>> operates at cacheline-aligned granularity, something that would be _even
+>> faster_ than simply fixing the code to do aligned accesses.
+>
+> Cache aligned compression is unlikely to compress anything at all.
+> Compression algorithms are usually by definition unaligned.
 
-Can we get some consensus on the right approach here? I'm loathe to code
-this if its going to be rejected.
+Sure it's a bitstream, but that does not imply the impossibility of 
+reading data in in an word-aligned manner.
 
-I'd prefer the driver to be properly split so we dont have the MDIO
-driver mapping the ethernet drivers address spaces, but if thats not
-going to be merged, I'm not feeling like doing the work for nothing.
+Maybe cache-aligned is ambitious, because of resultant code bloat, but 
+machine-int-aligned is doable and reasonable.
 
-If the driver is to use the overlapping-address mapped-by-the-mdio
-scheme, then so be it, but I could do with knowing.
-
-Another point against the latter scheme is that the MDIO driver could
-sensibly be used (the block is identical) on the ArmadaXP, which has 4
-ethernet blocks rather than two, yet grouped in two pairs with a
-discontiguous address range.
-
-I'd like to get this moved along as soon as possible though.
-
--Ian
+	Jeff
