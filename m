@@ -1,56 +1,40 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 16 Aug 2012 10:20:05 -0400
-Subject: dreamplug spi partitions
-In-Reply-To: <1344498477.11783.38.camel@dagon.hellion.org.uk>
-References: <1344498477.11783.38.camel@dagon.hellion.org.uk>
-Message-ID: <20120816142005.GS22226@titan.lakedaemon.net>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 16 Aug 2012 16:26:53 +0200
+Subject: [PATCH 1/2] mtd: lpc32xx_slc: Adjust to pl08x DMA interface
+ changes
+In-Reply-To: <1345027069.3393.124.camel@sauron.fi.intel.com>
+References: <1342095778-13403-1-git-send-email-stigge@antcom.de>
+ <1342095778-13403-2-git-send-email-stigge@antcom.de>
+ <1345027069.3393.124.camel@sauron.fi.intel.com>
+Message-ID: <502D032D.1000301@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 09, 2012 at 08:47:57AM +0100, Ian Campbell wrote:
-> Hi all,
+Hi,
+
+On 08/15/2012 12:37 PM, Artem Bityutskiy wrote:
+> On Thu, 2012-07-12 at 14:22 +0200, Roland Stigge wrote:
+>> This patch adjusts the LPC32xx SLC NAND driver to the new pl08x
+>> DMA interface, fixing the compile error resulting from changed
+>> pl08x structures.
+>> 
+>> Signed-off-by: Roland Stigge <stigge@antcom.de>
 > 
-> I've been using "fw_printenv" and "fw_setenv" from the u-boot-tools
-> package on my DreamPlug which work fine with this /etc/fw_env.config:
->         # Configuration file for fw_(printenv/saveenv) utility.
->         # Up to two entries are valid, in this case the redundant
->         # environment sector is assumed present.
->         # MTD device name       Device offset   Env. size       Flash sector size
->         /dev/mtd1               0x00000000      0x00001000      0x00001000
->         
-> This corresponds roughly, but not exactly, with:
->         # cat /proc/mtd 
->         dev:    size   erasesize  name
->         mtd0: 00080000 00001000 "u-boot"
->         mtd1: 00010000 00001000 "u-boot env"
->         mtd2: 00010000 00001000 "dtb"
+> This patch breaks compilation:
 > 
-> But notice how "Env. size" and mtd1's size don't match -- if I use
-> 0x10000 in fw_env.cfg then the tools don't work (checksums don't match).
+> ERROR: "pl08x_filter_id" [drivers/mtd/nand/lpc32xx_slc.ko]
+> undefined!
+> 
+> Please, send a fix. The defconfig I used is attached.
 
-I've always seen the u-boot environment set to 4k.  The kernel
-partitions came out of my head.  When I added support for the dreamplug
-to u-boot, I found out there was a bug in the factory supplied u-boot
-which only allowed it to see the first 1MB of the 2MB flash.  Also, the
-factory supplied kernel didn't even have support for the flash.
+Please see my just posted patches:
 
-So, I fixed u-boot, and figured the extra 1MB was too small for a
-kernel, wasn't used by anybody else, and imho, the factory location of
-the environment didn't leave much room for new u-boots.
+mtd: lpc32xx_slc: Make driver independent of AMBA DMA engine driver
+mtd: lpc32xx_mlc: Make driver independent of AMBA DMA engine driver
 
-I decided to move the environment and make a place for the dtb.  As I
-didn't want to constrain either one, I split the extra space between the
-two.
+This also fixes the above problem by getting rid of the reference to
+pl08x_filter_id.
 
-Was that the best decision?  Well, no one yelled at me and I was new to
-the whole process, so that's how it went down.
+Thanks,
 
-As it is right now, if you configure your own u-boot to have, say
-0x10000 bytes for the environment, you don't need to change your kernel
-to support it.  Just set the size and write it.
-
-I'm open to suggestions and patches...
-
-hth,
-
-Jason.
+Roland
