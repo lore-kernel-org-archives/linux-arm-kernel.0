@@ -1,90 +1,40 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 16 Aug 2012 16:44:15 +0800
-Subject: [GIT PULL][for 3.7] pull request from dt branch in pxa git tree
-Message-ID: <CAN1soZwJMbr-9T-7qhh_qfmfjJ+WmTstkhFmZ=yewoJxs+MGqA@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 16 Aug 2012 10:46:48 +0200
+Subject: [PATCH 1/2] mtd: lpc32xx_slc: Adjust to pl08x DMA interface
+ changes
+In-Reply-To: <1345027069.3393.124.camel@sauron.fi.intel.com>
+References: <1342095778-13403-1-git-send-email-stigge@antcom.de>
+ <1342095778-13403-2-git-send-email-stigge@antcom.de>
+ <1345027069.3393.124.camel@sauron.fi.intel.com>
+Message-ID: <502CB378.1020708@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof & Arnd,
+Hi,
 
-Please help to merge these patches from dt branch in pxa git tree.
+On 08/15/2012 12:37 PM, Artem Bityutskiy wrote:
+> On Thu, 2012-07-12 at 14:22 +0200, Roland Stigge wrote:
+>> This patch adjusts the LPC32xx SLC NAND driver to the new pl08x
+>> DMA interface, fixing the compile error resulting from changed
+>> pl08x structures.
+>> 
+>> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> 
+> This patch breaks compilation:
+> 
+> ERROR: "pl08x_filter_id" [drivers/mtd/nand/lpc32xx_slc.ko]
+> undefined!
+> 
+> Please, send a fix. The defconfig I used is attached.
 
-It's the V4 version. The changes are in below.
+Thanks for the note. The issue happens on compiling lpc32xx_slc and
+lpc32xx_mlc as a module. Caused by pl08x_filter_id not being exported.
+Looking at other dma drivers, they have an EXPORT_SYMBOL() for this,
+see also
 
-v4:
-1. remove pinctrl patches for pxa.
+drivers/dma/coh901318.c
+drivers/dma/sirf-dma.c
 
-v3:
-1. Revert d03c1990c9681047bf94caa497c41172b3f28351 GPIO: gpio-pxa: fix
-devicetree functions
-since it's merged into Linus' gpio tree.
+Will post a respective adjustment for drivers/dma/amba-pl08x.c separately.
 
-v2:
-1. Add Linus's Ack in pinctrl driver.
-2. Add chao's & haojian's patches for Tauros2 cache.
-
-The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
-
-  Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
-
-are available in the git repository at:
-
-  git://github.com/hzhuang1/linux.git dt
-
-for you to fetch changes up to 51931b37fcb17a2f48f726fd21b88e3af770ddc2:
-
-  ARM: mmp: enable tauros2 cache in mmp2 dt (2012-08-16 16:17:10 +0800)
-
-----------------------------------------------------------------
-Chao Xie (7):
-      ARM: pxa: support CKENC in clk_enable
-      gpio: pxa: add chain_eneter and chain_exit for irq handler
-      ARM: cache: fix uninitialized ptr in tauros2_init
-      ARM: cache: add cputype.h for tauros2
-      ARM: cache: add extra feature enable for tauros2
-      ARM: mmp&dove: modify tauros2_init call
-      ARM: cache: add dt support for tauros2 cache
-
-Daniel Mack (7):
-      RTC: add DT bindings to pxa-rtc
-      MTD: pxa3xx-nand: add devicetree bindings
-      GPIO: gpio-pxa: simplify pxa_gpio_to_irq() and pxa_irq_to_chip()
-      ARM: pxa: add devicetree code for irq handling
-      ARM: pxa3xx: skip default device initialization when booting via DT
-      ARM: pxa3xx: add generic DT machine code
-      ARM: pxa: add .dtsi files
-
-Haojian Zhuang (2):
-      ARM: mmp: enable tauros2 cache in pxa910
-      ARM: mmp: enable tauros2 cache in mmp2 dt
-
- .../devicetree/bindings/arm/mrvl/tauros2.txt       |   17 +++
- .../devicetree/bindings/mtd/pxa3xx-nand.txt        |   31 +++++
- Documentation/devicetree/bindings/rtc/pxa-rtc.txt  |   14 +++
- arch/arm/boot/dts/mmp2.dtsi                        |    5 +
- arch/arm/boot/dts/pxa27x.dtsi                      |   14 +++
- arch/arm/boot/dts/pxa2xx.dtsi                      |  132 ++++++++++++++++++++
- arch/arm/boot/dts/pxa3xx.dtsi                      |   32 +++++
- arch/arm/boot/dts/pxa910.dtsi                      |    5 +
- arch/arm/include/asm/hardware/cache-tauros2.h      |    5 +-
- arch/arm/mach-dove/common.c                        |    2 +-
- arch/arm/mach-mmp/mmp2.c                           |    2 +-
- arch/arm/mach-mmp/pxa910.c                         |    4 +
- arch/arm/mach-pxa/Kconfig                          |   12 ++
- arch/arm/mach-pxa/Makefile                         |    3 +
- arch/arm/mach-pxa/clock-pxa3xx.c                   |    8 +-
- arch/arm/mach-pxa/irq.c                            |  131 +++++++++++++++----
- arch/arm/mach-pxa/pxa-dt.c                         |   63 ++++++++++
- arch/arm/mach-pxa/pxa3xx.c                         |   21 +++-
- arch/arm/mm/cache-tauros2.c                        |   83 ++++++++----
- drivers/gpio/gpio-pxa.c                            |   77 ++++--------
- drivers/mtd/nand/pxa3xx_nand.c                     |   85 ++++++++++---
- drivers/rtc/rtc-pxa.c                              |   11 ++
- 22 files changed, 639 insertions(+), 118 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/mrvl/tauros2.txt
- create mode 100644 Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
- create mode 100644 Documentation/devicetree/bindings/rtc/pxa-rtc.txt
- create mode 100644 arch/arm/boot/dts/pxa27x.dtsi
- create mode 100644 arch/arm/boot/dts/pxa2xx.dtsi
- create mode 100644 arch/arm/boot/dts/pxa3xx.dtsi
- create mode 100644 arch/arm/mach-pxa/pxa-dt.c
+Roland
