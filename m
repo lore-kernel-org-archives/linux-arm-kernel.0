@@ -1,74 +1,39 @@
-From: jason77.wang@gmail.com (Hui Wang)
-Date: Thu, 16 Aug 2012 18:47:31 +0800
-Subject: [PATCH v4 3/3] ARM: dts: imx6q-sabrelite: add eeti egalax
-In-Reply-To: <1345114051-3052-3-git-send-email-jason77.wang@gmail.com>
-References: <1345114051-3052-1-git-send-email-jason77.wang@gmail.com>
- <1345114051-3052-2-git-send-email-jason77.wang@gmail.com>
- <1345114051-3052-3-git-send-email-jason77.wang@gmail.com>
-Message-ID: <1345114051-3052-4-git-send-email-jason77.wang@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 16 Aug 2012 11:51:34 +0100
+Subject: [PATCH v2 25/31] arm64: Performance counters support
+In-Reply-To: <201208151511.11612.arnd@arndb.de>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-26-git-send-email-catalin.marinas@arm.com>
+ <201208151511.11612.arnd@arndb.de>
+Message-ID: <20120816105134.GJ31784@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6Q sabrelite board uses i2c3 to connect an eeti egalax
-touchscreen controller, add it as an i2c slave device in the dts.
+On Wed, Aug 15, 2012 at 04:11:11PM +0100, Arnd Bergmann wrote:
+> On Tuesday 14 August 2012, Catalin Marinas wrote:
+> > From: Will Deacon <will.deacon@arm.com>
+> > 
+> > This patch adds support for the AArch64 performance counters.
+> > 
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > ---
+> >  arch/arm64/include/asm/perf_event.h |   22 +
+> >  arch/arm64/include/asm/pmu.h        |   82 +++
+> >  arch/arm64/kernel/perf_event.c      | 1368 +++++++++++++++++++++++++++++++++++
+> >  tools/perf/perf.h                   |    6 +
+> 
+> Can you explain how AArch64 performance counters differ from the 32
+> bit ones? Do they work for AArch32 user space under AArch64 kernels?
+> Is it possible to share parts of the implementation with arch/arm?
 
-Signed-off-by: Hui Wang <jason77.wang@gmail.com>
----
- arch/arm/boot/dts/imx6q-sabrelite.dts |   16 ++++++++++++++++
- arch/arm/boot/dts/imx6q.dtsi          |    7 +++++++
- 2 files changed, 23 insertions(+), 0 deletions(-)
+Perf should work for compat tasks, yes. I'd like to share some of the code
+with arch/arm/ and I've started reworking the arch/arm/ stuff to accomodate
+this better:
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index 72f30f3..337ec74 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -54,6 +54,7 @@
- 							   144  0x80000000	/* MX6Q_PAD_EIM_D22__GPIO_3_22 */
- 							   121  0x80000000	/* MX6Q_PAD_EIM_D19__GPIO_3_19 */
- 							   953  0x80000000	/* MX6Q_PAD_GPIO_0__CCM_CLKO */
-+							   972  0x10		/* MX6Q_PAD_GPIO_9__GPIO_1_9 */
- 							   >;
- 					};
- 				};
-@@ -115,6 +116,21 @@
- 					VDDIO-supply = <&reg_3p3v>;
- 				};
- 			};
-+
-+			i2c at 021a8000 { /* I2C3 */
-+				status = "okay";
-+				clock-frequency = <100000>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_i2c3_1>;
-+
-+				egalax_ts at 04 {
-+					compatible = "eeti,egalax_ts";
-+					reg = <0x04>;
-+					interrupt-parent = <&gpio1>;
-+					interrupts = <9 8>;
-+					wakeup-gpios = <&gpio1 9 0>;
-+				};
-+			};
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index fd57079..6f833b3 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -552,6 +552,13 @@
- 					};
- 				};
- 
-+				i2c3 {
-+					pinctrl_i2c3_1: i2c3grp-1 {
-+						fsl,pins = <1013 0x4001b8b1	/* MX6Q_PAD_GPIO_5__I2C3_SCL */
-+							    1037 0x4001b8b1>;	/* MX6Q_PAD_GPIO_16__I2C3_SDA */
-+					};
-+				};
-+
- 				serial2 {
- 					pinctrl_serial2_1: serial2grp-1 {
- 						fsl,pins = <183 0x1b0b1		/* MX6Q_PAD_EIM_D26__UART2_TXD */
--- 
-1.7.6
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git perf/updates
+
+I'm not sure how well it will fit in drivers/ but I'm certainly willing to
+give it a try.
+
+Will
