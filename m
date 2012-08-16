@@ -1,44 +1,41 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 16 Aug 2012 16:41:06 +0300
-Subject: [PATCH v3 7/9] ASoC: omap-mcbsp: Remove cpu_is_omap* checks from the
- code
+Date: Thu, 16 Aug 2012 16:41:07 +0300
+Subject: [PATCH v3 8/9] ARM: OMAP2+: McBSP: Do not create legacy devices when
+ booting with DT data
 In-Reply-To: <1345124468-8876-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1345124468-8876-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1345124468-8876-8-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1345124468-8876-9-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can use the has_ccr flag to replace the cpu_is_omap* checks.
-This provides future proof implementation and we do not need to update the
-code if new OMAP revision starts to use the McBSP driver.
+Only create the devices in a legacy way if we do not have the DT data.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Acked-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
 ---
- sound/soc/omap/omap-mcbsp.c |    8 +++++---
- 1 files changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/mcbsp.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-diff --git a/sound/soc/omap/omap-mcbsp.c b/sound/soc/omap/omap-mcbsp.c
-index 5061594..b9770ee 100644
---- a/sound/soc/omap/omap-mcbsp.c
-+++ b/sound/soc/omap/omap-mcbsp.c
-@@ -398,12 +398,14 @@ static int omap_mcbsp_dai_set_dai_fmt(struct snd_soc_dai *cpu_dai,
- 	/* Generic McBSP register settings */
- 	regs->spcr2	|= XINTM(3) | FREE;
- 	regs->spcr1	|= RINTM(3);
--	/* RFIG and XFIG are not defined in 34xx */
--	if (!cpu_is_omap34xx() && !cpu_is_omap44xx()) {
-+	/* RFIG and XFIG are not defined in 2430 and on OMAP3+ */
-+	if (!mcbsp->pdata->has_ccr) {
- 		regs->rcr2	|= RFIG;
- 		regs->xcr2	|= XFIG;
- 	}
--	if (cpu_is_omap2430() || cpu_is_omap34xx() || cpu_is_omap44xx()) {
-+
-+	/* Configure XCCR/RCCR only for revisions which have ccr registers */
-+	if (mcbsp->pdata->has_ccr) {
- 		regs->xccr = DXENDLY(1) | XDMAEN | XDISABLE;
- 		regs->rccr = RFULL_CYCLE | RDMAEN | RDISABLE;
- 	}
+diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
+index 660e00b..d57a357 100644
+--- a/arch/arm/mach-omap2/mcbsp.c
++++ b/arch/arm/mach-omap2/mcbsp.c
+@@ -15,6 +15,7 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ 
+@@ -113,7 +114,8 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
+ 
+ static int __init omap2_mcbsp_init(void)
+ {
+-	omap_hwmod_for_each_by_class("mcbsp", omap_init_mcbsp, NULL);
++	if (!of_have_populated_dt())
++		omap_hwmod_for_each_by_class("mcbsp", omap_init_mcbsp, NULL);
+ 
+ 	return 0;
+ }
 -- 
 1.7.8.6
