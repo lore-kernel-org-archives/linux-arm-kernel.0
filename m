@@ -1,13 +1,13 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Aug 2012 08:59:49 +0000
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Aug 2012 10:00:41 +0100
 Subject: [PATCH] dma: amba-pl08x: Export pl08x_filter_id
 In-Reply-To: <1345107396-27079-1-git-send-email-stigge@antcom.de>
 References: <1345107396-27079-1-git-send-email-stigge@antcom.de>
-Message-ID: <201208160859.49317.arnd@arndb.de>
+Message-ID: <20120816090041.GK18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 August 2012, Roland Stigge wrote:
+On Thu, Aug 16, 2012 at 10:56:36AM +0200, Roland Stigge wrote:
 > This patch fixes the following when compiling a driver module that uses
 > amba-pl08x:
 > 
@@ -15,12 +15,10 @@ On Thursday 16 August 2012, Roland Stigge wrote:
 > ERROR: "pl08x_filter_id" [drivers/mtd/nand/lpc32xx_mlc.ko] undefined!
 > 
 > (drivers/mtd/nand/lpc32xx_* are still in l2-mtd.git)
-> 
-> Done as in:
-> 
-> drivers/dma/coh901318.c
-> drivers/dma/sirf-dma.c
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+It is currently intended that this be passed from platform code into
+drivers via platform data, so that drivers can decide which DMA engine
+they wish to make use of.
+
+See how all the AMBA drivers work in this regard (because they need to
+support more than just a single DMA engine implementation.)
