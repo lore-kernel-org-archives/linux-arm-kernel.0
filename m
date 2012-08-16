@@ -1,33 +1,70 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 16 Aug 2012 10:43:18 +0100
-Subject: Discontiguous memory and cacheflush
-In-Reply-To: <20120816091953.GL18957@n2100.arm.linux.org.uk>
-References: <20120813160008.GA30302@n2100.arm.linux.org.uk>
- <1822556972.575011.1345068509111.JavaMail.root@mozilla.com>
- <20120816082726.GA2101@linaro.org>
- <20120816091953.GL18957@n2100.arm.linux.org.uk>
-Message-ID: <20120816094318.GB2101@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 16 Aug 2012 10:54:31 +0100
+Subject: [PATCH v2] ARM: support syscall tracing
+In-Reply-To: <502C04CF.2080409@mentor.com>
+References: <502BBCCC.1020006@mentor.com>
+ <20120815162157.GJ29448@mudshark.cambridge.arm.com>
+ <502BD544.70903@mentor.com>
+ <20120815172731.GL29448@mudshark.cambridge.arm.com>
+ <502BFA08.6010708@mentor.com> <502C04CF.2080409@mentor.com>
+Message-ID: <20120816095431.GE31784@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 16, 2012 at 10:19:53AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Aug 16, 2012 at 09:27:26AM +0100, Dave Martin wrote:
-> > Could we use the currently must-be-zero flags parameter to add new
-> > functionality to this syscall, or are there legacy uses of that
-> > parameter (or history of userspace not bothering to zero it?)
-> > 
-> > For example, we could have something like
-> > 
-> > do_cache_op(struct iovec *iov, int iovcnt, CF_IOVEC)
-> > 
-> > to flush a discontiguous set of ranges described by an iovec (though we
-> > can of course also describe the ranges in other ways)
+On Wed, Aug 15, 2012 at 09:21:35PM +0100, Wade Farnsworth wrote:
+> Wade Farnsworth wrote:
+> > Will Deacon wrote:
+> >> On Wed, Aug 15, 2012 at 05:58:44PM +0100, Wade Farnsworth wrote:
+> >>> We need to set current_thread_info()->syscall, since it's used in the
+> >>> call to syscall_get_nr() in perf_syscall_{enter,exit}.
+> >>
+> >> Damn. I think that also means we have a bug, given that the SYSCALL_TRACE
+> >> code can set this to -1, which gets used as an index into a bitmap by the
+> >> looks of it. Considering that we have to pass the syscall number to
+> >> trace_sys_enter anyway, it also seems broken.
+> >>
+> >
+> > I agree. Looking at the other architectures, it seems the analogous
+> > function to ptrace_syscall_trace can return -1 under certain
+> > circumstances, but the original syscall value should be passed onto
+> > trace_sys_enter and returned from syscall_get_nr(). So, I'm thinking
+> > that we should modify our behavior accordingly. What this means for us
+> > is that we never store -1 in the thread_info syscall field, and then
+> > pass that into trace_sys_enter instead of the ptrace_syscall_trace
+> > return value. Do you see any problems with this approach?
+> >
 > 
-> Why overload an existing syscall with multiple different argument types
-> rather than having a new syscall with a sane API?
+> Hmm, on closer inspection it looks that perf_syscall_enter is broken. 
+> ftrace_syscall_enter correctly returns if result of a syscall_get_nr is 
+> negative.  The perf version omits the check for negative values. 
 
-Sure, if it's OK to add a new system call, that would be a cleaner
-approach.
+Yes, that's what I was getting at with the -1 bitmap index. Something like
+this should fix it though:
 
-Cheers
----Dave
+
+diff --git a/kernel/trace/trace_syscalls.c b/kernel/trace/trace_syscalls.c
+index 96fc733..bbff120 100644
+--- a/kernel/trace/trace_syscalls.c
++++ b/kernel/trace/trace_syscalls.c
+@@ -506,13 +506,13 @@ static void perf_syscall_enter(void *ignore, struct pt_regs *regs, long id)
+        int size;
+ 
+        syscall_nr = syscall_get_nr(current, regs);
+-       if (!test_bit(syscall_nr, enabled_perf_enter_syscalls))
+-               return;
+-
+        sys_data = syscall_nr_to_meta(syscall_nr);
+        if (!sys_data)
+                return;
+ 
++       if (!test_bit(syscall_nr, enabled_perf_enter_syscalls))
++               return;
++
+        /* get the size after alignment with the u32 buffer size field */
+        size = sizeof(unsigned long) * sys_data->nb_args + sizeof(*rec);
+        size = ALIGN(size + sizeof(u32), sizeof(u64));
+
+
+If you're happy with that, I can post to LKML and see what people say.
+
+Will
