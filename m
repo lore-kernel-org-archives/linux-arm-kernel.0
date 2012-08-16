@@ -1,40 +1,79 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 16 Aug 2012 16:26:53 +0200
-Subject: [PATCH 1/2] mtd: lpc32xx_slc: Adjust to pl08x DMA interface
- changes
-In-Reply-To: <1345027069.3393.124.camel@sauron.fi.intel.com>
-References: <1342095778-13403-1-git-send-email-stigge@antcom.de>
- <1342095778-13403-2-git-send-email-stigge@antcom.de>
- <1345027069.3393.124.camel@sauron.fi.intel.com>
-Message-ID: <502D032D.1000301@antcom.de>
+From: wade_farnsworth@mentor.com (Wade Farnsworth)
+Date: Thu, 16 Aug 2012 07:33:45 -0700
+Subject: [PATCH v2] ARM: support syscall tracing
+In-Reply-To: <20120816095431.GE31784@mudshark.cambridge.arm.com>
+References: <502BBCCC.1020006@mentor.com>
+ <20120815162157.GJ29448@mudshark.cambridge.arm.com>
+ <502BD544.70903@mentor.com>
+ <20120815172731.GL29448@mudshark.cambridge.arm.com>
+ <502BFA08.6010708@mentor.com> <502C04CF.2080409@mentor.com>
+ <20120816095431.GE31784@mudshark.cambridge.arm.com>
+Message-ID: <502D04C9.2050501@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Will Deacon wrote:
+> On Wed, Aug 15, 2012 at 09:21:35PM +0100, Wade Farnsworth wrote:
+>> Wade Farnsworth wrote:
+>>> Will Deacon wrote:
+>>>> On Wed, Aug 15, 2012 at 05:58:44PM +0100, Wade Farnsworth wrote:
+>>>>> We need to set current_thread_info()->syscall, since it's used in the
+>>>>> call to syscall_get_nr() in perf_syscall_{enter,exit}.
+>>>>
+>>>> Damn. I think that also means we have a bug, given that the SYSCALL_TRACE
+>>>> code can set this to -1, which gets used as an index into a bitmap by the
+>>>> looks of it. Considering that we have to pass the syscall number to
+>>>> trace_sys_enter anyway, it also seems broken.
+>>>>
+>>>
+>>> I agree. Looking at the other architectures, it seems the analogous
+>>> function to ptrace_syscall_trace can return -1 under certain
+>>> circumstances, but the original syscall value should be passed onto
+>>> trace_sys_enter and returned from syscall_get_nr(). So, I'm thinking
+>>> that we should modify our behavior accordingly. What this means for us
+>>> is that we never store -1 in the thread_info syscall field, and then
+>>> pass that into trace_sys_enter instead of the ptrace_syscall_trace
+>>> return value. Do you see any problems with this approach?
+>>>
+>>
+>> Hmm, on closer inspection it looks that perf_syscall_enter is broken.
+>> ftrace_syscall_enter correctly returns if result of a syscall_get_nr is
+>> negative.  The perf version omits the check for negative values.
+>
+> Yes, that's what I was getting at with the -1 bitmap index. Something like
+> this should fix it though:
+>
+>
+> diff --git a/kernel/trace/trace_syscalls.c b/kernel/trace/trace_syscalls.c
+> index 96fc733..bbff120 100644
+> --- a/kernel/trace/trace_syscalls.c
+> +++ b/kernel/trace/trace_syscalls.c
+> @@ -506,13 +506,13 @@ static void perf_syscall_enter(void *ignore, struct pt_regs *regs, long id)
+>          int size;
+>
+>          syscall_nr = syscall_get_nr(current, regs);
+> -       if (!test_bit(syscall_nr, enabled_perf_enter_syscalls))
+> -               return;
+> -
+>          sys_data = syscall_nr_to_meta(syscall_nr);
+>          if (!sys_data)
+>                  return;
+>
+> +       if (!test_bit(syscall_nr, enabled_perf_enter_syscalls))
+> +               return;
+> +
+>          /* get the size after alignment with the u32 buffer size field */
+>          size = sizeof(unsigned long) * sys_data->nb_args + sizeof(*rec);
+>          size = ALIGN(size + sizeof(u32), sizeof(u64));
+>
+>
+> If you're happy with that, I can post to LKML and see what people say.
+>
+> Will
 
-On 08/15/2012 12:37 PM, Artem Bityutskiy wrote:
-> On Thu, 2012-07-12 at 14:22 +0200, Roland Stigge wrote:
->> This patch adjusts the LPC32xx SLC NAND driver to the new pl08x
->> DMA interface, fixing the compile error resulting from changed
->> pl08x structures.
->> 
->> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> 
-> This patch breaks compilation:
-> 
-> ERROR: "pl08x_filter_id" [drivers/mtd/nand/lpc32xx_slc.ko]
-> undefined!
-> 
-> Please, send a fix. The defconfig I used is attached.
-
-Please see my just posted patches:
-
-mtd: lpc32xx_slc: Make driver independent of AMBA DMA engine driver
-mtd: lpc32xx_mlc: Make driver independent of AMBA DMA engine driver
-
-This also fixes the above problem by getting rid of the reference to
-pl08x_filter_id.
+I think you have to make a corresponding change in perf_syscall_exit, 
+but yes, this looks right to me.
 
 Thanks,
 
-Roland
+Wade
