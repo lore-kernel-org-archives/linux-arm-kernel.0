@@ -1,66 +1,47 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 16 Aug 2012 11:03:13 +0800
-Subject: [PATCH] rtc: snvs: change timeout to use a fixed number of loop
-In-Reply-To: <Message-ID: <1342164663-31351-1-git-send-email-shawn.guo@linaro.org>
-References: <Message-ID: <1342164663-31351-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1345086193-23870-1-git-send-email-shawn.guo@linaro.org>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Thu, 16 Aug 2012 11:08:40 +0800
+Subject: [PATCH V3 0/5] clk: mmp: add clock framework for mmp
+Message-ID: <1345086525-12328-1-git-send-email-xiechao.mail@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew Morton <akpm@linux-foundation.org> wrote:
+From: Chao Xie <chao.xie@marvell.com>
 
-> The timeout code here is fragile.  If acquiring the spinlock takes more
-> than a millisecond or if this thread gets interrupted or preempted then
-> we could easily execute that loop just a single time, and fail.
->
-> It would be better to retry a fixed number of times, say 1000?  That
-> would take around 1 millisecond, but might be overkill.
+v1->v2:
+replace __raw_xxx with xxx_relax
+use ioremap to remap the registers. Finaly it will use device tree to
+get the physical address.
+do not use macro to register clocks, and directly call the functions.
 
-Take Andrew's suggestion to change the timeout code to retry 1000
-times.
+v2->v3:
+pxa910 will have APB extension clock, so some peripharals will have
+clocks in APB extension base.
+change pxa168-pwm to be pxa910-pwm for pxa910. It will fit the current
+pwm driver.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/rtc/rtc-snvs.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+Chao Xie (5):
+  clk: mmp: add mmp specific clocks
+  clk: mmp: add clock definition for pxa168
+  clk: mmp: add clock definition for pxa910
+  clk: mmp: add clock definition for mmp2
+  arm: mmp: make all SOCs use common clock by default
 
-diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
-index 912f116..3c0da33 100644
---- a/drivers/rtc/rtc-snvs.c
-+++ b/drivers/rtc/rtc-snvs.c
-@@ -83,8 +83,8 @@ static void rtc_write_sync_lp(void __iomem *ioaddr)
- 
- static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
- {
--	unsigned long timeout = jiffies + msecs_to_jiffies(1);
- 	unsigned long flags;
-+	int timeout = 1000;
- 	u32 lpcr;
- 
- 	spin_lock_irqsave(&data->lock, flags);
-@@ -98,7 +98,7 @@ static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
- 
- 	spin_unlock_irqrestore(&data->lock, flags);
- 
--	while (1) {
-+	while (--timeout) {
- 		lpcr = readl(data->ioaddr + SNVS_LPCR);
- 
- 		if (enable) {
-@@ -108,11 +108,11 @@ static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
- 			if (!(lpcr & SNVS_LPCR_SRTC_ENV))
- 				break;
- 		}
--
--		if (time_after(jiffies, timeout))
--			return -ETIMEDOUT;
- 	}
- 
-+	if (!timeout)
-+		return -ETIMEDOUT;
-+
- 	return 0;
- }
- 
--- 
-1.7.5.4
+ arch/arm/mach-mmp/Kconfig    |    3 +
+ drivers/clk/Makefile         |    3 +
+ drivers/clk/mmp/Makefile     |    9 +
+ drivers/clk/mmp/clk-apbc.c   |  152 ++++++++++++
+ drivers/clk/mmp/clk-apmu.c   |   97 ++++++++
+ drivers/clk/mmp/clk-frac.c   |  153 ++++++++++++
+ drivers/clk/mmp/clk-mmp2.c   |  544 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/mmp/clk-pxa168.c |  414 ++++++++++++++++++++++++++++++++
+ drivers/clk/mmp/clk-pxa910.c |  361 ++++++++++++++++++++++++++++
+ drivers/clk/mmp/clk.h        |   35 +++
+ 10 files changed, 1771 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/clk/mmp/Makefile
+ create mode 100644 drivers/clk/mmp/clk-apbc.c
+ create mode 100644 drivers/clk/mmp/clk-apmu.c
+ create mode 100644 drivers/clk/mmp/clk-frac.c
+ create mode 100644 drivers/clk/mmp/clk-mmp2.c
+ create mode 100644 drivers/clk/mmp/clk-pxa168.c
+ create mode 100644 drivers/clk/mmp/clk-pxa910.c
+ create mode 100644 drivers/clk/mmp/clk.h
