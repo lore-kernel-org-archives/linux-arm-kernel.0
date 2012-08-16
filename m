@@ -1,38 +1,124 @@
 From: hdk@igel.co.jp (Hideki EIRAKU)
-Date: Thu, 16 Aug 2012 16:42:02 +0900
-Subject: [PATCH v2 0/2] Renesas IPMMU driver for sh7372
-Message-ID: <1345102924-22045-1-git-send-email-hdk@igel.co.jp>
+Date: Thu, 16 Aug 2012 16:42:04 +0900
+Subject: [PATCH v2 2/2] ARM: mach-shmobile: sh7372: Add IPMMU device
+In-Reply-To: <1345102924-22045-1-git-send-email-hdk@igel.co.jp>
+References: <1345102924-22045-1-git-send-email-hdk@igel.co.jp>
+Message-ID: <1345102924-22045-3-git-send-email-hdk@igel.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the Renesas IPMMU driver, IOMMU API implementation and IPMMU
-device support for sh7372 (AP4EVB and Mackerel).
+This patch adds an IPMMU device and notifies the IPMMU driver which
+devices are connected via the IPMMU module.  All devices connected to the main
+memory bus via the IPMMU module MUST be registered when SHMOBILE_IPMMU and
+SHMOBILE_IOMMU are enabled because physical address cannot be used
+while the IPMMU module's MMU function is enabled.
 
-The IPMMU module supports the MMU function and the PMB function.  The
-MMU function provides address translation by pagetable compatible with
-ARMv6.  The PMB function provides address translation including
-tile-linear translation.  This is implementation of the MMU function.
+Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
+---
+ arch/arm/mach-shmobile/board-ap4evb.c   |    5 +++++
+ arch/arm/mach-shmobile/board-mackerel.c |    5 +++++
+ arch/arm/mach-shmobile/setup-sh7372.c   |   22 ++++++++++++++++++++++
+ 3 files changed, 32 insertions(+), 0 deletions(-)
 
-v2:
-- Rebased on v3.6-rc1.
-- Make variable names clear.
-- Page table size can now be selected by config.
-
-Hideki EIRAKU (2):
-  iommu/shmobile: Add iommu driver for Renesas IPMMU modules
-  ARM: mach-shmobile: sh7372: Add IPMMU device
-
- arch/arm/mach-shmobile/Kconfig              |    6 +
- arch/arm/mach-shmobile/Makefile             |    3 +
- arch/arm/mach-shmobile/board-ap4evb.c       |    5 +
- arch/arm/mach-shmobile/board-mackerel.c     |    5 +
- arch/arm/mach-shmobile/include/mach/ipmmu.h |   10 +
- arch/arm/mach-shmobile/ipmmu.c              |  130 ++++++++++
- arch/arm/mach-shmobile/setup-sh7372.c       |   22 ++
- drivers/iommu/Kconfig                       |   35 +++
- drivers/iommu/Makefile                      |    1 +
- drivers/iommu/shmobile-iommu.c              |  342 +++++++++++++++++++++++++++
- 10 files changed, 559 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-shmobile/include/mach/ipmmu.h
- create mode 100644 arch/arm/mach-shmobile/ipmmu.c
- create mode 100644 drivers/iommu/shmobile-iommu.c
+diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
+index f172ca8..ce6d796 100644
+--- a/arch/arm/mach-shmobile/board-ap4evb.c
++++ b/arch/arm/mach-shmobile/board-ap4evb.c
+@@ -61,6 +61,7 @@
+ #include <mach/common.h>
+ #include <mach/irqs.h>
+ #include <mach/sh7372.h>
++#include <mach/ipmmu.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -1448,6 +1449,10 @@ static void __init ap4evb_init(void)
+ 
+ 	sh7372_add_standard_devices();
+ 
++	ipmmu_add_device(&lcdc_device.dev);
++	ipmmu_add_device(&lcdc1_device.dev);
++	ipmmu_add_device(&ceu_device.dev);
++
+ 	/* HDMI */
+ 	gpio_request(GPIO_FN_HDMI_HPD, NULL);
+ 	gpio_request(GPIO_FN_HDMI_CEC, NULL);
+diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
+index 7ea2b31..ac1adb5 100644
+--- a/arch/arm/mach-shmobile/board-mackerel.c
++++ b/arch/arm/mach-shmobile/board-mackerel.c
+@@ -60,6 +60,7 @@
+ #include <mach/common.h>
+ #include <mach/irqs.h>
+ #include <mach/sh7372.h>
++#include <mach/ipmmu.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+@@ -1621,6 +1622,10 @@ static void __init mackerel_init(void)
+ 
+ 	sh7372_add_standard_devices();
+ 
++	ipmmu_add_device(&lcdc_device.dev);
++	ipmmu_add_device(&hdmi_lcdc_device.dev);
++	ipmmu_add_device(&ceu_device.dev);
++
+ 	platform_add_devices(mackerel_devices, ARRAY_SIZE(mackerel_devices));
+ 
+ 	rmobile_add_device_to_domain(&sh7372_pd_a4lc, &lcdc_device);
+diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
+index 838a87b..1106b4f 100644
+--- a/arch/arm/mach-shmobile/setup-sh7372.c
++++ b/arch/arm/mach-shmobile/setup-sh7372.c
+@@ -38,6 +38,7 @@
+ #include <mach/irqs.h>
+ #include <mach/sh7372.h>
+ #include <mach/common.h>
++#include <mach/ipmmu.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -968,6 +969,23 @@ static struct platform_device spu1_device = {
+ 	.num_resources	= ARRAY_SIZE(spu1_resources),
+ };
+ 
++/* IPMMUI (an IPMMU module for ICB/LMB) */
++static struct resource ipmmu_resources[] = {
++	[0] = {
++		.name	= "IPMMUI",
++		.start	= 0xfe951000,
++		.end	= 0xfe9510ff,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device ipmmu_device = {
++	.name           = "ipmmu",
++	.id             = -1,
++	.resource       = ipmmu_resources,
++	.num_resources  = ARRAY_SIZE(ipmmu_resources),
++};
++
+ static struct platform_device *sh7372_early_devices[] __initdata = {
+ 	&scif0_device,
+ 	&scif1_device,
+@@ -979,6 +997,7 @@ static struct platform_device *sh7372_early_devices[] __initdata = {
+ 	&cmt2_device,
+ 	&tmu00_device,
+ 	&tmu01_device,
++	&ipmmu_device,
+ };
+ 
+ static struct platform_device *sh7372_late_devices[] __initdata = {
+@@ -1020,6 +1039,9 @@ void __init sh7372_add_standard_devices(void)
+ 	platform_add_devices(sh7372_early_devices,
+ 			    ARRAY_SIZE(sh7372_early_devices));
+ 
++	ipmmu_add_device(&vpu_device.dev);
++	ipmmu_add_device(&jpu_device.dev);
++
+ 	platform_add_devices(sh7372_late_devices,
+ 			    ARRAY_SIZE(sh7372_late_devices));
+ 
+-- 
+1.7.0.4
