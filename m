@@ -1,272 +1,83 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 16 Aug 2012 14:40:02 +0200
-Subject: [PATCH 5/6] ARM: integrator: convert AMBA devices to device tree
-In-Reply-To: <1345119373-22774-1-git-send-email-linus.walleij@linaro.org>
-References: <1345119373-22774-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20120816124002.GB7439@game.jcrosoft.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 16 Aug 2012 14:40:06 +0200
+Subject: [PATCH v2 28/31] arm64: Generic timers support
+In-Reply-To: <1344966752-16102-29-git-send-email-catalin.marinas@arm.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-29-git-send-email-catalin.marinas@arm.com>
+Message-ID: <CACRpkdYJngvG92BJ_jMyx5KZcr2WmMwGtat6=wKsq+RLk3ECgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:16 Thu 16 Aug     , Linus Walleij wrote:
-> This converts the AMBA (PrimeCell) devices on the Integrator/AP
-> and Integrator/CP over to probing from the Device Tree if the
-> kernel is compiled for Device Tree support.
-> 
-> We continue to #ifdef out all non-DT code and vice versa on
-> respective boot type to get a clean cut.
-> 
-> We need to add a bunch of auxdata (compare to the Versatile)
-> to handle bus names and callbacks alike.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/boot/dts/integratorap.dts       |  47 +++++++++++++
->  arch/arm/boot/dts/integratorcp.dts       |  64 ++++++++++++++++++
->  arch/arm/mach-integrator/common.h        |   2 +
->  arch/arm/mach-integrator/core.c          |   8 ++-
->  arch/arm/mach-integrator/integrator_ap.c | 109 ++++++++++++++++++++++---------
->  arch/arm/mach-integrator/integrator_cp.c |  97 +++++++++++++++++----------
->  6 files changed, 261 insertions(+), 66 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/integratorap.dts b/arch/arm/boot/dts/integratorap.dts
-> index a40d1ec0..303d001 100644
-> --- a/arch/arm/boot/dts/integratorap.dts
-> +++ b/arch/arm/boot/dts/integratorap.dts
-> @@ -23,4 +23,51 @@
->  		clear-mask = <0xffffffff>;
->  		valid-mask = <0x003fffff>;
->  	};
-> +
-> +	fpga {
-> +		compatible = "arm,amba-bus", "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		rtc: rtc at 15000000 {
-> +			compatible = "arm,pl031", "arm,primecell";
-> +			reg = <0x15000000 0x1000>;
-> +			interrupt-parent = <&pic>;
-> +			interrupts = <8>;
-> +			arm,primecell-periphid = <0x00041030>;
-> +		};
-> +
-> +		uart0: uart at 16000000 {
-> +			compatible = "arm,pl011", "arm,primecell";
-> +			reg = <0x16000000 0x1000>;
-> +			interrupt-parent = <&pic>;
-> +			interrupts = <1>;
-> +			arm,primecell-periphid = <0x00041010>;
-> +		};
-> +
-> +		uart1: uart at 17000000 {
-> +			compatible = "arm,pl011", "arm,primecell";
-> +			reg = <0x17000000 0x1000>;
-> +			interrupt-parent = <&pic>;
-> +			interrupts = <2>;
-> +			arm,primecell-periphid = <0x00041010>;
-> +		};
-> +
-> +		kmi0: kmi at 18000000 {
-> +			compatible = "arm,pl050", "arm,primecell";
-> +			reg = <0x18000000 0x1000>;
-> +			interrupt-parent = <&pic>;
-> +			interrupts = <3>;
-> +			arm,primecell-periphid = <0x00041050>;
-> +		};
-> +
-> +		kmi1: kmi at 19000000 {
-> +			compatible = "arm,pl050", "arm,primecell";
-> +			reg = <0x19000000 0x1000>;
-> +			interrupt-parent = <&pic>;
-> +			interrupts = <4>;
-> +			arm,primecell-periphid = <0x00041050>;
-> +		};
-> +	};
->  };
-> diff --git a/arch/arm/boot/dts/integratorcp.dts b/arch/arm/boot/dts/integratorcp.dts
-> index b6ca10f..517d420 100644
-> --- a/arch/arm/boot/dts/integratorcp.dts
-> +++ b/arch/arm/boot/dts/integratorcp.dts
-> @@ -43,4 +43,68 @@
->  		clear-mask = <0x00000fff>;
->  		valid-mask = <0x00000fff>;
->  	};
-> +
-> +	fpga {
-> +		compatible = "arm,amba-bus", "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		rtc: rtc at 15000000 {
-> +			compatible = "arm,pl031", "arm,primecell";
-> +			reg = <0x15000000 0x1000>;
-> +			interrupt-parent = <&pic>;
-> +			interrupts = <8>;
-> +		};
-> +
-> +		uart0: uart at 16000000 {
-> +			compatible = "arm,pl011", "arm,primecell";
-> +			reg = <0x16000000 0x1000>;
-> +			interrupt-parent = <&pic>;
-> +			interrupts = <1>;
-> +		};
-> +
-> +		uart1: uart at 17000000 {
-> +			compatible = "arm,pl011", "arm,primecell";
-> +			reg = <0x17000000 0x1000>;
-> +			interrupt-parent = <&pic>;
-> +			interrupts = <2>;
-> +		};
-> +
-> +		kmi0: kmi at 18000000 {
-> +			compatible = "arm,pl050", "arm,primecell";
-> +			reg = <0x18000000 0x1000>;
-> +			interrupt-parent = <&pic>;
-> +			interrupts = <3>;
-> +		};
-> +
-> +		kmi1: kmi at 19000000 {
-> +			compatible = "arm,pl050", "arm,primecell";
-> +			reg = <0x19000000 0x1000>;
-> +			interrupt-parent = <&pic>;
-> +			interrupts = <4>;
-> +		};
-> +
-> +		mmci: mmc at 1C000000 {
-> +			compatible = "arm,pl180", "arm,primecell";
-> +			reg = <0x1C000000 0x1000>;
-> +			interrupt-parent = <&pic>;
-> +			interrupts = <23 24>;
-> +			max-frequency = <515633>;
-> +		};
-> +
-> +		aaci: aaci at 1D000000 {
-> +			compatible = "arm,pl041", "arm,primecell";
-> +			reg = <0x1D000000 0x1000>;
-> +			interrupt-parent = <&pic>;
-> +			interrupts = <25>;
-> +		};
-> +
-> +		clcd: clcd at c0000000 {
-> +			compatible = "arm,pl110", "arm,primecell";
-> +			reg = <0xC0000000 0x1000>;
-> +			interrupt-parent = <&pic>;
-> +			interrupts = <22>;
-> +		};
-> +	};
->  };
-> diff --git a/arch/arm/mach-integrator/common.h b/arch/arm/mach-integrator/common.h
-> index c4338e2..c3ff21b 100644
-> --- a/arch/arm/mach-integrator/common.h
-> +++ b/arch/arm/mach-integrator/common.h
-> @@ -1,3 +1,5 @@
-> +#include <linux/amba/serial.h>
-> +extern struct amba_pl010_data integrator_uart_data;
->  void integrator_init_early(void);
->  int integrator_init(bool is_cp);
->  void integrator_reserve(void);
-> diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
-> index 67ea181..42890c8 100644
-> --- a/arch/arm/mach-integrator/core.c
-> +++ b/arch/arm/mach-integrator/core.c
-> @@ -33,7 +33,9 @@
->  #include <asm/mach/time.h>
->  #include <asm/pgtable.h>
->  
-> -static struct amba_pl010_data integrator_uart_data;
-> +#include "common.h"
-> +
-> +#ifndef CONFIG_OF
->  
->  #define INTEGRATOR_RTC_IRQ	{ IRQ_RTCINT }
->  #define INTEGRATOR_UART0_IRQ	{ IRQ_UARTINT0 }
-> @@ -86,6 +88,8 @@ int __init integrator_init(bool is_cp)
->  	return 0;
->  }
->  
-> +#endif
-> +
->  /*
->   * On the Integrator platform, the port RTS and DTR are provided by
->   * bits in the following SC_CTRLS register bits:
-> @@ -122,7 +126,7 @@ static void integrator_uart_set_mctrl(struct amba_device *dev, void __iomem *bas
->  	__raw_writel(ctrlc, SC_CTRLC);
->  }
->  
-> -static struct amba_pl010_data integrator_uart_data = {
-> +struct amba_pl010_data integrator_uart_data = {
->  	.set_mctrl = integrator_uart_set_mctrl,
->  };
->  
-> diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-> index 58b0a58..ff20173 100644
-> --- a/arch/arm/mach-integrator/integrator_ap.c
-> +++ b/arch/arm/mach-integrator/integrator_ap.c
-> @@ -35,6 +35,7 @@
->  #include <linux/clk.h>
->  #include <linux/platform_data/clk-integrator.h>
->  #include <linux/of_irq.h>
-> +#include <linux/of_platform.h>
->  #include <video/vga.h>
->  
->  #include <mach/hardware.h>
-> @@ -270,36 +271,6 @@ static struct platform_device cfi_flash_device = {
->  	.resource	= &cfi_flash_resource,
->  };
->  
-> -static void __init ap_init(void)
-> -{
-> -	unsigned long sc_dec;
-> -	int i;
-> -
-> -	platform_device_register(&cfi_flash_device);
-> -
-> -	sc_dec = readl(VA_SC_BASE + INTEGRATOR_SC_DEC_OFFSET);
-> -	for (i = 0; i < 4; i++) {
-> -		struct lm_device *lmdev;
-> -
-> -		if ((sc_dec & (16 << i)) == 0)
-> -			continue;
-> -
-> -		lmdev = kzalloc(sizeof(struct lm_device), GFP_KERNEL);
-> -		if (!lmdev)
-> -			continue;
-> -
-> -		lmdev->resource.start = 0xc0000000 + 0x10000000 * i;
-> -		lmdev->resource.end = lmdev->resource.start + 0x0fffffff;
-> -		lmdev->resource.flags = IORESOURCE_MEM;
-> -		lmdev->irq = IRQ_AP_EXPINT0 + i;
-> -		lmdev->id = i;
-> -
-> -		lm_device_register(lmdev);
-> -	}
-> -
-> -	integrator_init(false);
-> -}
-> -
->  /*
->   * Where is the timer (VA)?
->   */
-> @@ -472,6 +443,52 @@ static void __init ap_init_irq_of(void)
->  	integrator_clk_init(false);
->  }
->  
-> +/* For the Device Tree, add in the UART callbacks as AUXDATA */
-> +static struct of_dev_auxdata ap_auxdata_lookup[] __initdata = {
-> +	OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_RTC_BASE,
-> +		"rtc", NULL),
-> +	OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_UART0_BASE,
-> +		"uart0", &integrator_uart_data),
-> +	OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_UART1_BASE,
-> +		"uart1", &integrator_uart_data),
-> +	OF_DEV_AUXDATA("arm,primecell", KMI0_BASE,
-> +		"kmi0", NULL),
-> +	OF_DEV_AUXDATA("arm,primecell", KMI1_BASE,
-> +		"kmi1", NULL),
-> +	{ /* sentinel */ },
-why that?
+On Tue, Aug 14, 2012 at 7:52 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
 
-Best Regards,
-J.
+> From: Marc Zyngier <marc.zyngier@arm.com>
+(...)
+> +static void __init arch_timer_calibrate(void)
+
+I think you wrot in the last review thread that this should be renamed
+"arch_timer_get_freq()".
+
+> +{
+> +       if (arch_timer_rate == 0) {
+> +               arch_timer_reg_write(ARCH_TIMER_REG_CTRL, 0);
+> +               arch_timer_rate = arch_timer_reg_read(ARCH_TIMER_REG_FREQ);
+> +
+> +               /* Check the timer frequency. */
+> +               if (arch_timer_rate == 0)
+> +                       panic("Architected timer frequency is set to zero.\n"
+> +                             "You must set this in your .dts file\n");
+
+This comment about the .dts file is completely out-of-place.
+The error message should be about the register containing 0, right?
+
+Also, at this very point in the code, I think you should convert that panic()
+to pr_err() and insert:
+
+#include <linux/clk.h>
+
+struct clk *clk;
+
+clk = clk_get_sys("arm_generic_timer", NULL);
+if (IS_ERR(clk))
+               panic("Not even a clk to get freq off! Giving up.\n");
+err = clk_prepare_enable(clk);
+if (err) {
+           pr_err("smp_twd: clock failed to prepare: %d\n", err);
+           clk_put(clk);
+           panic("Not even a clk to get freq off! Giving up.\n");
+}
+arch_timer_rate = clk_get_rate(clk);
+
+Possibly the clk should even be able to override the register value,
+then it's the other way around.
+
+> +       }
+> +
+> +       /* Cache the sched_clock multiplier to save a divide in the hot path. */
+> +
+> +       sched_clock_mult = NSEC_PER_SEC / arch_timer_rate;
+> +
+> +       pr_info("Architected local timer running at %u.%02uMHz.\n",
+> +                arch_timer_rate / 1000000, (arch_timer_rate / 10000) % 100);
+
+This multiplier and print should be moved below the call site since
+the DT frequency
+overrides it and then you get no print which is sad, and incorrect
+sched_clock_mult
+which is a bug.
+
+> +}
+
+(...)
+> +       /* Try to determine the frequency from the device tree or CNTFRQ */
+> +       if (!of_property_read_u32(np, "clock-frequency", &freq))
+> +               arch_timer_rate = freq;
+> +       arch_timer_calibrate();
+
+rename arch_timer_get_freq()
+
+And move that print here.
+
+Yours,
+Linus Walleij
