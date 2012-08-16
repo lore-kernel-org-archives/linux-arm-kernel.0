@@ -1,31 +1,34 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 16 Aug 2012 10:18:52 +0000
-Subject: [PATCHv2 0/8] *** ARM: Update arch-vt8500 to Devicetree ***
-In-Reply-To: <502BF734.9000608@wwwdotorg.org>
-References: <1344477300-25251-1-git-send-email-linux@prisktech.co.nz>,
- <502BF734.9000608@wwwdotorg.org>
-Message-ID: <76F764B079F92A4E843589C893D0A022D62814E9@SERVER.prisktech.co.nz>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 16 Aug 2012 11:28:09 +0100
+Subject: [PATCH v2 21/31] arm64: 32-bit (compat) applications support
+In-Reply-To: <201208151434.05145.arnd@arndb.de>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-22-git-send-email-catalin.marinas@arm.com>
+ <201208151434.05145.arnd@arndb.de>
+Message-ID: <20120816102808.GH31784@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>On 08/08/2012 07:54 PM, Tony Prisk wrote:
->> This patchset updates arch-vt8500 to devicetree and removes all the old-style
->> code. Support for WM8650 has also been added.
+On Wed, Aug 15, 2012 at 03:34:04PM +0100, Arnd Bergmann wrote:
+> On Tuesday 14 August 2012, Catalin Marinas wrote:
+> > +asmlinkage int compat_sys_personality(compat_ulong_t personality)
+> > +{
+> > +	int ret;
+> > +
+> > +	if (personality(current->personality) == PER_LINUX32 &&
+> > +		personality == PER_LINUX)
+> > +		personality = PER_LINUX32;
+> > +	ret = sys_personality(personality);
+> > +	if (ret == PER_LINUX32)
+> > +		ret = PER_LINUX;
+> > +	return ret;
+> > +}
+> 
+> Where did you get this from?
+> 
+> You should not need compat_sys_personality, just call the native function.
 
->Sorry for taking such a long time to re-review this.
+Hmm, but in that case an aarch32 application doing a personality(PER_LINUX)
+syscall will start seeing the wrong uname.
 
->I scanned the series looking for just the changes to the issues I raised
->on v1, and I do see almost everything has been fixed up OK, except for
->the one issue I just commented on. So, aside from that, this series is
->fine by me. I'll defer to others about whether it's necessary to fix the
->display node-name-vs.-phandle issue I pointed out, or defer that until
->later.
-
-Thanks for the review Stephen.
-
-There will be a v3 shortly - I noticed a few other issues that needed to
-be corrected as well. I agree with the display-node/phandle comment
-and will make sure its included for v3. To be honest, it just slipped my
-memory at the time.
-
-Tony Prisk
+Will
