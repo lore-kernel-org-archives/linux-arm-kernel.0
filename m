@@ -1,54 +1,33 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 16 Aug 2012 09:36:44 +0000
-Subject: [PATCH v2 04/14] ARM: OMAP5: Add minimal support for OMAP5430 SOC
-In-Reply-To: <alpine.DEB.2.00.1208151618590.1731@utopia.booyaka.com>
-References: <1341566515-22665-1-git-send-email-santosh.shilimkar@ti.com>
- <1341566515-22665-5-git-send-email-santosh.shilimkar@ti.com>
- <4FFA9B61.8030808@ti.com> <20120709131156.GH1122@atomide.com>
- <alpine.DEB.2.00.1208151618590.1731@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA91188@DBDE01.ent.ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 16 Aug 2012 10:43:18 +0100
+Subject: Discontiguous memory and cacheflush
+In-Reply-To: <20120816091953.GL18957@n2100.arm.linux.org.uk>
+References: <20120813160008.GA30302@n2100.arm.linux.org.uk>
+ <1822556972.575011.1345068509111.JavaMail.root@mozilla.com>
+ <20120816082726.GA2101@linaro.org>
+ <20120816091953.GL18957@n2100.arm.linux.org.uk>
+Message-ID: <20120816094318.GB2101@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 16, 2012 at 03:56:42, Paul Walmsley wrote:
-> Hi
-> 
-> On Mon, 9 Jul 2012, Tony Lindgren wrote:
-> 
-> > Below (untested) is what could be done in the short term.
-> 
-> That's fine with me.  Do you want to queue it or do you want me to queue 
-> it?
-> 
-> > Heh these CK_XXXX defines are now running out of the u16 cpu_mask.
+On Thu, Aug 16, 2012 at 10:19:53AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Aug 16, 2012 at 09:27:26AM +0100, Dave Martin wrote:
+> > Could we use the currently must-be-zero flags parameter to add new
+> > functionality to this syscall, or are there legacy uses of that
+> > parameter (or history of userspace not bothering to zero it?)
 > > 
-> > They really should be replaced with SoC specific lists of clocks
-> > rather than bloating the cpu_mask and repeating it for every clock
-> > that's compiled in for 800+ times.
-> 
-> Frankly, an extra 1.6KB -- uncompressed -- is pretty low on my list of 
-> bloat concerns for multi-OMAP kernels.  If it were up to me, I'd just 
-> change it to a u32 and be done with the problem for the foreseeable 
-> future.
-> 
-> > I wonder if we could #define CK_OMAP_DUMMY 0 that's always set
-> > for non-shared clocks if they only get set in some *_data.c
-> > file in a unique way?
+> > For example, we could have something like
 > > 
-> > Paul got any better ideas?
+> > do_cache_op(struct iovec *iov, int iovcnt, CF_IOVEC)
+> > 
+> > to flush a discontiguous set of ranges described by an iovec (though we
+> > can of course also describe the ranges in other ways)
 > 
-> Aside from using u32?  Not really.  As we've discussed in the past, at 
-> some point we should convert the clock initialization to using some kind 
-> of per-SoC list.  But it doesn't seem worth spending too much time on that 
-> while the common clock framework conversion is higher priority.
-> 
-> 
+> Why overload an existing syscall with multiple different argument types
+> rather than having a new syscall with a sane API?
 
-This reminds me for AM33xx clock-tree migration to common-clock framework,
-so just wanted to update on this, I have already converted the clock-tree to 
-common-clock fw, on top of Rajendra's repository.
+Sure, if it's OK to add a new system call, that would be a cleaner
+approach.
 
-Now waiting on Rajendra for his next series...
-
-Thanks,
-Vaibhav
+Cheers
+---Dave
