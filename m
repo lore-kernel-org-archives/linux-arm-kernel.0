@@ -1,102 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 16 Aug 2012 11:57:09 +0100
-Subject: [PATCH v2 26/31] arm64: Miscellaneous library functions
-In-Reply-To: <201208151521.14663.arnd@arndb.de>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-27-git-send-email-catalin.marinas@arm.com>
- <201208151521.14663.arnd@arndb.de>
-Message-ID: <20120816105709.GK31784@mudshark.cambridge.arm.com>
+From: jtzhou@marvell.com (Jett.Zhou)
+Date: Thu, 16 Aug 2012 19:59:08 +0800
+Subject: [PATCH 1/3] rtc: avoid cpuid checking in pxa-rtc
+Message-ID: <1345118348-10255-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2012 at 04:21:14PM +0100, Arnd Bergmann wrote:
-> On Tuesday 14 August 2012, Catalin Marinas wrote:
-> 
-> > +
-> > +/*
-> > + * Use compiler builtins for simple inline operations.
-> > + */
-> > +static inline unsigned long __ffs(unsigned long word)
-> > +{
-> > +	return __builtin_ffsl(word) - 1;
-> > +}
-> > +
-> > +static inline int ffs(int x)
-> > +{
-> > +	return __builtin_ffs(x);
-> > +}
-> > +
-> > +static inline unsigned long __fls(unsigned long word)
-> > +{
-> > +	return BITS_PER_LONG - 1 - __builtin_clzl(word);
-> > +}
-> > +
-> > +static inline int fls(int x)
-> > +{
-> > +	return x ? sizeof(x) * BITS_PER_BYTE - __builtin_clz(x) : 0;
-> > +}
-> 
-> These are all great, but I think whether to use them or not should
-> depend on the compiler version rather than the architecture in
-> general. Do we know a minimum gcc version that supports all of the
-> above? Then we could put that code into the generic files.
+From: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-I imagine that the version of GCC that supports these builtins varies for
-each architecture. For aarch64, the compile will always support these
-builtins and these particular ones are guaranteed to be inlined.
+pxa-rtc is widely used in pxa27x/pxa3xx/pxa93x/pxa95x. Checking cpuid in
+pxa-rtc driver is unnecessary since we assign on-chip device in soc files.
 
-> If that's not possible, we could still make the implementation
-> available for other architectures by moving it to
-> 
-> asm-generic/bitops/builtin-__ffs.h
-> asm-generic/bitops/builtin-ffs.h
-> asm-generic/bitops/builtin-__fls.h
-> asm-generic/bitops/builtin-fls.h
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+---
+ drivers/rtc/rtc-pxa.c |    5 +----
+ 1 files changed, 1 insertions(+), 4 deletions(-)
 
-Yeah, that might be an idea. The architecture can then decide to use them if
-it knows they are available and usable.
-
-> > --- /dev/null
-> > +++ b/arch/arm64/lib/bitops.c
-> > @@ -0,0 +1,25 @@
-> > +/*
-> > + * Copyright (C) 2012 ARM Limited
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> > + */
-> > +
-> > +#include <linux/kernel.h>
-> > +#include <linux/spinlock.h>
-> > +#include <linux/atomic.h>
-> > +
-> > +#ifdef CONFIG_SMP
-> > +arch_spinlock_t __atomic_hash[ATOMIC_HASH_SIZE] __lock_aligned = {
-> > +       [0 ... (ATOMIC_HASH_SIZE-1)]  = __ARCH_SPIN_LOCK_UNLOCKED
-> > +};
-> > +#endif
-> 
-> What?
-> 
-> I suppose this is a leftover from an earlier version using the
-> generic bitops, right?
-
-We currently use the generic atomic bitops (asm-generic/bitops/atomic.h)
-which contains:
-
-#  define ATOMIC_HASH(a) (&(__atomic_hash[ (((unsigned long) a)/L1_CACHE_BYTES) & (ATOMIC_HASH_SIZE-1) ]))
-
-so we have to provide a definition for the array. We have additional patches
-containing optimised assembly implementations of the atomic bitops which we
-will push later, once we've got some hardware to benchmark with.
-
-Will
+diff --git a/drivers/rtc/rtc-pxa.c b/drivers/rtc/rtc-pxa.c
+index 0075c8f..a2c3534 100644
+--- a/drivers/rtc/rtc-pxa.c
++++ b/drivers/rtc/rtc-pxa.c
+@@ -433,10 +433,7 @@ static struct platform_driver pxa_rtc_driver = {
+ 
+ static int __init pxa_rtc_init(void)
+ {
+-	if (cpu_is_pxa27x() || cpu_is_pxa3xx())
+-		return platform_driver_probe(&pxa_rtc_driver, pxa_rtc_probe);
+-
+-	return -ENODEV;
++	return platform_driver_probe(&pxa_rtc_driver, pxa_rtc_probe);
+ }
+ 
+ static void __exit pxa_rtc_exit(void)
+-- 
+1.7.0.4
