@@ -1,70 +1,94 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 16 Aug 2012 14:15:17 +0200
-Subject: [PATCH 0/6] Integrator devicetree support
-Message-ID: <1345119317-22600-1-git-send-email-linus.walleij@linaro.org>
+Date: Thu, 16 Aug 2012 14:15:39 +0200
+Subject: [PATCH 1/6] ARM: integrator: call common init function from machine
+Message-ID: <1345119339-22638-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a patch set for devicetree on the Integrator/AP and
-Integrator/CP I've been cooking. I did some stepwise development
-in recent kernels moving to sparse IRQs, per-system clock
-source then common clk. Now we can do single zImage and
-also devicetree on this platform, so this is a first patch
-set.
+There is currently a common integrator_init() function set up
+to be called from an arch_initcall(). The problem is that it is
+using machine_is_integrator() which is not working with device
+tree, let's call this from respective machine initilization
+function and add a parameter to tell whether it's the
+Integrator/AP or Integrator/CP instead.
 
-In case you're wondering why, take down your Torvalds
-autobiography and read the title. It was also a bit of
-learning exercise, plus it's fun to run devicetree on this
-ARMv4 system.
+There are still machine_is*() calls in the Integrator
+machines directory, but this one needs to be fixed lest we
+don't even get a UART console on the Integrator/AP after a
+Device Tree boot.
 
-This patch set moves all the non-DT platform code into
-#ifndef CONFIG_OF sections for clarity. The plan is to
-delete them after deprecation.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-integrator/common.h        | 1 +
+ arch/arm/mach-integrator/core.c          | 6 ++----
+ arch/arm/mach-integrator/integrator_ap.c | 2 ++
+ arch/arm/mach-integrator/integrator_cp.c | 1 +
+ 4 files changed, 6 insertions(+), 4 deletions(-)
 
-Remaining roadblocks to deleting non-DT code altogether.
-
-- Uncertain about how to do the fpga-irq DT binding so
-  please review closely.
-
-- The Integrator/AP ARM core tiles have add-on logic modules
-  called Integrator/IM-PD1 with a load of PrimeCells and
-  stuff. These spawn off a special bus called "lm" in
-  arch/arm/mach-integrator/lm.c, and the core module support
-  is in impd1.c. It'd probably be pretty easy to create
-  device tree bindings for these, but I have no such module
-  and no clue on where to get one. Is anyone actually using
-  it? Russell?
-
-- The special PCI adapter in the Integrator has to be DT:ed,
-  but AFAICT there is still a problem with how to represent
-  these things in DT. Any hints/examples, Arnd, Rob?
-  arch/arm/mach-integrator/pci_v3.c
-
-Yours,
-Linus Walleij
-
-Linus Walleij (6):
-  ARM: integrator: call common init function from machine
-  ARM: integrator: check PL010 device name rather than base address
-  ARM: plat-versatile: add DT support to FPGA IRQ controller
-  ARM: integrator: initial device tree support
-  ARM: integrator: convert AMBA devices to device tree
-  ARM: integrator: convert platform devices to Device Tree
-
- Documentation/devicetree/bindings/arm/arm-boards   |  12 +
- .../devicetree/bindings/arm/versatile-fpga-irq.txt |  35 +++
- arch/arm/boot/dts/integratorap.dts                 |  78 ++++++
- arch/arm/boot/dts/integratorcp.dts                 | 122 +++++++++
- arch/arm/mach-integrator/common.h                  |   3 +
- arch/arm/mach-integrator/core.c                    |  14 +-
- arch/arm/mach-integrator/integrator_ap.c           | 214 ++++++++++-----
- arch/arm/mach-integrator/integrator_cp.c           | 296 +++++++++++++--------
- arch/arm/plat-versatile/fpga-irq.c                 |  41 +++
- arch/arm/plat-versatile/include/plat/fpga-irq.h    |   2 +
- 10 files changed, 640 insertions(+), 177 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/versatile-fpga-irq.txt
- create mode 100644 arch/arm/boot/dts/integratorap.dts
- create mode 100644 arch/arm/boot/dts/integratorcp.dts
-
+diff --git a/arch/arm/mach-integrator/common.h b/arch/arm/mach-integrator/common.h
+index 899561d..c4338e2 100644
+--- a/arch/arm/mach-integrator/common.h
++++ b/arch/arm/mach-integrator/common.h
+@@ -1,3 +1,4 @@
+ void integrator_init_early(void);
++int integrator_init(bool is_cp);
+ void integrator_reserve(void);
+ void integrator_restart(char, const char *);
+diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
+index 3fa6c51..5ba4bc8 100644
+--- a/arch/arm/mach-integrator/core.c
++++ b/arch/arm/mach-integrator/core.c
+@@ -61,7 +61,7 @@ static struct amba_device *amba_devs[] __initdata = {
+ 	&kmi1_device,
+ };
+ 
+-static int __init integrator_init(void)
++int __init integrator_init(bool is_cp)
+ {
+ 	int i;
+ 
+@@ -70,7 +70,7 @@ static int __init integrator_init(void)
+ 	 * hard-code them. The Integator/CP and forward have proper cell IDs.
+ 	 * Else we leave them undefined to the bus driver can autoprobe them.
+ 	 */
+-	if (machine_is_integrator()) {
++	if (!is_cp) {
+ 		rtc_device.periphid	= 0x00041030;
+ 		uart0_device.periphid	= 0x00041010;
+ 		uart1_device.periphid	= 0x00041010;
+@@ -86,8 +86,6 @@ static int __init integrator_init(void)
+ 	return 0;
+ }
+ 
+-arch_initcall(integrator_init);
+-
+ /*
+  * On the Integrator platform, the port RTS and DTR are provided by
+  * bits in the following SC_CTRLS register bits:
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 3b22675..ff966d8 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -312,6 +312,8 @@ static void __init ap_init(void)
+ 
+ 		lm_device_register(lmdev);
+ 	}
++
++	integrator_init(false);
+ }
+ 
+ /*
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index 82d5c83..2b40bc1 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -366,6 +366,7 @@ static void __init intcp_init(void)
+ 		struct amba_device *d = amba_devs[i];
+ 		amba_device_register(d, &iomem_resource);
+ 	}
++	integrator_init(true);
+ }
+ 
+ #define TIMER0_VA_BASE __io_address(INTEGRATOR_TIMER0_BASE)
 -- 
 1.7.11.2
