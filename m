@@ -1,44 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Aug 2012 13:56:38 +0000
-Subject: [PATCH 5/6] ARM: integrator: convert AMBA devices to device tree
-In-Reply-To: <1345119373-22774-1-git-send-email-linus.walleij@linaro.org>
-References: <1345119373-22774-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201208161356.38997.arnd@arndb.de>
+Date: Thu, 16 Aug 2012 13:59:21 +0000
+Subject: [PATCH] ARM: LPC32xx: Provide DMA filter callbacks via platform
+ data
+In-Reply-To: <1345122935-22115-1-git-send-email-stigge@antcom.de>
+References: <1345122935-22115-1-git-send-email-stigge@antcom.de>
+Message-ID: <201208161359.21276.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 August 2012, Linus Walleij wrote:
-> +       fpga {
-> +               compatible = "arm,amba-bus", "simple-bus";
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               ranges;
-> +
-> +               rtc: rtc at 15000000 {
-> +                       compatible = "arm,pl031", "arm,primecell";
-> +                       reg = <0x15000000 0x1000>;
-> +                       interrupt-parent = <&pic>;
-> +                       interrupts = <8>;
-> +                       arm,primecell-periphid = <0x00041030>;
-> +               };
-> +
-> +               uart0: uart at 16000000 {
-> +                       compatible = "arm,pl011", "arm,primecell";
-> +                       reg = <0x16000000 0x1000>;
-> +                       interrupt-parent = <&pic>;
-> +                       interrupts = <1>;
-> +                       arm,primecell-periphid = <0x00041010>;
-> +               };
-> +
-> +               uart1: uart at 17000000 {
-> +                       compatible = "arm,pl011", "arm,primecell";
-> +                       reg = <0x17000000 0x1000>;
-> +                       interrupt-parent = <&pic>;
-> +                       interrupts = <2>;
-> +                       arm,primecell-periphid = <0x00041010>;
-> +               };
+On Thursday 16 August 2012, Roland Stigge wrote:
+> The SLC and MLC NAND drivers now need their dma_filter callbacks via platform
+> data to make them independent of single DMA engine drivers.
+> 
+> (This also helps fixing build errors of the SLC and MLC drivers when building
+> as modules because direct access to AMBA dma filter functions isn't available
+> via export.)
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-When all devices set the same interrupt-parent, you can just as well
-move that property to the fpga node.
+Yes, this looks right.
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+Once we have proper DT bindings for the DMA channels, we can hopefully
+get rid of the auxdata again.
 
 	Arnd
