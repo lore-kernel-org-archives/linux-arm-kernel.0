@@ -1,109 +1,128 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 16 Aug 2012 19:33:38 +0530
-Subject: [PATCHv7 07/24] i2c: omap: improve i462 errata handling
+Date: Thu, 16 Aug 2012 19:33:54 +0530
+Subject: [PATCHv7 23/24] i2c: omap: sanitize exit path
 In-Reply-To: <1345125835-15524-1-git-send-email-shubhrajyoti@ti.com>
 References: <1345125835-15524-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1345125835-15524-8-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1345125835-15524-24-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-Make it not depend on ISR's local variables
-in order to make it easier to re-factor the
-transmit data loop.
-Also since we are waiting for XUDF(Transmitter underflow) just before
-writing data lets not flag the underflow.
-This is anyways going to go once we write
-the data.
+move the goto out label one line down, so that
+it can be used when stat is read as zero. All
+other exits, can be done with a break statement.
+
+While at that, also break out as soon as we
+complete draining IRQ, since at that time
+we know we transferred everything there was
+to be transferred.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   43 ++++++++++++++++++++++++++++------------
- 1 files changed, 30 insertions(+), 13 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   26 +++++++++++++-------------
+ 1 files changed, 13 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 139602f..0067875 100644
+index d81189a..3df6f92 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -725,27 +725,30 @@ omap_i2c_omap1_isr(int this_irq, void *dev_id)
-  * data to DATA_REG. Otherwise some data bytes can be lost while transferring
-  * them from the memory to the I2C interface.
-  */
--static int errata_omap3_i462(struct omap_i2c_dev *dev, u16 *stat, int *err)
-+static int errata_omap3_i462(struct omap_i2c_dev *dev)
- {
- 	unsigned long timeout = 10000;
-+	u16 stat;
+@@ -901,27 +901,26 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
  
--	while (--timeout && !(*stat & OMAP_I2C_STAT_XUDF)) {
--		if (*stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
-+	do {
-+		stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
-+		if (stat & OMAP_I2C_STAT_XUDF)
-+			break;
-+
-+		if (stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
- 			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_XRDY |
- 							OMAP_I2C_STAT_XDR));
--			return -ETIMEDOUT;
-+			return -EIO;
+ 		if (!stat) {
+ 			/* my work here is done */
+-			spin_unlock_irqrestore(&dev->lock, flags);
+-			return IRQ_HANDLED;
++			goto out;
  		}
  
- 		cpu_relax();
--		*stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
--	}
-+	} while (--timeout);
+ 		dev_dbg(dev->dev, "IRQ (ISR = 0x%04x)\n", stat);
+ 		if (count++ == 100) {
+ 			dev_warn(dev->dev, "Too much work in one IRQ\n");
+-			goto out;
++			break;
+ 		}
  
- 	if (!timeout) {
- 		dev_err(dev->dev, "timeout waiting on XUDF bit\n");
- 		return 0;
- 	}
+ 		if (stat & OMAP_I2C_STAT_NACK) {
+ 			err |= OMAP_I2C_STAT_NACK;
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
+-			goto out;
++			break;
+ 		}
  
--	*err |= OMAP_I2C_STAT_XUDF;
- 	return 0;
- }
+ 		if (stat & OMAP_I2C_STAT_AL) {
+ 			dev_err(dev->dev, "Arbitration lost\n");
+ 			err |= OMAP_I2C_STAT_AL;
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_AL);
+-			goto out;
++			break;
+ 		}
  
-@@ -903,9 +906,16 @@ complete:
- 					}
- 				}
+ 		/*
+@@ -934,7 +933,7 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
+ 						OMAP_I2C_STAT_XRDY |
+ 						OMAP_I2C_STAT_XDR |
+ 						OMAP_I2C_STAT_ARDY));
+-			goto out;
++			break;
+ 		}
  
--				if ((dev->errata & I2C_OMAP_ERRATA_I462) &&
--				    errata_omap3_i462(dev, &stat, &err))
--					goto complete;
-+				if (dev->errata & I2C_OMAP_ERRATA_I462) {
-+					int ret;
+ 		if (stat & OMAP_I2C_STAT_RDR) {
+@@ -949,7 +948,7 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
+ 				i2c_omap_errata_i207(dev, stat);
+ 
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_RDR);
+-			continue;
++			break;
+ 		}
+ 
+ 		if (stat & OMAP_I2C_STAT_RRDY) {
+@@ -972,10 +971,10 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
+ 
+ 			ret = omap_i2c_transmit_data(dev, num_bytes, true);
+ 			if (ret < 0)
+-				goto out;
++				break;
+ 
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XDR);
+-			continue;
++			break;
+ 		}
+ 
+ 		if (stat & OMAP_I2C_STAT_XRDY) {
+@@ -987,7 +986,7 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
+ 
+ 			ret = omap_i2c_transmit_data(dev, num_bytes, false);
+ 			if (ret < 0)
+-				goto out;
++				break;
+ 
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XRDY);
+ 			continue;
+@@ -997,19 +996,20 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
+ 			dev_err(dev->dev, "Receive overrun\n");
+ 			err |= OMAP_I2C_STAT_ROVR;
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_ROVR);
+-			goto out;
++			break;
+ 		}
+ 
+ 		if (stat & OMAP_I2C_STAT_XUDF) {
+ 			dev_err(dev->dev, "Transmit underflow\n");
+ 			err |= OMAP_I2C_STAT_XUDF;
+ 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XUDF);
+-			goto out;
++			break;
+ 		}
+ 	} while (stat);
+ 
+-out:
+ 	omap_i2c_complete_cmd(dev, err);
 +
-+					ret = errata_omap3_i462(dev);
-+					stat = omap_i2c_read_reg(dev,
-+							OMAP_I2C_STAT_REG);
-+
-+					if (ret < 0)
-+						goto complete;
-+				}
++out:
+ 	spin_unlock_irqrestore(&dev->lock, flags);
  
- 				omap_i2c_write_reg(dev, OMAP_I2C_DATA_REG, w);
- 			}
-@@ -943,9 +953,16 @@ complete:
- 					}
- 				}
- 
--				if ((dev->errata & I2C_OMAP_ERRATA_I462) &&
--				    errata_omap3_i462(dev, &stat, &err))
--					goto complete;
-+				if (dev->errata & I2C_OMAP_ERRATA_I462) {
-+					int ret;
-+
-+					ret = errata_omap3_i462(dev);
-+					stat = omap_i2c_read_reg(dev,
-+							OMAP_I2C_STAT_REG);
-+
-+					if (ret < 0)
-+						goto complete;
-+				}
- 
- 				omap_i2c_write_reg(dev, OMAP_I2C_DATA_REG, w);
- 			}
+ 	return IRQ_HANDLED;
 -- 
 1.7.5.4
