@@ -1,331 +1,158 @@
-From: prabhakar.lad@ti.com (Prabhakar Lad)
-Date: Thu, 16 Aug 2012 16:01:51 +0530
-Subject: [PATCH 2/2] ARM: da850/omap-l138: Add EVM specific code for VPIF
- to work
-In-Reply-To: <502A4BFB.9020407@ti.com>
-References: <1343115786-15801-1-git-send-email-prabhakar.lad@ti.com>
- <1343115786-15801-3-git-send-email-prabhakar.lad@ti.com>
- <502A4BFB.9020407@ti.com>
-Message-ID: <502CCC17.9080208@ti.com>
+From: alanbutty12@gmail.com (alan butler)
+Date: Thu, 16 Aug 2012 11:36:55 +0100
+Subject: PATCH Add support for the Iomega IX2-200 Device Tree
+In-Reply-To: <CADhrpJ5UF6r2N027nOS6xmJtu21UbDxfzLninCZ7O-A+G3ALgg@mail.gmail.com>
+References: <20120815211517.GA15830@lunn.ch>
+ <CADhrpJ7+MoKF9qbeh9RBHo3j-m22574pi=cuHfQ9-KeVNX=mzw@mail.gmail.com>
+ <20120815213221.GE15830@lunn.ch>
+ <CADhrpJ4eAUdDaLF8OXvjRf6oA6ya0na-SHYs43eoNwdoEJETpA@mail.gmail.com>
+ <20120815215237.GF15830@lunn.ch>
+ <CADhrpJ7ANwD4asN4-D9OeicGA_V5-9DZoV9G6dDFZ9taN7AZsg@mail.gmail.com>
+ <20120815221613.GH15830@lunn.ch>
+ <CADhrpJ66ncpT74ATyvJDXTuJC-zrmh8vQ99RPg0t=XuQ_2RcVA@mail.gmail.com>
+ <CADhrpJ4sH9krkrWSoFjCg5jrkompgFY=G8iiXo0xy8_iCKeKxA@mail.gmail.com>
+ <CADhrpJ7=5QbivftpcuVdhmcKxp3rjiuKQ4Lrf3NckBwL6YNmPQ@mail.gmail.com>
+ <20120815234159.GK22226@titan.lakedaemon.net>
+ <CADhrpJ4EMCuvuynF9x+q-PkNPRBaCD_G_YWbcYVj0UrGRQk5dg@mail.gmail.com>
+ <CADhrpJ5UF6r2N027nOS6xmJtu21UbDxfzLninCZ7O-A+G3ALgg@mail.gmail.com>
+Message-ID: <CADhrpJ7geSRc3pow-DQWiA3rZ=f0i2WSws_QuKSDk7uZx1VSRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
-
-Thanks for the review.
-
-On Tuesday 14 August 2012 06:30 PM, Sekhar Nori wrote:
-> Hi Prabhakar,
-> 
-> On 7/24/2012 1:13 PM, Prabhakar Lad wrote:
->> From: Manjunath Hadli <manjunath.hadli@ti.com>
+On 16 August 2012 01:00, alan butler <alanbutty12@gmail.com> wrote:
+> On 16 August 2012 00:52, alan butler <alanbutty12@gmail.com> wrote:
+>> On 16 August 2012 00:41, Jason Cooper <jason@lakedaemon.net> wrote:
+>>> On Thu, Aug 16, 2012 at 12:34:46AM +0100, alan butler wrote:
+>>>> On 16 August 2012 00:12, alan butler <alanbutty12@gmail.com> wrote:
+>>>> > On 16 August 2012 00:02, alan butler <alanbutty12@gmail.com> wrote:
+>>>> >> On 15 August 2012 23:16, Andrew Lunn <andrew@lunn.ch> wrote:
+>>>> >>> On Wed, Aug 15, 2012 at 10:57:27PM +0100, alan butler wrote:
+>>>> >>>> On 15 August 2012 22:52, Andrew Lunn <andrew@lunn.ch> wrote:
+>>>> >>>> >> That would be great i just need to recreate the patch with those
+>>>> >>>> >> changes but i was talking with jason cooper i believe and he said to
+>>>> >>>> >> put the buttons for the device in the dts file and im working on that
+>>>> >>>> >> but the kernel panics
+>>>> >>>> >
+>>>> >>>> > Please show us the panic.
+>>>> >>>> >
+>>>> >>>> >        Andrew
+>>>> >>>>
+>>>> >>>> i sent it to jason a lil bit earlier but i guess i must of forgotten
+>>>> >>>> to cc the list on the last message or 2 but here is the panic again:
+>>>> >>>>
+>>>> >>>> [    5.976074] Key type dns_resolver registered
+>>>> >>>> [    5.981782] Unable to handle kernel NULL pointer dereference at
+>>>> >>>> virtual address 00000004
+>>>> >>>> [    5.989932] pgd = c0004000
+>>>> >>>> [    5.992649] [00000004] *pgd=00000000
+>>>> >>>> [    5.996247] Internal error: Oops: 805 [#1] ARM
+>>>> >>>> [    6.000707] Modules linked in:
+>>>> >>>> [    6.003780] CPU: 0    Not tainted  (3.6.0-rc1-next-20120814 #13)
+>>>> >>>> [    6.009822] PC is at gpio_keys_probe+0x110/0x6d4
+>>>> >>>
+>>>> >>> You might want to scatter some printk() in gpio_keys_probe() and see
+>>>> >>> where it panics. It will probably then be clear what is wrong.
+>>>> >>>
+>>>> >>>       Andrew
+>>>> >>
+>>>> >> where do i find the gpio_keys_probe() ?
+>>>> >
+>>>> > i found the gpio_keys_probe() and it seems that it is failing in this
+>>>> > piece of code i put a printk() before and after it and it didnt reach
+>>>> > the printk after it:
+>>>> >
+>>>> > if (!pdata) {
+>>>> >                 pdata = gpio_keys_get_devtree_pdata(dev);
+>>>> >                 if (IS_ERR(pdata))
+>>>> >                         return PTR_ERR(pdata);
+>>>> >         }
+>>>> >
+>>>> >         ddata = kzalloc(sizeof(struct gpio_keys_drvdata) +
+>>>> >                         pdata->nbuttons * sizeof(struct gpio_button_data),
+>>>> >                         GFP_KERNEL);
+>>>> >         input = input_allocate_device();
+>>>> >         if (!ddata || !input) {
+>>>> >                 dev_err(dev, "failed to allocate state\n");
+>>>> >                 error = -ENOMEM;
+>>>> >                 goto fail1;
+>>>> >         }
+>>>>
+>>>> actualy it seems to not be getting past this piece of code in what i
+>>>> posted before:
+>>>>
+>>>> if (!pdata) {
+>>>>               pdata = gpio_keys_get_devtree_pdata(dev);
+>>>>               if (IS_ERR(pdata))
+>>>>                       return PTR_ERR(pdata);
+>>>>       }
+>>>
+>>> That means gpio_keys_get_devtree_pdata() is returning an error.  Have
+>>> you tried 'linux,input-type = <0x05>;' ?
+>>>
+>>> thx,
+>>>
+>>> Jason.
 >>
->> Include the expander settings to select VPIF peripheral on
->> UI card and add registration call in EVM init. Also add platform
->> data to configure display and capture devices.
->>
->> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
->> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> ---
->>  arch/arm/mach-davinci/Kconfig           |    9 ++
->>  arch/arm/mach-davinci/board-da850-evm.c |  195 +++++++++++++++++++++++++++++++
->>  2 files changed, 204 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
->> index 32d837d..19ee4ee 100644
->> --- a/arch/arm/mach-davinci/Kconfig
->> +++ b/arch/arm/mach-davinci/Kconfig
->> @@ -190,6 +190,15 @@ config DA850_UI_RMII
->>  	  NOTE: Please take care while choosing this option, MII PHY will
->>  	  not be functional if RMII mode is selected.
->>  
->> +config DA850_UI_SD_VIDEO_PORT
->> +	bool "Video Port Interface"
->> +	help
->> +	  Say Y if you want to use Video Port Interface (VPIF) on the
->> +	  DA850/OMAP-L138 EVM. The Video decoders/encoders are found on the
->> +	  UI daughter card that is supplied with the EVM.
->> +	  NOTE: Please make sure to disable RMII and CLCD options when you
->> +	  select Video Port Interface.
-> 
-> RMII is in the same choice block as this so it is not possible to have
-> RMII enabled along with video port selection. On the CLCD, it will be
-> good to register only one of CLCD or video and print a warning if user
-> enabled both. davinci_evm_init() in
-> arch/arm/mach-davinci/board-dm644x-evm.c has an example of this.
-> 
- The CLCD support is not in mainlined yet, if it is the option to enable
-the CLCD will also come in the same choice block if  I am not wrong. So
-by any means the user can select only one of them.
+>> 'inux,input-type = <0x05>' instead of 'linux,code = <...>' in the dts?
+>> no i havent tried will give it a try now.
+>
+> with the buttons setup as follows:
+> gpio-keys {
+>                 compatible = "gpio-keys";
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+>                 iomotb {
+>                         label = "OTB Button";
+>                         linux,input-type = <133>;
+>                         gpios = <&gpio1 3 1>;
+>                         debounce-interval = <100>;
+>                 };
+>                 iomreset {
+>                         label = "Reset";
+>                         linux,input-type = <0x198>;
+>                         gpios = <&gpio0 12 1>;
+>                         debounce-interval = <100>;
+>                 };
+>         };
+>
+> it errors at the following:
+>
+> button->gpio = of_get_gpio_flags(pp, 0, &flags);
+> button->active_low = flags & OF_GPIO_ACTIVE_LOW;
 
->> +
->>  endchoice
->>  
->>  config DA850_WL12XX
->> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
->> index 0149fb4..1f5d2c1 100644
->> --- a/arch/arm/mach-davinci/board-da850-evm.c
->> +++ b/arch/arm/mach-davinci/board-da850-evm.c
->> @@ -45,6 +45,8 @@
->>  #include <mach/aemif.h>
->>  #include <mach/spi.h>
->>  
->> +#include <media/tvp514x.h>
->> +
->>  #define DA850_EVM_PHY_ID		"davinci_mdio-0:00"
->>  #define DA850_LCD_PWR_PIN		GPIO_TO_PIN(2, 8)
->>  #define DA850_LCD_BL_PIN		GPIO_TO_PIN(2, 15)
->> @@ -121,6 +123,12 @@ static struct spi_board_info da850evm_spi_info[] = {
->>  	},
->>  };
->>  
->> +#define TVP5147_CH0		"tvp514x-0"
->> +#define TVP5147_CH1		"tvp514x-1"
->> +
->> +#define VPIF_STATUS		0x002c
->> +#define VPIF_STATUS_CLR		0x0030
->> +
->>  #ifdef CONFIG_MTD
->>  static void da850_evm_m25p80_notify_add(struct mtd_info *mtd)
->>  {
->> @@ -452,6 +460,15 @@ static void da850_evm_ui_keys_init(unsigned gpio)
->>  	}
->>  }
->>  
->> +#ifdef CONFIG_DA850_UI_SD_VIDEO_PORT
->> +static inline void da850_evm_setup_video_port(int video_sel)
->> +{
->> +	gpio_set_value_cansleep(video_sel, 0);
->> +}
->> +#else
->> +static inline void da850_evm_setup_video_port(int video_sel) { }
->> +#endif
->> +
->>  static int da850_evm_ui_expander_setup(struct i2c_client *client, unsigned gpio,
->>  						unsigned ngpio, void *c)
->>  {
->> @@ -497,6 +514,8 @@ static int da850_evm_ui_expander_setup(struct i2c_client *client, unsigned gpio,
->>  
->>  	da850_evm_setup_emac_rmii(sel_a);
->>  
->> +	da850_evm_setup_video_port(sel_c);
->> +
->>  	return 0;
->>  
->>  exp_setup_keys_fail:
->> @@ -1149,6 +1168,151 @@ static __init int da850_evm_init_cpufreq(void)
->>  static __init int da850_evm_init_cpufreq(void) { return 0; }
->>  #endif
->>  
->> +/* Retaining these APIs, since the VPIF drivers do not check NULL handlers */
->> +static int da850_set_vpif_clock(int mux_mode, int hd)
->> +{
->> +	return 0;
->> +}
->> +
->> +static int da850_setup_vpif_input_channel_mode(int mux_mode)
->> +{
->> +	return 0;
->> +}
->> +
->> +int da850_vpif_setup_input_path(int ch, const char *name)
->> +{
->> +	return 0;
->> +}
-> 
-> Why not enhance the VPIF driver to handle NULL values for these instead?
-> 
-  Ok can be done.
->> +
->> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
->> +/* VPIF capture configuration */
->> +static struct tvp514x_platform_data tvp5146_pdata = {
->> +	.clk_polarity = 0,
->> +	.hs_polarity = 1,
->> +	.vs_polarity = 1
->> +};
->> +#endif
->> +
->> +#define TVP514X_STD_ALL (V4L2_STD_NTSC | V4L2_STD_PAL)
->> +
->> +static struct vpif_subdev_info da850_vpif_capture_sdev_info[] = {
->> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
-> 
-> Why not just continue with the previous #ifdef
-> CONFIG_DA850_UI_SD_VIDEO_PORT?
-> 
- Ok
+with the buttons setup like this:
 
->> +	{
->> +		.name	= TVP5147_CH0,
->> +		.board_info = {
->> +			I2C_BOARD_INFO("tvp5146", 0x5d),
->> +			.platform_data = &tvp5146_pdata,
->> +		},
->> +		.input = INPUT_CVBS_VI2B,
->> +		.output = OUTPUT_10BIT_422_EMBEDDED_SYNC,
->> +		.can_route = 1,
->> +		.vpif_if = {
->> +			.if_type = VPIF_IF_BT656,
->> +			.hd_pol = 1,
->> +			.vd_pol = 1,
->> +			.fid_pol = 0,
->> +		},
->> +	},
->> +	{
->> +		.name	= TVP5147_CH1,
->> +		.board_info = {
->> +			I2C_BOARD_INFO("tvp5146", 0x5c),
->> +			.platform_data = &tvp5146_pdata,
->> +		},
->> +		.input = INPUT_SVIDEO_VI2C_VI1C,
->> +		.output = OUTPUT_10BIT_422_EMBEDDED_SYNC,
->> +		.can_route = 1,
->> +		.vpif_if = {
->> +			.if_type = VPIF_IF_BT656,
->> +			.hd_pol = 1,
->> +			.vd_pol = 1,
->> +			.fid_pol = 0,
->> +		},
->> +	},
->> +#endif
->> +};
->> +
->> +static const struct vpif_input da850_ch0_inputs[] = {
->> +	{
->> +		.input = {
->> +			.index = 0,
->> +			.name = "Composite",
->> +			.type = V4L2_INPUT_TYPE_CAMERA,
->> +			.std = TVP514X_STD_ALL,
->> +		},
->> +		.subdev_name = TVP5147_CH0,
->> +	},
->> +};
->> +
->> +static const struct vpif_input da850_ch1_inputs[] = {
->> +	{
->> +		.input = {
->> +			.index = 0,
->> +			.name = "S-Video",
->> +			.type = V4L2_INPUT_TYPE_CAMERA,
->> +			.std = TVP514X_STD_ALL,
->> +		},
->> +		.subdev_name = TVP5147_CH1,
->> +	},
->> +};
->> +
->> +static struct vpif_capture_config da850_vpif_capture_config = {
->> +	.setup_input_channel_mode = da850_setup_vpif_input_channel_mode,
->> +	.setup_input_path = da850_vpif_setup_input_path,
->> +	.subdev_info = da850_vpif_capture_sdev_info,
->> +	.subdev_count = ARRAY_SIZE(da850_vpif_capture_sdev_info),
->> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
-> 
-> Same here.
-> 
-  Ok
->> +	.chan_config[0] = {
->> +		.inputs = da850_ch0_inputs,
->> +		.input_count = ARRAY_SIZE(da850_ch0_inputs),
->> +	},
->> +	.chan_config[1] = {
->> +		.inputs = da850_ch1_inputs,
->> +		.input_count = ARRAY_SIZE(da850_ch1_inputs),
->> +	},
->> +#endif
->> +	.card_name      = "DA850/OMAP-L138 Video Capture",
->> +};
->> +
->> +/* VPIF display configuration */
->> +static struct vpif_subdev_info da850_vpif_subdev[] = {
->> +	{
->> +		.name	= "adv7343",
->> +		.board_info = {
->> +			I2C_BOARD_INFO("adv7343", 0x2a),
->> +		},
->> +	},
->> +};
->> +
->> +static const char const *vpif_output[] = {
->> +	"Composite",
->> +	"Component",
->> +	"S-Video",
->> +};
->> +
->> +static struct vpif_display_config da850_vpif_display_config = {
->> +	.set_clock	= da850_set_vpif_clock,
->> +	.subdevinfo	= da850_vpif_subdev,
->> +	.subdev_count	= ARRAY_SIZE(da850_vpif_subdev),
->> +	.output		= vpif_output,
->> +	.output_count	= ARRAY_SIZE(vpif_output),
->> +	.card_name	= "DA850/OMAP-L138 Video Display",
->> +};
->> +
->> +#if defined(CONFIG_VIDEO_DAVINCI_VPIF_DISPLAY) ||\
->> +		defined(CONFIG_VIDEO_DAVINCI_VPIF_DISPLAY_MODULE)
->> +#define HAS_VPIF_DISPLAY 1
->> +#else
->> +#define HAS_VPIF_DISPLAY 0
->> +#endif
->> +
->> +#if defined(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) ||\
->> +		defined(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE_MODULE)
->> +#define HAS_VPIF_CAPTURE 1
->> +#else
->> +#define HAS_VPIF_CAPTURE 0
->> +#endif
->> +
->>  #ifdef CONFIG_DA850_WL12XX
->>  
->>  static void wl12xx_set_power(int index, bool power_on)
->> @@ -1375,6 +1539,37 @@ static __init void da850_evm_init(void)
->>  		pr_warning("da850_evm_init: suspend registration failed: %d\n",
->>  				ret);
->>  
->> +	if (HAS_VPIF_DISPLAY || HAS_VPIF_CAPTURE) {
->> +		ret = da850_register_vpif();
->> +		if (ret)
->> +			pr_warn("da850_evm_init: VPIF setup failed: %d\n",
->> +				   ret);
->> +	}
->> +
->> +	if (HAS_VPIF_CAPTURE) {
->> +		ret = davinci_cfg_reg_list(da850_vpif_capture_pins);
->> +		if (ret)
->> +			pr_warn("da850_evm_init: VPIF capture mux failed:%d\n",
->> +					ret);
->> +
->> +		ret = da850_register_vpif_capture(&da850_vpif_capture_config);
->> +		if (ret)
->> +			pr_warn("da850_evm_init: VPIF capture setup" \
->> +			" failed: %d\n", ret);
-> 
-> Please don't break print messages.
-> 
- Ok.
+gpio_keys {
+		compatible = "gpio-keys";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		button at 1 {
+			label = "Reset Button";
+			linux,code = <116>;
+			gpios = <&gpio0 12 1>;
+		};
+		button at 2 {
+			label = "Power-on Switch";
+			linux,code = <116>;
+			gpios = <&gpio0 14 1>;
+		};
+		button at 3 {
+			label = "OTB Switch";
+			linux,code = <142>;
+			gpios = <&gpio1 3 1>;
+		};
+	};
 
->> +	}
->> +
->> +	if (HAS_VPIF_DISPLAY) {
->> +		ret = davinci_cfg_reg_list(da850_vpif_display_pins);
->> +		if (ret)
->> +			pr_warn("da850_evm_init : VPIF capture mux failed" \
->> +			": %d\n", ret);
->> +
->> +		ret = da850_register_vpif_display(&da850_vpif_display_config);
->> +		if (ret)
->> +			pr_warn("da850_evm_init: VPIF display setup" \
->> +			" failed: %d\n", ret);
-> 
-> Same here.
-> 
- Ok.
+the problem seems to be in this comming from this line:
 
-Thx,
---Prabhakar
+button->gpio = of_get_gpio_flags(pp, 0, &flags);
 
-> Thanks,
-> Sekhar
-> 
+in the function :
+
+/*
+ * Translate OpenFirmware node properties into platform_data
+ */
+static struct gpio_keys_platform_data * __devinit
+
+of the gpio_keys.c file or whatever that line links to. It does not
+know how to deal with some NULL reference as far as i can tell.
