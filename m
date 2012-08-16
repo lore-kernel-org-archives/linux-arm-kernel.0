@@ -1,221 +1,108 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 16 Aug 2012 16:35:53 +0100
-Subject: [PATCH v3 01/25] arm: initial Xen support
+Date: Thu, 16 Aug 2012 16:35:59 +0100
+Subject: [PATCH v3 07/25] xen/arm: Xen detection and shared_info page mapping
 In-Reply-To: <alpine.DEB.2.02.1208161618550.4850@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1208161618550.4850@kaball.uk.xensource.com>
-Message-ID: <1345131377-14713-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1345131377-14713-7-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Basic hypervisor.h and interface.h definitions.
-- Skeleton enlighten.c, set xen_start_info to an empty struct.
-- Make xen_initial_domain dependent on the SIF_PRIVILIGED_BIT.
+Check for a node in the device tree compatible with "xen,xen", if it is
+present set xen_domain_type to XEN_HVM_DOMAIN and continue
+initialization.
 
-The new code only compiles when CONFIG_XEN is set, that is going to be
-added to arch/arm/Kconfig in patch #11 "xen/arm: introduce CONFIG_XEN on
-ARM".
+Map the real shared info page using XENMEM_add_to_physmap with
+XENMAPSPACE_shared_info.
 
 Changes in v3:
 
-- improve comments.
+- use the "xen,xen" notation rather than "arm,xen";
+- add an additional check on the presence of the Xen version.
+
+Changes in v2:
+
+- replace pr_info with pr_debug.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 ---
- arch/arm/Makefile                     |    1 +
- arch/arm/include/asm/hypervisor.h     |    6 +++
- arch/arm/include/asm/xen/hypervisor.h |   19 ++++++++++
- arch/arm/include/asm/xen/interface.h  |   65 +++++++++++++++++++++++++++++++++
- arch/arm/xen/Makefile                 |    1 +
- arch/arm/xen/enlighten.c              |   35 ++++++++++++++++++
- include/xen/xen.h                     |    2 +-
- 7 files changed, 128 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/include/asm/hypervisor.h
- create mode 100644 arch/arm/include/asm/xen/hypervisor.h
- create mode 100644 arch/arm/include/asm/xen/interface.h
- create mode 100644 arch/arm/xen/Makefile
- create mode 100644 arch/arm/xen/enlighten.c
+ arch/arm/xen/enlighten.c |   61 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 61 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 0298b00..70aaa82 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -246,6 +246,7 @@ endif
- core-$(CONFIG_FPE_NWFPE)	+= arch/arm/nwfpe/
- core-$(CONFIG_FPE_FASTFPE)	+= $(FASTFPE_OBJ)
- core-$(CONFIG_VFP)		+= arch/arm/vfp/
-+core-$(CONFIG_XEN)		+= arch/arm/xen/
- 
- # If we have a machine-specific directory, then include it in the build.
- core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
-diff --git a/arch/arm/include/asm/hypervisor.h b/arch/arm/include/asm/hypervisor.h
-new file mode 100644
-index 0000000..b90d9e5
---- /dev/null
-+++ b/arch/arm/include/asm/hypervisor.h
-@@ -0,0 +1,6 @@
-+#ifndef _ASM_ARM_HYPERVISOR_H
-+#define _ASM_ARM_HYPERVISOR_H
-+
-+#include <asm/xen/hypervisor.h>
-+
-+#endif
-diff --git a/arch/arm/include/asm/xen/hypervisor.h b/arch/arm/include/asm/xen/hypervisor.h
-new file mode 100644
-index 0000000..d7ab99a
---- /dev/null
-+++ b/arch/arm/include/asm/xen/hypervisor.h
-@@ -0,0 +1,19 @@
-+#ifndef _ASM_ARM_XEN_HYPERVISOR_H
-+#define _ASM_ARM_XEN_HYPERVISOR_H
-+
-+extern struct shared_info *HYPERVISOR_shared_info;
-+extern struct start_info *xen_start_info;
-+
-+/* Lazy mode for batching updates / context switch */
-+enum paravirt_lazy_mode {
-+	PARAVIRT_LAZY_NONE,
-+	PARAVIRT_LAZY_MMU,
-+	PARAVIRT_LAZY_CPU,
-+};
-+
-+static inline enum paravirt_lazy_mode paravirt_get_lazy_mode(void)
-+{
-+	return PARAVIRT_LAZY_NONE;
-+}
-+
-+#endif /* _ASM_ARM_XEN_HYPERVISOR_H */
-diff --git a/arch/arm/include/asm/xen/interface.h b/arch/arm/include/asm/xen/interface.h
-new file mode 100644
-index 0000000..9e0ec5a
---- /dev/null
-+++ b/arch/arm/include/asm/xen/interface.h
-@@ -0,0 +1,65 @@
-+/******************************************************************************
-+ * Guest OS interface to ARM Xen.
-+ *
-+ * Stefano Stabellini <stefano.stabellini@eu.citrix.com>, Citrix, 2012
-+ */
-+
-+#ifndef _ASM_ARM_XEN_INTERFACE_H
-+#define _ASM_ARM_XEN_INTERFACE_H
-+
-+#include <linux/types.h>
-+
-+#define __DEFINE_GUEST_HANDLE(name, type) \
-+	typedef type * __guest_handle_ ## name
-+
-+#define DEFINE_GUEST_HANDLE_STRUCT(name) \
-+	__DEFINE_GUEST_HANDLE(name, struct name)
-+#define DEFINE_GUEST_HANDLE(name) __DEFINE_GUEST_HANDLE(name, name)
-+#define GUEST_HANDLE(name)        __guest_handle_ ## name
-+
-+#define set_xen_guest_handle(hnd, val)			\
-+	do {						\
-+		if (sizeof(hnd) == 8)			\
-+			*(uint64_t *)&(hnd) = 0;	\
-+		(hnd) = val;				\
-+	} while (0)
-+
-+#ifndef __ASSEMBLY__
-+/* Guest handles for primitive C types. */
-+__DEFINE_GUEST_HANDLE(uchar, unsigned char);
-+__DEFINE_GUEST_HANDLE(uint,  unsigned int);
-+__DEFINE_GUEST_HANDLE(ulong, unsigned long);
-+DEFINE_GUEST_HANDLE(char);
-+DEFINE_GUEST_HANDLE(int);
-+DEFINE_GUEST_HANDLE(long);
-+DEFINE_GUEST_HANDLE(void);
-+DEFINE_GUEST_HANDLE(uint64_t);
-+DEFINE_GUEST_HANDLE(uint32_t);
-+
-+/* Maximum number of virtual CPUs in multi-processor guests. */
-+#define MAX_VIRT_CPUS 1
-+
-+struct arch_vcpu_info { };
-+struct arch_shared_info { };
-+
-+/* TODO: Move pvclock definitions some place arch independent */
-+struct pvclock_vcpu_time_info {
-+	u32   version;
-+	u32   pad0;
-+	u64   tsc_timestamp;
-+	u64   system_time;
-+	u32   tsc_to_system_mul;
-+	s8    tsc_shift;
-+	u8    flags;
-+	u8    pad[2];
-+} __attribute__((__packed__)); /* 32 bytes */
-+
-+/* It is OK to have a 12 bytes struct with no padding because it is packed */
-+struct pvclock_wall_clock {
-+	u32   version;
-+	u32   sec;
-+	u32   nsec;
-+} __attribute__((__packed__));
-+#endif
-+
-+#endif /* _ASM_ARM_XEN_INTERFACE_H */
-diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
-new file mode 100644
-index 0000000..0bad594
---- /dev/null
-+++ b/arch/arm/xen/Makefile
-@@ -0,0 +1 @@
-+obj-y		:= enlighten.o
 diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-new file mode 100644
-index 0000000..c535540
---- /dev/null
+index c535540..78ea1f7 100644
+--- a/arch/arm/xen/enlighten.c
 +++ b/arch/arm/xen/enlighten.c
-@@ -0,0 +1,35 @@
-+#include <xen/xen.h>
-+#include <xen/interface/xen.h>
-+#include <xen/interface/memory.h>
-+#include <xen/platform_pci.h>
-+#include <asm/xen/hypervisor.h>
-+#include <asm/xen/hypercall.h>
-+#include <linux/module.h>
-+
-+struct start_info _xen_start_info;
-+struct start_info *xen_start_info = &_xen_start_info;
-+EXPORT_SYMBOL_GPL(xen_start_info);
-+
-+enum xen_domain_type xen_domain_type = XEN_NATIVE;
-+EXPORT_SYMBOL_GPL(xen_domain_type);
-+
-+struct shared_info xen_dummy_shared_info;
-+struct shared_info *HYPERVISOR_shared_info = (void *)&xen_dummy_shared_info;
-+
-+DEFINE_PER_CPU(struct vcpu_info *, xen_vcpu);
-+
-+/* TODO: to be removed */
-+__read_mostly int xen_have_vector_callback;
-+EXPORT_SYMBOL_GPL(xen_have_vector_callback);
-+
-+int xen_platform_pci_unplug = XEN_UNPLUG_ALL;
-+EXPORT_SYMBOL_GPL(xen_platform_pci_unplug);
-+
-+int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
-+			       unsigned long addr,
-+			       unsigned long mfn, int nr,
-+			       pgprot_t prot, unsigned domid)
-+{
-+	return -ENOSYS;
-+}
-+EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_range);
-diff --git a/include/xen/xen.h b/include/xen/xen.h
-index a164024..2c0d3a5 100644
---- a/include/xen/xen.h
-+++ b/include/xen/xen.h
-@@ -23,7 +23,7 @@ extern enum xen_domain_type xen_domain_type;
- #include <xen/interface/xen.h>
+@@ -5,6 +5,9 @@
  #include <asm/xen/hypervisor.h>
+ #include <asm/xen/hypercall.h>
+ #include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
++#include <linux/of_address.h>
  
--#define xen_initial_domain()	(xen_pv_domain() && \
-+#define xen_initial_domain()	(xen_domain() && \
- 				 xen_start_info->flags & SIF_INITDOMAIN)
- #else  /* !CONFIG_XEN_DOM0 */
- #define xen_initial_domain()	(0)
+ struct start_info _xen_start_info;
+ struct start_info *xen_start_info = &_xen_start_info;
+@@ -33,3 +36,61 @@ int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
+ 	return -ENOSYS;
+ }
+ EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_range);
++
++/*
++ * see Documentation/devicetree/bindings/arm/xen.txt for the
++ * documentation of the Xen Device Tree format.
++ */
++static int __init xen_guest_init(void)
++{
++	struct xen_add_to_physmap xatp;
++	static struct shared_info *shared_info_page = 0;
++	struct device_node *node;
++	int len;
++	const char *s = NULL;
++	const char *version = NULL;
++	const char *xen_prefix = "xen,xen-";
++
++	node = of_find_compatible_node(NULL, NULL, "xen,xen");
++	if (!node) {
++		pr_debug("No Xen support\n");
++		return 0;
++	}
++	s = of_get_property(node, "compatible", &len);
++	if (strlen(s) + strlen(xen_prefix) + 1  < len &&
++			!strncmp(xen_prefix, s + strlen(s) + 1, strlen(xen_prefix)))
++		version = s + strlen(s) + strlen(xen_prefix) + 1;
++	if (version == NULL) {
++		pr_debug("Xen version not found\n");
++		return 0;
++	}
++	xen_domain_type = XEN_HVM_DOMAIN;
++
++	if (!shared_info_page)
++		shared_info_page = (struct shared_info *)
++			get_zeroed_page(GFP_KERNEL);
++	if (!shared_info_page) {
++		pr_err("not enough memory\n");
++		return -ENOMEM;
++	}
++	xatp.domid = DOMID_SELF;
++	xatp.idx = 0;
++	xatp.space = XENMAPSPACE_shared_info;
++	xatp.gpfn = __pa(shared_info_page) >> PAGE_SHIFT;
++	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
++		BUG();
++
++	HYPERVISOR_shared_info = (struct shared_info *)shared_info_page;
++
++	/* xen_vcpu is a pointer to the vcpu_info struct in the shared_info
++	 * page, we use it in the event channel upcall and in some pvclock
++	 * related functions. We don't need the vcpu_info placement
++	 * optimizations because we don't use any pv_mmu or pv_irq op on
++	 * HVM.
++	 * The shared info contains exactly 1 CPU (the boot CPU). The guest
++	 * is required to use VCPUOP_register_vcpu_info to place vcpu info
++	 * for secondary CPUs as they are brought up. */
++	per_cpu(xen_vcpu, 0) = &HYPERVISOR_shared_info->vcpu_info[0];
++	return 0;
++}
++core_initcall(xen_guest_init);
 -- 
 1.7.2.5
