@@ -1,44 +1,46 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 15 Aug 2012 18:48:13 -0600 (MDT)
-Subject: [PATCH v5 0/8] ARM: OMAP2+: PM: introduce the power domains
- functional states
-In-Reply-To: <CAMQu2gxznhsbK3--nyQmYdHqyGjwpCSa3CJx8aYpF4wwR1qBSg@mail.gmail.com>
-References: <1345024968-28951-1-git-send-email-j-pihet@ti.com>
- <CAMQu2gxznhsbK3--nyQmYdHqyGjwpCSa3CJx8aYpF4wwR1qBSg@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1208151842380.8833@utopia.booyaka.com>
+From: zhangfei.gao@marvell.com (Zhangfei Gao)
+Date: Thu, 16 Aug 2012 10:23:24 +0800
+Subject: [PATCH v4 0/2] dmaengine: add support mmp-pdma
+Message-ID: <1345083806-24588-1-git-send-email-zhangfei.gao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+v3-v4
+Set DMA_MEM_TO_MEM as default setting for memcpy, Suggested by Russell.
+"By default, any channel being asked to do memcpy
+should deal with the channel configuration itself and not require it
+to be set"
 
-On Wed, 15 Aug 2012, Shilimkar, Santosh wrote:
+v2->v3 
+Use "#dma-channels", instead of "dma-channels", suggested by Arnd
 
-> On Wed, Aug 15, 2012 at 3:32 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
->
-> I didn't find any mention here about why are we going in this path and not
-> in the direction proposed in another RFC [1]
-> I have already given my comments[2] against the introduction of another PD
-> layer which can be avoided easily as demonstrated by the RFC[1]. The comments
-> are still applicable for this series too.
-> 
-> We really need to reduce OMAP specific framework overhead and
-> move towards more generic PM frameworks. For me, this series is
-> a step back-ward from that direction. Am really sorry for being critical
-> again but I remain unconvinced about this series and the problem it
-> is trying to solve.
-> 
-> May be you have valid reasons not to follow the approach in [1] and in
-> that case, it will be good to clarify that so that some of us get
-> to know your rationale.
+v1->v2
+Sync with Arnd and Haojoan, change compatible name to "marvell,pdma-1.0"
+Used platfroms: pxa25x, pxa27x, pxa3xx, pxa93x, pxa168, pxa910, pxa688.
+Use IP name rather than platform name
 
-I've asked Jean to handle the work of evaluating and/or integrating any 
-feedback from you and Rajendra into this series.  Jean, has this latest 
-series fully considered those issues?  Or are there still some areas of 
-misalignment / lack of clarity?
+Also change "marvell,mmp-adma" to "marvell,adma-1.0"
 
-Anyway.  If there's a problem with this process, it sounds like you, 
-Rajendra, Jean, Beno?t and I should schedule some time to talk over the 
-same issues that you discussed with me on the phone.  Perhaps next week?
+v0->v1
+Update dt member and desc according to Arnd's suggestion
+Use dma_slave_config.slave_id to transfer drcmr followed Vinod's suggestion
 
+mmp-pdma is added under dmaengine framework.
+The final purpose is replacing arch/arm/plat-pxa/dma.c
 
-- Paul
+Test on pxa910 with pxa3xx-nand and dmatest.ko
+
+Zhangfei Gao (2):
+  dmaengine: mmp-pdma support
+  dmaengine: mmp_tdma: add dt support
+
+ Documentation/devicetree/bindings/dma/mmp-dma.txt |   75 ++
+ drivers/dma/Kconfig                               |    7 +
+ drivers/dma/Makefile                              |    1 +
+ drivers/dma/mmp_pdma.c                            |  876 +++++++++++++++++++++
+ drivers/dma/mmp_tdma.c                            |   51 +-
+ include/linux/platform_data/mmp_dma.h             |   19 +
+ 6 files changed, 1009 insertions(+), 20 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/mmp-dma.txt
+ create mode 100644 drivers/dma/mmp_pdma.c
+ create mode 100644 include/linux/platform_data/mmp_dma.h
