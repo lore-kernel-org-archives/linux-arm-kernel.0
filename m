@@ -1,28 +1,36 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 16 Aug 2012 15:00:56 +0100
-Subject: [PATCH v2 3/4] arm/dts: Add tps65910 regulator DT data to
- am335x-evm.dts
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA13D18@DBDE01.ent.ti.com>
-References: <1343110735-10640-1-git-send-email-anilkumar@ti.com>
- <1343110735-10640-4-git-send-email-anilkumar@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA1293E@DBDE01.ent.ti.com>
- <20120815125338.GA13544@opensource.wolfsonmicro.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA13118@DBDE01.ent.ti.com>
- <20120815165431.GF15365@opensource.wolfsonmicro.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA13D18@DBDE01.ent.ti.com>
-Message-ID: <20120816140056.GK15365@opensource.wolfsonmicro.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Thu, 16 Aug 2012 19:33:45 +0530
+Subject: [PATCHv7 14/24] i2c: omap: always return IRQ_HANDLED
+In-Reply-To: <1345125835-15524-1-git-send-email-shubhrajyoti@ti.com>
+References: <1345125835-15524-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1345125835-15524-15-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 16, 2012 at 01:22:27PM +0000, AnilKumar, Chimata wrote:
+From: Felipe Balbi <balbi@ti.com>
 
-> But problem here is single input supply battery/main is not sufficient.
+Always return IRQ_HANDLED otherwise we could get our IRQ line disabled due
+to many spurious IRQs.
 
-What makes you say this?
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+[Trivial changes to commitlogs]
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-> pmic->desc[i].supply_name = info->vin_name;
-> with this assignment regulator core searches for exact supply name vcc1 or
-> vcc2 etc if there are no matches then it will not register any regulators. 
-
-Why does this mean you need multiple regulators?  A single regulator can
-of course supply multiple devices.
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 80ebcf5..eb6898b 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -962,7 +962,7 @@ complete:
+ 		}
+ 	} while (stat);
+ 
+-	return count ? IRQ_HANDLED : IRQ_NONE;
++	return IRQ_HANDLED;
+ }
+ 
+ static const struct i2c_algorithm omap_i2c_algo = {
+-- 
+1.7.5.4
