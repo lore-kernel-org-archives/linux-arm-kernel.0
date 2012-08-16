@@ -1,44 +1,52 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Thu, 16 Aug 2012 11:08:45 +0800
-Subject: [PATCH V3 5/5] arm: mmp: make all SOCs use common clock by default
-In-Reply-To: <1345086525-12328-1-git-send-email-xiechao.mail@gmail.com>
-References: <1345086525-12328-1-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <1345086525-12328-6-git-send-email-xiechao.mail@gmail.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Thu, 16 Aug 2012 03:18:48 +0000
+Subject: [PATCHv6 14/24] i2c: omap: always return IRQ_HANDLED
+In-Reply-To: <1344953946-13005-15-git-send-email-shubhrajyoti@ti.com>
+References: <1344953946-13005-1-git-send-email-shubhrajyoti@ti.com>
+ <1344953946-13005-15-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA5F5B6@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chao Xie <chao.xie@marvell.com>
+On Tue, Aug 14, 2012 at 19:48:56, Datta, Shubhrajyoti wrote:
+> From: Felipe Balbi <balbi@ti.com>
+> 
+> otherwise we could get our IRQ line disabled due
+> to many spurious IRQs.
 
-Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
----
- arch/arm/mach-mmp/Kconfig |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+Patch description should be readable by itself. It is not a continuation of
+subject line.
 
-diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
-index 7fddd01..d697d07 100644
---- a/arch/arm/mach-mmp/Kconfig
-+++ b/arch/arm/mach-mmp/Kconfig
-@@ -108,18 +108,21 @@ endmenu
- config CPU_PXA168
- 	bool
- 	select CPU_MOHAWK
-+	select COMMON_CLK
- 	help
- 	  Select code specific to PXA168
- 
- config CPU_PXA910
- 	bool
- 	select CPU_MOHAWK
-+	select COMMON_CLK
- 	help
- 	  Select code specific to PXA910
- 
- config CPU_MMP2
- 	bool
- 	select CPU_PJ4
-+	select COMMON_CLK
- 	help
- 	  Select code specific to MMP2. MMP2 is ARMv7 compatible.
- 
--- 
-1.7.0.4
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> ---
+>  drivers/i2c/busses/i2c-omap.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 80ebcf5..eb6898b 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -962,7 +962,7 @@ complete:
+>  		}
+>  	} while (stat);
+>  
+> -	return count ? IRQ_HANDLED : IRQ_NONE;
+> +	return IRQ_HANDLED;
+>  }
+>  
+>  static const struct i2c_algorithm omap_i2c_algo = {
+> -- 
+> 1.7.5.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
+Regards, 
+Gururaja
