@@ -1,75 +1,88 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 16 Aug 2012 11:47:48 +0100
-Subject: [PATCH v2 23/31] arm64: Debugging support
-In-Reply-To: <201208151507.36174.arnd@arndb.de>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-24-git-send-email-catalin.marinas@arm.com>
- <201208151507.36174.arnd@arndb.de>
-Message-ID: <20120816104748.GI31784@mudshark.cambridge.arm.com>
+From: jason77.wang@gmail.com (Hui Wang)
+Date: Thu, 16 Aug 2012 18:47:29 +0800
+Subject: [PATCH v4 1/3] Input: egalax_ts: get gpio from devicetree node
+In-Reply-To: <1345114051-3052-1-git-send-email-jason77.wang@gmail.com>
+References: <1345114051-3052-1-git-send-email-jason77.wang@gmail.com>
+Message-ID: <1345114051-3052-2-git-send-email-jason77.wang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2012 at 04:07:36PM +0100, Arnd Bergmann wrote:
-> On Tuesday 14 August 2012, Catalin Marinas wrote:
-> 
-> > +const struct user_regset_view *task_user_regset_view(struct task_struct *task)
-> > +{
-> > +#ifdef CONFIG_AARCH32_EMULATION
-> > +	if (test_tsk_thread_flag(task, TIF_32BIT))
-> > +		return &user_aarch32_view;
-> > +#endif
-> > +	return &user_aarch64_view;
-> > +}
-> 
-> Ah, nice. So you support 64 bit debuggers debugging 32 bit processes, right?
+The irq_to_gpio() is old, most platforms use GENERIC_GPIO framework
+and don't support this API anymore.
 
-That should work if the debugger can deal with it, yes.
+The i.MX6q sabrelite platform equips an egalax touchscreen controller,
+and this platform already transfered to GENERIC_GPIO framework, to
+support this driver, we use a more generic way to get gpio.
 
-> From what I can tell, there is no support for 32 bit processes debugging
-> 64 bit ones. Is that something you plan to add in the future, or do you
-> consider that out of scope? In either case, a comment would be helpful.
+Add a return value checking for waking up the controller in the probe
+function, this guarantee only a workable device can pass init.
 
-That can't really work because the debugger won't be able to manipulate
-child pointers properly without us adding a new ptrace interface (and then,
-I still wonder about how feasible it really is). I can add a comment.
+Signed-off-by: Hui Wang <jason77.wang@gmail.com>
+---
+ drivers/input/touchscreen/egalax_ts.c |   25 ++++++++++++++++++++++---
+ 1 files changed, 22 insertions(+), 3 deletions(-)
 
-> > +long arch_ptrace(struct task_struct *child, long request,
-> > +		 unsigned long addr, unsigned long data)
-> > +{
-> > +	int ret;
-> > +	unsigned long *datap = (unsigned long __user *)data;
-> > +
-> > +	switch (request) {
-> > +		case PTRACE_GET_THREAD_AREA:
-> > +			ret = put_user(child->thread.tp_value, datap);
-> > +			break;
-> > +
-> > +#ifdef CONFIG_HAVE_HW_BREAKPOINT
-> > +		case PTRACE_GETHBPREGS:
-> > +			ret = ptrace_gethbpregs(child, addr, datap);
-> > +			break;
-> > +
-> > +		case PTRACE_SETHBPREGS:
-> > +			ret = ptrace_sethbpregs(child, addr, datap);
-> > +			break;
-> > +#endif
-> > +
-> > +		default:
-> > +			ret = ptrace_request(child, request, addr, data);
-> > +			break;
-> > +	}
-> > +
-> > +	return ret;
-> > +}
-> 
-> Is there a reaons why these are not regsets but have their own ptrace
-> commands? I believe new architectures should generally not add ptrace
-> commands any more.
-
-I could probably add some regset wrappers about the hbp accessors (which we
-have to keep for the compat ptrace interface). I'll have a think as it might
-even make sense to have different regsets for breakpoints and watchpoints.
-
-As for the the tls, is it worth having a regset with only one register?
-
-Will
+diff --git a/drivers/input/touchscreen/egalax_ts.c b/drivers/input/touchscreen/egalax_ts.c
+index 70524dd..8516a4e 100644
+--- a/drivers/input/touchscreen/egalax_ts.c
++++ b/drivers/input/touchscreen/egalax_ts.c
+@@ -28,6 +28,7 @@
+ #include <linux/slab.h>
+ #include <linux/bitops.h>
+ #include <linux/input/mt.h>
++#include <linux/of_gpio.h>
+ 
+ /*
+  * Mouse Mode: some panel may configure the controller to mouse mode,
+@@ -122,8 +123,15 @@ static irqreturn_t egalax_ts_interrupt(int irq, void *dev_id)
+ /* wake up controller by an falling edge of interrupt gpio.  */
+ static int egalax_wake_up_device(struct i2c_client *client)
+ {
+-	int gpio = irq_to_gpio(client->irq);
+-	int ret;
++	struct device_node *np = client->dev.of_node;
++	int gpio, ret;
++
++	if (!np)
++		return -ENODEV;
++
++	gpio = of_get_named_gpio(np, "wakeup-gpios", 0);
++	if (!gpio_is_valid(gpio))
++		return -ENODEV;
+ 
+ 	ret = gpio_request(gpio, "egalax_irq");
+ 	if (ret < 0) {
+@@ -181,7 +189,12 @@ static int __devinit egalax_ts_probe(struct i2c_client *client,
+ 	ts->input_dev = input_dev;
+ 
+ 	/* controller may be in sleep, wake it up. */
+-	egalax_wake_up_device(client);
++	ret = egalax_wake_up_device(client);
++	if (ret < 0) {
++		dev_err(&client->dev, "Failed to wake up the controller\n");
++		error = ret;
++		goto err_free_dev;
++	}
+ 
+ 	ret = egalax_firmware_version(client);
+ 	if (ret < 0) {
+@@ -274,11 +287,17 @@ static int egalax_ts_resume(struct device *dev)
+ 
+ static SIMPLE_DEV_PM_OPS(egalax_ts_pm_ops, egalax_ts_suspend, egalax_ts_resume);
+ 
++static struct of_device_id egalax_ts_dt_ids[] = {
++	{ .compatible = "eeti,egalax_ts" },
++	{ /* sentinel */ }
++};
++
+ static struct i2c_driver egalax_ts_driver = {
+ 	.driver = {
+ 		.name	= "egalax_ts",
+ 		.owner	= THIS_MODULE,
+ 		.pm	= &egalax_ts_pm_ops,
++		.of_match_table	= egalax_ts_dt_ids,
+ 	},
+ 	.id_table	= egalax_ts_id,
+ 	.probe		= egalax_ts_probe,
+-- 
+1.7.6
