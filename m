@@ -1,56 +1,57 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 16 Aug 2012 09:28:39 -0400
-Subject: [v3] Add basic address decoding support for Marvell 370/XP
-In-Reply-To: <1344246141-23931-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1344246141-23931-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20120816132839.GO22226@titan.lakedaemon.net>
+Date: Thu, 16 Aug 2012 09:35:21 -0400
+Subject: [PATCH v2 1/2] ARM: kirkwood: DT board setup for Seagate
+ FreeAgent Dockstar
+In-Reply-To: <20120814232256.GX22226@titan.lakedaemon.net>
+References: <20120814193613.GS22226@titan.lakedaemon.net>
+ <1344977022-29037-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20120814232256.GX22226@titan.lakedaemon.net>
+Message-ID: <20120816133521.GP22226@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2012 at 11:42:16AM +0200, Thomas Petazzoni wrote:
-> Andrew, Jason, Gr?gory,
+On Tue, Aug 14, 2012 at 07:22:56PM -0400, Jason Cooper wrote:
+> On Tue, Aug 14, 2012 at 10:43:41PM +0200, Sebastian Hesselbarth wrote:
+> > This add a DT compatible board specific setup for the Seagate
+> > FreeAgent Dockstar.
+> > 
+> > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > ---
+> > Cc: Jason Cooper <jason@lakedaemon.net>
+> > Cc: Andrew Lunn <andrew@lunn.ch>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-kernel at vger.kernel.org
+> > 
+> > v2: rebased on git://git.infradead.org/users/jcooper/linux.git fixes-for-v3.6
 > 
-> Here is a small patch set that introduces basic support for address
-> decoding on Armada 370 and Armada XP. The aim of this basic support is
-> essentially to be able to configure a window to remap the BootROM,
-> which is needed to startup the secondary CPUs for the SMP support.
+> patches [1/2] and [2/2] of this series applied to:
 > 
-> As we had discussed already, the address decoding configuration is not
-> described in the Device Tree, it is for now hardcoded on a per-SoC
-> basis. We might later discuss how to extend this to the Device Tree.
+>   git://git.infradead.org/users/jcooper/linux.git boards-for-v3.7
 > 
-> This patch set has five patches:
+> patch [2/2] depends upon:
 > 
->  (*) First patch reworks the addr-map code to use void __iomem * where
->      appropriate instead of u32, as per the suggestion of Arnd
->      Bergmann.
+>   bda63c1 ARM: Kirkwood: fix Makefile.boot
 > 
->  (*) Second patch introducing PLAT_ORION_LEGACY, which allows the
->      Marvell 370/XP platforms to be part of PLAT_ORION, and therefore
->      re-use the existing address decoding code.
-> 
->  (*) Third patch making a small change to an address decoding
->      structure so that we can define at runtime the virtual address of
->      the configuration registers. This is needed as on Armada 370/XP
->      the address decoding "controller" is declared in the Device Tree.
-> 
->  (*) Fourth patch adding the 370/XP address decoding code itself. For
->      now, it only maps the BootROM on Armada XP.
-> 
->  (*) Fifth path adding the necessary DT code to instantiate the
->      address decoding "controller".
-> 
-> Changes since v2:
->  * Remove one more useless (void __iomem *) cast in the Armada 370/XP
->    addr-map.c file, as noticed by Arnd Bergmann.
-> 
-> Changes since v1:
->  * Use void __iomem * in addr-map code. Suggested by Arnd Bergmann.
->  * Add Acked-by on patches 2->5 from Gr?gory Cl?ment
+> which should be in an upcoming v3.6-rc
 
-Whole series applied to:
+Oops, building with both legacy and DT support for the Dockstar yields
+the following error:
 
-git://git.infradead.org/users/jcooper/linux.git boards-for-v3.7
+arch/arm/mach-kirkwood/dockstar-setup.c:81:20: error: static declaration
+of 'dockstar_init' follows non-static declaration
+arch/arm/mach-kirkwood/common.h:86:6: note: previous declaration of
+'dockstar_init' was here
+make[1]: *** [arch/arm/mach-kirkwood/dockstar-setup.o] Error 1
+make: *** [arch/arm/mach-kirkwood] Error 2
+
+As a quick fix I renamed your dockstar_init() to dockstar_dt_init()
+across your patch.  This compiles clean.  Unfortunately, I can't send
+this fix up as a separate patch (a bisect may land in between it and
+yours).
+
+Unless I hear otherwise from you in the next day or so, I'm going to
+collapse the fix into your patch and push it that way.
 
 thx,
 
