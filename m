@@ -1,35 +1,70 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 16 Aug 2012 08:43:44 -0400
-Subject: PATCH Add support for the Iomega IX2-200 Device Tree
-In-Reply-To: <CADhrpJ4EMCuvuynF9x+q-PkNPRBaCD_G_YWbcYVj0UrGRQk5dg@mail.gmail.com>
-References: <20120815213221.GE15830@lunn.ch>
- <CADhrpJ4eAUdDaLF8OXvjRf6oA6ya0na-SHYs43eoNwdoEJETpA@mail.gmail.com>
- <20120815215237.GF15830@lunn.ch>
- <CADhrpJ7ANwD4asN4-D9OeicGA_V5-9DZoV9G6dDFZ9taN7AZsg@mail.gmail.com>
- <20120815221613.GH15830@lunn.ch>
- <CADhrpJ66ncpT74ATyvJDXTuJC-zrmh8vQ99RPg0t=XuQ_2RcVA@mail.gmail.com>
- <CADhrpJ4sH9krkrWSoFjCg5jrkompgFY=G8iiXo0xy8_iCKeKxA@mail.gmail.com>
- <CADhrpJ7=5QbivftpcuVdhmcKxp3rjiuKQ4Lrf3NckBwL6YNmPQ@mail.gmail.com>
- <20120815234159.GK22226@titan.lakedaemon.net>
- <CADhrpJ4EMCuvuynF9x+q-PkNPRBaCD_G_YWbcYVj0UrGRQk5dg@mail.gmail.com>
-Message-ID: <20120816124344.GM22226@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Aug 2012 12:49:34 +0000
+Subject: [PATCH v2 23/31] arm64: Debugging support
+In-Reply-To: <20120816104748.GI31784@mudshark.cambridge.arm.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <201208151507.36174.arnd@arndb.de>
+ <20120816104748.GI31784@mudshark.cambridge.arm.com>
+Message-ID: <201208161249.35008.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 16, 2012 at 12:52:18AM +0100, alan butler wrote:
-> On 16 August 2012 00:41, Jason Cooper <jason@lakedaemon.net> wrote:
-...
-> > That means gpio_keys_get_devtree_pdata() is returning an error.  Have
-> > you tried 'linux,input-type = <0x05>;' ?
+On Thursday 16 August 2012, Will Deacon wrote:
+> On Wed, Aug 15, 2012 at 04:07:36PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 14 August 2012, Catalin Marinas wrote:
+
+> > From what I can tell, there is no support for 32 bit processes debugging
+> > 64 bit ones. Is that something you plan to add in the future, or do you
+> > consider that out of scope? In either case, a comment would be helpful.
 > 
-> 'inux,input-type = <0x05>' instead of 'linux,code = <...>' in the dts?
-> no i havent tried will give it a try now.
+> That can't really work because the debugger won't be able to manipulate
+> child pointers properly without us adding a new ptrace interface (and then,
+> I still wonder about how feasible it really is). I can add a comment.
 
-no, use both.  Look at the original gpio code you had.  It specified
-both the type and the code in the struct.  gpio_keys.txt says when
-input-type isn't specified it defaults to EV_KEY, whereas your code set
-it to EV_SW (0x05 in include/linux/inputh:181).
+You can already have a 32 bit gdb that is able to do remote debugging of
+64 bit processes using a gdb server process. I guess it wouldn't be
+too strange to have a ptrace extension to allow the native case as well.
+I agree it's not a high priority.
 
-hth,
+> > > +long arch_ptrace(struct task_struct *child, long request,
+> > > +		 unsigned long addr, unsigned long data)
+> > > +{
+> > > +	int ret;
+> > > +	unsigned long *datap = (unsigned long __user *)data;
+> > > +
+> > > +	switch (request) {
+> > > +		case PTRACE_GET_THREAD_AREA:
+> > > +			ret = put_user(child->thread.tp_value, datap);
+> > > +			break;
+> > > +
+> > > +#ifdef CONFIG_HAVE_HW_BREAKPOINT
+> > > +		case PTRACE_GETHBPREGS:
+> > > +			ret = ptrace_gethbpregs(child, addr, datap);
+> > > +			break;
+> > > +
+> > > +		case PTRACE_SETHBPREGS:
+> > > +			ret = ptrace_sethbpregs(child, addr, datap);
+> > > +			break;
+> > > +#endif
+> > > +
+> > > +		default:
+> > > +			ret = ptrace_request(child, request, addr, data);
+> > > +			break;
+> > > +	}
+> > > +
+> > > +	return ret;
+> > > +}
+> > 
+> > Is there a reaons why these are not regsets but have their own ptrace
+> > commands? I believe new architectures should generally not add ptrace
+> > commands any more.
+> 
+> I could probably add some regset wrappers about the hbp accessors (which we
+> have to keep for the compat ptrace interface). I'll have a think as it might
+> even make sense to have different regsets for breakpoints and watchpoints.
+> 
+> As for the the tls, is it worth having a regset with only one register?
 
-Jason.
+Better ask the gdb folks. I'm adding Uli to Cc, maybe he has some insight.
+
+	Arnd
