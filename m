@@ -1,88 +1,55 @@
 From: jason77.wang@gmail.com (Hui Wang)
-Date: Thu, 16 Aug 2012 18:47:29 +0800
-Subject: [PATCH v4 1/3] Input: egalax_ts: get gpio from devicetree node
-In-Reply-To: <1345114051-3052-1-git-send-email-jason77.wang@gmail.com>
-References: <1345114051-3052-1-git-send-email-jason77.wang@gmail.com>
-Message-ID: <1345114051-3052-2-git-send-email-jason77.wang@gmail.com>
+Date: Thu, 16 Aug 2012 18:47:28 +0800
+Subject: [PATCH v4 0/3] Input: egalax_ts: parse devicetree to get gpio
+Message-ID: <1345114051-3052-1-git-send-email-jason77.wang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The irq_to_gpio() is old, most platforms use GENERIC_GPIO framework
-and don't support this API anymore.
+V4:
 
-The i.MX6q sabrelite platform equips an egalax touchscreen controller,
-and this platform already transfered to GENERIC_GPIO framework, to
-support this driver, we use a more generic way to get gpio.
+add of_match_table in the driver, and change egalax_ts gpio irq type value from
+2 to 8 (falling edge to low level) in the dts.
 
-Add a return value checking for waking up the controller in the probe
-function, this guarantee only a workable device can pass init.
+V3:
 
-Signed-off-by: Hui Wang <jason77.wang@gmail.com>
----
- drivers/input/touchscreen/egalax_ts.c |   25 ++++++++++++++++++++++---
- 1 files changed, 22 insertions(+), 3 deletions(-)
+Although have got Ack-by from driver author in the V2, i have to send
+V3 since the driver is changed due to the change of a property name
+in the dts.
 
-diff --git a/drivers/input/touchscreen/egalax_ts.c b/drivers/input/touchscreen/egalax_ts.c
-index 70524dd..8516a4e 100644
---- a/drivers/input/touchscreen/egalax_ts.c
-+++ b/drivers/input/touchscreen/egalax_ts.c
-@@ -28,6 +28,7 @@
- #include <linux/slab.h>
- #include <linux/bitops.h>
- #include <linux/input/mt.h>
-+#include <linux/of_gpio.h>
- 
- /*
-  * Mouse Mode: some panel may configure the controller to mouse mode,
-@@ -122,8 +123,15 @@ static irqreturn_t egalax_ts_interrupt(int irq, void *dev_id)
- /* wake up controller by an falling edge of interrupt gpio.  */
- static int egalax_wake_up_device(struct i2c_client *client)
- {
--	int gpio = irq_to_gpio(client->irq);
--	int ret;
-+	struct device_node *np = client->dev.of_node;
-+	int gpio, ret;
-+
-+	if (!np)
-+		return -ENODEV;
-+
-+	gpio = of_get_named_gpio(np, "wakeup-gpios", 0);
-+	if (!gpio_is_valid(gpio))
-+		return -ENODEV;
- 
- 	ret = gpio_request(gpio, "egalax_irq");
- 	if (ret < 0) {
-@@ -181,7 +189,12 @@ static int __devinit egalax_ts_probe(struct i2c_client *client,
- 	ts->input_dev = input_dev;
- 
- 	/* controller may be in sleep, wake it up. */
--	egalax_wake_up_device(client);
-+	ret = egalax_wake_up_device(client);
-+	if (ret < 0) {
-+		dev_err(&client->dev, "Failed to wake up the controller\n");
-+		error = ret;
-+		goto err_free_dev;
-+	}
- 
- 	ret = egalax_firmware_version(client);
- 	if (ret < 0) {
-@@ -274,11 +287,17 @@ static int egalax_ts_resume(struct device *dev)
- 
- static SIMPLE_DEV_PM_OPS(egalax_ts_pm_ops, egalax_ts_suspend, egalax_ts_resume);
- 
-+static struct of_device_id egalax_ts_dt_ids[] = {
-+	{ .compatible = "eeti,egalax_ts" },
-+	{ /* sentinel */ }
-+};
-+
- static struct i2c_driver egalax_ts_driver = {
- 	.driver = {
- 		.name	= "egalax_ts",
- 		.owner	= THIS_MODULE,
- 		.pm	= &egalax_ts_pm_ops,
-+		.of_match_table	= egalax_ts_dt_ids,
- 	},
- 	.id_table	= egalax_ts_id,
- 	.probe		= egalax_ts_probe,
+As Shawn.guo suggested, i renamed property "irq-gpio" to "wakeup-gpios".
+The reason is that, firstly the idiom of gpio naming in DT is *-gpios,
+even though most of time, it could be just one gpio, secondly as the pin is
+accessed as a gpio only in egalax_wake_up_device for waking up the device.
+
+This time i send the patches both to linux-input and linux-arm, 0001 and
+0002 belongs to linux-input, while the 0003 belongs to linux-arm.
+
+V2:
+
+Add return value checking for waking up the controller in the probe
+function.
+
+V1:
+
+eeti touch screen controller is an external chip for most platforms,
+it connect to CPU via i2c bus, and it has a irq request pin need to be
+connected to a gpio of the CPU, this irq request pin also act as a
+wake up signal for touch screen controller, we need to get this gpio
+number and operate it to wake up the controller, the old way to get
+gpio is irq_to_gpio(), this API is dying and most platforms don't support
+it, we change it to a more generic way to use devcietree.
+
+Hui Wang (3):
+  Input: egalax_ts: get gpio from devicetree node
+  Input: add devicetree binding note for egalax_ts
+  ARM: dts: imx6q-sabrelite: add eeti egalax touchscreen
+
+ .../bindings/input/touchscreen/egalax-ts.txt       |   19 +++++++++++++++
+ arch/arm/boot/dts/imx6q-sabrelite.dts              |   16 ++++++++++++
+ arch/arm/boot/dts/imx6q.dtsi                       |    7 +++++
+ drivers/input/touchscreen/egalax_ts.c              |   25 +++++++++++++++++--
+ 4 files changed, 64 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/egalax-ts.txt
+
 -- 
 1.7.6
