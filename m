@@ -1,62 +1,56 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 16 Aug 2012 16:15:38 +0200
-Subject: [PATCHv7 00/24] I2C big cleanup
-In-Reply-To: <1345125835-15524-1-git-send-email-shubhrajyoti@ti.com>
-References: <1345125835-15524-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20120816141538.GA13740@pengutronix.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 16 Aug 2012 10:20:05 -0400
+Subject: dreamplug spi partitions
+In-Reply-To: <1344498477.11783.38.camel@dagon.hellion.org.uk>
+References: <1344498477.11783.38.camel@dagon.hellion.org.uk>
+Message-ID: <20120816142005.GS22226@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 16, 2012 at 07:33:31PM +0530, Shubhrajyoti D wrote:
-> Changes since v1:
->        - removed tabification on patch 6/17
->        - removed dev_err() which was introduced on patch 09/17
-> Changes since v2:
->         - do not set full fifo depth in the RDR interrupt.
->         - some changelog updates.
->         - rebase to the Wolfram's tree.
-> Changes since v3:
->         - Remove a redundant read of status register
->         - Read the dev->buf_len variable instead of the register
->         as the information of the remaining bytes is there.
-> Changes since v4:
->         - Ack the arbitration lost.
->         - Rebase to the i2c-embedded/for-next branch.
-> Changes since v5:
->         - Rebase to latest mainline
->         - Added some more cleanup patches so as have a consolidated series.
-> Changes since v6:
->         - Fix comments on setting the pdev to NULL.
->         - Trivial changelog update
+On Thu, Aug 09, 2012 at 08:47:57AM +0100, Ian Campbell wrote:
+> Hi all,
 > 
-> Tested on omap4sdp and 3430sdp.
+> I've been using "fw_printenv" and "fw_setenv" from the u-boot-tools
+> package on my DreamPlug which work fine with this /etc/fw_env.config:
+>         # Configuration file for fw_(printenv/saveenv) utility.
+>         # Up to two entries are valid, in this case the redundant
+>         # environment sector is assumed present.
+>         # MTD device name       Device offset   Env. size       Flash sector size
+>         /dev/mtd1               0x00000000      0x00001000      0x00001000
+>         
+> This corresponds roughly, but not exactly, with:
+>         # cat /proc/mtd 
+>         dev:    size   erasesize  name
+>         mtd0: 00080000 00001000 "u-boot"
+>         mtd1: 00010000 00001000 "u-boot env"
+>         mtd2: 00010000 00001000 "dtb"
 > 
-> The following changes since commit 3bf671af14d591ede9251acb0085e8017f3705e7:
-> 
->   Merge branch 'fixes-for-3.6' of git://git.kernel.org/pub/scm/linux/kernel/git/cooloney/linux-leds (2012-08-13 09:59:04 +0300)
-> 
-> are available in the git repository at:
-> 
->   git://gitorious.org/linus-tree/linus-tree.git for_3.6/i2c/big_cleanup
+> But notice how "Env. size" and mtd1's size don't match -- if I use
+> 0x10000 in fw_env.cfg then the tools don't work (checksums don't match).
 
-A GIT tree, thanks for that!
+I've always seen the u-boot environment set to 4k.  The kernel
+partitions came out of my head.  When I added support for the dreamplug
+to u-boot, I found out there was a bug in the factory supplied u-boot
+which only allowed it to see the first 1MB of the 2MB flash.  Also, the
+factory supplied kernel didn't even have support for the flash.
 
-Since the series is quite huge, I'd appreciate it if you could wait for
-reviews a little bit (a few days) and collect the issues raised there
-before resending. I know "release early & often", yet the traffic causes
-some overhead here :)
+So, I fixed u-boot, and figured the extra 1MB was too small for a
+kernel, wasn't used by anybody else, and imho, the factory location of
+the environment didn't leave much room for new u-boots.
 
-Thanks,
+I decided to move the environment and make a place for the dtb.  As I
+didn't want to constrain either one, I split the extra space between the
+two.
 
-   Wolfram
+Was that the best decision?  Well, no one yelled at me and I was new to
+the whole process, so that's how it went down.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120816/a48a0b08/attachment.sig>
+As it is right now, if you configure your own u-boot to have, say
+0x10000 bytes for the environment, you don't need to change your kernel
+to support it.  Just set the size and write it.
+
+I'm open to suggestions and patches...
+
+hth,
+
+Jason.
