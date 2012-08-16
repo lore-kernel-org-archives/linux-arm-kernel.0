@@ -1,44 +1,84 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Thu, 16 Aug 2012 09:07:25 +0200
-Subject: [PATCH 00/23] work in progress: SPI controller w/DMA SAM9X5
-In-Reply-To: <502A8F5C.6000303@atmel.com>
-References: <1344952177-18385-1-git-send-email-richard.genoud@gmail.com>
- <502A6EEC.2010807@atmel.com> <20120814174425.GD8836@game.jcrosoft.org>
- <502A8F5C.6000303@atmel.com>
-Message-ID: <CACQ1gAjCXyOtfNd7odv3bJb3JQ7WYrCTS=VaLyOiG8+GtPYpeg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Aug 2012 07:17:03 +0000
+Subject: [PATCH V3 3/5] clk: mmp: add clock definition for pxa910
+In-Reply-To: <1345086525-12328-4-git-send-email-xiechao.mail@gmail.com>
+References: <1345086525-12328-1-git-send-email-xiechao.mail@gmail.com>
+ <1345086525-12328-4-git-send-email-xiechao.mail@gmail.com>
+Message-ID: <201208160717.03707.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/8/14 Nicolas Ferre <nicolas.ferre@atmel.com>:
->>>>   add at91sam9x5 Kconfig ARCH/SOC link
->>>
->>> Is it fixup for a bug? Jean-Christophe, a though about this one?
->> no the ARCH_xxx is old style can not be used on DT only soc
->>
->> this patch need to be droped
->
-> That is what I suspected, thanks J.
-Yes, Jean-Christophe is right. This patch needs to be dropped, and
-this one should be applied instead:
+On Thursday 16 August 2012, Chao Xie wrote:
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 169592a..f45d823 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -76,7 +76,7 @@ config SPI_ATMEL
+> +enum {
+> +	clk32, vctcxo, pll1, pll1_2, pll1_4, pll1_8, pll1_16, pll1_6, pll1_12,
+> +	pll1_24, pll1_48, pll1_96, pll1_13, pll1_13_1_5, pll1_2_1_5,
+> +	pll1_3_16, uart_pll, twsi0, twsi1, gpio, kpc, rtc, pwm0, pwm1, pwm2,
+> +	pwm3, uart0_mux, uart0, uart1_mux, uart1, uart2_mux, uart2,
+> +	ssp0_mux, ssp0, ssp1_mux, ssp1, dfc, sdh0_mux, sdh0, sdh1_mux, sdh1,
+> +	usb, sph, disp0_mux, disp0, ccic0_mux, ccic0, ccic0_phy_mux,
+> +	ccic0_phy, ccic0_sphy_div, ccic0_sphy, clk_max
+> +};
 
- config SPI_ATMEL_DMA
- 	bool "Atmel SPI DMA support"
--	depends on SPI_ATMEL && (ARCH_AT91SAM9G45 || ARCH_AT91SAM9X5) &&
-DMA_ENGINE && EXPERIMENTAL
-+	depends on SPI_ATMEL && (SOC_AT91SAM9G45 || SOC_AT91SAM9X5) &&
-DMA_ENGINE && EXPERIMENTAL
- 	default y
- 	help
- 	  Say Y here if you want the Atmel SPI driver to use the DMA engine.
-Data transfers
+I wonder whether you should just get rid of this enum
 
-Richard.
+> +void __init pxa910_clk_init(void)
+> +{
+> +	struct clk *clocks[clk_max];
 
--- 
-for me, ck means con kolivas and not calvin klein... does it mean I'm a geek ?
+and this array,
+
+> +	clocks[clk32] =
+> +	    clk_register_fixed_rate(NULL, "clk32", NULL, CLK_IS_ROOT, 3200);
+> +	clk_register_clkdev(clocks[clk32], "clk32", NULL);
+> +
+> +	clocks[vctcxo] =
+> +	    clk_register_fixed_rate(NULL, "vctcxo", NULL, CLK_IS_ROOT,
+> +				    26000000);
+> +	clk_register_clkdev(clocks[vctcxo], "vctcxo", NULL);
+
+because now that the "obfuscation" macro is gone, it's clear that each index
+is used only once here and then passed right into the next function. If you
+write it like:
+
+	struct clk *clk;
+
+	clk = clk_register_fixed_rate(NULL, "clk32", NULL, CLK_IS_ROOT, 3200);
+	clk_register_clkdev(clk, "clk32", NULL);
+
+it becomes much shorter, partly because things start fitting into one
+line again. The only exception in this file is 
+
+> +	clocks[uart_pll] =
+> +	    mmp_clk_register_factor("uart_pll", "pll1_4", 0,
+> +				    mpmu_base + MPMU_UART_PLL,
+> +				    &uart_factor_masks, uart_factor_tbl,
+> +				    ARRAY_SIZE(uart_factor_tbl));
+> +	clk_set_rate(clocks[uart_pll], 14745600);
+> +	clk_register_clkdev(clocks[uart_pll], "uart_pll", NULL);
+
+with
+
+> +	clocks[uart0_mux] =
+> +	    clk_register_mux(NULL, "uart0_mux", uart_parent,
+> +			     ARRAY_SIZE(uart_parent), CLK_SET_RATE_PARENT,
+> +			     apbc_base + APBC_UART0, 4, 3, 0, &clk_lock);
+> +	clk_set_parent(clocks[uart0_mux], clocks[uart_pll]);
+> +	clk_register_clkdev(clocks[uart0_mux], "uart_mux.0", NULL);
+> +
+> +	clocks[uart0] =
+> +	    mmp_clk_register_apbc("uart0", "uart0_mux", apbc_base + APBC_UART0,
+> +				  10, 0, &clk_lock);
+> +	clk_register_clkdev(clocks[uart0], NULL, "pxa2xx-uart.0");
+
+so just add another
+
+	struct clk *clk_uart;
+
+	clk_uart = mmp_clk_register_factor("uart_pll", "pll1_4", 0,
+			mpmu_base + MPMU_UART_PLL, &uart_factor_masks, uart_factor_tbl,
+			ARRAY_SIZE(uart_factor_tbl));
+
+
+
+	Arnd
