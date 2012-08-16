@@ -1,128 +1,137 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 16 Aug 2012 19:33:54 +0530
-Subject: [PATCHv7 23/24] i2c: omap: sanitize exit path
+Date: Thu, 16 Aug 2012 19:33:34 +0530
+Subject: [PATCHv7 03/24] i2c: omap: decrease indentation level on data handling
 In-Reply-To: <1345125835-15524-1-git-send-email-shubhrajyoti@ti.com>
 References: <1345125835-15524-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1345125835-15524-24-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1345125835-15524-4-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-move the goto out label one line down, so that
-it can be used when stat is read as zero. All
-other exits, can be done with a break statement.
+The patch intends to decrease the indentation level on the
+data handling
+by using the fact that else of if (dev->buf_len) is same as
+if (!dev->buf_len)
 
-While at that, also break out as soon as we
-complete draining IRQ, since at that time
-we know we transferred everything there was
-to be transferred.
+if (dev->buf_len) {
+	aaa;
+} else {
+	bbb;
+	break;
+}
+
+to
+
+if (!dev->buf_len) {
+        bbb;
+        break;
+}
+aaa;
+
+Hence no functional changes.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
+Reviewed-by : Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   26 +++++++++++++-------------
- 1 files changed, 13 insertions(+), 13 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   63 ++++++++++++++++++++---------------------
+ 1 files changed, 31 insertions(+), 32 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index d81189a..3df6f92 100644
+index 9b003a3..81ef0a7 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -901,27 +901,26 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 
- 		if (!stat) {
- 			/* my work here is done */
--			spin_unlock_irqrestore(&dev->lock, flags);
--			return IRQ_HANDLED;
-+			goto out;
- 		}
- 
- 		dev_dbg(dev->dev, "IRQ (ISR = 0x%04x)\n", stat);
- 		if (count++ == 100) {
- 			dev_warn(dev->dev, "Too much work in one IRQ\n");
--			goto out;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_NACK) {
- 			err |= OMAP_I2C_STAT_NACK;
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
--			goto out;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_AL) {
- 			dev_err(dev->dev, "Arbitration lost\n");
- 			err |= OMAP_I2C_STAT_AL;
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_AL);
--			goto out;
-+			break;
- 		}
- 
- 		/*
-@@ -934,7 +933,7 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 						OMAP_I2C_STAT_XRDY |
- 						OMAP_I2C_STAT_XDR |
- 						OMAP_I2C_STAT_ARDY));
--			goto out;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_RDR) {
-@@ -949,7 +948,7 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 				i2c_omap_errata_i207(dev, stat);
- 
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_RDR);
--			continue;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_RRDY) {
-@@ -972,10 +971,10 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 
- 			ret = omap_i2c_transmit_data(dev, num_bytes, true);
- 			if (ret < 0)
--				goto out;
-+				break;
- 
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XDR);
--			continue;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_XRDY) {
-@@ -987,7 +986,7 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 
- 			ret = omap_i2c_transmit_data(dev, num_bytes, false);
- 			if (ret < 0)
--				goto out;
-+				break;
- 
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XRDY);
- 			continue;
-@@ -997,19 +996,20 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 			dev_err(dev->dev, "Receive overrun\n");
- 			err |= OMAP_I2C_STAT_ROVR;
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_ROVR);
--			goto out;
-+			break;
- 		}
- 
- 		if (stat & OMAP_I2C_STAT_XUDF) {
- 			dev_err(dev->dev, "Transmit underflow\n");
- 			err |= OMAP_I2C_STAT_XUDF;
- 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XUDF);
--			goto out;
-+			break;
- 		}
- 	} while (stat);
- 
--out:
- 	omap_i2c_complete_cmd(dev, err);
+@@ -813,22 +813,7 @@ complete:
+ 							>> 8) & 0x3F;
+ 			}
+ 			while (num_bytes--) {
+-				w = omap_i2c_read_reg(dev, OMAP_I2C_DATA_REG);
+-				if (dev->buf_len) {
+-					*dev->buf++ = w;
+-					dev->buf_len--;
+-					/*
+-					 * Data reg in 2430, omap3 and
+-					 * omap4 is 8 bit wide
+-					 */
+-					if (dev->flags &
+-						 OMAP_I2C_FLAG_16BIT_DATA_REG) {
+-						if (dev->buf_len) {
+-							*dev->buf++ = w >> 8;
+-							dev->buf_len--;
+-						}
+-					}
+-				} else {
++				if (!dev->buf_len) {
+ 					if (stat & OMAP_I2C_STAT_RRDY)
+ 						dev_err(dev->dev,
+ 							"RRDY IRQ while no data"
+@@ -839,6 +824,21 @@ complete:
+ 								" requested\n");
+ 					break;
+ 				}
 +
-+out:
- 	spin_unlock_irqrestore(&dev->lock, flags);
++				w = omap_i2c_read_reg(dev, OMAP_I2C_DATA_REG);
++				*dev->buf++ = w;
++				dev->buf_len--;
++				/*
++				 * Data reg in 2430, omap3 and
++				 * omap4 is 8 bit wide
++				 */
++				if (dev->flags &
++						OMAP_I2C_FLAG_16BIT_DATA_REG) {
++					if (dev->buf_len) {
++						*dev->buf++ = w >> 8;
++						dev->buf_len--;
++					}
++				}
+ 			}
+ 			omap_i2c_ack_stat(dev,
+ 				stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR));
+@@ -855,22 +855,7 @@ complete:
+ 							& 0x3F;
+ 			}
+ 			while (num_bytes--) {
+-				w = 0;
+-				if (dev->buf_len) {
+-					w = *dev->buf++;
+-					dev->buf_len--;
+-					/*
+-					 * Data reg in 2430, omap3 and
+-					 * omap4 is 8 bit wide
+-					 */
+-					if (dev->flags &
+-						 OMAP_I2C_FLAG_16BIT_DATA_REG) {
+-						if (dev->buf_len) {
+-							w |= *dev->buf++ << 8;
+-							dev->buf_len--;
+-						}
+-					}
+-				} else {
++				if (!dev->buf_len) {
+ 					if (stat & OMAP_I2C_STAT_XRDY)
+ 						dev_err(dev->dev,
+ 							"XRDY IRQ while no "
+@@ -882,6 +867,20 @@ complete:
+ 					break;
+ 				}
  
- 	return IRQ_HANDLED;
++				w = *dev->buf++;
++				dev->buf_len--;
++				/*
++				 * Data reg in 2430, omap3 and
++				 * omap4 is 8 bit wide
++				 */
++				if (dev->flags &
++						OMAP_I2C_FLAG_16BIT_DATA_REG) {
++					if (dev->buf_len) {
++						w |= *dev->buf++ << 8;
++						dev->buf_len--;
++					}
++				}
++
+ 				if ((dev->errata & I2C_OMAP_ERRATA_I462) &&
+ 				    errata_omap3_i462(dev, &stat, &err))
+ 					goto complete;
 -- 
 1.7.5.4
