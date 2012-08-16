@@ -1,63 +1,66 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 16 Aug 2012 15:12:10 -0600
-Subject: [PATCH] pinctrl: imx5: start numbering pad from 0
-In-Reply-To: <20120816033006.GA11999@shlinux2.ap.freescale.net>
-References: <1344869278-27334-1-git-send-email-shawn.guo@linaro.org>
- <CAKGA1b=DqyZvSre3C4YQ3GM6RuFtFsGWDkF784iKggrNzwiKpg@mail.gmail.com>
- <CAP1dx+zQvBurT9oCmfJ0dGHHV3rbgdy+0Yh_hoPL9jQB8QNxKw@mail.gmail.com>
- <CAKGA1bmHqyDGyvZjEcQ+RO1jHiZNZKNu3BGkyUXzYfwVaySYEQ@mail.gmail.com>
- <CAP1dx+x0_j_f3Pj+9+YHcwoTqjGLXouf7t+SoCCMVGKJNOHCPw@mail.gmail.com>
- <20120815054436.GK2232@pengutronix.de>
- <20120815065526.GG19681@shlinux2.ap.freescale.net>
- <20120815075117.GL2232@pengutronix.de>
- <20120815092539.GH19681@shlinux2.ap.freescale.net>
- <20120815135947.GC2258@S2101-09.ap.freescale.net>
- <20120816033006.GA11999@shlinux2.ap.freescale.net>
-Message-ID: <502D622A.1030104@wwwdotorg.org>
+From: mporter@ti.com (Matt Porter)
+Date: Thu, 16 Aug 2012 17:44:28 -0400
+Subject: [PATCH 0/3] DaVinci DMA engine conversion
+Message-ID: <1345153471-22757-1-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2012 09:30 PM, Dong Aisheng wrote:
-> On Wed, Aug 15, 2012 at 09:59:50PM +0800, Shawn Guo wrote:
-> ...
->>> Another known issue is that via this way, that means the pinctrl subsystem
->>> can only see the using pads, this is a bit not align with the pinctrl
->>> subsystem design. No sure if Linus would like to see it.
->>>
->> I do not quite follow on this.  The "enum imx51_pads" will still be
->> there, so all the pads will still be visible to the pinctrl system.
->>
-> Sorry, i did not describe it accurately.
-> The problem is that those pins are visible to pinctrl subystem, but the pinctrl
-> subsystem can not manage them all.
-> Not sure this meet Linus's original design purpose.
-> Because for the way proposed, all the pin's basic properties like mux_reg, config_reg
-> are parsed from device tree at runtime.
-> If a pin is not used in device tree, the driver can not know this pin's
-> corresponding registers.
-> Thus, for those unused pins, we can not manage it on mux or config in pinctrl
-> subsystem and driver.
-> 
-> For example, the pin_config_get/pin_config_set API in
-> include/linux/pinctrl/consumer.h can not work for such pins.
+This series begins the conversion of the DaVinci private
+EDMA API implementation to a DMA engine driver and
+converts two of the three in-kernel users of the private
+EDMA API to DMA engine.
 
-Hmmm. Given we support all pin mux/config options from the mapping
-table, I'd question whether that API should even exist any more...
+The approach taken is similar to the recent OMAP DMA
+Engine conversion. The EDMA DMA Engine driver is a
+wrapper around the existing private EDMA implementation
+and registers the platform device within the driver.
+This allows the conversion series to stand alone with
+just the drivers and no changes to platform code. It
+also allows peripheral drivers to continue to use the
+private EDMA implementation until they are converted.
 
-> Then imx_pinconf_dbg_show in current driver may need change since it does not
-> support show all pins's config value.
+The EDMA DMA Engine driver supports slave transfers only
+at this time. It is planned to add cyclic transfers in
+support of audio peripherals.
 
-The pinctrl core assumes that the pin numbering space could be sparse.
-For example, see that pinconf.c:pinconf_pins_show() "continues" the loop
-if pin_desc_get() fails for a particular pin number. So just based on
-what I've read in this one email, I think this is fine.
+There are three users of the private EDMA API in the
+kernel now: davinci_mmc, spi-davinci, and davinci-mcasp.
+This series provides DMA Engine conversions for the
+davinci_mmc and spi-davinci drivers which use the
+supported slave transfers.
 
-> It looks like not a big issue currently since i did not see any client driver
-> using this API.
-> But i'm not sure if we may have this requirement in the future.
-> For example, is it possible that pinctrl subsystem may support configure pins
-> via sysfs dynamically?
+This series has been tested on an AM18x EVM and
+performance is comparable with the private EDMA
+API implementations. I do not have a Wifi module
+for the AM18x EVM to test the MMC1 instance which
+has DMA channels on the second EDMA channel controller
+instance. Testing is needed on all DaVinci platforms
+including DM355/365, DM644x/6x, DA830/OMAP-L137/AM17x,
+and DA850/OMAP-L138/AM18x.
 
-I can't comment on sysfs specifically, but I believe it would be
-generally true that a pin that isn't know to the pinctrl subsystem can't
-be manipulated in any way.
+After this series, the current plan is to complete
+the mcasp driver conversion which includes adding
+cyclic dma support. This will then enable the
+removal and refactoring of the private EDMA API
+functionality into the EDMA DMA Engine driver.
+Since EDMA is also used on the AM33xx family of
+parts in mach-omap2/, the plan is to enable this
+driver on that platform as well.
+
+Matt Porter (3):
+  dmaengine: add TI EDMA DMA engine driver
+  mmc: davinci_mmc: convert to DMA engine API
+  spi: spi-davinci: convert to DMA engine API
+
+ drivers/dma/Kconfig            |    9 +
+ drivers/dma/Makefile           |    1 +
+ drivers/dma/edma.c             |  729 ++++++++++++++++++++++++++++++++++++++++
+ drivers/mmc/host/davinci_mmc.c |  271 +++++----------
+ drivers/spi/spi-davinci.c      |  292 +++++++---------
+ include/linux/edma.h           |   29 ++
+ 6 files changed, 980 insertions(+), 351 deletions(-)
+ create mode 100644 drivers/dma/edma.c
+ create mode 100644 include/linux/edma.h
+
+-- 
+1.7.9.5
