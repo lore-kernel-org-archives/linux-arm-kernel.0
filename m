@@ -1,213 +1,170 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 16 Aug 2012 16:35:54 +0100
-Subject: [PATCH v3 02/25] xen/arm: hypercalls
+Date: Thu, 16 Aug 2012 16:36:01 +0100
+Subject: [PATCH v3 09/25] xen/arm: Introduce xen_ulong_t for unsigned long
 In-Reply-To: <alpine.DEB.2.02.1208161618550.4850@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1208161618550.4850@kaball.uk.xensource.com>
-Message-ID: <1345131377-14713-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1345131377-14713-9-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use r12 to pass the hypercall number to the hypervisor.
+All the original Xen headers have xen_ulong_t as unsigned long type, however
+when they have been imported in Linux, xen_ulong_t has been replaced with
+unsigned long. That might work for x86 and ia64 but it does not for arm.
+Bring back xen_ulong_t and let each architecture define xen_ulong_t as they
+see fit.
 
-We need a register to pass the hypercall number because we might not
-know it at compile time and HVC only takes an immediate argument.
-
-Among the available registers r12 seems to be the best choice because it
-is defined as "intra-procedure call scratch register".
-
-Use the ISS to pass an hypervisor specific tag.
+Also explicitly size pointers (__DEFINE_GUEST_HANDLE) to 64 bit.
 
 
-Changes in v2:
-- define an HYPERCALL macro for 5 arguments hypercall wrappers, even if
-at the moment is unused;
-- use ldm instead of pop;
-- fix up comments.
+Changes in v3:
+
+- remove the incorrect changes to multicall_entry;
+- remove the change to apic_physbase.
 
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- arch/arm/include/asm/xen/hypercall.h |   50 ++++++++++++++++
- arch/arm/xen/Makefile                |    2 +-
- arch/arm/xen/hypercall.S             |  106 ++++++++++++++++++++++++++++++++++
- 3 files changed, 157 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/include/asm/xen/hypercall.h
- create mode 100644 arch/arm/xen/hypercall.S
+ arch/arm/include/asm/xen/interface.h  |    8 ++++++--
+ arch/ia64/include/asm/xen/interface.h |    1 +
+ arch/x86/include/asm/xen/interface.h  |    1 +
+ include/xen/interface/memory.h        |   12 ++++++------
+ include/xen/interface/physdev.h       |    2 +-
+ include/xen/interface/version.h       |    2 +-
+ 6 files changed, 16 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/include/asm/xen/hypercall.h b/arch/arm/include/asm/xen/hypercall.h
-new file mode 100644
-index 0000000..4ac0624
---- /dev/null
-+++ b/arch/arm/include/asm/xen/hypercall.h
-@@ -0,0 +1,50 @@
-+/******************************************************************************
-+ * hypercall.h
-+ *
-+ * Linux-specific hypervisor handling.
-+ *
-+ * Stefano Stabellini <stefano.stabellini@eu.citrix.com>, Citrix, 2012
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License version 2
-+ * as published by the Free Software Foundation; or, when distributed
-+ * separately from the Linux kernel or incorporated into other
-+ * software packages, subject to the following license:
-+ *
-+ * Permission is hereby granted, free of charge, to any person obtaining a copy
-+ * of this source file (the "Software"), to deal in the Software without
-+ * restriction, including without limitation the rights to use, copy, modify,
-+ * merge, publish, distribute, sublicense, and/or sell copies of the Software,
-+ * and to permit persons to whom the Software is furnished to do so, subject to
-+ * the following conditions:
-+ *
-+ * The above copyright notice and this permission notice shall be included in
-+ * all copies or substantial portions of the Software.
-+ *
-+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-+ * IN THE SOFTWARE.
-+ */
+diff --git a/arch/arm/include/asm/xen/interface.h b/arch/arm/include/asm/xen/interface.h
+index 74c72b5..ae05e56 100644
+--- a/arch/arm/include/asm/xen/interface.h
++++ b/arch/arm/include/asm/xen/interface.h
+@@ -9,8 +9,11 @@
+ 
+ #include <linux/types.h>
+ 
++#define uint64_aligned_t uint64_t __attribute__((aligned(8)))
 +
-+#ifndef _ASM_ARM_XEN_HYPERCALL_H
-+#define _ASM_ARM_XEN_HYPERCALL_H
-+
-+#include <xen/interface/xen.h>
-+
-+long privcmd_call(unsigned call, unsigned long a1,
-+		unsigned long a2, unsigned long a3,
-+		unsigned long a4, unsigned long a5);
-+int HYPERVISOR_xen_version(int cmd, void *arg);
-+int HYPERVISOR_console_io(int cmd, int count, char *str);
-+int HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count);
-+int HYPERVISOR_sched_op(int cmd, void *arg);
-+int HYPERVISOR_event_channel_op(int cmd, void *arg);
-+unsigned long HYPERVISOR_hvm_op(int op, void *arg);
-+int HYPERVISOR_memory_op(unsigned int cmd, void *arg);
-+int HYPERVISOR_physdev_op(int cmd, void *arg);
-+
-+#endif /* _ASM_ARM_XEN_HYPERCALL_H */
-diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
-index 0bad594..b9d6acc 100644
---- a/arch/arm/xen/Makefile
-+++ b/arch/arm/xen/Makefile
-@@ -1 +1 @@
--obj-y		:= enlighten.o
-+obj-y		:= enlighten.o hypercall.o
-diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
-new file mode 100644
-index 0000000..074f5ed
---- /dev/null
-+++ b/arch/arm/xen/hypercall.S
-@@ -0,0 +1,106 @@
-+/******************************************************************************
-+ * hypercall.S
-+ *
-+ * Xen hypercall wrappers
-+ *
-+ * Stefano Stabellini <stefano.stabellini@eu.citrix.com>, Citrix, 2012
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License version 2
-+ * as published by the Free Software Foundation; or, when distributed
-+ * separately from the Linux kernel or incorporated into other
-+ * software packages, subject to the following license:
-+ *
-+ * Permission is hereby granted, free of charge, to any person obtaining a copy
-+ * of this source file (the "Software"), to deal in the Software without
-+ * restriction, including without limitation the rights to use, copy, modify,
-+ * merge, publish, distribute, sublicense, and/or sell copies of the Software,
-+ * and to permit persons to whom the Software is furnished to do so, subject to
-+ * the following conditions:
-+ *
-+ * The above copyright notice and this permission notice shall be included in
-+ * all copies or substantial portions of the Software.
-+ *
-+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-+ * IN THE SOFTWARE.
-+ */
-+
-+/*
-+ * The Xen hypercall calling convention is very similar to the ARM
-+ * procedure calling convention: the first paramter is passed in r0, the
-+ * second in r1, the third in r2 and the fourth in r3. Considering that
-+ * Xen hypercalls have 5 arguments at most, the fifth paramter is passed
-+ * in r4, differently from the procedure calling convention of using the
-+ * stack for that case.
-+ *
-+ * The hypercall number is passed in r12.
-+ *
-+ * The return value is in r0.
-+ *
-+ * The hvc ISS is required to be 0xEA1, that is the Xen specific ARM
-+ * hypercall tag.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <xen/interface/xen.h>
-+
-+
-+/* HVC 0xEA1 */
-+#ifdef CONFIG_THUMB2_KERNEL
-+#define xen_hvc .word 0xf7e08ea1
-+#else
-+#define xen_hvc .word 0xe140ea71
-+#endif
-+
-+#define HYPERCALL_SIMPLE(hypercall)		\
-+ENTRY(HYPERVISOR_##hypercall)			\
-+	mov r12, #__HYPERVISOR_##hypercall;	\
-+	xen_hvc;							\
-+	mov pc, lr;							\
-+ENDPROC(HYPERVISOR_##hypercall)
-+
-+#define HYPERCALL0 HYPERCALL_SIMPLE
-+#define HYPERCALL1 HYPERCALL_SIMPLE
-+#define HYPERCALL2 HYPERCALL_SIMPLE
-+#define HYPERCALL3 HYPERCALL_SIMPLE
-+#define HYPERCALL4 HYPERCALL_SIMPLE
-+
-+#define HYPERCALL5(hypercall)			\
-+ENTRY(HYPERVISOR_##hypercall)			\
-+	stmdb sp!, {r4}						\
-+	ldr r4, [sp, #4]					\
-+	mov r12, #__HYPERVISOR_##hypercall;	\
-+	xen_hvc								\
-+	ldm sp!, {r4}						\
-+	mov pc, lr							\
-+ENDPROC(HYPERVISOR_##hypercall)
-+
-+                .text
-+
-+HYPERCALL2(xen_version);
-+HYPERCALL3(console_io);
-+HYPERCALL3(grant_table_op);
-+HYPERCALL2(sched_op);
-+HYPERCALL2(event_channel_op);
-+HYPERCALL2(hvm_op);
-+HYPERCALL2(memory_op);
-+HYPERCALL2(physdev_op);
-+
-+ENTRY(privcmd_call)
-+	stmdb sp!, {r4}
-+	mov r12, r0
-+	mov r0, r1
-+	mov r1, r2
-+	mov r2, r3
-+	ldr r3, [sp, #8]
-+	ldr r4, [sp, #4]
-+	xen_hvc
-+	ldm sp!, {r4}
-+	mov pc, lr
-+ENDPROC(privcmd_call);
+ #define __DEFINE_GUEST_HANDLE(name, type) \
+-	typedef type * __guest_handle_ ## name
++	typedef struct { union { type *p; uint64_aligned_t q; }; }  \
++        __guest_handle_ ## name
+ 
+ #define DEFINE_GUEST_HANDLE_STRUCT(name) \
+ 	__DEFINE_GUEST_HANDLE(name, struct name)
+@@ -21,13 +24,14 @@
+ 	do {						\
+ 		if (sizeof(hnd) == 8)			\
+ 			*(uint64_t *)&(hnd) = 0;	\
+-		(hnd) = val;				\
++		(hnd).p = val;				\
+ 	} while (0)
+ 
+ #ifndef __ASSEMBLY__
+ /* Explicitly size integers that represent pfns in the interface with
+  * Xen so that we can have one ABI that works for 32 and 64 bit guests. */
+ typedef uint64_t xen_pfn_t;
++typedef uint64_t xen_ulong_t;
+ /* Guest handles for primitive C types. */
+ __DEFINE_GUEST_HANDLE(uchar, unsigned char);
+ __DEFINE_GUEST_HANDLE(uint,  unsigned int);
+diff --git a/arch/ia64/include/asm/xen/interface.h b/arch/ia64/include/asm/xen/interface.h
+index 686464e..7c83445 100644
+--- a/arch/ia64/include/asm/xen/interface.h
++++ b/arch/ia64/include/asm/xen/interface.h
+@@ -71,6 +71,7 @@
+  * with Xen so that we could have one ABI that works for 32 and 64 bit
+  * guests. */
+ typedef unsigned long xen_pfn_t;
++typedef unsigned long xen_ulong_t;
+ /* Guest handles for primitive C types. */
+ __DEFINE_GUEST_HANDLE(uchar, unsigned char);
+ __DEFINE_GUEST_HANDLE(uint, unsigned int);
+diff --git a/arch/x86/include/asm/xen/interface.h b/arch/x86/include/asm/xen/interface.h
+index 2289075..25cc8df 100644
+--- a/arch/x86/include/asm/xen/interface.h
++++ b/arch/x86/include/asm/xen/interface.h
+@@ -51,6 +51,7 @@
+  * with Xen so that on ARM we can have one ABI that works for 32 and 64
+  * bit guests. */
+ typedef unsigned long xen_pfn_t;
++typedef unsigned long xen_ulong_t;
+ /* Guest handles for primitive C types. */
+ __DEFINE_GUEST_HANDLE(uchar, unsigned char);
+ __DEFINE_GUEST_HANDLE(uint,  unsigned int);
+diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
+index abbbff0..b5c3098 100644
+--- a/include/xen/interface/memory.h
++++ b/include/xen/interface/memory.h
+@@ -34,7 +34,7 @@ struct xen_memory_reservation {
+     GUEST_HANDLE(xen_pfn_t) extent_start;
+ 
+     /* Number of extents, and size/alignment of each (2^extent_order pages). */
+-    unsigned long  nr_extents;
++    xen_ulong_t  nr_extents;
+     unsigned int   extent_order;
+ 
+     /*
+@@ -92,7 +92,7 @@ struct xen_memory_exchange {
+      *     command will be non-zero.
+      *  5. THIS FIELD MUST BE INITIALISED TO ZERO BY THE CALLER!
+      */
+-    unsigned long nr_exchanged;
++    xen_ulong_t nr_exchanged;
+ };
+ 
+ DEFINE_GUEST_HANDLE_STRUCT(xen_memory_exchange);
+@@ -148,8 +148,8 @@ DEFINE_GUEST_HANDLE_STRUCT(xen_machphys_mfn_list);
+  */
+ #define XENMEM_machphys_mapping     12
+ struct xen_machphys_mapping {
+-    unsigned long v_start, v_end; /* Start and end virtual addresses.   */
+-    unsigned long max_mfn;        /* Maximum MFN that can be looked up. */
++    xen_ulong_t v_start, v_end; /* Start and end virtual addresses.   */
++    xen_ulong_t max_mfn;        /* Maximum MFN that can be looked up. */
+ };
+ DEFINE_GUEST_HANDLE_STRUCT(xen_machphys_mapping_t);
+ 
+@@ -169,7 +169,7 @@ struct xen_add_to_physmap {
+     unsigned int space;
+ 
+     /* Index into source mapping space. */
+-    unsigned long idx;
++    xen_ulong_t idx;
+ 
+     /* GPFN where the source mapping page should appear. */
+     xen_pfn_t gpfn;
+@@ -186,7 +186,7 @@ struct xen_translate_gpfn_list {
+     domid_t domid;
+ 
+     /* Length of list. */
+-    unsigned long nr_gpfns;
++    xen_ulong_t nr_gpfns;
+ 
+     /* List of GPFNs to translate. */
+     GUEST_HANDLE(ulong) gpfn_list;
+diff --git a/include/xen/interface/physdev.h b/include/xen/interface/physdev.h
+index 9ce788d..f616514 100644
+--- a/include/xen/interface/physdev.h
++++ b/include/xen/interface/physdev.h
+@@ -56,7 +56,7 @@ struct physdev_eoi {
+ #define PHYSDEVOP_pirq_eoi_gmfn_v2       28
+ struct physdev_pirq_eoi_gmfn {
+     /* IN */
+-    unsigned long gmfn;
++    xen_ulong_t gmfn;
+ };
+ 
+ /*
+diff --git a/include/xen/interface/version.h b/include/xen/interface/version.h
+index e8b6519..30280c9 100644
+--- a/include/xen/interface/version.h
++++ b/include/xen/interface/version.h
+@@ -45,7 +45,7 @@ struct xen_changeset_info {
+ 
+ #define XENVER_platform_parameters 5
+ struct xen_platform_parameters {
+-    unsigned long virt_start;
++    xen_ulong_t virt_start;
+ };
+ 
+ #define XENVER_get_features 6
 -- 
 1.7.2.5
