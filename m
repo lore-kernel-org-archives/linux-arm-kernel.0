@@ -1,26 +1,144 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 16 Aug 2012 22:29:32 +0200
-Subject: [PATCH v6 0/3] Updated Cortex-M3 series
-In-Reply-To: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20120816202932.GY2232@pengutronix.de>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Thu, 16 Aug 2012 23:05:54 +0200
+Subject: [PATCH v3 2/3] PM / OPP: Initialize OPP table from device tree
+In-Reply-To: <1344577046-14847-3-git-send-email-shawn.guo@linaro.org>
+References: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
+ <1344577046-14847-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201208162305.55114.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+On Friday, August 10, 2012, Shawn Guo wrote:
+> With a lot of devices booting from device tree nowadays, it requires
+> that OPP table can be initialized from device tree.  The patch adds
+> a helper function of_init_opp_table together with a binding doc for
+> that purpose.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-On Fri, Aug 03, 2012 at 12:10:11PM +0200, Uwe Kleine-K?nig wrote:
-> the only changes compared to v5 (sent starting with Message-id:
-> 1341512035-8173-1-git-send-email-u.kleine-koenig at pengutronix.de)
-> are that several debug pr_infos were dropped that I missed to remove
-> before. Thanks to Will Deacon for pointing out that problem.
-> Furthermore I rebased (trivially) to v3.5.
-Any feedback from your side? It would be great to get this in for 3.7
-with some time in next before.
+I need an ACK from whoever maintains the DT bindings for that.
 
-Thanks
-Uwe
+Thanks,
+Rafael
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+
+> ---
+>  Documentation/devicetree/bindings/power/opp.txt |   25 ++++++++++++
+>  drivers/base/power/opp.c                        |   47 +++++++++++++++++++++++
+>  include/linux/opp.h                             |    8 ++++
+>  3 files changed, 80 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/power/opp.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
+> new file mode 100644
+> index 0000000..74499e5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/opp.txt
+> @@ -0,0 +1,25 @@
+> +* Generic OPP Interface
+> +
+> +SoCs have a standard set of tuples consisting of frequency and
+> +voltage pairs that the device will support per voltage domain. These
+> +are called Operating Performance Points or OPPs.
+> +
+> +Properties:
+> +- operating-points: An array of 2-tuples items, and each item consists
+> +  of frequency and voltage like <freq-kHz vol-uV>.
+> +	freq: clock frequency in kHz
+> +	vol: voltage in microvolt
+> +
+> +Examples:
+> +
+> +cpu at 0 {
+> +	compatible = "arm,cortex-a9";
+> +	reg = <0>;
+> +	next-level-cache = <&L2>;
+> +	operating-points = <
+> +		/* kHz    uV */
+> +		792000  1100000
+> +		396000  950000
+> +		198000  850000
+> +	>;
+> +};
+> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
+> index ac993ea..d946864 100644
+> --- a/drivers/base/power/opp.c
+> +++ b/drivers/base/power/opp.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/rculist.h>
+>  #include <linux/rcupdate.h>
+>  #include <linux/opp.h>
+> +#include <linux/of.h>
+>  
+>  /*
+>   * Internal data structure organization with the OPP layer library is as
+> @@ -674,3 +675,49 @@ struct srcu_notifier_head *opp_get_notifier(struct device *dev)
+>  
+>  	return &dev_opp->head;
+>  }
+> +
+> +#ifdef CONFIG_OF
+> +/**
+> + * of_init_opp_table() - Initialize opp table from device tree
+> + * @dev:	device pointer used to lookup device OPPs.
+> + *
+> + * Register the initial OPP table with the OPP library for given device.
+> + */
+> +int of_init_opp_table(struct device *dev)
+> +{
+> +	const struct property *prop;
+> +	const __be32 *val;
+> +	int nr;
+> +
+> +	prop = of_find_property(dev->of_node, "operating-points", NULL);
+> +	if (!prop)
+> +		return -ENODEV;
+> +	if (!prop->value)
+> +		return -ENODATA;
+> +
+> +	/*
+> +	 * Each OPP is a set of tuples consisting of frequency and
+> +	 * voltage like <freq-kHz vol-uV>.
+> +	 */
+> +	nr = prop->length / sizeof(u32);
+> +	if (nr % 2) {
+> +		dev_err(dev, "%s: Invalid OPP list\n", __func__);
+> +		return -EINVAL;
+> +	}
+> +
+> +	val = prop->value;
+> +	while (nr) {
+> +		unsigned long freq = be32_to_cpup(val++) * 1000;
+> +		unsigned long volt = be32_to_cpup(val++);
+> +
+> +		if (opp_add(dev, freq, volt)) {
+> +			dev_warn(dev, "%s: Failed to add OPP %ld\n",
+> +				 __func__, freq);
+> +			continue;
+> +		}
+> +		nr -= 2;
+> +	}
+> +
+> +	return 0;
+> +}
+> +#endif
+> diff --git a/include/linux/opp.h b/include/linux/opp.h
+> index 2a4e5fa..214e0eb 100644
+> --- a/include/linux/opp.h
+> +++ b/include/linux/opp.h
+> @@ -48,6 +48,14 @@ int opp_disable(struct device *dev, unsigned long freq);
+>  
+>  struct srcu_notifier_head *opp_get_notifier(struct device *dev);
+>  
+> +#ifdef CONFIG_OF
+> +int of_init_opp_table(struct device *dev);
+> +#else
+> +static inline int of_init_opp_table(struct device *dev)
+> +{
+> +	return -EINVAL;
+> +}
+> +#endif /* CONFIG_OF */
+>  #else
+>  static inline unsigned long opp_get_voltage(struct opp *opp)
+>  {
+> 
