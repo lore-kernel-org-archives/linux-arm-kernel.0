@@ -1,88 +1,60 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 16 Aug 2012 15:15:34 +0200
-Subject: [PATCH] mtd: lpc32xx_slc: Make driver independent of AMBA DMA engine
- driver
-In-Reply-To: <1345122935-22115-1-git-send-email-stigge@antcom.de>
-References: <1345122935-22115-1-git-send-email-stigge@antcom.de>
-Message-ID: <1345122935-22115-2-git-send-email-stigge@antcom.de>
+Date: Thu, 16 Aug 2012 15:15:33 +0200
+Subject: [PATCH] ARM: LPC32xx: Provide DMA filter callbacks via platform data
+Message-ID: <1345122935-22115-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes the SLC NAND driver independent of the single AMBA DMA engine
-driver by using the platform data provided dma_filter callback.
+The SLC and MLC NAND drivers now need their dma_filter callbacks via platform
+data to make them independent of single DMA engine drivers.
+
+(This also helps fixing build errors of the SLC and MLC drivers when building
+as modules because direct access to AMBA dma filter functions isn't available
+via export.)
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
 
 ---
- drivers/mtd/nand/lpc32xx_slc.c  |   13 +++++++++++--
- include/linux/mtd/lpc32xx_slc.h |   20 ++++++++++++++++++++
- 2 files changed, 31 insertions(+), 2 deletions(-)
 
---- linux-2.6.orig/drivers/mtd/nand/lpc32xx_slc.c
-+++ linux-2.6/drivers/mtd/nand/lpc32xx_slc.c
-@@ -37,7 +37,7 @@
- #include <linux/of.h>
- #include <linux/of_mtd.h>
- #include <linux/of_gpio.h>
--#include <linux/amba/pl08x.h>
+Applies to v3.6-rc1
+
+ arch/arm/mach-lpc32xx/phy3250.c |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/phy3250.c
++++ linux-2.6/arch/arm/mach-lpc32xx/phy3250.c
+@@ -37,6 +37,8 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/clk.h>
 +#include <linux/mtd/lpc32xx_slc.h>
++#include <linux/mtd/lpc32xx_mlc.h>
  
- #define LPC32XX_MODNAME		"lpc32xx-nand"
+ #include <asm/setup.h>
+ #include <asm/mach-types.h>
+@@ -223,6 +225,14 @@ static struct mmci_platform_data lpc32xx
+ 	 * gather, and the MMCI driver doesn't do it this way */
+ };
  
-@@ -199,6 +199,7 @@ struct lpc32xx_nand_cfg_slc {
- 
- struct lpc32xx_nand_host {
- 	struct nand_chip	nand_chip;
-+	struct lpc32xx_slc_platform_data *pdata;
- 	struct clk		*clk;
- 	struct mtd_info		mtd;
- 	void __iomem		*io_base;
-@@ -714,9 +715,15 @@ static int lpc32xx_nand_dma_setup(struct
- 	struct mtd_info *mtd = &host->mtd;
- 	dma_cap_mask_t mask;
- 
-+	if (!host->pdata || !host->pdata->dma_filter) {
-+		dev_err(mtd->dev.parent, "no DMA platform data\n");
-+		return -ENOENT;
-+	}
-+
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
--	host->dma_chan = dma_request_channel(mask, pl08x_filter_id, "nand-slc");
-+	host->dma_chan = dma_request_channel(mask, host->pdata->dma_filter,
-+					     "nand-slc");
- 	if (!host->dma_chan) {
- 		dev_err(mtd->dev.parent, "Failed to request DMA channel\n");
- 		return -EBUSY;
-@@ -814,6 +821,8 @@ static int __devinit lpc32xx_nand_probe(
- 	}
- 	lpc32xx_wp_disable(host);
- 
-+	host->pdata = pdev->dev.platform_data;
-+
- 	mtd = &host->mtd;
- 	chip = &host->nand_chip;
- 	chip->priv = host;
---- /dev/null
-+++ linux-2.6/include/linux/mtd/lpc32xx_slc.h
-@@ -0,0 +1,20 @@
-+/*
-+ * Platform data for LPC32xx SoC SLC NAND controller
-+ *
-+ * Copyright (C) 2012 Roland Stigge
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __LINUX_MTD_LPC32XX_SLC_H
-+#define __LINUX_MTD_LPC32XX_SLC_H
-+
-+#include <linux/dmaengine.h>
-+
-+struct lpc32xx_slc_platform_data {
-+	bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
++static struct lpc32xx_slc_platform_data lpc32xx_slc_data = {
++	.dma_filter = pl08x_filter_id,
 +};
 +
-+#endif  /* __LINUX_MTD_LPC32XX_SLC_H */
++static struct lpc32xx_mlc_platform_data lpc32xx_mlc_data = {
++	.dma_filter = pl08x_filter_id,
++};
++
+ static const struct of_dev_auxdata lpc32xx_auxdata_lookup[] __initconst = {
+ 	OF_DEV_AUXDATA("arm,pl022", 0x20084000, "dev:ssp0", &lpc32xx_ssp0_data),
+ 	OF_DEV_AUXDATA("arm,pl022", 0x2008C000, "dev:ssp1", &lpc32xx_ssp1_data),
+@@ -230,6 +240,10 @@ static const struct of_dev_auxdata lpc32
+ 	OF_DEV_AUXDATA("arm,pl080", 0x31000000, "pl08xdmac", &pl08x_pd),
+ 	OF_DEV_AUXDATA("arm,pl18x", 0x20098000, "20098000.sd",
+ 		       &lpc32xx_mmci_data),
++	OF_DEV_AUXDATA("nxp,lpc3220-slc", 0x20020000, "20020000.flash",
++		       &lpc32xx_slc_data),
++	OF_DEV_AUXDATA("nxp,lpc3220-mlc", 0x200a8000, "200a8000.flash",
++		       &lpc32xx_mlc_data),
+ 	{ }
+ };
+ 
