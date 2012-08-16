@@ -1,382 +1,499 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 16 Aug 2012 14:16:04 +0200
-Subject: [PATCH 4/6] ARM: integrator: initial device tree support
-Message-ID: <1345119364-22742-1-git-send-email-linus.walleij@linaro.org>
+Date: Thu, 16 Aug 2012 14:16:13 +0200
+Subject: [PATCH 5/6] ARM: integrator: convert AMBA devices to device tree
+Message-ID: <1345119373-22774-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is initial device tree support for the ARM Integrator family,
-we create a very basic device tree, #ifdef out the non-DT machines
-when compiling for device tree.
+This converts the AMBA (PrimeCell) devices on the Integrator/AP
+and Integrator/CP over to probing from the Device Tree if the
+kernel is compiled for Device Tree support.
+
+We continue to #ifdef out all non-DT code and vice versa on
+respective boot type to get a clean cut.
+
+We need to add a bunch of auxdata (compare to the Versatile)
+to handle bus names and callbacks alike.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/arm-boards |  12 +++
- arch/arm/boot/dts/integratorap.dts               |  26 ++++++
- arch/arm/boot/dts/integratorcp.dts               |  46 ++++++++++
- arch/arm/mach-integrator/integrator_ap.c         |  77 ++++++++++++----
- arch/arm/mach-integrator/integrator_cp.c         | 112 ++++++++++++++++-------
- 5 files changed, 221 insertions(+), 52 deletions(-)
- create mode 100644 arch/arm/boot/dts/integratorap.dts
- create mode 100644 arch/arm/boot/dts/integratorcp.dts
+ arch/arm/boot/dts/integratorap.dts       |  47 +++++++++++++
+ arch/arm/boot/dts/integratorcp.dts       |  64 ++++++++++++++++++
+ arch/arm/mach-integrator/common.h        |   2 +
+ arch/arm/mach-integrator/core.c          |   8 ++-
+ arch/arm/mach-integrator/integrator_ap.c | 109 ++++++++++++++++++++++---------
+ arch/arm/mach-integrator/integrator_cp.c |  97 +++++++++++++++++----------
+ 6 files changed, 261 insertions(+), 66 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/arm-boards b/Documentation/devicetree/bindings/arm/arm-boards
-index 91f2614..670e80e 100644
---- a/Documentation/devicetree/bindings/arm/arm-boards
-+++ b/Documentation/devicetree/bindings/arm/arm-boards
-@@ -1,3 +1,15 @@
-+ARM Integrator/AP (Application Platform) and Integrator/CP (Compact Platform)
-+-----------------------------------------------------------------------------
-+ARM's oldest Linux-supported platform with connectors for different core
-+tiles of ARMv4, ARMv5 and ARMv6 type.
-+
-+Required properties (in root node):
-+	compatible = "arm,integrator-ap";  /* Application Platform */
-+	compatible = "arm,integrator-cp";  /* Compact Platform */
-+
-+FPGA type interrupt controllers, see the fpga-irq binding doc.
-+
-+
- ARM Versatile Application and Platform Baseboards
- -------------------------------------------------
- ARM's development hardware platform with connectors for customizable
 diff --git a/arch/arm/boot/dts/integratorap.dts b/arch/arm/boot/dts/integratorap.dts
-new file mode 100644
-index 0000000..a40d1ec0
---- /dev/null
+index a40d1ec0..303d001 100644
+--- a/arch/arm/boot/dts/integratorap.dts
 +++ b/arch/arm/boot/dts/integratorap.dts
-@@ -0,0 +1,26 @@
-+/*
-+ * Device Tree for the ARM Integrator/AP platform
-+ */
+@@ -23,4 +23,51 @@
+ 		clear-mask = <0xffffffff>;
+ 		valid-mask = <0x003fffff>;
+ 	};
 +
-+/dts-v1/;
-+/include/ "skeleton.dtsi"
++	fpga {
++		compatible = "arm,amba-bus", "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
 +
-+/ {
-+	model = "ARM Integrator/AP";
-+	compatible = "arm,integrator-ap";
-+	ranges;
++		rtc: rtc at 15000000 {
++			compatible = "arm,pl031", "arm,primecell";
++			reg = <0x15000000 0x1000>;
++			interrupt-parent = <&pic>;
++			interrupts = <8>;
++			arm,primecell-periphid = <0x00041030>;
++		};
 +
-+	chosen {
-+		bootargs = "root=/dev/ram0 console=ttyAM0,38400n8 earlyprintk";
++		uart0: uart at 16000000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x16000000 0x1000>;
++			interrupt-parent = <&pic>;
++			interrupts = <1>;
++			arm,primecell-periphid = <0x00041010>;
++		};
++
++		uart1: uart at 17000000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x17000000 0x1000>;
++			interrupt-parent = <&pic>;
++			interrupts = <2>;
++			arm,primecell-periphid = <0x00041010>;
++		};
++
++		kmi0: kmi at 18000000 {
++			compatible = "arm,pl050", "arm,primecell";
++			reg = <0x18000000 0x1000>;
++			interrupt-parent = <&pic>;
++			interrupts = <3>;
++			arm,primecell-periphid = <0x00041050>;
++		};
++
++		kmi1: kmi at 19000000 {
++			compatible = "arm,pl050", "arm,primecell";
++			reg = <0x19000000 0x1000>;
++			interrupt-parent = <&pic>;
++			interrupts = <4>;
++			arm,primecell-periphid = <0x00041050>;
++		};
 +	};
-+
-+	pic: pic at 14000000 {
-+		compatible = "arm,versatile-fpga-irq";
-+		#interrupt-cells = <1>;
-+		interrupt-controller;
-+		reg = <0x14000000 0x100>;
-+		irq-start = <1>;
-+		clear-mask = <0xffffffff>;
-+		valid-mask = <0x003fffff>;
-+	};
-+};
+ };
 diff --git a/arch/arm/boot/dts/integratorcp.dts b/arch/arm/boot/dts/integratorcp.dts
-new file mode 100644
-index 0000000..b6ca10f
---- /dev/null
+index b6ca10f..517d420 100644
+--- a/arch/arm/boot/dts/integratorcp.dts
 +++ b/arch/arm/boot/dts/integratorcp.dts
-@@ -0,0 +1,46 @@
-+/*
-+ * Device Tree for the ARM Integrator/CP platform
-+ */
+@@ -43,4 +43,68 @@
+ 		clear-mask = <0x00000fff>;
+ 		valid-mask = <0x00000fff>;
+ 	};
 +
-+/dts-v1/;
-+/include/ "skeleton.dtsi"
++	fpga {
++		compatible = "arm,amba-bus", "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
 +
-+/ {
-+	model = "ARM Integrator/CP";
-+	compatible = "arm,integrator-cp";
-+	ranges;
++		rtc: rtc at 15000000 {
++			compatible = "arm,pl031", "arm,primecell";
++			reg = <0x15000000 0x1000>;
++			interrupt-parent = <&pic>;
++			interrupts = <8>;
++		};
 +
-+	chosen {
-+		bootargs = "root=/dev/ram0 console=ttyAMA0,38400n8 earlyprintk";
++		uart0: uart at 16000000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x16000000 0x1000>;
++			interrupt-parent = <&pic>;
++			interrupts = <1>;
++		};
++
++		uart1: uart at 17000000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x17000000 0x1000>;
++			interrupt-parent = <&pic>;
++			interrupts = <2>;
++		};
++
++		kmi0: kmi at 18000000 {
++			compatible = "arm,pl050", "arm,primecell";
++			reg = <0x18000000 0x1000>;
++			interrupt-parent = <&pic>;
++			interrupts = <3>;
++		};
++
++		kmi1: kmi at 19000000 {
++			compatible = "arm,pl050", "arm,primecell";
++			reg = <0x19000000 0x1000>;
++			interrupt-parent = <&pic>;
++			interrupts = <4>;
++		};
++
++		mmci: mmc at 1C000000 {
++			compatible = "arm,pl180", "arm,primecell";
++			reg = <0x1C000000 0x1000>;
++			interrupt-parent = <&pic>;
++			interrupts = <23 24>;
++			max-frequency = <515633>;
++		};
++
++		aaci: aaci at 1D000000 {
++			compatible = "arm,pl041", "arm,primecell";
++			reg = <0x1D000000 0x1000>;
++			interrupt-parent = <&pic>;
++			interrupts = <25>;
++		};
++
++		clcd: clcd at c0000000 {
++			compatible = "arm,pl110", "arm,primecell";
++			reg = <0xC0000000 0x1000>;
++			interrupt-parent = <&pic>;
++			interrupts = <22>;
++		};
 +	};
+ };
+diff --git a/arch/arm/mach-integrator/common.h b/arch/arm/mach-integrator/common.h
+index c4338e2..c3ff21b 100644
+--- a/arch/arm/mach-integrator/common.h
++++ b/arch/arm/mach-integrator/common.h
+@@ -1,3 +1,5 @@
++#include <linux/amba/serial.h>
++extern struct amba_pl010_data integrator_uart_data;
+ void integrator_init_early(void);
+ int integrator_init(bool is_cp);
+ void integrator_reserve(void);
+diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
+index 67ea181..42890c8 100644
+--- a/arch/arm/mach-integrator/core.c
++++ b/arch/arm/mach-integrator/core.c
+@@ -33,7 +33,9 @@
+ #include <asm/mach/time.h>
+ #include <asm/pgtable.h>
+ 
+-static struct amba_pl010_data integrator_uart_data;
++#include "common.h"
 +
-+	pic: pic at 14000000 {
-+		compatible = "arm,versatile-fpga-irq";
-+		#interrupt-cells = <1>;
-+		interrupt-controller;
-+		reg = <0x14000000 0x100>;
-+		irq-start = <1>;
-+		clear-mask = <0xffffffff>;
-+		valid-mask = <0x1fc003ff>;
-+	};
++#ifndef CONFIG_OF
+ 
+ #define INTEGRATOR_RTC_IRQ	{ IRQ_RTCINT }
+ #define INTEGRATOR_UART0_IRQ	{ IRQ_UARTINT0 }
+@@ -86,6 +88,8 @@ int __init integrator_init(bool is_cp)
+ 	return 0;
+ }
+ 
++#endif
 +
-+	cic: cic at 10000040 {
-+		compatible = "arm,versatile-fpga-irq";
-+		#interrupt-cells = <1>;
-+		interrupt-controller;
-+		reg = <0x10000040 0x100>;
-+		irq-start = <32>;
-+		clear-mask = <0xffffffff>;
-+		valid-mask = <0x00000007>;
-+	};
-+
-+	sic: sic at ca000000 {
-+		compatible = "arm,versatile-fpga-irq";
-+		#interrupt-cells = <1>;
-+		interrupt-controller;
-+		reg = <0xca000000 0x100>;
-+		irq-start = <35>;
-+		clear-mask = <0x00000fff>;
-+		valid-mask = <0x00000fff>;
-+	};
-+};
+ /*
+  * On the Integrator platform, the port RTS and DTR are provided by
+  * bits in the following SC_CTRLS register bits:
+@@ -122,7 +126,7 @@ static void integrator_uart_set_mctrl(struct amba_device *dev, void __iomem *bas
+ 	__raw_writel(ctrlc, SC_CTRLC);
+ }
+ 
+-static struct amba_pl010_data integrator_uart_data = {
++struct amba_pl010_data integrator_uart_data = {
+ 	.set_mctrl = integrator_uart_set_mctrl,
+ };
+ 
 diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index ff966d8..58b0a58 100644
+index 58b0a58..ff20173 100644
 --- a/arch/arm/mach-integrator/integrator_ap.c
 +++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -34,6 +34,7 @@
- #include <linux/mtd/physmap.h>
+@@ -35,6 +35,7 @@
  #include <linux/clk.h>
  #include <linux/platform_data/clk-integrator.h>
-+#include <linux/of_irq.h>
+ #include <linux/of_irq.h>
++#include <linux/of_platform.h>
  #include <video/vga.h>
  
  #include <mach/hardware.h>
-@@ -161,23 +162,6 @@ static void __init ap_map_io(void)
- 	vga_base = PCI_MEMORY_VADDR;
- }
- 
--#define INTEGRATOR_SC_VALID_INT	0x003fffff
--
--static void __init ap_init_irq(void)
--{
--	/* Disable all interrupts initially. */
--	/* Do the core module ones */
--	writel(-1, VA_CMIC_BASE + IRQ_ENABLE_CLEAR);
--
--	/* do the header card stuff next */
--	writel(-1, VA_IC_BASE + IRQ_ENABLE_CLEAR);
--	writel(-1, VA_IC_BASE + FIQ_ENABLE_CLEAR);
--
--	fpga_irq_init(VA_IC_BASE, "SC", IRQ_PIC_START,
--		-1, INTEGRATOR_SC_VALID_INT, NULL);
--	integrator_clk_init(false);
--}
--
- #ifdef CONFIG_PM
- static unsigned long ic_irq_enable;
- 
-@@ -473,6 +457,63 @@ static struct sys_timer ap_timer = {
- 	.init		= ap_init_timer,
+@@ -270,36 +271,6 @@ static struct platform_device cfi_flash_device = {
+ 	.resource	= &cfi_flash_resource,
  };
  
-+#ifdef CONFIG_OF
-+
-+static const struct of_device_id fpga_irq_of_match[] __initconst = {
-+	{ .compatible = "arm,versatile-fpga-irq", .data = fpga_irq_of_init, },
-+	{ /* Sentinel */ }
+-static void __init ap_init(void)
+-{
+-	unsigned long sc_dec;
+-	int i;
+-
+-	platform_device_register(&cfi_flash_device);
+-
+-	sc_dec = readl(VA_SC_BASE + INTEGRATOR_SC_DEC_OFFSET);
+-	for (i = 0; i < 4; i++) {
+-		struct lm_device *lmdev;
+-
+-		if ((sc_dec & (16 << i)) == 0)
+-			continue;
+-
+-		lmdev = kzalloc(sizeof(struct lm_device), GFP_KERNEL);
+-		if (!lmdev)
+-			continue;
+-
+-		lmdev->resource.start = 0xc0000000 + 0x10000000 * i;
+-		lmdev->resource.end = lmdev->resource.start + 0x0fffffff;
+-		lmdev->resource.flags = IORESOURCE_MEM;
+-		lmdev->irq = IRQ_AP_EXPINT0 + i;
+-		lmdev->id = i;
+-
+-		lm_device_register(lmdev);
+-	}
+-
+-	integrator_init(false);
+-}
+-
+ /*
+  * Where is the timer (VA)?
+  */
+@@ -472,6 +443,52 @@ static void __init ap_init_irq_of(void)
+ 	integrator_clk_init(false);
+ }
+ 
++/* For the Device Tree, add in the UART callbacks as AUXDATA */
++static struct of_dev_auxdata ap_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_RTC_BASE,
++		"rtc", NULL),
++	OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_UART0_BASE,
++		"uart0", &integrator_uart_data),
++	OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_UART1_BASE,
++		"uart1", &integrator_uart_data),
++	OF_DEV_AUXDATA("arm,primecell", KMI0_BASE,
++		"kmi0", NULL),
++	OF_DEV_AUXDATA("arm,primecell", KMI1_BASE,
++		"kmi1", NULL),
++	{ /* sentinel */ },
 +};
 +
-+static void __init ap_init_irq_of(void)
++static void __init ap_init_of(void)
 +{
-+	/* disable core module IRQs */
-+	writel(0xffffffffU, VA_CMIC_BASE + IRQ_ENABLE_CLEAR);
-+	of_irq_init(fpga_irq_of_match);
-+	integrator_clk_init(false);
++	unsigned long sc_dec;
++	int i;
++
++	of_platform_populate(NULL, of_default_bus_match_table,
++			ap_auxdata_lookup, NULL);
++
++	platform_device_register(&cfi_flash_device);
++
++	sc_dec = readl(VA_SC_BASE + INTEGRATOR_SC_DEC_OFFSET);
++	for (i = 0; i < 4; i++) {
++		struct lm_device *lmdev;
++
++		if ((sc_dec & (16 << i)) == 0)
++			continue;
++
++		lmdev = kzalloc(sizeof(struct lm_device), GFP_KERNEL);
++		if (!lmdev)
++			continue;
++
++		lmdev->resource.start = 0xc0000000 + 0x10000000 * i;
++		lmdev->resource.end = lmdev->resource.start + 0x0fffffff;
++		lmdev->resource.flags = IORESOURCE_MEM;
++		lmdev->irq = IRQ_AP_EXPINT0 + i;
++		lmdev->id = i;
++
++		lm_device_register(lmdev);
++	}
 +}
 +
-+static const char * ap_dt_board_compat[] = {
-+	"arm,integrator-ap",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(INTEGRATOR_AP_DT, "ARM Integrator/AP (Device Tree)")
-+	.reserve	= integrator_reserve,
-+	.map_io		= ap_map_io,
-+	.nr_irqs	= NR_IRQS_INTEGRATOR_AP,
-+	.init_early	= ap_init_early,
-+	.init_irq	= ap_init_irq_of,
-+	.handle_irq	= fpga_handle_irq,
-+	.timer		= &ap_timer,
-+	.init_machine	= ap_init,
-+	.restart	= integrator_restart,
-+	.dt_compat      = ap_dt_board_compat,
-+MACHINE_END
-+
-+#else
-+
-+/*
-+ * This is where non-devicetree initialization code is collected and stashed
-+ * for eventual deletion.
-+ */
-+
-+#define INTEGRATOR_SC_VALID_INT	0x003fffff
-+
-+static void __init ap_init_irq(void)
+ static const char * ap_dt_board_compat[] = {
+ 	"arm,integrator-ap",
+ 	NULL,
+@@ -485,7 +502,7 @@ DT_MACHINE_START(INTEGRATOR_AP_DT, "ARM Integrator/AP (Device Tree)")
+ 	.init_irq	= ap_init_irq_of,
+ 	.handle_irq	= fpga_handle_irq,
+ 	.timer		= &ap_timer,
+-	.init_machine	= ap_init,
++	.init_machine	= ap_init_of,
+ 	.restart	= integrator_restart,
+ 	.dt_compat      = ap_dt_board_compat,
+ MACHINE_END
+@@ -514,6 +531,36 @@ static void __init ap_init_irq(void)
+ 	integrator_clk_init(false);
+ }
+ 
++static void __init ap_init(void)
 +{
-+	/* Disable all interrupts initially. */
-+	/* Do the core module ones */
-+	writel(-1, VA_CMIC_BASE + IRQ_ENABLE_CLEAR);
++	unsigned long sc_dec;
++	int i;
 +
-+	/* do the header card stuff next */
-+	writel(-1, VA_IC_BASE + IRQ_ENABLE_CLEAR);
-+	writel(-1, VA_IC_BASE + FIQ_ENABLE_CLEAR);
++	platform_device_register(&cfi_flash_device);
 +
-+	fpga_irq_init(VA_IC_BASE, "SC", IRQ_PIC_START,
-+		-1, INTEGRATOR_SC_VALID_INT, NULL);
-+	integrator_clk_init(false);
++	sc_dec = readl(VA_SC_BASE + INTEGRATOR_SC_DEC_OFFSET);
++	for (i = 0; i < 4; i++) {
++		struct lm_device *lmdev;
++
++		if ((sc_dec & (16 << i)) == 0)
++			continue;
++
++		lmdev = kzalloc(sizeof(struct lm_device), GFP_KERNEL);
++		if (!lmdev)
++			continue;
++
++		lmdev->resource.start = 0xc0000000 + 0x10000000 * i;
++		lmdev->resource.end = lmdev->resource.start + 0x0fffffff;
++		lmdev->resource.flags = IORESOURCE_MEM;
++		lmdev->irq = IRQ_AP_EXPINT0 + i;
++		lmdev->id = i;
++
++		lm_device_register(lmdev);
++	}
++
++	integrator_init(false);
 +}
 +
  MACHINE_START(INTEGRATOR, "ARM-Integrator")
  	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
  	.atag_offset	= 0x100,
-@@ -486,3 +527,5 @@ MACHINE_START(INTEGRATOR, "ARM-Integrator")
- 	.init_machine	= ap_init,
- 	.restart	= integrator_restart,
- MACHINE_END
-+
-+#endif
 diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 2b40bc1..0f6dc99 100644
+index 0f6dc99..c341174 100644
 --- a/arch/arm/mach-integrator/integrator_cp.c
 +++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -23,6 +23,7 @@
- #include <linux/gfp.h>
+@@ -24,6 +24,7 @@
  #include <linux/mtd/physmap.h>
  #include <linux/platform_data/clk-integrator.h>
-+#include <linux/of_irq.h>
+ #include <linux/of_irq.h>
++#include <linux/of_platform.h>
  
  #include <mach/hardware.h>
  #include <mach/platform.h>
-@@ -53,10 +54,6 @@
- 
- #define INTCP_PA_CLCD_BASE		0xc0000000
- 
--#define INTCP_VA_CIC_BASE		__io_address(INTEGRATOR_HDR_BASE + 0x40)
--#define INTCP_VA_PIC_BASE		__io_address(INTEGRATOR_IC_BASE)
--#define INTCP_VA_SIC_BASE		__io_address(INTEGRATOR_CP_SIC_BASE)
--
- #define INTCP_ETH_SIZE			0x10
- 
- #define INTCP_VA_CTRL_BASE		IO_ADDRESS(INTEGRATOR_CP_CTL_BASE)
-@@ -143,37 +140,6 @@ static void __init intcp_map_io(void)
- 	iotable_init(intcp_io_desc, ARRAY_SIZE(intcp_io_desc));
- }
- 
--static void __init intcp_init_irq(void)
--{
--	u32 pic_mask, cic_mask, sic_mask;
--
--	/* These masks are for the HW IRQ registers */
--	pic_mask = ~((~0u) << (11 - IRQ_PIC_START));
--	pic_mask |= (~((~0u) << (29 - 22))) << 22;
--	cic_mask = ~((~0u) << (1 + IRQ_CIC_END - IRQ_CIC_START));
--	sic_mask = ~((~0u) << (1 + IRQ_SIC_END - IRQ_SIC_START));
--
--	/*
--	 * Disable all interrupt sources
--	 */
--	writel(0xffffffff, INTCP_VA_PIC_BASE + IRQ_ENABLE_CLEAR);
--	writel(0xffffffff, INTCP_VA_PIC_BASE + FIQ_ENABLE_CLEAR);
--	writel(0xffffffff, INTCP_VA_CIC_BASE + IRQ_ENABLE_CLEAR);
--	writel(0xffffffff, INTCP_VA_CIC_BASE + FIQ_ENABLE_CLEAR);
--	writel(sic_mask, INTCP_VA_SIC_BASE + IRQ_ENABLE_CLEAR);
--	writel(sic_mask, INTCP_VA_SIC_BASE + FIQ_ENABLE_CLEAR);
--
--	fpga_irq_init(INTCP_VA_PIC_BASE, "PIC", IRQ_PIC_START,
--		      -1, pic_mask, NULL);
--
--	fpga_irq_init(INTCP_VA_CIC_BASE, "CIC", IRQ_CIC_START,
--		      -1, cic_mask, NULL);
--
--	fpga_irq_init(INTCP_VA_SIC_BASE, "SIC", IRQ_SIC_START,
--		      IRQ_CP_CPPLDINT, sic_mask, NULL);
--	integrator_clk_init(true);
--}
--
- /*
-  * Flash handling.
-  */
-@@ -387,6 +353,80 @@ static struct sys_timer cp_timer = {
- 	.init		= intcp_timer_init,
+@@ -244,16 +245,6 @@ static struct mmci_platform_data mmc_data = {
+ 	.gpio_cd	= -1,
  };
  
-+#ifdef CONFIG_OF
-+
-+static const struct of_device_id fpga_irq_of_match[] __initconst = {
-+	{ .compatible = "arm,versatile-fpga-irq", .data = fpga_irq_of_init, },
-+	{ /* Sentinel */ }
+-#define INTEGRATOR_CP_MMC_IRQS	{ IRQ_CP_MMCIINT0, IRQ_CP_MMCIINT1 }
+-#define INTEGRATOR_CP_AACI_IRQS	{ IRQ_CP_AACIINT }
+-
+-static AMBA_APB_DEVICE(mmc, "mmci", 0, INTEGRATOR_CP_MMC_BASE,
+-	INTEGRATOR_CP_MMC_IRQS, &mmc_data);
+-
+-static AMBA_APB_DEVICE(aaci, "aaci", 0, INTEGRATOR_CP_AACI_BASE,
+-	INTEGRATOR_CP_AACI_IRQS, NULL);
+-
+-
+ /*
+  * CLCD support
+  */
+@@ -304,15 +295,6 @@ static struct clcd_board clcd_data = {
+ 	.remove		= versatile_clcd_remove_dma,
+ };
+ 
+-static AMBA_AHB_DEVICE(clcd, "clcd", 0, INTCP_PA_CLCD_BASE,
+-	{ IRQ_CP_CLCDCINT }, &clcd_data);
+-
+-static struct amba_device *amba_devs[] __initdata = {
+-	&mmc_device,
+-	&aaci_device,
+-	&clcd_device,
+-};
+-
+ #define REFCOUNTER (__io_address(INTEGRATOR_HDR_BASE) + 0x28)
+ 
+ static void __init intcp_init_early(void)
+@@ -322,19 +304,6 @@ static void __init intcp_init_early(void)
+ #endif
+ }
+ 
+-static void __init intcp_init(void)
+-{
+-	int i;
+-
+-	platform_add_devices(intcp_devs, ARRAY_SIZE(intcp_devs));
+-
+-	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
+-		struct amba_device *d = amba_devs[i];
+-		amba_device_register(d, &iomem_resource);
+-	}
+-	integrator_init(true);
+-}
+-
+ #define TIMER0_VA_BASE __io_address(INTEGRATOR_TIMER0_BASE)
+ #define TIMER1_VA_BASE __io_address(INTEGRATOR_TIMER1_BASE)
+ #define TIMER2_VA_BASE __io_address(INTEGRATOR_TIMER2_BASE)
+@@ -366,6 +335,37 @@ static void __init intcp_init_irq_of(void)
+ 	integrator_clk_init(true);
+ }
+ 
++/*
++ * For the Device Tree, add in the UART, MMC and CLCD specifics as AUXDATA
++ * and enforce the bus names since these are used for clock lookups.
++ */
++static struct of_dev_auxdata intcp_auxdata_lookup[] __initdata = {
++	OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_RTC_BASE,
++		"rtc", NULL),
++	OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_UART0_BASE,
++		"uart0", &integrator_uart_data),
++	OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_UART1_BASE,
++		"uart1", &integrator_uart_data),
++	OF_DEV_AUXDATA("arm,primecell", KMI0_BASE,
++		"kmi0", NULL),
++	OF_DEV_AUXDATA("arm,primecell", KMI1_BASE,
++		"kmi1", NULL),
++	OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_CP_MMC_BASE,
++		"mmci", &mmc_data),
++	OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_CP_AACI_BASE,
++		"aaci", &mmc_data),
++	OF_DEV_AUXDATA("arm,primecell", INTCP_PA_CLCD_BASE,
++		"clcd", &clcd_data),
++	{ /* sentinel */ },
 +};
 +
-+static void __init intcp_init_irq_of(void)
++static void __init intcp_init_of(void)
 +{
-+	of_irq_init(fpga_irq_of_match);
-+	integrator_clk_init(true);
++	of_platform_populate(NULL, of_default_bus_match_table,
++			intcp_auxdata_lookup, NULL);
++	platform_add_devices(intcp_devs, ARRAY_SIZE(intcp_devs));
 +}
 +
-+static const char * intcp_dt_board_compat[] = {
-+	"arm,integrator-cp",
-+	NULL,
+ static const char * intcp_dt_board_compat[] = {
+ 	"arm,integrator-cp",
+ 	NULL,
+@@ -379,7 +379,7 @@ DT_MACHINE_START(INTEGRATOR_CP_DT, "ARM Integrator/CP (Device Tree)")
+ 	.init_irq	= intcp_init_irq_of,
+ 	.handle_irq	= fpga_handle_irq,
+ 	.timer		= &cp_timer,
+-	.init_machine	= intcp_init,
++	.init_machine	= intcp_init_of,
+ 	.restart	= integrator_restart,
+ 	.dt_compat      = intcp_dt_board_compat,
+ MACHINE_END
+@@ -427,6 +427,37 @@ static void __init intcp_init_irq(void)
+ 	integrator_clk_init(true);
+ }
+ 
++#define INTEGRATOR_CP_MMC_IRQS	{ IRQ_CP_MMCIINT0, IRQ_CP_MMCIINT1 }
++#define INTEGRATOR_CP_AACI_IRQS	{ IRQ_CP_AACIINT }
++
++static AMBA_APB_DEVICE(mmc, "mmci", 0, INTEGRATOR_CP_MMC_BASE,
++	INTEGRATOR_CP_MMC_IRQS, &mmc_data);
++
++static AMBA_APB_DEVICE(aaci, "aaci", 0, INTEGRATOR_CP_AACI_BASE,
++	INTEGRATOR_CP_AACI_IRQS, NULL);
++
++static AMBA_AHB_DEVICE(clcd, "clcd", 0, INTCP_PA_CLCD_BASE,
++	{ IRQ_CP_CLCDCINT }, &clcd_data);
++
++static struct amba_device *amba_devs[] __initdata = {
++	&mmc_device,
++	&aaci_device,
++	&clcd_device,
 +};
 +
-+DT_MACHINE_START(INTEGRATOR_CP_DT, "ARM Integrator/CP (Device Tree)")
-+	.reserve	= integrator_reserve,
-+	.map_io		= intcp_map_io,
-+	.nr_irqs	= NR_IRQS_INTEGRATOR_CP,
-+	.init_early	= intcp_init_early,
-+	.init_irq	= intcp_init_irq_of,
-+	.handle_irq	= fpga_handle_irq,
-+	.timer		= &cp_timer,
-+	.init_machine	= intcp_init,
-+	.restart	= integrator_restart,
-+	.dt_compat      = intcp_dt_board_compat,
-+MACHINE_END
-+
-+#else
-+
-+/*
-+ * This is where non-devicetree initialization code is collected and stashed
-+ * for eventual deletion.
-+ */
-+
-+#define INTCP_VA_CIC_BASE		__io_address(INTEGRATOR_HDR_BASE + 0x40)
-+#define INTCP_VA_PIC_BASE		__io_address(INTEGRATOR_IC_BASE)
-+#define INTCP_VA_SIC_BASE		__io_address(INTEGRATOR_CP_SIC_BASE)
-+
-+static void __init intcp_init_irq(void)
++static void __init intcp_init(void)
 +{
-+	u32 pic_mask, cic_mask, sic_mask;
++	int i;
 +
-+	/* These masks are for the HW IRQ registers */
-+	pic_mask = ~((~0u) << (11 - IRQ_PIC_START));
-+	pic_mask |= (~((~0u) << (29 - 22))) << 22;
-+	cic_mask = ~((~0u) << (1 + IRQ_CIC_END - IRQ_CIC_START));
-+	sic_mask = ~((~0u) << (1 + IRQ_SIC_END - IRQ_SIC_START));
++	platform_add_devices(intcp_devs, ARRAY_SIZE(intcp_devs));
 +
-+	/*
-+	 * Disable all interrupt sources
-+	 */
-+	writel(0xffffffff, INTCP_VA_PIC_BASE + IRQ_ENABLE_CLEAR);
-+	writel(0xffffffff, INTCP_VA_PIC_BASE + FIQ_ENABLE_CLEAR);
-+	writel(0xffffffff, INTCP_VA_CIC_BASE + IRQ_ENABLE_CLEAR);
-+	writel(0xffffffff, INTCP_VA_CIC_BASE + FIQ_ENABLE_CLEAR);
-+	writel(sic_mask, INTCP_VA_SIC_BASE + IRQ_ENABLE_CLEAR);
-+	writel(sic_mask, INTCP_VA_SIC_BASE + FIQ_ENABLE_CLEAR);
-+
-+	fpga_irq_init(INTCP_VA_PIC_BASE, "PIC", IRQ_PIC_START,
-+		      -1, pic_mask, NULL);
-+
-+	fpga_irq_init(INTCP_VA_CIC_BASE, "CIC", IRQ_CIC_START,
-+		      -1, cic_mask, NULL);
-+
-+	fpga_irq_init(INTCP_VA_SIC_BASE, "SIC", IRQ_SIC_START,
-+		      IRQ_CP_CPPLDINT, sic_mask, NULL);
-+
-+	integrator_clk_init(true);
++	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
++		struct amba_device *d = amba_devs[i];
++		amba_device_register(d, &iomem_resource);
++	}
++	integrator_init(true);
 +}
 +
  MACHINE_START(CINTEGRATOR, "ARM-IntegratorCP")
  	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
  	.atag_offset	= 0x100,
-@@ -400,3 +440,5 @@ MACHINE_START(CINTEGRATOR, "ARM-IntegratorCP")
- 	.init_machine	= intcp_init,
- 	.restart	= integrator_restart,
- MACHINE_END
-+
-+#endif
 -- 
 1.7.11.2
