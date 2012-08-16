@@ -1,48 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Aug 2012 13:00:32 +0000
-Subject: [PATCH v2 26/31] arm64: Miscellaneous library functions
-In-Reply-To: <20120816105709.GK31784@mudshark.cambridge.arm.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <201208151521.14663.arnd@arndb.de>
- <20120816105709.GK31784@mudshark.cambridge.arm.com>
-Message-ID: <201208161300.32830.arnd@arndb.de>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 16 Aug 2012 15:13:48 +0200
+Subject: [PATCH] dma: amba-pl08x: Export pl08x_filter_id
+In-Reply-To: <20120816090041.GK18957@n2100.arm.linux.org.uk>
+References: <1345107396-27079-1-git-send-email-stigge@antcom.de>
+ <20120816090041.GK18957@n2100.arm.linux.org.uk>
+Message-ID: <502CF20C.20801@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 August 2012, Will Deacon wrote:
-> > > +
-> > > +#include <linux/kernel.h>
-> > > +#include <linux/spinlock.h>
-> > > +#include <linux/atomic.h>
-> > > +
-> > > +#ifdef CONFIG_SMP
-> > > +arch_spinlock_t __atomic_hash[ATOMIC_HASH_SIZE] __lock_aligned = {
-> > > +       [0 ... (ATOMIC_HASH_SIZE-1)]  = __ARCH_SPIN_LOCK_UNLOCKED
-> > > +};
-> > > +#endif
-> > 
-> > What?
-> > 
-> > I suppose this is a leftover from an earlier version using the
-> > generic bitops, right?
+On 08/16/2012 11:00 AM, Russell King - ARM Linux wrote:
+> On Thu, Aug 16, 2012 at 10:56:36AM +0200, Roland Stigge wrote:
+>> This patch fixes the following when compiling a driver module that uses
+>> amba-pl08x:
+>>
+>> ERROR: "pl08x_filter_id" [drivers/mtd/nand/lpc32xx_slc.ko] undefined!
+>> ERROR: "pl08x_filter_id" [drivers/mtd/nand/lpc32xx_mlc.ko] undefined!
+>>
+>> (drivers/mtd/nand/lpc32xx_* are still in l2-mtd.git)
 > 
-> We currently use the generic atomic bitops (asm-generic/bitops/atomic.h)
-> which contains:
+> It is currently intended that this be passed from platform code into
+> drivers via platform data, so that drivers can decide which DMA engine
+> they wish to make use of.
 > 
-> #  define ATOMIC_HASH(a) (&(__atomic_hash[ (((unsigned long) a)/L1_CACHE_BYTES) & (ATOMIC_HASH_SIZE-1) ]))
-> 
-> so we have to provide a definition for the array. We have additional patches
-> containing optimised assembly implementations of the atomic bitops which we
-> will push later, once we've got some hardware to benchmark with.
-> 
+> See how all the AMBA drivers work in this regard (because they need to
+> support more than just a single DMA engine implementation.)
 
-Ah, I was confusing this with the asm/atomic.h stuff, for which you already
-provide an optimized version.
+Thanks for the note!
 
-The generic atomic bitops are really horrible in performance and I would
-expect that there is just one obvious way to implement bitops using ldaxr/stlxr,
-so I recommend just doing that even if you have no hardware for benchmarking.
-
-The s390 version should be fairly easy to adapt.
-
-	Arnd
+I'll post respective changes to the MTD SLC and MLC drivers of LPC32xx
+(for the MTD subsystem) and the adjustment I'll do in mach-lpc32xx (my
+lpc32xx tree for arm-soc).
