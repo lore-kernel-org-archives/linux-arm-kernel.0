@@ -1,66 +1,28 @@
-From: jason77.wang@gmail.com (Hui Wang)
-Date: Thu, 16 Aug 2012 14:53:23 +0800
-Subject: [PATCH v3 3/3] ARM: dts: imx6q-sabrelite: add eeti egalax
-In-Reply-To: <20120815130108.GB2258@S2101-09.ap.freescale.net>
-References: <1345026708-14139-1-git-send-email-jason77.wang@gmail.com>
- <1345026708-14139-2-git-send-email-jason77.wang@gmail.com>
- <1345026708-14139-3-git-send-email-jason77.wang@gmail.com>
- <1345026708-14139-4-git-send-email-jason77.wang@gmail.com>
- <20120815130108.GB2258@S2101-09.ap.freescale.net>
-Message-ID: <502C98E3.5080306@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Aug 2012 07:03:50 +0000
+Subject: [PATCH v3 10/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <20120816045539.GA17067@avionic-0098.mockup.avionic-design.de>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <201208152025.25252.arnd@arndb.de>
+ <20120816045539.GA17067@avionic-0098.mockup.avionic-design.de>
+Message-ID: <201208160703.50364.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
-> On Wed, Aug 15, 2012 at 06:31:48PM +0800, Hui Wang wrote:
->   
->> i.MX6Q sabrelite board uses i2c3 to connect an eeti egalax
->> touchscreen controller, add it as an i2c slave device in the dts.
->>
->> Signed-off-by: Hui Wang <jason77.wang@gmail.com>
->> ---
->>  arch/arm/boot/dts/imx6q-sabrelite.dts |   16 ++++++++++++++++
->>  arch/arm/boot/dts/imx6q.dtsi          |    7 +++++++
->>  2 files changed, 23 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
->> index 72f30f3..4a68e1f 100644
->> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
->> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
->> @@ -54,6 +54,7 @@
->>  							   144  0x80000000	/* MX6Q_PAD_EIM_D22__GPIO_3_22 */
->>  							   121  0x80000000	/* MX6Q_PAD_EIM_D19__GPIO_3_19 */
->>  							   953  0x80000000	/* MX6Q_PAD_GPIO_0__CCM_CLKO */
->> +							   972  0x10		/* MX6Q_PAD_GPIO_9__GPIO_1_9 */
->>  							   >;
->>  					};
->>  				};
->> @@ -115,6 +116,21 @@
->>  					VDDIO-supply = <&reg_3p3v>;
->>  				};
->>  			};
->> +
->> +			i2c at 021a8000 { /* I2C3 */
->> +				status = "okay";
->> +				clock-frequency = <100000>;
->> +				pinctrl-names = "default";
->> +				pinctrl-0 = <&pinctrl_i2c3_1>;
->> +
->> +				egalax_ts at 04 {
->> +					compatible = "eeti,egalax_ts";
->> +					reg = <0x04>;
->> +					interrupt-parent = <&gpio1>;
->> +					interrupts = <9 2>;
->>     
->
-> So you take this interrupt as falling-edge, while I see IRQF_TRIGGER_LOW
-> is used in driver with request_threaded_irq call.
->
-> Regards,
-> Shawn
->
->   
-Yes, you are right. Should be 8 instead of 2.
+On Thursday 16 August 2012, Thierry Reding wrote:
+> At least for the config space this is incorrect. There's a single region
+> to access the configuration space for all devices below the PCIe
+> controller. So it is shared by both (Tegra20) or all three (Tegra30)
+> root ports.
+> 
+> I'm not sure about PCI domains. Do you have any good pointers as to
+> where I could read up on them? If they need special hardware support,
+> then I think Tegra doesn't support them either. At least I haven't come
+> across any mention of domains while going through the, admittedly some-
+> what sparse on PCIe, Tegra documentation.
 
-Regards,
-Hui.
+I was referring to the same thing here: if you had a separate config
+space for each root port, they would by definition be separate PCI
+domain. So you don't have them.
+
+	Arnd
