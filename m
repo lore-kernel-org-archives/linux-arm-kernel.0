@@ -1,47 +1,45 @@
-From: hdk@igel.co.jp (Hideki EIRAKU)
-Date: Thu, 16 Aug 2012 19:13:58 +0900 (JST)
-Subject: [PATCH v3 3/4] media: videobuf2-dma-contig: use
- dma_mmap_coherent if available
-In-Reply-To: <012701cd74ac$6a617060$3f245120$%szyprowski@samsung.com>
-References: <1344246924-32620-1-git-send-email-hdk@igel.co.jp>
- <1344246924-32620-4-git-send-email-hdk@igel.co.jp>
- <012701cd74ac$6a617060$3f245120$%szyprowski@samsung.com>
-Message-ID: <20120816.191358.127675610.hdk@igel.co.jp>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 16 Aug 2012 11:23:00 +0100
+Subject: [PATCH v2 16/31] arm64: ELF definitions
+In-Reply-To: <201208151415.39570.arnd@arndb.de>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-17-git-send-email-catalin.marinas@arm.com>
+ <201208151415.39570.arnd@arndb.de>
+Message-ID: <20120816102300.GG31784@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-From: Marek Szyprowski <m.szyprowski@samsung.com>
-Subject: RE: [PATCH v3 3/4] media: videobuf2-dma-contig: use dma_mmap_coherent if available
-Date: Tue, 07 Aug 2012 16:53:25 +0200
-
-> I'm sorry for bringing this issue now, once you have already created v3 of your
-> patches, but similar patch has been already proposed some time ago. It is already
-> processed together with general videobuf2-dma-contig redesign and dma-buf extensions
-> by Tomasz Stanislawski.
+On Wed, Aug 15, 2012 at 03:15:39PM +0100, Arnd Bergmann wrote:
+> On Tuesday 14 August 2012, Catalin Marinas wrote:
+> > +
+> > +void elf_set_personality(int personality)
+> > +{
+> > +       switch (personality & PER_MASK) {
+> > +       case PER_LINUX:
+> > +               clear_thread_flag(TIF_32BIT);
+> > +               break;
+> > +       case PER_LINUX32:
+> > +               set_thread_flag(TIF_32BIT);
+> > +               break;
+> > +       default:
+> > +               pr_warning("Process %s tried to assume unknown personality %d\n",
+> > +                          current->comm, personality);
+> > +               return;
+> > +       }
+> > +
+> > +       current->personality = personality;
+> > +}
+> > +EXPORT_SYMBOL(elf_set_personality);
 > 
-> See post http://thread.gmane.org/gmane.comp.video.dri.devel/70402/focus=49461 and
-> http://thread.gmane.org/gmane.linux.drivers.video-input-infrastructure/49438 
+> This looks wrong: PER_LINUX/PER_LINUX32 decides over the output of the
+> uname system call, while TIF_32BIT decides over the instruction set
+> when returning to user space. You definitely should not set the personality
+> to the value you pass from the elf loader. Instead, just do
 > 
-> It doesn't use conditional code inside videobuf2 allocator and rely entirely on 
-> dma-mapping subsystem to provide a working dma_mmap_coherent/writecombine/attrs() 
-> function. When it was posted, it relied on the dma-mapping extensions, which now
-> have been finally merged to v3.6-rc1. Now I wonder if there are any architectures, 
-> which don't use dma_map_ops based dma-mapping framework, which might use 
-> videobuf2-dma-conting module. 
+> #define SET_PERSONALITY(ex) clear_thread_flag(TIF_32BIT);
+> #defined COMPAT_SET_PERSONALITY(ex) set_thread_flag(TIF_32BIT);
 
-Thank you for telling me about videobuf2-dma-contig and v3.6-rc1.  The
-videobuf2-dma-contig patch I sent is now unnecessary.  So I will
-remove the patch.  I will remove the patch defining
-ARCH_HAS_DMA_MMAP_COHERENT too because the v3.6-rc1 kernel has generic
-dma_mmap_coherent() API for every architecture.
+In this case, won't uname be incorrect (aarch64l) for aarch32 tasks (which
+expect something like armv8l)?
 
-I will also remove the Laurent's patch I sent because it was related
-to ARCH_HAS_DMA_MMAP_COHERENT.
-
-The remaining patch is sh_mobile_lcdc.  I will remove ifdefs from the
-patch and re-post it as a patch v4.
-
--- 
-Hideki EIRAKU <hdk@igel.co.jp>
+Will
