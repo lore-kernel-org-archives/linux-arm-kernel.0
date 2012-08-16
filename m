@@ -1,51 +1,66 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 16 Aug 2012 10:31:11 +0800
-Subject: imx6q restart is broken
-In-Reply-To: <20120815214412.GC32560@n2100.arm.linux.org.uk>
-References: <20120808101817.GA14718@S2101-09.ap.freescale.net>
- <50224547.9020000@de.bosch.com> <50232C17.9000700@gmail.com>
- <20120809092021.GQ18957@n2100.arm.linux.org.uk>
- <502BBB43.5010403@gmail.com>
- <20120815214412.GC32560@n2100.arm.linux.org.uk>
-Message-ID: <20120816023109.GH2258@S2101-09.ap.freescale.net>
+Date: Thu, 16 Aug 2012 11:03:13 +0800
+Subject: [PATCH] rtc: snvs: change timeout to use a fixed number of loop
+In-Reply-To: <Message-ID: <1342164663-31351-1-git-send-email-shawn.guo@linaro.org>
+References: <Message-ID: <1342164663-31351-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1345086193-23870-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2012 at 10:44:12PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Aug 15, 2012 at 10:07:47AM -0500, Rob Herring wrote:
-> > I think I am seeing a similar problem on highbank with a v7 only build.
-> > 
-> > >From what I've debugged, restart hangs for me on the L2x0 spinlock
-> > during a writel. Changing the writel to writel_relaxed in the restart
-> > hook fixes the problem. This skips barriers in the writel and for the
-> > spinlock. However, I'm still puzzled as cpu_relax on the secondary cores
-> > should not be doing a dmb in my case on a v7 only build.
-> 
-> Well, I had the idea of only doing a dmb() once every N loops, but I don't
-> think we can sensibly introduce such a change into the mainline kernel.
-> (How would cpu_relax() know it's being used in a loop?)
-> 
-> Remember that the dmb() is in cpu_relax() as a work-around for the lack
-> of temporal flushing of pending stores, and is needed to make various bits
-> of the kernel work.
-> 
-The cpu_relax() will do dmb() only #if __LINUX_ARM_ARCH__ == 6 ||
-defined(CONFIG_ARM_ERRATA_754327).  Otherwise, it's just a barrier()
-call.  I guess Rob's puzzle is since the cpu_relax on the stopped
-cores does not do dmb, why a wmb/mb call on the running cpu would hang
-it.
+Andrew Morton <akpm@linux-foundation.org> wrote:
 
-One thing I note is that mb() will do a outer_sync() call.  Since the
-issue is around L2x0 operation, not sure if they are related ...
+> The timeout code here is fragile.  If acquiring the spinlock takes more
+> than a millisecond or if this thread gets interrupted or preempted then
+> we could easily execute that loop just a single time, and fail.
+>
+> It would be better to retry a fixed number of times, say 1000?  That
+> would take around 1 millisecond, but might be overkill.
 
-> So at the moment, there is no solution for this - and as I've pointed out
-> it can be trivially exploited in userspace on the affected CPUs.  So
-> really a kernel work-around isn't going to sort it.
+Take Andrew's suggestion to change the timeout code to retry 1000
+times.
 
-So, Sascha, it seems we get another good reason to split
-imx_v6_v7_defconfig into imx_v6_defconfig and imx_v7_defconfig?
-I have seen Matt Sealey and Hui Wang suggested doing this already.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/rtc/rtc-snvs.c |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
+diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
+index 912f116..3c0da33 100644
+--- a/drivers/rtc/rtc-snvs.c
++++ b/drivers/rtc/rtc-snvs.c
+@@ -83,8 +83,8 @@ static void rtc_write_sync_lp(void __iomem *ioaddr)
+ 
+ static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
+ {
+-	unsigned long timeout = jiffies + msecs_to_jiffies(1);
+ 	unsigned long flags;
++	int timeout = 1000;
+ 	u32 lpcr;
+ 
+ 	spin_lock_irqsave(&data->lock, flags);
+@@ -98,7 +98,7 @@ static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
+ 
+ 	spin_unlock_irqrestore(&data->lock, flags);
+ 
+-	while (1) {
++	while (--timeout) {
+ 		lpcr = readl(data->ioaddr + SNVS_LPCR);
+ 
+ 		if (enable) {
+@@ -108,11 +108,11 @@ static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
+ 			if (!(lpcr & SNVS_LPCR_SRTC_ENV))
+ 				break;
+ 		}
+-
+-		if (time_after(jiffies, timeout))
+-			return -ETIMEDOUT;
+ 	}
+ 
++	if (!timeout)
++		return -ETIMEDOUT;
++
+ 	return 0;
+ }
+ 
 -- 
-Regards,
-Shawn
+1.7.5.4
