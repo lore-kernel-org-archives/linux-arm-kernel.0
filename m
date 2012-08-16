@@ -1,41 +1,40 @@
 From: xiechao.mail@gmail.com (Chao Xie)
-Date: Thu, 16 Aug 2012 11:08:42 +0800
-Subject: [PATCH V3 2/5] clk: mmp: add clock definition for pxa168
+Date: Thu, 16 Aug 2012 11:08:43 +0800
+Subject: [PATCH V3 3/5] clk: mmp: add clock definition for pxa910
 In-Reply-To: <1345086525-12328-1-git-send-email-xiechao.mail@gmail.com>
 References: <1345086525-12328-1-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <1345086525-12328-3-git-send-email-xiechao.mail@gmail.com>
+Message-ID: <1345086525-12328-4-git-send-email-xiechao.mail@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chao Xie <chao.xie@marvell.com>
 
-Initialize the clocks for pxa168
+Initialize the clocks for pxa910
 
 Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
 ---
- drivers/clk/mmp/Makefile     |    2 +
- drivers/clk/mmp/clk-pxa168.c |  414 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 416 insertions(+), 0 deletions(-)
- create mode 100644 drivers/clk/mmp/clk-pxa168.c
+ drivers/clk/mmp/Makefile     |    1 +
+ drivers/clk/mmp/clk-pxa910.c |  380 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 381 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/clk/mmp/clk-pxa910.c
 
 diff --git a/drivers/clk/mmp/Makefile b/drivers/clk/mmp/Makefile
-index b5bc88c..a0e69ed 100644
+index a0e69ed..6160ac2 100644
 --- a/drivers/clk/mmp/Makefile
 +++ b/drivers/clk/mmp/Makefile
-@@ -3,3 +3,5 @@
- #
- 
+@@ -5,3 +5,4 @@
  obj-y += clk-apbc.o clk-apmu.o clk-frac.o
-+
-+obj-$(CONFIG_CPU_PXA168) += clk-pxa168.o
-diff --git a/drivers/clk/mmp/clk-pxa168.c b/drivers/clk/mmp/clk-pxa168.c
+ 
+ obj-$(CONFIG_CPU_PXA168) += clk-pxa168.o
++obj-$(CONFIG_CPU_PXA910) += clk-pxa910.o
+diff --git a/drivers/clk/mmp/clk-pxa910.c b/drivers/clk/mmp/clk-pxa910.c
 new file mode 100644
-index 0000000..1b04deb
+index 0000000..6f121e7
 --- /dev/null
-+++ b/drivers/clk/mmp/clk-pxa168.c
-@@ -0,0 +1,414 @@
++++ b/drivers/clk/mmp/clk-pxa910.c
+@@ -0,0 +1,380 @@
 +/*
-+ * pxa168 clock framework source file
++ * pxa910 clock framework source file
 + *
 + * Copyright (C) 2012 Marvell
 + * Chao Xie <xiechao.mail@gmail.com>
@@ -58,7 +57,7 @@ index 0000000..1b04deb
 +
 +#define APBC_RTC	0x28
 +#define APBC_TWSI0	0x2c
-+#define APBC_KPC	0x30
++#define APBC_KPC	0x18
 +#define APBC_UART0	0x0
 +#define APBC_UART1	0x4
 +#define APBC_GPIO	0x8
@@ -66,13 +65,11 @@ index 0000000..1b04deb
 +#define APBC_PWM1	0x10
 +#define APBC_PWM2	0x14
 +#define APBC_PWM3	0x18
-+#define APBC_SSP0	0x81c
-+#define APBC_SSP1	0x820
-+#define APBC_SSP2	0x84c
-+#define APBC_SSP3	0x858
-+#define APBC_SSP4	0x85c
-+#define APBC_TWSI1	0x6c
-+#define APBC_UART2	0x70
++#define APBC_SSP0	0x1c
++#define APBC_SSP1	0x20
++#define APBC_SSP2	0x4c
++#define APBCP_TWSI1	0x28
++#define APBCP_UART2	0x1c
 +#define APMU_SDH0	0x54
 +#define APMU_SDH1	0x58
 +#define APMU_USB	0x5c
@@ -88,9 +85,8 @@ index 0000000..1b04deb
 +	pll1_24, pll1_48, pll1_96, pll1_13, pll1_13_1_5, pll1_2_1_5,
 +	pll1_3_16, uart_pll, twsi0, twsi1, gpio, kpc, rtc, pwm0, pwm1, pwm2,
 +	pwm3, uart0_mux, uart0, uart1_mux, uart1, uart2_mux, uart2,
-+	ssp0_mux, ssp0, ssp1_mux, ssp1, ssp2_mux, ssp2, ssp3_mux, ssp3,
-+	ssp4_mux, ssp4, dfc, sdh0_mux, sdh0, sdh1_mux, sdh1, usb, sph,
-+	disp0_mux, disp0, disp0_hclk, ccic0_mux, ccic0, ccic0_phy_mux,
++	ssp0_mux, ssp0, ssp1_mux, ssp1, dfc, sdh0_mux, sdh0, sdh1_mux, sdh1,
++	usb, sph, disp0_mux, disp0, ccic0_mux, ccic0, ccic0_phy_mux,
 +	ccic0_phy, ccic0_sphy_div, ccic0_sphy, clk_max
 +};
 +
@@ -108,17 +104,18 @@ index 0000000..1b04deb
 +
 +static const char *uart_parent[] = {"pll1_3_16", "uart_pll"};
 +static const char *ssp_parent[] =
-+	{"pll1_96", "pll1_48", "pll1_24", "pll1_12" };
++	{"pll1_96", "pll1_48", "pll1_24", "pll1_12"};
 +static const char *sdh_parent[] = {"pll1_12", "pll1_13"};
 +static const char *disp_parent[] = {"pll1_2", "pll1_12"};
 +static const char *ccic_parent[] = {"pll1_2", "pll1_12"};
 +static const char *ccic_phy_parent[] = {"pll1_6", "pll1_12"};
 +
-+void __init pxa168_clk_init(void)
++void __init pxa910_clk_init(void)
 +{
 +	struct clk *clocks[clk_max];
 +	void __iomem *mpmu_base;
 +	void __iomem *apmu_base;
++	void __iomem *apbcp_base;
 +	void __iomem *apbc_base;
 +
 +	mpmu_base = ioremap(APB_PHYS_BASE + 0x50000, SZ_4K);
@@ -130,6 +127,12 @@ index 0000000..1b04deb
 +	apmu_base = ioremap(AXI_PHYS_BASE + 0x82800, SZ_4K);
 +	if (apmu_base == NULL) {
 +		pr_err("error to ioremap APMU base\n");
++		return;
++	}
++
++	apbcp_base = ioremap(APB_PHYS_BASE + 0x3b000, SZ_4K);
++	if (apbcp_base == NULL) {
++		pr_err("error to ioremap APBC extension base\n");
 +		return;
 +	}
 +
@@ -232,7 +235,7 @@ index 0000000..1b04deb
 +
 +	clocks[twsi1] =
 +	    mmp_clk_register_apbc("twsi1", "pll1_13_1_5",
-+				  apbc_base + APBC_TWSI1, 10, 0, &clk_lock);
++				  apbcp_base + APBCP_TWSI1, 10, 0, &clk_lock);
 +	clk_register_clkdev(clocks[twsi1], NULL, "pxa2xx-i2c.1");
 +
 +	clocks[gpio] =
@@ -253,22 +256,22 @@ index 0000000..1b04deb
 +	clocks[pwm0] =
 +	    mmp_clk_register_apbc("pwm0", "pll1_48", apbc_base + APBC_PWM0, 10,
 +				  0, &clk_lock);
-+	clk_register_clkdev(clocks[pwm0], NULL, "pxa168-pwm.0");
++	clk_register_clkdev(clocks[pwm0], NULL, "pxa910-pwm.0");
 +
 +	clocks[pwm1] =
 +	    mmp_clk_register_apbc("pwm1", "pll1_48", apbc_base + APBC_PWM1, 10,
 +				  0, &clk_lock);
-+	clk_register_clkdev(clocks[pwm1], NULL, "pxa168-pwm.1");
++	clk_register_clkdev(clocks[pwm1], NULL, "pxa910-pwm.1");
 +
 +	clocks[pwm2] =
 +	    mmp_clk_register_apbc("pwm2", "pll1_48", apbc_base + APBC_PWM2, 10,
 +				  0, &clk_lock);
-+	clk_register_clkdev(clocks[pwm2], NULL, "pxa168-pwm.2");
++	clk_register_clkdev(clocks[pwm2], NULL, "pxa910-pwm.2");
 +
 +	clocks[pwm3] =
 +	    mmp_clk_register_apbc("pwm3", "pll1_48", apbc_base + APBC_PWM3, 10,
 +				  0, &clk_lock);
-+	clk_register_clkdev(clocks[pwm3], NULL, "pxa168-pwm.3");
++	clk_register_clkdev(clocks[pwm3], NULL, "pxa910-pwm.3");
 +
 +	clocks[uart0_mux] =
 +	    clk_register_mux(NULL, "uart0_mux", uart_parent,
@@ -297,13 +300,13 @@ index 0000000..1b04deb
 +	clocks[uart2_mux] =
 +	    clk_register_mux(NULL, "uart2_mux", uart_parent,
 +			     ARRAY_SIZE(uart_parent), CLK_SET_RATE_PARENT,
-+			     apbc_base + APBC_UART2, 4, 3, 0, &clk_lock);
++			     apbcp_base + APBCP_UART2, 4, 3, 0, &clk_lock);
 +	clk_set_parent(clocks[uart2_mux], clocks[uart_pll]);
 +	clk_register_clkdev(clocks[uart2_mux], "uart_mux.2", NULL);
 +
 +	clocks[uart2] =
-+	    mmp_clk_register_apbc("uart2", "uart2_mux", apbc_base + APBC_UART2,
-+				  10, 0, &clk_lock);
++	    mmp_clk_register_apbc("uart2", "uart2_mux",
++				  apbcp_base + APBCP_UART2, 10, 0, &clk_lock);
 +	clk_register_clkdev(clocks[uart2], NULL, "pxa2xx-uart.2");
 +
 +	clocks[ssp0_mux] =
@@ -327,39 +330,6 @@ index 0000000..1b04deb
 +	    mmp_clk_register_apbc("ssp1", "ssp1_mux", apbc_base + APBC_SSP1, 10,
 +				  0, &clk_lock);
 +	clk_register_clkdev(clocks[ssp1], NULL, "mmp-ssp.1");
-+
-+	clocks[ssp2_mux] =
-+	    clk_register_mux(NULL, "ssp2_mux", ssp_parent,
-+			     ARRAY_SIZE(ssp_parent), CLK_SET_RATE_PARENT,
-+			     apbc_base + APBC_SSP2, 4, 3, 0, &clk_lock);
-+	clk_register_clkdev(clocks[ssp2_mux], "ssp_mux.2", NULL);
-+
-+	clocks[ssp2] =
-+	    mmp_clk_register_apbc("ssp2", "ssp1_mux", apbc_base + APBC_SSP2, 10,
-+				  0, &clk_lock);
-+	clk_register_clkdev(clocks[ssp2], NULL, "mmp-ssp.2");
-+
-+	clocks[ssp3_mux] =
-+	    clk_register_mux(NULL, "ssp3_mux", ssp_parent,
-+			     ARRAY_SIZE(ssp_parent), CLK_SET_RATE_PARENT,
-+			     apbc_base + APBC_SSP3, 4, 3, 0, &clk_lock);
-+	clk_register_clkdev(clocks[ssp3_mux], "ssp_mux.3", NULL);
-+
-+	clocks[ssp3] =
-+	    mmp_clk_register_apbc("ssp3", "ssp1_mux", apbc_base + APBC_SSP3, 10,
-+				  0, &clk_lock);
-+	clk_register_clkdev(clocks[ssp3], NULL, "mmp-ssp.3");
-+
-+	clocks[ssp4_mux] =
-+	    clk_register_mux(NULL, "ssp4_mux", ssp_parent,
-+			     ARRAY_SIZE(ssp_parent), CLK_SET_RATE_PARENT,
-+			     apbc_base + APBC_SSP4, 4, 3, 0, &clk_lock);
-+	clk_register_clkdev(clocks[ssp4_mux], "ssp_mux.4", NULL);
-+
-+	clocks[ssp4] =
-+	    mmp_clk_register_apbc("ssp4", "ssp1_mux", apbc_base + APBC_SSP4, 10,
-+				  0, &clk_lock);
-+	clk_register_clkdev(clocks[ssp4], NULL, "mmp-ssp.4");
 +
 +	clocks[dfc] =
 +	    mmp_clk_register_apmu("dfc", "pll1_4", apmu_base + APMU_DFC, 0x19b,
@@ -407,12 +377,7 @@ index 0000000..1b04deb
 +	clocks[disp0] =
 +	    mmp_clk_register_apmu("disp0", "disp0_mux", apmu_base + APMU_DISP0,
 +				  0x1b, &clk_lock);
-+	clk_register_clkdev(clocks[disp0], "fnclk", "mmp-disp.0");
-+
-+	clocks[disp0_hclk] =
-+	    mmp_clk_register_apmu("disp0_hclk", "disp0_mux",
-+				  apmu_base + APMU_DISP0, 0x24, &clk_lock);
-+	clk_register_clkdev(clocks[disp0_hclk], "hclk", "mmp-disp.0");
++	clk_register_clkdev(clocks[disp0], NULL, "mmp-disp.0");
 +
 +	clocks[ccic0_mux] =
 +	    clk_register_mux(NULL, "ccic0_mux", ccic_parent,
