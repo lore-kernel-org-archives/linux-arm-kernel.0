@@ -1,111 +1,66 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 16 Aug 2012 19:33:36 +0530
-Subject: [PATCHv7 05/24] i2c: omap: simplify omap_i2c_ack_stat()
+Date: Thu, 16 Aug 2012 19:33:53 +0530
+Subject: [PATCHv7 22/24] i2c: omap: switch over to autosuspend API
 In-Reply-To: <1345125835-15524-1-git-send-email-shubhrajyoti@ti.com>
 References: <1345125835-15524-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1345125835-15524-6-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1345125835-15524-23-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-stat & BIT(1) is the same as BIT(1), so let's
-simplify things a bit by removing "stat &" from
-all omap_i2c_ack_stat() calls.
-
-Code snippet (extremely simplified):
-
-if (stat & NACK) {
-        ...
-        omap_i2c_ack_stat(dev, stat & NACK);
-}
-
-if (stat & RDR) {
-        ...
-        omap_i2c_ack_stat(dev, stat & RDR);
-}
-
-and so on. The tricky place is only WRT errata handling, for example:
-
-if (*stat & (NACK | AL)) {
-        omap_i2c_ack_stat(dev, *stat & (XRDY | XDR));
-        ...
-}
-
-but in this case, the errata says we must clear XRDY and XDR if that
-errata triggers, so if they just got enabled or not, it doesn't matter.
-
-Another tricky place is RDR | RRDY (likewise for XDR | XRDY):
-
-if (stat & (RDR | RRDY)) {
-        ...
-        omap_i2c_ack_stat(dev, stat & (RDR | RRDY));
-}
-
-again here there will be no issues because those IRQs never fire
-simultaneously and one will only after after we have handled the
-previous, that's because the same FIFO is used anyway and we won't shift
-data into FIFO until we tell the IP "hey, I'm done with the FIFO, you
-can shift more data"
+this helps us reduce unnecessary pm transitions
+in case we have another i2c message starting soon.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
-Reviewed-by : Santosh Shilimkar <santosh.shilimkar@ti.com>
-[Added the explaination from the discurssion to the commit logs]
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   19 ++++++++++---------
- 1 files changed, 10 insertions(+), 9 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |   12 ++++++++++--
+ 1 files changed, 10 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index dbc5a3c..8009095 100644
+index 2d5db56..d81189a 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -731,7 +731,7 @@ static int errata_omap3_i462(struct omap_i2c_dev *dev, u16 *stat, int *err)
+@@ -55,6 +55,9 @@
+ /* timeout waiting for the controller to respond */
+ #define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
  
- 	while (--timeout && !(*stat & OMAP_I2C_STAT_XUDF)) {
- 		if (*stat & (OMAP_I2C_STAT_NACK | OMAP_I2C_STAT_AL)) {
--			omap_i2c_ack_stat(dev, *stat & (OMAP_I2C_STAT_XRDY |
-+			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_XRDY |
- 							OMAP_I2C_STAT_XDR));
- 			return -ETIMEDOUT;
- 		}
-@@ -792,10 +792,11 @@ complete:
- 		 */
- 		if (stat & (OMAP_I2C_STAT_ARDY | OMAP_I2C_STAT_NACK |
- 					OMAP_I2C_STAT_AL)) {
--			omap_i2c_ack_stat(dev, stat &
--				(OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR |
--				OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR |
--				OMAP_I2C_STAT_ARDY));
-+			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_RRDY |
-+						OMAP_I2C_STAT_RDR |
-+						OMAP_I2C_STAT_XRDY |
-+						OMAP_I2C_STAT_XDR |
-+						OMAP_I2C_STAT_ARDY));
- 			omap_i2c_complete_cmd(dev, err);
- 			return IRQ_HANDLED;
- 		}
-@@ -842,8 +843,8 @@ complete:
- 					}
- 				}
- 			}
--			omap_i2c_ack_stat(dev,
--				stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR));
-+			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_RRDY |
-+						OMAP_I2C_STAT_RDR));
- 			continue;
- 		}
++/* timeout for pm runtime autosuspend */
++#define OMAP_I2C_PM_TIMEOUT		1000	/* ms */
++
+ /* For OMAP3 I2C_IV has changed to I2C_WE (wakeup enable) */
+ enum {
+ 	OMAP_I2C_REV_REG = 0,
+@@ -645,7 +648,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
  
-@@ -890,8 +891,8 @@ complete:
+ 	omap_i2c_wait_for_bb(dev);
+ out:
+-	pm_runtime_put(dev->dev);
++	pm_runtime_mark_last_busy(dev->dev);
++	pm_runtime_put_autosuspend(dev->dev);
+ 	return r;
+ }
  
- 				omap_i2c_write_reg(dev, OMAP_I2C_DATA_REG, w);
- 			}
--			omap_i2c_ack_stat(dev,
--				stat & (OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR));
-+			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_XRDY |
-+						OMAP_I2C_STAT_XDR));
- 			continue;
- 		}
+@@ -1113,6 +1117,9 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		dev->regs = (u8 *)reg_map_ip_v1;
+ 
+ 	pm_runtime_enable(dev->dev);
++	pm_runtime_set_autosuspend_delay(dev->dev, OMAP_I2C_PM_TIMEOUT);
++	pm_runtime_use_autosuspend(dev->dev);
++
+ 	r = pm_runtime_get_sync(dev->dev);
+ 	if (IS_ERR_VALUE(r))
+ 		goto err_free_mem;
+@@ -1190,7 +1197,8 @@ omap_i2c_probe(struct platform_device *pdev)
+ 
+ 	of_i2c_register_devices(adap);
+ 
+-	pm_runtime_put(dev->dev);
++	pm_runtime_mark_last_busy(dev->dev);
++	pm_runtime_put_autosuspend(dev->dev);
+ 
+ 	return 0;
  
 -- 
 1.7.5.4
