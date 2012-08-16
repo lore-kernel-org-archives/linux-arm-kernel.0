@@ -1,126 +1,138 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 16 Aug 2012 15:13:14 +0300
-Subject: [PATCH v2 2/3] mfd: twl6040: Add twl6040-gpio child
-In-Reply-To: <1345119195-7490-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1345119195-7490-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1345119195-7490-3-git-send-email-peter.ujfalusi@ti.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 16 Aug 2012 14:15:13 +0200
+Subject: [PATCH v3 10/10] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <CAErSpo7Y9ADYHwZMjQjDwd7m8jtwgcxsE-NE_K5X_Z+PuV=C4w@mail.gmail.com>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <1343332512-28762-11-git-send-email-thierry.reding@avionic-design.de>
+ <20120814201215.GA10542@avionic-0098.mockup.avionic-design.de>
+ <CAErSpo6Awbx9-DWM3V02HUg7Xv4tWAhcLO7UKuT_0uXbpZ+nKw@mail.gmail.com>
+ <20120815063718.GA15665@avionic-0098.mockup.avionic-design.de>
+ <CAErSpo7Y9ADYHwZMjQjDwd7m8jtwgcxsE-NE_K5X_Z+PuV=C4w@mail.gmail.com>
+Message-ID: <20120816121513.GA10175@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add needed platform data structure and code to be able to load
-the GPO child of twl6040.
-Update the devicetree binding documentation at the same time.
+On Wed, Aug 15, 2012 at 05:18:04AM -0700, Bjorn Helgaas wrote:
+> On Tue, Aug 14, 2012 at 11:37 PM, Thierry Reding
+> <thierry.reding@avionic-design.de> wrote:
+> > On Tue, Aug 14, 2012 at 04:50:26PM -0700, Bjorn Helgaas wrote:
+> >> On Tue, Aug 14, 2012 at 1:12 PM, Thierry Reding
+> >> <thierry.reding@avionic-design.de> wrote:
+> >> > On Thu, Jul 26, 2012 at 09:55:12PM +0200, Thierry Reding wrote:
+> >> >> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> >> >> index a094c97..c886dff 100644
+> >> >> --- a/arch/arm/boot/dts/tegra20.dtsi
+> >> >> +++ b/arch/arm/boot/dts/tegra20.dtsi
+> >> >> @@ -199,6 +199,68 @@
+> >> >>               #size-cells = <0>;
+> >> >>       };
+> >> >>
+> >> >> +     pcie-controller {
+> >> >> +             compatible = "nvidia,tegra20-pcie";
+> >> >> +             reg = <0x80003000 0x00000800   /* PADS registers */
+> >> >> +                    0x80003800 0x00000200   /* AFI registers */
+> >> >> +                    0x81000000 0x01000000   /* configuration space */
+> >> >> +                    0x90000000 0x10000000>; /* extended configuration space */
+> >> >> +             interrupts = <0 98 0x04   /* controller interrupt */
+> >> >> +                           0 99 0x04>; /* MSI interrupt */
+> >> >> +             status = "disabled";
+> >> >> +
+> >> >> +             ranges = <0 0 0  0x80000000 0x00001000   /* root port 0 */
+> >> >> +                       0 1 0  0x81000000 0x00800000   /* port 0 config space */
+> >> >> +                       0 2 0  0x90000000 0x08000000   /* port 0 ext config space */
+> >> >> +                       0 3 0  0x82000000 0x00010000   /* port 0 downstream I/O */
+> >> >> +                       0 4 0  0xa0000000 0x08000000   /* port 0 non-prefetchable memory */
+> >> >> +                       0 5 0  0xb0000000 0x08000000   /* port 0 prefetchable memory */
+> >> >> +
+> >> >> +                       1 0 0  0x80001000 0x00001000   /* root port 1 */
+> >> >> +                       1 1 0  0x81800000 0x00800000   /* port 1 config space */
+> >> >> +                       1 2 0  0x98000000 0x08000000   /* port 1 ext config space */
+> >> >> +                       1 3 0  0x82010000 0x00010000   /* port 1 downstream I/O */
+> >> >> +                       1 4 0  0xa8000000 0x08000000   /* port 1 non-prefetchable memory */
+> >> >> +                       1 5 0  0xb8000000 0x08000000>; /* port 1 prefetchable memory */
+> >> >
+> >> > I've been thinking about this some more. The translations for both the
+> >> > regular and extended configuration spaces are configured in the top-
+> >> > level PCIe controller. It is therefore wrong how they are passed to the
+> >> > PCI host bridges via the ranges property.
+> >> >
+> >> > I remember Mitch saying that it should be passed down to the children
+> >> > because it is partitioned among them, but since the layout is compatible
+> >> > with ECAM, the partitioning isn't as simple as what's in the tree. In
+> >> > fact the partitions will be dependent on the number of devices attached
+> >> > to the host bridges.
+> >>
+> >> I don't understand this last bit about the number of devices attached
+> >> to the host bridges.  Logically, the host bridge has a bus number
+> >> aperture that you can know up front, even before you know anything
+> >> about what devices are below it.  On x86, for example, the ACPI _CRS
+> >> method has something like "[bus 00-7f]" in it, which means that any
+> >> buses in that range are below this bridge.  That doesn't tell us
+> >> anything about which buses actually have devices on them, of course;
+> >> it's just analogous to the secondary and subordinate bus number
+> >> registers in a P2P bridge.
+> >
+> > That's one of the issues I still need to take care of. Currently no bus
+> > resource is attached to the individual bridges (nor the PCI controller
+> > for that matter), so the PCI core will assign them dynamically.
+> 
+> So your PCI controller driver knows how to program the controller bus
+> number aperture?  Sometimes people start by assuming that two host
+> bridges both have [bus 00-ff] apertures, then they enumerate below the
+> first and adjust the bus number apertures based on what they found.
+> For example, if they found buses 00-12 behind the first bridge, they
+> make the apertures [bus 00-12] for the first bridge and [bus 13-ff]
+> for the second.  That might be the case, depending on what firmware
+> set up, but it seems like a dubious way to do it, and of course it
+> precludes a lot of hot-plug scenarios.
+> 
+> > If this
+> > range is known at boot time we could assign ECAM ranges based on the bus
+> > numbers. Standard ECAM ranges, that is. On Tegra this won't work because
+> > as Stephen mentioned in a previous mail, the bus field is not the top
+> > field in the ECAM addresses. Basically what you have is this:
+> >
+> >         [27:24] upper 4 bits of the register address for extended
+> >                 configuration space
+> >         [23:16] bus number
+> >         [15:11] device number
+> >         [10: 8] device function
+> >         [ 8: 0] register
+> >
+> > So the ECAM space cannot be partitioned by bus number.
+> 
+> Ah, OK, so definitely not standard PCIe ECAM.
 
-Signed-off-by: Sergio Aguirre <saaguirre@ti.com>
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- Documentation/devicetree/bindings/mfd/twl6040.txt |    9 ++++++---
- drivers/mfd/twl6040-core.c                        |   15 +++++++++++++++
- include/linux/mfd/twl6040.h                       |    9 ++++++++-
- 3 files changed, 29 insertions(+), 4 deletions(-)
+I had an idea about how we could maybe implement a generic ECAM
+mechanism that provides for this kind of mapping as well. Basically,
+every mechanism that can be covered by such an implementation would in
+one way or another specify the above five fields, so how about designing
+it in a way that the driver could define the fields that encode the
+information, so for Tegra, something along these lines:
 
-diff --git a/Documentation/devicetree/bindings/mfd/twl6040.txt b/Documentation/devicetree/bindings/mfd/twl6040.txt
-index c855240..0f5dd70 100644
---- a/Documentation/devicetree/bindings/mfd/twl6040.txt
-+++ b/Documentation/devicetree/bindings/mfd/twl6040.txt
-@@ -1,7 +1,7 @@
- Texas Instruments TWL6040 family
- 
--The TWL6040s are 8-channel high quality low-power audio codecs providing audio
--and vibra functionality on OMAP4+ platforms.
-+The TWL6040s are 8-channel high quality low-power audio codecs providing audio,
-+vibra and GPO functionality on OMAP4+ platforms.
- They are connected ot the host processor via i2c for commands, McPDM for audio
- data and commands.
- 
-@@ -10,6 +10,8 @@ Required properties:
- - reg: must be 0x4b for i2c address
- - interrupts: twl6040 has one interrupt line connecteded to the main SoC
- - interrupt-parent: The parent interrupt controller
-+- gpio-controller:
-+- #gpio-cells = <1>: twl6040 provides GPO lines.
- - twl6040,audpwron-gpio: Power on GPIO line for the twl6040
- 
- - vio-supply: Regulator for the twl6040 VIO supply
-@@ -37,7 +39,6 @@ Example:
- &i2c1 {
- 	twl6040: twl at 4b {
- 		compatible = "ti,twl6040";
--		reg = <0x4b>;
- 
- 		interrupts = <0 119 4>;
- 		interrupt-parent = <&gic>;
-@@ -60,3 +61,5 @@ Example:
- 		};
- 	};
- };
-+
-+/include/ "twl6040.dtsi"
-diff --git a/drivers/mfd/twl6040-core.c b/drivers/mfd/twl6040-core.c
-index b0fad0f..413df8e 100644
---- a/drivers/mfd/twl6040-core.c
-+++ b/drivers/mfd/twl6040-core.c
-@@ -631,6 +631,21 @@ static int __devinit twl6040_probe(struct i2c_client *client,
- 		children++;
- 	}
- 
-+	/*
-+	 * Enable the GPO driver in the following cases:
-+	 * DT booted kernel or legacy boot with valid gpo platform_data
-+	 */
-+	if (!pdata || (pdata && pdata->gpo)) {
-+		cell = &twl6040->cells[children];
-+		cell->name = "twl6040-gpo";
-+
-+		if (pdata) {
-+			cell->platform_data = pdata->gpo;
-+			cell->pdata_size = sizeof(*pdata->gpo);
-+		}
-+		children++;
-+	}
-+
- 	ret = mfd_add_devices(&client->dev, -1, twl6040->cells, children,
- 			      NULL, 0);
- 	if (ret)
-diff --git a/include/linux/mfd/twl6040.h b/include/linux/mfd/twl6040.h
-index 269b706..8991532 100644
---- a/include/linux/mfd/twl6040.h
-+++ b/include/linux/mfd/twl6040.h
-@@ -158,7 +158,7 @@
- #define TWL6040_VIBROCDET		0x20
- #define TWL6040_TSHUTDET                0x40
- 
--#define TWL6040_CELLS			2
-+#define TWL6040_CELLS			3
- 
- #define TWL6040_REV_ES1_0		0x00
- #define TWL6040_REV_ES1_1		0x01 /* Rev ES1.1 and ES1.2 */
-@@ -176,6 +176,8 @@
- #define TWL6040_SYSCLK_SEL_LPPLL	0
- #define TWL6040_SYSCLK_SEL_HPPLL	1
- 
-+#define TWL6040_GPO_MAX	3
-+
- struct twl6040_codec_data {
- 	u16 hs_left_step;
- 	u16 hs_right_step;
-@@ -192,12 +194,17 @@ struct twl6040_vibra_data {
- 	int vddvibr_uV;			/* VDDVIBR volt, set 0 for fixed reg */
- };
- 
-+struct twl6040_gpo_data {
-+	int gpio_base;
-+};
-+
- struct twl6040_platform_data {
- 	int audpwron_gpio;	/* audio power-on gpio */
- 	unsigned int irq_base;
- 
- 	struct twl6040_codec_data *codec;
- 	struct twl6040_vibra_data *vibra;
-+	struct twl6040_gpo_data *gpo;
- };
- 
- struct regmap;
--- 
-1.7.8.6
+	struct pci_ecam_map pci_ecam_tegra = {
+		.register = {  0,  7 },
+		.extended = { 24, 27 },
+		.function = {  8, 10 },
+		.device   = { 11, 15 },
+		.bus      = { 16, 23 },
+	}
+
+For standard ECAM, something like this:
+
+	struct pci_ecam_map pci_ecam_standard = {
+		.register = {  0,  7 },
+		.extended = {  8, 11 },
+		.function = { 12, 14 },
+		.device   = { 15, 19 },
+		.bus      = { 20, 27 },
+	};
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120816/5b473c13/attachment.sig>
