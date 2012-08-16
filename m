@@ -1,79 +1,85 @@
-From: wade_farnsworth@mentor.com (Wade Farnsworth)
-Date: Thu, 16 Aug 2012 07:33:45 -0700
-Subject: [PATCH v2] ARM: support syscall tracing
-In-Reply-To: <20120816095431.GE31784@mudshark.cambridge.arm.com>
-References: <502BBCCC.1020006@mentor.com>
- <20120815162157.GJ29448@mudshark.cambridge.arm.com>
- <502BD544.70903@mentor.com>
- <20120815172731.GL29448@mudshark.cambridge.arm.com>
- <502BFA08.6010708@mentor.com> <502C04CF.2080409@mentor.com>
- <20120816095431.GE31784@mudshark.cambridge.arm.com>
-Message-ID: <502D04C9.2050501@mentor.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 16 Aug 2012 10:04:14 -0500
+Subject: [RFC RESEND 1/4] arm/dts: OMAP: Add timer nodes
+In-Reply-To: <502B67DD.6050904@ti.com>
+References: <1342218413-30116-1-git-send-email-jon-hunter@ti.com>
+ <1342218413-30116-2-git-send-email-jon-hunter@ti.com>
+ <5000D647.4090200@gmail.com> <500439A8.1050705@ti.com>
+ <500D6CAB.4030504@ti.com> <502B67DD.6050904@ti.com>
+Message-ID: <502D0BEE.3010609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon wrote:
-> On Wed, Aug 15, 2012 at 09:21:35PM +0100, Wade Farnsworth wrote:
->> Wade Farnsworth wrote:
->>> Will Deacon wrote:
->>>> On Wed, Aug 15, 2012 at 05:58:44PM +0100, Wade Farnsworth wrote:
->>>>> We need to set current_thread_info()->syscall, since it's used in the
->>>>> call to syscall_get_nr() in perf_syscall_{enter,exit}.
->>>>
->>>> Damn. I think that also means we have a bug, given that the SYSCALL_TRACE
->>>> code can set this to -1, which gets used as an index into a bitmap by the
->>>> looks of it. Considering that we have to pass the syscall number to
->>>> trace_sys_enter anyway, it also seems broken.
->>>>
->>>
->>> I agree. Looking at the other architectures, it seems the analogous
->>> function to ptrace_syscall_trace can return -1 under certain
->>> circumstances, but the original syscall value should be passed onto
->>> trace_sys_enter and returned from syscall_get_nr(). So, I'm thinking
->>> that we should modify our behavior accordingly. What this means for us
->>> is that we never store -1 in the thread_info syscall field, and then
->>> pass that into trace_sys_enter instead of the ptrace_syscall_trace
->>> return value. Do you see any problems with this approach?
->>>
+Hi Vaibhav,
+
+On 08/15/2012 04:11 AM, Vaibhav Hiremath wrote:
+> 
+> 
+> On 7/23/2012 8:54 PM, Jon Hunter wrote:
+>> Hi Rob,
 >>
->> Hmm, on closer inspection it looks that perf_syscall_enter is broken.
->> ftrace_syscall_enter correctly returns if result of a syscall_get_nr is
->> negative.  The perf version omits the check for negative values.
->
-> Yes, that's what I was getting at with the -1 bitmap index. Something like
-> this should fix it though:
->
->
-> diff --git a/kernel/trace/trace_syscalls.c b/kernel/trace/trace_syscalls.c
-> index 96fc733..bbff120 100644
-> --- a/kernel/trace/trace_syscalls.c
-> +++ b/kernel/trace/trace_syscalls.c
-> @@ -506,13 +506,13 @@ static void perf_syscall_enter(void *ignore, struct pt_regs *regs, long id)
->          int size;
->
->          syscall_nr = syscall_get_nr(current, regs);
-> -       if (!test_bit(syscall_nr, enabled_perf_enter_syscalls))
-> -               return;
-> -
->          sys_data = syscall_nr_to_meta(syscall_nr);
->          if (!sys_data)
->                  return;
->
-> +       if (!test_bit(syscall_nr, enabled_perf_enter_syscalls))
-> +               return;
-> +
->          /* get the size after alignment with the u32 buffer size field */
->          size = sizeof(unsigned long) * sys_data->nb_args + sizeof(*rec);
->          size = ALIGN(size + sizeof(u32), sizeof(u64));
->
->
-> If you're happy with that, I can post to LKML and see what people say.
->
-> Will
+>> On 07/16/2012 10:56 AM, Jon Hunter wrote:
+>>> Hi Rob,
+>>>
+>>> On 07/13/2012 09:15 PM, Rob Herring wrote:
+>>>> On 07/13/2012 05:26 PM, Jon Hunter wrote:
+>>>>> Add the 12 GP timers nodes present in OMAP3.
+>>>>> Add the 11 GP timers nodes present in OMAP4.
+>>>>>
+>>>>> Add documentation for timer properties specific to OMAP.
+>>>>>
+>>>>> For each timer an alias is being added. The purpose for doing this is because
+>>>>> the OMAP dmtimer driver uses an ID to distinguish between the different timer
+>>>>> instances. For example, a timer can be requested by its ID. By adding an alias
+>>>>> for each timer we can then use the function of_alias_get_id() to extract the
+>>>>> ID for each timer from the alias name. The same method is used for the TTY
+>>>>> serial devices. If it is preferred that such an alias is not added and there
+>>>>> is a better way to pass an ID from device-tree let me know.
+>>>>
+>>>> I'm not sure this is really a good use of aliases. UARTs use aliases
+>>>> because it is important that the UART number to tty number is known and
+>>>> fixed. IIUC, as an example you are picking timer1 because it has
+>>>> properties X, Y and Z. If so, then you should describe those h/w
+>>>> properties within the timer nodes so you can pick which timer to use
+>>>> based on it's h/w properties.
+>>>
+>>> Thanks for the feedback. What you suggest could definitely work for most
+>>> timers. The only item that I would need to resolve here is the handling
+>>> of system timers (ie. those used for clockevents and clocksource). These
+>>> system timers (for OMAP) are reserved during early boot based upon the
+>>> timer ID today and so this is before the actual main timer driver has
+>>> been probed and all the attributes of the timers has been read for
+>>> device-tree.
+>>>
+>>> One thought would be to move the reservation of the system timers out of
+>>> the kernel and into device-tree itself. Then we query device tree on
+>>> start-up to see which we should use. I am wondering if this could be a
+>>> better use of alias? For example, say I want to use timer1 as my
+>>> clockevent timer and so I could have an alias of ...
+>>>
+>>> alias {
+>>> 	clockevent_timer = &timer1;
+>>> }
+>>>
+>>> However, I am not sure if this is even correct, because there does not
+>>> appear to be an API to search the aliases by name and return the
+>>> phandle, just of_alias_get_id(). Alternatively, I could add another
+>>> property called "ti,timer-clockevent" that is populated for the timer
+>>> used as the clockevent timer.
+>>
+>> Do you have any inputs on the above? Does it make sense to reserve timer
+>> resources for kernel system timers in device-tree?
+>>
+> 
+> Hey Jon,
+> 
+> Did we get conclude on this? I haven't got anything further on this
+> thread, this may block baseport support for the new devices in omap2
+> family, like AM33xx and OMAP5.
 
-I think you have to make a corresponding change in perf_syscall_exit, 
-but yes, this looks right to me.
+Sorry I have been out of the office. However, no update on this so far.
+I need to check with Tony if he has any preference for handling this. I
+will follow-up with him and keep you posted.
 
-Thanks,
-
-Wade
+Cheers
+Jon
