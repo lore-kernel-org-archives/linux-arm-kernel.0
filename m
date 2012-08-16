@@ -1,53 +1,46 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 16 Aug 2012 16:41:02 +0300
-Subject: [PATCH v3 3/9] ARM: OMAP: board-am3517evm: Configure McBSP1 CLKR/FSR
- signal source
+Date: Thu, 16 Aug 2012 16:41:05 +0300
+Subject: [PATCH v3 6/9] ASoC: omap-mcbsp: Remove unused defines
 In-Reply-To: <1345124468-8876-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1345124468-8876-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1345124468-8876-4-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1345124468-8876-7-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-am3517evm board uses McBSP1 for audio with 4pin configuration.
-The CLKR/FSR signals need to be connected to CLKX/FSX pin of the SoC in
-this case.
+NUM_LINKS is no longer in use by the code.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 Acked-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
 ---
- arch/arm/mach-omap2/board-am3517evm.c |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+ sound/soc/omap/omap-mcbsp.h |   16 ----------------
+ 1 files changed, 0 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
-index 18f6010..592812a 100644
---- a/arch/arm/mach-omap2/board-am3517evm.c
-+++ b/arch/arm/mach-omap2/board-am3517evm.c
-@@ -264,6 +264,16 @@ static __init void am3517_evm_musb_init(void)
- 	usb_musb_init(&musb_board_data);
- }
+diff --git a/sound/soc/omap/omap-mcbsp.h b/sound/soc/omap/omap-mcbsp.h
+index baebcee..ba8386a 100644
+--- a/sound/soc/omap/omap-mcbsp.h
++++ b/sound/soc/omap/omap-mcbsp.h
+@@ -39,22 +39,6 @@ enum omap_mcbsp_div {
+ 	OMAP_MCBSP_CLKGDV,		/* Sample rate generator divider */
+ };
  
-+static __init void am3517_evm_mcbsp1_init(void)
-+{
-+	u32 devconf0;
-+
-+	/* McBSP1 CLKR/FSR signal to be connected to CLKX/FSX pin */
-+	devconf0 = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0);
-+	devconf0 |=  OMAP2_MCBSP1_CLKR_MASK | OMAP2_MCBSP1_FSR_MASK;
-+	omap_ctrl_writel(devconf0, OMAP2_CONTROL_DEVCONF0);
-+}
-+
- static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
- 	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
- #if defined(CONFIG_PANEL_SHARP_LQ043T1DG01) || \
-@@ -373,6 +383,9 @@ static void __init am3517_evm_init(void)
- 	/* MUSB */
- 	am3517_evm_musb_init();
+-#if defined(CONFIG_SOC_OMAP2420)
+-#define NUM_LINKS	2
+-#endif
+-#if defined(CONFIG_ARCH_OMAP15XX) || defined(CONFIG_ARCH_OMAP16XX)
+-#undef  NUM_LINKS
+-#define NUM_LINKS	3
+-#endif
+-#if defined(CONFIG_ARCH_OMAP4)
+-#undef  NUM_LINKS
+-#define NUM_LINKS	4
+-#endif
+-#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_OMAP2430)
+-#undef  NUM_LINKS
+-#define NUM_LINKS	5
+-#endif
+-
+ int omap_mcbsp_st_add_controls(struct snd_soc_pcm_runtime *rtd);
  
-+	/* McBSP1 */
-+	am3517_evm_mcbsp1_init();
-+
- 	/* MMC init function */
- 	omap_hsmmc_init(mmc);
- }
+ #endif
 -- 
 1.7.8.6
