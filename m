@@ -1,83 +1,56 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 17 Aug 2012 14:51:21 +0800
-Subject: [PATCH] ARM: tegra: clocks: separate tegra_clk_32k_ops from Tegra20
- and Tegra30
-Message-ID: <1345186281-3859-1-git-send-email-josephl@nvidia.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 17 Aug 2012 08:53:01 +0200
+Subject: [PATCH 13/14] arm: at91: dt: at91sam9 add nand pinctrl support
+In-Reply-To: <20120816173844.GC7439@game.jcrosoft.org>
+References: <20120810124820.GA20557@game.jcrosoft.org>
+ <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
+ <1344603731-32667-13-git-send-email-plagnioj@jcrosoft.com>
+ <CACRpkdZXjFE7UsRneskNqnN7DFERHxgAt-FCXtL2A52xKgEA=w@mail.gmail.com>
+ <CACQ1gAhWdwrXEkicy4ij=rukzS-v98bZRr433Qq5M_Dan5JAog@mail.gmail.com>
+ <20120816173844.GC7439@game.jcrosoft.org>
+Message-ID: <CACQ1gAgqXOJiiocOEMBZiaBchXDhvxqfA7RkiEvCCsv000LQNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the tegra20 and tegra30 share the same symbol for
-tegra_clk_32k_ops. This will cause a compile error when building
-a tegra20-only kernel image. Add tegra_clk_32k_ops for tegra20 and
-modify tegra30_clk_32k_ops for tegra30.
+2012/8/16 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+>> Maybe it will be more readable if we use something like :
+>> atmel,pull-up;
+>> atmel,multidrive;
+>> atmel,mux="GPIO"
+>> atmel,mux="A"
+>> ...
+>> just my 2 cents...
+> no too much data and too much node as you will need a node per pin which we
+> tyr to avoid
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- arch/arm/mach-tegra/tegra20_clocks.c      |   10 ++++++++++
- arch/arm/mach-tegra/tegra30_clocks.c      |    2 +-
- arch/arm/mach-tegra/tegra30_clocks.h      |    2 +-
- arch/arm/mach-tegra/tegra30_clocks_data.c |    2 +-
- 4 files changed, 13 insertions(+), 3 deletions(-)
+One one hand we've got a DTS quite concise but unreadable, and on the
+other hand, something understandable but huge.
+( and it's not specific to your patch Jean-Christophe, on imx6q.dtsi,
+it looks worse )
+I'm just trying to make sure that having a DTS like that :
+nand {
+	pinctrl_nand: nand-0 {
+		atmel,pins =
+			<2 13 0x0 0x1   /* PC13 gpio RDY pin pull_up */
+			2 14 0x0 0x1>; /* PC14 gpio enable pin pull_up */
+	};
+};
+is better than :
+nand {
+	pinctrl_nand: nand-0 {
+		nand_rdy { atmel,bank = "C"; atmel,pin = <13>; atmel,mux = "GPIO";
+atmel,pull-up; };
+		nand_ena { atmel,bank = "C"; atmel,pin = <14>; atmel,mux = "GPIO";
+atmel,pull-up; };
+	};
+};
+It's what you did in 1st place on linux-at91 git, and I kinda liked it.
+But yeah, it's more verbose, and some lines will go beyond 80 columns,
+but that's already the case.
 
-diff --git a/arch/arm/mach-tegra/tegra20_clocks.c b/arch/arm/mach-tegra/tegra20_clocks.c
-index b073396..ee6922b 100644
---- a/arch/arm/mach-tegra/tegra20_clocks.c
-+++ b/arch/arm/mach-tegra/tegra20_clocks.c
-@@ -240,6 +240,16 @@ static int clk_div16_get_divider(unsigned long parent_rate, unsigned long rate)
- 	return divider_u16 - 1;
- }
- 
-+static unsigned long tegra_clk_fixed_recalc_rate(struct clk_hw *hw,
-+		unsigned long parent_rate)
-+{
-+	return to_clk_tegra(hw)->fixed_rate;
-+}
-+
-+struct clk_ops tegra_clk_32k_ops = {
-+	.recalc_rate = tegra_clk_fixed_recalc_rate,
-+};
-+
- /* clk_m functions */
- static unsigned long tegra20_clk_m_recalc_rate(struct clk_hw *hw,
- 			unsigned long prate)
-diff --git a/arch/arm/mach-tegra/tegra30_clocks.c b/arch/arm/mach-tegra/tegra30_clocks.c
-index b2d0864..7dad44d 100644
---- a/arch/arm/mach-tegra/tegra30_clocks.c
-+++ b/arch/arm/mach-tegra/tegra30_clocks.c
-@@ -489,7 +489,7 @@ static unsigned long tegra30_clk_fixed_recalc_rate(struct clk_hw *hw,
- 	return to_clk_tegra(hw)->fixed_rate;
- }
- 
--struct clk_ops tegra_clk_32k_ops = {
-+struct clk_ops tegra30_clk_32k_ops = {
- 	.recalc_rate = tegra30_clk_fixed_recalc_rate,
- };
- 
-diff --git a/arch/arm/mach-tegra/tegra30_clocks.h b/arch/arm/mach-tegra/tegra30_clocks.h
-index aeb4e96..b08b8d9 100644
---- a/arch/arm/mach-tegra/tegra30_clocks.h
-+++ b/arch/arm/mach-tegra/tegra30_clocks.h
-@@ -17,7 +17,7 @@
- #ifndef __MACH_TEGRA30_CLOCK_H
- #define __MACH_TEGRA30_CLOCK_H
- 
--extern struct clk_ops tegra_clk_32k_ops;
-+extern struct clk_ops tegra30_clk_32k_ops;
- extern struct clk_ops tegra30_clk_m_ops;
- extern struct clk_ops tegra_clk_m_div_ops;
- extern struct clk_ops tegra_pll_ref_ops;
-diff --git a/arch/arm/mach-tegra/tegra30_clocks_data.c b/arch/arm/mach-tegra/tegra30_clocks_data.c
-index dad1b2f..2271ac1 100644
---- a/arch/arm/mach-tegra/tegra30_clocks_data.c
-+++ b/arch/arm/mach-tegra/tegra30_clocks_data.c
-@@ -58,7 +58,7 @@ static struct clk_tegra tegra_clk_32k_hw = {
- static struct clk tegra_clk_32k = {
- 	.name = "clk_32k",
- 	.hw = &tegra_clk_32k_hw.hw,
--	.ops = &tegra_clk_32k_ops,
-+	.ops = &tegra30_clk_32k_ops,
- 	.flags = CLK_IS_ROOT,
- };
- 
+Best regards,
+
+Richard.
+
 -- 
-1.7.0.4
+for me, ck means con kolivas and not calvin klein... does it mean I'm a geek ?
