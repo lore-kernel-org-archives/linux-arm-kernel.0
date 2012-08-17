@@ -1,22 +1,50 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 17 Aug 2012 06:10:24 -0700
-Subject: [PATCH v3 0/9] ARM/ASoC: OMAP McBSP device tree support
-In-Reply-To: <20120817101838.GB30548@opensource.wolfsonmicro.com>
-References: <1345124468-8876-1-git-send-email-peter.ujfalusi@ti.com>
- <20120817101838.GB30548@opensource.wolfsonmicro.com>
-Message-ID: <20120817131023.GE11011@atomide.com>
+Date: Fri, 17 Aug 2012 06:13:59 -0700
+Subject: [PATCH v2 02/31] arm64: Kernel booting and initialisation
+In-Reply-To: <CAMQu2gzz0j+SnxCY0u3H__H4U-Lor_xV-eyiMBSohCMngbkD2w@mail.gmail.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-3-git-send-email-catalin.marinas@arm.com>
+ <502E11B6.4020104@ti.com> <20120817100533.GE24389@arm.com>
+ <CAMQu2gzz0j+SnxCY0u3H__H4U-Lor_xV-eyiMBSohCMngbkD2w@mail.gmail.com>
+Message-ID: <20120817131358.GF11011@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown <broonie@opensource.wolfsonmicro.com> [120817 03:18]:
-> On Thu, Aug 16, 2012 at 04:40:59PM +0300, Peter Ujfalusi wrote:
-> 
-> > in order to be able to add DT support for the McBSP driver which is used on all
-> > OMAP platforms (OMAP1/2/3/4/5) I needed to make some cleanups to the stack:
-> 
-> Tony, are you OK with these changes going via ASoC?
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [120817 03:11]:
+> On Fri, Aug 17, 2012 at 3:35 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> >
+> > On Fri, Aug 17, 2012 at 10:41:10AM +0100, Santosh Shilimkar wrote:
+> > >
+> > > So you expect all the secondary CPUs to be in wakeup state and probably
+> > > looping in WFE for a signal from kernel to boot. There is one issue
+> > > with this requirement though. For large CPU system, you need to reset
+> > > all the CPUs and hit this waiting loop. This will lead to large inrush
+> > > current need at bootup which may be not be supported. To avoid this
+> > > issue, secondary CPUs are kept in OFF state and then they are woken
+> > > up from kernel one by one whenever they need to be brought into the
+> > > system. This requirement should be considered.
+> >
+> > I agree, this part will be extended. That's one method that we currently
+> > support and suitable to the model.
+> >
+> > The better method is the SMC standardisation that Charles Garcia-Tobin
+> > has written (to be made available soon) and was presented at the last
+> > Linaro Connect in HK. Given that the CPU power is usually controlled by
+> > the secure side, we'll ask for an SMC to be issued for waking up
+> > secondary CPUs, so it's up to the secure firmware to write the correct
+> > hardware registers.
+> >
+> Thanks for the information. SMC standardization would indeed help
+> to overcome some of these. Will wait for that information before
+> next set of questions.
 
-Yes, had one 2420 related question about the FIFO, other than that
-I've acked the omap related patches.
+Yes please. If the SMC is not standardized for most calls at least,
+we'll end up with a horrible mess of SoC specific calls like we
+currently have. Related to that, the virtualization calls should be
+also standardized so we don't end up with multiple different hypervisors
+with different calls.
+
+Regards,
 
 Tony
