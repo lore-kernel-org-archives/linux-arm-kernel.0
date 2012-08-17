@@ -1,85 +1,153 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 17 Aug 2012 11:47:23 +0200
-Subject: [PATCH] BUG: clk_find() misses some clocks
-Message-ID: <1345196843-23059-1-git-send-email-richard.genoud@gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 17 Aug 2012 09:51:00 +0000
+Subject: [PATCH-V3] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data
+In-Reply-To: <20120817084047.GN11011@atomide.com>
+References: <1343214422-28718-1-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1207251438210.23542@utopia.booyaka.com>
+ <alpine.DEB.2.00.1207261359500.14468@utopia.booyaka.com>
+ <20120814082911.GG11011@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA8F4CD@DBDE01.ent.ti.com>
+ <20120817074934.GL11011@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA92062@DBDE01.ent.ti.com>
+ <20120817084047.GN11011@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EA9220D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-if a clock is declared like that:
-CLKDEV_CON_DEV_ID("pioA", "fffff400.gpio", &pioAB_clk)
-(so, dev_id AND con_id are defined)
-and the driver looks for a dev_id (but no specific con_id) like that:
-clock = clk_get(&pdev->dev, NULL);
+On Fri, Aug 17, 2012 at 14:10:47, Tony Lindgren wrote:
+> * Hiremath, Vaibhav <hvaibhav@ti.com> [120817 01:22]:
+> > On Fri, Aug 17, 2012 at 13:19:34, Tony Lindgren wrote:
+> > > * Hiremath, Vaibhav <hvaibhav@ti.com> [120815 02:11]:
+> > > > 
+> > > > Somehow we have to have some mechanism to initialize " _mpu_rt_va" before 
+> > > > core_init call, which will take DT resources and initialize accordingly.
+> > > 
+> > > That's for the device reset/idle? We should not do that in hwmod code
+> > > except in late_initcall for unclaimed devices as discussed earlier. We
+> > > discussed setting up the reset function in the device specific headers
+> > > so both device and hwmod code can call them as needed.
+> > 
+> > May be I didn't understand your above statement, can you please elaborate 
+> > more on "device specific header file"?
+> 
+> We should have the device drivers idle and reset the devices. But also
+> hwmod may need to do that for the unclaimed devices for PM to work. 
+> As the driver may not be even compiled in, the driver specific reset and
+> idle functions should be static inline functions in the device specific
+> header file so hwmod code can still call those.
+>  
 
-The clock won't be found:
+How about mapping the address of the devices?
 
-if (dev_id)
-	best_possible += 2; /* dev_id != NULL */
-if (con_id)
-	best_possible += 1; /* con_id == NULL */
-/* => so best possible == 2 */
+Some more thoughts on the similar line on unclaimed devices -
+As par of late_initcall(), traverse all the DTB nodes and for each node with 
+"state = disabled", we can do something like,
 
-list_for_each_entry(p, &clocks, node) {
-	match = 0;
-/*
- * checking p->dev_id = "fffff400.gpio" and p->con_id = "pioA"
- * against dev_id = "fffff400.gpio" and con_id = NULL
- */
-	if (p->dev_id) { /* ok, p->dev_id exists */
-	 /* and, we are lucky, there's a match ! \o/ */
-		if (!dev_id || strcmp(p->dev_id, dev_id))
-			continue;
-		match += 2;
+Late_initcall()
+	-> Traverse DTB nodes and check for "state = disabled"
+		-> Read the "ti,hwmod" entry and get offsets like, sys_config 
+		   and reset.
+		-> Map the base address
+		-> Enable the module/clock
+		-> Reset the device
+		-> Write to sysc register offset
+		-> Disable the module/clock
+
+
+
+> > Just to highlight, its not only during late_initcall, the _enable and _idle 
+> > functions are getting executed as part of every runtime_pm_get\put_sync from 
+> > the driver.
+> 
+> Right, so no need to initialize those until at driver probe time.
+>  
+
+Agreed.
+
+> > Are you saying as part of late_initcall, we should initialize " _mpu_rt_va" 
+> > of "struct omap_hwmod"???
+> 
+> I guess either at driver probe for the claimed devices, or at late_initcall
+> for the unclaimeded devices.
+> 
+> > Also, as far unclaimed resources is concerned, somewhere you should have 
+> > base addr of the device maintained, right? Currently, hwmod is maintaining 
+> > this data and the execution goes something like,
+> > 
+> > Core_initcall()
+> > 	-> _setup()
+> > 		-> _setup_reset()
+> > 		-> _idle()
+> 
+> For the DT only case also the unclaimed devices can from DT with
+> status = "disabled". 
+>  
+> > Another biggest worry is, if I play here, it may break existing omap3/4 
+> > Functionality, especially may impact from PM perspective. So I believe, we 
+> > need to have something which adds/cleans-up things in stages.
+> 
+> It seems that we need three stages: Something early for the timers only,
+> initialize most things during driver probe, then late_initcall for the
+> unclaimed devices.
+> 
+
+Most likely yes, or it may even get into more stages.
+
+At the current stage, I really think it would be really nice and beneficial 
+for driver developers from the community if they get Linux Boot from 
+linux-next/master branch. I have seen lot of community folks are struggling 
+with it and they are blocked because we do not have booting kernel on 
+BeagleBone.
+They always end up patching kernel with HWMOD patch and submit the driver 
+patches. So request to consider this cleanup as sequential patch on top of 
+original HWMOD patch?
+
+
+> > May be get rid of resource overwriting for AM33xx and OMAP5 alone as of 
+> > now??
+> 
+> Sorry I don't follow this part, care to explain a little more?
+> 
+
+As per current implementation, we are using HWMOD information to fill the 
+platform_device->resources. Even if you pass "reg" and "interrupt" property 
+from DT, omap_device layer overwrites it with HWMOD data information.
+
+So what I am trying to propose here is, avoid this overwrite and resources 
+(address and interrupt) should strictly gets used from DT blob. Since AM33xx 
+and OMAP5 devices are the new devices and supports DT boot only, we can 
+implement it easily for them.
+
+Only issue her is, DMA resources, I was going through some of the old email 
+archives today, submitted by Benoit and later Jon, but I am still not sure 
+how to pass dma_channel to driver as a resource.
+
+Below logic works for me, I have tested it on both BeagleBone and AM37xEVM -
+
+omap_device_alloc ()
+{
+	...
+
+	res_count = omap_device_count_resources(od);
+	if (res_count > pdev->num_resources) {
+		res = kzalloc(sizeof(struct resource) * res_count, GFP_KERNEL);
+	      if (!res)
+      		goto oda_exit3;
+
+		if (pdev->num_resources && pdev->resource) {
+			omap_device_fill_dma_resources(od, res);
+			memcpy(&res[pdev->num_resources], pdev->resource,
+				sizeof(struct resource) * pdev->num_resources);
+			} else {
+				omap_device_fill_resources(od, res);
+			}
+	
+		ret = platform_device_add_resources(pdev, res, res_count);
+		kfree(res);
 	}
-/* so we have match == 2 */
 
-	if (p->con_id) {
-		/* p->con_id is not null */
-		if (!con_id || strcmp(p->con_id, con_id))
-		/*
-		 * too bad !! con_id is null !
-		 * even if we have best_possible == match
-		 * our clock won't be selected
-		 */
-			continue;
-		match += 1;
-	}
-
-	if (match > best_found) {
-		cl = p;
-		if (match != best_possible)
-			best_found = match;
-		else
-			break;
-	}
+	...
 }
 
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
----
- drivers/clk/clkdev.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index d423c9b..e28b120 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -114,13 +114,13 @@ static struct clk_lookup *clk_find(const char *dev_id, const char *con_id)
- 
- 	list_for_each_entry(p, &clocks, node) {
- 		match = 0;
--		if (p->dev_id) {
--			if (!dev_id || strcmp(p->dev_id, dev_id))
-+		if (p->dev_id && dev_id) {
-+			if (strcmp(p->dev_id, dev_id))
- 				continue;
- 			match += 2;
- 		}
--		if (p->con_id) {
--			if (!con_id || strcmp(p->con_id, con_id))
-+		if (p->con_id && con_id) {
-+			if (strcmp(p->con_id, con_id))
- 				continue;
- 			match += 1;
- 		}
--- 
-1.7.2.5
+Thanks,
+Vaibhav
