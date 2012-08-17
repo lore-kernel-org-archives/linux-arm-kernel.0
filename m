@@ -1,65 +1,43 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 17 Aug 2012 09:08:51 -0500
-Subject: [PATCH 4/9] ARM: pmu: remove arm_pmu_type enumeration
-In-Reply-To: <1344620195-22372-5-git-send-email-will.deacon@arm.com>
-References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
- <1344620195-22372-5-git-send-email-will.deacon@arm.com>
-Message-ID: <502E5073.6000901@ti.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 17 Aug 2012 16:35:16 +0200
+Subject: [PATCH 0/8] UBI: add max_beb_per1024 parameter / ioctl
+Message-ID: <1345214124-5478-1-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will, Tony,
+Artem,
+This patch serie introduce, step by step the kernel module parameter
+max_beb_per1024, then the ioctl and finally drop the kernel config option
+CONFIG_MTD_UBI_BEB_LIMIT.
 
-On 08/10/2012 12:36 PM, Will Deacon wrote:
-> From: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
-> 
-> The arm_pmu_type enumeration was initially introduced to identify
-> different PMU types in the system, the usual one being that on the CPU
-> (ARM_PMU_DEVICE_CPU). With the removal of the PMU reservation code and
-> the introduction of devicetree bindings for the CPU PMU, the enumeration
-> is no longer required.
-> 
-> This patch removes the enumeration and updates the various CPU PMU
-> platform devices so that they no longer pass an .id field referring
-> to identify the PMU type.
+It's based on top of linux-ubi/master (and I added your patch on
+sam9_l9260_defconfig).
+BTW, I let the BEB value at 30 in sam9_l9260_defconfig, you can set it at 25 if
+you want (as it's the value from the datasheet).
 
-[snip]
+Best Regards
 
-> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-> index c00c689..02b9478 100644
-> --- a/arch/arm/mach-omap2/devices.c
-> +++ b/arch/arm/mach-omap2/devices.c
-> @@ -23,7 +23,6 @@
->  #include <mach/irqs.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/map.h>
-> -#include <asm/pmu.h>
->  
->  #include "iomap.h"
->  #include <plat/board.h>
-> @@ -448,7 +447,7 @@ static struct resource omap3_pmu_resource = {
->  
->  static struct platform_device omap_pmu_device = {
->  	.name		= "arm-pmu",
-> -	.id		= ARM_PMU_DEVICE_CPU,
-> +	.id		= -1,
->  	.num_resources	= 1,
->  };
+Richard.
 
-I know that I have already ack-ed the change and it is fine with me,
-however, I see a potential merge conflict here with my patch [1]
-(assuming that these all go into v3.7) where I am moving the above
-structure.
+Artem Bityutskiy (1):
+  arm: sam9_l9260_defconfig: adjust UBI bad eraseblocks limit
 
-For testing I have rebased my series on top of this series and it is
-working well so far on OMAP4460.
+Richard Genoud (7):
+  UBI: separate bad_peb_limit in a function
+  UBI: introduce MTD_PARAM_MAX_COUNT
+  UBI: prepare for max_beb_per1024 module parameter addition
+  UBI: check max_beb_per1024 value in ubi_attach_mtd_dev
+  UBI: replace MTD_UBI_BEB_LIMIT with module parameter
+  UBI: add ioctl for max_beb_per1024
+  UBI: drop CONFIG_MTD_UBI_BEB_LIMIT
 
-I am hoping to get the next version of my series for omap out next week.
-However, before I did I wanted to ask how we should handle the above
-change. Should I submit my series as rebased on top of this?
+ arch/arm/configs/sam9_l9260_defconfig |    1 -
+ drivers/mtd/ubi/Kconfig               |   26 -------
+ drivers/mtd/ubi/build.c               |  116 +++++++++++++++++++++-----------
+ drivers/mtd/ubi/cdev.c                |    3 +-
+ drivers/mtd/ubi/ubi.h                 |    6 ++-
+ include/mtd/ubi-user.h                |   19 +++++-
+ 6 files changed, 101 insertions(+), 70 deletions(-)
 
-Thanks
-Jon
-
-[1]
-https://github.com/jonhunter/linux/commit/6a07e3aa21f956bea7858704c224b7f50d25e1c0
+-- 
+1.7.2.5
