@@ -1,29 +1,109 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 17 Aug 2012 18:52:58 +0300
-Subject: [PATCH v2 1/3] mtd: nand: Include IMX6 in the list of supported
- SoCs
-In-Reply-To: <1343215100-24005-1-git-send-email-festevam@gmail.com>
-References: <1343215100-24005-1-git-send-email-festevam@gmail.com>
-Message-ID: <1345218778.1003.13.camel@sauron.fi.intel.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 17 Aug 2012 21:20:01 +0530
+Subject: [PATCH 1/2] ARM: da850/omap-l138: Add SoC related definitions for
+ VPIF
+In-Reply-To: <024a01cd7c8a$541efb20$fc5cf160$%szyprowski@samsung.com>
+References: <1343115786-15801-1-git-send-email-prabhakar.lad@ti.com>
+ <1343115786-15801-2-git-send-email-prabhakar.lad@ti.com>
+ <502A4464.3020706@ti.com>
+ <502CC7CD.80906@ti.com> <502E5C40.803@ti.com>
+ <024a01cd7c8a$541efb20$fc5cf160$%szyprowski@samsung.com>
+Message-ID: <CA+V-a8vcFhkF-dEOtBpx=v8P5DC+4qjsG8xxCeDRxkYTQTSStg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-07-25 at 08:18 -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Include IMX6 in the list of supported SoCs.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com> 
+Hi Marek,
 
-Pushed this one to l2-mtd.git, thanks!
+On Fri, Aug 17, 2012 at 8:39 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello,
+>
+> On Friday, August 17, 2012 4:59 PM Sekhar Nori wrote:
+>
+>> On 8/16/2012 3:43 PM, Prabhakar Lad wrote:
+>> > On Tuesday 14 August 2012 05:58 PM, Sekhar Nori wrote:
+>>
+>> [...]
+>>
+>> >>> +int __init da850_register_vpif_display(struct vpif_display_config
+>> >>> +                                         *display_config)
+>> >>> +{
+>> >>> + struct resource da850_vpif_display_resource[] = {
+>> >>> +         {
+>> >>> +                 .start = IRQ_DA850_VPIFINT,
+>> >>> +                 .end   = IRQ_DA850_VPIFINT,
+>> >>> +                 .flags = IORESOURCE_IRQ,
+>> >>> +         },
+>> >>> +         {},
+>> >>> + };
+>> >>> + unsigned long phys_end_kernel;
+>> >>> + int ret;
+>> >>> +
+>> >>> + if (vpif_disp_cont_bufsize) {
+>> >>> +         phys_end_kernel = virt_to_phys((void *)PAGE_OFFSET) +
+>> >>> +                                 (num_physpages << PAGE_SHIFT);
+>> >>> +         phys_end_kernel += vpif_disp_cont_buf_offset;
+>> >>> +         da850_vpif_display_resource[1].start = phys_end_kernel;
+>> >>> +         da850_vpif_display_resource[1].end = phys_end_kernel +
+>> >>> +                                         vpif_disp_cont_bufsize - 1;
+>> >>> +         da850_vpif_display_resource[1].flags = IORESOURCE_MEM;
+>> >>> +
+>> >>> +         if (!request_mem_region(da850_vpif_display_resource[1].start,
+>> >>> +                         resource_size(&da850_vpif_display_resource[1]),
+>> >>> +                         da850_vpif_display_dev.name)) {
+>> >>> +                 pr_err("region already claimed.\n");
+>> >>> +                 return -EBUSY;
+>> >>> +         }
+>> >>> +         ret = dma_declare_coherent_memory(&da850_vpif_display_dev.dev,
+>> >>> +                         phys_end_kernel, phys_end_kernel,
+>> >>> +                         vpif_disp_cont_bufsize,
+>> >>> +                         DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
+>> >>> +
+>> >>> +         if (!ret)
+>> >>> +                 return -ENOMEM;
+>> >>> + }
+>> >>> + ret = platform_device_add_resources(&da850_vpif_display_dev,
+>> >>> +                         da850_vpif_display_resource,
+>> >>> +                         ARRAY_SIZE(da850_vpif_display_resource));
+>> >>
+>> >> You are taking memory at the end of RAM and passing it as a IO resource
+>> >> to the driver. This is not correct. For contiguous memory needs can you
+>> >> look at the recently merged CMA framework (include/linux/dma-contiguous.h)
+>> >>
+>> > Ok. But looks like CMA is enabled for CPU_V6/V6K/V7. If CMA is enabled
+>> > for ARM926 too than we can use the global CMA itself rather then doing
+>> > it for each device, then three will be no need to do the above and all
+>> > the kernel parameters can be removed too.
+>>
+>> I hadn't followed the CMA development closely so I am not sure of the
+>> reasons behind restricting it to v6+. The patch that added this doesn't
+>> really talk about why it should be restricted to v6+. I am copying Marek
+>> here to see if he can quickly clarify, but may be you can even start a
+>> new thread asking about this.
+>
+> Frankly, this is a leftover from some earlier suggestions that CMA should solve the
+> aliasing of coherent mappings, which might be a problem on v6+. If it works correctly
+> on pre-v6, then this dependency should be removed. Feel free to submit a patch and
+> I will take it to my fixes branch.
+>
 
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120817/cef18020/attachment.sig>
+I have created a patch for enabling CMA on CPU32_v5 [1], and also
+tested it works.
+Soon posting this patch.
+
+[1] http://git.linuxtv.org/mhadli/v4l-dvb-davinci_devices.git/commitdiff/e940a1b9262bde96eec4b18971a6307f24262667?hp=2f30ae4ee373fe4c69ab1606373538dcc99ed283
+
+Thanks and Regards,
+--Prabhakar Lad
+
+> Best regards
+> --
+> Marek Szyprowski
+> Samsung Poland R&D Center
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
