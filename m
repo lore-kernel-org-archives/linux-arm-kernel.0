@@ -1,77 +1,73 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Fri, 17 Aug 2012 20:03:26 +0800
-Subject: [PATCH V4 2/5] clk: mmp: add clock definition for pxa168
-In-Reply-To: <201208171134.32195.arnd@arndb.de>
-References: <1345183330-20244-1-git-send-email-xiechao.mail@gmail.com>
- <1345183330-20244-3-git-send-email-xiechao.mail@gmail.com>
- <201208171134.32195.arnd@arndb.de>
-Message-ID: <CADApbejwG5F5pEicWSAb0308npupfHkE0fqTweec9ve2ZzkREw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 Aug 2012 12:13:08 +0000
+Subject: [PATCH v3 0/7] mv643xx.c: Add basic device tree support.
+In-Reply-To: <5028D040.60604@codethink.co.uk>
+References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
+ <201208101049.57586.arnd@arndb.de> <5028D040.60604@codethink.co.uk>
+Message-ID: <201208171213.09160.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 17, 2012 at 7:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 17 August 2012, Chao Xie wrote:
->> +void __init pxa168_clk_init(void)
->> +{
->> +       struct clk *clk;
->> +       struct clk *uart_pll;
->> +       void __iomem *mpmu_base;
->> +       void __iomem *apmu_base;
->> +       void __iomem *apbc_base;
->> +
->> +       mpmu_base = ioremap(APB_PHYS_BASE + 0x50000, SZ_4K);
->> +       if (mpmu_base == NULL) {
->> +               pr_err("error to ioremap MPMU base\n");
->> +               return;
->> +       }
->> +
->> +       apmu_base = ioremap(AXI_PHYS_BASE + 0x82800, SZ_4K);
->> +       if (apmu_base == NULL) {
->> +               pr_err("error to ioremap APMU base\n");
->> +               return;
->> +       }
->> +
->> +       apbc_base = ioremap(APB_PHYS_BASE + 0x15000, SZ_4K);
->> +       if (apbc_base == NULL) {
->> +               pr_err("error to ioremap APBC base\n");
->> +               return;
->> +       }
->
-> I hadn't noticed this before, but you are hardcoded physical address locations
-> in the driver, which is not so good since we're trying to move all those
-> locations to device tree. Maybe someone else has an idea to do this better.
->
->> +       clk = clk_register_fixed_rate(NULL, "clk32", NULL, CLK_IS_ROOT, 3200);
->> +       clk_register_clkdev(clk, "clk32", NULL);
->> +
->> +       clk =
->> +           clk_register_fixed_rate(NULL, "vctcxo", NULL, CLK_IS_ROOT,
->> +                                   26000000);
->> +       clk_register_clkdev(clk, "vctcxo", NULL);
->> +
->> +       clk =
->> +           clk_register_fixed_rate(NULL, "pll1", NULL, CLK_IS_ROOT, 624000000);
->> +       clk_register_clkdev(clk, "pll1", NULL);
->
-> Ok, so you've managed to remove the array, good!
->
-> I'm still not overly happy with the style of newline after "=", that is
-> very unusual, and only saves you two characters per line. I'd say just move
-> them each into one line as you did in the first one here. It's less important
-> to align the arguments to the opening braces if you are trying to stay in the
-> 80 character limit. Another option would be to rename the variable to just
-> 'c' instead of 'clk' ;-)
->
->         Arnd
->
->
->         Arnd
-hi
-The clock tree is formatted into a table, and i used perl to generate
-the code based on the table. In order to make the indent clearly, i
-used the scripts/Lindent to automatically format the .c file.
-I have tried to searched the parameter for indent, but i do not find
-that anything can remove the the style of newline after "=", so in
-order to not format the file line by line, i just accept the results
-of indent.
-Do you have any idea about it?
+On Monday 13 August 2012, Ian Molton wrote:
+> On 10/08/12 11:49, Arnd Bergmann wrote:
+> > On Thursday 09 August 2012, Ian Molton wrote:
+> >>>  The driver
+> >>> already knows all those offsets and they are always the same
+> >>> for all variants of mv643xx, right?
+> >> Yes, but its not clean. And no amount of refactoring is
+> >> really going to make a nice driver that also fits the ancient
+> >> (and badly thought out) OF bindings.
+> > In what way is it badly though out, or not clean? The use of
+> > underscores in the properties, and the way that the sram
+> > is configured is problematic, I agree. But The way that
+> > the three ports are addressed and how the PHY is found
+> > seems quite clever.
+> 
+> It forces one to load the MDIO driver first, because it maps ALL the
+> registers for both itself and all the ports, and the MDIO driver has no
+> way of knowing how many ethernet blocks are present (I have a device
+> here with two, and another with four). Thats anywhere from 1 to 12
+> ports, split across 1 to 4 address ranges, and theres a big gap in the
+> address range between controllers 0,1 and 2,3. *ALL* the devices on the
+> board are sharing ethernet block 0's MDIO bus. By pure luck it happens
+> to work, because the blocks 2,3 have an alias of the MDIO registers from
+> blocks 0,1.
+> 
+> Having the MDIO driver map the ethernet drivers memory is a terrible
+> solution, IMO. Ethernet drivers should map their own memory, and that
+> introduces the n-ports-per-block problem, because their address ranges
+> overlap.
+> 
+> I think the best solution is to make each ethernet block register 3 ports.
+> 
+> the PPC code can simply generate different fixups so that instead of
+> creating 3 devices, it creates one, with three ports.
+
+Ok.
+
+> Can we get some consensus on the right approach here? I'm loathe to code
+> this if its going to be rejected.
+> 
+> I'd prefer the driver to be properly split so we dont have the MDIO
+> driver mapping the ethernet drivers address spaces, but if thats not
+> going to be merged, I'm not feeling like doing the work for nothing.
+> 
+> If the driver is to use the overlapping-address mapped-by-the-mdio
+> scheme, then so be it, but I could do with knowing.
+> 
+> Another point against the latter scheme is that the MDIO driver could
+> sensibly be used (the block is identical) on the ArmadaXP, which has 4
+> ethernet blocks rather than two, yet grouped in two pairs with a
+> discontiguous address range.
+> 
+> I'd like to get this moved along as soon as possible though.
+
+I don't object to any device driver changes, but I do want to make
+sure that the bindings are sensible and can coexist with the
+ones that have been used for the past 5 years.
+
+Maybe you can move the binding for the ethernet parts out of the
+marvell.txt file into the place you want to use for the new
+bindings and then extend it to cover both the old and the new style.
+
+	Arnd
