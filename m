@@ -1,30 +1,20 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 17 Aug 2012 14:29:44 +0300
-Subject: [PATCH 1/1 v2] MTD: atmel nand: fix gpio missing request
-In-Reply-To: <1342081868-5995-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1342071036-15905-1-git-send-email-plagnioj@jcrosoft.com>
- <1342081868-5995-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1345202984.27859.54.camel@sauron.fi.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 Aug 2012 11:25:36 +0000
+Subject: [PATCH V4 5/5] arm: mmp: make all SOCs use common clock by default
+In-Reply-To: <1345183330-20244-6-git-send-email-xiechao.mail@gmail.com>
+References: <1345183330-20244-1-git-send-email-xiechao.mail@gmail.com>
+ <1345183330-20244-6-git-send-email-xiechao.mail@gmail.com>
+Message-ID: <201208171125.36990.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-07-12 at 10:31 +0200, Jean-Christophe PLAGNIOL-VILLARD
-wrote:
-> without this the gpio will not be muxed as a gpio by the current custom pinmux
-> or later by the pinctrl
+On Friday 17 August 2012, Chao Xie wrote:
+> From: Chao Xie <chao.xie@marvell.com>
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
+> ---
+>  arch/arm/mach-mmp/Kconfig |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
 
-Pushed to l2-mtd.git, thanks!
-
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120817/7a694f35/attachment.sig>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
