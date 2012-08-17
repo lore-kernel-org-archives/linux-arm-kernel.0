@@ -1,43 +1,111 @@
 From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 17 Aug 2012 16:35:16 +0200
-Subject: [PATCH 0/8] UBI: add max_beb_per1024 parameter / ioctl
-Message-ID: <1345214124-5478-1-git-send-email-richard.genoud@gmail.com>
+Date: Fri, 17 Aug 2012 16:35:20 +0200
+Subject: [PATCH 4/8] UBI: prepare for max_beb_per1024 module parameter addition
+In-Reply-To: <1345214124-5478-1-git-send-email-richard.genoud@gmail.com>
+References: <1345214124-5478-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1345214124-5478-5-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Artem,
-This patch serie introduce, step by step the kernel module parameter
-max_beb_per1024, then the ioctl and finally drop the kernel config option
-CONFIG_MTD_UBI_BEB_LIMIT.
+This patch prepare the way for the addition of max_beb_per1024 module
+parameter.
+There's no functional change.
 
-It's based on top of linux-ubi/master (and I added your patch on
-sam9_l9260_defconfig).
-BTW, I let the BEB value at 30 in sam9_l9260_defconfig, you can set it at 25 if
-you want (as it's the value from the datasheet).
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+---
+ drivers/mtd/ubi/build.c |   14 ++++++++------
+ drivers/mtd/ubi/cdev.c  |    3 ++-
+ drivers/mtd/ubi/ubi.h   |    3 ++-
+ 3 files changed, 12 insertions(+), 8 deletions(-)
 
-Best Regards
-
-Richard.
-
-Artem Bityutskiy (1):
-  arm: sam9_l9260_defconfig: adjust UBI bad eraseblocks limit
-
-Richard Genoud (7):
-  UBI: separate bad_peb_limit in a function
-  UBI: introduce MTD_PARAM_MAX_COUNT
-  UBI: prepare for max_beb_per1024 module parameter addition
-  UBI: check max_beb_per1024 value in ubi_attach_mtd_dev
-  UBI: replace MTD_UBI_BEB_LIMIT with module parameter
-  UBI: add ioctl for max_beb_per1024
-  UBI: drop CONFIG_MTD_UBI_BEB_LIMIT
-
- arch/arm/configs/sam9_l9260_defconfig |    1 -
- drivers/mtd/ubi/Kconfig               |   26 -------
- drivers/mtd/ubi/build.c               |  116 +++++++++++++++++++++-----------
- drivers/mtd/ubi/cdev.c                |    3 +-
- drivers/mtd/ubi/ubi.h                 |    6 ++-
- include/mtd/ubi-user.h                |   19 +++++-
- 6 files changed, 101 insertions(+), 70 deletions(-)
-
+diff --git a/drivers/mtd/ubi/build.c b/drivers/mtd/ubi/build.c
+index 1f45f51..58fe53d 100644
+--- a/drivers/mtd/ubi/build.c
++++ b/drivers/mtd/ubi/build.c
+@@ -602,6 +602,7 @@ static int get_bad_peb_limit(const struct ubi_device *ubi, int max_beb_per1024)
+ /**
+  * io_init - initialize I/O sub-system for a given UBI device.
+  * @ubi: UBI device description object
++ * @max_beb_per1024: maximum expected number of bad PEB per 1024 PEB
+  *
+  * If @ubi->vid_hdr_offset or @ubi->leb_start is zero, default offsets are
+  * assumed:
+@@ -614,10 +615,8 @@ static int get_bad_peb_limit(const struct ubi_device *ubi, int max_beb_per1024)
+  * This function returns zero in case of success and a negative error code in
+  * case of failure.
+  */
+-static int io_init(struct ubi_device *ubi)
++static int io_init(struct ubi_device *ubi, int max_beb_per1024)
+ {
+-	const int max_beb_per1024 = CONFIG_MTD_UBI_BEB_LIMIT;
+-
+ 	if (ubi->mtd->numeraseregions != 0) {
+ 		/*
+ 		 * Some flashes have several erase regions. Different regions
+@@ -839,6 +838,7 @@ static int autoresize(struct ubi_device *ubi, int vol_id)
+  * @mtd: MTD device description object
+  * @ubi_num: number to assign to the new UBI device
+  * @vid_hdr_offset: VID header offset
++ * @max_beb_per1024: maximum number of expected bad blocks per 1024 eraseblocks
+  *
+  * This function attaches MTD device @mtd_dev to UBI and assign @ubi_num number
+  * to the newly created UBI device, unless @ubi_num is %UBI_DEV_NUM_AUTO, in
+@@ -849,7 +849,8 @@ static int autoresize(struct ubi_device *ubi, int vol_id)
+  * Note, the invocations of this function has to be serialized by the
+  * @ubi_devices_mutex.
+  */
+-int ubi_attach_mtd_dev(struct mtd_info *mtd, int ubi_num, int vid_hdr_offset)
++int ubi_attach_mtd_dev(struct mtd_info *mtd, int ubi_num,
++		       int vid_hdr_offset, int max_beb_per1024)
+ {
+ 	struct ubi_device *ubi;
+ 	int i, err, ref = 0;
+@@ -922,7 +923,7 @@ int ubi_attach_mtd_dev(struct mtd_info *mtd, int ubi_num, int vid_hdr_offset)
+ 	dbg_msg("sizeof(struct ubi_ainf_peb) %zu", sizeof(struct ubi_ainf_peb));
+ 	dbg_msg("sizeof(struct ubi_wl_entry) %zu", sizeof(struct ubi_wl_entry));
+ 
+-	err = io_init(ubi);
++	err = io_init(ubi, max_beb_per1024);
+ 	if (err)
+ 		goto out_free;
+ 
+@@ -1211,7 +1212,8 @@ static int __init ubi_init(void)
+ 
+ 		mutex_lock(&ubi_devices_mutex);
+ 		err = ubi_attach_mtd_dev(mtd, UBI_DEV_NUM_AUTO,
+-					 p->vid_hdr_offs);
++					 p->vid_hdr_offs,
++					 CONFIG_MTD_UBI_BEB_LIMIT);
+ 		mutex_unlock(&ubi_devices_mutex);
+ 		if (err < 0) {
+ 			ubi_err("cannot attach mtd%d", mtd->index);
+diff --git a/drivers/mtd/ubi/cdev.c b/drivers/mtd/ubi/cdev.c
+index fb55678..619f914 100644
+--- a/drivers/mtd/ubi/cdev.c
++++ b/drivers/mtd/ubi/cdev.c
+@@ -1010,7 +1010,8 @@ static long ctrl_cdev_ioctl(struct file *file, unsigned int cmd,
+ 		 * 'ubi_attach_mtd_dev()'.
+ 		 */
+ 		mutex_lock(&ubi_devices_mutex);
+-		err = ubi_attach_mtd_dev(mtd, req.ubi_num, req.vid_hdr_offset);
++		err = ubi_attach_mtd_dev(mtd, req.ubi_num, req.vid_hdr_offset,
++					 CONFIG_MTD_UBI_BEB_LIMIT);
+ 		mutex_unlock(&ubi_devices_mutex);
+ 		if (err < 0)
+ 			put_mtd_device(mtd);
+diff --git a/drivers/mtd/ubi/ubi.h b/drivers/mtd/ubi/ubi.h
+index c94612e..2a2475b 100644
+--- a/drivers/mtd/ubi/ubi.h
++++ b/drivers/mtd/ubi/ubi.h
+@@ -693,7 +693,8 @@ int ubi_io_write_vid_hdr(struct ubi_device *ubi, int pnum,
+ 			 struct ubi_vid_hdr *vid_hdr);
+ 
+ /* build.c */
+-int ubi_attach_mtd_dev(struct mtd_info *mtd, int ubi_num, int vid_hdr_offset);
++int ubi_attach_mtd_dev(struct mtd_info *mtd, int ubi_num,
++		       int vid_hdr_offset, int max_beb_per1024);
+ int ubi_detach_mtd_dev(int ubi_num, int anyway);
+ struct ubi_device *ubi_get_device(int ubi_num);
+ void ubi_put_device(struct ubi_device *ubi);
 -- 
 1.7.2.5
