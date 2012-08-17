@@ -1,58 +1,35 @@
-From: r.sricharan@ti.com (R, Sricharan)
-Date: Fri, 17 Aug 2012 16:33:07 +0530
-Subject: [RFC PATCH] ARM: LPAE: Fix alloc_init_section to flush all the
- pmd entries.
-In-Reply-To: <1344249230-29835-1-git-send-email-r.sricharan@ti.com>
-References: <1344249230-29835-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <CAJ7qFSfdZmzH=u9DV4MYeFyee5ntB2gOC1GOSDqNzMBYh0puoA@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 17 Aug 2012 14:10:35 +0300
+Subject: [PATCH] ARM: LPC32xx: Provide DMA filter callbacks via platform
+ data
+In-Reply-To: <1345201311.27859.51.camel@sauron.fi.intel.com>
+References: <1345122935-22115-1-git-send-email-stigge@antcom.de>
+ <1345198171.27859.39.camel@sauron.fi.intel.com>
+ <502E2279.1030604@antcom.de>
+ <1345201311.27859.51.camel@sauron.fi.intel.com>
+Message-ID: <1345201835.27859.52.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Mon, Aug 6, 2012 at 4:03 PM, R Sricharan <r.sricharan@ti.com> wrote:
-> flush_pmd_entry flushes one cache line by MVA. This is
-> called by alloc_init_section to flush the mapped pmd
-> entries. But this is called outside the loop and when
-> LPAE is enabled the number of pmd entries to be
-> flushed can be across multiple cache lines. So call
-> this inside the loop so that all the mapped entries are
-> flushed.
->
-> This is going to result in additional cache line
-> flushes. There might be other better way to handle
-> this.
->
-> Signed-off-by: R Sricharan <r.sricharan@ti.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mm/mmu.c |    4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 0ed8808..02af3fe 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -619,7 +619,6 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
->          * up one logical pointer to an L2 table.
->          */
->         if (type->prot_sect && ((addr | end | phys) & ~SECTION_MASK) == 0) {
-> -               pmd_t *p = pmd;
->
->  #ifndef CONFIG_ARM_LPAE
->                 if (addr & SECTION_SIZE)
-> @@ -629,9 +628,8 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
->                 do {
->                         *pmd = __pmd(phys | type->prot_sect);
->                         phys += SECTION_SIZE;
-> +                       flush_pmd_entry(pmd);
->                 } while (pmd++, addr += SECTION_SIZE, addr != end);
-> -
-> -               flush_pmd_entry(p);
->         } else {
->                 /*
->                  * No need to loop; pte's aren't interested in the
-  Ping...
+On Fri, 2012-08-17 at 14:01 +0300, Artem Bityutskiy wrote:
+> > To later avoid collisions on subsystem merge, can you please leave the
+> > patch with arch/arm/mach-lpc32xx/phy3250.c for arm-soc.git? (I will
+> > provide a pull request for Arnd and Olof, as usual.)
+> 
+> Only if Arnd insists. Otherwise I'd prefer to resolve collisions (they
+> cannot be hard with this patch) than pulling the soc tree to the mtd
+> tree.
 
-Thanks,
- Sricharan
+Actually the mtd patches do not compile-depend on it, sorry, I am
+dropping it from the MTD tree. Thanks!
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120817/bbd3ec00/attachment.sig>
