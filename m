@@ -1,50 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 17 Aug 2012 06:13:59 -0700
-Subject: [PATCH v2 02/31] arm64: Kernel booting and initialisation
-In-Reply-To: <CAMQu2gzz0j+SnxCY0u3H__H4U-Lor_xV-eyiMBSohCMngbkD2w@mail.gmail.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-3-git-send-email-catalin.marinas@arm.com>
- <502E11B6.4020104@ti.com> <20120817100533.GE24389@arm.com>
- <CAMQu2gzz0j+SnxCY0u3H__H4U-Lor_xV-eyiMBSohCMngbkD2w@mail.gmail.com>
-Message-ID: <20120817131358.GF11011@atomide.com>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Fri, 17 Aug 2012 16:14:36 +0300
+Subject: [PATCH v3 2/9] ARM: OMAP: mcbsp: Enable FIFO use for OMAP2430
+In-Reply-To: <20120817130723.GZ11011@atomide.com>
+References: <1345124468-8876-1-git-send-email-peter.ujfalusi@ti.com>
+ <1345124468-8876-3-git-send-email-peter.ujfalusi@ti.com>
+ <20120817130723.GZ11011@atomide.com>
+Message-ID: <502E43BC.30708@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [120817 03:11]:
-> On Fri, Aug 17, 2012 at 3:35 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> >
-> > On Fri, Aug 17, 2012 at 10:41:10AM +0100, Santosh Shilimkar wrote:
-> > >
-> > > So you expect all the secondary CPUs to be in wakeup state and probably
-> > > looping in WFE for a signal from kernel to boot. There is one issue
-> > > with this requirement though. For large CPU system, you need to reset
-> > > all the CPUs and hit this waiting loop. This will lead to large inrush
-> > > current need at bootup which may be not be supported. To avoid this
-> > > issue, secondary CPUs are kept in OFF state and then they are woken
-> > > up from kernel one by one whenever they need to be brought into the
-> > > system. This requirement should be considered.
-> >
-> > I agree, this part will be extended. That's one method that we currently
-> > support and suitable to the model.
-> >
-> > The better method is the SMC standardisation that Charles Garcia-Tobin
-> > has written (to be made available soon) and was presented at the last
-> > Linaro Connect in HK. Given that the CPU power is usually controlled by
-> > the secure side, we'll ask for an SMC to be issued for waking up
-> > secondary CPUs, so it's up to the secure firmware to write the correct
-> > hardware registers.
-> >
-> Thanks for the information. SMC standardization would indeed help
-> to overcome some of these. Will wait for that information before
-> next set of questions.
+On 08/17/2012 04:07 PM, Tony Lindgren wrote:
+> * Peter Ujfalusi <peter.ujfalusi@ti.com> [120816 06:41]:
+>> On OMAP2430 all McBSP ports have 128 word long buffer, enable the use of
+>> the FIFO for the audio stack.
+> Is this the case also for 2420? I thought some only had a FIFO at
+> one port?
+> 
+IRCC (I don't have specs), nope. Only 2430 (as noted by Peter) and
+onwards have FIFO.
 
-Yes please. If the SMC is not standardized for most calls at least,
-we'll end up with a horrible mess of SoC specific calls like we
-currently have. Related to that, the virtualization calls should be
-also standardized so we don't end up with multiple different hypervisors
-with different calls.
+But that's true that FIFO sizes differ between the ports. E.g. only
+ports 2 and 3 have 1024+128 deep FIFOs in OMAP3.
 
-Regards,
-
-Tony
+-- 
+Jarkko
