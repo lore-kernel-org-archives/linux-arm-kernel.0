@@ -1,29 +1,54 @@
-From: jason77.wang@gmail.com (Hui Wang)
-Date: Fri, 17 Aug 2012 09:20:59 +0800
-Subject: [PATCH v4 3/3] ARM: dts: imx6q-sabrelite: add eeti egalax
-In-Reply-To: <20120817003329.GC24242@S2101-09.ap.freescale.net>
-References: <1345114051-3052-1-git-send-email-jason77.wang@gmail.com>
- <1345114051-3052-2-git-send-email-jason77.wang@gmail.com>
- <1345114051-3052-3-git-send-email-jason77.wang@gmail.com>
- <1345114051-3052-4-git-send-email-jason77.wang@gmail.com>
- <20120817003329.GC24242@S2101-09.ap.freescale.net>
-Message-ID: <502D9C7B.6070203@gmail.com>
+From: mitch.harder@sabayonlinux.org (Mitch Harder)
+Date: Thu, 16 Aug 2012 20:23:06 -0500
+Subject: [GIT PULL] Update LZO compression
+In-Reply-To: <20120816221758.GM11413@one.firstfloor.org>
+References: <50299142.2030504@oberhumer.com> <20120814123937.GA14756@sig21.net>
+ <502B8FE3.7080501@oberhumer.com> <20120815144539.GA8300@sig21.net>
+ <502C92C3.7090701@oberhumer.com> <20120816150647.GA22010@sig21.net>
+ <20120816232549.4d14a6aa@natsu>
+ <20120816175234.GL11413@one.firstfloor.org>
+ <CAMuHMdWK_Y=QwkgQD6K8tFBLaO04Fy0yVAzEpb2OYW6Ec0hGoA@mail.gmail.com>
+ <CAPkEcwgv6f5B+Mrw7kzrHcZ5JZ+Yr0o=bLdoFqCB-e4CLiVx5A@mail.gmail.com>
+ <20120816221758.GM11413@one.firstfloor.org>
+Message-ID: <CAKcLGm97zq7kx43cMyDwythin+R01E4zrtzrjAKkJjQL0iy+mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
-> On Thu, Aug 16, 2012 at 06:47:31PM +0800, Hui Wang wrote:
->   
->> i.MX6Q sabrelite board uses i2c3 to connect an eeti egalax
->> touchscreen controller, add it as an i2c slave device in the dts.
->>
->> Signed-off-by: Hui Wang <jason77.wang@gmail.com>
->>     
+On Thu, Aug 16, 2012 at 5:17 PM, Andi Kleen <andi@firstfloor.org> wrote:
+> On Thu, Aug 16, 2012 at 11:55:06AM -0700, james northrup wrote:
+>> looks like ARM results are inconclusive from a lot of folks without
+>> bandwidth to do a write-up, what about just plain STAGING status for ARM so
+>> the android tweakers can beat on it for a while?
 >
-> Looks good.  Will apply it after the driver part gets accepted.
+> Staging only really works for new drivers, not for updating existing
+> library functions like this.
 >
->   
-Got it, thanks.
+> I suppose you could keep both and have the architecture select with a
+> CONFIG.
+>
 
-Regards,
-Hui.
+I've been doing some rough benchmarking with the updated LZO in btrfs.
+
+My tests primarily consist of timing some typical copying, git
+manipulating, and running rsync using a set of kernel git sources.
+Git sources are typically about 50% pack files which won't compress
+very well, with the remainder being mostly highly compressible source
+files.
+
+Of course, any underlying speed improvement attributable only to LZO
+is not shown by test like this. But I thought it would be interesting
+to see the impact in some typical real-world btrfs operations.
+
+I was seeing between 3-9% improvement in speed with the new LZO.
+
+Copying several directories of git sources showed the most
+improvement, ~9%.  Typical git operations, such as a git checkout or
+git status where only showing 3-5% improvement, which is close to the
+noise level of my tests.  Running multiple rsync processes showed a 5%
+improvement.
+
+With only 10 trials (5 with each LZO), I can't say I would
+statistically hang my hat on these numbers.
+
+Given all the other stuff that is going on in my rough benchmarks, a
+3-9% improvement from a single change is probably pretty good.
