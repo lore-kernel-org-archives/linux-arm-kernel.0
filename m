@@ -1,27 +1,59 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 16 Aug 2012 20:53:05 -0500
-Subject: [PATCH v3 2/3] PM / OPP: Initialize OPP table from device tree
-In-Reply-To: <20120817005210.GD24242@S2101-09.ap.freescale.net>
-References: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
- <1344577046-14847-3-git-send-email-shawn.guo@linaro.org>
- <201208162305.55114.rjw@sisk.pl>
- <20120817005210.GD24242@S2101-09.ap.freescale.net>
-Message-ID: <502DA401.7040408@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 16 Aug 2012 20:14:25 -0700
+Subject: [PATCH] spi/s3c64xx: Drop extra calls to spi_master_get in
+ suspend/remove functions
+Message-ID: <1345173265-1721-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/16/2012 07:52 PM, Shawn Guo wrote:
-> On Thu, Aug 16, 2012 at 11:05:54PM +0200, Rafael J. Wysocki wrote:
->> On Friday, August 10, 2012, Shawn Guo wrote:
->>> With a lot of devices booting from device tree nowadays, it requires
->>> that OPP table can be initialized from device tree.  The patch adds
->>> a helper function of_init_opp_table together with a binding doc for
->>> that purpose.
->>>
->>> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->>
->> I need an ACK from whoever maintains the DT bindings for that.
->>
-> Rob, please?
+Suspend and resume functions call spi_master_get() without matching
+spi_master_put(). The extra references are unnecessary and cause subsequent
+module unload attempts to fail. Drop the calls.
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+ drivers/spi/spi-s3c64xx.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 646a765..d7a87df 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -1409,7 +1409,7 @@ static int s3c64xx_spi_remove(struct platform_device *pdev)
+ #ifdef CONFIG_PM
+ static int s3c64xx_spi_suspend(struct device *dev)
+ {
+-	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
++	struct spi_master *master = dev_get_drvdata(dev);
+ 	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(master);
+ 
+ 	spi_master_suspend(master);
+@@ -1428,7 +1428,7 @@ static int s3c64xx_spi_suspend(struct device *dev)
+ 
+ static int s3c64xx_spi_resume(struct device *dev)
+ {
+-	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
++	struct spi_master *master = dev_get_drvdata(dev);
+ 	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(master);
+ 	struct s3c64xx_spi_info *sci = sdd->cntrlr_info;
+ 
+@@ -1452,7 +1452,7 @@ static int s3c64xx_spi_resume(struct device *dev)
+ #ifdef CONFIG_PM_RUNTIME
+ static int s3c64xx_spi_runtime_suspend(struct device *dev)
+ {
+-	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
++	struct spi_master *master = dev_get_drvdata(dev);
+ 	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(master);
+ 
+ 	clk_disable(sdd->clk);
+@@ -1463,7 +1463,7 @@ static int s3c64xx_spi_runtime_suspend(struct device *dev)
+ 
+ static int s3c64xx_spi_runtime_resume(struct device *dev)
+ {
+-	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
++	struct spi_master *master = dev_get_drvdata(dev);
+ 	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(master);
+ 
+ 	clk_enable(sdd->src_clk);
+-- 
+1.7.9.7
