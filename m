@@ -1,32 +1,77 @@
-From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
-Date: Fri, 17 Aug 2012 13:09:31 +0300
-Subject: [PATCH] ARM: LPC32xx: Provide DMA filter callbacks via platform
- data
-In-Reply-To: <1345122935-22115-1-git-send-email-stigge@antcom.de>
-References: <1345122935-22115-1-git-send-email-stigge@antcom.de>
-Message-ID: <1345198171.27859.39.camel@sauron.fi.intel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 17 Aug 2012 11:05:33 +0100
+Subject: [PATCH v2 02/31] arm64: Kernel booting and initialisation
+In-Reply-To: <502E11B6.4020104@ti.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-3-git-send-email-catalin.marinas@arm.com>
+ <502E11B6.4020104@ti.com>
+Message-ID: <20120817100533.GE24389@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-08-16 at 15:15 +0200, Roland Stigge wrote:
-> The SLC and MLC NAND drivers now need their dma_filter callbacks via platform
-> data to make them independent of single DMA engine drivers.
+On Fri, Aug 17, 2012 at 10:41:10AM +0100, Santosh Shilimkar wrote:
+> On Tuesday 14 August 2012 11:22 PM, Catalin Marinas wrote:
+> > +The boot loader is expected to enter the kernel on each CPU in the
+> > +following manner:
+> > +
+> > +- The primary CPU must jump directly to the first instruction of the
+> > +  kernel image.  The device tree blob passed by this CPU must contain
+> > +  for each CPU node:
+> > +
+> > +    1. An 'enable-method' property. Currently, the only supported value
+> > +       for this field is the string "spin-table".
+> > +
+> > +    2. A 'cpu-release-addr' property identifying a 64-bit,
+> > +       zero-initialised memory location.
+> > +
+> > +  It is expected that the bootloader will generate these device tree
+> > +  properties and insert them into the blob prior to kernel entry.
+> > +
+> > +- Any secondary CPUs must spin outside of the kernel in a reserved area
+> > +  of memory (communicated to the kernel by a /memreserve/ region in the
+> > +  device tree) polling their cpu-release-addr location, which must be
+> > +  contained in the reserved region.  A wfe instruction may be inserted
+> > +  to reduce the overhead of the busy-loop and a sev will be issued by
+> > +  the primary CPU.  When a read of the location pointed to by the
+> > +  cpu-release-addr returns a non-zero value, the CPU must jump directly
+> > +  to this value.
 > 
-> (This also helps fixing build errors of the SLC and MLC drivers when building
-> as modules because direct access to AMBA dma filter functions isn't available
-> via export.)
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> So you expect all the secondary CPUs to be in wakeup state and probably
+> looping in WFE for a signal from kernel to boot. There is one issue
+> with this requirement though. For large CPU system, you need to reset
+> all the CPUs and hit this waiting loop. This will lead to large inrush
+> current need at bootup which may be not be supported. To avoid this
+> issue, secondary CPUs are kept in OFF state and then they are woken
+> up from kernel one by one whenever they need to be brought into the
+> system. This requirement should be considered.
 
-Pushed the 3 patches to l2-mtd.git, thanks!
+I agree, this part will be extended. That's one method that we currently
+support and suitable to the model.
+
+The better method is the SMC standardisation that Charles Garcia-Tobin
+has written (to be made available soon) and was presented at the last
+Linaro Connect in HK. Given that the CPU power is usually controlled by
+the secure side, we'll ask for an SMC to be issued for waking up
+secondary CPUs, so it's up to the secure firmware to write the correct
+hardware registers.
+
+> > --- /dev/null
+> > +++ b/arch/arm64/kernel/head.S
+> [..]
+> > +	/*
+> > +	 * DO NOT MODIFY. Image header expected by Linux boot-loaders.
+> > +	 */
+> > +	b	stext				// branch to kernel start, magic
+> > +	.long	0				// reserved
+> > +	.quad	TEXT_OFFSET			// Image load offset from start of RAM
+> > +	.quad	0				// reserved
+> > +	.quad	0				// reserved
+> > +
+> 
+> Minor nit. Avoid C++ commenting style "//"  here and rest of the patch.
+
+That's not C++ comment style, it's the *official* assembly comment style
+for AArch64 ('@' is no longer supported).
 
 -- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120817/c68f8b7a/attachment.sig>
+Catalin
