@@ -1,52 +1,63 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 17 Aug 2012 15:26:29 +0200
-Subject: Issues with all kernels after 3.3.7
-In-Reply-To: <CADhrpJ7r4PPM2nOD7Wch9H+usaDUJ5XYeim6THUKEDTz=-Zyig@mail.gmail.com>
-References: <CADhrpJ7r4PPM2nOD7Wch9H+usaDUJ5XYeim6THUKEDTz=-Zyig@mail.gmail.com>
-Message-ID: <20120817132629.GA2232@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 17 Aug 2012 14:45:15 +0100
+Subject: [PATCH v2 02/31] arm64: Kernel booting and initialisation
+In-Reply-To: <201208171120.40740.arnd@arndb.de>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-3-git-send-email-catalin.marinas@arm.com>
+ <alpine.LFD.2.02.1208161438110.1541@xanadu.home>
+ <201208171120.40740.arnd@arndb.de>
+Message-ID: <20120817134515.GH24389@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 17, 2012 at 01:47:06PM +0100, alan butler wrote:
-> I have been trying all kernels after 3.3.7 (except for the 3.5 series)
-> on my ix2-200
-> and have found that on every kernel 3.3.8, 3.4, 3.4.2, 3.4.4 =>3.4.7
-> and now even on 3.6 rc1
-> and the next dated today 17 august that when i use git for example:
+On Fri, Aug 17, 2012 at 12:20:40PM +0100, Arnd Bergmann wrote:
+> On Thursday 16 August 2012, Nicolas Pitre wrote:
+> > > +3. Decompress the kernel image
+> > > +------------------------------
+> > > +
+> > > +Requirement: OPTIONAL
+> > > +
+> > > +The AArch64 kernel does not provide a decompressor and therefore
+> > > +requires gzip decompression to be performed by the boot loader if the
+> > > +default Image.gz target is used.  For bootloaders that do not implement
+> > > +this requirement, the larger Image target is available instead.
+> > 
+> > Some people will want to use bzip2 or whatever other decompressor du 
+> > jour.  Maybe this shouldn't be gzip specific, or just presented as a 
+> > possible option?
 > 
-> git clone git://git.videolan.org/x264
-> 
-> my system just crash's / hangs and even through the serial port i get
-> no response.
-> This also happens when i try to access a web interface for example the
-> serviio java webui.
-> 
-> The second issue i have noticed is that my raid 0 array hangs / pauses
-> when being mounted
-> at system startup. (for approximatly 30 seconds maybe more maybe less
-> im not certain).
-> But again on the 3.3.7 kernel there was no issue and no hang.
-> 
-> If i return to 3.3.7 everything works fine with no other modifications
-> to the os or kernels.
-> I am using debian wheezy at the moment but also tried debian squeeze
-> so it does not
-> seem to be related to the specific linux version just the kernel.
-Can you bisect your problem? Doing that between 3.3.7 and 3.3.8 seems to
-be the obvious range to test.
+> Good point. Whether this should be part of this document depends on
+> what assumptions we make about the boot loader getting the image
+> in the first place.
 
-You can also try to enable the various debugging options like
+It ended up here because there is a Makefile target, Image.gz, though I
+haven't used it at all. I'll expand the text so that it is not
+restricted to gzip.
 
-	CONFIG_DETECT_HUNG_TASK
-	CONFIG_PROVE_LOCKING
-	CONFIG_DEBUG_ATOMIC_SLEEP
-	CONFIG_MAGIC_SYSRQ
+> In the strict sense, we are documenting the interface between the boot
+> loader and the kernel here, which already specifies that  the kernel
+> must be uncompressed by the time we enter it. If the boot loader wants
+> to add its own encryption or compression methods, or its own headers
+> in front of the binary, the boot protocol isn't really impacted.
 
-or try https://lkml.org/lkml/2012/5/26/83.
+Yes.
 
-Best regards
-Uwe
+> That said, I think it's a good idea to also specify what kind of
+> format we want to be used, e.g. a stripped ELF Image compressed
+> with one of gzip/bzip2/lzo/xz and with no other headers added,
+> on a vfat/ext4/btrfs formatted file system. There are probably a
+> lot of other things one might want to specify if we go down this
+> route. Or we could refer to the UEFI spec and mandate that the
+> same format that UEFI uses should be used here independent of
+> what boot loader is used. I think we can still allow other ways to
+> get to the image for deeply embedded systems, e.g. linking the
+> kernel into the boot loader as a blob on tightly constrained
+> systems. For that case, we'd only specify the interface between
+> boot loader and kernel as described above.
+
+At least the latter case is used on the model. For the other cases, it's
+quite early to clearly specify what is needed as we don't currently have
+a boot-loader other than UEFI. We may expect GRUB as well.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Catalin
