@@ -1,47 +1,43 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 17 Aug 2012 14:54:10 +0800
-Subject: [PATCH] ARM: tegra30: clocks: fix the wrong tegra_audio_sync_clk_ops
- name
-Message-ID: <1345186450-4517-1-git-send-email-josephl@nvidia.com>
+Date: Fri, 17 Aug 2012 15:04:31 +0800
+Subject: [PATCH] mmc: tegra: convert to device tree support only
+Message-ID: <1345187071-6619-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It should use tegra30_audio_sync_clk_ops for tegra30. It will cause
-the tegra30 use the wrong audio_sync_clk_ops when build a kernel with
-a tegra20 and tegra30 both supported kernel. And building error when
-a tegra30-only kernel.
+When compiling a kernel that supports only Tegra30 and not Tegra20,
+the SDHCI driver will fail to compile since the of_match_device() failure
+fallback code unconditinally references soc_data_tegra20, which is only
+compiled in when Tegra20 support is enabled.
+
+In Kernel 3.7, both Tegra20 and Tegra30 will only support booting using
+device tree, Hence, there is never a need to fall back to using
+soc_data_tegra20 if of_mach_device() fails. Instead, make this case an
+error. This removes the reference to soc_data_tegra20, and hence solves
+the compile failure.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
- arch/arm/mach-tegra/tegra30_clocks.h      |    2 +-
- arch/arm/mach-tegra/tegra30_clocks_data.c |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/mmc/host/sdhci-tegra.c |    7 +++----
+ 1 files changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/tegra30_clocks.h b/arch/arm/mach-tegra/tegra30_clocks.h
-index b08b8d9..f2f88fe 100644
---- a/arch/arm/mach-tegra/tegra30_clocks.h
-+++ b/arch/arm/mach-tegra/tegra30_clocks.h
-@@ -28,7 +28,7 @@ extern struct clk_ops tegra30_plle_ops;
- extern struct clk_ops tegra_cml_clk_ops;
- extern struct clk_ops tegra_pciex_clk_ops;
- extern struct clk_ops tegra_sync_source_ops;
--extern struct clk_ops tegra_audio_sync_clk_ops;
-+extern struct clk_ops tegra30_audio_sync_clk_ops;
- extern struct clk_ops tegra30_clk_double_ops;
- extern struct clk_ops tegra_clk_out_ops;
- extern struct clk_ops tegra30_super_ops;
-diff --git a/arch/arm/mach-tegra/tegra30_clocks_data.c b/arch/arm/mach-tegra/tegra30_clocks_data.c
-index 2271ac1..3d2e553 100644
---- a/arch/arm/mach-tegra/tegra30_clocks_data.c
-+++ b/arch/arm/mach-tegra/tegra30_clocks_data.c
-@@ -521,7 +521,7 @@ static const char *mux_audio_sync_clk[] = {
- 	};							\
- 	static struct clk tegra_##_name = {			\
- 		.name = #_name,					\
--		.ops = &tegra_audio_sync_clk_ops,		\
-+		.ops = &tegra30_audio_sync_clk_ops,		\
- 		.hw = &tegra_##_name##_hw.hw,			\
- 		.parent_names = mux_audio_sync_clk,		\
- 		.parents = tegra_sync_source_list,		\
+diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
+index 0810ccc..436186c 100644
+--- a/drivers/mmc/host/sdhci-tegra.c
++++ b/drivers/mmc/host/sdhci-tegra.c
+@@ -257,10 +257,9 @@ static int __devinit sdhci_tegra_probe(struct platform_device *pdev)
+ 	int rc;
+ 
+ 	match = of_match_device(sdhci_tegra_dt_match, &pdev->dev);
+-	if (match)
+-		soc_data = match->data;
+-	else
+-		soc_data = &soc_data_tegra20;
++	if (!match)
++		return -EINVAL;
++	soc_data = match->data;
+ 
+ 	host = sdhci_pltfm_init(pdev, soc_data->pdata);
+ 	if (IS_ERR(host))
 -- 
 1.7.0.4
