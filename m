@@ -1,19 +1,23 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 17 Aug 2012 08:32:11 +0800
-Subject: [PATCH v4 2/3] Input: add devicetree binding note for egalax_ts
-In-Reply-To: <1345114051-3052-3-git-send-email-jason77.wang@gmail.com>
+Date: Fri, 17 Aug 2012 08:33:31 +0800
+Subject: [PATCH v4 3/3] ARM: dts: imx6q-sabrelite: add eeti egalax
+In-Reply-To: <1345114051-3052-4-git-send-email-jason77.wang@gmail.com>
 References: <1345114051-3052-1-git-send-email-jason77.wang@gmail.com>
  <1345114051-3052-2-git-send-email-jason77.wang@gmail.com>
  <1345114051-3052-3-git-send-email-jason77.wang@gmail.com>
-Message-ID: <20120817003209.GB24242@S2101-09.ap.freescale.net>
+ <1345114051-3052-4-git-send-email-jason77.wang@gmail.com>
+Message-ID: <20120817003329.GC24242@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 16, 2012 at 06:47:30PM +0800, Hui Wang wrote:
-> The egalax_ts driver needs to get the gpio number of the irq pin,
-> and use this gpio to wake up the controller. So add a note
-> for this change.
+On Thu, Aug 16, 2012 at 06:47:31PM +0800, Hui Wang wrote:
+> i.MX6Q sabrelite board uses i2c3 to connect an eeti egalax
+> touchscreen controller, add it as an i2c slave device in the dts.
 > 
 > Signed-off-by: Hui Wang <jason77.wang@gmail.com>
 
-Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+Looks good.  Will apply it after the driver part gets accepted.
+
+-- 
+Regards,
+Shawn
