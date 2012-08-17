@@ -1,19 +1,17 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 17 Aug 2012 13:26:41 -0600
-Subject: [PATCH] ARM: tegra: clocks: separate tegra_clk_32k_ops from
- Tegra20 and Tegra30
-In-Reply-To: <1345186281-3859-1-git-send-email-josephl@nvidia.com>
-References: <1345186281-3859-1-git-send-email-josephl@nvidia.com>
-Message-ID: <502E9AF1.2000701@wwwdotorg.org>
+Date: Fri, 17 Aug 2012 13:26:51 -0600
+Subject: [PATCH] ARM: tegra30: clocks: fix the wrong
+ tegra_audio_sync_clk_ops name
+In-Reply-To: <1345186450-4517-1-git-send-email-josephl@nvidia.com>
+References: <1345186450-4517-1-git-send-email-josephl@nvidia.com>
+Message-ID: <502E9AFB.3090205@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2012 12:51 AM, Joseph Lo wrote:
-> Currently the tegra20 and tegra30 share the same symbol for
-> tegra_clk_32k_ops. This will cause a compile error when building
-> a tegra20-only kernel image. Add tegra_clk_32k_ops for tegra20 and
-> modify tegra30_clk_32k_ops for tegra30.
-> 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+On 08/17/2012 12:54 AM, Joseph Lo wrote:
+> It should use tegra30_audio_sync_clk_ops for tegra30. It will cause
+> the tegra30 use the wrong audio_sync_clk_ops when build a kernel with
+> a tegra20 and tegra30 both supported kernel. And building error when
+> a tegra30-only kernel.
 
 Thanks, applied to Tegra's for-3.7/common-clk branch.
