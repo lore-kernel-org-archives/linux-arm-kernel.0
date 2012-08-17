@@ -1,70 +1,85 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 16 Aug 2012 20:28:19 -0700
-Subject: [PATCH] spi/s3c64xx: Drop extra calls to spi_master_get in
- suspend/remove functions
-In-Reply-To: <1345173265-1721-1-git-send-email-linux@roeck-us.net>
-References: <1345173265-1721-1-git-send-email-linux@roeck-us.net>
-Message-ID: <20120817032819.GA6656@roeck-us.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 16 Aug 2012 23:43:01 -0400 (EDT)
+Subject: [PATCH] ARM: io: avoid writeback addressing modes for __raw_
+ accessors
+In-Reply-To: <1344956366-32574-1-git-send-email-will.deacon@arm.com>
+References: <1344956366-32574-1-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.02.1208161906390.1541@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sigh.
+On Tue, 14 Aug 2012, Will Deacon wrote:
 
-s/remove/resume/ in headline.
+> Data aborts taken to hyp mode do not provide a valid instruction
+> syndrome field in the HSR if the faulting instruction is a memory
+> access using a writeback addressing mode.
+> 
+> For hypervisors emulating MMIO accesses to virtual peripherals, taking
+> such an exception requires disassembling the faulting instruction in
+> order to determine the behaviour of the access. Since this requires
+> manually walking the two stages of translation, the world must be
+> stopped to prevent races against page aging in the guest, where the
+> first-stage translation is invalidated after the hypervisor has
+> translated to an IPA and the physical page is reused for something else.
+> 
+> This patch avoids taking this heavy performance penalty when running
+> Linux as a guest by ensuring that our I/O accessors do not make use of
+> writeback addressing modes.
 
-Guenter
+How often does this happen?  I don't really see writeback as a common 
+pattern for IO access.
 
-On Thu, Aug 16, 2012 at 08:14:25PM -0700, Guenter Roeck wrote:
-> Suspend and resume functions call spi_master_get() without matching
-> spi_master_put(). The extra references are unnecessary and cause subsequent
-> module unload attempts to fail. Drop the calls.
-> 
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> ---
->  drivers/spi/spi-s3c64xx.c |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-> index 646a765..d7a87df 100644
-> --- a/drivers/spi/spi-s3c64xx.c
-> +++ b/drivers/spi/spi-s3c64xx.c
-> @@ -1409,7 +1409,7 @@ static int s3c64xx_spi_remove(struct platform_device *pdev)
->  #ifdef CONFIG_PM
->  static int s3c64xx_spi_suspend(struct device *dev)
->  {
-> -	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
-> +	struct spi_master *master = dev_get_drvdata(dev);
->  	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(master);
->  
->  	spi_master_suspend(master);
-> @@ -1428,7 +1428,7 @@ static int s3c64xx_spi_suspend(struct device *dev)
->  
->  static int s3c64xx_spi_resume(struct device *dev)
->  {
-> -	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
-> +	struct spi_master *master = dev_get_drvdata(dev);
->  	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(master);
->  	struct s3c64xx_spi_info *sci = sdd->cntrlr_info;
->  
-> @@ -1452,7 +1452,7 @@ static int s3c64xx_spi_resume(struct device *dev)
->  #ifdef CONFIG_PM_RUNTIME
->  static int s3c64xx_spi_runtime_suspend(struct device *dev)
->  {
-> -	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
-> +	struct spi_master *master = dev_get_drvdata(dev);
->  	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(master);
->  
->  	clk_disable(sdd->clk);
-> @@ -1463,7 +1463,7 @@ static int s3c64xx_spi_runtime_suspend(struct device *dev)
->  
->  static int s3c64xx_spi_runtime_resume(struct device *dev)
->  {
-> -	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
-> +	struct spi_master *master = dev_get_drvdata(dev);
->  	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(master);
->  
->  	clk_enable(sdd->src_clk);
-> -- 
-> 1.7.9.7
-> 
-> 
+What does happen quite a lot, though, is pre-indexed addressing.  For 
+example, let's take this code which is fairly typical of driver code:
+
+#define HW_REG1		0x10
+#define HW_REG2		0x14
+#define HW_REG3		0x18
+#define HW_REG4		0x30
+
+int hw_init(void __iomem *ioaddr)
+{
+	writel(0, ioaddr + HW_REG1)
+	writel(-1, ioaddr + HW_REG2);
+	writel(readl(ioaddr + HW_REG3) | 0xff, ioaddr + HW_REG4);
+	return 0;
+}
+
+Right now this produces this:
+
+hw_init:
+        mov     r3, r0
+        mvn     r2, #0
+        mov     r0, #0
+        str     r0, [r3, #16]
+        str     r2, [r3, #20]
+        ldr     r2, [r3, #24]
+        orr     r2, r2, #255
+        str     r2, [r3, #48]
+        bx      lr
+
+With your patch applied this becomes:
+
+hw_init:
+        add     r2, r0, #16
+        mov     r3, #0
+        str r3, [r2]
+        mvn     r3, #0
+        add     r2, r0, #20
+        str r3, [r2]
+        add     r3, r0, #24
+        ldr r3, [r3]
+        orr     r3, r3, #255
+        add     r0, r0, #48
+        str r3, [r0]
+        mov     r0, #0
+        bx      lr
+
+This basically made every IO access into two instructions instead of 
+only one, as well as increasing register pressure.
+
+So, is the performance claim something that you've actually measured 
+with a real system, or was it only theoretical?
+
+
+Nicolas
