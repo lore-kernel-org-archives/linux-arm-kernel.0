@@ -1,26 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 Aug 2012 14:46:23 +0000
-Subject: [PATCH V4 2/5] clk: mmp: add clock definition for pxa168
-In-Reply-To: <CADApbejwG5F5pEicWSAb0308npupfHkE0fqTweec9ve2ZzkREw@mail.gmail.com>
-References: <1345183330-20244-1-git-send-email-xiechao.mail@gmail.com>
- <201208171134.32195.arnd@arndb.de>
- <CADApbejwG5F5pEicWSAb0308npupfHkE0fqTweec9ve2ZzkREw@mail.gmail.com>
-Message-ID: <201208171446.23851.arnd@arndb.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 17 Aug 2012 20:29:12 +0530
+Subject: [PATCH 1/2] ARM: da850/omap-l138: Add SoC related definitions
+ for VPIF
+In-Reply-To: <502CC7CD.80906@ti.com>
+References: <1343115786-15801-1-git-send-email-prabhakar.lad@ti.com>
+ <1343115786-15801-2-git-send-email-prabhakar.lad@ti.com>
+ <502A4464.3020706@ti.com> <502CC7CD.80906@ti.com>
+Message-ID: <502E5C40.803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 17 August 2012, Chao Xie wrote:
-> The clock tree is formatted into a table, and i used perl to generate
-> the code based on the table. In order to make the indent clearly, i
-> used the scripts/Lindent to automatically format the .c file.
-> I have tried to searched the parameter for indent, but i do not find
-> that anything can remove the the style of newline after "=", so in
-> order to not format the file line by line, i just accept the results
-> of indent.
-> Do you have any idea about it?
+Hi Prabhakar,
 
-No easy solution. I don't normally trust lindent. Especially if you want
-to bend the rules slightly, it's often better to manually edit the
-output of lindent.
+On 8/16/2012 3:43 PM, Prabhakar Lad wrote:
+> On Tuesday 14 August 2012 05:58 PM, Sekhar Nori wrote:
 
-	Arnd
+[...]
+
+>>> +int __init da850_register_vpif_display(struct vpif_display_config
+>>> +						*display_config)
+>>> +{
+>>> +	struct resource da850_vpif_display_resource[] = {
+>>> +		{
+>>> +			.start = IRQ_DA850_VPIFINT,
+>>> +			.end   = IRQ_DA850_VPIFINT,
+>>> +			.flags = IORESOURCE_IRQ,
+>>> +		},
+>>> +		{},
+>>> +	};
+>>> +	unsigned long phys_end_kernel;
+>>> +	int ret;
+>>> +
+>>> +	if (vpif_disp_cont_bufsize) {
+>>> +		phys_end_kernel = virt_to_phys((void *)PAGE_OFFSET) +
+>>> +					(num_physpages << PAGE_SHIFT);
+>>> +		phys_end_kernel += vpif_disp_cont_buf_offset;
+>>> +		da850_vpif_display_resource[1].start = phys_end_kernel;
+>>> +		da850_vpif_display_resource[1].end = phys_end_kernel +
+>>> +						vpif_disp_cont_bufsize - 1;
+>>> +		da850_vpif_display_resource[1].flags = IORESOURCE_MEM;
+>>> +
+>>> +		if (!request_mem_region(da850_vpif_display_resource[1].start,
+>>> +				resource_size(&da850_vpif_display_resource[1]),
+>>> +				da850_vpif_display_dev.name)) {
+>>> +			pr_err("region already claimed.\n");
+>>> +			return -EBUSY;
+>>> +		}
+>>> +		ret = dma_declare_coherent_memory(&da850_vpif_display_dev.dev,
+>>> +				phys_end_kernel, phys_end_kernel,
+>>> +				vpif_disp_cont_bufsize,
+>>> +				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
+>>> +
+>>> +		if (!ret)
+>>> +			return -ENOMEM;
+>>> +	}
+>>> +	ret = platform_device_add_resources(&da850_vpif_display_dev,
+>>> +				da850_vpif_display_resource,
+>>> +				ARRAY_SIZE(da850_vpif_display_resource));
+>>
+>> You are taking memory at the end of RAM and passing it as a IO resource
+>> to the driver. This is not correct. For contiguous memory needs can you
+>> look at the recently merged CMA framework (include/linux/dma-contiguous.h)
+>>
+> Ok. But looks like CMA is enabled for CPU_V6/V6K/V7. If CMA is enabled
+> for ARM926 too than we can use the global CMA itself rather then doing
+> it for each device, then three will be no need to do the above and all
+> the kernel parameters can be removed too.
+
+I hadn't followed the CMA development closely so I am not sure of the
+reasons behind restricting it to v6+. The patch that added this doesn't
+really talk about why it should be restricted to v6+. I am copying Marek
+here to see if he can quickly clarify, but may be you can even start a
+new thread asking about this.
+
+Thanks,
+Sekhar
