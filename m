@@ -1,43 +1,75 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 17 Aug 2012 15:04:31 +0800
-Subject: [PATCH] mmc: tegra: convert to device tree support only
-Message-ID: <1345187071-6619-1-git-send-email-josephl@nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 Aug 2012 07:06:07 +0000
+Subject: [PATCH v2 23/31] arm64: Debugging support
+In-Reply-To: <201208161249.35008.arnd@arndb.de>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <20120816104748.GI31784@mudshark.cambridge.arm.com>
+ <201208161249.35008.arnd@arndb.de>
+Message-ID: <201208170706.07821.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When compiling a kernel that supports only Tegra30 and not Tegra20,
-the SDHCI driver will fail to compile since the of_match_device() failure
-fallback code unconditinally references soc_data_tegra20, which is only
-compiled in when Tegra20 support is enabled.
+On Thursday 16 August 2012, Arnd Bergmann wrote:
+> On Thursday 16 August 2012, Will Deacon wrote:
+> > On Wed, Aug 15, 2012 at 04:07:36PM +0100, Arnd Bergmann wrote:
+> > > On Tuesday 14 August 2012, Catalin Marinas wrote:
+> 
+> > > From what I can tell, there is no support for 32 bit processes debugging
+> > > 64 bit ones. Is that something you plan to add in the future, or do you
+> > > consider that out of scope? In either case, a comment would be helpful.
+> > 
+> > That can't really work because the debugger won't be able to manipulate
+> > child pointers properly without us adding a new ptrace interface (and then,
+> > I still wonder about how feasible it really is). I can add a comment.
+> 
+> You can already have a 32 bit gdb that is able to do remote debugging of
+> 64 bit processes using a gdb server process. I guess it wouldn't be
+> too strange to have a ptrace extension to allow the native case as well.
+> I agree it's not a high priority.
+> 
+> > > > +long arch_ptrace(struct task_struct *child, long request,
+> > > > +		 unsigned long addr, unsigned long data)
+> > > > +{
+> > > > +	int ret;
+> > > > +	unsigned long *datap = (unsigned long __user *)data;
+> > > > +
+> > > > +	switch (request) {
+> > > > +		case PTRACE_GET_THREAD_AREA:
+> > > > +			ret = put_user(child->thread.tp_value, datap);
+> > > > +			break;
+> > > > +
+> > > > +#ifdef CONFIG_HAVE_HW_BREAKPOINT
+> > > > +		case PTRACE_GETHBPREGS:
+> > > > +			ret = ptrace_gethbpregs(child, addr, datap);
+> > > > +			break;
+> > > > +
+> > > > +		case PTRACE_SETHBPREGS:
+> > > > +			ret = ptrace_sethbpregs(child, addr, datap);
+> > > > +			break;
+> > > > +#endif
+> > > > +
+> > > > +		default:
+> > > > +			ret = ptrace_request(child, request, addr, data);
+> > > > +			break;
+> > > > +	}
+> > > > +
+> > > > +	return ret;
+> > > > +}
+> > > 
+> > > Is there a reaons why these are not regsets but have their own ptrace
+> > > commands? I believe new architectures should generally not add ptrace
+> > > commands any more.
+> > 
+> > I could probably add some regset wrappers about the hbp accessors (which we
+> > have to keep for the compat ptrace interface). I'll have a think as it might
+> > even make sense to have different regsets for breakpoints and watchpoints.
+> > 
+> > As for the the tls, is it worth having a regset with only one register?
+> 
+> Better ask the gdb folks. I'm adding Uli to Cc, maybe he has some insight.
 
-In Kernel 3.7, both Tegra20 and Tegra30 will only support booting using
-device tree, Hence, there is never a need to fall back to using
-soc_data_tegra20 if of_mach_device() fails. Instead, make this case an
-error. This removes the reference to soc_data_tegra20, and hence solves
-the compile failure.
+Sorry for the dumb question, but why do you even need PTRACE_GET_THREAD_AREA
+for 64 bit tasks? I thought the thread pointer is a GPR, or is this just
+for compat tasks?
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- drivers/mmc/host/sdhci-tegra.c |    7 +++----
- 1 files changed, 3 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
-index 0810ccc..436186c 100644
---- a/drivers/mmc/host/sdhci-tegra.c
-+++ b/drivers/mmc/host/sdhci-tegra.c
-@@ -257,10 +257,9 @@ static int __devinit sdhci_tegra_probe(struct platform_device *pdev)
- 	int rc;
- 
- 	match = of_match_device(sdhci_tegra_dt_match, &pdev->dev);
--	if (match)
--		soc_data = match->data;
--	else
--		soc_data = &soc_data_tegra20;
-+	if (!match)
-+		return -EINVAL;
-+	soc_data = match->data;
- 
- 	host = sdhci_pltfm_init(pdev, soc_data->pdata);
- 	if (IS_ERR(host))
--- 
-1.7.0.4
+	Arnd
