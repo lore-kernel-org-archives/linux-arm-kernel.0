@@ -1,39 +1,43 @@
-From: gcembed@gmail.com (=?UTF-8?B?R2HDq3RhbiBDYXJsaWVy?=)
-Date: Fri, 17 Aug 2012 17:28:41 +0200
-Subject: mx27_3ds : Sound doesn't work anymore on linux-next
-In-Reply-To: <502E6033.4010805@gmail.com>
-References: <502E6033.4010805@gmail.com>
-Message-ID: <502E6329.60308@gmail.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 17 Aug 2012 17:39:32 +0200
+Subject: [PATCH 06/14] arm: at91: dt: at91sam9 add pinctrl support
+In-Reply-To: <CACRpkdY2HjwOBy7P8mZ81f8bYU4V2=taXzqv03q9NWqbfMVQ4A@mail.gmail.com>
+References: <20120810124820.GA20557@game.jcrosoft.org>
+ <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
+ <1344603731-32667-6-git-send-email-plagnioj@jcrosoft.com>
+ <CACRpkdY2HjwOBy7P8mZ81f8bYU4V2=taXzqv03q9NWqbfMVQ4A@mail.gmail.com>
+Message-ID: <CACQ1gAjy7kT9emFGYQY5m1=kS3S5SPS4F5yMCV2ZzMxbhPcFGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just some more informations, process enter in D+ state and this is so 
-impossible to kill them.
-On 08/17/2012 05:16 PM, Ga?tan Carlier wrote:
-> Hi,
-> It is several days that I tried to make sound work on mx27_3ds platform
-> from linux-next (daily cloned/pulled) but each time I try start start
-> aplay or alsamixer, the process freeze and CTRL+C has not effect. I can
-> open another SSH session and execute other commands but alsa commands
-> always freeze.
-> The sound card is correctly installer at boot :
->
-> imx_mc13783 imx_mc13783.0:  mc13783-hifi <-> imx-ssi.0 mapping ok
-> ALSA device list:
->    #0: imx_mc13783
->
-> I only apply the patch "[PATCH 1/2] ARM: mx27pdk: Add audio support". I
-> attach my config file.
->
-> I try to apply patch on a previous commit when I told that this patch
-> was working but it didn't succeed the is still freezing.
-> I try to make it working on another mx27-based platform but same
-> problem. I try to update Alsa from version 1.0.23 to 1.0.25 but same
-> behaviour.
-> What is wrong ?
->
-> Regards,
-> Ga?tan Carlier.
+Jean-Christophe, it seems that you forgot those clocks:
 
 Regards,
-Ga?tan.
+Richard.
+
+
+    sam9x5: add clocks for pinctrl
+
+    Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+---
+ arch/arm/mach-at91/at91sam9x5.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+index 477cf9d..55b52ef 100644
+--- a/arch/arm/mach-at91/at91sam9x5.c
++++ b/arch/arm/mach-at91/at91sam9x5.c
+@@ -231,6 +231,11 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb0_clk),
+ 	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma0_clk),
+ 	CLKDEV_CON_DEV_ID("dma_clk", "ffffee00.dma-controller", &dma1_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioAB_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioAB_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioCD_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioCD_clk),
++
+ 	CLKDEV_CON_ID("pioA", &pioAB_clk),
+ 	CLKDEV_CON_ID("pioB", &pioAB_clk),
+ 	CLKDEV_CON_ID("pioC", &pioCD_clk),
+-- 
+1.7.2.5
