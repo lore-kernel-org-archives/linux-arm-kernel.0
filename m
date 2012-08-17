@@ -1,88 +1,77 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 17 Aug 2012 11:48:56 +0800
-Subject: imx6q restart is broken
-In-Reply-To: <20120816223446.GB15883@n2100.arm.linux.org.uk>
-References: <20120808101817.GA14718@S2101-09.ap.freescale.net>
- <50224547.9020000@de.bosch.com> <50232C17.9000700@gmail.com>
- <20120809092021.GQ18957@n2100.arm.linux.org.uk>
- <502BBB43.5010403@gmail.com>
- <20120815214412.GC32560@n2100.arm.linux.org.uk>
- <20120816023109.GH2258@S2101-09.ap.freescale.net>
- <20120816223446.GB15883@n2100.arm.linux.org.uk>
-Message-ID: <20120817034854.GE24242@S2101-09.ap.freescale.net>
+Date: Fri, 17 Aug 2012 13:11:56 +0800
+Subject: [PATCH] ARM: imx6q: remove imx_src_prepare_restart() call
+Message-ID: <1345180316-9209-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 16, 2012 at 11:34:46PM +0100, Russell King - ARM Linux wrote:
-> This doesn't get around the problem that userspace can still effectively
-> issue a DoS against the system by just running a dmb in a tight loop.
-> Or maybe this would have a much more dramatic effect:
-> 
-> 	while (1) {
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 		asm("dmb");
-> 	}
-> 
-> and make that 3 seconds to get a ps listing turn into something much
-> longer?
-> 
->From my testing, no, it does not get the thing even worse.
+Currently, imx_src_prepare_restart which is called by imx6q_restart
+assumes that cpu0 must be the running cpu, so it disables all secondary
+cpus.  However this is not the case, the restart routine could possibly
+running on cpu1 or any other secondary cores.  In that case, disabling
+the cpu that runs restart routine will hang up system.
 
-> I think what needs to happen here (while we wait) is someone _with_ the
-> problem needs to experiment, and find out how many nops are needed for
-> the DMB not to have much effect in cpu_relax().  If it turns out we just
-> need to put one nop in, then that's not _too_ bad.
+Also it turns out that everything that is done by imx_src_prepare_restart
+is not really necessary, because the watchdog reset will have those
+registers reset properly.  So let's remove the imx_src_prepare_restart
+call completely.
 
-At least, I need to have 5 nops to get rid of the issue, something like
-below.
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/mach-imx6q.c          |    2 --
+ arch/arm/mach-imx/src.c                 |   13 -------------
+ arch/arm/plat-mxc/include/mach/common.h |    1 -
+ 3 files changed, 0 insertions(+), 16 deletions(-)
 
-Regards,
-Shawn
-
---8<---
-
-diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
-index 99afa74..3e1b099 100644
---- a/arch/arm/include/asm/processor.h
-+++ b/arch/arm/include/asm/processor.h
-@@ -80,7 +80,14 @@ extern void release_thread(struct task_struct *);
- unsigned long get_wchan(struct task_struct *p);
-
- #if __LINUX_ARM_ARCH__ == 6 || defined(CONFIG_ARM_ERRATA_754327)
--#define cpu_relax()                    smp_mb()
-+#define cpu_relax()    do {                                            \
-+                               asm("nop");                             \
-+                               asm("nop");                             \
-+                               asm("nop");                             \
-+                               asm("nop");                             \
-+                               asm("nop");                             \
-+                               smp_mb();                               \
-+                       } while (0)
- #else
- #define cpu_relax()                    barrier()
- #endif
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 5ec0608..d9b0614 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -48,8 +48,6 @@ void imx6q_restart(char mode, const char *cmd)
+ 	if (!wdog_base)
+ 		goto soft;
+ 
+-	imx_src_prepare_restart();
+-
+ 	/* enable wdog */
+ 	writew_relaxed(1 << 2, wdog_base);
+ 	/* write twice to ensure the request will not get ignored */
+diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
+index e15f155..900b3c1 100644
+--- a/arch/arm/mach-imx/src.c
++++ b/arch/arm/mach-imx/src.c
+@@ -43,19 +43,6 @@ void imx_set_cpu_jump(int cpu, void *jump_addr)
+ 		       src_base + SRC_GPR1 + cpu * 8);
+ }
+ 
+-void imx_src_prepare_restart(void)
+-{
+-	u32 val;
+-
+-	/* clear enable bits of secondary cores */
+-	val = readl_relaxed(src_base + SRC_SCR);
+-	val &= ~(0x7 << BP_SRC_SCR_CORE1_ENABLE);
+-	writel_relaxed(val, src_base + SRC_SCR);
+-
+-	/* clear persistent entry register of primary core */
+-	writel_relaxed(0, src_base + SRC_GPR1);
+-}
+-
+ void __init imx_src_init(void)
+ {
+ 	struct device_node *np;
+diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+index 7128e97..e94073f 100644
+--- a/arch/arm/plat-mxc/include/mach/common.h
++++ b/arch/arm/plat-mxc/include/mach/common.h
+@@ -133,7 +133,6 @@ static inline void imx_smp_prepare(void) {}
+ extern void imx_enable_cpu(int cpu, bool enable);
+ extern void imx_set_cpu_jump(int cpu, void *jump_addr);
+ extern void imx_src_init(void);
+-extern void imx_src_prepare_restart(void);
+ extern void imx_gpc_init(void);
+ extern void imx_gpc_pre_suspend(void);
+ extern void imx_gpc_post_resume(void);
+-- 
+1.7.5.4
