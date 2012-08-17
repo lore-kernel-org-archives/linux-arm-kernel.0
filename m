@@ -1,43 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Aug 2012 12:34:42 +0100
-Subject: [PATCH] BUG: clk_find() misses some clocks
-In-Reply-To: <CACQ1gAh3YcMBXp7BFoR68+rdDM1PEe4fenNG77s=SP05RditEA@mail.gmail.com>
-References: <1345196843-23059-1-git-send-email-richard.genoud@gmail.com>
- <20120817095837.GM18957@n2100.arm.linux.org.uk>
- <CACQ1gAh3YcMBXp7BFoR68+rdDM1PEe4fenNG77s=SP05RditEA@mail.gmail.com>
-Message-ID: <20120817113442.GN18957@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 Aug 2012 11:40:50 +0000
+Subject: [PATCH] ARM: LPC32xx: Provide DMA filter callbacks via platform
+ data
+In-Reply-To: <1345201835.27859.52.camel@sauron.fi.intel.com>
+References: <1345122935-22115-1-git-send-email-stigge@antcom.de>
+ <1345201311.27859.51.camel@sauron.fi.intel.com>
+ <1345201835.27859.52.camel@sauron.fi.intel.com>
+Message-ID: <201208171140.50388.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 17, 2012 at 12:23:06PM +0200, Richard Genoud wrote:
-> Ok, so I have to declare it like that :
-> CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioAB_clk)
+On Friday 17 August 2012, Artem Bityutskiy wrote:
+>   Show Details
+>   On Fri, 2012-08-17 at 14:01 +0300, Artem Bityutskiy wrote:
+> > > To later avoid collisions on subsystem merge, can you please leave the
+> > > patch with arch/arm/mach-lpc32xx/phy3250.c for arm-soc.git? (I will
+> > > provide a pull request for Arnd and Olof, as usual.)
+> > 
+> > Only if Arnd insists. Otherwise I'd prefer to resolve collisions (they
+> > cannot be hard with this patch) than pulling the soc tree to the mtd
+> > tree.
+> 
+> Actually the mtd patches do not compile-depend on it, sorry, I am
+> dropping it from the MTD tree. Thanks!
 
-Yes, because the wildcarding is in the clkdev tables, not in the driver.
-If you think about what's going on, that's the way it has to be.  Remember
-that it's the _device_ that defines what the connection name is (there's
-the hint: it's the connection name on the device itself) and it isn't a
-global clock name.
+For reference, I'm fine with either outcome, I don't mind seeing an
+occasional collision with subsystem trees, as they tend to be trivial
+to resolve.
 
-So, for example, if set of devices used in multiple different SoCs have a
-clock input called "apbclk" and on some SoCs this clock is uncontrollable,
-but on others it can be individually controlled, we can cater for this:
+If you split a series to go through multiple git trees, you have to
+ensure that both halves are actually regression free by themselves,
+which typically ends up being much harder than fixing a small merge
+conflict.
 
-- the SoC where this clock is uncontrollable can create a dummy clock with
-  a connection ID of "apbclk" and a NULL device name, which will match
-  against any device asking for an "apbclk".
-- the SoC where the clock is individually controllable would list the
-  individual "apbclk" entries in the clkdev table, and clkdev will return
-  the appropriate one.
-
-In mixed environments, this also works, because we return the "best match"
-from clkdev.
-
-Same goes for devices where they have an "iclk" and an "fclk" (iow, two
-clocks) - the connection ID can be wildcarded in the clkdev tables so that
-the same clock can be returned for the same device where the driver asks
-for the clocks individually - if that's what the SoC support desires.
-
-It makes no sense for a driver to ask for "any clock on this device"
-because drivers always want the clock for a particular purpose.  Hence
-why NULL arguments to clk_get() don't act as wildcards.
+	Arnd
