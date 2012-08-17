@@ -1,29 +1,28 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 17 Aug 2012 23:43:28 +0100
-Subject: [PATCH 4/5] ASoC: Davinci: machine: Add device tree binding
-In-Reply-To: <1344948125-5649-5-git-send-email-gururaja.hebbar@ti.com>
+Date: Fri, 17 Aug 2012 23:45:13 +0100
+Subject: [PATCH 5/5] ASoC: tlv320aic3x: Add device tree bindings
+In-Reply-To: <1344948125-5649-6-git-send-email-gururaja.hebbar@ti.com>
 References: <1344948125-5649-1-git-send-email-gururaja.hebbar@ti.com>
- <1344948125-5649-5-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <20120817224327.GK18871@opensource.wolfsonmicro.com>
+ <1344948125-5649-6-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <20120817224512.GL18871@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 06:12:04PM +0530, Hebbar, Gururaja wrote:
+On Tue, Aug 14, 2012 at 06:12:05PM +0530, Hebbar, Gururaja wrote:
 
-> +- ti,codec-clock : The Codec Clock from the board
+> +- gpio-reset - <int> -  gpio pin number used for codec reset
 
-I think this is the clock rate?  Please specify it more specifically.
+This should be a standard DT GPIO reference by phandle like:
 
-> +"<CODEC DAI Name>",	"<true if evm_aic3x_init is required, else false>",
-> +"<evm ops required, evm_ops or evm_spdif_ops>";
+	gpio = <&gpio1 16 0>;
 
-Please be more specific as to what these actually do - consider the user
-who is reading the bindings with a view to implementing them for their
-board, or writing drivers for another OS.
+There's quite a few examples in tree.
+
+Otherwise this looks good.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120817/ebff4c85/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120817/3927f7bd/attachment.sig>
