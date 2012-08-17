@@ -1,26 +1,50 @@
-From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Fri, 17 Aug 2012 16:14:36 +0300
-Subject: [PATCH v3 2/9] ARM: OMAP: mcbsp: Enable FIFO use for OMAP2430
-In-Reply-To: <20120817130723.GZ11011@atomide.com>
-References: <1345124468-8876-1-git-send-email-peter.ujfalusi@ti.com>
- <1345124468-8876-3-git-send-email-peter.ujfalusi@ti.com>
- <20120817130723.GZ11011@atomide.com>
-Message-ID: <502E43BC.30708@bitmer.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 17 Aug 2012 15:21:56 +0200
+Subject: [v3] Add basic address decoding support for Marvell 370/XP
+In-Reply-To: <20120816183708.GT22226@titan.lakedaemon.net>
+References: <1344246141-23931-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120816132839.GO22226@titan.lakedaemon.net>
+ <20120816183708.GT22226@titan.lakedaemon.net>
+Message-ID: <20120817152156.4d91ba16@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2012 04:07 PM, Tony Lindgren wrote:
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [120816 06:41]:
->> On OMAP2430 all McBSP ports have 128 word long buffer, enable the use of
->> the FIFO for the audio stack.
-> Is this the case also for 2420? I thought some only had a FIFO at
-> one port?
+Hello,
+
+Le Thu, 16 Aug 2012 14:37:08 -0400,
+Jason Cooper <jason@lakedaemon.net> a ?crit :
+
+> > Whole series applied to:
+> > 
+> > git://git.infradead.org/users/jcooper/linux.git boards-for-v3.7
 > 
-IRCC (I don't have specs), nope. Only 2430 (as noted by Peter) and
-onwards have FIFO.
+> I'm getting the following build error with orion_nand enabled:
+> 
+>   CC      drivers/mtd/nand/orion_nand.o
+> drivers/mtd/nand/orion_nand.c:24:27: fatal error: mach/hardware.h: No
+> such file or directory
+> compilation terminated.
+> 
+> I don't have time to look at it right now, hopefully I can look at it
+> tomorrow or this weekend.
 
-But that's true that FIFO sizes differ between the ports. E.g. only
-ports 2 and 3 have 1024+128 deep FIFOs in OMAP3.
+I have just built your boards-for-v3.7 for Kirkwood (which includes the
+orion_nand driver) and it builds just fine.
 
+Are you perhaps trying to enable the orion_nand driver for a mach-mvebu
+platform (Armada 370 or XP)? If it's the case, then yes, this build
+breakage is expected: we haven't enabled any of the I/O for now, so we
+don't have hardware.h yet. This is not something that is broken due to
+the address decoding changes.
+
+If however my guess was wrong, could you send me the failing .config so
+that I can reproduce and investigate?
+
+Thanks!
+
+Thomas Petazzoni
 -- 
-Jarkko
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
