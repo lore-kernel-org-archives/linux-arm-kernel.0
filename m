@@ -1,49 +1,40 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 17 Aug 2012 15:51:17 +0530
-Subject: [PATCH v2 28/31] arm64: Generic timers support
-In-Reply-To: <1344966752-16102-29-git-send-email-catalin.marinas@arm.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-29-git-send-email-catalin.marinas@arm.com>
-Message-ID: <502E1B1D.2030609@ti.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 17 Aug 2012 12:23:06 +0200
+Subject: [PATCH] BUG: clk_find() misses some clocks
+In-Reply-To: <20120817095837.GM18957@n2100.arm.linux.org.uk>
+References: <1345196843-23059-1-git-send-email-richard.genoud@gmail.com>
+ <20120817095837.GM18957@n2100.arm.linux.org.uk>
+Message-ID: <CACQ1gAh3YcMBXp7BFoR68+rdDM1PEe4fenNG77s=SP05RditEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 August 2012 11:22 PM, Catalin Marinas wrote:
-> From: Marc Zyngier<marc.zyngier@arm.com>
+2012/8/17 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> Please read the comments on the function:
 >
-> This patch adds support for the ARM generic timers with A64 instructions
-> for accessing the timer registers. It uses the physical counter as the
-> clock source and the virtual counter as sched_clock.
+>  * Find the correct struct clk for the device and connection ID.
+>  * We do slightly fuzzy matching here:
+>  *  An entry with a NULL ID is assumed to be a wildcard.
+>  *  If an entry has a device ID, it must match
+>  *  If an entry has a connection ID, it must match
+>  * Then we take the most specific entry - with the following
+>  * order of precedence: dev+con > dev only > con only.
 >
-> The timer frequency can be specified via DT or read from the CNTFRQ_EL0
-> register. The physical counter is also accessible from user space
-> allowing fast gettimeofday() implementation.
+> On Fri, Aug 17, 2012 at 11:47:23AM +0200, Richard Genoud wrote:
+>> if a clock is declared like that:
+>> CLKDEV_CON_DEV_ID("pioA", "fffff400.gpio", &pioAB_clk)
 >
-> Signed-off-by: Marc Zyngier<marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon<will.deacon@arm.com>
-> Signed-off-by: Catalin Marinas<catalin.marinas@arm.com>
-> ---
+> So you've declared it with a connection ID.  Therefore, as the comment
+> above says, "it must match" what the driver is asking for.
+>
+> It's not a bug, this is done intentionally so that mismatches do not
+> occur.
+Ok, so I have to declare it like that :
+CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioAB_clk)
 
-[..]
+Got it !
+Thanks.
 
-> diff --git a/drivers/clocksource/arm_generic.c b/drivers/clocksource/arm_generic.c
-> new file mode 100644
-> index 0000000..05c898c
-> --- /dev/null
-> +++ b/drivers/clocksource/arm_generic.c
+Richard.
 
-[..]
-
-> +
-> +static void __cpuinit arch_timer_setup(struct clock_event_device *clk)
-> +{
-> +	/* Let's make sure the timer is off before doing anything else */
-> +	arch_timer_stop();
-> +
-> +	clk->features = CLOCK_EVT_FEAT_ONESHOT;
-Are these CPU timers wakeup capable or we need the wakeup capable
-broadcast timer for low power wakeups ?
-In that case C3STOP would be needed here.
-
-Regards
-santosh
+-- 
+for me, ck means con kolivas and not calvin klein... does it mean I'm a geek ?
