@@ -1,21 +1,41 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 17 Aug 2012 06:06:20 -0700
-Subject: [PATCH v3 1/9] ARM/ASoC: omap-mcbsp: Move OMAP2+ clock
- parenting code to ASoC driver
-In-Reply-To: <1345124468-8876-2-git-send-email-peter.ujfalusi@ti.com>
+Date: Fri, 17 Aug 2012 06:07:24 -0700
+Subject: [PATCH v3 2/9] ARM: OMAP: mcbsp: Enable FIFO use for OMAP2430
+In-Reply-To: <1345124468-8876-3-git-send-email-peter.ujfalusi@ti.com>
 References: <1345124468-8876-1-git-send-email-peter.ujfalusi@ti.com>
- <1345124468-8876-2-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20120817130619.GY11011@atomide.com>
+ <1345124468-8876-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120817130723.GZ11011@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Peter Ujfalusi <peter.ujfalusi@ti.com> [120816 06:41]:
-> Move the McBSP CLKS re-parenting code to ASoC driver from
-> arch/arm/mach-omap2.
-> The call fort the re-parenting has been already limited to OMAP2+ SoC in
-> the ASoC driver. There is no longer need to have callback function for it.
+> On OMAP2430 all McBSP ports have 128 word long buffer, enable the use of
+> the FIFO for the audio stack.
 > 
 > Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 > Acked-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
+> ---
+>  arch/arm/mach-omap2/mcbsp.c |    5 ++++-
+>  1 files changed, 4 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
+> index ebc801e..6e046e1 100644
+> --- a/arch/arm/mach-omap2/mcbsp.c
+> +++ b/arch/arm/mach-omap2/mcbsp.c
+> @@ -151,7 +151,10 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
+>  	if (id == 4 && oh->class->rev == MCBSP_CONFIG_TYPE4)
+>  		pdata->mux_signal = omap4_mcbsp4_mux_rx_clk;
+>  
+> -	if (oh->class->rev == MCBSP_CONFIG_TYPE3) {
+> +	if (oh->class->rev == MCBSP_CONFIG_TYPE2) {
+> +		/* The FIFO has 128 locations */
+> +		pdata->buffer_size = 0x80;
+> +	} else if (oh->class->rev == MCBSP_CONFIG_TYPE3) {
+>  		if (id == 2)
+>  			/* The FIFO has 1024 + 256 locations */
+>  			pdata->buffer_size = 0x500;
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Is this the case also for 2420? I thought some only had a FIFO at
+one port?
+
+Tony
