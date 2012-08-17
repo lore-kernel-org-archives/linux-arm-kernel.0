@@ -1,72 +1,15 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 17 Aug 2012 11:15:00 +0100
-Subject: [PATCH v2 05/31] arm64: MMU initialisation
-In-Reply-To: <502E1793.9080605@ti.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-6-git-send-email-catalin.marinas@arm.com>
- <502E1793.9080605@ti.com>
-Message-ID: <20120817101500.GG24389@arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 17 Aug 2012 11:18:39 +0100
+Subject: [PATCH v3 0/9] ARM/ASoC: OMAP McBSP device tree support
+In-Reply-To: <1345124468-8876-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1345124468-8876-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120817101838.GB30548@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 17, 2012 at 11:06:11AM +0100, Santosh Shilimkar wrote:
-> On Tuesday 14 August 2012 11:22 PM, Catalin Marinas wrote:
-> > This patch contains the initialisation of the memory blocks, MMU
-> > attributes and the memory map. Only five memory types are defined:
-> > Device nGnRnE (equivalent to Strongly Ordered), Device nGnRE (classic
-> > Device memory), Device GRE, Normal Non-cacheable and Normal Cacheable.
-> > Cache policies are supported via the memory attributes register
-> > (MAIR_EL1) and only affect the Normal Cacheable mappings.
-> >
-> > This patch also adds the SPARSEMEM_VMEMMAP initialisation.
-> >
-> > Signed-off-by: Will Deacon<will.deacon@arm.com>
-> > Signed-off-by: Catalin Marinas<catalin.marinas@arm.com>
-> > ---
-> 
-> Whats the difference between Device nGnRE and Device GRE ?
-> Sorry, I haven't gone through the specs yet and hence the
-> question.
+On Thu, Aug 16, 2012 at 04:40:59PM +0300, Peter Ujfalusi wrote:
 
-G - gathering (multiple reads/writes into one)
-R - reordering (reads/writes)
-E - early acknowledgement (the write may have not hit the device before
-    the instruction returns).
+> in order to be able to add DT support for the McBSP driver which is used on all
+> OMAP platforms (OMAP1/2/3/4/5) I needed to make some cleanups to the stack:
 
-The 'n' in front just negates the meaning.
-
-So the Device memory as we know it on ARMv7 is equivalent to nGnRE. The
-Strongly Ordered is nGnRnE. GRE is pretty much like Normal Non-cacheable
-memory but with Device mapping, so there are restrictions on unaligned
-accesses.
-
-> > +#ifdef CONFIG_ZONE_DMA32
-> > +	/* 4GB maximum for 32-bit only capable devices */
-> > +	max_dma32 = min(max, MAX_DMA32_PFN);
-> > +	zone_size[ZONE_DMA32] = max_dma32 - min;
-> > +#endif
-> 
-> Do you see need of supporting DMA32 on arm64 SOCs ?
-
-I've got some questions from partners but those devices may just be
-hidden behind an iommu. For now I left it in.
-
-> > +static struct cachepolicy cache_policies[] __initdata = {
-> > +	{
-> > +		.policy		= "uncached",
-> > +		.mair		= 0x44,			/* inner, outer non-cacheable */
-> > +		.tcr		= TCR_IRGN_NC | TCR_ORGN_NC,
-> > +	}, {
-> > +		.policy		= "writethrough",
-> > +		.mair		= 0xaa,			/* inner, outer write-through, read-allocate */
-> > +		.tcr		= TCR_IRGN_WT | TCR_ORGN_WT,
-> 
-> Is WT supported on arm64?
-> On the recent ARMv7 processors, I think WT wasn't supported.
-
-All of WB, WA, WT are just architectural hints. A CPU implementation may
-or may not ignore them but with Linux we try to follow the architecture
-rather than specific implementations.
-
--- 
-Catalin
+Tony, are you OK with these changes going via ASoC?
