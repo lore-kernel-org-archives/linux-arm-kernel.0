@@ -1,85 +1,88 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 16 Aug 2012 23:43:01 -0400 (EDT)
-Subject: [PATCH] ARM: io: avoid writeback addressing modes for __raw_
- accessors
-In-Reply-To: <1344956366-32574-1-git-send-email-will.deacon@arm.com>
-References: <1344956366-32574-1-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.02.1208161906390.1541@xanadu.home>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 17 Aug 2012 11:48:56 +0800
+Subject: imx6q restart is broken
+In-Reply-To: <20120816223446.GB15883@n2100.arm.linux.org.uk>
+References: <20120808101817.GA14718@S2101-09.ap.freescale.net>
+ <50224547.9020000@de.bosch.com> <50232C17.9000700@gmail.com>
+ <20120809092021.GQ18957@n2100.arm.linux.org.uk>
+ <502BBB43.5010403@gmail.com>
+ <20120815214412.GC32560@n2100.arm.linux.org.uk>
+ <20120816023109.GH2258@S2101-09.ap.freescale.net>
+ <20120816223446.GB15883@n2100.arm.linux.org.uk>
+Message-ID: <20120817034854.GE24242@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 Aug 2012, Will Deacon wrote:
-
-> Data aborts taken to hyp mode do not provide a valid instruction
-> syndrome field in the HSR if the faulting instruction is a memory
-> access using a writeback addressing mode.
+On Thu, Aug 16, 2012 at 11:34:46PM +0100, Russell King - ARM Linux wrote:
+> This doesn't get around the problem that userspace can still effectively
+> issue a DoS against the system by just running a dmb in a tight loop.
+> Or maybe this would have a much more dramatic effect:
 > 
-> For hypervisors emulating MMIO accesses to virtual peripherals, taking
-> such an exception requires disassembling the faulting instruction in
-> order to determine the behaviour of the access. Since this requires
-> manually walking the two stages of translation, the world must be
-> stopped to prevent races against page aging in the guest, where the
-> first-stage translation is invalidated after the hypervisor has
-> translated to an IPA and the physical page is reused for something else.
+> 	while (1) {
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 		asm("dmb");
+> 	}
 > 
-> This patch avoids taking this heavy performance penalty when running
-> Linux as a guest by ensuring that our I/O accessors do not make use of
-> writeback addressing modes.
+> and make that 3 seconds to get a ps listing turn into something much
+> longer?
+> 
+>From my testing, no, it does not get the thing even worse.
 
-How often does this happen?  I don't really see writeback as a common 
-pattern for IO access.
+> I think what needs to happen here (while we wait) is someone _with_ the
+> problem needs to experiment, and find out how many nops are needed for
+> the DMB not to have much effect in cpu_relax().  If it turns out we just
+> need to put one nop in, then that's not _too_ bad.
 
-What does happen quite a lot, though, is pre-indexed addressing.  For 
-example, let's take this code which is fairly typical of driver code:
+At least, I need to have 5 nops to get rid of the issue, something like
+below.
 
-#define HW_REG1		0x10
-#define HW_REG2		0x14
-#define HW_REG3		0x18
-#define HW_REG4		0x30
+Regards,
+Shawn
 
-int hw_init(void __iomem *ioaddr)
-{
-	writel(0, ioaddr + HW_REG1)
-	writel(-1, ioaddr + HW_REG2);
-	writel(readl(ioaddr + HW_REG3) | 0xff, ioaddr + HW_REG4);
-	return 0;
-}
+--8<---
 
-Right now this produces this:
+diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
+index 99afa74..3e1b099 100644
+--- a/arch/arm/include/asm/processor.h
++++ b/arch/arm/include/asm/processor.h
+@@ -80,7 +80,14 @@ extern void release_thread(struct task_struct *);
+ unsigned long get_wchan(struct task_struct *p);
 
-hw_init:
-        mov     r3, r0
-        mvn     r2, #0
-        mov     r0, #0
-        str     r0, [r3, #16]
-        str     r2, [r3, #20]
-        ldr     r2, [r3, #24]
-        orr     r2, r2, #255
-        str     r2, [r3, #48]
-        bx      lr
-
-With your patch applied this becomes:
-
-hw_init:
-        add     r2, r0, #16
-        mov     r3, #0
-        str r3, [r2]
-        mvn     r3, #0
-        add     r2, r0, #20
-        str r3, [r2]
-        add     r3, r0, #24
-        ldr r3, [r3]
-        orr     r3, r3, #255
-        add     r0, r0, #48
-        str r3, [r0]
-        mov     r0, #0
-        bx      lr
-
-This basically made every IO access into two instructions instead of 
-only one, as well as increasing register pressure.
-
-So, is the performance claim something that you've actually measured 
-with a real system, or was it only theoretical?
-
-
-Nicolas
+ #if __LINUX_ARM_ARCH__ == 6 || defined(CONFIG_ARM_ERRATA_754327)
+-#define cpu_relax()                    smp_mb()
++#define cpu_relax()    do {                                            \
++                               asm("nop");                             \
++                               asm("nop");                             \
++                               asm("nop");                             \
++                               asm("nop");                             \
++                               asm("nop");                             \
++                               smp_mb();                               \
++                       } while (0)
+ #else
+ #define cpu_relax()                    barrier()
+ #endif
