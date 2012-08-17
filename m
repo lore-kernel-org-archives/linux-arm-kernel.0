@@ -1,109 +1,67 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Fri, 17 Aug 2012 21:20:01 +0530
-Subject: [PATCH 1/2] ARM: da850/omap-l138: Add SoC related definitions for
- VPIF
-In-Reply-To: <024a01cd7c8a$541efb20$fc5cf160$%szyprowski@samsung.com>
-References: <1343115786-15801-1-git-send-email-prabhakar.lad@ti.com>
- <1343115786-15801-2-git-send-email-prabhakar.lad@ti.com>
- <502A4464.3020706@ti.com>
- <502CC7CD.80906@ti.com> <502E5C40.803@ti.com>
- <024a01cd7c8a$541efb20$fc5cf160$%szyprowski@samsung.com>
-Message-ID: <CA+V-a8vcFhkF-dEOtBpx=v8P5DC+4qjsG8xxCeDRxkYTQTSStg@mail.gmail.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Fri, 17 Aug 2012 16:53:44 +0100
+Subject: Discontiguous memory and cacheflush
+In-Reply-To: <1822556972.575011.1345068509111.JavaMail.root@mozilla.com>
+References: <1822556972.575011.1345068509111.JavaMail.root@mozilla.com>
+Message-ID: <502E6908.4070408@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On 15/08/12 23:08, Martin Rosenberg wrote:
 
-On Fri, Aug 17, 2012 at 8:39 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hello,
->
-> On Friday, August 17, 2012 4:59 PM Sekhar Nori wrote:
->
->> On 8/16/2012 3:43 PM, Prabhakar Lad wrote:
->> > On Tuesday 14 August 2012 05:58 PM, Sekhar Nori wrote:
->>
->> [...]
->>
->> >>> +int __init da850_register_vpif_display(struct vpif_display_config
->> >>> +                                         *display_config)
->> >>> +{
->> >>> + struct resource da850_vpif_display_resource[] = {
->> >>> +         {
->> >>> +                 .start = IRQ_DA850_VPIFINT,
->> >>> +                 .end   = IRQ_DA850_VPIFINT,
->> >>> +                 .flags = IORESOURCE_IRQ,
->> >>> +         },
->> >>> +         {},
->> >>> + };
->> >>> + unsigned long phys_end_kernel;
->> >>> + int ret;
->> >>> +
->> >>> + if (vpif_disp_cont_bufsize) {
->> >>> +         phys_end_kernel = virt_to_phys((void *)PAGE_OFFSET) +
->> >>> +                                 (num_physpages << PAGE_SHIFT);
->> >>> +         phys_end_kernel += vpif_disp_cont_buf_offset;
->> >>> +         da850_vpif_display_resource[1].start = phys_end_kernel;
->> >>> +         da850_vpif_display_resource[1].end = phys_end_kernel +
->> >>> +                                         vpif_disp_cont_bufsize - 1;
->> >>> +         da850_vpif_display_resource[1].flags = IORESOURCE_MEM;
->> >>> +
->> >>> +         if (!request_mem_region(da850_vpif_display_resource[1].start,
->> >>> +                         resource_size(&da850_vpif_display_resource[1]),
->> >>> +                         da850_vpif_display_dev.name)) {
->> >>> +                 pr_err("region already claimed.\n");
->> >>> +                 return -EBUSY;
->> >>> +         }
->> >>> +         ret = dma_declare_coherent_memory(&da850_vpif_display_dev.dev,
->> >>> +                         phys_end_kernel, phys_end_kernel,
->> >>> +                         vpif_disp_cont_bufsize,
->> >>> +                         DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
->> >>> +
->> >>> +         if (!ret)
->> >>> +                 return -ENOMEM;
->> >>> + }
->> >>> + ret = platform_device_add_resources(&da850_vpif_display_dev,
->> >>> +                         da850_vpif_display_resource,
->> >>> +                         ARRAY_SIZE(da850_vpif_display_resource));
->> >>
->> >> You are taking memory at the end of RAM and passing it as a IO resource
->> >> to the driver. This is not correct. For contiguous memory needs can you
->> >> look at the recently merged CMA framework (include/linux/dma-contiguous.h)
->> >>
->> > Ok. But looks like CMA is enabled for CPU_V6/V6K/V7. If CMA is enabled
->> > for ARM926 too than we can use the global CMA itself rather then doing
->> > it for each device, then three will be no need to do the above and all
->> > the kernel parameters can be removed too.
->>
->> I hadn't followed the CMA development closely so I am not sure of the
->> reasons behind restricting it to v6+. The patch that added this doesn't
->> really talk about why it should be restricted to v6+. I am copying Marek
->> here to see if he can quickly clarify, but may be you can even start a
->> new thread asking about this.
->
-> Frankly, this is a leftover from some earlier suggestions that CMA should solve the
-> aliasing of coherent mappings, which might be a problem on v6+. If it works correctly
-> on pre-v6, then this dependency should be removed. Feel free to submit a patch and
-> I will take it to my fixes branch.
->
+>> It's intention is to support self-modifying userspace code only and
+>> also intended to be used over a _short_ range of addresses only -
+>> it works by flushing each _individual_ cache line over the range of
+>> addreses requested.
+> Documenting the current behavior would mostly be acceptable, but it
+> is rather confusing (and took quite some time to track down)
+> 
+>> If it's going to be used for significantly larger areas, then we
+>> need to think about imposing a limit, upon which we just flush the
+>> entire cache and be done with it.
+> 
+> I found that there was still a net win making fewer syscalls, even
+> with the overhead of flushing extra cache lines. In the cases where
+> the range is discontiguous, 
 
-I have created a patch for enabling CMA on CPU32_v5 [1], and also
-tested it works.
-Soon posting this patch.
 
-[1] http://git.linuxtv.org/mhadli/v4l-dvb-davinci_devices.git/commitdiff/e940a1b9262bde96eec4b18971a6307f24262667?hp=2f30ae4ee373fe4c69ab1606373538dcc99ed283
+Was this net win on platforms other than ARM? Was it still evident after
+working around the truncation/multiple vma issue that occurs?
 
-Thanks and Regards,
---Prabhakar Lad
+I'm curious as to whether some (even most?) of your performance
+improvement could be coming from the range truncation. Perhaps the
+performance is better because you're actually doing less flushing, and
+not governed by the syscall overhead?
 
-> Best regards
-> --
-> Marek Szyprowski
-> Samsung Poland R&D Center
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Consider an extreme version of the case you describe below: lets say
+instruction 1/20 was in the first vma and 19/20 are in subsequent vmas.
+In the un-coalesced case you are going to flush several pages covering
+the addresses of all 20 instructions, but in your coalesced case I think
+only one page that contains the first instruction[1] will get
+flushed...(which, as you know, means you've got a bug!)
+
+> I usually need to do something silly,
+> like flush 20 individual instructions that are scattered throughout
+> several hundred MB of memory. I think the fastest method for
+> flushing in this case would be to shave a different call, with a
+> different api, where userspace can provide an array of addresses that
+> need to be flushed, but that sounds like material for a new thread.
+> Thanks --Marty
+
+A better understanding of the details of your case would be a good
+starting point for a discussion. For example it might be nice to know
+how significant the syscall overhead is compared to the time to flush
+ranges you're interested in...
+
+Also, as Russell says, there'll be a point at which flushing the whole
+cache is better than flushing a load of odd chunks here and there...
+
+Jonny
+
+[1] Had you noticed that our implementation flushes a minimum of 1-page?
+
+(cacheflush.h:257)
+#define flush_cache_user_range(start,end) \
+        __cpuc_coherent_user_range((start) & PAGE_MASK, PAGE_ALIGN(end))
+
+Does that have a bearing on what you're doing?
