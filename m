@@ -1,59 +1,81 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 17 Aug 2012 14:48:57 +0100
-Subject: [PATCH v2 02/31] arm64: Kernel booting and initialisation
-In-Reply-To: <20120817131358.GF11011@atomide.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-3-git-send-email-catalin.marinas@arm.com>
- <502E11B6.4020104@ti.com> <20120817100533.GE24389@arm.com>
- <CAMQu2gzz0j+SnxCY0u3H__H4U-Lor_xV-eyiMBSohCMngbkD2w@mail.gmail.com>
- <20120817131358.GF11011@atomide.com>
-Message-ID: <20120817134857.GI24389@arm.com>
+From: alanbutty12@gmail.com (Alan M Butler)
+Date: Fri, 17 Aug 2012 14:01:43 +0000
+Subject: Issues with all kernels after 3.3.7
+In-Reply-To: <20120817132629.GA2232@pengutronix.de>
+References: <CADhrpJ7r4PPM2nOD7Wch9H+usaDUJ5XYeim6THUKEDTz=-Zyig@mail.gmail.com>
+ <20120817132629.GA2232@pengutronix.de>
+Message-ID: <CADhrpJ63XMer2zQ+wBQxGGLYwfU8hJ=ejDTwYktFtmE6OY+dPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 17, 2012 at 02:13:59PM +0100, Tony Lindgren wrote:
-> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120817 03:11]:
-> > On Fri, Aug 17, 2012 at 3:35 PM, Catalin Marinas
-> > <catalin.marinas@arm.com> wrote:
-> > >
-> > > On Fri, Aug 17, 2012 at 10:41:10AM +0100, Santosh Shilimkar wrote:
-> > > >
-> > > > So you expect all the secondary CPUs to be in wakeup state and probably
-> > > > looping in WFE for a signal from kernel to boot. There is one issue
-> > > > with this requirement though. For large CPU system, you need to reset
-> > > > all the CPUs and hit this waiting loop. This will lead to large inrush
-> > > > current need at bootup which may be not be supported. To avoid this
-> > > > issue, secondary CPUs are kept in OFF state and then they are woken
-> > > > up from kernel one by one whenever they need to be brought into the
-> > > > system. This requirement should be considered.
-> > >
-> > > I agree, this part will be extended. That's one method that we currently
-> > > support and suitable to the model.
-> > >
-> > > The better method is the SMC standardisation that Charles Garcia-Tobin
-> > > has written (to be made available soon) and was presented at the last
-> > > Linaro Connect in HK. Given that the CPU power is usually controlled by
-> > > the secure side, we'll ask for an SMC to be issued for waking up
-> > > secondary CPUs, so it's up to the secure firmware to write the correct
-> > > hardware registers.
-> > >
-> > Thanks for the information. SMC standardization would indeed help
-> > to overcome some of these. Will wait for that information before
-> > next set of questions.
-> 
-> Yes please. If the SMC is not standardized for most calls at least,
-> we'll end up with a horrible mess of SoC specific calls like we
-> currently have. Related to that, the virtualization calls should be
-> also standardized so we don't end up with multiple different hypervisors
-> with different calls.
+On 17 August 2012 13:26, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Fri, Aug 17, 2012 at 01:47:06PM +0100, alan butler wrote:
+>> I have been trying all kernels after 3.3.7 (except for the 3.5 series)
+>> on my ix2-200
+>> and have found that on every kernel 3.3.8, 3.4, 3.4.2, 3.4.4 =>3.4.7
+>> and now even on 3.6 rc1
+>> and the next dated today 17 august that when i use git for example:
+>>
+>> git clone git://git.videolan.org/x264
+>>
+>> my system just crash's / hangs and even through the serial port i get
+>> no response.
+>> This also happens when i try to access a web interface for example the
+>> serviio java webui.
+>>
+>> The second issue i have noticed is that my raid 0 array hangs / pauses
+>> when being mounted
+>> at system startup. (for approximatly 30 seconds maybe more maybe less
+>> im not certain).
+>> But again on the 3.3.7 kernel there was no issue and no hang.
+>>
+>> If i return to 3.3.7 everything works fine with no other modifications
+>> to the os or kernels.
+>> I am using debian wheezy at the moment but also tried debian squeeze
+>> so it does not
+>> seem to be related to the specific linux version just the kernel.
+> Can you bisect your problem? Doing that between 3.3.7 and 3.3.8 seems to
+> be the obvious range to test.
+>
+> You can also try to enable the various debugging options like
+>
+>         CONFIG_DETECT_HUNG_TASK
+>         CONFIG_PROVE_LOCKING
+>         CONFIG_DEBUG_ATOMIC_SLEEP
+>         CONFIG_MAGIC_SYSRQ
+>
+> or try https://lkml.org/lkml/2012/5/26/83.
+>
+> Best regards
+> Uwe
+>
+> --
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
-For hypervisor, there are two kinds of API - one meant for power
-management that is pretty much the same as the SMC and another specific
-to the hypervisor solution (KVM, Xen etc.). The latter is specific to
-the host kernel that's running as we start it at EL2 but it's not
-standardised. It would be good indeed and there are other advantages
-like self-virtualisation but it needs the KVM and Xen guys to come to a
-common definition.
+i enabled the options you said there and i see alot of the following
+popping up while connected through serial:
 
--- 
-Catalin
+ BUG: sleeping function called from invalid context at
+include/linux/freezer.h:46
+[  126.896958] in_atomic(): 0, irqs_disabled(): 128, pid: 2180, name:
+console-kit-dae
+[  126.904566] no locks held by console-kit-dae/2180.
+[  126.909378] irq event stamp: 27643
+[  126.912797] hardirqs last  enabled at (27642): [<c03781ac>]
+_raw_spin_unlock_irqrestore+0x3c/0x5c
+[  126.921735] hardirqs last disabled at (27643): [<c00090cc>]
+ret_fast_syscall+0xc/0x38
+[  126.929618] softirqs last  enabled at (25565): [<c001bc20>]
+irq_exit+0x54/0xb8
+[  126.936890] softirqs last disabled at (25558): [<c001bc20>]
+irq_exit+0x54/0xb8
+[  126.944185] [<c000ea8c>] (unwind_backtrace+0x0/0xe0) from
+[<c000b414>] (do_signal+0x84/0x5c0)
+[  126.952764] [<c000b414>] (do_signal+0x84/0x5c0) from [<c000be0c>]
+(do_notify_resume+0x18/0x60)
+[  126.961430] [<c000be0c>] (do_notify_resume+0x18/0x60) from
+[<c0009120>] (work_pending+0x24/0x28)
+
+there seems to be alot more of them when i have serviio upnp server running.
