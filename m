@@ -1,30 +1,19 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 17 Aug 2012 16:08:47 -0300
-Subject: [alsa-devel] Lockups reading from i.MX51 SSI registers
-In-Reply-To: <20120810210647.GG1451@pengutronix.de>
-References: <20120810195005.GP24328@opensource.wolfsonmicro.com>
- <20120810195638.GF1451@pengutronix.de>
- <20120810201456.GL25520@pengutronix.de>
- <20120810210647.GG1451@pengutronix.de>
-Message-ID: <CAOMZO5DAs=jm-08tWdfdLG_nm=gdi-Q_RReiUKGM_RCgB82dwA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 17 Aug 2012 13:26:41 -0600
+Subject: [PATCH] ARM: tegra: clocks: separate tegra_clk_32k_ops from
+ Tegra20 and Tegra30
+In-Reply-To: <1345186281-3859-1-git-send-email-josephl@nvidia.com>
+References: <1345186281-3859-1-git-send-email-josephl@nvidia.com>
+Message-ID: <502E9AF1.2000701@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2012 at 6:06 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+On 08/17/2012 12:51 AM, Joseph Lo wrote:
+> Currently the tegra20 and tegra30 share the same symbol for
+> tegra_clk_32k_ops. This will cause a compile error when building
+> a tegra20-only kernel image. Add tegra_clk_32k_ops for tegra20 and
+> modify tegra30_clk_32k_ops for tegra30.
+> 
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
 
-> One clock is for the bus which must be turned on. The other is for the
-> bitclock which we currently can ignore since we only support clock slave
-> mode.
-> On an i.MX5 ssi[123]_ipg_gate must be turned on by the ssi driver. From
-> a quick look to the clock code it looks correct.
-
-I tested audio playback on a mx51evk board last week using linux-next
-and it worked fine (it has a sgtl5000).
-
-I don't have any hardware with ac97 to try it.
-
-Also, for the playback to work you need to install the SDMA firmware.
-
-Regards,
-
-Fabio Estevam
+Thanks, applied to Tegra's for-3.7/common-clk branch.
