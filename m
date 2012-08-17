@@ -1,54 +1,25 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 17 Aug 2012 14:21:24 -0400 (EDT)
-Subject: [PATCH v2 02/31] arm64: Kernel booting and initialisation
-In-Reply-To: <201208171120.40740.arnd@arndb.de>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-3-git-send-email-catalin.marinas@arm.com>
- <alpine.LFD.2.02.1208161438110.1541@xanadu.home>
- <201208171120.40740.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1208171407540.1541@xanadu.home>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 17 Aug 2012 13:01:31 -0600
+Subject: [PATCH] mmc: tegra: convert to device tree support only
+In-Reply-To: <1345187071-6619-1-git-send-email-josephl@nvidia.com>
+References: <1345187071-6619-1-git-send-email-josephl@nvidia.com>
+Message-ID: <502E950B.2010205@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 Aug 2012, Arnd Bergmann wrote:
-
-> On Thursday 16 August 2012, Nicolas Pitre wrote:
-> > Some people will want to use bzip2 or whatever other decompressor du 
-> > jour.  Maybe this shouldn't be gzip specific, or just presented as a 
-> > possible option?
+On 08/17/2012 01:04 AM, Joseph Lo wrote:
+> When compiling a kernel that supports only Tegra30 and not Tegra20,
+> the SDHCI driver will fail to compile since the of_match_device() failure
+> fallback code unconditinally references soc_data_tegra20, which is only
+> compiled in when Tegra20 support is enabled.
 > 
-> Good point. Whether this should be part of this document depends on
-> what assumptions we make about the boot loader getting the image
-> in the first place.
-> 
-> In the strict sense, we are documenting the interface between the boot
-> loader and the kernel here, which already specifies that  the kernel
-> must be uncompressed by the time we enter it. If the boot loader wants
-> to add its own encryption or compression methods, or its own headers
-> in front of the binary, the boot protocol isn't really impacted.
+> In Kernel 3.7, both Tegra20 and Tegra30 will only support booting using
+> device tree, Hence, there is never a need to fall back to using
+> soc_data_tegra20 if of_mach_device() fails. Instead, make this case an
+> error. This removes the reference to soc_data_tegra20, and hence solves
+> the compile failure.
 
-Right.  And someone else will insist on wrapping the kernel into a boot 
-loader specific image format e.g. u-Boot.  If all those variations could 
-be kept out of the kernel build that would be a good thing.
+Tested-by: Stephen Warren <swarren@wwwdotorg.org>
 
-That means the kernel should be wrapped/compressed/scrambled at 
-installation time, not at build time.  This way the kernel image remains 
-universal and flexibility in its installation is possible.
-
-> That said, I think it's a good idea to also specify what kind of 
-> format we want to be used, e.g. a stripped ELF Image compressed with 
-> one of gzip/bzip2/lzo/xz and with no other headers added, on a 
-> vfat/ext4/btrfs formatted file system. There are probably a lot of 
-> other things one might want to specify if we go down this route. Or we 
-> could refer to the UEFI spec and mandate that the same format that 
-> UEFI uses should be used here independent of what boot loader is used. 
-> I think we can still allow other ways to get to the image for deeply 
-> embedded systems, e.g. linking the kernel into the boot loader as a 
-> blob on tightly constrained systems. For that case, we'd only specify 
-> the interface between boot loader and kernel as described above.
-
-I don't think we'll have to concern ourselves with tightly constrained 
-systems that much on ARM64.
-
-
-Nicolas
+(built and tested both Tegra20-only and Tegr30-only kernels with this
+applied on top of next-20120816).
