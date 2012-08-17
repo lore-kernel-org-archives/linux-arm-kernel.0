@@ -1,61 +1,54 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 17 Aug 2012 23:43:44 +0530
-Subject: [PATCH 1/5] ASoC/ARM: Davinci: McASP: split asp header into
- platform and audio specific
-In-Reply-To: <1344948125-5649-2-git-send-email-gururaja.hebbar@ti.com>
-References: <1344948125-5649-1-git-send-email-gururaja.hebbar@ti.com>
- <1344948125-5649-2-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <502E89D8.2090304@ti.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 17 Aug 2012 14:21:24 -0400 (EDT)
+Subject: [PATCH v2 02/31] arm64: Kernel booting and initialisation
+In-Reply-To: <201208171120.40740.arnd@arndb.de>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-3-git-send-email-catalin.marinas@arm.com>
+ <alpine.LFD.2.02.1208161438110.1541@xanadu.home>
+ <201208171120.40740.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.02.1208171407540.1541@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gururaja,
+On Fri, 17 Aug 2012, Arnd Bergmann wrote:
 
-On 8/14/2012 6:12 PM, Hebbar, Gururaja wrote:
-> Davinci McASP header & driver are shared by few OMAP platforms (like
-> TI81xx, AM335x). Splitting asp header into Davinci platform specific
-> header and Audio specific header helps to share them across platforms.
+> On Thursday 16 August 2012, Nicolas Pitre wrote:
+> > Some people will want to use bzip2 or whatever other decompressor du 
+> > jour.  Maybe this shouldn't be gzip specific, or just presented as a 
+> > possible option?
 > 
-> Audio specific defines is moved to to common
-> <linux/platform_data/davinci_asp.h> so that the header can be
-> accessed by all related platforms.
+> Good point. Whether this should be part of this document depends on
+> what assumptions we make about the boot loader getting the image
+> in the first place.
 > 
-> While here, correct the header usage (remove multiple header
-> re-definitions and unused headers) and remove platform names from
-> structures comments and enum
-> 
-> Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
-> Acked-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> In the strict sense, we are documenting the interface between the boot
+> loader and the kernel here, which already specifies that  the kernel
+> must be uncompressed by the time we enter it. If the boot loader wants
+> to add its own encryption or compression methods, or its own headers
+> in front of the binary, the boot protocol isn't really impacted.
 
-This patch looks good to me. See a minor nit below.
+Right.  And someone else will insist on wrapping the kernel into a boot 
+loader specific image format e.g. u-Boot.  If all those variations could 
+be kept out of the kernel build that would be a good thing.
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+That means the kernel should be wrapped/compressed/scrambled at 
+installation time, not at build time.  This way the kernel image remains 
+universal and flexibility in its installation is possible.
 
-> diff --git a/arch/arm/mach-davinci/asp.h b/arch/arm/mach-davinci/asp.h
-> new file mode 100644
-> index 0000000..8fd5238
-> --- /dev/null
-> +++ b/arch/arm/mach-davinci/asp.h
-> @@ -0,0 +1,49 @@
-> +/*
-> + * TI DaVinci Audio definitions
-> + */
-> +#ifndef __ASM_ARCH_DAVINCI_ASP_H
-> +#define __ASM_ARCH_DAVINCI_ASP_H
-> +
-> +/* Bases of dm644x and dm355 register banks */
-> +#define DAVINCI_ASP0_BASE	0x01E02000
-> +#define DAVINCI_ASP1_BASE	0x01E04000
-> +
-> +/* Bases of dm365 register banks */
-> +#define DAVINCI_DM365_ASP0_BASE	0x01D02000
-> +
-> +/* Bases of dm646x register banks */
-> +#define	DAVINCI_DM646X_MCASP0_REG_BASE		0x01D01000
-> +#define DAVINCI_DM646X_MCASP1_REG_BASE		0x01D01800
+> That said, I think it's a good idea to also specify what kind of 
+> format we want to be used, e.g. a stripped ELF Image compressed with 
+> one of gzip/bzip2/lzo/xz and with no other headers added, on a 
+> vfat/ext4/btrfs formatted file system. There are probably a lot of 
+> other things one might want to specify if we go down this route. Or we 
+> could refer to the UEFI spec and mandate that the same format that 
+> UEFI uses should be used here independent of what boot loader is used. 
+> I think we can still allow other ways to get to the image for deeply 
+> embedded systems, e.g. linking the kernel into the boot loader as a 
+> blob on tightly constrained systems. For that case, we'd only specify 
+> the interface between boot loader and kernel as described above.
 
-Can you remove usage of tabs after 'define'. I understand this is coming
-from existing code.
+I don't think we'll have to concern ourselves with tightly constrained 
+systems that much on ARM64.
 
-Thanks,
-Sekhar
+
+Nicolas
