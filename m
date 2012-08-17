@@ -1,35 +1,50 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 17 Aug 2012 14:10:35 +0300
-Subject: [PATCH] ARM: LPC32xx: Provide DMA filter callbacks via platform
- data
-In-Reply-To: <1345201311.27859.51.camel@sauron.fi.intel.com>
-References: <1345122935-22115-1-git-send-email-stigge@antcom.de>
- <1345198171.27859.39.camel@sauron.fi.intel.com>
- <502E2279.1030604@antcom.de>
- <1345201311.27859.51.camel@sauron.fi.intel.com>
-Message-ID: <1345201835.27859.52.camel@sauron.fi.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 Aug 2012 11:20:40 +0000
+Subject: [PATCH v2 02/31] arm64: Kernel booting and initialisation
+In-Reply-To: <alpine.LFD.2.02.1208161438110.1541@xanadu.home>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-3-git-send-email-catalin.marinas@arm.com>
+ <alpine.LFD.2.02.1208161438110.1541@xanadu.home>
+Message-ID: <201208171120.40740.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-08-17 at 14:01 +0300, Artem Bityutskiy wrote:
-> > To later avoid collisions on subsystem merge, can you please leave the
-> > patch with arch/arm/mach-lpc32xx/phy3250.c for arm-soc.git? (I will
-> > provide a pull request for Arnd and Olof, as usual.)
+On Thursday 16 August 2012, Nicolas Pitre wrote:
+> > +3. Decompress the kernel image
+> > +------------------------------
+> > +
+> > +Requirement: OPTIONAL
+> > +
+> > +The AArch64 kernel does not provide a decompressor and therefore
+> > +requires gzip decompression to be performed by the boot loader if the
+> > +default Image.gz target is used.  For bootloaders that do not implement
+> > +this requirement, the larger Image target is available instead.
 > 
-> Only if Arnd insists. Otherwise I'd prefer to resolve collisions (they
-> cannot be hard with this patch) than pulling the soc tree to the mtd
-> tree.
+> Some people will want to use bzip2 or whatever other decompressor du 
+> jour.  Maybe this shouldn't be gzip specific, or just presented as a 
+> possible option?
 
-Actually the mtd patches do not compile-depend on it, sorry, I am
-dropping it from the MTD tree. Thanks!
+Good point. Whether this should be part of this document depends on
+what assumptions we make about the boot loader getting the image
+in the first place.
 
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120817/bbd3ec00/attachment.sig>
+In the strict sense, we are documenting the interface between the boot
+loader and the kernel here, which already specifies that  the kernel
+must be uncompressed by the time we enter it. If the boot loader wants
+to add its own encryption or compression methods, or its own headers
+in front of the binary, the boot protocol isn't really impacted.
+
+That said, I think it's a good idea to also specify what kind of
+format we want to be used, e.g. a stripped ELF Image compressed
+with one of gzip/bzip2/lzo/xz and with no other headers added,
+on a vfat/ext4/btrfs formatted file system. There are probably a
+lot of other things one might want to specify if we go down this
+route. Or we could refer to the UEFI spec and mandate that the
+same format that UEFI uses should be used here independent of
+what boot loader is used. I think we can still allow other ways to
+get to the image for deeply embedded systems, e.g. linking the
+kernel into the boot loader as a blob on tightly constrained
+systems. For that case, we'd only specify the interface between
+boot loader and kernel as described above.
+
+	Arnd
