@@ -1,32 +1,29 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 17 Aug 2012 23:41:32 +0100
-Subject: [PATCH 2/5] ASoC: Davinci: McASP: add device tree support for
- McASP
-In-Reply-To: <1344948125-5649-3-git-send-email-gururaja.hebbar@ti.com>
+Date: Fri, 17 Aug 2012 23:43:28 +0100
+Subject: [PATCH 4/5] ASoC: Davinci: machine: Add device tree binding
+In-Reply-To: <1344948125-5649-5-git-send-email-gururaja.hebbar@ti.com>
 References: <1344948125-5649-1-git-send-email-gururaja.hebbar@ti.com>
- <1344948125-5649-3-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <20120817224131.GJ18871@opensource.wolfsonmicro.com>
+ <1344948125-5649-5-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <20120817224327.GK18871@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 06:12:02PM +0530, Hebbar, Gururaja wrote:
+On Tue, Aug 14, 2012 at 06:12:04PM +0530, Hebbar, Gururaja wrote:
 
-> +- op-mode : I2S/DIT ops mode.
+> +- ti,codec-clock : The Codec Clock from the board
 
-This would normally be part of the machine binding since it needs to be
-applied to both ends of the link.  When adding it could you come up with
-a generic binding for this in terms of the current ASoC DAI paremeters
-please?  That way we'll be able to have other machine drivers be
-consistent with this one.
+I think this is the clock rate?  Please specify it more specifically.
 
-> +- tdm-slots : Slots for TDM operation.
+> +"<CODEC DAI Name>",	"<true if evm_aic3x_init is required, else false>",
+> +"<evm ops required, evm_ops or evm_spdif_ops>";
 
-This would normally also be a machine driver thing though it's less
-normal to need to configure this on both ends.
+Please be more specific as to what these actually do - consider the user
+who is reading the bindings with a view to implementing them for their
+board, or writing drivers for another OS.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120817/2771ff94/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120817/ebff4c85/attachment.sig>
