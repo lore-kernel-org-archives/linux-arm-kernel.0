@@ -1,50 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 18 Aug 2012 21:14:34 +0000
-Subject: [PATCH 02/14] at91: regroup gpio and pinctrl under a simple-bus
-In-Reply-To: <1344603731-32667-2-git-send-email-plagnioj@jcrosoft.com>
+Date: Sat, 18 Aug 2012 21:18:45 +0000
+Subject: [PATCH 03/14] arm: at91: at91sam9x5: fix gpio number per bank
+In-Reply-To: <1344603731-32667-3-git-send-email-plagnioj@jcrosoft.com>
 References: <20120810124820.GA20557@game.jcrosoft.org>
  <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
- <1344603731-32667-2-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <201208182114.35063.arnd@arndb.de>
+ <1344603731-32667-3-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <201208182118.45349.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 10 August 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> -                       pioA: gpio at fffff400 {
-> -                               compatible = "atmel,at91rm9200-gpio";
-> -                               reg = <0xfffff400 0x100>;
-> -                               interrupts = <2 4 1>;
-> -                               #gpio-cells = <2>;
-> -                               gpio-controller;
-> -                               interrupt-controller;
-> -                       };
-> +                       pinctrl at fffff400 {
-> +                               #address-cells = <1>;
-> +                               #size-cells = <1>;
-> +                               ranges;
-> +                               compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
-> +                               reg = <0xfffff400 0x600>;
+> --- a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
+> +++ b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
+> @@ -9,6 +9,10 @@ Required properties:
+>    unused).
+>  - gpio-controller: Marks the device node as a GPIO controller.
+>  
+> +optional properties:
+> +- gpio-nb: Number of gpio if absent 32.
 > +
-> +                               pioA: gpio at fffff400 {
-> +                                       compatible = "atmel,at91rm9200-gpio";
-> +                                       reg = <0xfffff400 0x200>;
-> +                                       interrupts = <2 4 1>;
-> +                                       #gpio-cells = <2>;
-> +                                       gpio-controller;
-> +                                       interrupt-controller;
-> +                               };
+> +
+>  Example:
+>         pioA: gpio at fffff200 {
+>                 compatible = "atmel,at91rm9200-gpio";
+> @@ -16,5 +20,6 @@ Example:
+>                 interrupts = <2 4>;
+>                 #gpio-cells = <2>;
+>                 gpio-controller;
+> +               gpio-nb = <19>;
 
-Hmm, If the node declares itself to be an interrupt-controller, it should
-normally have an #interrupt-cells property as well.
+What does "nb" stand for?
 
-Also, I think you should not list the same registers in both the parent
-and the children. It's probably better to remove the registers in the
-parent node and just refer to the children from the pinctrl driver.
-Since the pinctrl device is not really a bus in the sense that devices
-connected to it see the same address space, you could have the
-registers translated like 
-
-	ranges = <0xfffff400 0 0x600>;
-
+The marvell-gpio binding uses "ngpio" for the number, so that would
+already be established. Otherwise, I think "#gpio-lines" would be
+more in line with other things we count in the bindings.
 
 	Arnd
