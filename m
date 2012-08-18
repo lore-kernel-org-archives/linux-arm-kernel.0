@@ -1,38 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 18 Aug 2012 21:18:45 +0000
-Subject: [PATCH 03/14] arm: at91: at91sam9x5: fix gpio number per bank
-In-Reply-To: <1344603731-32667-3-git-send-email-plagnioj@jcrosoft.com>
-References: <20120810124820.GA20557@game.jcrosoft.org>
- <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
- <1344603731-32667-3-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <201208182118.45349.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 19 Aug 2012 00:42:12 +0200
+Subject: [PATCH 5/6] ARM: integrator: convert AMBA devices to device tree
+In-Reply-To: <20120816124002.GB7439@game.jcrosoft.org>
+References: <1345119373-22774-1-git-send-email-linus.walleij@linaro.org>
+ <20120816124002.GB7439@game.jcrosoft.org>
+Message-ID: <CACRpkdZDMxk30YTkrumRveR3OuWptSpzNevrAvC2FxYShOZp-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 August 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> --- a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
-> +++ b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
-> @@ -9,6 +9,10 @@ Required properties:
->    unused).
->  - gpio-controller: Marks the device node as a GPIO controller.
->  
-> +optional properties:
-> +- gpio-nb: Number of gpio if absent 32.
-> +
-> +
->  Example:
->         pioA: gpio at fffff200 {
->                 compatible = "atmel,at91rm9200-gpio";
-> @@ -16,5 +20,6 @@ Example:
->                 interrupts = <2 4>;
->                 #gpio-cells = <2>;
->                 gpio-controller;
-> +               gpio-nb = <19>;
+On Thu, Aug 16, 2012 at 2:40 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 14:16 Thu 16 Aug     , Linus Walleij wrote:
+>> +/* For the Device Tree, add in the UART callbacks as AUXDATA */
+>> +static struct of_dev_auxdata ap_auxdata_lookup[] __initdata = {
+>> +     OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_RTC_BASE,
+>> +             "rtc", NULL),
+>> +     OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_UART0_BASE,
+>> +             "uart0", &integrator_uart_data),
+>> +     OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_UART1_BASE,
+>> +             "uart1", &integrator_uart_data),
+>> +     OF_DEV_AUXDATA("arm,primecell", KMI0_BASE,
+>> +             "kmi0", NULL),
+>> +     OF_DEV_AUXDATA("arm,primecell", KMI1_BASE,
+>> +             "kmi1", NULL),
+>> +     { /* sentinel */ },
 
-What does "nb" stand for?
+> why that?
 
-The marvell-gpio binding uses "ngpio" for the number, so that would
-already be established. Otherwise, I think "#gpio-lines" would be
-more in line with other things we count in the bindings.
+Based on similar code by Grant in arch/arm/mach-versatile/core.c
+also ending with a {}. Also at other places ... I though this terminated
+the list iteration, is it not needed anymore?
 
-	Arnd
+Yours,
+Linus Walleij
