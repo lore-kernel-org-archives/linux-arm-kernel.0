@@ -1,69 +1,65 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 18 Aug 2012 16:09:25 +0800
-Subject: [PATCH] ARM: imx6: spin the cpu until hardware takes it down
-Message-ID: <1345277365-30192-1-git-send-email-shawn.guo@linaro.org>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Sat, 18 Aug 2012 10:10:08 +0200
+Subject: [PATCH] rtc: snvs: improve timeout handling in snvs_rtc_enable()
+Message-ID: <1345277408-30044-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Though commit 602bf40 (ARM: imx6: exit coherency when shutting down
-a cpu) improves the stability of imx6q cpu hotplug a lot, there are
-still hangs seen with a more stressful hotplug testing.
+If snvs_rtc_enable() happens to be descheduled for a period longer
+than the timout period, a timeout may be indicated even if the RTC
+status has changed meanwhile. Force a status read at the end of the
+timeout period to prevent bogus timeout errors.
 
-It's expected that once imx_enable_cpu(cpu, false) is called, the cpu
-will be taken down by hardware immediately, and the code after that
-will not get any chance to execute.  However, this is not always the
-case from the testing.  The cpu could possibly be alive for a few
-cycles before hardware actually takes it down.  So rather than letting
-cpu execute some code that could cause a hang in these cycles, let's
-make the cpu spin there and wait for hardware to take it down.
 
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/mach-imx/hotplug.c |   23 +++--------------------
- 1 files changed, 3 insertions(+), 20 deletions(-)
+ drivers/rtc/rtc-snvs.c |   22 +++++++++++++---------
+ 1 files changed, 13 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
-index 20ed2d5..f8f7437 100644
---- a/arch/arm/mach-imx/hotplug.c
-+++ b/arch/arm/mach-imx/hotplug.c
-@@ -42,22 +42,6 @@ static inline void cpu_enter_lowpower(void)
- 	  : "cc");
+ Compile tested only due to lack of HW.
+
+diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
+index 912f116..dc921b2 100644
+--- a/drivers/rtc/rtc-snvs.c
++++ b/drivers/rtc/rtc-snvs.c
+@@ -81,6 +81,13 @@ static void rtc_write_sync_lp(void __iomem *ioaddr)
+ 	}
  }
  
--static inline void cpu_leave_lowpower(void)
--{
--	unsigned int v;
--
--	asm volatile(
--		"mrc	p15, 0, %0, c1, c0, 0\n"
--	"	orr	%0, %0, %1\n"
--	"	mcr	p15, 0, %0, c1, c0, 0\n"
--	"	mrc	p15, 0, %0, c1, c0, 1\n"
--	"	orr	%0, %0, %2\n"
--	"	mcr	p15, 0, %0, c1, c0, 1\n"
--	  : "=&r" (v)
--	  : "Ir" (CR_C), "Ir" (0x40)
--	  : "cc");
--}
--
- /*
-  * platform-specific code to shutdown a CPU
-  *
-@@ -67,11 +51,10 @@ void platform_cpu_die(unsigned int cpu)
++static int snvs_rtc_enable_done(int enable, void __iomem *addr)
++{
++	u32 lpcr = readl(addr + SNVS_LPCR);
++
++	return !!enable ^ !(lpcr & SNVS_LPCR_SRTC_ENV);
++}
++
+ static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
  {
- 	cpu_enter_lowpower();
- 	imx_enable_cpu(cpu, false);
--	cpu_do_idle();
--	cpu_leave_lowpower();
+ 	unsigned long timeout = jiffies + msecs_to_jiffies(1);
+@@ -99,18 +106,15 @@ static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
+ 	spin_unlock_irqrestore(&data->lock, flags);
  
--	/* We should never return from idle */
--	panic("cpu %d unexpectedly exit from shutdown\n", cpu);
-+	/* spin here until hardware takes it down */
-+	while (1)
-+		;
- }
+ 	while (1) {
+-		lpcr = readl(data->ioaddr + SNVS_LPCR);
++		if (snvs_rtc_enable_done(enable, data->ioaddr))
++			break;
  
- int platform_cpu_disable(unsigned int cpu)
+-		if (enable) {
+-			if (lpcr & SNVS_LPCR_SRTC_ENV)
+-				break;
+-		} else {
+-			if (!(lpcr & SNVS_LPCR_SRTC_ENV))
++		if (time_after(jiffies, timeout)) {
++			if (snvs_rtc_enable_done(enable, data->ioaddr))
+ 				break;
++			else
++				return -ETIMEDOUT;
+ 		}
+-
+-		if (time_after(jiffies, timeout))
+-			return -ETIMEDOUT;
+ 	}
+ 
+ 	return 0;
 -- 
-1.7.5.4
+1.7.2.5
