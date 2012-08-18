@@ -1,36 +1,38 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sat, 18 Aug 2012 10:13:00 +0200
-Subject: [PATCH] I2C: OMAP: xfer: fix runtime PM get/put balance on error
-In-Reply-To: <87wr1b35qb.fsf@ti.com>
-References: <1340761532-27231-1-git-send-email-khilman@ti.com>
- <87wr1b35qb.fsf@ti.com>
-Message-ID: <20120818081300.GE24639@pengutronix.de>
+Date: Sat, 18 Aug 2012 10:41:54 +0200
+Subject: [PATCH v7] ARM: davinci: i2c: add OF support
+In-Reply-To: <502127A4.2040505@denx.de>
+References: <1343632872-25896-1-git-send-email-hs@denx.de>
+ <502127A4.2040505@denx.de>
+Message-ID: <20120818084154.GF24639@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2012 at 05:28:44PM -0700, Kevin Hilman wrote:
-> Hi Wolfram,
+On Tue, Aug 07, 2012 at 04:35:16PM +0200, Heiko Schocher wrote:
+> Hello,
 > 
-> Kevin Hilman <khilman@ti.com> writes:
-> 
-> > In omap_i2c_xfer(), ensure pm_runtime_put() is called, even on
-> > failure.
+> On 30.07.2012 09:21, Heiko Schocher wrote:
+> >add of support for the davinci i2c driver.
 > >
-> > Without this, after a failed xfer, the runtime PM usecount will have
-> > been incremented, but not decremented causing the usecount to never
-> > reach zero after a failure.  This keeps the device always runtime PM
-> > enabled which keeps the enclosing power domain active, and prevents
-> > full-chip retention/off from happening during idle.
+> >Signed-off-by: Heiko Schocher<hs@denx.de>
+> >Signed-off-by: Sekhar Nori<nsekhar@ti.com>
+> >Cc: davinci-linux-open-source at linux.davincidsp.com
+> >Cc: linux-arm-kernel at lists.infradead.org
+> >Cc: devicetree-discuss at lists.ozlabs.org
+> >Cc: linux-i2c at vger.kernel.org
+> >Cc: Ben Dooks<ben-linux@fluff.org>
+> >Cc: Wolfram Sang<w.sang@pengutronix.de>
+> >Cc: Grant Likely<grant.likely@secretlab.ca>
+> >Cc: Sekhar Nori<nsekhar@ti.com>
+> >Cc: Wolfgang Denk<wd@denx.de>
+> >Cc: Sylwester Nawrocki<s.nawrocki@samsung.com>
 > >
-> > Cc: Shubhrajyoti D <shubhrajyoti@ti.com>
-> > Signed-off-by: Kevin Hilman <khilman@ti.com>
-> > ---
-> > This patch applies to current i2c-embedded/for-next branch
+> >---
 > 
-> This one is needed for v3.6.  Can you queue this up as a fix for
-> v3.6-rc?
+> ping ... any comments?
 
-Done, applied to -current, thanks!
+Applied to -next with indentation fixes to the binding description.
+Thanks!
 
 -- 
 Pengutronix e.K.                           | Wolfram Sang                |
@@ -41,4 +43,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120818/5491bc9d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120818/57924366/attachment.sig>
