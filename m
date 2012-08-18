@@ -1,39 +1,47 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 18 Aug 2012 09:42:16 +0200
-Subject: [alsa-devel] Lockups reading from i.MX51 SSI registers
-In-Reply-To: <20120817222738.GH18871@opensource.wolfsonmicro.com>
-References: <20120810195005.GP24328@opensource.wolfsonmicro.com>
- <20120810195638.GF1451@pengutronix.de>
- <20120810201456.GL25520@pengutronix.de>
- <20120810210647.GG1451@pengutronix.de>
- <CAOMZO5DAs=jm-08tWdfdLG_nm=gdi-Q_RReiUKGM_RCgB82dwA@mail.gmail.com>
- <20120817222738.GH18871@opensource.wolfsonmicro.com>
-Message-ID: <20120818074216.GG2232@pengutronix.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sat, 18 Aug 2012 10:01:10 +0200
+Subject: [PATCH 1/1 v4] i2c: Add default configuration into the Nomadik
+ I2C driver.
+In-Reply-To: <20120808131158.GD8227@gmail.com>
+References: <1344266253-14050-1-git-send-email-lee.jones@linaro.org>
+ <20120808131158.GD8227@gmail.com>
+Message-ID: <20120818080110.GC24639@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 17, 2012 at 11:27:38PM +0100, Mark Brown wrote:
-> On Fri, Aug 17, 2012 at 04:08:47PM -0300, Fabio Estevam wrote:
+On Wed, Aug 08, 2012 at 02:11:59PM +0100, Lee Jones wrote:
+> From: Lee Jones <lee.jones@linaro.org>
+> Date: Tue, 7 Aug 2012 12:27:24 +0100
+> Subject: [PATCH 1/1 v4] i2c/nomadik: Add default configuration into the Nomadik I2C driver
+
+Actually, unlike Linus said, I prefer "i2c: nomadik:"; minor nit,
+though.
+
 > 
-> > Also, for the playback to work you need to install the SDMA firmware.
+> At this moment in time there is only one known configuration for the
+> Nomadik I2C driver. By not holding that configuration in the driver
+> adds some unnecessary overhead in platform code. The configuration
+> as already been removed from platform code, this patch checks for any
+
+  ^^ has ( I fixed it )
+
+> over-riding configurations. If there aren't any, the default is used.
 > 
-> This is deadlocking during boot, I'm getting nowhere near trying
-> playback.
-You're on i.MX35, right. I had to add
+> Cc: linux-i2c at vger.kernel.org
+> Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-	clk_register_clkdev(clk[ssi1_gate], NULL, "imx-ssi.0");
-
-to arch/arm/mach-imx/clk-imx35.c to be able to access the codec.
-(Obviously this is a hack, and to do it better, you'd need to change
-
-	clk_register_clkdev(clk[ssi1_div_post], "per", "imx-ssi.0");
-
-to use ssi1_gate and fix the ssi-driver to be aware that there are two
-clocks to handle.)
-
-Best regards
-Uwe
+Applied to -current, thanks! I added a note from Linus that it is needed
+because of boot regressions. That is also useful in commit messages.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           | Wolfram Sang                |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120818/226190a7/attachment.sig>
