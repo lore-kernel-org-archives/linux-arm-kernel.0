@@ -1,225 +1,200 @@
-From: alanbutty12@gmail.com (Alan M Butler)
-Date: Fri, 17 Aug 2012 20:20:32 -0000
-Subject: Issues with all kernels after 3.3.7
-In-Reply-To: <4345020.aIxQDhhJn6@flatron>
-References: <CADhrpJ7r4PPM2nOD7Wch9H+usaDUJ5XYeim6THUKEDTz=-Zyig@mail.gmail.com>
- <CADhrpJ7vg_CERZ8D8VDKkPhRPwZfiam6W3uAaw8yi9WuB2anDg@mail.gmail.com>
- <CADhrpJ7=XooXLcU5_V9wkZAgwCJaLdUL4bfPUWbo-J_eVqovHQ@mail.gmail.com>
- <4345020.aIxQDhhJn6@flatron>
-Message-ID: <CADhrpJ798WD8rLbLY+XYbOvU4LacCeoVGM9SUYtHu6jD2Dtm9g@mail.gmail.com>
+From: keguang.zhang@gmail.com (Kelvin Cheung)
+Date: Sat, 18 Aug 2012 11:54:27 -0000
+Subject: [PATCH] clk: add Loongson1B clock support
+In-Reply-To: <CAAfyv36-wwvSFJGXN9bmDy8pdDOT_h0b7sy78+7f4kCW57AxuA@mail.gmail.com>
+References: <1345287301-18165-1-git-send-email-keguang.zhang@gmail.com>
+ <CAAfyv36-wwvSFJGXN9bmDy8pdDOT_h0b7sy78+7f4kCW57AxuA@mail.gmail.com>
+Message-ID: <CAJhJPsVd_XM2QJnU7teQc4JCEPzp3e-YU5vTvW4Twzs9d--0FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 August 2012 21:08, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi Alan,
->
-> On Friday 17 of August 2012 20:37:08 Alan M Butler wrote:
->> On 17 August 2012 19:12, Alan M Butler <alanbutty12@gmail.com> wrote:
->> > From: Alan M Butler <alanbutty12@gmail.com>
->> > Date: 17 August 2012 18:09
->> > Subject: Re: Issues with all kernels after 3.3.7
->> > To: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->> >
->> >
->> > On 17 August 2012 17:46, Uwe Kleine-K?nig
->> >
->> > <u.kleine-koenig@pengutronix.de> wrote:
->> >> Hello,
->> >>
->> >> On Fri, Aug 17, 2012 at 05:30:27PM +0000, Alan M Butler wrote:
->> >>> On 17 August 2012 14:01, Alan M Butler <alanbutty12@gmail.com> wrote:
->> >>> > On 17 August 2012 13:26, Uwe Kleine-K?nig
->> >>> >
->> >>> > <u.kleine-koenig@pengutronix.de> wrote:
->> >>> >> On Fri, Aug 17, 2012 at 01:47:06PM +0100, alan butler wrote:
->> >>> >>> I have been trying all kernels after 3.3.7 (except for the 3.5
->> >>> >>> series)
->> >>> >>> on my ix2-200
->> >>> >>> and have found that on every kernel 3.3.8, 3.4, 3.4.2, 3.4.4
->> >>> >>> =>3.4.7
->> >>> >>> and now even on 3.6 rc1
->> >>> >>> and the next dated today 17 august that when i use git for
->> >>> >>> example:
->> >>> >>>
->> >>> >>> git clone git://git.videolan.org/x264
->> >>> >>>
->> >>> >>> my system just crash's / hangs and even through the serial port i
->> >>> >>> get
->> >>> >>> no response.
->> >>> >>> This also happens when i try to access a web interface for
->> >>> >>> example the
->> >>> >>> serviio java webui.
->> >>> >>>
->> >>> >>> The second issue i have noticed is that my raid 0 array hangs /
->> >>> >>> pauses
->> >>> >>> when being mounted
->> >>> >>> at system startup. (for approximatly 30 seconds maybe more maybe
->> >>> >>> less
->> >>> >>> im not certain).
->> >>> >>> But again on the 3.3.7 kernel there was no issue and no hang.
->> >>> >>>
->> >>> >>> If i return to 3.3.7 everything works fine with no other
->> >>> >>> modifications
->> >>> >>> to the os or kernels.
->> >>> >>> I am using debian wheezy at the moment but also tried debian
->> >>> >>> squeeze
->> >>> >>> so it does not
->> >>> >>> seem to be related to the specific linux version just the kernel.
->> >>> >>
->> >>> >> Can you bisect your problem? Doing that between 3.3.7 and 3.3.8
->> >>> >> seems to
->> >>> >> be the obvious range to test.
->> >>> >>
->> >>> >> You can also try to enable the various debugging options like
->> >>> >>
->> >>> >>         CONFIG_DETECT_HUNG_TASK
->> >>> >>         CONFIG_PROVE_LOCKING
->> >>> >>         CONFIG_DEBUG_ATOMIC_SLEEP
->> >>> >>         CONFIG_MAGIC_SYSRQ
->> >>> >>
->> >>> >> or try https://lkml.org/lkml/2012/5/26/83.
->> >>> >>
->> >>> >> Best regards
->> >>> >> Uwe
->> >>> >>
->> >>> >> --
->> >>> >> Pengutronix e.K.                           | Uwe Kleine-K?nig
->> >>> >>       | Industrial Linux Solutions                 |
->> >>> >> http://www.pengutronix.de/  |>>> >
->> >>> > i enabled the options you said there and i see alot of the
->> >>> > following
->> >>> >
->> >>> > popping up while connected through serial:
->> >>> >  BUG: sleeping function called from invalid context at
->> >>> >
->> >>> > include/linux/freezer.h:46
->> >>> > [  126.896958] in_atomic(): 0, irqs_disabled(): 128, pid: 2180,
->> >>> > name:
->> >>> > console-kit-dae
->> >>> > [  126.904566] no locks held by console-kit-dae/2180.
->> >>> > [  126.909378] irq event stamp: 27643
->> >>> > [  126.912797] hardirqs last  enabled at (27642): [<c03781ac>]
->> >>> > _raw_spin_unlock_irqrestore+0x3c/0x5c
->> >>> > [  126.921735] hardirqs last disabled at (27643): [<c00090cc>]
->> >>> > ret_fast_syscall+0xc/0x38
->> >>> > [  126.929618] softirqs last  enabled at (25565): [<c001bc20>]
->> >>> > irq_exit+0x54/0xb8
->> >>> > [  126.936890] softirqs last disabled at (25558): [<c001bc20>]
->> >>> > irq_exit+0x54/0xb8
->> >>> > [  126.944185] [<c000ea8c>] (unwind_backtrace+0x0/0xe0) from
->> >>> > [<c000b414>] (do_signal+0x84/0x5c0)
->> >>> > [  126.952764] [<c000b414>] (do_signal+0x84/0x5c0) from
->> >>> > [<c000be0c>]
->> >>> > (do_notify_resume+0x18/0x60)
->> >>> > [  126.961430] [<c000be0c>] (do_notify_resume+0x18/0x60) from
->> >>> > [<c0009120>] (work_pending+0x24/0x28)
->> >>> >
->> >>> > there seems to be alot more of them when i have serviio upnp server
->> >>> > running.>>>
->> >>> After a little testing with those config options enabled that you
->> >>> sujested iv found that the problem with git first appears in the
->> >>> 3.4.1
->> >>> kernel.
->> >>> For example:
->> >>> in 3.4.0 kernel i can use 'git clone git://git.videolan.org/x264'
->> >>> successfully.
->> >>>
->> >>> From 3.4.1 kernel on  I can not use 'git clone
->> >>> git://git.videolan.org/x264' the system hangs / crashes with no
->> >>> output
->> >>> at all.
->> >>>
->> >>> the other issue the hang / stall while mounting my etx4 raid 0 is
->> >>> actualy much more recent than i remembered i have tested each kernel
->> >>> from 3.4.0 all the way to 3.4.9 with the config options enabled as
->> >>> sujested before and the stall first starts in kernel 3.4.8 and the
->> >>> following bug keeps popping up repeatedly until the raid is mounted
->> >>> and then anytime a disk is accessed it seems. I was certain it had
->> >>> been popping up before 3.4.8.
->> >>>
->> >>> The following is one of what pops up:
->> >>>  BUG: sleeping function called from invalid context at
->> >>>
->> >>> include/linux/freezer.h:46
->> >>> in_atomic(): 0, irqs_disabled(): 128, pid: 2166, name: minissdpd
->> >>> no locks held by minissdpd/2166.
->> >>>
->> >>>  irq event stamp: 2081
->> >>>
->> >>> hardirqs last  enabled at (2080): [<c02f8dc8>]
->> >>> _raw_spin_unlock_irq+0x24/0x4c hardirqs last disabled at (2081):
->> >>> [<c00090cc>] ret_fast_syscall+0xc/0x38 softirqs last  enabled at
->> >>> (0): [<c0016b38>] copy_process+0x3f8/0xfe8 softirqs last disabled at
->> >>> (0): [<  (null)>]   (null)
->> >>> [<c000eae4>] (unwind_backtrace+0x0/0xe0) from [<c000b5a0>]
->> >>> (do_signal+0x84/0x554)
->> >>> [<c000b5a0>] (do_signal+0x84/0x554) from [<c000bec0>]
->> >>> (do_notify_resume+0x18/0x60)
->> >>> [<c000bec0>] (do_notify_resume+0x18/0x60) from [<c0009120>]
->> >>> (work_pending+0x24/0x28)
->> >>
->> >> I think this is an unrelated issue that I think is fixed in later
->> >> kernels. So I'd disable CONFIG_DEBUG_ATOMIC_SLEEP for further testing.
->> >> Can you try a bisection, i.e.
->> >>
->> >>         git clone
->> >>         git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.
->> >>         git cd linus
->> >>         git remote add -f stable
->> >>         git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-st
->> >>         able.git git bisect v3.4.1 v3.4
->> >>
->> >> and test if the kernel that is checked out then results in a freeze.
->> >>
->> >> Depending on the test result either do:
->> >>         git bisect good # i.e. problem doesn't occur
->> >>
->> >> or
->> >>
->> >>         git bisect bad # problem is reproducible
->> >>
->> >> Repeat that until git points out the first bad commit and report that.
->> >>
->> >> Best regards
->> >> Uwe
->> >>
->> >> --
->> >> Pengutronix e.K.                           | Uwe Kleine-K?nig
->> >>   | Industrial Linux Solutions                 |
->> >> http://www.pengutronix.de/  |>
->> > I dont think it has as i have recently been building the latest 3.6 rc
->> > kernels while creating a patch for my nas and i had the same issue's
->> > on them. Thats what prompted me to actualy come to the mailing list
->> > with it. I have tried the 3.6-rc1 and the latest linux-next dated 17th
->> > of august.
->>
->> Im not sure if this is the right commit as i dont know what way it
->> works but basically the very first commit caused the issue of me not
->> being able to use git and when i typed the git bisect bad it said
->> this:
->>
->> ownerx35 at ownerx35-VirtualBox:~/Desktop/linux$ git bisect bad
->>
->> Bisecting: 21 revisions left to test after this (roughly 5 steps)
->> [774a93aa647f8939867c8ff956847bc63dd51cb3] usbhid: prevent deadlock
->> during timeout
->
-> After calling git bisect bad it checks out files from a revision between
-> the one currently checked and the one marked as good (imagine binary
-> search).
->
-> You have to compile and test resulting kernels and tell git whether they're
-> good or bad until it tells you that it found the problematic commit.
->
-> Best regards,
-> Tomasz Figa
->
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+2012/8/18 Belisko Marek <marek.belisko@gmail.com>
 
-It said something about doing it 5 more times or such. and if im
-understanding what your saying basicaly i have to build it 5 more
-times then it will tell me the commit that was actualy bad so the one
-i said there is not the problematic one?
+> On Sat, Aug 18, 2012 at 12:55 PM, Kelvin Cheung <keguang.zhang@gmail.com>
+> wrote:
+> > This adds clock support to Loongson1B SoC using the common clock
+> > infrastructure.
+> >
+> > Signed-off-by: Kelvin Cheung <keguang.zhang@gmail.com>
+> > ---
+> >  drivers/clk/Makefile   |    1 +
+> >  drivers/clk/clk-ls1x.c |  108
+> ++++++++++++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 109 insertions(+), 0 deletions(-)
+> >  create mode 100644 drivers/clk/clk-ls1x.c
+> >
+> > diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> > index 5869ea3..018ec57 100644
+> > --- a/drivers/clk/Makefile
+> > +++ b/drivers/clk/Makefile
+> > @@ -10,6 +10,7 @@ obj-$(CONFIG_ARCH_SOCFPGA)    += socfpga/
+> >  obj-$(CONFIG_PLAT_SPEAR)       += spear/
+> >  obj-$(CONFIG_ARCH_U300)                += clk-u300.o
+> >  obj-$(CONFIG_ARCH_INTEGRATOR)  += versatile/
+> > +obj-$(CONFIG_MACH_LOONGSON1)   += clk-ls1x.o
+> >
+> >  # Chip specific
+> >  obj-$(CONFIG_COMMON_CLK_WM831X) += clk-wm831x.o
+> > diff --git a/drivers/clk/clk-ls1x.c b/drivers/clk/clk-ls1x.c
+> > new file mode 100644
+> > index 0000000..0aadf9d
+> > --- /dev/null
+> > +++ b/drivers/clk/clk-ls1x.c
+> > @@ -0,0 +1,108 @@
+> > +/*
+> > + * Copyright (c) 2012 Zhang, Keguang <keguang.zhang@gmail.com>
+> > + *
+> > + * This program is free software; you can redistribute  it and/or
+> modify it
+> > + * under  the terms of  the GNU General  Public License as published by
+> the
+> > + * Free Software Foundation;  either version 2 of the  License, or (at
+> your
+> > + * option) any later version.
+> > + */
+> > +
+> > +#include <linux/clkdev.h>
+> > +#include <linux/clk-provider.h>
+> > +#include <linux/io.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/err.h>
+> > +#include <asm/mach-loongson1/loongson1.h>
+> > +
+> > +#include <loongson1.h>
+> > +
+> > +#define OSC    33
+> > +
+> > +static DEFINE_SPINLOCK(_lock);
+> > +
+> > +int ls1x_pll_clk_enable(struct clk_hw *hw)
+> ^^^^static
+>
+
+OK, will do.
+Thanks!
+
+
+> > +{
+> > +       return 0;
+> > +}
+> > +
+> > +void ls1x_pll_clk_disable(struct clk_hw *hw)
+> ^^^^ also static
+> > +{
+> > +}
+> > +
+> > +static unsigned long ls1x_pll_recalc_rate(struct clk_hw *hw,
+> > +                                            unsigned long parent_rate)
+> > +{
+> > +       u32 pll, rate;
+> > +
+> > +       pll = __raw_readl(LS1X_CLK_PLL_FREQ);
+> > +       rate = ((12 + (pll & 0x3f)) * 1000000) +
+> > +               ((((pll >> 8) & 0x3ff) * 1000000) >> 10);
+> > +       rate *= OSC;
+> > +       rate >>= 1;
+> > +
+> > +       return rate;
+> > +}
+> > +
+> > +static const struct clk_ops ls1x_pll_clk_ops = {
+> > +       .enable = ls1x_pll_clk_enable,
+> > +       .disable = ls1x_pll_clk_disable,
+> > +       .recalc_rate = ls1x_pll_recalc_rate,
+> > +};
+> > +
+> > +static struct clk * __init clk_register_pll(struct device *dev,
+> > +        const char *name, const char *parent_name, unsigned long flags)
+> > +{
+> > +       struct clk_hw *hw;
+> > +       struct clk *clk;
+> > +       struct clk_init_data init;
+> > +
+> > +       /* allocate the divider */
+> > +       hw = kzalloc(sizeof(struct clk_hw), GFP_KERNEL);
+> > +       if (!hw) {
+> > +               pr_err("%s: could not allocate clk_hw\n", __func__);
+> > +               return ERR_PTR(-ENOMEM);
+> > +       }
+> > +
+> > +       init.name = name;
+> > +       init.ops = &ls1x_pll_clk_ops;
+> > +       init.flags = flags | CLK_IS_BASIC;
+> > +       init.parent_names = (parent_name ? &parent_name : NULL);
+> > +       init.num_parents = (parent_name ? 1 : 0);
+> > +       hw->init = &init;
+> > +
+> > +       /* register the clock */
+> > +       clk = clk_register(dev, hw);
+> > +
+> > +       if (IS_ERR(clk))
+> > +               kfree(hw);
+> > +
+> > +       return clk;
+> > +}
+> > +
+> > +void __init ls1x_clk_init(void)
+> > +{
+> > +       struct clk *clk;
+> > +
+> > +       clk = clk_register_pll(NULL, "pll_clk", NULL, CLK_IS_ROOT);
+> > +       clk_prepare_enable(clk);
+> > +
+> > +       clk = clk_register_divider(NULL, "cpu_clk", "pll_clk",
+> > +                       CLK_SET_RATE_PARENT, LS1X_CLK_PLL_DIV,
+> DIV_CPU_SHIFT,
+> > +                       DIV_CPU_WIDTH, CLK_DIVIDER_ONE_BASED, &_lock);
+> > +       clk_prepare_enable(clk);
+> > +       clk_register_clkdev(clk, "cpu", NULL);
+> > +
+> > +       clk = clk_register_divider(NULL, "ddr_clk", "pll_clk",
+> > +                       CLK_SET_RATE_PARENT, LS1X_CLK_PLL_DIV,
+> DIV_DDR_SHIFT,
+> > +                       DIV_DDR_WIDTH, CLK_DIVIDER_ONE_BASED, &_lock);
+> > +       clk_prepare_enable(clk);
+> > +       clk_register_clkdev(clk, "ddr", NULL);
+> > +       clk_register_clkdev(clk, "stmmaceth", NULL);
+> > +
+> > +       clk = clk_register_divider(NULL, "dc_clk", "pll_clk",
+> > +                       CLK_SET_RATE_PARENT, LS1X_CLK_PLL_DIV,
+> DIV_DC_SHIFT,
+> > +                       DIV_DC_WIDTH, CLK_DIVIDER_ONE_BASED, &_lock);
+> > +       clk_prepare_enable(clk);
+> > +       clk_register_clkdev(clk, "dc", NULL);
+> > +       clk_register_clkdev(clk, "serial8250", NULL);
+> > +}
+> > --
+> > 1.7.1
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel"
+> in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
+>
+> cheers,
+>
+> marek
+>
+> --
+> as simple and primitive as possible
+> -------------------------------------------------
+> Marek Belisko - OPEN-NANDRA
+> Freelance Developer
+>
+> Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
+> Tel: +421 915 052 184
+> skype: marekwhite
+> twitter: #opennandra
+> web: http://open-nandra.com
+>
+
+
+
+-- 
+Best Regards!
+Kelvin
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120818/bec2ab4a/attachment-0001.html>
