@@ -1,54 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 18 Aug 2012 15:03:54 +0800
-Subject: [rtc-linux] [PATCH v3] rtc: snvs: add Freescale rtc-snvs driver
-In-Reply-To: <20527.14712.202172.863404@ipc1.ka-ro>
-References: <1342164663-31351-1-git-send-email-shawn.guo@linaro.org>
- <20120814170300.8f97afcf.akpm@linux-foundation.org>
- <20120815141606.GA2457@S2101-09.ap.freescale.net>
- <20120815133221.ca88d4ba.akpm@linux-foundation.org>
- <20524.43620.36859.792122@ipc1.ka-ro>
- <20120817061439.GF24242@S2101-09.ap.freescale.net>
- <20527.14712.202172.863404@ipc1.ka-ro>
-Message-ID: <20120818070352.GG24242@S2101-09.ap.freescale.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 18 Aug 2012 09:42:16 +0200
+Subject: [alsa-devel] Lockups reading from i.MX51 SSI registers
+In-Reply-To: <20120817222738.GH18871@opensource.wolfsonmicro.com>
+References: <20120810195005.GP24328@opensource.wolfsonmicro.com>
+ <20120810195638.GF1451@pengutronix.de>
+ <20120810201456.GL25520@pengutronix.de>
+ <20120810210647.GG1451@pengutronix.de>
+ <CAOMZO5DAs=jm-08tWdfdLG_nm=gdi-Q_RReiUKGM_RCgB82dwA@mail.gmail.com>
+ <20120817222738.GH18871@opensource.wolfsonmicro.com>
+Message-ID: <20120818074216.GG2232@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 18, 2012 at 08:43:04AM +0200, Lothar Wa?mann wrote:
-> Hi,
+On Fri, Aug 17, 2012 at 11:27:38PM +0100, Mark Brown wrote:
+> On Fri, Aug 17, 2012 at 04:08:47PM -0300, Fabio Estevam wrote:
 > 
-> Shawn Guo writes:
-> > On Thu, Aug 16, 2012 at 10:08:04AM +0200, Lothar Wa?mann wrote:
-> > > Why not read the register once more in case of a timeout, which
-> > > would guarantee to have a current view of the register contents no
-> > > matter how long the process may have been descheduled before:
-> > > 
-> > > [...]
-> > > static int snvs_rtc_enable_done(int enable, void __iomem *addr)
-> > > {
-> > > 	u32 lpcr = readl(addr + SNVS_LPCR);
-> > > 
-> > > 	return !!enable ^ !(lpcr & SNVS_LPCR_SRTC_ENV);
-> > > }
-> > > [...]
-> > > 	while (1) {
-> > > 		if (svns_rtc_enable_done(enable, data->ioaddr))
-> > > 			break;
-> > > 
-> > > 		if (time_after(jiffies, timeout)) {
-> > > 			if (!svns_rtc_enable_done(enable, data->ioaddr))
-> > > 				return -ETIMEDOUT;
-> > > 		}
-> > > 	}
-> > > 
-> > I'm fine with this solution.  Can you send a formal patch for this?
-> > Then we will have two incremental patches (I already sent the fixed
-> > times loop one) for Andrew to choose one.
-> > 
-> What should I base this patch on?
+> > Also, for the playback to work you need to install the SDMA firmware.
 > 
-v3.6-rc1 with "[PATCH v3] rtc: snvs: add Freescale rtc-snvs driver"
-applied.
+> This is deadlocking during boot, I'm getting nowhere near trying
+> playback.
+You're on i.MX35, right. I had to add
+
+	clk_register_clkdev(clk[ssi1_gate], NULL, "imx-ssi.0");
+
+to arch/arm/mach-imx/clk-imx35.c to be able to access the codec.
+(Obviously this is a hack, and to do it better, you'd need to change
+
+	clk_register_clkdev(clk[ssi1_div_post], "per", "imx-ssi.0");
+
+to use ssi1_gate and fix the ssi-driver to be aware that there are two
+clocks to handle.)
+
+Best regards
+Uwe
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
