@@ -1,65 +1,44 @@
-From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Sat, 18 Aug 2012 10:10:08 +0200
-Subject: [PATCH] rtc: snvs: improve timeout handling in snvs_rtc_enable()
-Message-ID: <1345277408-30044-1-git-send-email-LW@KARO-electronics.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sat, 18 Aug 2012 10:13:00 +0200
+Subject: [PATCH] I2C: OMAP: xfer: fix runtime PM get/put balance on error
+In-Reply-To: <87wr1b35qb.fsf@ti.com>
+References: <1340761532-27231-1-git-send-email-khilman@ti.com>
+ <87wr1b35qb.fsf@ti.com>
+Message-ID: <20120818081300.GE24639@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If snvs_rtc_enable() happens to be descheduled for a period longer
-than the timout period, a timeout may be indicated even if the RTC
-status has changed meanwhile. Force a status read at the end of the
-timeout period to prevent bogus timeout errors.
+On Mon, Aug 06, 2012 at 05:28:44PM -0700, Kevin Hilman wrote:
+> Hi Wolfram,
+> 
+> Kevin Hilman <khilman@ti.com> writes:
+> 
+> > In omap_i2c_xfer(), ensure pm_runtime_put() is called, even on
+> > failure.
+> >
+> > Without this, after a failed xfer, the runtime PM usecount will have
+> > been incremented, but not decremented causing the usecount to never
+> > reach zero after a failure.  This keeps the device always runtime PM
+> > enabled which keeps the enclosing power domain active, and prevents
+> > full-chip retention/off from happening during idle.
+> >
+> > Cc: Shubhrajyoti D <shubhrajyoti@ti.com>
+> > Signed-off-by: Kevin Hilman <khilman@ti.com>
+> > ---
+> > This patch applies to current i2c-embedded/for-next branch
+> 
+> This one is needed for v3.6.  Can you queue this up as a fix for
+> v3.6-rc?
 
+Done, applied to -current, thanks!
 
-Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
----
- drivers/rtc/rtc-snvs.c |   22 +++++++++++++---------
- 1 files changed, 13 insertions(+), 9 deletions(-)
-
- Compile tested only due to lack of HW.
-
-diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
-index 912f116..dc921b2 100644
---- a/drivers/rtc/rtc-snvs.c
-+++ b/drivers/rtc/rtc-snvs.c
-@@ -81,6 +81,13 @@ static void rtc_write_sync_lp(void __iomem *ioaddr)
- 	}
- }
- 
-+static int snvs_rtc_enable_done(int enable, void __iomem *addr)
-+{
-+	u32 lpcr = readl(addr + SNVS_LPCR);
-+
-+	return !!enable ^ !(lpcr & SNVS_LPCR_SRTC_ENV);
-+}
-+
- static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
- {
- 	unsigned long timeout = jiffies + msecs_to_jiffies(1);
-@@ -99,18 +106,15 @@ static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
- 	spin_unlock_irqrestore(&data->lock, flags);
- 
- 	while (1) {
--		lpcr = readl(data->ioaddr + SNVS_LPCR);
-+		if (snvs_rtc_enable_done(enable, data->ioaddr))
-+			break;
- 
--		if (enable) {
--			if (lpcr & SNVS_LPCR_SRTC_ENV)
--				break;
--		} else {
--			if (!(lpcr & SNVS_LPCR_SRTC_ENV))
-+		if (time_after(jiffies, timeout)) {
-+			if (snvs_rtc_enable_done(enable, data->ioaddr))
- 				break;
-+			else
-+				return -ETIMEDOUT;
- 		}
--
--		if (time_after(jiffies, timeout))
--			return -ETIMEDOUT;
- 	}
- 
- 	return 0;
 -- 
-1.7.2.5
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120818/5491bc9d/attachment.sig>
