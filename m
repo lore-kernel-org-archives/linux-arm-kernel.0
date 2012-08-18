@@ -1,47 +1,69 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sat, 18 Aug 2012 10:01:10 +0200
-Subject: [PATCH 1/1 v4] i2c: Add default configuration into the Nomadik
- I2C driver.
-In-Reply-To: <20120808131158.GD8227@gmail.com>
-References: <1344266253-14050-1-git-send-email-lee.jones@linaro.org>
- <20120808131158.GD8227@gmail.com>
-Message-ID: <20120818080110.GC24639@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 18 Aug 2012 16:09:25 +0800
+Subject: [PATCH] ARM: imx6: spin the cpu until hardware takes it down
+Message-ID: <1345277365-30192-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2012 at 02:11:59PM +0100, Lee Jones wrote:
-> From: Lee Jones <lee.jones@linaro.org>
-> Date: Tue, 7 Aug 2012 12:27:24 +0100
-> Subject: [PATCH 1/1 v4] i2c/nomadik: Add default configuration into the Nomadik I2C driver
+Though commit 602bf40 (ARM: imx6: exit coherency when shutting down
+a cpu) improves the stability of imx6q cpu hotplug a lot, there are
+still hangs seen with a more stressful hotplug testing.
 
-Actually, unlike Linus said, I prefer "i2c: nomadik:"; minor nit,
-though.
+It's expected that once imx_enable_cpu(cpu, false) is called, the cpu
+will be taken down by hardware immediately, and the code after that
+will not get any chance to execute.  However, this is not always the
+case from the testing.  The cpu could possibly be alive for a few
+cycles before hardware actually takes it down.  So rather than letting
+cpu execute some code that could cause a hang in these cycles, let's
+make the cpu spin there and wait for hardware to take it down.
 
-> 
-> At this moment in time there is only one known configuration for the
-> Nomadik I2C driver. By not holding that configuration in the driver
-> adds some unnecessary overhead in platform code. The configuration
-> as already been removed from platform code, this patch checks for any
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/hotplug.c |   23 +++--------------------
+ 1 files changed, 3 insertions(+), 20 deletions(-)
 
-  ^^ has ( I fixed it )
-
-> over-riding configurations. If there aren't any, the default is used.
-> 
-> Cc: linux-i2c at vger.kernel.org
-> Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-Applied to -current, thanks! I added a note from Linus that it is needed
-because of boot regressions. That is also useful in commit messages.
-
+diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
+index 20ed2d5..f8f7437 100644
+--- a/arch/arm/mach-imx/hotplug.c
++++ b/arch/arm/mach-imx/hotplug.c
+@@ -42,22 +42,6 @@ static inline void cpu_enter_lowpower(void)
+ 	  : "cc");
+ }
+ 
+-static inline void cpu_leave_lowpower(void)
+-{
+-	unsigned int v;
+-
+-	asm volatile(
+-		"mrc	p15, 0, %0, c1, c0, 0\n"
+-	"	orr	%0, %0, %1\n"
+-	"	mcr	p15, 0, %0, c1, c0, 0\n"
+-	"	mrc	p15, 0, %0, c1, c0, 1\n"
+-	"	orr	%0, %0, %2\n"
+-	"	mcr	p15, 0, %0, c1, c0, 1\n"
+-	  : "=&r" (v)
+-	  : "Ir" (CR_C), "Ir" (0x40)
+-	  : "cc");
+-}
+-
+ /*
+  * platform-specific code to shutdown a CPU
+  *
+@@ -67,11 +51,10 @@ void platform_cpu_die(unsigned int cpu)
+ {
+ 	cpu_enter_lowpower();
+ 	imx_enable_cpu(cpu, false);
+-	cpu_do_idle();
+-	cpu_leave_lowpower();
+ 
+-	/* We should never return from idle */
+-	panic("cpu %d unexpectedly exit from shutdown\n", cpu);
++	/* spin here until hardware takes it down */
++	while (1)
++		;
+ }
+ 
+ int platform_cpu_disable(unsigned int cpu)
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120818/226190a7/attachment.sig>
+1.7.5.4
