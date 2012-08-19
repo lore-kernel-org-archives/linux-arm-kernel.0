@@ -1,39 +1,32 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Sun, 19 Aug 2012 22:32:19 +0300
-Subject: [PATCH 3/8] UBI: introduce MTD_PARAM_MAX_COUNT
-In-Reply-To: <1345214124-5478-4-git-send-email-richard.genoud@gmail.com>
-References: <1345214124-5478-1-git-send-email-richard.genoud@gmail.com>
- <1345214124-5478-4-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1345404739.1930.11.camel@kyv>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Mon, 20 Aug 2012 02:18:12 +0300
+Subject: ARM hugetlb support?
+Message-ID: <CANOLnOPLLQ=Cy5rvf5J7R96whrvLKO4HW9nVn4rQXqXCTVgCPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-08-17 at 16:35 +0200, Richard Genoud wrote:
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> ---
->  drivers/mtd/ubi/build.c |    7 +++++--
->  1 files changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mtd/ubi/build.c b/drivers/mtd/ubi/build.c
-> index 82d11e1..1f45f51 100644
-> --- a/drivers/mtd/ubi/build.c
-> +++ b/drivers/mtd/ubi/build.c
-> @@ -46,6 +46,9 @@
->  /* Maximum length of the 'mtd=' parameter */
->  #define MTD_PARAM_LEN_MAX 64
->  
-> +/* Maximum number of comma-separated items in ht 'mtd=' parameter */
-> +#define MTD_PARAM_MAX_COUNT 2
+Hello,
 
-Fixed the spelling of "the" and pushed to linux-ubi.git, thanks!
+We are developing an application that's drawing various geometry on
+1024x1024 framebuffer (lines, triangles, etc) and is running on
+Cortex-A8 CPU. It seems this kind of application is suffering badly
+from TLB misses, as A8 only has 32 entry TLB cache.
+
+I've found that hugetlb support patches have been posted some months
+ago [1]. I've been testing them with very good results [2]. Are there
+still plans to further develop them and eventually merge them?
+
+
+[1] http://marc.info/?l=linux-arm-kernel&m=132912620601308&w=2
+[2] Cycle measurements of rendering full scene (using cycle counter in
+A8), x1000 cycles:
+
+       normal hugetlb improvement
+scene1 28507  21351   34%
+scene2 11710  10138   16%
+scene3 17178  13631   26%
+scene4 4372   3810    15%
+scene5 3525   3255    8%
 
 -- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120819/43454bc0/attachment.sig>
+Gra?vydas
