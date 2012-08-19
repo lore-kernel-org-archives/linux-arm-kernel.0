@@ -1,22 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 19 Aug 2012 15:21:37 +0000
-Subject: [PATCH 0/3] New algorithm for ASID allocation and rollover
-In-Reply-To: <1345049642-29704-1-git-send-email-will.deacon@arm.com>
-References: <1345049642-29704-1-git-send-email-will.deacon@arm.com>
-Message-ID: <201208191521.37460.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 19 Aug 2012 23:26:58 +0800
+Subject: imx6q restart is broken
+In-Reply-To: <20120817034854.GE24242@S2101-09.ap.freescale.net>
+References: <20120808101817.GA14718@S2101-09.ap.freescale.net>
+ <50224547.9020000@de.bosch.com> <50232C17.9000700@gmail.com>
+ <20120809092021.GQ18957@n2100.arm.linux.org.uk>
+ <502BBB43.5010403@gmail.com>
+ <20120815214412.GC32560@n2100.arm.linux.org.uk>
+ <20120816023109.GH2258@S2101-09.ap.freescale.net>
+ <20120816223446.GB15883@n2100.arm.linux.org.uk>
+ <20120817034854.GE24242@S2101-09.ap.freescale.net>
+Message-ID: <20120819152656.GI24242@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 August 2012, Will Deacon wrote:
-> After some discussion, it became apparent that tracking the ASIDs
-> currently active on the cores in the system means that, on rollover, we
-> can automatically reserve those that are in use without having to stop
-> the world.
+On Fri, Aug 17, 2012 at 11:48:56AM +0800, Shawn Guo wrote:
+> > I think what needs to happen here (while we wait) is someone _with_ the
+> > problem needs to experiment, and find out how many nops are needed for
+> > the DMB not to have much effect in cpu_relax().  If it turns out we just
+> > need to put one nop in, then that's not _too_ bad.
+> 
+> At least, I need to have 5 nops to get rid of the issue, something like
+> below.
+> 
+Russell,
 
-Just a question for my general understanding of how this is done: How do
-you know if an ASID is active or not? Do you broadcast flush an address
-space completely when the struct mm goes away, or do you keep track of
-which CPUs had TLBs in an ASIC when it went away and then flush that ASID
-when you reuse it on that CPU?
+What's your take on this then?
 
-	Arnd
+-- 
+Regards,
+Shawn
