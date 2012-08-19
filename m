@@ -1,45 +1,46 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 19 Aug 2012 11:09:06 -0300
-Subject: [PATCH 2/2] ARM: clk-imx25: Fix SSI clock registration
-In-Reply-To: <1345385346-25412-1-git-send-email-festevam@gmail.com>
-References: <1345385346-25412-1-git-send-email-festevam@gmail.com>
-Message-ID: <1345385346-25412-2-git-send-email-festevam@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 19 Aug 2012 14:16:03 +0000
+Subject: [v3] Add basic address decoding support for Marvell 370/XP
+In-Reply-To: <20120819012303.GX22226@titan.lakedaemon.net>
+References: <1344246141-23931-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120817152156.4d91ba16@skate> <20120819012303.GX22226@titan.lakedaemon.net>
+Message-ID: <201208191416.03873.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Sunday 19 August 2012, Jason Cooper wrote:
+> On Fri, Aug 17, 2012 at 03:21:56PM +0200, Thomas Petazzoni wrote:
+> > Le Thu, 16 Aug 2012 14:37:08 -0400,
+> > Jason Cooper <jason@lakedaemon.net> a ?crit :
+> > 
+> > > > Whole series applied to:
+> > > > 
+> > > > git://git.infradead.org/users/jcooper/linux.git boards-for-v3.7
+> > > 
+> > > I'm getting the following build error with orion_nand enabled:
+> > > 
+> > >   CC      drivers/mtd/nand/orion_nand.o
+> > > drivers/mtd/nand/orion_nand.c:24:27: fatal error: mach/hardware.h: No
+> > > such file or directory
+> > > compilation terminated.
+> > 
+> > Are you perhaps trying to enable the orion_nand driver for a mach-mvebu
+> > platform (Armada 370 or XP)? If it's the case, then yes, this build
+> > breakage is expected: we haven't enabled any of the I/O for now, so we
+> > don't have hardware.h yet. This is not something that is broken due to
+> > the address decoding changes.
+> 
+> Ok, I've added Arnd and Olof to the CC.  The above is exactly what I
+> did.
+> 
+> Arnd, how extensive is the 'make randconfig' testing in next?  Is this
+> something that needs to be fixed before we push?  I found it by a fluke,
+> but the right randconfig would light it up as well.
 
-SSI block has two types of clock:
+If there is a bug you know about, you should fix it. In the above
+example, I would guess that you should not actually need to include
+mach/hardware.h, so the fix should be simple. In general, we should
+eliminate mach/hardware.h where we can and put register locations
+into resource, and offsets into the drivers themselves.
 
-ipg: bus clock, the clock needed for accessing registers.
-per: peripheral clock, the clock needed for generating the bit rate.
-
-Currently SSI driver only supports slave mode and only need to handle
-the ipg clock, because the peripheral clock comes from the master codec.
-
-Only register the ipg clock and do not register the peripheral clock for ssi.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/clk-imx25.c |    6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index fdd8cc8..5ff9534 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -222,10 +222,8 @@ int __init mx25_clocks_init(void)
- 	clk_register_clkdev(clk[lcdc_ipg], "ipg", "imx-fb.0");
- 	clk_register_clkdev(clk[lcdc_ahb], "ahb", "imx-fb.0");
- 	clk_register_clkdev(clk[wdt_ipg], NULL, "imx2-wdt.0");
--	clk_register_clkdev(clk[ssi1_ipg_per], "per", "imx-ssi.0");
--	clk_register_clkdev(clk[ssi1_ipg], "ipg", "imx-ssi.0");
--	clk_register_clkdev(clk[ssi2_ipg_per], "per", "imx-ssi.1");
--	clk_register_clkdev(clk[ssi2_ipg], "ipg", "imx-ssi.1");
-+	clk_register_clkdev(clk[ssi1_ipg], NULL, "imx-ssi.0");
-+	clk_register_clkdev(clk[ssi2_ipg], NULL, "imx-ssi.0");
- 	clk_register_clkdev(clk[esdhc1_ipg_per], "per", "sdhci-esdhc-imx25.0");
- 	clk_register_clkdev(clk[esdhc1_ipg], "ipg", "sdhci-esdhc-imx25.0");
- 	clk_register_clkdev(clk[esdhc1_ahb], "ahb", "sdhci-esdhc-imx25.0");
--- 
-1.7.9.5
+	Arnd
