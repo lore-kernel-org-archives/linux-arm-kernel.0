@@ -1,61 +1,165 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 19 Aug 2012 01:06:50 +0200
-Subject: [PATCH 0/6] Integrator devicetree support
-In-Reply-To: <201208161344.55723.arnd@arndb.de>
-References: <1345119317-22600-1-git-send-email-linus.walleij@linaro.org>
- <201208161344.55723.arnd@arndb.de>
-Message-ID: <CACRpkdYYgdzAU=nyL7dQbdMLx3z3G+K7ba0uJe1=aX=BLeF_sg@mail.gmail.com>
+From: marcos21xx@gmail.com (Marcos Silva Cunha)
+Date: Sat, 18 Aug 2012 18:22:23 -0700 (PDT)
+Subject: [PATCH 0/8] *** ARM: Update arch-vt8500 to Devicetree ***
+In-Reply-To: <1344389967-8465-1-git-send-email-linux@prisktech.co.nz>
+References: <1344389967-8465-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <f807b970-dbc1-4c58-8647-42d5291b096b@googlegroups.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 16, 2012 at 3:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 16 August 2012, Linus Walleij wrote:
->> This patch set moves all the non-DT platform code into
->> #ifndef CONFIG_OF sections for clarity. The plan is to
->> delete them after deprecation.
+These patches can be used directly on kernel.org's main tarballs? Or just 
+on gitorious/vt8500 ?
+
+On Tuesday, 7 August 2012 22:39:18 UTC-3, Tony Prisk wrote:
 >
-> I'm fine with your playing around with this in any way you
-> like, but I think in general we should have a new CONFIG_ATAG
-> symbol, so you can build a kernel that supports booting
-> both with and without DT for the same platform, depending
-> on what the boot loader supports.
+> This patchset updates arch-vt8500 to devicetree and removes all the 
+> old-style 
+> code. Support for WM8650 has also been added. 
 >
-> Then you can enclose all the non-DT sections in #ifdef
-> CONFIG_ATAG and we can remove them at some later stage.
-
-Since we already have CONFIG_USE_OF I think
-CONFIG_USE_ATAGS is more apropriate, but I get the
-idea. So it begins like this:
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e91c7cd..0764ef7 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1907,6 +1907,12 @@ endmenu
-
- menu "Boot options"
-
-+config USE_ATAGS
-+       bool "ATAGS support"
-+       default y
-+       help
-+         Include support for ATAGS-based machine descriptions.
-+
- config USE_OF
-        bool "Flattened Device Tree support"
-        select OF
-@@ -2110,6 +2116,7 @@ config KEXEC
-
- config ATAGS_PROC
-        bool "Export atags in procfs"
-+       depends on USE_ATAGS
-        depends on KEXEC
-        default y
-        help
-
-But then we hit #ifdeffing and compiling out a lot of dangerous stuff
-in arch/arm/kernel and then I get the creeps. I can try, but I think
-this is typical Nico territory for example...
-
-Yours,
-Linus Walleij
+> Example dts/dtsi files are given for the three currently supported models. 
+>
+> Major changes: 
+>
+> GPIO code has been converted to a platform_device and rewritten as WM8505 
+> support was broken. Add support for WM8650 gpio controller. 
+>
+> UHCI support was missing. Added this as a generic non-pci uhci controller 
+> as 
+> it doesn't require anything special. Should be usable by any system that 
+> doesn't 
+> have special requirements to get the UHCI controller working. 
+>
+> Framebuffer code patched to support WM8650. The bindings for this are of 
+> concern 
+> but there doesn't seem to be a formalized binding yet. This patch is based 
+> off 
+> Sascha Hauer's current patch on the dri-devel mailing list and should be 
+> easily 
+> patched out when its finalized. 
+>
+> Patchset based on Arnd's arm-soc/for-next branch. 
+>
+>
+> Could I get this reviewed, hopefully for inclusion into v3.7. 
+>
+> Regards 
+> Tony Prisk 
+>
+>
+> Tony Prisk (8): 
+>   arm: vt8500: Add device tree files for VIA/Wondermedia SoC's 
+>   rtc: vt8500: Add devicetree support for vt8500-rtc 
+>   serial: vt8500: Add devicetree support for vt8500-serial 
+>   usb: vt8500: Add devicetree support for vt8500-ehci and -uhci. 
+>   video: vt8500: Add devicetree support for vt8500-fb and wm8505-fb 
+>   arm: vt8500: Update arch-vt8500 to devicetree support. 
+>   arm: vt8500: doc: Add device tree bindings for arch-vt8500 devices 
+>   ARM: vt8500: gpio: Devicetree support for arch-vt8500 
+>
+>  Documentation/devicetree/bindings/arm/vt8500.txt   |   15 + 
+>  .../bindings/arm/vt8500/via,vt8500-intc.txt        |   16 + 
+>  .../bindings/arm/vt8500/via,vt8500-pmc.txt         |   13 + 
+>  .../bindings/arm/vt8500/via,vt8500-timer.txt       |   15 + 
+>  .../devicetree/bindings/gpio/gpio_vt8500.txt       |   24 ++ 
+>  .../devicetree/bindings/rtc/via,vt8500-rtc.txt     |   15 + 
+>  .../bindings/tty/serial/via,vt8500-uart.txt        |   15 + 
+>  .../devicetree/bindings/usb/platform-uhci.txt      |   15 + 
+>  .../devicetree/bindings/usb/via,vt8500-ehci.txt    |   15 + 
+>  .../devicetree/bindings/vendor-prefixes.txt        |    2 + 
+>  .../devicetree/bindings/video/via,vt8500-fb.txt    |   46 +++ 
+>  .../devicetree/bindings/video/wm,prizm-ge-rops.txt |   13 + 
+>  .../devicetree/bindings/video/wm,wm8505-fb.txt     |   20 ++ 
+>  arch/arm/Kconfig                                   |    2 + 
+>  arch/arm/boot/dts/vt8500.dtsi                      |   99 ++++++ 
+>  arch/arm/boot/dts/vt8500_ref.dts                   |   31 ++ 
+>  arch/arm/boot/dts/wm8505.dtsi                      |  125 ++++++++ 
+>  arch/arm/boot/dts/wm8505_ref.dts                   |   31 ++ 
+>  arch/arm/boot/dts/wm8650.dtsi                      |   95 ++++++ 
+>  arch/arm/boot/dts/wm8650_ref.dts                   |   31 ++ 
+>  arch/arm/mach-vt8500/Kconfig                       |   72 +---- 
+>  arch/arm/mach-vt8500/Makefile                      |    9 +- 
+>  arch/arm/mach-vt8500/bv07.c                        |   80 ----- 
+>  arch/arm/mach-vt8500/common.h                      |   25 ++ 
+>  arch/arm/mach-vt8500/devices-vt8500.c              |   91 ------ 
+>  arch/arm/mach-vt8500/devices-wm8505.c              |   99 ------ 
+>  arch/arm/mach-vt8500/devices.c                     |  270 
+> ----------------- 
+>  arch/arm/mach-vt8500/devices.h                     |   88 ------ 
+>  arch/arm/mach-vt8500/gpio.c                        |  240 --------------- 
+>  arch/arm/mach-vt8500/include/mach/restart.h        |    4 +- 
+>  arch/arm/mach-vt8500/include/mach/vt8500_irqs.h    |   88 ------ 
+>  arch/arm/mach-vt8500/include/mach/vt8500_regs.h    |   79 ----- 
+>  arch/arm/mach-vt8500/include/mach/wm8505_irqs.h    |  115 ------- 
+>  arch/arm/mach-vt8500/include/mach/wm8505_regs.h    |   78 ----- 
+>  arch/arm/mach-vt8500/irq.c                         |  160 +++++----- 
+>  arch/arm/mach-vt8500/restart.c                     |   54 ---- 
+>  arch/arm/mach-vt8500/timer.c                       |   56 +++- 
+>  arch/arm/mach-vt8500/vt8500.c                      |  192 ++++++++++++ 
+>  arch/arm/mach-vt8500/wm8505_7in.c                  |   79 ----- 
+>  drivers/gpio/Kconfig                               |    6 + 
+>  drivers/gpio/Makefile                              |    1 + 
+>  drivers/gpio/gpio-vt8500.c                         |  318 
+> ++++++++++++++++++++ 
+>  drivers/rtc/rtc-vt8500.c                           |    7 + 
+>  drivers/tty/serial/vt8500_serial.c                 |    7 + 
+>  drivers/usb/host/Kconfig                           |    4 +- 
+>  drivers/usb/host/ehci-vt8500.c                     |   24 +- 
+>  drivers/usb/host/uhci-hcd.c                        |    5 + 
+>  drivers/usb/host/uhci-platform.c                   |  166 ++++++++++ 
+>  drivers/video/Kconfig                              |    6 +- 
+>  drivers/video/vt8500lcdfb.c                        |   77 ++++- 
+>  drivers/video/wm8505fb.c                           |   95 +++++- 
+>  drivers/video/wmt_ge_rops.c                        |    7 + 
+>  52 files changed, 1674 insertions(+), 1566 deletions(-) 
+>  create mode 100644 Documentation/devicetree/bindings/arm/vt8500.txt 
+>  create mode 100644 
+> Documentation/devicetree/bindings/arm/vt8500/via,vt8500-intc.txt 
+>  create mode 100644 
+> Documentation/devicetree/bindings/arm/vt8500/via,vt8500-pmc.txt 
+>  create mode 100644 
+> Documentation/devicetree/bindings/arm/vt8500/via,vt8500-timer.txt 
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio_vt8500.txt 
+>  create mode 100644 
+> Documentation/devicetree/bindings/rtc/via,vt8500-rtc.txt 
+>  create mode 100644 
+> Documentation/devicetree/bindings/tty/serial/via,vt8500-uart.txt 
+>  create mode 100644 
+> Documentation/devicetree/bindings/usb/platform-uhci.txt 
+>  create mode 100644 
+> Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt 
+>  create mode 100644 
+> Documentation/devicetree/bindings/video/via,vt8500-fb.txt 
+>  create mode 100644 
+> Documentation/devicetree/bindings/video/wm,prizm-ge-rops.txt 
+>  create mode 100644 
+> Documentation/devicetree/bindings/video/wm,wm8505-fb.txt 
+>  create mode 100644 arch/arm/boot/dts/vt8500.dtsi 
+>  create mode 100644 arch/arm/boot/dts/vt8500_ref.dts 
+>  create mode 100644 arch/arm/boot/dts/wm8505.dtsi 
+>  create mode 100644 arch/arm/boot/dts/wm8505_ref.dts 
+>  create mode 100644 arch/arm/boot/dts/wm8650.dtsi 
+>  create mode 100644 arch/arm/boot/dts/wm8650_ref.dts 
+>  delete mode 100644 arch/arm/mach-vt8500/bv07.c 
+>  create mode 100644 arch/arm/mach-vt8500/common.h 
+>  delete mode 100644 arch/arm/mach-vt8500/devices-vt8500.c 
+>  delete mode 100644 arch/arm/mach-vt8500/devices-wm8505.c 
+>  delete mode 100644 arch/arm/mach-vt8500/devices.c 
+>  delete mode 100644 arch/arm/mach-vt8500/devices.h 
+>  delete mode 100644 arch/arm/mach-vt8500/gpio.c 
+>  delete mode 100644 arch/arm/mach-vt8500/include/mach/vt8500_irqs.h 
+>  delete mode 100644 arch/arm/mach-vt8500/include/mach/vt8500_regs.h 
+>  delete mode 100644 arch/arm/mach-vt8500/include/mach/wm8505_irqs.h 
+>  delete mode 100644 arch/arm/mach-vt8500/include/mach/wm8505_regs.h 
+>  delete mode 100644 arch/arm/mach-vt8500/restart.c 
+>  create mode 100644 arch/arm/mach-vt8500/vt8500.c 
+>  delete mode 100644 arch/arm/mach-vt8500/wm8505_7in.c 
+>  create mode 100644 drivers/gpio/gpio-vt8500.c 
+>  create mode 100644 drivers/usb/host/uhci-platform.c 
+>
+> -- 
+> 1.7.9.5 
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120818/7d16f695/attachment-0001.html>
