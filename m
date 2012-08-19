@@ -1,32 +1,66 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 19 Aug 2012 23:26:58 +0800
-Subject: imx6q restart is broken
-In-Reply-To: <20120817034854.GE24242@S2101-09.ap.freescale.net>
-References: <20120808101817.GA14718@S2101-09.ap.freescale.net>
- <50224547.9020000@de.bosch.com> <50232C17.9000700@gmail.com>
- <20120809092021.GQ18957@n2100.arm.linux.org.uk>
- <502BBB43.5010403@gmail.com>
- <20120815214412.GC32560@n2100.arm.linux.org.uk>
- <20120816023109.GH2258@S2101-09.ap.freescale.net>
- <20120816223446.GB15883@n2100.arm.linux.org.uk>
- <20120817034854.GE24242@S2101-09.ap.freescale.net>
-Message-ID: <20120819152656.GI24242@S2101-09.ap.freescale.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sun, 19 Aug 2012 11:42:15 -0400 (EDT)
+Subject: [PATCH] arm: mm: Fix vmalloc overlap check for !HIGHMEM
+In-Reply-To: <1345222980-16965-1-git-send-email-jonathan.austin@arm.com>
+References: <1345222980-16965-1-git-send-email-jonathan.austin@arm.com>
+Message-ID: <alpine.LFD.2.02.1208191141470.1754@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 17, 2012 at 11:48:56AM +0800, Shawn Guo wrote:
-> > I think what needs to happen here (while we wait) is someone _with_ the
-> > problem needs to experiment, and find out how many nops are needed for
-> > the DMB not to have much effect in cpu_relax().  If it turns out we just
-> > need to put one nop in, then that's not _too_ bad.
-> 
-> At least, I need to have 5 nops to get rid of the issue, something like
-> below.
-> 
-Russell,
+On Fri, 17 Aug 2012, Jonathan Austin wrote:
 
-What's your take on this then?
+> With !HIGHMEM, sanity_check_meminfo checks for banks that completely or
+> partially overlap the vmalloc region. The test for partial overlap checks
+> __va(bank->start + bank->size) > vmalloc_min. This is not appropriate if
+> there is a non-linear translation between virtual and physical addresses,
+> as bank->start + bank->size is actually in the bank following the one being
+> interrogated.
+> 
+> In most cases, even when using SPARSEMEM, this is not problematic as the
+> subsequent bank will start at a higher va than the one in question. However
+> if the physical to virtual address conversion is not monotonic increasing,
+> the incorrect test could result in a bank not being truncated when it
+> should be.
+> 
+> This patch ensures we perform the va-pa conversion on memory from the
+> bank we are interested in, not the following one.
+> 
+> Reported-by: ????????? (Steve) <zhanzhenbo@gmail.com>
+> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
 
--- 
-Regards,
-Shawn
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+> ---
+> 
+> This is modified based on Russell's feedback in the original
+> discussion (Why the region area don't decrease 1 in function
+> sanity_check_meminfo?)
+> 
+>  arch/arm/mm/mmu.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 4c2d045..dbd9ff6 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -961,8 +961,8 @@ void __init sanity_check_meminfo(void)
+>  		 * Check whether this memory bank would partially overlap
+>  		 * the vmalloc area.
+>  		 */
+> -		if (__va(bank->start + bank->size) > vmalloc_min ||
+> -		    __va(bank->start + bank->size) < __va(bank->start)) {
+> +		if (__va(bank->start + bank->size - 1) >= vmalloc_min ||
+> +		    __va(bank->start + bank->size - 1) <= __va(bank->start)) {
+>  			unsigned long newsize = vmalloc_min - __va(bank->start);
+>  			printk(KERN_NOTICE "Truncating RAM at %.8llx-%.8llx "
+>  			       "to -%.8llx (vmalloc region overlap).\n",
+> -- 
+> 1.7.1
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
