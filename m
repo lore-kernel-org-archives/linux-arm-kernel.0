@@ -1,23 +1,46 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 19 Aug 2012 11:52:32 -0400 (EDT)
-Subject: [PATCH 0/6] Integrator devicetree support
-In-Reply-To: <CACRpkdYYgdzAU=nyL7dQbdMLx3z3G+K7ba0uJe1=aX=BLeF_sg@mail.gmail.com>
-References: <1345119317-22600-1-git-send-email-linus.walleij@linaro.org>
- <201208161344.55723.arnd@arndb.de>
- <CACRpkdYYgdzAU=nyL7dQbdMLx3z3G+K7ba0uJe1=aX=BLeF_sg@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1208191148520.1754@xanadu.home>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 19 Aug 2012 14:05:59 -0300
+Subject: [PATCH v2 2/2] ARM: clk-imx25: Fix SSI clock registration
+Message-ID: <1345395959-26978-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 19 Aug 2012, Linus Walleij wrote:
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-> But then we hit #ifdeffing and compiling out a lot of dangerous stuff
-> in arch/arm/kernel and then I get the creeps. I can try, but I think
-> this is typical Nico territory for example...
+SSI block has two types of clock:
 
-I did post a patch moving all the ATAG stuff to a separate source file a 
-while ago, exactly for that purpose.  I should try to dig it out and 
-refresh it.
+ipg: bus clock, the clock needed for accessing registers.
+per: peripheral clock, the clock needed for generating the bit rate.
 
+Currently SSI driver only supports slave mode and only need to handle
+the ipg clock, because the peripheral clock comes from the master codec.
 
-Nicolas
+Only register the ipg clock and do not register the peripheral clock for ssi.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Use imx-ssi.1 for ssi2_ipg
+
+ arch/arm/mach-imx/clk-imx25.c |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
+index fdd8cc8..5ff9534 100644
+--- a/arch/arm/mach-imx/clk-imx25.c
++++ b/arch/arm/mach-imx/clk-imx25.c
+@@ -222,10 +222,8 @@ int __init mx25_clocks_init(void)
+ 	clk_register_clkdev(clk[lcdc_ipg], "ipg", "imx-fb.0");
+ 	clk_register_clkdev(clk[lcdc_ahb], "ahb", "imx-fb.0");
+ 	clk_register_clkdev(clk[wdt_ipg], NULL, "imx2-wdt.0");
+-	clk_register_clkdev(clk[ssi1_ipg_per], "per", "imx-ssi.0");
+-	clk_register_clkdev(clk[ssi1_ipg], "ipg", "imx-ssi.0");
+-	clk_register_clkdev(clk[ssi2_ipg_per], "per", "imx-ssi.1");
+-	clk_register_clkdev(clk[ssi2_ipg], "ipg", "imx-ssi.1");
++	clk_register_clkdev(clk[ssi1_ipg], NULL, "imx-ssi.0");
++	clk_register_clkdev(clk[ssi2_ipg], NULL, "imx-ssi.1");
+ 	clk_register_clkdev(clk[esdhc1_ipg_per], "per", "sdhci-esdhc-imx25.0");
+ 	clk_register_clkdev(clk[esdhc1_ipg], "ipg", "sdhci-esdhc-imx25.0");
+ 	clk_register_clkdev(clk[esdhc1_ahb], "ahb", "sdhci-esdhc-imx25.0");
+-- 
+1.7.9.5
