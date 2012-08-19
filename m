@@ -1,199 +1,198 @@
 From: burman.yan@gmail.com (Yan Burman)
-Date: Sun, 19 Aug 2012 22:58:16 +0300
-Subject: [PATCH v2] ARM: ep93xx: Use HW MAC filter in ethernet driver
-Message-ID: <1345406296.20237.4.camel@localhost>
+Date: Sun, 19 Aug 2012 23:00:44 +0300
+Subject: [PATCH v2] ARM: ep93xx: clockevent support
+Message-ID: <1345406444.20237.7.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: ep93xx: Use HW MAC filter in ethernet driver
-Use HW MAC filtering for broadcasts and multicasts.
-Do not always work in promiscuous mode.
-Partially based on kernel 2.6.20.4 driver from cirrus logic.
-Tested on 9302 and 9315 based boards.
+ARM: ep93xx: clockevent support
+I have ported to 3.6-rc2 and slightly modified a previous patch for clockevent support for the ep93xx.
+The porting mainly consists of sched_clock support + CLKSRC_MMIO usage.
+Tested on 9302 based board.
 
 Changes from v1:
-* Some minor style fixes
-* Use CRC32 code instead of duplicating code
-* Fixed multicast reception (tested with omping)
+* Number of cosmetic style fixes
+* Use CLKSRC_MMIO
 
+From: Ahmed Ammar <aammar <at> edge-techno.com>
 Signed-off-by: Yan Burman <burman.yan@gmail.com>
 
-diff --git a/drivers/net/ethernet/cirrus/Kconfig b/drivers/net/ethernet/cirrus/Kconfig
-index 8388e36..b7b154f 100644
---- a/drivers/net/ethernet/cirrus/Kconfig
-+++ b/drivers/net/ethernet/cirrus/Kconfig
-@@ -46,6 +46,7 @@ config EP93XX_ETH
- 	depends on ARM && ARCH_EP93XX
- 	select NET_CORE
- 	select MII
-+	select CRC32
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e91c7cd..b1d0b11 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -451,7 +451,8 @@ config ARCH_EP93XX
+ 	select CLKDEV_LOOKUP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+-	select ARCH_USES_GETTIMEOFFSET
++	select GENERIC_CLOCKEVENTS
++	select CLKSRC_MMIO
+ 	select NEED_MACH_MEMORY_H
  	help
- 	  This is a driver for the ethernet hardware included in EP93xx CPUs.
- 	  Say Y if you are building a kernel for EP93xx based devices.
-diff --git a/drivers/net/ethernet/cirrus/ep93xx_eth.c b/drivers/net/ethernet/cirrus/ep93xx_eth.c
-index 78c5521..27299ce 100644
---- a/drivers/net/ethernet/cirrus/ep93xx_eth.c
-+++ b/drivers/net/ethernet/cirrus/ep93xx_eth.c
-@@ -25,6 +25,7 @@
- #include <linux/delay.h>
- #include <linux/io.h>
- #include <linux/slab.h>
-+#include <linux/crc32.h>
+ 	  This enables support for the Cirrus EP93xx series of CPUs.
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index 4afe52a..f59a849 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -30,6 +30,8 @@
+ #include <linux/amba/bus.h>
+ #include <linux/amba/serial.h>
+ #include <linux/mtd/physmap.h>
++#include <linux/clocksource.h>
++#include <linux/clockchips.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c-gpio.h>
+ #include <linux/spi/spi.h>
+@@ -43,6 +45,7 @@
  
- #include <mach/hardware.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
++#include <asm/sched_clock.h>
  
-@@ -37,8 +38,32 @@
- #define MAX_PKT_SIZE		2044
- #define PKT_BUF_SIZE		2048
+ #include <asm/hardware/vic.h>
  
-+#define HASH_TBL_ENTRIES	8
+@@ -114,63 +117,114 @@ void __init ep93xx_map_io(void)
+ #define EP93XX_TIMER4_CLOCK		983040
+ 
+ #define TIMER1_RELOAD			((EP93XX_TIMER123_CLOCK / HZ) - 1)
+-#define TIMER4_TICKS_PER_JIFFY		DIV_ROUND_CLOSEST(CLOCK_TICK_RATE, HZ)
+-
+-static unsigned int last_jiffy_time;
+ 
+ static irqreturn_t ep93xx_timer_interrupt(int irq, void *dev_id)
+ {
++	struct clock_event_device *evt = dev_id;
 +
- #define REG_RXCTL		0x0000
--#define  REG_RXCTL_DEFAULT	0x00073800
-+#define  REG_RXCTL_PauseA  (1 << 20)
-+#define  REG_RXCTL_RxFCE1  (1 << 19)
-+#define  REG_RXCTL_RxFCE0  (1 << 18)
-+#define  REG_RXCTL_BCRC    (1 << 17)
-+#define  REG_RXCTL_SRxON   (1 << 16)
-+#define  REG_RXCTL_RCRCA   (1 << 13)
-+#define  REG_RXCTL_RA      (1 << 12)
-+#define  REG_RXCTL_PA      (1 << 11)
-+#define  REG_RXCTL_BA      (1 << 10)
-+#define  REG_RXCTL_MA      (1 << 9)
-+#define  REG_RXCTL_IAHA    (1 << 8)
-+#define  REG_RXCTL_IA3     (1 << 3)
-+#define  REG_RXCTL_IA2     (1 << 2)
-+#define  REG_RXCTL_IA1     (1 << 1)
-+#define  REG_RXCTL_IA0     (1 << 0)
-+#define  REG_RXCTL_DEFAULT	(REG_RXCTL_BA | \
-+				REG_RXCTL_RA | \
-+				REG_RXCTL_RCRCA | \
-+				REG_RXCTL_SRxON | \
-+				REG_RXCTL_BCRC | \
-+				REG_RXCTL_RxFCE0 | \
-+				REG_RXCTL_IA0)
-+
- #define REG_TXCTL		0x0004
- #define  REG_TXCTL_ENABLE	0x00000001
- #define REG_MIICMD		0x0010
-@@ -57,6 +82,12 @@
- #define  REG_INTSTS_RX		0x00000004
- #define REG_INTSTSC		0x002c
- #define REG_AFP			0x004c
-+#define  REG_AFP_IA0		0
-+#define  REG_AFP_IA1		1
-+#define  REG_AFP_IA2		2
-+#define  REG_AFP_IA3		3
-+#define  REG_AFP_DTxP		6
-+#define  REG_AFP_HASH		7
- #define REG_INDAD0		0x0050
- #define REG_INDAD1		0x0051
- #define REG_INDAD2		0x0052
-@@ -386,6 +417,51 @@ static int ep93xx_xmit(struct sk_buff *skb, struct net_device *dev)
- 	return NETDEV_TX_OK;
+ 	/* Writing any value clears the timer interrupt */
+ 	__raw_writel(1, EP93XX_TIMER1_CLEAR);
+-
+-	/* Recover lost jiffies */
+-	while ((signed long)
+-		(__raw_readl(EP93XX_TIMER4_VALUE_LOW) - last_jiffy_time)
+-						>= TIMER4_TICKS_PER_JIFFY) {
+-		last_jiffy_time += TIMER4_TICKS_PER_JIFFY;
+-		timer_tick();
+-	}
++	evt->event_handler(evt);
+ 
+ 	return IRQ_HANDLED;
  }
  
-+static void ep93xx_set_mcast_tbl(struct net_device *dev, u8 *buf)
++static int ep93xx_set_next_event(unsigned long evt,
++				struct clock_event_device *unused)
 +{
-+	struct netdev_hw_addr *ha;
-+	u32 crc;
++	u32 tmode = __raw_readl(EP93XX_TIMER1_CONTROL);
 +
-+	netdev_for_each_mc_addr(ha, dev) {
-+		crc = ether_crc_le(ETH_ALEN, ha->addr);
-+		buf[crc >> 29] |= (1 << ((crc >> 26) & 7));
-+	}
-+}
-+
-+static int ep93xx_ind_addr_write(struct net_device *dev, int afp, char *buf)
-+{
-+	u32 rxctl;
-+	unsigned int i, len;
-+	struct ep93xx_priv *ep = netdev_priv(dev);
-+
-+	switch (afp) {
-+	case REG_AFP_IA0:
-+	case REG_AFP_IA1:
-+	case REG_AFP_IA2:
-+	case REG_AFP_IA3:
-+	case REG_AFP_DTxP:
-+		len = ETH_ALEN;
-+		break;
-+
-+	case REG_AFP_HASH:
-+		len = HASH_TBL_ENTRIES;
-+		break;
-+
-+	default:
-+		pr_crit("invalid afp value: %d\n", afp);
-+		return -1;
-+	}
-+
-+	rxctl = rdl(ep, REG_RXCTL);
-+	wrl(ep, REG_RXCTL, ~REG_RXCTL_SRxON & rxctl);
-+	wrl(ep, REG_AFP, afp);
-+	for (i = 0; i < len; i++)
-+		wrb(ep, REG_INDAD0 + i, buf[i]);
-+	wrl(ep, REG_RXCTL, rxctl);
++	/* stop timer */
++	__raw_writel(tmode & ~EP93XX_TIMER123_CONTROL_ENABLE,
++			EP93XX_TIMER1_CONTROL);
++	/* program timer */
++	__raw_writel(evt, EP93XX_TIMER1_LOAD);
++	/* start timer */
++	__raw_writel(tmode | EP93XX_TIMER123_CONTROL_ENABLE,
++			EP93XX_TIMER1_CONTROL);
 +
 +	return 0;
 +}
 +
- static void ep93xx_tx_complete(struct net_device *dev)
- {
- 	struct ep93xx_priv *ep = netdev_priv(dev);
-@@ -615,13 +691,7 @@ static int ep93xx_start_hw(struct net_device *dev)
- 	wrl(ep, REG_RXDENQ, RX_QUEUE_ENTRIES);
- 	wrl(ep, REG_RXSTSENQ, RX_QUEUE_ENTRIES);
- 
--	wrb(ep, REG_INDAD0, dev->dev_addr[0]);
--	wrb(ep, REG_INDAD1, dev->dev_addr[1]);
--	wrb(ep, REG_INDAD2, dev->dev_addr[2]);
--	wrb(ep, REG_INDAD3, dev->dev_addr[3]);
--	wrb(ep, REG_INDAD4, dev->dev_addr[4]);
--	wrb(ep, REG_INDAD5, dev->dev_addr[5]);
--	wrl(ep, REG_AFP, 0);
-+	ep93xx_ind_addr_write(dev, REG_AFP_IA0, dev->dev_addr);
- 
- 	wrl(ep, REG_MAXFRMLEN, (MAX_PKT_SIZE << 16) | MAX_PKT_SIZE);
- 
-@@ -647,6 +717,32 @@ static void ep93xx_stop_hw(struct net_device *dev)
- 		pr_crit("hw failed to reset\n");
- }
- 
-+static void ep93xx_set_multicast_list(struct net_device *dev)
++static void ep93xx_set_mode(enum clock_event_mode mode,
++			    struct clock_event_device *evt)
 +{
-+	struct ep93xx_priv *ep = netdev_priv(dev);
++	u32 tmode = EP93XX_TIMER123_CONTROL_CLKSEL;
 +
-+	if (dev->flags & IFF_PROMISC) {
-+		wrl(ep, REG_RXCTL, REG_RXCTL_PA | rdl(ep, REG_RXCTL));
-+	} else if (dev->flags & IFF_ALLMULTI) {
-+		wrl(ep, REG_RXCTL, REG_RXCTL_MA |
-+			(~REG_RXCTL_PA & rdl(ep, REG_RXCTL)));
-+		ep93xx_ind_addr_write(dev, REG_AFP_HASH,
-+			      "\xff\xff\xff\xff\xff\xff\xff\xff");
-+	} else if (!netdev_mc_empty(dev)) {
-+		u8 tblMulti[HASH_TBL_ENTRIES + 1];
++	/* Disable timer */
++	__raw_writel(tmode, EP93XX_TIMER1_CONTROL);
 +
-+		memset(tblMulti, 0, sizeof(tblMulti));
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		/* Set timer period  */
++		__raw_writel(TIMER1_RELOAD, EP93XX_TIMER1_LOAD);
++		tmode |= EP93XX_TIMER123_CONTROL_MODE;
++		/* fall through */
 +
-+		ep93xx_set_mcast_tbl(dev, tblMulti);
-+		wrl(ep, REG_RXCTL, REG_RXCTL_MA |
-+			(~REG_RXCTL_PA & rdl(ep, REG_RXCTL)));
-+		ep93xx_ind_addr_write(dev, REG_AFP_HASH, tblMulti);
-+	} else {
-+		wrl(ep, REG_RXCTL,
-+			~(REG_RXCTL_PA | REG_RXCTL_MA) & rdl(ep, REG_RXCTL));
++	case CLOCK_EVT_MODE_ONESHOT:
++		tmode |= EP93XX_TIMER123_CONTROL_ENABLE;
++		__raw_writel(tmode, EP93XX_TIMER1_CONTROL);
++		break;
++
++	case CLOCK_EVT_MODE_SHUTDOWN:
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_RESUME:
++		break;
 +	}
 +}
 +
- static int ep93xx_open(struct net_device *dev)
- {
- 	struct ep93xx_priv *ep = netdev_priv(dev);
-@@ -754,6 +850,7 @@ static const struct net_device_ops ep93xx_netdev_ops = {
- 	.ndo_validate_addr	= eth_validate_addr,
- 	.ndo_change_mtu		= eth_change_mtu,
- 	.ndo_set_mac_address	= eth_mac_addr,
-+	.ndo_set_rx_mode	= ep93xx_set_multicast_list,
++static struct clock_event_device ep93xx_clockevent = {
++	.name		= "ep93xx-timer1",
++	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
++	.shift		= 32,
++	.set_mode	= ep93xx_set_mode,
++	.set_next_event	= ep93xx_set_next_event,
++};
++
+ static struct irqaction ep93xx_timer_irq = {
+ 	.name		= "ep93xx timer",
+ 	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+ 	.handler	= ep93xx_timer_interrupt,
++	.dev_id		= &ep93xx_clockevent,
  };
  
- static struct net_device *ep93xx_dev_alloc(struct ep93xx_eth_data *data)
+-static void __init ep93xx_timer_init(void)
++static void __init ep93xx_clockevent_init(void)
+ {
+-	u32 tmode = EP93XX_TIMER123_CONTROL_MODE |
+-		    EP93XX_TIMER123_CONTROL_CLKSEL;
++	struct clock_event_device *evt = &ep93xx_clockevent;
+ 
+-	/* Enable periodic HZ timer.  */
+-	__raw_writel(tmode, EP93XX_TIMER1_CONTROL);
+-	__raw_writel(TIMER1_RELOAD, EP93XX_TIMER1_LOAD);
+-	__raw_writel(tmode | EP93XX_TIMER123_CONTROL_ENABLE,
+-			EP93XX_TIMER1_CONTROL);
+-
+-	/* Enable lost jiffy timer.  */
+-	__raw_writel(EP93XX_TIMER4_VALUE_HIGH_ENABLE,
+-			EP93XX_TIMER4_VALUE_HIGH);
++	evt->mult = div_sc(EP93XX_TIMER123_CLOCK, NSEC_PER_SEC, evt->shift);
++	evt->max_delta_ns = clockevent_delta2ns(0xfffffffe, evt);
++	evt->min_delta_ns = clockevent_delta2ns(0xf, evt);
++	evt->cpumask = cpumask_of(0);
+ 
+ 	setup_irq(IRQ_EP93XX_TIMER1, &ep93xx_timer_irq);
++
++	clockevents_register_device(evt);
+ }
+ 
+-static unsigned long ep93xx_gettimeoffset(void)
++static void __init ep93xx_clocksource_init(void)
+ {
+-	int offset;
++	/* Reset time-stamp counter */
++	__raw_writel(EP93XX_TIMER4_VALUE_HIGH_ENABLE, EP93XX_TIMER4_VALUE_HIGH);
++
++	clocksource_mmio_init(EP93XX_TIMER4_VALUE_LOW, "ep93xx-timer4",
++		CLOCK_TICK_RATE, 200, 32, clocksource_mmio_readl_up);
++}
+ 
+-	offset = __raw_readl(EP93XX_TIMER4_VALUE_LOW) - last_jiffy_time;
++static u32 notrace ep93xx_sched_clock(void)
++{
++	return __raw_readl(EP93XX_TIMER4_VALUE_LOW);
++}
+ 
+-	/* Calculate (1000000 / 983040) * offset.  */
+-	return offset + (53 * offset / 3072);
++static void __init ep93xx_timer_init(void)
++{
++	ep93xx_clocksource_init();
++	ep93xx_clockevent_init();
++	setup_sched_clock(ep93xx_sched_clock, 32, CLOCK_TICK_RATE);
+ }
+ 
+ struct sys_timer ep93xx_timer = {
+ 	.init		= ep93xx_timer_init,
+-	.offset		= ep93xx_gettimeoffset,
+ };
+ 
+ 
