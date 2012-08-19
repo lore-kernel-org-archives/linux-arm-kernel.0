@@ -1,337 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 19 Aug 2012 22:05:55 +0800
-Subject: [PATCH 4/4] clk: mxs: replace imx23 clk_register_clkdev with clock DT
- lookup
-In-Reply-To: <1345104526-14797-1-git-send-email-shawn.guo@linaro.org>
-References: <1345104526-14797-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1345385155-15301-1-git-send-email-shawn.guo@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 19 Aug 2012 11:09:05 -0300
+Subject: [PATCH 1/2] ARM: clk-imx35: Fix SSI clock registration
+Message-ID: <1345385346-25412-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It really becomes a maintenance issue that every time a device needs
-to look up (clk_get) a clock we have to patch kernel clock file to call
-clk_register_clkdev for that clock.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Since clock DT support which is meant to resolve clock lookup in device
-tree is in place, the patch moves imx23 client devices' clock lookup
-over to device tree, so that any new lookup to be added at later time
-can just get done in DT instead of kernel.
+SSI block has two types of clock:
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+ipg: bus clock, the clock needed for accessing registers.
+per: peripheral clock, the clock needed for generating the bit rate.
+
+Currently SSI driver only supports slave mode and only need to handle
+the ipg clock, because the peripheral clock comes from the master codec.
+
+Only register the ipg clock and do not register the peripheral clock for ssi.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- .../devicetree/bindings/clock/imx23-clock.txt      |   77 ++++++++++++++++++++
- arch/arm/boot/dts/imx23.dtsi                       |   60 +++++++++++++++-
- drivers/clk/mxs/clk-imx23.c                        |   51 ++------------
- 3 files changed, 141 insertions(+), 47 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/imx23-clock.txt
+ arch/arm/mach-imx/clk-imx35.c |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/imx23-clock.txt b/Documentation/devicetree/bindings/clock/imx23-clock.txt
-new file mode 100644
-index 0000000..d8e89b2
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/imx23-clock.txt
-@@ -0,0 +1,77 @@
-+* Clock bindings for Freescale i.MX23
-+
-+Required properties:
-+- compatible: Should be "fsl,imx23-clkctrl"
-+- reg: Address and length of the register set
-+- #clock-cells: Should be <1>
-+- clock-output-names: A list of clock output names that i.MX23 CLKCTRL
-+  provides.  The full list of all valid clock names and IDs is below.
-+
-+	Name		ID
-+	------------------
-+	ref_xtal	0
-+	pll		1
-+	ref_cpu		2
-+	ref_emi		3
-+	ref_pix		4
-+	ref_io		5
-+	saif_sel	6
-+	lcdif_sel	7
-+	gpmi_sel	8
-+	ssp_sel		9
-+	emi_sel		10
-+	cpu		11
-+	etm_sel		12
-+	cpu_pll		13
-+	cpu_xtal	14
-+	hbus		15
-+	xbus		16
-+	lcdif_div	17
-+	ssp_div		18
-+	gpmi_div	19
-+	emi_pll		20
-+	emi_xtal	21
-+	etm_div		22
-+	saif_div	23
-+	clk32k_div	24
-+	rtc		25
-+	adc		26
-+	spdif_div	27
-+	clk32k		28
-+	dri		29
-+	pwm		30
-+	filt		31
-+	uart		32
-+	ssp		33
-+	gpmi		34
-+	spdif		35
-+	emi		36
-+	saif		37
-+	lcdif		38
-+	etm		39
-+	usb		40
-+	usb_pwr		41
-+
-+  The ID will be used by clock consumer in the first cell of "clocks"
-+  phandle to specify the desired clock.
-+
-+Examples:
-+
-+clks: clkctrl at 80040000 {
-+	compatible = "fsl,imx23-clkctrl";
-+	reg = <0x80040000 0x2000>;
-+	#clock-cells = <1>;
-+	clock-output-names =
-+		...
-+		"uart",		/* 32 */
-+		...
-+		"end_of_list";
-+};
-+
-+auart0: serial at 8006c000 {
-+	compatible = "fsl,imx23-auart";
-+	reg = <0x8006c000 0x2000>;
-+	interrupts = <24 25 23>;
-+	clocks = <&clks 32>;
-+	status = "disabled";
-+};
-diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index 9700872..b7b2963 100644
---- a/arch/arm/boot/dts/imx23.dtsi
-+++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -52,6 +52,7 @@
- 			dma-apbh at 80004000 {
- 				compatible = "fsl,imx23-dma-apbh";
- 				reg = <0x80004000 0x2000>;
-+				clocks = <&clks 15>;
- 			};
- 
- 			ecc at 80008000 {
-@@ -67,6 +68,7 @@
- 				reg-names = "gpmi-nand", "bch";
- 				interrupts = <13>, <56>;
- 				interrupt-names = "gpmi-dma", "bch";
-+				clocks = <&clks 34>;
- 				fsl,gpmi-dma-channel = <4>;
- 				status = "disabled";
- 			};
-@@ -74,6 +76,7 @@
- 			ssp0: ssp at 80010000 {
- 				reg = <0x80010000 0x2000>;
- 				interrupts = <15 14>;
-+				clocks = <&clks 33>;
- 				fsl,ssp-dma-channel = <1>;
- 				status = "disabled";
- 			};
-@@ -291,6 +294,7 @@
- 			dma-apbx at 80024000 {
- 				compatible = "fsl,imx23-dma-apbx";
- 				reg = <0x80024000 0x2000>;
-+				clocks = <&clks 16>;
- 			};
- 
- 			dcp at 80028000 {
-@@ -317,12 +321,14 @@
- 				compatible = "fsl,imx23-lcdif";
- 				reg = <0x80030000 2000>;
- 				interrupts = <46 45>;
-+				clocks = <&clks 38>;
- 				status = "disabled";
- 			};
- 
- 			ssp1: ssp at 80034000 {
- 				reg = <0x80034000 0x2000>;
- 				interrupts = <2 20>;
-+				clocks = <&clks 33>;
- 				fsl,ssp-dma-channel = <2>;
- 				status = "disabled";
- 			};
-@@ -340,9 +346,54 @@
- 			reg = <0x80040000 0x40000>;
- 			ranges;
- 
--			clkctl at 80040000 {
-+			clks: clkctrl at 80040000 {
-+				compatible = "fsl,imx23-clkctrl";
- 				reg = <0x80040000 0x2000>;
--				status = "disabled";
-+				#clock-cells = <1>;
-+				clock-output-names =
-+					"ref_xtal",	/* 0 */
-+					"pll",		/* 1 */
-+					"ref_cpu",	/* 2 */
-+					"ref_emi",	/* 3 */
-+					"ref_pix",	/* 4 */
-+					"ref_io",	/* 5 */
-+					"saif_sel",	/* 6 */
-+					"lcdif_sel",	/* 7 */
-+					"gpmi_sel",	/* 8 */
-+					"ssp_sel",	/* 9 */
-+					"emi_sel",	/* 10 */
-+					"cpu",		/* 11 */
-+					"etm_sel",	/* 12 */
-+					"cpu_pll",	/* 13 */
-+					"cpu_xtal",	/* 14 */
-+					"hbus",		/* 15 */
-+					"xbus",		/* 16 */
-+					"lcdif_div",	/* 17 */
-+					"ssp_div",	/* 18 */
-+					"gpmi_div",	/* 19 */
-+					"emi_pll",	/* 20 */
-+					"emi_xtal",	/* 21 */
-+					"etm_div",	/* 22 */
-+					"saif_div",	/* 23 */
-+					"clk32k_div",	/* 24 */
-+					"rtc",		/* 25 */
-+					"adc",		/* 26 */
-+					"spdif_div",	/* 27 */
-+					"clk32k",	/* 28 */
-+					"dri",		/* 29 */
-+					"pwm",		/* 30 */
-+					"filt",		/* 31 */
-+					"uart",		/* 32 */
-+					"ssp",		/* 33 */
-+					"gpmi",		/* 34 */
-+					"spdif",	/* 35 */
-+					"emi",		/* 36 */
-+					"saif",		/* 37 */
-+					"lcdif",	/* 38 */
-+					"etm",		/* 39 */
-+					"usb",		/* 40 */
-+					"usb_pwr",	/* 41 */
-+					"end_of_list";
- 			};
- 
- 			saif0: saif at 80042000 {
-@@ -394,6 +445,7 @@
- 			pwm: pwm at 80064000 {
- 				compatible = "fsl,imx23-pwm";
- 				reg = <0x80064000 0x2000>;
-+				clocks = <&clks 30>;
- 				#pwm-cells = <2>;
- 				fsl,pwm-number = <5>;
- 				status = "disabled";
-@@ -408,6 +460,7 @@
- 				compatible = "fsl,imx23-auart";
- 				reg = <0x8006c000 0x2000>;
- 				interrupts = <24 25 23>;
-+				clocks = <&clks 32>;
- 				status = "disabled";
- 			};
- 
-@@ -415,6 +468,7 @@
- 				compatible = "fsl,imx23-auart";
- 				reg = <0x8006e000 0x2000>;
- 				interrupts = <59 60 58>;
-+				clocks = <&clks 32>;
- 				status = "disabled";
- 			};
- 
-@@ -422,6 +476,8 @@
- 				compatible = "arm,pl011", "arm,primecell";
- 				reg = <0x80070000 0x2000>;
- 				interrupts = <0>;
-+				clocks = <&clks 32>, <&clks 16>;
-+				clock-names = "uart", "apb_pclk";
- 				status = "disabled";
- 			};
- 
-diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
-index 844043ad0..d1c7cdb 100644
---- a/drivers/clk/mxs/clk-imx23.c
-+++ b/drivers/clk/mxs/clk-imx23.c
-@@ -14,6 +14,7 @@
- #include <linux/err.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <linux/of.h>
- #include <mach/common.h>
- #include <mach/mx23.h>
- #include "clk.h"
-@@ -71,44 +72,6 @@ static void __init clk_misc_init(void)
- 	__mxs_setl(30 << BP_FRAC_IOFRAC, FRAC);
- }
- 
--static struct clk_lookup uart_lookups[] = {
--	{ .dev_id = "duart", },
--	{ .dev_id = "mxs-auart.0", },
--	{ .dev_id = "mxs-auart.1", },
--	{ .dev_id = "8006c000.serial", },
--	{ .dev_id = "8006e000.serial", },
--	{ .dev_id = "80070000.serial", },
--};
--
--static struct clk_lookup hbus_lookups[] = {
--	{ .dev_id = "imx23-dma-apbh", },
--	{ .dev_id = "80004000.dma-apbh", },
--};
--
--static struct clk_lookup xbus_lookups[] = {
--	{ .dev_id = "duart", .con_id = "apb_pclk"},
--	{ .dev_id = "80070000.serial", .con_id = "apb_pclk"},
--	{ .dev_id = "imx23-dma-apbx", },
--	{ .dev_id = "80024000.dma-apbx", },
--};
--
--static struct clk_lookup ssp_lookups[] = {
--	{ .dev_id = "imx23-mmc.0", },
--	{ .dev_id = "imx23-mmc.1", },
--	{ .dev_id = "80010000.ssp", },
--	{ .dev_id = "80034000.ssp", },
--};
--
--static struct clk_lookup lcdif_lookups[] = {
--	{ .dev_id = "imx23-fb", },
--	{ .dev_id = "80030000.lcdif", },
--};
--
--static struct clk_lookup gpmi_lookups[] = {
--	{ .dev_id = "imx23-gpmi-nand", },
--	{ .dev_id = "8000c000.gpmi-nand", },
--};
--
- static const char *sel_pll[]  __initconst = { "pll", "ref_xtal", };
- static const char *sel_cpu[]  __initconst = { "ref_cpu", "ref_xtal", };
- static const char *sel_pix[]  __initconst = { "ref_pix", "ref_xtal", };
-@@ -134,6 +97,7 @@ static enum imx23_clk clks_init_on[] __initdata = {
- 
- int __init mx23_clocks_init(void)
- {
-+	struct device_node *np;
- 	int i;
- 
- 	clk_misc_init();
-@@ -188,14 +152,11 @@ int __init mx23_clocks_init(void)
- 			return PTR_ERR(clks[i]);
- 		}
- 
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx23-clkctrl");
-+	if (np)
-+		of_clk_add_provider(np, of_clk_src_onecell_get, NULL);
-+
- 	clk_register_clkdev(clks[clk32k], NULL, "timrot");
--	clk_register_clkdev(clks[pwm], NULL, "80064000.pwm");
--	clk_register_clkdevs(clks[hbus], hbus_lookups, ARRAY_SIZE(hbus_lookups));
--	clk_register_clkdevs(clks[xbus], xbus_lookups, ARRAY_SIZE(xbus_lookups));
--	clk_register_clkdevs(clks[uart], uart_lookups, ARRAY_SIZE(uart_lookups));
--	clk_register_clkdevs(clks[ssp], ssp_lookups, ARRAY_SIZE(ssp_lookups));
--	clk_register_clkdevs(clks[gpmi], gpmi_lookups, ARRAY_SIZE(gpmi_lookups));
--	clk_register_clkdevs(clks[lcdif], lcdif_lookups, ARRAY_SIZE(lcdif_lookups));
- 
- 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
- 		clk_prepare_enable(clks[clks_init_on[i]]);
+diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
+index c6422fb..f7910df 100644
+--- a/arch/arm/mach-imx/clk-imx35.c
++++ b/arch/arm/mach-imx/clk-imx35.c
+@@ -230,10 +230,8 @@ int __init mx35_clocks_init()
+ 	clk_register_clkdev(clk[ipu_gate], NULL, "mx3_sdc_fb");
+ 	clk_register_clkdev(clk[owire_gate], NULL, "mxc_w1");
+ 	clk_register_clkdev(clk[sdma_gate], NULL, "imx35-sdma");
+-	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.0");
+-	clk_register_clkdev(clk[ssi1_div_post], "per", "imx-ssi.0");
+-	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.1");
+-	clk_register_clkdev(clk[ssi2_div_post], "per", "imx-ssi.1");
++	clk_register_clkdev(clk[ssi1_gate], NULL, "imx-ssi.0");
++	clk_register_clkdev(clk[ssi1_gate], NULL, "imx-ssi.1");
+ 	/* i.mx35 has the i.mx21 type uart */
+ 	clk_register_clkdev(clk[uart1_gate], "per", "imx21-uart.0");
+ 	clk_register_clkdev(clk[ipg], "ipg", "imx21-uart.0");
 -- 
-1.7.5.4
+1.7.9.5
