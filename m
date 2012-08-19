@@ -1,54 +1,19 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sun, 19 Aug 2012 10:44:30 +0200
-Subject: [PATCH 14/14] drivers/spi/spi-s3c24xx.c: fix error return code
-In-Reply-To: <1345365870-29831-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1345365870-29831-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1345365870-29831-15-git-send-email-Julia.Lawall@lip6.fr>
+From: shmulik.ladkani@gmail.com (Shmulik Ladkani)
+Date: Sun, 19 Aug 2012 12:01:17 +0300
+Subject: [PATCH 4/8] UBI: prepare for max_beb_per1024 module parameter
+ addition
+In-Reply-To: <1345214124-5478-5-git-send-email-richard.genoud@gmail.com>
+References: <1345214124-5478-1-git-send-email-richard.genoud@gmail.com>
+ <1345214124-5478-5-git-send-email-richard.genoud@gmail.com>
+Message-ID: <20120819120117.0d47ec6c@pixies.home.jungo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <Julia.Lawall@lip6.fr>
+On Fri, 17 Aug 2012 16:35:20 +0200 Richard Genoud <richard.genoud@gmail.com> wrote:
+> This patch prepare the way for the addition of max_beb_per1024 module
+> parameter.
+> There's no functional change.
+> 
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 
-Initialize return variable before exiting on an error path.
-
-A simplified version of the semantic match that finds this problem is as
-follows: (http://coccinelle.lip6.fr/)
-
-// <smpl>
-(
-if at p1 (\(ret < 0\|ret != 0\))
- { ... return ret; }
-|
-ret@p1 = 0
-)
-... when != ret = e1
-    when != &ret
-*if(...)
-{
-  ... when != ret = e2
-      when forall
- return ret;
-}
-
-// </smpl>
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
----
-Perhaps -EINVAL is not the right value in this case.
-
- drivers/spi/spi-s3c24xx.c |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/spi/spi-s3c24xx.c b/drivers/spi/spi-s3c24xx.c
-index 8ee7d79..a2a080b 100644
---- a/drivers/spi/spi-s3c24xx.c
-+++ b/drivers/spi/spi-s3c24xx.c
-@@ -611,6 +611,7 @@ static int __devinit s3c24xx_spi_probe(struct platform_device *pdev)
- 	if (!pdata->set_cs) {
- 		if (pdata->pin_cs < 0) {
- 			dev_err(&pdev->dev, "No chipselect pin\n");
-+			err = -EINVAL;
- 			goto err_register;
- 		}
- 
+Reviewed-by: Shmulik Ladkani <shmulik.ladkani@gmail.com>
