@@ -1,25 +1,58 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 20 Aug 2012 09:56:12 +0200
-Subject: [PATCH 1/8] arm: sam9_l9260_defconfig: adjust UBI bad
- eraseblocks limit
-In-Reply-To: <1345214124-5478-2-git-send-email-richard.genoud@gmail.com>
-References: <1345214124-5478-1-git-send-email-richard.genoud@gmail.com>
- <1345214124-5478-2-git-send-email-richard.genoud@gmail.com>
-Message-ID: <20120820075612.GD7439@game.jcrosoft.org>
+Date: Mon, 20 Aug 2012 09:58:32 +0200
+Subject: [PATCH 13/14] arm: at91: dt: at91sam9 add nand pinctrl support
+In-Reply-To: <CACQ1gAgqXOJiiocOEMBZiaBchXDhvxqfA7RkiEvCCsv000LQNw@mail.gmail.com>
+References: <20120810124820.GA20557@game.jcrosoft.org>
+ <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
+ <1344603731-32667-13-git-send-email-plagnioj@jcrosoft.com>
+ <CACRpkdZXjFE7UsRneskNqnN7DFERHxgAt-FCXtL2A52xKgEA=w@mail.gmail.com>
+ <CACQ1gAhWdwrXEkicy4ij=rukzS-v98bZRr433Qq5M_Dan5JAog@mail.gmail.com>
+ <20120816173844.GC7439@game.jcrosoft.org>
+ <CACQ1gAgqXOJiiocOEMBZiaBchXDhvxqfA7RkiEvCCsv000LQNw@mail.gmail.com>
+Message-ID: <20120820075832.GE7439@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:35 Fri 17 Aug     , Richard Genoud wrote:
-> From: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+On 08:53 Fri 17 Aug     , Richard Genoud wrote:
+> 2012/8/16 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+> >> Maybe it will be more readable if we use something like :
+> >> atmel,pull-up;
+> >> atmel,multidrive;
+> >> atmel,mux="GPIO"
+> >> atmel,mux="A"
+> >> ...
+> >> just my 2 cents...
+> > no too much data and too much node as you will need a node per pin which we
+> > tyr to avoid
 > 
-> UBI has changed the MTD_UBI_BEB_LIMIT semantics. It used to be a percent of
-> total amount of eraseblock in the partition, and now it is the maximum
-> amount of bad eraseblocks on the entire devise per 1024 eraseblocks. So not
-> only the units changed, but also the meaning. But anyway, old 3% roughly
-> correspond to new 30, so change the defconfig correspondingly.
-> 
-> Signed-off-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-simply drop this defconfig
+> One one hand we've got a DTS quite concise but unreadable, and on the
+> other hand, something understandable but huge.
+> ( and it's not specific to your patch Jean-Christophe, on imx6q.dtsi,
+> it looks worse )
+> I'm just trying to make sure that having a DTS like that :
+> nand {
+> 	pinctrl_nand: nand-0 {
+> 		atmel,pins =
+> 			<2 13 0x0 0x1   /* PC13 gpio RDY pin pull_up */
+> 			2 14 0x0 0x1>; /* PC14 gpio enable pin pull_up */
+> 	};
+> };
+> is better than :
+> nand {
+> 	pinctrl_nand: nand-0 {
+> 		nand_rdy { atmel,bank = "C"; atmel,pin = <13>; atmel,mux = "GPIO";
+> atmel,pull-up; };
+> 		nand_ena { atmel,bank = "C"; atmel,pin = <14>; atmel,mux = "GPIO";
+> atmel,pull-up; };
+> 	};
+> };
+> It's what you did in 1st place on linux-at91 git, and I kinda liked it.
+> But yeah, it's more verbose, and some lines will go beyond 80 columns,
+> but that's already the case.
+but as I explain you the DT must not have 1000s of not which we will have if
+we do this. that's why I drop it
+
+and soon we will have macro in DT so this will be more readable
 
 Best Regards,
 J.
