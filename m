@@ -1,52 +1,84 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 20 Aug 2012 13:55:32 +0100
-Subject: [PATCH 5/8] mfd: Provide the PRCMU with its own IRQ domain
-In-Reply-To: <20120820121055.GA26991@opensource.wolfsonmicro.com>
-References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
- <1344527635-6163-6-git-send-email-lee.jones@linaro.org>
- <CACRpkdZ7bMBytyDppV2sB1d1sUbDpPRqAQVOq8k4UOYdmg+Mkw@mail.gmail.com>
- <201208140942.54773.arnd@arndb.de>
- <CACRpkdYbOBEPNbCdfi+=gupdqS8_7t7MpOgXs7VCVTs8Y3j_mQ@mail.gmail.com>
- <20120820083640.GH8450@gmail.com>
- <20120820121055.GA26991@opensource.wolfsonmicro.com>
-Message-ID: <20120820125531.GA20242@gmail.com>
+From: alanbutty12@gmail.com (Alan M Butler)
+Date: Mon, 20 Aug 2012 13:55:39 +0100
+Subject: [PATCH] ARM: Kirkwood: Iomega_IX2_200 DT support Signed-off-by:
+ Alan M Butler <alanbutty12@gmail.com>
+In-Reply-To: <20120820114320.GB26837@lunn.ch>
+References: <cover.1345459608.git.alanbutty12@gmail.com>
+ <1d07faa52b5ca4453c7eaa7c9decb01af92ee648.1345459608.git.alanbutty12@gmail.com>
+ <20120820114320.GB26837@lunn.ch>
+Message-ID: <CADhrpJ6oH3W9XevfFo52-cxu0zoZ2tmxZuANje01igXeawJP4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 01:10:55PM +0100, Mark Brown wrote:
-> On Mon, Aug 20, 2012 at 09:36:43AM +0100, Lee Jones wrote:
-> > On Tue, Aug 14, 2012 at 12:44:37PM +0200, Linus Walleij wrote:
-> 
-> > > Yes but I think I saw this other patch set from Lee, hitting
-> > > irqdomain, OF and MFD to actually fix this ... or did I get
-> > > it wrong?
-> 
-> > No, you're not wrong.
-> 
-> > Historically (in my patches) xb8500_irq_get_virq() was used by drivers
-> > to obtain a VIRQ when not using Device Tree. Now the MFD core handles
-> > conversion there is little requirement for it. In fact there are no
-> > more users for db8500_irq_get_virq() and only one user for 
-> > ab8500_irq_get_virq() and that's itself. I guess we can rid them and
-> > call irq_get_mapping() directly instead.
-> 
-> Oh dear.  Unfortunately whoever added this support to the MFD core did
-> so in such a manner that it's only supported for device tree systems
-> and only for devices which express the MFD cells as device tree nodes
-> which means that most devices can't it - db8500 has got a reasonably
-> unusual combination there.
+On 20 August 2012 12:43, Andrew Lunn <andrew@lunn.ch> wrote:
+> Hi Alan
+>
+> Overall this is looking good.
+>
+> Just a few minor comments below.
+>
+>> diff --git a/arch/arm/mach-kirkwood/board-iomega_ix2_200.c b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
+>> new file mode 100644
+>> index 0000000..0c78752
+>> --- /dev/null
+>> +++ b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
+>> @@ -0,0 +1,79 @@
+>> +/*
+>> + * arch/arm/mach-kirkwood/board-iomega_ix2_200.c
+>> + *
+>> + * Iomega StorCenter ix2-200
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2.  This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/init.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/irq.h>
+>> +#include <linux/mtd/partitions.h>
+>> +#include <linux/ata_platform.h>
+>> +#include <linux/mv643xx_eth.h>
+>> +#include <linux/ethtool.h>
+>> +#include <net/dsa.h>
+>> +#include <linux/gpio.h>
+>> +#include <linux/leds.h>
+>> +#include <linux/i2c.h>
+>> +#include <asm/mach-types.h>
+>> +#include <asm/mach/arch.h>
+>> +#include <mach/kirkwood.h>
+>> +#include "common.h"
+>> +#include "mpp.h"
+>
+> It would be good to remove all the unneeded include files.
+>
+>> +
+>> +static struct mv643xx_eth_platform_data iomega_ix2_200_ge00_data = {
+>> +     .phy_addr       = MV643XX_ETH_PHY_NONE,
+>> +     .speed          = SPEED_1000,
+>> +     .duplex         = DUPLEX_FULL,
+>> +};
+>
+> It is somewhat unusual to have this configuration, 1000 full. Is this
+> a hardware limitation? Or is the port connected to an internal switch?
+> Maybe add a comment why its hard coded.
+>
+>       Andrew
+>
 
-Right, that was the initial intention. It would be a trivial semantic
-change if drivers without DT support wished to use the functionality
-though. However, the only examples I found of a non-DT enabled driver
-that could make good use of it in order to strip out some cruft would
-be the Arizona and one of the Samsung drivers, and they each have
-their own hand-rolled methods of hwirq -> virq conversion now, so any
-change to support them would result in multiple invocations of
-irq_create_mapping which would likely cause breakage.
- 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+the only 2 includes i can think of that might be able to be removed are:
+
+#include <linux/ethtool.h>
+#include <net/dsa.h>
+
+As they do not appear in the iconnect or the goflexnet which i have
+been using as my guide to makeing the dts file.
+But i am not sure about the include files its probably best to leave
+them the way they are maybe?.
+
+As for the network that was setup that way in the origional modified
+config file and in uboot on the device it states 2 network devices
+egiga0 and egiga1 i believe it refers to them by but the device only
+has only 1 phisical network interface (egiga1) so i think there must
+be some kind of switch inside.
