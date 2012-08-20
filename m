@@ -1,30 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Aug 2012 20:47:07 +0000
-Subject: [PATCH v2 08/31] arm64: CPU support
-In-Reply-To: <20120820155740.GA912@arm.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <20120815001043.GD19607@quad.lixom.net> <20120820155740.GA912@arm.com>
-Message-ID: <201208202047.07991.arnd@arndb.de>
+From: swetland@google.com (Brian Swetland)
+Date: Mon, 20 Aug 2012 13:51:33 -0700
+Subject: [PATCH v4 0/12] KGDB/KDB FIQ (NMI) debugger
+In-Reply-To: <20120820144449.GA32560@lizard>
+References: <20120820144449.GA32560@lizard>
+Message-ID: <CANqkERCzQdViRjhtz19wbSWEEnxYjpDcuUZNP9jNHYrtANwp-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 August 2012, Catalin Marinas wrote:
-> > > --- /dev/null
-> > > +++ b/arch/arm64/mm/proc-syms.c
-> ...
-> > > +EXPORT_SYMBOL(__cpuc_flush_kern_all);
-> > > +EXPORT_SYMBOL(__cpuc_flush_user_all);
-> > > +EXPORT_SYMBOL(__cpuc_flush_user_range);
-> > > +EXPORT_SYMBOL(__cpuc_coherent_kern_range);
-> > > +EXPORT_SYMBOL(__cpuc_flush_dcache_area);
-> > 
-> > See comment on other email about putting function pointers in a struct
-> > instead.
-> 
-> There is no need to support multiple CPU architectures with different
-> implementations, so allowing these functions to be called without
-> indirection is better.
+On Mon, Aug 20, 2012 at 7:44 AM, Anton Vorontsov
+<anton.vorontsov@linaro.org> wrote:
+>
+> - KGDB/KDB FIQ debugger shell is synchronous. In Google's version you
+>   could have a dedicated shell always running in the FIQ context, so
+>   when you type something on a serial line, you won't actually cause any
+>   debugging actions, FIQ would save the characters in its own buffer and
+>   continue execution normally. But when you hit return key after the
+>   command, then the command is executed.
+>
+>   In KGDB/KDB FIQ debugger it is different. Once you enter KGDB, the
+>   kernel will stop until you instruct it to continue.
+>
+>   This might look as a drastic change, but it is not. There is actually
+>   no difference whether you have sync or async shell, or at least I
+>   couldn't find any use-case where this would matter at all. Anyways, it
+>   is still possible to do async shell in KDB, just don't see any need
+>   for this.
 
-What is the __cpuc prefix about then? Could you just drop it?
+The main reason we did this asynchronously was that it's entirely possible
+to get the occasional random character on the debug serial port (which is
+often multiplexed with the audio path on the headphone jack), and having
+the device freeze mysteriously when this happens is problematic.
 
-	Arnd
+Since the FIQ debugger is incredibly useful for diagnosing "my device is
+stuck" type problems, we tend to leave it enabled on large numbers of
+devices during internal testing, so that if somebody runs into a problem
+an engineer can plug in a serial debug cable and take a look.  It's
+important that the presence of the debug feature doesn't lead to instability,
+and thus we don't want a single random character to stop the normal
+operation ofthe device.
+
+Brian
