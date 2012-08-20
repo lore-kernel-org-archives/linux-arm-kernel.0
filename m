@@ -1,64 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Aug 2012 21:06:42 +0000
-Subject: [PATCH 2/3] ARM: PRIMA2: make mach-prima2 common for all SiRF
- series SoC
-In-Reply-To: <1345450787-17246-3-git-send-email-Barry.Song@csr.com>
-References: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
- <1345450787-17246-3-git-send-email-Barry.Song@csr.com>
-Message-ID: <201208202106.43206.arnd@arndb.de>
+From: anton.vorontsov@linaro.org (Anton Vorontsov)
+Date: Mon, 20 Aug 2012 14:24:51 -0700
+Subject: [PATCH v4 0/12] KGDB/KDB FIQ (NMI) debugger
+In-Reply-To: <CANqkERCzQdViRjhtz19wbSWEEnxYjpDcuUZNP9jNHYrtANwp-g@mail.gmail.com>
+References: <20120820144449.GA32560@lizard>
+ <CANqkERCzQdViRjhtz19wbSWEEnxYjpDcuUZNP9jNHYrtANwp-g@mail.gmail.com>
+Message-ID: <20120820212451.GA15823@lizard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 August 2012, Barry Song wrote:
-> From: Barry Song <Baohua.Song@csr.com>
+Hi Brian,
+
+On Mon, Aug 20, 2012 at 01:51:33PM -0700, Brian Swetland wrote:
+> > - KGDB/KDB FIQ debugger shell is synchronous. In Google's version you
+> >   could have a dedicated shell always running in the FIQ context,
+[...]
+> The main reason we did this asynchronously was that it's entirely possible
+> to get the occasional random character on the debug serial port (which is
+> often multiplexed with the audio path on the headphone jack), and having
+> the device freeze mysteriously when this happens is problematic.
 > 
-> We will have SiRF Marco and Polo, so rename the dir to mach-sirf
-> and add Kconfig menu
-> 
-> Signed-off-by: Baohua Song <Baohua.Song@csr.com>
-> ---
->  arch/arm/Kconfig                                   |   10 +++++-----
->  arch/arm/Makefile                                  |    2 +-
->  arch/arm/mach-sirf/Kconfig                         |   16 ++++++++++++++++
->  arch/arm/{mach-prima2 => mach-sirf}/Makefile       |    0
->  arch/arm/{mach-prima2 => mach-sirf}/Makefile.boot  |    0
->  .../arm/{mach-prima2 => mach-sirf}/board-generic.c |    0
->  arch/arm/{mach-prima2 => mach-sirf}/common.h       |    0
->  .../include/mach/clkdev.h                          |    0
->  .../include/mach/debug-macro.S                     |    0
->  .../include/mach/entry-macro.S                     |    0
->  .../{mach-prima2 => mach-sirf}/include/mach/gpio.h |    0
->  .../include/mach/hardware.h                        |    0
->  .../{mach-prima2 => mach-sirf}/include/mach/irqs.h |    0
->  .../{mach-prima2 => mach-sirf}/include/mach/map.h  |    0
+> Since the FIQ debugger is incredibly useful for diagnosing "my device is
+> stuck" type problems, we tend to leave it enabled on large numbers of
+> devices during internal testing, so that if somebody runs into a problem
+> an engineer can plug in a serial debug cable and take a look.  It's
+> important that the presence of the debug feature doesn't lead to instability,
+> and thus we don't want a single random character to stop the normal
+> operation ofthe device.
 
-I'm not sure if we should rename all of these right now. I've been thinking
-about moving all of recent and simple ARMv7 based platforms (socfpga, zynq,
-prima2, ...) into a single directory, where they would basically end up
-being one file per platform. We should discuss this at the ARM mini summit,
-and I can let you know the outcome of it. I don't object on the rename in
-principle, but it might end up causing extra churn.
+Yup, and that's why in my approach I implemented a tiny async "shell" on
+to of KDB, the shell accepts just one command "$3#33" -- GDB-protocol
+escape sequence:
 
-> +if ARCH_SIRF
-> +
-> +choice
-> +       prompt "Qualcomm SiRF SoC Type"
-> +       default ARCH_PRIMA2
+/**
+ * kgdb_nmi_poll_knock - Check if it is time to enter the debugger
+ *
+ * "Serial ports are often noisy, especially when muxed over another port (we
+ * often use serial over the headset connector). Noise on the async command
+ * line just causes characters that are ignored, on a command line that blocked
+ * execution noise would be catastrophic." -- Colin Cross
+ *
+ * So, this function implements KGDB/KDB knocking on the serial line: we won't
+ * enter the debugger until we receive a known magic phrase (which is actually
+ * "$3#33", known as "escape to KDB" command.
+ ...
 
-I'm curious about this: I did read that Samsung acquired CSR, and
-you list the chips as Qualcomm. What's the story here?
+I.e. the kernel will print this prompt on the NMI debugger console:
 
-> +config ARCH_PRIMA2
-> +       bool "CSR SiRFSoC PRIMA2 ARM Cortex A9 Platform"
-> +       select CPU_V7
-> +       select ZONE_DMA
-> +       help
-> +          Support for CSR SiRFSoC ARM Cortex A9 Platform
-> +
-> +endchoice
+        Type $3#33 to enter the debugger>
 
-Is this still needed? When you add other SoC type here, would you
-build kernels that are for just one of them in practice?  If they
-are completely generic anyway, you can skip the submenu.
+And this command will be processed asynchronously.
 
-	Arnd
+Thanks!
+
+Anton.
