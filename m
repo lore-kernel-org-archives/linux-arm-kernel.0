@@ -1,147 +1,313 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 20 Aug 2012 09:29:31 -0400 (EDT)
-Subject: [PATCH] ARM: io: avoid writeback addressing modes for __raw_
- accessors
-In-Reply-To: <20120820124109.GK25864@mudshark.cambridge.arm.com>
-References: <1344956366-32574-1-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.02.1208161906390.1541@xanadu.home>
- <20120820124109.GK25864@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1208200902120.1754@xanadu.home>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 20 Aug 2012 15:43:11 +0200
+Subject: [PATCH 02/11] pinctrl: mvebu: dove pinctrl driver
+In-Reply-To: <1344689809-6223-3-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1344689809-6223-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CACRpkda9BL5+NiDOsMKG0kv2coBsw=Er=ZccXnNkgeftV9hPhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Aug 2012, Will Deacon wrote:
+On Sat, Aug 11, 2012 at 2:56 PM, Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com> wrote:
 
-> Hi Nicolas,
-> 
-> [apologies in advance for the long reply]
-> 
-> On Fri, Aug 17, 2012 at 04:43:01AM +0100, Nicolas Pitre wrote:
-> > On Tue, 14 Aug 2012, Will Deacon wrote:
-> > 
-> > > Data aborts taken to hyp mode do not provide a valid instruction
-> > > syndrome field in the HSR if the faulting instruction is a memory
-> > > access using a writeback addressing mode.
-> > > 
-> > > For hypervisors emulating MMIO accesses to virtual peripherals, taking
-> > > such an exception requires disassembling the faulting instruction in
-> > > order to determine the behaviour of the access. Since this requires
-> > > manually walking the two stages of translation, the world must be
-> > > stopped to prevent races against page aging in the guest, where the
-> > > first-stage translation is invalidated after the hypervisor has
-> > > translated to an IPA and the physical page is reused for something else.
-> > > 
-> > > This patch avoids taking this heavy performance penalty when running
-> > > Linux as a guest by ensuring that our I/O accessors do not make use of
-> > > writeback addressing modes.
-> > 
-> > How often does this happen?  I don't really see writeback as a common 
-> > pattern for IO access.
-> 
-> Building a Thumb-2 kernel with GCC:
-> 
-> gcc version 4.6.3 20120201 (prerelease) (crosstool-NG
-> linaro-1.13.1-2012.02-20120222 - Linaro GCC 2012.02)
-> 
-> Translates the following code from amba_device_add:
-> 
-> 		for (pid = 0, i = 0; i < 4; i++)
-> 			pid |= (readl(tmp + size - 0x20 + 4 * i) & 255) <<
-> 				(i * 8);
-> 		for (cid = 0, i = 0; i < 4; i++)
-> 			cid |= (readl(tmp + size - 0x10 + 4 * i) & 255) <<
-> 				(i * 8);
-> 
-> into:
-[...]
+(...)
+> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+> @@ -147,7 +147,7 @@ config PINCTRL_COH901
+>
+>  config PINCTRL_MVEBU
+>         bool "Marvell SoC pin controller drivers"
+> -       depends on ARCH_MVEBU
+> +       depends on ARCH_MVEBU || ARCH_DOVE
 
-OK, I can see how the compiler will fold the loop increment into the IO 
-access instruction.  But my point is: is this common?  And when this 
-happens, is this a critical path?
+Hmmmm.
 
-> > What does happen quite a lot, though, is pre-indexed addressing.  For 
-> > example, let's take this code which is fairly typical of driver code:
-> > 
-> > #define HW_REG1		0x10
-> > #define HW_REG2		0x14
-> > #define HW_REG3		0x18
-> > #define HW_REG4		0x30
-> > 
-> > int hw_init(void __iomem *ioaddr)
-> > {
-> > 	writel(0, ioaddr + HW_REG1)
-> > 	writel(-1, ioaddr + HW_REG2);
-> > 	writel(readl(ioaddr + HW_REG3) | 0xff, ioaddr + HW_REG4);
-> > 	return 0;
-> > }
-> > 
-> > Right now this produces this:
-> > 
-> > hw_init:
-> >         mov     r3, r0
-> >         mvn     r2, #0
-> >         mov     r0, #0
-> >         str     r0, [r3, #16]
-> >         str     r2, [r3, #20]
-> >         ldr     r2, [r3, #24]
-> >         orr     r2, r2, #255
-> >         str     r2, [r3, #48]
-> >         bx      lr
-> 
-> Well, that's not quite true for CONFIG_ARM_DMA_MEM_BUFFERABLE=y.
+Shouldn't this thing rather be:
 
-True.  I turned those readl() into their raw counterparts to generate 
-the assembly but didn't update the example code in my mailer.
+depends on PLAT_ORION
 
-> whilst the addressing modes are still nice, the dsb is going to be the
-> performance limitation here. That said, we could try the "Qo" constraints,
-> which I seem to remember don't generate writebacks. I'll have a play.
+else you end up lining up all Marvell machines here...
 
-OK.  That would be excellent.
+>         select PINMUX
+>         select PINCONF
+>         help
+> @@ -155,6 +155,13 @@ config PINCTRL_MVEBU
+>           This is only the driver core and additionally needs a SoC specific
+>           driver.
+>
+> +config PINCTRL_DOVE
+> +       bool "Support for Marvell Dove SoCs"
+> +       depends on PINCTRL_MVEBU
 
-> > So, is the performance claim something that you've actually measured 
-> > with a real system, or was it only theoretical?
-> 
-> The difference is down to the work done by the hypvervisor: an MMIO access
-> will trap to hyp mode, where the HSR describes the instruction (access size,
-> load/store, Rt, signed etc). For the case of a writeback instruction, this
-> information is not provided by the hardware. Instead, the hypervisor has to
-> disassemble the faulting instruction and work out what it's doing at which
-> address prior to emulation.
-> 
-> Even if that cost was acceptable, the problem then gets worse. Imagine that
-> a guest MMIO access faults into the hypervisor, where the emulation code
-> tries to decode the instruction because the fault information is incomplete.
-> To do this, it must obtain the *physical* address of the faulting text page
-> so that it can load the instruction. This happens via the ATS12NSOP{R,W}
-> registers, which return a PA for the faulting VA (i.e. both stages of
-> translation).
-> 
-> Now, let's say the hypervisor has got hold of a PA but hasn't yet loaded the
-> instruction. Meanwhile, another virtual CPU running the same guest decides
-> (due to page aging or whatnot) to reclaim the text page containing the
-> faulting instruction. It writes a faulting pte and does a TLB invalidation,
-> however this is too late for the hypervisor, who has already translated its
-> address. Furthermore, let's say that the guest then reuses the same physical
-> page for something like a network buffer. The hypervisor goes ahead and grabs
-> what it thinks is the faulting instruction from memory but in fact gets a
-> load of random network data!
-> 
-> To deal with this, the hypervisor will likely have to stop the virtual world
-> when emulating any MMIO accesses that report incomplete fault information to
-> avoid racing with a TLB invalidation from another virtual CPU. That will
-> certainly be more expensive than an additional instruction on each access.
+Shouldn't this rather be:
 
-I totally agree with you here.
+depends on ARCH_DOVE
+select PINCTRL_MVEBU
 
-However, for completeness and above all for security reasons, the 
-hypervisor will _ahve_ to support that case anyway.
+since you call down into the mvebu driver, it definatley needs
+to select that.
 
-So it is now a matter of compromise between performance and code size.  
-If the pathological case you brought up above is the exception and not 
-the rule then I think that we can live with the performance impact in 
-that case and keep the optimal pre-indexed addressing for the common 
-cases.
+(...)
+> diff --git a/drivers/pinctrl/pinctrl-dove.c b/drivers/pinctrl/pinctrl-dove.c
 
+> +#define  DOVE_AU0_AC97_SEL             (1 << 16)
 
-Nicolas
+It is way cleaner to say:
+
+#include <linux/bitops.h>
+
+#define  DOVE_AU0_AC97_SEL             BIT(16)
+
+(...)
+> +static int dove_pmu_mpp_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
+> +                                unsigned long *config)
+> +{
+> +       unsigned off = (ctrl->pid / 8) * 4;
+> +       unsigned shift = (ctrl->pid % 8) * 4;
+> +       unsigned long pmu = readl(DOVE_PMU_MPP_GENERAL_CTRL);
+> +       unsigned long mpp = readl(DOVE_MPP_VIRT_BASE + off);
+> +
+> +       if (pmu & (1 << ctrl->pid))
+> +               *config = 0x10;
+> +       else
+> +               *config = (mpp >> shift) & 0xf;
+> +       return 0;
+> +}
+
+Same comments about the magic numbers as in the review of the first
+patch.
+
+> +static int dove_pmu_mpp_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
+> +                                unsigned long config)
+> +{
+> +       unsigned off = (ctrl->pid / 8) * 4;
+> +       unsigned shift = (ctrl->pid % 8) * 4;
+> +       unsigned long pmu = readl(DOVE_PMU_MPP_GENERAL_CTRL);
+> +       unsigned long mpp = readl(DOVE_MPP_VIRT_BASE + off);
+> +
+> +       if (config == 0x10)
+> +               writel(pmu | (1 << ctrl->pid), DOVE_PMU_MPP_GENERAL_CTRL);
+> +       else {
+> +               writel(pmu & ~(1 << ctrl->pid), DOVE_PMU_MPP_GENERAL_CTRL);
+> +               mpp &= ~(0xf << shift);
+> +               mpp |= config << shift;
+> +               writel(mpp, DOVE_MPP_VIRT_BASE + off);
+> +       }
+> +       return 0;
+> +}
+
+Dito.
+
+> +static int dove_mpp4_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
+> +                             unsigned long *config)
+> +{
+> +       unsigned long mpp4 = readl(DOVE_MPP_CTRL4_VIRT_BASE);
+> +       unsigned long mask;
+> +
+> +       if (ctrl->pid == 24)
+> +               mask = DOVE_CAM_GPIO_SEL;
+> +       else if (ctrl->pid == 40)
+> +               mask = DOVE_SD0_GPIO_SEL;
+> +       else if (ctrl->pid == 46)
+> +               mask = DOVE_SD1_GPIO_SEL;
+> +       else if (ctrl->pid == 58)
+> +               mask = DOVE_SPI_GPIO_SEL;
+> +       else if (ctrl->pid == 62)
+> +               mask = DOVE_UART1_GPIO_SEL;
+> +       else
+> +               return -EINVAL;
+
+Magic numbers, atleast provide a comment on what is so special about
+these pins, and can you use a switch() statement instead?
+
+(...)
+> +static int dove_mpp4_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
+> +                             unsigned long config)
+> +{
+> +       unsigned long mpp4 = readl(DOVE_MPP_CTRL4_VIRT_BASE);
+> +       unsigned long mask;
+> +
+> +       if (ctrl->pid == 24)
+> +               mask = DOVE_CAM_GPIO_SEL;
+> +       else if (ctrl->pid == 40)
+> +               mask = DOVE_SD0_GPIO_SEL;
+> +       else if (ctrl->pid == 46)
+> +               mask = DOVE_SD1_GPIO_SEL;
+> +       else if (ctrl->pid == 58)
+> +               mask = DOVE_SPI_GPIO_SEL;
+> +       else if (ctrl->pid == 62)
+> +               mask = DOVE_UART1_GPIO_SEL;
+> +       else
+> +               return -EINVAL;
+
+Dito.
+
+(...)
+> +static int dove_audio1_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
+> +                               unsigned long *config)
+> +{
+> +       unsigned long mpp4 = readl(DOVE_MPP_CTRL4_VIRT_BASE);
+> +       unsigned long sspc1 = readl(DOVE_SSP_CTRL_STATUS_1);
+> +       unsigned long gmpp = readl(DOVE_MPP_GENERAL_VIRT_BASE);
+> +       unsigned long gcfg2 = readl(DOVE_GLOBAL_CONFIG_2);
+> +
+> +       *config = 0;
+> +       if (mpp4 & DOVE_AU1_GPIO_SEL)
+> +               *config |= 0x8;
+> +       if (sspc1 & DOVE_SSP_ON_AU1)
+> +               *config |= 0x4;
+> +       if (gmpp & DOVE_AU1_SPDIFO_GPIO_EN)
+> +               *config |= 0x2;
+> +       if (gcfg2 & DOVE_TWSI_OPTION3_GPIO)
+> +               *config |= 0x1;
+
+More magic, but the flags make it clear what the set
+bits are all about, so OK.
+
+But I would have:
+#include <linux/bitops.h>
+
+*config |= BIT(0);
+
+etc.
+
+> +       /* SSP/TWSI only if I2S1 not set*/
+> +       if ((*config & 0x8) == 0)
+> +               *config &= ~(0x4 | 0x1);
+> +       /* TWSI only if SPDIFO not set*/
+> +       if ((*config & 0x2) == 0)
+> +               *config &= ~(0x1);
+> +       return 0;
+
+And that applies to these.
+
+> +static int dove_audio1_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
+> +                               unsigned long config)
+> +{
+> +       unsigned long mpp4 = readl(DOVE_MPP_CTRL4_VIRT_BASE);
+> +       unsigned long sspc1 = readl(DOVE_SSP_CTRL_STATUS_1);
+> +       unsigned long gmpp = readl(DOVE_MPP_GENERAL_VIRT_BASE);
+> +       unsigned long gcfg2 = readl(DOVE_GLOBAL_CONFIG_2);
+> +
+> +       if (config & 0x1)
+> +               gcfg2 |= DOVE_TWSI_OPTION3_GPIO;
+> +       if (config & 0x2)
+> +               gmpp |= DOVE_AU1_SPDIFO_GPIO_EN;
+> +       if (config & 0x4)
+> +               sspc1 |= DOVE_SSP_ON_AU1;
+> +       if (config & 0x8)
+> +               mpp4 |= DOVE_AU1_GPIO_SEL;
+
+Dito.
+
+> +static int dove_audio1_ctrl_gpio_req(struct mvebu_mpp_ctrl *ctrl, u8 pid)
+> +{
+> +       unsigned long config;
+> +
+> +       dove_audio1_ctrl_get(ctrl, &config);
+> +
+> +       switch (config) {
+> +       /* mode 0x00 i2s1/spdifo : no gpio */
+> +       /* mode 0x0c ssp/spdifo  : no gpio */
+> +       /* mode 0x0f ssp/twsi    : no gpio */
+> +       case 0x00:
+> +       case 0x0c:
+> +       case 0x0f:
+> +               return -ENOTSUPP;
+
+Nice with the comments (also before the function),
+now I understand what's happening, this is pretty OK,
+I would have put the comments on the same
+line as the magic number but whatever.
+
+However you could just delete these lines and let them
+fall through to -ENOTSUPP at the bottom.
+
+> +
+> +       /* mode 0x02 i2s1 : gpio[56:57] */
+> +       /* mode 0x0e ssp  : gpio[56:57] */
+> +       case 0x02:
+> +       case 0x0e:
+> +               if (pid >= 56)
+> +                       return 0;
+> +
+> +       /* mode 0x08 spdifo : gpio[52:55] */
+> +       /* mode 0x0b twsi   : gpio[52:55] */
+> +       case 0x08:
+> +       case 0x0b:
+> +               if (pid <= 55)
+> +                       return 0;
+> +
+> +       /* mode 0x0a/gpio : all gpio */
+> +       case 0x0a:
+> +               return 0;
+> +       }
+> +
+> +       return -ENOTSUPP;
+> +}
+
+> +/* mpp[52:57] has gpio pins capable of in and out */
+> +static int dove_audio1_ctrl_gpio_dir(struct mvebu_mpp_ctrl *ctrl, u8 pid,
+> +                               bool input)
+> +{
+> +       return 0;
+> +}
+
+So should this not return a -ENOTSUPP for
+pin < 52 || pin > 57?
+
+(...)
+> +static int __devinit dove_pinctrl_probe(struct platform_device *pdev)
+> +{
+> +       const struct of_device_id *match =
+> +               of_match_device(dove_pinctrl_of_match, &pdev->dev);
+> +       int ret;
+> +
+> +       if (match)
+> +               pdev->dev.platform_data = match->data;
+> +
+> +       /*
+> +        * General MPP Configuration Register is part of pdma registers.
+> +        * grab clk to make sure it is clocked.
+> +        */
+> +       pdma_clk = clk_get_sys("dove-pdma", NULL);
+
+First there is something really weird with the name of this
+clock. Atleast call the variable holding the clk something
+apropriate like just "clk".
+
+Second why are you fetching a sys clock instead of using the clkdev
+device binding in the clock tree so you could say:
+
+clk = clk_get(&pdev->dev, NULL);
+
+> +       clk_prepare_enable(pdma_clk);
+
+Good!
+
+> +       ret = mvebu_pinctrl_probe(pdev);
+> +       if (!ret)
+> +               return 0;
+> +
+> +       clk_disable_unprepare(pdma_clk);
+> +       clk_put(pdma_clk);
+> +       return ret;
+> +}
+> +
+> +static int __devexit dove_pinctrl_remove(struct platform_device *pdev)
+> +{
+> +       int ret;
+> +
+> +       ret = mvebu_pinctrl_remove(pdev);
+> +       if (!IS_ERR(pdma_clk)) {
+> +               clk_disable_unprepare(pdma_clk);
+> +               clk_put(pdma_clk);
+> +       }
+
+You don't need this (!IS_ERR()) clause, look in yout probe function:
+you bail out if the clock is not found.
+
+The rest looks good... atleast now, but I'm low on coffee FTM.
+
+Yours,
+Linus Walleij
