@@ -1,38 +1,33 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Mon, 20 Aug 2012 10:21:46 -0500
-Subject: i.MX27 SLCDC driver
-In-Reply-To: <502DEDCD.9050303@gmail.com>
-References: <502DEDCD.9050303@gmail.com>
-Message-ID: <CAKGA1bmuUxiHbkF0n+bOx81EBQujuhu+piDsfHSVo2LejoPmcw@mail.gmail.com>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Mon, 20 Aug 2012 17:40:26 +0200
+Subject: [PATCH v2] ARM: at91: select DT support by default
+Message-ID: <1345477226-23483-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 17, 2012 at 2:07 AM, Ga?tan Carlier <gcembed@gmail.com> wrote:
-> Hello,
-> I would like to write the driver for SmartLCD controller of i.MX27. This
-> kind of interface needs a LCD with an embedded graphic controller partially
-> controlled by GPIO. I want to link it with an OLED DD12832.
->
-> How have I to write this driver : One driver for SLCDC and one driver for
-> DD12832 ? How to link them together ?
->
-> Maybe use similar philosophy than soc-camera ?
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Please use DRM if you can. That way your SLCDC controller is a "crtc"
-and your OLED panel is a combination "encoder" and "connector". The
-DRM subsystem isn't by far the best solution since it is designed
-around PCI-class graphics cards and the split is intended for those
-and not for more tightly-knit LCDC+display combinations, but it does
-split things the way you're thinking and with a little extra code it
-will do exactly what you want if a little less efficient than your
-attached driver.
+Since at91sam9x5, at91sam9n12 and future SOCs only have device tree
+support, select it by default.
 
-I was sure Sascha had a driver for this already;
-http://git.pengutronix.de/?p=imx/linux-2.6.git;a=commit;h=c333f47fa185edfd1c9d889fc8af040dd557b02c
-- it should not be too hard to add your panel and the specific gpio
-control as an encoder/connector. Maybe with a user this can actually
-go upstream.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ arch/arm/mach-at91/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index c8050b1..5aee940 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -502,6 +502,7 @@ comment "Generic Board Type"
+ 
+ config MACH_AT91SAM_DT
+ 	bool "Atmel AT91SAM Evaluation Kits with device-tree support"
++	default y
+ 	select USE_OF
+ 	help
+ 	  Select this if you want to experiment device-tree with
 -- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+1.7.11.3
