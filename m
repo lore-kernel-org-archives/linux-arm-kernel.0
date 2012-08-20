@@ -1,39 +1,83 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 20 Aug 2012 12:53:08 +0200
-Subject: [PATCH v2 21/31] arm64: 32-bit (compat) applications support
-In-Reply-To: <1344966752-16102-22-git-send-email-catalin.marinas@arm.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-22-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20120820105308.GA906@elf.ucw.cz>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 20 Aug 2012 11:53:36 +0100
+Subject: [PATCH] mfd: ab8500: Make ab8500_irq_get_virq() static
+Message-ID: <1345460017-404-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+MFD core now takes care of  HWIRQ <-> VIRQ mapping, so the helper
+ab8500_irq_get_virq() is no longer used by ab8500 subordinate devices
+to obtain a Linux wide Virtual IRQ. The AB8500 IRQ controller still
+uses it internally though, so we'll just hide it from the rest of the
+world by making it static instead.
 
-> This patch adds support for 32-bit applications. The vectors page is a
-> binary blob mapped into the application user space at 0xffff0000 (the
-> AArch64 toolchain does not support compilation of AArch32 code). Full
-> compatibility with ARMv7 user space is supported. The use of deprecated
-> ARMv7 functionality (SWP, CP15 barriers) has been disabled by default on
-> AArch64 kernels and unaligned LDM/STM is not supported.
-> 
-> Please note that only the ARM 32-bit EABI is supported, so no OABI
-> compatibility.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/ab8500-core.c         |   33 ++++++++++++++++-----------------
+ include/linux/mfd/abx500/ab8500.h |    2 --
+ 2 files changed, 16 insertions(+), 19 deletions(-)
 
-> +struct compat_statfs {
-> +	int		f_type;
-> +	int		f_bsize;
-> +	int		f_blocks;
-> +	int		f_bfree;
-> +	int		f_bavail;
-> +	int		f_files;
-> +	int		f_ffree;
-> +	compat_fsid_t	f_fsid;
-> +	int		f_namelen;	/* SunOS ignores this field. */
-
-I'm sure it does. But is it good comment?
-
-									Pavel
+diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+index 71a7757..020c1a8 100644
+--- a/drivers/mfd/ab8500-core.c
++++ b/drivers/mfd/ab8500-core.c
+@@ -472,6 +472,22 @@ static irqreturn_t ab8500_hierarchical_irq(int irq, void *dev)
+ 	return IRQ_HANDLED;
+ }
+ 
++/**
++ * ab8500_irq_get_virq(): Map an interrupt on a chip to a virtual IRQ
++ *
++ * @ab8500: ab8500_irq controller to operate on.
++ * @irq: index of the interrupt requested in the chip IRQs
++ *
++ * Useful for drivers to request their own IRQs.
++ */
++static int ab8500_irq_get_virq(struct ab8500 *ab8500, int irq)
++{
++	if (!ab8500)
++		return -EINVAL;
++
++	return irq_create_mapping(ab8500->domain, irq);
++}
++
+ static irqreturn_t ab8500_irq(int irq, void *dev)
+ {
+ 	struct ab8500 *ab8500 = dev;
+@@ -512,23 +528,6 @@ static irqreturn_t ab8500_irq(int irq, void *dev)
+ 	return IRQ_HANDLED;
+ }
+ 
+-/**
+- * ab8500_irq_get_virq(): Map an interrupt on a chip to a virtual IRQ
+- *
+- * @ab8500: ab8500_irq controller to operate on.
+- * @irq: index of the interrupt requested in the chip IRQs
+- *
+- * Useful for drivers to request their own IRQs.
+- */
+-int ab8500_irq_get_virq(struct ab8500 *ab8500, int irq)
+-{
+-	if (!ab8500)
+-		return -EINVAL;
+-
+-	return irq_create_mapping(ab8500->domain, irq);
+-}
+-EXPORT_SYMBOL_GPL(ab8500_irq_get_virq);
+-
+ static int ab8500_irq_map(struct irq_domain *d, unsigned int virq,
+ 				irq_hw_number_t hwirq)
+ {
+diff --git a/include/linux/mfd/abx500/ab8500.h b/include/linux/mfd/abx500/ab8500.h
+index 3764cb6..1491044 100644
+--- a/include/linux/mfd/abx500/ab8500.h
++++ b/include/linux/mfd/abx500/ab8500.h
+@@ -341,6 +341,4 @@ static inline int is_ab8500_2p0(struct ab8500 *ab)
+ 	return (is_ab8500(ab) && (ab->chip_id == AB8500_CUT2P0));
+ }
+ 
+-int ab8500_irq_get_virq(struct ab8500 *ab8500, int irq);
+-
+ #endif /* MFD_AB8500_H */
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.7.9.5
