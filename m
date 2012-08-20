@@ -1,88 +1,36 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Mon, 20 Aug 2012 07:47:30 -0700
-Subject: [PATCH 12/12] ARM: versatile: Make able to use UART ports for KGDB
- FIQ debugger
-In-Reply-To: <20120820144449.GA32560@lizard>
-References: <20120820144449.GA32560@lizard>
-Message-ID: <1345474050-8339-12-git-send-email-anton.vorontsov@linaro.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 20 Aug 2012 16:51:20 +0200
+Subject: [PATCH 01/11] pinctrl: mvebu: pinctrl driver core
+In-Reply-To: <CACRpkdaozBQPe1PkjaKrnqYZ=tpX1mv1iS-rCrJaSFAsQqzgnA@mail.gmail.com>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>	<1344689809-6223-2-git-send-email-sebastian.hesselbarth@gmail.com>	<CACRpkda0wUW4E3y=ucGRFu5fwwyFWo2dc=4qBaH6CFSOW2ZL_A@mail.gmail.com>	<CABJ1b_TCF=Jfb0uuoh-M87n6faezj4OqZ4S_nJLA0yKga2-ioQ@mail.gmail.com>
+ <CACRpkdaozBQPe1PkjaKrnqYZ=tpX1mv1iS-rCrJaSFAsQqzgnA@mail.gmail.com>
+Message-ID: <50324EE8.9010206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If enabled, kernel will able to enter KGDB upon serial line activity on
-UART ports.
+On 08/20/2012 04:18 PM, Linus Walleij wrote:
+>> I'll review the variant types but inside pinctrl-mvebu variant
+>> is used as a bit mask to distinguish different variants. Anyway,
+>> they should always be the same size.
+>
+> Aha bitmask, seems you can only have 8 different variants of
+> the Marvell's then?
 
-Note that even with this patch and CONFIG_KGDB_FIQ is enabled, you still
-need to pass kgdb_fiq.enable=1 kernel command line option, otherwise UART
-will behave in a normal way.
+Only 8 different variants of one SoC! Currently, there are 5 for
+Kirkwood, none for Dove. I think there are two more Kirkwood's that
+never appeared in public, but it is still < 8.
 
-By default UART0 is used, but this can be changed via kgdb_fiq.uart_num
-kernel command line option.
+>> Well, I see if I can clarify the description but wrt the datasheet it
+>> _should_ be quite obvious.
+>
+> I mainly worry about being able to read the code and figure out
+> what's going on, if the datasheet is vital then pls include some
+> link to it or so in the header of the file (but preferrably the code
+> should speak for itself).
 
-Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
----
- arch/arm/Kconfig                   |  1 +
- arch/arm/mach-versatile/Makefile   |  1 +
- arch/arm/mach-versatile/kgdb_fiq.c | 31 +++++++++++++++++++++++++++++++
- 3 files changed, 33 insertions(+)
- create mode 100644 arch/arm/mach-versatile/kgdb_fiq.c
+Ok, I clarify whats meant by mvebu_*_ctrl/ctrl_setting/mode. I am not
+that happy with that names either, but honestly pinctrl core already
+took all names that I'd have chosen. Therefore, I chose some that do
+not interfere with pinctrl core as the meaning is different.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c978c74..689b716 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -330,6 +330,7 @@ config ARCH_VERSATILE
- 	select ICST
- 	select GENERIC_CLOCKEVENTS
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
-+	select ARCH_MIGHT_HAVE_KGDB_FIQ
- 	select NEED_MACH_IO_H if PCI
- 	select PLAT_VERSATILE
- 	select PLAT_VERSATILE_CLOCK
-diff --git a/arch/arm/mach-versatile/Makefile b/arch/arm/mach-versatile/Makefile
-index 81fa3fe..bfd761f 100644
---- a/arch/arm/mach-versatile/Makefile
-+++ b/arch/arm/mach-versatile/Makefile
-@@ -7,3 +7,4 @@ obj-$(CONFIG_ARCH_VERSATILE_PB)		+= versatile_pb.o
- obj-$(CONFIG_MACH_VERSATILE_AB)		+= versatile_ab.o
- obj-$(CONFIG_MACH_VERSATILE_DT)		+= versatile_dt.o
- obj-$(CONFIG_PCI)			+= pci.o
-+obj-$(CONFIG_KGDB_FIQ)			+= kgdb_fiq.o
-diff --git a/arch/arm/mach-versatile/kgdb_fiq.c b/arch/arm/mach-versatile/kgdb_fiq.c
-new file mode 100644
-index 0000000..3cdf71d
---- /dev/null
-+++ b/arch/arm/mach-versatile/kgdb_fiq.c
-@@ -0,0 +1,31 @@
-+/*
-+ * KGDB FIQ board support
-+ *
-+ * Copyright 2012 Linaro Ltd.
-+ *		  Anton Vorontsov <anton.vorontsov@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published
-+ * by the Free Software Foundation.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/kgdb.h>
-+#include <mach/hardware.h>
-+#include <mach/platform.h>
-+#include <asm/hardware/vic.h>
-+
-+static int kgdb_fiq;
-+module_param_named(uart_num, kgdb_fiq, int, 0600);
-+MODULE_PARM_DESC(uart_num, "UART<number> port to use for KGDB FIQ");
-+
-+static int __init kgdb_fiq_init(void)
-+{
-+	WARN_ON(kgdb_fiq > INT_UARTINT2 - INT_UARTINT0);
-+
-+	return kgdb_register_fiq(INT_UARTINT0 + kgdb_fiq,
-+				 vic_fiq_select,
-+				 vic_is_fiq_rised);
-+}
-+console_initcall(kgdb_fiq_init);
--- 
-1.7.11.5
+Sebastian
