@@ -1,38 +1,49 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 20 Aug 2012 09:38:31 +0200
-Subject: [PATCH 6/8] UBI: replace MTD_UBI_BEB_LIMIT with module parameter
-In-Reply-To: <20120819122634.252f1ea5@pixies.home.jungo.com>
-References: <1345214124-5478-1-git-send-email-richard.genoud@gmail.com>
- <1345214124-5478-7-git-send-email-richard.genoud@gmail.com>
- <20120819122634.252f1ea5@pixies.home.jungo.com>
-Message-ID: <CACQ1gAgUdXj9KKtgjf=Lx0Kz2v18Xgz4RjiRQnKHMsf3m3THJw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon, 20 Aug 2012 09:52:05 +0200
+Subject: [PATCH RFC] ARM: busy loop at the end of machine_power_off
+Message-ID: <1345449125-23212-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/8/19 Shmulik Ladkani <shmulik.ladkani@gmail.com>:
-> Hi Richard,
->
-> On Fri, 17 Aug 2012 16:35:22 +0200 Richard Genoud <richard.genoud@gmail.com> wrote:
->> +                   "MTD devices may be specified by their number, name, or path to the MTD character device node.\n"
->> +                   "Optional \"vid_hdr_offs\" parameter specifies UBI VID header position to be used by UBI. (default value if 0 or not set)\n"
->> +                   "Optional \"max_beb_per1024\" parameter specifies the maximum expected bad eraseblock per 1024 eraseblocks. (default value ("
->> +                   __stringify(CONFIG_MTD_UBI_BEB_LIMIT) ") if 0 or not set)\n"
->
-> Looks like "mtd=/dev/mtd1,,25" is invalid, although we state "default
-> value if 0 or not set".
-I'm going to check that.
->
-> Also, lines are exceeding 80 chars, not sure this is more readable than
-> if they were broken.
-Actually, I didn't split those lines to make checkpatch happy.
-Checkpatch.pl doesn't like split strings because they are hard to grep.
-So there's an exception on the 80 column rule for strings.
+When machine_power_off returns the kernel panics with
 
->
-> Regards,
-> Shmulik
+	Attempted to kill init!
 
+. So let machine_power_off busy loop as machine_halt does, too.
 
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+This is triggered when issuing
 
+	poweroff
+
+only if the machine sets the pm_power_off callback because the reboot
+system call does
+
+        if ((cmd == LINUX_REBOOT_CMD_POWER_OFF) && !pm_power_off)
+		cmd = LINUX_REBOOT_CMD_HALT;
+
+So it might even be safe to call pm_power_off unconditionally in
+machine_power_off.
+
+Best regards
+Uwe
+
+ arch/arm/kernel/process.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 693b744..eda0846 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -256,6 +256,8 @@ void machine_power_off(void)
+ 	machine_shutdown();
+ 	if (pm_power_off)
+ 		pm_power_off();
++	local_irq_disable();
++	while (1);
+ }
+ 
+ void machine_restart(char *cmd)
 -- 
-for me, ck means con kolivas and not calvin klein... does it mean I'm a geek ?
+1.7.10.4
