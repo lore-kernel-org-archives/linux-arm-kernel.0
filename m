@@ -1,48 +1,163 @@
-From: prabhakar.lad@ti.com (Prabhakar Lad)
-Date: Mon, 20 Aug 2012 16:59:57 +0530
-Subject: [PATCH] ARM: relax conditions required for enabling Contiguous
- Memory Allocator
-In-Reply-To: <1345443372-3824-1-git-send-email-m.szyprowski@samsung.com>
-References: <1345443372-3824-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <50321FB5.90507@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 20 Aug 2012 12:34:31 +0100
+Subject: [PATCH 1/1] ASoC: codecs: Enable AB8500 CODEC for Device Tree
+In-Reply-To: <s5h628lu0q9.wl%tiwai@suse.de>
+References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
+ <1344527268-5964-9-git-send-email-lee.jones@linaro.org>
+ <s5h628lu0q9.wl%tiwai@suse.de>
+Message-ID: <20120820113427.GN8450@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+From: Lee Jones <lee.jones@linaro.org>
+Date: Fri, 27 Jul 2012 08:50:05 +0100
+Subject: [PATCH 1/1] ASoC: codecs: Enable AB8500 CODEC for Device Tree
 
-Thanks for the patch.
+We continue to allow the AB8500 CODEC to be registered via the AB8500
+Multi Functional Device API, only this time we extract its configuration
+from the Device Tree binary.
 
-On Monday 20 August 2012 11:46 AM, Marek Szyprowski wrote:
-> Contiguous Memory Allocator requires only paging and MMU enabled not
-> particular CPU architectures, so there is no need for strict dependency
-> on CPU type. This enables to use CMA on some older ARM v5 systems which
-> also might need large contiguous blocks for the multimedia processing hw
-> modules.
-> 
-> Reported-by: Prabhakar Lad <prabhakar.csengg@gmail.com>
+CC: alsa-devel at alsa-project.org
+Acked-by: Ola Lilja <ola.o.lilja@stericsson.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ include/linux/mfd/abx500/ab8500-codec.h |    6 ++-
+ sound/soc/codecs/ab8500-codec.c         |   81 +++++++++++++++++++++++++++++++
+ 2 files changed, 85 insertions(+), 2 deletions(-)
 
-  Reported-by: Prabhakar Lad <prabhakar.lad@ti.com>
-  Tested-by: Prabhakar Lad <prabhakar.lad@ti.com>
-
-Thx,
---Prabhakar
-
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  arch/arm/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index e91c7cd..6ef75e2 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -6,7 +6,7 @@ config ARM
->  	select HAVE_DMA_API_DEBUG
->  	select HAVE_IDE if PCI || ISA || PCMCIA
->  	select HAVE_DMA_ATTRS
-> -	select HAVE_DMA_CONTIGUOUS if (CPU_V6 || CPU_V6K || CPU_V7)
-> +	select HAVE_DMA_CONTIGUOUS if MMU
->  	select HAVE_MEMBLOCK
->  	select RTC_LIB
->  	select SYS_SUPPORTS_APM_EMULATION
-> 
+diff --git a/include/linux/mfd/abx500/ab8500-codec.h b/include/linux/mfd/abx500/ab8500-codec.h
+index dc65292..d707941 100644
+--- a/include/linux/mfd/abx500/ab8500-codec.h
++++ b/include/linux/mfd/abx500/ab8500-codec.h
+@@ -23,7 +23,8 @@ enum amic_type {
+ /* Mic-biases */
+ enum amic_micbias {
+ 	AMIC_MICBIAS_VAMIC1,
+-	AMIC_MICBIAS_VAMIC2
++	AMIC_MICBIAS_VAMIC2,
++	AMIC_MICBIAS_UNKNOWN
+ };
+ 
+ /* Bias-voltage */
+@@ -31,7 +32,8 @@ enum ear_cm_voltage {
+ 	EAR_CMV_0_95V,
+ 	EAR_CMV_1_10V,
+ 	EAR_CMV_1_27V,
+-	EAR_CMV_1_58V
++	EAR_CMV_1_58V,
++	EAR_CMV_UNKNOWN
+ };
+ 
+ /* Analog microphone settings */
+diff --git a/sound/soc/codecs/ab8500-codec.c b/sound/soc/codecs/ab8500-codec.c
+index 23b4018..99dffcf 100644
+--- a/sound/soc/codecs/ab8500-codec.c
++++ b/sound/soc/codecs/ab8500-codec.c
+@@ -34,6 +34,7 @@
+ #include <linux/mfd/abx500/ab8500-sysctrl.h>
+ #include <linux/mfd/abx500/ab8500-codec.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/of.h>
+ 
+ #include <sound/core.h>
+ #include <sound/pcm.h>
+@@ -2394,9 +2395,65 @@ struct snd_soc_dai_driver ab8500_codec_dai[] = {
+ 	}
+ };
+ 
++static void ab8500_codec_of_probe(struct device *dev, struct device_node *np,
++				struct ab8500_codec_platform_data *codec)
++{
++	u32 value;
++
++	if (of_get_property(np, "stericsson,amic1-type-single-ended", NULL))
++		codec->amics.mic1_type = AMIC_TYPE_SINGLE_ENDED;
++	else
++		codec->amics.mic1_type = AMIC_TYPE_DIFFERENTIAL;
++
++	if (of_get_property(np, "stericsson,amic2-type-single-ended", NULL))
++		codec->amics.mic2_type = AMIC_TYPE_SINGLE_ENDED;
++	else
++		codec->amics.mic2_type = AMIC_TYPE_DIFFERENTIAL;
++
++	/* Has a non-standard Vamic been requested? */
++	if (of_get_property(np, "stericsson,amic1a-bias-vamic2", NULL))
++		codec->amics.mic1a_micbias = AMIC_MICBIAS_VAMIC2;
++	else
++		codec->amics.mic1a_micbias = AMIC_MICBIAS_VAMIC1;
++
++	if (of_get_property(np, "stericsson,amic1b-bias-vamic2", NULL))
++		codec->amics.mic1b_micbias = AMIC_MICBIAS_VAMIC2;
++	else
++		codec->amics.mic1b_micbias = AMIC_MICBIAS_VAMIC1;
++
++	if (of_get_property(np, "stericsson,amic2-bias-vamic1", NULL))
++		codec->amics.mic2_micbias = AMIC_MICBIAS_VAMIC1;
++	else
++		codec->amics.mic2_micbias = AMIC_MICBIAS_VAMIC2;
++
++	if (!of_property_read_u32(np, "stericsson,earpeice-cmv", &value)) {
++		switch (value) {
++		case 950 :
++			codec->ear_cmv = EAR_CMV_0_95V;
++			break;
++		case 1100 :
++			codec->ear_cmv = EAR_CMV_1_10V;
++			break;
++		case 1270 :
++			codec->ear_cmv = EAR_CMV_1_27V;
++			break;
++		case 1580 :
++			codec->ear_cmv = EAR_CMV_1_58V;
++			break;
++		default :
++			codec->ear_cmv = EAR_CMV_UNKNOWN;
++			dev_err(dev, "Unsuitable earpiece voltage found in DT\n");
++		}
++	} else {
++		dev_warn(dev, "No earpiece voltage found in DT - using default\n");
++		codec->ear_cmv = EAR_CMV_0_95V;
++	}
++}
++
+ static int ab8500_codec_probe(struct snd_soc_codec *codec)
+ {
+ 	struct device *dev = codec->dev;
++	struct device_node *np = dev->of_node;
+ 	struct ab8500_codec_drvdata *drvdata = dev_get_drvdata(dev);
+ 	struct ab8500_platform_data *pdata;
+ 	struct filter_control *fc;
+@@ -2407,6 +2464,30 @@ static int ab8500_codec_probe(struct snd_soc_codec *codec)
+ 	/* Setup AB8500 according to board-settings */
+ 	pdata = (struct ab8500_platform_data *)dev_get_platdata(dev->parent);
+ 
++	if (np) {
++		if (!pdata)
++			pdata = devm_kzalloc(dev,
++					sizeof(struct ab8500_platform_data),
++					GFP_KERNEL);
++
++		if (pdata && !pdata->codec)
++			pdata->codec
++				= devm_kzalloc(dev,
++					sizeof(struct ab8500_codec_platform_data),
++					GFP_KERNEL);
++
++		if (!(pdata && pdata->codec))
++			return -ENOMEM;
++
++		ab8500_codec_of_probe(dev, np, pdata->codec);
++
++	} else {
++		if (!(pdata && pdata->codec)) {
++			dev_err(dev, "No codec platform data or DT found\n");
++			return -EINVAL;
++		}
++	}
++
+ 	/* Inform SoC Core that we have our own I/O arrangements. */
+ 	codec->control_data = (void *)true;
+ 
+-- 
+1.7.9.5
