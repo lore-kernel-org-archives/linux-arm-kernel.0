@@ -1,65 +1,39 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 20 Aug 2012 18:51:55 +0100
-Subject: [PATCH 5/8] mfd: Provide the PRCMU with its own IRQ domain
-In-Reply-To: <20120820164949.GB22749@gmail.com>
-References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
- <1344527635-6163-6-git-send-email-lee.jones@linaro.org>
- <CACRpkdZ7bMBytyDppV2sB1d1sUbDpPRqAQVOq8k4UOYdmg+Mkw@mail.gmail.com>
- <201208140942.54773.arnd@arndb.de>
- <CACRpkdYbOBEPNbCdfi+=gupdqS8_7t7MpOgXs7VCVTs8Y3j_mQ@mail.gmail.com>
- <20120820083640.GH8450@gmail.com>
- <20120820121055.GA26991@opensource.wolfsonmicro.com>
- <20120820125531.GA20242@gmail.com>
- <20120820162923.GF26991@opensource.wolfsonmicro.com>
- <20120820164949.GB22749@gmail.com>
-Message-ID: <20120820175155.GH26991@opensource.wolfsonmicro.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 20 Aug 2012 20:01:51 +0200
+Subject: [PATCH 04/11] pinctrl: mvebu: add pinctrl driver for Armada 370
+In-Reply-To: <20120820193622.4e539451@skate>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1344689809-6223-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CACRpkdYNZar7865-T12J37h3AWA9-8R1R5tymuOhaB0b3ddEAA@mail.gmail.com>
+ <50326A60.1070007@gmail.com> <20120820193622.4e539451@skate>
+Message-ID: <50327B8F.3050503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 05:49:50PM +0100, Lee Jones wrote:
-> On Mon, Aug 20, 2012 at 05:29:23PM +0100, Mark Brown wrote:
+On 08/20/2012 07:36 PM, Thomas Petazzoni wrote:
+> In order to keep the consistency with other SoC families, maybe we can
+> split the 370 and XP options in two separate MACH_ARMADA_370 and
+> MACH_ARMADA_XP. So, in the ideal world, once all Marvell EBU SoCs are
+> converted to DT+mach-mvebu, we should have:
+>
+>   *) arch/arm/Kconfig defines MACH_MVEBU
+>
+>   *) arch/arm/mach-mvebu/Kconfig defines MACH_KIRKWOOD, MACH_DOVE,
+>      MACH_MX78X00, MACH_ARMADA_370, MACH_ARMADA_XP, MACH_ORION5X
+>
+> Then, an user is free to build a single kernel image that supports all,
+> or a selection of the supported Marvell EBU SoCs.
+>
+> Would that be ok with you?
 
-> > All of the regmap devices could use this.
+Yes!
 
-> Only if they have linear domains and don't support DT.
+> If that's fine with you, then I would prefer if we keep the single
+> MACH_ARMADA_370_XP symbol for now, so that your pinctrl set of patches
+> does not depend on something else. We would do the small Kconfig option
+> refactoring as a follow-up set of patches. Thoughts?
 
-Neither of those restrictions really apply...
+Despite any objections, I will remove all arch/arm/*/Kconfig patches
+from pinctrl patch set.
 
-> If they don't have linear domains there's no point, if they support DT
-> then they can use it as it is.
-
-All this stuff just works for any IRQ domain type, there's no
-requirement for a particular one.  It's not urgently exciting for legacy
-domains but it's not harmful either and pushes all the handling of this
-stuff out of the MFD core and into the irqdomain code which is
-definitely an abstraction win.
-
-As far as DT goes supporting DT isn't enough, the current code will only
-work on systems that actively use DT and do so using a particular style
-of binding.  Since the majority of Linux architectures don't support DT
-at all and it's not universally deployed on those that do this means
-that generic drivers can't rely on it, and even drivers that use DT
-might not be using the binding pattern which the framework code now
-uses.
-
-Indeed now that I think about the above isn't this going to be actively
-harmful for generic drivers if they use this pattern for their bindings?
-On DT systems the framework will unconditionally do the mapping but on
-others no mapping will be done.  The function drivers don't know if the
-mapping has been performed or not.
-
-Unless I'm missing something here we need to fix this before the merge
-window...
-
-> To stop being DT dependent we'd need to remove all hand-rolled stuff 
-> that these drivers are currently using, or else they will be attempting
-> to convert and already converted VIRQ value. 
-
-Well, yes - using framework code would be the goal here...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120820/febc6aa3/attachment.sig>
+Sebastian
