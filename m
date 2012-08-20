@@ -1,144 +1,160 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 20 Aug 2012 15:49:28 +0100
-Subject: [PATCH] ARM: io: avoid writeback addressing modes for __raw_
- accessors
-In-Reply-To: <alpine.LFD.2.02.1208200902120.1754@xanadu.home>
-References: <1344956366-32574-1-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.02.1208161906390.1541@xanadu.home>
- <20120820124109.GK25864@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1208200902120.1754@xanadu.home>
-Message-ID: <20120820144927.GP25864@mudshark.cambridge.arm.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 20 Aug 2012 16:49:40 +0200
+Subject: [PATCH 1/3] ARM: OMAP: hwmod: partially un-reset hwmods might
+ not be properly enabled
+In-Reply-To: <1342466485-1050-2-git-send-email-omar.luna@linaro.org>
+References: <1342466485-1050-1-git-send-email-omar.luna@linaro.org>
+ <1342466485-1050-2-git-send-email-omar.luna@linaro.org>
+Message-ID: <50324E84.6080407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 02:29:31PM +0100, Nicolas Pitre wrote:
-> On Mon, 20 Aug 2012, Will Deacon wrote:
-> > Translates the following code from amba_device_add:
-> > 
-> > 		for (pid = 0, i = 0; i < 4; i++)
-> > 			pid |= (readl(tmp + size - 0x20 + 4 * i) & 255) <<
-> > 				(i * 8);
-> > 		for (cid = 0, i = 0; i < 4; i++)
-> > 			cid |= (readl(tmp + size - 0x10 + 4 * i) & 255) <<
-> > 				(i * 8);
-> > 
-> > into:
-> [...]
+Hi Omar,
+
+On 07/16/2012 09:21 PM, Omar Ramirez Luna wrote:
+> Some IP blocks might not be using/controlling more than one
+> reset line, this check loosens the restriction to fully use
+> hwmod framework for those drivers.
 > 
-> OK, I can see how the compiler will fold the loop increment into the IO 
-> access instruction.  But my point is: is this common?  And when this 
-> happens, is this a critical path?
+> E.g.: ipu has reset lines: mmu_cache, cpu0 and cpu1.
+> - cpu1 might not be used and hence (with previous check)
+>   won't be fully enabled by hwmod code.
 
-Sure, this case isn't such a big deal (basically just boot-time probing) but
-GCC could still generate this stuff in a driver, where it could end up being
-an I/O bottleneck for a guest OS.
+You mean that you might have some case where you need to enable the
+mmu_cache and cpu0 and thus deassert only the mmu/cpu0 while keeping the
+cpu1 under reset?
 
-> > whilst the addressing modes are still nice, the dsb is going to be the
-> > performance limitation here. That said, we could try the "Qo" constraints,
-> > which I seem to remember don't generate writebacks. I'll have a play.
+So the any_hardreset is indeed not appropriate in that case.
+
+In fact, since the hardreset cannot be handled at all by the hwmod fmwk,
+I'm even wondering if we should take care of checking the state at all.
+But as Paul stated, if was done due to the lack of understanding about
+the diver usage, so maybe things will become clearer once we will have
+that code available.
+
+So I guess that checking for all the lines for the hardreset state is
+anyway already a first step toward a good understanding of the reset
+need for the remote processors.
+
+The patch looks fine to me considering that we do not have a lot of
+information about the usage :-(
+
+Maybe you could add more information in the changelog to explain the way
+you are going to use the reset API.
+
+Regards,
+Benoit
+
+
+> While at it, prevent _omap4_module_disable if all the hardreset
+> lines on an IP block are not under reset.
+
+
 > 
-> OK.  That would be excellent.
-
-Looks like we have a winner (diff against the original patch below). I now
-see:
-
-00000340 <hw_init>:
- 340:   e1a03000        mov     r3, r0
- 344:   e3a00000        mov     r0, #0
- 348:   e5830010        str     r0, [r3, #16]
- 34c:   e3e02000        mvn     r2, #0
- 350:   e5832014        str     r2, [r3, #20]
- 354:   e5932018        ldr     r2, [r3, #24]
- 358:   e38220ff        orr     r2, r2, #255    ; 0xff
- 35c:   e5832030        str     r2, [r3, #48]   ; 0x30
- 360:   e12fff1e        bx      lr
-
-with the new code, which is basically the same as the old code but the mvn and
-a str have switched places. The same difference occurs when targetting Thumb2.
-
-> > To deal with this, the hypervisor will likely have to stop the virtual world
-> > when emulating any MMIO accesses that report incomplete fault information to
-> > avoid racing with a TLB invalidation from another virtual CPU. That will
-> > certainly be more expensive than an additional instruction on each access.
+> Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod.c |   37 ++++++++++++++++++++++---------------
+>  1 files changed, 22 insertions(+), 15 deletions(-)
 > 
-> I totally agree with you here.
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 3215dad..091c199 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -1558,25 +1558,28 @@ static int _read_hardreset(struct omap_hwmod *oh, const char *name)
+>  }
+>  
+>  /**
+> - * _are_any_hardreset_lines_asserted - return true if part of @oh is hard-reset
+> + * _are_all_hardreset_lines_asserted - return true if the @oh is hard-reset
+>   * @oh: struct omap_hwmod *
+>   *
+> - * If any hardreset line associated with @oh is asserted, then return true.
+> - * Otherwise, if @oh has no hardreset lines associated with it, or if
+> - * no hardreset lines associated with @oh are asserted, then return false.
+> + * If all hardreset lines associated with @oh are asserted, then return true.
+> + * Otherwise, if part of @oh is out hardreset or if no hardreset lines
+> + * associated with @oh are asserted, then return false.
+>   * This function is used to avoid executing some parts of the IP block
+> - * enable/disable sequence if a hardreset line is set.
+> + * enable/disable sequence if its hardreset line is set.
+>   */
+> -static bool _are_any_hardreset_lines_asserted(struct omap_hwmod *oh)
+> +static bool _are_all_hardreset_lines_asserted(struct omap_hwmod *oh)
+>  {
+> -	int i;
+> +	int i, rst_cnt = 0;
+>  
+>  	if (oh->rst_lines_cnt == 0)
+>  		return false;
+>  
+>  	for (i = 0; i < oh->rst_lines_cnt; i++)
+>  		if (_read_hardreset(oh, oh->rst_lines[i].name) > 0)
+> -			return true;
+> +			rst_cnt++;
+> +
+> +	if (oh->rst_lines_cnt == rst_cnt)
+> +		return true;
+>  
+>  	return false;
+>  }
+> @@ -1595,6 +1598,13 @@ static int _omap4_disable_module(struct omap_hwmod *oh)
+>  	if (!oh->clkdm || !oh->prcm.omap4.modulemode)
+>  		return -EINVAL;
+>  
+> +	/*
+> +	 * Since integration code might still be doing something, only
+> +	 * disable if all lines are under hardreset.
+> +	 */
+> +	if (!_are_all_hardreset_lines_asserted(oh))
+> +		return 0;
+> +
+>  	pr_debug("omap_hwmod: %s: %s\n", oh->name, __func__);
+>  
+>  	omap4_cminst_module_disable(oh->clkdm->prcm_partition,
+> @@ -1602,9 +1612,6 @@ static int _omap4_disable_module(struct omap_hwmod *oh)
+>  				    oh->clkdm->clkdm_offs,
+>  				    oh->prcm.omap4.clkctrl_offs);
+>  
+> -	if (_are_any_hardreset_lines_asserted(oh))
+> -		return 0;
+> -
+>  	v = _omap4_wait_target_disable(oh);
+>  	if (v)
+>  		pr_warn("omap_hwmod: %s: _wait_target_disable failed\n",
+> @@ -1830,7 +1837,7 @@ static int _enable(struct omap_hwmod *oh)
+>  	}
+>  
+>  	/*
+> -	 * If an IP block contains HW reset lines and any of them are
+> +	 * If an IP block contains HW reset lines and all of them are
+>  	 * asserted, we let integration code associated with that
+>  	 * block handle the enable.  We've received very little
+>  	 * information on what those driver authors need, and until
+> @@ -1838,7 +1845,7 @@ static int _enable(struct omap_hwmod *oh)
+>  	 * posted to the public lists, this is probably the best we
+>  	 * can do.
+>  	 */
+> -	if (_are_any_hardreset_lines_asserted(oh))
+> +	if (_are_all_hardreset_lines_asserted(oh))
+>  		return 0;
+>  
+>  	/* Mux pins for device runtime if populated */
+> @@ -1918,7 +1925,7 @@ static int _idle(struct omap_hwmod *oh)
+>  		return -EINVAL;
+>  	}
+>  
+> -	if (_are_any_hardreset_lines_asserted(oh))
+> +	if (_are_all_hardreset_lines_asserted(oh))
+>  		return 0;
+>  
+>  	if (oh->class->sysc)
+> @@ -2006,7 +2013,7 @@ static int _shutdown(struct omap_hwmod *oh)
+>  		return -EINVAL;
+>  	}
+>  
+> -	if (_are_any_hardreset_lines_asserted(oh))
+> +	if (_are_all_hardreset_lines_asserted(oh))
+>  		return 0;
+>  
+>  	pr_debug("omap_hwmod: %s: disabling\n", oh->name);
 > 
-> However, for completeness and above all for security reasons, the 
-> hypervisor will _ahve_ to support that case anyway.
-
-Support it, yes, but perhaps not efficiently.
-
-> So it is now a matter of compromise between performance and code size.  
-> If the pathological case you brought up above is the exception and not 
-> the rule then I think that we can live with the performance impact in 
-> that case and keep the optimal pre-indexed addressing for the common 
-> cases.
-
-It looks like the new code does exactly what we want, so I think we could
-actually have the best of both worlds: pre-index addressing and no
-writeback.
-
-Will
-
---- >8
-
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index b54d687..bbc94c2 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -63,38 +63,50 @@ extern void __raw_readsl(const void __iomem *addr, void *data, int longlen);
-  */
- static inline void __raw_writew(u16 val, volatile void __iomem *addr)
- {
--       asm volatile("strh %0, [%1]" : : "r" (val), "r" (addr));
-+       asm volatile("strh %1, %0"
-+                    : "=Qo" (*(volatile u16 __force *)addr)
-+                    : "r" (val));
- }
- 
- static inline u16 __raw_readw(const volatile void __iomem *addr)
- {
-        u16 val;
--       asm volatile("ldrh %0, [%1]" : "=r" (val) : "r" (addr));
-+       asm volatile("ldrh %0, %1"
-+                    : "=r" (val)
-+                    : "Qo" (*(const volatile u16 __force *)addr));
-        return val;
- }
- #endif
- 
- static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
- {
--       asm volatile("strb %0, [%1]" : : "r" (val), "r" (addr));
-+       asm volatile("strb %1, %0"
-+                    : "=Qo" (*(volatile u8 __force *)addr)
-+                    : "r" (val));
- }
- 
- static inline void __raw_writel(u32 val, volatile void __iomem *addr)
- {
--       asm volatile("str %0, [%1]" : : "r" (val), "r" (addr));
-+       asm volatile("str %1, %0"
-+                    : "=Qo" (*(volatile u32 __force *)addr)
-+                    : "r" (val));
- }
- 
- static inline u8 __raw_readb(const volatile void __iomem *addr)
- {
-        u8 val;
--       asm volatile("ldrb %0, [%1]" : "=r" (val) : "r" (addr));
-+       asm volatile("ldrb %0, %1"
-+                    : "=r" (val)
-+                    : "Qo" (*(const volatile u8 __force *)addr));
-        return val;
- }
- 
- static inline u32 __raw_readl(const volatile void __iomem *addr)
- {
-        u32 val;
--       asm volatile("ldr %0, [%1]" : "=r" (val) : "r" (addr));
-+       asm volatile("ldr %0, %1"
-+                    : "=r" (val)
-+                    : "Qo" (*(const volatile u32 __force *)addr));
-        return val;
- }
