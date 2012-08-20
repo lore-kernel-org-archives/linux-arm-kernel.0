@@ -1,313 +1,121 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 Aug 2012 15:43:11 +0200
-Subject: [PATCH 02/11] pinctrl: mvebu: dove pinctrl driver
-In-Reply-To: <1344689809-6223-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Mon, 20 Aug 2012 15:49:01 +0200
+Subject: [PATCH 03/11] pinctrl: mvebu: kirkwood pinctrl driver
+In-Reply-To: <1344689809-6223-4-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1344689809-6223-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CACRpkda9BL5+NiDOsMKG0kv2coBsw=Er=ZccXnNkgeftV9hPhQ@mail.gmail.com>
+ <1344689809-6223-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CACRpkdbG4jkFcVP_6AmAZzciffQCamKXw7PcFnTdccyq7AMa8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sat, Aug 11, 2012 at 2:56 PM, Sebastian Hesselbarth
 <sebastian.hesselbarth@gmail.com> wrote:
 
-(...)
+> This patch adds a SoC specific pinctrl driver for Marvell Kirkwood SoCs
+> plus DT binding documentation. This driver will use the mvebu pinctrl
+> driver core.
+
+Thanks for working on Kirkwood. Love this platform.
+
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index cd3d827..361f513 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -596,6 +596,7 @@ config ARCH_KIRKWOOD
+>         select GENERIC_CLOCKEVENTS
+>         select NEED_MACH_IO_H
+>         select PLAT_ORION
+> +       select PINCTRL
+
+select PINCTRL_KIRKWOOD too I think.
+Then it's just automatic.
+
 > diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+> index e2427eb..1f84090 100644
+> --- a/drivers/pinctrl/Kconfig
+> +++ b/drivers/pinctrl/Kconfig
 > @@ -147,7 +147,7 @@ config PINCTRL_COH901
 >
 >  config PINCTRL_MVEBU
 >         bool "Marvell SoC pin controller drivers"
-> -       depends on ARCH_MVEBU
-> +       depends on ARCH_MVEBU || ARCH_DOVE
+> -       depends on ARCH_MVEBU || ARCH_DOVE
+> +       depends on ARCH_MVEBU || ARCH_DOVE || ARCH_KIRKWOOD
 
-Hmmmm.
-
-Shouldn't this thing rather be:
-
+As stated elsewhere I think this should be
 depends on PLAT_ORION
 
-else you end up lining up all Marvell machines here...
-
->         select PINMUX
->         select PINCONF
->         help
-> @@ -155,6 +155,13 @@ config PINCTRL_MVEBU
->           This is only the driver core and additionally needs a SoC specific
->           driver.
->
-> +config PINCTRL_DOVE
-> +       bool "Support for Marvell Dove SoCs"
+> +config PINCTRL_KIRKWOOD
+> +       bool "Support for Marvell Kirkwood SoCs"
 > +       depends on PINCTRL_MVEBU
 
-Shouldn't this rather be:
-
-depends on ARCH_DOVE
+depends on ARCH_KIRKWOOD
 select PINCTRL_MVEBU
 
-since you call down into the mvebu driver, it definatley needs
-to select that.
-
 (...)
-> diff --git a/drivers/pinctrl/pinctrl-dove.c b/drivers/pinctrl/pinctrl-dove.c
+> diff --git a/drivers/pinctrl/pinctrl-kirkwood.c b/drivers/pinctrl/pinctrl-kirkwood.c
+> +static struct mvebu_pinctrl_soc_info kirkwood_pinctrl_info;
+> +
+> +static struct of_device_id kirkwood_pinctrl_of_match[] __devinitdata = {
+> +       { .compatible = "marvell,88f6180-pinctrl",
+> +                                         .data = (void *)VARIANT_MV88F6180 },
+> +       { .compatible = "marvell,88f6190-pinctrl",
+> +                                         .data = (void *)VARIANT_MV88F6190 },
+> +       { .compatible = "marvell,88f6192-pinctrl",
+> +                                         .data = (void *)VARIANT_MV88F6192 },
+> +       { .compatible = "marvell,88f6281-pinctrl",
+> +                                         .data = (void *)VARIANT_MV88F6281 },
+> +       { .compatible = "marvell,88f6282-pinctrl",
+> +                                         .data = (void *)VARIANT_MV88F6282 },
+> +       { }
+> +};
 
-> +#define  DOVE_AU0_AC97_SEL             (1 << 16)
+I'm thinking this variant should maybe be an enum... unless it is
+strongly established somewhere in Orion/Marvell stuff.
 
-It is way cleaner to say:
-
-#include <linux/bitops.h>
-
-#define  DOVE_AU0_AC97_SEL             BIT(16)
-
-(...)
-> +static int dove_pmu_mpp_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
-> +                                unsigned long *config)
+> +static int __devinit kirkwood_pinctrl_probe(struct platform_device *pdev)
 > +{
-> +       unsigned off = (ctrl->pid / 8) * 4;
-> +       unsigned shift = (ctrl->pid % 8) * 4;
-> +       unsigned long pmu = readl(DOVE_PMU_MPP_GENERAL_CTRL);
-> +       unsigned long mpp = readl(DOVE_MPP_VIRT_BASE + off);
-> +
-> +       if (pmu & (1 << ctrl->pid))
-> +               *config = 0x10;
-> +       else
-> +               *config = (mpp >> shift) & 0xf;
-> +       return 0;
-> +}
-
-Same comments about the magic numbers as in the review of the first
-patch.
-
-> +static int dove_pmu_mpp_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
-> +                                unsigned long config)
-> +{
-> +       unsigned off = (ctrl->pid / 8) * 4;
-> +       unsigned shift = (ctrl->pid % 8) * 4;
-> +       unsigned long pmu = readl(DOVE_PMU_MPP_GENERAL_CTRL);
-> +       unsigned long mpp = readl(DOVE_MPP_VIRT_BASE + off);
-> +
-> +       if (config == 0x10)
-> +               writel(pmu | (1 << ctrl->pid), DOVE_PMU_MPP_GENERAL_CTRL);
-> +       else {
-> +               writel(pmu & ~(1 << ctrl->pid), DOVE_PMU_MPP_GENERAL_CTRL);
-> +               mpp &= ~(0xf << shift);
-> +               mpp |= config << shift;
-> +               writel(mpp, DOVE_MPP_VIRT_BASE + off);
-> +       }
-> +       return 0;
-> +}
-
-Dito.
-
-> +static int dove_mpp4_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
-> +                             unsigned long *config)
-> +{
-> +       unsigned long mpp4 = readl(DOVE_MPP_CTRL4_VIRT_BASE);
-> +       unsigned long mask;
-> +
-> +       if (ctrl->pid == 24)
-> +               mask = DOVE_CAM_GPIO_SEL;
-> +       else if (ctrl->pid == 40)
-> +               mask = DOVE_SD0_GPIO_SEL;
-> +       else if (ctrl->pid == 46)
-> +               mask = DOVE_SD1_GPIO_SEL;
-> +       else if (ctrl->pid == 58)
-> +               mask = DOVE_SPI_GPIO_SEL;
-> +       else if (ctrl->pid == 62)
-> +               mask = DOVE_UART1_GPIO_SEL;
-> +       else
-> +               return -EINVAL;
-
-Magic numbers, atleast provide a comment on what is so special about
-these pins, and can you use a switch() statement instead?
-
-(...)
-> +static int dove_mpp4_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
-> +                             unsigned long config)
-> +{
-> +       unsigned long mpp4 = readl(DOVE_MPP_CTRL4_VIRT_BASE);
-> +       unsigned long mask;
-> +
-> +       if (ctrl->pid == 24)
-> +               mask = DOVE_CAM_GPIO_SEL;
-> +       else if (ctrl->pid == 40)
-> +               mask = DOVE_SD0_GPIO_SEL;
-> +       else if (ctrl->pid == 46)
-> +               mask = DOVE_SD1_GPIO_SEL;
-> +       else if (ctrl->pid == 58)
-> +               mask = DOVE_SPI_GPIO_SEL;
-> +       else if (ctrl->pid == 62)
-> +               mask = DOVE_UART1_GPIO_SEL;
-> +       else
-> +               return -EINVAL;
-
-Dito.
-
-(...)
-> +static int dove_audio1_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
-> +                               unsigned long *config)
-> +{
-> +       unsigned long mpp4 = readl(DOVE_MPP_CTRL4_VIRT_BASE);
-> +       unsigned long sspc1 = readl(DOVE_SSP_CTRL_STATUS_1);
-> +       unsigned long gmpp = readl(DOVE_MPP_GENERAL_VIRT_BASE);
-> +       unsigned long gcfg2 = readl(DOVE_GLOBAL_CONFIG_2);
-> +
-> +       *config = 0;
-> +       if (mpp4 & DOVE_AU1_GPIO_SEL)
-> +               *config |= 0x8;
-> +       if (sspc1 & DOVE_SSP_ON_AU1)
-> +               *config |= 0x4;
-> +       if (gmpp & DOVE_AU1_SPDIFO_GPIO_EN)
-> +               *config |= 0x2;
-> +       if (gcfg2 & DOVE_TWSI_OPTION3_GPIO)
-> +               *config |= 0x1;
-
-More magic, but the flags make it clear what the set
-bits are all about, so OK.
-
-But I would have:
-#include <linux/bitops.h>
-
-*config |= BIT(0);
-
-etc.
-
-> +       /* SSP/TWSI only if I2S1 not set*/
-> +       if ((*config & 0x8) == 0)
-> +               *config &= ~(0x4 | 0x1);
-> +       /* TWSI only if SPDIFO not set*/
-> +       if ((*config & 0x2) == 0)
-> +               *config &= ~(0x1);
-> +       return 0;
-
-And that applies to these.
-
-> +static int dove_audio1_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
-> +                               unsigned long config)
-> +{
-> +       unsigned long mpp4 = readl(DOVE_MPP_CTRL4_VIRT_BASE);
-> +       unsigned long sspc1 = readl(DOVE_SSP_CTRL_STATUS_1);
-> +       unsigned long gmpp = readl(DOVE_MPP_GENERAL_VIRT_BASE);
-> +       unsigned long gcfg2 = readl(DOVE_GLOBAL_CONFIG_2);
-> +
-> +       if (config & 0x1)
-> +               gcfg2 |= DOVE_TWSI_OPTION3_GPIO;
-> +       if (config & 0x2)
-> +               gmpp |= DOVE_AU1_SPDIFO_GPIO_EN;
-> +       if (config & 0x4)
-> +               sspc1 |= DOVE_SSP_ON_AU1;
-> +       if (config & 0x8)
-> +               mpp4 |= DOVE_AU1_GPIO_SEL;
-
-Dito.
-
-> +static int dove_audio1_ctrl_gpio_req(struct mvebu_mpp_ctrl *ctrl, u8 pid)
-> +{
-> +       unsigned long config;
-> +
-> +       dove_audio1_ctrl_get(ctrl, &config);
-> +
-> +       switch (config) {
-> +       /* mode 0x00 i2s1/spdifo : no gpio */
-> +       /* mode 0x0c ssp/spdifo  : no gpio */
-> +       /* mode 0x0f ssp/twsi    : no gpio */
-> +       case 0x00:
-> +       case 0x0c:
-> +       case 0x0f:
-> +               return -ENOTSUPP;
-
-Nice with the comments (also before the function),
-now I understand what's happening, this is pretty OK,
-I would have put the comments on the same
-line as the magic number but whatever.
-
-However you could just delete these lines and let them
-fall through to -ENOTSUPP at the bottom.
-
-> +
-> +       /* mode 0x02 i2s1 : gpio[56:57] */
-> +       /* mode 0x0e ssp  : gpio[56:57] */
-> +       case 0x02:
-> +       case 0x0e:
-> +               if (pid >= 56)
-> +                       return 0;
-> +
-> +       /* mode 0x08 spdifo : gpio[52:55] */
-> +       /* mode 0x0b twsi   : gpio[52:55] */
-> +       case 0x08:
-> +       case 0x0b:
-> +               if (pid <= 55)
-> +                       return 0;
-> +
-> +       /* mode 0x0a/gpio : all gpio */
-> +       case 0x0a:
-> +               return 0;
-> +       }
-> +
-> +       return -ENOTSUPP;
-> +}
-
-> +/* mpp[52:57] has gpio pins capable of in and out */
-> +static int dove_audio1_ctrl_gpio_dir(struct mvebu_mpp_ctrl *ctrl, u8 pid,
-> +                               bool input)
-> +{
-> +       return 0;
-> +}
-
-So should this not return a -ENOTSUPP for
-pin < 52 || pin > 57?
-
-(...)
-> +static int __devinit dove_pinctrl_probe(struct platform_device *pdev)
-> +{
+> +       struct mvebu_pinctrl_soc_info *soc = &kirkwood_pinctrl_info;
 > +       const struct of_device_id *match =
-> +               of_match_device(dove_pinctrl_of_match, &pdev->dev);
-> +       int ret;
+> +               of_match_device(kirkwood_pinctrl_of_match, &pdev->dev);
 > +
-> +       if (match)
-> +               pdev->dev.platform_data = match->data;
-> +
-> +       /*
-> +        * General MPP Configuration Register is part of pdma registers.
-> +        * grab clk to make sure it is clocked.
-> +        */
-> +       pdma_clk = clk_get_sys("dove-pdma", NULL);
-
-First there is something really weird with the name of this
-clock. Atleast call the variable holding the clk something
-apropriate like just "clk".
-
-Second why are you fetching a sys clock instead of using the clkdev
-device binding in the clock tree so you could say:
-
-clk = clk_get(&pdev->dev, NULL);
-
-> +       clk_prepare_enable(pdma_clk);
-
-Good!
-
-> +       ret = mvebu_pinctrl_probe(pdev);
-> +       if (!ret)
-> +               return 0;
-> +
-> +       clk_disable_unprepare(pdma_clk);
-> +       clk_put(pdma_clk);
-> +       return ret;
-> +}
-> +
-> +static int __devexit dove_pinctrl_remove(struct platform_device *pdev)
-> +{
-> +       int ret;
-> +
-> +       ret = mvebu_pinctrl_remove(pdev);
-> +       if (!IS_ERR(pdma_clk)) {
-> +               clk_disable_unprepare(pdma_clk);
-> +               clk_put(pdma_clk);
+> +       if (match) {
+> +               soc->variant = (unsigned)match->data & 0xff;
+> +               switch (soc->variant) {
+> +               case VARIANT_MV88F6180:
+> +                       soc->controls = mv88f6180_mpp_controls;
+> +                       soc->ncontrols = ARRAY_SIZE(mv88f6180_mpp_controls);
+> +                       soc->modes = mv88f6xxx_mpp_modes;
+> +                       soc->nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes);
+> +                       soc->gpioranges = mv88f6180_gpio_ranges;
+> +                       soc->ngpioranges = ARRAY_SIZE(mv88f6180_gpio_ranges);
+> +                       break;
+> +               case VARIANT_MV88F6190:
+> +               case VARIANT_MV88F6192:
+> +                       soc->controls = mv88f619x_mpp_controls;
+> +                       soc->ncontrols = ARRAY_SIZE(mv88f619x_mpp_controls);
+> +                       soc->modes = mv88f6xxx_mpp_modes;
+> +                       soc->nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes);
+> +                       soc->gpioranges = mv88f619x_gpio_ranges;
+> +                       soc->ngpioranges = ARRAY_SIZE(mv88f619x_gpio_ranges);
+> +                       break;
+> +               case VARIANT_MV88F6281:
+> +               case VARIANT_MV88F6282:
+> +                       soc->controls = mv88f628x_mpp_controls;
+> +                       soc->ncontrols = ARRAY_SIZE(mv88f628x_mpp_controls);
+> +                       soc->modes = mv88f6xxx_mpp_modes;
+> +                       soc->nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes);
+> +                       soc->gpioranges = mv88f628x_gpio_ranges;
+> +                       soc->ngpioranges = ARRAY_SIZE(mv88f628x_gpio_ranges);
+> +                       break;
+> +               }
+> +               pdev->dev.platform_data = soc;
 > +       }
+> +       return mvebu_pinctrl_probe(pdev);
+> +}
 
-You don't need this (!IS_ERR()) clause, look in yout probe function:
-you bail out if the clock is not found.
+This is looking real good, clean & nice.
 
-The rest looks good... atleast now, but I'm low on coffee FTM.
+No further comments on this driver.
 
 Yours,
 Linus Walleij
