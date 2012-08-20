@@ -1,45 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 20 Aug 2012 09:36:43 +0100
-Subject: [PATCH 5/8] mfd: Provide the PRCMU with its own IRQ domain
-In-Reply-To: <CACRpkdYbOBEPNbCdfi+=gupdqS8_7t7MpOgXs7VCVTs8Y3j_mQ@mail.gmail.com>
-References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
- <1344527635-6163-6-git-send-email-lee.jones@linaro.org>
- <CACRpkdZ7bMBytyDppV2sB1d1sUbDpPRqAQVOq8k4UOYdmg+Mkw@mail.gmail.com>
- <201208140942.54773.arnd@arndb.de>
- <CACRpkdYbOBEPNbCdfi+=gupdqS8_7t7MpOgXs7VCVTs8Y3j_mQ@mail.gmail.com>
-Message-ID: <20120820083640.GH8450@gmail.com>
+From: alanbutty12@gmail.com (Alan M Butler)
+Date: Mon, 20 Aug 2012 09:41:20 +0100
+Subject: [PATCH] ARM: Kirkwood: Iomega IX2-200 Device Tree Support Patch
+ v2 Signed-off-by: Alan M Butler <alanbutty12@gmail.com>
+In-Reply-To: <CAOMZO5AZZwQS8rkvrG3Nd7KAhgh3+PcfkdoKiqRW95eaUyTghg@mail.gmail.com>
+References: <cover.1345196553.git.alanbutty12@gmail.com>
+ <05c3c186d3675cde472bcc3a01198b6726c48a3c.1345196553.git.alanbutty12@gmail.com>
+ <20120819020607.GZ22226@titan.lakedaemon.net>
+ <CADhrpJ5WX-ZR3vxwe92Rg4R9a1+79Vf-QxKdJhyaC87o8HJYrw@mail.gmail.com>
+ <CADhrpJ6HmUd86zx6Az0bx9JiiYp6kMmTis6ARMWBrNqoK8aKng@mail.gmail.com>
+ <CAOMZO5AZZwQS8rkvrG3Nd7KAhgh3+PcfkdoKiqRW95eaUyTghg@mail.gmail.com>
+Message-ID: <CADhrpJ7ZE=L25V8sKyQAT02iDuyCRwyCAjw4ukopek1i0TRqNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 12:44:37PM +0200, Linus Walleij wrote:
-> On Tue, Aug 14, 2012 at 11:42 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 14 August 2012, Linus Walleij wrote:
-> >> On Thu, Aug 9, 2012 at 5:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> >>
-> >> > +int db8500_irq_get_virq(int irq);
-> >>
-> >> And I'm sceptic about this business. Why isn't this physical-to virtual
-> >> mapping business confined to the core MFD driver? But enlighten me.
-> >
-> > Traditionally, an MFD would add an offset to the local IRQ number
-> > to put the VIRQ into the IRQ resource, but this doesn't work when
-> > you have domains other than legacy.
-> 
-> Yes but I think I saw this other patch set from Lee, hitting
-> irqdomain, OF and MFD to actually fix this ... or did I get
-> it wrong?
+On 20 August 2012 03:31, Fabio Estevam <festevam@gmail.com> wrote:
+> On Sun, Aug 19, 2012 at 3:03 PM, Alan M Butler <alanbutty12@gmail.com> wrote:
+>> i just thaught i should let fabio and jason know that i just tried
+>> kernel 3.6-rc2 and the buttons work i tried to apply the patch that
+>> fabio sent me before but it didnt apply so i tried the kernel anyway
+>> and the buttons do work.
+>
+> The patch I sent applies against linux-next.
+>
+> If you try linux-next you will probably get the kernel crash.
 
-No, you're not wrong.
+Oh yeah i did send you the eroor before i did try the patch on linux
+next dated the 17th and the kernel did not crash but i got an error so
+i will re-send you the error i got again incase you have lost it or
+anything.
 
-Historically (in my patches) xb8500_irq_get_virq() was used by drivers
-to obtain a VIRQ when not using Device Tree. Now the MFD core handles
-conversion there is little requirement for it. In fact there are no
-more users for db8500_irq_get_virq() and only one user for 
-ab8500_irq_get_virq() and that's itself. I guess we can rid them and
-call irq_get_mapping() directly instead.
+> orion_gpio_is_valid: invalid GPIO 0
+> orion_gpio_is_valid: invalid GPIO 0
+> gpio-keys gpio-keys.2: \x013INFO: %s in %pS age=%lu cpu=%u pid=%d
+> Failed to request GPIO 0, error -22
+> gpio-keys: probe of gpio-keys.2 failed with error -22
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thats what i got on that linux-next. but the 3.6-rc2 works fine. the
+gpio settings are the exact same in the rc2 that i tried in the linux
+next so it might be something in the way the dts file is read in the
+new code?
+
+should the gpio-keys be named button at 1 and so on as i see that in the
+other kirkwood dts files where i have mine named power, otb, reset?
