@@ -1,50 +1,38 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 20 Aug 2012 12:21:56 +0200
-Subject: [PATCH 2/3] ARM: OMAP: hwmod: revise deassert sequence
-In-Reply-To: <CALLhW=7yJTq_cfB=KGY5VT8fNO1u_hrY118ysihFuQA+gVFRuQ@mail.gmail.com>
-References: <1342466485-1050-1-git-send-email-omar.luna@linaro.org>
- <1342466485-1050-3-git-send-email-omar.luna@linaro.org>
- <alpine.DEB.2.00.1208020150240.4177@utopia.booyaka.com>
- <CALLhW=6-b+kjfG-u3+uXiD64UwoNEdufjJKu0Mx-sGWp6n9csg@mail.gmail.com>
- <501B609F.9030403@ti.com>
- <CALLhW=7yJTq_cfB=KGY5VT8fNO1u_hrY118ysihFuQA+gVFRuQ@mail.gmail.com>
-Message-ID: <50320FC4.2020100@ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 20 Aug 2012 12:47:25 +0200
+Subject: [PATCH 0/3] Add code for setting coherent pool size
+Message-ID: <1345459648-24263-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Omar,
+Hi!
 
-On 08/03/2012 05:52 PM, Omar Ramirez Luna wrote:
-> On 3 August 2012 00:24, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
->> On 8/3/2012 3:50 AM, Omar Ramirez Luna wrote:
->>> So in _enable:
->>>
->>>         _enable_clocks(oh);
->>>         if (soc_ops.enable_module)
->>>                 soc_ops.enable_module(oh);
->>>
->>> The enable_module part seems redundant to me, since the module should
->>> be already enabled by the first call to _enable_clocks.
->>
->> Yes they do same thing, I believe the plan is to get rid of all clock
->> leaf-nodes in the near future, and let hwmod handle module
->> enable/disable part.
-> 
-> If this is the case then an enable_module call is needed in my patch
-> for when these changes are made. The original works fine but only
-> because currently clock framework does what enable_module is doing.
+Aaro Koskinen and Josh Coombs reported that commit e9da6e9905e639 ("ARM:
+dma-mapping: remove custom consistent dma region") introduced a
+regresion. It turned out that the default 256KiB for atomic coherent
+pool might not be enough. After that patch, some Kirkwood systems run
+out of atomic coherent memory and fail without any meanfull message.
 
-Yes, that's the case, but I plan to remove most of the leaf clocks ASAP,
-so we cannot rely on that.
+This patch series is an attempt to fix those issues by adding function
+for setting coherent pool size from platform initialization code and
+increasing the size of the pool for Kirkwood systems.
 
-> Please let me know if you want me to resend with this change.
+Best regards
+Marek Szyprowski
+Samsung Poland R&D Center
 
-Yes, could you please repost with that change?
+Patch summary:
 
-It will be good as well that you remove the leaf clock and use the
-parent clock of current leaf as the main_clock. In that case it will
-ensure that this is the hwmod fmwk that does enable the modulemode and
-not the clock fmwk.
+Marek Szyprowski (3):
+  ARM: DMA-Mapping: add function for setting coherent pool size from
+    platform code
+  ARM: DMA-Mapping: print warning when atomic coherent allocation fails
+  ARM: Kirkwood: increase atomic coherent pool size
 
-Regards,
-Benoit
+ arch/arm/include/asm/dma-mapping.h |    7 +++++++
+ arch/arm/mach-kirkwood/common.c    |    7 +++++++
+ arch/arm/mm/dma-mapping.c          |   22 +++++++++++++++++++++-
+ 3 files changed, 35 insertions(+), 1 deletions(-)
+
+-- 
+1.7.1.569.g6f426
