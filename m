@@ -1,61 +1,60 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 20 Aug 2012 17:49:50 +0100
-Subject: [PATCH 5/8] mfd: Provide the PRCMU with its own IRQ domain
-In-Reply-To: <20120820162923.GF26991@opensource.wolfsonmicro.com>
-References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
- <1344527635-6163-6-git-send-email-lee.jones@linaro.org>
- <CACRpkdZ7bMBytyDppV2sB1d1sUbDpPRqAQVOq8k4UOYdmg+Mkw@mail.gmail.com>
- <201208140942.54773.arnd@arndb.de>
- <CACRpkdYbOBEPNbCdfi+=gupdqS8_7t7MpOgXs7VCVTs8Y3j_mQ@mail.gmail.com>
- <20120820083640.GH8450@gmail.com>
- <20120820121055.GA26991@opensource.wolfsonmicro.com>
- <20120820125531.GA20242@gmail.com>
- <20120820162923.GF26991@opensource.wolfsonmicro.com>
-Message-ID: <20120820164949.GB22749@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 20 Aug 2012 17:54:05 +0100
+Subject: [PATCH] ARM: io: avoid writeback addressing modes for __raw_
+ accessors
+In-Reply-To: <alpine.LFD.2.02.1208201150010.1754@xanadu.home>
+References: <1344956366-32574-1-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.02.1208161906390.1541@xanadu.home>
+ <20120820124109.GK25864@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1208200902120.1754@xanadu.home>
+ <20120820144927.GP25864@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1208201150010.1754@xanadu.home>
+Message-ID: <20120820165405.GU25864@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 05:29:23PM +0100, Mark Brown wrote:
-> On Mon, Aug 20, 2012 at 01:55:32PM +0100, Lee Jones wrote:
+On Mon, Aug 20, 2012 at 05:09:06PM +0100, Nicolas Pitre wrote:
+> On Mon, 20 Aug 2012, Will Deacon wrote:
+> > diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> > index b54d687..bbc94c2 100644
+> > --- a/arch/arm/include/asm/io.h
+> > +++ b/arch/arm/include/asm/io.h
+> > @@ -63,38 +63,50 @@ extern void __raw_readsl(const void __iomem *addr, void *data, int longlen);
+> >   */
+> >  static inline void __raw_writew(u16 val, volatile void __iomem *addr)
+> >  {
+> > -       asm volatile("strh %0, [%1]" : : "r" (val), "r" (addr));
+> > +       asm volatile("strh %1, %0"
+> > +                    : "=Qo" (*(volatile u16 __force *)addr)
+> > +                    : "r" (val));
+> >  }
+> >  
+> >  static inline u16 __raw_readw(const volatile void __iomem *addr)
+> >  {
+> >         u16 val;
+> > -       asm volatile("ldrh %0, [%1]" : "=r" (val) : "r" (addr));
+> > +       asm volatile("ldrh %0, %1"
+> > +                    : "=r" (val)
+> > +                    : "Qo" (*(const volatile u16 __force *)addr));
+> >         return val;
+> >  }
 > 
-> > Right, that was the initial intention. It would be a trivial semantic
-> > change if drivers without DT support wished to use the functionality
-> > though. However, the only examples I found of a non-DT enabled driver
-> > that could make good use of it in order to strip out some cruft would
-> > be the Arizona and one of the Samsung drivers, and they each have
-> 
-> All of the regmap devices could use this.
+> Semantically, I think the qualifier on the Qo constraint should be + as 
+> in "+Qo" listed in the input operand list in both cases since we may not 
+> assume anything about the memory location when it is referring to IO 
+> registers.  It is not because you write to it that previous writes can 
+> be optimized away, and it is not because you read from it that the 
+> accessed memory location will remain the same after the read.  Granted, 
+> the volatile should take care of that, but it doesn't hurt to be 
+> explicit.
 
-Only if they have linear domains and don't support DT.
+Hmm, ok. I too would hope that the volatile keyword would sort that out but,
+since the '+' doesn't seem to change the generated code, I can add that. It
+does, however, mean we have to cast away the `const' in the read accessors
+which makes the code even uglier.
 
-If they don't have linear domains there's no point, if they support DT
-then they can use it as it is.
+> Reviewed-by: Nicolas Pitre <nico@linaro.org>
 
-> > their own hand-rolled methods of hwirq -> virq conversion now, so any
-> > change to support them would result in multiple invocations of
-> > irq_create_mapping which would likely cause breakage.
-> 
-> Multiple calls to irq_create_mapping() are totally fine.
+Cheers Nicolas, I'll post the patch independently with your tag.
 
-Sorry, perhaps I wasn't clear.
-
-<mfd_parent_device>_probe()
-|
-+-> mfd_add_device()
-    |
-    +-> res->start = res->end = irq_create_mapping(res->start); // Now a VIRQ
-
-
-<mfd_child_device>_probe()
-|
-+-> <mfd_parent_device>_irq_get_virq(res->start) // Ahhh, double VIRQ conversion
-
-To stop being DT dependent we'd need to remove all hand-rolled stuff 
-that these drivers are currently using, or else they will be attempting
-to convert and already converted VIRQ value. 
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Will
