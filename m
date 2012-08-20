@@ -1,75 +1,30 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Mon, 20 Aug 2012 16:19:44 +0800
-Subject: [PATCH 0/3] ARM: PRIMA2: some patches prepared to support new SiRF
- SoCs
-Message-ID: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon, 20 Aug 2012 10:21:17 +0200
+Subject: [PATCH 6/8] UBI: replace MTD_UBI_BEB_LIMIT with module parameter
+In-Reply-To: <CACQ1gAgUdXj9KKtgjf=Lx0Kz2v18Xgz4RjiRQnKHMsf3m3THJw@mail.gmail.com>
+References: <1345214124-5478-1-git-send-email-richard.genoud@gmail.com>
+ <1345214124-5478-7-git-send-email-richard.genoud@gmail.com>
+ <20120819122634.252f1ea5@pixies.home.jungo.com>
+ <CACQ1gAgUdXj9KKtgjf=Lx0Kz2v18Xgz4RjiRQnKHMsf3m3THJw@mail.gmail.com>
+Message-ID: <CACQ1gAjqL3DS8e+Ya2xAKOBVuRjjyLPYU7xa74vTOKhyypHL2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+2012/8/20 Richard Genoud <richard.genoud@gmail.com>:
+> 2012/8/19 Shmulik Ladkani <shmulik.ladkani@gmail.com>:
+>> Hi Richard,
+>>
+>> On Fri, 17 Aug 2012 16:35:22 +0200 Richard Genoud <richard.genoud@gmail.com> wrote:
+>>> +                   "MTD devices may be specified by their number, name, or path to the MTD character device node.\n"
+>>> +                   "Optional \"vid_hdr_offs\" parameter specifies UBI VID header position to be used by UBI. (default value if 0 or not set)\n"
+>>> +                   "Optional \"max_beb_per1024\" parameter specifies the maximum expected bad eraseblock per 1024 eraseblocks. (default value ("
+>>> +                   __stringify(CONFIG_MTD_UBI_BEB_LIMIT) ") if 0 or not set)\n"
+>>
+>> Looks like "mtd=/dev/mtd1,,25" is invalid, although we state "default
+>> value if 0 or not set".
+> I'm going to check that.
+I made a patch to accept empty string value.
+I'll send it with the rest of the patch serie.
 
-we will support SiRFmarco and SiRFpolo SMP SoCs, this series is making
-mach-prima2 common for all of them.
-
-Barry Song (3):
-  ARM: PRIMA2: use DT_MACHINE_START and convert to generic board
-  ARM: PRIMA2: make mach-prima2 common for all SiRF series SoC
-  ARM: SIRF: make sirf irqchip driver selectable since new SoCs will
-    have GIC
-
- arch/arm/Kconfig                                   |   10 +++++-----
- arch/arm/Makefile                                  |    2 +-
- arch/arm/mach-sirf/Kconfig                         |   20 ++++++++++++++++++++
- arch/arm/{mach-prima2 => mach-sirf}/Makefile       |    4 ++--
- arch/arm/{mach-prima2 => mach-sirf}/Makefile.boot  |    0
- .../prima2.c => mach-sirf/board-generic.c}         |   10 ++++++----
- arch/arm/{mach-prima2 => mach-sirf}/common.h       |    0
- .../include/mach/clkdev.h                          |    0
- .../include/mach/debug-macro.S                     |    0
- .../include/mach/entry-macro.S                     |    0
- .../{mach-prima2 => mach-sirf}/include/mach/gpio.h |    0
- .../include/mach/hardware.h                        |    0
- .../{mach-prima2 => mach-sirf}/include/mach/irqs.h |    0
- .../{mach-prima2 => mach-sirf}/include/mach/map.h  |    0
- .../include/mach/timex.h                           |    0
- .../{mach-prima2 => mach-sirf}/include/mach/uart.h |    0
- .../include/mach/uncompress.h                      |    0
- arch/arm/{mach-prima2 => mach-sirf}/irq.c          |    0
- arch/arm/{mach-prima2 => mach-sirf}/l2x0.c         |    0
- arch/arm/{mach-prima2 => mach-sirf}/lluart.c       |    0
- arch/arm/{mach-prima2 => mach-sirf}/pm.c           |    0
- arch/arm/{mach-prima2 => mach-sirf}/pm.h           |    0
- arch/arm/{mach-prima2 => mach-sirf}/rstc.c         |    0
- arch/arm/{mach-prima2 => mach-sirf}/rtciobrg.c     |    0
- arch/arm/{mach-prima2 => mach-sirf}/sleep.S        |    0
- arch/arm/{mach-prima2 => mach-sirf}/timer.c        |    0
- 26 files changed, 34 insertions(+), 12 deletions(-)
- create mode 100644 arch/arm/mach-sirf/Kconfig
- rename arch/arm/{mach-prima2 => mach-sirf}/Makefile (73%)
- rename arch/arm/{mach-prima2 => mach-sirf}/Makefile.boot (100%)
- rename arch/arm/{mach-prima2/prima2.c => mach-sirf/board-generic.c} (81%)
- rename arch/arm/{mach-prima2 => mach-sirf}/common.h (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/clkdev.h (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/debug-macro.S (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/entry-macro.S (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/gpio.h (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/hardware.h (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/irqs.h (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/map.h (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/timex.h (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/uart.h (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/uncompress.h (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/irq.c (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/l2x0.c (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/lluart.c (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/pm.c (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/pm.h (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/rstc.c (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/rtciobrg.c (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/sleep.S (100%)
- rename arch/arm/{mach-prima2 => mach-sirf}/timer.c (100%)
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Regards,
+Richard.
