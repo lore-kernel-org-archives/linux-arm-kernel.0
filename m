@@ -1,58 +1,48 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 20 Aug 2012 09:58:32 +0200
-Subject: [PATCH 13/14] arm: at91: dt: at91sam9 add nand pinctrl support
-In-Reply-To: <CACQ1gAgqXOJiiocOEMBZiaBchXDhvxqfA7RkiEvCCsv000LQNw@mail.gmail.com>
-References: <20120810124820.GA20557@game.jcrosoft.org>
- <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
- <1344603731-32667-13-git-send-email-plagnioj@jcrosoft.com>
- <CACRpkdZXjFE7UsRneskNqnN7DFERHxgAt-FCXtL2A52xKgEA=w@mail.gmail.com>
- <CACQ1gAhWdwrXEkicy4ij=rukzS-v98bZRr433Qq5M_Dan5JAog@mail.gmail.com>
- <20120816173844.GC7439@game.jcrosoft.org>
- <CACQ1gAgqXOJiiocOEMBZiaBchXDhvxqfA7RkiEvCCsv000LQNw@mail.gmail.com>
-Message-ID: <20120820075832.GE7439@game.jcrosoft.org>
+Date: Mon, 20 Aug 2012 10:02:10 +0200
+Subject: [PATCH 5/6] ARM: integrator: convert AMBA devices to device tree
+In-Reply-To: <CACRpkdZDMxk30YTkrumRveR3OuWptSpzNevrAvC2FxYShOZp-A@mail.gmail.com>
+References: <1345119373-22774-1-git-send-email-linus.walleij@linaro.org>
+ <20120816124002.GB7439@game.jcrosoft.org>
+ <CACRpkdZDMxk30YTkrumRveR3OuWptSpzNevrAvC2FxYShOZp-A@mail.gmail.com>
+Message-ID: <20120820080210.GF7439@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08:53 Fri 17 Aug     , Richard Genoud wrote:
-> 2012/8/16 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
-> >> Maybe it will be more readable if we use something like :
-> >> atmel,pull-up;
-> >> atmel,multidrive;
-> >> atmel,mux="GPIO"
-> >> atmel,mux="A"
-> >> ...
-> >> just my 2 cents...
-> > no too much data and too much node as you will need a node per pin which we
-> > tyr to avoid
+On 00:42 Sun 19 Aug     , Linus Walleij wrote:
+> On Thu, Aug 16, 2012 at 2:40 PM, Jean-Christophe PLAGNIOL-VILLARD
+> <plagnioj@jcrosoft.com> wrote:
+> > On 14:16 Thu 16 Aug     , Linus Walleij wrote:
+> >> +/* For the Device Tree, add in the UART callbacks as AUXDATA */
+> >> +static struct of_dev_auxdata ap_auxdata_lookup[] __initdata = {
+> >> +     OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_RTC_BASE,
+> >> +             "rtc", NULL),
+> >> +     OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_UART0_BASE,
+> >> +             "uart0", &integrator_uart_data),
+> >> +     OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_UART1_BASE,
+> >> +             "uart1", &integrator_uart_data),
+> >> +     OF_DEV_AUXDATA("arm,primecell", KMI0_BASE,
+> >> +             "kmi0", NULL),
+> >> +     OF_DEV_AUXDATA("arm,primecell", KMI1_BASE,
+> >> +             "kmi1", NULL),
+> >> +     { /* sentinel */ },
 > 
-> One one hand we've got a DTS quite concise but unreadable, and on the
-> other hand, something understandable but huge.
-> ( and it's not specific to your patch Jean-Christophe, on imx6q.dtsi,
-> it looks worse )
-> I'm just trying to make sure that having a DTS like that :
-> nand {
-> 	pinctrl_nand: nand-0 {
-> 		atmel,pins =
-> 			<2 13 0x0 0x1   /* PC13 gpio RDY pin pull_up */
-> 			2 14 0x0 0x1>; /* PC14 gpio enable pin pull_up */
-> 	};
-> };
-> is better than :
-> nand {
-> 	pinctrl_nand: nand-0 {
-> 		nand_rdy { atmel,bank = "C"; atmel,pin = <13>; atmel,mux = "GPIO";
-> atmel,pull-up; };
-> 		nand_ena { atmel,bank = "C"; atmel,pin = <14>; atmel,mux = "GPIO";
-> atmel,pull-up; };
-> 	};
-> };
-> It's what you did in 1st place on linux-at91 git, and I kinda liked it.
-> But yeah, it's more verbose, and some lines will go beyond 80 columns,
-> but that's already the case.
-but as I explain you the DT must not have 1000s of not which we will have if
-we do this. that's why I drop it
+> > why that?
+> 
+> Based on similar code by Grant in arch/arm/mach-versatile/core.c
+> also ending with a {}. Also at other places ... I though this terminated
+> the list iteration, is it not needed anymore?
+no I mean why
+> >> +     OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_RTC_BASE,
+> >> +             "rtc", NULL),
+> >> +     OF_DEV_AUXDATA("arm,primecell", KMI0_BASE,
+> >> +             "kmi0", NULL),
+> >> +     OF_DEV_AUXDATA("arm,primecell", KMI1_BASE,
+> >> +             "kmi1", NULL),
 
-and soon we will have macro in DT so this will be more readable
+no platform data why do you use the AUXDATA?
 
-Best Regards,
+as the OF_DEV_AUXDATA is deprecated now
+
+Bset Regards,
 J.
