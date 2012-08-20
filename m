@@ -1,40 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 Aug 2012 16:29:55 +0200
-Subject: [PATCH 10/11] arm: mvebu: enable PINCTRL usage
-In-Reply-To: <1344689809-6223-11-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1344689809-6223-11-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CACRpkda+X5-GtsMJ07TA7UBbbk1W+pJzTtQjQJ8VPD9z_5UoDQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 20 Aug 2012 22:30:44 +0800
+Subject: [PATCH 1/2] clk: add of_clk_src_onecell_get() support
+In-Reply-To: <1345104526-14797-2-git-send-email-shawn.guo@linaro.org>
+References: <1345104526-14797-1-git-send-email-shawn.guo@linaro.org>
+ <1345104526-14797-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120820143042.GL24242@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 11, 2012 at 2:56 PM, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
+On Thu, Aug 16, 2012 at 04:08:45PM +0800, Shawn Guo wrote:
+> For those SoCs that have hundreds of clock outputs, their clock
+> DT bindings could reasonably define #clock-cells as 1 and require
+> the client device specify the index of the clock it consumes in the
+> cell of its "clocks" phandle.
+> 
+> Add a generic of_clk_src_onecell_get() function for this purpose.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  drivers/clk/clk.c            |   15 +++++++++++++++
+>  include/linux/clk-provider.h |    1 +
+>  2 files changed, 16 insertions(+), 0 deletions(-)
+> 
+Mike,
 
-> From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->
-> Now that we have a proper pinctrl driver for Marvell EBU platforms,
-> enable PINCTRL support in ARCH_MVEBU.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Can you please apply this patch on clk tree if it looks good to you?
+I plan to ask arm-soc people pull in clk tree as dependency and then
+have the other 3 patches in the series to go via arm-soc tree.
 
-(...)
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 361f513..95317a9 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -573,6 +573,7 @@ config ARCH_MVEBU
->         select GENERIC_IRQ_CHIP
->         select IRQ_DOMAIN
->         select COMMON_CLK
-> +       select PINCTRL
->         help
->           Support for the Marvell SoC Family with device tree support
-
-So this symbol collects all the DT-migrated platforms?
-
-Probably OK but want to figure out if the PLAT_NOMADIK symbol
-is applicable.
-
-Yours,
-Linus Walleij
+Regards,
+Shawn
