@@ -1,55 +1,44 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 20 Aug 2012 14:19:52 +0200
-Subject: [PATCHv3 0/4] Add device tree data for omap5
-In-Reply-To: <CAKdam543ATO96rbhgCWKtGUGRQ_+=KSyAk-nGBknjC+BvJSmOw@mail.gmail.com>
-References: <1344961473-13675-1-git-send-email-sourav.poddar@ti.com>
- <CAKdam57L8txFtE9ahy3u3vLW0XRP5z4QaNQKVFj9KaEFZE1qvg@mail.gmail.com>
- <503229F5.4030405@ti.com>
- <CAKdam543ATO96rbhgCWKtGUGRQ_+=KSyAk-nGBknjC+BvJSmOw@mail.gmail.com>
-Message-ID: <50322B68.8060906@ti.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 20 Aug 2012 09:39:22 -0300
+Subject: [PATCH v2 1/2] ARM: clk-imx35: Fix SSI clock registration
+Message-ID: <1345466362-2576-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2012 02:17 PM, Poddar, Sourav wrote:
-> Hi Benoit,
-> 
-> On Mon, Aug 20, 2012 at 5:43 PM, Benoit Cousson <b-cousson@ti.com> wrote:
->> On 08/20/2012 02:10 PM, Poddar, Sourav wrote:
->>> Hi All,
->>>
->>> On Tue, Aug 14, 2012 at 9:54 PM, Sourav Poddar <sourav.poddar@ti.com> wrote:
->>>> The following patch series add i2c support for omap5.
->>>> As well as enable I2C based devices like pressure and temperature
->>>> through device tree. Also add onchip keypad dts data.
->>>>
->>>> Cc: Benoit Cousson <b-cousson@ti.com>
->>>> Cc: Felipe Balbi <balbi@ti.com>
->>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>
->>>> Sourav Poddar (4):
->>>>   arm/dts: omap5-evm: Add I2C support
->>>>   arm/dts: omap5-evm: Add tmp102 sensor support
->>>>   arm/dts: omap5-evm: Add keypad data
->>>>   arm/dts: omap5-evm: Add bmp085 sensor support
->>>>
->>>> v2->v3
->>>> - Rebased on 3.6-rc1
->>>> - Add comments for tmp102 and bmp085
->>>>  arch/arm/boot/dts/omap5-evm.dts |   32 +++++++++++++++++++++++++++++++
->>>>  arch/arm/boot/dts/omap5.dtsi    |   40 +++++++++++++++++++++++++++++++++++++++
->>>>  2 files changed, 72 insertions(+), 0 deletions(-)
->>>>
->>> Any comment on this series?
->>
->> Didn't we mentioned updating the trivial-devices.txt in the
->> documentation to list these devices?
->>
-> I had posted a patch for updating the Documentation, though I created
-> a seperate
-> hwmon/tmp102.txt file. There is a comment to add it to trivial devices. So,
-> I will post a single patch doing so.
+SSI block has two types of clock:
 
-Cool, I'll take it on top of this one then.
+ipg: bus clock, the clock needed for accessing registers.
+per: peripheral clock, the clock needed for generating the bit rate.
 
-Thanks,
-Benoit
+Currently SSI driver only supports slave mode and only need to handle
+the ipg clock, because the peripheral clock comes from the master codec.
+
+Only register the ipg clock and do not register the peripheral clock for ssi.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Use ssi2_gate for imx-ssi.1
+
+ arch/arm/mach-imx/clk-imx35.c |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
+index c6422fb..f7910df 100644
+--- a/arch/arm/mach-imx/clk-imx35.c
++++ b/arch/arm/mach-imx/clk-imx35.c
+@@ -230,10 +230,8 @@ int __init mx35_clocks_init()
+ 	clk_register_clkdev(clk[ipu_gate], NULL, "mx3_sdc_fb");
+ 	clk_register_clkdev(clk[owire_gate], NULL, "mxc_w1");
+ 	clk_register_clkdev(clk[sdma_gate], NULL, "imx35-sdma");
+-	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.0");
+-	clk_register_clkdev(clk[ssi1_div_post], "per", "imx-ssi.0");
+-	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.1");
+-	clk_register_clkdev(clk[ssi2_div_post], "per", "imx-ssi.1");
++	clk_register_clkdev(clk[ssi1_gate], NULL, "imx-ssi.0");
++	clk_register_clkdev(clk[ssi2_gate], NULL, "imx-ssi.1");
+ 	/* i.mx35 has the i.mx21 type uart */
+ 	clk_register_clkdev(clk[uart1_gate], "per", "imx21-uart.0");
+ 	clk_register_clkdev(clk[ipg], "ipg", "imx21-uart.0");
+-- 
+1.7.9.5
