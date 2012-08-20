@@ -1,43 +1,41 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 20 Aug 2012 10:02:58 +0200
-Subject: [PATCH 03/14] arm: at91: at91sam9x5: fix gpio number per bank
-In-Reply-To: <201208182118.45349.arnd@arndb.de>
-References: <20120810124820.GA20557@game.jcrosoft.org>
- <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
- <1344603731-32667-3-git-send-email-plagnioj@jcrosoft.com>
- <201208182118.45349.arnd@arndb.de>
-Message-ID: <20120820080258.GG7439@game.jcrosoft.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 20 Aug 2012 09:06:34 +0100
+Subject: [PATCH 13/22] ARM: ux500: Fork MSP platform registration for
+ step-by-step DT enablement
+In-Reply-To: <CACRpkdaem6t3mvy-_9e=GEgwWoeBQSoX3Hf1L=hjWsvLJdsVAQ@mail.gmail.com>
+References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
+ <1344527268-5964-14-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaem6t3mvy-_9e=GEgwWoeBQSoX3Hf1L=hjWsvLJdsVAQ@mail.gmail.com>
+Message-ID: <20120820080632.GD8450@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21:18 Sat 18 Aug     , Arnd Bergmann wrote:
-> On Friday 10 August 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > --- a/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
-> > +++ b/Documentation/devicetree/bindings/gpio/gpio_atmel.txt
-> > @@ -9,6 +9,10 @@ Required properties:
-> >    unused).
-> >  - gpio-controller: Marks the device node as a GPIO controller.
-> >  
-> > +optional properties:
-> > +- gpio-nb: Number of gpio if absent 32.
-> > +
-> > +
-> >  Example:
-> >         pioA: gpio at fffff200 {
-> >                 compatible = "atmel,at91rm9200-gpio";
-> > @@ -16,5 +20,6 @@ Example:
-> >                 interrupts = <2 4>;
-> >                 #gpio-cells = <2>;
-> >                 gpio-controller;
-> > +               gpio-nb = <19>;
+On Tue, Aug 14, 2012 at 01:13:49PM +0200, Linus Walleij wrote:
+> On Thu, Aug 9, 2012 at 5:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> What does "nb" stand for?
+> > We've done this before and it worked well last time. Here we're
+> > duplicating a complex registration function to ease the process
+> > of enabling it for Device Tree. As there are quite a few steps
+> > taken during the registration process, it makes sense to break
+> > them up into more manageable chunks. This patch will aid us.
+> >
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> The marvell-gpio binding uses "ngpio" for the number, so that would
-> already be established. Otherwise, I think "#gpio-lines" would be
-> more in line with other things we count in the bindings.
-ngpio I dont like
-#gpio-lines ok
+> I understand you have used this approach before so:
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Best Regards,
-J.
+Does this comment take back your previous one:
+
+NOTE: it seems this patch set contains some churn. First you
+add in the forked device init, put in a big chunk of code and
+then in the *same* patch set delete it again. It's not like
+we're dying to see all the development history... can this
+be squashed down a bit?
+
+... hence leave the patch-set as it is?
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
