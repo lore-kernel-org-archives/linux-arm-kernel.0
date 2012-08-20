@@ -1,26 +1,48 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Mon, 20 Aug 2012 20:15:31 +0200
-Subject: [PATCH] media: mx2_camera: Remove MX2_CAMERA_SWAP16 and
- MX2_CAMERA_PACK_DIR_MSB flags.
-In-Reply-To: <CACKLOr3OmRUACO8QaJnYA6E=YZMCrrOq1pAXb1wTv4Udg+u8bQ@mail.gmail.com>
-References: <1342083809-19921-1-git-send-email-javier.martin@vista-silicon.com>
- <Pine.LNX.4.64.1207201330240.27906@axis700.grange>
- <CACKLOr2sKVWCk3we_cP5MvnR6-WsaFwA9AC=fgp3iLm8B6mfEA@mail.gmail.com>
- <Pine.LNX.4.64.1207301718510.28003@axis700.grange>
- <CACKLOr3OmRUACO8QaJnYA6E=YZMCrrOq1pAXb1wTv4Udg+u8bQ@mail.gmail.com>
-Message-ID: <20120820181531.GL31821@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 20 Aug 2012 19:16:55 +0200
+Subject: [PATCH 02/11] pinctrl: mvebu: dove pinctrl driver
+In-Reply-To: <CACRpkda9BL5+NiDOsMKG0kv2coBsw=Er=ZccXnNkgeftV9hPhQ@mail.gmail.com>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1344689809-6223-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CACRpkda9BL5+NiDOsMKG0kv2coBsw=Er=ZccXnNkgeftV9hPhQ@mail.gmail.com>
+Message-ID: <20120820191655.5e2f2dba@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 10:08:39AM +0200, javier Martin wrote:
-> Sascha, do you have any comments on this one? I can't find it in
-> arm-soc, did you already merge it?
+Le Mon, 20 Aug 2012 15:43:11 +0200,
+Linus Walleij <linus.walleij@linaro.org> a ?crit :
 
-Sascha is not in the office this week.
+> >  config PINCTRL_MVEBU
+> >         bool "Marvell SoC pin controller drivers"
+> > -       depends on ARCH_MVEBU
+> > +       depends on ARCH_MVEBU || ARCH_DOVE
+> 
+> Hmmmm.
+> 
+> Shouldn't this thing rather be:
+> 
+> depends on PLAT_ORION
+> 
+> else you end up lining up all Marvell machines here...
 
-rsc
+When we started working on this, ARCH_MVEBU was not a PLAT_ORION
+platform, because PLAT_ORION includes its own custom pinmux code, gpio
+code, etc, and what we're trying to achieve with Sebastian is to clean
+all this. Ultimately, our goal is to have all Orion, Kirkwood, Dove,
+Discovery and Armada 370/XP supported in mach-mvebu, and therefore
+plat-orion would most likely disappear.
+
+In the mean time, a patch got accepted that separates PLAT_ORION for
+PLAT_ORION_LEGACY, and therefore MACH_MVEBU now selects PLAT_ORION to
+access things that are still useful (address decoding code) while all
+other platforms select PLAT_ORION_LEGACY to get the old pinmux code,
+old gpio code, etc. All this is very much a work in progress.
+
+Best regards,
+
+Thomas
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
