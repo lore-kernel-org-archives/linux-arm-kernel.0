@@ -1,59 +1,57 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Mon, 20 Aug 2012 10:08:39 +0200
-Subject: [PATCH] media: mx2_camera: Remove MX2_CAMERA_SWAP16 and
- MX2_CAMERA_PACK_DIR_MSB flags.
-In-Reply-To: <Pine.LNX.4.64.1207301718510.28003@axis700.grange>
-References: <1342083809-19921-1-git-send-email-javier.martin@vista-silicon.com>
- <Pine.LNX.4.64.1207201330240.27906@axis700.grange>
- <CACKLOr2sKVWCk3we_cP5MvnR6-WsaFwA9AC=fgp3iLm8B6mfEA@mail.gmail.com>
- <Pine.LNX.4.64.1207301718510.28003@axis700.grange>
-Message-ID: <CACKLOr3OmRUACO8QaJnYA6E=YZMCrrOq1pAXb1wTv4Udg+u8bQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 20 Aug 2012 09:09:46 +0100
+Subject: [PATCH 04/22] ASoC: Ux500: Move MSP pinctrl setup into the MSP
+ driver
+In-Reply-To: <CACRpkda_xOyu9BFGRK4xTsXOO9RCJu7BbU-kPGpttVkR6mDMZg@mail.gmail.com>
+References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
+ <1344527268-5964-5-git-send-email-lee.jones@linaro.org>
+ <CACRpkda_xOyu9BFGRK4xTsXOO9RCJu7BbU-kPGpttVkR6mDMZg@mail.gmail.com>
+Message-ID: <20120820080945.GE8450@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Aug 14, 2012 at 10:51:02AM +0200, Linus Walleij wrote:
+> On Thu, Aug 9, 2012 at 5:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > In the initial submission of the MSP driver msp1 and msp3's associated
+> > pinctrl mechanism was passed back to platform code using a plat_init()
+> > call-back routine, but it has no place in platform code. The MSP driver
+> > should set this up for the appropriate ports. Instead we use a use_pinctrl
+> > identifier which is passed from platform_data/Device Tree which indicates
+> > which ports should use pinctrl.
+> >
+> > CC: alsa-devel at alsa-project.org
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> This is very good because it rids platform code and makes the driver
+> self-contained without strange platform data hooks.
+> 
+> Now details...
+> 
+> > +/* MSP1/3 Tx/Rx usage protection */
+> > +static DEFINE_SPINLOCK(msp_rxtx_lock);
+> > +
+> > +/* Pin modes */
+> > +struct pinctrl *pinctrl_p;
+> > +struct pinctrl_state *pinctrl_def;
+> > +struct pinctrl_state *pinctrl_sleep;
+> > +
+> > +/* Reference Count */
+> > +int pinctrl_rxtx_ref;
+> 
+> 
+> But wait. These are just local statics. Surelty you can put these into
+> struct ux500_msp instead? Here it looks like these will be used for
+> all ports, so MSP2 will enable the pins requested by MSP1 etc
+> completely broken. So put it into the struct ux500_msp state
+> container from ux500_msp_i2s.h where it belongs.
 
-On 30 July 2012 17:33, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> Hi Javier
->
-> On Mon, 30 Jul 2012, javier Martin wrote:
->
->> Hi,
->> thank you for yor ACKs.
->>
->> On 20 July 2012 13:31, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
->> > On Thu, 12 Jul 2012, Javier Martin wrote:
->> >
->> >> These flags are not used any longer and can be safely removed
->> >> since the following patch:
->> >> http://www.spinics.net/lists/linux-media/msg50165.html
->> >>
->> >> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
->> >
->> > For the ARM tree:
->> >
->> > Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
->>
->> forgive my ignorance on the matter. Could you please point me to the
->> git repository this patch should be merged?
->
-> Sorry, my "for the ARM tree" comment was probably not clear enough. This
-> patch should certainly go via the ARM (SoC) tree, since it only touches
-> arch/arm. So, the maintainer (Sascha - added to CC), that will be
-> forwarding this patch to Linus can thereby add my "acked-by" to this
-> patch, if he feels like it.
->
-
-Sascha, do you have any comments on this one? I can't find it in
-arm-soc, did you already merge it?
-
-Regards.
+This was intentional, as in the previous implementation only MSP1 and
+MSP3 (which share pins) were enabled for pinctrl. I will move them into
+struct ux500_msp instead though, no problem
 
 -- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
