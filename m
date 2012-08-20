@@ -1,49 +1,25 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 20 Aug 2012 09:52:05 +0200
-Subject: [PATCH RFC] ARM: busy loop at the end of machine_power_off
-Message-ID: <1345449125-23212-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 20 Aug 2012 09:56:12 +0200
+Subject: [PATCH 1/8] arm: sam9_l9260_defconfig: adjust UBI bad
+ eraseblocks limit
+In-Reply-To: <1345214124-5478-2-git-send-email-richard.genoud@gmail.com>
+References: <1345214124-5478-1-git-send-email-richard.genoud@gmail.com>
+ <1345214124-5478-2-git-send-email-richard.genoud@gmail.com>
+Message-ID: <20120820075612.GD7439@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When machine_power_off returns the kernel panics with
+On 16:35 Fri 17 Aug     , Richard Genoud wrote:
+> From: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+> 
+> UBI has changed the MTD_UBI_BEB_LIMIT semantics. It used to be a percent of
+> total amount of eraseblock in the partition, and now it is the maximum
+> amount of bad eraseblocks on the entire devise per 1024 eraseblocks. So not
+> only the units changed, but also the meaning. But anyway, old 3% roughly
+> correspond to new 30, so change the defconfig correspondingly.
+> 
+> Signed-off-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+simply drop this defconfig
 
-	Attempted to kill init!
-
-. So let machine_power_off busy loop as machine_halt does, too.
-
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-This is triggered when issuing
-
-	poweroff
-
-only if the machine sets the pm_power_off callback because the reboot
-system call does
-
-        if ((cmd == LINUX_REBOOT_CMD_POWER_OFF) && !pm_power_off)
-		cmd = LINUX_REBOOT_CMD_HALT;
-
-So it might even be safe to call pm_power_off unconditionally in
-machine_power_off.
-
-Best regards
-Uwe
-
- arch/arm/kernel/process.c |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 693b744..eda0846 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -256,6 +256,8 @@ void machine_power_off(void)
- 	machine_shutdown();
- 	if (pm_power_off)
- 		pm_power_off();
-+	local_irq_disable();
-+	while (1);
- }
- 
- void machine_restart(char *cmd)
--- 
-1.7.10.4
+Best Regards,
+J.
