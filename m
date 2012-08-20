@@ -1,37 +1,21 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Mon, 20 Aug 2012 11:29:48 +0300
-Subject: [PATCH 5/8] UBI: check max_beb_per1024 value in ubi_attach_mtd_dev
-In-Reply-To: <1345451128.2848.14.camel@sauron.fi.intel.com>
-References: <1345214124-5478-1-git-send-email-richard.genoud@gmail.com>
- <1345214124-5478-6-git-send-email-richard.genoud@gmail.com>
- <20120819120804.15c33931@pixies.home.jungo.com>
- <CACQ1gAgLirwiwiUOoL7ig7R_RpB8xDr2-g2gVOEUZNvAHB60pQ@mail.gmail.com>
- <1345451128.2848.14.camel@sauron.fi.intel.com>
-Message-ID: <1345451388.2848.16.camel@sauron.fi.intel.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Mon, 20 Aug 2012 16:32:47 +0800
+Subject: [PATCH 11/11] pm/drivers: fix use of SIMPLE_DEV_PM_OPS
+In-Reply-To: <201208081726.21878.arnd@arndb.de>
+References: <1344437248-20560-1-git-send-email-arnd@arndb.de>
+ <201208081622.29777.arnd@arndb.de> <s5hwr19fi6h.wl%tiwai@suse.de>
+ <201208081726.21878.arnd@arndb.de>
+Message-ID: <20120820083247.GF22951@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-08-20 at 11:25 +0300, Artem Bityutskiy wrote:
-> On Mon, 2012-08-20 at 08:31 +0200, Richard Genoud wrote:
-> > That's right, I'll correct that in next version.
-> > Thanks !
+On Wed, Aug 08, 2012 at 05:26:21PM +0000, Arnd Bergmann wrote:
 > 
-> I've amended this patch, added Shmulik's reviewed-by and pushed to
-> linux-ubi.git, thanks!
+> Ok. this leaves the omap-rng driver, and my patch comes down to the below.
+> Thanks!
 
-Sorry, actually I've dropped it - it does not compile :-) Please, send
-bisectable patch-sets. Anyway, I expect you to re-send patches 5-8.
-
-P.S. I am not sure we need to CC arm mailing list and lkml - I think we
-spam them unnecessarily and the MTD list is enough.
-
+Patch applied.  Thanks Arnd.
 -- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120820/b1a6f574/attachment.sig>
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
