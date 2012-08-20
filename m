@@ -1,73 +1,73 @@
 From: Barry.Song@csr.com (Barry Song)
-Date: Mon, 20 Aug 2012 16:19:45 +0800
-Subject: [PATCH 1/3] ARM: PRIMA2: use DT_MACHINE_START and convert to generic
- board
-In-Reply-To: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
-References: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <1345450787-17246-2-git-send-email-Barry.Song@csr.com>
+Date: Mon, 20 Aug 2012 16:19:44 +0800
+Subject: [PATCH 0/3] ARM: PRIMA2: some patches prepared to support new SiRF
+ SoCs
+Message-ID: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Barry Song <Baohua.Song@csr.com>
 
-we will have SiRFMarco and SiRFPolo, all of them will be in the
-generic board.
+we will support SiRFmarco and SiRFpolo SMP SoCs, this series is making
+mach-prima2 common for all of them.
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/mach-prima2/Makefile                      |    2 +-
- arch/arm/mach-prima2/{prima2.c => board-generic.c} |   10 ++++++----
- 2 files changed, 7 insertions(+), 5 deletions(-)
- rename arch/arm/mach-prima2/{prima2.c => board-generic.c} (81%)
+Barry Song (3):
+  ARM: PRIMA2: use DT_MACHINE_START and convert to generic board
+  ARM: PRIMA2: make mach-prima2 common for all SiRF series SoC
+  ARM: SIRF: make sirf irqchip driver selectable since new SoCs will
+    have GIC
 
-diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
-index 841847d..852af49 100644
---- a/arch/arm/mach-prima2/Makefile
-+++ b/arch/arm/mach-prima2/Makefile
-@@ -1,7 +1,7 @@
- obj-y := timer.o
- obj-y += irq.o
- obj-y += rstc.o
--obj-y += prima2.o
-+obj-y += board-generic.o
- obj-y += rtciobrg.o
- obj-$(CONFIG_DEBUG_LL) += lluart.o
- obj-$(CONFIG_CACHE_L2X0) += l2x0.o
-diff --git a/arch/arm/mach-prima2/prima2.c b/arch/arm/mach-prima2/board-generic.c
-similarity index 81%
-rename from arch/arm/mach-prima2/prima2.c
-rename to arch/arm/mach-prima2/board-generic.c
-index e9a17ae..f06b887 100644
---- a/arch/arm/mach-prima2/prima2.c
-+++ b/arch/arm/mach-prima2/board-generic.c
-@@ -30,12 +30,13 @@ void __init sirfsoc_init_late(void)
- 	sirfsoc_pm_init();
- }
- 
--static const char *prima2cb_dt_match[] __initdata = {
--       "sirf,prima2-cb",
-+#ifdef CONFIG_ARCH_PRIMA2
-+static const char *prima2_dt_match[] __initdata = {
-+       "sirf,prima2",
-        NULL
- };
- 
--MACHINE_START(PRIMA2_EVB, "prima2cb")
-+DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
- 	/* Maintainer: Barry Song <baohua.song@csr.com> */
- 	.atag_offset	= 0x100,
- 	.map_io         = sirfsoc_map_lluart,
-@@ -44,6 +45,7 @@ MACHINE_START(PRIMA2_EVB, "prima2cb")
- 	.dma_zone_size	= SZ_256M,
- 	.init_machine	= sirfsoc_mach_init,
- 	.init_late	= sirfsoc_init_late,
--	.dt_compat      = prima2cb_dt_match,
-+	.dt_compat      = prima2_dt_match,
- 	.restart	= sirfsoc_restart,
- MACHINE_END
-+#endif
--- 
-1.7.0.4
+ arch/arm/Kconfig                                   |   10 +++++-----
+ arch/arm/Makefile                                  |    2 +-
+ arch/arm/mach-sirf/Kconfig                         |   20 ++++++++++++++++++++
+ arch/arm/{mach-prima2 => mach-sirf}/Makefile       |    4 ++--
+ arch/arm/{mach-prima2 => mach-sirf}/Makefile.boot  |    0
+ .../prima2.c => mach-sirf/board-generic.c}         |   10 ++++++----
+ arch/arm/{mach-prima2 => mach-sirf}/common.h       |    0
+ .../include/mach/clkdev.h                          |    0
+ .../include/mach/debug-macro.S                     |    0
+ .../include/mach/entry-macro.S                     |    0
+ .../{mach-prima2 => mach-sirf}/include/mach/gpio.h |    0
+ .../include/mach/hardware.h                        |    0
+ .../{mach-prima2 => mach-sirf}/include/mach/irqs.h |    0
+ .../{mach-prima2 => mach-sirf}/include/mach/map.h  |    0
+ .../include/mach/timex.h                           |    0
+ .../{mach-prima2 => mach-sirf}/include/mach/uart.h |    0
+ .../include/mach/uncompress.h                      |    0
+ arch/arm/{mach-prima2 => mach-sirf}/irq.c          |    0
+ arch/arm/{mach-prima2 => mach-sirf}/l2x0.c         |    0
+ arch/arm/{mach-prima2 => mach-sirf}/lluart.c       |    0
+ arch/arm/{mach-prima2 => mach-sirf}/pm.c           |    0
+ arch/arm/{mach-prima2 => mach-sirf}/pm.h           |    0
+ arch/arm/{mach-prima2 => mach-sirf}/rstc.c         |    0
+ arch/arm/{mach-prima2 => mach-sirf}/rtciobrg.c     |    0
+ arch/arm/{mach-prima2 => mach-sirf}/sleep.S        |    0
+ arch/arm/{mach-prima2 => mach-sirf}/timer.c        |    0
+ 26 files changed, 34 insertions(+), 12 deletions(-)
+ create mode 100644 arch/arm/mach-sirf/Kconfig
+ rename arch/arm/{mach-prima2 => mach-sirf}/Makefile (73%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/Makefile.boot (100%)
+ rename arch/arm/{mach-prima2/prima2.c => mach-sirf/board-generic.c} (81%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/common.h (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/clkdev.h (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/debug-macro.S (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/entry-macro.S (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/gpio.h (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/hardware.h (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/irqs.h (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/map.h (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/timex.h (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/uart.h (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/include/mach/uncompress.h (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/irq.c (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/l2x0.c (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/lluart.c (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/pm.c (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/pm.h (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/rstc.c (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/rtciobrg.c (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/sleep.S (100%)
+ rename arch/arm/{mach-prima2 => mach-sirf}/timer.c (100%)
 
 
 
