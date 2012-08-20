@@ -1,39 +1,64 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 20 Aug 2012 20:01:51 +0200
-Subject: [PATCH 04/11] pinctrl: mvebu: add pinctrl driver for Armada 370
-In-Reply-To: <20120820193622.4e539451@skate>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1344689809-6223-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <CACRpkdYNZar7865-T12J37h3AWA9-8R1R5tymuOhaB0b3ddEAA@mail.gmail.com>
- <50326A60.1070007@gmail.com> <20120820193622.4e539451@skate>
-Message-ID: <50327B8F.3050503@gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 20 Aug 2012 14:04:01 -0400 (EDT)
+Subject: [PATCH] ARM: io: avoid writeback addressing modes for __raw_
+ accessors
+In-Reply-To: <20120820165405.GU25864@mudshark.cambridge.arm.com>
+References: <1344956366-32574-1-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.02.1208161906390.1541@xanadu.home>
+ <20120820124109.GK25864@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1208200902120.1754@xanadu.home>
+ <20120820144927.GP25864@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1208201150010.1754@xanadu.home>
+ <20120820165405.GU25864@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1208201356130.1754@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2012 07:36 PM, Thomas Petazzoni wrote:
-> In order to keep the consistency with other SoC families, maybe we can
-> split the 370 and XP options in two separate MACH_ARMADA_370 and
-> MACH_ARMADA_XP. So, in the ideal world, once all Marvell EBU SoCs are
-> converted to DT+mach-mvebu, we should have:
->
->   *) arch/arm/Kconfig defines MACH_MVEBU
->
->   *) arch/arm/mach-mvebu/Kconfig defines MACH_KIRKWOOD, MACH_DOVE,
->      MACH_MX78X00, MACH_ARMADA_370, MACH_ARMADA_XP, MACH_ORION5X
->
-> Then, an user is free to build a single kernel image that supports all,
-> or a selection of the supported Marvell EBU SoCs.
->
-> Would that be ok with you?
+On Mon, 20 Aug 2012, Will Deacon wrote:
 
-Yes!
+> On Mon, Aug 20, 2012 at 05:09:06PM +0100, Nicolas Pitre wrote:
+> > On Mon, 20 Aug 2012, Will Deacon wrote:
+> > > diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> > > index b54d687..bbc94c2 100644
+> > > --- a/arch/arm/include/asm/io.h
+> > > +++ b/arch/arm/include/asm/io.h
+> > > @@ -63,38 +63,50 @@ extern void __raw_readsl(const void __iomem *addr, void *data, int longlen);
+> > >   */
+> > >  static inline void __raw_writew(u16 val, volatile void __iomem *addr)
+> > >  {
+> > > -       asm volatile("strh %0, [%1]" : : "r" (val), "r" (addr));
+> > > +       asm volatile("strh %1, %0"
+> > > +                    : "=Qo" (*(volatile u16 __force *)addr)
+> > > +                    : "r" (val));
+> > >  }
+> > >  
+> > >  static inline u16 __raw_readw(const volatile void __iomem *addr)
+> > >  {
+> > >         u16 val;
+> > > -       asm volatile("ldrh %0, [%1]" : "=r" (val) : "r" (addr));
+> > > +       asm volatile("ldrh %0, %1"
+> > > +                    : "=r" (val)
+> > > +                    : "Qo" (*(const volatile u16 __force *)addr));
+> > >         return val;
+> > >  }
+> > 
+> > Semantically, I think the qualifier on the Qo constraint should be + as 
+> > in "+Qo" listed in the input operand list in both cases since we may not 
+> > assume anything about the memory location when it is referring to IO 
+> > registers.  It is not because you write to it that previous writes can 
+> > be optimized away, and it is not because you read from it that the 
+> > accessed memory location will remain the same after the read.  Granted, 
+> > the volatile should take care of that, but it doesn't hurt to be 
+> > explicit.
+> 
+> Hmm, ok. I too would hope that the volatile keyword would sort that out but,
+> since the '+' doesn't seem to change the generated code, I can add that. It
+> does, however, mean we have to cast away the `const' in the read accessors
+> which makes the code even uglier.
 
-> If that's fine with you, then I would prefer if we keep the single
-> MACH_ARMADA_370_XP symbol for now, so that your pinctrl set of patches
-> does not depend on something else. We would do the small Kconfig option
-> refactoring as a follow-up set of patches. Thoughts?
+Nah... the const is wrong.  The way you wrote it means that addr may 
+change but the pointed data is constant.  This is obviously wrong since 
+we expect the pointed location to change even from a read.
 
-Despite any objections, I will remove all arch/arm/*/Kconfig patches
-from pinctrl patch set.
 
-Sebastian
+Nicolas
