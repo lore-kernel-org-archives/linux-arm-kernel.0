@@ -1,40 +1,36 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 20 Aug 2012 23:00:17 +0300
-Subject: [PATCH] drivers/watchdog: Adding PRCMU based WD for ux500
- processors
-In-Reply-To: <1345492255-28900-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1345492255-28900-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20120820200017.GE3829@tarshish>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 20 Aug 2012 20:01:23 +0000
+Subject: [PATCH] ARM: relax conditions required for enabling Contiguous
+ Memory Allocator
+In-Reply-To: <1345443372-3824-1-git-send-email-m.szyprowski@samsung.com>
+References: <1345443372-3824-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <201208202001.23443.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
-
-On Mon, Aug 20, 2012 at 01:50:55PM -0600, mathieu.poirier at linaro.org wrote:
-> From: "Mathieu J. Poirier" <mathieu.poirier@linaro.org>
+On Monday 20 August 2012, Marek Szyprowski wrote:
+> Contiguous Memory Allocator requires only paging and MMU enabled not
+> particular CPU architectures, so there is no need for strict dependency
+> on CPU type. This enables to use CMA on some older ARM v5 systems which
+> also might need large contiguous blocks for the multimedia processing hw
+> modules.
 > 
-> This patch is a partial re-write of the driver developed by
-> Jonas Aaberg and brings it up to the new watchdog interface
-> now the standard in the mainline kernel.
-> 
-> Cc: Jonas Aaberg <jonas.aberg@stericsson.com>
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Reported-by: Prabhakar Lad <prabhakar.csengg@gmail.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-[snip]
+The patch looks simple, but I want a better explanation for it.
+When we went through all possible cases, we decided that:
 
-> +/**
-> + * struct ux500_wdt_data
-> + */
-> +struct ux500_wdt_data {
-> +	int timeout;
-> +	int nowayout;
-> +};
+* ARMv6+ need CMA to avoid the double mapping problem.
+* ARMv4/v5 cannot generally use CMA because it doesn't work
+  together with DMABOUNCE. I don't remember if it was the
+  only problem, but I definitely remember this was intentional.
+* We want a common kernel for all ARMv6+ eventually, and a
+  separate kernel for all ARMv4/v5 ones.
 
-This struct doesn't seem to be used anywhere.
+If the reasoning has changed, please try to explain the full
+situation. On a related topic, what happened to the idea that
+ARMv6+ is broken without CMA? I noticed that it's optional
+now.
 
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+	Arnd
