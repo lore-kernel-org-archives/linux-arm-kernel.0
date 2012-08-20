@@ -1,39 +1,45 @@
-From: alanbutty12@gmail.com (Alan M Butler)
-Date: Mon, 20 Aug 2012 13:44:56 +0100
-Subject: [PATCH] ARM: Kirkwood: Iomega IX2-200 Device Tree Support Patch
- v2 Signed-off-by: Alan M Butler <alanbutty12@gmail.com>
-In-Reply-To: <CAOMZO5BbdT2CXHh4NEt8bPZ4C7Mg=Yd9C9E7J2H_JsGJ=88fqQ@mail.gmail.com>
-References: <cover.1345196553.git.alanbutty12@gmail.com>
- <05c3c186d3675cde472bcc3a01198b6726c48a3c.1345196553.git.alanbutty12@gmail.com>
- <20120819020607.GZ22226@titan.lakedaemon.net>
- <CADhrpJ5WX-ZR3vxwe92Rg4R9a1+79Vf-QxKdJhyaC87o8HJYrw@mail.gmail.com>
- <CADhrpJ6HmUd86zx6Az0bx9JiiYp6kMmTis6ARMWBrNqoK8aKng@mail.gmail.com>
- <CAOMZO5AZZwQS8rkvrG3Nd7KAhgh3+PcfkdoKiqRW95eaUyTghg@mail.gmail.com>
- <CADhrpJ7ZE=L25V8sKyQAT02iDuyCRwyCAjw4ukopek1i0TRqNw@mail.gmail.com>
- <CAOMZO5BoWyGzB3p11yE9NXAXq319oi0bnbFuwxvahCqGDOZKrw@mail.gmail.com>
- <CADhrpJ487cN23gRkws1Grp+SEmrKO2JdDT0r-DVeCZm-XqdP=A@mail.gmail.com>
- <CAOMZO5BbdT2CXHh4NEt8bPZ4C7Mg=Yd9C9E7J2H_JsGJ=88fqQ@mail.gmail.com>
-Message-ID: <CADhrpJ7Fq0FktNN-54++39=SN_GrkX7gpse+2QfD7ioQw+_cEA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 20 Aug 2012 13:51:16 +0100
+Subject: [PATCH 0/3] New algorithm for ASID allocation and rollover
+In-Reply-To: <201208191521.37460.arnd@arndb.de>
+References: <1345049642-29704-1-git-send-email-will.deacon@arm.com>
+ <201208191521.37460.arnd@arndb.de>
+Message-ID: <20120820125116.GM25864@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 August 2012 13:36, Fabio Estevam <festevam@gmail.com> wrote:
-> On Mon, Aug 20, 2012 at 9:30 AM, Alan M Butler <alanbutty12@gmail.com> wrote:
->
->> im not sure but i only get that after applying the patch you sent me
->> on the linux next from the 17th.
->> i will try building a new linux-next later today and will send you what happens.
->
-> Please do not drop the list from Cc.
->
->> would it be because i named the buttons power, reset and otb? instead
->> of button at 1 and so on like the other kirkwood devices?
->
-> I am not familiar with kirkwood device, sorry.
+Hi Arnd,
 
-sorry i forgot to cc the list.
+Thanks for the interest!
 
-But as far as i can tell with the buttons the only difference between
-my device and the other's like the iconnect is that they named the
-buttons button at 1 and i named mine Power, Reset and OTB. Is it possible
-the capital letters are causing the problem?
+On Sun, Aug 19, 2012 at 04:21:37PM +0100, Arnd Bergmann wrote:
+> On Wednesday 15 August 2012, Will Deacon wrote:
+> > After some discussion, it became apparent that tracking the ASIDs
+> > currently active on the cores in the system means that, on rollover, we
+> > can automatically reserve those that are in use without having to stop
+> > the world.
+> 
+> Just a question for my general understanding of how this is done: How do
+> you know if an ASID is active or not? Do you broadcast flush an address
+> space completely when the struct mm goes away, or do you keep track of
+> which CPUs had TLBs in an ASIC when it went away and then flush that ASID
+> when you reuse it on that CPU?
+
+Ok, I'll address these in turn:
+
+1. We know if an ASID is active or not by updating the per-cpu active_asids
+   variable when switching mm.
+
+2. Flushing (TLB invalidation) only happens when all ASIDs are dirty. So
+   when a struct mm is freed, its ASID remains `dirty' in the asid_map.
+   Eventually, no more ASIDs can be allocated, so the flushing takes place
+   then. All v7 CPUs broadcast this operation in hardware. At this point, we
+   mark all the active ASIDs as dirty to prevent them being re-allocated to
+   different tasks.
+
+I did play with per-ASID TLB-flushing depending on ASID pressure but I
+couldn't find any benchmarks that showed an improvement.
+
+Cheers,
+
+Will
