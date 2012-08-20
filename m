@@ -1,37 +1,40 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 20 Aug 2012 13:49:39 +0800
-Subject: [PATCH 3/3] ARM: pxa: fix build issue while CONFIG_OF is disabled
-In-Reply-To: <1345441779-22632-1-git-send-email-haojian.zhuang@gmail.com>
-References: <1345441779-22632-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <1345441779-22632-3-git-send-email-haojian.zhuang@gmail.com>
+Date: Mon, 20 Aug 2012 13:55:23 +0800
+Subject: [GIT PULL][for 3.7] pull request for pxa/dt branch in arm-soc from
+ arch-pxa git tree
+Message-ID: <CAN1soZwqoOvk3f7jzQUbza3PH2houwE4ERFJFn480F9yzBqm_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/mach-pxa/built-in.o: In function `pxa3xx_dt_init_irq':
-saar.c:(.init.text+0x604): undefined reference to `pxa_dt_irq_init'
+Hi Arnd & Olof,
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
----
- arch/arm/mach-pxa/pxa3xx.c |    2 ++
- 1 file changed, 2 insertions(+)
+Please help to merge these three patches into pxa/dt branch. Since
+they're depend
+on existing patch on pxa/dt branch, I didn't do rebase on v3.6-rc2.
 
-diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-index 4a9d04a..ff9c957 100644
---- a/arch/arm/mach-pxa/pxa3xx.c
-+++ b/arch/arm/mach-pxa/pxa3xx.c
-@@ -402,11 +402,13 @@ void __init pxa3xx_init_irq(void)
- 	pxa_init_irq(56, pxa3xx_set_wake);
- }
- 
-+#ifdef CONFIG_OF
- void __init pxa3xx_dt_init_irq(void)
- {
- 	__pxa3xx_init_irq();
- 	pxa_dt_irq_init(pxa3xx_set_wake);
- }
-+#endif	/* CONFIG_OF */
- 
- static struct map_desc pxa3xx_io_desc[] __initdata = {
- 	{	/* Mem Ctl */
--- 
-1.7.9.5
+Regards
+Haojian
+
+The following changes since commit 51931b37fcb17a2f48f726fd21b88e3af770ddc2:
+
+  ARM: mmp: enable tauros2 cache in mmp2 dt (2012-08-16 16:17:10 +0800)
+
+are available in the git repository at:
+
+  git://github.com/hzhuang1/linux.git dt
+
+for you to fetch changes up to e6c509c8ef85155bf504254399d758384a3b2e38:
+
+  ARM: pxa: fix build issue while CONFIG_OF is disabled (2012-08-20
+13:52:05 +0800)
+
+----------------------------------------------------------------
+Haojian Zhuang (3):
+      ARM: pxa: append the definition of CKENC
+      mtd: nand: append missing parameter and value
+      ARM: pxa: fix build issue while CONFIG_OF is disabled
+
+ arch/arm/mach-pxa/include/mach/pxa3xx-regs.h |    1 +
+ arch/arm/mach-pxa/pxa3xx.c                   |    2 ++
+ drivers/mtd/nand/pxa3xx_nand.c               |    4 ++--
+ 3 files changed, 5 insertions(+), 2 deletions(-)
