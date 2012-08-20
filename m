@@ -1,26 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 20 Aug 2012 10:27:44 +0100
-Subject: [PATCH v2 23/31] arm64: Debugging support
-In-Reply-To: <20120820090754.GB25864@mudshark.cambridge.arm.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <20120816104748.GI31784@mudshark.cambridge.arm.com>
- <201208161249.35008.arnd@arndb.de>
- <201208170706.07821.arnd@arndb.de>
- <20120820090754.GB25864@mudshark.cambridge.arm.com>
-Message-ID: <20120820092744.GD25864@mudshark.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 20 Aug 2012 10:36:40 +0100
+Subject: [PATCH 5/8] mfd: Provide the PRCMU with its own IRQ domain
+In-Reply-To: <CACRpkdZ7bMBytyDppV2sB1d1sUbDpPRqAQVOq8k4UOYdmg+Mkw@mail.gmail.com>
+References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
+ <1344527635-6163-6-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZ7bMBytyDppV2sB1d1sUbDpPRqAQVOq8k4UOYdmg+Mkw@mail.gmail.com>
+Message-ID: <20120820093638.GK8450@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 10:07:54AM +0100, Will Deacon wrote:
-> On Fri, Aug 17, 2012 at 08:06:07AM +0100, Arnd Bergmann wrote:
-> > Sorry for the dumb question, but why do you even need PTRACE_GET_THREAD_AREA
-> > for 64 bit tasks? I thought the thread pointer is a GPR, or is this just
-> > for compat tasks?
+On Tue, Aug 14, 2012 at 10:29:14AM +0200, Linus Walleij wrote:
+> On Thu, Aug 9, 2012 at 5:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> The TLS is stored in a co-processor register which is read-only for
-> userspace.
+> > +static struct irq_domain *db8500_irq_domain;
+> 
+> So this is a good idea.
 
-I should elaborate: the register is RW for AArch64 tasks, RO for aarch32
-tasks (although that doesn't affect the need for the ptrace request).
+Did you mean this, or did you mean that it's _not_ a good idea?
 
-Will
+If the latter is true, where would you prefer to see it?
+
+> > +int db8500_irq_get_virq(int irq);
+> 
+> And I'm sceptic about this business. Why isn't this physical-to virtual
+> mapping business confined to the core MFD driver? But enlighten me.
+> 
+> Yours,
+> Linus Walleij
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
