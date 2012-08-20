@@ -1,52 +1,70 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 20 Aug 2012 19:36:22 +0200
-Subject: [PATCH 04/11] pinctrl: mvebu: add pinctrl driver for Armada 370
-In-Reply-To: <50326A60.1070007@gmail.com>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1344689809-6223-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <CACRpkdYNZar7865-T12J37h3AWA9-8R1R5tymuOhaB0b3ddEAA@mail.gmail.com>
- <50326A60.1070007@gmail.com>
-Message-ID: <20120820193622.4e539451@skate>
+From: alanbutty12@gmail.com (Alan M Butler)
+Date: Mon, 20 Aug 2012 18:37:32 +0100
+Subject: [PATCH] ARM: Kirkwood: Iomega IX2-200 Device Tree Support Patch
+ v2 Signed-off-by: Alan M Butler <alanbutty12@gmail.com>
+In-Reply-To: <CADhrpJ7Fq0FktNN-54++39=SN_GrkX7gpse+2QfD7ioQw+_cEA@mail.gmail.com>
+References: <cover.1345196553.git.alanbutty12@gmail.com>
+ <05c3c186d3675cde472bcc3a01198b6726c48a3c.1345196553.git.alanbutty12@gmail.com>
+ <20120819020607.GZ22226@titan.lakedaemon.net>
+ <CADhrpJ5WX-ZR3vxwe92Rg4R9a1+79Vf-QxKdJhyaC87o8HJYrw@mail.gmail.com>
+ <CADhrpJ6HmUd86zx6Az0bx9JiiYp6kMmTis6ARMWBrNqoK8aKng@mail.gmail.com>
+ <CAOMZO5AZZwQS8rkvrG3Nd7KAhgh3+PcfkdoKiqRW95eaUyTghg@mail.gmail.com>
+ <CADhrpJ7ZE=L25V8sKyQAT02iDuyCRwyCAjw4ukopek1i0TRqNw@mail.gmail.com>
+ <CAOMZO5BoWyGzB3p11yE9NXAXq319oi0bnbFuwxvahCqGDOZKrw@mail.gmail.com>
+ <CADhrpJ487cN23gRkws1Grp+SEmrKO2JdDT0r-DVeCZm-XqdP=A@mail.gmail.com>
+ <CAOMZO5BbdT2CXHh4NEt8bPZ4C7Mg=Yd9C9E7J2H_JsGJ=88fqQ@mail.gmail.com>
+ <CADhrpJ7Fq0FktNN-54++39=SN_GrkX7gpse+2QfD7ioQw+_cEA@mail.gmail.com>
+Message-ID: <CADhrpJ56iWZnBKf6Knoqbm6iucrXMb7ESDtB8WSyWbCxO6A4rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Mon, 20 Aug 2012 18:48:32 +0200,
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
+On 20 August 2012 13:44, Alan M Butler <alanbutty12@gmail.com> wrote:
+> On 20 August 2012 13:36, Fabio Estevam <festevam@gmail.com> wrote:
+>> On Mon, Aug 20, 2012 at 9:30 AM, Alan M Butler <alanbutty12@gmail.com> wrote:
+>>
+>>> im not sure but i only get that after applying the patch you sent me
+>>> on the linux next from the 17th.
+>>> i will try building a new linux-next later today and will send you what happens.
+>>
+>> Please do not drop the list from Cc.
+>>
+>>> would it be because i named the buttons power, reset and otb? instead
+>>> of button at 1 and so on like the other kirkwood devices?
+>>
+>> I am not familiar with kirkwood device, sorry.
+>
+> sorry i forgot to cc the list.
+>
+> But as far as i can tell with the buttons the only difference between
+> my device and the other's like the iconnect is that they named the
+> buttons button at 1 and i named mine Power, Reset and OTB. Is it possible
+> the capital letters are causing the problem?
 
-> this is really difficult here ;) I thought I could just add PINCTRL_DOVE
-> to MACH_DOVE inside ARCH_MVEBU, PINCTRL_KIRKWOOD to MACH_KIRKWOOD, aso.
-> But there is a common MACH_ARMADA_370_XP for both 370 and XP obviously.
-> 
-> If it is ok for you I will add both PINCTRL_ stubs to the Kconfig and
-> you work it out if you ever have two distinct MACHs? Or it could remain
-> selectable in pinctrl/Kconfig but that will then be different with the
-> other stubs.
+i just tried your patch again with the latest linux-next dated 20th of
+august with that patch you gave me and i am still getting the errors
+on the gpio-keys this is the error:
 
-In order to keep the consistency with other SoC families, maybe we can
-split the 370 and XP options in two separate MACH_ARMADA_370 and
-MACH_ARMADA_XP. So, in the ideal world, once all Marvell EBU SoCs are
-converted to DT+mach-mvebu, we should have:
+[    4.838988] orion_gpio_is_valid: invalid GPIO 0
+[    4.838999] orion_gpio_is_valid: invalid GPIO 0
+[    4.839015] gpio-keys gpio-keys.2: Failed to request GPIO 0, error -22
+[    4.845617] gpio-keys: probe of gpio-keys.2 failed with error -22
 
- *) arch/arm/Kconfig defines MACH_MVEBU
+and this is how the keys are assigned in the dts file:
 
- *) arch/arm/mach-mvebu/Kconfig defines MACH_KIRKWOOD, MACH_DOVE,
-    MACH_MX78X00, MACH_ARMADA_370, MACH_ARMADA_XP, MACH_ORION5X
+               Power {
+                       label = "Power Button";
+                       linux,code = <116>;
+                       gpios = <&gpio0 14 1>;
+               };
+               Reset {
+                       label = "Reset Button";
+                       linux,code = <0x198>;
+                       gpios = <&gpio0 12 1>;
+               };
+               OTB {
+                       label = "OTB Button";
+                       linux,code = <133>;
+                       gpios = <&gpio1 3 1>;
+               };
 
-Then, an user is free to build a single kernel image that supports all,
-or a selection of the supported Marvell EBU SoCs.
-
-Would that be ok with you?
-
-If that's fine with you, then I would prefer if we keep the single
-MACH_ARMADA_370_XP symbol for now, so that your pinctrl set of patches
-does not depend on something else. We would do the small Kconfig option
-refactoring as a follow-up set of patches. Thoughts?
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+I hope this helps you figure out the problem.
