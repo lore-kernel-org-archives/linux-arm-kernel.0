@@ -1,46 +1,26 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 20 Aug 2012 11:21:45 +0200
-Subject: restart callback not supposed to sleep?
-In-Reply-To: <20120820090546.GR18957@n2100.arm.linux.org.uk>
-References: <20120820082423.GJ2232@pengutronix.de>
- <20529.64510.403690.325993@ipc1.ka-ro>
- <20120820090546.GR18957@n2100.arm.linux.org.uk>
-Message-ID: <20120820092145.GM2232@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 20 Aug 2012 10:27:44 +0100
+Subject: [PATCH v2 23/31] arm64: Debugging support
+In-Reply-To: <20120820090754.GB25864@mudshark.cambridge.arm.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <20120816104748.GI31784@mudshark.cambridge.arm.com>
+ <201208161249.35008.arnd@arndb.de>
+ <201208170706.07821.arnd@arndb.de>
+ <20120820090754.GB25864@mudshark.cambridge.arm.com>
+Message-ID: <20120820092744.GD25864@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 10:05:46AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Aug 20, 2012 at 10:57:34AM +0200, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > Uwe Kleine-K?nig writes:
-> > > Hello,
-> > > 
-> > > while triggering a reboot via sysrq on an ARM machine I saw a "BUG:
-> > > sleeping function called from invalid context" message (details below).
-> > > The reason is that the sysrq handler is calling the restart hook in irq
-> > > context. So what should be done about that? The obvious possiblities
-> > > are:
-> > > 
-> > >  a) ignore the problem as it won't result in problems (and maybe somehow
-> > >     silence the warnign); or
-> > >  b) make the restart hook atomic; or
-> > >  c) assert sysrq not calling the hook in atomic mode
-> > > 
-> > > What do you think?
-> > > 
-> > This has been discussed earlier (with your participation) with 'a)'
-> > being the conclusion.
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2010-December/033877.html
+On Mon, Aug 20, 2012 at 10:07:54AM +0100, Will Deacon wrote:
+> On Fri, Aug 17, 2012 at 08:06:07AM +0100, Arnd Bergmann wrote:
+> > Sorry for the dumb question, but why do you even need PTRACE_GET_THREAD_AREA
+> > for 64 bit tasks? I thought the thread pointer is a GPR, or is this just
+> > for compat tasks?
 > 
-> Except if you look at the backtrace, it seems that it fails to restart.
-> There are two attempts there at making it restart so the first could
-> not have succeeded.
-Just for the log: The restart works ok.
+> The TLS is stored in a co-processor register which is read-only for
+> userspace.
 
-Best regards
-Uwe
+I should elaborate: the register is RW for AArch64 tasks, RO for aarch32
+tasks (although that doesn't affect the need for the ptrace request).
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Will
