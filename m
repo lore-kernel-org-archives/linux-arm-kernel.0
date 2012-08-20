@@ -1,46 +1,27 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 20 Aug 2012 21:07:15 +0100
-Subject: [PATCH v2 3/4] arm/dts: Add tps65910 regulator DT data to
- am335x-evm.dts
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA19A81@DBDE01.ent.ti.com>
-References: <1343110735-10640-1-git-send-email-anilkumar@ti.com>
- <1343110735-10640-4-git-send-email-anilkumar@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA1293E@DBDE01.ent.ti.com>
- <20120815125338.GA13544@opensource.wolfsonmicro.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA13118@DBDE01.ent.ti.com>
- <20120815165431.GF15365@opensource.wolfsonmicro.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA13D18@DBDE01.ent.ti.com>
- <20120816140056.GK15365@opensource.wolfsonmicro.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA19A81@DBDE01.ent.ti.com>
-Message-ID: <20120820200715.GT26991@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 20 Aug 2012 20:10:59 +0000
+Subject: [PATCH v2 23/31] arm64: Debugging support
+In-Reply-To: <20120820092744.GD25864@mudshark.cambridge.arm.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <20120820090754.GB25864@mudshark.cambridge.arm.com>
+ <20120820092744.GD25864@mudshark.cambridge.arm.com>
+Message-ID: <201208202010.59985.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 06:27:01AM +0000, AnilKumar, Chimata wrote:
-> On Thu, Aug 16, 2012 at 19:30:56, Mark Brown wrote:
+On Monday 20 August 2012, Will Deacon wrote:
+> On Mon, Aug 20, 2012 at 10:07:54AM +0100, Will Deacon wrote:
+> > On Fri, Aug 17, 2012 at 08:06:07AM +0100, Arnd Bergmann wrote:
+> > > Sorry for the dumb question, but why do you even need PTRACE_GET_THREAD_AREA
+> > > for 64 bit tasks? I thought the thread pointer is a GPR, or is this just
+> > > for compat tasks?
+> > 
+> > The TLS is stored in a co-processor register which is read-only for
+> > userspace.
+> 
+> I should elaborate: the register is RW for AArch64 tasks, RO for aarch32
+> tasks (although that doesn't affect the need for the ptrace request).
 
-> > Why does this mean you need multiple regulators?  A single regulator can
-> > of course supply multiple devices.
+So can't you just /add/ that register to the GPR regset?
 
-> I got your point but tps65910 driver is failing if we add single fixed
-> regulator. Solution is driver needs to change or add multiple fixed
-> regulators.
-
-No, really.  One regulator can supply many things, not being a.
-
-> vrtc:
-> tps65910 0-002d: Failed to find supply vcc7
-> tps65910 0-002d: failed to register tps65910-pmic regulator
-
-So you've specified a whole bunch of supplies and this one individual
-supply is not matching (and it's not the first...).  You should
-investigate what's gone wrong there rather than bodging around the
-problem.  I can't immediately say anything much based on the information
-you've given.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120820/4e98778b/attachment.sig>
+	Arnd
