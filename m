@@ -1,29 +1,60 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Mon, 20 Aug 2012 11:25:28 +0300
-Subject: [PATCH 5/8] UBI: check max_beb_per1024 value in ubi_attach_mtd_dev
-In-Reply-To: <CACQ1gAgLirwiwiUOoL7ig7R_RpB8xDr2-g2gVOEUZNvAHB60pQ@mail.gmail.com>
-References: <1345214124-5478-1-git-send-email-richard.genoud@gmail.com>
- <1345214124-5478-6-git-send-email-richard.genoud@gmail.com>
- <20120819120804.15c33931@pixies.home.jungo.com>
- <CACQ1gAgLirwiwiUOoL7ig7R_RpB8xDr2-g2gVOEUZNvAHB60pQ@mail.gmail.com>
-Message-ID: <1345451128.2848.14.camel@sauron.fi.intel.com>
+From: Barry.Song@csr.com (Barry Song)
+Date: Mon, 20 Aug 2012 16:19:47 +0800
+Subject: [PATCH 3/3] ARM: SIRF: make sirf irqchip driver selectable since new
+ SoCs will have GIC
+In-Reply-To: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
+References: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <1345450787-17246-4-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-08-20 at 08:31 +0200, Richard Genoud wrote:
-> That's right, I'll correct that in next version.
-> Thanks !
+From: Barry Song <Baohua.Song@csr.com>
 
-I've amended this patch, added Shmulik's reviewed-by and pushed to
-linux-ubi.git, thanks!
+New MARCO and POLO SoC uses GIC, so make irq.c selectable and select
+it for PRIMAII
 
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/mach-sirf/Kconfig  |    4 ++++
+ arch/arm/mach-sirf/Makefile |    2 +-
+ 2 files changed, 5 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-sirf/Kconfig b/arch/arm/mach-sirf/Kconfig
+index 811e782..fea4bd9 100644
+--- a/arch/arm/mach-sirf/Kconfig
++++ b/arch/arm/mach-sirf/Kconfig
+@@ -8,9 +8,13 @@ config ARCH_PRIMA2
+ 	bool "CSR SiRFSoC PRIMA2 ARM Cortex A9 Platform"
+ 	select CPU_V7
+ 	select ZONE_DMA
++	select SIRF_IRQ
+ 	help
+           Support for CSR SiRFSoC ARM Cortex A9 Platform
+ 
+ endchoice
+ 
++config SIRF_IRQ
++	bool
++
+ endif
+diff --git a/arch/arm/mach-sirf/Makefile b/arch/arm/mach-sirf/Makefile
+index 852af49..3103fdf 100644
+--- a/arch/arm/mach-sirf/Makefile
++++ b/arch/arm/mach-sirf/Makefile
+@@ -1,8 +1,8 @@
+ obj-y := timer.o
+-obj-y += irq.o
+ obj-y += rstc.o
+ obj-y += board-generic.o
+ obj-y += rtciobrg.o
+ obj-$(CONFIG_DEBUG_LL) += lluart.o
+ obj-$(CONFIG_CACHE_L2X0) += l2x0.o
+ obj-$(CONFIG_SUSPEND) += pm.o sleep.o
++obj-$(CONFIG_SIRF_IRQ) += irq.o
 -- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120820/167a9045/attachment.sig>
+1.7.0.4
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
