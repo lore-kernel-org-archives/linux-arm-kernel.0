@@ -1,65 +1,96 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Mon, 20 Aug 2012 12:22:56 -0500
-Subject: [PATCH 2/2] ARM: imx6q: replace clk_register_clkdev with clock DT
- lookup
-In-Reply-To: <20120820151609.GN24242@S2101-09.ap.freescale.net>
-References: <1345104526-14797-1-git-send-email-shawn.guo@linaro.org>
- <1345104526-14797-3-git-send-email-shawn.guo@linaro.org>
- <503232E0.3000007@gmail.com>
- <CAKGA1bn2uCWE8YkGR4EzTxZ_bXJ_ov2diq63uxQ=dT7b6Fu9GQ@mail.gmail.com>
- <20120820151609.GN24242@S2101-09.ap.freescale.net>
-Message-ID: <CAKGA1bnfhMC8QG9OqBbpy5iq6ZAfEgrYMg_LVd50U7yikLhDAg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 20 Aug 2012 18:26:00 +0100
+Subject: [PATCH v3] ARM: support syscall tracing
+In-Reply-To: <50324BED.9000500@mentor.com>
+References: <50324BED.9000500@mentor.com>
+Message-ID: <20120820172559.GW25864@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 10:16 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Mon, Aug 20, 2012 at 09:54:48AM -0500, Matt Sealey wrote:
->> Yet another arbitrary array...
->>
->> I'm not sure why you would move the registration lookup into the DT
->
-> Because I do not want to patch kernel every time I need a new lookup.
-> Furthermore, looking at function imx53_qsb_init in imx53-dt.c, you
-> will find that lookup for sgtl5000 is really board specific and should
-> go to device tree.
->
->> and use an arbitrarily ordered array again. Sure, you're looking it up
->> entirely within the device tree here, but a better solution would be
->> to not name clocks twice, and structure your clock definition
->> properly.
->>
->> What's wrong with;
->>
->> ccm at 020c4000 {
->>    ...
->>    my_clock: clock at 0 {
->>        name = "my_clock_name";
->>    }
->> }
->>
->> uart at nnnnnnnn {
->>    ...
->>    clocks = <&my_clock>;
->> }
->>
->> ?
->>
-> It turns a property into 185 nodes, which will just bloat the device
-> tree.  This issue has been discussed for a plenty of times.
+Hi Wade,
 
-It's not bloat just because it is by its very definition "a big list", is it?
+On Mon, Aug 20, 2012 at 03:38:37PM +0100, Wade Farnsworth wrote:
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index 978eac5..b032c94 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -94,6 +94,15 @@ ENDPROC(ret_from_fork)
+>  	.equ NR_syscalls,0
+>  #define CALL(x) .equ NR_syscalls,NR_syscalls+1
+>  #include "calls.S"
+> +
+> +/*
+> + * Ensure that the system call table is equal to __NR_syscalls,
+> + * which is the value the rest of the system sees
+> + */
+> +.ifne NR_syscalls - __NR_syscalls
+> +.error "__NR_syscalls is not equal to the size of the syscall table"
+> +.endif
+> +
+>  #undef CALL
+>  #define CALL(x) .long x
+>  
+> @@ -415,7 +424,7 @@ local_restart:
+>  1:
+>  #endif
+>  
+> -	tst	r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
+> +	tst     r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
 
-How do you explain duplicating the clock names in the array AND in the
-device node as NOT being bloated?
+This is just a whitespace change, so I think you can drop it.
 
-You're going to have to define these clocks as a tree with parents and
-leaf nodes anyway in the clock subsystem. Why not define these in the
-device tree in total and reference them by handle when you build the
-entire clock tree from the ground up? Or will it just be all the
-clocks defined in Linux, but the lookups (which is what I see here)
-moved into the DT? Why not form the lookups as part of the definition
-of the clock tree?
+> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+> index 3e0fc5f..4974cdf 100644
+> --- a/arch/arm/kernel/ptrace.c
+> +++ b/arch/arm/kernel/ptrace.c
+> @@ -30,6 +30,9 @@
+>  #include <asm/pgtable.h>
+>  #include <asm/traps.h>
+>  
+> +#define CREATE_TRACE_POINTS
+> +#include <trace/events/syscalls.h>
+> +
+>  #define REG_PC	15
+>  #define REG_PSR	16
+>  /*
+> @@ -918,11 +921,11 @@ static int ptrace_syscall_trace(struct pt_regs *regs, int scno,
+>  {
+>  	unsigned long ip;
+>  
+> +	current_thread_info()->syscall = scno;
+> +
+>  	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+>  		return scno;
+>  
+> -	current_thread_info()->syscall = scno;
+> -
+>  	/*
+>  	 * IP is used to denote syscall entry/exit:
+>  	 * IP = 0 -> entry, =1 -> exit
+> @@ -942,6 +945,8 @@ static int ptrace_syscall_trace(struct pt_regs *regs, int scno,
+>  asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
+>  {
+>  	int ret = ptrace_syscall_trace(regs, scno, PTRACE_SYSCALL_ENTER);
+> +	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
+> +		trace_sys_enter(regs, scno);
+>  	audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0, regs->ARM_r1,
+>  			    regs->ARM_r2, regs->ARM_r3);
+>  	return ret;
+> @@ -950,6 +955,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
+>  asmlinkage int syscall_trace_exit(struct pt_regs *regs, int scno)
+>  {
+>  	int ret = ptrace_syscall_trace(regs, scno, PTRACE_SYSCALL_EXIT);
+> +	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
+> +		trace_sys_exit(regs, scno);
 
--- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+I think that trace_sys_{enter,exit} should take ret rather than scno. A
+debugger could change the syscall number if TIF_SYSCALL_TRACE is set and
+that new number should be the one that we use.
+
+The style, however, is much better and I think the code is fairly clear now
+so we just need to wait for my fix to the core code to get merged (it got
+picked up by Steve Rostedt) and I think we can use ret directly. It might be
+worth dropping the local variable and using scno for everything, so that
+it's obvious where the syscall number is stored.
+
+Will
