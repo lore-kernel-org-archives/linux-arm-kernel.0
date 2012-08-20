@@ -1,45 +1,46 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 20 Aug 2012 17:03:35 +0200
-Subject: [PATCH] ARM: at91: automatically select DT support for sam9x5
- and sam9n12
-In-Reply-To: <1345473840-22141-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1345473840-22141-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20120820150335.GH7439@game.jcrosoft.org>
+Date: Mon, 20 Aug 2012 17:11:46 +0200
+Subject: [PATCH 06/14] arm: at91: dt: at91sam9 add pinctrl support
+In-Reply-To: <CACQ1gAjJ2HL1b9hi3RKGWWs_kW_hELAFYQ=fnHGj5nymjWdiWw@mail.gmail.com>
+References: <20120810124820.GA20557@game.jcrosoft.org>
+ <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
+ <1344603731-32667-6-git-send-email-plagnioj@jcrosoft.com>
+ <CACQ1gAjJ2HL1b9hi3RKGWWs_kW_hELAFYQ=fnHGj5nymjWdiWw@mail.gmail.com>
+Message-ID: <20120820151146.GA7456@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:44 Mon 20 Aug     , ludovic.desroches at atmel.com wrote:
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On 16:09 Mon 20 Aug     , Richard Genoud wrote:
+> Hi Jean-Christophe,
 > 
-> at91sam9x5 and at91sam9n12 only have device tree support so we can
-> select device tree support when selecting these chips.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> ---
->  arch/arm/mach-at91/Kconfig | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index c8050b1..db94ec6 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -88,6 +88,7 @@ config SOC_AT91SAM9X5
->  	select HAVE_AT91_DBGU0
->  	select HAVE_FB_ATMEL
->  	select HAVE_NET_MACB
-> +	select MACH_AT91SAM_DT
->  	help
->  	  Select this if you are using one of Atmel's AT91SAM9x5 family SoC.
->  	  This means that your SAM9 name finishes with a '5' (except if it is
-> @@ -100,6 +101,7 @@ config SOC_AT91SAM9N12
->  	select SOC_AT91SAM9
->  	select HAVE_AT91_DBGU0
->  	select HAVE_FB_ATMEL
-> +	select MACH_AT91SAM_DT
-as we are goig to have more and more soc put it as default in the
-MACH_AT91SAM_DT if the DT is enabled
+> 2012/8/10 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+> > diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+> > index 477cf9d..bbd2f8e 100644
+> > --- a/arch/arm/mach-at91/at91sam9x5.c
+> > +++ b/arch/arm/mach-at91/at91sam9x5.c
+> > @@ -310,12 +310,6 @@ static void __init at91sam9x5_map_io(void)
+> >         at91_init_sram(0, AT91SAM9X5_SRAM_BASE, AT91SAM9X5_SRAM_SIZE);
+> >  }
+> >
+> > -void __init at91sam9x5_initialize(void)
+> > -{
+> > -       /* Register GPIO subsystem (using DT) */
+> > -       at91_gpio_init(NULL, 0);
+> > -}
+> > -
+> >  /* --------------------------------------------------------------------
+> >   *  Interrupt initialization
+> >   * -------------------------------------------------------------------- */
+> > @@ -323,5 +317,4 @@ void __init at91sam9x5_initialize(void)
+> >  struct at91_init_soc __initdata at91sam9x5_soc = {
+> >         .map_io = at91sam9x5_map_io,
+> >         .register_clocks = at91sam9x5_register_clocks,
+> > -       .init = at91sam9x5_initialize,
+> >  };
+> That's why my board wasn't booting anymore after your patchset.
+> if .init is NULL, then in arch/arm/mach-at91/soc.h :
+> static inline int at91_soc_is_enabled(void)
+the it have the patch that drop this
 
 Best Regards,
 J.
