@@ -1,35 +1,123 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 20 Aug 2012 12:47:27 +0200
-Subject: [PATCH 2/3] ARM: DMA-Mapping: print warning when atomic coherent
- allocation fails
-In-Reply-To: <1345459648-24263-1-git-send-email-m.szyprowski@samsung.com>
-References: <1345459648-24263-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1345459648-24263-3-git-send-email-m.szyprowski@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 20 Aug 2012 11:49:49 +0100
+Subject: [PATCH 5/8] mfd: Provide the PRCMU with its own IRQ domain
+In-Reply-To: <CACRpkdZ7bMBytyDppV2sB1d1sUbDpPRqAQVOq8k4UOYdmg+Mkw@mail.gmail.com>
+References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
+ <1344527635-6163-6-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZ7bMBytyDppV2sB1d1sUbDpPRqAQVOq8k4UOYdmg+Mkw@mail.gmail.com>
+Message-ID: <20120820104944.GM8450@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Print a loud warning when system runs out of memory from atomic coherent
-pool to let users notice the potential problem.
+From: Lee Jones <lee.jones@linaro.org>
+Date: Fri, 3 Aug 2012 15:45:50 +0100
+Subject: [PATCH 1/1] mfd: Provide the PRCMU with its own IRQ domain
 
-Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+The PRCMU has its own USB, Thermal, GPIO, Modem, HSI and RTC drivers,
+amongst other things. This patch allows those subordinate devices to
+use it as an interrupt controller as and when they are DT enabled.
+
+CC: Samuel Ortiz <sameo@linux.intel.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mm/dma-mapping.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ drivers/mfd/db8500-prcmu.c |   48 ++++++++++++++++++++++++++++++++------------
+ 1 file changed, 35 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index d1cc9c1..25963ea 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -461,6 +461,9 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page)
- 		bitmap_set(pool->bitmap, pageno, count);
- 		ptr = pool->vaddr + PAGE_SIZE * pageno;
- 		*ret_page = pool->page + pageno;
-+	} else {
-+		pr_err("Atomic coherent pool too small!\n"
-+		       "Please increase it with coherent_pool= kernel parameter!\n");
- 	}
- 	spin_unlock_irqrestore(&pool->lock, flags);
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index 7040a00..de09113 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -270,6 +270,8 @@ static struct {
+ 	struct prcmu_fw_version version;
+ } fw_info;
  
++static struct irq_domain *db8500_irq_domain;
++
+ /*
+  * This vector maps irq numbers to the bits in the bit field used in
+  * communication with the PRCMU firmware.
+@@ -2583,7 +2585,7 @@ static void prcmu_irq_mask(struct irq_data *d)
+ 
+ 	spin_lock_irqsave(&mb0_transfer.dbb_irqs_lock, flags);
+ 
+-	mb0_transfer.req.dbb_irqs &= ~prcmu_irq_bit[d->irq - IRQ_PRCMU_BASE];
++	mb0_transfer.req.dbb_irqs &= ~prcmu_irq_bit[d->hwirq];
+ 
+ 	spin_unlock_irqrestore(&mb0_transfer.dbb_irqs_lock, flags);
+ 
+@@ -2597,7 +2599,7 @@ static void prcmu_irq_unmask(struct irq_data *d)
+ 
+ 	spin_lock_irqsave(&mb0_transfer.dbb_irqs_lock, flags);
+ 
+-	mb0_transfer.req.dbb_irqs |= prcmu_irq_bit[d->irq - IRQ_PRCMU_BASE];
++	mb0_transfer.req.dbb_irqs |= prcmu_irq_bit[d->hwirq];
+ 
+ 	spin_unlock_irqrestore(&mb0_transfer.dbb_irqs_lock, flags);
+ 
+@@ -2637,9 +2639,37 @@ static char *fw_project_name(u8 project)
+ 	}
+ }
+ 
++static int db8500_irq_map(struct irq_domain *d, unsigned int virq,
++				irq_hw_number_t hwirq)
++{
++	irq_set_chip_and_handler(virq, &prcmu_irq_chip,
++				handle_simple_irq);
++	set_irq_flags(virq, IRQF_VALID);
++
++	return 0;
++}
++
++static struct irq_domain_ops db8500_irq_ops = {
++        .map    = db8500_irq_map,
++        .xlate  = irq_domain_xlate_twocell,
++};
++
++static int db8500_irq_init(struct device_node *np)
++{
++	db8500_irq_domain = irq_domain_add_legacy(
++		np, NUM_PRCMU_WAKEUPS, IRQ_PRCMU_BASE,
++		0, &db8500_irq_ops, NULL);
++
++	if (!db8500_irq_domain) {
++		pr_err("Failed to create irqdomain\n");
++		return -ENOSYS;
++	}
++
++	return 0;
++}
++
+ void __init db8500_prcmu_early_init(void)
+ {
+-	unsigned int i;
+ 	if (cpu_is_u8500v2()) {
+ 		void *tcpm_base = ioremap_nocache(U8500_PRCMU_TCPM_BASE, SZ_4K);
+ 
+@@ -2683,16 +2713,6 @@ void __init db8500_prcmu_early_init(void)
+ 	init_completion(&mb5_transfer.work);
+ 
+ 	INIT_WORK(&mb0_transfer.mask_work, prcmu_mask_work);
+-
+-	/* Initalize irqs. */
+-	for (i = 0; i < NUM_PRCMU_WAKEUPS; i++) {
+-		unsigned int irq;
+-
+-		irq = IRQ_PRCMU_BASE + i;
+-		irq_set_chip_and_handler(irq, &prcmu_irq_chip,
+-					 handle_simple_irq);
+-		set_irq_flags(irq, IRQF_VALID);
+-	}
+ }
+ 
+ static void __init init_prcm_registers(void)
+@@ -2999,6 +3019,8 @@ static int __devinit db8500_prcmu_probe(struct platform_device *pdev)
+ 		goto no_irq_return;
+ 	}
+ 
++	db8500_irq_init(np);
++
+ 	for (i = 0; i < ARRAY_SIZE(db8500_prcmu_devs); i++) {
+ 		if (!strcmp(db8500_prcmu_devs[i].name, "ab8500-core")) {
+ 			db8500_prcmu_devs[i].platform_data = ab8500_platdata;
 -- 
-1.7.1.569.g6f426
+1.7.9.5
