@@ -1,56 +1,71 @@
 From: Barry.Song@csr.com (Barry Song)
-Date: Mon, 20 Aug 2012 16:19:47 +0800
-Subject: [PATCH 3/3] ARM: SIRF: make sirf irqchip driver selectable since new
- SoCs will have GIC
+Date: Mon, 20 Aug 2012 16:19:45 +0800
+Subject: [PATCH 1/3] ARM: PRIMA2: use DT_MACHINE_START and convert to generic
+ board
 In-Reply-To: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
 References: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <1345450787-17246-4-git-send-email-Barry.Song@csr.com>
+Message-ID: <1345450787-17246-2-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Barry Song <Baohua.Song@csr.com>
 
-New MARCO and POLO SoC uses GIC, so make irq.c selectable and select
-it for PRIMAII
+we will have SiRFMarco and SiRFPolo, all of them will be in the
+generic board.
 
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- arch/arm/mach-sirf/Kconfig  |    4 ++++
- arch/arm/mach-sirf/Makefile |    2 +-
- 2 files changed, 5 insertions(+), 1 deletions(-)
+ arch/arm/mach-prima2/Makefile                      |    2 +-
+ arch/arm/mach-prima2/{prima2.c => board-generic.c} |   10 ++++++----
+ 2 files changed, 7 insertions(+), 5 deletions(-)
+ rename arch/arm/mach-prima2/{prima2.c => board-generic.c} (81%)
 
-diff --git a/arch/arm/mach-sirf/Kconfig b/arch/arm/mach-sirf/Kconfig
-index 811e782..fea4bd9 100644
---- a/arch/arm/mach-sirf/Kconfig
-+++ b/arch/arm/mach-sirf/Kconfig
-@@ -8,9 +8,13 @@ config ARCH_PRIMA2
- 	bool "CSR SiRFSoC PRIMA2 ARM Cortex A9 Platform"
- 	select CPU_V7
- 	select ZONE_DMA
-+	select SIRF_IRQ
- 	help
-           Support for CSR SiRFSoC ARM Cortex A9 Platform
- 
- endchoice
- 
-+config SIRF_IRQ
-+	bool
-+
- endif
-diff --git a/arch/arm/mach-sirf/Makefile b/arch/arm/mach-sirf/Makefile
-index 852af49..3103fdf 100644
---- a/arch/arm/mach-sirf/Makefile
-+++ b/arch/arm/mach-sirf/Makefile
-@@ -1,8 +1,8 @@
+diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
+index 841847d..852af49 100644
+--- a/arch/arm/mach-prima2/Makefile
++++ b/arch/arm/mach-prima2/Makefile
+@@ -1,7 +1,7 @@
  obj-y := timer.o
--obj-y += irq.o
+ obj-y += irq.o
  obj-y += rstc.o
- obj-y += board-generic.o
+-obj-y += prima2.o
++obj-y += board-generic.o
  obj-y += rtciobrg.o
  obj-$(CONFIG_DEBUG_LL) += lluart.o
  obj-$(CONFIG_CACHE_L2X0) += l2x0.o
- obj-$(CONFIG_SUSPEND) += pm.o sleep.o
-+obj-$(CONFIG_SIRF_IRQ) += irq.o
+diff --git a/arch/arm/mach-prima2/prima2.c b/arch/arm/mach-prima2/board-generic.c
+similarity index 81%
+rename from arch/arm/mach-prima2/prima2.c
+rename to arch/arm/mach-prima2/board-generic.c
+index e9a17ae..f06b887 100644
+--- a/arch/arm/mach-prima2/prima2.c
++++ b/arch/arm/mach-prima2/board-generic.c
+@@ -30,12 +30,13 @@ void __init sirfsoc_init_late(void)
+ 	sirfsoc_pm_init();
+ }
+ 
+-static const char *prima2cb_dt_match[] __initdata = {
+-       "sirf,prima2-cb",
++#ifdef CONFIG_ARCH_PRIMA2
++static const char *prima2_dt_match[] __initdata = {
++       "sirf,prima2",
+        NULL
+ };
+ 
+-MACHINE_START(PRIMA2_EVB, "prima2cb")
++DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
+ 	/* Maintainer: Barry Song <baohua.song@csr.com> */
+ 	.atag_offset	= 0x100,
+ 	.map_io         = sirfsoc_map_lluart,
+@@ -44,6 +45,7 @@ MACHINE_START(PRIMA2_EVB, "prima2cb")
+ 	.dma_zone_size	= SZ_256M,
+ 	.init_machine	= sirfsoc_mach_init,
+ 	.init_late	= sirfsoc_init_late,
+-	.dt_compat      = prima2cb_dt_match,
++	.dt_compat      = prima2_dt_match,
+ 	.restart	= sirfsoc_restart,
+ MACHINE_END
++#endif
 -- 
 1.7.0.4
 
