@@ -1,204 +1,32 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 20 Aug 2012 22:19:58 +0800
-Subject: [PATCH 4/6] ARM: mxs: adopt irq_domain support for icoll driver
+Date: Mon, 20 Aug 2012 22:19:59 +0800
+Subject: [PATCH 5/6] ARM: mxs: select SPARSE_IRQ
 In-Reply-To: <1345472400-31262-1-git-send-email-shawn.guo@linaro.org>
 References: <1345472400-31262-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1345472400-31262-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1345472400-31262-6-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove irq_domain_add_legacy call from mach-mxs.c and have icoll adopt
-irq_domain support in the driver.
+With icoll and gpio interrupt controllers adopt irqdomain support and
+all interrupt nubmers are retrieved from device tree, it's save to
+select SPARSE_IRQ for mxs now.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx23.dtsi |    2 +-
- arch/arm/boot/dts/imx28.dtsi |    2 +-
- arch/arm/mach-mxs/icoll.c    |   45 ++++++++++++++++++++++++++++++++++-------
- arch/arm/mach-mxs/mach-mxs.c |   25 +---------------------
- 4 files changed, 41 insertions(+), 33 deletions(-)
+ arch/arm/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index 2672dcf..8de4eb2 100644
---- a/arch/arm/boot/dts/imx23.dtsi
-+++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -43,7 +43,7 @@
- 			ranges;
- 
- 			icoll: interrupt-controller at 80000000 {
--				compatible = "fsl,imx23-icoll", "fsl,mxs-icoll";
-+				compatible = "fsl,imx23-icoll", "fsl,icoll";
- 				interrupt-controller;
- 				#interrupt-cells = <1>;
- 				reg = <0x80000000 0x2000>;
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index f8b145a..bed5c48 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -50,7 +50,7 @@
- 			ranges;
- 
- 			icoll: interrupt-controller at 80000000 {
--				compatible = "fsl,imx28-icoll", "fsl,mxs-icoll";
-+				compatible = "fsl,imx28-icoll", "fsl,icoll";
- 				interrupt-controller;
- 				#interrupt-cells = <1>;
- 				reg = <0x80000000 0x2000>;
-diff --git a/arch/arm/mach-mxs/icoll.c b/arch/arm/mach-mxs/icoll.c
-index a11b618..8fb23af 100644
---- a/arch/arm/mach-mxs/icoll.c
-+++ b/arch/arm/mach-mxs/icoll.c
-@@ -19,7 +19,10 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_irq.h>
- #include <asm/exception.h>
- #include <mach/mxs.h>
- #include <mach/common.h>
-@@ -33,7 +36,10 @@
- #define BM_ICOLL_INTERRUPTn_ENABLE		0x00000004
- #define BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0	0x1
- 
-+#define ICOLL_NUM_IRQS		128
-+
- static void __iomem *icoll_base = MXS_IO_ADDRESS(MXS_ICOLL_BASE_ADDR);
-+static struct irq_domain *icoll_domain;
- 
- static void icoll_ack_irq(struct irq_data *d)
- {
-@@ -49,13 +55,13 @@ static void icoll_ack_irq(struct irq_data *d)
- static void icoll_mask_irq(struct irq_data *d)
- {
- 	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
--			icoll_base + HW_ICOLL_INTERRUPTn_CLR(d->irq));
-+			icoll_base + HW_ICOLL_INTERRUPTn_CLR(d->hwirq));
- }
- 
- static void icoll_unmask_irq(struct irq_data *d)
- {
- 	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
--			icoll_base + HW_ICOLL_INTERRUPTn_SET(d->irq));
-+			icoll_base + HW_ICOLL_INTERRUPTn_SET(d->hwirq));
- }
- 
- static struct irq_chip mxs_icoll_chip = {
-@@ -72,6 +78,7 @@ asmlinkage void __exception_irq_entry icoll_handle_irq(struct pt_regs *regs)
- 		irqnr = __raw_readl(icoll_base + HW_ICOLL_STAT_OFFSET);
- 		if (irqnr != 0x7f) {
- 			__raw_writel(irqnr, icoll_base + HW_ICOLL_VECTOR);
-+			irqnr = irq_find_mapping(icoll_domain, irqnr);
- 			handle_IRQ(irqnr, regs);
- 			continue;
- 		}
-@@ -79,18 +86,40 @@ asmlinkage void __exception_irq_entry icoll_handle_irq(struct pt_regs *regs)
- 	} while (1);
- }
- 
--void __init icoll_init_irq(void)
-+static int icoll_irq_domain_map(struct irq_domain *d, unsigned int virq,
-+				irq_hw_number_t hw)
- {
--	int i;
-+	irq_set_chip_and_handler(virq, &mxs_icoll_chip, handle_level_irq);
-+	set_irq_flags(virq, IRQF_VALID);
-+
-+	return 0;
-+}
- 
-+static struct irq_domain_ops icoll_irq_domain_ops = {
-+	.map = icoll_irq_domain_map,
-+	.xlate = irq_domain_xlate_onecell,
-+};
-+
-+void __init icoll_of_init(struct device_node *np,
-+			  struct device_node *interrupt_parent)
-+{
- 	/*
- 	 * Interrupt Collector reset, which initializes the priority
- 	 * for each irq to level 0.
- 	 */
- 	mxs_reset_block(icoll_base + HW_ICOLL_CTRL);
- 
--	for (i = 0; i < MXS_INTERNAL_IRQS; i++) {
--		irq_set_chip_and_handler(i, &mxs_icoll_chip, handle_level_irq);
--		set_irq_flags(i, IRQF_VALID);
--	}
-+	icoll_domain = irq_domain_add_linear(np, ICOLL_NUM_IRQS,
-+					     &icoll_irq_domain_ops, NULL);
-+	WARN_ON(!icoll_domain);
-+}
-+
-+static const struct of_device_id icoll_of_match[] __initconst = {
-+	{.compatible = "fsl,icoll", .data = icoll_of_init},
-+	{ /* sentinel */ }
-+};
-+
-+void __init icoll_init_irq(void)
-+{
-+	of_irq_init(icoll_of_match);
- }
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index d238eb0..a1fb04d 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -17,10 +17,8 @@
- #include <linux/err.h>
- #include <linux/gpio.h>
- #include <linux/init.h>
--#include <linux/irqdomain.h>
- #include <linux/micrel_phy.h>
- #include <linux/mxsfb.h>
--#include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/phy.h>
- #include <linux/pinctrl/consumer.h>
-@@ -141,25 +139,6 @@ static struct of_dev_auxdata mxs_auxdata_lookup[] __initdata = {
- 	{ /* sentinel */ }
- };
- 
--static int __init mxs_icoll_add_irq_domain(struct device_node *np,
--				struct device_node *interrupt_parent)
--{
--	irq_domain_add_legacy(np, 128, 0, 0, &irq_domain_simple_ops, NULL);
--
--	return 0;
--}
--
--static const struct of_device_id mxs_irq_match[] __initconst = {
--	{ .compatible = "fsl,mxs-icoll", .data = mxs_icoll_add_irq_domain, },
--	{ /* sentinel */ }
--};
--
--static void __init mxs_dt_init_irq(void)
--{
--	icoll_init_irq();
--	of_irq_init(mxs_irq_match);
--}
--
- static void __init imx23_timer_init(void)
- {
- 	mx23_clocks_init();
-@@ -412,7 +391,7 @@ static const char *imx28_dt_compat[] __initdata = {
- 
- DT_MACHINE_START(IMX23, "Freescale i.MX23 (Device Tree)")
- 	.map_io		= mx23_map_io,
--	.init_irq	= mxs_dt_init_irq,
-+	.init_irq	= icoll_init_irq,
- 	.handle_irq	= icoll_handle_irq,
- 	.timer		= &imx23_timer,
- 	.init_machine	= mxs_machine_init,
-@@ -422,7 +401,7 @@ MACHINE_END
- 
- DT_MACHINE_START(IMX28, "Freescale i.MX28 (Device Tree)")
- 	.map_io		= mx28_map_io,
--	.init_irq	= mxs_dt_init_irq,
-+	.init_irq	= icoll_init_irq,
- 	.handle_irq	= icoll_handle_irq,
- 	.timer		= &imx28_timer,
- 	.init_machine	= mxs_machine_init,
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7207086..58bffb3 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -491,6 +491,7 @@ config ARCH_MXS
+ 	select HAVE_CLK_PREPARE
+ 	select MULTI_IRQ_HANDLER
+ 	select PINCTRL
++	select SPARSE_IRQ
+ 	select USE_OF
+ 	help
+ 	  Support for Freescale MXS-based family of processors
 -- 
 1.7.5.4
