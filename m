@@ -1,303 +1,132 @@
-From: alanbutty12@gmail.com (Alan M Butler)
-Date: Mon, 20 Aug 2012 12:16:31 +0100
-Subject: [PATCH] ARM: Kirkwood: Iomega_IX2_200 DT support Signed-off-by: Alan
- M Butler <alanbutty12@gmail.com>
-In-Reply-To: <cover.1345459608.git.alanbutty12@gmail.com>
-References: <cover.1345459608.git.alanbutty12@gmail.com>
-Message-ID: <1d07faa52b5ca4453c7eaa7c9decb01af92ee648.1345459608.git.alanbutty12@gmail.com>
+From: sourav.poddar@ti.com (Poddar, Sourav)
+Date: Mon, 20 Aug 2012 16:49:36 +0530
+Subject: [PATCHv7] arm/dts: omap4-sdp: Add keypad data
+In-Reply-To: <1344942937-4685-1-git-send-email-sourav.poddar@ti.com>
+References: <1344942937-4685-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <CAKdam57n1jA5_7EOLcsB=u5X4wX6hPVXoZ2HLrnpEKS3kLZ=OQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch version 4.
-Add support for the Iomega ix2-200.
-Led's and buttons working as of kernel 3.6-rc2
-Product page:
-http://go.iomega.com/en/products/network-storage-desktop/storcenter-network-storage-solution/network-hard-drive-ix2-200-cloud/?partner=4735#tech_specsItem_tab
+Hi All,
 
-Signed-off-by: Alan M Butler <alanbutty12@gmail.com>
+On Tue, Aug 14, 2012 at 4:45 PM, Sourav Poddar <sourav.poddar@ti.com> wrote:
+> Add keypad data node in omap4 device tree file.
+> Also fill the device tree binding parameters
+> with the required value in "omap4-sdp" dts file.
+>
+> Tested on omap4430 sdp.
+>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> ---
+> v6->v7
+> Add key name as a comment.
+>  arch/arm/boot/dts/omap4-sdp.dts |   70 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/omap4.dtsi    |    5 +++
+>  2 files changed, 75 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+> index 72216e9..8e200f4 100644
+> --- a/arch/arm/boot/dts/omap4-sdp.dts
+> +++ b/arch/arm/boot/dts/omap4-sdp.dts
+> @@ -113,6 +113,76 @@
+>                         "DMic", "Digital Mic",
+>                         "Digital Mic", "Digital Mic1 Bias";
+>         };
+> +
+> +       keypad {
+> +               keypad,num-rows = <8>;
+> +               keypad,num-columns = <8>;
+> +               linux,keymap = < 0x00000012 /* KEY_E */
+> +                       0x00010013 /* KEY_R */
+> +                       0x00020014 /* KEY_T */
+> +                       0x00030066 /* KEY_HOME */
+> +                       0x0004003f /* KEY_F5 */
+> +                       0x000500f0 /* KEY_UNKNOWN */
+> +                       0x00060017 /* KEY_I */
+> +                       0x0007002a /* KEY_LEFTSHIFT */
+> +                       0x01000020 /* KEY_D*/
+> +                       0x01010021 /* KEY_F */
+> +                       0x01020022 /* KEY_G */
+> +                       0x010300e7 /* KEY_SEND */
+> +                       0x01040040 /* KEY_F6 */
+> +                       0x010500f0 /* KEY_UNKNOWN */
+> +                       0x01060025 /* KEY_K */
+> +                       0x0107001c /* KEY_ENTER */
+> +                       0x0200002d /* KEY_X */
+> +                       0x0201002e /* KEY_C */
+> +                       0x0202002f /* KEY_V */
+> +                       0x0203006b /* KEY_END */
+> +                       0x02040041 /* KEY_F7 */
+> +                       0x020500f0 /* KEY_UNKNOWN */
+> +                       0x02060034 /* KEY_DOT */
+> +                       0x0207003a /* KEY_CAPSLOCK */
+> +                       0x0300002c /* KEY_Z */
+> +                       0x0301004e /* KEY_KPLUS */
+> +                       0x03020030 /* KEY_B */
+> +                       0x0303003b /* KEY_F1 */
+> +                       0x03040042 /* KEY_F8 */
+> +                       0x030500f0 /* KEY_UNKNOWN */
+> +                       0x03060018 /* KEY_O */
+> +                       0x03070039 /* KEY_SPACE */
+> +                       0x04000011 /* KEY_W */
+> +                       0x04010015 /* KEY_Y */
+> +                       0x04020016 /* KEY_U */
+> +                       0x0403003c /* KEY_F2 */
+> +                       0x04040073 /* KEY_VOLUMEUP */
+> +                       0x040500f0 /* KEY_UNKNOWN */
+> +                       0x04060026 /* KEY_L */
+> +                       0x04070069 /* KEY_LEFT */
+> +                       0x0500001f /* KEY_S */
+> +                       0x05010023 /* KEY_H */
+> +                       0x05020024 /* KEY_J */
+> +                       0x0503003d /* KEY_F3 */
+> +                       0x05040043 /* KEY_F9 */
+> +                       0x05050072 /* KEY_VOLUMEDOWN */
+> +                       0x05060032 /* KEY_M */
+> +                       0x0507006a /* KEY_RIGHT */
+> +                       0x06000010 /* KEY_Q */
+> +                       0x0601001e /* KEY_A */
+> +                       0x06020031 /* KEY_N */
+> +                       0x0603009e /* KEY_BACK */
+> +                       0x0604000e /* KEY_BACKSPACE */
+> +                       0x060500f0 /* KEY_UNKNOWN */
+> +                       0x06060019 /* KEY_P */
+> +                       0x06070067 /* KEY_UP */
+> +                       0x07000094 /* KEY_PROG1 */
+> +                       0x07010095 /* KEY_PROG2 */
+> +                       0x070200ca /* KEY_PROG3 */
+> +                       0x070300cb /* KEY_PROG4 */
+> +                       0x0704003e /* KEY_F4 */
+> +                       0x070500f0 /* KEY_UNKNOWN */
+> +                       0x07060160 /* KEY_OK */
+> +                       0x0707006c >; /* KEY_DOWN */
+> +               linux,input-no-autorepeat;
+> +       };
+>  };
+>
+>  &i2c1 {
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index 04cbbcb..e78a1f1 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -296,4 +296,9 @@
+>                         ti,hwmods = "dmic";
+>                 };
+>         };
+> +
+> +       keypad {
+> +               compatible = "ti,omap4-keypad";
+> +               ti,hwmods = "kbd";
+> +       };
+>  };
+> --
+> 1.7.1
+>
+Any more comments on this?
 
----
- arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts |  105 +++++++++++++++++++++++++
- arch/arm/mach-kirkwood/Kconfig                |    7 ++
- arch/arm/mach-kirkwood/Makefile               |    1 +
- arch/arm/mach-kirkwood/Makefile.boot          |    1 +
- arch/arm/mach-kirkwood/board-dt.c             |    4 +
- arch/arm/mach-kirkwood/board-iomega_ix2_200.c |   79 +++++++++++++++++++
- arch/arm/mach-kirkwood/common.h               |    6 ++
- 7 files changed, 203 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
- create mode 100644 arch/arm/mach-kirkwood/board-iomega_ix2_200.c
-
-diff --git a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-new file mode 100644
-index 0000000..865aeec
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-@@ -0,0 +1,105 @@
-+/dts-v1/;
-+
-+/include/ "kirkwood.dtsi"
-+
-+/ {
-+	model = "Iomega StorCenter ix2-200";
-+	compatible = "iom,ix2-200", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x10000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8 earlyprintk";
-+	};
-+
-+	ocp at f1000000 {
-+		i2c at 11000 {
-+			status = "okay";
-+
-+			lm63: lm63 at 4c {
-+				compatible = "national,lm63";
-+				reg = <0x4c>;
-+			};
-+		};
-+
-+		serial at 12000 {
-+			clock-frequency = <200000000>;
-+			status = "ok";
-+		};
-+
-+		nand at 3000000 {
-+			status = "okay";
-+
-+			partition at 0 {
-+				label = "u-boot";
-+				reg = <0x0000000 0x100000>;
-+				read-only;
-+			};
-+
-+			partition at a0000 {
-+				label = "env";
-+				reg = <0xa0000 0x20000>;
-+				read-only;
-+			};
-+
-+			partition at 100000 {
-+				label = "uImage";
-+				reg = <0x100000 0x300000>;
-+			};
-+
-+			partition at 400000 {
-+				label = "uInitrd";
-+				reg = <0x540000 0x1000000>;
-+			};
-+		};
-+		sata at 80000 {
-+			status = "okay";
-+			nr-ports = <2>;
-+		};
-+
-+	};
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		power_led {
-+			label = "status:white:power_led";
-+			gpios = <&gpio0 16 0>;
-+			linux,default-trigger = "default-on";
-+		};
-+		health_led1 {
-+			label = "status:red:health_led";
-+			gpios = <&gpio1 5 0>;
-+		};
-+		health_led2 {
-+			label = "status:white:health_led";
-+			gpios = <&gpio1 4 0>;
-+		};
-+		backup_led {
-+			label = "status:blue:backup_led";
-+			gpios = <&gpio0 15 0>;
-+		};
-+	};
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		Power {
-+			label = "Power Button";
-+			linux,code = <116>;
-+			gpios = <&gpio0 14 1>;
-+		};
-+		Reset {
-+			label = "Reset Button";
-+			linux,code = <0x198>;
-+			gpios = <&gpio0 12 1>;
-+		};
-+		OTB {
-+			label = "OTB Button";
-+			linux,code = <133>;
-+			gpios = <&gpio1 3 1>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index ca5c15a..bee8451 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -195,6 +195,13 @@ config MACH_T5325
- 	  Say 'Y' here if you want your kernel to support the
- 	  HP t5325 Thin Client.
- 
-+config MACH_IOMEGA_IX2_200_DT
-+	bool "Iomega StorCenter ix2-200 (Flattened Device Tree)"
-+	select ARCH_KIRKWOOD_DT
-+	help
-+	  Say 'Y' here if you want your kernel to support the
-+	  Iomega StorCenter ix2-200 (Flattened Device Tree).
-+
- endmenu
- 
- endif
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index 055c85a..f5484dc 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -28,3 +28,4 @@ obj-$(CONFIG_MACH_IB62X0_DT)		+= board-ib62x0.o
- obj-$(CONFIG_MACH_TS219_DT)		+= board-ts219.o tsx1x-common.o
- obj-$(CONFIG_MACH_GOFLEXNET_DT)		+= board-goflexnet.o
- obj-$(CONFIG_MACH_LSXL_DT)		+= board-lsxl.o
-+obj-$(CONFIG_MACH_IOMEGA_IX2_200_DT)	+= board-iomega_ix2_200.o
-diff --git a/arch/arm/mach-kirkwood/Makefile.boot b/arch/arm/mach-kirkwood/Makefile.boot
-index a571755..59b719d 100644
---- a/arch/arm/mach-kirkwood/Makefile.boot
-+++ b/arch/arm/mach-kirkwood/Makefile.boot
-@@ -11,3 +11,4 @@ dtb-$(CONFIG_MACH_TS219_DT)	+= kirkwood-qnap-ts219.dtb
- dtb-$(CONFIG_MACH_GOFLEXNET_DT) += kirkwood-goflexnet.dtb
- dtb-$(CONFIG_MACH_LSXL_DT) += kirkwood-lschlv2.dtb
- dtb-$(CONFIG_MACH_LSXL_DT) += kirkwood-lsxhl.dtb
-+dtb-$(CONFIG_MACH_IOMEGA_IX2_200_DT) += kirkwood-iomega_ix2_200.dtb
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index e4eb450..9b3ec17 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -87,6 +87,9 @@ static void __init kirkwood_dt_init(void)
- 	if (of_machine_is_compatible("buffalo,lsxl"))
- 		lsxl_init();
- 
-+	if (of_machine_is_compatible("iom,ix2-200"))
-+		iomega_ix2_200_init();
-+
- 	of_platform_populate(NULL, kirkwood_dt_match_table,
- 			     kirkwood_auxdata_lookup, NULL);
- }
-@@ -100,6 +103,7 @@ static const char *kirkwood_dt_board_compat[] = {
- 	"qnap,ts219",
- 	"seagate,goflexnet",
- 	"buffalo,lsxl",
-+	"iom,ix2-200",
- 	NULL
- };
- 
-diff --git a/arch/arm/mach-kirkwood/board-iomega_ix2_200.c b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
-new file mode 100644
-index 0000000..0c78752
---- /dev/null
-+++ b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
-@@ -0,0 +1,79 @@
-+/*
-+ * arch/arm/mach-kirkwood/board-iomega_ix2_200.c
-+ *
-+ * Iomega StorCenter ix2-200
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/irq.h>
-+#include <linux/mtd/partitions.h>
-+#include <linux/ata_platform.h>
-+#include <linux/mv643xx_eth.h>
-+#include <linux/ethtool.h>
-+#include <net/dsa.h>
-+#include <linux/gpio.h>
-+#include <linux/leds.h>
-+#include <linux/i2c.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <mach/kirkwood.h>
-+#include "common.h"
-+#include "mpp.h"
-+
-+static struct mv643xx_eth_platform_data iomega_ix2_200_ge00_data = {
-+	.phy_addr       = MV643XX_ETH_PHY_NONE,
-+	.speed          = SPEED_1000,
-+	.duplex         = DUPLEX_FULL,
-+};
-+
-+static struct mv643xx_eth_platform_data iomega_ix2_200_ge01_data = {
-+	.phy_addr	= MV643XX_ETH_PHY_ADDR(11),
-+};
-+
-+static unsigned int iomega_ix2_200_mpp_config[] __initdata = {
-+	MPP12_GPIO,			/* Reset Button */
-+	MPP14_GPIO,			/* Power Button */
-+	MPP15_GPIO,			/* Backup LED (blue) */
-+	MPP16_GPIO,			/* Power LED (white) */
-+	MPP35_GPIO,			/* OTB Button */
-+	MPP36_GPIO,			/* Rebuild LED (white) */
-+	MPP37_GPIO,			/* Health LED (red) */
-+	MPP38_GPIO,			/* SATA LED brightness control 1 */
-+	MPP39_GPIO,			/* SATA LED brightness control 2 */
-+	MPP40_GPIO,			/* Backup LED brightness control 1 */
-+	MPP41_GPIO,			/* Backup LED brightness control 2 */
-+	MPP42_GPIO,			/* Power LED brightness control 1 */
-+	MPP43_GPIO,			/* Power LED brightness control 2 */
-+	MPP44_GPIO,			/* Health LED brightness control 1 */
-+	MPP45_GPIO,			/* Health LED brightness control 2 */
-+	MPP46_GPIO,			/* Rebuild LED brightness control 1 */
-+	MPP47_GPIO,			/* Rebuild LED brightness control 2 */
-+	0
-+};
-+
-+void __init iomega_ix2_200_init(void)
-+{
-+	/*
-+	 * Basic setup. Needs to be called early.
-+	 */
-+	kirkwood_mpp_conf(iomega_ix2_200_mpp_config);
-+
-+	kirkwood_ehci_init();
-+
-+	kirkwood_ge00_init(&iomega_ix2_200_ge00_data);
-+	kirkwood_ge01_init(&iomega_ix2_200_ge01_data);
-+}
-+static int __init iomega_ix2_200_pci_init(void)
-+{
-+	if (of_machine_is_compatible("iom,ix2-200"))
-+		kirkwood_pcie_init(KW_PCIE0);
-+	return 0;
-+}
-+subsys_initcall(iomega_ix2_200_pci_init);
-+
-diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index 304dd1a..d5d4064 100644
---- a/arch/arm/mach-kirkwood/common.h
-+++ b/arch/arm/mach-kirkwood/common.h
-@@ -94,6 +94,12 @@ void lsxl_init(void);
- static inline void lsxl_init(void) {};
- #endif
- 
-+#ifdef CONFIG_MACH_IOMEGA_IX2_200_DT
-+void iomega_ix2_200_init(void);
-+#else
-+static inline void iomega_ix2_200_init(void) {};
-+#endif
-+
- /* early init functions not converted to fdt yet */
- char *kirkwood_id(void);
- void kirkwood_l2_init(void);
--- 
-1.7.9.5
+~Sourav
