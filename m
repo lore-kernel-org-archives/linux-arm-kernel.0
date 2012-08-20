@@ -1,203 +1,132 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 20 Aug 2012 22:19:55 +0800
-Subject: [PATCH 1/6] gpio/mxs: adopt irq_domain support for mxs gpio driver
+Date: Mon, 20 Aug 2012 22:19:56 +0800
+Subject: [PATCH 2/6] ARM: mxs: retrieve timer irq from device tree
 In-Reply-To: <1345472400-31262-1-git-send-email-shawn.guo@linaro.org>
 References: <1345472400-31262-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1345472400-31262-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1345472400-31262-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove irq_domain_add_legacy call from mach-mxs.c and have the gpio
-driver adopt irqdomain support, so that we can have the mapping
-between gpio and irq number available without using virtual_irq_start
-and MXS_GPIO_IRQ_START.
+Rather than using the static timer irq definition, we should retrieve
+timer irq from device tree for better.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-mxs/mach-mxs.c |   12 ----------
- drivers/gpio/gpio-mxs.c      |   48 ++++++++++++++++++++++++++---------------
- 2 files changed, 30 insertions(+), 30 deletions(-)
+ arch/arm/boot/dts/imx23.dtsi            |    3 ++-
+ arch/arm/boot/dts/imx28.dtsi            |    3 ++-
+ arch/arm/mach-mxs/include/mach/common.h |    2 +-
+ arch/arm/mach-mxs/timer.c               |   13 ++++++++++++-
+ drivers/clk/mxs/clk-imx23.c             |    2 +-
+ drivers/clk/mxs/clk-imx28.c             |    2 +-
+ 6 files changed, 19 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index 3b0d9c6..9f8406e 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -149,20 +149,8 @@ static int __init mxs_icoll_add_irq_domain(struct device_node *np,
- 	return 0;
- }
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 9700872..2672dcf 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -400,8 +400,9 @@
+ 			};
  
--static int __init mxs_gpio_add_irq_domain(struct device_node *np,
--				struct device_node *interrupt_parent)
--{
--	static int gpio_irq_base = MXS_GPIO_IRQ_START;
--
--	irq_domain_add_legacy(np, 32, gpio_irq_base, 0, &irq_domain_simple_ops, NULL);
--	gpio_irq_base += 32;
--
--	return 0;
--}
--
- static const struct of_device_id mxs_irq_match[] __initconst = {
- 	{ .compatible = "fsl,mxs-icoll", .data = mxs_icoll_add_irq_domain, },
--	{ .compatible = "fsl,mxs-gpio", .data = mxs_gpio_add_irq_domain, },
- 	{ /* sentinel */ }
- };
+ 			timrot at 80068000 {
++				compatible = "fsl,imx23-timrot", "fsl,timrot";
+ 				reg = <0x80068000 0x2000>;
+-				status = "disabled";
++				interrupts = <28 29 30 31>;
+ 			};
  
-diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-index 39e4956..796fb13 100644
---- a/drivers/gpio/gpio-mxs.c
-+++ b/drivers/gpio/gpio-mxs.c
-@@ -24,6 +24,7 @@
- #include <linux/interrupt.h>
- #include <linux/io.h>
+ 			auart0: serial at 8006c000 {
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index e2240da..f8b145a 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -686,8 +686,9 @@
+ 			};
+ 
+ 			timrot at 80068000 {
++				compatible = "fsl,imx28-timrot", "fsl,timrot";
+ 				reg = <0x80068000 0x2000>;
+-				status = "disabled";
++				interrupts = <48 49 50 51>;
+ 			};
+ 
+ 			auart0: serial at 8006a000 {
+diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
+index 4dec795..6798be5 100644
+--- a/arch/arm/mach-mxs/include/mach/common.h
++++ b/arch/arm/mach-mxs/include/mach/common.h
+@@ -13,7 +13,7 @@
+ 
+ extern const u32 *mxs_get_ocotp(void);
+ extern int mxs_reset_block(void __iomem *);
+-extern void mxs_timer_init(int);
++extern void mxs_timer_init(void);
+ extern void mxs_restart(char, const char *);
+ extern int mxs_saif_clkmux_select(unsigned int clkmux);
+ 
+diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
+index 02d36de..7c37926 100644
+--- a/arch/arm/mach-mxs/timer.c
++++ b/arch/arm/mach-mxs/timer.c
+@@ -25,6 +25,8 @@
  #include <linux/irq.h>
-+#include <linux/irqdomain.h>
- #include <linux/gpio.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-@@ -52,8 +53,6 @@
- #define GPIO_INT_LEV_MASK	(1 << 0)
- #define GPIO_INT_POL_MASK	(1 << 1)
+ #include <linux/clockchips.h>
+ #include <linux/clk.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
  
--#define irq_to_gpio(irq)	((irq) - MXS_GPIO_IRQ_START)
--
- enum mxs_gpio_id {
- 	IMX23_GPIO,
- 	IMX28_GPIO,
-@@ -63,7 +62,7 @@ struct mxs_gpio_port {
- 	void __iomem *base;
- 	int id;
- 	int irq;
--	int virtual_irq_start;
-+	struct irq_domain *domain;
- 	struct bgpio_chip bgc;
- 	enum mxs_gpio_id devid;
- };
-@@ -82,8 +81,7 @@ static inline int is_imx28_gpio(struct mxs_gpio_port *port)
- 
- static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
- {
--	u32 gpio = irq_to_gpio(d->irq);
--	u32 pin_mask = 1 << (gpio & 31);
-+	u32 pin_mask = 1 << d->hwirq;
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
- 	struct mxs_gpio_port *port = gc->private;
- 	void __iomem *pin_addr;
-@@ -120,7 +118,7 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
- 	else
- 		writel(pin_mask, pin_addr + MXS_CLR);
- 
--	writel(1 << (gpio & 0x1f),
-+	writel(pin_mask,
- 	       port->base + PINCTRL_IRQSTAT(port) + MXS_CLR);
- 
- 	return 0;
-@@ -131,7 +129,6 @@ static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
- {
- 	u32 irq_stat;
- 	struct mxs_gpio_port *port = irq_get_handler_data(irq);
--	u32 gpio_irq_no_base = port->virtual_irq_start;
- 
- 	desc->irq_data.chip->irq_ack(&desc->irq_data);
- 
-@@ -140,7 +137,7 @@ static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
- 
- 	while (irq_stat != 0) {
- 		int irqoffset = fls(irq_stat) - 1;
--		generic_handle_irq(gpio_irq_no_base + irqoffset);
-+		generic_handle_irq(irq_find_mapping(port->domain, irqoffset));
- 		irq_stat &= ~(1 << irqoffset);
- 	}
- }
-@@ -167,12 +164,12 @@ static int mxs_gpio_set_wake_irq(struct irq_data *d, unsigned int enable)
+ #include <asm/mach/time.h>
+ #include <mach/mxs.h>
+@@ -244,9 +246,17 @@ static int __init mxs_clocksource_init(struct clk *timer_clk)
  	return 0;
  }
  
--static void __init mxs_gpio_init_gc(struct mxs_gpio_port *port)
-+static void __init mxs_gpio_init_gc(struct mxs_gpio_port *port, int irq_base)
+-void __init mxs_timer_init(int irq)
++void __init mxs_timer_init(void)
  {
- 	struct irq_chip_generic *gc;
- 	struct irq_chip_type *ct;
- 
--	gc = irq_alloc_generic_chip("gpio-mxs", 1, port->virtual_irq_start,
-+	gc = irq_alloc_generic_chip("gpio-mxs", 1, irq_base,
- 				    port->base, handle_level_irq);
- 	gc->private = port;
- 
-@@ -194,7 +191,7 @@ static int mxs_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
- 	struct mxs_gpio_port *port =
- 		container_of(bgc, struct mxs_gpio_port, bgc);
- 
--	return port->virtual_irq_start + offset;
-+	return irq_find_mapping(port->domain, offset);
- }
- 
- static struct platform_device_id mxs_gpio_ids[] = {
-@@ -226,6 +223,7 @@ static int __devinit mxs_gpio_probe(struct platform_device *pdev)
- 	static void __iomem *base;
- 	struct mxs_gpio_port *port;
- 	struct resource *iores = NULL;
-+	int irq_base;
- 	int err;
- 
- 	port = devm_kzalloc(&pdev->dev, sizeof(*port), GFP_KERNEL);
-@@ -241,7 +239,6 @@ static int __devinit mxs_gpio_probe(struct platform_device *pdev)
- 		port->id = pdev->id;
- 		port->devid = pdev->id_entry->driver_data;
- 	}
--	port->virtual_irq_start = MXS_GPIO_IRQ_START + port->id * 32;
- 
- 	port->irq = platform_get_irq(pdev, 0);
- 	if (port->irq < 0)
-@@ -275,8 +272,19 @@ static int __devinit mxs_gpio_probe(struct platform_device *pdev)
- 	/* clear address has to be used to clear IRQSTAT bits */
- 	writel(~0U, port->base + PINCTRL_IRQSTAT(port) + MXS_CLR);
- 
-+	irq_base = irq_alloc_descs(-1, 0, 32, numa_node_id());
-+	if (irq_base < 0)
-+		return irq_base;
++	struct device_node *np;
+ 	struct clk *timer_clk;
++	int irq;
 +
-+	port->domain = irq_domain_add_legacy(np, 32, irq_base, 0,
-+					     &irq_domain_simple_ops, NULL);
-+	if (!port->domain) {
-+		err = -ENODEV;
-+		goto out_irqdesc_free;
++	np = of_find_compatible_node(NULL, NULL, "fsl,timrot");
++	if (!np) {
++		pr_err("%s: failed find timrot node\n", __func__);
++		return;
 +	}
-+
- 	/* gpio-mxs can be a generic irq chip */
--	mxs_gpio_init_gc(port);
-+	mxs_gpio_init_gc(port, irq_base);
  
- 	/* setup one handler for each entry */
- 	irq_set_chained_handler(port->irq, mxs_gpio_irq_handler);
-@@ -287,18 +295,22 @@ static int __devinit mxs_gpio_probe(struct platform_device *pdev)
- 			 port->base + PINCTRL_DOUT(port), NULL,
- 			 port->base + PINCTRL_DOE(port), NULL, 0);
- 	if (err)
--		return err;
-+		goto out_irqdesc_free;
+ 	timer_clk = clk_get_sys("timrot", NULL);
+ 	if (IS_ERR(timer_clk)) {
+@@ -295,5 +305,6 @@ void __init mxs_timer_init(int irq)
+ 	mxs_clockevent_init(timer_clk);
  
- 	port->bgc.gc.to_irq = mxs_gpio_to_irq;
- 	port->bgc.gc.base = port->id * 32;
+ 	/* Make irqs happen */
++	irq = irq_of_parse_and_map(np, 0);
+ 	setup_irq(irq, &mxs_timer_irq);
+ }
+diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
+index 844043ad0..e0dc3f8 100644
+--- a/drivers/clk/mxs/clk-imx23.c
++++ b/drivers/clk/mxs/clk-imx23.c
+@@ -200,7 +200,7 @@ int __init mx23_clocks_init(void)
+ 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+ 		clk_prepare_enable(clks[clks_init_on[i]]);
  
- 	err = gpiochip_add(&port->bgc.gc);
--	if (err) {
--		bgpio_remove(&port->bgc);
--		return err;
--	}
-+	if (err)
-+		goto out_bgpio_remove;
+-	mxs_timer_init(MX23_INT_TIMER0);
++	mxs_timer_init();
  
  	return 0;
-+
-+out_bgpio_remove:
-+	bgpio_remove(&port->bgc);
-+out_irqdesc_free:
-+	irq_free_descs(irq_base, 32);
-+	return err;
  }
+diff --git a/drivers/clk/mxs/clk-imx28.c b/drivers/clk/mxs/clk-imx28.c
+index e3aab67..9df864d 100644
+--- a/drivers/clk/mxs/clk-imx28.c
++++ b/drivers/clk/mxs/clk-imx28.c
+@@ -337,7 +337,7 @@ int __init mx28_clocks_init(void)
+ 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+ 		clk_prepare_enable(clks[clks_init_on[i]]);
  
- static struct platform_driver mxs_gpio_driver = {
+-	mxs_timer_init(MX28_INT_TIMER0);
++	mxs_timer_init();
+ 
+ 	return 0;
+ }
 -- 
 1.7.5.4
