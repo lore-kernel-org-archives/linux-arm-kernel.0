@@ -1,31 +1,21 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 20 Aug 2012 09:41:23 -0600
-Subject: [PATCH] ARM: tegra: remove duplicate select USE_OF
-Message-ID: <1345477283-26000-1-git-send-email-swarren@wwwdotorg.org>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon, 20 Aug 2012 17:43:50 +0200
+Subject: [PATCH 06/14] arm: at91: dt: at91sam9 add pinctrl support
+In-Reply-To: <20120820151146.GA7456@game.jcrosoft.org>
+References: <20120810124820.GA20557@game.jcrosoft.org>
+ <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
+ <1344603731-32667-6-git-send-email-plagnioj@jcrosoft.com>
+ <CACQ1gAjJ2HL1b9hi3RKGWWs_kW_hELAFYQ=fnHGj5nymjWdiWw@mail.gmail.com>
+ <20120820151146.GA7456@game.jcrosoft.org>
+Message-ID: <CACQ1gAjT9zSUdNxiS7wxm1YKo44e8zN_mtLwmSuCV9EMAxCXLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+2012/8/20 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+>> if .init is NULL, then in arch/arm/mach-at91/soc.h :
+>> static inline int at91_soc_is_enabled(void)
+> the it have the patch that drop this
 
-ARCH_TEGRA (arch/arm/Kconfig) now selects USE_OF, so there's not need
-for ARCH_TEGRA_3x_SOC to do so too.
+and who/where is "it" ?
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/Kconfig |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index d3e73ec..b3226f8 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -34,7 +34,6 @@ config ARCH_TEGRA_3x_SOC
- 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select USB_ULPI if USB
- 	select USB_ULPI_VIEWPORT if USB_SUPPORT
--	select USE_OF
- 	select ARM_ERRATA_743622
- 	select ARM_ERRATA_751472
- 	select ARM_ERRATA_754322
--- 
-1.7.0.4
+Richard.
