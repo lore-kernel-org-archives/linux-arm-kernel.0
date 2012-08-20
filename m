@@ -1,21 +1,110 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 20 Aug 2012 17:43:50 +0200
-Subject: [PATCH 06/14] arm: at91: dt: at91sam9 add pinctrl support
-In-Reply-To: <20120820151146.GA7456@game.jcrosoft.org>
-References: <20120810124820.GA20557@game.jcrosoft.org>
- <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
- <1344603731-32667-6-git-send-email-plagnioj@jcrosoft.com>
- <CACQ1gAjJ2HL1b9hi3RKGWWs_kW_hELAFYQ=fnHGj5nymjWdiWw@mail.gmail.com>
- <20120820151146.GA7456@game.jcrosoft.org>
-Message-ID: <CACQ1gAjT9zSUdNxiS7wxm1YKo44e8zN_mtLwmSuCV9EMAxCXLg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 20 Aug 2012 16:57:40 +0100
+Subject: [PATCH v2 08/31] arm64: CPU support
+In-Reply-To: <20120815001043.GD19607@quad.lixom.net>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-9-git-send-email-catalin.marinas@arm.com>
+ <20120815001043.GD19607@quad.lixom.net>
+Message-ID: <20120820155740.GA912@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/8/20 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
->> if .init is NULL, then in arch/arm/mach-at91/soc.h :
->> static inline int at91_soc_is_enabled(void)
-> the it have the patch that drop this
+On Wed, Aug 15, 2012 at 01:10:43AM +0100, Olof Johansson wrote:
+> On Tue, Aug 14, 2012 at 06:52:09PM +0100, Catalin Marinas wrote:
+> 
+> > diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+> > new file mode 100644
+> > index 0000000..ef54125
+> > --- /dev/null
+> > +++ b/arch/arm64/include/asm/cputype.h
+> > @@ -0,0 +1,49 @@
+> > +#define ID_MIDR_EL1		"midr_el1"
+> > +#define ID_CTR_EL0		"ctr_el0"
+> > +
+> > +#define ID_AA64PFR0_EL1		"id_aa64pfr0_el1"
+> > +#define ID_AA64DFR0_EL1		"id_aa64dfr0_el1"
+> > +#define ID_AA64AFR0_EL1		"id_aa64afr0_el1"
+> > +#define ID_AA64ISAR0_EL1	"id_aa64isar0_el1"
+> > +#define ID_AA64MMFR0_EL1	"id_aa64mmfr0_el1"
+> > +
+> > +#define read_cpuid(reg) ({						\
+> > +	u64 __val;							\
+> > +	asm("mrs	%0, " reg : "=r" (__val));			\
+> > +	__val;								\
+> > +})
+> > +
+> > +/*
+> > + * The CPU ID never changes at run time, so we might as well tell the
+> > + * compiler that it's constant.  Use this function to read the CPU ID
+> > + * rather than directly reading processor_id or read_cpuid() directly.
+> > + */
+> > +static inline u32 __attribute_const__ read_cpuid_id(void)
+> > +{
+> > +	return read_cpuid(ID_MIDR_EL1);
+> > +}
+> > +
+> > +static inline u32 __attribute_const__ read_cpuid_cachetype(void)
+> > +{
+> > +	return read_cpuid(ID_CTR_EL0);
+> > +}
+> 
+> Is this perhaps a carry-over from arch/arm? Abstracting out read_cpuid()
+> doesn't seem to buy anything here, just opencode the one-line assembly
+> in each.
 
-and who/where is "it" ?
+It doesn't buy much but it's more readable to use read_cpuid() in places
+like hw_breakpoint.c than open coding the assembly.
 
-Richard.
+I could get rid of the ID_* macros and just pass the register name
+direcly to read_cpuid().
+
+> Might as well cleanup the naming a little too while you're at it, i.e.
+> read_cpu_id() and read_cpu_cachetype().
+
+These were defined for convenience, a bit less typing. But they have the
+intended name.
+
+> > --- /dev/null
+> > +++ b/arch/arm64/mm/proc-syms.c
+...
+> > +EXPORT_SYMBOL(__cpuc_flush_kern_all);
+> > +EXPORT_SYMBOL(__cpuc_flush_user_all);
+> > +EXPORT_SYMBOL(__cpuc_flush_user_range);
+> > +EXPORT_SYMBOL(__cpuc_coherent_kern_range);
+> > +EXPORT_SYMBOL(__cpuc_flush_dcache_area);
+> 
+> See comment on other email about putting function pointers in a struct
+> instead.
+
+There is no need to support multiple CPU architectures with different
+implementations, so allowing these functions to be called without
+indirection is better.
+
+> > diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> > new file mode 100644
+> > index 0000000..453f517
+> > --- /dev/null
+> > +++ b/arch/arm64/mm/proc.S
+> > @@ -0,0 +1,193 @@
+> > +	.section ".proc.info.init", #alloc, #execinstr
+> > +
+> > +	.type	__v8_proc_info, #object
+> > +__v8_proc_info:
+> > +	.long	0x000f0000			// Required ID value
+> > +	.long	0x000f0000			// Mask for ID
+> > +	b	__cpu_setup
+> > +	nop
+> > +	.quad	cpu_name
+> > +	.long	0
+> > +	.size	__v8_proc_info, . - __v8_proc_info
+> 
+> I know this is a carry-over from arch/arm, but how about moving this
+> to more of a C construct similar to arch/powerpc/kernel/cputable.c
+> instead? It's considerably easier to read that way, and it's convenient
+> to have the definitions all in one place, making it easier to share some
+> of the functions, etc.
+
+I can do this, it would be indeed cleaner.
+
+-- 
+Catalin
