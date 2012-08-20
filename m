@@ -1,36 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Aug 2012 05:39:17 +0000
-Subject: [PATCH V5 0/5] clk: mmp: add clock framework for mmp
-In-Reply-To: <1345431315-8037-1-git-send-email-xiechao.mail@gmail.com>
-References: <1345431315-8037-1-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <201208200539.17878.arnd@arndb.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 20 Aug 2012 13:49:37 +0800
+Subject: [PATCH 1/3] ARM: pxa: append the definition of CKENC
+Message-ID: <1345441779-22632-1-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 August 2012, Chao Xie wrote:
-> 
-> From: Chao Xie <chao.xie@marvell.com>
-> 
-> v1->v2:
-> replace __raw_xxx with xxx_relax
-> use ioremap to remap the registers. Finaly it will use device tree to
-> get the physical address.
-> do not use macro to register clocks, and directly call the functions.
-> 
-> v2->v3:
-> pxa910 will have APB extension clock, so some peripharals will have
-> clocks in APB extension base.
-> change pxa168-pwm to be pxa910-pwm for pxa910. It will fit the current
-> pwm driver.
-> 
-> v3->v4:
-> remove addtional clock name definition
-> replace left __raw_xxx
-> 
-> v4->v5:
-> change the format of the file
-> 
+Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+---
+ arch/arm/mach-pxa/include/mach/pxa3xx-regs.h |    1 +
+ 1 file changed, 1 insertion(+)
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-
-	Arnd
+diff --git a/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h b/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h
+index 207ecb4..f4d48d2 100644
+--- a/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h
++++ b/arch/arm/mach-pxa/include/mach/pxa3xx-regs.h
+@@ -131,6 +131,7 @@
+ #define AICSR		__REG(0x41340008)	/* Application Subsystem Interrupt Control/Status Register */
+ #define CKENA		__REG(0x4134000C)	/* A Clock Enable Register */
+ #define CKENB		__REG(0x41340010)	/* B Clock Enable Register */
++#define CKENC		__REG(0x41340024)	/* C Clock Enable Register */
+ #define AC97_DIV	__REG(0x41340014)	/* AC97 clock divisor value register */
+ 
+ #define ACCR_XPDIS		(1 << 31)	/* Core PLL Output Disable */
+-- 
+1.7.9.5
