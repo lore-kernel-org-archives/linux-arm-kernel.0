@@ -1,184 +1,144 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Mon, 20 Aug 2012 07:44:49 -0700
-Subject: [PATCH v4 0/12] KGDB/KDB FIQ (NMI) debugger
-Message-ID: <20120820144449.GA32560@lizard>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 20 Aug 2012 15:49:28 +0100
+Subject: [PATCH] ARM: io: avoid writeback addressing modes for __raw_
+ accessors
+In-Reply-To: <alpine.LFD.2.02.1208200902120.1754@xanadu.home>
+References: <1344956366-32574-1-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.02.1208161906390.1541@xanadu.home>
+ <20120820124109.GK25864@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1208200902120.1754@xanadu.home>
+Message-ID: <20120820144927.GP25864@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Mon, Aug 20, 2012 at 02:29:31PM +0100, Nicolas Pitre wrote:
+> On Mon, 20 Aug 2012, Will Deacon wrote:
+> > Translates the following code from amba_device_add:
+> > 
+> > 		for (pid = 0, i = 0; i < 4; i++)
+> > 			pid |= (readl(tmp + size - 0x20 + 4 * i) & 255) <<
+> > 				(i * 8);
+> > 		for (cid = 0, i = 0; i < 4; i++)
+> > 			cid |= (readl(tmp + size - 0x10 + 4 * i) & 255) <<
+> > 				(i * 8);
+> > 
+> > into:
+> [...]
+> 
+> OK, I can see how the compiler will fold the loop increment into the IO 
+> access instruction.  But my point is: is this common?  And when this 
+> happens, is this a critical path?
 
-In v4:
+Sure, this case isn't such a big deal (basically just boot-time probing) but
+GCC could still generate this stuff in a driver, where it could end up being
+an I/O bottleneck for a guest OS.
 
-- Implemented kgdb_nmi serial driver, it provides 'nmi_console' KDB
-  command. With the driver we can use our debugger port as a normal
-  console, except that we can always get back to the debugger using the
-  magic sequence.  Note that I still somewhat reluctant to introduce
-  software-raised interrupts, as they're arch-specific and not always
-  possible.  So today the driver uses a tasklet, it should be pretty
-  cheap: we're checking for the input on timer interrupts, but we don't
-  cause needless wakeups. The pro of this is that it works everywhere
-  (but arches still have an option to optimize things, of course);
+> > whilst the addressing modes are still nice, the dsb is going to be the
+> > performance limitation here. That said, we could try the "Qo" constraints,
+> > which I seem to remember don't generate writebacks. I'll have a play.
+> 
+> OK.  That would be excellent.
 
-- Two new patches added to propagate init_poll() callbacks from tty
-  to uart drivers. As a side-effect, a long-standing bug fixed in
-  amba-pl1011 driver;
+Looks like we have a winner (diff against the original patch below). I now
+see:
 
-- Dropped patch 'Get rid of .LCcralign local label';
+00000340 <hw_init>:
+ 340:   e1a03000        mov     r3, r0
+ 344:   e3a00000        mov     r0, #0
+ 348:   e5830010        str     r0, [r3, #16]
+ 34c:   e3e02000        mvn     r2, #0
+ 350:   e5832014        str     r2, [r3, #20]
+ 354:   e5932018        ldr     r2, [r3, #24]
+ 358:   e38220ff        orr     r2, r2, #255    ; 0xff
+ 35c:   e5832030        str     r2, [r3, #48]   ; 0x30
+ 360:   e12fff1e        bx      lr
 
-- Some more fixes in SVC return path. Now it seems rock-solid;
+with the new code, which is basically the same as the old code but the mvn and
+a str have switched places. The same difference occurs when targetting Thumb2.
 
-- The patches were rebased on the latest Linus' tree, and as usual can
-  be found in the following repo:
+> > To deal with this, the hypervisor will likely have to stop the virtual world
+> > when emulating any MMIO accesses that report incomplete fault information to
+> > avoid racing with a TLB invalidation from another virtual CPU. That will
+> > certainly be more expensive than an additional instruction on each access.
+> 
+> I totally agree with you here.
+> 
+> However, for completeness and above all for security reasons, the 
+> hypervisor will _ahve_ to support that case anyway.
 
-	git://git.infradead.org/users/cbou/linux-nmi-kdb.git master
+Support it, yes, but perhaps not efficiently.
 
+> So it is now a matter of compromise between performance and code size.  
+> If the pathological case you brought up above is the exception and not 
+> the rule then I think that we can live with the performance impact in 
+> that case and keep the optimal pre-indexed addressing for the common 
+> cases.
 
-Boilerplate:
+It looks like the new code does exactly what we want, so I think we could
+actually have the best of both worlds: pre-index addressing and no
+writeback.
 
-These patches introduce KGDB FIQ debugger support. The idea (and some
-code, of course) comes from Google's FIQ debugger[2]. There are some
-differences (mostly implementation details, feature-wise they're almost
-equivalent, or can be made equivalent, if desired).
+Will
 
-The FIQ debugger is a facility that can be used to debug situations when
-the kernel stuck in uninterruptable sections, e.g. the kernel infinitely
-loops or deadlocked in an interrupt or with interrupts disabled. On some
-development boards there is even a special NMI button, which is very
-useful for debugging weird kernel hangs.
+--- >8
 
-And FIQ is basically an NMI, it has a higher priority than IRQs, and
-upon IRQ exception FIQs are not disabled. It is still possible to
-disable FIQs (as well as some "NMIs" on other architectures), but via
-special means.
-
-So, here FIQs and NMIs are synonyms, but in the code I use NMI term for
-arch-independent code, and FIQs for ARM code.
-
-A few years ago KDB wasn't yet ready for production, or even not
-well-known, so originally Google implemented its own FIQ debugger that
-included its own shell, ring-buffer, commands, dumping, backtracing
-logic and whatnot. This is very much like PowerPC's xmon
-(arch/powerpc/xmon), except that xmon was there for a decade, so it even
-predates KDB.
-
-Anyway, nowadays KGDB/KDB is the cross-platform debugger, and the only
-feature that was missing is NMI handling. This is now fixed for ARM.
-
-There are a few differences comparing to the original (Google's) FIQ
-debugger:
-
-- Doing stuff in FIQ context is dangerous, as there we are not allowed
-  to cause aborts or faults. In the original FIQ debugger there was a
-  "signal" software-induced interrupt, upon exit from FIQ it would fire,
-  and we would continue to execute "dangerous" commands from there.
-
-  In KGDB/KDB we don't use signal interrupts. We can do easier: set up a
-  breakpoint, continue, and you'll trap into KGDB again in a safe
-  context.
-
-  It works for most cases, but I can imagine cases when you can't set up
-  a breakpoint. For these cases we'd better introduce a KDB command
-  "exit_nmi", that will rise the SW IRQ, after which we're allowed to do
-  anything.
-
-- KGDB/KDB FIQ debugger shell is synchronous. In Google's version you
-  could have a dedicated shell always running in the FIQ context, so
-  when you type something on a serial line, you won't actually cause any
-  debugging actions, FIQ would save the characters in its own buffer and
-  continue execution normally. But when you hit return key after the
-  command, then the command is executed.
-
-  In KGDB/KDB FIQ debugger it is different. Once you enter KGDB, the
-  kernel will stop until you instruct it to continue.
-
-  This might look as a drastic change, but it is not. There is actually
-  no difference whether you have sync or async shell, or at least I
-  couldn't find any use-case where this would matter at all. Anyways, it
-  is still possible to do async shell in KDB, just don't see any need
-  for this.
-
-- Original FIQ debugger used a custom FIQ vector handling code, w/ a lot
-  of logic in it. In this approach I'm using the fact that FIQs are
-  basically IRQs, except that we there are a bit more registers banked,
-  and we can actually trap from the IRQ context.
-
-  But this all does not prevent us from using a simple jump-table based
-  approach as used in the generic ARM entry code. So, here I just reuse
-  the generic approach.
-
-Note that I test the code on a modelled ARM machine (QEMU Versatile), so
-there might be some issues on a real HW, but it works in QEMU tho. :-)
-
-Assuming you have QEMU >= 1.1.0, you can easily play with the code using
-ARM/versatile defconfig and command like this:
-
-  qemu-system-arm -nographic -machine versatilepb -kernel
-  linux/arch/arm/boot/zImage -append "console=ttyAMA0 kgdboc=ttyAMA0
-  kgdb_fiq.enable=1"
-
-Thanks,
-
---
- arch/arm/Kconfig                    |  19 ++
- arch/arm/common/vic.c               |  28 +++
- arch/arm/include/asm/hardware/vic.h |   2 +
- arch/arm/include/asm/kgdb.h         |   8 +
- arch/arm/kernel/Makefile            |   1 +
- arch/arm/kernel/entry-armv.S        | 167 +----------------
- arch/arm/kernel/entry-header.S      | 170 ++++++++++++++++++
- arch/arm/kernel/kgdb_fiq.c          |  99 ++++++++++
- arch/arm/kernel/kgdb_fiq_entry.S    |  87 +++++++++
- arch/arm/mach-versatile/Makefile    |   1 +
- arch/arm/mach-versatile/kgdb_fiq.c  |  31 ++++
- drivers/tty/serial/Kconfig          |  19 ++
- drivers/tty/serial/Makefile         |   1 +
- drivers/tty/serial/amba-pl011.c     |  60 +++++--
- drivers/tty/serial/kgdb_nmi.c       | 348 ++++++++++++++++++++++++++++++++++++
- drivers/tty/serial/kgdboc.c         |  16 ++
- drivers/tty/serial/serial_core.c    |  30 ++++
- include/linux/kdb.h                 |  29 +--
- include/linux/kgdb.h                |  34 ++++
- include/linux/serial_core.h         |   2 +
- include/linux/tty_driver.h          |   1 +
- kernel/debug/debug_core.c           |  36 +++-
- kernel/debug/kdb/kdb_main.c         |  29 +++
- 23 files changed, 1024 insertions(+), 194 deletions(-)
-
-In v3:
-
-- Per Colin Cross suggestion, added a way to release a debug console for
-  normal use.  This is done via 'disable_nmi' command (in the original
-  FIQ debugger it was 'console' command). For this I added a new
-  callback in the tty ops, and serial drivers have to provide a way to
-  clear its interrupts. The patch 'tty/serial/kgdboc: Add and wire up
-  clear_irqs callback' explains the concept in details.
-- Made the debug entry prompt more shell-like;
-- A new knocking mode '-1'. It disables the feature altogether, and thus
-  makes it possible to hook KDB entry to a dedicated button.
-- The code was rebased on 'v3.5 + kdb kiosk'[1] patches;
-
-In v2:
-
-- Per Colin Cross' suggestion, we should not enter the debugger on any
-  received byte (this might be a problem when there's a noise on the
-  serial line). So there is now an additional patch that implements
-  "knocking" to the KDB (either via $3#33 command or return key, this is
-  configurable);
-- Reworked {enable,select}_fiq/is_fiq callbacks, now multi-mach kernels
-  should not be a problem;
-- For versatile machines there are run-time checks for proper UART port
-  (kernel will scream aloud if out of range port is specified);
-- Added some __init annotations;
-- Since not every architecture defines FIQ_START, we can't just blindly
-  select CONFIG_FIQ symbol. So ARCH_MIGHT_HAVE_FIQ introduced;
-- Add !THUMB2_KERNEL dependency for KGDB_FIQ, we don't support Thumb2
-  kernels;
-- New patch that is used to get rid of LCcralign label in alignment_trap
-  macro.
-
-[1] https://lkml.org/lkml/2012/7/26/260
-[2]
-Original Google's FIQ debugger, fiq_* files:
-http://android.git.linaro.org/gitweb?p=kernel/common.git;a=tree;f=arch/arm/common;hb=refs/heads/android-3.4
-And board support as an example of using it:
-http://nv-tegra.nvidia.com/gitweb/?p=linux-2.6.git;a=commitdiff;h=461cb80c16e4e266ab6207a00767b59212148086
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index b54d687..bbc94c2 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -63,38 +63,50 @@ extern void __raw_readsl(const void __iomem *addr, void *data, int longlen);
+  */
+ static inline void __raw_writew(u16 val, volatile void __iomem *addr)
+ {
+-       asm volatile("strh %0, [%1]" : : "r" (val), "r" (addr));
++       asm volatile("strh %1, %0"
++                    : "=Qo" (*(volatile u16 __force *)addr)
++                    : "r" (val));
+ }
+ 
+ static inline u16 __raw_readw(const volatile void __iomem *addr)
+ {
+        u16 val;
+-       asm volatile("ldrh %0, [%1]" : "=r" (val) : "r" (addr));
++       asm volatile("ldrh %0, %1"
++                    : "=r" (val)
++                    : "Qo" (*(const volatile u16 __force *)addr));
+        return val;
+ }
+ #endif
+ 
+ static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
+ {
+-       asm volatile("strb %0, [%1]" : : "r" (val), "r" (addr));
++       asm volatile("strb %1, %0"
++                    : "=Qo" (*(volatile u8 __force *)addr)
++                    : "r" (val));
+ }
+ 
+ static inline void __raw_writel(u32 val, volatile void __iomem *addr)
+ {
+-       asm volatile("str %0, [%1]" : : "r" (val), "r" (addr));
++       asm volatile("str %1, %0"
++                    : "=Qo" (*(volatile u32 __force *)addr)
++                    : "r" (val));
+ }
+ 
+ static inline u8 __raw_readb(const volatile void __iomem *addr)
+ {
+        u8 val;
+-       asm volatile("ldrb %0, [%1]" : "=r" (val) : "r" (addr));
++       asm volatile("ldrb %0, %1"
++                    : "=r" (val)
++                    : "Qo" (*(const volatile u8 __force *)addr));
+        return val;
+ }
+ 
+ static inline u32 __raw_readl(const volatile void __iomem *addr)
+ {
+        u32 val;
+-       asm volatile("ldr %0, [%1]" : "=r" (val) : "r" (addr));
++       asm volatile("ldr %0, %1"
++                    : "=r" (val)
++                    : "Qo" (*(const volatile u32 __force *)addr));
+        return val;
+ }
