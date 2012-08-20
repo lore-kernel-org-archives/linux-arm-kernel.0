@@ -1,24 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 Aug 2012 10:12:31 +0200
-Subject: [PATCH 00/11] pinctrl: mvebu: pinctrl driver
-In-Reply-To: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CACRpkdZn73M_5rciZhpTTidMpwfMSZqb+wZnY5FkgztK2YBFiQ@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 20 Aug 2012 11:25:28 +0300
+Subject: [PATCH 5/8] UBI: check max_beb_per1024 value in ubi_attach_mtd_dev
+In-Reply-To: <CACQ1gAgLirwiwiUOoL7ig7R_RpB8xDr2-g2gVOEUZNvAHB60pQ@mail.gmail.com>
+References: <1345214124-5478-1-git-send-email-richard.genoud@gmail.com>
+ <1345214124-5478-6-git-send-email-richard.genoud@gmail.com>
+ <20120819120804.15c33931@pixies.home.jungo.com>
+ <CACQ1gAgLirwiwiUOoL7ig7R_RpB8xDr2-g2gVOEUZNvAHB60pQ@mail.gmail.com>
+Message-ID: <1345451128.2848.14.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 11, 2012 at 2:56 PM, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
+On Mon, 2012-08-20 at 08:31 +0200, Richard Genoud wrote:
+> That's right, I'll correct that in next version.
+> Thanks !
 
-> This patch set adds a core pinctrl driver for Marvell MVEBU SoCs and
-> SoC specific stubs for Armada 370, Armada XP, Dove, and Kirkwood.
-> The SoC specific stubs use the pinctrl-mvebu core driver that handles
-> pinctrl API and register accesses for common pinctrl registers.
+I've amended this patch, added Shmulik's reviewed-by and pushed to
+linux-ubi.git, thanks!
 
-Nice! I'll now go in and review it.
-
-Please add Stephen Warren <swarren@wwwdotorg.org> on CC for
-subsequent iterations.
-
-Yours,
-Linus Walleij
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120820/167a9045/attachment.sig>
