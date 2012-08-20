@@ -1,48 +1,40 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 20 Aug 2012 19:16:55 +0200
-Subject: [PATCH 02/11] pinctrl: mvebu: dove pinctrl driver
-In-Reply-To: <CACRpkda9BL5+NiDOsMKG0kv2coBsw=Er=ZccXnNkgeftV9hPhQ@mail.gmail.com>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1344689809-6223-3-git-send-email-sebastian.hesselbarth@gmail.com>
- <CACRpkda9BL5+NiDOsMKG0kv2coBsw=Er=ZccXnNkgeftV9hPhQ@mail.gmail.com>
-Message-ID: <20120820191655.5e2f2dba@skate>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 20 Aug 2012 14:45:20 -0400 (EDT)
+Subject: [PATCH] ARM: io: avoid writeback addressing modes for __raw_
+ accessors
+In-Reply-To: <20120820181007.GX25864@mudshark.cambridge.arm.com>
+References: <1344956366-32574-1-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.02.1208161906390.1541@xanadu.home>
+ <20120820124109.GK25864@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1208200902120.1754@xanadu.home>
+ <20120820144927.GP25864@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1208201150010.1754@xanadu.home>
+ <20120820165405.GU25864@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1208201356130.1754@xanadu.home>
+ <20120820181007.GX25864@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1208201443070.1754@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Mon, 20 Aug 2012 15:43:11 +0200,
-Linus Walleij <linus.walleij@linaro.org> a ?crit :
+On Mon, 20 Aug 2012, Will Deacon wrote:
 
-> >  config PINCTRL_MVEBU
-> >         bool "Marvell SoC pin controller drivers"
-> > -       depends on ARCH_MVEBU
-> > +       depends on ARCH_MVEBU || ARCH_DOVE
+> On Mon, Aug 20, 2012 at 07:04:01PM +0100, Nicolas Pitre wrote:
+> > On Mon, 20 Aug 2012, Will Deacon wrote:
+> > > 
+> > > Hmm, ok. I too would hope that the volatile keyword would sort that out but,
+> > > since the '+' doesn't seem to change the generated code, I can add that. It
+> > > does, however, mean we have to cast away the `const' in the read accessors
+> > > which makes the code even uglier.
+> > 
+> > Nah... the const is wrong.  The way you wrote it means that addr may 
+> > change but the pointed data is constant.  This is obviously wrong since 
+> > we expect the pointed location to change even from a read.
 > 
-> Hmmmm.
-> 
-> Shouldn't this thing rather be:
-> 
-> depends on PLAT_ORION
-> 
-> else you end up lining up all Marvell machines here...
+> That's the prototype for the read accessors though -- a bunch of other
+> architectures define them that way (including asm-generic), so I wonder what
+> the reasoning behind that was?
 
-When we started working on this, ARCH_MVEBU was not a PLAT_ORION
-platform, because PLAT_ORION includes its own custom pinmux code, gpio
-code, etc, and what we're trying to achieve with Sebastian is to clean
-all this. Ultimately, our goal is to have all Orion, Kirkwood, Dove,
-Discovery and Armada 370/XP supported in mach-mvebu, and therefore
-plat-orion would most likely disappear.
+I'm still asserting that they're wrong.
 
-In the mean time, a patch got accepted that separates PLAT_ORION for
-PLAT_ORION_LEGACY, and therefore MACH_MVEBU now selects PLAT_ORION to
-access things that are still useful (address decoding code) while all
-other platforms select PLAT_ORION_LEGACY to get the old pinmux code,
-old gpio code, etc. All this is very much a work in progress.
 
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Nicolas
