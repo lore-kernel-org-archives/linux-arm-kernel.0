@@ -1,54 +1,44 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Mon, 20 Aug 2012 18:40:39 +0200
-Subject: [PATCH v2] ARM: at91: select DT support by default
-In-Reply-To: <20120820162651.GB7456@game.jcrosoft.org>
-References: <1345477226-23483-1-git-send-email-ludovic.desroches@atmel.com>
- <20120820162651.GB7456@game.jcrosoft.org>
-Message-ID: <50326887.5050400@atmel.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 20 Aug 2012 18:47:58 +0200
+Subject: [PATCH RESEND 1/2] i2c: pnx: Fix bit definitions
+In-Reply-To: <083DF309106F364B939360100EC290F823A0354A3D@eu1rdcrdc1wx030.exi.nxp.com>
+References: <1344411752-23469-1-git-send-email-stigge@antcom.de>
+ <20120818095108.GB24812@pengutronix.de> <5030A81E.5090508@antcom.de>
+ <083DF309106F364B939360100EC290F823A0354A3D@eu1rdcrdc1wx030.exi.nxp.com>
+Message-ID: <50326A3E.9070607@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 08/20/2012 06:26 PM, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
-> On 17:40 Mon 20 Aug     , ludovic.desroches at atmel.com wrote:
->> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On 08/20/2012 06:26 PM, Kevin Wells wrote:
+>>>> This patch for i2c-pnx affects PNX4008 and LPC32xx (and LPC31xx,
+>>>> not yet in mainline). Can you please test and double-check the
+>>>> manuals of PNX4008 and LPC31xx? I only found this via the manual
+>>>> of LPC32xx but assume it's the same for the others, also.
+>>>>
+>>>> Thanks in advance!
+>>>
+>>> Kevin, since the other manuals seem to be not easily available, can
+>>> you please check?
 >>
->> Since at91sam9x5, at91sam9n12 and future SOCs only have device tree
->> support, select it by default.
->>
->> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> ---
->>   arch/arm/mach-at91/Kconfig | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
->> index c8050b1..5aee940 100644
->> --- a/arch/arm/mach-at91/Kconfig
->> +++ b/arch/arm/mach-at91/Kconfig
->> @@ -502,6 +502,7 @@ comment "Generic Board Type"
->>
->>   config MACH_AT91SAM_DT
->>   	bool "Atmel AT91SAM Evaluation Kits with device-tree support"
->> +	default y
->>   	select USE_OF
-> no you can not force the USE_OF
->
-> force the machine by default if USE_OF ok otherwise no
-> to this you need to select the USE_OF as SoC level
+>> Yes, would be great if someone at NXP could confirm that PNX actually
+>> uses the same IP core for the I2C controller as LPCs do (which is
+>> currently assumed by Linux anyway).
+> 
+> I've never had my hands on a PNX4008 chip at NXP, but I do believe they
+> are the same IP. That specific I2C IP was used in a number of NXP/Phillips
+> chips besides the PNX4008/LPC32xx. I don't think there are any PNX4008's in
+> the wild, and even working in NXP, I can't find any non-marketing reference
+> material for that part (including the user manual).
 
-Sorry, it seems I have badly understood your first answer and I don't 
-understand the second one too.
+Considering this, it might be a good idea to remove support for PNX4008
+(arch/arm/mach-pnx4008/) altogether. It's hard to maintain support for
+hardware which isn't available, even at NXP. It would also simplify
+maintenance of mach-lpc32xx because the overlap currently makes me
+always wonder if the respective changes still work with mach-pnx4008.
 
-So what did you mean by "as we are goig to have more and more soc put it 
-as default in the MACH_AT91SAM_DT if the DT is enabled"?
+Any opposition?
 
->
-> Best Regards,
-> J.
->
->
+Roland
 
-Regards
 
-Ludovic
+PS: I just wonder how mach-pnx4008 came into the kernel at all...
