@@ -1,25 +1,65 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 20 Aug 2012 11:17:59 -0600
-Subject: [PATCH 3/3] ARM: tegra: remove board (but not DT) support for
- Harmony
-In-Reply-To: <1344288734-24131-3-git-send-email-swarren@wwwdotorg.org>
-References: <1344288734-24131-1-git-send-email-swarren@wwwdotorg.org>
- <1344288734-24131-3-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <50327147.6060406@wwwdotorg.org>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Mon, 20 Aug 2012 12:22:56 -0500
+Subject: [PATCH 2/2] ARM: imx6q: replace clk_register_clkdev with clock DT
+ lookup
+In-Reply-To: <20120820151609.GN24242@S2101-09.ap.freescale.net>
+References: <1345104526-14797-1-git-send-email-shawn.guo@linaro.org>
+ <1345104526-14797-3-git-send-email-shawn.guo@linaro.org>
+ <503232E0.3000007@gmail.com>
+ <CAKGA1bn2uCWE8YkGR4EzTxZ_bXJ_ov2diq63uxQ=dT7b6Fu9GQ@mail.gmail.com>
+ <20120820151609.GN24242@S2101-09.ap.freescale.net>
+Message-ID: <CAKGA1bnfhMC8QG9OqBbpy5iq6ZAfEgrYMg_LVd50U7yikLhDAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/2012 03:32 PM, Stephen Warren wrote:
-> Harmony can be booted using device tree with equal functionality as when
-> booted using a board file. Remove as much of the board file as is
-> possible, since it's no longer needed.
-> 
-> Two special-cases are still left in board-dt-tegra20.c, since the Tegra
-> PCIe driver doesn't support device tree yet, and the Harmony .dts file
-> doesn't yet describe regulators which are needed for PCIe. This logic is
-> now enabled unconditionally rather than via CONFIG_MACH_HARMONY. While
-> this is more code than other boards, it's still unlikely to be much of a
-> problem, and both regulators and PCIe should be supported via device tree
-> in the near future, allowing the remaining code to be removed.
+On Mon, Aug 20, 2012 at 10:16 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Mon, Aug 20, 2012 at 09:54:48AM -0500, Matt Sealey wrote:
+>> Yet another arbitrary array...
+>>
+>> I'm not sure why you would move the registration lookup into the DT
+>
+> Because I do not want to patch kernel every time I need a new lookup.
+> Furthermore, looking at function imx53_qsb_init in imx53-dt.c, you
+> will find that lookup for sgtl5000 is really board specific and should
+> go to device tree.
+>
+>> and use an arbitrarily ordered array again. Sure, you're looking it up
+>> entirely within the device tree here, but a better solution would be
+>> to not name clocks twice, and structure your clock definition
+>> properly.
+>>
+>> What's wrong with;
+>>
+>> ccm at 020c4000 {
+>>    ...
+>>    my_clock: clock at 0 {
+>>        name = "my_clock_name";
+>>    }
+>> }
+>>
+>> uart at nnnnnnnn {
+>>    ...
+>>    clocks = <&my_clock>;
+>> }
+>>
+>> ?
+>>
+> It turns a property into 185 nodes, which will just bloat the device
+> tree.  This issue has been discussed for a plenty of times.
 
-Applied to Tegra's for-3.7/board-removal branch.
+It's not bloat just because it is by its very definition "a big list", is it?
+
+How do you explain duplicating the clock names in the array AND in the
+device node as NOT being bloated?
+
+You're going to have to define these clocks as a tree with parents and
+leaf nodes anyway in the clock subsystem. Why not define these in the
+device tree in total and reference them by handle when you build the
+entire clock tree from the ground up? Or will it just be all the
+clocks defined in Linux, but the lookups (which is what I see here)
+moved into the DT? Why not form the lookups as part of the definition
+of the clock tree?
+
+-- 
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
