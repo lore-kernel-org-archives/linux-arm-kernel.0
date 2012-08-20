@@ -1,42 +1,65 @@
-From: swetland@google.com (Brian Swetland)
-Date: Mon, 20 Aug 2012 13:51:33 -0700
-Subject: [PATCH v4 0/12] KGDB/KDB FIQ (NMI) debugger
-In-Reply-To: <20120820144449.GA32560@lizard>
-References: <20120820144449.GA32560@lizard>
-Message-ID: <CANqkERCzQdViRjhtz19wbSWEEnxYjpDcuUZNP9jNHYrtANwp-g@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 20 Aug 2012 20:56:28 +0000
+Subject: [PATCH 1/3] ARM: PRIMA2: use DT_MACHINE_START and convert to
+ generic board
+In-Reply-To: <1345450787-17246-2-git-send-email-Barry.Song@csr.com>
+References: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
+ <1345450787-17246-2-git-send-email-Barry.Song@csr.com>
+Message-ID: <201208202056.28361.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 7:44 AM, Anton Vorontsov
-<anton.vorontsov@linaro.org> wrote:
->
-> - KGDB/KDB FIQ debugger shell is synchronous. In Google's version you
->   could have a dedicated shell always running in the FIQ context, so
->   when you type something on a serial line, you won't actually cause any
->   debugging actions, FIQ would save the characters in its own buffer and
->   continue execution normally. But when you hit return key after the
->   command, then the command is executed.
->
->   In KGDB/KDB FIQ debugger it is different. Once you enter KGDB, the
->   kernel will stop until you instruct it to continue.
->
->   This might look as a drastic change, but it is not. There is actually
->   no difference whether you have sync or async shell, or at least I
->   couldn't find any use-case where this would matter at all. Anyways, it
->   is still possible to do async shell in KDB, just don't see any need
->   for this.
+On Monday 20 August 2012, Barry Song wrote:
+> From: Barry Song <Baohua.Song@csr.com>
+> 
+> we will have SiRFMarco and SiRFPolo, all of them will be in the
+> generic board.
+> 
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> ---
+>  arch/arm/mach-prima2/Makefile                      |    2 +-
+>  arch/arm/mach-prima2/{prima2.c => board-generic.c} |   10 ++++++----
+>  2 files changed, 7 insertions(+), 5 deletions(-)
+>  rename arch/arm/mach-prima2/{prima2.c => board-generic.c} (81%)
 
-The main reason we did this asynchronously was that it's entirely possible
-to get the occasional random character on the debug serial port (which is
-often multiplexed with the audio path on the headphone jack), and having
-the device freeze mysteriously when this happens is problematic.
+I would prefer not to have a board-* file in there, because it's not
+specific to a board. If you want to get rid of the prima2 name in it,
+you can call it common.c.
 
-Since the FIQ debugger is incredibly useful for diagnosing "my device is
-stuck" type problems, we tend to leave it enabled on large numbers of
-devices during internal testing, so that if somebody runs into a problem
-an engineer can plug in a serial debug cable and take a look.  It's
-important that the presence of the debug feature doesn't lead to instability,
-and thus we don't want a single random character to stop the normal
-operation ofthe device.
+> diff --git a/arch/arm/mach-prima2/prima2.c b/arch/arm/mach-prima2/board-generic.c
+> similarity index 81%
+> rename from arch/arm/mach-prima2/prima2.c
+> rename to arch/arm/mach-prima2/board-generic.c
+> index e9a17ae..f06b887 100644
+> --- a/arch/arm/mach-prima2/prima2.c
+> +++ b/arch/arm/mach-prima2/board-generic.c
+> @@ -30,12 +30,13 @@ void __init sirfsoc_init_late(void)
+>  	sirfsoc_pm_init();
+>  }
+>  
+> -static const char *prima2cb_dt_match[] __initdata = {
+> -       "sirf,prima2-cb",
+> +#ifdef CONFIG_ARCH_PRIMA2
+> +static const char *prima2_dt_match[] __initdata = {
+> +       "sirf,prima2",
+>         NULL
+>  };
+>  
+> -MACHINE_START(PRIMA2_EVB, "prima2cb")
+> +DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
+>  	/* Maintainer: Barry Song <baohua.song@csr.com> */
+>  	.atag_offset	= 0x100,
+>  	.map_io         = sirfsoc_map_lluart,
+> @@ -44,6 +45,7 @@ MACHINE_START(PRIMA2_EVB, "prima2cb")
+>  	.dma_zone_size	= SZ_256M,
+>  	.init_machine	= sirfsoc_mach_init,
+>  	.init_late	= sirfsoc_init_late,
+> -	.dt_compat      = prima2cb_dt_match,
+> +	.dt_compat      = prima2_dt_match,
+>  	.restart	= sirfsoc_restart,
+>  MACHINE_END
+> +#endif
 
-Brian
+I suppose this never really worked before then?
+
+	Arnd
