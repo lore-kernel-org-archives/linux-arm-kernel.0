@@ -1,59 +1,258 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Aug 2012 19:49:05 +0000
-Subject: [PATCH RESEND 1/2] i2c: pnx: Fix bit definitions
-In-Reply-To: <50326A3E.9070607@antcom.de>
-References: <1344411752-23469-1-git-send-email-stigge@antcom.de>
- <083DF309106F364B939360100EC290F823A0354A3D@eu1rdcrdc1wx030.exi.nxp.com>
- <50326A3E.9070607@antcom.de>
-Message-ID: <201208201949.06530.arnd@arndb.de>
+From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
+Date: Mon, 20 Aug 2012 13:50:55 -0600
+Subject: [PATCH] drivers/watchdog: Adding PRCMU based WD for ux500 processors
+Message-ID: <1345492255-28900-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 August 2012, Roland Stigge wrote:
-> On 08/20/2012 06:26 PM, Kevin Wells wrote:
-> > I've never had my hands on a PNX4008 chip at NXP, but I do believe they
-> > are the same IP. That specific I2C IP was used in a number of NXP/Phillips
-> > chips besides the PNX4008/LPC32xx. I don't think there are any PNX4008's in
-> > the wild, and even working in NXP, I can't find any non-marketing reference
-> > material for that part (including the user manual).
-> 
-> Considering this, it might be a good idea to remove support for PNX4008
-> (arch/arm/mach-pnx4008/) altogether. It's hard to maintain support for
-> hardware which isn't available, even at NXP. It would also simplify
-> maintenance of mach-lpc32xx because the overlap currently makes me
-> always wonder if the respective changes still work with mach-pnx4008.
-> 
-> Any opposition?
-> 
-> 
-> PS: I just wonder how mach-pnx4008 came into the kernel at all...
+From: "Mathieu J. Poirier" <mathieu.poirier@linaro.org>
 
-According to the git logs, Vitaly Wool originally added support for the
-platform in 2006 when working at MontaVista, and that year was also the
-last time he or anyone else from that company contributed anything in
-that directory. Russell was the only other person to make substantial
-contributions to it, but they all seem to be cross-platform changes.
+This patch is a partial re-write of the driver developed by
+Jonas Aaberg and brings it up to the new watchdog interface
+now the standard in the mainline kernel.
 
-In the platform code, there is only a single board number reserved,
-with the name of the SoC: MACHINE_START(PNX4008, "Philips PNX4008").
-This indicates that whoever was actually using the code did not have
-their board code upstream and relied on out-of-tree patches for the
-platform.
+Cc: Jonas Aaberg <jonas.aberg@stericsson.com>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/watchdog/Kconfig      |   10 +++
+ drivers/watchdog/Makefile     |    1 +
+ drivers/watchdog/ux500_wdt.c  |  168 +++++++++++++++++++++++++++++++++++++++++
+ include/linux/mfd/ux500_wdt.h |   19 +++++
+ 4 files changed, 198 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/watchdog/ux500_wdt.c
+ create mode 100644 include/linux/mfd/ux500_wdt.h
 
->From all I can tell, the PNX4008 family probably went to ST-Ericsson,
-not to NXP in the various acquisitions and mergers that happened
-around NXP. This explains why Kevin has no documentation or hardware
-for it. On the ST-Ericsson web site, I could find some information
-about the PNX4908, presumably a follow-on chip, but not about PNX4008,
-so I guess the company also considers the product line dead.
-
-Finally, the chips seems to be targetted at mobile phones and was
-introduced seven years ago, which is multiple generations of
-products in that market, so probably people stopped caring about
-them long ago, unlike embedded chips from the same era for other
-markets.
-
-I'd say let's wait for Vitaly to reply on this matter, if he doesn't
-care about the code, we can kill it off in 3.7 or 3.8.
-
-	Arnd
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 53d7571..5e5f2e5 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -352,6 +352,16 @@ config IMX2_WDT
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called imx2_wdt.
+ 
++config UX500_WATCHDOG
++	bool "ST-Ericsson Ux500 watchdog"
++	depends on UX500_SOC_DB8500
++	default y
++	help
++	  Say Y here to include Watchdog timer support for the
++	  watchdog existing in the prcmu of ST-Ericsson Ux500 series platforms.
++	  This watchdog is used to reset the system and thus cannot be
++	  compiled as a module.
++
+ # AVR32 Architecture
+ 
+ config AT32AP700X_WDT
+diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+index 572b39b..bec0ef8 100644
+--- a/drivers/watchdog/Makefile
++++ b/drivers/watchdog/Makefile
+@@ -52,6 +52,7 @@ obj-$(CONFIG_STMP3XXX_WATCHDOG) += stmp3xxx_wdt.o
+ obj-$(CONFIG_NUC900_WATCHDOG) += nuc900_wdt.o
+ obj-$(CONFIG_TS72XX_WATCHDOG) += ts72xx_wdt.o
+ obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
++obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
+ 
+ # AVR32 Architecture
+ obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+diff --git a/drivers/watchdog/ux500_wdt.c b/drivers/watchdog/ux500_wdt.c
+new file mode 100644
+index 0000000..7b8cfe27
+--- /dev/null
++++ b/drivers/watchdog/ux500_wdt.c
+@@ -0,0 +1,168 @@
++/*
++ * Copyright (C) ST-Ericsson SA 2011
++ *
++ * License Terms: GNU General Public License v2
++ *
++ * Author: Mathieu Poirier <mathieu.poirier@linaro.org> for ST-Ericsson
++ * Author: Jonas Aaberg <jonas.aberg@stericsson.com> for ST-Ericsson
++ *
++ * Heavily based upon geodewdt.c
++ */
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/moduleparam.h>
++#include <linux/debugfs.h>
++#include <linux/seq_file.h>
++#include <linux/err.h>
++#include <linux/uaccess.h>
++#include <linux/miscdevice.h>
++#include <linux/watchdog.h>
++#include <linux/platform_device.h>
++#include <linux/mfd/ux500_wdt.h>
++#include <linux/mfd/db8500-prcmu.h>
++#include <mach/id.h>
++
++#define WATCHDOG_TIMEOUT 600 /* 10 minutes */
++#define WATCHDOG_MIN	0
++#define WATCHDOG_MAX	268435 /* 28 bit resolution in ms == 268435.455 s */
++
++static int timeout = WATCHDOG_TIMEOUT;
++module_param(timeout, int, 0);
++MODULE_PARM_DESC(timeout,
++	"Watchdog timeout in seconds. default="
++				__MODULE_STRING(WATCHDOG_TIMEOUT) ".");
++
++static int nowayout = WATCHDOG_NOWAYOUT;
++module_param(nowayout, int, 0);
++MODULE_PARM_DESC(nowayout,
++	"Watchdog cannot be stopped once started (default="
++				__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
++static bool wdt_en;
++static bool wdt_auto_off;
++
++static int ux500_wdt_start(struct watchdog_device *wdd)
++{
++	wdt_en = true;
++	return db8500_prcmu_enable_a9wdog(0);
++}
++
++static int ux500_wdt_stop(struct watchdog_device *wdd)
++{
++	return  db8500_prcmu_disable_a9wdog(0);
++}
++
++static int ux500_wdt_keepalive(struct watchdog_device *wdd)
++{
++	return db8500_prcmu_kick_a9wdog(0);
++}
++
++static int ux500_wdt_set_timeout(struct watchdog_device *wdd,
++						unsigned int timeout)
++{
++	ux500_wdt_stop(wdd);
++	db8500_prcmu_load_a9wdog(0, timeout);
++	ux500_wdt_start(wdd);
++
++	return 0;
++}
++
++static const struct watchdog_info ux500_wdt_info = {
++	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
++	.identity = "Ux500 WDT",
++	.firmware_version = 1,
++};
++
++static struct watchdog_ops ux500_wdt_ops = {
++	.owner = THIS_MODULE,
++	.start = ux500_wdt_start,
++	.stop  = ux500_wdt_stop,
++	.ping  = ux500_wdt_keepalive,
++	.set_timeout = ux500_wdt_set_timeout,
++
++};
++
++static struct watchdog_device ux500_wdt = {
++	.info = &ux500_wdt_info,
++	.ops = &ux500_wdt_ops,
++	.min_timeout = WATCHDOG_MIN,
++	.max_timeout = WATCHDOG_MAX,
++};
++
++static int __init ux500_wdt_probe(struct platform_device *pdev)
++{
++	int err;
++
++	watchdog_set_nowayout(&ux500_wdt, nowayout);
++
++	/* auto off on sleep */
++	db8500_prcmu_config_a9wdog(1, wdt_auto_off);
++
++	/* set HW initial value */
++	db8500_prcmu_load_a9wdog(0, timeout * 1000);
++
++	err = watchdog_register_device(&ux500_wdt);
++	if (err)
++		return err;
++
++	dev_info(&pdev->dev, "initialized\n");
++
++	return 0;
++}
++
++static int __exit ux500_wdt_remove(struct platform_device *dev)
++{
++	watchdog_unregister_device(&ux500_wdt);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM
++static int ux500_wdt_suspend(struct platform_device *pdev,
++			     pm_message_t state)
++{
++	if (wdt_en && !wdt_auto_off) {
++		ux500_wdt_stop(&ux500_wdt);
++		db8500_prcmu_config_a9wdog(1, true);
++
++		db8500_prcmu_load_a9wdog(0, timeout * 1000);
++		ux500_wdt_start(&ux500_wdt);
++	}
++	return 0;
++}
++
++static int ux500_wdt_resume(struct platform_device *pdev)
++{
++	if (wdt_en && !wdt_auto_off) {
++		ux500_wdt_stop(&ux500_wdt);
++		db8500_prcmu_config_a9wdog(1, true);
++
++		db8500_prcmu_load_a9wdog(0, timeout * 1000);
++		ux500_wdt_start(&ux500_wdt);
++	}
++	return 0;
++}
++
++#else
++#define ux500_wdt_suspend NULL
++#define ux500_wdt_resume NULL
++#endif
++static struct platform_driver ux500_wdt_driver = {
++	.remove		= __exit_p(ux500_wdt_remove),
++	.driver		= {
++		.owner	= THIS_MODULE,
++		.name	= "ux500_wdt",
++	},
++	.suspend	= ux500_wdt_suspend,
++	.resume		= ux500_wdt_resume,
++};
++
++static int __init ux500_wdt_init(void)
++{
++	return platform_driver_probe(&ux500_wdt_driver, ux500_wdt_probe);
++}
++module_init(ux500_wdt_init);
++
++MODULE_AUTHOR("Jonas Aaberg <jonas.aberg@stericsson.com>");
++MODULE_DESCRIPTION("Ux500 Watchdog Driver");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
+diff --git a/include/linux/mfd/ux500_wdt.h b/include/linux/mfd/ux500_wdt.h
+new file mode 100644
+index 0000000..bfb91f1
+--- /dev/null
++++ b/include/linux/mfd/ux500_wdt.h
+@@ -0,0 +1,19 @@
++/*
++ * Copyright (C) ST Ericsson SA 2011
++ *
++ * License Terms: GNU General Public License v2
++ *
++ * STE Ux500 PRCMU API
++ */
++#ifndef __UX500_WDT_H
++#define __UX500_WDT_H
++
++/**
++ * struct ux500_wdt_data
++ */
++struct ux500_wdt_data {
++	int timeout;
++	int nowayout;
++};
++
++#endif /* __UX500_WDT_H */
+-- 
+1.7.5.4
