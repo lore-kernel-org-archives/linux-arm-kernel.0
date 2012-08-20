@@ -1,23 +1,54 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 19 Aug 2012 23:31:55 -0300
-Subject: [PATCH] ARM: Kirkwood: Iomega IX2-200 Device Tree Support Patch
- v2 Signed-off-by: Alan M Butler <alanbutty12@gmail.com>
-In-Reply-To: <CADhrpJ6HmUd86zx6Az0bx9JiiYp6kMmTis6ARMWBrNqoK8aKng@mail.gmail.com>
-References: <cover.1345196553.git.alanbutty12@gmail.com>
- <05c3c186d3675cde472bcc3a01198b6726c48a3c.1345196553.git.alanbutty12@gmail.com>
- <20120819020607.GZ22226@titan.lakedaemon.net>
- <CADhrpJ5WX-ZR3vxwe92Rg4R9a1+79Vf-QxKdJhyaC87o8HJYrw@mail.gmail.com>
- <CADhrpJ6HmUd86zx6Az0bx9JiiYp6kMmTis6ARMWBrNqoK8aKng@mail.gmail.com>
-Message-ID: <CAOMZO5AZZwQS8rkvrG3Nd7KAhgh3+PcfkdoKiqRW95eaUyTghg@mail.gmail.com>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Mon, 20 Aug 2012 10:55:10 +0800
+Subject: [PATCH V5 0/5] clk: mmp: add clock framework for mmp
+Message-ID: <1345431315-8037-1-git-send-email-xiechao.mail@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 19, 2012 at 3:03 PM, Alan M Butler <alanbutty12@gmail.com> wrote:
-> i just thaught i should let fabio and jason know that i just tried
-> kernel 3.6-rc2 and the buttons work i tried to apply the patch that
-> fabio sent me before but it didnt apply so i tried the kernel anyway
-> and the buttons do work.
+From: Chao Xie <chao.xie@marvell.com>
 
-The patch I sent applies against linux-next.
+v1->v2:
+replace __raw_xxx with xxx_relax
+use ioremap to remap the registers. Finaly it will use device tree to
+get the physical address.
+do not use macro to register clocks, and directly call the functions.
 
-If you try linux-next you will probably get the kernel crash.
+v2->v3:
+pxa910 will have APB extension clock, so some peripharals will have
+clocks in APB extension base.
+change pxa168-pwm to be pxa910-pwm for pxa910. It will fit the current
+pwm driver.
+
+v3->v4:
+remove addtional clock name definition
+replace left __raw_xxx
+
+v4->v5:
+change the format of the file
+
+Chao Xie (5):
+  clk: mmp: add mmp specific clocks
+  clk: mmp: add clock definition for pxa168
+  clk: mmp: add clock definition for pxa910
+  clk: mmp: add clock definition for mmp2
+  arm: mmp: make all SOCs use common clock by default
+
+ arch/arm/mach-mmp/Kconfig    |    3 +
+ drivers/clk/Makefile         |    3 +
+ drivers/clk/mmp/Makefile     |    9 +
+ drivers/clk/mmp/clk-apbc.c   |  152 ++++++++++++++
+ drivers/clk/mmp/clk-apmu.c   |   97 +++++++++
+ drivers/clk/mmp/clk-frac.c   |  153 ++++++++++++++
+ drivers/clk/mmp/clk-mmp2.c   |  449 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/mmp/clk-pxa168.c |  346 ++++++++++++++++++++++++++++++++
+ drivers/clk/mmp/clk-pxa910.c |  320 ++++++++++++++++++++++++++++++
+ drivers/clk/mmp/clk.h        |   35 ++++
+ 10 files changed, 1567 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/clk/mmp/Makefile
+ create mode 100644 drivers/clk/mmp/clk-apbc.c
+ create mode 100644 drivers/clk/mmp/clk-apmu.c
+ create mode 100644 drivers/clk/mmp/clk-frac.c
+ create mode 100644 drivers/clk/mmp/clk-mmp2.c
+ create mode 100644 drivers/clk/mmp/clk-pxa168.c
+ create mode 100644 drivers/clk/mmp/clk-pxa910.c
+ create mode 100644 drivers/clk/mmp/clk.h
