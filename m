@@ -1,50 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 20 Aug 2012 23:16:11 +0800
-Subject: [PATCH 2/2] ARM: imx6q: replace clk_register_clkdev with clock
- DT lookup
-In-Reply-To: <CAKGA1bn2uCWE8YkGR4EzTxZ_bXJ_ov2diq63uxQ=dT7b6Fu9GQ@mail.gmail.com>
-References: <1345104526-14797-1-git-send-email-shawn.guo@linaro.org>
- <1345104526-14797-3-git-send-email-shawn.guo@linaro.org>
- <503232E0.3000007@gmail.com>
- <CAKGA1bn2uCWE8YkGR4EzTxZ_bXJ_ov2diq63uxQ=dT7b6Fu9GQ@mail.gmail.com>
-Message-ID: <20120820151609.GN24242@S2101-09.ap.freescale.net>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Mon, 20 Aug 2012 10:21:46 -0500
+Subject: i.MX27 SLCDC driver
+In-Reply-To: <502DEDCD.9050303@gmail.com>
+References: <502DEDCD.9050303@gmail.com>
+Message-ID: <CAKGA1bmuUxiHbkF0n+bOx81EBQujuhu+piDsfHSVo2LejoPmcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 09:54:48AM -0500, Matt Sealey wrote:
-> Yet another arbitrary array...
-> 
-> I'm not sure why you would move the registration lookup into the DT
+On Fri, Aug 17, 2012 at 2:07 AM, Ga?tan Carlier <gcembed@gmail.com> wrote:
+> Hello,
+> I would like to write the driver for SmartLCD controller of i.MX27. This
+> kind of interface needs a LCD with an embedded graphic controller partially
+> controlled by GPIO. I want to link it with an OLED DD12832.
+>
+> How have I to write this driver : One driver for SLCDC and one driver for
+> DD12832 ? How to link them together ?
+>
+> Maybe use similar philosophy than soc-camera ?
 
-Because I do not want to patch kernel every time I need a new lookup.
-Furthermore, looking at function imx53_qsb_init in imx53-dt.c, you
-will find that lookup for sgtl5000 is really board specific and should
-go to device tree.
+Please use DRM if you can. That way your SLCDC controller is a "crtc"
+and your OLED panel is a combination "encoder" and "connector". The
+DRM subsystem isn't by far the best solution since it is designed
+around PCI-class graphics cards and the split is intended for those
+and not for more tightly-knit LCDC+display combinations, but it does
+split things the way you're thinking and with a little extra code it
+will do exactly what you want if a little less efficient than your
+attached driver.
 
-> and use an arbitrarily ordered array again. Sure, you're looking it up
-> entirely within the device tree here, but a better solution would be
-> to not name clocks twice, and structure your clock definition
-> properly.
-> 
-> What's wrong with;
-> 
-> ccm at 020c4000 {
->    ...
->    my_clock: clock at 0 {
->        name = "my_clock_name";
->    }
-> }
-> 
-> uart at nnnnnnnn {
->    ...
->    clocks = <&my_clock>;
-> }
-> 
-> ?
-> 
-It turns a property into 185 nodes, which will just bloat the device
-tree.  This issue has been discussed for a plenty of times.
+I was sure Sascha had a driver for this already;
+http://git.pengutronix.de/?p=imx/linux-2.6.git;a=commit;h=c333f47fa185edfd1c9d889fc8af040dd557b02c
+- it should not be too hard to add your panel and the specific gpio
+control as an encoder/connector. Maybe with a user this can actually
+go upstream.
 
 -- 
-Regards,
-Shawn
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
