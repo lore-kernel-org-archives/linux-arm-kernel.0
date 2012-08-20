@@ -1,96 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 20 Aug 2012 18:26:00 +0100
-Subject: [PATCH v3] ARM: support syscall tracing
-In-Reply-To: <50324BED.9000500@mentor.com>
-References: <50324BED.9000500@mentor.com>
-Message-ID: <20120820172559.GW25864@mudshark.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 20 Aug 2012 19:36:22 +0200
+Subject: [PATCH 04/11] pinctrl: mvebu: add pinctrl driver for Armada 370
+In-Reply-To: <50326A60.1070007@gmail.com>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1344689809-6223-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CACRpkdYNZar7865-T12J37h3AWA9-8R1R5tymuOhaB0b3ddEAA@mail.gmail.com>
+ <50326A60.1070007@gmail.com>
+Message-ID: <20120820193622.4e539451@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wade,
+Le Mon, 20 Aug 2012 18:48:32 +0200,
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
 
-On Mon, Aug 20, 2012 at 03:38:37PM +0100, Wade Farnsworth wrote:
-> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> index 978eac5..b032c94 100644
-> --- a/arch/arm/kernel/entry-common.S
-> +++ b/arch/arm/kernel/entry-common.S
-> @@ -94,6 +94,15 @@ ENDPROC(ret_from_fork)
->  	.equ NR_syscalls,0
->  #define CALL(x) .equ NR_syscalls,NR_syscalls+1
->  #include "calls.S"
-> +
-> +/*
-> + * Ensure that the system call table is equal to __NR_syscalls,
-> + * which is the value the rest of the system sees
-> + */
-> +.ifne NR_syscalls - __NR_syscalls
-> +.error "__NR_syscalls is not equal to the size of the syscall table"
-> +.endif
-> +
->  #undef CALL
->  #define CALL(x) .long x
->  
-> @@ -415,7 +424,7 @@ local_restart:
->  1:
->  #endif
->  
-> -	tst	r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
-> +	tst     r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
+> this is really difficult here ;) I thought I could just add PINCTRL_DOVE
+> to MACH_DOVE inside ARCH_MVEBU, PINCTRL_KIRKWOOD to MACH_KIRKWOOD, aso.
+> But there is a common MACH_ARMADA_370_XP for both 370 and XP obviously.
+> 
+> If it is ok for you I will add both PINCTRL_ stubs to the Kconfig and
+> you work it out if you ever have two distinct MACHs? Or it could remain
+> selectable in pinctrl/Kconfig but that will then be different with the
+> other stubs.
 
-This is just a whitespace change, so I think you can drop it.
+In order to keep the consistency with other SoC families, maybe we can
+split the 370 and XP options in two separate MACH_ARMADA_370 and
+MACH_ARMADA_XP. So, in the ideal world, once all Marvell EBU SoCs are
+converted to DT+mach-mvebu, we should have:
 
-> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-> index 3e0fc5f..4974cdf 100644
-> --- a/arch/arm/kernel/ptrace.c
-> +++ b/arch/arm/kernel/ptrace.c
-> @@ -30,6 +30,9 @@
->  #include <asm/pgtable.h>
->  #include <asm/traps.h>
->  
-> +#define CREATE_TRACE_POINTS
-> +#include <trace/events/syscalls.h>
-> +
->  #define REG_PC	15
->  #define REG_PSR	16
->  /*
-> @@ -918,11 +921,11 @@ static int ptrace_syscall_trace(struct pt_regs *regs, int scno,
->  {
->  	unsigned long ip;
->  
-> +	current_thread_info()->syscall = scno;
-> +
->  	if (!test_thread_flag(TIF_SYSCALL_TRACE))
->  		return scno;
->  
-> -	current_thread_info()->syscall = scno;
-> -
->  	/*
->  	 * IP is used to denote syscall entry/exit:
->  	 * IP = 0 -> entry, =1 -> exit
-> @@ -942,6 +945,8 @@ static int ptrace_syscall_trace(struct pt_regs *regs, int scno,
->  asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
->  {
->  	int ret = ptrace_syscall_trace(regs, scno, PTRACE_SYSCALL_ENTER);
-> +	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
-> +		trace_sys_enter(regs, scno);
->  	audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0, regs->ARM_r1,
->  			    regs->ARM_r2, regs->ARM_r3);
->  	return ret;
-> @@ -950,6 +955,8 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
->  asmlinkage int syscall_trace_exit(struct pt_regs *regs, int scno)
->  {
->  	int ret = ptrace_syscall_trace(regs, scno, PTRACE_SYSCALL_EXIT);
-> +	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
-> +		trace_sys_exit(regs, scno);
+ *) arch/arm/Kconfig defines MACH_MVEBU
 
-I think that trace_sys_{enter,exit} should take ret rather than scno. A
-debugger could change the syscall number if TIF_SYSCALL_TRACE is set and
-that new number should be the one that we use.
+ *) arch/arm/mach-mvebu/Kconfig defines MACH_KIRKWOOD, MACH_DOVE,
+    MACH_MX78X00, MACH_ARMADA_370, MACH_ARMADA_XP, MACH_ORION5X
 
-The style, however, is much better and I think the code is fairly clear now
-so we just need to wait for my fix to the core code to get merged (it got
-picked up by Steve Rostedt) and I think we can use ret directly. It might be
-worth dropping the local variable and using scno for everything, so that
-it's obvious where the syscall number is stored.
+Then, an user is free to build a single kernel image that supports all,
+or a selection of the supported Marvell EBU SoCs.
 
-Will
+Would that be ok with you?
+
+If that's fine with you, then I would prefer if we keep the single
+MACH_ARMADA_370_XP symbol for now, so that your pinctrl set of patches
+does not depend on something else. We would do the small Kconfig option
+refactoring as a follow-up set of patches. Thoughts?
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
