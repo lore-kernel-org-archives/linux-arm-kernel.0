@@ -1,11 +1,10 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 Aug 2012 16:27:05 +0200
-Subject: [PATCH 06/11] ARM: mvebu: add pinctrl device in DT for Armada
- 370/XP SoCs
-In-Reply-To: <1344689809-6223-7-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Mon, 20 Aug 2012 16:27:41 +0200
+Subject: [PATCH 07/11] ARM: mvebu: Add pinctrl support to Armada XP SoCs
+In-Reply-To: <1344689809-6223-8-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1344689809-6223-7-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CACRpkdaWKf2se6PE7SMoOoqbTCLaMBMgjKbJa5tpQzr-RTSmJg@mail.gmail.com>
+ <1344689809-6223-8-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CACRpkdbNpeBLy-JmUz-YjFYVZfAw3mavUAWigLKyXU=iQ_wMSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,12 +13,16 @@ On Sat, Aug 11, 2012 at 2:56 PM, Sebastian Hesselbarth
 
 > From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 >
-> The Armada 370 and XP SoCs have configurable muxing for a certain
-> number of their pins, controlled through a pinctrl driver.
+> This commits adds the necessary device tree information to define the
+> compatible property for the pinctrl driver instance of Armada XP SoCs.
 >
-> The 'compatible' property is defined in the SoC-specific .dtsi files,
-> since the compatible string identifies the number of pins and other
-> SoC-specific properties.
+> Until now, the device tree representation considered the Armada XP as
+> a single SoC. But in fact, there are three different SoCs in the
+> Armada XP families, with different number of CPU cores, different
+> number of Ethernet interfaces... and different number of muxable pins
+> or functions. We therefore introduce three armada-xp-mv78xx0.dtsi for
+> the three SoCs of the Armada XP family. The current armada-xp-db.dts
+> evaluation board uses the MV78460 variant of the SoC.
 >
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
