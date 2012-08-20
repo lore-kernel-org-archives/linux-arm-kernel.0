@@ -1,54 +1,59 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 20 Aug 2012 15:53:33 -0300
-Subject: [PATCH] ARM: Kirkwood: Iomega IX2-200 Device Tree Support Patch
- v2 Signed-off-by: Alan M Butler <alanbutty12@gmail.com>
-In-Reply-To: <CADhrpJ56iWZnBKf6Knoqbm6iucrXMb7ESDtB8WSyWbCxO6A4rg@mail.gmail.com>
-References: <cover.1345196553.git.alanbutty12@gmail.com>
- <05c3c186d3675cde472bcc3a01198b6726c48a3c.1345196553.git.alanbutty12@gmail.com>
- <20120819020607.GZ22226@titan.lakedaemon.net>
- <CADhrpJ5WX-ZR3vxwe92Rg4R9a1+79Vf-QxKdJhyaC87o8HJYrw@mail.gmail.com>
- <CADhrpJ6HmUd86zx6Az0bx9JiiYp6kMmTis6ARMWBrNqoK8aKng@mail.gmail.com>
- <CAOMZO5AZZwQS8rkvrG3Nd7KAhgh3+PcfkdoKiqRW95eaUyTghg@mail.gmail.com>
- <CADhrpJ7ZE=L25V8sKyQAT02iDuyCRwyCAjw4ukopek1i0TRqNw@mail.gmail.com>
- <CAOMZO5BoWyGzB3p11yE9NXAXq319oi0bnbFuwxvahCqGDOZKrw@mail.gmail.com>
- <CADhrpJ487cN23gRkws1Grp+SEmrKO2JdDT0r-DVeCZm-XqdP=A@mail.gmail.com>
- <CAOMZO5BbdT2CXHh4NEt8bPZ4C7Mg=Yd9C9E7J2H_JsGJ=88fqQ@mail.gmail.com>
- <CADhrpJ7Fq0FktNN-54++39=SN_GrkX7gpse+2QfD7ioQw+_cEA@mail.gmail.com>
- <CADhrpJ56iWZnBKf6Knoqbm6iucrXMb7ESDtB8WSyWbCxO6A4rg@mail.gmail.com>
-Message-ID: <CAOMZO5ApRi6uF1ByNzudSM9VaRNhWy4Pa1AJ-G976NezReG3WA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 20 Aug 2012 19:49:05 +0000
+Subject: [PATCH RESEND 1/2] i2c: pnx: Fix bit definitions
+In-Reply-To: <50326A3E.9070607@antcom.de>
+References: <1344411752-23469-1-git-send-email-stigge@antcom.de>
+ <083DF309106F364B939360100EC290F823A0354A3D@eu1rdcrdc1wx030.exi.nxp.com>
+ <50326A3E.9070607@antcom.de>
+Message-ID: <201208201949.06530.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+On Monday 20 August 2012, Roland Stigge wrote:
+> On 08/20/2012 06:26 PM, Kevin Wells wrote:
+> > I've never had my hands on a PNX4008 chip at NXP, but I do believe they
+> > are the same IP. That specific I2C IP was used in a number of NXP/Phillips
+> > chips besides the PNX4008/LPC32xx. I don't think there are any PNX4008's in
+> > the wild, and even working in NXP, I can't find any non-marketing reference
+> > material for that part (including the user manual).
+> 
+> Considering this, it might be a good idea to remove support for PNX4008
+> (arch/arm/mach-pnx4008/) altogether. It's hard to maintain support for
+> hardware which isn't available, even at NXP. It would also simplify
+> maintenance of mach-lpc32xx because the overlap currently makes me
+> always wonder if the respective changes still work with mach-pnx4008.
+> 
+> Any opposition?
+> 
+> 
+> PS: I just wonder how mach-pnx4008 came into the kernel at all...
 
-On Mon, Aug 20, 2012 at 2:37 PM, Alan M Butler <alanbutty12@gmail.com> wrote:
+According to the git logs, Vitaly Wool originally added support for the
+platform in 2006 when working at MontaVista, and that year was also the
+last time he or anyone else from that company contributed anything in
+that directory. Russell was the only other person to make substantial
+contributions to it, but they all seem to be cross-platform changes.
 
-> i just tried your patch again with the latest linux-next dated 20th of
-> august with that patch you gave me and i am still getting the errors
-> on the gpio-keys this is the error:
->
-> [    4.838988] orion_gpio_is_valid: invalid GPIO 0
-> [    4.838999] orion_gpio_is_valid: invalid GPIO 0
-> [    4.839015] gpio-keys gpio-keys.2: Failed to request GPIO 0, error -22
-> [    4.845617] gpio-keys: probe of gpio-keys.2 failed with error -22
+In the platform code, there is only a single board number reserved,
+with the name of the SoC: MACHINE_START(PNX4008, "Philips PNX4008").
+This indicates that whoever was actually using the code did not have
+their board code upstream and relied on out-of-tree patches for the
+platform.
 
-Ok, I am able to reproduce your issue on a mx53qsb as well.
+>From all I can tell, the PNX4008 family probably went to ST-Ericsson,
+not to NXP in the various acquisitions and mergers that happened
+around NXP. This explains why Kevin has no documentation or hardware
+for it. On the ST-Ericsson web site, I could find some information
+about the PNX4908, presumably a follow-on chip, but not about PNX4008,
+so I guess the company also considers the product line dead.
 
-I haven't seen the issue previously because I was registering only one
-key on my mx51-babbage. The failure happens on the subsequent key
-registrations.
+Finally, the chips seems to be targetted at mobile phones and was
+introduced seven years ago, which is multiple generations of
+products in that market, so probably people stopped caring about
+them long ago, unlike embedded chips from the same era for other
+markets.
 
-I fixed it with the attached patch, which just sent it to the linux-input list.
+I'd say let's wait for Vitaly to reply on this matter, if he doesn't
+care about the code, we can kill it off in 3.7 or 3.8.
 
-Can you please test it?
-
-Regards,
-
-Fabio Estevam
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-buttonv2.patch
-Type: application/octet-stream
-Size: 2989 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120820/988ed840/attachment.obj>
+	Arnd
