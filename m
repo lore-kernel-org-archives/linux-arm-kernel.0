@@ -1,32 +1,23 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Mon, 20 Aug 2012 02:18:12 +0300
-Subject: ARM hugetlb support?
-Message-ID: <CANOLnOPLLQ=Cy5rvf5J7R96whrvLKO4HW9nVn4rQXqXCTVgCPA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 19 Aug 2012 23:31:55 -0300
+Subject: [PATCH] ARM: Kirkwood: Iomega IX2-200 Device Tree Support Patch
+ v2 Signed-off-by: Alan M Butler <alanbutty12@gmail.com>
+In-Reply-To: <CADhrpJ6HmUd86zx6Az0bx9JiiYp6kMmTis6ARMWBrNqoK8aKng@mail.gmail.com>
+References: <cover.1345196553.git.alanbutty12@gmail.com>
+ <05c3c186d3675cde472bcc3a01198b6726c48a3c.1345196553.git.alanbutty12@gmail.com>
+ <20120819020607.GZ22226@titan.lakedaemon.net>
+ <CADhrpJ5WX-ZR3vxwe92Rg4R9a1+79Vf-QxKdJhyaC87o8HJYrw@mail.gmail.com>
+ <CADhrpJ6HmUd86zx6Az0bx9JiiYp6kMmTis6ARMWBrNqoK8aKng@mail.gmail.com>
+Message-ID: <CAOMZO5AZZwQS8rkvrG3Nd7KAhgh3+PcfkdoKiqRW95eaUyTghg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sun, Aug 19, 2012 at 3:03 PM, Alan M Butler <alanbutty12@gmail.com> wrote:
+> i just thaught i should let fabio and jason know that i just tried
+> kernel 3.6-rc2 and the buttons work i tried to apply the patch that
+> fabio sent me before but it didnt apply so i tried the kernel anyway
+> and the buttons do work.
 
-We are developing an application that's drawing various geometry on
-1024x1024 framebuffer (lines, triangles, etc) and is running on
-Cortex-A8 CPU. It seems this kind of application is suffering badly
-from TLB misses, as A8 only has 32 entry TLB cache.
+The patch I sent applies against linux-next.
 
-I've found that hugetlb support patches have been posted some months
-ago [1]. I've been testing them with very good results [2]. Are there
-still plans to further develop them and eventually merge them?
-
-
-[1] http://marc.info/?l=linux-arm-kernel&m=132912620601308&w=2
-[2] Cycle measurements of rendering full scene (using cycle counter in
-A8), x1000 cycles:
-
-       normal hugetlb improvement
-scene1 28507  21351   34%
-scene2 11710  10138   16%
-scene3 17178  13631   26%
-scene4 4372   3810    15%
-scene5 3525   3255    8%
-
--- 
-Gra?vydas
+If you try linux-next you will probably get the kernel crash.
