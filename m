@@ -1,27 +1,51 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 21 Aug 2012 02:14:19 +0300
-Subject: [PATCH 3/3] ARM: Kirkwood: increase atomic coherent pool size
-In-Reply-To: <1345459648-24263-4-git-send-email-m.szyprowski@samsung.com>
-References: <1345459648-24263-1-git-send-email-m.szyprowski@samsung.com>
- <1345459648-24263-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20120820231419.GB755@harshnoise.musicnaut.iki.fi>
+From: omar.luna@linaro.org (Omar Ramirez Luna)
+Date: Mon, 20 Aug 2012 20:13:47 -0500
+Subject: [PATCH 1/3] ARM: OMAP: hwmod: partially un-reset hwmods might not
+ be properly enabled
+In-Reply-To: <50324E84.6080407@ti.com>
+References: <1342466485-1050-1-git-send-email-omar.luna@linaro.org>
+ <1342466485-1050-2-git-send-email-omar.luna@linaro.org>
+ <50324E84.6080407@ti.com>
+Message-ID: <CALLhW=44R0H-3k5qU=Uckf9UjzP2=xLFYXJt8Nce7VoKFpX_dQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 12:47:28PM +0200, Marek Szyprowski wrote:
-> The default 256 KiB coherent pool may be too small for some of the Kirkwood
-> devices, so increase it to make sure that devices will be able to allocate
-> their buffers with GFP_ATOMIC flag.
-[...]
-> +	/*
-> +	 * Some Kirkwood devices allocate their coherent buffers from atomic
-> +	 * context. Increase size of atomic coherent pool to make sure such
-> +	 * the allocations won't fail.
-> +	 */
-> +	init_dma_coherent_pool_size(SZ_1M);
+Hi Benoit,
 
-Not sure if it's a valid use case, but what if some user wants to drop
-e.g. SATA driver and and free up some memory. Would a smaller coherent
-pool kernel parameter override this code in that case?
+On 20 August 2012 09:49, Benoit Cousson <b-cousson@ti.com> wrote:
+> On 07/16/2012 09:21 PM, Omar Ramirez Luna wrote:
+>> Some IP blocks might not be using/controlling more than one
+>> reset line, this check loosens the restriction to fully use
+>> hwmod framework for those drivers.
+>>
+>> E.g.: ipu has reset lines: mmu_cache, cpu0 and cpu1.
+>> - cpu1 might not be used and hence (with previous check)
+>>   won't be fully enabled by hwmod code.
+>
+> You mean that you might have some case where you need to enable the
+> mmu_cache and cpu0 and thus deassert only the mmu/cpu0 while keeping the
+> cpu1 under reset?
+>
+> So the any_hardreset is indeed not appropriate in that case.
+>
+> In fact, since the hardreset cannot be handled at all by the hwmod fmwk,
+> I'm even wondering if we should take care of checking the state at all.
+> But as Paul stated, if was done due to the lack of understanding about
+> the diver usage, so maybe things will become clearer once we will have
+> that code available.
+>
+> So I guess that checking for all the lines for the hardreset state is
+> anyway already a first step toward a good understanding of the reset
+> need for the remote processors.
+>
+> The patch looks fine to me considering that we do not have a lot of
+> information about the usage :-(
+>
+> Maybe you could add more information in the changelog to explain the way
+> you are going to use the reset API.
 
-A.
+I'll add an updated description with more information.
+
+Thanks for the comments,
+
+Omar
