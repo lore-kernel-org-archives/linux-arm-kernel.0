@@ -1,173 +1,86 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Tue, 21 Aug 2012 16:32:00 +0200
-Subject: [PATCH 5/5] ARM: dts: add twi nodes for atmel boards
-In-Reply-To: <1345559345-13988-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1345559345-13988-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1345559520-14074-1-git-send-email-ludovic.desroches@atmel.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 21 Aug 2012 17:33:56 +0300
+Subject: [PATCH] ASoC: omap-mcbsp: Device tree binding documentation update
+Message-ID: <1345559636-23370-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+To reflect the final devicetree node structure of McBSPs.
 
-Use the atmel twi instead of gpio for i2c stuff.
-
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/at91sam9263ek.dts         | 20 ++++++++++----------
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi | 28 ++++++++++++++--------------
- arch/arm/boot/dts/at91sam9g25ek.dts         | 12 ++++++++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts      | 14 ++++++++++++++
- arch/arm/boot/dts/at91sam9n12ek.dts         |  8 ++++++++
- 5 files changed, 58 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
-index f86ac4b..772ab75 100644
---- a/arch/arm/boot/dts/at91sam9263ek.dts
-+++ b/arch/arm/boot/dts/at91sam9263ek.dts
-@@ -50,6 +50,16 @@
- 				atmel,vbus-gpio = <&pioA 25 0>;
- 				status = "okay";
- 			};
-+
-+			i2c0: i2c at fff88000 {
-+				status = "okay";
-+
-+				24c512 at 50 {
-+					compatible = "24c512";
-+					reg = <0x50>;
-+					pagesize = <128>;
-+				};
-+			};
- 		};
+Hello,
+
+the initial OMAP McBSP DT structure was not able to describe the IP (and it's
+versions) correctly.
+The main issue was the sidetone block of McBSP2/3 on OMAP3.
+With this change in the DT description the OS can get the needed information
+about the IP.
+
+The sidetone is still not supported when the Linux kernel is booted with DT
+since we still depend on hwmod to fill the resources.
+
+This patch depend on the McBSP DT support series going via audio tree.
+
+Regards,
+Peter
+
+ .../devicetree/bindings/sound/omap-mcbsp.txt       |   28 +++++++------------
+ 1 files changed, 10 insertions(+), 18 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/sound/omap-mcbsp.txt b/Documentation/devicetree/bindings/sound/omap-mcbsp.txt
+index 447cb13..17cce44 100644
+--- a/Documentation/devicetree/bindings/sound/omap-mcbsp.txt
++++ b/Documentation/devicetree/bindings/sound/omap-mcbsp.txt
+@@ -8,38 +8,30 @@ Required properties:
+ - reg: Register location and size, for OMAP4+ as an array:
+        <MPU access base address, size>,
+        <L3 interconnect address, size>;
++- reg-names: Array of strings associated with the address space
+ - interrupts: Interrupt numbers for the McBSP port, as an array in case the
+ 	      McBSP IP have more interrupt lines:
+ 	<OCP compliant irq>,
+ 	<TX irq>,
+ 	<RX irq>;
++- interrupt-names: Array of strings associated with the interrupt numbers
+ - interrupt-parent: The parent interrupt controller
+ - ti,buffer-size: Size of the FIFO on the port (OMAP2430 and newer SoC)
+ - ti,hwmods: Name of the hwmod associated to the McBSP port
  
- 		nand0: nand at 40000000 {
-@@ -143,14 +153,4 @@
- 			gpio-key,wakeup;
- 		};
- 	};
+-Sidetone support for OMAP3 McBSP2 and 3 ports:
+-- sidetone { }: Within this section the following parameters are required:
+-- reg: Register location and size for the ST block
+-- interrupts: The interrupt number for the ST block
+-- interrupt-parent: The parent interrupt controller for the ST block
 -
--	i2c at 0 {
--		status = "okay";
+ Example:
+ 
+ mcbsp2: mcbsp at 49022000 {
+ 	compatible = "ti,omap3-mcbsp";
+-	#address-cells = <1>;
+-	#size-cells = <1>;
+-	reg = <0x49022000 0xff>;
+-	interrupts = <0 17 0x4>, /* OCP compliant interrup */
+-		     <0 62 0x4>, /* TX interrup */
+-		     <0 63 0x4>; /* RX interrup */
++	reg = <0x49022000 0xff>,
++	      <0x49028000 0xff>;
++	reg-names = "mpu", "sidetone";
++	interrupts = <0 17 0x4>, /* OCP compliant interrupt */
++		     <0 62 0x4>, /* TX interrupt */
++		     <0 63 0x4>, /* RX interrupt */
++		     <0 4 0x4>;  /* Sidetone */
++	interrupt-names = "common", "tx", "rx", "sidetone";
+ 	interrupt-parent = <&intc>;
+ 	ti,buffer-size = <1280>;
+ 	ti,hwmods = "mcbsp2";
 -
--		24c512 at 50 {
--			compatible = "24c512";
--			reg = <0x50>;
--			pagesize = <128>;
--		};
+-	sidetone {
+-		reg = <0x49028000 0xff>;
+-		interrupts = <0 4 0x4>;
+-		interrupt-parent = <&intc>;
 -	};
  };
-diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-index b06c0db..712106b 100644
---- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-@@ -51,6 +51,20 @@
- 				atmel,vbus-gpio = <&pioC 5 0>;
- 				status = "okay";
- 			};
-+
-+			i2c0: i2c at fffac000 {
-+				status = "okay";
-+
-+				24c512 at 50 {
-+					compatible = "24c512";
-+					reg = <0x50>;
-+				};
-+
-+				wm8731 at 1b {
-+					compatible = "wm8731";
-+					reg = <0x1b>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-@@ -106,20 +120,6 @@
- 		};
- 	};
- 
--	i2c at 0 {
--		status = "okay";
--
--		24c512 at 50 {
--			compatible = "24c512";
--			reg = <0x50>;
--		};
--
--		wm8731 at 1b {
--			compatible = "wm8731";
--			reg = <0x1b>;
--		};
--	};
--
- 	gpio_keys {
- 		compatible = "gpio-keys";
- 		#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
-index 7829a4d..3b0adbc 100644
---- a/arch/arm/boot/dts/at91sam9g25ek.dts
-+++ b/arch/arm/boot/dts/at91sam9g25ek.dts
-@@ -32,6 +32,18 @@
- 				phy-mode = "rmii";
- 				status = "okay";
- 			};
-+
-+			i2c0: i2c at f8010000 {
-+				status = "okay";
-+			};
-+
-+			i2c1: i2c at f8014000 {
-+				status = "okay";
-+			};
-+
-+			i2c2: i2c at f8018000 {
-+				status = "okay";
-+			};
- 		};
- 
- 		usb0: ohci at 00600000 {
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index a3633bd..4f94f23 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -46,6 +46,20 @@
- 				phy-mode = "rmii";
- 				status = "okay";
- 			};
-+
-+			i2c0: i2c at fff84000 {
-+				status = "okay";
-+
-+				24c512 at 50 {
-+					compatible = "24c512";
-+					reg = <0x50>;
-+					pagesize = <128>;
-+				};
-+			};
-+			
-+			i2c1: i2c at fff88000 {
-+				status = "okay";
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-index f4e43e3..912b2c2 100644
---- a/arch/arm/boot/dts/at91sam9n12ek.dts
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -37,6 +37,14 @@
- 			dbgu: serial at fffff200 {
- 				status = "okay";
- 			};
-+
-+			i2c0: i2c at f8010000 {
-+				status = "okay";
-+			};
-+
-+			i2c1: i2c at f8014000 {
-+				status = "okay";
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
 -- 
-1.7.11.3
+1.7.8.6
