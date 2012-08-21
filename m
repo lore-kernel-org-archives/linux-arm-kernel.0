@@ -1,86 +1,79 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Tue, 21 Aug 2012 14:15:21 +0200
-Subject: [PATCHv6 2/2] ARM: dma-mapping: remove custom consistent dma
- region
-In-Reply-To: <20120821142235.97984abc9ad98d01015a3338@nvidia.com>
-References: <1343636899-19508-1-git-send-email-m.szyprowski@samsung.com><1343636899-19508-3-git-send-email-m.szyprowski@samsung.com><20120821142235.97984abc9ad98d01015a3338@nvidia.com>
-Message-ID: <20120821.151521.702882672715065253.hdoyu@nvidia.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 21 Aug 2012 15:15:58 +0300
+Subject: [PATCH v2 00/13] OMAP Serial patches
+In-Reply-To: <1345540555-24359-1-git-send-email-balbi@ti.com>
+References: <1345540555-24359-1-git-send-email-balbi@ti.com>
+Message-ID: <1345551371-18862-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hiroshi Doyu <hdoyu@nvidia.com> wrote @ Tue, 21 Aug 2012 13:22:35 +0200:
+Hi guys,
 
-> Hi,
-> 
-> On Mon, 30 Jul 2012 10:28:19 +0200
-> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> 
-> > This patch changes dma-mapping subsystem to use generic vmalloc areas
-> > for all consistent dma allocations. This increases the total size limit
-> > of the consistent allocations and removes platform hacks and a lot of
-> > duplicated code.
-> > 
-> > Atomic allocations are served from special pool preallocated on boot,
-> > because vmalloc areas cannot be reliably created in atomic context.
-> > 
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Reviewed-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >  Documentation/kernel-parameters.txt |    2 +-
-> >  arch/arm/include/asm/dma-mapping.h  |    2 +-
-> >  arch/arm/mm/dma-mapping.c           |  486 ++++++++++++-----------------------
-> >  arch/arm/mm/mm.h                    |    3 +
-> >  include/linux/vmalloc.h             |    1 +
-> >  mm/vmalloc.c                        |   10 +-
-> >  6 files changed, 181 insertions(+), 323 deletions(-)
-> > 
-> ...
-> > @@ -1117,61 +984,32 @@ static int __iommu_free_buffer(struct device *dev, struct page **pages, size_t s
-> >   * Create a CPU mapping for a specified pages
-> >   */
-> >  static void *
-> > -__iommu_alloc_remap(struct page **pages, size_t size, gfp_t gfp, pgprot_t prot)
-> > +__iommu_alloc_remap(struct page **pages, size_t size, gfp_t gfp, pgprot_t prot,
-> > +                   const void *caller)
-> >  {
-> > -       struct arm_vmregion *c;
-> > -       size_t align;
-> > -       size_t count = size >> PAGE_SHIFT;
-> > -       int bit;
-> > +       unsigned int i, nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
-> > +       struct vm_struct *area;
-> > +       unsigned long p;
-> > 
-> > -       if (!consistent_pte[0]) {
-> > -               pr_err("%s: not initialised\n", __func__);
-> > -               dump_stack();
-> > +       area = get_vm_area_caller(size, VM_ARM_DMA_CONSISTENT | VM_USERMAP,
-> > +                                 caller);
-> > +       if (!area)
-> 
-> This patch replaced the custom "consistent_pte" with
-> get_vm_area_caller()", which breaks the compatibility with the
-> existing driver. This causes the following kernel oops(*1). That
-> driver has called dma_pool_alloc() to allocate memory from the
-> interrupt context, and it hits BUG_ON(in_interrpt()) in
-> "get_vm_area_caller()"(*2). Regardless of the badness of allocation
-> from interrupt handler in the driver, I have the following question.
-> 
-> The following "__get_vm_area_node()" can take gfp_mask, it means that
-> this function is expected to be called from atomic context, but why
-> it's _NOT_ allowed _ONLY_ from interrupt context?
-> 
-> According to the following definitions, "in_interrupt()" is in "in_atomic()".
-> 
-> #define in_interrupt()	(preempt_count() & (HARDIRQ_MASK | SOFTIRQ_MASK | NMI_MASK))
-> #define in_atomic()	((preempt_count() & ~PREEMPT_ACTIVE) != 0)
-> 
-> Does anyone know why BUG_ON(in_interrupt()) is set in __get_vm_area_node(*3)?
+here's a series of cleanup patches to the OMAP serial
+driver. A later series could be made re-implementing
+DMA using the DMA Engine API. Note that for RX DMA
+we could be using RX Timeout IRQ as a hint that we better
+use PIO instead ;-)
 
-For arm_dma_alloc(), it allocates from the pool if GFP_ATOMIC, but for
-arm_iommu_alloc_attrs() doesn't have pre-allocate pool at all, and it
-always call "get_vm_area_caller()". That's why it hits BUG(). But
-still I don't understand why it's not BUG_ON(in_atomic) as Russell
-already pointed out(*1).
+All patches were tested on my pandaboard, but I'd really
+like to receive Tested-by on other platforms.
 
-*1: http://article.gmane.org/gmane.linux.kernel.mm/76708
+After this goes in, I'll probably try to get UART wakeup
+working again and only after that look at DMA.
+
+Changes since v1:
+
+	. improved commit log on patch 9/13 (formerly 10/13)
+	. removed patch 2/13
+	. added a new patch switching from spin_lock_irqsave() to spin_lock and
+		spin_unlock_irqrestore to spin_unlock
+
+Retested with my pandaboard, UART continues to work:
+
+ # grep -i uart /proc/interrupts
+ 106:        124          0       GIC  OMAP UART2
+ #  grep -i uart /proc/interrupts
+ 106:        189          0       GIC  OMAP UART2
+ #  grep -i uart /proc/interrupts
+ 106:        255          0       GIC  OMAP UART2
+ #  grep -i uart /proc/interrupts
+ 106:        321          0       GIC  OMAP UART2
+ #  grep -i uart /proc/interrupts
+ 106:        387          0       GIC  OMAP UART2
+ #  grep -i uart /proc/interrupts
+ 106:        453          0       GIC  OMAP UART2
+ #  grep -i uart /proc/interrupts
+ 106:        519          0       GIC  OMAP UART2
+
+cheers
+
+ps: if anyone knows a better test for UART, let me know.
+
+for convenience of anyone testing, patches are available on my git tree [1] on
+branch uart
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git uart
+
+Felipe Balbi (13):
+  serial: omap: define and use to_uart_omap_port()
+  serial: omap: define helpers for pdata function pointers
+  serial: omap: don't access the platform_device
+  serial: omap: drop DMA support
+  serial: add OMAP-specific defines
+  serial: omap: simplify IRQ handling
+  serial: omap: refactor receive_chars() into rdi/rlsi handlers
+  serial: omap: move THRE check to transmit_chars()
+  serial: omap: stick to put_autosuspend
+  serial: omap: set dev->drvdata before enabling pm_runtime
+  serial: omap: drop unnecessary check from remove
+  serial: omap: make sure to suspend device before remove
+  serial: omap: don't save IRQ flags on hardirq
+
+ arch/arm/mach-omap2/serial.c                  |  15 +-
+ arch/arm/plat-omap/include/plat/omap-serial.h |  12 +-
+ drivers/tty/serial/omap-serial.c              | 713 +++++++++-----------------
+ include/linux/serial_reg.h                    |   4 +
+ 4 files changed, 254 insertions(+), 490 deletions(-)
+
+-- 
+1.7.12.rc3
