@@ -1,35 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 21 Aug 2012 10:50:51 +0100
-Subject: [PATCH v2 08/31] arm64: CPU support
-In-Reply-To: <201208202047.07991.arnd@arndb.de>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <20120815001043.GD19607@quad.lixom.net>
- <20120820155740.GA912@arm.com> <201208202047.07991.arnd@arndb.de>
-Message-ID: <20120821095051.GA12708@arm.com>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Tue, 21 Aug 2012 12:57:40 +0300
+Subject: ARM hugetlb support?
+In-Reply-To: <20120820082514.GF27631@e103986-lin>
+References: <20120820082514.GF27631@e103986-lin>
+Message-ID: <CANOLnOMaV_urZvRL5NF++3UpOQSa_RwL1jfOTdGkn7fN+yZ28Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 09:47:07PM +0100, Arnd Bergmann wrote:
-> On Monday 20 August 2012, Catalin Marinas wrote:
-> > > > --- /dev/null
-> > > > +++ b/arch/arm64/mm/proc-syms.c
-> > ...
-> > > > +EXPORT_SYMBOL(__cpuc_flush_kern_all);
-> > > > +EXPORT_SYMBOL(__cpuc_flush_user_all);
-> > > > +EXPORT_SYMBOL(__cpuc_flush_user_range);
-> > > > +EXPORT_SYMBOL(__cpuc_coherent_kern_range);
-> > > > +EXPORT_SYMBOL(__cpuc_flush_dcache_area);
-> > > 
-> > > See comment on other email about putting function pointers in a struct
-> > > instead.
-> > 
-> > There is no need to support multiple CPU architectures with different
-> > implementations, so allowing these functions to be called without
-> > indirection is better.
-> 
-> What is the __cpuc prefix about then? Could you just drop it?
+On Mon, Aug 20, 2012 at 11:25 AM, Steve Capper <steve.capper@arm.com> wrote:
+> n Mon, Aug 20, 2012 at 00:18:12AM +0100, Grazvydas Ignotas wrote:
+>> Hello,
+> Hello Grazvydas,
+>
+>> I've found that hugetlb support patches have been posted some months
+>> ago [1]. I've been testing them with very good results [2]. Are there
+>> still plans to further develop them and eventually merge them?
+>>
+>
+> We are currently working on HugeTLB and Transparent HugePage support for both
+> LPAE and non-LPAE memory descriptors. The non-LPAE HugeTLB patches are based
+> on Bill's.
+>
+> I hope to get some patches out to the list soon.
 
-It can be dropped indeed.
+Sounds promising. If you CC me when sending those patches, I can test
+them on CortexA8 with my application.
+BTW as you probably know know, Catalin seems to have hugetlb branch for LPAE:
+http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-arm-arch.git;a=shortlog;h=refs/heads/hugetlb
+
 
 -- 
-Catalin
+Gra?vydas
