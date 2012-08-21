@@ -1,43 +1,117 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Tue, 21 Aug 2012 16:47:26 +0530
-Subject: [PATCH v3 0/4] Add AM33XX regulators device tree data
-Message-ID: <1345547850-29761-1-git-send-email-anilkumar@ti.com>
+Date: Tue, 21 Aug 2012 16:47:27 +0530
+Subject: [PATCH v3 1/4] arm/dts: regulator: Add tps65910 device tree data
+In-Reply-To: <1345547850-29761-1-git-send-email-anilkumar@ti.com>
+References: <1345547850-29761-1-git-send-email-anilkumar@ti.com>
+Message-ID: <1345547850-29761-2-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series add AM33XX regulators (tps65910/tps65217) device
-tree data to am335x-evm and am335x-bone dts files. These patches
-are based on Tony L "devel-dt" tree with these patches
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg73843.html
-and these patches has been tested on AM335x EVM and Bone devices.
+Add device tree data for tps65910 regulator by adding all tps65910
+regulator nodes. Regulator is initialized based on compatiable
+name provided in tps65910 DT file.
 
-Changes from v2:
-	- Added remaining regulator nodes with always on flag.
-	  With out this flag regulator core calls for disable
-	  regulators after init, which make device hang.
-	- Modified tps65910 DTS entires with respect to tps65910
-	  input supply.
+All tps65910 PMIC regulator device tree nodes are placed in a
+seperate device tree include file (tps65910.dtsi). This patch
+was tested on AM335x-EVM.
 
-Changes from v1:
-	- Incorporated all Mark Brown's review comments on v1 by
-	  * moving all the regulator constraints to corresponding
-	    DTS file
-	  * Regulator constraints are added according to board.
-	- regulator name is added.
-
-AnilKumar Ch (4):
-  arm/dts: regulator: Add tps65910 device tree data
-  arm/dts: regulator: Add tps65217 device tree data
-  arm/dts: Add tps65910 regulator DT data to am335x-evm.dts
-  arm/dts: Add tps65217 regulator DT data to am335x-bone.dts
-
- arch/arm/boot/dts/am335x-bone.dts |   54 +++++++++++++++++++++
- arch/arm/boot/dts/am335x-evm.dts  |   94 +++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/tps65217.dtsi   |   56 ++++++++++++++++++++++
- arch/arm/boot/dts/tps65910.dtsi   |   86 +++++++++++++++++++++++++++++++++
- 4 files changed, 290 insertions(+)
- create mode 100644 arch/arm/boot/dts/tps65217.dtsi
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+ arch/arm/boot/dts/tps65910.dtsi |   86 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 86 insertions(+)
  create mode 100644 arch/arm/boot/dts/tps65910.dtsi
 
+diff --git a/arch/arm/boot/dts/tps65910.dtsi b/arch/arm/boot/dts/tps65910.dtsi
+new file mode 100644
+index 0000000..92693a8
+--- /dev/null
++++ b/arch/arm/boot/dts/tps65910.dtsi
+@@ -0,0 +1,86 @@
++/*
++ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/*
++ * Integrated Power Management Chip
++ * http://www.ti.com/lit/ds/symlink/tps65910.pdf
++ */
++
++&tps {
++	compatible = "ti,tps65910";
++
++	regulators {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		vrtc_reg: regulator at 0 {
++			reg = <0>;
++			regulator-compatible = "vrtc";
++		};
++
++		vio_reg: regulator at 1 {
++			reg = <1>;
++			regulator-compatible = "vio";
++		};
++
++		vdd1_reg: regulator at 2 {
++			reg = <2>;
++			regulator-compatible = "vdd1";
++		};
++
++		vdd2_reg: regulator at 3 {
++			reg = <3>;
++			regulator-compatible = "vdd2";
++		};
++
++		vdd3_reg: regulator at 4 {
++			reg = <4>;
++			regulator-compatible = "vdd3";
++		};
++
++		vdig1_reg: regulator at 5 {
++			reg = <5>;
++			regulator-compatible = "vdig1";
++		};
++
++		vdig2_reg: regulator at 6 {
++			reg = <6>;
++			regulator-compatible = "vdig2";
++		};
++
++		vpll_reg: regulator at 7 {
++			reg = <7>;
++			regulator-compatible = "vpll";
++		};
++
++		vdac_reg: regulator at 8 {
++			reg = <8>;
++			regulator-compatible = "vdac";
++		};
++
++		vaux1_reg: regulator at 9 {
++			reg = <9>;
++			regulator-compatible = "vaux1";
++		};
++
++		vaux2_reg: regulator at 10 {
++			reg = <10>;
++			regulator-compatible = "vaux2";
++		};
++
++		vaux33_reg: regulator at 11 {
++			reg = <11>;
++			regulator-compatible = "vaux33";
++		};
++
++		vmmc_reg: regulator at 12 {
++			reg = <12>;
++			regulator-compatible = "vmmc";
++		};
++	};
++};
 -- 
 1.7.9.5
