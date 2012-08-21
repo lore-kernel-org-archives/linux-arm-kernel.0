@@ -1,78 +1,129 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Tue, 21 Aug 2012 16:15:40 +0530
-Subject: [PATCH v6 06/10] ARM: OMAP2+: gpmc: remove cs# in sync clk div calc
-In-Reply-To: <cover.1345524670.git.afzal@ti.com>
-References: <cover.1345524670.git.afzal@ti.com>
-Message-ID: <3cc7885c2ae9055763ba72cae0735b065dae403e.1345524670.git.afzal@ti.com>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Tue, 21 Aug 2012 16:15:39 +0530
+Subject: [PATCH 3/4] arm/dts: omap5-evm: Add keypad support
+In-Reply-To: <1345545940-2232-1-git-send-email-sourav.poddar@ti.com>
+References: <1345545940-2232-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <1345545940-2232-4-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Divider value for a certain sync clk is determined solely
-based on gpmc fclk. CS# does not have any role here, thus
-remove presence of CS# in clock divider calculation API.
+Add keypad data node in omap5-evm.
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
+Based on I2C support patch for omap5, which has been
+already posted as a different series.
+
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Tested on omap5430 sdp with 3.5 custom kernel.
+
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
 ---
- arch/arm/mach-omap2/gpmc-onenand.c     |    3 +--
- arch/arm/mach-omap2/gpmc.c             |    4 ++--
- arch/arm/plat-omap/include/plat/gpmc.h |    2 +-
- 3 files changed, 4 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/omap5-evm.dts |   95 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 95 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
-index 8a301f3..e139e3f 100644
---- a/arch/arm/mach-omap2/gpmc-onenand.c
-+++ b/arch/arm/mach-omap2/gpmc-onenand.c
-@@ -182,7 +182,6 @@ omap2_onenand_calc_sync_timings(struct omap_onenand_platform_data *cfg,
- 	int min_gpmc_clk_period, t_ces, t_avds, t_avdh, t_ach, t_aavdh, t_rdyo;
- 	int div, fclk_offset_ns, fclk_offset, gpmc_clk_ns;
- 	int ticks_cez;
--	int cs = cfg->cs;
- 
- 	if (cfg->flags & ONENAND_SYNC_READ)
- 		onenand_flags = ONENAND_FLAG_SYNCREAD;
-@@ -229,7 +228,7 @@ omap2_onenand_calc_sync_timings(struct omap_onenand_platform_data *cfg,
- 		break;
- 	}
- 
--	div = gpmc_cs_calc_divider(cs, min_gpmc_clk_period);
-+	div = gpmc_calc_divider(min_gpmc_clk_period);
- 	gpmc_clk_ns = gpmc_ticks_to_ns(div);
- 	if (gpmc_clk_ns < 15) /* >66Mhz */
- 		onenand_flags |= ONENAND_FLAG_HF;
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 68123d0..d005b3a 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -313,7 +313,7 @@ static int set_gpmc_timing_reg(int cs, int reg, int st_bit, int end_bit,
- 		return -1
- #endif
- 
--int gpmc_cs_calc_divider(int cs, unsigned int sync_clk)
-+int gpmc_calc_divider(unsigned int sync_clk)
- {
- 	int div;
- 	u32 l;
-@@ -333,7 +333,7 @@ int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t)
- 	int div;
- 	u32 l;
- 
--	div = gpmc_cs_calc_divider(cs, t->sync_clk);
-+	div = gpmc_calc_divider(t->sync_clk);
- 	if (div < 0)
- 		return -1;
- 
-diff --git a/arch/arm/plat-omap/include/plat/gpmc.h b/arch/arm/plat-omap/include/plat/gpmc.h
-index b7c9ea6..1cafbfd 100644
---- a/arch/arm/plat-omap/include/plat/gpmc.h
-+++ b/arch/arm/plat-omap/include/plat/gpmc.h
-@@ -179,7 +179,7 @@ extern unsigned long gpmc_get_fclk_period(void);
- 
- extern void gpmc_cs_write_reg(int cs, int idx, u32 val);
- extern u32 gpmc_cs_read_reg(int cs, int idx);
--extern int gpmc_cs_calc_divider(int cs, unsigned int sync_clk);
-+extern int gpmc_calc_divider(unsigned int sync_clk);
- extern int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t);
- extern int gpmc_cs_request(int cs, unsigned long size, unsigned long *base);
- extern void gpmc_cs_free(int cs);
+diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
+index 200c39a..6473983 100644
+--- a/arch/arm/boot/dts/omap5-evm.dts
++++ b/arch/arm/boot/dts/omap5-evm.dts
+@@ -18,3 +18,98 @@
+ 		reg = <0x80000000 0x40000000>; /* 1 GB */
+ 	};
+ };
++
++&i2c5 {
++	clock-frequency = <400000>;
++
++	smsc at 38 {
++		compatible = "smsc";
++		reg = <0x38>;
++		clock = <0x13>;
++		keypad {
++			compatible = "smsc,keypad";
++			interrupt-parent = <&gpio5>;
++			interrupts = <23>; /* gpio line 151 */
++			keypad,num-rows = <8>;
++			keypad,num-columns = <16>;
++			linux,keymap = < 0x20041 /*KEY_F7*/
++					0x30001 /*KEY_ESC*/
++					0x4003e /*KEY_F4*/
++					0x50022 /*KEY_G*/
++					0x70023 /*KEY_H*/
++					0x9009a /*KEY_CYCLEWINDOWS*/
++					0xc000e /*KEY_BACKSPACE*/
++					0xd0057 /*KEY_F11*/
++					0xe009f /*KEY_FORWARD*/
++					0xf006e /*KEY_INSERT*/
++					0x1020036 /*KEY_RIGHTSHIFT*/
++					0x1030011 /*KEY_W*/
++					0x1040010 /*KEY_Q*/
++					0x1050012 /*KEY_E*/
++					0x1070013 /*KEY_R*/
++					0x1080016 /*KEY_U*/
++					0x10c0017 /*KEY_I*/
++					0x10d0067 /*KEY_UP*/
++					0x10e0018 /*KEY_O*/
++					0x10f0019 /*KEY_LEFT*/
++					0x2020003 /*KEY_2*/
++					0x2040004 /*KEY_1*/
++					0x2050005 /*KEY_3*/
++					0x2070008 /*KEY_4*/
++					0x2080009 /*KEY_7*/
++					0x20b0064 /*KEY_8*/
++					0x20c006c /*KEY_RIGHTALT*/
++					0x20d000a /*KEY_DOWN*/
++					0x20e0001 /*KEY_0*/
++					0x20f006a /*KEY_RIGHT*/
++					0x3010061 /*KEY_RIGHTCTRL*/
++					0x302001f /*KEY_S*/
++					0x303001e /*KEY_A*/
++					0x3040020 /*KEY_D*/
++					0x3050021 /*KEY_F*/
++					0x3070024 /*KEY_J*/
++					0x3080025 /*KEY_K*/
++					0x30c001c /*KEY_ENTER*/
++					0x30d0026 /*KEY_L*/
++					0x30e0027 /*KEY_SEMICOLON*/
++					0x400002a /*KEY_LEFTSHIFT*/
++					0x402002d /*KEY_X*/
++					0x403002c /*KEY_Z*/
++					0x404002e /*KEY_C*/
++					0x405002f /*KEY_V/
++					0x4070032 /*KEY_M*/
++					0x4080033 /*KEY_COMMA*/
++					0x40c0039 /*KEY_SPACE*/
++					0x40d0033 /*KEY_DOT*/
++					0x40e0035 /*KEY_SLASH*/
++					0x40f006b /*KEY_END*/
++					0x501001d /*KEY_LEFTCTRL*/
++					0x5020040 /*KEY_F6*/
++					0x503000f /*KEY_TAB*/
++					0x504003d /*KEY_F3*/
++					0x5050014 /*KEY_T*/
++					0x5070015 /*KEY_Y*/
++					0x508001a /*KEY_LEFTBRACE*/
++					0x50d0044 /*KEY_F10*/
++					0x50e001b /*KEY_RIGHTBRACE*/
++					0x50f0066 /*KEY_HOME*/
++					0x602003f /*KEY_F5*/
++					0x604003c /*KEY_F2*/
++					0x6050006 /*KEY_5*/
++					0x60601d0 /*KEY_FN*/
++					0x6070007 /*KEY_6*/
++					0x60a008b /*KEY_MENU*/
++					0x60c002b /*KEY_BACKSLASH*/
++					0x60d0043 /*KEY_F9*/
++					0x7020042 /*KEY_F8*/
++					0x703003a /*KEY_CAPSLOCK*/
++					0x704003b /*KEY_F1*/
++					0x7050030 /*KEY_B*/
++					0x7070031 /*KEY_N*/
++					0x70b0038 /*KEY_LEFTALT*/
++					0x70d0058 /*KEY_F12*/
++					0x70f006f >; /*KEY_DELETE*/
++			linux,input-no-autorepeat;
++		};
++	};
++};
 -- 
 1.7.1
