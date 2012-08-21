@@ -1,106 +1,45 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 21 Aug 2012 13:29:59 +0300
-Subject: [PATCH 4/5] ARM: OMAP4: Add L2 Cache Controller in Device Tree
-In-Reply-To: <CAMQu2gy46sVEBH0hvaXrwOLMfcKH+fwyExFmwzAPzxQKoYwhhA@mail.gmail.com>
-References: <1344855623-14879-1-git-send-email-santosh.shilimkar@ti.com>
- <1344855623-14879-5-git-send-email-santosh.shilimkar@ti.com>
- <503240EF.4050805@ti.com>
- <CAMQu2gxgSasF4mmEFiZq-gsZfQwYn07DKyVGBVPWqjYkTSTu6g@mail.gmail.com>
- <CAMQu2gyL4-j9QSKMpNi5QQFsLqex8Q=bW9uNQtsewXVyrTumOQ@mail.gmail.com>
- <20120821102455.GM10347@arwen.pp.htv.fi>
- <CAMQu2gy46sVEBH0hvaXrwOLMfcKH+fwyExFmwzAPzxQKoYwhhA@mail.gmail.com>
-Message-ID: <20120821102958.GN10347@arwen.pp.htv.fi>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 21 Aug 2012 16:05:22 +0530
+Subject: [RFC/PATCH 05/13] serial: omap: drop DMA support
+In-Reply-To: <20120821102045.GL10347@arwen.pp.htv.fi>
+References: <1345540555-24359-1-git-send-email-balbi@ti.com>
+ <1345540555-24359-6-git-send-email-balbi@ti.com>
+ <CAMQu2gw93ES=u9J1FfWK_CKkgUq8V487+tmKtQ34p8O7VJ6aHA@mail.gmail.com>
+ <20120821102045.GL10347@arwen.pp.htv.fi>
+Message-ID: <CAMQu2gyGVhB63rn+G6B3nFLki5ib40C_2o2Bh1mBd8sw8wT_Ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2012 at 04:02:38PM +0530, Shilimkar, Santosh wrote:
-> On Tue, Aug 21, 2012 at 3:54 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > On Tue, Aug 21, 2012 at 03:11:51PM +0530, Shilimkar, Santosh wrote:
-> >> On Mon, Aug 20, 2012 at 9:21 PM, Shilimkar, Santosh
-> >> <santosh.shilimkar@ti.com> wrote:
-> >> > On Mon, Aug 20, 2012 at 7:21 PM, Benoit Cousson <b-cousson@ti.com> wrote:
-> >> >> Hi Santosh,
-> >> >>
-> >> >> On 08/13/2012 01:00 PM, Santosh Shilimkar wrote:
-> >> >>> This provides PL310 Level 2 Cache Controller Device Tree
-> >> >>> support for OMAP4 based devices.
-> >> >>>
-> >> >>> Cc: Benoit Cousson <b-cousson@ti.com>
-> >> >>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >> >>> ---
-> >> >>>  arch/arm/boot/dts/omap4.dtsi       |    7 +++++++
-> >> >>>  arch/arm/mach-omap2/omap4-common.c |    6 +++++-
-> >> >>>  2 files changed, 12 insertions(+), 1 deletion(-)
-> >> >>>
-> >> >>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> >> >>> index 6717c71..cf1efb6 100644
-> >> >>> --- a/arch/arm/boot/dts/omap4.dtsi
-> >> >>> +++ b/arch/arm/boot/dts/omap4.dtsi
-> >> >>> @@ -36,6 +36,13 @@
-> >> >>>               };
-> >> >>>       };
-> >> >>>
-> >> >>
-> >> >>> +     L2: l2-cache-controller {
-> >> >>
-> >> >> The reg offset is missing: l2-cache-controller at 48242000
-> >> >>
-> >> >>> +             compatible = "arm,pl310-cache";
-> >> >>> +             reg = <0x48242000 0x1000>;
-> >> >>> +             cache-unified;
-> >> >>> +             cache-level = <2>;
-> >> >>> +     };
-> >> >>> +
-> >> >>
-> >> >> In theory, the L2 cache should be referenced from the CPUs.
-> >> >>
-> >> > Agree.
-> >> >
-> >> I have added the reference for the L2 controller in CPUs.
-> >> Other information like L1 cache size etc can be added in cpu
-> >> DT node with another patch.
-> >>
-> >> Updated patch below. Have also updated git branch
-> >> accordingly.
-> >>
-> >> Regards
-> >> Santosh
-> >>
-> >> From 91d6cb4f999061c8cfc844a3916ee3384f2e488a Mon Sep 17 00:00:00 2001
-> >> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >> Date: Wed, 4 Jul 2012 17:57:34 +0530
-> >> Subject: [PATCH 1/2 v2] ARM: OMAP4: Add L2 Cache Controller in Device Tree
-> >>
-> >> This provides PL310 Level 2 Cache Controller Device Tree
-> >> support for OMAP4 based devices.
-> >>
-> >> Cc: Benoit Cousson <b-cousson@ti.com>
-> >> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> >
-> > nice work :-)
-> >
-> > FWIW this looks good to me:
-> >
-> > Acked-by: Felipe Balbi <balbi@ti.com>
-> >
-> Thanks.
-> 
-> > just one thing, will a similar patch for omap3 be sent ?
-> >
-> OMAP3 has an integrated L2 cache controller so there
-> won't any additional DT node for L2.
-> 
-> OMAP3 CPU DT node can be updated with l1/l2 cache
-> size etc related information though.
+On Tue, Aug 21, 2012 at 3:50 PM, Felipe Balbi <balbi@ti.com> wrote:
+> On Tue, Aug 21, 2012 at 03:14:19PM +0530, Shilimkar, Santosh wrote:
+>> On Tue, Aug 21, 2012 at 2:45 PM, Felipe Balbi <balbi@ti.com> wrote:
+>> > The current support is known to be broken and
+>> > a later patch will come re-adding it using
+>> > dma engine API.
+>> >
+>> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+>> > ---
+>> Thanks Felipe !!
+>
+> no problem.
+>
+>> One less driver now towards OMAP DMA
+>> engine conversion.
+>
+> indeed :-) I'll take a closer look into rx timeout IRQ, but it looks
+> like we can use it to kick dma only for "big" transfers... need to play
+> with it for a while first, though.
+>
+Yep. The RX path with DMA is bit of difficult part to manage for
+UART.
 
-fair enough, thanks for the info.
+>> FWIW,
+>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>
+> is this Ack for this patch only or the entire series ??
+>
+Two more patches to review and then I will do it for
+full series on top of the cover-letter :-)
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120821/2e66d1a3/attachment.sig>
+Regards
+Santosh
