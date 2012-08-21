@@ -1,51 +1,61 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 21 Aug 2012 15:16:11 +0300
-Subject: [PATCH v2 13/13] serial: omap: don't save IRQ flags on hardirq
-In-Reply-To: <1345551371-18862-1-git-send-email-balbi@ti.com>
-References: <1345540555-24359-1-git-send-email-balbi@ti.com>
- <1345551371-18862-1-git-send-email-balbi@ti.com>
-Message-ID: <1345551371-18862-14-git-send-email-balbi@ti.com>
+Date: Tue, 21 Aug 2012 15:22:18 +0300
+Subject: [RFC/PATCH 4/4] gpio: smscece: Add support for gpio IO expander
+ feature
+In-Reply-To: <CAKdam55SqXiCGv766yxoY1GdDjxNCYNaDdNZPaeLTAXc+3+c6g@mail.gmail.com>
+References: <1345545940-2232-1-git-send-email-sourav.poddar@ti.com>
+ <1345545940-2232-5-git-send-email-sourav.poddar@ti.com>
+ <20120821105333.GW10347@arwen.pp.htv.fi>
+ <CAKdam56DiFpnoQwrHe1tjQWLMy5vP9ynstNj_n=OyMxkJJAUOA@mail.gmail.com>
+ <20120821120052.GD10347@arwen.pp.htv.fi>
+ <CAKdam55SqXiCGv766yxoY1GdDjxNCYNaDdNZPaeLTAXc+3+c6g@mail.gmail.com>
+Message-ID: <20120821122217.GF10347@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we're running our hardirq handler, there's
-not need to disable IRQs with spin_lock_irqsave()
-because IRQs are already disabled. It also makes
-no difference if we save or not IRQ flags.
+On Tue, Aug 21, 2012 at 05:50:28PM +0530, Poddar, Sourav wrote:
+> Hi,
+> 
+> On Tue, Aug 21, 2012 at 5:30 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > Hi,
+> >
+> > On Tue, Aug 21, 2012 at 05:17:37PM +0530, Poddar, Sourav wrote:
+> >> >> +     if (type & IRQ_TYPE_LEVEL_HIGH)
+> >> >> +             sg->int_lvl[bank] |= bit;
+> >> >> +     else if (type & IRQ_TYPE_LEVEL_LOW)
+> >> >> +             sg->int_lvl[bank] &= ~bit;
+> >> >> +     else
+> >> >> +             return -EINVAL;
+> >> >
+> >> > this looks wrong. You could have a user who wants to trigger on both
+> >> > HIGH and LOW levels, no ?
+> >> >
+> >> Yes, I think there can be a scenario where gpio_keys are attached
+> >> to this driver and signals a "key press" at low and "key release" at
+> >> high. ?
+> >>  Will figure out a way to add support to check for case where
+> >> both High and low levels are used.
+> >
+> > could probably be done on a separate patch, maybe... Just now I saw that
+> > HIGH and LOW levels use the same bit.
+> >
+> If I am understanding correctly, if they both uses the same bit we cannot
+> use both for a particular user. ?
 
-Switch over to simple spin_lock/spin_unlock and
-drop the "flags" variable.
+we can, it's just a bit more complex. If a user request both LOW and
+HIGH, then you start with HIGH, once it triggers, before calling the
+nested IRQ handler, you need to change it LOW. When low triggers, before
+calling the nested IRQ handler, you need to change it to HIGH again. And
+so on. I'm just not sure if that's valid on linux IRQ subsystem.
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- drivers/tty/serial/omap-serial.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+Anyone ?
 
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index b79c4fa..a79658d 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -350,11 +350,10 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
- 	struct tty_struct *tty = up->port.state->port.tty;
- 	unsigned int iir, lsr;
- 	unsigned int type;
--	unsigned long flags;
- 	irqreturn_t ret = IRQ_HANDLED;
- 	int max_count = 256;
- 
--	spin_lock_irqsave(&up->port.lock, flags);
-+	spin_lock(&up->port.lock);
- 	pm_runtime_get_sync(up->dev);
- 
- 	do {
-@@ -394,7 +393,7 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
- 		}
- 	} while (!(iir & UART_IIR_NO_INT) && max_count--);
- 
--	spin_unlock_irqrestore(&up->port.lock, flags);
-+	spin_unlock(&up->port.lock);
- 
- 	tty_flip_buffer_push(tty);
- 
 -- 
-1.7.12.rc3
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120821/6d7f7c26/attachment.sig>
