@@ -1,249 +1,180 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Tue, 21 Aug 2012 16:16:07 +0530
-Subject: [PATCH v6 10/10] ARM: OMAP2+: tusb6010: generic timing calculation
-In-Reply-To: <cover.1345524670.git.afzal@ti.com>
-References: <cover.1345524670.git.afzal@ti.com>
-Message-ID: <bc000ac53bb1b3ae1a951bbcf372caf6336d2a19.1345524670.git.afzal@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 21 Aug 2012 13:45:49 +0300
+Subject: [PATCH 2/4] Input: keypad: Add smsc ece1099 keypad driver
+In-Reply-To: <1345545940-2232-3-git-send-email-sourav.poddar@ti.com>
+References: <1345545940-2232-1-git-send-email-sourav.poddar@ti.com>
+ <1345545940-2232-3-git-send-email-sourav.poddar@ti.com>
+Message-ID: <20120821104549.GT10347@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generic gpmc timing calculation helper is available now, use
-it instead of custom timing calculation.
+On Tue, Aug 21, 2012 at 04:15:38PM +0530, Sourav Poddar wrote:
+> From: G, Manjunath Kondaiah <manjugk@ti.com>
+> 
+> SMSC ECE1099 is a keyboard scan or GPIO expansion device.The device
+> supports a keypad scan matrix of 23*8.This driver uses this
+> device as a keypad driver.
+> 
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/mach-omap2/usb-tusb6010.c |  181 +++++++++---------------------------
- 1 files changed, 43 insertions(+), 138 deletions(-)
+looks good. If you just fix my comment on free_irq() below, you can add:
 
-diff --git a/arch/arm/mach-omap2/usb-tusb6010.c b/arch/arm/mach-omap2/usb-tusb6010.c
-index 7a85ebe..cce1f06 100644
---- a/arch/arm/mach-omap2/usb-tusb6010.c
-+++ b/arch/arm/mach-omap2/usb-tusb6010.c
-@@ -26,182 +26,87 @@ static u8		async_cs, sync_cs;
- static unsigned		refclk_psec;
- 
- 
--/* t2_ps, when quantized to fclk units, must happen no earlier than
-- * the clock after after t1_NS.
-- *
-- * Return a possibly updated value of t2_ps, converted to nsec.
-- */
--static unsigned
--next_clk(unsigned t1_NS, unsigned t2_ps, unsigned fclk_ps)
--{
--	unsigned	t1_ps = t1_NS * 1000;
--	unsigned	t1_f, t2_f;
--
--	if ((t1_ps + fclk_ps) < t2_ps)
--		return t2_ps / 1000;
--
--	t1_f = (t1_ps + fclk_ps - 1) / fclk_ps;
--	t2_f = (t2_ps + fclk_ps - 1) / fclk_ps;
--
--	if (t1_f >= t2_f)
--		t2_f = t1_f + 1;
--
--	return (t2_f * fclk_ps) / 1000;
--}
--
- /* NOTE:  timings are from tusb 6010 datasheet Rev 1.8, 12-Sept 2006 */
- 
--static int tusb_set_async_mode(unsigned sysclk_ps, unsigned fclk_ps)
-+static int tusb_set_async_mode(unsigned sysclk_ps)
- {
-+	struct gpmc_device_timings dev_t;
- 	struct gpmc_timings	t;
- 	unsigned		t_acsnh_advnh = sysclk_ps + 3000;
--	unsigned		tmp;
--
--	memset(&t, 0, sizeof(t));
--
--	/* CS_ON = t_acsnh_acsnl */
--	t.cs_on = 8;
--	/* ADV_ON = t_acsnh_advnh - t_advn */
--	t.adv_on = next_clk(t.cs_on, t_acsnh_advnh - 7000, fclk_ps);
--
--	/*
--	 * READ ... from omap2420 TRM fig 12-13
--	 */
--
--	/* ADV_RD_OFF = t_acsnh_advnh */
--	t.adv_rd_off = next_clk(t.adv_on, t_acsnh_advnh, fclk_ps);
--
--	/* OE_ON = t_acsnh_advnh + t_advn_oen (then wait for nRDY) */
--	t.oe_on = next_clk(t.adv_on, t_acsnh_advnh + 1000, fclk_ps);
--
--	/* ACCESS = counters continue only after nRDY */
--	tmp = t.oe_on * 1000 + 300;
--	t.access = next_clk(t.oe_on, tmp, fclk_ps);
--
--	/* OE_OFF = after data gets sampled */
--	tmp = t.access * 1000;
--	t.oe_off = next_clk(t.access, tmp, fclk_ps);
--
--	t.cs_rd_off = t.oe_off;
--
--	tmp = t.cs_rd_off * 1000 + 7000 /* t_acsn_rdy_z */;
--	t.rd_cycle = next_clk(t.cs_rd_off, tmp, fclk_ps);
--
--	/*
--	 * WRITE ... from omap2420 TRM fig 12-15
--	 */
- 
--	/* ADV_WR_OFF = t_acsnh_advnh */
--	t.adv_wr_off = t.adv_rd_off;
-+	memset(&dev_t, 0, sizeof(dev_t));
- 
--	/* WE_ON = t_acsnh_advnh + t_advn_wen (then wait for nRDY) */
--	t.we_on = next_clk(t.adv_wr_off, t_acsnh_advnh + 1000, fclk_ps);
-+	dev_t.mux = true;
- 
--	/* WE_OFF = after data gets sampled */
--	tmp = t.we_on * 1000 + 300;
--	t.we_off = next_clk(t.we_on, tmp, fclk_ps);
-+	dev_t.t_ceasu = 8 * 1000;
-+	dev_t.t_avdasu = t_acsnh_advnh - 7000;
-+	dev_t.t_ce_avd = 1000;
-+	dev_t.t_avdp_r = t_acsnh_advnh;
-+	dev_t.t_oeasu = t_acsnh_advnh + 1000;
-+	dev_t.t_oe = 300;
-+	dev_t.t_cez_r = dev_t.t_cez_w = 7000;
-+	dev_t.t_avdp_w = t_acsnh_advnh;
-+	dev_t.t_weasu = t_acsnh_advnh + 1000;
-+	dev_t.t_wpl = 300;
-+	dev_t.cyc_aavdh_we = 1;
- 
--	t.cs_wr_off = t.we_off;
--
--	tmp = t.cs_wr_off * 1000 + 7000 /* t_acsn_rdy_z */;
--	t.wr_cycle = next_clk(t.cs_wr_off, tmp, fclk_ps);
-+	gpmc_calc_timings(&t, &dev_t);
- 
- 	return gpmc_cs_set_timings(async_cs, &t);
- }
- 
--static int tusb_set_sync_mode(unsigned sysclk_ps, unsigned fclk_ps)
-+static int tusb_set_sync_mode(unsigned sysclk_ps)
- {
-+	struct gpmc_device_timings dev_t;
- 	struct gpmc_timings	t;
- 	unsigned		t_scsnh_advnh = sysclk_ps + 3000;
--	unsigned		tmp;
--
--	memset(&t, 0, sizeof(t));
--	t.cs_on = 8;
--
--	/* ADV_ON = t_acsnh_advnh - t_advn */
--	t.adv_on = next_clk(t.cs_on, t_scsnh_advnh - 7000, fclk_ps);
--
--	/* GPMC_CLK rate = fclk rate / div */
--	t.sync_clk = 11100 /* 11.1 nsec */;
--	tmp = (t.sync_clk + fclk_ps - 1) / fclk_ps;
--	if (tmp > 4)
--		return -ERANGE;
--	if (tmp == 0)
--		tmp = 1;
--	t.page_burst_access = (fclk_ps * tmp) / 1000;
--
--	/*
--	 * READ ... based on omap2420 TRM fig 12-19, 12-20
--	 */
--
--	/* ADV_RD_OFF = t_scsnh_advnh */
--	t.adv_rd_off = next_clk(t.adv_on, t_scsnh_advnh, fclk_ps);
--
--	/* OE_ON = t_scsnh_advnh + t_advn_oen * fclk_ps (then wait for nRDY) */
--	tmp = (t.adv_rd_off * 1000) + (3 * fclk_ps);
--	t.oe_on = next_clk(t.adv_on, tmp, fclk_ps);
--
--	/* ACCESS = number of clock cycles after t_adv_eon */
--	tmp = (t.oe_on * 1000) + (5 * fclk_ps);
--	t.access = next_clk(t.oe_on, tmp, fclk_ps);
--
--	/* OE_OFF = after data gets sampled */
--	tmp = (t.access * 1000) + (1 * fclk_ps);
--	t.oe_off = next_clk(t.access, tmp, fclk_ps);
- 
--	t.cs_rd_off = t.oe_off;
--
--	tmp = t.cs_rd_off * 1000 + 7000 /* t_scsn_rdy_z */;
--	t.rd_cycle = next_clk(t.cs_rd_off, tmp, fclk_ps);
--
--	/*
--	 * WRITE ... based on omap2420 TRM fig 12-21
--	 */
--
--	/* ADV_WR_OFF = t_scsnh_advnh */
--	t.adv_wr_off = t.adv_rd_off;
--
--	/* WE_ON = t_scsnh_advnh + t_advn_wen * fclk_ps (then wait for nRDY) */
--	tmp = (t.adv_wr_off * 1000) + (3 * fclk_ps);
--	t.we_on = next_clk(t.adv_wr_off, tmp, fclk_ps);
--
--	/* WE_OFF = number of clock cycles after t_adv_wen */
--	tmp = (t.we_on * 1000) + (6 * fclk_ps);
--	t.we_off = next_clk(t.we_on, tmp, fclk_ps);
--
--	t.cs_wr_off = t.we_off;
--
--	tmp = t.cs_wr_off * 1000 + 7000 /* t_scsn_rdy_z */;
--	t.wr_cycle = next_clk(t.cs_wr_off, tmp, fclk_ps);
--
--	t.clk_activation = gpmc_ticks_to_ns(1);
-+	memset(&dev_t, 0, sizeof(dev_t));
-+
-+	dev_t.mux = true;
-+	dev_t.sync_read = true;
-+	dev_t.sync_write = true;
-+
-+	dev_t.clk = 11100;
-+	dev_t.t_bacc = 1000;
-+	dev_t.t_ces = 1000;
-+	dev_t.t_ceasu = 8 * 1000;
-+	dev_t.t_avdasu = t_scsnh_advnh - 7000;
-+	dev_t.t_ce_avd = 1000;
-+	dev_t.t_avdp_r = t_scsnh_advnh;
-+	dev_t.cyc_aavdh_oe = 3;
-+	dev_t.cyc_oe = 5;
-+	dev_t.t_ce_rdyz = 7000;
-+	dev_t.t_avdp_w = t_scsnh_advnh;
-+	dev_t.cyc_aavdh_we = 3;
-+	dev_t.cyc_wpl = 6;
-+	dev_t.t_ce_rdyz = 7000;
-+
-+	gpmc_calc_timings(&t, &dev_t);
- 
- 	return gpmc_cs_set_timings(sync_cs, &t);
- }
- 
--extern unsigned long gpmc_get_fclk_period(void);
--
- /* tusb driver calls this when it changes the chip's clocking */
- int tusb6010_platform_retime(unsigned is_refclk)
- {
- 	static const char	error[] =
- 		KERN_ERR "tusb6010 %s retime error %d\n";
- 
--	unsigned	fclk_ps = gpmc_get_fclk_period();
- 	unsigned	sysclk_ps;
- 	int		status;
- 
--	if (!refclk_psec || fclk_ps == 0)
-+	if (!refclk_psec)
- 		return -ENODEV;
- 
- 	sysclk_ps = is_refclk ? refclk_psec : TUSB6010_OSCCLK_60;
- 
--	status = tusb_set_async_mode(sysclk_ps, fclk_ps);
-+	status = tusb_set_async_mode(sysclk_ps);
- 	if (status < 0) {
- 		printk(error, "async", status);
- 		goto done;
- 	}
--	status = tusb_set_sync_mode(sysclk_ps, fclk_ps);
-+	status = tusb_set_sync_mode(sysclk_ps);
- 	if (status < 0)
- 		printk(error, "sync", status);
- done:
+Acked-by: Felipe Balbi <balbi@ti.com>
+
+> +static int __devinit
+> +smsc_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct smsc *smsc = dev_get_drvdata(pdev->dev.parent);
+> +	struct input_dev *input;
+> +	struct smsc_keypad *kp;
+> +	int ret = 0, error;
+> +	int col, i, max_keys, row_shift;
+> +	int irq;
+> +	int addr_start, addr;
+> +
+> +	kp = devm_kzalloc(dev, sizeof(*kp), GFP_KERNEL);
+> +
+> +	input = input_allocate_device();
+> +	if (!kp || !input) {
+> +		error = -ENOMEM;
+> +		goto err1;
+> +	}
+> +
+> +	error = smsc_keypad_parse_dt(&pdev->dev, kp);
+> +	if (error)
+> +		return error;
+> +
+> +	/* Get the debug Device */
+> +	kp->input = input;
+> +	kp->smsc = smsc;
+> +	kp->irq = platform_get_irq(pdev, 0);
+> +	kp->dev = dev;
+> +
+> +	for (col = 0; col < 16; col++) {
+> +		kp->last_key_state[col] = 0;
+> +		kp->last_key_ms[col] = 0;
+> +	}
+> +
+> +	/* setup input device */
+> +	 __set_bit(EV_KEY, input->evbit);
+> +
+> +	/* Enable auto repeat feature of Linux input subsystem */
+> +	if (!(kp->no_autorepeat))
+> +		__set_bit(EV_REP, input->evbit);
+> +
+> +	input_set_capability(input, EV_MSC, MSC_SCAN);
+> +	input->name             = "SMSC Keypad";
+> +	input->phys             = "smsc_keypad/input0";
+> +	input->dev.parent       = &pdev->dev;
+> +	input->id.bustype       = BUS_HOST;
+> +	input->id.vendor        = 0x0001;
+> +	input->id.product       = 0x0001;
+> +	input->id.version       = 0x0003;
+> +
+> +	error = input_register_device(input);
+> +	if (error) {
+> +		dev_err(kp->dev,
+> +			"Unable to register twl4030 keypad device\n");
+> +		goto err1;
+> +	}
+> +
+> +	/* Mask all GPIO interrupts (0x37-0x3B) */
+> +	for (addr = 0x37; addr < 0x3B; addr++)
+> +		smsc_write(dev, addr, 0);
+> +
+> +	/* Set all outputs high (0x05-0x09) */
+> +	for (addr = 0x05; addr < 0x09; addr++)
+> +		smsc_write(dev, addr, 0xff);
+> +
+> +	/* Clear all GPIO interrupts (0x32-0x36) */
+> +	for (addr = 0x32; addr < 0x36; addr++)
+> +		smsc_write(dev, addr, 0xff);
+> +
+> +	addr_start = 0x12;
+> +	for (i = 0; i <= kp->rows; i++) {
+> +		addr = 0x12 + i;
+> +		smsc_write(dev, addr, SMSC_KP_KSI);
+> +	}
+> +
+> +	addr_start =  0x1A;
+> +	for (i = 0; i <= kp->cols; i++) {
+> +		addr = 0x1A + i;
+> +		smsc_write(dev, addr, SMSC_KP_KSO);
+> +	}
+> +
+> +	addr = SMSC_KP_INT_STAT;
+> +	smsc_write(dev, addr, SMSC_KP_SET_HIGH);
+> +
+> +	addr = SMSC_WKUP_CTRL;
+> +	smsc_write(dev, addr, SMSC_KP_SET_LOW_PWR);
+> +
+> +	addr = SMSC_KP_OUT;
+> +	smsc_write(dev, addr, SMSC_KSO_ALL_LOW);
+> +
+> +	row_shift = get_count_order(kp->cols);
+> +	max_keys = kp->rows << row_shift;
+> +
+> +	kp->row_shift = row_shift;
+> +	kp->keymap = kzalloc(max_keys * sizeof(kp->keymap[0]),
+> +					GFP_KERNEL);
+> +	if (!kp->keymap) {
+> +		dev_err(&pdev->dev, "Not enough memory for keymap\n");
+> +		error = -ENOMEM;
+> +	}
+> +
+> +	matrix_keypad_build_keymap(NULL, NULL, kp->rows,
+> +			kp->cols, kp->keymap, input);
+> +
+> +	/*
+> +	* This ISR will always execute in kernel thread context because of
+> +	* the need to access the SMSC over the I2C bus.
+> +	*/
+> +	ret = devm_request_threaded_irq(dev, kp->irq, NULL, do_kp_irq,
+> +			IRQF_TRIGGER_FALLING | IRQF_ONESHOT, pdev->name, kp);
+> +	if (ret) {
+> +		dev_dbg(&pdev->dev, "request_irq failed for irq no=%d\n",
+> +			irq);
+> +		goto err2;
+> +	}
+> +
+> +	/* Enable smsc keypad interrupts */
+> +	ret = smsc_write(dev, SMSC_KP_INT_MASK, 0xff);
+> +	if (ret < 0)
+> +		goto err2;
+> +
+> +	return 0;
+> +
+> +err2:
+> +	input_unregister_device(input);
+> +	free_irq(kp->irq, NULL);
+
+you're using devm_request_threaded_irq, this is unnecessary
+
+> +err1:
+> +	input_free_device(input);
+> +	return ret;
+> +}
+> +
+> +static int smsc_remove(struct platform_device *pdev)
+> +{
+> +	struct smsc_keypad *kp = platform_get_drvdata(pdev);
+> +	free_irq(kp->irq, kp);
+
+ditto.
+
+
 -- 
-1.7.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120821/5d6caf36/attachment.sig>
