@@ -1,129 +1,65 @@
-From: anilkumar@ti.com (AnilKumar Ch)
-Date: Tue, 21 Aug 2012 16:47:29 +0530
-Subject: [PATCH v3 3/4] arm/dts: Add tps65910 regulator DT data to
- am335x-evm.dts
-In-Reply-To: <1345547850-29761-1-git-send-email-anilkumar@ti.com>
-References: <1345547850-29761-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1345547850-29761-4-git-send-email-anilkumar@ti.com>
+From: sourav.poddar@ti.com (Poddar, Sourav)
+Date: Tue, 21 Aug 2012 16:50:50 +0530
+Subject: [PATCH 3/4] arm/dts: omap5-evm: Add keypad support
+In-Reply-To: <20120821104744.GV10347@arwen.pp.htv.fi>
+References: <1345545940-2232-1-git-send-email-sourav.poddar@ti.com>
+ <1345545940-2232-4-git-send-email-sourav.poddar@ti.com>
+ <20120821104744.GV10347@arwen.pp.htv.fi>
+Message-ID: <CAKdam54=+vn7YepPoDVkKaXm+0cxGNZ=w4v-eYbW4VtmWxmYBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add tps65910 regulator device tree data to AM335x-EVM by adding
-regulator consumers with tightened constraints and regulator-name.
-TPS65910 regulator handle can be obtained by using this regulator
-name.
+Hi,
 
-This patch also add I2C node with I2C frequency and tps65910 PMIC
-I2C slave address.
-
-Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
----
- arch/arm/boot/dts/am335x-evm.dts |   94 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 94 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 1e1fc15..f9c28a5 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -38,5 +38,99 @@
- 		dcan1: d_can at 481D0000 {
- 			status = "okay";
- 		};
-+
-+		i2c1: i2c at 44E0B000 {
-+			status = "okay";
-+			clock-frequency = <400000>;
-+
-+			tps: tps at 2D {
-+				reg = <0x2D>;
-+			};
-+		};
-+	};
-+
-+	vbat: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vbat";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-boot-on;
-+	};
-+};
-+
-+/include/ "tps65910.dtsi"
-+
-+&tps {
-+	vcc1-supply = <&vbat>;
-+	vcc2-supply = <&vbat>;
-+	vcc3-supply = <&vbat>;
-+	vcc4-supply = <&vbat>;
-+	vcc5-supply = <&vbat>;
-+	vcc6-supply = <&vbat>;
-+	vcc7-supply = <&vbat>;
-+	vccio-supply = <&vbat>;
-+
-+	regulators {
-+		vrtc_reg: regulator at 0 {
-+			regulator-always-on;
-+		};
-+
-+		vio_reg: regulator at 1 {
-+			regulator-always-on;
-+		};
-+
-+		vdd1_reg: regulator at 2 {
-+			/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
-+			regulator-name = "vdd_mpu";
-+			regulator-min-microvolt = <912500>;
-+			regulator-max-microvolt = <1312500>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		vdd2_reg: regulator at 3 {
-+			/* VDD_CORE voltage limits 0.95V - 1.1V with +/-4% tolerance */
-+			regulator-name = "vdd_core";
-+			regulator-min-microvolt = <912500>;
-+			regulator-max-microvolt = <1150000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		vdd3_reg: regulator at 4 {
-+			regulator-always-on;
-+		};
-+
-+		vdig1_reg: regulator at 5 {
-+			regulator-always-on;
-+		};
-+
-+		vdig2_reg: regulator at 6 {
-+			regulator-always-on;
-+		};
-+
-+		vpll_reg: regulator at 7 {
-+			regulator-always-on;
-+		};
-+
-+		vdac_reg: regulator at 8 {
-+			regulator-always-on;
-+		};
-+
-+		vaux1_reg: regulator at 9 {
-+			regulator-always-on;
-+		};
-+
-+		vaux2_reg: regulator at 10 {
-+			regulator-always-on;
-+		};
-+
-+		vaux33_reg: regulator at 11 {
-+			regulator-always-on;
-+		};
-+
-+		vmmc_reg: regulator at 12 {
-+			regulator-always-on;
-+		};
- 	};
- };
--- 
-1.7.9.5
+On Tue, Aug 21, 2012 at 4:17 PM, Felipe Balbi <balbi@ti.com> wrote:
+> On Tue, Aug 21, 2012 at 04:15:39PM +0530, Sourav Poddar wrote:
+>> Add keypad data node in omap5-evm.
+>>
+>> Based on I2C support patch for omap5, which has been
+>> already posted as a different series.
+>>
+>> Cc: Benoit Cousson <b-cousson@ti.com>
+>> Cc: Felipe Balbi <balbi@ti.com>
+>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Tested on omap5430 sdp with 3.5 custom kernel.
+>>
+>> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+>
+> after fixing my only comment below, you can add my:
+>
+> Acked-by: Felipe Balbi <balbi@ti.com>
+>
+>> ---
+>>  arch/arm/boot/dts/omap5-evm.dts |   95 +++++++++++++++++++++++++++++++++++++++
+>>  1 files changed, 95 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
+>> index 200c39a..6473983 100644
+>> --- a/arch/arm/boot/dts/omap5-evm.dts
+>> +++ b/arch/arm/boot/dts/omap5-evm.dts
+>> @@ -18,3 +18,98 @@
+>>               reg = <0x80000000 0x40000000>; /* 1 GB */
+>>       };
+>>  };
+>> +
+>> +&i2c5 {
+>> +     clock-frequency = <400000>;
+>> +
+>> +     smsc at 38 {
+>> +             compatible = "smsc";
+>> +             reg = <0x38>;
+>> +             clock = <0x13>;
+>> +             keypad {
+>> +                     compatible = "smsc,keypad";
+>> +                     interrupt-parent = <&gpio5>;
+>> +                     interrupts = <23>; /* gpio line 151 */
+>> +                     keypad,num-rows = <8>;
+>> +                     keypad,num-columns = <16>;
+>> +                     linux,keymap = < 0x20041 /*KEY_F7*/
+>
+> please add spaces around /* and */ so it's easier to read. Ditto to all
+> others.
+>
+Yes, will add spaces in the new version.
+> --
+> balbi
