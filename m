@@ -1,61 +1,83 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 21 Aug 2012 15:22:18 +0300
-Subject: [RFC/PATCH 4/4] gpio: smscece: Add support for gpio IO expander
- feature
-In-Reply-To: <CAKdam55SqXiCGv766yxoY1GdDjxNCYNaDdNZPaeLTAXc+3+c6g@mail.gmail.com>
-References: <1345545940-2232-1-git-send-email-sourav.poddar@ti.com>
- <1345545940-2232-5-git-send-email-sourav.poddar@ti.com>
- <20120821105333.GW10347@arwen.pp.htv.fi>
- <CAKdam56DiFpnoQwrHe1tjQWLMy5vP9ynstNj_n=OyMxkJJAUOA@mail.gmail.com>
- <20120821120052.GD10347@arwen.pp.htv.fi>
- <CAKdam55SqXiCGv766yxoY1GdDjxNCYNaDdNZPaeLTAXc+3+c6g@mail.gmail.com>
-Message-ID: <20120821122217.GF10347@arwen.pp.htv.fi>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Aug 2012 13:27:53 +0100
+Subject: [PATCH 2/2] ARM: imx6q: replace clk_register_clkdev with clock
+ DT lookup
+In-Reply-To: <CAKGA1bnfhMC8QG9OqBbpy5iq6ZAfEgrYMg_LVd50U7yikLhDAg@mail.gmail.com>
+References: <1345104526-14797-1-git-send-email-shawn.guo@linaro.org>
+ <1345104526-14797-3-git-send-email-shawn.guo@linaro.org>
+ <503232E0.3000007@gmail.com>
+ <CAKGA1bn2uCWE8YkGR4EzTxZ_bXJ_ov2diq63uxQ=dT7b6Fu9GQ@mail.gmail.com>
+ <20120820151609.GN24242@S2101-09.ap.freescale.net>
+ <CAKGA1bnfhMC8QG9OqBbpy5iq6ZAfEgrYMg_LVd50U7yikLhDAg@mail.gmail.com>
+Message-ID: <20120821122753.GU18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2012 at 05:50:28PM +0530, Poddar, Sourav wrote:
-> Hi,
-> 
-> On Tue, Aug 21, 2012 at 5:30 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > Hi,
-> >
-> > On Tue, Aug 21, 2012 at 05:17:37PM +0530, Poddar, Sourav wrote:
-> >> >> +     if (type & IRQ_TYPE_LEVEL_HIGH)
-> >> >> +             sg->int_lvl[bank] |= bit;
-> >> >> +     else if (type & IRQ_TYPE_LEVEL_LOW)
-> >> >> +             sg->int_lvl[bank] &= ~bit;
-> >> >> +     else
-> >> >> +             return -EINVAL;
-> >> >
-> >> > this looks wrong. You could have a user who wants to trigger on both
-> >> > HIGH and LOW levels, no ?
-> >> >
-> >> Yes, I think there can be a scenario where gpio_keys are attached
-> >> to this driver and signals a "key press" at low and "key release" at
-> >> high. ?
-> >>  Will figure out a way to add support to check for case where
-> >> both High and low levels are used.
-> >
-> > could probably be done on a separate patch, maybe... Just now I saw that
-> > HIGH and LOW levels use the same bit.
-> >
-> If I am understanding correctly, if they both uses the same bit we cannot
-> use both for a particular user. ?
+On Mon, Aug 20, 2012 at 12:22:56PM -0500, Matt Sealey wrote:
+> You're going to have to define these clocks as a tree with parents and
+> leaf nodes anyway in the clock subsystem. Why not define these in the
+> device tree in total and reference them by handle when you build the
+> entire clock tree from the ground up? Or will it just be all the
+> clocks defined in Linux, but the lookups (which is what I see here)
+> moved into the DT? Why not form the lookups as part of the definition
+> of the clock tree?
 
-we can, it's just a bit more complex. If a user request both LOW and
-HIGH, then you start with HIGH, once it triggers, before calling the
-nested IRQ handler, you need to change it LOW. When low triggers, before
-calling the nested IRQ handler, you need to change it to HIGH again. And
-so on. I'm just not sure if that's valid on linux IRQ subsystem.
+Well, IMHO the DT conversion of the clk lookup stuff has been done
+completely wrong.
 
-Anyone ?
+What should have been done is rather than invent a totally new bloody
+lookup interface that drivers have to use instead of clk_get(), is to
+embed the OF lookup _inside_ clk_get().
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120821/6d7f7c26/attachment.sig>
+What you do is this:
+
+1. Have property names in the device node like:
+
+	clock_<connection-id> = <&provider-node output>
+
+   In the case of a NULL connection id:
+
+	clock = <&provider-node output>
+
+   Remember that the connection ID is _supposed_ to be something that
+   is described by the hardware (like - for the AACI primecell, the
+   clock which runs the functional side is called "AACICLK" by the TRM,
+   and for the MMCI primecell, it's "MMCICLK" - even though these two
+   clocks may be fed by the same source in an implementation.)
+
+2. clkdev's lookup is then modified to look at the struct device, and
+   check for a DT node.  If there is a DT node, it formats a property
+   string:
+
+	if (dev->of_node) {
+		char *propname, *clk_prop = NULL;
+		struct property *p;
+
+		if (conn_id) {
+			clk_prop = kasprintf("clock_%s", conn_id);
+			propname = clk_prop;
+		} else {
+			propname = "clock";
+		}
+
+		p = of_find_property(dev->of_node, propname, NULL);
+		if (clk_prop)
+			kfree(clk_prop);
+
+		if (p) {
+			clk = clk_get_from_of_property(p);
+			if (clk)
+				return clk;
+		}
+
+		/* Fallthrough to clkdev table lookup */
+	}
+
+So now, you're not dealing with inventing a whole load of names for clocks
+on a platform, instead what you're doing is describing _where_ the clock
+comes from in the system for a particular device by device node and index
+into it - just like we do for interrupts.
+
+This means there's no need for huge tables and such like of clock names.
+
+I did mention this idea long ago but got ignored.
