@@ -1,39 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 21 Aug 2012 19:50:06 +0000
-Subject: [PATCH 1/4] ARM: clps711x: Remove board support for CEIVA
-In-Reply-To: <1345568375-28516-1-git-send-email-shc_work@mail.ru>
-References: <1345568375-28516-1-git-send-email-shc_work@mail.ru>
-Message-ID: <201208211950.07166.arnd@arndb.de>
+Date: Tue, 21 Aug 2012 20:14:01 +0000
+Subject: [PATCH v2 17/31] arm64: System calls handling
+In-Reply-To: <20120821175122.GI12708@arm.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <201208151422.16335.arnd@arndb.de> <20120821175122.GI12708@arm.com>
+Message-ID: <201208212014.01837.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 August 2012, Alexander Shiyan wrote:
-> The current kernel does not fit in the CEIVA ROM. Also, some functional
-> has already been removed due migrate from 2.6 to 3.0, and it seems that
-> no one uses this platform. So, remove support for this board and modules
-> specific only to this board.
+On Tuesday 21 August 2012, Catalin Marinas wrote:
+> > > +asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
+> > > +                    unsigned long prot, unsigned long flags,
+> > > +                    unsigned long fd, off_t off)
+> > > +{
+> > > +   if (offset_in_page(off) != 0)
+> > > +           return -EINVAL;
+> > > +
+> > > +   return sys_mmap_pgoff(addr, len, prot, flags, fd, off >> PAGE_SHIFT);
+> > > +}
+> > 
+> > I think
+> > 
+> > #define sys_mmap sys_mmap_pgoff 
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> There are slightly different semantics with the last argument of
+> sys_mmap() which takes a byte offset. The sys_mmap_pgoff() function
+> takes the offset shifted by PAGE_SHIFT (which is the same as sys_mmap2).
+> 
+> Looking at the other architectures, it makes sense to use a generic
+> sys_mmap() implementation similar to the one above (or the ia-64, seems
+> to be the most complete).
+> 
 
-I got curious about this machine and found some ten year old emails
-and a howto from Colin Cross about this machine. Since he's still
-actively working on ARM Linux, maybe he has some final words to say
-about this platform before it gets removed.
-
-Otherwise, no objections.
+Why that? The generic sys_mmap_pgoff was specifically added so new architectures
+could just use that instead of having their own wrappers, see f8b72560.
 
 	Arnd
-
->  arch/arm/mach-clps711x/Kconfig                 |    6 -
->  arch/arm/mach-clps711x/Makefile                |    1 -
->  arch/arm/mach-clps711x/ceiva.c                 |   64 --
->  arch/arm/mach-clps711x/include/mach/hardware.h |   48 --
->  arch/arm/tools/mach-types                      |    1 -
->  drivers/video/Kconfig                          |   12 -
->  drivers/video/Makefile                         |    1 -
->  drivers/video/epson1355fb.c                    |  749 ------------------------
->  include/video/epson1355.h                      |   64 --
->  9 files changed, 0 insertions(+), 946 deletions(-)
->  delete mode 100644 arch/arm/mach-clps711x/ceiva.c
->  delete mode 100644 drivers/video/epson1355fb.c
->  delete mode 100644 include/video/epson1355.h
