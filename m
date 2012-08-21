@@ -1,42 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 21 Aug 2012 20:17:07 +0000
-Subject: [PATCH v2 16/31] arm64: ELF definitions
-In-Reply-To: <20120821160653.GH12708@arm.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <201208161237.53594.arnd@arndb.de> <20120821160653.GH12708@arm.com>
-Message-ID: <201208212017.08110.arnd@arndb.de>
+From: ccross@android.com (Colin Cross)
+Date: Tue, 21 Aug 2012 13:31:58 -0700
+Subject: [PATCH 1/4] ARM: clps711x: Remove board support for CEIVA
+In-Reply-To: <201208211950.07166.arnd@arndb.de>
+References: <1345568375-28516-1-git-send-email-shc_work@mail.ru>
+ <201208211950.07166.arnd@arndb.de>
+Message-ID: <CAMbhsRReOzQogzESWjKu5o=0Ep3UqcEP1zdzO8dbHfM4AofhYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 August 2012, Catalin Marinas wrote:
-> On Thu, Aug 16, 2012 at 01:37:53PM +0100, Arnd Bergmann wrote:
-> > On Thursday 16 August 2012, Will Deacon wrote:
-> > > > This looks wrong: PER_LINUX/PER_LINUX32 decides over the output of the
-> > > > uname system call, while TIF_32BIT decides over the instruction set
-> > > > when returning to user space. You definitely should not set the personality
-> > > > to the value you pass from the elf loader. Instead, just do
-> > > > 
-> > > > #define SET_PERSONALITY(ex) clear_thread_flag(TIF_32BIT);
-> > > > #defined COMPAT_SET_PERSONALITY(ex) set_thread_flag(TIF_32BIT);
-> > > 
-> > > In this case, won't uname be incorrect (aarch64l) for aarch32 tasks (which
-> > > expect something like armv8l)?
-> > 
-> > No, the uname output is meant to tell you about the system, not the
-> > instruction set that you are using (you already know that in compiled
-> > code).
-> 
-> OK, so we assumed that compat tasks should get a uname as close as
-> possible to a 32-bit system, i.e. armv8l, for full compatibility. This
-> would allow us to run something like 32-bit Debian on an AArch64 kernel
-> without worrying about any scripts failing.
+On Tue, Aug 21, 2012 at 12:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 21 August 2012, Alexander Shiyan wrote:
+>> The current kernel does not fit in the CEIVA ROM. Also, some functional
+>> has already been removed due migrate from 2.6 to 3.0, and it seems that
+>> no one uses this platform. So, remove support for this board and modules
+>> specific only to this board.
+>>
+>> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+>
+> I got curious about this machine and found some ten year old emails
+> and a howto from Colin Cross about this machine. Since he's still
+> actively working on ARM Linux, maybe he has some final words to say
+> about this platform before it gets removed.
+>
+> Otherwise, no objections.
 
-You can still do that, just boot with init="/sbin/setarch armv7 /sbin/init".
-
-> But I can see on x86 that it always reports x86_64 even if the task is
-> x86_32.
-
-Not just x86, the same behavior is used on powerpc, s390, mips, sparc and
-parisc. Not sure about tile though.
-
-	Arnd
+That was my first embedded linux hobby project, and I haven't touched
+it in ten years, although I probably have one in a box somewhere.  I
+have no objection to removing it.
