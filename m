@@ -1,35 +1,51 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 21 Aug 2012 15:16:10 +0300
-Subject: [PATCH v2 12/13] serial: omap: make sure to suspend device before
- remove
+Date: Tue, 21 Aug 2012 15:16:11 +0300
+Subject: [PATCH v2 13/13] serial: omap: don't save IRQ flags on hardirq
 In-Reply-To: <1345551371-18862-1-git-send-email-balbi@ti.com>
 References: <1345540555-24359-1-git-send-email-balbi@ti.com>
  <1345551371-18862-1-git-send-email-balbi@ti.com>
-Message-ID: <1345551371-18862-13-git-send-email-balbi@ti.com>
+Message-ID: <1345551371-18862-14-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-before removing the driver, let's make sure
-to force device into a suspended state in order
-to conserve power.
+When we're running our hardirq handler, there's
+not need to disable IRQs with spin_lock_irqsave()
+because IRQs are already disabled. It also makes
+no difference if we save or not IRQ flags.
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Switch over to simple spin_lock/spin_unlock and
+drop the "flags" variable.
+
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/tty/serial/omap-serial.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/tty/serial/omap-serial.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 2e1a33a..b79c4fa 100644
+index b79c4fa..a79658d 100644
 --- a/drivers/tty/serial/omap-serial.c
 +++ b/drivers/tty/serial/omap-serial.c
-@@ -1337,6 +1337,7 @@ static int serial_omap_remove(struct platform_device *dev)
- {
- 	struct uart_omap_port *up = platform_get_drvdata(dev);
+@@ -350,11 +350,10 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
+ 	struct tty_struct *tty = up->port.state->port.tty;
+ 	unsigned int iir, lsr;
+ 	unsigned int type;
+-	unsigned long flags;
+ 	irqreturn_t ret = IRQ_HANDLED;
+ 	int max_count = 256;
  
-+	pm_runtime_put_sync(up->dev);
- 	pm_runtime_disable(up->dev);
- 	uart_remove_one_port(&serial_omap_reg, &up->port);
- 	pm_qos_remove_request(&up->pm_qos_request);
+-	spin_lock_irqsave(&up->port.lock, flags);
++	spin_lock(&up->port.lock);
+ 	pm_runtime_get_sync(up->dev);
+ 
+ 	do {
+@@ -394,7 +393,7 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
+ 		}
+ 	} while (!(iir & UART_IIR_NO_INT) && max_count--);
+ 
+-	spin_unlock_irqrestore(&up->port.lock, flags);
++	spin_unlock(&up->port.lock);
+ 
+ 	tty_flip_buffer_push(tty);
+ 
 -- 
 1.7.12.rc3
