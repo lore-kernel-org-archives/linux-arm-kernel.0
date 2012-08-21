@@ -1,101 +1,50 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 21 Aug 2012 08:26:15 -0500
-Subject: [PATCH] serial: pl011: honour serial aliases in device tree
-In-Reply-To: <1345544302-12406-1-git-send-email-matthew.leach@arm.com>
-References: <1345544302-12406-1-git-send-email-matthew.leach@arm.com>
-Message-ID: <50338C77.4060700@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 21 Aug 2012 16:27:44 +0300
+Subject: [PATCH 1/4] mfd: smsc: Add support for smsc gpio io/keypad driver
+In-Reply-To: <20120821132222.GF7995@opensource.wolfsonmicro.com>
+References: <1345545940-2232-1-git-send-email-sourav.poddar@ti.com>
+ <1345545940-2232-2-git-send-email-sourav.poddar@ti.com>
+ <20120821124146.GA21557@sirena.org.uk>
+ <20120821124243.GG10347@arwen.pp.htv.fi>
+ <20120821132222.GF7995@opensource.wolfsonmicro.com>
+Message-ID: <20120821132741.GI10347@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2012 05:18 AM, Matthew Leach wrote:
-> If the order of UART nodes is changed in the device tree, then tty dev
-> devices are attached to different serial ports causing the console to
-> be directed to a different physical serial port. The "serial" aliases
-> in the device tree should prevent this.
+On Tue, Aug 21, 2012 at 02:22:22PM +0100, Mark Brown wrote:
+> On Tue, Aug 21, 2012 at 03:42:45PM +0300, Felipe Balbi wrote:
+> > On Tue, Aug 21, 2012 at 01:41:46PM +0100, Mark Brown wrote:
+> > > > +	regmap_read(smsc->regmap, SMSC_DEV_ID, &ret);
+> > > > +	dev_dbg(&i2c->dev, "SMSC Device ID: %d\n", ret);
 > 
-> This patch ensures that the UART driver creates tty devices that
-> honour these aliases if a device tree is present.
+> > > I'd make these log messages dev_info() or something.
 > 
-> Signed-off-by: Matthew Leach <matthew.leach@arm.com>
-
-One comment/question below, but otherwise:
-
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-
-> ---
->  drivers/tty/serial/amba-pl011.c |   39 +++++++++++++++++++++++++++++++++++++++
->  1 files changed, 39 insertions(+), 0 deletions(-)
+> > dev_info() ? It'lll just make boot noisier for no good reason. Which
+> > user wants to see this during boot up ? That's a debugging feature for
+> > develop IMHO.
 > 
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index c17923e..5919599 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -52,6 +52,7 @@
->  #include <linux/scatterlist.h>
->  #include <linux/delay.h>
->  #include <linux/types.h>
-> +#include <linux/of_device.h>
->  #include <linux/pinctrl/consumer.h>
->  
->  #include <asm/io.h>
-> @@ -1869,6 +1870,42 @@ static struct uart_driver amba_reg = {
->  	.cons			= AMBA_CONSOLE,
->  };
->  
-> +#ifdef CONFIG_OF
+> Most of the registers appeared to be chip revision information which is
+> most definitely useful to tell people about, though possibly with neater
+> formatting ("why is this batch of boards failing...  oh, right").  If
+> they're fixed device IDs then the driver should instead be verifying
+> that the registers contain the expected values and bombing out if they
+> don't.  Either way dev_dbg() isn't too helpful.
 
-Now that we have IS_ENABLED, perhaps we want to put this inside the
-function instead?
+I still beg to differ. Even if it fails, dmesg will still contain the
+message (provided you have it enabled). I really don't think we want
+this to print to console on every boot.
 
-if (!IS_ENABLED(CONFIG_OF))
-	return index;
+If you're still testing your new batch of boards, you're not just a
+simple user and you will have debugging enabled anyway. dev_info() will
+be visible to anyone who's got a console running. Not sure how useful
+that would be to my neighbor.
 
-
-> +static int pl011_probe_dt_alias(int index, struct device *dev)
-> +{
-> +	struct device_node *np;
-> +	static bool seen_dev_with_alias = false;
-> +	static bool seen_dev_without_alias = false;
-> +	int ret = index;
-> +
-> +	np = dev->of_node;
-> +	if (!np)
-> +		return ret;
-> +
-> +	ret = of_alias_get_id(np, "serial");
-> +	if (IS_ERR_VALUE(ret)) {
-> +		seen_dev_without_alias = true;
-> +		ret = index;
-> +	} else {
-> +		seen_dev_with_alias = true;
-> +		if (ret >= ARRAY_SIZE(amba_ports) || amba_ports[ret] != NULL) {
-> +			dev_warn(dev, "requested serial port %d  not available.\n", ret);
-> +			ret = index;
-> +		}
-> +	}
-> +
-> +	if (seen_dev_with_alias && seen_dev_without_alias)
-> +		dev_warn(dev, "aliased and non-aliased serial devices found in device tree. Serial port enumeration may be unpredictable.\n");
-> +
-> +	return ret;
-> +}
-> +#else
-> +static int pl011_probe_dt_alias(int index, struct device *dev)
-> +{
-> +	return index;
-> +}
-> +#endif
-> +
->  static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
->  {
->  	struct uart_amba_port *uap;
-> @@ -1891,6 +1928,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
->  		goto out;
->  	}
->  
-> +	i = pl011_probe_dt_alias(i, &dev->dev);
-> +
->  	base = ioremap(dev->res.start, resource_size(&dev->res));
->  	if (!base) {
->  		ret = -ENOMEM;
-> 
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120821/ef82173b/attachment-0001.sig>
