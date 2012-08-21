@@ -1,138 +1,66 @@
 From: afzal@ti.com (Afzal Mohammed)
-Date: Tue, 21 Aug 2012 16:15:25 +0530
-Subject: [PATCH v6 04/10] ARM: OMAP2+: GPMC: Remove unused OneNAND get_freq()
- platform function
+Date: Tue, 21 Aug 2012 16:15:33 +0530
+Subject: [PATCH v6 05/10] ARM: OMAP2+: gpmc: find features by ip rev check
 In-Reply-To: <cover.1345524670.git.afzal@ti.com>
 References: <cover.1345524670.git.afzal@ti.com>
-Message-ID: <17842e012f55065653a29e9361625d03567ac4f6.1345524670.git.afzal@ti.com>
+Message-ID: <0b211272d0d6f9281df7db400cb2d6a968b31222.1345524670.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Hunter <jon-hunter@ti.com>
+Newer IP's have wr_access and wr_data_mux_bus fields. Use
+IP revision values to determine availability of these
+fields and hence decide on whether to configure them.
 
-A platform function pointer for getting the frequency of a OneNAND device
-was added so that a platform could specify a custom function for returning
-the frequency and not just rely on the OneNAND version to determine the
-frequency. However, this platform function pointer is not currently being
-used and I am not sure if it ever has.
-
-OneNAND devices are not so common these days and as far as I know not being
-used with new devices. Therefore, it is most likely that this get_freq()
-function pointer will not be used and so remove it.
-
-Given that the get_freq() function pointer is not used, neither is the
-clk_dep variable and so all references to it can also be removed.
-
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- arch/arm/mach-omap2/gpmc-onenand.c        |   39 +++-------------------------
- arch/arm/plat-omap/include/plat/onenand.h |    8 ------
- 2 files changed, 5 insertions(+), 42 deletions(-)
+ arch/arm/mach-omap2/gpmc.c |   12 ++++++++++--
+ 1 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
-index bbae674..8a301f3 100644
---- a/arch/arm/mach-omap2/gpmc-onenand.c
-+++ b/arch/arm/mach-omap2/gpmc-onenand.c
-@@ -139,21 +139,10 @@ static void set_onenand_cfg(void __iomem *onenand_base)
- }
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index 070fac5..68123d0 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -85,6 +85,11 @@
+ #define ENABLE_PREFETCH		(0x1 << 7)
+ #define DMA_MPU_MODE		2
  
- static int omap2_onenand_get_freq(struct omap_onenand_platform_data *cfg,
--				  void __iomem *onenand_base, bool *clk_dep)
-+				  void __iomem *onenand_base)
- {
- 	u16 ver = readw(onenand_base + ONENAND_REG_VERSION_ID);
--	int freq = 0;
--
--	if (cfg->get_freq) {
--		struct onenand_freq_info fi;
--
--		fi.maf_id = readw(onenand_base + ONENAND_REG_MANUFACTURER_ID);
--		fi.dev_id = readw(onenand_base + ONENAND_REG_DEVICE_ID);
--		fi.ver_id = ver;
--		freq = cfg->get_freq(&fi, clk_dep);
--		if (freq)
--			return freq;
++#define	GPMC_REVISION_MAJOR(l)		((l >> 4) & 0xf)
++
++#define	GPMC_HAS_WR_ACCESS		0x1
++#define	GPMC_HAS_WR_DATA_MUX_BUS	0x2
++
+ /* XXX: Only NAND irq has been considered,currently these are the only ones used
+  */
+ #define	GPMC_NR_IRQ		2
+@@ -131,6 +136,7 @@ static DEFINE_SPINLOCK(gpmc_mem_lock);
+ static unsigned int gpmc_cs_map;	/* flag for cs which are initialized */
+ static int gpmc_ecc_used = -EINVAL;	/* cs using ecc engine */
+ 
++static unsigned gpmc_capability;
+ static void __iomem *gpmc_base;
+ 
+ static struct clk *gpmc_l3_clk;
+@@ -356,10 +362,10 @@ int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t)
+ 	GPMC_SET_ONE(GPMC_CS_CONFIG1, 18, 19, wait_monitoring);
+ 	GPMC_SET_ONE(GPMC_CS_CONFIG1, 25, 26, clk_activation);
+ 
+-	if (cpu_is_omap34xx()) {
++	if (gpmc_capability & GPMC_HAS_WR_DATA_MUX_BUS)
+ 		GPMC_SET_ONE(GPMC_CS_CONFIG6, 16, 19, wr_data_mux_bus);
++	if (gpmc_capability & GPMC_HAS_WR_ACCESS)
+ 		GPMC_SET_ONE(GPMC_CS_CONFIG6, 24, 28, wr_access);
 -	}
-+	int freq;
  
- 	switch ((ver >> 4) & 0xf) {
- 	case 0:
-@@ -181,7 +170,7 @@ static int omap2_onenand_get_freq(struct omap_onenand_platform_data *cfg,
+ 	/* caller is expected to have initialized CONFIG1 to cover
+ 	 * at least sync vs async
+@@ -922,6 +928,8 @@ static int __init gpmc_init(void)
+ 	clk_enable(gpmc_l3_clk);
  
- static struct gpmc_timings
- omap2_onenand_calc_sync_timings(struct omap_onenand_platform_data *cfg,
--						int freq, bool clk_dep)
-+						int freq)
- {
- 	struct gpmc_timings t;
- 	const int t_cer  = 15;
-@@ -259,22 +248,6 @@ omap2_onenand_calc_sync_timings(struct omap_onenand_platform_data *cfg,
- 	else
- 		latency = 4;
- 
--	if (clk_dep) {
--		if (gpmc_clk_ns < 12) { /* >83Mhz */
--			t_ces   = 3;
--			t_avds  = 4;
--		} else if (gpmc_clk_ns < 15) { /* >66Mhz */
--			t_ces   = 5;
--			t_avds  = 4;
--		} else if (gpmc_clk_ns < 25) { /* >40Mhz */
--			t_ces   = 6;
--			t_avds  = 5;
--		} else {
--			t_ces   = 7;
--			t_avds  = 7;
--		}
--	}
--
- 	/* Set synchronous read timings */
- 	memset(&t, 0, sizeof(t));
- 
-@@ -381,16 +354,14 @@ static int omap2_onenand_setup_sync(void __iomem *onenand_base, int *freq_ptr)
- {
- 	int ret, freq = *freq_ptr;
- 	struct gpmc_timings t;
--	bool clk_dep = false;
- 
- 	if (!freq) {
- 		/* Very first call freq is not known */
--		freq = omap2_onenand_get_freq(gpmc_onenand_data,
--						onenand_base, &clk_dep);
-+		freq = omap2_onenand_get_freq(gpmc_onenand_data, onenand_base);
- 		set_onenand_cfg(onenand_base);
- 	}
- 
--	t = omap2_onenand_calc_sync_timings(gpmc_onenand_data, freq, clk_dep);
-+	t = omap2_onenand_calc_sync_timings(gpmc_onenand_data, freq);
- 
- 	ret = gpmc_set_sync_mode(gpmc_onenand_data->cs, &t);
- 	if (IS_ERR_VALUE(ret))
-diff --git a/arch/arm/plat-omap/include/plat/onenand.h b/arch/arm/plat-omap/include/plat/onenand.h
-index 2858667..21bb0ff 100644
---- a/arch/arm/plat-omap/include/plat/onenand.h
-+++ b/arch/arm/plat-omap/include/plat/onenand.h
-@@ -15,20 +15,12 @@
- #define ONENAND_SYNC_READ	(1 << 0)
- #define ONENAND_SYNC_READWRITE	(1 << 1)
- 
--struct onenand_freq_info {
--	u16			maf_id;
--	u16			dev_id;
--	u16			ver_id;
--};
--
- struct omap_onenand_platform_data {
- 	int			cs;
- 	int			gpio_irq;
- 	struct mtd_partition	*parts;
- 	int			nr_parts;
- 	int			(*onenand_setup)(void __iomem *, int *freq_ptr);
--	int		(*get_freq)(const struct onenand_freq_info *freq_info,
--				    bool *clk_dep);
- 	int			dma_channel;
- 	u8			flags;
- 	u8			regulator_can_sleep;
+ 	l = gpmc_read_reg(GPMC_REVISION);
++	if (GPMC_REVISION_MAJOR(l) > 0x4)
++		gpmc_capability = GPMC_HAS_WR_ACCESS | GPMC_HAS_WR_DATA_MUX_BUS;
+ 	printk(KERN_INFO "GPMC revision %d.%d\n", (l >> 4) & 0x0f, l & 0x0f);
+ 	/* Set smart idle mode and automatic L3 clock gating */
+ 	l = gpmc_read_reg(GPMC_SYSCONFIG);
 -- 
 1.7.1
