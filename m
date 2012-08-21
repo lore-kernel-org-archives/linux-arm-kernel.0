@@ -1,20 +1,39 @@
-From: alan@linux.intel.com (Alan Cox)
-Date: Tue, 21 Aug 2012 12:50:05 +0100
-Subject: [RFC/PATCH 02/13] serial: omap: always return IRQ_HANDLED
-In-Reply-To: <1345540555-24359-3-git-send-email-balbi@ti.com>
-References: <1345540555-24359-1-git-send-email-balbi@ti.com>
- <1345540555-24359-3-git-send-email-balbi@ti.com>
-Message-ID: <20120821125005.235926e0@bob.linux.org.uk>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 21 Aug 2012 14:37:00 +0300
+Subject: [PATCH v6 01/10] ARM: OMAP2+: nand: unify init functions
+In-Reply-To: <8e0958354be60d026e7e03bd179509fcbe70957b.1345524670.git.afzal@ti.com>
+References: <cover.1345524670.git.afzal@ti.com>
+ <8e0958354be60d026e7e03bd179509fcbe70957b.1345524670.git.afzal@ti.com>
+Message-ID: <503372DC.20504@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Aug 2012 12:15:44 +0300
-Felipe Balbi <balbi@ti.com> wrote:
+Hi Afzal,
 
-> Even if we enter our IRQ handler just to notice
-> that the our device didn't generate the IRQ,
-> that still means "handling" and IRQ, so let's
-> return IRQ_HANDLED.
+Thanks for the patches!
 
-That looks wrong - you'll defeat the stuck IRQ protection. If we didn't
-cause the IRQ then we are IRQ_NONE ?
+On 08/21/12 13:45, Afzal Mohammed wrote:
+> Helper function for updating nand platform data has been
+> added the capability to take timing structure arguement.
+> Usage of omap_nand_flash_init() has been replaced by modifed
+> one, omap_nand_flash_init was doing things similar to
+> board_nand_init except that NAND CS# were being acquired
+> based on bootloader setting. As CS# is hardwired for a given
+> board, acquiring gpmc CS# has been removed, and updated with
+> the value on board.
+> 
+> NAND CS# used in beagle board & omap3evm was found to be CS0.
+> Thomas Weber <thomas.weber.linux@googlemail.com> reported
+> that value of devkit8000 to be CS0. Overo board was found
+> to be using CS0 based on u-boot, while google grep says
+> omap3touchbook too has CS0.
+> 
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> Reviewed-by: Jon Hunter <jon-hunter@ti.com>
+
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+
+
+-- 
+Regards,
+Igor.
