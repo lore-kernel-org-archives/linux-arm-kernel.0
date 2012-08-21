@@ -1,86 +1,45 @@
-From: matthew.leach@arm.com (Matthew Leach)
-Date: Tue, 21 Aug 2012 16:48:14 +0100
-Subject: [PATCH v2] serial: pl011: honour serial aliases in device tree
-Message-ID: <1345564094-16565-1-git-send-email-matthew.leach@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 21 Aug 2012 09:48:21 -0600
+Subject: [PATCH v3 1/4] arm/dts: regulator: Add tps65910 device tree data
+In-Reply-To: <1345547850-29761-2-git-send-email-anilkumar@ti.com>
+References: <1345547850-29761-1-git-send-email-anilkumar@ti.com>
+ <1345547850-29761-2-git-send-email-anilkumar@ti.com>
+Message-ID: <5033ADC5.4030002@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the order of UART nodes is changed in the device tree, then tty dev
-devices are attached to different serial ports causing the console to
-be directed to a different physical serial port. The "serial" aliases
-in the device tree should prevent this.
+On 08/21/2012 05:17 AM, AnilKumar Ch wrote:
+> Add device tree data for tps65910 regulator by adding all tps65910
+> regulator nodes. Regulator is initialized based on compatiable
+> name provided in tps65910 DT file.
+> 
+> All tps65910 PMIC regulator device tree nodes are placed in a
+> seperate device tree include file (tps65910.dtsi). This patch
+> was tested on AM335x-EVM.
 
-This patch ensures that the UART driver creates tty devices that
-honour these aliases if a device tree is present.
+This .dtsi file adds a node for every single regulator within the
+TPS65910, which in turn means that of_regulator_match() will find a node
+for every regulator, and in turn every regulator will be registered. On
+some boards, not all of those regulators will be used, and hence we
+don't want all of them to be registered.
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-Signed-off-by: Matthew Leach <matthew.leach@arm.com>
----
-v2: use IS_ENABLED instead of ifdefs
+If we backport the /delete-node/ feature I implemented, perhaps we could
+solve that; see:
 
- drivers/tty/serial/amba-pl011.c |   36 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 36 insertions(+), 0 deletions(-)
+http://comments.gmane.org/gmane.linux.drivers.devicetree/19170
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index d3553b5..33c90f6 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -52,6 +52,8 @@
- #include <linux/scatterlist.h>
- #include <linux/delay.h>
- #include <linux/types.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- #include <linux/pinctrl/consumer.h>
- #include <linux/sizes.h>
- 
-@@ -1869,6 +1871,38 @@ static struct uart_driver amba_reg = {
- 	.cons			= AMBA_CONSOLE,
- };
- 
-+static int pl011_probe_dt_alias(int index, struct device *dev)
-+{
-+	struct device_node *np;
-+	static bool seen_dev_with_alias = false;
-+	static bool seen_dev_without_alias = false;
-+	int ret = index;
-+
-+	if (!IS_ENABLED(CONFIG_OF))
-+		return index;
-+
-+	np = dev->of_node;
-+	if (!np)
-+		return ret;
-+
-+	ret = of_alias_get_id(np, "serial");
-+	if (IS_ERR_VALUE(ret)) {
-+		seen_dev_without_alias = true;
-+		ret = index;
-+	} else {
-+		seen_dev_with_alias = true;
-+		if (ret >= ARRAY_SIZE(amba_ports) || amba_ports[ret] != NULL) {
-+			dev_warn(dev, "requested serial port %d  not available.\n", ret);
-+			ret = index;
-+		}
-+	}
-+
-+	if (seen_dev_with_alias && seen_dev_without_alias)
-+		dev_warn(dev, "aliased and non-aliased serial devices found in device tree. Serial port enumeration may be unpredictable.\n");
-+
-+	return ret;
-+}
-+
- static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- {
- 	struct uart_amba_port *uap;
-@@ -1891,6 +1925,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 		goto out;
- 	}
- 
-+	i = pl011_probe_dt_alias(i, &dev->dev);
-+
- 	base = ioremap(dev->res.start, resource_size(&dev->res));
- 	if (!base) {
- 		ret = -ENOMEM;
--- 
-1.7.0.4
+> diff --git a/arch/arm/boot/dts/tps65910.dtsi b/arch/arm/boot/dts/tps65910.dtsi
+
+I wonder if there shouldn't be some better common location for .dtsi
+files that are ancilliary chips, rather than ARM-specific?
+
+> +&tps {
+> +	compatible = "ti,tps65910";
+
+Perhaps this file should expect some more unique label than just "tps".
+Many boards have many power-related chips, all with model names that
+start with "tps"; I foresee conflict here.
+
+If dtc allowed /include/ inside a node rather than just at the
+top-level, that might solve this. Or, #defines to the board .dts could
+define the label name, and the .dtsi reference that label name.
