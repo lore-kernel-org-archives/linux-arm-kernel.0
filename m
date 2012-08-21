@@ -1,67 +1,59 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 21 Aug 2012 16:46:54 +0200
+Date: Tue, 21 Aug 2012 16:47:25 +0200
 Subject: [PATCH] ARM: relax conditions required for enabling Contiguous
  Memory Allocator
-In-Reply-To: <201208202001.23443.arnd@arndb.de>
+In-Reply-To: <20120821121256.GT18957@n2100.arm.linux.org.uk>
 References: <1345443372-3824-1-git-send-email-m.szyprowski@samsung.com>
  <201208202001.23443.arnd@arndb.de>
-Message-ID: <00c001cd7fab$d145f350$73d1d9f0$%szyprowski@samsung.com>
+ <20120821121256.GT18957@n2100.arm.linux.org.uk>
+Message-ID: <00c101cd7fab$e341fc20$a9c5f460$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Monday, August 20, 2012 10:01 PM Arnd Bergmann wrote:
+On Tuesday, August 21, 2012 2:13 PM Russell King - ARM Linux wrote:
 
-> On Monday 20 August 2012, Marek Szyprowski wrote:
-> > Contiguous Memory Allocator requires only paging and MMU enabled not
-> > particular CPU architectures, so there is no need for strict dependency
-> > on CPU type. This enables to use CMA on some older ARM v5 systems which
-> > also might need large contiguous blocks for the multimedia processing hw
-> > modules.
+> On Mon, Aug 20, 2012 at 08:01:23PM +0000, Arnd Bergmann wrote:
+> > The patch looks simple, but I want a better explanation for it.
+> > When we went through all possible cases, we decided that:
 > >
-> > Reported-by: Prabhakar Lad <prabhakar.csengg@gmail.com>
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > * ARMv6+ need CMA to avoid the double mapping problem.
+> > * ARMv4/v5 cannot generally use CMA because it doesn't work
+> >   together with DMABOUNCE. I don't remember if it was the
+> >   only problem, but I definitely remember this was intentional.
+> > * We want a common kernel for all ARMv6+ eventually, and a
+> >   separate kernel for all ARMv4/v5 ones.
+> >
+> > If the reasoning has changed, please try to explain the full
+> > situation.
 > 
-> The patch looks simple, but I want a better explanation for it.
-> When we went through all possible cases, we decided that:
+> Indeed.
 > 
-> * ARMv6+ need CMA to avoid the double mapping problem.
-
-Right. CMA can be used to avoid double mapping issues, but we also should keep in
-mind that right now no one observed any issues with the real hw, so this discussion
-is still a bit hypothetical.
-
-> * ARMv4/v5 cannot generally use CMA because it doesn't work
->   together with DMABOUNCE. I don't remember if it was the
->   only problem, but I definitely remember this was intentional.
-
-DMABOUNCE is used only by a few machines. I also tested and see no reason why it 
-might cause problems with such machines. I've used DMABOUNCE code to test atomic 
-allocations many times and found no problems. The only issue I might suspect is 
-a very limited DMA zone. CMA needs 4Mib alignment of the contiguous area base and
-size to meet requirements of the memory management core (mainly for migration and
-page isolation purposes), so it might not fit into some small DMA zones.
-
-> * We want a common kernel for all ARMv6+ eventually, and a
->   separate kernel for all ARMv4/v5 ones.
-
-I see no problem here, if required why may have even a separate dma_map_ops for
-CMA and use it only for selected devices.
-
+> > On a related topic, what happened to the idea that
+> > ARMv6+ is broken without CMA? I noticed that it's optional
+> > now.
 > 
-> If the reasoning has changed, please try to explain the full
-> situation. On a related topic, what happened to the idea that
-> ARMv6+ is broken without CMA? I noticed that it's optional
-> now.
+> With Marek's patch, it's always selected for MMU-based builds (it can't
+> be disabled).  Before the patch, it was always selected for V6 and later
+> CPUs.
 
-Right. I removed unconditional dependency on CMA on Russell's request. CMA is
-still experimental and there are still some known issues with it, which we are 
-investigating. It doesn't make sense to make the whole architecture depending
-on the experimental stuff. The old method of allocating and managing coherent
-buffers was stable and worked well enough for the drivers and platforms already
-present in the mainline kernel, so if one want to use stable stuff I see no 
-reason to disable it.
+My patch only alters dependences of HAVE_DMA_CONTIGUOUS symbol, by changing
+them from CPU_V6+ to MMU. It doesn't change or select CMA for any of the 
+systems - this is done by the CONFIG_CMA symbol from drivers/base/KConfig 
+which depends on HAVE_DMA_CONTIGUOUS. It is up to user to enable it or not.
+
+> And the description doesn't make sense:
+> 
+> "Contiguous Memory Allocator requires only paging and MMU enabled not
+> particular CPU architectures,"
+> 
+> what does "only paging and MMU enabled" mean?  Are you trying to say that
+> CMA only requires a kernel with MMU support?
+
+On ARM architecture CMA can be enabled on any system which has MMU support, 
+MMU is required for page migration. The integration layer in dma-mapping is 
+generic enough to work on any ARM architecture.
 
 Best regards
 -- 
