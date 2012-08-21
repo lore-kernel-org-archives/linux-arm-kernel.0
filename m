@@ -1,33 +1,53 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Tue, 21 Aug 2012 12:57:40 +0300
-Subject: ARM hugetlb support?
-In-Reply-To: <20120820082514.GF27631@e103986-lin>
-References: <20120820082514.GF27631@e103986-lin>
-Message-ID: <CANOLnOMaV_urZvRL5NF++3UpOQSa_RwL1jfOTdGkn7fN+yZ28Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 21 Aug 2012 10:11:40 +0000
+Subject: [PATCH] ARM: io: avoid writeback addressing modes for __raw_
+ accessors
+In-Reply-To: <20120821090213.GE28660@mudshark.cambridge.arm.com>
+References: <1344956366-32574-1-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.02.1208201443070.1754@xanadu.home>
+ <20120821090213.GE28660@mudshark.cambridge.arm.com>
+Message-ID: <201208211011.41093.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 11:25 AM, Steve Capper <steve.capper@arm.com> wrote:
-> n Mon, Aug 20, 2012 at 00:18:12AM +0100, Grazvydas Ignotas wrote:
->> Hello,
-> Hello Grazvydas,
->
->> I've found that hugetlb support patches have been posted some months
->> ago [1]. I've been testing them with very good results [2]. Are there
->> still plans to further develop them and eventually merge them?
->>
->
-> We are currently working on HugeTLB and Transparent HugePage support for both
-> LPAE and non-LPAE memory descriptors. The non-LPAE HugeTLB patches are based
-> on Bill's.
->
-> I hope to get some patches out to the list soon.
+On Tuesday 21 August 2012, Will Deacon wrote:
+> On Mon, Aug 20, 2012 at 07:45:20PM +0100, Nicolas Pitre wrote:
+> > On Mon, 20 Aug 2012, Will Deacon wrote:
+> > > On Mon, Aug 20, 2012 at 07:04:01PM +0100, Nicolas Pitre wrote:
+> > > > Nah... the const is wrong.  The way you wrote it means that addr may 
+> > > > change but the pointed data is constant.  This is obviously wrong since 
+> > > > we expect the pointed location to change even from a read.
+> > > 
+> > > That's the prototype for the read accessors though -- a bunch of other
+> > > architectures define them that way (including asm-generic), so I wonder what
+> > > the reasoning behind that was?
+> > 
+> > I'm still asserting that they're wrong.
+> 
+> I did a bit of digging around and `const volatile void *' is apparently used
+> because a function with such a parameter type can be passed any old pointer
+> without warnings. Torvalds says something about them here:
+> 
+>   http://readlist.com/lists/vger.kernel.org/linux-kernel/14/72300.html
+> 
+> Personally, I too think that the const is misleading and who on Earth would
+> be passing in pointers to const for an I/O region? However, it's an argument
+> I'd rather avoid so, for the sake of consistency, I'll cast away the const in
+> the asm block.
+> 
 
-Sounds promising. If you CC me when sending those patches, I can test
-them on CortexA8 with my application.
-BTW as you probably know know, Catalin seems to have hugetlb branch for LPAE:
-http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-arm-arch.git;a=shortlog;h=refs/heads/hugetlb
+You could have a read-only register area, and I would regard it as sensible
+to mark a pointer to it as "const", although there should not be any
+optimizations based on that.
 
+There is no need to cast away the constness of the pointer when passing
+it into the inline assembly, as the "asm volatile" already implies that
+gcc cannot remove the contents.
 
--- 
-Gra?vydas
+On a related topic, thank you very much for introducing the inline
+assemblies here, as they finally solve a lingering problem that has
+hit us in the past [1] and that could happen again in other drivers.
+
+	Arnd
+
+[1] http://old.nabble.com/ARM-unaligned-MMIO-access-with-attribute%28%28packed%29%29-td30827280.html
