@@ -1,34 +1,54 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 21 Aug 2012 14:54:27 +0300
-Subject: [RFC/PATCH 02/13] serial: omap: always return IRQ_HANDLED
-In-Reply-To: <20120821125005.235926e0@bob.linux.org.uk>
-References: <1345540555-24359-1-git-send-email-balbi@ti.com>
- <1345540555-24359-3-git-send-email-balbi@ti.com>
- <20120821125005.235926e0@bob.linux.org.uk>
-Message-ID: <20120821115426.GC10347@arwen.pp.htv.fi>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 21 Aug 2012 14:02:18 +0200
+Subject: [PATCH v2 2/4] pinctrl: add exynos4210 specific extensions for
+ samsung pinctrl driver
+In-Reply-To: <1345060656-32201-3-git-send-email-thomas.abraham@linaro.org>
+References: <1345060656-32201-1-git-send-email-thomas.abraham@linaro.org>
+ <1345060656-32201-3-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CACRpkdYiJOkHrjZ22_0onRHc0ApmBLj+tXPa4SrPo2h0d=fJHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2012 at 12:50:05PM +0100, Alan Cox wrote:
-> On Tue, 21 Aug 2012 12:15:44 +0300
-> Felipe Balbi <balbi@ti.com> wrote:
-> 
-> > Even if we enter our IRQ handler just to notice
-> > that the our device didn't generate the IRQ,
-> > that still means "handling" and IRQ, so let's
-> > return IRQ_HANDLED.
-> 
-> That looks wrong - you'll defeat the stuck IRQ protection. If we didn't
-> cause the IRQ then we are IRQ_NONE ?
+On Wed, Aug 15, 2012 at 9:57 PM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
 
-that's true. I'll drop this patch from the list. My bad.
+> Add information about the Exynos4210 pin banks and driver data which is
+> used by the Samsung pinctrl driver. In addition to this, the support for
+> external gpio and wakeup interrupt support is included and hooked up with
+> the Samsung pinctrl driver.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120821/3c2e60a4/attachment.sig>
+OK...
+
+> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+> +config PINCTRL_EXYNOS4
+> +       bool "Pinctrl driver data for Exynos4 SoC"
+> +       depends on ARCH_EXYNOS4 && OF
+
+Since you depend on PINCTRL_SAMSUNG which depends
+on OF you don't need to depend on OF here.
+
+> +       depends on PINCTRL_SAMSUNG
+> +       select PINMUX
+> +       select PINCONF
+
+So as noted in the main driver, let PINCTRL_SAMSUNG
+select PINMUX and PINCONF and you need only select
+PINCTRL_SAMSUNG here.
+
+> diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
+(...)
+> +#include <linux/interrupt.h>
+> +#include <linux/irqdomain.h>
+> +#include <linux/irq.h>
+> +#include <linux/of_irq.h>
+
+Do you need these includes? Didn't you put them
+all in "pinctrl-samsung.h"?
+
+Overall this looks good and straight-forward, but I cannot figure
+out how the samsung_pinctrl_soc_data is passed to the main
+driver, it seems to be through some DT node but I cannot figure
+this out. Can you explain this?
+
+Yours,
+Linus Walleij
