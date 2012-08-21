@@ -1,29 +1,46 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 21 Aug 2012 13:31:58 -0700
-Subject: [PATCH 1/4] ARM: clps711x: Remove board support for CEIVA
-In-Reply-To: <201208211950.07166.arnd@arndb.de>
-References: <1345568375-28516-1-git-send-email-shc_work@mail.ru>
- <201208211950.07166.arnd@arndb.de>
-Message-ID: <CAMbhsRReOzQogzESWjKu5o=0Ep3UqcEP1zdzO8dbHfM4AofhYQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 Aug 2012 21:42:04 +0100
+Subject: [PATCH v2] serial: pl011: honour serial aliases in device tree
+In-Reply-To: <1345564094-16565-1-git-send-email-matthew.leach@arm.com>
+References: <1345564094-16565-1-git-send-email-matthew.leach@arm.com>
+Message-ID: <20120821204204.GA8316@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2012 at 12:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 21 August 2012, Alexander Shiyan wrote:
->> The current kernel does not fit in the CEIVA ROM. Also, some functional
->> has already been removed due migrate from 2.6 to 3.0, and it seems that
->> no one uses this platform. So, remove support for this board and modules
->> specific only to this board.
->>
->> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
->
-> I got curious about this machine and found some ten year old emails
-> and a howto from Colin Cross about this machine. Since he's still
-> actively working on ARM Linux, maybe he has some final words to say
-> about this platform before it gets removed.
->
-> Otherwise, no objections.
+Hi Matthew,
 
-That was my first embedded linux hobby project, and I haven't touched
-it in ten years, although I probably have one in a box somewhere.  I
-have no objection to removing it.
+On Tue, Aug 21, 2012 at 04:48:14PM +0100, Matthew Leach wrote:
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index d3553b5..33c90f6 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -52,6 +52,8 @@
+>  #include <linux/scatterlist.h>
+>  #include <linux/delay.h>
+>  #include <linux/types.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+>  #include <linux/pinctrl/consumer.h>
+>  #include <linux/sizes.h>
+>  
+> @@ -1869,6 +1871,38 @@ static struct uart_driver amba_reg = {
+>  	.cons			= AMBA_CONSOLE,
+>  };
+>  
+> +static int pl011_probe_dt_alias(int index, struct device *dev)
+> +{
+> +	struct device_node *np;
+> +	static bool seen_dev_with_alias = false;
+> +	static bool seen_dev_without_alias = false;
+> +	int ret = index;
+> +
+> +	if (!IS_ENABLED(CONFIG_OF))
+> +		return index;
+
+May as well return ret here for consistency. With that:
+
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+
+I guess this goes via Greg's tree rather than the ARM one?
+
+Will
