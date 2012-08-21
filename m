@@ -1,35 +1,94 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 21 Aug 2012 12:15:48 +0300
-Subject: [RFC/PATCH 06/13] serial: add OMAP-specific defines
+Date: Tue, 21 Aug 2012 12:15:49 +0300
+Subject: [RFC/PATCH 07/13] serial: omap: simplify IRQ handling
 In-Reply-To: <1345540555-24359-1-git-send-email-balbi@ti.com>
 References: <1345540555-24359-1-git-send-email-balbi@ti.com>
-Message-ID: <1345540555-24359-7-git-send-email-balbi@ti.com>
+Message-ID: <1345540555-24359-8-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP has some extra Interrupt types which can
-be really useful for SW. Let's define them
-so we can later use those in OMAP's serial driver.
+quite a few changes here, though they are
+pretty obvious. In summary we're making sure
+to detect which interrupt type we need to
+handle before calling the underlying interrupt
+handling procedure.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- include/linux/serial_reg.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/tty/serial/omap-serial.c | 47 ++++++++++++++++++++++++++++++----------
+ 1 file changed, 35 insertions(+), 12 deletions(-)
 
-diff --git a/include/linux/serial_reg.h b/include/linux/serial_reg.h
-index 8ce70d7..5ed325e 100644
---- a/include/linux/serial_reg.h
-+++ b/include/linux/serial_reg.h
-@@ -40,6 +40,10 @@
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 4d74a9b..1ca08b8 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -350,32 +350,55 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
+ {
+ 	struct uart_omap_port *up = dev_id;
+ 	unsigned int iir, lsr;
++	unsigned int type;
+ 	unsigned long flags;
  
- #define UART_IIR_BUSY		0x07 /* DesignWare APB Busy Detect */
++	spin_lock_irqsave(&up->port.lock, flags);
+ 	pm_runtime_get_sync(up->dev);
+ 	iir = serial_in(up, UART_IIR);
+-	if (iir & UART_IIR_NO_INT) {
+-		pm_runtime_mark_last_busy(up->dev);
+-		pm_runtime_put_autosuspend(up->dev);
+-		return IRQ_HANDLED;
+-	}
++again:
++	if (iir & UART_IIR_NO_INT)
++		goto out;
  
-+#define UART_IIR_RX_TIMEOUT	0x0c /* OMAP RX Timeout interrupt */
-+#define UART_IIR_XOFF		0x10 /* OMAP XOFF/Special Character */
-+#define UART_IIR_CTS_RTS_DSR	0x20 /* OMAP CTS/RTS/DSR Change */
+-	spin_lock_irqsave(&up->port.lock, flags);
+ 	lsr = serial_in(up, UART_LSR);
+-	if (iir & UART_IIR_RLSI) {
 +
- #define UART_FCR	2	/* Out: FIFO Control Register */
- #define UART_FCR_ENABLE_FIFO	0x01 /* Enable the FIFO */
- #define UART_FCR_CLEAR_RCVR	0x02 /* Clear the RCVR FIFO */
++	/* extract IRQ type from IIR register */
++	type = iir & 0x3e;
++
++	switch (type) {
++	case UART_IIR_MSI:
++		check_modem_status(up);
++		break;
++	case UART_IIR_THRI:
++		if (lsr & UART_LSR_THRE)
++			transmit_chars(up);
++		break;
++	case UART_IIR_RDI:
+ 		if (lsr & UART_LSR_DR)
+ 			receive_chars(up, &lsr);
++		break;
++	case UART_IIR_RLSI:
++		if (lsr & UART_LSR_BRK_ERROR_BITS)
++			receive_chars(up, &lsr);
++		break;
++	case UART_IIR_RX_TIMEOUT:
++		receive_chars(up, &lsr);
++		break;
++	case UART_IIR_CTS_RTS_DSR:
++		iir = serial_in(up, UART_IIR);
++		goto again;
++	case UART_IIR_XOFF:
++		/* FALLTHROUGH */
++	default:
++		break;
+ 	}
+ 
+-	check_modem_status(up);
+-	if ((lsr & UART_LSR_THRE) && (iir & UART_IIR_THRI))
+-		transmit_chars(up);
+-
++out:
+ 	spin_unlock_irqrestore(&up->port.lock, flags);
+ 	pm_runtime_mark_last_busy(up->dev);
+ 	pm_runtime_put_autosuspend(up->dev);
+-
+ 	up->port_activity = jiffies;
++
+ 	return IRQ_HANDLED;
+ }
+ 
 -- 
 1.7.12.rc3
