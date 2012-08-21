@@ -1,42 +1,41 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 21 Aug 2012 13:50:45 +0200
-Subject: [v3] Add basic address decoding support for Marvell 370/XP
-In-Reply-To: <CABJ1b_RVaSjsneDCvejSMot0ZHDr1dmeroVRDUNMF2y83UGXNA@mail.gmail.com>
-References: <1344246141-23931-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20120816132839.GO22226@titan.lakedaemon.net>
- <20120816183708.GT22226@titan.lakedaemon.net>
- <20120817152156.4d91ba16@skate>
- <20120819012303.GX22226@titan.lakedaemon.net>
- <20120821114630.545fb771@skate>
- <CABJ1b_RVaSjsneDCvejSMot0ZHDr1dmeroVRDUNMF2y83UGXNA@mail.gmail.com>
-Message-ID: <20120821135045.58e2a633@skate>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 21 Aug 2012 12:51:24 +0100
+Subject: [PATCH 1/1] ASoC: codecs: Enable AB8500 CODEC for Device Tree
+In-Reply-To: <20120820143653.GE26991@opensource.wolfsonmicro.com>
+References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
+ <1344527268-5964-9-git-send-email-lee.jones@linaro.org>
+ <s5h628lu0q9.wl%tiwai@suse.de> <20120820113427.GN8450@gmail.com>
+ <20120820143653.GE26991@opensource.wolfsonmicro.com>
+Message-ID: <20120821115123.GE26899@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Tue, 21 Aug 2012 12:37:24 +0200,
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
-
-> I have reworked addr-map to allow for both Armada 370/XP and Orion SoCs
-> merging into mach-mvebu. Instead of reusing PLAT_ORION this is totally
-> independent but reusing as much code as possible. I can send it hopefully
-> today if I get it cleaned up. I also have irq-mvebu, irq-orion, and time-mvebu
-> patches that merge code. With that patches booting Dove into mach-mvebu
-> works until DMA kicks in because XOR hasn't event touched for DT support
-> and is still missing.
+On Mon, Aug 20, 2012 at 03:36:53PM +0100, Mark Brown wrote:
+> On Mon, Aug 20, 2012 at 12:34:31PM +0100, Lee Jones wrote:
+> > From: Lee Jones <lee.jones@linaro.org>
+> > Date: Fri, 27 Jul 2012 08:50:05 +0100
+> > Subject: [PATCH 1/1] ASoC: codecs: Enable AB8500 CODEC for Device Tree
+> > 
+> > We continue to allow the AB8500 CODEC to be registered via the AB8500
+> > Multi Functional Device API, only this time we extract its configuration
+> > from the Device Tree binary.
 > 
-> Armada 370/XP should still work as they do with current patches in for-3.7
-> with little changes in DT. But that of course must be tested by you.
+> Please resend this series with all the acks you've got rather than
+> mixing incremental updates in like this.
 
-Ok, I will look at your code, but the purpose of
-PLAT_ORION/PLAT_ORION_LEGACY was not only to re-use the addr-map code,
-but also to allow drivers to access the header files containing their
-platform_data structure and other stuff (i.e, all the header files from
-arch/arm/plat-orion/include/). How do you handle this problem if
-MACH_MVEBU is not a PLAT_ORION platform?
+I'm waiting until I have a few more Acks before I resend the entire
+patch-set again. Actually it's you and one other that I'm waiting for
+to review (and Ack as necessary) the ones requested by Linus, then 
+resend with the corrections.
 
-Thomas
+> Please also send patches in
+> the format documented in SubmittingPatches.
+
+That's a big document, most of which I guess I'm adhering to. Care to
+be a little more specific?
+
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
