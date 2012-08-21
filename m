@@ -1,83 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Aug 2012 13:27:53 +0100
-Subject: [PATCH 2/2] ARM: imx6q: replace clk_register_clkdev with clock
- DT lookup
-In-Reply-To: <CAKGA1bnfhMC8QG9OqBbpy5iq6ZAfEgrYMg_LVd50U7yikLhDAg@mail.gmail.com>
-References: <1345104526-14797-1-git-send-email-shawn.guo@linaro.org>
- <1345104526-14797-3-git-send-email-shawn.guo@linaro.org>
- <503232E0.3000007@gmail.com>
- <CAKGA1bn2uCWE8YkGR4EzTxZ_bXJ_ov2diq63uxQ=dT7b6Fu9GQ@mail.gmail.com>
- <20120820151609.GN24242@S2101-09.ap.freescale.net>
- <CAKGA1bnfhMC8QG9OqBbpy5iq6ZAfEgrYMg_LVd50U7yikLhDAg@mail.gmail.com>
-Message-ID: <20120821122753.GU18957@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 21 Aug 2012 14:31:43 +0200
+Subject: [PATCH 2/2] ARM: EXYNOS: Enable PINCTRL config option for Exynos4
+ device tree enabled platform
+In-Reply-To: <1345061442-32378-3-git-send-email-thomas.abraham@linaro.org>
+References: <1345061442-32378-1-git-send-email-thomas.abraham@linaro.org>
+ <1345061442-32378-3-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CACRpkda9BiGejU+Qs=1CqKgLxLGumcM4QZOb_og-aAAmKr-0VQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 12:22:56PM -0500, Matt Sealey wrote:
-> You're going to have to define these clocks as a tree with parents and
-> leaf nodes anyway in the clock subsystem. Why not define these in the
-> device tree in total and reference them by handle when you build the
-> entire clock tree from the ground up? Or will it just be all the
-> clocks defined in Linux, but the lookups (which is what I see here)
-> moved into the DT? Why not form the lookups as part of the definition
-> of the clock tree?
+On Wed, Aug 15, 2012 at 10:10 PM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
 
-Well, IMHO the DT conversion of the clk lookup stuff has been done
-completely wrong.
+> This enables support for Samsung and Exynos4 pinctrl driver for device
+> tree enabled Exynos4 platforms.
+>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+>  arch/arm/mach-exynos/Kconfig |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index b5b4c8c..ad96c59 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -405,6 +405,7 @@ config MACH_EXYNOS4_DT
+>         select USE_OF
+>         select ARM_AMBA
+>         select HAVE_SAMSUNG_KEYPAD if INPUT_KEYBOARD
+> +       select PINCTRL
 
-What should have been done is rather than invent a totally new bloody
-lookup interface that drivers have to use instead of clk_get(), is to
-embed the OF lookup _inside_ clk_get().
+I don't think this works, since PINCTRL_SAMSUNG is not default "y"
+(nor should it be).
 
-What you do is this:
+For the platforms I converted I had to select both the subsystem and
+the indivudual driver, as is already done for some GPIO controllers
+for example:
 
-1. Have property names in the device node like:
+select PINCTRL
+select PINCTRL_SAMSUNG
 
-	clock_<connection-id> = <&provider-node output>
-
-   In the case of a NULL connection id:
-
-	clock = <&provider-node output>
-
-   Remember that the connection ID is _supposed_ to be something that
-   is described by the hardware (like - for the AACI primecell, the
-   clock which runs the functional side is called "AACICLK" by the TRM,
-   and for the MMCI primecell, it's "MMCICLK" - even though these two
-   clocks may be fed by the same source in an implementation.)
-
-2. clkdev's lookup is then modified to look at the struct device, and
-   check for a DT node.  If there is a DT node, it formats a property
-   string:
-
-	if (dev->of_node) {
-		char *propname, *clk_prop = NULL;
-		struct property *p;
-
-		if (conn_id) {
-			clk_prop = kasprintf("clock_%s", conn_id);
-			propname = clk_prop;
-		} else {
-			propname = "clock";
-		}
-
-		p = of_find_property(dev->of_node, propname, NULL);
-		if (clk_prop)
-			kfree(clk_prop);
-
-		if (p) {
-			clk = clk_get_from_of_property(p);
-			if (clk)
-				return clk;
-		}
-
-		/* Fallthrough to clkdev table lookup */
-	}
-
-So now, you're not dealing with inventing a whole load of names for clocks
-on a platform, instead what you're doing is describing _where_ the clock
-comes from in the system for a particular device by device node and index
-into it - just like we do for interrupts.
-
-This means there's no need for huge tables and such like of clock names.
-
-I did mention this idea long ago but got ignored.
+Yours,
+Linus Walleij
