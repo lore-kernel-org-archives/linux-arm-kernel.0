@@ -1,65 +1,217 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 21 Aug 2012 14:02:46 +0300
+Date: Tue, 21 Aug 2012 14:09:52 +0300
 Subject: [RFC/PATCH 10/13] serial: omap: stick to put_autosuspend
-In-Reply-To: <CAMQu2gzJ2YksrJKPLNZ9pBoBoSih2Up=isca=X9Wsd5MsnNrTQ@mail.gmail.com>
+In-Reply-To: <20120821110245.GY10347@arwen.pp.htv.fi>
 References: <1345540555-24359-1-git-send-email-balbi@ti.com>
  <1345540555-24359-11-git-send-email-balbi@ti.com>
  <CAMQu2gzm4z8DbCiz4hOS2nKa2HzNofmp=SPORYEu2Z_H3+JN9Q@mail.gmail.com>
  <20120821105702.GX10347@arwen.pp.htv.fi>
  <CAMQu2gzJ2YksrJKPLNZ9pBoBoSih2Up=isca=X9Wsd5MsnNrTQ@mail.gmail.com>
-Message-ID: <20120821110245.GY10347@arwen.pp.htv.fi>
+ <20120821110245.GY10347@arwen.pp.htv.fi>
+Message-ID: <20120821110951.GZ10347@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2012 at 04:35:26PM +0530, Shilimkar, Santosh wrote:
-> On Tue, Aug 21, 2012 at 4:27 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > On Tue, Aug 21, 2012 at 04:12:11PM +0530, Shilimkar, Santosh wrote:
-> >> On Tue, Aug 21, 2012 at 2:45 PM, Felipe Balbi <balbi@ti.com> wrote:
-> >> > Everytime we're done using our TTY, we want
-> >> > the pm timer to be reinitilized. By sticking
-> >> > to pm_runtime_pm_autosuspend() we make sure
-> >> > that this will always be the case.
-> >> >
-> >> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> >> > ---
-> >> >  drivers/tty/serial/omap-serial.c | 33 ++++++++++++++++++++++-----------
-> >> >  1 file changed, 22 insertions(+), 11 deletions(-)
-> >> >
-> >> > diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> >> > index 6ea24c5..458d77c 100644
-> >> > --- a/drivers/tty/serial/omap-serial.c
-> >> > +++ b/drivers/tty/serial/omap-serial.c
-> >> > @@ -164,7 +164,8 @@ static void serial_omap_enable_ms(struct uart_port *port)
-> >> >         pm_runtime_get_sync(up->dev);
-> >> >         up->ier |= UART_IER_MSI;
-> >> >         serial_out(up, UART_IER, up->ier);
-> >> > -       pm_runtime_put(up->dev);
-> >> > +       pm_runtime_mark_last_busy(up->dev);
-> >> > +       pm_runtime_put_autosuspend(up->dev);
-> >> >  }
-> >> >
-> >> Can you please expand the change-log a bit ?
-> >> Didn't follow the time re-init part completely.
-> >
-> > It's really just a micro-optimization. The thing is:
-> >
-> > if I call pm_runtime_put(), I will not reinitialize the pm timer to
-> > whatever timeout value I used. This means that pm_runtime_put() could
-> > actually execute right away (if timer was about to expire when I called
-> > pm_runtime_put()). While this wouldn't cause any issues, it's better to
-> > reinitialize the timer and make sure if there's another
-> > read/write/set_termios/whatever coming right after this, UART is still
-> > powered up.
-> >
-> > I mean, it's really just trying to avoid context save & restore when
-> > UART is still under heavy usage.
-> >
-> > Does it make sense ?
-> 
-> It does. Would be good to add the above description in the change-log.
-> Thanks for clarification.
+Hi,
 
-will do, cheers
+On Tue, Aug 21, 2012 at 02:02:46PM +0300, Felipe Balbi wrote:
+> On Tue, Aug 21, 2012 at 04:35:26PM +0530, Shilimkar, Santosh wrote:
+> > On Tue, Aug 21, 2012 at 4:27 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > > On Tue, Aug 21, 2012 at 04:12:11PM +0530, Shilimkar, Santosh wrote:
+> > >> On Tue, Aug 21, 2012 at 2:45 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > >> > Everytime we're done using our TTY, we want
+> > >> > the pm timer to be reinitilized. By sticking
+> > >> > to pm_runtime_pm_autosuspend() we make sure
+> > >> > that this will always be the case.
+> > >> >
+> > >> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > >> > ---
+> > >> >  drivers/tty/serial/omap-serial.c | 33 ++++++++++++++++++++++-----------
+> > >> >  1 file changed, 22 insertions(+), 11 deletions(-)
+> > >> >
+> > >> > diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> > >> > index 6ea24c5..458d77c 100644
+> > >> > --- a/drivers/tty/serial/omap-serial.c
+> > >> > +++ b/drivers/tty/serial/omap-serial.c
+> > >> > @@ -164,7 +164,8 @@ static void serial_omap_enable_ms(struct uart_port *port)
+> > >> >         pm_runtime_get_sync(up->dev);
+> > >> >         up->ier |= UART_IER_MSI;
+> > >> >         serial_out(up, UART_IER, up->ier);
+> > >> > -       pm_runtime_put(up->dev);
+> > >> > +       pm_runtime_mark_last_busy(up->dev);
+> > >> > +       pm_runtime_put_autosuspend(up->dev);
+> > >> >  }
+> > >> >
+> > >> Can you please expand the change-log a bit ?
+> > >> Didn't follow the time re-init part completely.
+> > >
+> > > It's really just a micro-optimization. The thing is:
+> > >
+> > > if I call pm_runtime_put(), I will not reinitialize the pm timer to
+> > > whatever timeout value I used. This means that pm_runtime_put() could
+> > > actually execute right away (if timer was about to expire when I called
+> > > pm_runtime_put()). While this wouldn't cause any issues, it's better to
+> > > reinitialize the timer and make sure if there's another
+> > > read/write/set_termios/whatever coming right after this, UART is still
+> > > powered up.
+> > >
+> > > I mean, it's really just trying to avoid context save & restore when
+> > > UART is still under heavy usage.
+> > >
+> > > Does it make sense ?
+> > 
+> > It does. Would be good to add the above description in the change-log.
+> > Thanks for clarification.
+> 
+> will do, cheers
+
+I have updated my branch like below. Will wait for any other comments
+before sending another version.
+
+commit 8ff7ab777d2bf8619328ddd43ddf2f8660dd011f
+Author: Felipe Balbi <balbi@ti.com>
+Date:   Tue Aug 21 11:45:47 2012 +0300
+
+    serial: omap: stick to put_autosuspend
+    
+    Everytime we're done using our TTY, we want
+    the pm timer to be reinitilized. By sticking
+    to pm_runtime_pm_autosuspend() we make sure
+    that this will always be the case.
+    
+    The idea behind this patch is to make sure we
+    will always reinitialize the pm timer so that
+    we don't fall into a situation where pm_runtime_put()
+    expires right away (if timer was already about to
+    expire when we made the call to pm_runtime_put()).
+    
+    While suspending right away wouldn't cause any
+    issues, reinitializing the pm timer can help us
+    avoiding unnecessary context save & restore
+    operations (which are somewhat expensive) if there's
+    another read/write/set_termios request coming right
+    after. IOW, we are trying to make sure UART is still
+    powered up while it's still under heavy usage.
+    
+    Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+    Signed-off-by: Felipe Balbi <balbi@ti.com>
+
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 6ea24c5..458d77c 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -164,7 +164,8 @@ static void serial_omap_enable_ms(struct uart_port *port)
+ 	pm_runtime_get_sync(up->dev);
+ 	up->ier |= UART_IER_MSI;
+ 	serial_out(up, UART_IER, up->ier);
+-	pm_runtime_put(up->dev);
++	pm_runtime_mark_last_busy(up->dev);
++	pm_runtime_put_autosuspend(up->dev);
+ }
+ 
+ static void serial_omap_stop_tx(struct uart_port *port)
+@@ -412,7 +413,8 @@ static unsigned int serial_omap_tx_empty(struct uart_port *port)
+ 	spin_lock_irqsave(&up->port.lock, flags);
+ 	ret = serial_in(up, UART_LSR) & UART_LSR_TEMT ? TIOCSER_TEMT : 0;
+ 	spin_unlock_irqrestore(&up->port.lock, flags);
+-	pm_runtime_put(up->dev);
++	pm_runtime_mark_last_busy(up->dev);
++	pm_runtime_put_autosuspend(up->dev);
+ 	return ret;
+ }
+ 
+@@ -424,7 +426,8 @@ static unsigned int serial_omap_get_mctrl(struct uart_port *port)
+ 
+ 	pm_runtime_get_sync(up->dev);
+ 	status = check_modem_status(up);
+-	pm_runtime_put(up->dev);
++	pm_runtime_mark_last_busy(up->dev);
++	pm_runtime_put_autosuspend(up->dev);
+ 
+ 	dev_dbg(up->port.dev, "serial_omap_get_mctrl+%d\n", up->port.line);
+ 
+@@ -460,7 +463,8 @@ static void serial_omap_set_mctrl(struct uart_port *port, unsigned int mctrl)
+ 	up->mcr = serial_in(up, UART_MCR);
+ 	up->mcr |= mcr;
+ 	serial_out(up, UART_MCR, up->mcr);
+-	pm_runtime_put(up->dev);
++	pm_runtime_mark_last_busy(up->dev);
++	pm_runtime_put_autosuspend(up->dev);
+ }
+ 
+ static void serial_omap_break_ctl(struct uart_port *port, int break_state)
+@@ -477,7 +481,8 @@ static void serial_omap_break_ctl(struct uart_port *port, int break_state)
+ 		up->lcr &= ~UART_LCR_SBC;
+ 	serial_out(up, UART_LCR, up->lcr);
+ 	spin_unlock_irqrestore(&up->port.lock, flags);
+-	pm_runtime_put(up->dev);
++	pm_runtime_mark_last_busy(up->dev);
++	pm_runtime_put_autosuspend(up->dev);
+ }
+ 
+ static int serial_omap_startup(struct uart_port *port)
+@@ -575,7 +580,8 @@ static void serial_omap_shutdown(struct uart_port *port)
+ 	if (serial_in(up, UART_LSR) & UART_LSR_DR)
+ 		(void) serial_in(up, UART_RX);
+ 
+-	pm_runtime_put(up->dev);
++	pm_runtime_mark_last_busy(up->dev);
++	pm_runtime_put_autosuspend(up->dev);
+ 	free_irq(up->port.irq, up);
+ }
+ 
+@@ -846,7 +852,8 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	serial_omap_configure_xonxoff(up, termios);
+ 
+ 	spin_unlock_irqrestore(&up->port.lock, flags);
+-	pm_runtime_put(up->dev);
++	pm_runtime_mark_last_busy(up->dev);
++	pm_runtime_put_autosuspend(up->dev);
+ 	dev_dbg(up->port.dev, "serial_omap_set_termios+%d\n", up->port.line);
+ }
+ 
+@@ -877,7 +884,8 @@ serial_omap_pm(struct uart_port *port, unsigned int state,
+ 			pm_runtime_allow(up->dev);
+ 	}
+ 
+-	pm_runtime_put(up->dev);
++	pm_runtime_mark_last_busy(up->dev);
++	pm_runtime_put_autosuspend(up->dev);
+ }
+ 
+ static void serial_omap_release_port(struct uart_port *port)
+@@ -959,7 +967,8 @@ static void serial_omap_poll_put_char(struct uart_port *port, unsigned char ch)
+ 	pm_runtime_get_sync(up->dev);
+ 	wait_for_xmitr(up);
+ 	serial_out(up, UART_TX, ch);
+-	pm_runtime_put(up->dev);
++	pm_runtime_mark_last_busy(up->dev);
++	pm_runtime_put_autosuspend(up->dev);
+ }
+ 
+ static int serial_omap_poll_get_char(struct uart_port *port)
+@@ -973,7 +982,8 @@ static int serial_omap_poll_get_char(struct uart_port *port)
+ 		return NO_POLL_CHAR;
+ 
+ 	status = serial_in(up, UART_RX);
+-	pm_runtime_put(up->dev);
++	pm_runtime_mark_last_busy(up->dev);
++	pm_runtime_put_autosuspend(up->dev);
+ 	return status;
+ }
+ 
+@@ -1305,7 +1315,8 @@ static int serial_omap_probe(struct platform_device *pdev)
+ 	if (ret != 0)
+ 		goto err_add_port;
+ 
+-	pm_runtime_put(&pdev->dev);
++	pm_runtime_mark_last_busy(up->dev);
++	pm_runtime_put_autosuspend(up->dev);
+ 	platform_set_drvdata(pdev, up);
+ 	return 0;
+ 
+
+let me know if your Ack is still valid.
 
 -- 
 balbi
@@ -69,4 +221,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120821/71f04e74/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120821/504f76fc/attachment-0001.sig>
