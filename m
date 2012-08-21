@@ -1,59 +1,95 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Mon, 20 Aug 2012 20:15:16 -0500
-Subject: [PATCH 2/3] ARM: OMAP: hwmod: revise deassert sequence
-In-Reply-To: <50320FC4.2020100@ti.com>
-References: <1342466485-1050-1-git-send-email-omar.luna@linaro.org>
- <1342466485-1050-3-git-send-email-omar.luna@linaro.org>
- <alpine.DEB.2.00.1208020150240.4177@utopia.booyaka.com>
- <CALLhW=6-b+kjfG-u3+uXiD64UwoNEdufjJKu0Mx-sGWp6n9csg@mail.gmail.com>
- <501B609F.9030403@ti.com>
- <CALLhW=7yJTq_cfB=KGY5VT8fNO1u_hrY118ysihFuQA+gVFRuQ@mail.gmail.com>
- <50320FC4.2020100@ti.com>
-Message-ID: <CALLhW=6DNiH4pimWVB3o3uoCp2sC6gqub4_DqE+MB1Chjri8sw@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 20 Aug 2012 22:43:15 -0300
+Subject: [PATCH] ARM: olinuxino: Add gpio-led support
+Message-ID: <1345513396-12320-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On 20 August 2012 05:21, Benoit Cousson <b-cousson@ti.com> wrote:
-> Hi Omar,
->
-> On 08/03/2012 05:52 PM, Omar Ramirez Luna wrote:
->> On 3 August 2012 00:24, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
->>> On 8/3/2012 3:50 AM, Omar Ramirez Luna wrote:
->>>> So in _enable:
->>>>
->>>>         _enable_clocks(oh);
->>>>         if (soc_ops.enable_module)
->>>>                 soc_ops.enable_module(oh);
->>>>
->>>> The enable_module part seems redundant to me, since the module should
->>>> be already enabled by the first call to _enable_clocks.
->>>
->>> Yes they do same thing, I believe the plan is to get rid of all clock
->>> leaf-nodes in the near future, and let hwmod handle module
->>> enable/disable part.
->>
->> If this is the case then an enable_module call is needed in my patch
->> for when these changes are made. The original works fine but only
->> because currently clock framework does what enable_module is doing.
->
-> Yes, that's the case, but I plan to remove most of the leaf clocks ASAP,
-> so we cannot rely on that.
->
->> Please let me know if you want me to resend with this change.
->
-> Yes, could you please repost with that change?
+Olinuxino has a LED connected to MX23_PAD_SSP1_DETECT__GPIO_2_1 pin.
 
-Not a problem.
+Since mmc0_4bit_pins_a defines MX23_PAD_SSP1_DETECT as SSP function, create
+a new mmc0_4bit_pins_b.
 
-> It will be good as well that you remove the leaf clock and use the
-> parent clock of current leaf as the main_clock. In that case it will
-> ensure that this is the hwmod fmwk that does enable the modulemode and
-> not the clock fmwk.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx23-olinuxino.dts |   28 +++++++++++++++++++++++++++-
+ arch/arm/boot/dts/imx23.dtsi          |   15 +++++++++++++++
+ 2 files changed, 42 insertions(+), 1 deletion(-)
 
-Ok, let me try that.
-
-Thanks for the comments,
-
-Omar
+diff --git a/arch/arm/boot/dts/imx23-olinuxino.dts b/arch/arm/boot/dts/imx23-olinuxino.dts
+index a286873..dece3fe 100644
+--- a/arch/arm/boot/dts/imx23-olinuxino.dts
++++ b/arch/arm/boot/dts/imx23-olinuxino.dts
+@@ -27,10 +27,25 @@
+ 			ssp0: ssp at 80010000 {
+ 				compatible = "fsl,imx23-mmc";
+ 				pinctrl-names = "default";
+-				pinctrl-0 = <&mmc0_4bit_pins_a &mmc0_pins_fixup>;
++				pinctrl-0 = <&mmc0_4bit_pins_b &mmc0_pins_fixup>;
+ 				bus-width = <4>;
+ 				status = "okay";
+ 			};
++
++			pinctrl at 80018000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&hog_pins_a>;
++
++				hog_pins_a: hog-gpios at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x2013 /* MX23_PAD_SSP1_DETECT__GPIO_2_1 */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++			};
+ 		};
+ 
+ 		apbx at 80040000 {
+@@ -47,4 +62,15 @@
+ 			};
+ 		};
+ 	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		user {
++			label = "green";
++			gpios = <&gpio2 1 0>;
++			linux,default-trigger = "default-on";
++			default-state = "on";
++		};
++	};
+ };
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 9700872..a8b423a 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -202,6 +202,21 @@
+ 					fsl,pull-up = <1>;
+ 				};
+ 
++				mmc0_4bit_pins_b: mmc0-4bit_b at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x2020 /* MX23_PAD_SSP1_DATA0__SSP1_DATA0 */
++						0x2030 /* MX23_PAD_SSP1_DATA1__SSP1_DATA1 */
++						0x2040 /* MX23_PAD_SSP1_DATA2__SSP1_DATA2 */
++						0x2050 /* MX23_PAD_SSP1_DATA3__SSP1_DATA3 */
++						0x2000 /* MX23_PAD_SSP1_CMD__SSP1_CMD */
++						0x2060 /* MX23_PAD_SSP1_SCK__SSP1_SCK */
++					>;
++					fsl,drive-strength = <1>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <1>;
++				};
++
+ 				mmc0_8bit_pins_a: mmc0-8bit at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+-- 
+1.7.9.5
