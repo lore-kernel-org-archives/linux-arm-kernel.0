@@ -1,33 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 21 Aug 2012 15:38:12 +0000
-Subject: [PATCH v2] ARM: io: avoid writeback addressing modes for __raw_
- accessors
-In-Reply-To: <1345557059-6922-1-git-send-email-will.deacon@arm.com>
-References: <1345557059-6922-1-git-send-email-will.deacon@arm.com>
-Message-ID: <201208211538.13113.arnd@arndb.de>
+From: matthew.leach@arm.com (Matthew Leach)
+Date: Tue, 21 Aug 2012 16:48:14 +0100
+Subject: [PATCH v2] serial: pl011: honour serial aliases in device tree
+Message-ID: <1345564094-16565-1-git-send-email-matthew.leach@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 August 2012, Will Deacon wrote:
-> 
-> Data aborts taken to hyp mode do not provide a valid instruction
-> syndrome field in the HSR if the faulting instruction is a memory
-> access using a writeback addressing mode.
-> 
-> For hypervisors emulating MMIO accesses to virtual peripherals, taking
-> such an exception requires disassembling the faulting instruction in
-> order to determine the behaviour of the access. Since this requires
-> manually walking the two stages of translation, the world must be
-> stopped to prevent races against page aging in the guest, where the
-> first-stage translation is invalidated after the hypervisor has
-> translated to an IPA and the physical page is reused for something else.
-> 
-> This patch avoids taking this heavy performance penalty when running
-> Linux as a guest by ensuring that our I/O accessors do not make use of
-> writeback addressing modes.
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Reviewed-by: Nicolas Pitre <nico@linaro.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+If the order of UART nodes is changed in the device tree, then tty dev
+devices are attached to different serial ports causing the console to
+be directed to a different physical serial port. The "serial" aliases
+in the device tree should prevent this.
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+This patch ensures that the UART driver creates tty devices that
+honour these aliases if a device tree is present.
+
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Matthew Leach <matthew.leach@arm.com>
+---
+v2: use IS_ENABLED instead of ifdefs
+
+ drivers/tty/serial/amba-pl011.c |   36 ++++++++++++++++++++++++++++++++++++
+ 1 files changed, 36 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index d3553b5..33c90f6 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -52,6 +52,8 @@
+ #include <linux/scatterlist.h>
+ #include <linux/delay.h>
+ #include <linux/types.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/sizes.h>
+ 
+@@ -1869,6 +1871,38 @@ static struct uart_driver amba_reg = {
+ 	.cons			= AMBA_CONSOLE,
+ };
+ 
++static int pl011_probe_dt_alias(int index, struct device *dev)
++{
++	struct device_node *np;
++	static bool seen_dev_with_alias = false;
++	static bool seen_dev_without_alias = false;
++	int ret = index;
++
++	if (!IS_ENABLED(CONFIG_OF))
++		return index;
++
++	np = dev->of_node;
++	if (!np)
++		return ret;
++
++	ret = of_alias_get_id(np, "serial");
++	if (IS_ERR_VALUE(ret)) {
++		seen_dev_without_alias = true;
++		ret = index;
++	} else {
++		seen_dev_with_alias = true;
++		if (ret >= ARRAY_SIZE(amba_ports) || amba_ports[ret] != NULL) {
++			dev_warn(dev, "requested serial port %d  not available.\n", ret);
++			ret = index;
++		}
++	}
++
++	if (seen_dev_with_alias && seen_dev_without_alias)
++		dev_warn(dev, "aliased and non-aliased serial devices found in device tree. Serial port enumeration may be unpredictable.\n");
++
++	return ret;
++}
++
+ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ {
+ 	struct uart_amba_port *uap;
+@@ -1891,6 +1925,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 		goto out;
+ 	}
+ 
++	i = pl011_probe_dt_alias(i, &dev->dev);
++
+ 	base = ioremap(dev->res.start, resource_size(&dev->res));
+ 	if (!base) {
+ 		ret = -ENOMEM;
+-- 
+1.7.0.4
