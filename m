@@ -1,33 +1,24 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 21 Aug 2012 12:14:51 +0200
-Subject: [PATCH 2/3] ARM: DMA-Mapping: print warning when atomic coherent
- allocation fails
-In-Reply-To: <20120820230058.GA755@harshnoise.musicnaut.iki.fi>
-References: <1345459648-24263-1-git-send-email-m.szyprowski@samsung.com>
- <1345459648-24263-3-git-send-email-m.szyprowski@samsung.com>
- <20120820230058.GA755@harshnoise.musicnaut.iki.fi>
-Message-ID: <000d01cd7f85$d091b3c0$71b51b40$%szyprowski@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 21 Aug 2012 10:16:22 +0000
+Subject: [PATCH 2/3] ARM: PRIMA2: make mach-prima2 common for all SiRF
+ series SoC
+In-Reply-To: <CAGsJ_4zBEgexWBWsKCe2UtfP1m7BSMO9dq8thi3oQVYsq22v+A@mail.gmail.com>
+References: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
+ <CAGsJ_4ynJjm6WuA6NGZdOgj80Xc=ZxKcRatQuEacVW=EXuxh=w@mail.gmail.com>
+ <CAGsJ_4zBEgexWBWsKCe2UtfP1m7BSMO9dq8thi3oQVYsq22v+A@mail.gmail.com>
+Message-ID: <201208211016.22511.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tuesday, August 21, 2012 1:01 AM Aaro Koskinen wrote:
-
-> On Mon, Aug 20, 2012 at 12:47:27PM +0200, Marek Szyprowski wrote:
-> > @@ -461,6 +461,9 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page)
-> >  		bitmap_set(pool->bitmap, pageno, count);
-> >  		ptr = pool->vaddr + PAGE_SIZE * pageno;
-> >  		*ret_page = pool->page + pageno;
-> > +	} else {
-> > +		pr_err("Atomic coherent pool too small!\n"
-> > +		       "Please increase it with coherent_pool= kernel parameter!\n");
+On Tuesday 21 August 2012, Barry Song wrote:
+> i would think merging several SoCs into a dir still needs much time.
+> if the whole rename is too aggresive for the moment, how about keeping
+> the mach-prima2 temporarily, but this prima2 dir will also include the
+> coming Marco stuff?
 > 
-> This should be rate limited, perhaps even printed only once.
 
-Ok, I will change it to pr_err_once().
+Yes, that is what I meant. Sorry if I wasn't clear on that. Please send
+the marco patches adding the code in the mach-prima2 directory.
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+
+	Arnd
