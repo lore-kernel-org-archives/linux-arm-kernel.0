@@ -1,95 +1,78 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 20 Aug 2012 22:43:15 -0300
-Subject: [PATCH] ARM: olinuxino: Add gpio-led support
-Message-ID: <1345513396-12320-1-git-send-email-festevam@gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 21 Aug 2012 09:49:04 +0800
+Subject: [PATCH 1/3] ARM: PRIMA2: use DT_MACHINE_START and convert to
+ generic board
+In-Reply-To: <201208202056.28361.arnd@arndb.de>
+References: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
+ <1345450787-17246-2-git-send-email-Barry.Song@csr.com>
+ <201208202056.28361.arnd@arndb.de>
+Message-ID: <CAGsJ_4wR1dU05QutVeKHephDmSpSKOki1+AGZVV95hf3ABePDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+2012/8/21 Arnd Bergmann <arnd@arndb.de>:
+> On Monday 20 August 2012, Barry Song wrote:
+>> From: Barry Song <Baohua.Song@csr.com>
+>>
+>> we will have SiRFMarco and SiRFPolo, all of them will be in the
+>> generic board.
+>>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> ---
+>>  arch/arm/mach-prima2/Makefile                      |    2 +-
+>>  arch/arm/mach-prima2/{prima2.c => board-generic.c} |   10 ++++++----
+>>  2 files changed, 7 insertions(+), 5 deletions(-)
+>>  rename arch/arm/mach-prima2/{prima2.c => board-generic.c} (81%)
+>
+> I would prefer not to have a board-* file in there, because it's not
+> specific to a board. If you want to get rid of the prima2 name in it,
+> you can call it common.c.
 
-Olinuxino has a LED connected to MX23_PAD_SSP1_DETECT__GPIO_2_1 pin.
+that is fine to me. i rename to board-generic.c just because omap and
+some others did like that.
+and i'll add marco and polo DT_MACHINE_START to this file too.
 
-Since mmc0_4bit_pins_a defines MX23_PAD_SSP1_DETECT as SSP function, create
-a new mmc0_4bit_pins_b.
+>
+>> diff --git a/arch/arm/mach-prima2/prima2.c b/arch/arm/mach-prima2/board-generic.c
+>> similarity index 81%
+>> rename from arch/arm/mach-prima2/prima2.c
+>> rename to arch/arm/mach-prima2/board-generic.c
+>> index e9a17ae..f06b887 100644
+>> --- a/arch/arm/mach-prima2/prima2.c
+>> +++ b/arch/arm/mach-prima2/board-generic.c
+>> @@ -30,12 +30,13 @@ void __init sirfsoc_init_late(void)
+>>       sirfsoc_pm_init();
+>>  }
+>>
+>> -static const char *prima2cb_dt_match[] __initdata = {
+>> -       "sirf,prima2-cb",
+>> +#ifdef CONFIG_ARCH_PRIMA2
+>> +static const char *prima2_dt_match[] __initdata = {
+>> +       "sirf,prima2",
+>>         NULL
+>>  };
+>>
+>> -MACHINE_START(PRIMA2_EVB, "prima2cb")
+>> +DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
+>>       /* Maintainer: Barry Song <baohua.song@csr.com> */
+>>       .atag_offset    = 0x100,
+>>       .map_io         = sirfsoc_map_lluart,
+>> @@ -44,6 +45,7 @@ MACHINE_START(PRIMA2_EVB, "prima2cb")
+>>       .dma_zone_size  = SZ_256M,
+>>       .init_machine   = sirfsoc_mach_init,
+>>       .init_late      = sirfsoc_init_late,
+>> -     .dt_compat      = prima2cb_dt_match,
+>> +     .dt_compat      = prima2_dt_match,
+>>       .restart        = sirfsoc_restart,
+>>  MACHINE_END
+>> +#endif
+>
+> I suppose this never really worked before then?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx23-olinuxino.dts |   28 +++++++++++++++++++++++++++-
- arch/arm/boot/dts/imx23.dtsi          |   15 +++++++++++++++
- 2 files changed, 42 insertions(+), 1 deletion(-)
+i am not sure what you mean, but this does work and i tested and found
+prima2 can boot normally.
 
-diff --git a/arch/arm/boot/dts/imx23-olinuxino.dts b/arch/arm/boot/dts/imx23-olinuxino.dts
-index a286873..dece3fe 100644
---- a/arch/arm/boot/dts/imx23-olinuxino.dts
-+++ b/arch/arm/boot/dts/imx23-olinuxino.dts
-@@ -27,10 +27,25 @@
- 			ssp0: ssp at 80010000 {
- 				compatible = "fsl,imx23-mmc";
- 				pinctrl-names = "default";
--				pinctrl-0 = <&mmc0_4bit_pins_a &mmc0_pins_fixup>;
-+				pinctrl-0 = <&mmc0_4bit_pins_b &mmc0_pins_fixup>;
- 				bus-width = <4>;
- 				status = "okay";
- 			};
-+
-+			pinctrl at 80018000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&hog_pins_a>;
-+
-+				hog_pins_a: hog-gpios at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x2013 /* MX23_PAD_SSP1_DETECT__GPIO_2_1 */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <0>;
-+				};
-+			};
- 		};
- 
- 		apbx at 80040000 {
-@@ -47,4 +62,15 @@
- 			};
- 		};
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		user {
-+			label = "green";
-+			gpios = <&gpio2 1 0>;
-+			linux,default-trigger = "default-on";
-+			default-state = "on";
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index 9700872..a8b423a 100644
---- a/arch/arm/boot/dts/imx23.dtsi
-+++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -202,6 +202,21 @@
- 					fsl,pull-up = <1>;
- 				};
- 
-+				mmc0_4bit_pins_b: mmc0-4bit_b at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x2020 /* MX23_PAD_SSP1_DATA0__SSP1_DATA0 */
-+						0x2030 /* MX23_PAD_SSP1_DATA1__SSP1_DATA1 */
-+						0x2040 /* MX23_PAD_SSP1_DATA2__SSP1_DATA2 */
-+						0x2050 /* MX23_PAD_SSP1_DATA3__SSP1_DATA3 */
-+						0x2000 /* MX23_PAD_SSP1_CMD__SSP1_CMD */
-+						0x2060 /* MX23_PAD_SSP1_SCK__SSP1_SCK */
-+					>;
-+					fsl,drive-strength = <1>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
-+				};
-+
- 				mmc0_8bit_pins_a: mmc0-8bit at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
--- 
-1.7.9.5
+>
+>         Arnd
+
+-barry
