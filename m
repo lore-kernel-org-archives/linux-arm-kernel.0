@@ -1,38 +1,75 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 21 Aug 2012 09:31:25 +0200
-Subject: [PATCH 3/3] ARM: Kirkwood: increase atomic coherent pool size
-In-Reply-To: <20120820231419.GB755@harshnoise.musicnaut.iki.fi>
-References: <1345459648-24263-1-git-send-email-m.szyprowski@samsung.com>
- <1345459648-24263-4-git-send-email-m.szyprowski@samsung.com>
- <20120820231419.GB755@harshnoise.musicnaut.iki.fi>
-Message-ID: <000301cd7f6e$fc925130$f5b6f390$%szyprowski@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 21 Aug 2012 07:53:12 +0000
+Subject: [PATCH 1/3] ARM: PRIMA2: use DT_MACHINE_START and convert to
+ generic board
+In-Reply-To: <CAGsJ_4wR1dU05QutVeKHephDmSpSKOki1+AGZVV95hf3ABePDA@mail.gmail.com>
+References: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
+ <201208202056.28361.arnd@arndb.de>
+ <CAGsJ_4wR1dU05QutVeKHephDmSpSKOki1+AGZVV95hf3ABePDA@mail.gmail.com>
+Message-ID: <201208210753.12718.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tuesday, August 21, 2012 1:14 AM Aaro Koskinen wrote:
-
-> On Mon, Aug 20, 2012 at 12:47:28PM +0200, Marek Szyprowski wrote:
-> > The default 256 KiB coherent pool may be too small for some of the Kirkwood
-> > devices, so increase it to make sure that devices will be able to allocate
-> > their buffers with GFP_ATOMIC flag.
-> [...]
-> > +	/*
-> > +	 * Some Kirkwood devices allocate their coherent buffers from atomic
-> > +	 * context. Increase size of atomic coherent pool to make sure such
-> > +	 * the allocations won't fail.
-> > +	 */
-> > +	init_dma_coherent_pool_size(SZ_1M);
+On Tuesday 21 August 2012, Barry Song wrote:
+> 2012/8/21 Arnd Bergmann <arnd@arndb.de>:
+> > On Monday 20 August 2012, Barry Song wrote:
+> >
+> > I would prefer not to have a board-* file in there, because it's not
+> > specific to a board. If you want to get rid of the prima2 name in it,
+> > you can call it common.c.
 > 
-> Not sure if it's a valid use case, but what if some user wants to drop
-> e.g. SATA driver and and free up some memory. Would a smaller coherent
-> pool kernel parameter override this code in that case?
+> that is fine to me. i rename to board-generic.c just because omap and
+> some others did like that.
+> and i'll add marco and polo DT_MACHINE_START to this file too.
 
-Kernel command line parameter always overrides the value set by platform code
-(or the default 256KiB).
+Ok. For the older platforms that have a lot of non-DT board files, it makes
+sense to have a separate board-generic.c file.
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+> >> diff --git a/arch/arm/mach-prima2/prima2.c b/arch/arm/mach-prima2/board-generic.c
+> >> similarity index 81%
+> >> rename from arch/arm/mach-prima2/prima2.c
+> >> rename to arch/arm/mach-prima2/board-generic.c
+> >> index e9a17ae..f06b887 100644
+> >> --- a/arch/arm/mach-prima2/prima2.c
+> >> +++ b/arch/arm/mach-prima2/board-generic.c
+> >> @@ -30,12 +30,13 @@ void __init sirfsoc_init_late(void)
+> >>       sirfsoc_pm_init();
+> >>  }
+> >>
+> >> -static const char *prima2cb_dt_match[] __initdata = {
+> >> -       "sirf,prima2-cb",
+> >> +#ifdef CONFIG_ARCH_PRIMA2
+> >> +static const char *prima2_dt_match[] __initdata = {
+> >> +       "sirf,prima2",
+> >>         NULL
+> >>  };
+> >>
+> >> -MACHINE_START(PRIMA2_EVB, "prima2cb")
+> >> +DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
+> >>       /* Maintainer: Barry Song <baohua.song@csr.com> */
+> >>       .atag_offset    = 0x100,
+> >>       .map_io         = sirfsoc_map_lluart,
+> >> @@ -44,6 +45,7 @@ MACHINE_START(PRIMA2_EVB, "prima2cb")
+> >>       .dma_zone_size  = SZ_256M,
+> >>       .init_machine   = sirfsoc_mach_init,
+> >>       .init_late      = sirfsoc_init_late,
+> >> -     .dt_compat      = prima2cb_dt_match,
+> >> +     .dt_compat      = prima2_dt_match,
+> >>       .restart        = sirfsoc_restart,
+> >>  MACHINE_END
+> >> +#endif
+> >
+> > I suppose this never really worked before then?
+> 
+> i am not sure what you mean, but this does work and i tested and found
+> prima2 can boot normally.
+
+I mean the old version, not the new one. If you use MACHINE_START,
+you cannot access the device tree data from the boot loader, which
+means that none of the device drivers find their devices.
+
+I also just noticed that you ahve both the .atag_offset and the .dt_compat
+field set here, which is a bit strange as the dt_compat field was previously
+unused. Now, the .atag_offset field is unused, so you should remove that.
+
+	Arnd
