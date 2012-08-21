@@ -1,69 +1,51 @@
-From: vapier@gentoo.org (Mike Frysinger)
-Date: Tue, 21 Aug 2012 14:53:16 -0400
-Subject: [PATCH v2 16/31] arm64: ELF definitions
-In-Reply-To: <20120821182731.GJ12708@arm.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 21 Aug 2012 15:20:18 -0400
+Subject: [PATCH v2 28/31] arm64: Generic timers support
+In-Reply-To: <1344966752-16102-29-git-send-email-catalin.marinas@arm.com>
 References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <CAMuHMdVEX0egzFETMJ=LA_PB+7Qc=Ph-7uxofVr__wOE-0cvLQ@mail.gmail.com>
- <20120821182731.GJ12708@arm.com>
-Message-ID: <201208211453.18583.vapier@gentoo.org>
+ <1344966752-16102-29-git-send-email-catalin.marinas@arm.com>
+Message-ID: <5033DF72.70609@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 August 2012 14:27:31 Catalin Marinas wrote:
-> On Tue, Aug 21, 2012 at 07:17:19PM +0100, Geert Uytterhoeven wrote:
-> > On Tue, Aug 21, 2012 at 6:06 PM, Catalin Marinas wrote:
-> > > But I can see on x86 that it always reports x86_64 even if the task is
-> > > x86_32.
-> > 
-> > Really?
-> > 
-> > $ uname -m
-> > x86_64
-> > $ linux32 uname -m
-> > i686
-> > $
+On 08/14/2012 01:52 PM, Catalin Marinas wrote:
+> From: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> Well, you set the personality explicitly with linux32. What I tested was
-> with an x86_32 uname called directly (without linux32) and even though
-> the ELF was a 32-bit one, it was reporting x86_64. In this AArch64
-> patch, a compat task was automatically setting the linux32 personality
-> (which x86 does not do).
+> This patch adds support for the ARM generic timers with A64 instructions
+> for accessing the timer registers. It uses the physical counter as the
+> clock source and the virtual counter as sched_clock.
+> 
+> The timer frequency can be specified via DT or read from the CNTFRQ_EL0
+> register. The physical counter is also accessible from user space
+> allowing fast gettimeofday() implementation.
 
-i don't think any arch does this.
+[...]
 
-$ uname -m
-ppc64
-$ linux32 uname -m
-ppc
+> +++ b/drivers/clocksource/arm_generic.c
 
-$ uname -m
-sparc64
-$ linux32 uname -m
-sparc
+[...]
 
-$ uname -m
-x86_64
-$ linux32 uname -m
-i686
+> +static void arch_timer_reg_write(int reg, u32 val)
+> +{
+> +	switch (reg) {
+> +	case ARCH_TIMER_REG_CTRL:
+> +		asm volatile("msr cntp_ctl_el0,  %0" : : "r" (val));
+> +		break;
+> +	case ARCH_TIMER_REG_TVAL:
+> +		asm volatile("msr cntp_tval_el0, %0" : : "r" (val));
+> +		break;
+> +	default:
+> +		BUG();
+> +	}
+> +
+> +	isb();
+> +}
 
-$ uname -m
-s390x
-$ linux32 uname -m
-s390
+Doesn't architecture-specific assembly need to go in the arch directory rather
+than the drivers directory?
 
-> Arnd's point is that the ELF file should not affect the personality and
-> hence the uname value. This should only be done by an explicit call to
-> sys_personality().
+Christopher
 
-correct.  if someone really wants to launch their whole userland with the 
-adjusted personality, they could always boot the kernel with:
-	init=/usr/bin/linux32 /sbin/init
-but the kernel shouldn't be doing this automatically.
--mike
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120821/0313a2db/attachment.sig>
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum
