@@ -1,44 +1,55 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 21 Aug 2012 15:38:40 -0600
-Subject: [PATCH v2 1/4] pinctrl: add samsung pinctrl and gpiolib driver
-In-Reply-To: <CACRpkdYqPYesgE-YxPLZqROw1T2fsPWR6R+aDTTz2=XbP7oe9A@mail.gmail.com>
-References: <1345060656-32201-1-git-send-email-thomas.abraham@linaro.org>
- <1345060656-32201-2-git-send-email-thomas.abraham@linaro.org>
- <CACRpkdYqPYesgE-YxPLZqROw1T2fsPWR6R+aDTTz2=XbP7oe9A@mail.gmail.com>
-Message-ID: <5033FFE0.5070209@wwwdotorg.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 21 Aug 2012 23:01:45 +0100
+Subject: [PATCH v2 17/31] arm64: System calls handling
+In-Reply-To: <201208212014.01837.arnd@arndb.de>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <201208151422.16335.arnd@arndb.de> <20120821175122.GI12708@arm.com>
+ <201208212014.01837.arnd@arndb.de>
+Message-ID: <20120821220145.GA27934@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2012 05:25 AM, Linus Walleij wrote:
-> On Wed, Aug 15, 2012 at 9:57 PM, Thomas Abraham
-> <thomas.abraham@linaro.org> wrote:
+On Tue, Aug 21, 2012 at 09:14:01PM +0100, Arnd Bergmann wrote:
+> On Tuesday 21 August 2012, Catalin Marinas wrote:
+> > > > +asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
+> > > > +                    unsigned long prot, unsigned long flags,
+> > > > +                    unsigned long fd, off_t off)
+> > > > +{
+> > > > +   if (offset_in_page(off) != 0)
+> > > > +           return -EINVAL;
+> > > > +
+> > > > +   return sys_mmap_pgoff(addr, len, prot, flags, fd, off >> PAGE_SHIFT);
+> > > > +}
+> > > 
+> > > I think
+> > > 
+> > > #define sys_mmap sys_mmap_pgoff 
+> > 
+> > There are slightly different semantics with the last argument of
+> > sys_mmap() which takes a byte offset. The sys_mmap_pgoff() function
+> > takes the offset shifted by PAGE_SHIFT (which is the same as sys_mmap2).
+> > 
+> > Looking at the other architectures, it makes sense to use a generic
+> > sys_mmap() implementation similar to the one above (or the ia-64, seems
+> > to be the most complete).
 > 
->> Add a new device tree enabled pinctrl and gpiolib driver for Samsung
->> SoC's.
-...
->> +  The child node can also optionally specify one or more of the pin
->> +  configuration that should be applied on all the pins listed in the
->> +  "samsung,pins" property of the child node. The following pin configuration
->> +  properties are supported.
->> +
->> +  - samsung,pin-pud: Pull up/down configuration.
->> +  - samsung,pin-drv: Drive strength configuration.
->> +  - samsung,pin-pud-pdn: Pull up/down configuration in power down mode.
->> +  - samsung,pin-drv-pdn: Drive strength configuration in power down mode.
-> 
-> This looks a bit scary, as it seems to be orthogonal to the pin config
-> interface. I.e. this will be programmed "behind the back" of the
-> pin config system. However as long as the pin config implementation
-> reads back these things from the registers it will work, too.
-> 
-> In the U300 and Ux500 I explicitly use pin config hogs to set up
-> the pin configuration, and when we enter a state such as
-> "default" the mux setting and config settings are set from the
-> framework separately.
+> Why that? The generic sys_mmap_pgoff was specifically added so new architectures
+> could just use that instead of having their own wrappers, see f8b72560.
 
-I know that some HW has a separate set of registers (or fields) for the
-"awake" and "sleep" configuration, and the HW switches between the two
-automatically when sleeping. I have no idea if the Samsung SoCs do this,
-but I think if this were the case, it'd be quite legitimate to define
-both these HW states as separate sets of properties within a single
-pinctrl SW state. So, that might be the explanation here?
+As I understand, sys_mmap_pgoff can be used instead of sys_mmap2 on new
+32-bit architectures. But on 64-bit architectures we don't have
+sys_mmap2, only sys_mmap with the difference that the last argument is
+the offset in bytes (and multiple of PAGE_SIZE) rather than in pages. So
+unless we change the meaning of this last argument for sys_mmap, we
+cannot just define it to sys_mmap_pgoff.
+
+Since the other 64-bit architectures seem to have a sys_mmap wrapper
+that does this:
+
+	sys_mmap_pgoff(..., off >> PAGE_SHIFT);
+
+I think AArch64 should also use the same sys_mmap convention. We can
+make this wrapper generic.
+
+-- 
+Catalin
