@@ -1,63 +1,62 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 21 Aug 2012 13:57:03 +0300
-Subject: [RFC/PATCH 10/13] serial: omap: stick to put_autosuspend
-In-Reply-To: <CAMQu2gzm4z8DbCiz4hOS2nKa2HzNofmp=SPORYEu2Z_H3+JN9Q@mail.gmail.com>
-References: <1345540555-24359-1-git-send-email-balbi@ti.com>
- <1345540555-24359-11-git-send-email-balbi@ti.com>
- <CAMQu2gzm4z8DbCiz4hOS2nKa2HzNofmp=SPORYEu2Z_H3+JN9Q@mail.gmail.com>
-Message-ID: <20120821105702.GX10347@arwen.pp.htv.fi>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 21 Aug 2012 12:03:29 +0100
+Subject: [PATCH 5/8] mfd: Provide the PRCMU with its own IRQ domain
+In-Reply-To: <20120821105413.GD26899@gmail.com>
+References: <CACRpkdYbOBEPNbCdfi+=gupdqS8_7t7MpOgXs7VCVTs8Y3j_mQ@mail.gmail.com>
+ <20120820083640.GH8450@gmail.com>
+ <20120820121055.GA26991@opensource.wolfsonmicro.com>
+ <20120820125531.GA20242@gmail.com>
+ <20120820162923.GF26991@opensource.wolfsonmicro.com>
+ <20120820164949.GB22749@gmail.com>
+ <20120820175155.GH26991@opensource.wolfsonmicro.com>
+ <20120821085618.GA26899@gmail.com>
+ <20120821095026.GU26991@opensource.wolfsonmicro.com>
+ <20120821105413.GD26899@gmail.com>
+Message-ID: <20120821110329.GA7995@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2012 at 04:12:11PM +0530, Shilimkar, Santosh wrote:
-> On Tue, Aug 21, 2012 at 2:45 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > Everytime we're done using our TTY, we want
-> > the pm timer to be reinitilized. By sticking
-> > to pm_runtime_pm_autosuspend() we make sure
-> > that this will always be the case.
-> >
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > ---
-> >  drivers/tty/serial/omap-serial.c | 33 ++++++++++++++++++++++-----------
-> >  1 file changed, 22 insertions(+), 11 deletions(-)
-> >
-> > diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> > index 6ea24c5..458d77c 100644
-> > --- a/drivers/tty/serial/omap-serial.c
-> > +++ b/drivers/tty/serial/omap-serial.c
-> > @@ -164,7 +164,8 @@ static void serial_omap_enable_ms(struct uart_port *port)
-> >         pm_runtime_get_sync(up->dev);
-> >         up->ier |= UART_IER_MSI;
-> >         serial_out(up, UART_IER, up->ier);
-> > -       pm_runtime_put(up->dev);
-> > +       pm_runtime_mark_last_busy(up->dev);
-> > +       pm_runtime_put_autosuspend(up->dev);
-> >  }
-> >
-> Can you please expand the change-log a bit ?
-> Didn't follow the time re-init part completely.
+On Tue, Aug 21, 2012 at 11:54:14AM +0100, Lee Jones wrote:
+> On Tue, Aug 21, 2012 at 10:50:27AM +0100, Mark Brown wrote:
 
-It's really just a micro-optimization. The thing is:
+> > What makes you say this?  This is just a convenience for finding a
+> > domain, irqdomains are *completely* indepentant of device tree.
 
-if I call pm_runtime_put(), I will not reinitialize the pm timer to
-whatever timeout value I used. This means that pm_runtime_put() could
-actually execute right away (if timer was about to expire when I called
-pm_runtime_put()). While this wouldn't cause any issues, it's better to
-reinitialize the timer and make sure if there's another
-read/write/set_termios/whatever coming right after this, UART is still
-powered up.
+> How can you say that? I think you mean _can_ be independent of DT. If
+> that's what you mean then yes, that's true. All I'm saying is we need
 
-I mean, it's really just trying to avoid context save & restore when
-UART is still under heavy usage.
+No, I really mean what I'm saying.  Device tree builds on irqdomains,
+not the other way around.
 
-Does it make sense ?
+> another way to get hold of the domain, because the only way to obtain
+> it without having direct access is via a device node.
 
--- 
-balbi
+This doesn't actually hold.
+
+> > > - I know that you have interest in pushing the functionality into the
+> > > IRQ domain subsystem, but I'm struggling to see how. It's calling into
+> > > the IRQ domain where we're seeing issues in the first place, specifically
+> > > irq_create_mapping(). How about if we passed 'irq_domain' as a parameter
+> > > when requesting the IRQ? That way we can pass the correct IRQ without
+> > > worry of conversion. If 'irq_domain' is !NULL the IRQ management subsystem
+> > > can do the necessary conversions. If 'irq_domain' is NULL it continues to
+> > > use the requested IRQ as a virq.
+
+> > This is totally orthogonal to doing the mapping in the MFD subsystem
+> > which is the issue here.
+
+> Again, I only mentioned this because you said you wanted it to be handled
+> by the irqdomain.
+
+The *mapping* should be being handled in irqdomain.
+
+> I'll code up the second suggestion now.
+
+I've already done this.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120821/d67495a8/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120821/ba3c2e95/attachment.sig>
