@@ -1,29 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 22 Aug 2012 00:04:23 +0200
-Subject: [PATCH v2] serial: pl011: honour serial aliases in device tree
-In-Reply-To: <1345564094-16565-1-git-send-email-matthew.leach@arm.com>
-References: <1345564094-16565-1-git-send-email-matthew.leach@arm.com>
-Message-ID: <CACRpkdbh-PhFKU54FCti-7RwQLJ8Q0d9_XLPEk5vNemjDOa-wQ@mail.gmail.com>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Tue, 21 Aug 2012 23:12:55 +0100
+Subject: [PATCHv3 3/9] serial: vt8500: Add devicetree support for
+ vt8500-serial
+In-Reply-To: <1345582058-2291-4-git-send-email-linux@prisktech.co.nz>
+References: <1345582058-2291-1-git-send-email-linux@prisktech.co.nz>
+ <1345582058-2291-4-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20120821231255.71a7515a@pyramind.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2012 at 5:48 PM, Matthew Leach <matthew.leach@arm.com> wrote:
+On Wed, 22 Aug 2012 08:47:32 +1200
+Tony Prisk <linux@prisktech.co.nz> wrote:
 
-> If the order of UART nodes is changed in the device tree, then tty dev
-> devices are attached to different serial ports causing the console to
-> be directed to a different physical serial port. The "serial" aliases
-> in the device tree should prevent this.
->
-> This patch ensures that the UART driver creates tty devices that
-> honour these aliases if a device tree is present.
->
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
-> Signed-off-by: Matthew Leach <matthew.leach@arm.com>
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 > ---
-> v2: use IS_ENABLED instead of ifdefs
+>  drivers/tty/serial/vt8500_serial.c |   37 ++++++++++++++++++++++++++++++++----
+>  1 file changed, 33 insertions(+), 4 deletions(-)
 
-Looks good to me.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Can we have a comment attached to a change this size. In particular one
+describing why it gone from 4 to 6 ports, and why the port id twiddling.
 
-Yours,
-Linus Walleij
+Is there a reason you can't use the device tree port id ?
+
+What are the regression risks for existing users expecting the pdev->id
+binding ?
