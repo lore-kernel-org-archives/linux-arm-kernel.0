@@ -1,524 +1,168 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed, 22 Aug 2012 08:47:30 +1200
-Subject: [PATCHv3 1/9] arm: vt8500: Add device tree files for VIA/Wondermedia
- SoC's
-In-Reply-To: <1345582058-2291-1-git-send-email-linux@prisktech.co.nz>
-References: <1345582058-2291-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1345582058-2291-2-git-send-email-linux@prisktech.co.nz>
+Date: Wed, 22 Aug 2012 08:47:29 +1200
+Subject: [PATCHv3 0/9] *** ARM: Update arch-vt8500 to Devicetree ***
+Message-ID: <1345582058-2291-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree files for VT8500, WM8505 and WM8650 SoC's and
-reference boards.
+This patchset updates arch-vt8500 to devicetree and removes all the old-style
+code. Support for WM8650 has also been added.
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
- arch/arm/boot/dts/vt8500-bv07.dts |   31 +++++++++
- arch/arm/boot/dts/vt8500.dtsi     |  100 +++++++++++++++++++++++++++
- arch/arm/boot/dts/wm8505-ref.dts  |   31 +++++++++
- arch/arm/boot/dts/wm8505.dtsi     |  126 +++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/wm8650-mid.dts  |   31 +++++++++
- arch/arm/boot/dts/wm8650.dtsi     |  138 +++++++++++++++++++++++++++++++++++++
- 6 files changed, 457 insertions(+)
+Example dts/dtsi files are given for the three currently supported models.
+
+Major changes:
+
+GPIO code has been converted to a platform_device and rewritten as WM8505
+support was broken. Add support for WM8650 gpio controller.
+
+UHCI support was missing. Added this as a generic non-pci uhci controller as
+it doesn't require anything special. Should be usable by any system that doesn't
+have special requirements to get the UHCI controller working.
+
+Framebuffer code patched to support WM8650. The bindings for this are of concern
+but there doesn't seem to be a formalized binding yet. This patch is based off
+Sascha Hauer's current patch on the dri-devel mailing list and should be easily
+patched out when its finalized.
+
+Patchset based on Arnd's arm-soc/for-next branch.
+
+
+Could I get this reviewed, hopefully for inclusion into v3.7.
+
+Regards
+Tony Prisk
+
+Changes
+v2:
+Cleanup style/formatting errors
+Removed erroneous commit message about GPIO not being converted to devicetree
+Corrected arch-vt8500/irq.c header to correct filename
+Changed GPIO driver to use module_platform_driver()
+Renamed vt8500_gpio_bank_regs -> vt8500_gpio_bank_regoffsets
+Changed vt8500_gpio_bank_regoffset fields to unsigned int
+Changed bit-setting code to use BIT() macro
+Removed of_find_compatible() and use pdev->dev.of_node in _probe()
+Removed regoff field and related code - leftover from old design
+Added kerneldoc regarding struct vt8500_gpio_bank_regoffsets fields
+Update MODULE_LICENSE on all platform devices to "GPL v2" to match their headers
+Renamed dts board files to clarify product names
+
+v3:
+Corrected serial driver issue after porting to device tree. pdev->id no longer
+valid.
+Corrected irq.c to properly initialize slaved interrupt controller.
+Updated framebuffer drivers to use phandles for display node.
+Corrected dts definitions for updated framebuffer driver.
+EHCI/UHCI patch (Patch 4/9) already in -next via usb-next tree.
+
+Included common clock frame support.
+Added initialization code to arch/arm/mach-vt8500/vt8500.c for clocks.
+Updated wm8650.dtsi to include basic clocks.
+
+
+Tony Prisk (9):
+  arm: vt8500: Add device tree files for VIA/Wondermedia SoC's
+  rtc: vt8500: Add devicetree support for vt8500-rtc
+  serial: vt8500: Add devicetree support for vt8500-serial
+  usb: vt8500: Add devicetree support for vt8500-ehci and -uhci.
+  video: vt8500: Add devicetree support for vt8500-fb and wm8505-fb
+  arm: vt8500: Update arch-vt8500 to devicetree support.
+  arm: vt8500: doc: Add device tree bindings for arch-vt8500 devices
+  arm: vt8500: gpio: Devicetree support for arch-vt8500
+  arm: vt8500: clk: Add Common Clock Framework support
+
+ Documentation/devicetree/bindings/arm/vt8500.txt   |   15 +
+ .../bindings/arm/vt8500/via,vt8500-intc.txt        |   16 +
+ .../bindings/arm/vt8500/via,vt8500-pmc.txt         |   13 +
+ .../bindings/arm/vt8500/via,vt8500-timer.txt       |   15 +
+ Documentation/devicetree/bindings/clock/vt8500.txt |   72 +++
+ .../devicetree/bindings/gpio/gpio_vt8500.txt       |   24 +
+ .../devicetree/bindings/rtc/via,vt8500-rtc.txt     |   15 +
+ .../bindings/tty/serial/via,vt8500-uart.txt        |   15 +
+ .../devicetree/bindings/usb/platform-uhci.txt      |   15 +
+ .../devicetree/bindings/usb/via,vt8500-ehci.txt    |   15 +
+ .../devicetree/bindings/vendor-prefixes.txt        |    2 +
+ .../devicetree/bindings/video/via,vt8500-fb.txt    |   48 ++
+ .../devicetree/bindings/video/wm,prizm-ge-rops.txt |   13 +
+ .../devicetree/bindings/video/wm,wm8505-fb.txt     |   22 +
+ arch/arm/Kconfig                                   |    5 +
+ arch/arm/boot/dts/vt8500-bv07.dts                  |   31 ++
+ arch/arm/boot/dts/vt8500.dtsi                      |  100 ++++
+ arch/arm/boot/dts/wm8505-ref.dts                   |   31 ++
+ arch/arm/boot/dts/wm8505.dtsi                      |  126 +++++
+ arch/arm/boot/dts/wm8650-mid.dts                   |   31 ++
+ arch/arm/boot/dts/wm8650.dtsi                      |  138 ++++++
+ arch/arm/mach-vt8500/Kconfig                       |   72 +--
+ arch/arm/mach-vt8500/Makefile                      |    9 +-
+ arch/arm/mach-vt8500/bv07.c                        |   80 ----
+ arch/arm/mach-vt8500/common.h                      |   28 ++
+ arch/arm/mach-vt8500/devices-vt8500.c              |   91 ----
+ arch/arm/mach-vt8500/devices-wm8505.c              |   99 ----
+ arch/arm/mach-vt8500/devices.c                     |  270 -----------
+ arch/arm/mach-vt8500/devices.h                     |   88 ----
+ arch/arm/mach-vt8500/gpio.c                        |  240 ----------
+ arch/arm/mach-vt8500/include/mach/restart.h        |    4 +-
+ arch/arm/mach-vt8500/include/mach/vt8500_irqs.h    |   88 ----
+ arch/arm/mach-vt8500/include/mach/vt8500_regs.h    |   79 ----
+ arch/arm/mach-vt8500/include/mach/wm8505_irqs.h    |  115 -----
+ arch/arm/mach-vt8500/include/mach/wm8505_regs.h    |   78 ---
+ arch/arm/mach-vt8500/irq.c                         |  209 +++++----
+ arch/arm/mach-vt8500/restart.c                     |   54 ---
+ arch/arm/mach-vt8500/timer.c                       |   67 ++-
+ arch/arm/mach-vt8500/vt8500.c                      |  196 ++++++++
+ arch/arm/mach-vt8500/wm8505_7in.c                  |   79 ----
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/clk-vt8500.c                           |  496 ++++++++++++++++++++
+ drivers/gpio/Kconfig                               |    6 +
+ drivers/gpio/Makefile                              |    1 +
+ drivers/gpio/gpio-vt8500.c                         |  313 ++++++++++++
+ drivers/rtc/rtc-vt8500.c                           |    9 +-
+ drivers/tty/serial/vt8500_serial.c                 |   37 +-
+ drivers/usb/host/Kconfig                           |    4 +-
+ drivers/usb/host/ehci-vt8500.c                     |   25 +-
+ drivers/usb/host/uhci-hcd.c                        |    5 +
+ drivers/usb/host/uhci-platform.c                   |  169 +++++++
+ drivers/video/Kconfig                              |    6 +-
+ drivers/video/vt8500lcdfb.c                        |   79 +++-
+ drivers/video/wm8505fb.c                           |   97 +++-
+ drivers/video/wmt_ge_rops.c                        |    9 +-
+ 55 files changed, 2384 insertions(+), 1581 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/vt8500.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/vt8500/via,vt8500-intc.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/vt8500/via,vt8500-pmc.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/vt8500/via,vt8500-timer.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/vt8500.txt
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio_vt8500.txt
+ create mode 100644 Documentation/devicetree/bindings/rtc/via,vt8500-rtc.txt
+ create mode 100644 Documentation/devicetree/bindings/tty/serial/via,vt8500-uart.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/platform-uhci.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
+ create mode 100644 Documentation/devicetree/bindings/video/via,vt8500-fb.txt
+ create mode 100644 Documentation/devicetree/bindings/video/wm,prizm-ge-rops.txt
+ create mode 100644 Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
  create mode 100644 arch/arm/boot/dts/vt8500-bv07.dts
  create mode 100644 arch/arm/boot/dts/vt8500.dtsi
  create mode 100644 arch/arm/boot/dts/wm8505-ref.dts
  create mode 100644 arch/arm/boot/dts/wm8505.dtsi
  create mode 100644 arch/arm/boot/dts/wm8650-mid.dts
  create mode 100644 arch/arm/boot/dts/wm8650.dtsi
+ delete mode 100644 arch/arm/mach-vt8500/bv07.c
+ create mode 100644 arch/arm/mach-vt8500/common.h
+ delete mode 100644 arch/arm/mach-vt8500/devices-vt8500.c
+ delete mode 100644 arch/arm/mach-vt8500/devices-wm8505.c
+ delete mode 100644 arch/arm/mach-vt8500/devices.c
+ delete mode 100644 arch/arm/mach-vt8500/devices.h
+ delete mode 100644 arch/arm/mach-vt8500/gpio.c
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/vt8500_irqs.h
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/vt8500_regs.h
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/wm8505_irqs.h
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/wm8505_regs.h
+ delete mode 100644 arch/arm/mach-vt8500/restart.c
+ create mode 100644 arch/arm/mach-vt8500/vt8500.c
+ delete mode 100644 arch/arm/mach-vt8500/wm8505_7in.c
+ create mode 100644 drivers/clk/clk-vt8500.c
+ create mode 100644 drivers/gpio/gpio-vt8500.c
+ create mode 100644 drivers/usb/host/uhci-platform.c
 
-diff --git a/arch/arm/boot/dts/vt8500-bv07.dts b/arch/arm/boot/dts/vt8500-bv07.dts
-new file mode 100644
-index 0000000..339a664
---- /dev/null
-+++ b/arch/arm/boot/dts/vt8500-bv07.dts
-@@ -0,0 +1,31 @@
-+/*
-+ * vt8500-bv07.dts - Device tree file for Benign BV07 Netbook
-+ *
-+ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
-+ *
-+ * Licensed under GPLv2 or later
-+ */
-+
-+/dts-v1/;
-+/include/ "vt8500.dtsi"
-+
-+/ {
-+	model = "Benign BV07 Netbook";
-+
-+	/*
-+	 * Display node is based on Sascha Hauer's patch on dri-devel.
-+	 * Added a bpp property to calculate the size of the framebuffer
-+	 * until the binding is formalized.
-+	 */
-+	display: display {
-+		xres = <800>;
-+		yres = <480>;
-+		left-margin = <88>;
-+		right-margin = <40>;
-+		hsync-len = <0>;
-+		upper-margin = <32>;
-+		lower-margin = <11>;
-+		vsync-len = <1>;
-+		bpp = <16>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/vt8500.dtsi b/arch/arm/boot/dts/vt8500.dtsi
-new file mode 100644
-index 0000000..78571d5
---- /dev/null
-+++ b/arch/arm/boot/dts/vt8500.dtsi
-@@ -0,0 +1,100 @@
-+/*
-+ * vt8500.dtsi - Device tree file for VIA VT8500 SoC
-+ *
-+ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
-+ *
-+ * Licensed under GPLv2 or later
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "via,vt8500";
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges;
-+		interrupt-parent = <&intc>;
-+
-+		intc: interrupt-controller at d8140000 {
-+			compatible = "via,vt8500-intc";
-+			interrupt-controller;
-+			reg = <0xd8140000 0x10000>;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		gpio: gpio-controller at d8110000 {
-+			compatible = "via,vt8500-gpio";
-+			gpio-controller;
-+			reg = <0xd8110000 0x10000>;
-+			#gpio-cells = <3>;
-+		};
-+
-+		pmc at d8130000 {
-+			compatible = "via,vt8500-pmc";
-+			reg = <0xd8130000 0x1000>;
-+		};
-+
-+		timer at d8130100 {
-+			compatible = "via,vt8500-timer";
-+			reg = <0xd8130100 0x28>;
-+			interrupts = <36>;
-+		};
-+
-+		ehci at d8007900 {
-+			compatible = "via,vt8500-ehci";
-+			reg = <0xd8007900 0x200>;
-+			interrupts = <43>;
-+		};
-+
-+		uhci at d8007b00 {
-+			compatible = "platform-uhci";
-+			reg = <0xd8007b00 0x200>;
-+			interrupts = <43>;
-+		};
-+
-+		fb at d800e400 {
-+			compatible = "via,vt8500-fb";
-+			reg = <0xd800e400 0x400>;
-+			interrupts = <12>;
-+			via,display = <&display>;
-+		};
-+
-+		ge_rops at d8050400 {
-+			compatible = "wm,prizm-ge-rops";
-+			reg = <0xd8050400 0x100>;
-+		};
-+
-+		uart at d8200000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd8200000 0x1040>;
-+			interrupts = <32>;
-+		};
-+
-+		uart at d82b0000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd82b0000 0x1040>;
-+			interrupts = <33>;
-+		};
-+
-+		uart at d8210000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd8210000 0x1040>;
-+			interrupts = <47>;
-+		};
-+
-+		uart at d82c0000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd82c0000 0x1040>;
-+			interrupts = <50>;
-+		};
-+
-+		rtc at d8100000 {
-+			compatible = "via,vt8500-rtc";
-+			reg = <0xd8100000 0x10000>;
-+			interrupts = <48>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/wm8505-ref.dts b/arch/arm/boot/dts/wm8505-ref.dts
-new file mode 100644
-index 0000000..fcd9836
---- /dev/null
-+++ b/arch/arm/boot/dts/wm8505-ref.dts
-@@ -0,0 +1,31 @@
-+/*
-+ * wm8505-ref.dts - Device tree file for Wondermedia WM8505 reference netbook
-+ *
-+ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
-+ *
-+ * Licensed under GPLv2 or later
-+ */
-+
-+/dts-v1/;
-+/include/ "wm8505.dtsi"
-+
-+/ {
-+	model = "Wondermedia WM8505 Netbook";
-+
-+	/*
-+	 * Display node is based on Sascha Hauer's patch on dri-devel.
-+	 * Added a bpp property to calculate the size of the framebuffer
-+	 * until the binding is formalized.
-+	 */
-+	display: display {
-+		xres = <800>;
-+		yres = <480>;
-+		left-margin = <88>;
-+		right-margin = <40>;
-+		hsync-len = <0>;
-+		upper-margin = <32>;
-+		lower-margin = <11>;
-+		vsync-len = <1>;
-+		bpp = <32>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/wm8505.dtsi b/arch/arm/boot/dts/wm8505.dtsi
-new file mode 100644
-index 0000000..64a3d7f
---- /dev/null
-+++ b/arch/arm/boot/dts/wm8505.dtsi
-@@ -0,0 +1,126 @@
-+/*
-+ * wm8505.dtsi - Device tree file for Wondermedia WM8505 SoC
-+ *
-+ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
-+ *
-+ * Licensed under GPLv2 or later
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "wm,wm8505";
-+
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,arm926ejs";
-+		};
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges;
-+		interrupt-parent = <&intc0>;
-+
-+		intc0: interrupt-controller at d8140000 {
-+			compatible = "via,vt8500-intc";
-+			interrupt-controller;
-+			reg = <0xd8140000 0x10000>;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		/* Secondary IC cascaded to intc0 */
-+		intc1: interrupt-controller at d8150000 {
-+			compatible = "via,vt8500-intc";
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			reg = <0xD8150000 0x10000>;
-+			interrupts = <56 57 58 59 60 61 62 63>;
-+		};
-+
-+		gpio: gpio-controller at d8110000 {
-+			compatible = "wm,wm8505-gpio";
-+			gpio-controller;
-+			reg = <0xd8110000 0x10000>;
-+			#gpio-cells = <3>;
-+		};
-+
-+		pmc at d8130000 {
-+			compatible = "via,vt8500-pmc";
-+			reg = <0xd8130000 0x1000>;
-+		};
-+
-+		timer at d8130100 {
-+			compatible = "via,vt8500-timer";
-+			reg = <0xd8130100 0x28>;
-+			interrupts = <36>;
-+		};
-+
-+		ehci at d8007100 {
-+			compatible = "via,vt8500-ehci";
-+			reg = <0xd8007100 0x200>;
-+			interrupts = <43>;
-+		};
-+
-+		uhci at d8007300 {
-+			compatible = "platform-uhci";
-+			reg = <0xd8007300 0x200>;
-+			interrupts = <43>;
-+		};
-+
-+		fb at d8050800 {
-+			compatible = "wm,wm8505-fb";
-+			reg = <0xd8050800 0x200>;
-+			via,display = <&display>;
-+		};
-+
-+		ge_rops at d8050400 {
-+			compatible = "wm,prizm-ge-rops";
-+			reg = <0xd8050400 0x100>;
-+		};
-+
-+		uart at d8200000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd8200000 0x1040>;
-+			interrupts = <32>;
-+		};
-+
-+		uart at d82b0000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd82b0000 0x1040>;
-+			interrupts = <33>;
-+		};
-+
-+		uart at d8210000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd8210000 0x1040>;
-+			interrupts = <47>;
-+		};
-+
-+		uart at d82c0000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd82c0000 0x1040>;
-+			interrupts = <50>;
-+		};
-+
-+		uart at d8370000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd8370000 0x1040>;
-+			interrupts = <31>;
-+		};
-+
-+		uart at d8380000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd8380000 0x1040>;
-+			interrupts = <30>;
-+		};
-+
-+		rtc at d8100000 {
-+			compatible = "via,vt8500-rtc";
-+			reg = <0xd8100000 0x10000>;
-+			interrupts = <48>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/wm8650-mid.dts b/arch/arm/boot/dts/wm8650-mid.dts
-new file mode 100644
-index 0000000..d37dbf0
---- /dev/null
-+++ b/arch/arm/boot/dts/wm8650-mid.dts
-@@ -0,0 +1,31 @@
-+/*
-+ * wm8650-mid.dts - Device tree file for Wondermedia WM8650-MID Tablet
-+ *
-+ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
-+ *
-+ * Licensed under GPLv2 or later
-+ */
-+
-+/dts-v1/;
-+/include/ "wm8650.dtsi"
-+
-+/ {
-+	model = "Wondermedia WM8650-MID Tablet";
-+
-+	/*
-+	 * Display node is based on Sascha Hauer's patch on dri-devel.
-+	 * Added a bpp property to calculate the size of the framebuffer
-+	 * until the binding is formalized.
-+	 */
-+	display: display {
-+		xres = <800>;
-+		yres = <480>;
-+		left-margin = <88>;
-+		right-margin = <40>;
-+		hsync-len = <0>;
-+		upper-margin = <32>;
-+		lower-margin = <11>;
-+		vsync-len = <1>;
-+		bpp = <16>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/wm8650.dtsi b/arch/arm/boot/dts/wm8650.dtsi
-new file mode 100644
-index 0000000..e4ca840
---- /dev/null
-+++ b/arch/arm/boot/dts/wm8650.dtsi
-@@ -0,0 +1,138 @@
-+/*
-+ * wm8650.dtsi - Device tree file for Wondermedia WM8650 SoC
-+ *
-+ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
-+ *
-+ * Licensed under GPLv2 or later
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "wm,wm8650";
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges;
-+		interrupt-parent = <&intc0>;
-+
-+		intc0: interrupt-controller at d8140000 {
-+			compatible = "via,vt8500-intc";
-+			interrupt-controller;
-+			reg = <0xd8140000 0x10000>;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		/* Secondary IC cascaded to intc0 */
-+		intc1: interrupt-controller at d8150000 {
-+			compatible = "via,vt8500-intc";
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			reg = <0xD8150000 0x10000>;
-+			interrupts = <56 57 58 59 60 61 62 63>;
-+		};
-+
-+		gpio: gpio-controller at d8110000 {
-+			compatible = "wm,wm8650-gpio";
-+			gpio-controller;
-+			reg = <0xd8110000 0x10000>;
-+			#gpio-cells = <3>;
-+		};
-+
-+		pmc at d8130000 {
-+			compatible = "via,vt8500-pmc";
-+			reg = <0xd8130000 0x1000>;
-+
-+			clocks {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				ref25: ref25M {
-+					#clock-cells = <0>;
-+					compatible = "fixed-clock";
-+					clock-frequency = <25000000>;
-+				};
-+
-+				plla: plla {
-+					#clock-cells = <0>;
-+					compatible = "wm,wm8650-pll-clock";
-+					clocks = <&ref25>;
-+					reg = <0x200>;
-+				};
-+
-+				pllb: pllb {
-+					#clock-cells = <0>;
-+					compatible = "wm,wm8650-pll-clock";
-+					clocks = <&ref25>;
-+					reg = <0x204>;
-+				};
-+
-+				arm: arm {
-+					#clock-cells = <0>;
-+					compatible = "via,vt8500-device-clock";
-+					clocks = <&plla>;
-+					divisor-reg = <0x300>;
-+				};
-+
-+				sdhc: sdhc {
-+					#clock-cells = <0>;
-+					compatible = "via,vt8500-device-clock";
-+					clocks = <&pllb>;
-+					divisor-reg = <0x328>;
-+					divisor-mask = <0x3f>;
-+					enable-reg = <0x254>;
-+					enable-bit = <18>;
-+				};
-+			};
-+		};
-+
-+		timer at d8130100 {
-+			compatible = "via,vt8500-timer";
-+			reg = <0xd8130100 0x28>;
-+			interrupts = <36>;
-+		};
-+
-+		ehci at d8007900 {
-+			compatible = "via,vt8500-ehci";
-+			reg = <0xd8007900 0x200>;
-+			interrupts = <43>;
-+		};
-+
-+		uhci at d8007b00 {
-+			compatible = "platform-uhci";
-+			reg = <0xd8007b00 0x200>;
-+			interrupts = <43>;
-+		};
-+
-+		fb at d8050800 {
-+			compatible = "wm,wm8505-fb";
-+			reg = <0xd8050800 0x200>;
-+			via,display = <&display>;
-+		};
-+
-+		ge_rops at d8050400 {
-+			compatible = "wm,prizm-ge-rops";
-+			reg = <0xd8050400 0x100>;
-+		};
-+
-+		uart at d8200000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd8200000 0x1040>;
-+			interrupts = <32>;
-+		};
-+
-+		uart at d82b0000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd82b0000 0x1040>;
-+			interrupts = <33>;
-+		};
-+
-+		rtc at d8100000 {
-+			compatible = "via,vt8500-rtc";
-+			reg = <0xd8100000 0x10000>;
-+			interrupts = <48>;
-+		};
-+	};
-+};
 -- 
 1.7.9.5
