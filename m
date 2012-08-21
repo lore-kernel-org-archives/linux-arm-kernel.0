@@ -1,40 +1,56 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 21 Aug 2012 09:42:44 -0700
-Subject: [PATCH 8/8] input: ab8500-ponkey: Rely on MFD core to convert
- IRQs to virtual
-In-Reply-To: <20120821092328.GC26899@gmail.com>
-References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
- <1344527635-6163-9-git-send-email-lee.jones@linaro.org>
- <CACRpkdZ-HOGy_sdsCQSNOdYTDzHFszk0OySM88TjO-neSJUz0A@mail.gmail.com>
- <20120821092328.GC26899@gmail.com>
-Message-ID: <20120821164244.GA4672@core.coreip.homeip.net>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Tue, 21 Aug 2012 20:59:33 +0400
+Subject: [PATCH 2/4] ARM: clps711x: Fix register definitions
+In-Reply-To: <1345568375-28516-1-git-send-email-shc_work@mail.ru>
+References: <1345568375-28516-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1345568375-28516-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2012 at 10:23:29AM +0100, Lee Jones wrote:
-> On Tue, Aug 14, 2012 at 10:31:08AM +0200, Linus Walleij wrote:
-> > On Thu, Aug 9, 2012 at 5:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > 
-> > > There was a plan to place ab8500_irq_get_virq() calls in each AB8500
-> > > child device prior to requesting an IRQ, but as we're no longer using
-> > > Device Tree to collect our IRQ numbers, it's actually better to allow
-> > > the core to do this during device registration time. So the IRQ number
-> > > we pull from its resource has already been converted to a virtual IRQ.
-> > >
-> > > CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > > CC: linux-input at vger.kernel.org
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > This is looking good, I guess you need all patches to go in at the
-> > same time so Dmitry's ACK is required.
-> 
-> Yep, just waiting for that now.
+This patch contain some fixes:
+- Fixes the address of register PORTE.
+- Corrects name for DAIDR0 register.
+- Removes unused definition for SYNCIO_CFGLEN.
+- Fixes definition SYNCIO_FRMLEN.
 
-Sorry for the delay. Yes, this shoudl be fine, but since it is
-essentially a revert of the original patch it should be pushed in as
-such.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-clps711x/include/mach/clps711x.h |    9 ++++-----
+ 1 files changed, 4 insertions(+), 5 deletions(-)
 
-Thanks.
-
+diff --git a/arch/arm/mach-clps711x/include/mach/clps711x.h b/arch/arm/mach-clps711x/include/mach/clps711x.h
+index 1dd806f..c82e21c 100644
+--- a/arch/arm/mach-clps711x/include/mach/clps711x.h
++++ b/arch/arm/mach-clps711x/include/mach/clps711x.h
+@@ -31,8 +31,8 @@
+ #define PBDDR		(0x0041)
+ #define PCDDR		(0x0042)
+ #define PDDDR		(0x0043)
+-#define PEDR		(0x0080)
+-#define PEDDR		(0x00c0)
++#define PEDR		(0x0083)
++#define PEDDR		(0x00c3)
+ #define SYSCON1		(0x0100)
+ #define SYSFLG1		(0x0140)
+ #define MEMCFG1		(0x0180)
+@@ -77,7 +77,7 @@
+ #define KBDEOI		(0x1700)
+ 
+ #define DAIR		(0x2000)
+-#define DAIR0		(0x2040)
++#define DAIDR0		(0x2040)
+ #define DAIDR1		(0x2080)
+ #define DAIDR2		(0x20c0)
+ #define DAISR		(0x2100)
+@@ -191,8 +191,7 @@
+ #define UBRLCR_WRDLEN8		(3 << 17)
+ #define UBRLCR_WRDLEN_MASK	(3 << 17)
+ 
+-#define SYNCIO_FRMLEN(x)	(((x) & 0x3f) << 7)
+-#define SYNCIO_CFGLEN(x)	((x) & 0x7f)
++#define SYNCIO_FRMLEN(x)	(((x) & 0x1f) << 8)
+ #define SYNCIO_SMCKEN		(1 << 13)
+ #define SYNCIO_TXFRMEN		(1 << 14)
+ 
 -- 
-Dmitry
+1.7.8.6
