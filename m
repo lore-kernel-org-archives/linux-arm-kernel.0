@@ -1,40 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 21 Aug 2012 08:16:13 +0200
-Subject: [GIT PULL] ux500 fixes
-Message-ID: <CACRpkdZeTb35naqs7UXo127syN7iPgsHUokRE7B=ER8iJRNhmw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 21 Aug 2012 09:12:41 +0200
+Subject: [PATCH 04/11] pinctrl: mvebu: add pinctrl driver for Armada 370
+In-Reply-To: <20120820193622.4e539451@skate>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1344689809-6223-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CACRpkdYNZar7865-T12J37h3AWA9-8R1R5tymuOhaB0b3ddEAA@mail.gmail.com>
+ <50326A60.1070007@gmail.com> <20120820193622.4e539451@skate>
+Message-ID: <503334E9.508@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On 08/20/2012 07:36 PM, Thomas Petazzoni wrote:
+> Le Mon, 20 Aug 2012 18:48:32 +0200,
+> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
+> 
+>> this is really difficult here ;) I thought I could just add PINCTRL_DOVE
+>> to MACH_DOVE inside ARCH_MVEBU, PINCTRL_KIRKWOOD to MACH_KIRKWOOD, aso.
+>> But there is a common MACH_ARMADA_370_XP for both 370 and XP obviously.
+>>
+>> If it is ok for you I will add both PINCTRL_ stubs to the Kconfig and
+>> you work it out if you ever have two distinct MACHs? Or it could remain
+>> selectable in pinctrl/Kconfig but that will then be different with the
+>> other stubs.
+> 
+> In order to keep the consistency with other SoC families, maybe we can
+> split the 370 and XP options in two separate MACH_ARMADA_370 and
+> MACH_ARMADA_XP. So, in the ideal world, once all Marvell EBU SoCs are
+> converted to DT+mach-mvebu, we should have:
+> 
+>  *) arch/arm/Kconfig defines MACH_MVEBU
+> 
+>  *) arch/arm/mach-mvebu/Kconfig defines MACH_KIRKWOOD, MACH_DOVE,
+>     MACH_MX78X00, MACH_ARMADA_370, MACH_ARMADA_XP, MACH_ORION5X
+> 
+> Then, an user is free to build a single kernel image that supports all,
+> or a selection of the supported Marvell EBU SoCs.
 
-here are two audio fixes from Lee Jones for ux500 for the -rc series.
-Using a signed tag now!
+I agree with Thomas
 
-Please pull them in,
-Linus Walleij
+> 
+> Thomas
+> 
 
-The following changes since commit d9875690d9b89a866022ff49e3fcea892345ad92:
 
-  Linux 3.6-rc2 (2012-08-16 14:51:24 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-fixes-v3.6-rc2
-
-for you to fetch changes up to 46a8b9837da20206c6daca11949485fab7b6e875:
-
-  ARM: ux500: Ensure probing of Audio devices when Device Tree is
-enabled (2012-08-17 11:21:30 +0200)
-
-----------------------------------------------------------------
-Here are two audio fixes for the ux500 found by Lee Jones.
-
-----------------------------------------------------------------
-Lee Jones (2):
-      ARM: ux500: Fix merge error, no matching driver name for 'snd_soc_u8500'
-      ARM: ux500: Ensure probing of Audio devices when Device Tree is enabled
-
- arch/arm/mach-ux500/board-mop500-msp.c | 10 +++++-----
- arch/arm/mach-ux500/board-mop500.c     |  4 ++++
- 2 files changed, 9 insertions(+), 5 deletions(-)
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
