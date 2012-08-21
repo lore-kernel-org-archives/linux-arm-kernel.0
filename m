@@ -1,67 +1,34 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 21 Aug 2012 13:41:46 +0100
-Subject: [PATCH 1/4] mfd: smsc: Add support for smsc gpio io/keypad driver
-In-Reply-To: <1345545940-2232-2-git-send-email-sourav.poddar@ti.com>
-References: <1345545940-2232-1-git-send-email-sourav.poddar@ti.com>
- <1345545940-2232-2-git-send-email-sourav.poddar@ti.com>
-Message-ID: <20120821124146.GA21557@sirena.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 21 Aug 2012 14:45:23 +0200
+Subject: [v3] Add basic address decoding support for Marvell 370/XP
+In-Reply-To: <20120821135045.58e2a633@skate>
+References: <1344246141-23931-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120816132839.GO22226@titan.lakedaemon.net>
+ <20120816183708.GT22226@titan.lakedaemon.net>
+ <20120817152156.4d91ba16@skate>
+ <20120819012303.GX22226@titan.lakedaemon.net>
+ <20120821114630.545fb771@skate>
+ <CABJ1b_RVaSjsneDCvejSMot0ZHDr1dmeroVRDUNMF2y83UGXNA@mail.gmail.com>
+ <20120821135045.58e2a633@skate>
+Message-ID: <CABJ1b_Tg-O6HOnrLynJv33oFYAaqSKJ+XmvwW7TzY47Q4+MhDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2012 at 04:15:37PM +0530, Sourav Poddar wrote:
+On 8/21/12, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+> Ok, I will look at your code, but the purpose of
+> PLAT_ORION/PLAT_ORION_LEGACY was not only to re-use the addr-map code,
+> but also to allow drivers to access the header files containing their
+> platform_data structure and other stuff (i.e, all the header files from
+> arch/arm/plat-orion/include/). How do you handle this problem if
+> MACH_MVEBU is not a PLAT_ORION platform?
 
-> +config MFD_SMSC
-> +       bool "Support for the SMSC ECE1099 series chips"
-> +       depends on I2C=y && MFD_CORE && REGMAP_I2C
+Hmm, ok I wasn't aware of that. But I have a bad feeling about joining
+PLAT_ORION into MACH_MVEBU if you want to have ORION replaced
+by MVEBU in the future. Maybe it is better here to put all you need into
+mach-mvebu/include/mach/legacy.h that can be easily abandoned when
+everything is ported to something more general.
 
-This needs to select REGMAP_I2C not depend on it.  REGMAP_I2C will only
-be enabled by being selected.
+I know it is code duplication but it is only for the purpose of removing
+PLAT_ORION later on.
 
-> +int smsc_read(struct device *child, unsigned int reg,
-> +	unsigned int *dest)
-> +{
-> +	struct smsc     *smsc = dev_get_drvdata(child->parent);
-> +
-> +	return regmap_read(smsc->regmap, reg, dest);
-> +}
-> +EXPORT_SYMBOL_GPL(smsc_read);
-
-I'd suggest making these static inlines in the header given that they're
-so trivial.
-
-> +static struct regmap_config smsc_regmap_config = {
-> +		.reg_bits = 8,
-> +		.val_bits = 8,
-> +		.cache_type = REGCACHE_COMPRESSED,
-> +};
-
-Indentation is weird here.  For the cache we should have at least
-.max_register defined and given the functionality there must surely be
-some volatile registers (I'm surprised this works at all as it is, the
-cache should break things).
-
-> +	of_property_read_u32(node, "clock", &smsc->clk);
-> +
-
-This is all unconditional, there should be a dependency on this in
-Kconfig.
-
-> +	regmap_read(smsc->regmap, SMSC_DEV_ID, &ret);
-> +	dev_dbg(&i2c->dev, "SMSC Device ID: %d\n", ret);
-
-I'd make these log messages dev_info() or something.
-
-> +err:
-> +	kfree(smsc);
-
-Use devm_kzalloc() for this.
-
-> +static const struct i2c_device_id smsc_i2c_id[] = {
-> +	{ "smsc", 0},
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(i2c, smsc_i2c_id);
-
-This should probably list the part name rather than "smsc" - that seems
-far too generic a name to use, obviously smsc produce more than one
-part!
+Sebastian
