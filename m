@@ -1,61 +1,86 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 21 Aug 2012 12:28:11 +0200
-Subject: [PATCH v2 21/31] arm64: 32-bit (compat) applications support
-In-Reply-To: <201208202034.55135.arnd@arndb.de>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-22-git-send-email-catalin.marinas@arm.com>
- <20120820105308.GA906@elf.ucw.cz>
- <201208202034.55135.arnd@arndb.de>
-Message-ID: <20120821102811.GA22126@elf.ucw.cz>
+From: matthew.leach@arm.com (Matthew Leach)
+Date: Tue, 21 Aug 2012 11:18:22 +0100
+Subject: [PATCH] serial: pl011: honour serial aliases in device tree
+Message-ID: <1345544302-12406-1-git-send-email-matthew.leach@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2012-08-20 20:34:54, Arnd Bergmann wrote:
-> On Monday 20 August 2012, Pavel Machek wrote:
-> > > This patch adds support for 32-bit applications. The vectors page is a
-> > > binary blob mapped into the application user space at 0xffff0000 (the
-> > > AArch64 toolchain does not support compilation of AArch32 code). Full
-> > > compatibility with ARMv7 user space is supported. The use of deprecated
-> > > ARMv7 functionality (SWP, CP15 barriers) has been disabled by default on
-> > > AArch64 kernels and unaligned LDM/STM is not supported.
-> > > 
-> > > Please note that only the ARM 32-bit EABI is supported, so no OABI
-> > > compatibility.
-> > 
-> > > +struct compat_statfs {
-> > > +     int             f_type;
-> > > +     int             f_bsize;
-> > > +     int             f_blocks;
-> > > +     int             f_bfree;
-> > > +     int             f_bavail;
-> > > +     int             f_files;
-> > > +     int             f_ffree;
-> > > +     compat_fsid_t   f_fsid;
-> > > +     int             f_namelen;      /* SunOS ignores this field. */
-> > 
-> > I'm sure it does. But is it good comment?
-> 
-> Good catch. It seems that some of the other compat platforms (x86,
-> sparc, powerpc) have the same thing. I guess the real solution would
-> be to introduce an asm-generic/compat.h file that contains a bunch
-> of those definitions, like
-> 
-> #ifndef compat_timespec
-> struct compat_timespec {
->         compat_time_t   tv_sec;
->         s32             tv_nsec;
-> };
-> #endif
-> 
-> #ifndef compat_timeval
-> struct compat_timeval {
->         compat_time_t   tv_sec;
->         s32             tv_usec;
-> };
-> #endif
+If the order of UART nodes is changed in the device tree, then tty dev
+devices are attached to different serial ports causing the console to
+be directed to a different physical serial port. The "serial" aliases
+in the device tree should prevent this.
 
-Yes, I guess that would be very good.
-									Pavel
+This patch ensures that the UART driver creates tty devices that
+honour these aliases if a device tree is present.
+
+Signed-off-by: Matthew Leach <matthew.leach@arm.com>
+---
+ drivers/tty/serial/amba-pl011.c |   39 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 39 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index c17923e..5919599 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -52,6 +52,7 @@
+ #include <linux/scatterlist.h>
+ #include <linux/delay.h>
+ #include <linux/types.h>
++#include <linux/of_device.h>
+ #include <linux/pinctrl/consumer.h>
+ 
+ #include <asm/io.h>
+@@ -1869,6 +1870,42 @@ static struct uart_driver amba_reg = {
+ 	.cons			= AMBA_CONSOLE,
+ };
+ 
++#ifdef CONFIG_OF
++static int pl011_probe_dt_alias(int index, struct device *dev)
++{
++	struct device_node *np;
++	static bool seen_dev_with_alias = false;
++	static bool seen_dev_without_alias = false;
++	int ret = index;
++
++	np = dev->of_node;
++	if (!np)
++		return ret;
++
++	ret = of_alias_get_id(np, "serial");
++	if (IS_ERR_VALUE(ret)) {
++		seen_dev_without_alias = true;
++		ret = index;
++	} else {
++		seen_dev_with_alias = true;
++		if (ret >= ARRAY_SIZE(amba_ports) || amba_ports[ret] != NULL) {
++			dev_warn(dev, "requested serial port %d  not available.\n", ret);
++			ret = index;
++		}
++	}
++
++	if (seen_dev_with_alias && seen_dev_without_alias)
++		dev_warn(dev, "aliased and non-aliased serial devices found in device tree. Serial port enumeration may be unpredictable.\n");
++
++	return ret;
++}
++#else
++static int pl011_probe_dt_alias(int index, struct device *dev)
++{
++	return index;
++}
++#endif
++
+ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ {
+ 	struct uart_amba_port *uap;
+@@ -1891,6 +1928,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 		goto out;
+ 	}
+ 
++	i = pl011_probe_dt_alias(i, &dev->dev);
++
+ 	base = ioremap(dev->res.start, resource_size(&dev->res));
+ 	if (!base) {
+ 		ret = -ENOMEM;
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.7.0.4
