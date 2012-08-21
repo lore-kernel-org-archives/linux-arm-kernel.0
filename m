@@ -1,44 +1,28 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 21 Aug 2012 15:00:54 +0300
-Subject: [RFC/PATCH 4/4] gpio: smscece: Add support for gpio IO expander
- feature
-In-Reply-To: <CAKdam56DiFpnoQwrHe1tjQWLMy5vP9ynstNj_n=OyMxkJJAUOA@mail.gmail.com>
-References: <1345545940-2232-1-git-send-email-sourav.poddar@ti.com>
- <1345545940-2232-5-git-send-email-sourav.poddar@ti.com>
- <20120821105333.GW10347@arwen.pp.htv.fi>
- <CAKdam56DiFpnoQwrHe1tjQWLMy5vP9ynstNj_n=OyMxkJJAUOA@mail.gmail.com>
-Message-ID: <20120821120052.GD10347@arwen.pp.htv.fi>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 21 Aug 2012 14:05:22 +0200
+Subject: [PATCH v2 3/4] gpio: exynos4: skip gpiolib registration if
+ pinctrl driver is used
+In-Reply-To: <1345060656-32201-4-git-send-email-thomas.abraham@linaro.org>
+References: <1345060656-32201-1-git-send-email-thomas.abraham@linaro.org>
+ <1345060656-32201-4-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CACRpkdYc-iMgKBNfRmxUFftK78G77qQ8h_Rr5td1-95NGo7wZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Aug 15, 2012 at 9:57 PM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
 
-On Tue, Aug 21, 2012 at 05:17:37PM +0530, Poddar, Sourav wrote:
-> >> +     if (type & IRQ_TYPE_LEVEL_HIGH)
-> >> +             sg->int_lvl[bank] |= bit;
-> >> +     else if (type & IRQ_TYPE_LEVEL_LOW)
-> >> +             sg->int_lvl[bank] &= ~bit;
-> >> +     else
-> >> +             return -EINVAL;
-> >
-> > this looks wrong. You could have a user who wants to trigger on both
-> > HIGH and LOW levels, no ?
-> >
-> Yes, I think there can be a scenario where gpio_keys are attached
-> to this driver and signals a "key press" at low and "key release" at
-> high. ?
->  Will figure out a way to add support to check for case where
-> both High and low levels are used.
+> Pinctrl driver, when enabled, registers all the gpio pins and hence the
+> registration of gpio pins by this driver can be skipped.
+>
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 
-could probably be done on a separate patch, maybe... Just now I saw that
-HIGH and LOW levels use the same bit.
+> +#ifdef CONFIG_OF
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120821/c672efb3/attachment.sig>
+Wouldn't it be better to use
+#ifdef CONFIG_PINCTRL_SAMSUNG?
+
+Yours,
+Linus Walleij
