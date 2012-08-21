@@ -1,55 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 21 Aug 2012 23:01:45 +0100
-Subject: [PATCH v2 17/31] arm64: System calls handling
-In-Reply-To: <201208212014.01837.arnd@arndb.de>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <201208151422.16335.arnd@arndb.de> <20120821175122.GI12708@arm.com>
- <201208212014.01837.arnd@arndb.de>
-Message-ID: <20120821220145.GA27934@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 22 Aug 2012 00:04:23 +0200
+Subject: [PATCH v2] serial: pl011: honour serial aliases in device tree
+In-Reply-To: <1345564094-16565-1-git-send-email-matthew.leach@arm.com>
+References: <1345564094-16565-1-git-send-email-matthew.leach@arm.com>
+Message-ID: <CACRpkdbh-PhFKU54FCti-7RwQLJ8Q0d9_XLPEk5vNemjDOa-wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2012 at 09:14:01PM +0100, Arnd Bergmann wrote:
-> On Tuesday 21 August 2012, Catalin Marinas wrote:
-> > > > +asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
-> > > > +                    unsigned long prot, unsigned long flags,
-> > > > +                    unsigned long fd, off_t off)
-> > > > +{
-> > > > +   if (offset_in_page(off) != 0)
-> > > > +           return -EINVAL;
-> > > > +
-> > > > +   return sys_mmap_pgoff(addr, len, prot, flags, fd, off >> PAGE_SHIFT);
-> > > > +}
-> > > 
-> > > I think
-> > > 
-> > > #define sys_mmap sys_mmap_pgoff 
-> > 
-> > There are slightly different semantics with the last argument of
-> > sys_mmap() which takes a byte offset. The sys_mmap_pgoff() function
-> > takes the offset shifted by PAGE_SHIFT (which is the same as sys_mmap2).
-> > 
-> > Looking at the other architectures, it makes sense to use a generic
-> > sys_mmap() implementation similar to the one above (or the ia-64, seems
-> > to be the most complete).
-> 
-> Why that? The generic sys_mmap_pgoff was specifically added so new architectures
-> could just use that instead of having their own wrappers, see f8b72560.
+On Tue, Aug 21, 2012 at 5:48 PM, Matthew Leach <matthew.leach@arm.com> wrote:
 
-As I understand, sys_mmap_pgoff can be used instead of sys_mmap2 on new
-32-bit architectures. But on 64-bit architectures we don't have
-sys_mmap2, only sys_mmap with the difference that the last argument is
-the offset in bytes (and multiple of PAGE_SIZE) rather than in pages. So
-unless we change the meaning of this last argument for sys_mmap, we
-cannot just define it to sys_mmap_pgoff.
+> If the order of UART nodes is changed in the device tree, then tty dev
+> devices are attached to different serial ports causing the console to
+> be directed to a different physical serial port. The "serial" aliases
+> in the device tree should prevent this.
+>
+> This patch ensures that the UART driver creates tty devices that
+> honour these aliases if a device tree is present.
+>
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Matthew Leach <matthew.leach@arm.com>
+> ---
+> v2: use IS_ENABLED instead of ifdefs
 
-Since the other 64-bit architectures seem to have a sys_mmap wrapper
-that does this:
+Looks good to me.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-	sys_mmap_pgoff(..., off >> PAGE_SHIFT);
-
-I think AArch64 should also use the same sys_mmap convention. We can
-make this wrapper generic.
-
--- 
-Catalin
+Yours,
+Linus Walleij
