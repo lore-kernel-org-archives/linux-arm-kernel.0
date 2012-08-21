@@ -1,66 +1,45 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Tue, 21 Aug 2012 16:15:33 +0530
-Subject: [PATCH v6 05/10] ARM: OMAP2+: gpmc: find features by ip rev check
-In-Reply-To: <cover.1345524670.git.afzal@ti.com>
-References: <cover.1345524670.git.afzal@ti.com>
-Message-ID: <0b211272d0d6f9281df7db400cb2d6a968b31222.1345524670.git.afzal@ti.com>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Tue, 21 Aug 2012 16:15:36 +0530
+Subject: [PATCH 0/4] Add mfd driver for smsc-ece1099 chip
+Message-ID: <1345545940-2232-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Newer IP's have wr_access and wr_data_mux_bus fields. Use
-IP revision values to determine availability of these
-fields and hence decide on whether to configure them.
+Add a smsc-ece1099 mfd driver which will work as 
+keypad scan device or a gpio expander device.
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/mach-omap2/gpmc.c |   12 ++++++++++--
- 1 files changed, 10 insertions(+), 2 deletions(-)
+Patch 1 creates the parent mfd driver.
+Patch 2 add keypad support. Patch 3 adds dts
+support for keypad in omap5 dts file.
+Patch 4 add gpio expansion driver for chip (RFC).
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 070fac5..68123d0 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -85,6 +85,11 @@
- #define ENABLE_PREFETCH		(0x1 << 7)
- #define DMA_MPU_MODE		2
- 
-+#define	GPMC_REVISION_MAJOR(l)		((l >> 4) & 0xf)
-+
-+#define	GPMC_HAS_WR_ACCESS		0x1
-+#define	GPMC_HAS_WR_DATA_MUX_BUS	0x2
-+
- /* XXX: Only NAND irq has been considered,currently these are the only ones used
-  */
- #define	GPMC_NR_IRQ		2
-@@ -131,6 +136,7 @@ static DEFINE_SPINLOCK(gpmc_mem_lock);
- static unsigned int gpmc_cs_map;	/* flag for cs which are initialized */
- static int gpmc_ecc_used = -EINVAL;	/* cs using ecc engine */
- 
-+static unsigned gpmc_capability;
- static void __iomem *gpmc_base;
- 
- static struct clk *gpmc_l3_clk;
-@@ -356,10 +362,10 @@ int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t)
- 	GPMC_SET_ONE(GPMC_CS_CONFIG1, 18, 19, wait_monitoring);
- 	GPMC_SET_ONE(GPMC_CS_CONFIG1, 25, 26, clk_activation);
- 
--	if (cpu_is_omap34xx()) {
-+	if (gpmc_capability & GPMC_HAS_WR_DATA_MUX_BUS)
- 		GPMC_SET_ONE(GPMC_CS_CONFIG6, 16, 19, wr_data_mux_bus);
-+	if (gpmc_capability & GPMC_HAS_WR_ACCESS)
- 		GPMC_SET_ONE(GPMC_CS_CONFIG6, 24, 28, wr_access);
--	}
- 
- 	/* caller is expected to have initialized CONFIG1 to cover
- 	 * at least sync vs async
-@@ -922,6 +928,8 @@ static int __init gpmc_init(void)
- 	clk_enable(gpmc_l3_clk);
- 
- 	l = gpmc_read_reg(GPMC_REVISION);
-+	if (GPMC_REVISION_MAJOR(l) > 0x4)
-+		gpmc_capability = GPMC_HAS_WR_ACCESS | GPMC_HAS_WR_DATA_MUX_BUS;
- 	printk(KERN_INFO "GPMC revision %d.%d\n", (l >> 4) & 0x0f, l & 0x0f);
- 	/* Set smart idle mode and automatic L3 clock gating */
- 	l = gpmc_read_reg(GPMC_SYSCONFIG);
--- 
-1.7.1
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+
+G, Manjunath Kondaiah (1):
+  Input: keypad: Add smsc ece1099 keypad driver
+
+Sourav Poddar (3):
+  mfd: smsc: Add support for smsc gpio io/keypad driver
+  arm/dts: omap5-evm: Add keypad support
+  gpio: smscece: Add support for gpio IO expander feature
+
+ Documentation/smsc_ece1099.txt               |   56 ++++
+ arch/arm/boot/dts/omap5-evm.dts              |   95 +++++++
+ drivers/gpio/Kconfig                         |    7 +
+ drivers/gpio/Makefile                        |    1 +
+ drivers/gpio/gpio-smscece.c                  |  373 ++++++++++++++++++++++++++
+ drivers/input/keyboard/Kconfig               |   11 +
+ drivers/input/keyboard/Makefile              |    1 +
+ drivers/input/keyboard/smsc-ece1099-keypad.c |  308 +++++++++++++++++++++
+ drivers/mfd/Kconfig                          |   10 +
+ drivers/mfd/Makefile                         |    1 +
+ drivers/mfd/smsc-ece1099.c                   |  139 ++++++++++
+ include/linux/mfd/smsc.h                     |   89 ++++++
+ 12 files changed, 1091 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/smsc_ece1099.txt
+ create mode 100644 drivers/gpio/gpio-smscece.c
+ create mode 100644 drivers/input/keyboard/smsc-ece1099-keypad.c
+ create mode 100644 drivers/mfd/smsc-ece1099.c
+ create mode 100644 include/linux/mfd/smsc.h
