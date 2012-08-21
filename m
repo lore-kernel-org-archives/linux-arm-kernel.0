@@ -1,52 +1,98 @@
-From: bill4carson@gmail.com (bill4carson)
-Date: Tue, 21 Aug 2012 09:55:17 +0800
-Subject: ARM hugetlb support?
-In-Reply-To: <CANOLnOPLLQ=Cy5rvf5J7R96whrvLKO4HW9nVn4rQXqXCTVgCPA@mail.gmail.com>
-References: <CANOLnOPLLQ=Cy5rvf5J7R96whrvLKO4HW9nVn4rQXqXCTVgCPA@mail.gmail.com>
-Message-ID: <5032EA85.9030404@gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 21 Aug 2012 09:56:02 +0800
+Subject: [PATCH 2/3] ARM: PRIMA2: make mach-prima2 common for all SiRF
+ series SoC
+In-Reply-To: <201208202106.43206.arnd@arndb.de>
+References: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
+ <1345450787-17246-3-git-send-email-Barry.Song@csr.com>
+ <201208202106.43206.arnd@arndb.de>
+Message-ID: <CAGsJ_4ynJjm6WuA6NGZdOgj80Xc=ZxKcRatQuEacVW=EXuxh=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2012?08?20? 07:18, Grazvydas Ignotas wrote:
-> Hello,
+2012/8/21 Arnd Bergmann <arnd@arndb.de>:
+> On Monday 20 August 2012, Barry Song wrote:
+>> From: Barry Song <Baohua.Song@csr.com>
+>>
+>> We will have SiRF Marco and Polo, so rename the dir to mach-sirf
+>> and add Kconfig menu
+>>
+>> Signed-off-by: Baohua Song <Baohua.Song@csr.com>
+>> ---
+>>  arch/arm/Kconfig                                   |   10 +++++-----
+>>  arch/arm/Makefile                                  |    2 +-
+>>  arch/arm/mach-sirf/Kconfig                         |   16 ++++++++++++++++
+>>  arch/arm/{mach-prima2 => mach-sirf}/Makefile       |    0
+>>  arch/arm/{mach-prima2 => mach-sirf}/Makefile.boot  |    0
+>>  .../arm/{mach-prima2 => mach-sirf}/board-generic.c |    0
+>>  arch/arm/{mach-prima2 => mach-sirf}/common.h       |    0
+>>  .../include/mach/clkdev.h                          |    0
+>>  .../include/mach/debug-macro.S                     |    0
+>>  .../include/mach/entry-macro.S                     |    0
+>>  .../{mach-prima2 => mach-sirf}/include/mach/gpio.h |    0
+>>  .../include/mach/hardware.h                        |    0
+>>  .../{mach-prima2 => mach-sirf}/include/mach/irqs.h |    0
+>>  .../{mach-prima2 => mach-sirf}/include/mach/map.h  |    0
 >
-> We are developing an application that's drawing various geometry on
-> 1024x1024 framebuffer (lines, triangles, etc) and is running on
-> Cortex-A8 CPU. It seems this kind of application is suffering badly
-> from TLB misses, as A8 only has 32 entry TLB cache.
->
-> I've found that hugetlb support patches have been posted some months
-> ago [1]. I've been testing them with very good results [2]. Are there
-> still plans to further develop them and eventually merge them?
->
-Hi, Grazvydas
+> I'm not sure if we should rename all of these right now. I've been thinking
+> about moving all of recent and simple ARMv7 based platforms (socfpga, zynq,
+> prima2, ...) into a single directory, where they would basically end up
+> being one file per platform. We should discuss this at the ARM mini summit,
+> and I can let you know the outcome of it. I don't object on the rename in
+> principle, but it might end up causing extra churn.
 
-I'm glad you got performance boost with my hugetlb patch!
-
-It's a pity this patch series probably will not be developed.
-I really don't have much time to continue with the development,
-especially provide statistics how arm huge tlb could be tunned
-well to produce better performance, that's based on much testing
-and also application specific.
-
-Anyway, query and discussion are always welcome.
+ok. i will follow the output of  ARM mini summit.
 
 >
-> [1] http://marc.info/?l=linux-arm-kernel&m=132912620601308&w=2
-> [2] Cycle measurements of rendering full scene (using cycle counter in
-> A8), x1000 cycles:
+>> +if ARCH_SIRF
+>> +
+>> +choice
+>> +       prompt "Qualcomm SiRF SoC Type"
+>> +       default ARCH_PRIMA2
 >
->         normal hugetlb improvement
-> scene1 28507  21351   34%
-> scene2 11710  10138   16%
-> scene3 17178  13631   26%
-> scene4 4372   3810    15%
-> scene5 3525   3255    8%
+> I'm curious about this: I did read that Samsung acquired CSR, and
+> you list the chips as Qualcomm. What's the story here?
+
+sorry. this is typo.
+prompt "Qualcomm SiRF SoC Type"
+->
+prompt "CSR SiRF SoC Type"
+
+>
+>> +config ARCH_PRIMA2
+>> +       bool "CSR SiRFSoC PRIMA2 ARM Cortex A9 Platform"
+>> +       select CPU_V7
+>> +       select ZONE_DMA
+>> +       help
+>> +          Support for CSR SiRFSoC ARM Cortex A9 Platform
+>> +
+>> +endchoice
+>
+> Is this still needed? When you add other SoC type here, would you
+> build kernels that are for just one of them in practice?  If they
+> are completely generic anyway, you can skip the submenu.
 >
 
--- 
-Love each day!
+for the moment, that is needed just because the DEBUG UART base
+address is difficult for different SoC. debug-macro.S is very early,
+it depends on the SIRFSOC_UART1_PA_BASE.
 
---bill
+ /* UART-1: used as serial debug port */
+ #ifdef CONFIG_ARCH_PRIMA2
+#define SIRFSOC_UART1_PA_BASE          0xb0060000
+ #elif defined(CONFIG_ARCH_MARCO)
+#define SIRFSOC_UART1_PA_BASE          0xcc060000
+#endif
+otherwise, PRIMA2 and MARCO can co-exist.
+
+i think i can find some ways to set the rp dynamically according to chip type.
+         .macro  addruart, rp, rv, tmp
+         ldr     \rp, =SIRFSOC_UART1_PA_BASE             @ physical
+         ldr     \rv, =SIRFSOC_UART1_VA_BASE             @ virtual
+         .endm
+
+
+>         Arnd
+>
+
+-barry
