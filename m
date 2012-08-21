@@ -1,46 +1,36 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 21 Aug 2012 08:16:37 -0500
-Subject: [PATCH 1/6] gpio/mxs: adopt irq_domain support for mxs gpio driver
-In-Reply-To: <CACRpkda2hc2eZaFqRfAPEG7KfLd3mFFdWze=V45=w84nRPqijA@mail.gmail.com>
-References: <1345472400-31262-1-git-send-email-shawn.guo@linaro.org>
- <1345472400-31262-2-git-send-email-shawn.guo@linaro.org>
- <CACRpkda2hc2eZaFqRfAPEG7KfLd3mFFdWze=V45=w84nRPqijA@mail.gmail.com>
-Message-ID: <50338A35.9070803@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 21 Aug 2012 14:22:22 +0100
+Subject: [PATCH 1/4] mfd: smsc: Add support for smsc gpio io/keypad driver
+In-Reply-To: <20120821124243.GG10347@arwen.pp.htv.fi>
+References: <1345545940-2232-1-git-send-email-sourav.poddar@ti.com>
+ <1345545940-2232-2-git-send-email-sourav.poddar@ti.com>
+ <20120821124146.GA21557@sirena.org.uk>
+ <20120821124243.GG10347@arwen.pp.htv.fi>
+Message-ID: <20120821132222.GF7995@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2012 08:01 AM, Linus Walleij wrote:
-> On Mon, Aug 20, 2012 at 4:19 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> 
->> Remove irq_domain_add_legacy call from mach-mxs.c and have the gpio
->> driver adopt irqdomain support, so that we can have the mapping
->> between gpio and irq number available without using virtual_irq_start
->> and MXS_GPIO_IRQ_START.
-> 
-> Seems like a good thing to do, but with Grant and Rob being better at
-> irqdomain than me I'd prefer one of them to have a look at this too.
-> 
->> +       irq_base = irq_alloc_descs(-1, 0, 32, numa_node_id());
->> +       if (irq_base < 0)
->> +               return irq_base;
->> +
->> +       port->domain = irq_domain_add_legacy(np, 32, irq_base, 0,
->> +                                            &irq_domain_simple_ops, NULL);
-> 
-> For example I want to understand if it'd be possible to use a
-> linear domain here.
+On Tue, Aug 21, 2012 at 03:42:45PM +0300, Felipe Balbi wrote:
+> On Tue, Aug 21, 2012 at 01:41:46PM +0100, Mark Brown wrote:
+> > > +	regmap_read(smsc->regmap, SMSC_DEV_ID, &ret);
+> > > +	dev_dbg(&i2c->dev, "SMSC Device ID: %d\n", ret);
 
-Unfortunately, not if you care about your irq base and need sequential
-irq numbers which is the case for non-DT.
+> > I'd make these log messages dev_info() or something.
 
-Rob
+> dev_info() ? It'lll just make boot noisier for no good reason. Which
+> user wants to see this during boot up ? That's a debugging feature for
+> develop IMHO.
 
-> 
-> Yours,
-> Linus Walleij
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Most of the registers appeared to be chip revision information which is
+most definitely useful to tell people about, though possibly with neater
+formatting ("why is this batch of boards failing...  oh, right").  If
+they're fixed device IDs then the driver should instead be verifying
+that the registers contain the expected values and bombing out if they
+don't.  Either way dev_dbg() isn't too helpful.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120821/53e02add/attachment.sig>
