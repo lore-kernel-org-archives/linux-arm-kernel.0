@@ -1,78 +1,52 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 21 Aug 2012 09:49:04 +0800
-Subject: [PATCH 1/3] ARM: PRIMA2: use DT_MACHINE_START and convert to
- generic board
-In-Reply-To: <201208202056.28361.arnd@arndb.de>
-References: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
- <1345450787-17246-2-git-send-email-Barry.Song@csr.com>
- <201208202056.28361.arnd@arndb.de>
-Message-ID: <CAGsJ_4wR1dU05QutVeKHephDmSpSKOki1+AGZVV95hf3ABePDA@mail.gmail.com>
+From: bill4carson@gmail.com (bill4carson)
+Date: Tue, 21 Aug 2012 09:55:17 +0800
+Subject: ARM hugetlb support?
+In-Reply-To: <CANOLnOPLLQ=Cy5rvf5J7R96whrvLKO4HW9nVn4rQXqXCTVgCPA@mail.gmail.com>
+References: <CANOLnOPLLQ=Cy5rvf5J7R96whrvLKO4HW9nVn4rQXqXCTVgCPA@mail.gmail.com>
+Message-ID: <5032EA85.9030404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/8/21 Arnd Bergmann <arnd@arndb.de>:
-> On Monday 20 August 2012, Barry Song wrote:
->> From: Barry Song <Baohua.Song@csr.com>
->>
->> we will have SiRFMarco and SiRFPolo, all of them will be in the
->> generic board.
->>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> ---
->>  arch/arm/mach-prima2/Makefile                      |    2 +-
->>  arch/arm/mach-prima2/{prima2.c => board-generic.c} |   10 ++++++----
->>  2 files changed, 7 insertions(+), 5 deletions(-)
->>  rename arch/arm/mach-prima2/{prima2.c => board-generic.c} (81%)
->
-> I would prefer not to have a board-* file in there, because it's not
-> specific to a board. If you want to get rid of the prima2 name in it,
-> you can call it common.c.
 
-that is fine to me. i rename to board-generic.c just because omap and
-some others did like that.
-and i'll add marco and polo DT_MACHINE_START to this file too.
 
+On 2012?08?20? 07:18, Grazvydas Ignotas wrote:
+> Hello,
 >
->> diff --git a/arch/arm/mach-prima2/prima2.c b/arch/arm/mach-prima2/board-generic.c
->> similarity index 81%
->> rename from arch/arm/mach-prima2/prima2.c
->> rename to arch/arm/mach-prima2/board-generic.c
->> index e9a17ae..f06b887 100644
->> --- a/arch/arm/mach-prima2/prima2.c
->> +++ b/arch/arm/mach-prima2/board-generic.c
->> @@ -30,12 +30,13 @@ void __init sirfsoc_init_late(void)
->>       sirfsoc_pm_init();
->>  }
->>
->> -static const char *prima2cb_dt_match[] __initdata = {
->> -       "sirf,prima2-cb",
->> +#ifdef CONFIG_ARCH_PRIMA2
->> +static const char *prima2_dt_match[] __initdata = {
->> +       "sirf,prima2",
->>         NULL
->>  };
->>
->> -MACHINE_START(PRIMA2_EVB, "prima2cb")
->> +DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
->>       /* Maintainer: Barry Song <baohua.song@csr.com> */
->>       .atag_offset    = 0x100,
->>       .map_io         = sirfsoc_map_lluart,
->> @@ -44,6 +45,7 @@ MACHINE_START(PRIMA2_EVB, "prima2cb")
->>       .dma_zone_size  = SZ_256M,
->>       .init_machine   = sirfsoc_mach_init,
->>       .init_late      = sirfsoc_init_late,
->> -     .dt_compat      = prima2cb_dt_match,
->> +     .dt_compat      = prima2_dt_match,
->>       .restart        = sirfsoc_restart,
->>  MACHINE_END
->> +#endif
+> We are developing an application that's drawing various geometry on
+> 1024x1024 framebuffer (lines, triangles, etc) and is running on
+> Cortex-A8 CPU. It seems this kind of application is suffering badly
+> from TLB misses, as A8 only has 32 entry TLB cache.
 >
-> I suppose this never really worked before then?
+> I've found that hugetlb support patches have been posted some months
+> ago [1]. I've been testing them with very good results [2]. Are there
+> still plans to further develop them and eventually merge them?
+>
+Hi, Grazvydas
 
-i am not sure what you mean, but this does work and i tested and found
-prima2 can boot normally.
+I'm glad you got performance boost with my hugetlb patch!
+
+It's a pity this patch series probably will not be developed.
+I really don't have much time to continue with the development,
+especially provide statistics how arm huge tlb could be tunned
+well to produce better performance, that's based on much testing
+and also application specific.
+
+Anyway, query and discussion are always welcome.
 
 >
->         Arnd
+> [1] http://marc.info/?l=linux-arm-kernel&m=132912620601308&w=2
+> [2] Cycle measurements of rendering full scene (using cycle counter in
+> A8), x1000 cycles:
+>
+>         normal hugetlb improvement
+> scene1 28507  21351   34%
+> scene2 11710  10138   16%
+> scene3 17178  13631   26%
+> scene4 4372   3810    15%
+> scene5 3525   3255    8%
+>
 
--barry
+-- 
+Love each day!
+
+--bill
