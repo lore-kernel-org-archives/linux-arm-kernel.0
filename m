@@ -1,40 +1,31 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 21 Aug 2012 16:48:58 +0200
-Subject: [PATCH 0/4] Per device coherent DMA map ops
-In-Reply-To: <201208202006.24851.arnd@arndb.de>
-References: <1344916147-13546-1-git-send-email-robherring2@gmail.com>
- <000601cd7ede$5d2ef390$178cdab0$%szyprowski@samsung.com>
- <50324F9A.5000608@gmail.com> <201208202006.24851.arnd@arndb.de>
-Message-ID: <00c201cd7fac$1abf75b0$503e6110$%szyprowski@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 21 Aug 2012 15:50:09 +0100
+Subject: [RFC/PATCH 4/4] gpio: smscece: Add support for gpio IO
+ expander feature
+In-Reply-To: <20120821122217.GF10347@arwen.pp.htv.fi>
+References: <1345545940-2232-1-git-send-email-sourav.poddar@ti.com>
+ <1345545940-2232-5-git-send-email-sourav.poddar@ti.com>
+ <20120821105333.GW10347@arwen.pp.htv.fi>
+ <CAKdam56DiFpnoQwrHe1tjQWLMy5vP9ynstNj_n=OyMxkJJAUOA@mail.gmail.com>
+ <20120821120052.GD10347@arwen.pp.htv.fi>
+ <CAKdam55SqXiCGv766yxoY1GdDjxNCYNaDdNZPaeLTAXc+3+c6g@mail.gmail.com>
+ <20120821122217.GF10347@arwen.pp.htv.fi>
+Message-ID: <20120821145009.GE21557@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Aug 21, 2012 at 03:22:18PM +0300, Felipe Balbi wrote:
+> On Tue, Aug 21, 2012 at 05:50:28PM +0530, Poddar, Sourav wrote:
 
-On Monday, August 20, 2012 10:06 PM Arnd Bergmann wrote:
+> > If I am understanding correctly, if they both uses the same bit we cannot
+> > use both for a particular user. ?
 
-> On Monday 20 August 2012, Rob Herring wrote:
-> > >
-> > > I like those patches and I would like to take it to my dma-mapping-next tree, but I wonder
-> > > how to handle merging of the last patch. Arnd, Olof - could You tell me how to do it? I
-> assume
-> > > that it should be somehow merged by arm-soc tree, so it depends on the earlier patches.
-> > > Would it be enough if I take them to the topic branch? Then I can continue works on
-> > > dma-mapping subsystem by merging that topic branch to my dma-mapping-next and you will
-> > > also take it as a dependency for highbank patches. Am I right?
-> > >
-> >
-> > I'm fine with it all going in thru your tree. Seems a bit silly to deal
-> > with tracking the dependencies all for 1 patch. The only possible
-> > conflict I see is with the dts file and some other SATA related changes
-> > which will go in via the ata tree. But the merge is trivial and the
-> > conflict will be there either with your tree or arm-soc.
-> 
-> Right. I see no problem having this patch go through the dma-mapping tree.
+> we can, it's just a bit more complex. If a user request both LOW and
+> HIGH, then you start with HIGH, once it triggers, before calling the
+> nested IRQ handler, you need to change it LOW. When low triggers, before
+> calling the nested IRQ handler, you need to change it to HIGH again. And
+> so on. I'm just not sure if that's valid on linux IRQ subsystem.
 
-Ok, I've took them to my dma-mapping-next tree and I will handle pushing them to Linus.
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+The given example was for keypress - usually a system would use edge
+triggered interrupts in combination with reading the GPIO state rather
+than level triggered interrupts.
