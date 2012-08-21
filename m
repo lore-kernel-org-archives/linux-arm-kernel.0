@@ -1,46 +1,129 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 21 Aug 2012 21:42:04 +0100
-Subject: [PATCH v2] serial: pl011: honour serial aliases in device tree
-In-Reply-To: <1345564094-16565-1-git-send-email-matthew.leach@arm.com>
-References: <1345564094-16565-1-git-send-email-matthew.leach@arm.com>
-Message-ID: <20120821204204.GA8316@mudshark.cambridge.arm.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 22 Aug 2012 08:47:32 +1200
+Subject: [PATCHv3 3/9] serial: vt8500: Add devicetree support for vt8500-serial
+In-Reply-To: <1345582058-2291-1-git-send-email-linux@prisktech.co.nz>
+References: <1345582058-2291-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1345582058-2291-4-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthew,
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ drivers/tty/serial/vt8500_serial.c |   37 ++++++++++++++++++++++++++++++++----
+ 1 file changed, 33 insertions(+), 4 deletions(-)
 
-On Tue, Aug 21, 2012 at 04:48:14PM +0100, Matthew Leach wrote:
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index d3553b5..33c90f6 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -52,6 +52,8 @@
->  #include <linux/scatterlist.h>
->  #include <linux/delay.h>
->  #include <linux/types.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
->  #include <linux/pinctrl/consumer.h>
->  #include <linux/sizes.h>
->  
-> @@ -1869,6 +1871,38 @@ static struct uart_driver amba_reg = {
->  	.cons			= AMBA_CONSOLE,
->  };
->  
-> +static int pl011_probe_dt_alias(int index, struct device *dev)
-> +{
-> +	struct device_node *np;
-> +	static bool seen_dev_with_alias = false;
-> +	static bool seen_dev_without_alias = false;
-> +	int ret = index;
-> +
-> +	if (!IS_ENABLED(CONFIG_OF))
-> +		return index;
-
-May as well return ret here for consistency. With that:
-
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-
-I guess this goes via Greg's tree rather than the ARM one?
-
-Will
+diff --git a/drivers/tty/serial/vt8500_serial.c b/drivers/tty/serial/vt8500_serial.c
+index 2be006f..72e32db 100644
+--- a/drivers/tty/serial/vt8500_serial.c
++++ b/drivers/tty/serial/vt8500_serial.c
+@@ -34,6 +34,7 @@
+ #include <linux/slab.h>
+ #include <linux/clk.h>
+ #include <linux/platform_device.h>
++#include <linux/of.h>
+ 
+ /*
+  * UART Register offsets
+@@ -76,6 +77,8 @@
+ #define RX_FIFO_INTS	(RXFAF | RXFF | RXOVER | PER | FER | RXTOUT)
+ #define TX_FIFO_INTS	(TXFAE | TXFE | TXUDR)
+ 
++#define VT8500_MAX_PORTS	6
++
+ struct vt8500_port {
+ 	struct uart_port	uart;
+ 	char			name[16];
+@@ -83,6 +86,13 @@ struct vt8500_port {
+ 	unsigned int		ier;
+ };
+ 
++/*
++ * we use this variable to keep track of which ports
++ * have been allocated as we can't use pdev->id in
++ * devicetree
++ */
++static unsigned long vt8500_ports_in_use;
++
+ static inline void vt8500_write(struct uart_port *port, unsigned int val,
+ 			     unsigned int off)
+ {
+@@ -431,7 +441,7 @@ static int vt8500_verify_port(struct uart_port *port,
+ 	return 0;
+ }
+ 
+-static struct vt8500_port *vt8500_uart_ports[4];
++static struct vt8500_port *vt8500_uart_ports[VT8500_MAX_PORTS];
+ static struct uart_driver vt8500_uart_driver;
+ 
+ #ifdef CONFIG_SERIAL_VT8500_CONSOLE
+@@ -549,6 +559,7 @@ static int __devinit vt8500_serial_probe(struct platform_device *pdev)
+ 	struct vt8500_port *vt8500_port;
+ 	struct resource *mmres, *irqres;
+ 	int ret;
++	int port;
+ 
+ 	mmres = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	irqres = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+@@ -559,13 +570,25 @@ static int __devinit vt8500_serial_probe(struct platform_device *pdev)
+ 	if (!vt8500_port)
+ 		return -ENOMEM;
+ 
++	/* calculate the port id */
++	port = find_first_zero_bit(&vt8500_ports_in_use,
++				sizeof(vt8500_ports_in_use));
++	if (port > VT8500_MAX_PORTS)
++		return -ENODEV;
++
++	/* reserve the port id */
++	if (test_and_set_bit(port, &vt8500_ports_in_use)) {
++		/* port already in use - shouldn't really happen */
++		return -EBUSY;
++	}
++
+ 	vt8500_port->uart.type = PORT_VT8500;
+ 	vt8500_port->uart.iotype = UPIO_MEM;
+ 	vt8500_port->uart.mapbase = mmres->start;
+ 	vt8500_port->uart.irq = irqres->start;
+ 	vt8500_port->uart.fifosize = 16;
+ 	vt8500_port->uart.ops = &vt8500_uart_pops;
+-	vt8500_port->uart.line = pdev->id;
++	vt8500_port->uart.line = port;
+ 	vt8500_port->uart.dev = &pdev->dev;
+ 	vt8500_port->uart.flags = UPF_IOREMAP | UPF_BOOT_AUTOCONF;
+ 	vt8500_port->uart.uartclk = 24000000;
+@@ -579,7 +602,7 @@ static int __devinit vt8500_serial_probe(struct platform_device *pdev)
+ 		goto err;
+ 	}
+ 
+-	vt8500_uart_ports[pdev->id] = vt8500_port;
++	vt8500_uart_ports[port] = vt8500_port;
+ 
+ 	uart_add_one_port(&vt8500_uart_driver, &vt8500_port->uart);
+ 
+@@ -603,12 +626,18 @@ static int __devexit vt8500_serial_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id wmt_dt_ids[] = {
++	{ .compatible = "via,vt8500-uart", },
++	{}
++};
++
+ static struct platform_driver vt8500_platform_driver = {
+ 	.probe  = vt8500_serial_probe,
+ 	.remove = __devexit_p(vt8500_serial_remove),
+ 	.driver = {
+ 		.name = "vt8500_serial",
+ 		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(wmt_dt_ids),
+ 	},
+ };
+ 
+@@ -642,4 +671,4 @@ module_exit(vt8500_serial_exit);
+ 
+ MODULE_AUTHOR("Alexey Charkov <alchark@gmail.com>");
+ MODULE_DESCRIPTION("Driver for vt8500 serial device");
+-MODULE_LICENSE("GPL");
++MODULE_LICENSE("GPL v2");
+-- 
+1.7.9.5
