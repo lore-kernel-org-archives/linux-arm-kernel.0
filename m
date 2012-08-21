@@ -1,29 +1,38 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 21 Aug 2012 09:29:48 +0200
-Subject: [RFC] Add support for Aurora L2 Cache Controller
-In-Reply-To: <CAHkRjk4qPPktXsqnRaZLG0Z=VMH_Qf6xRdQBPMvxC20m6noc+A@mail.gmail.com>
-References: <1344438307-8468-1-git-send-email-gregory.clement@free-electrons.com>
- <CAHkRjk4qPPktXsqnRaZLG0Z=VMH_Qf6xRdQBPMvxC20m6noc+A@mail.gmail.com>
-Message-ID: <503338EC.4070303@free-electrons.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 21 Aug 2012 09:31:25 +0200
+Subject: [PATCH 3/3] ARM: Kirkwood: increase atomic coherent pool size
+In-Reply-To: <20120820231419.GB755@harshnoise.musicnaut.iki.fi>
+References: <1345459648-24263-1-git-send-email-m.szyprowski@samsung.com>
+ <1345459648-24263-4-git-send-email-m.szyprowski@samsung.com>
+ <20120820231419.GB755@harshnoise.musicnaut.iki.fi>
+Message-ID: <000301cd7f6e$fc925130$f5b6f390$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2012 05:16 PM, Catalin Marinas wrote:> On 8 August 2012 16:05, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->> - two flavors of the controller 'outer cache' and 'system cache' (the
->>   last one meaning maintenance operations on L1 are broadcasted to the
->>   L2 and L2 performs the same operation).
->
-> BTW, is the DSB also transparently handled by the L2 in 'system cache' mode?
->
+Hello,
 
-The information I have is that from the point view of the software
-there is no need to take any extra actions when using this kind of
-command, everything is handle by the hardware. So I guess that the
-answer to your question should be yes.
+On Tuesday, August 21, 2012 1:14 AM Aaro Koskinen wrote:
 
----
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> On Mon, Aug 20, 2012 at 12:47:28PM +0200, Marek Szyprowski wrote:
+> > The default 256 KiB coherent pool may be too small for some of the Kirkwood
+> > devices, so increase it to make sure that devices will be able to allocate
+> > their buffers with GFP_ATOMIC flag.
+> [...]
+> > +	/*
+> > +	 * Some Kirkwood devices allocate their coherent buffers from atomic
+> > +	 * context. Increase size of atomic coherent pool to make sure such
+> > +	 * the allocations won't fail.
+> > +	 */
+> > +	init_dma_coherent_pool_size(SZ_1M);
+> 
+> Not sure if it's a valid use case, but what if some user wants to drop
+> e.g. SATA driver and and free up some memory. Would a smaller coherent
+> pool kernel parameter override this code in that case?
+
+Kernel command line parameter always overrides the value set by platform code
+(or the default 256KiB).
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
