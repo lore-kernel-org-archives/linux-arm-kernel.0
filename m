@@ -1,41 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 21 Aug 2012 12:51:24 +0100
-Subject: [PATCH 1/1] ASoC: codecs: Enable AB8500 CODEC for Device Tree
-In-Reply-To: <20120820143653.GE26991@opensource.wolfsonmicro.com>
-References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
- <1344527268-5964-9-git-send-email-lee.jones@linaro.org>
- <s5h628lu0q9.wl%tiwai@suse.de> <20120820113427.GN8450@gmail.com>
- <20120820143653.GE26991@opensource.wolfsonmicro.com>
-Message-ID: <20120821115123.GE26899@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 21 Aug 2012 14:54:27 +0300
+Subject: [RFC/PATCH 02/13] serial: omap: always return IRQ_HANDLED
+In-Reply-To: <20120821125005.235926e0@bob.linux.org.uk>
+References: <1345540555-24359-1-git-send-email-balbi@ti.com>
+ <1345540555-24359-3-git-send-email-balbi@ti.com>
+ <20120821125005.235926e0@bob.linux.org.uk>
+Message-ID: <20120821115426.GC10347@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 03:36:53PM +0100, Mark Brown wrote:
-> On Mon, Aug 20, 2012 at 12:34:31PM +0100, Lee Jones wrote:
-> > From: Lee Jones <lee.jones@linaro.org>
-> > Date: Fri, 27 Jul 2012 08:50:05 +0100
-> > Subject: [PATCH 1/1] ASoC: codecs: Enable AB8500 CODEC for Device Tree
-> > 
-> > We continue to allow the AB8500 CODEC to be registered via the AB8500
-> > Multi Functional Device API, only this time we extract its configuration
-> > from the Device Tree binary.
+On Tue, Aug 21, 2012 at 12:50:05PM +0100, Alan Cox wrote:
+> On Tue, 21 Aug 2012 12:15:44 +0300
+> Felipe Balbi <balbi@ti.com> wrote:
 > 
-> Please resend this series with all the acks you've got rather than
-> mixing incremental updates in like this.
+> > Even if we enter our IRQ handler just to notice
+> > that the our device didn't generate the IRQ,
+> > that still means "handling" and IRQ, so let's
+> > return IRQ_HANDLED.
+> 
+> That looks wrong - you'll defeat the stuck IRQ protection. If we didn't
+> cause the IRQ then we are IRQ_NONE ?
 
-I'm waiting until I have a few more Acks before I resend the entire
-patch-set again. Actually it's you and one other that I'm waiting for
-to review (and Ack as necessary) the ones requested by Linus, then 
-resend with the corrections.
-
-> Please also send patches in
-> the format documented in SubmittingPatches.
-
-That's a big document, most of which I guess I'm adhering to. Care to
-be a little more specific?
+that's true. I'll drop this patch from the list. My bad.
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120821/3c2e60a4/attachment.sig>
