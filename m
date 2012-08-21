@@ -1,31 +1,50 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Tue, 21 Aug 2012 14:59:45 +0200
-Subject: [PATCHv6 2/2] ARM: dma-mapping: remove custom consistent dma
- region
-In-Reply-To: <20120821123451.GV18957@n2100.arm.linux.org.uk>
-References: <1343636899-19508-3-git-send-email-m.szyprowski@samsung.com><20120821142235.97984abc9ad98d01015a3338@nvidia.com><20120821123451.GV18957@n2100.arm.linux.org.uk>
-Message-ID: <20120821.155945.1711711797763144039.hdoyu@nvidia.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 21 Aug 2012 13:59:48 +0100
+Subject: [PATCH v2 14/31] arm64: DMA mapping API
+In-Reply-To: <201208151616.01114.arnd@arndb.de>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-15-git-send-email-catalin.marinas@arm.com>
+ <201208151616.01114.arnd@arndb.de>
+Message-ID: <20120821125948.GC12708@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote @ Tue, 21 Aug 2012 14:34:51 +0200:
-
-> On Tue, Aug 21, 2012 at 02:22:35PM +0300, Hiroshi Doyu wrote:
-> > The following "__get_vm_area_node()" can take gfp_mask, it means that
-> > this function is expected to be called from atomic context, but why
-> > it's _NOT_ allowed _ONLY_ from interrupt context?
+On Wed, Aug 15, 2012 at 05:16:00PM +0100, Arnd Bergmann wrote:
+> On Tuesday 14 August 2012, Catalin Marinas wrote:
+> > +static struct dma_map_ops arm64_swiotlb_dma_ops = {
+> > +       .alloc = arm64_swiotlb_alloc_coherent,
+> > +       .free = arm64_swiotlb_free_coherent,
+> > +       .map_page = arm64_swiotlb_map_page,
+> > +       .unmap_page = arm64_swiotlb_unmap_page,
+> > +       .map_sg = arm64_swiotlb_map_sg_attrs,
+> > +       .unmap_sg = arm64_swiotlb_unmap_sg_attrs,
+> > +       .sync_single_for_cpu = arm64_swiotlb_sync_single_for_cpu,
+> > +       .sync_single_for_device = arm64_swiotlb_sync_single_for_device,
+> > +       .sync_sg_for_cpu = arm64_swiotlb_sync_sg_for_cpu,
+> > +       .sync_sg_for_device = arm64_swiotlb_sync_sg_for_device,
+> > +       .dma_supported = swiotlb_dma_supported,
+> > +       .mapping_error = swiotlb_dma_mapping_error,
+> > +};
+> > +
+> > +void __init swiotlb_init_with_default_size(size_t default_size, int verbose);
+> > +
+> > +void __init arm64_swiotlb_init(size_t max_size)
+> > +{
+> > +       dma_ops = &arm64_swiotlb_dma_ops;
+> > +       swiotlb_init_with_default_size(min((size_t)SZ_64M, max_size), 1);
+> > +}
 > 
-> One reason is it takes read/write locks without using the IRQ safe
-> versions for starters (vmap_area_lock and vmlist_lock).  I don't see
-> any other reasons in that bit of code though.
+> Why is swiotlb the default? I would expect that most devices can in fact
+> use the entire 64 bit address space, so you can use a simple linear
+> implementation for those.
 
-IIRC, if *_{irqsave,irqrestore} versions were introduced to protect
-from IRQ context, could we remove this BUG_ON(in_interrupt()) in
-__get_vm_area_node() at least? Or is it not encouraged from
-performance POV?
+That was my worry, devices not capable of accessing the full 64-bit
+address space. We can hope that those SoCs would have an IOMMU but I
+can't tell for sure at this stage.
 
-It seems that the solution to allow IOMMU'able device driver to
-allocate from ISR are:
-(1) To provide the pre-allocate area like arm_dma_alloc() does,
-or
-(2) __get_vm_area_node() can be called from ISR.
+The default implementation could be simpler. I can even drop it
+altogether from the initial patchset given that no SoC makes use of it
+yet.
+
+-- 
+Catalin
