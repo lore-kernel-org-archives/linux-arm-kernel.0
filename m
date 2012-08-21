@@ -1,86 +1,69 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 21 Aug 2012 17:33:56 +0300
-Subject: [PATCH] ASoC: omap-mcbsp: Device tree binding documentation update
-Message-ID: <1345559636-23370-1-git-send-email-peter.ujfalusi@ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 21 Aug 2012 16:46:54 +0200
+Subject: [PATCH] ARM: relax conditions required for enabling Contiguous
+ Memory Allocator
+In-Reply-To: <201208202001.23443.arnd@arndb.de>
+References: <1345443372-3824-1-git-send-email-m.szyprowski@samsung.com>
+ <201208202001.23443.arnd@arndb.de>
+Message-ID: <00c001cd7fab$d145f350$73d1d9f0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To reflect the final devicetree node structure of McBSPs.
-
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
-
 Hello,
 
-the initial OMAP McBSP DT structure was not able to describe the IP (and it's
-versions) correctly.
-The main issue was the sidetone block of McBSP2/3 on OMAP3.
-With this change in the DT description the OS can get the needed information
-about the IP.
+On Monday, August 20, 2012 10:01 PM Arnd Bergmann wrote:
 
-The sidetone is still not supported when the Linux kernel is booted with DT
-since we still depend on hwmod to fill the resources.
+> On Monday 20 August 2012, Marek Szyprowski wrote:
+> > Contiguous Memory Allocator requires only paging and MMU enabled not
+> > particular CPU architectures, so there is no need for strict dependency
+> > on CPU type. This enables to use CMA on some older ARM v5 systems which
+> > also might need large contiguous blocks for the multimedia processing hw
+> > modules.
+> >
+> > Reported-by: Prabhakar Lad <prabhakar.csengg@gmail.com>
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> 
+> The patch looks simple, but I want a better explanation for it.
+> When we went through all possible cases, we decided that:
+> 
+> * ARMv6+ need CMA to avoid the double mapping problem.
 
-This patch depend on the McBSP DT support series going via audio tree.
+Right. CMA can be used to avoid double mapping issues, but we also should keep in
+mind that right now no one observed any issues with the real hw, so this discussion
+is still a bit hypothetical.
 
-Regards,
-Peter
+> * ARMv4/v5 cannot generally use CMA because it doesn't work
+>   together with DMABOUNCE. I don't remember if it was the
+>   only problem, but I definitely remember this was intentional.
 
- .../devicetree/bindings/sound/omap-mcbsp.txt       |   28 +++++++------------
- 1 files changed, 10 insertions(+), 18 deletions(-)
+DMABOUNCE is used only by a few machines. I also tested and see no reason why it 
+might cause problems with such machines. I've used DMABOUNCE code to test atomic 
+allocations many times and found no problems. The only issue I might suspect is 
+a very limited DMA zone. CMA needs 4Mib alignment of the contiguous area base and
+size to meet requirements of the memory management core (mainly for migration and
+page isolation purposes), so it might not fit into some small DMA zones.
 
-diff --git a/Documentation/devicetree/bindings/sound/omap-mcbsp.txt b/Documentation/devicetree/bindings/sound/omap-mcbsp.txt
-index 447cb13..17cce44 100644
---- a/Documentation/devicetree/bindings/sound/omap-mcbsp.txt
-+++ b/Documentation/devicetree/bindings/sound/omap-mcbsp.txt
-@@ -8,38 +8,30 @@ Required properties:
- - reg: Register location and size, for OMAP4+ as an array:
-        <MPU access base address, size>,
-        <L3 interconnect address, size>;
-+- reg-names: Array of strings associated with the address space
- - interrupts: Interrupt numbers for the McBSP port, as an array in case the
- 	      McBSP IP have more interrupt lines:
- 	<OCP compliant irq>,
- 	<TX irq>,
- 	<RX irq>;
-+- interrupt-names: Array of strings associated with the interrupt numbers
- - interrupt-parent: The parent interrupt controller
- - ti,buffer-size: Size of the FIFO on the port (OMAP2430 and newer SoC)
- - ti,hwmods: Name of the hwmod associated to the McBSP port
- 
--Sidetone support for OMAP3 McBSP2 and 3 ports:
--- sidetone { }: Within this section the following parameters are required:
--- reg: Register location and size for the ST block
--- interrupts: The interrupt number for the ST block
--- interrupt-parent: The parent interrupt controller for the ST block
--
- Example:
- 
- mcbsp2: mcbsp at 49022000 {
- 	compatible = "ti,omap3-mcbsp";
--	#address-cells = <1>;
--	#size-cells = <1>;
--	reg = <0x49022000 0xff>;
--	interrupts = <0 17 0x4>, /* OCP compliant interrup */
--		     <0 62 0x4>, /* TX interrup */
--		     <0 63 0x4>; /* RX interrup */
-+	reg = <0x49022000 0xff>,
-+	      <0x49028000 0xff>;
-+	reg-names = "mpu", "sidetone";
-+	interrupts = <0 17 0x4>, /* OCP compliant interrupt */
-+		     <0 62 0x4>, /* TX interrupt */
-+		     <0 63 0x4>, /* RX interrupt */
-+		     <0 4 0x4>;  /* Sidetone */
-+	interrupt-names = "common", "tx", "rx", "sidetone";
- 	interrupt-parent = <&intc>;
- 	ti,buffer-size = <1280>;
- 	ti,hwmods = "mcbsp2";
--
--	sidetone {
--		reg = <0x49028000 0xff>;
--		interrupts = <0 4 0x4>;
--		interrupt-parent = <&intc>;
--	};
- };
+> * We want a common kernel for all ARMv6+ eventually, and a
+>   separate kernel for all ARMv4/v5 ones.
+
+I see no problem here, if required why may have even a separate dma_map_ops for
+CMA and use it only for selected devices.
+
+> 
+> If the reasoning has changed, please try to explain the full
+> situation. On a related topic, what happened to the idea that
+> ARMv6+ is broken without CMA? I noticed that it's optional
+> now.
+
+Right. I removed unconditional dependency on CMA on Russell's request. CMA is
+still experimental and there are still some known issues with it, which we are 
+investigating. It doesn't make sense to make the whole architecture depending
+on the experimental stuff. The old method of allocating and managing coherent
+buffers was stable and worked well enough for the drivers and platforms already
+present in the mainline kernel, so if one want to use stable stuff I see no 
+reason to disable it.
+
+Best regards
 -- 
-1.7.8.6
+Marek Szyprowski
+Samsung Poland R&D Center
