@@ -1,39 +1,77 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 21 Aug 2012 19:27:31 +0100
-Subject: [PATCH v2 16/31] arm64: ELF definitions
-In-Reply-To: <CAMuHMdVEX0egzFETMJ=LA_PB+7Qc=Ph-7uxofVr__wOE-0cvLQ@mail.gmail.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <201208151415.39570.arnd@arndb.de>
- <20120816102300.GG31784@mudshark.cambridge.arm.com>
- <201208161237.53594.arnd@arndb.de> <20120821160653.GH12708@arm.com>
- <CAMuHMdVEX0egzFETMJ=LA_PB+7Qc=Ph-7uxofVr__wOE-0cvLQ@mail.gmail.com>
-Message-ID: <20120821182731.GJ12708@arm.com>
+From: mporter@ti.com (Matt Porter)
+Date: Tue, 21 Aug 2012 14:43:06 -0400
+Subject: [PATCH v2 0/3] DaVinci DMA engine conversion
+Message-ID: <1345574589-24757-1-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2012 at 07:17:19PM +0100, Geert Uytterhoeven wrote:
-> On Tue, Aug 21, 2012 at 6:06 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > But I can see on x86 that it always reports x86_64 even if the task is
-> > x86_32.
-> 
-> Really?
-> 
-> $ uname -m
-> x86_64
-> $ linux32 uname -m
-> i686
-> $
+Changes since v1:
+	- Add virt-dma support. Better error checks
+	  and simplified descriptor handling.
+	- Fix support for multiple EDMA controllers
+	  Tested on AM18x EVM with WL12xx on MMC1
 
-Well, you set the personality explicitly with linux32. What I tested was
-with an x86_32 uname called directly (without linux32) and even though
-the ELF was a 32-bit one, it was reporting x86_64. In this AArch64
-patch, a compat task was automatically setting the linux32 personality
-(which x86 does not do).
+This series begins the conversion of the DaVinci private
+EDMA API implementation to a DMA engine driver and
+converts two of the three in-kernel users of the private
+EDMA API to DMA engine.
 
-Arnd's point is that the ELF file should not affect the personality and
-hence the uname value. This should only be done by an explicit call to
-sys_personality().
+The approach taken is similar to the recent OMAP DMA
+Engine conversion. The EDMA DMA Engine driver is a
+wrapper around the existing private EDMA implementation
+and registers the platform device within the driver.
+This allows the conversion series to stand alone with
+just the drivers and no changes to platform code. It
+also allows peripheral drivers to continue to use the
+private EDMA implementation until they are converted.
+
+The EDMA DMA Engine driver supports slave transfers only
+at this time. It is planned to add cyclic transfers in
+support of audio peripherals.
+
+There are three users of the private EDMA API in the
+kernel now: davinci_mmc, spi-davinci, and davinci-mcasp.
+This series provides DMA Engine conversions for the
+davinci_mmc and spi-davinci drivers which use the
+supported slave transfers.
+
+This series has been tested on an AM18x EVM and
+performance is comparable with the private EDMA
+API implementations. Both MMC0 and MMC1 are tested
+which handles the DA850/OMAP-L138/AM18x specific
+case where MMC1 has DMA channels on a second EDMA
+channel controller. Testing is needed on all DaVinci
+platforms including DM355/365, DM644x/6x,
+DA830/OMAP-L137/AM17x, and DA850/OMAP-L138/AM18x.
+
+In order to ease the testing burden, I've pushed a
+branch for each series release to my github tree
+at https://github.com/ohporter/linux. The current
+branch is edma-dmaengine-v2.
+
+After this series, the current plan is to complete
+the mcasp driver conversion which includes adding
+cyclic dma support. This will then enable the
+removal and refactoring of the private EDMA API
+functionality into the EDMA DMA Engine driver.
+Since EDMA is also used on the AM33xx family of
+parts in mach-omap2/, the plan is to enable this
+driver on that platform as well.
+
+Matt Porter (3):
+  dmaengine: add TI EDMA DMA engine driver
+  mmc: davinci_mmc: convert to DMA engine API
+  spi: spi-davinci: convert to DMA engine API
+
+ drivers/dma/Kconfig            |   10 +
+ drivers/dma/Makefile           |    1 +
+ drivers/dma/edma.c             |  684 ++++++++++++++++++++++++++++++++++++++++
+ drivers/mmc/host/davinci_mmc.c |  271 +++++-----------
+ drivers/spi/spi-davinci.c      |  292 ++++++++---------
+ include/linux/edma.h           |   29 ++
+ 6 files changed, 936 insertions(+), 351 deletions(-)
+ create mode 100644 drivers/dma/edma.c
+ create mode 100644 include/linux/edma.h
 
 -- 
-Catalin
+1.7.9.5
