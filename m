@@ -1,382 +1,536 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed, 22 Aug 2012 08:47:34 +1200
-Subject: [PATCHv3 5/9] video: vt8500: Add devicetree support for vt8500-fb and
- wm8505-fb
+Date: Wed, 22 Aug 2012 08:47:38 +1200
+Subject: [PATCHv3 9/9] arm: vt8500: clk: Add Common Clock Framework support
 In-Reply-To: <1345582058-2291-1-git-send-email-linux@prisktech.co.nz>
 References: <1345582058-2291-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1345582058-2291-6-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1345582058-2291-10-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update vt8500-fb, wm8505-fb and wmt-ge-rops to support device
-tree bindings.
-Small change in wm8505-fb.c to support WM8650 framebuffer color
-format.
+This patch adds common clock framework support for arch-vt8500.
+Support for PLL and device clocks on VT8500, WM8505 and WM8650
+are included.
 
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
- drivers/video/Kconfig       |    6 +--
- drivers/video/vt8500lcdfb.c |   79 ++++++++++++++++++++++++++++++-----
- drivers/video/wm8505fb.c    |   97 ++++++++++++++++++++++++++++++++++++-------
- drivers/video/wmt_ge_rops.c |    9 +++-
- 4 files changed, 161 insertions(+), 30 deletions(-)
+ drivers/clk/Makefile     |    1 +
+ drivers/clk/clk-vt8500.c |  496 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 497 insertions(+)
+ create mode 100644 drivers/clk/clk-vt8500.c
 
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index 0217f74..b66d951 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -1788,7 +1788,7 @@ config FB_AU1200
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 5869ea3..42fb173 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -10,6 +10,7 @@ obj-$(CONFIG_ARCH_SOCFPGA)	+= socfpga/
+ obj-$(CONFIG_PLAT_SPEAR)	+= spear/
+ obj-$(CONFIG_ARCH_U300)		+= clk-u300.o
+ obj-$(CONFIG_ARCH_INTEGRATOR)	+= versatile/
++obj-$(CONFIG_ARCH_VT8500)	+= clk-vt8500.o
  
- config FB_VT8500
- 	bool "VT8500 LCD Driver"
--	depends on (FB = y) && ARM && ARCH_VT8500 && VTWM_VERSION_VT8500
-+	depends on (FB = y) && ARM && ARCH_VT8500
- 	select FB_WMT_GE_ROPS
- 	select FB_SYS_IMAGEBLIT
- 	help
-@@ -1797,11 +1797,11 @@ config FB_VT8500
- 
- config FB_WM8505
- 	bool "WM8505 frame buffer support"
--	depends on (FB = y) && ARM && ARCH_VT8500 && VTWM_VERSION_WM8505
-+	depends on (FB = y) && ARM && ARCH_VT8500
- 	select FB_WMT_GE_ROPS
- 	select FB_SYS_IMAGEBLIT
- 	help
--	  This is the framebuffer driver for WonderMedia WM8505
-+	  This is the framebuffer driver for WonderMedia WM8505/WM8650
- 	  integrated LCD controller.
- 
- source "drivers/video/geode/Kconfig"
-diff --git a/drivers/video/vt8500lcdfb.c b/drivers/video/vt8500lcdfb.c
-index 2a5fe6e..758e359 100644
---- a/drivers/video/vt8500lcdfb.c
-+++ b/drivers/video/vt8500lcdfb.c
-@@ -35,6 +35,13 @@
- #include "vt8500lcdfb.h"
- #include "wmt_ge_rops.h"
- 
-+#ifdef CONFIG_OF
+ # Chip specific
+ obj-$(CONFIG_COMMON_CLK_WM831X) += clk-wm831x.o
+diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
+new file mode 100644
+index 0000000..524c479
+--- /dev/null
++++ b/drivers/clk/clk-vt8500.c
+@@ -0,0 +1,496 @@
++#include <linux/io.h>
 +#include <linux/of.h>
-+#include <linux/of_fdt.h>
-+#include <linux/memblock.h>
-+#endif
++#include <linux/slab.h>
++#include <linux/bitops.h>
++#include <linux/clkdev.h>
++#include <linux/clk-provider.h>
 +
++/* All clocks share the same lock as none can be changed concurrently */
++static DEFINE_SPINLOCK(_lock);
 +
- #define to_vt8500lcd_info(__info) container_of(__info, \
- 						struct vt8500lcd_info, fb)
- 
-@@ -270,15 +277,21 @@ static int __devinit vt8500lcd_probe(struct platform_device *pdev)
- {
- 	struct vt8500lcd_info *fbi;
- 	struct resource *res;
--	struct vt8500fb_platform_data *pdata = pdev->dev.platform_data;
- 	void *addr;
- 	int irq, ret;
- 
-+	struct fb_videomode	of_mode;
-+	struct device_node	*np;
-+	u32			bpp;
-+	dma_addr_t fb_mem_phys;
-+	unsigned long fb_mem_len;
-+	void *fb_mem_virt;
-+
- 	ret = -ENOMEM;
- 	fbi = NULL;
- 
--	fbi = kzalloc(sizeof(struct vt8500lcd_info) + sizeof(u32) * 16,
--							GFP_KERNEL);
-+	fbi = devm_kzalloc(&pdev->dev, sizeof(struct vt8500lcd_info)
-+			+ sizeof(u32) * 16, GFP_KERNEL);
- 	if (!fbi) {
- 		dev_err(&pdev->dev, "Failed to initialize framebuffer device\n");
- 		ret = -ENOMEM;
-@@ -333,9 +346,45 @@ static int __devinit vt8500lcd_probe(struct platform_device *pdev)
- 		goto failed_free_res;
- 	}
- 
--	fbi->fb.fix.smem_start	= pdata->video_mem_phys;
--	fbi->fb.fix.smem_len	= pdata->video_mem_len;
--	fbi->fb.screen_base	= pdata->video_mem_virt;
-+	np = of_parse_phandle(pdev->dev.of_node, "via,display", 0);
-+	if (!np) {
-+		pr_err("%s: No display description in Device Tree\n", __func__);
-+		ret = -EINVAL;
-+		goto failed_free_res;
-+	}
-+
-+	/*
-+	 * This code is copied from Sascha Hauer's of_videomode helper
-+	 * and can be replaced with a call to the helper once mainlined
-+	 */
-+	ret = 0;
-+	ret |= of_property_read_u32(np, "xres", &of_mode.xres);
-+	ret |= of_property_read_u32(np, "yres", &of_mode.yres);
-+	ret |= of_property_read_u32(np, "left-margin", &of_mode.left_margin);
-+	ret |= of_property_read_u32(np, "right-margin", &of_mode.right_margin);
-+	ret |= of_property_read_u32(np, "hsync-len", &of_mode.hsync_len);
-+	ret |= of_property_read_u32(np, "upper-margin", &of_mode.upper_margin);
-+	ret |= of_property_read_u32(np, "lower-margin", &of_mode.lower_margin);
-+	ret |= of_property_read_u32(np, "vsync-len", &of_mode.vsync_len);
-+	ret |= of_property_read_u32(np, "bpp", &bpp);
-+	if (ret) {
-+		pr_err("%s: Unable to read display properties\n", __func__);
-+		goto failed_free_res;
-+	}
-+	of_mode.vmode = FB_VMODE_NONINTERLACED;
-+
-+	/* try allocating the framebuffer */
-+	fb_mem_len = of_mode.xres * of_mode.yres * 2 * (bpp / 8);
-+	fb_mem_virt = dma_alloc_coherent(&pdev->dev, fb_mem_len, &fb_mem_phys,
-+				GFP_KERNEL);
-+	if (!fb_mem_virt) {
-+		pr_err("%s: Failed to allocate framebuffer\n", __func__);
-+		return -ENOMEM;
-+	};
-+
-+	fbi->fb.fix.smem_start	= fb_mem_phys;
-+	fbi->fb.fix.smem_len	= fb_mem_len;
-+	fbi->fb.screen_base	= fb_mem_virt;
- 
- 	fbi->palette_size	= PAGE_ALIGN(512);
- 	fbi->palette_cpu	= dma_alloc_coherent(&pdev->dev,
-@@ -370,10 +419,11 @@ static int __devinit vt8500lcd_probe(struct platform_device *pdev)
- 		goto failed_free_irq;
- 	}
- 
--	fb_videomode_to_var(&fbi->fb.var, &pdata->mode);
--	fbi->fb.var.bits_per_pixel	= pdata->bpp;
--	fbi->fb.var.xres_virtual	= pdata->xres_virtual;
--	fbi->fb.var.yres_virtual	= pdata->yres_virtual;
-+	fb_videomode_to_var(&fbi->fb.var, &of_mode);
-+
-+	fbi->fb.var.xres_virtual	= of_mode.xres;
-+	fbi->fb.var.yres_virtual	= of_mode.yres * 2;
-+	fbi->fb.var.bits_per_pixel	= bpp;
- 
- 	ret = vt8500lcd_set_par(&fbi->fb);
- 	if (ret) {
-@@ -448,12 +498,18 @@ static int __devexit vt8500lcd_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id via_dt_ids[] = {
-+	{ .compatible = "via,vt8500-fb", },
-+	{}
++struct clk_device {
++	struct clk_hw	hw;
++	void __iomem	*div_reg;
++	unsigned int	div_mask;
++	void __iomem	*en_reg;
++	int		en_bit;
++	spinlock_t	*lock;
 +};
 +
- static struct platform_driver vt8500lcd_driver = {
- 	.probe		= vt8500lcd_probe,
- 	.remove		= __devexit_p(vt8500lcd_remove),
- 	.driver		= {
- 		.owner	= THIS_MODULE,
- 		.name	= "vt8500-lcd",
-+		.of_match_table = of_match_ptr(via_dt_ids),
- 	},
- };
- 
-@@ -461,4 +517,5 @@ module_platform_driver(vt8500lcd_driver);
- 
- MODULE_AUTHOR("Alexey Charkov <alchark@gmail.com>");
- MODULE_DESCRIPTION("LCD controller driver for VIA VT8500");
--MODULE_LICENSE("GPL");
-+MODULE_LICENSE("GPL v2");
-+MODULE_DEVICE_TABLE(of, via_dt_ids);
-diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
-index c8703bd..d4448b0 100644
---- a/drivers/video/wm8505fb.c
-+++ b/drivers/video/wm8505fb.c
-@@ -28,6 +28,9 @@
- #include <linux/dma-mapping.h>
- #include <linux/platform_device.h>
- #include <linux/wait.h>
-+#include <linux/of.h>
-+#include <linux/of_fdt.h>
-+#include <linux/memblock.h>
- 
- #include <mach/vt8500fb.h>
- 
-@@ -59,8 +62,12 @@ static int wm8505fb_init_hw(struct fb_info *info)
- 	writel(fbi->fb.fix.smem_start, fbi->regbase + WMT_GOVR_FBADDR);
- 	writel(fbi->fb.fix.smem_start, fbi->regbase + WMT_GOVR_FBADDR1);
- 
--	/* Set in-memory picture format to RGB 32bpp */
--	writel(0x1c,		       fbi->regbase + WMT_GOVR_COLORSPACE);
-+	/*
-+	 * Set in-memory picture format to RGB
-+	 * 0x31C sets the correct color mode (RGB565) for WM8650
-+	 * Bit 8+9 (0x300) are ignored on WM8505 as reserved
-+	 */
-+	writel(0x31c,		       fbi->regbase + WMT_GOVR_COLORSPACE);
- 	writel(1,		       fbi->regbase + WMT_GOVR_COLORSPACE1);
- 
- 	/* Virtual buffer size */
-@@ -127,6 +134,18 @@ static int wm8505fb_set_par(struct fb_info *info)
- 		info->var.blue.msb_right = 0;
- 		info->fix.visual = FB_VISUAL_TRUECOLOR;
- 		info->fix.line_length = info->var.xres_virtual << 2;
-+	} else if (info->var.bits_per_pixel == 16) {
-+		info->var.red.offset = 11;
-+		info->var.red.length = 5;
-+		info->var.red.msb_right = 0;
-+		info->var.green.offset = 5;
-+		info->var.green.length = 6;
-+		info->var.green.msb_right = 0;
-+		info->var.blue.offset = 0;
-+		info->var.blue.length = 5;
-+		info->var.blue.msb_right = 0;
-+		info->fix.visual = FB_VISUAL_TRUECOLOR;
-+		info->fix.line_length = info->var.xres_virtual << 1;
- 	}
- 
- 	wm8505fb_set_timing(info);
-@@ -246,16 +265,20 @@ static int __devinit wm8505fb_probe(struct platform_device *pdev)
- 	struct wm8505fb_info	*fbi;
- 	struct resource		*res;
- 	void			*addr;
--	struct vt8500fb_platform_data *pdata;
- 	int ret;
- 
--	pdata = pdev->dev.platform_data;
-+	struct fb_videomode	of_mode;
-+	struct device_node	*np;
-+	u32			bpp;
-+	dma_addr_t fb_mem_phys;
-+	unsigned long fb_mem_len;
-+	void *fb_mem_virt;
- 
- 	ret = -ENOMEM;
- 	fbi = NULL;
- 
--	fbi = kzalloc(sizeof(struct wm8505fb_info) + sizeof(u32) * 16,
--							GFP_KERNEL);
-+	fbi = devm_kzalloc(&pdev->dev, sizeof(struct wm8505fb_info) +
-+			sizeof(u32) * 16, GFP_KERNEL);
- 	if (!fbi) {
- 		dev_err(&pdev->dev, "Failed to initialize framebuffer device\n");
- 		ret = -ENOMEM;
-@@ -305,21 +328,58 @@ static int __devinit wm8505fb_probe(struct platform_device *pdev)
- 		goto failed_free_res;
- 	}
- 
--	fb_videomode_to_var(&fbi->fb.var, &pdata->mode);
-+	np = of_parse_phandle(pdev->dev.of_node, "via,display", 0);
-+	if (!np) {
-+		pr_err("%s: No display description in Device Tree\n", __func__);
-+		ret = -EINVAL;
-+		goto failed_free_res;
-+	}
++/*
++ * Add new PLL_TYPE_x definitions here as required. Use the first known model
++ * to support the new type as the name.
++ * Add case statements to vtwm_pll_recalc_rate(), vtwm_pll_round_round() and
++ * vtwm_pll_set_rate() to handle the new PLL_TYPE_x
++ */
 +
-+	/*
-+	 * This code is copied from Sascha Hauer's of_videomode helper
-+	 * and can be replaced with a call to the helper once mainlined
-+	 */
-+	ret = 0;
-+	ret |= of_property_read_u32(np, "xres", &of_mode.xres);
-+	ret |= of_property_read_u32(np, "yres", &of_mode.yres);
-+	ret |= of_property_read_u32(np, "left-margin", &of_mode.left_margin);
-+	ret |= of_property_read_u32(np, "right-margin", &of_mode.right_margin);
-+	ret |= of_property_read_u32(np, "hsync-len", &of_mode.hsync_len);
-+	ret |= of_property_read_u32(np, "upper-margin", &of_mode.upper_margin);
-+	ret |= of_property_read_u32(np, "lower-margin", &of_mode.lower_margin);
-+	ret |= of_property_read_u32(np, "vsync-len", &of_mode.vsync_len);
-+	ret |= of_property_read_u32(np, "bpp", &bpp);
-+	if (ret) {
-+		pr_err("%s: Unable to read display properties\n", __func__);
-+		goto failed_free_res;
-+	}
++#define PLL_TYPE_VT8500		0
++#define PLL_TYPE_WM8650		1
 +
-+	of_mode.vmode = FB_VMODE_NONINTERLACED;
-+	fb_videomode_to_var(&fbi->fb.var, &of_mode);
- 
- 	fbi->fb.var.nonstd		= 0;
- 	fbi->fb.var.activate		= FB_ACTIVATE_NOW;
- 
- 	fbi->fb.var.height		= -1;
- 	fbi->fb.var.width		= -1;
--	fbi->fb.var.xres_virtual	= pdata->xres_virtual;
--	fbi->fb.var.yres_virtual	= pdata->yres_virtual;
--	fbi->fb.var.bits_per_pixel	= pdata->bpp;
- 
--	fbi->fb.fix.smem_start	= pdata->video_mem_phys;
--	fbi->fb.fix.smem_len	= pdata->video_mem_len;
--	fbi->fb.screen_base	= pdata->video_mem_virt;
--	fbi->fb.screen_size	= pdata->video_mem_len;
-+	/* try allocating the framebuffer */
-+	fb_mem_len = of_mode.xres * of_mode.yres * 2 * (bpp / 8);
-+	fb_mem_virt = dma_alloc_coherent(&pdev->dev, fb_mem_len, &fb_mem_phys,
-+				GFP_KERNEL);
-+	if (!fb_mem_virt) {
-+		pr_err("%s: Failed to allocate framebuffer\n", __func__);
-+		return -ENOMEM;
-+	};
-+
-+	fbi->fb.var.xres_virtual	= of_mode.xres;
-+	fbi->fb.var.yres_virtual	= of_mode.yres * 2;
-+	fbi->fb.var.bits_per_pixel	= bpp;
-+
-+	fbi->fb.fix.smem_start		= fb_mem_phys;
-+	fbi->fb.fix.smem_len		= fb_mem_len;
-+	fbi->fb.screen_base		= fb_mem_virt;
-+	fbi->fb.screen_size		= fb_mem_len;
- 
- 	if (fb_alloc_cmap(&fbi->fb.cmap, 256, 0) < 0) {
- 		dev_err(&pdev->dev, "Failed to allocate color map\n");
-@@ -395,12 +455,18 @@ static int __devexit wm8505fb_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id wmt_dt_ids[] = {
-+	{ .compatible = "wm,wm8505-fb", },
-+	{}
++struct clk_pll {
++	struct clk_hw	hw;
++	void __iomem	*reg;
++	spinlock_t	*lock;
++	int		type;
 +};
 +
- static struct platform_driver wm8505fb_driver = {
- 	.probe		= wm8505fb_probe,
- 	.remove		= __devexit_p(wm8505fb_remove),
- 	.driver		= {
- 		.owner	= THIS_MODULE,
- 		.name	= DRIVER_NAME,
-+		.of_match_table = of_match_ptr(wmt_dt_ids),
- 	},
- };
- 
-@@ -408,4 +474,5 @@ module_platform_driver(wm8505fb_driver);
- 
- MODULE_AUTHOR("Ed Spiridonov <edo.rus@gmail.com>");
- MODULE_DESCRIPTION("Framebuffer driver for WMT WM8505");
--MODULE_LICENSE("GPL");
-+MODULE_LICENSE("GPL v2");
-+MODULE_DEVICE_TABLE(of, wmt_dt_ids);
-diff --git a/drivers/video/wmt_ge_rops.c b/drivers/video/wmt_ge_rops.c
-index 55be386..ba025b4 100644
---- a/drivers/video/wmt_ge_rops.c
-+++ b/drivers/video/wmt_ge_rops.c
-@@ -158,12 +158,18 @@ static int __devexit wmt_ge_rops_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id wmt_dt_ids[] = {
-+	{ .compatible = "wm,prizm-ge-rops", },
++static void __iomem *pmc_base;
++
++#define to_clk_device(_hw) container_of(_hw, struct clk_device, hw)
++
++
++#define VT8500_PMC_BUSY_MASK		0x18
++
++static void vt8500_pmc_wait_busy(void)
++{
++	while (readl(pmc_base) & VT8500_PMC_BUSY_MASK)
++		cpu_relax();
++}
++
++static void vt8500_dclk_endisable(struct clk_hw *hw, int enable)
++{
++	struct clk_device *cdev = to_clk_device(hw);
++	u32 en_val;
++	unsigned long flags = 0;
++
++	spin_lock_irqsave(cdev->lock, flags);
++
++	en_val = readl(cdev->en_reg);
++
++	if (enable)
++		en_val |= BIT(cdev->en_bit);
++	else
++		en_val &= ~BIT(cdev->en_bit);
++
++	writel(en_val, cdev->en_reg);
++
++	spin_unlock_irqrestore(cdev->lock, flags);
++}
++
++static int vt8500_dclk_enable(struct clk_hw *hw)
++{
++	vt8500_dclk_endisable(hw, 1);
++	return 0;
++}
++
++static void vt8500_dclk_disable(struct clk_hw *hw)
++{
++	vt8500_dclk_endisable(hw, 0);
++}
++
++static int vt8500_dclk_is_enabled(struct clk_hw *hw)
++{
++	struct clk_device *cdev = to_clk_device(hw);
++	u32 en_val = (readl(cdev->en_reg) & BIT(cdev->en_bit));
++
++	return en_val ? 1 : 0;
++}
++
++static unsigned long vt8500_dclk_recalc_rate(struct clk_hw *hw,
++				unsigned long parent_rate)
++{
++	struct clk_device *cdev = to_clk_device(hw);
++	u32 div = readl(cdev->div_reg) & cdev->div_mask;
++
++	/* Special case for SDMMC devices */
++	if ((cdev->div_mask == 0x3F) && (div & BIT(5)))
++		div = 64 * (div & 0x1f);
++
++	/* div == 0 is actually the highest divisor */
++	if (div == 0)
++		div = (cdev->div_mask + 1);
++
++	return parent_rate / div;
++}
++
++static long vt8500_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long *prate)
++{
++	u32 divisor = rate / *prate;
++
++	return *prate / divisor;
++}
++
++static int vt8500_dclk_set_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long parent_rate)
++{
++	struct clk_device *cdev = to_clk_device(hw);
++	u32 divisor = rate / parent_rate;
++	unsigned long flags = 0;
++
++	if (divisor == cdev->div_mask + 1)
++		divisor = 0;
++
++	if (divisor > cdev->div_mask) {
++		pr_err("%s: invalid divisor for clock\n", __func__);
++		return -EINVAL;
++	}
++
++	spin_lock_irqsave(cdev->lock, flags);
++
++	vt8500_pmc_wait_busy();
++	writel(divisor, cdev->div_reg);
++	vt8500_pmc_wait_busy();
++
++	spin_lock_irqsave(cdev->lock, flags);
++
++	return 0;
++}
++
++
++static const struct clk_ops vt8500_gated_clk_ops = {
++	.enable = vt8500_dclk_enable,
++	.disable = vt8500_dclk_disable,
++	.is_enabled = vt8500_dclk_is_enabled,
++};
++
++static const struct clk_ops vt8500_divisor_clk_ops = {
++	.round_rate = vt8500_dclk_round_rate,
++	.set_rate = vt8500_dclk_set_rate,
++	.recalc_rate = vt8500_dclk_recalc_rate,
++};
++
++static const struct clk_ops vt8500_gated_divisor_clk_ops = {
++	.enable = vt8500_dclk_enable,
++	.disable = vt8500_dclk_disable,
++	.is_enabled = vt8500_dclk_is_enabled,
++	.round_rate = vt8500_dclk_round_rate,
++	.set_rate = vt8500_dclk_set_rate,
++	.recalc_rate = vt8500_dclk_recalc_rate,
++};
++
++#define CLK_INIT_GATED			BIT(0)
++#define CLK_INIT_DIVISOR		BIT(1)
++#define CLK_INIT_GATED_DIVISOR		(CLK_INIT_DIVISOR | CLK_INIT_GATED)
++
++static __init void vtwm_device_clk_init(struct device_node *node)
++{
++	u32 en_reg, div_reg;
++	struct clk *clk;
++	struct clk_device *dev_clk;
++	const char *clk_name = node->name;
++	const char *parent_name;
++	struct clk_init_data init;
++	int rc;
++	int clk_init_flags = 0;
++
++	dev_clk = kzalloc(sizeof(*dev_clk), GFP_KERNEL);
++	if (WARN_ON(!dev_clk))
++		return;
++
++	dev_clk->lock = &_lock;
++
++	rc = of_property_read_u32(node, "enable-reg", &en_reg);
++	if (!rc) {
++		dev_clk->en_reg = pmc_base + en_reg;
++		rc = of_property_read_u32(node, "enable-bit", &dev_clk->en_bit);
++		if (rc) {
++			pr_err("%s: enable-bit property required for gated clock\n",
++								__func__);
++			return;
++		}
++		clk_init_flags |= CLK_INIT_GATED;
++	}
++
++	rc = of_property_read_u32(node, "divisor-reg", &div_reg);
++	if (!rc) {
++		dev_clk->div_reg = pmc_base + div_reg;
++		/*
++		 * use 0x1f as the default mask since it covers
++		 * almost all the clocks and reduces dts properties
++		 */
++		dev_clk->div_mask = 0x1f;
++
++		of_property_read_u32(node, "divisor-mask", &dev_clk->div_mask);
++		clk_init_flags |= CLK_INIT_DIVISOR;
++	}
++
++	of_property_read_string(node, "clock-output-names", &clk_name);
++
++	switch (clk_init_flags) {
++	case CLK_INIT_GATED:
++		init.ops = &vt8500_gated_clk_ops;
++		break;
++	case CLK_INIT_DIVISOR:
++		init.ops = &vt8500_divisor_clk_ops;
++		break;
++	case CLK_INIT_GATED_DIVISOR:
++		init.ops = &vt8500_gated_divisor_clk_ops;
++		break;
++	default:
++		pr_err("%s: Invalid clock description in device tree\n",
++								__func__);
++		kfree(dev_clk);
++		return;
++	}
++
++	init.name = clk_name;
++	init.flags = 0;
++	parent_name = of_clk_get_parent_name(node, 0);
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++
++	dev_clk->hw.init = &init;
++
++	clk = clk_register(NULL, &dev_clk->hw);
++	if (WARN_ON(IS_ERR(clk))) {
++		kfree(dev_clk);
++		return;
++	}
++	rc = of_clk_add_provider(node, of_clk_src_simple_get, clk);
++	clk_register_clkdev(clk, clk_name, NULL);
++}
++
++
++/* PLL clock related functions */
++
++#define to_clk_pll(_hw) container_of(_hw, struct clk_pll, hw)
++
++/* Helper macros for PLL_VT8500 */
++#define VT8500_PLL_MUL(x)	((x & 0x1F) << 1)
++#define VT8500_PLL_DIV(x)	((x & 0x100) ? 1 : 2)
++
++#define VT8500_BITS_TO_FREQ(r, m, d)					\
++				((r / d) * m)
++
++#define VT8500_BITS_TO_VAL(m, d)					\
++				((d == 2 ? 0 : 0x100) | ((m >> 1) & 0x1F))
++
++/* Helper macros for PLL_WM8650 */
++#define WM8650_PLL_MUL(x)	(x & 0x3FF)
++#define WM8650_PLL_DIV(x)	(((x >> 10) & 7) * (1 << ((x >> 13) & 3)))
++
++#define WM8650_BITS_TO_FREQ(r, m, d1, d2)				\
++				(r * m / (d1 * (1 << d2)))
++
++#define WM8650_BITS_TO_VAL(m, d1, d2)					\
++				((d2 << 13) | (d1 << 10) | (m & 0x3FF))
++
++
++static void vt8500_find_pll_bits(unsigned long rate, unsigned long parent_rate,
++				u32 *multiplier, u32 *prediv)
++{
++	unsigned long tclk;
++
++	/* sanity check */
++	if ((rate < parent_rate * 4) || (rate > parent_rate * 62)) {
++		pr_err("%s: requested rate out of range\n", __func__);
++		*multiplier = 0;
++		*prediv = 1;
++		return;
++	}
++	if (rate <= parent_rate * 31)
++		/* use the prediv to double the resolution */
++		*prediv = 2;
++	else
++		*prediv = 1;
++
++	*multiplier = rate / (parent_rate / *prediv);
++	tclk = (parent_rate / *prediv) * *multiplier;
++
++	if (tclk != rate)
++		pr_warn("%s: requested rate %lu, found rate %lu\n", __func__,
++								rate, tclk);
++}
++
++static void wm8650_find_pll_bits(unsigned long rate, unsigned long parent_rate,
++				u32 *multiplier, u32 *divisor1, u32 *divisor2)
++{
++	u32 mul, div1, div2;
++	u32 best_mul, best_div1, best_div2;
++	unsigned long tclk, rate_err, best_err;
++
++	best_err = (unsigned long)-1;
++
++	/* Find the closest match (lower or equal to requested) */
++	for (div1 = 5; div1 >= 3; div1--)
++		for (div2 = 3; div2 >= 0; div2--)
++			for (mul = 3; mul <= 1023; mul++) {
++				tclk = parent_rate * mul / (div1 * (1 << div2));
++				if (tclk > rate)
++					continue;
++				/* error will always be +ve */
++				rate_err = rate - tclk;
++				if (rate_err == 0) {
++					*multiplier = mul;
++					*divisor1 = div1;
++					*divisor2 = div2;
++					return;
++				}
++
++				if (rate_err < best_err) {
++					best_err = rate_err;
++					best_mul = mul;
++					best_div1 = div1;
++					best_div2 = div2;
++				}
++			}
++
++	/* if we got here, it wasn't an exact match */
++	pr_warn("%s: requested rate %lu, found rate %lu\n", __func__, rate,
++							rate - best_err);
++	*multiplier = mul;
++	*divisor1 = div1;
++	*divisor2 = div2;
++}
++
++static int vtwm_pll_set_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long parent_rate)
++{
++	struct clk_pll *pll = to_clk_pll(hw);
++	u32 mul, div1, div2;
++	u32 pll_val;
++	unsigned long flags = 0;
++
++	/* sanity check */
++
++	switch (pll->type) {
++	case PLL_TYPE_VT8500:
++		vt8500_find_pll_bits(rate, parent_rate, &mul, &div1);
++		pll_val = VT8500_BITS_TO_VAL(mul, div1);
++		break;
++	case PLL_TYPE_WM8650:
++		wm8650_find_pll_bits(rate, parent_rate, &mul, &div1, &div2);
++		pll_val = WM8650_BITS_TO_VAL(mul, div1, div2);
++		break;
++	default:
++		pr_err("%s: invalid pll type\n", __func__);
++		return 0;
++	}
++
++	spin_lock_irqsave(pll->lock, flags);
++
++	vt8500_pmc_wait_busy();
++	writel(pll_val, pll->reg);
++	vt8500_pmc_wait_busy();
++
++	spin_unlock_irqrestore(pll->lock, flags);
++
++	return 0;
++}
++
++static long vtwm_pll_round_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long *prate)
++{
++	struct clk_pll *pll = to_clk_pll(hw);
++	u32 mul, div1, div2;
++	long round_rate;
++
++	switch (pll->type) {
++	case PLL_TYPE_VT8500:
++		vt8500_find_pll_bits(rate, *prate, &mul, &div1);
++		round_rate = VT8500_BITS_TO_FREQ(*prate, mul, div1);
++		break;
++	case PLL_TYPE_WM8650:
++		wm8650_find_pll_bits(rate, *prate, &mul, &div1, &div2);
++		round_rate = WM8650_BITS_TO_FREQ(*prate, mul, div1, div2);
++		break;
++	default:
++		round_rate = 0;
++	}
++
++	return round_rate;
++}
++
++static unsigned long vtwm_pll_recalc_rate(struct clk_hw *hw,
++				unsigned long parent_rate)
++{
++	struct clk_pll *pll = to_clk_pll(hw);
++	u32 pll_val = readl(pll->reg);
++	unsigned long pll_freq;
++
++	switch (pll->type) {
++	case PLL_TYPE_VT8500:
++		pll_freq = parent_rate * VT8500_PLL_MUL(pll_val);
++		pll_freq /= VT8500_PLL_DIV(pll_val);
++		break;
++	case PLL_TYPE_WM8650:
++		pll_freq = parent_rate * WM8650_PLL_MUL(pll_val);
++		pll_freq /= WM8650_PLL_DIV(pll_val);
++		break;
++	default:
++		pll_freq = 0;
++	}
++
++	return pll_freq;
++}
++
++const struct clk_ops vtwm_pll_ops = {
++	.round_rate = vtwm_pll_round_rate,
++	.set_rate = vtwm_pll_set_rate,
++	.recalc_rate = vtwm_pll_recalc_rate,
++};
++
++static __init void vtwm_pll_clk_init(struct device_node *node, int pll_type)
++{
++	u32 reg;
++	struct clk *clk;
++	struct clk_pll *pll_clk;
++	const char *clk_name = node->name;
++	const char *parent_name;
++	struct clk_init_data init;
++	int rc;
++
++	rc = of_property_read_u32(node, "reg", &reg);
++	if (WARN_ON(rc))
++		return;
++
++	pll_clk = kzalloc(sizeof(*pll_clk), GFP_KERNEL);
++	if (WARN_ON(!pll_clk))
++		return;
++
++	pll_clk->reg = pmc_base + reg;
++	pll_clk->lock = &_lock;
++	pll_clk->type = pll_type;
++
++	of_property_read_string(node, "clock-output-names", &clk_name);
++
++	init.name = clk_name;
++	init.ops = &vtwm_pll_ops;
++	init.flags = 0;
++	parent_name = of_clk_get_parent_name(node, 0);
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++
++	pll_clk->hw.init = &init;
++
++	clk = clk_register(NULL, &pll_clk->hw);
++	if (WARN_ON(IS_ERR(clk))) {
++		kfree(pll_clk);
++		return;
++	}
++	rc = of_clk_add_provider(node, of_clk_src_simple_get, clk);
++	clk_register_clkdev(clk, clk_name, NULL);
++}
++
++
++/* Wrappers for initialization functions */
++
++static void __init vt8500_pll_init(struct device_node *node)
++{
++	vtwm_pll_clk_init(node, PLL_TYPE_VT8500);
++}
++
++static void __init wm8650_pll_init(struct device_node *node)
++{
++	vtwm_pll_clk_init(node, PLL_TYPE_WM8650);
++}
++
++static const __initconst struct of_device_id clk_match[] = {
++	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
++	{ .compatible = "via,vt8500-pll-clock", .data = vt8500_pll_init, },
++	{ .compatible = "wm,wm8650-pll-clock", .data = wm8650_pll_init, },
++	{ .compatible = "via,vt8500-device-clock",
++					.data = vtwm_device_clk_init, },
 +	{ /* sentinel */ }
 +};
 +
- static struct platform_driver wmt_ge_rops_driver = {
- 	.probe		= wmt_ge_rops_probe,
- 	.remove		= __devexit_p(wmt_ge_rops_remove),
- 	.driver		= {
- 		.owner	= THIS_MODULE,
- 		.name	= "wmt_ge_rops",
-+		.of_match_table = of_match_ptr(wmt_dt_ids),
- 	},
- };
- 
-@@ -172,4 +178,5 @@ module_platform_driver(wmt_ge_rops_driver);
- MODULE_AUTHOR("Alexey Charkov <alchark@gmail.com");
- MODULE_DESCRIPTION("Accelerators for raster operations using "
- 		   "WonderMedia Graphics Engine");
--MODULE_LICENSE("GPL");
-+MODULE_LICENSE("GPL v2");
-+MODULE_DEVICE_TABLE(of, wmt_dt_ids);
++void __init vtwm_clk_init(void __iomem *base)
++{
++	if (!base)
++		return;
++
++	pmc_base = base;
++
++	of_clk_init(clk_match);
++}
 -- 
 1.7.9.5
