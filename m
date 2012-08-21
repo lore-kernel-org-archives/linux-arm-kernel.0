@@ -1,45 +1,44 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 21 Aug 2012 15:16:08 +0300
-Subject: [PATCH v2 10/13] serial: omap: set dev->drvdata before enabling
- pm_runtime
+Date: Tue, 21 Aug 2012 15:16:09 +0300
+Subject: [PATCH v2 11/13] serial: omap: drop unnecessary check from remove
 In-Reply-To: <1345551371-18862-1-git-send-email-balbi@ti.com>
 References: <1345540555-24359-1-git-send-email-balbi@ti.com>
  <1345551371-18862-1-git-send-email-balbi@ti.com>
-Message-ID: <1345551371-18862-11-git-send-email-balbi@ti.com>
+Message-ID: <1345551371-18862-12-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-by the time we call our first pm_runtme_get_sync()
-after enable pm_runtime, our resume method might
-be called. To avoid problems, we must make sure
-that our dev->drvdata is set correctly before
-our resume method gets called.
+if platform_get_drvdata() returns NULL, that's
+quite a nasty bug on the driver which we want to
+catch ASAP. Otherwise, that check is hugely
+unneeded.
 
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/tty/serial/omap-serial.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/tty/serial/omap-serial.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index c272ecc..1aaba77 100644
+index 1aaba77..2e1a33a 100644
 --- a/drivers/tty/serial/omap-serial.c
 +++ b/drivers/tty/serial/omap-serial.c
-@@ -1301,6 +1301,7 @@ static int serial_omap_probe(struct platform_device *pdev)
- 	serial_omap_uart_wq = create_singlethread_workqueue(up->name);
- 	INIT_WORK(&up->qos_work, serial_omap_uart_qos_work);
+@@ -1337,13 +1337,10 @@ static int serial_omap_remove(struct platform_device *dev)
+ {
+ 	struct uart_omap_port *up = platform_get_drvdata(dev);
  
-+	platform_set_drvdata(pdev, up);
- 	pm_runtime_use_autosuspend(&pdev->dev);
- 	pm_runtime_set_autosuspend_delay(&pdev->dev,
- 			omap_up_info->autosuspend_timeout);
-@@ -1320,7 +1321,6 @@ static int serial_omap_probe(struct platform_device *pdev)
+-	if (up) {
+-		pm_runtime_disable(up->dev);
+-		uart_remove_one_port(&serial_omap_reg, &up->port);
+-		pm_qos_remove_request(&up->pm_qos_request);
+-	}
++	pm_runtime_disable(up->dev);
++	uart_remove_one_port(&serial_omap_reg, &up->port);
++	pm_qos_remove_request(&up->pm_qos_request);
  
- 	pm_runtime_mark_last_busy(up->dev);
- 	pm_runtime_put_autosuspend(up->dev);
--	platform_set_drvdata(pdev, up);
+-	platform_set_drvdata(dev, NULL);
  	return 0;
+ }
  
- err_add_port:
 -- 
 1.7.12.rc3
