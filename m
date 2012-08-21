@@ -1,51 +1,39 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 21 Aug 2012 15:20:18 -0400
-Subject: [PATCH v2 28/31] arm64: Generic timers support
-In-Reply-To: <1344966752-16102-29-git-send-email-catalin.marinas@arm.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-29-git-send-email-catalin.marinas@arm.com>
-Message-ID: <5033DF72.70609@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 21 Aug 2012 19:50:06 +0000
+Subject: [PATCH 1/4] ARM: clps711x: Remove board support for CEIVA
+In-Reply-To: <1345568375-28516-1-git-send-email-shc_work@mail.ru>
+References: <1345568375-28516-1-git-send-email-shc_work@mail.ru>
+Message-ID: <201208211950.07166.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2012 01:52 PM, Catalin Marinas wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
+On Tuesday 21 August 2012, Alexander Shiyan wrote:
+> The current kernel does not fit in the CEIVA ROM. Also, some functional
+> has already been removed due migrate from 2.6 to 3.0, and it seems that
+> no one uses this platform. So, remove support for this board and modules
+> specific only to this board.
 > 
-> This patch adds support for the ARM generic timers with A64 instructions
-> for accessing the timer registers. It uses the physical counter as the
-> clock source and the virtual counter as sched_clock.
-> 
-> The timer frequency can be specified via DT or read from the CNTFRQ_EL0
-> register. The physical counter is also accessible from user space
-> allowing fast gettimeofday() implementation.
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-[...]
+I got curious about this machine and found some ten year old emails
+and a howto from Colin Cross about this machine. Since he's still
+actively working on ARM Linux, maybe he has some final words to say
+about this platform before it gets removed.
 
-> +++ b/drivers/clocksource/arm_generic.c
+Otherwise, no objections.
 
-[...]
+	Arnd
 
-> +static void arch_timer_reg_write(int reg, u32 val)
-> +{
-> +	switch (reg) {
-> +	case ARCH_TIMER_REG_CTRL:
-> +		asm volatile("msr cntp_ctl_el0,  %0" : : "r" (val));
-> +		break;
-> +	case ARCH_TIMER_REG_TVAL:
-> +		asm volatile("msr cntp_tval_el0, %0" : : "r" (val));
-> +		break;
-> +	default:
-> +		BUG();
-> +	}
-> +
-> +	isb();
-> +}
-
-Doesn't architecture-specific assembly need to go in the arch directory rather
-than the drivers directory?
-
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum
+>  arch/arm/mach-clps711x/Kconfig                 |    6 -
+>  arch/arm/mach-clps711x/Makefile                |    1 -
+>  arch/arm/mach-clps711x/ceiva.c                 |   64 --
+>  arch/arm/mach-clps711x/include/mach/hardware.h |   48 --
+>  arch/arm/tools/mach-types                      |    1 -
+>  drivers/video/Kconfig                          |   12 -
+>  drivers/video/Makefile                         |    1 -
+>  drivers/video/epson1355fb.c                    |  749 ------------------------
+>  include/video/epson1355.h                      |   64 --
+>  9 files changed, 0 insertions(+), 946 deletions(-)
+>  delete mode 100644 arch/arm/mach-clps711x/ceiva.c
+>  delete mode 100644 drivers/video/epson1355fb.c
+>  delete mode 100644 include/video/epson1355.h
