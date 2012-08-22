@@ -1,56 +1,29 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Wed, 22 Aug 2012 13:42:47 +0200 (CEST)
-Subject: [PATCH 14/14] drivers/spi/spi-s3c24xx.c: fix error return code
-In-Reply-To: <20120822114015.GI7995@opensource.wolfsonmicro.com>
-References: <1345365870-29831-1-git-send-email-Julia.Lawall@lip6.fr>
- <1345365870-29831-15-git-send-email-Julia.Lawall@lip6.fr>
- <1b3201cd8049$e753f720$b5fbe560$%kim@samsung.com>
- <20120822114015.GI7995@opensource.wolfsonmicro.com>
-Message-ID: <alpine.DEB.2.02.1208221342240.1991@hadrien>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 22 Aug 2012 13:49:22 +0200
+Subject: [PATCH 0/7] Ux500 and MASK_ON_SUSPEND
+In-Reply-To: <1345624986-5557-1-git-send-email-linus.walleij@stericsson.com>
+References: <1345624986-5557-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CACRpkdYyrFZYuNSj+y7f1uyF53+TYqdSfEcpv28H677uS1fd6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <Julia.Lawall@lip6.fr>
+On Wed, Aug 22, 2012 at 10:43 AM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
 
-Initialize return variable before exiting on an error path.
+> We have discovered transient IRQs when going to suspend on the
+> Ux500 platform. This patch series hits all sources by marking
+> the applicable IRQchips with MASK_ON_SUSPEND.
+>
+> I don't know if this is a common problem or seen in other
+> platforms so comments are welcome.
+>
+> Else I request that the patches be merged into respective
+> subtree, I will take care of the ux500, gpio and pinctrl
+> patches myself, while Sam gets to merge all the MFD stuff.
 
-A simplified version of the semantic match that finds this problem is as
-follows: (http://coccinelle.lip6.fr/)
+Bah it turns out transient IRQs are only occurring on the pinctrl
+and maybe GIC. Let's just flag these two, forget the rest of the
+patches.
 
-// <smpl>
-(
-if at p1 (\(ret < 0\|ret != 0\))
- { ... return ret; }
-|
-ret@p1 = 0
-)
-... when != ret = e1
-    when != &ret
-*if(...)
-{
-  ... when != ret = e2
-      when forall
- return ret;
-}
-
-// </smpl>
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
----
-Perhaps -EINVAL is not the right value in this case.
-
- drivers/spi/spi-s3c24xx.c |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/spi/spi-s3c24xx.c b/drivers/spi/spi-s3c24xx.c
-index 8ee7d79..a2a080b 100644
---- a/drivers/spi/spi-s3c24xx.c
-+++ b/drivers/spi/spi-s3c24xx.c
-@@ -611,6 +611,7 @@ static int __devinit s3c24xx_spi_probe(struct platform_device *pdev)
- 	if (!pdata->set_cs) {
- 		if (pdata->pin_cs < 0) {
- 			dev_err(&pdev->dev, "No chipselect pin\n");
-+			err = -EINVAL;
- 			goto err_register;
- 		}
+Yours,
+Linus Walleij
