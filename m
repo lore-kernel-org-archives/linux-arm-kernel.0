@@ -1,89 +1,68 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 22 Aug 2012 12:55:25 +0100
-Subject: [PATCH 5/8] mfd: Provide the PRCMU with its own IRQ domain
-In-Reply-To: <20120822111913.GG7995@opensource.wolfsonmicro.com>
-References: <20120820164949.GB22749@gmail.com>
- <20120820175155.GH26991@opensource.wolfsonmicro.com>
- <20120821085618.GA26899@gmail.com>
- <20120821095026.GU26991@opensource.wolfsonmicro.com>
- <20120821105413.GD26899@gmail.com>
- <20120821110329.GA7995@opensource.wolfsonmicro.com>
- <20120821120243.GF26899@gmail.com>
- <20120821165207.GX7995@opensource.wolfsonmicro.com>
- <20120822081746.GA4089@gmail.com>
- <20120822111913.GG7995@opensource.wolfsonmicro.com>
-Message-ID: <20120822115524.GA18545@gmail.com>
+From: mnalajal@codeaurora.org (Murali Nalajala)
+Date: Wed, 22 Aug 2012 17:33:41 +0530
+Subject: ioremap() fail on physical address 0x0 in 3.4 kernel
+In-Reply-To: <20120822095302.GX18957@n2100.arm.linux.org.uk>
+References: <50339AF6.1060601@codeaurora.org>
+ <5033C428.2050607@codeaurora.org> <50348030.9080200@codeaurora.org>
+ <20120822095302.GX18957@n2100.arm.linux.org.uk>
+Message-ID: <5034CA9D.1070001@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > I made the suggestion then later on realised that this was actively
-> > > going to break things I care about so I actually need it fixing.
-> 
-> > I'm a little taken aback and annoyed by this. In a previous email thread
-> > you categorically requested that I discuss some of the important changes
-> > with maintainers and people in-the-know prior to actually writing any
-> > code.
-> 
-> No, that's not something I've ever said to do.
-> 
-> I *have* asked you to communicate more clearly about what you're doing
-> but that doesn't mean to stop sending code, it means to have clearer
-> words around what you're sending. 
+On 8/22/2012 3:23 PM, Russell King - ARM Linux wrote:
+> On Wed, Aug 22, 2012 at 12:16:08PM +0530, Trilok Soni wrote:
+>> Thanks for the patch, but how about just checking pmd_none on such
+>> addresses and since there won't be any mapping created for such gaps? We
+>> need to check if this is fine for all, since I remember that Nico
+>> added these functions for the OMAP boot issue I guess.
+>
+> A better solution would be as below - this requires no changes to the
+> existing ioremap code, we just mark these differently.
+>
+> diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
+> index 2e8a1ef..87fa3f2 100644
+> --- a/arch/arm/mm/mm.h
+> +++ b/arch/arm/mm/mm.h
+> @@ -55,6 +55,9 @@ extern void __flush_dcache_page(struct address_space *mapping, struct page *page
+>   /* permanent static mappings from iotable_init() */
+>   #define VM_ARM_STATIC_MAPPING	0x40000000
+>
+> +/* empty mapping */
+> +#define VM_ARM_EMPTY_MAPPING	0x20000000
+> +
+>   /* mapping type (attributes) for permanent static mappings */
+>   #define VM_ARM_MTYPE(mt)		((mt)<<  20)
+>   #define VM_ARM_MTYPE_MASK	(0x1f<<  20)
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index cf4528d..da90ef1 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -813,7 +813,7 @@ static void __init pmd_empty_section_gap(unsigned long addr)
+>   	vm = early_alloc_aligned(sizeof(*vm), __alignof__(*vm));
+>   	vm->addr = (void *)addr;
+>   	vm->size = SECTION_SIZE;
+> -	vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
+> +	vm->flags = VM_IOREMAP | VM_ARM_EMPTY_MAPPING;
+>   	vm->caller = pmd_empty_section_gap;
+>   	vm_area_add_early(vm);
+>   }
+> @@ -826,7 +826,7 @@ static void __init fill_pmd_gaps(void)
+>
+>   	/* we're still single threaded hence no lock needed here */
+>   	for (vm = vmlist; vm; vm = vm->next) {
+> -		if (!(vm->flags&  VM_ARM_STATIC_MAPPING))
+> +		if (!(vm->flags&  (VM_ARM_STATIC_MAPPING | VM_ARM_EMPTY_MAPPING))
+>   			continue;
+>   		addr = (unsigned long)vm->addr;
+>   		if (addr<  next)
+>
+Tested on MSM platform
 
-That's not how I interpreted your words:
+Tested-by: Murali Nalajala <mnalajal@codeaurora.org>
 
-"What you can do here is to commmunicate about what you're doing more.
-Don't just think about the code, think about the communication
-surrounding the code - this is the core of the issue."
-
-> The really bad pattern here is that
-> you're frequently working around issues in your drivers with changes in
-> the subsystem without mentioning that the driver issues even exist -
-> this makes it much harder understand what you are trying to achieve,
-> especially when there is a problem with your subsystem changes and/or
-> the urgency you're attaching to them.
-
-Frequently? I've done this once, and yes I did push hard because I
-thought the subsystem was incorrect (I still think folding an entire
-driver because of a minor failure is wrong, but we digress).
-
-This is completely different to that. This was a subsystem change
-designed to aid DT enabled MFDs which 'chose' to register themselves
-in a specific way, by passing their compatible string through the 
-mfd_cell only. It doesn't affect any other MFD unless they wrongly
-assume the conversion would be automatically done for them. However,
-the author would know because they would have tested it. All of this
-was discussed at length with Arnd and this is what we came up with. 
-
-I think it's great that you like the idea and want to extend that
-functionality to other MFDs which perhaps don't support DT, or the
-ones that do but don't want to provide compatible strings or device
-nodes for all the MFD's child devices. But that is all we're doing
-here. There was no breakage. It served a purpose and it worked well.
-So well in fact that you've now provided the intended functionality
-to other devices.
-
-> >       I was obviously actively working on, had put time into, and was in
-> > the mist of discussing this with you. Then you just go ahead and code it
-> > (the easy part) yourself, essentially wasting my time. Surely there's
-> > some kind of etiquette surrounding such things?
-> 
-> To be honest in this case I had expected to send the patch out much
-> sooner than I did - several priority interrupts stopped me testing it.
-> Like I say I realised that I really needed a fix and it seemed like the
-> quickest way to accomplish that was to just send the code.
-
-You only noticed it 2 days ago and I had a patch ready to go yesterday.
-I'm confused because I don't understand why would you even complain about
-it if you intended to work on it yourself? Surely, "Ah, I see an issue with
-xyz, patch to follow." Would have been more appropriate, instead of 
-complaining about it, then I go and waste my time trying to fix something
-you intend on fixing yourself.
-
-I guess what's done is done now.
+Thanks,
+Murali N
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
