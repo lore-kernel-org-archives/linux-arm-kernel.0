@@ -1,30 +1,45 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 22 Aug 2012 16:00:14 -0700
-Subject: [PATCH 2/2] ARM: MSM: Add msm8660-surf.dts to Makefile.boot
-In-Reply-To: <1345676414-16635-1-git-send-email-sboyd@codeaurora.org>
-References: <1345676414-16635-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1345676414-16635-3-git-send-email-sboyd@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 22 Aug 2012 17:18:16 -0600
+Subject: Can one  set GPIO direction in pinmux definition?
+In-Reply-To: <503558B8.4010603@grid-net.com>
+References: <5034FCB2.5040709@grid-net.com> <5035388D.2060909@wwwdotorg.org>
+ <503558B8.4010603@grid-net.com>
+Message-ID: <503568B8.4080501@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add this entry to the Makefile so that we can build the dtb
-automatically with 'make dtbs'.
+On 08/22/2012 04:10 PM, Subodh Nijsure wrote:
+> On 08/22/2012 12:52 PM, Stephen Warren wrote:
+>> On 08/22/2012 09:37 AM, Subodh Nijsure wrote:
+>>> For a MX28 based hardware I am working with I need to use AUART4
+>>>
+>>> I need to configure this AUART4 as uart only when necessary and at all
+>>> other times pins associated with AUART4 need to be configured as inputs.
+>> Out of curiosity, why?
+>
+> Our hardware is connected to external equipment, electric meter via this
+> UART.
+> This electricity meter can also be read externally by an optical reader.
+> Since this is a shared bus, we can't be sitting on that bus with our
+> interface configured as UART as it prevents optical reader from talking
+> to the meter. There are ways we can tell is optical meter is connected,
+> if we detect that its connected we configure these pins as input else
+> configure them for UART functionality.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/mach-msm/Makefile.boot | 2 ++
- 1 file changed, 2 insertions(+)
+OK, I guess it was something like that. Can the optical be
+plugged/unplugged at run-time, or is it a one-off thing? pinctrl would
+be appropriate for runtime. Maybe not so much for one-off detection at
+boot-time.
 
-diff --git a/arch/arm/mach-msm/Makefile.boot b/arch/arm/mach-msm/Makefile.boot
-index 9b803a5..8de0678 100644
---- a/arch/arm/mach-msm/Makefile.boot
-+++ b/arch/arm/mach-msm/Makefile.boot
-@@ -1,3 +1,5 @@
-   zreladdr-y		+= 0x10008000
- params_phys-y		:= 0x10000100
- initrd_phys-y		:= 0x10800000
-+
-+dtb-$(CONFIG_ARCH_MSM8X60) += msm8660-surf.dtb
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+I wonder whether making the UART driver do the switching is the right
+thing though. I assume that:
+
+* The UART driver can be used on systems (boards) that never have this
+HW configuration, and don't care about this at all.
+
+* The detection of optical meter presence is entirely unrelated to the UART.
+
+So probably, the muxing can be seen as completely external and unrelated
+to the UART HW module itself. Would it be better represented as a
+completely standalone and custom "RS232 bus mux" node/device instead of
+tacking this into the UART driver?
