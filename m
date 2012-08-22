@@ -1,33 +1,118 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 22 Aug 2012 15:55:42 -0700
-Subject: [PATCH 0/3] Miscellaneous MSM fixes
-Message-ID: <1345676145-12321-1-git-send-email-sboyd@codeaurora.org>
+Date: Wed, 22 Aug 2012 15:55:43 -0700
+Subject: [PATCH 1/3] ARM: MSM: Remove msm_hw_reset_hook
+In-Reply-To: <1345676145-12321-1-git-send-email-sboyd@codeaurora.org>
+References: <1345676145-12321-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1345676145-12321-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's a small collection of MSM patches I have lying around.
-The first removes a useless file and hook that nobody is using.
-The second marks some functions static in clock-pcom.c since
-they aren't used outside the file and the last removes idle.c
-because it's dead code.
+This reset hook is never assigned and is dead code. Remove it so
+we have one less header file in the mach directory.
 
-Stephen Boyd (3):
-  ARM: MSM: Remove msm_hw_reset_hook
-  ARM: MSM: clock-pcom: Mark functions static
-  ARM: MSM: Remove unused idle.c
-
- arch/arm/mach-msm/Makefile              |  2 +-
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
  arch/arm/mach-msm/board-mahimahi.c      |  1 -
  arch/arm/mach-msm/board-sapphire.c      |  1 -
- arch/arm/mach-msm/clock-pcom.c          | 18 ++++++------
- arch/arm/mach-msm/idle.c                | 49 ---------------------------------
- arch/arm/mach-msm/include/mach/system.h | 19 -------------
+ arch/arm/mach-msm/include/mach/system.h | 19 -------------------
  arch/arm/mach-msm/proc_comm.c           |  1 -
- arch/arm/mach-msm/smd.c                 |  7 -----
- 8 files changed, 10 insertions(+), 88 deletions(-)
- delete mode 100644 arch/arm/mach-msm/idle.c
+ arch/arm/mach-msm/smd.c                 |  7 -------
+ 5 files changed, 29 deletions(-)
  delete mode 100644 arch/arm/mach-msm/include/mach/system.h
 
+diff --git a/arch/arm/mach-msm/board-mahimahi.c b/arch/arm/mach-msm/board-mahimahi.c
+index cf1f89a..df00bc0 100644
+--- a/arch/arm/mach-msm/board-mahimahi.c
++++ b/arch/arm/mach-msm/board-mahimahi.c
+@@ -30,7 +30,6 @@
+ 
+ #include <mach/board.h>
+ #include <mach/hardware.h>
+-#include <mach/system.h>
+ 
+ #include "board-mahimahi.h"
+ #include "devices.h"
+diff --git a/arch/arm/mach-msm/board-sapphire.c b/arch/arm/mach-msm/board-sapphire.c
+index 2e569ab..b7b0fc7 100644
+--- a/arch/arm/mach-msm/board-sapphire.c
++++ b/arch/arm/mach-msm/board-sapphire.c
+@@ -27,7 +27,6 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/flash.h>
+-#include <mach/system.h>
+ #include <mach/vreg.h>
+ #include <mach/board.h>
+ 
+diff --git a/arch/arm/mach-msm/include/mach/system.h b/arch/arm/mach-msm/include/mach/system.h
+deleted file mode 100644
+index f5fb2ec..0000000
+--- a/arch/arm/mach-msm/include/mach/system.h
++++ /dev/null
+@@ -1,19 +0,0 @@
+-/* arch/arm/mach-msm/include/mach/system.h
+- *
+- * Copyright (C) 2007 Google, Inc.
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-/* low level hardware reset hook -- for example, hitting the
+- * PSHOLD line on the PMIC to hard reset the system
+- */
+-extern void (*msm_hw_reset_hook)(void);
+diff --git a/arch/arm/mach-msm/proc_comm.c b/arch/arm/mach-msm/proc_comm.c
+index 9980dc7..8f1eecd 100644
+--- a/arch/arm/mach-msm/proc_comm.c
++++ b/arch/arm/mach-msm/proc_comm.c
+@@ -19,7 +19,6 @@
+ #include <linux/io.h>
+ #include <linux/spinlock.h>
+ #include <mach/msm_iomap.h>
+-#include <mach/system.h>
+ 
+ #include "proc_comm.h"
+ 
+diff --git a/arch/arm/mach-msm/smd.c b/arch/arm/mach-msm/smd.c
+index 657be73..84183ed 100644
+--- a/arch/arm/mach-msm/smd.c
++++ b/arch/arm/mach-msm/smd.c
+@@ -30,7 +30,6 @@
+ #include <linux/delay.h>
+ 
+ #include <mach/msm_smd.h>
+-#include <mach/system.h>
+ 
+ #include "smd_private.h"
+ #include "proc_comm.h"
+@@ -39,8 +38,6 @@
+ #define CONFIG_QDSP6 1
+ #endif
+ 
+-void (*msm_hw_reset_hook)(void);
+-
+ #define MODULE_NAME "msm_smd"
+ 
+ enum {
+@@ -101,10 +98,6 @@ static void handle_modem_crash(void)
+ 	pr_err("ARM9 has CRASHED\n");
+ 	smd_diag();
+ 
+-	/* hard reboot if possible */
+-	if (msm_hw_reset_hook)
+-		msm_hw_reset_hook();
+-
+ 	/* in this case the modem or watchdog should reboot us */
+ 	for (;;)
+ 		;
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
