@@ -1,46 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 22 Aug 2012 22:52:18 +0800
-Subject: [PATCH] ARM: fix cpu_relax() in case of doing dmb
-Message-ID: <1345647138-8815-1-git-send-email-shawn.guo@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Aug 2012 17:13:05 +0200
+Subject: [PATCH 1/6] ARM: ux500: don't select LEDS_GPIO for snowball
+In-Reply-To: <1345648390-4234-1-git-send-email-arnd@arndb.de>
+References: <1345648390-4234-1-git-send-email-arnd@arndb.de>
+Message-ID: <1345648390-4234-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is an issue reported on imx6q restart function.  The issue is only
-seen with the image building ARMv7 and ARMv6 together, where cpu_relax()
-is define to do dmb.  It's been root-caused by Russell as below.
+The gpio leds driver can only be built if the generic LED code is
+also enabled. Snowball selects LEDS_GPIO for an unknown reason
+but it does not select LEDS_CLASS and also does not really require
+the LED support at all, so we can just drop this dependency.
 
-Russell King - ARM Linux wrote:
-> I suspect having this dmb inside cpu_relax() is flooding the
-> interconnects with traffic, which then prevents other CPUs getting
-> a look-in (maybe there's no fairness when it comes to dmb's.
+Without this patch, building without LEDS_CLASS esults in:
 
-Fix the issue by insert a few NOPs into cpu_relax() where doing dmb.
+drivers/built-in.o: In function `create_gpio_led.part.2':
+governor_userspace.c:(.devinit.text+0x5a58): undefined reference to `led_classdev_register'
+drivers/built-in.o: In function `gpio_led_remove':
+governor_userspace.c:(.devexit.text+0x6b8): undefined reference to `led_classdev_unregister'
 
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+This reverts 8733f53c6 "ARM: ux500: Kconfig: Compile in leds-gpio
+support for Snowball", which was not completely thought through.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/include/asm/processor.h |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
+ arch/arm/mach-ux500/Kconfig |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
-index 99afa74..7cc67ce 100644
---- a/arch/arm/include/asm/processor.h
-+++ b/arch/arm/include/asm/processor.h
-@@ -80,7 +80,14 @@ extern void release_thread(struct task_struct *);
- unsigned long get_wchan(struct task_struct *p);
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index c013bbf..53d3d46 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -41,7 +41,6 @@ config MACH_HREFV60
+ config MACH_SNOWBALL
+ 	bool "U8500 Snowball platform"
+ 	select MACH_MOP500
+-	select LEDS_GPIO
+ 	help
+ 	  Include support for the snowball development platform.
  
- #if __LINUX_ARM_ARCH__ == 6 || defined(CONFIG_ARM_ERRATA_754327)
--#define cpu_relax()			smp_mb()
-+#define cpu_relax()		do {					\
-+					asm("nop");			\
-+					asm("nop");			\
-+					asm("nop");			\
-+					asm("nop");			\
-+					asm("nop");			\
-+					smp_mb();			\
-+				} while (0)
- #else
- #define cpu_relax()			barrier()
- #endif
 -- 
-1.7.5.4
+1.7.10
