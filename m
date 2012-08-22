@@ -1,57 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Aug 2012 17:13:08 +0200
-Subject: [PATCH 4/6] ARM: imx: fix ksz9021rn_phy_fixup
+Date: Wed, 22 Aug 2012 17:13:09 +0200
+Subject: [PATCH 5/6] ARM: imx: select CPU_FREQ_TABLE when needed
 In-Reply-To: <1345648390-4234-1-git-send-email-arnd@arndb.de>
 References: <1345648390-4234-1-git-send-email-arnd@arndb.de>
-Message-ID: <1345648390-4234-5-git-send-email-arnd@arndb.de>
+Message-ID: <1345648390-4234-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ksz9021rn_phy_fixup and mx6q_sabrelite functions try to
-set up an ethernet phy if they can. They do check whether
-phylib is enabled, but unfortunately the functions can only
-be called from platform code if phylib is builtin, not
-if it is a module
+The i.MX cpufreq implementation uses the CPU_FREQ_TABLE helpers,
+so it needs to select that code to be built. This problem has
+apparently existed since the i.MX cpufreq code was first merged
+in v3.6.37.
 
-Without this patch, building with a modular phylib results in:
+Building IMX without CPU_FREQ_TABLE results in:
 
-arch/arm/mach-imx/mach-imx6q.c: In function 'imx6q_sabrelite_init':
-arch/arm/mach-imx/mach-imx6q.c:120:5: error: 'ksz9021rn_phy_fixup' undeclared (first use in this function)
-arch/arm/mach-imx/mach-imx6q.c:120:5: note: each undeclared identifier is reported only once for each function it appears in
-
-The bug was originally reported by Artem Bityutskiy but only
-partially fixed in ef441806 "ARM: imx6q: register phy fixup only when
-CONFIG_PHYLIB is enabled".
+arch/arm/plat-mxc/built-in.o: In function `mxc_cpufreq_exit':
+arch/arm/plat-mxc/cpufreq.c:173: undefined reference to `cpufreq_frequency_table_put_attr'
+arch/arm/plat-mxc/built-in.o: In function `mxc_set_target':
+arch/arm/plat-mxc/cpufreq.c:84: undefined reference to `cpufreq_frequency_table_target'
+arch/arm/plat-mxc/built-in.o: In function `mxc_verify_speed':
+arch/arm/plat-mxc/cpufreq.c:65: undefined reference to `cpufreq_frequency_table_verify'
+arch/arm/plat-mxc/built-in.o: In function `mxc_cpufreq_init':
+arch/arm/plat-mxc/cpufreq.c:154: undefined reference to `cpufreq_frequency_table_cpuinfo'
+arch/arm/plat-mxc/cpufreq.c:162: undefined reference to `cpufreq_frequency_table_get_attr'
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Artem Bityutskiy <dedekind1@gmail.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Yong Shen <yong.shen@linaro.org>
+Cc: Shawn Guo <shawn.guo@freescale.com>
+Cc: stable at vger.kernel.org
 ---
- arch/arm/mach-imx/mach-imx6q.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 5ec0608..045b3f6 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -71,7 +71,7 @@ soft:
- /* For imx6q sabrelite board: set KSZ9021RN RGMII pad skew */
- static int ksz9021rn_phy_fixup(struct phy_device *phydev)
- {
--	if (IS_ENABLED(CONFIG_PHYLIB)) {
-+	if (IS_BUILTIN(CONFIG_PHYLIB)) {
- 		/* min rx data delay */
- 		phy_write(phydev, 0x0b, 0x8105);
- 		phy_write(phydev, 0x0c, 0x0000);
-@@ -112,7 +112,7 @@ put_clk:
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e91c7cd..84b5a0c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2150,6 +2150,7 @@ source "drivers/cpufreq/Kconfig"
+ config CPU_FREQ_IMX
+ 	tristate "CPUfreq driver for i.MX CPUs"
+ 	depends on ARCH_MXC && CPU_FREQ
++	select CPU_FREQ_TABLE
+ 	help
+ 	  This enables the CPUfreq driver for i.MX CPUs.
  
- static void __init imx6q_sabrelite_init(void)
- {
--	if (IS_ENABLED(CONFIG_PHYLIB))
-+	if (IS_BUILTIN(CONFIG_PHYLIB))
- 		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
- 				ksz9021rn_phy_fixup);
- 	imx6q_sabrelite_cko1_setup();
 -- 
 1.7.10
