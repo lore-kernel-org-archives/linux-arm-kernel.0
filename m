@@ -1,44 +1,32 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 22 Aug 2012 11:12:28 +0200
-Subject: [PATCH] ARM: ux500: implement set_wake() callback for the GIC
-Message-ID: <1345626748-29057-1-git-send-email-linus.walleij@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 22 Aug 2012 11:21:32 +0200
+Subject: [rtc-linux] [PATCHv3 8/9] arm: vt8500: gpio: Devicetree support
+ for arch-vt8500
+In-Reply-To: <1345582058-2291-9-git-send-email-linux@prisktech.co.nz>
+References: <1345582058-2291-1-git-send-email-linux@prisktech.co.nz>
+ <1345582058-2291-9-git-send-email-linux@prisktech.co.nz>
+Message-ID: <CACRpkdZnQyLSRQ6cRpFBurAv2cv44einGAsT86FLCqsj1euDMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Tue, Aug 21, 2012 at 10:47 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
 
-The Ux500 will be able to wake up on any IRQ, so implement a
-.set_wake() callback that just returns 0 instead of the default
-in common/gic.c which returns an error if you try to set
-wakeup on the GIC.
+> Converted the existing arch-vt8500 gpio to a platform_device.
+> Added support for WM8505 and WM8650 GPIO controllers.
+(...)
+> +       unsigned val;
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/cpu.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+I asked about the datatype for this "val", it sure isn't "unsigned".
 
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index e2360e7..24598e2 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -46,11 +46,18 @@ static const struct of_device_id ux500_dt_irq_match[] = {
- 	{},
- };
- 
-+static int ux500_gic_irq_set_wake(struct irq_data *d, unsigned int on)
-+{
-+	return 0;
-+}
-+
- void __init ux500_init_irq(void)
- {
- 	void __iomem *dist_base;
- 	void __iomem *cpu_base;
- 
-+	gic_arch_extn.irq_set_wake = ux500_gic_irq_set_wake;
-+
- 	if (cpu_is_u8500_family()) {
- 		dist_base = __io_address(U8500_GIC_DIST_BASE);
- 		cpu_base = __io_address(U8500_GIC_CPU_BASE);
--- 
-1.7.11.3
+I suspected the registers were only 8bit and so it should be u8.
+But atleast use u32 if you must use all these bits.
+
+(...)
+> +       val = readl(vt8500_chip->base + vt8500_chip->regs->en);
+> +       val |= BIT(offset);
+> +       writel(val, vt8500_chip->base + vt8500_chip->regs->en);
+
+BTW: have you considered [readl|writel]_relaxed?
+
+Yours,
+Linus Walleij
