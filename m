@@ -1,46 +1,67 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 22 Aug 2012 17:02:41 +0100
-Subject: [PATCH 1/7] mfd: add imx syscon driver based on regmap
-In-Reply-To: <1345619928-15446-2-git-send-email-b29396@freescale.com>
-References: <1345619928-15446-1-git-send-email-b29396@freescale.com>
- <1345619928-15446-2-git-send-email-b29396@freescale.com>
-Message-ID: <20120822160241.GR7995@opensource.wolfsonmicro.com>
+From: mporter@ti.com (Matt Porter)
+Date: Wed, 22 Aug 2012 12:04:17 -0400
+Subject: [PATCH v2 3/3] spi: spi-davinci: convert to DMA engine API
+In-Reply-To: <1345607122.1895.44.camel@vkoul-udesk3>
+References: <1345574589-24757-1-git-send-email-mporter@ti.com>
+ <1345574589-24757-4-git-send-email-mporter@ti.com>
+ <1345607122.1895.44.camel@vkoul-udesk3>
+Message-ID: <20120822160417.GA27758@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2012 at 03:18:42PM +0800, Dong Aisheng wrote:
+On Wed, Aug 22, 2012 at 09:15:22AM +0530, Vinod Koul wrote:
+> On Tue, 2012-08-21 at 14:43 -0400, Matt Porter wrote:
+> > Removes use of the DaVinci EDMA private DMA API and replaces
+> > it with use of the DMA engine API.
+> > 
+> > Signed-off-by: Matt Porter <mporter@ti.com>
+> > ---
+> 
+> > +		struct dma_slave_config dma_rx_conf = {
+> > +			.direction = DMA_DEV_TO_MEM,
+> > +			.src_addr = (unsigned long)dspi->pbase + SPIBUF,
+> > +			.src_addr_width = data_type,
+> > +			.src_maxburst = 1,
+> what does 1 mean in this context? We define as number of units that
+> needs to be transfered, so are you sure that you want only one unit to
+> be dma'ed in a single burst. that seems like killing your dmac,
+> shouldn't you be using larger bursts for a better dma performance?
 
-> From: Dong Aisheng <dong.aisheng@linaro.org>
+This device can't handle bursts, it's a simple shift register based
+SPI master that always asserts a DMA req for each SPI word transfer.
 
-> Add regmap based imx syscon driver.
+The other important thing to note is that the EDMA driver itself
+is able to handle a maxburst of 1 as a special case. That is, the
+EDMA has some limitations in transfer sizes it can handle if you
+need burst support. So, on the EDMA end of things you'll see that
+if maxburst if 1, it's able to handle setting up an A-synchronized
+transfer to handle any sized segment coming in with a single transfer
+slot. However, is maxburst is >1, EDMA requires up to set up an
+AB-synchronized transfer. This type of transfer limits allows for
+a DMA req per burst, but the maximum segment size we can handle is
+SZ_64K-1. An annoying hardware design limitation, indeed.
 
-Nice to see more regmap-mmio usage!
+It works out ok because in this spi driver conversion we always
+map a SPI transfer into a single segment (similar to the
+spi-omap2-mcspi conversion). Since the SPI master can't handle
+bursts, the EDMA driver is able to handle any sized transfer
+without any performance penalty. If this SPI master could
+handle bursts, we'd be in trouble because we quickly run
+into our AB-synced max segment limitation.
 
-Reviwed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+In the mmc driver, we have a device that can handle bursts for
+performance reasons. It sets maxburst appropriately and the
+EDMA driver does the required AB-synced transfer at the h/w
+level. However, this is subject to our limitation of SZ_64K-1
+per segment. Luckily we aren't the first to need to limit the
+segment size coming into an mmc host driver. The mmc
+subsystem already handles this case and the existing driver
+using the private EDMA API was already advertising a maximum
+number of segments and segments size to the mmc subsystem.
+Ideally, we should have a dmaengine interface that allows
+for querying of these types of limitations. Right now, the
+mmc driver implicitly knows that EDMA needs this restriction
+but it's something that should be queried before calling
+prep_slave().
 
-from a regmap point of view.
-
-> +int imx_syscon_write(struct device_node *np, u32 reg, u32 val)
-> +{
-> +	struct device *dev;
-> +	struct imx_syscon *syscon;
-> +	int ret = 0;
-> +
-> +	dev = driver_find_device(&imx_syscon_driver.driver, NULL, np,
-> +				 imx_syscon_match);
-> +	if (!dev)
-> +		return -EPROBE_DEFER;
-> +
-> +	syscon = dev_get_drvdata(dev);
-> +	ret = regmap_write(syscon->regmap, reg, val);
-
-It'd be good to provide a way of retrieving the regmap so that drivers
-for subsystems with generic regmap code could use the framework features
-(regulator is one example that I just mentioned in my other mail).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120822/bde6a801/attachment.sig>
+-Matt
