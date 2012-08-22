@@ -1,7 +1,7 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 22 Aug 2012 10:43:56 +0200
-Subject: [PATCH 2/7] mfd/ab8500: MASK_ON_SUSPEND
-Message-ID: <1345625036-5643-1-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 22 Aug 2012 10:44:23 +0200
+Subject: [PATCH 6/7] mfd/stmpe: MASK_ON_SUSPEND
+Message-ID: <1345625063-5784-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,20 +25,33 @@ Cc: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Etienne Carriere <etienne.carriere@stericsson.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/mfd/ab8500-core.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/gpio/gpio-stmpe.c | 1 +
+ drivers/mfd/stmpe.c       | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index 626b4ec..b25a0b0 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -386,6 +386,7 @@ static struct irq_chip ab8500_irq_chip = {
- 	.irq_mask		= ab8500_irq_mask,
- 	.irq_disable		= ab8500_irq_mask,
- 	.irq_unmask		= ab8500_irq_unmask,
+diff --git a/drivers/gpio/gpio-stmpe.c b/drivers/gpio/gpio-stmpe.c
+index dce3472..2195abc 100644
+--- a/drivers/gpio/gpio-stmpe.c
++++ b/drivers/gpio/gpio-stmpe.c
+@@ -223,6 +223,7 @@ static struct irq_chip stmpe_gpio_irq_chip = {
+ 	.irq_mask		= stmpe_gpio_irq_mask,
+ 	.irq_unmask		= stmpe_gpio_irq_unmask,
+ 	.irq_set_type		= stmpe_gpio_irq_set_type,
 +	.flags			= IRQCHIP_MASK_ON_SUSPEND,
  };
  
- static int ab8500_handle_hierarchical_line(struct ab8500 *ab8500,
+ static irqreturn_t stmpe_gpio_irq(int irq, void *dev)
+diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
+index 2dd8d49..846b9c8 100644
+--- a/drivers/mfd/stmpe.c
++++ b/drivers/mfd/stmpe.c
+@@ -851,6 +851,7 @@ static struct irq_chip stmpe_irq_chip = {
+ 	.irq_bus_sync_unlock	= stmpe_irq_sync_unlock,
+ 	.irq_mask		= stmpe_irq_mask,
+ 	.irq_unmask		= stmpe_irq_unmask,
++	.flags			= IRQCHIP_MASK_ON_SUSPEND,
+ };
+ 
+ static int __devinit stmpe_irq_init(struct stmpe *stmpe)
 -- 
 1.7.11.3
