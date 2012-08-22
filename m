@@ -1,30 +1,28 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Wed, 22 Aug 2012 13:11:23 +0000
-Subject: [PATCH 1/5] ASoC/ARM: Davinci: McASP: split asp header into
- platform and audio specific
-In-Reply-To: <20120817223358.GI18871@opensource.wolfsonmicro.com>
-References: <1344948125-5649-1-git-send-email-gururaja.hebbar@ti.com>
- <1344948125-5649-2-git-send-email-gururaja.hebbar@ti.com>
- <20120817223358.GI18871@opensource.wolfsonmicro.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA67D44@DBDE01.ent.ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 22 Aug 2012 09:19:01 -0400 (EDT)
+Subject: ioremap() fail on physical address 0x0 in 3.4 kernel
+In-Reply-To: <20120822112339.GY18957@n2100.arm.linux.org.uk>
+References: <50339AF6.1060601@codeaurora.org>
+ <5033C428.2050607@codeaurora.org> <50348030.9080200@codeaurora.org>
+ <20120822095302.GX18957@n2100.arm.linux.org.uk>
+ <20120822112339.GY18957@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1208220918320.1754@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 18, 2012 at 04:03:58, Mark Brown wrote:
-> On Tue, Aug 14, 2012 at 06:12:01PM +0530, Hebbar, Gururaja wrote:
-> > Davinci McASP header & driver are shared by few OMAP platforms (like
-> > TI81xx, AM335x). Splitting asp header into Davinci platform specific
-> > header and Audio specific header helps to share them across platforms.
+On Wed, 22 Aug 2012, Russell King - ARM Linux wrote:
+
+> On Wed, Aug 22, 2012 at 10:53:02AM +0100, Russell King - ARM Linux wrote:
+> > @@ -826,7 +826,7 @@ static void __init fill_pmd_gaps(void)
+> >  
+> >  	/* we're still single threaded hence no lock needed here */
+> >  	for (vm = vmlist; vm; vm = vm->next) {
+> > -		if (!(vm->flags & VM_ARM_STATIC_MAPPING))
+> > +		if (!(vm->flags & (VM_ARM_STATIC_MAPPING | VM_ARM_EMPTY_MAPPING))
 > 
-> This doesn't apply against v3.6-rc2, I suspect there's overlapping
-> changes in arch/arm.  I was just going to apply it on a separate branch
-> to allow cross-tree merge if there's overlap with architecture work.
-> Can you please check and resend?
+> Not forgetting the additional close paren needed here...
 
-I will re-apply and send it as v2
-
-> 
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
 
-Regards, 
-Gururaja
+Nicolas
