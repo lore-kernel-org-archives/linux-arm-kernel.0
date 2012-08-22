@@ -1,33 +1,62 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Wed, 22 Aug 2012 13:50:09 +0000
-Subject: [PATCH 3/5] ASoC: Davinci: pcm: Add device tree bindings
-In-Reply-To: <20120817223122.GA21445@opensource.wolfsonmicro.com>
-References: <1344948125-5649-1-git-send-email-gururaja.hebbar@ti.com>
- <1344948125-5649-4-git-send-email-gururaja.hebbar@ti.com>
- <20120817223122.GA21445@opensource.wolfsonmicro.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA67DA1@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 22 Aug 2012 21:58:07 +0800
+Subject: [PATCH] ARM: dts: imx51-babbage: fix esdhc cd/wp properties
+Message-ID: <1345643887-30606-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 18, 2012 at 04:01:24, Mark Brown wrote:
-> On Tue, Aug 14, 2012 at 06:12:03PM +0530, Hebbar, Gururaja wrote:
-> > Device tree support for Davinci/OMAP2+ pcm driver.
-> 
-> This looks like it's a device which maps a shared DMA controller in the
-> SoC core into ASoC rather than actual hardware.  Such devices are
-> usually instantiated automatically from the DAI rather than being
-> represented in the device tree since they are a Linux internal thing
-> really - the Tegra and Freescale drivers provide examples of how this
-> sort of thing can be done.
+The binding doc and dts use properties "fsl,{cd,wp}-internal" while
+esdhc driver uses "fsl,{cd,wp}-controller".  Fix binding doc and dts
+to get them match driver code.
 
->From your for-3.7 branch, I could only find such implementation in Tegra
-Platform. 
-Most Freescale platforms implements this through a device/driver method.
-Exception being sound/soc/mxs/mxs-pcm.c
+Reported-by: Chris Ball <cjb@laptop.org>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: <stable@vger.kernel.org>
+---
+ .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |    8 ++++----
+ arch/arm/boot/dts/imx51-babbage.dts                |    4 ++--
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-So should I follow tegra implementation?
-> 
-
-
-Regards, 
-Gururaja
+diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+index 70cd49b..1dd6225 100644
+--- a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
++++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+@@ -10,8 +10,8 @@ Required properties:
+ - compatible : Should be "fsl,<chip>-esdhc"
+ 
+ Optional properties:
+-- fsl,cd-internal : Indicate to use controller internal card detection
+-- fsl,wp-internal : Indicate to use controller internal write protection
++- fsl,cd-controller : Indicate to use controller internal card detection
++- fsl,wp-controller : Indicate to use controller internal write protection
+ 
+ Examples:
+ 
+@@ -19,8 +19,8 @@ esdhc at 70004000 {
+ 	compatible = "fsl,imx51-esdhc";
+ 	reg = <0x70004000 0x4000>;
+ 	interrupts = <1>;
+-	fsl,cd-internal;
+-	fsl,wp-internal;
++	fsl,cd-controller;
++	fsl,wp-controller;
+ };
+ 
+ esdhc at 70008000 {
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index cd86177..59d9789 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -25,8 +25,8 @@
+ 		aips at 70000000 { /* aips-1 */
+ 			spba at 70000000 {
+ 				esdhc at 70004000 { /* ESDHC1 */
+-					fsl,cd-internal;
+-					fsl,wp-internal;
++					fsl,cd-controller;
++					fsl,wp-controller;
+ 					status = "okay";
+ 				};
+ 
+-- 
+1.7.5.4
