@@ -1,71 +1,46 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Wed, 22 Aug 2012 07:06:17 +0000
-Subject: [PATCH 1/5] ASoC/ARM: Davinci: McASP: split asp header into
- platform and audio specific
-In-Reply-To: <502E89D8.2090304@ti.com>
-References: <1344948125-5649-1-git-send-email-gururaja.hebbar@ti.com>
- <1344948125-5649-2-git-send-email-gururaja.hebbar@ti.com>
- <502E89D8.2090304@ti.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA64A1D@DBDE01.ent.ti.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 22 Aug 2012 15:18:41 +0800
+Subject: [PATCH 0/7] add imx-syscon driver for general registers access
+Message-ID: <1345619928-15446-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 17, 2012 at 23:43:44, Nori, Sekhar wrote:
-> Hi Gururaja,
-> 
-> On 8/14/2012 6:12 PM, Hebbar, Gururaja wrote:
-> > Davinci McASP header & driver are shared by few OMAP platforms (like
-> > TI81xx, AM335x). Splitting asp header into Davinci platform specific
-> > header and Audio specific header helps to share them across platforms.
-> > 
-> > Audio specific defines is moved to to common
-> > <linux/platform_data/davinci_asp.h> so that the header can be
-> > accessed by all related platforms.
-> > 
-> > While here, correct the header usage (remove multiple header
-> > re-definitions and unused headers) and remove platform names from
-> > structures comments and enum
-> > 
-> > Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
-> > Acked-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> 
-> This patch looks good to me. See a minor nit below.
-> 
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
-> 
-> > diff --git a/arch/arm/mach-davinci/asp.h b/arch/arm/mach-davinci/asp.h
-> > new file mode 100644
-> > index 0000000..8fd5238
-> > --- /dev/null
-> > +++ b/arch/arm/mach-davinci/asp.h
-> > @@ -0,0 +1,49 @@
-> > +/*
-> > + * TI DaVinci Audio definitions
-> > + */
-> > +#ifndef __ASM_ARCH_DAVINCI_ASP_H
-> > +#define __ASM_ARCH_DAVINCI_ASP_H
-> > +
-> > +/* Bases of dm644x and dm355 register banks */
-> > +#define DAVINCI_ASP0_BASE	0x01E02000
-> > +#define DAVINCI_ASP1_BASE	0x01E04000
-> > +
-> > +/* Bases of dm365 register banks */
-> > +#define DAVINCI_DM365_ASP0_BASE	0x01D02000
-> > +
-> > +/* Bases of dm646x register banks */
-> > +#define	DAVINCI_DM646X_MCASP0_REG_BASE		0x01D01000
-> > +#define DAVINCI_DM646X_MCASP1_REG_BASE		0x01D01800
-> 
-> Can you remove usage of tabs after 'define'. I understand this is coming
-> from existing code.
+This patch series mainly adds an imx-syscon driver which is used to access
+general system controller registers like IOMUXC GPR and ANATOP,
+after that, we convert all the exist private access general registers code to use
+standard API from imx-syscon to access registers.
+Finally we remove the old mfd anatop driver which is only for anatop register
+access.
 
-Ok. I have got few more comments from Mark. Will add this into it.
+The patch series is based on linus's tree since commit 9160338.
 
-> 
-> Thanks,
-> Sekhar
-> 
+Dong Aisheng (7):
+  mfd: add imx syscon driver based on regmap
+  ARM: imx6q: add iomuxc gpr support into imx-syscon
+  ARM: imx6q: add anatop support into imx-syscon
+  regulator: anatop-regulator: convert to use imx-syscon to access
+    anatop register
+  ARM: imx6q: convert to use imx-syscon to access anatop registers
+  ARM: dts: imx6q: add simple-bus compatible string for anatop
+  mfd: anatop-mfd: remove anatop driver
 
-
-Regards, 
-Gururaja
+ .../devicetree/bindings/mfd/imx-syscon.txt         |   11 +
+ arch/arm/boot/dts/imx6q.dtsi                       |   15 +-
+ arch/arm/mach-imx/Kconfig                          |    2 +-
+ arch/arm/mach-imx/mach-imx6q.c                     |   25 +--
+ drivers/mfd/Kconfig                                |   14 +-
+ drivers/mfd/Makefile                               |    2 +-
+ drivers/mfd/anatop-mfd.c                           |  124 --------
+ drivers/mfd/imx-syscon.c                           |  193 ++++++++++++
+ drivers/regulator/Kconfig                          |    2 +-
+ drivers/regulator/anatop-regulator.c               |   17 +-
+ include/linux/fsl/imx6q-iomuxc-gpr.h               |  319 ++++++++++++++++++++
+ include/linux/mfd/anatop.h                         |   40 ---
+ include/linux/mfd/imx-syscon.h                     |   22 ++
+ 13 files changed, 585 insertions(+), 201 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/imx-syscon.txt
+ delete mode 100644 drivers/mfd/anatop-mfd.c
+ create mode 100644 drivers/mfd/imx-syscon.c
+ create mode 100644 include/linux/fsl/imx6q-iomuxc-gpr.h
+ delete mode 100644 include/linux/mfd/anatop.h
+ create mode 100644 include/linux/mfd/imx-syscon.h
