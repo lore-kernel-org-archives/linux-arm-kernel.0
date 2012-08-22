@@ -1,41 +1,44 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 22 Aug 2012 10:43:06 +0200
-Subject: [PATCH 0/7] Ux500 and MASK_ON_SUSPEND
-Message-ID: <1345624986-5557-1-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 22 Aug 2012 10:44:09 +0200
+Subject: [PATCH 4/7] mfd/db8500-prcmu: MASK_ON_SUSPEND
+Message-ID: <1345625049-5714-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+From: Etienne Carriere <etienne.carriere@stericsson.com>
 
-We have discovered transient IRQs when going to suspend on the
-Ux500 platform. This patch series hits all sources by marking
-the applicable IRQchips with MASK_ON_SUSPEND.
+ux500 machines performs pins (GPIO) reconfiguration when entering
+in the suspended mode. This reconfiguration aims at reaching an ultra
+low power HW configuration.
 
-I don't know if this is a common problem or seen in other
-platforms so comments are welcome.
+Due to this HW reconfiguration, some HW devices can change of HW state
+and have their output signals at level that could generate IRQs.
 
-Else I request that the patches be merged into respective
-subtree, I will take care of the ux500, gpio and pinctrl
-patches myself, while Sam gets to merge all the MFD stuff.
+If the non-wakeup IRQs are disabled but not yet masked (delayed interrupt
+disable feature from the generic irq layer), effective interrupts reach
+the system only because the system attempt to enter the suspended mode.
 
-Etienne Carriere (7):
-  ux500: GIC: MASK_ON_SUSPEND
-  mfd/ab8500: MASK_ON_SUSPEND
-  gpio/ab8500: MASK_ON_SUSPEND
-  mfd/db8500-prcmu: MASK_ON_SUSPEND
-  pinctrl/nomdik: MASK_ON_SUSPEND
-  mfd/stmpe: MASK_ON_SUSPEND
-  mfd/tc3589x: MASK_ON_SUSPEND
+To prevent such IRQs to trig, all irq chips embedded in ux500 platform
+should enable their IRQCHIP_MASK_ON_SUSPEND flag.
 
- arch/arm/mach-ux500/cpu.c         | 2 ++
- drivers/gpio/gpio-ab8500.c        | 1 +
- drivers/gpio/gpio-stmpe.c         | 1 +
- drivers/gpio/gpio-tc3589x.c       | 1 +
- drivers/mfd/ab8500-core.c         | 1 +
- drivers/mfd/db8500-prcmu.c        | 1 +
- drivers/mfd/stmpe.c               | 1 +
- drivers/pinctrl/pinctrl-nomadik.c | 1 +
- 8 files changed, 9 insertions(+)
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Signed-off-by: Etienne Carriere <etienne.carriere@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/mfd/db8500-prcmu.c | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index 7040a00..25d2e9d 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -2615,6 +2615,7 @@ static struct irq_chip prcmu_irq_chip = {
+ 	.irq_ack	= noop,
+ 	.irq_mask	= prcmu_irq_mask,
+ 	.irq_unmask	= prcmu_irq_unmask,
++	.flags		= IRQCHIP_MASK_ON_SUSPEND,
+ };
+ 
+ static char *fw_project_name(u8 project)
 -- 
 1.7.11.3
