@@ -1,48 +1,55 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Aug 2012 16:29:37 +0200
-Subject: [PATCH 1/4] ARM: export read_current_timer
+Date: Wed, 22 Aug 2012 16:29:40 +0200
+Subject: [PATCH 4/4] ARM: kprobes: make more tests conditional
 In-Reply-To: <1345645780-2749-1-git-send-email-arnd@arndb.de>
 References: <1345645780-2749-1-git-send-email-arnd@arndb.de>
-Message-ID: <1345645780-2749-2-git-send-email-arnd@arndb.de>
+Message-ID: <1345645780-2749-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-read_current_timer is used in the get_cycles() function when
-ARM_ARCH_TIMER is set, and that function can be inlined into
-driver modules, so we should export the function to avoid
-errors like
+The mls instruction is not available in ARMv6K or below, so we
+should make the test conditional on at least ARMv7. ldrex/strex
+are available in ARMv6K or ARMv7, which we can test by checking
+the CONFIG_CPU_32v6K symbol. Just testing for ARMv6 is not enough.
 
-ERROR: "read_current_timer" [drivers/video/udlfb.ko] undefined!
-ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
+/tmp/ccuMTZ8D.s: Assembler messages:
+/tmp/ccuMTZ8D.s:22188: Error: selected processor does not support ARM mode `mls r0,r1,r2,r3'
+/tmp/ccuMTZ8D.s:22222: Error: selected processor does not support ARM mode `mlshi r7,r8,r9,r10'
+/tmp/ccuMTZ8D.s:22252: Error: selected processor does not support ARM mode `mls lr,r1,r2,r13'
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Jon Medhurst <tixy@yxit.co.uk>
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Leif Lindholm <leif.lindholm@arm.com>
 ---
- arch/arm/kernel/arch_timer.c |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/kernel/kprobes-test-arm.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index cf25880..6327d1f 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -14,6 +14,7 @@
- #include <linux/device.h>
- #include <linux/smp.h>
- #include <linux/cpu.h>
-+#include <linux/export.h>
- #include <linux/jiffies.h>
- #include <linux/clockchips.h>
- #include <linux/interrupt.h>
-@@ -232,6 +233,7 @@ int read_current_timer(unsigned long *timer_val)
- 	*timer_val = arch_counter_get_cntpct();
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(read_current_timer);
+diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/kernel/kprobes-test-arm.c
+index 38c1a3b..3e87ff7 100644
+--- a/arch/arm/kernel/kprobes-test-arm.c
++++ b/arch/arm/kernel/kprobes-test-arm.c
+@@ -367,9 +367,11 @@ void kprobe_arm_test_cases(void)
+ 	TEST_UNSUPPORTED(".word 0xe0500090 @ undef")
+ 	TEST_UNSUPPORTED(".word 0xe05fff9f @ undef")
  
- static struct clocksource clocksource_counter = {
- 	.name	= "arch_sys_counter",
++#if __LINUX_ARM_ARCH__ >= 7
+ 	TEST_RRR(  "mls		r0, r",1, VAL1,", r",2, VAL2,", r",3,  VAL3,"")
+ 	TEST_RRR(  "mlshi	r7, r",8, VAL3,", r",9, VAL1,", r",10, VAL2,"")
+ 	TEST_RR(   "mls		lr, r",1, VAL2,", r",2, VAL3,", r13")
++#endif
+ 	TEST_UNSUPPORTED(".word 0xe06f3291 @ mls pc, r1, r2, r3")
+ 	TEST_UNSUPPORTED(".word 0xe060329f @ mls r0, pc, r2, r3")
+ 	TEST_UNSUPPORTED(".word 0xe0603f91 @ mls r0, r1, pc, r3")
+@@ -454,7 +456,7 @@ void kprobe_arm_test_cases(void)
+ 	TEST_UNSUPPORTED(".word	0xe1500090") /* Unallocated space */
+ 	TEST_UNSUPPORTED(".word	0xe1600090") /* Unallocated space */
+ 	TEST_UNSUPPORTED(".word	0xe1700090") /* Unallocated space */
+-#if __LINUX_ARM_ARCH__ >= 6
++#ifdef CONFIG_CPU_32v6K
+ 	TEST_UNSUPPORTED("ldrex	r2, [sp]")
+ 	TEST_UNSUPPORTED("strexd	r0, r2, r3, [sp]")
+ 	TEST_UNSUPPORTED("ldrexd	r2, r3, [sp]")
 -- 
 1.7.10
