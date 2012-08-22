@@ -1,15 +1,17 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 23 Aug 2012 00:25:10 +0200
-Subject: [PATCH RESEND] mtd: lpc32xx_mlc: Make driver independent of AMBA DMA
+Date: Thu, 23 Aug 2012 00:25:11 +0200
+Subject: [PATCH RESEND] mtd: lpc32xx_slc: Make driver independent of AMBA DMA
  engine driver
-Message-ID: <1345674311-16874-1-git-send-email-stigge@antcom.de>
+In-Reply-To: <1345674311-16874-1-git-send-email-stigge@antcom.de>
+References: <1345674311-16874-1-git-send-email-stigge@antcom.de>
+Message-ID: <1345674311-16874-2-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes the MLC NAND driver independent of the single AMBA DMA engine
+This patch makes the SLC NAND driver independent of the single AMBA DMA engine
 driver by using the platform data provided dma_filter callback.
 
-(This also fixes the build error of the MLC NAND driver in case of module
+(This also fixes the build error of the SLC NAND driver in case of module
 linking because the (not exported) reference to pl08x_filter_id is gone now.)
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
@@ -17,30 +19,30 @@ Signed-off-by: Roland Stigge <stigge@antcom.de>
 ---
 Applies to: v3.6-rc2
 
- drivers/mtd/nand/lpc32xx_mlc.c  |   13 +++++++++++--
- include/linux/mtd/lpc32xx_mlc.h |   20 ++++++++++++++++++++
+ drivers/mtd/nand/lpc32xx_slc.c  |   13 +++++++++++--
+ include/linux/mtd/lpc32xx_slc.h |   20 ++++++++++++++++++++
  2 files changed, 31 insertions(+), 2 deletions(-)
 
---- linux-2.6.orig/drivers/mtd/nand/lpc32xx_mlc.c
-+++ linux-2.6/drivers/mtd/nand/lpc32xx_mlc.c
+--- linux-2.6.orig/drivers/mtd/nand/lpc32xx_slc.c
++++ linux-2.6/drivers/mtd/nand/lpc32xx_slc.c
 @@ -37,7 +37,7 @@
  #include <linux/of.h>
  #include <linux/of_mtd.h>
  #include <linux/of_gpio.h>
 -#include <linux/amba/pl08x.h>
-+#include <linux/mtd/lpc32xx_mlc.h>
- #include <linux/io.h>
- #include <linux/mm.h>
- #include <linux/dma-mapping.h>
-@@ -171,6 +171,7 @@ static struct nand_bbt_descr lpc32xx_nan
++#include <linux/mtd/lpc32xx_slc.h>
+ 
+ #define LPC32XX_MODNAME		"lpc32xx-nand"
+ 
+@@ -199,6 +199,7 @@ struct lpc32xx_nand_cfg_slc {
  
  struct lpc32xx_nand_host {
  	struct nand_chip	nand_chip;
-+	struct lpc32xx_mlc_platform_data *pdata;
++	struct lpc32xx_slc_platform_data *pdata;
  	struct clk		*clk;
  	struct mtd_info		mtd;
  	void __iomem		*io_base;
-@@ -581,9 +582,15 @@ static int lpc32xx_dma_setup(struct lpc3
+@@ -714,9 +715,15 @@ static int lpc32xx_nand_dma_setup(struct
  	struct mtd_info *mtd = &host->mtd;
  	dma_cap_mask_t mask;
  
@@ -51,26 +53,26 @@ Applies to: v3.6-rc2
 +
  	dma_cap_zero(mask);
  	dma_cap_set(DMA_SLAVE, mask);
--	host->dma_chan = dma_request_channel(mask, pl08x_filter_id, "nand-mlc");
+-	host->dma_chan = dma_request_channel(mask, pl08x_filter_id, "nand-slc");
 +	host->dma_chan = dma_request_channel(mask, host->pdata->dma_filter,
-+					     "nand-mlc");
++					     "nand-slc");
  	if (!host->dma_chan) {
  		dev_err(mtd->dev.parent, "Failed to request DMA channel\n");
  		return -EBUSY;
-@@ -703,6 +710,8 @@ static int __devinit lpc32xx_nand_probe(
+@@ -814,6 +821,8 @@ static int __devinit lpc32xx_nand_probe(
  	}
  	lpc32xx_wp_disable(host);
  
 +	host->pdata = pdev->dev.platform_data;
 +
- 	nand_chip->priv = host;		/* link the private data structures */
- 	mtd->priv = nand_chip;
- 	mtd->owner = THIS_MODULE;
+ 	mtd = &host->mtd;
+ 	chip = &host->nand_chip;
+ 	chip->priv = host;
 --- /dev/null
-+++ linux-2.6/include/linux/mtd/lpc32xx_mlc.h
++++ linux-2.6/include/linux/mtd/lpc32xx_slc.h
 @@ -0,0 +1,20 @@
 +/*
-+ * Platform data for LPC32xx SoC MLC NAND controller
++ * Platform data for LPC32xx SoC SLC NAND controller
 + *
 + * Copyright (C) 2012 Roland Stigge
 + *
@@ -79,13 +81,13 @@ Applies to: v3.6-rc2
 + * published by the Free Software Foundation.
 + */
 +
-+#ifndef __LINUX_MTD_LPC32XX_MLC_H
-+#define __LINUX_MTD_LPC32XX_MLC_H
++#ifndef __LINUX_MTD_LPC32XX_SLC_H
++#define __LINUX_MTD_LPC32XX_SLC_H
 +
 +#include <linux/dmaengine.h>
 +
-+struct lpc32xx_mlc_platform_data {
++struct lpc32xx_slc_platform_data {
 +	bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
 +};
 +
-+#endif  /* __LINUX_MTD_LPC32XX_MLC_H */
++#endif  /* __LINUX_MTD_LPC32XX_SLC_H */
