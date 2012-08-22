@@ -1,51 +1,44 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 22 Aug 2012 16:52:36 +0800
-Subject: [PATCH 6/7] ARM: dts: imx6q: add simple-bus compatible string
- for anatop
-In-Reply-To: <1345619928-15446-7-git-send-email-b29396@freescale.com>
-References: <1345619928-15446-1-git-send-email-b29396@freescale.com>
- <1345619928-15446-7-git-send-email-b29396@freescale.com>
-Message-ID: <20120822085236.GK4011@b20223-02.ap.freescale.net>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 22 Aug 2012 11:12:28 +0200
+Subject: [PATCH] ARM: ux500: implement set_wake() callback for the GIC
+Message-ID: <1345626748-29057-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2012 at 03:18:47PM +0800, Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> Originally the anatop regulator devices are populated by mfd anatop driver.
-> Since mfd anatop driver will be deleted later, we change to populate the
-> regulator devices by devicetree automatically.
-> This will cause some warning messages as follows during boot due to device
-> recreation: "vdd1p1: Failed to create debugfs directory"
-> But it does not break any function.
-> Later, we will remove mfd anatop driver which can get rid of this
-> error message.
-> 
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> ---
->  arch/arm/boot/dts/imx6q.dtsi |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index 7076be0..426f735 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -379,7 +379,7 @@
->  			};
->  
->  			anatop: anatop at 020c8000 {
-> -				compatible = "fsl,imx6q-anatop", "fsl,imx-syscon";
-> +				compatible = "fsl,imx6q-anatop", "fsl,imx-syscon", "simple-bus";
-To prevent bisect break, it should merge with patch #4.
-It's really strange to use simple-bus, because it's not a bus.
-I like more the way how anatop driver handle it. Anatop driver populate
-devices in its code.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Thanks
-Richard
->  				reg = <0x020c8000 0x1000>;
->  				interrupts = <0 49 0x04 0 54 0x04 0 127 0x04>;
->  
-> -- 
-> 1.7.0.4
-> 
+The Ux500 will be able to wake up on any IRQ, so implement a
+.set_wake() callback that just returns 0 instead of the default
+in common/gic.c which returns an error if you try to set
+wakeup on the GIC.
+
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/cpu.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
+index e2360e7..24598e2 100644
+--- a/arch/arm/mach-ux500/cpu.c
++++ b/arch/arm/mach-ux500/cpu.c
+@@ -46,11 +46,18 @@ static const struct of_device_id ux500_dt_irq_match[] = {
+ 	{},
+ };
+ 
++static int ux500_gic_irq_set_wake(struct irq_data *d, unsigned int on)
++{
++	return 0;
++}
++
+ void __init ux500_init_irq(void)
+ {
+ 	void __iomem *dist_base;
+ 	void __iomem *cpu_base;
+ 
++	gic_arch_extn.irq_set_wake = ux500_gic_irq_set_wake;
++
+ 	if (cpu_is_u8500_family()) {
+ 		dist_base = __io_address(U8500_GIC_DIST_BASE);
+ 		cpu_base = __io_address(U8500_GIC_CPU_BASE);
+-- 
+1.7.11.3
