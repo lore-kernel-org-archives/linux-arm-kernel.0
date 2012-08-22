@@ -1,81 +1,78 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 22 Aug 2012 13:52:45 -0600
-Subject: Can one  set GPIO direction in pinmux definition?
-In-Reply-To: <5034FCB2.5040709@grid-net.com>
-References: <5034FCB2.5040709@grid-net.com>
-Message-ID: <5035388D.2060909@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Aug 2012 20:04:05 +0000
+Subject: [PATCH 0/4] [RFC] ARM: multiplatform: rename all mach headers
+In-Reply-To: <50353689.6060404@wwwdotorg.org>
+References: <201208221253.07278.arnd@arndb.de> <50353689.6060404@wwwdotorg.org>
+Message-ID: <201208222004.06179.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2012 09:37 AM, Subodh Nijsure wrote:
+On Wednesday 22 August 2012, Stephen Warren wrote:
+> On 08/22/2012 06:53 AM, Arnd Bergmann wrote:
+> > I've created this series some time ago, and updated it now to
+> > v3.6-rc1. The idea is to get us a big step closer to the
+> > single zImage kernel across multiple ARM platforms by
+> > untangling the duplicate header file names.
+> > 
+> > There are two branches available in the arm-soc tree:
+> > 
+> > 1. This series,
+> >    http://git.kernel.org/?p=linux/kernel/git/arm/arm-soc.git;a=shortlog;h=refs/heads/testing/mach-headers
+> >    This just moves header files around and changes most of the
+> >    files including them. There are a few remaining drivers
+> >    and platform files that keep including a generic file name
+> >    like <mach/uncompress.h>....
 > 
-> For a MX28 based hardware I am working with I need to use AUART4
+> FWIW, I merged this with next-20120820, ignored all the non-Tegra
+> conflicts, and it built and ran just fine on Tegra. There were a lot of
+> conflicts overall though...
+
+Ah, very cool, thanks for the testing. If you want, you can also
+try to merge in the testing/randconfig branch and see how far
+you get with enabling tegra in there. That does however require
+that you also use the COMMON_CLK and SPARSE_IRQ options, and I'm
+not sure what your status on those is.
+
+> > I would like to get the first series merged in v3.7 if we can agree
+> > on the general approach. So far, feedback in Linaro internal
+> > meetings has been very positive, but Russell had concerns when
+> > we first discussed it a few months ago.
+> > 
+> > A patch set this large means a lot of churn, and there are a few
+> > ways we could deal with this:
+> > 
+> > a) Put the branch into linux-next now, and have everyone who
+> > encounters conflicts pull it into their own branch to resolve
+> > the conflicts. This can be a lot of work, and it means we
+> > cannot rebase this branch any more.
 > 
-> I need to configure this AUART4 as uart only when necessary and at all
-> other times pins associated with AUART4 need to be configured as inputs.
+> I did a very quick test of rebasing all the Tegra branches onto this,
+> and it worked out to be very easy; very few conflicts and mostly just
+> files deleted in the Tegra tree this time around. One of the Tegra
+> branches depends on v3.6-rc2 in order to pick up some changes that
+> conflict with changes made there. If we convert to dmaengine in 3.7,
+> then we'll probably depend on a later v3.6-rc for a dmaengine driver
+> bug-fix. Does it make sense to rebase this mach-headers onto a later
+> v3.6-rc? I suppose I could branch from v3.6-rc2, merge in mach-headers,
+> and then build on that if needed.
 
-Out of curiosity, why?
+It's only problematic if multiple people merge the same branch with
+later -rc releases and fix the same conflicts in different ways.
+If we get such conflicts, it would probably be best if I merge a
+new -rc into my branch and let other people base on my merge
+commit.
 
-BTW, you didn't CC any of the IMX maintainers, so it's likely they won't
-see your question. I've CC'd LinusW, Shawn, and Dong.
-
-> I am using following DT definitions to setup AUART4 mux  but can't
-> figure out how to setup pin direction via DT, can it be done or I need
-> to do it in C code?
+> > b) Involve Linus Torvalds in the process and get him to
+> > take the series at the end of the v3.7 merge window, after
+> > rebasing it on top of all the other branches he merged.
+> > This means it happens pretty much ad-hoc and there is little
+> > testing on the patches that actually get merged.
 > 
->         apb at 80000000 {
->                 apbh at 80000000 {
->                                 auart4_pins_a: auart4 at 0 {
->                                         reg = <0>;
->                                         fsl,pinmux-ids = <
->                                                 0x3142 /*
-> MX28_PAD_SAIF0_MCLK__AUART4_CTS */
->                                                 0x3152 /*
-> MX28_PAD_SAIF0_LRCLK__AUART4_RTS */
->                                                 0x3162 /*
-> MX28_PAD_SAIF0_BITCLK__AUART4_RX */
->                                                 0x3172 /*
-> MX28_PAD_SAIF0_SDATA0__AUART4_TX */
->                                         >;
->                                         fsl,drive-strength = <0>;
->                                         fsl,voltage = <1>;
->                                         fsl,pull-up = <0>;
->                                 };
->                                 auart4_highz_pins: auart4-gpio at 0 {
->                                         reg = <0>;
->                                         fsl,pinmux-ids = <
->                                                 0x3143 /*
-> MX28_PAD_SAIF0_MCLK__GPIO_3_20 */
->                                                 0x3153 /*
-> MX28_PAD_SAIF0_LRCLK__GPIO_3_21 */
->                                                 0x3163 /*
-> MX28_PAD_SAIF0_BITCLK__GPIO_3_22 */
->                                                 0x3173 /*
-> MX28_PAD_SAIF0_SDATA0__GPIO_3_23 */
->                                         >;
->                                         fsl,drive-strength = <0>;
->                                         fsl,voltage = <1>;
->                                         fsl,pull-up = <0>;
->                                 };
->                  };
->           };
+> Given the number of merge conflicts this has with next-20120820, that
+> sounds like a lot of work you need to do at the end of the merge window,
+> but I suppose if it's mostly scripted, it wouldn't be too hard to
+> recreate the series in a short time.
 
-I don't know IMX HW, but where is highz controlled? On other SoCs I'm
-familiar with, when a pad is configured as a GPIO, the highz state is
-controlled by the GPIO module, so there's nothing pinmux can do about
-it. Even if the pinmux HW does control highz, gpio_direction_*() are
-still meant to communicate with the pinctrl driver to implement this, so
-overriding it through the pinctrl configuration seems like a bad thing.
+Yes, I've done it a few times.
 
-So I think your UART driver would have to request the GPIOs, and set
-them as inputs. So, I guess your UART node below would need a property
-listing the GPIOs to do this to.
-
->                 apbx at 80040000 {
->                         auart4: serial at 80072000 {
->                                 pinctrl-names = "default", "auart";
->                                 pinctrl-0 = <&auart4_highz_pins>;
->                                 pinctrl-1 = <&auart4_pins_a>;
->                                 status = "okay";
->                         };
->                };
+	Arnd
