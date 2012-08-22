@@ -1,45 +1,123 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 22 Aug 2012 17:18:16 -0600
-Subject: Can one  set GPIO direction in pinmux definition?
-In-Reply-To: <503558B8.4010603@grid-net.com>
-References: <5034FCB2.5040709@grid-net.com> <5035388D.2060909@wwwdotorg.org>
- <503558B8.4010603@grid-net.com>
-Message-ID: <503568B8.4080501@wwwdotorg.org>
+From: tixy@yxit.co.uk (Tixy)
+Date: Thu, 23 Aug 2012 00:51:01 +0100
+Subject: [PATCHv3 4/4] ARM: kprobes: make more tests conditional
+In-Reply-To: <201208221841.29645.arnd@arndb.de>
+References: <1345645780-2749-1-git-send-email-arnd@arndb.de>
+ <201208221519.12056.arnd@arndb.de>
+ <alpine.LFD.2.02.1208221136180.1754@xanadu.home>
+ <201208221841.29645.arnd@arndb.de>
+Message-ID: <1345679461.3601.20.camel@computer5.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2012 04:10 PM, Subodh Nijsure wrote:
-> On 08/22/2012 12:52 PM, Stephen Warren wrote:
->> On 08/22/2012 09:37 AM, Subodh Nijsure wrote:
->>> For a MX28 based hardware I am working with I need to use AUART4
->>>
->>> I need to configure this AUART4 as uart only when necessary and at all
->>> other times pins associated with AUART4 need to be configured as inputs.
->> Out of curiosity, why?
->
-> Our hardware is connected to external equipment, electric meter via this
-> UART.
-> This electricity meter can also be read externally by an optical reader.
-> Since this is a shared bus, we can't be sitting on that bus with our
-> interface configured as UART as it prevents optical reader from talking
-> to the meter. There are ways we can tell is optical meter is connected,
-> if we detect that its connected we configure these pins as input else
-> configure them for UART functionality.
+On Wed, 2012-08-22 at 18:41 +0000, Arnd Bergmann wrote:
+> On Wednesday 22 August 2012, Nicolas Pitre wrote:
+> > On Wed, 22 Aug 2012, Arnd Bergmann wrote:
+> > > > 
+> > > > The ldrex/strex instructions are available on ARMv6.  It's only the d 
+> > > > variants (strexd/ldrexd) which are only available from ARMv6k.
+> > > 
+> > > Ok. How is the version below then? I haven't tested this one yet.
+> > 
+> > In fact, I think the b variants are ARMv6k+ as well.  Only the plain 
+> > (non b non d) variants are available on ARMv6.
+> 
+> Ok, third attempt then. This leaves ldrex for ARMv6 but marks
+> {st,ld}rex{b,h,d} as V6K specific (which includes ARMv7).
 
-OK, I guess it was something like that. Can the optical be
-plugged/unplugged at run-time, or is it a one-off thing? pinctrl would
-be appropriate for runtime. Maybe not so much for one-off detection at
-boot-time.
+ARMv7 does set CPU_32v6K, because arch/arm/mm/Kconfig has
 
-I wonder whether making the UART driver do the switching is the right
-thing though. I assume that:
+config CPU_V7
+	bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
+	select CPU_32v6K
+	select CPU_32v7
 
-* The UART driver can be used on systems (boards) that never have this
-HW configuration, and don't care about this at all.
+but this seems more for peripheral reasons not because all the various
+CPU configs systematically select the earlier architecture variants,
+e.g. CPU_V7 doesn't select CPU_32v6.
 
-* The detection of optical meter presence is entirely unrelated to the UART.
+So I would have been inclined to test for
 
-So probably, the muxing can be seen as completely external and unrelated
-to the UART HW module itself. Would it be better represented as a
-completely standalone and custom "RS232 bus mux" node/device instead of
-tacking this into the UART driver?
+#if defined(CONFIG_CPU_32v6K) || (__LINUX_ARM_ARCH__ >= 7) 
+
+but as the current patch is functionally correct I'm not going to
+suggest a v4 patch :-)
+
+If you do feel so inclined for a v4 however ;-) you could also make the
+mls part of the patch tidier by moving the added #endif to instead
+terminate the preceding "#if __LINUX_ARM_ARCH__ >= 6", i.e.
+
+@@ -367,8 +367,10 @@ void kprobe_arm_test_cases(void)
+ 	TEST_UNSUPPORTED(".word 0xe0500090 @ undef")
+ 	TEST_UNSUPPORTED(".word 0xe05fff9f @ undef")
++#endif
+ 
++#if __LINUX_ARM_ARCH__ >= 7
+ 	TEST_RRR(  "mls		r0, r",1, VAL1,", r",2, VAL2,", r",3,  VAL3,"")
+ 	TEST_RRR(  "mlshi	r7, r",8, VAL3,", r",9, VAL1,", r",10, VAL2,"")
+ 	TEST_RR(   "mls		lr, r",1, VAL2,", r",2, VAL3,", r13")
+
+
+this looks funny in patch form, but the resulting source file is more
+consistent with other conditional tests.
+
+
+> 	Arnd
+> 
+> 8<-----
+> From 6eab418c61c18393006f30d189e2f28d6e403040 Mon Sep 17 00:00:00 2001
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Thu, 16 Aug 2012 07:49:31 +0000
+> Subject: [PATCH] ARM: kprobes: make more tests conditional
+> 
+> The mls instruction is not available in ARMv6K or below, so we
+> should make the test conditional on at least ARMv7. ldrexd/strexd
+> are available in ARMv6K or ARMv7, which we can test by checking
+> the CONFIG_CPU_32v6K symbol. Just testing for ARMv6 is not enough.
+> 
+> /tmp/ccuMTZ8D.s: Assembler messages:
+> /tmp/ccuMTZ8D.s:22188: Error: selected processor does not support ARM mode `mls r0,r1,r2,r3'
+> /tmp/ccuMTZ8D.s:22222: Error: selected processor does not support ARM mode `mlshi r7,r8,r9,r10'
+> /tmp/ccuMTZ8D.s:22252: Error: selected processor does not support ARM mode `mls lr,r1,r2,r13'
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Jon Medhurst <tixy@yxit.co.uk>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Leif Lindholm <leif.lindholm@arm.com>
+> ---
+>  arch/arm/kernel/kprobes-test-arm.c |    4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/kernel/kprobes-test-arm.c
+> index 38c1a3b..58dd6c3 100644
+> --- a/arch/arm/kernel/kprobes-test-arm.c
+> +++ b/arch/arm/kernel/kprobes-test-arm.c
+> @@ -367,9 +367,11 @@ void kprobe_arm_test_cases(void)
+>  	TEST_UNSUPPORTED(".word 0xe0500090 @ undef")
+>  	TEST_UNSUPPORTED(".word 0xe05fff9f @ undef")
+>  
+> +#if __LINUX_ARM_ARCH__ >= 7
+>  	TEST_RRR(  "mls		r0, r",1, VAL1,", r",2, VAL2,", r",3,  VAL3,"")
+>  	TEST_RRR(  "mlshi	r7, r",8, VAL3,", r",9, VAL1,", r",10, VAL2,"")
+>  	TEST_RR(   "mls		lr, r",1, VAL2,", r",2, VAL3,", r13")
+> +#endif
+>  	TEST_UNSUPPORTED(".word 0xe06f3291 @ mls pc, r1, r2, r3")
+>  	TEST_UNSUPPORTED(".word 0xe060329f @ mls r0, pc, r2, r3")
+>  	TEST_UNSUPPORTED(".word 0xe0603f91 @ mls r0, r1, pc, r3")
+> @@ -456,6 +458,7 @@ void kprobe_arm_test_cases(void)
+>  	TEST_UNSUPPORTED(".word	0xe1700090") /* Unallocated space */
+>  #if __LINUX_ARM_ARCH__ >= 6
+>  	TEST_UNSUPPORTED("ldrex	r2, [sp]")
+> +#ifdef CONFIG_CPU_32v6K
+>  	TEST_UNSUPPORTED("strexd	r0, r2, r3, [sp]")
+>  	TEST_UNSUPPORTED("ldrexd	r2, r3, [sp]")
+>  	TEST_UNSUPPORTED("strexb	r0, r2, [sp]")
+> @@ -463,6 +466,7 @@ void kprobe_arm_test_cases(void)
+>  	TEST_UNSUPPORTED("strexh	r0, r2, [sp]")
+>  	TEST_UNSUPPORTED("ldrexh	r2, [sp]")
+>  #endif
+> +#endif
+>  	TEST_GROUP("Extra load/store instructions")
+>  
+>  	TEST_RPR(  "strh	r",0, VAL1,", [r",1, 48,", -r",2, 24,"]")
