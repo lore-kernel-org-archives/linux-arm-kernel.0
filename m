@@ -1,92 +1,33 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 23 Aug 2012 09:32:35 +1200
-Subject: [PATCHv3 7/9] arm: vt8500: doc: Add device tree bindings for
- arch-vt8500 devices
-In-Reply-To: <50354A09.7070507@wwwdotorg.org>
-References: <1345582058-2291-1-git-send-email-linux@prisktech.co.nz>
- <1345582058-2291-8-git-send-email-linux@prisktech.co.nz>
- <50354A09.7070507@wwwdotorg.org>
-Message-ID: <1345671155.2090.8.camel@gitbox>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Aug 2012 22:43:23 +0100
+Subject: [PATCH 4/4] [RFC] ARM: treewide: manually change more
+ mach-*/*.h includes
+In-Reply-To: <201208221301.19439.arnd@arndb.de>
+References: <201208221253.07278.arnd@arndb.de>
+ <201208221301.19439.arnd@arndb.de>
+Message-ID: <20120822214323.GA12255@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-08-22 at 15:07 -0600, Stephen Warren wrote:
-> On 08/21/2012 02:47 PM, Tony Prisk wrote:
-> > Bindings for gpio, interrupt controller, power management controller,
-> > timer, realtime clock, serial uart, ehci and uhci controllers and
-> > framebuffer controllers used on the arch-vt8500 platform.
-> > 
-> > Framebuffer binding also specifies a 'display' node which is required
-> > for determining the lcd panel data.
-> 
-> > diff --git a/Documentation/devicetree/bindings/gpio/gpio_vt8500.txt b/Documentation/devicetree/bindings/gpio/gpio_vt8500.txt
-> 
-> > +- #gpio-cells : should be <3>.
-> > +	1) bank
-> > +	2) pin number
-> > +	3) flags
-> 
-> Should this enumerate what legal values are for flags, or point at a
-> standard document that does?
+On Wed, Aug 22, 2012 at 01:01:19PM +0000, Arnd Bergmann wrote:
+> These are lots of device drivers that include machine
+> specific header files from ARM platforms and that are
+> not easily scriptable. The changes have been found through
+> manual inspection and should cause no visible changes
+> because of the build script that maps the old names to the
+> new ones.
 
-There currently are no supported flags - guess this was an oversight.
-I'll take a look if there are any that we might require in the future
-and implement them otherwise I'll drop the flags reference.
+And you end up missing a bunch of drivers in the process, such as the
+sa1100 RTC driver which is shared between sa11x0 and PXA.  I wonder
+how many of the Samsung platforms get broken by this as well...
 
-> 
-> > diff --git a/Documentation/devicetree/bindings/tty/serial/via,vt8500-uart.txt b/Documentation/devicetree/bindings/tty/serial/via,vt8500-uart.txt
-> 
-> > +	uart at d8210000 {
-> > +		compatible = "via,vt8500-uart";
-> > +		reg = <0xd8210000 0x1040>;
-> > +		interrupts = <47>;
-> > +	};
-> 
-> How does the UART know what frequency its clock input is, in order to
-> calculate dividers? Should there be a clocks property to link to the
-> input clock, so the rate can be queried? If so, a reference to the
-> common clock binding, plus a specification of which clocks must be
-> listed in the clock property should be included here.
-> 
+In any case, what we _should_ be doing here as well is moving the headers
+included by drivers for platform data out of the arch/arm/mach/ subtrees
+and into include/linux/platform_data.  That will substantially reduce the
+amount of mach/ headers to deal with.
 
-I didn't revisit the code that had already been posted in v1/v2 when I
-added the common clock code and there was no clock handling code at that
-point. The uart's are all clocked via a clkgen that outputs 24Mhz and
-this was hardcoded in the driver.
-I will correct this and add the appropriate device tree entries and
-documentation.
-
-> > diff --git a/Documentation/devicetree/bindings/video/via,vt8500-fb.txt b/Documentation/devicetree/bindings/video/via,vt8500-fb.txt
-> 
-> > +VIA VT8500 Display
-> > +-----------------------------------------------------
-> > +Required properties:
-> > +- xres : lcd panel horizontal resolution
-> > +- yres : lcd panel vertical resolution
-> > +- left-margin,
-> > +- right-margin,
-> > +- hsync-len: lcd panel horizontal timings in pixels
-> > +- upper-margin,
-> > +- lower-margin,
-> > +- vsync-len: lcd panel verticals timings in pixels
-> > +- bpp: lcd panel bit-depth.
-> > +	<16> for RGB565, <32> for RGB888
-> 
-> Shouldn't this reference Sascha Hauer's binding document (although I
-> suppose it isn't checked in yet), and just document the additions? I
-> wonder if this binding should be written assuming Sascha's binding doc
-> will be checked in?
-
-I haven't seen Sascha's binding yet - I'm not even sure its been agreed
-upon but it does seem to be the most likely candidate so far. Hopefully
-it will get accepted in this window, and I will have time to do exactly
-as you commented, which was the plan from the start. This binding was
-based on the most current one I had seen suggested at the time.
-
-
-Given the additional comments for this patch set, and the required
-changes I'll hold off posting v4 until everything is tidied up.
-
-Regards
-
-Tony Prisk
+Where I want this to get to is not a persistence of the existing crappy
+situation where platforms stuff platform data definitions into arch/arm,
+but instead put them in the right place.  That means providing them with
+a good reason why the existing solution won't work, and not allowing
+mach/ includes in drivers is a very good way to achieve that.
