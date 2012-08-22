@@ -1,127 +1,55 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 22 Aug 2012 18:38:54 +0900
-Subject: [PATCH] ARM: SAMSUNG: use spin_lock_irqsave() in clk_set_parent
-In-Reply-To: <1345058187-18843-1-git-send-email-msb@chromium.org>
-References: <1345058187-18843-1-git-send-email-msb@chromium.org>
-Message-ID: <1b3701cd8049$f20e16f0$d62a44d0$%kim@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Aug 2012 10:53:02 +0100
+Subject: ioremap() fail on physical address 0x0 in 3.4 kernel
+In-Reply-To: <50348030.9080200@codeaurora.org>
+References: <50339AF6.1060601@codeaurora.org>
+ <5033C428.2050607@codeaurora.org> <50348030.9080200@codeaurora.org>
+Message-ID: <20120822095302.GX18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mandeep Singh Baines wrote:
-> 
-> From 0cdf3aff, "ARM: SAMSUNG: use spin_lock_irqsave() in
-> clk_{enable,disable}":
-> 
->   The clk_enable()and clk_disable() can be used process and ISR either.
->   And actually it is used for real product and other platforms use it
->   now. So spin_lock_irqsave() should be used instead.
-> 
-> We need to make a similar change in clk_set_parent(). Otherwise,
-> you can potentially get spinlock recursion:
-> 
-> BUG: spinlock recursion on CPU#0, kinteractive/68
->  lock: 807832a8, .magic: dead4ead, .owner: kinteractive/68, .owner_cpu: 0
-> [<80015f54>] (unwind_backtrace+0x0/0x128) from [<804f2914>]
-> (dump_stack+0x20/0x24)
-> [<804f2914>] (dump_stack+0x20/0x24) from [<804f57b8>]
-(spin_dump+0x80/0x94)
-> [<804f57b8>] (spin_dump+0x80/0x94) from [<804f57f8>] (spin_bug+0x2c/0x30)
-> [<804f57f8>] (spin_bug+0x2c/0x30) from [<80222730>]
-> (do_raw_spin_lock+0x54/0x150)
-> [<80222730>] (do_raw_spin_lock+0x54/0x150) from [<804f96ec>]
-> (_raw_spin_lock_irqsave+0x20/0x28)
-> [<804f96ec>] (_raw_spin_lock_irqsave+0x20/0x28) from [<80022ea4>]
-> (clk_enable+0x3c/0x84)
-> [<80022ea4>] (clk_enable+0x3c/0x84) from [<8038336c>]
-> (s5p_mfc_clock_on+0x60/0x74)
-> [<8038336c>] (s5p_mfc_clock_on+0x60/0x74) from [<8038645c>]
-> (s5p_mfc_read_info+0x20/0x38)
-> [<8038645c>] (s5p_mfc_read_info+0x20/0x38) from [<8037ca3c>]
-> (s5p_mfc_handle_frame+0x2e4/0x4bc)
-> [<8037ca3c>] (s5p_mfc_handle_frame+0x2e4/0x4bc) from [<8037d420>]
-> (s5p_mfc_irq+0x1ec/0x6cc)
-> [<8037d420>] (s5p_mfc_irq+0x1ec/0x6cc) from [<8007fc74>]
-> (handle_irq_event_percpu+0x8c/0x244)
-> [<8007fc74>] (handle_irq_event_percpu+0x8c/0x244) from [<8007fe78>]
-> (handle_irq_event+0x4c/0x6c)
-> [<8007fe78>] (handle_irq_event+0x4c/0x6c) from [<80082dd8>]
-> (handle_fasteoi_irq+0xe4/0x150)
-> [<80082dd8>] (handle_fasteoi_irq+0xe4/0x150) from [<8007f424>]
-> (generic_handle_irq+0x3c/0x50)
-> [<8007f424>] (generic_handle_irq+0x3c/0x50) from [<8000f7c4>]
-> (handle_IRQ+0x88/0xc8)
-> [<8000f7c4>] (handle_IRQ+0x88/0xc8) from [<80008564>]
-> (gic_handle_irq+0x44/0x68)
-> [<80008564>] (gic_handle_irq+0x44/0x68) from [<8000e400>]
-> (__irq_svc+0x40/0x60)
-> Exception stack(0xef3cbe68 to 0xef3cbeb0)
-> [<8000e400>] (__irq_svc+0x40/0x60) from [<80022cfc>]
-> (clk_set_parent+0x30/0x74)
-> [<80022cfc>] (clk_set_parent+0x30/0x74) from [<803ac7f8>]
-> (set_apll.isra.0+0x28/0xb0)
-> [<803ac7f8>] (set_apll.isra.0+0x28/0xb0) from [<803ac8e4>]
-> (exynos5250_set_frequency+0x64/0xb8)
-> [<803ac8e4>] (exynos5250_set_frequency+0x64/0xb8) from [<803ac280>]
-> (exynos_target+0x1b0/0x220)
-> [<803ac280>] (exynos_target+0x1b0/0x220) from [<803a4a0c>]
-> (__cpufreq_driver_target+0xb0/0xd4)
-> [<803a4a0c>] (__cpufreq_driver_target+0xb0/0xd4) from [<803aab80>]
-> (cpufreq_interactive_updown_task+0x214/0x264)
-> [<803aab80>] (cpufreq_interactive_updown_task+0x214/0x264) from
-> [<80047d04>] (kthread+0x9c/0xa8)
-> [<80047d04>] (kthread+0x9c/0xa8) from [<8000fa48>]
-> (kernel_thread_exit+0x0/0x8)
-> 
-> Signed-off-by: Mandeep Singh Baines <msb@chromium.org>
-> Suggested-by: Sunil Mazhavanchery <sunilm@samsung.com>
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: linux-samsung-soc at vger.kernel.org
-> CC: Ben Dooks <ben-linux@fluff.org>
-> CC: Kukjin Kim <kgene.kim@samsung.com>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: Minho Ban <mhban@samsung.com>
-> CC: Jaecheol Lee <jc.lee@samsung.com>
-> CC: Sunyoung Kang <sy0816.kang@samsung.com>
-> CC: Kukjin Kim <kgene.kim@samsung.com>
-> CC: Olof Johansson <olofj@chromium.org>
-> ---
->  arch/arm/plat-samsung/clock.c |    5 +++--
->  1 files changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
-> index 65c5eca..80eacca 100644
-> --- a/arch/arm/plat-samsung/clock.c
-> +++ b/arch/arm/plat-samsung/clock.c
-> @@ -173,17 +173,18 @@ struct clk *clk_get_parent(struct clk *clk)
-> 
->  int clk_set_parent(struct clk *clk, struct clk *parent)
->  {
-> +	unsigned long flags;
->  	int ret = 0;
-> 
->  	if (IS_ERR(clk))
->  		return -EINVAL;
-> 
-> -	spin_lock(&clocks_lock);
-> +	spin_lock_irqsave(&clocks_lock, flags);
-> 
->  	if (clk->ops && clk->ops->set_parent)
->  		ret = (clk->ops->set_parent)(clk, parent);
-> 
-> -	spin_unlock(&clocks_lock);
-> +	spin_unlock_irqrestore(&clocks_lock, flags);
-> 
->  	return ret;
->  }
-> --
-> 1.7.7.3
+On Wed, Aug 22, 2012 at 12:16:08PM +0530, Trilok Soni wrote:
+> Thanks for the patch, but how about just checking pmd_none on such  
+> addresses and since there won't be any mapping created for such gaps? We  
+> need to check if this is fine for all, since I remember that Nico
+> added these functions for the OMAP boot issue I guess.
 
-Yup, right. Applied.
+A better solution would be as below - this requires no changes to the
+existing ioremap code, we just mark these differently.
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
+index 2e8a1ef..87fa3f2 100644
+--- a/arch/arm/mm/mm.h
++++ b/arch/arm/mm/mm.h
+@@ -55,6 +55,9 @@ extern void __flush_dcache_page(struct address_space *mapping, struct page *page
+ /* permanent static mappings from iotable_init() */
+ #define VM_ARM_STATIC_MAPPING	0x40000000
+ 
++/* empty mapping */
++#define VM_ARM_EMPTY_MAPPING	0x20000000
++
+ /* mapping type (attributes) for permanent static mappings */
+ #define VM_ARM_MTYPE(mt)		((mt) << 20)
+ #define VM_ARM_MTYPE_MASK	(0x1f << 20)
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index cf4528d..da90ef1 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -813,7 +813,7 @@ static void __init pmd_empty_section_gap(unsigned long addr)
+ 	vm = early_alloc_aligned(sizeof(*vm), __alignof__(*vm));
+ 	vm->addr = (void *)addr;
+ 	vm->size = SECTION_SIZE;
+-	vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
++	vm->flags = VM_IOREMAP | VM_ARM_EMPTY_MAPPING;
+ 	vm->caller = pmd_empty_section_gap;
+ 	vm_area_add_early(vm);
+ }
+@@ -826,7 +826,7 @@ static void __init fill_pmd_gaps(void)
+ 
+ 	/* we're still single threaded hence no lock needed here */
+ 	for (vm = vmlist; vm; vm = vm->next) {
+-		if (!(vm->flags & VM_ARM_STATIC_MAPPING))
++		if (!(vm->flags & (VM_ARM_STATIC_MAPPING | VM_ARM_EMPTY_MAPPING))
+ 			continue;
+ 		addr = (unsigned long)vm->addr;
+ 		if (addr < next)
