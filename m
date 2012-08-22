@@ -1,32 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 22 Aug 2012 11:21:32 +0200
-Subject: [rtc-linux] [PATCHv3 8/9] arm: vt8500: gpio: Devicetree support
- for arch-vt8500
-In-Reply-To: <1345582058-2291-9-git-send-email-linux@prisktech.co.nz>
-References: <1345582058-2291-1-git-send-email-linux@prisktech.co.nz>
- <1345582058-2291-9-git-send-email-linux@prisktech.co.nz>
-Message-ID: <CACRpkdZnQyLSRQ6cRpFBurAv2cv44einGAsT86FLCqsj1euDMA@mail.gmail.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Wed, 22 Aug 2012 09:26:36 +0000
+Subject: [PATCH 5/5] ASoC: tlv320aic3x: Add device tree bindings
+In-Reply-To: <20120817224512.GL18871@opensource.wolfsonmicro.com>
+References: <1344948125-5649-1-git-send-email-gururaja.hebbar@ti.com>
+ <1344948125-5649-6-git-send-email-gururaja.hebbar@ti.com>
+ <20120817224512.GL18871@opensource.wolfsonmicro.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA64BA4@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2012 at 10:47 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
+On Sat, Aug 18, 2012 at 04:15:13, Mark Brown wrote:
+> On Tue, Aug 14, 2012 at 06:12:05PM +0530, Hebbar, Gururaja wrote:
+> 
+> > +- gpio-reset - <int> -  gpio pin number used for codec reset
+> 
+> This should be a standard DT GPIO reference by phandle like:
+> 
+> 	gpio = <&gpio1 16 0>;
 
-> Converted the existing arch-vt8500 gpio to a platform_device.
-> Added support for WM8505 and WM8650 GPIO controllers.
-(...)
-> +       unsigned val;
+I will correct in V2
 
-I asked about the datatype for this "val", it sure isn't "unsigned".
+> 
+> There's quite a few examples in tree.
+> 
+> Otherwise this looks good.
+> 
 
-I suspected the registers were only 8bit and so it should be u8.
-But atleast use u32 if you must use all these bits.
+Thanks for all the reviews.
 
-(...)
-> +       val = readl(vt8500_chip->base + vt8500_chip->regs->en);
-> +       val |= BIT(offset);
-> +       writel(val, vt8500_chip->base + vt8500_chip->regs->en);
-
-BTW: have you considered [readl|writel]_relaxed?
-
-Yours,
-Linus Walleij
+Regards, 
+Gururaja
