@@ -1,55 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Aug 2012 10:53:02 +0100
-Subject: ioremap() fail on physical address 0x0 in 3.4 kernel
-In-Reply-To: <50348030.9080200@codeaurora.org>
-References: <50339AF6.1060601@codeaurora.org>
- <5033C428.2050607@codeaurora.org> <50348030.9080200@codeaurora.org>
-Message-ID: <20120822095302.GX18957@n2100.arm.linux.org.uk>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 22 Aug 2012 13:09:59 +0300
+Subject: [PATCHv6 2/2] ARM: dma-mapping: remove custom consistent dma
+ region
+In-Reply-To: <00c301cd7fad$cfc7f3f0$6f57dbd0$%szyprowski@samsung.com>
+References: <1343636899-19508-1-git-send-email-m.szyprowski@samsung.com>
+ <1343636899-19508-3-git-send-email-m.szyprowski@samsung.com>
+ <20120821142235.97984abc9ad98d01015a3338@nvidia.com>
+ <20120821.151521.702882672715065253.hdoyu@nvidia.com>
+ <00c301cd7fad$cfc7f3f0$6f57dbd0$%szyprowski@samsung.com>
+Message-ID: <20120822130959.183933b51c45c4245e44478d@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2012 at 12:16:08PM +0530, Trilok Soni wrote:
-> Thanks for the patch, but how about just checking pmd_none on such  
-> addresses and since there won't be any mapping created for such gaps? We  
-> need to check if this is fine for all, since I remember that Nico
-> added these functions for the OMAP boot issue I guess.
+Hi Marek,
 
-A better solution would be as below - this requires no changes to the
-existing ioremap code, we just mark these differently.
+On Tue, 21 Aug 2012 17:01:08 +0200
+Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 
-diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
-index 2e8a1ef..87fa3f2 100644
---- a/arch/arm/mm/mm.h
-+++ b/arch/arm/mm/mm.h
-@@ -55,6 +55,9 @@ extern void __flush_dcache_page(struct address_space *mapping, struct page *page
- /* permanent static mappings from iotable_init() */
- #define VM_ARM_STATIC_MAPPING	0x40000000
- 
-+/* empty mapping */
-+#define VM_ARM_EMPTY_MAPPING	0x20000000
-+
- /* mapping type (attributes) for permanent static mappings */
- #define VM_ARM_MTYPE(mt)		((mt) << 20)
- #define VM_ARM_MTYPE_MASK	(0x1f << 20)
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index cf4528d..da90ef1 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -813,7 +813,7 @@ static void __init pmd_empty_section_gap(unsigned long addr)
- 	vm = early_alloc_aligned(sizeof(*vm), __alignof__(*vm));
- 	vm->addr = (void *)addr;
- 	vm->size = SECTION_SIZE;
--	vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
-+	vm->flags = VM_IOREMAP | VM_ARM_EMPTY_MAPPING;
- 	vm->caller = pmd_empty_section_gap;
- 	vm_area_add_early(vm);
- }
-@@ -826,7 +826,7 @@ static void __init fill_pmd_gaps(void)
- 
- 	/* we're still single threaded hence no lock needed here */
- 	for (vm = vmlist; vm; vm = vm->next) {
--		if (!(vm->flags & VM_ARM_STATIC_MAPPING))
-+		if (!(vm->flags & (VM_ARM_STATIC_MAPPING | VM_ARM_EMPTY_MAPPING))
- 			continue;
- 		addr = (unsigned long)vm->addr;
- 		if (addr < next)
+> > > > -__iommu_alloc_remap(struct page **pages, size_t size, gfp_t gfp, pgprot_t prot)
+> > > > +__iommu_alloc_remap(struct page **pages, size_t size, gfp_t gfp, pgprot_t prot,
+> > > > +                   const void *caller)
+> > > >  {
+> > > > -       struct arm_vmregion *c;
+> > > > -       size_t align;
+> > > > -       size_t count = size >> PAGE_SHIFT;
+> > > > -       int bit;
+> > > > +       unsigned int i, nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+> > > > +       struct vm_struct *area;
+> > > > +       unsigned long p;
+> > > >
+> > > > -       if (!consistent_pte[0]) {
+> > > > -               pr_err("%s: not initialised\n", __func__);
+> > > > -               dump_stack();
+> > > > +       area = get_vm_area_caller(size, VM_ARM_DMA_CONSISTENT | VM_USERMAP,
+> > > > +                                 caller);
+> > > > +       if (!area)
+> > >
+> > > This patch replaced the custom "consistent_pte" with
+> > > get_vm_area_caller()", which breaks the compatibility with the
+> > > existing driver. This causes the following kernel oops(*1). That
+> > > driver has called dma_pool_alloc() to allocate memory from the
+> > > interrupt context, and it hits BUG_ON(in_interrpt()) in
+> > > "get_vm_area_caller()"(*2). Regardless of the badness of allocation
+> > > from interrupt handler in the driver, I have the following question.
+> > >
+> > > The following "__get_vm_area_node()" can take gfp_mask, it means that
+> > > this function is expected to be called from atomic context, but why
+> > > it's _NOT_ allowed _ONLY_ from interrupt context?
+> > >
+> > > According to the following definitions, "in_interrupt()" is in "in_atomic()".
+> > >
+> > > #define in_interrupt()	(preempt_count() & (HARDIRQ_MASK | SOFTIRQ_MASK | NMI_MASK))
+> > > #define in_atomic()	((preempt_count() & ~PREEMPT_ACTIVE) != 0)
+> > >
+> > > Does anyone know why BUG_ON(in_interrupt()) is set in __get_vm_area_node(*3)?
+> > 
+> > For arm_dma_alloc(), it allocates from the pool if GFP_ATOMIC, but for
+> > arm_iommu_alloc_attrs() doesn't have pre-allocate pool at all, and it
+> > always call "get_vm_area_caller()". That's why it hits BUG(). But
+> > still I don't understand why it's not BUG_ON(in_atomic) as Russell
+> > already pointed out(*1).
+> > 
+> > *1: http://article.gmane.org/gmane.linux.kernel.mm/76708
+> 
+> Ok, now I see the problem. I will try to find out a solution for your issue.
+
+My explanation wasn't so good.
+
+For a solution, I thought that, in order to allow IOMMU'able device
+drivers to allocate memory from atomic context/ISR, there were the
+following 2 solutions:
+
+(1) To provide the pre-allocate area like arm_dma_alloc() does,
+or
+(2) __get_vm_area_node() can be called from ISR.
+
+But (2) doesn't work because PGALLOC_GFP(GFP_KERNEL) is used to
+allocate a page table. This is called from:
+
+  arm_iommu_alloc_attrs() ->
+    __iommu_alloc_remap() ->
+      ioremap_page_range() ->
+        .....              ->
+          pte_alloc_one_kernel() ->
+              pte = (pte_t *)__get_free_page(PGALLOC_GFP);
+
+We always have to avoid changing a page table for atomic
+allocation. So for me, the only remaining solution is
+(1) pre-allocation. We can make use of the same atomic pool both for
+DMA and IOMMU. I'll send the patch.
