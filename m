@@ -1,36 +1,52 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 22 Aug 2012 10:09:34 +0530
-Subject: [PATCH v2 4/4] ARM: EXYNOS: skip wakeup interrupt setup if
- pinctrl driver is used
-In-Reply-To: <CACRpkdaxSZZQwefN3FNvv3ctXFHqaLZoAZ5f8CVu7Tx9n6-v1Q@mail.gmail.com>
-References: <1345060656-32201-1-git-send-email-thomas.abraham@linaro.org>
- <1345060656-32201-5-git-send-email-thomas.abraham@linaro.org>
- <CACRpkdaxSZZQwefN3FNvv3ctXFHqaLZoAZ5f8CVu7Tx9n6-v1Q@mail.gmail.com>
-Message-ID: <CAJuYYwTsYNWRo7uraELdv=KJvXm-7F9JFb9ZrFvEYrcwJvBMmA@mail.gmail.com>
+Date: Wed, 22 Aug 2012 10:28:08 +0530
+Subject: [PATCH 2/2] ARM: EXYNOS: Enable PINCTRL config option for Exynos4
+ device tree enabled platform
+In-Reply-To: <CACRpkda9BiGejU+Qs=1CqKgLxLGumcM4QZOb_og-aAAmKr-0VQ@mail.gmail.com>
+References: <1345061442-32378-1-git-send-email-thomas.abraham@linaro.org>
+ <1345061442-32378-3-git-send-email-thomas.abraham@linaro.org>
+ <CACRpkda9BiGejU+Qs=1CqKgLxLGumcM4QZOb_og-aAAmKr-0VQ@mail.gmail.com>
+Message-ID: <CAJuYYwQnia6xB0AgmQ9UKH1Ot+-C=ABzQ7LC8shdjxwKGGP0oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 August 2012 17:34, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Aug 15, 2012 at 9:57 PM, Thomas Abraham
+On 21 August 2012 18:01, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Aug 15, 2012 at 10:10 PM, Thomas Abraham
 > <thomas.abraham@linaro.org> wrote:
 >
->> Pinctrl driver includes support for configuring the external wakeup
->> interrupts. On exynos platforms that use pinctrl driver, the setup
->> of wakeup interrupts in the exynos platform code can be skipped.
+>> This enables support for Samsung and Exynos4 pinctrl driver for device
+>> tree enabled Exynos4 platforms.
 >>
 >> Cc: Kukjin Kim <kgene.kim@samsung.com>
 >> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> ---
+>>  arch/arm/mach-exynos/Kconfig |    1 +
+>>  1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+>> index b5b4c8c..ad96c59 100644
+>> --- a/arch/arm/mach-exynos/Kconfig
+>> +++ b/arch/arm/mach-exynos/Kconfig
+>> @@ -405,6 +405,7 @@ config MACH_EXYNOS4_DT
+>>         select USE_OF
+>>         select ARM_AMBA
+>>         select HAVE_SAMSUNG_KEYPAD if INPUT_KEYBOARD
+>> +       select PINCTRL
 >
->> +#ifdef CONFIG_OF
->
-> Don't you actually want to use:
->
-> #fidef CONFIG_PINCTRL_SAMSUNG
->
-> here? CONFIG_OF is a bit vague.
+> I don't think this works, since PINCTRL_SAMSUNG is not default "y"
+> (nor should it be).
 
-Ok. I will use CONFIG_PINCTRL_SAMSUNG here.
+I think I got this wrong. PINCTRL_SAMSUNG depends of OF, which is not
+correct. The correct way would be select PINCTRL_SAMSUNG from
+PINCTRL_EXYNOS4. I will fix this.
 
+>
+> For the platforms I converted I had to select both the subsystem and
+> the indivudual driver, as is already done for some GPIO controllers
+> for example:
+>
+> select PINCTRL
+> select PINCTRL_SAMSUNG
 >
 > Yours,
 > Linus Walleij
