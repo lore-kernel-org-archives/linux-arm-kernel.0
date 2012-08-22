@@ -1,303 +1,84 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 22 Aug 2012 21:36:30 +0800
-Subject: [PATCH v2 4/4] clk: mxs: replace imx23 clk_register_clkdev with clock
- DT lookup
-In-Reply-To: <1345642590-29905-1-git-send-email-shawn.guo@linaro.org>
-References: <1345642590-29905-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1345642590-29905-5-git-send-email-shawn.guo@linaro.org>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 22 Aug 2012 15:36:48 +0200
+Subject: [RFC 2/4] ARM: dma-mapping: IOMMU allocates pages from pool
+ with GFP_ATOMIC
+In-Reply-To: <CAHQjnOOF7Ca-Dz8K_zcS=gxQsJvKYaWA3tqUeK1RSd-wLYZ44w@mail.gmail.com>
+References: <1345630830-9586-1-git-send-email-hdoyu@nvidia.com><1345630830-9586-3-git-send-email-hdoyu@nvidia.com><CAHQjnOOF7Ca-Dz8K_zcS=gxQsJvKYaWA3tqUeK1RSd-wLYZ44w@mail.gmail.com>
+Message-ID: <20120822.163648.3800987367886904.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It really becomes a maintenance issue that every time a device needs
-to look up (clk_get) a clock we have to patch kernel clock file to call
-clk_register_clkdev for that clock.
+Hi,
 
-Since clock DT support which is meant to resolve clock lookup in device
-tree is in place, the patch moves imx23 client devices' clock lookup
-over to device tree, so that any new lookup to be added at later time
-can just get done in DT instead of kernel.
+KyongHo Cho <pullip.cho@samsung.com> wrote @ Wed, 22 Aug 2012 14:47:00 +0200:
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> vzalloc() call in __iommu_alloc_buffer() also causes BUG() in atomic context.
+
+Right.
+
+I've been thinking that kzalloc() may be enough here, since
+vzalloc() was introduced to avoid allocation failure for big chunk of
+memory, but I think that it's unlikely that the number of page array
+can be so big. So I propose to drop vzalloc() here, and just simply to
+use kzalloc only as below(*1).
+
+For example, 
+
+1920(H) x 1080(W) x 4(bytes) ~= 8MiB
+
+For 8 MiB buffer,
+  8(MiB) * 1024 = 8192(KiB)
+  8192(KiB) / 4(KiB/page) = 2048 pages
+  sizeof(struct page *) = 4 bytes
+  2048(pages) * 4(bytes/page) = 8192(bytes) = 8(KiB)
+  8(KiB) / 4(KiB/page) = 2 pages
+
+If the above estimation is right(I hope;)), the necessary pages are
+_at most_ 2 pages. If the system gets into the situation to fail to
+allocate 2 contiguous pages, that's real the problem. I guess that
+that kind of fragmentation problem would be solved with page migration
+or something, especially nowadays devices are getting larger memories.
+
+*1:
+>From a613c40d1b3d4fb1577cdb0807a74e8dbd08a3e6 Mon Sep 17 00:00:00 2001
+From: Hiroshi Doyu <hdoyu@nvidia.com>
+Date: Wed, 22 Aug 2012 16:25:54 +0300
+Subject: [PATCH 1/1] ARM: dma-mapping: Use only kzalloc without vzalloc
+
+Use only kzalloc for atomic allocation.
+
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
- .../devicetree/bindings/clock/imx23-clock.txt      |   76 ++++++++++++++++++++
- arch/arm/boot/dts/imx23.dtsi                       |   16 ++++-
- drivers/clk/mxs/clk-imx23.c                        |   55 +++------------
- 3 files changed, 100 insertions(+), 47 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/imx23-clock.txt
+ arch/arm/mm/dma-mapping.c |   10 ++--------
+ 1 files changed, 2 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/imx23-clock.txt b/Documentation/devicetree/bindings/clock/imx23-clock.txt
-new file mode 100644
-index 0000000..a0b867e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/imx23-clock.txt
-@@ -0,0 +1,76 @@
-+* Clock bindings for Freescale i.MX23
-+
-+Required properties:
-+- compatible: Should be "fsl,imx23-clkctrl"
-+- reg: Address and length of the register set
-+- #clock-cells: Should be <1>
-+
-+The clock consumer should specify the desired clock by having the clock
-+ID in its "clocks" phandle cell.  The following is a full list of i.MX23
-+clocks and IDs.
-+
-+	Clock		ID
-+	------------------
-+	ref_xtal	0
-+	pll		1
-+	ref_cpu		2
-+	ref_emi		3
-+	ref_pix		4
-+	ref_io		5
-+	saif_sel	6
-+	lcdif_sel	7
-+	gpmi_sel	8
-+	ssp_sel		9
-+	emi_sel		10
-+	cpu		11
-+	etm_sel		12
-+	cpu_pll		13
-+	cpu_xtal	14
-+	hbus		15
-+	xbus		16
-+	lcdif_div	17
-+	ssp_div		18
-+	gpmi_div	19
-+	emi_pll		20
-+	emi_xtal	21
-+	etm_div		22
-+	saif_div	23
-+	clk32k_div	24
-+	rtc		25
-+	adc		26
-+	spdif_div	27
-+	clk32k		28
-+	dri		29
-+	pwm		30
-+	filt		31
-+	uart		32
-+	ssp		33
-+	gpmi		34
-+	spdif		35
-+	emi		36
-+	saif		37
-+	lcdif		38
-+	etm		39
-+	usb		40
-+	usb_pwr		41
-+
-+Examples:
-+
-+clks: clkctrl at 80040000 {
-+	compatible = "fsl,imx23-clkctrl";
-+	reg = <0x80040000 0x2000>;
-+	#clock-cells = <1>;
-+	clock-output-names =
-+		...
-+		"uart",		/* 32 */
-+		...
-+		"end_of_list";
-+};
-+
-+auart0: serial at 8006c000 {
-+	compatible = "fsl,imx23-auart";
-+	reg = <0x8006c000 0x2000>;
-+	interrupts = <24 25 23>;
-+	clocks = <&clks 32>;
-+	status = "disabled";
-+};
-diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index e613831..ba55bee 100644
---- a/arch/arm/boot/dts/imx23.dtsi
-+++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -52,6 +52,7 @@
- 			dma-apbh at 80004000 {
- 				compatible = "fsl,imx23-dma-apbh";
- 				reg = <0x80004000 0x2000>;
-+				clocks = <&clks 15>;
- 			};
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 4656c0f..d4f1cf2 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1083,10 +1083,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
+ 	int count = size >> PAGE_SHIFT;
+ 	int array_size = count * sizeof(struct page *);
  
- 			ecc at 80008000 {
-@@ -67,6 +68,7 @@
- 				reg-names = "gpmi-nand", "bch";
- 				interrupts = <13>, <56>;
- 				interrupt-names = "gpmi-dma", "bch";
-+				clocks = <&clks 34>;
- 				fsl,gpmi-dma-channel = <4>;
- 				status = "disabled";
- 			};
-@@ -74,6 +76,7 @@
- 			ssp0: ssp at 80010000 {
- 				reg = <0x80010000 0x2000>;
- 				interrupts = <15 14>;
-+				clocks = <&clks 33>;
- 				fsl,ssp-dma-channel = <1>;
- 				status = "disabled";
- 			};
-@@ -280,6 +283,7 @@
- 			dma-apbx at 80024000 {
- 				compatible = "fsl,imx23-dma-apbx";
- 				reg = <0x80024000 0x2000>;
-+				clocks = <&clks 16>;
- 			};
+-	if (array_size <= PAGE_SIZE)
+-		pages = kzalloc(array_size, gfp);
+-	else
+-		pages = vzalloc(array_size);
++	pages = kzalloc(array_size, gfp);
+ 	if (!pages)
+ 		return NULL;
  
- 			dcp at 80028000 {
-@@ -306,12 +310,14 @@
- 				compatible = "fsl,imx23-lcdif";
- 				reg = <0x80030000 2000>;
- 				interrupts = <46 45>;
-+				clocks = <&clks 38>;
- 				status = "disabled";
- 			};
+@@ -1107,10 +1104,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
  
- 			ssp1: ssp at 80034000 {
- 				reg = <0x80034000 0x2000>;
- 				interrupts = <2 20>;
-+				clocks = <&clks 33>;
- 				fsl,ssp-dma-channel = <2>;
- 				status = "disabled";
- 			};
-@@ -329,9 +335,10 @@
- 			reg = <0x80040000 0x40000>;
- 			ranges;
- 
--			clkctl at 80040000 {
-+			clks: clkctrl at 80040000 {
-+				compatible = "fsl,imx23-clkctrl";
- 				reg = <0x80040000 0x2000>;
--				status = "disabled";
-+				#clock-cells = <1>;
- 			};
- 
- 			saif0: saif at 80042000 {
-@@ -383,6 +390,7 @@
- 			pwm: pwm at 80064000 {
- 				compatible = "fsl,imx23-pwm";
- 				reg = <0x80064000 0x2000>;
-+				clocks = <&clks 30>;
- 				#pwm-cells = <2>;
- 				fsl,pwm-number = <5>;
- 				status = "disabled";
-@@ -397,6 +405,7 @@
- 				compatible = "fsl,imx23-auart";
- 				reg = <0x8006c000 0x2000>;
- 				interrupts = <24 25 23>;
-+				clocks = <&clks 32>;
- 				status = "disabled";
- 			};
- 
-@@ -404,6 +413,7 @@
- 				compatible = "fsl,imx23-auart";
- 				reg = <0x8006e000 0x2000>;
- 				interrupts = <59 60 58>;
-+				clocks = <&clks 32>;
- 				status = "disabled";
- 			};
- 
-@@ -411,6 +421,8 @@
- 				compatible = "arm,pl011", "arm,primecell";
- 				reg = <0x80070000 0x2000>;
- 				interrupts = <0>;
-+				clocks = <&clks 32>, <&clks 16>;
-+				clock-names = "uart", "apb_pclk";
- 				status = "disabled";
- 			};
- 
-diff --git a/drivers/clk/mxs/clk-imx23.c b/drivers/clk/mxs/clk-imx23.c
-index 844043ad0..9f6d155 100644
---- a/drivers/clk/mxs/clk-imx23.c
-+++ b/drivers/clk/mxs/clk-imx23.c
-@@ -14,6 +14,7 @@
- #include <linux/err.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <linux/of.h>
- #include <mach/common.h>
- #include <mach/mx23.h>
- #include "clk.h"
-@@ -71,44 +72,6 @@ static void __init clk_misc_init(void)
- 	__mxs_setl(30 << BP_FRAC_IOFRAC, FRAC);
+ 	return pages;
+ error:
+-	if (array_size <= PAGE_SIZE)
+-		kfree(pages);
+-	else
+-		vfree(pages);
++	kfree(pages);
+ 	return NULL;
  }
  
--static struct clk_lookup uart_lookups[] = {
--	{ .dev_id = "duart", },
--	{ .dev_id = "mxs-auart.0", },
--	{ .dev_id = "mxs-auart.1", },
--	{ .dev_id = "8006c000.serial", },
--	{ .dev_id = "8006e000.serial", },
--	{ .dev_id = "80070000.serial", },
--};
--
--static struct clk_lookup hbus_lookups[] = {
--	{ .dev_id = "imx23-dma-apbh", },
--	{ .dev_id = "80004000.dma-apbh", },
--};
--
--static struct clk_lookup xbus_lookups[] = {
--	{ .dev_id = "duart", .con_id = "apb_pclk"},
--	{ .dev_id = "80070000.serial", .con_id = "apb_pclk"},
--	{ .dev_id = "imx23-dma-apbx", },
--	{ .dev_id = "80024000.dma-apbx", },
--};
--
--static struct clk_lookup ssp_lookups[] = {
--	{ .dev_id = "imx23-mmc.0", },
--	{ .dev_id = "imx23-mmc.1", },
--	{ .dev_id = "80010000.ssp", },
--	{ .dev_id = "80034000.ssp", },
--};
--
--static struct clk_lookup lcdif_lookups[] = {
--	{ .dev_id = "imx23-fb", },
--	{ .dev_id = "80030000.lcdif", },
--};
--
--static struct clk_lookup gpmi_lookups[] = {
--	{ .dev_id = "imx23-gpmi-nand", },
--	{ .dev_id = "8000c000.gpmi-nand", },
--};
--
- static const char *sel_pll[]  __initconst = { "pll", "ref_xtal", };
- static const char *sel_cpu[]  __initconst = { "ref_cpu", "ref_xtal", };
- static const char *sel_pix[]  __initconst = { "ref_pix", "ref_xtal", };
-@@ -127,6 +90,7 @@ enum imx23_clk {
- };
- 
- static struct clk *clks[clk_max];
-+static struct clk_onecell_data clk_data;
- 
- static enum imx23_clk clks_init_on[] __initdata = {
- 	cpu, hbus, xbus, emi, uart,
-@@ -134,6 +98,7 @@ static enum imx23_clk clks_init_on[] __initdata = {
- 
- int __init mx23_clocks_init(void)
- {
-+	struct device_node *np;
- 	int i;
- 
- 	clk_misc_init();
-@@ -188,14 +153,14 @@ int __init mx23_clocks_init(void)
- 			return PTR_ERR(clks[i]);
- 		}
- 
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx23-clkctrl");
-+	if (np) {
-+		clk_data.clks = clks;
-+		clk_data.clk_num = ARRAY_SIZE(clks);
-+		of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-+	}
-+
- 	clk_register_clkdev(clks[clk32k], NULL, "timrot");
--	clk_register_clkdev(clks[pwm], NULL, "80064000.pwm");
--	clk_register_clkdevs(clks[hbus], hbus_lookups, ARRAY_SIZE(hbus_lookups));
--	clk_register_clkdevs(clks[xbus], xbus_lookups, ARRAY_SIZE(xbus_lookups));
--	clk_register_clkdevs(clks[uart], uart_lookups, ARRAY_SIZE(uart_lookups));
--	clk_register_clkdevs(clks[ssp], ssp_lookups, ARRAY_SIZE(ssp_lookups));
--	clk_register_clkdevs(clks[gpmi], gpmi_lookups, ARRAY_SIZE(gpmi_lookups));
--	clk_register_clkdevs(clks[lcdif], lcdif_lookups, ARRAY_SIZE(lcdif_lookups));
- 
- 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
- 		clk_prepare_enable(clks[clks_init_on[i]]);
 -- 
 1.7.5.4
