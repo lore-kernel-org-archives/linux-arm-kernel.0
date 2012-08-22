@@ -1,54 +1,63 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 22 Aug 2012 17:07:11 -0400
-Subject: [PATCH] mxs/spi: Fix misuse of init_completion
-In-Reply-To: <1345669065-17750-1-git-send-email-marex@denx.de> (Marek Vasut's
- message of "Wed, 22 Aug 2012 22:57:45 +0200")
-References: <1345669065-17750-1-git-send-email-marex@denx.de>
-Message-ID: <87ehmyzlds.fsf@octavius.laptop.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 22 Aug 2012 15:07:21 -0600
+Subject: [PATCHv3 7/9] arm: vt8500: doc: Add device tree bindings for
+ arch-vt8500 devices
+In-Reply-To: <1345582058-2291-8-git-send-email-linux@prisktech.co.nz>
+References: <1345582058-2291-1-git-send-email-linux@prisktech.co.nz>
+ <1345582058-2291-8-git-send-email-linux@prisktech.co.nz>
+Message-ID: <50354A09.7070507@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 08/21/2012 02:47 PM, Tony Prisk wrote:
+> Bindings for gpio, interrupt controller, power management controller,
+> timer, realtime clock, serial uart, ehci and uhci controllers and
+> framebuffer controllers used on the arch-vt8500 platform.
+> 
+> Framebuffer binding also specifies a 'display' node which is required
+> for determining the lcd panel data.
 
-On Wed, Aug 22 2012, Marek Vasut wrote:
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  drivers/spi/spi-mxs.c |    4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/spi/spi-mxs.c b/drivers/spi/spi-mxs.c
-> index 331f600..c965cc6 100644
-> --- a/drivers/spi/spi-mxs.c
-> +++ b/drivers/spi/spi-mxs.c
-> @@ -230,7 +230,7 @@ static int mxs_spi_txrx_dma(struct mxs_spi *spi, int cs,
->  		return -EINVAL;
->  	}
->  
-> -	init_completion(&spi->c);
-> +	INIT_COMPLETION(spi->c);
->  
->  	if (*first)
->  		pio |= BM_SSP_CTRL0_LOCK_CS;
-> @@ -560,6 +560,8 @@ static int __devinit mxs_spi_probe(struct platform_device *pdev)
->  	ssp->devid = devid;
->  	ssp->dma_channel = dma_channel;
->  
-> +	init_completion(&spi->c);
-> +
->  	ret = devm_request_irq(&pdev->dev, irq_err, mxs_ssp_irq_handler, 0,
->  			       DRIVER_NAME, ssp);
->  	if (ret)
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio_vt8500.txt b/Documentation/devicetree/bindings/gpio/gpio_vt8500.txt
 
-Please be more specific with commit messages -- is there an observed
-symptom that this fixes?  Does the patch need to go to stable@, too?
+> +- #gpio-cells : should be <3>.
+> +	1) bank
+> +	2) pin number
+> +	3) flags
 
-Thanks,
+Should this enumerate what legal values are for flags, or point at a
+standard document that does?
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+> diff --git a/Documentation/devicetree/bindings/tty/serial/via,vt8500-uart.txt b/Documentation/devicetree/bindings/tty/serial/via,vt8500-uart.txt
+
+> +	uart at d8210000 {
+> +		compatible = "via,vt8500-uart";
+> +		reg = <0xd8210000 0x1040>;
+> +		interrupts = <47>;
+> +	};
+
+How does the UART know what frequency its clock input is, in order to
+calculate dividers? Should there be a clocks property to link to the
+input clock, so the rate can be queried? If so, a reference to the
+common clock binding, plus a specification of which clocks must be
+listed in the clock property should be included here.
+
+> diff --git a/Documentation/devicetree/bindings/video/via,vt8500-fb.txt b/Documentation/devicetree/bindings/video/via,vt8500-fb.txt
+
+> +VIA VT8500 Display
+> +-----------------------------------------------------
+> +Required properties:
+> +- xres : lcd panel horizontal resolution
+> +- yres : lcd panel vertical resolution
+> +- left-margin,
+> +- right-margin,
+> +- hsync-len: lcd panel horizontal timings in pixels
+> +- upper-margin,
+> +- lower-margin,
+> +- vsync-len: lcd panel verticals timings in pixels
+> +- bpp: lcd panel bit-depth.
+> +	<16> for RGB565, <32> for RGB888
+
+Shouldn't this reference Sascha Hauer's binding document (although I
+suppose it isn't checked in yet), and just document the additions? I
+wonder if this binding should be written assuming Sascha's binding doc
+will be checked in?
