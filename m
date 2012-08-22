@@ -1,33 +1,60 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 22 Aug 2012 20:18:35 +0100
-Subject: [PATCH] ASoC: omap-mcbsp: Device tree binding documentation update
-In-Reply-To: <1345559636-23370-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1345559636-23370-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20120822191835.GQ7995@opensource.wolfsonmicro.com>
+From: richard.purdie@linuxfoundation.org (Richard Purdie)
+Date: Wed, 22 Aug 2012 20:19:42 +0100
+Subject: [RFC][PATCH] Disintegrate sharpsl_param.c
+In-Reply-To: <1345656424-31234-1-git-send-email-dromede@gmail.com>
+References: <1345656424-31234-1-git-send-email-dromede@gmail.com>
+Message-ID: <1345663182.3907.134.camel@ted>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2012 at 05:33:56PM +0300, Peter Ujfalusi wrote:
-> To reflect the final devicetree node structure of McBSPs.
+On Wed, 2012-08-22 at 19:27 +0200, dromede at gmail.com wrote:
+> From: Marko Katic <dromede.gmail.com>
+>
+> I recently tried running 3.6-rc2 kernel on my Sharp Zaurus C-1000. It 
+> hanged almost immediately after uncompressing the kernel. I tracked the
+> problem down to a single line in arch/arm/common/sharpsl_param.c:
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-
-Applied, thanks.
-
-> the initial OMAP McBSP DT structure was not able to describe the IP (and it's
-> versions) correctly.
-> The main issue was the sidetone block of McBSP2/3 on OMAP3.
-> With this change in the DT description the OS can get the needed information
-> about the IP.
+> memcpy(&sharpsl_param, (void *)PARAM_BASE, sizeof(struct sharpsl_param_info));
 > 
-> The sidetone is still not supported when the Linux kernel is booted with DT
-> since we still depend on hwmod to fill the resources.
+> Commenting out the line makes the kernel boot just fine. This left me
+> wondering whether sharpsl_param.c is actually needed. Here's a comment
+> from sharpsl_param.c that describes what sharpsl_param.c actually does:
 
-I pasted this into the changelog to explain what's going on.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120822/eb5e9878/attachment-0001.sig>
+Sharp went to the trouble of saving these values into the hardware and
+passing them into the drivers. They're basically used by the LCD
+initialisation code from what I remember. I don't remember what the
+risks are of incorrect values.
+
+>  So sharpsl_save_param() is supposed to fill the sharpsl_param_info struct
+>  with various parameters or fill some of the struct fields with -1. 
+>  I found only four drivers that use some of these
+>  parameters (only two parameters are used by these drivers, comadj and phadadj). 
+>  These drivers are:
+>  
+>  drivers/video/backlight/corgi_lcd.c
+>  drivers/video/backlight/locomolcd.c
+>  drivers/video/backlight/tosa_bl.c
+>  drivers/video/backlight/tosa_lcd.c
+>  
+>  These drivers also have default values when comadj or phadadj == -1.
+>  I checked what values are actually contained in this struct in
+>  earlier kernels. 3.2.24 kernel is the latest one i know of where
+>  sharpsl_save_param() works properly. And it also has these fields initialised
+>  to -1.
+
+What values was it loading from the bootloader? Or are you saying that
+it wasn't finding the bootloader information and therefore just using -1
+for everything?
+ 
+>  So it seems to me that sharpsl_param.c is redundant as it currently only  
+>  serves to assign -1 to a few variables. And drivers that use these variables
+>  then handle -1 with assigning default values.
+
+Its not redundant, it sounds like its just broken at some point, at
+least on the platform you tested and nobody has noticed/cared. The
+better solution would be to fix it. Obviously its much easier to delete
+the code though.
+
+Cheers,
+
+Richard
