@@ -1,33 +1,51 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Wed, 22 Aug 2012 12:04:35 +0530
-Subject: [PATCH] drivers/dma/sirf-dma.c: fix usage of devm functions
-In-Reply-To: <CAGsJ_4wkyY7VkrgMwGwmFF4kpGiGEtU8Ox46G-yOspAi27Lqgg@mail.gmail.com>
-References: <1344069330-29569-1-git-send-email-Julia.Lawall@lip6.fr>
- <1345608994.1895.73.camel@vkoul-udesk3>
- <CAGsJ_4yjzE3eNGz=AA7gGxGNkjBH8bKRAUsYXcG+A1p8PtOQPw@mail.gmail.com>
- <alpine.DEB.2.02.1208220729440.1966@localhost6.localdomain6>
- <CAGsJ_4wkyY7VkrgMwGwmFF4kpGiGEtU8Ox46G-yOspAi27Lqgg@mail.gmail.com>
-Message-ID: <1345617275.1895.83.camel@vkoul-udesk3>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 22 Aug 2012 18:34:38 +1200
+Subject: [PATCHv3 3/9] serial: vt8500: Add devicetree support for
+In-Reply-To: <20120821231255.71a7515a@pyramind.ukuu.org.uk>
+References: <1345582058-2291-1-git-send-email-linux@prisktech.co.nz>
+ <1345582058-2291-4-git-send-email-linux@prisktech.co.nz>
+ <20120821231255.71a7515a@pyramind.ukuu.org.uk>
+Message-ID: <1345617278.7491.4.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-08-22 at 13:41 +0800, Barry Song wrote:
-> >>
-> >>
-> >> the git log "drivers/dma/sirf-dma.c: fix usage of devm functions"
-> >> should be fixed.
-> >
-> >
-> > What do you suggest?  The patch is about problems with the use of
-> > devm_kzalloc, devm_ioremap, and devm_request_irq.
+On Tue, 2012-08-21 at 23:12 +0100, Alan Cox wrote:
+> On Wed, 22 Aug 2012 08:47:32 +1200
+> Tony Prisk <linux@prisktech.co.nz> wrote:
 > 
-> i mean the prefix
+> > Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> > ---
+> >  drivers/tty/serial/vt8500_serial.c |   37 ++++++++++++++++++++++++++++++++----
+> >  1 file changed, 33 insertions(+), 4 deletions(-)
 > 
-> dmaengine: sirf: .............
-That is the usual way, it helps if you see the notation used by
-subsystem by checking patches being sent to subsystem, but it is not a
-really big deal, pls take care of this in future.
+> Can we have a comment attached to a change this size. In particular one
+> describing why it gone from 4 to 6 ports, and why the port id twiddling.
+> 
+> Is there a reason you can't use the device tree port id ?
+> 
+> What are the regression risks for existing users expecting the pdev->id
+> binding ?
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
+Sorry Alan,
 
--- 
-~Vinod
+The original patch was very simple, but I revisited it to fix other
+issues and forgot to add the relevant comments.
+
+Port size is changed to fix a problem - WM8505 actually had 6 uart's
+defined in platform data but the vt8500_ports variable was only 4.
+
+I have added devicetree port id support as well.
+
+No regression risks as the entire platform is being converted to
+devicetree and existing code dropped in this patchset.
+
+Patchv4 3/9 to follow.
+
+Regards
+
+Tony Prisk
