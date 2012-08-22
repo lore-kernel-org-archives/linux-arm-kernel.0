@@ -1,77 +1,88 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 22 Aug 2012 10:21:19 -0000
-Subject: [RFC 4/4] ARM: dma-mapping: dma_{alloc,
- free}_coherent with empty attrs
-In-Reply-To: <1345630830-9586-1-git-send-email-hdoyu@nvidia.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Wed, 22 Aug 2012 12:47:09 -0000
+Subject: [RFC 2/4] ARM: dma-mapping: IOMMU allocates pages from pool with
+ GFP_ATOMIC
+In-Reply-To: <1345630830-9586-3-git-send-email-hdoyu@nvidia.com>
 References: <1345630830-9586-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1345630830-9586-5-git-send-email-hdoyu@nvidia.com>
+ <1345630830-9586-3-git-send-email-hdoyu@nvidia.com>
+Message-ID: <CAHQjnOOF7Ca-Dz8K_zcS=gxQsJvKYaWA3tqUeK1RSd-wLYZ44w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's possibility that this attrs be used later to set.
+Hi.
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
- arch/arm/include/asm/dma-mapping.h |   21 +++++++++++++++++----
- 1 files changed, 17 insertions(+), 4 deletions(-)
+vzalloc() call in __iommu_alloc_buffer() also causes BUG() in atomic
+context.
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index c27d855..96b67c7 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -125,8 +125,6 @@ extern int dma_supported(struct device *dev, u64 mask);
- extern void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
- 			   gfp_t gfp, struct dma_attrs *attrs);
- 
--#define dma_alloc_coherent(d, s, h, f) dma_alloc_attrs(d, s, h, f, NULL)
--
- static inline void *dma_alloc_attrs(struct device *dev, size_t size,
- 				       dma_addr_t *dma_handle, gfp_t flag,
- 				       struct dma_attrs *attrs)
-@@ -135,11 +133,21 @@ static inline void *dma_alloc_attrs(struct device *dev, size_t size,
- 	void *cpu_addr;
- 	BUG_ON(!ops);
- 
-+	if (flag & GFP_ATOMIC)
-+		dma_set_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs);
-+
- 	cpu_addr = ops->alloc(dev, size, dma_handle, flag, attrs);
- 	debug_dma_alloc_coherent(dev, size, *dma_handle, cpu_addr);
- 	return cpu_addr;
- }
- 
-+static inline void *dma_alloc_coherent(struct device *dev, size_t size,
-+				       dma_addr_t *dma_handle, gfp_t flag)
-+{
-+	DEFINE_DMA_ATTRS(attrs);
-+	return dma_alloc_attrs(dev, size, dma_handle, flag, &attrs);
-+}
-+
- /**
-  * arm_dma_free - free memory allocated by arm_dma_alloc
-  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
-@@ -157,8 +165,6 @@ static inline void *dma_alloc_attrs(struct device *dev, size_t size,
- extern void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
- 			 dma_addr_t handle, struct dma_attrs *attrs);
- 
--#define dma_free_coherent(d, s, c, h) dma_free_attrs(d, s, c, h, NULL)
--
- static inline void dma_free_attrs(struct device *dev, size_t size,
- 				     void *cpu_addr, dma_addr_t dma_handle,
- 				     struct dma_attrs *attrs)
-@@ -170,6 +176,13 @@ static inline void dma_free_attrs(struct device *dev, size_t size,
- 	ops->free(dev, size, cpu_addr, dma_handle, attrs);
- }
- 
-+static inline void dma_free_coherent(struct device *dev, size_t size,
-+				     void *cpu_addr, dma_addr_t dma_handle)
-+{
-+	DEFINE_DMA_ATTRS(attrs);
-+	return dma_free_attrs(dev, size, cpu_addr, dma_handle, &attrs);
-+}
-+
- /**
-  * arm_dma_mmap - map a coherent DMA allocation into user space
-  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
--- 
-1.7.5.4
+
+On Wed, Aug 22, 2012 at 7:20 PM, Hiroshi Doyu <hdoyu@nvidia.com> wrote:
+> Makes use of the same atomic pool from DMA, and skips kernel page
+> mapping which can involves sleep'able operation at allocating a kernel
+> page table.
+>
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+>  arch/arm/mm/dma-mapping.c |   22 ++++++++++++++++++----
+>  1 files changed, 18 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index aec0c06..9260107 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1028,7 +1028,6 @@ static struct page **__iommu_alloc_buffer(struct
+device *dev, size_t size,
+>         struct page **pages;
+>         int count = size >> PAGE_SHIFT;
+>         int array_size = count * sizeof(struct page *);
+> -       int err;
+>
+>         if (array_size <= PAGE_SIZE)
+>                 pages = kzalloc(array_size, gfp);
+> @@ -1037,9 +1036,20 @@ static struct page **__iommu_alloc_buffer(struct
+device *dev, size_t size,
+>         if (!pages)
+>                 return NULL;
+>
+> -       err = __alloc_fill_pages(&pages, count, gfp);
+> -       if (err)
+> -               goto error
+> +       if (gfp & GFP_ATOMIC) {
+> +               struct page *page;
+> +               int i;
+> +               void *addr = __alloc_from_pool(size, &page);
+> +               if (!addr)
+> +                       goto err_out;
+> +
+> +               for (i = 0; i < count; i++)
+> +                       pages[i] = page + i;
+> +       } else {
+> +               int err = __alloc_fill_pages(&pages, count, gfp);
+> +               if (err)
+> +                       goto error;
+> +       }
+>
+>         return pages;
+>  error:
+> @@ -1055,6 +1065,10 @@ static int __iommu_free_buffer(struct device *dev,
+struct page **pages, size_t s
+>         int count = size >> PAGE_SHIFT;
+>         int array_size = count * sizeof(struct page *);
+>         int i;
+> +
+> +       if (__free_from_pool(page_address(pages[0]), size))
+> +               return 0;
+> +
+>         for (i = 0; i < count; i++)
+>                 if (pages[i])
+>                         __free_pages(pages[i], 0);
+> --
+> 1.7.5.4
+>
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120822/61768214/attachment-0001.html>
