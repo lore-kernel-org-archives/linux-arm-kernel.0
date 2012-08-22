@@ -1,34 +1,27 @@
-From: cmahapatra@ti.com (Chandrabhanu Mahapatra)
-Date: Wed, 22 Aug 2012 12:08:38 +0530
-Subject: [PATCH V6 4/6] ARM: OMAP: Disable venc for OMAP4
-In-Reply-To: <cover.1345616887.git.cmahapatra@ti.com>
-References: <cover.1345468541.git.cmahapatra@ti.com>
- <cover.1345616887.git.cmahapatra@ti.com>
-Message-ID: <1f7081278149b234ce8a03e0621a7a7f927e48d6.1345616887.git.cmahapatra@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Aug 2012 06:44:17 +0000
+Subject: [PATCHv3 3/9] serial: vt8500: Add devicetree support for
+In-Reply-To: <1345617278.7491.4.camel@gitbox>
+References: <1345582058-2291-1-git-send-email-linux@prisktech.co.nz>
+ <20120821231255.71a7515a@pyramind.ukuu.org.uk>
+ <1345617278.7491.4.camel@gitbox>
+Message-ID: <201208220644.18059.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a alternative to "HACK: OMAP: DSS2: VENC: disable VENC on OMAP4 to
-prevent crash" (ba02fa37de) by Tomi Valkeinen <tomi.valkeinen@ti.com> to prevent
-VENC from crashing OMAP4 kernel. This prevents OMAPDSS from initial registration
-of a device for VENC on OMAP4.
+On Wednesday 22 August 2012, Tony Prisk wrote:
+> The original patch was very simple, but I revisited it to fix other
+> issues and forgot to add the relevant comments.
+> 
+> Port size is changed to fix a problem - WM8505 actually had 6 uart's
+> defined in platform data but the vt8500_ports variable was only 4.
+> 
+> I have added devicetree port id support as well.
 
-Signed-off-by: Chandrabhanu Mahapatra <cmahapatra@ti.com>
----
- arch/arm/mach-omap2/display.c |    1 -
- 1 file changed, 1 deletion(-)
+If you do multiple things in one driver, you should normally send multiple
+patches as well, each with a description why that change is done.
+It may seem silly at first to send out a one-line patch next to a 100-line
+patch for the same file, but those cases are actually the ones where it's
+most important.
 
-diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
-index af1ed7d..ee40739 100644
---- a/arch/arm/mach-omap2/display.c
-+++ b/arch/arm/mach-omap2/display.c
-@@ -95,7 +95,6 @@ static const struct omap_dss_hwmod_data omap4_dss_hwmod_data[] __initdata = {
- 	{ "dss_core", "omapdss_dss", -1 },
- 	{ "dss_dispc", "omapdss_dispc", -1 },
- 	{ "dss_rfbi", "omapdss_rfbi", -1 },
--	{ "dss_venc", "omapdss_venc", -1 },
- 	{ "dss_dsi1", "omapdss_dsi", 0 },
- 	{ "dss_dsi2", "omapdss_dsi", 1 },
- 	{ "dss_hdmi", "omapdss_hdmi", -1 },
--- 
-1.7.10
+	Arnd
