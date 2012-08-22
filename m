@@ -1,63 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 22 Aug 2012 11:29:53 +0100
-Subject: [PATCH v2 17/31] arm64: System calls handling
-In-Reply-To: <201208220756.31149.arnd@arndb.de>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <201208212014.01837.arnd@arndb.de> <20120821220145.GA27934@arm.com>
- <201208220756.31149.arnd@arndb.de>
-Message-ID: <20120822102953.GA24136@arm.com>
+From: js@sig21.net (Johannes Stezenbach)
+Date: Wed, 22 Aug 2012 12:34:43 +0200
+Subject: [GIT PULL v2] Update LZO compression
+In-Reply-To: <5033A78E.3080703@oberhumer.com>
+References: <5033A78E.3080703@oberhumer.com>
+Message-ID: <20120822103443.GA15245@sig21.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2012 at 08:56:30AM +0100, Arnd Bergmann wrote:
-> On Tuesday 21 August 2012, Catalin Marinas wrote:
-> > As I understand, sys_mmap_pgoff can be used instead of sys_mmap2 on new
-> > 32-bit architectures. But on 64-bit architectures we don't have
-> > sys_mmap2, only sys_mmap with the difference that the last argument is
-> > the offset in bytes (and multiple of PAGE_SIZE) rather than in pages. So
-> > unless we change the meaning of this last argument for sys_mmap, we
-> > cannot just define it to sys_mmap_pgoff.
-> > 
-> > Since the other 64-bit architectures seem to have a sys_mmap wrapper
-> > that does this:
-> > 
-> >         sys_mmap_pgoff(..., off >> PAGE_SHIFT);
-> > 
-> > I think AArch64 should also use the same sys_mmap convention. We can
-> > make this wrapper generic.
-> 
-> But the wrapper can just as well be part of glibc, which already has
-> one. There is no reason for the kernel to export two generic interfaces
-> for mmap when one of them only works on 64 bit and the other one is
-> good for both 32 and 64 bit.
+On Tue, Aug 21, 2012 at 05:21:50PM +0200, Markus F.X.J. Oberhumer wrote:
+> as suggested on the mailing list I have converted the updated LZO
+> code into git, so please pull my "lzo-update" branch from
+...
+> [ Changes in v2: Optimize code for CPUs with inefficient unaligned
+>   access => significant speed increase on ARM ]
 
-The kernel only exports a single interface for 64-bit, that's
-sys_mmap(). For compat we only export sys_mmap2() (which, of course,
-would not work for 64-bit).
+I can confirm that this new code runs at the same speed
+as the current lzo code in the Linux kernel on
+my ARM926EJ-S based platform.  I only tested decompression,
+using the attached hacky userspace code.
 
-The generic prototypes for sys_mmap and sys_mmap2 are different with
-regards to the last argument: off_t vs unsigned long. While in practice
-it's the same size, off_t is used throughout the kernel as offset in
-bytes rather than pages (hence the prototype change in sys_mmap2 and
-sys_mmap_pgoff).
+   # time ./lzo-bench/old/unlzop <lzoimage >/dev/null
+   real    0m 0.29s
+   # time ./lzo-bench/new/unlzop <lzoimage >/dev/null
+   real    0m 0.29s
 
-But what's more important - moving this wrapper to glibc causes issues
-with the page size. We support both 4KB and 64KB pages on 64-bit systems
-(the latter without compat support). The kernel is in a better position
-to do the shift by a compile-time constant. Glibc would need to enquire
-the actual page size to do the shift before calling sys_mmap_pgoff. If
-we assume in glibc that the shift is always 12, we need another wrapper
-in the kernel anyway for 64KB page configuration. So passing the offset
-in bytes worked best for us.
+   (where lzoimage is a Linux Image compressed with lzop)
 
-> All the other 64 bit architectures (besides tile) were added to the
-> kernel before we had sys_mmap_pgoff.
+So, from my side there are no more objections.
+Thanks for doing this work, Markus.
 
-So there is no new 64-bit architecture that defines sys_mmap to
-sys_mmap_pgoff. I don't think that AArch64 should introduce this, given
-the restrictions I mentioned above. sys_mmap2/sys_mmap_pgoff are a way
-to extend the file offset beyond 32-bit but that's not needed on a
-64-bit system.
 
--- 
-Catalin
+Johannes
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: lzo-bench.tar.gz
+Type: application/octet-stream
+Size: 35783 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120822/ee82ee5e/attachment-0001.obj>
