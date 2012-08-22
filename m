@@ -1,46 +1,87 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 22 Aug 2012 09:34:48 -0600
-Subject: [PATCH 05/14] ARM: at91: add pinctrl support
-In-Reply-To: <CACRpkdZ2__V06Eo8JH451Sup5Nw2jJXVOH2FOfZBp5nNYpCtbg@mail.gmail.com>
-References: <20120810124820.GA20557@game.jcrosoft.org>
- <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
- <1344603731-32667-5-git-send-email-plagnioj@jcrosoft.com>
- <CACRpkdZ2__V06Eo8JH451Sup5Nw2jJXVOH2FOfZBp5nNYpCtbg@mail.gmail.com>
-Message-ID: <5034FC18.2090400@wwwdotorg.org>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 22 Aug 2012 21:06:38 +0530
+Subject: [PATCH 2/6] ARM: omap: allow building omap44xx without SMP
+In-Reply-To: <1345648390-4234-3-git-send-email-arnd@arndb.de>
+References: <1345648390-4234-1-git-send-email-arnd@arndb.de>
+ <1345648390-4234-3-git-send-email-arnd@arndb.de>
+Message-ID: <CAMQu2gw0x6saWrK-M3teu49tJDGvS8RhGrVSh6JTs5DEy+22pA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2012 08:38 AM, Linus Walleij wrote:
-> (Hm maybe I should've read this patch first, well whatever.)
-> 
-> On Fri, Aug 10, 2012 at 3:02 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> 
->> This is also include the gpio controller as the IP share both.
->> Each soc will have to describe the SoC limitation and pin configuration via
->> DT.
+On Wed, Aug 22, 2012 at 8:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The new omap4 cpuidle implementation currently requires
+> ARCH_NEEDS_CPU_IDLE_COUPLED, which only works on SMP.
+>
+> This patch makes it possible to build a non-SMP kernel
+> for that platform. This is not normally desired for
+> end-users but can be useful for testing.
+>
+> Without this patch, building rand-0y2jSKT results in:
+>
+> drivers/cpuidle/coupled.c: In function 'cpuidle_coupled_poke':
+> drivers/cpuidle/coupled.c:317:3: error: implicit declaration of function '__smp_call_function_single' [-Werror=implicit-function-declaration]
+>
+> It's not clear if this patch is the best solution for
+> the problem at hand. I have made sure that we can now
+> build the kernel in all configurations, but that does
+> not mean it will actually work on an OMAP44xx.
+>
+Am not sure either about the subject patch.
 
->> +++ b/Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/Kconfig       |    2 +-
+>  arch/arm/mach-omap2/cpuidle44xx.c |    3 ++-
+>  include/linux/cpuidle.h           |    4 ++++
+>  3 files changed, 7 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index dd2db02..66a8be3 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -62,7 +62,7 @@ config ARCH_OMAP4
+>         select PM_OPP if PM
+>         select USB_ARCH_HAS_EHCI if USB_SUPPORT
+>         select ARM_CPU_SUSPEND if PM
+> -       select ARCH_NEEDS_CPU_IDLE_COUPLED
+> +       select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
+>
+>  config SOC_OMAP5
+>         bool "TI OMAP5"
+> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+> index ee05e19..288bee6 100644
+> --- a/arch/arm/mach-omap2/cpuidle44xx.c
+> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
+> @@ -238,8 +238,9 @@ int __init omap4_idle_init(void)
+>         for_each_cpu(cpu_id, cpu_online_mask) {
+>                 dev = &per_cpu(omap4_idle_dev, cpu_id);
+>                 dev->cpu = cpu_id;
+> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
+>                 dev->coupled_cpus = *cpu_online_mask;
+> -
+> +#endif
 
->> +Required properties for iomux controller:
->> +- compatible: "atmel,at91rm9200-pinctrl"
->> +- atmel,mux-mask: array of mask (periph per bank) to describe if a pin can be
->> +  configured in this periph mode. All the periph and bank need to be describe.
-> 
-> Can you please be more elaborate on this mux-mask, like what each bit
-> means and why the bits are arranged like that and what it means on the
-> AT91 platform.... I was first reading the .dts and was like ?woot? so
-> I go to the bindings doc and I read this and I'm still like ?woot?..
+Was just thinking whether we should just take care of it at
+core cpuidle level itself. Will below be enough to kill the build
+error what you mentioned in the change log ?
 
-Yes, I'm a little confused what this is, and wouldn't have a clue how to
-fill it in.
+diff --git a/drivers/cpuidle/coupled.c b/drivers/cpuidle/coupled.c
+index 2c9bf26..df34534 100644
+--- a/drivers/cpuidle/coupled.c
++++ b/drivers/cpuidle/coupled.c
+@@ -314,7 +314,9 @@ static void cpuidle_coupled_poke(int cpu)
+        struct call_single_data *csd = &per_cpu(cpuidle_coupled_poke_cb, cpu);
 
->> +static int at91_dt_node_to_map(struct pinctrl_dev *pctldev,
->> +                       struct device_node *np,
->> +                       struct pinctrl_map **map, unsigned *num_maps)
-> 
-> DT parse code, looks nice but would request Stephen to have a look
-> at it.
+        if (!cpumask_test_and_set_cpu(cpu, &cpuidle_coupled_poked_mask))
++#ifdef CONFIG_SMP
+                __smp_call_function_single(cpu, csd, 0);
++#endif
+ }
 
-I think it looks reasonable; I don't see any obvious issues at a quick
-glance.
+ /**
+
+Regards
+Santosh
