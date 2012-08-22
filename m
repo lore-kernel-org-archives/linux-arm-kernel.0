@@ -1,55 +1,55 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 22 Aug 2012 10:28:08 +0530
-Subject: [PATCH 2/2] ARM: EXYNOS: Enable PINCTRL config option for Exynos4
- device tree enabled platform
-In-Reply-To: <CACRpkda9BiGejU+Qs=1CqKgLxLGumcM4QZOb_og-aAAmKr-0VQ@mail.gmail.com>
-References: <1345061442-32378-1-git-send-email-thomas.abraham@linaro.org>
- <1345061442-32378-3-git-send-email-thomas.abraham@linaro.org>
- <CACRpkda9BiGejU+Qs=1CqKgLxLGumcM4QZOb_og-aAAmKr-0VQ@mail.gmail.com>
-Message-ID: <CAJuYYwQnia6xB0AgmQ9UKH1Ot+-C=ABzQ7LC8shdjxwKGGP0oA@mail.gmail.com>
+Date: Wed, 22 Aug 2012 10:30:02 +0530
+Subject: [PATCH v2 1/4] pinctrl: add samsung pinctrl and gpiolib driver
+In-Reply-To: <5033FFE0.5070209@wwwdotorg.org>
+References: <1345060656-32201-1-git-send-email-thomas.abraham@linaro.org>
+ <1345060656-32201-2-git-send-email-thomas.abraham@linaro.org>
+ <CACRpkdYqPYesgE-YxPLZqROw1T2fsPWR6R+aDTTz2=XbP7oe9A@mail.gmail.com>
+ <5033FFE0.5070209@wwwdotorg.org>
+Message-ID: <CAJuYYwQx35bNJdNeNexGoxzenstT7GaOLa3=+6uYMMGoYrCtRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 August 2012 18:01, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Aug 15, 2012 at 10:10 PM, Thomas Abraham
-> <thomas.abraham@linaro.org> wrote:
->
->> This enables support for Samsung and Exynos4 pinctrl driver for device
->> tree enabled Exynos4 platforms.
+On 22 August 2012 03:08, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/21/2012 05:25 AM, Linus Walleij wrote:
+>> On Wed, Aug 15, 2012 at 9:57 PM, Thomas Abraham
+>> <thomas.abraham@linaro.org> wrote:
 >>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> ---
->>  arch/arm/mach-exynos/Kconfig |    1 +
->>  1 files changed, 1 insertions(+), 0 deletions(-)
+>>> Add a new device tree enabled pinctrl and gpiolib driver for Samsung
+>>> SoC's.
+> ...
+>>> +  The child node can also optionally specify one or more of the pin
+>>> +  configuration that should be applied on all the pins listed in the
+>>> +  "samsung,pins" property of the child node. The following pin configuration
+>>> +  properties are supported.
+>>> +
+>>> +  - samsung,pin-pud: Pull up/down configuration.
+>>> +  - samsung,pin-drv: Drive strength configuration.
+>>> +  - samsung,pin-pud-pdn: Pull up/down configuration in power down mode.
+>>> +  - samsung,pin-drv-pdn: Drive strength configuration in power down mode.
 >>
->> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
->> index b5b4c8c..ad96c59 100644
->> --- a/arch/arm/mach-exynos/Kconfig
->> +++ b/arch/arm/mach-exynos/Kconfig
->> @@ -405,6 +405,7 @@ config MACH_EXYNOS4_DT
->>         select USE_OF
->>         select ARM_AMBA
->>         select HAVE_SAMSUNG_KEYPAD if INPUT_KEYBOARD
->> +       select PINCTRL
+>> This looks a bit scary, as it seems to be orthogonal to the pin config
+>> interface. I.e. this will be programmed "behind the back" of the
+>> pin config system. However as long as the pin config implementation
+>> reads back these things from the registers it will work, too.
+>>
+>> In the U300 and Ux500 I explicitly use pin config hogs to set up
+>> the pin configuration, and when we enter a state such as
+>> "default" the mux setting and config settings are set from the
+>> framework separately.
 >
-> I don't think this works, since PINCTRL_SAMSUNG is not default "y"
-> (nor should it be).
+> I know that some HW has a separate set of registers (or fields) for the
+> "awake" and "sleep" configuration, and the HW switches between the two
+> automatically when sleeping. I have no idea if the Samsung SoCs do this,
+> but I think if this were the case, it'd be quite legitimate to define
+> both these HW states as separate sets of properties within a single
+> pinctrl SW state. So, that might be the explanation here?
+>
 
-I think I got this wrong. PINCTRL_SAMSUNG depends of OF, which is not
-correct. The correct way would be select PINCTRL_SAMSUNG from
-PINCTRL_EXYNOS4. I will fix this.
+Hi Stephen,
 
->
-> For the platforms I converted I had to select both the subsystem and
-> the indivudual driver, as is already done for some GPIO controllers
-> for example:
->
-> select PINCTRL
-> select PINCTRL_SAMSUNG
->
-> Yours,
-> Linus Walleij
+Yes, Samsung SoC support the "awake" and "sleep" configuration in that
+way you described.
 
 Thanks,
 Thomas.
