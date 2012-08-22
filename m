@@ -1,36 +1,30 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 22 Aug 2012 15:02:51 +0200
-Subject: [PATCH v2] ARM: DMA-Mapping: print warning when atomic coherent
- allocation fails
-In-Reply-To: <20120822083053.42efc6162076534250112652@nvidia.com>
-References: <20120822083053.42efc6162076534250112652@nvidia.com>
-Message-ID: <1345640571-14349-1-git-send-email-m.szyprowski@samsung.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Wed, 22 Aug 2012 13:11:23 +0000
+Subject: [PATCH 1/5] ASoC/ARM: Davinci: McASP: split asp header into
+ platform and audio specific
+In-Reply-To: <20120817223358.GI18871@opensource.wolfsonmicro.com>
+References: <1344948125-5649-1-git-send-email-gururaja.hebbar@ti.com>
+ <1344948125-5649-2-git-send-email-gururaja.hebbar@ti.com>
+ <20120817223358.GI18871@opensource.wolfsonmicro.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA67D44@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Print a loud warning when system runs out of memory from atomic DMA
-coherent pool to let users notice the potential problem.
+On Sat, Aug 18, 2012 at 04:03:58, Mark Brown wrote:
+> On Tue, Aug 14, 2012 at 06:12:01PM +0530, Hebbar, Gururaja wrote:
+> > Davinci McASP header & driver are shared by few OMAP platforms (like
+> > TI81xx, AM335x). Splitting asp header into Davinci platform specific
+> > header and Audio specific header helps to share them across platforms.
+> 
+> This doesn't apply against v3.6-rc2, I suspect there's overlapping
+> changes in arch/arm.  I was just going to apply it on a separate branch
+> to allow cross-tree merge if there's overlap with architecture work.
+> Can you please check and resend?
 
-Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/mm/dma-mapping.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+I will re-apply and send it as v2
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index d1cc9c1..acced93 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -461,6 +461,10 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page)
- 		bitmap_set(pool->bitmap, pageno, count);
- 		ptr = pool->vaddr + PAGE_SIZE * pageno;
- 		*ret_page = pool->page + pageno;
-+	} else {
-+		pr_err_once("ERROR: %u KiB atomic DMA coherent pool is too small!\n"
-+			    "Please increase it with coherent_pool= kernel parameter!\n",
-+			    (unsigned)pool->size / 1024);
- 	}
- 	spin_unlock_irqrestore(&pool->lock, flags);
- 
--- 
-1.7.1.569.g6f426
+> 
+
+
+Regards, 
+Gururaja
