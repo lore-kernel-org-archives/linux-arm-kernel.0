@@ -1,45 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Aug 2012 17:13:07 +0200
-Subject: [PATCH 3/6] ARM: imx: build pm-imx5 code only when PM is enabled
-In-Reply-To: <1345648390-4234-1-git-send-email-arnd@arndb.de>
-References: <1345648390-4234-1-git-send-email-arnd@arndb.de>
-Message-ID: <1345648390-4234-4-git-send-email-arnd@arndb.de>
+Date: Wed, 22 Aug 2012 17:13:04 +0200
+Subject: [PATCH 0/6] ARM: randconfig bugs
+Message-ID: <1345648390-4234-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves the imx5 pm code out of the list of unconditionally
-compiled files for imx5, mirroring what we already do for imx6
-and how it was done before the code was move from mach-mx5 to
-mach-imx in v3.3.
+Hi everyone,
 
-Without this patch, building with CONFIG_PM disabled results in:
+Here are some more patches for bugs I found using
+'make randconfig' in v3.6-rc+multiplatform. I can
+to merge them through the arm-soc tree, but please
+have a look and provide Acks.
 
-arch/arm/mach-imx/pm-imx5.c:202:116: error: redefinition of 'imx51_pm_init'
-arch/arm/mach-imx/include/mach-imx/common.h:154:91: note: previous definition of 'imx51_pm_init' was here
-arch/arm/mach-imx/pm-imx5.c:209:116: error: redefinition of 'imx53_pm_init'
-arch/arm/mach-imx/include/mach-imx/common.h:155:91: note: previous definition of 'imx53_pm_init' was here
+	Arnd
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: stable at vger.kernel.org
 ---
- arch/arm/mach-imx/Makefile |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Cc: Artem Bityutskiy <dedekind1@gmail.com>
+Cc: Eric Miao <eric.miao@linaro.org>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Lee Jones <lee.jones@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Yong Shen <yong.shen@linaro.org>
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 07f7c22..e08adb7 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -9,7 +9,8 @@ obj-$(CONFIG_SOC_IMX27) += clk-imx27.o mm-imx27.o ehci-imx27.o
- obj-$(CONFIG_SOC_IMX31) += mm-imx3.o cpu-imx31.o clk-imx31.o iomux-imx31.o ehci-imx31.o pm-imx3.o
- obj-$(CONFIG_SOC_IMX35) += mm-imx3.o cpu-imx35.o clk-imx35.o ehci-imx35.o pm-imx3.o
- 
--obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o mm-imx5.o clk-imx51-imx53.o ehci-imx5.o pm-imx5.o cpu_op-mx51.o
-+imx5-pm-$(CONFIG_PM) += pm-imx5.o
-+obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o mm-imx5.o clk-imx51-imx53.o ehci-imx5.o $(imx5-pm-y) cpu_op-mx51.o
- 
- obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
- 			    clk-pfd.o clk-busy.o
+
+Arnd Bergmann (6):
+  ARM: ux500: don't select LEDS_GPIO for snowball
+  ARM: omap: allow building omap44xx without SMP
+  ARM: imx: build pm-imx5 code only when PM is enabled
+  ARM: imx: fix ksz9021rn_phy_fixup
+  ARM: imx: select CPU_FREQ_TABLE when needed
+  ARM: imx: select ARM_CPU_SUSPEND when necessary
+
+ arch/arm/Kconfig                  |    1 +
+ arch/arm/mach-imx/Kconfig         |    1 +
+ arch/arm/mach-imx/Makefile        |    3 ++-
+ arch/arm/mach-imx/mach-imx6q.c    |    4 ++--
+ arch/arm/mach-omap2/Kconfig       |    2 +-
+ arch/arm/mach-omap2/cpuidle44xx.c |    3 ++-
+ arch/arm/mach-ux500/Kconfig       |    1 -
+ include/linux/cpuidle.h           |    4 ++++
+ 8 files changed, 13 insertions(+), 6 deletions(-)
+
 -- 
 1.7.10
