@@ -1,80 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Aug 2012 15:19:11 +0000
-Subject: [PATCH 4/4] ARM: kprobes: make more tests conditional
-In-Reply-To: <alpine.LFD.2.02.1208221040250.1754@xanadu.home>
-References: <1345645780-2749-1-git-send-email-arnd@arndb.de>
- <1345645780-2749-5-git-send-email-arnd@arndb.de>
- <alpine.LFD.2.02.1208221040250.1754@xanadu.home>
-Message-ID: <201208221519.12056.arnd@arndb.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 22 Aug 2012 11:23:23 -0400 (EDT)
+Subject: [PATCH 0/4] [RFC] ARM: multiplatform: rename all mach headers
+In-Reply-To: <201208221253.07278.arnd@arndb.de>
+References: <201208221253.07278.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.02.1208221106010.1754@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 August 2012, Nicolas Pitre wrote:
-> On Wed, 22 Aug 2012, Arnd Bergmann wrote:
+On Wed, 22 Aug 2012, Arnd Bergmann wrote:
+
+> I've created this series some time ago, and updated it now to
+> v3.6-rc1. The idea is to get us a big step closer to the
+> single zImage kernel across multiple ARM platforms by
+> untangling the duplicate header file names.
+
+Thanks for picking up this task.
+
+> There are two branches available in the arm-soc tree:
 > 
-> > The mls instruction is not available in ARMv6K or below, so we
-> > should make the test conditional on at least ARMv7. ldrex/strex
-> > are available in ARMv6K or ARMv7, which we can test by checking
-> > the CONFIG_CPU_32v6K symbol. Just testing for ARMv6 is not enough.
-> 
-> The ldrex/strex instructions are available on ARMv6.  It's only the d 
-> variants (strexd/ldrexd) which are only available from ARMv6k.
+> 1. This series,
+>    http://git.kernel.org/?p=linux/kernel/git/arm/arm-soc.git;a=shortlog;h=refs/heads/testing/mach-headers
+>    This just moves header files around and changes most of the
+>    files including them. There are a few remaining drivers
+>    and platform files that keep including a generic file name
+>    like <mach/uncompress.h>. It remains possible to do that,
+>    and I've run extensive tests to ensure I did not break
+>    anything with this. However, each of these instances means
+>    that there is something that stops working when you get to
+>    the real multiplatform kernel and we still need to deal
+>    with them one by one.
 
-Ok. How is the version below then? I haven't tested this one yet.
+The content of <mach/uncompress.h> is fundamentally machine or SOC 
+specific.  We already know it is generally incompatible with a multi 
+platform kernel.  So the best way to deal with this at the moment is 
+probably to just provide a dummy uncompress.h with empty stubs whenever 
+CONFIG_ARCH_MULTIPLATFORM is selected.  The effect from this is that 
+there wouldn't be any "Uncompressing the kernel... Done" output anymore, 
+which should be an acceptable compromise until a better solution is 
+found.
 
-	Arnd
+One problem is that some (very few) machines define a method in that 
+file to keep a hardware watchdog alive.  This might not be the case for 
+all the intended targets to gather in a single kernel binary image 
+though.
 
-8<---
->From d878ab212cf0ac1957be83ad80dc734ace2b476c Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Thu, 16 Aug 2012 07:49:31 +0000
-Subject: [PATCH] ARM: kprobes: make more tests conditional
+Another issue is the fact that some platforms do very ugly 
+layer-violating hacks where the decompressor selects a serial port for 
+early output and then store that selection in some arbitrary memory 
+location for the main kernel to blindly use, making the decompressor 
+mandatory.  OMAP and Davinci are prime example of such "abuse" which 
+would need to be fixed.
 
-The mls instruction is not available in ARMv6K or below, so we
-should make the test conditional on at least ARMv7. ldrexd/strexd
-are available in ARMv6K or ARMv7, which we can test by checking
-the CONFIG_CPU_32v6K symbol. Just testing for ARMv6 is not enough.
 
-/tmp/ccuMTZ8D.s: Assembler messages:
-/tmp/ccuMTZ8D.s:22188: Error: selected processor does not support ARM mode `mls r0,r1,r2,r3'
-/tmp/ccuMTZ8D.s:22222: Error: selected processor does not support ARM mode `mlshi r7,r8,r9,r10'
-/tmp/ccuMTZ8D.s:22252: Error: selected processor does not support ARM mode `mls lr,r1,r2,r13'
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Jon Medhurst <tixy@yxit.co.uk>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: Leif Lindholm <leif.lindholm@arm.com>
----
- arch/arm/kernel/kprobes-test-arm.c |    4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/kernel/kprobes-test-arm.c
-index 38c1a3b..fc9f6e0 100644
---- a/arch/arm/kernel/kprobes-test-arm.c
-+++ b/arch/arm/kernel/kprobes-test-arm.c
-@@ -367,9 +367,11 @@ void kprobe_arm_test_cases(void)
- 	TEST_UNSUPPORTED(".word 0xe0500090 @ undef")
- 	TEST_UNSUPPORTED(".word 0xe05fff9f @ undef")
- 
-+#if __LINUX_ARM_ARCH__ >= 7
- 	TEST_RRR(  "mls		r0, r",1, VAL1,", r",2, VAL2,", r",3,  VAL3,"")
- 	TEST_RRR(  "mlshi	r7, r",8, VAL3,", r",9, VAL1,", r",10, VAL2,"")
- 	TEST_RR(   "mls		lr, r",1, VAL2,", r",2, VAL3,", r13")
-+#endif
- 	TEST_UNSUPPORTED(".word 0xe06f3291 @ mls pc, r1, r2, r3")
- 	TEST_UNSUPPORTED(".word 0xe060329f @ mls r0, pc, r2, r3")
- 	TEST_UNSUPPORTED(".word 0xe0603f91 @ mls r0, r1, pc, r3")
-@@ -456,8 +458,10 @@ void kprobe_arm_test_cases(void)
- 	TEST_UNSUPPORTED(".word	0xe1700090") /* Unallocated space */
- #if __LINUX_ARM_ARCH__ >= 6
- 	TEST_UNSUPPORTED("ldrex	r2, [sp]")
-+#ifdef CONFIG_CPU_32v6K
- 	TEST_UNSUPPORTED("strexd	r0, r2, r3, [sp]")
- 	TEST_UNSUPPORTED("ldrexd	r2, r3, [sp]")
-+#endif
- 	TEST_UNSUPPORTED("strexb	r0, r2, [sp]")
- 	TEST_UNSUPPORTED("ldrexb	r2, [sp]")
- 	TEST_UNSUPPORTED("strexh	r0, r2, [sp]")
--- 
-1.7.10
+Nicolas
