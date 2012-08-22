@@ -1,44 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Aug 2012 16:29:36 +0200
-Subject: [PATCH 0/4] ARM: patches for randconfig build errors
-Message-ID: <1345645780-2749-1-git-send-email-arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 22 Aug 2012 15:39:46 +0100
+Subject: [PATCH 2/4] ARM: allow PID_IN_CONTEXTIDR only for ARMv7
+In-Reply-To: <1345645780-2749-3-git-send-email-arnd@arndb.de>
+References: <1345645780-2749-1-git-send-email-arnd@arndb.de>
+ <1345645780-2749-3-git-send-email-arnd@arndb.de>
+Message-ID: <20120822143946.GM9093@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Arnd,
 
-I've done some testing with the experimental multiplatform tree
-and that uncovered a few preexisting bugs. Here are the ones
-that should go through your tree. Please have a look to
-see if the fixes make sense. I can put the patches in the patch
-tracker or send you a pull request then.
+On Wed, Aug 22, 2012 at 03:29:38PM +0100, Arnd Bergmann wrote:
+> When ARMv6 is enabled, we build the kernel with -march=armv6 or
+> -march=armv6k, which means the bfi instruction is not available.
+> Instead, it only works with -march=armv6t2 or -march=armv7-a.
+> 
+> Without this patch, building rand-enIHAOL results in:
+> 
+> /tmp/ccwCsCXC.s: Assembler messages:
+> /tmp/ccwCsCXC.s:49: Error: selected processor does not support ARM mode `bfi r3,r2,#0,#8'
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/Kconfig.debug |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index f15f82b..11b9ff4 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -398,6 +398,7 @@ config ARM_KPROBES_TEST
+>  config PID_IN_CONTEXTIDR
+>  	bool "Write the current PID to the CONTEXTIDR register"
+>  	depends on CPU_COPY_V6
+> +	depends on CPU_V7 && !CPU_V6
+>  	help
+>  	  Enabling this option causes the kernel to write the current PID to
+>  	  the PROCID field of the CONTEXTIDR register, at the expense of some
 
-	Arnd
----
-Cc: Jon Medhurst <tixy@yxit.co.uk>
-Cc: Leif Lindholm <leif.lindholm@arm.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Magnus Damm <damm@opensource.se>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: Rafael J. Wysocki <rjw@sisk.pl>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Will Deacon <will.deacon@arm.com>
+Nah, I'll fix the contextidr_notifier instead. I forgot that this stuff gets
+used on non-SMP v6 platforms.
 
-Arnd Bergmann (4):
-  ARM: export read_current_timer
-  ARM: allow PID_IN_CONTEXTIDR only for ARMv7
-  ARM: export set_irq_flags/irq_set_chip_and_handler
-  ARM: kprobes: make more tests conditional
+Cheers,
 
- arch/arm/Kconfig.debug             |    1 +
- arch/arm/kernel/arch_timer.c       |    2 ++
- arch/arm/kernel/irq.c              |    2 ++
- arch/arm/kernel/kprobes-test-arm.c |    4 +++-
- kernel/irq/chip.c                  |    2 ++
- 5 files changed, 10 insertions(+), 1 deletion(-)
-
--- 
-1.7.10
+Will
