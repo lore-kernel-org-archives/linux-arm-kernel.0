@@ -1,45 +1,44 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Wed, 22 Aug 2012 10:22:54 +0800
-Subject: FW: [PATCH V5 0/5] clk: mmp: add clock framework for mmp
-In-Reply-To: <AAD1C6EB06EE3649B35B7E026785068D1A754366CB@SC-VEXCH2.marvell.com>
-References: <AAD1C6EB06EE3649B35B7E026785068D1A754366CB@SC-VEXCH2.marvell.com>
-Message-ID: <CADApbehnsRzwu_LrAEMf+L7AvXv+JBtPBOzWHj578Vs6B_LrCw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 22 Aug 2012 10:47:09 +0800
+Subject: [PATCH 2/2] ARM: imx6q: replace clk_register_clkdev with clock
+ DT lookup
+In-Reply-To: <CAKGA1bnfhMC8QG9OqBbpy5iq6ZAfEgrYMg_LVd50U7yikLhDAg@mail.gmail.com>
+References: <1345104526-14797-1-git-send-email-shawn.guo@linaro.org>
+ <1345104526-14797-3-git-send-email-shawn.guo@linaro.org>
+ <503232E0.3000007@gmail.com>
+ <CAKGA1bn2uCWE8YkGR4EzTxZ_bXJ_ov2diq63uxQ=dT7b6Fu9GQ@mail.gmail.com>
+ <20120820151609.GN24242@S2101-09.ap.freescale.net>
+ <CAKGA1bnfhMC8QG9OqBbpy5iq6ZAfEgrYMg_LVd50U7yikLhDAg@mail.gmail.com>
+Message-ID: <20120822024707.GP24242@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Monday, August 20, 2012 1:39 PM
-> To: Chao Xie
-> Cc: haojian.zhuang at gmail.com; mturquette at linaro.org; viresh.linux at gmail.com; s.hauer at pengutronix.de; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Chao Xie
-> Subject: Re: [PATCH V5 0/5] clk: mmp: add clock framework for mmp
->
-> On Monday 20 August 2012, Chao Xie wrote:
->>
->> From: Chao Xie <chao.xie@marvell.com>
->>
->> v1->v2:
->> replace __raw_xxx with xxx_relax
->> use ioremap to remap the registers. Finaly it will use device tree to
->> get the physical address.
->> do not use macro to register clocks, and directly call the functions.
->>
->> v2->v3:
->> pxa910 will have APB extension clock, so some peripharals will have
->> clocks in APB extension base.
->> change pxa168-pwm to be pxa910-pwm for pxa910. It will fit the current
->> pwm driver.
->>
->> v3->v4:
->> remove addtional clock name definition
->> replace left __raw_xxx
->>
->> v4->v5:
->> change the format of the file
->>
->
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
->
->         Arnd
+On Mon, Aug 20, 2012 at 12:22:56PM -0500, Matt Sealey wrote:
+> It's not bloat just because it is by its very definition "a big list", is it?
+> 
+Grep for_each_node_by_*() and for_each_*_node() (include/linux/of.h)
+in the tree to see how often these global device tree searching is
+used, you may know how important not having so many nodes is.
 
-Who will be responsible for merging these patches?
+> How do you explain duplicating the clock names in the array AND in the
+> device node as NOT being bloated?
+> 
+> You're going to have to define these clocks as a tree with parents and
+> leaf nodes anyway in the clock subsystem. Why not define these in the
+> device tree in total and reference them by handle when you build the
+> entire clock tree from the ground up? Or will it just be all the
+> clocks defined in Linux, but the lookups (which is what I see here)
+> moved into the DT? Why not form the lookups as part of the definition
+> of the clock tree?
+> 
+This is something I had tried long time before, but it did not get
+accepted because:
+
+* It's unnecessary to encode the entire clock tree which is SoC
+  specific in device tree.  Clock driver is a good place for that.
+
+* Again, doing so will bloat device tree with hundreds of nodes.
+
+-- 
+Regards,
+Shawn
