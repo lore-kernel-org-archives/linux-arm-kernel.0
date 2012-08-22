@@ -1,7 +1,7 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 22 Aug 2012 10:44:09 +0200
-Subject: [PATCH 4/7] mfd/db8500-prcmu: MASK_ON_SUSPEND
-Message-ID: <1345625049-5714-1-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 22 Aug 2012 10:44:02 +0200
+Subject: [PATCH 3/7] gpio/ab8500: MASK_ON_SUSPEND
+Message-ID: <1345625042-5678-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,24 +21,24 @@ the system only because the system attempt to enter the suspended mode.
 To prevent such IRQs to trig, all irq chips embedded in ux500 platform
 should enable their IRQCHIP_MASK_ON_SUSPEND flag.
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
 Signed-off-by: Etienne Carriere <etienne.carriere@stericsson.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/mfd/db8500-prcmu.c | 1 +
+ drivers/gpio/gpio-ab8500.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 7040a00..25d2e9d 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -2615,6 +2615,7 @@ static struct irq_chip prcmu_irq_chip = {
- 	.irq_ack	= noop,
- 	.irq_mask	= prcmu_irq_mask,
- 	.irq_unmask	= prcmu_irq_unmask,
-+	.flags		= IRQCHIP_MASK_ON_SUSPEND,
+diff --git a/drivers/gpio/gpio-ab8500.c b/drivers/gpio/gpio-ab8500.c
+index 050c05d..3d2cd66 100644
+--- a/drivers/gpio/gpio-ab8500.c
++++ b/drivers/gpio/gpio-ab8500.c
+@@ -203,6 +203,7 @@ static struct gpio_chip ab8500gpio_chip = {
+ 	.direction_output	= ab8500_gpio_direction_output,
+ 	.set			= ab8500_gpio_set,
+ 	.to_irq			= ab8500_gpio_to_irq,
++	.flags			= IRQCHIP_MASK_ON_SUSPEND,
  };
  
- static char *fw_project_name(u8 project)
+ static unsigned int irq_to_rising(unsigned int irq)
 -- 
 1.7.11.3
