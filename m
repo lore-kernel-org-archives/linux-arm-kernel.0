@@ -1,57 +1,34 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 22 Aug 2012 10:44:23 +0200
-Subject: [PATCH 6/7] mfd/stmpe: MASK_ON_SUSPEND
-Message-ID: <1345625063-5784-1-git-send-email-linus.walleij@stericsson.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 22 Aug 2012 11:44:27 +0300
+Subject: [PATCH V6 0/6] OMAPDSS: Cleanup cpu_is checks
+In-Reply-To: <cover.1345616887.git.cmahapatra@ti.com>
+References: <cover.1345468541.git.cmahapatra@ti.com>
+ <cover.1345616887.git.cmahapatra@ti.com>
+Message-ID: <1345625067.3036.19.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Etienne Carriere <etienne.carriere@stericsson.com>
+On Wed, 2012-08-22 at 12:06 +0530, Chandrabhanu Mahapatra wrote:
+> Hi everyone,
+> this patch series aims at cleaning up of DSS of cpu_is checks thereby making it
+> more generic.
+> 
+> The 1st patch cleans up cpu_is checks from DISPC code.
+> The 2nd patch removes unused functions from DSS code.
+> The 3rd patch cleans up cpu_is checks from DSS code.
+> The 4th patch disables VENC support on OMAP4.
+> The 5th patch removes cpu_is checks from VENC code.
+> The 6th patch removes cpu_is checks from DPI code and replaces it with a
+> dss feature.
 
-ux500 machines performs pins (GPIO) reconfiguration when entering
-in the suspended mode. This reconfiguration aims at reaching an ultra
-low power HW configuration.
+Thanks, looks good. I'll apply this to omapdss tree.
 
-Due to this HW reconfiguration, some HW devices can change of HW state
-and have their output signals at level that could generate IRQs.
+ Tomi
 
-If the non-wakeup IRQs are disabled but not yet masked (delayed interrupt
-disable feature from the generic irq layer), effective interrupts reach
-the system only because the system attempt to enter the suspended mode.
-
-To prevent such IRQs to trig, all irq chips embedded in ux500 platform
-should enable their IRQCHIP_MASK_ON_SUSPEND flag.
-
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Signed-off-by: Etienne Carriere <etienne.carriere@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/gpio/gpio-stmpe.c | 1 +
- drivers/mfd/stmpe.c       | 1 +
- 2 files changed, 2 insertions(+)
-
-diff --git a/drivers/gpio/gpio-stmpe.c b/drivers/gpio/gpio-stmpe.c
-index dce3472..2195abc 100644
---- a/drivers/gpio/gpio-stmpe.c
-+++ b/drivers/gpio/gpio-stmpe.c
-@@ -223,6 +223,7 @@ static struct irq_chip stmpe_gpio_irq_chip = {
- 	.irq_mask		= stmpe_gpio_irq_mask,
- 	.irq_unmask		= stmpe_gpio_irq_unmask,
- 	.irq_set_type		= stmpe_gpio_irq_set_type,
-+	.flags			= IRQCHIP_MASK_ON_SUSPEND,
- };
- 
- static irqreturn_t stmpe_gpio_irq(int irq, void *dev)
-diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
-index 2dd8d49..846b9c8 100644
---- a/drivers/mfd/stmpe.c
-+++ b/drivers/mfd/stmpe.c
-@@ -851,6 +851,7 @@ static struct irq_chip stmpe_irq_chip = {
- 	.irq_bus_sync_unlock	= stmpe_irq_sync_unlock,
- 	.irq_mask		= stmpe_irq_mask,
- 	.irq_unmask		= stmpe_irq_unmask,
-+	.flags			= IRQCHIP_MASK_ON_SUSPEND,
- };
- 
- static int __devinit stmpe_irq_init(struct stmpe *stmpe)
--- 
-1.7.11.3
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120822/ac61f56d/attachment.sig>
