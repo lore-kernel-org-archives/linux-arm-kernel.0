@@ -1,103 +1,68 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 22 Aug 2012 18:57:30 +0800
-Subject: [PATCH 1/7] mfd: add imx syscon driver based on regmap
-In-Reply-To: <20120822082940.GJ4011@b20223-02.ap.freescale.net>
-References: <1345619928-15446-1-git-send-email-b29396@freescale.com>
- <1345619928-15446-2-git-send-email-b29396@freescale.com>
- <20120822082940.GJ4011@b20223-02.ap.freescale.net>
-Message-ID: <20120822105729.GB10057@shlinux2.ap.freescale.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 22 Aug 2012 12:19:13 +0100
+Subject: [PATCH 5/8] mfd: Provide the PRCMU with its own IRQ domain
+In-Reply-To: <20120822081746.GA4089@gmail.com>
+References: <20120820162923.GF26991@opensource.wolfsonmicro.com>
+ <20120820164949.GB22749@gmail.com>
+ <20120820175155.GH26991@opensource.wolfsonmicro.com>
+ <20120821085618.GA26899@gmail.com>
+ <20120821095026.GU26991@opensource.wolfsonmicro.com>
+ <20120821105413.GD26899@gmail.com>
+ <20120821110329.GA7995@opensource.wolfsonmicro.com>
+ <20120821120243.GF26899@gmail.com>
+ <20120821165207.GX7995@opensource.wolfsonmicro.com>
+ <20120822081746.GA4089@gmail.com>
+Message-ID: <20120822111913.GG7995@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2012 at 04:29:41PM +0800, Zhao Richard-B20223 wrote:
-> On Wed, Aug 22, 2012 at 03:18:42PM +0800, Dong Aisheng wrote:
-> > From: Dong Aisheng <dong.aisheng@linaro.org>
-> > 
-> > Add regmap based imx syscon driver.
-> > This is usually used for access misc bits in registers which does not belong
-> > to a specific module, for example, IOMUXC GPR and ANATOP.
-> > With this driver, we provide a standard API for client driver to call to
-> > access registers which are registered into syscon.
-> > 
-> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> > ---
-> > Currently it's just simply for IMX, however the driver really is not too
-> > much imx specific.
-> > If people want, we probably could extend it to support other platforms too.
-> > ---
-> >  .../devicetree/bindings/mfd/imx-syscon.txt         |   11 +
-> >  drivers/mfd/Kconfig                                |    8 +
-> >  drivers/mfd/Makefile                               |    1 +
-> >  drivers/mfd/imx-syscon.c                           |  193 ++++++++++++++++++++
-> >  include/linux/mfd/imx-syscon.h                     |   22 +++
-> >  5 files changed, 235 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mfd/imx-syscon.txt b/Documentation/devicetree/bindings/mfd/imx-syscon.txt
-> > new file mode 100644
-> > index 0000000..4a72994
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mfd/imx-syscon.txt
-> > @@ -0,0 +1,11 @@
-> > +* Freescale IMX System Controller Registers R/W driver
-> > +
-> > +Required properties:
-> > +- compatible: Should contain "fsl,imx-syscon".
-> > +- reg: the register range can be access from imx-syscon
-> > +
-> > +Examples:
-> > +gpr: iomuxc-gpr at 020e0000 {
-> > +	compatible = "fsl,imx6q-iomuxc", "fsl,imx-syscon";
-> why is it compatible with iomuxc?
-> 
-The first one usually is describing the device itself,
-the second one is the required compatible string for using imx-sycon.
+On Wed, Aug 22, 2012 at 09:17:50AM +0100, Lee Jones wrote:
 
-btw, it looks i'd better change "fsl,imx6q-iomuxc" to "fsl,imx6q-iomuxc-gpr"
-since the later is the real case for us which is in patch 2/7.
+> I was saying that in order for the MFD core to carry out the hwirq->virq
+> conversion, it needed to obtain the irqdomain pointer pertaining to the
+> provided hwirq. The only helper function the irqdomain subsystem provides
+> requires a device node pointer to be passed as an argument, hence the
+> mention of 'irq_find_host(struct device_node *np)'. Then the Device Tree
+> is traversed until a specified 'interrupt-controller' is stumbled upon
+> or is pointed to by the 'interrupt-parent' property. Hence, we have to 
+> find another way to find the irqdomain pointers for non-DT based MFDs. To
+> which we now have a solution.
 
-> > +static int imx_syscon_match(struct device *dev, void *data)
-> > +{
-> > +	struct imx_syscon *syscon = dev_get_drvdata(dev);
-> > +	struct device_node *dn = data;
-> > +
-> > +	return (syscon->dev->of_node == dn) ? 1 : 0;
-> > +}
-> > +
-> > +int imx_syscon_write(struct device_node *np, u32 reg, u32 val)
-> For API function, is it better to use struct device rather not np?
->  - it won't need to search dev in below code every time it access
->    registers.
-The purpose is not require client driver to know the implementation details
-of imx_syscon_{read/write} API, it's more easy to use since client only
-needs pass the device node to which it wants to read/write.
+Oh, right.  Yes, there's no way to get an irqdomain if you don't already
+have it or something which has a direct mapping to one like an irqdomain.
 
-For search dev, it doesn't look like a big issue since it only search devices
-attached on the driver which is very quick.
-And hide it in common API does not require every client driver to write
-duplicated codes.
+> > I made the suggestion then later on realised that this was actively
+> > going to break things I care about so I actually need it fixing.
 
-> > +static int __devinit imx_syscon_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct device_node *np = dev->of_node;
-> > +	struct imx_syscon *syscon;
-> > +	struct resource res;
-> > +	int ret;
-> > +
-> > +	if (!np)
-> > +		return -ENOENT;
-> > +
-> > +	syscon = devm_kzalloc(&pdev->dev, sizeof(struct imx_syscon),
-> > +			    GFP_KERNEL);
-> > +	if (!syscon)
-> > +		return -ENOMEM;
-> > +
-> > +	syscon->base = of_iomap(np, 0);
-> no request? use devm_request_and_ioremap?
-> 
-The io space registered into imx-sycon may be overlapped with other device,
-e.g. iomuxc gpr overlapped with iomuxc. So we do not request it here.
-There are also some exist examples, imx28 pinctrl with gpio devices contained.
+> I'm a little taken aback and annoyed by this. In a previous email thread
+> you categorically requested that I discuss some of the important changes
+> with maintainers and people in-the-know prior to actually writing any
+> code.
 
-Regards
-Dong Aisheng
+No, that's not something I've ever said to do.
+
+I *have* asked you to communicate more clearly about what you're doing
+but that doesn't mean to stop sending code, it means to have clearer
+words around what you're sending.  The really bad pattern here is that
+you're frequently working around issues in your drivers with changes in
+the subsystem without mentioning that the driver issues even exist -
+this makes it much harder understand what you are trying to achieve,
+especially when there is a problem with your subsystem changes and/or
+the urgency you're attaching to them.
+
+>       I was obviously actively working on, had put time into, and was in
+> the mist of discussing this with you. Then you just go ahead and code it
+> (the easy part) yourself, essentially wasting my time. Surely there's
+> some kind of etiquette surrounding such things?
+
+To be honest in this case I had expected to send the patch out much
+sooner than I did - several priority interrupts stopped me testing it.
+Like I say I realised that I really needed a fix and it seemed like the
+quickest way to accomplish that was to just send the code.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120822/7e96b246/attachment.sig>
