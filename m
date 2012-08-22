@@ -1,305 +1,362 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 22 Aug 2012 15:18:42 +0800
-Subject: [PATCH 1/7] mfd: add imx syscon driver based on regmap
+Date: Wed, 22 Aug 2012 15:18:43 +0800
+Subject: [PATCH 2/7] ARM: imx6q: add iomuxc gpr support into imx-syscon
 In-Reply-To: <1345619928-15446-1-git-send-email-b29396@freescale.com>
 References: <1345619928-15446-1-git-send-email-b29396@freescale.com>
-Message-ID: <1345619928-15446-2-git-send-email-b29396@freescale.com>
+Message-ID: <1345619928-15446-3-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dong Aisheng <dong.aisheng@linaro.org>
 
-Add regmap based imx syscon driver.
-This is usually used for access misc bits in registers which does not belong
-to a specific module, for example, IOMUXC GPR and ANATOP.
-With this driver, we provide a standard API for client driver to call to
-access registers which are registered into syscon.
+Include headfile for easy using.
 
 Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 ---
-Currently it's just simply for IMX, however the driver really is not too
-much imx specific.
-If people want, we probably could extend it to support other platforms too.
----
- .../devicetree/bindings/mfd/imx-syscon.txt         |   11 +
- drivers/mfd/Kconfig                                |    8 +
- drivers/mfd/Makefile                               |    1 +
- drivers/mfd/imx-syscon.c                           |  193 ++++++++++++++++++++
- include/linux/mfd/imx-syscon.h                     |   22 +++
- 5 files changed, 235 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx6q.dtsi         |    5 +
+ include/linux/fsl/imx6q-iomuxc-gpr.h |  319 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 324 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mfd/imx-syscon.txt b/Documentation/devicetree/bindings/mfd/imx-syscon.txt
-new file mode 100644
-index 0000000..4a72994
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/imx-syscon.txt
-@@ -0,0 +1,11 @@
-+* Freescale IMX System Controller Registers R/W driver
-+
-+Required properties:
-+- compatible: Should contain "fsl,imx-syscon".
-+- reg: the register range can be access from imx-syscon
-+
-+Examples:
-+gpr: iomuxc-gpr at 020e0000 {
-+	compatible = "fsl,imx6q-iomuxc", "fsl,imx-syscon";
-+	reg = <0x020e0000 0x38>;
-+};
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index b1a1462..20a050e 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -993,6 +993,14 @@ config MFD_ANATOP
- 	  MFD controller. This controller embeds regulator and
- 	  thermal devices for Freescale i.MX platforms.
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index fd57079..1306868 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -507,6 +507,11 @@
+ 				interrupts = <0 89 0x04 0 90 0x04>;
+ 			};
  
-+config MFD_IMX_SYSCON
-+        bool "Freescale i.MX System Controller Register R/W Based on Regmap"
-+        depends on ARCH_MXC
-+        select REGMAP_MMIO
-+        help
-+          Select this option to enable access Freescale i.MX system control
-+	  registers like iomuxc gpr and anatop via regmap.
++			gpr: iomuxc-gpr at 020e0000 {
++				compatible = "fsl,imx6q-iomuxc-gpr", "fsl,imx-syscon";
++				reg = <0x020e0000 0x38>;
++			};
 +
- config MFD_PALMAS
- 	bool "Support for the TI Palmas series chips"
- 	select MFD_CORE
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index 79dd22d..82c7ee1 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -131,4 +131,5 @@ obj-$(CONFIG_MFD_PALMAS)	+= palmas.o
- obj-$(CONFIG_MFD_RC5T583)	+= rc5t583.o rc5t583-irq.o
- obj-$(CONFIG_MFD_SEC_CORE)	+= sec-core.o sec-irq.o
- obj-$(CONFIG_MFD_ANATOP)	+= anatop-mfd.o
-+obj-$(CONFIG_MFD_IMX_SYSCON)	+= imx-syscon.o
- obj-$(CONFIG_MFD_LM3533)	+= lm3533-core.o lm3533-ctrlbank.o
-diff --git a/drivers/mfd/imx-syscon.c b/drivers/mfd/imx-syscon.c
+ 			iomuxc at 020e0000 {
+ 				compatible = "fsl,imx6q-iomuxc";
+ 				reg = <0x020e0000 0x4000>;
+diff --git a/include/linux/fsl/imx6q-iomuxc-gpr.h b/include/linux/fsl/imx6q-iomuxc-gpr.h
 new file mode 100644
-index 0000000..141b456
+index 0000000..2c44573
 --- /dev/null
-+++ b/drivers/mfd/imx-syscon.c
-@@ -0,0 +1,193 @@
++++ b/include/linux/fsl/imx6q-iomuxc-gpr.h
+@@ -0,0 +1,319 @@
 +/*
-+ * Freescale IMX System Control Driver
-+ *
 + * Copyright (C) 2012 Freescale Semiconductor, Inc.
-+ * Copyright (C) 2012 Linaro Ltd.
-+ *
-+ * Author: Dong Aisheng <dong.aisheng@linaro.org>
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
 +
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
++#ifndef __LINUX_IMX6Q_IOMUXC_GPR_H
++#define __LINUX_IMX6Q_IOMUXC_GPR_H
 +
-+static struct platform_driver imx_syscon_driver;
++#include <linux/bitops.h>
 +
-+struct imx_syscon {
-+	struct device *dev;
-+	void __iomem *base;
-+	struct regmap *regmap;
-+};
++#define IOMUXC_GPR0	0x00
++#define IOMUXC_GPR1	0x04
++#define IOMUXC_GPR2	0x08
++#define IOMUXC_GPR3	0x0c
++#define IOMUXC_GPR4	0x10
++#define IOMUXC_GPR5	0x14
++#define IOMUXC_GPR6	0x18
++#define IOMUXC_GPR7	0x1c
++#define IOMUXC_GPR8	0x20
++#define IOMUXC_GPR9	0x24
++#define IOMUXC_GPR10	0x28
++#define IOMUXC_GPR11	0x2c
++#define IOMUXC_GPR12	0x30
++#define IOMUXC_GPR13	0x34
 +
-+static int imx_syscon_match(struct device *dev, void *data)
-+{
-+	struct imx_syscon *syscon = dev_get_drvdata(dev);
-+	struct device_node *dn = data;
++#define IMX6Q_GPR0_CLOCK_8_MUX_SEL_MASK		(0x3 << 30)
++#define IMX6Q_GPR0_CLOCK_8_MUX_SEL_AUDMUX_RXCLK_P7_MUXED	(0x0 << 30)
++#define IMX6Q_GPR0_CLOCK_8_MUX_SEL_AUDMUX_RXCLK_P7	(0x1 << 30)
++#define IMX6Q_GPR0_CLOCK_8_MUX_SEL_SSI3_SSI_SRCK	(0x2 << 30)
++#define IMX6Q_GPR0_CLOCK_8_MUX_SEL_SSI3_RX_BIT_CLK	(0x3 << 30)
++#define IMX6Q_GPR0_CLOCK_0_MUX_SEL_MASK		(0x3 << 28)
++#define IMX6Q_GPR0_CLOCK_0_MUX_SEL_ESAI1_IPP_IND_SCKR_MUXED	(0x0 << 28)
++#define IMX6Q_GPR0_CLOCK_0_MUX_SEL_ESAI1_IPP_IND_SCKR	(0x1 << 28)
++#define IMX6Q_GPR0_CLOCK_0_MUX_SEL_ESAI1_IPP_DO_SCKR	(0x2 << 28)
++#define IMX6Q_GPR0_CLOCK_B_MUX_SEL_MASK		(0x3 << 26)
++#define IMX6Q_GPR0_CLOCK_B_MUX_SEL_AUDMUX_TXCLK_P7_MUXED	(0x0 << 26)
++#define IMX6Q_GPR0_CLOCK_B_MUX_SEL_AUDMUX_TXCLK_P7	(0x1 << 26)
++#define IMX6Q_GPR0_CLOCK_B_MUX_SEL_SSI3_SSI_STCK	(0x2 << 26)
++#define IMX6Q_GPR0_CLOCK_B_MUX_SEL_SSI3_TX_BIT_CLK	(0x3 << 26)
++#define IMX6Q_GPR0_CLOCK_3_MUX_SEL_MASK		(0x3 << 24)
++#define IMX6Q_GPR0_CLOCK_3_MUX_SEL_AUDMUX_RXCLK_P7_MUXED	(0x3 << 24)
++#define IMX6Q_GPR0_CLOCK_3_MUX_SEL_AUDMUX_RXCLK_P7	(0x3 << 24)
++#define IMX6Q_GPR0_CLOCK_3_MUX_SEL_SSI3_SSI_SRCK	(0x3 << 24)
++#define IMX6Q_GPR0_CLOCK_3_MUX_SEL_SSI3_RX_BIT_CLK	(0x3 << 24)
++#define IMX6Q_GPR0_CLOCK_A_MUX_SEL_MASK		(0x3 << 22)
++#define IMX6Q_GPR0_CLOCK_A_MUX_SEL_AUDMUX_TXCLK_P2_MUXED	(0x0 << 22)
++#define IMX6Q_GPR0_CLOCK_A_MUX_SEL_AUDMUX_TXCLK_P2	(0x1 << 22)
++#define IMX6Q_GPR0_CLOCK_A_MUX_SEL_SSI2_SSI_STCK	(0x2 << 22)
++#define IMX6Q_GPR0_CLOCK_A_MUX_SEL_SSI2_TX_BIT_CLK	(0x3 << 22)
++#define IMX6Q_GPR0_CLOCK_2_MUX_SEL_MASK		(0x3 << 20)
++#define IMX6Q_GPR0_CLOCK_2_MUX_SEL_AUDMUX_RXCLK_P2_MUXED	(0x0 << 20)
++#define IMX6Q_GPR0_CLOCK_2_MUX_SEL_AUDMUX_RXCLK_P2	(0x1 << 20)
++#define IMX6Q_GPR0_CLOCK_2_MUX_SEL_SSI2_SSI_SRCK	(0x2 << 20)
++#define IMX6Q_GPR0_CLOCK_2_MUX_SEL_SSI2_RX_BIT_CLK	(0x3 << 20)
++#define IMX6Q_GPR0_CLOCK_9_MUX_SEL_MASK		(0x3 << 18)
++#define IMX6Q_GPR0_CLOCK_9_MUX_SEL_AUDMUX_TXCLK_P1_MUXED	(0x0 << 18)
++#define IMX6Q_GPR0_CLOCK_9_MUX_SEL_AUDMUX_TXCLK_P1	(0x1 << 18)
++#define IMX6Q_GPR0_CLOCK_9_MUX_SEL_SSI1_SSI_STCK	(0x2 << 18)
++#define IMX6Q_GPR0_CLOCK_9_MUX_SEL_SSI1_SSI_TX_BIT_CLK	(0x3 << 18)
++#define IMX6Q_GPR0_CLOCK_1_MUX_SEL_MASK		(0x3 << 16)
++#define IMX6Q_GPR0_CLOCK_1_MUX_SEL_AUDMUX_RXCLK_P1_MUXED	(0x0 << 16)
++#define IMX6Q_GPR0_CLOCK_1_MUX_SEL_AUDMUX_RXCLK_P1	(0x1 << 16)
++#define IMX6Q_GPR0_CLOCK_1_MUX_SEL_SSI1_SSI_SRCK	(0x2 << 16)
++#define IMX6Q_GPR0_CLOCK_1_MUX_SEL_SSI1_SSI_RX_BIT_CLK	(0x3 << 16)
++#define IMX6Q_GPR0_TX_CLK2_MUX_SEL_MASK		(0x3 << 14)
++#define IMX6Q_GPR0_TX_CLK2_MUX_SEL_ASRCK_CLK1	(0x0 << 14)
++#define IMX6Q_GPR0_TX_CLK2_MUX_SEL_ASRCK_CLK2	(0x1 << 14)
++#define IMX6Q_GPR0_TX_CLK2_MUX_SEL_ASRCK_CLK3	(0x2 << 14)
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL7_MASK		BIT(7)
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL7_SPDIF	0x0
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL7_IOMUX	BIT(7)
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL6_MASK		BIT(6)
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL6_ESAI		0x0
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL6_I2C3		BIT(6)
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL5_MASK		BIT(5)
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL5_ECSPI4	0x0
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL5_EPIT2	BIT(5)
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL4_MASK		BIT(4)
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL4_ECSPI4	0x0
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL4_I2C1		BIT(4)
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL3_MASK		BIT(3)
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL3_ECSPI2	0x0
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL3_I2C1		BIT(3)
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL2_MASK		BIT(2)
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL2_ECSPI1	0x0
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL2_I2C2		BIT(2)
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL1_MASK		BIT(1)
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL1_ECSPI1	0x0
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL1_I2C3		BIT(1)
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL0_MASK		BIT(0)
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL0_IPU1		0x0
++#define IMX6Q_GPR0_DMAREQ_MUX_SEL0_IOMUX	BIT(0)
 +
-+	return (syscon->dev->of_node == dn) ? 1 : 0;
-+}
++#define IMX6Q_GPR1_PCIE_REQ_MASK		(0x3 << 30)
++#define IMX6Q_GPR1_PCIE_EXIT_L1			BIT(28)
++#define IMX6Q_GPR1_PCIE_RDY_L23			BIT(27)
++#define IMX6Q_GPR1_PCIE_ENTER_L1		BIT(26)
++#define IMX6Q_GPR1_MIPI_COLOR_SW		BIT(25)
++#define IMX6Q_GPR1_DPI_OFF			BIT(24)
++#define IMX6Q_GPR1_EXC_MON_MASK			BIT(22)
++#define IMX6Q_GPR1_EXC_MON_OKAY			0x0
++#define IMX6Q_GPR1_EXC_MON_SLVE			BIT(22)
++#define IMX6Q_GPR1_MIPI_IPU2_SEL_MASK		BIT(21)
++#define IMX6Q_GPR1_MIPI_IPU2_SEL_GASKET		0x0
++#define IMX6Q_GPR1_MIPI_IPU2_SEL_IOMUX		BIT(21)
++#define IMX6Q_GPR1_MIPI_IPU1_MUX_MASK		BIT(20)
++#define IMX6Q_GPR1_MIPI_IPU1_MUX_GASKET		0x0
++#define IMX6Q_GPR1_MIPI_IPU1_MUX_IOMUX		BIT(20)
++#define IMX6Q_GPR1_MIPI_IPU2_MUX_MASK		BIT(19)
++#define IMX6Q_GPR1_MIPI_IPU2_MUX_GASKET		0x0
++#define IMX6Q_GPR1_MIPI_IPU2_MUX_IOMUX		BIT(19)
++#define IMX6Q_GPR1_PCIE_TEST_PD			BIT(18)
++#define IMX6Q_GPR1_IPU_VPU_MUX_MASK		BIT(17)
++#define IMX6Q_GPR1_IPU_VPU_MUX_IPU1		0x0
++#define IMX6Q_GPR1_IPU_VPU_MUX_IPU2		BIT(17)
++#define IMX6Q_GPR1_PCIE_REF_CLK_EN		BIT(16)
++#define IMX6Q_GPR1_USB_EXP_MODE			BIT(15)
++#define IMX6Q_GPR1_PCIE_INT			BIT(14)
++#define IMX6Q_GPR1_USB_OTG_ID_SEL_MASK		BIT(13)
++#define IMX6Q_GPR1_USB_OTG_ID_SEL_ENET_RX_ER	0x0
++#define IMX6Q_GPR1_USB_OTG_ID_SEL_GPIO_1	BIT(13)
++#define IMX6Q_GPR1_GINT				BIT(12)
++#define IMX6Q_GPR1_ADDRS3_MASK			(0x3 << 10)
++#define IMX6Q_GPR1_ADDRS3_32MB			(0x0 << 10)
++#define IMX6Q_GPR1_ADDRS3_64MB			(0x1 << 10)
++#define IMX6Q_GPR1_ADDRS3_128MB			(0x2 << 10)
++#define IMX6Q_GPR1_ACT_CS3			BIT(9)
++#define IMX6Q_GPR1_ADDRS2_MASK			(0x3 << 7)
++#define IMX6Q_GPR1_ACT_CS2			BIT(6)
++#define IMX6Q_GPR1_ADDRS1_MASK			(0x3 << 4)
++#define IMX6Q_GPR1_ACT_CS1			BIT(3)
++#define IMX6Q_GPR1_ADDRS0_MASK			(0x3 << 1)
++#define IMX6Q_GPR1_ACT_CS0			BIT(0)
 +
-+int imx_syscon_write(struct device_node *np, u32 reg, u32 val)
-+{
-+	struct device *dev;
-+	struct imx_syscon *syscon;
-+	int ret = 0;
++#define IMX6Q_GPR2_COUNTER_RESET_VAL_MASK	(0x3 << 20)
++#define IMX6Q_GPR2_COUNTER_RESET_VAL_5		(0x0 << 20)
++#define IMX6Q_GPR2_COUNTER_RESET_VAL_3		(0x1 << 20)
++#define IMX6Q_GPR2_COUNTER_RESET_VAL_4		(0x2 << 20)
++#define IMX6Q_GPR2_COUNTER_RESET_VAL_6		(0x3 << 20)
++#define IMX6Q_GPR2_LVDS_CLK_SHIFT_MASK		(0x7 << 16)
++#define IMX6Q_GPR2_LVDS_CLK_SHIFT_0		(0x0 << 16)
++#define IMX6Q_GPR2_LVDS_CLK_SHIFT_1		(0x1 << 16)
++#define IMX6Q_GPR2_LVDS_CLK_SHIFT_2		(0x2 << 16)
++#define IMX6Q_GPR2_LVDS_CLK_SHIFT_3		(0x3 << 16)
++#define IMX6Q_GPR2_LVDS_CLK_SHIFT_4		(0x4 << 16)
++#define IMX6Q_GPR2_LVDS_CLK_SHIFT_5		(0x5 << 16)
++#define IMX6Q_GPR2_LVDS_CLK_SHIFT_6		(0x6 << 16)
++#define IMX6Q_GPR2_LVDS_CLK_SHIFT_7		(0x7 << 16)
++#define IMX6Q_GPR2_BGREF_RRMODE_MASK		BIT(15)
++#define IMX6Q_GPR2_BGREF_RRMODE_EXT_RESISTOR	0x0
++#define IMX6Q_GPR2_BGREF_RRMODE_INT_RESISTOR	BIT(15)
++#define IMX6Q_GPR2_DI1_VS_POLARITY_MASK		BIT(10)
++#define IMX6Q_GPR2_DI1_VS_POLARITY_ACTIVE_H	0x0
++#define IMX6Q_GPR2_DI1_VS_POLARITY_ACTIVE_L	BIT(10)
++#define IMX6Q_GPR2_DI0_VS_POLARITY_MASK		BIT(9)
++#define IMX6Q_GPR2_DI0_VS_POLARITY_ACTIVE_H	0x0
++#define IMX6Q_GPR2_DI0_VS_POLARITY_ACTIVE_L	BIT(9)
++#define IMX6Q_GPR2_BIT_MAPPING_CH1_MASK		BIT(8)
++#define IMX6Q_GPR2_BIT_MAPPING_CH1_SPWG		0x0
++#define IMX6Q_GPR2_BIT_MAPPING_CH1_JEIDA	BIT(8)
++#define IMX6Q_GPR2_DATA_WIDTH_CH1_MASK		BIT(7)
++#define IMX6Q_GPR2_DATA_WIDTH_CH1_18BIT		0x0
++#define IMX6Q_GPR2_DATA_WIDTH_CH1_24BIT		BIT(7)
++#define IMX6Q_GPR2_BIT_MAPPING_CH0_MASK		BIT(6)
++#define IMX6Q_GPR2_BIT_MAPPING_CH0_SPWG		0x0
++#define IMX6Q_GPR2_BIT_MAPPING_CH0_JEIDA	BIT(6)
++#define IMX6Q_GPR2_DATA_WIDTH_CH0_MASK		BIT(5)
++#define IMX6Q_GPR2_DATA_WIDTH_CH0_18BIT		0x0
++#define IMX6Q_GPR2_DATA_WIDTH_CH0_24BIT		BIT(5)
++#define IMX6Q_GPR2_SPLIT_MODE_EN		BIT(4)
++#define IMX6Q_GPR2_CH1_MODE_MASK		(0x3 << 2)
++#define IMX6Q_GPR2_CH1_MODE_DISABLE		(0x0 << 2)
++#define IMX6Q_GPR2_CH1_MODE_EN_ROUTE_DI0	(0x1 << 2)
++#define IMX6Q_GPR2_CH1_MODE_EN_ROUTE_DI1	(0x3 << 2)
++#define IMX6Q_GPR2_CH0_MODE_MASK		(0x3 << 0)
++#define IMX6Q_GPR2_CH0_MODE_DISABLE		(0x0 << 0)
++#define IMX6Q_GPR2_CH0_MODE_EN_ROUTE_DI0	(0x1 << 0)
++#define IMX6Q_GPR2_CH0_MODE_EN_ROUTE_DI1	(0x3 << 0)
 +
-+	dev = driver_find_device(&imx_syscon_driver.driver, NULL, np,
-+				 imx_syscon_match);
-+	if (!dev)
-+		return -EPROBE_DEFER;
++#define IMX6Q_GPR3_GPU_DBG_MASK			(0x3 << 29)
++#define IMX6Q_GPR3_GPU_DBG_GPU3D		(0x0 << 29)
++#define IMX6Q_GPR3_GPU_DBG_GPU2D		(0x1 << 29)
++#define IMX6Q_GPR3_GPU_DBG_OPENVG		(0x2 << 29)
++#define IMX6Q_GPR3_BCH_WR_CACHE_CTL		BIT(28)
++#define IMX6Q_GPR3_BCH_RD_CACHE_CTL		BIT(27)
++#define IMX6Q_GPR3_USDHCX_WR_CACHE_CTL		BIT(26)
++#define IMX6Q_GPR3_USDHCX_RD_CACHE_CTL		BIT(25)
++#define IMX6Q_GPR3_OCRAM_CTL_MASK		(0xf << 21)
++#define IMX6Q_GPR3_OCRAM_STATUS_MASK		(0xf << 17)
++#define IMX6Q_GPR3_CORE3_DBG_ACK_EN		BIT(16)
++#define IMX6Q_GPR3_CORE2_DBG_ACK_EN		BIT(15)
++#define IMX6Q_GPR3_CORE1_DBG_ACK_EN		BIT(14)
++#define IMX6Q_GPR3_CORE0_DBG_ACK_EN		BIT(13)
++#define IMX6Q_GPR3_TZASC2_BOOT_LOCK		BIT(12)
++#define IMX6Q_GPR3_TZASC1_BOOT_LOCK		BIT(11)
++#define IMX6Q_GPR3_IPU_DIAG_MASK		BIT(10)
++#define IMX6Q_GPR3_LVDS1_MUX_CTL_MASK		(0x3 << 8)
++#define IMX6Q_GPR3_LVDS1_MUX_CTL_IPU1_DI0	(0x0 << 8)
++#define IMX6Q_GPR3_LVDS1_MUX_CTL_IPU1_DI1	(0x1 << 8)
++#define IMX6Q_GPR3_LVDS1_MUX_CTL_IPU2_DI0	(0x2 << 8)
++#define IMX6Q_GPR3_LVDS1_MUX_CTL_IPU2_DI1	(0x3 << 8)
++#define IMX6Q_GPR3_LVDS0_MUX_CTL_MASK		(0x3 << 6)
++#define IMX6Q_GPR3_LVDS0_MUX_CTL_IPU1_DI0	(0x0 << 6)
++#define IMX6Q_GPR3_LVDS0_MUX_CTL_IPU1_DI1	(0x1 << 6)
++#define IMX6Q_GPR3_LVDS0_MUX_CTL_IPU2_DI0	(0x2 << 6)
++#define IMX6Q_GPR3_LVDS0_MUX_CTL_IPU2_DI1	(0x3 << 6)
++#define IMX6Q_GPR3_MIPI_MUX_CTL_MASK		(0x3 << 4)
++#define IMX6Q_GPR3_MIPI_MUX_CTL_IPU1_DI0	(0x0 << 4)
++#define IMX6Q_GPR3_MIPI_MUX_CTL_IPU1_DI1	(0x1 << 4)
++#define IMX6Q_GPR3_MIPI_MUX_CTL_IPU2_DI0	(0x2 << 4)
++#define IMX6Q_GPR3_MIPI_MUX_CTL_IPU2_DI1	(0x3 << 4)
++#define IMX6Q_GPR3_HDMI_MUX_CTL_MASK		(0x3 << 2)
++#define IMX6Q_GPR3_HDMI_MUX_CTL_IPU1_DI0	(0x0 << 2)
++#define IMX6Q_GPR3_HDMI_MUX_CTL_IPU1_DI1	(0x1 << 2)
++#define IMX6Q_GPR3_HDMI_MUX_CTL_IPU2_DI0	(0x2 << 2)
++#define IMX6Q_GPR3_HDMI_MUX_CTL_IPU2_DI1	(0x3 << 2)
 +
-+	syscon = dev_get_drvdata(dev);
-+	ret = regmap_write(syscon->regmap, reg, val);
-+	if (ret)
-+		dev_err(dev, "failed to write regmap(%s) reg 0x%x (%d)\n",
-+			np->name, reg, ret);
++#define IMX6Q_GPR4_VDOA_WR_CACHE_SEL		BIT(31)
++#define IMX6Q_GPR4_VDOA_RD_CACHE_SEL		BIT(30)
++#define IMX6Q_GPR4_VDOA_WR_CACHE_VAL		BIT(29)
++#define IMX6Q_GPR4_VDOA_RD_CACHE_VAL		BIT(28)
++#define IMX6Q_GPR4_PCIE_WR_CACHE_SEL		BIT(27)
++#define IMX6Q_GPR4_PCIE_RD_CACHE_SEL		BIT(26)
++#define IMX6Q_GPR4_PCIE_WR_CACHE_VAL		BIT(25)
++#define IMX6Q_GPR4_PCIE_RD_CACHE_VAL		BIT(24)
++#define IMX6Q_GPR4_SDMA_STOP_ACK		BIT(19)
++#define IMX6Q_GPR4_CAN2_STOP_ACK		BIT(18)
++#define IMX6Q_GPR4_CAN1_STOP_ACK		BIT(17)
++#define IMX6Q_GPR4_ENET_STOP_ACK		BIT(16)
++#define IMX6Q_GPR4_SOC_VERSION_MASK		(0xff << 8)
++#define IMX6Q_GPR4_SOC_VERSION_OFF		0x8
++#define IMX6Q_GPR4_VPU_WR_CACHE_SEL		BIT(7)
++#define IMX6Q_GPR4_VPU_RD_CACHE_SEL		BIT(6)
++#define IMX6Q_GPR4_VPU_P_WR_CACHE_VAL		BIT(3)
++#define IMX6Q_GPR4_VPU_P_RD_CACHE_VAL_MASK	BIT(2)
++#define IMX6Q_GPR4_IPU_WR_CACHE_CTL		BIT(1)
++#define IMX6Q_GPR4_IPU_RD_CACHE_CTL		BIT(0)
 +
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(imx_syscon_write);
++#define IMX6Q_GPR5_L2_CLK_STOP			BIT(8)
 +
-+int imx_syscon_read(struct device_node *np, u32 reg, u32 *val)
-+{
-+	struct device *dev;
-+	struct imx_syscon *syscon;
-+	int ret = 0;
++#define IMX6Q_GPR9_TZASC2_BYP			BIT(1)
++#define IMX6Q_GPR9_TZASC1_BYP			BIT(0)
 +
-+	dev = driver_find_device(&imx_syscon_driver.driver, NULL, np,
-+				 imx_syscon_match);
-+	if (!dev)
-+		return -EPROBE_DEFER;
++#define IMX6Q_GPR10_LOCK_DBG_EN			BIT(29)
++#define IMX6Q_GPR10_LOCK_DBG_CLK_EN		BIT(28)
++#define IMX6Q_GPR10_LOCK_SEC_ERR_RESP		BIT(27)
++#define IMX6Q_GPR10_LOCK_OCRAM_TZ_ADDR		(0x3f << 21)
++#define IMX6Q_GPR10_LOCK_OCRAM_TZ_EN		BIT(20)
++#define IMX6Q_GPR10_LOCK_DCIC2_MUX_MASK		(0x3 << 18)
++#define IMX6Q_GPR10_LOCK_DCIC1_MUX_MASK		(0x3 << 16)
++#define IMX6Q_GPR10_DBG_EN			BIT(13)
++#define IMX6Q_GPR10_DBG_CLK_EN			BIT(12)
++#define IMX6Q_GPR10_SEC_ERR_RESP_MASK		BIT(11)
++#define IMX6Q_GPR10_SEC_ERR_RESP_OKEY		0x0
++#define IMX6Q_GPR10_SEC_ERR_RESP_SLVE		BIT(11)
++#define IMX6Q_GPR10_OCRAM_TZ_ADDR_MASK		(0x3f << 5)
++#define IMX6Q_GPR10_OCRAM_TZ_EN_MASK		BIT(4)
++#define IMX6Q_GPR10_DCIC2_MUX_CTL_MASK		(0x3 << 2)
++#define IMX6Q_GPR10_DCIC2_MUX_CTL_IPU1_DI0	(0x0 << 2)
++#define IMX6Q_GPR10_DCIC2_MUX_CTL_IPU1_DI1	(0x1 << 2)
++#define IMX6Q_GPR10_DCIC2_MUX_CTL_IPU2_DI0	(0x2 << 2)
++#define IMX6Q_GPR10_DCIC2_MUX_CTL_IPU2_DI1	(0x3 << 2)
++#define IMX6Q_GPR10_DCIC1_MUX_CTL_MASK		(0x3 << 0)
++#define IMX6Q_GPR10_DCIC1_MUX_CTL_IPU1_DI0	(0x0 << 0)
++#define IMX6Q_GPR10_DCIC1_MUX_CTL_IPU1_DI1	(0x1 << 0)
++#define IMX6Q_GPR10_DCIC1_MUX_CTL_IPU2_DI0	(0x2 << 0)
++#define IMX6Q_GPR10_DCIC1_MUX_CTL_IPU2_DI1	(0x3 << 0)
 +
-+	syscon = dev_get_drvdata(dev);
-+	ret = regmap_read(syscon->regmap, reg, val);
-+	if (ret)
-+		dev_err(dev, "failed to read regmap(%s) reg 0x%x (%d)\n",
-+			np->name, reg, ret);
++#define IMX6Q_GPR12_ARMP_IPG_CLK_EN		BIT(27)
++#define IMX6Q_GPR12_ARMP_AHB_CLK_EN		BIT(26)
++#define IMX6Q_GPR12_ARMP_ATB_CLK_EN		BIT(25)
++#define IMX6Q_GPR12_ARMP_APB_CLK_EN		BIT(24)
++#define IMX6Q_GPR12_PCIE_CTL_2			BIT(10)
 +
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(imx_syscon_read);
++#define IMX6Q_GPR13_SDMA_STOP_REQ		BIT(30)
++#define IMX6Q_GPR13_CAN2_STOP_REQ		BIT(29)
++#define IMX6Q_GPR13_CAN1_STOP_REQ		BIT(28)
++#define IMX6Q_GPR13_ENET_STOP_REQ		BIT(27)
++#define IMX6Q_GPR13_SATA_PHY_8_MASK		(0x7 << 24)
++#define IMX6Q_GPR13_SATA_PHY_8_0_5_DB		(0x0 << 24)
++#define IMX6Q_GPR13_SATA_PHY_8_1_0_DB		(0x1 << 24)
++#define IMX6Q_GPR13_SATA_PHY_8_1_5_DB		(0x2 << 24)
++#define IMX6Q_GPR13_SATA_PHY_8_2_0_DB		(0x3 << 24)
++#define IMX6Q_GPR13_SATA_PHY_8_2_5_DB		(0x4 << 24)
++#define IMX6Q_GPR13_SATA_PHY_8_3_0_DB		(0x5 << 24)
++#define IMX6Q_GPR13_SATA_PHY_8_3_5_DB		(0x6 << 24)
++#define IMX6Q_GPR13_SATA_PHY_8_4_0_DB		(0x7 << 24)
++#define IMX6Q_GPR13_SATA_PHY_7_MASK		(0x1f << 19)
++#define IMX6Q_GPR13_SATA_PHY_7_SATA1I		(0x10 << 19)
++#define IMX6Q_GPR13_SATA_PHY_7_SATA1M		(0x10 << 19)
++#define IMX6Q_GPR13_SATA_PHY_7_SATA1X		(0x1a << 19)
++#define IMX6Q_GPR13_SATA_PHY_7_SATA2I		(0x12 << 19)
++#define IMX6Q_GPR13_SATA_PHY_7_SATA2M		(0x12 << 19)
++#define IMX6Q_GPR13_SATA_PHY_7_SATA2X		(0x1a << 19)
++#define IMX6Q_GPR13_SATA_PHY_6_MASK		(0x7 << 16)
++#define IMX6Q_GPR13_SATA_SPEED_MASK		BIT(15)
++#define IMX6Q_GPR13_SATA_SPEED_1P5G		0x0
++#define IMX6Q_GPR13_SATA_SPEED_3P0G		BIT(15)
++#define IMX6Q_GPR13_SATA_PHY_5			BIT(14)
++#define IMX6Q_GPR13_SATA_PHY_4_MASK		(0x7 << 11)
++#define IMX6Q_GPR13_SATA_PHY_4_16_16		(0x0 << 11)
++#define IMX6Q_GPR13_SATA_PHY_4_14_16		(0x1 << 11)
++#define IMX6Q_GPR13_SATA_PHY_4_12_16		(0x2 << 11)
++#define IMX6Q_GPR13_SATA_PHY_4_10_16		(0x3 << 11)
++#define IMX6Q_GPR13_SATA_PHY_4_9_16		(0x4 << 11)
++#define IMX6Q_GPR13_SATA_PHY_4_8_16		(0x5 << 11)
++#define IMX6Q_GPR13_SATA_PHY_3_MASK		(0xf << 7)
++#define IMX6Q_GPR13_SATA_PHY_3_OFF		0x7
++#define IMX6Q_GPR13_SATA_PHY_2_MASK		(0x1f << 2)
++#define IMX6Q_GPR13_SATA_PHY_2_OFF		0x2
++#define IMX6Q_GPR13_SATA_PHY_1_MASK		(0x3 << 0)
++#define IMX6Q_GPR13_SATA_PHY_1_FAST		(0x0 << 0)
++#define IMX6Q_GPR13_SATA_PHY_1_MED		(0x1 << 0)
++#define IMX6Q_GPR13_SATA_PHY_1_SLOW		(0x2 << 0)
 +
-+int imx_syscon_update_bits(struct device_node *np, u32 reg,
-+					u32 mask, u32 val)
-+{
-+	struct device *dev;
-+	struct imx_syscon *syscon;
-+	int ret = 0;
-+
-+	dev = driver_find_device(&imx_syscon_driver.driver, NULL, np,
-+				 imx_syscon_match);
-+	if (!dev)
-+		return -EPROBE_DEFER;
-+
-+	syscon = dev_get_drvdata(dev);
-+	ret = regmap_update_bits(syscon->regmap, reg, mask, val);
-+	if (ret)
-+		dev_err(dev, "failed to update regmap(%s) reg 0x%x (%d)\n",
-+			np->name, reg, ret);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(imx_syscon_update_bits);
-+
-+static const struct of_device_id of_imx_syscon_match[] = {
-+	{ .compatible = "fsl,imx-syscon", },
-+	{ },
-+};
-+
-+static struct regmap_config imx_syscon_regmap_config = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = 4,
-+};
-+
-+static int __devinit imx_syscon_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct imx_syscon *syscon;
-+	struct resource res;
-+	int ret;
-+
-+	if (!np)
-+		return -ENOENT;
-+
-+	syscon = devm_kzalloc(&pdev->dev, sizeof(struct imx_syscon),
-+			    GFP_KERNEL);
-+	if (!syscon)
-+		return -ENOMEM;
-+
-+	syscon->base = of_iomap(np, 0);
-+	if (!syscon->base)
-+		return -EADDRNOTAVAIL;
-+
-+	ret = of_address_to_resource(np, 0, &res);
-+	if (ret)
-+		return ret;
-+
-+	imx_syscon_regmap_config.max_register = res.end - res.start - 3;
-+	syscon->regmap = devm_regmap_init_mmio(&pdev->dev, syscon->base,
-+					&imx_syscon_regmap_config);
-+	if (IS_ERR(syscon->regmap)) {
-+		dev_err(&pdev->dev, "regmap init failed\n");
-+		return PTR_ERR(syscon->regmap);
-+	}
-+
-+	regcache_cache_only(syscon->regmap, false);
-+
-+	dev_info(dev, "syscon regmap start 0x%x end 0x%x registered\n",
-+		res.start, res.end);
-+
-+	syscon->dev = &pdev->dev;
-+	platform_set_drvdata(pdev, syscon);
-+
-+	return 0;
-+}
-+
-+static int __devexit imx_syscon_remove(struct platform_device *pdev)
-+{
-+	struct imx_syscon *syscon;
-+
-+	syscon = platform_get_drvdata(pdev);
-+	iounmap(syscon->base);
-+	platform_set_drvdata(pdev, NULL);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver imx_syscon_driver = {
-+	.driver = {
-+		.name = "imx-syscon",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_imx_syscon_match,
-+	},
-+	.probe		= imx_syscon_probe,
-+	.remove		= imx_syscon_remove,
-+};
-+
-+static int __init imx_syscon_init(void)
-+{
-+	return platform_driver_register(&imx_syscon_driver);
-+}
-+postcore_initcall(imx_syscon_init);
-+
-+static void __exit anatop_exit(void)
-+{
-+	platform_driver_unregister(&imx_syscon_driver);
-+}
-+module_exit(anatop_exit);
-+
-+MODULE_AUTHOR("Dong Aisheng <dong.aisheng@linaro.org>");
-+MODULE_DESCRIPTION("Freescale IMX System Control driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/mfd/imx-syscon.h b/include/linux/mfd/imx-syscon.h
-new file mode 100644
-index 0000000..be8b6db
---- /dev/null
-+++ b/include/linux/mfd/imx-syscon.h
-@@ -0,0 +1,22 @@
-+/*
-+ * Freescale IMX System Control Driver
-+ *
-+ * Copyright (C) 2012 Freescale Semiconductor, Inc.
-+ * Copyright (C) 2012 Linaro Ltd.
-+ *
-+ * Author: Dong Aisheng <dong.aisheng@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#ifndef __LINUX_MFD_IMX_SYSCON_H__
-+#define __LINUX_MFD_IMX_SYSCON_H__
-+
-+extern int imx_syscon_write(struct device_node *np, u32 reg, u32 val);
-+extern int imx_syscon_read(struct device_node *np, u32 reg, u32 *val);
-+extern int imx_syscon_update_bits(struct device_node *np, u32 reg,
-+					u32 mask, u32 val);
-+#endif /* __LINUX_MFD_IMX_SYSCON_H__ */
++#endif /* !__LINUX_IMX6Q_IOMUXC_GPR_H */
 -- 
 1.7.0.4
