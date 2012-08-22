@@ -1,93 +1,52 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 22 Aug 2012 11:56:33 -0700
-Subject: [PATCHv2] ARM: Sort exception table at compile time
-In-Reply-To: <1343683803-15507-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1345661793-26468-1-git-send-email-sboyd@codeaurora.org>
+Date: Wed, 22 Aug 2012 12:05:38 -0700
+Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
+In-Reply-To: <50297B34.5090504@codeaurora.org>
+References: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
+ <20120611155716.GA18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111241470.23555@xanadu.home>
+ <20120611165115.GB18267@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
+ <4FD62DBB.8070407@codeaurora.org>
+ <20120611192519.GF18267@n2100.arm.linux.org.uk>
+ <4FE1FB15.3090305@codeaurora.org>
+ <0e0201cd5f2f$2c2f6e60$848e4b20$%kim@samsung.com>
+ <5016D03D.8010607@codeaurora.org>
+ <CANqRtoQ9BCPhQPi38vK__61G2yAY=g9s17NG3LhSnrxdOYnkDg@mail.gmail.com>
+ <50297B34.5090504@codeaurora.org>
+Message-ID: <50352D82.2050509@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the ARM machine identifier to sortextable and select the
-config option so that we can sort the exception table at compile
-time. sortextable relies on a section named __ex_table existing
-in the vmlinux, but ARM's linker script places the exception
-table in the data section. Give the exception table its own
-section so that sortextable can find it.
+On 08/13/12 15:09, Stephen Boyd wrote:
+> On 08/07/12 23:52, Magnus Damm wrote:
+>> So I finally managed to try this out on my KZM9D board. The SMP bring
+>> up code continues to work as expected, so it seems that SGI0 can be
+>> used instead of SGI1 on EMEV2. Let's just say that the boot protocol
+>> implemented by the mask ROM is rather poorly documented. Anyway, to
+>> test I used the following patch on top of linux git 42a579a.
+>>
+>> --- 0001/arch/arm/mach-shmobile/smp-emev2.c
+>> +++ work/arch/arm/mach-shmobile/smp-emev2.c	2012-08-08 15:42:54.000000000 +0900
+>> @@ -82,7 +82,7 @@ int __cpuinit emev2_boot_secondary(unsig
+>>  	/* Tell ROM loader about our vector (in headsmp.S) */
+>>  	emev2_set_boot_vector(__pa(shmobile_secondary_vector));
+>>
+>> -	gic_raise_softirq(cpumask_of(cpu), 1);
+>> +	gic_raise_softirq(cpumask_of(cpu), 0);
+>>  	return 0;
+>>  }
+>>
+>> So if/where needed, please add my:
+>>
+>> Acked-by: Magnus Damm <damm@opensource.se>
+>>
+> Thanks Magnus, would you be able to merge this through the shmobile
+> tree? Otherwise I can put it in the patch tracker.
+>
 
-This allows us to skip the sorting step during boot.
+Ok, I've put it in the patch tracker.
 
-Cc: David Daney <david.daney@cavium.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
-
-Changes since v1:
- * Moved exception table next to RO data for XIP builds
-
- arch/arm/Kconfig              |  1 +
- arch/arm/kernel/vmlinux.lds.S | 19 +++++++++----------
- scripts/sortextable.c         |  1 +
- 3 files changed, 11 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 6d6e18f..ccf830b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1,6 +1,7 @@
- config ARM
- 	bool
- 	default y
-+	select BUILDTIME_EXTABLE_SORT if MMU
- 	select ARCH_HAVE_CUSTOM_GPIO_H
- 	select HAVE_AOUT
- 	select HAVE_DMA_API_DEBUG
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 36ff15b..b9f38e3 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -114,6 +114,15 @@ SECTIONS
- 
- 	RO_DATA(PAGE_SIZE)
- 
-+	. = ALIGN(4);
-+	__ex_table : AT(ADDR(__ex_table) - LOAD_OFFSET) {
-+		__start___ex_table = .;
-+#ifdef CONFIG_MMU
-+		*(__ex_table)
-+#endif
-+		__stop___ex_table = .;
-+	}
-+
- #ifdef CONFIG_ARM_UNWIND
- 	/*
- 	 * Stack unwinding tables
-@@ -220,16 +229,6 @@ SECTIONS
- 		READ_MOSTLY_DATA(L1_CACHE_BYTES)
- 
- 		/*
--		 * The exception fixup table (might need resorting at runtime)
--		 */
--		. = ALIGN(4);
--		__start___ex_table = .;
--#ifdef CONFIG_MMU
--		*(__ex_table)
--#endif
--		__stop___ex_table = .;
--
--		/*
- 		 * and the usual data section
- 		 */
- 		DATA_DATA
-diff --git a/scripts/sortextable.c b/scripts/sortextable.c
-index 6acf834..ba8f7c1 100644
---- a/scripts/sortextable.c
-+++ b/scripts/sortextable.c
-@@ -247,6 +247,7 @@ do_file(char const *const fname)
- 	case EM_X86_64:
- 		custom_sort = sort_x86_table;
- 		break;
-+	case EM_ARM:
- 	case EM_S390:
- 	case EM_MIPS:
- 		break;
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
