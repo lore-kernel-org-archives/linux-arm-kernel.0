@@ -1,32 +1,26 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 22 Aug 2012 20:27:23 +0100
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 22 Aug 2012 16:38:26 -0300
 Subject: [PATCH v2 1/2] ARM: clk-imx35: Fix SSI clock registration
-In-Reply-To: <1345466362-2576-1-git-send-email-fabio.estevam@freescale.com>
+In-Reply-To: <20120822192723.GS7995@opensource.wolfsonmicro.com>
 References: <1345466362-2576-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20120822192723.GS7995@opensource.wolfsonmicro.com>
+ <20120822192723.GS7995@opensource.wolfsonmicro.com>
+Message-ID: <CAOMZO5B2feJzbqEQgJm_gKDcZPSKuckXWj=s+b+5R39Tnv7-kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 09:39:22AM -0300, Fabio Estevam wrote:
-> SSI block has two types of clock:
-> 
-> ipg: bus clock, the clock needed for accessing registers.
-> per: peripheral clock, the clock needed for generating the bit rate.
-> 
-> Currently SSI driver only supports slave mode and only need to handle
-> the ipg clock, because the peripheral clock comes from the master codec.
-> 
-> Only register the ipg clock and do not register the peripheral clock for ssi.
+On Wed, Aug 22, 2012 at 4:27 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
 
-Tested-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Tested-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+>
+> in that it stops boot hanging on the board, though it still doesn't make
+> AC'97 come out of reset happily.  That's probably some separate issue
+> (pinmux perhaps?) though.
 
-in that it stops boot hanging on the board, though it still doesn't make
-AC'97 come out of reset happily.  That's probably some separate issue
-(pinmux perhaps?) though.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120822/ebdabfcf/attachment.sig>
+Yes, looks like a separate issue.
+
+Did imx_ssi_probe go successfully? What is the error log you are getting?
+
+Regards,
+
+Fabio Estevam
