@@ -1,56 +1,76 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 23 Aug 2012 06:23:33 +0900
-Subject: [PATCH] ARM: formalize an IPI for CPU wake-ups
-In-Reply-To: <50352D82.2050509@codeaurora.org>
-References: <alpine.LFD.2.02.1206111152190.23555@xanadu.home>
- <20120611155716.GA18267@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1206111241470.23555@xanadu.home>
- <20120611165115.GB18267@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1206111307550.23555@xanadu.home>
- <4FD62DBB.8070407@codeaurora.org>
- <20120611192519.GF18267@n2100.arm.linux.org.uk>
- <4FE1FB15.3090305@codeaurora.org>
- <0e0201cd5f2f$2c2f6e60$848e4b20$%kim@samsung.com>
- <5016D03D.8010607@codeaurora.org>
- <CANqRtoQ9BCPhQPi38vK__61G2yAY=g9s17NG3LhSnrxdOYnkDg@mail.gmail.com>
- <50297B34.5090504@codeaurora.org> <50352D82.2050509@codeaurora.org>
-Message-ID: <CANqRtoTi_4Te-Nvbj6eq6Jwj4UJ4OTdA9e+H_qtOAToZVmLL+A@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 22 Aug 2012 23:30:37 +0200
+Subject: [PATCH] mxs/spi: Fix misuse of init_completion
+In-Reply-To: <87ehmyzlds.fsf@octavius.laptop.org>
+References: <1345669065-17750-1-git-send-email-marex@denx.de>
+ <87ehmyzlds.fsf@octavius.laptop.org>
+Message-ID: <201208222330.37925.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 4:05 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 08/13/12 15:09, Stephen Boyd wrote:
->> On 08/07/12 23:52, Magnus Damm wrote:
->>> So I finally managed to try this out on my KZM9D board. The SMP bring
->>> up code continues to work as expected, so it seems that SGI0 can be
->>> used instead of SGI1 on EMEV2. Let's just say that the boot protocol
->>> implemented by the mask ROM is rather poorly documented. Anyway, to
->>> test I used the following patch on top of linux git 42a579a.
->>>
->>> --- 0001/arch/arm/mach-shmobile/smp-emev2.c
->>> +++ work/arch/arm/mach-shmobile/smp-emev2.c  2012-08-08 15:42:54.000000000 +0900
->>> @@ -82,7 +82,7 @@ int __cpuinit emev2_boot_secondary(unsig
->>>      /* Tell ROM loader about our vector (in headsmp.S) */
->>>      emev2_set_boot_vector(__pa(shmobile_secondary_vector));
->>>
->>> -    gic_raise_softirq(cpumask_of(cpu), 1);
->>> +    gic_raise_softirq(cpumask_of(cpu), 0);
->>>      return 0;
->>>  }
->>>
->>> So if/where needed, please add my:
->>>
->>> Acked-by: Magnus Damm <damm@opensource.se>
->>>
->> Thanks Magnus, would you be able to merge this through the shmobile
->> tree? Otherwise I can put it in the patch tracker.
->>
->
-> Ok, I've put it in the patch tracker.
+Dear Chris Ball,
 
-Oh, thanks a lot! We're currently in the middle of rearranging our
-kernel repository handling so things move a bit slower than usual...
+> Hi,
+> 
+> On Wed, Aug 22 2012, Marek Vasut wrote:
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: Chris Ball <cjb@laptop.org>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > ---
+> > 
+> >  drivers/spi/spi-mxs.c |    4 +++-
+> >  1 file changed, 3 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/spi/spi-mxs.c b/drivers/spi/spi-mxs.c
+> > index 331f600..c965cc6 100644
+> > --- a/drivers/spi/spi-mxs.c
+> > +++ b/drivers/spi/spi-mxs.c
+> > @@ -230,7 +230,7 @@ static int mxs_spi_txrx_dma(struct mxs_spi *spi, int
+> > cs,
+> > 
+> >  		return -EINVAL;
+> >  	
+> >  	}
+> > 
+> > -	init_completion(&spi->c);
+> > +	INIT_COMPLETION(spi->c);
+> > 
+> >  	if (*first)
+> >  	
+> >  		pio |= BM_SSP_CTRL0_LOCK_CS;
+> > 
+> > @@ -560,6 +560,8 @@ static int __devinit mxs_spi_probe(struct
+> > platform_device *pdev)
+> > 
+> >  	ssp->devid = devid;
+> >  	ssp->dma_channel = dma_channel;
+> > 
+> > +	init_completion(&spi->c);
+> > +
+> > 
+> >  	ret = devm_request_irq(&pdev->dev, irq_err, mxs_ssp_irq_handler, 0,
+> >  	
+> >  			       DRIVER_NAME, ssp);
+> >  	
+> >  	if (ret)
+> 
+> Please be more specific with commit messages
 
-Thanks for your help!
+I kind of expected this change was pretty obvious.
 
-/ magnus
+> is there an observed symptom that this fixes?
+
+None. I noticed this misuse, so I fixed it.
+
+> Does the patch need to go to stable@, too?
+
+No, this driver is in -next currently.
+
+> Thanks,
+> 
+> - Chris.
+
+Best regards,
+Marek Vasut
