@@ -1,38 +1,39 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 22 Aug 2012 10:02:48 -0400
-Subject: [PATCH] ARM: dts: imx51-babbage: fix esdhc cd/wp properties
-In-Reply-To: <1345643887-30606-1-git-send-email-shawn.guo@linaro.org> (Shawn
- Guo's message of "Wed, 22 Aug 2012 21:58:07 +0800")
-References: <1345643887-30606-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <87pq6j3tyv.fsf@octavius.laptop.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Aug 2012 16:29:38 +0200
+Subject: [PATCH 2/4] ARM: allow PID_IN_CONTEXTIDR only for ARMv7
+In-Reply-To: <1345645780-2749-1-git-send-email-arnd@arndb.de>
+References: <1345645780-2749-1-git-send-email-arnd@arndb.de>
+Message-ID: <1345645780-2749-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When ARMv6 is enabled, we build the kernel with -march=armv6 or
+-march=armv6k, which means the bfi instruction is not available.
+Instead, it only works with -march=armv6t2 or -march=armv7-a.
 
-(removing stable@ from e-mail)
+Without this patch, building rand-enIHAOL results in:
 
-On Wed, Aug 22 2012, Shawn Guo wrote:
-> The binding doc and dts use properties "fsl,{cd,wp}-internal" while
-> esdhc driver uses "fsl,{cd,wp}-controller".  Fix binding doc and dts
-> to get them match driver code.
->
-> Reported-by: Chris Ball <cjb@laptop.org>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: <stable@vger.kernel.org>
-> ---
->  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |    8 ++++----
->  arch/arm/boot/dts/imx51-babbage.dts                |    4 ++--
->  2 files changed, 6 insertions(+), 6 deletions(-)
+/tmp/ccwCsCXC.s: Assembler messages:
+/tmp/ccwCsCXC.s:49: Error: selected processor does not support ARM mode `bfi r3,r2,#0,#8'
 
-Want to take this through your own tree, to avoid .dts conflicts later?
-If so:
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/Kconfig.debug |    1 +
+ 1 file changed, 1 insertion(+)
 
-Acked-by: Chris Ball <cjb@laptop.org>
-
-Thanks,
-
-- Chris.
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index f15f82b..11b9ff4 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -398,6 +398,7 @@ config ARM_KPROBES_TEST
+ config PID_IN_CONTEXTIDR
+ 	bool "Write the current PID to the CONTEXTIDR register"
+ 	depends on CPU_COPY_V6
++	depends on CPU_V7 && !CPU_V6
+ 	help
+ 	  Enabling this option causes the kernel to write the current PID to
+ 	  the PROCID field of the CONTEXTIDR register, at the expense of some
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+1.7.10
