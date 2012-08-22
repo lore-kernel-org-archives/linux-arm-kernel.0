@@ -1,42 +1,38 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 22 Aug 2012 13:41:42 +0800
-Subject: [PATCH] drivers/dma/sirf-dma.c: fix usage of devm functions
-In-Reply-To: <alpine.DEB.2.02.1208220729440.1966@localhost6.localdomain6>
-References: <1344069330-29569-1-git-send-email-Julia.Lawall@lip6.fr>
- <1345608994.1895.73.camel@vkoul-udesk3>
- <CAGsJ_4yjzE3eNGz=AA7gGxGNkjBH8bKRAUsYXcG+A1p8PtOQPw@mail.gmail.com>
- <alpine.DEB.2.02.1208220729440.1966@localhost6.localdomain6>
-Message-ID: <CAGsJ_4wkyY7VkrgMwGwmFF4kpGiGEtU8Ox46G-yOspAi27Lqgg@mail.gmail.com>
+From: omar.luna@linaro.org (Omar Ramirez Luna)
+Date: Wed, 22 Aug 2012 00:42:28 -0500
+Subject: [PATCH 0/2] OMAP: hwmod: fix hardreset handling
+Message-ID: <1345614150-25723-1-git-send-email-omar.luna@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/8/22 Julia Lawall <julia.lawall@lip6.fr>:
-> On Wed, 22 Aug 2012, Barry Song wrote:
->
->> 2012/8/22 Vinod Koul <vinod.koul@linux.intel.com>:
->>>
->>> On Sat, 2012-08-04 at 10:35 +0200, Julia Lawall wrote:
->>>>
->>>> From: Julia Lawall <Julia.Lawall@lip6.fr>
->>>>
->>>> Fix some problems with the use of devm_ functions.
->>>
->>> Applied, thanks
->>
->>
->> the git log "drivers/dma/sirf-dma.c: fix usage of devm functions"
->> should be fixed.
->
->
-> What do you suggest?  The patch is about problems with the use of
-> devm_kzalloc, devm_ioremap, and devm_request_irq.
+From: Omar Ramirez Luna <omar.ramirez@ti.com>
 
-i mean the prefix
+The patch to expose hwmod assert/deassert functions through omap_device
+has been accepted and queued for 3.7[1], however these two patches are
+needed to make the API functional. Hence a revised version is being sent
+according to previous comments:
 
-dmaengine: sirf: .............
+- ARM: OMAP: hwmod: revise deassert sequence
+Now it uses enable|disable_module to handle the configuration of the
+modulemode inside CLKCTRL. As part of the cleanup of leaf clocks, the
+one associated with ipu_mmu will be removed along with the iommu hwmod
+migration[2].
 
->
-> thanks,
-> julia
+- ARM: OMAP: hwmod: partially un-reset hwmods might not be properly
+  enabled
+More infomation added in the patch description[3].
 
--barry
+[1] http://patchwork.kernel.org/patch/1266731/
+[2] http://patchwork.kernel.org/patch/1201791/
+[3] http://patchwork.kernel.org/patch/1201801/
+
+Omar Ramirez Luna (2):
+  ARM: OMAP: hwmod: partially un-reset hwmods might not be properly
+    enabled
+  ARM: OMAP: hwmod: revise deassert sequence
+
+ arch/arm/mach-omap2/omap_hwmod.c |   74 ++++++++++++++++++++++++++++++--------
+ 1 file changed, 59 insertions(+), 15 deletions(-)
+
+-- 
+1.7.9.5
