@@ -1,22 +1,28 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 22 Aug 2012 10:42:40 -0400 (EDT)
-Subject: [PATCH 4/4] ARM: kprobes: make more tests conditional
-In-Reply-To: <1345645780-2749-5-git-send-email-arnd@arndb.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Aug 2012 14:44:42 +0000
+Subject: [PATCH 2/4] ARM: allow PID_IN_CONTEXTIDR only for ARMv7
+In-Reply-To: <20120822143946.GM9093@mudshark.cambridge.arm.com>
 References: <1345645780-2749-1-git-send-email-arnd@arndb.de>
- <1345645780-2749-5-git-send-email-arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1208221040250.1754@xanadu.home>
+ <1345645780-2749-3-git-send-email-arnd@arndb.de>
+ <20120822143946.GM9093@mudshark.cambridge.arm.com>
+Message-ID: <201208221444.42668.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 Aug 2012, Arnd Bergmann wrote:
+On Wednesday 22 August 2012, Will Deacon wrote:
+> > @@ -398,6 +398,7 @@ config ARM_KPROBES_TEST
+> >  config PID_IN_CONTEXTIDR
+> >       bool "Write the current PID to the CONTEXTIDR register"
+> >       depends on CPU_COPY_V6
+> > +     depends on CPU_V7 && !CPU_V6
+> >       help
+> >         Enabling this option causes the kernel to write the current PID to
+> >         the PROCID field of the CONTEXTIDR register, at the expense of some
+> 
+> Nah, I'll fix the contextidr_notifier instead. I forgot that this stuff gets
+> used on non-SMP v6 platforms.
+> 
 
-> The mls instruction is not available in ARMv6K or below, so we
-> should make the test conditional on at least ARMv7. ldrex/strex
-> are available in ARMv6K or ARMv7, which we can test by checking
-> the CONFIG_CPU_32v6K symbol. Just testing for ARMv6 is not enough.
+Ok, thanks!
 
-The ldrex/strex instructions are available on ARMv6.  It's only the d 
-variants (strexd/ldrexd) which are only available from ARMv6k.
-
-
-Nicolas
+	Arnd
