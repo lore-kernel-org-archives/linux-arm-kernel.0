@@ -1,51 +1,33 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed, 22 Aug 2012 13:33:52 +0000
-Subject: [rtc-linux] [PATCHv3 8/9] arm: vt8500: gpio: Devicetree support
- for arch-vt8500
-In-Reply-To: <CACRpkdZnQyLSRQ6cRpFBurAv2cv44einGAsT86FLCqsj1euDMA@mail.gmail.com>
-References: <1345582058-2291-1-git-send-email-linux@prisktech.co.nz>
- <1345582058-2291-9-git-send-email-linux@prisktech.co.nz>,
- <CACRpkdZnQyLSRQ6cRpFBurAv2cv44einGAsT86FLCqsj1euDMA@mail.gmail.com>
-Message-ID: <76F764B079F92A4E843589C893D0A022DAF67144@SERVER.prisktech.co.nz>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Wed, 22 Aug 2012 13:50:09 +0000
+Subject: [PATCH 3/5] ASoC: Davinci: pcm: Add device tree bindings
+In-Reply-To: <20120817223122.GA21445@opensource.wolfsonmicro.com>
+References: <1344948125-5649-1-git-send-email-gururaja.hebbar@ti.com>
+ <1344948125-5649-4-git-send-email-gururaja.hebbar@ti.com>
+ <20120817223122.GA21445@opensource.wolfsonmicro.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA67DA1@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Converted the existing arch-vt8500 gpio to a platform_device.
->> Added support for WM8505 and WM8650 GPIO controllers.
->(...)
->> +       unsigned val;
+On Sat, Aug 18, 2012 at 04:01:24, Mark Brown wrote:
+> On Tue, Aug 14, 2012 at 06:12:03PM +0530, Hebbar, Gururaja wrote:
+> > Device tree support for Davinci/OMAP2+ pcm driver.
+> 
+> This looks like it's a device which maps a shared DMA controller in the
+> SoC core into ASoC rather than actual hardware.  Such devices are
+> usually instantiated automatically from the DAI rather than being
+> represented in the device tree since they are a Linux internal thing
+> really - the Tegra and Freescale drivers provide examples of how this
+> sort of thing can be done.
 
->I asked about the datatype for this "val", it sure isn't "unsigned".
+>From your for-3.7 branch, I could only find such implementation in Tegra
+Platform. 
+Most Freescale platforms implements this through a device/driver method.
+Exception being sound/soc/mxs/mxs-pcm.c
 
->I suspected the registers were only 8bit and so it should be u8.
->But atleast use u32 if you must use all these bits.
-
-Sorry - missed adding this to my list of fixes. I've used u32 as the
-datasheet advises these are 32-bit registers and must be
-read/written as such.
-Changes included in v4.
-
->(...)
->> +       val = readl(vt8500_chip->base + vt8500_chip->regs->en);
->> +       val |= BIT(offset);
->> +       writel(val, vt8500_chip->base + vt8500_chip->regs->en);
-
->BTW: have you considered [readl|writel]_relaxed?
-
-I haven't - and to be honest I didn't know what difference it would
-make until I read up on it.
-Most of this code already existed in mainline in
-arch/arm/mach-vt8500/gpio.c and I simply moved it across to
-drivers/gpio and made some changes/additions. Having looked,
-I don't see any reason why it can't use the _relaxed variants.
-Changes included in v4.
+So should I follow tegra implementation?
+> 
 
 
-I'll post up v4 for review when I get home in about 7 hours.
-
-Work always gets in the way of being productive :)
-
-
-Regards
-
-Tony Prisk
+Regards, 
+Gururaja
