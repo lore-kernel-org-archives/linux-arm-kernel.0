@@ -1,60 +1,221 @@
-From: richard.purdie@linuxfoundation.org (Richard Purdie)
-Date: Wed, 22 Aug 2012 20:19:42 +0100
-Subject: [RFC][PATCH] Disintegrate sharpsl_param.c
-In-Reply-To: <1345656424-31234-1-git-send-email-dromede@gmail.com>
-References: <1345656424-31234-1-git-send-email-dromede@gmail.com>
-Message-ID: <1345663182.3907.134.camel@ted>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Wed, 22 Aug 2012 20:53:43 +0200
+Subject: [PATCH v2 2/3] mmc: davinci_mmc: convert to DMA engine API
+In-Reply-To: <1345574589-24757-3-git-send-email-mporter@ti.com>
+References: <1345574589-24757-1-git-send-email-mporter@ti.com>
+ <1345574589-24757-3-git-send-email-mporter@ti.com>
+Message-ID: <k139rl$gbm$2@ger.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-08-22 at 19:27 +0200, dromede at gmail.com wrote:
-> From: Marko Katic <dromede.gmail.com>
->
-> I recently tried running 3.6-rc2 kernel on my Sharp Zaurus C-1000. It 
-> hanged almost immediately after uncompressing the kernel. I tracked the
-> problem down to a single line in arch/arm/common/sharpsl_param.c:
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+Op 21-08-12 20:43, Matt Porter schreef:
+> Removes use of the DaVinci EDMA private DMA API and replaces it with use
+> of the DMA engine API.
 > 
-> memcpy(&sharpsl_param, (void *)PARAM_BASE, sizeof(struct sharpsl_param_info));
+> Signed-off-by: Matt Porter <mporter@ti.com>
+
+Runtime tested on hawkboard with 3.6.0-rc2 with rootfs on SD and running
+bonnie++ on it.
+
+Tested-by: Koen Kooi <koen@dominion.thruhere.net>
+
+> --- drivers/mmc/host/davinci_mmc.c |  271
+> ++++++++++++---------------------------- 1 file changed, 82
+> insertions(+), 189 deletions(-)
 > 
-> Commenting out the line makes the kernel boot just fine. This left me
-> wondering whether sharpsl_param.c is actually needed. Here's a comment
-> from sharpsl_param.c that describes what sharpsl_param.c actually does:
+> diff --git a/drivers/mmc/host/davinci_mmc.c
+> b/drivers/mmc/host/davinci_mmc.c index 7cf6c62..c5e1eeb 100644 ---
+> a/drivers/mmc/host/davinci_mmc.c +++ b/drivers/mmc/host/davinci_mmc.c @@
+> -30,11 +30,12 @@ #include <linux/io.h> #include <linux/irq.h> #include
+> <linux/delay.h> +#include <linux/dmaengine.h> #include
+> <linux/dma-mapping.h> +#include <linux/edma.h> #include
+> <linux/mmc/mmc.h>
+> 
+> #include <mach/mmc.h> -#include <mach/edma.h>
+> 
+> /* * Register Definitions @@ -200,21 +201,13 @@ struct mmc_davinci_host
+> { u32 bytes_left;
+> 
+> u32 rxdma, txdma; +	struct dma_chan *dma_tx; +	struct dma_chan *dma_rx; 
+> bool use_dma; bool do_dma; bool sdio_int; bool active_request;
+> 
+> -	/* Scatterlist DMA uses one or more parameter RAM entries: -	 * the
+> main one (associated with rxdma or txdma) plus zero or -	 * more links.
+> The entries for a given transfer differ only -	 * by memory buffer
+> (address, length) and link field. -	 */ -	struct edmacc_param
+> tx_template; -	struct edmacc_param	rx_template; -	unsigned		n_link; -	u32
+> links[MAX_NR_SG - 1]; - /* For PIO we walk scatterlists one segment at a
+> time. */ unsigned int		sg_len; struct scatterlist *sg; @@ -410,153
+> +403,74 @@ static void mmc_davinci_start_command(struct mmc_davinci_host
+> *host,
+> 
+> static void davinci_abort_dma(struct mmc_davinci_host *host) { -	int
+> sync_dev; +	struct dma_chan *sync_dev;
+> 
+> if (host->data_dir == DAVINCI_MMC_DATADIR_READ) -		sync_dev =
+> host->rxdma; +		sync_dev = host->dma_rx; else -		sync_dev = host->txdma; 
+> - -	edma_stop(sync_dev); -	edma_clean_channel(sync_dev); -} - -static
+> void -mmc_davinci_xfer_done(struct mmc_davinci_host *host, struct
+> mmc_data *data); - -static void mmc_davinci_dma_cb(unsigned channel, u16
+> ch_status, void *data) -{ -	if (DMA_COMPLETE != ch_status) { -		struct
+> mmc_davinci_host *host = data; - -		/* Currently means:  DMA Event
+> Missed, or "null" transfer -		 * request was seen.  In the future, TC
+> errors (like bad -		 * addresses) might be presented too. -		 */ -
+> dev_warn(mmc_dev(host->mmc), "DMA %s error\n", -			(host->data->flags &
+> MMC_DATA_WRITE) -				? "write" : "read"); -		host->data->error = -EIO; -
+> mmc_davinci_xfer_done(host, host->data); -	} -} - -/* Set up tx or rx
+> template, to be modified and updated later */ -static void __init
+> mmc_davinci_dma_setup(struct mmc_davinci_host *host, -		bool tx, struct
+> edmacc_param *template) -{ -	unsigned	sync_dev; -	const u16	acnt = 4; -
+> const u16	bcnt = rw_threshold >> 2; -	const u16	ccnt = 0; -	u32		src_port
+> = 0; -	u32		dst_port = 0; -	s16		src_bidx, dst_bidx; -	s16		src_cidx,
+> dst_cidx; - -	/* -	 * A-B Sync transfer:  each DMA request is for one
+> "frame" of -	 * rw_threshold bytes, broken into "acnt"-size chunks
+> repeated -	 * "bcnt" times.  Each segment needs "ccnt" such frames;
+> since -	 * we tell the block layer our mmc->max_seg_size limit, we can -
+> * trust (later) that it's within bounds. -	 * -	 * The FIFOs are
+> read/written in 4-byte chunks (acnt == 4) and -	 * EDMA will optimize
+> memory operations to use larger bursts. -	 */ -	if (tx) { -		sync_dev =
+> host->txdma; - -		/* src_prt, ccnt, and link to be set up later */ -
+> src_bidx = acnt; -		src_cidx = acnt * bcnt; - -		dst_port =
+> host->mem_res->start + DAVINCI_MMCDXR; -		dst_bidx = 0; -		dst_cidx = 0; 
+> -	} else { -		sync_dev = host->rxdma; - -		src_port =
+> host->mem_res->start + DAVINCI_MMCDRR; -		src_bidx = 0; -		src_cidx = 0; 
+> - -		/* dst_prt, ccnt, and link to be set up later */ -		dst_bidx =
+> acnt; -		dst_cidx = acnt * bcnt; -	} - -	/* -	 * We can't use FIFO mode
+> for the FIFOs because MMC FIFO addresses -	 * are not 256-bit (32-byte)
+> aligned.  So we use INCR, and the W8BIT -	 * parameter is ignored. -	 */ 
+> -	edma_set_src(sync_dev, src_port, INCR, W8BIT); -
+> edma_set_dest(sync_dev, dst_port, INCR, W8BIT); +		sync_dev =
+> host->dma_tx;
+> 
+> -	edma_set_src_index(sync_dev, src_bidx, src_cidx); -
+> edma_set_dest_index(sync_dev, dst_bidx, dst_cidx); - -
+> edma_set_transfer_params(sync_dev, acnt, bcnt, ccnt, 8, ABSYNC); - -
+> edma_read_slot(sync_dev, template); - -	/* don't bother with irqs or
+> chaining */ -	template->opt |= EDMA_CHAN_SLOT(sync_dev) << 12; +
+> dmaengine_terminate_all(sync_dev); }
+> 
+> -static void mmc_davinci_send_dma_request(struct mmc_davinci_host *host, 
+> +static int mmc_davinci_send_dma_request(struct mmc_davinci_host *host, 
+> struct mmc_data *data) { -	struct edmacc_param	*template; -	int
+> channel, slot; -	unsigned		link; -	struct scatterlist	*sg; -	unsigned
+> sg_len; -	unsigned		bytes_left = host->bytes_left; -	const unsigned
+> shift = ffs(rw_threshold) - 1; +	struct dma_chan *chan; +	struct
+> dma_async_tx_descriptor *desc; +	int ret = 0;
+> 
+> if (host->data_dir == DAVINCI_MMC_DATADIR_WRITE) { -		template =
+> &host->tx_template; -		channel = host->txdma; +		struct dma_slave_config
+> dma_tx_conf = { +			.direction = DMA_MEM_TO_DEV, +			.dst_addr =
+> host->mem_res->start + DAVINCI_MMCDXR, +			.dst_addr_width =
+> DMA_SLAVE_BUSWIDTH_4_BYTES, +			.dst_maxburst = +				rw_threshold /
+> DMA_SLAVE_BUSWIDTH_4_BYTES, +		}; +		chan = host->dma_tx; +
+> dmaengine_slave_config(host->dma_tx, &dma_tx_conf); + +		desc =
+> dmaengine_prep_slave_sg(host->dma_tx, +				data->sg, +				host->sg_len, +
+> DMA_MEM_TO_DEV, +				DMA_PREP_INTERRUPT | DMA_CTRL_ACK); +		if (!desc) { 
+> +			dev_dbg(mmc_dev(host->mmc), +				"failed to allocate DMA TX
+> descriptor"); +			ret = -1; +			goto out; +		} } else { -		template =
+> &host->rx_template; -		channel = host->rxdma; -	} - -	/* We know sg_len
+> and ccnt will never be out of range because -	 * we told the mmc layer
+> which in turn tells the block layer -	 * to ensure that it only hands us
+> one scatterlist segment -	 * per EDMA PARAM entry.  Update the PARAM -	 *
+> entries needed for each segment of this scatterlist. -	 */ -	for (slot =
+> channel, link = 0, sg = data->sg, sg_len = host->sg_len; -			sg_len-- !=
+> 0 && bytes_left; -			sg = sg_next(sg), slot = host->links[link++]) { -
+> u32		buf = sg_dma_address(sg); -		unsigned	count = sg_dma_len(sg); - -
+> template->link_bcntrld = sg_len -				? (EDMA_CHAN_SLOT(host->links[link])
+> << 5) -				: 0xffff; - -		if (count > bytes_left) -			count =
+> bytes_left; -		bytes_left -= count; - -		if (host->data_dir ==
+> DAVINCI_MMC_DATADIR_WRITE) -			template->src = buf; -		else -
+> template->dst = buf; -		template->ccnt = count >> shift; - -
+> edma_write_slot(slot, template); +		struct dma_slave_config dma_rx_conf =
+> { +			.direction = DMA_DEV_TO_MEM, +			.src_addr = host->mem_res->start +
+> DAVINCI_MMCDRR, +			.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES, +
+> .src_maxburst = +				rw_threshold / DMA_SLAVE_BUSWIDTH_4_BYTES, +		}; +
+> chan = host->dma_rx; +		dmaengine_slave_config(host->dma_rx,
+> &dma_rx_conf); + +		desc = dmaengine_prep_slave_sg(host->dma_rx, +
+> data->sg, +				host->sg_len, +				DMA_DEV_TO_MEM, +				DMA_PREP_INTERRUPT
+> | DMA_CTRL_ACK); +		if (!desc) { +			dev_dbg(mmc_dev(host->mmc), +
+> "failed to allocate DMA RX descriptor"); +			ret = -1; +			goto out; +
+> } }
+> 
+> -	if (host->version == MMC_CTLR_VERSION_2) -		edma_clear_event(channel); 
+> +	dmaengine_submit(desc); +	dma_async_issue_pending(chan);
+> 
+> -	edma_start(channel); +out: +	return ret; }
+> 
+> static int mmc_davinci_start_dma_transfer(struct mmc_davinci_host *host, 
+> @@ -564,6 +478,7 @@ static int mmc_davinci_start_dma_transfer(struct
+> mmc_davinci_host *host, { int i; int mask = rw_threshold - 1; +	int ret =
+> 0;
+> 
+> host->sg_len = dma_map_sg(mmc_dev(host->mmc), data->sg, data->sg_len, 
+> ((data->flags & MMC_DATA_WRITE) @@ -583,70 +498,48 @@ static int
+> mmc_davinci_start_dma_transfer(struct mmc_davinci_host *host, }
+> 
+> host->do_dma = 1; -	mmc_davinci_send_dma_request(host, data); +	ret =
+> mmc_davinci_send_dma_request(host, data);
+> 
+> -	return 0; +	return ret; }
+> 
+> static void __init_or_module davinci_release_dma_channels(struct
+> mmc_davinci_host *host) { -	unsigned	i; - if (!host->use_dma) return;
+> 
+> -	for (i = 0; i < host->n_link; i++) -		edma_free_slot(host->links[i]); 
+> - -	edma_free_channel(host->txdma); -	edma_free_channel(host->rxdma); +
+> dma_release_channel(host->dma_tx); +	dma_release_channel(host->dma_rx); 
+> }
+> 
+> static int __init davinci_acquire_dma_channels(struct mmc_davinci_host
+> *host) { -	u32 link_size; -	int r, i; - -	/* Acquire master DMA write
+> channel */ -	r = edma_alloc_channel(host->txdma, mmc_davinci_dma_cb,
+> host, -			EVENTQ_DEFAULT); -	if (r < 0) { -		dev_warn(mmc_dev(host->mmc),
+> "alloc %s channel err %d\n", -				"tx", r); -		return r; -	} -
+> mmc_davinci_dma_setup(host, true, &host->tx_template); - -	/* Acquire
+> master DMA read channel */ -	r = edma_alloc_channel(host->rxdma,
+> mmc_davinci_dma_cb, host, -			EVENTQ_DEFAULT); -	if (r < 0) { -
+> dev_warn(mmc_dev(host->mmc), "alloc %s channel err %d\n", -				"rx", r); 
+> -		goto free_master_write; +	int r; +	dma_cap_mask_t mask; + +
+> dma_cap_zero(mask); +	dma_cap_set(DMA_SLAVE, mask); + +	host->dma_tx = +
+> dma_request_channel(mask, edma_filter_fn, &host->txdma); +	if
+> (!host->dma_tx) { +		dev_err(mmc_dev(host->mmc), "Can't get dma_tx
+> channel\n"); +		return -ENODEV; } -	mmc_davinci_dma_setup(host, false,
+> &host->rx_template);
+> 
+> -	/* Allocate parameter RAM slots, which will later be bound to a -	 *
+> channel as needed to handle a scatterlist. -	 */ -	link_size =
+> min_t(unsigned, host->nr_sg, ARRAY_SIZE(host->links)); -	for (i = 0; i <
+> link_size; i++) { -		r = edma_alloc_slot(EDMA_CTLR(host->txdma),
+> EDMA_SLOT_ANY); -		if (r < 0) { -			dev_dbg(mmc_dev(host->mmc), "dma
+> PaRAM alloc --> %d\n", -				r); -			break; -		} -		host->links[i] = r; +
+> host->dma_rx = +		dma_request_channel(mask, edma_filter_fn,
+> &host->rxdma); +	if (!host->dma_rx) { +		dev_err(mmc_dev(host->mmc),
+> "Can't get dma_rx channel\n"); +		r = -ENODEV; +		goto
+> free_master_write; } -	host->n_link = i;
+> 
+> return 0;
+> 
+> free_master_write: -	edma_free_channel(host->txdma); +
+> dma_release_channel(host->dma_tx);
+> 
+> return r; } @@ -1359,7 +1252,7 @@ static int __init
+> davinci_mmcsd_probe(struct platform_device *pdev) * Each hw_seg uses one
+> EDMA parameter RAM slot, always one * channel and then usually some
+> linked slots. */ -	mmc->max_segs		= 1 + host->n_link; +	mmc->max_segs		=
+> MAX_NR_SG;
+> 
+> /* EDMA limit per hw segment (one or two MBytes) */ mmc->max_seg_size	=
+> MAX_CCNT * rw_threshold;
+> 
 
-Sharp went to the trouble of saving these values into the hardware and
-passing them into the drivers. They're basically used by the LCD
-initialisation code from what I remember. I don't remember what the
-risks are of incorrect values.
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.5 (Darwin)
+Comment: GPGTools - http://gpgtools.org
 
->  So sharpsl_save_param() is supposed to fill the sharpsl_param_info struct
->  with various parameters or fill some of the struct fields with -1. 
->  I found only four drivers that use some of these
->  parameters (only two parameters are used by these drivers, comadj and phadadj). 
->  These drivers are:
->  
->  drivers/video/backlight/corgi_lcd.c
->  drivers/video/backlight/locomolcd.c
->  drivers/video/backlight/tosa_bl.c
->  drivers/video/backlight/tosa_lcd.c
->  
->  These drivers also have default values when comadj or phadadj == -1.
->  I checked what values are actually contained in this struct in
->  earlier kernels. 3.2.24 kernel is the latest one i know of where
->  sharpsl_save_param() works properly. And it also has these fields initialised
->  to -1.
-
-What values was it loading from the bootloader? Or are you saying that
-it wasn't finding the bootloader information and therefore just using -1
-for everything?
- 
->  So it seems to me that sharpsl_param.c is redundant as it currently only  
->  serves to assign -1 to a few variables. And drivers that use these variables
->  then handle -1 with assigning default values.
-
-Its not redundant, it sounds like its just broken at some point, at
-least on the platform you tested and nobody has noticed/cared. The
-better solution would be to fix it. Obviously its much easier to delete
-the code though.
-
-Cheers,
-
-Richard
+iD8DBQFQNSq3MkyGM64RGpERAtYeAKCAw+H7rVY1JjuI5sNTDXCpDRiYNgCeKhq/
+8QNkFCA4uG1wcb5cg7BjQl0=
+=XQE4
+-----END PGP SIGNATURE-----
