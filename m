@@ -1,43 +1,51 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 22 Aug 2012 10:44:16 +0200
-Subject: [PATCH 5/7] pinctrl/nomdik: MASK_ON_SUSPEND
-Message-ID: <1345625056-5749-1-git-send-email-linus.walleij@stericsson.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 22 Aug 2012 16:52:36 +0800
+Subject: [PATCH 6/7] ARM: dts: imx6q: add simple-bus compatible string
+ for anatop
+In-Reply-To: <1345619928-15446-7-git-send-email-b29396@freescale.com>
+References: <1345619928-15446-1-git-send-email-b29396@freescale.com>
+ <1345619928-15446-7-git-send-email-b29396@freescale.com>
+Message-ID: <20120822085236.GK4011@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Etienne Carriere <etienne.carriere@stericsson.com>
+On Wed, Aug 22, 2012 at 03:18:47PM +0800, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> Originally the anatop regulator devices are populated by mfd anatop driver.
+> Since mfd anatop driver will be deleted later, we change to populate the
+> regulator devices by devicetree automatically.
+> This will cause some warning messages as follows during boot due to device
+> recreation: "vdd1p1: Failed to create debugfs directory"
+> But it does not break any function.
+> Later, we will remove mfd anatop driver which can get rid of this
+> error message.
+> 
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index 7076be0..426f735 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -379,7 +379,7 @@
+>  			};
+>  
+>  			anatop: anatop at 020c8000 {
+> -				compatible = "fsl,imx6q-anatop", "fsl,imx-syscon";
+> +				compatible = "fsl,imx6q-anatop", "fsl,imx-syscon", "simple-bus";
+To prevent bisect break, it should merge with patch #4.
+It's really strange to use simple-bus, because it's not a bus.
+I like more the way how anatop driver handle it. Anatop driver populate
+devices in its code.
 
-ux500 machines performs pins (GPIO) reconfiguration when entering
-in the suspended mode. This reconfiguration aims at reaching an ultra
-low power HW configuration.
-
-Due to this HW reconfiguration, some HW devices can change of HW state
-and have their output signals at level that could generate IRQs.
-
-If the non-wakeup IRQs are disabled but not yet masked (delayed interrupt
-disable feature from the generic irq layer), effective interrupts reach
-the system only because the system attempt to enter the suspended mode.
-
-To prevent such IRQs to trig, all irq chips embedded in ux500 platform
-should enable their IRQCHIP_MASK_ON_SUSPEND flag.
-
-Signed-off-by: Etienne Carriere <etienne.carriere@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/pinctrl-nomadik.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-index ec6ac50..41f1a3d 100644
---- a/drivers/pinctrl/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/pinctrl-nomadik.c
-@@ -819,6 +819,7 @@ static struct irq_chip nmk_gpio_irq_chip = {
- 	.irq_set_wake	= nmk_gpio_irq_set_wake,
- 	.irq_startup	= nmk_gpio_irq_startup,
- 	.irq_shutdown	= nmk_gpio_irq_shutdown,
-+	.flags		= IRQCHIP_MASK_ON_SUSPEND,
- };
- 
- static void __nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc,
--- 
-1.7.11.3
+Thanks
+Richard
+>  				reg = <0x020c8000 0x1000>;
+>  				interrupts = <0 49 0x04 0 54 0x04 0 127 0x04>;
+>  
+> -- 
+> 1.7.0.4
+> 
