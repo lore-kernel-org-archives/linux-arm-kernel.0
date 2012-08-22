@@ -1,84 +1,51 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 22 Aug 2012 15:36:48 +0200
-Subject: [RFC 2/4] ARM: dma-mapping: IOMMU allocates pages from pool
- with GFP_ATOMIC
-In-Reply-To: <CAHQjnOOF7Ca-Dz8K_zcS=gxQsJvKYaWA3tqUeK1RSd-wLYZ44w@mail.gmail.com>
-References: <1345630830-9586-1-git-send-email-hdoyu@nvidia.com><1345630830-9586-3-git-send-email-hdoyu@nvidia.com><CAHQjnOOF7Ca-Dz8K_zcS=gxQsJvKYaWA3tqUeK1RSd-wLYZ44w@mail.gmail.com>
-Message-ID: <20120822.163648.3800987367886904.hdoyu@nvidia.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 22 Aug 2012 13:33:52 +0000
+Subject: [rtc-linux] [PATCHv3 8/9] arm: vt8500: gpio: Devicetree support
+ for arch-vt8500
+In-Reply-To: <CACRpkdZnQyLSRQ6cRpFBurAv2cv44einGAsT86FLCqsj1euDMA@mail.gmail.com>
+References: <1345582058-2291-1-git-send-email-linux@prisktech.co.nz>
+ <1345582058-2291-9-git-send-email-linux@prisktech.co.nz>,
+ <CACRpkdZnQyLSRQ6cRpFBurAv2cv44einGAsT86FLCqsj1euDMA@mail.gmail.com>
+Message-ID: <76F764B079F92A4E843589C893D0A022DAF67144@SERVER.prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+>> Converted the existing arch-vt8500 gpio to a platform_device.
+>> Added support for WM8505 and WM8650 GPIO controllers.
+>(...)
+>> +       unsigned val;
 
-KyongHo Cho <pullip.cho@samsung.com> wrote @ Wed, 22 Aug 2012 14:47:00 +0200:
+>I asked about the datatype for this "val", it sure isn't "unsigned".
 
-> vzalloc() call in __iommu_alloc_buffer() also causes BUG() in atomic context.
+>I suspected the registers were only 8bit and so it should be u8.
+>But atleast use u32 if you must use all these bits.
 
-Right.
+Sorry - missed adding this to my list of fixes. I've used u32 as the
+datasheet advises these are 32-bit registers and must be
+read/written as such.
+Changes included in v4.
 
-I've been thinking that kzalloc() may be enough here, since
-vzalloc() was introduced to avoid allocation failure for big chunk of
-memory, but I think that it's unlikely that the number of page array
-can be so big. So I propose to drop vzalloc() here, and just simply to
-use kzalloc only as below(*1).
+>(...)
+>> +       val = readl(vt8500_chip->base + vt8500_chip->regs->en);
+>> +       val |= BIT(offset);
+>> +       writel(val, vt8500_chip->base + vt8500_chip->regs->en);
 
-For example, 
+>BTW: have you considered [readl|writel]_relaxed?
 
-1920(H) x 1080(W) x 4(bytes) ~= 8MiB
+I haven't - and to be honest I didn't know what difference it would
+make until I read up on it.
+Most of this code already existed in mainline in
+arch/arm/mach-vt8500/gpio.c and I simply moved it across to
+drivers/gpio and made some changes/additions. Having looked,
+I don't see any reason why it can't use the _relaxed variants.
+Changes included in v4.
 
-For 8 MiB buffer,
-  8(MiB) * 1024 = 8192(KiB)
-  8192(KiB) / 4(KiB/page) = 2048 pages
-  sizeof(struct page *) = 4 bytes
-  2048(pages) * 4(bytes/page) = 8192(bytes) = 8(KiB)
-  8(KiB) / 4(KiB/page) = 2 pages
 
-If the above estimation is right(I hope;)), the necessary pages are
-_at most_ 2 pages. If the system gets into the situation to fail to
-allocate 2 contiguous pages, that's real the problem. I guess that
-that kind of fragmentation problem would be solved with page migration
-or something, especially nowadays devices are getting larger memories.
+I'll post up v4 for review when I get home in about 7 hours.
 
-*1:
->From a613c40d1b3d4fb1577cdb0807a74e8dbd08a3e6 Mon Sep 17 00:00:00 2001
-From: Hiroshi Doyu <hdoyu@nvidia.com>
-Date: Wed, 22 Aug 2012 16:25:54 +0300
-Subject: [PATCH 1/1] ARM: dma-mapping: Use only kzalloc without vzalloc
+Work always gets in the way of being productive :)
 
-Use only kzalloc for atomic allocation.
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
- arch/arm/mm/dma-mapping.c |   10 ++--------
- 1 files changed, 2 insertions(+), 8 deletions(-)
+Regards
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 4656c0f..d4f1cf2 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1083,10 +1083,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
- 	int count = size >> PAGE_SHIFT;
- 	int array_size = count * sizeof(struct page *);
- 
--	if (array_size <= PAGE_SIZE)
--		pages = kzalloc(array_size, gfp);
--	else
--		pages = vzalloc(array_size);
-+	pages = kzalloc(array_size, gfp);
- 	if (!pages)
- 		return NULL;
- 
-@@ -1107,10 +1104,7 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
- 
- 	return pages;
- error:
--	if (array_size <= PAGE_SIZE)
--		kfree(pages);
--	else
--		vfree(pages);
-+	kfree(pages);
- 	return NULL;
- }
- 
--- 
-1.7.5.4
+Tony Prisk
