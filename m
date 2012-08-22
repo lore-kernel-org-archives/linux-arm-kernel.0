@@ -1,35 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Aug 2012 07:56:30 +0000
-Subject: [PATCH v2 17/31] arm64: System calls handling
-In-Reply-To: <20120821220145.GA27934@arm.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <201208212014.01837.arnd@arndb.de> <20120821220145.GA27934@arm.com>
-Message-ID: <201208220756.31149.arnd@arndb.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 22 Aug 2012 16:00:36 +0800
+Subject: FW: [PATCH V5 0/5] clk: mmp: add clock framework for mmp
+In-Reply-To: <201208220641.21891.arnd@arndb.de>
+References: <AAD1C6EB06EE3649B35B7E026785068D1A754366CB@SC-VEXCH2.marvell.com>
+ <CADApbehnsRzwu_LrAEMf+L7AvXv+JBtPBOzWHj578Vs6B_LrCw@mail.gmail.com>
+ <201208220641.21891.arnd@arndb.de>
+Message-ID: <CAN1soZxJ87=rL0Mq-3LFRXhqRGrKXcHS+rsMdVeM+yMK+WBCnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 August 2012, Catalin Marinas wrote:
-> As I understand, sys_mmap_pgoff can be used instead of sys_mmap2 on new
-> 32-bit architectures. But on 64-bit architectures we don't have
-> sys_mmap2, only sys_mmap with the difference that the last argument is
-> the offset in bytes (and multiple of PAGE_SIZE) rather than in pages. So
-> unless we change the meaning of this last argument for sys_mmap, we
-> cannot just define it to sys_mmap_pgoff.
-> 
-> Since the other 64-bit architectures seem to have a sys_mmap wrapper
-> that does this:
-> 
->         sys_mmap_pgoff(..., off >> PAGE_SHIFT);
-> 
-> I think AArch64 should also use the same sys_mmap convention. We can
-> make this wrapper generic.
+On Wed, Aug 22, 2012 at 2:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 22 August 2012, Chao Xie wrote:
+>> >
+>> > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+>> >
+>> >         Arnd
+>>
+>> Who will be responsible for merging these patches?
+>>
+>
+> They should go through Mike's tree, unless there is a reason why he
+> prefers them to go through arm-soc. It would be helpful to add
+> an 'Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>' line
+> and my 'Reviewed-by: Arnd Bergmann <arnd@arndb.de>' line to each
+> patch for that.
+>
+>         Arnd
 
-But the wrapper can just as well be part of glibc, which already has
-one. There is no reason for the kernel to export two generic interfaces
-for mmap when one of them only works on 64 bit and the other one is
-good for both 32 and 64 bit.
+I'm OK on these patches.
 
-All the other 64 bit architectures (besides tile) were added to the
-kernel before we had sys_mmap_pgoff.
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 
-	Arnd
+Regards
+Haojian
