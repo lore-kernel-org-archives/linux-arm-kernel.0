@@ -1,43 +1,45 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 22 Aug 2012 10:14:27 +0800
-Subject: [PATCH 1/6] gpio/mxs: adopt irq_domain support for mxs gpio driver
-In-Reply-To: <50338A35.9070803@gmail.com>
-References: <1345472400-31262-1-git-send-email-shawn.guo@linaro.org>
- <1345472400-31262-2-git-send-email-shawn.guo@linaro.org>
- <CACRpkda2hc2eZaFqRfAPEG7KfLd3mFFdWze=V45=w84nRPqijA@mail.gmail.com>
- <50338A35.9070803@gmail.com>
-Message-ID: <20120822021424.GO24242@S2101-09.ap.freescale.net>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Wed, 22 Aug 2012 10:22:54 +0800
+Subject: FW: [PATCH V5 0/5] clk: mmp: add clock framework for mmp
+In-Reply-To: <AAD1C6EB06EE3649B35B7E026785068D1A754366CB@SC-VEXCH2.marvell.com>
+References: <AAD1C6EB06EE3649B35B7E026785068D1A754366CB@SC-VEXCH2.marvell.com>
+Message-ID: <CADApbehnsRzwu_LrAEMf+L7AvXv+JBtPBOzWHj578Vs6B_LrCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2012 at 08:16:37AM -0500, Rob Herring wrote:
-> On 08/21/2012 08:01 AM, Linus Walleij wrote:
-> > On Mon, Aug 20, 2012 at 4:19 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > 
-> >> Remove irq_domain_add_legacy call from mach-mxs.c and have the gpio
-> >> driver adopt irqdomain support, so that we can have the mapping
-> >> between gpio and irq number available without using virtual_irq_start
-> >> and MXS_GPIO_IRQ_START.
-> > 
-> > Seems like a good thing to do, but with Grant and Rob being better at
-> > irqdomain than me I'd prefer one of them to have a look at this too.
-> > 
-> >> +       irq_base = irq_alloc_descs(-1, 0, 32, numa_node_id());
-> >> +       if (irq_base < 0)
-> >> +               return irq_base;
-> >> +
-> >> +       port->domain = irq_domain_add_legacy(np, 32, irq_base, 0,
-> >> +                                            &irq_domain_simple_ops, NULL);
-> > 
-> > For example I want to understand if it'd be possible to use a
-> > linear domain here.
-> 
-> Unfortunately, not if you care about your irq base and need sequential
-> irq numbers which is the case for non-DT.
-> 
-Right.  For for this particular case, it's more because generic-chip
-currently does not cope with the driver using linear domain.
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Monday, August 20, 2012 1:39 PM
+> To: Chao Xie
+> Cc: haojian.zhuang at gmail.com; mturquette at linaro.org; viresh.linux at gmail.com; s.hauer at pengutronix.de; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Chao Xie
+> Subject: Re: [PATCH V5 0/5] clk: mmp: add clock framework for mmp
+>
+> On Monday 20 August 2012, Chao Xie wrote:
+>>
+>> From: Chao Xie <chao.xie@marvell.com>
+>>
+>> v1->v2:
+>> replace __raw_xxx with xxx_relax
+>> use ioremap to remap the registers. Finaly it will use device tree to
+>> get the physical address.
+>> do not use macro to register clocks, and directly call the functions.
+>>
+>> v2->v3:
+>> pxa910 will have APB extension clock, so some peripharals will have
+>> clocks in APB extension base.
+>> change pxa168-pwm to be pxa910-pwm for pxa910. It will fit the current
+>> pwm driver.
+>>
+>> v3->v4:
+>> remove addtional clock name definition
+>> replace left __raw_xxx
+>>
+>> v4->v5:
+>> change the format of the file
+>>
+>
+> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+>
+>         Arnd
 
--- 
-Regards,
-Shawn
+Who will be responsible for merging these patches?
