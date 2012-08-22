@@ -1,34 +1,44 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 22 Aug 2012 11:44:27 +0300
-Subject: [PATCH V6 0/6] OMAPDSS: Cleanup cpu_is checks
-In-Reply-To: <cover.1345616887.git.cmahapatra@ti.com>
-References: <cover.1345468541.git.cmahapatra@ti.com>
- <cover.1345616887.git.cmahapatra@ti.com>
-Message-ID: <1345625067.3036.19.camel@deskari>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 22 Aug 2012 10:44:30 +0200
+Subject: [PATCH 7/7] mfd/tc3589x: MASK_ON_SUSPEND
+Message-ID: <1345625070-5820-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-08-22 at 12:06 +0530, Chandrabhanu Mahapatra wrote:
-> Hi everyone,
-> this patch series aims at cleaning up of DSS of cpu_is checks thereby making it
-> more generic.
-> 
-> The 1st patch cleans up cpu_is checks from DISPC code.
-> The 2nd patch removes unused functions from DSS code.
-> The 3rd patch cleans up cpu_is checks from DSS code.
-> The 4th patch disables VENC support on OMAP4.
-> The 5th patch removes cpu_is checks from VENC code.
-> The 6th patch removes cpu_is checks from DPI code and replaces it with a
-> dss feature.
+From: Etienne Carriere <etienne.carriere@stericsson.com>
 
-Thanks, looks good. I'll apply this to omapdss tree.
+ux500 machines performs pins (GPIO) reconfiguration when entering
+in the suspended mode. This reconfiguration aims at reaching an ultra
+low power HW configuration.
 
- Tomi
+Due to this HW reconfiguration, some HW devices can change of HW state
+and have their output signals at level that could generate IRQs.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120822/ac61f56d/attachment.sig>
+If the non-wakeup IRQs are disabled but not yet masked (delayed interrupt
+disable feature from the generic irq layer), effective interrupts reach
+the system only because the system attempt to enter the suspended mode.
+
+To prevent such IRQs to trig, all irq chips embedded in ux500 platform
+should enable their IRQCHIP_MASK_ON_SUSPEND flag.
+
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Signed-off-by: Etienne Carriere <etienne.carriere@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/gpio/gpio-tc3589x.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/gpio/gpio-tc3589x.c b/drivers/gpio/gpio-tc3589x.c
+index 2a82e89..6e48c50 100644
+--- a/drivers/gpio/gpio-tc3589x.c
++++ b/drivers/gpio/gpio-tc3589x.c
+@@ -199,6 +199,7 @@ static struct irq_chip tc3589x_gpio_irq_chip = {
+ 	.irq_mask		= tc3589x_gpio_irq_mask,
+ 	.irq_unmask		= tc3589x_gpio_irq_unmask,
+ 	.irq_set_type		= tc3589x_gpio_irq_set_type,
++	.flags			= IRQCHIP_MASK_ON_SUSPEND,
+ };
+ 
+ static irqreturn_t tc3589x_gpio_irq(int irq, void *dev)
+-- 
+1.7.11.3
