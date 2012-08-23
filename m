@@ -1,87 +1,65 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 23 Aug 2012 11:42:52 +0100
-Subject: PER_LINUX32, Was: [PATCH v2 21/31] arm64: 32-bit (compat)
- applications support
-In-Reply-To: <201208230646.31276.arnd@arndb.de>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <201208151434.05145.arnd@arndb.de>
- <20120816102808.GH31784@mudshark.cambridge.arm.com>
- <201208230646.31276.arnd@arndb.de>
-Message-ID: <20120823104252.GA7585@arm.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 23 Aug 2012 16:45:25 +0530
+Subject: [PATCH v3 0/4] pinctrl: add support for samsung pinctrl driver
+Message-ID: <1345720529-32315-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 07:46:30AM +0100, Arnd Bergmann wrote:
-> On Thursday 16 August 2012, Will Deacon wrote:
-> > On Wed, Aug 15, 2012 at 03:34:04PM +0100, Arnd Bergmann wrote:
-> > > On Tuesday 14 August 2012, Catalin Marinas wrote:
-> > > > +asmlinkage int compat_sys_personality(compat_ulong_t personality)
-> > > > +{
-> > > > +	int ret;
-> > > > +
-> > > > +	if (personality(current->personality) == PER_LINUX32 &&
-> > > > +		personality == PER_LINUX)
-> > > > +		personality = PER_LINUX32;
-> > > > +	ret = sys_personality(personality);
-> > > > +	if (ret == PER_LINUX32)
-> > > > +		ret = PER_LINUX;
-> > > > +	return ret;
-> > > > +}
-> > > 
-> > > Where did you get this from?
-> > > 
-> > > You should not need compat_sys_personality, just call the native function.
-> > 
-> > Hmm, but in that case an aarch32 application doing a personality(PER_LINUX)
-> > syscall will start seeing the wrong uname.
-> 
-> Coming back at this topic, I noticed another issue. Jiri Kosina
-> has recently posted patches to fix this function in the other architectures
-> in order to mask out the other personality bits, which is a correct fix,
-> but the above function is odd for other reasons.
-> 
-> * On MIPS, it is used only for compat tasks, like you have it above.
-> * On PA-RISC, it is used for native 32 bit tasks and for compat 32 bit tasks,
->   but not for native 64 bit ones.
-> * On IA64, it was used for compat tasks (support for which has since
->   been removed from the kernel), plus all 32 bit tasks would start with
->   PER_LINUX32.
-> * On PowerPC, Sparc and s390, it is used for native 64 bit tasks and for
->   compat 32 bit tasks, but not for native 32 bit ones.
-> * On Tile, it was never used.
-> * On x86_64, it used to be defined (copied from ia64) but not used
->   throughout the git history.
-> 
-> The semantics of the function are also interesting: The intention seems
-> to be that to a compat task, PER_LINUX32 would appear as PER_LINUX.
-> The effect is that any process can set PER_LINUX32 but it can never
-> be unset except by a 64 bit MIPS or PA-RISC task.
+Changes since v2:
+- Fixes as suggested by Linus Walleij <linus.walleij@linaro.org>
 
-IMHO, it makes sense to keep the compat_sys_personality() as implemented
-above. You may want to start a chroot ARMv7 environment using "linux32"
-but don't want some 32-bit app calling personality(PER_LINUX) (as that's
-the default personality on an ARMv7 system) and unknowingly changing the
-personality that you wanted to enforce via "linux32".
+Changes since v1:
+- Added support for external gpio and wakeup interrupts for Exynos4.
 
-I agree with not setting the personality based on the ELF type, but
-that's different from the compat_sys_personality().
+This patch series adds a common pinctrl driver for all Samsung platforms and
+enables the pinctrl driver support for Exynos4210 based device tree enabled
+platforms. The scope of this driver is limited to only device tree enabled
+platforms.
 
-> Since x86_64 does not implement this behavior at all, I suspect that
-> there are now lots of things depending on not having it, while all
-> the other architectures might also have some (even predating the
-> x86_64 port) use cases that depend on depend on not being able to
-> observe PER_LINUX32 in 32 bit compat tasks.
-> 
-> I think we should try to agree on how this is all supposed to work
-> and use common code, either put the ppc/sparc/s390 version into
-> sys_personality, or remove all of them and just do what x86 and tile
-> do, using the regular sys_personality for all tasks.
+The intention of this driver is to replace the existing gpiolib driver and
+provide pinctrl subsystem interface to configure the pins/mux instead
+of existing platform callbacks.
 
-Late topic for the KS :).
+Note that, the Samsung pinctrl driver is usable only on device tree enabled
+Samsung platforms. Legacy platforms would still continue to use the older
+gpiolib driver and hence updates to device drivers to use the pinctrl api
+should ensure that support for legacy platforms is maintained.
 
-I don't think we can move this behaviour to sys_personality. We may want
-to add a generic compat_sys_personality() if we agree on the above
-use-case.
+The first patch adds a new pinctrl driver for Samsung. It provides interfaces
+to the pinctrl and gpiolib subsystems. This driver provides a common framework
+for all Samsung SoC's to enable the pinctrl and gpiolib support. The driver
+accepts the information about pins, groups and functions from the device tree
+and the information about gpio banks is supplied using driver data.
 
--- 
-Catalin
+The second patch adds the driver data required to operate the pinctrl driver
+on Exynos4210 based platforms. It allows includes support for Exynos4210
+specific external gpio and wakeup interrupts which are provides to the Samsung
+pinctrl driver as extensions.
+
+The third patch modifies the existing gpiolib driver to skip the gpio pin
+registrations if pinctrl driver support is found to be enabled. The fourth
+patch skips the external wakeup interrupt configuration process in the
+Exynos4 platform code if the external wakeup interrupt support is provided
+by the pin-control driver.
+
+Thomas Abraham (4):
+  pinctrl: add samsung pinctrl and gpiolib driver
+  pinctrl: add exynos4210 specific extensions for samsung pinctrl driver
+  gpio: exynos4: skip gpiolib registration if pinctrl driver is used
+  ARM: EXYNOS: skip wakeup interrupt setup if pinctrl driver is used
+
+ .../bindings/pinctrl/samsung-pinctrl.txt           |  196 +++++
+ arch/arm/mach-exynos/common.c                      |   26 +
+ drivers/gpio/gpio-samsung.c                        |   21 +
+ drivers/pinctrl/Kconfig                            |    9 +
+ drivers/pinctrl/Makefile                           |    2 +
+ drivers/pinctrl/pinctrl-exynos.c                   |  560 ++++++++++++
+ drivers/pinctrl/pinctrl-exynos.h                   |  217 +++++
+ drivers/pinctrl/pinctrl-samsung.c                  |  888 ++++++++++++++++++++
+ drivers/pinctrl/pinctrl-samsung.h                  |  239 ++++++
+ 9 files changed, 2158 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+ create mode 100644 drivers/pinctrl/pinctrl-exynos.c
+ create mode 100644 drivers/pinctrl/pinctrl-exynos.h
+ create mode 100644 drivers/pinctrl/pinctrl-samsung.c
+ create mode 100644 drivers/pinctrl/pinctrl-samsung.h
