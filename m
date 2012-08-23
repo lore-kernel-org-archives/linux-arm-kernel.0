@@ -1,36 +1,40 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 23 Aug 2012 11:12:46 +0300
-Subject: [PATCH v3 5/9] ARM/ASoC: omap-mcbsp: Remove CLKR/FSR mux
- configuration code
-In-Reply-To: <20120822191506.GL7995@opensource.wolfsonmicro.com>
-References: <1345124468-8876-1-git-send-email-peter.ujfalusi@ti.com>
- <1345124468-8876-6-git-send-email-peter.ujfalusi@ti.com>
- <20120822191506.GL7995@opensource.wolfsonmicro.com>
-Message-ID: <5035E5FE.90401@ti.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 23 Aug 2012 10:18:39 +0200
+Subject: [PATCH 1/2] usb: change the dependency chain for LPC32XX and
+ ISP1301
+In-Reply-To: <5035D9E0.1000905@linutronix.de>
+References: <Pine.LNX.4.44L0.1208221537260.1328-100000@iolanthe.rowland.org>
+ <50355A2C.9010505@antcom.de> <5035D9E0.1000905@linutronix.de>
+Message-ID: <5035E75F.5080801@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 08/23/2012 09:21 AM, Sebastian Andrzej Siewior wrote:
+> On 08/23/2012 12:16 AM, Roland Stigge wrote:
+>> This issue could be resolved in a different way: Have you followed the
+>> discussion at linux-arm-kernel at lists.infradead.org on 2012-08-20,
+>> Subject "i2c: pnx: Fix bit definitions"? If nothing unexpected turns
+>> out, PNX4008 should probably be removed altogether. (Practically
+>> abandoned arch for 6 years.) Easily possible for v3.7.
+> 
+> Ach. I assumed that is being merged. The PNX arch does not define
+> USB_ARCH_HAS_OHCI so I goes that you can't select it there?
 
-On 08/22/2012 10:15 PM, Mark Brown wrote:
-> Applied but this didn't quite apply cleanly, please check that it did so.
+Yes, this issue will be gone also.
 
-The part which removes the omap_mcbsp_6pin_src_mux() function from
-sound/soc/omap/mcbsp.c is the one which did not made it.
+>> Then, the resulting solution is much simpler and Sebastian's patch
+>> obsolete.
+> 
+> That would be what?
 
-It failed to apply on top of topic/omap is that the branch does not have the
-following commit:
-d0db84e ASoC: omap-mcbsp: Fix 6pin mux configuration
+Well, your idea won't be obsolete completely. :-) But much simpler
+without all the "PNX4008 || LPC32XX" stuff. Following Alan's proposal,
+I'd prefer not introducing new symbols, and much of the "PNX4008 ||
+LPC32XX" logic won't be necessary anymore.
 
-This patch is in your for-next branch. I can not find it in the for-3.6 or
-for-3.7 branch either.
+For the PNX4008 removal - should I already post a patch to build the
+respective changes on top of, without PNX4008 references?
 
-Commit d0db84e was planed to be part of 3.6 AFAIK. Without that patch in
-topic/omap we are going to have merge issue with 3.7.
+Thanks,
 
-I can send a patch which removes the omap_mcbsp_6pin_src_mux() in topic/omap
-but the patch will similarly fail when we going to have d0db84e already
-applied mainline.
-
--- 
-P?ter
+Roland
