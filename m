@@ -1,70 +1,47 @@
-From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
-Date: Thu, 23 Aug 2012 15:37:39 +0300
-Subject: JFFS2 issue with v3.5.x and later on Atmel chips at least
-In-Reply-To: <5035F266.2040909@atmel.com>
-References: <5034B45A.5060107@atmel.com> <5034F3F8.9080802@atmel.com>
- <1345707689.2848.203.camel@sauron.fi.intel.com>
- <5035F266.2040909@atmel.com>
-Message-ID: <1345725459.2848.238.camel@sauron.fi.intel.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 23 Aug 2012 14:37:43 +0200
+Subject: [PATCH 4/4] [RFC] ARM: treewide: manually change more mach-*/*.h
+ includes
+In-Reply-To: <201208231135.11688.arnd@arndb.de>
+References: <201208221253.07278.arnd@arndb.de>
+ <201208221301.19439.arnd@arndb.de>
+ <20120822214323.GA12255@n2100.arm.linux.org.uk>
+ <201208231135.11688.arnd@arndb.de>
+Message-ID: <50362417.9070600@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-08-23 at 11:05 +0200, ludovic.desroches wrote:
+On 08/23/2012 01:35 PM, Arnd Bergmann :
+> On Wednesday 22 August 2012, Russell King - ARM Linux wrote:
+>>
+>> On Wed, Aug 22, 2012 at 01:01:19PM +0000, Arnd Bergmann wrote:
+>>> These are lots of device drivers that include machine
+>>> specific header files from ARM platforms and that are
+>>> not easily scriptable. The changes have been found through
+>>> manual inspection and should cause no visible changes
+>>> because of the build script that maps the old names to the
+>>> new ones.
+
+[..]
+
+> How about I move all the pure platform data definition files now and
+> rebase the other patches on top of that. Here is a list of suggested
+> file names in include/linux/platform_data/:
 > 
-> Tested-by: Ludovic Desroches <ludovic.desroches@atmel.com> 
+> mach-at91/at_hdmac.h		-> dma-atmel.h
 
-Thanks, pushed to l2-mtd.git tree a bit modified patch. Will ping dwmw2
-about merging it to Linus.
+Fine with me. Maybe atmel-dma.h can better match what we already have in
+this directory, but I do not know what is the policy in this directory...
 
-From: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-Date: Thu, 23 Aug 2012 10:10:07 +0300
-Subject: [PATCH] JFFS2: fix unmount regression
+[..]
 
-This patch fixes regression introduced by
-"8bdc81c jffs2: get rid of jffs2_sync_super". We submit a delayed work in order
-to make sure the write-buffer is synchronized at some point. But we do not
-flush it when we unmount, which causes an oops when we unmount the file-system
-and then the delayed work is executed.
 
-This patch fixes the issue by adding a "cancel_delayed_work_sync()" infocation
-in the '->sync_fs()' handler. This will make sure the delayed work is canceled
-on sync, unmount and re-mount. And because VFS always callse 'sync_fs()' before
-unmounting or remounting, this fixes the issue.
+> ** list of mach/* inclusions that I could not match with
+> ** exactly one ARM platform:
 
-Reported-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Cc: stable at vger.kernel.org [3.5+]
-Signed-off-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-Tested-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- fs/jffs2/super.c |    4 ++++
- 1 file changed, 4 insertions(+)
+In fact, for "*atmel*" type of files, they usually match *both* AVR32
+and ARM/AT91 devices: so, we have to be careful about them...
 
-diff --git a/fs/jffs2/super.c b/fs/jffs2/super.c
-index 61ea413..1224d6b 100644
---- a/fs/jffs2/super.c
-+++ b/fs/jffs2/super.c
-@@ -100,6 +100,10 @@ static int jffs2_sync_fs(struct super_block *sb, int wait)
- {
- 	struct jffs2_sb_info *c = JFFS2_SB_INFO(sb);
- 
-+#ifdef CONFIG_JFFS2_FS_WRITEBUFFER
-+	cancel_delayed_work_sync(&c->wbuf_dwork);
-+#endif
-+
- 	mutex_lock(&c->alloc_sem);
- 	jffs2_flush_wbuf_pad(c);
- 	mutex_unlock(&c->alloc_sem);
+Best regards,
 -- 
-1.7.10.4
-
-
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120823/c05bd241/attachment.sig>
+Nicolas Ferre
