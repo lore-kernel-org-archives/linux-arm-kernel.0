@@ -1,27 +1,27 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Thu, 23 Aug 2012 18:34:43 +0300
-Subject: [PATCH v6] ARM: mtd: nand: davinci: add OF support for davinci
- nand controller
-In-Reply-To: <1343632944-25971-1-git-send-email-hs@denx.de>
-References: <1343632944-25971-1-git-send-email-hs@denx.de>
-Message-ID: <1345736083.2848.248.camel@sauron.fi.intel.com>
+From: hachimi.samir@gmail.com (hachimi.samir at gmail.com)
+Date: Thu, 23 Aug 2012 17:32:37 +0200
+Subject: [PATCH 0/2] imx6q: pwm: Activate stop_mode and remove auto enable
+ after configuration
+In-Reply-To: <[PATCH 0/2] imx6q: pwm: Activate stop_mode and remove auto
+ enable after configuration>
+References: <[PATCH 0/2] imx6q: pwm: Activate stop_mode and remove auto enable
+ after configuration>
+Message-ID: <1345735959-12964-1-git-send-email-hachimi.samir@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-07-30 at 09:22 +0200, Heiko Schocher wrote:
-> add OF support for the davinci nand controller.
-> 
-> Signed-off-by: Heiko Schocher <hs@denx.de>
+This patch series enables support for pwm driver on imx6q SoC. The first
+patch of the series configure the pinctrl for pwm in device-tree. Actually
+they are several pin who can be set to pwmO for each pwm, so I assume that
+all of them must be enabled when configuring pin.
+The second patch activate stop_enable mode and unset the enable bit during
+configuration of pwm, and set the enable bit in pwm CR register during enable.
 
-Pushed to l2-mtd.git, thanks!
-
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120823/2bd20e75/attachment.sig>
+Samir Hachimi (2):
+imx6q: Configure the pwm node for pinmux support.
+imx6q: Set pwm control register during enable and config call
+---
+ arch/arm/boot/dts/imx6q.dtsi  |   50 ++++++++
+ arch/arm/mach-imx/clk-imx6q.c |    4 ++++
+ drivers/pwm/pwm-imx.c         |   37 ++++++++++++++++++++++++++-----------
+ 3 files changed, 80 insertions(+), 11 deletions(-)
