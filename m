@@ -1,34 +1,27 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 23 Aug 2012 16:54:58 +0530
-Subject: [PATCH v2 2/2] ARM: EXYNOS: Enable pinctrl driver support for Exynos4
- device tree enabled platform
-In-Reply-To: <1345721098-32459-1-git-send-email-thomas.abraham@linaro.org>
-References: <1345721098-32459-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1345721098-32459-3-git-send-email-thomas.abraham@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 23 Aug 2012 08:13:38 -0300
+Subject: [PATCH v2] ARM: imx: add imx5x usb controller clock lookups
+In-Reply-To: <1345719696-25738-1-git-send-email-m.grzeschik@pengutronix.de>
+References: <1345718328-6547-1-git-send-email-m.grzeschik@pengutronix.de>
+ <1345719696-25738-1-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <CAOMZO5AV5eYgjuxAHBi-r1-kA4w2ue3kGVqYYG83d4=qxUxhDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables support for Samsung and Exynos4 pinctrl driver for device
-tree enabled Exynos4 platforms.
+Hi Michael,
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- arch/arm/mach-exynos/Kconfig |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+On Thu, Aug 23, 2012 at 8:01 AM, Michael Grzeschik
+<m.grzeschik@pengutronix.de> wrote:
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> ---
+>  arch/arm/mach-imx/clk-imx51-imx53.c |   24 ++++++++++++++++++++++++
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index b5b4c8c..195b50e 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -405,6 +405,8 @@ config MACH_EXYNOS4_DT
- 	select USE_OF
- 	select ARM_AMBA
- 	select HAVE_SAMSUNG_KEYPAD if INPUT_KEYBOARD
-+	select PINCTRL
-+	select PINCTRL_EXYNOS4
- 	help
- 	  Machine support for Samsung Exynos4 machine with device tree enabled.
- 	  Select this if a fdt blob is available for the Exynos4 SoC based board.
--- 
-1.6.6.rc2
+Just curious: does the current Chip Idea USB driver work 'as is' on mx5?
+
+Are you also going to submit the <soc>.dtsi and <board>.dts patches?
+
+I would like to try it on a mx53qsb.
+
+Regards,
+
+Fabio Estevam
