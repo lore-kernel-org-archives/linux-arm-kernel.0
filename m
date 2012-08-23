@@ -1,50 +1,93 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 23 Aug 2012 13:33:03 +0300
-Subject: [PATCH v3 23/23] serial: omap: enable RX and TX FIFO usage
-In-Reply-To: <1345717983-18179-1-git-send-email-balbi@ti.com>
-References: <1345717983-18179-1-git-send-email-balbi@ti.com>
-Message-ID: <1345717983-18179-24-git-send-email-balbi@ti.com>
+From: m.grzeschik@pengutronix.de (Michael Grzeschik)
+Date: Thu, 23 Aug 2012 12:35:57 +0200
+Subject: [PATCH] ARM: dts: imx: add imx5x usb entries
+Message-ID: <1345718157-7927-1-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enable RX FIFO for 16 characters and TX FIFO
-for 16 spaces.
-
-Tested-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-Signed-off-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
 ---
- drivers/tty/serial/omap-serial.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/imx51.dtsi |   28 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx53.dtsi |   28 ++++++++++++++++++++++++++++
+ 2 files changed, 56 insertions(+)
 
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 0e5ffdf..137d475 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -55,8 +55,8 @@
- #define OMAP_UART_SCR_RX_TRIG_GRANU1_MASK		(1 << 7)
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index aba28dc..4ec015f 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -130,6 +130,34 @@
+ 				};
+ 			};
  
- /* FCR register bitmasks */
--#define OMAP_UART_FCR_RX_FIFO_TRIG_SHIFT		6
- #define OMAP_UART_FCR_RX_FIFO_TRIG_MASK			(0x3 << 6)
-+#define OMAP_UART_FCR_TX_FIFO_TRIG_MASK			(0x3 << 4)
++			usb at 73f80000 {
++				compatible = "fsl,imx51-usb", "fsl,imx27-usb";
++				reg = <0x73f80000 0x0200>;
++				interrupts = <18>;
++				status = "disabled";
++			};
++
++			usb at 73f80200 {
++				compatible = "fsl,imx51-usb", "fsl,imx27-usb";
++				reg = <0x73f80200 0x0200>;
++				interrupts = <14>;
++				status = "disabled";
++			};
++
++			usb at 73f80400 {
++				compatible = "fsl,imx51-usb", "fsl,imx27-usb";
++				reg = <0x73f80400 0x0200>;
++				interrupts = <16>;
++				status = "disabled";
++			};
++
++			usb at 73f80600 {
++				compatible = "fsl,imx51-usb", "fsl,imx27-usb";
++				reg = <0x73f80600 0x0200>;
++				interrupts = <17>;
++				status = "disabled";
++			};
++
+ 			gpio1: gpio at 73f84000 {
+ 				compatible = "fsl,imx51-gpio", "fsl,imx35-gpio";
+ 				reg = <0x73f84000 0x4000>;
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index cd37165..24280a4 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -135,6 +135,34 @@
+ 				};
+ 			};
  
- /* MVR register bitmasks */
- #define OMAP_UART_MVR_SCHEME_SHIFT	30
-@@ -820,9 +820,13 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
- 
- 	up->scr |= OMAP_UART_SCR_RX_TRIG_GRANU1_MASK;
- 
--	/* Set receive FIFO threshold to 1 byte */
-+	/* Set receive FIFO threshold to 16 characters and
-+	 * transmit FIFO threshold to 16 spaces
-+	 */
- 	up->fcr &= ~OMAP_UART_FCR_RX_FIFO_TRIG_MASK;
--	up->fcr |= (0x1 << OMAP_UART_FCR_RX_FIFO_TRIG_SHIFT);
-+	up->fcr &= ~OMAP_UART_FCR_TX_FIFO_TRIG_MASK;
-+	up->fcr |= UART_FCR6_R_TRIGGER_16 | UART_FCR6_T_TRIGGER_24 |
-+		UART_FCR_ENABLE_FIFO;
- 
- 	serial_out(up, UART_FCR, up->fcr);
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
++			usb at 53f80000 {
++				compatible = "fsl,imx53-usb", "fsl,imx27-usb";
++				reg = <0x53f80000 0x0200>;
++				interrupts = <18>;
++				status = "disabled";
++			};
++
++			usb at 53f80200 {
++				compatible = "fsl,imx53-usb", "fsl,imx27-usb";
++				reg = <0x53f80200 0x0200>;
++				interrupts = <14>;
++				status = "disabled";
++			};
++
++			usb at 53f80400 {
++				compatible = "fsl,imx53-usb", "fsl,imx27-usb";
++				reg = <0x53f80400 0x0200>;
++				interrupts = <16>;
++				status = "disabled";
++			};
++
++			usb at 53f80600 {
++				compatible = "fsl,imx53-usb", "fsl,imx27-usb";
++				reg = <0x53f80600 0x0200>;
++				interrupts = <17>;
++				status = "disabled";
++			};
++
+ 			gpio1: gpio at 53f84000 {
+ 				compatible = "fsl,imx53-gpio", "fsl,imx35-gpio";
+ 				reg = <0x53f84000 0x4000>;
 -- 
-1.7.12.rc3
+1.7.10.4
