@@ -1,127 +1,106 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 23 Aug 2012 11:45:27 +0200
-Subject: [PATCH v2 1/9] pinctrl: mvebu: pinctrl driver core
-In-Reply-To: <5035445B.6000500@wwwdotorg.org>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1345623750-10645-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <5035445B.6000500@wwwdotorg.org>
-Message-ID: <CABJ1b_Tdr80DGqb-FRzwDbF3m7g6fBguk5GtRAfRUYx5Sqy_cA@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 23 Aug 2012 18:55:37 +0900
+Subject: [PATCH V2 0/5] arm: samsung: Move FIMD headers to include/video/
+In-Reply-To: <5018FDF6.4020205@gmx.de>
+References: <1343737385-23337-1-git-send-email-l.krishna@samsung.com>
+ <02f701cd6f8d$5ca3e850$15ebb8f0$%kim@samsung.com> <5018FDF6.4020205@gmx.de>
+Message-ID: <1d5a01cd8115$7251eb40$56f5c1c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/22/12, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 08/22/2012 02:22 AM, Sebastian Hesselbarth wrote:
->> +++ b/drivers/pinctrl/pinctrl-mvebu.c
->
->> +static int mvebu_pinctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
->
->> +	of_property_for_each_string(np, "marvell,pins", prop, group) {
->> +		struct mvebu_pinctrl_group *grp =
->> +			mvebu_pinctrl_find_group_by_name(pctl, group);
->> +
->> +		if (!grp) {
->> +			dev_err(pctl->dev, "unknown pin %s", group);
->> +			continue;
->> +		}
->> +
->> +		if (!mvebu_pinctrl_find_setting_by_name(pctl, grp, function)) {
->> +			dev_err(pctl->dev, "unsupported function %s on pin %s",
->> +				function, group);
->> +			continue;
->> +		}
->
-> The error-checking here isn't strictly necessary; the pinctrl core will
-> error-check all the names if/when the map entries are used. So, you
-> could probably get away with just assigning the pin/function names
-> directly into (*map) and hence remove some code here. Still, it's not a
-> big deal either way.
+Florian Tobias Schandinat wrote:
+> 
+> On 08/01/2012 02:28 AM, Kukjin Kim wrote:
+> > Leela Krishna Amudala wrote:
+> >>
+> >> This patchset moves the contents of regs-fb-v4.h and regs-fb.h from
+> arch
+> >> side
+> >> to include/video/samsung_fimd.h
+> >>
+> >> This patchset is created and rebased against master branch of torvalds
+> >> tree.
+> >> Tested on smdk5250 board, build tested for other boards.
+> >>
+> > (Cc'ed Florian Tobias Schandinat)
+> >
+> > Yeah, since it's merge window, this series could be created against on
+> > mainline. And IMO, would be helpful to us if this series could be sent
+> to
+> > upstream via samsung tree after reviewing, because this touches too many
+> > files in samsung tree and just adds include/video/samsung_fimd.h. But
+> I'm
+> > not sure the added inclusion will be used in other file of
+drivers/video.
+> If
+> > so, I can provide some topic branch can be merged into Florian's tree.
+> > Florian, how about?
+> 
+> Using a topic branch to merge it in both trees sounds like a good plan
+> to me.
+> 
+Florian,
 
-Hi Stephen,
+Please pull following topic branch we talked. I already merged it into my
+-next.
 
-as these error checks are only performed once, I'd like to have them there
-as they give hints when someone uses wrong marvell,pins/function names
-in DT.
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+v3.7-for-florian
 
->> +static int __devinit mvebu_pinctrl_dt_parse_function(struct mvebu_pinctrl
->> *pctl,
->
->> +static int __devinit mvebu_pinctrl_dt_parse(struct platform_device
->> *pdev,
->> +					struct mvebu_pinctrl *pctl)
->
-> I don't understand what those two functions do, or a good chunk of
-> probe(). It seems like they're setting up the ability to get/set pin
-> configrations in addition to pin muxing, although if that's so, it seems
-> odd that none of the binding documents specify any way of controlling
-> pin configuration from device tree. Are you expecting drivers to call
-> APIs such as pin_config_set() directly, rather than controlling pin
-> config through DT?
+Note, I applied Leela's V4 patches not this V2 series.
 
-probe() receives some structs from the SoC specific driver stubs that
-describe, e.g. how many muxable pins are available, which pingroup they
-belong to (marvell,pins), what valid register values are and how they are
-named (marvell,function). Although, all mvebu SoC share a good part of
-pinmux register layout, there are especially for dove some very different
-ways to mux pins. As mvebu pinctrl is a true mux-only driver, i.e. no
-pin drive strength or pin direction configuration, we decided not to have
-single pins controlable but only pingroups even if they comprise only a
-single pin.
+If any problems, please kindly let me know.
 
-dt_parse() and dt_parse_function() build up structs that get used later on
-in mvebu_pinmux_ops that require indexed functions. I can join them with
-dt_node_to_map() but that would require incremental kzalloc for the
-corresponding array. Or I could (functionally) leave dt_parse() to allocate
-the array and only join dt_parse_function() with dt_node_to_map().
+Thanks.
 
-There is an example of how to use pinctrl in marvell.mvebu-pinctrl.txt:
-uart1: serial at 12100 {
-	compatible = "ns16550a";
-	reg = <0x12100 0x100>;
-	reg-shift = <2>;
-	interrupts = <7>;
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-	pinctrl-0 = <&pmx_uart1_sw>;
-};
+The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
 
-pinctrl: pinctrl at d0200 {
-	compatible = "marvell,dove-pinctrl";
-	reg = <0xd0200 0x20>;
+  Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
 
-	pmx_uart1_sw: pmx-uart1-sw {
-		marvell,pins = "mpp_uart1";
-		marvell,function = "uart1";
-	};
-};
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+v3.7-for-florian
 
-In my understanding this will allow uart1 to switch the pingroup "mpp_uart1"
-to the function "uart1". The pinctrl core driver is taking care of
-translating mpp_uart1
-to the corresponding pingroup and mvebu core driver of translating
-uart1 into the required
-register values to set the requested function. Is it so odd, that we
-use names instead
-of direct register values in DT? I agree, that maybe picking an example for dove
-that is a little bit different in pingroup naming isn't the best
-choice but it still gives
-you an idea how to use it.
+Leela Krishna Amudala (2):
+      include/video: move fimd register headers from platform to
+include/video
+      include/video: Add register offsets for FIMD version 8
 
-Consider this (virtual) example:
-Muxing some SATA functions to pins 24 and 37 would require to set
-register values
-to 0x3 on pin 24 and 0x6 on pin 37. The proposed driver still allows
-us to have a DT
-description of
-
-pmx_sata_example: pmx-sata-example {
-	marvell,pins = "mpp24", "mpp37";
-	marvell,function = "sata";
-};
-
-because the SoC specific driver passes function "sata" on pins 24 and
-37 with the
-corresponding register values. These are fed by the mvebu core driver
-that builds
-up all required pins, pingroups, and pinmux functions.
-
-Sebastian
+ arch/arm/mach-exynos/mach-nuri.c                   |    2 +-
+ arch/arm/mach-exynos/mach-origen.c                 |    2 +-
+ arch/arm/mach-exynos/mach-smdk4x12.c               |    2 +-
+ arch/arm/mach-exynos/mach-smdkv310.c               |    2 +-
+ arch/arm/mach-exynos/mach-universal_c210.c         |    2 +-
+ arch/arm/mach-exynos/setup-fimd0.c                 |    2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2416.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-anw6410.c               |    2 +-
+ arch/arm/mach-s3c64xx/mach-crag6410.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-hmt.c                   |    2 +-
+ arch/arm/mach-s3c64xx/mach-mini6410.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-ncp.c                   |    2 +-
+ arch/arm/mach-s3c64xx/mach-real6410.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-smartq5.c               |    2 +-
+ arch/arm/mach-s3c64xx/mach-smartq7.c               |    2 +-
+ arch/arm/mach-s3c64xx/mach-smdk6410.c              |    2 +-
+ arch/arm/mach-s5p64x0/mach-smdk6440.c              |    2 +-
+ arch/arm/mach-s5p64x0/mach-smdk6450.c              |    2 +-
+ arch/arm/mach-s5pc100/mach-smdkc100.c              |    2 +-
+ arch/arm/mach-s5pv210/mach-aquila.c                |    2 +-
+ arch/arm/mach-s5pv210/mach-goni.c                  |    2 +-
+ arch/arm/mach-s5pv210/mach-smdkv210.c              |    2 +-
+ arch/arm/plat-samsung/include/plat/regs-fb-v4.h    |  159
+--------------------
+ drivers/gpu/drm/exynos/exynos_drm_fimd.c           |    2 +-
+ drivers/video/s3c-fb.c                             |    2 +-
+ .../plat/regs-fb.h => include/video/samsung_fimd.h |  152
++++++++++++++++++--
+ 26 files changed, 165 insertions(+), 194 deletions(-)
+ delete mode 100644 arch/arm/plat-samsung/include/plat/regs-fb-v4.h
+ rename arch/arm/plat-samsung/include/plat/regs-fb.h =>
+include/video/samsung_fimd.h (73%)
