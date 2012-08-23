@@ -1,22 +1,29 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 23 Aug 2012 10:02:24 +0800
-Subject: [PATCH 1/3] ARM: mxs: Rename 'hog-gpios'
-In-Reply-To: <1345652733-13265-1-git-send-email-festevam@gmail.com>
-References: <1345652733-13265-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120823020220.GZ24242@S2101-09.ap.freescale.net>
+Date: Thu, 23 Aug 2012 10:07:48 +0800
+Subject: [PATCH 3/6] ARM: imx: build pm-imx5 code only when PM is enabled
+In-Reply-To: <1345648390-4234-4-git-send-email-arnd@arndb.de>
+References: <1345648390-4234-1-git-send-email-arnd@arndb.de>
+ <1345648390-4234-4-git-send-email-arnd@arndb.de>
+Message-ID: <20120823020746.GA24242@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2012 at 01:25:31PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Wed, Aug 22, 2012 at 05:13:07PM +0200, Arnd Bergmann wrote:
+> This moves the imx5 pm code out of the list of unconditionally
+> compiled files for imx5, mirroring what we already do for imx6
+> and how it was done before the code was move from mach-mx5 to
+> mach-imx in v3.3.
 > 
-> hog_pins is used to setup the pin functions, and it is not neccesarily used only
-> for GPIO pins, so use only 'hog' to describe a more generic term.
+> Without this patch, building with CONFIG_PM disabled results in:
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> arch/arm/mach-imx/pm-imx5.c:202:116: error: redefinition of 'imx51_pm_init'
+> arch/arm/mach-imx/include/mach-imx/common.h:154:91: note: previous definition of 'imx51_pm_init' was here
+> arch/arm/mach-imx/pm-imx5.c:209:116: error: redefinition of 'imx53_pm_init'
+> arch/arm/mach-imx/include/mach-imx/common.h:155:91: note: previous definition of 'imx53_pm_init' was here
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: stable at vger.kernel.org
 
-Applied all 3 patches, thanks.
-
--- 
-Regards,
-Shawn
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
