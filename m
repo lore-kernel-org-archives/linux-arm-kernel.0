@@ -1,313 +1,186 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 23 Aug 2012 19:35:40 +1200
-Subject: [PATCHv4 4/9] usb: vt8500: Add devicetree support for vt8500-ehci and
- -uhci.
-In-Reply-To: <1345707346-9035-1-git-send-email-linux@prisktech.co.nz>
-References: <1345707346-9035-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1345707346-9035-5-git-send-email-linux@prisktech.co.nz>
+Date: Thu, 23 Aug 2012 19:35:36 +1200
+Subject: [PATCHv4 0/9] *** ARM: Update arch-vt8500 to Devicetree ***
+Message-ID: <1345707346-9035-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devicetree support for vt8500-ehci.
-Convert vt8500-uhci to a generic non-pci platform-uhci with
-device tree support.
+This patchset updates arch-vt8500 to devicetree and removes all the old-style
+code. Support for WM8650 has also been added.
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
- drivers/usb/host/Kconfig         |    4 +-
- drivers/usb/host/ehci-vt8500.c   |   25 ++++--
- drivers/usb/host/uhci-hcd.c      |    5 ++
- drivers/usb/host/uhci-platform.c |  169 ++++++++++++++++++++++++++++++++++++++
- 4 files changed, 195 insertions(+), 8 deletions(-)
+Example dts/dtsi files are given for the three currently supported models.
+
+Major changes:
+
+GPIO code has been converted to a platform_device and rewritten as WM8505
+support was broken. Add support for WM8650 gpio controller.
+
+UHCI support was missing. Added this as a generic non-pci uhci controller as
+it doesn't require anything special. Should be usable by any system that doesn't
+have special requirements to get the UHCI controller working.
+
+Framebuffer code patched to support WM8650. The bindings for this are of concern
+but there doesn't seem to be a formalized binding yet. This patch is based off
+Sascha Hauer's current patch on the dri-devel mailing list and should be easily
+patched out when its finalized.
+
+Patchset based on Arnd's arm-soc/for-next branch.
+
+
+Could I get this reviewed, hopefully for inclusion into v3.7.
+
+Regards
+Tony Prisk
+
+Changes
+v2:
+Cleanup style/formatting errors
+Removed erroneous commit message about GPIO not being converted to devicetree
+Corrected arch-vt8500/irq.c header to correct filename
+Changed GPIO driver to use module_platform_driver()
+Renamed vt8500_gpio_bank_regs -> vt8500_gpio_bank_regoffsets
+Changed vt8500_gpio_bank_regoffset fields to unsigned int
+Changed bit-setting code to use BIT() macro
+Removed of_find_compatible() and use pdev->dev.of_node in _probe()
+Removed regoff field and related code - leftover from old design
+Added kerneldoc regarding struct vt8500_gpio_bank_regoffsets fields
+Update MODULE_LICENSE on all platform devices to "GPL v2" to match their headers
+Renamed dts board files to clarify product names
+
+v3:
+Corrected serial driver issue after porting to device tree. pdev->id no longer
+valid.
+Corrected irq.c to properly initialize slaved interrupt controller.
+Updated framebuffer drivers to use phandles for display node.
+Corrected dts definitions for updated framebuffer driver.
+
+EHCI/UHCI patch (Patch 4/9) already in -next via usb-next tree.
+
+Included common clock frame support.
+Added initialization code to arch/arm/mach-vt8500/vt8500.c for clocks.
+Updated wm8650.dtsi to include basic clocks.
+
+v4:
+Added missing GPL header to clk-vt8500.c
+Corrected unsigned variables in gpio-vt8500.c
+Changed gpio-vt8500.c to use readl/writel _relaxed variants.
+Update serial driver to get clock source from device tree.
+Update dtsi files for uart clock sources.
+Renamed vt8500_gpio.txt to vt8500-gpio.txt
+Describe gpio flags property - currently no flags are defined, but will need
+to be when gpio interrupts are supported. Kept for future compatibility.
+
+Stephen W: I've taken a look on dri-devel mailing list and -next but haven't
+seen a new binding document for Sascha's of_videomode_helper yet. I've left the
+code as is for now - hopefully the OF helper will be formalized in this cycle.
+I took a look at the GPIO flags - this was added on Arnd's recommendation as it
+will be needed later once the GPIO controller is also an interrupt-controller.
+I've add documentation that it should be =0 for now.
+
+
+Tony Prisk (9):
+  arm: vt8500: Add device tree files for VIA/Wondermedia SoC's
+  rtc: vt8500: Add devicetree support for vt8500-rtc
+  serial: vt8500: Add devicetree support for vt8500-serial
+  usb: vt8500: Add devicetree support for vt8500-ehci and -uhci.
+  video: vt8500: Add devicetree support for vt8500-fb and wm8505-fb
+  arm: vt8500: Update arch-vt8500 to devicetree support.
+  arm: vt8500: doc: Add device tree bindings for arch-vt8500 devices
+  arm: vt8500: gpio: Devicetree support for arch-vt8500
+  arm: vt8500: clk: Add Common Clock Framework support
+
+ Documentation/devicetree/bindings/arm/vt8500.txt   |   15 +
+ .../bindings/arm/vt8500/via,vt8500-intc.txt        |   16 +
+ .../bindings/arm/vt8500/via,vt8500-pmc.txt         |   13 +
+ .../bindings/arm/vt8500/via,vt8500-timer.txt       |   15 +
+ Documentation/devicetree/bindings/clock/vt8500.txt |   72 +++
+ .../devicetree/bindings/gpio/gpio-vt8500.txt       |   24 +
+ .../devicetree/bindings/rtc/via,vt8500-rtc.txt     |   15 +
+ .../bindings/tty/serial/via,vt8500-uart.txt        |   17 +
+ .../devicetree/bindings/usb/platform-uhci.txt      |   15 +
+ .../devicetree/bindings/usb/via,vt8500-ehci.txt    |   15 +
+ .../devicetree/bindings/vendor-prefixes.txt        |    2 +
+ .../devicetree/bindings/video/via,vt8500-fb.txt    |   48 ++
+ .../devicetree/bindings/video/wm,prizm-ge-rops.txt |   13 +
+ .../devicetree/bindings/video/wm,wm8505-fb.txt     |   22 +
+ arch/arm/Kconfig                                   |    5 +
+ arch/arm/boot/dts/vt8500-bv07.dts                  |   31 ++
+ arch/arm/boot/dts/vt8500.dtsi                      |  115 +++++
+ arch/arm/boot/dts/wm8505-ref.dts                   |   31 ++
+ arch/arm/boot/dts/wm8505.dtsi                      |  142 ++++++
+ arch/arm/boot/dts/wm8650-mid.dts                   |   31 ++
+ arch/arm/boot/dts/wm8650.dtsi                      |  146 ++++++
+ arch/arm/mach-vt8500/Kconfig                       |   72 +--
+ arch/arm/mach-vt8500/Makefile                      |    9 +-
+ arch/arm/mach-vt8500/bv07.c                        |   80 ---
+ arch/arm/mach-vt8500/common.h                      |   28 ++
+ arch/arm/mach-vt8500/devices-vt8500.c              |   91 ----
+ arch/arm/mach-vt8500/devices-wm8505.c              |   99 ----
+ arch/arm/mach-vt8500/devices.c                     |  270 -----------
+ arch/arm/mach-vt8500/devices.h                     |   88 ----
+ arch/arm/mach-vt8500/gpio.c                        |  240 ---------
+ arch/arm/mach-vt8500/include/mach/restart.h        |    4 +-
+ arch/arm/mach-vt8500/include/mach/vt8500_irqs.h    |   88 ----
+ arch/arm/mach-vt8500/include/mach/vt8500_regs.h    |   79 ---
+ arch/arm/mach-vt8500/include/mach/wm8505_irqs.h    |  115 -----
+ arch/arm/mach-vt8500/include/mach/wm8505_regs.h    |   78 ---
+ arch/arm/mach-vt8500/irq.c                         |  209 ++++----
+ arch/arm/mach-vt8500/restart.c                     |   54 ---
+ arch/arm/mach-vt8500/timer.c                       |   67 ++-
+ arch/arm/mach-vt8500/vt8500.c                      |  196 ++++++++
+ arch/arm/mach-vt8500/wm8505_7in.c                  |   79 ---
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/clk-vt8500.c                           |  511 ++++++++++++++++++++
+ drivers/gpio/Kconfig                               |    6 +
+ drivers/gpio/Makefile                              |    1 +
+ drivers/gpio/gpio-vt8500.c                         |  316 ++++++++++++
+ drivers/rtc/rtc-vt8500.c                           |    9 +-
+ drivers/tty/serial/vt8500_serial.c                 |   58 ++-
+ drivers/usb/host/Kconfig                           |    4 +-
+ drivers/usb/host/ehci-vt8500.c                     |   25 +-
+ drivers/usb/host/uhci-hcd.c                        |    5 +
+ drivers/usb/host/uhci-platform.c                   |  169 +++++++
+ drivers/video/Kconfig                              |    6 +-
+ drivers/video/vt8500lcdfb.c                        |   79 ++-
+ drivers/video/wm8505fb.c                           |   97 +++-
+ drivers/video/wmt_ge_rops.c                        |    9 +-
+ 55 files changed, 2463 insertions(+), 1582 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/vt8500.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/vt8500/via,vt8500-intc.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/vt8500/via,vt8500-pmc.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/vt8500/via,vt8500-timer.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/vt8500.txt
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-vt8500.txt
+ create mode 100644 Documentation/devicetree/bindings/rtc/via,vt8500-rtc.txt
+ create mode 100644 Documentation/devicetree/bindings/tty/serial/via,vt8500-uart.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/platform-uhci.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
+ create mode 100644 Documentation/devicetree/bindings/video/via,vt8500-fb.txt
+ create mode 100644 Documentation/devicetree/bindings/video/wm,prizm-ge-rops.txt
+ create mode 100644 Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
+ create mode 100644 arch/arm/boot/dts/vt8500-bv07.dts
+ create mode 100644 arch/arm/boot/dts/vt8500.dtsi
+ create mode 100644 arch/arm/boot/dts/wm8505-ref.dts
+ create mode 100644 arch/arm/boot/dts/wm8505.dtsi
+ create mode 100644 arch/arm/boot/dts/wm8650-mid.dts
+ create mode 100644 arch/arm/boot/dts/wm8650.dtsi
+ delete mode 100644 arch/arm/mach-vt8500/bv07.c
+ create mode 100644 arch/arm/mach-vt8500/common.h
+ delete mode 100644 arch/arm/mach-vt8500/devices-vt8500.c
+ delete mode 100644 arch/arm/mach-vt8500/devices-wm8505.c
+ delete mode 100644 arch/arm/mach-vt8500/devices.c
+ delete mode 100644 arch/arm/mach-vt8500/devices.h
+ delete mode 100644 arch/arm/mach-vt8500/gpio.c
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/vt8500_irqs.h
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/vt8500_regs.h
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/wm8505_irqs.h
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/wm8505_regs.h
+ delete mode 100644 arch/arm/mach-vt8500/restart.c
+ create mode 100644 arch/arm/mach-vt8500/vt8500.c
+ delete mode 100644 arch/arm/mach-vt8500/wm8505_7in.c
+ create mode 100644 drivers/clk/clk-vt8500.c
+ create mode 100644 drivers/gpio/gpio-vt8500.c
  create mode 100644 drivers/usb/host/uhci-platform.c
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index dcfaaa9..d7a6b10 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -450,7 +450,7 @@ config USB_OHCI_LITTLE_ENDIAN
- 
- config USB_UHCI_HCD
- 	tristate "UHCI HCD (most Intel and VIA) support"
--	depends on USB && (PCI || SPARC_LEON)
-+	depends on USB && (PCI || SPARC_LEON || ARCH_VT8500)
- 	---help---
- 	  The Universal Host Controller Interface is a standard by Intel for
- 	  accessing the USB hardware in the PC (which is also called the USB
-@@ -468,7 +468,7 @@ config USB_UHCI_HCD
- config USB_UHCI_SUPPORT_NON_PCI_HC
- 	bool
- 	depends on USB_UHCI_HCD
--	default y if SPARC_LEON
-+	default y if (SPARC_LEON  || ARCH_VT8500)
- 
- config USB_UHCI_BIG_ENDIAN_MMIO
- 	bool
-diff --git a/drivers/usb/host/ehci-vt8500.c b/drivers/usb/host/ehci-vt8500.c
-index c1eda73..0e1637b 100644
---- a/drivers/usb/host/ehci-vt8500.c
-+++ b/drivers/usb/host/ehci-vt8500.c
-@@ -16,6 +16,7 @@
-  *
-  */
- 
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- 
- static int ehci_update_device(struct usb_hcd *hcd, struct usb_device *udev)
-@@ -84,20 +85,23 @@ static const struct hc_driver vt8500_ehci_hc_driver = {
- 	.clear_tt_buffer_complete	= ehci_clear_tt_buffer_complete,
- };
- 
-+static u64 wmt_ehci_dma_mask = DMA_BIT_MASK(32);
-+
- static int vt8500_ehci_drv_probe(struct platform_device *pdev)
- {
- 	struct usb_hcd *hcd;
- 	struct ehci_hcd *ehci;
- 	struct resource *res;
-+	int irq;
- 	int ret;
- 
- 	if (usb_disabled())
- 		return -ENODEV;
- 
--	if (pdev->resource[1].flags != IORESOURCE_IRQ) {
--		pr_debug("resource[1] is not IORESOURCE_IRQ");
--		return -ENOMEM;
--	}
-+	/* devicetree created devices don't specify a dma mask */
-+	if (!pdev->dev.dma_mask)
-+		pdev->dev.dma_mask = &wmt_ehci_dma_mask;
-+
- 	hcd = usb_create_hcd(&vt8500_ehci_hc_driver, &pdev->dev, "VT8500");
- 	if (!hcd)
- 		return -ENOMEM;
-@@ -134,8 +138,9 @@ static int vt8500_ehci_drv_probe(struct platform_device *pdev)
- 
- 	ehci_reset(ehci);
- 
--	ret = usb_add_hcd(hcd, pdev->resource[1].start,
--			  IRQF_SHARED);
-+	irq = platform_get_irq(pdev, 0);
-+
-+	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
- 	if (ret == 0) {
- 		platform_set_drvdata(pdev, hcd);
- 		return ret;
-@@ -162,6 +167,11 @@ static int vt8500_ehci_drv_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id vt8500_ehci_ids[] = {
-+	{ .compatible = "via,vt8500-ehci", },
-+	{}
-+};
-+
- static struct platform_driver vt8500_ehci_driver = {
- 	.probe		= vt8500_ehci_drv_probe,
- 	.remove		= vt8500_ehci_drv_remove,
-@@ -169,7 +179,10 @@ static struct platform_driver vt8500_ehci_driver = {
- 	.driver = {
- 		.name	= "vt8500-ehci",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(vt8500_ehci_ids),
- 	}
- };
- 
- MODULE_ALIAS("platform:vt8500-ehci");
-+MODULE_LICENSE("GPL v2");
-+MODULE_DEVICE_TABLE(of, vt8500_ehci_ids);
-diff --git a/drivers/usb/host/uhci-hcd.c b/drivers/usb/host/uhci-hcd.c
-index e4db350..5da5c99 100644
---- a/drivers/usb/host/uhci-hcd.c
-+++ b/drivers/usb/host/uhci-hcd.c
-@@ -846,6 +846,11 @@ static const char hcd_name[] = "uhci_hcd";
- #define PLATFORM_DRIVER		uhci_grlib_driver
- #endif
- 
-+#ifdef CONFIG_ARCH_VT8500
-+#include "uhci-platform.c"
-+#define PLATFORM_DRIVER		uhci_platform_driver
-+#endif
-+
- #if !defined(PCI_DRIVER) && !defined(PLATFORM_DRIVER)
- #error "missing bus glue for uhci-hcd"
- #endif
-diff --git a/drivers/usb/host/uhci-platform.c b/drivers/usb/host/uhci-platform.c
-new file mode 100644
-index 0000000..35ca094
---- /dev/null
-+++ b/drivers/usb/host/uhci-platform.c
-@@ -0,0 +1,169 @@
-+/*
-+ * Generic UHCI HCD (Host Controller Driver) for Platform Devices
-+ *
-+ * Copyright (c) 2011 Tony Prisk <linux@prisktech.co.nz>
-+ *
-+ * This file is based on uhci-grlib.c
-+ * (C) Copyright 2004-2007 Alan Stern, stern at rowland.harvard.edu
-+ */
-+
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+
-+static int uhci_platform_init(struct usb_hcd *hcd)
-+{
-+	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
-+
-+	uhci->rh_numports = uhci_count_ports(hcd);
-+
-+	/* Set up pointers to to generic functions */
-+	uhci->reset_hc = uhci_generic_reset_hc;
-+	uhci->check_and_reset_hc = uhci_generic_check_and_reset_hc;
-+
-+	/* No special actions need to be taken for the functions below */
-+	uhci->configure_hc = NULL;
-+	uhci->resume_detect_interrupts_are_broken = NULL;
-+	uhci->global_suspend_mode_is_broken = NULL;
-+
-+	/* Reset if the controller isn't already safely quiescent. */
-+	check_and_reset_hc(uhci);
-+	return 0;
-+}
-+
-+static const struct hc_driver uhci_platform_hc_driver = {
-+	.description =          hcd_name,
-+	.product_desc =         "Generic UHCI Host Controller",
-+	.hcd_priv_size =        sizeof(struct uhci_hcd),
-+
-+	/* Generic hardware linkage */
-+	.irq =                  uhci_irq,
-+	.flags =                HCD_MEMORY | HCD_USB11,
-+
-+	/* Basic lifecycle operations */
-+	.reset =                uhci_platform_init,
-+	.start =                uhci_start,
-+#ifdef CONFIG_PM
-+	.pci_suspend =          NULL,
-+	.pci_resume =           NULL,
-+	.bus_suspend =          uhci_rh_suspend,
-+	.bus_resume =           uhci_rh_resume,
-+#endif
-+	.stop =                 uhci_stop,
-+
-+	.urb_enqueue =          uhci_urb_enqueue,
-+	.urb_dequeue =          uhci_urb_dequeue,
-+
-+	.endpoint_disable =     uhci_hcd_endpoint_disable,
-+	.get_frame_number =     uhci_hcd_get_frame_number,
-+
-+	.hub_status_data =      uhci_hub_status_data,
-+	.hub_control =          uhci_hub_control,
-+};
-+
-+static u64 platform_uhci_dma_mask = DMA_BIT_MASK(32);
-+
-+static int __devinit uhci_hcd_platform_probe(struct platform_device *pdev)
-+{
-+	struct usb_hcd *hcd;
-+	struct uhci_hcd *uhci;
-+	struct resource *res;
-+	int ret;
-+
-+	if (usb_disabled())
-+		return -ENODEV;
-+
-+	/* Right now device-tree probed devices don't get dma_mask set.
-+	 * Since shared usb code relies on it, set it here for now.
-+	 * Once we have dma capability bindings this can go away.
-+	 */
-+	if (!pdev->dev.dma_mask)
-+		pdev->dev.dma_mask = &platform_uhci_dma_mask;
-+
-+	hcd = usb_create_hcd(&uhci_platform_hc_driver, &pdev->dev,
-+				pdev->name);
-+	if (!hcd)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	hcd->rsrc_start = res->start;
-+	hcd->rsrc_len = resource_size(res);
-+
-+	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
-+		pr_err("%s: request_mem_region failed\n", __func__);
-+		ret = -EBUSY;
-+		goto err_rmr;
-+	}
-+
-+	hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
-+	if (!hcd->regs) {
-+		pr_err("%s: ioremap failed\n", __func__);
-+		ret = -ENOMEM;
-+		goto err_irq;
-+	}
-+	uhci = hcd_to_uhci(hcd);
-+
-+	uhci->regs = hcd->regs;
-+
-+	ret = usb_add_hcd(hcd, pdev->resource[1].start, IRQF_DISABLED |
-+								IRQF_SHARED);
-+	if (ret)
-+		goto err_uhci;
-+
-+	return 0;
-+
-+err_uhci:
-+	iounmap(hcd->regs);
-+err_irq:
-+	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
-+err_rmr:
-+	usb_put_hcd(hcd);
-+
-+	return ret;
-+}
-+
-+static int uhci_hcd_platform_remove(struct platform_device *pdev)
-+{
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
-+
-+	usb_remove_hcd(hcd);
-+	iounmap(hcd->regs);
-+	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
-+	usb_put_hcd(hcd);
-+	platform_set_drvdata(pdev, NULL);
-+
-+	return 0;
-+}
-+
-+/* Make sure the controller is quiescent and that we're not using it
-+ * any more.  This is mainly for the benefit of programs which, like kexec,
-+ * expect the hardware to be idle: not doing DMA or generating IRQs.
-+ *
-+ * This routine may be called in a damaged or failing kernel.  Hence we
-+ * do not acquire the spinlock before shutting down the controller.
-+ */
-+static void uhci_hcd_platform_shutdown(struct platform_device *op)
-+{
-+	struct usb_hcd *hcd = dev_get_drvdata(&op->dev);
-+
-+	uhci_hc_died(hcd_to_uhci(hcd));
-+}
-+
-+static const struct of_device_id platform_uhci_ids[] = {
-+	{ .compatible = "platform-uhci", },
-+	{}
-+};
-+
-+static struct platform_driver uhci_platform_driver = {
-+	.probe          = uhci_hcd_platform_probe,
-+	.remove         = uhci_hcd_platform_remove,
-+	.shutdown       = uhci_hcd_platform_shutdown,
-+	.driver = {
-+		.name = "platform-uhci",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(platform_uhci_ids),
-+	},
-+};
-+
-+MODULE_ALIAS("platform:platform-uhci");
-+MODULE_LICENSE("GPL v2");
-+MODULE_DEVICE_TABLE(of, platform_uhci_ids);
 -- 
 1.7.9.5
