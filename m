@@ -1,74 +1,156 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Thu, 23 Aug 2012 15:06:58 +0800
-Subject: [PATCH 1/7] mfd: add imx syscon driver based on regmap
-In-Reply-To: <5035BCB1.8000801@wwwdotorg.org>
-References: <1345619928-15446-1-git-send-email-b29396@freescale.com>
- <1345619928-15446-2-git-send-email-b29396@freescale.com>
- <20120822082940.GJ4011@b20223-02.ap.freescale.net>
- <20120822105729.GB10057@shlinux2.ap.freescale.net>
- <5035BCB1.8000801@wwwdotorg.org>
-Message-ID: <20120823070657.GE10057@shlinux2.ap.freescale.net>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 23 Aug 2012 09:33:05 +0200
+Subject: [v2 4/4] ARM: dma-mapping: IOMMU allocates pages from atomic_pool
+ with GFP_ATOMIC
+In-Reply-To: <1345702229-9539-5-git-send-email-hdoyu@nvidia.com>
+References: <1345702229-9539-1-git-send-email-hdoyu@nvidia.com>
+ <1345702229-9539-5-git-send-email-hdoyu@nvidia.com>
+Message-ID: <013c01cd8101$8ccfa020$a66ee060$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 01:16:33PM +0800, Stephen Warren wrote:
-> On 08/22/2012 04:57 AM, Dong Aisheng wrote:
-> > On Wed, Aug 22, 2012 at 04:29:41PM +0800, Zhao Richard-B20223 wrote:
-> >> On Wed, Aug 22, 2012 at 03:18:42PM +0800, Dong Aisheng wrote:
-> >>> Add regmap based imx syscon driver.
-> >>> This is usually used for access misc bits in registers which does not belong
-> >>> to a specific module, for example, IOMUXC GPR and ANATOP.
-> >>> With this driver, we provide a standard API for client driver to call to
-> >>> access registers which are registered into syscon.
-> 
-> >>> +static int imx_syscon_match(struct device *dev, void *data)
-> >>> +{
-> >>> +	struct imx_syscon *syscon = dev_get_drvdata(dev);
-> >>> +	struct device_node *dn = data;
-> >>> +
-> >>> +	return (syscon->dev->of_node == dn) ? 1 : 0;
-> >>> +}
-> >>> +
-> >>> +int imx_syscon_write(struct device_node *np, u32 reg, u32 val)
-> >>
-> >> For API function, is it better to use struct device rather not np?
-> >>  - it won't need to search dev in below code every time it access
-> >>    registers.
-> >
-> > The purpose is not require client driver to know the implementation details
-> > of imx_syscon_{read/write} API, it's more easy to use since client only
-> > needs pass the device node to which it wants to read/write.
-> > 
-> > For search dev, it doesn't look like a big issue since it only search devices
-> > attached on the driver which is very quick.
-> > And hide it in common API does not require every client driver to write
-> > duplicated codes.
-> 
-> You could still implement a function:
-> 
-> struct device *imx_syscon_lookup(struct device_node *np)
-> 
-> ... and require all clients to call that, and pass the dev to the other
-> functions. That'd still keep all the lookup code in one place, but
-> prevent it having to run every time, no matter how small it is.
-> 
-> I think such an API is required anyway, since client drivers need some
-> way to determine whether the imx_syscon driver is available yet, and if
-> not defer their probe until it is.
-> 
-> So, clients would do:
-> 
-> foo->syscon_dev = imx_syscon_lookup(np);
-> if (!foo->syscon_dev)
->     return -EPROBE_DEFER;
-> 
-> rather than:
-> 
-> foo->syscon_np = np;
-> 
-> Not too much overhead/boiler-plate in each client driver.
-> 
-Looks like a good idea.
+Hi Hiroshi,
 
-Regards
-Dong Aisheng
+On Thursday, August 23, 2012 8:10 AM Hiroshi Doyu wrote:
+
+> Makes use of the same atomic pool from DMA, and skips kernel page
+> mapping which can involve sleep'able operations at allocating a kernel
+> page table.
+> 
+> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> ---
+>  arch/arm/mm/dma-mapping.c |   30 +++++++++++++++++++++++++-----
+>  1 files changed, 25 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 7ab016b..433312a 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1063,7 +1063,6 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t
+> size,
+>  	struct page **pages;
+>  	int count = size >> PAGE_SHIFT;
+>  	int array_size = count * sizeof(struct page *);
+> -	int err;
+> 
+>  	if ((array_size <= PAGE_SIZE) || (gfp & GFP_ATOMIC))
+>  		pages = kzalloc(array_size, gfp);
+> @@ -1072,9 +1071,20 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t
+> size,
+>  	if (!pages)
+>  		return NULL;
+> 
+> -	err = __alloc_fill_pages(&pages, count, gfp);
+> -	if (err)
+> -		goto error
+> +	if (gfp & GFP_ATOMIC) {
+> +		struct page *page;
+> +		int i;
+> +		void *addr = __alloc_from_pool(size, &page);
+> +		if (!addr)
+> +			goto error;
+> +
+> +		for (i = 0; i < count; i++)
+> +			pages[i] = page + i;
+> +	} else {
+> +		int err = __alloc_fill_pages(&pages, count, gfp);
+> +		if (err)
+> +			goto error;
+> +	}
+> 
+>  	return pages;
+> 
+> @@ -1091,9 +1101,15 @@ static int __iommu_free_buffer(struct device *dev, struct page **pages,
+> size_t s
+>  	int count = size >> PAGE_SHIFT;
+>  	int array_size = count * sizeof(struct page *);
+>  	int i;
+> +
+> +	if (__free_from_pool(page_address(pages[0]), size))
+> +		goto out;
+> +
+>  	for (i = 0; i < count; i++)
+>  		if (pages[i])
+>  			__free_pages(pages[i], 0);
+> +
+> +out:
+>  	if ((array_size <= PAGE_SIZE) ||
+>  	    __in_atomic_pool(page_address(pages[0]), size))
+>  		kfree(pages);
+> @@ -1221,6 +1237,9 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+>  	if (*handle == DMA_ERROR_CODE)
+>  		goto err_buffer;
+> 
+> +	if (gfp & GFP_ATOMIC)
+> +		return page_address(pages[0]);
+> +
+>  	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs))
+>  		return pages;
+> 
+
+I've read the whole code and it looks that it starts to become a little spaghetti - there are too
+many places altered by those atomic changes and it is hard to follow the logic at the first sight.
+
+IMHO it will be better to add a following function:
+
+static void *__iommu_alloc_atomic(struct device *dev, size_t size,
+                                  dma_addr_t *handle)
+{
+        struct page *page, **pages;
+        int count = size >> PAGE_SHIFT;
+        int array_size = count * sizeof(struct page *);
+        void *addr;
+        int i;
+
+        pages = kzalloc(array_size, gfp);
+        if (!pages)
+                return NULL;
+
+        addr = __alloc_from_pool(size, &page);
+        if (!addr)
+                goto err_pool;
+
+        for (i = 0; i < count; i++)
+                pages[i] = page + i;
+
+        *handle = __iommu_create_mapping(dev, pages, size);
+        if (*handle == DMA_ERROR_CODE)
+                goto err_mapping;
+
+        return addr;
+
+err_mapping:
+        __free_from_pool(addr, size);
+err_pool:
+        kfree(pages);
+        return NULL;
+}
+
+and then call it@the beginning of the arm_iommu_alloc_attrs():
+
+        if (gfp & GFP_ATOMIC)
+                return __iommu_alloc_atomic(dev, size, handle);
+
+You should also add support for the allocation from atomic_pool to __iommu_get_pages() function
+to get dma_mmap() and dma_get_sgtable() working correctly.
+ 
+> @@ -1279,7 +1298,8 @@ void arm_iommu_free_attrs(struct device *dev, size_t size, void
+> *cpu_addr,
+>  		return;
+>  	}
+> 
+> -	if (!dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs)) {
+> +	if (!dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs) ||
+> +	    !__in_atomic_pool(cpu_addr, size)) {
+>  		unmap_kernel_range((unsigned long)cpu_addr, size);
+>  		vunmap(cpu_addr);
+>  	}
+
+Are you sure this one works?  __iommu_get_pages() won't find pages array, because atomic
+allocations don't get their separate vm_struct area, so this check will be never reached. Maybe
+a __iommu_free_atomic() function would also make it safer and easier to understand.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
