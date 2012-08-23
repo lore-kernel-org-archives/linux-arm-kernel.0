@@ -1,39 +1,38 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 23 Aug 2012 15:27:28 +0200
-Subject: [PATCH] ARM: at91/feature-removal-schedule: delay at91_mci removal
-Message-ID: <1345728448-29384-1-git-send-email-nicolas.ferre@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 23 Aug 2012 13:31:09 +0000
+Subject: [PATCH 4/4] [RFC] ARM: treewide: manually change more mach-*/*.h
+ includes
+In-Reply-To: <50362417.9070600@atmel.com>
+References: <201208221253.07278.arnd@arndb.de>
+ <201208231135.11688.arnd@arndb.de> <50362417.9070600@atmel.com>
+Message-ID: <201208231331.09612.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Thursday 23 August 2012, Nicolas Ferre wrote:
+> > How about I move all the pure platform data definition files now and
+> > rebase the other patches on top of that. Here is a list of suggested
+> > file names in include/linux/platform_data/:
+> > 
+> > mach-at91/at_hdmac.h          -> dma-atmel.h
+> 
+> Fine with me. Maybe atmel-dma.h can better match what we already have in
+> this directory, but I do not know what is the policy in this directory...
 
-Delay sd/mmc driver at91_mci.c removal because of tight schedule to
-move platform data to new driver atmel-mci.
-
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Hi,
-
-I plan to queue this one with the at91-fixes pull-request for 3.6. If you do
-not feel it is a good idea, please say so.
-
-
- Documentation/feature-removal-schedule.txt |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/Documentation/feature-removal-schedule.txt b/Documentation/feature-removal-schedule.txt
-index afaff31..f4d8c71 100644
---- a/Documentation/feature-removal-schedule.txt
-+++ b/Documentation/feature-removal-schedule.txt
-@@ -579,7 +579,7 @@ Why:	KVM tracepoints provide mostly equivalent information in a much more
- ----------------------------
+There does not seem to be a clear policy in that directory yet, so I
+chose to put the subsystem name first. There have been a few subsystems
+recently which adopted this naming scheme for their drivers, so it
+seemed to be a good choice if we want to start a naming scheme that
+sticks.
  
- What:	at91-mci driver ("CONFIG_MMC_AT91")
--When:	3.7
-+When:	3.8
- Why:	There are two mci drivers: at91-mci and atmel-mci. The PDC support
- 	was added to atmel-mci as a first step to support more chips.
- 	Then at91-mci was kept only for old IP versions (on at91rm9200 and
--- 
-1.7.10
+> > ** list of mach/* inclusions that I could not match with
+> > ** exactly one ARM platform:
+> 
+> In fact, for "*atmel*" type of files, they usually match both AVR32
+> and ARM/AT91 devices: so, we have to be careful about them...
+
+Yes, I'm aware of that. My list did not include the mach/atmel-mci.h
+or the mach/board.h files, which suffer from this problem and cannot
+easily be merged.
+
+	Arnd
