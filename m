@@ -1,46 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 23 Aug 2012 18:48:43 +0100
-Subject: [PATCH] ARM: decompressor: reset ttbcr for VMSA ARMv7 cores
-Message-ID: <1345744123-4121-1-git-send-email-will.deacon@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 23 Aug 2012 11:49:31 -0600
+Subject: [PATCH 05/14] ARM: at91: add pinctrl support
+In-Reply-To: <CACQ1gAieByr5vMmyyCuGtS8AgnnRZPPhLZY8sKvwvcQYe5ieUA@mail.gmail.com>
+References: <20120810124820.GA20557@game.jcrosoft.org>
+ <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
+ <1344603731-32667-5-git-send-email-plagnioj@jcrosoft.com>
+ <CACRpkdZ2__V06Eo8JH451Sup5Nw2jJXVOH2FOfZBp5nNYpCtbg@mail.gmail.com>
+ <5034FC18.2090400@wwwdotorg.org>
+ <CACQ1gAieByr5vMmyyCuGtS8AgnnRZPPhLZY8sKvwvcQYe5ieUA@mail.gmail.com>
+Message-ID: <50366D2B.4010807@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When enabling the MMU for ARMv7 CPUs, the decompressor does not touch
-the ttbcr register, assuming that it will be zeroed (N == 0, EAE == 0).
-Given that only EAE is defined as 0 for non-secure copies of the
-register (and a bootloader such as kexec may leave it set to 1 anyway),
-we should ensure that we reset the register ourselves before turning on
-the MMU.
+On 08/23/2012 01:06 AM, Richard Genoud wrote:
+> 2012/8/22 Stephen Warren <swarren@wwwdotorg.org>:
+>>>> +Required properties for iomux controller:
+>>>> +- compatible: "atmel,at91rm9200-pinctrl"
+>>>> +- atmel,mux-mask: array of mask (periph per bank) to describe if a pin can be
+>>>> +  configured in this periph mode. All the periph and bank need to be describe.
+>>>
+>>> Can you please be more elaborate on this mux-mask, like what each bit
+>>> means and why the bits are arranged like that and what it means on the
+>>> AT91 platform.... I was first reading the .dts and was like ?woot? so
+>>> I go to the bindings doc and I read this and I'm still like ?woot?..
+>>
+>> Yes, I'm a little confused what this is, and wouldn't have a clue how to
+>> fill it in.
+>
+> With a practical example it's easier to understand.
+> Take a SAM9X5 release manual (here is sam9g35):
+> http://www.atmel.com/Images/doc11053.pdf page 11 (?4.3 package pinout)
+> in the file arch/arm/boot/dts/at91sam9x5.dtsi you've got the the
+> atmel,mux-mask like that:
+>
+> /* periphA  periphB    periphC     */
+> 0xffffffff 0xffe0399f 0xc000001c  /* pioA */
+> 0x0007ffff 0x8000fe3f 0x00000000  /* pioB */
+> 0x80000000 0x07c0ffff 0xb83fffff  /* pioC */
+> 0x003fffff 0x003f8000 0x00000000  /* pioD */
+> 
+> Let's take the PioA - peripheral B: 0xffe0399f
+> From the documentation table 4-3, we can extract the column PIO
+> Periperal B for all signals PA0-PA31:
+...
+> Each time it's possible to mux a pin to the peripheral B function (ie
+> when there's no "-----") the corresponding bit is set:
+...
+> => this gives 0x399f
 
-This patch zeroes TTBCR.EAE and TTBCR.N prior to enabling the MMU for
-ARMv7 cores in the decompressor, configuring us exclusively for 32-bit
-translation tables via TTBR0.
-
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Signed-off-by: Matthew Leach <matthew.leach@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/boot/compressed/head.S |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index b8c64b8..81769c1 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -659,10 +659,14 @@ __armv7_mmu_cache_on:
- #ifdef CONFIG_CPU_ENDIAN_BE8
- 		orr	r0, r0, #1 << 25	@ big-endian page tables
- #endif
-+		mrcne   p15, 0, r6, c2, c0, 2   @ read ttb control reg
- 		orrne	r0, r0, #1		@ MMU enabled
- 		movne	r1, #0xfffffffd		@ domain 0 = client
-+		bic     r6, r6, #1 << 31        @ 32-bit translation system
-+		bic     r6, r6, #3 << 0         @ use only ttbr0
- 		mcrne	p15, 0, r3, c2, c0, 0	@ load page table pointer
- 		mcrne	p15, 0, r1, c3, c0, 0	@ load domain access control
-+		mcrne   p15, 0, r6, c2, c0, 2   @ load ttb control
- #endif
- 		mcr	p15, 0, r0, c7, c5, 4	@ ISB
- 		mcr	p15, 0, r0, c1, c0, 0	@ load control register
--- 
-1.7.4.1
+Ah OK. It would be a good idea to briefly describe this process in the
+binding document I think. I assume this property exists to avoid the
+kernel driver having to contain tables for each Atmel device; the driver
+is generic.
