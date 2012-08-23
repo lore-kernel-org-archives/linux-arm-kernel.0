@@ -1,86 +1,123 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 23 Aug 2012 14:40:45 +0900
-Subject: [PATCH] spi/s3c64xx: Drop extra calls to spi_master_get in
- suspend/remove functions
-In-Reply-To: <1345173265-1721-1-git-send-email-linux@roeck-us.net>
-References: <1345173265-1721-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1d0b01cd80f1$d77eaf90$867c0eb0$%kim@samsung.com>
+From: Barry.Song@csr.com (Barry Song)
+Date: Thu, 23 Aug 2012 13:41:58 +0800
+Subject: [PATCH v2 2/3] ARM: PRIMA2: adjust Kconfig to support select SoC
+ features
+In-Reply-To: <1345700519-667-1-git-send-email-Barry.Song@csr.com>
+References: <1345700519-667-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <1345700519-667-3-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guenter Roeck wrote:
-> 
-> Suspend and resume functions call spi_master_get() without matching
-> spi_master_put(). The extra references are unnecessary and cause
-> subsequent
-> module unload attempts to fail. Drop the calls.
-> 
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+From: Barry Song <Baohua.Song@csr.com>
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Now we have primaII, but will include Marco and Polo in mach-prima2
+as well. We add Kconfig menu so that we can select necessary SoC
+features.
 
-(Cc'ed Mark Brown who is handling spi now)
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ -v2:
+ fix typo;
+ don't rename mach-prima2 to mach-sirf;
+ make ARCH_PRIMA2 become an enable feature but not a choice of SoC types;
 
-Guenter, maybe you need to re-send this patch to Mark so that he can apply
-;-)
+ arch/arm/Kconfig                  |   10 +++++-----
+ arch/arm/configs/prima2_defconfig |    7 +++----
+ arch/arm/mach-prima2/Kconfig      |   15 +++++++++++++++
+ 3 files changed, 23 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm/mach-prima2/Kconfig
 
-Thanks.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index fb60148..2c1ca9f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -407,9 +407,8 @@ config ARCH_GEMINI
+ 	help
+ 	  Support for the Cortina Systems Gemini family SoCs
+ 
+-config ARCH_PRIMA2
+-	bool "CSR SiRFSoC PRIMA2 ARM Cortex A9 Platform"
+-	select CPU_V7
++config ARCH_SIRF
++	bool "CSR SiRF"
+ 	select NO_IOPORT
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select GENERIC_CLOCKEVENTS
+@@ -419,9 +418,8 @@ config ARCH_PRIMA2
+ 	select PINCTRL
+ 	select PINCTRL_SIRF
+ 	select USE_OF
+-	select ZONE_DMA
+ 	help
+-          Support for CSR SiRFSoC ARM Cortex A9 Platform
++	  Support for CSR SiRFprimaII/Marco/Polo platforms
+ 
+ config ARCH_EBSA110
+ 	bool "EBSA-110"
+@@ -1118,6 +1116,8 @@ source "arch/arm/mach-exynos/Kconfig"
+ 
+ source "arch/arm/mach-shmobile/Kconfig"
+ 
++source "arch/arm/mach-prima2/Kconfig"
++
+ source "arch/arm/mach-tegra/Kconfig"
+ 
+ source "arch/arm/mach-u300/Kconfig"
+diff --git a/arch/arm/configs/prima2_defconfig b/arch/arm/configs/prima2_defconfig
+index c328ac6..807d4e2 100644
+--- a/arch/arm/configs/prima2_defconfig
++++ b/arch/arm/configs/prima2_defconfig
+@@ -1,4 +1,6 @@
+ CONFIG_EXPERIMENTAL=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_RELAY=y
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_KALLSYMS_ALL=y
+@@ -8,9 +10,7 @@ CONFIG_MODULE_UNLOAD=y
+ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_BSD_DISKLABEL=y
+ CONFIG_SOLARIS_X86_PARTITION=y
+-CONFIG_ARCH_PRIMA2=y
+-CONFIG_NO_HZ=y
+-CONFIG_HIGH_RES_TIMERS=y
++CONFIG_ARCH_SIRF=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_KEXEC=y
+@@ -36,7 +36,6 @@ CONFIG_SPI=y
+ CONFIG_SPI_SIRF=y
+ CONFIG_SPI_SPIDEV=y
+ # CONFIG_HWMON is not set
+-# CONFIG_HID_SUPPORT is not set
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_FILE_STORAGE=m
+ CONFIG_USB_MASS_STORAGE=m
+diff --git a/arch/arm/mach-prima2/Kconfig b/arch/arm/mach-prima2/Kconfig
+new file mode 100644
+index 0000000..65438e1
+--- /dev/null
++++ b/arch/arm/mach-prima2/Kconfig
+@@ -0,0 +1,15 @@
++if ARCH_SIRF
++
++menu "CSR SiRF primaII/Marco/Polo Specific Features"
++
++config ARCH_PRIMA2
++	bool "CSR SiRFSoC PRIMA2 ARM Cortex A9 Platform"
++	default y
++	select CPU_V7
++	select ZONE_DMA
++	help
++          Support for CSR SiRFSoC ARM Cortex A9 Platform
++
++endmenu
++
++endif
+-- 
+1.7.0.4
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-> ---
->  drivers/spi/spi-s3c64xx.c |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-> index 646a765..d7a87df 100644
-> --- a/drivers/spi/spi-s3c64xx.c
-> +++ b/drivers/spi/spi-s3c64xx.c
-> @@ -1409,7 +1409,7 @@ static int s3c64xx_spi_remove(struct platform_device
-> *pdev)
->  #ifdef CONFIG_PM
->  static int s3c64xx_spi_suspend(struct device *dev)
->  {
-> -	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
-> +	struct spi_master *master = dev_get_drvdata(dev);
->  	struct s3c64xx_spi_driver_data *sdd =
-> spi_master_get_devdata(master);
-> 
->  	spi_master_suspend(master);
-> @@ -1428,7 +1428,7 @@ static int s3c64xx_spi_suspend(struct device *dev)
-> 
->  static int s3c64xx_spi_resume(struct device *dev)
->  {
-> -	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
-> +	struct spi_master *master = dev_get_drvdata(dev);
->  	struct s3c64xx_spi_driver_data *sdd =
-> spi_master_get_devdata(master);
->  	struct s3c64xx_spi_info *sci = sdd->cntrlr_info;
-> 
-> @@ -1452,7 +1452,7 @@ static int s3c64xx_spi_resume(struct device *dev)
->  #ifdef CONFIG_PM_RUNTIME
->  static int s3c64xx_spi_runtime_suspend(struct device *dev)
->  {
-> -	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
-> +	struct spi_master *master = dev_get_drvdata(dev);
->  	struct s3c64xx_spi_driver_data *sdd =
-> spi_master_get_devdata(master);
-> 
->  	clk_disable(sdd->clk);
-> @@ -1463,7 +1463,7 @@ static int s3c64xx_spi_runtime_suspend(struct device
-> *dev)
-> 
->  static int s3c64xx_spi_runtime_resume(struct device *dev)
->  {
-> -	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
-> +	struct spi_master *master = dev_get_drvdata(dev);
->  	struct s3c64xx_spi_driver_data *sdd =
-> spi_master_get_devdata(master);
-> 
->  	clk_enable(sdd->src_clk);
-> --
-> 1.7.9.7
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
