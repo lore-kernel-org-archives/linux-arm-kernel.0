@@ -1,58 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 24 Aug 2012 00:08:45 +0200
-Subject: [PATCH] GPIO: Add support for GPIO on CLPS711X-target platform
-In-Reply-To: <1345635383-12224-1-git-send-email-shc_work@mail.ru>
-References: <1345635383-12224-1-git-send-email-shc_work@mail.ru>
-Message-ID: <CACRpkdZrcBLz+sg-AwWnBD0SA697uWQzocUYnbC1nPYG14LYyA@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 24 Aug 2012 01:01:13 +0200
+Subject: [PATCH v2 1/9] pinctrl: mvebu: pinctrl driver core
+In-Reply-To: <50369FEE.8000003@wwwdotorg.org>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1345623750-10645-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <5035445B.6000500@wwwdotorg.org>
+ <CABJ1b_Tdr80DGqb-FRzwDbF3m7g6fBguk5GtRAfRUYx5Sqy_cA@mail.gmail.com>
+ <50366E44.4030606@wwwdotorg.org> <50369305.6050304@gmail.com>
+ <50369FEE.8000003@wwwdotorg.org>
+Message-ID: <5036B639.20608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2012 at 1:36 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+On 08/23/2012 11:26 PM, Stephen Warren wrote:
+> As you may have guessed, I strongly prefer the hard-coded static table
+> based approach, or at least separating the definition of known
+> pins/groups/functions from the configuration nodes that define which
+> particular mux settings to actually use.
+>
+> Puting this all a little more simply, the pinctrl core wants to generate
+> a list of all known functions. It is a single global/unified list. It
+> first calls pinmux_ops.get_functions_count() to find out how many
+> functions there are in the list, then pinmux_ops.get_function_name() for
+> each one to find its name, then pinmux_ops.get_function_groups() to find
+> out which groups allow that function to be mux'd onto them.
 
-> The CLPS711X CPUs provide some GPIOs for use in the system. This
-> driver provides support for these via gpiolib. Due to platform
-> limitations, driver does not support interrupts, only inputs and
-> outputs.
+Ok, now this becomes a little bit more clear to me.
 
-OK...
+Consider uart1 on dove is muxable to:
+mpp2 uart1(rts), mpp3 uart1(cts), mpp21 uart1(rts), mpp22 uart1(cts),
+and finally mpp_uart1(rx and tx).
 
-(...)
-> +#include <mach/hardware.h>
+So possible, valid combinations for uart1 would be:
+(a) mpp_uart1;
+(b) mpp_uart1, mpp2, mpp3;
+(c) mpp_uart1, mpp21, mpp22;
+(d) mpp_uart1, mpp2, mpp22;
+(e) mpp_uart1, mpp21, mpp3;
 
-> +struct clps711x_gpio {
-> +       struct gpio_chip        chip[CLPS711X_GPIO_PORTS];
-> +       struct mutex            lock;
-> +};
+Now what we currently do is, use DT to setup all known functions with e.g.
+marvell,pins = "mpp_uart1", "mpp2", "mpp22" and marvell,function = "uart1".
+This requires to count all pinctrl DT node children to count the known
+functions that can ever be muxed to. It will never allow to mux uart1 to sw
+flow control during run-time when there was no DT child node for it.
 
-That lock is just protecting a few register reads/writes. Use a
-spinlock instead, it's more apropriate.
+But you are proposing to scan the list passed from SoC specific driver for all
+possible marvell,function ("uart1", "uart2", "sdio0", ...) and build up lists
+of pingroups that can be used with this specific marvell,function; or even build
+up lists of pingroups that allow uart1(rts), and another one for uart1(cts), ...?
 
-(...)
-> +static int gpio_clps711x_get(struct gpio_chip *chip, unsigned offset)
-> +{
-> +       int ret;
-> +       struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
-> +
-> +       mutex_lock(&gpio->lock);
-> +       ret = clps_readb(gpio_clps711x_port_dataaddr(chip)) & (1 << offset);
-> +       mutex_unlock(&gpio->lock);
-> +
-> +       return !!ret;
-> +}
-
-Please get rid of this clps_readb() business. I can see it's just this:
-#define clps_readb(off)         readb(CLPS711X_VIRT_BASE + (off))
-
-This makes stuff hard to understand, please pass the virtual base as
-a memory resource to the platform device, store it in the state holder
-and just use readb() in the driver from that offset.
-
-(...)
-> +static int __devinit gpio_clps711x_probe(struct platform_device *pdev)
-
-This should just be __init, you have made it very certain that this
-cannot be loaded and unloaded at runtime. (No remove function!)
-and its a bool in the Kconfig.
-
-Yours,
-Linus Walleij
+Sebastian
