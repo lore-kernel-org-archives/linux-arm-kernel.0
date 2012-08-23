@@ -1,77 +1,61 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Thu, 23 Aug 2012 13:41:59 +0800
-Subject: [PATCH v2 3/3] ARM: SIRF: make sirf irqchip driver optional since new
- SoCs will have GIC
-In-Reply-To: <1345700519-667-1-git-send-email-Barry.Song@csr.com>
-References: <1345700519-667-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <1345700519-667-4-git-send-email-Barry.Song@csr.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 23 Aug 2012 14:45:54 +0900
+Subject: [PATCH 4/9] ARM: pmu: remove arm_pmu_type enumeration
+In-Reply-To: <1344620195-22372-5-git-send-email-will.deacon@arm.com>
+References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
+ <1344620195-22372-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1d0c01cd80f2$8f974970$aec5dc50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+Will Deacon wrote:
+> 
+> From: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
+> 
+> The arm_pmu_type enumeration was initially introduced to identify
+> different PMU types in the system, the usual one being that on the CPU
+> (ARM_PMU_DEVICE_CPU). With the removal of the PMU reservation code and
+> the introduction of devicetree bindings for the CPU PMU, the enumeration
+> is no longer required.
+> 
+> This patch removes the enumeration and updates the various CPU PMU
+> platform devices so that they no longer pass an .id field referring
+> to identify the PMU type.
+> 
+> Cc: JD Zheng <jdzheng@broadcom.com>
+> Cc: Jon Hunter <jon-hunter@ti.com>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
 
-New MARCO and POLO SoC use GIC, so make irq.c optional and enable it
-only if we enable ARCH_PRIMA2 in Kconfig
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- -v2: if dt node is not found, return but not panic since we might enable
- ARCH_PRIMA2 even we work on ARCH_MARCO
+Thanks.
 
- arch/arm/mach-prima2/Kconfig  |    4 ++++
- arch/arm/mach-prima2/Makefile |    2 +-
- arch/arm/mach-prima2/irq.c    |    2 +-
- 3 files changed, 6 insertions(+), 2 deletions(-)
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-diff --git a/arch/arm/mach-prima2/Kconfig b/arch/arm/mach-prima2/Kconfig
-index 65438e1..41fc853 100644
---- a/arch/arm/mach-prima2/Kconfig
-+++ b/arch/arm/mach-prima2/Kconfig
-@@ -7,9 +7,13 @@ config ARCH_PRIMA2
- 	default y
- 	select CPU_V7
- 	select ZONE_DMA
-+	select SIRF_IRQ
- 	help
-           Support for CSR SiRFSoC ARM Cortex A9 Platform
- 
- endmenu
- 
-+config SIRF_IRQ
-+	bool
-+
- endif
-diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
-index f2cde60..fc9ce22 100644
---- a/arch/arm/mach-prima2/Makefile
-+++ b/arch/arm/mach-prima2/Makefile
-@@ -1,8 +1,8 @@
- obj-y := timer.o
--obj-y += irq.o
- obj-y += rstc.o
- obj-y += common.o
- obj-y += rtciobrg.o
- obj-$(CONFIG_DEBUG_LL) += lluart.o
- obj-$(CONFIG_CACHE_L2X0) += l2x0.o
- obj-$(CONFIG_SUSPEND) += pm.o sleep.o
-+obj-$(CONFIG_SIRF_IRQ) += irq.o
-diff --git a/arch/arm/mach-prima2/irq.c b/arch/arm/mach-prima2/irq.c
-index a7b9415..7dee917 100644
---- a/arch/arm/mach-prima2/irq.c
-+++ b/arch/arm/mach-prima2/irq.c
-@@ -63,7 +63,7 @@ void __init sirfsoc_of_irq_init(void)
- 
- 	np = of_find_matching_node(NULL, intc_ids);
- 	if (!np)
--		panic("unable to find compatible intc node in dtb\n");
-+		return;
- 
- 	sirfsoc_intc_base = of_iomap(np, 0);
- 	if (!sirfsoc_intc_base)
--- 
-1.7.0.4
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Signed-off-by: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
+> [will: cosmetic edits and actual removal of the enum type]
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/include/asm/pmu.h               |   10 ----------
+>  arch/arm/mach-bcmring/arch.c             |    3 +--
+>  arch/arm/mach-omap2/devices.c            |    3 +--
+>  arch/arm/mach-pxa/devices.c              |    3 +--
+>  arch/arm/mach-realview/realview_eb.c     |    3 +--
+>  arch/arm/mach-realview/realview_pb1176.c |    3 +--
+>  arch/arm/mach-realview/realview_pb11mp.c |    3 +--
+>  arch/arm/mach-realview/realview_pba8.c   |    3 +--
+>  arch/arm/mach-realview/realview_pbx.c    |    3 +--
+>  arch/arm/mach-tegra/devices.c            |    3 +--
+>  arch/arm/mach-ux500/cpu-db8500.c         |    3 +--
+>  arch/arm/mach-vexpress/ct-ca9x4.c        |    3 +--
+>  arch/arm/plat-iop/pmu.c                  |    3 +--
+>  arch/arm/plat-samsung/devs.c             |    3 +--
+>  14 files changed, 13 insertions(+), 36 deletions(-)
