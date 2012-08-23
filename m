@@ -1,53 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Aug 2012 14:26:19 +0100
-Subject: [PATCH 07/22] ASoC: Ux500: Initialise PCM from MSP probe rather
- than as a device
-In-Reply-To: <20120823125903.GA7995@opensource.wolfsonmicro.com>
-References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
- <1344527268-5964-8-git-send-email-lee.jones@linaro.org>
- <CACRpkdbc6bGC4Yp7Bcdfev=Uc=1h4L1v+Lj9RbmJV3F+knQOZQ@mail.gmail.com>
- <002801cd7c31$14d3d0c0$3e7b7240$@se>
- <20120820085111.GJ8450@gmail.com>
- <006d01cd7f5a$65937840$30ba68c0$@se>
- <20120823092216.GA27264@gmail.com>
- <20120823113922.GZ7995@opensource.wolfsonmicro.com>
- <20120823121936.GA1047@gmail.com>
- <20120823125903.GA7995@opensource.wolfsonmicro.com>
-Message-ID: <20120823132618.GB1047@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 23 Aug 2012 15:27:28 +0200
+Subject: [PATCH] ARM: at91/feature-removal-schedule: delay at91_mci removal
+Message-ID: <1345728448-29384-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > "I'm sorry but this patch is breaking the design of ASoC. The ASoC-
-> > platform is the DMA-block (in combination with the MSP-block), and
-> > there should be a platform-driver for the DMA/PCM. The platform-driver 
-> > then has a DAI which is the MSP. The ASoC DAI-link-struct should have
-> > one driver for each of these, so the dummy-driver for PCM should be
-> > there."
-> 
-> > So I don't really know where to go with it. Any ideas?
-> 
-> I think Ola is suggesting probing the DMA driver from the machine which
-> will also work though I'm not 100% sure if I'm parsing the above
-> correctly.  The issue in DT terms is that if the DMA controller is
-> shared with a bunch of other IPs then it should have one node shared
-> between them all and not a bunch of shim nodes inserted in the middle
-> which only exists due to the way Linux instantiates stuff.
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-When you say 'machine', do you mean from arch/<arch>/mach-*? If so, I'm
-keen for that not to happen.
+Delay sd/mmc driver at91_mci.c removal because of tight schedule to
+move platform data to new driver atmel-mci.
 
-> > How do the all the other DT:ed audio drivers handle the PCM then? More
-> > importantly, how would you like to see it handled? Ola has NACKed this
-> > patch and explained why:
-> 
-> They instantiate the PCM driver dynamically from the DAI when it's
-> probed which is pretty much what you're patch is doing.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Hi,
 
-So they do it in the same why I have with this patch? Do you know why
-Ola might think this is a bad idea?
+I plan to queue this one with the at91-fixes pull-request for 3.6. If you do
+not feel it is a good idea, please say so.
 
+
+ Documentation/feature-removal-schedule.txt |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Documentation/feature-removal-schedule.txt b/Documentation/feature-removal-schedule.txt
+index afaff31..f4d8c71 100644
+--- a/Documentation/feature-removal-schedule.txt
++++ b/Documentation/feature-removal-schedule.txt
+@@ -579,7 +579,7 @@ Why:	KVM tracepoints provide mostly equivalent information in a much more
+ ----------------------------
+ 
+ What:	at91-mci driver ("CONFIG_MMC_AT91")
+-When:	3.7
++When:	3.8
+ Why:	There are two mci drivers: at91-mci and atmel-mci. The PDC support
+ 	was added to atmel-mci as a first step to support more chips.
+ 	Then at91-mci was kept only for old IP versions (on at91rm9200 and
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.10
