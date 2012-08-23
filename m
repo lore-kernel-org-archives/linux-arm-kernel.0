@@ -1,30 +1,96 @@
-From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
-Date: Thu, 23 Aug 2012 15:36:54 +0200 (CEST)
-Subject: [BUG] leds-pwm: First setting of brightness does nothing
-In-Reply-To: <322770447.2755463.1345727876098.JavaMail.root@advansee.com>
-Message-ID: <320569847.2756382.1345729013971.JavaMail.root@advansee.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 23 Aug 2012 06:39:31 -0700
+Subject: [PATCH] spi/s3c64xx: Drop extra calls to spi_master_get in
+ suspend/remove functions
+In-Reply-To: <1d0b01cd80f1$d77eaf90$867c0eb0$%kim@samsung.com>
+References: <1345173265-1721-1-git-send-email-linux@roeck-us.net>
+ <1d0b01cd80f1$d77eaf90$867c0eb0$%kim@samsung.com>
+Message-ID: <20120823133931.GB24319@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Thu, Aug 23, 2012 at 02:40:45PM +0900, Kukjin Kim wrote:
+> Guenter Roeck wrote:
+> > 
+> > Suspend and resume functions call spi_master_get() without matching
+> > spi_master_put(). The extra references are unnecessary and cause
+> > subsequent
+> > module unload attempts to fail. Drop the calls.
+> > 
+> > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> 
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> 
+> (Cc'ed Mark Brown who is handling spi now)
+> 
+> Guenter, maybe you need to re-send this patch to Mark so that he can apply
+> ;-)
+> 
+Guess you are right - and I did copy Mark on my later patches. Mark, I just
+bounced the patch to you, so you should have it now.
 
-I have found a bug using leds-pwm with the i.MX PWM driver. The first time a
-non-0 brightness is set through sysfs, this has no effect. It works fine from
-the 2nd time.
+Thanks,
+Guenter
 
-The cause of this bug is that leds-pwm.c:led_pwm_set() calls pwm_config() before
-pwm_enable(), while in the i.MX PWM driver pwm_enable() enables the PWM IP
-clock, so that a call to pwm_config() has no effect before the first call to
-pwm_enable().
-
-Several other PWM drivers in drivers/pwm/ work in the same way. pwm-beeper.c and
-pwm_bl.c also call pwm_config() before pwm_enable(). The PWM documentation does
-not say if the wrong doers are these PWM users or the i.MX-like PWM drivers.
-
-So what should be fixed? Fixing these PWM users would be quite easy since it's a
-simple swap of the pwm_config() and pwm_enable() calls. This should not produce
-any glitch since the duty cycle is always set to 0 by these PWM users before
-calling pwm_disable().
-
-Best regards,
-Beno?t
+> Thanks.
+> 
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+> 
+> > ---
+> >  drivers/spi/spi-s3c64xx.c |    8 ++++----
+> >  1 file changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+> > index 646a765..d7a87df 100644
+> > --- a/drivers/spi/spi-s3c64xx.c
+> > +++ b/drivers/spi/spi-s3c64xx.c
+> > @@ -1409,7 +1409,7 @@ static int s3c64xx_spi_remove(struct platform_device
+> > *pdev)
+> >  #ifdef CONFIG_PM
+> >  static int s3c64xx_spi_suspend(struct device *dev)
+> >  {
+> > -	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
+> > +	struct spi_master *master = dev_get_drvdata(dev);
+> >  	struct s3c64xx_spi_driver_data *sdd =
+> > spi_master_get_devdata(master);
+> > 
+> >  	spi_master_suspend(master);
+> > @@ -1428,7 +1428,7 @@ static int s3c64xx_spi_suspend(struct device *dev)
+> > 
+> >  static int s3c64xx_spi_resume(struct device *dev)
+> >  {
+> > -	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
+> > +	struct spi_master *master = dev_get_drvdata(dev);
+> >  	struct s3c64xx_spi_driver_data *sdd =
+> > spi_master_get_devdata(master);
+> >  	struct s3c64xx_spi_info *sci = sdd->cntrlr_info;
+> > 
+> > @@ -1452,7 +1452,7 @@ static int s3c64xx_spi_resume(struct device *dev)
+> >  #ifdef CONFIG_PM_RUNTIME
+> >  static int s3c64xx_spi_runtime_suspend(struct device *dev)
+> >  {
+> > -	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
+> > +	struct spi_master *master = dev_get_drvdata(dev);
+> >  	struct s3c64xx_spi_driver_data *sdd =
+> > spi_master_get_devdata(master);
+> > 
+> >  	clk_disable(sdd->clk);
+> > @@ -1463,7 +1463,7 @@ static int s3c64xx_spi_runtime_suspend(struct device
+> > *dev)
+> > 
+> >  static int s3c64xx_spi_runtime_resume(struct device *dev)
+> >  {
+> > -	struct spi_master *master = spi_master_get(dev_get_drvdata(dev));
+> > +	struct spi_master *master = dev_get_drvdata(dev);
+> >  	struct s3c64xx_spi_driver_data *sdd =
+> > spi_master_get_devdata(master);
+> > 
+> >  	clk_enable(sdd->src_clk);
+> > --
+> > 1.7.9.7
+> 
+> 
