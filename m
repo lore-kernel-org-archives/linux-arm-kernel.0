@@ -1,47 +1,38 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 23 Aug 2012 14:37:43 +0200
-Subject: [PATCH 4/4] [RFC] ARM: treewide: manually change more mach-*/*.h
- includes
-In-Reply-To: <201208231135.11688.arnd@arndb.de>
-References: <201208221253.07278.arnd@arndb.de>
- <201208221301.19439.arnd@arndb.de>
- <20120822214323.GA12255@n2100.arm.linux.org.uk>
- <201208231135.11688.arnd@arndb.de>
-Message-ID: <50362417.9070600@atmel.com>
+Date: Thu, 23 Aug 2012 14:41:28 +0200
+Subject: [PATCH] arm: dts: remove partial parameter in at91sam9g25ek.dts
+In-Reply-To: <1345191836-16523-1-git-send-email-voice.shen@atmel.com>
+References: <1345191836-16523-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <503624F8.4070906@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2012 01:35 PM, Arnd Bergmann :
-> On Wednesday 22 August 2012, Russell King - ARM Linux wrote:
->>
->> On Wed, Aug 22, 2012 at 01:01:19PM +0000, Arnd Bergmann wrote:
->>> These are lots of device drivers that include machine
->>> specific header files from ARM platforms and that are
->>> not easily scriptable. The changes have been found through
->>> manual inspection and should cause no visible changes
->>> because of the build script that maps the old names to the
->>> new ones.
-
-[..]
-
-> How about I move all the pure platform data definition files now and
-> rebase the other patches on top of that. Here is a list of suggested
-> file names in include/linux/platform_data/:
+On 08/17/2012 10:23 AM, Bo Shen :
+> Remove the partial parameter in at91sam9g25ek.dts file
 > 
-> mach-at91/at_hdmac.h		-> dma-atmel.h
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
 
-Fine with me. Maybe atmel-dma.h can better match what we already have in
-this directory, but I do not know what is the policy in this directory...
+Included in at91-fixes for 3.6: thanks a lot.
 
-[..]
+> ---
+>  arch/arm/boot/dts/at91sam9g25ek.dts |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
+> index 7829a4d..96514c1 100644
+> --- a/arch/arm/boot/dts/at91sam9g25ek.dts
+> +++ b/arch/arm/boot/dts/at91sam9g25ek.dts
+> @@ -15,7 +15,7 @@
+>  	compatible = "atmel,at91sam9g25ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
+>  
+>  	chosen {
+> -		bootargs = "128M console=ttyS0,115200 root=/dev/mtdblock1 rw rootfstype=ubifs ubi.mtd=1 root=ubi0:rootfs";
+> +		bootargs = "console=ttyS0,115200 root=/dev/mtdblock1 rw rootfstype=ubifs ubi.mtd=1 root=ubi0:rootfs";
+>  	};
+>  
+>  	ahb {
+> 
 
 
-> ** list of mach/* inclusions that I could not match with
-> ** exactly one ARM platform:
-
-In fact, for "*atmel*" type of files, they usually match *both* AVR32
-and ARM/AT91 devices: so, we have to be careful about them...
-
-Best regards,
 -- 
 Nicolas Ferre
