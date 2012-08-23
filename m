@@ -1,43 +1,43 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Thu, 23 Aug 2012 14:09:52 +0800
-Subject: [PATCH] ARM: PRIMA2: rstc: use of_property_read_u32 to replace
- of_get_property and be32_to_cpup
-Message-ID: <1345702192-1153-1-git-send-email-Barry.Song@csr.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 23 Aug 2012 14:12:03 +0800
+Subject: [PATCH 4/7] regulator: anatop-regulator: convert to use
+ imx-syscon to access anatop register
+In-Reply-To: <5035BDBF.9020602@wwwdotorg.org>
+References: <1345619928-15446-1-git-send-email-b29396@freescale.com>
+ <1345619928-15446-5-git-send-email-b29396@freescale.com>
+ <5035BDBF.9020602@wwwdotorg.org>
+Message-ID: <20120823061202.GM4011@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+On Wed, Aug 22, 2012 at 11:21:03PM -0600, Stephen Warren wrote:
+> On 08/22/2012 01:18 AM, Dong Aisheng wrote:
+> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> > diff --git a/drivers/regulator/anatop-regulator.c b/drivers/regulator/anatop-regulator.c
+> 
+> > @@ -109,7 +110,11 @@ static int __devinit anatop_regulator_probe(struct platform_device *pdev)
+> >  	rdesc->ops = &anatop_rops;
+> >  	rdesc->type = REGULATOR_VOLTAGE;
+> >  	rdesc->owner = THIS_MODULE;
+> > -	sreg->mfd = anatopmfd;
+> > +
+> > +	sreg->anatop = of_parse_phandle(np, "fsl,anatop", 0);
+> > +	if (!sreg->anatop)
+> > +		return -ENODEV;
+> 
+> In fact, that imx_syscon_lookup function I proposed could even do the
+> of_parse_phandle() internally, so perhaps:
+> 
+> foo->syscon_dev = imx_syscon_lookup(np, "fsl,anatop", 0);
+> if (IS_ERR(foo->syscon_dev))
+>     return PTR_ERR(foo->syscon_dev);
+> 
+> with imx_syscon_lookup() internally knowing when to return EPROBE_DEFER
+> rather than any other permanent error code (e.g. for missing property,
+> bad phandle, etc.)
+In some case that we access register in machine code, we don't have any
+phandler. The node is got by find compatible or by path.
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/mach-prima2/rstc.c |    9 +++------
- 1 files changed, 3 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-prima2/rstc.c b/arch/arm/mach-prima2/rstc.c
-index 762adb7..d03ff19 100644
---- a/arch/arm/mach-prima2/rstc.c
-+++ b/arch/arm/mach-prima2/rstc.c
-@@ -42,13 +42,10 @@ early_initcall(sirfsoc_of_rstc_init);
- 
- int sirfsoc_reset_device(struct device *dev)
- {
--	const unsigned int *prop = of_get_property(dev->of_node, "reset-bit", NULL);
--	unsigned int reset_bit;
-+	u32 reset_bit;
- 
--	if (!prop)
--		return -ENODEV;
--
--	reset_bit = be32_to_cpup(prop);
-+	if (of_property_read_u32(dev->of_node, "reset-bit", &reset_bit))
-+		return -EINVAL;
- 
- 	mutex_lock(&rstc_lock);
- 
--- 
-1.7.0.4
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Thanks
+Richard 
