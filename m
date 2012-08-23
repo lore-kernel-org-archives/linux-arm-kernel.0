@@ -1,36 +1,127 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 23 Aug 2012 18:45:19 +0900
-Subject: [PATCH 1/2] ARM: S3C64XX: Update configuration for WM5102 module
- on Cragganmore
-In-Reply-To: <20120813122359.GA13446@opensource.wolfsonmicro.com>
-References: <1344535549-4371-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <0db901cd76b4$7daf1730$790d4590$%kim@samsung.com>
- <20120810100713.GH24328@opensource.wolfsonmicro.com>
- <0eff01cd777f$4c9d1f90$e5d75eb0$%kim@samsung.com>
- <20120813122359.GA13446@opensource.wolfsonmicro.com>
-Message-ID: <1d5901cd8114$023550f0$069ff2d0$%kim@samsung.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 23 Aug 2012 11:45:27 +0200
+Subject: [PATCH v2 1/9] pinctrl: mvebu: pinctrl driver core
+In-Reply-To: <5035445B.6000500@wwwdotorg.org>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1345623750-10645-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <5035445B.6000500@wwwdotorg.org>
+Message-ID: <CABJ1b_Tdr80DGqb-FRzwDbF3m7g6fBguk5GtRAfRUYx5Sqy_cA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> On Sat, Aug 11, 2012 at 02:08:09PM +0900, Kukjin Kim wrote:
-> 
-> > BTW, don't you need to enable your Cragganmore board in the defconfig?
-> 
-> Well, it doesn't really matter that much to us - it's more a question
-> for whoever uses the defconfig.
+On 8/22/12, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/22/2012 02:22 AM, Sebastian Hesselbarth wrote:
+>> +++ b/drivers/pinctrl/pinctrl-mvebu.c
+>
+>> +static int mvebu_pinctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
+>
+>> +	of_property_for_each_string(np, "marvell,pins", prop, group) {
+>> +		struct mvebu_pinctrl_group *grp =
+>> +			mvebu_pinctrl_find_group_by_name(pctl, group);
+>> +
+>> +		if (!grp) {
+>> +			dev_err(pctl->dev, "unknown pin %s", group);
+>> +			continue;
+>> +		}
+>> +
+>> +		if (!mvebu_pinctrl_find_setting_by_name(pctl, grp, function)) {
+>> +			dev_err(pctl->dev, "unsupported function %s on pin %s",
+>> +				function, group);
+>> +			continue;
+>> +		}
+>
+> The error-checking here isn't strictly necessary; the pinctrl core will
+> error-check all the names if/when the map entries are used. So, you
+> could probably get away with just assigning the pin/function names
+> directly into (*map) and hence remove some code here. Still, it's not a
+> big deal either way.
 
-Yeah, actually SoC defconfig in mainline doesn't cover _real_ requirements
-for (mass) product. But I think, it's time we need to sort out the
-defconfigs so that we could use them efficiently on product. BTW, if
-enabling board in defconfig, at least, unexpected build breakages could be
-detected by testing defconfig before merge for mainline...
+Hi Stephen,
 
-Thanks.
+as these error checks are only performed once, I'd like to have them there
+as they give hints when someone uses wrong marvell,pins/function names
+in DT.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+>> +static int __devinit mvebu_pinctrl_dt_parse_function(struct mvebu_pinctrl
+>> *pctl,
+>
+>> +static int __devinit mvebu_pinctrl_dt_parse(struct platform_device
+>> *pdev,
+>> +					struct mvebu_pinctrl *pctl)
+>
+> I don't understand what those two functions do, or a good chunk of
+> probe(). It seems like they're setting up the ability to get/set pin
+> configrations in addition to pin muxing, although if that's so, it seems
+> odd that none of the binding documents specify any way of controlling
+> pin configuration from device tree. Are you expecting drivers to call
+> APIs such as pin_config_set() directly, rather than controlling pin
+> config through DT?
+
+probe() receives some structs from the SoC specific driver stubs that
+describe, e.g. how many muxable pins are available, which pingroup they
+belong to (marvell,pins), what valid register values are and how they are
+named (marvell,function). Although, all mvebu SoC share a good part of
+pinmux register layout, there are especially for dove some very different
+ways to mux pins. As mvebu pinctrl is a true mux-only driver, i.e. no
+pin drive strength or pin direction configuration, we decided not to have
+single pins controlable but only pingroups even if they comprise only a
+single pin.
+
+dt_parse() and dt_parse_function() build up structs that get used later on
+in mvebu_pinmux_ops that require indexed functions. I can join them with
+dt_node_to_map() but that would require incremental kzalloc for the
+corresponding array. Or I could (functionally) leave dt_parse() to allocate
+the array and only join dt_parse_function() with dt_node_to_map().
+
+There is an example of how to use pinctrl in marvell.mvebu-pinctrl.txt:
+uart1: serial at 12100 {
+	compatible = "ns16550a";
+	reg = <0x12100 0x100>;
+	reg-shift = <2>;
+	interrupts = <7>;
+
+	pinctrl-0 = <&pmx_uart1_sw>;
+};
+
+pinctrl: pinctrl at d0200 {
+	compatible = "marvell,dove-pinctrl";
+	reg = <0xd0200 0x20>;
+
+	pmx_uart1_sw: pmx-uart1-sw {
+		marvell,pins = "mpp_uart1";
+		marvell,function = "uart1";
+	};
+};
+
+In my understanding this will allow uart1 to switch the pingroup "mpp_uart1"
+to the function "uart1". The pinctrl core driver is taking care of
+translating mpp_uart1
+to the corresponding pingroup and mvebu core driver of translating
+uart1 into the required
+register values to set the requested function. Is it so odd, that we
+use names instead
+of direct register values in DT? I agree, that maybe picking an example for dove
+that is a little bit different in pingroup naming isn't the best
+choice but it still gives
+you an idea how to use it.
+
+Consider this (virtual) example:
+Muxing some SATA functions to pins 24 and 37 would require to set
+register values
+to 0x3 on pin 24 and 0x6 on pin 37. The proposed driver still allows
+us to have a DT
+description of
+
+pmx_sata_example: pmx-sata-example {
+	marvell,pins = "mpp24", "mpp37";
+	marvell,function = "sata";
+};
+
+because the SoC specific driver passes function "sata" on pins 24 and
+37 with the
+corresponding register values. These are fed by the mvebu core driver
+that builds
+up all required pins, pingroups, and pinmux functions.
+
+Sebastian
