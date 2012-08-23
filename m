@@ -1,65 +1,69 @@
-From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
-Date: Thu, 23 Aug 2012 10:41:29 +0300
-Subject: JFFS2 issue with v3.5.x and later on Atmel chips at least (was:
- Kernel oops since v3.5.x on Atmel chips)
-In-Reply-To: <5034F3F8.9080802@atmel.com>
-References: <5034B45A.5060107@atmel.com> <5034F3F8.9080802@atmel.com>
-Message-ID: <1345707689.2848.203.camel@sauron.fi.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 23 Aug 2012 06:46:30 +0000
+Subject: PER_LINUX32,
+ Was: [PATCH v2 21/31] arm64: 32-bit (compat) applications support
+In-Reply-To: <20120816102808.GH31784@mudshark.cambridge.arm.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <201208151434.05145.arnd@arndb.de>
+ <20120816102808.GH31784@mudshark.cambridge.arm.com>
+Message-ID: <201208230646.31276.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-Date: Thu, 23 Aug 2012 10:10:07 +0300
-Subject: [PATCH] JFFS2: fix unmount regression
+On Thursday 16 August 2012, Will Deacon wrote:
+> On Wed, Aug 15, 2012 at 03:34:04PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 14 August 2012, Catalin Marinas wrote:
+> > > +asmlinkage int compat_sys_personality(compat_ulong_t personality)
+> > > +{
+> > > +	int ret;
+> > > +
+> > > +	if (personality(current->personality) == PER_LINUX32 &&
+> > > +		personality == PER_LINUX)
+> > > +		personality = PER_LINUX32;
+> > > +	ret = sys_personality(personality);
+> > > +	if (ret == PER_LINUX32)
+> > > +		ret = PER_LINUX;
+> > > +	return ret;
+> > > +}
+> > 
+> > Where did you get this from?
+> > 
+> > You should not need compat_sys_personality, just call the native function.
+> 
+> Hmm, but in that case an aarch32 application doing a personality(PER_LINUX)
+> syscall will start seeing the wrong uname.
 
-This patch fixes regression introduced by
-"8bdc81c jffs2: get rid of jffs2_sync_super". We submit a delayed work in order
-to make sure the write-buffer is synchronized at some point. But we do not
-flush it when we unmount, which causes an oops when we unmount the file-system
-and then the delayed work is executed.
+Coming back at this topic, I noticed another issue. Jiri Kosina
+has recently posted patches to fix this function in the other architectures
+in order to mask out the other personality bits, which is a correct fix,
+but the above function is odd for other reasons.
 
-This patch fixes the issue by adding a "cancel_delayed_work_sync()" infocation
-in the '->sync_fs()' handler. This will make sure the delayed work is canceled
-on sync, unmount and re-mount. And because VFS always callse 'sync_fs()' before
-unmounting or remounting, this fixes the issue.
+* On MIPS, it is used only for compat tasks, like you have it above.
+* On PA-RISC, it is used for native 32 bit tasks and for compat 32 bit tasks,
+  but not for native 64 bit ones.
+* On IA64, it was used for compat tasks (support for which has since
+  been removed from the kernel), plus all 32 bit tasks would start with
+  PER_LINUX32.
+* On PowerPC, Sparc and s390, it is used for native 64 bit tasks and for
+  compat 32 bit tasks, but not for native 32 bit ones.
+* On Tile, it was never used.
+* On x86_64, it used to be defined (copied from ia64) but not used
+  throughout the git history.
 
-Reported-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Cc: stable at vger.kernel.org [3.5+]
-Signed-off-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
----
+The semantics of the function are also interesting: The intention seems
+to be that to a compat task, PER_LINUX32 would appear as PER_LINUX.
+The effect is that any process can set PER_LINUX32 but it can never
+be unset except by a 64 bit MIPS or PA-RISC task.
 
-Ludovic, would you please give this patch a test? Also attached.
+Since x86_64 does not implement this behavior at all, I suspect that
+there are now lots of things depending on not having it, while all
+the other architectures might also have some (even predating the
+x86_64 port) use cases that depend on depend on not being able to
+observe PER_LINUX32 in 32 bit compat tasks.
 
- fs/jffs2/super.c |    3 +++
- 1 file changed, 3 insertions(+)
+I think we should try to agree on how this is all supposed to work
+and use common code, either put the ppc/sparc/s390 version into
+sys_personality, or remove all of them and just do what x86 and tile
+do, using the regular sys_personality for all tasks.
 
-diff --git a/fs/jffs2/super.c b/fs/jffs2/super.c
-index 61ea413..e385fa3 100644
---- a/fs/jffs2/super.c
-+++ b/fs/jffs2/super.c
-@@ -100,6 +100,9 @@ static int jffs2_sync_fs(struct super_block *sb, int wait)
- {
- 	struct jffs2_sb_info *c = JFFS2_SB_INFO(sb);
- 
-+	if (IS_ENABLED(CONFIG_JFFS2_FS_WRITEBUFFER))
-+		cancel_delayed_work_sync(&c->wbuf_dwork);
-+
- 	mutex_lock(&c->alloc_sem);
- 	jffs2_flush_wbuf_pad(c);
- 	mutex_unlock(&c->alloc_sem);
--- 
-1.7.10.4
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-JFFS2-fix-unmount-regression.patch
-Type: text/x-patch
-Size: 1538 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120823/238e9a92/attachment.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120823/238e9a92/attachment.sig>
+	Arnd
