@@ -1,36 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 23 Aug 2012 13:32:40 +0000
-Subject: [PATCH 2/6] ARM: omap: allow building omap44xx without SMP
-In-Reply-To: <CAMQu2gzPMkbDvTfTOZVp+Qh=2=AHOuyt4NXtxAps=RmMF+mf6Q@mail.gmail.com>
-References: <1345648390-4234-1-git-send-email-arnd@arndb.de>
- <201208231212.04869.arnd@arndb.de>
- <CAMQu2gzPMkbDvTfTOZVp+Qh=2=AHOuyt4NXtxAps=RmMF+mf6Q@mail.gmail.com>
-Message-ID: <201208231332.40530.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 23 Aug 2012 15:34:08 +0200
+Subject: [rtc-linux] RE: [PATCHv4 0/9] *** ARM: Update arch-vt8500 to
+ Devicetree ***
+In-Reply-To: <76F764B079F92A4E843589C893D0A022DAF68C14@SERVER.prisktech.co.nz>
+References: <1345707346-9035-1-git-send-email-linux@prisktech.co.nz>
+ <201208231040.16702.arnd@arndb.de>
+ <76F764B079F92A4E843589C893D0A022DAF68C14@SERVER.prisktech.co.nz>
+Message-ID: <CACRpkda-xuo1+cunCb6bYdRsCn4CWuSLdxTjib=Gz1kqMz-xEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 23 August 2012, Shilimkar, Santosh wrote:
-> 
-> On Thu, Aug 23, 2012 at 5:42 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> > On Thursday 23 August 2012, Shilimkar, Santosh wrote:
-> > > I see your point but alternate patch is pushing down the fix to the low
-> > > level driver and that means you end up patching more drivers when they
-> > > use COUPLE idle infrastructure. That was the only reason I was thinking
-> > > of suppressing the error at the source.
-> > >
-> > > Since it is just for the random builds and actually doesn't impact the
-> > > real
-> > > functionality as such, I am fine with your proposed patch too.
-> >
-> > Ok. It would be nice of course to test if this actually works on
-> > uniprocessor
-> > configurations.
-> >
-> Have tested the patch and it does boot with UP build on OMAP.
-> 
-> Acked-tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Thu, Aug 23, 2012 at 2:58 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
 
-Ok, thanks a lot!
+> Linus W has provided some feedback on the gpio driver - I missed the
+> issues he raised the first time around so just waiting for him to take a look
+> at v4 when he's got time.
 
-	Arnd
+Reviewed and OK:ed, looking good now.
+
+Yours,
+Linus Walleij
