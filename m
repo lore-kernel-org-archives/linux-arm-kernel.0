@@ -1,54 +1,87 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 23 Aug 2012 11:49:31 -0600
-Subject: [PATCH 05/14] ARM: at91: add pinctrl support
-In-Reply-To: <CACQ1gAieByr5vMmyyCuGtS8AgnnRZPPhLZY8sKvwvcQYe5ieUA@mail.gmail.com>
-References: <20120810124820.GA20557@game.jcrosoft.org>
- <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
- <1344603731-32667-5-git-send-email-plagnioj@jcrosoft.com>
- <CACRpkdZ2__V06Eo8JH451Sup5Nw2jJXVOH2FOfZBp5nNYpCtbg@mail.gmail.com>
- <5034FC18.2090400@wwwdotorg.org>
- <CACQ1gAieByr5vMmyyCuGtS8AgnnRZPPhLZY8sKvwvcQYe5ieUA@mail.gmail.com>
-Message-ID: <50366D2B.4010807@wwwdotorg.org>
+Date: Thu, 23 Aug 2012 11:54:12 -0600
+Subject: [PATCH v2 1/9] pinctrl: mvebu: pinctrl driver core
+In-Reply-To: <CABJ1b_Tdr80DGqb-FRzwDbF3m7g6fBguk5GtRAfRUYx5Sqy_cA@mail.gmail.com>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1345623750-10645-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <5035445B.6000500@wwwdotorg.org>
+ <CABJ1b_Tdr80DGqb-FRzwDbF3m7g6fBguk5GtRAfRUYx5Sqy_cA@mail.gmail.com>
+Message-ID: <50366E44.4030606@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2012 01:06 AM, Richard Genoud wrote:
-> 2012/8/22 Stephen Warren <swarren@wwwdotorg.org>:
->>>> +Required properties for iomux controller:
->>>> +- compatible: "atmel,at91rm9200-pinctrl"
->>>> +- atmel,mux-mask: array of mask (periph per bank) to describe if a pin can be
->>>> +  configured in this periph mode. All the periph and bank need to be describe.
->>>
->>> Can you please be more elaborate on this mux-mask, like what each bit
->>> means and why the bits are arranged like that and what it means on the
->>> AT91 platform.... I was first reading the .dts and was like ?woot? so
->>> I go to the bindings doc and I read this and I'm still like ?woot?..
+On 08/23/2012 03:45 AM, Sebastian Hesselbarth wrote:
+> On 8/22/12, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 08/22/2012 02:22 AM, Sebastian Hesselbarth wrote:
+>>> +++ b/drivers/pinctrl/pinctrl-mvebu.c
 >>
->> Yes, I'm a little confused what this is, and wouldn't have a clue how to
->> fill it in.
->
-> With a practical example it's easier to understand.
-> Take a SAM9X5 release manual (here is sam9g35):
-> http://www.atmel.com/Images/doc11053.pdf page 11 (?4.3 package pinout)
-> in the file arch/arm/boot/dts/at91sam9x5.dtsi you've got the the
-> atmel,mux-mask like that:
->
-> /* periphA  periphB    periphC     */
-> 0xffffffff 0xffe0399f 0xc000001c  /* pioA */
-> 0x0007ffff 0x8000fe3f 0x00000000  /* pioB */
-> 0x80000000 0x07c0ffff 0xb83fffff  /* pioC */
-> 0x003fffff 0x003f8000 0x00000000  /* pioD */
+>>> +static int mvebu_pinctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
+>>
+>>> +	of_property_for_each_string(np, "marvell,pins", prop, group) {
+>>> +		struct mvebu_pinctrl_group *grp =
+>>> +			mvebu_pinctrl_find_group_by_name(pctl, group);
+>>> +
+>>> +		if (!grp) {
+>>> +			dev_err(pctl->dev, "unknown pin %s", group);
+>>> +			continue;
+>>> +		}
+>>> +
+>>> +		if (!mvebu_pinctrl_find_setting_by_name(pctl, grp, function)) {
+>>> +			dev_err(pctl->dev, "unsupported function %s on pin %s",
+>>> +				function, group);
+>>> +			continue;
+>>> +		}
+>>
+>> The error-checking here isn't strictly necessary; the pinctrl core will
+>> error-check all the names if/when the map entries are used. So, you
+>> could probably get away with just assigning the pin/function names
+>> directly into (*map) and hence remove some code here. Still, it's not a
+>> big deal either way.
 > 
-> Let's take the PioA - peripheral B: 0xffe0399f
-> From the documentation table 4-3, we can extract the column PIO
-> Periperal B for all signals PA0-PA31:
-...
-> Each time it's possible to mux a pin to the peripheral B function (ie
-> when there's no "-----") the corresponding bit is set:
-...
-> => this gives 0x399f
+> Hi Stephen,
+> 
+> as these error checks are only performed once, I'd like to have them there
+> as they give hints when someone uses wrong marvell,pins/function names
+> in DT.
+> 
+>>> +static int __devinit mvebu_pinctrl_dt_parse_function(struct mvebu_pinctrl
+>>> *pctl,
+>>
+>>> +static int __devinit mvebu_pinctrl_dt_parse(struct platform_device
+>>> *pdev,
+>>> +					struct mvebu_pinctrl *pctl)
+>>
+>> I don't understand what those two functions do, or a good chunk of
+>> probe(). It seems like they're setting up the ability to get/set pin
+>> configrations in addition to pin muxing, although if that's so, it seems
+>> odd that none of the binding documents specify any way of controlling
+>> pin configuration from device tree. Are you expecting drivers to call
+>> APIs such as pin_config_set() directly, rather than controlling pin
+>> config through DT?
+> 
+> probe() receives some structs from the SoC specific driver stubs that
+> describe, e.g. how many muxable pins are available, which pingroup they
+> belong to (marvell,pins), what valid register values are and how they are
+> named (marvell,function). Although, all mvebu SoC share a good part of
+> pinmux register layout, there are especially for dove some very different
+> ways to mux pins. As mvebu pinctrl is a true mux-only driver, i.e. no
+> pin drive strength or pin direction configuration, we decided not to have
+> single pins controlable but only pingroups even if they comprise only a
+> single pin.
+> 
+> dt_parse() and dt_parse_function() build up structs that get used later on
+> in mvebu_pinmux_ops that require indexed functions. I can join them with
+> dt_node_to_map() but that would require incremental kzalloc for the
+> corresponding array. Or I could (functionally) leave dt_parse() to allocate
+> the array and only join dt_parse_function() with dt_node_to_map().
 
-Ah OK. It would be a good idea to briefly describe this process in the
-binding document I think. I assume this property exists to avoid the
-kernel driver having to contain tables for each Atmel device; the driver
-is generic.
+So everything you said makes sense, in that the core driver is
+parameterizable and receives data from a SoC-variant-specific driver
+indicating which pins/groups/functions are available. I'm still not sure
+though why the translation of the pin/group/function structures passed
+to probe into other data structures requires accessing the DT at all;
+the set of available pins/groups/functions isn't configured through DT,
+and doesn't need to be limited to only those options actually used in
+DT, so can't you just process all the data that's passed to probe
+without interaction with the DT?
