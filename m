@@ -1,55 +1,48 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 23 Aug 2012 10:29:04 +0200
-Subject: [PATCH 1/2] usb: change the dependency chain for LPC32XX and
- ISP1301
-In-Reply-To: <5035E75F.5080801@antcom.de>
-References: <Pine.LNX.4.44L0.1208221537260.1328-100000@iolanthe.rowland.org>
- <50355A2C.9010505@antcom.de> <5035D9E0.1000905@linutronix.de>
- <5035E75F.5080801@antcom.de>
-Message-ID: <5035E9D0.9020107@linutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 23 Aug 2012 10:42:27 +0200
+Subject: [PATCHv3 0/4] 
+Message-ID: <1345711351-16367-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2012 10:18 AM, Roland Stigge wrote:
-> On 08/23/2012 09:21 AM, Sebastian Andrzej Siewior wrote:
->> On 08/23/2012 12:16 AM, Roland Stigge wrote:
->>> This issue could be resolved in a different way: Have you followed the
->>> discussion at linux-arm-kernel at lists.infradead.org on 2012-08-20,
->>> Subject "i2c: pnx: Fix bit definitions"? If nothing unexpected turns
->>> out, PNX4008 should probably be removed altogether. (Practically
->>> abandoned arch for 6 years.) Easily possible for v3.7.
->>
->> Ach. I assumed that is being merged. The PNX arch does not define
->> USB_ARCH_HAS_OHCI so I goes that you can't select it there?
->
-> Yes, this issue will be gone also.
->
->>> Then, the resulting solution is much simpler and Sebastian's patch
->>> obsolete.
->>
->> That would be what?
->
-> Well, your idea won't be obsolete completely. :-) But much simpler
-> without all the "PNX4008 || LPC32XX" stuff. Following Alan's proposal,
-> I'd prefer not introducing new symbols, and much of the "PNX4008 ||
-> LPC32XX" logic won't be necessary anymore.
->
-> For the PNX4008 removal - should I already post a patch to build the
-> respective changes on top of, without PNX4008 references?
+Hi everyone,
 
-If nobody cares about PNX4008 and nobody tested if it actually works in
-the OHCI mode I don't see the point in keeping it around especially if
-there are rumors to remove the arch.
+This patchset adds support for the solomon SSD1307 OLED controller present
+in the CFA-10036 board.
 
-It would be nice, if you could manage to compile this thingy without
-I2C. In the end one could attach something different than isp1301, no?
-So I think, in the perfect world you would probe for your phy and
-notice that it is not there and print a message: "Dude! Select isp1301
-for OHCI, aight?!"
+It first adds the framebuffer driver for this controller, and then the
+needed bits to enable it in the cfa10036 dts.
 
->
-> Thanks,
->
-> Roland
+Thanks,
+Maxime
 
-Sebastian
+Changes from v2:
+  * Add the pin name as comment to the pwm4 pinctrl declaration
+  * Change slightly the documentation of the dt bindings for the gpios to remove
+    the mxs-specific cell.
+
+Changes from v1:
+  * Did some factorisation of the ssd1307fb_write* functions.
+  * Filled the smem_start field of the fb_fix_screeninfo structure
+  * Fixed the broken pwm declaration
+  * Change the names of oled-reset-gpios and reset-active-low properties in the
+    device tree to oled-reset-gpio and oled-reset-active-low for consistency
+
+Maxime Ripard (4):
+  video: Add support for the Solomon SSD1307 OLED Controller
+  ARM: dts: mxs: Add alternative I2C muxing options for imx28
+  ARM: dts: mxs: Add pwm4 muxing options for imx28
+  ARM: dts: mxs: add oled support for the cfa-10036
+
+ .../devicetree/bindings/video/ssd1307fb.txt        |   24 ++
+ arch/arm/boot/dts/imx28-cfa10036.dts               |   20 +
+ arch/arm/boot/dts/imx28.dtsi                       |   21 ++
+ drivers/video/Kconfig                              |   13 +
+ drivers/video/Makefile                             |    1 +
+ drivers/video/ssd1307fb.c                          |  386 ++++++++++++++++++++
+ 6 files changed, 465 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/ssd1307fb.txt
+ create mode 100644 drivers/video/ssd1307fb.c
+
+-- 
+1.7.9.5
