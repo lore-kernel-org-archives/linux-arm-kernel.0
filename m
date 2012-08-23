@@ -1,95 +1,74 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 23 Aug 2012 12:29:10 +0300
-Subject: [PATCH 3/6] ARM/dts: OMAP3: Add McBSP entries
+Date: Thu, 23 Aug 2012 12:29:11 +0300
+Subject: [PATCH 4/6] ARM/dts: OMAP4: Add McBSP entries
 In-Reply-To: <1345714153-13094-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1345714153-13094-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1345714153-13094-4-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1345714153-13094-5-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create the needed sections to be able to probe McBSP ports via DT.
+Create the sections describing the McBSP ports to be able to use them via
+DT.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/omap3.dtsi |   69 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 69 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/omap4.dtsi |   47 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 47 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 8109471..5c14b00 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -220,5 +220,74 @@
- 			compatible = "ti,omap3-wdt";
- 			ti,hwmods = "wd_timer2";
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 04cbbcb..258435f 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -295,5 +295,52 @@
+ 			interrupt-parent = <&gic>;
+ 			ti,hwmods = "dmic";
  		};
 +
-+		mcbsp1: mcbsp at 48074000 {
-+			compatible = "ti,omap3-mcbsp";
-+			reg = <0x48074000 0xff>;
-+			reg-names = "mpu";
-+			interrupts = <0 16 0x4>, /* OCP compliant interrupt */
-+				     <0 59 0x4>, /* TX interrupt */
-+				     <0 60 0x4>; /* RX interrupt */
-+			interrupt-names = "common", "tx", "rx";
-+			interrupt-parent = <&intc>;
++		mcbsp1: mcbsp at 40122000 {
++			compatible = "ti,omap4-mcbsp";
++			reg = <0x40122000 0xff>, /* MPU private access */
++			      <0x49022000 0xff>; /* L3 Interconnect */
++			reg-names = "mpu", "dma";
++			interrupts = <0 17 0x4>;
++			interrupt-names = "common";
++			interrupt-parent = <&gic>;
 +			ti,buffer-size = <128>;
 +			ti,hwmods = "mcbsp1";
 +		};
 +
-+		mcbsp2: mcbsp at 49022000 {
-+			compatible = "ti,omap3-mcbsp";
-+			reg = <0x49022000 0xff>,
-+			      <0x49028000 0xff>;
-+			reg-names = "mpu", "sidetone";
-+			interrupts = <0 17 0x4>, /* OCP compliant interrupt */
-+				     <0 62 0x4>, /* TX interrupt */
-+				     <0 63 0x4>, /* RX interrupt */
-+				     <0 4 0x4>;  /* Sidetone */
-+			interrupt-names = "common", "tx", "rx", "sidetone";
-+			interrupt-parent = <&intc>;
-+			ti,buffer-size = <1280>;
++		mcbsp2: mcbsp at 40124000 {
++			compatible = "ti,omap4-mcbsp";
++			reg = <0x40124000 0xff>, /* MPU private access */
++			      <0x49024000 0xff>; /* L3 Interconnect */
++			reg-names = "mpu", "dma";
++			interrupts = <0 22 0x4>;
++			interrupt-names = "common";
++			interrupt-parent = <&gic>;
++			ti,buffer-size = <128>;
 +			ti,hwmods = "mcbsp2";
 +		};
 +
-+		mcbsp3: mcbsp at 49024000 {
-+			compatible = "ti,omap3-mcbsp";
-+			reg = <0x49024000 0xff>,
-+			      <0x4902a000 0xff>;
-+			reg-names = "mpu", "sidetone";
-+			interrupts = <0 22 0x4>, /* OCP compliant interrupt */
-+				     <0 89 0x4>, /* TX interrupt */
-+				     <0 90 0x4>, /* RX interrupt */
-+				     <0 5 0x4>;  /* Sidetone */
-+			interrupt-names = "common", "tx", "rx", "sidetone";
-+			interrupt-parent = <&intc>;
++		mcbsp3: mcbsp at 40126000 {
++			compatible = "ti,omap4-mcbsp";
++			reg = <0x40126000 0xff>, /* MPU private access */
++			      <0x49026000 0xff>; /* L3 Interconnect */
++			reg-names = "mpu", "dma";
++			interrupts = <0 23 0x4>;
++			interrupt-names = "common";
++			interrupt-parent = <&gic>;
 +			ti,buffer-size = <128>;
 +			ti,hwmods = "mcbsp3";
 +		};
 +
-+		mcbsp4: mcbsp at 49026000 {
-+			compatible = "ti,omap3-mcbsp";
-+			reg = <0x49026000 0xff>;
++		mcbsp4: mcbsp at 48096000 {
++			compatible = "ti,omap4-mcbsp";
++			reg = <0x48096000 0xff>; /* L4 Interconnect */
 +			reg-names = "mpu";
-+			interrupts = <0 23 0x4>, /* OCP compliant interrupt */
-+				     <0 54 0x4>, /* TX interrupt */
-+				     <0 55 0x4>; /* RX interrupt */
-+			interrupt-names = "common", "tx", "rx";
-+			interrupt-parent = <&intc>;
++			interrupts = <0 16 0x4>;
++			interrupt-names = "common";
++			interrupt-parent = <&gic>;
 +			ti,buffer-size = <128>;
 +			ti,hwmods = "mcbsp4";
-+		};
-+
-+		mcbsp5: mcbsp at 48096000 {
-+			compatible = "ti,omap3-mcbsp";
-+			reg = <0x48096000 0xff>;
-+			reg-names = "mpu";
-+			interrupts = <0 27 0x4>, /* OCP compliant interrupt */
-+				     <0 81 0x4>, /* TX interrupt */
-+				     <0 82 0x4>; /* RX interrupt */
-+			interrupt-names = "common", "tx", "rx";
-+			interrupt-parent = <&intc>;
-+			ti,buffer-size = <128>;
-+			ti,hwmods = "mcbsp5";
 +		};
  	};
  };
