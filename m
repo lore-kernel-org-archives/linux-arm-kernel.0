@@ -1,36 +1,34 @@
 From: Barry.Song@csr.com (Barry Song)
-Date: Thu, 23 Aug 2012 10:47:52 +0800
-Subject: [PATCH 1/3] ARM: PRIMA2: add missing interrupts property for pinctrl
- node
-In-Reply-To: <1345690074-31327-1-git-send-email-Barry.Song@csr.com>
-References: <1345690074-31327-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <1345690074-31327-2-git-send-email-Barry.Song@csr.com>
+Date: Thu, 23 Aug 2012 10:47:51 +0800
+Subject: [PATCH 0/3] pinctrl: sirf: add DT binding pinmux mapping support
+Message-ID: <1345690074-31327-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+This series makes us possible to define pinmux mapping support in board
+specific .dts files directly.
 
-commit 5130216265f6f924a4 missed the interrupts property
+As we want to add more SoCs(Marco, Polo) in mach-prima2, we want the dir
+have no trivial PIN_MAP_MUX_GROUP_DEFAULT and pinctrl_register_mappings
+codes.
 
-Signed-off-by: Barry Song <Barry.Song@csr.com>
----
- arch/arm/boot/dts/prima2-cb.dts |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+we will have a clean mach-prima2/common.c file then.
 
-diff --git a/arch/arm/boot/dts/prima2-cb.dts b/arch/arm/boot/dts/prima2-cb.dts
-index 34ae3a6..4245306 100644
---- a/arch/arm/boot/dts/prima2-cb.dts
-+++ b/arch/arm/boot/dts/prima2-cb.dts
-@@ -284,6 +284,7 @@
- 				#interrupt-cells = <2>;
- 				compatible = "sirf,prima2-gpio-pinmux";
- 				reg = <0xb0120000 0x10000>;
-+				interrupts = <43 44 45 46 47>;
- 				gpio-controller;
- 				interrupt-controller;
- 			};
--- 
-1.7.0.4
+Barry Song (3):
+  ARM: PRIMA2: add missing interrupts property for pinctrl node
+  ARM: PRIMA2: rename prima2-cb.dts to prima2.dtsi as it only has SoC
+    features
+  pinctrl: sirf: add DT-binding pinmux mapping support
+
+ arch/arm/boot/dts/prima2-cb.dts    |  424 ------------------------
+ arch/arm/boot/dts/prima2-evb.dts   |   37 ++
+ arch/arm/boot/dts/prima2.dtsi      |  640 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-prima2/Makefile.boot |    2 +
+ drivers/pinctrl/pinctrl-sirf.c     |   58 ++++-
+ 5 files changed, 736 insertions(+), 425 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/prima2-cb.dts
+ create mode 100644 arch/arm/boot/dts/prima2-evb.dts
+ create mode 100644 arch/arm/boot/dts/prima2.dtsi
 
 
 
