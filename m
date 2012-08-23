@@ -1,43 +1,74 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 23 Aug 2012 13:32:54 +0300
-Subject: [PATCH v3 14/23] serial: omap: fix sequence of pm_runtime_* calls.
+Date: Thu, 23 Aug 2012 13:32:55 +0300
+Subject: [PATCH v3 15/23] serial: omap: optimization with section annotations
 In-Reply-To: <1345717983-18179-1-git-send-email-balbi@ti.com>
 References: <1345717983-18179-1-git-send-email-balbi@ti.com>
-Message-ID: <1345717983-18179-15-git-send-email-balbi@ti.com>
+Message-ID: <1345717983-18179-16-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ruchika Kharwar <ruchika@ti.com>
-
-pm_runtime_enable() needs to be invoked before
-pm_runtime_use_autosuspend(), and
-pm_runtime_set_autosuspend_delay() functions.
+Two functions:
+omap_serial_fill_features_erratas() and
+of_get_uart_port_info() are only called from probe().
+Marking them as __devinit gives us another
+oportunity to free some code after .init.text
+is done.
 
 Tested-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Ruchika Kharwar <ruchika@ti.com>
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/tty/serial/omap-serial.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/tty/serial/omap-serial.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 8a60212..8254561 100644
+index 8254561..bdfd019 100644
 --- a/drivers/tty/serial/omap-serial.c
 +++ b/drivers/tty/serial/omap-serial.c
-@@ -1300,12 +1300,12 @@ static int serial_omap_probe(struct platform_device *pdev)
- 	INIT_WORK(&up->qos_work, serial_omap_uart_qos_work);
+@@ -1154,7 +1154,7 @@ static int serial_omap_resume(struct device *dev)
+ }
+ #endif
  
- 	platform_set_drvdata(pdev, up);
-+	pm_runtime_enable(&pdev->dev);
- 	pm_runtime_use_autosuspend(&pdev->dev);
- 	pm_runtime_set_autosuspend_delay(&pdev->dev,
- 			omap_up_info->autosuspend_timeout);
+-static void omap_serial_fill_features_erratas(struct uart_omap_port *up)
++static void __devinit omap_serial_fill_features_erratas(struct uart_omap_port *up)
+ {
+ 	u32 mvr, scheme;
+ 	u16 revision, major, minor;
+@@ -1207,7 +1207,7 @@ static void omap_serial_fill_features_erratas(struct uart_omap_port *up)
+ 	}
+ }
  
- 	pm_runtime_irq_safe(&pdev->dev);
--	pm_runtime_enable(&pdev->dev);
- 	pm_runtime_get_sync(&pdev->dev);
+-static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
++static __devinit struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
+ {
+ 	struct omap_uart_port_info *omap_up_info;
  
- 	omap_serial_fill_features_erratas(up);
+@@ -1220,7 +1220,7 @@ static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
+ 	return omap_up_info;
+ }
+ 
+-static int serial_omap_probe(struct platform_device *pdev)
++static int __devinit serial_omap_probe(struct platform_device *pdev)
+ {
+ 	struct uart_omap_port	*up;
+ 	struct resource		*mem, *irq;
+@@ -1331,7 +1331,7 @@ err_port_line:
+ 	return ret;
+ }
+ 
+-static int serial_omap_remove(struct platform_device *dev)
++static int __devexit serial_omap_remove(struct platform_device *dev)
+ {
+ 	struct uart_omap_port *up = platform_get_drvdata(dev);
+ 
+@@ -1475,7 +1475,7 @@ MODULE_DEVICE_TABLE(of, omap_serial_of_match);
+ 
+ static struct platform_driver serial_omap_driver = {
+ 	.probe          = serial_omap_probe,
+-	.remove         = serial_omap_remove,
++	.remove         = __devexit_p(serial_omap_remove),
+ 	.driver		= {
+ 		.name	= DRIVER_NAME,
+ 		.pm	= &serial_omap_dev_pm_ops,
 -- 
 1.7.12.rc3
