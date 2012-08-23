@@ -1,33 +1,87 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 23 Aug 2012 11:43:56 +0100
-Subject: [PATCH] ARM: fix cpu_relax() in case of doing dmb
-In-Reply-To: <1345647138-8815-1-git-send-email-shawn.guo@linaro.org>
-References: <1345647138-8815-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120823104356.GA13622@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 23 Aug 2012 11:42:52 +0100
+Subject: PER_LINUX32, Was: [PATCH v2 21/31] arm64: 32-bit (compat)
+ applications support
+In-Reply-To: <201208230646.31276.arnd@arndb.de>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <201208151434.05145.arnd@arndb.de>
+ <20120816102808.GH31784@mudshark.cambridge.arm.com>
+ <201208230646.31276.arnd@arndb.de>
+Message-ID: <20120823104252.GA7585@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2012 at 03:52:18PM +0100, Shawn Guo wrote:
-> diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
-> index 99afa74..7cc67ce 100644
-> --- a/arch/arm/include/asm/processor.h
-> +++ b/arch/arm/include/asm/processor.h
-> @@ -80,7 +80,14 @@ extern void release_thread(struct task_struct *);
->  unsigned long get_wchan(struct task_struct *p);
->  
->  #if __LINUX_ARM_ARCH__ == 6 || defined(CONFIG_ARM_ERRATA_754327)
-> -#define cpu_relax()			smp_mb()
-> +#define cpu_relax()		do {					\
-> +					asm("nop");			\
-> +					asm("nop");			\
-> +					asm("nop");			\
-> +					asm("nop");			\
-> +					asm("nop");			\
+On Thu, Aug 23, 2012 at 07:46:30AM +0100, Arnd Bergmann wrote:
+> On Thursday 16 August 2012, Will Deacon wrote:
+> > On Wed, Aug 15, 2012 at 03:34:04PM +0100, Arnd Bergmann wrote:
+> > > On Tuesday 14 August 2012, Catalin Marinas wrote:
+> > > > +asmlinkage int compat_sys_personality(compat_ulong_t personality)
+> > > > +{
+> > > > +	int ret;
+> > > > +
+> > > > +	if (personality(current->personality) == PER_LINUX32 &&
+> > > > +		personality == PER_LINUX)
+> > > > +		personality = PER_LINUX32;
+> > > > +	ret = sys_personality(personality);
+> > > > +	if (ret == PER_LINUX32)
+> > > > +		ret = PER_LINUX;
+> > > > +	return ret;
+> > > > +}
+> > > 
+> > > Where did you get this from?
+> > > 
+> > > You should not need compat_sys_personality, just call the native function.
+> > 
+> > Hmm, but in that case an aarch32 application doing a personality(PER_LINUX)
+> > syscall will start seeing the wrong uname.
+> 
+> Coming back at this topic, I noticed another issue. Jiri Kosina
+> has recently posted patches to fix this function in the other architectures
+> in order to mask out the other personality bits, which is a correct fix,
+> but the above function is odd for other reasons.
+> 
+> * On MIPS, it is used only for compat tasks, like you have it above.
+> * On PA-RISC, it is used for native 32 bit tasks and for compat 32 bit tasks,
+>   but not for native 64 bit ones.
+> * On IA64, it was used for compat tasks (support for which has since
+>   been removed from the kernel), plus all 32 bit tasks would start with
+>   PER_LINUX32.
+> * On PowerPC, Sparc and s390, it is used for native 64 bit tasks and for
+>   compat 32 bit tasks, but not for native 32 bit ones.
+> * On Tile, it was never used.
+> * On x86_64, it used to be defined (copied from ia64) but not used
+>   throughout the git history.
+> 
+> The semantics of the function are also interesting: The intention seems
+> to be that to a compat task, PER_LINUX32 would appear as PER_LINUX.
+> The effect is that any process can set PER_LINUX32 but it can never
+> be unset except by a 64 bit MIPS or PA-RISC task.
 
-Can you use nop() instead of the explicit asm? Also, I think we should try
-and use some methodology on deciding the number of nops to insert. Without
-having a full handle on the problem at the moment, it would seem that we
-need at least NR_CPUS worth (since the number of spinning secondaries is
-NR_CPUS-1 and they may execute their barriers in lock-step).
+IMHO, it makes sense to keep the compat_sys_personality() as implemented
+above. You may want to start a chroot ARMv7 environment using "linux32"
+but don't want some 32-bit app calling personality(PER_LINUX) (as that's
+the default personality on an ARMv7 system) and unknowingly changing the
+personality that you wanted to enforce via "linux32".
 
-Will
+I agree with not setting the personality based on the ELF type, but
+that's different from the compat_sys_personality().
+
+> Since x86_64 does not implement this behavior at all, I suspect that
+> there are now lots of things depending on not having it, while all
+> the other architectures might also have some (even predating the
+> x86_64 port) use cases that depend on depend on not being able to
+> observe PER_LINUX32 in 32 bit compat tasks.
+> 
+> I think we should try to agree on how this is all supposed to work
+> and use common code, either put the ppc/sparc/s390 version into
+> sys_personality, or remove all of them and just do what x86 and tile
+> do, using the regular sys_personality for all tasks.
+
+Late topic for the KS :).
+
+I don't think we can move this behaviour to sys_personality. We may want
+to add a generic compat_sys_personality() if we agree on the above
+use-case.
+
+-- 
+Catalin
