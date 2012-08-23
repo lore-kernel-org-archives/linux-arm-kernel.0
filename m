@@ -1,48 +1,55 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Thu, 23 Aug 2012 15:32:04 +0800
-Subject: [PATCH 4/7] regulator: anatop-regulator: convert to use
- imx-syscon to access anatop register
-In-Reply-To: <5035BDBF.9020602@wwwdotorg.org>
-References: <1345619928-15446-1-git-send-email-b29396@freescale.com>
- <1345619928-15446-5-git-send-email-b29396@freescale.com>
- <5035BDBF.9020602@wwwdotorg.org>
-Message-ID: <20120823073203.GH10057@shlinux2.ap.freescale.net>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 23 Aug 2012 09:52:07 +0200
+Subject: [RFC 2/4] ARM: dma-mapping: IOMMU allocates pages from pool with
+ GFP_ATOMIC
+In-Reply-To: <20120823091519.804aeae4ba93bcfe011e787c@nvidia.com>
+References: <1345630830-9586-1-git-send-email-hdoyu@nvidia.com>
+ <1345630830-9586-3-git-send-email-hdoyu@nvidia.com>
+ <CAHQjnOOF7Ca-Dz8K_zcS=gxQsJvKYaWA3tqUeK1RSd-wLYZ44w@mail.gmail.com>
+ <20120822.163648.3800987367886904.hdoyu@nvidia.com>
+ <012401cd80f4$59727020$0c575060$%szyprowski@samsung.com>
+ <20120823091519.804aeae4ba93bcfe011e787c@nvidia.com>
+Message-ID: <014501cd8104$35a8ce40$a0fa6ac0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 01:21:03PM +0800, Stephen Warren wrote:
-> On 08/22/2012 01:18 AM, Dong Aisheng wrote:
-> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> > diff --git a/drivers/regulator/anatop-regulator.c b/drivers/regulator/anatop-regulator.c
-> 
-> > @@ -109,7 +110,11 @@ static int __devinit anatop_regulator_probe(struct platform_device *pdev)
-> >  	rdesc->ops = &anatop_rops;
-> >  	rdesc->type = REGULATOR_VOLTAGE;
-> >  	rdesc->owner = THIS_MODULE;
-> > -	sreg->mfd = anatopmfd;
-> > +
-> > +	sreg->anatop = of_parse_phandle(np, "fsl,anatop", 0);
-> > +	if (!sreg->anatop)
-> > +		return -ENODEV;
-> 
-> In fact, that imx_syscon_lookup function I proposed could even do the
-> of_parse_phandle() internally, so perhaps:
-> 
-> foo->syscon_dev = imx_syscon_lookup(np, "fsl,anatop", 0);
-> if (IS_ERR(foo->syscon_dev))
->     return PTR_ERR(foo->syscon_dev);
-> 
-> with imx_syscon_lookup() internally knowing when to return EPROBE_DEFER
-> rather than any other permanent error code (e.g. for missing property,
-> bad phandle, etc.)
-> 
-This also looks reasonable to me.
-btw, see my last reply to mark in another mail.
-I'm not sure but Mark may want something slightly different as this one,
-imx_syscon_lookup directly return regmap rather than dev, then we do not
-need implement any register read/write API in imx-syscon driver, just
-using the exist regmap r/w API is ok.
+Hi Hiroshi,
 
-Regards
-Dong Aisheng
+On Thursday, August 23, 2012 8:15 AM Hiroshi Doyu wrote:
+
+> On Thu, 23 Aug 2012 07:58:34 +0200
+> Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> 
+> > Hello,
+> >
+> > On Wednesday, August 22, 2012 3:37 PM Hiroshi Doyu wrote:
+> >
+> > > KyongHo Cho <pullip.cho@samsung.com> wrote @ Wed, 22 Aug 2012 14:47:00 +0200:
+> > >
+> > > > vzalloc() call in __iommu_alloc_buffer() also causes BUG() in atomic context.
+> > >
+> > > Right.
+> > >
+> > > I've been thinking that kzalloc() may be enough here, since
+> > > vzalloc() was introduced to avoid allocation failure for big chunk of
+> > > memory, but I think that it's unlikely that the number of page array
+> > > can be so big. So I propose to drop vzalloc() here, and just simply to
+> > > use kzalloc only as below(*1).
+> >
+> > We already had a discussion about this, so I don't think it makes much sense to
+> > change it back to kzalloc. This vmalloc() call won't hurt anyone. It should not
+> > be considered a problem for atomic allocations, because no sane driver will try
+> > to allocate buffers larger than a dozen KiB with GFP_ATOMIC flag. I would call
+> > such try a serious bug, which we should not care here.
+> 
+> Ok, I've already sent v2 just now, where, instead of changing it back,
+> just with GFP_ATOMIC, kzalloc() would be selected, just in case. I guess
+> that this would be ok(a bit safer?)
+
+I've posted some comments to v2. If you agree with my suggestion, no changes around
+those vmalloc() calls will be needed.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
