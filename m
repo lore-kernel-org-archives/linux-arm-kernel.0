@@ -1,55 +1,45 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 23 Aug 2012 13:32:48 +0300
-Subject: [PATCH v3 08/23] serial: omap: move THRE check to transmit_chars()
+Date: Thu, 23 Aug 2012 13:32:50 +0300
+Subject: [PATCH v3 10/23] serial: omap: set dev->drvdata before enabling
+ pm_runtime
 In-Reply-To: <1345717983-18179-1-git-send-email-balbi@ti.com>
 References: <1345717983-18179-1-git-send-email-balbi@ti.com>
-Message-ID: <1345717983-18179-9-git-send-email-balbi@ti.com>
+Message-ID: <1345717983-18179-11-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-since all other IRQ types now do all necessary
-checks inside their handlers, transmit_chars()
-was the only one left expecting serial_omap_irq()
-to check THRE for it. We can move THRE check to
-transmit_chars() in order to make serial_omap_irq()
-more uniform.
+by the time we call our first pm_runtme_get_sync()
+after enable pm_runtime, our resume method might
+be called. To avoid problems, we must make sure
+that our dev->drvdata is set correctly before
+our resume method gets called.
 
 Tested-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/tty/serial/omap-serial.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/tty/serial/omap-serial.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index e55f9f1..50ba51e 100644
+index e07afb3..9f709d4 100644
 --- a/drivers/tty/serial/omap-serial.c
 +++ b/drivers/tty/serial/omap-serial.c
-@@ -195,11 +195,14 @@ static void serial_omap_stop_rx(struct uart_port *port)
+@@ -1300,6 +1300,7 @@ static int serial_omap_probe(struct platform_device *pdev)
+ 	serial_omap_uart_wq = create_singlethread_workqueue(up->name);
+ 	INIT_WORK(&up->qos_work, serial_omap_uart_qos_work);
+ 
++	platform_set_drvdata(pdev, up);
+ 	pm_runtime_use_autosuspend(&pdev->dev);
+ 	pm_runtime_set_autosuspend_delay(&pdev->dev,
+ 			omap_up_info->autosuspend_timeout);
+@@ -1319,7 +1320,6 @@ static int serial_omap_probe(struct platform_device *pdev)
+ 
+ 	pm_runtime_mark_last_busy(up->dev);
  	pm_runtime_put_autosuspend(up->dev);
- }
+-	platform_set_drvdata(pdev, up);
+ 	return 0;
  
--static void transmit_chars(struct uart_omap_port *up)
-+static void transmit_chars(struct uart_omap_port *up, unsigned int lsr)
- {
- 	struct circ_buf *xmit = &up->port.state->xmit;
- 	int count;
- 
-+	if (!(lsr & UART_LSR_THRE))
-+		return;
-+
- 	if (up->port.x_char) {
- 		serial_out(up, UART_TX, up->port.x_char);
- 		up->port.icount.tx++;
-@@ -369,8 +372,7 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
- 			check_modem_status(up);
- 			break;
- 		case UART_IIR_THRI:
--			if (lsr & UART_LSR_THRE)
--				transmit_chars(up);
-+			transmit_chars(up, lsr);
- 			break;
- 		case UART_IIR_RX_TIMEOUT:
- 			/* FALLTHROUGH */
+ err_add_port:
 -- 
 1.7.12.rc3
