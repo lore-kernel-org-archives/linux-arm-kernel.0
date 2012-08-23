@@ -1,71 +1,74 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 23 Aug 2012 22:45:45 +0800
-Subject: [PATCH 4/4] ARM: dts: mxs: add oled support for the cfa-10036
-In-Reply-To: <1345711351-16367-5-git-send-email-maxime.ripard@free-electrons.com>
-References: <1345711351-16367-1-git-send-email-maxime.ripard@free-electrons.com>
- <1345711351-16367-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20120823144541.GL24242@S2101-09.ap.freescale.net>
+Date: Thu, 23 Aug 2012 22:55:27 +0800
+Subject: [PATCH 6/6] ARM: imx: select ARM_CPU_SUSPEND when necessary
+In-Reply-To: <201208231420.50247.arnd@arndb.de>
+References: <1345648390-4234-1-git-send-email-arnd@arndb.de>
+ <1345648390-4234-7-git-send-email-arnd@arndb.de>
+ <20120823024119.GD24242@S2101-09.ap.freescale.net>
+ <201208231420.50247.arnd@arndb.de>
+Message-ID: <20120823145524.GM24242@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 10:42:31AM +0200, Maxime Ripard wrote:
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Brian Lilly <brian@crystalfontz.com>
-> ---
->  arch/arm/boot/dts/imx28-cfa10036.dts |   20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
+On Thu, Aug 23, 2012 at 02:20:50PM +0000, Arnd Bergmann wrote:
+> From 4036e8f292887e7b1abc8eacec7d619abd608178 Mon Sep 17 00:00:00 2001
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Fri, 17 Aug 2012 00:16:08 +0000
+> Subject: [PATCH] ARM: imx: build i.MX6 functions only when needed
 > 
-Looks mostly good, but I have to postpone it until driver part gets
-accepted.
+> The head-v7.S contains a call to the generic cpu_suspend function,
+> which is only available when selected by the i.MX6 code. As
+> pointed out by Shawn Guo, i.MX does not actually use any
 
-Some minor comments below.
+s/i.MX/i.MX5
 
-> diff --git a/arch/arm/boot/dts/imx28-cfa10036.dts b/arch/arm/boot/dts/imx28-cfa10036.dts
-> index c03a577..92784a9 100644
-> --- a/arch/arm/boot/dts/imx28-cfa10036.dts
-> +++ b/arch/arm/boot/dts/imx28-cfa10036.dts
-> @@ -33,11 +33,31 @@
->  		};
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+> functions defined in head-v7.S. It is also needed only for
+> the i.MX6 power management code and for the SMP code, so
+> we can restrict building this file to situations in which
+> at least one of those two is present.
+> 
+> Finally, other platforms with a similar file call it headsmp.S,
+> so we can rename it to the same for consistency.
+> 
+> Without this patch, building imx5 standalone results in:
+> 
+> arch/arm/mach-imx/built-in.o: In function `v7_cpu_resume':
+> arch/arm/mach-imx/head-v7.S:104: undefined reference to `cpu_resume'
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Eric Miao <eric.miao@linaro.org>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: stable at vger.kernel.org
+> 
+> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> index e08adb7..d004d37 100644
+> --- a/arch/arm/mach-imx/Makefile
+> +++ b/arch/arm/mach-imx/Makefile
+> @@ -71,14 +71,13 @@ obj-$(CONFIG_DEBUG_LL) += lluart.o
+>  obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
+>  obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
+>  obj-$(CONFIG_HAVE_IMX_SRC) += src.o
+> -obj-$(CONFIG_CPU_V7) += head-v7.o
+> -AFLAGS_head-v7.o :=-Wa,-march=armv7-a
+> -obj-$(CONFIG_SMP) += platsmp.o
+> +AFLAGS_headsmp.o :=-Wa,-march=armv7-a
+> +obj-$(CONFIG_SMP) += headsmp.o platsmp.o
+>  obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+>  obj-$(CONFIG_SOC_IMX6Q) += clk-imx6q.o mach-imx6q.o
 >  
->  		apbx at 80040000 {
-> +			pwm: pwm at 80064000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pwm4_pins_a>;
-> +				status = "okay";
-> +			};
-> +
->  			duart: serial at 80074000 {
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&duart_pins_b>;
->  				status = "okay";
->  			};
-> +
-> +			i2c0: i2c at 80058000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&i2c0_pins_b>;
-> +				status = "okay";
-> +
-> +				ssd1307: oled at 3c {
-> +					compatible = "solomon,ssd1307fb-i2c";
-> +					reg = <0x3c>;
-> +					pwms = <&pwm 4 3000>;
-> +					oled-reset-gpio = <&gpio2 7 1>;
+>  ifeq ($(CONFIG_PM),y)
+> -obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o
+> +obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o
+>  endif
+>  
+>  # i.MX5 based machines
+> diff --git a/arch/arm/mach-imx/head-v7.S b/arch/arm/mach-imx/headsmp.S
+> similarity index 100%
+> rename from arch/arm/mach-imx/head-v7.S
+> rename to arch/arm/mach-imx/headsmp.S
 
-The idiom of naming gpio in DT is *-gpios, even though most of times
-there is only one pin.
-
-> +					oled-reset-active-low;
-
-I would drop oled- prefix for above two properties.
-
+-- 
 Regards,
 Shawn
-
-> +				};
-> +			};
->  		};
->  	};
->  
-> -- 
-> 1.7.9.5
-> 
