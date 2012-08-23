@@ -1,44 +1,124 @@
-From: dgreid@chromium.org (Dylan Reid)
-Date: Thu, 23 Aug 2012 13:54:21 -0700
-Subject: [PATCH] ASoC: samsung dma - prepare dma in start/resume trigger
- path
-In-Reply-To: <1345755069-9512-1-git-send-email-dgreid@chromium.org>
-References: <1345755069-9512-1-git-send-email-dgreid@chromium.org>
-Message-ID: <CAEUnVG57R87KmO0BMMQ1hwnJ2Gx=g+PxMZH0=2XE7uxUzk84iQ@mail.gmail.com>
+From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
+Date: Thu, 23 Aug 2012 23:03:57 +0200 (CEST)
+Subject: [PATCH] pwm-imx: Fix config / enable / disable
+In-Reply-To: <20120823191108.GB8127@avionic-0098.mockup.avionic-design.de>
+Message-ID: <1305545087.2775440.1345755837651.JavaMail.root@advansee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 1:51 PM, Dylan Reid <dgreid@chromium.org> wrote:
-> On suspend all dma transactions are terminated (by the stop/suspend
-> trigger calling ops->stop), they need to be set up again during resume.
-> Move the prepare op to the start/resume/unpause trigger path so that dma
-> and audio will restart on resume/unpause.
->
-> Signed-off-by: Dylan Reid <dgreid@chromium.org>
-> ---
->  sound/soc/samsung/dma.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
-> index f3ebc38..5772762 100644
-> --- a/sound/soc/samsung/dma.c
-> +++ b/sound/soc/samsung/dma.c
-> @@ -250,6 +250,7 @@ static int dma_trigger(struct snd_pcm_substream *substream, int cmd)
->         case SNDRV_PCM_TRIGGER_START:
->         case SNDRV_PCM_TRIGGER_RESUME:
->         case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-> +               dma_prepare(substream);
->                 prtd->state |= ST_RUNNING;
->                 prtd->params->ops->trigger(prtd->params->ch);
->                 break;
-> @@ -352,7 +353,6 @@ static struct snd_pcm_ops dma_ops = {
->         .ioctl          = snd_pcm_lib_ioctl,
->         .hw_params      = dma_hw_params,
->         .hw_free        = dma_hw_free,
-> -       .prepare        = dma_prepare,
->         .trigger        = dma_trigger,
->         .pointer        = dma_pointer,
->         .mmap           = dma_mmap,
-> --
-> 1.7.7.3
->
+imx_pwm_config() did not enable the PWM IP clock while accessing the registers.
+Hence, a call to pwm_config() had no effect before pwm_enable() had been called,
+which does not comply to the PWM API.
+
+Moreover, calling pwm_disable() then pwm_enable() must be a transparent
+operation.
+
+This fixes the first setting of brightness through sysfs that had no effect with
+leds-pwm.
+
+Cc: Thierry Reding <thierry.reding@avionic-design.de>
+Cc: <linux-kernel@vger.kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Cc: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+---
+ .../drivers/pwm/pwm-imx.c                          |   55 +++++++++++++++-----
+ 1 file changed, 43 insertions(+), 12 deletions(-)
+
+diff --git linux-next-c94456b.orig/drivers/pwm/pwm-imx.c linux-next-c94456b/drivers/pwm/pwm-imx.c
+index 2a0b353..0519bf2 100644
+--- linux-next-c94456b.orig/drivers/pwm/pwm-imx.c
++++ linux-next-c94456b/drivers/pwm/pwm-imx.c
+@@ -55,6 +55,16 @@ static int imx_pwm_config(struct pwm_chip *chip,
+ {
+ 	struct imx_chip *imx = to_imx_chip(chip);
+ 
++	/*
++	 * If the PWM is disabled, make sure to turn on the clock before
++	 * accessing the registers.
++	 */
++	if (!imx->clk_enabled) {
++		int rc = clk_prepare_enable(imx->clk);
++		if (rc)
++			return rc;
++	}
++
+ 	if (!(cpu_is_mx1() || cpu_is_mx21())) {
+ 		unsigned long long c;
+ 		unsigned long period_cycles, duty_cycles, prescale;
+@@ -85,8 +95,11 @@ static int imx_pwm_config(struct pwm_chip *chip,
+ 		writel(period_cycles, imx->mmio_base + MX3_PWMPR);
+ 
+ 		cr = MX3_PWMCR_PRESCALER(prescale) |
+-			MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN |
+-			MX3_PWMCR_DBGEN | MX3_PWMCR_EN;
++			MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN | MX3_PWMCR_DBGEN;
++
++		/* If the PWM is enabled, keep it so. */
++		if (imx->clk_enabled)
++			cr |= MX3_PWMCR_EN;
+ 
+ 		if (cpu_is_mx25())
+ 			cr |= MX3_PWMCR_CLKSRC_IPG;
+@@ -118,32 +131,50 @@ static int imx_pwm_config(struct pwm_chip *chip,
+ 		BUG();
+ 	}
+ 
++	/* If the PWM is disabled, turn the clock off again to save power. */
++	if (!imx->clk_enabled)
++		clk_disable_unprepare(imx->clk);
++
+ 	return 0;
+ }
+ 
+ static int imx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
+ 	struct imx_chip *imx = to_imx_chip(chip);
+-	int rc = 0;
++	int rc;
+ 
+-	if (!imx->clk_enabled) {
+-		rc = clk_prepare_enable(imx->clk);
+-		if (!rc)
+-			imx->clk_enabled = 1;
++	if (imx->clk_enabled)
++		return 0;
++
++	rc = clk_prepare_enable(imx->clk);
++	if (rc)
++		return rc;
++
++	if (!(cpu_is_mx1() || cpu_is_mx21())) {
++		u32 cr = readl(imx->mmio_base + MX3_PWMCR);
++		cr |= MX3_PWMCR_EN;
++		writel(cr, imx->mmio_base + MX3_PWMCR);
+ 	}
+-	return rc;
++
++	imx->clk_enabled = 1;
++	return 0;
+ }
+ 
+ static void imx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
+ 	struct imx_chip *imx = to_imx_chip(chip);
+ 
+-	writel(0, imx->mmio_base + MX3_PWMCR);
++	if (!imx->clk_enabled)
++		return;
+ 
+-	if (imx->clk_enabled) {
+-		clk_disable_unprepare(imx->clk);
+-		imx->clk_enabled = 0;
++	if (!(cpu_is_mx1() || cpu_is_mx21())) {
++		u32 cr = readl(imx->mmio_base + MX3_PWMCR);
++		cr &= ~MX3_PWMCR_EN;
++		writel(cr, imx->mmio_base + MX3_PWMCR);
+ 	}
++
++	clk_disable_unprepare(imx->clk);
++	imx->clk_enabled = 0;
+ }
+ 
+ static struct pwm_ops imx_pwm_ops = {
