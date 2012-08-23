@@ -1,37 +1,42 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 23 Aug 2012 09:35:01 +0300
-Subject: [PATCH] ARM: OMAP2+: twl-common: Fix compile time error when
- omap-twl4030 audio is not enabled
-Message-ID: <1345703701-27283-1-git-send-email-peter.ujfalusi@ti.com>
+From: minchan@kernel.org (Minchan Kim)
+Date: Thu, 23 Aug 2012 15:43:57 +0900
+Subject: [v2 0/4] ARM: dma-mapping: IOMMU atomic allocation
+In-Reply-To: <1345702229-9539-1-git-send-email-hdoyu@nvidia.com>
+References: <1345702229-9539-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <20120823064357.GD5369@bbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes:
-CC      arch/arm/mach-omap2/twl-common.o arch/arm/mach-omap2/twl-common.c:562: error: conflicting types for ?omap_twl4030_audio_init?
-arch/arm/mach-omap2/twl-common.h:62: error: previous declaration of ?omap_twl4030_audio_init? was here
-make[1]: *** [arch/arm/mach-omap2/twl-common.o] Error 1
-make: *** [arch/arm/mach-omap2] Error 2
+On Thu, Aug 23, 2012 at 09:10:25AM +0300, Hiroshi Doyu wrote:
+> Hi,
+> 
+> The commit e9da6e9 "ARM: dma-mapping: remove custom consistent dma
+> region" breaks the compatibility with existing drivers. This causes
+> the following kernel oops(*1). That driver has called dma_pool_alloc()
+> to allocate memory from the interrupt context, and it hits
+> BUG_ON(in_interrpt()) in "get_vm_area_caller()". This patch seris
+> fixes this problem with making use of the pre-allocate atomic memory
+> pool which DMA is using in the same way as DMA does now.
+> 
+> Any comment would be really appreciated.
+> 
+> v2:
+> Don't modify attrs(DMA_ATTR_NO_KERNEL_MAPPING) for atomic allocation. (Marek)
+> Skip vzalloc (KyongHo, Minchan)
 
-When building the kernel with !SND_OMAP_SOC_OMAP_TWL4030
+Huh? I would like to correct exactly. I didn't say that kzalloc unify is okay.
+As KyongHo said, there are other usecases for allocating big buffer but
+I can't agree his opinion that it's system memory shortage if the allocation
+fails. Because there are lots of freeable pages(cached page + anon pages
+with swap , shrinkable slab and so on). But as I said early, VM can't do
+anything except relying on kswapd in atomic context while there are a ton
+of freeable pages in system and we can't gaurantee kswapd will do something
+for us before seeing the page allocation failure in process context.
+Especially, UP is more problem. So, it never indicate system needs more memory.
 
-Reported-by: Brian Austin <brian.austin@cirrus.com>
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/mach-omap2/twl-common.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Atomic high order allocation is very fragile in VM POV
+so caller should have fallback mechanism. Otherwise, don't do that.
 
-diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-index 1c6045a..2919d7a 100644
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -544,7 +544,7 @@ void __init omap_twl4030_audio_init(char *card_name)
- }
- 
- #else /* SOC_OMAP_TWL4030 */
--void __init omap_twl4030_audio_init(char *card_name, int codec_sysclk)
-+void __init omap_twl4030_audio_init(char *card_name)
- {
- 	return;
- }
 -- 
-1.7.8.6
+Kind regards,
+Minchan Kim
