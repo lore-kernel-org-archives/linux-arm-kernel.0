@@ -1,29 +1,29 @@
 From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 23 Aug 2012 12:23:30 +0200
-Subject: [PATCH] ARM: imx6q: remove imx_src_prepare_restart() call
-In-Reply-To: <1345180316-9209-1-git-send-email-shawn.guo@linaro.org>
-References: <1345180316-9209-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <503604A2.3050001@de.bosch.com>
+Date: Thu, 23 Aug 2012 12:23:45 +0200
+Subject: [PATCH] ARM: fix cpu_relax() in case of doing dmb
+In-Reply-To: <1345647138-8815-1-git-send-email-shawn.guo@linaro.org>
+References: <1345647138-8815-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <503604B1.7030207@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.08.2012 07:11, Shawn Guo wrote:
-> Currently, imx_src_prepare_restart which is called by imx6q_restart
-> assumes that cpu0 must be the running cpu, so it disables all secondary
-> cpus.  However this is not the case, the restart routine could possibly
-> running on cpu1 or any other secondary cores.  In that case, disabling
-> the cpu that runs restart routine will hang up system.
+On 22.08.2012 16:52, Shawn Guo wrote:
+> There is an issue reported on imx6q restart function.  The issue is only
+> seen with the image building ARMv7 and ARMv6 together, where cpu_relax()
+> is define to do dmb.  It's been root-caused by Russell as below.
 > 
-> Also it turns out that everything that is done by imx_src_prepare_restart
-> is not really necessary, because the watchdog reset will have those
-> registers reset properly.  So let's remove the imx_src_prepare_restart
-> call completely.
+> Russell King - ARM Linux wrote:
+>> I suspect having this dmb inside cpu_relax() is flooding the
+>> interconnects with traffic, which then prevents other CPUs getting
+>> a look-in (maybe there's no fairness when it comes to dmb's.
+> 
+> Fix the issue by insert a few NOPs into cpu_relax() where doing dmb.
 > 
 > Cc: <stable@vger.kernel.org>
 > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Tested on a i.MX6 SabreLite board together with the patch 'ARM: fix 
-cpu_relax() in case of doing dmb':
+Tested on a i.MX6 SabreLite board together with the patch 'ARM: imx6q: 
+remove imx_src_prepare_restart() call':
 
 Tested-by: Dirk Behme <dirk.behme@de.bosch.com>
 
@@ -32,57 +32,26 @@ Thanks
 Dirk
 
 > ---
->  arch/arm/mach-imx/mach-imx6q.c          |    2 --
->  arch/arm/mach-imx/src.c                 |   13 -------------
->  arch/arm/plat-mxc/include/mach/common.h |    1 -
->  3 files changed, 0 insertions(+), 16 deletions(-)
+>  arch/arm/include/asm/processor.h |    9 ++++++++-
+>  1 files changed, 8 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> index 5ec0608..d9b0614 100644
-> --- a/arch/arm/mach-imx/mach-imx6q.c
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> @@ -48,8 +48,6 @@ void imx6q_restart(char mode, const char *cmd)
->  	if (!wdog_base)
->  		goto soft;
+> diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
+> index 99afa74..7cc67ce 100644
+> --- a/arch/arm/include/asm/processor.h
+> +++ b/arch/arm/include/asm/processor.h
+> @@ -80,7 +80,14 @@ extern void release_thread(struct task_struct *);
+>  unsigned long get_wchan(struct task_struct *p);
 >  
-> -	imx_src_prepare_restart();
-> -
->  	/* enable wdog */
->  	writew_relaxed(1 << 2, wdog_base);
->  	/* write twice to ensure the request will not get ignored */
-> diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
-> index e15f155..900b3c1 100644
-> --- a/arch/arm/mach-imx/src.c
-> +++ b/arch/arm/mach-imx/src.c
-> @@ -43,19 +43,6 @@ void imx_set_cpu_jump(int cpu, void *jump_addr)
->  		       src_base + SRC_GPR1 + cpu * 8);
->  }
->  
-> -void imx_src_prepare_restart(void)
-> -{
-> -	u32 val;
-> -
-> -	/* clear enable bits of secondary cores */
-> -	val = readl_relaxed(src_base + SRC_SCR);
-> -	val &= ~(0x7 << BP_SRC_SCR_CORE1_ENABLE);
-> -	writel_relaxed(val, src_base + SRC_SCR);
-> -
-> -	/* clear persistent entry register of primary core */
-> -	writel_relaxed(0, src_base + SRC_GPR1);
-> -}
-> -
->  void __init imx_src_init(void)
->  {
->  	struct device_node *np;
-> diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-> index 7128e97..e94073f 100644
-> --- a/arch/arm/plat-mxc/include/mach/common.h
-> +++ b/arch/arm/plat-mxc/include/mach/common.h
-> @@ -133,7 +133,6 @@ static inline void imx_smp_prepare(void) {}
->  extern void imx_enable_cpu(int cpu, bool enable);
->  extern void imx_set_cpu_jump(int cpu, void *jump_addr);
->  extern void imx_src_init(void);
-> -extern void imx_src_prepare_restart(void);
->  extern void imx_gpc_init(void);
->  extern void imx_gpc_pre_suspend(void);
->  extern void imx_gpc_post_resume(void);
+>  #if __LINUX_ARM_ARCH__ == 6 || defined(CONFIG_ARM_ERRATA_754327)
+> -#define cpu_relax()			smp_mb()
+> +#define cpu_relax()		do {					\
+> +					asm("nop");			\
+> +					asm("nop");			\
+> +					asm("nop");			\
+> +					asm("nop");			\
+> +					asm("nop");			\
+> +					smp_mb();			\
+> +				} while (0)
+>  #else
+>  #define cpu_relax()			barrier()
+>  #endif
