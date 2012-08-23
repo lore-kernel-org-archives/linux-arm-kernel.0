@@ -1,74 +1,46 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 23 Aug 2012 13:33:00 +0300
-Subject: [PATCH v3 20/23] serial: omap: fix software flow control
+Date: Thu, 23 Aug 2012 13:33:01 +0300
+Subject: [PATCH v3 21/23] serial: omap: remove unnecessary header and add a
+ missing one
 In-Reply-To: <1345717983-18179-1-git-send-email-balbi@ti.com>
 References: <1345717983-18179-1-git-send-email-balbi@ti.com>
-Message-ID: <1345717983-18179-21-git-send-email-balbi@ti.com>
+Message-ID: <1345717983-18179-22-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vikram Pandita <vikram.pandita@ti.com>
+this driver doesn't use any from <plat/dmtimer.h>, so
+we can remove it without any problems.
 
-Software flow control register bits were not defined correctly.
+This will, however cause a problem because omap-serial.c
+was relying on indirect inclusion of <linux/platform_device.h>,
+let's fix the issue by including <linux/platform_device.h>
+on omap-serial.c as it should be.
 
-Also clarify the IXON and IXOFF logic to reflect what userspace wants.
-
-Cc: stable at vger.kernel.org
 Tested-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-Signed-off-by: Vikram Pandita <vikram.pandita@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/plat-omap/include/plat/omap-serial.h |  4 ++--
- drivers/tty/serial/omap-serial.c              | 12 ++++++------
- 2 files changed, 8 insertions(+), 8 deletions(-)
+ drivers/tty/serial/omap-serial.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
-index 743ac80..12e6805 100644
---- a/arch/arm/plat-omap/include/plat/omap-serial.h
-+++ b/arch/arm/plat-omap/include/plat/omap-serial.h
-@@ -42,10 +42,10 @@
- #define OMAP_UART_WER_MOD_WKUP	0X7F
- 
- /* Enable XON/XOFF flow control on output */
--#define OMAP_UART_SW_TX		0x04
-+#define OMAP_UART_SW_TX		0x8
- 
- /* Enable XON/XOFF flow control on input */
--#define OMAP_UART_SW_RX		0x04
-+#define OMAP_UART_SW_RX		0x2
- 
- #define OMAP_UART_SYSC_RESET	0X07
- #define OMAP_UART_TCR_TRIG	0X0F
 diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index c3579c0..d49981d 100644
+index d49981d..e5a56cb 100644
 --- a/drivers/tty/serial/omap-serial.c
 +++ b/drivers/tty/serial/omap-serial.c
-@@ -606,19 +606,19 @@ serial_omap_configure_xonxoff
+@@ -32,6 +32,7 @@
+ #include <linux/slab.h>
+ #include <linux/tty.h>
+ #include <linux/tty_flip.h>
++#include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/clk.h>
+ #include <linux/serial_core.h>
+@@ -39,7 +40,6 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/of.h>
  
- 	/*
- 	 * IXON Flag:
--	 * Enable XON/XOFF flow control on output.
--	 * Transmit XON1, XOFF1
-+	 * Flow control for OMAP.TX
-+	 * OMAP.RX should listen for XON/XOFF
- 	 */
- 	if (termios->c_iflag & IXON)
--		up->efr |= OMAP_UART_SW_TX;
-+		up->efr |= OMAP_UART_SW_RX;
+-#include <plat/dmtimer.h>
+ #include <plat/omap-serial.h>
  
- 	/*
- 	 * IXOFF Flag:
--	 * Enable XON/XOFF flow control on input.
--	 * Receiver compares XON1, XOFF1.
-+	 * Flow control for OMAP.RX
-+	 * OMAP.TX should send XON/XOFF
- 	 */
- 	if (termios->c_iflag & IXOFF)
--		up->efr |= OMAP_UART_SW_RX;
-+		up->efr |= OMAP_UART_SW_TX;
- 
- 	serial_out(up, UART_EFR, up->efr | UART_EFR_ECB);
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
+ #define UART_BUILD_REVISION(x, y)	(((x) << 8) | (y))
 -- 
 1.7.12.rc3
