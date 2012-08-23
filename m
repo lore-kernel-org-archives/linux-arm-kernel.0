@@ -1,21 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 23 Aug 2012 10:40:16 +0000
-Subject: [PATCHv4 0/9] *** ARM: Update arch-vt8500 to Devicetree ***
-In-Reply-To: <1345707346-9035-1-git-send-email-linux@prisktech.co.nz>
-References: <1345707346-9035-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <201208231040.16702.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 23 Aug 2012 11:43:56 +0100
+Subject: [PATCH] ARM: fix cpu_relax() in case of doing dmb
+In-Reply-To: <1345647138-8815-1-git-send-email-shawn.guo@linaro.org>
+References: <1345647138-8815-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120823104356.GA13622@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 23 August 2012, Tony Prisk wrote:
-> Patchset based on Arnd's arm-soc/for-next branch.
-> 
-> 
-> Could I get this reviewed, hopefully for inclusion into v3.7.
+On Wed, Aug 22, 2012 at 03:52:18PM +0100, Shawn Guo wrote:
+> diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
+> index 99afa74..7cc67ce 100644
+> --- a/arch/arm/include/asm/processor.h
+> +++ b/arch/arm/include/asm/processor.h
+> @@ -80,7 +80,14 @@ extern void release_thread(struct task_struct *);
+>  unsigned long get_wchan(struct task_struct *p);
+>  
+>  #if __LINUX_ARM_ARCH__ == 6 || defined(CONFIG_ARM_ERRATA_754327)
+> -#define cpu_relax()			smp_mb()
+> +#define cpu_relax()		do {					\
+> +					asm("nop");			\
+> +					asm("nop");			\
+> +					asm("nop");			\
+> +					asm("nop");			\
+> +					asm("nop");			\
 
-I can take them into the arm-soc tree if there are no new comments.
-For the last two patches, you need to get an Acked-by comment from the
-gpio and clk maintainers, respectively, or you should send them
-the patches for inclusion in those subsystem trees.
+Can you use nop() instead of the explicit asm? Also, I think we should try
+and use some methodology on deciding the number of nops to insert. Without
+having a full handle on the problem at the moment, it would seem that we
+need at least NR_CPUS worth (since the number of spinning secondaries is
+NR_CPUS-1 and they may execute their barriers in lock-step).
 
-	Arnd
+Will
