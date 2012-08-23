@@ -1,34 +1,65 @@
 From: Barry.Song@csr.com (Barry Song)
-Date: Thu, 23 Aug 2012 10:47:51 +0800
-Subject: [PATCH 0/3] pinctrl: sirf: add DT binding pinmux mapping support
-Message-ID: <1345690074-31327-1-git-send-email-Barry.Song@csr.com>
+Date: Thu, 23 Aug 2012 10:47:53 +0800
+Subject: [PATCH 2/3] ARM: PRIMA2: rename prima2-cb.dts to prima2.dtsi as it
+ only has SoC features
+In-Reply-To: <1345690074-31327-1-git-send-email-Barry.Song@csr.com>
+References: <1345690074-31327-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <1345690074-31327-3-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series makes us possible to define pinmux mapping support in board
-specific .dts files directly.
+From: Barry Song <Baohua.Song@csr.com>
 
-As we want to add more SoCs(Marco, Polo) in mach-prima2, we want the dir
-have no trivial PIN_MAP_MUX_GROUP_DEFAULT and pinctrl_register_mappings
-codes.
+The current prima2-cb.dts only includes prima2 SoC feature without board-
+specific descriptions. This patches rename it to dtsi and clean some useless
+content.
 
-we will have a clean mach-prima2/common.c file then.
+Signed-off-by: Barry Song <Barry.Song@csr.com>
+---
+ arch/arm/boot/dts/{prima2-cb.dts => prima2.dtsi} |   22 ++++++++++------------
+ 1 files changed, 10 insertions(+), 12 deletions(-)
+ rename arch/arm/boot/dts/{prima2-cb.dts => prima2.dtsi} (96%)
 
-Barry Song (3):
-  ARM: PRIMA2: add missing interrupts property for pinctrl node
-  ARM: PRIMA2: rename prima2-cb.dts to prima2.dtsi as it only has SoC
-    features
-  pinctrl: sirf: add DT-binding pinmux mapping support
-
- arch/arm/boot/dts/prima2-cb.dts    |  424 ------------------------
- arch/arm/boot/dts/prima2-evb.dts   |   37 ++
- arch/arm/boot/dts/prima2.dtsi      |  640 ++++++++++++++++++++++++++++++++++++
- arch/arm/mach-prima2/Makefile.boot |    2 +
- drivers/pinctrl/pinctrl-sirf.c     |   58 ++++-
- 5 files changed, 736 insertions(+), 425 deletions(-)
- delete mode 100644 arch/arm/boot/dts/prima2-cb.dts
- create mode 100644 arch/arm/boot/dts/prima2-evb.dts
- create mode 100644 arch/arm/boot/dts/prima2.dtsi
+diff --git a/arch/arm/boot/dts/prima2-cb.dts b/arch/arm/boot/dts/prima2.dtsi
+similarity index 96%
+rename from arch/arm/boot/dts/prima2-cb.dts
+rename to arch/arm/boot/dts/prima2.dtsi
+index 4245306..1b716aa 100644
+--- a/arch/arm/boot/dts/prima2-cb.dts
++++ b/arch/arm/boot/dts/prima2.dtsi
+@@ -1,20 +1,18 @@
+-/dts-v1/;
++/*
++ * DTS file for CSR SiRFprimaII SoC
++ *
++ * Copyright (c) 2012 Cambridge Silicon Radio Limited, a CSR plc group company.
++ *
++ * Licensed under GPLv2 or later.
++ */
++
++/include/ "skeleton.dtsi"
+ / {
+-	model = "SiRF Prima2 eVB";
+-	compatible = "sirf,prima2-cb", "sirf,prima2";
++	compatible = "sirf,prima2";
+ 	#address-cells = <1>;
+ 	#size-cells = <1>;
+ 	interrupt-parent = <&intc>;
+ 
+-	memory {
+-		reg = <0x00000000 0x20000000>;
+-	};
+-
+-	chosen {
+-		bootargs = "mem=512M real_root=/dev/mmcblk0p2 console=ttyS0 panel=1 bootsplash=true bpp=16 androidboot.console=ttyS1";
+-		linux,stdout-path = &uart1;
+-	};
+-
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-- 
+1.7.0.4
 
 
 
