@@ -1,54 +1,55 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 23 Aug 2012 11:56:58 -0600
-Subject: [PATCH 4/7] regulator: anatop-regulator: convert to use imx-syscon
- to access anatop register
-In-Reply-To: <20120823061202.GM4011@b20223-02.ap.freescale.net>
-References: <1345619928-15446-1-git-send-email-b29396@freescale.com>
- <1345619928-15446-5-git-send-email-b29396@freescale.com>
- <5035BDBF.9020602@wwwdotorg.org>
- <20120823061202.GM4011@b20223-02.ap.freescale.net>
-Message-ID: <50366EEA.2070200@wwwdotorg.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 23 Aug 2012 14:02:14 -0400 (EDT)
+Subject: [PATCH] ARM: decompressor: reset ttbcr for VMSA ARMv7 cores
+In-Reply-To: <1345744123-4121-1-git-send-email-will.deacon@arm.com>
+References: <1345744123-4121-1-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.02.1208231401460.1754@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2012 12:12 AM, Richard Zhao wrote:
-> On Wed, Aug 22, 2012 at 11:21:03PM -0600, Stephen Warren wrote:
->> On 08/22/2012 01:18 AM, Dong Aisheng wrote:
->>> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
->>
->>> diff --git a/drivers/regulator/anatop-regulator.c b/drivers/regulator/anatop-regulator.c
->>
->>> @@ -109,7 +110,11 @@ static int __devinit anatop_regulator_probe(struct platform_device *pdev)
->>>  	rdesc->ops = &anatop_rops;
->>>  	rdesc->type = REGULATOR_VOLTAGE;
->>>  	rdesc->owner = THIS_MODULE;
->>> -	sreg->mfd = anatopmfd;
->>> +
->>> +	sreg->anatop = of_parse_phandle(np, "fsl,anatop", 0);
->>> +	if (!sreg->anatop)
->>> +		return -ENODEV;
->>
->> In fact, that imx_syscon_lookup function I proposed could even do the
->> of_parse_phandle() internally, so perhaps:
->>
->> foo->syscon_dev = imx_syscon_lookup(np, "fsl,anatop", 0);
->> if (IS_ERR(foo->syscon_dev))
->>     return PTR_ERR(foo->syscon_dev);
->>
->> with imx_syscon_lookup() internally knowing when to return EPROBE_DEFER
->> rather than any other permanent error code (e.g. for missing property,
->> bad phandle, etc.)
->
-> In some case that we access register in machine code, we don't have any
-> phandle. The node is got by find compatible or by path.
+On Thu, 23 Aug 2012, Will Deacon wrote:
 
-That sounds a little odd; why not just use a phandle consistently
-everywhere?
+> When enabling the MMU for ARMv7 CPUs, the decompressor does not touch
+> the ttbcr register, assuming that it will be zeroed (N == 0, EAE == 0).
+> Given that only EAE is defined as 0 for non-secure copies of the
+> register (and a bootloader such as kexec may leave it set to 1 anyway),
+> we should ensure that we reset the register ourselves before turning on
+> the MMU.
+> 
+> This patch zeroes TTBCR.EAE and TTBCR.N prior to enabling the MMU for
+> ARMv7 cores in the decompressor, configuring us exclusively for 32-bit
+> translation tables via TTBR0.
+> 
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Signed-off-by: Matthew Leach <matthew.leach@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Either way though, I could imagine still putting all the lookup code
-into the syscon driver; just have different functions for the different
-lookup methods:
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-imx_syscon_lookup_by_phandle(np, char *property_name)
-imx_syscon_lookup_by_compatible(char *compatible
-imx_syscon_lookup_by_path(char *node_path)
+
+> ---
+>  arch/arm/boot/compressed/head.S |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index b8c64b8..81769c1 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -659,10 +659,14 @@ __armv7_mmu_cache_on:
+>  #ifdef CONFIG_CPU_ENDIAN_BE8
+>  		orr	r0, r0, #1 << 25	@ big-endian page tables
+>  #endif
+> +		mrcne   p15, 0, r6, c2, c0, 2   @ read ttb control reg
+>  		orrne	r0, r0, #1		@ MMU enabled
+>  		movne	r1, #0xfffffffd		@ domain 0 = client
+> +		bic     r6, r6, #1 << 31        @ 32-bit translation system
+> +		bic     r6, r6, #3 << 0         @ use only ttbr0
+>  		mcrne	p15, 0, r3, c2, c0, 0	@ load page table pointer
+>  		mcrne	p15, 0, r1, c3, c0, 0	@ load domain access control
+> +		mcrne   p15, 0, r6, c2, c0, 2   @ load ttb control
+>  #endif
+>  		mcr	p15, 0, r0, c7, c5, 4	@ ISB
+>  		mcr	p15, 0, r0, c1, c0, 0	@ load control register
+> -- 
+> 1.7.4.1
+> 
