@@ -1,54 +1,44 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 23 Aug 2012 16:54:09 +0300
-Subject: [PATCH] ARM: omap_hwmod: Fix up resource names when booted with
- devicetree
-Message-ID: <1345730049-12675-1-git-send-email-peter.ujfalusi@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 23 Aug 2012 21:58:09 +0800
+Subject: [PATCH] ARM: fix cpu_relax() in case of doing dmb
+In-Reply-To: <20120823104356.GA13622@mudshark.cambridge.arm.com>
+References: <1345647138-8815-1-git-send-email-shawn.guo@linaro.org>
+ <20120823104356.GA13622@mudshark.cambridge.arm.com>
+Message-ID: <20120823135806.GG24242@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booted with some resource will have their name set to NULL. This can
-cause later kernel crash since this is not expected by the platform code.
+On Thu, Aug 23, 2012 at 11:43:56AM +0100, Will Deacon wrote:
+> On Wed, Aug 22, 2012 at 03:52:18PM +0100, Shawn Guo wrote:
+> > diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
+> > index 99afa74..7cc67ce 100644
+> > --- a/arch/arm/include/asm/processor.h
+> > +++ b/arch/arm/include/asm/processor.h
+> > @@ -80,7 +80,14 @@ extern void release_thread(struct task_struct *);
+> >  unsigned long get_wchan(struct task_struct *p);
+> >  
+> >  #if __LINUX_ARM_ARCH__ == 6 || defined(CONFIG_ARM_ERRATA_754327)
+> > -#define cpu_relax()			smp_mb()
+> > +#define cpu_relax()		do {					\
+> > +					asm("nop");			\
+> > +					asm("nop");			\
+> > +					asm("nop");			\
+> > +					asm("nop");			\
+> > +					asm("nop");			\
+> 
+> Can you use nop() instead of the explicit asm?
 
-When we boot without DT the devices are created with platform_device_add()
-which itself fixes up the missing resource names:
-if (r->name == NULL)
-	r->name = dev_name(&pdev->dev);
+Yes.  I just tried, and it works too.
 
-The of core also fixes up the resource names when taking the information
-from DT data - in __of_address_to_resource():
-r->name = name ? name : dev->full_name;
+> Also, I think we should try
+> and use some methodology on deciding the number of nops to insert. Without
+> having a full handle on the problem at the moment, it would seem that we
+> need at least NR_CPUS worth (since the number of spinning secondaries is
+> NR_CPUS-1 and they may execute their barriers in lock-step).
+> 
+I'm not sure we get something like that.  In my testing here, I need
+at least 5 nops to get rid of the issue.
 
-When we boot OMAP with devicetree: of will create the devices based on the
-DT data so the resource names are guarantied to be not NULL. Since we have
-the 'ti,hwmod' tag, we remove the of created resources from the device and
-re-create them based on hwmod data. If the hwmod data does not specify a
-name for a resource it will be NULL.
-This can cause kernel crash if the driver uses
-platform_get_resource_byname() to get any resource.
-
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/plat-omap/omap_device.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index c490240..ff57b5a 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -370,6 +370,14 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
- 		goto odbfd_exit1;
- 	}
- 
-+	/* Fix up missing resource names */
-+	for (i = 0; i < pdev->num_resources; i++) {
-+		struct resource *r = &pdev->resource[i];
-+
-+		if (r->name == NULL)
-+			r->name = dev_name(&pdev->dev);
-+	}
-+
- 	if (of_get_property(node, "ti,no_idle_on_suspend", NULL))
- 		omap_device_disable_idle_on_suspend(pdev);
- 
 -- 
-1.7.8.6
+Regards,
+Shawn
