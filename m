@@ -1,9 +1,9 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 23 Aug 2012 14:44:38 +0200
+Date: Thu, 23 Aug 2012 14:51:25 +0200
 Subject: [PATCH] atmel-ssc: include linux/io.h for raw io
 In-Reply-To: <1344887950-25596-1-git-send-email-joachim.eastwood@jotron.com>
 References: <1344887950-25596-1-git-send-email-joachim.eastwood@jotron.com>
-Message-ID: <503625B6.1090204@atmel.com>
+Message-ID: <5036274D.8000803@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,12 +16,15 @@ On 08/13/2012 09:59 PM, Joachim Eastwood :
 > sound/soc/atmel/atmel_ssc_dai.c:171: error: implicit declaration of function '__raw_readl'
 > sound/soc/atmel/atmel_ssc_dai.c: In function 'atmel_ssc_shutdown':
 > sound/soc/atmel/atmel_ssc_dai.c:249: error: implicit declaration of function '__raw_writel'
-> 
+>
 > Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
 
-Added to at91-fixes for 3.6. Thanks!
+Liam, Mark,
 
-Arnd, can I queue this one in my upcoming pull-request to you?
+May I have your Acked-by for this patch, I plan to queue it with my
+other at91-related fixes in arm-soc tree?
+
+Thanks, best regards,
 
 > ---
 >  include/linux/atmel-ssc.h | 1 +
