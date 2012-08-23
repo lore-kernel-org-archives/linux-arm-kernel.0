@@ -1,24 +1,18 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Thu, 23 Aug 2012 05:22:39 -0700
-Subject: [V4 3/4] power_supply: Enable battery-charger for 88pm860x
-In-Reply-To: <CACDDiy-ZzUxi4MvjELwHzYC+AxF0b0+LuOh=JdFBBgSA2ijjNw@mail.gmail.com>
-References: <20120714081254.GD20018@lizard>
- <1343377636-16128-1-git-send-email-jtzhou@marvell.com>
- <20120823034815.GB16674@lizard> <20120823044348.GA415@lizard>
- <CACDDiy-ZzUxi4MvjELwHzYC+AxF0b0+LuOh=JdFBBgSA2ijjNw@mail.gmail.com>
-Message-ID: <20120823122239.GA29485@lizard>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 23 Aug 2012 15:25:45 +0300
+Subject: [PATCH] ARM: OMAP2+: twl-common: Fix compile time error when
+ omap-twl4030 audio is not enabled
+In-Reply-To: <20120823112204.GY7995@opensource.wolfsonmicro.com>
+References: <1345703701-27283-1-git-send-email-peter.ujfalusi@ti.com>
+ <20120823112204.GY7995@opensource.wolfsonmicro.com>
+Message-ID: <50362149.6020107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 05:06:22PM +0800, jett zhou wrote:
-> Thanks for helping me to amend these patch.  I got many good
-> suggestions and learn a lot in this process:) BTW, you mean you will
-> help to amend that several minor warning with battery tree?
+On 08/23/2012 02:22 PM, Mark Brown wrote:
+> Which branch needs this?
 
-Yup, I have these small fixups locally in my tree already, so if/once
-Samuel gives me an Ack for the mfd part, I'll merge it into battery git
-tree.
+for-3.7, for-next and topic/omap needs this patch.
 
-Thanks,
-
-Anton.
+-- 
+P?ter
