@@ -1,31 +1,78 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 23 Aug 2012 09:51:29 -0700
-Subject: [PATCH] ARM: omap: add dtb targets
-Message-ID: <1345740689-21676-1-git-send-email-olof@lixom.net>
+From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
+Date: Thu, 23 Aug 2012 18:57:05 +0200 (CEST)
+Subject: [PATCH] pwm: Call pwm_enable() before pwm_config()
+In-Reply-To: <50364FA4.7000401@metafoo.de>
+Message-ID: <36966374.2768747.1345741025741.JavaMail.root@advansee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Makes it easier to just do 'make dtbs' for whatever the kernel was
-configured for, just like some other platforms.
+On Thursday, August 23, 2012 5:43:32 PM, Lars-Peter Clausen wrote:
+> On 08/23/2012 04:19 PM, Beno?t Th?baudeau wrote:
+> > Some PWM drivers enable the clock of the PWM peripheral in
+> > pwm_enable(). Hence,
+> > for these drivers, a call to pwm_config() does not have any effect
+> > before
+> > pwm_enable() has been called.
+> > 
+> > This patch fixes the PWM users to make sure that they call
+> > pwm_enable() before
+> > pwm_config().
+> > 
+> > This fixes the first setting of brightness through sysfs that had
+> > no effect with
+> > leds-pwm and the i.MX PWM driver.
+> 
+> But isn't this a bug in the PWM peripheral driver? With this change
+> the PWM
+> will start with the old settings first. While this is not so much of
+> a problem
+> for a backlight (although it might cause a short flickering) it might
+> cause
+> problems for other applications, like using the PWM pin as a timing
+> generator.
+> In my opinion it's better to fix the PWM peripheral drivers which
+> have this
+> problem instead of trying to work around it in every user of the PWM
+> API.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- arch/arm/mach-omap2/Makefile.boot | 6 ++++++
- 1 file changed, 6 insertions(+)
+I don't know. See my detailed description of this issue here:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-August/115667.html
 
-diff --git a/arch/arm/mach-omap2/Makefile.boot b/arch/arm/mach-omap2/Makefile.boot
-index b03e562..6cf1c2d 100644
---- a/arch/arm/mach-omap2/Makefile.boot
-+++ b/arch/arm/mach-omap2/Makefile.boot
-@@ -1,3 +1,9 @@
-   zreladdr-y		+= 0x80008000
- params_phys-y		:= 0x80000100
- initrd_phys-y		:= 0x80800000
-+
-+dtb-$(CONFIG_SOC_OMAP2420)	+= omap2420-h4.dtb
-+dtb-$(CONFIG_ARCH_OMAP3)	+= omap3-beagle.dtb omap3-evm.dtb
-+dtb-$(CONFIG_ARCH_OMAP4)	+= omap4-panda.dtb omap4-pandaES.dtb
-+dtb-$(CONFIG_ARCH_OMAP4)	+= omap4-var_som.dtb omap4-sdp.dtb
-+dtb-$(CONFIG_SOC_OMAP5)		+= omap5-evm.dtb
--- 
-1.7.10.1.488.g05fbf7a
+Where the bug is depends on the detailed definition of the PWM API, which I
+don't find documented anywhere.
+
+If pwm_enable() means "start PWM timer with the configured settings", then the
+bug is in the drivers. If it means "enable the PWM peripheral so that we can
+work with it", then the bug is in the PWM users.
+
+I don't really have time to work on this, so I suggested this patch as a simple
+solution. Otherwise, it means reworking several PWM drivers for different
+hardware that is not available to everyone for testing.
+
+If we decide to only change the i.MX PWM driver, the fix would be:
+pwm_config()
+{
+        save passed config in private data;
+        if (pwm enabled)
+                apply passed config;
+}
+
+pwm_enable()
+{
+        if (!(pwm enabled)) {
+                enable pwm ip clk;
+                apply config from private data;
+        }
+}
+
+If we fix only this driver, we must not forget that the same issue probably
+exists with several other PWM drivers.
+
+As I said in my bug description, the PWM users set the duty cycle to 0 before
+calling pwm_disable(), so fixing the PWM users should not be an issue, even in
+the timing generator use case you're talking about.
+
+I don't have a strong opinion about what should be fixed here.
+
+Best regards,
+Beno?t
