@@ -1,56 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 23 Aug 2012 20:06:35 +0900
-Subject: [GIT PULL] Samsung fixes for v3.6
-Message-ID: <1d5f01cd811f$5c5de8c0$1519ba40$%kim@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 23 Aug 2012 12:06:47 +0100
+Subject: [PATCH 1/7] mfd: add imx syscon driver based on regmap
+In-Reply-To: <20120823072629.GG10057@shlinux2.ap.freescale.net>
+References: <1345619928-15446-1-git-send-email-b29396@freescale.com>
+ <1345619928-15446-2-git-send-email-b29396@freescale.com>
+ <20120822160241.GR7995@opensource.wolfsonmicro.com>
+ <20120823072629.GG10057@shlinux2.ap.freescale.net>
+Message-ID: <20120823110647.GU7995@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Thu, Aug 23, 2012 at 03:26:30PM +0800, Dong Aisheng wrote:
+> On Thu, Aug 23, 2012 at 12:02:41AM +0800, Mark Brown wrote:
 
-Here are Samsung fixes for v3.6
+> > It'd be good to provide a way of retrieving the regmap so that drivers
+> > for subsystems with generic regmap code could use the framework features
+> > (regulator is one example that I just mentioned in my other mail).
 
-For HDMI, already HDMI support for EXYNOS in mainline kernel is broken
-because its configuration moved to platform data but regarding platform data
-didn't support yet. And others are for fix warnings.
+> Do you mean something like:
+> regmap = syscon_regmap_dev_lookup(np, "fsl,anatop");
+> regmap_write(regmap, reg, val);
 
-If any problems, please kindly let me know.
+> Then drivers can use generic regmap framework features rather than depend
+> on what imx-syscon implemented, is that correct?
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-The following changes since commit 0d7614f09c1ebdbaa1599a5aba7593f147bf96ee:
-
-  Linux 3.6-rc1 (2012-08-02 16:38:10 -0700)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-v3.6-samsung-fixes-1
-
-Heiko Stuebner (2):
-      ARM: S3C24XX: Add missing DMACH_DT_PROP
-      ARM: S3C24XX: Fix s3c2410_dma_enqueue parameters
-
-Sachin Kamat (3):
-      ARM: Samsung: Make uart_save static in pm.c file
-      ARM: SAMSUNG: Set HDMI platform data for Exynos4x12 SoCs
-      ARM: EXYNOS: Set HDMI platform data in SMDKV310
-
-Tushar Behera (2):
-      ARM: SAMSUNG: Add API to set platform data for s5p-tv driver
-      ARM: EXYNOS: Set HDMI platform data in Origen board
-
- arch/arm/mach-exynos/mach-origen.c        |    7 +++++++
- arch/arm/mach-exynos/mach-smdkv310.c      |    7 +++++++
- arch/arm/mach-s3c24xx/include/mach/dma.h  |    3 ++-
- arch/arm/plat-s3c24xx/dma.c               |    2 +-
- arch/arm/plat-samsung/devs.c              |   29
-++++++++++++++++++++++++++++-
- arch/arm/plat-samsung/include/plat/hdmi.h |   16 ++++++++++++++++
- arch/arm/plat-samsung/pm.c                |    2 +-
- 7 files changed, 62 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/plat-samsung/include/plat/hdmi.h
+Yes, this is mainly for cases where the subsystem has helper functions
+that can work with regmap.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120823/0ada1439/attachment.sig>
