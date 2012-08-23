@@ -1,563 +1,65 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 23 Aug 2012 19:35:37 +1200
-Subject: [PATCHv4 1/9] arm: vt8500: Add device tree files for VIA/Wondermedia
- SoC's
-In-Reply-To: <1345707346-9035-1-git-send-email-linux@prisktech.co.nz>
-References: <1345707346-9035-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1345707346-9035-2-git-send-email-linux@prisktech.co.nz>
+From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
+Date: Thu, 23 Aug 2012 10:41:29 +0300
+Subject: JFFS2 issue with v3.5.x and later on Atmel chips at least (was:
+ Kernel oops since v3.5.x on Atmel chips)
+In-Reply-To: <5034F3F8.9080802@atmel.com>
+References: <5034B45A.5060107@atmel.com> <5034F3F8.9080802@atmel.com>
+Message-ID: <1345707689.2848.203.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree files for VT8500, WM8505 and WM8650 SoC's and
-reference boards.
+From: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+Date: Thu, 23 Aug 2012 10:10:07 +0300
+Subject: [PATCH] JFFS2: fix unmount regression
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+This patch fixes regression introduced by
+"8bdc81c jffs2: get rid of jffs2_sync_super". We submit a delayed work in order
+to make sure the write-buffer is synchronized at some point. But we do not
+flush it when we unmount, which causes an oops when we unmount the file-system
+and then the delayed work is executed.
+
+This patch fixes the issue by adding a "cancel_delayed_work_sync()" infocation
+in the '->sync_fs()' handler. This will make sure the delayed work is canceled
+on sync, unmount and re-mount. And because VFS always callse 'sync_fs()' before
+unmounting or remounting, this fixes the issue.
+
+Reported-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Cc: stable at vger.kernel.org [3.5+]
+Signed-off-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
 ---
- arch/arm/boot/dts/vt8500-bv07.dts |   31 ++++++++
- arch/arm/boot/dts/vt8500.dtsi     |  115 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/wm8505-ref.dts  |   31 ++++++++
- arch/arm/boot/dts/wm8505.dtsi     |  142 ++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/wm8650-mid.dts  |   31 ++++++++
- arch/arm/boot/dts/wm8650.dtsi     |  146 +++++++++++++++++++++++++++++++++++++
- 6 files changed, 496 insertions(+)
- create mode 100644 arch/arm/boot/dts/vt8500-bv07.dts
- create mode 100644 arch/arm/boot/dts/vt8500.dtsi
- create mode 100644 arch/arm/boot/dts/wm8505-ref.dts
- create mode 100644 arch/arm/boot/dts/wm8505.dtsi
- create mode 100644 arch/arm/boot/dts/wm8650-mid.dts
- create mode 100644 arch/arm/boot/dts/wm8650.dtsi
 
-diff --git a/arch/arm/boot/dts/vt8500-bv07.dts b/arch/arm/boot/dts/vt8500-bv07.dts
-new file mode 100644
-index 0000000..339a664
---- /dev/null
-+++ b/arch/arm/boot/dts/vt8500-bv07.dts
-@@ -0,0 +1,31 @@
-+/*
-+ * vt8500-bv07.dts - Device tree file for Benign BV07 Netbook
-+ *
-+ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
-+ *
-+ * Licensed under GPLv2 or later
-+ */
-+
-+/dts-v1/;
-+/include/ "vt8500.dtsi"
-+
-+/ {
-+	model = "Benign BV07 Netbook";
-+
-+	/*
-+	 * Display node is based on Sascha Hauer's patch on dri-devel.
-+	 * Added a bpp property to calculate the size of the framebuffer
-+	 * until the binding is formalized.
-+	 */
-+	display: display {
-+		xres = <800>;
-+		yres = <480>;
-+		left-margin = <88>;
-+		right-margin = <40>;
-+		hsync-len = <0>;
-+		upper-margin = <32>;
-+		lower-margin = <11>;
-+		vsync-len = <1>;
-+		bpp = <16>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/vt8500.dtsi b/arch/arm/boot/dts/vt8500.dtsi
-new file mode 100644
-index 0000000..17a1d0d
---- /dev/null
-+++ b/arch/arm/boot/dts/vt8500.dtsi
-@@ -0,0 +1,115 @@
-+/*
-+ * vt8500.dtsi - Device tree file for VIA VT8500 SoC
-+ *
-+ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
-+ *
-+ * Licensed under GPLv2 or later
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "via,vt8500";
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges;
-+		interrupt-parent = <&intc>;
-+
-+		intc: interrupt-controller at d8140000 {
-+			compatible = "via,vt8500-intc";
-+			interrupt-controller;
-+			reg = <0xd8140000 0x10000>;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		gpio: gpio-controller at d8110000 {
-+			compatible = "via,vt8500-gpio";
-+			gpio-controller;
-+			reg = <0xd8110000 0x10000>;
-+			#gpio-cells = <3>;
-+		};
-+
-+		pmc at d8130000 {
-+			compatible = "via,vt8500-pmc";
-+			reg = <0xd8130000 0x1000>;
-+
-+			clocks {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				ref24: ref24M {
-+					#clock-cells = <0>;
-+					compatible = "fixed-clock";
-+					clock-frequency = <24000000>;
-+				};
-+			};
-+		};
-+
-+		timer at d8130100 {
-+			compatible = "via,vt8500-timer";
-+			reg = <0xd8130100 0x28>;
-+			interrupts = <36>;
-+		};
-+
-+		ehci at d8007900 {
-+			compatible = "via,vt8500-ehci";
-+			reg = <0xd8007900 0x200>;
-+			interrupts = <43>;
-+		};
-+
-+		uhci at d8007b00 {
-+			compatible = "platform-uhci";
-+			reg = <0xd8007b00 0x200>;
-+			interrupts = <43>;
-+		};
-+
-+		fb at d800e400 {
-+			compatible = "via,vt8500-fb";
-+			reg = <0xd800e400 0x400>;
-+			interrupts = <12>;
-+			via,display = <&display>;
-+		};
-+
-+		ge_rops at d8050400 {
-+			compatible = "wm,prizm-ge-rops";
-+			reg = <0xd8050400 0x100>;
-+		};
-+
-+		uart at d8200000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd8200000 0x1040>;
-+			interrupts = <32>;
-+			clocks = <&ref24>;
-+		};
-+
-+		uart at d82b0000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd82b0000 0x1040>;
-+			interrupts = <33>;
-+			clocks = <&ref24>;
-+		};
-+
-+		uart at d8210000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd8210000 0x1040>;
-+			interrupts = <47>;
-+			clocks = <&ref24>;
-+		};
-+
-+		uart at d82c0000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd82c0000 0x1040>;
-+			interrupts = <50>;
-+			clocks = <&ref24>;
-+		};
-+
-+		rtc at d8100000 {
-+			compatible = "via,vt8500-rtc";
-+			reg = <0xd8100000 0x10000>;
-+			interrupts = <48>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/wm8505-ref.dts b/arch/arm/boot/dts/wm8505-ref.dts
-new file mode 100644
-index 0000000..fcd9836
---- /dev/null
-+++ b/arch/arm/boot/dts/wm8505-ref.dts
-@@ -0,0 +1,31 @@
-+/*
-+ * wm8505-ref.dts - Device tree file for Wondermedia WM8505 reference netbook
-+ *
-+ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
-+ *
-+ * Licensed under GPLv2 or later
-+ */
-+
-+/dts-v1/;
-+/include/ "wm8505.dtsi"
-+
-+/ {
-+	model = "Wondermedia WM8505 Netbook";
-+
-+	/*
-+	 * Display node is based on Sascha Hauer's patch on dri-devel.
-+	 * Added a bpp property to calculate the size of the framebuffer
-+	 * until the binding is formalized.
-+	 */
-+	display: display {
-+		xres = <800>;
-+		yres = <480>;
-+		left-margin = <88>;
-+		right-margin = <40>;
-+		hsync-len = <0>;
-+		upper-margin = <32>;
-+		lower-margin = <11>;
-+		vsync-len = <1>;
-+		bpp = <32>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/wm8505.dtsi b/arch/arm/boot/dts/wm8505.dtsi
-new file mode 100644
-index 0000000..aa6d492
---- /dev/null
-+++ b/arch/arm/boot/dts/wm8505.dtsi
-@@ -0,0 +1,142 @@
-+/*
-+ * wm8505.dtsi - Device tree file for Wondermedia WM8505 SoC
-+ *
-+ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
-+ *
-+ * Licensed under GPLv2 or later
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "wm,wm8505";
-+
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,arm926ejs";
-+		};
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges;
-+		interrupt-parent = <&intc0>;
-+
-+		intc0: interrupt-controller at d8140000 {
-+			compatible = "via,vt8500-intc";
-+			interrupt-controller;
-+			reg = <0xd8140000 0x10000>;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		/* Secondary IC cascaded to intc0 */
-+		intc1: interrupt-controller at d8150000 {
-+			compatible = "via,vt8500-intc";
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			reg = <0xD8150000 0x10000>;
-+			interrupts = <56 57 58 59 60 61 62 63>;
-+		};
-+
-+		gpio: gpio-controller at d8110000 {
-+			compatible = "wm,wm8505-gpio";
-+			gpio-controller;
-+			reg = <0xd8110000 0x10000>;
-+			#gpio-cells = <3>;
-+		};
-+
-+		pmc at d8130000 {
-+			compatible = "via,vt8500-pmc";
-+			reg = <0xd8130000 0x1000>;
-+			clocks {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				ref24: ref24M {
-+					#clock-cells = <0>;
-+					compatible = "fixed-clock";
-+					clock-frequency = <24000000>;
-+				};
-+			};
-+		};
-+
-+		timer at d8130100 {
-+			compatible = "via,vt8500-timer";
-+			reg = <0xd8130100 0x28>;
-+			interrupts = <36>;
-+		};
-+
-+		ehci at d8007100 {
-+			compatible = "via,vt8500-ehci";
-+			reg = <0xd8007100 0x200>;
-+			interrupts = <43>;
-+		};
-+
-+		uhci at d8007300 {
-+			compatible = "platform-uhci";
-+			reg = <0xd8007300 0x200>;
-+			interrupts = <43>;
-+		};
-+
-+		fb at d8050800 {
-+			compatible = "wm,wm8505-fb";
-+			reg = <0xd8050800 0x200>;
-+			via,display = <&display>;
-+		};
-+
-+		ge_rops at d8050400 {
-+			compatible = "wm,prizm-ge-rops";
-+			reg = <0xd8050400 0x100>;
-+		};
-+
-+		uart at d8200000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd8200000 0x1040>;
-+			interrupts = <32>;
-+			clocks = <&ref24>;
-+		};
-+
-+		uart at d82b0000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd82b0000 0x1040>;
-+			interrupts = <33>;
-+			clocks = <&ref24>;
-+		};
-+
-+		uart at d8210000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd8210000 0x1040>;
-+			interrupts = <47>;
-+			clocks = <&ref24>;
-+		};
-+
-+		uart at d82c0000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd82c0000 0x1040>;
-+			interrupts = <50>;
-+			clocks = <&ref24>;
-+		};
-+
-+		uart at d8370000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd8370000 0x1040>;
-+			interrupts = <31>;
-+			clocks = <&ref24>;
-+		};
-+
-+		uart at d8380000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd8380000 0x1040>;
-+			interrupts = <30>;
-+			clocks = <&ref24>;
-+		};
-+
-+		rtc at d8100000 {
-+			compatible = "via,vt8500-rtc";
-+			reg = <0xd8100000 0x10000>;
-+			interrupts = <48>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/wm8650-mid.dts b/arch/arm/boot/dts/wm8650-mid.dts
-new file mode 100644
-index 0000000..d37dbf0
---- /dev/null
-+++ b/arch/arm/boot/dts/wm8650-mid.dts
-@@ -0,0 +1,31 @@
-+/*
-+ * wm8650-mid.dts - Device tree file for Wondermedia WM8650-MID Tablet
-+ *
-+ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
-+ *
-+ * Licensed under GPLv2 or later
-+ */
-+
-+/dts-v1/;
-+/include/ "wm8650.dtsi"
-+
-+/ {
-+	model = "Wondermedia WM8650-MID Tablet";
-+
-+	/*
-+	 * Display node is based on Sascha Hauer's patch on dri-devel.
-+	 * Added a bpp property to calculate the size of the framebuffer
-+	 * until the binding is formalized.
-+	 */
-+	display: display {
-+		xres = <800>;
-+		yres = <480>;
-+		left-margin = <88>;
-+		right-margin = <40>;
-+		hsync-len = <0>;
-+		upper-margin = <32>;
-+		lower-margin = <11>;
-+		vsync-len = <1>;
-+		bpp = <16>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/wm8650.dtsi b/arch/arm/boot/dts/wm8650.dtsi
-new file mode 100644
-index 0000000..372a734
---- /dev/null
-+++ b/arch/arm/boot/dts/wm8650.dtsi
-@@ -0,0 +1,146 @@
-+/*
-+ * wm8650.dtsi - Device tree file for Wondermedia WM8650 SoC
-+ *
-+ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
-+ *
-+ * Licensed under GPLv2 or later
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	compatible = "wm,wm8650";
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges;
-+		interrupt-parent = <&intc0>;
-+
-+		intc0: interrupt-controller at d8140000 {
-+			compatible = "via,vt8500-intc";
-+			interrupt-controller;
-+			reg = <0xd8140000 0x10000>;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		/* Secondary IC cascaded to intc0 */
-+		intc1: interrupt-controller at d8150000 {
-+			compatible = "via,vt8500-intc";
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			reg = <0xD8150000 0x10000>;
-+			interrupts = <56 57 58 59 60 61 62 63>;
-+		};
-+
-+		gpio: gpio-controller at d8110000 {
-+			compatible = "wm,wm8650-gpio";
-+			gpio-controller;
-+			reg = <0xd8110000 0x10000>;
-+			#gpio-cells = <3>;
-+		};
-+
-+		pmc at d8130000 {
-+			compatible = "via,vt8500-pmc";
-+			reg = <0xd8130000 0x1000>;
-+
-+			clocks {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				ref25: ref25M {
-+					#clock-cells = <0>;
-+					compatible = "fixed-clock";
-+					clock-frequency = <25000000>;
-+				};
-+
-+				ref24: ref24M {
-+					#clock-cells = <0>;
-+					compatible = "fixed-clock";
-+					clock-frequency = <24000000>;
-+				};
-+
-+				plla: plla {
-+					#clock-cells = <0>;
-+					compatible = "wm,wm8650-pll-clock";
-+					clocks = <&ref25>;
-+					reg = <0x200>;
-+				};
-+
-+				pllb: pllb {
-+					#clock-cells = <0>;
-+					compatible = "wm,wm8650-pll-clock";
-+					clocks = <&ref25>;
-+					reg = <0x204>;
-+				};
-+
-+				arm: arm {
-+					#clock-cells = <0>;
-+					compatible = "via,vt8500-device-clock";
-+					clocks = <&plla>;
-+					divisor-reg = <0x300>;
-+				};
-+
-+				sdhc: sdhc {
-+					#clock-cells = <0>;
-+					compatible = "via,vt8500-device-clock";
-+					clocks = <&pllb>;
-+					divisor-reg = <0x328>;
-+					divisor-mask = <0x3f>;
-+					enable-reg = <0x254>;
-+					enable-bit = <18>;
-+				};
-+			};
-+		};
-+
-+		timer at d8130100 {
-+			compatible = "via,vt8500-timer";
-+			reg = <0xd8130100 0x28>;
-+			interrupts = <36>;
-+		};
-+
-+		ehci at d8007900 {
-+			compatible = "via,vt8500-ehci";
-+			reg = <0xd8007900 0x200>;
-+			interrupts = <43>;
-+		};
-+
-+		uhci at d8007b00 {
-+			compatible = "platform-uhci";
-+			reg = <0xd8007b00 0x200>;
-+			interrupts = <43>;
-+		};
-+
-+		fb at d8050800 {
-+			compatible = "wm,wm8505-fb";
-+			reg = <0xd8050800 0x200>;
-+			via,display = <&display>;
-+		};
-+
-+		ge_rops at d8050400 {
-+			compatible = "wm,prizm-ge-rops";
-+			reg = <0xd8050400 0x100>;
-+		};
-+
-+		uart at d8200000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd8200000 0x1040>;
-+			interrupts = <32>;
-+			clocks = <&ref24>;
-+		};
-+
-+		uart at d82b0000 {
-+			compatible = "via,vt8500-uart";
-+			reg = <0xd82b0000 0x1040>;
-+			interrupts = <33>;
-+			clocks = <&ref24>;
-+		};
-+
-+		rtc at d8100000 {
-+			compatible = "via,vt8500-rtc";
-+			reg = <0xd8100000 0x10000>;
-+			interrupts = <48>;
-+		};
-+	};
-+};
+Ludovic, would you please give this patch a test? Also attached.
+
+ fs/jffs2/super.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/fs/jffs2/super.c b/fs/jffs2/super.c
+index 61ea413..e385fa3 100644
+--- a/fs/jffs2/super.c
++++ b/fs/jffs2/super.c
+@@ -100,6 +100,9 @@ static int jffs2_sync_fs(struct super_block *sb, int wait)
+ {
+ 	struct jffs2_sb_info *c = JFFS2_SB_INFO(sb);
+ 
++	if (IS_ENABLED(CONFIG_JFFS2_FS_WRITEBUFFER))
++		cancel_delayed_work_sync(&c->wbuf_dwork);
++
+ 	mutex_lock(&c->alloc_sem);
+ 	jffs2_flush_wbuf_pad(c);
+ 	mutex_unlock(&c->alloc_sem);
 -- 
-1.7.9.5
+1.7.10.4
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-JFFS2-fix-unmount-regression.patch
+Type: text/x-patch
+Size: 1538 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120823/238e9a92/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120823/238e9a92/attachment.sig>
