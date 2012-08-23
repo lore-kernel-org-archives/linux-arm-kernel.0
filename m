@@ -1,75 +1,58 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 23 Aug 2012 21:48:54 +0000
-Subject: [PATCHv4 0/9] *** ARM: Update arch-vt8500 to Devicetree ***
-In-Reply-To: <201208231322.23077.arnd@arndb.de>
-References: <1345707346-9035-1-git-send-email-linux@prisktech.co.nz>
- <201208231040.16702.arnd@arndb.de>
- <76F764B079F92A4E843589C893D0A022DAF68C14@SERVER.prisktech.co.nz>
- <201208231322.23077.arnd@arndb.de>
-Message-ID: <1345758702.2061.6.camel@gitbox>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 24 Aug 2012 00:08:45 +0200
+Subject: [PATCH] GPIO: Add support for GPIO on CLPS711X-target platform
+In-Reply-To: <1345635383-12224-1-git-send-email-shc_work@mail.ru>
+References: <1345635383-12224-1-git-send-email-shc_work@mail.ru>
+Message-ID: <CACRpkdZrcBLz+sg-AwWnBD0SA697uWQzocUYnbC1nPYG14LYyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-08-23 at 13:22 +0000, Arnd Bergmann wrote:
-> On Thursday 23 August 2012, Tony Prisk wrote:
-> > >On Thursday 23 August 2012, Tony Prisk wrote:
-> 
-> > 
-> > Without the clock patch (9/9), the mach-vt8500 patch (6/9) won't compile
-> > due to unresolved symbols.
-> > 
-> > In arch/arm/mach-vt8500/vt8500.c - you will get an unresolved symbol
-> > for 'vtwm_clk_init'
-> > 
-> > Not sure if this matters, thought I should point it out.
-> > Does it need to compile cleanly in your tree (which is what I would assume),
-> > or just once its all combined in -next?
-> > Does it matter that the usb patches are already in -next?
-> > 
-> > I don't really understand the requirements around submitting to individual
-> > trees and which (if any) of these points are actually issues.
-> 
-> The rule is that each changeset should be free of regressions compared
-> to the version before. So if you have a set of 7 patches in one branch
-> that you want me to pick up, the result after applying those 7 patches
-> should work, and each previous step should also work. You cannot for
-> instance add a call to a function in one patch and then provide that
-> function in the following patch.
-> 
-> There are multiple ways to achieve this:
-> 
-> * when you have dependencies, get everything merged through one
-> maintainer tree, and get Acks for each patch that belongs to another
-> maintainer.
-> 
-> * submit a branch with the patches that other stuff depends on to
-> both the subsystem maintainer who is responsible for it and to
-> the subsystem maintainer who gets the other patches that are built
-> on top of this branch. If you do this, you have to make sure that
-> the first branch never gets rebased and that the second branch is
-> not sent before the first one is upstream.
-> 
-> * change the code so that no dependencies exist, e.g. by introducing
-> a dummy implementation in one patch and the proper one in another.
-> This can generate merge conflicts, but that's usually ok.
-> 
-> 	Arnd
-> 
+On Wed, Aug 22, 2012 at 1:36 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
 
-I was about to say that if Mike has any issues with the driver that I
-can fix the patch conflict at the same time, but I just realised that
-its more work than I originally thought :)
+> The CLPS711X CPUs provide some GPIOs for use in the system. This
+> driver provides support for these via gpiolib. Due to platform
+> limitations, driver does not support interrupts, only inputs and
+> outputs.
 
-I was going to move the arch-vt8500 part of the clocks patch back into
-the clocks patch - but that will just move the issue from arm-soc to
-clocks because Mike's branch won't have the arch-vt8500 patch so the
-patch will fail.
+OK...
 
-If Mike is OK with it once the clocks driver is reviewed, it will be a
-lot easier for the whole lot to go in via arm-soc, otherwise I can try
-figuring out how to get the arch-vt8500 patch to Mike first, and then
-the clocks patch.
+(...)
+> +#include <mach/hardware.h>
 
+> +struct clps711x_gpio {
+> +       struct gpio_chip        chip[CLPS711X_GPIO_PORTS];
+> +       struct mutex            lock;
+> +};
 
-Regards
-Tony Prisk
+That lock is just protecting a few register reads/writes. Use a
+spinlock instead, it's more apropriate.
+
+(...)
+> +static int gpio_clps711x_get(struct gpio_chip *chip, unsigned offset)
+> +{
+> +       int ret;
+> +       struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
+> +
+> +       mutex_lock(&gpio->lock);
+> +       ret = clps_readb(gpio_clps711x_port_dataaddr(chip)) & (1 << offset);
+> +       mutex_unlock(&gpio->lock);
+> +
+> +       return !!ret;
+> +}
+
+Please get rid of this clps_readb() business. I can see it's just this:
+#define clps_readb(off)         readb(CLPS711X_VIRT_BASE + (off))
+
+This makes stuff hard to understand, please pass the virtual base as
+a memory resource to the platform device, store it in the state holder
+and just use readb() in the driver from that offset.
+
+(...)
+> +static int __devinit gpio_clps711x_probe(struct platform_device *pdev)
+
+This should just be __init, you have made it very certain that this
+cannot be loaded and unloaded at runtime. (No remove function!)
+and its a bool in the Kconfig.
+
+Yours,
+Linus Walleij
