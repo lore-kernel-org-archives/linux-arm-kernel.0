@@ -1,77 +1,17 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Aug 2012 16:01:27 +0100
-Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik I2C
- driver
-In-Reply-To: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
-References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 23 Aug 2012 15:04:48 +0000
+Subject: [GIT PULL] Samsung fixes for v3.6
+In-Reply-To: <1d5f01cd811f$5c5de8c0$1519ba40$%kim@samsung.com>
+References: <1d5f01cd811f$5c5de8c0$1519ba40$%kim@samsung.com>
+Message-ID: <201208231504.49021.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we apply the bindings required for successful Device Tree
-probing of the i2c-nomadik driver.
+On Thursday 23 August 2012, Kukjin Kim wrote:
+> For HDMI, already HDMI support for EXYNOS in mainline kernel is broken
+> because its configuration moved to platform data but regarding platform data
+> didn't support yet. And others are for fix warnings.
 
-Cc: linux-i2c at vger.kernel.org
-Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/i2c/busses/i2c-nomadik.c |   28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+Pulled into fixes branch. Thanks,
 
-diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index 61b00ed..8168389 100644
---- a/drivers/i2c/busses/i2c-nomadik.c
-+++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -25,6 +25,7 @@
- #include <linux/regulator/consumer.h>
- #include <linux/pm_runtime.h>
- #include <linux/platform_data/i2c-nomadik.h>
-+#include <linux/of.h>
- 
- #define DRIVER_NAME "nmk-i2c"
- 
-@@ -920,15 +921,42 @@ static struct nmk_i2c_controller u8500_i2c = {
- 	.sm             = I2C_FREQ_MODE_FAST,
- };
- 
-+static void nmk_i2c_of_probe(struct device_node *np,
-+			struct nmk_i2c_controller *pdata)
-+{
-+	/* Provide the default configuration as a base. */
-+	pdata = &u8500_i2c;
-+
-+	of_property_read_u32(np, "clock-frequency", (u32*)&pdata->clk_freq);
-+
-+	/* This driver only supports 'standard' and 'fast' modes of operation. */
-+	if (pdata->clk_freq <= 100000)
-+		pdata->sm = I2C_FREQ_MODE_STANDARD;
-+	else
-+		pdata->sm = I2C_FREQ_MODE_FAST;
-+}
-+
- static atomic_t adapter_id = ATOMIC_INIT(0);
- 
- static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
- {
- 	int ret = 0;
- 	struct nmk_i2c_controller *pdata = adev->dev.platform_data;
-+	struct device_node *np = adev->dev.of_node;
- 	struct nmk_i2c_dev	*dev;
- 	struct i2c_adapter *adap;
- 
-+	if (np) {
-+		if (!pdata) {
-+			pdata = devm_kzalloc(&adev->dev, sizeof(*pdata), GFP_KERNEL);
-+			if (!pdata) {
-+				ret = -ENOMEM;
-+				goto err_no_mem;
-+			}
-+		}
-+		nmk_i2c_of_probe(np, pdata);
-+	}
-+
- 	if (!pdata)
- 		/* No i2c configuration found, using the default. */
- 		pdata = &u8500_i2c;
--- 
-1.7.9.5
+	Arnd
