@@ -1,36 +1,44 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 23 Aug 2012 14:41:28 +0200
-Subject: [PATCH] arm: dts: remove partial parameter in at91sam9g25ek.dts
-In-Reply-To: <1345191836-16523-1-git-send-email-voice.shen@atmel.com>
-References: <1345191836-16523-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <503624F8.4070906@atmel.com>
+Date: Thu, 23 Aug 2012 14:44:38 +0200
+Subject: [PATCH] atmel-ssc: include linux/io.h for raw io
+In-Reply-To: <1344887950-25596-1-git-send-email-joachim.eastwood@jotron.com>
+References: <1344887950-25596-1-git-send-email-joachim.eastwood@jotron.com>
+Message-ID: <503625B6.1090204@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2012 10:23 AM, Bo Shen :
-> Remove the partial parameter in at91sam9g25ek.dts file
+On 08/13/2012 09:59 PM, Joachim Eastwood :
+> Include linux/io.h for raw io operations in atmel-scc header.
 > 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> This fixes the following build error:
+>   CC [M]  sound/soc/atmel/atmel_ssc_dai.o
+> sound/soc/atmel/atmel_ssc_dai.c: In function 'atmel_ssc_interrupt':
+> sound/soc/atmel/atmel_ssc_dai.c:171: error: implicit declaration of function '__raw_readl'
+> sound/soc/atmel/atmel_ssc_dai.c: In function 'atmel_ssc_shutdown':
+> sound/soc/atmel/atmel_ssc_dai.c:249: error: implicit declaration of function '__raw_writel'
+> 
+> Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
 
-Included in at91-fixes for 3.6: thanks a lot.
+Added to at91-fixes for 3.6. Thanks!
+
+Arnd, can I queue this one in my upcoming pull-request to you?
 
 > ---
->  arch/arm/boot/dts/at91sam9g25ek.dts |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  include/linux/atmel-ssc.h | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
-> index 7829a4d..96514c1 100644
-> --- a/arch/arm/boot/dts/at91sam9g25ek.dts
-> +++ b/arch/arm/boot/dts/at91sam9g25ek.dts
-> @@ -15,7 +15,7 @@
->  	compatible = "atmel,at91sam9g25ek", "atmel,at91sam9x5ek", "atmel,at91sam9x5", "atmel,at91sam9";
+> diff --git a/include/linux/atmel-ssc.h b/include/linux/atmel-ssc.h
+> index 0602339..4eb3175 100644
+> --- a/include/linux/atmel-ssc.h
+> +++ b/include/linux/atmel-ssc.h
+> @@ -3,6 +3,7 @@
 >  
->  	chosen {
-> -		bootargs = "128M console=ttyS0,115200 root=/dev/mtdblock1 rw rootfstype=ubifs ubi.mtd=1 root=ubi0:rootfs";
-> +		bootargs = "console=ttyS0,115200 root=/dev/mtdblock1 rw rootfstype=ubifs ubi.mtd=1 root=ubi0:rootfs";
->  	};
+>  #include <linux/platform_device.h>
+>  #include <linux/list.h>
+> +#include <linux/io.h>
 >  
->  	ahb {
+>  struct ssc_device {
+>  	struct list_head	list;
 > 
 
 
