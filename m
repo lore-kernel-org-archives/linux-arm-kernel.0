@@ -1,88 +1,107 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 23 Aug 2012 14:04:21 -0400 (EDT)
-Subject: [PATCHv4 4/4] ARM: kprobes: make more tests conditional
-In-Reply-To: <201208231209.26707.arnd@arndb.de>
-References: <1345645780-2749-1-git-send-email-arnd@arndb.de>
- <201208221841.29645.arnd@arndb.de> <1345679461.3601.20.camel@computer5.home>
- <201208231209.26707.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1208231403440.1754@xanadu.home>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Thu, 23 Aug 2012 13:04:04 -0500
+Subject: [PATCH 1/2] imx6q: Configure the pwm node for pinmux support
+In-Reply-To: <1345735959-12964-2-git-send-email-hachimi.samir@gmail.com>
+References: <1345735959-12964-2-git-send-email-hachimi.samir@gmail.com>
+Message-ID: <CAKGA1bk86r_0rZQ20S1Zii7UGuhGFSq5GLzcBpPJfyvoEAPfaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Aug 2012, Arnd Bergmann wrote:
+On Thu, Aug 23, 2012 at 10:32 AM,  <hachimi.samir@gmail.com> wrote:
+> From: Samir Hachimi <hachimi.samir@gmail.com>
+>
+>  Add the pinmux support for pwm.
+>  Several pin can be set to PwmO for the same Pwm. This configuration set all
+>  of them when enabled.
+>
+> Signed-off-by: Samir Hachimi <shachimi@adeneo-embedded.com>
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi |   42 ++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 42 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index fd57079..c913b99 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -248,23 +248,35 @@
+>                         };
+>
+>                         pwm at 02080000 { /* PWM1 */
+> +                               pinctrl-names = "default";
+> +                               pinctrl-0 = <&pinctrl_pwm1_1>;
+>                                 reg = <0x02080000 0x4000>;
+>                                 interrupts = <0 83 0x04>;
+> +                               status = "disabled";
+>                         };
+>
+>                         pwm at 02084000 { /* PWM2 */
+> +                               pinctrl-names = "default";
+> +                               pinctrl-0 = <&pinctrl_pwm2_1>;
+>                                 reg = <0x02084000 0x4000>;
+>                                 interrupts = <0 84 0x04>;
+> +                               status = "disabled";
+>                         };
+>
+>                         pwm at 02088000 { /* PWM3 */
+> +                               pinctrl-names = "default";
+> +                               pinctrl-0 = <&pinctrl_pwm3_1>;
+>                                 reg = <0x02088000 0x4000>;
+>                                 interrupts = <0 85 0x04>;
+> +                               status = "disabled";
+>                         };
+>
+>                         pwm at 0208c000 { /* PWM4 */
+> +                               pinctrl-names = "default";
+> +                               pinctrl-0 = <&pinctrl_pwm4_1>;
+>                                 reg = <0x0208c000 0x4000>;
+>                                 interrupts = <0 86 0x04>;
+> +                               status = "disabled";
+>                         };
+>
+>                         flexcan at 02090000 { /* CAN1 */
+> @@ -559,6 +571,36 @@
+>                                         };
+>                                 };
+>
+> +                               pwm1 {
+> +                                       pinctrl_pwm1_1: pwm1grp-1 {
+> +                                               fsl,pins = <1543 0x80000000     /* MX6Q_PAD_SD1_DAT3__PWM1_PWMO */
+> +                                                           574 0x80000000      /* MX6Q_PAD_DISPO_DAT8__PWM1_PWMO */
+> +                                                           971 0x80000000>;    /* MX6Q_PAD_GPIO_9__PWM1_PWMO */
+> +                                       };
+> +                               };
+> +
+> +                               pwm2 {
+> +                                       pinctrl_pwm2_1: pwm2grp-1 {
+> +                                               fsl,pins = <1557 0x80000000     /* MX6Q_PAD_SD1_DAT2__PWM2_PWMO */
+> +                                                           582 0x80000000      /* MX6Q_PAD_DISP0_DAT9__PWM2_PWMO */
+> +                                                           963 0x80000000>;    /* MX6Q_PAD_GPIO_1__PWM2_PWMO */
+> +                                       };
+> +                               };
+> +
+> +                               pwm3 {
+> +                                       pinctrl_pwm3_1: pwm3grp-1 {
+> +                                               fsl,pins = <1471 0x80000000     /* MX6Q_PAD_SD4_DAT1__PWM3_PWMO */
+> +                                                           1526 0x80000000>;   /* MX6Q_PAD_SD1_DAT1__PWM3_PWMO */
+> +                                       };
+> +                               };
+> +
+> +                               pwm4 {
+> +                                       pinctrl_pwm4_1: pwm4grp-1 {
+> +                                               fsl,pins = <1479 0x80000000     /* MX6Q_PAD_SD4_DAT2__PWM4_PWMO */
+> +                                                           1550 0x80000000>;   /* MX6Q_PAD_SD1_CMD__PWM4_PWMO */
+> +                                       };
+> +                               };
+> +
+>                                 usdhc3 {
+>                                         pinctrl_usdhc3_1: usdhc3grp-1 {
+>                                                 fsl,pins = <1273 0x17059        /* MX6Q_PAD_SD3_CMD__USDHC3_CMD */
+> --
+> 1.7.1
 
-> On Wednesday 22 August 2012, Tixy wrote:
-> 
-> > If you do feel so inclined for a v4 however ;-) you could also make the
-> > mls part of the patch tidier by moving the added #endif to instead
-> > terminate the preceding "#if __LINUX_ARM_ARCH__ >= 6", i.e.
-> > 
-> > @@ -367,8 +367,10 @@ void kprobe_arm_test_cases(void)
-> >  	TEST_UNSUPPORTED(".word 0xe0500090 @ undef")
-> >  	TEST_UNSUPPORTED(".word 0xe05fff9f @ undef")
-> > +#endif
-> >  
-> > +#if __LINUX_ARM_ARCH__ >= 7
-> >  	TEST_RRR(  "mls		r0, r",1, VAL1,", r",2, VAL2,", r",3,  VAL3,"")
-> >  	TEST_RRR(  "mlshi	r7, r",8, VAL3,", r",9, VAL1,", r",10, VAL2,"")
-> >  	TEST_RR(   "mls		lr, r",1, VAL2,", r",2, VAL3,", r13")
-> > 
-> > 
-> > this looks funny in patch form, but the resulting source file is more
-> > consistent with other conditional tests.
-> 
-> Ok, here we go.
-> 
-> 	Arnd
-> 
-> 
-> commit abfef4db8731591fbb721262bd4712662aaa6d14
-> Author: Arnd Bergmann <arnd@arndb.de>
-> Date:   Thu Aug 16 07:49:31 2012 +0000
-> 
->     ARM: kprobes: make more tests conditional
->     
->     The mls instruction is not available in ARMv6K or below, so we
->     should make the test conditional on at least ARMv7. ldrexd/strexd
->     are available in ARMv6K or ARMv7, which we can test by checking
->     the CONFIG_CPU_32v6K symbol.
->     
->     /tmp/ccuMTZ8D.s: Assembler messages:
->     /tmp/ccuMTZ8D.s:22188: Error: selected processor does not support ARM mode `mls r0,r1,r2,r3'
->     /tmp/ccuMTZ8D.s:22222: Error: selected processor does not support ARM mode `mlshi r7,r8,r9,r10'
->     /tmp/ccuMTZ8D.s:22252: Error: selected processor does not support ARM mode `mls lr,r1,r2,r13'
->     
->     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->     Cc: Jon Medhurst <tixy@yxit.co.uk>
->     Cc: Russell King <rmk+kernel@arm.linux.org.uk>
->     Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
->     Cc: Leif Lindholm <leif.lindholm@arm.com>
+Surely you only specify the pinmux for the pad you want to use, not
+every combination.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-> 
-> diff --git a/arch/arm/kernel/kprobes-test-arm.c b/arch/arm/kernel/kprobes-test-arm.c
-> index 38c1a3b..8393129 100644
-> --- a/arch/arm/kernel/kprobes-test-arm.c
-> +++ b/arch/arm/kernel/kprobes-test-arm.c
-> @@ -366,7 +366,9 @@ void kprobe_arm_test_cases(void)
->  	TEST_UNSUPPORTED(".word 0xe04f0392 @ umaal r0, pc, r2, r3")
->  	TEST_UNSUPPORTED(".word 0xe0500090 @ undef")
->  	TEST_UNSUPPORTED(".word 0xe05fff9f @ undef")
-> +#endif
->  
-> +#if __LINUX_ARM_ARCH__ >= 7
->  	TEST_RRR(  "mls		r0, r",1, VAL1,", r",2, VAL2,", r",3,  VAL3,"")
->  	TEST_RRR(  "mlshi	r7, r",8, VAL3,", r",9, VAL1,", r",10, VAL2,"")
->  	TEST_RR(   "mls		lr, r",1, VAL2,", r",2, VAL3,", r13")
-> @@ -456,6 +458,8 @@ void kprobe_arm_test_cases(void)
->  	TEST_UNSUPPORTED(".word	0xe1700090") /* Unallocated space */
->  #if __LINUX_ARM_ARCH__ >= 6
->  	TEST_UNSUPPORTED("ldrex	r2, [sp]")
-> +#endif
-> +#if (__LINUX_ARM_ARCH__ >= 7) || defined(CONFIG_CPU_32v6K)
->  	TEST_UNSUPPORTED("strexd	r0, r2, r3, [sp]")
->  	TEST_UNSUPPORTED("ldrexd	r2, r3, [sp]")
->  	TEST_UNSUPPORTED("strexb	r0, r2, [sp]")
-> 
+-- 
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
