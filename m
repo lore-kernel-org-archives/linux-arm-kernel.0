@@ -1,100 +1,44 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 23 Aug 2012 13:32:46 +0300
-Subject: [PATCH v3 06/23] serial: omap: simplify IRQ handling
+Date: Thu, 23 Aug 2012 13:32:51 +0300
+Subject: [PATCH v3 11/23] serial: omap: drop unnecessary check from remove
 In-Reply-To: <1345717983-18179-1-git-send-email-balbi@ti.com>
 References: <1345717983-18179-1-git-send-email-balbi@ti.com>
-Message-ID: <1345717983-18179-7-git-send-email-balbi@ti.com>
+Message-ID: <1345717983-18179-12-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-quite a few changes here, though they are
-pretty obvious. In summary we're making sure
-to detect which interrupt type we need to
-handle before calling the underlying interrupt
-handling procedure.
+if platform_get_drvdata() returns NULL, that's
+quite a nasty bug on the driver which we want to
+catch ASAP. Otherwise, that check is hugely
+unneeded.
 
 Tested-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/tty/serial/omap-serial.c | 51 ++++++++++++++++++++++++++++++----------
- 1 file changed, 38 insertions(+), 13 deletions(-)
+ drivers/tty/serial/omap-serial.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 16808b6..1e91ca6 100644
+index 9f709d4..9581741 100644
 --- a/drivers/tty/serial/omap-serial.c
 +++ b/drivers/tty/serial/omap-serial.c
-@@ -350,33 +350,58 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
+@@ -1336,13 +1336,10 @@ static int serial_omap_remove(struct platform_device *dev)
  {
- 	struct uart_omap_port *up = dev_id;
- 	unsigned int iir, lsr;
-+	unsigned int type;
- 	unsigned long flags;
-+	irqreturn_t ret = IRQ_NONE;
+ 	struct uart_omap_port *up = platform_get_drvdata(dev);
  
-+	spin_lock_irqsave(&up->port.lock, flags);
- 	pm_runtime_get_sync(up->dev);
- 	iir = serial_in(up, UART_IIR);
--	if (iir & UART_IIR_NO_INT) {
--		pm_runtime_mark_last_busy(up->dev);
--		pm_runtime_put_autosuspend(up->dev);
--		return IRQ_NONE;
+-	if (up) {
+-		pm_runtime_disable(up->dev);
+-		uart_remove_one_port(&serial_omap_reg, &up->port);
+-		pm_qos_remove_request(&up->pm_qos_request);
 -	}
-+again:
-+	if (iir & UART_IIR_NO_INT)
-+		goto out;
++	pm_runtime_disable(up->dev);
++	uart_remove_one_port(&serial_omap_reg, &up->port);
++	pm_qos_remove_request(&up->pm_qos_request);
  
--	spin_lock_irqsave(&up->port.lock, flags);
-+	ret = IRQ_HANDLED;
- 	lsr = serial_in(up, UART_LSR);
--	if (iir & UART_IIR_RLSI) {
-+
-+	/* extract IRQ type from IIR register */
-+	type = iir & 0x3e;
-+
-+	switch (type) {
-+	case UART_IIR_MSI:
-+		check_modem_status(up);
-+		break;
-+	case UART_IIR_THRI:
-+		if (lsr & UART_LSR_THRE)
-+			transmit_chars(up);
-+		break;
-+	case UART_IIR_RDI:
- 		if (lsr & UART_LSR_DR)
- 			receive_chars(up, &lsr);
-+		break;
-+	case UART_IIR_RLSI:
-+		if (lsr & UART_LSR_BRK_ERROR_BITS)
-+			receive_chars(up, &lsr);
-+		break;
-+	case UART_IIR_RX_TIMEOUT:
-+		receive_chars(up, &lsr);
-+		break;
-+	case UART_IIR_CTS_RTS_DSR:
-+		iir = serial_in(up, UART_IIR);
-+		goto again;
-+	case UART_IIR_XOFF:
-+		/* FALLTHROUGH */
-+	default:
-+		break;
- 	}
- 
--	check_modem_status(up);
--	if ((lsr & UART_LSR_THRE) && (iir & UART_IIR_THRI))
--		transmit_chars(up);
--
-+out:
- 	spin_unlock_irqrestore(&up->port.lock, flags);
- 	pm_runtime_mark_last_busy(up->dev);
- 	pm_runtime_put_autosuspend(up->dev);
--
- 	up->port_activity = jiffies;
--	return IRQ_HANDLED;
-+
-+	return ret;
+-	platform_set_drvdata(dev, NULL);
+ 	return 0;
  }
  
- static unsigned int serial_omap_tx_empty(struct uart_port *port)
 -- 
 1.7.12.rc3
