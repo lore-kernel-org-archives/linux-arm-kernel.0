@@ -1,61 +1,39 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 23 Aug 2012 14:45:54 +0900
-Subject: [PATCH 4/9] ARM: pmu: remove arm_pmu_type enumeration
-In-Reply-To: <1344620195-22372-5-git-send-email-will.deacon@arm.com>
-References: <1344620195-22372-1-git-send-email-will.deacon@arm.com>
- <1344620195-22372-5-git-send-email-will.deacon@arm.com>
-Message-ID: <1d0c01cd80f2$8f974970$aec5dc50$%kim@samsung.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 23 Aug 2012 07:58:34 +0200
+Subject: [RFC 2/4] ARM: dma-mapping: IOMMU allocates pages from pool with
+ GFP_ATOMIC
+In-Reply-To: <20120822.163648.3800987367886904.hdoyu@nvidia.com>
+References: <1345630830-9586-1-git-send-email-hdoyu@nvidia.com>
+ <1345630830-9586-3-git-send-email-hdoyu@nvidia.com>
+ <CAHQjnOOF7Ca-Dz8K_zcS=gxQsJvKYaWA3tqUeK1RSd-wLYZ44w@mail.gmail.com>
+ <20120822.163648.3800987367886904.hdoyu@nvidia.com>
+Message-ID: <012401cd80f4$59727020$0c575060$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon wrote:
-> 
-> From: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
-> 
-> The arm_pmu_type enumeration was initially introduced to identify
-> different PMU types in the system, the usual one being that on the CPU
-> (ARM_PMU_DEVICE_CPU). With the removal of the PMU reservation code and
-> the introduction of devicetree bindings for the CPU PMU, the enumeration
-> is no longer required.
-> 
-> This patch removes the enumeration and updates the various CPU PMU
-> platform devices so that they no longer pass an .id field referring
-> to identify the PMU type.
-> 
-> Cc: JD Zheng <jdzheng@broadcom.com>
-> Cc: Jon Hunter <jon-hunter@ti.com>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Linus Walleij <linus.walleij@stericsson.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
+Hello,
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+On Wednesday, August 22, 2012 3:37 PM Hiroshi Doyu wrote:
 
-Thanks.
+> KyongHo Cho <pullip.cho@samsung.com> wrote @ Wed, 22 Aug 2012 14:47:00 +0200:
+> 
+> > vzalloc() call in __iommu_alloc_buffer() also causes BUG() in atomic context.
+> 
+> Right.
+> 
+> I've been thinking that kzalloc() may be enough here, since
+> vzalloc() was introduced to avoid allocation failure for big chunk of
+> memory, but I think that it's unlikely that the number of page array
+> can be so big. So I propose to drop vzalloc() here, and just simply to
+> use kzalloc only as below(*1).
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+We already had a discussion about this, so I don't think it makes much sense to
+change it back to kzalloc. This vmalloc() call won't hurt anyone. It should not
+be considered a problem for atomic allocations, because no sane driver will try
+to allocate buffers larger than a dozen KiB with GFP_ATOMIC flag. I would call
+such try a serious bug, which we should not care here.
 
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Signed-off-by: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
-> [will: cosmetic edits and actual removal of the enum type]
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/include/asm/pmu.h               |   10 ----------
->  arch/arm/mach-bcmring/arch.c             |    3 +--
->  arch/arm/mach-omap2/devices.c            |    3 +--
->  arch/arm/mach-pxa/devices.c              |    3 +--
->  arch/arm/mach-realview/realview_eb.c     |    3 +--
->  arch/arm/mach-realview/realview_pb1176.c |    3 +--
->  arch/arm/mach-realview/realview_pb11mp.c |    3 +--
->  arch/arm/mach-realview/realview_pba8.c   |    3 +--
->  arch/arm/mach-realview/realview_pbx.c    |    3 +--
->  arch/arm/mach-tegra/devices.c            |    3 +--
->  arch/arm/mach-ux500/cpu-db8500.c         |    3 +--
->  arch/arm/mach-vexpress/ct-ca9x4.c        |    3 +--
->  arch/arm/plat-iop/pmu.c                  |    3 +--
->  arch/arm/plat-samsung/devs.c             |    3 +--
->  14 files changed, 13 insertions(+), 36 deletions(-)
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
