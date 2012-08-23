@@ -1,69 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 23 Aug 2012 06:46:30 +0000
-Subject: PER_LINUX32,
- Was: [PATCH v2 21/31] arm64: 32-bit (compat) applications support
-In-Reply-To: <20120816102808.GH31784@mudshark.cambridge.arm.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <201208151434.05145.arnd@arndb.de>
- <20120816102808.GH31784@mudshark.cambridge.arm.com>
-Message-ID: <201208230646.31276.arnd@arndb.de>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Thu, 23 Aug 2012 15:26:30 +0800
+Subject: [PATCH 1/7] mfd: add imx syscon driver based on regmap
+In-Reply-To: <20120822160241.GR7995@opensource.wolfsonmicro.com>
+References: <1345619928-15446-1-git-send-email-b29396@freescale.com>
+ <1345619928-15446-2-git-send-email-b29396@freescale.com>
+ <20120822160241.GR7995@opensource.wolfsonmicro.com>
+Message-ID: <20120823072629.GG10057@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 August 2012, Will Deacon wrote:
-> On Wed, Aug 15, 2012 at 03:34:04PM +0100, Arnd Bergmann wrote:
-> > On Tuesday 14 August 2012, Catalin Marinas wrote:
-> > > +asmlinkage int compat_sys_personality(compat_ulong_t personality)
-> > > +{
-> > > +	int ret;
-> > > +
-> > > +	if (personality(current->personality) == PER_LINUX32 &&
-> > > +		personality == PER_LINUX)
-> > > +		personality = PER_LINUX32;
-> > > +	ret = sys_personality(personality);
-> > > +	if (ret == PER_LINUX32)
-> > > +		ret = PER_LINUX;
-> > > +	return ret;
-> > > +}
-> > 
-> > Where did you get this from?
-> > 
-> > You should not need compat_sys_personality, just call the native function.
+On Thu, Aug 23, 2012 at 12:02:41AM +0800, Mark Brown wrote:
+> On Wed, Aug 22, 2012 at 03:18:42PM +0800, Dong Aisheng wrote:
 > 
-> Hmm, but in that case an aarch32 application doing a personality(PER_LINUX)
-> syscall will start seeing the wrong uname.
+> > From: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> > Add regmap based imx syscon driver.
+> 
+> Nice to see more regmap-mmio usage!
+> 
+> Reviwed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> 
+> from a regmap point of view.
+> 
+Thanks
 
-Coming back at this topic, I noticed another issue. Jiri Kosina
-has recently posted patches to fix this function in the other architectures
-in order to mask out the other personality bits, which is a correct fix,
-but the above function is odd for other reasons.
+> > +int imx_syscon_write(struct device_node *np, u32 reg, u32 val)
+> > +{
+> > +	struct device *dev;
+> > +	struct imx_syscon *syscon;
+> > +	int ret = 0;
+> > +
+> > +	dev = driver_find_device(&imx_syscon_driver.driver, NULL, np,
+> > +				 imx_syscon_match);
+> > +	if (!dev)
+> > +		return -EPROBE_DEFER;
+> > +
+> > +	syscon = dev_get_drvdata(dev);
+> > +	ret = regmap_write(syscon->regmap, reg, val);
+> 
+> It'd be good to provide a way of retrieving the regmap so that drivers
+> for subsystems with generic regmap code could use the framework features
+> (regulator is one example that I just mentioned in my other mail).
 
-* On MIPS, it is used only for compat tasks, like you have it above.
-* On PA-RISC, it is used for native 32 bit tasks and for compat 32 bit tasks,
-  but not for native 64 bit ones.
-* On IA64, it was used for compat tasks (support for which has since
-  been removed from the kernel), plus all 32 bit tasks would start with
-  PER_LINUX32.
-* On PowerPC, Sparc and s390, it is used for native 64 bit tasks and for
-  compat 32 bit tasks, but not for native 32 bit ones.
-* On Tile, it was never used.
-* On x86_64, it used to be defined (copied from ia64) but not used
-  throughout the git history.
+Do you mean something like:
+regmap = syscon_regmap_dev_lookup(np, "fsl,anatop");
+regmap_write(regmap, reg, val);
 
-The semantics of the function are also interesting: The intention seems
-to be that to a compat task, PER_LINUX32 would appear as PER_LINUX.
-The effect is that any process can set PER_LINUX32 but it can never
-be unset except by a 64 bit MIPS or PA-RISC task.
+Then drivers can use generic regmap framework features rather than depend
+on what imx-syscon implemented, is that correct?
 
-Since x86_64 does not implement this behavior at all, I suspect that
-there are now lots of things depending on not having it, while all
-the other architectures might also have some (even predating the
-x86_64 port) use cases that depend on depend on not being able to
-observe PER_LINUX32 in 32 bit compat tasks.
-
-I think we should try to agree on how this is all supposed to work
-and use common code, either put the ppc/sparc/s390 version into
-sys_personality, or remove all of them and just do what x86 and tile
-do, using the regular sys_personality for all tasks.
-
-	Arnd
+Regards
+Dong Aisheng
