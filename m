@@ -1,73 +1,37 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 23 Aug 2012 09:26:47 +0300
-Subject: [PATCH v2 00/13] OMAP Serial patches
-In-Reply-To: <1345551371-18862-1-git-send-email-balbi@ti.com>
-References: <1345540555-24359-1-git-send-email-balbi@ti.com>
- <1345551371-18862-1-git-send-email-balbi@ti.com>
-Message-ID: <20120823062646.GC31295@arwen.pp.htv.fi>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 23 Aug 2012 09:35:01 +0300
+Subject: [PATCH] ARM: OMAP2+: twl-common: Fix compile time error when
+ omap-twl4030 audio is not enabled
+Message-ID: <1345703701-27283-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Fixes:
+CC      arch/arm/mach-omap2/twl-common.o arch/arm/mach-omap2/twl-common.c:562: error: conflicting types for ?omap_twl4030_audio_init?
+arch/arm/mach-omap2/twl-common.h:62: error: previous declaration of ?omap_twl4030_audio_init? was here
+make[1]: *** [arch/arm/mach-omap2/twl-common.o] Error 1
+make: *** [arch/arm/mach-omap2] Error 2
 
-On Tue, Aug 21, 2012 at 03:15:58PM +0300, Felipe Balbi wrote:
-> Hi guys,
-> 
-> here's a series of cleanup patches to the OMAP serial
-> driver. A later series could be made re-implementing
-> DMA using the DMA Engine API. Note that for RX DMA
-> we could be using RX Timeout IRQ as a hint that we better
-> use PIO instead ;-)
-> 
-> All patches were tested on my pandaboard, but I'd really
-> like to receive Tested-by on other platforms.
-> 
-> After this goes in, I'll probably try to get UART wakeup
-> working again and only after that look at DMA.
-> 
-> Changes since v1:
-> 
-> 	. improved commit log on patch 9/13 (formerly 10/13)
-> 	. removed patch 2/13
-> 	. added a new patch switching from spin_lock_irqsave() to spin_lock and
-> 		spin_unlock_irqrestore to spin_unlock
-> 
-> Retested with my pandaboard, UART continues to work:
-> 
->  # grep -i uart /proc/interrupts
->  106:        124          0       GIC  OMAP UART2
->  #  grep -i uart /proc/interrupts
->  106:        189          0       GIC  OMAP UART2
->  #  grep -i uart /proc/interrupts
->  106:        255          0       GIC  OMAP UART2
->  #  grep -i uart /proc/interrupts
->  106:        321          0       GIC  OMAP UART2
->  #  grep -i uart /proc/interrupts
->  106:        387          0       GIC  OMAP UART2
->  #  grep -i uart /proc/interrupts
->  106:        453          0       GIC  OMAP UART2
->  #  grep -i uart /proc/interrupts
->  106:        519          0       GIC  OMAP UART2
-> 
-> cheers
-> 
-> ps: if anyone knows a better test for UART, let me know.
-> 
-> for convenience of anyone testing, patches are available on my git tree [1] on
-> branch uart
-> 
-> [1] git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git uart
+When building the kernel with !SND_OMAP_SOC_OMAP_TWL4030
 
-Well, it turns out we found a small issue with one of these patches. We
-have already fixed the isse. Will re-send the series soon with a few
-more patches added. cheers
+Reported-by: Brian Austin <brian.austin@cirrus.com>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/mach-omap2/twl-common.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
+index 1c6045a..2919d7a 100644
+--- a/arch/arm/mach-omap2/twl-common.c
++++ b/arch/arm/mach-omap2/twl-common.c
+@@ -544,7 +544,7 @@ void __init omap_twl4030_audio_init(char *card_name)
+ }
+ 
+ #else /* SOC_OMAP_TWL4030 */
+-void __init omap_twl4030_audio_init(char *card_name, int codec_sysclk)
++void __init omap_twl4030_audio_init(char *card_name)
+ {
+ 	return;
+ }
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120823/36470e8b/attachment-0001.sig>
+1.7.8.6
