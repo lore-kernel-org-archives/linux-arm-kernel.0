@@ -1,92 +1,89 @@
-From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
-Date: Thu, 23 Aug 2012 16:19:47 +0200 (CEST)
-Subject: [PATCH] pwm: Call pwm_enable() before pwm_config()
-In-Reply-To: <320569847.2756382.1345729013971.JavaMail.root@advansee.com>
-Message-ID: <217877237.2758643.1345731587941.JavaMail.root@advansee.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 23 Aug 2012 22:18:18 +0800
+Subject: [PATCH] ARM: imx: add imx5x usb controller clock lookups
+In-Reply-To: <1345718328-6547-1-git-send-email-m.grzeschik@pengutronix.de>
+References: <1345718328-6547-1-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <20120823141815.GI24242@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some PWM drivers enable the clock of the PWM peripheral in pwm_enable(). Hence,
-for these drivers, a call to pwm_config() does not have any effect before
-pwm_enable() has been called.
+On Thu, Aug 23, 2012 at 12:38:48PM +0200, Michael Grzeschik wrote:
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> ---
+>  arch/arm/mach-imx/clk-imx51-imx53.c |   36 +++++++++++++++++++++++------------
+>  1 file changed, 24 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+> index 4bdcaa9..6ce49b1 100644
+> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
+> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+> @@ -258,18 +258,6 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+>  	clk_register_clkdev(clk[pwm2_ipg_gate], "pwm", "mxc_pwm.1");
+>  	clk_register_clkdev(clk[i2c1_gate], NULL, "imx-i2c.0");
+>  	clk_register_clkdev(clk[i2c2_gate], NULL, "imx-i2c.1");
+> -	clk_register_clkdev(clk[usboh3_per_gate], "per", "mxc-ehci.0");
+> -	clk_register_clkdev(clk[usboh3_gate], "ipg", "mxc-ehci.0");
+> -	clk_register_clkdev(clk[usboh3_gate], "ahb", "mxc-ehci.0");
+> -	clk_register_clkdev(clk[usboh3_per_gate], "per", "mxc-ehci.1");
+> -	clk_register_clkdev(clk[usboh3_gate], "ipg", "mxc-ehci.1");
+> -	clk_register_clkdev(clk[usboh3_gate], "ahb", "mxc-ehci.1");
+> -	clk_register_clkdev(clk[usboh3_per_gate], "per", "mxc-ehci.2");
+> -	clk_register_clkdev(clk[usboh3_gate], "ipg", "mxc-ehci.2");
+> -	clk_register_clkdev(clk[usboh3_gate], "ahb", "mxc-ehci.2");
+> -	clk_register_clkdev(clk[usboh3_per_gate], "per", "fsl-usb2-udc");
+> -	clk_register_clkdev(clk[usboh3_gate], "ipg", "fsl-usb2-udc");
+> -	clk_register_clkdev(clk[usboh3_gate], "ahb", "fsl-usb2-udc");
 
-This patch fixes the PWM users to make sure that they call pwm_enable() before
-pwm_config().
+Removing those will break some in-tree users, right?
 
-This fixes the first setting of brightness through sysfs that had no effect with
-leds-pwm and the i.MX PWM driver.
+>  	clk_register_clkdev(clk[nfc_gate], NULL, "mxc_nand");
+>  	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.0");
+>  	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "imx-ssi.1");
+> @@ -351,6 +339,18 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+>  	clk_register_clkdev(clk[ipu_di0_gate], "di0", "imx51-ipu");
+>  	clk_register_clkdev(clk[ipu_di1_gate], "di1", "imx51-ipu");
+>  	clk_register_clkdev(clk[ipu_gate], "hsp", "imx51-ipu");
+> +	clk_register_clkdev(clk[usboh3_per_gate], "per", "73f80600.usb");
+> +	clk_register_clkdev(clk[usboh3_gate], "ipg", "73f80600.usb");
+> +	clk_register_clkdev(clk[usboh3_gate], "ahb", "73f80600.usb");
+> +	clk_register_clkdev(clk[usboh3_per_gate], "per", "73f80400.usb");
+> +	clk_register_clkdev(clk[usboh3_gate], "ipg", "73f80400.usb");
+> +	clk_register_clkdev(clk[usboh3_gate], "ahb", "73f80400.usb");
+> +	clk_register_clkdev(clk[usboh3_per_gate], "per", "73f80200.usb");
+> +	clk_register_clkdev(clk[usboh3_gate], "ipg", "73f80200.usb");
+> +	clk_register_clkdev(clk[usboh3_gate], "ahb", "73f80200.usb");
+> +	clk_register_clkdev(clk[usboh3_per_gate], "per", "73f80000.usb");
+> +	clk_register_clkdev(clk[usboh3_gate], "ipg", "73f80000.usb");
+> +	clk_register_clkdev(clk[usboh3_gate], "ahb", "73f80000.usb");
 
-Cc: Thierry Reding <thierry.reding@avionic-design.de>
-Cc: <linux-kernel@vger.kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: <linux-input@vger.kernel.org>
-Cc: Bryan Wu <bryan.wu@canonical.com>
-Cc: Richard Purdie <rpurdie@rpsys.net>
-Cc: <linux-leds@vger.kernel.org>
-Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-Cc: <linux-fbdev@vger.kernel.org>
-Cc: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
-Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
----
- .../drivers/input/misc/pwm-beeper.c                |    6 +++---
- .../drivers/leds/leds-pwm.c                        |    2 +-
- .../drivers/video/backlight/pwm_bl.c               |    2 +-
- 3 files changed, 5 insertions(+), 5 deletions(-)
+I haven't seen new driver requesting these clocks, so would postpone
+the changes until the driver actually requests them.
 
-diff --git linux-next-c94456b.orig/drivers/input/misc/pwm-beeper.c linux-next-c94456b/drivers/input/misc/pwm-beeper.c
-index fc84c8a..97d322b 100644
---- linux-next-c94456b.orig/drivers/input/misc/pwm-beeper.c
-+++ linux-next-c94456b/drivers/input/misc/pwm-beeper.c
-@@ -53,10 +53,10 @@ static int pwm_beeper_event(struct input_dev *input,
- 		pwm_disable(beeper->pwm);
- 	} else {
- 		period = HZ_TO_NANOSECONDS(value);
--		ret = pwm_config(beeper->pwm, period / 2, period);
-+		ret = pwm_enable(beeper->pwm);
- 		if (ret)
- 			return ret;
--		ret = pwm_enable(beeper->pwm);
-+		ret = pwm_config(beeper->pwm, period / 2, period);
- 		if (ret)
- 			return ret;
- 		beeper->period = period;
-@@ -156,8 +156,8 @@ static int pwm_beeper_resume(struct device *dev)
- 	struct pwm_beeper *beeper = dev_get_drvdata(dev);
- 
- 	if (beeper->period) {
--		pwm_config(beeper->pwm, beeper->period / 2, beeper->period);
- 		pwm_enable(beeper->pwm);
-+		pwm_config(beeper->pwm, beeper->period / 2, beeper->period);
- 	}
- 
- 	return 0;
-diff --git linux-next-c94456b.orig/drivers/leds/leds-pwm.c linux-next-c94456b/drivers/leds/leds-pwm.c
-index f2e44c7..c2e0c22 100644
---- linux-next-c94456b.orig/drivers/leds/leds-pwm.c
-+++ linux-next-c94456b/drivers/leds/leds-pwm.c
-@@ -42,8 +42,8 @@ static void led_pwm_set(struct led_classdev *led_cdev,
- 		pwm_config(led_dat->pwm, 0, period);
- 		pwm_disable(led_dat->pwm);
- 	} else {
--		pwm_config(led_dat->pwm, brightness * period / max, period);
- 		pwm_enable(led_dat->pwm);
-+		pwm_config(led_dat->pwm, brightness * period / max, period);
- 	}
- }
- 
-diff --git linux-next-c94456b.orig/drivers/video/backlight/pwm_bl.c linux-next-c94456b/drivers/video/backlight/pwm_bl.c
-index 995f016..a4bb95c 100644
---- linux-next-c94456b.orig/drivers/video/backlight/pwm_bl.c
-+++ linux-next-c94456b/drivers/video/backlight/pwm_bl.c
-@@ -65,8 +65,8 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
- 
- 		duty_cycle = pb->lth_brightness +
- 		     (duty_cycle * (pb->period - pb->lth_brightness) / max);
--		pwm_config(pb->pwm, duty_cycle, pb->period);
- 		pwm_enable(pb->pwm);
-+		pwm_config(pb->pwm, duty_cycle, pb->period);
- 	}
- 
- 	if (pb->notify_after)
+Regards,
+Shawn
+
+>  	clk_register_clkdev(clk[usb_phy_gate], "phy", "mxc-ehci.0");
+>  	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx51.0");
+>  	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx51.0");
+> @@ -439,6 +439,18 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+>  	clk_register_clkdev(clk[ipu_di0_gate], "di0", "imx53-ipu");
+>  	clk_register_clkdev(clk[ipu_di1_gate], "di1", "imx53-ipu");
+>  	clk_register_clkdev(clk[ipu_gate], "hsp", "imx53-ipu");
+> +	clk_register_clkdev(clk[usboh3_per_gate], "per", "53f80600.usb");
+> +	clk_register_clkdev(clk[usboh3_gate], "ipg", "53f80600.usb");
+> +	clk_register_clkdev(clk[usboh3_gate], "ahb", "53f80600.usb");
+> +	clk_register_clkdev(clk[usboh3_per_gate], "per", "53f80400.usb");
+> +	clk_register_clkdev(clk[usboh3_gate], "ipg", "53f80400.usb");
+> +	clk_register_clkdev(clk[usboh3_gate], "ahb", "53f80400.usb");
+> +	clk_register_clkdev(clk[usboh3_per_gate], "per", "53f80200.usb");
+> +	clk_register_clkdev(clk[usboh3_gate], "ipg", "53f80200.usb");
+> +	clk_register_clkdev(clk[usboh3_gate], "ahb", "53f80200.usb");
+> +	clk_register_clkdev(clk[usboh3_per_gate], "per", "53f80000.usb");
+> +	clk_register_clkdev(clk[usboh3_gate], "ipg", "53f80000.usb");
+> +	clk_register_clkdev(clk[usboh3_gate], "ahb", "53f80000.usb");
+>  	clk_register_clkdev(clk[usb_phy1_gate], "usb_phy1", "mxc-ehci.0");
+>  	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx53.0");
+>  	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx53.0");
+> -- 
+> 1.7.10.4
+> 
