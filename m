@@ -1,24 +1,75 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 23 Aug 2012 23:49:50 +0200
-Subject: [PATCH 1/6] gpio/mxs: adopt irq_domain support for mxs gpio driver
-In-Reply-To: <1345472400-31262-2-git-send-email-shawn.guo@linaro.org>
-References: <1345472400-31262-1-git-send-email-shawn.guo@linaro.org>
- <1345472400-31262-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CACRpkdbSaa6ZOZYB1Cm7WjW0O51kvwsTAxhjefEKd-7XaBB3dw@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu, 23 Aug 2012 21:48:54 +0000
+Subject: [PATCHv4 0/9] *** ARM: Update arch-vt8500 to Devicetree ***
+In-Reply-To: <201208231322.23077.arnd@arndb.de>
+References: <1345707346-9035-1-git-send-email-linux@prisktech.co.nz>
+ <201208231040.16702.arnd@arndb.de>
+ <76F764B079F92A4E843589C893D0A022DAF68C14@SERVER.prisktech.co.nz>
+ <201208231322.23077.arnd@arndb.de>
+Message-ID: <1345758702.2061.6.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 4:19 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Thu, 2012-08-23 at 13:22 +0000, Arnd Bergmann wrote:
+> On Thursday 23 August 2012, Tony Prisk wrote:
+> > >On Thursday 23 August 2012, Tony Prisk wrote:
+> 
+> > 
+> > Without the clock patch (9/9), the mach-vt8500 patch (6/9) won't compile
+> > due to unresolved symbols.
+> > 
+> > In arch/arm/mach-vt8500/vt8500.c - you will get an unresolved symbol
+> > for 'vtwm_clk_init'
+> > 
+> > Not sure if this matters, thought I should point it out.
+> > Does it need to compile cleanly in your tree (which is what I would assume),
+> > or just once its all combined in -next?
+> > Does it matter that the usb patches are already in -next?
+> > 
+> > I don't really understand the requirements around submitting to individual
+> > trees and which (if any) of these points are actually issues.
+> 
+> The rule is that each changeset should be free of regressions compared
+> to the version before. So if you have a set of 7 patches in one branch
+> that you want me to pick up, the result after applying those 7 patches
+> should work, and each previous step should also work. You cannot for
+> instance add a call to a function in one patch and then provide that
+> function in the following patch.
+> 
+> There are multiple ways to achieve this:
+> 
+> * when you have dependencies, get everything merged through one
+> maintainer tree, and get Acks for each patch that belongs to another
+> maintainer.
+> 
+> * submit a branch with the patches that other stuff depends on to
+> both the subsystem maintainer who is responsible for it and to
+> the subsystem maintainer who gets the other patches that are built
+> on top of this branch. If you do this, you have to make sure that
+> the first branch never gets rebased and that the second branch is
+> not sent before the first one is upstream.
+> 
+> * change the code so that no dependencies exist, e.g. by introducing
+> a dummy implementation in one patch and the proper one in another.
+> This can generate merge conflicts, but that's usually ok.
+> 
+> 	Arnd
+> 
 
-> Remove irq_domain_add_legacy call from mach-mxs.c and have the gpio
-> driver adopt irqdomain support, so that we can have the mapping
-> between gpio and irq number available without using virtual_irq_start
-> and MXS_GPIO_IRQ_START.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+I was about to say that if Mike has any issues with the driver that I
+can fix the patch conflict at the same time, but I just realised that
+its more work than I originally thought :)
 
-OK patch applied, thanks!
+I was going to move the arch-vt8500 part of the clocks patch back into
+the clocks patch - but that will just move the issue from arm-soc to
+clocks because Mike's branch won't have the arch-vt8500 patch so the
+patch will fail.
 
-Yours,
-Linus Walleij
+If Mike is OK with it once the clocks driver is reviewed, it will be a
+lot easier for the whole lot to go in via arm-soc, otherwise I can try
+figuring out how to get the arch-vt8500 patch to Mike first, and then
+the clocks patch.
+
+
+Regards
+Tony Prisk
