@@ -1,53 +1,35 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 24 Aug 2012 01:01:13 +0200
-Subject: [PATCH v2 1/9] pinctrl: mvebu: pinctrl driver core
-In-Reply-To: <50369FEE.8000003@wwwdotorg.org>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1345623750-10645-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <5035445B.6000500@wwwdotorg.org>
- <CABJ1b_Tdr80DGqb-FRzwDbF3m7g6fBguk5GtRAfRUYx5Sqy_cA@mail.gmail.com>
- <50366E44.4030606@wwwdotorg.org> <50369305.6050304@gmail.com>
- <50369FEE.8000003@wwwdotorg.org>
-Message-ID: <5036B639.20608@gmail.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Fri, 24 Aug 2012 01:18:16 +0200
+Subject: [GIT PULL] Renesas ARM-based SoC fix for v3.6
+Message-ID: <201208240118.16563.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2012 11:26 PM, Stephen Warren wrote:
-> As you may have guessed, I strongly prefer the hard-coded static table
-> based approach, or at least separating the definition of known
-> pins/groups/functions from the configuration nodes that define which
-> particular mux settings to actually use.
->
-> Puting this all a little more simply, the pinctrl core wants to generate
-> a list of all known functions. It is a single global/unified list. It
-> first calls pinmux_ops.get_functions_count() to find out how many
-> functions there are in the list, then pinmux_ops.get_function_name() for
-> each one to find its name, then pinmux_ops.get_function_groups() to find
-> out which groups allow that function to be mux'd onto them.
+Hi,
 
-Ok, now this becomes a little bit more clear to me.
+Please pull from the git repository at
 
-Consider uart1 on dove is muxable to:
-mpp2 uart1(rts), mpp3 uart1(cts), mpp21 uart1(rts), mpp22 uart1(cts),
-and finally mpp_uart1(rx and tx).
+  git://git.kernel.org/pub/scm/linux/kernel/git/rafael/renesas.git fixes
 
-So possible, valid combinations for uart1 would be:
-(a) mpp_uart1;
-(b) mpp_uart1, mpp2, mpp3;
-(c) mpp_uart1, mpp21, mpp22;
-(d) mpp_uart1, mpp2, mpp22;
-(e) mpp_uart1, mpp21, mpp3;
+to receive one fix for the sh73a0 SoC support code as commit
+6c0274cbe63ec265f842537825684a619e6cce93
 
-Now what we currently do is, use DT to setup all known functions with e.g.
-marvell,pins = "mpp_uart1", "mpp2", "mpp22" and marvell,function = "uart1".
-This requires to count all pinctrl DT node children to count the known
-functions that can ever be muxed to. It will never allow to mux uart1 to sw
-flow control during run-time when there was no DT child node for it.
+  ARM: shmobile: sh73a0: fixup RELOC_BASE of intca_irq_pins_desc
 
-But you are proposing to scan the list passed from SoC specific driver for all
-possible marvell,function ("uart1", "uart2", "sdio0", ...) and build up lists
-of pingroups that can be used with this specific marvell,function; or even build
-up lists of pingroups that allow uart1(rts), and another one for uart1(cts), ...?
+on top of commit d9875690d9b89a866022ff49e3fcea892345ad92
 
-Sebastian
+  Linux 3.6-rc2
+
+It fixes an IRQ configuration issue uncovered by the addition of
+preliminary irqdomain support.
+
+Thanks!
+
+
+ arch/arm/mach-shmobile/intc-sh73a0.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+---------------
+
+Kuninori Morimoto (1):
+      ARM: shmobile: sh73a0: fixup RELOC_BASE of intca_irq_pins_desc
