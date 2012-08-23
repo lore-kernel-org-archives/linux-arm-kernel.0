@@ -1,124 +1,159 @@
-From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
-Date: Thu, 23 Aug 2012 23:03:57 +0200 (CEST)
-Subject: [PATCH] pwm-imx: Fix config / enable / disable
-In-Reply-To: <20120823191108.GB8127@avionic-0098.mockup.avionic-design.de>
-Message-ID: <1305545087.2775440.1345755837651.JavaMail.root@advansee.com>
+From: pmeerw@pmeerw.net (Peter Meerwald)
+Date: Thu, 23 Aug 2012 23:00:42 +0200 (CEST)
+Subject: [PATCH 1/1] mmc: host: enable OMAP DMA engine support for omap
+ hosts by default
+In-Reply-To: <CAAwP0s2Efuuc7vsX3bZuwz175zUjnmsOV87OcZ06p_eoe4T3Ug@mail.gmail.com>
+References: <1342485005-5178-1-git-send-email-javier@dowhile0.org>
+ <CAMQu2gxaF8K78puE84+=8VJLbsdtdD97ww81XJxG6sCtYTYXww@mail.gmail.com>
+ <CABxcv=nsmeVLspzXERYXebmPaNO6rKCsVnak7dMtvGjiYH4vOw@mail.gmail.com>
+ <20120718065951.GH6522@atomide.com>
+ <CAMQu2gzX1d1FQtE3z=cwfA6daDgxJe6UFUaSY0PzGGLQOz_-ZQ@mail.gmail.com>
+ <20120718071039.GI6522@atomide.com>
+ <CANfBPZ97onLov1TwXYaT5A6D5XzXxwpvk+=y09W_9FmcOne4Mw@mail.gmail.com>
+ <CAMQu2gy-U1WmgGOGZ+VyXjZmLem9TEWbq5kR8jzC0qXvqF-=BA@mail.gmail.com>
+ <CAAwP0s2Efuuc7vsX3bZuwz175zUjnmsOV87OcZ06p_eoe4T3Ug@mail.gmail.com>
+Message-ID: <alpine.DEB.2.01.1208232246530.15831@pmeerw.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx_pwm_config() did not enable the PWM IP clock while accessing the registers.
-Hence, a call to pwm_config() had no effect before pwm_enable() had been called,
-which does not comply to the PWM API.
+On Wed, 18 Jul 2012, Javier Martinez Canillas wrote:
 
-Moreover, calling pwm_disable() then pwm_enable() must be a transparent
-operation.
+> On Wed, Jul 18, 2012 at 10:36 AM, Shilimkar, Santosh
+> <santosh.shilimkar@ti.com> wrote:
+> > On Wed, Jul 18, 2012 at 1:14 PM, S, Venkatraman <svenkatr@ti.com> wrote:
+> >> On Wed, Jul 18, 2012 at 12:40 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >>> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120718 00:09]:
+> >>>> On Wed, Jul 18, 2012 at 12:29 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >>>> > * Javier Martinez Canillas <javier@dowhile0.org> [120716 23:56]:
+> >>>> >> On Tue, Jul 17, 2012 at 8:45 AM, Shilimkar, Santosh
+> >>>> >> <santosh.shilimkar@ti.com> wrote:
+> >>>> >> > Hi,
+> >>>> >> >
+> >>>> >> > On Tue, Jul 17, 2012 at 6:00 AM, Javier Martinez Canillas
+> >>>> >> > <javier@dowhile0.org> wrote:
+> >>>> >> >> The OMAP MMC and OMAP High Speed MMC hosts now use entirely the DMA
+> >>>> >> >> engine API instead of the previous private DMA API implementation.
+> >>>> >> >>
+> >>>> >> >> So, if the kernel is built with support for any of these hosts but it
+> >>>> >> >> doesn't support DMA devices nor OMAP DMA support, it fails when trying
+> >>>> >> >> to obtain a DMA channel which leads to the following error on an OMAP3
+> >>>> >> >> IGEPv2 Rev.C board (and probably on most OMAP boards with MMC support):
+> >>>> >> >>
+> >>>> >> >> [ 2.199981] omap_hsmmc omap_hsmmc.1: unable to obtain RX DMA engine channel 48
+> >>>> >> >> [    2.215087] omap_hsmmc omap_hsmmc.0: unable to obtain RX DMA engine channel 62
+> >>>> >> >>
+> >>>> >> >> selecting automatically CONFIG_DMADEVICES and CONFIG_DMA_OMAP solves it.
+> >>>> >> >>
+> >>>> >> >> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+> >>>> >> >> ---
+> >>>> >> > Considering, we are updating drivers to select the DMA engine, can you
+> >>>> >> > also include
+> >>>> >> > "drivers/spi/spi-omap2-mcspi.c" which is also updated for DMA engine.
+> >>>> >> >
+> >>>> >> > Regards
+> >>>> >> > Santosh
+> >>>> >>
+> >>>> >> Hi Santosh,
+> >>>> >>
+> >>>> >> Ok, I'll send a v2 now which includes spi-omap2-mcspi then.
+> >>>> >
+> >>>> > I don't think we should do this, the drivers should work with and without
+> >>>> > dma. This just needs to be added to the omap2plus_defconfig.
+> >>>> >
+> >>>> Well this was not decided based on any DMA CONFIG option before for
+> >>>> the subject drivers. It is already by default enabled if the DMA is supported
+> >>>> by the driver IP. There is a possibility to disable it from driver platform/dt
+> >>>> data so that still remains.
+> >>>
+> >>> I think it should rather be that if the driver is broken and does not work
+> >>> without DMA, it should have depends on CONFIG_DMA_OMAP.
+> >>>
+> >> I can confirm that omap MMC can't work without DMA; polled mode is not
+> >> supported / implemented.
+> >
+> > Same case for SPI driver as well. It uses DMA for everything except the cases
+> > where DMA doesn't make sense like 1 byte/2 byte etc. And its not configurable,
+> >
+> > At least considering this, it is better we do this per driver than enabling
+> > it at SOC config.
+> >
+> > Regards
+> > Santosh
+> > --
+> 
+> Hi Santosh,
+> 
+> And what about enabling it at the SoC config level but making the
+> drivers dependant on CONFIG_DMADEVICES and CONFIG_DMA_OMAP? If you
+> agree I can send something like this in two different patches (one for
+> the omap2plus_defconfig and another to make the drivers dependant on
+> the config option):
+> 
+> diff --git a/arch/arm/configs/omap2plus_defconfig
+> b/arch/arm/configs/omap2plus_defconfig
+> index b152de7..e58edc3 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -193,6 +193,8 @@ CONFIG_MMC_OMAP_HS=y
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_DRV_TWL92330=y
+>  CONFIG_RTC_DRV_TWL4030=y
+> +CONFIG_DMADEVICES=y
+> +CONFIG_DMA_OMAP=y
+>  CONFIG_EXT2_FS=y
+>  CONFIG_EXT3_FS=y
+>  # CONFIG_EXT3_FS_XATTR is not set
 
-This fixes the first setting of brightness through sysfs that had no effect with
-leds-pwm.
+above has been merged, 89269ef1f0abc72c551198123e19cd4edfd43cf4
+but I am missing the patches below in mainline (3.6-rc3) -- what happened?
 
-Cc: Thierry Reding <thierry.reding@avionic-design.de>
-Cc: <linux-kernel@vger.kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Cc: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
-Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
----
- .../drivers/pwm/pwm-imx.c                          |   55 +++++++++++++++-----
- 1 file changed, 43 insertions(+), 12 deletions(-)
+as Javier pointed out in https://patchwork.kernel.org/patch/1203391/, 
+MMC is broken support e.g. on beagleboard unless DMA_OMAP is defined
 
-diff --git linux-next-c94456b.orig/drivers/pwm/pwm-imx.c linux-next-c94456b/drivers/pwm/pwm-imx.c
-index 2a0b353..0519bf2 100644
---- linux-next-c94456b.orig/drivers/pwm/pwm-imx.c
-+++ linux-next-c94456b/drivers/pwm/pwm-imx.c
-@@ -55,6 +55,16 @@ static int imx_pwm_config(struct pwm_chip *chip,
- {
- 	struct imx_chip *imx = to_imx_chip(chip);
- 
-+	/*
-+	 * If the PWM is disabled, make sure to turn on the clock before
-+	 * accessing the registers.
-+	 */
-+	if (!imx->clk_enabled) {
-+		int rc = clk_prepare_enable(imx->clk);
-+		if (rc)
-+			return rc;
-+	}
-+
- 	if (!(cpu_is_mx1() || cpu_is_mx21())) {
- 		unsigned long long c;
- 		unsigned long period_cycles, duty_cycles, prescale;
-@@ -85,8 +95,11 @@ static int imx_pwm_config(struct pwm_chip *chip,
- 		writel(period_cycles, imx->mmio_base + MX3_PWMPR);
- 
- 		cr = MX3_PWMCR_PRESCALER(prescale) |
--			MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN |
--			MX3_PWMCR_DBGEN | MX3_PWMCR_EN;
-+			MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN | MX3_PWMCR_DBGEN;
-+
-+		/* If the PWM is enabled, keep it so. */
-+		if (imx->clk_enabled)
-+			cr |= MX3_PWMCR_EN;
- 
- 		if (cpu_is_mx25())
- 			cr |= MX3_PWMCR_CLKSRC_IPG;
-@@ -118,32 +131,50 @@ static int imx_pwm_config(struct pwm_chip *chip,
- 		BUG();
- 	}
- 
-+	/* If the PWM is disabled, turn the clock off again to save power. */
-+	if (!imx->clk_enabled)
-+		clk_disable_unprepare(imx->clk);
-+
- 	return 0;
- }
- 
- static int imx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- {
- 	struct imx_chip *imx = to_imx_chip(chip);
--	int rc = 0;
-+	int rc;
- 
--	if (!imx->clk_enabled) {
--		rc = clk_prepare_enable(imx->clk);
--		if (!rc)
--			imx->clk_enabled = 1;
-+	if (imx->clk_enabled)
-+		return 0;
-+
-+	rc = clk_prepare_enable(imx->clk);
-+	if (rc)
-+		return rc;
-+
-+	if (!(cpu_is_mx1() || cpu_is_mx21())) {
-+		u32 cr = readl(imx->mmio_base + MX3_PWMCR);
-+		cr |= MX3_PWMCR_EN;
-+		writel(cr, imx->mmio_base + MX3_PWMCR);
- 	}
--	return rc;
-+
-+	imx->clk_enabled = 1;
-+	return 0;
- }
- 
- static void imx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- {
- 	struct imx_chip *imx = to_imx_chip(chip);
- 
--	writel(0, imx->mmio_base + MX3_PWMCR);
-+	if (!imx->clk_enabled)
-+		return;
- 
--	if (imx->clk_enabled) {
--		clk_disable_unprepare(imx->clk);
--		imx->clk_enabled = 0;
-+	if (!(cpu_is_mx1() || cpu_is_mx21())) {
-+		u32 cr = readl(imx->mmio_base + MX3_PWMCR);
-+		cr &= ~MX3_PWMCR_EN;
-+		writel(cr, imx->mmio_base + MX3_PWMCR);
- 	}
-+
-+	clk_disable_unprepare(imx->clk);
-+	imx->clk_enabled = 0;
- }
- 
- static struct pwm_ops imx_pwm_ops = {
+I suggest to take below patches and help to avoid some extra gray hair for 
+people looking for a fix for non-booting beagleboards
+
+thanks, p.
+
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index aa131b3..314c7bd 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -231,7 +231,7 @@ config MMC_SDHCI_S3C_DMA
+> 
+>  config MMC_OMAP
+>  	tristate "TI OMAP Multimedia Card Interface support"
+> -	depends on ARCH_OMAP
+> +	depends on ARCH_OMAP && DMADEVICES && DMA_OMAP
+>  	select TPS65010 if MACH_OMAP_H2
+>  	help
+>  	  This selects the TI OMAP Multimedia card Interface.
+> @@ -242,7 +242,8 @@ config MMC_OMAP
+> 
+>  config MMC_OMAP_HS
+>  	tristate "TI OMAP High Speed Multimedia Card Interface support"
+> -	depends on SOC_OMAP2430 || ARCH_OMAP3 || ARCH_OMAP4
+> +	depends on (SOC_OMAP2430 || ARCH_OMAP3 || ARCH_OMAP4) && \
+> +		    DMADEVICES && DMA_OMAP
+>  	help
+>  	  This selects the TI OMAP High Speed Multimedia card Interface.
+>  	  If you have an OMAP2430 or OMAP3 board or OMAP4 board with a
+> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+> index cd2fe35..1c23242 100644
+> --- a/drivers/spi/Kconfig
+> +++ b/drivers/spi/Kconfig
+> @@ -237,7 +237,7 @@ config SPI_OMAP_UWIRE
+> 
+>  config SPI_OMAP24XX
+>  	tristate "McSPI driver for OMAP"
+> -	depends on ARCH_OMAP2PLUS
+> +	depends on ARCH_OMAP2PLUS && DMADEVICES && DMA_OMAP
+>  	help
+>  	  SPI master controller for OMAP24XX and later Multichannel SPI
+>  	  (McSPI) modules.
+
+
+-- 
+
+Peter Meerwald
++43-664-2444418 (mobile)
