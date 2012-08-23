@@ -1,25 +1,92 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Thu, 23 Aug 2012 16:13:48 +0200
-Subject: [PATCH v3 4/4] arm/dts: Add tps65217 regulator DT data to
- am335x-bone.dts
-In-Reply-To: <1345547850-29761-5-git-send-email-anilkumar@ti.com>
-References: <1345547850-29761-1-git-send-email-anilkumar@ti.com>
- <1345547850-29761-5-git-send-email-anilkumar@ti.com>
-Message-ID: <A823657F-0D26-429F-8E1C-DF1AE5AB78F4@dominion.thruhere.net>
+From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
+Date: Thu, 23 Aug 2012 16:19:47 +0200 (CEST)
+Subject: [PATCH] pwm: Call pwm_enable() before pwm_config()
+In-Reply-To: <320569847.2756382.1345729013971.JavaMail.root@advansee.com>
+Message-ID: <217877237.2758643.1345731587941.JavaMail.root@advansee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Some PWM drivers enable the clock of the PWM peripheral in pwm_enable(). Hence,
+for these drivers, a call to pwm_config() does not have any effect before
+pwm_enable() has been called.
 
-Op 21 aug. 2012, om 13:17 heeft AnilKumar Ch <anilkumar@ti.com> het volgende geschreven:
+This patch fixes the PWM users to make sure that they call pwm_enable() before
+pwm_config().
 
-> Add tps65217 regulator device tree data to AM335x-Bone by adding
-> regulator consumers with tightened constraints and regulator-name.
-> TPS65217 regulator handle can be obtained by using this regulator
-> name.
-> 
-> This patch also add I2C node with I2C frequency and tps65217 PMIC
-> I2C slave address.
-> 
-> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+This fixes the first setting of brightness through sysfs that had no effect with
+leds-pwm and the i.MX PWM driver.
 
-I tried this and the kernel immediately crashes on my beaglebone. Could you upload the complete git tree and .config you used to test this to somewhere public please?
+Cc: Thierry Reding <thierry.reding@avionic-design.de>
+Cc: <linux-kernel@vger.kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Cc: <linux-input@vger.kernel.org>
+Cc: Bryan Wu <bryan.wu@canonical.com>
+Cc: Richard Purdie <rpurdie@rpsys.net>
+Cc: <linux-leds@vger.kernel.org>
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Cc: <linux-fbdev@vger.kernel.org>
+Cc: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+---
+ .../drivers/input/misc/pwm-beeper.c                |    6 +++---
+ .../drivers/leds/leds-pwm.c                        |    2 +-
+ .../drivers/video/backlight/pwm_bl.c               |    2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git linux-next-c94456b.orig/drivers/input/misc/pwm-beeper.c linux-next-c94456b/drivers/input/misc/pwm-beeper.c
+index fc84c8a..97d322b 100644
+--- linux-next-c94456b.orig/drivers/input/misc/pwm-beeper.c
++++ linux-next-c94456b/drivers/input/misc/pwm-beeper.c
+@@ -53,10 +53,10 @@ static int pwm_beeper_event(struct input_dev *input,
+ 		pwm_disable(beeper->pwm);
+ 	} else {
+ 		period = HZ_TO_NANOSECONDS(value);
+-		ret = pwm_config(beeper->pwm, period / 2, period);
++		ret = pwm_enable(beeper->pwm);
+ 		if (ret)
+ 			return ret;
+-		ret = pwm_enable(beeper->pwm);
++		ret = pwm_config(beeper->pwm, period / 2, period);
+ 		if (ret)
+ 			return ret;
+ 		beeper->period = period;
+@@ -156,8 +156,8 @@ static int pwm_beeper_resume(struct device *dev)
+ 	struct pwm_beeper *beeper = dev_get_drvdata(dev);
+ 
+ 	if (beeper->period) {
+-		pwm_config(beeper->pwm, beeper->period / 2, beeper->period);
+ 		pwm_enable(beeper->pwm);
++		pwm_config(beeper->pwm, beeper->period / 2, beeper->period);
+ 	}
+ 
+ 	return 0;
+diff --git linux-next-c94456b.orig/drivers/leds/leds-pwm.c linux-next-c94456b/drivers/leds/leds-pwm.c
+index f2e44c7..c2e0c22 100644
+--- linux-next-c94456b.orig/drivers/leds/leds-pwm.c
++++ linux-next-c94456b/drivers/leds/leds-pwm.c
+@@ -42,8 +42,8 @@ static void led_pwm_set(struct led_classdev *led_cdev,
+ 		pwm_config(led_dat->pwm, 0, period);
+ 		pwm_disable(led_dat->pwm);
+ 	} else {
+-		pwm_config(led_dat->pwm, brightness * period / max, period);
+ 		pwm_enable(led_dat->pwm);
++		pwm_config(led_dat->pwm, brightness * period / max, period);
+ 	}
+ }
+ 
+diff --git linux-next-c94456b.orig/drivers/video/backlight/pwm_bl.c linux-next-c94456b/drivers/video/backlight/pwm_bl.c
+index 995f016..a4bb95c 100644
+--- linux-next-c94456b.orig/drivers/video/backlight/pwm_bl.c
++++ linux-next-c94456b/drivers/video/backlight/pwm_bl.c
+@@ -65,8 +65,8 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
+ 
+ 		duty_cycle = pb->lth_brightness +
+ 		     (duty_cycle * (pb->period - pb->lth_brightness) / max);
+-		pwm_config(pb->pwm, duty_cycle, pb->period);
+ 		pwm_enable(pb->pwm);
++		pwm_config(pb->pwm, duty_cycle, pb->period);
+ 	}
+ 
+ 	if (pb->notify_after)
