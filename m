@@ -1,32 +1,93 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 23 Aug 2012 16:00:24 +0100
-Subject: [PATCH 07/22] ASoC: Ux500: Initialise PCM from MSP probe rather
- than as a device
-In-Reply-To: <20120823145904.GC1047@gmail.com>
-References: <002801cd7c31$14d3d0c0$3e7b7240$@se>
- <20120820085111.GJ8450@gmail.com>
- <006d01cd7f5a$65937840$30ba68c0$@se>
- <20120823092216.GA27264@gmail.com>
- <20120823113922.GZ7995@opensource.wolfsonmicro.com>
- <20120823121936.GA1047@gmail.com>
- <20120823125903.GA7995@opensource.wolfsonmicro.com>
- <20120823132618.GB1047@gmail.com>
- <20120823143757.GB7995@opensource.wolfsonmicro.com>
- <20120823145904.GC1047@gmail.com>
-Message-ID: <20120823150024.GF7995@opensource.wolfsonmicro.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 23 Aug 2012 16:01:25 +0100
+Subject: [PATCH 1/3] ARM: ux500: Add i2c configurations to the Device Tree for
+ DB8500 based devices
+Message-ID: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 03:59:06PM +0100, Lee Jones wrote:
+Since initial support was provided for the Nomadik I2C driver, it
+has been converted to an AMBA device. AMBA devices are probed in
+a slightly different way to other devices, so we have to identify
+them using an "arm,primecell" compatible string. As well as doing
+just that, this patch specifies which regulators the controller
+should use and requests a clock-speed. The latter is provided as
+more of an example, as it's the same as the recently changed
+default configuration.
 
-> I'll attempt to re-jig the patch-set, as this is a blocker atm.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/dbx5x0.dtsi |   25 ++++++++++++++++++++-----
+ 1 file changed, 20 insertions(+), 5 deletions(-)
 
-OK, if we could get at least the DAI driver and arch/arm changes in
-that'd at least make the series smaller.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120823/2f0dd929/attachment.sig>
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index 51209a8..3708a6b 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -480,43 +480,58 @@
+ 		};
+ 
+ 		i2c at 80004000 {
+-			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
++			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80004000 0x1000>;
+ 			interrupts = <0 21 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			v-i2c-supply = <&db8500_vape_reg>;
++
++			clock-frequency = <400000>;
+ 		};
+ 
+ 		i2c at 80122000 {
+-			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
++			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80122000 0x1000>;
+ 			interrupts = <0 22 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			v-i2c-supply = <&db8500_vape_reg>;
++
++			clock-frequency = <400000>;
+ 		};
+ 
+ 		i2c at 80128000 {
+-			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
++			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80128000 0x1000>;
+ 			interrupts = <0 55 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			v-i2c-supply = <&db8500_vape_reg>;
++
++			clock-frequency = <400000>;
+ 		};
+ 
+ 		i2c at 80110000 {
+-			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
++			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80110000 0x1000>;
+ 			interrupts = <0 12 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			v-i2c-supply = <&db8500_vape_reg>;
++
++			clock-frequency = <400000>;
+ 		};
+ 
+ 		i2c at 8012a000 {
+-			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
++			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x8012a000 0x1000>;
+ 			interrupts = <0 51 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			v-i2c-supply = <&db8500_vape_reg>;
++
++			clock-frequency = <400000>;
+ 		};
+ 
+ 		ssp at 80002000 {
+-- 
+1.7.9.5
