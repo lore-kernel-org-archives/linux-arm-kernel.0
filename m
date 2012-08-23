@@ -1,45 +1,39 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 23 Aug 2012 22:31:01 +0200
-Subject: [PATCH v2 1/9] pinctrl: mvebu: pinctrl driver core
-In-Reply-To: <50366E44.4030606@wwwdotorg.org>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1345623750-10645-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <5035445B.6000500@wwwdotorg.org>
- <CABJ1b_Tdr80DGqb-FRzwDbF3m7g6fBguk5GtRAfRUYx5Sqy_cA@mail.gmail.com>
- <50366E44.4030606@wwwdotorg.org>
-Message-ID: <50369305.6050304@gmail.com>
+From: dgreid@chromium.org (Dylan Reid)
+Date: Thu, 23 Aug 2012 13:51:09 -0700
+Subject: [PATCH] ASoC: samsung dma - prepare dma in start/resume trigger path
+Message-ID: <1345755069-9512-1-git-send-email-dgreid@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2012 07:54 PM, Stephen Warren wrote:
->> dt_parse() and dt_parse_function() build up structs that get used later on
->> in mvebu_pinmux_ops that require indexed functions. I can join them with
->> dt_node_to_map() but that would require incremental kzalloc for the
->> corresponding array. Or I could (functionally) leave dt_parse() to allocate
->> the array and only join dt_parse_function() with dt_node_to_map().
->
-> So everything you said makes sense, in that the core driver is
-> parameterizable and receives data from a SoC-variant-specific driver
-> indicating which pins/groups/functions are available. I'm still not sure
-> though why the translation of the pin/group/function structures passed
-> to probe into other data structures requires accessing the DT at all;
-> the set of available pins/groups/functions isn't configured through DT,
-> and doesn't need to be limited to only those options actually used in
-> DT, so can't you just process all the data that's passed to probe
-> without interaction with the DT?
+On suspend all dma transactions are terminated (by the stop/suspend
+trigger calling ops->stop), they need to be set up again during resume.
+Move the prepare op to the start/resume/unpause trigger path so that dma
+and audio will restart on resume/unpause.
 
-Hmm, maybe I still don't quite understand the terminology of pinctrl/pinmux
-core completely. What exactly should mvebu_pinmux_get_funcs_count return
-if not the number of DT node children?
+Signed-off-by: Dylan Reid <dgreid@chromium.org>
+---
+ sound/soc/samsung/dma.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-I thought that a "function" in the terminology of pinctrl/pinmux core is
-a list of pingroups and corresponding values to actually set it to e.g. uart1.
-In pinctrl-mvebu this would be one marvell,function assigned to one or more
-marvell,pins.
-
-If the above is correct, I still need to access DT in probe() at least to count
-the number of children passed to allocate an array for mvebu_pinmux_ops callbacks
-that get indexed by "fid" (pctl->functions).
-
-Sebastian
+diff --git a/sound/soc/samsung/dma.c b/sound/soc/samsung/dma.c
+index f3ebc38..5772762 100644
+--- a/sound/soc/samsung/dma.c
++++ b/sound/soc/samsung/dma.c
+@@ -250,6 +250,7 @@ static int dma_trigger(struct snd_pcm_substream *substream, int cmd)
+ 	case SNDRV_PCM_TRIGGER_START:
+ 	case SNDRV_PCM_TRIGGER_RESUME:
+ 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
++		dma_prepare(substream);
+ 		prtd->state |= ST_RUNNING;
+ 		prtd->params->ops->trigger(prtd->params->ch);
+ 		break;
+@@ -352,7 +353,6 @@ static struct snd_pcm_ops dma_ops = {
+ 	.ioctl		= snd_pcm_lib_ioctl,
+ 	.hw_params	= dma_hw_params,
+ 	.hw_free	= dma_hw_free,
+-	.prepare	= dma_prepare,
+ 	.trigger	= dma_trigger,
+ 	.pointer	= dma_pointer,
+ 	.mmap		= dma_mmap,
+-- 
+1.7.7.3
