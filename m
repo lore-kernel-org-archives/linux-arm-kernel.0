@@ -1,35 +1,24 @@
-From: rob@landley.net (Rob Landley)
-Date: Thu, 23 Aug 2012 16:29:37 -0500
-Subject: [PATCHv3 3/9] serial: vt8500: Add devicetree support for
-In-Reply-To: <201208220644.18059.arnd@arndb.de>
-References: <1345582058-2291-1-git-send-email-linux@prisktech.co.nz>
- <20120821231255.71a7515a@pyramind.ukuu.org.uk>
- <1345617278.7491.4.camel@gitbox> <201208220644.18059.arnd@arndb.de>
-Message-ID: <5036A0C1.4030209@landley.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 23 Aug 2012 23:49:50 +0200
+Subject: [PATCH 1/6] gpio/mxs: adopt irq_domain support for mxs gpio driver
+In-Reply-To: <1345472400-31262-2-git-send-email-shawn.guo@linaro.org>
+References: <1345472400-31262-1-git-send-email-shawn.guo@linaro.org>
+ <1345472400-31262-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CACRpkdbSaa6ZOZYB1Cm7WjW0O51kvwsTAxhjefEKd-7XaBB3dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2012 01:44 AM, Arnd Bergmann wrote:
-> On Wednesday 22 August 2012, Tony Prisk wrote:
->> The original patch was very simple, but I revisited it to fix other
->> issues and forgot to add the relevant comments.
->>
->> Port size is changed to fix a problem - WM8505 actually had 6 uart's
->> defined in platform data but the vt8500_ports variable was only 4.
->>
->> I have added devicetree port id support as well.
-> 
-> If you do multiple things in one driver, you should normally send multiple
-> patches as well, each with a description why that change is done.
-> It may seem silly at first to send out a one-line patch next to a 100-line
-> patch for the same file, but those cases are actually the ones where it's
-> most important.
+On Mon, Aug 20, 2012 at 4:19 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-Think of us poor git-bisect monkeys who have no idea why something broke
-but can (purely mechanically) figure out which commit did it. If it's a
-patch that does three unrelated things, we're kinda stuck.
+> Remove irq_domain_add_legacy call from mach-mxs.c and have the gpio
+> driver adopt irqdomain support, so that we can have the mapping
+> between gpio and irq number available without using virtual_irq_start
+> and MXS_GPIO_IRQ_START.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 
-Rob
--- 
-GNU/Linux isn't: Linux=GPLv2, GNU=GPLv3+, they can't share code.
-Either it's "mere aggregation", or a license violation.  Pick one.
+OK patch applied, thanks!
+
+Yours,
+Linus Walleij
