@@ -1,37 +1,36 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 23 Aug 2012 17:34:11 +0800
-Subject: [GIT PULL] imx fixes for 3.6 (take 2)
-Message-ID: <20120823093407.GE24242@S2101-09.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 23 Aug 2012 18:45:19 +0900
+Subject: [PATCH 1/2] ARM: S3C64XX: Update configuration for WM5102 module
+ on Cragganmore
+In-Reply-To: <20120813122359.GA13446@opensource.wolfsonmicro.com>
+References: <1344535549-4371-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <0db901cd76b4$7daf1730$790d4590$%kim@samsung.com>
+ <20120810100713.GH24328@opensource.wolfsonmicro.com>
+ <0eff01cd777f$4c9d1f90$e5d75eb0$%kim@samsung.com>
+ <20120813122359.GA13446@opensource.wolfsonmicro.com>
+Message-ID: <1d5901cd8114$023550f0$069ff2d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Mark Brown wrote:
+> 
+> On Sat, Aug 11, 2012 at 02:08:09PM +0900, Kukjin Kim wrote:
+> 
+> > BTW, don't you need to enable your Cragganmore board in the defconfig?
+> 
+> Well, it doesn't really matter that much to us - it's more a question
+> for whoever uses the defconfig.
 
-Please pull the following imx fixes for 3.6-rc.  Thanks.
+Yeah, actually SoC defconfig in mainline doesn't cover _real_ requirements
+for (mass) product. But I think, it's time we need to sort out the
+defconfigs so that we could use them efficiently on product. BTW, if
+enabling board in defconfig, at least, unexpected build breakages could be
+detected by testing defconfig before merge for mainline...
 
-Regards,
-Shawn
+Thanks.
 
-The following changes since commit d9875690d9b89a866022ff49e3fcea892345ad92:
-
-  Linux 3.6-rc2 (2012-08-16 14:51:24 -0700)
-
-are available in the git repository at:
-  git://git.linaro.org/people/shawnguo/linux-2.6.git imx/fixes-for-3.6
-
-Philipp Zabel (1):
-      ARM i.MX6q: Add virtual 1/3.5 dividers in the LDB clock path
-
-Shawn Guo (3):
-      ARM: imx6q: remove imx_src_prepare_restart() call
-      ARM: imx6: spin the cpu until hardware takes it down
-      ARM: dts: imx51-babbage: fix esdhc cd/wp properties
-
- .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |    8 +++---
- arch/arm/boot/dts/imx51-babbage.dts                |    4 +-
- arch/arm/mach-imx/clk-imx6q.c                      |    8 ++++--
- arch/arm/mach-imx/hotplug.c                        |   23 ++-----------------
- arch/arm/mach-imx/mach-imx6q.c                     |    2 -
- arch/arm/mach-imx/src.c                            |   13 -----------
- arch/arm/plat-mxc/include/mach/common.h            |    1 -
- 7 files changed, 14 insertions(+), 45 deletions(-)
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
