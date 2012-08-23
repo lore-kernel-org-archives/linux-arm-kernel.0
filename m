@@ -1,94 +1,76 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Wed, 22 Aug 2012 19:17:50 -0500
-Subject: Can one set GPIO direction in pinmux definition?
-In-Reply-To: <5034FCB2.5040709@grid-net.com>
-References: <5034FCB2.5040709@grid-net.com>
-Message-ID: <CAKGA1b=ko_KBW5KwSLmJ2W1KioZt2s2fuezfrB+oZFcwjC7LGg@mail.gmail.com>
+From: mporter@ti.com (Matt Porter)
+Date: Wed, 22 Aug 2012 21:09:33 -0400
+Subject: [PATCH v3 0/3] DaVinci DMA engine conversion
+Message-ID: <1345684176-21472-1-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2012 at 10:37 AM, Subodh Nijsure <snijsure@grid-net.com> wrote:
->
-> For a MX28 based hardware I am working with I need to use AUART4
->
-> I need to configure this AUART4 as uart only when necessary and at all other
-> times pins associated with AUART4 need to be configured as inputs.
->
-> I am using following DT definitions to setup AUART4 mux  but can't figure
-> out how to setup pin direction via DT, can it be done or I need to do it in
-> C code?
->
->         apb at 80000000 {
->                 apbh at 80000000 {
->                                 auart4_pins_a: auart4 at 0 {
->                                         reg = <0>;
->                                         fsl,pinmux-ids = <
->                                                 0x3142 /*
-> MX28_PAD_SAIF0_MCLK__AUART4_CTS */
->                                                 0x3152 /*
-> MX28_PAD_SAIF0_LRCLK__AUART4_RTS */
->                                                 0x3162 /*
-> MX28_PAD_SAIF0_BITCLK__AUART4_RX */
->                                                 0x3172 /*
-> MX28_PAD_SAIF0_SDATA0__AUART4_TX */
->                                         >;
->                                         fsl,drive-strength = <0>;
->                                         fsl,voltage = <1>;
->                                         fsl,pull-up = <0>;
->                                 };
->                                 auart4_highz_pins: auart4-gpio at 0 {
->                                         reg = <0>;
->                                         fsl,pinmux-ids = <
->                                                 0x3143 /*
-> MX28_PAD_SAIF0_MCLK__GPIO_3_20 */
->                                                 0x3153 /*
-> MX28_PAD_SAIF0_LRCLK__GPIO_3_21 */
->                                                 0x3163 /*
-> MX28_PAD_SAIF0_BITCLK__GPIO_3_22 */
->                                                 0x3173 /*
-> MX28_PAD_SAIF0_SDATA0__GPIO_3_23 */
->                                         >;
->                                         fsl,drive-strength = <0>;
->                                         fsl,voltage = <1>;
->                                         fsl,pull-up = <0>;
->                                 };
->                  };
->           };
->
->                 apbx at 80040000 {
->                         auart4: serial at 80072000 {
->                                 pinctrl-names = "default", "auart";
->                                 pinctrl-0 = <&auart4_highz_pins>;
->                                 pinctrl-1 = <&auart4_pins_a>;
->                                 status = "okay";
->                         };
->                };
+Changes since v1:
+	- Add virt-dma support. Better error checks
+	  and simplified descriptor handling.
+	- Fix support for multiple EDMA controllers
+	  Tested on AM18x EVM with WL12xx on MMC1
 
-Those pin definitions are defined per-device but they're parsed at
-module init - so you'd load uart, then your gpio stuff and your uart
-would stop working as it's input paths would have moved in the iomux
-controller. Until you unloaded the gpio and uart drivers, then loaded
-the right one. I am guessing you don't want to be forcibly loading and
-unloading drivers just to swap modes.
+Changes since v2:
+	- Set default Kconfig state to off
+	- Fix whitespace and indent issues
+	- Simplify struct device * assignments
+	- Remove unneeded chcnt in edma_chan_init
+	- Remove unneeded conditional assignment of prep_slave_sg
+	- Fix devm_* usage
 
-Someone did some kind of external bus muxing implementation
-("extbus"?) a while back which could sort this out; it's since lost in
-time and space, or at least I can't figure out the terms I need to
-Google to recover it or how I saved my bookmark. You'd have to
-(re-)write the drivers to support the switch (i.e. dynamically parse
-pinctrl nodes for the swap or pass them by reference to the muxing
-implementation) and stop "working" while the other is in use, but I
-feel like I remember that only really supported the case where you had
-multiple potential plugin boards at boot (not hotpluggable).
+This series begins the conversion of the DaVinci private EDMA API
+implementation to a DMA engine driver and converts two of the three
+in-kernel users of the private EDMA API to DMA engine.
 
-In order to set the directions you'd need to define them in a
-driver-specific way, but IMO there needs to be a binding that
-configures gpio directions anyway since there's not one currently
-which is perplexing - for interrupt-capable GPIO sources it is
-implicit through the gpio interrupt domain, but for just inputs you
-can read, you have to rely on the bootloader setting it up and your
-driver knowing exactly what to do..
+The approach taken is similar to the recent OMAP DMA Engine
+conversion. The EDMA DMA Engine driver is a wrapper around the existing
+private EDMA implementation and registers the platform device within
+the driver.  This allows the conversion series to stand alone with just
+the drivers and no changes to platform code. It also allows peripheral
+drivers to continue to use the private EDMA implementation until they
+are converted.
+
+The EDMA DMA Engine driver supports slave transfers only at this time. It
+is planned to add cyclic transfers in support of audio peripherals.
+
+There are three users of the private EDMA API in the kernel now:
+davinci_mmc, spi-davinci, and davinci-mcasp.  This series provides DMA
+Engine conversions for the davinci_mmc and spi-davinci drivers which
+use the supported slave transfers.
+
+This series has been tested on an AM18x EVM and Hawkboard with
+driver performance comparable to that of the private EDMA API
+implementations. Both MMC0 and MMC1 are tested which handles the
+DA850/OMAP-L138/AM18x specific case where MMC1 uses DMA channels on
+a second EDMA channel controller.  All other platforms have a simpler
+design with just a single EDMA channel controller.
+
+For those wanting to easily test this series, I've pushed a branch for
+each version to my github tree at https://github.com/ohporter/linux. The
+current branch is edma-dmaengine-v3.
+
+After this series, the current plan is to complete the mcasp driver
+conversion which includes adding cyclic dma support. This will then
+enable the removal and refactoring of the private EDMA API functionality
+into the EDMA DMA Engine driver.  Since EDMA is also used on the AM33xx
+family of parts in mach-omap2/, the plan is to enable this driver on
+that platform as well.
+
+Matt Porter (3):
+  dmaengine: add TI EDMA DMA engine driver
+  mmc: davinci_mmc: convert to DMA engine API
+  spi: spi-davinci: convert to DMA engine API
+
+ drivers/dma/Kconfig            |   10 +
+ drivers/dma/Makefile           |    1 +
+ drivers/dma/edma.c             |  671 ++++++++++++++++++++++++++++++++++++++++
+ drivers/mmc/host/davinci_mmc.c |  271 +++++-----------
+ drivers/spi/spi-davinci.c      |  292 ++++++++---------
+ include/linux/edma.h           |   29 ++
+ 6 files changed, 923 insertions(+), 351 deletions(-)
+ create mode 100644 drivers/dma/edma.c
+ create mode 100644 include/linux/edma.h
 
 -- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+1.7.9.5
