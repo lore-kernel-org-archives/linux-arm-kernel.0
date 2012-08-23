@@ -1,48 +1,40 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 23 Aug 2012 10:42:27 +0200
-Subject: [PATCHv3 0/4] 
-Message-ID: <1345711351-16367-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Thu, 23 Aug 2012 10:42:29 +0200
+Subject: [PATCH 2/4] ARM: dts: mxs: Add alternative I2C muxing options for
+ imx28
+In-Reply-To: <1345711351-16367-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1345711351-16367-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1345711351-16367-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Brian Lilly <brian@crystalfontz.com>
+---
+ arch/arm/boot/dts/imx28.dtsi |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-This patchset adds support for the solomon SSD1307 OLED controller present
-in the CFA-10036 board.
-
-It first adds the framebuffer driver for this controller, and then the
-needed bits to enable it in the cfa10036 dts.
-
-Thanks,
-Maxime
-
-Changes from v2:
-  * Add the pin name as comment to the pwm4 pinctrl declaration
-  * Change slightly the documentation of the dt bindings for the gpios to remove
-    the mxs-specific cell.
-
-Changes from v1:
-  * Did some factorisation of the ssd1307fb_write* functions.
-  * Filled the smem_start field of the fb_fix_screeninfo structure
-  * Fixed the broken pwm declaration
-  * Change the names of oled-reset-gpios and reset-active-low properties in the
-    device tree to oled-reset-gpio and oled-reset-active-low for consistency
-
-Maxime Ripard (4):
-  video: Add support for the Solomon SSD1307 OLED Controller
-  ARM: dts: mxs: Add alternative I2C muxing options for imx28
-  ARM: dts: mxs: Add pwm4 muxing options for imx28
-  ARM: dts: mxs: add oled support for the cfa-10036
-
- .../devicetree/bindings/video/ssd1307fb.txt        |   24 ++
- arch/arm/boot/dts/imx28-cfa10036.dts               |   20 +
- arch/arm/boot/dts/imx28.dtsi                       |   21 ++
- drivers/video/Kconfig                              |   13 +
- drivers/video/Makefile                             |    1 +
- drivers/video/ssd1307fb.c                          |  386 ++++++++++++++++++++
- 6 files changed, 465 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/video/ssd1307fb.txt
- create mode 100644 drivers/video/ssd1307fb.c
-
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 787efac..f6ffcd9 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -410,6 +410,17 @@
+ 					fsl,pull-up = <1>;
+ 				};
+ 
++				i2c0_pins_b: i2c0 at 1 {
++					reg = <1>;
++					fsl,pinmux-ids = <
++						0x3001 /* MX28_PAD_AUART0_RX__DUART_CTS */
++						0x3011 /* MX28_PAD_AUART0_TX__DUART_RTS */
++					>;
++					fsl,drive-strength = <1>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <1>;
++				};
++
+ 				saif0_pins_a: saif0 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
 -- 
 1.7.9.5
