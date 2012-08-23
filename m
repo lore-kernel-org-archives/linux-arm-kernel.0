@@ -1,74 +1,55 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 23 Aug 2012 22:55:27 +0800
-Subject: [PATCH 6/6] ARM: imx: select ARM_CPU_SUSPEND when necessary
-In-Reply-To: <201208231420.50247.arnd@arndb.de>
-References: <1345648390-4234-1-git-send-email-arnd@arndb.de>
- <1345648390-4234-7-git-send-email-arnd@arndb.de>
- <20120823024119.GD24242@S2101-09.ap.freescale.net>
- <201208231420.50247.arnd@arndb.de>
-Message-ID: <20120823145524.GM24242@S2101-09.ap.freescale.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 23 Aug 2012 15:59:06 +0100
+Subject: [PATCH 07/22] ASoC: Ux500: Initialise PCM from MSP probe rather
+ than as a device
+In-Reply-To: <20120823143757.GB7995@opensource.wolfsonmicro.com>
+References: <CACRpkdbc6bGC4Yp7Bcdfev=Uc=1h4L1v+Lj9RbmJV3F+knQOZQ@mail.gmail.com>
+ <002801cd7c31$14d3d0c0$3e7b7240$@se>
+ <20120820085111.GJ8450@gmail.com>
+ <006d01cd7f5a$65937840$30ba68c0$@se>
+ <20120823092216.GA27264@gmail.com>
+ <20120823113922.GZ7995@opensource.wolfsonmicro.com>
+ <20120823121936.GA1047@gmail.com>
+ <20120823125903.GA7995@opensource.wolfsonmicro.com>
+ <20120823132618.GB1047@gmail.com>
+ <20120823143757.GB7995@opensource.wolfsonmicro.com>
+Message-ID: <20120823145904.GC1047@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 02:20:50PM +0000, Arnd Bergmann wrote:
-> From 4036e8f292887e7b1abc8eacec7d619abd608178 Mon Sep 17 00:00:00 2001
-> From: Arnd Bergmann <arnd@arndb.de>
-> Date: Fri, 17 Aug 2012 00:16:08 +0000
-> Subject: [PATCH] ARM: imx: build i.MX6 functions only when needed
+On Thu, Aug 23, 2012 at 03:37:57PM +0100, Mark Brown wrote:
+> On Thu, Aug 23, 2012 at 02:26:19PM +0100, Lee Jones wrote:
 > 
-> The head-v7.S contains a call to the generic cpu_suspend function,
-> which is only available when selected by the i.MX6 code. As
-> pointed out by Shawn Guo, i.MX does not actually use any
+> > > I think Ola is suggesting probing the DMA driver from the machine which
+> > > will also work though I'm not 100% sure if I'm parsing the above
+> > > correctly.  The issue in DT terms is that if the DMA controller is
+> > > shared with a bunch of other IPs then it should have one node shared
+> > > between them all and not a bunch of shim nodes inserted in the middle
+> > > which only exists due to the way Linux instantiates stuff.
+> 
+> > When you say 'machine', do you mean from arch/<arch>/mach-*? If so, I'm
+> > keen for that not to happen.
+> 
+> No, sound/soc/ux500/snowball.c or whatever.  At least that's my guess.
 
-s/i.MX/i.MX5
+Ah, I see. Maybe the mop500.c file then.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> > > They instantiate the PCM driver dynamically from the DAI when it's
+> > > probed which is pretty much what you're patch is doing.
+> 
+> > So they do it in the same why I have with this patch? Do you know why
+> > Ola might think this is a bad idea?
+> 
+> I'm not 100% sure, I'm guessing it might be down to the fact that you
+> end up with multiple PCM drivers.  We could avoid that with refcounting
+> but nobody's really worried about it.
 
-> functions defined in head-v7.S. It is also needed only for
-> the i.MX6 power management code and for the SMP code, so
-> we can restrict building this file to situations in which
-> at least one of those two is present.
-> 
-> Finally, other platforms with a similar file call it headsmp.S,
-> so we can rename it to the same for consistency.
-> 
-> Without this patch, building imx5 standalone results in:
-> 
-> arch/arm/mach-imx/built-in.o: In function `v7_cpu_resume':
-> arch/arm/mach-imx/head-v7.S:104: undefined reference to `cpu_resume'
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Eric Miao <eric.miao@linaro.org>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: stable at vger.kernel.org
-> 
-> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> index e08adb7..d004d37 100644
-> --- a/arch/arm/mach-imx/Makefile
-> +++ b/arch/arm/mach-imx/Makefile
-> @@ -71,14 +71,13 @@ obj-$(CONFIG_DEBUG_LL) += lluart.o
->  obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
->  obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
->  obj-$(CONFIG_HAVE_IMX_SRC) += src.o
-> -obj-$(CONFIG_CPU_V7) += head-v7.o
-> -AFLAGS_head-v7.o :=-Wa,-march=armv7-a
-> -obj-$(CONFIG_SMP) += platsmp.o
-> +AFLAGS_headsmp.o :=-Wa,-march=armv7-a
-> +obj-$(CONFIG_SMP) += headsmp.o platsmp.o
->  obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
->  obj-$(CONFIG_SOC_IMX6Q) += clk-imx6q.o mach-imx6q.o
->  
->  ifeq ($(CONFIG_PM),y)
-> -obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o
-> +obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o
->  endif
->  
->  # i.MX5 based machines
-> diff --git a/arch/arm/mach-imx/head-v7.S b/arch/arm/mach-imx/headsmp.S
-> similarity index 100%
-> rename from arch/arm/mach-imx/head-v7.S
-> rename to arch/arm/mach-imx/headsmp.S
+I think I'll wait for Ola to get back, as he's the expert on this stuff.
+
+I'll attempt to re-jig the patch-set, as this is a blocker atm.
 
 -- 
-Regards,
-Shawn
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
