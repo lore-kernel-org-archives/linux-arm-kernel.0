@@ -1,87 +1,54 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 23 Aug 2012 11:54:12 -0600
-Subject: [PATCH v2 1/9] pinctrl: mvebu: pinctrl driver core
-In-Reply-To: <CABJ1b_Tdr80DGqb-FRzwDbF3m7g6fBguk5GtRAfRUYx5Sqy_cA@mail.gmail.com>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1345623750-10645-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <5035445B.6000500@wwwdotorg.org>
- <CABJ1b_Tdr80DGqb-FRzwDbF3m7g6fBguk5GtRAfRUYx5Sqy_cA@mail.gmail.com>
-Message-ID: <50366E44.4030606@wwwdotorg.org>
+Date: Thu, 23 Aug 2012 11:56:58 -0600
+Subject: [PATCH 4/7] regulator: anatop-regulator: convert to use imx-syscon
+ to access anatop register
+In-Reply-To: <20120823061202.GM4011@b20223-02.ap.freescale.net>
+References: <1345619928-15446-1-git-send-email-b29396@freescale.com>
+ <1345619928-15446-5-git-send-email-b29396@freescale.com>
+ <5035BDBF.9020602@wwwdotorg.org>
+ <20120823061202.GM4011@b20223-02.ap.freescale.net>
+Message-ID: <50366EEA.2070200@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2012 03:45 AM, Sebastian Hesselbarth wrote:
-> On 8/22/12, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 08/22/2012 02:22 AM, Sebastian Hesselbarth wrote:
->>> +++ b/drivers/pinctrl/pinctrl-mvebu.c
+On 08/23/2012 12:12 AM, Richard Zhao wrote:
+> On Wed, Aug 22, 2012 at 11:21:03PM -0600, Stephen Warren wrote:
+>> On 08/22/2012 01:18 AM, Dong Aisheng wrote:
+>>> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 >>
->>> +static int mvebu_pinctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
+>>> diff --git a/drivers/regulator/anatop-regulator.c b/drivers/regulator/anatop-regulator.c
 >>
->>> +	of_property_for_each_string(np, "marvell,pins", prop, group) {
->>> +		struct mvebu_pinctrl_group *grp =
->>> +			mvebu_pinctrl_find_group_by_name(pctl, group);
+>>> @@ -109,7 +110,11 @@ static int __devinit anatop_regulator_probe(struct platform_device *pdev)
+>>>  	rdesc->ops = &anatop_rops;
+>>>  	rdesc->type = REGULATOR_VOLTAGE;
+>>>  	rdesc->owner = THIS_MODULE;
+>>> -	sreg->mfd = anatopmfd;
 >>> +
->>> +		if (!grp) {
->>> +			dev_err(pctl->dev, "unknown pin %s", group);
->>> +			continue;
->>> +		}
->>> +
->>> +		if (!mvebu_pinctrl_find_setting_by_name(pctl, grp, function)) {
->>> +			dev_err(pctl->dev, "unsupported function %s on pin %s",
->>> +				function, group);
->>> +			continue;
->>> +		}
+>>> +	sreg->anatop = of_parse_phandle(np, "fsl,anatop", 0);
+>>> +	if (!sreg->anatop)
+>>> +		return -ENODEV;
 >>
->> The error-checking here isn't strictly necessary; the pinctrl core will
->> error-check all the names if/when the map entries are used. So, you
->> could probably get away with just assigning the pin/function names
->> directly into (*map) and hence remove some code here. Still, it's not a
->> big deal either way.
-> 
-> Hi Stephen,
-> 
-> as these error checks are only performed once, I'd like to have them there
-> as they give hints when someone uses wrong marvell,pins/function names
-> in DT.
-> 
->>> +static int __devinit mvebu_pinctrl_dt_parse_function(struct mvebu_pinctrl
->>> *pctl,
+>> In fact, that imx_syscon_lookup function I proposed could even do the
+>> of_parse_phandle() internally, so perhaps:
 >>
->>> +static int __devinit mvebu_pinctrl_dt_parse(struct platform_device
->>> *pdev,
->>> +					struct mvebu_pinctrl *pctl)
+>> foo->syscon_dev = imx_syscon_lookup(np, "fsl,anatop", 0);
+>> if (IS_ERR(foo->syscon_dev))
+>>     return PTR_ERR(foo->syscon_dev);
 >>
->> I don't understand what those two functions do, or a good chunk of
->> probe(). It seems like they're setting up the ability to get/set pin
->> configrations in addition to pin muxing, although if that's so, it seems
->> odd that none of the binding documents specify any way of controlling
->> pin configuration from device tree. Are you expecting drivers to call
->> APIs such as pin_config_set() directly, rather than controlling pin
->> config through DT?
-> 
-> probe() receives some structs from the SoC specific driver stubs that
-> describe, e.g. how many muxable pins are available, which pingroup they
-> belong to (marvell,pins), what valid register values are and how they are
-> named (marvell,function). Although, all mvebu SoC share a good part of
-> pinmux register layout, there are especially for dove some very different
-> ways to mux pins. As mvebu pinctrl is a true mux-only driver, i.e. no
-> pin drive strength or pin direction configuration, we decided not to have
-> single pins controlable but only pingroups even if they comprise only a
-> single pin.
-> 
-> dt_parse() and dt_parse_function() build up structs that get used later on
-> in mvebu_pinmux_ops that require indexed functions. I can join them with
-> dt_node_to_map() but that would require incremental kzalloc for the
-> corresponding array. Or I could (functionally) leave dt_parse() to allocate
-> the array and only join dt_parse_function() with dt_node_to_map().
+>> with imx_syscon_lookup() internally knowing when to return EPROBE_DEFER
+>> rather than any other permanent error code (e.g. for missing property,
+>> bad phandle, etc.)
+>
+> In some case that we access register in machine code, we don't have any
+> phandle. The node is got by find compatible or by path.
 
-So everything you said makes sense, in that the core driver is
-parameterizable and receives data from a SoC-variant-specific driver
-indicating which pins/groups/functions are available. I'm still not sure
-though why the translation of the pin/group/function structures passed
-to probe into other data structures requires accessing the DT at all;
-the set of available pins/groups/functions isn't configured through DT,
-and doesn't need to be limited to only those options actually used in
-DT, so can't you just process all the data that's passed to probe
-without interaction with the DT?
+That sounds a little odd; why not just use a phandle consistently
+everywhere?
+
+Either way though, I could imagine still putting all the lookup code
+into the syscon driver; just have different functions for the different
+lookup methods:
+
+imx_syscon_lookup_by_phandle(np, char *property_name)
+imx_syscon_lookup_by_compatible(char *compatible
+imx_syscon_lookup_by_path(char *node_path)
