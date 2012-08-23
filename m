@@ -1,24 +1,27 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 23 Aug 2012 16:23:24 +0100
-Subject: [PATCH] atmel-ssc: include linux/io.h for raw io
-In-Reply-To: <5036274D.8000803@atmel.com>
-References: <1344887950-25596-1-git-send-email-joachim.eastwood@jotron.com>
- <5036274D.8000803@atmel.com>
-Message-ID: <20120823152324.GI7995@opensource.wolfsonmicro.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 23 Aug 2012 18:34:43 +0300
+Subject: [PATCH v6] ARM: mtd: nand: davinci: add OF support for davinci
+ nand controller
+In-Reply-To: <1343632944-25971-1-git-send-email-hs@denx.de>
+References: <1343632944-25971-1-git-send-email-hs@denx.de>
+Message-ID: <1345736083.2848.248.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 02:51:25PM +0200, Nicolas Ferre wrote:
+On Mon, 2012-07-30 at 09:22 +0200, Heiko Schocher wrote:
+> add OF support for the davinci nand controller.
+> 
+> Signed-off-by: Heiko Schocher <hs@denx.de>
 
-> May I have your Acked-by for this patch, I plan to queue it with my
-> other at91-related fixes in arm-soc tree?
+Pushed to l2-mtd.git, thanks!
 
-Don't think the original patch was CCed to me - can you send me a copy
-please and I'll take a look?
+-- 
+Best Regards,
+Artem Bityutskiy
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120823/c63b9cf6/attachment.sig>
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120823/2bd20e75/attachment.sig>
