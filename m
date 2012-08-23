@@ -1,51 +1,77 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Aug 2012 16:01:26 +0100
-Subject: [PATCH 2/3] Documentation: Device Tree binding information for
- i2c-nomadik driver
+Date: Thu, 23 Aug 2012 16:01:27 +0100
+Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik I2C
+ driver
 In-Reply-To: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
 References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1345734087-21803-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This document describes each of the non-standard Device Tree bindings
-used in the Nomadik I2C driver.
+Here we apply the bindings required for successful Device Tree
+probing of the i2c-nomadik driver.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-i2c at vger.kernel.org
+Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- Documentation/devicetree/bindings/i2c/nomadik.txt |   23 +++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/i2c/nomadik.txt
+ drivers/i2c/busses/i2c-nomadik.c |   28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/i2c/nomadik.txt b/Documentation/devicetree/bindings/i2c/nomadik.txt
-new file mode 100644
-index 0000000..72065b0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/nomadik.txt
-@@ -0,0 +1,23 @@
-+I2C for Nomadik based systems
+diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+index 61b00ed..8168389 100644
+--- a/drivers/i2c/busses/i2c-nomadik.c
++++ b/drivers/i2c/busses/i2c-nomadik.c
+@@ -25,6 +25,7 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/platform_data/i2c-nomadik.h>
++#include <linux/of.h>
+ 
+ #define DRIVER_NAME "nmk-i2c"
+ 
+@@ -920,15 +921,42 @@ static struct nmk_i2c_controller u8500_i2c = {
+ 	.sm             = I2C_FREQ_MODE_FAST,
+ };
+ 
++static void nmk_i2c_of_probe(struct device_node *np,
++			struct nmk_i2c_controller *pdata)
++{
++	/* Provide the default configuration as a base. */
++	pdata = &u8500_i2c;
 +
-+Required (non-standard) properties:
-+ - Nil
++	of_property_read_u32(np, "clock-frequency", (u32*)&pdata->clk_freq);
 +
-+Recommended (non-standard) properties:
-+ - clock-frequency : Maximum bus clock frequency for the device
++	/* This driver only supports 'standard' and 'fast' modes of operation. */
++	if (pdata->clk_freq <= 100000)
++		pdata->sm = I2C_FREQ_MODE_STANDARD;
++	else
++		pdata->sm = I2C_FREQ_MODE_FAST;
++}
 +
-+Optional (non-standard) properties:
-+ - Nil
+ static atomic_t adapter_id = ATOMIC_INIT(0);
+ 
+ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
+ {
+ 	int ret = 0;
+ 	struct nmk_i2c_controller *pdata = adev->dev.platform_data;
++	struct device_node *np = adev->dev.of_node;
+ 	struct nmk_i2c_dev	*dev;
+ 	struct i2c_adapter *adap;
+ 
++	if (np) {
++		if (!pdata) {
++			pdata = devm_kzalloc(&adev->dev, sizeof(*pdata), GFP_KERNEL);
++			if (!pdata) {
++				ret = -ENOMEM;
++				goto err_no_mem;
++			}
++		}
++		nmk_i2c_of_probe(np, pdata);
++	}
 +
-+Example :
-+
-+i2c at 80004000 {
-+        compatible = "stericsson,db8500-i2c", "st,nomadik-i2c";
-+        reg = <0x80004000 0x1000>;
-+        interrupts = <0 21 0x4>;
-+        #address-cells = <1>;
-+        #size-cells = <0>;
-+        v-i2c-supply = <&db8500_vape_reg>;
-+
-+        clock-frequency = <400000>;
-+};
+ 	if (!pdata)
+ 		/* No i2c configuration found, using the default. */
+ 		pdata = &u8500_i2c;
 -- 
 1.7.9.5
