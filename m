@@ -1,30 +1,52 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 23 Aug 2012 11:04:52 +0800
-Subject: [PATCH 3/3] pinctrl: sirf: add DT-binding pinmux mapping support
-In-Reply-To: <1345690074-31327-4-git-send-email-Barry.Song@csr.com>
-References: <1345690074-31327-1-git-send-email-Barry.Song@csr.com>
- <1345690074-31327-4-git-send-email-Barry.Song@csr.com>
-Message-ID: <CAGsJ_4ziz=11DQGnnO5pEutrZzq4h3d-WU7UkGEVs2bzgmjq_w@mail.gmail.com>
+From: minchan@kernel.org (Minchan Kim)
+Date: Thu, 23 Aug 2012 12:49:35 +0900
+Subject: [RFC 2/4] ARM: dma-mapping: IOMMU allocates pages from pool with
+ GFP_ATOMIC
+In-Reply-To: <20120822.163648.3800987367886904.hdoyu@nvidia.com>
+References: <1345630830-9586-1-git-send-email-hdoyu@nvidia.com>
+ <1345630830-9586-3-git-send-email-hdoyu@nvidia.com>
+ <CAHQjnOOF7Ca-Dz8K_zcS=gxQsJvKYaWA3tqUeK1RSd-wLYZ44w@mail.gmail.com>
+ <20120822.163648.3800987367886904.hdoyu@nvidia.com>
+Message-ID: <20120823034935.GC5369@bbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Barry Song <Baohua.Song@csr.com>
->
-> This makes us possible to define pinmux mapping in board-specific DTS.
-> prima2.dtsi provides all possible (groups,functions) configuration, and
-> device in .dts select configurations from dtsi files.
->
-> Signed-off-by: Barry Song <Barry.Song@csr.com>
-> ---
->  arch/arm/boot/dts/prima2-evb.dts   |   37 ++++++
->  arch/arm/boot/dts/prima2.dtsi      |  221 +++++++++++++++++++++++++++++++++++-
->  arch/arm/mach-prima2/Makefile.boot |    2 +
->  drivers/pinctrl/pinctrl-sirf.c     |   58 +++++++++-
->  4 files changed, 315 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm/boot/dts/prima2-evb.dts
+On Wed, Aug 22, 2012 at 03:36:48PM +0200, Hiroshi Doyu wrote:
+> Hi,
+> 
+> KyongHo Cho <pullip.cho@samsung.com> wrote @ Wed, 22 Aug 2012 14:47:00 +0200:
+> 
+> > vzalloc() call in __iommu_alloc_buffer() also causes BUG() in atomic context.
+> 
+> Right.
+> 
+> I've been thinking that kzalloc() may be enough here, since
+> vzalloc() was introduced to avoid allocation failure for big chunk of
+> memory, but I think that it's unlikely that the number of page array
+> can be so big. So I propose to drop vzalloc() here, and just simply to
+> use kzalloc only as below(*1).
+> 
+> For example, 
+> 
+> 1920(H) x 1080(W) x 4(bytes) ~= 8MiB
+> 
+> For 8 MiB buffer,
+>   8(MiB) * 1024 = 8192(KiB)
+>   8192(KiB) / 4(KiB/page) = 2048 pages
+>   sizeof(struct page *) = 4 bytes
+>   2048(pages) * 4(bytes/page) = 8192(bytes) = 8(KiB)
+>   8(KiB) / 4(KiB/page) = 2 pages
+> 
+> If the above estimation is right(I hope;)), the necessary pages are
+> _at most_ 2 pages. If the system gets into the situation to fail to
+> allocate 2 contiguous pages, that's real the problem. I guess that
+> that kind of fragmentation problem would be solved with page migration
+> or something, especially nowadays devices are getting larger memories.
 
-Sorry for missing dt binding document, pls ignore this and take
+In atomic context, VM have no choice except relying on kswapd so
+high order allocation can fail easily when memory fragementation
+is high.
 
-[PATCH RESEND 3/3] pinctrl: sirf: add DT-binding pinmux mapping support
-
--barry
+-- 
+Kind regards,
+Minchan Kim
