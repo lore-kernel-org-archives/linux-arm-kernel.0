@@ -1,43 +1,36 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Thu, 23 Aug 2012 07:56:44 +0000
-Subject: [PATCH 2/5] ASoC: Davinci: McASP: add device tree support for
- McASP
-In-Reply-To: <20120817224131.GJ18871@opensource.wolfsonmicro.com>
-References: <1344948125-5649-1-git-send-email-gururaja.hebbar@ti.com>
- <1344948125-5649-3-git-send-email-gururaja.hebbar@ti.com>
- <20120817224131.GJ18871@opensource.wolfsonmicro.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA68834@DBDE01.ent.ti.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 23 Aug 2012 11:12:46 +0300
+Subject: [PATCH v3 5/9] ARM/ASoC: omap-mcbsp: Remove CLKR/FSR mux
+ configuration code
+In-Reply-To: <20120822191506.GL7995@opensource.wolfsonmicro.com>
+References: <1345124468-8876-1-git-send-email-peter.ujfalusi@ti.com>
+ <1345124468-8876-6-git-send-email-peter.ujfalusi@ti.com>
+ <20120822191506.GL7995@opensource.wolfsonmicro.com>
+Message-ID: <5035E5FE.90401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 18, 2012 at 04:11:32, Mark Brown wrote:
-> On Tue, Aug 14, 2012 at 06:12:02PM +0530, Hebbar, Gururaja wrote:
-> 
-> > +- op-mode : I2S/DIT ops mode.
-> 
-> This would normally be part of the machine binding since it needs to be
-> applied to both ends of the link.
+Hi Mark,
 
-But in case of McASP driver, it is used when calling snd_soc_register_dai()
-To pick the proper dai depending on the McASP operation mode.
+On 08/22/2012 10:15 PM, Mark Brown wrote:
+> Applied but this didn't quite apply cleanly, please check that it did so.
 
+The part which removes the omap_mcbsp_6pin_src_mux() function from
+sound/soc/omap/mcbsp.c is the one which did not made it.
 
-> When adding it could you come up with
-> a generic binding for this in terms of the current ASoC DAI paremeters
-> please?  That way we'll be able to have other machine drivers be
-> consistent with this one.
+It failed to apply on top of topic/omap is that the branch does not have the
+following commit:
+d0db84e ASoC: omap-mcbsp: Fix 6pin mux configuration
 
-Will look into this once I complete the initial DT porting.
+This patch is in your for-next branch. I can not find it in the for-3.6 or
+for-3.7 branch either.
 
-> 
-> > +- tdm-slots : Slots for TDM operation.
-> 
-> This would normally also be a machine driver thing though it's less
-> normal to need to configure this on both ends.
-> 
+Commit d0db84e was planed to be part of 3.6 AFAIK. Without that patch in
+topic/omap we are going to have merge issue with 3.7.
 
-This parameter is used by McASP hardware controller for managing slots and
-Isn't related to any machine modules.
+I can send a patch which removes the omap_mcbsp_6pin_src_mux() in topic/omap
+but the patch will similarly fail when we going to have d0db84e already
+applied mainline.
 
-Regards, 
-Gururaja
+-- 
+P?ter
