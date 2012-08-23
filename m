@@ -1,42 +1,50 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Thu, 23 Aug 2012 15:43:57 +0900
-Subject: [v2 0/4] ARM: dma-mapping: IOMMU atomic allocation
-In-Reply-To: <1345702229-9539-1-git-send-email-hdoyu@nvidia.com>
-References: <1345702229-9539-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20120823064357.GD5369@bbox>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 23 Aug 2012 12:35:08 +0530
+Subject: [PATCH 2/6] ARM: omap: allow building omap44xx without SMP
+In-Reply-To: <201208221722.06775.arnd@arndb.de>
+References: <1345648390-4234-1-git-send-email-arnd@arndb.de>
+ <1345648390-4234-3-git-send-email-arnd@arndb.de>
+ <CAMQu2gw0x6saWrK-M3teu49tJDGvS8RhGrVSh6JTs5DEy+22pA@mail.gmail.com>
+ <201208221722.06775.arnd@arndb.de>
+Message-ID: <CAMQu2gw_090MiWxs6m=5o0wQhL=ovmN1Y_7DUVhTbJU6mHPS5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 09:10:25AM +0300, Hiroshi Doyu wrote:
-> Hi,
-> 
-> The commit e9da6e9 "ARM: dma-mapping: remove custom consistent dma
-> region" breaks the compatibility with existing drivers. This causes
-> the following kernel oops(*1). That driver has called dma_pool_alloc()
-> to allocate memory from the interrupt context, and it hits
-> BUG_ON(in_interrpt()) in "get_vm_area_caller()". This patch seris
-> fixes this problem with making use of the pre-allocate atomic memory
-> pool which DMA is using in the same way as DMA does now.
-> 
-> Any comment would be really appreciated.
-> 
-> v2:
-> Don't modify attrs(DMA_ATTR_NO_KERNEL_MAPPING) for atomic allocation. (Marek)
-> Skip vzalloc (KyongHo, Minchan)
+On Wed, Aug 22, 2012 at 10:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> On Wednesday 22 August 2012, Shilimkar, Santosh wrote:
+>
+> > Was just thinking whether we should just take care of it at
+> > core cpuidle level itself. Will below be enough to kill the build
+> > error what you mentioned in the change log ?
+> >
+> > diff --git a/drivers/cpuidle/coupled.c b/drivers/cpuidle/coupled.c
+> > index 2c9bf26..df34534 100644
+> > --- a/drivers/cpuidle/coupled.c
+> > +++ b/drivers/cpuidle/coupled.c
+> > @@ -314,7 +314,9 @@ static void cpuidle_coupled_poke(int cpu)
+> >         struct call_single_data *csd = &per_cpu(cpuidle_coupled_poke_cb,
+> > cpu);
+> >
+> >         if (!cpumask_test_and_set_cpu(cpu, &cpuidle_coupled_poked_mask))
+> > +#ifdef CONFIG_SMP
+> >                 __smp_call_function_single(cpu, csd, 0);
+> > +#endif
+> >  }
+> >
+>
+> That would work, but isn't the entire concept of the cpuidle-coupled
+> driver
+> dependent on SMP? If this driver makes no sense on UP, I think we should
+> not attempt to build it.
+>
+I see your point but alternate patch is pushing down the fix to the low
+level driver and that means you end up patching more drivers when they
+use COUPLE idle infrastructure. That was the only reason I was thinking
+of suppressing the error at the source.
 
-Huh? I would like to correct exactly. I didn't say that kzalloc unify is okay.
-As KyongHo said, there are other usecases for allocating big buffer but
-I can't agree his opinion that it's system memory shortage if the allocation
-fails. Because there are lots of freeable pages(cached page + anon pages
-with swap , shrinkable slab and so on). But as I said early, VM can't do
-anything except relying on kswapd in atomic context while there are a ton
-of freeable pages in system and we can't gaurantee kswapd will do something
-for us before seeing the page allocation failure in process context.
-Especially, UP is more problem. So, it never indicate system needs more memory.
+Since it is just for the random builds and actually doesn't impact the real
+functionality as such, I am fine with your proposed patch too.
 
-Atomic high order allocation is very fragile in VM POV
-so caller should have fallback mechanism. Otherwise, don't do that.
-
--- 
-Kind regards,
-Minchan Kim
+Regards
+santosh
