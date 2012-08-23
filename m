@@ -1,55 +1,48 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 23 Aug 2012 12:58:29 +0000
-Subject: [PATCHv4 0/9] *** ARM: Update arch-vt8500 to Devicetree ***
-In-Reply-To: <201208231040.16702.arnd@arndb.de>
-References: <1345707346-9035-1-git-send-email-linux@prisktech.co.nz>,
- <201208231040.16702.arnd@arndb.de>
-Message-ID: <76F764B079F92A4E843589C893D0A022DAF68C14@SERVER.prisktech.co.nz>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 23 Aug 2012 21:13:46 +0800
+Subject: [GIT PULL] imx fixes for 3.6 (take 2)
+In-Reply-To: <20120823093407.GE24242@S2101-09.ap.freescale.net>
+References: <20120823093407.GE24242@S2101-09.ap.freescale.net>
+Message-ID: <20120823131342.GF24242@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->On Thursday 23 August 2012, Tony Prisk wrote:
->> Patchset based on Arnd's arm-soc/for-next branch.
->>
->>
->> Could I get this reviewed, hopefully for inclusion into v3.7.
+On Thu, Aug 23, 2012 at 05:34:11PM +0800, Shawn Guo wrote:
+> Hi Arnd, Olof,
+> 
+> Please pull the following imx fixes for 3.6-rc.  Thanks.
+> 
+> Regards,
+> Shawn
+> 
+> The following changes since commit d9875690d9b89a866022ff49e3fcea892345ad92:
+> 
+>   Linux 3.6-rc2 (2012-08-16 14:51:24 -0700)
+> 
+> are available in the git repository at:
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git imx/fixes-for-3.6
+> 
+> Philipp Zabel (1):
+>       ARM i.MX6q: Add virtual 1/3.5 dividers in the LDB clock path
+> 
+> Shawn Guo (3):
+>       ARM: imx6q: remove imx_src_prepare_restart() call
 
->I can take them into the arm-soc tree if there are no new comments.
->For the last two patches, you need to get an Acked-by comment from the
->gpio and clk maintainers, respectively, or you should send them
->the patches for inclusion in those subsystem trees.
+I just noticed something wrong with this patch, so updated the branch
+to drop it.  Please do not pull this one (if you already pulled the
+branch).
 
->        Arnd
+Regards,
+Shawn
 
-
-Linus W has provided some feedback on the gpio driver - I missed the
-issues he raised the first time around so just waiting for him to take a look
-at v4 when he's got time.
-
-I haven't heard from Mike T in regards to the new clock code - He did
-reply about the original patch (pre-devicetree) but I asked him to hold off
-reviewing it because it was going to be rewritten.
-
-EHCI/UHCI has gone to -next (on patchv2) via usb-next
-git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git
-There haven't been any changes to it in v3/v4.
-
-GPIO going via another tree isn't really an issue if necessary.
-
-Without the clock patch (9/9), the mach-vt8500 patch (6/9) won't compile
-due to unresolved symbols.
-
-In arch/arm/mach-vt8500/vt8500.c - you will get an unresolved symbol
-for 'vtwm_clk_init'
-
-Not sure if this matters, thought I should point it out.
-Does it need to compile cleanly in your tree (which is what I would assume),
-or just once its all combined in -next?
-Does it matter that the usb patches are already in -next?
-
-I don't really understand the requirements around submitting to individual
-trees and which (if any) of these points are actually issues.
-
-Regards
-
-Tony Prisk
+>       ARM: imx6: spin the cpu until hardware takes it down
+>       ARM: dts: imx51-babbage: fix esdhc cd/wp properties
+> 
+>  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |    8 +++---
+>  arch/arm/boot/dts/imx51-babbage.dts                |    4 +-
+>  arch/arm/mach-imx/clk-imx6q.c                      |    8 ++++--
+>  arch/arm/mach-imx/hotplug.c                        |   23 ++-----------------
+>  arch/arm/mach-imx/mach-imx6q.c                     |    2 -
+>  arch/arm/mach-imx/src.c                            |   13 -----------
+>  arch/arm/plat-mxc/include/mach/common.h            |    1 -
+>  7 files changed, 14 insertions(+), 45 deletions(-)
