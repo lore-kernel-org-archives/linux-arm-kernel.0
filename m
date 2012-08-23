@@ -1,551 +1,440 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 23 Aug 2012 19:35:45 +1200
-Subject: [PATCHv4 9/9] arm: vt8500: clk: Add Common Clock Framework support
+Date: Thu, 23 Aug 2012 19:35:43 +1200
+Subject: [PATCHv4 7/9] arm: vt8500: doc: Add device tree bindings for
+ arch-vt8500 devices
 In-Reply-To: <1345707346-9035-1-git-send-email-linux@prisktech.co.nz>
 References: <1345707346-9035-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1345707346-9035-10-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1345707346-9035-8-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds common clock framework support for arch-vt8500.
-Support for PLL and device clocks on VT8500, WM8505 and WM8650
-are included.
+Bindings for gpio, interrupt controller, power management controller,
+timer, realtime clock, serial uart, ehci and uhci controllers and
+framebuffer controllers used on the arch-vt8500 platform.
+
+Framebuffer binding also specifies a 'display' node which is required
+for determining the lcd panel data.
 
 Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
- drivers/clk/Makefile     |    1 +
- drivers/clk/clk-vt8500.c |  511 ++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 512 insertions(+)
- create mode 100644 drivers/clk/clk-vt8500.c
+ Documentation/devicetree/bindings/arm/vt8500.txt   |   15 ++++
+ .../bindings/arm/vt8500/via,vt8500-intc.txt        |   16 +++++
+ .../bindings/arm/vt8500/via,vt8500-pmc.txt         |   13 ++++
+ .../bindings/arm/vt8500/via,vt8500-timer.txt       |   15 ++++
+ Documentation/devicetree/bindings/clock/vt8500.txt |   72 ++++++++++++++++++++
+ .../devicetree/bindings/gpio/gpio-vt8500.txt       |   24 +++++++
+ .../devicetree/bindings/rtc/via,vt8500-rtc.txt     |   15 ++++
+ .../bindings/tty/serial/via,vt8500-uart.txt        |   17 +++++
+ .../devicetree/bindings/usb/platform-uhci.txt      |   15 ++++
+ .../devicetree/bindings/usb/via,vt8500-ehci.txt    |   15 ++++
+ .../devicetree/bindings/vendor-prefixes.txt        |    2 +
+ .../devicetree/bindings/video/via,vt8500-fb.txt    |   48 +++++++++++++
+ .../devicetree/bindings/video/wm,prizm-ge-rops.txt |   13 ++++
+ .../devicetree/bindings/video/wm,wm8505-fb.txt     |   22 ++++++
+ 14 files changed, 302 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/vt8500.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/vt8500/via,vt8500-intc.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/vt8500/via,vt8500-pmc.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/vt8500/via,vt8500-timer.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/vt8500.txt
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-vt8500.txt
+ create mode 100644 Documentation/devicetree/bindings/rtc/via,vt8500-rtc.txt
+ create mode 100644 Documentation/devicetree/bindings/tty/serial/via,vt8500-uart.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/platform-uhci.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
+ create mode 100644 Documentation/devicetree/bindings/video/via,vt8500-fb.txt
+ create mode 100644 Documentation/devicetree/bindings/video/wm,prizm-ge-rops.txt
+ create mode 100644 Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 5869ea3..42fb173 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -10,6 +10,7 @@ obj-$(CONFIG_ARCH_SOCFPGA)	+= socfpga/
- obj-$(CONFIG_PLAT_SPEAR)	+= spear/
- obj-$(CONFIG_ARCH_U300)		+= clk-u300.o
- obj-$(CONFIG_ARCH_INTEGRATOR)	+= versatile/
-+obj-$(CONFIG_ARCH_VT8500)	+= clk-vt8500.o
- 
- # Chip specific
- obj-$(CONFIG_COMMON_CLK_WM831X) += clk-wm831x.o
-diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
+diff --git a/Documentation/devicetree/bindings/arm/vt8500.txt b/Documentation/devicetree/bindings/arm/vt8500.txt
 new file mode 100644
-index 0000000..2f7c77d
+index 0000000..1b3b187
 --- /dev/null
-+++ b/drivers/clk/clk-vt8500.c
-@@ -0,0 +1,511 @@
-+/* drivers/clk/clk-vt8500.c
-+ *
-+ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
++++ b/Documentation/devicetree/bindings/arm/vt8500.txt
+@@ -0,0 +1,15 @@
++VIA/Wondermedia VT8500 Platforms Device Tree Bindings
++---------------------------------------
 +
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/slab.h>
-+#include <linux/bitops.h>
-+#include <linux/clkdev.h>
-+#include <linux/clk-provider.h>
++Boards with the VIA VT8500 SoC shall have the following properties:
++Required root node property:
++compatible = "via,vt8500";
 +
-+/* All clocks share the same lock as none can be changed concurrently */
-+static DEFINE_SPINLOCK(_lock);
++Boards with the Wondermedia WM8505 SoC shall have the following properties:
++Required root node property:
++compatible = "wm,wm8505";
 +
-+struct clk_device {
-+	struct clk_hw	hw;
-+	void __iomem	*div_reg;
-+	unsigned int	div_mask;
-+	void __iomem	*en_reg;
-+	int		en_bit;
-+	spinlock_t	*lock;
++Boards with the Wondermedia WM8650 SoC shall have the following properties:
++Required root node property:
++compatible = "wm,wm8650";
++
+diff --git a/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-intc.txt b/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-intc.txt
+new file mode 100644
+index 0000000..0a4ce10
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-intc.txt
+@@ -0,0 +1,16 @@
++VIA/Wondermedia VT8500 Interrupt Controller
++-----------------------------------------------------
++
++Required properties:
++- compatible : "via,vt8500-intc"
++- reg : Should contain 1 register ranges(address and length)
++- #interrupt-cells : should be <1>
++
++Example:
++
++	intc: interrupt-controller at d8140000 {
++		compatible = "via,vt8500-intc";
++		interrupt-controller;
++		reg = <0xd8140000 0x10000>;
++		#interrupt-cells = <1>;
++	};
+diff --git a/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-pmc.txt b/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-pmc.txt
+new file mode 100644
+index 0000000..521b9c7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-pmc.txt
+@@ -0,0 +1,13 @@
++VIA/Wondermedia VT8500 Power Management Controller
++-----------------------------------------------------
++
++Required properties:
++- compatible : "via,vt8500-pmc"
++- reg : Should contain 1 register ranges(address and length)
++
++Example:
++
++	pmc at d8130000 {
++		compatible = "via,vt8500-pmc";
++		reg = <0xd8130000 0x1000>;
++	};
+diff --git a/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-timer.txt b/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-timer.txt
+new file mode 100644
+index 0000000..901c73f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/vt8500/via,vt8500-timer.txt
+@@ -0,0 +1,15 @@
++VIA/Wondermedia VT8500 Timer
++-----------------------------------------------------
++
++Required properties:
++- compatible : "via,vt8500-timer"
++- reg : Should contain 1 register ranges(address and length)
++- interrupts : interrupt for the timer
++
++Example:
++
++	timer at d8130100 {
++		compatible = "via,vt8500-timer";
++		reg = <0xd8130100 0x28>;
++		interrupts = <36>;
++	};
+diff --git a/Documentation/devicetree/bindings/clock/vt8500.txt b/Documentation/devicetree/bindings/clock/vt8500.txt
+new file mode 100644
+index 0000000..a880c70
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/vt8500.txt
+@@ -0,0 +1,72 @@
++Device Tree Clock bindings for arch-vt8500
++
++This binding uses the common clock binding[1].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Required properties:
++- compatible : shall be one of the following:
++	"via,vt8500-pll-clock" - for a VT8500/WM8505 PLL clock
++	"wm,wm8650-pll-clock" - for a WM8650 PLL clock
++	"via,vt8500-device-clock" - for a VT/WM device clock
++
++Required properties for PLL clocks:
++- reg : shall be the control register offset from PMC base for the pll clock.
++- clocks : shall be the input parent clock phandle for the clock. This should
++	be the reference clock.
++- #clock-cells : from common clock binding; shall be set to 0.
++
++Required properties for device clocks:
++- clocks : shall be the input parent clock phandle for the clock. This should
++	be a pll output.
++- #clock-cells : from common clock binding; shall be set to 0.
++
++
++Device Clocks
++
++Device clocks are required to have one or both of the following sets of
++properties:
++
++
++Gated device clocks:
++
++Required properties:
++- enable-reg : shall be the register offset from PMC base for the enable
++	register.
++- enable-bit : shall be the bit within enable-reg to enable/disable the clock.
++
++
++Divisor device clocks:
++
++Required property:
++- divisor-reg : shall be the register offset from PMC base for the divisor
++	register.
++Optional property:
++- divisor-mask : shall be the mask for the divisor register. Defaults to 0x1f
++	if not specified.
++
++
++For example:
++
++ref25: ref25M {
++	#clock-cells = <0>;
++	compatible = "fixed-clock";
++	clock-frequency = <25000000>;
 +};
 +
-+/*
-+ * Add new PLL_TYPE_x definitions here as required. Use the first known model
-+ * to support the new type as the name.
-+ * Add case statements to vtwm_pll_recalc_rate(), vtwm_pll_round_round() and
-+ * vtwm_pll_set_rate() to handle the new PLL_TYPE_x
-+ */
-+
-+#define PLL_TYPE_VT8500		0
-+#define PLL_TYPE_WM8650		1
-+
-+struct clk_pll {
-+	struct clk_hw	hw;
-+	void __iomem	*reg;
-+	spinlock_t	*lock;
-+	int		type;
++plla: plla {
++	#clock-cells = <0>;
++	compatible = "wm,wm8650-pll-clock";
++	clocks = <&ref25>;
++	reg = <0x200>;
 +};
 +
-+static void __iomem *pmc_base;
-+
-+#define to_clk_device(_hw) container_of(_hw, struct clk_device, hw)
-+
-+
-+#define VT8500_PMC_BUSY_MASK		0x18
-+
-+static void vt8500_pmc_wait_busy(void)
-+{
-+	while (readl(pmc_base) & VT8500_PMC_BUSY_MASK)
-+		cpu_relax();
-+}
-+
-+static void vt8500_dclk_endisable(struct clk_hw *hw, int enable)
-+{
-+	struct clk_device *cdev = to_clk_device(hw);
-+	u32 en_val;
-+	unsigned long flags = 0;
-+
-+	spin_lock_irqsave(cdev->lock, flags);
-+
-+	en_val = readl(cdev->en_reg);
-+
-+	if (enable)
-+		en_val |= BIT(cdev->en_bit);
-+	else
-+		en_val &= ~BIT(cdev->en_bit);
-+
-+	writel(en_val, cdev->en_reg);
-+
-+	spin_unlock_irqrestore(cdev->lock, flags);
-+}
-+
-+static int vt8500_dclk_enable(struct clk_hw *hw)
-+{
-+	vt8500_dclk_endisable(hw, 1);
-+	return 0;
-+}
-+
-+static void vt8500_dclk_disable(struct clk_hw *hw)
-+{
-+	vt8500_dclk_endisable(hw, 0);
-+}
-+
-+static int vt8500_dclk_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_device *cdev = to_clk_device(hw);
-+	u32 en_val = (readl(cdev->en_reg) & BIT(cdev->en_bit));
-+
-+	return en_val ? 1 : 0;
-+}
-+
-+static unsigned long vt8500_dclk_recalc_rate(struct clk_hw *hw,
-+				unsigned long parent_rate)
-+{
-+	struct clk_device *cdev = to_clk_device(hw);
-+	u32 div = readl(cdev->div_reg) & cdev->div_mask;
-+
-+	/* Special case for SDMMC devices */
-+	if ((cdev->div_mask == 0x3F) && (div & BIT(5)))
-+		div = 64 * (div & 0x1f);
-+
-+	/* div == 0 is actually the highest divisor */
-+	if (div == 0)
-+		div = (cdev->div_mask + 1);
-+
-+	return parent_rate / div;
-+}
-+
-+static long vt8500_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long *prate)
-+{
-+	u32 divisor = rate / *prate;
-+
-+	return *prate / divisor;
-+}
-+
-+static int vt8500_dclk_set_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long parent_rate)
-+{
-+	struct clk_device *cdev = to_clk_device(hw);
-+	u32 divisor = rate / parent_rate;
-+	unsigned long flags = 0;
-+
-+	if (divisor == cdev->div_mask + 1)
-+		divisor = 0;
-+
-+	if (divisor > cdev->div_mask) {
-+		pr_err("%s: invalid divisor for clock\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	spin_lock_irqsave(cdev->lock, flags);
-+
-+	vt8500_pmc_wait_busy();
-+	writel(divisor, cdev->div_reg);
-+	vt8500_pmc_wait_busy();
-+
-+	spin_lock_irqsave(cdev->lock, flags);
-+
-+	return 0;
-+}
-+
-+
-+static const struct clk_ops vt8500_gated_clk_ops = {
-+	.enable = vt8500_dclk_enable,
-+	.disable = vt8500_dclk_disable,
-+	.is_enabled = vt8500_dclk_is_enabled,
++sdhc: sdhc {
++	#clock-cells = <0>;
++	compatible = "via,vt8500-device-clock";
++	clocks = <&pllb>;
++	divisor-reg = <0x328>;
++	divisor-mask = <0x3f>;
++	enable-reg = <0x254>;
++	enable-bit = <18>;
 +};
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-vt8500.txt b/Documentation/devicetree/bindings/gpio/gpio-vt8500.txt
+new file mode 100644
+index 0000000..f4dc523
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio-vt8500.txt
+@@ -0,0 +1,24 @@
++VIA/Wondermedia VT8500 GPIO Controller
++-----------------------------------------------------
 +
-+static const struct clk_ops vt8500_divisor_clk_ops = {
-+	.round_rate = vt8500_dclk_round_rate,
-+	.set_rate = vt8500_dclk_set_rate,
-+	.recalc_rate = vt8500_dclk_recalc_rate,
-+};
++Required properties:
++- compatible : "via,vt8500-gpio", "wm,wm8505-gpio"
++	or "wm,wm8650-gpio" depending on your SoC
++- reg : Should contain 1 register range (address and length)
++- #gpio-cells : should be <3>.
++	1) bank
++	2) pin number
++	3) flags - should be 0
 +
-+static const struct clk_ops vt8500_gated_divisor_clk_ops = {
-+	.enable = vt8500_dclk_enable,
-+	.disable = vt8500_dclk_disable,
-+	.is_enabled = vt8500_dclk_is_enabled,
-+	.round_rate = vt8500_dclk_round_rate,
-+	.set_rate = vt8500_dclk_set_rate,
-+	.recalc_rate = vt8500_dclk_recalc_rate,
-+};
++Example:
 +
-+#define CLK_INIT_GATED			BIT(0)
-+#define CLK_INIT_DIVISOR		BIT(1)
-+#define CLK_INIT_GATED_DIVISOR		(CLK_INIT_DIVISOR | CLK_INIT_GATED)
++	gpio: gpio-controller at d8110000 {
++		compatible = "via,vt8500-gpio";
++		gpio-controller;
++		reg = <0xd8110000 0x10000>;
++		#gpio-cells = <3>;
++	};
 +
-+static __init void vtwm_device_clk_init(struct device_node *node)
-+{
-+	u32 en_reg, div_reg;
-+	struct clk *clk;
-+	struct clk_device *dev_clk;
-+	const char *clk_name = node->name;
-+	const char *parent_name;
-+	struct clk_init_data init;
-+	int rc;
-+	int clk_init_flags = 0;
++	vibrate {
++		gpios = <&gpio 0 1 0>; /* Bank 0, Pin 1, No flags */
++	};
+diff --git a/Documentation/devicetree/bindings/rtc/via,vt8500-rtc.txt b/Documentation/devicetree/bindings/rtc/via,vt8500-rtc.txt
+new file mode 100644
+index 0000000..3c0484c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rtc/via,vt8500-rtc.txt
+@@ -0,0 +1,15 @@
++VIA/Wondermedia VT8500 Realtime Clock Controller
++-----------------------------------------------------
 +
-+	dev_clk = kzalloc(sizeof(*dev_clk), GFP_KERNEL);
-+	if (WARN_ON(!dev_clk))
-+		return;
++Required properties:
++- compatible : "via,vt8500-rtc"
++- reg : Should contain 1 register ranges(address and length)
++- interrupts : alarm interrupt
 +
-+	dev_clk->lock = &_lock;
++Example:
 +
-+	rc = of_property_read_u32(node, "enable-reg", &en_reg);
-+	if (!rc) {
-+		dev_clk->en_reg = pmc_base + en_reg;
-+		rc = of_property_read_u32(node, "enable-bit", &dev_clk->en_bit);
-+		if (rc) {
-+			pr_err("%s: enable-bit property required for gated clock\n",
-+								__func__);
-+			return;
-+		}
-+		clk_init_flags |= CLK_INIT_GATED;
-+	}
++	rtc at d8100000 {
++		compatible = "via,vt8500-rtc";
++		reg = <0xd8100000 0x10000>;
++		interrupts = <48>;
++	};
+diff --git a/Documentation/devicetree/bindings/tty/serial/via,vt8500-uart.txt b/Documentation/devicetree/bindings/tty/serial/via,vt8500-uart.txt
+new file mode 100644
+index 0000000..5feef1e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/tty/serial/via,vt8500-uart.txt
+@@ -0,0 +1,17 @@
++VIA/Wondermedia VT8500 UART Controller
++-----------------------------------------------------
 +
-+	rc = of_property_read_u32(node, "divisor-reg", &div_reg);
-+	if (!rc) {
-+		dev_clk->div_reg = pmc_base + div_reg;
-+		/*
-+		 * use 0x1f as the default mask since it covers
-+		 * almost all the clocks and reduces dts properties
-+		 */
-+		dev_clk->div_mask = 0x1f;
++Required properties:
++- compatible : "via,vt8500-uart"
++- reg : Should contain 1 register ranges(address and length)
++- interrupts : UART interrupt
++- clocks : phandle to the uart source clock (usually a 24Mhz fixed clock)
 +
-+		of_property_read_u32(node, "divisor-mask", &dev_clk->div_mask);
-+		clk_init_flags |= CLK_INIT_DIVISOR;
-+	}
++Example:
 +
-+	of_property_read_string(node, "clock-output-names", &clk_name);
++	uart at d8210000 {
++		compatible = "via,vt8500-uart";
++		reg = <0xd8210000 0x1040>;
++		interrupts = <47>;
++		clocks = <&ref24>;
++	};
+diff --git a/Documentation/devicetree/bindings/usb/platform-uhci.txt b/Documentation/devicetree/bindings/usb/platform-uhci.txt
+new file mode 100644
+index 0000000..a4fb071
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/platform-uhci.txt
+@@ -0,0 +1,15 @@
++Generic Platform UHCI Controller
++-----------------------------------------------------
 +
-+	switch (clk_init_flags) {
-+	case CLK_INIT_GATED:
-+		init.ops = &vt8500_gated_clk_ops;
-+		break;
-+	case CLK_INIT_DIVISOR:
-+		init.ops = &vt8500_divisor_clk_ops;
-+		break;
-+	case CLK_INIT_GATED_DIVISOR:
-+		init.ops = &vt8500_gated_divisor_clk_ops;
-+		break;
-+	default:
-+		pr_err("%s: Invalid clock description in device tree\n",
-+								__func__);
-+		kfree(dev_clk);
-+		return;
-+	}
++Required properties:
++- compatible : "platform-uhci"
++- reg : Should contain 1 register ranges(address and length)
++- interrupts : UHCI controller interrupt
 +
-+	init.name = clk_name;
-+	init.flags = 0;
-+	parent_name = of_clk_get_parent_name(node, 0);
-+	init.parent_names = &parent_name;
-+	init.num_parents = 1;
++Example:
 +
-+	dev_clk->hw.init = &init;
++	uhci at d8007b00 {
++		compatible = "platform-uhci";
++		reg = <0xd8007b00 0x200>;
++		interrupts = <43>;
++	};
+diff --git a/Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt b/Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
+new file mode 100644
+index 0000000..17b3ad1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
+@@ -0,0 +1,15 @@
++VIA/Wondermedia VT8500 EHCI Controller
++-----------------------------------------------------
 +
-+	clk = clk_register(NULL, &dev_clk->hw);
-+	if (WARN_ON(IS_ERR(clk))) {
-+		kfree(dev_clk);
-+		return;
-+	}
-+	rc = of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+	clk_register_clkdev(clk, clk_name, NULL);
-+}
++Required properties:
++- compatible : "via,vt8500-ehci"
++- reg : Should contain 1 register ranges(address and length)
++- interrupts : ehci controller interrupt
 +
++Example:
 +
-+/* PLL clock related functions */
++	ehci at d8007900 {
++		compatible = "via,vt8500-ehci";
++		reg = <0xd8007900 0x200>;
++		interrupts = <43>;
++	};
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index db4d3af..5c63da2 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -47,5 +47,7 @@ sirf	SiRF Technology, Inc.
+ st	STMicroelectronics
+ stericsson	ST-Ericsson
+ ti	Texas Instruments
++via	VIA Technologies, Inc.
+ wlf	Wolfson Microelectronics
++wm	Wondermedia Technologies, Inc.
+ xlnx	Xilinx
+diff --git a/Documentation/devicetree/bindings/video/via,vt8500-fb.txt b/Documentation/devicetree/bindings/video/via,vt8500-fb.txt
+new file mode 100644
+index 0000000..98ad14c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/video/via,vt8500-fb.txt
+@@ -0,0 +1,48 @@
++VIA VT8500 Framebuffer
++-----------------------------------------------------
 +
-+#define to_clk_pll(_hw) container_of(_hw, struct clk_pll, hw)
++Required properties:
++- compatible : "via,vt8500-fb"
++- reg : Should contain 1 register ranges(address and length)
++- interrupts : framebuffer controller interrupt
++- via,display: a phandle pointing to the display node
 +
-+/* Helper macros for PLL_VT8500 */
-+#define VT8500_PLL_MUL(x)	((x & 0x1F) << 1)
-+#define VT8500_PLL_DIV(x)	((x & 0x100) ? 1 : 2)
++Required nodes:
++- display: a display node is required to initialize the lcd panel
++	This should be in the board dts.
 +
-+#define VT8500_BITS_TO_FREQ(r, m, d)					\
-+				((r / d) * m)
++Example:
 +
-+#define VT8500_BITS_TO_VAL(m, d)					\
-+				((d == 2 ? 0 : 0x100) | ((m >> 1) & 0x1F))
++	fb at d800e400 {
++		compatible = "via,vt8500-fb";
++		reg = <0xd800e400 0x400>;
++		interrupts = <12>;
++		via,display = <&display>;
++	};
 +
-+/* Helper macros for PLL_WM8650 */
-+#define WM8650_PLL_MUL(x)	(x & 0x3FF)
-+#define WM8650_PLL_DIV(x)	(((x >> 10) & 7) * (1 << ((x >> 13) & 3)))
++VIA VT8500 Display
++-----------------------------------------------------
++Required properties:
++- xres : lcd panel horizontal resolution
++- yres : lcd panel vertical resolution
++- left-margin,
++- right-margin,
++- hsync-len: lcd panel horizontal timings in pixels
++- upper-margin,
++- lower-margin,
++- vsync-len: lcd panel verticals timings in pixels
++- bpp: lcd panel bit-depth.
++	<16> for RGB565, <32> for RGB888
 +
-+#define WM8650_BITS_TO_FREQ(r, m, d1, d2)				\
-+				(r * m / (d1 * (1 << d2)))
++Example:
++	display {
++		xres = <800>;
++		yres = <480>;
++		left-margin = <88>;
++		right-margin = <40>;
++		hsync-len = <0>;
++		upper-margin = <32>;
++		lower-margin = <11>;
++		vsync-len = <1>;
++		bpp = <16>;
++	};
+diff --git a/Documentation/devicetree/bindings/video/wm,prizm-ge-rops.txt b/Documentation/devicetree/bindings/video/wm,prizm-ge-rops.txt
+new file mode 100644
+index 0000000..a850fa0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/video/wm,prizm-ge-rops.txt
+@@ -0,0 +1,13 @@
++VIA/Wondermedia Graphics Engine Controller
++-----------------------------------------------------
 +
-+#define WM8650_BITS_TO_VAL(m, d1, d2)					\
-+				((d2 << 13) | (d1 << 10) | (m & 0x3FF))
++Required properties:
++- compatible : "wm,prizm-ge-rops"
++- reg : Should contain 1 register ranges(address and length)
 +
++Example:
 +
-+static void vt8500_find_pll_bits(unsigned long rate, unsigned long parent_rate,
-+				u32 *multiplier, u32 *prediv)
-+{
-+	unsigned long tclk;
++	ge_rops at d8050400 {
++		compatible = "wm,prizm-ge-rops";
++		reg = <0xd8050400 0x100>;
++	};
+diff --git a/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt b/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
+new file mode 100644
+index 0000000..64f016a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
+@@ -0,0 +1,22 @@
++Wondermedia WM8505 Framebuffer
++-----------------------------------------------------
 +
-+	/* sanity check */
-+	if ((rate < parent_rate * 4) || (rate > parent_rate * 62)) {
-+		pr_err("%s: requested rate out of range\n", __func__);
-+		*multiplier = 0;
-+		*prediv = 1;
-+		return;
-+	}
-+	if (rate <= parent_rate * 31)
-+		/* use the prediv to double the resolution */
-+		*prediv = 2;
-+	else
-+		*prediv = 1;
++Required properties:
++- compatible : "wm,wm8505-fb"
++- reg : Should contain 1 register ranges(address and length)
++- via,display: a phandle pointing to the display node
 +
-+	*multiplier = rate / (parent_rate / *prediv);
-+	tclk = (parent_rate / *prediv) * *multiplier;
-+
-+	if (tclk != rate)
-+		pr_warn("%s: requested rate %lu, found rate %lu\n", __func__,
-+								rate, tclk);
-+}
-+
-+static void wm8650_find_pll_bits(unsigned long rate, unsigned long parent_rate,
-+				u32 *multiplier, u32 *divisor1, u32 *divisor2)
-+{
-+	u32 mul, div1, div2;
-+	u32 best_mul, best_div1, best_div2;
-+	unsigned long tclk, rate_err, best_err;
-+
-+	best_err = (unsigned long)-1;
-+
-+	/* Find the closest match (lower or equal to requested) */
-+	for (div1 = 5; div1 >= 3; div1--)
-+		for (div2 = 3; div2 >= 0; div2--)
-+			for (mul = 3; mul <= 1023; mul++) {
-+				tclk = parent_rate * mul / (div1 * (1 << div2));
-+				if (tclk > rate)
-+					continue;
-+				/* error will always be +ve */
-+				rate_err = rate - tclk;
-+				if (rate_err == 0) {
-+					*multiplier = mul;
-+					*divisor1 = div1;
-+					*divisor2 = div2;
-+					return;
-+				}
-+
-+				if (rate_err < best_err) {
-+					best_err = rate_err;
-+					best_mul = mul;
-+					best_div1 = div1;
-+					best_div2 = div2;
-+				}
-+			}
-+
-+	/* if we got here, it wasn't an exact match */
-+	pr_warn("%s: requested rate %lu, found rate %lu\n", __func__, rate,
-+							rate - best_err);
-+	*multiplier = mul;
-+	*divisor1 = div1;
-+	*divisor2 = div2;
-+}
-+
-+static int vtwm_pll_set_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long parent_rate)
-+{
-+	struct clk_pll *pll = to_clk_pll(hw);
-+	u32 mul, div1, div2;
-+	u32 pll_val;
-+	unsigned long flags = 0;
-+
-+	/* sanity check */
-+
-+	switch (pll->type) {
-+	case PLL_TYPE_VT8500:
-+		vt8500_find_pll_bits(rate, parent_rate, &mul, &div1);
-+		pll_val = VT8500_BITS_TO_VAL(mul, div1);
-+		break;
-+	case PLL_TYPE_WM8650:
-+		wm8650_find_pll_bits(rate, parent_rate, &mul, &div1, &div2);
-+		pll_val = WM8650_BITS_TO_VAL(mul, div1, div2);
-+		break;
-+	default:
-+		pr_err("%s: invalid pll type\n", __func__);
-+		return 0;
-+	}
-+
-+	spin_lock_irqsave(pll->lock, flags);
-+
-+	vt8500_pmc_wait_busy();
-+	writel(pll_val, pll->reg);
-+	vt8500_pmc_wait_busy();
-+
-+	spin_unlock_irqrestore(pll->lock, flags);
-+
-+	return 0;
-+}
-+
-+static long vtwm_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long *prate)
-+{
-+	struct clk_pll *pll = to_clk_pll(hw);
-+	u32 mul, div1, div2;
-+	long round_rate;
-+
-+	switch (pll->type) {
-+	case PLL_TYPE_VT8500:
-+		vt8500_find_pll_bits(rate, *prate, &mul, &div1);
-+		round_rate = VT8500_BITS_TO_FREQ(*prate, mul, div1);
-+		break;
-+	case PLL_TYPE_WM8650:
-+		wm8650_find_pll_bits(rate, *prate, &mul, &div1, &div2);
-+		round_rate = WM8650_BITS_TO_FREQ(*prate, mul, div1, div2);
-+		break;
-+	default:
-+		round_rate = 0;
-+	}
-+
-+	return round_rate;
-+}
-+
-+static unsigned long vtwm_pll_recalc_rate(struct clk_hw *hw,
-+				unsigned long parent_rate)
-+{
-+	struct clk_pll *pll = to_clk_pll(hw);
-+	u32 pll_val = readl(pll->reg);
-+	unsigned long pll_freq;
-+
-+	switch (pll->type) {
-+	case PLL_TYPE_VT8500:
-+		pll_freq = parent_rate * VT8500_PLL_MUL(pll_val);
-+		pll_freq /= VT8500_PLL_DIV(pll_val);
-+		break;
-+	case PLL_TYPE_WM8650:
-+		pll_freq = parent_rate * WM8650_PLL_MUL(pll_val);
-+		pll_freq /= WM8650_PLL_DIV(pll_val);
-+		break;
-+	default:
-+		pll_freq = 0;
-+	}
-+
-+	return pll_freq;
-+}
-+
-+const struct clk_ops vtwm_pll_ops = {
-+	.round_rate = vtwm_pll_round_rate,
-+	.set_rate = vtwm_pll_set_rate,
-+	.recalc_rate = vtwm_pll_recalc_rate,
-+};
-+
-+static __init void vtwm_pll_clk_init(struct device_node *node, int pll_type)
-+{
-+	u32 reg;
-+	struct clk *clk;
-+	struct clk_pll *pll_clk;
-+	const char *clk_name = node->name;
-+	const char *parent_name;
-+	struct clk_init_data init;
-+	int rc;
-+
-+	rc = of_property_read_u32(node, "reg", &reg);
-+	if (WARN_ON(rc))
-+		return;
-+
-+	pll_clk = kzalloc(sizeof(*pll_clk), GFP_KERNEL);
-+	if (WARN_ON(!pll_clk))
-+		return;
-+
-+	pll_clk->reg = pmc_base + reg;
-+	pll_clk->lock = &_lock;
-+	pll_clk->type = pll_type;
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+
-+	init.name = clk_name;
-+	init.ops = &vtwm_pll_ops;
-+	init.flags = 0;
-+	parent_name = of_clk_get_parent_name(node, 0);
-+	init.parent_names = &parent_name;
-+	init.num_parents = 1;
-+
-+	pll_clk->hw.init = &init;
-+
-+	clk = clk_register(NULL, &pll_clk->hw);
-+	if (WARN_ON(IS_ERR(clk))) {
-+		kfree(pll_clk);
-+		return;
-+	}
-+	rc = of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+	clk_register_clkdev(clk, clk_name, NULL);
-+}
++Required nodes:
++- display: a display node is required to initialize the lcd panel
++	This should be in the board dts. See definition in
++	Documentation/devicetree/bindings/video/via,vt8500-fb.txt
 +
 +
-+/* Wrappers for initialization functions */
++Example:
 +
-+static void __init vt8500_pll_init(struct device_node *node)
-+{
-+	vtwm_pll_clk_init(node, PLL_TYPE_VT8500);
-+}
++	fb at d8050800 {
++		compatible = "wm,wm8505-fb";
++		reg = <0xd8050800 0x200>;
++		via,display = <&display>;
++	};
 +
-+static void __init wm8650_pll_init(struct device_node *node)
-+{
-+	vtwm_pll_clk_init(node, PLL_TYPE_WM8650);
-+}
-+
-+static const __initconst struct of_device_id clk_match[] = {
-+	{ .compatible = "fixed-clock", .data = of_fixed_clk_setup, },
-+	{ .compatible = "via,vt8500-pll-clock", .data = vt8500_pll_init, },
-+	{ .compatible = "wm,wm8650-pll-clock", .data = wm8650_pll_init, },
-+	{ .compatible = "via,vt8500-device-clock",
-+					.data = vtwm_device_clk_init, },
-+	{ /* sentinel */ }
-+};
-+
-+void __init vtwm_clk_init(void __iomem *base)
-+{
-+	if (!base)
-+		return;
-+
-+	pmc_base = base;
-+
-+	of_clk_init(clk_match);
-+}
 -- 
 1.7.9.5
