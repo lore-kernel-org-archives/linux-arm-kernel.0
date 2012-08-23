@@ -1,44 +1,31 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Thu, 23 Aug 2012 09:15:19 +0300
-Subject: [RFC 2/4] ARM: dma-mapping: IOMMU allocates pages from pool
- with GFP_ATOMIC
-In-Reply-To: <012401cd80f4$59727020$0c575060$%szyprowski@samsung.com>
-References: <1345630830-9586-1-git-send-email-hdoyu@nvidia.com>
- <1345630830-9586-3-git-send-email-hdoyu@nvidia.com>
- <CAHQjnOOF7Ca-Dz8K_zcS=gxQsJvKYaWA3tqUeK1RSd-wLYZ44w@mail.gmail.com>
- <20120822.163648.3800987367886904.hdoyu@nvidia.com>
- <012401cd80f4$59727020$0c575060$%szyprowski@samsung.com>
-Message-ID: <20120823091519.804aeae4ba93bcfe011e787c@nvidia.com>
+From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
+Date: Thu, 23 Aug 2012 09:35:18 +0300
+Subject: JFFS2 issue with v3.5.x and later on Atmel chips at least (was:
+ Kernel oops since v3.5.x on Atmel chips)
+In-Reply-To: <5034F3F8.9080802@atmel.com>
+References: <5034B45A.5060107@atmel.com> <5034F3F8.9080802@atmel.com>
+Message-ID: <1345703718.2848.200.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, 23 Aug 2012 07:58:34 +0200
-Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-
-> Hello,
+On Wed, 2012-08-22 at 17:00 +0200, ludovic.desroches wrote:
+> After bisection the commit causing this issue is:
 > 
-> On Wednesday, August 22, 2012 3:37 PM Hiroshi Doyu wrote:
+> commit 8bdc81c5069e43755d6e59e5e990e21ca200e8e2
+> Author: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+> Date:   Mon May 7 19:56:53 2012 +0300
 > 
-> > KyongHo Cho <pullip.cho@samsung.com> wrote @ Wed, 22 Aug 2012 14:47:00 +0200:
-> > 
-> > > vzalloc() call in __iommu_alloc_buffer() also causes BUG() in atomic context.
-> > 
-> > Right.
-> > 
-> > I've been thinking that kzalloc() may be enough here, since
-> > vzalloc() was introduced to avoid allocation failure for big chunk of
-> > memory, but I think that it's unlikely that the number of page array
-> > can be so big. So I propose to drop vzalloc() here, and just simply to
-> > use kzalloc only as below(*1).
-> 
-> We already had a discussion about this, so I don't think it makes much sense to
-> change it back to kzalloc. This vmalloc() call won't hurt anyone. It should not
-> be considered a problem for atomic allocations, because no sane driver will try
-> to allocate buffers larger than a dozen KiB with GFP_ATOMIC flag. I would call
-> such try a serious bug, which we should not care here.
+>      jffs2: get rid of jffs2_sync_super
 
-Ok, I've already sent v2 just now, where, instead of changing it back,
-just with GFP_ATOMIC, kzalloc() would be selected, just in case. I guess
-that this would be ok(a bit safer?)
+Thanks Ludovic for bisecting the issue, I'll take a look at this.
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120823/f501db9f/attachment.sig>
