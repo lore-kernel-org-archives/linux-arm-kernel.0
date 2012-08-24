@@ -1,61 +1,151 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 24 Aug 2012 15:01:53 +0100
-Subject: [PATCH 17/17] Documentation: Add the AB8500 CODEC device to the MFD
- AB8500 doc
-In-Reply-To: <1345816913-4113-1-git-send-email-lee.jones@linaro.org>
-References: <1345816913-4113-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1345816913-4113-18-git-send-email-lee.jones@linaro.org>
+Date: Fri, 24 Aug 2012 15:08:51 +0100
+Subject: [PATCH 1/1 v2] ARM: ux500: Provide SMSC911x fixed-regulator when
+ not booting DT
+In-Reply-To: <5037871F.7080300@st.com>
+References: <1345812481-2384-1-git-send-email-lee.jones@linaro.org>
+ <5037871F.7080300@st.com>
+Message-ID: <20120824140849.GM32491@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we document the AB8500 Audio CODEC in the existing MFD AB8500 document.
+> I have checked in Snowball schematics and I can confirm that the fixed
+> 3.3V regulator is GPIO26 on AB8500 not DB8500, so its numero is 
+> MOP500_AB8500_PIN_GPIO(26)
 
-CC: alsa-devel at alsa-project.org
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- Documentation/devicetree/bindings/mfd/ab8500.txt |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+We're also using GPIO26 on the DB8500 in the Device Tree solution.
+Odd that is should work? I wonder if we're just getting lucky, or if
+it's just not required?
 
-diff --git a/Documentation/devicetree/bindings/mfd/ab8500.txt b/Documentation/devicetree/bindings/mfd/ab8500.txt
-index 69e757a..ce83c8d 100644
---- a/Documentation/devicetree/bindings/mfd/ab8500.txt
-+++ b/Documentation/devicetree/bindings/mfd/ab8500.txt
-@@ -23,6 +23,7 @@ Device                     IRQ Names              Supply Names   Description
- ab8500-bm                :                      :              : Battery Manager
- ab8500-btemp             :                      :              : Battery Temperature
- ab8500-charger           :                      :              : Battery Charger
-+ab8500-codec             :                      :              : Audio Codec
- ab8500-fg                :                      :              : Fuel Gauge
- ab8500-gpadc             : HW_CONV_END          : vddadc       : Analogue to Digital Converter
-                            SW_CONV_END          :              :
-@@ -52,6 +53,14 @@ Optional child device properties:
-                            supplied in the interrupts property
- - <supply_name>-supply   : contains a phandle to the regulator supply node in Device Tree
- 
-+Non-standard child device properties:
-+ - Audio CODEC:
-+   - stericsson,amic[1|2]-type-single-ended : Single-ended Analoge Mic (default: differential)
-+   - stericsson,amic1a-bias-vamic2          : Analoge Mic wishes to use a non-standard Vamic
-+   - stericsson,amic1b-bias-vamic2          : Analoge Mic wishes to use a non-standard Vamic
-+   - stericsson,amic2-bias-vamic1           : Analoge Mic wishes to use a non-standard Vamic
-+   - stericsson,earpeice-cmv                : Earpeice voltage (only: 950 | 1100 | 1270 | 1580)
-+
- ab8500 at 5 {
-          compatible = "stericsson,ab8500";
-          reg = <5>; /* mailbox 5 is i2c */
-@@ -110,6 +119,12 @@ ab8500 at 5 {
-                 compatible = "stericsson,ab8500-pwm";
-         };
- 
-+	codec: ab8500-codec {
-+		compatible = "stericsson,ab8500-codec";
-+
-+		stericsson,earpeice-cmv = <950>; /* Units in mV. */
-+	};
-+
-         ab8500-regulators {
-                 compatible = "stericsson,ab8500-regulator";
- 
+> and you have first to update the upstream gpio-ab8500 driver.
+
+I see. Do you know what needs to be updated to get it working?
+
+> On 08/24/2012 02:48 PM, Lee Jones wrote:
+> > The SMSC911x Ethernet chip requires a fixed-regulator in order to
+> > function correctly. We have previously provided a means to obtain
+> > this during a Device Tree boot, however nothing has been put into
+> > place when booting with a non-DT kernel. This patch aims to change
+> > that.
+> >
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >   arch/arm/mach-ux500/board-mop500-regulators.c |   17 +++++++++++++++++
+> >   arch/arm/mach-ux500/board-mop500-regulators.h |    1 +
+> >   arch/arm/mach-ux500/board-mop500.c            |   21 +++++++++++++++++++++
+> >   arch/arm/mach-ux500/board-mop500.h            |    2 +-
+> >   4 files changed, 40 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
+> > index 52426a4..139f31e 100644
+> > --- a/arch/arm/mach-ux500/board-mop500-regulators.c
+> > +++ b/arch/arm/mach-ux500/board-mop500-regulators.c
+> > @@ -13,6 +13,23 @@
+> >   #include <linux/regulator/ab8500.h>
+> >   #include "board-mop500-regulators.h"
+> >   
+> > +#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
+> > +static struct regulator_consumer_supply gpio_en_3v3_consumers[] = {
+> > +	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
+> > +};
+> > +
+> > +struct regulator_init_data gpio_en_3v3_regulator = {
+> > +	.constraints = {
+> > +		.name = "EN-3V3",
+> > +		.min_uV = 3300000,
+> > +		.max_uV = 3300000,
+> > +		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+> > +	},
+> > +	.num_consumer_supplies = ARRAY_SIZE(gpio_en_3v3_consumers),
+> > +	.consumer_supplies = gpio_en_3v3_consumers,
+> > +};
+> > +#endif
+> > +
+> >   /*
+> >    * TPS61052 regulator
+> >    */
+> > diff --git a/arch/arm/mach-ux500/board-mop500-regulators.h b/arch/arm/mach-ux500/board-mop500-regulators.h
+> > index 9499215..78a0642 100644
+> > --- a/arch/arm/mach-ux500/board-mop500-regulators.h
+> > +++ b/arch/arm/mach-ux500/board-mop500-regulators.h
+> > @@ -18,5 +18,6 @@ extern struct ab8500_regulator_reg_init
+> >   ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS];
+> >   extern struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS];
+> >   extern struct regulator_init_data tps61052_regulator;
+> > +extern struct regulator_init_data gpio_en_3v3_regulator;
+> >   
+> >   #endif
+> > diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+> > index 42e1759..c7f0973 100644
+> > --- a/arch/arm/mach-ux500/board-mop500.c
+> > +++ b/arch/arm/mach-ux500/board-mop500.c
+> > @@ -23,6 +23,7 @@
+> >   #include <linux/spi/spi.h>
+> >   #include <linux/mfd/abx500/ab8500.h>
+> >   #include <linux/regulator/ab8500.h>
+> > +#include <linux/regulator/fixed.h>
+> >   #include <linux/mfd/tc3589x.h>
+> >   #include <linux/mfd/tps6105x.h>
+> >   #include <linux/mfd/abx500/ab8500-gpio.h>
+> > @@ -75,6 +76,25 @@ static struct platform_device snowball_led_dev = {
+> >   	},
+> >   };
+> >   
+> > +#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
+> > +static struct fixed_voltage_config snowball_gpio_en_3v3_data = {
+> > +	.supply_name		= "EN-3V3",
+> > +	.gpio			= SNOWBALL_EN_3V3_ETH_GPIO,
+> > +	.microvolts		= 3300000,
+> > +	.enable_high		= 1,
+> > +	.init_data		= &gpio_en_3v3_regulator,
+> > +	.startup_delay		= 5000, /* 1200us */
+> > +};
+> > +
+> > +static struct platform_device snowball_gpio_en_3v3_regulator_dev = {
+> > +	.name	= "reg-fixed-voltage",
+> > +	.id	= 1,
+> > +	.dev	= {
+> > +		.platform_data	= &snowball_gpio_en_3v3_data,
+> > +	},
+> > +};
+> > +#endif
+> > +
+> >   static struct ab8500_gpio_platform_data ab8500_gpio_pdata = {
+> >   	.gpio_base		= MOP500_AB8500_PIN_GPIO(1),
+> >   	.irq_base		= MOP500_AB8500_VIR_GPIO_IRQ_BASE,
+> > @@ -585,6 +605,7 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
+> >   	&snowball_led_dev,
+> >   	&snowball_key_dev,
+> >   	&snowball_sbnet_dev,
+> > +	&snowball_gpio_en_3v3_regulator_dev,
+> >   };
+> >   
+> >   static void __init mop500_init_machine(void)
+> > diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+> > index 9e9dd5a..d3a02d5 100644
+> > --- a/arch/arm/mach-ux500/board-mop500.h
+> > +++ b/arch/arm/mach-ux500/board-mop500.h
+> > @@ -13,6 +13,7 @@
+> >   #include <linux/amba/mmci.h>
+> >   
+> >   /* Snowball specific GPIO assignments, this board has no GPIO expander */
+> > +#define SNOWBALL_EN_3V3_ETH_GPIO	26
+> No it's MOP500_AB8500_PIN_GPIO(26)
+> >   #define SNOWBALL_ACCEL_INT1_GPIO	163
+> >   #define SNOWBALL_ACCEL_INT2_GPIO	164
+> >   #define SNOWBALL_MAGNET_DRDY_GPIO	165
+> > @@ -76,7 +77,6 @@
+> >   #define SNOWBALL_PM_GPIO4_GPIO		MOP500_AB8500_PIN_GPIO(4)	/* SYSCLKREQ6/GPIO4 */
+> >   #define SNOWBALL_EN_3V6_GPIO		MOP500_AB8500_PIN_GPIO(16)	/* PWMOUT3/GPIO16 */
+> >   #define SNOWBALL_PME_ETH_GPIO		MOP500_AB8500_PIN_GPIO(24)	/* SYSCLKREQ7/GPIO24 */
+> > -#define SNOWBALL_EN_3V3_ETH_GPIO	MOP500_AB8500_PIN_GPIO(26)	/* GPIO26 */
+> keep this line
+> >   
+> >   struct device;
+> >   struct i2c_board_info;
+
 -- 
-1.7.9.5
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
