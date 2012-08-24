@@ -1,61 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 24 Aug 2012 09:15:59 +0800
-Subject: [PATCH] ARM: fix cpu_relax() in case of doing dmb
-In-Reply-To: <1345746686.4894.7.camel@computer5.home>
-References: <1345647138-8815-1-git-send-email-shawn.guo@linaro.org>
- <20120823104356.GA13622@mudshark.cambridge.arm.com>
- <20120823135806.GG24242@S2101-09.ap.freescale.net>
- <1345746686.4894.7.camel@computer5.home>
-Message-ID: <20120824011557.GO24242@S2101-09.ap.freescale.net>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Fri, 24 Aug 2012 09:40:33 +0800
+Subject: [PATCH] mmc: tegra: convert to device tree support only
+In-Reply-To: <502E950B.2010205@wwwdotorg.org>
+References: <1345187071-6619-1-git-send-email-josephl@nvidia.com>
+ <502E950B.2010205@wwwdotorg.org>
+Message-ID: <1345772433.5081.1.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 07:31:26PM +0100, Jon Medhurst (Tixy) wrote:
-> On Thu, 2012-08-23 at 21:58 +0800, Shawn Guo wrote:
-> > On Thu, Aug 23, 2012 at 11:43:56AM +0100, Will Deacon wrote:
-> > > On Wed, Aug 22, 2012 at 03:52:18PM +0100, Shawn Guo wrote:
-> > > > diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
-> > > > index 99afa74..7cc67ce 100644
-> > > > --- a/arch/arm/include/asm/processor.h
-> > > > +++ b/arch/arm/include/asm/processor.h
-> > > > @@ -80,7 +80,14 @@ extern void release_thread(struct task_struct *);
-> > > >  unsigned long get_wchan(struct task_struct *p);
-> > > >  
-> > > >  #if __LINUX_ARM_ARCH__ == 6 || defined(CONFIG_ARM_ERRATA_754327)
-> > > > -#define cpu_relax()			smp_mb()
-> > > > +#define cpu_relax()		do {					\
-> > > > +					asm("nop");			\
-> > > > +					asm("nop");			\
-> > > > +					asm("nop");			\
-> > > > +					asm("nop");			\
-> > > > +					asm("nop");			\
-> > > 
-> > > Can you use nop() instead of the explicit asm?
+On Sat, 2012-08-18 at 03:01 +0800, Stephen Warren wrote:
+> On 08/17/2012 01:04 AM, Joseph Lo wrote:
+> > When compiling a kernel that supports only Tegra30 and not Tegra20,
+> > the SDHCI driver will fail to compile since the of_match_device() failure
+> > fallback code unconditinally references soc_data_tegra20, which is only
+> > compiled in when Tegra20 support is enabled.
 > > 
-> > Yes.  I just tried, and it works too.
-> > 
-> > > Also, I think we should try
-> > > and use some methodology on deciding the number of nops to insert. Without
-> > > having a full handle on the problem at the moment, it would seem that we
-> > > need at least NR_CPUS worth (since the number of spinning secondaries is
-> > > NR_CPUS-1 and they may execute their barriers in lock-step).
-> > > 
-> > I'm not sure we get something like that.  In my testing here, I need
-> > at least 5 nops to get rid of the issue.
+> > In Kernel 3.7, both Tegra20 and Tegra30 will only support booting using
+> > device tree, Hence, there is never a need to fall back to using
+> > soc_data_tegra20 if of_mach_device() fails. Instead, make this case an
+> > error. This removes the reference to soc_data_tegra20, and hence solves
+> > the compile failure.
 > 
-> Doesn't A9 do dual issue?
-
-Do you have some details about the issue to share?
-
-> If so, the maths for your 4 core iMX6Q might
-> match up with Will's hypothesis. You could try the theory by building
-> say with CONFIG_NR_CPUS == 3.
+> Tested-by: Stephen Warren <swarren@wwwdotorg.org>
 > 
-I'm still not quite sure about the hypothesis, but I assume you are
-asking if 3 NOPs will fix the issue.  If so, the answer is NO.
-I increase the number of NOP incrementally starting from 1, and the
-issue remains until we have 5 NOPs in there.
+> (built and tested both Tegra20-only and Tegr30-only kernels with this
+> applied on top of next-20120816).
 
--- 
-Regards,
-Shawn
+Ping.
+
+Could anyone help to review this?
+Thanks.
