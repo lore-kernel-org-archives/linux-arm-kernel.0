@@ -1,43 +1,58 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 24 Aug 2012 04:54:40 +0200
-Subject: [PATCH V2] mxs/spi: Fix misuse of init_completion
-In-Reply-To: <87393dt3em.fsf@octavius.laptop.org>
-References: <1345775624-9696-1-git-send-email-marex@denx.de>
- <87393dt3em.fsf@octavius.laptop.org>
-Message-ID: <201208240454.40561.marex@denx.de>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 24 Aug 2012 04:56:27 +0200
+Subject: [PATCH V3] mxs/spi: Fix misuse of init_completion
+Message-ID: <1345776987-15350-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Chris Ball,
+The init_completion() call does reinit not only the variable carrying
+the flag that the completion finished, but also initialized the
+waitqueue associated with the completion. On the contrary, the
+INIT_COMPLETION() call only reinits the flag.
 
-> Hi Marek,
-> 
-> On Thu, Aug 23 2012, Marek Vasut wrote:
-> > The init_completion() call does reinit not only the variable carrying
-> > the flag that the completion finished, but also initialized the
-> > waitqueue associated with the completion. On the contrary, the
-> > INIT_WAITQUEUE() call only reinits the flag.
+In case there was anything still stuck in the waitqueue, subsequent call
+to init_completion() would be able to create possible race condition. This
+patch uses the proper function and moves init_completion() into .probe() call
+of the driver, to be issued only once.
 
-Darn, it's INIT_COMPLETION() of course.
+Note that such scenario is impossible, since two threads can never enter the
+mxs_spi_txrx_dma(), since whole this section is protected by mutex in SPI core.
+This by no means allows this issue to exit though.
 
-> > In case there was anything still stuck in the waitqueue, subsequent call
-> > to init_completion() would be able to create possible race condition.
-> > This patch uses the proper function and moves init_completion() into
-> > .probe() call of the driver, to be issued only once.
-> > 
-> > Note that such scenario is impossible, since two threads can never enter
-> > the mxs_spi_txrx_dma(), since whole this section is protected by mutex
-> > in SPI core. This by no means allows this issue to exit though.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> 
-> Thanks for writing that up -- I appreciate seeing the explanation of the
-> problems this could have caused.
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Chris Ball <cjb@laptop.org>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ drivers/spi/spi-mxs.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-You're very welcome, I was really lazy, sorry about that and thanks for pushing 
-me ;-) I hope someone might eventually even find this explanation useful.
+V2: Update the patch description and snap a whip over myself for being lazy to
+    write one in the first place!
+V3: Replace INIT_WORKQUEUE() with INIT_COMPLETION(), typo in patch description.
 
-> - Chris.
-
-Best regards,
-Marek Vasut
+diff --git a/drivers/spi/spi-mxs.c b/drivers/spi/spi-mxs.c
+index 331f600..c965cc6 100644
+--- a/drivers/spi/spi-mxs.c
++++ b/drivers/spi/spi-mxs.c
+@@ -230,7 +230,7 @@ static int mxs_spi_txrx_dma(struct mxs_spi *spi, int cs,
+ 		return -EINVAL;
+ 	}
+ 
+-	init_completion(&spi->c);
++	INIT_COMPLETION(spi->c);
+ 
+ 	if (*first)
+ 		pio |= BM_SSP_CTRL0_LOCK_CS;
+@@ -560,6 +560,8 @@ static int __devinit mxs_spi_probe(struct platform_device *pdev)
+ 	ssp->devid = devid;
+ 	ssp->dma_channel = dma_channel;
+ 
++	init_completion(&spi->c);
++
+ 	ret = devm_request_irq(&pdev->dev, irq_err, mxs_ssp_irq_handler, 0,
+ 			       DRIVER_NAME, ssp);
+ 	if (ret)
+-- 
+1.7.10.4
