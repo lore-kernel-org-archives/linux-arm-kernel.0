@@ -1,153 +1,113 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 24 Aug 2012 18:40:16 +0200
-Subject: [PATCH v5 1/2] ARM: Make a compile firmware conditionally
-In-Reply-To: <20120824083351.GA25369@july>
-References: <20120824083351.GA25369@july>
-Message-ID: <1672307.utfAA3y7zd@flatron>
+From: nforrester@whoi.edu (Ned Forrester)
+Date: Fri, 24 Aug 2012 12:54:55 -0400
+Subject: SLAVE Side SPI kernel driver development
+In-Reply-To: <201208241738.45601.marex@denx.de>
+References: <1345820228.87750.YahooMailNeo@web29604.mail.ird.yahoo.com>	<CAOMZO5Ds6NKsTCptQXDGZDJasb119hYWqXMzX8nG5WFArysL7A@mail.gmail.com>
+ <201208241738.45601.marex@denx.de>
+Message-ID: <5037B1DF.40503@whoi.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 08/24/2012 11:38 AM, Marek Vasut wrote:
+> Dear Fabio Estevam,
+> 
+>> On Fri, Aug 24, 2012 at 11:57 AM, Bastelli Carlo (yahoo)
+> 
+> CCing SPI list
+> 
+>> <carlo_bastelli@yahoo.it> wrote:
+>>> Hello, I'm Carlo, I have a difficult task at work, my boss asked me to
+>>> develop
+>>>
+>>>  a driver SPI slave side on embedded ARM processor running Linux.
+>>>
+>>> Precisely linux occur on the SPI bus as a slave, not master as required
+>>> by the hierarchical structure of the current kernel. The new driver
+>>> will
+>>>
+>>>  receive via interrupt and respond when selected by its chip select.
+> 
+> So a soft-spi ? It's gonna be slow as hell and unstable too.
+> 
+>>>  Can
+>>>  anyone suggest the best way to develop this driver?
+> 
+> Get a CPU which has SPI-slave capable IP, start from there. If you were to 
+> implement soft-spi this way, you'd have to use FIQ on ARM, to be able to handle 
+> stuff with reasonable latency ... check how the ps/2-gpio driver is done in 
+> Linux ... I tried it, it barely worked, you don't want to go down that road.
+> 
+>>>  Personally, I
+>>>
+>>> have identified two main roads, the first if possible to exploit the
+>>> structure SPI master driver
+> 
+> Not happening. You'd have to split the parts from the struct spi_master into 
+> common and master-only parts. That's for starters.
+> 
+>>> with a few tricks that now I can not
+>>> define. The second most radical, write a driver for a UART like, but
+>>> managing the SPI device.
+>>> Thank you for any suggestions or examples.
+> 
+> First of all, the SPI slave mode is COMPLETELY different from the master mode. 
+> You need to react on incoming CS-low ASAP, which might turn out to be a problem 
+> on it's own. Then, even if you do, you do not know how long the transfer is 
+> going to be, so you need to allocate enough buffers as the transfer progresses 
+> onwards.
+> 
+> In case of your soft-spi, how do you plan to sample the CLK line to sync clock?
+> 
+>> Marek got spi slave running on a mx28. See his patch:
+>> http://www.spinics.net/lists/arm-kernel/msg190860.html
+> 
+> This was tested (and developed) on this board:
+> http://www.denx-cs.de/?q=M28
+> 
+> The userland code is really easy too, simply pump it into spidev or read from 
+> it. But all that is only possible because of the SPI IP in the mx28 is nice.
+> 
+>> Regards,
+>>
+>> Fabio Estevam
+> 
+> Best regards,
+> Marek Vasut
 
-On Friday 24 of August 2012 17:33:51 Kyungmin Park wrote:
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Some boards can use the firmware at trustzone but others can't use this.
-> However we need to build it simultaneously. To address this issue,
-> introduce arm firmware support and use it at each board files.
-> 
-> e.g., In boot_secondary at mach-exynos/platsmp.c
-> 
->         __raw_writel(virt_to_phys(exynos4_secondary_startup),
->                 CPU1_BOOT_REG);
-> 
->         if (IS_ENABLED(CONFIG_ARM_FIRMWARE)) {
->                 /* Call Exynos specific smc call */
->                 do_firmware_op(cpu_boot, cpu);
->         }
+I generally agree with the above comments.  A generalized SPI slave must
+be able to respond instantly, often within one clock cycle.  This can
+only work in hardware, or in an OS like Linux when the activity on the
+bus is completely predictable by the Linux slave.  The only cases I know
+of are streaming of data in a predictable way between a single master
+and single slave (no other devices on the bus).
 
-There is no need for if (IS_ENABLED(CONFIG_ARM_FIRMWARE)) now when we have 
-conditional call_firmware_op macro.
+This topic comes up periodically, but I don't think there has been any
+change in the situation for all the time I've followed the discussion.
+I recommend that you read the archives of this mailing list to
+understand the limitations of a potential slave mode.  The archives can
+be found at:
 
-Also I guess there is a typo: s/do_firmware_op/call_firmware_op/ .
+http://sourceforge.net/mailarchive/forum.php?forum_name=spi-devel-general
 
---
-Best regards,
-Tomasz Figa
+then look for threads with "slave" in the subject in the following
+months (I'd give thread start dates, but parts of the threads are
+disconnected in the archives, and this is the easiest way to see all the
+parts, day ranges are in parentheses):
 
->         gic_raise_softirq(cpumask_of(cpu), 1);
-> 
->         if (pen_release == -1)
-> 
-> e.g., exynos4412 based board
-> 
-> static void __init board_init_early(void)
-> {
->         exynos_firmware_init();
-> }
-> 
-> TODO
->         1. DT support.
->         2. call firmware init by smp_ops.
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> Changelog v4
-> 	use call_firmware_op commented by Tomasz Figa.
-> 	remove useless core_initcall
-> 
-> diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
-> index 283fa1d..5b097ca 100644
-> --- a/arch/arm/common/Kconfig
-> +++ b/arch/arm/common/Kconfig
-> @@ -21,6 +21,9 @@ config ARM_VIC_NR
->  	  The maximum number of VICs available in the system, for
->  	  power management.
-> 
-> +config ARM_FIRMWARE
-> +	bool
-> +
->  config ICST
->  	bool
-> 
-> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
-> index e8a4e58..4af6568 100644
-> --- a/arch/arm/common/Makefile
-> +++ b/arch/arm/common/Makefile
-> @@ -4,6 +4,7 @@
-> 
->  obj-$(CONFIG_ARM_GIC)		+= gic.o
->  obj-$(CONFIG_ARM_VIC)		+= vic.o
-> +obj-$(CONFIG_ARM_FIRMWARE)	+= firmware.o
->  obj-$(CONFIG_ICST)		+= icst.o
->  obj-$(CONFIG_SA1111)		+= sa1111.o
->  obj-$(CONFIG_PCI_HOST_VIA82C505) += via82c505.o
-> diff --git a/arch/arm/common/firmware.c b/arch/arm/common/firmware.c
-> new file mode 100644
-> index 0000000..e375e9f
-> --- /dev/null
-> +++ b/arch/arm/common/firmware.c
-> @@ -0,0 +1,25 @@
-> +/*
-> + *  Copyright (C) 2012 Samsung Electronics.
-> + *  Kyungmin Park <kyungmin.park@samsung.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/suspend.h>
-> +
-> +#include <asm/firmware.h>
-> +
-> +static void cpu_boot(int cpu)
-> +{
-> +	/* Do nothing */
-> +}
-> +
-> +static struct firmware_ops default_firmware_ops = {
-> +	.do_idle		= cpu_do_idle,
-> +	.cpu_boot		= cpu_boot,
-> +};
-> +
-> +struct firmware_ops *firmware_ops = &default_firmware_ops;
-> diff --git a/arch/arm/include/asm/firmware.h
-> b/arch/arm/include/asm/firmware.h new file mode 100644
-> index 0000000..99c97ff
-> --- /dev/null
-> +++ b/arch/arm/include/asm/firmware.h
-> @@ -0,0 +1,27 @@
-> +/*
-> + *  Copyright (C) 2012 Samsung Electronics.
-> + *  Kyungmin Park <kyungmin.park@samsung.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __ASM_ARM_FIRMWARE_H
-> +#define __ASM_ARM_FIRMWARE_H
-> +
-> +struct firmware_ops {
-> +	int	(*do_idle)(void);
-> +	void	(*cpu_boot)(int cpu);
-> +};
-> +
-> +extern struct firmware_ops *firmware_ops;
-> +
-> +#ifdef CONFIG_ARM_FIRMWARE
-> +#define call_firmware_op(op, ...)					\
-> +	((firmware_ops->op) ? firmware_ops->op(__VA_ARGS__) : 0)
-> +#else
-> +#define call_firmware_op(op, ...)		do { } while (0)
-> +#endif
-> +
-> +#endif
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+2007/04	(13-18)
+2007/09/27 and 2007/10 (13-17)
+2009/03 (2-3)
+2009/12/18 and 2010/1/19 and 2010/02 (14-16)
+2010/07 (26) and 2010/08 (13)
+2011/01 (28-31) and 2011/02 (1-10)
+2011/10 (18)
+2012/06 (29-30 and 2012/07 (1-17)
+
+-- 
+Ned Forrester                                       nforrester at whoi.edu
+Oceanographic Systems Lab                           508-289-2226 Office
+Applied Ocean Physics and Engineering Dept.
+Woods Hole Oceanographic Institution          Woods Hole, MA 02543, USA
+http://www.whoi.edu/
+http://www.whoi.edu/page.do?pid=29856
+http://www.whoi.edu/hpb/Site.do?id=1532
