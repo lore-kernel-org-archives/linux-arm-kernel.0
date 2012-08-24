@@ -1,149 +1,142 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 24 Aug 2012 08:44:51 -0500
-Subject: [PATCH 1/4] [RFC] ARM: autogenerate mach-foo/* and plat-foo/*
- header redirects
-In-Reply-To: <201208221254.22292.arnd@arndb.de>
-References: <201208221253.07278.arnd@arndb.de>
- <201208221254.22292.arnd@arndb.de>
-Message-ID: <50378553.5040102@gmail.com>
+From: philippe.langlais@st.com (Philippe LANGLAIS)
+Date: Fri, 24 Aug 2012 15:52:31 +0200
+Subject: [PATCH 1/1 v2] ARM: ux500: Provide SMSC911x fixed-regulator
+ when not booting DT
+In-Reply-To: <1345812481-2384-1-git-send-email-lee.jones@linaro.org>
+References: <1345812481-2384-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <5037871F.7080300@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2012 07:54 AM, Arnd Bergmann wrote:
-> This is an attempt to simplify the duplicate header problem for
-> multiplatform kernels, in multiple steps:
-> 
-> 1. (this patch)
->    for each arch/arm/mach-${MACHINE}/include/mach-${MACHINE}/*.h file,
->    generate a arch/arm/include/generated/mach/*.h file at build time,
->    same for plat-*.
-> 
-> 2. rename all arch/arm/mach-${MACHINE}/include/mach/*.h to
->    arch/arm/mach-${MACHINE}/include/mach-${MACHINE}/*.h and
->    arch/arm/plat-${PLAT}/include/plat/*.h to
->    arch/arm/plat-${PLAT}/include/plat-${PLAT}/*.h
-> 
-> 3. change all includes of <mach/*.h> to <mach-${MACHINE}/*.h>
->    in all files where ${MACHINE} is known.
-> 
-> 4. ...
-> 
-> 5. Revert this patch again.
-> 
-> We can apply this patch at any time, and do step 2 at the end
-> of the next merge window to minimize the potential for conflicts.
-> We will also still need to deal with any inclusion of a mach/*
-> file, but out of the 6355 ones we have today, I expect only a
+Hi Lee,
 
-Don't you mean 635? That's about what I counted in drivers/ and sound/.
-It's important as 635 is within the realm of manually fixing, but 6355
-is not. More comments comming on 0/4...
+I have checked in Snowball schematics and I can confirm that the fixed
+3.3V regulator is GPIO26 on AB8500 not DB8500, so its numero is 
+MOP500_AB8500_PIN_GPIO(26)
+and you have first to update the upstream gpio-ab8500 driver.
 
-Rob
+BR,
+Philippe
 
-
-> few hundred to remain after step 3 and they will be much easier
-> to spot.
-> 
-> I've picked the format <mach-foo/bar.h> to get a unique name because
-> it matches the directory name under arch/arm, but other names
-> would work with the same script, <mach/foo-bar.h> and <foo/bar.h>
-> have been suggested previously.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On 08/24/2012 02:48 PM, Lee Jones wrote:
+> The SMSC911x Ethernet chip requires a fixed-regulator in order to
+> function correctly. We have previously provided a means to obtain
+> this during a Device Tree boot, however nothing has been put into
+> place when booting with a non-DT kernel. This patch aims to change
+> that.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  arch/arm/Makefile          |    1 +
->  arch/arm/tools/Makefile    |    5 ++++
->  arch/arm/tools/gen-headers |   57 ++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 63 insertions(+)
->  create mode 100755 arch/arm/tools/gen-headers
-> 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 30eae87..761b077 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -274,6 +274,7 @@ boot := arch/arm/boot
->  
->  archprepare:
->         $(Q)$(MAKE) $(build)=arch/arm/tools include/generated/mach-types.h
-> +       $(Q)$(MAKE) $(build)=arch/arm/tools plat="$(plat-y)" machine="$(machine-y)" gen_headers
->  
->  # Convert bzImage to zImage
->  bzImage: zImage
-> diff --git a/arch/arm/tools/Makefile b/arch/arm/tools/Makefile
-> index 635cb18..6e18ca9 100644
-> --- a/arch/arm/tools/Makefile
-> +++ b/arch/arm/tools/Makefile
-> @@ -8,3 +8,8 @@ include/generated/mach-types.h: $(src)/gen-mach-types $(src)/mach-types
->         @echo '  Generating $@'
->         @mkdir -p $(dir $@)
->         $(Q)$(AWK) -f $^ > $@ || { rm -f $@; /bin/false; }
+>   arch/arm/mach-ux500/board-mop500-regulators.c |   17 +++++++++++++++++
+>   arch/arm/mach-ux500/board-mop500-regulators.h |    1 +
+>   arch/arm/mach-ux500/board-mop500.c            |   21 +++++++++++++++++++++
+>   arch/arm/mach-ux500/board-mop500.h            |    2 +-
+>   4 files changed, 40 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
+> index 52426a4..139f31e 100644
+> --- a/arch/arm/mach-ux500/board-mop500-regulators.c
+> +++ b/arch/arm/mach-ux500/board-mop500-regulators.c
+> @@ -13,6 +13,23 @@
+>   #include <linux/regulator/ab8500.h>
+>   #include "board-mop500-regulators.h"
+>   
+> +#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
+> +static struct regulator_consumer_supply gpio_en_3v3_consumers[] = {
+> +	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
+> +};
 > +
-> +gen_headers:
-> +       $(Q)bash $(srctree)/$(src)/gen-headers $(srctree) $(objtree) $(machine) $(plat)
+> +struct regulator_init_data gpio_en_3v3_regulator = {
+> +	.constraints = {
+> +		.name = "EN-3V3",
+> +		.min_uV = 3300000,
+> +		.max_uV = 3300000,
+> +		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+> +	},
+> +	.num_consumer_supplies = ARRAY_SIZE(gpio_en_3v3_consumers),
+> +	.consumer_supplies = gpio_en_3v3_consumers,
+> +};
+> +#endif
 > +
-> +.PHONY: gen_headers
-> diff --git a/arch/arm/tools/gen-headers b/arch/arm/tools/gen-headers
-> new file mode 100755
-> index 0000000..caa6a9a
-> --- /dev/null
-> +++ b/arch/arm/tools/gen-headers
-> @@ -0,0 +1,57 @@
-> +#!/bin/bash
+>   /*
+>    * TPS61052 regulator
+>    */
+> diff --git a/arch/arm/mach-ux500/board-mop500-regulators.h b/arch/arm/mach-ux500/board-mop500-regulators.h
+> index 9499215..78a0642 100644
+> --- a/arch/arm/mach-ux500/board-mop500-regulators.h
+> +++ b/arch/arm/mach-ux500/board-mop500-regulators.h
+> @@ -18,5 +18,6 @@ extern struct ab8500_regulator_reg_init
+>   ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS];
+>   extern struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS];
+>   extern struct regulator_init_data tps61052_regulator;
+> +extern struct regulator_init_data gpio_en_3v3_regulator;
+>   
+>   #endif
+> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+> index 42e1759..c7f0973 100644
+> --- a/arch/arm/mach-ux500/board-mop500.c
+> +++ b/arch/arm/mach-ux500/board-mop500.c
+> @@ -23,6 +23,7 @@
+>   #include <linux/spi/spi.h>
+>   #include <linux/mfd/abx500/ab8500.h>
+>   #include <linux/regulator/ab8500.h>
+> +#include <linux/regulator/fixed.h>
+>   #include <linux/mfd/tc3589x.h>
+>   #include <linux/mfd/tps6105x.h>
+>   #include <linux/mfd/abx500/ab8500-gpio.h>
+> @@ -75,6 +76,25 @@ static struct platform_device snowball_led_dev = {
+>   	},
+>   };
+>   
+> +#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
+> +static struct fixed_voltage_config snowball_gpio_en_3v3_data = {
+> +	.supply_name		= "EN-3V3",
+> +	.gpio			= SNOWBALL_EN_3V3_ETH_GPIO,
+> +	.microvolts		= 3300000,
+> +	.enable_high		= 1,
+> +	.init_data		= &gpio_en_3v3_regulator,
+> +	.startup_delay		= 5000, /* 1200us */
+> +};
 > +
-> +SRC=$1
-> +OBJ=$2
-> +MACH=$3
-> +PLAT1=$4
-> +PLAT2=$5
+> +static struct platform_device snowball_gpio_en_3v3_regulator_dev = {
+> +	.name	= "reg-fixed-voltage",
+> +	.id	= 1,
+> +	.dev	= {
+> +		.platform_data	= &snowball_gpio_en_3v3_data,
+> +	},
+> +};
+> +#endif
 > +
-> +# create $3 to include $2 if it doesn't already have the correct
-> +# contents, or remove it if it's no longer needed.
-> +mkfile()
-> +{
-> +       if [ -e $1/$2 ] ; then
-> +               if [ ! -e $3 ] ; then
-> +                       mkdir -p ${3%/*}
-> +                       echo "#include <${2}>" > $3
-> +               elif [ "`cat $3`" != "#include <${2#./}>" ] ; then
-> +                       echo "#include <${2}>" > $3
-> +               fi
-> +       elif [ ! -e $1/$2 -a -e $3 ] ; then
-> +               rm -f $3
-> +       fi
-> +}
-> +
-> +# list any header files that are present in the source or
-> +# destination directories
-> +find_files()
-> +{
-> +       pushd ${SRC}/arch/arm/$1-$2/include/$1-$2 >/dev/null 2>&1 &&
-> +       find . -type f -name \*.h -o -name \*.S &&
-> +       popd > /dev/null 2>&1
-> +       pushd ${OBJ}/arch/arm/include/generated/$1 >/dev/null 2>&1 &&
-> +       find . -type f -name \*.h -o -name \*.S &&
-> +       popd > /dev/null 2>&1
-> +}
-> +
-> +# process files in either mach-{MACH} or plat-${PLAT}
-> +mkfiles()
-> +{
-> +       mkdir -p ${OBJ}/arch/arm/include/generated/$1
-> +
-> +       FILES=`find_files $1 $2 | sort -u`
-> +       for i in ${FILES} ; do
-> +               mkfile "${SRC}/arch/arm/$1-$2/include/" "$1-$2/${i#./}" \
-> +                       "${OBJ}/arch/arm/include/generated/$1/$i"
-> +       done
-> +}
-> +
-> +# always process mach-*
-> +mkfiles mach ${MACH}
-> +# process plat-* if applicable
-> +if [ -d ${SRC}/arch/arm/plat-${PLAT1} ]; then
-> +       mkfiles plat ${PLAT1}
-> +fi
-> +if [ -d ${SRC}/arch/arm/plat-${PLAT2} ]; then
-> +       mkfiles plat ${PLAT2}
-> +fi
-> 
+>   static struct ab8500_gpio_platform_data ab8500_gpio_pdata = {
+>   	.gpio_base		= MOP500_AB8500_PIN_GPIO(1),
+>   	.irq_base		= MOP500_AB8500_VIR_GPIO_IRQ_BASE,
+> @@ -585,6 +605,7 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
+>   	&snowball_led_dev,
+>   	&snowball_key_dev,
+>   	&snowball_sbnet_dev,
+> +	&snowball_gpio_en_3v3_regulator_dev,
+>   };
+>   
+>   static void __init mop500_init_machine(void)
+> diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+> index 9e9dd5a..d3a02d5 100644
+> --- a/arch/arm/mach-ux500/board-mop500.h
+> +++ b/arch/arm/mach-ux500/board-mop500.h
+> @@ -13,6 +13,7 @@
+>   #include <linux/amba/mmci.h>
+>   
+>   /* Snowball specific GPIO assignments, this board has no GPIO expander */
+> +#define SNOWBALL_EN_3V3_ETH_GPIO	26
+No it's MOP500_AB8500_PIN_GPIO(26)
+>   #define SNOWBALL_ACCEL_INT1_GPIO	163
+>   #define SNOWBALL_ACCEL_INT2_GPIO	164
+>   #define SNOWBALL_MAGNET_DRDY_GPIO	165
+> @@ -76,7 +77,6 @@
+>   #define SNOWBALL_PM_GPIO4_GPIO		MOP500_AB8500_PIN_GPIO(4)	/* SYSCLKREQ6/GPIO4 */
+>   #define SNOWBALL_EN_3V6_GPIO		MOP500_AB8500_PIN_GPIO(16)	/* PWMOUT3/GPIO16 */
+>   #define SNOWBALL_PME_ETH_GPIO		MOP500_AB8500_PIN_GPIO(24)	/* SYSCLKREQ7/GPIO24 */
+> -#define SNOWBALL_EN_3V3_ETH_GPIO	MOP500_AB8500_PIN_GPIO(26)	/* GPIO26 */
+keep this line
+>   
+>   struct device;
+>   struct i2c_board_info;
