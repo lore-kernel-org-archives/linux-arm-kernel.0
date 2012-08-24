@@ -1,31 +1,41 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 24 Aug 2012 14:43:00 +0800
-Subject: [PATCH 1/7] mfd: add imx syscon driver based on regmap
-In-Reply-To: <1345619928-15446-2-git-send-email-b29396@freescale.com>
-References: <1345619928-15446-1-git-send-email-b29396@freescale.com>
- <1345619928-15446-2-git-send-email-b29396@freescale.com>
-Message-ID: <20120824064257.GA31998@S2101-09.ap.freescale.net>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Fri, 24 Aug 2012 15:07:19 +0800
+Subject: FW: [PATCH V5 0/5] clk: mmp: add clock framework for mmp
+In-Reply-To: <CAN1soZxJ87=rL0Mq-3LFRXhqRGrKXcHS+rsMdVeM+yMK+WBCnQ@mail.gmail.com>
+References: <AAD1C6EB06EE3649B35B7E026785068D1A754366CB@SC-VEXCH2.marvell.com>
+ <CADApbehnsRzwu_LrAEMf+L7AvXv+JBtPBOzWHj578Vs6B_LrCw@mail.gmail.com>
+ <201208220641.21891.arnd@arndb.de>
+ <CAN1soZxJ87=rL0Mq-3LFRXhqRGrKXcHS+rsMdVeM+yMK+WBCnQ@mail.gmail.com>
+Message-ID: <CADApbehj-AFDeJq=ig4AU5u9XGKgOK0imC=qNR9jet9kx3zW2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2012 at 03:18:42PM +0800, Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> Add regmap based imx syscon driver.
-> This is usually used for access misc bits in registers which does not belong
-> to a specific module, for example, IOMUXC GPR and ANATOP.
-> With this driver, we provide a standard API for client driver to call to
-> access registers which are registered into syscon.
-> 
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> ---
-> Currently it's just simply for IMX, however the driver really is not too
-> much imx specific.
-> If people want, we probably could extend it to support other platforms too.
+hi, Mike
+Can you help to review and merge these patches?
 
-Right.  I do not see anything IMX specific there.  We should probably
-at least give the driver a generic name from day one.
-
--- 
-Regards,
-Shawn
+On Wed, Aug 22, 2012 at 4:00 PM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> On Wed, Aug 22, 2012 at 2:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Wednesday 22 August 2012, Chao Xie wrote:
+>>> >
+>>> > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+>>> >
+>>> >         Arnd
+>>>
+>>> Who will be responsible for merging these patches?
+>>>
+>>
+>> They should go through Mike's tree, unless there is a reason why he
+>> prefers them to go through arm-soc. It would be helpful to add
+>> an 'Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>' line
+>> and my 'Reviewed-by: Arnd Bergmann <arnd@arndb.de>' line to each
+>> patch for that.
+>>
+>>         Arnd
+>
+> I'm OK on these patches.
+>
+> Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+>
+> Regards
+> Haojian
