@@ -1,50 +1,102 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Fri, 24 Aug 2012 20:22:16 +0530
-Subject: [PATCH] ARM: Exynos4: Turn off clocks for NAND,
- OneNAND and TSI controllers
-Message-ID: <1345819936-6503-1-git-send-email-chander.kashyap@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 24 Aug 2012 15:52:56 +0100
+Subject: [PATCH v3 2/2] ARM: arch_timers: register a time/cycle counter
+In-Reply-To: <1345819976-6339-1-git-send-email-marc.zyngier@arm.com>
+References: <1345819976-6339-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1345819976-6339-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clocks for NAND, OneNAND and Transport Stream Interface(TSI)
-controllers could be either enabled or disabled at boot. To ensure
-that these are turned off until used, add them to the list of clocks
-to be turned off during boot.
+Some subsystems (KVM for example) need access to a cycle counter.
+In the KVM case, this is used to measure the time delta between
+host and guest in order to accurately generate timer events for
+the guest.
 
-Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-exynos/clock-exynos4.c |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/include/asm/arch_timer.h |  7 +++++++
+ arch/arm/kernel/arch_timer.c      | 25 +++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-exynos/clock-exynos4.c
-index 2f51293..7cc5491 100644
---- a/arch/arm/mach-exynos/clock-exynos4.c
-+++ b/arch/arm/mach-exynos/clock-exynos4.c
-@@ -501,6 +501,10 @@ static struct clk exynos4_init_clocks_off[] = {
- 		.enable		= exynos4_clk_ip_cam_ctrl,
- 		.ctrlbit	= (1 << 3),
- 	}, {
-+		.name		= "tsi",
-+		.enable		= exynos4_clk_ip_fsys_ctrl,
-+		.ctrlbit	= (1 << 4),
-+	}, {
- 		.name		= "hsmmc",
- 		.devname	= "exynos4-sdhci.0",
- 		.parent		= &exynos4_clk_aclk_133.clk,
-@@ -530,6 +534,14 @@ static struct clk exynos4_init_clocks_off[] = {
- 		.enable		= exynos4_clk_ip_fsys_ctrl,
- 		.ctrlbit	= (1 << 9),
- 	}, {
-+		.name		= "onenand",
-+		.enable		= exynos4_clk_ip_fsys_ctrl,
-+		.ctrlbit	= (1 << 15),
-+	}, {
-+		.name		= "nfcon",
-+		.enable		= exynos4_clk_ip_fsys_ctrl,
-+		.ctrlbit	= (1 << 16),
-+	}, {
- 		.name		= "dac",
- 		.devname	= "s5p-sdo",
- 		.enable		= exynos4_clk_ip_tv_ctrl,
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+index 62e7547..ad9b155 100644
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -2,11 +2,13 @@
+ #define __ASMARM_ARCH_TIMER_H
+ 
+ #include <asm/errno.h>
++#include <linux/clocksource.h>
+ 
+ #ifdef CONFIG_ARM_ARCH_TIMER
+ #define ARCH_HAS_READ_CURRENT_TIMER
+ int arch_timer_of_register(void);
+ int arch_timer_sched_clock_init(void);
++struct timecounter *arch_timer_get_timecounter(void);
+ #else
+ static inline int arch_timer_of_register(void)
+ {
+@@ -17,6 +19,11 @@ static inline int arch_timer_sched_clock_init(void)
+ {
+ 	return -ENXIO;
+ }
++
++static inline struct timecounter *arch_timer_get_timecounter(void)
++{
++	return NULL;
++}
+ #endif
+ 
+ #endif
+diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
+index 3f63b90..f999d11 100644
+--- a/arch/arm/kernel/arch_timer.c
++++ b/arch/arm/kernel/arch_timer.c
+@@ -323,6 +323,15 @@ int read_current_timer(unsigned long *timer_val)
+ 	return 0;
+ }
+ 
++static cycle_t arch_counter_read_cc(const struct cyclecounter *cc)
++{
++	/*
++	 * Always use the physical counter for the clocksource.
++	 * CNTHCTL.PL1PCTEN must be set to 1.
++	 */
++	return arch_counter_get_cntpct();
++}
++
+ static struct clocksource clocksource_counter = {
+ 	.name	= "arch_sys_counter",
+ 	.rating	= 400,
+@@ -331,6 +340,18 @@ static struct clocksource clocksource_counter = {
+ 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
+ 
++static struct cyclecounter cyclecounter = {
++	.read	= arch_counter_read_cc,
++	.mask	= CLOCKSOURCE_MASK(56),
++};
++
++static struct timecounter timecounter;
++
++struct timecounter *arch_timer_get_timecounter(void)
++{
++	return &timecounter;
++}
++
+ static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
+ {
+ 	pr_debug("arch_timer_teardown disable IRQ%d cpu #%d\n",
+@@ -370,6 +391,10 @@ static int __init arch_timer_register(void)
+ 	}
+ 
+ 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
++	cyclecounter.mult = clocksource_counter.mult;
++	cyclecounter.shift = clocksource_counter.shift;
++	timecounter_init(&timecounter, &cyclecounter,
++			 arch_counter_get_cntpct());
+ 
+ 	if (arch_timer_use_virtual) {
+ 		ppi = arch_timer_ppi[VIRT_PPI];
 -- 
-1.7.9.5
+1.7.11.4
