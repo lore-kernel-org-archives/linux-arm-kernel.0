@@ -1,56 +1,100 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 24 Aug 2012 17:59:47 +0200
-Subject: [GIT PULL] at91: fixes for 3.6 (take 1)
-Message-ID: <5037A4F3.9090608@atmel.com>
+From: gcembed@gmail.com (=?UTF-8?q?Ga=C3=ABtan=20Carlier?=)
+Date: Fri, 24 Aug 2012 18:17:44 +0200
+Subject: [PATCH 1/1] mxc_nand : allow swapping the Bad block Indicator for NFC
+ v1.
+In-Reply-To: <1345811288.2848.308.camel@sauron.fi.intel.com>
+References: <1345811288.2848.308.camel@sauron.fi.intel.com>
+Message-ID: <1345825064-9147-1-git-send-email-gcembed@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d9875690d9b89a866022ff49e3fcea892345ad92:
+Swap the BI-byte on position 0x7D0 with a data byte at 0x835.  To fix a bug
+in Freescale imx NFC v1 SoC's for 2K page NAND flashes: imx27 and imx31.
+Warning: The same solution needs to be applied to the boot loader and the
+flash programmer.
 
-  Linux 3.6-rc2 (2012-08-16 14:51:24 -0700)
+This is a modified version of patch sent by J?rgen Lambrecht :
+[PATCH] Add 'config IMX_NFC_V1_BISWAP' to swap the Bad block Indicator,
+and use for imx27pdk nand support.
 
-are available in the git repository at:
+ v3: - use accessor function for I/O memory accesses as suggested by Artem
+       Bityutskiy
+     - rename function name as suggested by Artem Bityutskiy
 
-  git://github.com/at91linux/linux-at91.git tags/at91-fixes
+ v2: - Use a flag in a mxc_nand_platform structure instead of adding option
+       in Kconfig
 
-for you to fetch changes up to 0d4d1e37ca732615717d4434b58682f81a6bb61c:
+ v1: - Original patch "Add 'config IMX_NFC_V1_BISWAP'" by J?rgen Lambrecht
 
-  ARM: at91/feature-removal-schedule: delay at91_mci removal (2012-08-24 10:45:07 +0200)
+Signed-off-by: Ga?tan Carlier <gcembed@gmail.com>
+---
+ arch/arm/plat-mxc/include/mach/mxc_nand.h |    2 ++
+ drivers/mtd/nand/mxc_nand.c               |   26 ++++++++++++++++++++++++++
+ 2 files changed, 28 insertions(+), 0 deletions(-)
 
-----------------------------------------------------------------
-Fixes for AT91 related to:
-- move to sparse IRQ: some drivers were forgotten
-- a build error in sound driver & a DTS typo
-- the delay for removal of old at91_mci driver
-
-----------------------------------------------------------------
-Bo Shen (1):
-      ARM: at91/dts: remove partial parameter in at91sam9g25ek.dts
-
-Joachim Eastwood (1):
-      ASoC: atmel-ssc: include linux/io.h for raw io
-
-Ludovic Desroches (3):
-      ARM: at91: fix system timer irq issue due to sparse irq support
-      ARM: at91: fix rtc-at91sam9 irq issue due to sparse irq support
-      ARM: at91/feature-removal-schedule: delay at91_mci removal
-
-Nicolas Ferre (1):
-      ARM: at91/clock: fix PLLA overclock warning
-
- Documentation/feature-removal-schedule.txt |    2 +-
- arch/arm/boot/dts/at91sam9g25ek.dts        |    2 +-
- arch/arm/mach-at91/at91rm9200_time.c       |    2 +-
- arch/arm/mach-at91/at91sam9260_devices.c   |    6 +++++-
- arch/arm/mach-at91/at91sam9261_devices.c   |    6 +++++-
- arch/arm/mach-at91/at91sam9263_devices.c   |   10 ++++++++--
- arch/arm/mach-at91/at91sam9g45_devices.c   |    6 +++++-
- arch/arm/mach-at91/at91sam9rl_devices.c    |    6 +++++-
- arch/arm/mach-at91/clock.c                 |   12 ++++++++++++
- drivers/rtc/rtc-at91sam9.c                 |   22 +++++++++++++++-------
- include/linux/atmel-ssc.h                  |    1 +
- 11 files changed, 59 insertions(+), 16 deletions(-)
-
-Thanks, best regards,
+diff --git a/arch/arm/plat-mxc/include/mach/mxc_nand.h b/arch/arm/plat-mxc/include/mach/mxc_nand.h
+index 6bb96ef..7c04437 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc_nand.h
++++ b/arch/arm/plat-mxc/include/mach/mxc_nand.h
+@@ -26,6 +26,8 @@ struct mxc_nand_platform_data {
+ 	unsigned int width;	/* data bus width in bytes */
+ 	unsigned int hw_ecc:1;	/* 0 if suppress hardware ECC */
+ 	unsigned int flash_bbt:1; /* set to 1 to use a flash based bbt */
++	unsigned int biswap:1;	/* set to 1 to swap the Bad Block Indicator
++				   NFC v1 workaround */
+ 	struct mtd_partition *parts;	/* partition table */
+ 	int nr_parts;			/* size of parts */
+ };
+diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+index 3f94e1f..24fc9e1 100644
+--- a/drivers/mtd/nand/mxc_nand.c
++++ b/drivers/mtd/nand/mxc_nand.c
+@@ -682,6 +682,26 @@ static int mxc_nand_calculate_ecc(struct mtd_info *mtd, const u_char *dat,
+ 	return 0;
+ }
+ 
++/*
++ * Swap the BI-byte on position 0x7D0 with a data byte at 0x835.
++ * To fix a bug in NFC v1 SoC's for 2K page NAND flashes: imx27 and imx31.
++ * Warning: The same solution needs to be applied to the boot loader and the
++ * flash programmer.
++ */
++static void nfcv1_bi_swap_quirk(struct mtd_info *mtd)
++{
++	struct nand_chip *nand_chip = mtd->priv;
++	struct mxc_nand_host *host = nand_chip->priv;
++	unsigned short temp1, temp2, new_temp1;
++
++	temp1 = ioread16(host->main_area0 + 0x7D0);
++	temp2 = ioread16(host->main_area0 + 0x834);
++	new_temp1 = (temp1 & 0xFF00) | (temp2 >> 8);
++	temp2 = (temp2 & 0x00FF) | (temp1 << 8);
++	iowrite16(new_temp1, host->main_area0 + 0x7D0);
++	iowrite16(temp2, host->main_area0 + 0x834);
++}
++
+ static u_char mxc_nand_read_byte(struct mtd_info *mtd)
+ {
+ 	struct nand_chip *nand_chip = mtd->priv;
+@@ -1093,6 +1113,9 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
+ 
+ 		host->devtype_data->send_page(mtd, NFC_OUTPUT);
+ 
++		if ((mtd->writesize > 512) && nfc_is_v1() && host->pdata.biswap)
++			nfcv1_bi_swap_quirk(mtd);
++
+ 		memcpy32_fromio(host->data_buf, host->main_area0,
+ 				mtd->writesize);
+ 		copy_spare(mtd, true);
+@@ -1112,6 +1135,9 @@ static void mxc_nand_command(struct mtd_info *mtd, unsigned command,
+ 	case NAND_CMD_PAGEPROG:
+ 		memcpy32_toio(host->main_area0, host->data_buf, mtd->writesize);
+ 		copy_spare(mtd, false);
++		if ((mtd->writesize > 512) && nfc_is_v1() && host->pdata.biswap)
++			nfcv1_bi_swap_quirk(mtd);
++
+ 		host->devtype_data->send_page(mtd, NFC_INPUT);
+ 		host->devtype_data->send_cmd(host, command, true);
+ 		mxc_do_addr_cycle(mtd, column, page_addr);
 -- 
-Nicolas Ferre
+1.7.7.4
