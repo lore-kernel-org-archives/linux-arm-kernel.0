@@ -1,37 +1,69 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Aug 2012 15:52:54 +0100
-Subject: [PATCH v3 0/2] arch_timers patches to enable KVM support
-Message-ID: <1345819976-6339-1-git-send-email-marc.zyngier@arm.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Fri, 24 Aug 2012 20:24:24 +0530
+Subject: [PATCH] ARM: OMAP2+: dpll: Add missing soc_is_am33xx() check for
+ common functions
+Message-ID: <1345820064-5243-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is aimed at offering the minimum level of support that KVM
-needs when it comes to architected timers.
+Add missing soc_is_am33xx() check for DPLL common control & clock
+related functions, without this dpll programmability would be broken
+for am33xx family of devices.
 
-The first patch changes the driver to use the virtual timer by default
-instead of the physical one (access to the later is conditioned by the
-hypervisor settings, while the former is always available). This could
-be required even if the kernel is not running as a guest.
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+---
+Not sure whether this should go as a fix in -rc, as AM33XX device
+doesn't still boot without hwmod data (which is not yet upstream).
 
-The second patch exposes a clockcycle counter that can be used by
-other subsystems.
+ arch/arm/mach-omap2/clkt_dpll.c |    4 ++--
+ arch/arm/mach-omap2/dpll3xxx.c  |    4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-Tested on A15 (VE+TC2), both as a host and a KVM guest. Patches
-against v3.6-rc3.
+diff --git a/arch/arm/mach-omap2/clkt_dpll.c b/arch/arm/mach-omap2/clkt_dpll.c
+index cd7fd0f..05ff99e 100644
+--- a/arch/arm/mach-omap2/clkt_dpll.c
++++ b/arch/arm/mach-omap2/clkt_dpll.c
+@@ -211,7 +211,7 @@ void omap2_init_dpll_parent(struct clk *clk)
+ 		if (v == OMAP3XXX_EN_DPLL_LPBYPASS ||
+ 		    v == OMAP3XXX_EN_DPLL_FRBYPASS)
+ 			clk_reparent(clk, dd->clk_bypass);
+-	} else if (cpu_is_omap44xx()) {
++	} else if (soc_is_am33xx() || cpu_is_omap44xx()) {
+ 		if (v == OMAP4XXX_EN_DPLL_LPBYPASS ||
+ 		    v == OMAP4XXX_EN_DPLL_FRBYPASS ||
+ 		    v == OMAP4XXX_EN_DPLL_MNBYPASS)
+@@ -257,7 +257,7 @@ u32 omap2_get_dpll_rate(struct clk *clk)
+ 		if (v == OMAP3XXX_EN_DPLL_LPBYPASS ||
+ 		    v == OMAP3XXX_EN_DPLL_FRBYPASS)
+ 			return dd->clk_bypass->rate;
+-	} else if (cpu_is_omap44xx()) {
++	} else if (soc_is_am33xx() || cpu_is_omap44xx()) {
+ 		if (v == OMAP4XXX_EN_DPLL_LPBYPASS ||
+ 		    v == OMAP4XXX_EN_DPLL_FRBYPASS ||
+ 		    v == OMAP4XXX_EN_DPLL_MNBYPASS)
+diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+index b9c8d2f..063e1f9 100644
+--- a/arch/arm/mach-omap2/dpll3xxx.c
++++ b/arch/arm/mach-omap2/dpll3xxx.c
+@@ -311,7 +311,7 @@ static int omap3_noncore_dpll_program(struct clk *clk, u16 m, u8 n, u16 freqsel)
+ 	 * Set jitter correction. No jitter correction for OMAP4 and 3630
+ 	 * since freqsel field is no longer present
+ 	 */
+-	if (!cpu_is_omap44xx() && !cpu_is_omap3630()) {
++	if (!soc_is_am33xx() && !cpu_is_omap44xx() && !cpu_is_omap3630()) {
+ 		v = __raw_readl(dd->control_reg);
+ 		v &= ~dd->freqsel_mask;
+ 		v |= freqsel << __ffs(dd->freqsel_mask);
+@@ -471,7 +471,7 @@ int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate)
+ 			return -EINVAL;
 
-* From v2:
-- Trick the compiler into generating really nice code, at the expense
-  of a certain lack of abstraction
-- Don't mandate physical timer non-secure PPI, in order to stay
-  compatible with existing and possibly incomplete DTs.
-  
-Marc Zyngier (2):
-  ARM: arch_timers: enable the use of the virtual timer
-  ARM: arch_timers: register a time/cycle counter
-
- arch/arm/include/asm/arch_timer.h |   7 +
- arch/arm/kernel/arch_timer.c      | 362 +++++++++++++++++++++++++++-----------
- 2 files changed, 265 insertions(+), 104 deletions(-)
-
--- 
-1.7.11.4
+ 		/* No freqsel on OMAP4 and OMAP3630 */
+-		if (!cpu_is_omap44xx() && !cpu_is_omap3630()) {
++		if (!soc_is_am33xx() && !cpu_is_omap44xx() && !cpu_is_omap3630()) {
+ 			freqsel = _omap3_dpll_compute_freqsel(clk,
+ 						dd->last_rounded_n);
+ 			if (!freqsel)
+--
+1.7.0.4
