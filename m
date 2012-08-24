@@ -1,41 +1,76 @@
-From: jett.zhou@gmail.com (jett zhou)
-Date: Thu, 23 Aug 2012 20:26:07 +0800
-Subject: [V4 3/4] power_supply: Enable battery-charger for 88pm860x
-In-Reply-To: <20120823122239.GA29485@lizard>
-References: <20120714081254.GD20018@lizard>
- <1343377636-16128-1-git-send-email-jtzhou@marvell.com>
- <20120823034815.GB16674@lizard> <20120823044348.GA415@lizard>
- <CACDDiy-ZzUxi4MvjELwHzYC+AxF0b0+LuOh=JdFBBgSA2ijjNw@mail.gmail.com>
- <20120823122239.GA29485@lizard>
-Message-ID: <CACDDiy9WX0jF2jXA9HvVxU11XOUBD1mRHURVW_B3j0MEXJM0BQ@mail.gmail.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Fri, 24 Aug 2012 11:29:02 +0300
+Subject: [v3 1/4] ARM: dma-mapping: atomic_pool with struct page **pages
+In-Reply-To: <1345796945-21115-1-git-send-email-hdoyu@nvidia.com>
+References: <1345796945-21115-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1345796945-21115-2-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Got it. Thanks
+struct page **pages is necessary to align with non atomic path in
+__iommu_get_pages(). atomic_pool() has the intialized **pages instead
+of just *page.
 
-2012/8/23 Anton Vorontsov <anton.vorontsov@linaro.org>
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+ arch/arm/mm/dma-mapping.c |   17 +++++++++++++----
+ 1 files changed, 13 insertions(+), 4 deletions(-)
 
-> On Thu, Aug 23, 2012 at 05:06:22PM +0800, jett zhou wrote:
-> > Thanks for helping me to amend these patch.  I got many good
-> > suggestions and learn a lot in this process:) BTW, you mean you will
-> > help to amend that several minor warning with battery tree?
->
-> Yup, I have these small fixups locally in my tree already, so if/once
-> Samuel gives me an Ack for the mfd part, I'll merge it into battery git
-> tree.
->
-> Thanks,
->
-> Anton.
->
-
-
-
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 601da7a..b14ee64 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -296,7 +296,7 @@ struct dma_pool {
+ 	unsigned long *bitmap;
+ 	unsigned long nr_pages;
+ 	void *vaddr;
+-	struct page *page;
++	struct page **pages;
+ };
+ 
+ static struct dma_pool atomic_pool = {
+@@ -335,12 +335,16 @@ static int __init atomic_pool_init(void)
+ 	unsigned long nr_pages = pool->size >> PAGE_SHIFT;
+ 	unsigned long *bitmap;
+ 	struct page *page;
++	struct page **pages;
+ 	void *ptr;
+ 	int bitmap_size = BITS_TO_LONGS(nr_pages) * sizeof(long);
++	size_t size = nr_pages * sizeof(struct page *);
+ 
+-	bitmap = kzalloc(bitmap_size, GFP_KERNEL);
++	size += bitmap_size;
++	bitmap = kzalloc(size, GFP_KERNEL);
+ 	if (!bitmap)
+ 		goto no_bitmap;
++	pages = (void *)bitmap + bitmap_size;
+ 
+ 	if (IS_ENABLED(CONFIG_CMA))
+ 		ptr = __alloc_from_contiguous(NULL, pool->size, prot, &page);
+@@ -348,9 +352,14 @@ static int __init atomic_pool_init(void)
+ 		ptr = __alloc_remap_buffer(NULL, pool->size, GFP_KERNEL, prot,
+ 					   &page, NULL);
+ 	if (ptr) {
++		int i;
++
++		for (i = 0; i < nr_pages; i++)
++			pages[i] = page + i;
++
+ 		spin_lock_init(&pool->lock);
+ 		pool->vaddr = ptr;
+-		pool->page = page;
++		pool->pages = pages;
+ 		pool->bitmap = bitmap;
+ 		pool->nr_pages = nr_pages;
+ 		pr_info("DMA: preallocated %u KiB pool for atomic coherent allocations\n",
+@@ -481,7 +490,7 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page)
+ 	if (pageno < pool->nr_pages) {
+ 		bitmap_set(pool->bitmap, pageno, count);
+ 		ptr = pool->vaddr + PAGE_SIZE * pageno;
+-		*ret_page = pool->page + pageno;
++		*ret_page = pool->pages[pageno];
+ 	} else {
+ 		pr_err_once("ERROR: %u KiB atomic DMA coherent pool is too small!\n"
+ 			    "Please increase it with coherent_pool= kernel parameter!\n",
 -- 
-
-----------------------------------
-Best Regards
-Jett Zhou
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120823/f253b8f3/attachment-0001.html>
+1.7.5.4
