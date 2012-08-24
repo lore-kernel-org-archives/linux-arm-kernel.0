@@ -1,47 +1,35 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 24 Aug 2012 13:39:55 +0200
-Subject: [v3 2/4] ARM: dma-mapping: Refactor out to introduce
- __in_atomic_pool
-In-Reply-To: <20120824111455.GC11007@konrad-lan.dumpdata.com>
-References: <1345796945-21115-1-git-send-email-hdoyu@nvidia.com><1345796945-21115-3-git-send-email-hdoyu@nvidia.com><20120824111455.GC11007@konrad-lan.dumpdata.com>
-Message-ID: <20120824.143955.659265444078193982.hdoyu@nvidia.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 24 Aug 2012 14:51:53 +0300
+Subject: [PATCH 14/14] MTD: atmel_nand: add pinctrl consumer support
+In-Reply-To: <1344603731-32667-14-git-send-email-plagnioj@jcrosoft.com>
+References: <20120810124820.GA20557@game.jcrosoft.org>
+ <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
+ <1344603731-32667-14-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1345809113.2848.293.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Konrad Rzeszutek Wilk <konrad.wilk@oracle.com> wrote @ Fri, 24 Aug 2012 13:14:55 +0200:
-
-> On Fri, Aug 24, 2012 at 11:29:03AM +0300, Hiroshi Doyu wrote:
-> > Check the given range("start", "size") is included in "atomic_pool" or not.
-> > 
-> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> > ---
-> >  arch/arm/mm/dma-mapping.c |   25 +++++++++++++++++++------
-> >  1 files changed, 19 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> > index b14ee64..508fde1 100644
-> > --- a/arch/arm/mm/dma-mapping.c
-> > +++ b/arch/arm/mm/dma-mapping.c
-> > @@ -501,19 +501,32 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page)
-> >  	return ptr;
-> >  }
-> >  
-> > +static bool __in_atomic_pool(void *start, size_t size)
-> > +{
-> > +	struct dma_pool *pool = &atomic_pool;
-> > +	void *end = start + size;
-> > +	void *pool_start = pool->vaddr;
-> > +	void *pool_end = pool->vaddr + pool->size;
-> > +
-> > +	if (start < pool_start || start > pool_end)
-> > +		return false;
-> > +
-> > +	if (end > pool_end) {
-> > +		WARN(1, "freeing wrong coherent size from pool\n");
+On Fri, 2012-08-10 at 15:02 +0200, Jean-Christophe PLAGNIOL-VILLARD
+wrote:
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: linux-mtd at lists.infradead.org
+> ---
+> Hi David,
 > 
-> That does not tell what size or from what pool. Perhaps you should
-> include some details, such as the 'size' value, the pool used, the
-> range of the pool, etc. Something that will help _you_in the field
-> be able to narrow down what might be wrong.
+> 	if you don't mind I would like to apply with the rest of the pinctrl
+> 	patch series
 
-True. I'll.
+Acked-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120824/2eb0d9cb/attachment.sig>
