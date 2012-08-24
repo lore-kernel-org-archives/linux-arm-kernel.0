@@ -1,27 +1,22 @@
-From: ian.molton@codethink.co.uk (Ian Molton)
-Date: Fri, 24 Aug 2012 16:56:09 +0200
-Subject: [PATCH 5/6] arm: mvebu: add Aurora L2 Cache Controller to the DT
-In-Reply-To: <1345799361-23735-6-git-send-email-gregory.clement@free-electrons.com>
-References: <1345799361-23735-1-git-send-email-gregory.clement@free-electrons.com>
- <1345799361-23735-6-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <50379609.1020006@codethink.co.uk>
+From: carlo_bastelli@yahoo.it (Bastelli Carlo (yahoo))
+Date: Fri, 24 Aug 2012 15:57:08 +0100 (BST)
+Subject: SLAVE Side SPI kernel driver development
+Message-ID: <1345820228.87750.YahooMailNeo@web29604.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/08/12 11:09, Gregory CLEMENT wrote:
-> + compatible = "marvell,aurora-cache-with-outer";
+Hello, I'm Carlo, I have a difficult task at work, my boss asked me to 
+develop
+ a driver SPI slave side on embedded ARM processor running Linux. 
+Precisely linux occur on the SPI bus as a slave, not master as required 
+by the hierarchical structure of the current kernel. The new driver 
+will
+ receive via interrupt and respond when selected by its chip select. Can
+ anyone suggest the best way to develop this driver?. Personally, I 
+have identified two main roads, the first if possible to exploit the 
+structure SPI master driver, with a few tricks that now I can not 
+define. The second most radical, write a driver for a UART like, but 
+managing the SPI device.
+Thank you for any suggestions or examples.
 
-This reads wrong.
-
-perhaps aurora-with-outer-cache?
-
-or better, perhaps something like:
-
-compatible = "marvell,armada370", "marvell,armada-370-xp";
-    L2: l2-cache {
-        compatible = "marvell,aurora-cache-with-outer";
-        reg = <0xd0008000 0x1000>;
-        cache-id-part = <0x100>;
-        wt-override;
-        with-outer="yes";
-    };
+Carlo Bastelli
