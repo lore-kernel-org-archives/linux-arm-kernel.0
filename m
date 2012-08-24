@@ -1,61 +1,82 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 24 Aug 2012 11:29:03 +0300
-Subject: [v3 2/4] ARM: dma-mapping: Refactor out to introduce __in_atomic_pool
+Date: Fri, 24 Aug 2012 11:29:05 +0300
+Subject: [v3 4/4] ARM: dma-mapping: IOMMU allocates pages from atomic_pool
+ with GFP_ATOMIC
 In-Reply-To: <1345796945-21115-1-git-send-email-hdoyu@nvidia.com>
 References: <1345796945-21115-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1345796945-21115-3-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1345796945-21115-5-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check the given range("start", "size") is included in "atomic_pool" or not.
+Make use of the same atomic pool as DMA does, and skip a kernel page
+mapping which can involve sleep'able operations at allocating a kernel
+page table.
 
 Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
- arch/arm/mm/dma-mapping.c |   25 +++++++++++++++++++------
- 1 files changed, 19 insertions(+), 6 deletions(-)
+ arch/arm/mm/dma-mapping.c |   36 ++++++++++++++++++++++++++++++++++++
+ 1 files changed, 36 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index b14ee64..508fde1 100644
+index 58a852b..3ce152a 100644
 --- a/arch/arm/mm/dma-mapping.c
 +++ b/arch/arm/mm/dma-mapping.c
-@@ -501,19 +501,32 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page)
- 	return ptr;
+@@ -1205,6 +1205,34 @@ static struct page **__iommu_get_pages(void *cpu_addr, struct dma_attrs *attrs)
+ 	return NULL;
  }
  
-+static bool __in_atomic_pool(void *start, size_t size)
++static void *__iommu_alloc_atomic(struct device *dev, size_t size,
++				  dma_addr_t *handle)
 +{
-+	struct dma_pool *pool = &atomic_pool;
-+	void *end = start + size;
-+	void *pool_start = pool->vaddr;
-+	void *pool_end = pool->vaddr + pool->size;
++	struct page *page;
++	void *addr;
 +
-+	if (start < pool_start || start > pool_end)
-+		return false;
++	addr = __alloc_from_pool(size, &page);
++	if (!addr)
++		return NULL;
 +
-+	if (end > pool_end) {
-+		WARN(1, "freeing wrong coherent size from pool\n");
-+		return false;
-+	}
++	*handle = __iommu_create_mapping(dev, &page, size);
++	if (*handle == DMA_ERROR_CODE)
++		goto err_mapping;
 +
-+	return true;
++	return addr;
++
++err_mapping:
++	__free_from_pool(addr, size);
++	return NULL;
 +}
 +
- static int __free_from_pool(void *start, size_t size)
++static void __iommu_free_atomic(struct device *dev, struct page **pages,
++				dma_addr_t handle, size_t size)
++{
++	__iommu_remove_mapping(dev, handle, size);
++	__free_from_pool(page_address(pages[0]), size);
++}
++
+ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+ 	    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
  {
- 	struct dma_pool *pool = &atomic_pool;
- 	unsigned long pageno, count;
- 	unsigned long flags;
+@@ -1215,6 +1243,9 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+ 	*handle = DMA_ERROR_CODE;
+ 	size = PAGE_ALIGN(size);
  
--	if (start < pool->vaddr || start > pool->vaddr + pool->size)
--		return 0;
--
--	if (start + size > pool->vaddr + pool->size) {
--		WARN(1, "freeing wrong coherent size from pool\n");
-+	if (!__in_atomic_pool(start, size))
- 		return 0;
--	}
++	if (gfp & GFP_ATOMIC)
++		return __iommu_alloc_atomic(dev, size, handle);
++
+ 	pages = __iommu_alloc_buffer(dev, size, gfp);
+ 	if (!pages)
+ 		return NULL;
+@@ -1281,6 +1312,11 @@ void arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+ 		return;
+ 	}
  
- 	pageno = (start - pool->vaddr) >> PAGE_SHIFT;
- 	count = size >> PAGE_SHIFT;
++	if (__in_atomic_pool(cpu_addr, size)) {
++		__iommu_free_atomic(dev, pages, handle, size);
++		return;
++	}
++
+ 	if (!dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs)) {
+ 		unmap_kernel_range((unsigned long)cpu_addr, size);
+ 		vunmap(cpu_addr);
 -- 
 1.7.5.4
