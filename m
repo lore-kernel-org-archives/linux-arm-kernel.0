@@ -1,28 +1,31 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 24 Aug 2012 16:08:03 +0100
-Subject: [alsa-devel] [PATCH 14/17] ARM: ux500: Rename MSP board file to
- something more meaningful
-In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA69B3A@DBDE01.ent.ti.com>
-References: <1345816913-4113-1-git-send-email-lee.jones@linaro.org>
- <1345816913-4113-15-git-send-email-lee.jones@linaro.org>
- <1BAFE6F6C881BF42822005164F1491C33EA69B3A@DBDE01.ent.ti.com>
-Message-ID: <20120824150802.GP32491@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 24 Aug 2012 12:14:00 -0300
+Subject: SLAVE Side SPI kernel driver development
+In-Reply-To: <1345820228.87750.YahooMailNeo@web29604.mail.ird.yahoo.com>
+References: <1345820228.87750.YahooMailNeo@web29604.mail.ird.yahoo.com>
+Message-ID: <CAOMZO5Ds6NKsTCptQXDGZDJasb119hYWqXMzX8nG5WFArysL7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >  arch/arm/mach-ux500/Makefile             |    2 +-
-> >  arch/arm/mach-ux500/board-mop500-audio.c |  199 ++++++++++++++++++++++++++++++
-> >  arch/arm/mach-ux500/board-mop500-msp.c   |  199 ------------------------------
-> 
-> Please use _M option when generating patches (git-format-patch -M ...).
-> This will reduce the final patch size
+On Fri, Aug 24, 2012 at 11:57 AM, Bastelli Carlo (yahoo)
+<carlo_bastelli@yahoo.it> wrote:
+> Hello, I'm Carlo, I have a difficult task at work, my boss asked me to
+> develop
+>  a driver SPI slave side on embedded ARM processor running Linux.
+> Precisely linux occur on the SPI bus as a slave, not master as required
+> by the hierarchical structure of the current kernel. The new driver
+> will
+>  receive via interrupt and respond when selected by its chip select. Can
+>  anyone suggest the best way to develop this driver?. Personally, I
+> have identified two main roads, the first if possible to exploit the
+> structure SPI master driver, with a few tricks that now I can not
+> define. The second most radical, write a driver for a UART like, but
+> managing the SPI device.
+> Thank you for any suggestions or examples.
 
-Ah, I see. That's what Linus was going on about!
+Marek got spi slave running on a mx28. See his patch:
+http://www.spinics.net/lists/arm-kernel/msg190860.html
 
-I can do that.
+Regards,
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Fabio Estevam
