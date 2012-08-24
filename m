@@ -1,82 +1,123 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 24 Aug 2012 11:29:05 +0300
-Subject: [v3 4/4] ARM: dma-mapping: IOMMU allocates pages from atomic_pool
- with GFP_ATOMIC
-In-Reply-To: <1345796945-21115-1-git-send-email-hdoyu@nvidia.com>
-References: <1345796945-21115-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1345796945-21115-5-git-send-email-hdoyu@nvidia.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 24 Aug 2012 15:24:20 +0200
+Subject: [GIT PULL] ARM: mach-pnx4008: Remove architecture
+In-Reply-To: <1345724548-18130-1-git-send-email-stigge@antcom.de>
+References: <1345724548-18130-1-git-send-email-stigge@antcom.de>
+Message-ID: <50378084.3080102@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make use of the same atomic pool as DMA does, and skip a kernel page
-mapping which can involve sleep'able operations at allocating a kernel
-page table.
+Hi,
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
- arch/arm/mm/dma-mapping.c |   36 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 36 insertions(+), 0 deletions(-)
+On 23/08/12 14:22, Roland Stigge wrote:
+> This patch removes the ARM architecture mach-pnx4008. No direct support or user
+> feedback since 2006. Acknowledgements from NXP/Philips and Linux arm-soc
+> maintainers.
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 58a852b..3ce152a 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1205,6 +1205,34 @@ static struct page **__iommu_get_pages(void *cpu_addr, struct dma_attrs *attrs)
- 	return NULL;
- }
- 
-+static void *__iommu_alloc_atomic(struct device *dev, size_t size,
-+				  dma_addr_t *handle)
-+{
-+	struct page *page;
-+	void *addr;
-+
-+	addr = __alloc_from_pool(size, &page);
-+	if (!addr)
-+		return NULL;
-+
-+	*handle = __iommu_create_mapping(dev, &page, size);
-+	if (*handle == DMA_ERROR_CODE)
-+		goto err_mapping;
-+
-+	return addr;
-+
-+err_mapping:
-+	__free_from_pool(addr, size);
-+	return NULL;
-+}
-+
-+static void __iommu_free_atomic(struct device *dev, struct page **pages,
-+				dma_addr_t handle, size_t size)
-+{
-+	__iommu_remove_mapping(dev, handle, size);
-+	__free_from_pool(page_address(pages[0]), size);
-+}
-+
- static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
- 	    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
- {
-@@ -1215,6 +1243,9 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
- 	*handle = DMA_ERROR_CODE;
- 	size = PAGE_ALIGN(size);
- 
-+	if (gfp & GFP_ATOMIC)
-+		return __iommu_alloc_atomic(dev, size, handle);
-+
- 	pages = __iommu_alloc_buffer(dev, size, gfp);
- 	if (!pages)
- 		return NULL;
-@@ -1281,6 +1312,11 @@ void arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
- 		return;
- 	}
- 
-+	if (__in_atomic_pool(cpu_addr, size)) {
-+		__iommu_free_atomic(dev, pages, handle, size);
-+		return;
-+	}
-+
- 	if (!dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs)) {
- 		unmap_kernel_range((unsigned long)cpu_addr, size);
- 		vunmap(cpu_addr);
--- 
-1.7.5.4
+The patch was a bit too big for the mailing list - sorry.
+
+Now re-proposing via pull request, below.
+
+Thanks in advance,
+
+Roland
+
+
+The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
+
+  Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
+
+are available in the git repository at:
+
+  git://git.antcom.de/linux-2.6.git pnx4008-removal
+
+for you to fetch changes up to 5b54d019ca93850099299527753d23a5ff57c2e6:
+
+  ARM: mach-pnx4008: Remove architecture (2012-08-24 15:12:21 +0200)
+
+----------------------------------------------------------------
+Roland Stigge (1):
+      ARM: mach-pnx4008: Remove architecture
+
+ arch/arm/Kconfig                                  |    8 -
+ arch/arm/Makefile                                 |    1 -
+ arch/arm/configs/pnx4008_defconfig                |  472 ---------
+ arch/arm/mach-pnx4008/Makefile                    |   12 -
+ arch/arm/mach-pnx4008/Makefile.boot               |    4 -
+ arch/arm/mach-pnx4008/clock.c                     | 1001 -------------------
+ arch/arm/mach-pnx4008/clock.h                     |   43 -
+ arch/arm/mach-pnx4008/core.c                      |  290 ------
+ arch/arm/mach-pnx4008/dma.c                       | 1105 ---------------------
+ arch/arm/mach-pnx4008/gpio.c                      |  328 ------
+ arch/arm/mach-pnx4008/i2c.c                       |   86 --
+ arch/arm/mach-pnx4008/include/mach/clock.h        |   62 --
+ arch/arm/mach-pnx4008/include/mach/debug-macro.S  |   21 -
+ arch/arm/mach-pnx4008/include/mach/dma.h          |  160 ---
+ arch/arm/mach-pnx4008/include/mach/entry-macro.S  |  116 ---
+ arch/arm/mach-pnx4008/include/mach/gpio-pnx4008.h |  241 -----
+ arch/arm/mach-pnx4008/include/mach/hardware.h     |   32 -
+ arch/arm/mach-pnx4008/include/mach/irq.h          |   42 -
+ arch/arm/mach-pnx4008/include/mach/irqs.h         |  215 ----
+ arch/arm/mach-pnx4008/include/mach/param.h        |   21 -
+ arch/arm/mach-pnx4008/include/mach/platform.h     |   69 --
+ arch/arm/mach-pnx4008/include/mach/pm.h           |   33 -
+ arch/arm/mach-pnx4008/include/mach/timex.h        |   19 -
+ arch/arm/mach-pnx4008/include/mach/uncompress.h   |   46 -
+ arch/arm/mach-pnx4008/irq.c                       |  121 ---
+ arch/arm/mach-pnx4008/pm.c                        |  153 ---
+ arch/arm/mach-pnx4008/serial.c                    |   67 --
+ arch/arm/mach-pnx4008/sleep.S                     |  195 ----
+ arch/arm/mach-pnx4008/time.c                      |  134 ---
+ arch/arm/mach-pnx4008/time.h                      |   70 --
+ arch/arm/tools/mach-types                         |    1 -
+ drivers/i2c/busses/Kconfig                        |    2 +-
+ drivers/usb/Kconfig                               |    1 -
+ drivers/usb/host/Kconfig                          |    2 +-
+ drivers/usb/host/ohci-hcd.c                       |    2 +-
+ drivers/usb/host/ohci-nxp.c                       |   84 +-
+ drivers/video/Kconfig                             |   15 -
+ drivers/video/Makefile                            |    2 -
+ drivers/video/pnx4008/Makefile                    |    7 -
+ drivers/video/pnx4008/dum.h                       |  211 ----
+ drivers/video/pnx4008/fbcommon.h                  |   43 -
+ drivers/video/pnx4008/pnxrgbfb.c                  |  198 ----
+ drivers/video/pnx4008/sdum.c                      |  861 ----------------
+ drivers/video/pnx4008/sdum.h                      |  136 ---
+ drivers/watchdog/Kconfig                          |    6 +-
+ 45 files changed, 7 insertions(+), 6731 deletions(-)
+ delete mode 100644 arch/arm/configs/pnx4008_defconfig
+ delete mode 100644 arch/arm/mach-pnx4008/Makefile
+ delete mode 100644 arch/arm/mach-pnx4008/Makefile.boot
+ delete mode 100644 arch/arm/mach-pnx4008/clock.c
+ delete mode 100644 arch/arm/mach-pnx4008/clock.h
+ delete mode 100644 arch/arm/mach-pnx4008/core.c
+ delete mode 100644 arch/arm/mach-pnx4008/dma.c
+ delete mode 100644 arch/arm/mach-pnx4008/gpio.c
+ delete mode 100644 arch/arm/mach-pnx4008/i2c.c
+ delete mode 100644 arch/arm/mach-pnx4008/include/mach/clock.h
+ delete mode 100644 arch/arm/mach-pnx4008/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/mach-pnx4008/include/mach/dma.h
+ delete mode 100644 arch/arm/mach-pnx4008/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-pnx4008/include/mach/gpio-pnx4008.h
+ delete mode 100644 arch/arm/mach-pnx4008/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-pnx4008/include/mach/irq.h
+ delete mode 100644 arch/arm/mach-pnx4008/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-pnx4008/include/mach/param.h
+ delete mode 100644 arch/arm/mach-pnx4008/include/mach/platform.h
+ delete mode 100644 arch/arm/mach-pnx4008/include/mach/pm.h
+ delete mode 100644 arch/arm/mach-pnx4008/include/mach/timex.h
+ delete mode 100644 arch/arm/mach-pnx4008/include/mach/uncompress.h
+ delete mode 100644 arch/arm/mach-pnx4008/irq.c
+ delete mode 100644 arch/arm/mach-pnx4008/pm.c
+ delete mode 100644 arch/arm/mach-pnx4008/serial.c
+ delete mode 100644 arch/arm/mach-pnx4008/sleep.S
+ delete mode 100644 arch/arm/mach-pnx4008/time.c
+ delete mode 100644 arch/arm/mach-pnx4008/time.h
+ delete mode 100644 drivers/video/pnx4008/Makefile
+ delete mode 100644 drivers/video/pnx4008/dum.h
+ delete mode 100644 drivers/video/pnx4008/fbcommon.h
+ delete mode 100644 drivers/video/pnx4008/pnxrgbfb.c
+ delete mode 100644 drivers/video/pnx4008/sdum.c
+ delete mode 100644 drivers/video/pnx4008/sdum.h
