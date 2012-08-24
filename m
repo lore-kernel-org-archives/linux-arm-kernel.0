@@ -1,143 +1,134 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 23 Aug 2012 17:12:43 -0600
-Subject: [PATCH v3 1/4] pinctrl: add samsung pinctrl and gpiolib driver
-In-Reply-To: <1345720529-32315-2-git-send-email-thomas.abraham@linaro.org>
-References: <1345720529-32315-1-git-send-email-thomas.abraham@linaro.org>
- <1345720529-32315-2-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <5036B8EB.5050502@wwwdotorg.org>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 24 Aug 2012 09:24:37 +0900
+Subject: [PATCH v4 1/2] ARM: Make a compile firmware conditionally
+Message-ID: <20120824002437.GA17038@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2012 05:15 AM, Thomas Abraham wrote:
-> Add a new device tree enabled pinctrl and gpiolib driver for Samsung
-> SoC's. This driver provides a common and extensible framework for all
-> Samsung SoC's to interface with the pinctrl and gpiolib subsystems. This
-> driver supports only device tree based instantiation and hence can be
-> used only on those Samsung platforms that have device tree enabled.
-> 
-> This driver is split into two parts: the pinctrl interface and the gpiolib
-> interface. The pinctrl interface registers pinctrl devices with the pinctrl
-> subsystem and gpiolib interface registers gpio chips with the gpiolib
-> subsystem. The information about the pins, pin groups, pin functions and
-> gpio chips, which are SoC specific, are parsed from device tree node.
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+Some boards can use the firmware at trustzone but others can't use this.
+However we need to build it simultaneously. To address this issue,
+introduce arm firmware support and use it at each board files.
 
-BTW, this is a very nicely written and complete/precise binding
-document. Well done.
+e.g., In boot_secondary at mach-exynos/platsmp.c
 
-> +Samsung GPIO and Pin Mux/Config controller
-> +
-> +Samsung's ARM based SoC's integrates a GPIO and Pin mux/config hardware
-> +controller. It controls the input/output settings on the available pads/pins
-> +and also provides ability to multiplex and configure the output of various
-> +on-chip controllers onto these pads.
-> +
-> +Required Properties:
-> +- compatible: should be one of the following.
-> +  - "samsung,pinctrl-exynos4210": for Exynos4210 compatible pin-controller.
-> +  - "samsung,pinctrl-exynos5250": for Exynos5250 compatible pin-controller.
-> +
-> +- reg: Base address of the pin controller hardware module and length of
-> +  the address space it occupies.
-> +
-> +- interrupts: interrupt specifier for the controller. The format and value of
-> +  the interrupt specifier depends on the interrupt parent for the controller.
-> +
-> +- Pin mux/config groups as child nodes: The pin mux (selecting pin function
+        __raw_writel(virt_to_phys(exynos4_secondary_startup),
+                CPU1_BOOT_REG);
 
-Direct child nodes of the pin-controller, not a second level?
+        if (IS_ENABLED(CONFIG_ARM_FIRMWARE)) {
+                /* Call Exynos specific smc call */
+                firmware_ops->cpu_boot(cpu);
+        }
 
-While that's quite legal, it means that if you need a particular client
-module to use 4 pins, 2 of which need one samsung,pin-function value and
-2 of which need a different pin-function value, then the client device's
-pinctrl-0 property has to have two entries.
+        gic_raise_softirq(cpumask_of(cpu), 1);
 
-i.e. a completely hypothetical example roughly based on yours below:
+        if (pen_release == -1)
 
-	pinctrl_1: pinctrl at 11000000 {
-		uart0_rxd: uart0-rxd {
-			samsung,pins = "gpa0-0";
-			samsung,pin-function = <2>;
-			samsung,pin-pud = <0>;
-			samsung,pin-drv = <0>;
-		};
+Now smp_ops is not yet merged, now just call the firmware_init at init_early
+ at board file
 
-		uart0_txd: uart0-txd {
-			samsung,pins = "gpa0-1";
-			samsung,pin-function = <1>;
-			samsung,pin-pud = <0>;
-			samsung,pin-drv = <0>;
-		};
-	};
+e.g., exynos4412 based board
 
-	uart at 13800000 {
-		pinctrl-names = "default";
-		pinctrl-0 = <&uart0_rxd &uart0_txd>;
-	};
+static void __init board_init_early(void)
+{
+        exynos_firmware_init();
+}
 
-rather than:
+TODO
+        1. DT support.
+        2. call firmware init by smp_ops.
 
-	pinctrl_1: pinctrl at 11000000 {
-		uart0_opt1: uart0-opt1 {
-			uart0_rxd: uart0-rxd {
-				samsung,pins = "gpa0-0";
-				samsung,pin-function = <2>;
-				samsung,pin-pud = <0>;
-				samsung,pin-drv = <0>;
-			};
-
-			uart0_txd: uart0-txd {
-				samsung,pins = "gpa0-1";
-				samsung,pin-function = <1>;
-				samsung,pin-pud = <0>;
-				samsung,pin-drv = <0>;
-			};
-		};
-	};
-
-	uart at 13800000 {
-		pinctrl-names = "default";
-		pinctrl-0 = <&uart0_opt1;
-	};
-
-The latter layout simplifies writing the client nodes, since all the
-related settings can be grouped together by whoever writes the pinctrl
-node, rather than every client author having to work out all the entries
-to include in the list.
-
-That all said, the way you've defined the binding is perfectly
-legitimate, and I don't have any kind of issue with it; it's just
-something you might want to consider.
-
-Irrespective of whether you choose to keep the binding as-is, or change
-it, please consider it:
-
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-
-> +  The values specified by these config properties should be dervied from the
-
-s/dervied/derived/
-
-> +External GPIO and Wakeup Interrupts:
-> +
-> +The controller supports two types of external interrupts over gpio. The first
-> +is the external gpio interrupt and second is the external wakeup interrupts.
-> +The difference between the two is that the external wakeup interrupts can be
-> +used as system wakeup events.
-> +
-> +A. External GPIO Interrupts: For supporting external gpio interrupts, the
-> +   properties should be specified in the pin-controller device node.
-
-s/the properties/the following properties/ ?
-
-> +Aliases:
-> +
-> +All the pin controller nodes should be represented in the aliases node using
-> +the following format 'pinctrl{n}' where n is a unique number for the alias.
-
-There /should/ be an alias, or there /may/ be; I'm not sure why
-requiring or recommending an alias would be particularly important for
-this device?
-
-I've only had time to review the binding document so far.
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+index 283fa1d..5b097ca 100644
+--- a/arch/arm/common/Kconfig
++++ b/arch/arm/common/Kconfig
+@@ -21,6 +21,9 @@ config ARM_VIC_NR
+ 	  The maximum number of VICs available in the system, for
+ 	  power management.
+ 
++config ARM_FIRMWARE
++	bool
++
+ config ICST
+ 	bool
+ 
+diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+index e8a4e58..4af6568 100644
+--- a/arch/arm/common/Makefile
++++ b/arch/arm/common/Makefile
+@@ -4,6 +4,7 @@
+ 
+ obj-$(CONFIG_ARM_GIC)		+= gic.o
+ obj-$(CONFIG_ARM_VIC)		+= vic.o
++obj-$(CONFIG_ARM_FIRMWARE)	+= firmware.o
+ obj-$(CONFIG_ICST)		+= icst.o
+ obj-$(CONFIG_SA1111)		+= sa1111.o
+ obj-$(CONFIG_PCI_HOST_VIA82C505) += via82c505.o
+diff --git a/arch/arm/common/firmware.c b/arch/arm/common/firmware.c
+new file mode 100644
+index 0000000..d2c5d37
+--- /dev/null
++++ b/arch/arm/common/firmware.c
+@@ -0,0 +1,33 @@
++/*
++ *  Copyright (C) 2012 Samsung Electronics.
++ *  Kyungmin Park <kyungmin.park@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/kernel.h>
++#include <linux/suspend.h>
++
++#include <asm/firmware.h>
++
++struct firmware_ops *firmware_ops;
++
++static void cpu_boot(int cpu)
++{
++	/* Do nothing */
++}
++
++static struct firmware_ops __firmware_ops = {
++	.do_idle		= cpu_do_idle,
++	.cpu_boot		= cpu_boot,
++};
++
++static int __init firmware_init(void)
++{
++	firmware_ops = __firmware_ops;
++	return 0;
++}
++
++core_initcall(firmware_init);
+diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
+new file mode 100644
+index 0000000..8f47cf7
+--- /dev/null
++++ b/arch/arm/include/asm/firmware.h
+@@ -0,0 +1,20 @@
++/*
++ *  Copyright (C) 2012 Samsung Electronics.
++ *  Kyungmin Park <kyungmin.park@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASM_ARM_FIRMWARE_H
++#define __ASM_ARM_FIRMWARE_H
++
++struct firmware_ops {
++	int	(*do_idle)(void);
++	void	(*cpu_boot)(int cpu);
++};
++
++extern struct firmware_ops *firmware_ops;
++
++#endif
