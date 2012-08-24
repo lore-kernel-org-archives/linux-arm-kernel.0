@@ -1,36 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 24 Aug 2012 12:24:50 -0300
-Subject: [PATCH] ARM: imx6q-sabrelite: Rename 'pinctrl_gpio_hog'
-Message-ID: <1345821890-2922-1-git-send-email-festevam@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 24 Aug 2012 15:38:01 +0000 (UTC)
+Subject: [PATCH] ARM: omap_hwmod: Fix up resource names when booted with
+ devicetree
+In-Reply-To: <1345730049-12675-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1345730049-12675-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <alpine.DEB.2.00.1208241536290.25436@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hello P?ter,
 
-'pinctrl_gpio_hog' is used to setup the pin functions, and it is not neccesarily used only
-for GPIO pins, so remove 'gpio' from its name to describe a more generic term.
+On Thu, 23 Aug 2012, Peter Ujfalusi wrote:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6q-sabrelite.dts |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> When booted with some resource will have their name set to NULL. This can
+> cause later kernel crash since this is not expected by the platform code.
+> 
+> When we boot without DT the devices are created with platform_device_add()
+> which itself fixes up the missing resource names:
+> if (r->name == NULL)
+> 	r->name = dev_name(&pdev->dev);
+> 
+> The of core also fixes up the resource names when taking the information
+> from DT data - in __of_address_to_resource():
+> r->name = name ? name : dev->full_name;
+> 
+> When we boot OMAP with devicetree: of will create the devices based on the
+> DT data so the resource names are guarantied to be not NULL. Since we have
+> the 'ti,hwmod' tag, we remove the of created resources from the device and
+> re-create them based on hwmod data. If the hwmod data does not specify a
+> name for a resource it will be NULL.
+> This can cause kernel crash if the driver uses
+> platform_get_resource_byname() to get any resource.
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index 72f30f3..2e01478 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -46,10 +46,10 @@
- 
- 			iomuxc at 020e0000 {
- 				pinctrl-names = "default";
--				pinctrl-0 = <&pinctrl_gpio_hog>;
-+				pinctrl-0 = <&pinctrl_hog>;
- 
- 				gpios {
--					pinctrl_gpio_hog: gpiohog {
-+					pinctrl_hog: hog {
- 						fsl,pins = <
- 							   144  0x80000000	/* MX6Q_PAD_EIM_D22__GPIO_3_22 */
- 							   121  0x80000000	/* MX6Q_PAD_EIM_D19__GPIO_3_19 */
--- 
-1.7.9.5
+Do we need both this one and your '[PATCH] driver core: Check if r->name 
+is valid in platform_get_resource_byname()' ?  Or would that second patch 
+be enough?  Is the crash happening in the platform_get_resource_byname() 
+iterator?
+
+
+- Paul
