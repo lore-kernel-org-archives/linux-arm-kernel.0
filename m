@@ -1,30 +1,82 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 24 Aug 2012 08:05:50 -0500
-Subject: Cortex A9 with ACP needing mixed coherency model
-In-Reply-To: <20120824085440.GC5400@mudshark.cambridge.arm.com>
-References: <CAB9O=CPx2PKjyWiKa6B+MJnO0G=805Gb_rnjULb+xw1YOZjCyQ@mail.gmail.com>
- <20120824085440.GC5400@mudshark.cambridge.arm.com>
-Message-ID: <50377C2E.4080408@gmail.com>
+From: ola.o.lilja@stericsson.com (Ola Lilja)
+Date: Fri, 24 Aug 2012 15:05:17 +0200
+Subject: FW: [PATCH 07/22] ASoC: Ux500: Initialise PCM from MSP probe
+ rather than as a device
+In-Reply-To: <014401cd8165$99960c40$ccc224c0$@se>
+References: <014401cd8165$99960c40$ccc224c0$@se>
+Message-ID: <50377C0D.2060905@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/24/2012 03:54 AM, Will Deacon wrote:
-> On Fri, Aug 24, 2012 at 01:58:50AM +0100, John Linn wrote:
->> It doesn't look like there's any good way to have a mixed coherency
->> model to support using the ACP where there is coherency and using
->> other ports where there is not coherency.
->> ARM Linux kernel can support arch_is_coherent(), which means all DMA
->> I/O is coherent. We have multiple DMA engines and they can go to thru
->> coherent or non-coherent ports.
->>
->> Am I missing something, or has someone figured out a way to deal with this?
-> 
-> Didn't Rob have a crack at fixing this with his recent DMA series?
-> 
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2012-August/113929.html
-> 
-> It's a really nice set of patches, so take a look.
+On 08/23/2012 09:29 PM, Ola Lilja wrote:
 
-It's queued up in Marek's dma-mapping tree for 3.7.
+> 
+> 
+>> -----Original Message-----
+>> From: Lee Jones [mailto:lee.jones at linaro.org]
+>> Sent: den 23 augusti 2012 16:59
+>> To: Mark Brown
+>> Cc: Ola Lilja; 'Linus Walleij'; roger.xr.nilsson at stericsson.com; linux-
+>> arm-kernel at lists.infradead.org; alsa-devel at alsa-project.org
+>> Subject: Re: [PATCH 07/22] ASoC: Ux500: Initialise PCM from MSP probe
+>> rather than as a device
+>> 
+>> On Thu, Aug 23, 2012 at 03:37:57PM +0100, Mark Brown wrote:
+>> > On Thu, Aug 23, 2012 at 02:26:19PM +0100, Lee Jones wrote:
+>> >
+>> > > > I think Ola is suggesting probing the DMA driver from the machine
+>> > > > which will also work though I'm not 100% sure if I'm parsing the
+>> > > > above correctly.  The issue in DT terms is that if the DMA
+>> > > > controller is shared with a bunch of other IPs then it should
+>> have
+>> > > > one node shared between them all and not a bunch of shim nodes
+>> > > > inserted in the middle which only exists due to the way Linux
+>> instantiates stuff.
 
-Rob
+
+I haven't followed everything in this discussion, but what I meant in an earlier
+mail was that using the device for platform-DAI (MSP_I2S) also
+as platform int the DAI-link struct is not anything I can see fit (as in the
+patch Lee first submitted).
+I can see a few acceptable solutions:
+1) Use it as it is! (A virtual device for PCM is created in arch/arm and the
+probe is invoked from the machine-driver).
+2) Since the actual platform is the DMA-block, maybe there is some way of making
+the device "non-virtual" by having some sub-device in the DMA-driver that is
+instead triggered in the same way as in 1).
+3) Move it to DT, but it seems that it is not possible when it is now a virtual
+device.
+
+Any of these three would be fine with me.
+
+>> >
+>> > > When you say 'machine', do you mean from arch/<arch>/mach-*? If so,
+>> > > I'm keen for that not to happen.
+>> >
+>> > No, sound/soc/ux500/snowball.c or whatever.  At least that's my
+>> guess.
+>> 
+>> Ah, I see. Maybe the mop500.c file then.
+>> 
+>> > > > They instantiate the PCM driver dynamically from the DAI when
+>> it's
+>> > > > probed which is pretty much what you're patch is doing.
+>> >
+>> > > So they do it in the same why I have with this patch? Do you know
+>> > > why Ola might think this is a bad idea?
+>> >
+>> > I'm not 100% sure, I'm guessing it might be down to the fact that you
+>> > end up with multiple PCM drivers.  We could avoid that with
+>> > refcounting but nobody's really worried about it.
+>> 
+>> I think I'll wait for Ola to get back, as he's the expert on this
+>> stuff.
+>> 
+>> I'll attempt to re-jig the patch-set, as this is a blocker atm.
+>> 
+>> --
+>> Lee Jones
+>> Linaro ST-Ericsson Landing Team Lead
+>> Linaro.org ? Open source software for ARM SoCs Follow Linaro: Facebook
+>> | Twitter | Blog
+> 
