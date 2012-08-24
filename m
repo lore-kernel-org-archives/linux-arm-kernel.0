@@ -1,29 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 Aug 2012 11:43:10 +0100
-Subject: [PATCH 3/6] arm: cache-l2x0: add support for Aurora L2 cache ctrl
-In-Reply-To: <1345799361-23735-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1345799361-23735-1-git-send-email-gregory.clement@free-electrons.com>
- <1345799361-23735-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20120824104309.GE5400@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 24 Aug 2012 11:43:39 +0100
+Subject: [PATCH v2 21/31] arm64: 32-bit (compat) applications support
+In-Reply-To: <201208151434.05145.arnd@arndb.de>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-22-git-send-email-catalin.marinas@arm.com>
+ <201208151434.05145.arnd@arndb.de>
+Message-ID: <20120824104338.GI7585@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2012 at 10:09:18AM +0100, Gregory CLEMENT wrote:
-> +static void __init aurora_broadcast_l2_commands(void)
-> +{
-> +       __u32 u;
-> +       /* Enable Broadcasting of cache commands to L2*/
-> +       __asm__ __volatile__("mrc p15, 1, %0, c15, c2, 0" : "=r"(u));
-> +       u |= 0x100;             /* Set the FW bit */
-> +       __asm__ __volatile__("mcr p15, 1, %0, c15, c2, 0\n" : : "r"(u));
-> +}
+On Wed, Aug 15, 2012 at 03:34:04PM +0100, Arnd Bergmann wrote:
+> On Tuesday 14 August 2012, Catalin Marinas wrote:
+> 
+> > +#ifdef CONFIG_AARCH32_EMULATION
+> > +#include <linux/compat.h>
+> > +
+> > +#define AARCH32_KERN_SIGRET_CODE_OFFSET	0x500
+> > +
+> > +extern const compat_ulong_t aarch32_sigret_code[6];
+> > +
+> > +int compat_setup_frame(int usig, struct k_sigaction *ka, sigset_t *set,
+> > +		       struct pt_regs *regs);
+> > +int compat_setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
+> > +			  sigset_t *set, struct pt_regs *regs);
+> > +
+> > +void compat_setup_restart_syscall(struct pt_regs *regs);
+> > +#else
+> > +
+> > +static inline int compat_setup_frame(int usid, struct k_sigaction *ka,
+> > +				     sigset_t *set, struct pt_regs *regs)
+> > +{
+> > +	BUG();
+> > +}
+> 
+> What good is the run-time BUG() here? Nothing should be calling these
+> when CONFIG_COMPAT is disabled, so I think you should just remove
+> the #ifdef around the declarations, and the entire #else case.
 
-Couple of questions about this code:
+They are called from handle_signal(), so that's to avoid #ifdef inside
+functions. I can drop the BUG() (but keep the empty function) and
+change the checks to is_compat_task() so that the compiler optimises the
+condition out when !COMPAT.
 
-1. Is this register r/w from non-secure?
-2. I'm surprised that there aren't barriers and/or maintenance operations
-   needed around this operation. It might be worth checking in the
-   documentation that you have (you probably need at least an isb()
-   following the mcr).
-
-Will
+-- 
+Catalin
