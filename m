@@ -1,12 +1,16 @@
 From: marex@denx.de (Marek Vasut)
-Date: Fri, 24 Aug 2012 05:25:41 +0200
-Subject: [PATCH 1/2] ARM: mx28: Add SPI pinmux into imx28.dtsi
-Message-ID: <1345778742-20994-1-git-send-email-marex@denx.de>
+Date: Fri, 24 Aug 2012 05:25:42 +0200
+Subject: [PATCH 2/2] ARM: mxs: Update DENX M28 machine and dts file
+In-Reply-To: <1345778742-20994-1-git-send-email-marex@denx.de>
+References: <1345778742-20994-1-git-send-email-marex@denx.de>
+Message-ID: <1345778742-20994-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add this SSP pin multiplexing configuration into the imx28.dtsi file.
-This covers pinmux for all four SSP ports available on the i.MX28.
+Update the mach-mxs machine by removing the enet_clkout(). The new
+revision of the board doesn't need that. Also, update the DTS file
+with all the new drivers pulled in the mainline recently, that is,
+SPI, LRADC, USB. Also, remove bogus AUART3.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chris Ball <cjb@laptop.org>
@@ -14,84 +18,198 @@ Cc: Fabio Estevam <fabio.estevam@freescale.com>
 Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx28.dtsi |   61 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
+ arch/arm/boot/dts/imx28-m28evk.dts |   98 +++++++++++++++++++++++++++++++++---
+ arch/arm/mach-mxs/mach-mxs.c       |    1 -
+ 2 files changed, 92 insertions(+), 7 deletions(-)
 
-NOTE: Shawn, I'd like to add this altogether. I have a board scheduled in my
-      queue that uses other SSP ports, so I consider it pointless to split this.
-      Fabio, what does MX28EVK use?
-
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 91b43e9..327a33f 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -507,6 +507,67 @@
+diff --git a/arch/arm/boot/dts/imx28-m28evk.dts b/arch/arm/boot/dts/imx28-m28evk.dts
+index 183a3fd..e418b75 100644
+--- a/arch/arm/boot/dts/imx28-m28evk.dts
++++ b/arch/arm/boot/dts/imx28-m28evk.dts
+@@ -23,6 +23,8 @@
+ 	apb at 80000000 {
+ 		apbh at 80000000 {
+ 			gpmi-nand at 8000c000 {
++				#address-cells = <1>;
++				#size-cells = <1>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
+ 				status = "okay";
+@@ -62,9 +64,28 @@
+ 					     &mmc0_sck_cfg>;
+ 				bus-width = <8>;
+ 				wp-gpios = <&gpio3 10 1>;
++				vmmc-supply = <&reg_vddio_sd0>;
+ 				status = "okay";
+ 			};
+ 
++			ssp2: ssp at 80014000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,imx28-spi";
++				pinctrl-names = "default";
++				pinctrl-0 = <&spi2_pins_a>;
++				status = "okay";
++
++				flash: m25p80 at 0 {
++					#address-cells = <1>;
++					#size-cells = <1>;
++					compatible = "m25p80";
++					spi-max-frequency = <40000000>;
++					m25p,fast-read;
++					reg = <0>;
++				};
++			};
++
+ 			pinctrl at 80018000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&hog_pins_a>;
+@@ -72,8 +93,11 @@
+ 				hog_pins_a: hog-gpios at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
++						0x31c3 /* MX28_PAD_PWM3__GPIO_3_28 */
+ 						0x30a3 /* MX28_PAD_AUART2_CTS__GPIO_3_10 */
+ 						0x30b3 /* MX28_PAD_AUART2_RTS__GPIO_3_11 */
++						0x30c3 /* MX28_PAD_AUART3_RX__GPIO_3_12 */
++						0x30d3 /* MX28_PAD_AUART3_TX__GPIO_3_13 */
+ 					>;
+ 					fsl,drive-strength = <0>;
+ 					fsl,voltage = <1>;
+@@ -90,6 +114,22 @@
  					fsl,voltage = <1>;
  					fsl,pull-up = <0>;
  				};
 +
-+				spi0_pins_a: spi0 at 0 {
++				usb0_pins_a: usb0 at 0 {
 +					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x2000 /* MX28_PAD_SSP0_DATA0__SSP0_D0 */
-+						0x2010 /* MX28_PAD_SSP0_DATA1__SSP0_D1 */
-+						0x2020 /* MX28_PAD_SSP0_DATA2__SSP0_D2 */
-+						0x2030 /* MX28_PAD_SSP0_DATA3__SSP0_D3 */
-+						0x2040 /* MX28_PAD_SSP0_DATA4__SSP0_D4 */
-+						0x2050 /* MX28_PAD_SSP0_DATA5__SSP0_D5 */
-+						0x2060 /* MX28_PAD_SSP0_DATA6__SSP0_D6 */
-+						0x2070 /* MX28_PAD_SSP0_DATA7__SSP0_D7 */
-+						0x2080 /* MX28_PAD_SSP0_CMD__SSP0_CMD */
-+						0x2090 /* MX28_PAD_SSP0_DETECT__SSP0_CARD_DETECT */
-+						0x20a0 /* MX28_PAD_SSP0_SCK__SSP0_SCK */
-+					>;
-+					fsl,drive-strength = <1>;
++					fsl,pinmux-ids = <0x2152>;
++					fsl,drive-strength = <2>;
 +					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
++					fsl,pull-up = <0>;
 +				};
 +
-+				spi1_pins_a: spi1 at 0 {
++				usb1_pins_a: usb1 at 0 {
 +					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x20c0 /* MX28_PAD_SSP1_SCK__SSP1_SCK */
-+						0x20d0 /* MX28_PAD_SSP1_CMD__SSP1_CMD */
-+						0x20e0 /* MX28_PAD_SSP1_DATA0__SSP1_D0 */
-+						0x20f0 /* MX28_PAD_SSP1_DATA3__SSP1_D3 */
-+					>;
-+					fsl,drive-strength = <1>;
++					fsl,pinmux-ids = <0x2142>;
++					fsl,drive-strength = <2>;
 +					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
-+				};
-+
-+				spi2_pins_a: spi2 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x2100 /* MX28_PAD_SSP2_SCK__SSP2_SCK */
-+						0x2110 /* MX28_PAD_SSP2_MOSI__SSP2_CMD */
-+						0x2120 /* MX28_PAD_SSP2_MISO__SSP2_D0 */
-+						0x2130 /* MX28_PAD_SSP2_SS0__SSP2_D3 */
-+						0x2140 /* MX28_PAD_SSP2_SS1__SSP2_D4 */
-+						0x2150 /* MX28_PAD_SSP2_SS2__SSP2_D5 */
-+					>;
-+					fsl,drive-strength = <1>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
-+				};
-+
-+				spi3_pins_a: spi3 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x2180 /* MX28_PAD_SSP3_SCK__SSP3_SCK */
-+						0x2190 /* MX28_PAD_SSP3_MOSI__SSP3_CMD */
-+						0x21a0 /* MX28_PAD_SSP3_MISO__SSP3_D0 */
-+						0x21b0 /* MX28_PAD_SSP3_SS0__SSP3_D3 */
-+					>;
-+					fsl,drive-strength = <1>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
++					fsl,pull-up = <0>;
 +				};
  			};
  
- 			digctl at 8001c000 {
+ 			lcdif at 80030000 {
+@@ -99,6 +139,10 @@
+ 				status = "okay";
+ 			};
+ 
++			lradc at 80050000 {
++				status = "okay";
++			};
++
+ 			can0: can at 80032000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&can0_pins_a>;
+@@ -129,6 +173,7 @@
+ 			i2c0: i2c at 80058000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&i2c0_pins_a>;
++				clock-frequency = <400000>;
+ 				status = "okay";
+ 
+ 				sgtl5000: codec at 0a {
+@@ -157,26 +202,41 @@
+ 				status = "okay";
+ 			};
+ 
+-			auart0: serial at 8006a000 {
+-				pinctrl-names = "default";
+-				pinctrl-0 = <&auart0_2pins_a>;
++			usbphy0: usbphy at 8007c000 {
+ 				status = "okay";
+ 			};
+ 
+-			auart3: serial at 80070000 {
++			usbphy1: usbphy at 8007e000 {
++				status = "okay";
++			};
++
++			auart0: serial at 8006a000 {
+ 				pinctrl-names = "default";
+-				pinctrl-0 = <&auart3_pins_a>;
++				pinctrl-0 = <&auart0_2pins_a>;
+ 				status = "okay";
+ 			};
+ 		};
+ 	};
+ 
+ 	ahb at 80080000 {
++		usb0: usb at 80080000 {
++			vbus-supply = <&reg_usb0_vbus>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&usb0_pins_a>;
++			status = "okay";
++		};
++
++		usb1: usb at 80090000 {
++			vbus-supply = <&reg_usb1_vbus>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&usb1_pins_a>;
++			status = "okay";
++		};
++
+ 		mac0: ethernet at 800f0000 {
+ 			phy-mode = "rmii";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&mac0_pins_a>;
+-			phy-reset-gpios = <&gpio3 11 0>;
+ 			status = "okay";
+ 		};
+ 
+@@ -198,6 +258,32 @@
+ 			regulator-max-microvolt = <3300000>;
+ 			regulator-always-on;
+ 		};
++
++		reg_vddio_sd0: vddio-sd0 {
++			compatible = "regulator-fixed";
++			regulator-name = "vddio-sd0";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			gpio = <&gpio3 28 0>;
++		};
++
++		reg_usb0_vbus: usb0_vbus {
++			compatible = "regulator-fixed";
++			regulator-name = "usb0_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio3 12 0>;
++			enable-active-low;
++		};
++
++		reg_usb1_vbus: usb1_vbus {
++			compatible = "regulator-fixed";
++			regulator-name = "usb1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio3 13 0>;
++			enable-active-low;
++		};
+ 	};
+ 
+ 	sound {
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 8dabfe8..5ac45a1 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -241,7 +241,6 @@ static void __init imx28_evk_init(void)
+ 
+ static void __init m28evk_init(void)
+ {
+-	enable_clk_enet_out();
+ 	update_fec_mac_prop(OUI_DENX);
+ 
+ 	mxsfb_pdata.mode_list = m28evk_video_modes;
 -- 
 1.7.10.4
