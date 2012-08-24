@@ -1,43 +1,31 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Fri, 24 Aug 2012 08:28:34 +0200
-Subject: [PATCH v3 4/4] arm/dts: Add tps65217 regulator DT data to
- am335x-bone.dts
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA1F1D7@DBDE01.ent.ti.com>
-References: <1345547850-29761-1-git-send-email-anilkumar@ti.com>
- <1345547850-29761-5-git-send-email-anilkumar@ti.com>
- <A823657F-0D26-429F-8E1C-DF1AE5AB78F4@dominion.thruhere.net>
- <331ABD5ECB02734CA317220B2BBEABC13EA1F1D7@DBDE01.ent.ti.com>
-Message-ID: <583C0877-1C4C-46B6-A5D0-BDD34D6BB7C8@dominion.thruhere.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 24 Aug 2012 14:43:00 +0800
+Subject: [PATCH 1/7] mfd: add imx syscon driver based on regmap
+In-Reply-To: <1345619928-15446-2-git-send-email-b29396@freescale.com>
+References: <1345619928-15446-1-git-send-email-b29396@freescale.com>
+ <1345619928-15446-2-git-send-email-b29396@freescale.com>
+Message-ID: <20120824064257.GA31998@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Aug 22, 2012 at 03:18:42PM +0800, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> Add regmap based imx syscon driver.
+> This is usually used for access misc bits in registers which does not belong
+> to a specific module, for example, IOMUXC GPR and ANATOP.
+> With this driver, we provide a standard API for client driver to call to
+> access registers which are registered into syscon.
+> 
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> ---
+> Currently it's just simply for IMX, however the driver really is not too
+> much imx specific.
+> If people want, we probably could extend it to support other platforms too.
 
-Op 24 aug. 2012, om 07:50 heeft "AnilKumar, Chimata" <anilkumar@ti.com> het volgende geschreven:
+Right.  I do not see anything IMX specific there.  We should probably
+at least give the driver a generic name from day one.
 
-> Hi Koen,
-> 
-> On Thu, Aug 23, 2012 at 19:43:48, Koen Kooi wrote:
->> 
->> Op 21 aug. 2012, om 13:17 heeft AnilKumar Ch <anilkumar@ti.com> het volgende geschreven:
->> 
->>> Add tps65217 regulator device tree data to AM335x-Bone by adding
->>> regulator consumers with tightened constraints and regulator-name.
->>> TPS65217 regulator handle can be obtained by using this regulator
->>> name.
->>> 
->>> This patch also add I2C node with I2C frequency and tps65217 PMIC
->>> I2C slave address.
->>> 
->>> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
->> 
->> I tried this and the kernel immediately crashes on my beaglebone. Could you upload the complete git tree and .config you used to test this to somewhere public please?
-> 
-> Use this repo to test on beaglebone
-> https://github.com/hvaibhav/am335x-linux/commits/am335x-upstream-staging-pinctrl
-> 
-> This wiki talks about how to build and use?
-> https://github.com/hvaibhav/am335x-linux/wiki/How-To-Use-Upstream-Tree
-> 
-> Note: Enable tps65217 regulator in kernel config.
-
-I used that repo and as a seperate test I rebased that to latest mainline, same thing: as soon as I turn on the TPS in the .config it crashes on boot. Is the pinctrl repo the *exact* repo you used to test the patches on beaglebone?
+-- 
+Regards,
+Shawn
