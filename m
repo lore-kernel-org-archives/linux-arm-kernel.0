@@ -1,35 +1,30 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 24 Aug 2012 15:01:04 +0200
-Subject: [PATCH] ARM: ux500: set proper GIC flags
-Message-ID: <1345813264-4896-1-git-send-email-linus.walleij@stericsson.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 24 Aug 2012 08:05:50 -0500
+Subject: Cortex A9 with ACP needing mixed coherency model
+In-Reply-To: <20120824085440.GC5400@mudshark.cambridge.arm.com>
+References: <CAB9O=CPx2PKjyWiKa6B+MJnO0G=805Gb_rnjULb+xw1YOZjCyQ@mail.gmail.com>
+ <20120824085440.GC5400@mudshark.cambridge.arm.com>
+Message-ID: <50377C2E.4080408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On 08/24/2012 03:54 AM, Will Deacon wrote:
+> On Fri, Aug 24, 2012 at 01:58:50AM +0100, John Linn wrote:
+>> It doesn't look like there's any good way to have a mixed coherency
+>> model to support using the ACP where there is coherency and using
+>> other ports where there is not coherency.
+>> ARM Linux kernel can support arch_is_coherent(), which means all DMA
+>> I/O is coherent. We have multiple DMA engines and they can go to thru
+>> coherent or non-coherent ports.
+>>
+>> Am I missing something, or has someone figured out a way to deal with this?
+> 
+> Didn't Rob have a crack at fixing this with his recent DMA series?
+> 
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2012-August/113929.html
+> 
+> It's a really nice set of patches, so take a look.
 
-The Ux500 will be able to wake up on any IRQ, so flag it with
-IRQCHIP_SKIP_SET_WAKE, and we want to mask off the IRQs when
-going to suspend to avoid transient effects so also flag
-this with IRQCHIP_MASK_ON_SUSPEND.
+It's queued up in Marek's dma-mapping tree for 3.7.
 
-Cc: Etienne Carriere <etienne.carriere@st.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/cpu.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index e2360e7..2957432 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -51,6 +51,8 @@ void __init ux500_init_irq(void)
- 	void __iomem *dist_base;
- 	void __iomem *cpu_base;
- 
-+	gic_arch_extn.flags = IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND;
-+
- 	if (cpu_is_u8500_family()) {
- 		dist_base = __io_address(U8500_GIC_DIST_BASE);
- 		cpu_base = __io_address(U8500_GIC_CPU_BASE);
--- 
-1.7.11.3
+Rob
