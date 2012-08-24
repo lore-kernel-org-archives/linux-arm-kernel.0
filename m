@@ -1,36 +1,129 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 24 Aug 2012 13:52:03 +0200
-Subject: Preliminary topic proposals for the ARM mini-summit
-In-Reply-To: <20120810155128.GM2066@mudshark.cambridge.arm.com>
-References: <20120810155128.GM2066@mudshark.cambridge.arm.com>
-Message-ID: <20120824135203.1bfd2b14@skate>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 24 Aug 2012 13:00:12 +0100
+Subject: [PATCH] ARM: ux500: Provide SMSC911x fixed-regulator when not booting
+ DT
+Message-ID: <1345809612-30992-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Will,
+The SMSC911x Ethernet chip requires a fixed-regulator in order to
+function correctly. We have previously provided a means to obtain
+this during a Device Tree boot, however nothing has been put into
+place when booting with a non-DT kernel. This patch aims to change
+that.
 
-Le Fri, 10 Aug 2012 16:51:28 +0100,
-Will Deacon <will.deacon@arm.com> a ?crit :
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500-regulators.c |   17 +++++++++++++++++
+ arch/arm/mach-ux500/board-mop500-regulators.h |    1 +
+ arch/arm/mach-ux500/board-mop500.c            |   21 +++++++++++++++++++++
+ arch/arm/mach-ux500/board-mop500.h            |    2 +-
+ 4 files changed, 40 insertions(+), 1 deletion(-)
 
-> The invitation email was slightly misleading as it only referred to Tuesday
-> 28 August, when in fact the mini-summit will be held on *both* Monday 27
-> and Tuesday 28. We will run topics in the morning (and allow an hour in
-> the afternoon for overflow discussion) and dedicate the rest of the time
-> to hacking. Initial topic proposals are:
-
-The "Kernel Summit Attendee Information" e-mail that we have received
-on August 22th still mentions that the workshops will only take place
-on Tuesday 28, with the ARM workshop being in room Marina 6, starting
-at 9:00 AM.
-
-In what room will take place the ARM workshop on Monday 27 ? I guess
-the starting time will be 9:00 AM as well, is this correct?
-
-Thanks,
-
-Thomas
+diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
+index 52426a4..11ddda7 100644
+--- a/arch/arm/mach-ux500/board-mop500-regulators.c
++++ b/arch/arm/mach-ux500/board-mop500-regulators.c
+@@ -13,6 +13,23 @@
+ #include <linux/regulator/ab8500.h>
+ #include "board-mop500-regulators.h"
+ 
++#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
++static struct regulator_consumer_supply gpio_en_3v3_consumers[] = {
++       REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
++};
++
++struct regulator_init_data gpio_en_3v3_regulator = {
++       .constraints = {
++               .name = "EN-3V3",
++               .min_uV = 3300000,
++               .max_uV = 3300000,
++               .valid_ops_mask = REGULATOR_CHANGE_STATUS,
++       },
++       .num_consumer_supplies = ARRAY_SIZE(gpio_en_3v3_consumers),
++       .consumer_supplies = gpio_en_3v3_consumers,
++};
++#endif
++
+ /*
+  * TPS61052 regulator
+  */
+diff --git a/arch/arm/mach-ux500/board-mop500-regulators.h b/arch/arm/mach-ux500/board-mop500-regulators.h
+index 9499215..78a0642 100644
+--- a/arch/arm/mach-ux500/board-mop500-regulators.h
++++ b/arch/arm/mach-ux500/board-mop500-regulators.h
+@@ -18,5 +18,6 @@ extern struct ab8500_regulator_reg_init
+ ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS];
+ extern struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS];
+ extern struct regulator_init_data tps61052_regulator;
++extern struct regulator_init_data gpio_en_3v3_regulator;
+ 
+ #endif
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index de10f8f..0e904c8 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -23,6 +23,7 @@
+ #include <linux/spi/spi.h>
+ #include <linux/mfd/abx500/ab8500.h>
+ #include <linux/regulator/ab8500.h>
++#include <linux/regulator/fixed.h>
+ #include <linux/mfd/tc3589x.h>
+ #include <linux/mfd/tps6105x.h>
+ #include <linux/mfd/abx500/ab8500-gpio.h>
+@@ -75,6 +76,25 @@ static struct platform_device snowball_led_dev = {
+ 	},
+ };
+ 
++#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
++static struct fixed_voltage_config snowball_gpio_en_3v3_data = {
++	.supply_name		= "EN-3V3",
++	.gpio			= SNOWBALL_EN_3V3_ETH_GPIO,
++	.microvolts		= 3300000,
++	.enable_high		= 1,
++	.init_data		= &gpio_en_3v3_regulator,
++	.startup_delay		= 5000, /* 1200us */
++};
++
++static struct platform_device snowball_gpio_en_3v3_regulator_dev = {
++	.name	= "reg-fixed-voltage",
++	.id	= 1,
++	.dev	= {
++		.platform_data	= &snowball_gpio_en_3v3_data,
++	},
++};
++#endif
++
+ static struct ab8500_gpio_platform_data ab8500_gpio_pdata = {
+ 	.gpio_base		= MOP500_AB8500_PIN_GPIO(1),
+ 	.irq_base		= MOP500_AB8500_VIR_GPIO_IRQ_BASE,
+@@ -585,6 +605,7 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
+ 	&snowball_led_dev,
+ 	&snowball_key_dev,
+ 	&snowball_sbnet_dev,
++	&snowball_gpio_en_3v3_regulator_dev,
+ };
+ 
+ static void __init mop500_init_machine(void)
+diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+index a0f920d..4ace165 100644
+--- a/arch/arm/mach-ux500/board-mop500.h
++++ b/arch/arm/mach-ux500/board-mop500.h
+@@ -13,6 +13,7 @@
+ #include <linux/amba/mmci.h>
+ 
+ /* Snowball specific GPIO assignments, this board has no GPIO expander */
++#define SNOWBALL_EN_3V3_ETH_GPIO	26
+ #define SNOWBALL_ACCEL_INT1_GPIO	163
+ #define SNOWBALL_ACCEL_INT2_GPIO	164
+ #define SNOWBALL_MAGNET_DRDY_GPIO	165
+@@ -76,7 +77,6 @@
+ #define SNOWBALL_PM_GPIO4_GPIO		MOP500_AB8500_PIN_GPIO(4)	/* SYSCLKREQ6/GPIO4 */
+ #define SNOWBALL_EN_3V6_GPIO		MOP500_AB8500_PIN_GPIO(16)	/* PWMOUT3/GPIO16 */
+ #define SNOWBALL_PME_ETH_GPIO		MOP500_AB8500_PIN_GPIO(24)	/* SYSCLKREQ7/GPIO24 */
+-#define SNOWBALL_EN_3V3_ETH_GPIO	MOP500_AB8500_PIN_GPIO(26)	/* GPIO26 */
+ 
+ struct device;
+ struct i2c_board_info;
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
