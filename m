@@ -1,61 +1,50 @@
-From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
-Date: Fri, 24 Aug 2012 16:52:57 +0200 (CEST)
-Subject: [PATCH 4/5] DRM: add i.MX IPUv3 base driver
-In-Reply-To: <1596192785.2810155.1345817566620.JavaMail.root@advansee.com>
-Message-ID: <806769921.2812305.1345819977325.JavaMail.root@advansee.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Fri, 24 Aug 2012 20:22:16 +0530
+Subject: [PATCH] ARM: Exynos4: Turn off clocks for NAND,
+ OneNAND and TSI controllers
+Message-ID: <1345819936-6503-1-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+The clocks for NAND, OneNAND and Transport Stream Interface(TSI)
+controllers could be either enabled or disabled at boot. To ensure
+that these are turned off until used, add them to the list of clocks
+to be turned off during boot.
 
-On Thu, Jun 14, 09:43:26 EDT 2012, Sascha Hauer wrote:
-> The IPU is the Image Processing Unit found on i.MX51/53 SoCs. It
-> features several units for image processing, this patch adds support
-> for the units needed for Framebuffer support, namely:
-> 
-> - Display Controller (dc)
-> - Display Interface (di)
-> - Display Multi Fifo Controller (dmfc)
-> - Display Processor (dp)
-> - Image DMA Controller (idmac)
-> 
-> This patch is based on the Freescale driver, but follows a different
-> approach. The Freescale code implements logical idmac channels and
-> the handling of the subunits is hidden in common idmac code pathes
-> in big switch/case statements. This patch instead just provides code
-> and resource management for the different subunits. The user, in this
-> case the framebuffer driver, decides how the different units play
-> together.
+Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+---
+ arch/arm/mach-exynos/clock-exynos4.c |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-What is the status of this series, and especially of this patch, as to its
-integration into upstream? At some point, you were talking about pushing it to
-staging, but since things don't seem to have evolved.
-
-> The IPU has other units missing in this patch:
-> 
-> - CMOS Sensor Interface (csi)
-> - Video Deinterlacer (vdi)
-> - Sensor Multi FIFO Controler (smfc)
-> - Image Converter (ic)
-> - Image Rotator (irt)
-> 
-> So expect more files to come in this directory.
-
-Do you have a schedule for that? Are you waiting for more customer projects at
-Pengutronix to do that?
-
-Would your customers_pengutronix_mx5_master-20120612 tag be the starting point
-for these new files? Can it be used as a working solution in the meantime, or
-does it have limitations?
-
-That would be great to finally have full IPU/VPU/GPU support for i.MX5 into
-upstream. As you already know, Linaro also have some video support for i.MX5 in
-this head:
-http://git.linaro.org/gitweb?p=landing-teams/working/freescale/kernel.git;a=shortlog;h=refs/heads/lt-3.2-imx5
-
-Matt, I think you also have video support for efikamx, don't you?
-
-Is there a plan to merge all these developments into upstream?
-
-Best regards,
-Beno?t
+diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-exynos/clock-exynos4.c
+index 2f51293..7cc5491 100644
+--- a/arch/arm/mach-exynos/clock-exynos4.c
++++ b/arch/arm/mach-exynos/clock-exynos4.c
+@@ -501,6 +501,10 @@ static struct clk exynos4_init_clocks_off[] = {
+ 		.enable		= exynos4_clk_ip_cam_ctrl,
+ 		.ctrlbit	= (1 << 3),
+ 	}, {
++		.name		= "tsi",
++		.enable		= exynos4_clk_ip_fsys_ctrl,
++		.ctrlbit	= (1 << 4),
++	}, {
+ 		.name		= "hsmmc",
+ 		.devname	= "exynos4-sdhci.0",
+ 		.parent		= &exynos4_clk_aclk_133.clk,
+@@ -530,6 +534,14 @@ static struct clk exynos4_init_clocks_off[] = {
+ 		.enable		= exynos4_clk_ip_fsys_ctrl,
+ 		.ctrlbit	= (1 << 9),
+ 	}, {
++		.name		= "onenand",
++		.enable		= exynos4_clk_ip_fsys_ctrl,
++		.ctrlbit	= (1 << 15),
++	}, {
++		.name		= "nfcon",
++		.enable		= exynos4_clk_ip_fsys_ctrl,
++		.ctrlbit	= (1 << 16),
++	}, {
+ 		.name		= "dac",
+ 		.devname	= "s5p-sdo",
+ 		.enable		= exynos4_clk_ip_tv_ctrl,
+-- 
+1.7.9.5
