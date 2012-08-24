@@ -1,35 +1,58 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 24 Aug 2012 14:51:53 +0300
-Subject: [PATCH 14/14] MTD: atmel_nand: add pinctrl consumer support
-In-Reply-To: <1344603731-32667-14-git-send-email-plagnioj@jcrosoft.com>
-References: <20120810124820.GA20557@game.jcrosoft.org>
- <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
- <1344603731-32667-14-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1345809113.2848.293.camel@sauron.fi.intel.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Fri, 24 Aug 2012 13:52:00 +0200
+Subject: [v3 1/4] ARM: dma-mapping: atomic_pool with struct page **pages
+In-Reply-To: <20120824111323.GB11007@konrad-lan.dumpdata.com>
+References: <1345796945-21115-1-git-send-email-hdoyu@nvidia.com><1345796945-21115-2-git-send-email-hdoyu@nvidia.com><20120824111323.GB11007@konrad-lan.dumpdata.com>
+Message-ID: <20120824.145200.843951079622652894.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-08-10 at 15:02 +0200, Jean-Christophe PLAGNIOL-VILLARD
-wrote:
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: linux-mtd at lists.infradead.org
-> ---
-> Hi David,
+Konrad Rzeszutek Wilk <konrad.wilk@oracle.com> wrote @ Fri, 24 Aug 2012 13:13:23 +0200:
+
+> On Fri, Aug 24, 2012 at 11:29:02AM +0300, Hiroshi Doyu wrote:
+> > struct page **pages is necessary to align with non atomic path in
+> > __iommu_get_pages(). atomic_pool() has the intialized **pages instead
+> > of just *page.
+> > 
+> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > ---
+> >  arch/arm/mm/dma-mapping.c |   17 +++++++++++++----
+> >  1 files changed, 13 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> > index 601da7a..b14ee64 100644
+> > --- a/arch/arm/mm/dma-mapping.c
+> > +++ b/arch/arm/mm/dma-mapping.c
+> > @@ -296,7 +296,7 @@ struct dma_pool {
+> >  	unsigned long *bitmap;
+> >  	unsigned long nr_pages;
+> >  	void *vaddr;
+> > -	struct page *page;
+> > +	struct page **pages;
+> >  };
+> >  
+> >  static struct dma_pool atomic_pool = {
+> > @@ -335,12 +335,16 @@ static int __init atomic_pool_init(void)
+> >  	unsigned long nr_pages = pool->size >> PAGE_SHIFT;
+> >  	unsigned long *bitmap;
+> >  	struct page *page;
+> > +	struct page **pages;
+> >  	void *ptr;
+> >  	int bitmap_size = BITS_TO_LONGS(nr_pages) * sizeof(long);
+> > +	size_t size = nr_pages * sizeof(struct page *);
+> >  
+> > -	bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+> > +	size += bitmap_size;
+> > +	bitmap = kzalloc(size, GFP_KERNEL);
+> >  	if (!bitmap)
+> >  		goto no_bitmap;
+> > +	pages = (void *)bitmap + bitmap_size;
 > 
-> 	if you don't mind I would like to apply with the rest of the pinctrl
-> 	patch series
+> So you stuck a bitmap field in front of the array then?
+> Why not just define a structure where this is clearly defined
+> instead of doing the casting.
 
-Acked-by: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120824/2eb0d9cb/attachment.sig>
+I just wanted to allocate only once for the members "pool->bitmap" and
+"pool->pages" at once. Since the size of a whole bitmap isn't known in
+advance, I couldn't find any fixed type for this bitmap, which pointer
+can be shifted without casting. IOW, they are variable length.
