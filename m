@@ -1,39 +1,74 @@
-From: dgreid@chromium.org (Dylan Reid)
-Date: Fri, 24 Aug 2012 00:52:10 -0700
-Subject: [alsa-devel] [PATCH] ASoC: samsung dma - prepare dma in
- start/resume trigger path
-In-Reply-To: <00df01cd81cb$e21d2f00$a6578d00$@com>
-References: <1345755069-9512-1-git-send-email-dgreid@chromium.org>
- <00df01cd81cb$e21d2f00$a6578d00$@com>
-Message-ID: <CAEUnVG58NPNKuf_PRyBEegYnH95dkTN81PGZGYxDt41jhH2uaQ@mail.gmail.com>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Fri, 24 Aug 2012 09:56:30 +0200
+Subject: [PATCH v3 4/4] arm/dts: Add tps65217 regulator DT data to
+ am335x-bone.dts
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA1F3B0@DBDE01.ent.ti.com>
+References: <1345547850-29761-1-git-send-email-anilkumar@ti.com>
+ <1345547850-29761-5-git-send-email-anilkumar@ti.com>
+ <A823657F-0D26-429F-8E1C-DF1AE5AB78F4@dominion.thruhere.net>
+ <331ABD5ECB02734CA317220B2BBEABC13EA1F1D7@DBDE01.ent.ti.com>
+ <583C0877-1C4C-46B6-A5D0-BDD34D6BB7C8@dominion.thruhere.net>
+ <331ABD5ECB02734CA317220B2BBEABC13EA1F3B0@DBDE01.ent.ti.com>
+Message-ID: <6C2AC14D-1CAC-4B93-910C-B7E52D3355FD@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2012 at 12:41 AM, Sangbeom Kim <sbkim73@samsung.com> wrote:
-> Hi!
->
-> On Thu, Aug 24, 2012 at 5:51 AM, Dylan Reid wrote:
->> On suspend all dma transactions are terminated (by the stop/suspend
->> trigger calling ops->stop), they need to be set up again during resume.
->> Move the prepare op to the start/resume/unpause trigger path so that dma
->> and audio will restart on resume/unpause.
-> Do you mean that currently, suspend/resume can't be supported?
 
-Yes. Currently, if I suspend while playing, after resume it won't work
-until I close and reopen the device.  the call to snd_pcm_resume is
-not indicating an error, but a write error comes from snd_pcm_write a
-little later.
+Op 24 aug. 2012, om 09:26 heeft "AnilKumar, Chimata" <anilkumar@ti.com> het volgende geschreven:
 
-The suspend trigger calls ops->stop, which in turn sends
-DMA_TERMINATE_ALL to the pl330.  I think this causes resume's call to
-ops->trigger to fail because there is nothing enqueued, but I'm pretty
-new to this system.
+> Hi Koen,
+> 
+> On Fri, Aug 24, 2012 at 11:58:34, Koen Kooi wrote:
+>> 
+>> Op 24 aug. 2012, om 07:50 heeft "AnilKumar, Chimata" <anilkumar@ti.com> het volgende geschreven:
+>> 
+>>> Hi Koen,
+>>> 
+>>> On Thu, Aug 23, 2012 at 19:43:48, Koen Kooi wrote:
+>>>> 
+>>>> Op 21 aug. 2012, om 13:17 heeft AnilKumar Ch <anilkumar@ti.com> het volgende geschreven:
+>>>> 
+>>>>> Add tps65217 regulator device tree data to AM335x-Bone by adding
+>>>>> regulator consumers with tightened constraints and regulator-name.
+>>>>> TPS65217 regulator handle can be obtained by using this regulator
+>>>>> name.
+>>>>> 
+>>>>> This patch also add I2C node with I2C frequency and tps65217 PMIC
+>>>>> I2C slave address.
+>>>>> 
+>>>>> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+>>>> 
+>>>> I tried this and the kernel immediately crashes on my beaglebone. Could you upload the complete git tree and .config you used to test this to somewhere public please?
+>>> 
+>>> Use this repo to test on beaglebone
+>>> https://github.com/hvaibhav/am335x-linux/commits/am335x-upstream-staging-pinctrl
+>>> 
+>>> This wiki talks about how to build and use?
+>>> https://github.com/hvaibhav/am335x-linux/wiki/How-To-Use-Upstream-Tree
+>>> 
+>>> Note: Enable tps65217 regulator in kernel config.
+>> 
+>> I used that repo and as a seperate test I rebased that to latest mainline, same thing: as soon as I turn on the TPS in the .config it crashes on boot. Is the pinctrl repo the *exact* repo you used to test the patches on beaglebone?
+> 
+> I tested on latest mainline after merging to
+> am335x-upstream-staging-pinctrl (voltage also changing)
+> 
+> Can you share your .config and uImage?
 
-Thanks for the help!
+Config: https://github.com/beagleboard/kernel/blob/beaglebone-3.6/patches/configs/beaglebone
 
-Dylan
+> My config details:- (After merge)
+> 1. omap2plus_defconfig
+> 2. Enable tps65217 MFD driver
+> 3. Enable tps65217 regulator driver
 
->
-> Thanks,
-> Sangbeom.
->
+
+I rebased onto latest mainline and refreshed the base patches from Vaibhav and I now get: 
+
+[    0.246796] tps65217 0-0024: TPS65217 ID 0xf version 1.1
+
+So it boots! I don't know what made it break before, but it's working now :)
+
+regards,
+
+Koen
