@@ -1,17 +1,16 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 24 Aug 2012 13:36:23 -0700
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 Aug 2012 21:47:37 +0100
 Subject: [PATCH 4/4] [RFC] ARM: treewide: manually change more
  mach-*/*.h includes
 In-Reply-To: <201208231726.11293.arnd@arndb.de>
 References: <201208221253.07278.arnd@arndb.de>
  <20120822214323.GA12255@n2100.arm.linux.org.uk>
- <201208231135.11688.arnd@arndb.de>
- <201208231726.11293.arnd@arndb.de>
-Message-ID: <20120824203622.GB1303@atomide.com>
+ <201208231135.11688.arnd@arndb.de> <201208231726.11293.arnd@arndb.de>
+Message-ID: <20120824204737.GE18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [120823 10:27]:
+On Thu, Aug 23, 2012 at 05:26:10PM +0000, Arnd Bergmann wrote:
 > On Thursday 23 August 2012, Arnd Bergmann wrote:
 > > On Wednesday 22 August 2012, Russell King - ARM Linux wrote:
 > > > In any case, what we should be doing here as well is moving the headers
@@ -31,24 +30,6 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > I've just scripted this and am running my build testsuite over it now.
 > 
 > Please let me know what you think about it.
-> 
-> 	Arnd
-> 
-> The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
-> 
->   Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git 
 
-I'd like to run some checks on this, but branch name missing here for
-pulling a branch in for testing..
- 
-> for you to fetch changes up to 25296e032db173e8376123c2801cd233c9dc9b78:
-
-..and -ENOSUCHCOMMIT after fetching in arm-soc tree.
-
-Regards,
-
-Tony
+This certainly looks like a step in the right direction, thanks for doing
+this.
