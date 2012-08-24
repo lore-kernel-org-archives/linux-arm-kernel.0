@@ -1,21 +1,74 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 24 Aug 2012 14:18:56 +0200
-Subject: [PATCH 3/6] arm: cache-l2x0: add support for Aurora L2 cache ctrl
-In-Reply-To: <1345799361-23735-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1345799361-23735-1-git-send-email-gregory.clement@free-electrons.com>
- <1345799361-23735-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CABJ1b_Sk2jb=xmnvcY5AHHLUs5j6vGWJWqL_q0Rc5akAfdJhRw@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 24 Aug 2012 14:21:22 +0200
+Subject: [v3 1/4] ARM: dma-mapping: atomic_pool with struct page **pages
+In-Reply-To: <20120824.145200.843951079622652894.hdoyu@nvidia.com>
+References: <1345796945-21115-1-git-send-email-hdoyu@nvidia.com>
+ <1345796945-21115-2-git-send-email-hdoyu@nvidia.com>
+ <20120824111323.GB11007@konrad-lan.dumpdata.com>
+ <20120824.145200.843951079622652894.hdoyu@nvidia.com>
+Message-ID: <026901cd81f2$fffea680$fffbf380$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/24/12, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-> +++ b/arch/arm/mm/cache-l2x0.c
-> ...
-> @@ -597,6 +838,12 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+Hello,
 
-Hi all,
+On Friday, August 24, 2012 1:52 PM Hiroshi Doyu wrote:
 
-IMHO l2x0_of_init shouldn't rely on anything else but the compatible device node
-found. Is there any other way to set aux_val and aux_mask from DT or match data?
+> Konrad Rzeszutek Wilk <konrad.wilk@oracle.com> wrote @ Fri, 24 Aug 2012 13:13:23 +0200:
+> 
+> > On Fri, Aug 24, 2012 at 11:29:02AM +0300, Hiroshi Doyu wrote:
+> > > struct page **pages is necessary to align with non atomic path in
+> > > __iommu_get_pages(). atomic_pool() has the intialized **pages instead
+> > > of just *page.
+> > >
+> > > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+> > > ---
+> > >  arch/arm/mm/dma-mapping.c |   17 +++++++++++++----
+> > >  1 files changed, 13 insertions(+), 4 deletions(-)
+> > >
+> > > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> > > index 601da7a..b14ee64 100644
+> > > --- a/arch/arm/mm/dma-mapping.c
+> > > +++ b/arch/arm/mm/dma-mapping.c
+> > > @@ -296,7 +296,7 @@ struct dma_pool {
+> > >  	unsigned long *bitmap;
+> > >  	unsigned long nr_pages;
+> > >  	void *vaddr;
+> > > -	struct page *page;
+> > > +	struct page **pages;
+> > >  };
+> > >
+> > >  static struct dma_pool atomic_pool = {
+> > > @@ -335,12 +335,16 @@ static int __init atomic_pool_init(void)
+> > >  	unsigned long nr_pages = pool->size >> PAGE_SHIFT;
+> > >  	unsigned long *bitmap;
+> > >  	struct page *page;
+> > > +	struct page **pages;
+> > >  	void *ptr;
+> > >  	int bitmap_size = BITS_TO_LONGS(nr_pages) * sizeof(long);
+> > > +	size_t size = nr_pages * sizeof(struct page *);
+> > >
+> > > -	bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+> > > +	size += bitmap_size;
+> > > +	bitmap = kzalloc(size, GFP_KERNEL);
+> > >  	if (!bitmap)
+> > >  		goto no_bitmap;
+> > > +	pages = (void *)bitmap + bitmap_size;
+> >
+> > So you stuck a bitmap field in front of the array then?
+> > Why not just define a structure where this is clearly defined
+> > instead of doing the casting.
+> 
+> I just wanted to allocate only once for the members "pool->bitmap" and
+> "pool->pages" at once. Since the size of a whole bitmap isn't known in
+> advance, I couldn't find any fixed type for this bitmap, which pointer
+> can be shifted without casting. IOW, they are variable length.
 
-Sebastian
+IMHO it is better to avoid any non-trivial things in generic arch code. Merging
+those 2 allocations doesn't save any significant bit of memory and might confuse
+someone. Better just allocate them separately.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
