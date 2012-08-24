@@ -1,40 +1,39 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 24 Aug 2012 13:16:34 -0700
-Subject: [PATCH v3 1/4] arm/dts: regulator: Add tps65910 device tree data
-In-Reply-To: <20120821180847.GC7995@opensource.wolfsonmicro.com>
-References: <1345547850-29761-1-git-send-email-anilkumar@ti.com>
- <1345547850-29761-2-git-send-email-anilkumar@ti.com>
- <5033ADC5.4030002@wwwdotorg.org>
- <20120821163805.GW7995@opensource.wolfsonmicro.com>
- <5033CDDB.808@wwwdotorg.org>
- <20120821180847.GC7995@opensource.wolfsonmicro.com>
-Message-ID: <20120824201634.GZ11011@atomide.com>
+Date: Fri, 24 Aug 2012 13:18:13 -0700
+Subject: [PATCH] ARM: omap: add dtb targets
+In-Reply-To: <1345740689-21676-1-git-send-email-olof@lixom.net>
+References: <1345740689-21676-1-git-send-email-olof@lixom.net>
+Message-ID: <20120824201813.GA11011@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown <broonie@opensource.wolfsonmicro.com> [120821 11:09]:
-> On Tue, Aug 21, 2012 at 12:05:15PM -0600, Stephen Warren wrote:
-> > On 08/21/2012 10:38 AM, Mark Brown wrote:
-> 
-> > > This isn't the general view for the regualtor API - we generally
-> > > want all regulators to be registered in order to allow us to see
-> > > what's going on with things even if we've not figured them out from
-> > > software.
-> 
-> > Oh, I said the above specifically because when I added the LDO
-> > configuration for the regulators that weren't used to the Tegra .dts
-> > files, you told me to remove it, based on the comment I put in there
-> > that they weren't used on the board.
-> 
-> The board shouldn't have to define the regulators, the regulator driver
-> really ought to be able to figure out that they're there by itself if
-> there's no configuration based purely on knowing which chip is there.
-> From that point of view it's OK for the chip .dtsi to have them (though
-> ideally the driver wouldn't *need* that either) which was what was
-> happening here.
+* Olof Johansson <olof@lixom.net> [120823 09:52]:
+> Makes it easier to just do 'make dtbs' for whatever the kernel was
+> configured for, just like some other platforms.
 
-So I assume no changes needed here then?
-
-Regards,
+Thanks applying into omap devel-dt branch.
 
 Tony
+ 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+>  arch/arm/mach-omap2/Makefile.boot | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/Makefile.boot b/arch/arm/mach-omap2/Makefile.boot
+> index b03e562..6cf1c2d 100644
+> --- a/arch/arm/mach-omap2/Makefile.boot
+> +++ b/arch/arm/mach-omap2/Makefile.boot
+> @@ -1,3 +1,9 @@
+>    zreladdr-y		+= 0x80008000
+>  params_phys-y		:= 0x80000100
+>  initrd_phys-y		:= 0x80800000
+> +
+> +dtb-$(CONFIG_SOC_OMAP2420)	+= omap2420-h4.dtb
+> +dtb-$(CONFIG_ARCH_OMAP3)	+= omap3-beagle.dtb omap3-evm.dtb
+> +dtb-$(CONFIG_ARCH_OMAP4)	+= omap4-panda.dtb omap4-pandaES.dtb
+> +dtb-$(CONFIG_ARCH_OMAP4)	+= omap4-var_som.dtb omap4-sdp.dtb
+> +dtb-$(CONFIG_SOC_OMAP5)		+= omap5-evm.dtb
+> -- 
+> 1.7.10.1.488.g05fbf7a
+> 
