@@ -1,92 +1,80 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 24 Aug 2012 13:40:47 +0300
-Subject: [PATCH v3 00/23] OMAP UART patches
-In-Reply-To: <1345717983-18179-1-git-send-email-balbi@ti.com>
-References: <1345717983-18179-1-git-send-email-balbi@ti.com>
-Message-ID: <20120824104045.GC5172@arwen.pp.htv.fi>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 24 Aug 2012 16:15:26 +0530
+Subject: [PATCH 1/1] mmc: host: enable OMAP DMA engine support for omap
+ hosts by default
+In-Reply-To: <20120824103913.GB25765@n2100.arm.linux.org.uk>
+References: <CAMQu2gzX1d1FQtE3z=cwfA6daDgxJe6UFUaSY0PzGGLQOz_-ZQ@mail.gmail.com>
+ <20120718071039.GI6522@atomide.com>
+ <CANfBPZ97onLov1TwXYaT5A6D5XzXxwpvk+=y09W_9FmcOne4Mw@mail.gmail.com>
+ <CAMQu2gy-U1WmgGOGZ+VyXjZmLem9TEWbq5kR8jzC0qXvqF-=BA@mail.gmail.com>
+ <CAAwP0s2Efuuc7vsX3bZuwz175zUjnmsOV87OcZ06p_eoe4T3Ug@mail.gmail.com>
+ <alpine.DEB.2.01.1208232246530.15831@pmeerw.net>
+ <CAMQu2gyEGPbNEE0ur0wh9RoJKuBe4B5NkQMUafQNWGVLX8t9vg@mail.gmail.com>
+ <alpine.DEB.2.01.1208240942100.21552@pmeerw.net>
+ <20120824094231.GA25765@n2100.arm.linux.org.uk>
+ <CAMQu2gxs0bzNMtxb0LFyFKM9s4M4yXxFpopaBO+Hah3RjhCpLA@mail.gmail.com>
+ <20120824103913.GB25765@n2100.arm.linux.org.uk>
+Message-ID: <CAMQu2gw-vEguFU9naxsHtDVOfJkZVsFNMWJbvbc=ZuULy7TZNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forgot to Cc greg initially, my bad
+On Fri, Aug 24, 2012 at 4:09 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Aug 24, 2012 at 03:51:26PM +0530, Shilimkar, Santosh wrote:
+>> On Fri, Aug 24, 2012 at 3:12 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> >
+>> > On Fri, Aug 24, 2012 at 09:51:15AM +0200, Peter Meerwald wrote:
+>> > > the commit just sets CONFIG_DMA_OMAP=y and CONFIG_DMADEVICES=y in
+>> > > omap2plus_defconfig; this does not help people updating the kernel while
+>> > > keeping the config, nor does it help people in configuring the kernel
+>> > >
+>> > > there is a dependency (at least for beagleboard) between MMC_OMAP_HS and
+>> > > DMA_OMAP, and I think this should be made explicit
+>> >
+>> > Well, this is where stuff starts to get really yucky, because that
+>> > means if you have DMA_OMAP as a module, you have to have MMC_OMAP_HS
+>> > as a module too.  Or vice versa.  Which is a real pain for further
+>> > development of DMA_OMAP.
+>> >
+>> > Whatever, the solution here is NOT to add select statements to the
+>> > Kconfig to force DMA engine support and DMA_OMAP to 'y' for OMAP.
+>> > The best solution is for MMC_OMAP_HS to depend on DMA_OMAP, but that
+>> > will just mean that you'll end up with MMC_OMAP_HS disabled in your
+>> > config witout DMA engine support.  Another less desirable solution
+>> > is to have MMC_OMAP_HS select DMA engine and DMA_OMAP.
+>>
+>> Part of the patch [1] does the last part.
+>> MMC_OMAP_HS select DMA engine and DMA_OMAP.
+>>
+>> Regards
+>> Santosh
+>>
+>> [1] https://patchwork.kernel.org/patch/1203391/
+>
+> Well, I never saw that patch.  When I say "I'm going to be away for most
+> of July, and I won't be reading email, and I won't catch up with email
+> when I'm back" and when I get back I explicitly ask for stuff which needs
+> my attention sending, that's hardly surprising...
+>
+> But anyway, as I said above, the "select" option is less desirable because
+> it forces stuff.  And if you've seen the kind of crap that you have to go
+> through to figure out why the hell you can't disable an option, you'll
+> understand why I consider that solution revolting.
+>
+> Take, for instance, a list of dependencies spits out by menuconfig that
+> fills your entire screen, and you have to work out by reading carefully
+> through 2K of characters which combination of options is forcing the one
+> you want to turn off back on.  That is why "select" used inappropriately
+> is pure evil incarnate.
+I fully agree on the select and it's undesirable side effects.
+Since the polling mode isn't supported yet on OMAP MMC drivers, there
+was no choice. As per the previous discussion on [1], MMC and SPI driver
+folks are looking at supporting polling mode support which can remove
+the force select needed for OMAP_DMA.
 
-On Thu, Aug 23, 2012 at 01:32:40PM +0300, Felipe Balbi wrote:
-> Hi guys,
-> 
-> here's v3 and hopefully final version of this series. A whole bunch of new
-> patches added but the good thing is that now I had another engineer's help to
-> test, so he's got his Tested-by in all patches.
-> 
-> Changes since v2:
-> 	. Added a bunch of new patches
-> 	. Fixed a problem where we would always return IRQ_NONE even though we
-> 		handled IRQ
-> 
-> Changes since v1:
->         . improved commit log on patch 9/13 (formerly 10/13)
->         . removed patch 2/13
->         . added a new patch switching from spin_lock_irqsave() to spin_lock and
->                 spin_unlock_irqrestore to spin_unlock
-> 
-> Alan, if you prefer in pull request form, here it is:
-> 
-> The following changes since commit d9875690d9b89a866022ff49e3fcea892345ad92:
-> 
->   Linux 3.6-rc2 (2012-08-16 14:51:24 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git uart
-> 
-> for you to fetch changes up to a29230f14d8466c9b8c25171715378bf52189453:
-> 
->   serial: omap: enable RX and TX FIFO usage (2012-08-23 09:25:16 +0300)
-> 
-> ----------------------------------------------------------------
-> Felipe Balbi (20):
->       serial: omap: define and use to_uart_omap_port()
->       serial: omap: define helpers for pdata function pointers
->       serial: omap: don't access the platform_device
->       serial: omap: drop DMA support
->       serial: add OMAP-specific defines
->       serial: omap: simplify IRQ handling
->       serial: omap: refactor receive_chars() into rdi/rlsi handlers
->       serial: omap: move THRE check to transmit_chars()
->       serial: omap: stick to put_autosuspend
->       serial: omap: set dev->drvdata before enabling pm_runtime
->       serial: omap: drop unnecessary check from remove
->       serial: omap: make sure to suspend device before remove
->       serial: omap: don't save IRQ flags on hardirq
->       serial: omap: optimization with section annotations
->       serial: omap: drop "inline" from IRQ handler prototype
->       serial: omap: implement set_wake
->       serial: omap: make sure to put() on poll_get_char
->       serial: omap: remove unnecessary header and add a missing one
->       serial: omap: move uart_omap_port definition to C file
->       serial: omap: enable RX and TX FIFO usage
-> 
-> Ruchika Kharwar (2):
->       serial: omap: fix sequence of pm_runtime_* calls.
->       serial: omap: unlock the port lock
-> 
-> Vikram Pandita (1):
->       serial: omap: fix software flow control
-> 
->  arch/arm/mach-omap2/serial.c                  |  15 +-
->  arch/arm/plat-omap/include/plat/omap-serial.h |  47 +-
->  drivers/tty/serial/omap-serial.c              | 808 ++++++++++----------------
->  include/linux/serial_reg.h                    |   4 +
->  4 files changed, 330 insertions(+), 544 deletions(-)
-> 
-> -- 
-> 1.7.12.rc3
-> 
+Regards
+santosh
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120824/848da8b1/attachment.sig>
+Regards
+Santosh
