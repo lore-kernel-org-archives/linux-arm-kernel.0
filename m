@@ -1,58 +1,36 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 24 Aug 2012 13:52:00 +0200
-Subject: [v3 1/4] ARM: dma-mapping: atomic_pool with struct page **pages
-In-Reply-To: <20120824111323.GB11007@konrad-lan.dumpdata.com>
-References: <1345796945-21115-1-git-send-email-hdoyu@nvidia.com><1345796945-21115-2-git-send-email-hdoyu@nvidia.com><20120824111323.GB11007@konrad-lan.dumpdata.com>
-Message-ID: <20120824.145200.843951079622652894.hdoyu@nvidia.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 24 Aug 2012 13:52:03 +0200
+Subject: Preliminary topic proposals for the ARM mini-summit
+In-Reply-To: <20120810155128.GM2066@mudshark.cambridge.arm.com>
+References: <20120810155128.GM2066@mudshark.cambridge.arm.com>
+Message-ID: <20120824135203.1bfd2b14@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Konrad Rzeszutek Wilk <konrad.wilk@oracle.com> wrote @ Fri, 24 Aug 2012 13:13:23 +0200:
+Hello Will,
 
-> On Fri, Aug 24, 2012 at 11:29:02AM +0300, Hiroshi Doyu wrote:
-> > struct page **pages is necessary to align with non atomic path in
-> > __iommu_get_pages(). atomic_pool() has the intialized **pages instead
-> > of just *page.
-> > 
-> > Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> > ---
-> >  arch/arm/mm/dma-mapping.c |   17 +++++++++++++----
-> >  1 files changed, 13 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> > index 601da7a..b14ee64 100644
-> > --- a/arch/arm/mm/dma-mapping.c
-> > +++ b/arch/arm/mm/dma-mapping.c
-> > @@ -296,7 +296,7 @@ struct dma_pool {
-> >  	unsigned long *bitmap;
-> >  	unsigned long nr_pages;
-> >  	void *vaddr;
-> > -	struct page *page;
-> > +	struct page **pages;
-> >  };
-> >  
-> >  static struct dma_pool atomic_pool = {
-> > @@ -335,12 +335,16 @@ static int __init atomic_pool_init(void)
-> >  	unsigned long nr_pages = pool->size >> PAGE_SHIFT;
-> >  	unsigned long *bitmap;
-> >  	struct page *page;
-> > +	struct page **pages;
-> >  	void *ptr;
-> >  	int bitmap_size = BITS_TO_LONGS(nr_pages) * sizeof(long);
-> > +	size_t size = nr_pages * sizeof(struct page *);
-> >  
-> > -	bitmap = kzalloc(bitmap_size, GFP_KERNEL);
-> > +	size += bitmap_size;
-> > +	bitmap = kzalloc(size, GFP_KERNEL);
-> >  	if (!bitmap)
-> >  		goto no_bitmap;
-> > +	pages = (void *)bitmap + bitmap_size;
-> 
-> So you stuck a bitmap field in front of the array then?
-> Why not just define a structure where this is clearly defined
-> instead of doing the casting.
+Le Fri, 10 Aug 2012 16:51:28 +0100,
+Will Deacon <will.deacon@arm.com> a ?crit :
 
-I just wanted to allocate only once for the members "pool->bitmap" and
-"pool->pages" at once. Since the size of a whole bitmap isn't known in
-advance, I couldn't find any fixed type for this bitmap, which pointer
-can be shifted without casting. IOW, they are variable length.
+> The invitation email was slightly misleading as it only referred to Tuesday
+> 28 August, when in fact the mini-summit will be held on *both* Monday 27
+> and Tuesday 28. We will run topics in the morning (and allow an hour in
+> the afternoon for overflow discussion) and dedicate the rest of the time
+> to hacking. Initial topic proposals are:
+
+The "Kernel Summit Attendee Information" e-mail that we have received
+on August 22th still mentions that the workshops will only take place
+on Tuesday 28, with the ARM workshop being in room Marina 6, starting
+at 9:00 AM.
+
+In what room will take place the ARM workshop on Monday 27 ? I guess
+the starting time will be 9:00 AM as well, is this correct?
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
