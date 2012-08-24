@@ -1,11 +1,13 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sat, 25 Aug 2012 01:51:37 +0200
-Subject: [PATCH 1/4 V2] ARM: mx28: Add SPI 2 pinmux into imx28.dtsi
-Message-ID: <1345852300-2213-1-git-send-email-marex@denx.de>
+Date: Sat, 25 Aug 2012 01:51:38 +0200
+Subject: [PATCH 2/4 V2] ARM: mx28: Add USB PHY overcurrent pinmux
+In-Reply-To: <1345852300-2213-1-git-send-email-marex@denx.de>
+References: <1345852300-2213-1-git-send-email-marex@denx.de>
+Message-ID: <1345852300-2213-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add this SSP port 2 pin multiplexing configuration into the imx28.dtsi file.
+Add the pinmux settings for USB PHY overcurrent pins.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Chris Ball <cjb@laptop.org>
@@ -13,31 +15,49 @@ Cc: Fabio Estevam <fabio.estevam@freescale.com>
 Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx28.dtsi |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/imx28.dtsi |   30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-V2: Add only SSP2 pinmux.
+V2: This is pulled from the M28EVK and SPS1 board files, put it into common
+    file.
 
 diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 91b43e9..b996c2d 100644
+index b996c2d..3cba62d 100644
 --- a/arch/arm/boot/dts/imx28.dtsi
 +++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -507,6 +507,19 @@
+@@ -520,6 +520,36 @@
  					fsl,voltage = <1>;
- 					fsl,pull-up = <0>;
+ 					fsl,pull-up = <1>;
  				};
 +
-+				spi2_pins_a: spi2 at 0 {
++				usbphy0_pins_a: usbphy0 at 0 {
 +					reg = <0>;
 +					fsl,pinmux-ids = <
-+						0x2100 /* MX28_PAD_SSP2_SCK__SSP2_SCK */
-+						0x2110 /* MX28_PAD_SSP2_MOSI__SSP2_CMD */
-+						0x2120 /* MX28_PAD_SSP2_MISO__SSP2_D0 */
-+						0x2130 /* MX28_PAD_SSP2_SS0__SSP2_D3 */
++						0x2152 /* MX28_PAD_SSP2_SS2__USB0_OVERCURRENT */
 +					>;
-+					fsl,drive-strength = <1>;
++					fsl,drive-strength = <2>;
 +					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
++					fsl,pull-up = <0>;
++				};
++
++				usbphy0_pins_b: usbphy0 at 1 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x3061 /* MX28_PAD_AUART1_CTS__USB0_OVERCURRENT */
++					>;
++					fsl,drive-strength = <2>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++
++				usbphy1_pins_a: usbphy1 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x2142 /* MX28_PAD_SSP2_SS1__USB1_OVERCURRENT */
++					>;
++					fsl,drive-strength = <2>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
 +				};
  			};
  
