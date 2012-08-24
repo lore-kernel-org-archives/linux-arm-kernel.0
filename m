@@ -1,146 +1,102 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 24 Aug 2012 12:40:12 +0530
-Subject: [PATCH 1/1] mmc: host: enable OMAP DMA engine support for omap
- hosts by default
-In-Reply-To: <alpine.DEB.2.01.1208232246530.15831@pmeerw.net>
-References: <1342485005-5178-1-git-send-email-javier@dowhile0.org>
- <CAMQu2gxaF8K78puE84+=8VJLbsdtdD97ww81XJxG6sCtYTYXww@mail.gmail.com>
- <CABxcv=nsmeVLspzXERYXebmPaNO6rKCsVnak7dMtvGjiYH4vOw@mail.gmail.com>
- <20120718065951.GH6522@atomide.com>
- <CAMQu2gzX1d1FQtE3z=cwfA6daDgxJe6UFUaSY0PzGGLQOz_-ZQ@mail.gmail.com>
- <20120718071039.GI6522@atomide.com>
- <CANfBPZ97onLov1TwXYaT5A6D5XzXxwpvk+=y09W_9FmcOne4Mw@mail.gmail.com>
- <CAMQu2gy-U1WmgGOGZ+VyXjZmLem9TEWbq5kR8jzC0qXvqF-=BA@mail.gmail.com>
- <CAAwP0s2Efuuc7vsX3bZuwz175zUjnmsOV87OcZ06p_eoe4T3Ug@mail.gmail.com>
- <alpine.DEB.2.01.1208232246530.15831@pmeerw.net>
-Message-ID: <CAMQu2gyEGPbNEE0ur0wh9RoJKuBe4B5NkQMUafQNWGVLX8t9vg@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 24 Aug 2012 09:14:15 +0200
+Subject: [PATCH 1/1] clk: add DT support for clock gating control
+In-Reply-To: <1345782559.20538.22.camel@gitbox>
+References: <1341767726-25630-1-git-send-email-sebastian.hesselbarth@googlemail.com>
+ <20120824023135.4547.2534@nucleus> <1345782559.20538.22.camel@gitbox>
+Message-ID: <503729C7.8040508@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2012 at 2:30 AM, Peter Meerwald <pmeerw@pmeerw.net> wrote:
->
-> On Wed, 18 Jul 2012, Javier Martinez Canillas wrote:
->
-> > On Wed, Jul 18, 2012 at 10:36 AM, Shilimkar, Santosh
-> > <santosh.shilimkar@ti.com> wrote:
-> > > On Wed, Jul 18, 2012 at 1:14 PM, S, Venkatraman <svenkatr@ti.com>
-> > > wrote:
-> > >> On Wed, Jul 18, 2012 at 12:40 PM, Tony Lindgren <tony@atomide.com>
-> > >> wrote:
-> > >>> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120718 00:09]:
-> > >>>> On Wed, Jul 18, 2012 at 12:29 PM, Tony Lindgren <tony@atomide.com>
-> > >>>> wrote:
-> > >>>> > * Javier Martinez Canillas <javier@dowhile0.org> [120716 23:56]:
-> > >>>> >> On Tue, Jul 17, 2012 at 8:45 AM, Shilimkar, Santosh
-> > >>>> >> <santosh.shilimkar@ti.com> wrote:
-> > >>>> >> > Hi,
-> > >>>> >> >
-> > >>>> >> > On Tue, Jul 17, 2012 at 6:00 AM, Javier Martinez Canillas
-> > >>>> >> > <javier@dowhile0.org> wrote:
-> > >>>> >> >> The OMAP MMC and OMAP High Speed MMC hosts now use entirely
-> > >>>> >> >> the DMA
-> > >>>> >> >> engine API instead of the previous private DMA API
-> > >>>> >> >> implementation.
-> > >>>> >> >>
-> > >>>> >> >> So, if the kernel is built with support for any of these
-> > >>>> >> >> hosts but it
-> > >>>> >> >> doesn't support DMA devices nor OMAP DMA support, it fails
-> > >>>> >> >> when trying
-> > >>>> >> >> to obtain a DMA channel which leads to the following error on
-> > >>>> >> >> an OMAP3
-> > >>>> >> >> IGEPv2 Rev.C board (and probably on most OMAP boards with MMC
-> > >>>> >> >> support):
-> > >>>> >> >>
-> > >>>> >> >> [ 2.199981] omap_hsmmc omap_hsmmc.1: unable to obtain RX DMA
-> > >>>> >> >> engine channel 48
-> > >>>> >> >> [    2.215087] omap_hsmmc omap_hsmmc.0: unable to obtain RX
-> > >>>> >> >> DMA engine channel 62
-> > >>>> >> >>
-> > >>>> >> >> selecting automatically CONFIG_DMADEVICES and CONFIG_DMA_OMAP
-> > >>>> >> >> solves it.
-> > >>>> >> >>
-> > >>>> >> >> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
-> > >>>> >> >> ---
-> > >>>> >> > Considering, we are updating drivers to select the DMA engine,
-> > >>>> >> > can you
-> > >>>> >> > also include
-> > >>>> >> > "drivers/spi/spi-omap2-mcspi.c" which is also updated for DMA
-> > >>>> >> > engine.
-> > >>>> >> >
-> > >>>> >> > Regards
-> > >>>> >> > Santosh
-> > >>>> >>
-> > >>>> >> Hi Santosh,
-> > >>>> >>
-> > >>>> >> Ok, I'll send a v2 now which includes spi-omap2-mcspi then.
-> > >>>> >
-> > >>>> > I don't think we should do this, the drivers should work with and
-> > >>>> > without
-> > >>>> > dma. This just needs to be added to the omap2plus_defconfig.
-> > >>>> >
-> > >>>> Well this was not decided based on any DMA CONFIG option before for
-> > >>>> the subject drivers. It is already by default enabled if the DMA is
-> > >>>> supported
-> > >>>> by the driver IP. There is a possibility to disable it from driver
-> > >>>> platform/dt
-> > >>>> data so that still remains.
-> > >>>
-> > >>> I think it should rather be that if the driver is broken and does
-> > >>> not work
-> > >>> without DMA, it should have depends on CONFIG_DMA_OMAP.
-> > >>>
-> > >> I can confirm that omap MMC can't work without DMA; polled mode is
-> > >> not
-> > >> supported / implemented.
-> > >
-> > > Same case for SPI driver as well. It uses DMA for everything except
-> > > the cases
-> > > where DMA doesn't make sense like 1 byte/2 byte etc. And its not
-> > > configurable,
-> > >
-> > > At least considering this, it is better we do this per driver than
-> > > enabling
-> > > it at SOC config.
-> > >
-> > > Regards
-> > > Santosh
-> > > --
-> >
-> > Hi Santosh,
-> >
-> > And what about enabling it at the SoC config level but making the
-> > drivers dependant on CONFIG_DMADEVICES and CONFIG_DMA_OMAP? If you
-> > agree I can send something like this in two different patches (one for
-> > the omap2plus_defconfig and another to make the drivers dependant on
-> > the config option):
-> >
-> > diff --git a/arch/arm/configs/omap2plus_defconfig
-> > b/arch/arm/configs/omap2plus_defconfig
-> > index b152de7..e58edc3 100644
-> > --- a/arch/arm/configs/omap2plus_defconfig
-> > +++ b/arch/arm/configs/omap2plus_defconfig
-> > @@ -193,6 +193,8 @@ CONFIG_MMC_OMAP_HS=y
-> >  CONFIG_RTC_CLASS=y
-> >  CONFIG_RTC_DRV_TWL92330=y
-> >  CONFIG_RTC_DRV_TWL4030=y
-> > +CONFIG_DMADEVICES=y
-> > +CONFIG_DMA_OMAP=y
-> >  CONFIG_EXT2_FS=y
-> >  CONFIG_EXT3_FS=y
-> >  # CONFIG_EXT3_FS_XATTR is not set
->
-> above has been merged, 89269ef1f0abc72c551198123e19cd4edfd43cf4
-> but I am missing the patches below in mainline (3.6-rc3) -- what happened?
->
-> as Javier pointed out in https://patchwork.kernel.org/patch/1203391/,
-> MMC is broken support e.g. on beagleboard unless DMA_OMAP is defined
->
-> I suggest to take below patches and help to avoid some extra gray hair for
-> people looking for a fix for non-booting beagleboards
->
-May be I am missing something, but why you would need below patch
-for beagle with "89269ef1f0abc72c551198123e19cd4edfd43cf4" commit
-enabling the DMA_OMAP for all OMAP boards.
+On 08/24/2012 06:29 AM, Tony Prisk wrote:
+> On Thu, 2012-08-23 at 19:31 -0700, Mike Turquette wrote:
+>> Quoting Sebastian Hesselbarth (2012-07-08 10:15:26)
+>>> This patch adds support for using clock gates (clk-gate) from DT based
+>>> on Rob Herrings DT clk binding support for 3.6.
+>>>
+>>> It adds a helper function to clk-gate to allocate all resources required by
+>>> a set of individual clock gates, i.e. register base address and lock. Each
+>>> clock gate is described as a child of the clock-gating-control in DT and
+>>> also created by the helper function.
+>>>
+>> Thanks for submitting this.  I'd prefer for Rob or someone with a more vested
+>> interest in DT to review your binding.  I have some comments on the code below.
 
-Regards
-Santosh
+Mike, Tony,
+
+thanks for reviewing this, I didn't even remember submitting it ;)
+
+>> <snip>
+>>> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+>>> +
+>>> +       lockp = kzalloc(sizeof(spinlock_t), GFP_KERNEL);
+>>> +       if (!lockp) {
+>>> +               pr_debug("%s: unable to allocate spinlock for %s\n",
+>>> +                        __func__, np->full_name);
+>>> +               return;
+>>> +       }
+>>> +
+>>> +       spin_lock_init(lockp);
+>>
+>> The spinlocks for the basic clock types have always been optional.  This
+>> code should reflect that and not assume the spinlock.
+>>
+>> Also I wonder if the assumption is true that a single spinlock
+>> corresponding to a device_node is always the right thing for every
+>> platform.  What about a 32-bit register that contains some gating bits
+>> and a 3-bit wide field for a mux which we perform read-modify-write
+>> operations on?
+>>
+>> You'll have to pardon my DT ignorance.  My concerns above may be totally
+>> crazy with respect to DT.
+>
+> This also requires you to split your gated clocks in seperate nodes by
+> register if you don't want unrelated clocks locking each other out.
+> Also, you need a method of 'sharing' the lock outside of the gated-clock
+> for use by other clock types that may share the same register.
+
+The clock-gatining-control was inspired by a single 32b register that only
+has clock gating bits. Some weeks of more insight into kernel code and DT,
+I agree to do this differently.
+
+> Are you assuming that all gated-clocks will be contained within a parent
+> node with:
+> #address-cells =<1>;
+> #size-cells =<1>;
+> with no other types of clocks? This generally isn't how people are
+> writing their device tree files.
+>
+> Looking through the current dts files, the platforms that are using
+> clocks to any real degree are using address=1, size=0.
+> The only ones I see with 1/1 are only defining a fixed-clock and don't
+> use the reg property anyway so could just as well be 1/0.
+>
+> It might be better to pass the bit field as a separate property rather
+> than requiring people change their reg property to suit.
+>
+> myclock {
+> 	reg =<0x0120>;
+> 	enable-bit =<22>;
+> };
+
+Actually, today I would rather have some platform specific node for the
+clock gating register and don't name each individual clock but only use
+the clocks phandle to sort out the corresponding bit.
+
+cgc: clock-gating-control {
+	compatible = "marvell,orion-clkctrl";
+	reg = <0x12340 0x8>;
+	#clock-cells = <1>;
+};
+
+some_device: gateable-device {
+	...
+	clocks = <&cgc 13>;
+};
+
+The platform specific node will take care of all requirements like
+spinlock or not. Maybe there will have to be a property to mask out
+reserved bits in the 32b register or maybe I can assume that reserved
+bits do no harm if set.
+
+Sebastian
