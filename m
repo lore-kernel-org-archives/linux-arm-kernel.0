@@ -1,106 +1,199 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 24 Aug 2012 10:25:11 +0300
-Subject: [PATCH] MMC: OMAP MSDI: fix broken PIO mode
-In-Reply-To: <alpine.DEB.2.00.1208240555210.25436@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1208240555210.25436@utopia.booyaka.com>
-Message-ID: <20120824072509.GC3334@arwen.pp.htv.fi>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 24 Aug 2012 15:30:04 +0800
+Subject: [PATCH 2/2] imx6q: Set pwm control register during enable and
+ config call
+In-Reply-To: <1345735959-12964-3-git-send-email-hachimi.samir@gmail.com>
+References: <1345735959-12964-3-git-send-email-hachimi.samir@gmail.com>
+Message-ID: <20120824073002.GC31998@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Aug 23, 2012 at 05:32:39PM +0200, hachimi.samir at gmail.com wrote:
+> From: Samir Hachimi <hachimi.samir@gmail.com>
+> 
+> Bind pwm node with driver.
+> Activate stop_enable mode when imx_pwm_config and set enable bit in pwm
+> CR register during imx_pwm_enable.
+> 
+> Signed-off-by: Samir Hachimi <shachimi@adeneo-embedded.com>
 
-On Fri, Aug 24, 2012 at 06:00:18AM +0000, Paul Walmsley wrote:
-> 
-> After commit 26b88520b80695a6fa5fd95b5d97c03f4daf87e0 ("mmc:
-> omap_hsmmc: remove private DMA API implementation"), the Nokia N800
-> here stopped booting:
-> 
-> [    2.086181] Waiting for root device /dev/mmcblk0p1...
-> [    2.324066] Unhandled fault: imprecise external abort (0x406) at 0x00000000
-> [    2.331451] Internal error: : 406 [#1] ARM
-> [    2.335784] Modules linked in:
-> [    2.339050] CPU: 0    Not tainted  (3.6.0-rc3 #60)
-> [    2.344146] PC is at default_idle+0x28/0x30
-> [    2.348602] LR is at trace_hardirqs_on_caller+0x15c/0x1b0
-> 
-> ...
-> 
-> This turned out to be due to memory corruption caused by long-broken
-> PIO code in drivers/mmc/host/omap.c.  (Previously, this driver had
-> been using DMA; but the above commit caused the MMC driver to fall
-> back to PIO mode with an unmodified Kconfig.)
-> 
-> The PIO code, added with the rest of the driver in commit
-> 730c9b7e6630f786fcec026fb11d2e6f2c90fdcb ("[MMC] Add OMAP MMC host
-> driver"), confused bytes with 16-bit words.  This bug caused memory
-> located after the PIO transfer buffer to be corrupted with transfers
-> larger than 32 bytes.  The driver also did not increment the buffer
-> pointer after the transfer occurred.  This bug resulted in data
-> corruption during any transfer larger than 64 bytes.
-> 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Juha Yrj?l? <juha.yrjola@nokia.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Carlos Aguiar <carlos.aguiar@indt.org.br>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-
-this looks good to me, though I don't have how to test. FWIW:
-
-Reviewed-by: Felipe Balbi <balbi@ti.com>
+You should use same one email address for author/From: and
+Signed-off-by.
 
 > ---
->  drivers/mmc/host/omap.c |   14 +++++++++++---
->  1 file changed, 11 insertions(+), 3 deletions(-)
+>  arch/arm/boot/dts/imx6q.dtsi  |    8 ++++++++
+>  arch/arm/mach-imx/clk-imx6q.c |    4 ++++
+>  drivers/pwm/pwm-imx.c         |   34 +++++++++++++++++++++++-----------
+>  3 files changed, 35 insertions(+), 11 deletions(-)
+
+The patch should be split into two, one for arch/arm/ part, and the
+other for drivers/pwm part.  The arch/arm/ part will go via arm-soc
+tree, while drivers/pwm part should go via pwm tree.
+
+See following info from MAINTAINERS file for drivers/pwm part.
+
+PWM SUBSYSTEM
+M:      Thierry Reding <thierry.reding@avionic-design.de>
+L:      linux-kernel at vger.kernel.org
+S:      Maintained
+W:      http://gitorious.org/linux-pwm
+T:      git git://gitorious.org/linux-pwm/linux-pwm.git
+F:      Documentation/pwm.txt
+F:      Documentation/devicetree/bindings/pwm/
+F:      include/linux/pwm.h
+F:      include/linux/of_pwm.h
+F:      drivers/pwm/
+
+
 > 
-> diff --git a/drivers/mmc/host/omap.c b/drivers/mmc/host/omap.c
-> index 50e08f0..a5999a7 100644
-> --- a/drivers/mmc/host/omap.c
-> +++ b/drivers/mmc/host/omap.c
-> @@ -668,7 +668,7 @@ mmc_omap_clk_timer(unsigned long data)
->  static void
->  mmc_omap_xfer_data(struct mmc_omap_host *host, int write)
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index c913b99..7ce9dc1 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -248,6 +248,8 @@
+>  			};
+>  
+>  			pwm at 02080000 { /* PWM1 */
+> +				compatible = "fsl,imx6q-pwm";
+> +				#pwm-cells = <2>;
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_pwm1_1>;
+>  				reg = <0x02080000 0x4000>;
+> @@ -256,6 +258,8 @@
+>  			};
+>  
+>  			pwm at 02084000 { /* PWM2 */
+> +				compatible = "fsl,imx6q-pwm";
+> +				#pwm-cells = <2>;
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_pwm2_1>;
+>  				reg = <0x02084000 0x4000>;
+> @@ -264,6 +268,8 @@
+>  			};
+>  
+>  			pwm at 02088000 { /* PWM3 */
+> +				compatible = "fsl,imx6q-pwm";
+> +				#pwm-cells = <2>;
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_pwm3_1>;
+>  				reg = <0x02088000 0x4000>;
+> @@ -272,6 +278,8 @@
+>  			};
+>  
+>  			pwm at 0208c000 { /* PWM4 */
+> +				compatible = "fsl,imx6q-pwm";
+> +				#pwm-cells = <2>;
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_pwm4_1>;
+>  				reg = <0x0208c000 0x4000>;
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> index ea89520..057740b 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+> @@ -430,6 +430,10 @@ int __init mx6q_clocks_init(void)
+>  	clk_register_clkdev(clk[ecspi3], NULL, "2010000.ecspi");
+>  	clk_register_clkdev(clk[ecspi4], NULL, "2014000.ecspi");
+>  	clk_register_clkdev(clk[ecspi5], NULL, "2018000.ecspi");
+> +	clk_register_clkdev(clk[pwm1], "pwm", "2080000.pwm");
+> +	clk_register_clkdev(clk[pwm2], "pwm", "2084000.pwm");
+> +	clk_register_clkdev(clk[pwm3], "pwm", "2088000.pwm");
+> +	clk_register_clkdev(clk[pwm4], "pwm", "208c000.pwm");
+
+We are moving clock lookup into device tree, so these changes are not
+welcomed at this point.
+
+>  	clk_register_clkdev(clk[sdma], NULL, "20ec000.sdma");
+>  	clk_register_clkdev(clk[dummy], NULL, "20bc000.wdog");
+>  	clk_register_clkdev(clk[dummy], NULL, "20c0000.wdog");
+> diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+> index 2a0b353..0b13f34 100644
+> --- a/drivers/pwm/pwm-imx.c
+> +++ b/drivers/pwm/pwm-imx.c
+> @@ -32,6 +33,7 @@
+>  #define MX3_PWMSAR                0x0C    /* PWM Sample Register */
+>  #define MX3_PWMPR                 0x10    /* PWM Period Register */
+>  #define MX3_PWMCR_PRESCALER(x)    (((x - 1) & 0xFFF) << 4)
+> +#define MX3_PWMCR_STOPEN		(1 << 25)
+>  #define MX3_PWMCR_DOZEEN                (1 << 24)
+>  #define MX3_PWMCR_WAITEN                (1 << 23)
+>  #define MX3_PWMCR_DBGEN			(1 << 22)
+> @@ -68,25 +70,21 @@ static int imx_pwm_config(struct pwm_chip *chip,
+>  		prescale = period_cycles / 0x10000 + 1;
+>  
+>  		period_cycles /= prescale;
+> -		c = (unsigned long long)period_cycles * duty_ns;
+> -		do_div(c, period_ns);
+> -		duty_cycles = c;
+>  
+> -		/*
+> -		 * according to imx pwm RM, the real period value should be
+> -		 * PERIOD value in PWMPR plus 2.
+> +		/* the chip documentation says the counter counts up to
+> +		 * period_cycles + 1 and then is reset to 0, so the
+> +		 *  actual period of the PWM wave is period_cycles + 2
+>  		 */
+> -		if (period_cycles > 2)
+> -			period_cycles -= 2;
+> -		else
+> -			period_cycles = 0;
+> +		c = (unsigned long long)(period_cycles + 2) * duty_ns;
+> +		do_div(c, period_ns);
+> +		duty_cycles = c;
+>  
+>  		writel(duty_cycles, imx->mmio_base + MX3_PWMSAR);
+>  		writel(period_cycles, imx->mmio_base + MX3_PWMPR);
+>  
+>  		cr = MX3_PWMCR_PRESCALER(prescale) |
+>  			MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN |
+> -			MX3_PWMCR_DBGEN | MX3_PWMCR_EN;
+> +			MX3_PWMCR_DBGEN | MX3_PWMCR_STOPEN;
+>  
+>  		if (cpu_is_mx25())
+>  			cr |= MX3_PWMCR_CLKSRC_IPG;
+> @@ -124,6 +122,7 @@ static int imx_pwm_config(struct pwm_chip *chip,
+>  static int imx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
 >  {
-> -	int n;
-> +	int n, nwords;
+>  	struct imx_chip *imx = to_imx_chip(chip);
+> +	unsigned long reg;
+>  	int rc = 0;
 >  
->  	if (host->buffer_bytes_left == 0) {
->  		host->sg_idx++;
-> @@ -678,15 +678,23 @@ mmc_omap_xfer_data(struct mmc_omap_host *host, int write)
->  	n = 64;
->  	if (n > host->buffer_bytes_left)
->  		n = host->buffer_bytes_left;
-> +
-> +	nwords = n / 2;
-> +	nwords += n & 1; /* handle odd number of bytes to transfer */
-> +
->  	host->buffer_bytes_left -= n;
->  	host->total_bytes_left -= n;
->  	host->data->bytes_xfered += n;
->  
->  	if (write) {
-> -		__raw_writesw(host->virt_base + OMAP_MMC_REG(host, DATA), host->buffer, n);
-> +		__raw_writesw(host->virt_base + OMAP_MMC_REG(host, DATA),
-> +			      host->buffer, nwords);
->  	} else {
-> -		__raw_readsw(host->virt_base + OMAP_MMC_REG(host, DATA), host->buffer, n);
-> +		__raw_readsw(host->virt_base + OMAP_MMC_REG(host, DATA),
-> +			     host->buffer, nwords);
+>  	if (!imx->clk_enabled) {
+> @@ -131,6 +130,11 @@ static int imx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+>  		if (!rc)
+>  			imx->clk_enabled = 1;
 >  	}
 > +
-> +	host->buffer += nwords;
+> +	reg = readl(imx->mmio_base + MX3_PWMCR);
+> +	reg |= MX3_PWMCR_EN;
+> +	writel(reg, imx->mmio_base + MX3_PWMCR);
+> +
+>  	return rc;
 >  }
 >  
->  static inline void mmc_omap_report_irq(u16 status)
+> @@ -206,9 +212,15 @@ static int __devexit imx_pwm_remove(struct platform_device *pdev)
+>  	return pwmchip_remove(&imx->chip);
+>  }
+>  
+> +static const struct of_device_id mxc_pwm_dt_ids[] = {
+> +	{ .compatible = "fsl,imx6q-pwm", },
+
+The driver really needs a cleanup before we add device tree support for
+it.  For example, all these cpu_is_xxx stuff need to go and use
+device_id instead.
+
+Regards,
+Shawn
+
+> +	{ /* sentinel */ }
+> +};
+> +
+>  static struct platform_driver imx_pwm_driver = {
+>  	.driver		= {
+>  		.name	= "mxc_pwm",
+> +		.of_match_table = of_match_ptr(mxc_pwm_dt_ids),
+>  	},
+>  	.probe		= imx_pwm_probe,
+>  	.remove		= __devexit_p(imx_pwm_remove),
 > -- 
-> 1.7.10.4
-
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120824/0d42d851/attachment-0001.sig>
+> 1.7.1
+> 
