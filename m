@@ -1,59 +1,138 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Fri, 24 Aug 2012 19:18:12 +1200
-Subject: [PATCHv4 0/9] *** ARM: Update arch-vt8500 to Devicetree ***
-In-Reply-To: <CABjd4Yxxf5XDc6gs0WABZgF3SOd89J7CfjsU9uitOg4qpQ4WEQ@mail.gmail.com>
-References: <1345707346-9035-1-git-send-email-linux@prisktech.co.nz>
- <201208231322.23077.arnd@arndb.de> <1345758702.2061.6.camel@gitbox>
- <201208240540.12316.arnd@arndb.de> <1345787536.23177.3.camel@gitbox>
- <CABjd4Yxxf5XDc6gs0WABZgF3SOd89J7CfjsU9uitOg4qpQ4WEQ@mail.gmail.com>
-Message-ID: <1345792692.23550.3.camel@gitbox>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 24 Aug 2012 15:21:05 +0800
+Subject: [PATCH 1/2] imx6q: Configure the pwm node for pinmux support
+In-Reply-To: <1345735959-12964-2-git-send-email-hachimi.samir@gmail.com>
+References: <1345735959-12964-2-git-send-email-hachimi.samir@gmail.com>
+Message-ID: <20120824072102.GB31998@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-08-24 at 09:54 +0400, Alexey Charkov wrote:
-> 2012/8/24 Tony Prisk <linux@prisktech.co.nz>:
-> > On Fri, 2012-08-24 at 05:40 +0000, Arnd Bergmann wrote:
-> >> On Thursday 23 August 2012, Tony Prisk wrote:
-> >> > I was about to say that if Mike has any issues with the driver that I
-> >> > can fix the patch conflict at the same time, but I just realised that
-> >> > its more work than I originally thought :)
-> >> >
-> >> > I was going to move the arch-vt8500 part of the clocks patch back into
-> >> > the clocks patch - but that will just move the issue from arm-soc to
-> >> > clocks because Mike's branch won't have the arch-vt8500 patch so the
-> >> > patch will fail.
-> >>
-> >> But that's ok, because without the arch-v8500 part, nothing uses
-> >> the vt8500-clock driver, so nothing breaks. You can introduce broken
-> >> code in the meantime as long as it's impossible to enable and it will
-> >> work afterwards.
-> >>
-> >>       Arnd
-> >
-> > You lost me a little bit there :)
-> > If it stays as is now, the arch-vt8500 patch will introduce an
-> > unresolved symbol.
-> > If I move the clock code from the arch-vt8500 patch to the clock patch,
-> > then the clock patch won't apply because it needs the arch-vt8500 patch
-> > first and Mike won't have that patch, but it would be fine if both
-> > patches went in via your tree.
+On Thu, Aug 23, 2012 at 05:32:38PM +0200, hachimi.samir at gmail.com wrote:
+> From: Samir Hachimi <hachimi.samir@gmail.com>
 > 
-> Why don't you add a #define in the first patch that makes your
-> to-be-unresolved symbol a no-op and then drop it within the clock
-> patch?
+>  Add the pinmux support for pwm.
+>  Several pin can be set to PwmO for the same Pwm. This configuration set all
+>  of them when enabled.
+
+No, not at all.  See more below.
+
 > 
-> Best,
-> Alexey
+> Signed-off-by: Samir Hachimi <shachimi@adeneo-embedded.com>
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi |   42 ++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 42 insertions(+), 0 deletions(-)
 > 
-Actually - that doesn't resolve the problem unless it all goes in via
-the same tree still because the clock patch can only drop the #define if
-the arch-vt8500 patch exists still - same as problem #2 I mentioned.
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index fd57079..c913b99 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -248,23 +248,35 @@
+>  			};
+>  
+>  			pwm at 02080000 { /* PWM1 */
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_pwm1_1>;
+>  				reg = <0x02080000 0x4000>;
+>  				interrupts = <0 83 0x04>;
+> +				status = "disabled";
+>  			};
+>  
+>  			pwm at 02084000 { /* PWM2 */
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_pwm2_1>;
+>  				reg = <0x02084000 0x4000>;
+>  				interrupts = <0 84 0x04>;
+> +				status = "disabled";
+>  			};
+>  
+>  			pwm at 02088000 { /* PWM3 */
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_pwm3_1>;
+>  				reg = <0x02088000 0x4000>;
+>  				interrupts = <0 85 0x04>;
+> +				status = "disabled";
+>  			};
+>  
+>  			pwm at 0208c000 { /* PWM4 */
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_pwm4_1>;
+>  				reg = <0x0208c000 0x4000>;
+>  				interrupts = <0 86 0x04>;
+> +				status = "disabled";
+>  			};
+>  
+>  			flexcan at 02090000 { /* CAN1 */
+> @@ -559,6 +571,36 @@
+>  					};
+>  				};
+>  
+> +				pwm1 {
+> +				     	pinctrl_pwm1_1: pwm1grp-1 {
+> +						fsl,pins = <1543 0x80000000	/* MX6Q_PAD_SD1_DAT3__PWM1_PWMO */
+> +							    574 0x80000000      /* MX6Q_PAD_DISPO_DAT8__PWM1_PWMO */
+> +							    971 0x80000000>;	/* MX6Q_PAD_GPIO_9__PWM1_PWMO */
+> +					};
 
-If the clock patch goes via Mikes tree he will need the arch-vt8500
-patch as well - don't think it can be avoided.
+It really should be something like the below.
 
-Still easier to send the whole lot via arm-soc, then at least we can
-resolve the patch conflicts without having to apply the patches twice.
+				     	pinctrl_pwm1_1: pwm1grp-1 {
+						fsl,pins = <
+							1543 0x80000000	/* MX6Q_PAD_SD1_DAT3__PWM1_PWMO */
+						>;
+					};
 
-Regards
-Tony P
+
+				     	pinctrl_pwm1_2: pwm1grp-2 {
+						fsl,pins = <
+							574 0x80000000	/* MX6Q_PAD_DISPO_DAT8__PWM1_PWMO */
+						>;
+					};
+
+				     	pinctrl_pwm1_3: pwm1grp-3 {
+						fsl,pins = <
+							971 0x80000000	/* MX6Q_PAD_GPIO_9__PWM1_PWMO */
+						>;
+					};
+
+The rationale behind this is there are 3 possible pads on SoC imx6q,
+MX6Q_PAD_SD1_DAT3, MX6Q_PAD_DISPO_DAT8 and MX6Q_PAD_GPIO_9 could be
+muxed on function PWM1_PWMO.  But for particular user (board design),
+only one option is needed.
+
+You do not need to enumerate all the possible options from the
+beginning.  We would add an option when it's actually used by some
+board.
+
+Regards,
+Shawn
+
+> +				};
+> +
+> +				pwm2 {
+> +				     	pinctrl_pwm2_1: pwm2grp-1 {
+> +						fsl,pins = <1557 0x80000000     /* MX6Q_PAD_SD1_DAT2__PWM2_PWMO */
+> +							    582 0x80000000	/* MX6Q_PAD_DISP0_DAT9__PWM2_PWMO */
+> +							    963 0x80000000>;	/* MX6Q_PAD_GPIO_1__PWM2_PWMO */
+> +					};
+> +				};
+> +
+> +				pwm3 {
+> +				     	pinctrl_pwm3_1: pwm3grp-1 {
+> +						fsl,pins = <1471 0x80000000	/* MX6Q_PAD_SD4_DAT1__PWM3_PWMO */
+> +							    1526 0x80000000>;	/* MX6Q_PAD_SD1_DAT1__PWM3_PWMO */
+> +					};
+> +				};
+> +
+> +				pwm4 {
+> +				     	pinctrl_pwm4_1: pwm4grp-1 {
+> +						fsl,pins = <1479 0x80000000	/* MX6Q_PAD_SD4_DAT2__PWM4_PWMO */
+> +							    1550 0x80000000>;	/* MX6Q_PAD_SD1_CMD__PWM4_PWMO */
+> +					};
+> +				};
+> +
+>  				usdhc3 {
+>  					pinctrl_usdhc3_1: usdhc3grp-1 {
+>  						fsl,pins = <1273 0x17059	/* MX6Q_PAD_SD3_CMD__USDHC3_CMD */
+> -- 
+> 1.7.1
+> 
