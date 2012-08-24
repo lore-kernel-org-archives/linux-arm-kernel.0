@@ -1,27 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 24 Aug 2012 12:54:47 -0700
-Subject: [PATCH v6 07/10] ARM: OMAP2+: gpmc: generic timing calculation
-In-Reply-To: <50359C64.40603@ti.com>
-References: <cover.1345524670.git.afzal@ti.com>
- <83b963e4ebcc1009a26a8c6419c785ac6d742c0b.1345524670.git.afzal@ti.com>
- <50359C64.40603@ti.com>
-Message-ID: <20120824195446.GV11011@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 24 Aug 2012 14:01:32 -0600
+Subject: [RFC PATCH] ARM: initial multiplatform support
+In-Reply-To: <1345837852-10277-1-git-send-email-robherring2@gmail.com>
+References: <1345837852-10277-1-git-send-email-robherring2@gmail.com>
+Message-ID: <5037DD9C.2090403@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@TI.COM> [120822 19:58]:
+On 08/24/2012 01:50 PM, Rob Herring wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
 > 
-> So although this may consolidate how the timings are calculated today, I
-> am concerned it will be confusing to add timings for a new device. At
-> least if I am calculating timings, I am taking the timing information
-> for the device and translating that to the how I need to program the
-> gpmc register fields.
+> This lets us build a multiplatform kernel for experimental purposes.
+> However, it will not be useful for any real work, because it relies
+> on a number of useful things to be disabled for now:
+...
 
-Yes agreed. Also as some values make sense only in cycles, converting them
-back and forth to time is wrong. So at least some values should have an
-option to specify them in cycles directly, and then ignore any time based
-values.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
 
-Regards,
+> +config ARCH_SOCFPGA_CHOICE
+> +	bool "Altera SOCFPGA family"
+> +	select ARCH_SOCFPGA
 
-Tony
+> -config ARCH_VEXPRESS
+> +config ARCH_VEXPRESS_CHOICE
+...
+> +	select ARCH_VEXPRESS
+
+> -config ARCH_HIGHBANK
+> +config ARCH_HIGHBANK_CHOICE
+...
+>  	help
+
+Doesn't that need "select ARCH_HIGHBANK" too?
+
+I see Tegra doesn't work with SPARSE_IRQ:-( I'll have to look into
+what's required to make that work...
