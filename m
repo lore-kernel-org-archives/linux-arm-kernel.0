@@ -1,92 +1,134 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Fri, 24 Aug 2012 11:29:01 +0300
-Subject: [v3 0/4] ARM: dma-mapping: IOMMU atomic allocation
-Message-ID: <1345796945-21115-1-git-send-email-hdoyu@nvidia.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 24 Aug 2012 17:33:51 +0900
+Subject: [PATCH v5 1/2] ARM: Make a compile firmware conditionally
+Message-ID: <20120824083351.GA25369@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-The commit e9da6e9 "ARM: dma-mapping: remove custom consistent dma
-region" breaks the compatibility with existing drivers. This causes
-the following kernel oops(*1). That driver has called dma_pool_alloc()
-to allocate memory from the interrupt context, and it hits
-BUG_ON(in_interrpt()) in "get_vm_area_caller()". This patch seris
-fixes this problem with making use of the pre-allocate atomic memory
-pool which DMA is using in the same way as DMA does now.
+Some boards can use the firmware at trustzone but others can't use this.
+However we need to build it simultaneously. To address this issue,
+introduce arm firmware support and use it at each board files.
 
-Any comment would be really appreciated.
+e.g., In boot_secondary at mach-exynos/platsmp.c
 
-v3:
-Provide a different path for IOMMU for more clean code. (Marek)
-atomic_pool is backed with struct page *pages[].
-v2:
-Don't modify attrs(DMA_ATTR_NO_KERNEL_MAPPING) for atomic allocation. (Marek)
-Modify vzalloc (KyongHo, Minchan)
-v1:
-http://lists.linaro.org/pipermail/linaro-mm-sig/2012-August/002398.html
+        __raw_writel(virt_to_phys(exynos4_secondary_startup),
+                CPU1_BOOT_REG);
 
-*1:
-[    8.321343] ------------[ cut here ]------------
-[    8.325971] kernel BUG at kernel/mm/vmalloc.c:1322!
-[    8.333615] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP ARM
-[    8.339436] Modules linked in:
-[    8.342496] CPU: 0    Tainted: G        W     (3.4.6-00067-g5d485f7 #67)
-[    8.349192] PC is at __get_vm_area_node.isra.29+0x164/0x16c
-[    8.354758] LR is at get_vm_area_caller+0x4c/0x54
-[    8.359454] pc : [<c011297c>]    lr : [<c011318c>]    psr: 20000193
-[    8.359458] sp : c09edca0  ip : c09ec000  fp : ae278000
-[    8.370922] r10: f0000000  r9 : c011aa54  r8 : c0a26cb8
-[    8.376136] r7 : 00000001  r6 : 000000d0  r5 : 20000008  r4 : c09edca0
-[    8.382651] r3 : 00010000  r2 : 20000008  r1 : 00000001  r0 : 00001000
-[    8.389166] Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-[    8.396549] Control: 10c5387d  Table: ad98c04a  DAC: 00000015
-....
-[    9.169162] dfa0: 412fc099 c09ec000 00000000 c000fdd8 c06df1e4 c0a1b080 00000000 00000000
-[    9.177329] dfc0: c0a235cc 8000406a 00000000 c0986818 ffffffff ffffffff c0986404 00000000
-[    9.185497] dfe0: 00000000 c09bb070 10c5387d c0a19c58 c09bb064 80008044 00000000 00000000
-[    9.193673] [<c011297c>] (__get_vm_area_node.isra.29+0x164/0x16c) from [<c011318c>] (get_vm_area_caller+0x4c/0x54)
-[    9.204022] [<c011318c>] (get_vm_area_caller+0x4c/0x54) from [<c001aed8>] (__iommu_alloc_remap.isra.14+0x2c/0xfc)
-[    9.214276] [<c001aed8>] (__iommu_alloc_remap.isra.14+0x2c/0xfc) from [<c001b06c>] (arm_iommu_alloc_attrs+0xc4/0xf8)
-[    9.224795] [<c001b06c>] (arm_iommu_alloc_attrs+0xc4/0xf8) from [<c011aa54>] (pool_alloc_page.constprop.5+0x6c/0xf8)
-[    9.235309] [<c011aa54>] (pool_alloc_page.constprop.5+0x6c/0xf8) from [<c011ab60>] (dma_pool_alloc+0x80/0x170)
-[    9.245304] [<c011ab60>] (dma_pool_alloc+0x80/0x170) from [<c03cbbcc>] (tegra_build_dtd+0x48/0x14c)
-[    9.254344] [<c03cbbcc>] (tegra_build_dtd+0x48/0x14c) from [<c03cbd4c>] (tegra_req_to_dtd+0x7c/0xa8)
-[    9.263467] [<c03cbd4c>] (tegra_req_to_dtd+0x7c/0xa8) from [<c03cc140>] (tegra_ep_queue+0x154/0x33c)
-[    9.272592] [<c03cc140>] (tegra_ep_queue+0x154/0x33c) from [<c03dd5b4>] (composite_setup+0x364/0x6d4)
-[    9.281804] [<c03dd5b4>] (composite_setup+0x364/0x6d4) from [<c03dd9dc>] (android_setup+0xb8/0x14c)
-[    9.290843] [<c03dd9dc>] (android_setup+0xb8/0x14c) from [<c03cd144>] (setup_received_irq+0xbc/0x270)
-[    9.300053] [<c03cd144>] (setup_received_irq+0xbc/0x270) from [<c03cda64>] (tegra_udc_irq+0x2ac/0x2c4)
-[    9.309353] [<c03cda64>] (tegra_udc_irq+0x2ac/0x2c4) from [<c00b5708>] (handle_irq_event_percpu+0x78/0x2e0)
-[    9.319087] [<c00b5708>] (handle_irq_event_percpu+0x78/0x2e0) from [<c00b59b4>] (handle_irq_event+0x44/0x64)
-[    9.328907] [<c00b59b4>] (handle_irq_event+0x44/0x64) from [<c00b8688>] (handle_fasteoi_irq+0xc4/0x16c)
-[    9.338294] [<c00b8688>] (handle_fasteoi_irq+0xc4/0x16c) from [<c00b4f14>] (generic_handle_irq+0x34/0x48)
-[    9.347858] [<c00b4f14>] (generic_handle_irq+0x34/0x48) from [<c000f6f4>] (handle_IRQ+0x54/0xb4)
-[    9.356637] [<c000f6f4>] (handle_IRQ+0x54/0xb4) from [<c00084b0>] (gic_handle_irq+0x2c/0x60)
-[    9.365068] [<c00084b0>] (gic_handle_irq+0x2c/0x60) from [<c000e900>] (__irq_svc+0x40/0x70)
-[    9.373405] Exception stack(0xc09edf10 to 0xc09edf58)
-[    9.378447] df00:                                     00000000 000f4240 00000003 00000000
-[    9.386615] df20: 00000000 e55bbc00 ef66f3ca 00000001 00000000 412fc099 c0abb9c8 00000000
-[    9.394781] df40: 3b9ac9ff c09edf58 c027a9bc c0042880 20000113 ffffffff
-[    9.401396] [<c000e900>] (__irq_svc+0x40/0x70) from [<c0042880>] (tegra_idle_enter_lp3+0x68/0x78)
-[    9.410272] [<c0042880>] (tegra_idle_enter_lp3+0x68/0x78) from [<c04701d4>] (cpuidle_idle_call+0xdc/0x3a4)
-[    9.419922] [<c04701d4>] (cpuidle_idle_call+0xdc/0x3a4) from [<c000fdd8>] (cpu_idle+0xd8/0x134)
-[    9.428612] [<c000fdd8>] (cpu_idle+0xd8/0x134) from [<c0986818>] (start_kernel+0x27c/0x2cc)
-[    9.436952] Code: e1a00004 e3a04000 eb002265 eaffffe0 (e7f001f2)
-[    9.443038] ---[ end trace 1b75b31a2719ed24 ]---
-[    9.447645] Kernel panic - not syncing: Fatal exception in interrupt
+        if (IS_ENABLED(CONFIG_ARM_FIRMWARE)) {
+                /* Call Exynos specific smc call */
+                do_firmware_op(cpu_boot, cpu);
+        }
 
+        gic_raise_softirq(cpumask_of(cpu), 1);
 
-Hiroshi Doyu (4):
-  ARM: dma-mapping: atomic_pool with struct page **pages
-  ARM: dma-mapping: Refactor out to introduce __in_atomic_pool
-  ARM: dma-mapping: Introduce __atomic_get_pages() for
-    __iommu_get_pages()
-  ARM: dma-mapping: IOMMU allocates pages from atomic_pool with
-    GFP_ATOMIC
+        if (pen_release == -1)
 
- arch/arm/mm/dma-mapping.c |   90 ++++++++++++++++++++++++++++++++++++++++-----
- 1 files changed, 80 insertions(+), 10 deletions(-)
+e.g., exynos4412 based board
 
--- 
-1.7.5.4
+static void __init board_init_early(void)
+{
+        exynos_firmware_init();
+}
+
+TODO
+        1. DT support.
+        2. call firmware init by smp_ops.
+
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+Changelog v4
+	use call_firmware_op commented by Tomasz Figa.
+	remove useless core_initcall
+	
+diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+index 283fa1d..5b097ca 100644
+--- a/arch/arm/common/Kconfig
++++ b/arch/arm/common/Kconfig
+@@ -21,6 +21,9 @@ config ARM_VIC_NR
+ 	  The maximum number of VICs available in the system, for
+ 	  power management.
+ 
++config ARM_FIRMWARE
++	bool
++
+ config ICST
+ 	bool
+ 
+diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+index e8a4e58..4af6568 100644
+--- a/arch/arm/common/Makefile
++++ b/arch/arm/common/Makefile
+@@ -4,6 +4,7 @@
+ 
+ obj-$(CONFIG_ARM_GIC)		+= gic.o
+ obj-$(CONFIG_ARM_VIC)		+= vic.o
++obj-$(CONFIG_ARM_FIRMWARE)	+= firmware.o
+ obj-$(CONFIG_ICST)		+= icst.o
+ obj-$(CONFIG_SA1111)		+= sa1111.o
+ obj-$(CONFIG_PCI_HOST_VIA82C505) += via82c505.o
+diff --git a/arch/arm/common/firmware.c b/arch/arm/common/firmware.c
+new file mode 100644
+index 0000000..e375e9f
+--- /dev/null
++++ b/arch/arm/common/firmware.c
+@@ -0,0 +1,25 @@
++/*
++ *  Copyright (C) 2012 Samsung Electronics.
++ *  Kyungmin Park <kyungmin.park@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/kernel.h>
++#include <linux/suspend.h>
++
++#include <asm/firmware.h>
++
++static void cpu_boot(int cpu)
++{
++	/* Do nothing */
++}
++
++static struct firmware_ops default_firmware_ops = {
++	.do_idle		= cpu_do_idle,
++	.cpu_boot		= cpu_boot,
++};
++
++struct firmware_ops *firmware_ops = &default_firmware_ops;
+diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
+new file mode 100644
+index 0000000..99c97ff
+--- /dev/null
++++ b/arch/arm/include/asm/firmware.h
+@@ -0,0 +1,27 @@
++/*
++ *  Copyright (C) 2012 Samsung Electronics.
++ *  Kyungmin Park <kyungmin.park@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASM_ARM_FIRMWARE_H
++#define __ASM_ARM_FIRMWARE_H
++
++struct firmware_ops {
++	int	(*do_idle)(void);
++	void	(*cpu_boot)(int cpu);
++};
++
++extern struct firmware_ops *firmware_ops;
++
++#ifdef CONFIG_ARM_FIRMWARE
++#define call_firmware_op(op, ...)					\
++	((firmware_ops->op) ? firmware_ops->op(__VA_ARGS__) : 0)
++#else
++#define call_firmware_op(op, ...)		do { } while (0)
++#endif
++
++#endif
