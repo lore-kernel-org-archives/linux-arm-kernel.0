@@ -1,36 +1,69 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 24 Aug 2012 15:01:45 +0100
-Subject: [PATCH 09/17] ARM: ux500: Add AB8500 CODEC node to DB8500 Device Tree
+Date: Fri, 24 Aug 2012 15:01:46 +0100
+Subject: [PATCH 10/17] ARM: ux500: Fork MSP platform registration for
+ step-by-step DT enablement
 In-Reply-To: <1345816913-4113-1-git-send-email-lee.jones@linaro.org>
 References: <1345816913-4113-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1345816913-4113-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1345816913-4113-11-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure correct probing and pass though important configuration
-options to the AB8500 CODEC driver when DT is enabled
+We've done this before and it worked well last time. Here we're
+duplicating a complex registration function to ease the process
+of enabling it for Device Tree. As there are quite a few steps
+taken during the registration process, it makes sense to break
+them up into more manageable chunks. This patch will aid us.
 
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/dbx5x0.dtsi |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/mach-ux500/board-mop500-msp.c |   20 ++++++++++++++++++++
+ arch/arm/mach-ux500/board-mop500.c     |    2 +-
+ 2 files changed, 21 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index 3180a9c..7f8c9db 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -389,6 +389,12 @@
- 					compatible = "stericsson,ab8500-debug";
- 				};
+diff --git a/arch/arm/mach-ux500/board-mop500-msp.c b/arch/arm/mach-ux500/board-mop500-msp.c
+index 1a67577..24a3604 100644
+--- a/arch/arm/mach-ux500/board-mop500-msp.c
++++ b/arch/arm/mach-ux500/board-mop500-msp.c
+@@ -172,6 +172,26 @@ static struct msp_i2s_platform_data msp3_platform_data = {
+ 	.msp_i2s_dma_tx	= NULL,
+ };
  
-+				codec: ab8500-codec {
-+					compatible = "stericsson,ab8500-codec";
++/* Due for removal once the MSP driver has been fully DT:ed. */
++void mop500_of_msp_init(struct device *parent)
++{
++	pr_info("%s: Register platform-device 'snd-soc-u8500'.\n", __func__);
++	platform_device_register(&snd_soc_mop500);
 +
-+					stericsson,earpeice-cmv = <950>; /* Units in mV. */
-+				};
++	pr_info("Initialize MSP I2S-devices.\n");
++	db8500_add_msp_i2s(parent, 0, U8500_MSP0_BASE, IRQ_DB8500_MSP0,
++			   &msp0_platform_data);
++	db8500_add_msp_i2s(parent, 1, U8500_MSP1_BASE, IRQ_DB8500_MSP1,
++			   &msp1_platform_data);
++	db8500_add_msp_i2s(parent, 2, U8500_MSP2_BASE, IRQ_DB8500_MSP2,
++			   &msp2_platform_data);
++	db8500_add_msp_i2s(parent, 3, U8500_MSP3_BASE, IRQ_DB8500_MSP1,
++			   &msp3_platform_data);
 +
- 				ab8500-regulators {
- 					compatible = "stericsson,ab8500-regulator";
++	pr_info("%s: Register platform-device 'ux500-pcm'\n", __func__);
++	platform_device_register(&ux500_pcm);
++}
++
+ void mop500_msp_init(struct device *parent)
+ {
+ 	pr_info("%s: Register platform-device 'snd-soc-mop500'.\n", __func__);
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 11dd962..8f419b1 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -807,7 +807,7 @@ static void __init u8500_init_machine(void)
+ 		mop500_uib_init();
  
+ 	} else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
+-		mop500_msp_init(parent);
++		mop500_of_msp_init(parent);
+ 	} else if (of_machine_is_compatible("st-ericsson,hrefv60+")) {
+ 		/*
+ 		 * The HREFv60 board removed a GPIO expander and routed
 -- 
 1.7.9.5
