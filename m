@@ -1,71 +1,27 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Fri, 24 Aug 2012 07:14:55 -0400
-Subject: [v3 2/4] ARM: dma-mapping: Refactor out to introduce
- __in_atomic_pool
-In-Reply-To: <1345796945-21115-3-git-send-email-hdoyu@nvidia.com>
-References: <1345796945-21115-1-git-send-email-hdoyu@nvidia.com>
- <1345796945-21115-3-git-send-email-hdoyu@nvidia.com>
-Message-ID: <20120824111455.GC11007@konrad-lan.dumpdata.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 24 Aug 2012 14:25:37 +0300
+Subject: [PATCH] mtd: use %*ph[CN] to dump small buffers
+In-Reply-To: <1343912807-29355-1-git-send-email-andriy.shevchenko@linux.intel.com>
+References: <1343912807-29355-1-git-send-email-andriy.shevchenko@linux.intel.com>
+Message-ID: <1345807537.2848.280.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2012 at 11:29:03AM +0300, Hiroshi Doyu wrote:
-> Check the given range("start", "size") is included in "atomic_pool" or not.
+On Thu, 2012-08-02 at 16:06 +0300, Andy Shevchenko wrote:
+> There is new format specified that helps to dump small buffers. It makes the
+> code simplier and nicer.
 > 
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
->  arch/arm/mm/dma-mapping.c |   25 +++++++++++++++++++------
->  1 files changed, 19 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index b14ee64..508fde1 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -501,19 +501,32 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page)
->  	return ptr;
->  }
->  
-> +static bool __in_atomic_pool(void *start, size_t size)
-> +{
-> +	struct dma_pool *pool = &atomic_pool;
-> +	void *end = start + size;
-> +	void *pool_start = pool->vaddr;
-> +	void *pool_end = pool->vaddr + pool->size;
-> +
-> +	if (start < pool_start || start > pool_end)
-> +		return false;
-> +
-> +	if (end > pool_end) {
-> +		WARN(1, "freeing wrong coherent size from pool\n");
+> Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 
-That does not tell what size or from what pool. Perhaps you should
-include some details, such as the 'size' value, the pool used, the
-range of the pool, etc. Something that will help _you_in the field
-be able to narrow down what might be wrong.
+Pushed to l2-mtd.git, thanks!
 
-> +		return false;
-> +	}
-> +
-> +	return true;
-> +}
-> +
->  static int __free_from_pool(void *start, size_t size)
->  {
->  	struct dma_pool *pool = &atomic_pool;
->  	unsigned long pageno, count;
->  	unsigned long flags;
->  
-> -	if (start < pool->vaddr || start > pool->vaddr + pool->size)
-> -		return 0;
-> -
-> -	if (start + size > pool->vaddr + pool->size) {
-> -		WARN(1, "freeing wrong coherent size from pool\n");
-> +	if (!__in_atomic_pool(start, size))
->  		return 0;
-> -	}
->  
->  	pageno = (start - pool->vaddr) >> PAGE_SHIFT;
->  	count = size >> PAGE_SHIFT;
-> -- 
-> 1.7.5.4
-> 
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120824/065b8e5e/attachment.sig>
