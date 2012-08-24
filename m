@@ -1,129 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 24 Aug 2012 13:48:01 +0100
-Subject: [PATCH 1/1 v2] ARM: ux500: Provide SMSC911x fixed-regulator when not
- booting DT
-Message-ID: <1345812481-2384-1-git-send-email-lee.jones@linaro.org>
+From: dromede@gmail.com (=?UTF-8?B?TWFya28gS2F0acSH?=)
+Date: Fri, 24 Aug 2012 14:53:15 +0200
+Subject: [RFC][PATCH] Disintegrate sharpsl_param.c
+In-Reply-To: <20120824112536.GA19675@atrey.karlin.mff.cuni.cz>
+References: <1345656424-31234-1-git-send-email-dromede@gmail.com>
+ <1345663182.3907.134.camel@ted> <20120824111211.GA28183@elf.ucw.cz>
+ <20120824112536.GA19675@atrey.karlin.mff.cuni.cz>
+Message-ID: <CAHod+Gc8udMVChaezqte3dEns5E-udduwugL0o_VCYu=UCP9Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SMSC911x Ethernet chip requires a fixed-regulator in order to
-function correctly. We have previously provided a means to obtain
-this during a Device Tree boot, however nothing has been put into
-place when booting with a non-DT kernel. This patch aims to change
-that.
-
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/board-mop500-regulators.c |   17 +++++++++++++++++
- arch/arm/mach-ux500/board-mop500-regulators.h |    1 +
- arch/arm/mach-ux500/board-mop500.c            |   21 +++++++++++++++++++++
- arch/arm/mach-ux500/board-mop500.h            |    2 +-
- 4 files changed, 40 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
-index 52426a4..139f31e 100644
---- a/arch/arm/mach-ux500/board-mop500-regulators.c
-+++ b/arch/arm/mach-ux500/board-mop500-regulators.c
-@@ -13,6 +13,23 @@
- #include <linux/regulator/ab8500.h>
- #include "board-mop500-regulators.h"
- 
-+#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
-+static struct regulator_consumer_supply gpio_en_3v3_consumers[] = {
-+	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
-+};
-+
-+struct regulator_init_data gpio_en_3v3_regulator = {
-+	.constraints = {
-+		.name = "EN-3V3",
-+		.min_uV = 3300000,
-+		.max_uV = 3300000,
-+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies = ARRAY_SIZE(gpio_en_3v3_consumers),
-+	.consumer_supplies = gpio_en_3v3_consumers,
-+};
-+#endif
-+
- /*
-  * TPS61052 regulator
-  */
-diff --git a/arch/arm/mach-ux500/board-mop500-regulators.h b/arch/arm/mach-ux500/board-mop500-regulators.h
-index 9499215..78a0642 100644
---- a/arch/arm/mach-ux500/board-mop500-regulators.h
-+++ b/arch/arm/mach-ux500/board-mop500-regulators.h
-@@ -18,5 +18,6 @@ extern struct ab8500_regulator_reg_init
- ab8500_regulator_reg_init[AB8500_NUM_REGULATOR_REGISTERS];
- extern struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS];
- extern struct regulator_init_data tps61052_regulator;
-+extern struct regulator_init_data gpio_en_3v3_regulator;
- 
- #endif
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 42e1759..c7f0973 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -23,6 +23,7 @@
- #include <linux/spi/spi.h>
- #include <linux/mfd/abx500/ab8500.h>
- #include <linux/regulator/ab8500.h>
-+#include <linux/regulator/fixed.h>
- #include <linux/mfd/tc3589x.h>
- #include <linux/mfd/tps6105x.h>
- #include <linux/mfd/abx500/ab8500-gpio.h>
-@@ -75,6 +76,25 @@ static struct platform_device snowball_led_dev = {
- 	},
- };
- 
-+#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
-+static struct fixed_voltage_config snowball_gpio_en_3v3_data = {
-+	.supply_name		= "EN-3V3",
-+	.gpio			= SNOWBALL_EN_3V3_ETH_GPIO,
-+	.microvolts		= 3300000,
-+	.enable_high		= 1,
-+	.init_data		= &gpio_en_3v3_regulator,
-+	.startup_delay		= 5000, /* 1200us */
-+};
-+
-+static struct platform_device snowball_gpio_en_3v3_regulator_dev = {
-+	.name	= "reg-fixed-voltage",
-+	.id	= 1,
-+	.dev	= {
-+		.platform_data	= &snowball_gpio_en_3v3_data,
-+	},
-+};
-+#endif
-+
- static struct ab8500_gpio_platform_data ab8500_gpio_pdata = {
- 	.gpio_base		= MOP500_AB8500_PIN_GPIO(1),
- 	.irq_base		= MOP500_AB8500_VIR_GPIO_IRQ_BASE,
-@@ -585,6 +605,7 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
- 	&snowball_led_dev,
- 	&snowball_key_dev,
- 	&snowball_sbnet_dev,
-+	&snowball_gpio_en_3v3_regulator_dev,
- };
- 
- static void __init mop500_init_machine(void)
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index 9e9dd5a..d3a02d5 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -13,6 +13,7 @@
- #include <linux/amba/mmci.h>
- 
- /* Snowball specific GPIO assignments, this board has no GPIO expander */
-+#define SNOWBALL_EN_3V3_ETH_GPIO	26
- #define SNOWBALL_ACCEL_INT1_GPIO	163
- #define SNOWBALL_ACCEL_INT2_GPIO	164
- #define SNOWBALL_MAGNET_DRDY_GPIO	165
-@@ -76,7 +77,6 @@
- #define SNOWBALL_PM_GPIO4_GPIO		MOP500_AB8500_PIN_GPIO(4)	/* SYSCLKREQ6/GPIO4 */
- #define SNOWBALL_EN_3V6_GPIO		MOP500_AB8500_PIN_GPIO(16)	/* PWMOUT3/GPIO16 */
- #define SNOWBALL_PME_ETH_GPIO		MOP500_AB8500_PIN_GPIO(24)	/* SYSCLKREQ7/GPIO24 */
--#define SNOWBALL_EN_3V3_ETH_GPIO	MOP500_AB8500_PIN_GPIO(26)	/* GPIO26 */
- 
- struct device;
- struct i2c_board_info;
--- 
-1.7.9.5
+On Fri, Aug 24, 2012 at 1:25 PM, Cyril Hrubis <metan@ucw.cz> wrote:
+> Hi!
+>> > > I recently tried running 3.6-rc2 kernel on my Sharp Zaurus C-1000. It
+>> > > hanged almost immediately after uncompressing the kernel. I tracked the
+>> > > problem down to a single line in arch/arm/common/sharpsl_param.c:
+>> > >
+>> > > memcpy(&sharpsl_param, (void *)PARAM_BASE, sizeof(struct sharpsl_param_info));
+>> > >
+>> > > Commenting out the line makes the kernel boot just fine. This left me
+>> > > wondering whether sharpsl_param.c is actually needed. Here's a comment
+>> > > from sharpsl_param.c that describes what sharpsl_param.c actually does:
+>> >
+>> > Sharp went to the trouble of saving these values into the hardware and
+>> > passing them into the drivers. They're basically used by the LCD
+>> > initialisation code from what I remember. I don't remember what the
+>> > risks are of incorrect values.
+>>
+>> We were seeing strange flicker on LCD on some machines...? Particulary
+>> metan's machine with wifi on did that. OTOH it looked like some kind
+>> of DMA issue.
+>
+> Yes, the problems with my LCD are DMA related (too much DMA to wifi cf card
+> causes timing issues on display refresh). When there is no network activity
+> it's okay.
+>
+> And as far as I remeber there are some magic values needed for the LCD in order
+> not to have distorted picture (blurred, etc.) There is a callibration program
+> in the service menu that allows you to modify the values stored in the flash.
+>
+> I remeber Stanislav did some research on that (CCing).
+>
+> --
+> metan
