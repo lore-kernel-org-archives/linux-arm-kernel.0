@@ -1,225 +1,92 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 24 Aug 2012 16:26:11 +0800
-Subject: [PATCH 2/2] ARM: mxs: Update DENX M28 machine and dts file
-In-Reply-To: <1345778742-20994-2-git-send-email-marex@denx.de>
-References: <1345778742-20994-1-git-send-email-marex@denx.de>
- <1345778742-20994-2-git-send-email-marex@denx.de>
-Message-ID: <20120824082609.GE31998@S2101-09.ap.freescale.net>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Fri, 24 Aug 2012 11:29:01 +0300
+Subject: [v3 0/4] ARM: dma-mapping: IOMMU atomic allocation
+Message-ID: <1345796945-21115-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2012 at 05:25:42AM +0200, Marek Vasut wrote:
-> Update the mach-mxs machine by removing the enet_clkout(). The new
-> revision of the board doesn't need that. Also, update the DTS file
-> with all the new drivers pulled in the mainline recently, that is,
-> SPI, LRADC, USB. Also, remove bogus AUART3.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/boot/dts/imx28-m28evk.dts |   98 +++++++++++++++++++++++++++++++++---
->  arch/arm/mach-mxs/mach-mxs.c       |    1 -
->  2 files changed, 92 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx28-m28evk.dts b/arch/arm/boot/dts/imx28-m28evk.dts
-> index 183a3fd..e418b75 100644
-> --- a/arch/arm/boot/dts/imx28-m28evk.dts
-> +++ b/arch/arm/boot/dts/imx28-m28evk.dts
-> @@ -23,6 +23,8 @@
->  	apb at 80000000 {
->  		apbh at 80000000 {
->  			gpmi-nand at 8000c000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
->  				status = "okay";
-> @@ -62,9 +64,28 @@
->  					     &mmc0_sck_cfg>;
->  				bus-width = <8>;
->  				wp-gpios = <&gpio3 10 1>;
-> +				vmmc-supply = <&reg_vddio_sd0>;
->  				status = "okay";
->  			};
->  
-> +			ssp2: ssp at 80014000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "fsl,imx28-spi";
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&spi2_pins_a>;
-> +				status = "okay";
-> +
-> +				flash: m25p80 at 0 {
-> +					#address-cells = <1>;
-> +					#size-cells = <1>;
-> +					compatible = "m25p80";
-> +					spi-max-frequency = <40000000>;
-> +					m25p,fast-read;
-> +					reg = <0>;
-> +				};
-> +			};
-> +
->  			pinctrl at 80018000 {
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&hog_pins_a>;
-> @@ -72,8 +93,11 @@
->  				hog_pins_a: hog-gpios at 0 {
->  					reg = <0>;
->  					fsl,pinmux-ids = <
-> +						0x31c3 /* MX28_PAD_PWM3__GPIO_3_28 */
->  						0x30a3 /* MX28_PAD_AUART2_CTS__GPIO_3_10 */
->  						0x30b3 /* MX28_PAD_AUART2_RTS__GPIO_3_11 */
-> +						0x30c3 /* MX28_PAD_AUART3_RX__GPIO_3_12 */
-> +						0x30d3 /* MX28_PAD_AUART3_TX__GPIO_3_13 */
->  					>;
->  					fsl,drive-strength = <0>;
->  					fsl,voltage = <1>;
-> @@ -90,6 +114,22 @@
->  					fsl,voltage = <1>;
->  					fsl,pull-up = <0>;
->  				};
-> +
-> +				usb0_pins_a: usb0 at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <0x2152>;
-> +					fsl,drive-strength = <2>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
-> +
-> +				usb1_pins_a: usb1 at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <0x2142>;
-> +					fsl,drive-strength = <2>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
+Hi,
 
-These two nodes should be put into imx28.dtsi.  Also, please put
-a comment after the pinmux-id.
+The commit e9da6e9 "ARM: dma-mapping: remove custom consistent dma
+region" breaks the compatibility with existing drivers. This causes
+the following kernel oops(*1). That driver has called dma_pool_alloc()
+to allocate memory from the interrupt context, and it hits
+BUG_ON(in_interrpt()) in "get_vm_area_caller()". This patch seris
+fixes this problem with making use of the pre-allocate atomic memory
+pool which DMA is using in the same way as DMA does now.
 
-Regards,
-Shawn
+Any comment would be really appreciated.
 
->  			};
->  
->  			lcdif at 80030000 {
-> @@ -99,6 +139,10 @@
->  				status = "okay";
->  			};
->  
-> +			lradc at 80050000 {
-> +				status = "okay";
-> +			};
-> +
->  			can0: can at 80032000 {
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&can0_pins_a>;
-> @@ -129,6 +173,7 @@
->  			i2c0: i2c at 80058000 {
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&i2c0_pins_a>;
-> +				clock-frequency = <400000>;
->  				status = "okay";
->  
->  				sgtl5000: codec at 0a {
-> @@ -157,26 +202,41 @@
->  				status = "okay";
->  			};
->  
-> -			auart0: serial at 8006a000 {
-> -				pinctrl-names = "default";
-> -				pinctrl-0 = <&auart0_2pins_a>;
-> +			usbphy0: usbphy at 8007c000 {
->  				status = "okay";
->  			};
->  
-> -			auart3: serial at 80070000 {
-> +			usbphy1: usbphy at 8007e000 {
-> +				status = "okay";
-> +			};
-> +
-> +			auart0: serial at 8006a000 {
->  				pinctrl-names = "default";
-> -				pinctrl-0 = <&auart3_pins_a>;
-> +				pinctrl-0 = <&auart0_2pins_a>;
->  				status = "okay";
->  			};
->  		};
->  	};
->  
->  	ahb at 80080000 {
-> +		usb0: usb at 80080000 {
-> +			vbus-supply = <&reg_usb0_vbus>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&usb0_pins_a>;
-> +			status = "okay";
-> +		};
-> +
-> +		usb1: usb at 80090000 {
-> +			vbus-supply = <&reg_usb1_vbus>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&usb1_pins_a>;
-> +			status = "okay";
-> +		};
-> +
->  		mac0: ethernet at 800f0000 {
->  			phy-mode = "rmii";
->  			pinctrl-names = "default";
->  			pinctrl-0 = <&mac0_pins_a>;
-> -			phy-reset-gpios = <&gpio3 11 0>;
->  			status = "okay";
->  		};
->  
-> @@ -198,6 +258,32 @@
->  			regulator-max-microvolt = <3300000>;
->  			regulator-always-on;
->  		};
-> +
-> +		reg_vddio_sd0: vddio-sd0 {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "vddio-sd0";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			gpio = <&gpio3 28 0>;
-> +		};
-> +
-> +		reg_usb0_vbus: usb0_vbus {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "usb0_vbus";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			gpio = <&gpio3 12 0>;
-> +			enable-active-low;
-> +		};
-> +
-> +		reg_usb1_vbus: usb1_vbus {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "usb1_vbus";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			gpio = <&gpio3 13 0>;
-> +			enable-active-low;
-> +		};
->  	};
->  
->  	sound {
-> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> index 8dabfe8..5ac45a1 100644
-> --- a/arch/arm/mach-mxs/mach-mxs.c
-> +++ b/arch/arm/mach-mxs/mach-mxs.c
-> @@ -241,7 +241,6 @@ static void __init imx28_evk_init(void)
->  
->  static void __init m28evk_init(void)
->  {
-> -	enable_clk_enet_out();
->  	update_fec_mac_prop(OUI_DENX);
->  
->  	mxsfb_pdata.mode_list = m28evk_video_modes;
-> -- 
-> 1.7.10.4
-> 
+v3:
+Provide a different path for IOMMU for more clean code. (Marek)
+atomic_pool is backed with struct page *pages[].
+v2:
+Don't modify attrs(DMA_ATTR_NO_KERNEL_MAPPING) for atomic allocation. (Marek)
+Modify vzalloc (KyongHo, Minchan)
+v1:
+http://lists.linaro.org/pipermail/linaro-mm-sig/2012-August/002398.html
+
+*1:
+[    8.321343] ------------[ cut here ]------------
+[    8.325971] kernel BUG at kernel/mm/vmalloc.c:1322!
+[    8.333615] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP ARM
+[    8.339436] Modules linked in:
+[    8.342496] CPU: 0    Tainted: G        W     (3.4.6-00067-g5d485f7 #67)
+[    8.349192] PC is at __get_vm_area_node.isra.29+0x164/0x16c
+[    8.354758] LR is at get_vm_area_caller+0x4c/0x54
+[    8.359454] pc : [<c011297c>]    lr : [<c011318c>]    psr: 20000193
+[    8.359458] sp : c09edca0  ip : c09ec000  fp : ae278000
+[    8.370922] r10: f0000000  r9 : c011aa54  r8 : c0a26cb8
+[    8.376136] r7 : 00000001  r6 : 000000d0  r5 : 20000008  r4 : c09edca0
+[    8.382651] r3 : 00010000  r2 : 20000008  r1 : 00000001  r0 : 00001000
+[    8.389166] Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+[    8.396549] Control: 10c5387d  Table: ad98c04a  DAC: 00000015
+....
+[    9.169162] dfa0: 412fc099 c09ec000 00000000 c000fdd8 c06df1e4 c0a1b080 00000000 00000000
+[    9.177329] dfc0: c0a235cc 8000406a 00000000 c0986818 ffffffff ffffffff c0986404 00000000
+[    9.185497] dfe0: 00000000 c09bb070 10c5387d c0a19c58 c09bb064 80008044 00000000 00000000
+[    9.193673] [<c011297c>] (__get_vm_area_node.isra.29+0x164/0x16c) from [<c011318c>] (get_vm_area_caller+0x4c/0x54)
+[    9.204022] [<c011318c>] (get_vm_area_caller+0x4c/0x54) from [<c001aed8>] (__iommu_alloc_remap.isra.14+0x2c/0xfc)
+[    9.214276] [<c001aed8>] (__iommu_alloc_remap.isra.14+0x2c/0xfc) from [<c001b06c>] (arm_iommu_alloc_attrs+0xc4/0xf8)
+[    9.224795] [<c001b06c>] (arm_iommu_alloc_attrs+0xc4/0xf8) from [<c011aa54>] (pool_alloc_page.constprop.5+0x6c/0xf8)
+[    9.235309] [<c011aa54>] (pool_alloc_page.constprop.5+0x6c/0xf8) from [<c011ab60>] (dma_pool_alloc+0x80/0x170)
+[    9.245304] [<c011ab60>] (dma_pool_alloc+0x80/0x170) from [<c03cbbcc>] (tegra_build_dtd+0x48/0x14c)
+[    9.254344] [<c03cbbcc>] (tegra_build_dtd+0x48/0x14c) from [<c03cbd4c>] (tegra_req_to_dtd+0x7c/0xa8)
+[    9.263467] [<c03cbd4c>] (tegra_req_to_dtd+0x7c/0xa8) from [<c03cc140>] (tegra_ep_queue+0x154/0x33c)
+[    9.272592] [<c03cc140>] (tegra_ep_queue+0x154/0x33c) from [<c03dd5b4>] (composite_setup+0x364/0x6d4)
+[    9.281804] [<c03dd5b4>] (composite_setup+0x364/0x6d4) from [<c03dd9dc>] (android_setup+0xb8/0x14c)
+[    9.290843] [<c03dd9dc>] (android_setup+0xb8/0x14c) from [<c03cd144>] (setup_received_irq+0xbc/0x270)
+[    9.300053] [<c03cd144>] (setup_received_irq+0xbc/0x270) from [<c03cda64>] (tegra_udc_irq+0x2ac/0x2c4)
+[    9.309353] [<c03cda64>] (tegra_udc_irq+0x2ac/0x2c4) from [<c00b5708>] (handle_irq_event_percpu+0x78/0x2e0)
+[    9.319087] [<c00b5708>] (handle_irq_event_percpu+0x78/0x2e0) from [<c00b59b4>] (handle_irq_event+0x44/0x64)
+[    9.328907] [<c00b59b4>] (handle_irq_event+0x44/0x64) from [<c00b8688>] (handle_fasteoi_irq+0xc4/0x16c)
+[    9.338294] [<c00b8688>] (handle_fasteoi_irq+0xc4/0x16c) from [<c00b4f14>] (generic_handle_irq+0x34/0x48)
+[    9.347858] [<c00b4f14>] (generic_handle_irq+0x34/0x48) from [<c000f6f4>] (handle_IRQ+0x54/0xb4)
+[    9.356637] [<c000f6f4>] (handle_IRQ+0x54/0xb4) from [<c00084b0>] (gic_handle_irq+0x2c/0x60)
+[    9.365068] [<c00084b0>] (gic_handle_irq+0x2c/0x60) from [<c000e900>] (__irq_svc+0x40/0x70)
+[    9.373405] Exception stack(0xc09edf10 to 0xc09edf58)
+[    9.378447] df00:                                     00000000 000f4240 00000003 00000000
+[    9.386615] df20: 00000000 e55bbc00 ef66f3ca 00000001 00000000 412fc099 c0abb9c8 00000000
+[    9.394781] df40: 3b9ac9ff c09edf58 c027a9bc c0042880 20000113 ffffffff
+[    9.401396] [<c000e900>] (__irq_svc+0x40/0x70) from [<c0042880>] (tegra_idle_enter_lp3+0x68/0x78)
+[    9.410272] [<c0042880>] (tegra_idle_enter_lp3+0x68/0x78) from [<c04701d4>] (cpuidle_idle_call+0xdc/0x3a4)
+[    9.419922] [<c04701d4>] (cpuidle_idle_call+0xdc/0x3a4) from [<c000fdd8>] (cpu_idle+0xd8/0x134)
+[    9.428612] [<c000fdd8>] (cpu_idle+0xd8/0x134) from [<c0986818>] (start_kernel+0x27c/0x2cc)
+[    9.436952] Code: e1a00004 e3a04000 eb002265 eaffffe0 (e7f001f2)
+[    9.443038] ---[ end trace 1b75b31a2719ed24 ]---
+[    9.447645] Kernel panic - not syncing: Fatal exception in interrupt
+
+
+Hiroshi Doyu (4):
+  ARM: dma-mapping: atomic_pool with struct page **pages
+  ARM: dma-mapping: Refactor out to introduce __in_atomic_pool
+  ARM: dma-mapping: Introduce __atomic_get_pages() for
+    __iommu_get_pages()
+  ARM: dma-mapping: IOMMU allocates pages from atomic_pool with
+    GFP_ATOMIC
+
+ arch/arm/mm/dma-mapping.c |   90 ++++++++++++++++++++++++++++++++++++++++-----
+ 1 files changed, 80 insertions(+), 10 deletions(-)
+
+-- 
+1.7.5.4
