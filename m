@@ -1,27 +1,42 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 24 Aug 2012 14:25:37 +0300
-Subject: [PATCH] mtd: use %*ph[CN] to dump small buffers
-In-Reply-To: <1343912807-29355-1-git-send-email-andriy.shevchenko@linux.intel.com>
-References: <1343912807-29355-1-git-send-email-andriy.shevchenko@linux.intel.com>
-Message-ID: <1345807537.2848.280.camel@sauron.fi.intel.com>
+From: metan@ucw.cz (Cyril Hrubis)
+Date: Fri, 24 Aug 2012 13:25:36 +0200
+Subject: [RFC][PATCH] Disintegrate sharpsl_param.c
+In-Reply-To: <20120824111211.GA28183@elf.ucw.cz>
+References: <1345656424-31234-1-git-send-email-dromede@gmail.com>
+ <1345663182.3907.134.camel@ted> <20120824111211.GA28183@elf.ucw.cz>
+Message-ID: <20120824112536.GA19675@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-08-02 at 16:06 +0300, Andy Shevchenko wrote:
-> There is new format specified that helps to dump small buffers. It makes the
-> code simplier and nicer.
+Hi!
+> > > I recently tried running 3.6-rc2 kernel on my Sharp Zaurus C-1000. It 
+> > > hanged almost immediately after uncompressing the kernel. I tracked the
+> > > problem down to a single line in arch/arm/common/sharpsl_param.c:
+> > > 
+> > > memcpy(&sharpsl_param, (void *)PARAM_BASE, sizeof(struct sharpsl_param_info));
+> > > 
+> > > Commenting out the line makes the kernel boot just fine. This left me
+> > > wondering whether sharpsl_param.c is actually needed. Here's a comment
+> > > from sharpsl_param.c that describes what sharpsl_param.c actually does:
+> > 
+> > Sharp went to the trouble of saving these values into the hardware and
+> > passing them into the drivers. They're basically used by the LCD
+> > initialisation code from what I remember. I don't remember what the
+> > risks are of incorrect values.
 > 
-> Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> We were seeing strange flicker on LCD on some machines...? Particulary
+> metan's machine with wifi on did that. OTOH it looked like some kind
+> of DMA issue.
 
-Pushed to l2-mtd.git, thanks!
+Yes, the problems with my LCD are DMA related (too much DMA to wifi cf card
+causes timing issues on display refresh). When there is no network activity
+it's okay.
+
+And as far as I remeber there are some magic values needed for the LCD in order
+not to have distorted picture (blurred, etc.) There is a callibration program
+in the service menu that allows you to modify the values stored in the flash.
+
+I remeber Stanislav did some research on that (CCing).
 
 -- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120824/065b8e5e/attachment.sig>
+metan
