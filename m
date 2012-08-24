@@ -1,26 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Aug 2012 05:40:12 +0000
-Subject: [PATCHv4 0/9] *** ARM: Update arch-vt8500 to Devicetree ***
-In-Reply-To: <1345758702.2061.6.camel@gitbox>
-References: <1345707346-9035-1-git-send-email-linux@prisktech.co.nz>
- <201208231322.23077.arnd@arndb.de> <1345758702.2061.6.camel@gitbox>
-Message-ID: <201208240540.12316.arnd@arndb.de>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Fri, 24 Aug 2012 05:50:17 +0000
+Subject: [PATCH v3 4/4] arm/dts: Add tps65217 regulator DT data to
+ am335x-bone.dts
+In-Reply-To: <A823657F-0D26-429F-8E1C-DF1AE5AB78F4@dominion.thruhere.net>
+References: <1345547850-29761-1-git-send-email-anilkumar@ti.com>
+ <1345547850-29761-5-git-send-email-anilkumar@ti.com>
+ <A823657F-0D26-429F-8E1C-DF1AE5AB78F4@dominion.thruhere.net>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA1F1D7@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 23 August 2012, Tony Prisk wrote:
-> I was about to say that if Mike has any issues with the driver that I
-> can fix the patch conflict at the same time, but I just realised that
-> its more work than I originally thought :)
+Hi Koen,
+
+On Thu, Aug 23, 2012 at 19:43:48, Koen Kooi wrote:
 > 
-> I was going to move the arch-vt8500 part of the clocks patch back into
-> the clocks patch - but that will just move the issue from arm-soc to
-> clocks because Mike's branch won't have the arch-vt8500 patch so the
-> patch will fail.
+> Op 21 aug. 2012, om 13:17 heeft AnilKumar Ch <anilkumar@ti.com> het volgende geschreven:
+> 
+> > Add tps65217 regulator device tree data to AM335x-Bone by adding
+> > regulator consumers with tightened constraints and regulator-name.
+> > TPS65217 regulator handle can be obtained by using this regulator
+> > name.
+> > 
+> > This patch also add I2C node with I2C frequency and tps65217 PMIC
+> > I2C slave address.
+> > 
+> > Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> 
+> I tried this and the kernel immediately crashes on my beaglebone. Could you upload the complete git tree and .config you used to test this to somewhere public please?
 
-But that's ok, because without the arch-v8500 part, nothing uses
-the vt8500-clock driver, so nothing breaks. You can introduce broken
-code in the meantime as long as it's impossible to enable and it will
-work afterwards.
+Use this repo to test on beaglebone
+https://github.com/hvaibhav/am335x-linux/commits/am335x-upstream-staging-pinctrl
 
-	Arnd
+This wiki talks about how to build and use?
+https://github.com/hvaibhav/am335x-linux/wiki/How-To-Use-Upstream-Tree
+
+Note: Enable tps65217 regulator in kernel config.
+
+Regards
+AnilKumar
