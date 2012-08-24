@@ -1,200 +1,35 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 24 Aug 2012 19:15:51 +0200
-Subject: [PATCH v5 2/2] ARM: EXYNOS: SMC instruction (aka firmware) support
-In-Reply-To: <20120824083357.GA25384@july>
-References: <20120824083357.GA25384@july>
-Message-ID: <1708287.hpZdyEpgtl@flatron>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 24 Aug 2012 19:26:02 +0200
+Subject: Preliminary topic proposals for the ARM mini-summit
+In-Reply-To: <20120824120656.GH5400@mudshark.cambridge.arm.com>
+References: <20120810155128.GM2066@mudshark.cambridge.arm.com>
+ <20120824135203.1bfd2b14@skate>
+ <20120824120656.GH5400@mudshark.cambridge.arm.com>
+Message-ID: <20120824192602.45f48636@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Le Fri, 24 Aug 2012 13:06:56 +0100,
+Will Deacon <will.deacon@arm.com> a ?crit :
 
-Please see my comments inline.
+> > The "Kernel Summit Attendee Information" e-mail that we have
+> > received on August 22th still mentions that the workshops will only
+> > take place on Tuesday 28, with the ARM workshop being in room
+> > Marina 6, starting at 9:00 AM.
+> 
+> Thanks for pointing this out.
+> 
+> > In what room will take place the ARM workshop on Monday 27 ? I guess
+> > the starting time will be 9:00 AM as well, is this correct?
+> 
+> That's right, we have the room from 9am both days and plan to start
+> then.
 
-On Friday 24 of August 2012 17:33:57 Kyungmin Park wrote:
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Some boards, e.g., exynos4412, can use smc instruction (aka firmware)
-> interally.
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> Changelog v4
-> 	use call_firmware_op instead of indirect call
-> 
-> diff --git a/arch/arm/mach-exynos/Makefile
-> b/arch/arm/mach-exynos/Makefile index 9b58024..8ee779c 100644
-> --- a/arch/arm/mach-exynos/Makefile
-> +++ b/arch/arm/mach-exynos/Makefile
-> @@ -30,6 +30,11 @@ obj-$(CONFIG_EXYNOS4_MCT)	+= mct.o
-> 
->  obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
-> 
-> +obj-$(CONFIG_ARM_FIRMWARE)	+= exynos-smc.o firmware.o
-> +
-> +plus_sec := $(call as-instr,.arch_extension sec,+sec)
-> +AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
-> +
->  # machine support
-> 
->  obj-$(CONFIG_MACH_SMDKC210)		+= mach-smdkv310.o
-> diff --git a/arch/arm/mach-exynos/common.h
-> b/arch/arm/mach-exynos/common.h index aed2eeb..540918f 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -21,6 +21,8 @@ void exynos4_restart(char mode, const char *cmd);
->  void exynos5_restart(char mode, const char *cmd);
->  void exynos_init_late(void);
-> 
-> +void exynos_firmware_init(void);
-> +
->  #ifdef CONFIG_PM_GENERIC_DOMAINS
->  int exynos_pm_late_initcall(void);
->  #else
-> diff --git a/arch/arm/mach-exynos/exynos-smc.S
-> b/arch/arm/mach-exynos/exynos-smc.S new file mode 100644
-> index 0000000..2e27aa3
-> --- /dev/null
-> +++ b/arch/arm/mach-exynos/exynos-smc.S
-> @@ -0,0 +1,22 @@
-> +/*
-> + * Copyright (C) 2012 Samsung Electronics.
-> + *
-> + * Copied from omap-smc.S Copyright (C) 2010 Texas Instruments, Inc.
-> + *
-> + * This program is free software,you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/linkage.h>
-> +
-> +/*
-> + * Function signature: void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32
-> arg3) + */
-> +
-> +ENTRY(exynos_smc)
-> +	stmfd	sp!, {r4-r11, lr}
-> +	dsb
-> +	smc	#0
-> +	ldmfd	sp!, {r4-r11, pc}
-> +ENDPROC(exynos_smc)
-> diff --git a/arch/arm/mach-exynos/firmware.c
-> b/arch/arm/mach-exynos/firmware.c new file mode 100644
-> index 0000000..a144593
-> --- /dev/null
-> +++ b/arch/arm/mach-exynos/firmware.c
-> @@ -0,0 +1,37 @@
-> +/*
-> + *  Copyright (C) 2012 Samsung Electronics.
-> + *  Kyungmin Park <kyungmin.park@samsung.com>
-> + *
-> + * This program is free software,you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +
-> +#include <asm/firmware.h>
-> +
-> +#include "smc.h"
-> +
-> +static int exynos_do_idle(void)
-> +{
-> +        exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
-> +        return 0;
-> +}
-> +
-> +static void exynos_cpu_boot(int cpu)
-> +{
-> +	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
-> +}
-> +
-> +static struct firmware_ops exynos_firmware_ops __initdata = {
-> +	.do_idle	= exynos_do_idle,
-> +	.cpu_boot	= exynos_cpu_boot,
-> +};
-> +
-> +int __init exynos_firmware_init(void)
-> +{
-> +	firmware_ops = exynos_firmware_ops;
-> +	return 0;
-> +}
-> diff --git a/arch/arm/mach-exynos/platsmp.c
-> b/arch/arm/mach-exynos/platsmp.c index 36c3984..c664a86 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -25,6 +25,7 @@
->  #include <asm/hardware/gic.h>
->  #include <asm/smp_plat.h>
->  #include <asm/smp_scu.h>
-> +#include <asm/firmware.h>
-> 
->  #include <mach/hardware.h>
->  #include <mach/regs-clock.h>
-> @@ -139,6 +140,12 @@ int __cpuinit boot_secondary(unsigned int cpu,
-> struct task_struct *idle)
-> 
->  		__raw_writel(virt_to_phys(exynos4_secondary_startup),
->  			CPU1_BOOT_REG);
-> +
-> +		if (IS_ENABLED(CONFIG_ARM_FIRMWARE)) {
-> +			/* Call Exynos specific smc call */
-> +			call_firmware_op(cpu_boot, cpu);
-> +		}
+Great, thanks for the confirmation.
 
-We don't need to check IS_ENABLED(CONFIG_ARM_FIRMWARE) now as 
-call_firmware_op does it for us.
-
---
-Best regards,
-Tomasz Figa
-
-> +
->  		gic_raise_softirq(cpumask_of(cpu), 1);
-> 
->  		if (pen_release == -1)
-> diff --git a/arch/arm/mach-exynos/smc.h b/arch/arm/mach-exynos/smc.h
-> new file mode 100644
-> index 0000000..e972390
-> --- /dev/null
-> +++ b/arch/arm/mach-exynos/smc.h
-> @@ -0,0 +1,31 @@
-> +/*
-> + *  Copyright (c) 2012 Samsung Electronics.
-> + *
-> + * EXYNOS - SMC Call
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __ASM_ARCH_EXYNOS_SMC_H
-> +#define __ASM_ARCH_EXYNOS_SMC_H
-> +
-> +#define SMC_CMD_INIT            (-1)
-> +#define SMC_CMD_INFO            (-2)
-> +/* For Power Management */
-> +#define SMC_CMD_SLEEP           (-3)
-> +#define SMC_CMD_CPU1BOOT        (-4)
-> +#define SMC_CMD_CPU0AFTR        (-5)
-> +/* For CP15 Access */
-> +#define SMC_CMD_C15RESUME       (-11)
-> +/* For L2 Cache Access */
-> +#define SMC_CMD_L2X0CTRL        (-21)
-> +#define SMC_CMD_L2X0SETUP1      (-22)
-> +#define SMC_CMD_L2X0SETUP2      (-23)
-> +#define SMC_CMD_L2X0INVALL      (-24)
-> +#define SMC_CMD_L2X0DEBUG       (-25)
-> +
-> +extern void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32 arg3);
-> +
-> +#endif
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
