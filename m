@@ -1,34 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 24 Aug 2012 22:16:13 +0800
-Subject: [PATCH 0/5] Add device tree support for on-chip SRAM
-In-Reply-To: <1345799866-19876-1-git-send-email-p.zabel@pengutronix.de>
-References: <1345799866-19876-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20120824141610.GG31998@S2101-09.ap.freescale.net>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 24 Aug 2012 17:23:19 +0300
+Subject: [PATCH] mtd: kill MTD_NAND_VERIFY_WRITE
+In-Reply-To: <1344998325-3279-1-git-send-email-shijie8@gmail.com>
+References: <1344998325-3279-1-git-send-email-shijie8@gmail.com>
+Message-ID: <1345818199.2848.314.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2012 at 11:17:41AM +0200, Philipp Zabel wrote:
-> These patches add support to configure the on-chip SRAM via device-tree
-> node and to obtain the resulting genalloc pool from a phandle pointing   
-> at the node.
-> This allows drivers to allocate SRAM with the genalloc API without
-> hard-coding the genalloc pool address.
+On Tue, 2012-08-14 at 22:38 -0400, Huang Shijie wrote:
+> Just as Artem suggested:
 > 
-It looks like a good stuff.  But in the end, there is nothing IMX
-specific with iram_alloc.c.  Why do we name it in IMX?
+> "Both UBI and JFFS2 are able to read verify what they wrote already.
+> There are also MTD tests which do this verification. So I think there
+> is no reason to keep this in the NAND layer, let alone wasting RAM in
+> the driver to support this feature."
+> 
+> So kill MTD_NAND_VERIFY_WRITE entirely.
+> 
+> Signed-off-by: Huang Shijie <shijie8@gmail.com>
 
-Regards,
-Shawn
+Pushed to l2-mtd.git, thanks!
 
-> regards
-> Philipp
-> 
-> ---
->  arch/arm/boot/dts/imx53.dtsi          |    5 ++
->  arch/arm/boot/dts/imx6q.dtsi          |    5 ++
->  arch/arm/plat-mxc/include/mach/iram.h |   41 -----------------
->  arch/arm/plat-mxc/iram_alloc.c        |   81 ++++++++++++++++++++-------------
->  include/linux/genalloc.h              |   14 ++++++
->  lib/genalloc.c                        |   77 +++++++++++++++++++++++++++++++
->  6 files changed, 150 insertions(+), 73 deletions(-)
-> 
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120824/b44b8d33/attachment-0001.sig>
