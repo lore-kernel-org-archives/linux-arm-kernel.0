@@ -1,113 +1,200 @@
-From: nforrester@whoi.edu (Ned Forrester)
-Date: Fri, 24 Aug 2012 12:54:55 -0400
-Subject: SLAVE Side SPI kernel driver development
-In-Reply-To: <201208241738.45601.marex@denx.de>
-References: <1345820228.87750.YahooMailNeo@web29604.mail.ird.yahoo.com>	<CAOMZO5Ds6NKsTCptQXDGZDJasb119hYWqXMzX8nG5WFArysL7A@mail.gmail.com>
- <201208241738.45601.marex@denx.de>
-Message-ID: <5037B1DF.40503@whoi.edu>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 24 Aug 2012 19:15:51 +0200
+Subject: [PATCH v5 2/2] ARM: EXYNOS: SMC instruction (aka firmware) support
+In-Reply-To: <20120824083357.GA25384@july>
+References: <20120824083357.GA25384@july>
+Message-ID: <1708287.hpZdyEpgtl@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/24/2012 11:38 AM, Marek Vasut wrote:
-> Dear Fabio Estevam,
-> 
->> On Fri, Aug 24, 2012 at 11:57 AM, Bastelli Carlo (yahoo)
-> 
-> CCing SPI list
-> 
->> <carlo_bastelli@yahoo.it> wrote:
->>> Hello, I'm Carlo, I have a difficult task at work, my boss asked me to
->>> develop
->>>
->>>  a driver SPI slave side on embedded ARM processor running Linux.
->>>
->>> Precisely linux occur on the SPI bus as a slave, not master as required
->>> by the hierarchical structure of the current kernel. The new driver
->>> will
->>>
->>>  receive via interrupt and respond when selected by its chip select.
-> 
-> So a soft-spi ? It's gonna be slow as hell and unstable too.
-> 
->>>  Can
->>>  anyone suggest the best way to develop this driver?
-> 
-> Get a CPU which has SPI-slave capable IP, start from there. If you were to 
-> implement soft-spi this way, you'd have to use FIQ on ARM, to be able to handle 
-> stuff with reasonable latency ... check how the ps/2-gpio driver is done in 
-> Linux ... I tried it, it barely worked, you don't want to go down that road.
-> 
->>>  Personally, I
->>>
->>> have identified two main roads, the first if possible to exploit the
->>> structure SPI master driver
-> 
-> Not happening. You'd have to split the parts from the struct spi_master into 
-> common and master-only parts. That's for starters.
-> 
->>> with a few tricks that now I can not
->>> define. The second most radical, write a driver for a UART like, but
->>> managing the SPI device.
->>> Thank you for any suggestions or examples.
-> 
-> First of all, the SPI slave mode is COMPLETELY different from the master mode. 
-> You need to react on incoming CS-low ASAP, which might turn out to be a problem 
-> on it's own. Then, even if you do, you do not know how long the transfer is 
-> going to be, so you need to allocate enough buffers as the transfer progresses 
-> onwards.
-> 
-> In case of your soft-spi, how do you plan to sample the CLK line to sync clock?
-> 
->> Marek got spi slave running on a mx28. See his patch:
->> http://www.spinics.net/lists/arm-kernel/msg190860.html
-> 
-> This was tested (and developed) on this board:
-> http://www.denx-cs.de/?q=M28
-> 
-> The userland code is really easy too, simply pump it into spidev or read from 
-> it. But all that is only possible because of the SPI IP in the mx28 is nice.
-> 
->> Regards,
->>
->> Fabio Estevam
-> 
-> Best regards,
-> Marek Vasut
+Hello,
 
-I generally agree with the above comments.  A generalized SPI slave must
-be able to respond instantly, often within one clock cycle.  This can
-only work in hardware, or in an OS like Linux when the activity on the
-bus is completely predictable by the Linux slave.  The only cases I know
-of are streaming of data in a predictable way between a single master
-and single slave (no other devices on the bus).
+Please see my comments inline.
 
-This topic comes up periodically, but I don't think there has been any
-change in the situation for all the time I've followed the discussion.
-I recommend that you read the archives of this mailing list to
-understand the limitations of a potential slave mode.  The archives can
-be found at:
+On Friday 24 of August 2012 17:33:57 Kyungmin Park wrote:
+> From: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> Some boards, e.g., exynos4412, can use smc instruction (aka firmware)
+> interally.
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> Changelog v4
+> 	use call_firmware_op instead of indirect call
+> 
+> diff --git a/arch/arm/mach-exynos/Makefile
+> b/arch/arm/mach-exynos/Makefile index 9b58024..8ee779c 100644
+> --- a/arch/arm/mach-exynos/Makefile
+> +++ b/arch/arm/mach-exynos/Makefile
+> @@ -30,6 +30,11 @@ obj-$(CONFIG_EXYNOS4_MCT)	+= mct.o
+> 
+>  obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+> 
+> +obj-$(CONFIG_ARM_FIRMWARE)	+= exynos-smc.o firmware.o
+> +
+> +plus_sec := $(call as-instr,.arch_extension sec,+sec)
+> +AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
+> +
+>  # machine support
+> 
+>  obj-$(CONFIG_MACH_SMDKC210)		+= mach-smdkv310.o
+> diff --git a/arch/arm/mach-exynos/common.h
+> b/arch/arm/mach-exynos/common.h index aed2eeb..540918f 100644
+> --- a/arch/arm/mach-exynos/common.h
+> +++ b/arch/arm/mach-exynos/common.h
+> @@ -21,6 +21,8 @@ void exynos4_restart(char mode, const char *cmd);
+>  void exynos5_restart(char mode, const char *cmd);
+>  void exynos_init_late(void);
+> 
+> +void exynos_firmware_init(void);
+> +
+>  #ifdef CONFIG_PM_GENERIC_DOMAINS
+>  int exynos_pm_late_initcall(void);
+>  #else
+> diff --git a/arch/arm/mach-exynos/exynos-smc.S
+> b/arch/arm/mach-exynos/exynos-smc.S new file mode 100644
+> index 0000000..2e27aa3
+> --- /dev/null
+> +++ b/arch/arm/mach-exynos/exynos-smc.S
+> @@ -0,0 +1,22 @@
+> +/*
+> + * Copyright (C) 2012 Samsung Electronics.
+> + *
+> + * Copied from omap-smc.S Copyright (C) 2010 Texas Instruments, Inc.
+> + *
+> + * This program is free software,you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +
+> +/*
+> + * Function signature: void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32
+> arg3) + */
+> +
+> +ENTRY(exynos_smc)
+> +	stmfd	sp!, {r4-r11, lr}
+> +	dsb
+> +	smc	#0
+> +	ldmfd	sp!, {r4-r11, pc}
+> +ENDPROC(exynos_smc)
+> diff --git a/arch/arm/mach-exynos/firmware.c
+> b/arch/arm/mach-exynos/firmware.c new file mode 100644
+> index 0000000..a144593
+> --- /dev/null
+> +++ b/arch/arm/mach-exynos/firmware.c
+> @@ -0,0 +1,37 @@
+> +/*
+> + *  Copyright (C) 2012 Samsung Electronics.
+> + *  Kyungmin Park <kyungmin.park@samsung.com>
+> + *
+> + * This program is free software,you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +
+> +#include <asm/firmware.h>
+> +
+> +#include "smc.h"
+> +
+> +static int exynos_do_idle(void)
+> +{
+> +        exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
+> +        return 0;
+> +}
+> +
+> +static void exynos_cpu_boot(int cpu)
+> +{
+> +	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
+> +}
+> +
+> +static struct firmware_ops exynos_firmware_ops __initdata = {
+> +	.do_idle	= exynos_do_idle,
+> +	.cpu_boot	= exynos_cpu_boot,
+> +};
+> +
+> +int __init exynos_firmware_init(void)
+> +{
+> +	firmware_ops = exynos_firmware_ops;
+> +	return 0;
+> +}
+> diff --git a/arch/arm/mach-exynos/platsmp.c
+> b/arch/arm/mach-exynos/platsmp.c index 36c3984..c664a86 100644
+> --- a/arch/arm/mach-exynos/platsmp.c
+> +++ b/arch/arm/mach-exynos/platsmp.c
+> @@ -25,6 +25,7 @@
+>  #include <asm/hardware/gic.h>
+>  #include <asm/smp_plat.h>
+>  #include <asm/smp_scu.h>
+> +#include <asm/firmware.h>
+> 
+>  #include <mach/hardware.h>
+>  #include <mach/regs-clock.h>
+> @@ -139,6 +140,12 @@ int __cpuinit boot_secondary(unsigned int cpu,
+> struct task_struct *idle)
+> 
+>  		__raw_writel(virt_to_phys(exynos4_secondary_startup),
+>  			CPU1_BOOT_REG);
+> +
+> +		if (IS_ENABLED(CONFIG_ARM_FIRMWARE)) {
+> +			/* Call Exynos specific smc call */
+> +			call_firmware_op(cpu_boot, cpu);
+> +		}
 
-http://sourceforge.net/mailarchive/forum.php?forum_name=spi-devel-general
+We don't need to check IS_ENABLED(CONFIG_ARM_FIRMWARE) now as 
+call_firmware_op does it for us.
 
-then look for threads with "slave" in the subject in the following
-months (I'd give thread start dates, but parts of the threads are
-disconnected in the archives, and this is the easiest way to see all the
-parts, day ranges are in parentheses):
+--
+Best regards,
+Tomasz Figa
 
-2007/04	(13-18)
-2007/09/27 and 2007/10 (13-17)
-2009/03 (2-3)
-2009/12/18 and 2010/1/19 and 2010/02 (14-16)
-2010/07 (26) and 2010/08 (13)
-2011/01 (28-31) and 2011/02 (1-10)
-2011/10 (18)
-2012/06 (29-30 and 2012/07 (1-17)
-
--- 
-Ned Forrester                                       nforrester at whoi.edu
-Oceanographic Systems Lab                           508-289-2226 Office
-Applied Ocean Physics and Engineering Dept.
-Woods Hole Oceanographic Institution          Woods Hole, MA 02543, USA
-http://www.whoi.edu/
-http://www.whoi.edu/page.do?pid=29856
-http://www.whoi.edu/hpb/Site.do?id=1532
+> +
+>  		gic_raise_softirq(cpumask_of(cpu), 1);
+> 
+>  		if (pen_release == -1)
+> diff --git a/arch/arm/mach-exynos/smc.h b/arch/arm/mach-exynos/smc.h
+> new file mode 100644
+> index 0000000..e972390
+> --- /dev/null
+> +++ b/arch/arm/mach-exynos/smc.h
+> @@ -0,0 +1,31 @@
+> +/*
+> + *  Copyright (c) 2012 Samsung Electronics.
+> + *
+> + * EXYNOS - SMC Call
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __ASM_ARCH_EXYNOS_SMC_H
+> +#define __ASM_ARCH_EXYNOS_SMC_H
+> +
+> +#define SMC_CMD_INIT            (-1)
+> +#define SMC_CMD_INFO            (-2)
+> +/* For Power Management */
+> +#define SMC_CMD_SLEEP           (-3)
+> +#define SMC_CMD_CPU1BOOT        (-4)
+> +#define SMC_CMD_CPU0AFTR        (-5)
+> +/* For CP15 Access */
+> +#define SMC_CMD_C15RESUME       (-11)
+> +/* For L2 Cache Access */
+> +#define SMC_CMD_L2X0CTRL        (-21)
+> +#define SMC_CMD_L2X0SETUP1      (-22)
+> +#define SMC_CMD_L2X0SETUP2      (-23)
+> +#define SMC_CMD_L2X0INVALL      (-24)
+> +#define SMC_CMD_L2X0DEBUG       (-25)
+> +
+> +extern void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32 arg3);
+> +
+> +#endif
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
