@@ -1,60 +1,26 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 25 Aug 2012 13:01:26 +0800
-Subject: [PATCH] ARM: imx6q-sabrelite: Rename 'pinctrl_gpio_hog'
-In-Reply-To: <1345821890-2922-1-git-send-email-festevam@gmail.com>
-References: <1345821890-2922-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120825050123.GH31998@S2101-09.ap.freescale.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 25 Aug 2012 16:13:44 +0900
+Subject: [PATCH 0/2] Renesas IPMMU driver for sh7372
+In-Reply-To: <1343197742-13630-1-git-send-email-hdk@igel.co.jp>
+References: <1343197742-13630-1-git-send-email-hdk@igel.co.jp>
+Message-ID: <20120825071344.GI29755@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2012 at 12:24:50PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Wed, Jul 25, 2012 at 03:29:00PM +0900, Hideki EIRAKU wrote:
+> This is the Renesas IPMMU driver, IOMMU API implementation and IPMMU
+> device support for sh7372 (AP4EVB and Mackerel).
 > 
-> 'pinctrl_gpio_hog' is used to setup the pin functions, and it is not neccesarily used only
-> for GPIO pins, so remove 'gpio' from its name to describe a more generic term.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> The IPMMU module supports the MMU function and the PMB function.  The
+> MMU function provides address translation by pagetable compatible with
+> ARMv6.  The PMB function provides address translation including
+> tile-linear translation.  This is implementation of the MMU function.
 
-Applied with the following changes amended.
+Hi,
 
-diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-index 38755b1..1c57e19 100644
---- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-+++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-@@ -48,8 +48,8 @@
-                                pinctrl-names = "default";
-                                pinctrl-0 = <&pinctrl_hog>;
+I am wondering if anyone has had a chance to review this short series.
+It seems reasonable to me with the minor exception that I would
+be happier the second patch to update the relevant defconfigs
+to either enable or disable the driver.
 
--                               gpios {
--                                       pinctrl_hog: hog {
-+                               hog {
-+                                       pinctrl_hog: hoggrp {
-                                                fsl,pins = <
-                                                        1450 0x80000000 /* MX6Q_PAD_NANDF_D6__GPIO_2_6 */
-                                                        1458 0x80000000 /* MX6Q_PAD_NANDF_D7__GPIO_2_7 */
-
-
-> ---
->  arch/arm/boot/dts/imx6q-sabrelite.dts |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> index 72f30f3..2e01478 100644
-> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> @@ -46,10 +46,10 @@
->  
->  			iomuxc at 020e0000 {
->  				pinctrl-names = "default";
-> -				pinctrl-0 = <&pinctrl_gpio_hog>;
-> +				pinctrl-0 = <&pinctrl_hog>;
->  
->  				gpios {
-> -					pinctrl_gpio_hog: gpiohog {
-> +					pinctrl_hog: hog {
->  						fsl,pins = <
->  							   144  0x80000000	/* MX6Q_PAD_EIM_D22__GPIO_3_22 */
->  							   121  0x80000000	/* MX6Q_PAD_EIM_D19__GPIO_3_19 */
-> -- 
-> 1.7.9.5
-> 
+I am also curious to know how this driver may be tested.
