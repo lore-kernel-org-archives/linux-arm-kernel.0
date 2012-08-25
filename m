@@ -1,79 +1,49 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 25 Aug 2012 15:57:06 +0800
-Subject: [PATCH 2/4 V2] ARM: mx28: Add USB PHY overcurrent pinmux
-In-Reply-To: <1345852300-2213-2-git-send-email-marex@denx.de>
-References: <1345852300-2213-1-git-send-email-marex@denx.de>
- <1345852300-2213-2-git-send-email-marex@denx.de>
-Message-ID: <20120825075704.GK31998@S2101-09.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 25 Aug 2012 08:57:42 +0100
+Subject: [PATCH 1/1] mmc: host: enable OMAP DMA engine support for omap
+ hosts by default
+In-Reply-To: <alpine.DEB.2.01.1208241404440.21552@pmeerw.net>
+References: <CAMQu2gy-U1WmgGOGZ+VyXjZmLem9TEWbq5kR8jzC0qXvqF-=BA@mail.gmail.com>
+ <CAAwP0s2Efuuc7vsX3bZuwz175zUjnmsOV87OcZ06p_eoe4T3Ug@mail.gmail.com>
+ <alpine.DEB.2.01.1208232246530.15831@pmeerw.net>
+ <CAMQu2gyEGPbNEE0ur0wh9RoJKuBe4B5NkQMUafQNWGVLX8t9vg@mail.gmail.com>
+ <alpine.DEB.2.01.1208240942100.21552@pmeerw.net>
+ <20120824094231.GA25765@n2100.arm.linux.org.uk>
+ <CAMQu2gxs0bzNMtxb0LFyFKM9s4M4yXxFpopaBO+Hah3RjhCpLA@mail.gmail.com>
+ <20120824103913.GB25765@n2100.arm.linux.org.uk>
+ <CAMQu2gw-vEguFU9naxsHtDVOfJkZVsFNMWJbvbc=ZuULy7TZNA@mail.gmail.com>
+ <alpine.DEB.2.01.1208241404440.21552@pmeerw.net>
+Message-ID: <20120825075742.GC25765@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 25, 2012 at 01:51:38AM +0200, Marek Vasut wrote:
-> Add the pinmux settings for USB PHY overcurrent pins.
+On Fri, Aug 24, 2012 at 02:10:38PM +0200, Peter Meerwald wrote:
+> with Linux 3.6-rc3:
 > 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/boot/dts/imx28.dtsi |   30 ++++++++++++++++++++++++++++++
->  1 file changed, 30 insertions(+)
+> CONFIG_DMA_OMAP=m
+> CONFIG_DMA_ENGINE=y
+> CONFIG_DMA_VIRTUAL_CHANNELS=m
+> CONFIG_MMC_OMAP_HS=y
+> CONFIG_SPI_OMAP24XX=y
+> CONFIG_MTD_NAND_OMAP2=y
 > 
-> V2: This is pulled from the M28EVK and SPS1 board files, put it into common
->     file.
+>   LD      init/built-in.o
+> drivers/built-in.o: In function `omap2_mcspi_setup':
+> /home/pmeerw/linux-pmeerw/drivers/spi/spi-omap2-mcspi.c:859: undefined reference to `omap_dma_filter_fn'
+> drivers/built-in.o: In function `omap_nand_probe':
+> /home/pmeerw/linux-pmeerw/drivers/mtd/nand/omap2.c:1371: undefined reference to `omap_dma_filter_fn'
+> drivers/built-in.o: In function `omap_hsmmc_probe':
+> /home/pmeerw/linux-pmeerw/drivers/mmc/host/omap_hsmmc.c:2039: undefined reference to `omap_dma_filter_fn'
+> make: *** [vmlinux] Error 1
 > 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index b996c2d..3cba62d 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -520,6 +520,36 @@
->  					fsl,voltage = <1>;
->  					fsl,pull-up = <1>;
->  				};
-> +
-> +				usbphy0_pins_a: usbphy0 at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <
-> +						0x2152 /* MX28_PAD_SSP2_SS2__USB0_OVERCURRENT */
-> +					>;
-> +					fsl,drive-strength = <2>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
-> +
-> +				usbphy0_pins_b: usbphy0 at 1 {
-> +					reg = <0>;
+> in addition to SPI and MMC, there seems to be also a NAND dependency
 
-This should be
-					reg = <1>;
+Yes.  Unlike the PL08x driver, OMAP has no way to pass the filter function
+into its drivers, and I didn't want the pain of fiddling around with DT
+crap to try and work out how to do this.  So what you have here is
+something that I got as far as I could, and TI then wanted it pushed into
+mainline.
 
-Fixed it up and applied the patch.
-
-> +					fsl,pinmux-ids = <
-> +						0x3061 /* MX28_PAD_AUART1_CTS__USB0_OVERCURRENT */
-> +					>;
-> +					fsl,drive-strength = <2>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
-> +
-> +				usbphy1_pins_a: usbphy1 at 0 {
-> +					reg = <0>;
-> +					fsl,pinmux-ids = <
-> +						0x2142 /* MX28_PAD_SSP2_SS1__USB1_OVERCURRENT */
-> +					>;
-> +					fsl,drive-strength = <2>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <0>;
-> +				};
->  			};
->  
->  			digctl at 8001c000 {
-> -- 
-> 1.7.10.4
-> 
-
--- 
-Regards,
-Shawn
+I have no solution for the above at present - the long term solution is
+to sort out how to deal with DMA engine with DT etc.  At the moment,
+there has been discussion about this but no solution.
