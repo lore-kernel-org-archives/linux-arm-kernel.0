@@ -1,50 +1,27 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 25 Aug 2012 18:33:01 +0800
-Subject: Shutdown problem in SMP system happened on Tegra20
-In-Reply-To: <20120825075221.GH18957@n2100.arm.linux.org.uk>
-References: <A7051F87A141B744BCAF487D48E5B3BDF5BA982848@HKMAIL02.nvidia.com>
- <20120824182133.GB18957@n2100.arm.linux.org.uk>
- <20120825073624.GI31998@S2101-09.ap.freescale.net>
- <20120825075221.GH18957@n2100.arm.linux.org.uk>
-Message-ID: <20120825103257.GN31998@S2101-09.ap.freescale.net>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Sat, 25 Aug 2012 14:20:40 +0200
+Subject: [PATCH 0/3] Removal of obsolete s3c2410_* GPIO API
+Message-ID: <1345897243-15619-1-git-send-email-sylvester.nawrocki@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 25, 2012 at 08:52:21AM +0100, Russell King - ARM Linux wrote:
-> On Sat, Aug 25, 2012 at 03:36:27PM +0800, Shawn Guo wrote:
-> > On Fri, Aug 24, 2012 at 07:21:33PM +0100, Russell King - ARM Linux wrote:
-> > > Why not just ensure that CONFIG_PM_SLEEP_SMP is enabled if your platform
-> > > requires that the lowest CPU number be the CPU dealing with reboot?
-> > 
-> > I have CONFIG_PM_SLEEP_SMP enabled for imx6q, but still see the imx6q
-> > restart hook running on cpu1 than cpu0.  It seems that
-> > disable_nonboot_cpus is only called in kernel_power_off but never
-> > kernel_restart.  We should probably patch kernel_restart or
-> > machine_restart to have disable_nonboot_cpus called? 
-> 
-> Remember that this path gets called from IRQ context which makes calling
-> functions which sleep very dodgy.
+This short patch series converts remaining users of the s3c24xx SoC
+specific gpiolib functions to the gpiolib API and finally removes
+all s3c2410_* functions from drivers/gpio/gpio-samsung.c.
 
-I'm so familiar with the code/context.  Are you saying disable_nonboot_cpus
-sleeps and kernel_power_off never gets called from IRQ context?
+Sylwester Nawrocki (3):
+  ARM: S3C24XX: Convert users of s3c2410_gpio_setpin to gpiolib API
+  ARM: S3C24XX: Remove obsolete GPIO API declarations
+  gpio-samsung: Remove now unused s3c2410_gpio* API
 
-I tested the code change below on kernel_restart with
-CONFIG_DEBUG_ATOMIC_SLEEP enabled.  It fixes imx6q restart issue (with
-no change on cpu_relax) while no sleep-inside-atomic-section warning
-is seen. 
+ arch/arm/mach-s3c24xx/mach-anubis.c           |    3 +-
+ arch/arm/mach-s3c24xx/mach-jive.c             |   12 ++--
+ arch/arm/mach-s3c24xx/mach-mini2440.c         |    4 +-
+ arch/arm/mach-s3c24xx/mach-nexcoder.c         |   22 +++---
+ arch/arm/mach-s3c24xx/mach-osiris.c           |    7 +-
+ arch/arm/plat-samsung/include/plat/gpio-fns.h |   97 -------------------------
+ drivers/gpio/gpio-samsung.c                   |   40 ----------
+ 7 files changed, 25 insertions(+), 160 deletions(-)
 
-Regards,
-Shawn
-
-diff --git a/kernel/sys.c b/kernel/sys.c
-index 241507f..0359328 100644
---- a/kernel/sys.c
-+++ b/kernel/sys.c
-@@ -373,6 +373,7 @@ void kernel_restart(char *cmd)
-        else
-                printk(KERN_EMERG "Restarting system with command '%s'.\n", cmd);
-        kmsg_dump(KMSG_DUMP_RESTART);
-+       disable_nonboot_cpus();
-        machine_restart(cmd);
- }
- EXPORT_SYMBOL_GPL(kernel_restart);
+--
+1.7.4.1
