@@ -1,46 +1,70 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 24 Aug 2012 17:21:51 -0700
-Subject: [PATCH V5 0/5] clk: mmp: add clock framework for mmp
-In-Reply-To: <1345431315-8037-1-git-send-email-xiechao.mail@gmail.com>
-References: <1345431315-8037-1-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <20120825002151.18366.99434@nucleus>
+From: omycle@gmail.com (Li Haifeng)
+Date: Sat, 25 Aug 2012 11:12:09 +0800
+Subject: For physical memory management, why take holes page as free pages?
+Message-ID: <CAFNq8R6FL3bVnht2b16zsCm82N+WyrobH3kXzXv3Z-YERfeudw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Chao Xie (2012-08-19 19:55:10)
-> From: Chao Xie <chao.xie@marvell.com>
->  arch/arm/mach-mmp/Kconfig    |    3 +
->  drivers/clk/Makefile         |    3 +
->  drivers/clk/mmp/Makefile     |    9 +
->  drivers/clk/mmp/clk-apbc.c   |  152 ++++++++++++++
->  drivers/clk/mmp/clk-apmu.c   |   97 +++++++++
->  drivers/clk/mmp/clk-frac.c   |  153 ++++++++++++++
->  drivers/clk/mmp/clk-mmp2.c   |  449 ++++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/mmp/clk-pxa168.c |  346 ++++++++++++++++++++++++++++++++
->  drivers/clk/mmp/clk-pxa910.c |  320 ++++++++++++++++++++++++++++++
->  drivers/clk/mmp/clk.h        |   35 ++++
+Hi, everybody.
 
-Looks like you are not removing your arch/arm/mach-mmp/clock.c.  Is that
-intentional?
+Sorry to disturb you. When I study memory management of boot_mem, I
+have question about 505~506 lines below code for initialization of
+physical memory management. The function of these two lines is to make
+the holes between adjacent bank free in node_bootmem_map of
+corresponding node, which is a bitmap.
 
-When I apply your series against v3.6-rc3 I find that compilation breaks
-with mmp2_defconfig due to conflicting definitions for the clk api
-(clk_enable, clk_set_rate, etc).  This is not surprising since your
-legacy clock code is neither deleted nor removed from compilation
-conditionally by checking for CONFIG_COMMON_CLK.
+IMO, the holes between two bank should be marked reserved in page
+bitmap, because it couldn't be used for allocating memory in buddy
+system.
 
-Did I somehow manage to misapply your patches or should your patches
-have removed the arch-specific clock framework as well?
+start_kernel->mm_init->mem_init-> free_unused_memmap:
+-------------------------------->
+arch/arm/mm/init.c:
 
-Regards,
-Mike
+472 static void __init free_unused_memmap(struct meminfo *mi)
+473 {
+474         unsigned long bank_start, prev_bank_end = 0;
+475         unsigned int i;
+476
+477         /*
+478          * This relies on each bank being in address order.
+479          * The banks are sorted previously in bootmem_init().
+480          */
+481         for_each_bank(i, mi) {
+482                 struct membank *bank = &mi->bank[i];
+483
+484                 bank_start = bank_pfn_start(bank);
+485
+486 #ifdef CONFIG_SPARSEMEM
+487                 /*
+488                  * Take care not to free memmap entries that don't exist
+489                  * due to SPARSEMEM sections which aren't present.
+490                  */
+491                 bank_start = min(bank_start,
+492                                  ALIGN(prev_bank_end, PAGES_PER_SECTION));
+493 #else
+494                 /*
+495                  * Align down here since the VM subsystem insists that the
+496                  * memmap entries are valid from the bank start aligned to
+497                  * MAX_ORDER_NR_PAGES.
+498                  */
+499                 bank_start = round_down(bank_start, MAX_ORDER_NR_PAGES);
+500 #endif
+501                 /*
+502                  * If we had a previous bank, and there is a space
+503                  * between the current bank and the previous, free it.
+504                  */
+505                 if (prev_bank_end && prev_bank_end < bank_start)
+506                         free_memmap(prev_bank_end, bank_start);
+507
+508                 /*
+509                  * Align up here since the VM subsystem insists that the
+510                  * memmap entries are valid from the bank end aligned to
+511                  * MAX_ORDER_NR_PAGES.
+512                  */
+513                 prev_bank_end = ALIGN(bank_pfn_end(bank),
+MAX_ORDER_NR_PAGES);
+514         }
 
->  10 files changed, 1567 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/clk/mmp/Makefile
->  create mode 100644 drivers/clk/mmp/clk-apbc.c
->  create mode 100644 drivers/clk/mmp/clk-apmu.c
->  create mode 100644 drivers/clk/mmp/clk-frac.c
->  create mode 100644 drivers/clk/mmp/clk-mmp2.c
->  create mode 100644 drivers/clk/mmp/clk-pxa168.c
->  create mode 100644 drivers/clk/mmp/clk-pxa910.c
->  create mode 100644 drivers/clk/mmp/clk.h
+
+Thanks.
