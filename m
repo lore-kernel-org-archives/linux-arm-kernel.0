@@ -1,26 +1,32 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 25 Aug 2012 16:13:44 +0900
-Subject: [PATCH 0/2] Renesas IPMMU driver for sh7372
-In-Reply-To: <1343197742-13630-1-git-send-email-hdk@igel.co.jp>
-References: <1343197742-13630-1-git-send-email-hdk@igel.co.jp>
-Message-ID: <20120825071344.GI29755@verge.net.au>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 25 Aug 2012 08:17:56 +0100
+Subject: Shutdown problem in SMP system happened on Tegra20
+In-Reply-To: <A7051F87A141B744BCAF487D48E5B3BDF5BA98284A@HKMAIL02.nvidia.com>
+References: <A7051F87A141B744BCAF487D48E5B3BDF5BA982848@HKMAIL02.nvidia.com>
+ <20120824182133.GB18957@n2100.arm.linux.org.uk>
+ <A7051F87A141B744BCAF487D48E5B3BDF5BA98284A@HKMAIL02.nvidia.com>
+Message-ID: <20120825071755.GG18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2012 at 03:29:00PM +0900, Hideki EIRAKU wrote:
-> This is the Renesas IPMMU driver, IOMMU API implementation and IPMMU
-> device support for sh7372 (AP4EVB and Mackerel).
+On Sat, Aug 25, 2012 at 08:00:56AM +0800, Bill Huang wrote:
+> nvpublic
+> > So what you're asking for is a feature to do what CONFIG_PM_SLEEP_SMP does, but without
+> > CONFIG_PM_SLEEP_SMP enabled?
 > 
-> The IPMMU module supports the MMU function and the PMB function.  The
-> MMU function provides address translation by pagetable compatible with
-> ARMv6.  The PMB function provides address translation including
-> tile-linear translation.  This is implementation of the MMU function.
+> Yeah pretty much, I'm actually asking should we take care of this since maybe not all platforms 
+> will have this config enabled?
+> > 
+> > Why not just ensure that CONFIG_PM_SLEEP_SMP is enabled if your platform requires that the lowest CPU
+> > number be the CPU dealing with reboot?
+> 
+> Someday we will have it enabled, but before that we'll hit the issue, so you don't think
+> this should be taken care of? Thanks.
 
-Hi,
+Well, just enable CONFIG_PM_SLEEP_SMP then - it'll be far better than
+trying to implement something in the ARM code, especially as sysrq can
+be used for poweroff/reboot etc (which will run from atomic contexts
+where you can't switch to another CPU.)
 
-I am wondering if anyone has had a chance to review this short series.
-It seems reasonable to me with the minor exception that I would
-be happier the second patch to update the relevant defconfigs
-to either enable or disable the driver.
-
-I am also curious to know how this driver may be tested.
+What you're asking for will make these callbacks fragile for other
+platforms.
