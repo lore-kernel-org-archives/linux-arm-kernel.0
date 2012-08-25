@@ -1,24 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 25 Aug 2012 08:52:21 +0100
-Subject: Shutdown problem in SMP system happened on Tegra20
-In-Reply-To: <20120825073624.GI31998@S2101-09.ap.freescale.net>
-References: <A7051F87A141B744BCAF487D48E5B3BDF5BA982848@HKMAIL02.nvidia.com>
- <20120824182133.GB18957@n2100.arm.linux.org.uk>
- <20120825073624.GI31998@S2101-09.ap.freescale.net>
-Message-ID: <20120825075221.GH18957@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 25 Aug 2012 15:56:10 +0800
+Subject: [PATCH 1/4 V2] ARM: mx28: Add SPI 2 pinmux into imx28.dtsi
+In-Reply-To: <1345852300-2213-1-git-send-email-marex@denx.de>
+References: <1345852300-2213-1-git-send-email-marex@denx.de>
+Message-ID: <20120825075606.GJ31998@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 25, 2012 at 03:36:27PM +0800, Shawn Guo wrote:
-> On Fri, Aug 24, 2012 at 07:21:33PM +0100, Russell King - ARM Linux wrote:
-> > Why not just ensure that CONFIG_PM_SLEEP_SMP is enabled if your platform
-> > requires that the lowest CPU number be the CPU dealing with reboot?
+On Sat, Aug 25, 2012 at 01:51:37AM +0200, Marek Vasut wrote:
+> Add this SSP port 2 pin multiplexing configuration into the imx28.dtsi file.
 > 
-> I have CONFIG_PM_SLEEP_SMP enabled for imx6q, but still see the imx6q
-> restart hook running on cpu1 than cpu0.  It seems that
-> disable_nonboot_cpus is only called in kernel_power_off but never
-> kernel_restart.  We should probably patch kernel_restart or
-> machine_restart to have disable_nonboot_cpus called? 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
 
-Remember that this path gets called from IRQ context which makes calling
-functions which sleep very dodgy.
+Applied, thanks.
+
+-- 
+Regards,
+Shawn
