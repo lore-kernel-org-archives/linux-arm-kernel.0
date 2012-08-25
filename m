@@ -1,71 +1,32 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sat, 25 Aug 2012 14:20:43 +0200
-Subject: [PATCH 3/3] gpio-samsung: Remove now unused s3c2410_gpio* API
-In-Reply-To: <1345897243-15619-1-git-send-email-sylvester.nawrocki@gmail.com>
-References: <1345897243-15619-1-git-send-email-sylvester.nawrocki@gmail.com>
-Message-ID: <1345897243-15619-4-git-send-email-sylvester.nawrocki@gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Sat, 25 Aug 2012 15:33:27 +0300
+Subject: [PATCH RESEND] mtd: lpc32xx_mlc: Make driver independent of
+ AMBA DMA engine driver
+In-Reply-To: <1345674311-16874-1-git-send-email-stigge@antcom.de>
+References: <1345674311-16874-1-git-send-email-stigge@antcom.de>
+Message-ID: <1345898007.1815.7.camel@kyv>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no more users of s3c2410_gpio_pullup(), s3c2410_gpio_setpin()
-and s3c2410_gpio_getpin() so remove theese functions.
+On Thu, 2012-08-23 at 00:25 +0200, Roland Stigge wrote:
+> This patch makes the MLC NAND driver independent of the single AMBA DMA engine
+> driver by using the platform data provided dma_filter callback.
+> 
+> (This also fixes the build error of the MLC NAND driver in case of module
+> linking because the (not exported) reference to pl08x_filter_id is gone now.)
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
----
- drivers/gpio/gpio-samsung.c |   40 ----------------------------------------
- 1 files changed, 0 insertions(+), 40 deletions(-)
+I already have both patches in l2-mtd.git. Please, use it as the
+baseline for sending patches.
 
-diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
-index 92f7b2b..9e71340 100644
---- a/drivers/gpio/gpio-samsung.c
-+++ b/drivers/gpio/gpio-samsung.c
-@@ -3131,46 +3131,6 @@ samsung_gpio_pull_t s3c_gpio_getpull(unsigned int pin)
- }
- EXPORT_SYMBOL(s3c_gpio_getpull);
- 
--/* gpiolib wrappers until these are totally eliminated */
--
--void s3c2410_gpio_pullup(unsigned int pin, unsigned int to)
--{
--	int ret;
--
--	WARN_ON(to);	/* should be none of these left */
--
--	if (!to) {
--		/* if pull is enabled, try first with up, and if that
--		 * fails, try using down */
--
--		ret = s3c_gpio_setpull(pin, S3C_GPIO_PULL_UP);
--		if (ret)
--			s3c_gpio_setpull(pin, S3C_GPIO_PULL_DOWN);
--	} else {
--		s3c_gpio_setpull(pin, S3C_GPIO_PULL_NONE);
--	}
--}
--EXPORT_SYMBOL(s3c2410_gpio_pullup);
--
--void s3c2410_gpio_setpin(unsigned int pin, unsigned int to)
--{
--	/* do this via gpiolib until all users removed */
--
--	gpio_request(pin, "temporary");
--	gpio_set_value(pin, to);
--	gpio_free(pin);
--}
--EXPORT_SYMBOL(s3c2410_gpio_setpin);
--
--unsigned int s3c2410_gpio_getpin(unsigned int pin)
--{
--	struct samsung_gpio_chip *chip = samsung_gpiolib_getchip(pin);
--	unsigned long offs = pin - chip->chip.base;
--
--	return __raw_readl(chip->base + 0x04) & (1 << offs);
--}
--EXPORT_SYMBOL(s3c2410_gpio_getpin);
--
- #ifdef CONFIG_S5P_GPIO_DRVSTR
- s5p_gpio_drvstr_t s5p_gpio_get_drvstr(unsigned int pin)
- {
 -- 
-1.7.4.1
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120825/c350c170/attachment.sig>
