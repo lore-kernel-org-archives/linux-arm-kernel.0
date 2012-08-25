@@ -1,68 +1,46 @@
-From: bilhuang@nvidia.com (Bill Huang)
-Date: Sat, 25 Aug 2012 08:00:56 +0800
-Subject: Shutdown problem in SMP system happened on Tegra20
-In-Reply-To: <20120824182133.GB18957@n2100.arm.linux.org.uk>
-References: <A7051F87A141B744BCAF487D48E5B3BDF5BA982848@HKMAIL02.nvidia.com>
- <20120824182133.GB18957@n2100.arm.linux.org.uk>
-Message-ID: <A7051F87A141B744BCAF487D48E5B3BDF5BA98284A@HKMAIL02.nvidia.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 24 Aug 2012 17:21:51 -0700
+Subject: [PATCH V5 0/5] clk: mmp: add clock framework for mmp
+In-Reply-To: <1345431315-8037-1-git-send-email-xiechao.mail@gmail.com>
+References: <1345431315-8037-1-git-send-email-xiechao.mail@gmail.com>
+Message-ID: <20120825002151.18366.99434@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-nvpublic
-> On Fri, Aug 24, 2012 at 04:23:39PM +0800, Bill Huang wrote:
-> > When doing shutdown on Tegra20/Tegra30, we need to read/write PMIC
-> > registers through I2C to perform the power off sequence.
-> > Unfortunately, sometimes we'll fail to shutdown due to I2C timeout on
-> > Tegra20. And the cause of the timeout is due to the CPU which I2C
-> > controller IRQ affined to will have chance to be offlined without
-> > migrating all irqs affined to it, so the following I2C transactions
-> > will fail (no any CPU will handle that interrupt since then).
-> 
-> > Some snippet of the shutdown codes:
-> >
-> > void kernel_power_off(void)
-> > {
-> > 	kernel_shutdown_prepare(SYSTEM_POWER_OFF);
-> > 	:
-> > 	disable_nonboot_cpus();
-> > 	:
-> > 	machine_power_off();
-> > }
-> >
-> > void machine_power_off(void)
-> > {
-> > 	machine_shutdown();
-> > 	if (pm_power_off)
-> > 		pm_power_off(); /* this is where we send I2C write to shutdown */ }
-> >
-> > void machine_shutdown(void)
-> > {
-> > #ifdef CONFIG_SMP
-> > 	smp_send_stop();
-> > #endif
-> > }
-> >
-> > In "smp_send_stop()", it will send "IPI_CPU_STOPS" to offline other
-> > cpus except current cpu (smp_processor_id()), however, current cpu
-> > will not always be cpu0 at least at Tegra20, that said for example
-> > cpu1 might be the current cpu and cpu0 will be offlined and this is the case why the I2C transaction
-> will timeout.
-> >
-> > For normal case, "disable_nonboot_cpus()" call will disable all other
-> > Cpus except cpu0, that means we won't hit the problem mentioned here
-> > since cpu0 will always be the current cpu in the call "smp_send_stop", but the call to
-> "disable_nonboot_cpus"
-> > will happen only when "CONFIG_PM_SLEEP_SMP" is enabled which is not
-> > the case for Tegra20/Tegra30, we don't support suspend yet so this can't be enabled.
-> 
-> So what you're asking for is a feature to do what CONFIG_PM_SLEEP_SMP does, but without
-> CONFIG_PM_SLEEP_SMP enabled?
+Quoting Chao Xie (2012-08-19 19:55:10)
+> From: Chao Xie <chao.xie@marvell.com>
+>  arch/arm/mach-mmp/Kconfig    |    3 +
+>  drivers/clk/Makefile         |    3 +
+>  drivers/clk/mmp/Makefile     |    9 +
+>  drivers/clk/mmp/clk-apbc.c   |  152 ++++++++++++++
+>  drivers/clk/mmp/clk-apmu.c   |   97 +++++++++
+>  drivers/clk/mmp/clk-frac.c   |  153 ++++++++++++++
+>  drivers/clk/mmp/clk-mmp2.c   |  449 ++++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/mmp/clk-pxa168.c |  346 ++++++++++++++++++++++++++++++++
+>  drivers/clk/mmp/clk-pxa910.c |  320 ++++++++++++++++++++++++++++++
+>  drivers/clk/mmp/clk.h        |   35 ++++
 
-Yeah pretty much, I'm actually asking should we take care of this since maybe not all platforms 
-will have this config enabled?
-> 
-> Why not just ensure that CONFIG_PM_SLEEP_SMP is enabled if your platform requires that the lowest CPU
-> number be the CPU dealing with reboot?
+Looks like you are not removing your arch/arm/mach-mmp/clock.c.  Is that
+intentional?
 
-Someday we will have it enabled, but before that we'll hit the issue, so you don't think
-this should be taken care of? Thanks.
+When I apply your series against v3.6-rc3 I find that compilation breaks
+with mmp2_defconfig due to conflicting definitions for the clk api
+(clk_enable, clk_set_rate, etc).  This is not surprising since your
+legacy clock code is neither deleted nor removed from compilation
+conditionally by checking for CONFIG_COMMON_CLK.
+
+Did I somehow manage to misapply your patches or should your patches
+have removed the arch-specific clock framework as well?
+
+Regards,
+Mike
+
+>  10 files changed, 1567 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/clk/mmp/Makefile
+>  create mode 100644 drivers/clk/mmp/clk-apbc.c
+>  create mode 100644 drivers/clk/mmp/clk-apmu.c
+>  create mode 100644 drivers/clk/mmp/clk-frac.c
+>  create mode 100644 drivers/clk/mmp/clk-mmp2.c
+>  create mode 100644 drivers/clk/mmp/clk-pxa168.c
+>  create mode 100644 drivers/clk/mmp/clk-pxa910.c
+>  create mode 100644 drivers/clk/mmp/clk.h
