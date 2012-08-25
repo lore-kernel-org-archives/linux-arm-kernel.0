@@ -1,49 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 25 Aug 2012 08:57:42 +0100
-Subject: [PATCH 1/1] mmc: host: enable OMAP DMA engine support for omap
- hosts by default
-In-Reply-To: <alpine.DEB.2.01.1208241404440.21552@pmeerw.net>
-References: <CAMQu2gy-U1WmgGOGZ+VyXjZmLem9TEWbq5kR8jzC0qXvqF-=BA@mail.gmail.com>
- <CAAwP0s2Efuuc7vsX3bZuwz175zUjnmsOV87OcZ06p_eoe4T3Ug@mail.gmail.com>
- <alpine.DEB.2.01.1208232246530.15831@pmeerw.net>
- <CAMQu2gyEGPbNEE0ur0wh9RoJKuBe4B5NkQMUafQNWGVLX8t9vg@mail.gmail.com>
- <alpine.DEB.2.01.1208240942100.21552@pmeerw.net>
- <20120824094231.GA25765@n2100.arm.linux.org.uk>
- <CAMQu2gxs0bzNMtxb0LFyFKM9s4M4yXxFpopaBO+Hah3RjhCpLA@mail.gmail.com>
- <20120824103913.GB25765@n2100.arm.linux.org.uk>
- <CAMQu2gw-vEguFU9naxsHtDVOfJkZVsFNMWJbvbc=ZuULy7TZNA@mail.gmail.com>
- <alpine.DEB.2.01.1208241404440.21552@pmeerw.net>
-Message-ID: <20120825075742.GC25765@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 25 Aug 2012 16:05:07 +0800
+Subject: [PATCH 3/4 V2] ARM: mxs: Update DENX M28 machine and dts file
+In-Reply-To: <1345852300-2213-3-git-send-email-marex@denx.de>
+References: <1345852300-2213-1-git-send-email-marex@denx.de>
+ <1345852300-2213-3-git-send-email-marex@denx.de>
+Message-ID: <20120825080504.GL31998@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2012 at 02:10:38PM +0200, Peter Meerwald wrote:
-> with Linux 3.6-rc3:
-> 
-> CONFIG_DMA_OMAP=m
-> CONFIG_DMA_ENGINE=y
-> CONFIG_DMA_VIRTUAL_CHANNELS=m
-> CONFIG_MMC_OMAP_HS=y
-> CONFIG_SPI_OMAP24XX=y
-> CONFIG_MTD_NAND_OMAP2=y
-> 
->   LD      init/built-in.o
-> drivers/built-in.o: In function `omap2_mcspi_setup':
-> /home/pmeerw/linux-pmeerw/drivers/spi/spi-omap2-mcspi.c:859: undefined reference to `omap_dma_filter_fn'
-> drivers/built-in.o: In function `omap_nand_probe':
-> /home/pmeerw/linux-pmeerw/drivers/mtd/nand/omap2.c:1371: undefined reference to `omap_dma_filter_fn'
-> drivers/built-in.o: In function `omap_hsmmc_probe':
-> /home/pmeerw/linux-pmeerw/drivers/mmc/host/omap_hsmmc.c:2039: undefined reference to `omap_dma_filter_fn'
-> make: *** [vmlinux] Error 1
-> 
-> in addition to SPI and MMC, there seems to be also a NAND dependency
+On Sat, Aug 25, 2012 at 01:51:39AM +0200, Marek Vasut wrote:
+> +
+> +		reg_vddio_sd0: vddio-sd0 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "vddio-sd0";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			gpio = <&gpio3 28 0>;
+> +		};
+> +
+> +		reg_usb0_vbus: usb0_vbus {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "usb0_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio3 12 0>;
+> +			enable-active-low;
 
-Yes.  Unlike the PL08x driver, OMAP has no way to pass the filter function
-into its drivers, and I didn't want the pain of fiddling around with DT
-crap to try and work out how to do this.  So what you have here is
-something that I got as far as I could, and TI then wanted it pushed into
-mainline.
+Documentation/devicetree/bindings/regulator/fixed-regulator.txt:
 
-I have no solution for the above at present - the long term solution is
-to sort out how to deal with DMA engine with DT etc.  At the moment,
-there has been discussion about this but no solution.
+- enable-active-high: Polarity of GPIO is Active high
+If this property is missing, the default assumed is Active low.
+
+I suspect you need to recheck this aspect for all these 3 fixed
+regulators.
+
+> +		};
+> +
+> +		reg_usb1_vbus: usb1_vbus {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "usb1_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio3 13 0>;
+> +			enable-active-low;
+> +		};
+
+-- 
+Regards,
+Shawn
