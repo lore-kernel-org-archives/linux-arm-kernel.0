@@ -1,50 +1,29 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 25 Aug 2012 16:05:07 +0800
-Subject: [PATCH 3/4 V2] ARM: mxs: Update DENX M28 machine and dts file
-In-Reply-To: <1345852300-2213-3-git-send-email-marex@denx.de>
-References: <1345852300-2213-1-git-send-email-marex@denx.de>
- <1345852300-2213-3-git-send-email-marex@denx.de>
-Message-ID: <20120825080504.GL31998@S2101-09.ap.freescale.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 25 Aug 2012 10:22:31 +0200
+Subject: [PATCH 01/11] pinctrl: mvebu: pinctrl driver core
+In-Reply-To: <CACRpkda0wUW4E3y=ucGRFu5fwwyFWo2dc=4qBaH6CFSOW2ZL_A@mail.gmail.com>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1344689809-6223-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CACRpkda0wUW4E3y=ucGRFu5fwwyFWo2dc=4qBaH6CFSOW2ZL_A@mail.gmail.com>
+Message-ID: <20120825082231.GG9886@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 25, 2012 at 01:51:39AM +0200, Marek Vasut wrote:
-> +
-> +		reg_vddio_sd0: vddio-sd0 {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "vddio-sd0";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			gpio = <&gpio3 28 0>;
-> +		};
-> +
-> +		reg_usb0_vbus: usb0_vbus {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "usb0_vbus";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			gpio = <&gpio3 12 0>;
-> +			enable-active-low;
+On Mon, Aug 20, 2012 at 11:09:51AM +0200, Linus Walleij wrote:
+> On Sat, Aug 11, 2012 at 2:56 PM, Sebastian Hesselbarth
+> <sebastian.hesselbarth@gmail.com> wrote:
+> 
+> > This patch adds a pinctrl driver core for Marvell SoCs plus DT
+> > binding documentation. This core driver will be used by SoC family
+> > specific drivers, i.e. Armada XP, Armada 370, Dove, Kirkwood, aso.
+> 
+> Thanks for dealing with this, much appreaciated!
+> 
+> Are you taking this patch series through some Marvell tree or do you want
+> me to carry it in the pinctrl tree?
 
-Documentation/devicetree/bindings/regulator/fixed-regulator.txt:
+Hi Linus
 
-- enable-active-high: Polarity of GPIO is Active high
-If this property is missing, the default assumed is Active low.
+We can carry it thought the Marvell tree. 
 
-I suspect you need to recheck this aspect for all these 3 fixed
-regulators.
-
-> +		};
-> +
-> +		reg_usb1_vbus: usb1_vbus {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "usb1_vbus";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			gpio = <&gpio3 13 0>;
-> +			enable-active-low;
-> +		};
-
--- 
-Regards,
-Shawn
+   Andrew
