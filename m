@@ -1,36 +1,93 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 26 Aug 2012 15:06:36 -0700
-Subject: Preliminary topic proposals for the ARM mini-summit
-In-Reply-To: <8968365a6cd8adb4c4863b365facb2c2@codethink.co.uk>
-References: <20120810155128.GM2066@mudshark.cambridge.arm.com>
- <8968365a6cd8adb4c4863b365facb2c2@codethink.co.uk>
-Message-ID: <35F49889-05C9-4BB3-B1B7-4A733D48A96D@lixom.net>
+From: hein_tibosch@yahoo.es (Hein Tibosch)
+Date: Mon, 27 Aug 2012 04:20:59 +0800
+Subject: [PATCH 1/2] mmc: atmel-mci: DMA can be used with other controller
+Message-ID: <503A852B.8010902@yahoo.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+After the latest changes to atmel-mci, it could not be used with
+DMA on the AVR32 platform. This patch will allow to use DMA again
+and it will avoid access to MCI register ATMCI_DMA.
 
+Signed-off-by: Hein Tibosch <hein_tibosch@yahoo.es>
 
+---
+ drivers/mmc/host/atmel-mci.c |   21 +++++++++------------
+ 1 files changed, 9 insertions(+), 12 deletions(-)
 
-
-On Aug 26, 2012, at 2:15 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-
-> On 10/08/2012 08:51, Will Deacon wrote:
->> Hello,
->> 
->> By now, those of you on CC should have received your invitation codes for
->> the ARM mini-summit in a couple of weeks time. If not, please contact me
->> separately and I'll look into it [Magnus -- I'm aware you haven't
->> received anything yet, hopefully this will be fixed soon].
->> 
->> The invitation email was slightly misleading as it only referred to Tuesday
->> 28 August, when in fact the mini-summit will be held on *both* Monday 27
->> and Tuesday 28. We will run topics in the morning (and allow an hour in
->> the afternoon for overflow discussion) and dedicate the rest of the time
->> to hacking. Initial topic proposals are:
-> 
-> Does this include the Sunday Evening event? If not, are people planning on
-> getting together this evening?
-
-ARM summit members are not invited to any KS events besides the one on Tuesday night as far as I know. I will arrive late tonight myself, so I'll see everyone in the morning.
-
--Olof
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index f2c115e..66e9fdc 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -71,7 +71,7 @@ enum atmci_pdc_buf {
+ };
+ 
+ struct atmel_mci_caps {
+-	bool    has_dma;
++	bool    has_dma_conf_reg;
+ 	bool    has_pdc;
+ 	bool    has_cfg_reg;
+ 	bool    has_cstor_reg;
+@@ -411,7 +411,7 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+ 	atmci_show_status_reg(s, "SR", buf[ATMCI_SR / 4]);
+ 	atmci_show_status_reg(s, "IMR", buf[ATMCI_IMR / 4]);
+ 
+-	if (host->caps.has_dma) {
++	if (host->caps.has_dma_conf_reg) {
+ 		u32 val;
+ 
+ 		val = buf[ATMCI_DMA / 4];
+@@ -767,7 +767,7 @@ static void atmci_dma_complete(void *arg)
+ 
+ 	dev_vdbg(&host->pdev->dev, "DMA complete\n");
+ 
+-	if (host->caps.has_dma)
++	if (host->caps.has_dma_conf_reg)
+ 		/* Disable DMA hardware handshaking on MCI */
+ 		atmci_writel(host, ATMCI_DMA, atmci_readl(host, ATMCI_DMA) & ~ATMCI_DMAEN);
+ 
+@@ -954,7 +954,9 @@ atmci_prepare_data_dma(struct atmel_mci *host, struct mmc_data *data)
+ 		maxburst = atmci_convert_chksize(host->dma_conf.dst_maxburst);
+ 	}
+ 
+-	atmci_writel(host, ATMCI_DMA, ATMCI_DMA_CHKSIZE(maxburst) | ATMCI_DMAEN);
++	if (host->caps.has_dma_conf_reg)
++		atmci_writel(host, ATMCI_DMA, ATMCI_DMA_CHKSIZE(maxburst) |
++			ATMCI_DMAEN);
+ 
+ 	sglen = dma_map_sg(chan->device->dev, data->sg,
+ 			data->sg_len, direction);
+@@ -2202,7 +2204,7 @@ static void __init atmci_get_cap(struct atmel_mci *host)
+ 	dev_info(&host->pdev->dev,
+ 			"version: 0x%x\n", version);
+ 
+-	host->caps.has_dma = 0;
++	host->caps.has_dma_conf_reg = 0;
+ 	host->caps.has_pdc = 1;
+ 	host->caps.has_cfg_reg = 0;
+ 	host->caps.has_cstor_reg = 0;
+@@ -2219,12 +2221,7 @@ static void __init atmci_get_cap(struct atmel_mci *host)
+ 		host->caps.has_odd_clk_div = 1;
+ 	case 0x400:
+ 	case 0x300:
+-#ifdef CONFIG_AT_HDMAC
+-		host->caps.has_dma = 1;
+-#else
+-		dev_info(&host->pdev->dev,
+-			"has dma capability but dma engine is not selected, then use pio\n");
+-#endif
++		host->caps.has_dma_conf_reg = 1;
+ 		host->caps.has_pdc = 0;
+ 		host->caps.has_cfg_reg = 1;
+ 		host->caps.has_cstor_reg = 1;
+@@ -2298,7 +2295,7 @@ static int __init atmci_probe(struct platform_device *pdev)
+ 
+ 	/* Get MCI capabilities and set operations according to it */
+ 	atmci_get_cap(host);
+-	if (host->caps.has_dma && atmci_configure_dma(host)) {
++	if (atmci_configure_dma(host)) {
+ 		host->prepare_data = &atmci_prepare_data_dma;
+ 		host->submit_data = &atmci_submit_data_dma;
+ 		host->stop_transfer = &atmci_stop_transfer_dma;
+-- 
+1.7.8.0
