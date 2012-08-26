@@ -1,26 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 26 Aug 2012 09:40:49 +0100
-Subject: For physical memory management, why take holes page as free pages?
-In-Reply-To: <CAFNq8R7w7nFSoR1S=r0_Uo3wvKzCALCFgC_TB9Vi_aSuuLwC+g@mail.gmail.com>
-References: <CAFNq8R6FL3bVnht2b16zsCm82N+WyrobH3kXzXv3Z-YERfeudw@mail.gmail.com>
- <CAH+eYFCUOVnc81jLkDafN-9qzy+B66DWQ4zvdj7tzjeN=OS0nA@mail.gmail.com>
- <CAFNq8R7w7nFSoR1S=r0_Uo3wvKzCALCFgC_TB9Vi_aSuuLwC+g@mail.gmail.com>
-Message-ID: <20120826084049.GK18957@n2100.arm.linux.org.uk>
+From: sangsu4u.park@samsung.com (=?ks_c_5601-1987?B?udq787z2?=)
+Date: Sun, 26 Aug 2012 17:45:54 +0900
+Subject: [PATCH] ASoC: SAMSUNG: Add SND_SOC_DAIFMT_CONT option for
+ snd_soc_set_fmt()
+Message-ID: <003101cd8367$3476e650$9d64b2f0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 26, 2012 at 12:29:13PM +0800, Li Haifeng wrote:
-> I understand, but also confused. More seriously, mem_map array is a
-> obsoleted comment in the code, right? It really means node_bootmem_map
-> of a memory node, and it 's a bitmap, which a bit indicated a
-> page,right?
+SND_SOC_DAIFMT_CONT option is now needed because of below commit:
 
-No.  You're confusing two things - the bootmem bitmap array, and the
-mem_map array, which is an array of "struct page"s.  One struct page
-exists per page, where each struct page is normally around 32 bytes.
-So one 4K page of struct pages is 128 entries in the map, which covers
-512kB of memory.
+ASoC: Allow DAI formats to be specified in the dai_link
 
-Take the case where you have a hole of 128MB between your memory banks.
-That's 256 pages of unused page structures, or a total of 1MB of memory
-consumed by unused page structures.
+Otherwise, s3c_pcm_set_fmt() returns -EINVAL.
+
+Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
+---
+ sound/soc/samsung/smdk_wm8994pcm.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/sound/soc/samsung/smdk_wm8994pcm.c b/sound/soc/samsung/smdk_wm8994pcm.c
+index 77ecba9..cb88cbc 100644
+--- a/sound/soc/samsung/smdk_wm8994pcm.c
++++ b/sound/soc/samsung/smdk_wm8994pcm.c
+@@ -77,6 +77,7 @@ static int smdk_wm8994_pcm_hw_params(struct snd_pcm_substream *substream,
+ 
+ 	/* Set the cpu DAI configuration */
+ 	ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_DSP_B
++				| SND_SOC_DAIFMT_CONT
+ 				| SND_SOC_DAIFMT_IB_NF
+ 				| SND_SOC_DAIFMT_CBS_CFS);
+ 	if (ret < 0)
+-- 
+1.7.1
