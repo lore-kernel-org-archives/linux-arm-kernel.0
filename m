@@ -1,10 +1,10 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sun, 26 Aug 2012 18:01:03 +0200
-Subject: [PATCH 11/13] arch/arm/mach-at91/gpio.c: use clk_prepare_enable and
+Date: Sun, 26 Aug 2012 18:01:05 +0200
+Subject: [PATCH 13/13] drivers/rtc/rtc-coh901331.c: use clk_prepare_enable and
  clk_disable_unprepare
 In-Reply-To: <1345996865-32082-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1345996865-32082-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1345996865-32082-12-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1345996865-32082-14-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -38,32 +38,23 @@ expression e;
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
- arch/arm/mach-at91/gpio.c |    9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+I'm not sure about this.  Maybe it would be better to leave the disable and
+unprepare separated, since there is no matching nearby clk_prepare.
 
-diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-index be42cf0..7760f35 100644
---- a/arch/arm/mach-at91/gpio.c
-+++ b/arch/arm/mach-at91/gpio.c
-@@ -956,19 +956,14 @@ static int __init at91_gpio_setup_clk(int idx)
- 		goto err;
- 	}
+ drivers/rtc/rtc-coh901331.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/rtc/rtc-coh901331.c b/drivers/rtc/rtc-coh901331.c
+index 76b2156..c8115b8 100644
+--- a/drivers/rtc/rtc-coh901331.c
++++ b/drivers/rtc/rtc-coh901331.c
+@@ -276,8 +276,7 @@ static void coh901331_shutdown(struct platform_device *pdev)
  
--	if (clk_prepare(at91_gpio->clock))
--		goto clk_prep_err;
--
- 	/* enable PIO controller's clock */
--	if (clk_enable(at91_gpio->clock)) {
-+	if (clk_prepare_enable(at91_gpio->clock)) {
- 		pr_err("at91_gpio.%d, failed to enable clock, ignoring.\n", idx);
--		goto clk_err;
-+		goto clk_prep_err;
- 	}
+ 	clk_enable(rtap->clk);
+ 	writel(0, rtap->virtbase + COH901331_IRQ_MASK);
+-	clk_disable(rtap->clk);
+-	clk_unprepare(rtap->clk);
++	clk_disable_unprepare(rtap->clk);
+ }
  
- 	return 0;
- 
--clk_err:
--	clk_unprepare(at91_gpio->clock);
- clk_prep_err:
- 	clk_put(at91_gpio->clock);
- err:
+ static struct platform_driver coh901331_driver = {
