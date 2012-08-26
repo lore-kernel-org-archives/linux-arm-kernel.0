@@ -1,32 +1,32 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Sun, 26 Aug 2012 14:15:08 -0700
-Subject: Preliminary topic proposals for the ARM mini-summit
-In-Reply-To: <20120810155128.GM2066@mudshark.cambridge.arm.com>
-References: <20120810155128.GM2066@mudshark.cambridge.arm.com>
-Message-ID: <8968365a6cd8adb4c4863b365facb2c2@codethink.co.uk>
+From: jaccon.bastiaansen@gmail.com (Jaccon Bastiaansen)
+Date: Sun, 26 Aug 2012 23:35:38 +0200
+Subject: [PATCH] imx21ads : avoid overlapping static i/o mappings
+Message-ID: <1346016938-28175-1-git-send-email-jaccon.bastiaansen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/2012 08:51, Will Deacon wrote:
-> Hello,
->
-> By now, those of you on CC should have received your invitation codes 
-> for
-> the ARM mini-summit in a couple of weeks time. If not, please contact 
-> me
-> separately and I'll look into it [Magnus -- I'm aware you haven't
-> received anything yet, hopefully this will be fixed soon].
->
-> The invitation email was slightly misleading as it only referred to 
-> Tuesday
-> 28 August, when in fact the mini-summit will be held on *both* Monday 
-> 27
-> and Tuesday 28. We will run topics in the morning (and allow an hour 
-> in
-> the afternoon for overflow discussion) and dedicate the rest of the 
-> time
-> to hacking. Initial topic proposals are:
+The static I/O mappings for the cs89x0 ethernet controller and the
+secondary AHB port 1 (SAHB1) overlapped, causing a kernel crash
+at startup. This is fixed by mapping the cs89x0 to 0xf6000000 (which
+is free to use according to arch/arm/plat-mxc/include/mach/hardware.h).
 
-Does this include the Sunday Evening event? If not, are people planning 
-on
-getting together this evening?
+Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
+---
+ arch/arm/mach-imx/mach-mx21ads.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-imx/mach-mx21ads.c b/arch/arm/mach-imx/mach-mx21ads.c
+index ed22e3f..712c90e 100644
+--- a/arch/arm/mach-imx/mach-mx21ads.c
++++ b/arch/arm/mach-imx/mach-mx21ads.c
+@@ -31,7 +31,7 @@
+ /*
+  * Memory-mapped I/O on MX21ADS base board
+  */
+-#define MX21ADS_MMIO_BASE_ADDR   0xf5000000
++#define MX21ADS_MMIO_BASE_ADDR   0xf6000000
+ #define MX21ADS_MMIO_SIZE        0xc00000
+ 
+ #define MX21ADS_REG_ADDR(offset)    (void __force __iomem *) \
+-- 
+1.7.1
