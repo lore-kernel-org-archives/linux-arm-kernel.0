@@ -1,41 +1,27 @@
-From: joe@perches.com (Joe Perches)
-Date: Sun, 26 Aug 2012 15:26:01 -0700
-Subject: [PATCH] cs89x0 : packet reception not working
-In-Reply-To: <1346017146-28248-1-git-send-email-jaccon.bastiaansen@gmail.com>
-References: <1346017146-28248-1-git-send-email-jaccon.bastiaansen@gmail.com>
-Message-ID: <1346019961.2064.4.camel@joe2Laptop>
+From: davidb@codeaurora.org (David Brown)
+Date: Sun, 26 Aug 2012 15:32:02 -0700
+Subject: Preliminary topic proposals for the ARM mini-summit
+In-Reply-To: <8968365a6cd8adb4c4863b365facb2c2@codethink.co.uk>
+References: <20120810155128.GM2066@mudshark.cambridge.arm.com>
+ <8968365a6cd8adb4c4863b365facb2c2@codethink.co.uk>
+Message-ID: <20120826223202.GA17211@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2012-08-26 at 23:39 +0200, Jaccon Bastiaansen wrote:
-> The RxCFG register of the CS89x0 could be configured incorrectly
-> (because of misplaced parentheses), resulting in the disabling
-> of packet reception.
+On Sun, Aug 26, 2012 at 02:15:08PM -0700, Ben Dooks wrote:
 
-Thanks.
+> Does this include the Sunday Evening event? If not, are people
+> planning on getting together this evening?
 
-> diff --git a/drivers/net/ethernet/cirrus/cs89x0.c b/drivers/net/ethernet/cirrus/cs89x0.c
-[]
-> @@ -1261,10 +1261,10 @@ static void set_multicast_list(struct net_device *dev)
->  	 * so we have to enable interrupts on them also
->  	 */
->  	writereg(dev, PP_RxCFG,
-> -		 (lp->curr_rx_cfg |
-> -		  (lp->rx_mode == RX_ALL_ACCEPT)
-> -		  ? (RX_CRC_ERROR_ENBL | RX_RUNT_ENBL | RX_EXTRA_DATA_ENBL)
-> -		  : 0));
-> +		 lp->curr_rx_cfg |
-> +		 (lp->rx_mode == RX_ALL_ACCEPT
-> +		 ? (RX_CRC_ERROR_ENBL | RX_RUNT_ENBL | RX_EXTRA_DATA_ENBL)
-> +		 : 0));
->  	spin_unlock_irqrestore(&lp->lock, flags);
->  }
+I hadn't planned on driving down just for this evening (it's about 30
+minutes away for me).
 
-Perhaps it would be better to use something like:
+Ping me on IRC if anyone needs any ideas for dining.  Unfortunately,
+nothing is particularly close to the hotel, but there are many things
+about 5 miles away in several directions.
 
-	int cfg = lp->curr_rx_cfg;
+David
 
-	if (lp->rx_mode == RX_ALL_ACCEPT)
-		cfg |= RX_CRC_ERROR_ENBL | RX_RUNT_ENBL | RX_EXTRA_DATA_ENBL;
-
-	writereg(dev, PP_RxCFG, cfg);
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
