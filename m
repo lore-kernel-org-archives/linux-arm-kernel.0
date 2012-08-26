@@ -1,118 +1,119 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sun, 26 Aug 2012 16:34:42 +0200
-Subject: [GIT PULL] ARM: mach-pnx4008: Remove architecture
-In-Reply-To: <201208260441.25905.arnd@arndb.de>
-References: <1345724548-18130-1-git-send-email-stigge@antcom.de>
- <50378084.3080102@antcom.de> <201208260441.25905.arnd@arndb.de>
-Message-ID: <503A3402.7090508@antcom.de>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Sun, 26 Aug 2012 18:00:57 +0200
+Subject: [PATCH 5/13] arch/arm: use clk_prepare_enable and
+ clk_disable_unprepare
+In-Reply-To: <1345996865-32082-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1345996865-32082-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1345996865-32082-6-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/08/12 06:41, Arnd Bergmann wrote:
-> On Friday 24 August 2012, Roland Stigge wrote:
->> On 23/08/12 14:22, Roland Stigge wrote:
->>> This patch removes the ARM architecture mach-pnx4008. No direct support or user
->>> feedback since 2006. Acknowledgements from NXP/Philips and Linux arm-soc
->>> maintainers.
->>>
->>> Signed-off-by: Roland Stigge <stigge@antcom.de>
->>
->> The patch was a bit too big for the mailing list - sorry.
->>
->> Now re-proposing via pull request, below.
-> 
-> I think the removal of the frame buffer driver should go separately via the
-> framebuffer maintainer (Florian Schandinat), I can take the rest through the
-> arm-soc tree.
+From: Julia Lawall <Julia.Lawall@lip6.fr>
 
-Fine - consider the new pull request for arch-pnx4008, below.
+Clk_prepare_enable and clk_disable_unprepare combine clk_prepare and
+clk_enable, and clk_disable and clk_unprepare.  They make the code more
+concise, and ensure that clk_unprepare is called when clk_enable fails.
 
-(Patch for video is separate, now.)
+A simplified version of the semantic patch that introduces calls to these
+functions is as follows: (http://coccinelle.lip6.fr/)
 
-Thanks,
+// <smpl>
+@@
+expression e;
+@@
 
-Roland
+- clk_prepare(e);
+- clk_enable(e);
++ clk_prepare_enable(e);
 
+@@
+expression e;
+@@
 
-The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
+- clk_disable(e);
+- clk_unprepare(e);
++ clk_disable_unprepare(e);
+// </smpl>
 
-  Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-are available in the git repository at:
+---
+ arch/arm/common/sa1111.c   |    3 +--
+ arch/arm/common/timer-sp.c |   16 ++++------------
+ arch/arm/kernel/smp_twd.c  |   13 +++----------
+ 3 files changed, 8 insertions(+), 24 deletions(-)
 
-  git://git.antcom.de/linux-2.6.git pnx4008-removal
-
-for you to fetch changes up to d684f05f2d55655eee93d86974e9271010aaed09:
-
-  ARM: mach-pnx4008: Remove architecture (2012-08-26 16:30:37 +0200)
-
-----------------------------------------------------------------
-Roland Stigge (1):
-      ARM: mach-pnx4008: Remove architecture
-
- arch/arm/Kconfig                                  |    8 -
- arch/arm/Makefile                                 |    1 -
- arch/arm/configs/pnx4008_defconfig                |  472 -----------------------------
- arch/arm/mach-pnx4008/Makefile                    |   12 -
- arch/arm/mach-pnx4008/Makefile.boot               |    4 -
- arch/arm/mach-pnx4008/clock.c                     | 1001 ------------------------------------------------------------
- arch/arm/mach-pnx4008/clock.h                     |   43 ---
- arch/arm/mach-pnx4008/core.c                      |  290 ------------------
- arch/arm/mach-pnx4008/dma.c                       | 1105 -------------------------------------------------------------------
- arch/arm/mach-pnx4008/gpio.c                      |  328 --------------------
- arch/arm/mach-pnx4008/i2c.c                       |   86 ------
- arch/arm/mach-pnx4008/include/mach/clock.h        |   62 ----
- arch/arm/mach-pnx4008/include/mach/debug-macro.S  |   21 --
- arch/arm/mach-pnx4008/include/mach/dma.h          |  160 ----------
- arch/arm/mach-pnx4008/include/mach/entry-macro.S  |  116 -------
- arch/arm/mach-pnx4008/include/mach/gpio-pnx4008.h |  241 ---------------
- arch/arm/mach-pnx4008/include/mach/hardware.h     |   32 --
- arch/arm/mach-pnx4008/include/mach/irq.h          |   42 ---
- arch/arm/mach-pnx4008/include/mach/irqs.h         |  215 -------------
- arch/arm/mach-pnx4008/include/mach/param.h        |   21 --
- arch/arm/mach-pnx4008/include/mach/platform.h     |   69 -----
- arch/arm/mach-pnx4008/include/mach/pm.h           |   33 --
- arch/arm/mach-pnx4008/include/mach/timex.h        |   19 --
- arch/arm/mach-pnx4008/include/mach/uncompress.h   |   46 ---
- arch/arm/mach-pnx4008/irq.c                       |  121 --------
- arch/arm/mach-pnx4008/pm.c                        |  153 ----------
- arch/arm/mach-pnx4008/serial.c                    |   67 -----
- arch/arm/mach-pnx4008/sleep.S                     |  195 ------------
- arch/arm/mach-pnx4008/time.c                      |  134 ---------
- arch/arm/mach-pnx4008/time.h                      |   70 -----
- arch/arm/tools/mach-types                         |    1 -
- drivers/i2c/busses/Kconfig                        |    2 +-
- drivers/usb/Kconfig                               |    1 -
- drivers/usb/host/Kconfig                          |    2 +-
- drivers/usb/host/ohci-hcd.c                       |    2 +-
- drivers/usb/host/ohci-nxp.c                       |   84 +-----
- drivers/watchdog/Kconfig                          |    6 +-
- 37 files changed, 7 insertions(+), 5258 deletions(-)
- delete mode 100644 arch/arm/configs/pnx4008_defconfig
- delete mode 100644 arch/arm/mach-pnx4008/Makefile
- delete mode 100644 arch/arm/mach-pnx4008/Makefile.boot
- delete mode 100644 arch/arm/mach-pnx4008/clock.c
- delete mode 100644 arch/arm/mach-pnx4008/clock.h
- delete mode 100644 arch/arm/mach-pnx4008/core.c
- delete mode 100644 arch/arm/mach-pnx4008/dma.c
- delete mode 100644 arch/arm/mach-pnx4008/gpio.c
- delete mode 100644 arch/arm/mach-pnx4008/i2c.c
- delete mode 100644 arch/arm/mach-pnx4008/include/mach/clock.h
- delete mode 100644 arch/arm/mach-pnx4008/include/mach/debug-macro.S
- delete mode 100644 arch/arm/mach-pnx4008/include/mach/dma.h
- delete mode 100644 arch/arm/mach-pnx4008/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-pnx4008/include/mach/gpio-pnx4008.h
- delete mode 100644 arch/arm/mach-pnx4008/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-pnx4008/include/mach/irq.h
- delete mode 100644 arch/arm/mach-pnx4008/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-pnx4008/include/mach/param.h
- delete mode 100644 arch/arm/mach-pnx4008/include/mach/platform.h
- delete mode 100644 arch/arm/mach-pnx4008/include/mach/pm.h
- delete mode 100644 arch/arm/mach-pnx4008/include/mach/timex.h
- delete mode 100644 arch/arm/mach-pnx4008/include/mach/uncompress.h
- delete mode 100644 arch/arm/mach-pnx4008/irq.c
- delete mode 100644 arch/arm/mach-pnx4008/pm.c
- delete mode 100644 arch/arm/mach-pnx4008/serial.c
- delete mode 100644 arch/arm/mach-pnx4008/sleep.S
- delete mode 100644 arch/arm/mach-pnx4008/time.c
- delete mode 100644 arch/arm/mach-pnx4008/time.h
+diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
+index 9173d11..bd58414 100644
+--- a/arch/arm/common/sa1111.c
++++ b/arch/arm/common/sa1111.c
+@@ -834,8 +834,7 @@ static void __sa1111_remove(struct sa1111 *sachip)
+ 	sa1111_writel(0, irqbase + SA1111_WAKEEN0);
+ 	sa1111_writel(0, irqbase + SA1111_WAKEEN1);
+ 
+-	clk_disable(sachip->clk);
+-	clk_unprepare(sachip->clk);
++	clk_disable_unprepare(sachip->clk);
+ 
+ 	if (sachip->irq != NO_IRQ) {
+ 		irq_set_chained_handler(sachip->irq, NULL);
+diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
+index df13a3f..af1a4ab 100644
+--- a/arch/arm/common/timer-sp.c
++++ b/arch/arm/common/timer-sp.c
+@@ -42,17 +42,10 @@ static long __init sp804_get_clock_rate(const char *name)
+ 		return PTR_ERR(clk);
+ 	}
+ 
+-	err = clk_prepare(clk);
++	err = clk_prepare_enable(clk);
+ 	if (err) {
+-		pr_err("sp804: %s clock failed to prepare: %d\n", name, err);
+-		clk_put(clk);
+-		return err;
+-	}
+-
+-	err = clk_enable(clk);
+-	if (err) {
+-		pr_err("sp804: %s clock failed to enable: %d\n", name, err);
+-		clk_unprepare(clk);
++		pr_err("sp804: %s clock failed to prepare or to enable: %d\n",
++		       name, err);
+ 		clk_put(clk);
+ 		return err;
+ 	}
+@@ -60,8 +53,7 @@ static long __init sp804_get_clock_rate(const char *name)
+ 	rate = clk_get_rate(clk);
+ 	if (rate < 0) {
+ 		pr_err("sp804: %s clock failed to get rate: %ld\n", name, rate);
+-		clk_disable(clk);
+-		clk_unprepare(clk);
++		clk_disable_unprepare(clk);
+ 		clk_put(clk);
+ 	}
+ 
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index fef42b2..8c94b8b 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -204,17 +204,10 @@ static struct clk *twd_get_clock(void)
+ 		return clk;
+ 	}
+ 
+-	err = clk_prepare(clk);
++	err = clk_prepare_enable(clk);
+ 	if (err) {
+-		pr_err("smp_twd: clock failed to prepare: %d\n", err);
+-		clk_put(clk);
+-		return ERR_PTR(err);
+-	}
+-
+-	err = clk_enable(clk);
+-	if (err) {
+-		pr_err("smp_twd: clock failed to enable: %d\n", err);
+-		clk_unprepare(clk);
++		pr_err("smp_twd: clock failed to prepare or to enable: %d\n",
++		       err);
+ 		clk_put(clk);
+ 		return ERR_PTR(err);
+ 	}
