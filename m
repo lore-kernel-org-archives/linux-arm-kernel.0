@@ -1,10 +1,10 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sun, 26 Aug 2012 18:00:56 +0200
-Subject: [PATCH 4/13] i2c: sirf: use clk_prepare_enable and
+Date: Sun, 26 Aug 2012 18:01:03 +0200
+Subject: [PATCH 11/13] arch/arm/mach-at91/gpio.c: use clk_prepare_enable and
  clk_disable_unprepare
 In-Reply-To: <1345996865-32082-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1345996865-32082-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1345996865-32082-5-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1345996865-32082-12-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -38,42 +38,32 @@ expression e;
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
- drivers/i2c/busses/i2c-sirf.c |   14 +++-----------
- 1 file changed, 3 insertions(+), 11 deletions(-)
+ arch/arm/mach-at91/gpio.c |    9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-sirf.c b/drivers/i2c/busses/i2c-sirf.c
-index 5574a47..110660a 100644
---- a/drivers/i2c/busses/i2c-sirf.c
-+++ b/drivers/i2c/busses/i2c-sirf.c
-@@ -278,18 +278,12 @@ static int __devinit i2c_sirfsoc_probe(struct platform_device *pdev)
- 		goto err_get_clk;
+diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+index be42cf0..7760f35 100644
+--- a/arch/arm/mach-at91/gpio.c
++++ b/arch/arm/mach-at91/gpio.c
+@@ -956,19 +956,14 @@ static int __init at91_gpio_setup_clk(int idx)
+ 		goto err;
  	}
  
--	err = clk_prepare(clk);
-+	err = clk_prepare_enable(clk);
- 	if (err) {
--		dev_err(&pdev->dev, "Clock prepare failed\n");
-+		dev_err(&pdev->dev, "Clock prepare or enable failed\n");
- 		goto err_clk_prep;
- 	}
- 
--	err = clk_enable(clk);
--	if (err) {
--		dev_err(&pdev->dev, "Clock enable failed\n");
--		goto err_clk_en;
--	}
+-	if (clk_prepare(at91_gpio->clock))
+-		goto clk_prep_err;
 -
- 	ctrl_speed = clk_get_rate(clk);
+ 	/* enable PIO controller's clock */
+-	if (clk_enable(at91_gpio->clock)) {
++	if (clk_prepare_enable(at91_gpio->clock)) {
+ 		pr_err("at91_gpio.%d, failed to enable clock, ignoring.\n", idx);
+-		goto clk_err;
++		goto clk_prep_err;
+ 	}
  
- 	siic = devm_kzalloc(&pdev->dev, sizeof(*siic), GFP_KERNEL);
-@@ -376,9 +370,7 @@ static int __devinit i2c_sirfsoc_probe(struct platform_device *pdev)
  	return 0;
  
- out:
--	clk_disable(clk);
--err_clk_en:
--	clk_unprepare(clk);
-+	clk_disable_unprepare(clk);
- err_clk_prep:
- 	clk_put(clk);
- err_get_clk:
+-clk_err:
+-	clk_unprepare(at91_gpio->clock);
+ clk_prep_err:
+ 	clk_put(at91_gpio->clock);
+ err:
