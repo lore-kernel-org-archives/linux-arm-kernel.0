@@ -1,38 +1,74 @@
 From: omycle@gmail.com (Li Haifeng)
-Date: Sun, 26 Aug 2012 17:06:35 +0800
-Subject: For physical memory management, why take holes page as free pages?
-In-Reply-To: <20120826084049.GK18957@n2100.arm.linux.org.uk>
-References: <CAFNq8R6FL3bVnht2b16zsCm82N+WyrobH3kXzXv3Z-YERfeudw@mail.gmail.com>
- <CAH+eYFCUOVnc81jLkDafN-9qzy+B66DWQ4zvdj7tzjeN=OS0nA@mail.gmail.com>
- <CAFNq8R7w7nFSoR1S=r0_Uo3wvKzCALCFgC_TB9Vi_aSuuLwC+g@mail.gmail.com>
- <20120826084049.GK18957@n2100.arm.linux.org.uk>
-Message-ID: <CAFNq8R60JkNj-rHXUgb6J6tXyBBaMD-qRYwoFEHRA1uyvFsrCA@mail.gmail.com>
+Date: Sun, 26 Aug 2012 18:39:47 +0800
+Subject: For buddy system initialization, the holes between banks adjacent
+ will be released to buddy allocator?
+Message-ID: <CAFNq8R6kBonhW4Q+Zj_6GV7y88pcAUJ_MrYn1nYM9LHtMZqdvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for your patience.
+Sorry to disturb you again.
 
-2012/8/26 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Sun, Aug 26, 2012 at 12:29:13PM +0800, Li Haifeng wrote:
->> I understand, but also confused. More seriously, mem_map array is a
->> obsoleted comment in the code, right? It really means node_bootmem_map
->> of a memory node, and it 's a bitmap, which a bit indicated a
->> page,right?
->
-> No.  You're confusing two things - the bootmem bitmap array, and the
-> mem_map array, which is an array of "struct page"s.  One struct page
-> exists per page, where each struct page is normally around 32 bytes.
-> So one 4K page of struct pages is 128 entries in the map, which covers
-> 512kB of memory.
+I am still confused about holes between banks adjacent.
 
-Yes. The key is mem_map. And I understand now.
+The lines 180~181 get the low memory's range, and the range includes holes.
+But while releasing the memory to buddy allocator, the code doesn't
+prevent the holes from releasing to the buddy allocator.
 
-Thanks very much again.
-
->
-> Take the case where you have a hole of 128MB between your memory banks.
-> That's 256 pages of unused page structures, or a total of 1MB of memory
-> consumed by unused page structures.
-
-Regards,
-Haifeng Li
+172 static unsigned long __init free_all_bootmem_core(bootmem_data_t *bdata)
+173 {
+174         struct page *page;
+175         unsigned long start, end, pages, count = 0;
+176
+177         if (!bdata->node_bootmem_map)
+178                 return 0;
+179
+180         start = bdata->node_min_pfn;
+181         end = bdata->node_low_pfn;
+182
+183         bdebug("nid=%td start=%lx end=%lx\n",
+184                 bdata - bootmem_node_data, start, end);
+185
+186         while (start < end) {
+187                 unsigned long *map, idx, vec;
+188
+189                 map = bdata->node_bootmem_map;
+190                 idx = start - bdata->node_min_pfn;
+191                 vec = ~map[idx / BITS_PER_LONG];
+192                 /*
+193                  * If we have a properly aligned and fully unreserved
+194                  * BITS_PER_LONG block of pages in front of us, free
+195                  * it in one go.
+196                  */
+197                 if (IS_ALIGNED(start, BITS_PER_LONG) && vec == ~0UL) {
+198                         int order = ilog2(BITS_PER_LONG);
+199
+200                         __free_pages_bootmem(pfn_to_page(start), order);
+201                         count += BITS_PER_LONG;
+202                         start += BITS_PER_LONG;
+203                 } else {
+204                         unsigned long off = 0;
+205
+206                         while (vec && off < BITS_PER_LONG) {
+207                                 if (vec & 1) {
+208                                         page = pfn_to_page(start + off);
+209                                         __free_pages_bootmem(page, 0);
+210                                         count++;
+211                                 }
+212                                 vec >>= 1;
+213                                 off++;
+214                         }
+215                         start = ALIGN(start + 1, BITS_PER_LONG);
+216                 }
+217         }
+218
+219         page = virt_to_page(bdata->node_bootmem_map);
+220         pages = bdata->node_low_pfn - bdata->node_min_pfn;
+221         pages = bootmem_bootmap_pages(pages);
+222         count += pages;
+223         while (pages--)
+224                 __free_pages_bootmem(page++, 0);
+225
+226         bdebug("nid=%td released=%lx\n", bdata - bootmem_node_data, count);
+227
+228         return count;
+229 }
