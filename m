@@ -1,60 +1,30 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sun, 26 Aug 2012 18:01:05 +0200
-Subject: [PATCH 13/13] drivers/rtc/rtc-coh901331.c: use clk_prepare_enable and
- clk_disable_unprepare
-In-Reply-To: <1345996865-32082-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1345996865-32082-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1345996865-32082-14-git-send-email-Julia.Lawall@lip6.fr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 26 Aug 2012 20:44:29 +0100
+Subject: Preliminary topic proposals for the ARM mini-summit
+In-Reply-To: <20120810155128.GM2066@mudshark.cambridge.arm.com>
+References: <20120810155128.GM2066@mudshark.cambridge.arm.com>
+Message-ID: <20120826194429.GA5010@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <Julia.Lawall@lip6.fr>
+Hello again,
 
-Clk_prepare_enable and clk_disable_unprepare combine clk_prepare and
-clk_enable, and clk_disable and clk_unprepare.  They make the code more
-concise, and ensure that clk_unprepare is called when clk_enable fails.
+By now I suspect most of you have either arrived in San Diego or are on
+your way there at the moment. In preparation for the mini-summit starting
+tomorrow morning, some useful links are:
 
-A simplified version of the semantic patch that introduces calls to these
-functions is as follows: (http://coccinelle.lip6.fr/)
+  Agenda: https://sites.google.com/site/kernelsummit2012/workshops/arm
+  IRC: #armsummit on freenode
+  Etherpad: http://pad.linaro.org/arm-mini-summit-2012
 
-// <smpl>
-@@
-expression e;
-@@
+David Brown is local to the area, so he can probably advise on places to
+eat, visit etc.
 
-- clk_prepare(e);
-- clk_enable(e);
-+ clk_prepare_enable(e);
+We will be looking for people to take `moderator' roles in the topic
+sessions, so if you feel that you have something to contribute, please
+let us know before the session (otherwise we'll nominate people that we
+know are involved in the subject :).
 
-@@
-expression e;
-@@
+Looking forward to it,
 
-- clk_disable(e);
-- clk_unprepare(e);
-+ clk_disable_unprepare(e);
-// </smpl>
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
----
-I'm not sure about this.  Maybe it would be better to leave the disable and
-unprepare separated, since there is no matching nearby clk_prepare.
-
- drivers/rtc/rtc-coh901331.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/drivers/rtc/rtc-coh901331.c b/drivers/rtc/rtc-coh901331.c
-index 76b2156..c8115b8 100644
---- a/drivers/rtc/rtc-coh901331.c
-+++ b/drivers/rtc/rtc-coh901331.c
-@@ -276,8 +276,7 @@ static void coh901331_shutdown(struct platform_device *pdev)
- 
- 	clk_enable(rtap->clk);
- 	writel(0, rtap->virtbase + COH901331_IRQ_MASK);
--	clk_disable(rtap->clk);
--	clk_unprepare(rtap->clk);
-+	clk_disable_unprepare(rtap->clk);
- }
- 
- static struct platform_driver coh901331_driver = {
+Will
