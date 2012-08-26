@@ -1,26 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 26 Aug 2012 04:49:32 +0000
-Subject: [PATCH v2 21/31] arm64: 32-bit (compat) applications support
-In-Reply-To: <20120824104338.GI7585@arm.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <201208151434.05145.arnd@arndb.de> <20120824104338.GI7585@arm.com>
-Message-ID: <201208260449.32807.arnd@arndb.de>
+From: sangsu4u.park@samsung.com (=?ks_c_5601-1987?B?udq787z2?=)
+Date: Sun, 26 Aug 2012 17:04:37 +0900
+Subject: ASoC: SAMSUNG: Change Kconfig to support all EXYNOSs
+Message-ID: <003001cd8361$7016a110$5043e330$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 August 2012, Catalin Marinas wrote:
-> > What good is the run-time BUG() here? Nothing should be calling these
-> > when CONFIG_COMPAT is disabled, so I think you should just remove
-> > the #ifdef around the declarations, and the entire #else case.
-> 
-> They are called from handle_signal(), so that's to avoid #ifdef inside
-> functions. I can drop the BUG() (but keep the empty function) and
-> change the checks to is_compat_task() so that the compiler optimises the
-> condition out when !COMPAT.
-> 
+All EXYNOSs use SND_SOC_SAMSUNG configuration.
+This patch change Kconfig to support all EXYNOSs like EXYNOS4 and EXYNOS5.
 
-Sounds good. Note that you can turn a lot of #ifdef into
-if(IS_ENABLED(CONFIG_FOO)) as well, even if there is no other runtime
-check for them.
+Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
+---
+ sound/soc/samsung/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-	Arnd
+diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+index f17dd25..9e64ae6 100644
+--- a/sound/soc/samsung/Kconfig
++++ b/sound/soc/samsung/Kconfig
+@@ -1,6 +1,6 @@
+ config SND_SOC_SAMSUNG
+ 	tristate "ASoC support for Samsung"
+-	depends on ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_S5P64X0 ||
+ARCH_EXYNOS4
++	depends on ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_S5P64X0 ||
+ARCH_EXYNOS
+ 	select S3C64XX_DMA if ARCH_S3C64XX
+ 	select S3C2410_DMA if ARCH_S3C24XX
+ 	help
+-- 
+1.7.1
