@@ -1,44 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 26 Aug 2012 04:47:58 +0000
-Subject: [PATCH 1/4] clk: ux500: Adapt PRCMU and PRCC clocks for common clk
-In-Reply-To: <1345807565-7729-2-git-send-email-ulf.hansson@stericsson.com>
-References: <1345807565-7729-1-git-send-email-ulf.hansson@stericsson.com>
- <1345807565-7729-2-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <201208260447.58396.arnd@arndb.de>
+Date: Sun, 26 Aug 2012 04:49:32 +0000
+Subject: [PATCH v2 21/31] arm64: 32-bit (compat) applications support
+In-Reply-To: <20120824104338.GI7585@arm.com>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <201208151434.05145.arnd@arndb.de> <20120824104338.GI7585@arm.com>
+Message-ID: <201208260449.32807.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 August 2012, Ulf Hansson wrote:
-> From: Ulf Hansson <ulf.hansson@linaro.org>
+On Friday 24 August 2012, Catalin Marinas wrote:
+> > What good is the run-time BUG() here? Nothing should be calling these
+> > when CONFIG_COMPAT is disabled, so I think you should just remove
+> > the #ifdef around the declarations, and the entire #else case.
 > 
-> First version of common clock implementation of PRCMU clocks
-> and PRCC clocks for ux500 platforms.
+> They are called from handle_signal(), so that's to avoid #ifdef inside
+> functions. I can drop the BUG() (but keep the empty function) and
+> change the checks to is_compat_task() so that the compiler optimises the
+> condition out when !COMPAT.
 > 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Very nice, glad to see you got this working!
-
-I only noticed one thing that you should improve:
-
-> +#define to_clk_prcc(_hw) container_of(_hw, struct clk_prcc, hw)
-> +
-> +struct clk_prcc {
-> +	struct clk_hw hw;
-> +	unsigned int io_base;
-> +	u32 cg_sel;
-> +	int is_enabled;
-> +};
-> +
-> +/* PRCC clock operations. */
-> +
-> +static int clk_prcc_pclk_enable(struct clk_hw *hw)
-> +{
-> +	struct clk_prcc *clk = to_clk_prcc(hw);
-> +	void __iomem *io_base = __io_address(clk->io_base);
-
-In a proper device driver, we should not use hacks like __io_address. Please
-change the driver to ioremap the register area at initialization time, and
-don't pass a physical io_base like above but instead pass an offset into
-the register area.
+Sounds good. Note that you can turn a lot of #ifdef into
+if(IS_ENABLED(CONFIG_FOO)) as well, even if there is no other runtime
+check for them.
 
 	Arnd
