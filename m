@@ -1,37 +1,54 @@
-From: jaccon.bastiaansen@gmail.com (Jaccon Bastiaansen)
-Date: Sun, 26 Aug 2012 23:39:06 +0200
-Subject: [PATCH] cs89x0 : packet reception not working
-Message-ID: <1346017146-28248-1-git-send-email-jaccon.bastiaansen@gmail.com>
+From: hein_tibosch@yahoo.es (Hein Tibosch)
+Date: Mon, 27 Aug 2012 04:22:02 +0800
+Subject: [PATCH 2/2] mmc: atmel-mci: AP700x PDC is not connected to MCI
+Message-ID: <503A856A.9020303@yahoo.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RxCFG register of the CS89x0 could be configured incorrectly
-(because of misplaced parentheses), resulting in the disabling
-of packet reception.
+Earlier, atmel-mci was adapter to make use of the peripheral DMA
+controller (PDC), in case normal DMA wouldn't work.
+( http://comments.gmane.org/gmane.linux.kernel.mmc/9403 )
+This works OK on ARM platforms (AT91), but it broke the driver
+for AVR32, the AP700x.
+This patch makes the use of PDC depend on CONFIG_AVR32
 
-Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
+Signed-off-by: Hein Tibosch <hein_tibosch@yahoo.es>
+
 ---
- drivers/net/ethernet/cirrus/cs89x0.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/net/ethernet/cirrus/cs89x0.c b/drivers/net/ethernet/cirrus/cs89x0.c
-index 845b202..ea521fa 100644
---- a/drivers/net/ethernet/cirrus/cs89x0.c
-+++ b/drivers/net/ethernet/cirrus/cs89x0.c
-@@ -1261,10 +1261,10 @@ static void set_multicast_list(struct net_device *dev)
- 	 * so we have to enable interrupts on them also
- 	 */
- 	writereg(dev, PP_RxCFG,
--		 (lp->curr_rx_cfg |
--		  (lp->rx_mode == RX_ALL_ACCEPT)
--		  ? (RX_CRC_ERROR_ENBL | RX_RUNT_ENBL | RX_EXTRA_DATA_ENBL)
--		  : 0));
-+		 lp->curr_rx_cfg |
-+		 (lp->rx_mode == RX_ALL_ACCEPT
-+		 ? (RX_CRC_ERROR_ENBL | RX_RUNT_ENBL | RX_EXTRA_DATA_ENBL)
-+		 : 0));
- 	spin_unlock_irqrestore(&lp->lock, flags);
- }
+ drivers/mmc/host/atmel-mci-regs.h |    7 +++++++
+ drivers/mmc/host/atmel-mci.c      |    2 +-
+ 2 files changed, 8 insertions(+), 1 deletions(-)
  
+diff --git a/drivers/mmc/host/atmel-mci-regs.h b/drivers/mmc/host/atmel-mci-regs.h
+index ab56f7d..c97001e 100644
+--- a/drivers/mmc/host/atmel-mci-regs.h
++++ b/drivers/mmc/host/atmel-mci-regs.h
+@@ -140,6 +140,13 @@
+ #define atmci_writel(port,reg,value)			\
+ 	__raw_writel((value), (port)->regs + reg)
+ 
++/* On AVR chips the Peripheral DMA Controller is not connected to MCI. */
++#ifdef CONFIG_AVR32
++#	define ATMCI_PDC_CONNECTED	0
++#else
++#	define ATMCI_PDC_CONNECTED	1
++#endif
++
+ /*
+  * Fix sconfig's burst size according to atmel MCI. We need to convert them as:
+  * 1 -> 0, 4 -> 1, 8 -> 2, 16 -> 3.
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index 66e9fdc..702ab5c 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -2205,7 +2205,7 @@ static void __init atmci_get_cap(struct atmel_mci *host)
+ 			"version: 0x%x\n", version);
+ 
+ 	host->caps.has_dma_conf_reg = 0;
+-	host->caps.has_pdc = 1;
++	host->caps.has_pdc = ATMCI_PDC_CONNECTED;
+ 	host->caps.has_cfg_reg = 0;
+ 	host->caps.has_cstor_reg = 0;
+ 	host->caps.has_highspeed = 0;
 -- 
-1.7.1
+1.7.8.0
