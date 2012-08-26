@@ -1,10 +1,10 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sun, 26 Aug 2012 18:00:57 +0200
-Subject: [PATCH 5/13] arch/arm: use clk_prepare_enable and
+Date: Sun, 26 Aug 2012 18:00:56 +0200
+Subject: [PATCH 4/13] i2c: sirf: use clk_prepare_enable and
  clk_disable_unprepare
 In-Reply-To: <1345996865-32082-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1345996865-32082-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1345996865-32082-6-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1345996865-32082-5-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -38,82 +38,42 @@ expression e;
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
- arch/arm/common/sa1111.c   |    3 +--
- arch/arm/common/timer-sp.c |   16 ++++------------
- arch/arm/kernel/smp_twd.c  |   13 +++----------
- 3 files changed, 8 insertions(+), 24 deletions(-)
+ drivers/i2c/busses/i2c-sirf.c |   14 +++-----------
+ 1 file changed, 3 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-index 9173d11..bd58414 100644
---- a/arch/arm/common/sa1111.c
-+++ b/arch/arm/common/sa1111.c
-@@ -834,8 +834,7 @@ static void __sa1111_remove(struct sa1111 *sachip)
- 	sa1111_writel(0, irqbase + SA1111_WAKEEN0);
- 	sa1111_writel(0, irqbase + SA1111_WAKEEN1);
- 
--	clk_disable(sachip->clk);
--	clk_unprepare(sachip->clk);
-+	clk_disable_unprepare(sachip->clk);
- 
- 	if (sachip->irq != NO_IRQ) {
- 		irq_set_chained_handler(sachip->irq, NULL);
-diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
-index df13a3f..af1a4ab 100644
---- a/arch/arm/common/timer-sp.c
-+++ b/arch/arm/common/timer-sp.c
-@@ -42,17 +42,10 @@ static long __init sp804_get_clock_rate(const char *name)
- 		return PTR_ERR(clk);
+diff --git a/drivers/i2c/busses/i2c-sirf.c b/drivers/i2c/busses/i2c-sirf.c
+index 5574a47..110660a 100644
+--- a/drivers/i2c/busses/i2c-sirf.c
++++ b/drivers/i2c/busses/i2c-sirf.c
+@@ -278,18 +278,12 @@ static int __devinit i2c_sirfsoc_probe(struct platform_device *pdev)
+ 		goto err_get_clk;
  	}
  
 -	err = clk_prepare(clk);
 +	err = clk_prepare_enable(clk);
  	if (err) {
--		pr_err("sp804: %s clock failed to prepare: %d\n", name, err);
--		clk_put(clk);
--		return err;
--	}
--
--	err = clk_enable(clk);
--	if (err) {
--		pr_err("sp804: %s clock failed to enable: %d\n", name, err);
--		clk_unprepare(clk);
-+		pr_err("sp804: %s clock failed to prepare or to enable: %d\n",
-+		       name, err);
- 		clk_put(clk);
- 		return err;
- 	}
-@@ -60,8 +53,7 @@ static long __init sp804_get_clock_rate(const char *name)
- 	rate = clk_get_rate(clk);
- 	if (rate < 0) {
- 		pr_err("sp804: %s clock failed to get rate: %ld\n", name, rate);
--		clk_disable(clk);
--		clk_unprepare(clk);
-+		clk_disable_unprepare(clk);
- 		clk_put(clk);
+-		dev_err(&pdev->dev, "Clock prepare failed\n");
++		dev_err(&pdev->dev, "Clock prepare or enable failed\n");
+ 		goto err_clk_prep;
  	}
  
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index fef42b2..8c94b8b 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -204,17 +204,10 @@ static struct clk *twd_get_clock(void)
- 		return clk;
- 	}
- 
--	err = clk_prepare(clk);
-+	err = clk_prepare_enable(clk);
- 	if (err) {
--		pr_err("smp_twd: clock failed to prepare: %d\n", err);
--		clk_put(clk);
--		return ERR_PTR(err);
--	}
--
 -	err = clk_enable(clk);
 -	if (err) {
--		pr_err("smp_twd: clock failed to enable: %d\n", err);
--		clk_unprepare(clk);
-+		pr_err("smp_twd: clock failed to prepare or to enable: %d\n",
-+		       err);
- 		clk_put(clk);
- 		return ERR_PTR(err);
- 	}
+-		dev_err(&pdev->dev, "Clock enable failed\n");
+-		goto err_clk_en;
+-	}
+-
+ 	ctrl_speed = clk_get_rate(clk);
+ 
+ 	siic = devm_kzalloc(&pdev->dev, sizeof(*siic), GFP_KERNEL);
+@@ -376,9 +370,7 @@ static int __devinit i2c_sirfsoc_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ out:
+-	clk_disable(clk);
+-err_clk_en:
+-	clk_unprepare(clk);
++	clk_disable_unprepare(clk);
+ err_clk_prep:
+ 	clk_put(clk);
+ err_get_clk:
