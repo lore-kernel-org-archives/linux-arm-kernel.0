@@ -1,74 +1,127 @@
-From: omycle@gmail.com (Li Haifeng)
-Date: Sun, 26 Aug 2012 18:39:47 +0800
-Subject: For buddy system initialization, the holes between banks adjacent
- will be released to buddy allocator?
-Message-ID: <CAFNq8R6kBonhW4Q+Zj_6GV7y88pcAUJ_MrYn1nYM9LHtMZqdvQ@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Sun, 26 Aug 2012 17:29:29 +0530
+Subject: [PATCH v3 1/3] ARM: Samsung: Add support for MSHC controller clocks
+In-Reply-To: <1345982371-26483-1-git-send-email-thomas.abraham@linaro.org>
+References: <1345982371-26483-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1345982371-26483-2-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry to disturb you again.
+Add clock instances for bus interface unit clock and card interface unit
+clock of the all four MSHC controller instances.
 
-I am still confused about holes between banks adjacent.
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
+ arch/arm/mach-exynos/clock-exynos5.c |   45 ++++++++++++----------------------
+ 1 files changed, 16 insertions(+), 29 deletions(-)
 
-The lines 180~181 get the low memory's range, and the range includes holes.
-But while releasing the memory to buddy allocator, the code doesn't
-prevent the holes from releasing to the buddy allocator.
-
-172 static unsigned long __init free_all_bootmem_core(bootmem_data_t *bdata)
-173 {
-174         struct page *page;
-175         unsigned long start, end, pages, count = 0;
-176
-177         if (!bdata->node_bootmem_map)
-178                 return 0;
-179
-180         start = bdata->node_min_pfn;
-181         end = bdata->node_low_pfn;
-182
-183         bdebug("nid=%td start=%lx end=%lx\n",
-184                 bdata - bootmem_node_data, start, end);
-185
-186         while (start < end) {
-187                 unsigned long *map, idx, vec;
-188
-189                 map = bdata->node_bootmem_map;
-190                 idx = start - bdata->node_min_pfn;
-191                 vec = ~map[idx / BITS_PER_LONG];
-192                 /*
-193                  * If we have a properly aligned and fully unreserved
-194                  * BITS_PER_LONG block of pages in front of us, free
-195                  * it in one go.
-196                  */
-197                 if (IS_ALIGNED(start, BITS_PER_LONG) && vec == ~0UL) {
-198                         int order = ilog2(BITS_PER_LONG);
-199
-200                         __free_pages_bootmem(pfn_to_page(start), order);
-201                         count += BITS_PER_LONG;
-202                         start += BITS_PER_LONG;
-203                 } else {
-204                         unsigned long off = 0;
-205
-206                         while (vec && off < BITS_PER_LONG) {
-207                                 if (vec & 1) {
-208                                         page = pfn_to_page(start + off);
-209                                         __free_pages_bootmem(page, 0);
-210                                         count++;
-211                                 }
-212                                 vec >>= 1;
-213                                 off++;
-214                         }
-215                         start = ALIGN(start + 1, BITS_PER_LONG);
-216                 }
-217         }
-218
-219         page = virt_to_page(bdata->node_bootmem_map);
-220         pages = bdata->node_low_pfn - bdata->node_min_pfn;
-221         pages = bootmem_bootmap_pages(pages);
-222         count += pages;
-223         while (pages--)
-224                 __free_pages_bootmem(page++, 0);
-225
-226         bdebug("nid=%td released=%lx\n", bdata - bootmem_node_data, count);
-227
-228         return count;
-229 }
+diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
+index 3b00e29..16d8bef 100644
+--- a/arch/arm/mach-exynos/clock-exynos5.c
++++ b/arch/arm/mach-exynos/clock-exynos5.c
+@@ -564,35 +564,30 @@ static struct clk exynos5_init_clocks_off[] = {
+ 		.enable		= exynos5_clk_ip_peris_ctrl,
+ 		.ctrlbit	= (1 << 19),
+ 	}, {
+-		.name		= "hsmmc",
+-		.devname	= "exynos4-sdhci.0",
++		.name		= "biu",
++		.devname	= "dw_mmc.0",
+ 		.parent		= &exynos5_clk_aclk_200.clk,
+ 		.enable		= exynos5_clk_ip_fsys_ctrl,
+ 		.ctrlbit	= (1 << 12),
+ 	}, {
+-		.name		= "hsmmc",
+-		.devname	= "exynos4-sdhci.1",
++		.name		= "biu",
++		.devname	= "dw_mmc.1",
+ 		.parent		= &exynos5_clk_aclk_200.clk,
+ 		.enable		= exynos5_clk_ip_fsys_ctrl,
+ 		.ctrlbit	= (1 << 13),
+ 	}, {
+-		.name		= "hsmmc",
+-		.devname	= "exynos4-sdhci.2",
++		.name		= "biu",
++		.devname	= "dw_mmc.2",
+ 		.parent		= &exynos5_clk_aclk_200.clk,
+ 		.enable		= exynos5_clk_ip_fsys_ctrl,
+ 		.ctrlbit	= (1 << 14),
+ 	}, {
+-		.name		= "hsmmc",
+-		.devname	= "exynos4-sdhci.3",
++		.name		= "biu",
++		.devname	= "dw_mmc.3",
+ 		.parent		= &exynos5_clk_aclk_200.clk,
+ 		.enable		= exynos5_clk_ip_fsys_ctrl,
+ 		.ctrlbit	= (1 << 15),
+ 	}, {
+-		.name		= "dwmci",
+-		.parent		= &exynos5_clk_aclk_200.clk,
+-		.enable		= exynos5_clk_ip_fsys_ctrl,
+-		.ctrlbit	= (1 << 16),
+-	}, {
+ 		.name		= "sata",
+ 		.devname	= "ahci",
+ 		.enable		= exynos5_clk_ip_fsys_ctrl,
+@@ -1006,8 +1001,8 @@ static struct clksrc_clk exynos5_clk_sclk_uart3 = {
+ 
+ static struct clksrc_clk exynos5_clk_sclk_mmc0 = {
+ 	.clk	= {
+-		.name		= "sclk_mmc",
+-		.devname	= "exynos4-sdhci.0",
++		.name		= "ciu",
++		.devname	= "dw_mmc.0",
+ 		.parent		= &exynos5_clk_dout_mmc0.clk,
+ 		.enable		= exynos5_clksrc_mask_fsys_ctrl,
+ 		.ctrlbit	= (1 << 0),
+@@ -1017,8 +1012,8 @@ static struct clksrc_clk exynos5_clk_sclk_mmc0 = {
+ 
+ static struct clksrc_clk exynos5_clk_sclk_mmc1 = {
+ 	.clk	= {
+-		.name		= "sclk_mmc",
+-		.devname	= "exynos4-sdhci.1",
++		.name		= "ciu",
++		.devname	= "dw_mmc.1",
+ 		.parent		= &exynos5_clk_dout_mmc1.clk,
+ 		.enable		= exynos5_clksrc_mask_fsys_ctrl,
+ 		.ctrlbit	= (1 << 4),
+@@ -1028,8 +1023,8 @@ static struct clksrc_clk exynos5_clk_sclk_mmc1 = {
+ 
+ static struct clksrc_clk exynos5_clk_sclk_mmc2 = {
+ 	.clk	= {
+-		.name		= "sclk_mmc",
+-		.devname	= "exynos4-sdhci.2",
++		.name		= "ciu",
++		.devname	= "dw_mmc.2",
+ 		.parent		= &exynos5_clk_dout_mmc2.clk,
+ 		.enable		= exynos5_clksrc_mask_fsys_ctrl,
+ 		.ctrlbit	= (1 << 8),
+@@ -1039,8 +1034,8 @@ static struct clksrc_clk exynos5_clk_sclk_mmc2 = {
+ 
+ static struct clksrc_clk exynos5_clk_sclk_mmc3 = {
+ 	.clk	= {
+-		.name		= "sclk_mmc",
+-		.devname	= "exynos4-sdhci.3",
++		.name		= "ciu",
++		.devname	= "dw_mmc.3",
+ 		.parent		= &exynos5_clk_dout_mmc3.clk,
+ 		.enable		= exynos5_clksrc_mask_fsys_ctrl,
+ 		.ctrlbit	= (1 << 12),
+@@ -1114,14 +1109,6 @@ static struct clksrc_clk exynos5_clk_sclk_spi2 = {
+ static struct clksrc_clk exynos5_clksrcs[] = {
+ 	{
+ 		.clk	= {
+-			.name		= "sclk_dwmci",
+-			.parent		= &exynos5_clk_dout_mmc4.clk,
+-			.enable		= exynos5_clksrc_mask_fsys_ctrl,
+-			.ctrlbit	= (1 << 16),
+-		},
+-		.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS3, .shift = 8, .size = 8 },
+-	}, {
+-		.clk	= {
+ 			.name		= "sclk_fimd",
+ 			.devname	= "s3cfb.1",
+ 			.enable		= exynos5_clksrc_mask_disp1_0_ctrl,
+-- 
+1.6.6.rc2
