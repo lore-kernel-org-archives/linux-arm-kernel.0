@@ -1,173 +1,57 @@
-From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
-Date: Mon, 27 Aug 2012 16:30:06 +0200
-Subject: [PATCH] dma: imx-dma: Fix kernel crash due to missing clock
- conversion
-In-Reply-To: <1341341045-9472-1-git-send-email-fabio.estevam@freescale.com>
-References: <1341341045-9472-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20120827163006.0cffd20c@eb-e6520>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 27 Aug 2012 17:33:19 +0200
+Subject: [PATCH v3 0/3] DaVinci DMA engine conversion
+In-Reply-To: <1345684176-21472-1-git-send-email-mporter@ti.com>
+References: <1345684176-21472-1-git-send-email-mporter@ti.com>
+Message-ID: <503B933F.2030803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg, Hi Fabio,
+Hi Matt,
 
-this patch went into 3.4.10 as commit
-9ea2c02bafe276e97b592a046ac733610a6d57fd
-which seems wrong as devm_clk_get seems to be added in linux-3.5 so
-compiling a 3.4.10 kernel with imx-dma enabled now leads :
-
-drivers/dma/imx-dma.c: In function 'imxdma_probe':
-drivers/dma/imx-dma.c:980: error: implicit declaration of function
-'devm_clk_get'
-drivers/dma/imx-dma.c:980: warning: assignment makes pointer from
-integer without a cast
-drivers/dma/imx-dma.c:986: warning: assignment makes pointer from
-integer without a cast
-
-Reverting 9ea2c02bafe276e97b592a046ac733610a6d57fd allows to get a
-3.4.10 kernel running fine on an i.MX35.
-
-Best regards
-Eric
-
-Le Tue, 3 Jul 2012 15:44:04-0300, Fabio Estevam
-<fabio.estevam@freescale.com> a ?crit :
-
-> From: Fabio Estevam <festevam@gmail.com>
+On 23.08.2012 03:09, Matt Porter wrote:
+> This series begins the conversion of the DaVinci private EDMA API
+> implementation to a DMA engine driver and converts two of the three
+> in-kernel users of the private EDMA API to DMA engine.
 > 
-> With the new i.MX clock infrastructure we need to request the dma clocks
-> seperately: ahb and ipg clocks.
+> The approach taken is similar to the recent OMAP DMA Engine
+> conversion. The EDMA DMA Engine driver is a wrapper around the existing
+> private EDMA implementation and registers the platform device within
+> the driver.  This allows the conversion series to stand alone with just
+> the drivers and no changes to platform code. It also allows peripheral
+> drivers to continue to use the private EDMA implementation until they
+> are converted.
 > 
-> This fixes the following kernel crash and make audio to be functional again:
+> The EDMA DMA Engine driver supports slave transfers only at this time. It
+> is planned to add cyclic transfers in support of audio peripherals.
 > 
-> root at freescale /home$ aplay audio48k16S.wav 
-> Playing WAVE 'audio48k16S.wav' : Signed 16 bit Little Endian, Rate 48000 Hz, Stereo
-> Unable to handle kernel NULL pointer dereference at virtual address 00000000
-> pgd = c7b74000
-> [00000000] *pgd=a7bb5831, *pte=00000000, *ppte=00000000
-> Internal error: Oops: 17 [#1] PREEMPT ARM
-> Modules linked in:
-> CPU: 0    Not tainted  (3.5.0-rc5-next-20120702-00007-g3028b64 #1128)
-> PC is at snd_dmaengine_pcm_get_chan+0x8/0x10
-> LR is at snd_imx_pcm_hw_params+0x18/0xdc
-> pc : [<c02d3cf8>]    lr : [<c02e95ec>]    psr: a0000013
-> sp : c7b45e30  ip : ffffffff  fp : c7ae58e0
-> r10: 00000000  r9 : c7ae981c  r8 : c7b88800
-> r7 : c7ae5a60  r6 : c7ae5b20  r5 : c7ae9810  r4 : c7afa060
-> r3 : 00000000  r2 : 00000001  r1 : c7b88800  r0 : c7afa060
-> Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-> Control: 0005317f  Table: a7b74000  DAC: 00000015
-> Process aplay (pid: 701, stack limit = 0xc7b44270)
-> Stack: (0xc7b45e30 to 0xc7b46000)
-> 5e20:                                     00100000 00000029 c7b88800 c02db870
-> 5e40: c7ae5a60 c02d4594 00000010 01ae5a60 c7ae5a60 c7ae9810 c7ae9810 c7afa060
-> 5e60: c7ae5b20 c7ae5a60 c7b88800 c02e3ef0 c02e3e08 c7b1e400 c7afa060 c7b88800
-> 5e80: 00000000 c0014da8 c7b44000 00000000 bec566ac c02cd400 c7afa060 c7afa060
-> 5ea0: bec56800 c7b88800 c0014da8 c02cdd7c c04ee710 c04ee7b8 00000003 c005fc74
-> 5ec0: 00000000 7fffffff c7b45f00 c7afa060 c7b67420 c7ba3070 00000004 c0014da8
-> 5ee0: c7b44000 00000000 bec566ac c02ced88 c04e95f8 b6f5ab04 c7b45fb0 0145a468
-> 5f00: 0145a600 bec566bc bec56800 c7b67420 c7ba3070 c00d499c c7b45f18 c7b45f18
-> 5f20: 0000001a 00000004 00000001 c7b44000 c0527f40 00000009 00000008 00000000
-> 5f40: c7b44000 c002c9ec 00000001 c04f0ab0 c04ebec0 00000101 00000000 0000000a
-> 5f60: 60000093 c7b67420 bec56800 c25c4111 00000004 c0014da8 c7b44000 00000000
-> 5f80: bec566ac c00d4f38 b6ffb658 00000000 c0522d80 0145a468 b6fd5000 0145a418
-> 5fa0: 00000036 c0014c00 0145a468 b6fd5000 00000004 c25c4111 bec56800 00020001
-> 5fc0: 0145a468 b6fd5000 0145a418 00000036 0145a468 0145a600 bec566bc bec566ac
-> 5fe0: 0145a468 bec56388 b6f65ce4 b6dcebec 20000010 00000004 00000000 00000000
-> [<c02d3cf8>] (snd_dmaengine_pcm_get_chan+0x8/0x10) from [<c02e95ec>] (snd_imx_pcm_hw_params+0x18/0xdc)
-> [<c02e95ec>] (snd_imx_pcm_hw_params+0x18/0xdc) from [<c02e3ef0>] (soc_pcm_hw_params+0xe8/0x1f0)
-> [<c02e3ef0>] (soc_pcm_hw_params+0xe8/0x1f0) from [<c02cd400>] (snd_pcm_hw_params+0x124/0x474)
-> [<c02cd400>] (snd_pcm_hw_params+0x124/0x474) from [<c02cdd7c>] (snd_pcm_common_ioctl1+0x4b4/0xf74)
-> [<c02cdd7c>] (snd_pcm_common_ioctl1+0x4b4/0xf74) from [<c02ced88>] (snd_pcm_playback_ioctl1+0x30/0x510)
-> [<c02ced88>] (snd_pcm_playback_ioctl1+0x30/0x510) from [<c00d499c>] (do_vfs_ioctl+0x80/0x5e4)
-> [<c00d499c>] (do_vfs_ioctl+0x80/0x5e4) from [<c00d4f38>] (sys_ioctl+0x38/0x60)
-> [<c00d4f38>] (sys_ioctl+0x38/0x60) from [<c0014c00>] (ret_fast_syscall+0x0/0x2c)
-> Code: e593000c e12fff1e e59030a0 e59330bc (e5930000) 
-> ---[ end trace fa518c8ba3a74e97 ]--
+> There are three users of the private EDMA API in the kernel now:
+> davinci_mmc, spi-davinci, and davinci-mcasp.  This series provides DMA
+> Engine conversions for the davinci_mmc and spi-davinci drivers which
+> use the supported slave transfers.
 > 
-> Reported-by: Javier Martin <javier.martin@vista-silicon.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  drivers/dma/imx-dma.c |   36 +++++++++++++++++++++++++-----------
->  1 files changed, 25 insertions(+), 11 deletions(-)
+> This series has been tested on an AM18x EVM and Hawkboard with
+> driver performance comparable to that of the private EDMA API
+> implementations. Both MMC0 and MMC1 are tested which handles the
+> DA850/OMAP-L138/AM18x specific case where MMC1 uses DMA channels on
+> a second EDMA channel controller.  All other platforms have a simpler
+> design with just a single EDMA channel controller.
 > 
-> diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-> index fcfeb3c..5084975 100644
-> --- a/drivers/dma/imx-dma.c
-> +++ b/drivers/dma/imx-dma.c
-> @@ -172,7 +172,8 @@ struct imxdma_engine {
->  	struct device_dma_parameters	dma_parms;
->  	struct dma_device		dma_device;
->  	void __iomem			*base;
-> -	struct clk			*dma_clk;
-> +	struct clk			*dma_ahb;
-> +	struct clk			*dma_ipg;
->  	spinlock_t			lock;
->  	struct imx_dma_2d_config	slots_2d[IMX_DMA_2D_SLOTS];
->  	struct imxdma_channel		channel[IMX_DMA_CHANNELS];
-> @@ -976,10 +977,20 @@ static int __init imxdma_probe(struct platform_device *pdev)
->  		return 0;
->  	}
->  
-> -	imxdma->dma_clk = clk_get(NULL, "dma");
-> -	if (IS_ERR(imxdma->dma_clk))
-> -		return PTR_ERR(imxdma->dma_clk);
-> -	clk_enable(imxdma->dma_clk);
-> +	imxdma->dma_ipg = devm_clk_get(&pdev->dev, "ipg");
-> +	if (IS_ERR(imxdma->dma_ipg)) {
-> +		ret = PTR_ERR(imxdma->dma_ipg);
-> +		goto err_clk;
-> +	}
-> +
-> +	imxdma->dma_ahb = devm_clk_get(&pdev->dev, "ahb");
-> +	if (IS_ERR(imxdma->dma_ahb)) {
-> +		ret = PTR_ERR(imxdma->dma_ahb);
-> +		goto err_clk;
-> +	}
-> +
-> +	clk_prepare_enable(imxdma->dma_ipg);
-> +	clk_prepare_enable(imxdma->dma_ahb);
->  
->  	/* reset DMA module */
->  	imx_dmav1_writel(imxdma, DCR_DRST, DMA_DCR);
-> @@ -988,16 +999,14 @@ static int __init imxdma_probe(struct platform_device *pdev)
->  		ret = request_irq(MX1_DMA_INT, dma_irq_handler, 0, "DMA", imxdma);
->  		if (ret) {
->  			dev_warn(imxdma->dev, "Can't register IRQ for DMA\n");
-> -			kfree(imxdma);
-> -			return ret;
-> +			goto err_enable;
->  		}
->  
->  		ret = request_irq(MX1_DMA_ERR, imxdma_err_handler, 0, "DMA", imxdma);
->  		if (ret) {
->  			dev_warn(imxdma->dev, "Can't register ERRIRQ for DMA\n");
->  			free_irq(MX1_DMA_INT, NULL);
-> -			kfree(imxdma);
-> -			return ret;
-> +			goto err_enable;
->  		}
->  	}
->  
-> @@ -1094,7 +1103,10 @@ err_init:
->  		free_irq(MX1_DMA_INT, NULL);
->  		free_irq(MX1_DMA_ERR, NULL);
->  	}
-> -
-> +err_enable:
-> +	clk_disable_unprepare(imxdma->dma_ipg);
-> +	clk_disable_unprepare(imxdma->dma_ahb);
-> +err_clk:
->  	kfree(imxdma);
->  	return ret;
->  }
-> @@ -1114,7 +1126,9 @@ static int __exit imxdma_remove(struct platform_device *pdev)
->  		free_irq(MX1_DMA_ERR, NULL);
->  	}
->  
-> -        kfree(imxdma);
-> +	clk_disable_unprepare(imxdma->dma_ipg);
-> +	clk_disable_unprepare(imxdma->dma_ahb);
-> +	kfree(imxdma);
->  
->          return 0;
->  }
+> For those wanting to easily test this series, I've pushed a branch for
+> each version to my github tree at https://github.com/ohporter/linux. The
+> current branch is edma-dmaengine-v3.
+> 
+> After this series, the current plan is to complete the mcasp driver
+> conversion which includes adding cyclic dma support. This will then
+> enable the removal and refactoring of the private EDMA API functionality
+> into the EDMA DMA Engine driver.  Since EDMA is also used on the AM33xx
+> family of parts in mach-omap2/, the plan is to enable this driver on
+> that platform as well.
+
+Once you have a patch for the McASP driver conversion, I can happily
+test this on a AM33xx board, together with Gururaja's latest McASP
+refactoring series. Let me know how I can help you here.
+
+
+Thanks,
+Daniel
