@@ -1,70 +1,106 @@
 From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Mon, 27 Aug 2012 09:36:50 +0200
-Subject: [PATCH 0/2] tty: serial: imx: fix lockup and garbage on SMP
-Message-ID: <1346053012-25686-1-git-send-email-dirk.behme@de.bosch.com>
+Date: Mon, 27 Aug 2012 09:36:51 +0200
+Subject: [PATCH 1/2] tty: serial: imx: console write routing is unsafe on SMP
+In-Reply-To: <1346053012-25686-1-git-send-email-dirk.behme@de.bosch.com>
+References: <1346053012-25686-1-git-send-email-dirk.behme@de.bosch.com>
+Message-ID: <1346053012-25686-2-git-send-email-dirk.behme@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following two patches are a port from Freescale's patch
+From: Xinyu Chen <xinyu.chen@freescale.com>
 
-http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/commit/drivers/tty/serial/imx.c?h=imx_3.0.15_android&id=80e525d66d1818722db18e21dc7f1dc41f314156
+The console feature's write routing is unsafe on SMP with
+the startup/shutdown call.
 
-Using a 3.6-rc3 kernel on a i.MX6 SabreLite board and increasing the
-verbosity of the kernel's serial console output with some debug printk
-like [1] results in two issues:
+There could be several consumers of the console
+* the kernel printk
+* the init process using /dev/kmsg to call printk to show log
+* shell, which open /dev/console and write with sys_write()
 
-1. After some time the kernel output hangs [2]. The debugger tells us that
-it hangs in drivers/tty/serial/imx.c at
+The shell goes into the normal uart open/write routing,
+but the other two go into the console operations.
+The open routing calls imx serial startup, which will write USR1/2
+register without any lock and critical with imx_console_write call.
 
-...
-/*
- *	Finally, wait for transmitter to become empty
- *	and restore UCR1/2/3
- */
-while (!(readl(sport->port.membase + USR2) & USR2_TXDC));
-...
+Add a spin_lock for startup/shutdown/console_write routing.
 
-with permanently reading 0x1000 from USR2 while it waits for bit USR2_TXDC
-(0x8).
+This patch is a port from Freescale's Android kernel.
 
-2. Even after applying the first patch, there happens to be some garbage in the
-   output [3].
+Signed-off-by: Xinyu Chen <xinyu.chen@freescale.com>
+Tested-by: Dirk Behme <dirk.behme@de.bosch.com>
+CC: Shawn Guo <shawn.guo@linaro.org>
+CC: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/tty/serial/imx.c |   12 +++++++++++-
+ 1 files changed, 11 insertions(+), 1 deletions(-)
 
-Both issues are gone applying these two patches.
-
-Note: If these patches are fine, they should go to stable, too.
-
-Best regards
-
-Dirk
-
-[1]
-
-Index: a/mm/mmap.c
-===================================================================
---- a/mm/mmap.c
-+++ b/mm/mmap.c
-@@ -1290,6 +1290,9 @@ munmap_back:
- 	vma->vm_pgoff = pgoff;
- 	INIT_LIST_HEAD(&vma->anon_vma_chain);
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index d5c689d..908178f 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -754,6 +754,7 @@ static int imx_startup(struct uart_port *port)
+ 		}
+ 	}
  
-+	printk(" => mmap_region: start: 0x%08X end: 0x%08X len: %d\n",
-+		(unsigned int)vma->vm_start, (unsigned int)vma->vm_end, (int)len);
++	spin_lock_irqsave(&sport->port.lock, flags);
+ 	/*
+ 	 * Finally, clear and enable interrupts
+ 	 */
+@@ -807,7 +808,6 @@ static int imx_startup(struct uart_port *port)
+ 	/*
+ 	 * Enable modem status interrupts
+ 	 */
+-	spin_lock_irqsave(&sport->port.lock,flags);
+ 	imx_enable_ms(&sport->port);
+ 	spin_unlock_irqrestore(&sport->port.lock,flags);
+ 
+@@ -837,10 +837,13 @@ static void imx_shutdown(struct uart_port *port)
+ {
+ 	struct imx_port *sport = (struct imx_port *)port;
+ 	unsigned long temp;
++	unsigned long flags;
+ 
++	spin_lock_irqsave(&sport->port.lock, flags);
+ 	temp = readl(sport->port.membase + UCR2);
+ 	temp &= ~(UCR2_TXEN);
+ 	writel(temp, sport->port.membase + UCR2);
++	spin_unlock_irqrestore(&sport->port.lock, flags);
+ 
+ 	if (USE_IRDA(sport)) {
+ 		struct imxuart_platform_data *pdata;
+@@ -869,12 +872,14 @@ static void imx_shutdown(struct uart_port *port)
+ 	 * Disable all interrupts, port and break condition.
+ 	 */
+ 
++	spin_lock_irqsave(&sport->port.lock, flags);
+ 	temp = readl(sport->port.membase + UCR1);
+ 	temp &= ~(UCR1_TXMPTYEN | UCR1_RRDYEN | UCR1_RTSDEN | UCR1_UARTEN);
+ 	if (USE_IRDA(sport))
+ 		temp &= ~(UCR1_IREN);
+ 
+ 	writel(temp, sport->port.membase + UCR1);
++	spin_unlock_irqrestore(&sport->port.lock, flags);
+ }
+ 
+ static void
+@@ -1217,6 +1222,9 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
+ 	struct imx_port *sport = imx_ports[co->index];
+ 	struct imx_port_ucrs old_ucr;
+ 	unsigned int ucr1;
++	unsigned long flags;
 +
- 	error = -EINVAL;	/* when rejecting VM_GROWSDOWN|VM_GROWSUP */
++	spin_lock_irqsave(&sport->port.lock, flags);
  
- 	if (file) {
-
-[2]
-...
-=> mmap_region: start: 0x76DBC000 end: 0x76DBE000 len: 8192
-=> mmap_region: start: 0x76DBE000 end: 0x76DC0000 len: 8192
-=> mmap_region: start: 0x76D5C000 end: 0x76DA0000 ??
-<hang, no output any more>
-
-[3]
-...
-=> mmap_region: start: 0x0011C000 end: 0x0011D000 len: 4096
-=> mmap_region: start: 0x00008000 end: 0x000B500f??#.??????R????r????j???????}???????????? start: 0x000BD000 end: 0x000BE000 len: 4096
-=> mmap_region: start: 0x000BD000 end: 0x000BE000 len: 4096
-...
+ 	/*
+ 	 *	First, save UCR1/2/3 and then disable interrupts
+@@ -1242,6 +1250,8 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
+ 	while (!(readl(sport->port.membase + USR2) & USR2_TXDC));
+ 
+ 	imx_port_ucrs_restore(&sport->port, &old_ucr);
++
++	spin_unlock_irqrestore(&sport->port.lock, flags);
+ }
+ 
+ /*
+-- 
+1.7.0.4
