@@ -1,60 +1,70 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Mon, 27 Aug 2012 07:35:43 +0000
-Subject: [PATCH v3 0/6] omap-am33xx rtc dt support
-In-Reply-To: <50256797.3020505@ti.com>
-References: <cover.1343383616.git.afzal@ti.com> <50256797.3020505@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9BA4EB@DBDE01.ent.ti.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Mon, 27 Aug 2012 09:36:50 +0200
+Subject: [PATCH 0/2] tty: serial: imx: fix lockup and garbage on SMP
+Message-ID: <1346053012-25686-1-git-send-email-dirk.behme@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alessandro,
+The following two patches are a port from Freescale's patch
 
-On Sat, Aug 11, 2012 at 01:27:11, Nori, Sekhar wrote:
-> On 7/27/2012 5:53 PM, Afzal Mohammed wrote:
+http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/commit/drivers/tty/serial/imx.c?h=imx_3.0.15_android&id=80e525d66d1818722db18e21dc7f1dc41f314156
 
-> > This series makes rtc-omap driver DT capable, adds AM33xx
-> > RTC DT support along with a few enchancments to the driver.
-> > 
-> > rtc-omap driver is made intelligent enough to handle kicker
-> > mechanism. This helps in removing kicker mechanism support
-> > done for DaVinci at platform level.
-> > 
-> > This has been tested on Beaglebone (AM33xx platform) and on
-> > DaVinci DA850 EVM.
-> > 
-> > This series is based over linux-omap master and can be
-> > directly applied over linux-next, except for
-> > [PATCH 6/6] arm/dts: am33xx rtc node.
-> > 
-> > PATCH 6/6 should go through linux-omap tree and needs
-> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg71644.html
-> > (arm/dts: am33xx wdt node) to get applied cleanly
-> 
-> I tested patches 1-5 on AM18x EVM using rtcwake and hwclock commands.
-> Also tested on DT enabled AM18x EVM using hwclock.
-> 
-> For patched 1-5:
-> 
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
-> 
-> Alessandro,
-> 
-> I assume you would want me to queue 2/6 through DaVinci tree. That patch
-> depends on 1/6 being accepted and merged by you. Let me know how you
-> want to move forward here.
+Using a 3.6-rc3 kernel on a i.MX6 SabreLite board and increasing the
+verbosity of the kernel's serial console output with some debug printk
+like [1] results in two issues:
 
-Can you please help 1-5 patches in this series to get into mainline.
-1-5 of this series is a prerequisite for adding RTC support for AM335X
-SoC's, which is present in beaglebone, AM335X EVM.
+1. After some time the kernel output hangs [2]. The debugger tells us that
+it hangs in drivers/tty/serial/imx.c at
 
-Also this series does cleanup on DaVinci platform by moving kicker handling
-mechanism to driver. And we have Ack from DaVinci maintainer on 1-5 of this
-series.
+...
+/*
+ *	Finally, wait for transmitter to become empty
+ *	and restore UCR1/2/3
+ */
+while (!(readl(sport->port.membase + USR2) & USR2_TXDC));
+...
 
-Patch 6/6 adds AM335X RTC DT support, not sure whether you can take 6/6
-or Tony should be taking it.
+with permanently reading 0x1000 from USR2 while it waits for bit USR2_TXDC
+(0x8).
 
-The series applies cleanly over linux-next (now including 6/6)
+2. Even after applying the first patch, there happens to be some garbage in the
+   output [3].
 
-Regards
-Afzal
+Both issues are gone applying these two patches.
+
+Note: If these patches are fine, they should go to stable, too.
+
+Best regards
+
+Dirk
+
+[1]
+
+Index: a/mm/mmap.c
+===================================================================
+--- a/mm/mmap.c
++++ b/mm/mmap.c
+@@ -1290,6 +1290,9 @@ munmap_back:
+ 	vma->vm_pgoff = pgoff;
+ 	INIT_LIST_HEAD(&vma->anon_vma_chain);
+ 
++	printk(" => mmap_region: start: 0x%08X end: 0x%08X len: %d\n",
++		(unsigned int)vma->vm_start, (unsigned int)vma->vm_end, (int)len);
++
+ 	error = -EINVAL;	/* when rejecting VM_GROWSDOWN|VM_GROWSUP */
+ 
+ 	if (file) {
+
+[2]
+...
+=> mmap_region: start: 0x76DBC000 end: 0x76DBE000 len: 8192
+=> mmap_region: start: 0x76DBE000 end: 0x76DC0000 len: 8192
+=> mmap_region: start: 0x76D5C000 end: 0x76DA0000 ??
+<hang, no output any more>
+
+[3]
+...
+=> mmap_region: start: 0x0011C000 end: 0x0011D000 len: 4096
+=> mmap_region: start: 0x00008000 end: 0x000B500f??#.??????R????r????j???????}???????????? start: 0x000BD000 end: 0x000BE000 len: 4096
+=> mmap_region: start: 0x000BD000 end: 0x000BE000 len: 4096
+...
