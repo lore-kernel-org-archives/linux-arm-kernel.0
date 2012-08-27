@@ -1,22 +1,16 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 27 Aug 2012 14:12:10 -0300
-Subject: [PATCH] dma: imx-dma: Fix kernel crash due to missing clock
- conversion
-In-Reply-To: <20120827165242.GA11102@kroah.com>
-References: <1341341045-9472-1-git-send-email-fabio.estevam@freescale.com>
- <20120827163006.0cffd20c@eb-e6520>
- <20120827165242.GA11102@kroah.com>
-Message-ID: <CAOMZO5A3v-K3OGghy2wYqkyqba5y=NcGSXa4C=9bEFHn1x6vaQ@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 27 Aug 2012 10:13:30 -0700
+Subject: ASoC: SAMSUNG: Change Kconfig to support all EXYNOSs
+In-Reply-To: <003001cd8361$7016a110$5043e330$@samsung.com>
+References: <003001cd8361$7016a110$5043e330$@samsung.com>
+Message-ID: <20120827171329.GO4339@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 1:52 PM, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
+On Sun, Aug 26, 2012 at 05:04:37PM +0900, ????? wrote:
+> All EXYNOSs use SND_SOC_SAMSUNG configuration.
+> This patch change Kconfig to support all EXYNOSs like EXYNOS4 and EXYNOS5.
 
-> Ok, should I just revert it?  It's still needed on 3.5, right?
+git can't figure out how to apply your patch due to your character set:
 
-Yes, please revert it from 3.4 and keep it on 3.5.
-
-Thanks,
-
-Fabio Estevam
+   fatal: cannot convert from ks_c_5601-1987 to UTF-8
