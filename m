@@ -1,49 +1,37 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Mon, 27 Aug 2012 14:04:12 +0200
-Subject: [PATCH v11 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
-In-Reply-To: <BC0F374A1C27184AB96177CDFEC2F54225ECC330@EXMDB06.org.aalto.fi>
-References: <cover.1345618760.git.n.voss@weinmann.de>
- <4f3dcfbf1e8eab3e251ab3558e9e1e9123643928.1345618760.git.n.voss@weinmann.de>,
- <503B4919.6080306@atmel.com>
- <BC0F374A1C27184AB96177CDFEC2F54225ECC330@EXMDB06.org.aalto.fi>
-Message-ID: <503B623C.4030304@atmel.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 27 Aug 2012 14:16:17 +0200
+Subject: [PATCH v6 00/10] OMAP-GPMC: generic time calc, prepare for driver
+In-Reply-To: <cover.1345524670.git.afzal@ti.com>
+References: <cover.1345524670.git.afzal@ti.com>
+Message-ID: <503B6511.4050909@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adrian,
+Hi Afzal,
 
-Le 08/27/2012 12:40 PM, Yanes Martinez Adrian a ?crit :
-> Hi Ludovic,
->
->> Tested on at91rm9200, at91sam9261, at91sam9g20 and at91sam9m10 with
->> eeprom, temperature sensor and rtc devices (and wolfson chip for
->> sam9g20).
->
-> concerning the at91rm9200, what was the amount of bytes you transmitted?
->
+On 21.08.2012 12:41, Afzal Mohammed wrote:
+> This series provides a generic gpmc timing calculation routine. There
+> were three peripherals (OneNAND, tusb6010, smc91x) using custom timing
+> calculations, they are migrated to use the generic timing calculation.
+> 
+> Such a generic routine would help create a driver out of gpmc platform
+> code, which would be peripheral agnostic and thus lead to DT finally.
+> Input to generic timing calculation routine would be gpmc peripheral
+> timings, output - translated timings that gpmc can understand. Later,
+> to DT'ify, gpmc peripheral timings could be passed through DT. Input
+> timings that has been used here are selected such that it represents
+> those that are present in peripheral timing datasheets.
 
-I have only checked that I can communicate with i2c devices so the 
-amount is very low (1-4 bytes).
+What I don't understand yet about this new approach is where the gpmc
+client code should live in. In order to probe the drivers via DT, each
+driver would need to call the gpmc support functions itself, right? Is
+the plan to obsolete helper functions like gpmc_nand_init() and move
+that functionality to the drivers?
 
-> Some months ago I performed some testing[1] with the previous version of
-> the patch and the main conclusion was that the absence of PDC in the
-> AT91RM9200 made this driver unusable in such platform.
->
+I applied these patches locally and would like to help get the NAND
+controller on my AX33xx DT-driven board going. Let me know if I can do
+anything here.
 
-Does the new driver break something? Was it working with the old one?
 
-There are some issues with which are not related to the driver but to 
-the design of the IP. With old I2C versions, using GPIO I2C is recommended.
-
-> Please double check this.
->
-> Thanks in advance,
->
-> Adrian.
->
-> 1 - http://thread.gmane.org/gmane.linux.drivers.i2c/10367/focus=1287445
->
-
-Regards
-
-Ludovic
+Regards,
+Daniel
