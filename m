@@ -1,28 +1,16 @@
 From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Mon, 27 Aug 2012 09:36:51 +0200
-Subject: [PATCH 1/2] tty: serial: imx: console write routing is unsafe on SMP
+Date: Mon, 27 Aug 2012 09:36:52 +0200
+Subject: [PATCH 2/2] tty: serial: imx: don't reinit clock with enabled console
 In-Reply-To: <1346053012-25686-1-git-send-email-dirk.behme@de.bosch.com>
 References: <1346053012-25686-1-git-send-email-dirk.behme@de.bosch.com>
-Message-ID: <1346053012-25686-2-git-send-email-dirk.behme@de.bosch.com>
+Message-ID: <1346053012-25686-3-git-send-email-dirk.behme@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Xinyu Chen <xinyu.chen@freescale.com>
 
-The console feature's write routing is unsafe on SMP with
-the startup/shutdown call.
-
-There could be several consumers of the console
-* the kernel printk
-* the init process using /dev/kmsg to call printk to show log
-* shell, which open /dev/console and write with sys_write()
-
-The shell goes into the normal uart open/write routing,
-but the other two go into the console operations.
-The open routing calls imx serial startup, which will write USR1/2
-register without any lock and critical with imx_console_write call.
-
-Add a spin_lock for startup/shutdown/console_write routing.
+Remove the imx_setup_ufcr() call on startup when CONSOLE enabled,
+as this will cause clock reinit, and output garbage.
 
 This patch is a port from Freescale's Android kernel.
 
@@ -31,76 +19,22 @@ Tested-by: Dirk Behme <dirk.behme@de.bosch.com>
 CC: Shawn Guo <shawn.guo@linaro.org>
 CC: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/tty/serial/imx.c |   12 +++++++++++-
- 1 files changed, 11 insertions(+), 1 deletions(-)
+ drivers/tty/serial/imx.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index d5c689d..908178f 100644
+index 908178f..31ce414 100644
 --- a/drivers/tty/serial/imx.c
 +++ b/drivers/tty/serial/imx.c
-@@ -754,6 +754,7 @@ static int imx_startup(struct uart_port *port)
- 		}
- 	}
+@@ -695,7 +695,9 @@ static int imx_startup(struct uart_port *port)
+ 	int retval;
+ 	unsigned long flags, temp;
  
-+	spin_lock_irqsave(&sport->port.lock, flags);
- 	/*
- 	 * Finally, clear and enable interrupts
- 	 */
-@@ -807,7 +808,6 @@ static int imx_startup(struct uart_port *port)
- 	/*
- 	 * Enable modem status interrupts
- 	 */
--	spin_lock_irqsave(&sport->port.lock,flags);
- 	imx_enable_ms(&sport->port);
- 	spin_unlock_irqrestore(&sport->port.lock,flags);
++#ifndef CONFIG_SERIAL_CORE_CONSOLE
+ 	imx_setup_ufcr(sport, 0);
++#endif
  
-@@ -837,10 +837,13 @@ static void imx_shutdown(struct uart_port *port)
- {
- 	struct imx_port *sport = (struct imx_port *)port;
- 	unsigned long temp;
-+	unsigned long flags;
- 
-+	spin_lock_irqsave(&sport->port.lock, flags);
- 	temp = readl(sport->port.membase + UCR2);
- 	temp &= ~(UCR2_TXEN);
- 	writel(temp, sport->port.membase + UCR2);
-+	spin_unlock_irqrestore(&sport->port.lock, flags);
- 
- 	if (USE_IRDA(sport)) {
- 		struct imxuart_platform_data *pdata;
-@@ -869,12 +872,14 @@ static void imx_shutdown(struct uart_port *port)
- 	 * Disable all interrupts, port and break condition.
- 	 */
- 
-+	spin_lock_irqsave(&sport->port.lock, flags);
- 	temp = readl(sport->port.membase + UCR1);
- 	temp &= ~(UCR1_TXMPTYEN | UCR1_RRDYEN | UCR1_RTSDEN | UCR1_UARTEN);
- 	if (USE_IRDA(sport))
- 		temp &= ~(UCR1_IREN);
- 
- 	writel(temp, sport->port.membase + UCR1);
-+	spin_unlock_irqrestore(&sport->port.lock, flags);
- }
- 
- static void
-@@ -1217,6 +1222,9 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
- 	struct imx_port *sport = imx_ports[co->index];
- 	struct imx_port_ucrs old_ucr;
- 	unsigned int ucr1;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&sport->port.lock, flags);
- 
- 	/*
- 	 *	First, save UCR1/2/3 and then disable interrupts
-@@ -1242,6 +1250,8 @@ imx_console_write(struct console *co, const char *s, unsigned int count)
- 	while (!(readl(sport->port.membase + USR2) & USR2_TXDC));
- 
- 	imx_port_ucrs_restore(&sport->port, &old_ucr);
-+
-+	spin_unlock_irqrestore(&sport->port.lock, flags);
- }
- 
- /*
+ 	/* disable the DREN bit (Data Ready interrupt enable) before
+ 	 * requesting IRQs
 -- 
 1.7.0.4
