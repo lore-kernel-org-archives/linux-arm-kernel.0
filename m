@@ -1,127 +1,30 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Mon, 27 Aug 2012 10:37:42 +0000
-Subject: [PATCH v6 07/10] ARM: OMAP2+: gpmc: generic timing calculation
-In-Reply-To: <50359C64.40603@ti.com>
-References: <cover.1345524670.git.afzal@ti.com>
- <83b963e4ebcc1009a26a8c6419c785ac6d742c0b.1345524670.git.afzal@ti.com>
- <50359C64.40603@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9BA63D@DBDE01.ent.ti.com>
+From: adrian.yanes@aalto.fi (Yanes Martinez Adrian)
+Date: Mon, 27 Aug 2012 10:40:37 +0000
+Subject: [PATCH v11 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <503B4919.6080306@atmel.com>
+References: <cover.1345618760.git.n.voss@weinmann.de>
+ <4f3dcfbf1e8eab3e251ab3558e9e1e9123643928.1345618760.git.n.voss@weinmann.de>,
+ <503B4919.6080306@atmel.com>
+Message-ID: <BC0F374A1C27184AB96177CDFEC2F54225ECC330@EXMDB06.org.aalto.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+Hi Ludovic,
 
-On Thu, Aug 23, 2012 at 08:28:44, Hunter, Jon wrote:
-> On 08/21/2012 05:45 AM, Afzal Mohammed wrote:
+>Tested on at91rm9200, at91sam9261, at91sam9g20 and at91sam9m10 with
+>eeprom, temperature sensor and rtc devices (and wolfson chip for
+>sam9g20).
 
-> > +/* can the cycles be avoided ? */
-> 
-> What is the above comment referring too?
+concerning the at91rm9200, what was the amount of bytes you transmitted?
 
-This was added in the initial stages and refers to the usage of
-cycles in struct gpmc_device_timings. I wanted to avoid usage
-of cycles, but it seems it is required logically as well. This
-was mentioned as a note for future to find out whether at any
-future point of time this can be removed.
+Some months ago I performed some testing[1] with the previous version of
+the patch and the main conclusion was that the absence of PDC in the
+AT91RM9200 made this driver unusable in such platform.
 
-> > +/* Device timings in picoseconds */
-> 
-> Why pico seconds and not nanoseconds? I understand you may need to
-> temporarily convert to pico-secs for rounding, but when providing timing
-> it seems nano-secs is more suitable.
+Please double check this.
 
-For more accuracy, if you see some of the tusb6010 calculation
-are in picoseconds, this can be true for any device although
-only tusb does so. If we hold on to picoseconds till the last
-moment, value would be more accurate. For eg. 300 ps has to be
-used in the case of tusb, and with ns, it can't be accounted for
+Thanks in advance,
 
-> I am a little concerned about the above timings structure. For example,
-> if I am adding support for a new devices it is not clear ...
-> 
-> 1. Which are required
-> 2. Which are applicable for async, sync, address-data multiplexed etc.
-> 3. Exactly how these relate to the fields in the gpmc registers.
+Adrian.
 
-Please see at the end
-
-> 
-> I understand that this is based upon how timings for onenand and tusb
-> are being calculated today, but I am not sure that this is the way to go
-> for all devices. Personally, I would like to see us get away from how
-> those devices are calculating timings for any new device.
-
-You cannot do away with many of the those, as logically they
-are right. Eg. read data should be available at access time,
-assuming a zero data hold time, we can very well derive an
-expression as,
-
-read de-assertion time (oe_off) = access time plus 1 gpmc clock,
-
-and this is what the existing calculations do, and also the
-generic routine. There could be other constraints, but this
-certainly should be one (I do realize that oe_off could be
-optimized to be less than access time, by relying on read
-hold time, then again effect of it would be in similar way
-for different peripherals, but let's forget about
-optimization in the beginning)
-
-> In general, I am concerned that we are abstracting the timings further
-> from the actual register fields. For example, the timings parameter
-> "t_ceasu" is described "address setup to CS valid" which is not
-> incorrect but this value is really just programming the CSONTIME field
-> and so why not call this cs_on?
-
-Timing fields of struct gpmc_device_timings are selected such
-that they should be bindable by DT. At least one of the peripheral
-datasheet has these fields. If user knows timings in terms of
-gpmc values, he can directly use struct gpmc_timings, but
-then all the values should be updated in struct gpmc_timings.
-User should not update some of the values in terms of
-peripheral timings, others in terms of gpmc timings, that
-would make things complex and does not seem the right way
-to me.
-
-cs_on and other gpmc aware timings could be binded by DT, not as
-peripheral timing, but as gpmc timing.
-
-Bindings for peripheral DT timings should be something that
-can be obtained from peripheral datasheet, here accidentally
-it is same as gpmc timings, but not most timings are this way.
-Also there could be other constraints that can come for cs_on,
-even though I have not come across any till now.
-
-> 
-> So although this may consolidate how the timings are calculated today, I
-> am concerned it will be confusing to add timings for a new device. At
-> least if I am calculating timings, I am taking the timing information
-> for the device and translating that to the how I need to program the
-> gpmc register fields.
-
-If I am not wrong, GPMC IP has been present for around a
-decade, and so far I have not come across any generic time
-calculation method that can be applied to all peripherals.
-Getting to work same peripheral for a different gpmc
-frequency is another problem.
-
-Here we are trying to generalize based on the understanding of
-gpmc & peripheral timings, as well as by a kind of reverse
-engineering without most of the hardware or datasheet. Think of
-this as an attempt to create one, let it evolve and become a
-robust one. If a new user want to add a peripheral, let him add
-support, input timings are selected such that it is found in
-peripheral datasheet, if that does not work, let him try
-to add any new timing field or alter existing expression
-as he deems to be proper and verify that it does not break
-others. And I can help provided I am not heavily loaded
-with other works.
-
-And at least for initial users, they are expected to have
-some grasp on how to calculate timings, such a user will
-not be much worried about your 3 concerns above, anyway as
-of now they need to have a good grasp on it.
-
-Meanwhile I will try to document more.
-
-Regards
-Afzal
+1 - http://thread.gmane.org/gmane.linux.drivers.i2c/10367/focus=1287445
