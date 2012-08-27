@@ -1,70 +1,19 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 27 Aug 2012 10:03:45 +0200
-Subject: [GIT PULL] at91: fixes for 3.6 (take 1)
-In-Reply-To: <5037A4F3.9090608@atmel.com>
-References: <5037A4F3.9090608@atmel.com>
-Message-ID: <503B29E1.5080901@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Aug 2012 09:09:13 +0100
+Subject: For buddy system initialization, the holes between banks
+ adjacent will be released to buddy allocator?
+In-Reply-To: <CAFNq8R7fCyD5P4mAA8LGzcOvVynSJa8mOBDwrLOF9mVvo9q5VA@mail.gmail.com>
+References: <CAFNq8R6kBonhW4Q+Zj_6GV7y88pcAUJ_MrYn1nYM9LHtMZqdvQ@mail.gmail.com>
+ <CAFNq8R7fCyD5P4mAA8LGzcOvVynSJa8mOBDwrLOF9mVvo9q5VA@mail.gmail.com>
+Message-ID: <20120827080913.GL18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/24/2012 05:59 PM, Nicolas Ferre :
-> The following changes since commit d9875690d9b89a866022ff49e3fcea892345ad92:
+On Mon, Aug 27, 2012 at 10:42:40AM +0800, Li Haifeng wrote:
+> Just now, I tested it on my ARM development board.
 > 
->   Linux 3.6-rc2 (2012-08-16 14:51:24 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/at91linux/linux-at91.git tags/at91-fixes
-> 
-> for you to fetch changes up to 0d4d1e37ca732615717d4434b58682f81a6bb61c:
-> 
->   ARM: at91/feature-removal-schedule: delay at91_mci removal (2012-08-24 10:45:07 +0200)
-> 
-> ----------------------------------------------------------------
-> Fixes for AT91 related to:
-> - move to sparse IRQ: some drivers were forgotten
-> - a build error in sound driver & a DTS typo
-> - the delay for removal of old at91_mci driver
-> 
-> ----------------------------------------------------------------
-> Bo Shen (1):
->       ARM: at91/dts: remove partial parameter in at91sam9g25ek.dts
-> 
-> Joachim Eastwood (1):
->       ASoC: atmel-ssc: include linux/io.h for raw io
+> The holes between banks does be released to buddy allocator. And the
+> buddy system will allocate holes for thread, which will cause fault.
+> Is it right?
 
-Hi,
-
-As per Mark's suggestion, this one will go through ASoC tree. So I have
-removed it from the tag. I resend a pull request now.
-
-Best regards,
-
-
-> Ludovic Desroches (3):
->       ARM: at91: fix system timer irq issue due to sparse irq support
->       ARM: at91: fix rtc-at91sam9 irq issue due to sparse irq support
->       ARM: at91/feature-removal-schedule: delay at91_mci removal
-> 
-> Nicolas Ferre (1):
->       ARM: at91/clock: fix PLLA overclock warning
-> 
->  Documentation/feature-removal-schedule.txt |    2 +-
->  arch/arm/boot/dts/at91sam9g25ek.dts        |    2 +-
->  arch/arm/mach-at91/at91rm9200_time.c       |    2 +-
->  arch/arm/mach-at91/at91sam9260_devices.c   |    6 +++++-
->  arch/arm/mach-at91/at91sam9261_devices.c   |    6 +++++-
->  arch/arm/mach-at91/at91sam9263_devices.c   |   10 ++++++++--
->  arch/arm/mach-at91/at91sam9g45_devices.c   |    6 +++++-
->  arch/arm/mach-at91/at91sam9rl_devices.c    |    6 +++++-
->  arch/arm/mach-at91/clock.c                 |   12 ++++++++++++
->  drivers/rtc/rtc-at91sam9.c                 |   22 +++++++++++++++-------
->  include/linux/atmel-ssc.h                  |    1 +
->  11 files changed, 59 insertions(+), 16 deletions(-)
-> 
-> Thanks, best regards,
-> 
-
-
--- 
-Nicolas Ferre
+Could you rephrase your question please?
