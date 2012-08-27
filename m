@@ -1,29 +1,62 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 27 Aug 2012 21:45:23 +0800
-Subject: Question about ION carveout heap support partial cache flush
-In-Reply-To: <CAMj5BkjqUNV2o_BMyHH8C5ZCsUf6qChamc6h4H-a9otEGVBx4A@mail.gmail.com>
-References: <CAMj5BkgffAW6azUjwz+iCF1tBLmBDRBvBjR-_fTr=4G=h+BLZw@mail.gmail.com>
- <CAN1soZyZ=4wjKkVrk5--2U_8SeT7qee9QAfhss7NgqtQAz+RrA@mail.gmail.com>
- <CAMj5BkiVq9ayJjUrwh3S-gDfezUTNiPFW-xd_dsbTJYTyLv2WQ@mail.gmail.com>
- <20120827082914.GN18957@n2100.arm.linux.org.uk>
- <CAMj5BkjqUNV2o_BMyHH8C5ZCsUf6qChamc6h4H-a9otEGVBx4A@mail.gmail.com>
-Message-ID: <CAN1soZyPp4--G3GjSpy8JZViFE4ed8dSyRnxgBfORam21SzpDQ@mail.gmail.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Mon, 27 Aug 2012 15:45:49 +0200
+Subject: [PATCH V2 0/4] clk: Convert ARM ux500 to common clock
+Message-ID: <1346075153-14180-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 4:56 PM, zhangfei gao <zhangfei.gao@gmail.com> wrote:
->
-> Any suggestion of flushing cache according to cache line, instead of PAGE_SIZE.
-> In order to get specific area, we use addr from user directly, which
-> may not be the PAGE start.
->
-> We have some usage case to flush cache according to cache line.
-> CPU - cache - ddr - gpu
-> 1. For correctness, driver only flush used size, if align to PAGE_SIZE,
-> other area may be flushed by mistake.
-> 2. for efficiency, cache line align will be perfered.
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-I think that maybe flushing PAGE_SIZE is acceptable. ION/PMEM is always designed
-for large memory sharing. Maybe you can monitor the partial flushing
-user case, I doubt
-they're always flushing several pages, not several cachelines.
+This converts the ux500 machine specific clocks to the common
+clock framework. Old clock code are then removed from the ux500
+machine directory.
+
+This first version contains PRCMU and PRCC clock implementation.
+Additional clock types shall be implemented as the next step,
+although the u8500 platform is able to boot without having to
+manage these.
+
+Clock definitions are setup for u8500 and are prepared to be
+setup for u9540 and as well for u8540.
+
+This patchseries is based upon Linux 3.6 rc.2.
+
+Compile wise a cross dependency exist to the arm-soc-tree for
+the last patch (PATCH 4) affecting the ux500 machine code files.
+Hopefully Arnd Bergmann can assist in getting those patches, pushed
+by Linus Walleij merged prior to these onces.
+
+Ulf Hansson (4):
+  clk: ux500: Adapt PRCMU and PRCC clocks for common clk
+  clk: ux500: First version of clock definitions for ux500
+  clk: ux500: Clock definitions for u8500
+  ARM: ux500: Switch to use common clock framework
+
+ arch/arm/mach-ux500/Kconfig             |    1 +
+ arch/arm/mach-ux500/Makefile            |    2 +-
+ arch/arm/mach-ux500/clock.c             |  715 -------------------------------
+ arch/arm/mach-ux500/clock.h             |  164 -------
+ arch/arm/mach-ux500/cpu.c               |   14 +-
+ drivers/clk/Makefile                    |    1 +
+ drivers/clk/ux500/Makefile              |   12 +
+ drivers/clk/ux500/clk-prcc.c            |  164 +++++++
+ drivers/clk/ux500/clk-prcmu.c           |  238 ++++++++++
+ drivers/clk/ux500/clk.h                 |   43 ++
+ drivers/clk/ux500/u8500_clk.c           |  473 ++++++++++++++++++++
+ drivers/clk/ux500/u8540_clk.c           |   21 +
+ drivers/clk/ux500/u9540_clk.c           |   21 +
+ include/linux/platform_data/clk-ux500.h |   17 +
+ 14 files changed, 1000 insertions(+), 886 deletions(-)
+ delete mode 100644 arch/arm/mach-ux500/clock.c
+ delete mode 100644 arch/arm/mach-ux500/clock.h
+ create mode 100644 drivers/clk/ux500/Makefile
+ create mode 100644 drivers/clk/ux500/clk-prcc.c
+ create mode 100644 drivers/clk/ux500/clk-prcmu.c
+ create mode 100644 drivers/clk/ux500/clk.h
+ create mode 100644 drivers/clk/ux500/u8500_clk.c
+ create mode 100644 drivers/clk/ux500/u8540_clk.c
+ create mode 100644 drivers/clk/ux500/u9540_clk.c
+ create mode 100644 include/linux/platform_data/clk-ux500.h
+
+-- 
+1.7.10
