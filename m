@@ -1,41 +1,23 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 27 Aug 2012 11:06:47 -0700
-Subject: ASoC: SAMSUNG: Change Kconfig to support all EXYNOSs
-In-Reply-To: <003001cd8361$7016a110$5043e330$@samsung.com>
-References: <003001cd8361$7016a110$5043e330$@samsung.com>
-Message-ID: <503BB737.7090004@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 27 Aug 2012 11:08:25 -0700
+Subject: [PATCH V2 4/6] ASoC: Davinci: McASP: add device tree support for
+ McASP
+In-Reply-To: <1346074004-22172-5-git-send-email-gururaja.hebbar@ti.com>
+References: <1346074004-22172-1-git-send-email-gururaja.hebbar@ti.com>
+ <1346074004-22172-5-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <20120827180824.GR4339@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/26/12 01:04, ??? wrote:
-> All EXYNOSs use SND_SOC_SAMSUNG configuration.
-> This patch change Kconfig to support all EXYNOSs like EXYNOS4 and EXYNOS5.
-> 
-> Signed-off-by: Sangsu Park<sangsu4u.park@samsung.com>
-> ---
->   sound/soc/samsung/Kconfig |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-> index f17dd25..9e64ae6 100644
-> --- a/sound/soc/samsung/Kconfig
-> +++ b/sound/soc/samsung/Kconfig
-> @@ -1,6 +1,6 @@
->   config SND_SOC_SAMSUNG
->   	tristate "ASoC support for Samsung"
-> -	depends on ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_S5P64X0 ||
-> ARCH_EXYNOS4
-> +	depends on ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_S5P64X0 ||
-> ARCH_EXYNOS
+On Mon, Aug 27, 2012 at 06:56:42PM +0530, Hebbar, Gururaja wrote:
 
-Hmm, all of Samsung stuff is available...so how about?
+> +- sram-size-playback : size of sram to be allocated during playback
+> +- sram-size-capture  : size of sram to be allocated during capture
 
-+	depends on PLAT_SAMSUNG
+These smell like runtime/policy configuration rather than fixed
+properties of the device so it probably shouldn't appear in the device
+tree, ideally at some point in the future we'll be able to work out some
+wonderful way of automatically allocating the resources.
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+That said if the rest of the series looks OK I'll apply this but it'd be
+nice to get these numbers from somewhere else.
