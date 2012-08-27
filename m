@@ -1,29 +1,49 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Mon, 27 Aug 2012 11:46:02 +0000
-Subject: [PATCH v6 07/10] ARM: OMAP2+: gpmc: generic timing calculation
-In-Reply-To: <20120824195446.GV11011@atomide.com>
-References: <cover.1345524670.git.afzal@ti.com>
- <83b963e4ebcc1009a26a8c6419c785ac6d742c0b.1345524670.git.afzal@ti.com>
- <50359C64.40603@ti.com> <20120824195446.GV11011@atomide.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9BA684@DBDE01.ent.ti.com>
+From: ludovic.desroches@atmel.com (ludovic.desroches)
+Date: Mon, 27 Aug 2012 14:04:12 +0200
+Subject: [PATCH v11 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <BC0F374A1C27184AB96177CDFEC2F54225ECC330@EXMDB06.org.aalto.fi>
+References: <cover.1345618760.git.n.voss@weinmann.de>
+ <4f3dcfbf1e8eab3e251ab3558e9e1e9123643928.1345618760.git.n.voss@weinmann.de>,
+ <503B4919.6080306@atmel.com>
+ <BC0F374A1C27184AB96177CDFEC2F54225ECC330@EXMDB06.org.aalto.fi>
+Message-ID: <503B623C.4030304@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi Adrian,
 
-On Sat, Aug 25, 2012 at 01:24:47, Tony Lindgren wrote:
+Le 08/27/2012 12:40 PM, Yanes Martinez Adrian a ?crit :
+> Hi Ludovic,
+>
+>> Tested on at91rm9200, at91sam9261, at91sam9g20 and at91sam9m10 with
+>> eeprom, temperature sensor and rtc devices (and wolfson chip for
+>> sam9g20).
+>
+> concerning the at91rm9200, what was the amount of bytes you transmitted?
+>
 
-> Yes agreed. Also as some values make sense only in cycles, converting them
-> back and forth to time is wrong. So at least some values should have an
-> option to specify them in cycles directly, and then ignore any time based
-> values.
+I have only checked that I can communicate with i2c devices so the 
+amount is very low (1-4 bytes).
 
-Which values in struct gpmc_device_timings are you referring to ?
+> Some months ago I performed some testing[1] with the previous version of
+> the patch and the main conclusion was that the absence of PDC in the
+> AT91RM9200 made this driver unusable in such platform.
+>
 
-Values that need to have an option to specify in cycles has been provided
-such an option, while not updating time based field value, you can
-achieve what you mentioned above. But if you want that to be handled in
-in generic routine, I will do so.
+Does the new driver break something? Was it working with the old one?
+
+There are some issues with which are not related to the driver but to 
+the design of the IP. With old I2C versions, using GPIO I2C is recommended.
+
+> Please double check this.
+>
+> Thanks in advance,
+>
+> Adrian.
+>
+> 1 - http://thread.gmane.org/gmane.linux.drivers.i2c/10367/focus=1287445
+>
 
 Regards
-Afzal
+
+Ludovic
