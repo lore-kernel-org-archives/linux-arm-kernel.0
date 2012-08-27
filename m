@@ -1,97 +1,48 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 27 Aug 2012 13:02:32 -0700
-Subject: [PATCH 03/11] pinctrl: mvebu: kirkwood pinctrl driver
-In-Reply-To: <503BC830.7090705@gmail.com>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1344689809-6223-4-git-send-email-sebastian.hesselbarth@gmail.com>
- <CACRpkdbG4jkFcVP_6AmAZzciffQCamKXw7PcFnTdccyq7AMa8A@mail.gmail.com>
- <343192fa3698ed0575444a5603ed734d@codethink.co.uk>
- <503BC830.7090705@gmail.com>
-Message-ID: <503BD258.8050209@wwwdotorg.org>
+Date: Mon, 27 Aug 2012 13:06:29 -0700
+Subject: [PATCH 2/6] brcmfmac: Handling the interrupt in ISR directly
+ for non-OOB
+In-Reply-To: <503B9F31.5050502@broadcom.com>
+References: <1346063114-30361-1-git-send-email-wni@nvidia.com>
+ <1346063114-30361-3-git-send-email-wni@nvidia.com>
+ <503B9F31.5050502@broadcom.com>
+Message-ID: <503BD345.6030501@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2012 12:19 PM, Sebastian Hesselbarth wrote:
-> On 08/27/2012 03:43 PM, Ben Dooks wrote:
->> On 20/08/2012 06:49, Linus Walleij wrote:
->>> On Sat, Aug 11, 2012 at 2:56 PM, Sebastian Hesselbarth
->>> <sebastian.hesselbarth@gmail.com> wrote:
->>> (...)
->>>> diff --git a/drivers/pinctrl/pinctrl-kirkwood.c
->>>> b/drivers/pinctrl/pinctrl-kirkwood.c
->>>> +static struct mvebu_pinctrl_soc_info kirkwood_pinctrl_info;
->>>> +
->>>> +static struct of_device_id kirkwood_pinctrl_of_match[] __devinitdata
->>>> = {
->>>> + { .compatible = "marvell,88f6180-pinctrl",
->>>> + .data = (void *)VARIANT_MV88F6180 },
->>>> + { .compatible = "marvell,88f6190-pinctrl",
->>>> + .data = (void *)VARIANT_MV88F6190 },
->>>> + { .compatible = "marvell,88f6192-pinctrl",
->>>> + .data = (void *)VARIANT_MV88F6192 },
->>>> + { .compatible = "marvell,88f6281-pinctrl",
->>>> + .data = (void *)VARIANT_MV88F6281 },
->>>> + { .compatible = "marvell,88f6282-pinctrl",
->>>> + .data = (void *)VARIANT_MV88F6282 },
->>>> + { }
->>>> +};
->>>
->>> I'm thinking this variant should maybe be an enum... unless it is
->>> strongly established somewhere in Orion/Marvell stuff.
->>>
->>>> +static int __devinit kirkwood_pinctrl_probe(struct platform_device
->>>> *pdev)
->>>> +{
->>>> + struct mvebu_pinctrl_soc_info *soc = &kirkwood_pinctrl_info;
->>>> + const struct of_device_id *match =
->>>> + of_match_device(kirkwood_pinctrl_of_match, &pdev->dev);
->>>> +
->>>> + if (match) {
->>>> + soc->variant = (unsigned)match->data & 0xff;
->>>> + switch (soc->variant) {
->>>> + case VARIANT_MV88F6180:
->>>> + soc->controls = mv88f6180_mpp_controls;
->>>> + soc->ncontrols = ARRAY_SIZE(mv88f6180_mpp_controls);
->>>> + soc->modes = mv88f6xxx_mpp_modes;
->>>> + soc->nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes);
->>>> + soc->gpioranges = mv88f6180_gpio_ranges;
->>>> + soc->ngpioranges = ARRAY_SIZE(mv88f6180_gpio_ranges);
->>>> + break;
->>>> + case VARIANT_MV88F6190:
->>>> + case VARIANT_MV88F6192:
->>>> + soc->controls = mv88f619x_mpp_controls;
->>>> + soc->ncontrols = ARRAY_SIZE(mv88f619x_mpp_controls);
->>>> + soc->modes = mv88f6xxx_mpp_modes;
->>>> + soc->nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes);
->>>> + soc->gpioranges = mv88f619x_gpio_ranges;
->>>> + soc->ngpioranges = ARRAY_SIZE(mv88f619x_gpio_ranges);
->>>> + break;
->>>> + case VARIANT_MV88F6281:
->>>> + case VARIANT_MV88F6282:
->>>> + soc->controls = mv88f628x_mpp_controls;
->>>> + soc->ncontrols = ARRAY_SIZE(mv88f628x_mpp_controls);
->>>> + soc->modes = mv88f6xxx_mpp_modes;
->>>> + soc->nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes);
->>>> + soc->gpioranges = mv88f628x_gpio_ranges;
->>>> + soc->ngpioranges = ARRAY_SIZE(mv88f628x_gpio_ranges);
->>>> + break;
->>>> + }
->>>> + pdev->dev.platform_data = soc;
->>>> + }
->>>> + return mvebu_pinctrl_probe(pdev);
->>>> +}
->>
->> Why not have structures defining the soc-> parameters and use that in the
->> of_match list?
+On 08/27/2012 09:24 AM, Arend van Spriel wrote:
+> On 08/27/2012 12:25 PM, Wei Ni wrote:
+>> In case of inband interrupts, if we handle the interrupt in dpc thread,
+>> two level of thread switching takes place to process wifi interrupts.
+>> One in SDHCI driver and the other in Wifi driver. This may cause the
+>> system
+>> instability.
 > 
-> Ben,
+> Looking into the sdhci/mmc code indeed shows that the brcmfmac irq
+> handler is not called in true IRQ context. So the dpc thread may add
+> unnecessary complexity, but to me there is not indication that there is
+> a stability issue.
 > 
-> functionally it is equivalent and IMHO using soc structs doesn't improve
-> readability here. I there any other good reason to have structs for each
-> soc?
+>> Because the SDHCI calls sdio_irq_thread() to handle the irq, this
+>> thread locks
+>> mmc host and calls wifi handler. It expects WiFi handler to be quick and
+>> enables sdio interrupt from card at end. If wifi handler defers this
+>> work for
+>> a different thread, sdio_irq_thread() will be stuck on next wifi
+>> interrupt
+>> since mmc lock is not freed.
+> 
+> Not sure if I can follow this explanation. The isr is called with host
+> claimed (by sdio_irq_thread) and all it does is at a linked list member
+> and signal the dpc thread. After doing this the host is released.
 
-Well, it does change from 6 assignments down to one, and remove the need
-for a switch statement - i.e. all of the code quoted above becomes just
-roughly:
+Is the issue something like the ISR handler or first level of threading
+does:
 
-*soc = *match->data;
+* Trigger DPC
+* Re-enable interrupt
+
+So that the interrupt then fires again before the triggered DPC can run
+to handle/clear it, thus causing an interrupt storm?
+
+Whereas handling the interrupt directly prevents this race condition?
