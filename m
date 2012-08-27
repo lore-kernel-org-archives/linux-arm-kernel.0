@@ -1,33 +1,16 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 27 Aug 2012 13:23:28 -0300
-Subject: [PATCH 2/3] ARM: mx28evk: Add LRADC support
-In-Reply-To: <1346084609-31407-1-git-send-email-fabio.estevam@freescale.com>
-References: <1346084609-31407-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1346084609-31407-2-git-send-email-fabio.estevam@freescale.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 27 Aug 2012 09:23:46 -0700
+Subject: [PATCH] ASoC: atmel-ssc: include linux/io.h for raw io
+In-Reply-To: <1345738494-4014-1-git-send-email-nicolas.ferre@atmel.com>
+References: <20120823152324.GI7995@opensource.wolfsonmicro.com>
+ <1345738494-4014-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20120827162346.GB4339@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add LRADC support.
+On Thu, Aug 23, 2012 at 06:14:54PM +0200, Nicolas Ferre wrote:
+> From: Joachim Eastwood <manabian@gmail.com>
+> 
+> Include linux/io.h for raw io operations in atmel-scc header.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx28-evk.dts |    4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index 8a9a2f4..ed92d61 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -145,6 +145,10 @@
- 				status = "okay";
- 			};
- 
-+			lradc at 80050000 {
-+				status = "okay";
-+			};
-+
- 			i2c0: i2c at 80058000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&i2c0_pins_a>;
--- 
-1.7.9.5
+Applied, thanks.
