@@ -1,52 +1,84 @@
 From: wni@nvidia.com (Wei Ni)
-Date: Mon, 27 Aug 2012 18:25:12 +0800
-Subject: [PATCH 4/6] ARM: dt: t20 ventana: set pinmux and power for wlan
+Date: Mon, 27 Aug 2012 18:25:13 +0800
+Subject: [PATCH 5/6] ARM: dt: t30 cardhu: set pinmux and power for wlan
 In-Reply-To: <1346063114-30361-1-git-send-email-wni@nvidia.com>
 References: <1346063114-30361-1-git-send-email-wni@nvidia.com>
-Message-ID: <1346063114-30361-5-git-send-email-wni@nvidia.com>
+Message-ID: <1346063114-30361-6-git-send-email-wni@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Configure pinmux as required for WiFi.
-Enable the SDHCI1 controller, which is connectted to the WiFi module.
+Enable the SDHCI1 controller. This is connectted to the WiFi module.
+For now, always enable the regulator that provides power to the Wifi module.
 
 Signed-off-by: Wei Ni <wni@nvidia.com>
 ---
- arch/arm/boot/dts/tegra20-ventana.dts |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/tegra30-cardhu.dtsi |   32 ++++++++++++++++++++++++++++++++
+ 1 files changed, 32 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
-index 4ec6b4c..3cbe54c 100644
---- a/arch/arm/boot/dts/tegra20-ventana.dts
-+++ b/arch/arm/boot/dts/tegra20-ventana.dts
-@@ -237,6 +237,16 @@
- 					"ld23_22";
- 				nvidia,pull = <1>;
+diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+index 4794693..ed9b530 100644
+--- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
++++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+@@ -52,6 +52,22 @@
+ 				nvidia,pull = <2>;
+ 				nvidia,tristate = <0>;
  			};
-+			drive_sdio1 {
-+				nvidia,pins = "drive_sdio1";
++			sdmmc3_clk_pa6 {
++				nvidia,pins = "sdmmc3_clk_pa6";
++				nvidia,function = "sdmmc3";
++				nvidia,pull = <0>;
++				nvidia,tristate = <0>;
++			};
++			sdmmc3_cmd_pa7 {
++				nvidia,pins =	"sdmmc3_cmd_pa7",
++						"sdmmc3_dat0_pb7",
++						"sdmmc3_dat1_pb6",
++						"sdmmc3_dat2_pb5",
++						"sdmmc3_dat3_pb4";
++				nvidia,function = "sdmmc3";
++				nvidia,pull = <2>;
++				nvidia,tristate = <0>;
++			};
+ 			sdmmc4_clk_pcc4 {
+ 				nvidia,pins =	"sdmmc4_clk_pcc4",
+ 						"sdmmc4_rst_n_pcc3";
+@@ -81,6 +97,15 @@
+ 				nvidia,pull = <0>;
+ 				nvidia,tristate = <0>;
+ 			};
++			sdio3 {
++				nvidia,pins = "drive_sdio3";
 +				nvidia,high-speed-mode = <0>;
-+				nvidia,schmitt = <1>;
-+				nvidia,low-power-mode = <3>;
-+				nvidia,pull-down-strength = <31>;
-+				nvidia,pull-up-strength = <31>;
-+				nvidia,slew-rate-rising = <3>;
-+				nvidia,slew-rate-falling = <3>;
++				nvidia,schmitt = <0>;
++				nvidia,pull-down-strength = <46>;
++				nvidia,pull-up-strength = <42>;
++				nvidia,slew-rate-rising = <1>;
++				nvidia,slew-rate-falling = <1>;
 +			};
  		};
  	};
  
-@@ -454,6 +464,11 @@
- 		status = "okay";
+@@ -292,6 +317,11 @@
+ 		bus-width = <4>;
  	};
  
-+	sdhci at c8000000 {
++	sdhci at 78000400 {
 +		status = "okay";
-+		power-gpios = <&gpio 86 0>; /* gpio PK6 */
++		power-gpios = <&gpio 28 0>; /* gpio PD4 */
 +	};
 +
- 	sdhci at c8000400 {
+ 	sdhci at 78000600 {
  		status = "okay";
- 		cd-gpios = <&gpio 69 0>; /* gpio PI5 */
+ 		bus-width = <8>;
+@@ -407,6 +437,8 @@
+ 			regulator-name = "vdd_com";
+ 			regulator-min-microvolt = <3300000>;
+ 			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++			regulator-boot-on;
+ 			enable-active-high;
+ 			gpio = <&gpio 24 0>; /* gpio PD0 */
+ 			vin-supply = <&sys_3v3_reg>;
 -- 
 1.7.1
