@@ -1,218 +1,62 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Aug 2012 16:22:57 -0700
-Subject: [PATCH v2 1/4] pinctrl: add samsung pinctrl and gpiolib driver
-In-Reply-To: <CAJuYYwQu7OXQEWCumuMeSKJ2RZD7e==pLKDE1=bvPgfXtO=AUw@mail.gmail.com>
-References: <1345060656-32201-1-git-send-email-thomas.abraham@linaro.org>
- <1345060656-32201-2-git-send-email-thomas.abraham@linaro.org>
- <CACRpkdYqPYesgE-YxPLZqROw1T2fsPWR6R+aDTTz2=XbP7oe9A@mail.gmail.com>
- <CAJuYYwQu7OXQEWCumuMeSKJ2RZD7e==pLKDE1=bvPgfXtO=AUw@mail.gmail.com>
-Message-ID: <CACRpkdbVY1mmzb9H4ZfmVScW1ZNf1FTMLdgo5UFgqTftycMyrQ@mail.gmail.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Tue, 28 Aug 2012 02:26:13 +0300
+Subject: [PATCH] arm: omap: ratelimit omap_l3_smx error log spam
+In-Reply-To: <CAMQu2gz9HE0xEoW7gu257rpLWdCUpt7N6GQNQzWVhFb-A+69hg@mail.gmail.com>
+References: <1346101403-5882-1-git-send-email-aaro.koskinen@iki.fi>
+ <CAMQu2gyEctrq_3K8W6VahMW-ODOiv7TjrBfPTkZqNGJ+0m9ozw@mail.gmail.com>
+ <20120827220254.GA783@harshnoise.musicnaut.iki.fi>
+ <CAMQu2gz9HE0xEoW7gu257rpLWdCUpt7N6GQNQzWVhFb-A+69hg@mail.gmail.com>
+Message-ID: <20120827232613.GB783@harshnoise.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2012 at 9:22 PM, Thomas Abraham
-<thomas.abraham@linaro.org> wrote:
+On Mon, Aug 27, 2012 at 03:12:07PM -0700, Shilimkar, Santosh wrote:
+> On Mon, Aug 27, 2012 at 3:02 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
+> > Hi,
+> >
+> > On Mon, Aug 27, 2012 at 02:35:57PM -0700, Shilimkar, Santosh wrote:
+> >> > -       pr_err("%s seen by %s %s at address %x\n",
+> >> > +       pr_err_ratelimited("%s seen by %s %s at address %x\n",
+> >> >                         omap3_l3_code_string(code),
+> >> >                         omap3_l3_initiator_string(initid),
+> >> >                         multi ? "Multiple Errors" : "", address);
+> >> > -       WARN_ON(1);
+> >> > +       WARN_ON_ONCE(1);
+> >> >
+> >> The issue needs to be fixed instead of WARN_ON_ONCE() and then
+> >> just moving ahead. Interconnect in bad states is really bad state and you
+> >> won't have reliable operations post that on SOC.
+> >
+> > How printing megabytes of identical stack traces helps anything?
+> >
+> It just says repeatedly and  loudly... Fix the issue :-)
+> 
+> > This has been there always (since the L3 driver was added) on every boot
+> > with N950/N9 (which BTW are HS devices, not sure if that has anything
+> > to do with it). There is no apparent effect on device functionality,
+> > at least nothing unusual has been observed...
+> >
+> I assumed this is secure device when I saw the SRAM memset is causing the
+> issue.
+> 
+> > Is there any documentation how to interpret and debug this error report?
+> >
+> The issue could be, there is memset tried on Secure portion of SRAM or
+> CPU speculatively accessed adjacent SRAM region of public SRAM which
+> is secure and hence the error.
 
->>> +  - samsung,pin-pud: Pull up/down configuration.
->>> +  - samsung,pin-drv: Drive strength configuration.
->>> +  - samsung,pin-pud-pdn: Pull up/down configuration in power down mode.
->>> +  - samsung,pin-drv-pdn: Drive strength configuration in power down mode.
->>
->> This looks a bit scary, as it seems to be orthogonal to the pin config
->> interface. I.e. this will be programmed "behind the back" of the
->> pin config system. However as long as the pin config implementation
->> reads back these things from the registers it will work, too.
->
-> These properties are converted to a PIN_MAP_TYPE_CONFIGS_GROUP map
-> type and stored in a instance of 'struct pinctrl_map'. These can be
-> read back from the registers and reverse-mapped as well.
+Thanks, that makes sense.
 
-OK
+> If you just bypass the SRAM init [1], does the issue go away ?
 
-> All the dt bindings defined and used in the Samsung pinctrl driver are
-> first translated into pinctrl subystem defined data structures and
-> then used. Hence, there are no register configurations done that skip
-> over the pinctrl subsystem (except for the gpio/wakeup interrupts).
+I tried bypassing the whole SRAM init, but the device does not seem to
+boot up at all.
 
-OK fine.
+If I comment out the memset alone, then it boots and the issue is gone:
 
->> In the U300 and Ux500 I explicitly use pin config hogs to set up
->> the pin configuration, and when we enter a state such as
->> "default" the mux setting and config settings are set from the
->> framework separately.
->>
->> See for example:
->> arch/arm/mach-ux500/board-mop500-pins.c
->>
->> This example is using platform data but it should be trivial to do with
->> device tree.
->>
->> I think the Tegra also works this way. Can you elaborate on
->> why you need this static setup from the device tree instead
->> of using default states?
->
-> Sorry, I did not understand this question.
++#if 0
+	memset_io(omap_sram_base + SRAM_BOOTLOADER_SZ, 0,
+		  omap_sram_size - SRAM_BOOTLOADER_SZ);
++#endif
 
-You answered above, no problem.
-
->>> +       pinctrl_0: pinctrl at 11400000 {
->>> +               compatible = "samsung,pinctrl-exynos4210";
->>> +               reg = <0x11400000 0x1000>;
->>> +               interrupts = <0 47 0>;
->>> +
->>> +               uart0_data: uart0-data {
->>> +                       samsung,pins = "gpa0-0", "gpa0-1";
->>> +                       samsung,pin-function = <2>;
->>> +                       samsung,pin-pud = <0>;
->>> +                       samsung,pin-drv = <0>;
->>> +               };
->>
->> This setup needs to be associated with a certain state, it's possible to
->> do in the code or directly in the device tree.
->>
->> I.e. these settings for pin-pud and pin-drv needs to belong to a
->> certain pin config state, typically the state named "default"
->
-> Yes, I agree. So, for example, the uart device node would have
->
->                     uart at 13800000 {
->                                compatilble = " .... ";
->                                <rest of the properties here>
->
->                                pinctrl-names = "default";
->                                pinctrl-0 - <&uart0_data>;
->                     };
->
-> The uart driver during probe can then call
->
->                    devm_pinctrl_get_select_default(&pdev->dev);
->
-> For the example above, this call will set the 'mux', 'pud' and 'drv'
-> values to gpa-0 and gpa-1 pins.
-
-OK perfect, that's how it should work.
-
->>> +/* list of all possible config options supported */
->>> +struct pin_config {
->>> +       char            *prop_cfg;
->>> +       unsigned int    cfg_type;
->>> +} pcfgs[] = {
->>> +       { "samsung,pin-pud", PINCFG_TYPE_PUD },
->>> +       { "samsung,pin-drv", PINCFG_TYPE_DRV },
->>> +       { "samsung,pin-pud-pdn", PINCFG_TYPE_CON_PND },
->>> +       { "samsung,pin-drv-pdn", PINCFG_TYPE_PUD_PND },
->>> +};
->>
->> Hmmmmm it looks very much like this controller could make use of
->> the generic pinconf library, but it's not mandatory so just a suggestion.
->
-> Ok. The last two entries in the above table are Samsung specific and
-> not covered by generic-pinconf. So, I am not sure if it can be added
-> to generic-pinconf.
-
-What is so Samsung-specific about them?
-
-If you tell us the electrical property of setting them we can figure out
-if they should be generic or not...
-
-> For now, since you are not enforcing the use of
-> generic-pinconf, I will keep it the way it is now.
-
-Sure that's OK.
-
->>> +       /* Allocate memory for pin group name. The pin group name is derived
->>> +        * from the node name from which these map entries are be created.
->>> +        */
->>> +       gname = kzalloc(strlen(np->name) + 4, GFP_KERNEL);
->>
->> Why +4? I would have suspected +1 for the null terminator...
->
-> The name of the pin group is derived from the node name and hence
-> strlen(np->name). To this name, "-grp" is appended to imply that this
-> is a group. Hence +4 is used. I will replace +4 with probably
-> strlen(PINGRP_SUFFIX) where PINGRP_SUFFIX is defined as "-grp".
-
-Aha OK I get it.
-
->>> +/* reading pin pull up/down and driver strength settings not implemented */
->>
->> OK why not? It seems very simple and straight-forward.
->> Just read the same registers and switch() then return...
->
-> Ok, I will do that. I did not see how those would be used and hence skipped it.
-
-One good usecase is to look at the state of pins in debugfs.
-
->>> +static int __devinit samsung_pinctrl_probe(struct platform_device *pdev)
->> (...)
->>> +       if (ctrl->eint_gpio_init)
->>> +               ctrl->eint_gpio_init(drvdata);
->>> +       if (ctrl->eint_wkup_init)
->>> +               ctrl->eint_wkup_init(drvdata);
->>
->> So this stuff I'm doing in the default states instead.
->
-> These callbacks setup the irq domain and irq_chip for gpio and wakeup
-> interrupts. These are Samsung specific and are dealt with outside of
-> the pinctrl subsystem framework.
-
-Aha I get it, OK.
-
->>> +       unsigned int            eint_type;
->>
->> Shouldn't this be some kund of enum if it denotes a type?
->
-> It was done to reduce adding new data types.
-
-Oh I like new data types if they make the code easier to read
-and reduce the risk for errors so just go ahead :-)
-
->>> +/**
->>> + * struct samsung_pin_ctrl: represent a pin controller.
->>> + * @pin_banks: list of pin banks included in this controller.
->>> + * @nr_banks: number of pin banks.
->>> + * @base: starting system wide pin number.
->>> + * @nr_pins: number of pins supported by the controller.
->>> + * @nr_gint: number of external gpio interrupts supported.
->>> + * @nr_wint: number of external wakeup interrupts supported.
->>> + * @geint_con: offset of the ext-gpio controller registers.
->>
->> If it's an offset why not name it geint_con_offset?
->
-> I wanted to keep the lines within 80 columns. Splitting a line into
-> two lines started making the code look unreadable.
-
-OK no big deal.
-
->>> +       int                     (*eint_gpio_init)(struct samsung_pinctrl_drv_data *);
->>> +       int                     (*eint_wkup_init)(struct samsung_pinctrl_drv_data *);
->>
->> I guess you need to set up these using auxdata?
->
-> No, these are populated by the platform (SoC) specific data that the
-> Samsung pinctrl driver gets during probe. Due to the differences in
-> the gpio and wakeup interrupt controllers on Samsung SoC's, the setup
-> and implementations of these  interrupts have been made SoC specific.
-> The pinctrl driver is responsible only for initiating the setup of the
-> gpio/wakeup interrupts.
-
-I see, OK.
-
->>> +/**
->>> + * struct samsung_pinctrl_drv_data: wrapper for holding driver data together.
->>> + * @virt_base: register base address of the controller.
->>> + * @dev: device instance representing the controller.
->>> + * @irq: interrpt number used by the controller to notify gpio interrupts.
->>> + * @ctrl: pin controller instance managed by the driver.
->>> + * @pctl: pin controller descriptor registered with the pinctrl subsystem.
->>
->> Maybe name this pctl_desc then?
->
-> This name is used to in multiple places in the code and the longer the
-> name, there is always the case of the line spilling over 80
-> characters.
-
-OK whatever... looking formward to next iteration!
-
-Yours,
-Linus Walleij
+A.
