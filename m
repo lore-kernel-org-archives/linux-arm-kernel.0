@@ -1,71 +1,197 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 27 Aug 2012 15:12:07 -0700
-Subject: [PATCH] arm: omap: ratelimit omap_l3_smx error log spam
-In-Reply-To: <20120827220254.GA783@harshnoise.musicnaut.iki.fi>
-References: <1346101403-5882-1-git-send-email-aaro.koskinen@iki.fi>
- <CAMQu2gyEctrq_3K8W6VahMW-ODOiv7TjrBfPTkZqNGJ+0m9ozw@mail.gmail.com>
- <20120827220254.GA783@harshnoise.musicnaut.iki.fi>
-Message-ID: <CAMQu2gz9HE0xEoW7gu257rpLWdCUpt7N6GQNQzWVhFb-A+69hg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 28 Aug 2012 06:15:35 +0800
+Subject: [PATCH v2 4/7] regulator: anatop-regulator: convert to use
+ syscon to access anatop register
+In-Reply-To: <1346052285-4344-5-git-send-email-b29396@freescale.com>
+References: <1346052285-4344-1-git-send-email-b29396@freescale.com>
+ <1346052285-4344-5-git-send-email-b29396@freescale.com>
+Message-ID: <20120827221532.GC2281@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 3:02 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-> Hi,
->
-> On Mon, Aug 27, 2012 at 02:35:57PM -0700, Shilimkar, Santosh wrote:
->> > -       pr_err("%s seen by %s %s at address %x\n",
->> > +       pr_err_ratelimited("%s seen by %s %s at address %x\n",
->> >                         omap3_l3_code_string(code),
->> >                         omap3_l3_initiator_string(initid),
->> >                         multi ? "Multiple Errors" : "", address);
->> > -       WARN_ON(1);
->> > +       WARN_ON_ONCE(1);
->> >
->> The issue needs to be fixed instead of WARN_ON_ONCE() and then
->> just moving ahead. Interconnect in bad states is really bad state and you
->> won't have reliable operations post that on SOC.
->
-> How printing megabytes of identical stack traces helps anything?
->
-It just says repeatedly and  loudly... Fix the issue :-)
+On Mon, Aug 27, 2012 at 03:24:42PM +0800, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> Using syscon to access anatop register.
+> 
+> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> ---
+> ChangeLog v1-v2:
+>  * update to use generic regmap api
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi         |    6 ++++++
+>  drivers/regulator/Kconfig            |    2 +-
+>  drivers/regulator/anatop-regulator.c |   25 +++++++++++++++----------
+>  3 files changed, 22 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index db3fa15..da2bb71 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -395,6 +395,7 @@
+>  					anatop-min-bit-val = <4>;
+>  					anatop-min-voltage = <800000>;
+>  					anatop-max-voltage = <1375000>;
+> +					fsl,anatop = <&anatop>;
+>  				};
+>  
+>  				regulator-3p0 at 120 {
+> @@ -409,6 +410,7 @@
+>  					anatop-min-bit-val = <0>;
+>  					anatop-min-voltage = <2625000>;
+>  					anatop-max-voltage = <3400000>;
+> +					fsl,anatop = <&anatop>;
+>  				};
+>  
+>  				regulator-2p5 at 130 {
+> @@ -423,6 +425,7 @@
+>  					anatop-min-bit-val = <0>;
+>  					anatop-min-voltage = <2000000>;
+>  					anatop-max-voltage = <2750000>;
+> +					fsl,anatop = <&anatop>;
+>  				};
+>  
+>  				regulator-vddcore at 140 {
+> @@ -437,6 +440,7 @@
+>  					anatop-min-bit-val = <1>;
+>  					anatop-min-voltage = <725000>;
+>  					anatop-max-voltage = <1450000>;
+> +					fsl,anatop = <&anatop>;
+>  				};
+>  
+>  				regulator-vddpu at 140 {
+> @@ -451,6 +455,7 @@
+>  					anatop-min-bit-val = <1>;
+>  					anatop-min-voltage = <725000>;
+>  					anatop-max-voltage = <1450000>;
+> +					fsl,anatop = <&anatop>;
+>  				};
+>  
+>  				regulator-vddsoc at 140 {
+> @@ -465,6 +470,7 @@
+>  					anatop-min-bit-val = <1>;
+>  					anatop-min-voltage = <725000>;
+>  					anatop-max-voltage = <1450000>;
+> +					fsl,anatop = <&anatop>;
+>  				};
+>  			};
+>  
+> diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+> index 4e932cc..2ae1d97 100644
+> --- a/drivers/regulator/Kconfig
+> +++ b/drivers/regulator/Kconfig
+> @@ -112,7 +112,7 @@ config REGULATOR_DA9052
+>  
+>  config REGULATOR_ANATOP
+>  	tristate "Freescale i.MX on-chip ANATOP LDO regulators"
+> -	depends on MFD_ANATOP
+> +	depends on MFD_SYSCON
+>  	help
+>  	  Say y here to support Freescale i.MX on-chip ANATOP LDOs
+>  	  regulators. It is recommended that this option be
+> diff --git a/drivers/regulator/anatop-regulator.c b/drivers/regulator/anatop-regulator.c
+> index ce0fe72..71586a7 100644
+> --- a/drivers/regulator/anatop-regulator.c
+> +++ b/drivers/regulator/anatop-regulator.c
+> @@ -21,19 +21,20 @@
+>  #include <linux/slab.h>
+>  #include <linux/device.h>
+>  #include <linux/module.h>
+> +#include <linux/mfd/syscon.h>
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> -#include <linux/mfd/anatop.h>
+> +#include <linux/regmap.h>
+>  #include <linux/regulator/driver.h>
+>  #include <linux/regulator/of_regulator.h>
+>  
+>  struct anatop_regulator {
+>  	const char *name;
+>  	u32 control_reg;
+> -	struct anatop *mfd;
+> +	struct regmap *anatop;
+>  	int vol_bit_shift;
+>  	int vol_bit_width;
+>  	int min_bit_val;
+> @@ -43,7 +44,7 @@ struct anatop_regulator {
+>  	struct regulator_init_data *initdata;
+>  };
+>  
+> -static int anatop_set_voltage_sel(struct regulator_dev *reg, unsigned selector)
+> +static int anatop_regmap_set_voltage_sel(struct regulator_dev *reg, unsigned selector)
+>  {
+>  	struct anatop_regulator *anatop_reg = rdev_get_drvdata(reg);
+>  	u32 val, mask;
+> @@ -56,12 +57,13 @@ static int anatop_set_voltage_sel(struct regulator_dev *reg, unsigned selector)
+>  	mask = ((1 << anatop_reg->vol_bit_width) - 1) <<
+>  		anatop_reg->vol_bit_shift;
+>  	val <<= anatop_reg->vol_bit_shift;
+> -	anatop_write_reg(anatop_reg->mfd, anatop_reg->control_reg, val, mask);
+> +	regmap_update_bits(anatop_reg->anatop, anatop_reg->control_reg,
+> +				mask, val);
+>  
+>  	return 0;
+>  }
+>  
+> -static int anatop_get_voltage_sel(struct regulator_dev *reg)
+> +static int anatop_regmap_get_voltage_sel(struct regulator_dev *reg)
+>  {
+>  	struct anatop_regulator *anatop_reg = rdev_get_drvdata(reg);
+>  	u32 val, mask;
+> @@ -69,7 +71,7 @@ static int anatop_get_voltage_sel(struct regulator_dev *reg)
+>  	if (!anatop_reg->control_reg)
+>  		return -ENOTSUPP;
+>  
+> -	val = anatop_read_reg(anatop_reg->mfd, anatop_reg->control_reg);
+> +	regmap_read(anatop_reg->anatop, anatop_reg->control_reg, &val);
+>  	mask = ((1 << anatop_reg->vol_bit_width) - 1) <<
+>  		anatop_reg->vol_bit_shift;
+>  	val = (val & mask) >> anatop_reg->vol_bit_shift;
+> @@ -78,8 +80,8 @@ static int anatop_get_voltage_sel(struct regulator_dev *reg)
+>  }
+>  
+>  static struct regulator_ops anatop_rops = {
+> -	.set_voltage_sel = anatop_set_voltage_sel,
+> -	.get_voltage_sel = anatop_get_voltage_sel,
+> +	.set_voltage_sel = anatop_regmap_set_voltage_sel,
+> +	.get_voltage_sel = anatop_regmap_get_voltage_sel,
+>  	.list_voltage = regulator_list_voltage_linear,
+>  	.map_voltage = regulator_map_voltage_linear,
+>  };
+> @@ -92,7 +94,6 @@ static int __devinit anatop_regulator_probe(struct platform_device *pdev)
+>  	struct regulator_dev *rdev;
+>  	struct anatop_regulator *sreg;
+>  	struct regulator_init_data *initdata;
+> -	struct anatop *anatopmfd = dev_get_drvdata(pdev->dev.parent);
+>  	struct regulator_config config = { };
+>  	int ret = 0;
+>  
+> @@ -109,7 +110,11 @@ static int __devinit anatop_regulator_probe(struct platform_device *pdev)
+>  	rdesc->ops = &anatop_rops;
+>  	rdesc->type = REGULATOR_VOLTAGE;
+>  	rdesc->owner = THIS_MODULE;
+> -	sreg->mfd = anatopmfd;
+> +
+> +	sreg->anatop = syscon_regmap_lookup_by_phandle(np, "fsl,anatop");
+> +	if (IS_ERR(sreg->anatop))
+> +		return PTR_ERR(sreg->anatop);
+> +
 
-> This has been there always (since the L3 driver was added) on every boot
-> with N950/N9 (which BTW are HS devices, not sure if that has anything
-> to do with it). There is no apparent effect on device functionality,
-> at least nothing unusual has been observed...
->
-I assumed this is secure device when I saw the SRAM memset is causing the
-issue.
+All the anatop regulators are child nodes of anatop.  It looks a little
+odd to use phandle there.  of_get_parent should just works.
 
-> Is there any documentation how to interpret and debug this error report?
->
-The issue could be, there is memset tried on Secure portion of SRAM or
-CPU speculatively accessed adjacent SRAM region of public SRAM which
-is secure and hence the error.
+>  	ret = of_property_read_u32(np, "anatop-reg-offset",
+>  				   &sreg->control_reg);
+>  	if (ret) {
+> -- 
+> 1.7.0.4
+> 
+> 
 
-If you just bypass the SRAM init [1], does the issue go away ?
-
-Regards
-Santosh
-
-[1]
-diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
-index 766181c..305e6de 100644
---- a/arch/arm/plat-omap/sram.c
-+++ b/arch/arm/plat-omap/sram.c
-@@ -384,6 +384,7 @@ static inline int am33xx_sram_init(void)
-
- int __init omap_sram_init(void)
- {
-+#if 0
-        omap_detect_sram();
-        omap_map_sram();
-
-@@ -397,6 +398,6 @@ int __init omap_sram_init(void)
-                am33xx_sram_init();
-        else if (cpu_is_omap34xx())
-                omap34xx_sram_init();
--
-+#endif
-        return 0;
- }
+-- 
+Regards,
+Shawn
