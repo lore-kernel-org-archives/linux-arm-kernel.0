@@ -1,74 +1,78 @@
 From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Mon, 27 Aug 2012 18:56:40 +0530
-Subject: [PATCH V2 2/6] ARM: Davinci: Remove references to davinci pcm
-In-Reply-To: <1346074004-22172-1-git-send-email-gururaja.hebbar@ti.com>
-References: <1346074004-22172-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <1346074004-22172-3-git-send-email-gururaja.hebbar@ti.com>
+Date: Mon, 27 Aug 2012 18:56:38 +0530
+Subject: [PATCH V2 0/6]  ARM/ASoC: Davinci: Add Device Tree Support
+Message-ID: <1346074004-22172-1-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since davinci-pcm is no more a platform_driver but helper to register
-"platform" pcm driver, remove  davinci-pcm device registration
+This patch-set is a cumulative of below tasks
+1. Split asp header into platform and audio specific
+   Davinci driver is shared by few OMAP platforms (like TI81xx, AM335x).
+   Splitting asp header into Davinci platform specific and Audio specific helps
+   to share them across platforms.
 
-Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
----
+2. Add DT support for Davinci Audio Module (McASP, machine, pcm & Codec)
+
+
+This patch was tested on AM18x Board (Tested to check if the commits doesn't
+break on compile or runtime) and is based on repo at 
+http://git.kernel.org/?p=linux/kernel/git/broonie/sound.git;
+a=shortlog;h=refs/heads/for-3.7 (v3.6-rc2)
+
+Note:
+Matt Porter from TI is working on DMA engine conversion of DaVinci EDMA
+support and DT conversion of DMA parts will be taken up post that is
+complete.
+Since Audio requires DMA to work, this patch set does not yet provide
+complete functionality required to use sound on DT-based platforms, but
+is a step towards that direction.
+
 Changes from V1:
-	- New Commit. 
+	- Instanciate seudo-device (davinci-pcm) directly from DAI driver rather
+	  than having a separate virtual-device registered
+	- add more explanation to DT parameters
+	- Change DT parameter from "ti,codec-clock" to "ti,codec-clock-rate"
+	- use standard DT GPIO reference by phandle to populate gpio based DT
+	  parameters
+	- Dont return err if some DT parameters are missing. They will be
+	  treated as 0.
+	- Through Error warning if num-serializer != "serial-dir" array size
+	- Coding Style correction
 
-:100644 100644 783eab6... 4735d64... M	arch/arm/mach-davinci/devices-da8xx.c
-:100644 100644 d2f96662.. 70056fb... M	arch/arm/mach-davinci/devices.c
- arch/arm/mach-davinci/devices-da8xx.c |    7 -------
- arch/arm/mach-davinci/devices.c       |   11 -----------
- 2 files changed, 0 insertions(+), 18 deletions(-)
+Hebbar, Gururaja (6):
+  ASoC: davinci: davinci-pcm does not need to be a plaform_driver
+  ARM: Davinci: Remove references to davinci pcm
+  ASoC/ARM: Davinci: McASP: split asp header into platform and audio
+    specific
+  ASoC: Davinci: McASP: add device tree support for McASP
+  ASoC: Davinci: machine: Add device tree binding
+  ASoC: tlv320aic3x: Add device tree bindings
 
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index 783eab6..4735d64 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -505,15 +505,8 @@ static struct platform_device da850_mcasp_device = {
- 	.resource	= da850_mcasp_resources,
- };
- 
--static struct platform_device davinci_pcm_device = {
--	.name	= "davinci-pcm-audio",
--	.id	= -1,
--};
--
- void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata)
- {
--	platform_device_register(&davinci_pcm_device);
--
- 	/* DA830/OMAP-L137 has 3 instances of McASP */
- 	if (cpu_is_davinci_da830() && id == 1) {
- 		da830_mcasp1_device.dev.platform_data = pdata;
-diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
-index d2f9666..70056fb 100644
---- a/arch/arm/mach-davinci/devices.c
-+++ b/arch/arm/mach-davinci/devices.c
-@@ -313,16 +313,6 @@ static void davinci_init_wdt(void)
- 
- /*-------------------------------------------------------------------------*/
- 
--static struct platform_device davinci_pcm_device = {
--	.name		= "davinci-pcm-audio",
--	.id		= -1,
--};
--
--static void davinci_init_pcm(void)
--{
--	platform_device_register(&davinci_pcm_device);
--}
--
- /*-------------------------------------------------------------------------*/
- 
- struct davinci_timer_instance davinci_timer_instance[2] = {
-@@ -345,7 +335,6 @@ static int __init davinci_init_devices(void)
- 	/* please keep these calls, and their implementations above,
- 	 * in alphabetical order so they're easier to sort through.
- 	 */
--	davinci_init_pcm();
- 	davinci_init_wdt();
- 
- 	return 0;
--- 
-1.7.1
+ .../bindings/sound/davinci-evm-audio.txt           |   63 ++++++
+ .../bindings/sound/davinci-mcasp-audio.txt         |   44 +++++
+ .../devicetree/bindings/sound/tlv320aic3x.txt      |   20 ++
+ arch/arm/mach-davinci/asp.h                        |   49 +++++
+ arch/arm/mach-davinci/davinci.h                    |    3 +-
+ arch/arm/mach-davinci/devices-da8xx.c              |    8 +-
+ arch/arm/mach-davinci/devices.c                    |   11 -
+ arch/arm/mach-davinci/dm355.c                      |    2 +-
+ arch/arm/mach-davinci/dm365.c                      |    2 +-
+ arch/arm/mach-davinci/dm644x.c                     |    2 +-
+ arch/arm/mach-davinci/dm646x.c                     |    2 +-
+ arch/arm/mach-davinci/include/mach/da8xx.h         |    2 +-
+ .../linux/platform_data/davinci_asp.h              |   73 ++-----
+ sound/soc/codecs/tlv320aic3x.c                     |   31 +++
+ sound/soc/davinci/davinci-evm.c                    |  203 +++++++++++++++++---
+ sound/soc/davinci/davinci-i2s.c                    |   13 +-
+ sound/soc/davinci/davinci-mcasp.c                  |  134 +++++++++++++-
+ sound/soc/davinci/davinci-mcasp.h                  |    3 +-
+ sound/soc/davinci/davinci-pcm.c                    |   24 +--
+ sound/soc/davinci/davinci-pcm.h                    |    6 +-
+ sound/soc/davinci/davinci-sffsdr.c                 |    2 +-
+ sound/soc/davinci/davinci-vcif.c                   |    8 +
+ 22 files changed, 573 insertions(+), 132 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/davinci-evm-audio.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/davinci-mcasp-audio.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/tlv320aic3x.txt
+ create mode 100644 arch/arm/mach-davinci/asp.h
+ rename arch/arm/mach-davinci/include/mach/asp.h => include/linux/platform_data/davinci_asp.h (56%)
