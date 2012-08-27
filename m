@@ -1,54 +1,34 @@
-From: nareshgbhat@gmail.com (Naresh Bhat)
-Date: Mon, 27 Aug 2012 16:16:02 +0530
-Subject: Boot v3.5 kernel on QEMU for vexpress-a15 architecture with cpu as
- cortex-a15
-Message-ID: <CAJXQGfLUyP=J6=Asd8eM6wcHN90Vc52=wekM=16XoH_D_KXPbA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Aug 2012 11:54:48 +0100
+Subject: For buddy system initialization, the holes between banks
+ adjacent will be released to buddy allocator?
+In-Reply-To: <CAFNq8R6TgfdAbDDTQTyt6hncA+OHAy7SkNpzdGuABcAtaegTiw@mail.gmail.com>
+References: <CAFNq8R6kBonhW4Q+Zj_6GV7y88pcAUJ_MrYn1nYM9LHtMZqdvQ@mail.gmail.com>
+ <CAFNq8R7fCyD5P4mAA8LGzcOvVynSJa8mOBDwrLOF9mVvo9q5VA@mail.gmail.com>
+ <20120827080913.GL18957@n2100.arm.linux.org.uk>
+ <CAFNq8R6TgfdAbDDTQTyt6hncA+OHAy7SkNpzdGuABcAtaegTiw@mail.gmail.com>
+Message-ID: <20120827105448.GO18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+On Mon, Aug 27, 2012 at 06:30:42PM +0800, Li Haifeng wrote:
+> 2012/8/27 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > On Mon, Aug 27, 2012 at 10:42:40AM +0800, Li Haifeng wrote:
+> >> Just now, I tested it on my ARM development board.
+> >>
+> >> The holes between banks does be released to buddy allocator. And the
+> >> buddy system will allocate holes for thread, which will cause fault.
+> >> Is it right?
+> >
+> > Could you rephrase your question please?
+> 
+> The code below is to release free memory to buddy allocator, according
+> to node_bootmem_map.
+> 
+> The lines 180~181 get the low memory's range, and the range includes holes.
+> But while releasing the memory to buddy allocator, the code doesn't
+> prevent the holes from releasing to the buddy allocator. So, if the
+> holes are allocated to thread, fault will happen.
 
-I want to boot kernel.org v3.5 image (zImage) using QEMU with machine
-architecture as vexpress-a15 and cpu as cortex-a15 on my Fedora-17
-desktop machine.  I have followed the below method but resulted
-nothing.  Can anybody please point me in a right direction ?
-
-1. Clone the Torvalds kernel
-   # git clone git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
-
-2. Checkout to v3.5-rc7 branch
-    # git branch linux-3.5-rc7 v3.5-rc7
-
-3. Cross compile the kernel
-    # make ARCH=arm CROSS_COMPILE=arm-cortex_a15-linux-gnueabi-
-vexpress_defconfig
-    # make ARCH=arm CROSS_COMPILE=arm-cortex_a15-linux-gnueabi- uImage modules
-
-4. Grab Pawe?'s DTS tree: git://linux-arm.org/arm-dts.git
-
-5. From your kernel tree, run:
-    # ./script/dtc/dtc -O dtb -o rtsm_ve-cortex_a15x4.dtb
-wherever_your_arm-dts_tree_is/fast_models/rtsm_ve-cortex_a15x4.dts
-    # cat rtsm_ve-cortex_a15x2.dtb >>arch/arm/boot/zImage
-
-6.  Try to boot using QEMU
-
-# qemu-system-arm -kernel arch/arm/boot/zImage -dtb
-./rtsm_ve-cortex_a15x4.dtb -m 512 -M vexpress-a15 -cpu cortex-a15
--append "console=ttyAMA0"
-oss: Could not initialize DAC
-oss: Failed to open `/dev/dsp'
-oss: Reason: No such file or directory
-oss: Could not initialize DAC
-oss: Failed to open `/dev/dsp'
-oss: Reason: No such file or directory
-audio: Failed to create voice `lm4549.out'
-.................
-........................
-
-I am just a beginner in QEMU.  Am I doing any steps wrong ?? can you
-please suggest right method ? I will appreciate your help.
-
--- Thanks and Regards
-"For things to change, we must change"
--Naresh Bhat
+The whole purpose _is_ to allow these pages to be re-used, rather than
+being tied up uselessly in the map where they're not being used.
