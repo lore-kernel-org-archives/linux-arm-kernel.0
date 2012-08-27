@@ -1,80 +1,71 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 27 Aug 2012 15:10:30 -0700
-Subject: [PATCH v5 2/2] ARM: EXYNOS: SMC instruction (aka firmware) support
-In-Reply-To: <20120824083357.GA25384@july>
-References: <20120824083357.GA25384@july>
-Message-ID: <20120827221030.GC7431@lumpy>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 27 Aug 2012 15:12:07 -0700
+Subject: [PATCH] arm: omap: ratelimit omap_l3_smx error log spam
+In-Reply-To: <20120827220254.GA783@harshnoise.musicnaut.iki.fi>
+References: <1346101403-5882-1-git-send-email-aaro.koskinen@iki.fi>
+ <CAMQu2gyEctrq_3K8W6VahMW-ODOiv7TjrBfPTkZqNGJ+0m9ozw@mail.gmail.com>
+ <20120827220254.GA783@harshnoise.musicnaut.iki.fi>
+Message-ID: <CAMQu2gz9HE0xEoW7gu257rpLWdCUpt7N6GQNQzWVhFb-A+69hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Aug 27, 2012 at 3:02 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
+> Hi,
+>
+> On Mon, Aug 27, 2012 at 02:35:57PM -0700, Shilimkar, Santosh wrote:
+>> > -       pr_err("%s seen by %s %s at address %x\n",
+>> > +       pr_err_ratelimited("%s seen by %s %s at address %x\n",
+>> >                         omap3_l3_code_string(code),
+>> >                         omap3_l3_initiator_string(initid),
+>> >                         multi ? "Multiple Errors" : "", address);
+>> > -       WARN_ON(1);
+>> > +       WARN_ON_ONCE(1);
+>> >
+>> The issue needs to be fixed instead of WARN_ON_ONCE() and then
+>> just moving ahead. Interconnect in bad states is really bad state and you
+>> won't have reliable operations post that on SOC.
+>
+> How printing megabytes of identical stack traces helps anything?
+>
+It just says repeatedly and  loudly... Fix the issue :-)
 
-See below.
+> This has been there always (since the L3 driver was added) on every boot
+> with N950/N9 (which BTW are HS devices, not sure if that has anything
+> to do with it). There is no apparent effect on device functionality,
+> at least nothing unusual has been observed...
+>
+I assumed this is secure device when I saw the SRAM memset is causing the
+issue.
 
-On Fri, Aug 24, 2012 at 05:33:57PM +0900, Kyungmin Park wrote:
+> Is there any documentation how to interpret and debug this error report?
+>
+The issue could be, there is memset tried on Secure portion of SRAM or
+CPU speculatively accessed adjacent SRAM region of public SRAM which
+is secure and hence the error.
 
-> diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-> index 9b58024..8ee779c 100644
-> --- a/arch/arm/mach-exynos/Makefile
-> +++ b/arch/arm/mach-exynos/Makefile
-> @@ -30,6 +30,11 @@ obj-$(CONFIG_EXYNOS4_MCT)	+= mct.o
->  
->  obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
->  
-> +obj-$(CONFIG_ARM_FIRMWARE)	+= exynos-smc.o firmware.o
-> +
-> +plus_sec := $(call as-instr,.arch_extension sec,+sec)
-> +AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
+If you just bypass the SRAM init [1], does the issue go away ?
 
-Again, no need for a config option here.
+Regards
+Santosh
 
-> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
-> new file mode 100644
-> index 0000000..a144593
-> --- /dev/null
-> +++ b/arch/arm/mach-exynos/firmware.c
-> @@ -0,0 +1,37 @@
-> +/*
-> + *  Copyright (C) 2012 Samsung Electronics.
-> + *  Kyungmin Park <kyungmin.park@samsung.com>
-> + *
-> + * This program is free software,you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +
-> +#include <asm/firmware.h>
-> +
-> +#include "smc.h"
-> +
-> +static int exynos_do_idle(void)
-> +{
-> +        exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
-> +        return 0;
-> +}
-> +
-> +static void exynos_cpu_boot(int cpu)
-> +{
-> +	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
-> +}
-> +
-> +static struct firmware_ops exynos_firmware_ops __initdata = {
-> +	.do_idle	= exynos_do_idle,
-> +	.cpu_boot	= exynos_cpu_boot,
-> +};
-> +
-> +int __init exynos_firmware_init(void)
-> +{
-> +	firmware_ops = exynos_firmware_ops;
-> +	return 0;
-> +}
+[1]
+diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+index 766181c..305e6de 100644
+--- a/arch/arm/plat-omap/sram.c
++++ b/arch/arm/plat-omap/sram.c
+@@ -384,6 +384,7 @@ static inline int am33xx_sram_init(void)
 
-If you add a check for SMC presence/execution mode here, then you can
-make this a runtime instead of boot time option, thus making it possible
-to build a kernel that boots and runs both with and without SMC support.
+ int __init omap_sram_init(void)
+ {
++#if 0
+        omap_detect_sram();
+        omap_map_sram();
 
-
--Olof
+@@ -397,6 +398,6 @@ int __init omap_sram_init(void)
+                am33xx_sram_init();
+        else if (cpu_is_omap34xx())
+                omap34xx_sram_init();
+-
++#endif
+        return 0;
+ }
