@@ -1,25 +1,60 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 27 Aug 2012 11:19:40 -0700
-Subject: [PATCH V2 5/6] ASoC: Davinci: machine: Add device tree binding
-In-Reply-To: <1346074004-22172-6-git-send-email-gururaja.hebbar@ti.com>
-References: <1346074004-22172-1-git-send-email-gururaja.hebbar@ti.com>
- <1346074004-22172-6-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <20120827181939.GX4339@opensource.wolfsonmicro.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Mon, 27 Aug 2012 11:20:10 -0700
+Subject: [PATCH 2/2] tty: serial: imx: don't reinit clock with enabled
+ console
+In-Reply-To: <1346053012-25686-3-git-send-email-dirk.behme@de.bosch.com>
+References: <1346053012-25686-1-git-send-email-dirk.behme@de.bosch.com>
+ <1346053012-25686-3-git-send-email-dirk.behme@de.bosch.com>
+Message-ID: <503BBA5A.8040609@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 06:56:43PM +0530, Hebbar, Gururaja wrote:
-> Device tree support for tlv320aic3x CODEC driver
+On 8/27/2012 12:36 AM, Dirk Behme wrote:
+> From: Xinyu Chen <xinyu.chen@freescale.com>
+>
+> Remove the imx_setup_ufcr() call on startup when CONSOLE enabled,
+> as this will cause clock reinit, and output garbage.
+>
+> This patch is a port from Freescale's Android kernel.
+>
+> Signed-off-by: Xinyu Chen <xinyu.chen@freescale.com>
+> Tested-by: Dirk Behme <dirk.behme@de.bosch.com>
+> CC: Shawn Guo <shawn.guo@linaro.org>
+> CC: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>   drivers/tty/serial/imx.c |    2 ++
+>   1 files changed, 2 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index 908178f..31ce414 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -695,7 +695,9 @@ static int imx_startup(struct uart_port *port)
+>   	int retval;
+>   	unsigned long flags, temp;
+>   
+> +#ifndef CONFIG_SERIAL_CORE_CONSOLE
+>   	imx_setup_ufcr(sport, 0);
+> +#endif
+>   
+>   	/* disable the DREN bit (Data Ready interrupt enable) before
+>   	 * requesting IRQs
 
-Not really for the CODEC - this is a machine driver.
 
-> +- dai-data		: A list of DAI data used by SOC code to register
-> +			  DAI, Codecs platform.
-> +			  The string index "should" be as shown below.
-> +dai-data =
-> +"<DAI Name>", 		"<DAI Stream Name>",
-> +"<CODEC DAI Name>",	"<true if evm_aic3x_init is required, else false>",
-> +"<evm ops required (evm_ops or evm_spdif_ops)>";
+I'd rather do something like this
 
-What do these different ops do - how would the user figure it out or if
-they're needed at all?
+static int imx_setup_ufcr(struct imx_port *sport, unsigned int mode)
+{
+         unsigned int val;
+
+         /* set receiver / transmitter trigger level. */
+         val = readl(sport->port.membase + UFCR) & UFCR_RFDIV;
+         val |= TXTL << 10 | RXTL;
+         writel(val, sport->port.membase + UFCR);
+         return 0;
+}
+
+There is no need for imx_setup_ufcr to change divisor.
+
+
+Troy
