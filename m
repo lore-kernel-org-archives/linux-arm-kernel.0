@@ -1,46 +1,35 @@
-From: jaccon.bastiaansen@gmail.com (Jaccon Bastiaansen)
-Date: Mon, 27 Aug 2012 23:53:51 +0200
-Subject: [PATCH v2] cs89x0 : packet reception not working
-Message-ID: <1346104431-3784-1-git-send-email-jaccon.bastiaansen@gmail.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Tue, 28 Aug 2012 01:02:54 +0300
+Subject: [PATCH] arm: omap: ratelimit omap_l3_smx error log spam
+In-Reply-To: <CAMQu2gyEctrq_3K8W6VahMW-ODOiv7TjrBfPTkZqNGJ+0m9ozw@mail.gmail.com>
+References: <1346101403-5882-1-git-send-email-aaro.koskinen@iki.fi>
+ <CAMQu2gyEctrq_3K8W6VahMW-ODOiv7TjrBfPTkZqNGJ+0m9ozw@mail.gmail.com>
+Message-ID: <20120827220254.GA783@harshnoise.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RxCFG register of the CS89x0 could be configured incorrectly
-(because of misplaced parentheses), resulting in the disabling
-of packet reception.
+Hi,
 
-Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
----
- drivers/net/ethernet/cirrus/cs89x0.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+On Mon, Aug 27, 2012 at 02:35:57PM -0700, Shilimkar, Santosh wrote:
+> > -       pr_err("%s seen by %s %s at address %x\n",
+> > +       pr_err_ratelimited("%s seen by %s %s at address %x\n",
+> >                         omap3_l3_code_string(code),
+> >                         omap3_l3_initiator_string(initid),
+> >                         multi ? "Multiple Errors" : "", address);
+> > -       WARN_ON(1);
+> > +       WARN_ON_ONCE(1);
+> >
+> The issue needs to be fixed instead of WARN_ON_ONCE() and then
+> just moving ahead. Interconnect in bad states is really bad state and you
+> won't have reliable operations post that on SOC.
 
-diff --git a/drivers/net/ethernet/cirrus/cs89x0.c b/drivers/net/ethernet/cirrus/cs89x0.c
-index 845b202..1384469 100644
---- a/drivers/net/ethernet/cirrus/cs89x0.c
-+++ b/drivers/net/ethernet/cirrus/cs89x0.c
-@@ -1243,6 +1243,7 @@ static void set_multicast_list(struct net_device *dev)
- {
- 	struct net_local *lp = netdev_priv(dev);
- 	unsigned long flags;
-+	u16 cfg;
- 
- 	spin_lock_irqsave(&lp->lock, flags);
- 	if (dev->flags & IFF_PROMISC)
-@@ -1260,11 +1261,10 @@ static void set_multicast_list(struct net_device *dev)
- 	/* in promiscuous mode, we accept errored packets,
- 	 * so we have to enable interrupts on them also
- 	 */
--	writereg(dev, PP_RxCFG,
--		 (lp->curr_rx_cfg |
--		  (lp->rx_mode == RX_ALL_ACCEPT)
--		  ? (RX_CRC_ERROR_ENBL | RX_RUNT_ENBL | RX_EXTRA_DATA_ENBL)
--		  : 0));
-+	cfg = lp->curr_rx_cfg;
-+	if (lp->rx_mode == RX_ALL_ACCEPT)
-+		cfg |= RX_CRC_ERROR_ENBL | RX_RUNT_ENBL | RX_EXTRA_DATA_ENBL;
-+	writereg(dev, PP_RxCFG, cfg);
- 	spin_unlock_irqrestore(&lp->lock, flags);
- }
- 
--- 
-1.7.1
+How printing megabytes of identical stack traces helps anything?
+
+This has been there always (since the L3 driver was added) on every boot
+with N950/N9 (which BTW are HS devices, not sure if that has anything
+to do with it). There is no apparent effect on device functionality,
+at least nothing unusual has been observed...
+
+Is there any documentation how to interpret and debug this error report?
+
+A.
