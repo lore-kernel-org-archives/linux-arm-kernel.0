@@ -1,35 +1,29 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 27 Aug 2012 16:39:59 -0300
-Subject: [PATCH] ARM: mx28evk: Add I2C EEPROM support
-Message-ID: <1346096399-10114-1-git-send-email-fabio.estevam@freescale.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 27 Aug 2012 16:46:58 -0300
+Subject: [PATCH 1/3] ARM: mx28evk: Add SPI flash support
+In-Reply-To: <201208271858.16842.marex@denx.de>
+References: <1346084609-31407-1-git-send-email-fabio.estevam@freescale.com>
+ <201208271858.16842.marex@denx.de>
+Message-ID: <CAOMZO5BfPnFXShGQx7eB1JcTfq39j_4iDsdd-heLBdsDfF7WJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mx28evk has a free slot U50 that can be used to populate an I2C EEPROM.
+On Mon, Aug 27, 2012 at 1:58 PM, Marek Vasut <marex@denx.de> wrote:
 
-Add support for it.
+>> +                     ssp2: ssp at 80014000 {
+>> +                             #address-cells = <1>;
+>> +                             #size-cells = <0>;
+>> +                             compatible = "fsl,imx28-spi";
+>> +                             pinctrl-names = "default";
+>> +                             pinctrl-0 = <&spi2_pins_a>;
+>> +                             status = "okay";
+>> +
+>> +                             flash: m25p80 at 0 {
+>
+> Shouldn't this also be sst25vf016b at 0 ?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx28-evk.dts |    6 ++++++
- 1 file changed, 6 insertions(+)
+The alias is still m25p80 in this case.
 
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index ed92d61..a0ad71c 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -161,6 +161,12 @@
- 					VDDIO-supply = <&reg_3p3v>;
- 
- 				};
-+
-+				at24 at 51 {
-+					compatible = "at24,24c32";
-+					pagesize = <32>;
-+					reg = <0x51>;
-+				};
- 			};
- 
- 			pwm: pwm at 80064000 {
--- 
-1.7.9.5
+Regards,
+
+Fabio Estevam
