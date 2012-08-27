@@ -1,36 +1,54 @@
-From: ccross@android.com (Colin Cross)
-Date: Sun, 26 Aug 2012 15:46:54 -0700
-Subject: [PATCH 0/2] ARM: enable dumping stacks for CONFIG_SMP
-Message-ID: <1346021216-21979-1-git-send-email-ccross@android.com>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Mon, 27 Aug 2012 09:19:02 +0800
+Subject: [PATCH V5 0/5] clk: mmp: add clock framework for mmp
+In-Reply-To: <20120825002151.18366.99434@nucleus>
+References: <1345431315-8037-1-git-send-email-xiechao.mail@gmail.com>
+ <20120825002151.18366.99434@nucleus>
+Message-ID: <CADApbehotHB7JSCHdo_eoTb08C5Pe6ewh7whwckQTyuCcMM=BQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This topic has come up before, see
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/102458
-for the previous discussion.
+On Sat, Aug 25, 2012 at 8:21 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Chao Xie (2012-08-19 19:55:10)
+>> From: Chao Xie <chao.xie@marvell.com>
+>>  arch/arm/mach-mmp/Kconfig    |    3 +
+>>  drivers/clk/Makefile         |    3 +
+>>  drivers/clk/mmp/Makefile     |    9 +
+>>  drivers/clk/mmp/clk-apbc.c   |  152 ++++++++++++++
+>>  drivers/clk/mmp/clk-apmu.c   |   97 +++++++++
+>>  drivers/clk/mmp/clk-frac.c   |  153 ++++++++++++++
+>>  drivers/clk/mmp/clk-mmp2.c   |  449 ++++++++++++++++++++++++++++++++++++++++++
+>>  drivers/clk/mmp/clk-pxa168.c |  346 ++++++++++++++++++++++++++++++++
+>>  drivers/clk/mmp/clk-pxa910.c |  320 ++++++++++++++++++++++++++++++
+>>  drivers/clk/mmp/clk.h        |   35 ++++
+>
+> Looks like you are not removing your arch/arm/mach-mmp/clock.c.  Is that
+> intentional?
+>
+> When I apply your series against v3.6-rc3 I find that compilation breaks
+> with mmp2_defconfig due to conflicting definitions for the clk api
+> (clk_enable, clk_set_rate, etc).  This is not surprising since your
+> legacy clock code is neither deleted nor removed from compilation
+> conditionally by checking for CONFIG_COMMON_CLK.
+>
+> Did I somehow manage to misapply your patches or should your patches
+> have removed the arch-specific clock framework as well?
+>
+hi, Mike
+Yes. There are some patches for seperate the original clock code in arch.
+I had sent these patches before, but it seems that too many patches
+sent, and haojian missed it.
+I will sent out the patches for arch today. Thanks.
 
-SMP is now the norm for new ARM systems, and the limitation that
-CONFIG_STACKTRACE doesn't work for tasks besides 'current' causes
-problems.  The particular case I'm dealing with is automated
-debugging information collected from /proc/<pid>/stack when
-userspace detects a process is not responding.
-
-Dumping stacktraces is currently disabled due to the worry that the
-task may be running on another CPU and that the unwinder may be
-unstable when presented with a stack that is being modified.  I have
-attempted to harden the frame pointer based unwinder and the unwind
-table based unwinder against invalid stacks.  I separated the two
-into individual patches, as I expect the patch to the table unwinder
-to be more controversial than the frame pointer unwinder.
-
-Even without the hardening, unwinding a stack for a running process
-is not completely untested.  When CONFIG_ARM_UNWIND is enabled,
-sysrq-t calls unwind_backtrace for all tasks including running ones.
-In addition, any callers to unwind_frame with preemption enabled,
-including proc_pid_stack, could see a modified stack even on a UP
-system (pointed out by Rabin Vincent the last time this topic came
-up).
-
- arch/arm/kernel/stacktrace.c |   24 +++++++++++++-----------
- arch/arm/kernel/unwind.c     |   31 +++++++++++++++++++++++++++----
- 2 files changed, 40 insertions(+), 15 deletions(-)
+> Regards,
+> Mike
+>
+>>  10 files changed, 1567 insertions(+), 0 deletions(-)
+>>  create mode 100644 drivers/clk/mmp/Makefile
+>>  create mode 100644 drivers/clk/mmp/clk-apbc.c
+>>  create mode 100644 drivers/clk/mmp/clk-apmu.c
+>>  create mode 100644 drivers/clk/mmp/clk-frac.c
+>>  create mode 100644 drivers/clk/mmp/clk-mmp2.c
+>>  create mode 100644 drivers/clk/mmp/clk-pxa168.c
+>>  create mode 100644 drivers/clk/mmp/clk-pxa910.c
+>>  create mode 100644 drivers/clk/mmp/clk.h
