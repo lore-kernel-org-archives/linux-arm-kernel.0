@@ -1,46 +1,172 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 27 Aug 2012 15:45:06 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC: Armadillo800EVA for 3.7
-In-Reply-To: <1346049610-2266-1-git-send-email-horms@verge.net.au>
-References: <1346049610-2266-1-git-send-email-horms@verge.net.au>
-Message-ID: <20120827064506.GB26953@verge.net.au>
+From: keguang.zhang@gmail.com (Kelvin Cheung)
+Date: Mon, 27 Aug 2012 14:55:36 +0800
+Subject: [PATCH v3] clk: add Loongson1B clock support
+In-Reply-To: <1345457135-12737-1-git-send-email-keguang.zhang@gmail.com>
+References: <1345457135-12737-1-git-send-email-keguang.zhang@gmail.com>
+Message-ID: <CAJhJPsXdCn0u9aefehsTd1ZLLnbBgZZFExq=PC_Z-jv4F9XqWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Somehow I forgot to give the previous email a subject, not a good start :(
+Ping?
 
-On Mon, Aug 27, 2012 at 03:40:08PM +0900, Simon Horman wrote:
-> Hi Arnd, Hi Olaf,
-> 
-> please consider the following enhancements for the Armadillo800EVA board
-> from Laurent Pinchart for inclusion in 3.7.
-> 
-> I am currently in the processes of taking over maintenance
-> of shmoble from Rafael Wysocki and this my the first pull request
-> in that role.
-> 
-> ----------------------------------------------------------------
-> The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
-> 
->   Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git armadillo800eva
-> 
-> for you to fetch changes up to 5c1d2d16772e2d7d4e2e8da99a92d6f50b9102f0:
-> 
->   ARM: mach-shmobile: armadillo800eva: Enable power button as wakeup source (2012-08-25 15:44:53 +0900)
-> 
-> ----------------------------------------------------------------
-> Laurent Pinchart (2):
->       ARM: mach-shmobile: armadillo800eva: Fix GPIO buttons descriptions
->       ARM: mach-shmobile: armadillo800eva: Enable power button as wakeup source
-> 
->  arch/arm/mach-shmobile/board-armadillo800eva.c | 11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
+2012/8/20 Kelvin Cheung <keguang.zhang@gmail.com>
+
+> This adds clock support to Loongson1B SoC using the common clock
+> infrastructure.
+>
+> Signed-off-by: Kelvin Cheung <keguang.zhang@gmail.com>
+> ---
+>  drivers/clk/Makefile   |    1 +
+>  drivers/clk/clk-ls1x.c |  111
+> ++++++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 112 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/clk/clk-ls1x.c
+>
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 5869ea3..018ec57 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -10,6 +10,7 @@ obj-$(CONFIG_ARCH_SOCFPGA)    += socfpga/
+>  obj-$(CONFIG_PLAT_SPEAR)       += spear/
+>  obj-$(CONFIG_ARCH_U300)                += clk-u300.o
+>  obj-$(CONFIG_ARCH_INTEGRATOR)  += versatile/
+> +obj-$(CONFIG_MACH_LOONGSON1)   += clk-ls1x.o
+>
+>  # Chip specific
+>  obj-$(CONFIG_COMMON_CLK_WM831X) += clk-wm831x.o
+> diff --git a/drivers/clk/clk-ls1x.c b/drivers/clk/clk-ls1x.c
+> new file mode 100644
+> index 0000000..f20b750
+> --- /dev/null
+> +++ b/drivers/clk/clk-ls1x.c
+> @@ -0,0 +1,111 @@
+> +/*
+> + * Copyright (c) 2012 Zhang, Keguang <keguang.zhang@gmail.com>
+> + *
+> + * This program is free software; you can redistribute  it and/or modify
+> it
+> + * under  the terms of  the GNU General  Public License as published by
+> the
+> + * Free Software Foundation;  either version 2 of the  License, or (at
+> your
+> + * option) any later version.
+> + */
+> +
+> +#include <linux/clkdev.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/io.h>
+> +#include <linux/slab.h>
+> +#include <linux/err.h>
+> +
+> +#include <loongson1.h>
+> +
+> +#define OSC    33
+> +
+> +static DEFINE_SPINLOCK(_lock);
+> +
+> +static int ls1x_pll_clk_enable(struct clk_hw *hw)
+> +{
+> +       return 0;
+> +}
+> +
+> +static void ls1x_pll_clk_disable(struct clk_hw *hw)
+> +{
+> +}
+> +
+> +static unsigned long ls1x_pll_recalc_rate(struct clk_hw *hw,
+> +                                            unsigned long parent_rate)
+> +{
+> +       u32 pll, rate;
+> +
+> +       pll = __raw_readl(LS1X_CLK_PLL_FREQ);
+> +       rate = ((12 + (pll & 0x3f)) * 1000000) +
+> +               ((((pll >> 8) & 0x3ff) * 1000000) >> 10);
+> +       rate *= OSC;
+> +       rate >>= 1;
+> +
+> +       return rate;
+> +}
+> +
+> +static const struct clk_ops ls1x_pll_clk_ops = {
+> +       .enable = ls1x_pll_clk_enable,
+> +       .disable = ls1x_pll_clk_disable,
+> +       .recalc_rate = ls1x_pll_recalc_rate,
+> +};
+> +
+> +static struct clk * __init clk_register_pll(struct device *dev,
+> +        const char *name, const char *parent_name, unsigned long flags)
+> +{
+> +       struct clk_hw *hw;
+> +       struct clk *clk;
+> +       struct clk_init_data init;
+> +
+> +       /* allocate the divider */
+> +       hw = kzalloc(sizeof(struct clk_hw), GFP_KERNEL);
+> +       if (!hw) {
+> +               pr_err("%s: could not allocate clk_hw\n", __func__);
+> +               return ERR_PTR(-ENOMEM);
+> +       }
+> +
+> +       init.name = name;
+> +       init.ops = &ls1x_pll_clk_ops;
+> +       init.flags = flags | CLK_IS_BASIC;
+> +       init.parent_names = (parent_name ? &parent_name : NULL);
+> +       init.num_parents = (parent_name ? 1 : 0);
+> +       hw->init = &init;
+> +
+> +       /* register the clock */
+> +       clk = clk_register(dev, hw);
+> +
+> +       if (IS_ERR(clk))
+> +               kfree(hw);
+> +
+> +       return clk;
+> +}
+> +
+> +void __init ls1x_clk_init(void)
+> +{
+> +       struct clk *clk;
+> +
+> +       clk = clk_register_pll(NULL, "pll_clk", NULL, CLK_IS_ROOT);
+> +       clk_prepare_enable(clk);
+> +
+> +       clk = clk_register_divider(NULL, "cpu_clk", "pll_clk",
+> +                       CLK_SET_RATE_PARENT, LS1X_CLK_PLL_DIV,
+> DIV_CPU_SHIFT,
+> +                       DIV_CPU_WIDTH, CLK_DIVIDER_ONE_BASED, &_lock);
+> +       clk_prepare_enable(clk);
+> +       clk_register_clkdev(clk, "cpu", NULL);
+> +
+> +       clk = clk_register_divider(NULL, "dc_clk", "pll_clk",
+> +                       CLK_SET_RATE_PARENT, LS1X_CLK_PLL_DIV,
+> DIV_DC_SHIFT,
+> +                       DIV_DC_WIDTH, CLK_DIVIDER_ONE_BASED, &_lock);
+> +       clk_prepare_enable(clk);
+> +       clk_register_clkdev(clk, "dc", NULL);
+> +
+> +       clk = clk_register_divider(NULL, "ahb_clk", "pll_clk",
+> +                       CLK_SET_RATE_PARENT, LS1X_CLK_PLL_DIV,
+> DIV_DDR_SHIFT,
+> +                       DIV_DDR_WIDTH, CLK_DIVIDER_ONE_BASED, &_lock);
+> +       clk_prepare_enable(clk);
+> +       clk_register_clkdev(clk, "ahb", NULL);
+> +       clk_register_clkdev(clk, "stmmaceth", NULL);
+> +
+> +       clk = clk_register_fixed_factor(NULL, "apb_clk", "ahb_clk", 0, 1,
+> 2);
+> +       clk_prepare_enable(clk);
+> +       clk_register_clkdev(clk, "apb", NULL);
+> +       clk_register_clkdev(clk, "serial8250", NULL);
+> +}
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> 1.7.1
+>
+>
+
+
+-- 
+Best Regards!
+Kelvin
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120827/3970ad72/attachment-0001.html>
