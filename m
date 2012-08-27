@@ -1,43 +1,41 @@
-From: N.Voss@weinmann.de (Voss, Nikolaus)
-Date: Mon, 27 Aug 2012 15:32:11 +0200
-Subject: [PATCH v11 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
-In-Reply-To: <BC0F374A1C27184AB96177CDFEC2F54225ECD36E@EXMDB06.org.aalto.fi>
-References: <cover.1345618760.git.n.voss@weinmann.de>
- <4f3dcfbf1e8eab3e251ab3558e9e1e9123643928.1345618760.git.n.voss@weinmann.de>,
- <503B4919.6080306@atmel.com>
- <BC0F374A1C27184AB96177CDFEC2F54225ECC330@EXMDB06.org.aalto.fi>,
- <503B623C.4030304@atmel.com>
- <BC0F374A1C27184AB96177CDFEC2F54225ECD36E@EXMDB06.org.aalto.fi>
-Message-ID: <EF2E73589CA71846A15D0B2CDF79505D090EC3D6F6@wm021.weinmann.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 27 Aug 2012 21:43:10 +0800
+Subject: Question about ION carveout heap support partial cache flush
+In-Reply-To: <20120827082914.GN18957@n2100.arm.linux.org.uk>
+References: <CAMj5BkgffAW6azUjwz+iCF1tBLmBDRBvBjR-_fTr=4G=h+BLZw@mail.gmail.com>
+ <CAN1soZyZ=4wjKkVrk5--2U_8SeT7qee9QAfhss7NgqtQAz+RrA@mail.gmail.com>
+ <CAMj5BkiVq9ayJjUrwh3S-gDfezUTNiPFW-xd_dsbTJYTyLv2WQ@mail.gmail.com>
+ <20120827082914.GN18957@n2100.arm.linux.org.uk>
+Message-ID: <CAN1soZw4Qk5qSyuyMko9SZWu3u3_7OPA2yNVYz6C1WQWVimbvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adian,
-
-Yanes Martinez Adrian wrote on Monday, August 27, 2012 2:46 PM:
-> Le 08/27/2012 12:40 PM, Yanes Martinez Adrian a ?crit :
->> Hi Ludovic,
+On Mon, Aug 27, 2012 at 4:29 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Aug 27, 2012 at 04:23:31PM +0800, zhangfei gao wrote:
+>> On Mon, Aug 27, 2012 at 1:46 PM, Haojian Zhuang
+>> <haojian.zhuang@gmail.com> wrote:
+>> > Let me summerize it. First, user space address is mapped. Then,
+>> > flushing user space
+>> > address is triggered. It's a workaround of fixing non-existed virtual
+>> > address without fixing
+>> > vmap() or any other solution. It's just a quick fix.
+>> >
+>> > Zhangfei,
+>> > I doubt that the issue may be caused by missing memory barrier.
+>> > Flushing is using
+>> > coprocessor instructions. It's a little different.
 >>
->>> Tested on at91rm9200, at91sam9261, at91sam9g20 and at91sam9m10 with
->>> eeprom, temperature sensor and rtc devices (and wolfson chip for
->>> sam9g20).
->>
->> concerning the at91rm9200, what was the amount of bytes you
-> transmitted?
->>
-> 
->> I have only checked that I can communicate with i2c devices so the
->> amount is very low (1-4 bytes).
-> 
-> IIRC it was from >7 bytes when the issues appeared.
-> 
->> Some months ago I performed some testing[1] with the previous version of
->> the patch and the main conclusion was that the absence of PDC in the
->> AT91RM9200 made this driver unusable in such platform.
+>> Is there any limitation that dmac_map_area & dmac_flush_range
+>> supporting addr mapped from user space?
+>
+> They DEFINITELY DO NOT SUPPORT FLUSHING USER SPACE.
 
-I didn't get your last post  in that thread. In my opinion RM9200 should really
-be excluded from being configured with this driver, what's your opinion
-Ludovic?
+I agree that those API are defined to support kernel space address only.
+But the implementation is only flushing address by assembly code.
 
-Regards,
-Niko
+If we don't care the original goal of API, the problem should be caused
+by address mapping isn't set up yet. I doubt that the first step isn't fully
+finished. Since the second step is using coprocessor instruction, that's
+a shortcut. If we add delay such as memory barrier, the first step can
+be really finished before the second step running.
