@@ -1,31 +1,24 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 27 Aug 2012 17:20:12 +0000 (UTC)
-Subject: [PATCH] ARM: AM33XX: clock: Add dcan clock aliases for device-tree
-In-Reply-To: <1346061842-28714-1-git-send-email-hvaibhav@ti.com>
-References: <1346061842-28714-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <alpine.DEB.2.00.1208271717420.26953@utopia.booyaka.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 27 Aug 2012 10:25:10 -0700
+Subject: [PATCH] dma: imx-dma: Fix kernel crash due to missing clock
+ conversion
+In-Reply-To: <CAOMZO5A3v-K3OGghy2wYqkyqba5y=NcGSXa4C=9bEFHn1x6vaQ@mail.gmail.com>
+References: <1341341045-9472-1-git-send-email-fabio.estevam@freescale.com>
+ <20120827163006.0cffd20c@eb-e6520>
+ <20120827165242.GA11102@kroah.com>
+ <CAOMZO5A3v-K3OGghy2wYqkyqba5y=NcGSXa4C=9bEFHn1x6vaQ@mail.gmail.com>
+Message-ID: <20120827172510.GA25335@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Mon, 27 Aug 2012, Vaibhav Hiremath wrote:
-
-> Currently, the device names for the dcan module follows the
-> format "dcan.X", where 'X' is the dcan instance number.
-> On other side, driver may request for clock with/without con_id
-> and dev_id, and it is expected that platform should respect this
-> request and return the requested clock handle.
+On Mon, Aug 27, 2012 at 02:12:10PM -0300, Fabio Estevam wrote:
+> On Mon, Aug 27, 2012 at 1:52 PM, Greg Kroah-Hartman
+> <gregkh@linuxfoundation.org> wrote:
 > 
-> Now, when using device tree, the format of the device name created
-> by OF layer is different, "<reg-address>.<device-name>",
-> assuming that the device-tree "reg" property is specified.
-> This causes the look-up failure for clock node in dcan driver
+> > Ok, should I just revert it?  It's still needed on 3.5, right?
 > 
-> To fix this add new dcan clock alias for using device-tree.
+> Yes, please revert it from 3.4 and keep it on 3.5.
 
-Is the dcan driver present in v3.6-rc kernels?  Doesn't look like it but 
-maybe it's under an alias.
+Thanks for letting me know, now reverted.
 
-
-- Paul
+greg k-h
