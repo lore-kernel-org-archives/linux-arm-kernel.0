@@ -1,48 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 27 Aug 2012 16:35:21 -0700
-Subject: [PATCH] ARM: MSM: Fix early debug uart mapping on some memory configs
-Message-ID: <1346110521-24999-1-git-send-email-sboyd@codeaurora.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 28 Aug 2012 01:35:28 +0200
+Subject: [PATCH] mtd: orion_nand: remove <mach/hardware.h> include
+In-Reply-To: <1346110528-30858-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <20120816183708.GT22226@titan.lakedaemon.net>
+ <1346110528-30858-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1346110528-30858-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The uart mapping runs into the space allocated for lowmem on some
-8960 boards when we have more than 512Mb of memory. We were
-getting lucky before and our mapping wasn't part of DDR. Move the
-mapping up into the vmalloc area which will always be outside of
-the lowmem mapping regardless of how much lowmem actually exists.
+Commit c085d965fb63ac3b4cc7379d45588c0b39e2bdb0 made the ARCH_MVEBU
+platform select PLAT_ORION, which means that now all Orion drivers can
+be enabled on ARCH_MVEBU. This works fine for most drivers, except for
+orion_nand, because it includes <mach/hardware.h>, but mach-mvebu does
+not have a mach/hardware.h header (it is considered as a deprecated
+practice).
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+It turns out that the <mach/hardware.h> include in orion_nand is not
+necessary: the driver builds perfectly fine without it, so we simply
+get rid of it.
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: linux-mtd at lists.infradead.org
+Cc: Artem Bityutskiy <dedekind1@gmail.com>
 ---
- arch/arm/mach-msm/include/mach/msm_iomap-8960.h | 2 +-
- arch/arm/mach-msm/include/mach/msm_iomap-8x60.h | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/mtd/nand/orion_nand.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8960.h b/arch/arm/mach-msm/include/mach/msm_iomap-8960.h
-index a1752c0..facf434 100644
---- a/arch/arm/mach-msm/include/mach/msm_iomap-8960.h
-+++ b/arch/arm/mach-msm/include/mach/msm_iomap-8960.h
-@@ -46,7 +46,7 @@
- #define MSM8960_TMR0_SIZE	SZ_4K
+diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+index fc5a868..9ee436d 100644
+--- a/drivers/mtd/nand/orion_nand.c
++++ b/drivers/mtd/nand/orion_nand.c
+@@ -21,7 +21,6 @@
+ #include <linux/err.h>
+ #include <asm/io.h>
+ #include <asm/sizes.h>
+-#include <mach/hardware.h>
+ #include <plat/orion_nand.h>
  
- #ifdef CONFIG_DEBUG_MSM8960_UART
--#define MSM_DEBUG_UART_BASE	0xE1040000
-+#define MSM_DEBUG_UART_BASE	0xF0040000
- #define MSM_DEBUG_UART_PHYS	0x16440000
- #endif
- 
-diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
-index 5aed57d..21a2a88 100644
---- a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
-+++ b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
-@@ -63,7 +63,7 @@
- #define MSM8X60_TMR0_SIZE	SZ_4K
- 
- #ifdef CONFIG_DEBUG_MSM8660_UART
--#define MSM_DEBUG_UART_BASE	0xE1040000
-+#define MSM_DEBUG_UART_BASE	0xF0040000
- #define MSM_DEBUG_UART_PHYS	0x19C40000
- #endif
- 
+ static void orion_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.9.5
