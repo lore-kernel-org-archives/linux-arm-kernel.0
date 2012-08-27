@@ -1,197 +1,46 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 28 Aug 2012 07:05:13 +0800
-Subject: [PATCH v2 2/2] Enable Stop_enable mode during configuration of
- pwm.
-In-Reply-To: <3465D313FDFB824F9A9C8CD24FA4F6BCB4ACFE@frontmail.adetel.com>
-References: <1346081672-27866-1-git-send-email-shachimi@adeneo-embedded.com>
- <3465D313FDFB824F9A9C8CD24FA4F6BCB4ACFE@frontmail.adetel.com>
-Message-ID: <20120827230511.GG2281@r65073-Latitude-D630>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 Aug 2012 16:07:58 -0700
+Subject: [PATCH 13/22] ARM: ux500: Fork MSP platform registration for
+ step-by-step DT enablement
+In-Reply-To: <20120820080632.GD8450@gmail.com>
+References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
+ <1344527268-5964-14-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaem6t3mvy-_9e=GEgwWoeBQSoX3Hf1L=hjWsvLJdsVAQ@mail.gmail.com>
+ <20120820080632.GD8450@gmail.com>
+Message-ID: <CACRpkdZRJ1yX-o8-NUuMzXMz5ebbp=H21Xa6JMy1y56Chq-T9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 05:34:32PM +0200, HACHIMI Samir wrote:
-> From: Samir Hachimi <shachimi@adeneo-embedded.com>
-> 
->  Enable Stop_enable mode during configuration of pwm.
->  Check architecture by looking in driver_data instead of cpu_is_xxx.
+On Mon, Aug 20, 2012 at 1:06 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Tue, Aug 14, 2012 at 01:13:49PM +0200, Linus Walleij wrote:
+>> On Thu, Aug 9, 2012 at 5:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>>
+>> > We've done this before and it worked well last time. Here we're
+>> > duplicating a complex registration function to ease the process
+>> > of enabling it for Device Tree. As there are quite a few steps
+>> > taken during the registration process, it makes sense to break
+>> > them up into more manageable chunks. This patch will aid us.
+>> >
+>> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>
+>> I understand you have used this approach before so:
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Does this comment take back your previous one:
+>
+> NOTE: it seems this patch set contains some churn. First you
+> add in the forked device init, put in a big chunk of code and
+> then in the *same* patch set delete it again. It's not like
+> we're dying to see all the development history... can this
+> be squashed down a bit?
+>
+> ... hence leave the patch-set as it is?
 
-It does 2 things, and should be split into 2 patches.  Also you should
-have a better commit log for the thing you are doing.  For example, why
-you need to enable STOPEN during configuration, what problem you are
-running into without doing so, etc.
+No. I just meant leave it like that for the devices outside of this
+set.
 
-> 
-> Signed-off-by: Samir Hachimi <shachimi@adeneo-embedded.com>
-> ---
->  drivers/pwm/pwm-imx.c |   59 +++++++++++++++++++++++++++++++++++-------------
->  1 files changed, 43 insertions(+), 16 deletions(-)
-> 
-> diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-> index 0519bf2..7df919f 100644
-> --- a/drivers/pwm/pwm-imx.c
-> +++ b/drivers/pwm/pwm-imx.c
-> @@ -32,6 +32,7 @@
->  #define MX3_PWMSAR                0x0C    /* PWM Sample Register */
->  #define MX3_PWMPR                 0x10    /* PWM Period Register */
->  #define MX3_PWMCR_PRESCALER(x)    (((x - 1) & 0xFFF) << 4)
-> +#define MX3_PWMCR_STOPEN		(1 << 25)
->  #define MX3_PWMCR_DOZEEN                (1 << 24)
->  #define MX3_PWMCR_WAITEN                (1 << 23)
->  #define MX3_PWMCR_DBGEN			(1 << 22)
-> @@ -39,6 +40,16 @@
->  #define MX3_PWMCR_CLKSRC_IPG      (1 << 16)
->  #define MX3_PWMCR_EN              (1 << 0)
->  
-> +/* Use the platform_id to distinguish different Archs. */
-> +#define IS_MX1			0x0
-> +#define IS_MX21			0x1
-> +#define IS_MX25			0x2
-> +#define IS_MX6Q			0x3
+If you're adding and then removing *all* of them in this set,
+why add them in the first place?
 
-I prefer to use enum for these ...
-
-> +#define PWM_IS_MX1(x)		((x)->id_entry->driver_data == IS_MX1)
-> +#define PWM_IS_MX21(x)		((x)->id_entry->driver_data == IS_MX21)
-> +#define PWM_IS_MX25(x)		((x)->id_entry->driver_data == IS_MX25)
-> +#define PWM_IS_MX6Q(x)		((x)->id_entry->driver_data == IS_MX6Q)
-> +
-
-... and inline function for these.  drivers/mmc/host/sdhci-esdhc-imx.c
-could be an example here.
-
-Also, I see PWM_IS_MX6Q used nowhere, which probably means the pwm on
-imx6q is compatible with imx25 one, and we should not introduce MX6Q
-type at all.
-
->  struct imx_chip {
->  	struct clk	*clk;
->  
-> @@ -46,6 +57,7 @@ struct imx_chip {
->  	void __iomem	*mmio_base;
->  
->  	struct pwm_chip	chip;
-> +	struct platform_device	*pdev;
->  };
->  
->  #define to_imx_chip(chip)	container_of(chip, struct imx_chip, chip)
-> @@ -65,7 +77,7 @@ static int imx_pwm_config(struct pwm_chip *chip,
->  			return rc;
->  	}
->  
-> -	if (!(cpu_is_mx1() || cpu_is_mx21())) {
-> +	if (!(PWM_IS_MX1(imx->pdev) || PWM_IS_MX21(imx->pdev))) {
->  		unsigned long long c;
->  		unsigned long period_cycles, duty_cycles, prescale;
->  		u32 cr;
-> @@ -78,36 +90,33 @@ static int imx_pwm_config(struct pwm_chip *chip,
->  		prescale = period_cycles / 0x10000 + 1;
->  
->  		period_cycles /= prescale;
-> -		c = (unsigned long long)period_cycles * duty_ns;
-> -		do_div(c, period_ns);
-> -		duty_cycles = c;
->  
-> -		/*
-> -		 * according to imx pwm RM, the real period value should be
-> -		 * PERIOD value in PWMPR plus 2.
-> +		/* the chip documentation says the counter counts up to
-> +		 * period_cycles + 1 and then is reset to 0, so the
-> +		 *  actual period of the PWM wave is period_cycles + 2
->  		 */
-> -		if (period_cycles > 2)
-> -			period_cycles -= 2;
-> -		else
-> -			period_cycles = 0;
-> +		c = (unsigned long long)(period_cycles + 2) * duty_ns;
-> +		do_div(c, period_ns);
-> +		duty_cycles = c;
->  
->  		writel(duty_cycles, imx->mmio_base + MX3_PWMSAR);
->  		writel(period_cycles, imx->mmio_base + MX3_PWMPR);
->  
->  		cr = MX3_PWMCR_PRESCALER(prescale) |
-> -			MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN | MX3_PWMCR_DBGEN;
-> +			MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN |
-> +			MX3_PWMCR_DBGEN | MX3_PWMCR_STOPEN;
->  
->  		/* If the PWM is enabled, keep it so. */
->  		if (imx->clk_enabled)
->  			cr |= MX3_PWMCR_EN;
->  
-> -		if (cpu_is_mx25())
-> +		if (PWM_IS_MX25(imx->pdev))
->  			cr |= MX3_PWMCR_CLKSRC_IPG;
->  		else
->  			cr |= MX3_PWMCR_CLKSRC_IPG_HIGH;
->  
->  		writel(cr, imx->mmio_base + MX3_PWMCR);
-> -	} else if (cpu_is_mx1() || cpu_is_mx21()) {
-> +	} else if (PWM_IS_MX1(imx->pdev) || PWM_IS_MX21(imx->pdev)) {
->  		/* The PWM subsystem allows for exact frequencies. However,
->  		 * I cannot connect a scope on my device to the PWM line and
->  		 * thus cannot provide the program the PWM controller
-> @@ -150,7 +159,7 @@ static int imx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
->  	if (rc)
->  		return rc;
->  
-> -	if (!(cpu_is_mx1() || cpu_is_mx21())) {
-> +	if (!(PWM_IS_MX1(imx->pdev) || PWM_IS_MX21(imx->pdev))) {
->  		u32 cr = readl(imx->mmio_base + MX3_PWMCR);
->  		cr |= MX3_PWMCR_EN;
->  		writel(cr, imx->mmio_base + MX3_PWMCR);
-> @@ -167,7 +176,7 @@ static void imx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->  	if (!imx->clk_enabled)
->  		return;
->  
-> -	if (!(cpu_is_mx1() || cpu_is_mx21())) {
-> +	if (!(PWM_IS_MX1(imx->pdev) || PWM_IS_MX21(imx->pdev))) {
->  		u32 cr = readl(imx->mmio_base + MX3_PWMCR);
->  		cr &= ~MX3_PWMCR_EN;
->  		writel(cr, imx->mmio_base + MX3_PWMCR);
-> @@ -207,6 +216,7 @@ static int __devinit imx_pwm_probe(struct platform_device *pdev)
->  	imx->chip.npwm = 1;
->  
->  	imx->clk_enabled = 0;
-> +	imx->pdev = pdev;
->  
->  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	if (r == NULL) {
-> @@ -237,9 +247,26 @@ static int __devexit imx_pwm_remove(struct platform_device *pdev)
->  	return pwmchip_remove(&imx->chip);
->  }
->  
-> +static const struct platform_device_id pwm_ids[] = {
-> +	{ .name = "imx1-pwm", .driver_data = IS_MX1, },
-> +	{ .name = "imx21-pwm", .driver_data = IS_MX21, },
-> +	{ .name = "imx25-pwm", .driver_data = IS_MX25, },
-> +	{ .name = "imx6q-pwm", .driver_data = IS_MX6Q, },
-> +	{},
-> +};
-
-You are not using the table as .id_table of imx_pwm_driver, so these
-PWM_IS_xxx stuff does not work at all.  Also, changing to use
-platform_device_id will require updates to machine code that registers
-platform_device for non-DT case.
-
-> +
-> +static const struct of_device_id mxc_pwm_dt_ids[] = {
-> +	{
-> +		.compatible = "fsl,imx6q-pwm",
-> +		.data = (void *)&pwm_ids[IS_MX6Q]
-> +	},
-> +	{ /* sentinel */ }
-> +};
-> +
->  static struct platform_driver imx_pwm_driver = {
->  	.driver		= {
->  		.name	= "mxc_pwm",
-> +		.of_match_table = of_match_ptr(mxc_pwm_dt_ids),
->  	},
->  	.probe		= imx_pwm_probe,
->  	.remove		= __devexit_p(imx_pwm_remove),
-> -- 
-> 1.7.1
-
--- 
-Regards,
-Shawn
+Yours,
+Linus Walleij
