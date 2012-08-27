@@ -1,59 +1,43 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 27 Aug 2012 15:30:32 +0200
-Subject: [PATCH v6 00/10] OMAP-GPMC: generic time calc, prepare for driver
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E9BA713@DBDE01.ent.ti.com>
-References: <cover.1345524670.git.afzal@ti.com> <503B6511.4050909@gmail.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9BA713@DBDE01.ent.ti.com>
-Message-ID: <503B7678.90308@gmail.com>
+From: N.Voss@weinmann.de (Voss, Nikolaus)
+Date: Mon, 27 Aug 2012 15:32:11 +0200
+Subject: [PATCH v11 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <BC0F374A1C27184AB96177CDFEC2F54225ECD36E@EXMDB06.org.aalto.fi>
+References: <cover.1345618760.git.n.voss@weinmann.de>
+ <4f3dcfbf1e8eab3e251ab3558e9e1e9123643928.1345618760.git.n.voss@weinmann.de>,
+ <503B4919.6080306@atmel.com>
+ <BC0F374A1C27184AB96177CDFEC2F54225ECC330@EXMDB06.org.aalto.fi>,
+ <503B623C.4030304@atmel.com>
+ <BC0F374A1C27184AB96177CDFEC2F54225ECD36E@EXMDB06.org.aalto.fi>
+Message-ID: <EF2E73589CA71846A15D0B2CDF79505D090EC3D6F6@wm021.weinmann.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.08.2012 14:38, Mohammed, Afzal wrote:
-> On Mon, Aug 27, 2012 at 17:46:17, Daniel Mack wrote:
-> 
->>> Such a generic routine would help create a driver out of gpmc platform
->>> code, which would be peripheral agnostic and thus lead to DT finally.
->>> Input to generic timing calculation routine would be gpmc peripheral
->>> timings, output - translated timings that gpmc can understand. Later,
->>> to DT'ify, gpmc peripheral timings could be passed through DT. Input
->>> timings that has been used here are selected such that it represents
->>> those that are present in peripheral timing datasheets.
+Hi Adian,
+
+Yanes Martinez Adrian wrote on Monday, August 27, 2012 2:46 PM:
+> Le 08/27/2012 12:40 PM, Yanes Martinez Adrian a ?crit :
+>> Hi Ludovic,
 >>
->> What I don't understand yet about this new approach is where the gpmc
->> client code should live in. In order to probe the drivers via DT, each
->> driver would need to call the gpmc support functions itself, right? Is
-> 
-> By gpmc client code, if you are referring to helper functions in
-> mach-omap2/gpmc-*, if things go as per plan, with DT, they will go away
-> and gpmc driver would handle those based on the information from DT.
-
-So the GPMC driver is the one that is matched from DT, and the NAND
-driver will the be instanciated from the (generic) GPMC driver?
-
-> No change would be needed for client drivers like smc91x ethernet drivers,
-> but NAND driver may need some change to live with DT as it is tightly
-> coupled with GPMC.
-
-NAND drivers also typically parse partition entries that are children of
-the DT node the are owning.
-
->> the plan to obsolete helper functions like gpmc_nand_init() and move
->> that functionality to the drivers?
-> 
-> Yes, plan is to obsolete the functions like gpmc_nand_init, those tasks
-> would be handled by gpmc driver
-> 
+>>> Tested on at91rm9200, at91sam9261, at91sam9g20 and at91sam9m10 with
+>>> eeprom, temperature sensor and rtc devices (and wolfson chip for
+>>> sam9g20).
 >>
->> I applied these patches locally and would like to help get the NAND
->> controller on my AX33xx DT-driven board going. Let me know if I can do
->> anything here.
+>> concerning the at91rm9200, what was the amount of bytes you
+> transmitted?
+>>
 > 
-> Thanks for offering the help, will take liberty to ask you for help
-> when required. BTW, do you have any OMAP family boards ?
+>> I have only checked that I can communicate with i2c devices so the
+>> amount is very low (1-4 bytes).
+> 
+> IIRC it was from >7 bytes when the issues appeared.
+> 
+>> Some months ago I performed some testing[1] with the previous version of
+>> the patch and the main conclusion was that the absence of PDC in the
+>> AT91RM9200 made this driver unusable in such platform.
 
-I do have a beaglboard xM, but the board I'm currently working with is a
-custom one based on an AM33xx.
+I didn't get your last post  in that thread. In my opinion RM9200 should really
+be excluded from being configured with this driver, what's your opinion
+Ludovic?
 
-
-Thanks,
-Daniel
+Regards,
+Niko
