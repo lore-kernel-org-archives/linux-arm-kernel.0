@@ -1,53 +1,60 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Mon, 27 Aug 2012 12:22:53 +0530
-Subject: [PATCH] ARM: OMAP2+: am33xx: Fix the timer fck clock naming
- convention
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA6E8B1@DBDE01.ent.ti.com>
-References: <1342462158-15998-1-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1207161754230.28834@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EA6E8B1@DBDE01.ent.ti.com>
-Message-ID: <503B1945.5010308@ti.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 27 Aug 2012 07:35:43 +0000
+Subject: [PATCH v3 0/6] omap-am33xx rtc dt support
+In-Reply-To: <50256797.3020505@ti.com>
+References: <cover.1343383616.git.afzal@ti.com> <50256797.3020505@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9BA4EB@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Alessandro,
 
+On Sat, Aug 11, 2012 at 01:27:11, Nori, Sekhar wrote:
+> On 7/27/2012 5:53 PM, Afzal Mohammed wrote:
 
-On 7/17/2012 10:14 AM, Hiremath, Vaibhav wrote:
-> On Tue, Jul 17, 2012 at 05:24:39, Paul Walmsley wrote:
->> On Mon, 16 Jul 2012, Vaibhav Hiremath wrote:
->>
->>> With commit ae6df418a21f3a361c5f9b878e32a8aba4e17692
->>> Sub: ARM: OMAP2+: dmtimer: cleanup fclk usage)
->>> The Timer functional clock naming convention has changed from
->>> gptX_fck => timerXfck, and so as the timer init function
->>> in mach-omap2/timer.c.
->>> OMAP4 clocktree also has changed accordingly.
->>>
->>> AM33xx Clock Tree has been merged during rc3-4 timeframe,
->>> before above commit got merged, so similar change is required
->>> for AM33xx as well (Change the gptX_fck => timerX_fck).
->>>
->>> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
->>
->> Thanks, this looks like 3.6-rc material, right?
->>
->>
+> > This series makes rtc-omap driver DT capable, adds AM33xx
+> > RTC DT support along with a few enchancments to the driver.
+> > 
+> > rtc-omap driver is made intelligent enough to handle kicker
+> > mechanism. This helps in removing kicker mechanism support
+> > done for DaVinci at platform level.
+> > 
+> > This has been tested on Beaglebone (AM33xx platform) and on
+> > DaVinci DA850 EVM.
+> > 
+> > This series is based over linux-omap master and can be
+> > directly applied over linux-next, except for
+> > [PATCH 6/6] arm/dts: am33xx rtc node.
+> > 
+> > PATCH 6/6 should go through linux-omap tree and needs
+> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg71644.html
+> > (arm/dts: am33xx wdt node) to get applied cleanly
 > 
-> Yes, that's correct.
+> I tested patches 1-5 on AM18x EVM using rtcwake and hwclock commands.
+> Also tested on DT enabled AM18x EVM using hwclock.
 > 
-
-Tony/Paul,
-
-Ping !!!
-
-Thanks,
-Vaibhav
-
-> Thanks,
-> Vaibhav
+> For patched 1-5:
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Acked-by: Sekhar Nori <nsekhar@ti.com>
 > 
+> Alessandro,
+> 
+> I assume you would want me to queue 2/6 through DaVinci tree. That patch
+> depends on 1/6 being accepted and merged by you. Let me know how you
+> want to move forward here.
+
+Can you please help 1-5 patches in this series to get into mainline.
+1-5 of this series is a prerequisite for adding RTC support for AM335X
+SoC's, which is present in beaglebone, AM335X EVM.
+
+Also this series does cleanup on DaVinci platform by moving kicker handling
+mechanism to driver. And we have Ack from DaVinci maintainer on 1-5 of this
+series.
+
+Patch 6/6 adds AM335X RTC DT support, not sure whether you can take 6/6
+or Tony should be taking it.
+
+The series applies cleanly over linux-next (now including 6/6)
+
+Regards
+Afzal
