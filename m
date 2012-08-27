@@ -1,52 +1,102 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 27 Aug 2012 13:23:29 -0300
-Subject: [PATCH 3/3] ARM: mxs_defconfig: Add SPI and LRADC support
-In-Reply-To: <1346084609-31407-1-git-send-email-fabio.estevam@freescale.com>
-References: <1346084609-31407-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1346084609-31407-3-git-send-email-fabio.estevam@freescale.com>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Mon, 27 Aug 2012 18:24:17 +0200
+Subject: [PATCH 2/6] brcmfmac: Handling the interrupt in ISR
+ directly for non-OOB
+In-Reply-To: <1346063114-30361-3-git-send-email-wni@nvidia.com>
+References: <1346063114-30361-1-git-send-email-wni@nvidia.com>
+ <1346063114-30361-3-git-send-email-wni@nvidia.com>
+Message-ID: <503B9F31.5050502@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SPI and LRADC support.
+On 08/27/2012 12:25 PM, Wei Ni wrote:
+> In case of inband interrupts, if we handle the interrupt in dpc thread,
+> two level of thread switching takes place to process wifi interrupts.
+> One in SDHCI driver and the other in Wifi driver. This may cause the system
+> instability.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/mxs_defconfig |    8 ++++++++
- 1 file changed, 8 insertions(+)
+Looking into the sdhci/mmc code indeed shows that the brcmfmac irq 
+handler is not called in true IRQ context. So the dpc thread may add 
+unnecessary complexity, but to me there is not indication that there is 
+a stability issue.
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index 36d60dd..d2910f9 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -53,6 +53,9 @@ CONFIG_DEVTMPFS=y
- # CONFIG_FIRMWARE_IN_KERNEL is not set
- # CONFIG_BLK_DEV is not set
- CONFIG_MTD=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_DATAFLASH=y
-+CONFIG_MTD_M25P80
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_GPMI_NAND=y
- CONFIG_NETDEVICES=y
-@@ -82,6 +85,7 @@ CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_MXS=y
- CONFIG_SPI=y
- CONFIG_SPI_GPIO=m
-+CONFIG_SPI_MXS=y
- CONFIG_DEBUG_GPIO=y
- CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
-@@ -110,7 +114,11 @@ CONFIG_RTC_DRV_DS1307=m
- CONFIG_RTC_DRV_STMP=y
- CONFIG_DMADEVICES=y
- CONFIG_MXS_DMA=y
-+CONFIG_STAGING=y
-+CONFIG_MXS_LRADC=y
-+CONFIG_IIO_SYSFS_TRIGGER=y
- CONFIG_COMMON_CLK_DEBUG=y
-+CONFIG_IIO=y
- CONFIG_EXT3_FS=y
- # CONFIG_DNOTIFY is not set
- CONFIG_FSCACHE=m
--- 
-1.7.9.5
+> Because the SDHCI calls sdio_irq_thread() to handle the irq, this thread locks
+> mmc host and calls wifi handler. It expects WiFi handler to be quick and
+> enables sdio interrupt from card at end. If wifi handler defers this work for
+> a different thread, sdio_irq_thread() will be stuck on next wifi interrupt
+> since mmc lock is not freed.
+
+Not sure if I can follow this explanation. The isr is called with host 
+claimed (by sdio_irq_thread) and all it does is at a linked list member 
+and signal the dpc thread. After doing this the host is released.
+
+> Handling the interrupt in ISR directly will prevent thread context switching in
+> wifi driver. It can fix the instability problems.
+
+This basically increases the duration of the isr in brcmfmac.
+
+> Signed-off-by: Wei Ni <wni@nvidia.com>
+> ---
+>   drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c   |    2 ++
+>   drivers/net/wireless/brcm80211/brcmfmac/dhd_sdio.c |    8 +++++++-
+>   2 files changed, 9 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
+> index 8e7e692..5cf6c3b 100644
+> --- a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
+> +++ b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
+> @@ -121,7 +121,9 @@ static void brcmf_sdio_irqhandler(struct sdio_func *func)
+>
+>   	brcmf_dbg(INTR, "ib intr triggered\n");
+>
+> +	sdio_release_host(sdiodev->func[1]);
+>   	brcmf_sdbrcm_isr(sdiodev->bus);
+> +	sdio_claim_host(sdiodev->func[1]);
+
+This is probably needed because the ISR now locks the host to long 
+because brcmf_sdbrcm_dpc() is called directly.
+
+>   }
+>
+>   /* dummy handler for SDIO function 2 interrupt */
+> diff --git a/drivers/net/wireless/brcm80211/brcmfmac/dhd_sdio.c b/drivers/net/wireless/brcm80211/brcmfmac/dhd_sdio.c
+> index 472f2ef..4576d59 100644
+> --- a/drivers/net/wireless/brcm80211/brcmfmac/dhd_sdio.c
+> +++ b/drivers/net/wireless/brcm80211/brcmfmac/dhd_sdio.c
+> @@ -2347,7 +2347,7 @@ static bool brcmf_sdbrcm_dpc(struct brcmf_sdio *bus)
+>   	uint framecnt = 0;	/* Temporary counter of tx/rx frames */
+>   	bool rxdone = true;	/* Flag for no more read data */
+>   	bool resched = false;	/* Flag indicating resched wanted */
+> -	int err;
+> +	int err = 0;
+>
+>   	brcmf_dbg(TRACE, "Enter\n");
+>
+> @@ -3786,11 +3786,17 @@ void brcmf_sdbrcm_isr(void *arg)
+>   	if (!bus->intr)
+>   		brcmf_dbg(ERROR, "isr w/o interrupt configured!\n");
+>
+> +
+> +#ifndef CONFIG_BRCMFMAC_SDIO_OOB
+> +	while (brcmf_sdbrcm_dpc(bus))
+> +		;
+> +#else
+>   	bus->dpc_sched = true;
+>   	if (bus->dpc_tsk) {
+>   		brcmf_sdbrcm_adddpctsk(bus);
+>   		complete(&bus->dpc_wait);
+>   	}
+> +#endif
+>   }
+>
+>   static bool brcmf_sdbrcm_bus_watchdog(struct brcmf_sdio *bus)
+>
+
+I would really like to know what issue is solved by this change. Could 
+you provide more details.
+
+Franky,
+
+Do you have anything to add here?
+
+Gr. AvS
