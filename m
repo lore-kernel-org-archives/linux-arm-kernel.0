@@ -1,130 +1,46 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 27 Aug 2012 12:51:27 +0300
-Subject: [PATCH] gpio: samsung: add devicetree init for s3c24xx arches
-In-Reply-To: <201208271144.03681.heiko@sntech.de>
-References: <201208252353.59345.heiko@sntech.de>
- <201208271001.05026.heiko@sntech.de>
- <CA+E=qVfV1DL1ikjVnLd7qTeCx9C8Z7dGvhh_9NSgxPYrOCJ=0g@mail.gmail.com>
- <201208271144.03681.heiko@sntech.de>
-Message-ID: <CA+E=qVf9+J1rtvr7snhfRgqKHgWZ+g7TfcQuP8qm00+HH86CDQ@mail.gmail.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Mon, 27 Aug 2012 15:34:02 +0530
+Subject: [PATCH] ARM: AM33XX: clock: Add dcan clock aliases for device-tree
+Message-ID: <1346061842-28714-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 12:44 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> Hi Vasily,
->
-> I'm not sure I follow :-) .
->
-> The compatible property here only sets the mechanism on how to handle the
-> gpios defined in the devicetree - here to use the s3c24xx-style. As you can
-> see in gpio-samsung.c the handling is already unified for all the s3c24xx
-> architectures.
->
-> The definition of what gpio banks exist is then done in the respective
-> devicetree file for the individual SoC. And of course here one would have
-> individual definitions, depending on the banks present.
->
-> For reference my quite empty s3c2416.dtsi file currently looks like:
->
-> /include/ "skeleton.dtsi"
->
-> / {
->         compatible = "samsung,s3c2416";
->
->         cpus {
->                 cpu at 0 {
->                         compatible = "arm,arm926ejs";
->                 };
->         };
->
->         gpio-controllers {
->                 #address-cells = <1>;
->                 #size-cells = <1>;
->                 gpio-controller;
->                 ranges;
->
->                 gpa: gpio-controller at 56000000 {
->                         compatible = "samsung,s3c24xx-gpio";
->                         reg = <0x56000000 0x10>;
->                         #gpio-cells = <3>;
->                 };
->
->                 gpb: gpio-controller at 56000010 {
->                         compatible = "samsung,s3c24xx-gpio";
->                         reg = <0x56000010 0x10>;
->                         #gpio-cells = <3>;
->                 };
->
->                 gpc: gpio-controller at 56000020 {
->                         compatible = "samsung,s3c24xx-gpio";
->                         reg = <0x56000020 0x10>;
->                         #gpio-cells = <3>;
->                 };
->
->                 gpd: gpio-controller at 56000030 {
->                         compatible = "samsung,s3c24xx-gpio";
->                         reg = <0x56000030 0x10>;
->                         #gpio-cells = <3>;
->                 };
->
->                 gpe: gpio-controller at 56000040 {
->                         compatible = "samsung,s3c24xx-gpio";
->                         reg = <0x56000040 0x10>;
->                         #gpio-cells = <3>;
->                 };
->
->                 gpf: gpio-controller at 56000050 {
->                         compatible = "samsung,s3c24xx-gpio";
->                         reg = <0x56000050 0x10>;
->                         #gpio-cells = <3>;
->                 };
->
->                 gpg: gpio-controller at 56000060 {
->                         compatible = "samsung,s3c24xx-gpio";
->                         reg = <0x56000060 0x10>;
->                         #gpio-cells = <3>;
->                 };
->
->                 gph: gpio-controller at 56000070 {
->                         compatible = "samsung,s3c24xx-gpio";
->                         reg = <0x56000070 0x10>;
->                         #gpio-cells = <3>;
->                 };
->
->                 /* s3c2443 and later */
->                 gpj: gpio-controller at 560000D0 {
->                         compatible = "samsung,s3c24xx-gpio";
->                         reg = <0x560000D0 0x10>;
->                         #gpio-cells = <3>;
->                 };
->
->                 gpk: gpio-controller at 560000E0 {
->                         compatible = "samsung,s3c24xx-gpio";
->                         reg = <0x560000E0 0x10>;
->                         #gpio-cells = <3>;
->                 };
->
->                 gpl: gpio-controller at 560000F0 {
->                         compatible = "samsung,s3c24xx-gpio";
->                         reg = <0x560000F0 0x10>;
->                         #gpio-cells = <3>;
->                 };
->
->                 gpm: gpio-controller at 56000100 {
->                         compatible = "samsung,s3c24xx-gpio";
->                         reg = <0x56000100 0x10>;
->                         #gpio-cells = <3>;
->                 };
->         };
-> };
->
-> Other s3c24xx SoCs would of course need to define their own.
+Currently, the device names for the dcan module follows the
+format "dcan.X", where 'X' is the dcan instance number.
+On other side, driver may request for clock with/without con_id
+and dev_id, and it is expected that platform should respect this
+request and return the requested clock handle.
 
-I see. But how does it handle GPA bank (which is output-only, and
-GPACON differs a bit from GP{B-J}CON? And some banks has lower number
-(not 16) of GPIOs, like GPH.
+Now, when using device tree, the format of the device name created
+by OF layer is different, "<reg-address>.<device-name>",
+assuming that the device-tree "reg" property is specified.
+This causes the look-up failure for clock node in dcan driver
 
-Also, what would be value for S3C_GPIO_END?
+To fix this add new dcan clock alias for using device-tree.
 
-Regards
-Vasily
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <robherring2@gmail.com>
+---
+ arch/arm/mach-omap2/clock33xx_data.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/clock33xx_data.c b/arch/arm/mach-omap2/clock33xx_data.c
+index ae27de8..a4006b2 100644
+--- a/arch/arm/mach-omap2/clock33xx_data.c
++++ b/arch/arm/mach-omap2/clock33xx_data.c
+@@ -1027,7 +1027,9 @@ static struct omap_clk am33xx_clks[] = {
+ 	CLK(NULL,	"cefuse_fck",		&cefuse_fck,	CK_AM33XX),
+ 	CLK(NULL,	"clkdiv32k_ick",	&clkdiv32k_ick,	CK_AM33XX),
+ 	CLK(NULL,	"dcan0_fck",		&dcan0_fck,	CK_AM33XX),
++	CLK("481cc000.d_can",	NULL,		&dcan0_fck,	CK_AM33XX),
+ 	CLK(NULL,	"dcan1_fck",		&dcan1_fck,	CK_AM33XX),
++	CLK("481d0000.d_can",	NULL,		&dcan1_fck,	CK_AM33XX),
+ 	CLK(NULL,	"debugss_ick",		&debugss_ick,	CK_AM33XX),
+ 	CLK(NULL,	"pruss_ocp_gclk",	&pruss_ocp_gclk,	CK_AM33XX),
+ 	CLK("davinci-mcasp.0",  NULL,           &mcasp0_fck,    CK_AM33XX),
+-- 
+1.7.0.4
