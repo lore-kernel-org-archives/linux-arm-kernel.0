@@ -1,22 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Aug 2012 16:40:11 -0700
-Subject: [PATCH 1/6] ARM: ux500: don't select LEDS_GPIO for snowball
-In-Reply-To: <201208231426.43105.arnd@arndb.de>
-References: <1345648390-4234-1-git-send-email-arnd@arndb.de>
- <1345648390-4234-2-git-send-email-arnd@arndb.de>
- <201208231426.43105.arnd@arndb.de>
-Message-ID: <CACRpkdYbyrXRYTujEsKPofEpw01S8_B8b97edO-SpHjgfJ6V1Q@mail.gmail.com>
+Date: Mon, 27 Aug 2012 16:42:49 -0700
+Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
+ I2C driver
+In-Reply-To: <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
+References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
+ <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdapY3JvZmLxK7dX917O-E+aDgVE9ELnysjqAyETXMZHNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 7:26 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Thu, Aug 23, 2012 at 8:01 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> I discussed this with Lee on IRC, he really wants to keep the LED enabled for snowball
-> for his own convenience. How is this version instead?
+> Here we apply the bindings required for successful Device Tree
+> probing of the i2c-nomadik driver.
+>
+> Cc: linux-i2c at vger.kernel.org
+> Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Sure, I guess you already merged it though?
-
-Acked-by.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
