@@ -1,90 +1,127 @@
-From: omycle@gmail.com (Li Haifeng)
-Date: Mon, 27 Aug 2012 18:30:42 +0800
-Subject: For buddy system initialization, the holes between banks adjacent
- will be released to buddy allocator?
-In-Reply-To: <20120827080913.GL18957@n2100.arm.linux.org.uk>
-References: <CAFNq8R6kBonhW4Q+Zj_6GV7y88pcAUJ_MrYn1nYM9LHtMZqdvQ@mail.gmail.com>
- <CAFNq8R7fCyD5P4mAA8LGzcOvVynSJa8mOBDwrLOF9mVvo9q5VA@mail.gmail.com>
- <20120827080913.GL18957@n2100.arm.linux.org.uk>
-Message-ID: <CAFNq8R6TgfdAbDDTQTyt6hncA+OHAy7SkNpzdGuABcAtaegTiw@mail.gmail.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 27 Aug 2012 10:37:42 +0000
+Subject: [PATCH v6 07/10] ARM: OMAP2+: gpmc: generic timing calculation
+In-Reply-To: <50359C64.40603@ti.com>
+References: <cover.1345524670.git.afzal@ti.com>
+ <83b963e4ebcc1009a26a8c6419c785ac6d742c0b.1345524670.git.afzal@ti.com>
+ <50359C64.40603@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9BA63D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/8/27 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Aug 27, 2012 at 10:42:40AM +0800, Li Haifeng wrote:
->> Just now, I tested it on my ARM development board.
->>
->> The holes between banks does be released to buddy allocator. And the
->> buddy system will allocate holes for thread, which will cause fault.
->> Is it right?
->
-> Could you rephrase your question please?
+Hi Jon,
 
-The code below is to release free memory to buddy allocator, according
-to node_bootmem_map.
+On Thu, Aug 23, 2012 at 08:28:44, Hunter, Jon wrote:
+> On 08/21/2012 05:45 AM, Afzal Mohammed wrote:
 
-The lines 180~181 get the low memory's range, and the range includes holes.
-But while releasing the memory to buddy allocator, the code doesn't
-prevent the holes from releasing to the buddy allocator. So, if the
-holes are allocated to thread, fault will happen.
+> > +/* can the cycles be avoided ? */
+> 
+> What is the above comment referring too?
 
-IMO, it is a bug. Is it right?
+This was added in the initial stages and refers to the usage of
+cycles in struct gpmc_device_timings. I wanted to avoid usage
+of cycles, but it seems it is required logically as well. This
+was mentioned as a note for future to find out whether at any
+future point of time this can be removed.
 
-172 static unsigned long __init free_all_bootmem_core(bootmem_data_t *bdata)
-173 {
-174         struct page *page;
-175         unsigned long start, end, pages, count = 0;
-176
-177         if (!bdata->node_bootmem_map)
-178                 return 0;
-179
-180         start = bdata->node_min_pfn;
-181         end = bdata->node_low_pfn;
-182
-183         bdebug("nid=%td start=%lx end=%lx\n",
-184                 bdata - bootmem_node_data, start, end);
-185
-186         while (start < end) {
-187                 unsigned long *map, idx, vec;
-188
-189                 map = bdata->node_bootmem_map;
-190                 idx = start - bdata->node_min_pfn;
-191                 vec = ~map[idx / BITS_PER_LONG];
-192                 /*
-193                  * If we have a properly aligned and fully unreserved
-194                  * BITS_PER_LONG block of pages in front of us, free
-195                  * it in one go.
-196                  */
-197                 if (IS_ALIGNED(start, BITS_PER_LONG) && vec == ~0UL) {
-198                         int order = ilog2(BITS_PER_LONG);
-199
-200                         __free_pages_bootmem(pfn_to_page(start), order);
-201                         count += BITS_PER_LONG;
-202                         start += BITS_PER_LONG;
-203                 } else {
-204                         unsigned long off = 0;
-205
-206                         while (vec && off < BITS_PER_LONG) {
-207                                 if (vec & 1) {
-208                                         page = pfn_to_page(start + off);
-209                                         __free_pages_bootmem(page, 0);
-210                                         count++;
-211                                 }
-212                                 vec >>= 1;
-213                                 off++;
-214                         }
-215                         start = ALIGN(start + 1, BITS_PER_LONG);
-216                 }
-217         }
-218
-219         page = virt_to_page(bdata->node_bootmem_map);
-220         pages = bdata->node_low_pfn - bdata->node_min_pfn;
-221         pages = bootmem_bootmap_pages(pages);
-222         count += pages;
-223         while (pages--)
-224                 __free_pages_bootmem(page++, 0);
-225
-226         bdebug("nid=%td released=%lx\n", bdata - bootmem_node_data, count);
-227
-228         return count;
-229 }
+> > +/* Device timings in picoseconds */
+> 
+> Why pico seconds and not nanoseconds? I understand you may need to
+> temporarily convert to pico-secs for rounding, but when providing timing
+> it seems nano-secs is more suitable.
+
+For more accuracy, if you see some of the tusb6010 calculation
+are in picoseconds, this can be true for any device although
+only tusb does so. If we hold on to picoseconds till the last
+moment, value would be more accurate. For eg. 300 ps has to be
+used in the case of tusb, and with ns, it can't be accounted for
+
+> I am a little concerned about the above timings structure. For example,
+> if I am adding support for a new devices it is not clear ...
+> 
+> 1. Which are required
+> 2. Which are applicable for async, sync, address-data multiplexed etc.
+> 3. Exactly how these relate to the fields in the gpmc registers.
+
+Please see at the end
+
+> 
+> I understand that this is based upon how timings for onenand and tusb
+> are being calculated today, but I am not sure that this is the way to go
+> for all devices. Personally, I would like to see us get away from how
+> those devices are calculating timings for any new device.
+
+You cannot do away with many of the those, as logically they
+are right. Eg. read data should be available at access time,
+assuming a zero data hold time, we can very well derive an
+expression as,
+
+read de-assertion time (oe_off) = access time plus 1 gpmc clock,
+
+and this is what the existing calculations do, and also the
+generic routine. There could be other constraints, but this
+certainly should be one (I do realize that oe_off could be
+optimized to be less than access time, by relying on read
+hold time, then again effect of it would be in similar way
+for different peripherals, but let's forget about
+optimization in the beginning)
+
+> In general, I am concerned that we are abstracting the timings further
+> from the actual register fields. For example, the timings parameter
+> "t_ceasu" is described "address setup to CS valid" which is not
+> incorrect but this value is really just programming the CSONTIME field
+> and so why not call this cs_on?
+
+Timing fields of struct gpmc_device_timings are selected such
+that they should be bindable by DT. At least one of the peripheral
+datasheet has these fields. If user knows timings in terms of
+gpmc values, he can directly use struct gpmc_timings, but
+then all the values should be updated in struct gpmc_timings.
+User should not update some of the values in terms of
+peripheral timings, others in terms of gpmc timings, that
+would make things complex and does not seem the right way
+to me.
+
+cs_on and other gpmc aware timings could be binded by DT, not as
+peripheral timing, but as gpmc timing.
+
+Bindings for peripheral DT timings should be something that
+can be obtained from peripheral datasheet, here accidentally
+it is same as gpmc timings, but not most timings are this way.
+Also there could be other constraints that can come for cs_on,
+even though I have not come across any till now.
+
+> 
+> So although this may consolidate how the timings are calculated today, I
+> am concerned it will be confusing to add timings for a new device. At
+> least if I am calculating timings, I am taking the timing information
+> for the device and translating that to the how I need to program the
+> gpmc register fields.
+
+If I am not wrong, GPMC IP has been present for around a
+decade, and so far I have not come across any generic time
+calculation method that can be applied to all peripherals.
+Getting to work same peripheral for a different gpmc
+frequency is another problem.
+
+Here we are trying to generalize based on the understanding of
+gpmc & peripheral timings, as well as by a kind of reverse
+engineering without most of the hardware or datasheet. Think of
+this as an attempt to create one, let it evolve and become a
+robust one. If a new user want to add a peripheral, let him add
+support, input timings are selected such that it is found in
+peripheral datasheet, if that does not work, let him try
+to add any new timing field or alter existing expression
+as he deems to be proper and verify that it does not break
+others. And I can help provided I am not heavily loaded
+with other works.
+
+And at least for initial users, they are expected to have
+some grasp on how to calculate timings, such a user will
+not be much worried about your 3 concerns above, anyway as
+of now they need to have a good grasp on it.
+
+Meanwhile I will try to document more.
+
+Regards
+Afzal
