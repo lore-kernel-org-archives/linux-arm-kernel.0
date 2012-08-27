@@ -1,143 +1,119 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 27 Aug 2012 06:43:31 -0700
-Subject: [PATCH 03/11] pinctrl: mvebu: kirkwood pinctrl driver
-In-Reply-To: <CACRpkdbG4jkFcVP_6AmAZzciffQCamKXw7PcFnTdccyq7AMa8A@mail.gmail.com>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1344689809-6223-4-git-send-email-sebastian.hesselbarth@gmail.com>
- <CACRpkdbG4jkFcVP_6AmAZzciffQCamKXw7PcFnTdccyq7AMa8A@mail.gmail.com>
-Message-ID: <343192fa3698ed0575444a5603ed734d@codethink.co.uk>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Mon, 27 Aug 2012 18:56:44 +0530
+Subject: [PATCH V2 6/6] ASoC: tlv320aic3x: Add device tree bindings
+In-Reply-To: <1346074004-22172-1-git-send-email-gururaja.hebbar@ti.com>
+References: <1346074004-22172-1-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <1346074004-22172-7-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/08/2012 06:49, Linus Walleij wrote:
-> On Sat, Aug 11, 2012 at 2:56 PM, Sebastian Hesselbarth
-> <sebastian.hesselbarth@gmail.com> wrote:
->
->> This patch adds a SoC specific pinctrl driver for Marvell Kirkwood 
->> SoCs
->> plus DT binding documentation. This driver will use the mvebu 
->> pinctrl
->> driver core.
->
-> Thanks for working on Kirkwood. Love this platform.
->
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index cd3d827..361f513 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -596,6 +596,7 @@ config ARCH_KIRKWOOD
->>         select GENERIC_CLOCKEVENTS
->>         select NEED_MACH_IO_H
->>         select PLAT_ORION
->> +       select PINCTRL
->
-> select PINCTRL_KIRKWOOD too I think.
-> Then it's just automatic.
->
->> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
->> index e2427eb..1f84090 100644
->> --- a/drivers/pinctrl/Kconfig
->> +++ b/drivers/pinctrl/Kconfig
->> @@ -147,7 +147,7 @@ config PINCTRL_COH901
->>
->>  config PINCTRL_MVEBU
->>         bool "Marvell SoC pin controller drivers"
->> -       depends on ARCH_MVEBU || ARCH_DOVE
->> +       depends on ARCH_MVEBU || ARCH_DOVE || ARCH_KIRKWOOD
->
-> As stated elsewhere I think this should be
-> depends on PLAT_ORION
->
->> +config PINCTRL_KIRKWOOD
->> +       bool "Support for Marvell Kirkwood SoCs"
->> +       depends on PINCTRL_MVEBU
->
-> depends on ARCH_KIRKWOOD
-> select PINCTRL_MVEBU
->
-> (...)
->> diff --git a/drivers/pinctrl/pinctrl-kirkwood.c 
->> b/drivers/pinctrl/pinctrl-kirkwood.c
->> +static struct mvebu_pinctrl_soc_info kirkwood_pinctrl_info;
->> +
->> +static struct of_device_id kirkwood_pinctrl_of_match[] 
->> __devinitdata = {
->> +       { .compatible = "marvell,88f6180-pinctrl",
->> +                                         .data = (void 
->> *)VARIANT_MV88F6180 },
->> +       { .compatible = "marvell,88f6190-pinctrl",
->> +                                         .data = (void 
->> *)VARIANT_MV88F6190 },
->> +       { .compatible = "marvell,88f6192-pinctrl",
->> +                                         .data = (void 
->> *)VARIANT_MV88F6192 },
->> +       { .compatible = "marvell,88f6281-pinctrl",
->> +                                         .data = (void 
->> *)VARIANT_MV88F6281 },
->> +       { .compatible = "marvell,88f6282-pinctrl",
->> +                                         .data = (void 
->> *)VARIANT_MV88F6282 },
->> +       { }
->> +};
->
-> I'm thinking this variant should maybe be an enum... unless it is
-> strongly established somewhere in Orion/Marvell stuff.
->
->> +static int __devinit kirkwood_pinctrl_probe(struct platform_device 
->> *pdev)
->> +{
->> +       struct mvebu_pinctrl_soc_info *soc = &kirkwood_pinctrl_info;
->> +       const struct of_device_id *match =
->> +               of_match_device(kirkwood_pinctrl_of_match, 
->> &pdev->dev);
->> +
->> +       if (match) {
->> +               soc->variant = (unsigned)match->data & 0xff;
->> +               switch (soc->variant) {
->> +               case VARIANT_MV88F6180:
->> +                       soc->controls = mv88f6180_mpp_controls;
->> +                       soc->ncontrols = 
->> ARRAY_SIZE(mv88f6180_mpp_controls);
->> +                       soc->modes = mv88f6xxx_mpp_modes;
->> +                       soc->nmodes = 
->> ARRAY_SIZE(mv88f6xxx_mpp_modes);
->> +                       soc->gpioranges = mv88f6180_gpio_ranges;
->> +                       soc->ngpioranges = 
->> ARRAY_SIZE(mv88f6180_gpio_ranges);
->> +                       break;
->> +               case VARIANT_MV88F6190:
->> +               case VARIANT_MV88F6192:
->> +                       soc->controls = mv88f619x_mpp_controls;
->> +                       soc->ncontrols = 
->> ARRAY_SIZE(mv88f619x_mpp_controls);
->> +                       soc->modes = mv88f6xxx_mpp_modes;
->> +                       soc->nmodes = 
->> ARRAY_SIZE(mv88f6xxx_mpp_modes);
->> +                       soc->gpioranges = mv88f619x_gpio_ranges;
->> +                       soc->ngpioranges = 
->> ARRAY_SIZE(mv88f619x_gpio_ranges);
->> +                       break;
->> +               case VARIANT_MV88F6281:
->> +               case VARIANT_MV88F6282:
->> +                       soc->controls = mv88f628x_mpp_controls;
->> +                       soc->ncontrols = 
->> ARRAY_SIZE(mv88f628x_mpp_controls);
->> +                       soc->modes = mv88f6xxx_mpp_modes;
->> +                       soc->nmodes = 
->> ARRAY_SIZE(mv88f6xxx_mpp_modes);
->> +                       soc->gpioranges = mv88f628x_gpio_ranges;
->> +                       soc->ngpioranges = 
->> ARRAY_SIZE(mv88f628x_gpio_ranges);
->> +                       break;
->> +               }
->> +               pdev->dev.platform_data = soc;
->> +       }
->> +       return mvebu_pinctrl_probe(pdev);
->> +}
+Device tree support for tlv320aic3x CODEC driver.
 
-Why not have structures defining the soc-> parameters and use that in 
-the
-of_match list?
+Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
+---
+Changes from V1:
+	- use standard DT GPIO reference by phandle to populate gpio based DT
+	  parameters
 
+:000000 100644 0000000... e7b98f4... A	Documentation/devicetree/bindings/sound/tlv320aic3x.txt
+:100644 100644 01485bd... 5708a97... M	sound/soc/codecs/tlv320aic3x.c
+ .../devicetree/bindings/sound/tlv320aic3x.txt      |   20 +++++++++++++
+ sound/soc/codecs/tlv320aic3x.c                     |   31 ++++++++++++++++++++
+ 2 files changed, 51 insertions(+), 0 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/sound/tlv320aic3x.txt b/Documentation/devicetree/bindings/sound/tlv320aic3x.txt
+new file mode 100644
+index 0000000..e7b98f4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/tlv320aic3x.txt
+@@ -0,0 +1,20 @@
++Texas Instruments - tlv320aic3x Codec module
++
++The tlv320aic3x serial control bus communicates through I2C protocols
++
++Required properties:
++- compatible - "string" -  "ti,tlv320aic3x"
++- reg - <int> -  I2C slave address
++
++
++Optional properties:
++
++- gpio-reset - gpio pin number used for codec reset
++- ai3x-gpio-func - <array of 2 int> - AIC3X_GPIO1 & AIC3X_GPIO2 Functionality
++
++Example:
++
++tlv320aic3x: tlv320aic3x at 1b {
++	compatible = "ti,tlv320aic3x";
++	reg = <0x1b>;
++};
+diff --git a/sound/soc/codecs/tlv320aic3x.c b/sound/soc/codecs/tlv320aic3x.c
+index 01485bd..5708a97 100644
+--- a/sound/soc/codecs/tlv320aic3x.c
++++ b/sound/soc/codecs/tlv320aic3x.c
+@@ -40,6 +40,7 @@
+ #include <linux/i2c.h>
+ #include <linux/gpio.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/of_gpio.h>
+ #include <linux/slab.h>
+ #include <sound/core.h>
+ #include <sound/pcm.h>
+@@ -1457,6 +1458,8 @@ static int aic3x_i2c_probe(struct i2c_client *i2c,
+ {
+ 	struct aic3x_pdata *pdata = i2c->dev.platform_data;
+ 	struct aic3x_priv *aic3x;
++	struct aic3x_setup_data *ai3x_setup;
++	struct device_node *np = i2c->dev.of_node;
+ 	int ret;
+ 
+ 	aic3x = devm_kzalloc(&i2c->dev, sizeof(struct aic3x_priv), GFP_KERNEL);
+@@ -1471,6 +1474,25 @@ static int aic3x_i2c_probe(struct i2c_client *i2c,
+ 	if (pdata) {
+ 		aic3x->gpio_reset = pdata->gpio_reset;
+ 		aic3x->setup = pdata->setup;
++	} else if (np) {
++		ai3x_setup = devm_kzalloc(&i2c->dev, sizeof(*ai3x_setup),
++								GFP_KERNEL);
++		if (ai3x_setup == NULL) {
++			dev_err(&i2c->dev, "failed to create private data\n");
++			return -ENOMEM;
++		}
++
++		ret = of_get_named_gpio(np, "gpio-reset", 0);
++		if (ret >= 0)
++			aic3x->gpio_reset = ret;
++		else
++			aic3x->gpio_reset = -1;
++
++		if (of_property_read_u32_array(np, "ai3x-gpio-func",
++					ai3x_setup->gpio_func, 2) >= 0) {
++			aic3x->setup = ai3x_setup;
++		}
++
+ 	} else {
+ 		aic3x->gpio_reset = -1;
+ 	}
+@@ -1488,11 +1510,20 @@ static int aic3x_i2c_remove(struct i2c_client *client)
+ 	return 0;
+ }
+ 
++#if defined(CONFIG_OF)
++static const struct of_device_id tlv320aic3x_of_match[] = {
++	{ .compatible = "ti,tlv320aic3x", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, tlv320aic3x_of_match);
++#endif
++
+ /* machine i2c codec control layer */
+ static struct i2c_driver aic3x_i2c_driver = {
+ 	.driver = {
+ 		.name = "tlv320aic3x-codec",
+ 		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(tlv320aic3x_of_match),
+ 	},
+ 	.probe	= aic3x_i2c_probe,
+ 	.remove = aic3x_i2c_remove,
 -- 
-Ben
+1.7.1
