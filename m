@@ -1,32 +1,20 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 27 Aug 2012 13:45:51 -0700
-Subject: [PATCH] ASoC: SAMSUNG: Add SND_SOC_DAIFMT_CONT option for
- snd_soc_set_fmt()
-In-Reply-To: <003101cd8367$3476e650$9d64b2f0$@samsung.com>
-References: <003101cd8367$3476e650$9d64b2f0$@samsung.com>
-Message-ID: <20120827204550.GA4400@opensource.wolfsonmicro.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 28 Aug 2012 04:45:56 +0800
+Subject: [PATCH V3] ARM: mxs: Update DENX M28 machine and dts file
+In-Reply-To: <1345985971-12061-1-git-send-email-marex@denx.de>
+References: <1345985971-12061-1-git-send-email-marex@denx.de>
+Message-ID: <20120827204554.GA2281@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 26, 2012 at 05:45:54PM +0900, ????? wrote:
-> SND_SOC_DAIFMT_CONT option is now needed because of below commit:
+On Sun, Aug 26, 2012 at 02:59:31PM +0200, Marek Vasut wrote:
+> Update the mach-mxs machine by removing the enet_clkout(). The new
+> revision of the board doesn't need that. Also, update the DTS file
+> with all the new drivers pulled in the mainline recently, that is,
+> SPI, LRADC, USB.
 > 
-> ASoC: Allow DAI formats to be specified in the dai_link
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
 
-Clearly it's not a direct consequence of this commit, that just
-introduces a new optional facility which...
-
->  	/* Set the cpu DAI configuration */
->  	ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_DSP_B
-> +				| SND_SOC_DAIFMT_CONT
->  				| SND_SOC_DAIFMT_IB_NF
->  				| SND_SOC_DAIFMT_CBS_CFS);
-
-...isn't being used by the driver.
-
-Looking at the above it looks like the PCM driver is doing something
-very odd - _CONT doesn't make a whole lot of sense on the slave side,
-it's related to the clock generation so should have no effect at all on
-the slave side.  The driver code looks reasonably sensible though.
-
-What specifically is going wrong here?
+Applied, thanks.
