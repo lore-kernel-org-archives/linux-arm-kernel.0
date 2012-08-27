@@ -1,62 +1,44 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 28 Aug 2012 02:26:13 +0300
-Subject: [PATCH] arm: omap: ratelimit omap_l3_smx error log spam
-In-Reply-To: <CAMQu2gz9HE0xEoW7gu257rpLWdCUpt7N6GQNQzWVhFb-A+69hg@mail.gmail.com>
-References: <1346101403-5882-1-git-send-email-aaro.koskinen@iki.fi>
- <CAMQu2gyEctrq_3K8W6VahMW-ODOiv7TjrBfPTkZqNGJ+0m9ozw@mail.gmail.com>
- <20120827220254.GA783@harshnoise.musicnaut.iki.fi>
- <CAMQu2gz9HE0xEoW7gu257rpLWdCUpt7N6GQNQzWVhFb-A+69hg@mail.gmail.com>
-Message-ID: <20120827232613.GB783@harshnoise.musicnaut.iki.fi>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 27 Aug 2012 16:33:43 -0700
+Subject: [PATCH 0/3] Removal of obsolete s3c2410_* GPIO API
+In-Reply-To: <1345897243-15619-1-git-send-email-sylvester.nawrocki@gmail.com>
+References: <1345897243-15619-1-git-send-email-sylvester.nawrocki@gmail.com>
+Message-ID: <503C03D7.5050801@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 03:12:07PM -0700, Shilimkar, Santosh wrote:
-> On Mon, Aug 27, 2012 at 3:02 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-> > Hi,
-> >
-> > On Mon, Aug 27, 2012 at 02:35:57PM -0700, Shilimkar, Santosh wrote:
-> >> > -       pr_err("%s seen by %s %s at address %x\n",
-> >> > +       pr_err_ratelimited("%s seen by %s %s at address %x\n",
-> >> >                         omap3_l3_code_string(code),
-> >> >                         omap3_l3_initiator_string(initid),
-> >> >                         multi ? "Multiple Errors" : "", address);
-> >> > -       WARN_ON(1);
-> >> > +       WARN_ON_ONCE(1);
-> >> >
-> >> The issue needs to be fixed instead of WARN_ON_ONCE() and then
-> >> just moving ahead. Interconnect in bad states is really bad state and you
-> >> won't have reliable operations post that on SOC.
-> >
-> > How printing megabytes of identical stack traces helps anything?
-> >
-> It just says repeatedly and  loudly... Fix the issue :-)
-> 
-> > This has been there always (since the L3 driver was added) on every boot
-> > with N950/N9 (which BTW are HS devices, not sure if that has anything
-> > to do with it). There is no apparent effect on device functionality,
-> > at least nothing unusual has been observed...
-> >
-> I assumed this is secure device when I saw the SRAM memset is causing the
-> issue.
-> 
-> > Is there any documentation how to interpret and debug this error report?
-> >
-> The issue could be, there is memset tried on Secure portion of SRAM or
-> CPU speculatively accessed adjacent SRAM region of public SRAM which
-> is secure and hence the error.
+On 08/25/12 05:20, Sylwester Nawrocki wrote:
+> This short patch series converts remaining users of the s3c24xx SoC
+> specific gpiolib functions to the gpiolib API and finally removes
+> all s3c2410_* functions from drivers/gpio/gpio-samsung.c.
+>
+> Sylwester Nawrocki (3):
+>    ARM: S3C24XX: Convert users of s3c2410_gpio_setpin to gpiolib API
+>    ARM: S3C24XX: Remove obsolete GPIO API declarations
+>    gpio-samsung: Remove now unused s3c2410_gpio* API
+>
+>   arch/arm/mach-s3c24xx/mach-anubis.c           |    3 +-
+>   arch/arm/mach-s3c24xx/mach-jive.c             |   12 ++--
+>   arch/arm/mach-s3c24xx/mach-mini2440.c         |    4 +-
+>   arch/arm/mach-s3c24xx/mach-nexcoder.c         |   22 +++---
+>   arch/arm/mach-s3c24xx/mach-osiris.c           |    7 +-
+>   arch/arm/plat-samsung/include/plat/gpio-fns.h |   97 -------------------------
+>   drivers/gpio/gpio-samsung.c                   |   40 ----------
+>   7 files changed, 25 insertions(+), 160 deletions(-)
+>
 
-Thanks, that makes sense.
+Nice cleanup.
 
-> If you just bypass the SRAM init [1], does the issue go away ?
+Accordingly, we need to sort out the 
+'Documentation/arm/Samsung-S3C24XX/GPIO.txt' later?
 
-I tried bypassing the whole SRAM init, but the device does not seem to
-boot up at all.
+Linus, this series should be sent to upstream via both trees, samsung 
+and gpio to avoid useless merge conflicts. How do you think?
 
-If I comment out the memset alone, then it boots and the issue is gone:
+Thanks.
 
-+#if 0
-	memset_io(omap_sram_base + SRAM_BOOTLOADER_SZ, 0,
-		  omap_sram_size - SRAM_BOOTLOADER_SZ);
-+#endif
-
-A.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
