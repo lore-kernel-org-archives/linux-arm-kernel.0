@@ -1,46 +1,48 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Mon, 27 Aug 2012 16:56:44 +0800
-Subject: Question about ION carveout heap support partial cache flush
-In-Reply-To: <20120827082914.GN18957@n2100.arm.linux.org.uk>
-References: <CAMj5BkgffAW6azUjwz+iCF1tBLmBDRBvBjR-_fTr=4G=h+BLZw@mail.gmail.com>
- <CAN1soZyZ=4wjKkVrk5--2U_8SeT7qee9QAfhss7NgqtQAz+RrA@mail.gmail.com>
- <CAMj5BkiVq9ayJjUrwh3S-gDfezUTNiPFW-xd_dsbTJYTyLv2WQ@mail.gmail.com>
- <20120827082914.GN18957@n2100.arm.linux.org.uk>
-Message-ID: <CAMj5BkjqUNV2o_BMyHH8C5ZCsUf6qChamc6h4H-a9otEGVBx4A@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 27 Aug 2012 11:57:04 +0300
+Subject: [PATCH] gpio: samsung: add devicetree init for s3c24xx arches
+In-Reply-To: <201208271001.05026.heiko@sntech.de>
+References: <201208252353.59345.heiko@sntech.de>
+ <CAJuYYwQBOP7-D0fepDsCr+43ASKQ3CmMBMH-M79QH7r=xS85Eg@mail.gmail.com>
+ <201208271001.05026.heiko@sntech.de>
+Message-ID: <CA+E=qVfV1DL1ikjVnLd7qTeCx9C8Z7dGvhh_9NSgxPYrOCJ=0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 4:29 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Aug 27, 2012 at 04:23:31PM +0800, zhangfei gao wrote:
->> On Mon, Aug 27, 2012 at 1:46 PM, Haojian Zhuang
->> <haojian.zhuang@gmail.com> wrote:
->> > Let me summerize it. First, user space address is mapped. Then,
->> > flushing user space
->> > address is triggered. It's a workaround of fixing non-existed virtual
->> > address without fixing
->> > vmap() or any other solution. It's just a quick fix.
->> >
->> > Zhangfei,
->> > I doubt that the issue may be caused by missing memory barrier.
->> > Flushing is using
->> > coprocessor instructions. It's a little different.
->>
->> Is there any limitation that dmac_map_area & dmac_flush_range
->> supporting addr mapped from user space?
+Hi,
+
+On Mon, Aug 27, 2012 at 11:01 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> Hi Thomas,
 >
-> They DEFINITELY DO NOT SUPPORT FLUSHING USER SPACE.
+> thanks for your review:
+>
+> Hmmm, but the logic to drive the gpio controller is the same for all arches.
+> The only difference is the number to use for the different pull up/down
+> settings. So I think the "samsung,s3c24xx-gpio" is ok but the documentation
+> should simply reflect the different pull settings.
+>
 
-Thanks Russell
+Also s3c2410 and s3c2440 has different count of GPIOs. And that could
+be a problem on machines
+with GPIO-expanders (h1940 machine)
 
-Any suggestion of flushing cache according to cache line, instead of PAGE_SIZE.
-In order to get specific area, we use addr from user directly, which
-may not be the PAGE start.
+>> It would be informative to add information about the 'mux function'
+>> cell here as well. Specifically, on how to handle the banks that have
+>> an extended GPxSEL register that allow additional pin function
+>> selection.
+>
+> Will add a mux function description.
+>
+> Until now I've never realised the existence of the GPxSEL registers, so thanks
+> for the pointer :-).
+>
+> But is this used in the driver at all? All the setcfg/getcfg functions in
+> gpio-samsung.c only handle the GPxCON registers - I haven't found code to
+> handle the GPxSEL registers at all. So my guess is that this was never
+> implemented - or that I'm blind ;-) .
 
-We have some usage case to flush cache according to cache line.
-CPU - cache - ddr - gpu
-1. For correctness, driver only flush used size, if align to PAGE_SIZE,
-other area may be flushed by mistake.
-2. for efficiency, cache line align will be perfered.
+There're no GPxSEL registers on s3c2410/s3c2440/s3c2442. Is it
+something s3c2412/sec2416 specific?
 
-Thanks
+Regards
+Vasily
