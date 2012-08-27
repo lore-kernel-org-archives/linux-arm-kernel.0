@@ -1,40 +1,47 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Mon, 27 Aug 2012 09:36:52 +0200
-Subject: [PATCH 2/2] tty: serial: imx: don't reinit clock with enabled console
-In-Reply-To: <1346053012-25686-1-git-send-email-dirk.behme@de.bosch.com>
-References: <1346053012-25686-1-git-send-email-dirk.behme@de.bosch.com>
-Message-ID: <1346053012-25686-3-git-send-email-dirk.behme@de.bosch.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Mon, 27 Aug 2012 15:24:38 +0800
+Subject: [PATCH v2 0/7] add syscon driver based on regmap for general
+ registers access
+Message-ID: <1346052285-4344-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xinyu Chen <xinyu.chen@freescale.com>
+This patch series mainly adds an syscon driver which is used to access
+general system controller registers like FSL IOMUXC GPR and ANATOP,
+after that, we convert all the exist private access general registers code to use
+standard API from regmap to access registers.
+Finally we remove the old mfd anatop driver which is only for anatop register
+access.
 
-Remove the imx_setup_ufcr() call on startup when CONSOLE enabled,
-as this will cause clock reinit, and output garbage.
+The patch series is based on linus's tree 3.6-rc3 since commit 9160338.
 
-This patch is a port from Freescale's Android kernel.
+Dong Aisheng (7):
+  mfd: add syscon driver based on regmap
+  ARM: imx6q: add iomuxc gpr support into syscon
+  ARM: imx6q: add anatop support into syscon
+  regulator: anatop-regulator: convert to use syscon to access anatop
+    register
+  ARM: imx6q: convert to use syscon to access anatop registers
+  ARM: dts: imx6q: add simple-bus compatible string for anatop
+  mfd: anatop-mfd: remove anatop driver
 
-Signed-off-by: Xinyu Chen <xinyu.chen@freescale.com>
-Tested-by: Dirk Behme <dirk.behme@de.bosch.com>
-CC: Shawn Guo <shawn.guo@linaro.org>
-CC: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/tty/serial/imx.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 908178f..31ce414 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -695,7 +695,9 @@ static int imx_startup(struct uart_port *port)
- 	int retval;
- 	unsigned long flags, temp;
- 
-+#ifndef CONFIG_SERIAL_CORE_CONSOLE
- 	imx_setup_ufcr(sport, 0);
-+#endif
- 
- 	/* disable the DREN bit (Data Ready interrupt enable) before
- 	 * requesting IRQs
--- 
-1.7.0.4
+ .../devicetree/bindings/mfd/imx-syscon.txt         |   11 +
+ arch/arm/boot/dts/imx6q.dtsi                       |   15 +-
+ arch/arm/mach-imx/Kconfig                          |    2 +-
+ arch/arm/mach-imx/mach-imx6q.c                     |   43 ++--
+ drivers/mfd/Kconfig                                |   13 +-
+ drivers/mfd/Makefile                               |    2 +-
+ drivers/mfd/anatop-mfd.c                           |  124 --------
+ drivers/mfd/syscon.c                               |  169 +++++++++++
+ drivers/regulator/Kconfig                          |    2 +-
+ drivers/regulator/anatop-regulator.c               |   25 +-
+ include/linux/fsl/imx6q-iomuxc-gpr.h               |  319 ++++++++++++++++++++
+ include/linux/mfd/anatop.h                         |   40 ---
+ include/linux/mfd/syscon.h                         |   22 ++
+ 13 files changed, 576 insertions(+), 211 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/imx-syscon.txt
+ delete mode 100644 drivers/mfd/anatop-mfd.c
+ create mode 100644 drivers/mfd/syscon.c
+ create mode 100644 include/linux/fsl/imx6q-iomuxc-gpr.h
+ delete mode 100644 include/linux/mfd/anatop.h
+ create mode 100644 include/linux/mfd/syscon.h
