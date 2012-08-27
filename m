@@ -1,20 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 28 Aug 2012 07:37:59 +0800
-Subject: [PATCH 0/2] tty: serial: imx: fix lockup and garbage on SMP
-In-Reply-To: <20120827225142.GA11302@kroah.com>
-References: <1346053012-25686-1-git-send-email-dirk.behme@de.bosch.com>
- <20120827223134.GD2281@r65073-Latitude-D630>
- <20120827225142.GA11302@kroah.com>
-Message-ID: <20120827233756.GH2281@r65073-Latitude-D630>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 27 Aug 2012 17:36:06 -0600
+Subject: [PATCH 0/5] hwrng/ARM: OMAP: convert to use runtime PM
+Message-ID: <20120827232922.15045.56522.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 03:51:42PM -0700, Greg Kroah-Hartman wrote:
-> On both of them?  I can do that if needed.  How far back should they go?
-> 
-It should be okay to apply on 3.4 and 3.5.  But patch #2 is still in
-question.  I do not like the #ifdef.
+This series converts the OMAP hardware random number generator driver
+to use runtime PM.  Hardware integration data is added for OMAP2xxx
+systems.  I'm pretty sure this device is available on other OMAP chips
+too, but may require some experimentation with the integration details.
 
--- 
-Regards,
-Shawn
+There are still a few rough edges with this series.  Something is
+still not right with the reset behavior on OMAP2430, at least.  But it
+would be good to get acks from the hwrng folks for the three patches that
+touch files in that directory.  Will continue with the testing process
+here.
+
+
+- Paul
+
+---
+
+Paul Walmsley (5):
+      ARM: OMAP2/3: hwmod: add RNG integration data
+      hwrng: OMAP: store per-device data in per-device variables, not file statics
+      hwrng: OMAP: convert to use runtime PM
+      ARM: OMAP: split OMAP1, OMAP2+ RNG device registration
+      hwrng: OMAP: remove SoC restrictions from driver registration
+
+
+ arch/arm/mach-omap1/devices.c                      |   28 +++++
+ arch/arm/mach-omap2/devices.c                      |   18 +++
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |    1 
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |    1 
+ .../mach-omap2/omap_hwmod_2xxx_interconnect_data.c |   17 +++
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |   37 ++++++
+ arch/arm/mach-omap2/omap_hwmod_common_data.h       |    5 -
+ arch/arm/plat-omap/Makefile                        |    3 
+ arch/arm/plat-omap/devices.c                       |   92 ---------------
+ drivers/char/hw_random/omap-rng.c                  |  121 ++++++++++++--------
+ 10 files changed, 176 insertions(+), 147 deletions(-)
+ delete mode 100644 arch/arm/plat-omap/devices.c
