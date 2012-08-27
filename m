@@ -1,36 +1,35 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Aug 2012 00:49:45 +0100
-Subject: [PATCH 3/6] arm: cache-l2x0: add support for Aurora L2 cache ctrl
-In-Reply-To: <503BAEE7.5080401@free-electrons.com>
-References: <1345799361-23735-1-git-send-email-gregory.clement@free-electrons.com>
- <1345799361-23735-4-git-send-email-gregory.clement@free-electrons.com>
- <20120824104309.GE5400@mudshark.cambridge.arm.com>
- <5037776A.6050605@free-electrons.com>
- <503BAEE7.5080401@free-electrons.com>
-Message-ID: <20120827234944.GB7804@mudshark.cambridge.arm.com>
+Date: Tue, 28 Aug 2012 00:59:32 +0100
+Subject: [PATCH] ARM: MSM: Implement read_current_timer for msm timers
+In-Reply-To: <1346102319-24497-1-git-send-email-sboyd@codeaurora.org>
+References: <1345817604-9004-2-git-send-email-will.deacon@arm.com>
+ <1346102319-24497-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20120827235932.GA8468@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 06:31:19PM +0100, Gregory CLEMENT wrote:
-> On 08/24/2012 02:45 PM, Gregory CLEMENT wrote:
-> > On 08/24/2012 12:43 PM, Will Deacon wrote:> On Fri, Aug 24, 2012 at 10:09:18AM +0100, Gregory CLEMENT wrote:
-> >> 2. I'm surprised that there aren't barriers and/or maintenance operations
-> >>    needed around this operation. It might be worth checking in the
-> >>    documentation that you have (you probably need at least an isb()
-> >>    following the mcr).
-> > 
-> > I didn't find any mention of barriers and/or maintenance operations
-> > needed around this operation, but maybe I have missed something, or it
-> > was implicit for the people who wrote the documentation. I will ask
-> > confirmation that we don't need this.
+On Mon, Aug 27, 2012 at 10:18:39PM +0100, Stephen Boyd wrote:
+> Setup the same timer used as the clocksource to be used as the
+> read_current_timer implementation. This allows us to support a
+> stable udelay implementation on MSMs where it's possible for the
+> CPUs to scale speeds independently of one another.
 > 
-> I've just received confirmation that this register is  r/w from non-secure.
-> And that it would be good practice to have an ISB after this MCR, so I
-> will add this for the next version coming soon.
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+> 
+> I have some patches to send that add DT support to the MSM timer that
+> this conflicts with slightly. I'm not too concerned though, but we may
+> want to decide what tree this goes through when I send out those patches.
 
-That sounds about right, thanks for checking. Can you also confirm that
-we don't need an explicit L2 invalidation, like we have for the
-memory-mapped interface?
+Cheers Stephen, this looks good to me. After looking at this code some more
+I think I'll change the read_current_timer function pointer type to be:
+
+	unsigned long (*read_current_timer)(void);
+
+since it doesn't make sense to return an error code from the platform
+implementation (in fact, it will cause havoc in the delay loop).
+
+I'll post a new patch -- rebasing your code should be trivial.
 
 Cheers,
 
