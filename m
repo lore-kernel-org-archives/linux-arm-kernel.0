@@ -1,49 +1,125 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Mon, 27 Aug 2012 22:12:09 +0200
-Subject: [PATCH] ARM: S3C24XX: Add .get_rate callback for "camif-upll" clock
-Message-ID: <1346098329-32059-1-git-send-email-sylvester.nawrocki@gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 27 Aug 2012 15:30:13 -0500
+Subject: [PATCH v6 07/10] ARM: OMAP2+: gpmc: generic timing calculation
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E9BA63D@DBDE01.ent.ti.com>
+References: <cover.1345524670.git.afzal@ti.com>
+ <83b963e4ebcc1009a26a8c6419c785ac6d742c0b.1345524670.git.afzal@ti.com>
+ <50359C64.40603@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9BA63D@DBDE01.ent.ti.com>
+Message-ID: <503BD8D5.5060400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing get_rate callback for the "camif-upll" clock, so frequency
-of this clock is properly reported with clk_get_rate().
+Hi Afzal,
 
-Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
----
- arch/arm/mach-s3c24xx/clock-s3c2440.c |   14 ++++++++++++++
- 1 files changed, 14 insertions(+), 0 deletions(-)
+On 08/27/2012 05:37 AM, Mohammed, Afzal wrote:
+> On Thu, Aug 23, 2012 at 08:28:44, Hunter, Jon wrote:
 
-diff --git a/arch/arm/mach-s3c24xx/clock-s3c2440.c b/arch/arm/mach-s3c24xx/clock-s3c2440.c
-index cb2883d..749220f 100644
---- a/arch/arm/mach-s3c24xx/clock-s3c2440.c
-+++ b/arch/arm/mach-s3c24xx/clock-s3c2440.c
-@@ -87,6 +87,19 @@ static int s3c2440_camif_upll_setrate(struct clk *clk, unsigned long rate)
- 	return 0;
- }
+[snip]
 
-+static unsigned long s3c2440_camif_upll_getrate(struct clk *clk)
-+{
-+	unsigned long parent_rate = clk_get_rate(clk->parent);
-+	unsigned long camdivn =  __raw_readl(S3C2440_CAMDIVN);
-+
-+	if (!(camdivn & S3C2440_CAMDIVN_CAMCLK_SEL))
-+		return parent_rate;
-+
-+	camdivn &= S3C2440_CAMDIVN_CAMCLK_MASK;
-+
-+	return parent_rate / (camdivn + 1) / 2;
-+}
-+
- /* Extra S3C2440 clocks */
+>> I understand that this is based upon how timings for onenand and tusb
+>> are being calculated today, but I am not sure that this is the way to go
+>> for all devices. Personally, I would like to see us get away from how
+>> those devices are calculating timings for any new device.
+> 
+> You cannot do away with many of the those, as logically they
+> are right. Eg. read data should be available at access time,
+> assuming a zero data hold time, we can very well derive an
+> expression as,
 
- static struct clk s3c2440_clk_cam = {
-@@ -99,6 +112,7 @@ static struct clk s3c2440_clk_cam_upll = {
- 	.name		= "camif-upll",
- 	.ops		= &(struct clk_ops) {
- 		.set_rate	= s3c2440_camif_upll_setrate,
-+		.get_rate	= s3c2440_camif_upll_getrate,
- 		.round_rate	= s3c2440_camif_upll_round,
- 	},
- };
---
-1.7.4.1
+I am not saying that we do away with them for current devices, just
+maintain them as is.
+
+> read de-assertion time (oe_off) = access time plus 1 gpmc clock,
+> 
+> and this is what the existing calculations do, and also the
+> generic routine. There could be other constraints, but this
+> certainly should be one (I do realize that oe_off could be
+> optimized to be less than access time, by relying on read
+> hold time, then again effect of it would be in similar way
+> for different peripherals, but let's forget about
+> optimization in the beginning)
+> 
+>> In general, I am concerned that we are abstracting the timings further
+>> from the actual register fields. For example, the timings parameter
+>> "t_ceasu" is described "address setup to CS valid" which is not
+>> incorrect but this value is really just programming the CSONTIME field
+>> and so why not call this cs_on?
+> 
+> Timing fields of struct gpmc_device_timings are selected such
+> that they should be bindable by DT. At least one of the peripheral
+> datasheet has these fields.
+
+Right, but these are not applicable to every device and so I worry this
+could be confusing. However, more documentation may help clear this up.
+
+> If user knows timings in terms of
+> gpmc values, he can directly use struct gpmc_timings, but
+> then all the values should be updated in struct gpmc_timings.
+> User should not update some of the values in terms of
+> peripheral timings, others in terms of gpmc timings, that
+> would make things complex and does not seem the right way
+> to me.
+> 
+> cs_on and other gpmc aware timings could be binded by DT, not as
+> peripheral timing, but as gpmc timing.
+> 
+> Bindings for peripheral DT timings should be something that
+> can be obtained from peripheral datasheet, here accidentally
+> it is same as gpmc timings, but not most timings are this way.
+> Also there could be other constraints that can come for cs_on,
+> even though I have not come across any till now.
+> 
+>>
+>> So although this may consolidate how the timings are calculated today, I
+>> am concerned it will be confusing to add timings for a new device. At
+>> least if I am calculating timings, I am taking the timing information
+>> for the device and translating that to the how I need to program the
+>> gpmc register fields.
+> 
+> If I am not wrong, GPMC IP has been present for around a
+> decade, and so far I have not come across any generic time
+> calculation method that can be applied to all peripherals.
+
+Yes not an easy problem to solve :-(
+
+> Getting to work same peripheral for a different gpmc
+> frequency is another problem.
+> 
+> Here we are trying to generalize based on the understanding of
+> gpmc & peripheral timings, as well as by a kind of reverse
+> engineering without most of the hardware or datasheet. Think of
+> this as an attempt to create one, let it evolve and become a
+> robust one. If a new user want to add a peripheral, let him add
+> support, input timings are selected such that it is found in
+> peripheral datasheet, if that does not work, let him try
+> to add any new timing field or alter existing expression
+> as he deems to be proper and verify that it does not break
+> others. And I can help provided I am not heavily loaded
+> with other works.
+
+So long as it is maintainable ;-)
+
+> And at least for initial users, they are expected to have
+> some grasp on how to calculate timings, such a user will
+> not be much worried about your 3 concerns above, anyway as
+> of now they need to have a good grasp on it.
+
+I would consider myself to be an initial user and I am concerned,
+doesn't that count?
+
+An example, would be the following where you have 4 timing parameters
+for access time. You need to dig through the code to understand how
+these are being used.
+
++	u32     t_aa;		/* access time from ADV assertion */
++	u32     t_iaa;		/* initial access time */
++	u32     t_oe;		/* access time from OE assertion */
++	u32     t_ce;		/* access time from CS asertion */
+
+> Meanwhile I will try to document more.
+
+Yes more documentation is definitely needed.
+
+Cheers
+Jon
