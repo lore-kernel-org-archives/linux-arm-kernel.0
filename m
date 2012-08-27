@@ -1,33 +1,55 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 27 Aug 2012 09:52:42 -0700
-Subject: [PATCH] dma: imx-dma: Fix kernel crash due to missing clock
- conversion
-In-Reply-To: <20120827163006.0cffd20c@eb-e6520>
-References: <1341341045-9472-1-git-send-email-fabio.estevam@freescale.com>
- <20120827163006.0cffd20c@eb-e6520>
-Message-ID: <20120827165242.GA11102@kroah.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 27 Aug 2012 18:58:16 +0200
+Subject: [PATCH 1/3] ARM: mx28evk: Add SPI flash support
+In-Reply-To: <1346084609-31407-1-git-send-email-fabio.estevam@freescale.com>
+References: <1346084609-31407-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <201208271858.16842.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 04:30:06PM +0200, Eric B?nard wrote:
-> Hi Greg, Hi Fabio,
-> 
-> this patch went into 3.4.10 as commit
-> 9ea2c02bafe276e97b592a046ac733610a6d57fd
-> which seems wrong as devm_clk_get seems to be added in linux-3.5 so
-> compiling a 3.4.10 kernel with imx-dma enabled now leads :
-> 
-> drivers/dma/imx-dma.c: In function 'imxdma_probe':
-> drivers/dma/imx-dma.c:980: error: implicit declaration of function
-> 'devm_clk_get'
-> drivers/dma/imx-dma.c:980: warning: assignment makes pointer from
-> integer without a cast
-> drivers/dma/imx-dma.c:986: warning: assignment makes pointer from
-> integer without a cast
-> 
-> Reverting 9ea2c02bafe276e97b592a046ac733610a6d57fd allows to get a
-> 3.4.10 kernel running fine on an i.MX35.
+Dear Fabio Estevam,
 
-Ok, should I just revert it?  It's still needed on 3.5, right?
+> mx28evk has a free slot (J89) which can be used to populate an SPI NOR
+> Flash.
+> 
+> Add support for it.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx28-evk.dts |   17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx28-evk.dts
+> b/arch/arm/boot/dts/imx28-evk.dts index ab78ee5..8a9a2f4 100644
+> --- a/arch/arm/boot/dts/imx28-evk.dts
+> +++ b/arch/arm/boot/dts/imx28-evk.dts
+> @@ -46,6 +46,23 @@
+>  				wp-gpios = <&gpio0 28 0>;
+>  			};
+> 
+> +			ssp2: ssp at 80014000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "fsl,imx28-spi";
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&spi2_pins_a>;
+> +				status = "okay";
+> +
+> +				flash: m25p80 at 0 {
 
-greg k-h
+Shouldn't this also be sst25vf016b at 0 ?
+
+> +					#address-cells = <1>;
+> +					#size-cells = <1>;
+> +					compatible = "sst,sst25vf016b";
+> +					spi-max-frequency = <40000000>;
+> +					reg = <0>;
+> +				};
+> +			};
+> +
+>  			pinctrl at 80018000 {
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&hog_pins_a>;
+
+Best regards,
+Marek Vasut
