@@ -1,1006 +1,484 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 27 Aug 2012 15:45:53 +0200
-Subject: [PATCH V2 4/4] ARM: ux500: Switch to use common clock framework
+Date: Mon, 27 Aug 2012 15:45:52 +0200
+Subject: [PATCH V2 3/4] clk: ux500: Clock definitions for u8500
 In-Reply-To: <1346075153-14180-1-git-send-email-ulf.hansson@stericsson.com>
 References: <1346075153-14180-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1346075153-14180-5-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1346075153-14180-4-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ulf Hansson <ulf.hansson@linaro.org>
 
-Remove machine specific clock implementation and switch to use
-new common clock framework.
+First version of clock definitions of PRCMU and PRCC clocks
+for the u8500 platform.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm/mach-ux500/Kconfig  |    1 +
- arch/arm/mach-ux500/Makefile |    2 +-
- arch/arm/mach-ux500/clock.c  |  715 ------------------------------------------
- arch/arm/mach-ux500/clock.h  |  164 ----------
- arch/arm/mach-ux500/cpu.c    |   14 +-
- drivers/clk/Makefile         |    1 +
- 6 files changed, 11 insertions(+), 886 deletions(-)
- delete mode 100644 arch/arm/mach-ux500/clock.c
- delete mode 100644 arch/arm/mach-ux500/clock.h
+ drivers/clk/ux500/u8500_clk.c |  454 ++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 453 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-index c013bbf..2d76e4f 100644
---- a/arch/arm/mach-ux500/Kconfig
-+++ b/arch/arm/mach-ux500/Kconfig
-@@ -11,6 +11,7 @@ config UX500_SOC_COMMON
- 	select CACHE_L2X0
- 	select PINCTRL
- 	select PINCTRL_NOMADIK
-+	select COMMON_CLK
+diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
+index 2bc4901..5c1fca1 100644
+--- a/drivers/clk/ux500/u8500_clk.c
++++ b/drivers/clk/ux500/u8500_clk.c
+@@ -17,5 +17,457 @@
  
- config UX500_SOC_DB8500
- 	bool
-diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index 026086f..5691ef6 100644
---- a/arch/arm/mach-ux500/Makefile
-+++ b/arch/arm/mach-ux500/Makefile
-@@ -2,7 +2,7 @@
- # Makefile for the linux kernel, U8500 machine.
- #
- 
--obj-y				:= clock.o cpu.o devices.o devices-common.o \
-+obj-y				:= cpu.o devices.o devices-common.o \
- 				   id.o usb.o timer.o
- obj-$(CONFIG_CPU_IDLE)          += cpuidle.o
- obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
-diff --git a/arch/arm/mach-ux500/clock.c b/arch/arm/mach-ux500/clock.c
-deleted file mode 100644
-index 8d73b06..0000000
---- a/arch/arm/mach-ux500/clock.c
-+++ /dev/null
-@@ -1,715 +0,0 @@
--/*
-- *  Copyright (C) 2009 ST-Ericsson
-- *  Copyright (C) 2009 STMicroelectronics
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/module.h>
--#include <linux/kernel.h>
--#include <linux/list.h>
--#include <linux/errno.h>
--#include <linux/err.h>
--#include <linux/clk.h>
--#include <linux/io.h>
--#include <linux/clkdev.h>
--#include <linux/cpufreq.h>
--
--#include <plat/mtu.h>
--#include <mach/hardware.h>
--#include "clock.h"
--
--#ifdef CONFIG_DEBUG_FS
--#include <linux/debugfs.h>
--#include <linux/uaccess.h>	/* for copy_from_user */
--static LIST_HEAD(clk_list);
--#endif
--
--#define PRCC_PCKEN		0x00
--#define PRCC_PCKDIS		0x04
--#define PRCC_KCKEN		0x08
--#define PRCC_KCKDIS		0x0C
--
--#define PRCM_YYCLKEN0_MGT_SET	0x510
--#define PRCM_YYCLKEN1_MGT_SET	0x514
--#define PRCM_YYCLKEN0_MGT_CLR	0x518
--#define PRCM_YYCLKEN1_MGT_CLR	0x51C
--#define PRCM_YYCLKEN0_MGT_VAL	0x520
--#define PRCM_YYCLKEN1_MGT_VAL	0x524
--
--#define PRCM_SVAMMDSPCLK_MGT	0x008
--#define PRCM_SIAMMDSPCLK_MGT	0x00C
--#define PRCM_SGACLK_MGT		0x014
--#define PRCM_UARTCLK_MGT	0x018
--#define PRCM_MSP02CLK_MGT	0x01C
--#define PRCM_MSP1CLK_MGT	0x288
--#define PRCM_I2CCLK_MGT		0x020
--#define PRCM_SDMMCCLK_MGT	0x024
--#define PRCM_SLIMCLK_MGT	0x028
--#define PRCM_PER1CLK_MGT	0x02C
--#define PRCM_PER2CLK_MGT	0x030
--#define PRCM_PER3CLK_MGT	0x034
--#define PRCM_PER5CLK_MGT	0x038
--#define PRCM_PER6CLK_MGT	0x03C
--#define PRCM_PER7CLK_MGT	0x040
--#define PRCM_LCDCLK_MGT		0x044
--#define PRCM_BMLCLK_MGT		0x04C
--#define PRCM_HSITXCLK_MGT	0x050
--#define PRCM_HSIRXCLK_MGT	0x054
--#define PRCM_HDMICLK_MGT	0x058
--#define PRCM_APEATCLK_MGT	0x05C
--#define PRCM_APETRACECLK_MGT	0x060
--#define PRCM_MCDECLK_MGT	0x064
--#define PRCM_IPI2CCLK_MGT	0x068
--#define PRCM_DSIALTCLK_MGT	0x06C
--#define PRCM_DMACLK_MGT		0x074
--#define PRCM_B2R2CLK_MGT	0x078
--#define PRCM_TVCLK_MGT		0x07C
--#define PRCM_TCR		0x1C8
--#define PRCM_TCR_STOPPED	(1 << 16)
--#define PRCM_TCR_DOZE_MODE	(1 << 17)
--#define PRCM_UNIPROCLK_MGT	0x278
--#define PRCM_SSPCLK_MGT		0x280
--#define PRCM_RNGCLK_MGT		0x284
--#define PRCM_UICCCLK_MGT	0x27C
--
--#define PRCM_MGT_ENABLE		(1 << 8)
--
--static DEFINE_SPINLOCK(clocks_lock);
--
--static void __clk_enable(struct clk *clk)
--{
--	if (clk->enabled++ == 0) {
--		if (clk->parent_cluster)
--			__clk_enable(clk->parent_cluster);
--
--		if (clk->parent_periph)
--			__clk_enable(clk->parent_periph);
--
--		if (clk->ops && clk->ops->enable)
--			clk->ops->enable(clk);
--	}
--}
--
--int clk_enable(struct clk *clk)
--{
--	unsigned long flags;
--
--	spin_lock_irqsave(&clocks_lock, flags);
--	__clk_enable(clk);
--	spin_unlock_irqrestore(&clocks_lock, flags);
--
--	return 0;
--}
--EXPORT_SYMBOL(clk_enable);
--
--static void __clk_disable(struct clk *clk)
--{
--	if (--clk->enabled == 0) {
--		if (clk->ops && clk->ops->disable)
--			clk->ops->disable(clk);
--
--		if (clk->parent_periph)
--			__clk_disable(clk->parent_periph);
--
--		if (clk->parent_cluster)
--			__clk_disable(clk->parent_cluster);
--	}
--}
--
--void clk_disable(struct clk *clk)
--{
--	unsigned long flags;
--
--	WARN_ON(!clk->enabled);
--
--	spin_lock_irqsave(&clocks_lock, flags);
--	__clk_disable(clk);
--	spin_unlock_irqrestore(&clocks_lock, flags);
--}
--EXPORT_SYMBOL(clk_disable);
--
--/*
-- * The MTU has a separate, rather complex muxing setup
-- * with alternative parents (peripheral cluster or
-- * ULP or fixed 32768 Hz) depending on settings
-- */
--static unsigned long clk_mtu_get_rate(struct clk *clk)
--{
--	void __iomem *addr;
--	u32 tcr;
--	int mtu = (int) clk->data;
--	/*
--	 * One of these is selected eventually
--	 * TODO: Replace the constant with a reference
--	 * to the ULP source once this is modeled.
--	 */
--	unsigned long clk32k = 32768;
--	unsigned long mturate;
--	unsigned long retclk;
--
--	if (cpu_is_u8500_family())
--		addr = __io_address(U8500_PRCMU_BASE);
--	else
--		ux500_unknown_soc();
--
--	/*
--	 * On a startup, always conifgure the TCR to the doze mode;
--	 * bootloaders do it for us. Do this in the kernel too.
--	 */
--	writel(PRCM_TCR_DOZE_MODE, addr + PRCM_TCR);
--
--	tcr = readl(addr + PRCM_TCR);
--
--	/* Get the rate from the parent as a default */
--	if (clk->parent_periph)
--		mturate = clk_get_rate(clk->parent_periph);
--	else if (clk->parent_cluster)
--		mturate = clk_get_rate(clk->parent_cluster);
--	else
--		/* We need to be connected SOMEWHERE */
--		BUG();
--
--	/* Return the clock selected for this MTU */
--	if (tcr & (1 << mtu))
--		retclk = clk32k;
--	else
--		retclk = mturate;
--
--	pr_info("MTU%d clock rate: %lu Hz\n", mtu, retclk);
--	return retclk;
--}
--
--unsigned long clk_get_rate(struct clk *clk)
--{
--	unsigned long rate;
--
--	/*
--	 * If there is a custom getrate callback for this clock,
--	 * it will take precedence.
--	 */
--	if (clk->get_rate)
--		return clk->get_rate(clk);
--
--	if (clk->ops && clk->ops->get_rate)
--		return clk->ops->get_rate(clk);
--
--	rate = clk->rate;
--	if (!rate) {
--		if (clk->parent_periph)
--			rate = clk_get_rate(clk->parent_periph);
--		else if (clk->parent_cluster)
--			rate = clk_get_rate(clk->parent_cluster);
--	}
--
--	return rate;
--}
--EXPORT_SYMBOL(clk_get_rate);
--
--long clk_round_rate(struct clk *clk, unsigned long rate)
--{
--	/*TODO*/
--	return rate;
--}
--EXPORT_SYMBOL(clk_round_rate);
--
--int clk_set_rate(struct clk *clk, unsigned long rate)
--{
--	clk->rate = rate;
--	return 0;
--}
--EXPORT_SYMBOL(clk_set_rate);
--
--int clk_set_parent(struct clk *clk, struct clk *parent)
--{
--	/*TODO*/
--	return -ENOSYS;
--}
--EXPORT_SYMBOL(clk_set_parent);
--
--static void clk_prcmu_enable(struct clk *clk)
--{
--	void __iomem *cg_set_reg = __io_address(U8500_PRCMU_BASE)
--				   + PRCM_YYCLKEN0_MGT_SET + clk->prcmu_cg_off;
--
--	writel(1 << clk->prcmu_cg_bit, cg_set_reg);
--}
--
--static void clk_prcmu_disable(struct clk *clk)
--{
--	void __iomem *cg_clr_reg = __io_address(U8500_PRCMU_BASE)
--				   + PRCM_YYCLKEN0_MGT_CLR + clk->prcmu_cg_off;
--
--	writel(1 << clk->prcmu_cg_bit, cg_clr_reg);
--}
--
--static struct clkops clk_prcmu_ops = {
--	.enable = clk_prcmu_enable,
--	.disable = clk_prcmu_disable,
--};
--
--static unsigned int clkrst_base[] = {
--	[1] = U8500_CLKRST1_BASE,
--	[2] = U8500_CLKRST2_BASE,
--	[3] = U8500_CLKRST3_BASE,
--	[5] = U8500_CLKRST5_BASE,
--	[6] = U8500_CLKRST6_BASE,
--};
--
--static void clk_prcc_enable(struct clk *clk)
--{
--	void __iomem *addr = __io_address(clkrst_base[clk->cluster]);
--
--	if (clk->prcc_kernel != -1)
--		writel(1 << clk->prcc_kernel, addr + PRCC_KCKEN);
--
--	if (clk->prcc_bus != -1)
--		writel(1 << clk->prcc_bus, addr + PRCC_PCKEN);
--}
--
--static void clk_prcc_disable(struct clk *clk)
--{
--	void __iomem *addr = __io_address(clkrst_base[clk->cluster]);
--
--	if (clk->prcc_bus != -1)
--		writel(1 << clk->prcc_bus, addr + PRCC_PCKDIS);
--
--	if (clk->prcc_kernel != -1)
--		writel(1 << clk->prcc_kernel, addr + PRCC_KCKDIS);
--}
--
--static struct clkops clk_prcc_ops = {
--	.enable = clk_prcc_enable,
--	.disable = clk_prcc_disable,
--};
--
--static struct clk clk_32khz = {
--	.name =  "clk_32khz",
--	.rate = 32000,
--};
--
--/*
-- * PRCMU level clock gating
-- */
--
--/* Bank 0 */
--static DEFINE_PRCMU_CLK(svaclk,		0x0, 2, SVAMMDSPCLK);
--static DEFINE_PRCMU_CLK(siaclk,		0x0, 3, SIAMMDSPCLK);
--static DEFINE_PRCMU_CLK(sgaclk,		0x0, 4, SGACLK);
--static DEFINE_PRCMU_CLK_RATE(uartclk,	0x0, 5, UARTCLK, 38400000);
--static DEFINE_PRCMU_CLK(msp02clk,	0x0, 6, MSP02CLK);
--static DEFINE_PRCMU_CLK(msp1clk,	0x0, 7, MSP1CLK); /* v1 */
--static DEFINE_PRCMU_CLK_RATE(i2cclk,	0x0, 8, I2CCLK, 48000000);
--static DEFINE_PRCMU_CLK_RATE(sdmmcclk,	0x0, 9, SDMMCCLK, 100000000);
--static DEFINE_PRCMU_CLK(slimclk,	0x0, 10, SLIMCLK);
--static DEFINE_PRCMU_CLK(per1clk,	0x0, 11, PER1CLK);
--static DEFINE_PRCMU_CLK(per2clk,	0x0, 12, PER2CLK);
--static DEFINE_PRCMU_CLK(per3clk,	0x0, 13, PER3CLK);
--static DEFINE_PRCMU_CLK(per5clk,	0x0, 14, PER5CLK);
--static DEFINE_PRCMU_CLK_RATE(per6clk,	0x0, 15, PER6CLK, 133330000);
--static DEFINE_PRCMU_CLK(lcdclk,		0x0, 17, LCDCLK);
--static DEFINE_PRCMU_CLK(bmlclk,		0x0, 18, BMLCLK);
--static DEFINE_PRCMU_CLK(hsitxclk,	0x0, 19, HSITXCLK);
--static DEFINE_PRCMU_CLK(hsirxclk,	0x0, 20, HSIRXCLK);
--static DEFINE_PRCMU_CLK(hdmiclk,	0x0, 21, HDMICLK);
--static DEFINE_PRCMU_CLK(apeatclk,	0x0, 22, APEATCLK);
--static DEFINE_PRCMU_CLK(apetraceclk,	0x0, 23, APETRACECLK);
--static DEFINE_PRCMU_CLK(mcdeclk,	0x0, 24, MCDECLK);
--static DEFINE_PRCMU_CLK(ipi2clk,	0x0, 25, IPI2CCLK);
--static DEFINE_PRCMU_CLK(dsialtclk,	0x0, 26, DSIALTCLK); /* v1 */
--static DEFINE_PRCMU_CLK(dmaclk,		0x0, 27, DMACLK);
--static DEFINE_PRCMU_CLK(b2r2clk,	0x0, 28, B2R2CLK);
--static DEFINE_PRCMU_CLK(tvclk,		0x0, 29, TVCLK);
--static DEFINE_PRCMU_CLK(uniproclk,	0x0, 30, UNIPROCLK); /* v1 */
--static DEFINE_PRCMU_CLK_RATE(sspclk,	0x0, 31, SSPCLK, 48000000); /* v1 */
--
--/* Bank 1 */
--static DEFINE_PRCMU_CLK(rngclk,		0x4, 0, RNGCLK); /* v1 */
--static DEFINE_PRCMU_CLK(uiccclk,	0x4, 1, UICCCLK); /* v1 */
--
--/*
-- * PRCC level clock gating
-- * Format: per#, clk, PCKEN bit, KCKEN bit, parent
-- */
--
--/* Peripheral Cluster #1 */
--static DEFINE_PRCC_CLK(1, msp3,		11, 10, &clk_msp1clk);
--static DEFINE_PRCC_CLK(1, i2c4,		10, 9, &clk_i2cclk);
--static DEFINE_PRCC_CLK(1, gpio0,	9, -1, NULL);
--static DEFINE_PRCC_CLK(1, slimbus0,	8,  8, &clk_slimclk);
--static DEFINE_PRCC_CLK(1, spi3,		7, -1, NULL);
--static DEFINE_PRCC_CLK(1, i2c2,		6,  6, &clk_i2cclk);
--static DEFINE_PRCC_CLK(1, sdi0,		5,  5, &clk_sdmmcclk);
--static DEFINE_PRCC_CLK(1, msp1,		4,  4, &clk_msp1clk);
--static DEFINE_PRCC_CLK(1, msp0,		3,  3, &clk_msp02clk);
--static DEFINE_PRCC_CLK(1, i2c1,		2,  2, &clk_i2cclk);
--static DEFINE_PRCC_CLK(1, uart1,	1,  1, &clk_uartclk);
--static DEFINE_PRCC_CLK(1, uart0,	0,  0, &clk_uartclk);
--
--/* Peripheral Cluster #2 */
--static DEFINE_PRCC_CLK(2, gpio1,	11, -1, NULL);
--static DEFINE_PRCC_CLK(2, ssitx,	10,  7, NULL);
--static DEFINE_PRCC_CLK(2, ssirx,	 9,  6, NULL);
--static DEFINE_PRCC_CLK(2, spi0,		8, -1, NULL);
--static DEFINE_PRCC_CLK(2, sdi3,		7,  5, &clk_sdmmcclk);
--static DEFINE_PRCC_CLK(2, sdi1,		6,  4, &clk_sdmmcclk);
--static DEFINE_PRCC_CLK(2, msp2,		5,  3, &clk_msp02clk);
--static DEFINE_PRCC_CLK(2, sdi4,		4,  2, &clk_sdmmcclk);
--static DEFINE_PRCC_CLK(2, pwl,		3,  1, NULL);
--static DEFINE_PRCC_CLK(2, spi1,		2, -1, NULL);
--static DEFINE_PRCC_CLK(2, spi2,		1, -1, NULL);
--static DEFINE_PRCC_CLK(2, i2c3,		0,  0, &clk_i2cclk);
--
--/* Peripheral Cluster #3 */
--static DEFINE_PRCC_CLK(3, gpio2,	8, -1, NULL);
--static DEFINE_PRCC_CLK(3, sdi5,		7,  7, &clk_sdmmcclk);
--static DEFINE_PRCC_CLK(3, uart2,	6,  6, &clk_uartclk);
--static DEFINE_PRCC_CLK(3, ske,		5,  5, &clk_32khz);
--static DEFINE_PRCC_CLK(3, sdi2,		4,  4, &clk_sdmmcclk);
--static DEFINE_PRCC_CLK(3, i2c0,		3,  3, &clk_i2cclk);
--static DEFINE_PRCC_CLK(3, ssp1,		2,  2, &clk_sspclk);
--static DEFINE_PRCC_CLK(3, ssp0,		1,  1, &clk_sspclk);
--static DEFINE_PRCC_CLK(3, fsmc,		0, -1, NULL);
--
--/* Peripheral Cluster #4 is in the always on domain */
--
--/* Peripheral Cluster #5 */
--static DEFINE_PRCC_CLK(5, gpio3,	1, -1, NULL);
--static DEFINE_PRCC_CLK(5, usb,		0,  0, NULL);
--
--/* Peripheral Cluster #6 */
--
--/* MTU ID in data */
--static DEFINE_PRCC_CLK_CUSTOM(6, mtu1, 9, -1, NULL, clk_mtu_get_rate, 1);
--static DEFINE_PRCC_CLK_CUSTOM(6, mtu0, 8, -1, NULL, clk_mtu_get_rate, 0);
--static DEFINE_PRCC_CLK(6, cfgreg,	7,  7, NULL);
--static DEFINE_PRCC_CLK(6, hash1,	6, -1, NULL);
--static DEFINE_PRCC_CLK(6, unipro,	5,  1, &clk_uniproclk);
--static DEFINE_PRCC_CLK(6, pka,		4, -1, NULL);
--static DEFINE_PRCC_CLK(6, hash0,	3, -1, NULL);
--static DEFINE_PRCC_CLK(6, cryp0,	2, -1, NULL);
--static DEFINE_PRCC_CLK(6, cryp1,    1, -1, NULL);
--static DEFINE_PRCC_CLK(6, rng,	0,  0, &clk_rngclk);
--
--static struct clk clk_dummy_apb_pclk = {
--	.name = "apb_pclk",
--};
--
--static struct clk_lookup u8500_clks[] = {
--	CLK(dummy_apb_pclk, NULL,	"apb_pclk"),
--
--	/* Peripheral Cluster #1 */
--	CLK(gpio0,	"gpio.0",	NULL),
--	CLK(gpio0,	"gpio.1",	NULL),
--	CLK(slimbus0,	"slimbus0",	NULL),
--	CLK(i2c2,	"nmk-i2c.2",	NULL),
--	CLK(sdi0,	"sdi0",		NULL),
--	CLK(msp0,	"ux500-msp-i2s.0",	NULL),
--	CLK(i2c1,	"nmk-i2c.1",	NULL),
--	CLK(uart1,	"uart1",	NULL),
--	CLK(uart0,	"uart0",	NULL),
--
--	/* Peripheral Cluster #3 */
--	CLK(gpio2,	"gpio.2",	NULL),
--	CLK(gpio2,	"gpio.3",	NULL),
--	CLK(gpio2,	"gpio.4",	NULL),
--	CLK(gpio2,	"gpio.5",	NULL),
--	CLK(sdi5,	"sdi5",		NULL),
--	CLK(uart2,	"uart2",	NULL),
--	CLK(ske,	"ske",		NULL),
--	CLK(ske,	"nmk-ske-keypad",	NULL),
--	CLK(sdi2,	"sdi2",		NULL),
--	CLK(i2c0,	"nmk-i2c.0",	NULL),
--	CLK(fsmc,	"fsmc",		NULL),
--
--	/* Peripheral Cluster #5 */
--	CLK(gpio3,	"gpio.8",	NULL),
--
--	/* Peripheral Cluster #6 */
--	CLK(hash1,	"hash1",	NULL),
--	CLK(pka,	"pka",		NULL),
--	CLK(hash0,	"hash0",	NULL),
--	CLK(cryp0,	"cryp0",	NULL),
--	CLK(cryp1,  "cryp1",    NULL),
--
--	/* PRCMU level clock gating */
--
--	/* Bank 0 */
--	CLK(svaclk,	"sva",		NULL),
--	CLK(siaclk,	"sia",		NULL),
--	CLK(sgaclk,	"sga",		NULL),
--	CLK(slimclk,	"slim",		NULL),
--	CLK(lcdclk,	"lcd",		NULL),
--	CLK(bmlclk,	"bml",		NULL),
--	CLK(hsitxclk,	"stm-hsi.0",	NULL),
--	CLK(hsirxclk,	"stm-hsi.1",	NULL),
--	CLK(hdmiclk,	"hdmi",		NULL),
--	CLK(apeatclk,	"apeat",	NULL),
--	CLK(apetraceclk,	"apetrace",	NULL),
--	CLK(mcdeclk,	"mcde",		NULL),
--	CLK(ipi2clk,	"ipi2",		NULL),
--	CLK(dmaclk,	"dma40.0",	NULL),
--	CLK(b2r2clk,	"b2r2",		NULL),
--	CLK(tvclk,	"tv",		NULL),
--
--	/* Peripheral Cluster #1 */
--	CLK(i2c4,	"nmk-i2c.4",	NULL),
--	CLK(spi3,	"spi3",		NULL),
--	CLK(msp1,	"ux500-msp-i2s.1",	NULL),
--	CLK(msp3,	"ux500-msp-i2s.3",	NULL),
--
--	/* Peripheral Cluster #2 */
--	CLK(gpio1,	"gpio.6",	NULL),
--	CLK(gpio1,	"gpio.7",	NULL),
--	CLK(ssitx,	"ssitx",	NULL),
--	CLK(ssirx,	"ssirx",	NULL),
--	CLK(spi0,	"spi0",		NULL),
--	CLK(sdi3,	"sdi3",		NULL),
--	CLK(sdi1,	"sdi1",		NULL),
--	CLK(msp2,	"ux500-msp-i2s.2",	NULL),
--	CLK(sdi4,	"sdi4",		NULL),
--	CLK(pwl,	"pwl",		NULL),
--	CLK(spi1,	"spi1",		NULL),
--	CLK(spi2,	"spi2",		NULL),
--	CLK(i2c3,	"nmk-i2c.3",	NULL),
--
--	/* Peripheral Cluster #3 */
--	CLK(ssp1,	"ssp1",		NULL),
--	CLK(ssp0,	"ssp0",		NULL),
--
--	/* Peripheral Cluster #5 */
--	CLK(usb,	"musb-ux500.0",	"usb"),
--
--	/* Peripheral Cluster #6 */
--	CLK(mtu1,	"mtu1",		NULL),
--	CLK(mtu0,	"mtu0",		NULL),
--	CLK(cfgreg,	"cfgreg",	NULL),
--	CLK(hash1,	"hash1",	NULL),
--	CLK(unipro,	"unipro",	NULL),
--	CLK(rng,	"rng",		NULL),
--
--	/* PRCMU level clock gating */
--
--	/* Bank 0 */
--	CLK(uniproclk,	"uniproclk",	NULL),
--	CLK(dsialtclk,	"dsialt",	NULL),
--
--	/* Bank 1 */
--	CLK(rngclk,	"rng",		NULL),
--	CLK(uiccclk,	"uicc",		NULL),
--};
--
--#ifdef CONFIG_DEBUG_FS
--/*
-- *	debugfs support to trace clock tree hierarchy and attributes with
-- *	powerdebug
-- */
--static struct dentry *clk_debugfs_root;
--
--void __init clk_debugfs_add_table(struct clk_lookup *cl, size_t num)
--{
--	while (num--) {
--		/* Check that the clock has not been already registered */
--		if (!(cl->clk->list.prev != cl->clk->list.next))
--			list_add_tail(&cl->clk->list, &clk_list);
--
--		cl++;
--	}
--}
--
--static ssize_t usecount_dbg_read(struct file *file, char __user *buf,
--						  size_t size, loff_t *off)
--{
--	struct clk *clk = file->f_dentry->d_inode->i_private;
--	char cusecount[128];
--	unsigned int len;
--
--	len = sprintf(cusecount, "%u\n", clk->enabled);
--	return simple_read_from_buffer(buf, size, off, cusecount, len);
--}
--
--static ssize_t rate_dbg_read(struct file *file, char __user *buf,
--					  size_t size, loff_t *off)
--{
--	struct clk *clk = file->f_dentry->d_inode->i_private;
--	char crate[128];
--	unsigned int rate;
--	unsigned int len;
--
--	rate = clk_get_rate(clk);
--	len = sprintf(crate, "%u\n", rate);
--	return simple_read_from_buffer(buf, size, off, crate, len);
--}
--
--static const struct file_operations usecount_fops = {
--	.read = usecount_dbg_read,
--};
--
--static const struct file_operations set_rate_fops = {
--	.read = rate_dbg_read,
--};
--
--static struct dentry *clk_debugfs_register_dir(struct clk *c,
--						struct dentry *p_dentry)
--{
--	struct dentry *d, *clk_d;
--	const char *p = c->name;
--
--	if (!p)
--		p = "BUG";
--
--	clk_d = debugfs_create_dir(p, p_dentry);
--	if (!clk_d)
--		return NULL;
--
--	d = debugfs_create_file("usecount", S_IRUGO,
--				clk_d, c, &usecount_fops);
--	if (!d)
--		goto err_out;
--	d = debugfs_create_file("rate", S_IRUGO,
--				clk_d, c, &set_rate_fops);
--	if (!d)
--		goto err_out;
--	/*
--	 * TODO : not currently available in ux500
--	 * d = debugfs_create_x32("flags", S_IRUGO, clk_d, (u32 *)&c->flags);
--	 * if (!d)
--	 *	goto err_out;
--	 */
--
--	return clk_d;
--
--err_out:
--	debugfs_remove_recursive(clk_d);
--	return NULL;
--}
--
--static int clk_debugfs_register_one(struct clk *c)
--{
--	struct clk *pa = c->parent_periph;
--	struct clk *bpa = c->parent_cluster;
--
--	if (!(bpa && !pa)) {
--		c->dent = clk_debugfs_register_dir(c,
--				pa ? pa->dent : clk_debugfs_root);
--		if (!c->dent)
--			return -ENOMEM;
--	}
--
--	if (bpa) {
--		c->dent_bus = clk_debugfs_register_dir(c,
--				bpa->dent_bus ? bpa->dent_bus : bpa->dent);
--		if ((!c->dent_bus) &&  (c->dent)) {
--			debugfs_remove_recursive(c->dent);
--			c->dent = NULL;
--			return -ENOMEM;
--		}
--	}
--	return 0;
--}
--
--static int clk_debugfs_register(struct clk *c)
--{
--	int err;
--	struct clk *pa = c->parent_periph;
--	struct clk *bpa = c->parent_cluster;
--
--	if (pa && (!pa->dent && !pa->dent_bus)) {
--		err = clk_debugfs_register(pa);
--		if (err)
--			return err;
--	}
--
--	if (bpa && (!bpa->dent && !bpa->dent_bus)) {
--		err = clk_debugfs_register(bpa);
--		if (err)
--			return err;
--	}
--
--	if ((!c->dent) && (!c->dent_bus)) {
--		err = clk_debugfs_register_one(c);
--		if (err)
--			return err;
--	}
--	return 0;
--}
--
--int __init clk_debugfs_init(void)
--{
--	struct clk *c;
--	struct dentry *d;
--	int err;
--
--	d = debugfs_create_dir("clock", NULL);
--	if (!d)
--		return -ENOMEM;
--	clk_debugfs_root = d;
--
--	list_for_each_entry(c, &clk_list, list) {
--		err = clk_debugfs_register(c);
--		if (err)
--			goto err_out;
--	}
--	return 0;
--err_out:
--	debugfs_remove_recursive(clk_debugfs_root);
--	return err;
--}
--
--#endif /* defined(CONFIG_DEBUG_FS) */
--
--unsigned long clk_smp_twd_rate = 500000000;
--
--unsigned long clk_smp_twd_get_rate(struct clk *clk)
--{
--	return clk_smp_twd_rate;
--}
--
--static struct clk clk_smp_twd = {
--	.get_rate = clk_smp_twd_get_rate,
--	.name =  "smp_twd",
--};
--
--static struct clk_lookup clk_smp_twd_lookup = {
--	.dev_id = "smp_twd",
--	.clk = &clk_smp_twd,
--};
--
--#ifdef CONFIG_CPU_FREQ
--
--static int clk_twd_cpufreq_transition(struct notifier_block *nb,
--				      unsigned long state, void *data)
--{
--	struct cpufreq_freqs *f = data;
--
--	if (state == CPUFREQ_PRECHANGE) {
--		/* Save frequency in simple Hz */
--		clk_smp_twd_rate = (f->new * 1000) / 2;
--	}
--
--	return NOTIFY_OK;
--}
--
--static struct notifier_block clk_twd_cpufreq_nb = {
--	.notifier_call = clk_twd_cpufreq_transition,
--};
--
--int clk_init_smp_twd_cpufreq(void)
--{
--	return cpufreq_register_notifier(&clk_twd_cpufreq_nb,
--				  CPUFREQ_TRANSITION_NOTIFIER);
--}
--
--#endif
--
--int __init clk_init(void)
--{
--	clkdev_add_table(u8500_clks, ARRAY_SIZE(u8500_clks));
--	clkdev_add(&clk_smp_twd_lookup);
--
--#ifdef CONFIG_DEBUG_FS
--	clk_debugfs_add_table(u8500_clks, ARRAY_SIZE(u8500_clks));
--#endif
--	return 0;
--}
-diff --git a/arch/arm/mach-ux500/clock.h b/arch/arm/mach-ux500/clock.h
-deleted file mode 100644
-index 65d27a1..0000000
---- a/arch/arm/mach-ux500/clock.h
-+++ /dev/null
-@@ -1,164 +0,0 @@
--/*
-- *  Copyright (C) 2010 ST-Ericsson
-- *  Copyright (C) 2009 STMicroelectronics
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--/**
-- * struct clkops - ux500 clock operations
-- * @enable:	function to enable the clock
-- * @disable:	function to disable the clock
-- * @get_rate:	function to get the current clock rate
-- *
-- * This structure contains function pointers to functions that will be used to
-- * control the clock.  All of these functions are optional.  If get_rate is
-- * NULL, the rate in the struct clk will be used.
-- */
--struct clkops {
--	void (*enable) (struct clk *);
--	void (*disable) (struct clk *);
--	unsigned long (*get_rate) (struct clk *);
--	int (*set_parent)(struct clk *, struct clk *);
--};
--
--/**
-- * struct clk - ux500 clock structure
-- * @ops:		pointer to clkops struct used to control this clock
-- * @name:		name, for debugging
-- * @enabled:		refcount. positive if enabled, zero if disabled
-- * @get_rate:		custom callback for getting the clock rate
-- * @data:		custom per-clock data for example for the get_rate
-- *			callback
-- * @rate:		fixed rate for clocks which don't implement
-- * 			ops->getrate
-- * @prcmu_cg_off:	address offset of the combined enable/disable register
-- * 			(used on u8500v1)
-- * @prcmu_cg_bit:	bit in the combined enable/disable register (used on
-- * 			u8500v1)
-- * @prcmu_cg_mgt:	address of the enable/disable register (used on
-- * 			u8500ed)
-- * @cluster:		peripheral cluster number
-- * @prcc_bus:		bit for the bus clock in the peripheral's CLKRST
-- * @prcc_kernel:	bit for the kernel clock in the peripheral's CLKRST.
-- * 			-1 if no kernel clock exists.
-- * @parent_cluster:	pointer to parent's cluster clk struct
-- * @parent_periph:	pointer to parent's peripheral clk struct
-- *
-- * Peripherals are organised into clusters, and each cluster has an associated
-- * bus clock.  Some peripherals also have a parent peripheral clock.
-- *
-- * In order to enable a clock for a peripheral, we need to enable:
-- * 	(1) the parent cluster (bus) clock at the PRCMU level
-- * 	(2) the parent peripheral clock (if any) at the PRCMU level
-- * 	(3) the peripheral's bus & kernel clock at the PRCC level
-- *
-- * (1) and (2) are handled by defining clk structs (DEFINE_PRCMU_CLK) for each
-- * of the cluster and peripheral clocks, and hooking these as the parents of
-- * the individual peripheral clocks.
-- *
-- * (3) is handled by specifying the bits in the PRCC control registers required
-- * to enable these clocks and modifying them in the ->enable and
-- * ->disable callbacks of the peripheral clocks (DEFINE_PRCC_CLK).
-- *
-- * This structure describes both the PRCMU-level clocks and PRCC-level clocks.
-- * The prcmu_* fields are only used for the PRCMU clocks, and the cluster,
-- * prcc, and parent pointers are only used for the PRCC-level clocks.
-- */
--struct clk {
--	const struct clkops	*ops;
--	const char 		*name;
--	unsigned int		enabled;
--	unsigned long		(*get_rate)(struct clk *);
--	void			*data;
--
--	unsigned long		rate;
--	struct list_head	list;
--
--	/* These three are only for PRCMU clks */
--
--	unsigned int		prcmu_cg_off;
--	unsigned int		prcmu_cg_bit;
--	unsigned int		prcmu_cg_mgt;
--
--	/* The rest are only for PRCC clks */
--
--	int			cluster;
--	unsigned int		prcc_bus;
--	unsigned int		prcc_kernel;
--
--	struct clk		*parent_cluster;
--	struct clk		*parent_periph;
--#if defined(CONFIG_DEBUG_FS)
--	struct dentry		*dent;		/* For visible tree hierarchy */
--	struct dentry		*dent_bus;	/* For visible tree hierarchy */
--#endif
--};
--
--#define DEFINE_PRCMU_CLK(_name, _cg_off, _cg_bit, _reg)		\
--struct clk clk_##_name = {					\
--		.name		= #_name,			\
--		.ops    	= &clk_prcmu_ops, 		\
--		.prcmu_cg_off	= _cg_off, 			\
--		.prcmu_cg_bit	= _cg_bit,			\
--		.prcmu_cg_mgt	= PRCM_##_reg##_MGT		\
--	}
--
--#define DEFINE_PRCMU_CLK_RATE(_name, _cg_off, _cg_bit, _reg, _rate)	\
--struct clk clk_##_name = {						\
--		.name		= #_name,				\
--		.ops    	= &clk_prcmu_ops, 			\
--		.prcmu_cg_off	= _cg_off, 				\
--		.prcmu_cg_bit	= _cg_bit,				\
--		.rate		= _rate,				\
--		.prcmu_cg_mgt	= PRCM_##_reg##_MGT			\
--	}
--
--#define DEFINE_PRCC_CLK(_pclust, _name, _bus_en, _kernel_en, _kernclk)	\
--struct clk clk_##_name = {						\
--		.name		= #_name,				\
--		.ops    	= &clk_prcc_ops, 			\
--		.cluster 	= _pclust,				\
--		.prcc_bus 	= _bus_en, 				\
--		.prcc_kernel 	= _kernel_en, 				\
--		.parent_cluster = &clk_per##_pclust##clk,		\
--		.parent_periph 	= _kernclk				\
--	}
--
--#define DEFINE_PRCC_CLK_CUSTOM(_pclust, _name, _bus_en, _kernel_en, _kernclk, _callback, _data) \
--struct clk clk_##_name = {						\
--		.name		= #_name,				\
--		.ops		= &clk_prcc_ops,			\
--		.cluster	= _pclust,				\
--		.prcc_bus	= _bus_en,				\
--		.prcc_kernel	= _kernel_en,				\
--		.parent_cluster = &clk_per##_pclust##clk,		\
--		.parent_periph	= _kernclk,				\
--		.get_rate	= _callback,				\
--		.data		= (void *) _data			\
--	}
--
--
--#define CLK(_clk, _devname, _conname)			\
--	{						\
--		.clk	= &clk_##_clk,			\
--		.dev_id	= _devname,			\
--		.con_id = _conname,			\
--	}
--
--int __init clk_db8500_ed_fixup(void);
--int __init clk_init(void);
--
--#ifdef CONFIG_DEBUG_FS
--int clk_debugfs_init(void);
--#else
--static inline int clk_debugfs_init(void) { return 0; }
--#endif
--
--#ifdef CONFIG_CPU_FREQ
--int clk_init_smp_twd_cpufreq(void);
--#else
--static inline int clk_init_smp_twd_cpufreq(void) { return 0; }
--#endif
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index 4b0a9b3..3d62c64 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -8,7 +8,6 @@
- 
- #include <linux/platform_device.h>
- #include <linux/io.h>
--#include <linux/clk.h>
- #include <linux/mfd/db8500-prcmu.h>
- #include <linux/clksrc-dbx500-prcmu.h>
- #include <linux/sys_soc.h>
-@@ -17,6 +16,7 @@
- #include <linux/stat.h>
- #include <linux/of.h>
- #include <linux/of_irq.h>
-+#include <linux/platform_data/clk-ux500.h>
- 
- #include <asm/hardware/gic.h>
- #include <asm/mach/map.h>
-@@ -25,8 +25,6 @@
- #include <mach/setup.h>
- #include <mach/devices.h>
- 
--#include "clock.h"
--
- void __iomem *_PRCMU_BASE;
- 
- /*
-@@ -70,13 +68,17 @@ void __init ux500_init_irq(void)
- 	 */
- 	if (cpu_is_u8500_family())
- 		db8500_prcmu_early_init();
--	clk_init();
-+
-+	if (cpu_is_u8500_family())
-+		u8500_clk_init();
-+	else if (cpu_is_u9540())
-+		u9540_clk_init();
-+	else if (cpu_is_u8540())
-+		u8540_clk_init();
- }
- 
- void __init ux500_init_late(void)
+ void u8500_clk_init(void)
  {
--	clk_debugfs_init();
--	clk_init_smp_twd_cpufreq();
+-	/* register clocks here */
++	struct prcmu_fw_version *fw_version;
++	const char *sgaclk_parent = NULL;
++	struct clk *clk;
++
++	/* Clock sources */
++	clk = clk_reg_prcmu_gate("soc0_pll", NULL, PRCMU_PLLSOC0,
++				CLK_IS_ROOT|CLK_IGNORE_UNUSED);
++	clk_register_clkdev(clk, "soc0_pll", NULL);
++
++	clk = clk_reg_prcmu_gate("soc1_pll", NULL, PRCMU_PLLSOC1,
++				CLK_IS_ROOT|CLK_IGNORE_UNUSED);
++	clk_register_clkdev(clk, "soc1_pll", NULL);
++
++	clk = clk_reg_prcmu_gate("ddr_pll", NULL, PRCMU_PLLDDR,
++				CLK_IS_ROOT|CLK_IGNORE_UNUSED);
++	clk_register_clkdev(clk, "ddr_pll", NULL);
++
++	/* FIXME: Add sys, ulp and int clocks here. */
++
++	clk = clk_register_fixed_rate(NULL, "rtc32k", "NULL",
++				CLK_IS_ROOT|CLK_IGNORE_UNUSED,
++				32768);
++	clk_register_clkdev(clk, "clk32k", NULL);
++	clk_register_clkdev(clk, NULL, "rtc-pl031");
++
++	/* PRCMU clocks */
++	fw_version = prcmu_get_fw_version();
++	if (fw_version != NULL) {
++		switch (fw_version->project) {
++		case PRCMU_FW_PROJECT_U8500_C2:
++		case PRCMU_FW_PROJECT_U8520:
++		case PRCMU_FW_PROJECT_U8420:
++			sgaclk_parent = "soc0_pll";
++			break;
++		default:
++			break;
++		}
++	}
++
++	if (sgaclk_parent)
++		clk = clk_reg_prcmu_gate("sgclk", sgaclk_parent,
++					PRCMU_SGACLK, 0);
++	else
++		clk = clk_reg_prcmu_gate("sgclk", NULL,
++					PRCMU_SGACLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "mali");
++
++	clk = clk_reg_prcmu_gate("uartclk", NULL, PRCMU_UARTCLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "UART");
++
++	clk = clk_reg_prcmu_gate("msp02clk", NULL, PRCMU_MSP02CLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "MSP02");
++
++	clk = clk_reg_prcmu_gate("msp1clk", NULL, PRCMU_MSP1CLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "MSP1");
++
++	clk = clk_reg_prcmu_gate("i2cclk", NULL, PRCMU_I2CCLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "I2C");
++
++	clk = clk_reg_prcmu_gate("slimclk", NULL, PRCMU_SLIMCLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "slim");
++
++	clk = clk_reg_prcmu_gate("per1clk", NULL, PRCMU_PER1CLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "PERIPH1");
++
++	clk = clk_reg_prcmu_gate("per2clk", NULL, PRCMU_PER2CLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "PERIPH2");
++
++	clk = clk_reg_prcmu_gate("per3clk", NULL, PRCMU_PER3CLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "PERIPH3");
++
++	clk = clk_reg_prcmu_gate("per5clk", NULL, PRCMU_PER5CLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "PERIPH5");
++
++	clk = clk_reg_prcmu_gate("per6clk", NULL, PRCMU_PER6CLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "PERIPH6");
++
++	clk = clk_reg_prcmu_gate("per7clk", NULL, PRCMU_PER7CLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "PERIPH7");
++
++	clk = clk_reg_prcmu_scalable("lcdclk", NULL, PRCMU_LCDCLK, 0,
++				CLK_IS_ROOT|CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, NULL, "lcd");
++	clk_register_clkdev(clk, "lcd", "mcde");
++
++	clk = clk_reg_prcmu_opp_gate("bmlclk", NULL, PRCMU_BMLCLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "bml");
++
++	clk = clk_reg_prcmu_scalable("hsitxclk", NULL, PRCMU_HSITXCLK, 0,
++				CLK_IS_ROOT|CLK_SET_RATE_GATE);
++
++	clk = clk_reg_prcmu_scalable("hsirxclk", NULL, PRCMU_HSIRXCLK, 0,
++				CLK_IS_ROOT|CLK_SET_RATE_GATE);
++
++	clk = clk_reg_prcmu_scalable("hdmiclk", NULL, PRCMU_HDMICLK, 0,
++				CLK_IS_ROOT|CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, NULL, "hdmi");
++	clk_register_clkdev(clk, "hdmi", "mcde");
++
++	clk = clk_reg_prcmu_gate("apeatclk", NULL, PRCMU_APEATCLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "apeat");
++
++	clk = clk_reg_prcmu_gate("apetraceclk", NULL, PRCMU_APETRACECLK,
++				CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "apetrace");
++
++	clk = clk_reg_prcmu_gate("mcdeclk", NULL, PRCMU_MCDECLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "mcde");
++	clk_register_clkdev(clk, "mcde", "mcde");
++	clk_register_clkdev(clk, "dsisys", "dsilink.0");
++	clk_register_clkdev(clk, "dsisys", "dsilink.1");
++	clk_register_clkdev(clk, "dsisys", "dsilink.2");
++
++	clk = clk_reg_prcmu_opp_gate("ipi2cclk", NULL, PRCMU_IPI2CCLK,
++				CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "ipi2");
++
++	clk = clk_reg_prcmu_gate("dsialtclk", NULL, PRCMU_DSIALTCLK,
++				CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "dsialt");
++
++	clk = clk_reg_prcmu_gate("dmaclk", NULL, PRCMU_DMACLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "dma40.0");
++
++	clk = clk_reg_prcmu_gate("b2r2clk", NULL, PRCMU_B2R2CLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "b2r2");
++	clk_register_clkdev(clk, NULL, "b2r2_core");
++	clk_register_clkdev(clk, NULL, "U8500-B2R2.0");
++
++	clk = clk_reg_prcmu_scalable("tvclk", NULL, PRCMU_TVCLK, 0,
++				CLK_IS_ROOT|CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, NULL, "tv");
++	clk_register_clkdev(clk, "tv", "mcde");
++
++	clk = clk_reg_prcmu_gate("sspclk", NULL, PRCMU_SSPCLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "SSP");
++
++	clk = clk_reg_prcmu_gate("rngclk", NULL, PRCMU_RNGCLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "rngclk");
++
++	clk = clk_reg_prcmu_gate("uiccclk", NULL, PRCMU_UICCCLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "uicc");
++
++	/*
++	 * FIXME: The MTU clocks might need some kind of "parent muxed join"
++	 * and these have no K-clocks. For now, we ignore the missing
++	 * connection to the corresponding P-clocks, p6_mtu0_clk and
++	 * p6_mtu1_clk. Instead timclk is used which is the valid parent.
++	 */
++	clk = clk_reg_prcmu_gate("timclk", NULL, PRCMU_TIMCLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "mtu0");
++	clk_register_clkdev(clk, NULL, "mtu1");
++
++	clk = clk_reg_prcmu_gate("sdmmcclk", NULL, PRCMU_SDMMCCLK, CLK_IS_ROOT);
++	clk_register_clkdev(clk, NULL, "sdmmc");
++
++
++	clk = clk_reg_prcmu_scalable("dsi_pll", "hdmiclk",
++				PRCMU_PLLDSI, 0, CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, "dsihs2", "mcde");
++	clk_register_clkdev(clk, "dsihs2", "dsilink.2");
++
++
++	clk = clk_reg_prcmu_scalable("dsi0clk", "dsi_pll",
++				PRCMU_DSI0CLK, 0, CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, "dsihs0", "mcde");
++	clk_register_clkdev(clk, "dsihs0", "dsilink.0");
++
++	clk = clk_reg_prcmu_scalable("dsi1clk", "dsi_pll",
++				PRCMU_DSI1CLK, 0, CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, "dsihs1", "mcde");
++	clk_register_clkdev(clk, "dsihs1", "dsilink.1");
++
++	clk = clk_reg_prcmu_scalable("dsi0escclk", "tvclk",
++				PRCMU_DSI0ESCCLK, 0, CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, "dsilp0", "dsilink.0");
++	clk_register_clkdev(clk, "dsilp0", "mcde");
++
++	clk = clk_reg_prcmu_scalable("dsi1escclk", "tvclk",
++				PRCMU_DSI1ESCCLK, 0, CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, "dsilp1", "dsilink.1");
++	clk_register_clkdev(clk, "dsilp1", "mcde");
++
++	clk = clk_reg_prcmu_scalable("dsi2escclk", "tvclk",
++				PRCMU_DSI2ESCCLK, 0, CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, "dsilp2", "dsilink.2");
++	clk_register_clkdev(clk, "dsilp2", "mcde");
++
++	/*
++	 * FIXME: Add special handled PRCMU clocks here:
++	 * 1. smp_twd, use PRCMU_ARMSS.
++	 * 2. clk_arm, use PRCMU_ARMCLK.
++	 * 3. clkout0yuv, use PRCMU as parent + need regulator + pinctrl.
++	 * 4. ab9540_clkout1yuv, see clkout0yuv
++	 */
++
++	/* PRCC P-clocks */
++	clk = clk_reg_prcc_pclk("p1_pclk0", "per1clk", U8500_CLKRST1_BASE,
++				BIT(0), 0);
++	clk_register_clkdev(clk, "apb_pclk", "uart0");
++
++	clk = clk_reg_prcc_pclk("p1_pclk1", "per1clk", U8500_CLKRST1_BASE,
++				BIT(1), 0);
++	clk_register_clkdev(clk, "apb_pclk", "uart1");
++
++	clk = clk_reg_prcc_pclk("p1_pclk2", "per1clk", U8500_CLKRST1_BASE,
++				BIT(2), 0);
++	clk = clk_reg_prcc_pclk("p1_pclk3", "per1clk", U8500_CLKRST1_BASE,
++				BIT(3), 0);
++	clk = clk_reg_prcc_pclk("p1_pclk4", "per1clk", U8500_CLKRST1_BASE,
++				BIT(4), 0);
++
++	clk = clk_reg_prcc_pclk("p1_pclk5", "per1clk", U8500_CLKRST1_BASE,
++				BIT(5), 0);
++	clk_register_clkdev(clk, "apb_pclk", "sdi0");
++
++	clk = clk_reg_prcc_pclk("p1_pclk6", "per1clk", U8500_CLKRST1_BASE,
++				BIT(6), 0);
++
++	clk = clk_reg_prcc_pclk("p1_pclk7", "per1clk", U8500_CLKRST1_BASE,
++				BIT(7), 0);
++	clk_register_clkdev(clk, NULL, "spi3");
++
++	clk = clk_reg_prcc_pclk("p1_pclk8", "per1clk", U8500_CLKRST1_BASE,
++				BIT(8), 0);
++
++	clk = clk_reg_prcc_pclk("p1_pclk9", "per1clk", U8500_CLKRST1_BASE,
++				BIT(9), 0);
++	clk_register_clkdev(clk, NULL, "gpio.0");
++	clk_register_clkdev(clk, NULL, "gpio.1");
++	clk_register_clkdev(clk, NULL, "gpioblock0");
++
++	clk = clk_reg_prcc_pclk("p1_pclk10", "per1clk", U8500_CLKRST1_BASE,
++				BIT(10), 0);
++	clk = clk_reg_prcc_pclk("p1_pclk11", "per1clk", U8500_CLKRST1_BASE,
++				BIT(11), 0);
++
++	clk = clk_reg_prcc_pclk("p2_pclk0", "per2clk", U8500_CLKRST2_BASE,
++				BIT(0), 0);
++
++	clk = clk_reg_prcc_pclk("p2_pclk1", "per2clk", U8500_CLKRST2_BASE,
++				BIT(1), 0);
++	clk_register_clkdev(clk, NULL, "spi2");
++
++	clk = clk_reg_prcc_pclk("p2_pclk2", "per2clk", U8500_CLKRST2_BASE,
++				BIT(2), 0);
++	clk_register_clkdev(clk, NULL, "spi1");
++
++	clk = clk_reg_prcc_pclk("p2_pclk3", "per2clk", U8500_CLKRST2_BASE,
++				BIT(3), 0);
++	clk_register_clkdev(clk, NULL, "pwl");
++
++	clk = clk_reg_prcc_pclk("p2_pclk4", "per2clk", U8500_CLKRST2_BASE,
++				BIT(4), 0);
++	clk_register_clkdev(clk, "apb_pclk", "sdi4");
++
++	clk = clk_reg_prcc_pclk("p2_pclk5", "per2clk", U8500_CLKRST2_BASE,
++				BIT(5), 0);
++
++	clk = clk_reg_prcc_pclk("p2_pclk6", "per2clk", U8500_CLKRST2_BASE,
++				BIT(6), 0);
++	clk_register_clkdev(clk, "apb_pclk", "sdi1");
++
++
++	clk = clk_reg_prcc_pclk("p2_pclk7", "per2clk", U8500_CLKRST2_BASE,
++				BIT(7), 0);
++	clk_register_clkdev(clk, "apb_pclk", "sdi3");
++
++	clk = clk_reg_prcc_pclk("p2_pclk8", "per2clk", U8500_CLKRST2_BASE,
++				BIT(8), 0);
++	clk_register_clkdev(clk, NULL, "spi0");
++
++	clk = clk_reg_prcc_pclk("p2_pclk9", "per2clk", U8500_CLKRST2_BASE,
++				BIT(9), 0);
++	clk_register_clkdev(clk, "hsir_hclk", "ste_hsi.0");
++
++	clk = clk_reg_prcc_pclk("p2_pclk10", "per2clk", U8500_CLKRST2_BASE,
++				BIT(10), 0);
++	clk_register_clkdev(clk, "hsit_hclk", "ste_hsi.0");
++
++	clk = clk_reg_prcc_pclk("p2_pclk11", "per2clk", U8500_CLKRST2_BASE,
++				BIT(11), 0);
++	clk_register_clkdev(clk, NULL, "gpio.6");
++	clk_register_clkdev(clk, NULL, "gpio.7");
++	clk_register_clkdev(clk, NULL, "gpioblock1");
++
++	clk = clk_reg_prcc_pclk("p2_pclk12", "per2clk", U8500_CLKRST2_BASE,
++				BIT(11), 0);
++
++	clk = clk_reg_prcc_pclk("p3_pclk0", "per3clk", U8500_CLKRST3_BASE,
++				BIT(0), 0);
++	clk_register_clkdev(clk, NULL, "fsmc");
++
++	clk = clk_reg_prcc_pclk("p3_pclk1", "per3clk", U8500_CLKRST3_BASE,
++				BIT(1), 0);
++	clk = clk_reg_prcc_pclk("p3_pclk2", "per3clk", U8500_CLKRST3_BASE,
++				BIT(2), 0);
++	clk = clk_reg_prcc_pclk("p3_pclk3", "per3clk", U8500_CLKRST3_BASE,
++				BIT(3), 0);
++
++	clk = clk_reg_prcc_pclk("p3_pclk4", "per3clk", U8500_CLKRST3_BASE,
++				BIT(4), 0);
++	clk_register_clkdev(clk, "apb_pclk", "sdi2");
++
++	clk = clk_reg_prcc_pclk("p3_pclk5", "per3clk", U8500_CLKRST3_BASE,
++				BIT(5), 0);
++
++	clk = clk_reg_prcc_pclk("p3_pclk6", "per3clk", U8500_CLKRST3_BASE,
++				BIT(6), 0);
++	clk_register_clkdev(clk, "apb_pclk", "uart2");
++
++	clk = clk_reg_prcc_pclk("p3_pclk7", "per3clk", U8500_CLKRST3_BASE,
++				BIT(7), 0);
++	clk_register_clkdev(clk, "apb_pclk", "sdi5");
++
++	clk = clk_reg_prcc_pclk("p3_pclk8", "per3clk", U8500_CLKRST3_BASE,
++				BIT(8), 0);
++	clk_register_clkdev(clk, NULL, "gpio.2");
++	clk_register_clkdev(clk, NULL, "gpio.3");
++	clk_register_clkdev(clk, NULL, "gpio.4");
++	clk_register_clkdev(clk, NULL, "gpio.5");
++	clk_register_clkdev(clk, NULL, "gpioblock2");
++
++	clk = clk_reg_prcc_pclk("p5_pclk0", "per5clk", U8500_CLKRST5_BASE,
++				BIT(0), 0);
++	clk_register_clkdev(clk, "usb", "musb-ux500.0");
++
++	clk = clk_reg_prcc_pclk("p5_pclk1", "per5clk", U8500_CLKRST5_BASE,
++				BIT(1), 0);
++	clk_register_clkdev(clk, NULL, "gpio.8");
++	clk_register_clkdev(clk, NULL, "gpioblock3");
++
++	clk = clk_reg_prcc_pclk("p6_pclk0", "per6clk", U8500_CLKRST6_BASE,
++				BIT(0), 0);
++
++	clk = clk_reg_prcc_pclk("p6_pclk1", "per6clk", U8500_CLKRST6_BASE,
++				BIT(1), 0);
++	clk_register_clkdev(clk, NULL, "cryp0");
++	clk_register_clkdev(clk, NULL, "cryp1");
++
++	clk = clk_reg_prcc_pclk("p6_pclk2", "per6clk", U8500_CLKRST6_BASE,
++				BIT(2), 0);
++	clk_register_clkdev(clk, NULL, "hash0");
++
++	clk = clk_reg_prcc_pclk("p6_pclk3", "per6clk", U8500_CLKRST6_BASE,
++				BIT(3), 0);
++	clk_register_clkdev(clk, NULL, "pka");
++
++	clk = clk_reg_prcc_pclk("p6_pclk4", "per6clk", U8500_CLKRST6_BASE,
++				BIT(4), 0);
++	clk_register_clkdev(clk, NULL, "hash1");
++
++	clk = clk_reg_prcc_pclk("p6_pclk5", "per6clk", U8500_CLKRST6_BASE,
++				BIT(5), 0);
++	clk_register_clkdev(clk, NULL, "cfgreg");
++
++	clk = clk_reg_prcc_pclk("p6_pclk6", "per6clk", U8500_CLKRST6_BASE,
++				BIT(6), 0);
++	clk = clk_reg_prcc_pclk("p6_pclk7", "per6clk", U8500_CLKRST6_BASE,
++				BIT(7), 0);
++
++	/* PRCC K-clocks
++	 *
++	 * FIXME: Some drivers requires PERPIH[n| to be automatically enabled
++	 * by enabling just the K-clock, even if it is not a valid parent to
++	 * the K-clock. Until drivers get fixed we might need some kind of
++	 * "parent muxed join".
++	 */
++
++	/* Periph1 */
++	clk = clk_reg_prcc_kclk("p1_uart0_kclk", "uartclk",
++			U8500_CLKRST1_BASE, BIT(0), CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, NULL, "uart0");
++
++	clk = clk_reg_prcc_kclk("p1_uart1_kclk", "uartclk",
++			U8500_CLKRST1_BASE, BIT(1), CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, NULL, "uart1");
++
++	clk = clk_reg_prcc_kclk("p1_i2c1_kclk", "i2cclk",
++			U8500_CLKRST1_BASE, BIT(2), CLK_SET_RATE_GATE);
++	clk = clk_reg_prcc_kclk("p1_msp0_kclk", "msp02clk",
++			U8500_CLKRST1_BASE, BIT(3), CLK_SET_RATE_GATE);
++	clk = clk_reg_prcc_kclk("p1_msp1_kclk", "msp1clk",
++			U8500_CLKRST1_BASE, BIT(4), CLK_SET_RATE_GATE);
++
++	clk = clk_reg_prcc_kclk("p1_sdi0_kclk", "sdmmcclk",
++			U8500_CLKRST1_BASE, BIT(5), CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, NULL, "sdi0");
++
++	clk = clk_reg_prcc_kclk("p1_i2c2_kclk", "i2cclk",
++			U8500_CLKRST1_BASE, BIT(6), CLK_SET_RATE_GATE);
++	clk = clk_reg_prcc_kclk("p1_slimbus0_kclk", "slimclk",
++			U8500_CLKRST1_BASE, BIT(3), CLK_SET_RATE_GATE);
++	/* FIXME: Redefinition of BIT(3). */
++	clk = clk_reg_prcc_kclk("p1_i2c4_kclk", "i2cclk",
++			U8500_CLKRST1_BASE, BIT(9), CLK_SET_RATE_GATE);
++	clk = clk_reg_prcc_kclk("p1_msp3_kclk", "msp1clk",
++			U8500_CLKRST1_BASE, BIT(10), CLK_SET_RATE_GATE);
++
++	/* Periph2 */
++	clk = clk_reg_prcc_kclk("p2_i2c3_kclk", "i2cclk",
++			U8500_CLKRST2_BASE, BIT(0), CLK_SET_RATE_GATE);
++
++	clk = clk_reg_prcc_kclk("p2_sdi4_kclk", "sdmmcclk",
++			U8500_CLKRST2_BASE, BIT(2), CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, NULL, "sdi4");
++
++	clk = clk_reg_prcc_kclk("p2_msp2_kclk", "msp02clk",
++			U8500_CLKRST2_BASE, BIT(3), CLK_SET_RATE_GATE);
++
++	clk = clk_reg_prcc_kclk("p2_sdi1_kclk", "sdmmcclk",
++			U8500_CLKRST2_BASE, BIT(4), CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, NULL, "sdi1");
++
++	clk = clk_reg_prcc_kclk("p2_sdi3_kclk", "sdmmcclk",
++			U8500_CLKRST2_BASE, BIT(5), CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, NULL, "sdi3");
++
++	/* Note that rate is received from parent. */
++	clk = clk_reg_prcc_kclk("p2_ssirx_kclk", "hsirxclk",
++			U8500_CLKRST2_BASE, BIT(6),
++			CLK_SET_RATE_GATE|CLK_SET_RATE_PARENT);
++	clk = clk_reg_prcc_kclk("p2_ssitx_kclk", "hsitxclk",
++			U8500_CLKRST2_BASE, BIT(7),
++			CLK_SET_RATE_GATE|CLK_SET_RATE_PARENT);
++
++	/* Periph3 */
++	clk = clk_reg_prcc_kclk("p3_ssp0_kclk", "sspclk",
++			U8500_CLKRST3_BASE, BIT(1), CLK_SET_RATE_GATE);
++	clk = clk_reg_prcc_kclk("p3_ssp1_kclk", "sspclk",
++			U8500_CLKRST3_BASE, BIT(2), CLK_SET_RATE_GATE);
++	clk = clk_reg_prcc_kclk("p3_i2c0_kclk", "i2cclk",
++			U8500_CLKRST3_BASE, BIT(3), CLK_SET_RATE_GATE);
++
++	clk = clk_reg_prcc_kclk("p3_sdi2_kclk", "sdmmcclk",
++			U8500_CLKRST3_BASE, BIT(4), CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, NULL, "sdi2");
++
++	clk = clk_reg_prcc_kclk("p3_ske_kclk", "rtc32k",
++			U8500_CLKRST3_BASE, BIT(5), CLK_SET_RATE_GATE);
++
++	clk = clk_reg_prcc_kclk("p3_uart2_kclk", "uartclk",
++			U8500_CLKRST3_BASE, BIT(6), CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, NULL, "uart2");
++
++	clk = clk_reg_prcc_kclk("p3_sdi5_kclk", "sdmmcclk",
++			U8500_CLKRST3_BASE, BIT(7), CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, NULL, "sdi5");
++
++	/* Periph6 */
++	clk = clk_reg_prcc_kclk("p3_rng_kclk", "rngclk",
++			U8500_CLKRST6_BASE, BIT(0), CLK_SET_RATE_GATE);
++
  }
- 
- static const char * __init ux500_get_machine(void)
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 5869ea3..96df01b 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -9,6 +9,7 @@ obj-$(CONFIG_ARCH_MXS)		+= mxs/
- obj-$(CONFIG_ARCH_SOCFPGA)	+= socfpga/
- obj-$(CONFIG_PLAT_SPEAR)	+= spear/
- obj-$(CONFIG_ARCH_U300)		+= clk-u300.o
-+obj-$(CONFIG_ARCH_U8500)	+= ux500/
- obj-$(CONFIG_ARCH_INTEGRATOR)	+= versatile/
- 
- # Chip specific
 -- 
 1.7.10
