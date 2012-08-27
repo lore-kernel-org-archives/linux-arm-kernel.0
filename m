@@ -1,135 +1,94 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 28 Aug 2012 06:44:38 +0800
-Subject: [PATCH v2 1/2] imx6q: pwm: Add device tree support
-In-Reply-To: <3465D313FDFB824F9A9C8CD24FA4F6BCB4ACFD@frontmail.adetel.com>
-References: <1346081672-27866-1-git-send-email-shachimi@adeneo-embedded.com>
- <3465D313FDFB824F9A9C8CD24FA4F6BCB4ACFD@frontmail.adetel.com>
-Message-ID: <20120827224435.GF2281@r65073-Latitude-D630>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 27 Aug 2012 15:46:43 -0700
+Subject: [PATCH v3 3/3] ARM: dts: Add nodes for dw_mmc controllers for
+ Samsung Exynos5250 platforms
+In-Reply-To: <1345982371-26483-4-git-send-email-thomas.abraham@linaro.org>
+References: <1345982371-26483-1-git-send-email-thomas.abraham@linaro.org>
+ <1345982371-26483-4-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <503BF8D3.9060507@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 05:34:31PM +0200, HACHIMI Samir wrote:
-> From: Samir Hachimi <shachimi@adeneo-embedded.com>
-> 
->  Add clock look-up for pwm.
->  Add the pinmux support for pwm.
->  Several pin can be set to PwmO for the same Pwm.
-> 
-> Signed-off-by: Samir Hachimi <shachimi@adeneo-embedded.com>
+On 08/26/12 04:59, Thomas Abraham wrote:
+> Add device nodes for the four instances of dw_mmc controllers in Exynos5250
+> and enable instance 0 and 2 for the smdk5250 board.
+>
+> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
 > ---
->  arch/arm/boot/dts/imx6q.dtsi |   68 ++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 68 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index 925da33..346ae9c 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -268,23 +268,43 @@
->  			};
->  
->  			pwm at 02080000 { /* PWM1 */
-> +				compatible = "fsl,imx6q-pwm";
-> +				#pwm-cells = <2>;
->  				reg = <0x02080000 0x4000>;
->  				interrupts = <0 83 0x04>;
-> +				clocks = <&clks 145>;
-> +				clock-names = "pwm";
-> +				status = "disabled";
->  			};
->  
->  			pwm at 02084000 { /* PWM2 */
-> +				compatible = "fsl,imx6q-pwm";
-> +				#pwm-cells = <2>;
->  				reg = <0x02084000 0x4000>;
->  				interrupts = <0 84 0x04>;
-> +				clocks = <&clks 146>;
-> +				clock-names = "pwm";
-> +				status = "disabled";
->  			};
->  
->  			pwm at 02088000 { /* PWM3 */
-> +				compatible = "fsl,imx6q-pwm";
-> +				#pwm-cells = <2>;
->  				reg = <0x02088000 0x4000>;
->  				interrupts = <0 85 0x04>;
-> +				clocks = <&clks 147>;
-> +				clock-names = "pwm";
-> +				status = "disabled";
->  			};
->  
->  			pwm at 0208c000 { /* PWM4 */
-> +				compatible = "fsl,imx6q-pwm";
-> +				#pwm-cells = <2>;
->  				reg = <0x0208c000 0x4000>;
->  				interrupts = <0 86 0x04>;
-> +				clocks = <&clks 148>;
-> +				clock-names = "pwm";
-> +				status = "disabled";
->  			};
->  
->  			flexcan at 02090000 { /* CAN1 */
-> @@ -584,6 +604,54 @@
->  					};
->  				};
->  
-> +				pwm1 {
-> +				     	pinctrl_pwm1_1: pwm1grp-1 {
-> +						fsl,pins = <1543 0x80000000>;	/* MX6Q_PAD_SD1_DAT3__PWM1_PWMO */
-> +					};
+>   arch/arm/boot/dts/exynos5250-smdk5250.dts |   57 ++++++++++++++++++++++++++++-
+>   arch/arm/boot/dts/exynos5250.dtsi         |   32 ++++++++++++++++
+>   2 files changed, 88 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> index 8a5e348..6dc9faf 100644
+> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> @@ -16,12 +16,19 @@
+>   	model = "SAMSUNG SMDK5250 board based on EXYNOS5250";
+>   	compatible = "samsung,smdk5250", "samsung,exynos5250";
+>
+> +	aliases {
+> +		mshc0 =&mshc_0;
+> +		mshc1 =&mshc_1;
+> +		mshc2 =&mshc_2;
+> +		mshc3 =&mshc_3;
+> +	};
 > +
-> +				     	pinctrl_pwm1_2: pwm1grp-2 {
-> +						fsl,pins = <971 0x80000000>;	/* MX6Q_PAD_GPIO_9__PWM1_PWMO */
-> +					};
-> +
-> +				     	pinctrl_pwm1_3: pwm1grp-3 {
-> +						fsl,pins = <574 0x80000000>;	/* MX6Q_PAD_DISP0_DAT8__PWM1_PWMO */
-> +					};
+>   	memory {
+>   		reg =<0x40000000 0x80000000>;
+>   	};
+>
+>   	chosen {
+> -		bootargs = "root=/dev/ram0 rw ramdisk=8192 console=ttySAC1,115200";
+> +		bootargs = "root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
 
-Please do not enumerate all the possible options from the beginning.
-Instead, you should only add the one your board uses.  Then we can
-know the added configuration is actually used and tested.
+Yes, we need to sort out the 'bootargs' for using uart2 as a console, 
+but you know, this should be separated :-)
 
-Regards,
-Shawn
+>   	};
+>
+>   	i2c at 12C60000 {
+> @@ -72,6 +79,54 @@
+>   		status = "disabled";
+>   	};
+>
+> +	mshc_0: dwmmc0 at 12200000 {
 
-> +				};
-> +
-> +				pwm2 {
-> +				     	pinctrl_pwm2_1: pwm2grp-1 {
-> +						fsl,pins = <1557 0x80000000>;	/* MX6Q_PAD_SD1_DAT2__PWM2_PWMO */
-> +					};
-> +
-> +				     	pinctrl_pwm2_2: pwm2grp-2 {
-> +						fsl,pins = <963 0x80000000>;	/* MX6Q_PAD_GPIO_1__PWM2_PWMO */
-> +					};
-> +
-> +				     	pinctrl_pwm2_3: pwm2grp-3 {
-> +						fsl,pins = <582 0x80000000>;	/* MX6Q_PAD_DISP0_DAT8__PWM2_PWMO */
-> +					};
-> +				};
-> +
-> +				pwm3 {
-> +				     	pinctrl_pwm3_1: pwm3grp-1 {
-> +						fsl,pins = <1471 0x80000000>;	/* MX6Q_PAD_SD4_DAT1__PWM3_PWMO */
-> +					};
-> +
-> +				     	pinctrl_pwm3_2: pwm3grp-2 {
-> +						fsl,pins = <1526 0x80000000>;	/* MX6Q_PAD_SD1_DAT1__PWM3_PWMO */
-> +					};
-> +				};
-> +
-> +				pwm4 {
-> +				     	pinctrl_pwm4_1: pwm4grp-1 {
-> +						fsl,pins = <1479 0x80000000>;	/* MX6Q_PAD_SD4_DAT2__PWM4_PWMO */
-> +					};
-> +
-> +				     	pinctrl_pwm4_2: pwm4grp-2 {
-> +						fsl,pins = <1550 0x80000000>;	/* MX6Q_PAD_SD1_CMD__PWM4_PWMO */
-> +					};
-> +				};
-> +
->  				usdhc3 {
->  					pinctrl_usdhc3_1: usdhc3grp-1 {
->  						fsl,pins = <1273 0x17059	/* MX6Q_PAD_SD3_CMD__USDHC3_CMD */
-> -- 
-> 1.7.1
+How about to keep the consistent naming? dwmmc or dw_mmc? I think, 
+'dw_mmc' makes more sense?
+
+> +		num-slots =<1>;
+> +		supports-highspeed;
+> +		broken-cd;
+> +		fifo-depth =<0x80>;
+> +		card-detect-delay =<200>;
+> +		samsung,dw-mshc-sdr-timing =<2 3 3>;
+> +		samsung,dw-mshc-ddr-timing =<1 2 3>;
+
+We need to think again the name of dw-mshc-sdr-timing, dw-mshc-ddr-timing?
+
+[...]
+
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index 004aaa8..f69e389 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -182,6 +182,38 @@
+>   		#size-cells =<0>;
+>   	};
+>
+> +	dwmmc0 at 12200000 {
+> +		compatible = "samsung,exynos5250-dw-mshc";
+
+I'm not sure, 'exynos5250-dw-mshc' is right here. Because it is just 
+dw_mmc controller on exynos5250. So...hmm...
+
+[...]
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
