@@ -1,33 +1,54 @@
-From: bilhuang@nvidia.com (Bill Huang)
-Date: Mon, 27 Aug 2012 13:43:07 +0800
-Subject: Shutdown problem in SMP system happened on Tegra20
-In-Reply-To: <20120825071755.GG18957@n2100.arm.linux.org.uk>
-References: <A7051F87A141B744BCAF487D48E5B3BDF5BA982848@HKMAIL02.nvidia.com>
- <20120824182133.GB18957@n2100.arm.linux.org.uk>
- <A7051F87A141B744BCAF487D48E5B3BDF5BA98284A@HKMAIL02.nvidia.com>
- <20120825071755.GG18957@n2100.arm.linux.org.uk>
-Message-ID: <A7051F87A141B744BCAF487D48E5B3BDF5BA98284F@HKMAIL02.nvidia.com>
+From: jangra.pankaj9@gmail.com (Pankaj Jangra)
+Date: Mon, 27 Aug 2012 11:27:33 +0530
+Subject: [PATCH 5/13] arch/arm: use clk_prepare_enable and
+ clk_disable_unprepare
+In-Reply-To: <1345996865-32082-6-git-send-email-Julia.Lawall@lip6.fr>
+References: <1345996865-32082-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1345996865-32082-6-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <CADTbHxqm9Nktcn++-+GFqX8n_CwNzgp79XRJGf21-eDgtm8jsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Sat, Aug 25, 2012 at 08:00:56AM +0800, Bill Huang wrote:
-> > nvpublic
-> > > So what you're asking for is a feature to do what
-> > > CONFIG_PM_SLEEP_SMP does, but without CONFIG_PM_SLEEP_SMP enabled?
-> >
-> > Yeah pretty much, I'm actually asking should we take care of this
-> > since maybe not all platforms will have this config enabled?
-> > >
-> > > Why not just ensure that CONFIG_PM_SLEEP_SMP is enabled if your
-> > > platform requires that the lowest CPU number be the CPU dealing with reboot?
-> >
-> > Someday we will have it enabled, but before that we'll hit the issue,
-> > so you don't think this should be taken care of? Thanks.
-> 
-> Well, just enable CONFIG_PM_SLEEP_SMP then - it'll be far better than trying to implement something in
-> the ARM code, especially as sysrq can be used for poweroff/reboot etc (which will run from atomic
-> contexts where you can't switch to another CPU.)
-> 
-> What you're asking for will make these callbacks fragile for other platforms.
+Hi,
 
-OK, thanks.
+On Sun, Aug 26, 2012 at 9:30 PM, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
+> From: Julia Lawall <Julia.Lawall@lip6.fr>
+>
+> Clk_prepare_enable and clk_disable_unprepare combine clk_prepare and
+> clk_enable, and clk_disable and clk_unprepare.  They make the code more
+> concise, and ensure that clk_unprepare is called when clk_enable fails.
+>
+> A simplified version of the semantic patch that introduces calls to these
+> functions is as follows: (http://coccinelle.lip6.fr/)
+>
+> // <smpl>
+> @@
+> expression e;
+> @@
+>
+> - clk_prepare(e);
+> - clk_enable(e);
+> + clk_prepare_enable(e);
+>
+> @@
+> expression e;
+> @@
+>
+> - clk_disable(e);
+> - clk_unprepare(e);
+> + clk_disable_unprepare(e);
+> // </smpl>
+>
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+>
+> ---
+>  arch/arm/common/sa1111.c   |    3 +--
+>  arch/arm/common/timer-sp.c |   16 ++++------------
+>  arch/arm/kernel/smp_twd.c  |   13 +++----------
+>  3 files changed, 8 insertions(+), 24 deletions(-)
+>
+
+Reviewed-by: Pankaj Jangra <jangra.pankaj9@gmail.com>
+
+Regards,
+Pankaj Jangra
