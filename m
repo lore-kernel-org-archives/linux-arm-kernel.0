@@ -1,125 +1,167 @@
 From: shachimi@adeneo-embedded.com (HACHIMI Samir)
-Date: Mon, 27 Aug 2012 17:34:31 +0200
-Subject: [PATCH v2 1/2] imx6q: pwm: Add device tree support
+Date: Mon, 27 Aug 2012 17:34:32 +0200
+Subject: [PATCH v2 2/2] Enable Stop_enable mode during configuration of pwm.
 In-Reply-To: <1346081672-27866-1-git-send-email-shachimi@adeneo-embedded.com>
 References: <1346081672-27866-1-git-send-email-shachimi@adeneo-embedded.com>
-Message-ID: <3465D313FDFB824F9A9C8CD24FA4F6BCB4ACFD@frontmail.adetel.com>
+Message-ID: <3465D313FDFB824F9A9C8CD24FA4F6BCB4ACFE@frontmail.adetel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Samir Hachimi <shachimi@adeneo-embedded.com>
 
- Add clock look-up for pwm.
- Add the pinmux support for pwm.
- Several pin can be set to PwmO for the same Pwm.
+ Enable Stop_enable mode during configuration of pwm.
+ Check architecture by looking in driver_data instead of cpu_is_xxx.
 
 Signed-off-by: Samir Hachimi <shachimi@adeneo-embedded.com>
 ---
- arch/arm/boot/dts/imx6q.dtsi |   68 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 68 insertions(+), 0 deletions(-)
+ drivers/pwm/pwm-imx.c |   59 +++++++++++++++++++++++++++++++++++-------------
+ 1 files changed, 43 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 925da33..346ae9c 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -268,23 +268,43 @@
- 			};
+diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+index 0519bf2..7df919f 100644
+--- a/drivers/pwm/pwm-imx.c
++++ b/drivers/pwm/pwm-imx.c
+@@ -32,6 +32,7 @@
+ #define MX3_PWMSAR                0x0C    /* PWM Sample Register */
+ #define MX3_PWMPR                 0x10    /* PWM Period Register */
+ #define MX3_PWMCR_PRESCALER(x)    (((x - 1) & 0xFFF) << 4)
++#define MX3_PWMCR_STOPEN		(1 << 25)
+ #define MX3_PWMCR_DOZEEN                (1 << 24)
+ #define MX3_PWMCR_WAITEN                (1 << 23)
+ #define MX3_PWMCR_DBGEN			(1 << 22)
+@@ -39,6 +40,16 @@
+ #define MX3_PWMCR_CLKSRC_IPG      (1 << 16)
+ #define MX3_PWMCR_EN              (1 << 0)
  
- 			pwm at 02080000 { /* PWM1 */
-+				compatible = "fsl,imx6q-pwm";
-+				#pwm-cells = <2>;
- 				reg = <0x02080000 0x4000>;
- 				interrupts = <0 83 0x04>;
-+				clocks = <&clks 145>;
-+				clock-names = "pwm";
-+				status = "disabled";
- 			};
++/* Use the platform_id to distinguish different Archs. */
++#define IS_MX1			0x0
++#define IS_MX21			0x1
++#define IS_MX25			0x2
++#define IS_MX6Q			0x3
++#define PWM_IS_MX1(x)		((x)->id_entry->driver_data == IS_MX1)
++#define PWM_IS_MX21(x)		((x)->id_entry->driver_data == IS_MX21)
++#define PWM_IS_MX25(x)		((x)->id_entry->driver_data == IS_MX25)
++#define PWM_IS_MX6Q(x)		((x)->id_entry->driver_data == IS_MX6Q)
++
+ struct imx_chip {
+ 	struct clk	*clk;
  
- 			pwm at 02084000 { /* PWM2 */
-+				compatible = "fsl,imx6q-pwm";
-+				#pwm-cells = <2>;
- 				reg = <0x02084000 0x4000>;
- 				interrupts = <0 84 0x04>;
-+				clocks = <&clks 146>;
-+				clock-names = "pwm";
-+				status = "disabled";
- 			};
+@@ -46,6 +57,7 @@ struct imx_chip {
+ 	void __iomem	*mmio_base;
  
- 			pwm at 02088000 { /* PWM3 */
-+				compatible = "fsl,imx6q-pwm";
-+				#pwm-cells = <2>;
- 				reg = <0x02088000 0x4000>;
- 				interrupts = <0 85 0x04>;
-+				clocks = <&clks 147>;
-+				clock-names = "pwm";
-+				status = "disabled";
- 			};
+ 	struct pwm_chip	chip;
++	struct platform_device	*pdev;
+ };
  
- 			pwm at 0208c000 { /* PWM4 */
-+				compatible = "fsl,imx6q-pwm";
-+				#pwm-cells = <2>;
- 				reg = <0x0208c000 0x4000>;
- 				interrupts = <0 86 0x04>;
-+				clocks = <&clks 148>;
-+				clock-names = "pwm";
-+				status = "disabled";
- 			};
+ #define to_imx_chip(chip)	container_of(chip, struct imx_chip, chip)
+@@ -65,7 +77,7 @@ static int imx_pwm_config(struct pwm_chip *chip,
+ 			return rc;
+ 	}
  
- 			flexcan at 02090000 { /* CAN1 */
-@@ -584,6 +604,54 @@
- 					};
- 				};
+-	if (!(cpu_is_mx1() || cpu_is_mx21())) {
++	if (!(PWM_IS_MX1(imx->pdev) || PWM_IS_MX21(imx->pdev))) {
+ 		unsigned long long c;
+ 		unsigned long period_cycles, duty_cycles, prescale;
+ 		u32 cr;
+@@ -78,36 +90,33 @@ static int imx_pwm_config(struct pwm_chip *chip,
+ 		prescale = period_cycles / 0x10000 + 1;
  
-+				pwm1 {
-+				     	pinctrl_pwm1_1: pwm1grp-1 {
-+						fsl,pins = <1543 0x80000000>;	/* MX6Q_PAD_SD1_DAT3__PWM1_PWMO */
-+					};
+ 		period_cycles /= prescale;
+-		c = (unsigned long long)period_cycles * duty_ns;
+-		do_div(c, period_ns);
+-		duty_cycles = c;
+ 
+-		/*
+-		 * according to imx pwm RM, the real period value should be
+-		 * PERIOD value in PWMPR plus 2.
++		/* the chip documentation says the counter counts up to
++		 * period_cycles + 1 and then is reset to 0, so the
++		 *  actual period of the PWM wave is period_cycles + 2
+ 		 */
+-		if (period_cycles > 2)
+-			period_cycles -= 2;
+-		else
+-			period_cycles = 0;
++		c = (unsigned long long)(period_cycles + 2) * duty_ns;
++		do_div(c, period_ns);
++		duty_cycles = c;
+ 
+ 		writel(duty_cycles, imx->mmio_base + MX3_PWMSAR);
+ 		writel(period_cycles, imx->mmio_base + MX3_PWMPR);
+ 
+ 		cr = MX3_PWMCR_PRESCALER(prescale) |
+-			MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN | MX3_PWMCR_DBGEN;
++			MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN |
++			MX3_PWMCR_DBGEN | MX3_PWMCR_STOPEN;
+ 
+ 		/* If the PWM is enabled, keep it so. */
+ 		if (imx->clk_enabled)
+ 			cr |= MX3_PWMCR_EN;
+ 
+-		if (cpu_is_mx25())
++		if (PWM_IS_MX25(imx->pdev))
+ 			cr |= MX3_PWMCR_CLKSRC_IPG;
+ 		else
+ 			cr |= MX3_PWMCR_CLKSRC_IPG_HIGH;
+ 
+ 		writel(cr, imx->mmio_base + MX3_PWMCR);
+-	} else if (cpu_is_mx1() || cpu_is_mx21()) {
++	} else if (PWM_IS_MX1(imx->pdev) || PWM_IS_MX21(imx->pdev)) {
+ 		/* The PWM subsystem allows for exact frequencies. However,
+ 		 * I cannot connect a scope on my device to the PWM line and
+ 		 * thus cannot provide the program the PWM controller
+@@ -150,7 +159,7 @@ static int imx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	if (rc)
+ 		return rc;
+ 
+-	if (!(cpu_is_mx1() || cpu_is_mx21())) {
++	if (!(PWM_IS_MX1(imx->pdev) || PWM_IS_MX21(imx->pdev))) {
+ 		u32 cr = readl(imx->mmio_base + MX3_PWMCR);
+ 		cr |= MX3_PWMCR_EN;
+ 		writel(cr, imx->mmio_base + MX3_PWMCR);
+@@ -167,7 +176,7 @@ static void imx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	if (!imx->clk_enabled)
+ 		return;
+ 
+-	if (!(cpu_is_mx1() || cpu_is_mx21())) {
++	if (!(PWM_IS_MX1(imx->pdev) || PWM_IS_MX21(imx->pdev))) {
+ 		u32 cr = readl(imx->mmio_base + MX3_PWMCR);
+ 		cr &= ~MX3_PWMCR_EN;
+ 		writel(cr, imx->mmio_base + MX3_PWMCR);
+@@ -207,6 +216,7 @@ static int __devinit imx_pwm_probe(struct platform_device *pdev)
+ 	imx->chip.npwm = 1;
+ 
+ 	imx->clk_enabled = 0;
++	imx->pdev = pdev;
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (r == NULL) {
+@@ -237,9 +247,26 @@ static int __devexit imx_pwm_remove(struct platform_device *pdev)
+ 	return pwmchip_remove(&imx->chip);
+ }
+ 
++static const struct platform_device_id pwm_ids[] = {
++	{ .name = "imx1-pwm", .driver_data = IS_MX1, },
++	{ .name = "imx21-pwm", .driver_data = IS_MX21, },
++	{ .name = "imx25-pwm", .driver_data = IS_MX25, },
++	{ .name = "imx6q-pwm", .driver_data = IS_MX6Q, },
++	{},
++};
 +
-+				     	pinctrl_pwm1_2: pwm1grp-2 {
-+						fsl,pins = <971 0x80000000>;	/* MX6Q_PAD_GPIO_9__PWM1_PWMO */
-+					};
++static const struct of_device_id mxc_pwm_dt_ids[] = {
++	{
++		.compatible = "fsl,imx6q-pwm",
++		.data = (void *)&pwm_ids[IS_MX6Q]
++	},
++	{ /* sentinel */ }
++};
 +
-+				     	pinctrl_pwm1_3: pwm1grp-3 {
-+						fsl,pins = <574 0x80000000>;	/* MX6Q_PAD_DISP0_DAT8__PWM1_PWMO */
-+					};
-+				};
-+
-+				pwm2 {
-+				     	pinctrl_pwm2_1: pwm2grp-1 {
-+						fsl,pins = <1557 0x80000000>;	/* MX6Q_PAD_SD1_DAT2__PWM2_PWMO */
-+					};
-+
-+				     	pinctrl_pwm2_2: pwm2grp-2 {
-+						fsl,pins = <963 0x80000000>;	/* MX6Q_PAD_GPIO_1__PWM2_PWMO */
-+					};
-+
-+				     	pinctrl_pwm2_3: pwm2grp-3 {
-+						fsl,pins = <582 0x80000000>;	/* MX6Q_PAD_DISP0_DAT8__PWM2_PWMO */
-+					};
-+				};
-+
-+				pwm3 {
-+				     	pinctrl_pwm3_1: pwm3grp-1 {
-+						fsl,pins = <1471 0x80000000>;	/* MX6Q_PAD_SD4_DAT1__PWM3_PWMO */
-+					};
-+
-+				     	pinctrl_pwm3_2: pwm3grp-2 {
-+						fsl,pins = <1526 0x80000000>;	/* MX6Q_PAD_SD1_DAT1__PWM3_PWMO */
-+					};
-+				};
-+
-+				pwm4 {
-+				     	pinctrl_pwm4_1: pwm4grp-1 {
-+						fsl,pins = <1479 0x80000000>;	/* MX6Q_PAD_SD4_DAT2__PWM4_PWMO */
-+					};
-+
-+				     	pinctrl_pwm4_2: pwm4grp-2 {
-+						fsl,pins = <1550 0x80000000>;	/* MX6Q_PAD_SD1_CMD__PWM4_PWMO */
-+					};
-+				};
-+
- 				usdhc3 {
- 					pinctrl_usdhc3_1: usdhc3grp-1 {
- 						fsl,pins = <1273 0x17059	/* MX6Q_PAD_SD3_CMD__USDHC3_CMD */
+ static struct platform_driver imx_pwm_driver = {
+ 	.driver		= {
+ 		.name	= "mxc_pwm",
++		.of_match_table = of_match_ptr(mxc_pwm_dt_ids),
+ 	},
+ 	.probe		= imx_pwm_probe,
+ 	.remove		= __devexit_p(imx_pwm_remove),
 -- 
 1.7.1
