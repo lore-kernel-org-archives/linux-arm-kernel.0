@@ -1,52 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Aug 2012 16:46:45 -0700
-Subject: [PATCH 05/14] ARM: at91: add pinctrl support
-In-Reply-To: <20120825083811.GB7629@game.jcrosoft.org>
-References: <20120810124820.GA20557@game.jcrosoft.org>
- <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
- <1344603731-32667-5-git-send-email-plagnioj@jcrosoft.com>
- <CACRpkdZ2__V06Eo8JH451Sup5Nw2jJXVOH2FOfZBp5nNYpCtbg@mail.gmail.com>
- <5034FC18.2090400@wwwdotorg.org>
- <CACQ1gAieByr5vMmyyCuGtS8AgnnRZPPhLZY8sKvwvcQYe5ieUA@mail.gmail.com>
- <50366D2B.4010807@wwwdotorg.org>
- <20120825083811.GB7629@game.jcrosoft.org>
-Message-ID: <CACRpkdYWXZLNdgMhqoMZsaaszZ5Uz9pZ1EO=mrnuY5Der4O+Mw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 28 Aug 2012 00:49:45 +0100
+Subject: [PATCH 3/6] arm: cache-l2x0: add support for Aurora L2 cache ctrl
+In-Reply-To: <503BAEE7.5080401@free-electrons.com>
+References: <1345799361-23735-1-git-send-email-gregory.clement@free-electrons.com>
+ <1345799361-23735-4-git-send-email-gregory.clement@free-electrons.com>
+ <20120824104309.GE5400@mudshark.cambridge.arm.com>
+ <5037776A.6050605@free-electrons.com>
+ <503BAEE7.5080401@free-electrons.com>
+Message-ID: <20120827234944.GB7804@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 25, 2012 at 1:38 AM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 11:49 Thu 23 Aug     , Stephen Warren wrote:
->> On 08/23/2012 01:06 AM, Richard Genoud wrote:
+On Mon, Aug 27, 2012 at 06:31:19PM +0100, Gregory CLEMENT wrote:
+> On 08/24/2012 02:45 PM, Gregory CLEMENT wrote:
+> > On 08/24/2012 12:43 PM, Will Deacon wrote:> On Fri, Aug 24, 2012 at 10:09:18AM +0100, Gregory CLEMENT wrote:
+> >> 2. I'm surprised that there aren't barriers and/or maintenance operations
+> >>    needed around this operation. It might be worth checking in the
+> >>    documentation that you have (you probably need at least an isb()
+> >>    following the mcr).
+> > 
+> > I didn't find any mention of barriers and/or maintenance operations
+> > needed around this operation, but maybe I have missed something, or it
+> > was implicit for the people who wrote the documentation. I will ask
+> > confirmation that we don't need this.
+> 
+> I've just received confirmation that this register is  r/w from non-secure.
+> And that it would be good practice to have an ISB after this MCR, so I
+> will add this for the next version coming soon.
 
->> > Let's take the PioA - peripheral B: 0xffe0399f
->> > From the documentation table 4-3, we can extract the column PIO
->> > Periperal B for all signals PA0-PA31:
->> ...
->> > Each time it's possible to mux a pin to the peripheral B function (ie
->> > when there's no "-----") the corresponding bit is set:
->> ...
->> > => this gives 0x399f
->>
->> Ah OK. It would be a good idea to briefly describe this process in the
->> binding document I think. I assume this property exists to avoid the
->> kernel driver having to contain tables for each Atmel device; the driver
->> is generic.
-> Yeap I did this exactly for this
->
-> I do not want to maintain such code for the whole bunch of at91
-> and this way I add other SoC with just via dtsi without touching c code
->
-> I think other driver should do so too
+That sounds about right, thanks for checking. Can you also confirm that
+we don't need an explicit L2 invalidation, like we have for the
+memory-mapped interface?
 
-I'm following it now I think, after some discussion here at the kernel summit
-I have come to the conclusion that the real problem with readability comes
-from a shortcoming in the device tree compiler, that it cannot handle
-macros and defines (no preprocessor) so it's currently hard to make
-it more readable.
+Cheers,
 
-But that's not the implementers fault so I'm OK with this looking like
-this for the moment.
-
-Yours,
-Linus Walleij
+Will
