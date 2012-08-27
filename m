@@ -1,51 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Aug 2012 20:14:58 +0100
-Subject: Question about ION carveout heap support partial cache flush
-In-Reply-To: <CAN1soZw4Qk5qSyuyMko9SZWu3u3_7OPA2yNVYz6C1WQWVimbvg@mail.gmail.com>
-References: <CAMj5BkgffAW6azUjwz+iCF1tBLmBDRBvBjR-_fTr=4G=h+BLZw@mail.gmail.com>
- <CAN1soZyZ=4wjKkVrk5--2U_8SeT7qee9QAfhss7NgqtQAz+RrA@mail.gmail.com>
- <CAMj5BkiVq9ayJjUrwh3S-gDfezUTNiPFW-xd_dsbTJYTyLv2WQ@mail.gmail.com>
- <20120827082914.GN18957@n2100.arm.linux.org.uk>
- <CAN1soZw4Qk5qSyuyMko9SZWu3u3_7OPA2yNVYz6C1WQWVimbvg@mail.gmail.com>
-Message-ID: <20120827191458.GP18957@n2100.arm.linux.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 27 Aug 2012 21:19:12 +0200
+Subject: [PATCH 03/11] pinctrl: mvebu: kirkwood pinctrl driver
+In-Reply-To: <343192fa3698ed0575444a5603ed734d@codethink.co.uk>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1344689809-6223-4-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CACRpkdbG4jkFcVP_6AmAZzciffQCamKXw7PcFnTdccyq7AMa8A@mail.gmail.com>
+ <343192fa3698ed0575444a5603ed734d@codethink.co.uk>
+Message-ID: <503BC830.7090705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 09:43:10PM +0800, Haojian Zhuang wrote:
-> On Mon, Aug 27, 2012 at 4:29 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Mon, Aug 27, 2012 at 04:23:31PM +0800, zhangfei gao wrote:
-> >> On Mon, Aug 27, 2012 at 1:46 PM, Haojian Zhuang
-> >> <haojian.zhuang@gmail.com> wrote:
-> >> > Let me summerize it. First, user space address is mapped. Then,
-> >> > flushing user space
-> >> > address is triggered. It's a workaround of fixing non-existed virtual
-> >> > address without fixing
-> >> > vmap() or any other solution. It's just a quick fix.
-> >> >
-> >> > Zhangfei,
-> >> > I doubt that the issue may be caused by missing memory barrier.
-> >> > Flushing is using
-> >> > coprocessor instructions. It's a little different.
-> >>
-> >> Is there any limitation that dmac_map_area & dmac_flush_range
-> >> supporting addr mapped from user space?
-> >
-> > They DEFINITELY DO NOT SUPPORT FLUSHING USER SPACE.
-> 
-> I agree that those API are defined to support kernel space address only.
-> But the implementation is only flushing address by assembly code.
+On 08/27/2012 03:43 PM, Ben Dooks wrote:
+> On 20/08/2012 06:49, Linus Walleij wrote:
+>> On Sat, Aug 11, 2012 at 2:56 PM, Sebastian Hesselbarth
+>> <sebastian.hesselbarth@gmail.com> wrote:
+>> (...)
+>>> diff --git a/drivers/pinctrl/pinctrl-kirkwood.c
+>>> b/drivers/pinctrl/pinctrl-kirkwood.c
+>>> +static struct mvebu_pinctrl_soc_info kirkwood_pinctrl_info;
+>>> +
+>>> +static struct of_device_id kirkwood_pinctrl_of_match[] __devinitdata
+>>> = {
+>>> + { .compatible = "marvell,88f6180-pinctrl",
+>>> + .data = (void *)VARIANT_MV88F6180 },
+>>> + { .compatible = "marvell,88f6190-pinctrl",
+>>> + .data = (void *)VARIANT_MV88F6190 },
+>>> + { .compatible = "marvell,88f6192-pinctrl",
+>>> + .data = (void *)VARIANT_MV88F6192 },
+>>> + { .compatible = "marvell,88f6281-pinctrl",
+>>> + .data = (void *)VARIANT_MV88F6281 },
+>>> + { .compatible = "marvell,88f6282-pinctrl",
+>>> + .data = (void *)VARIANT_MV88F6282 },
+>>> + { }
+>>> +};
+>>
+>> I'm thinking this variant should maybe be an enum... unless it is
+>> strongly established somewhere in Orion/Marvell stuff.
+>>
+>>> +static int __devinit kirkwood_pinctrl_probe(struct platform_device
+>>> *pdev)
+>>> +{
+>>> + struct mvebu_pinctrl_soc_info *soc = &kirkwood_pinctrl_info;
+>>> + const struct of_device_id *match =
+>>> + of_match_device(kirkwood_pinctrl_of_match, &pdev->dev);
+>>> +
+>>> + if (match) {
+>>> + soc->variant = (unsigned)match->data & 0xff;
+>>> + switch (soc->variant) {
+>>> + case VARIANT_MV88F6180:
+>>> + soc->controls = mv88f6180_mpp_controls;
+>>> + soc->ncontrols = ARRAY_SIZE(mv88f6180_mpp_controls);
+>>> + soc->modes = mv88f6xxx_mpp_modes;
+>>> + soc->nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes);
+>>> + soc->gpioranges = mv88f6180_gpio_ranges;
+>>> + soc->ngpioranges = ARRAY_SIZE(mv88f6180_gpio_ranges);
+>>> + break;
+>>> + case VARIANT_MV88F6190:
+>>> + case VARIANT_MV88F6192:
+>>> + soc->controls = mv88f619x_mpp_controls;
+>>> + soc->ncontrols = ARRAY_SIZE(mv88f619x_mpp_controls);
+>>> + soc->modes = mv88f6xxx_mpp_modes;
+>>> + soc->nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes);
+>>> + soc->gpioranges = mv88f619x_gpio_ranges;
+>>> + soc->ngpioranges = ARRAY_SIZE(mv88f619x_gpio_ranges);
+>>> + break;
+>>> + case VARIANT_MV88F6281:
+>>> + case VARIANT_MV88F6282:
+>>> + soc->controls = mv88f628x_mpp_controls;
+>>> + soc->ncontrols = ARRAY_SIZE(mv88f628x_mpp_controls);
+>>> + soc->modes = mv88f6xxx_mpp_modes;
+>>> + soc->nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes);
+>>> + soc->gpioranges = mv88f628x_gpio_ranges;
+>>> + soc->ngpioranges = ARRAY_SIZE(mv88f628x_gpio_ranges);
+>>> + break;
+>>> + }
+>>> + pdev->dev.platform_data = soc;
+>>> + }
+>>> + return mvebu_pinctrl_probe(pdev);
+>>> +}
+>
+> Why not have structures defining the soc-> parameters and use that in the
+> of_match list?
 
-No.  Have you looked at what the dma_map_page() and scatterlist stuff
-does?  It all wants to deal with a 'struct page'.  Have you looked at
-how L2 caches are handled?  That wants to be able to use virt_to_phys
-and similar to convert addresses, which only work on the linear mapped
-region.
+Ben,
 
-Have you thought about what happens when the user's page gets unmapped
-or swapped out (or even just aged) ?  I don't think you've given any of
-this any consideration what so ever.
+functionally it is equivalent and IMHO using soc structs doesn't improve
+readability here. I there any other good reason to have structs for each
+soc?
 
-There's more here than just "oh we can just pass random address X into
-this function and hope that nothing goes wrong."  It's really not that
-simple.
+Sebastian
