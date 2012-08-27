@@ -1,43 +1,48 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 28 Aug 2012 06:42:33 +0800
-Subject: [PATCH 1/5] arm: mmp: make private clock definition exclude from
- common clock
-In-Reply-To: <1346036043-20115-1-git-send-email-xiechao.mail@gmail.com>
-References: <1346036043-20115-1-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <CAN1soZy54UcoQ_qrN2Wh4ZWVMCXj3gpHZas57GqQeT988dnkQQ@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Mon, 27 Aug 2012 18:42:42 -0400
+Subject: [PATCH] MMC: OMAP MSDI: fix broken PIO mode
+In-Reply-To: <alpine.DEB.2.00.1208240555210.25436@utopia.booyaka.com> (Paul
+ Walmsley's message of "Fri, 24 Aug 2012 06:00:18 +0000 (UTC)")
+References: <alpine.DEB.2.00.1208240555210.25436@utopia.booyaka.com>
+Message-ID: <873938yn19.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 10:53 AM, Chao Xie <xiechao.mail@gmail.com> wrote:
-> From: Chao Xie <chao.xie@marvell.com>
->
-> the clock.c is mmp private implementation, make it excluded
-> from common clock framework
->
-> Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
-> ---
->  arch/arm/mach-mmp/Makefile |    5 ++++-
->  1 files changed, 4 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
-> index b786f7e..815c3e7 100644
-> --- a/arch/arm/mach-mmp/Makefile
-> +++ b/arch/arm/mach-mmp/Makefile
-> @@ -2,13 +2,16 @@
->  # Makefile for Marvell's PXA168 processors line
->  #
->
-> -obj-y                          += common.o clock.o devices.o time.o irq.o
-> +obj-y                          += common.o devices.o time.o irq.o
->
->  # SoC support
->  obj-$(CONFIG_CPU_PXA168)       += pxa168.o
->  obj-$(CONFIG_CPU_PXA910)       += pxa910.o
->  obj-$(CONFIG_CPU_MMP2)         += mmp2.o sram.o
->
-> +ifeq ($(CONFIG_COMMON_CLK), )
-> +obj-y                          += clock.o
-> +endif
+Hi,
 
-Why not to discard all private clock code? Maybe you can use common
-clk in arch-mmp directly.
+On Fri, Aug 24 2012, Paul Walmsley wrote:
+> After commit 26b88520b80695a6fa5fd95b5d97c03f4daf87e0 ("mmc:
+> omap_hsmmc: remove private DMA API implementation"), the Nokia N800
+> here stopped booting:
+>
+> [    2.086181] Waiting for root device /dev/mmcblk0p1...
+> [    2.324066] Unhandled fault: imprecise external abort (0x406) at 0x00000000
+> [    2.331451] Internal error: : 406 [#1] ARM
+> [    2.335784] Modules linked in:
+> [    2.339050] CPU: 0    Not tainted  (3.6.0-rc3 #60)
+> [    2.344146] PC is at default_idle+0x28/0x30
+> [    2.348602] LR is at trace_hardirqs_on_caller+0x15c/0x1b0
+>
+> ...
+>
+> This turned out to be due to memory corruption caused by long-broken
+> PIO code in drivers/mmc/host/omap.c.  (Previously, this driver had
+> been using DMA; but the above commit caused the MMC driver to fall
+> back to PIO mode with an unmodified Kconfig.)
+>
+> The PIO code, added with the rest of the driver in commit
+> 730c9b7e6630f786fcec026fb11d2e6f2c90fdcb ("[MMC] Add OMAP MMC host
+> driver"), confused bytes with 16-bit words.  This bug caused memory
+> located after the PIO transfer buffer to be corrupted with transfers
+> larger than 32 bytes.  The driver also did not increment the buffer
+> pointer after the transfer occurred.  This bug resulted in data
+> corruption during any transfer larger than 64 bytes.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+
+Yuck.  Thanks for tracking that down, Paul -- pushed to mmc-next for 3.6.
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
