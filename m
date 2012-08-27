@@ -1,23 +1,17 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 27 Aug 2012 11:08:25 -0700
-Subject: [PATCH V2 4/6] ASoC: Davinci: McASP: add device tree support for
- McASP
-In-Reply-To: <1346074004-22172-5-git-send-email-gururaja.hebbar@ti.com>
-References: <1346074004-22172-1-git-send-email-gururaja.hebbar@ti.com>
- <1346074004-22172-5-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <20120827180824.GR4339@opensource.wolfsonmicro.com>
+Date: Mon, 27 Aug 2012 11:08:52 -0700
+Subject: ASoC: SAMSUNG: Change Kconfig to support all EXYNOSs
+In-Reply-To: <503BB737.7090004@samsung.com>
+References: <003001cd8361$7016a110$5043e330$@samsung.com>
+ <503BB737.7090004@samsung.com>
+Message-ID: <20120827180851.GS4339@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 06:56:42PM +0530, Hebbar, Gururaja wrote:
+On Mon, Aug 27, 2012 at 11:06:47AM -0700, Kukjin Kim wrote:
 
-> +- sram-size-playback : size of sram to be allocated during playback
-> +- sram-size-capture  : size of sram to be allocated during capture
+> Hmm, all of Samsung stuff is available...so how about?
+> 
+> +	depends on PLAT_SAMSUNG
 
-These smell like runtime/policy configuration rather than fixed
-properties of the device so it probably shouldn't appear in the device
-tree, ideally at some point in the future we'll be able to work out some
-wonderful way of automatically allocating the resources.
-
-That said if the rest of the series looks OK I'll apply this but it'd be
-nice to get these numbers from somewhere else.
+Yes, that's a very good idea!
