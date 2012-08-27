@@ -1,57 +1,31 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 27 Aug 2012 17:33:19 +0200
-Subject: [PATCH v3 0/3] DaVinci DMA engine conversion
-In-Reply-To: <1345684176-21472-1-git-send-email-mporter@ti.com>
-References: <1345684176-21472-1-git-send-email-mporter@ti.com>
-Message-ID: <503B933F.2030803@gmail.com>
+From: shachimi@adeneo-embedded.com (HACHIMI Samir)
+Date: Mon, 27 Aug 2012 17:34:30 +0200
+Subject: [PATCH v2 0/2] imx6q: pwm: Activate stop_mode and configure pinmux
+Message-ID: <3465D313FDFB824F9A9C8CD24FA4F6BCB4ACFC@frontmail.adetel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
+From: Samir Hachimi <shachimi@adeneo-embedded.com>
 
-On 23.08.2012 03:09, Matt Porter wrote:
-> This series begins the conversion of the DaVinci private EDMA API
-> implementation to a DMA engine driver and converts two of the three
-> in-kernel users of the private EDMA API to DMA engine.
-> 
-> The approach taken is similar to the recent OMAP DMA Engine
-> conversion. The EDMA DMA Engine driver is a wrapper around the existing
-> private EDMA implementation and registers the platform device within
-> the driver.  This allows the conversion series to stand alone with just
-> the drivers and no changes to platform code. It also allows peripheral
-> drivers to continue to use the private EDMA implementation until they
-> are converted.
-> 
-> The EDMA DMA Engine driver supports slave transfers only at this time. It
-> is planned to add cyclic transfers in support of audio peripherals.
-> 
-> There are three users of the private EDMA API in the kernel now:
-> davinci_mmc, spi-davinci, and davinci-mcasp.  This series provides DMA
-> Engine conversions for the davinci_mmc and spi-davinci drivers which
-> use the supported slave transfers.
-> 
-> This series has been tested on an AM18x EVM and Hawkboard with
-> driver performance comparable to that of the private EDMA API
-> implementations. Both MMC0 and MMC1 are tested which handles the
-> DA850/OMAP-L138/AM18x specific case where MMC1 uses DMA channels on
-> a second EDMA channel controller.  All other platforms have a simpler
-> design with just a single EDMA channel controller.
-> 
-> For those wanting to easily test this series, I've pushed a branch for
-> each version to my github tree at https://github.com/ohporter/linux. The
-> current branch is edma-dmaengine-v3.
-> 
-> After this series, the current plan is to complete the mcasp driver
-> conversion which includes adding cyclic dma support. This will then
-> enable the removal and refactoring of the private EDMA API functionality
-> into the EDMA DMA Engine driver.  Since EDMA is also used on the AM33xx
-> family of parts in mach-omap2/, the plan is to enable this driver on
-> that platform as well.
+This patch series enables support for pwm driver on imx6q SoC. The first
+patch of the series configure the pinctrl for pwm in device-tree. Actually
+they are several pin who can be set to pwmO for each pwm, so I assume that
+all of them must be enabled when configuring pin.
+The second patch activate stop_enable mode and unset the enable bit during
+configuration of pwm, and set the enable bit in pwm CR register during enable.
 
-Once you have a patch for the McASP driver conversion, I can happily
-test this on a AM33xx board, together with Gururaja's latest McASP
-refactoring series. Let me know how I can help you here.
+Changes since v1:
+Remove default pwm pinmux configuration in DT as Shawn and Matt suggested.
+Now, pwm used pwm's clocks properties to configure pwm's clock.
+Need Shawn's patch '[PATCH v2 0/4] Move imx6q/28/23 clock lookup over to device tree' to work.
+Use Beno??t's '[PATCH] pwm-imx: Fix config / enable / disable' (un)setting the cr enable bit to enable/disable pwm.
+The second patch used driver_data instead of cpu_is_xxx macros, to check used architecture and enabled stop_enable mode.
 
 
-Thanks,
-Daniel
+Samir Hachimi (2):
+  Add clock look-up for pwm.
+  Enable Stop_enable mode during configuration of pwm.
+
+ arch/arm/boot/dts/imx6q.dtsi |   68 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/pwm/pwm-imx.c        |   59 ++++++++++++++++++++++++++----------
+ 2 files changed, 111 insertions(+), 16 deletions(-)
