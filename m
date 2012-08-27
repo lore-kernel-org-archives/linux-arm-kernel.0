@@ -1,152 +1,177 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Mon, 27 Aug 2012 10:54:03 +0800
-Subject: [PATCH 5/5] arm: mmp: remove unused definition in regs-apbc and
- regs-apmu
-In-Reply-To: <1346036043-20115-1-git-send-email-xiechao.mail@gmail.com>
-References: <1346036043-20115-1-git-send-email-xiechao.mail@gmail.com>
-Message-ID: <1346036043-20115-5-git-send-email-xiechao.mail@gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 27 Aug 2012 09:50:49 +0530
+Subject: [PATCH] gpio: samsung: add devicetree init for s3c24xx arches
+In-Reply-To: <201208252353.59345.heiko@sntech.de>
+References: <201208252353.59345.heiko@sntech.de>
+Message-ID: <CAJuYYwQBOP7-D0fepDsCr+43ASKQ3CmMBMH-M79QH7r=xS85Eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chao Xie <chao.xie@marvell.com>
+Hi Heiko,
 
-Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
----
- arch/arm/mach-mmp/include/mach/regs-apbc.h |   95 ----------------------------
- arch/arm/mach-mmp/include/mach/regs-apmu.h |   15 -----
- 2 files changed, 0 insertions(+), 110 deletions(-)
+On 26 August 2012 03:23, Heiko St?bner <heiko@sntech.de> wrote:
+> Until now the Exynos-SoC was the only Samsung-SoC supporting the GPIOs
+> via the device tree. This patch implements dt-support for the
+> s3c24xx arches.
+>
+> The controllers contain only 3 cells, as the underlying gpio controller
+> does not support controlling the drive strength on a gpio level.
+>
+> Tested with the gpio-keys driver on a s3c2416 based machine.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  .../devicetree/bindings/gpio/gpio-samsung.txt      |   38 ++++++++++++
+>  drivers/gpio/gpio-samsung.c                        |   63 ++++++++++++++++++++
+>  2 files changed, 101 insertions(+), 0 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-samsung.txt b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
+> index 5375625..ce6a7d4 100644
+> --- a/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
+> @@ -39,3 +39,41 @@ Example:
+>                 #gpio-cells = <4>;
+>                 gpio-controller;
+>         };
+> +
+> +
+> +Samsung S3C24XX GPIO Controller
+> +
+> +Required properties:
+> +- compatible: Compatible property value should be "samsung,s3c24xx-gpio".
 
-diff --git a/arch/arm/mach-mmp/include/mach/regs-apbc.h b/arch/arm/mach-mmp/include/mach/regs-apbc.h
-index 68b0c93..ddc812f 100644
---- a/arch/arm/mach-mmp/include/mach/regs-apbc.h
-+++ b/arch/arm/mach-mmp/include/mach/regs-apbc.h
-@@ -13,101 +13,6 @@
- 
- #include <mach/addr-map.h>
- 
--/*
-- * APB clock register offsets for PXA168
-- */
--#define APBC_PXA168_UART1	APBC_REG(0x000)
--#define APBC_PXA168_UART2	APBC_REG(0x004)
--#define APBC_PXA168_GPIO	APBC_REG(0x008)
--#define APBC_PXA168_PWM1	APBC_REG(0x00c)
--#define APBC_PXA168_PWM2	APBC_REG(0x010)
--#define APBC_PXA168_PWM3	APBC_REG(0x014)
--#define APBC_PXA168_PWM4	APBC_REG(0x018)
--#define APBC_PXA168_RTC		APBC_REG(0x028)
--#define APBC_PXA168_TWSI0	APBC_REG(0x02c)
--#define APBC_PXA168_KPC		APBC_REG(0x030)
--#define APBC_PXA168_TIMERS	APBC_REG(0x034)
--#define APBC_PXA168_AIB		APBC_REG(0x03c)
--#define APBC_PXA168_SW_JTAG	APBC_REG(0x040)
--#define APBC_PXA168_ONEWIRE	APBC_REG(0x048)
--#define APBC_PXA168_ASFAR	APBC_REG(0x050)
--#define APBC_PXA168_ASSAR	APBC_REG(0x054)
--#define APBC_PXA168_TWSI1	APBC_REG(0x06c)
--#define APBC_PXA168_UART3	APBC_REG(0x070)
--#define APBC_PXA168_AC97	APBC_REG(0x084)
--#define APBC_PXA168_SSP1	APBC_REG(0x81c)
--#define APBC_PXA168_SSP2	APBC_REG(0x820)
--#define APBC_PXA168_SSP3	APBC_REG(0x84c)
--#define APBC_PXA168_SSP4	APBC_REG(0x858)
--#define APBC_PXA168_SSP5	APBC_REG(0x85c)
--
--/*
-- * APB Clock register offsets for PXA910
-- */
--#define APBC_PXA910_UART0	APBC_REG(0x000)
--#define APBC_PXA910_UART1	APBC_REG(0x004)
--#define APBC_PXA910_GPIO	APBC_REG(0x008)
--#define APBC_PXA910_PWM1	APBC_REG(0x00c)
--#define APBC_PXA910_PWM2	APBC_REG(0x010)
--#define APBC_PXA910_PWM3	APBC_REG(0x014)
--#define APBC_PXA910_PWM4	APBC_REG(0x018)
--#define APBC_PXA910_SSP1	APBC_REG(0x01c)
--#define APBC_PXA910_SSP2	APBC_REG(0x020)
--#define APBC_PXA910_IPC		APBC_REG(0x024)
--#define APBC_PXA910_RTC		APBC_REG(0x028)
--#define APBC_PXA910_TWSI0	APBC_REG(0x02c)
--#define APBC_PXA910_KPC		APBC_REG(0x030)
--#define APBC_PXA910_TIMERS	APBC_REG(0x034)
--#define APBC_PXA910_TBROT	APBC_REG(0x038)
--#define APBC_PXA910_AIB		APBC_REG(0x03c)
--#define APBC_PXA910_SW_JTAG	APBC_REG(0x040)
--#define APBC_PXA910_TIMERS1	APBC_REG(0x044)
--#define APBC_PXA910_ONEWIRE	APBC_REG(0x048)
--#define APBC_PXA910_SSP3	APBC_REG(0x04c)
--#define APBC_PXA910_ASFAR	APBC_REG(0x050)
--#define APBC_PXA910_ASSAR	APBC_REG(0x054)
--
--/*
-- * APB Clock register offsets for MMP2
-- */
--#define APBC_MMP2_RTC		APBC_REG(0x000)
--#define APBC_MMP2_TWSI1		APBC_REG(0x004)
--#define APBC_MMP2_TWSI2		APBC_REG(0x008)
--#define APBC_MMP2_TWSI3		APBC_REG(0x00c)
--#define APBC_MMP2_TWSI4		APBC_REG(0x010)
--#define APBC_MMP2_ONEWIRE	APBC_REG(0x014)
--#define APBC_MMP2_KPC		APBC_REG(0x018)
--#define APBC_MMP2_TB_ROTARY	APBC_REG(0x01c)
--#define APBC_MMP2_SW_JTAG	APBC_REG(0x020)
--#define APBC_MMP2_TIMERS	APBC_REG(0x024)
--#define APBC_MMP2_UART1		APBC_REG(0x02c)
--#define APBC_MMP2_UART2		APBC_REG(0x030)
--#define APBC_MMP2_UART3		APBC_REG(0x034)
--#define APBC_MMP2_GPIO		APBC_REG(0x038)
--#define APBC_MMP2_PWM0		APBC_REG(0x03c)
--#define APBC_MMP2_PWM1		APBC_REG(0x040)
--#define APBC_MMP2_PWM2		APBC_REG(0x044)
--#define APBC_MMP2_PWM3		APBC_REG(0x048)
--#define APBC_MMP2_SSP0		APBC_REG(0x04c)
--#define APBC_MMP2_SSP1		APBC_REG(0x050)
--#define APBC_MMP2_SSP2		APBC_REG(0x054)
--#define APBC_MMP2_SSP3		APBC_REG(0x058)
--#define APBC_MMP2_SSP4		APBC_REG(0x05c)
--#define APBC_MMP2_SSP5		APBC_REG(0x060)
--#define APBC_MMP2_AIB		APBC_REG(0x064)
--#define APBC_MMP2_ASFAR		APBC_REG(0x068)
--#define APBC_MMP2_ASSAR		APBC_REG(0x06c)
--#define APBC_MMP2_USIM		APBC_REG(0x070)
--#define APBC_MMP2_MPMU		APBC_REG(0x074)
--#define APBC_MMP2_IPC		APBC_REG(0x078)
--#define APBC_MMP2_TWSI5		APBC_REG(0x07c)
--#define APBC_MMP2_TWSI6		APBC_REG(0x080)
--#define APBC_MMP2_TWSI_INTSTS	APBC_REG(0x084)
--#define APBC_MMP2_UART4		APBC_REG(0x088)
--#define APBC_MMP2_RIPC		APBC_REG(0x08c)
--#define APBC_MMP2_THSENS1	APBC_REG(0x090)	/* Thermal Sensor */
--#define APBC_MMP2_THSENS_INTSTS	APBC_REG(0x0a4)
--
- /* Common APB clock register bit definitions */
- #define APBC_APBCLK	(1 << 0)  /* APB Bus Clock Enable */
- #define APBC_FNCLK	(1 << 1)  /* Functional Clock Enable */
-diff --git a/arch/arm/mach-mmp/include/mach/regs-apmu.h b/arch/arm/mach-mmp/include/mach/regs-apmu.h
-index 7af8deb..93c8d0e 100644
---- a/arch/arm/mach-mmp/include/mach/regs-apmu.h
-+++ b/arch/arm/mach-mmp/include/mach/regs-apmu.h
-@@ -13,21 +13,6 @@
- 
- #include <mach/addr-map.h>
- 
--/* Clock Reset Control */
--#define APMU_IRE	APMU_REG(0x048)
--#define APMU_LCD	APMU_REG(0x04c)
--#define APMU_CCIC	APMU_REG(0x050)
--#define APMU_SDH0	APMU_REG(0x054)
--#define APMU_SDH1	APMU_REG(0x058)
--#define APMU_USB	APMU_REG(0x05c)
--#define APMU_NAND	APMU_REG(0x060)
--#define APMU_DMA	APMU_REG(0x064)
--#define APMU_GEU	APMU_REG(0x068)
--#define APMU_BUS	APMU_REG(0x06c)
--#define APMU_SDH2	APMU_REG(0x0e8)
--#define APMU_SDH3	APMU_REG(0x0ec)
--#define APMU_ETH	APMU_REG(0x0fc)
--
- #define APMU_FNCLK_EN	(1 << 4)
- #define APMU_AXICLK_EN	(1 << 3)
- #define APMU_FNRST_DIS	(1 << 1)
--- 
-1.7.0.4
+This is debatable, but I would choose to be specific here and use
+"samsing,s3c2416-gpio". For instance, SoC's in s3c24xx family have
+differing value for pull none/down/up.
+
+> +
+> +- reg: Physical base address of the controller and length of memory mapped
+> +  region.
+> +
+> +- #gpio-cells: Should be 3. The syntax of the gpio specifier used by client nodes
+> +  should be the following with values derived from the SoC user manual.
+> +     <[phandle of the gpio controller node]
+> +      [pin number within the gpio controller]
+> +      [mux function]
+> +      [flags and pull up/down]
+> +
+> +  Values for gpio specifier:
+> +  - Pin number: depending on the controller a number from 0 up to 15.
+> +  - Flags and Pull Up/Down: 0 - Pull Up/Down Disabled.
+> +                            1 - Pull Down Enabled.
+> +                            3 - Pull Up Enabled.
+
+As per s3c2416 user manual, 2 is used for Pull Up and 3 is listed as
+reserved value. Any particular reason to use 3 here for pull up and
+not 2 as per the user manual?
+
+> +          Bit 16 (0x00010000) - Input is active low.
+> +
+> +- gpio-controller: Specifies that the node is a gpio controller.
+> +- #address-cells: should be 1.
+> +- #size-cells: should be 1.
+
+It would be informative to add information about the 'mux function'
+cell here as well. Specifically, on how to handle the banks that have
+an extended GPxSEL register that allow additional pin function
+selection.
+
+> +
+> +Example:
+> +
+> +       gpa: gpio-controller at 56000000 {
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               compatible = "samsung,s3c24xx-gpio";
+> +               reg = <0x56000000 0x10>;
+> +               #gpio-cells = <3>;
+> +               gpio-controller;
+> +       };
+> diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
+> index a150d2e..80a2817 100644
+> --- a/drivers/gpio/gpio-samsung.c
+> +++ b/drivers/gpio/gpio-samsung.c
+> @@ -938,6 +938,67 @@ static void __init samsung_gpiolib_add(struct samsung_gpio_chip *chip)
+>                 s3c_gpiolib_track(chip);
+>  }
+>
+> +#if defined(CONFIG_PLAT_S3C24XX) && defined(CONFIG_OF)
+> +static int s3c24xx_gpio_xlate(struct gpio_chip *gc,
+> +                       const struct of_phandle_args *gpiospec, u32 *flags)
+> +{
+> +       unsigned int pin;
+> +
+> +       if (WARN_ON(gc->of_gpio_n_cells < 3))
+> +               return -EINVAL;
+> +
+> +       if (WARN_ON(gpiospec->args_count < gc->of_gpio_n_cells))
+> +               return -EINVAL;
+> +
+> +       if (gpiospec->args[0] > gc->ngpio)
+> +               return -EINVAL;
+> +
+> +       pin = gc->base + gpiospec->args[0];
+> +
+> +       if (s3c_gpio_cfgpin(pin, S3C_GPIO_SFN(gpiospec->args[1])))
+> +               pr_warn("gpio_xlate: failed to set pin function\n");
+> +       if (s3c_gpio_setpull(pin, gpiospec->args[2] & 0xffff))
+> +               pr_warn("gpio_xlate: failed to set pin pull up/down\n");
+> +
+> +       if (flags)
+> +               *flags = gpiospec->args[2] >> 16;
+> +
+> +       return gpiospec->args[0];
+> +}
+> +
+> +static const struct of_device_id s3c24xx_gpio_dt_match[] __initdata = {
+> +       { .compatible = "samsung,s3c24xx-gpio", },
+> +       {}
+> +};
+> +
+> +static __init void s3c24xx_gpiolib_attach_ofnode(struct samsung_gpio_chip *chip,
+> +                                                u64 base, u64 offset)
+> +{
+> +       struct gpio_chip *gc =  &chip->chip;
+> +       u64 address;
+> +
+> +       if (!of_have_populated_dt())
+> +               return;
+> +
+> +       address = chip->base ? base + ((u32)chip->base & 0xfff) : base + offset;
+> +       gc->of_node = of_find_matching_node_by_address(NULL,
+> +                       s3c24xx_gpio_dt_match, address);
+> +       if (!gc->of_node) {
+> +               pr_info("gpio: device tree node not found for gpio controller"
+> +                       " with base address %08llx\n", address);
+> +               return;
+> +       }
+> +       gc->of_gpio_n_cells = 3;
+> +       gc->of_xlate = s3c24xx_gpio_xlate;
+> +}
+> +#elif defined(CONFIG_PLAT_S3C24XX)
+> +static __init void s3c24xx_gpiolib_attach_ofnode(struct samsung_gpio_chip *chip,
+> +                                                u64 base, u64 offset)
+> +{
+> +       return;
+> +}
+> +#endif /* defined(CONFIG_PLAT_S3C24XX) && defined(CONFIG_OF) */
+> +
+>  static void __init s3c24xx_gpiolib_add_chips(struct samsung_gpio_chip *chip,
+>                                              int nr_chips, void __iomem *base)
+>  {
+> @@ -962,6 +1023,8 @@ static void __init s3c24xx_gpiolib_add_chips(struct samsung_gpio_chip *chip,
+>                         gc->direction_output = samsung_gpiolib_2bit_output;
+>
+>                 samsung_gpiolib_add(chip);
+> +
+> +               s3c24xx_gpiolib_attach_ofnode(chip, S3C24XX_PA_GPIO, i * 0x10);
+>         }
+>  }
+>
+> --
+> 1.7.2.3
+>
+
+Overall, this is patch looks fine.
+
+Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
