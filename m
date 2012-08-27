@@ -1,102 +1,32 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Mon, 27 Aug 2012 18:24:17 +0200
-Subject: [PATCH 2/6] brcmfmac: Handling the interrupt in ISR
- directly for non-OOB
-In-Reply-To: <1346063114-30361-3-git-send-email-wni@nvidia.com>
-References: <1346063114-30361-1-git-send-email-wni@nvidia.com>
- <1346063114-30361-3-git-send-email-wni@nvidia.com>
-Message-ID: <503B9F31.5050502@broadcom.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 27 Aug 2012 09:33:38 -0700
+Subject: FW: [PATCH 07/22] ASoC: Ux500: Initialise PCM from MSP probe
+ rather than as a device
+In-Reply-To: <50377C0D.2060905@stericsson.com>
+References: <014401cd8165$99960c40$ccc224c0$@se>
+ <50377C0D.2060905@stericsson.com>
+Message-ID: <20120827163337.GC4339@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2012 12:25 PM, Wei Ni wrote:
-> In case of inband interrupts, if we handle the interrupt in dpc thread,
-> two level of thread switching takes place to process wifi interrupts.
-> One in SDHCI driver and the other in Wifi driver. This may cause the system
-> instability.
+On Fri, Aug 24, 2012 at 03:05:17PM +0200, Ola Lilja wrote:
 
-Looking into the sdhci/mmc code indeed shows that the brcmfmac irq 
-handler is not called in true IRQ context. So the dpc thread may add 
-unnecessary complexity, but to me there is not indication that there is 
-a stability issue.
+> I haven't followed everything in this discussion, but what I meant in an earlier
+> mail was that using the device for platform-DAI (MSP_I2S) also
+> as platform int the DAI-link struct is not anything I can see fit (as in the
+> patch Lee first submitted).
 
-> Because the SDHCI calls sdio_irq_thread() to handle the irq, this thread locks
-> mmc host and calls wifi handler. It expects WiFi handler to be quick and
-> enables sdio interrupt from card at end. If wifi handler defers this work for
-> a different thread, sdio_irq_thread() will be stuck on next wifi interrupt
-> since mmc lock is not freed.
+I'm not sure I fully understand the above - I didn't notice anything
+with the dai links but I have to say that I could've looked more closely
+as I was waiting for ARM side reviews.
 
-Not sure if I can follow this explanation. The isr is called with host 
-claimed (by sdio_irq_thread) and all it does is at a linked list member 
-and signal the dpc thread. After doing this the host is released.
+> I can see a few acceptable solutions:
+> 1) Use it as it is! (A virtual device for PCM is created in arch/arm and the
+> probe is invoked from the machine-driver).
+> 2) Since the actual platform is the DMA-block, maybe there is some way of making
+> the device "non-virtual" by having some sub-device in the DMA-driver that is
+> instead triggered in the same way as in 1).
 
-> Handling the interrupt in ISR directly will prevent thread context switching in
-> wifi driver. It can fix the instability problems.
-
-This basically increases the duration of the isr in brcmfmac.
-
-> Signed-off-by: Wei Ni <wni@nvidia.com>
-> ---
->   drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c   |    2 ++
->   drivers/net/wireless/brcm80211/brcmfmac/dhd_sdio.c |    8 +++++++-
->   2 files changed, 9 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
-> index 8e7e692..5cf6c3b 100644
-> --- a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
-> +++ b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh.c
-> @@ -121,7 +121,9 @@ static void brcmf_sdio_irqhandler(struct sdio_func *func)
->
->   	brcmf_dbg(INTR, "ib intr triggered\n");
->
-> +	sdio_release_host(sdiodev->func[1]);
->   	brcmf_sdbrcm_isr(sdiodev->bus);
-> +	sdio_claim_host(sdiodev->func[1]);
-
-This is probably needed because the ISR now locks the host to long 
-because brcmf_sdbrcm_dpc() is called directly.
-
->   }
->
->   /* dummy handler for SDIO function 2 interrupt */
-> diff --git a/drivers/net/wireless/brcm80211/brcmfmac/dhd_sdio.c b/drivers/net/wireless/brcm80211/brcmfmac/dhd_sdio.c
-> index 472f2ef..4576d59 100644
-> --- a/drivers/net/wireless/brcm80211/brcmfmac/dhd_sdio.c
-> +++ b/drivers/net/wireless/brcm80211/brcmfmac/dhd_sdio.c
-> @@ -2347,7 +2347,7 @@ static bool brcmf_sdbrcm_dpc(struct brcmf_sdio *bus)
->   	uint framecnt = 0;	/* Temporary counter of tx/rx frames */
->   	bool rxdone = true;	/* Flag for no more read data */
->   	bool resched = false;	/* Flag indicating resched wanted */
-> -	int err;
-> +	int err = 0;
->
->   	brcmf_dbg(TRACE, "Enter\n");
->
-> @@ -3786,11 +3786,17 @@ void brcmf_sdbrcm_isr(void *arg)
->   	if (!bus->intr)
->   		brcmf_dbg(ERROR, "isr w/o interrupt configured!\n");
->
-> +
-> +#ifndef CONFIG_BRCMFMAC_SDIO_OOB
-> +	while (brcmf_sdbrcm_dpc(bus))
-> +		;
-> +#else
->   	bus->dpc_sched = true;
->   	if (bus->dpc_tsk) {
->   		brcmf_sdbrcm_adddpctsk(bus);
->   		complete(&bus->dpc_wait);
->   	}
-> +#endif
->   }
->
->   static bool brcmf_sdbrcm_bus_watchdog(struct brcmf_sdio *bus)
->
-
-I would really like to know what issue is solved by this change. Could 
-you provide more details.
-
-Franky,
-
-Do you have anything to add here?
-
-Gr. AvS
+The option we're using is essentially your option 2 but doing it from
+the DAI driver rather than from the DMA driver (keeping things in the
+audio subsystem since it's an audio specific issue).
