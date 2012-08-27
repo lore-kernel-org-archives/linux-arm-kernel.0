@@ -1,68 +1,29 @@
-From: nareshgbhat@gmail.com (Naresh Bhat)
-Date: Mon, 27 Aug 2012 16:54:10 +0530
-Subject: Boot v3.5 kernel on QEMU for vexpress-a15 architecture with cpu
- as cortex-a15
-In-Reply-To: <CAJXQGfLUyP=J6=Asd8eM6wcHN90Vc52=wekM=16XoH_D_KXPbA@mail.gmail.com>
-References: <CAJXQGfLUyP=J6=Asd8eM6wcHN90Vc52=wekM=16XoH_D_KXPbA@mail.gmail.com>
-Message-ID: <CAJXQGfJSSsEh4sKnN5n=QSGGQN1j2STiJB3WF=h3evMQNycRWQ@mail.gmail.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 27 Aug 2012 11:46:02 +0000
+Subject: [PATCH v6 07/10] ARM: OMAP2+: gpmc: generic timing calculation
+In-Reply-To: <20120824195446.GV11011@atomide.com>
+References: <cover.1345524670.git.afzal@ti.com>
+ <83b963e4ebcc1009a26a8c6419c785ac6d742c0b.1345524670.git.afzal@ti.com>
+ <50359C64.40603@ti.com> <20120824195446.GV11011@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9BA684@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Hi Tony,
 
-I am able to boot the machine by using following command
+On Sat, Aug 25, 2012 at 01:24:47, Tony Lindgren wrote:
 
-# qemu-system-arm -kernel arch/arm/boot/zImage -dtb
-./rtsm_ve-cortex_a15x4.dtb -m 512 -M vexpress-a15 -serial stdio
--append "console=ttyAMA0"
+> Yes agreed. Also as some values make sense only in cycles, converting them
+> back and forth to time is wrong. So at least some values should have an
+> option to specify them in cycles directly, and then ignore any time based
+> values.
 
-Thanks and Regards
--Naresh Bhat
+Which values in struct gpmc_device_timings are you referring to ?
 
-On Mon, Aug 27, 2012 at 4:16 PM, Naresh Bhat <nareshgbhat@gmail.com> wrote:
-> Hi All,
->
-> I want to boot kernel.org v3.5 image (zImage) using QEMU with machine
-> architecture as vexpress-a15 and cpu as cortex-a15 on my Fedora-17
-> desktop machine.  I have followed the below method but resulted
-> nothing.  Can anybody please point me in a right direction ?
->
-> 1. Clone the Torvalds kernel
->    # git clone git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
->
-> 2. Checkout to v3.5-rc7 branch
->     # git branch linux-3.5-rc7 v3.5-rc7
->
-> 3. Cross compile the kernel
->     # make ARCH=arm CROSS_COMPILE=arm-cortex_a15-linux-gnueabi-
-> vexpress_defconfig
->     # make ARCH=arm CROSS_COMPILE=arm-cortex_a15-linux-gnueabi- uImage modules
->
-> 4. Grab Pawe?'s DTS tree: git://linux-arm.org/arm-dts.git
->
-> 5. From your kernel tree, run:
->     # ./script/dtc/dtc -O dtb -o rtsm_ve-cortex_a15x4.dtb
-> wherever_your_arm-dts_tree_is/fast_models/rtsm_ve-cortex_a15x4.dts
->     # cat rtsm_ve-cortex_a15x2.dtb >>arch/arm/boot/zImage
->
-> 6.  Try to boot using QEMU
->
-> # qemu-system-arm -kernel arch/arm/boot/zImage -dtb
-> ./rtsm_ve-cortex_a15x4.dtb -m 512 -M vexpress-a15 -cpu cortex-a15
-> -append "console=ttyAMA0"
-> oss: Could not initialize DAC
-> oss: Failed to open `/dev/dsp'
-> oss: Reason: No such file or directory
-> oss: Could not initialize DAC
-> oss: Failed to open `/dev/dsp'
-> oss: Reason: No such file or directory
-> audio: Failed to create voice `lm4549.out'
-> .................
-> ........................
->
-> I am just a beginner in QEMU.  Am I doing any steps wrong ?? can you
-> please suggest right method ? I will appreciate your help.
->
-> -- Thanks and Regards
-> "For things to change, we must change"
-> -Naresh Bhat
+Values that need to have an option to specify in cycles has been provided
+such an option, while not updating time based field value, you can
+achieve what you mentioned above. But if you want that to be handled in
+in generic routine, I will do so.
+
+Regards
+Afzal
