@@ -1,52 +1,46 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 27 Aug 2012 10:36:56 +0200
-Subject: [PATCH 1/4] clk: ux500: Adapt PRCMU and PRCC clocks for common clk
-In-Reply-To: <201208260447.58396.arnd@arndb.de>
-References: <1345807565-7729-1-git-send-email-ulf.hansson@stericsson.com>
- <1345807565-7729-2-git-send-email-ulf.hansson@stericsson.com>
- <201208260447.58396.arnd@arndb.de>
-Message-ID: <CAPDyKFqntUxx2Sr=myk42xT2_Gf=dZJQq+ytxph5tYxAFLCVog@mail.gmail.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Mon, 27 Aug 2012 16:56:44 +0800
+Subject: Question about ION carveout heap support partial cache flush
+In-Reply-To: <20120827082914.GN18957@n2100.arm.linux.org.uk>
+References: <CAMj5BkgffAW6azUjwz+iCF1tBLmBDRBvBjR-_fTr=4G=h+BLZw@mail.gmail.com>
+ <CAN1soZyZ=4wjKkVrk5--2U_8SeT7qee9QAfhss7NgqtQAz+RrA@mail.gmail.com>
+ <CAMj5BkiVq9ayJjUrwh3S-gDfezUTNiPFW-xd_dsbTJYTyLv2WQ@mail.gmail.com>
+ <20120827082914.GN18957@n2100.arm.linux.org.uk>
+Message-ID: <CAMj5BkjqUNV2o_BMyHH8C5ZCsUf6qChamc6h4H-a9otEGVBx4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 August 2012 06:47, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 24 August 2012, Ulf Hansson wrote:
->> From: Ulf Hansson <ulf.hansson@linaro.org>
+On Mon, Aug 27, 2012 at 4:29 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Aug 27, 2012 at 04:23:31PM +0800, zhangfei gao wrote:
+>> On Mon, Aug 27, 2012 at 1:46 PM, Haojian Zhuang
+>> <haojian.zhuang@gmail.com> wrote:
+>> > Let me summerize it. First, user space address is mapped. Then,
+>> > flushing user space
+>> > address is triggered. It's a workaround of fixing non-existed virtual
+>> > address without fixing
+>> > vmap() or any other solution. It's just a quick fix.
+>> >
+>> > Zhangfei,
+>> > I doubt that the issue may be caused by missing memory barrier.
+>> > Flushing is using
+>> > coprocessor instructions. It's a little different.
 >>
->> First version of common clock implementation of PRCMU clocks
->> and PRCC clocks for ux500 platforms.
->>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> Is there any limitation that dmac_map_area & dmac_flush_range
+>> supporting addr mapped from user space?
 >
-> Very nice, glad to see you got this working!
->
-> I only noticed one thing that you should improve:
->
+> They DEFINITELY DO NOT SUPPORT FLUSHING USER SPACE.
 
-Thanks for your input. I will send an updated patch.
+Thanks Russell
 
->> +#define to_clk_prcc(_hw) container_of(_hw, struct clk_prcc, hw)
->> +
->> +struct clk_prcc {
->> +     struct clk_hw hw;
->> +     unsigned int io_base;
->> +     u32 cg_sel;
->> +     int is_enabled;
->> +};
->> +
->> +/* PRCC clock operations. */
->> +
->> +static int clk_prcc_pclk_enable(struct clk_hw *hw)
->> +{
->> +     struct clk_prcc *clk = to_clk_prcc(hw);
->> +     void __iomem *io_base = __io_address(clk->io_base);
->
-> In a proper device driver, we should not use hacks like __io_address. Please
-> change the driver to ioremap the register area at initialization time, and
-> don't pass a physical io_base like above but instead pass an offset into
-> the register area.
->
->         Arnd
+Any suggestion of flushing cache according to cache line, instead of PAGE_SIZE.
+In order to get specific area, we use addr from user directly, which
+may not be the PAGE start.
 
-Kind regards
-Ulf Hansson
+We have some usage case to flush cache according to cache line.
+CPU - cache - ddr - gpu
+1. For correctness, driver only flush used size, if align to PAGE_SIZE,
+other area may be flushed by mistake.
+2. for efficiency, cache line align will be perfered.
+
+Thanks
