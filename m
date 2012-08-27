@@ -1,41 +1,143 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 27 Aug 2012 21:43:10 +0800
-Subject: Question about ION carveout heap support partial cache flush
-In-Reply-To: <20120827082914.GN18957@n2100.arm.linux.org.uk>
-References: <CAMj5BkgffAW6azUjwz+iCF1tBLmBDRBvBjR-_fTr=4G=h+BLZw@mail.gmail.com>
- <CAN1soZyZ=4wjKkVrk5--2U_8SeT7qee9QAfhss7NgqtQAz+RrA@mail.gmail.com>
- <CAMj5BkiVq9ayJjUrwh3S-gDfezUTNiPFW-xd_dsbTJYTyLv2WQ@mail.gmail.com>
- <20120827082914.GN18957@n2100.arm.linux.org.uk>
-Message-ID: <CAN1soZw4Qk5qSyuyMko9SZWu3u3_7OPA2yNVYz6C1WQWVimbvg@mail.gmail.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 27 Aug 2012 06:43:31 -0700
+Subject: [PATCH 03/11] pinctrl: mvebu: kirkwood pinctrl driver
+In-Reply-To: <CACRpkdbG4jkFcVP_6AmAZzciffQCamKXw7PcFnTdccyq7AMa8A@mail.gmail.com>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1344689809-6223-4-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CACRpkdbG4jkFcVP_6AmAZzciffQCamKXw7PcFnTdccyq7AMa8A@mail.gmail.com>
+Message-ID: <343192fa3698ed0575444a5603ed734d@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 4:29 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Aug 27, 2012 at 04:23:31PM +0800, zhangfei gao wrote:
->> On Mon, Aug 27, 2012 at 1:46 PM, Haojian Zhuang
->> <haojian.zhuang@gmail.com> wrote:
->> > Let me summerize it. First, user space address is mapped. Then,
->> > flushing user space
->> > address is triggered. It's a workaround of fixing non-existed virtual
->> > address without fixing
->> > vmap() or any other solution. It's just a quick fix.
->> >
->> > Zhangfei,
->> > I doubt that the issue may be caused by missing memory barrier.
->> > Flushing is using
->> > coprocessor instructions. It's a little different.
->>
->> Is there any limitation that dmac_map_area & dmac_flush_range
->> supporting addr mapped from user space?
+On 20/08/2012 06:49, Linus Walleij wrote:
+> On Sat, Aug 11, 2012 at 2:56 PM, Sebastian Hesselbarth
+> <sebastian.hesselbarth@gmail.com> wrote:
 >
-> They DEFINITELY DO NOT SUPPORT FLUSHING USER SPACE.
+>> This patch adds a SoC specific pinctrl driver for Marvell Kirkwood 
+>> SoCs
+>> plus DT binding documentation. This driver will use the mvebu 
+>> pinctrl
+>> driver core.
+>
+> Thanks for working on Kirkwood. Love this platform.
+>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index cd3d827..361f513 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -596,6 +596,7 @@ config ARCH_KIRKWOOD
+>>         select GENERIC_CLOCKEVENTS
+>>         select NEED_MACH_IO_H
+>>         select PLAT_ORION
+>> +       select PINCTRL
+>
+> select PINCTRL_KIRKWOOD too I think.
+> Then it's just automatic.
+>
+>> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+>> index e2427eb..1f84090 100644
+>> --- a/drivers/pinctrl/Kconfig
+>> +++ b/drivers/pinctrl/Kconfig
+>> @@ -147,7 +147,7 @@ config PINCTRL_COH901
+>>
+>>  config PINCTRL_MVEBU
+>>         bool "Marvell SoC pin controller drivers"
+>> -       depends on ARCH_MVEBU || ARCH_DOVE
+>> +       depends on ARCH_MVEBU || ARCH_DOVE || ARCH_KIRKWOOD
+>
+> As stated elsewhere I think this should be
+> depends on PLAT_ORION
+>
+>> +config PINCTRL_KIRKWOOD
+>> +       bool "Support for Marvell Kirkwood SoCs"
+>> +       depends on PINCTRL_MVEBU
+>
+> depends on ARCH_KIRKWOOD
+> select PINCTRL_MVEBU
+>
+> (...)
+>> diff --git a/drivers/pinctrl/pinctrl-kirkwood.c 
+>> b/drivers/pinctrl/pinctrl-kirkwood.c
+>> +static struct mvebu_pinctrl_soc_info kirkwood_pinctrl_info;
+>> +
+>> +static struct of_device_id kirkwood_pinctrl_of_match[] 
+>> __devinitdata = {
+>> +       { .compatible = "marvell,88f6180-pinctrl",
+>> +                                         .data = (void 
+>> *)VARIANT_MV88F6180 },
+>> +       { .compatible = "marvell,88f6190-pinctrl",
+>> +                                         .data = (void 
+>> *)VARIANT_MV88F6190 },
+>> +       { .compatible = "marvell,88f6192-pinctrl",
+>> +                                         .data = (void 
+>> *)VARIANT_MV88F6192 },
+>> +       { .compatible = "marvell,88f6281-pinctrl",
+>> +                                         .data = (void 
+>> *)VARIANT_MV88F6281 },
+>> +       { .compatible = "marvell,88f6282-pinctrl",
+>> +                                         .data = (void 
+>> *)VARIANT_MV88F6282 },
+>> +       { }
+>> +};
+>
+> I'm thinking this variant should maybe be an enum... unless it is
+> strongly established somewhere in Orion/Marvell stuff.
+>
+>> +static int __devinit kirkwood_pinctrl_probe(struct platform_device 
+>> *pdev)
+>> +{
+>> +       struct mvebu_pinctrl_soc_info *soc = &kirkwood_pinctrl_info;
+>> +       const struct of_device_id *match =
+>> +               of_match_device(kirkwood_pinctrl_of_match, 
+>> &pdev->dev);
+>> +
+>> +       if (match) {
+>> +               soc->variant = (unsigned)match->data & 0xff;
+>> +               switch (soc->variant) {
+>> +               case VARIANT_MV88F6180:
+>> +                       soc->controls = mv88f6180_mpp_controls;
+>> +                       soc->ncontrols = 
+>> ARRAY_SIZE(mv88f6180_mpp_controls);
+>> +                       soc->modes = mv88f6xxx_mpp_modes;
+>> +                       soc->nmodes = 
+>> ARRAY_SIZE(mv88f6xxx_mpp_modes);
+>> +                       soc->gpioranges = mv88f6180_gpio_ranges;
+>> +                       soc->ngpioranges = 
+>> ARRAY_SIZE(mv88f6180_gpio_ranges);
+>> +                       break;
+>> +               case VARIANT_MV88F6190:
+>> +               case VARIANT_MV88F6192:
+>> +                       soc->controls = mv88f619x_mpp_controls;
+>> +                       soc->ncontrols = 
+>> ARRAY_SIZE(mv88f619x_mpp_controls);
+>> +                       soc->modes = mv88f6xxx_mpp_modes;
+>> +                       soc->nmodes = 
+>> ARRAY_SIZE(mv88f6xxx_mpp_modes);
+>> +                       soc->gpioranges = mv88f619x_gpio_ranges;
+>> +                       soc->ngpioranges = 
+>> ARRAY_SIZE(mv88f619x_gpio_ranges);
+>> +                       break;
+>> +               case VARIANT_MV88F6281:
+>> +               case VARIANT_MV88F6282:
+>> +                       soc->controls = mv88f628x_mpp_controls;
+>> +                       soc->ncontrols = 
+>> ARRAY_SIZE(mv88f628x_mpp_controls);
+>> +                       soc->modes = mv88f6xxx_mpp_modes;
+>> +                       soc->nmodes = 
+>> ARRAY_SIZE(mv88f6xxx_mpp_modes);
+>> +                       soc->gpioranges = mv88f628x_gpio_ranges;
+>> +                       soc->ngpioranges = 
+>> ARRAY_SIZE(mv88f628x_gpio_ranges);
+>> +                       break;
+>> +               }
+>> +               pdev->dev.platform_data = soc;
+>> +       }
+>> +       return mvebu_pinctrl_probe(pdev);
+>> +}
 
-I agree that those API are defined to support kernel space address only.
-But the implementation is only flushing address by assembly code.
+Why not have structures defining the soc-> parameters and use that in 
+the
+of_match list?
 
-If we don't care the original goal of API, the problem should be caused
-by address mapping isn't set up yet. I doubt that the first step isn't fully
-finished. Since the second step is using coprocessor instruction, that's
-a shortcut. If we add delay such as memory barrier, the first step can
-be really finished before the second step running.
+-- 
+Ben
