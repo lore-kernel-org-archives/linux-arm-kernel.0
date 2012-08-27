@@ -1,46 +1,41 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 28 Aug 2012 01:26:14 +0300
-Subject: [PATCH] ARM: OMAP: timer: obey the !CONFIG_OMAP_32K_TIMER
-Message-ID: <1346106374-3283-1-git-send-email-grinberg@compulab.co.il>
+From: cjb@laptop.org (Chris Ball)
+Date: Mon, 27 Aug 2012 18:28:35 -0400
+Subject: [PATCH] mmc: tegra: convert to device tree support only
+In-Reply-To: <1345772433.5081.1.camel@jlo-ubuntu-64.nvidia.com> (Joseph Lo's
+ message of "Fri, 24 Aug 2012 09:40:33 +0800")
+References: <1345187071-6619-1-git-send-email-josephl@nvidia.com>
+ <502E950B.2010205@wwwdotorg.org>
+ <1345772433.5081.1.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <87a9xgynos.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, omap2_sync32k_clocksource_init() function initializes the 32K
-timer as the system clock source regardless of the CONFIG_OMAP_32K_TIMER
-setting.
-Fix this by providing a default implementation for
-!CONFIG_OMAP_32K_TIMER case.
+Hi,
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-Reviewed-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/timer.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+On Thu, Aug 23 2012, Joseph Lo wrote:
+> On Sat, 2012-08-18 at 03:01 +0800, Stephen Warren wrote:
+>> On 08/17/2012 01:04 AM, Joseph Lo wrote:
+>> > When compiling a kernel that supports only Tegra30 and not Tegra20,
+>> > the SDHCI driver will fail to compile since the of_match_device() failure
+>> > fallback code unconditinally references soc_data_tegra20, which is only
+>> > compiled in when Tegra20 support is enabled.
+>> > 
+>> > In Kernel 3.7, both Tegra20 and Tegra30 will only support booting using
+>> > device tree, Hence, there is never a need to fall back to using
+>> > soc_data_tegra20 if of_mach_device() fails. Instead, make this case an
+>> > error. This removes the reference to soc_data_tegra20, and hence solves
+>> > the compile failure.
+>> 
+>> Tested-by: Stephen Warren <swarren@wwwdotorg.org>
+>> 
+>> (built and tested both Tegra20-only and Tegr30-only kernels with this
+>> applied on top of next-20120816).
+>
+> Ping.
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 840929b..2cdbcc7 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -263,6 +263,7 @@ static u32 notrace dmtimer_read_sched_clock(void)
- 	return 0;
- }
- 
-+#ifdef CONFIG_OMAP_32K_TIMER
- /* Setup free-running counter for clocksource */
- static int __init omap2_sync32k_clocksource_init(void)
- {
-@@ -302,6 +303,12 @@ static int __init omap2_sync32k_clocksource_init(void)
- 
- 	return ret;
- }
-+#else
-+static inline int omap2_sync32k_clocksource_init(void)
-+{
-+	return -ENODEV;
-+}
-+#endif
- 
- static void __init omap2_gptimer_clocksource_init(int gptimer_id,
- 						const char *fck_source)
+Thanks, pushed to mmc-next for 3.7.
+
+- Chris.
 -- 
-1.7.3.4
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
