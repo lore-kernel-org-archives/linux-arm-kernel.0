@@ -1,59 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Sun, 26 Aug 2012 21:33:56 -0700
-Subject: [PATCH v2 1/9] pinctrl: mvebu: pinctrl driver core
-In-Reply-To: <5038F50E.7030807@gmail.com>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1345623750-10645-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <5035445B.6000500@wwwdotorg.org>
- <CABJ1b_Tdr80DGqb-FRzwDbF3m7g6fBguk5GtRAfRUYx5Sqy_cA@mail.gmail.com>
- <50366E44.4030606@wwwdotorg.org> <50369305.6050304@gmail.com>
- <50369FEE.8000003@wwwdotorg.org> <5036B639.20608@gmail.com>
- <5036F651.4020700@wwwdotorg.org> <5038F50E.7030807@gmail.com>
-Message-ID: <503AF8B4.1070206@wwwdotorg.org>
+From: bilhuang@nvidia.com (Bill Huang)
+Date: Mon, 27 Aug 2012 13:43:07 +0800
+Subject: Shutdown problem in SMP system happened on Tegra20
+In-Reply-To: <20120825071755.GG18957@n2100.arm.linux.org.uk>
+References: <A7051F87A141B744BCAF487D48E5B3BDF5BA982848@HKMAIL02.nvidia.com>
+ <20120824182133.GB18957@n2100.arm.linux.org.uk>
+ <A7051F87A141B744BCAF487D48E5B3BDF5BA98284A@HKMAIL02.nvidia.com>
+ <20120825071755.GG18957@n2100.arm.linux.org.uk>
+Message-ID: <A7051F87A141B744BCAF487D48E5B3BDF5BA98284F@HKMAIL02.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/2012 08:53 AM, Sebastian Hesselbarth wrote:
-> On 08/24/2012 05:34 AM, Stephen Warren wrote:
->> On 08/23/2012 05:01 PM, Sebastian Hesselbarth wrote:
->>> So possible, valid combinations for uart1 would be:
->>> (a) mpp_uart1;
->>> (b) mpp_uart1, mpp2, mpp3;
->>> (c) mpp_uart1, mpp21, mpp22;
->>> (d) mpp_uart1, mpp2, mpp22;
->>> (e) mpp_uart1, mpp21, mpp3;
->>>  [...]
->> In the example above, there is a single function named "uart1". If this
->> was all the HW supported, I'd expect the driver's
->> pinmux_ops.get_functions_count() to return 1,
->> pinmux_ops.get_function_name(0) to return "uart1", and
->> pinmux_ops.get_function_name(n>0) to return an error.
->>
->> In practice, I assume there are many other options that can be muxed
->> onto mpp2/3/21/22/uart1, so they'd be included in the list as well.
->>
->> I don't expect any scanning, no. I'd expect that tables provided by the
->> SoC-specific drivers to be:
->>
->> * A table of pins
->> * A table of groups
->> * A table of functions
->>
->> No scanning involved.
+> On Sat, Aug 25, 2012 at 08:00:56AM +0800, Bill Huang wrote:
+> > nvpublic
+> > > So what you're asking for is a feature to do what
+> > > CONFIG_PM_SLEEP_SMP does, but without CONFIG_PM_SLEEP_SMP enabled?
+> >
+> > Yeah pretty much, I'm actually asking should we take care of this
+> > since maybe not all platforms will have this config enabled?
+> > >
+> > > Why not just ensure that CONFIG_PM_SLEEP_SMP is enabled if your
+> > > platform requires that the lowest CPU number be the CPU dealing with reboot?
+> >
+> > Someday we will have it enabled, but before that we'll hit the issue,
+> > so you don't think this should be taken care of? Thanks.
 > 
-> Stephen,
+> Well, just enable CONFIG_PM_SLEEP_SMP then - it'll be far better than trying to implement something in
+> the ARM code, especially as sysrq can be used for poweroff/reboot etc (which will run from atomic
+> contexts where you can't switch to another CPU.)
 > 
-> now I do understand but in the current driver we pass pingroups associated
-> with the available functions, i.e. "mpp2" with "uart1", "uart2",
-> "sdio0", aso.
-> IMHO for the above three functions it would be better to have functions
-> associated
-> with the corresponding groups, i.e. "uart1" with "mpp_uart1", "mpp2",
-> "mpp3", aso.
+> What you're asking for will make these callbacks fragile for other platforms.
 
-The pinctrl subsystem does expect a list of functions, and for each
-function, a list of the groups where it can be selected. I admit that
-when I think about this, it's slightly backward, since HW typically has
-a list of pins/groups, and for each, a certain set of functions can be
-selected. Oh well...
+OK, thanks.
