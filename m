@@ -1,35 +1,41 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 27 Aug 2012 18:02:35 +0000
-Subject: [PATCH] ARM: AM33XX: clock: Add dcan clock aliases for device-tree
-In-Reply-To: <alpine.DEB.2.00.1208271717420.26953@utopia.booyaka.com>
-References: <1346061842-28714-1-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1208271717420.26953@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA99396@DBDE01.ent.ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 27 Aug 2012 11:06:47 -0700
+Subject: ASoC: SAMSUNG: Change Kconfig to support all EXYNOSs
+In-Reply-To: <003001cd8361$7016a110$5043e330$@samsung.com>
+References: <003001cd8361$7016a110$5043e330$@samsung.com>
+Message-ID: <503BB737.7090004@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 22:50:12, Paul Walmsley wrote:
-> Hi
+On 08/26/12 01:04, ??? wrote:
+> All EXYNOSs use SND_SOC_SAMSUNG configuration.
+> This patch change Kconfig to support all EXYNOSs like EXYNOS4 and EXYNOS5.
 > 
-> On Mon, 27 Aug 2012, Vaibhav Hiremath wrote:
+> Signed-off-by: Sangsu Park<sangsu4u.park@samsung.com>
+> ---
+>   sound/soc/samsung/Kconfig |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> > Currently, the device names for the dcan module follows the
-> > format "dcan.X", where 'X' is the dcan instance number.
-> > On other side, driver may request for clock with/without con_id
-> > and dev_id, and it is expected that platform should respect this
-> > request and return the requested clock handle.
-> > 
-> > Now, when using device tree, the format of the device name created
-> > by OF layer is different, "<reg-address>.<device-name>",
-> > assuming that the device-tree "reg" property is specified.
-> > This causes the look-up failure for clock node in dcan driver
-> > 
-> > To fix this add new dcan clock alias for using device-tree.
-> 
-> Is the dcan driver present in v3.6-rc kernels?  
+> diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+> index f17dd25..9e64ae6 100644
+> --- a/sound/soc/samsung/Kconfig
+> +++ b/sound/soc/samsung/Kconfig
+> @@ -1,6 +1,6 @@
+>   config SND_SOC_SAMSUNG
+>   	tristate "ASoC support for Samsung"
+> -	depends on ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_S5P64X0 ||
+> ARCH_EXYNOS4
+> +	depends on ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_S5P64X0 ||
+> ARCH_EXYNOS
 
-Multiple versions have been submitted already, I have validated using them.
-Irrespective of this, it is independent change and required for the driver.
+Hmm, all of Samsung stuff is available...so how about?
 
-Thanks,
-Vaibhav
++	depends on PLAT_SAMSUNG
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
