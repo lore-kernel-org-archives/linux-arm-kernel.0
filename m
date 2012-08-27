@@ -1,18 +1,15 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 27 Aug 2012 11:12:52 -0700
-Subject: [PATCH V2 1/6] ASoC: davinci: davinci-pcm does not need to be a
- plaform_driver
-In-Reply-To: <1346074004-22172-2-git-send-email-gururaja.hebbar@ti.com>
+Date: Mon, 27 Aug 2012 11:13:00 -0700
+Subject: [PATCH V2 2/6] ARM: Davinci: Remove references to davinci pcm
+In-Reply-To: <1346074004-22172-3-git-send-email-gururaja.hebbar@ti.com>
 References: <1346074004-22172-1-git-send-email-gururaja.hebbar@ti.com>
- <1346074004-22172-2-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <20120827181251.GT4339@opensource.wolfsonmicro.com>
+ <1346074004-22172-3-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <20120827181259.GU4339@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 06:56:39PM +0530, Hebbar, Gururaja wrote:
-> Same as the commit 518de86 (ASoC: tegra: register 'platform' from DAIs,
-> get rid of pdev). It makes davinci-pcm not a platform_driver but helper
-> to register "platform", so that the platform_device for davinci-pcm can
-> be saved completely.
+On Mon, Aug 27, 2012 at 06:56:40PM +0530, Hebbar, Gururaja wrote:
+> Since davinci-pcm is no more a platform_driver but helper to register
+> "platform" pcm driver, remove  davinci-pcm device registration
 
 Applied, thanks.
