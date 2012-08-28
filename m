@@ -1,81 +1,117 @@
-From: jkosina@suse.cz (Jiri Kosina)
-Date: Tue, 28 Aug 2012 11:28:11 -0700 (PDT)
-Subject: PER_LINUX32, Was: [PATCH v2 21/31] arm64: 32-bit (compat)
- applications support
-In-Reply-To: <201208230646.31276.arnd@arndb.de>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <201208151434.05145.arnd@arndb.de>
- <20120816102808.GH31784@mudshark.cambridge.arm.com>
- <201208230646.31276.arnd@arndb.de>
-Message-ID: <alpine.LNX.2.00.1208281124520.22447@pobox.suse.cz>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 29 Aug 2012 02:31:34 +0800
+Subject: [PATCH 1/1] arm: KGDB support for PXA
+In-Reply-To: <1346145124-23384-1-git-send-email-den@openvz.org>
+References: <1346145124-23384-1-git-send-email-den@openvz.org>
+Message-ID: <CAN1soZwXSrpJCCCok=weJwRtWJHXz5zPQ6jB88UTr1HePU84gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Aug 2012, Arnd Bergmann wrote:
+On Tue, Aug 28, 2012 at 5:12 PM, Denis V. Lunev <den@openvz.org> wrote:
+> From: "Denis V. Lunev" <den@openvz.org>
+>
+> Actually, in order to support KGDB over serial console one must
+> implement two callbacks for character polling. Clone them from
+> 8250 driver with a bit of tuning.
+>
+> Signed-off-by: Denis V. Lunev <den@openvz.org>
+> Signed-off-by: Marko Katic <dromede@gmail.com>
+> CC: Eric Miao <eric.y.miao@gmail.com>
+> CC: Russell King <linux@arm.linux.org.uk>
+> CC: Haojian Zhuang <haojian.zhuang@gmail.com>
+> CC: <linux-arm-kernel@lists.infradead.org>
+> ---
+> This patch has been originally posted by me to LKML in 2009 and postponed.
+> I was contacted last week by Marko who has kindly ported the patch to the
+> latest v3.6 kernel and asked to re-send it.
+>
+> Here it is :)
+>
+>  drivers/tty/serial/pxa.c |   55 ++++++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 55 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
+> index 5847a4b..54cbb02 100644
+> --- a/drivers/tty/serial/pxa.c
+> +++ b/drivers/tty/serial/pxa.c
+> @@ -691,6 +691,57 @@ serial_pxa_console_write(struct console *co, const char *s, unsigned int count)
+>         clk_disable_unprepare(up->clk);
+>  }
+>
+> +#ifdef CONFIG_CONSOLE_POLL
+> +/*
+> + * Console polling routines for writing and reading from the uart while
+> + * in an interrupt or debug context.
+> + */
+> +
+> +static int serial_pxa_get_poll_char(struct uart_port *port)
+> +{
+> +       struct uart_pxa_port *up = (struct uart_pxa_port *)port;
+> +       unsigned char lsr = serial_in(up, UART_LSR);
+> +
+> +       while (!(lsr & UART_LSR_DR))
+> +               lsr = serial_in(up, UART_LSR);
+> +
+> +       return serial_in(up, UART_RX);
+> +}
+> +
+> +
+> +static void serial_pxa_put_poll_char(struct uart_port *port,
+> +                        unsigned char c)
+> +{
+> +       unsigned int ier;
+> +       struct uart_pxa_port *up = (struct uart_pxa_port *)port;
+> +
+> +       /*
+> +        *      First save the IER then disable the interrupts
+> +        */
+> +       ier = serial_in(up, UART_IER);
+> +       serial_out(up, UART_IER, UART_IER_UUE);
+> +
+> +       wait_for_xmitr(up);
+> +       /*
+> +        *      Send the character out.
+> +        *      If a LF, also do CR...
+> +        */
+> +       serial_out(up, UART_TX, c);
+> +       if (c == 10) {
+> +               wait_for_xmitr(up);
+> +               serial_out(up, UART_TX, 13);
+> +       }
+> +
+> +       /*
+> +        *      Finally, wait for transmitter to become empty
+> +        *      and restore the IER
+> +        */
+> +       wait_for_xmitr(up);
+> +       serial_out(up, UART_IER, ier);
+> +}
+> +
+> +#endif /* CONFIG_CONSOLE_POLL */
+> +
+>  static int __init
+>  serial_pxa_console_setup(struct console *co, char *options)
+>  {
+> @@ -745,6 +796,10 @@ struct uart_ops serial_pxa_pops = {
+>         .request_port   = serial_pxa_request_port,
+>         .config_port    = serial_pxa_config_port,
+>         .verify_port    = serial_pxa_verify_port,
+> +#ifdef CONFIG_CONSOLE_POLL
+> +       .poll_get_char = serial_pxa_get_poll_char,
+> +       .poll_put_char = serial_pxa_put_poll_char,
+> +#endif
+>  };
+>
+>  static struct uart_driver serial_pxa_reg = {
+> --
+> 1.7.7.6
+>
 
-> > > > +asmlinkage int compat_sys_personality(compat_ulong_t personality)
-> > > > +{
-> > > > +	int ret;
-> > > > +
-> > > > +	if (personality(current->personality) == PER_LINUX32 &&
-> > > > +		personality == PER_LINUX)
-> > > > +		personality = PER_LINUX32;
-> > > > +	ret = sys_personality(personality);
-> > > > +	if (ret == PER_LINUX32)
-> > > > +		ret = PER_LINUX;
-> > > > +	return ret;
-> > > > +}
-> > > 
-> > > Where did you get this from?
-> > > 
-> > > You should not need compat_sys_personality, just call the native function.
-> > 
-> > Hmm, but in that case an aarch32 application doing a personality(PER_LINUX)
-> > syscall will start seeing the wrong uname.
-> 
-> Coming back at this topic, I noticed another issue. Jiri Kosina
-> has recently posted patches to fix this function in the other architectures
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 
-Yeah, there were quite a few broken ones, some of them since the beginning 
-of time.
+Greg,
 
-> in order to mask out the other personality bits, which is a correct fix,
-> but the above function is odd for other reasons.
-> 
-> * On MIPS, it is used only for compat tasks, like you have it above.
-> * On PA-RISC, it is used for native 32 bit tasks and for compat 32 bit tasks,
->   but not for native 64 bit ones.
-> * On IA64, it was used for compat tasks (support for which has since
->   been removed from the kernel), plus all 32 bit tasks would start with
->   PER_LINUX32.
-> * On PowerPC, Sparc and s390, it is used for native 64 bit tasks and for
->   compat 32 bit tasks, but not for native 32 bit ones.
-> * On Tile, it was never used.
-> * On x86_64, it used to be defined (copied from ia64) but not used
->   throughout the git history.
-> 
-> The semantics of the function are also interesting: The intention seems
-> to be that to a compat task, PER_LINUX32 would appear as PER_LINUX.
-> The effect is that any process can set PER_LINUX32 but it can never
-> be unset except by a 64 bit MIPS or PA-RISC task.
-> 
-> Since x86_64 does not implement this behavior at all, I suspect that
-> there are now lots of things depending on not having it, while all
-> the other architectures might also have some (even predating the
-> x86_64 port) use cases that depend on depend on not being able to
-> observe PER_LINUX32 in 32 bit compat tasks.
-> 
-> I think we should try to agree on how this is all supposed to work
-> and use common code, either put the ppc/sparc/s390 version into
-> sys_personality, or remove all of them and just do what x86 and tile
-> do, using the regular sys_personality for all tasks.
+Will you merge this patch into tty.git? or I merge it into arch-pxa tree?
 
-How about rather introducing common compat_sys_personality() and switching 
-the archs that are using it to it? Unifying the behavior (PER_LINUX / 
-PER_LINUX32 masquerading) should be painless.
-
-Thanks,
-
--- 
-Jiri Kosina
-SUSE Labs
+Regards
+Haojian
