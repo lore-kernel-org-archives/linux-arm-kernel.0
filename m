@@ -1,60 +1,142 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 28 Aug 2012 17:35:42 +0800
-Subject: [GIT PULL] CSR SiRFmarco preparing patches
-Message-ID: <CAGsJ_4xY17w96vVs1966KJBC5Tt24qyR=YAPbQWMTFrDRs+xog@mail.gmail.com>
+From: vbyravarasu@nvidia.com (Venu Byravarasu)
+Date: Tue, 28 Aug 2012 15:02:18 +0530
+Subject: [PATCH] usb: tegra: moving phy driver into drivers directory
+Message-ID: <1346146338-4996-1-git-send-email-vbyravarasu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd,
+In order to keep up with the USB driver files organization,
+moving USB phy driver from mach-tegra to drivers/USB directory.
 
-Please pull the following patches which are making mach-prima2 common
-for prima2 and coming new marco SoC.
-Note the 3/5 patches depend on 2/5:
-ARM: PRIMA2: convert to common clk and finish full clk tree
-clk: prima2: move from arch/arm/mach to drivers/clk
-which have been in Mike's clk-next, you might see:
-http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=shortlog;h=refs/heads/clk-next
+Signed-off-by: Venu Byravarasu <vbyravarasu@nvidia.com>
+---
+ arch/arm/mach-tegra/Makefile                       |    1 -
+ arch/arm/mach-tegra/devices.c                      |    8 +-------
+ arch/arm/mach-tegra/devices.h                      |    2 --
+ drivers/usb/host/ehci-tegra.c                      |    2 +-
+ drivers/usb/phy/Makefile                           |    1 +
+ .../usb_phy.c => drivers/usb/phy/tegra_usb_phy.c   |    4 +---
+ .../usb_phy.h => drivers/usb/phy/tegra_usb_phy.h   |    2 --
+ 7 files changed, 4 insertions(+), 16 deletions(-)
+ rename arch/arm/mach-tegra/usb_phy.c => drivers/usb/phy/tegra_usb_phy.c (99%)
+ rename arch/arm/mach-tegra/include/mach/usb_phy.h => drivers/usb/phy/tegra_usb_phy.h (97%)
 
-so i rebase other 3 patches on top of commit
-bc0e489eb07f4aa2fb5cb9b7ff1fdf4b6ba3bda5.
-
-i guess Mike will not rebase prima2 clk patches any more, so there
-will not be merge conflict.
-
-anyway, if i have let prima2-clk go through arm-soc tree but not clk
-tree, things should be better.
-
-Regards,
-Barry
-
-The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
-
-  Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
-
-are available in the git repository at:
-  git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git marco-prepare
-
-Barry Song (4):
-      clk: prima2: move from arch/arm/mach to drivers/clk
-      ARM: PRIMA2: use DT_MACHINE_START and convert to generic board
-      ARM: PRIMA2: adjust Kconfig to support select SoC features
-      ARM: SIRF: make sirf irqchip driver optional since new SoCs will have GIC
-
-Binghua Duan (1):
-      ARM: PRIMA2: convert to common clk and finish full clk tree
-
- arch/arm/Kconfig                            |   12 +-
- arch/arm/configs/prima2_defconfig           |    7 +-
- arch/arm/mach-prima2/Kconfig                |   19 +
- arch/arm/mach-prima2/Makefile               |    5 +-
- arch/arm/mach-prima2/clock.c                |  510 ------------
- arch/arm/mach-prima2/{prima2.c => common.c} |   12 +-
- arch/arm/mach-prima2/irq.c                  |    2 +-
- arch/arm/mach-prima2/timer.c                |    8 +-
- drivers/clk/Makefile                        |    1 +
- drivers/clk/clk-prima2.c                    | 1171 +++++++++++++++++++++++++++
- 10 files changed, 1216 insertions(+), 531 deletions(-)
- create mode 100644 arch/arm/mach-prima2/Kconfig
- delete mode 100644 arch/arm/mach-prima2/clock.c
- rename arch/arm/mach-prima2/{prima2.c => common.c} (81%)
- create mode 100644 drivers/clk/clk-prima2.c
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index b94858f..b542dac 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -25,7 +25,6 @@ obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
+ obj-$(CONFIG_TEGRA_SYSTEM_DMA)		+= dma.o
+ obj-$(CONFIG_CPU_FREQ)                  += cpu-tegra.o
+ obj-$(CONFIG_TEGRA_PCI)			+= pcie.o
+-obj-$(CONFIG_USB_SUPPORT)		+= usb_phy.o
+ 
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-dt-tegra20.o
+ obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= board-dt-tegra30.o
+diff --git a/arch/arm/mach-tegra/devices.c b/arch/arm/mach-tegra/devices.c
+index 61e9603..232d7e1 100644
+--- a/arch/arm/mach-tegra/devices.c
++++ b/arch/arm/mach-tegra/devices.c
+@@ -26,7 +26,6 @@
+ #include <mach/irqs.h>
+ #include <mach/iomap.h>
+ #include <mach/dma.h>
+-#include <mach/usb_phy.h>
+ 
+ #include "gpio-names.h"
+ #include "devices.h"
+@@ -438,11 +437,6 @@ static struct resource tegra_usb3_resources[] = {
+ 	},
+ };
+ 
+-struct tegra_ulpi_config tegra_ehci2_ulpi_phy_config = {
+-	.reset_gpio = -1,
+-	.clk = "cdev2",
+-};
+-
+ struct tegra_ehci_platform_data tegra_ehci1_pdata = {
+ 	.operating_mode = TEGRA_USB_OTG,
+ 	.power_down_on_bus_suspend = 1,
+@@ -450,7 +444,7 @@ struct tegra_ehci_platform_data tegra_ehci1_pdata = {
+ };
+ 
+ struct tegra_ehci_platform_data tegra_ehci2_pdata = {
+-	.phy_config = &tegra_ehci2_ulpi_phy_config,
++	.phy_config = NULL,
+ 	.operating_mode = TEGRA_USB_HOST,
+ 	.power_down_on_bus_suspend = 1,
+ 	.vbus_gpio = -1,
+diff --git a/arch/arm/mach-tegra/devices.h b/arch/arm/mach-tegra/devices.h
+index 4f50527..6bac5e6 100644
+--- a/arch/arm/mach-tegra/devices.h
++++ b/arch/arm/mach-tegra/devices.h
+@@ -22,8 +22,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/platform_data/tegra_usb.h>
+ 
+-#include <mach/usb_phy.h>
+-
+ extern struct tegra_ulpi_config tegra_ehci2_ulpi_phy_config;
+ 
+ extern struct tegra_ehci_platform_data tegra_ehci1_pdata;
+diff --git a/drivers/usb/host/ehci-tegra.c b/drivers/usb/host/ehci-tegra.c
+index 75eca42..a03e279 100644
+--- a/drivers/usb/host/ehci-tegra.c
++++ b/drivers/usb/host/ehci-tegra.c
+@@ -27,7 +27,7 @@
+ #include <linux/of_gpio.h>
+ #include <linux/pm_runtime.h>
+ 
+-#include <mach/usb_phy.h>
++#include "../phy/tegra_usb_phy.h"
+ #include <mach/iomap.h>
+ 
+ #define TEGRA_USB_DMA_ALIGN 32
+diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
+index eca095b..663164f 100644
+--- a/drivers/usb/phy/Makefile
++++ b/drivers/usb/phy/Makefile
+@@ -5,3 +5,4 @@
+ ccflags-$(CONFIG_USB_DEBUG) := -DDEBUG
+ 
+ obj-$(CONFIG_USB_ISP1301)		+= isp1301.o
++obj-$(CONFIG_USB_EHCI_TEGRA)		+= tegra_usb_phy.o
+diff --git a/arch/arm/mach-tegra/usb_phy.c b/drivers/usb/phy/tegra_usb_phy.c
+similarity index 99%
+rename from arch/arm/mach-tegra/usb_phy.c
+rename to drivers/usb/phy/tegra_usb_phy.c
+index 022b33a..c856716 100644
+--- a/arch/arm/mach-tegra/usb_phy.c
++++ b/drivers/usb/phy/tegra_usb_phy.c
+@@ -1,6 +1,4 @@
+ /*
+- * arch/arm/mach-tegra/usb_phy.c
+- *
+  * Copyright (C) 2010 Google, Inc.
+  *
+  * Author:
+@@ -31,7 +29,7 @@
+ #include <linux/usb/ulpi.h>
+ #include <asm/mach-types.h>
+ #include <mach/gpio-tegra.h>
+-#include <mach/usb_phy.h>
++#include "tegra_usb_phy.h"
+ #include <mach/iomap.h>
+ 
+ #define ULPI_VIEWPORT		0x170
+diff --git a/arch/arm/mach-tegra/include/mach/usb_phy.h b/drivers/usb/phy/tegra_usb_phy.h
+similarity index 97%
+rename from arch/arm/mach-tegra/include/mach/usb_phy.h
+rename to drivers/usb/phy/tegra_usb_phy.h
+index 935ce9f..516c724 100644
+--- a/arch/arm/mach-tegra/include/mach/usb_phy.h
++++ b/drivers/usb/phy/tegra_usb_phy.h
+@@ -1,6 +1,4 @@
+ /*
+- * arch/arm/mach-tegra/include/mach/usb_phy.h
+- *
+  * Copyright (C) 2010 Google, Inc.
+  *
+  * This software is licensed under the terms of the GNU General Public
+-- 
+1.7.1.1
