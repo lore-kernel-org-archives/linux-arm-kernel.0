@@ -1,80 +1,44 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 29 Aug 2012 02:18:50 +0300
-Subject: [PATCH 2/9] ARM: OMAP: omap3evm: cleanup revision bits
+Date: Wed, 29 Aug 2012 02:18:51 +0300
+Subject: [PATCH 3/9] ARM: OMAP: remove the sti console workaround
 In-Reply-To: <1346195937-6383-1-git-send-email-grinberg@compulab.co.il>
 References: <1346195937-6383-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1346195937-6383-3-git-send-email-grinberg@compulab.co.il>
+Message-ID: <1346195937-6383-4-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap3evm has its revision information bits inside the plat/board.h
-file. Those bits are not used anywhere in the upstream tree besides the
-board-omap3evm.c file.
-Move the OMAP3EVM_BOARD_GEN_* bits to the board file and remove the
-get_omap3_evm_rev() function declaration.
+The sti console workaround uses the OMAP custom tags.
+Those tags are not used in upstream kernel and therefore the workaround
+never fires on upstream kernels.
+Remove the sti console workaround tags part.
+This leaves the workaround functional part intact so can be reused if
+needed.
 
 Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
 ---
- arch/arm/mach-omap2/board-omap3evm.c    |   12 ++++++++++++
- arch/arm/plat-omap/include/plat/board.h |   18 ------------------
- 2 files changed, 12 insertions(+), 18 deletions(-)
+ arch/arm/mach-omap2/pm24xx.c |   10 ----------
+ 1 files changed, 0 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index 5be082b..8477137 100644
---- a/arch/arm/mach-omap2/board-omap3evm.c
-+++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -73,6 +73,18 @@
- #define OMAP3EVM_GEN1_ETHR_GPIO_RST	64
- #define OMAP3EVM_GEN2_ETHR_GPIO_RST	7
+diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+index 2edeffc..9e54dc9 100644
+--- a/arch/arm/mach-omap2/pm24xx.c
++++ b/arch/arm/mach-omap2/pm24xx.c
+@@ -352,16 +352,6 @@ int __init omap2_pm_init(void)
  
-+/*
-+ * OMAP35x EVM revision
-+ * Run time detection of EVM revision is done by reading Ethernet
-+ * PHY ID -
-+ *	GEN_1	= 0x01150000
-+ *	GEN_2	= 0x92200000
-+ */
-+enum {
-+	OMAP3EVM_BOARD_GEN_1 = 0,	/* EVM Rev between  A - D */
-+	OMAP3EVM_BOARD_GEN_2,		/* EVM Rev >= Rev E */
-+};
-+
- static u8 omap3_evm_version;
+ 	prcm_setup_regs();
  
- u8 get_omap3_evm_rev(void)
-diff --git a/arch/arm/plat-omap/include/plat/board.h b/arch/arm/plat-omap/include/plat/board.h
-index e6a8d79..db3bdc1 100644
---- a/arch/arm/plat-omap/include/plat/board.h
-+++ b/arch/arm/plat-omap/include/plat/board.h
-@@ -14,18 +14,6 @@
- 
- #include <plat/gpio-switch.h>
- 
--/*
-- * OMAP35x EVM revision
-- * Run time detection of EVM revision is done by reading Ethernet
-- * PHY ID -
-- *	GEN_1	= 0x01150000
-- *	GEN_2	= 0x92200000
-- */
--enum {
--	OMAP3EVM_BOARD_GEN_1 = 0,	/* EVM Rev between  A - D */
--	OMAP3EVM_BOARD_GEN_2,		/* EVM Rev >= Rev E */
--};
+-	/* Hack to prevent MPU retention when STI console is enabled. */
+-	{
+-		const struct omap_sti_console_config *sti;
 -
- /* Different peripheral ids */
- #define OMAP_TAG_CLOCK		0x4f01
- #define OMAP_TAG_GPIO_SWITCH	0x4f06
-@@ -125,10 +113,4 @@ extern int omap_board_config_size;
- /* for TI reference platforms sharing the same debug card */
- extern int debug_card_init(u32 addr, unsigned gpio);
- 
--/* OMAP3EVM revision */
--#if defined(CONFIG_MACH_OMAP3EVM)
--u8 get_omap3_evm_rev(void);
--#else
--#define get_omap3_evm_rev() (-EINVAL)
--#endif
- #endif
+-		sti = omap_get_config(OMAP_TAG_STI_CONSOLE,
+-				      struct omap_sti_console_config);
+-		if (sti != NULL && sti->enable)
+-			sti_console_enabled = 1;
+-	}
+-
+ 	/*
+ 	 * We copy the assembler sleep/wakeup routines to SRAM.
+ 	 * These routines need to be in SRAM as that's the only
 -- 
 1.7.8.6
