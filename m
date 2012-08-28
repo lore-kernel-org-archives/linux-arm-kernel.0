@@ -1,21 +1,47 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 28 Aug 2012 08:47:10 -0300
-Subject: [PATCH 1/2] ARM: clk-imx35: Fix SSI clock registration
-In-Reply-To: <20120828074533.GV26594@pengutronix.de>
-References: <1345385346-25412-1-git-send-email-festevam@gmail.com>
- <20120828074533.GV26594@pengutronix.de>
-Message-ID: <CAOMZO5AGCf_9Hzj=6F_u9oK7RAR_ppdm0QhYxht5PPHZ7_-GfQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 28 Aug 2012 13:48:15 +0200
+Subject: i.MX pwm patches
+Message-ID: <1346154504-5623-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/28/12, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+Hi All,
 
+The following patches are an overdue work on the i.MX pwm driver.
 
-> Applied and added stable tag (I assume this should go to stable, right?)
+- introduce SoC specific functions to make the driver easier to maintain
+- use peripheral clock for pwm output unconditionally
+- separate the two clocks this module has
+- enable ipg clock for register accesses, peripheral clock for enabling
+  the pwm
+- make the driver safe for calling pwm_config before pwm_enable
+- Add devicetree support for i.MX53
 
-Yes, please apply v2 version and you can add the stable tag (only
-applies to 3.5 stable branch though).
+The platform device support is still implemented using cpu_is_*, I think
+this can be dropped completely soon as this driver has no in kernel users
+currently, so there should be no need to keep compatibility for platform
+based boards.
 
-Thanks,
+Hopefully this series fixes the issues mentioned by Beno?t. It has been
+tested on an i.MX53 only.
 
-Fabio Estevam
+Sascha
+
+----------------------------------------------------------------
+Philipp Zabel (3):
+      pwm i.MX: add devicetree support
+      pwm i.MX: fix clock lookup
+      pwm i.MX: add devicetree support
+
+Sascha Hauer (6):
+      pwm i.MX: factor out SoC specific functions
+      pwm i.MX: remove unnecessary if in pwm_[en|dis]able
+      pwm i.MX: add functions to enable/disable pwm.
+      pwm i.MX: Use module_platform_driver
+      pwm i.MX: use per clock unconditionally
+      ARM i.MX53: Add pwms to dtsi
+
+ arch/arm/boot/dts/imx53.dtsi        |   14 ++
+ arch/arm/mach-imx/clk-imx51-imx53.c |    4 +
+ drivers/pwm/pwm-imx.c               |  278 +++++++++++++++++++++++------------
+ 3 files changed, 202 insertions(+), 94 deletions(-)
