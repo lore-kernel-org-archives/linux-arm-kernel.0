@@ -1,78 +1,60 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 28 Aug 2012 13:48:17 +0200
-Subject: [PATCH 2/9] pwm i.MX: remove unnecessary if in pwm_[en|dis]able
+Date: Tue, 28 Aug 2012 13:48:23 +0200
+Subject: [PATCH 8/9] ARM i.MX53: Add pwms to dtsi
 In-Reply-To: <1346154504-5623-1-git-send-email-s.hauer@pengutronix.de>
 References: <1346154504-5623-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1346154504-5623-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1346154504-5623-9-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pwm core makes sure that pwm_enable/disable are called only
-once. Still keep the enabled state since we will need it in
-pwm_config.
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/pwm/pwm-imx.c |   25 +++++++++++--------------
- 1 file changed, 11 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-index 38270f4..0f244e6 100644
---- a/drivers/pwm/pwm-imx.c
-+++ b/drivers/pwm/pwm-imx.c
-@@ -42,7 +42,7 @@
- struct imx_chip {
- 	struct clk	*clk;
+Conflicts:
+	arch/arm/mach-imx/clk-imx51-imx53.c
+---
+ arch/arm/boot/dts/imx53.dtsi        |   14 ++++++++++++++
+ arch/arm/mach-imx/clk-imx51-imx53.c |    4 ++++
+ 2 files changed, 18 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index cd37165..7ec17e4 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -189,6 +189,20 @@
+ 				status = "disabled";
+ 			};
  
--	int		clk_enabled;
-+	int		enabled;
- 	void __iomem	*mmio_base;
- 
- 	struct pwm_chip	chip;
-@@ -138,14 +138,15 @@ static int imx_pwm_config(struct pwm_chip *chip,
- static int imx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- {
- 	struct imx_chip *imx = to_imx_chip(chip);
--	int rc = 0;
-+	int rc;
- 
--	if (!imx->clk_enabled) {
--		rc = clk_prepare_enable(imx->clk);
--		if (!rc)
--			imx->clk_enabled = 1;
--	}
--	return rc;
-+	rc = clk_prepare_enable(imx->clk);
-+	if (rc)
-+		return rc;
++			pwm1: pwm at 53fb4000 {
++				#pwm-cells = <3>;
++				compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
++				reg = <0x53fb4000 0x4000>;
++				interrupts = <61>;
++			};
 +
-+	imx->enabled = 1;
++			pwm2: pwm at 53fb8000 {
++				#pwm-cells = <3>;
++				compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
++				reg = <0x53fb8000 0x4000>;
++				interrupts = <94>;
++			};
 +
-+	return 0;
- }
+ 			uart1: serial at 53fbc000 {
+ 				compatible = "fsl,imx53-uart", "fsl,imx21-uart";
+ 				reg = <0x53fbc000 0x4000>;
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 4bdcaa9..b522411 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -455,6 +455,10 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "63fcc000.ssi");
+ 	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "50014000.ssi");
+ 	clk_register_clkdev(clk[ssi3_ipg_gate], NULL, "63fd0000.ssi");
++	clk_register_clkdev(clk[pwm1_ipg_gate], "ipg", "53fb4000.pwm");
++	clk_register_clkdev(clk[pwm1_hf_gate], "per", "53fb4000.pwm");
++	clk_register_clkdev(clk[pwm2_ipg_gate], "ipg", "53fb8000.pwm");
++	clk_register_clkdev(clk[pwm2_hf_gate], "per", "53fb8000.pwm");
  
- static void imx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-@@ -154,10 +155,8 @@ static void imx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- 
- 	writel(0, imx->mmio_base + MX3_PWMCR);
- 
--	if (imx->clk_enabled) {
--		clk_disable_unprepare(imx->clk);
--		imx->clk_enabled = 0;
--	}
-+	clk_disable_unprepare(imx->clk);
-+	imx->enabled = 0;
- }
- 
- static struct pwm_ops imx_pwm_ops = {
-@@ -189,8 +188,6 @@ static int __devinit imx_pwm_probe(struct platform_device *pdev)
- 	imx->chip.base = -1;
- 	imx->chip.npwm = 1;
- 
--	imx->clk_enabled = 0;
--
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (r == NULL) {
- 		dev_err(&pdev->dev, "no memory resource defined\n");
+ 	/* set SDHC root clock to 200MHZ*/
+ 	clk_set_rate(clk[esdhc_a_podf], 200000000);
 -- 
 1.7.10.4
