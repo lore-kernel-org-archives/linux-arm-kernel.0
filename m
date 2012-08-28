@@ -1,31 +1,36 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 28 Aug 2012 09:22:01 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC: Core for 3.7
-Message-ID: <1346113322-21133-1-git-send-email-horms@verge.net.au>
+Date: Tue, 28 Aug 2012 09:22:02 +0900
+Subject: [PATCH] ARM: mach-shmobile: Add compilation support for dtbs using
+ 'make dtbs'
+In-Reply-To: <1346113322-21133-1-git-send-email-horms@verge.net.au>
+References: <1346113322-21133-1-git-send-email-horms@verge.net.au>
+Message-ID: <1346113322-21133-2-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olaf, Hi Arnd,
+From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
 
-please consider the following enhancement for the Renesas ARM-based SoC Core
-from Tetsuyuki Kobayashi for inclusion in 3.7.
+Add compilation support for dtbs using 'make dtbs'
 
-----------------------------------------------------------------
-The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
-
-  Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc-core
-
-for you to fetch changes up to e3586c612e3a13118f0dbd2f6e9a4901b1695b81:
-
-  ARM: mach-shmobile: Add compilation support for dtbs using 'make dtbs' (2012-08-25 14:38:13 +0900)
-
-----------------------------------------------------------------
-Tetsuyuki Kobayashi (1):
-      ARM: mach-shmobile: Add compilation support for dtbs using 'make dtbs'
-
+Cc: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
  arch/arm/mach-shmobile/Makefile.boot | 4 ++++
  1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
+index 498efd9..a1227ce 100644
+--- a/arch/arm/mach-shmobile/Makefile.boot
++++ b/arch/arm/mach-shmobile/Makefile.boot
+@@ -7,3 +7,7 @@ __ZRELADDR	:= $(shell /bin/bash -c 'printf "0x%08x" \
+ #
+ #params_phys-y (Instead: Pass atags pointer in r2)
+ #initrd_phys-y (Instead: Use compiled-in initramfs)
++
++dtb-$(CONFIG_MACH_KZM9G) += sh73a0-kzm9g.dtb
++dtb-$(CONFIG_MACH_KZM9D) += emev2-kzm9d.dts
++dtb-$(CONFIG_MACH_ARMADILLO800EVA) += r8a7740-armadillo800eva.dts
+-- 
+1.7.10.2.484.gcd07cc5
