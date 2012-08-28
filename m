@@ -1,57 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 28 Aug 2012 08:48:19 +0100
-Subject: [PATCH 13/22] ARM: ux500: Fork MSP platform registration for
- step-by-step DT enablement
-In-Reply-To: <CACRpkdZRJ1yX-o8-NUuMzXMz5ebbp=H21Xa6JMy1y56Chq-T9g@mail.gmail.com>
-References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
- <1344527268-5964-14-git-send-email-lee.jones@linaro.org>
- <CACRpkdaem6t3mvy-_9e=GEgwWoeBQSoX3Hf1L=hjWsvLJdsVAQ@mail.gmail.com>
- <20120820080632.GD8450@gmail.com>
- <CACRpkdZRJ1yX-o8-NUuMzXMz5ebbp=H21Xa6JMy1y56Chq-T9g@mail.gmail.com>
-Message-ID: <20120828074812.GA12957@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 28 Aug 2012 09:49:57 +0200
+Subject: [PATCH v2 1/2] ARM: clk-imx35: Fix SSI clock registration
+In-Reply-To: <1345466362-2576-1-git-send-email-fabio.estevam@freescale.com>
+References: <1345466362-2576-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20120828074957.GY26594@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 04:07:58PM -0700, Linus Walleij wrote:
-> On Mon, Aug 20, 2012 at 1:06 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Tue, Aug 14, 2012 at 01:13:49PM +0200, Linus Walleij wrote:
-> >> On Thu, Aug 9, 2012 at 5:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> >>
-> >> > We've done this before and it worked well last time. Here we're
-> >> > duplicating a complex registration function to ease the process
-> >> > of enabling it for Device Tree. As there are quite a few steps
-> >> > taken during the registration process, it makes sense to break
-> >> > them up into more manageable chunks. This patch will aid us.
-> >> >
-> >> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >>
-> >> I understand you have used this approach before so:
-> >> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> >
-> > Does this comment take back your previous one:
-> >
-> > NOTE: it seems this patch set contains some churn. First you
-> > add in the forked device init, put in a big chunk of code and
-> > then in the *same* patch set delete it again. It's not like
-> > we're dying to see all the development history... can this
-> > be squashed down a bit?
-> >
-> > ... hence leave the patch-set as it is?
+On Mon, Aug 20, 2012 at 09:39:22AM -0300, Fabio Estevam wrote:
+> SSI block has two types of clock:
 > 
-> No. I just meant leave it like that for the devices outside of this
-> set.
+> ipg: bus clock, the clock needed for accessing registers.
+> per: peripheral clock, the clock needed for generating the bit rate.
 > 
-> If you're adding and then removing *all* of them in this set,
-> why add them in the first place?
+> Currently SSI driver only supports slave mode and only need to handle
+> the ipg clock, because the peripheral clock comes from the master codec.
+> 
+> Only register the ipg clock and do not register the peripheral clock for ssi.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-So that there's no breakage during bisection.
+Ok, used this version instead.
 
-You should be able to roll the kernel back in between each of these
-patches and there to be full compatibility at each point. At least
-that was the intention. Is that wrong?
+Sascha
+
+> ---
+> Changes since v1:
+> - Use ssi2_gate for imx-ssi.1
+> 
+>  arch/arm/mach-imx/clk-imx35.c |    6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
+> index c6422fb..f7910df 100644
+> --- a/arch/arm/mach-imx/clk-imx35.c
+> +++ b/arch/arm/mach-imx/clk-imx35.c
+> @@ -230,10 +230,8 @@ int __init mx35_clocks_init()
+>  	clk_register_clkdev(clk[ipu_gate], NULL, "mx3_sdc_fb");
+>  	clk_register_clkdev(clk[owire_gate], NULL, "mxc_w1");
+>  	clk_register_clkdev(clk[sdma_gate], NULL, "imx35-sdma");
+> -	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.0");
+> -	clk_register_clkdev(clk[ssi1_div_post], "per", "imx-ssi.0");
+> -	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.1");
+> -	clk_register_clkdev(clk[ssi2_div_post], "per", "imx-ssi.1");
+> +	clk_register_clkdev(clk[ssi1_gate], NULL, "imx-ssi.0");
+> +	clk_register_clkdev(clk[ssi2_gate], NULL, "imx-ssi.1");
+>  	/* i.mx35 has the i.mx21 type uart */
+>  	clk_register_clkdev(clk[uart1_gate], "per", "imx21-uart.0");
+>  	clk_register_clkdev(clk[ipg], "ipg", "imx21-uart.0");
+> -- 
+> 1.7.9.5
+> 
+> 
+> 
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
