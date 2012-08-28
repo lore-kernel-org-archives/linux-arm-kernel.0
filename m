@@ -1,148 +1,55 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 28 Aug 2012 09:37:44 +0200
-Subject: [PATCH] pwm-imx: Fix config / enable / disable
-In-Reply-To: <1305545087.2775440.1345755837651.JavaMail.root@advansee.com>
-References: <20120823191108.GB8127@avionic-0098.mockup.avionic-design.de>
- <1305545087.2775440.1345755837651.JavaMail.root@advansee.com>
-Message-ID: <20120828073744.GU26594@pengutronix.de>
+Date: Tue, 28 Aug 2012 09:45:33 +0200
+Subject: [PATCH 1/2] ARM: clk-imx35: Fix SSI clock registration
+In-Reply-To: <1345385346-25412-1-git-send-email-festevam@gmail.com>
+References: <1345385346-25412-1-git-send-email-festevam@gmail.com>
+Message-ID: <20120828074533.GV26594@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 11:03:57PM +0200, Beno?t Th?baudeau wrote:
-> imx_pwm_config() did not enable the PWM IP clock while accessing the registers.
-> Hence, a call to pwm_config() had no effect before pwm_enable() had been called,
-> which does not comply to the PWM API.
+On Sun, Aug 19, 2012 at 11:09:05AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Moreover, calling pwm_disable() then pwm_enable() must be a transparent
-> operation.
+> SSI block has two types of clock:
 > 
-> This fixes the first setting of brightness through sysfs that had no effect with
-> leds-pwm.
+> ipg: bus clock, the clock needed for accessing registers.
+> per: peripheral clock, the clock needed for generating the bit rate.
+> 
+> Currently SSI driver only supports slave mode and only need to handle
+> the ipg clock, because the peripheral clock comes from the master codec.
+> 
+> Only register the ipg clock and do not register the peripheral clock for ssi.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-I don't really like this patch. I'd like to have this one first, it
-makes further cleanups easier:
-
-https://lkml.org/lkml/2012/8/28/24
-
-Simililarly, we should probably introduce a imx_pwm_[en|dis]able_v[12]
-
-Then, the pwm core already makes sure that pwm_enable/disable are called
-only once, so the if (imx->clk_enabled) in pwm_enable/disable is
-unnecessary.
+Applied and added stable tag (I assume this should go to stable, right?)
 
 Sascha
 
-> 
-> Cc: Thierry Reding <thierry.reding@avionic-design.de>
-> Cc: <linux-kernel@vger.kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: <linux-arm-kernel@lists.infradead.org>
-> Cc: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
-> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
 > ---
->  .../drivers/pwm/pwm-imx.c                          |   55 +++++++++++++++-----
->  1 file changed, 43 insertions(+), 12 deletions(-)
+>  arch/arm/mach-imx/clk-imx35.c |    6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
 > 
-> diff --git linux-next-c94456b.orig/drivers/pwm/pwm-imx.c linux-next-c94456b/drivers/pwm/pwm-imx.c
-> index 2a0b353..0519bf2 100644
-> --- linux-next-c94456b.orig/drivers/pwm/pwm-imx.c
-> +++ linux-next-c94456b/drivers/pwm/pwm-imx.c
-> @@ -55,6 +55,16 @@ static int imx_pwm_config(struct pwm_chip *chip,
->  {
->  	struct imx_chip *imx = to_imx_chip(chip);
->  
-> +	/*
-> +	 * If the PWM is disabled, make sure to turn on the clock before
-> +	 * accessing the registers.
-> +	 */
-> +	if (!imx->clk_enabled) {
-> +		int rc = clk_prepare_enable(imx->clk);
-> +		if (rc)
-> +			return rc;
-> +	}
-> +
->  	if (!(cpu_is_mx1() || cpu_is_mx21())) {
->  		unsigned long long c;
->  		unsigned long period_cycles, duty_cycles, prescale;
-> @@ -85,8 +95,11 @@ static int imx_pwm_config(struct pwm_chip *chip,
->  		writel(period_cycles, imx->mmio_base + MX3_PWMPR);
->  
->  		cr = MX3_PWMCR_PRESCALER(prescale) |
-> -			MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN |
-> -			MX3_PWMCR_DBGEN | MX3_PWMCR_EN;
-> +			MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN | MX3_PWMCR_DBGEN;
-> +
-> +		/* If the PWM is enabled, keep it so. */
-> +		if (imx->clk_enabled)
-> +			cr |= MX3_PWMCR_EN;
->  
->  		if (cpu_is_mx25())
->  			cr |= MX3_PWMCR_CLKSRC_IPG;
-> @@ -118,32 +131,50 @@ static int imx_pwm_config(struct pwm_chip *chip,
->  		BUG();
->  	}
->  
-> +	/* If the PWM is disabled, turn the clock off again to save power. */
-> +	if (!imx->clk_enabled)
-> +		clk_disable_unprepare(imx->clk);
-> +
->  	return 0;
->  }
->  
->  static int imx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
->  {
->  	struct imx_chip *imx = to_imx_chip(chip);
-> -	int rc = 0;
-> +	int rc;
->  
-> -	if (!imx->clk_enabled) {
-> -		rc = clk_prepare_enable(imx->clk);
-> -		if (!rc)
-> -			imx->clk_enabled = 1;
-> +	if (imx->clk_enabled)
-> +		return 0;
-> +
-> +	rc = clk_prepare_enable(imx->clk);
-> +	if (rc)
-> +		return rc;
-> +
-> +	if (!(cpu_is_mx1() || cpu_is_mx21())) {
-> +		u32 cr = readl(imx->mmio_base + MX3_PWMCR);
-> +		cr |= MX3_PWMCR_EN;
-> +		writel(cr, imx->mmio_base + MX3_PWMCR);
->  	}
-> -	return rc;
-> +
-> +	imx->clk_enabled = 1;
-> +	return 0;
->  }
->  
->  static void imx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->  {
->  	struct imx_chip *imx = to_imx_chip(chip);
->  
-> -	writel(0, imx->mmio_base + MX3_PWMCR);
-> +	if (!imx->clk_enabled)
-> +		return;
->  
-> -	if (imx->clk_enabled) {
-> -		clk_disable_unprepare(imx->clk);
-> -		imx->clk_enabled = 0;
-> +	if (!(cpu_is_mx1() || cpu_is_mx21())) {
-> +		u32 cr = readl(imx->mmio_base + MX3_PWMCR);
-> +		cr &= ~MX3_PWMCR_EN;
-> +		writel(cr, imx->mmio_base + MX3_PWMCR);
->  	}
-> +
-> +	clk_disable_unprepare(imx->clk);
-> +	imx->clk_enabled = 0;
->  }
->  
->  static struct pwm_ops imx_pwm_ops = {
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
+> index c6422fb..f7910df 100644
+> --- a/arch/arm/mach-imx/clk-imx35.c
+> +++ b/arch/arm/mach-imx/clk-imx35.c
+> @@ -230,10 +230,8 @@ int __init mx35_clocks_init()
+>  	clk_register_clkdev(clk[ipu_gate], NULL, "mx3_sdc_fb");
+>  	clk_register_clkdev(clk[owire_gate], NULL, "mxc_w1");
+>  	clk_register_clkdev(clk[sdma_gate], NULL, "imx35-sdma");
+> -	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.0");
+> -	clk_register_clkdev(clk[ssi1_div_post], "per", "imx-ssi.0");
+> -	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.1");
+> -	clk_register_clkdev(clk[ssi2_div_post], "per", "imx-ssi.1");
+> +	clk_register_clkdev(clk[ssi1_gate], NULL, "imx-ssi.0");
+> +	clk_register_clkdev(clk[ssi1_gate], NULL, "imx-ssi.1");
+>  	/* i.mx35 has the i.mx21 type uart */
+>  	clk_register_clkdev(clk[uart1_gate], "per", "imx21-uart.0");
+>  	clk_register_clkdev(clk[ipg], "ipg", "imx21-uart.0");
+> -- 
+> 1.7.9.5
+> 
 > 
 
 -- 
