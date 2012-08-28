@@ -1,38 +1,88 @@
-From: N.Voss@weinmann.de (Voss, Nikolaus)
-Date: Tue, 28 Aug 2012 17:32:52 +0200
-Subject: [PATCH v11 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
-In-Reply-To: <503CDF48.5080201@atmel.com>
-References: <cover.1345618760.git.n.voss@weinmann.de>
- <4f3dcfbf1e8eab3e251ab3558e9e1e9123643928.1345618760.git.n.voss@weinmann.de>
- <503CDF48.5080201@atmel.com>
-Message-ID: <EF2E73589CA71846A15D0B2CDF79505D090EC3DB91@wm021.weinmann.com>
+From: matthew.leach@arm.com (Matthew Leach)
+Date: Tue, 28 Aug 2012 16:41:28 +0100
+Subject: [PATCH v3] serial: pl011: honour serial aliases in device tree
+Message-ID: <1346168488-9309-1-git-send-email-matthew.leach@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic,
+If the order of UART nodes is changed in the device tree, then tty dev
+devices are attached to different serial ports causing the console to
+be directed to a different physical serial port. The "serial" aliases
+in the device tree should prevent this.
 
-ludovic.desroches wrote on Tuesday, August 28, 2012 5:10 PM:
-> > +static const struct platform_device_id twi_ip_type = {
-> > +	/*
-> > +	 * driver_data is 2 for SAM9261 compatible ip, see enum twi_ip_id in
-> > +	 * drivers/i2c/busses/i2c-at91.c
-> > +	 */
-> > +	.driver_data	= 2,
-> > +};
-> > +
-> >   static struct platform_device at91sam9261_twi_device = {
-> >   	.name			= "i2c-gpio",
-> >   	.id			= -1,
-> > +	.id_entry		= &twi_ip_type,
-> >   	.dev.platform_data	= &pdata,
-> >   };
-> >
-> 
-> [...]
-> 
-> You add the id_entry to the i2c-gpio device instead of at91_i2c device.
+This patch ensures that the UART driver creates tty devices that
+honour these aliases if a device tree is present.
 
-Oh! I'll post the complete series tomorrow.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Matthew Leach <matthew.leach@arm.com>
+---
+v3: minor consistency correction
+v2: use IS_ENABLED instead of ifdefs
+ drivers/tty/serial/amba-pl011.c |   36 ++++++++++++++++++++++++++++++++++++
+ 1 files changed, 36 insertions(+), 0 deletions(-)
 
-Regards,
-Niko
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index d3553b5..dc05dd1 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -52,6 +52,8 @@
+ #include <linux/scatterlist.h>
+ #include <linux/delay.h>
+ #include <linux/types.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/sizes.h>
+ 
+@@ -1869,6 +1871,38 @@ static struct uart_driver amba_reg = {
+ 	.cons			= AMBA_CONSOLE,
+ };
+ 
++static int pl011_probe_dt_alias(int index, struct device *dev)
++{
++	struct device_node *np;
++	static bool seen_dev_with_alias = false;
++	static bool seen_dev_without_alias = false;
++	int ret = index;
++
++	if (!IS_ENABLED(CONFIG_OF))
++		return ret;
++
++	np = dev->of_node;
++	if (!np)
++		return ret;
++
++	ret = of_alias_get_id(np, "serial");
++	if (IS_ERR_VALUE(ret)) {
++		seen_dev_without_alias = true;
++		ret = index;
++	} else {
++		seen_dev_with_alias = true;
++		if (ret >= ARRAY_SIZE(amba_ports) || amba_ports[ret] != NULL) {
++			dev_warn(dev, "requested serial port %d  not available.\n", ret);
++			ret = index;
++		}
++	}
++
++	if (seen_dev_with_alias && seen_dev_without_alias)
++		dev_warn(dev, "aliased and non-aliased serial devices found in device tree. Serial port enumeration may be unpredictable.\n");
++
++	return ret;
++}
++
+ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ {
+ 	struct uart_amba_port *uap;
+@@ -1891,6 +1925,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 		goto out;
+ 	}
+ 
++	i = pl011_probe_dt_alias(i, &dev->dev);
++
+ 	base = ioremap(dev->res.start, resource_size(&dev->res));
+ 	if (!base) {
+ 		ret = -ENOMEM;
+-- 
+1.7.0.4
