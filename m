@@ -1,57 +1,84 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Wed, 29 Aug 2012 02:09:17 +0300
-Subject: [PATCH] arm: omap: ratelimit omap_l3_smx error log spam
-In-Reply-To: <CAMQu2gwMk68_BNc4O0M52OACUVLLGzRCQe+5mGH_40DrwAQ4KA@mail.gmail.com>
-References: <1346101403-5882-1-git-send-email-aaro.koskinen@iki.fi>
- <CAMQu2gyEctrq_3K8W6VahMW-ODOiv7TjrBfPTkZqNGJ+0m9ozw@mail.gmail.com>
- <20120827220254.GA783@harshnoise.musicnaut.iki.fi>
- <CAMQu2gz9HE0xEoW7gu257rpLWdCUpt7N6GQNQzWVhFb-A+69hg@mail.gmail.com>
- <20120827232613.GB783@harshnoise.musicnaut.iki.fi>
- <CAMQu2gwHp3PgB-TqPTNWcbRuXRT0wjfvF99nYqfDyWr1GiUvCg@mail.gmail.com>
- <20120828122042.GC783@harshnoise.musicnaut.iki.fi>
- <CAMQu2gwMk68_BNc4O0M52OACUVLLGzRCQe+5mGH_40DrwAQ4KA@mail.gmail.com>
-Message-ID: <20120828230917.GD783@harshnoise.musicnaut.iki.fi>
+From: frankyl@broadcom.com (Franky Lin)
+Date: Tue, 28 Aug 2012 16:10:07 -0700
+Subject: [PATCH 2/6] brcmfmac: Handling the interrupt in ISR
+ directly for non-OOB
+In-Reply-To: <503D4E7F.9010205@wwwdotorg.org>
+References: <1346063114-30361-1-git-send-email-wni@nvidia.com>
+ <1346063114-30361-3-git-send-email-wni@nvidia.com>
+ <503B9F31.5050502@broadcom.com> <503BD345.6030501@wwwdotorg.org>
+ <1346152413.3516.211.camel@tegra-chromium-2>
+ <503CF5B3.8040201@broadcom.com> <503D48AC.5040509@wwwdotorg.org>
+ <503D4DD9.2060808@broadcom.com> <503D4E7F.9010205@wwwdotorg.org>
+Message-ID: <503D4FCF.7030109@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 08/28/2012 04:04 PM, Stephen Warren wrote:
+> On 08/28/2012 04:01 PM, Franky Lin wrote:
+>> On 08/28/2012 03:39 PM, Stephen Warren wrote:
+>>> On 08/28/2012 09:45 AM, Franky Lin wrote:
+>>>> On 08/28/2012 04:13 AM, Wei Ni wrote:
+>>>>> On Tue, 2012-08-28 at 04:06 +0800, Stephen Warren wrote:
+>>>>>> On 08/27/2012 09:24 AM, Arend van Spriel wrote:
+>>>>>>> On 08/27/2012 12:25 PM, Wei Ni wrote:
+>>>>>>>> In case of inband interrupts, if we handle the interrupt in dpc
+>>>>>>>> thread,
+>>>>>>>> two level of thread switching takes place to process wifi
+>>>>>>>> interrupts.
+>>>>>>>> One in SDHCI driver and the other in Wifi driver. This may cause the
+>>>>>>>> system
+>>>>>>>> instability.
+>>> ...
+>>>>>>> Not sure if I can follow this explanation. The isr is called with
+>>>>>>> host
+>>>>>>> claimed (by sdio_irq_thread) and all it does is at a linked list
+>>>>>>> member
+>>>>>>> and signal the dpc thread. After doing this the host is released.
+>>>>>>
+>>>>>> Is the issue something like the ISR handler or first level of
+>>>>>> threading
+>>>>>> does:
+>>>>>>
+>>>>>> * Trigger DPC
+>>>>>> * Re-enable interrupt
+>>>>>>
+>>>>>> So that the interrupt then fires again before the triggered DPC can
+>>>>>> run
+>>>>>> to handle/clear it, thus causing an interrupt storm?
+>>>>>>
+>>>>>> Whereas handling the interrupt directly prevents this race condition?
+>>>>>
+>>>>> Above is my understanding.
+>>>>
+>>>> I understand the issue here and totally agree that we should treat
+>>>> in-band and out-band interrupts differently. But my concern is that the
+>>>> behavior of releasing the host before calling brcmf_sdbrcm_isr and grab
+>>>> it after is likely error prone. Also we are restructuring the dpc
+>>>> routine internally and it's almost done. I will find a better solution
+>>>> for in-band interrupt and get it the queue as well. So I suggest
+>>>> dropping this patch.
+>>>
+>>> Franky, do you know which kernel release the DPC restructuring will make
+>>> it into? I ask because I can't apply the rest of the patches in this
+>>> series without first resolving the stability issues with the Broadcom
+>>> WiFi enabled, since that'd de-stabilize the Tegra platform
+>>> significantly, and I'd like to plan when we can apply these patches to
+>>> Tegra. Thanks!
+>>>
+>>
+>> Hi Stephen,
+>>
+>> Since we submit patches through linux-wireless tree, you may only be
+>> able to pick it up at 3.7-rc1. It's quite a big change so I don't think
+>> it will qualify as a bug fix to get into 3.6-rcX.
+>
+> That's as quick as I expected it to show up, so that's great. I don't
+> suppose you could mail Wei and myself once the patch gets into the
+> linux-wireless tree, so we can test it out on Tegra. If the patch could
+> possibly go into a topic branch in the wireless tree so it can be merged
+> into the Tegra tree before this series, that would be awesome. Thanks.
+>
 
-On Tue, Aug 28, 2012 at 07:19:38AM -0700, Shilimkar, Santosh wrote:
-> Or the PPA has resized the secure area of 16K. As you have seen the issue
-> on one OMAP3 device, it makes sense to takeout that 16K from the public
-> SRAM map.
-> 
-> Can you send the patch with fixed base address fir PUB SRAM ?
+Will keep you posted.
 
-Maybe I'm missing something, but I tried the following and now something
-else got broken:
-
-	save_secure_sram() returns 0000ff02
-
-(and it hangs there).
-
-diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
-index 766181c..242ea5b 100644
---- a/arch/arm/plat-omap/sram.c
-+++ b/arch/arm/plat-omap/sram.c
-@@ -38,7 +38,7 @@
- 
- #define OMAP1_SRAM_PA		0x20000000
- #define OMAP2_SRAM_PUB_PA	(OMAP2_SRAM_PA + 0xf800)
--#define OMAP3_SRAM_PUB_PA       (OMAP3_SRAM_PA + 0x8000)
-+#define OMAP3_SRAM_PUB_PA       (OMAP3_SRAM_PA + 0xc000)
- #ifdef CONFIG_OMAP4_ERRATA_I688
- #define OMAP4_SRAM_PUB_PA	OMAP4_SRAM_PA
- #else
-@@ -112,9 +112,9 @@ static void __init omap_detect_sram(void)
- 				omap_sram_start = OMAP3_SRAM_PUB_PA;
- 				if ((omap_type() == OMAP2_DEVICE_TYPE_EMU) ||
- 				    (omap_type() == OMAP2_DEVICE_TYPE_SEC)) {
--					omap_sram_size = 0x7000; /* 28K */
-+					omap_sram_size = 0x3000; /* 12K */
- 				} else {
--					omap_sram_size = 0x8000; /* 32K */
-+					omap_sram_size = SZ_16K; /* 16K */
- 				}
- 			} else if (cpu_is_omap44xx()) {
- 				omap_sram_start = OMAP4_SRAM_PUB_PA;
+Franky
