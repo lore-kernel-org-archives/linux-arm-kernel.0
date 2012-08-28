@@ -1,10 +1,10 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 28 Aug 2012 19:27:30 +0200
-Subject: [PATCH 2/3] gpio: samsung: Add support for Exynos4x12 SoCs
-In-Reply-To: <CAJuYYwR3tPhk=DHJVgk1E_MqWrwT+7_YdJOSjrYX=pF7_RFjpw@mail.gmail.com>
-References: <4648723.rWnut7F0uJ@amdc1227> <2265472.2J2KAQrYg1@amdc1227>
- <CAJuYYwR3tPhk=DHJVgk1E_MqWrwT+7_YdJOSjrYX=pF7_RFjpw@mail.gmail.com>
-Message-ID: <42072476.sfX69hco6r@flatron>
+Date: Tue, 28 Aug 2012 19:43:30 +0200
+Subject: [PATCH] ARM: EXYNOS: Add support for secondary CPU bring-up on
+ Exynos4412
+In-Reply-To: <503CF014.8010503@codeaurora.org>
+References: <1422318.SfZfh0XoVo@amdc1227> <503CF014.8010503@codeaurora.org>
+Message-ID: <2038010.NUtf96WSJU@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,65 +12,67 @@ Hi,
 
 Thanks for reviewing the patch.
 
-On Tuesday 28 of August 2012 20:25:34 Thomas Abraham wrote:
-> > +       }, {
-> > +               .config = &samsung_gpio_cfgs[9],
-> > +               .irq_base = IRQ_EINT(24),
-> > +               .chip   = {
-> > +                       .base   = EXYNOS4_GPX3(0),
-> > +                       .ngpio  = EXYNOS4_GPIO_X3_NR,
-> > +                       .label  = "GPX3",
-> > +                       .to_irq = samsung_gpiolib_to_irq,
-> > +               },
-> > +       },
-> > +};
+On Tuesday 28 of August 2012 09:21:40 Stephen Boyd wrote:
+> On 8/28/2012 4:13 AM, Tomasz Figa wrote:
+> > diff --git a/arch/arm/mach-exynos/platsmp.c
+> > b/arch/arm/mach-exynos/platsmp.c index 36c3984..1114ced 100644
+> > --- a/arch/arm/mach-exynos/platsmp.c
+> > +++ b/arch/arm/mach-exynos/platsmp.c
+> > @@ -34,8 +34,19 @@
+> > 
+> >  extern void exynos4_secondary_startup(void);
+> > 
+> > -#define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+> > -				S5P_INFORM5 : S5P_VA_SYSRAM)
+> > +static inline volatile void *cpu_boot_reg_base(void)
 > 
-> I see that GPX0, GPX1, GPX2 and GPX3 bank instances are already part
-> of mainline kernel. How is that this is being added here.
+> __iomem?
 
-It seems like somehow GPXx are added to exynos4210_gpios_2 again and the 
-already present part is used for exynos4x12_gpios_2. I guess that it's 
-because of adding ".base   = (void *)0xC00" to GPX0, which might be an 
-accidental mistake. I will recheck that.
-
-> > +       }, {
-> > +               .base   = (void *)0xC00,
-> > 
-> >                 .config = &samsung_gpio_cfgs[9],
-> >                 .irq_base = IRQ_EINT(0),
-> >                 .chip   = {
-> > 
-> > @@ -2370,9 +2619,7 @@ static struct samsung_gpio_chip exynos4_gpios_2[]
-> > = {> 
-> >                 },
-> >         
-> >         },
-> >  
-> >  };
+Sorry, bad habit. I will fix it. 
+ 
+> > +{
+> > +	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
+> > +		return S5P_INFORM5;
+> > +	return S5P_VA_SYSRAM;
+> > +}
+> > +
+> > +static inline volatile void *cpu_boot_reg(int cpu)
 > 
-> There are no GPX banks instantiated here for 4x12. What is the reason for
-> that?
+> __iomem? And why volatile?
 
-See previous point. GPXx which have been part of exynos4_gpios_2 become 
-part of exynos4210_gpios_2.
+Ditto.
 
-> > -#endif
+> > +{
+> > +	if (soc_is_exynos4412())
+> > +		return cpu_boot_reg_base() + 4*cpu;
+> > +	return cpu_boot_reg_base();
+> > +}
 > > 
-> > -#ifdef CONFIG_ARCH_EXYNOS4
-> > 
-> >  static struct samsung_gpio_chip exynos4_gpios_3[] = {
+> >  /*
 > >  
-> >         {
-> >         
-> >                 .chip   = {
+> >   * control for which core is the next to come out of the secondary
 > > 
-> > @@ -2727,12 +2974,15 @@ static __init void
-> > exynos_gpiolib_attach_ofnode(struct samsung_gpio_chip *chip,
-> What is the limitation in adding support for GPVx as well for 4x12 ?
+> > @@ -195,6 +208,8 @@ void __init platform_smp_prepare_cpus(unsigned int
+> > max_cpus)> 
+> >  	 * until it receives a soft interrupt, and then the
+> >  	 * secondary CPU branches to this address.
+> >  	 */
+> > 
+> > -	__raw_writel(virt_to_phys(exynos4_secondary_startup),
+> > -			CPU1_BOOT_REG);
+> > +	for (i = 1; i < max_cpus; ++i) {
+> > +		__raw_writel(virt_to_phys(exynos4_secondary_startup),
+> > +							cpu_boot_reg(i));
+> 
+> Do you need to use cpu_logical_map()?
 
-I'm not sure, I might have simply overlooked GPVx. I will recheck that 
-tomorrow.
+Correct me if I am wrong, but physical to logical CPU mapping will not be 
+1:1 only if booted on physical CPU other than 0. I have not seen yet an 
+Exynos-based board which does it.
 
-Best regards,
+However it might be wiser to use cpu_logical_map() just to be safe indeed. 
+I will add it in next version of the patch.
+
 --
+Best regards,
 Tomasz Figa
