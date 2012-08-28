@@ -1,117 +1,35 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 29 Aug 2012 02:31:34 +0800
-Subject: [PATCH 1/1] arm: KGDB support for PXA
-In-Reply-To: <1346145124-23384-1-git-send-email-den@openvz.org>
-References: <1346145124-23384-1-git-send-email-den@openvz.org>
-Message-ID: <CAN1soZwXSrpJCCCok=weJwRtWJHXz5zPQ6jB88UTr1HePU84gw@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 28 Aug 2012 20:37:57 +0200
+Subject: [PATCH 3/3] ARM: Kirkwood: increase atomic coherent pool size
+In-Reply-To: <20120828182523.GI19437@titan.lakedaemon.net>
+References: <1345459648-24263-1-git-send-email-m.szyprowski@samsung.com>
+ <1345459648-24263-4-git-send-email-m.szyprowski@samsung.com>
+ <20120828182523.GI19437@titan.lakedaemon.net>
+Message-ID: <503D1005.209@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2012 at 5:12 PM, Denis V. Lunev <den@openvz.org> wrote:
-> From: "Denis V. Lunev" <den@openvz.org>
->
-> Actually, in order to support KGDB over serial console one must
-> implement two callbacks for character polling. Clone them from
-> 8250 driver with a bit of tuning.
->
-> Signed-off-by: Denis V. Lunev <den@openvz.org>
-> Signed-off-by: Marko Katic <dromede@gmail.com>
-> CC: Eric Miao <eric.y.miao@gmail.com>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: Haojian Zhuang <haojian.zhuang@gmail.com>
-> CC: <linux-arm-kernel@lists.infradead.org>
-> ---
-> This patch has been originally posted by me to LKML in 2009 and postponed.
-> I was contacted last week by Marko who has kindly ported the patch to the
-> latest v3.6 kernel and asked to re-send it.
->
-> Here it is :)
->
->  drivers/tty/serial/pxa.c |   55 ++++++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 55 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
-> index 5847a4b..54cbb02 100644
-> --- a/drivers/tty/serial/pxa.c
-> +++ b/drivers/tty/serial/pxa.c
-> @@ -691,6 +691,57 @@ serial_pxa_console_write(struct console *co, const char *s, unsigned int count)
->         clk_disable_unprepare(up->clk);
->  }
->
-> +#ifdef CONFIG_CONSOLE_POLL
-> +/*
-> + * Console polling routines for writing and reading from the uart while
-> + * in an interrupt or debug context.
-> + */
-> +
-> +static int serial_pxa_get_poll_char(struct uart_port *port)
-> +{
-> +       struct uart_pxa_port *up = (struct uart_pxa_port *)port;
-> +       unsigned char lsr = serial_in(up, UART_LSR);
-> +
-> +       while (!(lsr & UART_LSR_DR))
-> +               lsr = serial_in(up, UART_LSR);
-> +
-> +       return serial_in(up, UART_RX);
-> +}
-> +
-> +
-> +static void serial_pxa_put_poll_char(struct uart_port *port,
-> +                        unsigned char c)
-> +{
-> +       unsigned int ier;
-> +       struct uart_pxa_port *up = (struct uart_pxa_port *)port;
-> +
-> +       /*
-> +        *      First save the IER then disable the interrupts
-> +        */
-> +       ier = serial_in(up, UART_IER);
-> +       serial_out(up, UART_IER, UART_IER_UUE);
-> +
-> +       wait_for_xmitr(up);
-> +       /*
-> +        *      Send the character out.
-> +        *      If a LF, also do CR...
-> +        */
-> +       serial_out(up, UART_TX, c);
-> +       if (c == 10) {
-> +               wait_for_xmitr(up);
-> +               serial_out(up, UART_TX, 13);
-> +       }
-> +
-> +       /*
-> +        *      Finally, wait for transmitter to become empty
-> +        *      and restore the IER
-> +        */
-> +       wait_for_xmitr(up);
-> +       serial_out(up, UART_IER, ier);
-> +}
-> +
-> +#endif /* CONFIG_CONSOLE_POLL */
-> +
->  static int __init
->  serial_pxa_console_setup(struct console *co, char *options)
->  {
-> @@ -745,6 +796,10 @@ struct uart_ops serial_pxa_pops = {
->         .request_port   = serial_pxa_request_port,
->         .config_port    = serial_pxa_config_port,
->         .verify_port    = serial_pxa_verify_port,
-> +#ifdef CONFIG_CONSOLE_POLL
-> +       .poll_get_char = serial_pxa_get_poll_char,
-> +       .poll_put_char = serial_pxa_put_poll_char,
-> +#endif
->  };
->
->  static struct uart_driver serial_pxa_reg = {
-> --
-> 1.7.7.6
->
+Hello Jason,
 
-Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+On 8/28/2012 8:25 PM, Jason Cooper wrote:
+> On Mon, Aug 20, 2012 at 12:47:28PM +0200, Marek Szyprowski wrote:
+>> The default 256 KiB coherent pool may be too small for some of the Kirkwood
+>> devices, so increase it to make sure that devices will be able to allocate
+>> their buffers with GFP_ATOMIC flag.
+>>
+>> Suggested-by: Josh Coombs <josh.coombs@gmail.com>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+>
+> I assume this will go through the dma tree.  Or, if they want to Ack it,
+> I'll take it through mine since I have boards depending on this.
 
-Greg,
+Thanks for the ack, I would like to push it via my dma-mapping tree
+together with the patches which add init_dma_coherent_pool_size()
+function. I've already added it to fixes-for-3.6 branch.
 
-Will you merge this patch into tty.git? or I merge it into arch-pxa tree?
-
-Regards
-Haojian
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
