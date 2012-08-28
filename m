@@ -1,55 +1,72 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 28 Aug 2012 16:44:47 -0700
-Subject: [PATCH 1/3] ARM: EXYNOS: Use EXYNOS4210_GPEx instead of
- EXYNOS4_GPEx
-In-Reply-To: <14029212.D3MKvQZpbq@amdc1227>
-References: <4648723.rWnut7F0uJ@amdc1227> <14029212.D3MKvQZpbq@amdc1227>
-Message-ID: <503D57EF.2090402@samsung.com>
+Date: Tue, 28 Aug 2012 16:56:45 -0700
+Subject: [PATCH] ARM: EXYNOS: Use non-secure MDMA1
+In-Reply-To: <5886686.Vz6SVkoRWm@amdc1227>
+References: <5886686.Vz6SVkoRWm@amdc1227>
+Message-ID: <503D5ABD.9040801@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/12 03:06, Tomasz Figa wrote:
-> The GPEx gpios are specific to Exynos4210 and do not exist on Exynos4x12.
-> Redefine them to use the exact SoC name.
->
-> Based on "ARM: EXYYNOS: Use EXYNOS4210_GPEx instead of EXYNOS4_GPEx" by
-> Joonyoung Shim, see:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/100738.html
+On 08/28/12 04:08, Tomasz Figa wrote:
+> Using secure MDMA1 on TrustZone-enabled boards causes early boot crash,
+> so use non-secure instead.
 >
 > Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
 > ---
->   arch/arm/mach-exynos/include/mach/gpio.h   | 32 +++++++++++++++---------------
->   arch/arm/mach-exynos/mach-nuri.c           | 16 +++++++--------
->   arch/arm/mach-exynos/mach-origen.c         |  6 +++---
->   arch/arm/mach-exynos/mach-trats.c          |  4 ++--
->   arch/arm/mach-exynos/mach-universal_c210.c | 32 +++++++++++++++---------------
->   arch/arm/mach-exynos/setup-fimc.c          |  4 ++--
->   drivers/gpio/gpio-samsung.c                | 20 +++++++++----------
->   7 files changed, 57 insertions(+), 57 deletions(-)
+>   arch/arm/mach-exynos/dma.c              | 2 +-
+>   arch/arm/mach-exynos/include/mach/map.h | 3 ++-
+>   2 files changed, 3 insertions(+), 2 deletions(-)
 >
-> diff --git a/arch/arm/mach-exynos/include/mach/gpio.h b/arch/arm/mach-exynos/include/mach/gpio.h
-> index eb24f1e..21c9bf1 100644
-> --- a/arch/arm/mach-exynos/include/mach/gpio.h
-> +++ b/arch/arm/mach-exynos/include/mach/gpio.h
-> @@ -26,11 +26,11 @@
->   #define EXYNOS4_GPIO_C1_NR	(5)
->   #define EXYNOS4_GPIO_D0_NR	(4)
->   #define EXYNOS4_GPIO_D1_NR	(4)
-> -#define EXYNOS4_GPIO_E0_NR	(5)
-> -#define EXYNOS4_GPIO_E1_NR	(8)
-> -#define EXYNOS4_GPIO_E2_NR	(6)
-> -#define EXYNOS4_GPIO_E3_NR	(8)
-> -#define EXYNOS4_GPIO_E4_NR	(8)
-> +#define EXYNOS4210_GPIO_E0_NR	(5)
-> +#define EXYNOS4210_GPIO_E1_NR	(8)
-> +#define EXYNOS4210_GPIO_E2_NR	(6)
-> +#define EXYNOS4210_GPIO_E3_NR	(8)
-> +#define EXYNOS4210_GPIO_E4_NR	(8)
+> diff --git a/arch/arm/mach-exynos/dma.c b/arch/arm/mach-exynos/dma.c
+> index f60b66d..8858df5 100644
+> --- a/arch/arm/mach-exynos/dma.c
+> +++ b/arch/arm/mach-exynos/dma.c
+> @@ -261,7 +261,7 @@ static struct dma_pl330_platdata exynos_mdma1_pdata = {
+>   };
+>
+>   static AMBA_AHB_DEVICE(exynos_mdma1,  "dma-pl330.2", 0x00041330,
+> -	EXYNOS4_PA_MDMA1, {EXYNOS4_IRQ_MDMA1},&exynos_mdma1_pdata);
+> +	EXYNOS4_PA_NS_MDMA1, {EXYNOS4_IRQ_MDMA1},&exynos_mdma1_pdata);
+>
+>   static int __init exynos_dma_init(void)
+>   {
+> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-
+> exynos/include/mach/map.h
+> index 51943f2..5df5910 100644
+> --- a/arch/arm/mach-exynos/include/mach/map.h
+> +++ b/arch/arm/mach-exynos/include/mach/map.h
+> @@ -89,7 +89,8 @@
+>   #define EXYNOS4_PA_L2CC			0x10502000
+>
+>   #define EXYNOS4_PA_MDMA0		0x10810000
+> -#define EXYNOS4_PA_MDMA1		0x12840000
+> +#define EXYNOS4_PA_S_MDMA1		0x12840000
+> +#define EXYNOS4_PA_NS_MDMA1		0x12850000
+>   #define EXYNOS4_PA_PDMA0		0x12680000
+>   #define EXYNOS4_PA_PDMA1		0x12690000
+>   #define EXYNOS5_PA_MDMA0		0x10800000
 
-Please see my comments on Joonyoung Shim's previous patch...
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/101522.html
+Cc'ed Boojin Kim.
 
-[...]
+Well, just fix the address is enough like exynos5 stuff? I don't have 
+any idea why we need secure mdma and non-secure mdma both here...
+
+diff --git a/arch/arm/mach-exynos/include/mach/map.h 
+b/arch/arm/mach-exynos/include/mach/map.h
+index c72b675..c941053 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -89,7 +89,7 @@
+  #define EXYNOS4_PA_L2CC                        0x10502000
+
+  #define EXYNOS4_PA_MDMA0		0x10810000
+-#define EXYNOS4_PA_MDMA1		0x12840000
++#define EXYNOS4_PA_MDMA1		0x12850000
+  #define EXYNOS4_PA_PDMA0		0x12680000
+  #define EXYNOS4_PA_PDMA1		0x12690000
+  #define EXYNOS5_PA_MDMA0		0x10800000
+--
 
 Thanks.
 
