@@ -1,46 +1,47 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 28 Aug 2012 12:52:19 +0200
-Subject: [PATCH] usb: chipidea: cleanup dma_pool if udc_start() fails
-In-Reply-To: <20120828104617.GZ4011@b20223-02.ap.freescale.net>
-References: <1346149885-3084-1-git-send-email-mkl@pengutronix.de>
- <20120828104617.GZ4011@b20223-02.ap.freescale.net>
-Message-ID: <503CA2E3.6010707@pengutronix.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 28 Aug 2012 13:08:28 +0200
+Subject: [PATCH] ARM: EXYNOS: Use non-secure MDMA1
+Message-ID: <5886686.Vz6SVkoRWm@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2012 12:46 PM, Richard Zhao wrote:
-> On Tue, Aug 28, 2012 at 12:31:25PM +0200, Marc Kleine-Budde wrote:
->> If udc_start() fails the qh_pool dma-pool cannot be closed because
->> it's still in use. This patch factors out the dma_pool_free() loop
->> into destroy_eps() and calls it in the error path of udc_start(),
->> too.
->>
->> Cc: Richard Zhao <richard.zhao@freescale.com>
->> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
->> ---
->> Hello,
->>
->> Richard, can you please include this patch in your stack. IIRC I think it once
->> was, but now it's not anymore.
-> Sorry for that. I just push it to my topics/usb-driver branch.
-> Of course, it's better, if Alex can give a ACK and Greg could pick up.
+Using secure MDMA1 on TrustZone-enabled boards causes early boot crash,
+so use non-secure instead.
 
-I'm not sure, if this [1] is the latest thread on this patch, but Greg
-asked to queue this patch into your tree.
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/dma.c              | 2 +-
+ arch/arm/mach-exynos/include/mach/map.h | 3 ++-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
-Marc
-
-[1] http://comments.gmane.org/gmane.linux.usb.general/66440
+diff --git a/arch/arm/mach-exynos/dma.c b/arch/arm/mach-exynos/dma.c
+index f60b66d..8858df5 100644
+--- a/arch/arm/mach-exynos/dma.c
++++ b/arch/arm/mach-exynos/dma.c
+@@ -261,7 +261,7 @@ static struct dma_pl330_platdata exynos_mdma1_pdata = {
+ };
+ 
+ static AMBA_AHB_DEVICE(exynos_mdma1,  "dma-pl330.2", 0x00041330,
+-	EXYNOS4_PA_MDMA1, {EXYNOS4_IRQ_MDMA1}, &exynos_mdma1_pdata);
++	EXYNOS4_PA_NS_MDMA1, {EXYNOS4_IRQ_MDMA1}, &exynos_mdma1_pdata);
+ 
+ static int __init exynos_dma_init(void)
+ {
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-
+exynos/include/mach/map.h
+index 51943f2..5df5910 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -89,7 +89,8 @@
+ #define EXYNOS4_PA_L2CC			0x10502000
+ 
+ #define EXYNOS4_PA_MDMA0		0x10810000
+-#define EXYNOS4_PA_MDMA1		0x12840000
++#define EXYNOS4_PA_S_MDMA1		0x12840000
++#define EXYNOS4_PA_NS_MDMA1		0x12850000
+ #define EXYNOS4_PA_PDMA0		0x12680000
+ #define EXYNOS4_PA_PDMA1		0x12690000
+ #define EXYNOS5_PA_MDMA0		0x10800000
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120828/6e88e645/attachment.sig>
+1.7.12
