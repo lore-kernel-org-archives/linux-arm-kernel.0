@@ -1,47 +1,106 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 28 Aug 2012 13:08:28 +0200
-Subject: [PATCH] ARM: EXYNOS: Use non-secure MDMA1
-Message-ID: <5886686.Vz6SVkoRWm@amdc1227>
+From: gcembed@gmail.com (=?UTF-8?q?Ga=C3=ABtan=20Carlier?=)
+Date: Tue, 28 Aug 2012 13:09:10 +0200
+Subject: [PATCH] MFD : MC13783 : add regulators sw1x and sw2x
+Message-ID: <1346152150-21669-1-git-send-email-gcembed@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using secure MDMA1 on TrustZone-enabled boards causes early boot crash,
-so use non-secure instead.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Ga?tan Carlier <gcembed@gmail.com>
 ---
- arch/arm/mach-exynos/dma.c              | 2 +-
- arch/arm/mach-exynos/include/mach/map.h | 3 ++-
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ drivers/regulator/mc13783-regulator.c |   66 +++++++++++++++++++++++++++++++++
+ 1 files changed, 66 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/dma.c b/arch/arm/mach-exynos/dma.c
-index f60b66d..8858df5 100644
---- a/arch/arm/mach-exynos/dma.c
-+++ b/arch/arm/mach-exynos/dma.c
-@@ -261,7 +261,7 @@ static struct dma_pl330_platdata exynos_mdma1_pdata = {
+diff --git a/drivers/regulator/mc13783-regulator.c b/drivers/regulator/mc13783-regulator.c
+index 4977b19..0801a6d 100644
+--- a/drivers/regulator/mc13783-regulator.c
++++ b/drivers/regulator/mc13783-regulator.c
+@@ -21,6 +21,30 @@
+ #include <linux/module.h>
+ #include "mc13xxx.h"
+ 
++#define MC13783_REG_SWITCHERS0			24
++/* Enable does not exist for SW1A */
++#define MC13783_REG_SWITCHERS0_SW1AEN			0
++#define MC13783_REG_SWITCHERS0_SW1AVSEL			0
++#define MC13783_REG_SWITCHERS0_SW1AVSEL_M		(63 << 0)
++
++#define MC13783_REG_SWITCHERS1			25
++/* Enable does not exist for SW1B */
++#define MC13783_REG_SWITCHERS1_SW1BEN			0
++#define MC13783_REG_SWITCHERS1_SW1BVSEL			0
++#define MC13783_REG_SWITCHERS1_SW1BVSEL_M		(63 << 0)
++
++#define MC13783_REG_SWITCHERS2			26
++/* Enable does not exist for SW2A */
++#define MC13783_REG_SWITCHERS2_SW2AEN			0
++#define MC13783_REG_SWITCHERS2_SW2AVSEL			0
++#define MC13783_REG_SWITCHERS2_SW2AVSEL_M		(63 << 0)
++
++#define MC13783_REG_SWITCHERS3			27
++/* Enable does not exist for SW2B */
++#define MC13783_REG_SWITCHERS3_SW2BEN			0
++#define MC13783_REG_SWITCHERS3_SW2BVSEL			0
++#define MC13783_REG_SWITCHERS3_SW2BVSEL_M		(63 << 0)
++
+ #define MC13783_REG_SWITCHERS5			29
+ #define MC13783_REG_SWITCHERS5_SW3EN			(1 << 20)
+ #define MC13783_REG_SWITCHERS5_SW3VSEL			18
+@@ -93,6 +117,44 @@
+ 
+ 
+ /* Voltage Values */
++static const int mc13783_sw1x_val[] = {
++	900000, 925000, 950000, 975000,
++	1000000, 1025000, 1050000, 1075000,
++	1100000, 1125000, 1150000, 1175000,
++	1200000, 1225000, 1250000, 1275000,
++	1300000, 1325000, 1350000, 1375000,
++	1400000, 1425000, 1450000, 1475000,
++	1500000, 1525000, 1550000, 1575000,
++	1600000, 1625000, 1650000, 1675000,
++	1700000, 1700000, 1700000, 1700000,
++	1800000, 1800000, 1800000, 1800000,
++	1850000, 1850000, 1850000, 1850000,
++	2000000, 2000000, 2000000, 2000000,
++	2100000, 2100000, 2100000, 2100000,
++	2200000, 2200000, 2200000, 2200000,
++	2200000, 2200000, 2200000, 2200000,
++	2200000, 2200000, 2200000, 2200000,
++};
++
++static const int mc13783_sw2x_val[] = {
++	900000, 925000, 950000, 975000,
++	1000000, 1025000, 1050000, 1075000,
++	1100000, 1125000, 1150000, 1175000,
++	1200000, 1225000, 1250000, 1275000,
++	1300000, 1325000, 1350000, 1375000,
++	1400000, 1425000, 1450000, 1475000,
++	1500000, 1525000, 1550000, 1575000,
++	1600000, 1625000, 1650000, 1675000,
++	1700000, 1700000, 1700000, 1700000,
++	1800000, 1800000, 1800000, 1800000,
++	1900000, 1900000, 1900000, 1900000,
++	2000000, 2000000, 2000000, 2000000,
++	2100000, 2100000, 2100000, 2100000,
++	2200000, 2200000, 2200000, 2200000,
++	2200000, 2200000, 2200000, 2200000,
++	2200000, 2200000, 2200000, 2200000,
++};
++
+ static const unsigned int mc13783_sw3_val[] = {
+ 	5000000, 5000000, 5000000, 5500000,
  };
+@@ -188,6 +250,10 @@ static struct regulator_ops mc13783_gpo_regulator_ops;
+ 	MC13783_DEFINE(REG, _name, _reg, _vsel_reg, _voltages)
  
- static AMBA_AHB_DEVICE(exynos_mdma1,  "dma-pl330.2", 0x00041330,
--	EXYNOS4_PA_MDMA1, {EXYNOS4_IRQ_MDMA1}, &exynos_mdma1_pdata);
-+	EXYNOS4_PA_NS_MDMA1, {EXYNOS4_IRQ_MDMA1}, &exynos_mdma1_pdata);
+ static struct mc13xxx_regulator mc13783_regulators[] = {
++	MC13783_DEFINE_SW(SW1A, SWITCHERS0, SWITCHERS0, mc13783_sw1x_val),
++	MC13783_DEFINE_SW(SW1B, SWITCHERS1, SWITCHERS1, mc13783_sw1x_val),
++	MC13783_DEFINE_SW(SW2A, SWITCHERS2, SWITCHERS2, mc13783_sw2x_val),
++	MC13783_DEFINE_SW(SW2B, SWITCHERS3, SWITCHERS3, mc13783_sw2x_val),
+ 	MC13783_DEFINE_SW(SW3, SWITCHERS5, SWITCHERS5, mc13783_sw3_val),
  
- static int __init exynos_dma_init(void)
- {
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-
-exynos/include/mach/map.h
-index 51943f2..5df5910 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -89,7 +89,8 @@
- #define EXYNOS4_PA_L2CC			0x10502000
- 
- #define EXYNOS4_PA_MDMA0		0x10810000
--#define EXYNOS4_PA_MDMA1		0x12840000
-+#define EXYNOS4_PA_S_MDMA1		0x12840000
-+#define EXYNOS4_PA_NS_MDMA1		0x12850000
- #define EXYNOS4_PA_PDMA0		0x12680000
- #define EXYNOS4_PA_PDMA1		0x12690000
- #define EXYNOS5_PA_MDMA0		0x10800000
+ 	MC13783_FIXED_DEFINE(REG, VAUDIO, REGULATORMODE0, mc13783_vaudio_val),
 -- 
-1.7.12
+1.7.7.4
