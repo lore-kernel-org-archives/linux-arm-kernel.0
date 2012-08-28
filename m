@@ -1,17 +1,29 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 28 Aug 2012 08:40:29 +0800
-Subject: [PATCH 1/3] ARM: mx28evk: Add SPI flash support
-In-Reply-To: <1346084609-31407-1-git-send-email-fabio.estevam@freescale.com>
-References: <1346084609-31407-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20120828004027.GJ2281@r65073-Latitude-D630>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 28 Aug 2012 02:44:56 +0200
+Subject: [PATCH 4/4] ARM: mxs: Add SchulerControl SPS1 DTS file
+In-Reply-To: <20120828002828.GI2281@r65073-Latitude-D630>
+References: <1345852300-2213-1-git-send-email-marex@denx.de>
+ <20120825083042.GM31998@S2101-09.ap.freescale.net>
+ <20120828002828.GI2281@r65073-Latitude-D630>
+Message-ID: <201208280244.56564.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 01:23:27PM -0300, Fabio Estevam wrote:
-> mx28evk has a free slot (J89) which can be used to populate an SPI NOR Flash.
-> 
-> Add support for it.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Dear Shawn Guo,
 
-Applied all three patches, thanks.
+> On Sat, Aug 25, 2012 at 04:30:45PM +0800, Shawn Guo wrote:
+> > > +				flash: m25p80 at 0 {
+> > > +					#address-cells = <1>;
+> > > +					#size-cells = <1>;
+> > > +					compatible = "everspin,mr25h256", 
+"mr25h256";
+> > 
+> > Node name "m25p80" and "mr25h256", same thing?
+> 
+> Ok, just got reminded by Fabio, m25p80 covers many devices including
+> mr25h256 here.
+
+I still need to look into the OUI
+
+Best regards,
+Marek Vasut
