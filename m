@@ -1,31 +1,52 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 28 Aug 2012 09:18:35 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC: KZM-9A-GT for 3.7
-Message-ID: <1346113116-20252-1-git-send-email-horms@verge.net.au>
+Date: Tue, 28 Aug 2012 09:18:36 +0900
+Subject: [PATCH] ARM: shmobile: kzm9g: enable restarting
+In-Reply-To: <1346113116-20252-1-git-send-email-horms@verge.net.au>
+References: <1346113116-20252-1-git-send-email-horms@verge.net.au>
+Message-ID: <1346113116-20252-2-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olaf, Hi Arnd,
+From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
 
-please consider the following enhancement for the KZM-9A-GT board
-from Tetsuyuki Kobayashi for inclusion in 3.7.
+Do soft-power-on-reset in sys_reboot system call.
 
-----------------------------------------------------------------
-The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
+How to test this patch
+  Execute "sudo reboot" from command line. The system will start shutdown
+  sequence and finally reboot and U-Boot restarts.
 
-  Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git kzm9g
-
-for you to fetch changes up to 7952717adb69efc1d2443a1858f96d23c2fb93e0:
-
-  ARM: shmobile: kzm9g: enable restarting (2012-08-25 14:39:44 +0900)
-
-----------------------------------------------------------------
-Tetsuyuki Kobayashi (1):
-      ARM: shmobile: kzm9g: enable restarting
-
+Cc: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
  arch/arm/mach-shmobile/board-kzm9g.c | 8 ++++++++
  1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
+index 53b7ea9..fd21fb6 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g.c
++++ b/arch/arm/mach-shmobile/board-kzm9g.c
+@@ -763,6 +763,13 @@ static void __init kzm_init(void)
+ 	platform_add_devices(kzm_devices, ARRAY_SIZE(kzm_devices));
+ }
+ 
++static void kzm9g_restart(char mode, const char *cmd)
++{
++#define RESCNT2 0xe6188020
++	/* Do soft power on reset */
++	writel((1 << 31), RESCNT2);
++}
++
+ static const char *kzm9g_boards_compat_dt[] __initdata = {
+ 	"renesas,kzm9g",
+ 	NULL,
+@@ -777,5 +784,6 @@ DT_MACHINE_START(KZM9G_DT, "kzm9g")
+ 	.init_machine	= kzm_init,
+ 	.init_late	= shmobile_init_late,
+ 	.timer		= &shmobile_timer,
++	.restart	= kzm9g_restart,
+ 	.dt_compat	= kzm9g_boards_compat_dt,
+ MACHINE_END
+-- 
+1.7.10.2.484.gcd07cc5
