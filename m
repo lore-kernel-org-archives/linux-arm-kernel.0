@@ -1,68 +1,68 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 28 Aug 2012 15:54:00 -0700
-Subject: [PATCH v3 1/7] mfd: add syscon driver based on regmap
-In-Reply-To: <1346145005-17961-2-git-send-email-b29396@freescale.com>
-References: <1346145005-17961-1-git-send-email-b29396@freescale.com>
- <1346145005-17961-2-git-send-email-b29396@freescale.com>
-Message-ID: <503D4C08.8040605@wwwdotorg.org>
+From: frankyl@broadcom.com (Franky Lin)
+Date: Tue, 28 Aug 2012 16:01:45 -0700
+Subject: [PATCH 2/6] brcmfmac: Handling the interrupt in ISR
+ directly for non-OOB
+In-Reply-To: <503D48AC.5040509@wwwdotorg.org>
+References: <1346063114-30361-1-git-send-email-wni@nvidia.com>
+ <1346063114-30361-3-git-send-email-wni@nvidia.com>
+ <503B9F31.5050502@broadcom.com> <503BD345.6030501@wwwdotorg.org>
+ <1346152413.3516.211.camel@tegra-chromium-2>
+ <503CF5B3.8040201@broadcom.com> <503D48AC.5040509@wwwdotorg.org>
+Message-ID: <503D4DD9.2060808@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2012 02:09 AM, Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> Add regmap based syscon driver.
-> This is usually used for access misc bits in registers which does not belong
-> to a specific module, for example, IMX IOMUXC GPR and ANATOP.
-> With this driver, client can use generic regmap API to access registers
-> which are registered into syscon.
+On 08/28/2012 03:39 PM, Stephen Warren wrote:
+> On 08/28/2012 09:45 AM, Franky Lin wrote:
+>> On 08/28/2012 04:13 AM, Wei Ni wrote:
+>>> On Tue, 2012-08-28 at 04:06 +0800, Stephen Warren wrote:
+>>>> On 08/27/2012 09:24 AM, Arend van Spriel wrote:
+>>>>> On 08/27/2012 12:25 PM, Wei Ni wrote:
+>>>>>> In case of inband interrupts, if we handle the interrupt in dpc
+>>>>>> thread,
+>>>>>> two level of thread switching takes place to process wifi interrupts.
+>>>>>> One in SDHCI driver and the other in Wifi driver. This may cause the
+>>>>>> system
+>>>>>> instability.
+> ...
+>>>>> Not sure if I can follow this explanation. The isr is called with host
+>>>>> claimed (by sdio_irq_thread) and all it does is at a linked list member
+>>>>> and signal the dpc thread. After doing this the host is released.
+>>>>
+>>>> Is the issue something like the ISR handler or first level of threading
+>>>> does:
+>>>>
+>>>> * Trigger DPC
+>>>> * Re-enable interrupt
+>>>>
+>>>> So that the interrupt then fires again before the triggered DPC can run
+>>>> to handle/clear it, thus causing an interrupt storm?
+>>>>
+>>>> Whereas handling the interrupt directly prevents this race condition?
+>>>
+>>> Above is my understanding.
+>>
+>> I understand the issue here and totally agree that we should treat
+>> in-band and out-band interrupts differently. But my concern is that the
+>> behavior of releasing the host before calling brcmf_sdbrcm_isr and grab
+>> it after is likely error prone. Also we are restructuring the dpc
+>> routine internally and it's almost done. I will find a better solution
+>> for in-band interrupt and get it the queue as well. So I suggest
+>> dropping this patch.
+>
+> Franky, do you know which kernel release the DPC restructuring will make
+> it into? I ask because I can't apply the rest of the patches in this
+> series without first resolving the stability issues with the Broadcom
+> WiFi enabled, since that'd de-stabilize the Tegra platform
+> significantly, and I'd like to plan when we can apply these patches to
+> Tegra. Thanks!
+>
 
-> diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
+Hi Stephen,
 
-> +* System Controller Registers R/W driver
+Since we submit patches through linux-wireless tree, you may only be 
+able to pick it up at 3.7-rc1. It's quite a big change so I don't think 
+it will qualify as a bug fix to get into 3.6-rcX.
 
-I think the binding document could use some information about what a
-"syscon" actually is, especially since the compatible value is something
-generic like "syscon" rather than something with a vendor-specific
-prefix. How about:
-
-A system controller node represents a register region containing a set
-of miscellaneous registers. The registers are not cohesive enough to
-represent as any specific type of device. The typical use-case is for
-some other node's driver, or platform-specific code, to acquire a
-reference to the syscon node (e.g. by phandle, node path, or search
-using a specific compatible value), interrogate the node (or associated
-OS driver) to determine the location of the registers, and access the
-registers directly.
-
-> +Required properties:
-> +- compatible: Should contain "syscon".
-> +- reg: the register range can be access from syscon
-> +
-> +Examples:
-> +gpr: iomuxc-gpr at 020e0000 {
-> +	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
-> +	reg = <0x020e0000 0x38>;
-> +};
-
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-
-> +config MFD_SYSCON
-> +        bool "System Controller Register R/W Based on Regmap"
-> +        select REGMAP_MMIO
-> +        help
-> +          Select this option to enable accessing system control registers
-> +	  via regmap.
-
-I think the indentation is off there.
-
-> +static int __devinit syscon_probe(struct platform_device *pdev)
-...
-> +	regcache_cache_only(syscon->regmap, false);
-
-Isn't that the default?
-
-Aside from that, I don't have any particular comments on this series, so
-please consider it,
-
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+Regards,
+Franky
