@@ -1,74 +1,59 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 28 Aug 2012 13:13:40 +0200
-Subject: [PATCH] ARM: EXYNOS: Add support for secondary CPU bring-up on
- Exynos4412
-Message-ID: <1422318.SfZfh0XoVo@amdc1227>
+From: wni@nvidia.com (Wei Ni)
+Date: Tue, 28 Aug 2012 19:13:33 +0800
+Subject: [PATCH 2/6] brcmfmac: Handling the interrupt in ISR directly
+ for non-OOB
+In-Reply-To: <503BD345.6030501@wwwdotorg.org>
+References: <1346063114-30361-1-git-send-email-wni@nvidia.com>
+ <1346063114-30361-3-git-send-email-wni@nvidia.com>
+ <503B9F31.5050502@broadcom.com>  <503BD345.6030501@wwwdotorg.org>
+Message-ID: <1346152413.3516.211.camel@tegra-chromium-2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos4412 uses different information register for each core. This patch
-adjusts the bring-up code to take that into account.
+On Tue, 2012-08-28 at 04:06 +0800, Stephen Warren wrote:
+> On 08/27/2012 09:24 AM, Arend van Spriel wrote:
+> > On 08/27/2012 12:25 PM, Wei Ni wrote:
+> >> In case of inband interrupts, if we handle the interrupt in dpc thread,
+> >> two level of thread switching takes place to process wifi interrupts.
+> >> One in SDHCI driver and the other in Wifi driver. This may cause the
+> >> system
+> >> instability.
+> > 
+> > Looking into the sdhci/mmc code indeed shows that the brcmfmac irq
+> > handler is not called in true IRQ context. So the dpc thread may add
+> > unnecessary complexity, but to me there is not indication that there is
+> > a stability issue.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos/platsmp.c | 25 ++++++++++++++++++++-----
- 1 file changed, 20 insertions(+), 5 deletions(-)
+The brcmfmac irq handler is called in the thread sdio_irq_thread(), this
+thread indeed is driven by the sdhci irq, although it's not the true IRQ
+context. If the brcmfmac doesn't clear the IRQ condition ASAP, the
+sdio_irq_thread will be triggered again and again, and in this condition
+it's too difficult to run the brcmfmac dpc thread, more and more
+interrupt can't be handled.
 
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 36c3984..1114ced 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -34,8 +34,19 @@
- 
- extern void exynos4_secondary_startup(void);
- 
--#define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1 ? \
--				S5P_INFORM5 : S5P_VA_SYSRAM)
-+static inline volatile void *cpu_boot_reg_base(void)
-+{
-+	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
-+		return S5P_INFORM5;
-+	return S5P_VA_SYSRAM;
-+}
-+
-+static inline volatile void *cpu_boot_reg(int cpu)
-+{
-+	if (soc_is_exynos4412())
-+		return cpu_boot_reg_base() + 4*cpu;
-+	return cpu_boot_reg_base();
-+}
- 
- /*
-  * control for which core is the next to come out of the secondary
-@@ -138,7 +149,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 		smp_rmb();
- 
- 		__raw_writel(virt_to_phys(exynos4_secondary_startup),
--			CPU1_BOOT_REG);
-+							cpu_boot_reg(cpu));
- 		gic_raise_softirq(cpumask_of(cpu), 1);
- 
- 		if (pen_release == -1)
-@@ -186,6 +197,8 @@ void __init smp_init_cpus(void)
- 
- void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- {
-+	int i;
-+
- 	if (!soc_is_exynos5250())
- 		scu_enable(scu_base_addr());
- 
-@@ -195,6 +208,8 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- 	 * until it receives a soft interrupt, and then the
- 	 * secondary CPU branches to this address.
- 	 */
--	__raw_writel(virt_to_phys(exynos4_secondary_startup),
--			CPU1_BOOT_REG);
-+	for (i = 1; i < max_cpus; ++i) {
-+		__raw_writel(virt_to_phys(exynos4_secondary_startup),
-+							cpu_boot_reg(i));
-+	}
- }
--- 
-1.7.12
+> > 
+> >> Because the SDHCI calls sdio_irq_thread() to handle the irq, this
+> >> thread locks
+> >> mmc host and calls wifi handler. It expects WiFi handler to be quick and
+> >> enables sdio interrupt from card at end. If wifi handler defers this
+> >> work for
+> >> a different thread, sdio_irq_thread() will be stuck on next wifi
+> >> interrupt
+> >> since mmc lock is not freed.
+> > 
+> > Not sure if I can follow this explanation. The isr is called with host
+> > claimed (by sdio_irq_thread) and all it does is at a linked list member
+> > and signal the dpc thread. After doing this the host is released.
+> 
+> Is the issue something like the ISR handler or first level of threading
+> does:
+> 
+> * Trigger DPC
+> * Re-enable interrupt
+> 
+> So that the interrupt then fires again before the triggered DPC can run
+> to handle/clear it, thus causing an interrupt storm?
+> 
+> Whereas handling the interrupt directly prevents this race condition?
+
+Above is my understanding.
