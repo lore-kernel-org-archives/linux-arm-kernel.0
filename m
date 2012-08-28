@@ -1,47 +1,90 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Tue, 28 Aug 2012 11:38:23 +0300
-Subject: [PATCH v2 05/11] USB: chipidea: don't let probe fail if otg
- controller start one role failed
-In-Reply-To: <1346137397-32374-6-git-send-email-richard.zhao@freescale.com>
-References: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
- <1346137397-32374-6-git-send-email-richard.zhao@freescale.com>
-Message-ID: <87ligz2yyo.fsf@ashishki-desk.ger.corp.intel.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 28 Aug 2012 17:39:39 +0900
+Subject: [PATCH v5 2/2] ARM: EXYNOS: SMC instruction (aka firmware) support
+In-Reply-To: <20120827221030.GC7431@lumpy>
+References: <20120824083357.GA25384@july>
+	<20120827221030.GC7431@lumpy>
+Message-ID: <CAH9JG2V5Xt1H5siBKT=LBr76YdSBRqyM92pTNFVo9K4WRWxcyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Zhao <richard.zhao@freescale.com> writes:
-
-> One role failed, but the other role will possiblly still work.
-> For example, when udc start failed, if plug in a host device,
-> it works.
-
-If you're a host device, ci->role should be HOST at this point and
-ci_role_start() shouldn't fail. If ci->role is detected wrongly, the
-role detection must be fixed. If ci_role_start() fails for host, but it
-still works when it's called again after the id pin change is detected,
-again, the problem is elsewhere.
-
+On 8/28/12, Olof Johansson <olof@lixom.net> wrote:
+> Hi,
 >
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> ---
->  drivers/usb/chipidea/core.c |    7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
+> See below.
 >
-> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> index 19ef324..8fd390a 100644
-> --- a/drivers/usb/chipidea/core.c
-> +++ b/drivers/usb/chipidea/core.c
-> @@ -473,8 +473,11 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
->  	ret = ci_role_start(ci, ci->role);
->  	if (ret) {
->  		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
-> -		ret = -ENODEV;
-> -		goto rm_wq;
-> +		ci->role = CI_ROLE_END;
+> On Fri, Aug 24, 2012 at 05:33:57PM +0900, Kyungmin Park wrote:
+>
+>> diff --git a/arch/arm/mach-exynos/Makefile
+>> b/arch/arm/mach-exynos/Makefile
+>> index 9b58024..8ee779c 100644
+>> --- a/arch/arm/mach-exynos/Makefile
+>> +++ b/arch/arm/mach-exynos/Makefile
+>> @@ -30,6 +30,11 @@ obj-$(CONFIG_EXYNOS4_MCT)	+= mct.o
+>>
+>>  obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+>>
+>> +obj-$(CONFIG_ARM_FIRMWARE)	+= exynos-smc.o firmware.o
+>> +
+>> +plus_sec := $(call as-instr,.arch_extension sec,+sec)
+>> +AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
+>
+> Again, no need for a config option here.
+checked, I just did as others, omap3, highbank.
+BTW, does it be required for older toolchain?
+>
+>> diff --git a/arch/arm/mach-exynos/firmware.c
+>> b/arch/arm/mach-exynos/firmware.c
+>> new file mode 100644
+>> index 0000000..a144593
+>> --- /dev/null
+>> +++ b/arch/arm/mach-exynos/firmware.c
+>> @@ -0,0 +1,37 @@
+>> +/*
+>> + *  Copyright (C) 2012 Samsung Electronics.
+>> + *  Kyungmin Park <kyungmin.park@samsung.com>
+>> + *
+>> + * This program is free software,you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/init.h>
+>> +
+>> +#include <asm/firmware.h>
+>> +
+>> +#include "smc.h"
+>> +
+>> +static int exynos_do_idle(void)
+>> +{
+>> +        exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
+>> +        return 0;
+>> +}
+>> +
+>> +static void exynos_cpu_boot(int cpu)
+>> +{
+>> +	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
+>> +}
+>> +
+>> +static struct firmware_ops exynos_firmware_ops __initdata = {
+>> +	.do_idle	= exynos_do_idle,
+>> +	.cpu_boot	= exynos_cpu_boot,
+>> +};
+>> +
+>> +int __init exynos_firmware_init(void)
+>> +{
+>> +	firmware_ops = exynos_firmware_ops;
+>> +	return 0;
+>> +}
+>
+> If you add a check for SMC presence/execution mode here, then you can
+> make this a runtime instead of boot time option, thus making it possible
+> to build a kernel that boots and runs both with and without SMC support.
+In the previous time, it's hard to detect at runtime, so I add this function.
+I think it's board specfic instead of SOC one.
+Can you check it again, does it possbiel to know smc firmware is
+support at this board?
 
-So are you relying on id pin interrupt for initializing the role after
-this? Can you provide more details?
-
-Regards,
---
-Alex
+Thank you,
+Kyungmin Park
