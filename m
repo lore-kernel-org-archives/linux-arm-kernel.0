@@ -1,57 +1,83 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 Aug 2012 14:25:23 -0400
-Subject: [PATCH 3/3] ARM: Kirkwood: increase atomic coherent pool size
-In-Reply-To: <1345459648-24263-4-git-send-email-m.szyprowski@samsung.com>
-References: <1345459648-24263-1-git-send-email-m.szyprowski@samsung.com>
- <1345459648-24263-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20120828182523.GI19437@titan.lakedaemon.net>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Tue, 28 Aug 2012 11:27:08 -0700
+Subject: [PATCH 2/2] tty: serial: imx: don't reinit clock with enabled
+ console
+In-Reply-To: <503CA183.70704@de.bosch.com>
+References: <1346053012-25686-1-git-send-email-dirk.behme@de.bosch.com>
+ <1346053012-25686-3-git-send-email-dirk.behme@de.bosch.com>
+ <503BBA5A.8040609@boundarydevices.com> <503CA183.70704@de.bosch.com>
+Message-ID: <503D0D7C.2070509@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 12:47:28PM +0200, Marek Szyprowski wrote:
-> The default 256 KiB coherent pool may be too small for some of the Kirkwood
-> devices, so increase it to make sure that devices will be able to allocate
-> their buffers with GFP_ATOMIC flag.
-> 
-> Suggested-by: Josh Coombs <josh.coombs@gmail.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+On 8/28/2012 3:46 AM, Dirk Behme wrote:
+> On 27.08.2012 20:20, Troy Kisky wrote:
+>> On 8/27/2012 12:36 AM, Dirk Behme wrote:
+>>> From: Xinyu Chen <xinyu.chen@freescale.com>
+>>>
+>>> Remove the imx_setup_ufcr() call on startup when CONSOLE enabled,
+>>> as this will cause clock reinit, and output garbage.
+>>>
+>>> This patch is a port from Freescale's Android kernel.
+>>>
+>>> Signed-off-by: Xinyu Chen <xinyu.chen@freescale.com>
+>>> Tested-by: Dirk Behme <dirk.behme@de.bosch.com>
+>>> CC: Shawn Guo <shawn.guo@linaro.org>
+>>> CC: Sascha Hauer <s.hauer@pengutronix.de>
+>>> ---
+>>>   drivers/tty/serial/imx.c |    2 ++
+>>>   1 files changed, 2 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+>>> index 908178f..31ce414 100644
+>>> --- a/drivers/tty/serial/imx.c
+>>> +++ b/drivers/tty/serial/imx.c
+>>> @@ -695,7 +695,9 @@ static int imx_startup(struct uart_port *port)
+>>>       int retval;
+>>>       unsigned long flags, temp;
+>>>   +#ifndef CONFIG_SERIAL_CORE_CONSOLE
+>>>       imx_setup_ufcr(sport, 0);
+>>> +#endif
+>>>         /* disable the DREN bit (Data Ready interrupt enable) before
+>>>        * requesting IRQs
+>>
+>>
+>> I'd rather do something like this
+>>
+>> static int imx_setup_ufcr(struct imx_port *sport, unsigned int mode)
+>> {
+>>          unsigned int val;
+>>
+>>          /* set receiver / transmitter trigger level. */
+>>          val = readl(sport->port.membase + UFCR) & UFCR_RFDIV;
+>
+> Shouldn't it be
+>
+> ... & (UFCR_RFDIV | UFCR_DCEDTE);
+>
+> then? My i.MX6 manual has DCEDTE as bit 6, which we don't want to 
+> touch, too? We only want to touch TXTL and RXTL?
+>
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+If you do that, you should also change imx_set_termios
+to possibly clear the bit
 
-I assume this will go through the dma tree.  Or, if they want to Ack it,
-I'll take it through mine since I have boards depending on this.
+new_ufcr = (old_ufcr & (~UFCR_RFDIV)) | UFCR_RFDIV_REG(div);
 
-thx,
+to
 
-Jason.
+new_ufcr = (old_ufcr & (~(UFCR_RFDIV | UFCR_DCEDTE))) | UFCR_RFDIV_REG(div);
 
-> ---
->  arch/arm/mach-kirkwood/common.c |    7 +++++++
->  1 files changed, 7 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-> index c4b64ad..d748f50 100644
-> --- a/arch/arm/mach-kirkwood/common.c
-> +++ b/arch/arm/mach-kirkwood/common.c
-> @@ -517,6 +517,13 @@ void __init kirkwood_wdt_init(void)
->  void __init kirkwood_init_early(void)
->  {
->  	orion_time_set_base(TIMER_VIRT_BASE);
-> +
-> +	/*
-> +	 * Some Kirkwood devices allocate their coherent buffers from atomic
-> +	 * context. Increase size of atomic coherent pool to make sure such
-> +	 * the allocations won't fail.
-> +	 */
-> +	init_dma_coherent_pool_size(SZ_1M);
->  }
->  
->  int kirkwood_tclk;
-> -- 
-> 1.7.1.569.g6f426
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>          val |= TXTL << 10 | RXTL;
+>>          writel(val, sport->port.membase + UFCR);
+>>          return 0;
+>> }
+>>
+>> There is no need for imx_setup_ufcr to change divisor.
+>
+> Ok
+>
+> Thanks
+>
+> Dirk
+>
