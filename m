@@ -1,63 +1,44 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 28 Aug 2012 10:06:43 +0900
-Subject: [PATCH] ARM: mach-shmobile: Add compilation support for dtbs
- using 'make dtbs'
-In-Reply-To: <503C1818.7020402@kmckk.co.jp>
-References: <1346113322-21133-1-git-send-email-horms@verge.net.au>
- <1346113322-21133-2-git-send-email-horms@verge.net.au>
- <503C1059.10300@codeaurora.org> <503C1818.7020402@kmckk.co.jp>
-Message-ID: <20120828010643.GA24108@verge.net.au>
+From: koba@kmckk.co.jp (Tetsuyuki Kobayashi)
+Date: Tue, 28 Aug 2012 10:15:03 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC: KZM-9A-GT for 3.7
+In-Reply-To: <1346113116-20252-1-git-send-email-horms@verge.net.au>
+References: <1346113116-20252-1-git-send-email-horms@verge.net.au>
+Message-ID: <503C1B97.3070004@kmckk.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2012 at 10:00:08AM +0900, Tetsuyuki Kobayashi wrote:
-> Simon-san,
+(2012/08/28 9:18), Simon Horman wrote:
+> Hi Olaf, Hi Arnd,
 > 
-> (2012/08/28 9:27), Stephen Boyd wrote:
-> >On 8/27/2012 5:22 PM, Simon Horman wrote:
-> >>+dtb-$(CONFIG_MACH_KZM9D) += emev2-kzm9d.dts
-> >>+dtb-$(CONFIG_MACH_ARMADILLO800EVA) += r8a7740-armadillo800eva.dts
-> >
-> >Shouldn't these be dtb instead of dts?
-> >
-> 
-> Please use my v2 patch.
-> I paste v2 patch here. (It was posted on 2012/07/23)
+> please consider the following enhancement for the KZM-9A-GT board
 
-Sorry about that. Please ignore this pull request.
-I will repost.
+Just a minor correction :)
+The board name is KZM-A9-GT.
 
+
+> from Tetsuyuki Kobayashi for inclusion in 3.7.
 > 
-> ==============================================================
-> From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+> ----------------------------------------------------------------
+> The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
 > 
-> Add compilation support for dtbs using 'make dtbs'
+>    Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
 > 
-> Cc: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
-> ---
-> Sorry, I found mistake. it should be dtb insted of dts.
+> are available in the git repository at:
 > 
-> Changes for v2
-> - replace dts to dtb in the 3rd and 4th line of patch.
+>    git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git kzm9g
 > 
->  arch/arm/mach-shmobile/Makefile.boot |    4 ++++
->  1 file changed, 4 insertions(+)
+> for you to fetch changes up to 7952717adb69efc1d2443a1858f96d23c2fb93e0:
 > 
-> diff --git a/arch/arm/mach-shmobile/Makefile.boot
-> b/arch/arm/mach-shmobile/Makefile.boot
-> index 498efd9..5e41019 100644
-> --- a/arch/arm/mach-shmobile/Makefile.boot
-> +++ b/arch/arm/mach-shmobile/Makefile.boot
-> @@ -7,3 +7,7 @@ __ZRELADDR	:= $(shell /bin/bash -c 'printf "0x%08x" \
->  #
->  #params_phys-y (Instead: Pass atags pointer in r2)
->  #initrd_phys-y (Instead: Use compiled-in initramfs)
-> +
-> +dtb-$(CONFIG_MACH_KZM9G) += sh73a0-kzm9g.dtb
-> +dtb-$(CONFIG_MACH_KZM9D) += emev2-kzm9d.dtb
-> +dtb-$(CONFIG_MACH_ARMADILLO800EVA) += r8a7740-armadillo800eva.dtb
-> -- 1.7.9.5
+>    ARM: shmobile: kzm9g: enable restarting (2012-08-25 14:39:44 +0900)
+> 
+> ----------------------------------------------------------------
+> Tetsuyuki Kobayashi (1):
+>        ARM: shmobile: kzm9g: enable restarting
+> 
+>   arch/arm/mach-shmobile/board-kzm9g.c | 8 ++++++++
+>   1 file changed, 8 insertions(+)
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
