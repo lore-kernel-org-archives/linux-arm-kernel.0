@@ -1,73 +1,46 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Tue, 28 Aug 2012 12:46:27 +0200
-Subject: [PATCH 2/2] tty: serial: imx: don't reinit clock with enabled
- console
-In-Reply-To: <503BBA5A.8040609@boundarydevices.com>
-References: <1346053012-25686-1-git-send-email-dirk.behme@de.bosch.com>
- <1346053012-25686-3-git-send-email-dirk.behme@de.bosch.com>
- <503BBA5A.8040609@boundarydevices.com>
-Message-ID: <503CA183.70704@de.bosch.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 28 Aug 2012 12:52:19 +0200
+Subject: [PATCH] usb: chipidea: cleanup dma_pool if udc_start() fails
+In-Reply-To: <20120828104617.GZ4011@b20223-02.ap.freescale.net>
+References: <1346149885-3084-1-git-send-email-mkl@pengutronix.de>
+ <20120828104617.GZ4011@b20223-02.ap.freescale.net>
+Message-ID: <503CA2E3.6010707@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.08.2012 20:20, Troy Kisky wrote:
-> On 8/27/2012 12:36 AM, Dirk Behme wrote:
->> From: Xinyu Chen <xinyu.chen@freescale.com>
+On 08/28/2012 12:46 PM, Richard Zhao wrote:
+> On Tue, Aug 28, 2012 at 12:31:25PM +0200, Marc Kleine-Budde wrote:
+>> If udc_start() fails the qh_pool dma-pool cannot be closed because
+>> it's still in use. This patch factors out the dma_pool_free() loop
+>> into destroy_eps() and calls it in the error path of udc_start(),
+>> too.
 >>
->> Remove the imx_setup_ufcr() call on startup when CONSOLE enabled,
->> as this will cause clock reinit, and output garbage.
->>
->> This patch is a port from Freescale's Android kernel.
->>
->> Signed-off-by: Xinyu Chen <xinyu.chen@freescale.com>
->> Tested-by: Dirk Behme <dirk.behme@de.bosch.com>
->> CC: Shawn Guo <shawn.guo@linaro.org>
->> CC: Sascha Hauer <s.hauer@pengutronix.de>
+>> Cc: Richard Zhao <richard.zhao@freescale.com>
+>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 >> ---
->>   drivers/tty/serial/imx.c |    2 ++
->>   1 files changed, 2 insertions(+), 0 deletions(-)
+>> Hello,
 >>
->> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
->> index 908178f..31ce414 100644
->> --- a/drivers/tty/serial/imx.c
->> +++ b/drivers/tty/serial/imx.c
->> @@ -695,7 +695,9 @@ static int imx_startup(struct uart_port *port)
->>   	int retval;
->>   	unsigned long flags, temp;
->>   
->> +#ifndef CONFIG_SERIAL_CORE_CONSOLE
->>   	imx_setup_ufcr(sport, 0);
->> +#endif
->>   
->>   	/* disable the DREN bit (Data Ready interrupt enable) before
->>   	 * requesting IRQs
-> 
-> 
-> I'd rather do something like this
-> 
-> static int imx_setup_ufcr(struct imx_port *sport, unsigned int mode)
-> {
->          unsigned int val;
-> 
->          /* set receiver / transmitter trigger level. */
->          val = readl(sport->port.membase + UFCR) & UFCR_RFDIV;
+>> Richard, can you please include this patch in your stack. IIRC I think it once
+>> was, but now it's not anymore.
+> Sorry for that. I just push it to my topics/usb-driver branch.
+> Of course, it's better, if Alex can give a ACK and Greg could pick up.
 
-Shouldn't it be
+I'm not sure, if this [1] is the latest thread on this patch, but Greg
+asked to queue this patch into your tree.
 
-... & (UFCR_RFDIV | UFCR_DCEDTE);
+Marc
 
-then? My i.MX6 manual has DCEDTE as bit 6, which we don't want to touch, 
-too? We only want to touch TXTL and RXTL?
+[1] http://comments.gmane.org/gmane.linux.usb.general/66440
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
->          val |= TXTL << 10 | RXTL;
->          writel(val, sport->port.membase + UFCR);
->          return 0;
-> }
-> 
-> There is no need for imx_setup_ufcr to change divisor.
-
-Ok
-
-Thanks
-
-Dirk
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120828/6e88e645/attachment.sig>
