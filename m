@@ -1,89 +1,220 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 28 Aug 2012 20:59:06 +0200
-Subject: [PATCH 5/8] dma: mv_xor: move <plat/mv_xor.h> to
- <linux/platform_data/mv_xor.h>
+Date: Tue, 28 Aug 2012 20:59:05 +0200
+Subject: [PATCH 4/8] mmc: mvsdio: move <plat/mvsdio.h> to
+ <linux/platform_data/mvsdio.h>
 In-Reply-To: <1346180349-25123-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1346180349-25123-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1346180349-25123-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1346180349-25123-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
+ arch/arm/mach-kirkwood/board-dreamplug.c           |    2 +-
+ arch/arm/mach-kirkwood/board-goflexnet.c           |    2 +-
  arch/arm/mach-kirkwood/common.c                    |    2 +-
- arch/arm/plat-orion/common.c                       |    2 +-
- drivers/dma/mv_xor.c                               |    2 +-
- .../plat => include/linux/platform_data}/mv_xor.h  |    6 ++----
- 4 files changed, 5 insertions(+), 7 deletions(-)
- rename {arch/arm/plat-orion/include/plat => include/linux/platform_data}/mv_xor.h (77%)
+ arch/arm/mach-kirkwood/db88f6281-bp-setup.c        |    2 +-
+ arch/arm/mach-kirkwood/dockstar-setup.c            |    2 +-
+ arch/arm/mach-kirkwood/guruplug-setup.c            |    2 +-
+ arch/arm/mach-kirkwood/openrd-setup.c              |    2 +-
+ arch/arm/mach-kirkwood/rd88f6281-setup.c           |    2 +-
+ arch/arm/mach-kirkwood/sheevaplug-setup.c          |    2 +-
+ drivers/mmc/host/mvsdio.c                          |    2 +-
+ .../plat => include/linux/platform_data}/mvsdio.h  |    6 ++----
+ 11 files changed, 12 insertions(+), 14 deletions(-)
+ rename {arch/arm/plat-orion/include/plat => include/linux/platform_data}/mvsdio.h (77%)
 
+diff --git a/arch/arm/mach-kirkwood/board-dreamplug.c b/arch/arm/mach-kirkwood/board-dreamplug.c
+index aeb234d..5256c1f 100644
+--- a/arch/arm/mach-kirkwood/board-dreamplug.c
++++ b/arch/arm/mach-kirkwood/board-dreamplug.c
+@@ -25,12 +25,12 @@
+ #include <linux/mtd/physmap.h>
+ #include <linux/spi/flash.h>
+ #include <linux/spi/spi.h>
++#include <linux/platform_data/mvsdio.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <mach/kirkwood.h>
+ #include <mach/bridge-regs.h>
+-#include <plat/mvsdio.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+diff --git a/arch/arm/mach-kirkwood/board-goflexnet.c b/arch/arm/mach-kirkwood/board-goflexnet.c
+index 413e2c8..3d4ba64 100644
+--- a/arch/arm/mach-kirkwood/board-goflexnet.c
++++ b/arch/arm/mach-kirkwood/board-goflexnet.c
+@@ -27,12 +27,12 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/gpio.h>
++#include <linux/platform_data/mvsdio.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <mach/kirkwood.h>
+ #include <mach/bridge-regs.h>
+-#include <plat/mvsdio.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
 diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index e04bd6f..a3d8836 100644
+index 833fe07..e04bd6f 100644
 --- a/arch/arm/mach-kirkwood/common.c
 +++ b/arch/arm/mach-kirkwood/common.c
-@@ -21,6 +21,7 @@
+@@ -20,6 +20,7 @@
+ #include <linux/mv643xx_i2c.h>
  #include <linux/platform_data/kirkwood-audio.h>
  #include <linux/platform_data/ehci-orion.h>
- #include <linux/platform_data/mvsdio.h>
-+#include <linux/platform_data/mv_xor.h>
++#include <linux/platform_data/mvsdio.h>
  #include <net/dsa.h>
  #include <asm/page.h>
  #include <asm/timex.h>
-@@ -34,7 +35,6 @@
+@@ -29,7 +30,6 @@
+ #include <mach/kirkwood.h>
+ #include <mach/bridge-regs.h>
+ #include <plat/cache-feroceon-l2.h>
+-#include <plat/mvsdio.h>
+ #include <plat/orion_nand.h>
  #include <plat/common.h>
  #include <plat/time.h>
- #include <plat/addr-map.h>
--#include <plat/mv_xor.h>
- #include "common.h"
- 
- /*****************************************************************************
-diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-index ebcf727..88dac08 100644
---- a/arch/arm/plat-orion/common.c
-+++ b/arch/arm/plat-orion/common.c
-@@ -19,8 +19,8 @@
+diff --git a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+index d933593..c0a367b 100644
+--- a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
++++ b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+@@ -14,10 +14,10 @@
+ #include <linux/mtd/partitions.h>
+ #include <linux/ata_platform.h>
  #include <linux/mv643xx_eth.h>
- #include <linux/mv643xx_i2c.h>
- #include <linux/platform_data/ehci-orion.h>
-+#include <linux/platform_data/mv_xor.h>
++#include <linux/platform_data/mvsdio.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <mach/kirkwood.h>
+-#include <plat/mvsdio.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+diff --git a/arch/arm/mach-kirkwood/dockstar-setup.c b/arch/arm/mach-kirkwood/dockstar-setup.c
+index 61d9a55..819cad1 100644
+--- a/arch/arm/mach-kirkwood/dockstar-setup.c
++++ b/arch/arm/mach-kirkwood/dockstar-setup.c
+@@ -16,10 +16,10 @@
+ #include <linux/mv643xx_eth.h>
+ #include <linux/gpio.h>
+ #include <linux/leds.h>
++#include <linux/platform_data/mvsdio.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <mach/kirkwood.h>
+-#include <plat/mvsdio.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+diff --git a/arch/arm/mach-kirkwood/guruplug-setup.c b/arch/arm/mach-kirkwood/guruplug-setup.c
+index bdaed38..be2b8fe 100644
+--- a/arch/arm/mach-kirkwood/guruplug-setup.c
++++ b/arch/arm/mach-kirkwood/guruplug-setup.c
+@@ -16,10 +16,10 @@
+ #include <linux/mv643xx_eth.h>
+ #include <linux/gpio.h>
+ #include <linux/leds.h>
++#include <linux/platform_data/mvsdio.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <mach/kirkwood.h>
+-#include <plat/mvsdio.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
+index 7e99c3f..3b36ae7 100644
+--- a/arch/arm/mach-kirkwood/openrd-setup.c
++++ b/arch/arm/mach-kirkwood/openrd-setup.c
+@@ -17,10 +17,10 @@
+ #include <linux/mv643xx_eth.h>
+ #include <linux/i2c.h>
+ #include <linux/gpio.h>
++#include <linux/platform_data/mvsdio.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <mach/kirkwood.h>
+-#include <plat/mvsdio.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+diff --git a/arch/arm/mach-kirkwood/rd88f6281-setup.c b/arch/arm/mach-kirkwood/rd88f6281-setup.c
+index ef92207..78e1541 100644
+--- a/arch/arm/mach-kirkwood/rd88f6281-setup.c
++++ b/arch/arm/mach-kirkwood/rd88f6281-setup.c
+@@ -16,11 +16,11 @@
+ #include <linux/ata_platform.h>
+ #include <linux/mv643xx_eth.h>
+ #include <linux/ethtool.h>
++#include <linux/platform_data/mvsdio.h>
  #include <net/dsa.h>
--#include <plat/mv_xor.h>
- #include <mach/bridge-regs.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <mach/kirkwood.h>
+-#include <plat/mvsdio.h>
+ #include "common.h"
+ #include "mpp.h"
  
- /* Create a clkdev entry for a given device/clk */
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 0b12e68..ec9c570 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -26,7 +26,7 @@
- #include <linux/platform_device.h>
- #include <linux/memory.h>
+diff --git a/arch/arm/mach-kirkwood/sheevaplug-setup.c b/arch/arm/mach-kirkwood/sheevaplug-setup.c
+index 4ea70e5..006dc69 100644
+--- a/arch/arm/mach-kirkwood/sheevaplug-setup.c
++++ b/arch/arm/mach-kirkwood/sheevaplug-setup.c
+@@ -16,10 +16,10 @@
+ #include <linux/mv643xx_eth.h>
+ #include <linux/gpio.h>
+ #include <linux/leds.h>
++#include <linux/platform_data/mvsdio.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <mach/kirkwood.h>
+-#include <plat/mvsdio.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+index a61cb5f..0ae0a53 100644
+--- a/drivers/mmc/host/mvsdio.c
++++ b/drivers/mmc/host/mvsdio.c
+@@ -22,10 +22,10 @@
  #include <linux/clk.h>
--#include <plat/mv_xor.h>
-+#include <linux/platform_data/mv_xor.h>
+ #include <linux/gpio.h>
+ #include <linux/mmc/host.h>
++#include <linux/platform_data/mvsdio.h>
  
- #include "dmaengine.h"
- #include "mv_xor.h"
-diff --git a/arch/arm/plat-orion/include/plat/mv_xor.h b/include/linux/platform_data/mv_xor.h
+ #include <asm/sizes.h>
+ #include <asm/unaligned.h>
+-#include <plat/mvsdio.h>
+ 
+ #include "mvsdio.h"
+ 
+diff --git a/arch/arm/plat-orion/include/plat/mvsdio.h b/include/linux/platform_data/mvsdio.h
 similarity index 77%
-rename from arch/arm/plat-orion/include/plat/mv_xor.h
-rename to include/linux/platform_data/mv_xor.h
-index 2ba1f7d..cbfc6e1 100644
---- a/arch/arm/plat-orion/include/plat/mv_xor.h
-+++ b/include/linux/platform_data/mv_xor.h
-@@ -1,11 +1,9 @@
+rename from arch/arm/plat-orion/include/plat/mvsdio.h
+rename to include/linux/platform_data/mvsdio.h
+index 1190efe..a44eb86 100644
+--- a/arch/arm/plat-orion/include/plat/mvsdio.h
++++ b/include/linux/platform_data/mvsdio.h
+@@ -1,13 +1,11 @@
  /*
-- * arch/arm/plat-orion/include/plat/mv_xor.h
+- * arch/arm/plat-orion/include/plat/mvsdio.h
 - *
-  * Marvell XOR platform device data definition file.
+  * This file is licensed under the terms of the GNU General Public
+  * License version 2.  This program is licensed "as is" without any
+  * warranty of any kind, whether express or implied.
   */
  
--#ifndef __PLAT_MV_XOR_H
--#define __PLAT_MV_XOR_H
-+#ifndef __MV_XOR_PDATA_H
-+#define __MV_XOR_PDATA_H
+-#ifndef __MACH_MVSDIO_H
+-#define __MACH_MVSDIO_H
++#ifndef __MVSDIO_PDATA_H
++#define __MVSDIO_PDATA_H
  
- #include <linux/dmaengine.h>
  #include <linux/mbus.h>
+ 
 -- 
 1.7.9.5
