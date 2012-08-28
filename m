@@ -1,36 +1,23 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 27 Aug 2012 17:05:04 -0700
-Subject: [GIT PULL] Renesas ARM-based SoC: Armadillo800EVA for 3.7
-In-Reply-To: <20120827064506.GB26953@verge.net.au>
-References: <1346049610-2266-1-git-send-email-horms@verge.net.au>
- <20120827064506.GB26953@verge.net.au>
-Message-ID: <20120828000504.GC3571@quad.lixom.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 Aug 2012 17:13:39 -0700
+Subject: [PATCH 0/3] Removal of obsolete s3c2410_* GPIO API
+In-Reply-To: <1345897243-15619-1-git-send-email-sylvester.nawrocki@gmail.com>
+References: <1345897243-15619-1-git-send-email-sylvester.nawrocki@gmail.com>
+Message-ID: <CACRpkdaspHBDUjwf_bPtZoFeYK7q97oX4Jat=pmX810RtGJOpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 03:45:06PM +0900, Simon Horman wrote:
-> Somehow I forgot to give the previous email a subject, not a good start :(
-> 
-> On Mon, Aug 27, 2012 at 03:40:08PM +0900, Simon Horman wrote:
-> > Hi Arnd, Hi Olaf,
-> > 
-> > please consider the following enhancements for the Armadillo800EVA board
-> > from Laurent Pinchart for inclusion in 3.7.
-> > 
-> > I am currently in the processes of taking over maintenance
-> > of shmoble from Rafael Wysocki and this my the first pull request
-> > in that role.
-> > 
-> > ----------------------------------------------------------------
-> > The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
-> > 
-> >   Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git armadillo800eva
+On Sat, Aug 25, 2012 at 5:20 AM, Sylwester Nawrocki
+<sylvester.nawrocki@gmail.com> wrote:
 
-Thanks, pulled.
+> This short patch series converts remaining users of the s3c24xx SoC
+> specific gpiolib functions to the gpiolib API and finally removes
+> all s3c2410_* functions from drivers/gpio/gpio-samsung.c.
 
+I'm fine with this as long as the Samsung maintainer is, so
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
--Olof
+But I suspect this will be merged through the Samsung SoC tree?
+
+Yours,
+Linus Walleij
