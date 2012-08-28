@@ -1,36 +1,60 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 28 Aug 2012 16:38:24 -0700
-Subject: [PATCH] arm: omap: ratelimit omap_l3_smx error log spam
-In-Reply-To: <20120828230917.GD783@harshnoise.musicnaut.iki.fi>
-References: <1346101403-5882-1-git-send-email-aaro.koskinen@iki.fi>
- <CAMQu2gyEctrq_3K8W6VahMW-ODOiv7TjrBfPTkZqNGJ+0m9ozw@mail.gmail.com>
- <20120827220254.GA783@harshnoise.musicnaut.iki.fi>
- <CAMQu2gz9HE0xEoW7gu257rpLWdCUpt7N6GQNQzWVhFb-A+69hg@mail.gmail.com>
- <20120827232613.GB783@harshnoise.musicnaut.iki.fi>
- <CAMQu2gwHp3PgB-TqPTNWcbRuXRT0wjfvF99nYqfDyWr1GiUvCg@mail.gmail.com>
- <20120828122042.GC783@harshnoise.musicnaut.iki.fi>
- <CAMQu2gwMk68_BNc4O0M52OACUVLLGzRCQe+5mGH_40DrwAQ4KA@mail.gmail.com>
- <20120828230917.GD783@harshnoise.musicnaut.iki.fi>
-Message-ID: <CAMQu2gxdXXa27yAYL4yEkBci7pAKH+FNjDWp8-Y86zxdqndO0Q@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 28 Aug 2012 16:44:47 -0700
+Subject: [PATCH 1/3] ARM: EXYNOS: Use EXYNOS4210_GPEx instead of
+ EXYNOS4_GPEx
+In-Reply-To: <14029212.D3MKvQZpbq@amdc1227>
+References: <4648723.rWnut7F0uJ@amdc1227> <14029212.D3MKvQZpbq@amdc1227>
+Message-ID: <503D57EF.2090402@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2012 at 4:09 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-> Hi,
+On 08/28/12 03:06, Tomasz Figa wrote:
+> The GPEx gpios are specific to Exynos4210 and do not exist on Exynos4x12.
+> Redefine them to use the exact SoC name.
 >
-> On Tue, Aug 28, 2012 at 07:19:38AM -0700, Shilimkar, Santosh wrote:
->> Or the PPA has resized the secure area of 16K. As you have seen the issue
->> on one OMAP3 device, it makes sense to takeout that 16K from the public
->> SRAM map.
->>
->> Can you send the patch with fixed base address fir PUB SRAM ?
+> Based on "ARM: EXYYNOS: Use EXYNOS4210_GPEx instead of EXYNOS4_GPEx" by
+> Joonyoung Shim, see:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/100738.html
 >
-> Maybe I'm missing something, but I tried the following and now something
-> else got broken:
+> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+> ---
+>   arch/arm/mach-exynos/include/mach/gpio.h   | 32 +++++++++++++++---------------
+>   arch/arm/mach-exynos/mach-nuri.c           | 16 +++++++--------
+>   arch/arm/mach-exynos/mach-origen.c         |  6 +++---
+>   arch/arm/mach-exynos/mach-trats.c          |  4 ++--
+>   arch/arm/mach-exynos/mach-universal_c210.c | 32 +++++++++++++++---------------
+>   arch/arm/mach-exynos/setup-fimc.c          |  4 ++--
+>   drivers/gpio/gpio-samsung.c                | 20 +++++++++----------
+>   7 files changed, 57 insertions(+), 57 deletions(-)
 >
->         save_secure_sram() returns 0000ff02
->
-Damn. Looks like, you are running short of memory now for sram_push stuff.
+> diff --git a/arch/arm/mach-exynos/include/mach/gpio.h b/arch/arm/mach-exynos/include/mach/gpio.h
+> index eb24f1e..21c9bf1 100644
+> --- a/arch/arm/mach-exynos/include/mach/gpio.h
+> +++ b/arch/arm/mach-exynos/include/mach/gpio.h
+> @@ -26,11 +26,11 @@
+>   #define EXYNOS4_GPIO_C1_NR	(5)
+>   #define EXYNOS4_GPIO_D0_NR	(4)
+>   #define EXYNOS4_GPIO_D1_NR	(4)
+> -#define EXYNOS4_GPIO_E0_NR	(5)
+> -#define EXYNOS4_GPIO_E1_NR	(8)
+> -#define EXYNOS4_GPIO_E2_NR	(6)
+> -#define EXYNOS4_GPIO_E3_NR	(8)
+> -#define EXYNOS4_GPIO_E4_NR	(8)
+> +#define EXYNOS4210_GPIO_E0_NR	(5)
+> +#define EXYNOS4210_GPIO_E1_NR	(8)
+> +#define EXYNOS4210_GPIO_E2_NR	(6)
+> +#define EXYNOS4210_GPIO_E3_NR	(8)
+> +#define EXYNOS4210_GPIO_E4_NR	(8)
 
-Regards
-Santosh
+Please see my comments on Joonyoung Shim's previous patch...
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/101522.html
+
+[...]
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
