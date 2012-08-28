@@ -1,74 +1,31 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 27 Aug 2012 17:17:30 -0700
-Subject: [PATCH] arm: omap: ratelimit omap_l3_smx error log spam
-In-Reply-To: <20120827232613.GB783@harshnoise.musicnaut.iki.fi>
-References: <1346101403-5882-1-git-send-email-aaro.koskinen@iki.fi>
- <CAMQu2gyEctrq_3K8W6VahMW-ODOiv7TjrBfPTkZqNGJ+0m9ozw@mail.gmail.com>
- <20120827220254.GA783@harshnoise.musicnaut.iki.fi>
- <CAMQu2gz9HE0xEoW7gu257rpLWdCUpt7N6GQNQzWVhFb-A+69hg@mail.gmail.com>
- <20120827232613.GB783@harshnoise.musicnaut.iki.fi>
-Message-ID: <CAMQu2gwHp3PgB-TqPTNWcbRuXRT0wjfvF99nYqfDyWr1GiUvCg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 28 Aug 2012 09:18:35 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC: KZM-9A-GT for 3.7
+Message-ID: <1346113116-20252-1-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 4:26 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-> On Mon, Aug 27, 2012 at 03:12:07PM -0700, Shilimkar, Santosh wrote:
->> On Mon, Aug 27, 2012 at 3:02 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
->> > Hi,
->> >
->> > On Mon, Aug 27, 2012 at 02:35:57PM -0700, Shilimkar, Santosh wrote:
->> >> > -       pr_err("%s seen by %s %s at address %x\n",
->> >> > +       pr_err_ratelimited("%s seen by %s %s at address %x\n",
->> >> >                         omap3_l3_code_string(code),
->> >> >                         omap3_l3_initiator_string(initid),
->> >> >                         multi ? "Multiple Errors" : "", address);
->> >> > -       WARN_ON(1);
->> >> > +       WARN_ON_ONCE(1);
->> >> >
->> >> The issue needs to be fixed instead of WARN_ON_ONCE() and then
->> >> just moving ahead. Interconnect in bad states is really bad state and you
->> >> won't have reliable operations post that on SOC.
->> >
->> > How printing megabytes of identical stack traces helps anything?
->> >
->> It just says repeatedly and  loudly... Fix the issue :-)
->>
->> > This has been there always (since the L3 driver was added) on every boot
->> > with N950/N9 (which BTW are HS devices, not sure if that has anything
->> > to do with it). There is no apparent effect on device functionality,
->> > at least nothing unusual has been observed...
->> >
->> I assumed this is secure device when I saw the SRAM memset is causing the
->> issue.
->>
->> > Is there any documentation how to interpret and debug this error report?
->> >
->> The issue could be, there is memset tried on Secure portion of SRAM or
->> CPU speculatively accessed adjacent SRAM region of public SRAM which
->> is secure and hence the error.
->
-> Thanks, that makes sense.
->
->> If you just bypass the SRAM init [1], does the issue go away ?
->
-> I tried bypassing the whole SRAM init, but the device does not seem to
-> boot up at all.
->
-> If I comment out the memset alone, then it boots and the issue is gone:
->
-> +#if 0
->         memset_io(omap_sram_base + SRAM_BOOTLOADER_SZ, 0,
->                   omap_sram_size - SRAM_BOOTLOADER_SZ);
-> +#endif
->
-Good. So the issue is indeed direct or indirect access to the secure SRAM.
-As security can dynamically resize the secure RAM size it is even harder
-to fix this issue properly. One easier way to deal with the issue is map only
-needed SRAM and leave rest for security.
+Hi Olaf, Hi Arnd,
 
-For now, Can you check if reducing the size of the SRAM in init is helping you
-to get way with the issue. Sorry it might need few iterations for you to get
-a working SRAM size.
+please consider the following enhancement for the KZM-9A-GT board
+from Tetsuyuki Kobayashi for inclusion in 3.7.
 
-Regards
-Santosh
+----------------------------------------------------------------
+The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
+
+  Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git kzm9g
+
+for you to fetch changes up to 7952717adb69efc1d2443a1858f96d23c2fb93e0:
+
+  ARM: shmobile: kzm9g: enable restarting (2012-08-25 14:39:44 +0900)
+
+----------------------------------------------------------------
+Tetsuyuki Kobayashi (1):
+      ARM: shmobile: kzm9g: enable restarting
+
+ arch/arm/mach-shmobile/board-kzm9g.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
