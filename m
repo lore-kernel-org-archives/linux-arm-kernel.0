@@ -1,56 +1,17 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 28 Aug 2012 15:39:40 -0700
-Subject: [PATCH 2/6] brcmfmac: Handling the interrupt in ISR directly
- for non-OOB
-In-Reply-To: <503CF5B3.8040201@broadcom.com>
-References: <1346063114-30361-1-git-send-email-wni@nvidia.com>
- <1346063114-30361-3-git-send-email-wni@nvidia.com>
- <503B9F31.5050502@broadcom.com> <503BD345.6030501@wwwdotorg.org>
- <1346152413.3516.211.camel@tegra-chromium-2> <503CF5B3.8040201@broadcom.com>
-Message-ID: <503D48AC.5040509@wwwdotorg.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 29 Aug 2012 00:53:01 +0200
+Subject: [PATCH 0/1] clk: add DT fixed-factor-clock binding support
+Message-ID: <1346194382-11405-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2012 09:45 AM, Franky Lin wrote:
-> On 08/28/2012 04:13 AM, Wei Ni wrote:
->> On Tue, 2012-08-28 at 04:06 +0800, Stephen Warren wrote:
->>> On 08/27/2012 09:24 AM, Arend van Spriel wrote:
->>>> On 08/27/2012 12:25 PM, Wei Ni wrote:
->>>>> In case of inband interrupts, if we handle the interrupt in dpc
->>>>> thread,
->>>>> two level of thread switching takes place to process wifi interrupts.
->>>>> One in SDHCI driver and the other in Wifi driver. This may cause the
->>>>> system
->>>>> instability.
-...
->>>> Not sure if I can follow this explanation. The isr is called with host
->>>> claimed (by sdio_irq_thread) and all it does is at a linked list member
->>>> and signal the dpc thread. After doing this the host is released.
->>>
->>> Is the issue something like the ISR handler or first level of threading
->>> does:
->>>
->>> * Trigger DPC
->>> * Re-enable interrupt
->>>
->>> So that the interrupt then fires again before the triggered DPC can run
->>> to handle/clear it, thus causing an interrupt storm?
->>>
->>> Whereas handling the interrupt directly prevents this race condition?
->>
->> Above is my understanding.
-> 
-> I understand the issue here and totally agree that we should treat
-> in-band and out-band interrupts differently. But my concern is that the
-> behavior of releasing the host before calling brcmf_sdbrcm_isr and grab
-> it after is likely error prone. Also we are restructuring the dpc
-> routine internally and it's almost done. I will find a better solution
-> for in-band interrupt and get it the queue as well. So I suggest
-> dropping this patch.
+Hi,
 
-Franky, do you know which kernel release the DPC restructuring will make
-it into? I ask because I can't apply the rest of the patches in this
-series without first resolving the stability issues with the Broadcom
-WiFi enabled, since that'd de-stabilize the Tegra platform
-significantly, and I'd like to plan when we can apply these patches to
-Tegra. Thanks!
+During the port of the clock common framework for the armada 370/XP, I
+need to get "fixed-factor-clock" using the device tree. For this need
+I add support DT for "fixed-factor-clock" in the same way that the
+existing support for "fixed-rate-clock". It turned out that finally I
+didn't need it anymore, but as the code was written and tested, here
+it is.
+
+Gregory Clement
