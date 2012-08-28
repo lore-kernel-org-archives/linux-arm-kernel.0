@@ -1,106 +1,74 @@
-From: gcembed@gmail.com (=?UTF-8?q?Ga=C3=ABtan=20Carlier?=)
-Date: Tue, 28 Aug 2012 13:09:10 +0200
-Subject: [PATCH] MFD : MC13783 : add regulators sw1x and sw2x
-Message-ID: <1346152150-21669-1-git-send-email-gcembed@gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 28 Aug 2012 13:13:40 +0200
+Subject: [PATCH] ARM: EXYNOS: Add support for secondary CPU bring-up on
+ Exynos4412
+Message-ID: <1422318.SfZfh0XoVo@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Exynos4412 uses different information register for each core. This patch
+adjusts the bring-up code to take that into account.
 
-Signed-off-by: Ga?tan Carlier <gcembed@gmail.com>
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/regulator/mc13783-regulator.c |   66 +++++++++++++++++++++++++++++++++
- 1 files changed, 66 insertions(+), 0 deletions(-)
+ arch/arm/mach-exynos/platsmp.c | 25 ++++++++++++++++++++-----
+ 1 file changed, 20 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/regulator/mc13783-regulator.c b/drivers/regulator/mc13783-regulator.c
-index 4977b19..0801a6d 100644
---- a/drivers/regulator/mc13783-regulator.c
-+++ b/drivers/regulator/mc13783-regulator.c
-@@ -21,6 +21,30 @@
- #include <linux/module.h>
- #include "mc13xxx.h"
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 36c3984..1114ced 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -34,8 +34,19 @@
  
-+#define MC13783_REG_SWITCHERS0			24
-+/* Enable does not exist for SW1A */
-+#define MC13783_REG_SWITCHERS0_SW1AEN			0
-+#define MC13783_REG_SWITCHERS0_SW1AVSEL			0
-+#define MC13783_REG_SWITCHERS0_SW1AVSEL_M		(63 << 0)
-+
-+#define MC13783_REG_SWITCHERS1			25
-+/* Enable does not exist for SW1B */
-+#define MC13783_REG_SWITCHERS1_SW1BEN			0
-+#define MC13783_REG_SWITCHERS1_SW1BVSEL			0
-+#define MC13783_REG_SWITCHERS1_SW1BVSEL_M		(63 << 0)
-+
-+#define MC13783_REG_SWITCHERS2			26
-+/* Enable does not exist for SW2A */
-+#define MC13783_REG_SWITCHERS2_SW2AEN			0
-+#define MC13783_REG_SWITCHERS2_SW2AVSEL			0
-+#define MC13783_REG_SWITCHERS2_SW2AVSEL_M		(63 << 0)
-+
-+#define MC13783_REG_SWITCHERS3			27
-+/* Enable does not exist for SW2B */
-+#define MC13783_REG_SWITCHERS3_SW2BEN			0
-+#define MC13783_REG_SWITCHERS3_SW2BVSEL			0
-+#define MC13783_REG_SWITCHERS3_SW2BVSEL_M		(63 << 0)
-+
- #define MC13783_REG_SWITCHERS5			29
- #define MC13783_REG_SWITCHERS5_SW3EN			(1 << 20)
- #define MC13783_REG_SWITCHERS5_SW3VSEL			18
-@@ -93,6 +117,44 @@
+ extern void exynos4_secondary_startup(void);
  
- 
- /* Voltage Values */
-+static const int mc13783_sw1x_val[] = {
-+	900000, 925000, 950000, 975000,
-+	1000000, 1025000, 1050000, 1075000,
-+	1100000, 1125000, 1150000, 1175000,
-+	1200000, 1225000, 1250000, 1275000,
-+	1300000, 1325000, 1350000, 1375000,
-+	1400000, 1425000, 1450000, 1475000,
-+	1500000, 1525000, 1550000, 1575000,
-+	1600000, 1625000, 1650000, 1675000,
-+	1700000, 1700000, 1700000, 1700000,
-+	1800000, 1800000, 1800000, 1800000,
-+	1850000, 1850000, 1850000, 1850000,
-+	2000000, 2000000, 2000000, 2000000,
-+	2100000, 2100000, 2100000, 2100000,
-+	2200000, 2200000, 2200000, 2200000,
-+	2200000, 2200000, 2200000, 2200000,
-+	2200000, 2200000, 2200000, 2200000,
-+};
+-#define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+-				S5P_INFORM5 : S5P_VA_SYSRAM)
++static inline volatile void *cpu_boot_reg_base(void)
++{
++	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
++		return S5P_INFORM5;
++	return S5P_VA_SYSRAM;
++}
 +
-+static const int mc13783_sw2x_val[] = {
-+	900000, 925000, 950000, 975000,
-+	1000000, 1025000, 1050000, 1075000,
-+	1100000, 1125000, 1150000, 1175000,
-+	1200000, 1225000, 1250000, 1275000,
-+	1300000, 1325000, 1350000, 1375000,
-+	1400000, 1425000, 1450000, 1475000,
-+	1500000, 1525000, 1550000, 1575000,
-+	1600000, 1625000, 1650000, 1675000,
-+	1700000, 1700000, 1700000, 1700000,
-+	1800000, 1800000, 1800000, 1800000,
-+	1900000, 1900000, 1900000, 1900000,
-+	2000000, 2000000, 2000000, 2000000,
-+	2100000, 2100000, 2100000, 2100000,
-+	2200000, 2200000, 2200000, 2200000,
-+	2200000, 2200000, 2200000, 2200000,
-+	2200000, 2200000, 2200000, 2200000,
-+};
++static inline volatile void *cpu_boot_reg(int cpu)
++{
++	if (soc_is_exynos4412())
++		return cpu_boot_reg_base() + 4*cpu;
++	return cpu_boot_reg_base();
++}
+ 
+ /*
+  * control for which core is the next to come out of the secondary
+@@ -138,7 +149,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 		smp_rmb();
+ 
+ 		__raw_writel(virt_to_phys(exynos4_secondary_startup),
+-			CPU1_BOOT_REG);
++							cpu_boot_reg(cpu));
+ 		gic_raise_softirq(cpumask_of(cpu), 1);
+ 
+ 		if (pen_release == -1)
+@@ -186,6 +197,8 @@ void __init smp_init_cpus(void)
+ 
+ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+ {
++	int i;
 +
- static const unsigned int mc13783_sw3_val[] = {
- 	5000000, 5000000, 5000000, 5500000,
- };
-@@ -188,6 +250,10 @@ static struct regulator_ops mc13783_gpo_regulator_ops;
- 	MC13783_DEFINE(REG, _name, _reg, _vsel_reg, _voltages)
+ 	if (!soc_is_exynos5250())
+ 		scu_enable(scu_base_addr());
  
- static struct mc13xxx_regulator mc13783_regulators[] = {
-+	MC13783_DEFINE_SW(SW1A, SWITCHERS0, SWITCHERS0, mc13783_sw1x_val),
-+	MC13783_DEFINE_SW(SW1B, SWITCHERS1, SWITCHERS1, mc13783_sw1x_val),
-+	MC13783_DEFINE_SW(SW2A, SWITCHERS2, SWITCHERS2, mc13783_sw2x_val),
-+	MC13783_DEFINE_SW(SW2B, SWITCHERS3, SWITCHERS3, mc13783_sw2x_val),
- 	MC13783_DEFINE_SW(SW3, SWITCHERS5, SWITCHERS5, mc13783_sw3_val),
- 
- 	MC13783_FIXED_DEFINE(REG, VAUDIO, REGULATORMODE0, mc13783_vaudio_val),
+@@ -195,6 +208,8 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+ 	 * until it receives a soft interrupt, and then the
+ 	 * secondary CPU branches to this address.
+ 	 */
+-	__raw_writel(virt_to_phys(exynos4_secondary_startup),
+-			CPU1_BOOT_REG);
++	for (i = 1; i < max_cpus; ++i) {
++		__raw_writel(virt_to_phys(exynos4_secondary_startup),
++							cpu_boot_reg(i));
++	}
+ }
 -- 
-1.7.7.4
+1.7.12
