@@ -1,47 +1,70 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 28 Aug 2012 13:48:15 +0200
-Subject: i.MX pwm patches
-Message-ID: <1346154504-5623-1-git-send-email-s.hauer@pengutronix.de>
+Date: Tue, 28 Aug 2012 13:48:24 +0200
+Subject: [PATCH 9/9] pwm i.MX: add devicetree support
+In-Reply-To: <1346154504-5623-1-git-send-email-s.hauer@pengutronix.de>
+References: <1346154504-5623-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1346154504-5623-10-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
-The following patches are an overdue work on the i.MX pwm driver.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/pwm/pwm-imx.c |   25 ++++++++++++++++++++++---
+ 1 file changed, 22 insertions(+), 3 deletions(-)
 
-- introduce SoC specific functions to make the driver easier to maintain
-- use peripheral clock for pwm output unconditionally
-- separate the two clocks this module has
-- enable ipg clock for register accesses, peripheral clock for enabling
-  the pwm
-- make the driver safe for calling pwm_config before pwm_enable
-- Add devicetree support for i.MX53
-
-The platform device support is still implemented using cpu_is_*, I think
-this can be dropped completely soon as this driver has no in kernel users
-currently, so there should be no need to keep compatibility for platform
-based boards.
-
-Hopefully this series fixes the issues mentioned by Beno?t. It has been
-tested on an i.MX53 only.
-
-Sascha
-
-----------------------------------------------------------------
-Philipp Zabel (3):
-      pwm i.MX: add devicetree support
-      pwm i.MX: fix clock lookup
-      pwm i.MX: add devicetree support
-
-Sascha Hauer (6):
-      pwm i.MX: factor out SoC specific functions
-      pwm i.MX: remove unnecessary if in pwm_[en|dis]able
-      pwm i.MX: add functions to enable/disable pwm.
-      pwm i.MX: Use module_platform_driver
-      pwm i.MX: use per clock unconditionally
-      ARM i.MX53: Add pwms to dtsi
-
- arch/arm/boot/dts/imx53.dtsi        |   14 ++
- arch/arm/mach-imx/clk-imx51-imx53.c |    4 +
- drivers/pwm/pwm-imx.c               |  278 +++++++++++++++++++++++------------
- 3 files changed, 202 insertions(+), 94 deletions(-)
+diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+index 308ab51..dce2acb 100644
+--- a/drivers/pwm/pwm-imx.c
++++ b/drivers/pwm/pwm-imx.c
+@@ -206,9 +206,25 @@ static struct pwm_ops imx_pwm_ops = {
+ 	.owner = THIS_MODULE,
+ };
+ 
++struct imx_pwm_data {
++	int (*config)(struct pwm_chip *chip,
++		struct pwm_device *pwm, int duty_ns, int period_ns);
++	void (*set_enable)(struct pwm_chip *chip, bool enable);
++};
++
++static struct imx_pwm_data imx_pwm_data_v1 = {
++	.config = imx_pwm_config_v1,
++	.set_enable = imx_pwm_set_enable_v1,
++};
++
++static struct imx_pwm_data imx_pwm_data_v2 = {
++	.config = imx_pwm_config_v2,
++	.set_enable = imx_pwm_set_enable_v2,
++};
++
+ static const struct of_device_id imx_pwm_dt_ids[] = {
+-	{ .compatible = "fsl,imx1-pwm", .data = &imx_pwm_config_v1, },
+-	{ .compatible = "fsl,imx27-pwm", .data = &imx_pwm_config_v2, },
++	{ .compatible = "fsl,imx1-pwm", .data = &imx_pwm_data_v1, },
++	{ .compatible = "fsl,imx27-pwm", .data = &imx_pwm_data_v2, },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, imx_pwm_of_match);
+@@ -257,7 +273,9 @@ static int __devinit imx_pwm_probe(struct platform_device *pdev)
+ 		return -EADDRNOTAVAIL;
+ 
+ 	if (of_id) {
+-		imx->config = of_id->data;
++		struct imx_pwm_data *data = of_id->data;
++		imx->config = data->config;
++		imx->set_enable = data->set_enable;
+ 	} else {
+ 		if (cpu_is_mx1() || cpu_is_mx21()) {
+ 			imx->config = imx_pwm_config_v1;
+@@ -290,6 +308,7 @@ static int __devexit imx_pwm_remove(struct platform_device *pdev)
+ static struct platform_driver imx_pwm_driver = {
+ 	.driver		= {
+ 		.name	= "mxc_pwm",
++		.of_match_table = of_match_ptr(imx_pwm_dt_ids),
+ 	},
+ 	.probe		= imx_pwm_probe,
+ 	.remove		= __devexit_p(imx_pwm_remove),
+-- 
+1.7.10.4
