@@ -1,119 +1,96 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 28 Aug 2012 10:36:45 +0530
-Subject: [PATCH v3 3/3] ARM: dts: Add nodes for dw_mmc controllers for
- Samsung Exynos5250 platforms
-In-Reply-To: <503BF8D3.9060507@samsung.com>
-References: <1345982371-26483-1-git-send-email-thomas.abraham@linaro.org>
- <1345982371-26483-4-git-send-email-thomas.abraham@linaro.org>
- <503BF8D3.9060507@samsung.com>
-Message-ID: <CAJuYYwTHXbWLchv-426hZjkqP9-eS_hg10G4CJuKox96Q2JQXQ@mail.gmail.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 28 Aug 2012 08:13:00 +0300
+Subject: [v4 0/4] ARM: dma-mapping: IOMMU atomic allocation
+Message-ID: <1346130784-23571-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 August 2012 04:16, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> On 08/26/12 04:59, Thomas Abraham wrote:
->>
->> Add device nodes for the four instances of dw_mmc controllers in
->> Exynos5250
->> and enable instance 0 and 2 for the smdk5250 board.
->>
->> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
->> ---
->>   arch/arm/boot/dts/exynos5250-smdk5250.dts |   57
->> ++++++++++++++++++++++++++++-
->>   arch/arm/boot/dts/exynos5250.dtsi         |   32 ++++++++++++++++
->>   2 files changed, 88 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> index 8a5e348..6dc9faf 100644
->> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> @@ -16,12 +16,19 @@
->>         model = "SAMSUNG SMDK5250 board based on EXYNOS5250";
->>         compatible = "samsung,smdk5250", "samsung,exynos5250";
->>
->> +       aliases {
->> +               mshc0 =&mshc_0;
->> +               mshc1 =&mshc_1;
->> +               mshc2 =&mshc_2;
->> +               mshc3 =&mshc_3;
->> +       };
->> +
->>         memory {
->>                 reg =<0x40000000 0x80000000>;
->>         };
->>
->>         chosen {
->> -               bootargs = "root=/dev/ram0 rw ramdisk=8192
->> console=ttySAC1,115200";
->> +               bootargs = "root=/dev/ram0 rw ramdisk=8192
->> initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
->
->
-> Yes, we need to sort out the 'bootargs' for using uart2 as a console, but
-> you know, this should be separated :-)
->
+Hi,
 
-Sorry, that was never intended to be in this patch. My mistake.
+The commit e9da6e9 "ARM: dma-mapping: remove custom consistent dma
+region" breaks the compatibility with existing drivers. This causes
+the following kernel oops(*1). That driver has called dma_pool_alloc()
+to allocate memory from the interrupt context, and it hits
+BUG_ON(in_interrpt()) in "get_vm_area_caller()". This patch seris
+fixes this problem with making use of the pre-allocate atomic memory
+pool which DMA is using in the same way as DMA does now.
 
->
->>         };
->>
->>         i2c at 12C60000 {
->> @@ -72,6 +79,54 @@
->>                 status = "disabled";
->>         };
->>
->> +       mshc_0: dwmmc0 at 12200000 {
->
->
-> How about to keep the consistent naming? dwmmc or dw_mmc? I think, 'dw_mmc'
-> makes more sense?
+Any comment would be really appreciated.
 
-Ok.
+v4:
+Fix plain memory allocation. (Konrad,Marek)
+Print nicer error message at __in_atomic_pool() (Konrad)
+v3:
+Provide a different path for IOMMU for more clean code. (Marek)
+atomic_pool is backed with struct page *pages[].
+http://lists.linaro.org/pipermail/linaro-mm-sig/2012-August/002446.html
+v2:
+Don't modify attrs(DMA_ATTR_NO_KERNEL_MAPPING) for atomic allocation. (Marek)
+Modify vzalloc (KyongHo,Minchan)
+http://lists.linaro.org/pipermail/linaro-mm-sig/2012-August/002430.html
+v1:
+http://lists.linaro.org/pipermail/linaro-mm-sig/2012-August/002398.html
 
->
->
->> +               num-slots =<1>;
->> +               supports-highspeed;
->> +               broken-cd;
->> +               fifo-depth =<0x80>;
->> +               card-detect-delay =<200>;
->> +               samsung,dw-mshc-sdr-timing =<2 3 3>;
->> +               samsung,dw-mshc-ddr-timing =<1 2 3>;
->
->
-> We need to think again the name of dw-mshc-sdr-timing, dw-mshc-ddr-timing?
+*1:
+[    8.321343] ------------[ cut here ]------------
+[    8.325971] kernel BUG at kernel/mm/vmalloc.c:1322!
+[    8.333615] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP ARM
+[    8.339436] Modules linked in:
+[    8.342496] CPU: 0    Tainted: G        W     (3.4.6-00067-g5d485f7 #67)
+[    8.349192] PC is at __get_vm_area_node.isra.29+0x164/0x16c
+[    8.354758] LR is at get_vm_area_caller+0x4c/0x54
+[    8.359454] pc : [<c011297c>]    lr : [<c011318c>]    psr: 20000193
+[    8.359458] sp : c09edca0  ip : c09ec000  fp : ae278000
+[    8.370922] r10: f0000000  r9 : c011aa54  r8 : c0a26cb8
+[    8.376136] r7 : 00000001  r6 : 000000d0  r5 : 20000008  r4 : c09edca0
+[    8.382651] r3 : 00010000  r2 : 20000008  r1 : 00000001  r0 : 00001000
+[    8.389166] Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+[    8.396549] Control: 10c5387d  Table: ad98c04a  DAC: 00000015
+....
+[    9.169162] dfa0: 412fc099 c09ec000 00000000 c000fdd8 c06df1e4 c0a1b080 00000000 00000000
+[    9.177329] dfc0: c0a235cc 8000406a 00000000 c0986818 ffffffff ffffffff c0986404 00000000
+[    9.185497] dfe0: 00000000 c09bb070 10c5387d c0a19c58 c09bb064 80008044 00000000 00000000
+[    9.193673] [<c011297c>] (__get_vm_area_node.isra.29+0x164/0x16c) from [<c011318c>] (get_vm_area_caller+0x4c/0x54)
+[    9.204022] [<c011318c>] (get_vm_area_caller+0x4c/0x54) from [<c001aed8>] (__iommu_alloc_remap.isra.14+0x2c/0xfc)
+[    9.214276] [<c001aed8>] (__iommu_alloc_remap.isra.14+0x2c/0xfc) from [<c001b06c>] (arm_iommu_alloc_attrs+0xc4/0xf8)
+[    9.224795] [<c001b06c>] (arm_iommu_alloc_attrs+0xc4/0xf8) from [<c011aa54>] (pool_alloc_page.constprop.5+0x6c/0xf8)
+[    9.235309] [<c011aa54>] (pool_alloc_page.constprop.5+0x6c/0xf8) from [<c011ab60>] (dma_pool_alloc+0x80/0x170)
+[    9.245304] [<c011ab60>] (dma_pool_alloc+0x80/0x170) from [<c03cbbcc>] (tegra_build_dtd+0x48/0x14c)
+[    9.254344] [<c03cbbcc>] (tegra_build_dtd+0x48/0x14c) from [<c03cbd4c>] (tegra_req_to_dtd+0x7c/0xa8)
+[    9.263467] [<c03cbd4c>] (tegra_req_to_dtd+0x7c/0xa8) from [<c03cc140>] (tegra_ep_queue+0x154/0x33c)
+[    9.272592] [<c03cc140>] (tegra_ep_queue+0x154/0x33c) from [<c03dd5b4>] (composite_setup+0x364/0x6d4)
+[    9.281804] [<c03dd5b4>] (composite_setup+0x364/0x6d4) from [<c03dd9dc>] (android_setup+0xb8/0x14c)
+[    9.290843] [<c03dd9dc>] (android_setup+0xb8/0x14c) from [<c03cd144>] (setup_received_irq+0xbc/0x270)
+[    9.300053] [<c03cd144>] (setup_received_irq+0xbc/0x270) from [<c03cda64>] (tegra_udc_irq+0x2ac/0x2c4)
+[    9.309353] [<c03cda64>] (tegra_udc_irq+0x2ac/0x2c4) from [<c00b5708>] (handle_irq_event_percpu+0x78/0x2e0)
+[    9.319087] [<c00b5708>] (handle_irq_event_percpu+0x78/0x2e0) from [<c00b59b4>] (handle_irq_event+0x44/0x64)
+[    9.328907] [<c00b59b4>] (handle_irq_event+0x44/0x64) from [<c00b8688>] (handle_fasteoi_irq+0xc4/0x16c)
+[    9.338294] [<c00b8688>] (handle_fasteoi_irq+0xc4/0x16c) from [<c00b4f14>] (generic_handle_irq+0x34/0x48)
+[    9.347858] [<c00b4f14>] (generic_handle_irq+0x34/0x48) from [<c000f6f4>] (handle_IRQ+0x54/0xb4)
+[    9.356637] [<c000f6f4>] (handle_IRQ+0x54/0xb4) from [<c00084b0>] (gic_handle_irq+0x2c/0x60)
+[    9.365068] [<c00084b0>] (gic_handle_irq+0x2c/0x60) from [<c000e900>] (__irq_svc+0x40/0x70)
+[    9.373405] Exception stack(0xc09edf10 to 0xc09edf58)
+[    9.378447] df00:                                     00000000 000f4240 00000003 00000000
+[    9.386615] df20: 00000000 e55bbc00 ef66f3ca 00000001 00000000 412fc099 c0abb9c8 00000000
+[    9.394781] df40: 3b9ac9ff c09edf58 c027a9bc c0042880 20000113 ffffffff
+[    9.401396] [<c000e900>] (__irq_svc+0x40/0x70) from [<c0042880>] (tegra_idle_enter_lp3+0x68/0x78)
+[    9.410272] [<c0042880>] (tegra_idle_enter_lp3+0x68/0x78) from [<c04701d4>] (cpuidle_idle_call+0xdc/0x3a4)
+[    9.419922] [<c04701d4>] (cpuidle_idle_call+0xdc/0x3a4) from [<c000fdd8>] (cpu_idle+0xd8/0x134)
+[    9.428612] [<c000fdd8>] (cpu_idle+0xd8/0x134) from [<c0986818>] (start_kernel+0x27c/0x2cc)
+[    9.436952] Code: e1a00004 e3a04000 eb002265 eaffffe0 (e7f001f2)
+[    9.443038] ---[ end trace 1b75b31a2719ed24 ]---
+[    9.447645] Kernel panic - not syncing: Fatal exception in interrupt
 
-Synopsis calls this controller "Mobile Storage Host Controller (MSHC)"
-in their online data sheets. Hence, all the bindings (which are used
-on non-samsung platforms as well) follow the this name. For any
-Samsung specific code for this controller, we are free to choose any
-name.
+Hiroshi Doyu (4):
+  ARM: dma-mapping: atomic_pool with struct page **pages
+  ARM: dma-mapping: Refactor out to introduce __in_atomic_pool
+  ARM: dma-mapping: Introduce __atomic_get_pages() for
+    __iommu_get_pages()
+  ARM: dma-mapping: IOMMU allocates pages from atomic_pool with
+    GFP_ATOMIC
 
->
-> [...]
->
->
->> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
->> b/arch/arm/boot/dts/exynos5250.dtsi
->> index 004aaa8..f69e389 100644
->> --- a/arch/arm/boot/dts/exynos5250.dtsi
->> +++ b/arch/arm/boot/dts/exynos5250.dtsi
->> @@ -182,6 +182,38 @@
->>                 #size-cells =<0>;
->>         };
->>
->> +       dwmmc0 at 12200000 {
->> +               compatible = "samsung,exynos5250-dw-mshc";
->
->
-> I'm not sure, 'exynos5250-dw-mshc' is right here. Because it is just dw_mmc
-> controller on exynos5250. So...hmm...
+ arch/arm/mm/dma-mapping.c |   91 ++++++++++++++++++++++++++++++++++++++++----
+ 1 files changed, 82 insertions(+), 9 deletions(-)
 
-There are differences in the implementation of the dw-mmc controller
-in Exynos SoC's. So it has to be exynos5250-dw-mshc.
-
-Thanks,
-Thomas.
+-- 
+1.7.5.4
