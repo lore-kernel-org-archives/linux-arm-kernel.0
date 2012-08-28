@@ -1,78 +1,38 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 28 Aug 2012 19:43:30 +0200
-Subject: [PATCH] ARM: EXYNOS: Add support for secondary CPU bring-up on
- Exynos4412
-In-Reply-To: <503CF014.8010503@codeaurora.org>
-References: <1422318.SfZfh0XoVo@amdc1227> <503CF014.8010503@codeaurora.org>
-Message-ID: <2038010.NUtf96WSJU@flatron>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 28 Aug 2012 14:10:08 -0400
+Subject: [PATCH] ARM: Kirkwood: Iomega ix2-200 DT support
+In-Reply-To: <2b8d12ce68911cc12c96dcdd60c3345b72d25780.1345472556.git.alanbutty12@gmail.com>
+References: <cover.1345472556.git.alanbutty12@gmail.com>
+ <2b8d12ce68911cc12c96dcdd60c3345b72d25780.1345472556.git.alanbutty12@gmail.com>
+Message-ID: <20120828181008.GG19437@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Thanks for reviewing the patch.
-
-On Tuesday 28 of August 2012 09:21:40 Stephen Boyd wrote:
-> On 8/28/2012 4:13 AM, Tomasz Figa wrote:
-> > diff --git a/arch/arm/mach-exynos/platsmp.c
-> > b/arch/arm/mach-exynos/platsmp.c index 36c3984..1114ced 100644
-> > --- a/arch/arm/mach-exynos/platsmp.c
-> > +++ b/arch/arm/mach-exynos/platsmp.c
-> > @@ -34,8 +34,19 @@
-> > 
-> >  extern void exynos4_secondary_startup(void);
-> > 
-> > -#define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1 ? \
-> > -				S5P_INFORM5 : S5P_VA_SYSRAM)
-> > +static inline volatile void *cpu_boot_reg_base(void)
+On Mon, Aug 20, 2012 at 03:29:07PM +0100, Alan M Butler wrote:
+> Patch version 5.
+> Add support for the Iomega ix2-200.
+> Led's and buttons working as of kernel 3.6-rc2
 > 
-> __iomem?
-
-Sorry, bad habit. I will fix it. 
- 
-> > +{
-> > +	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
-> > +		return S5P_INFORM5;
-> > +	return S5P_VA_SYSRAM;
-> > +}
-> > +
-> > +static inline volatile void *cpu_boot_reg(int cpu)
+> the 3 lines in the network interface do seem to be required as
+> removing either causes the network card to not be able to reach
+> the network (at least on my device).
 > 
-> __iomem? And why volatile?
-
-Ditto.
-
-> > +{
-> > +	if (soc_is_exynos4412())
-> > +		return cpu_boot_reg_base() + 4*cpu;
-> > +	return cpu_boot_reg_base();
-> > +}
-> > 
-> >  /*
-> >  
-> >   * control for which core is the next to come out of the secondary
-> > 
-> > @@ -195,6 +208,8 @@ void __init platform_smp_prepare_cpus(unsigned int
-> > max_cpus)> 
-> >  	 * until it receives a soft interrupt, and then the
-> >  	 * secondary CPU branches to this address.
-> >  	 */
-> > 
-> > -	__raw_writel(virt_to_phys(exynos4_secondary_startup),
-> > -			CPU1_BOOT_REG);
-> > +	for (i = 1; i < max_cpus; ++i) {
-> > +		__raw_writel(virt_to_phys(exynos4_secondary_startup),
-> > +							cpu_boot_reg(i));
+> Product page:
+> http://go.iomega.com/en/products/network-storage-desktop/storcenter-network-storage-solution/network-hard-drive-ix2-200-cloud/?partner=4735#tech_specsItem_tab
 > 
-> Do you need to use cpu_logical_map()?
+> Signed-off-by: Alan M Butler <alanbutty12@gmail.com>
 
-Correct me if I am wrong, but physical to logical CPU mapping will not be 
-1:1 only if booted on physical CPU other than 0. I have not seen yet an 
-Exynos-based board which does it.
+Alan,
 
-However it might be wiser to use cpu_logical_map() just to be safe indeed. 
-I will add it in next version of the patch.
+Great work!
 
---
-Best regards,
-Tomasz Figa
+Applied to:
+
+git://git.infradead.org/users/jcooper/linux.git boards-for-v3.7-v2
+
+I'll wait for the mv_sata fix and the gpio-keys fix before I send a pull
+request to the arm-soc maintainers.
+
+thx,
+
+Jason.
