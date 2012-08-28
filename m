@@ -1,72 +1,76 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 Aug 2012 13:23:44 -0400
-Subject: [RFC PATCH] ARM: initial DTS support for km_kirkwood
-In-Reply-To: <1346154976-16916-1-git-send-email-valentin.longchamp@keymile.com>
-References: <1346154976-16916-1-git-send-email-valentin.longchamp@keymile.com>
-Message-ID: <20120828172344.GE19437@titan.lakedaemon.net>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 28 Aug 2012 19:27:30 +0200
+Subject: [PATCH 2/3] gpio: samsung: Add support for Exynos4x12 SoCs
+In-Reply-To: <CAJuYYwR3tPhk=DHJVgk1E_MqWrwT+7_YdJOSjrYX=pF7_RFjpw@mail.gmail.com>
+References: <4648723.rWnut7F0uJ@amdc1227> <2265472.2J2KAQrYg1@amdc1227>
+ <CAJuYYwR3tPhk=DHJVgk1E_MqWrwT+7_YdJOSjrYX=pF7_RFjpw@mail.gmail.com>
+Message-ID: <42072476.sfX69hco6r@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2012 at 01:56:16PM +0200, Valentin Longchamp wrote:
-> This is a first attempt to support the km_kirkwood reference design with
-> a device tree. This km_kirkwood design is present in many Keymile
-> products. It is based on the Marvell Bobcat SOC which integrates a
-> Kirkwood CPU next to a big L2 Ethernet Switch. The Kirkwood in the SOC
-> is very similar to the "normal" one, but there are a few differences.
-> 
-> This initial support is minimal: the kernel can boot with network
-> (ge0), serial port and NAND functional.
-> 
-> Signed-off-by: Valentin Longchamp <valentin.longchamp@keymile.com>
-> Cc: Holger Brunck <holger.brunck@keymile.com>
-> ---
->  arch/arm/boot/dts/kirkwood-km_kirkwood.dts |   29 +++++++++++
->  arch/arm/mach-kirkwood/Kconfig             |    7 +++
->  arch/arm/mach-kirkwood/Makefile            |    1 +
->  arch/arm/mach-kirkwood/Makefile.boot       |    1 +
->  arch/arm/mach-kirkwood/board-dt.c          |    4 ++
->  arch/arm/mach-kirkwood/board-km_kirkwood.c |   75 ++++++++++++++++++++++++++++
->  arch/arm/mach-kirkwood/common.h            |    6 ++
->  7 files changed, 123 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/kirkwood-km_kirkwood.dts
->  create mode 100644 arch/arm/mach-kirkwood/board-km_kirkwood.c
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-km_kirkwood.dts b/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
-> new file mode 100644
-> index 0000000..60118d5
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
-> @@ -0,0 +1,29 @@
-> +/dts-v1/;
-> +
-> +/include/ "kirkwood.dtsi"
-> +
-> +/ {
-> +	model = "Keymile Kirkwood Reference Design";
-> +	compatible = "keymile,km_kirkwood", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x08000000>;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
-> +	};
-> +
-> +	ocp at f1000000 {
-> +		serial at 12000 {
-> +			clock-frequency = <200000000>;
-> +			status = "ok";
-> +		};
-> +
-> +		nand at 3000000 {
-> +			status = "ok";
-> +			chip-delay = <25>;
-> +		};
+Hi,
 
-Is there a partition layout for this board?
+Thanks for reviewing the patch.
 
-thx,
+On Tuesday 28 of August 2012 20:25:34 Thomas Abraham wrote:
+> > +       }, {
+> > +               .config = &samsung_gpio_cfgs[9],
+> > +               .irq_base = IRQ_EINT(24),
+> > +               .chip   = {
+> > +                       .base   = EXYNOS4_GPX3(0),
+> > +                       .ngpio  = EXYNOS4_GPIO_X3_NR,
+> > +                       .label  = "GPX3",
+> > +                       .to_irq = samsung_gpiolib_to_irq,
+> > +               },
+> > +       },
+> > +};
+> 
+> I see that GPX0, GPX1, GPX2 and GPX3 bank instances are already part
+> of mainline kernel. How is that this is being added here.
 
-Jason.
+It seems like somehow GPXx are added to exynos4210_gpios_2 again and the 
+already present part is used for exynos4x12_gpios_2. I guess that it's 
+because of adding ".base   = (void *)0xC00" to GPX0, which might be an 
+accidental mistake. I will recheck that.
+
+> > +       }, {
+> > +               .base   = (void *)0xC00,
+> > 
+> >                 .config = &samsung_gpio_cfgs[9],
+> >                 .irq_base = IRQ_EINT(0),
+> >                 .chip   = {
+> > 
+> > @@ -2370,9 +2619,7 @@ static struct samsung_gpio_chip exynos4_gpios_2[]
+> > = {> 
+> >                 },
+> >         
+> >         },
+> >  
+> >  };
+> 
+> There are no GPX banks instantiated here for 4x12. What is the reason for
+> that?
+
+See previous point. GPXx which have been part of exynos4_gpios_2 become 
+part of exynos4210_gpios_2.
+
+> > -#endif
+> > 
+> > -#ifdef CONFIG_ARCH_EXYNOS4
+> > 
+> >  static struct samsung_gpio_chip exynos4_gpios_3[] = {
+> >  
+> >         {
+> >         
+> >                 .chip   = {
+> > 
+> > @@ -2727,12 +2974,15 @@ static __init void
+> > exynos_gpiolib_attach_ofnode(struct samsung_gpio_chip *chip,
+> What is the limitation in adding support for GPVx as well for 4x12 ?
+
+I'm not sure, I might have simply overlooked GPVx. I will recheck that 
+tomorrow.
+
+Best regards,
+--
+Tomasz Figa
