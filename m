@@ -1,44 +1,17 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 27 Aug 2012 17:38:37 -0700
-Subject: [PATCH] ARM: tegra: remove tegra_timer from tegra_list_clks
-Message-ID: <1346114317-28486-1-git-send-email-swarren@wwwdotorg.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 28 Aug 2012 08:40:29 +0800
+Subject: [PATCH 1/3] ARM: mx28evk: Add SPI flash support
+In-Reply-To: <1346084609-31407-1-git-send-email-fabio.estevam@freescale.com>
+References: <1346084609-31407-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20120828004027.GJ2281@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Mon, Aug 27, 2012 at 01:23:27PM -0300, Fabio Estevam wrote:
+> mx28evk has a free slot (J89) which can be used to populate an SPI NOR Flash.
+> 
+> Add support for it.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-tegra_time is a struct sys_timer, not a struct clk, so can't be included
-in an array of struct clk *.
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/tegra20_clocks_data.c |    1 -
- arch/arm/mach-tegra/tegra30_clocks_data.c |    1 -
- 2 files changed, 2 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/tegra20_clocks_data.c b/arch/arm/mach-tegra/tegra20_clocks_data.c
-index b9cb82b..be57764 100644
---- a/arch/arm/mach-tegra/tegra20_clocks_data.c
-+++ b/arch/arm/mach-tegra/tegra20_clocks_data.c
-@@ -926,7 +926,6 @@ PERIPH_CLK(pcie_xclk,	NULL,		  "pcie_xclk",  74,     0,	26000000,  mux_clk_m,
- static struct clk *tegra_list_clks[] = {
- 	&tegra_apbdma,
- 	&tegra_rtc,
--	&tegra_timer,
- 	&tegra_i2s1,
- 	&tegra_i2s2,
- 	&tegra_spdif_out,
-diff --git a/arch/arm/mach-tegra/tegra30_clocks_data.c b/arch/arm/mach-tegra/tegra30_clocks_data.c
-index 3d2e553..d92cb55 100644
---- a/arch/arm/mach-tegra/tegra30_clocks_data.c
-+++ b/arch/arm/mach-tegra/tegra30_clocks_data.c
-@@ -1143,7 +1143,6 @@ struct clk *tegra_list_clks[] = {
- 	&tegra_apbdma,
- 	&tegra_rtc,
- 	&tegra_kbc,
--	&tegra_timer,
- 	&tegra_kfuse,
- 	&tegra_fuse,
- 	&tegra_fuse_burn,
--- 
-1.7.9.5
+Applied all three patches, thanks.
