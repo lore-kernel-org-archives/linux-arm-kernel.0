@@ -1,44 +1,48 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 28 Aug 2012 15:20:49 +0300
-Subject: [PATCH] arm: omap: ratelimit omap_l3_smx error log spam
-In-Reply-To: <CAMQu2gwHp3PgB-TqPTNWcbRuXRT0wjfvF99nYqfDyWr1GiUvCg@mail.gmail.com>
-References: <1346101403-5882-1-git-send-email-aaro.koskinen@iki.fi>
- <CAMQu2gyEctrq_3K8W6VahMW-ODOiv7TjrBfPTkZqNGJ+0m9ozw@mail.gmail.com>
- <20120827220254.GA783@harshnoise.musicnaut.iki.fi>
- <CAMQu2gz9HE0xEoW7gu257rpLWdCUpt7N6GQNQzWVhFb-A+69hg@mail.gmail.com>
- <20120827232613.GB783@harshnoise.musicnaut.iki.fi>
- <CAMQu2gwHp3PgB-TqPTNWcbRuXRT0wjfvF99nYqfDyWr1GiUvCg@mail.gmail.com>
-Message-ID: <20120828122042.GC783@harshnoise.musicnaut.iki.fi>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 28 Aug 2012 14:22:36 +0200
+Subject: [PATCH] mtd: orion_nand: remove <mach/hardware.h> include
+In-Reply-To: <20120828091139.GC31704@lunn.ch>
+References: <20120816183708.GT22226@titan.lakedaemon.net>
+ <1346110528-30858-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1346110528-30858-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20120828091139.GC31704@lunn.ch>
+Message-ID: <20120828142236.2c7e9bd3@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Le Tue, 28 Aug 2012 11:11:39 +0200,
+Andrew Lunn <andrew@lunn.ch> a ?crit :
 
-On Mon, Aug 27, 2012 at 05:17:30PM -0700, Shilimkar, Santosh wrote:
-> On Mon, Aug 27, 2012 at 4:26 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-> > I tried bypassing the whole SRAM init, but the device does not seem to
-> > boot up at all.
-> >
-> > If I comment out the memset alone, then it boots and the issue is gone:
-> >
-> > +#if 0
-> >         memset_io(omap_sram_base + SRAM_BOOTLOADER_SZ, 0,
-> >                   omap_sram_size - SRAM_BOOTLOADER_SZ);
-> > +#endif
-> >
-> Good. So the issue is indeed direct or indirect access to the secure SRAM.
-> As security can dynamically resize the secure RAM size it is even harder
-> to fix this issue properly. One easier way to deal with the issue is map only
-> needed SRAM and leave rest for security.
+> I compiled tested on Dove, Kirkwood, Orion5x and mv78xx0.
 > 
-> For now, Can you check if reducing the size of the SRAM in init is helping you
-> to get way with the issue. Sorry it might need few iterations for you to get
-> a working SRAM size.
+> Tested-by: Andrew Lunn <andrew@lunn.ch>
 
-The problem is triggered by writing to the beginning of the SRAM area,
-not to the end. I need to skip the first 16k (0x4000) to get rid of
-the errors. Maybe the base address calculation is wrong? This could
-also explain why it's still possible to use the device - it seems the
-allocator starts from the end, and moves towards the base...
+Thanks! Will Jason take care of merging this on top of the previous
+address decoding patches? Note that if you want to keep build
+bisectability, it should be merged before my "arm: plat-orion: introduce
+PLAT_ORION_LEGACY hidden config option" patch.
 
-A.
+> One other driver you might want to look at is:
+> 
+> drivers/watchdog/orion_wdt.c
+> 
+> It uses <mach/bridge-regs.h>
+
+This driver is:
+
+config ORION_WATCHDOG
+        tristate "Orion watchdog"
+        depends on ARCH_ORION5X || ARCH_KIRKWOOD
+
+so it isn't selectable with ARCH_MVEBU, so it will not cause problems
+for now. Of course, at some point, we'll have a look at the watchdog
+driver but for now, it's fine.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
