@@ -1,188 +1,168 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 29 Aug 2012 02:18:55 +0300
-Subject: [PATCH 7/9] ARM: OMAP1: move lcd pdata out of arch/arm/*
+Date: Wed, 29 Aug 2012 02:18:53 +0300
+Subject: [PATCH 5/9] ARM: OMAP: remove the omap custom tags
 In-Reply-To: <1346195937-6383-1-git-send-email-grinberg@compulab.co.il>
 References: <1346195937-6383-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1346195937-6383-8-git-send-email-grinberg@compulab.co.il>
+Message-ID: <1346195937-6383-6-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap1 lcd platform data resides inside plat/board.h while it
-should be inside include/linux/...
-Move the omap1 lcd platform data to include/linux/omapfb.h.
+The omap custom initialization tags are not used anymore (if ever)
+by the mainline kernel.
+Thus remove the omap custom initialization tags.
 
 Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
 ---
- arch/arm/mach-omap1/board-ams-delta.c   |    1 -
- arch/arm/mach-omap1/board-fsample.c     |    1 -
- arch/arm/mach-omap1/board-htcherald.c   |    1 -
- arch/arm/mach-omap1/board-nokia770.c    |    1 -
- arch/arm/mach-omap1/board-palmte.c      |    1 -
- arch/arm/mach-omap1/board-palmtt.c      |    1 -
- arch/arm/mach-omap1/board-palmz71.c     |    1 -
- arch/arm/mach-omap1/board-perseus2.c    |    1 -
- arch/arm/mach-omap1/board-sx1.c         |    1 -
- arch/arm/plat-omap/fb.c                 |    2 --
- arch/arm/plat-omap/include/plat/board.h |    7 -------
- include/linux/omapfb.h                  |    7 ++++++-
- 12 files changed, 6 insertions(+), 19 deletions(-)
+ arch/arm/plat-omap/common.c             |   34 ------------
+ arch/arm/plat-omap/include/plat/board.h |   84 -------------------------------
+ 2 files changed, 0 insertions(+), 118 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index c534698..c162369 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -37,7 +37,6 @@
- #include <plat/board-ams-delta.h>
- #include <plat/keypad.h>
- #include <plat/mux.h>
--#include <plat/board.h>
+diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
+index af98971..7c04748 100644
+--- a/arch/arm/plat-omap/common.c
++++ b/arch/arm/plat-omap/common.c
+@@ -24,40 +24,6 @@
  
- #include <mach/hardware.h>
- #include <mach/ams-delta-fiq.h>
-diff --git a/arch/arm/mach-omap1/board-fsample.c b/arch/arm/mach-omap1/board-fsample.c
-index 6872f3f..6d98552 100644
---- a/arch/arm/mach-omap1/board-fsample.c
-+++ b/arch/arm/mach-omap1/board-fsample.c
-@@ -32,7 +32,6 @@
- #include <plat/flash.h>
- #include <plat/fpga.h>
- #include <plat/keypad.h>
--#include <plat/board.h>
+ #include <plat/omap-secure.h>
  
- #include <mach/hardware.h>
- 
-diff --git a/arch/arm/mach-omap1/board-htcherald.c b/arch/arm/mach-omap1/board-htcherald.c
-index b3f6e94..b9771b5 100644
---- a/arch/arm/mach-omap1/board-htcherald.c
-+++ b/arch/arm/mach-omap1/board-htcherald.c
-@@ -42,7 +42,6 @@
- #include <asm/mach/arch.h>
- 
- #include <plat/omap7xx.h>
--#include <plat/board.h>
- #include <plat/keypad.h>
- #include <plat/mmc.h>
- 
-diff --git a/arch/arm/mach-omap1/board-nokia770.c b/arch/arm/mach-omap1/board-nokia770.c
-index 2c0ca8f..ec01f03 100644
---- a/arch/arm/mach-omap1/board-nokia770.c
-+++ b/arch/arm/mach-omap1/board-nokia770.c
-@@ -26,7 +26,6 @@
- #include <asm/mach/map.h>
- 
- #include <plat/mux.h>
--#include <plat/board.h>
- #include <plat/keypad.h>
- #include <plat/lcd_mipid.h>
- #include <plat/mmc.h>
-diff --git a/arch/arm/mach-omap1/board-palmte.c b/arch/arm/mach-omap1/board-palmte.c
-index 7bf00ba..49f8d74 100644
---- a/arch/arm/mach-omap1/board-palmte.c
-+++ b/arch/arm/mach-omap1/board-palmte.c
-@@ -38,7 +38,6 @@
- #include <plat/mux.h>
- #include <plat/tc.h>
- #include <plat/dma.h>
--#include <plat/board.h>
- #include <plat/irda.h>
- #include <plat/keypad.h>
- 
-diff --git a/arch/arm/mach-omap1/board-palmtt.c b/arch/arm/mach-omap1/board-palmtt.c
-index 2cce505..01523cd 100644
---- a/arch/arm/mach-omap1/board-palmtt.c
-+++ b/arch/arm/mach-omap1/board-palmtt.c
-@@ -38,7 +38,6 @@
- #include <plat/mux.h>
- #include <plat/dma.h>
- #include <plat/tc.h>
--#include <plat/board.h>
- #include <plat/irda.h>
- #include <plat/keypad.h>
- 
-diff --git a/arch/arm/mach-omap1/board-palmz71.c b/arch/arm/mach-omap1/board-palmz71.c
-index 45ab9f0..a7abce6 100644
---- a/arch/arm/mach-omap1/board-palmz71.c
-+++ b/arch/arm/mach-omap1/board-palmz71.c
-@@ -40,7 +40,6 @@
- #include <plat/mux.h>
- #include <plat/dma.h>
- #include <plat/tc.h>
--#include <plat/board.h>
- #include <plat/irda.h>
- #include <plat/keypad.h>
- 
-diff --git a/arch/arm/mach-omap1/board-perseus2.c b/arch/arm/mach-omap1/board-perseus2.c
-index 703d55e..277e0bc 100644
---- a/arch/arm/mach-omap1/board-perseus2.c
-+++ b/arch/arm/mach-omap1/board-perseus2.c
-@@ -32,7 +32,6 @@
- #include <plat/fpga.h>
- #include <plat/flash.h>
- #include <plat/keypad.h>
--#include <plat/board.h>
- 
- #include <mach/hardware.h>
- 
-diff --git a/arch/arm/mach-omap1/board-sx1.c b/arch/arm/mach-omap1/board-sx1.c
-index 8c665bd..2e1fff2 100644
---- a/arch/arm/mach-omap1/board-sx1.c
-+++ b/arch/arm/mach-omap1/board-sx1.c
-@@ -38,7 +38,6 @@
- #include <plat/dma.h>
- #include <plat/irda.h>
- #include <plat/tc.h>
--#include <plat/board.h>
- #include <plat/keypad.h>
- #include <plat/board-sx1.h>
- 
-diff --git a/arch/arm/plat-omap/fb.c b/arch/arm/plat-omap/fb.c
-index dd6f92c..bcbb9d5 100644
---- a/arch/arm/plat-omap/fb.c
-+++ b/arch/arm/plat-omap/fb.c
-@@ -33,8 +33,6 @@
- #include <mach/hardware.h>
- #include <asm/mach/map.h>
- 
--#include <plat/board.h>
 -
- #if defined(CONFIG_FB_OMAP) || defined(CONFIG_FB_OMAP_MODULE)
- 
- static bool omapfb_lcd_configured;
+-#define NO_LENGTH_CHECK 0xffffffff
+-
+-struct omap_board_config_kernel *omap_board_config __initdata;
+-int omap_board_config_size;
+-
+-static const void *__init get_config(u16 tag, size_t len,
+-		int skip, size_t *len_out)
+-{
+-	struct omap_board_config_kernel *kinfo = NULL;
+-	int i;
+-
+-	/* Try to find the config from the board-specific structures
+-	 * in the kernel. */
+-	for (i = 0; i < omap_board_config_size; i++) {
+-		if (omap_board_config[i].tag == tag) {
+-			if (skip == 0) {
+-				kinfo = &omap_board_config[i];
+-				break;
+-			} else {
+-				skip--;
+-			}
+-		}
+-	}
+-	if (kinfo == NULL)
+-		return NULL;
+-	return kinfo->data;
+-}
+-
+-const void *__init __omap_get_config(u16 tag, size_t len, int nr)
+-{
+-        return get_config(tag, len, nr, NULL);
+-}
+-
+ void __init omap_reserve(void)
+ {
+ 	omap_vram_reserve_sdram_memblock();
 diff --git a/arch/arm/plat-omap/include/plat/board.h b/arch/arm/plat-omap/include/plat/board.h
-index d0bc46e..2ddc198 100644
+index db3bdc1..5938c72 100644
 --- a/arch/arm/plat-omap/include/plat/board.h
 +++ b/arch/arm/plat-omap/include/plat/board.h
-@@ -12,13 +12,6 @@
+@@ -12,39 +12,6 @@
  
  #include <linux/types.h>
  
--struct omap_lcd_config {
--	char panel_name[16];
--	char ctrl_name[16];
--	s16  nreset_gpio;
--	u8   data_lines;
+-#include <plat/gpio-switch.h>
+-
+-/* Different peripheral ids */
+-#define OMAP_TAG_CLOCK		0x4f01
+-#define OMAP_TAG_GPIO_SWITCH	0x4f06
+-#define OMAP_TAG_STI_CONSOLE	0x4f09
+-#define OMAP_TAG_CAMERA_SENSOR	0x4f0a
+-
+-#define OMAP_TAG_BOOT_REASON    0x4f80
+-#define OMAP_TAG_FLASH_PART	0x4f81
+-#define OMAP_TAG_VERSION_STR	0x4f82
+-
+-struct omap_clock_config {
+-	/* 0 for 12 MHz, 1 for 13 MHz and 2 for 19.2 MHz */
+-	u8 system_clock_type;
 -};
+-
+-struct omap_serial_console_config {
+-	u8 console_uart;
+-	u32 console_speed;
+-};
+-
+-struct omap_sti_console_config {
+-	unsigned enable:1;
+-	u8 channel;
+-};
+-
+-struct omap_camera_sensor_config {
+-	u16 reset_gpio;
+-	int (*power_on)(void * data);
+-	int (*power_off)(void * data);
+-};
+-
+ struct omap_lcd_config {
+ 	char panel_name[16];
+ 	char ctrl_name[16];
+@@ -59,57 +26,6 @@ struct omap_backlight_config {
+ 	int (*set_power)(struct device *dev, int state);
+ };
+ 
+-struct omap_fbmem_config {
+-	u32 start;
+-	u32 size;
+-};
+-
+-struct omap_pwm_led_platform_data {
+-	const char *name;
+-	int intensity_timer;
+-	int blink_timer;
+-	void (*set_power)(struct omap_pwm_led_platform_data *self, int on_off);
+-};
+-
+-struct omap_uart_config {
+-	/* Bit field of UARTs present; bit 0 --> UART1 */
+-	unsigned int enabled_uarts;
+-};
+-
+-
+-struct omap_flash_part_config {
+-	char part_table[0];
+-};
+-
+-struct omap_boot_reason_config {
+-	char reason_str[12];
+-};
+-
+-struct omap_version_config {
+-	char component[12];
+-	char version[12];
+-};
+-
+-struct omap_board_config_entry {
+-	u16 tag;
+-	u16 len;
+-	u8  data[0];
+-};
+-
+-struct omap_board_config_kernel {
+-	u16 tag;
+-	const void *data;
+-};
+-
+-extern const void *__init __omap_get_config(u16 tag, size_t len, int nr);
+-
+-#define omap_get_config(tag, type) \
+-	((const type *) __omap_get_config((tag), sizeof(type), 0))
+-
+-extern struct omap_board_config_kernel *omap_board_config;
+-extern int omap_board_config_size;
+-
 -
  /* for TI reference platforms sharing the same debug card */
  extern int debug_card_init(u32 addr, unsigned gpio);
  
-diff --git a/include/linux/omapfb.h b/include/linux/omapfb.h
-index 4ff57e8..85af818 100644
---- a/include/linux/omapfb.h
-+++ b/include/linux/omapfb.h
-@@ -220,7 +220,12 @@ struct omapfb_display_info {
- 
- #ifdef __KERNEL__
- 
--#include <plat/board.h>
-+struct omap_lcd_config {
-+	char panel_name[16];
-+	char ctrl_name[16];
-+	s16  nreset_gpio;
-+	u8   data_lines;
-+};
- 
- struct omapfb_platform_data {
- 	struct omap_lcd_config		lcd;
 -- 
 1.7.8.6
