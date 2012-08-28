@@ -1,61 +1,47 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 28 Aug 2012 17:27:31 +0800
-Subject: [PATCH v2 05/11] USB: chipidea: don't let probe fail if otg
- controller start one role failed
-In-Reply-To: <87ligz2yyo.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
- <1346137397-32374-6-git-send-email-richard.zhao@freescale.com>
- <87ligz2yyo.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20120828092730.GY4011@b20223-02.ap.freescale.net>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 28 Aug 2012 17:09:58 +0800
+Subject: [PATCH v3 0/7] add syscon driver based on regmap for general
+ registers access
+Message-ID: <1346145005-17961-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2012 at 11:38:23AM +0300, Alexander Shishkin wrote:
-> Richard Zhao <richard.zhao@freescale.com> writes:
-> 
-> > One role failed, but the other role will possiblly still work.
-> > For example, when udc start failed, if plug in a host device,
-> > it works.
-> 
-> If you're a host device, ci->role should be HOST at this point and
-> ci_role_start() shouldn't fail. If ci->role is detected wrongly, the
-> role detection must be fixed. If ci_role_start() fails for host, but it
-> still works when it's called again after the id pin change is detected,
-> again, the problem is elsewhere.
-The check is only for OTG device. For single role device, it just fail
-if it start the role failed.
-> 
-> >
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > ---
-> >  drivers/usb/chipidea/core.c |    7 +++++--
-> >  1 file changed, 5 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> > index 19ef324..8fd390a 100644
-> > --- a/drivers/usb/chipidea/core.c
-> > +++ b/drivers/usb/chipidea/core.c
-> > @@ -473,8 +473,11 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
-> >  	ret = ci_role_start(ci, ci->role);
-> >  	if (ret) {
-> >  		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
-> > -		ret = -ENODEV;
-> > -		goto rm_wq;
-> > +		ci->role = CI_ROLE_END;
-> 
-> So are you relying on id pin interrupt for initializing the role after
-> this? Can you provide more details?
-Yes. The ID pin detect still works. My case is, gadget role failed,
-host role works. I was trying not to ruin host function.
+This patch series mainly adds an syscon driver which is used to access
+general system controller registers like FSL IOMUXC GPR and ANATOP,
+after that, we convert all the exist private access general registers code to use
+standard API from regmap to access registers.
+Finally we remove the old mfd anatop driver which is only for anatop register
+access.
 
-Thanks
-Richard
-> 
-> Regards,
-> --
-> Alex
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+The patch series is based on linus's tree 3.6-rc3 since commit 9160338.
+
+Dong Aisheng (7):
+  mfd: add syscon driver based on regmap
+  ARM: imx6q: add iomuxc gpr support into syscon
+  ARM: imx6q: add anatop support into syscon
+  regulator: anatop-regulator: convert to use syscon to access anatop
+    register
+  ARM: imx6q: convert to use syscon to access anatop registers
+  ARM: dts: imx6q: add simple-bus compatible string for anatop
+  mfd: anatop-mfd: remove anatop driver
+
+ Documentation/devicetree/bindings/mfd/syscon.txt |   11 +
+ arch/arm/boot/dts/imx6q.dtsi                     |    9 +-
+ arch/arm/mach-imx/Kconfig                        |    2 +-
+ arch/arm/mach-imx/mach-imx6q.c                   |   47 ++--
+ drivers/mfd/Kconfig                              |   13 +-
+ drivers/mfd/Makefile                             |    2 +-
+ drivers/mfd/anatop-mfd.c                         |  124 ---------
+ drivers/mfd/syscon.c                             |  172 ++++++++++++
+ drivers/regulator/Kconfig                        |    2 +-
+ drivers/regulator/anatop-regulator.c             |   30 ++-
+ include/linux/fsl/imx6q-iomuxc-gpr.h             |  319 ++++++++++++++++++++++
+ include/linux/mfd/anatop.h                       |   40 ---
+ include/linux/mfd/syscon.h                       |   23 ++
+ 13 files changed, 579 insertions(+), 215 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/syscon.txt
+ delete mode 100644 drivers/mfd/anatop-mfd.c
+ create mode 100644 drivers/mfd/syscon.c
+ create mode 100644 include/linux/fsl/imx6q-iomuxc-gpr.h
+ delete mode 100644 include/linux/mfd/anatop.h
+ create mode 100644 include/linux/mfd/syscon.h
