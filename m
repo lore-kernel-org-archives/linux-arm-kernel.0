@@ -1,36 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Aug 2012 00:59:32 +0100
-Subject: [PATCH] ARM: MSM: Implement read_current_timer for msm timers
-In-Reply-To: <1346102319-24497-1-git-send-email-sboyd@codeaurora.org>
-References: <1345817604-9004-2-git-send-email-will.deacon@arm.com>
- <1346102319-24497-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20120827235932.GA8468@mudshark.cambridge.arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 27 Aug 2012 17:00:58 -0700
+Subject: [GIT PULL] at91: fixes for 3.6 (take 1 bis)
+In-Reply-To: <503B2AE7.4020704@atmel.com>
+References: <5037A4F3.9090608@atmel.com>
+ <503B2AE7.4020704@atmel.com>
+Message-ID: <20120828000058.GB3571@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 10:18:39PM +0100, Stephen Boyd wrote:
-> Setup the same timer used as the clocksource to be used as the
-> read_current_timer implementation. This allows us to support a
-> stable udelay implementation on MSMs where it's possible for the
-> CPUs to scale speeds independently of one another.
+On Mon, Aug 27, 2012 at 10:08:07AM +0200, Nicolas Ferre wrote:
+> Hi,
 > 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
+> This pull request supersedes the previous one from August 24th. It removes
+> the ASoC SSC part which is now handled by Mark Brown.
 > 
-> I have some patches to send that add DT support to the MSM timer that
-> this conflicts with slightly. I'm not too concerned though, but we may
-> want to decide what tree this goes through when I send out those patches.
+> The following changes since commit d9875690d9b89a866022ff49e3fcea892345ad92:
+> 
+>   Linux 3.6-rc2 (2012-08-16 14:51:24 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/at91linux/linux-at91.git tags/at91-fixes
 
-Cheers Stephen, this looks good to me. After looking at this code some more
-I think I'll change the read_current_timer function pointer type to be:
+Merged, thanks.
 
-	unsigned long (*read_current_timer)(void);
 
-since it doesn't make sense to return an error code from the platform
-implementation (in fact, it will cause havoc in the delay loop).
-
-I'll post a new patch -- rebasing your code should be trivial.
-
-Cheers,
-
-Will
+-Olof
