@@ -1,54 +1,129 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 29 Aug 2012 02:18:52 +0300
-Subject: [PATCH 4/9] ARM: OMAP1: remove the crystal type tag parsing
+Date: Wed, 29 Aug 2012 02:18:54 +0300
+Subject: [PATCH 6/9] ARM: OMAP1: move omap1_bl pdata out of arch/arm/*
 In-Reply-To: <1346195937-6383-1-git-send-email-grinberg@compulab.co.il>
 References: <1346195937-6383-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1346195937-6383-5-git-send-email-grinberg@compulab.co.il>
+Message-ID: <1346195937-6383-7-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap1 crystal setting uses the OMAP custom tags.
-Those tags are not used in upstream kernel and therefore the crystal
-type is never set by the tag parsing code on upstream kernels.
-Remove the crystal tag parsing code.
+omap1 backlight platform data resides inside plat/board.h while it
+should be inside include/linux/...
+Move the omap1 backlight platform data to
+include/linux/platform_data/.
 
+Cc: Richard Purdie <rpurdie@rpsys.net>
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Cc: linux-fbdev at vger.kernel.org
 Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
 ---
- arch/arm/mach-omap1/clock_data.c |    8 --------
- 1 files changed, 0 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap1/board-osk.c         |    1 +
+ arch/arm/mach-omap1/board-palmte.c      |    1 +
+ arch/arm/mach-omap1/board-palmtt.c      |    1 +
+ arch/arm/mach-omap1/board-palmz71.c     |    1 +
+ arch/arm/plat-omap/include/plat/board.h |    7 -------
+ drivers/video/backlight/omap1_bl.c      |    2 +-
+ include/linux/platform_data/omap1_bl.h  |   11 +++++++++++
+ 7 files changed, 16 insertions(+), 8 deletions(-)
+ create mode 100644 include/linux/platform_data/omap1_bl.h
 
-diff --git a/arch/arm/mach-omap1/clock_data.c b/arch/arm/mach-omap1/clock_data.c
-index c007d80..6a32b9b 100644
---- a/arch/arm/mach-omap1/clock_data.c
-+++ b/arch/arm/mach-omap1/clock_data.c
-@@ -25,7 +25,6 @@
- #include <plat/clock.h>
- #include <plat/cpu.h>
- #include <plat/clkdev_omap.h>
--#include <plat/board.h>
- #include <plat/sram.h>	/* for omap_sram_reprogram_clock() */
+diff --git a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
+index 8784705..569b687 100644
+--- a/arch/arm/mach-omap1/board-osk.c
++++ b/arch/arm/mach-omap1/board-osk.c
+@@ -39,6 +39,7 @@
+ #include <linux/mtd/partitions.h>
+ #include <linux/mtd/physmap.h>
+ #include <linux/i2c/tps65010.h>
++#include <linux/platform_data/omap1_bl.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-omap1/board-palmte.c b/arch/arm/mach-omap1/board-palmte.c
+index 26bcb9d..7bf00ba 100644
+--- a/arch/arm/mach-omap1/board-palmte.c
++++ b/arch/arm/mach-omap1/board-palmte.c
+@@ -28,6 +28,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/apm-emulation.h>
+ #include <linux/omapfb.h>
++#include <linux/platform_data/omap1_bl.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-omap1/board-palmtt.c b/arch/arm/mach-omap1/board-palmtt.c
+index 4d09944..2cce505 100644
+--- a/arch/arm/mach-omap1/board-palmtt.c
++++ b/arch/arm/mach-omap1/board-palmtt.c
+@@ -27,6 +27,7 @@
+ #include <linux/omapfb.h>
+ #include <linux/spi/spi.h>
+ #include <linux/spi/ads7846.h>
++#include <linux/platform_data/omap1_bl.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-omap1/board-palmz71.c b/arch/arm/mach-omap1/board-palmz71.c
+index 3559803..45ab9f0 100644
+--- a/arch/arm/mach-omap1/board-palmz71.c
++++ b/arch/arm/mach-omap1/board-palmz71.c
+@@ -30,6 +30,7 @@
+ #include <linux/omapfb.h>
+ #include <linux/spi/spi.h>
+ #include <linux/spi/ads7846.h>
++#include <linux/platform_data/omap1_bl.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+diff --git a/arch/arm/plat-omap/include/plat/board.h b/arch/arm/plat-omap/include/plat/board.h
+index 5938c72..d0bc46e 100644
+--- a/arch/arm/plat-omap/include/plat/board.h
++++ b/arch/arm/plat-omap/include/plat/board.h
+@@ -19,13 +19,6 @@ struct omap_lcd_config {
+ 	u8   data_lines;
+ };
+ 
+-struct device;
+-struct fb_info;
+-struct omap_backlight_config {
+-	int default_intensity;
+-	int (*set_power)(struct device *dev, int state);
+-};
+-
+ /* for TI reference platforms sharing the same debug card */
+ extern int debug_card_init(u32 addr, unsigned gpio);
+ 
+diff --git a/drivers/video/backlight/omap1_bl.c b/drivers/video/backlight/omap1_bl.c
+index bfdc5fb..92257ef 100644
+--- a/drivers/video/backlight/omap1_bl.c
++++ b/drivers/video/backlight/omap1_bl.c
+@@ -27,9 +27,9 @@
+ #include <linux/fb.h>
+ #include <linux/backlight.h>
+ #include <linux/slab.h>
++#include <linux/platform_data/omap1_bl.h>
  
  #include <mach/hardware.h>
-@@ -788,7 +787,6 @@ u32 cpu_mask;
- int __init omap1_clk_init(void)
- {
- 	struct omap_clk *c;
--	const struct omap_clock_config *info;
- 	int crystal_type = 0; /* Default 12 MHz */
- 	u32 reg;
+-#include <plat/board.h>
+ #include <plat/mux.h>
  
-@@ -837,12 +835,6 @@ int __init omap1_clk_init(void)
- 	ck_dpll1_p = clk_get(NULL, "ck_dpll1");
- 	ck_ref_p = clk_get(NULL, "ck_ref");
- 
--	info = omap_get_config(OMAP_TAG_CLOCK, struct omap_clock_config);
--	if (info != NULL) {
--		if (!cpu_is_omap15xx())
--			crystal_type = info->system_clock_type;
--	}
--
- 	if (cpu_is_omap7xx())
- 		ck_ref.rate = 13000000;
- 	if (cpu_is_omap16xx() && crystal_type == 2)
+ #define OMAPBL_MAX_INTENSITY		0xff
+diff --git a/include/linux/platform_data/omap1_bl.h b/include/linux/platform_data/omap1_bl.h
+new file mode 100644
+index 0000000..881a8e9
+--- /dev/null
++++ b/include/linux/platform_data/omap1_bl.h
+@@ -0,0 +1,11 @@
++#ifndef __OMAP1_BL_H__
++#define __OMAP1_BL_H__
++
++#include <linux/device.h>
++
++struct omap_backlight_config {
++	int default_intensity;
++	int (*set_power)(struct device *dev, int state);
++};
++
++#endif
 -- 
 1.7.8.6
