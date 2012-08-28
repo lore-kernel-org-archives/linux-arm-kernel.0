@@ -1,37 +1,34 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 Aug 2012 14:10:08 -0400
-Subject: [PATCH] ARM: Kirkwood: Iomega ix2-200 DT support
-In-Reply-To: <2b8d12ce68911cc12c96dcdd60c3345b72d25780.1345472556.git.alanbutty12@gmail.com>
-References: <cover.1345472556.git.alanbutty12@gmail.com>
- <2b8d12ce68911cc12c96dcdd60c3345b72d25780.1345472556.git.alanbutty12@gmail.com>
-Message-ID: <20120828181008.GG19437@titan.lakedaemon.net>
+Date: Tue, 28 Aug 2012 14:12:47 -0400
+Subject: [PATCH] mtd: orion_nand: remove <mach/hardware.h> include
+In-Reply-To: <1346110528-30858-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <20120816183708.GT22226@titan.lakedaemon.net>
+ <1346110528-30858-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1346110528-30858-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20120828181247.GH19437@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 03:29:07PM +0100, Alan M Butler wrote:
-> Patch version 5.
-> Add support for the Iomega ix2-200.
-> Led's and buttons working as of kernel 3.6-rc2
+On Tue, Aug 28, 2012 at 01:35:28AM +0200, Thomas Petazzoni wrote:
+> Commit c085d965fb63ac3b4cc7379d45588c0b39e2bdb0 made the ARCH_MVEBU
+> platform select PLAT_ORION, which means that now all Orion drivers can
+> be enabled on ARCH_MVEBU. This works fine for most drivers, except for
+> orion_nand, because it includes <mach/hardware.h>, but mach-mvebu does
+> not have a mach/hardware.h header (it is considered as a deprecated
+> practice).
 > 
-> the 3 lines in the network interface do seem to be required as
-> removing either causes the network card to not be able to reach
-> the network (at least on my device).
+> It turns out that the <mach/hardware.h> include in orion_nand is not
+> necessary: the driver builds perfectly fine without it, so we simply
+> get rid of it.
 > 
-> Product page:
-> http://go.iomega.com/en/products/network-storage-desktop/storcenter-network-storage-solution/network-hard-drive-ix2-200-cloud/?partner=4735#tech_specsItem_tab
-> 
-> Signed-off-by: Alan M Butler <alanbutty12@gmail.com>
-
-Alan,
-
-Great work!
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: linux-mtd at lists.infradead.org
+> Cc: Artem Bityutskiy <dedekind1@gmail.com>
 
 Applied to:
 
 git://git.infradead.org/users/jcooper/linux.git boards-for-v3.7-v2
-
-I'll wait for the mv_sata fix and the gpio-keys fix before I send a pull
-request to the arm-soc maintainers.
 
 thx,
 
