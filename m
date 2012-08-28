@@ -1,33 +1,38 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Tue, 28 Aug 2012 20:34:11 +0530
-Subject: [PATCH 2/2] ARM: dt: tegra: harmony: add regulators
-In-Reply-To: <1346137800-7448-2-git-send-email-swarren@wwwdotorg.org>
-References: <1346137800-7448-1-git-send-email-swarren@wwwdotorg.org>
- <1346137800-7448-2-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <503CDDEB.1050201@nvidia.com>
+From: N.Voss@weinmann.de (Voss, Nikolaus)
+Date: Tue, 28 Aug 2012 17:32:52 +0200
+Subject: [PATCH v11 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
+In-Reply-To: <503CDF48.5080201@atmel.com>
+References: <cover.1345618760.git.n.voss@weinmann.de>
+ <4f3dcfbf1e8eab3e251ab3558e9e1e9123643928.1345618760.git.n.voss@weinmann.de>
+ <503CDF48.5080201@atmel.com>
+Message-ID: <EF2E73589CA71846A15D0B2CDF79505D090EC3DB91@wm021.weinmann.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 28 August 2012 12:40 PM, Stephen Warren wrote:
->   #include "board.h"
-> -#include "board-harmony.h"
->
->   #ifdef CONFIG_TEGRA_PCI
->
->   int __init harmony_pcie_init(void)
->   {
-> -       struct regulator *regulator = NULL;
-> +       struct regulator *regulator_1v5, *regulator_pex;
->          int err;
->
-> -       err = gpio_request(TEGRA_GPIO_EN_VDD_1V05_GPIO, "EN_VDD_1V05");
-> -       if (err)
-> -               return err;
-> +       regulator_1v5 = regulator_get(NULL, "vdd_1v5");
-> +       if (IS_ERR_OR_NULL(regulator_1v5)) {
-> +               err = PTR_ERR(regulator_1v5);
-> +               goto err_reg;
-> +       }
+Hi Ludovic,
 
-You need to return in case of err otherwise it will cause the crash in 
-regulator_disable() with NULL argument.
+ludovic.desroches wrote on Tuesday, August 28, 2012 5:10 PM:
+> > +static const struct platform_device_id twi_ip_type = {
+> > +	/*
+> > +	 * driver_data is 2 for SAM9261 compatible ip, see enum twi_ip_id in
+> > +	 * drivers/i2c/busses/i2c-at91.c
+> > +	 */
+> > +	.driver_data	= 2,
+> > +};
+> > +
+> >   static struct platform_device at91sam9261_twi_device = {
+> >   	.name			= "i2c-gpio",
+> >   	.id			= -1,
+> > +	.id_entry		= &twi_ip_type,
+> >   	.dev.platform_data	= &pdata,
+> >   };
+> >
+> 
+> [...]
+> 
+> You add the id_entry to the i2c-gpio device instead of at91_i2c device.
+
+Oh! I'll post the complete series tomorrow.
+
+Regards,
+Niko
