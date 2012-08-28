@@ -1,44 +1,51 @@
-From: koba@kmckk.co.jp (Tetsuyuki Kobayashi)
-Date: Tue, 28 Aug 2012 10:15:03 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC: KZM-9A-GT for 3.7
-In-Reply-To: <1346113116-20252-1-git-send-email-horms@verge.net.au>
-References: <1346113116-20252-1-git-send-email-horms@verge.net.au>
-Message-ID: <503C1B97.3070004@kmckk.co.jp>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Tue, 28 Aug 2012 09:40:07 +0800
+Subject: [PATCH 1/5] arm: mmp: make private clock definition exclude from
+ common clock
+In-Reply-To: <CAN1soZy54UcoQ_qrN2Wh4ZWVMCXj3gpHZas57GqQeT988dnkQQ@mail.gmail.com>
+References: <1346036043-20115-1-git-send-email-xiechao.mail@gmail.com>
+ <CAN1soZy54UcoQ_qrN2Wh4ZWVMCXj3gpHZas57GqQeT988dnkQQ@mail.gmail.com>
+Message-ID: <CADApbegJwd3jQr+rKd-54AxhZG=On0LSEG5ioX-jnq9S0xY=ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2012/08/28 9:18), Simon Horman wrote:
-> Hi Olaf, Hi Arnd,
-> 
-> please consider the following enhancement for the KZM-9A-GT board
-
-Just a minor correction :)
-The board name is KZM-A9-GT.
-
-
-> from Tetsuyuki Kobayashi for inclusion in 3.7.
-> 
-> ----------------------------------------------------------------
-> The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
-> 
->    Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
-> 
-> are available in the git repository at:
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git kzm9g
-> 
-> for you to fetch changes up to 7952717adb69efc1d2443a1858f96d23c2fb93e0:
-> 
->    ARM: shmobile: kzm9g: enable restarting (2012-08-25 14:39:44 +0900)
-> 
-> ----------------------------------------------------------------
-> Tetsuyuki Kobayashi (1):
->        ARM: shmobile: kzm9g: enable restarting
-> 
->   arch/arm/mach-shmobile/board-kzm9g.c | 8 ++++++++
->   1 file changed, 8 insertions(+)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+On Tue, Aug 28, 2012 at 6:42 AM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
+> On Mon, Aug 27, 2012 at 10:53 AM, Chao Xie <xiechao.mail@gmail.com> wrote:
+>> From: Chao Xie <chao.xie@marvell.com>
+>>
+>> the clock.c is mmp private implementation, make it excluded
+>> from common clock framework
+>>
+>> Signed-off-by: Chao Xie <xiechao.mail@gmail.com>
+>> ---
+>>  arch/arm/mach-mmp/Makefile |    5 ++++-
+>>  1 files changed, 4 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
+>> index b786f7e..815c3e7 100644
+>> --- a/arch/arm/mach-mmp/Makefile
+>> +++ b/arch/arm/mach-mmp/Makefile
+>> @@ -2,13 +2,16 @@
+>>  # Makefile for Marvell's PXA168 processors line
+>>  #
+>>
+>> -obj-y                          += common.o clock.o devices.o time.o irq.o
+>> +obj-y                          += common.o devices.o time.o irq.o
+>>
+>>  # SoC support
+>>  obj-$(CONFIG_CPU_PXA168)       += pxa168.o
+>>  obj-$(CONFIG_CPU_PXA910)       += pxa910.o
+>>  obj-$(CONFIG_CPU_MMP2)         += mmp2.o sram.o
+>>
+>> +ifeq ($(CONFIG_COMMON_CLK), )
+>> +obj-y                          += clock.o
+>> +endif
+>
+> Why not to discard all private clock code? Maybe you can use common
+> clk in arch-mmp directly.
+Our dvfs and devfreq are set up based on private clock code. The
+migration of dvfs and devfreq is on going. Checking in common clock
+framework code will help us mirgarate the dvfs and devfreq, but i do
+not want to block the our product development, so I would like to keep
+the private clock code untile we have settle down all the problems.
