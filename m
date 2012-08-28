@@ -1,56 +1,48 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 28 Aug 2012 09:49:57 +0200
-Subject: [PATCH v2 1/2] ARM: clk-imx35: Fix SSI clock registration
-In-Reply-To: <1345466362-2576-1-git-send-email-fabio.estevam@freescale.com>
-References: <1345466362-2576-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20120828074957.GY26594@pengutronix.de>
+Date: Tue, 28 Aug 2012 10:06:45 +0200
+Subject: [PATCH] ARM: imx: fix imx51 babbage SD2 CD/WP
+In-Reply-To: <1345779227-3700-1-git-send-email-shawn.guo@linaro.org>
+References: <1345779227-3700-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120828080645.GA26594@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 09:39:22AM -0300, Fabio Estevam wrote:
-> SSI block has two types of clock:
+On Fri, Aug 24, 2012 at 11:33:47AM +0800, Shawn Guo wrote:
+> Pads GPIO1_6 and GPIO1_5 are used as SD2 CD/WP on imx51 babbage board.
+> Before commit 5d23b39 (ARM: i.MX51 iomux: add missed definitions for
+> SION-bit and mode for some pads) gets in, we use the pad settings
+> configured by bootloader with NO_PAD_CTRL and SD2 CD/WP just works.
+> The commit changes the pad settings and causes SD2 CD/WP stop working.
 > 
-> ipg: bus clock, the clock needed for accessing registers.
-> per: peripheral clock, the clock needed for generating the bit rate.
+> Set up pads GPIO1_6 and GPIO1_5 in the configuation that bootloader
+> uses on imx51 babbage board to fix the SD2 CD/WP regression.
 > 
-> Currently SSI driver only supports slave mode and only need to handle
-> the ipg clock, because the peripheral clock comes from the master codec.
-> 
-> Only register the ipg clock and do not register the peripheral clock for ssi.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Ok, used this version instead.
-
-Sascha
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
 > ---
-> Changes since v1:
-> - Use ssi2_gate for imx-ssi.1
+>  arch/arm/mach-imx/mach-mx51_babbage.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
 > 
->  arch/arm/mach-imx/clk-imx35.c |    6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-> index c6422fb..f7910df 100644
-> --- a/arch/arm/mach-imx/clk-imx35.c
-> +++ b/arch/arm/mach-imx/clk-imx35.c
-> @@ -230,10 +230,8 @@ int __init mx35_clocks_init()
->  	clk_register_clkdev(clk[ipu_gate], NULL, "mx3_sdc_fb");
->  	clk_register_clkdev(clk[owire_gate], NULL, "mxc_w1");
->  	clk_register_clkdev(clk[sdma_gate], NULL, "imx35-sdma");
-> -	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.0");
-> -	clk_register_clkdev(clk[ssi1_div_post], "per", "imx-ssi.0");
-> -	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.1");
-> -	clk_register_clkdev(clk[ssi2_div_post], "per", "imx-ssi.1");
-> +	clk_register_clkdev(clk[ssi1_gate], NULL, "imx-ssi.0");
-> +	clk_register_clkdev(clk[ssi2_gate], NULL, "imx-ssi.1");
->  	/* i.mx35 has the i.mx21 type uart */
->  	clk_register_clkdev(clk[uart1_gate], "per", "imx21-uart.0");
->  	clk_register_clkdev(clk[ipg], "ipg", "imx21-uart.0");
+> diff --git a/arch/arm/mach-imx/mach-mx51_babbage.c b/arch/arm/mach-imx/mach-mx51_babbage.c
+> index 7b31cbd..83f49c4 100644
+> --- a/arch/arm/mach-imx/mach-mx51_babbage.c
+> +++ b/arch/arm/mach-imx/mach-mx51_babbage.c
+> @@ -154,8 +154,8 @@ static iomux_v3_cfg_t mx51babbage_pads[] = {
+>  	MX51_PAD_SD2_DATA2__SD2_DATA2,
+>  	MX51_PAD_SD2_DATA3__SD2_DATA3,
+>  	/* CD/WP gpio */
+> -	MX51_PAD_GPIO1_6__GPIO1_6,
+> -	MX51_PAD_GPIO1_5__GPIO1_5,
+> +	NEW_PAD_CTRL(MX51_PAD_GPIO1_6__GPIO1_6, PAD_CTL_HYS),
+> +	NEW_PAD_CTRL(MX51_PAD_GPIO1_5__GPIO1_5, PAD_CTL_HYS),
+>  
+>  	/* eCSPI1 */
+>  	MX51_PAD_CSPI1_MISO__ECSPI1_MISO,
 > -- 
-> 1.7.9.5
-> 
+> 1.7.5.4
 > 
 > 
 
