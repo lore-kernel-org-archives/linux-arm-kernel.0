@@ -1,176 +1,57 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 28 Aug 2012 16:09:37 -0700
-Subject: [PATCH v2] gpio: samsung: add devicetree init for s3c24xx arches
-In-Reply-To: <201208282355.44268.heiko@sntech.de>
-References: <201208282355.44268.heiko@sntech.de>
-Message-ID: <503D4FB1.1020206@samsung.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Wed, 29 Aug 2012 02:09:17 +0300
+Subject: [PATCH] arm: omap: ratelimit omap_l3_smx error log spam
+In-Reply-To: <CAMQu2gwMk68_BNc4O0M52OACUVLLGzRCQe+5mGH_40DrwAQ4KA@mail.gmail.com>
+References: <1346101403-5882-1-git-send-email-aaro.koskinen@iki.fi>
+ <CAMQu2gyEctrq_3K8W6VahMW-ODOiv7TjrBfPTkZqNGJ+0m9ozw@mail.gmail.com>
+ <20120827220254.GA783@harshnoise.musicnaut.iki.fi>
+ <CAMQu2gz9HE0xEoW7gu257rpLWdCUpt7N6GQNQzWVhFb-A+69hg@mail.gmail.com>
+ <20120827232613.GB783@harshnoise.musicnaut.iki.fi>
+ <CAMQu2gwHp3PgB-TqPTNWcbRuXRT0wjfvF99nYqfDyWr1GiUvCg@mail.gmail.com>
+ <20120828122042.GC783@harshnoise.musicnaut.iki.fi>
+ <CAMQu2gwMk68_BNc4O0M52OACUVLLGzRCQe+5mGH_40DrwAQ4KA@mail.gmail.com>
+Message-ID: <20120828230917.GD783@harshnoise.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/12 14:55, Heiko St?bner wrote:
-> Until now the Exynos-SoC was the only Samsung-SoC supporting the GPIOs
-> via the device tree. This patch implements dt-support for the
-> s3c24xx arches.
->
-> The controllers contain only 3 cells, as the underlying gpio controller
-> does not support controlling the drive strength on a gpio level.
->
-> Tested with the gpio-keys driver on a s3c2416 based machine.
->
-> Signed-off-by: Heiko Stuebner<heiko@sntech.de>
-> Reviewed-by: Thomas Abraham<thomas.abraham@linaro.org>
+Hi,
 
-Yeah, looks good to me...
+On Tue, Aug 28, 2012 at 07:19:38AM -0700, Shilimkar, Santosh wrote:
+> Or the PPA has resized the secure area of 16K. As you have seen the issue
+> on one OMAP3 device, it makes sense to takeout that 16K from the public
+> SRAM map.
+> 
+> Can you send the patch with fixed base address fir PUB SRAM ?
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Maybe I'm missing something, but I tried the following and now something
+else got broken:
 
-BTW, I'm not sure when we can support device tree for S3C24XX :-)
+	save_secure_sram() returns 0000ff02
 
-Thanks.
+(and it hangs there).
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> ---
-> changes since v1:
-> update bindings documentation to address SoC specific issues
->
->   .../devicetree/bindings/gpio/gpio-samsung.txt      |   43 +++++++++++++
->   drivers/gpio/gpio-samsung.c                        |   63 ++++++++++++++++++++
->   2 files changed, 106 insertions(+), 0 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-samsung.txt b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
-> index 5375625..f1e5dfe 100644
-> --- a/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
-> @@ -39,3 +39,46 @@ Example:
->   		#gpio-cells =<4>;
->   		gpio-controller;
->   	};
-> +
-> +
-> +Samsung S3C24XX GPIO Controller
-> +
-> +Required properties:
-> +- compatible: Compatible property value should be "samsung,s3c24xx-gpio".
-> +
-> +- reg: Physical base address of the controller and length of memory mapped
-> +  region.
-> +
-> +- #gpio-cells: Should be 3. The syntax of the gpio specifier used by client nodes
-> +  should be the following with values derived from the SoC user manual.
-> +<[phandle of the gpio controller node]
-> +      [pin number within the gpio controller]
-> +      [mux function]
-> +      [flags and pull up/down]
-> +
-> +  Values for gpio specifier:
-> +  - Pin number: depending on the controller a number from 0 up to 15.
-> +  - Mux function: Depending on the SoC and the gpio bank the gpio can be set
-> +                  as input, output or a special function
-> +  - Flags and Pull Up/Down: the values to use differ for the individual SoCs
-> +                    example S3C2416/S3C2450:
-> +                            0 - Pull Up/Down Disabled.
-> +                            1 - Pull Down Enabled.
-> +                            2 - Pull Up Enabled.
-> +          Bit 16 (0x00010000) - Input is active low.
-> +  Consult the user manual for the correct values of Mux and Pull Up/Down.
-> +
-> +- gpio-controller: Specifies that the node is a gpio controller.
-> +- #address-cells: should be 1.
-> +- #size-cells: should be 1.
-> +
-> +Example:
-> +
-> +	gpa: gpio-controller at 56000000 {
-> +		#address-cells =<1>;
-> +		#size-cells =<1>;
-> +		compatible = "samsung,s3c24xx-gpio";
-> +		reg =<0x56000000 0x10>;
-> +		#gpio-cells =<3>;
-> +		gpio-controller;
-> +	};
-> diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
-> index ba126cc..54f6663 100644
-> --- a/drivers/gpio/gpio-samsung.c
-> +++ b/drivers/gpio/gpio-samsung.c
-> @@ -938,6 +938,67 @@ static void __init samsung_gpiolib_add(struct samsung_gpio_chip *chip)
->   		s3c_gpiolib_track(chip);
->   }
->
-> +#if defined(CONFIG_PLAT_S3C24XX)&&  defined(CONFIG_OF)
-> +static int s3c24xx_gpio_xlate(struct gpio_chip *gc,
-> +			const struct of_phandle_args *gpiospec, u32 *flags)
-> +{
-> +	unsigned int pin;
-> +
-> +	if (WARN_ON(gc->of_gpio_n_cells<  3))
-> +		return -EINVAL;
-> +
-> +	if (WARN_ON(gpiospec->args_count<  gc->of_gpio_n_cells))
-> +		return -EINVAL;
-> +
-> +	if (gpiospec->args[0]>  gc->ngpio)
-> +		return -EINVAL;
-> +
-> +	pin = gc->base + gpiospec->args[0];
-> +
-> +	if (s3c_gpio_cfgpin(pin, S3C_GPIO_SFN(gpiospec->args[1])))
-> +		pr_warn("gpio_xlate: failed to set pin function\n");
-> +	if (s3c_gpio_setpull(pin, gpiospec->args[2]&  0xffff))
-> +		pr_warn("gpio_xlate: failed to set pin pull up/down\n");
-> +
-> +	if (flags)
-> +		*flags = gpiospec->args[2]>>  16;
-> +
-> +	return gpiospec->args[0];
-> +}
-> +
-> +static const struct of_device_id s3c24xx_gpio_dt_match[] __initdata = {
-> +	{ .compatible = "samsung,s3c24xx-gpio", },
-> +	{}
-> +};
-> +
-> +static __init void s3c24xx_gpiolib_attach_ofnode(struct samsung_gpio_chip *chip,
-> +						 u64 base, u64 offset)
-> +{
-> +	struct gpio_chip *gc =&chip->chip;
-> +	u64 address;
-> +
-> +	if (!of_have_populated_dt())
-> +		return;
-> +
-> +	address = chip->base ? base + ((u32)chip->base&  0xfff) : base + offset;
-> +	gc->of_node = of_find_matching_node_by_address(NULL,
-> +			s3c24xx_gpio_dt_match, address);
-> +	if (!gc->of_node) {
-> +		pr_info("gpio: device tree node not found for gpio controller"
-> +			" with base address %08llx\n", address);
-> +		return;
-> +	}
-> +	gc->of_gpio_n_cells = 3;
-> +	gc->of_xlate = s3c24xx_gpio_xlate;
-> +}
-> +#elif defined(CONFIG_PLAT_S3C24XX)
-> +static __init void s3c24xx_gpiolib_attach_ofnode(struct samsung_gpio_chip *chip,
-> +						 u64 base, u64 offset)
-> +{
-> +	return;
-> +}
-> +#endif /* defined(CONFIG_PLAT_S3C24XX)&&  defined(CONFIG_OF) */
-> +
->   static void __init s3c24xx_gpiolib_add_chips(struct samsung_gpio_chip *chip,
->   					     int nr_chips, void __iomem *base)
->   {
-> @@ -962,6 +1023,8 @@ static void __init s3c24xx_gpiolib_add_chips(struct samsung_gpio_chip *chip,
->   			gc->direction_output = samsung_gpiolib_2bit_output;
->
->   		samsung_gpiolib_add(chip);
-> +
-> +		s3c24xx_gpiolib_attach_ofnode(chip, S3C24XX_PA_GPIO, i * 0x10);
->   	}
->   }
->
+diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+index 766181c..242ea5b 100644
+--- a/arch/arm/plat-omap/sram.c
++++ b/arch/arm/plat-omap/sram.c
+@@ -38,7 +38,7 @@
+ 
+ #define OMAP1_SRAM_PA		0x20000000
+ #define OMAP2_SRAM_PUB_PA	(OMAP2_SRAM_PA + 0xf800)
+-#define OMAP3_SRAM_PUB_PA       (OMAP3_SRAM_PA + 0x8000)
++#define OMAP3_SRAM_PUB_PA       (OMAP3_SRAM_PA + 0xc000)
+ #ifdef CONFIG_OMAP4_ERRATA_I688
+ #define OMAP4_SRAM_PUB_PA	OMAP4_SRAM_PA
+ #else
+@@ -112,9 +112,9 @@ static void __init omap_detect_sram(void)
+ 				omap_sram_start = OMAP3_SRAM_PUB_PA;
+ 				if ((omap_type() == OMAP2_DEVICE_TYPE_EMU) ||
+ 				    (omap_type() == OMAP2_DEVICE_TYPE_SEC)) {
+-					omap_sram_size = 0x7000; /* 28K */
++					omap_sram_size = 0x3000; /* 12K */
+ 				} else {
+-					omap_sram_size = 0x8000; /* 32K */
++					omap_sram_size = SZ_16K; /* 16K */
+ 				}
+ 			} else if (cpu_is_omap44xx()) {
+ 				omap_sram_start = OMAP4_SRAM_PUB_PA;
