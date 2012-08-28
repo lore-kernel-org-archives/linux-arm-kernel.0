@@ -1,55 +1,64 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 28 Aug 2012 13:41:53 -0700
-Subject: [PATCH RESEND 2/2] msm: io: Change the default static iomappings
- to be shared
-In-Reply-To: <1344633496-1873-1-git-send-email-rvaswani@codeaurora.org>
-References: <1344633496-1873-1-git-send-email-rvaswani@codeaurora.org>
-Message-ID: <CAOesGMgC2OxEs-wGRQku-GeoiaO2Wa_dZ2AuwnKd3Nze4gknqQ@mail.gmail.com>
+Date: Tue, 28 Aug 2012 13:45:02 -0700
+Subject: [GIT PULL] msm fixes for v3.6
+In-Reply-To: <20120828165532.GA20947@codeaurora.org>
+References: <20120828165532.GA20947@codeaurora.org>
+Message-ID: <20120828204502.GA24149@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, Aug 10, 2012 at 2:18 PM, Rohit Vaswani <rvaswani@codeaurora.org> wrote:
-> With 3.4 kernel the static iomappings can be shared with the ioremap
-> mappings. If ioremap is called with an address for which a static
-> mapping already exists, then that mapping should be used instead
-> of creating a new one.
-> However, the MT_DEVICE_NONSHARED flag prevents this. Hence, get rid
-> of this flag. Some targets (7X00) that require the static iomappings
-> to be NONSHARED use the MSM_DEVICE_TYPE and MSM_CHIP_DEVICE_TYPE macros.
->
-> Signed-off-by: Rohit Vaswani <rvaswani@codeaurora.org>
-> ---
->  arch/arm/mach-msm/io.c |   25 +++++++++++++++++--------
->  1 files changed, 17 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
-> index 2409c0b..5fc2e48 100644
-> --- a/arch/arm/mach-msm/io.c
-> +++ b/arch/arm/mach-msm/io.c
-> @@ -33,23 +33,32 @@
->                 .virtual = (unsigned long) MSM_##name##_BASE, \
->                 .pfn = __phys_to_pfn(chip##_##name##_PHYS), \
->                 .length = chip##_##name##_SIZE, \
-> -               .type = MT_DEVICE_NONSHARED, \
-> +               .type = MT_DEVICE, \
-> +        }
-> +
-> +#define MSM_CHIP_DEVICE_TYPE(name, chip, mem_type) {                         \
-> +               .virtual = (unsigned long) MSM_##name##_BASE, \
-> +               .pfn = __phys_to_pfn(chip##_##name##_PHYS), \
-> +               .length = chip##_##name##_SIZE, \
-> +               .type = mem_type, \
->          }
+On Tue, Aug 28, 2012 at 09:55:32AM -0700, David Brown wrote:
+> The following changes since commit 28a33cbc24e4256c143dce96c7d93bf423229f92:
+> 
+>   Linux 3.5 (2012-07-21 13:58:29 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-fix-for3.6
+> 
+> for you to fetch changes up to e7501de53aa1a551526872f6c95901a00705f942:
+> 
+>   ARM: msm: Remove call to missing FPGA init on 8660 (2012-08-28 09:39:28 -0700)
+> 
+> ----------------------------------------------------------------
+> Fixes for two problems with MSM:
+> 
+>   - Mapping issue on 7x00 targets.
+>   - Compilation problems with devicetree on 8660.
 
-The above is partially hidden by lack of context in the diff, but now
-you have two defines that do nearly the same thing. It's better to
-move to a
+Thanks for using a tag with a description of the pull request contents,
+but it seems like you're missing a bit here -- it has a patch for the dtbs
+target, and the handle_irq fix isn't technically breaking compilation,
+I believe?
 
-#define MSM_CHIP_DEVICE(name, chip)  MSM_CHIP_DEVICE_TYPE(name, chip, MT_DEVICE)
+> ----------------------------------------------------------------
+> David Brown (1):
+>       ARM: msm: Remove call to missing FPGA init on 8660
 
-for the exising one, instead of duplicating the open coded macros.
+So, this seems to be breaking builds, seems appropriate as a fix.
+
+> Rohit Vaswani (2):
+>       ARM: msm: io: Remove 7x30 iomap region from 7x00
+>       ARM: msm: io: Change the default static iomappings to be shared
+
+These two patches lack your Signed-off-by, even though you seem to have been
+the committer. Please add it.
+
+But also, it's not clear to me if the second of the two patches actually causes
+problems, or if it's just that the mapping won't be reused from the static
+range. If it's the latter, then I'd say it's 3.7 material instead. Also see my
+separate comment on the posted patch about the format of it.
+
+> Stephen Boyd (2):
+>       ARM: msm: Add handle_irq handler for 8660 DT machine
+
+Clearly a bug fix, no problem.
+
+>       ARM: msm: Add msm8660-surf.dts to Makefile.boot
+
+This one looks like 3.7 material.
 
 
 -Olof
