@@ -1,45 +1,55 @@
-From: anilkumar@ti.com (AnilKumar Ch)
-Date: Tue, 28 Aug 2012 13:40:53 +0530
-Subject: [PATCH RESEND v4 2/3] arm/dts: AM33XX: Configure pinmuxs for user
- leds control on Bone
-In-Reply-To: <1346141454-18786-1-git-send-email-anilkumar@ti.com>
-References: <1346141454-18786-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1346141454-18786-3-git-send-email-anilkumar@ti.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 28 Aug 2012 13:45:47 +0530
+Subject: [PATCH] ARM: Exynos4: Turn off clocks for NAND,
+ OneNAND and TSI controllers
+In-Reply-To: <1345819936-6503-1-git-send-email-chander.kashyap@linaro.org>
+References: <1345819936-6503-1-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <CAJuYYwSFMR1cJm7SB-eF_aYM9SPMaopvw3K9stiPvabCfjH=QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds GPIO pinctrl nodes to am3358_pinmux master node to control
-user leds (USR0, USR1, USR2 and USR3) present on BeagleBone.
+On 24 August 2012 20:22, Chander Kashyap <chander.kashyap@linaro.org> wrote:
+> The clocks for NAND, OneNAND and Transport Stream Interface(TSI)
+> controllers could be either enabled or disabled at boot. To ensure
+> that these are turned off until used, add them to the list of clocks
+> to be turned off during boot.
+>
+> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> ---
+>  arch/arm/mach-exynos/clock-exynos4.c |   12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>
+> diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-exynos/clock-exynos4.c
+> index 2f51293..7cc5491 100644
+> --- a/arch/arm/mach-exynos/clock-exynos4.c
+> +++ b/arch/arm/mach-exynos/clock-exynos4.c
+> @@ -501,6 +501,10 @@ static struct clk exynos4_init_clocks_off[] = {
+>                 .enable         = exynos4_clk_ip_cam_ctrl,
+>                 .ctrlbit        = (1 << 3),
+>         }, {
+> +               .name           = "tsi",
+> +               .enable         = exynos4_clk_ip_fsys_ctrl,
+> +               .ctrlbit        = (1 << 4),
+> +       }, {
+>                 .name           = "hsmmc",
+>                 .devname        = "exynos4-sdhci.0",
+>                 .parent         = &exynos4_clk_aclk_133.clk,
+> @@ -530,6 +534,14 @@ static struct clk exynos4_init_clocks_off[] = {
+>                 .enable         = exynos4_clk_ip_fsys_ctrl,
+>                 .ctrlbit        = (1 << 9),
+>         }, {
+> +               .name           = "onenand",
+> +               .enable         = exynos4_clk_ip_fsys_ctrl,
+> +               .ctrlbit        = (1 << 15),
+> +       }, {
+> +               .name           = "nfcon",
+> +               .enable         = exynos4_clk_ip_fsys_ctrl,
+> +               .ctrlbit        = (1 << 16),
+> +       }, {
+>                 .name           = "dac",
+>                 .devname        = "s5p-sdo",
+>                 .enable         = exynos4_clk_ip_tv_ctrl,
+> --
+> 1.7.9.5
 
-Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
----
- arch/arm/boot/dts/am335x-bone.dts |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index a7906cb..58f5042 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -18,6 +18,20 @@
- 		reg = <0x80000000 0x10000000>; /* 256 MB */
- 	};
- 
-+	am3358_pinmux: pinmux at 44E10800 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&userled_pins>;
-+
-+		userled_pins: pinmux_userled_pins {
-+			pinctrl-single,pins = <
-+				0x54 0x7	/* gpmc_a5.gpio1_21, OUTPUT | MODE7 */
-+				0x58 0x17	/* gpmc_a6.gpio1_22, OUTPUT_PULLUP | MODE7 */
-+				0x5C 0x7	/* gpmc_a7.gpio1_23, OUTPUT | MODE7 */
-+				0x60 0x17	/* gpmc_a8.gpio1_24, OUTPUT_PULLUP | MODE7 */
-+			>;
-+		};
-+	};
-+
- 	ocp {
- 		uart1: serial at 44E09000 {
- 			status = "okay";
--- 
-1.7.9.5
+Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
