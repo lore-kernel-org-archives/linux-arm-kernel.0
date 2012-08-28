@@ -1,83 +1,81 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Tue, 28 Aug 2012 11:27:08 -0700
-Subject: [PATCH 2/2] tty: serial: imx: don't reinit clock with enabled
- console
-In-Reply-To: <503CA183.70704@de.bosch.com>
-References: <1346053012-25686-1-git-send-email-dirk.behme@de.bosch.com>
- <1346053012-25686-3-git-send-email-dirk.behme@de.bosch.com>
- <503BBA5A.8040609@boundarydevices.com> <503CA183.70704@de.bosch.com>
-Message-ID: <503D0D7C.2070509@boundarydevices.com>
+From: jkosina@suse.cz (Jiri Kosina)
+Date: Tue, 28 Aug 2012 11:28:11 -0700 (PDT)
+Subject: PER_LINUX32, Was: [PATCH v2 21/31] arm64: 32-bit (compat)
+ applications support
+In-Reply-To: <201208230646.31276.arnd@arndb.de>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <201208151434.05145.arnd@arndb.de>
+ <20120816102808.GH31784@mudshark.cambridge.arm.com>
+ <201208230646.31276.arnd@arndb.de>
+Message-ID: <alpine.LNX.2.00.1208281124520.22447@pobox.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/28/2012 3:46 AM, Dirk Behme wrote:
-> On 27.08.2012 20:20, Troy Kisky wrote:
->> On 8/27/2012 12:36 AM, Dirk Behme wrote:
->>> From: Xinyu Chen <xinyu.chen@freescale.com>
->>>
->>> Remove the imx_setup_ufcr() call on startup when CONSOLE enabled,
->>> as this will cause clock reinit, and output garbage.
->>>
->>> This patch is a port from Freescale's Android kernel.
->>>
->>> Signed-off-by: Xinyu Chen <xinyu.chen@freescale.com>
->>> Tested-by: Dirk Behme <dirk.behme@de.bosch.com>
->>> CC: Shawn Guo <shawn.guo@linaro.org>
->>> CC: Sascha Hauer <s.hauer@pengutronix.de>
->>> ---
->>>   drivers/tty/serial/imx.c |    2 ++
->>>   1 files changed, 2 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
->>> index 908178f..31ce414 100644
->>> --- a/drivers/tty/serial/imx.c
->>> +++ b/drivers/tty/serial/imx.c
->>> @@ -695,7 +695,9 @@ static int imx_startup(struct uart_port *port)
->>>       int retval;
->>>       unsigned long flags, temp;
->>>   +#ifndef CONFIG_SERIAL_CORE_CONSOLE
->>>       imx_setup_ufcr(sport, 0);
->>> +#endif
->>>         /* disable the DREN bit (Data Ready interrupt enable) before
->>>        * requesting IRQs
->>
->>
->> I'd rather do something like this
->>
->> static int imx_setup_ufcr(struct imx_port *sport, unsigned int mode)
->> {
->>          unsigned int val;
->>
->>          /* set receiver / transmitter trigger level. */
->>          val = readl(sport->port.membase + UFCR) & UFCR_RFDIV;
->
-> Shouldn't it be
->
-> ... & (UFCR_RFDIV | UFCR_DCEDTE);
->
-> then? My i.MX6 manual has DCEDTE as bit 6, which we don't want to 
-> touch, too? We only want to touch TXTL and RXTL?
->
+On Thu, 23 Aug 2012, Arnd Bergmann wrote:
 
-If you do that, you should also change imx_set_termios
-to possibly clear the bit
+> > > > +asmlinkage int compat_sys_personality(compat_ulong_t personality)
+> > > > +{
+> > > > +	int ret;
+> > > > +
+> > > > +	if (personality(current->personality) == PER_LINUX32 &&
+> > > > +		personality == PER_LINUX)
+> > > > +		personality = PER_LINUX32;
+> > > > +	ret = sys_personality(personality);
+> > > > +	if (ret == PER_LINUX32)
+> > > > +		ret = PER_LINUX;
+> > > > +	return ret;
+> > > > +}
+> > > 
+> > > Where did you get this from?
+> > > 
+> > > You should not need compat_sys_personality, just call the native function.
+> > 
+> > Hmm, but in that case an aarch32 application doing a personality(PER_LINUX)
+> > syscall will start seeing the wrong uname.
+> 
+> Coming back at this topic, I noticed another issue. Jiri Kosina
+> has recently posted patches to fix this function in the other architectures
 
-new_ufcr = (old_ufcr & (~UFCR_RFDIV)) | UFCR_RFDIV_REG(div);
+Yeah, there were quite a few broken ones, some of them since the beginning 
+of time.
 
-to
+> in order to mask out the other personality bits, which is a correct fix,
+> but the above function is odd for other reasons.
+> 
+> * On MIPS, it is used only for compat tasks, like you have it above.
+> * On PA-RISC, it is used for native 32 bit tasks and for compat 32 bit tasks,
+>   but not for native 64 bit ones.
+> * On IA64, it was used for compat tasks (support for which has since
+>   been removed from the kernel), plus all 32 bit tasks would start with
+>   PER_LINUX32.
+> * On PowerPC, Sparc and s390, it is used for native 64 bit tasks and for
+>   compat 32 bit tasks, but not for native 32 bit ones.
+> * On Tile, it was never used.
+> * On x86_64, it used to be defined (copied from ia64) but not used
+>   throughout the git history.
+> 
+> The semantics of the function are also interesting: The intention seems
+> to be that to a compat task, PER_LINUX32 would appear as PER_LINUX.
+> The effect is that any process can set PER_LINUX32 but it can never
+> be unset except by a 64 bit MIPS or PA-RISC task.
+> 
+> Since x86_64 does not implement this behavior at all, I suspect that
+> there are now lots of things depending on not having it, while all
+> the other architectures might also have some (even predating the
+> x86_64 port) use cases that depend on depend on not being able to
+> observe PER_LINUX32 in 32 bit compat tasks.
+> 
+> I think we should try to agree on how this is all supposed to work
+> and use common code, either put the ppc/sparc/s390 version into
+> sys_personality, or remove all of them and just do what x86 and tile
+> do, using the regular sys_personality for all tasks.
 
-new_ufcr = (old_ufcr & (~(UFCR_RFDIV | UFCR_DCEDTE))) | UFCR_RFDIV_REG(div);
+How about rather introducing common compat_sys_personality() and switching 
+the archs that are using it to it? Unifying the behavior (PER_LINUX / 
+PER_LINUX32 masquerading) should be painless.
 
->>          val |= TXTL << 10 | RXTL;
->>          writel(val, sport->port.membase + UFCR);
->>          return 0;
->> }
->>
->> There is no need for imx_setup_ufcr to change divisor.
->
-> Ok
->
-> Thanks
->
-> Dirk
->
+Thanks,
+
+-- 
+Jiri Kosina
+SUSE Labs
