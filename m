@@ -1,46 +1,33 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 28 Aug 2012 19:42:36 +0800
-Subject: [PATCH] usb: chipidea: cleanup dma_pool if udc_start() fails
-In-Reply-To: <503CA2E3.6010707@pengutronix.de>
-References: <1346149885-3084-1-git-send-email-mkl@pengutronix.de>
- <20120828104617.GZ4011@b20223-02.ap.freescale.net>
- <503CA2E3.6010707@pengutronix.de>
-Message-ID: <20120828114235.GA4011@b20223-02.ap.freescale.net>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 28 Aug 2012 14:43:51 +0300
+Subject: [PATCH 3/4] ARM: dma-mapping: Refrain noisy console message
+In-Reply-To: <1346154232-13299-1-git-send-email-hdoyu@nvidia.com>
+References: <1346154232-13299-1-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1346154232-13299-3-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2012 at 12:52:19PM +0200, Marc Kleine-Budde wrote:
-> On 08/28/2012 12:46 PM, Richard Zhao wrote:
-> > On Tue, Aug 28, 2012 at 12:31:25PM +0200, Marc Kleine-Budde wrote:
-> >> If udc_start() fails the qh_pool dma-pool cannot be closed because
-> >> it's still in use. This patch factors out the dma_pool_free() loop
-> >> into destroy_eps() and calls it in the error path of udc_start(),
-> >> too.
-> >>
-> >> Cc: Richard Zhao <richard.zhao@freescale.com>
-> >> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> >> ---
-> >> Hello,
-> >>
-> >> Richard, can you please include this patch in your stack. IIRC I think it once
-> >> was, but now it's not anymore.
-> > Sorry for that. I just push it to my topics/usb-driver branch.
-> > Of course, it's better, if Alex can give a ACK and Greg could pick up.
-> 
-> I'm not sure, if this [1] is the latest thread on this patch, but Greg
-> asked to queue this patch into your tree.
-It does not depends on my tree any more. It can be applied directly on
-Greg's tree.
+With many IOMMU'able devices, console gets noisy.
 
-Thanks
-Richard
-> 
-> Marc
-> 
-> [1] http://comments.gmane.org/gmane.linux.usb.general/66440
-> -- 
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-> 
+Tegra30 has a few dozen of IOMMU'able devices.
+
+Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
+---
+ arch/arm/mm/dma-mapping.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 8cb9542..2621282 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1747,7 +1747,7 @@ int arm_iommu_attach_device(struct device *dev,
+ 	dev->archdata.mapping = mapping;
+ 	set_dma_ops(dev, &iommu_ops);
+ 
+-	pr_info("Attached IOMMU controller to %s device.\n", dev_name(dev));
++	pr_debug("Attached IOMMU controller to %s device.\n", dev_name(dev));
+ 	return 0;
+ }
+ 
+-- 
+1.7.5.4
