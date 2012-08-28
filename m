@@ -1,46 +1,31 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 28 Aug 2012 15:03:06 +0800
-Subject: [PATCH v2 00/11] chipidea/imx: add otg support and some bug fix
-Message-ID: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
+Date: Tue, 28 Aug 2012 15:03:10 +0800
+Subject: [PATCH v2 04/11] USB: chipidea: clear gadget struct at udc_start fail
+ path
+In-Reply-To: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
+References: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1346137397-32374-5-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch set is tested on imx6q_sabrelite board.
+States in gadget are not needed any more, set it to zero.
 
-The patch can also be found at
-https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+---
+ drivers/usb/chipidea/udc.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-For test which merged platform patches:
-https://github.com/riczhao/kernel-imx/commits/topics/usb-test
-
-Changes since v1:
- - move usbmisc as the other patch series.
- - remove regulater_disable and old comments in ci13xxx_imx.
-
-Richard Zhao (11):
-  USB: chipidea: imx: add pinctrl support
-  USB: chipidea: delay 2ms before read ID status at probe time
-  USB: chipidea: move OTGSC_IDIS clearing from ci_role_work to irq
-    handler
-  USB: chipidea: clear gadget struct at udc_start fail path
-  USB: chipidea: don't let probe fail if otg controller start one role
-    failed
-  USB: mxs-phy: add basic otg support
-  USB: chipidea: add vbus detect for udc
-  USB: chipidea: convert to use devm_request_irq
-  USB: chipidea: add -DDEBUG if CONFIG_USB_CHIPIDEA_DEBUG
-  USB: chipidea: add set_vbus_power support
-  USB: chipidea: re-order irq handling to avoid unhandled irq
-
- drivers/usb/chipidea/Makefile      |    2 ++
- drivers/usb/chipidea/ci.h          |    1 +
- drivers/usb/chipidea/ci13xxx_imx.c |   51 +++++++++++++++++++++++-------------
- drivers/usb/chipidea/core.c        |   36 +++++++++++++++----------
- drivers/usb/chipidea/host.c        |    8 ++++++
- drivers/usb/chipidea/udc.c         |   40 +++++++++++++++++++++++++++-
- drivers/usb/otg/mxs-phy.c          |   21 +++++++++++++++
- include/linux/usb/chipidea.h       |    2 ++
- 8 files changed, 128 insertions(+), 33 deletions(-)
-
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index c7a032a..9fb6394 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -1746,6 +1746,7 @@ free_pools:
+ 	dma_pool_destroy(ci->td_pool);
+ free_qh_pool:
+ 	dma_pool_destroy(ci->qh_pool);
++	memset(&ci->gadget, 0, sizeof(ci->gadget));
+ 	return retval;
+ }
+ 
 -- 
 1.7.9.5
