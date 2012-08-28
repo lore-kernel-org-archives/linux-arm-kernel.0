@@ -1,92 +1,40 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 28 Aug 2012 16:08:38 +0800
-Subject: [PATCH 2/3] ARM: PRIMA2: make mach-prima2 common for all SiRF
- series SoC
-In-Reply-To: <CAGsJ_4x4DdHsNgh7ArkD1fCHT22rxRs18vcobHtpSXJ-cq3o4Q@mail.gmail.com>
-References: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
- <201208210757.32852.arnd@arndb.de>
- <CAGsJ_4yRbFrH8NPJZ6-gU1BebqVkQEBz_GLr4owQz+XpOyejug@mail.gmail.com>
- <201208210920.52816.arnd@arndb.de>
- <CAGsJ_4x4DdHsNgh7ArkD1fCHT22rxRs18vcobHtpSXJ-cq3o4Q@mail.gmail.com>
-Message-ID: <CAGsJ_4y3Snvf-2DLSrpU5+zmytkARtNxJN_nPdiOngd+BK-aDA@mail.gmail.com>
+From: anilkumar@ti.com (AnilKumar Ch)
+Date: Tue, 28 Aug 2012 13:40:52 +0530
+Subject: [PATCH RESEND v4 1/3] arm/dts: AM33XX: Add basic pinctrl device tree
+ data
+In-Reply-To: <1346141454-18786-1-git-send-email-anilkumar@ti.com>
+References: <1346141454-18786-1-git-send-email-anilkumar@ti.com>
+Message-ID: <1346141454-18786-2-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/8/28 Barry Song <21cnbao@gmail.com>:
-> 2012/8/21 Arnd Bergmann <arnd@arndb.de>:
->> On Tuesday 21 August 2012, Barry Song wrote:
->>> then i add these to Kconfig.debug as it is a common way
->>>
->>>         config DEBUG_PRIMA2_UART1
->>>                 bool "Kernel low-level debugging on DaVinci DA8XX using UART1"
->>>                 depends on ARCH_PRIMA2
->>>                 help
->>>                   Say Y here if you want the debug print routines to direct
->>>                   their output to UART1 serial port on SiRFprimaII devices.
->>>
->>>         config DEBUG_MARCO_UART1
->>>                 bool "Kernel low-level debugging on DaVinci DA8XX using UART2"
->>>                 depends on ARCH_MARCO
->>>                 help
->>>                   Say Y here if you want the debug print routines to direct
->>>                   their output to UART1 serial port on SiRFmarco devices.
->>>
->>> and these in mach-prima2/include/mach/uart.h
->>>
->>>   #ifdef CONFIG_DEBUG_PRIMA2_UART1
->>>   #define SIRFSOC_UART1_PA_BASE          0xb0060000
->>>   #elif defined(CONFIG_DEBUG_MARCO_UART1)
->>>   #define SIRFSOC_UART1_PA_BASE          0xcc060000
->>>   #endif
->>>
->>> the above codes seem still ugly ?
->>>
->>
->> No, that's fine, about as a good as it gets with today's kernel
->> capabilities. Just fix the description to have the correct
->> SoC name instead of "DaVinci DA8XX" ;-)
->
-> except the DEBUG_LL uart base address, i missed the zreladdr-y. for
-> primaii, it is 0x00008000, for marco, it is 0x40008000 as marco's
-> memory space begins from 0x4000000.
-> i would to have AUTO_ZRELADDR for the whole SiRF series.
-> but for uImage load address difference in uImage header, which blocks
-> multiple SoCs from using same uImage, is "KERNEL_NOLOAD" uImage type
-> the current generic solution?
+Adds basic pinctrl device tree data for AM33XX family of devices.
+This patch is based on the pinctrl-single driver.
 
-also add Stephen Warren.
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+ arch/arm/boot/dts/am33xx.dtsi |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-i have two verified ways to resolve this problem:
-
-1. use "kernel noload", build uImage by:
-
-make uImage UIMAGE_TYPE=kernel_noload
-and add the following patch in kernel:
-
-diff --git a/arch/arm/mach-prima2/Makefile.boot
-b/arch/arm/mach-prima2/Makefile.boot
-index 53c5225..059bcd7 100644
---- a/arch/arm/mach-prima2/Makefile.boot
-+++ b/arch/arm/mach-prima2/Makefile.boot
-@@ -1,12 +1,4 @@
-
--zreladdr-y             += 0x00008000
--params_phys-y          := 0x00000100
--initrd_phys-y          := 0x00800000
-#we use kernel_noload uImage and AUTO_ZRELADDR
-+zreladdr-y             += 0x0
-
-2. don't use kernel's uImage target, mkimage uImage out of kernel by
-giving mkimage the "-a 0x40008000" and keep kernel unchanged.
-
-anyway, i think arm SoC needs a generic way to handle this kind of problem.
-
-if we move to 1, i think almost all ARM SoCs don't need Makefile.boot again.
-
->
->>
->>         Arnd
->
-> -barry
-
--barry
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index dde76f7..dfe9c559 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -40,6 +40,15 @@
+ 		};
+ 	};
+ 
++	am3358_pinmux: pinmux at 44E10800 {
++		compatible = "pinctrl-single";
++		reg = <0x44E10800 0x0238>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-single,register-width = <32>;
++		pinctrl-single,function-mask = <0x7F>;
++	};
++
+ 	/*
+ 	 * XXX: Use a flat representation of the AM33XX interconnect.
+ 	 * The real AM33XX interconnect network is quite complex.Since
+-- 
+1.7.9.5
