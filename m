@@ -1,33 +1,88 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 28 Aug 2012 20:18:50 +0530
-Subject: [PATCH 1/3] ARM: EXYNOS: Use EXYNOS4210_GPEx instead of
- EXYNOS4_GPEx
-In-Reply-To: <14029212.D3MKvQZpbq@amdc1227>
-References: <4648723.rWnut7F0uJ@amdc1227>
-	<14029212.D3MKvQZpbq@amdc1227>
-Message-ID: <CAJuYYwQWzUaAhBqzf--kVN39GnhsYJMzH6ew6yDf-JCFaA--cQ@mail.gmail.com>
+From: mgr@pengutronix.de (Michael Grzeschik)
+Date: Tue, 28 Aug 2012 16:51:51 +0200
+Subject: [PATCH v6 1/3] USB: chipidea: add imx usbmisc support
+In-Reply-To: <1346137109-32247-2-git-send-email-richard.zhao@freescale.com>
+References: <1346137109-32247-1-git-send-email-richard.zhao@freescale.com>
+ <1346137109-32247-2-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20120828145151.GJ10429@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 August 2012 15:36, Tomasz Figa <t.figa@samsung.com> wrote:
-> The GPEx gpios are specific to Exynos4210 and do not exist on Exynos4x12.
-> Redefine them to use the exact SoC name.
->
-> Based on "ARM: EXYYNOS: Use EXYNOS4210_GPEx instead of EXYNOS4_GPEx" by
-> Joonyoung Shim, see:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/100738.html
->
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Hi,
+
+On Tue, Aug 28, 2012 at 02:58:27PM +0800, Richard Zhao wrote:
+> i.MX usb controllers shares non-core registers, which may include
+> SoC specific controls. We take it as a usbmisc device and usbmisc
+> driver set operations needed by ci13xxx_imx driver.
+> 
+> For example, Sabrelite board has bad over-current design, we can
+> usbmisc to disable over-current detect.
+> 
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 > ---
->  arch/arm/mach-exynos/include/mach/gpio.h   | 32 +++++++++++++++---------------
->  arch/arm/mach-exynos/mach-nuri.c           | 16 +++++++--------
->  arch/arm/mach-exynos/mach-origen.c         |  6 +++---
->  arch/arm/mach-exynos/mach-trats.c          |  4 ++--
->  arch/arm/mach-exynos/mach-universal_c210.c | 32 +++++++++++++++---------------
->  arch/arm/mach-exynos/setup-fimc.c          |  4 ++--
->  drivers/gpio/gpio-samsung.c                | 20 +++++++++----------
->  7 files changed, 57 insertions(+), 57 deletions(-)
+>  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    5 +
+>  .../devicetree/bindings/usb/usbmisc-imx.txt        |   14 ++
+>  drivers/usb/chipidea/Makefile                      |    2 +-
+>  drivers/usb/chipidea/ci13xxx_imx.c                 |   64 ++++++++
+>  drivers/usb/chipidea/ci13xxx_imx.h                 |   28 ++++
+>  drivers/usb/chipidea/usbmisc_imx6q.c               |  162 ++++++++++++++++++++
+>  6 files changed, 274 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/usb/usbmisc-imx.txt
+>  create mode 100644 drivers/usb/chipidea/ci13xxx_imx.h
+>  create mode 100644 drivers/usb/chipidea/usbmisc_imx6q.c
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> index 2c29041..5778b9c 100644
+> --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> @@ -7,7 +7,10 @@ Required properties:
+>  
+>  Optional properties:
+>  - fsl,usbphy: phandler of usb phy that connects to the only one port
+> +- fsl,usbmisc: phandler of non-core register device, with one argument
+> +  that indicate usb controller index
+>  - vbus-supply: regulator for vbus
+> +- disable-over-current: disable over current detect
+>  
+>  Examples:
+>  usb at 02184000 { /* USB OTG */
+> @@ -15,4 +18,6 @@ usb at 02184000 { /* USB OTG */
+>  	reg = <0x02184000 0x200>;
+>  	interrupts = <0 43 0x04>;
+>  	fsl,usbphy = <&usbphy1>;
+> +	fsl,usbmisc = <&usbmisc 0>;
+> +	disable-over-current;
+>  };
+> diff --git a/Documentation/devicetree/bindings/usb/usbmisc-imx.txt b/Documentation/devicetree/bindings/usb/usbmisc-imx.txt
+> new file mode 100644
+> index 0000000..97ce94e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/usbmisc-imx.txt
+> @@ -0,0 +1,14 @@
+> +* Freescale i.MX non-core registers
+> +
+> +Required properties:
+> +- #index-cells: Cells used to descibe usb controller index. Should be <1>
+> +- compatible: Should be one of below:
+> +	"fsl,imx6q-usbmisc" for imx6q
+> +- reg: Should contain registers location and length
+> +
+> +Examples:
+> +usbmisc at 02184800 {
+> +	#index-cells = <1>;
+> +	compatible = "fsl,imx6q-usbmisc";
+> +	reg = <0x02184800 0x200>;
+> +};
 
-Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
+i think we should have the devicetree-discuss Mailinglist in Cc: for
+that.
 
-[...]
+Thanks,
+Michael
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
