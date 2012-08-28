@@ -1,625 +1,90 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 28 Aug 2012 20:25:34 +0530
-Subject: [PATCH 2/3] gpio: samsung: Add support for Exynos4x12 SoCs
-In-Reply-To: <2265472.2J2KAQrYg1@amdc1227>
-References: <4648723.rWnut7F0uJ@amdc1227>
-	<2265472.2J2KAQrYg1@amdc1227>
-Message-ID: <CAJuYYwR3tPhk=DHJVgk1E_MqWrwT+7_YdJOSjrYX=pF7_RFjpw@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 28 Aug 2012 22:57:59 +0800
+Subject: [PATCH 2/3] ARM: PRIMA2: make mach-prima2 common for all SiRF
+ series SoC
+In-Reply-To: <503CD58C.1010703@wwwdotorg.org>
+References: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
+ <201208210757.32852.arnd@arndb.de>
+ <CAGsJ_4yRbFrH8NPJZ6-gU1BebqVkQEBz_GLr4owQz+XpOyejug@mail.gmail.com>
+ <201208210920.52816.arnd@arndb.de>
+ <CAGsJ_4x4DdHsNgh7ArkD1fCHT22rxRs18vcobHtpSXJ-cq3o4Q@mail.gmail.com>
+ <CAGsJ_4y3Snvf-2DLSrpU5+zmytkARtNxJN_nPdiOngd+BK-aDA@mail.gmail.com>
+ <503CD58C.1010703@wwwdotorg.org>
+Message-ID: <CAGsJ_4zgdsGE=Htuvg7+OGh8+2efUBMNyWBYmq5MhnBOgG+MLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 August 2012 15:36, Tomasz Figa <t.figa@samsung.com> wrote:
-> Based on patch "gpio/exynos: Add support for Exynos4x12 SoC" by Joonyoung Shim.
-> See: http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/100737.html
+2012/8/28 Stephen Warren <swarren@wwwdotorg.org>:
+> On 08/28/2012 01:08 AM, Barry Song wrote:
+>> 2012/8/28 Barry Song <21cnbao@gmail.com>:
+>>> 2012/8/21 Arnd Bergmann <arnd@arndb.de>:
+>>>> On Tuesday 21 August 2012, Barry Song wrote:
+>>>>> then i add these to Kconfig.debug as it is a common way
+>>>>>
+>>>>>         config DEBUG_PRIMA2_UART1
+>>>>>                 bool "Kernel low-level debugging on DaVinci DA8XX using UART1"
+>>>>>                 depends on ARCH_PRIMA2
+>>>>>                 help
+>>>>>                   Say Y here if you want the debug print routines to direct
+>>>>>                   their output to UART1 serial port on SiRFprimaII devices.
+>>>>>
+>>>>>         config DEBUG_MARCO_UART1
+>>>>>                 bool "Kernel low-level debugging on DaVinci DA8XX using UART2"
+>>>>>                 depends on ARCH_MARCO
+>>>>>                 help
+>>>>>                   Say Y here if you want the debug print routines to direct
+>>>>>                   their output to UART1 serial port on SiRFmarco devices.
+>>>>>
+>>>>> and these in mach-prima2/include/mach/uart.h
+>>>>>
+>>>>>   #ifdef CONFIG_DEBUG_PRIMA2_UART1
+>>>>>   #define SIRFSOC_UART1_PA_BASE          0xb0060000
+>>>>>   #elif defined(CONFIG_DEBUG_MARCO_UART1)
+>>>>>   #define SIRFSOC_UART1_PA_BASE          0xcc060000
+>>>>>   #endif
+>>>>>
+>>>>> the above codes seem still ugly ?
+>>>>>
+>>>>
+>>>> No, that's fine, about as a good as it gets with today's kernel
+>>>> capabilities. Just fix the description to have the correct
+>>>> SoC name instead of "DaVinci DA8XX" ;-)
+>>>
+>>> except the DEBUG_LL uart base address, i missed the zreladdr-y. for
+>>> primaii, it is 0x00008000, for marco, it is 0x40008000 as marco's
+>>> memory space begins from 0x4000000.
+>>> i would to have AUTO_ZRELADDR for the whole SiRF series.
+>>> but for uImage load address difference in uImage header, which blocks
+>>> multiple SoCs from using same uImage, is "KERNEL_NOLOAD" uImage type
+>>> the current generic solution?
+>>
+>> also add Stephen Warren.
+>>
+>> i have two verified ways to resolve this problem:
+>>
+>> 1. use "kernel noload", build uImage by:
+>>
+>> make uImage UIMAGE_TYPE=kernel_noload
+>> and add the following patch in kernel:
 >
-> Exynos4x12 GPIO part1 and part2 have different layout than Exynos4210,
-> so the initialization code has to be modified to support Exynos4x12 SoC.
-> GPVx Exynos4x12 GPIO part4 is not supported yet.
->
-> In the Exynos4x12 GPIO part1 and part2, the interval of base register
-> offset is 0x20 but GPF0, GPJ0, GPK0 and GPM0 have different offsets. Same goes
-> for the interrupt reg offset of GPF0 and GPK0. Refer to the layout below.
->
-> - Exynos4x12 GPIO Part1
-> GPIO    Base offset     Interrupt reg offset
-> GPA0    0x000           0x00
-> GPA1    0x020           0x04
-> GPB     0x040           0x08
-> GPC0    0x060           0x0C
-> GPC1    0x080           0x10
-> GPD0    0x0A0           0x14
-> GPD1    0x0C0           0x18
->         ...
-> GPF0    0x180           0x30
-> GPF1    0x1A0           0x34
-> GPF2    0x1C0           0x38
-> GPF3    0x1E0           0x3C
->         ...
-> GPJ0    0x240           0x40
-> GPJ1    0x260           0x44
->
-> - Exynos4x12 GPIO Part2
->         ...
-> GPK0    0x040           0x08
-> GPK1    0x060           0x0C
-> GPK2    0x080           0x10
-> GPK3    0x0A0           0x14
-> GPL0    0x0C0           0x18
-> GPL1    0x0E0           0x1C
-> GPL2    0x100           0x20
-> GPY0    0x120           x
-> GPY1    0x140           x
-> GPY2    0x160           x
-> GPY3    0x180           x
-> GPY4    0x1A0           x
-> GPY5    0x1C0           x
-> GPY6    0x1E0           x
->         ...
-> GPM0    0x260           0x24
-> GPM1    0x280           0x28
-> GPM2    0x2A0           0x2C
-> GPM3    0x2C0           0x30
-> GPM4    0x2E0           0x34
-> GPX0    0xC00           x
-> GPX1    0xC20           x
-> GPX2    0xC40           x
-> GPX3    0xC60           x
->
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  arch/arm/mach-exynos/include/mach/gpio.h |  28 ++-
->  arch/arm/mach-exynos/include/mach/irqs.h |   6 -
->  drivers/gpio/gpio-samsung.c              | 330 ++++++++++++++++++++++++++++---
->  3 files changed, 326 insertions(+), 38 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/include/mach/gpio.h b/arch/arm/mach-exynos/include/mach/gpio.h
-> index 21c9bf1..2103d14 100644
-> --- a/arch/arm/mach-exynos/include/mach/gpio.h
-> +++ b/arch/arm/mach-exynos/include/mach/gpio.h
-> @@ -26,11 +26,13 @@
->  #define EXYNOS4_GPIO_C1_NR     (5)
->  #define EXYNOS4_GPIO_D0_NR     (4)
->  #define EXYNOS4_GPIO_D1_NR     (4)
-> +
->  #define EXYNOS4210_GPIO_E0_NR  (5)
->  #define EXYNOS4210_GPIO_E1_NR  (8)
->  #define EXYNOS4210_GPIO_E2_NR  (6)
->  #define EXYNOS4210_GPIO_E3_NR  (8)
->  #define EXYNOS4210_GPIO_E4_NR  (8)
-> +
->  #define EXYNOS4_GPIO_F0_NR     (8)
->  #define EXYNOS4_GPIO_F1_NR     (8)
->  #define EXYNOS4_GPIO_F2_NR     (8)
-> @@ -44,6 +46,13 @@
->  #define EXYNOS4_GPIO_L0_NR     (8)
->  #define EXYNOS4_GPIO_L1_NR     (3)
->  #define EXYNOS4_GPIO_L2_NR     (8)
-> +
-> +#define EXYNOS4X12_GPIO_M0_NR  (8)
-> +#define EXYNOS4X12_GPIO_M1_NR  (7)
-> +#define EXYNOS4X12_GPIO_M2_NR  (5)
-> +#define EXYNOS4X12_GPIO_M3_NR  (8)
-> +#define EXYNOS4X12_GPIO_M4_NR  (8)
-> +
->  #define EXYNOS4_GPIO_X0_NR     (8)
->  #define EXYNOS4_GPIO_X1_NR     (8)
->  #define EXYNOS4_GPIO_X2_NR     (8)
-> @@ -67,12 +76,20 @@ enum exynos4_gpio_number {
->         EXYNOS4_GPIO_C1_START   = EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_C0),
->         EXYNOS4_GPIO_D0_START   = EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_C1),
->         EXYNOS4_GPIO_D1_START   = EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_D0),
-> +
->         EXYNOS4210_GPIO_E0_START        = EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_D1),
->         EXYNOS4210_GPIO_E1_START        = EXYNOS_GPIO_NEXT(EXYNOS4210_GPIO_E0),
->         EXYNOS4210_GPIO_E2_START        = EXYNOS_GPIO_NEXT(EXYNOS4210_GPIO_E1),
->         EXYNOS4210_GPIO_E3_START        = EXYNOS_GPIO_NEXT(EXYNOS4210_GPIO_E2),
->         EXYNOS4210_GPIO_E4_START        = EXYNOS_GPIO_NEXT(EXYNOS4210_GPIO_E3),
-> -       EXYNOS4_GPIO_F0_START   = EXYNOS_GPIO_NEXT(EXYNOS4210_GPIO_E4),
-> +
-> +       EXYNOS4X12_GPIO_M0_START        = EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_D1),
-> +       EXYNOS4X12_GPIO_M1_START        = EXYNOS_GPIO_NEXT(EXYNOS4X12_GPIO_M0),
-> +       EXYNOS4X12_GPIO_M2_START        = EXYNOS_GPIO_NEXT(EXYNOS4X12_GPIO_M1),
-> +       EXYNOS4X12_GPIO_M3_START        = EXYNOS_GPIO_NEXT(EXYNOS4X12_GPIO_M2),
-> +       EXYNOS4X12_GPIO_M4_START        = EXYNOS_GPIO_NEXT(EXYNOS4X12_GPIO_M3),
-> +
-> +       EXYNOS4_GPIO_F0_START   = EXYNOS_GPIO_NEXT(EXYNOS4X12_GPIO_M4),
->         EXYNOS4_GPIO_F1_START   = EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_F0),
->         EXYNOS4_GPIO_F2_START   = EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_F1),
->         EXYNOS4_GPIO_F3_START   = EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_F2),
-> @@ -108,11 +125,13 @@ enum exynos4_gpio_number {
->  #define EXYNOS4_GPC1(_nr)      (EXYNOS4_GPIO_C1_START + (_nr))
->  #define EXYNOS4_GPD0(_nr)      (EXYNOS4_GPIO_D0_START + (_nr))
->  #define EXYNOS4_GPD1(_nr)      (EXYNOS4_GPIO_D1_START + (_nr))
-> +
->  #define EXYNOS4210_GPE0(_nr)   (EXYNOS4210_GPIO_E0_START + (_nr))
->  #define EXYNOS4210_GPE1(_nr)   (EXYNOS4210_GPIO_E1_START + (_nr))
->  #define EXYNOS4210_GPE2(_nr)   (EXYNOS4210_GPIO_E2_START + (_nr))
->  #define EXYNOS4210_GPE3(_nr)   (EXYNOS4210_GPIO_E3_START + (_nr))
->  #define EXYNOS4210_GPE4(_nr)   (EXYNOS4210_GPIO_E4_START + (_nr))
-> +
->  #define EXYNOS4_GPF0(_nr)      (EXYNOS4_GPIO_F0_START + (_nr))
->  #define EXYNOS4_GPF1(_nr)      (EXYNOS4_GPIO_F1_START + (_nr))
->  #define EXYNOS4_GPF2(_nr)      (EXYNOS4_GPIO_F2_START + (_nr))
-> @@ -126,6 +145,13 @@ enum exynos4_gpio_number {
->  #define EXYNOS4_GPL0(_nr)      (EXYNOS4_GPIO_L0_START + (_nr))
->  #define EXYNOS4_GPL1(_nr)      (EXYNOS4_GPIO_L1_START + (_nr))
->  #define EXYNOS4_GPL2(_nr)      (EXYNOS4_GPIO_L2_START + (_nr))
-> +
-> +#define EXYNOS4X12_GPM0(_nr)   (EXYNOS4X12_GPIO_M0_START + (_nr))
-> +#define EXYNOS4X12_GPM1(_nr)   (EXYNOS4X12_GPIO_M1_START + (_nr))
-> +#define EXYNOS4X12_GPM2(_nr)   (EXYNOS4X12_GPIO_M2_START + (_nr))
-> +#define EXYNOS4X12_GPM3(_nr)   (EXYNOS4X12_GPIO_M3_START + (_nr))
-> +#define EXYNOS4X12_GPM4(_nr)   (EXYNOS4X12_GPIO_M4_START + (_nr))
-> +
->  #define EXYNOS4_GPX0(_nr)      (EXYNOS4_GPIO_X0_START + (_nr))
->  #define EXYNOS4_GPX1(_nr)      (EXYNOS4_GPIO_X1_START + (_nr))
->  #define EXYNOS4_GPX2(_nr)      (EXYNOS4_GPIO_X2_START + (_nr))
-> diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
-> index 315aa14..c2ad2be 100644
-> --- a/arch/arm/mach-exynos/include/mach/irqs.h
-> +++ b/arch/arm/mach-exynos/include/mach/irqs.h
-> @@ -168,9 +168,6 @@
->
->  #define EXYNOS4_MAX_COMBINER_NR                16
->
-> -#define EXYNOS4_IRQ_GPIO1_NR_GROUPS    16
-> -#define EXYNOS4_IRQ_GPIO2_NR_GROUPS    9
-> -
->  /*
->   * For Compatibility:
->   * the default is for EXYNOS4, and
-> @@ -238,9 +235,6 @@
->  #define IRQ_FIMD0_VSYNC                        EXYNOS4_IRQ_FIMD0_VSYNC
->  #define IRQ_FIMD0_SYSTEM               EXYNOS4_IRQ_FIMD0_SYSTEM
->
-> -#define IRQ_GPIO1_NR_GROUPS            EXYNOS4_IRQ_GPIO1_NR_GROUPS
-> -#define IRQ_GPIO2_NR_GROUPS            EXYNOS4_IRQ_GPIO2_NR_GROUPS
-> -
->  /* For EXYNOS5 SoCs */
->
->  #define EXYNOS5_IRQ_MDMA0              IRQ_SPI(33)
-> diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
-> index c996440..b5048f5 100644
-> --- a/drivers/gpio/gpio-samsung.c
-> +++ b/drivers/gpio/gpio-samsung.c
-> @@ -2126,7 +2126,7 @@ static struct samsung_gpio_chip s5pv210_gpios_4bit[] = {
->   */
->
->  #ifdef CONFIG_ARCH_EXYNOS4
-> -static struct samsung_gpio_chip exynos4_gpios_1[] = {
-> +static struct samsung_gpio_chip exynos4210_gpios_1[] = {
->         {
->                 .chip   = {
->                         .base   = EXYNOS4_GPA0(0),
-> @@ -2225,10 +2225,93 @@ static struct samsung_gpio_chip exynos4_gpios_1[] = {
->                 },
->         },
->  };
-> -#endif
->
-> -#ifdef CONFIG_ARCH_EXYNOS4
-> -static struct samsung_gpio_chip exynos4_gpios_2[] = {
-> +static struct samsung_gpio_chip exynos4x12_gpios_1[] = {
-> +       {
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPA0(0),
-> +                       .ngpio  = EXYNOS4_GPIO_A0_NR,
-> +                       .label  = "GPA0",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPA1(0),
-> +                       .ngpio  = EXYNOS4_GPIO_A1_NR,
-> +                       .label  = "GPA1",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPB(0),
-> +                       .ngpio  = EXYNOS4_GPIO_B_NR,
-> +                       .label  = "GPB",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPC0(0),
-> +                       .ngpio  = EXYNOS4_GPIO_C0_NR,
-> +                       .label  = "GPC0",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPC1(0),
-> +                       .ngpio  = EXYNOS4_GPIO_C1_NR,
-> +                       .label  = "GPC1",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPD0(0),
-> +                       .ngpio  = EXYNOS4_GPIO_D0_NR,
-> +                       .label  = "GPD0",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPD1(0),
-> +                       .ngpio  = EXYNOS4_GPIO_D1_NR,
-> +                       .label  = "GPD1",
-> +               },
-> +       }, {
-> +               .base   = (void *)0x180,
-> +               .group  = 12,
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPF0(0),
-> +                       .ngpio  = EXYNOS4_GPIO_F0_NR,
-> +                       .label  = "GPF0",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPF1(0),
-> +                       .ngpio  = EXYNOS4_GPIO_F1_NR,
-> +                       .label  = "GPF1",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPF2(0),
-> +                       .ngpio  = EXYNOS4_GPIO_F2_NR,
-> +                       .label  = "GPF2",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPF3(0),
-> +                       .ngpio  = EXYNOS4_GPIO_F3_NR,
-> +                       .label  = "GPF3",
-> +               },
-> +       }, {
-> +               .base   = (void *)0x240,
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPJ0(0),
-> +                       .ngpio  = EXYNOS4_GPIO_J0_NR,
-> +                       .label  = "GPJ0",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPJ1(0),
-> +                       .ngpio  = EXYNOS4_GPIO_J1_NR,
-> +                       .label  = "GPJ1",
-> +               },
-> +       },
-> +};
-> +
-> +static struct samsung_gpio_chip exynos4210_gpios_2[] = {
->         {
->                 .chip   = {
->                         .base   = EXYNOS4_GPJ0(0),
-> @@ -2333,6 +2416,172 @@ static struct samsung_gpio_chip exynos4_gpios_2[] = {
->                         .label  = "GPY6",
->                 },
->         }, {
-> +               .base   = (void *)0xC00,
-> +               .config = &samsung_gpio_cfgs[9],
-> +               .irq_base = IRQ_EINT(0),
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPX0(0),
-> +                       .ngpio  = EXYNOS4_GPIO_X0_NR,
-> +                       .label  = "GPX0",
-> +                       .to_irq = samsung_gpiolib_to_irq,
-> +               },
-> +       }, {
-> +               .config = &samsung_gpio_cfgs[9],
-> +               .irq_base = IRQ_EINT(8),
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPX1(0),
-> +                       .ngpio  = EXYNOS4_GPIO_X1_NR,
-> +                       .label  = "GPX1",
-> +                       .to_irq = samsung_gpiolib_to_irq,
-> +               },
-> +       }, {
-> +               .config = &samsung_gpio_cfgs[9],
-> +               .irq_base = IRQ_EINT(16),
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPX2(0),
-> +                       .ngpio  = EXYNOS4_GPIO_X2_NR,
-> +                       .label  = "GPX2",
-> +                       .to_irq = samsung_gpiolib_to_irq,
-> +               },
-> +       }, {
-> +               .config = &samsung_gpio_cfgs[9],
-> +               .irq_base = IRQ_EINT(24),
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPX3(0),
-> +                       .ngpio  = EXYNOS4_GPIO_X3_NR,
-> +                       .label  = "GPX3",
-> +                       .to_irq = samsung_gpiolib_to_irq,
-> +               },
-> +       },
-> +};
+> Very recent U-Boot have a bootz command, which acts just like bootm, but
+> allows use of a raw zImage or the kernel, rather than a
+> uImage-wrapped-zImage. This was implemented by Marek Vasut.
 
-I see that GPX0, GPX1, GPX2 and GPX3 bank instances are already part
-of mainline kernel. How is that this is being added here.
+Thanks, Stephen. i guess xianglong will try bootz on SiRFmarco and try
+to move from uImage to raw zImage.
 
-> +
-> +static struct samsung_gpio_chip exynos4x12_gpios_2[] = {
-> +       {
-> +               .base   = (void *)0x040,
-> +               .group  = 20,
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPK0(0),
-> +                       .ngpio  = EXYNOS4_GPIO_K0_NR,
-> +                       .label  = "GPK0",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPK1(0),
-> +                       .ngpio  = EXYNOS4_GPIO_K1_NR,
-> +                       .label  = "GPK1",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPK2(0),
-> +                       .ngpio  = EXYNOS4_GPIO_K2_NR,
-> +                       .label  = "GPK2",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPK3(0),
-> +                       .ngpio  = EXYNOS4_GPIO_K3_NR,
-> +                       .label  = "GPK3",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPL0(0),
-> +                       .ngpio  = EXYNOS4_GPIO_L0_NR,
-> +                       .label  = "GPL0",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPL1(0),
-> +                       .ngpio  = EXYNOS4_GPIO_L1_NR,
-> +                       .label  = "GPL1",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPL2(0),
-> +                       .ngpio  = EXYNOS4_GPIO_L2_NR,
-> +                       .label  = "GPL2",
-> +               },
-> +       }, {
-> +               .config = &samsung_gpio_cfgs[8],
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPY0(0),
-> +                       .ngpio  = EXYNOS4_GPIO_Y0_NR,
-> +                       .label  = "GPY0",
-> +               },
-> +       }, {
-> +               .config = &samsung_gpio_cfgs[8],
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPY1(0),
-> +                       .ngpio  = EXYNOS4_GPIO_Y1_NR,
-> +                       .label  = "GPY1",
-> +               },
-> +       }, {
-> +               .config = &samsung_gpio_cfgs[8],
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPY2(0),
-> +                       .ngpio  = EXYNOS4_GPIO_Y2_NR,
-> +                       .label  = "GPY2",
-> +               },
-> +       }, {
-> +               .config = &samsung_gpio_cfgs[8],
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPY3(0),
-> +                       .ngpio  = EXYNOS4_GPIO_Y3_NR,
-> +                       .label  = "GPY3",
-> +               },
-> +       }, {
-> +               .config = &samsung_gpio_cfgs[8],
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPY4(0),
-> +                       .ngpio  = EXYNOS4_GPIO_Y4_NR,
-> +                       .label  = "GPY4",
-> +               },
-> +       }, {
-> +               .config = &samsung_gpio_cfgs[8],
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPY5(0),
-> +                       .ngpio  = EXYNOS4_GPIO_Y5_NR,
-> +                       .label  = "GPY5",
-> +               },
-> +       }, {
-> +               .config = &samsung_gpio_cfgs[8],
-> +               .chip   = {
-> +                       .base   = EXYNOS4_GPY6(0),
-> +                       .ngpio  = EXYNOS4_GPIO_Y6_NR,
-> +                       .label  = "GPY6",
-> +               },
-> +       }, {
-> +               .base   = (void *)0x260,
-> +               .chip   = {
-> +                       .base   = EXYNOS4X12_GPM0(0),
-> +                       .ngpio  = EXYNOS4X12_GPIO_M0_NR,
-> +                       .label  = "GPM0",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4X12_GPM1(0),
-> +                       .ngpio  = EXYNOS4X12_GPIO_M1_NR,
-> +                       .label  = "GPM1",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4X12_GPM2(0),
-> +                       .ngpio  = EXYNOS4X12_GPIO_M2_NR,
-> +                       .label  = "GPM2",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4X12_GPM3(0),
-> +                       .ngpio  = EXYNOS4X12_GPIO_M3_NR,
-> +                       .label  = "GPM3",
-> +               },
-> +       }, {
-> +               .chip   = {
-> +                       .base   = EXYNOS4X12_GPM4(0),
-> +                       .ngpio  = EXYNOS4X12_GPIO_M4_NR,
-> +                       .label  = "GPM4",
-> +               },
-> +       }, {
-> +               .base   = (void *)0xC00,
->                 .config = &samsung_gpio_cfgs[9],
->                 .irq_base = IRQ_EINT(0),
->                 .chip   = {
-> @@ -2370,9 +2619,7 @@ static struct samsung_gpio_chip exynos4_gpios_2[] = {
->                 },
->         },
->  };
+Based on your past "kernel_noload" support patch, we actually can
+compile an uImage by:
+make uImage UIMAGE_TYPE=kernel_noload UIMAGE_ENTRYADDR=0x0
+and it gets a cross-SoCs uImage which doesn't care about zreladdr-y in
+Makefile.boot.
+actually it just jumps to (loaded uImage dram address + 0x40).
 
-There are no GPX banks instantiated here for 4x12. What is the reason for that?
+anyway, we don't need to modify mach-prima2/Makefile.boot for marco any more.
 
-> -#endif
->
-> -#ifdef CONFIG_ARCH_EXYNOS4
->  static struct samsung_gpio_chip exynos4_gpios_3[] = {
->         {
->                 .chip   = {
-> @@ -2727,12 +2974,15 @@ static __init void exynos_gpiolib_attach_ofnode(struct samsung_gpio_chip *chip,
+do people think we have a chance to delete mach-xxx/Makefile.boot for
+some platforms if  zreladdr-y and related address don't make many
+senses again?
 
-What is the limitation in adding support for GPVx as well for 4x12 ?
-
->
->  static __init void exynos4_gpiolib_init(void)
->  {
-> -#ifdef CONFIG_CPU_EXYNOS4210
-> +#ifdef CONFIG_ARCH_EXYNOS4
->         struct samsung_gpio_chip *chip;
->         int i, nr_chips;
->         void __iomem *gpio_base1, *gpio_base2, *gpio_base3;
->         int group = 0;
->         void __iomem *gpx_base;
-> +       struct samsung_gpio_chip *chip_p;
-> +       int offset = 0;
-> +       int group1 = 0;
->
->         /* gpio part1 */
->         gpio_base1 = ioremap(EXYNOS4_PA_GPIO1, SZ_4K);
-> @@ -2741,19 +2991,31 @@ static __init void exynos4_gpiolib_init(void)
->                 goto err_ioremap1;
->         }
->
-> -       chip = exynos4_gpios_1;
-> -       nr_chips = ARRAY_SIZE(exynos4_gpios_1);
-> +       if (soc_is_exynos4210()) {
-> +               chip = chip_p = exynos4210_gpios_1;
-> +               nr_chips = ARRAY_SIZE(exynos4210_gpios_1);
-> +       } else {
-> +               chip = chip_p = exynos4x12_gpios_1;
-> +               nr_chips = ARRAY_SIZE(exynos4x12_gpios_1);
-> +       }
->
->         for (i = 0; i < nr_chips; i++, chip++) {
->                 if (!chip->config) {
->                         chip->config = &exynos_gpio_cfg;
-> +                       if (chip->group)
-> +                               group = chip->group;
->                         chip->group = group++;
->                 }
-> -               exynos_gpiolib_attach_ofnode(chip,
-> -                               EXYNOS4_PA_GPIO1, i * 0x20);
-> +
-> +               if (chip->base)
-> +                       offset = (u32)chip->base;
-> +               chip->base = gpio_base1 + offset;
-> +               offset += 0x20;
-> +
-> +               exynos_gpiolib_attach_ofnode(chip, EXYNOS4_PA_GPIO1, 0);
->         }
-> -       samsung_gpiolib_add_4bit_chips(exynos4_gpios_1,
-> -                                      nr_chips, gpio_base1);
-> +       samsung_gpiolib_add_4bit_chips(chip_p, nr_chips, gpio_base1);
-> +       group1 = group;
->
->         /* gpio part2 */
->         gpio_base2 = ioremap(EXYNOS4_PA_GPIO2, SZ_4K);
-> @@ -2762,25 +3024,32 @@ static __init void exynos4_gpiolib_init(void)
->                 goto err_ioremap2;
->         }
->
-> -       /* need to set base address for gpx */
-> -       chip = &exynos4_gpios_2[16];
-> -       gpx_base = gpio_base2 + 0xC00;
-> -       for (i = 0; i < 4; i++, chip++, gpx_base += 0x20)
-> -               chip->base = gpx_base;
-> +       if (soc_is_exynos4210()) {
-> +               chip = chip_p = exynos4210_gpios_2;
-> +               nr_chips = ARRAY_SIZE(exynos4210_gpios_2);
-> +       } else {
-> +               chip = chip_p = exynos4x12_gpios_2;
-> +               nr_chips = ARRAY_SIZE(exynos4x12_gpios_2);
-> +       }
->
-> -       chip = exynos4_gpios_2;
-> -       nr_chips = ARRAY_SIZE(exynos4_gpios_2);
-> +       offset = 0;
->
->         for (i = 0; i < nr_chips; i++, chip++) {
->                 if (!chip->config) {
->                         chip->config = &exynos_gpio_cfg;
-> +                       if (chip->group)
-> +                               group = chip->group;
->                         chip->group = group++;
->                 }
-> -               exynos_gpiolib_attach_ofnode(chip,
-> -                               EXYNOS4_PA_GPIO2, i * 0x20);
-> +
-> +               if (chip->base)
-> +                       offset = (u32)chip->base;
-> +               chip->base = gpio_base2 + offset;
-> +               offset += 0x20;
-> +
-> +               exynos_gpiolib_attach_ofnode(chip, EXYNOS4_PA_GPIO2, 0);
->         }
-> -       samsung_gpiolib_add_4bit_chips(exynos4_gpios_2,
-> -                                      nr_chips, gpio_base2);
-> +       samsung_gpiolib_add_4bit_chips(chip_p, nr_chips, gpio_base2);
->
->         /* gpio part3 */
->         gpio_base3 = ioremap(EXYNOS4_PA_GPIO3, SZ_256);
-> @@ -2801,12 +3070,10 @@ static __init void exynos4_gpiolib_init(void)
->                                 EXYNOS4_PA_GPIO3, i * 0x20);
->         }
->         samsung_gpiolib_add_4bit_chips(exynos4_gpios_3,
-> -                                      nr_chips, gpio_base3);
-> +                                       nr_chips, gpio_base3);
->
-> -#if defined(CONFIG_CPU_EXYNOS4210) && defined(CONFIG_S5P_GPIO_INT)
-> -       s5p_register_gpioint_bank(IRQ_GPIO_XA, 0, IRQ_GPIO1_NR_GROUPS);
-> -       s5p_register_gpioint_bank(IRQ_GPIO_XB, IRQ_GPIO1_NR_GROUPS, IRQ_GPIO2_NR_GROUPS);
-> -#endif
-> +       s5p_register_gpioint_bank(IRQ_GPIO_XA, 0, group1);
-> +       s5p_register_gpioint_bank(IRQ_GPIO_XB, group1, group - group1);
->
->         return;
->
-> @@ -2816,7 +3083,7 @@ err_ioremap2:
->         iounmap(gpio_base1);
->  err_ioremap1:
->         return;
-> -#endif /* CONFIG_CPU_EXYNOS4210 */
-> +#endif /* CONFIG_ARCH_EXYNOS4 */
->  }
->
->  static __init void exynos5_gpiolib_init(void)
-> @@ -3010,7 +3277,8 @@ static __init int samsung_gpiolib_init(void)
->  #if defined(CONFIG_CPU_S5PV210) && defined(CONFIG_S5P_GPIO_INT)
->                 s5p_register_gpioint_bank(IRQ_GPIOINT, 0, S5P_GPIOINT_GROUP_MAXNR);
->  #endif
-> -       } else if (soc_is_exynos4210()) {
-> +       } else if (soc_is_exynos4210() || soc_is_exynos4212() ||
-> +                       soc_is_exynos4412()) {
->                 exynos4_gpiolib_init();
->         } else if (soc_is_exynos5250()) {
->                 exynos5_gpiolib_init();
-> --
-> 1.7.12
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-barry
