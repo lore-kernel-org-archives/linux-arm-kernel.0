@@ -1,88 +1,53 @@
-From: matthew.leach@arm.com (Matthew Leach)
-Date: Tue, 28 Aug 2012 16:41:28 +0100
-Subject: [PATCH v3] serial: pl011: honour serial aliases in device tree
-Message-ID: <1346168488-9309-1-git-send-email-matthew.leach@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Aug 2012 18:02:24 +0200
+Subject: [PATCH] ARM: dts: mxs: Add the second I2C adapter to the CFA10049
+ expansion board
+Message-ID: <1346169744-24674-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the order of UART nodes is changed in the device tree, then tty dev
-devices are attached to different serial ports causing the console to
-be directed to a different physical serial port. The "serial" aliases
-in the device tree should prevent this.
-
-This patch ensures that the UART driver creates tty devices that
-honour these aliases if a device tree is present.
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-Signed-off-by: Matthew Leach <matthew.leach@arm.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
-v3: minor consistency correction
-v2: use IS_ENABLED instead of ifdefs
- drivers/tty/serial/amba-pl011.c |   36 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 36 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx28-cfa10049.dts |   31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx28-cfa10049.dts
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index d3553b5..dc05dd1 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -52,6 +52,8 @@
- #include <linux/scatterlist.h>
- #include <linux/delay.h>
- #include <linux/types.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- #include <linux/pinctrl/consumer.h>
- #include <linux/sizes.h>
- 
-@@ -1869,6 +1871,38 @@ static struct uart_driver amba_reg = {
- 	.cons			= AMBA_CONSOLE,
- };
- 
-+static int pl011_probe_dt_alias(int index, struct device *dev)
-+{
-+	struct device_node *np;
-+	static bool seen_dev_with_alias = false;
-+	static bool seen_dev_without_alias = false;
-+	int ret = index;
+diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+new file mode 100644
+index 0000000..e0e4b8c
+--- /dev/null
++++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+@@ -0,0 +1,31 @@
++/*
++ * Copyright 2012 Free Electrons
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
 +
-+	if (!IS_ENABLED(CONFIG_OF))
-+		return ret;
++/*
++ * The CFA-10049 is an expansion board for the CFA-10036 module, thus we
++ * need to include the CFA-10036 DTS.
++ */
++/include/ "imx28-cfa10036.dts"
 +
-+	np = dev->of_node;
-+	if (!np)
-+		return ret;
++/ {
++	model = "Crystalfontz CFA-10049 Board";
++	compatible = "crystalfontz,cfa10049", "crystalfontz,cfa10036", "fsl,imx28";
 +
-+	ret = of_alias_get_id(np, "serial");
-+	if (IS_ERR_VALUE(ret)) {
-+		seen_dev_without_alias = true;
-+		ret = index;
-+	} else {
-+		seen_dev_with_alias = true;
-+		if (ret >= ARRAY_SIZE(amba_ports) || amba_ports[ret] != NULL) {
-+			dev_warn(dev, "requested serial port %d  not available.\n", ret);
-+			ret = index;
-+		}
-+	}
-+
-+	if (seen_dev_with_alias && seen_dev_without_alias)
-+		dev_warn(dev, "aliased and non-aliased serial devices found in device tree. Serial port enumeration may be unpredictable.\n");
-+
-+	return ret;
-+}
-+
- static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- {
- 	struct uart_amba_port *uap;
-@@ -1891,6 +1925,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 		goto out;
- 	}
- 
-+	i = pl011_probe_dt_alias(i, &dev->dev);
-+
- 	base = ioremap(dev->res.start, resource_size(&dev->res));
- 	if (!base) {
- 		ret = -ENOMEM;
++	apb at 80000000 {
++		apbx at 80040000 {
++			i2c1: i2c at 8005a000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&i2c1_pins_a>;
++				status = "okay";
++			};
++		};
++	};
++};
 -- 
-1.7.0.4
+1.7.9.5
