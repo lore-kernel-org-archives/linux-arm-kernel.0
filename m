@@ -1,58 +1,107 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 28 Aug 2012 14:15:26 +0800
-Subject: [PATCH 2/3] ARM: PRIMA2: make mach-prima2 common for all SiRF
- series SoC
-In-Reply-To: <201208210920.52816.arnd@arndb.de>
-References: <1345450787-17246-1-git-send-email-Barry.Song@csr.com>
- <201208210757.32852.arnd@arndb.de>
- <CAGsJ_4yRbFrH8NPJZ6-gU1BebqVkQEBz_GLr4owQz+XpOyejug@mail.gmail.com>
- <201208210920.52816.arnd@arndb.de>
-Message-ID: <CAGsJ_4x4DdHsNgh7ArkD1fCHT22rxRs18vcobHtpSXJ-cq3o4Q@mail.gmail.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Tue, 28 Aug 2012 11:51:32 +0530
+Subject: [PATCH v3 3/4] arm/dts: AM33XX: Configure pinmuxs for D_CAN1
+ on AM335x-EVM
+In-Reply-To: <20120824201447.GY11011@atomide.com>
+References: <1345119610-5247-1-git-send-email-anilkumar@ti.com>
+ <1345119610-5247-4-git-send-email-anilkumar@ti.com>
+ <20120824201447.GY11011@atomide.com>
+Message-ID: <503C636C.6080708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/8/21 Arnd Bergmann <arnd@arndb.de>:
-> On Tuesday 21 August 2012, Barry Song wrote:
->> then i add these to Kconfig.debug as it is a common way
->>
->>         config DEBUG_PRIMA2_UART1
->>                 bool "Kernel low-level debugging on DaVinci DA8XX using UART1"
->>                 depends on ARCH_PRIMA2
->>                 help
->>                   Say Y here if you want the debug print routines to direct
->>                   their output to UART1 serial port on SiRFprimaII devices.
->>
->>         config DEBUG_MARCO_UART1
->>                 bool "Kernel low-level debugging on DaVinci DA8XX using UART2"
->>                 depends on ARCH_MARCO
->>                 help
->>                   Say Y here if you want the debug print routines to direct
->>                   their output to UART1 serial port on SiRFmarco devices.
->>
->> and these in mach-prima2/include/mach/uart.h
->>
->>   #ifdef CONFIG_DEBUG_PRIMA2_UART1
->>   #define SIRFSOC_UART1_PA_BASE          0xb0060000
->>   #elif defined(CONFIG_DEBUG_MARCO_UART1)
->>   #define SIRFSOC_UART1_PA_BASE          0xcc060000
->>   #endif
->>
->> the above codes seem still ugly ?
->>
->
-> No, that's fine, about as a good as it gets with today's kernel
-> capabilities. Just fix the description to have the correct
-> SoC name instead of "DaVinci DA8XX" ;-)
 
-except the DEBUG_LL uart base address, i missed the zreladdr-y. for
-primaii, it is 0x00008000, for marco, it is 0x40008000 as marco's
-memory space begins from 0x4000000.
-i would to have AUTO_ZRELADDR for the whole SiRF series.
-but for uImage load address difference in uImage header, which blocks
-multiple SoCs from using same uImage, is "KERNEL_NOLOAD" uImage type
-the current generic solution?
 
->
->         Arnd
+On 8/25/2012 1:44 AM, Tony Lindgren wrote:
+> * AnilKumar Ch <anilkumar@ti.com> [120816 05:20]:
+>> Add D_CAN1 pinctrl node to am3358_pinmux master node to export
+>> D_CAN functionality on AM335x EVM according to pinctrl-single
+>> driver.
+>>
+>> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+>> ---
+>> Changes from v2:
+>> 	- Incorporated Vaibhav H's comments on v2
+>> 	  * Added dcan0 instances to am33xx.dtsi file
+>>
+>> Changes from v1:
+>> 	- These two patches separated from c_can DT support
+>> 	  patch series.
+>>
+>>  arch/arm/boot/dts/am335x-evm.dts |   12 ++++++++++++
+>>  1 file changed, 12 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+>> index 5dd8a6b..a64c30a 100644
+>> --- a/arch/arm/boot/dts/am335x-evm.dts
+>> +++ b/arch/arm/boot/dts/am335x-evm.dts
+>> @@ -18,6 +18,18 @@
+>>  		reg = <0x80000000 0x10000000>; /* 256 MB */
+>>  	};
+>>  
+>> +	am3358_pinmux: pinmux at 44E10800 {
+> 
+> This should be just &am3358_pinmux as you already include it.
+> 
 
--barry
+I think it won't work this way, it will result into syntax error.
+The reason being is, unlike OMAP (and like other platforms, like, imx)
+here we are again representing device hierarchy starting from root,
+
+am335x-evm.dts:
+/ {
+
+	ocp {
+		...
+	};
+
+};
+
+Although I am not too familiar with DTS compiler, but below code results
+in syntax error:
+
+am335x-evm.dts:
+/ {
+
+	ocp {
+		...
+		&am3358_pinmux {
+			...
+		};
+	};
+
+};
+
+
+Thanks,
+Vaibhav
+
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&d_can1_pins>;
+>> +
+>> +		d_can1_pins: pinmux_d_can_pins {
+>> +			pinctrl-single,pins = <
+>> +				0x168 0x2	/* uart0_ctsn.d_can1_tx, OUTPUT | MODE2 */
+>> +				0x16C 0x32	/* uart0_rtsn.d_can1_rx, INPUT_PULLUP | MODE2 */
+>> +			>;
+>> +		};
+>> +	};
+>> +
+> 
+> It would better to claim these pins in the dcan driver entry
+> rather than set them as pins enabled by the pinctrl driver.
+> The reason is that in case you want to enable runtime PM related
+> stuff, like some more advanced wake-up features, for the rx pin
+> you can do it in the driver.
+> 
+> Then one nit.. Please lowercase all hex number in this series as that's the style
+> here.
+> 
+> Regards,
+> 
+> Tony
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
+> 
