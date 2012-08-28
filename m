@@ -1,84 +1,88 @@
-From: frankyl@broadcom.com (Franky Lin)
-Date: Tue, 28 Aug 2012 16:10:07 -0700
-Subject: [PATCH 2/6] brcmfmac: Handling the interrupt in ISR
- directly for non-OOB
-In-Reply-To: <503D4E7F.9010205@wwwdotorg.org>
-References: <1346063114-30361-1-git-send-email-wni@nvidia.com>
- <1346063114-30361-3-git-send-email-wni@nvidia.com>
- <503B9F31.5050502@broadcom.com> <503BD345.6030501@wwwdotorg.org>
- <1346152413.3516.211.camel@tegra-chromium-2>
- <503CF5B3.8040201@broadcom.com> <503D48AC.5040509@wwwdotorg.org>
- <503D4DD9.2060808@broadcom.com> <503D4E7F.9010205@wwwdotorg.org>
-Message-ID: <503D4FCF.7030109@broadcom.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 28 Aug 2012 16:10:52 -0700
+Subject: [PATCH] ARM: S3C24XX: Add .get_rate callback for "camif-upll"
+ clock
+In-Reply-To: <503D3108.1030804@gmail.com>
+References: <1346098329-32059-1-git-send-email-sylvester.nawrocki@gmail.com>
+ <503BFB86.20607@samsung.com> <503D3108.1030804@gmail.com>
+Message-ID: <503D4FFC.9010706@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2012 04:04 PM, Stephen Warren wrote:
-> On 08/28/2012 04:01 PM, Franky Lin wrote:
->> On 08/28/2012 03:39 PM, Stephen Warren wrote:
->>> On 08/28/2012 09:45 AM, Franky Lin wrote:
->>>> On 08/28/2012 04:13 AM, Wei Ni wrote:
->>>>> On Tue, 2012-08-28 at 04:06 +0800, Stephen Warren wrote:
->>>>>> On 08/27/2012 09:24 AM, Arend van Spriel wrote:
->>>>>>> On 08/27/2012 12:25 PM, Wei Ni wrote:
->>>>>>>> In case of inband interrupts, if we handle the interrupt in dpc
->>>>>>>> thread,
->>>>>>>> two level of thread switching takes place to process wifi
->>>>>>>> interrupts.
->>>>>>>> One in SDHCI driver and the other in Wifi driver. This may cause the
->>>>>>>> system
->>>>>>>> instability.
->>> ...
->>>>>>> Not sure if I can follow this explanation. The isr is called with
->>>>>>> host
->>>>>>> claimed (by sdio_irq_thread) and all it does is at a linked list
->>>>>>> member
->>>>>>> and signal the dpc thread. After doing this the host is released.
->>>>>>
->>>>>> Is the issue something like the ISR handler or first level of
->>>>>> threading
->>>>>> does:
->>>>>>
->>>>>> * Trigger DPC
->>>>>> * Re-enable interrupt
->>>>>>
->>>>>> So that the interrupt then fires again before the triggered DPC can
->>>>>> run
->>>>>> to handle/clear it, thus causing an interrupt storm?
->>>>>>
->>>>>> Whereas handling the interrupt directly prevents this race condition?
->>>>>
->>>>> Above is my understanding.
->>>>
->>>> I understand the issue here and totally agree that we should treat
->>>> in-band and out-band interrupts differently. But my concern is that the
->>>> behavior of releasing the host before calling brcmf_sdbrcm_isr and grab
->>>> it after is likely error prone. Also we are restructuring the dpc
->>>> routine internally and it's almost done. I will find a better solution
->>>> for in-band interrupt and get it the queue as well. So I suggest
->>>> dropping this patch.
+On 08/28/12 13:58, Sylwester Nawrocki wrote:
+> On 08/28/2012 12:58 AM, Kukjin Kim wrote:
+>> On 08/27/12 13:12, Sylwester Nawrocki wrote:
+>>> Add missing get_rate callback for the "camif-upll" clock, so frequency
+>>> of this clock is properly reported with clk_get_rate().
 >>>
->>> Franky, do you know which kernel release the DPC restructuring will make
->>> it into? I ask because I can't apply the rest of the patches in this
->>> series without first resolving the stability issues with the Broadcom
->>> WiFi enabled, since that'd de-stabilize the Tegra platform
->>> significantly, and I'd like to plan when we can apply these patches to
->>> Tegra. Thanks!
+>>> Signed-off-by: Sylwester Nawrocki<sylvester.nawrocki@gmail.com>
+>>> ---
+>>> arch/arm/mach-s3c24xx/clock-s3c2440.c | 14 ++++++++++++++
+>>> 1 files changed, 14 insertions(+), 0 deletions(-)
 >>>
+>>> diff --git a/arch/arm/mach-s3c24xx/clock-s3c2440.c
+>>> b/arch/arm/mach-s3c24xx/clock-s3c2440.c
+>>> index cb2883d..749220f 100644
+>>> --- a/arch/arm/mach-s3c24xx/clock-s3c2440.c
+>>> +++ b/arch/arm/mach-s3c24xx/clock-s3c2440.c
+>>> @@ -87,6 +87,19 @@ static int s3c2440_camif_upll_setrate(struct clk
+>>> *clk, unsigned long rate)
+>>> return 0;
+>>> }
+>>>
+>>> +static unsigned long s3c2440_camif_upll_getrate(struct clk *clk)
+>>> +{
+>>> + unsigned long parent_rate = clk_get_rate(clk->parent);
+>>> + unsigned long camdivn = __raw_readl(S3C2440_CAMDIVN);
+>>> +
+>>> + if (!(camdivn&  S3C2440_CAMDIVN_CAMCLK_SEL))
+>>> + return parent_rate;
+>>> +
+>>> + camdivn&= S3C2440_CAMDIVN_CAMCLK_MASK;
+>>> +
+>>> + return parent_rate / (camdivn + 1) / 2;
 >>
->> Hi Stephen,
->>
->> Since we submit patches through linux-wireless tree, you may only be
->> able to pick it up at 3.7-rc1. It's quite a big change so I don't think
->> it will qualify as a bug fix to get into 3.6-rcX.
+>> Well, why do we need '/ 2' here?
 >
-> That's as quick as I expected it to show up, so that's great. I don't
-> suppose you could mail Wei and myself once the patch gets into the
-> linux-wireless tree, so we can test it out on Tegra. If the patch could
-> possibly go into a topic branch in the wireless tree so it can be merged
-> into the Tegra tree before this series, that would be awesome. Thanks.
+> I simply followed documentation of the camera clock divider register
+> (CAMDIVN). This is how CAMCLK_SEL and CAMCLK_DIV bit fields are described
+> there:
 >
+> CAMDIVN      |  Bit  |       Description
+> --------------------------------------------------------------------------
+> CAMCLK_SEL   | [4]   | 0 : Use CAMCLK with UPLL output(CAMCLK=UPLL output)
+>               |       | 1 : CAMCLK is divided by CAMCLK_DIV value
+> -------------+-------+----------------------------------------------------
+> CAMCLK_DIV   | [3:0] | CAMCLK divide factor setting register(0 ? 15).
+>               |       | Camera clock = UPLL / [(CAMCLK_DIV +1)x2].
+>               |       | This bit is valid when CAMCLK_SEL=1.
+>
+> So, camera clock frequency = parent_rate / ((camdivn + 1) * 2).
+> This is exactly same as 'parent_rate / ( camdivn + 1) / 2'.
+>
+> To be 1000% sure I compared frequency values reported from clk_get_rate()
+> in the driver with values measured with an oscilloscope at the CAMCLKOUT
+> pin. Everything was as expected (UPLL - 48 MHz, CAMCLKOUT - 12 MHz).
+>
+> Also, it's easy to confirm correctness of this code by inversing equations
+> found in function s3c2440_camif_upll_setrate(), i.e.
+>
+>   camdivn&= ~(S3C2440_CAMDIVN_CAMCLK_SEL | S3C2440_CAMDIVN_CAMCLK_MASK);
+>   if (rate != parent_rate) {
+>   	camdivn |= S3C2440_CAMDIVN_CAMCLK_SEL;
+>   	camdivn |= (((parent_rate / rate) / 2) - 1);
+>   }
+>
+>   __raw_writel(camdivn, S3C2440_CAMDIVN);
+>
+> --
 
-Will keep you posted.
+Looks OK, thanks for your reply :-)
 
-Franky
+Applied.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
