@@ -1,37 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 28 Aug 2012 12:26:07 +0100
-Subject: [PATCH RESEND 1/4] ARM: OMAP2+: AM33XX: Add tps65910 device tree
- data
-In-Reply-To: <20120723133400.GU4435@opensource.wolfsonmicro.com>
-References: <1342766789-28148-1-git-send-email-anilkumar@ti.com>
- <1342766789-28148-2-git-send-email-anilkumar@ti.com>
- <20120720095935.GQ4495@opensource.wolfsonmicro.com>
- <331ABD5ECB02734CA317220B2BBEABC13E9FA91E@DBDE01.ent.ti.com>
- <20120720113806.GW4495@opensource.wolfsonmicro.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA01F1E@DBDE01.ent.ti.com>
- <20120723133400.GU4435@opensource.wolfsonmicro.com>
-Message-ID: <20120828112603.GC25786@gmail.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Tue, 28 Aug 2012 19:42:36 +0800
+Subject: [PATCH] usb: chipidea: cleanup dma_pool if udc_start() fails
+In-Reply-To: <503CA2E3.6010707@pengutronix.de>
+References: <1346149885-3084-1-git-send-email-mkl@pengutronix.de>
+ <20120828104617.GZ4011@b20223-02.ap.freescale.net>
+ <503CA2E3.6010707@pengutronix.de>
+Message-ID: <20120828114235.GA4011@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-> > arch/arm/boot/dts/db8500.dtsi
+On Tue, Aug 28, 2012 at 12:52:19PM +0200, Marc Kleine-Budde wrote:
+> On 08/28/2012 12:46 PM, Richard Zhao wrote:
+> > On Tue, Aug 28, 2012 at 12:31:25PM +0200, Marc Kleine-Budde wrote:
+> >> If udc_start() fails the qh_pool dma-pool cannot be closed because
+> >> it's still in use. This patch factors out the dma_pool_free() loop
+> >> into destroy_eps() and calls it in the error path of udc_start(),
+> >> too.
+> >>
+> >> Cc: Richard Zhao <richard.zhao@freescale.com>
+> >> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> >> ---
+> >> Hello,
+> >>
+> >> Richard, can you please include this patch in your stack. IIRC I think it once
+> >> was, but now it's not anymore.
+> > Sorry for that. I just push it to my topics/usb-driver branch.
+> > Of course, it's better, if Alex can give a ACK and Greg could pick up.
 > 
-> I'm not actually seeing anything terribly problematic here, though the
-> regulator-name properties should really be removed as they're fairly
-> useless and seem to be missing the point of having the property.
+> I'm not sure, if this [1] is the latest thread on this patch, but Greg
+> asked to queue this patch into your tree.
+It does not depends on my tree any more. It can be applied directly on
+Greg's tree.
 
-Just looking at this now. 
-
-The regulator-name property is used to populate constrains->name. Are
-you sure you still want them all removed?
-
-Kind regards,
-Lee
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks
+Richard
+> 
+> Marc
+> 
+> [1] http://comments.gmane.org/gmane.linux.usb.general/66440
+> -- 
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> 
