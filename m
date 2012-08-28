@@ -1,13 +1,13 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 28 Aug 2012 09:45:33 +0200
-Subject: [PATCH 1/2] ARM: clk-imx35: Fix SSI clock registration
-In-Reply-To: <1345385346-25412-1-git-send-email-festevam@gmail.com>
-References: <1345385346-25412-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120828074533.GV26594@pengutronix.de>
+Date: Tue, 28 Aug 2012 09:45:51 +0200
+Subject: [PATCH v2 2/2] ARM: clk-imx25: Fix SSI clock registration
+In-Reply-To: <1345395959-26978-1-git-send-email-festevam@gmail.com>
+References: <1345395959-26978-1-git-send-email-festevam@gmail.com>
+Message-ID: <20120828074551.GW26594@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 19, 2012 at 11:09:05AM -0300, Fabio Estevam wrote:
+On Sun, Aug 19, 2012 at 02:05:59PM -0300, Fabio Estevam wrote:
 > From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
 > SSI block has two types of clock:
@@ -22,31 +22,34 @@ On Sun, Aug 19, 2012 at 11:09:05AM -0300, Fabio Estevam wrote:
 > 
 > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Applied and added stable tag (I assume this should go to stable, right?)
+Applied and also added stable tag.
 
 Sascha
 
 > ---
->  arch/arm/mach-imx/clk-imx35.c |    6 ++----
+> Changes since v1:
+> - Use imx-ssi.1 for ssi2_ipg
+> 
+>  arch/arm/mach-imx/clk-imx25.c |    6 ++----
 >  1 file changed, 2 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-> index c6422fb..f7910df 100644
-> --- a/arch/arm/mach-imx/clk-imx35.c
-> +++ b/arch/arm/mach-imx/clk-imx35.c
-> @@ -230,10 +230,8 @@ int __init mx35_clocks_init()
->  	clk_register_clkdev(clk[ipu_gate], NULL, "mx3_sdc_fb");
->  	clk_register_clkdev(clk[owire_gate], NULL, "mxc_w1");
->  	clk_register_clkdev(clk[sdma_gate], NULL, "imx35-sdma");
-> -	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.0");
-> -	clk_register_clkdev(clk[ssi1_div_post], "per", "imx-ssi.0");
-> -	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.1");
-> -	clk_register_clkdev(clk[ssi2_div_post], "per", "imx-ssi.1");
-> +	clk_register_clkdev(clk[ssi1_gate], NULL, "imx-ssi.0");
-> +	clk_register_clkdev(clk[ssi1_gate], NULL, "imx-ssi.1");
->  	/* i.mx35 has the i.mx21 type uart */
->  	clk_register_clkdev(clk[uart1_gate], "per", "imx21-uart.0");
->  	clk_register_clkdev(clk[ipg], "ipg", "imx21-uart.0");
+> diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
+> index fdd8cc8..5ff9534 100644
+> --- a/arch/arm/mach-imx/clk-imx25.c
+> +++ b/arch/arm/mach-imx/clk-imx25.c
+> @@ -222,10 +222,8 @@ int __init mx25_clocks_init(void)
+>  	clk_register_clkdev(clk[lcdc_ipg], "ipg", "imx-fb.0");
+>  	clk_register_clkdev(clk[lcdc_ahb], "ahb", "imx-fb.0");
+>  	clk_register_clkdev(clk[wdt_ipg], NULL, "imx2-wdt.0");
+> -	clk_register_clkdev(clk[ssi1_ipg_per], "per", "imx-ssi.0");
+> -	clk_register_clkdev(clk[ssi1_ipg], "ipg", "imx-ssi.0");
+> -	clk_register_clkdev(clk[ssi2_ipg_per], "per", "imx-ssi.1");
+> -	clk_register_clkdev(clk[ssi2_ipg], "ipg", "imx-ssi.1");
+> +	clk_register_clkdev(clk[ssi1_ipg], NULL, "imx-ssi.0");
+> +	clk_register_clkdev(clk[ssi2_ipg], NULL, "imx-ssi.1");
+>  	clk_register_clkdev(clk[esdhc1_ipg_per], "per", "sdhci-esdhc-imx25.0");
+>  	clk_register_clkdev(clk[esdhc1_ipg], "ipg", "sdhci-esdhc-imx25.0");
+>  	clk_register_clkdev(clk[esdhc1_ahb], "ahb", "sdhci-esdhc-imx25.0");
 > -- 
 > 1.7.9.5
 > 
