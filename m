@@ -1,41 +1,44 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 28 Aug 2012 08:47:10 +0200
-Subject: [PATCH] imx21ads : avoid overlapping static i/o mappings
-In-Reply-To: <1346016938-28175-1-git-send-email-jaccon.bastiaansen@gmail.com>
-References: <1346016938-28175-1-git-send-email-jaccon.bastiaansen@gmail.com>
-Message-ID: <20120828064710.GP26594@pengutronix.de>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 28 Aug 2012 08:51:44 +0200
+Subject: [PATCH 05/14] ARM: at91: add pinctrl support
+In-Reply-To: <CACRpkdYWXZLNdgMhqoMZsaaszZ5Uz9pZ1EO=mrnuY5Der4O+Mw@mail.gmail.com>
+References: <20120810124820.GA20557@game.jcrosoft.org>
+ <1344603731-32667-1-git-send-email-plagnioj@jcrosoft.com>
+ <1344603731-32667-5-git-send-email-plagnioj@jcrosoft.com>
+ <CACRpkdZ2__V06Eo8JH451Sup5Nw2jJXVOH2FOfZBp5nNYpCtbg@mail.gmail.com>
+ <5034FC18.2090400@wwwdotorg.org>
+ <CACQ1gAieByr5vMmyyCuGtS8AgnnRZPPhLZY8sKvwvcQYe5ieUA@mail.gmail.com>
+ <50366D2B.4010807@wwwdotorg.org> <20120825083811.GB7629@game.jcrosoft.org>
+ <CACRpkdYWXZLNdgMhqoMZsaaszZ5Uz9pZ1EO=mrnuY5Der4O+Mw@mail.gmail.com>
+Message-ID: <CACQ1gAiFQAwn34mCYXWi9cTZPLRNiDVHT0qLNtJ4cgL51kRQBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 26, 2012 at 11:35:38PM +0200, Jaccon Bastiaansen wrote:
-> The static I/O mappings for the cs89x0 ethernet controller and the
-> secondary AHB port 1 (SAHB1) overlapped, causing a kernel crash
-> at startup. This is fixed by mapping the cs89x0 to 0xf6000000 (which
-> is free to use according to arch/arm/plat-mxc/include/mach/hardware.h).
-> 
-> Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
-> ---
->  arch/arm/mach-imx/mach-mx21ads.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mach-mx21ads.c b/arch/arm/mach-imx/mach-mx21ads.c
-> index ed22e3f..712c90e 100644
-> --- a/arch/arm/mach-imx/mach-mx21ads.c
-> +++ b/arch/arm/mach-imx/mach-mx21ads.c
-> @@ -31,7 +31,7 @@
->  /*
->   * Memory-mapped I/O on MX21ADS base board
->   */
-> -#define MX21ADS_MMIO_BASE_ADDR   0xf5000000
-> +#define MX21ADS_MMIO_BASE_ADDR   0xf6000000
+2012/8/28 Linus Walleij <linus.walleij@linaro.org>:
+> I'm following it now I think, after some discussion here at the kernel summit
+> I have come to the conclusion that the real problem with readability comes
+> from a shortcoming in the device tree compiler, that it cannot handle
+> macros and defines (no preprocessor) so it's currently hard to make
+> it more readable.
+Definitively, I've seen quite some hex (or dec) voodoo with comment
+next to them like that:
+fsl,ssi-dma-events = <25 24 23 22>; /* TX0 RX0 TX1 RX1 */
+linux,code = <102>; /* KEY_HOME */
+linux,code = <158>; /* KEY_BACK */
+fsl,pinmux-ids = <
+		0x0180 /* MX28_PAD_GPMI_RDN__GPMI_RDN */
+		0x0190 /* MX28_PAD_GPMI_WRN__GPMI_WRN */
+		0x01c0 /* MX28_PAD_GPMI_RESETN__GPMI_RESETN */
+		>;
+Those bits of code are crying out "We want defines !"
+(And even bitwise OR would be usefull, instead of having to choose
+between hex voodoo and one bool for each bit in a register)
 
-I would prefer to ioremap the region instead. This makes sure this
-problem is solved once and for all.
+> But that's not the implementers fault so I'm OK with this looking like
+> this for the moment.
+>
+> Yours,
+> Linus Walleij
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Best regards,
+Richard.
