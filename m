@@ -1,66 +1,56 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 28 Aug 2012 23:58:48 +0200
-Subject: [PATCH 4/4] ARM: dma-mapping: Skip cache maint for invalid page
-In-Reply-To: <1346154232-13299-4-git-send-email-hdoyu@nvidia.com>
-References: <1346154232-13299-1-git-send-email-hdoyu@nvidia.com>
- <1346154232-13299-4-git-send-email-hdoyu@nvidia.com>
-Message-ID: <503D3F18.7070507@samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 28 Aug 2012 15:39:40 -0700
+Subject: [PATCH 2/6] brcmfmac: Handling the interrupt in ISR directly
+ for non-OOB
+In-Reply-To: <503CF5B3.8040201@broadcom.com>
+References: <1346063114-30361-1-git-send-email-wni@nvidia.com>
+ <1346063114-30361-3-git-send-email-wni@nvidia.com>
+ <503B9F31.5050502@broadcom.com> <503BD345.6030501@wwwdotorg.org>
+ <1346152413.3516.211.camel@tegra-chromium-2> <503CF5B3.8040201@broadcom.com>
+Message-ID: <503D48AC.5040509@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 08/28/2012 09:45 AM, Franky Lin wrote:
+> On 08/28/2012 04:13 AM, Wei Ni wrote:
+>> On Tue, 2012-08-28 at 04:06 +0800, Stephen Warren wrote:
+>>> On 08/27/2012 09:24 AM, Arend van Spriel wrote:
+>>>> On 08/27/2012 12:25 PM, Wei Ni wrote:
+>>>>> In case of inband interrupts, if we handle the interrupt in dpc
+>>>>> thread,
+>>>>> two level of thread switching takes place to process wifi interrupts.
+>>>>> One in SDHCI driver and the other in Wifi driver. This may cause the
+>>>>> system
+>>>>> instability.
+...
+>>>> Not sure if I can follow this explanation. The isr is called with host
+>>>> claimed (by sdio_irq_thread) and all it does is at a linked list member
+>>>> and signal the dpc thread. After doing this the host is released.
+>>>
+>>> Is the issue something like the ISR handler or first level of threading
+>>> does:
+>>>
+>>> * Trigger DPC
+>>> * Re-enable interrupt
+>>>
+>>> So that the interrupt then fires again before the triggered DPC can run
+>>> to handle/clear it, thus causing an interrupt storm?
+>>>
+>>> Whereas handling the interrupt directly prevents this race condition?
+>>
+>> Above is my understanding.
+> 
+> I understand the issue here and totally agree that we should treat
+> in-band and out-band interrupts differently. But my concern is that the
+> behavior of releasing the host before calling brcmf_sdbrcm_isr and grab
+> it after is likely error prone. Also we are restructuring the dpc
+> routine internally and it's almost done. I will find a better solution
+> for in-band interrupt and get it the queue as well. So I suggest
+> dropping this patch.
 
-On 8/28/2012 1:43 PM, Hiroshi Doyu wrote:
-
-> Skip cache maint for invalid page but warn it.
->
-> Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
-> ---
->   arch/arm/mm/dma-mapping.c |    9 +++++++++
->   1 files changed, 9 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 2621282..0368702 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1589,6 +1589,9 @@ static void arm_iommu_unmap_page(struct device *dev, dma_addr_t handle,
->   	if (!iova)
->   		return;
->
-> +	if (WARN_ON(!pfn_valid(page_to_pfn(page))))
-> +		return;
-> +
->   	if (!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
->   		__dma_page_dev_to_cpu(page, offset, size, dir);
->
-> @@ -1607,6 +1610,9 @@ static void arm_iommu_sync_single_for_cpu(struct device *dev,
->   	if (!iova)
->   		return;
->
-> +	if (WARN_ON(!pfn_valid(page_to_pfn(page))))
-> +		return;
-> +
->   	__dma_page_dev_to_cpu(page, offset, size, dir);
->   }
->
-> @@ -1621,6 +1627,9 @@ static void arm_iommu_sync_single_for_device(struct device *dev,
->   	if (!iova)
->   		return;
->
-> +	if (WARN_ON(!pfn_valid(page_to_pfn(page))))
-> +		return;
-> +
->   	__dma_page_cpu_to_dev(page, offset, size, dir);
->   }
-
-I really wonder what has happened in your system that you require
-such paranoid checks. All of the above functions are called on the
-scatter-list which has been first passed to dma_map_sg(). IMHO it
-makes much more sense to add a pfn_valid() check in dma_map_sg()
-and return error if the provided scatter list is not valid instead
-of these WARN_ONs.
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Franky, do you know which kernel release the DPC restructuring will make
+it into? I ask because I can't apply the rest of the patches in this
+series without first resolving the stability issues with the Broadcom
+WiFi enabled, since that'd de-stabilize the Tegra platform
+significantly, and I'd like to plan when we can apply these patches to
+Tegra. Thanks!
