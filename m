@@ -1,45 +1,74 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 28 Aug 2012 13:48:21 +0200
-Subject: [PATCH 6/9] pwm i.MX: use per clock unconditionally
+Date: Tue, 28 Aug 2012 13:48:20 +0200
+Subject: [PATCH 5/9] pwm i.MX: add devicetree support
 In-Reply-To: <1346154504-5623-1-git-send-email-s.hauer@pengutronix.de>
 References: <1346154504-5623-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1346154504-5623-7-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1346154504-5623-6-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX pwm core has two clocks: The ipg clock and the ipg highfreq
-(peripheral) clock. The ipg clock has to be enabled for this hardware
-to work. The actual pwm output can either be driven by the ipg clock
-or the ipg highfreq. The ipg highfreq has the advantage that it runs
-even when the SoC is in low power modes.
-Use the always running clock also on i.MX25.
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/pwm/pwm-imx.c |    7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+ drivers/pwm/pwm-imx.c |   25 +++++++++++++++++++------
+ 1 file changed, 19 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-index dfc1bae..3834f475 100644
+index a689144..dfc1bae 100644
 --- a/drivers/pwm/pwm-imx.c
 +++ b/drivers/pwm/pwm-imx.c
-@@ -132,16 +132,11 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
+@@ -16,9 +16,9 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/pwm.h>
++#include <linux/of_device.h>
+ #include <mach/hardware.h>
  
- 	cr = MX3_PWMCR_PRESCALER(prescale) |
- 		MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN |
--		MX3_PWMCR_DBGEN;
-+		MX3_PWMCR_DBGEN | MX3_PWMCR_CLKSRC_IPG_HIGH;
- 
- 	if (imx->enabled)
- 		cr |= MX3_PWMCR_EN;
- 
--	if (cpu_is_mx25())
--		cr |= MX3_PWMCR_CLKSRC_IPG;
--	else
--		cr |= MX3_PWMCR_CLKSRC_IPG_HIGH;
 -
- 	writel(cr, imx->mmio_base + MX3_PWMCR);
+ /* i.MX1 and i.MX21 share the same PWM function block: */
  
- 	return 0;
+ #define MX1_PWMC    0x00   /* PWM Control Register */
+@@ -203,8 +203,17 @@ static struct pwm_ops imx_pwm_ops = {
+ 	.owner = THIS_MODULE,
+ };
+ 
++static const struct of_device_id imx_pwm_dt_ids[] = {
++	{ .compatible = "fsl,imx1-pwm", .data = &imx_pwm_config_v1, },
++	{ .compatible = "fsl,imx27-pwm", .data = &imx_pwm_config_v2, },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, imx_pwm_of_match);
++
+ static int __devinit imx_pwm_probe(struct platform_device *pdev)
+ {
++	const struct of_device_id *of_id =
++			of_match_device(imx_pwm_dt_ids, &pdev->dev);
+ 	struct imx_chip *imx;
+ 	struct resource *r;
+ 	int ret = 0;
+@@ -235,12 +244,16 @@ static int __devinit imx_pwm_probe(struct platform_device *pdev)
+ 	if (imx->mmio_base == NULL)
+ 		return -EADDRNOTAVAIL;
+ 
+-	if (cpu_is_mx1() || cpu_is_mx21()) {
+-		imx->config = imx_pwm_config_v1;
+-		imx->set_enable = imx_pwm_set_enable_v1;
++	if (of_id) {
++		imx->config = of_id->data;
+ 	} else {
+-		imx->config = imx_pwm_config_v2;
+-		imx->set_enable = imx_pwm_set_enable_v2;
++		if (cpu_is_mx1() || cpu_is_mx21()) {
++			imx->config = imx_pwm_config_v1;
++			imx->set_enable = imx_pwm_set_enable_v1;
++		} else {
++			imx->config = imx_pwm_config_v2;
++			imx->set_enable = imx_pwm_set_enable_v2;
++		}
+ 	}
+ 
+ 	ret = pwmchip_add(&imx->chip);
 -- 
 1.7.10.4
