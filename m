@@ -1,155 +1,127 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 28 Aug 2012 20:59:07 +0200
-Subject: [PATCH 6/8] mtd: orion_nand: move <plat/orion_nand.h> to
- <linux/platform_data/orion_nand.h>
+Date: Tue, 28 Aug 2012 20:59:08 +0200
+Subject: [PATCH 7/8] i2c: mv643xx: move <linux/mv643xx_i2c.h> to
+ <linux/platform_data/mv643xx_i2c.h>
 In-Reply-To: <1346180349-25123-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1346180349-25123-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1346180349-25123-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1346180349-25123-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Even though this platform_data header was already in <linux/...> and
+not in <plat/...>, it makes sense to move it as well to
+<linux/platform_data/...>.
+
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-kirkwood/common.c                    |    2 +-
- arch/arm/mach-mv78xx0/common.c                     |    2 +-
- arch/arm/mach-orion5x/common.c                     |    2 +-
- arch/arm/mach-orion5x/db88f5281-setup.c            |    2 +-
- arch/arm/mach-orion5x/kurobox_pro-setup.c          |    2 +-
- drivers/mtd/nand/orion_nand.c                      |    2 +-
- .../linux/platform_data}/orion_nand.h              |    6 ++----
- 7 files changed, 8 insertions(+), 10 deletions(-)
- rename {arch/arm/plat-orion/include/plat => include/linux/platform_data}/orion_nand.h (82%)
+ arch/arm/mach-kirkwood/common.c                 |    2 +-
+ arch/arm/mach-orion5x/common.c                  |    2 +-
+ arch/arm/plat-orion/common.c                    |    2 +-
+ drivers/i2c/busses/i2c-mv64xxx.c                |    2 +-
+ include/linux/mv643xx.h                         |    2 +-
+ include/linux/{ => platform_data}/mv643xx_i2c.h |    4 ++--
+ 6 files changed, 7 insertions(+), 7 deletions(-)
+ rename include/linux/{ => platform_data}/mv643xx_i2c.h (89%)
 
 diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index a3d8836..3e14dfc 100644
+index 3e14dfc..7981012 100644
 --- a/arch/arm/mach-kirkwood/common.c
 +++ b/arch/arm/mach-kirkwood/common.c
-@@ -22,6 +22,7 @@
+@@ -17,11 +17,11 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/clk-provider.h>
+ #include <linux/spinlock.h>
+-#include <linux/mv643xx_i2c.h>
+ #include <linux/platform_data/kirkwood-audio.h>
  #include <linux/platform_data/ehci-orion.h>
  #include <linux/platform_data/mvsdio.h>
  #include <linux/platform_data/mv_xor.h>
-+#include <linux/platform_data/orion_nand.h>
++#include <linux/platform_data/mv643xx_i2c.h>
+ #include <linux/platform_data/orion_nand.h>
  #include <net/dsa.h>
  #include <asm/page.h>
- #include <asm/timex.h>
-@@ -31,7 +32,6 @@
- #include <mach/kirkwood.h>
- #include <mach/bridge-regs.h>
- #include <plat/cache-feroceon-l2.h>
--#include <plat/orion_nand.h>
- #include <plat/common.h>
- #include <plat/time.h>
- #include <plat/addr-map.h>
-diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
-index 7413c35..acc0791 100644
---- a/arch/arm/mach-mv78xx0/common.c
-+++ b/arch/arm/mach-mv78xx0/common.c
-@@ -16,12 +16,12 @@
- #include <linux/clk-provider.h>
- #include <linux/ethtool.h>
- #include <linux/platform_data/ehci-orion.h>
-+#include <linux/platform_data/orion_nand.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- #include <mach/mv78xx0.h>
- #include <mach/bridge-regs.h>
- #include <plat/cache-feroceon-l2.h>
--#include <plat/orion_nand.h>
- #include <plat/time.h>
- #include <plat/common.h>
- #include <plat/addr-map.h>
 diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
-index 7228eaa..e0db313 100644
+index e0db313..43ae1b7 100644
 --- a/arch/arm/mach-orion5x/common.c
 +++ b/arch/arm/mach-orion5x/common.c
-@@ -20,6 +20,7 @@
+@@ -15,11 +15,11 @@
+ #include <linux/platform_device.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/serial_8250.h>
+-#include <linux/mv643xx_i2c.h>
+ #include <linux/ata_platform.h>
  #include <linux/delay.h>
  #include <linux/clk-provider.h>
  #include <linux/platform_data/ehci-orion.h>
-+#include <linux/platform_data/orion_nand.h>
++#include <linux/platform_data/mv643xx_i2c.h>
+ #include <linux/platform_data/orion_nand.h>
  #include <net/dsa.h>
  #include <asm/page.h>
- #include <asm/setup.h>
-@@ -31,7 +32,6 @@
- #include <mach/bridge-regs.h>
- #include <mach/hardware.h>
- #include <mach/orion5x.h>
--#include <plat/orion_nand.h>
- #include <plat/time.h>
- #include <plat/common.h>
- #include <plat/addr-map.h>
-diff --git a/arch/arm/mach-orion5x/db88f5281-setup.c b/arch/arm/mach-orion5x/db88f5281-setup.c
-index 49a3fd6..be3080e 100644
---- a/arch/arm/mach-orion5x/db88f5281-setup.c
-+++ b/arch/arm/mach-orion5x/db88f5281-setup.c
-@@ -20,11 +20,11 @@
- #include <linux/timer.h>
+diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+index 88dac08..3aeb28f 100644
+--- a/arch/arm/plat-orion/common.c
++++ b/arch/arm/plat-orion/common.c
+@@ -17,9 +17,9 @@
+ #include <linux/clk.h>
+ #include <linux/clkdev.h>
  #include <linux/mv643xx_eth.h>
- #include <linux/i2c.h>
-+#include <linux/platform_data/orion_nand.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/pci.h>
- #include <mach/orion5x.h>
--#include <plat/orion_nand.h>
- #include "common.h"
- #include "mpp.h"
+-#include <linux/mv643xx_i2c.h>
+ #include <linux/platform_data/ehci-orion.h>
+ #include <linux/platform_data/mv_xor.h>
++#include <linux/platform_data/mv643xx_i2c.h>
+ #include <net/dsa.h>
+ #include <mach/bridge-regs.h>
  
-diff --git a/arch/arm/mach-orion5x/kurobox_pro-setup.c b/arch/arm/mach-orion5x/kurobox_pro-setup.c
-index 1e458ef..82cf706 100644
---- a/arch/arm/mach-orion5x/kurobox_pro-setup.c
-+++ b/arch/arm/mach-orion5x/kurobox_pro-setup.c
-@@ -20,11 +20,11 @@
+diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+index 2e9d567..c5e6993 100644
+--- a/drivers/i2c/busses/i2c-mv64xxx.c
++++ b/drivers/i2c/busses/i2c-mv64xxx.c
+@@ -15,7 +15,6 @@
+ #include <linux/spinlock.h>
  #include <linux/i2c.h>
- #include <linux/serial_reg.h>
- #include <linux/ata_platform.h>
-+#include <linux/platform_data/orion_nand.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/pci.h>
- #include <mach/orion5x.h>
--#include <plat/orion_nand.h>
- #include "common.h"
- #include "mpp.h"
- 
-diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
-index fc5a868..eaf8fc7 100644
---- a/drivers/mtd/nand/orion_nand.c
-+++ b/drivers/mtd/nand/orion_nand.c
-@@ -19,10 +19,10 @@
- #include <linux/mtd/partitions.h>
+ #include <linux/interrupt.h>
+-#include <linux/mv643xx_i2c.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
+@@ -23,6 +22,7 @@
+ #include <linux/of_i2c.h>
  #include <linux/clk.h>
  #include <linux/err.h>
-+#include <linux/platform_data/orion_nand.h>
- #include <asm/io.h>
- #include <asm/sizes.h>
- #include <mach/hardware.h>
--#include <plat/orion_nand.h>
++#include <linux/platform_data/mv643xx_i2c.h>
  
- static void orion_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
- {
-diff --git a/arch/arm/plat-orion/include/plat/orion_nand.h b/include/linux/platform_data/orion_nand.h
-similarity index 82%
-rename from arch/arm/plat-orion/include/plat/orion_nand.h
-rename to include/linux/platform_data/orion_nand.h
-index 9f3c180..baa1860 100644
---- a/arch/arm/plat-orion/include/plat/orion_nand.h
-+++ b/include/linux/platform_data/orion_nand.h
-@@ -1,13 +1,11 @@
- /*
-- * arch/arm/plat-orion/include/plat/orion_nand.h
-- *
-  * This file is licensed under the terms of the GNU General Public
-  * License version 2.  This program is licensed "as is" without any
-  * warranty of any kind, whether express or implied.
+ /* Register defines */
+ #define	MV64XXX_I2C_REG_SLAVE_ADDR			0x00
+diff --git a/include/linux/mv643xx.h b/include/linux/mv643xx.h
+index 69327b7..7e293ce 100644
+--- a/include/linux/mv643xx.h
++++ b/include/linux/mv643xx.h
+@@ -15,7 +15,7 @@
+ 
+ #include <asm/types.h>
+ #include <linux/mv643xx_eth.h>
+-#include <linux/mv643xx_i2c.h>
++#include <linux/platform_data/mv643xx_i2c.h>
+ 
+ /****************************************/
+ /* Processor Address Space              */
+diff --git a/include/linux/mv643xx_i2c.h b/include/linux/platform_data/mv643xx_i2c.h
+similarity index 89%
+rename from include/linux/mv643xx_i2c.h
+rename to include/linux/platform_data/mv643xx_i2c.h
+index 5db5152..a00c687 100644
+--- a/include/linux/mv643xx_i2c.h
++++ b/include/linux/platform_data/mv643xx_i2c.h
+@@ -5,8 +5,8 @@
+  * option) any later version.
   */
  
--#ifndef __PLAT_ORION_NAND_H
--#define __PLAT_ORION_NAND_H
-+#ifndef __ORION_NAND_PDATA_H
-+#define __ORION_NAND_PDATA_H
+-#ifndef _MV64XXX_I2C_H_
+-#define _MV64XXX_I2C_H_
++#ifndef _MV64XXX_I2C_PDATA_H_
++#define _MV64XXX_I2C_PDATA_H_
  
- /*
-  * Device bus NAND private data
+ #include <linux/types.h>
+ 
 -- 
 1.7.9.5
