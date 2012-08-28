@@ -1,128 +1,68 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 29 Aug 2012 02:18:54 +0300
-Subject: [PATCH 6/9] ARM: OMAP1: move omap1_bl pdata out of arch/arm/*
+Date: Wed, 29 Aug 2012 02:18:56 +0300
+Subject: [PATCH 8/9] ARM: OMAP: move debug_card_init() function
 In-Reply-To: <1346195937-6383-1-git-send-email-grinberg@compulab.co.il>
 References: <1346195937-6383-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1346195937-6383-7-git-send-email-grinberg@compulab.co.il>
+Message-ID: <1346195937-6383-9-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap1 backlight platform data resides inside plat/board.h while it
-should be inside include/linux/...
-Move the omap1 backlight platform data to
-include/linux/platform_data/.
+debug_card_init() function resides in the plat/board.h file.
+Move it to a separate header file under plat/ so the board.h file can be
+removed.
 
-Cc: Richard Purdie <rpurdie@rpsys.net>
-Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-Cc: linux-fbdev at vger.kernel.org
 Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
 ---
- arch/arm/mach-omap1/board-osk.c         |    1 +
- arch/arm/mach-omap1/board-palmte.c      |    1 +
- arch/arm/mach-omap1/board-palmtt.c      |    1 +
- arch/arm/mach-omap1/board-palmz71.c     |    1 +
- arch/arm/plat-omap/include/plat/board.h |    7 -------
- drivers/video/backlight/omap1_bl.c      |    2 +-
- include/linux/platform_data/omap1_bl.h  |   11 +++++++++++
- 7 files changed, 16 insertions(+), 8 deletions(-)
- create mode 100644 include/linux/platform_data/omap1_bl.h
+ arch/arm/mach-omap2/board-h4.c                  |    2 +-
+ arch/arm/plat-omap/include/plat/board.h         |    5 -----
+ arch/arm/plat-omap/include/plat/debug-devices.h |    9 +++++++++
+ 3 files changed, 10 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/plat-omap/include/plat/debug-devices.h
 
-diff --git a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
-index 8784705..569b687 100644
---- a/arch/arm/mach-omap1/board-osk.c
-+++ b/arch/arm/mach-omap1/board-osk.c
-@@ -39,6 +39,7 @@
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/physmap.h>
- #include <linux/i2c/tps65010.h>
-+#include <linux/platform_data/omap1_bl.h>
- 
- #include <asm/mach-types.h>
+diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
+index ace2048..5be30e6 100644
+--- a/arch/arm/mach-omap2/board-h4.c
++++ b/arch/arm/mach-omap2/board-h4.c
+@@ -32,11 +32,11 @@
  #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-omap1/board-palmte.c b/arch/arm/mach-omap1/board-palmte.c
-index 26bcb9d..7bf00ba 100644
---- a/arch/arm/mach-omap1/board-palmte.c
-+++ b/arch/arm/mach-omap1/board-palmte.c
-@@ -28,6 +28,7 @@
- #include <linux/interrupt.h>
- #include <linux/apm-emulation.h>
- #include <linux/omapfb.h>
-+#include <linux/platform_data/omap1_bl.h>
+ #include <asm/mach/map.h>
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-omap1/board-palmtt.c b/arch/arm/mach-omap1/board-palmtt.c
-index 4d09944..2cce505 100644
---- a/arch/arm/mach-omap1/board-palmtt.c
-+++ b/arch/arm/mach-omap1/board-palmtt.c
-@@ -27,6 +27,7 @@
- #include <linux/omapfb.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/ads7846.h>
-+#include <linux/platform_data/omap1_bl.h>
+-#include <plat/board.h>
+ #include "common.h"
+ #include <plat/menelaus.h>
+ #include <plat/dma.h>
+ #include <plat/gpmc.h>
++#include <plat/debug-devices.h>
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-diff --git a/arch/arm/mach-omap1/board-palmz71.c b/arch/arm/mach-omap1/board-palmz71.c
-index 3559803..45ab9f0 100644
---- a/arch/arm/mach-omap1/board-palmz71.c
-+++ b/arch/arm/mach-omap1/board-palmz71.c
-@@ -30,6 +30,7 @@
- #include <linux/omapfb.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/ads7846.h>
-+#include <linux/platform_data/omap1_bl.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
+ #include <video/omapdss.h>
+ #include <video/omap-panel-generic-dpi.h>
 diff --git a/arch/arm/plat-omap/include/plat/board.h b/arch/arm/plat-omap/include/plat/board.h
-index 5938c72..d0bc46e 100644
+index 2ddc198..d92f1b5 100644
 --- a/arch/arm/plat-omap/include/plat/board.h
 +++ b/arch/arm/plat-omap/include/plat/board.h
-@@ -19,13 +19,6 @@ struct omap_lcd_config {
- 	u8   data_lines;
- };
+@@ -10,9 +10,4 @@
+ #ifndef _OMAP_BOARD_H
+ #define _OMAP_BOARD_H
  
--struct device;
--struct fb_info;
--struct omap_backlight_config {
--	int default_intensity;
--	int (*set_power)(struct device *dev, int state);
--};
+-#include <linux/types.h>
 -
- /* for TI reference platforms sharing the same debug card */
- extern int debug_card_init(u32 addr, unsigned gpio);
- 
-diff --git a/drivers/video/backlight/omap1_bl.c b/drivers/video/backlight/omap1_bl.c
-index bfdc5fb..92257ef 100644
---- a/drivers/video/backlight/omap1_bl.c
-+++ b/drivers/video/backlight/omap1_bl.c
-@@ -27,9 +27,9 @@
- #include <linux/fb.h>
- #include <linux/backlight.h>
- #include <linux/slab.h>
-+#include <linux/platform_data/omap1_bl.h>
- 
- #include <mach/hardware.h>
--#include <plat/board.h>
- #include <plat/mux.h>
- 
- #define OMAPBL_MAX_INTENSITY		0xff
-diff --git a/include/linux/platform_data/omap1_bl.h b/include/linux/platform_data/omap1_bl.h
+-/* for TI reference platforms sharing the same debug card */
+-extern int debug_card_init(u32 addr, unsigned gpio);
+-
+ #endif
+diff --git a/arch/arm/plat-omap/include/plat/debug-devices.h b/arch/arm/plat-omap/include/plat/debug-devices.h
 new file mode 100644
-index 0000000..881a8e9
+index 0000000..a4edbd2
 --- /dev/null
-+++ b/include/linux/platform_data/omap1_bl.h
-@@ -0,0 +1,11 @@
-+#ifndef __OMAP1_BL_H__
-+#define __OMAP1_BL_H__
++++ b/arch/arm/plat-omap/include/plat/debug-devices.h
+@@ -0,0 +1,9 @@
++#ifndef _OMAP_DEBUG_DEVICES_H
++#define _OMAP_DEBUG_DEVICES_H
 +
-+#include <linux/device.h>
++#include <linux/types.h>
 +
-+struct omap_backlight_config {
-+	int default_intensity;
-+	int (*set_power)(struct device *dev, int state);
-+};
++/* for TI reference platforms sharing the same debug card */
++extern int debug_card_init(u32 addr, unsigned gpio);
 +
 +#endif
 -- 
