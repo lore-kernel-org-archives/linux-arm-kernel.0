@@ -1,26 +1,79 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 28 Aug 2012 11:31:37 +0200
-Subject: [PATCH] mtd: orion_nand: remove <mach/hardware.h> include
-In-Reply-To: <20120828091139.GC31704@lunn.ch>
-References: <20120816183708.GT22226@titan.lakedaemon.net>
- <1346110528-30858-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1346110528-30858-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20120828091139.GC31704@lunn.ch>
-Message-ID: <CABJ1b_QgJU_xLL2Z=-r_hs51O+d4W+oLZPPf9-6UmeO5B+chPg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 28 Aug 2012 11:35:17 +0200
+Subject: [PATCH] media: mx2_camera: Remove MX2_CAMERA_SWAP16 and
+ MX2_CAMERA_PACK_DIR_MSB flags.
+In-Reply-To: <CACKLOr3OmRUACO8QaJnYA6E=YZMCrrOq1pAXb1wTv4Udg+u8bQ@mail.gmail.com>
+References: <1342083809-19921-1-git-send-email-javier.martin@vista-silicon.com>
+ <Pine.LNX.4.64.1207201330240.27906@axis700.grange>
+ <CACKLOr2sKVWCk3we_cP5MvnR6-WsaFwA9AC=fgp3iLm8B6mfEA@mail.gmail.com>
+ <Pine.LNX.4.64.1207301718510.28003@axis700.grange>
+ <CACKLOr3OmRUACO8QaJnYA6E=YZMCrrOq1pAXb1wTv4Udg+u8bQ@mail.gmail.com>
+Message-ID: <20120828093517.GH26594@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/28/12, Andrew Lunn <andrew@lunn.ch> wrote:
-> One other driver you might want to look at is:
->
-> drivers/watchdog/orion_wdt.c
-> It uses <mach/bridge-regs.h>
+On Mon, Aug 20, 2012 at 10:08:39AM +0200, javier Martin wrote:
+> Hi,
+> 
+> On 30 July 2012 17:33, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> > Hi Javier
+> >
+> > On Mon, 30 Jul 2012, javier Martin wrote:
+> >
+> >> Hi,
+> >> thank you for yor ACKs.
+> >>
+> >> On 20 July 2012 13:31, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> >> > On Thu, 12 Jul 2012, Javier Martin wrote:
+> >> >
+> >> >> These flags are not used any longer and can be safely removed
+> >> >> since the following patch:
+> >> >> http://www.spinics.net/lists/linux-media/msg50165.html
+> >> >>
+> >> >> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+> >> >
+> >> > For the ARM tree:
+> >> >
+> >> > Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> >>
+> >> forgive my ignorance on the matter. Could you please point me to the
+> >> git repository this patch should be merged?
+> >
+> > Sorry, my "for the ARM tree" comment was probably not clear enough. This
+> > patch should certainly go via the ARM (SoC) tree, since it only touches
+> > arch/arm. So, the maintainer (Sascha - added to CC), that will be
+> > forwarding this patch to Linus can thereby add my "acked-by" to this
+> > patch, if he feels like it.
+> >
+> 
+> Sascha, do you have any comments on this one? I can't find it in
+> arm-soc, did you already merge it?
 
-Andrew, Thomas,
+Applied, thanks. I have rewritten the commit message as follows:
 
-both current watchdog and timer are using the bridge-regs to clear the
-interrupt cause. On orion the cause register is located in bridge-regs.
->From the work on timer together with Gregory, I expect Armada 370/XP
-to have the watchdog cause bit also within timer registers.
+Author: Javier Martin <javier.martin@vista-silicon.com>
+Date:   Thu Jul 12 11:03:29 2012 +0200
 
-Sebastian
+    ARM i.MX mx2_camera: Remove MX2_CAMERA_SWAP16 and MX2_CAMERA_PACK_DIR_MSB flags.
+    
+    These flags are not used any longer and can be safely removed
+    since:
+    
+    | commit 8a76e5383fb5f58868fdd3a2fe1f4b95988f10a8
+    | Author: Javier Martin <javier.martin@vista-silicon.com>
+    | Date:   Wed Jul 11 17:34:54 2012 +0200
+    |
+    |    media: mx2_camera: Fix mbus format handling
+    
+    Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+    Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+    Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+    Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
