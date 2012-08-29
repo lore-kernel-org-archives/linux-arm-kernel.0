@@ -1,36 +1,38 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 29 Aug 2012 17:31:27 -0500
-Subject: [PATCH 01/10] usb: pxa27x_udc: remove IRQ_USB define
+Date: Wed, 29 Aug 2012 17:31:28 -0500
+Subject: [PATCH 02/10] gpio: pxa: add explicit includes for cpu_is_X macros
 In-Reply-To: <1346279496-26286-1-git-send-email-robherring2@gmail.com>
 References: <1346279496-26286-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1346279496-26286-2-git-send-email-robherring2@gmail.com>
+Message-ID: <1346279496-26286-3-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-IRQ_USB was implicitly included by gpio.h. Use the existing variable
-instead of IRQ_USB.
+In preparation to remove implicit inclusion of mach/gpio.h, add the
+necessary includes for cpu_is_X macros.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/usb/gadget/pxa27x_udc.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpio/gpio-pxa.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/usb/gadget/pxa27x_udc.c b/drivers/usb/gadget/pxa27x_udc.c
-index 644b430..7a8713c 100644
---- a/drivers/usb/gadget/pxa27x_udc.c
-+++ b/drivers/usb/gadget/pxa27x_udc.c
-@@ -2508,7 +2508,7 @@ static int __init pxa_udc_probe(struct platform_device *pdev)
- 			IRQF_SHARED, driver_name, udc);
- 	if (retval != 0) {
- 		dev_err(udc->dev, "%s: can't get irq %i, err %d\n",
--			driver_name, IRQ_USB, retval);
-+			driver_name, udc->irq, retval);
- 		goto err_irq;
- 	}
- 	retval = usb_add_gadget_udc(&pdev->dev, &udc->gadget);
+diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
+index 9cac88a..4d44e2f 100644
+--- a/drivers/gpio/gpio-pxa.c
++++ b/drivers/gpio/gpio-pxa.c
+@@ -27,6 +27,10 @@
+ #include <linux/slab.h>
+ 
+ #include <mach/irqs.h>
++#include <mach/hardware.h>
++#ifdef CONFIG_ARCH_MMP
++#include <mach/cputype.h>
++#endif
+ 
+ /*
+  * We handle the GPIOs by banks, each bank covers up to 32 GPIOs with
 -- 
 1.7.9.5
