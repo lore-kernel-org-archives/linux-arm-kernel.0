@@ -1,108 +1,63 @@
-From: dromede@gmail.com (dromede at gmail.com)
-Date: Wed, 29 Aug 2012 17:06:43 +0200
-Subject: [RFC][PATCH] pxamci: defining CONFIG_REGULATOR_DUMMY may break PXA
- MMC controller driver.
-Message-ID: <1346252803-7817-1-git-send-email-dromede@gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 29 Aug 2012 17:16:10 +0200
+Subject: [PATCH] [media] atmel_isi: allocate memory to store the isi
+ platform data.
+In-Reply-To: <1346235093-28613-1-git-send-email-josh.wu@atmel.com>
+References: <1346235093-28613-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <503E323A.8060409@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marko Katic <dromede.gmail.com>
+Hi,
 
-Here's an interesting scenario. The spitz machine has an
-Intersil 6271A voltage regulator and an ADS7846 touchscreen
-controller. The ADS7846 driver requires the use of the voltage regulator
-or if not present, CONFIG_REGULATOR_DUMMY should be used for proper operation.
-So to support both devices, CONFIG_REGULATOR and CONFIG REGULATOR_DUMMY have
-to be defined.
+On 08/29/2012 12:11 PM, Josh Wu wrote:
+> This patch fix the bug: ISI driver's platform data became invalid 
+> when isi platform data's attribution is __initdata.
+> 
+> If the isi platform data is passed as __initdata. Then we need store
+> it in driver allocated memory. otherwise when we use it out of the 
+> probe() function, then the isi platform data is invalid.
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+>  drivers/media/platform/soc_camera/atmel-isi.c |   12 +++++++++++-
+>  1 file changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+> index ec3f6a0..dc0fdec 100644
+> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+> @@ -926,6 +926,7 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
+>  	clk_put(isi->mck);
+>  	clk_unprepare(isi->pclk);
+>  	clk_put(isi->pclk);
+> +	kfree(isi->pdata);
+>  	kfree(isi);
+>  
+>  	return 0;
+> @@ -968,8 +969,15 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
+>  		goto err_alloc_isi;
+>  	}
+>  
+> +	isi->pdata = kzalloc(sizeof(struct isi_platform_data), GFP_KERNEL);
+> +	if (!isi->pdata) {
+> +		ret = -ENOMEM;
+> +		dev_err(&pdev->dev, "Can't allocate isi platform data!\n");
+> +		goto err_alloc_isi_pdata;
+> +	}
+> +	memcpy(isi->pdata, pdata, sizeof(struct isi_platform_data));
+> +
 
-However, enabling CONFIG_REGULATOR_DUMMY breaks pxamci in pxamci_init_ocr().
-and pxamci_set_power() in the case when no vmmc regulator is present.
+Why not just embed struct isi_platform_data in struct atmel_isi and drop this
+another kzalloc() ?
+Then you could simply do isi->pdata = *pdata.
 
-These functions don't handle the presence of a dummy regulator very well
-since they expect a proper regulator when CONFIG_REGULATOR is defined or
-no regulator at all. I've modified both to do more checking and to always
-fall back to platform data if such data is present.
+Also, is this going to work when this driver is build and as a module
+and its loading is deferred past system booting ? At that time the driver's
+platform data may be well discarded. You may wan't to duplicate it on the
+running boards in board code with kmemdup() or something.
 
-I should probably add some dev_warns somewhere, i would like some input
-on that.
+--
 
-Signed-off-by: Marko Katic <dromede.gmail.com>
----
- drivers/mmc/host/pxamci.c |   36 ++++++++++++++++++++++--------------
- 1 files changed, 22 insertions(+), 14 deletions(-)
-
-diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-index cb2dc0e..ffbf177 100644
---- a/drivers/mmc/host/pxamci.c
-+++ b/drivers/mmc/host/pxamci.c
-@@ -80,18 +80,24 @@ struct pxamci_host {
- static inline void pxamci_init_ocr(struct pxamci_host *host)
- {
- #ifdef CONFIG_REGULATOR
-+	int ocr_mask;
- 	host->vcc = regulator_get(mmc_dev(host->mmc), "vmmc");
- 
- 	if (IS_ERR(host->vcc))
- 		host->vcc = NULL;
- 	else {
--		host->mmc->ocr_avail = mmc_regulator_get_ocrmask(host->vcc);
--		if (host->pdata && host->pdata->ocr_mask)
-+		ocr_mask = mmc_regulator_get_ocrmask(host->vcc);
-+		if (ocr_mask <= 0)
-+			host->mmc->ocr_avail = 0;
-+		else	
-+			host->mmc->ocr_avail = ocr_mask;
-+				
-+		if (host->pdata && host->pdata->ocr_mask && host->mmc->ocr_avail)
- 			dev_warn(mmc_dev(host->mmc),
- 				"ocr_mask/setpower will not be used\n");
- 	}
- #endif
--	if (host->vcc == NULL) {
-+	if (host->vcc == NULL || host->mmc->ocr_avail == 0) {
- 		/* fall-back to platform data */
- 		host->mmc->ocr_avail = host->pdata ?
- 			host->pdata->ocr_mask :
-@@ -104,27 +110,29 @@ static inline int pxamci_set_power(struct pxamci_host *host,
- 				    unsigned int vdd)
- {
- 	int on;
--
-+	
-+#ifdef CONFIG_REGULATOR
- 	if (host->vcc) {
--		int ret;
-+		int ret = 0;
- 
--		if (power_mode == MMC_POWER_UP) {
-+		if (power_mode == MMC_POWER_UP)
- 			ret = mmc_regulator_set_ocr(host->mmc, host->vcc, vdd);
--			if (ret)
--				return ret;
--		} else if (power_mode == MMC_POWER_OFF) {
-+
-+		if (power_mode == MMC_POWER_OFF)
- 			ret = mmc_regulator_set_ocr(host->mmc, host->vcc, 0);
--			if (ret)
--				return ret;
--		}
-+		
-+		if (ret == 0)
-+			return ret;
- 	}
--	if (!host->vcc && host->pdata &&
-+#endif
-+	
-+	if (host->pdata &&
- 	    gpio_is_valid(host->pdata->gpio_power)) {
- 		on = ((1 << vdd) & host->pdata->ocr_mask);
- 		gpio_set_value(host->pdata->gpio_power,
- 			       !!on ^ host->pdata->gpio_power_invert);
- 	}
--	if (!host->vcc && host->pdata && host->pdata->setpower)
-+	if (host->pdata && host->pdata->setpower)
- 		host->pdata->setpower(mmc_dev(host->mmc), vdd);
- 
- 	return 0;
--- 
-1.7.4.1
+Regards,
+Sylwester
