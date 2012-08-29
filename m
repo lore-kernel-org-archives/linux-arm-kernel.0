@@ -1,92 +1,33 @@
-From: vbyravarasu@nvidia.com (Venu Byravarasu)
-Date: Wed, 29 Aug 2012 10:47:51 +0530
-Subject: [PATCH] usb: tegra: moving phy driver into drivers directory
-In-Reply-To: <503CD0A0.7080300@wwwdotorg.org>
-References: <1346146338-4996-1-git-send-email-vbyravarasu@nvidia.com>
- <503CD0A0.7080300@wwwdotorg.org>
-Message-ID: <D958900912E20642BCBC71664EFECE3E6DDE14DD7C@BGMAIL02.nvidia.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 29 Aug 2012 07:35:23 +0200
+Subject: [PATCH] ARM: Build dtb files in all target
+Message-ID: <1346218523-15958-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Tools like kisskb are good at finding build regressions in the kernel
+sources. However, regressions in the DT desscriptions are not found,
+because generally these build systems don't build the DT binary blobs.
 
-> -----Original Message-----
-> From: Stephen Warren [mailto:swarren at wwwdotorg.org]
-> Sent: Tuesday, August 28, 2012 7:37 PM
-> To: Venu Byravarasu
-> Cc: ccross at android.com; olof at lixom.net; linux at arm.linux.org.uk;
-> stern at rowland.harvard.edu; gregkh at linuxfoundation.org; balbi at ti.com;
-> linux-kernel at vger.kernel.org; linux-tegra at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-usb at vger.kernel.org
-> Subject: Re: [PATCH] usb: tegra: moving phy driver into drivers directory
-> 
-> On 08/28/2012 02:32 AM, Venu Byravarasu wrote:
-> > In order to keep up with the USB driver files organization,
-> > moving USB phy driver from mach-tegra to drivers/USB directory.
-> >
-> > Signed-off-by: Venu Byravarasu <vbyravarasu@nvidia.com>
-> 
-> > diff --git a/arch/arm/mach-tegra/devices.c b/arch/arm/mach-
-> tegra/devices.c
-> 
-> > -struct tegra_ulpi_config tegra_ehci2_ulpi_phy_config = {
-> > -	.reset_gpio = -1,
-> > -	.clk = "cdev2",
-> > -};
-> > -
-> >  struct tegra_ehci_platform_data tegra_ehci1_pdata = {
-> >  	.operating_mode = TEGRA_USB_OTG,
-> >  	.power_down_on_bus_suspend = 1,
-> > @@ -450,7 +444,7 @@ struct tegra_ehci_platform_data tegra_ehci1_pdata
-> = {
-> >  };
-> >
-> >  struct tegra_ehci_platform_data tegra_ehci2_pdata = {
-> > -	.phy_config = &tegra_ehci2_ulpi_phy_config,
-> > +	.phy_config = NULL,
-> 
-> The PHY driver checks that field isn't NULL, and fails if it is:
-> 
-> > struct tegra_usb_phy *tegra_usb_phy_open(struct device *dev, int
-> instance,
-> >         void __iomem *regs, void *config, enum tegra_usb_phy_mode
-> phy_mode)
-> > {
-> ...
-> >         phy->config = config;
-> >         phy->mode = phy_mode;
-> >
-> >         if (!phy->config) {
-> >                 if (phy_is_ulpi(phy)) {
-> >                         pr_err("%s: ulpi phy configuration missing", __func__);
-> >                         err = -EINVAL;
-> >                         goto err0;
-> 
-> So, this change will completely break ULPI support, which currently
-> works fine. So, NAK.
+Extend the ARM all target to build all enabled DTB files.
 
-My initial plan was to add support for phy interfaces one by one.
-As part of that thought of UTMI only support at first and then add
-ULPI and HSIC in next patches.
-However as you were mentioning that it is not correct way, will
-push ULPI & UTMI support at once in next patches.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/Makefile |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> 
-> I also plan on deleting devices.[ch] in kernel 3.7, and moving the USB
-> platform data into board-dt-tegra20.c, since that's the only place it's
-> used right now. So, this patch would conflict with that rather badly. I
-> just posted the patches for that to the linux-tegra mailing list last
-> night. Do you have better proposals for that? Perhaps usb_phy.c should
-> set phy->config to &ulpi_default in a similar fashion to how it works
-> for UTMI; that would remove some of the coupling between the changes.
-> 
-> BTW, in your response to Felipe, you said...
-> 
-> > Thanks Felipe for your comments.
-> > Created a patch to separate out phy related stuff to phy.h with you as a
-> reviewer.
-> > Plz let me know your comments.
-> 
-> ... where is that patch?
-
-Plz see https://lkml.org/lkml/2012/8/28/58 
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 30eae87..aee2b1e 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -268,7 +268,7 @@ else
+ KBUILD_IMAGE := zImage
+ endif
  
+-all:	$(KBUILD_IMAGE)
++all:	$(KBUILD_IMAGE) dtbs
+ 
+ boot := arch/arm/boot
+ 
+-- 
+1.7.10.4
