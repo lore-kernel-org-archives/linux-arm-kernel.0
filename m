@@ -1,86 +1,99 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 29 Aug 2012 10:00:50 +0800
-Subject: [PATCH v3 1/7] mfd: add syscon driver based on regmap
-In-Reply-To: <503D4C08.8040605@wwwdotorg.org>
-References: <1346145005-17961-1-git-send-email-b29396@freescale.com>
- <1346145005-17961-2-git-send-email-b29396@freescale.com>
- <503D4C08.8040605@wwwdotorg.org>
-Message-ID: <20120829020049.GA29464@shlinux2.ap.freescale.net>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 29 Aug 2012 10:55:14 +0800
+Subject: [PATCH v6 1/3] USB: chipidea: add imx usbmisc support
+In-Reply-To: <20120828145151.GJ10429@pengutronix.de>
+References: <1346137109-32247-1-git-send-email-richard.zhao@freescale.com>
+ <1346137109-32247-2-git-send-email-richard.zhao@freescale.com>
+ <20120828145151.GJ10429@pengutronix.de>
+Message-ID: <20120829025513.GB4011@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2012 at 06:54:00AM +0800, Stephen Warren wrote:
-> On 08/28/2012 02:09 AM, Dong Aisheng wrote:
-> > From: Dong Aisheng <dong.aisheng@linaro.org>
+On Tue, Aug 28, 2012 at 04:51:51PM +0200, Michael Grzeschik wrote:
+> Hi,
+> 
+> On Tue, Aug 28, 2012 at 02:58:27PM +0800, Richard Zhao wrote:
+> > i.MX usb controllers shares non-core registers, which may include
+> > SoC specific controls. We take it as a usbmisc device and usbmisc
+> > driver set operations needed by ci13xxx_imx driver.
 > > 
-> > Add regmap based syscon driver.
-> > This is usually used for access misc bits in registers which does not belong
-> > to a specific module, for example, IMX IOMUXC GPR and ANATOP.
-> > With this driver, client can use generic regmap API to access registers
-> > which are registered into syscon.
-> 
-> > diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
-> 
-> > +* System Controller Registers R/W driver
-> 
-> I think the binding document could use some information about what a
-> "syscon" actually is, especially since the compatible value is something
-> generic like "syscon" rather than something with a vendor-specific
-> prefix.
-Yes, we'd better have it.
-
-> How about:
-> 
-> A system controller node represents a register region containing a set
-> of miscellaneous registers. The registers are not cohesive enough to
-> represent as any specific type of device. The typical use-case is for
-> some other node's driver, or platform-specific code, to acquire a
-> reference to the syscon node (e.g. by phandle, node path, or search
-> using a specific compatible value), interrogate the node (or associated
-> OS driver) to determine the location of the registers, and access the
-> registers directly.
-> 
-It looks very good to me.
-Thanks for the help.
-
+> > For example, Sabrelite board has bad over-current design, we can
+> > usbmisc to disable over-current detect.
+> > 
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  .../devicetree/bindings/usb/ci13xxx-imx.txt        |    5 +
+> >  .../devicetree/bindings/usb/usbmisc-imx.txt        |   14 ++
+> >  drivers/usb/chipidea/Makefile                      |    2 +-
+> >  drivers/usb/chipidea/ci13xxx_imx.c                 |   64 ++++++++
+> >  drivers/usb/chipidea/ci13xxx_imx.h                 |   28 ++++
+> >  drivers/usb/chipidea/usbmisc_imx6q.c               |  162 ++++++++++++++++++++
+> >  6 files changed, 274 insertions(+), 1 deletion(-)
+> >  create mode 100644 Documentation/devicetree/bindings/usb/usbmisc-imx.txt
+> >  create mode 100644 drivers/usb/chipidea/ci13xxx_imx.h
+> >  create mode 100644 drivers/usb/chipidea/usbmisc_imx6q.c
+> > 
+> > diff --git a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> > index 2c29041..5778b9c 100644
+> > --- a/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> > +++ b/Documentation/devicetree/bindings/usb/ci13xxx-imx.txt
+> > @@ -7,7 +7,10 @@ Required properties:
+> >  
+> >  Optional properties:
+> >  - fsl,usbphy: phandler of usb phy that connects to the only one port
+> > +- fsl,usbmisc: phandler of non-core register device, with one argument
+> > +  that indicate usb controller index
+> >  - vbus-supply: regulator for vbus
+> > +- disable-over-current: disable over current detect
+> >  
+> >  Examples:
+> >  usb at 02184000 { /* USB OTG */
+> > @@ -15,4 +18,6 @@ usb at 02184000 { /* USB OTG */
+> >  	reg = <0x02184000 0x200>;
+> >  	interrupts = <0 43 0x04>;
+> >  	fsl,usbphy = <&usbphy1>;
+> > +	fsl,usbmisc = <&usbmisc 0>;
+> > +	disable-over-current;
+> >  };
+> > diff --git a/Documentation/devicetree/bindings/usb/usbmisc-imx.txt b/Documentation/devicetree/bindings/usb/usbmisc-imx.txt
+> > new file mode 100644
+> > index 0000000..97ce94e
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/usb/usbmisc-imx.txt
+> > @@ -0,0 +1,14 @@
+> > +* Freescale i.MX non-core registers
+> > +
 > > +Required properties:
-> > +- compatible: Should contain "syscon".
-> > +- reg: the register range can be access from syscon
+> > +- #index-cells: Cells used to descibe usb controller index. Should be <1>
+> > +- compatible: Should be one of below:
+> > +	"fsl,imx6q-usbmisc" for imx6q
+> > +- reg: Should contain registers location and length
 > > +
 > > +Examples:
-> > +gpr: iomuxc-gpr at 020e0000 {
-> > +	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
-> > +	reg = <0x020e0000 0x38>;
+> > +usbmisc at 02184800 {
+> > +	#index-cells = <1>;
+> > +	compatible = "fsl,imx6q-usbmisc";
+> > +	reg = <0x02184800 0x200>;
 > > +};
 > 
-> > diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> 
-> > +config MFD_SYSCON
-> > +        bool "System Controller Register R/W Based on Regmap"
-> > +        select REGMAP_MMIO
-> > +        help
-> > +          Select this option to enable accessing system control registers
-> > +	  via regmap.
-> 
-> I think the indentation is off there.
-> 
-You're right.
-Will fix it.
+> i think we should have the devicetree-discuss Mailinglist in Cc: for
+> that.
+ccing devicetree-discuss ...
 
-> > +static int __devinit syscon_probe(struct platform_device *pdev)
-> ...
-> > +	regcache_cache_only(syscon->regmap, false);
+Thanks
+Richard
 > 
-> Isn't that the default?
+> Thanks,
+> Michael
 > 
-Correct, will remove.
-
-> Aside from that, I don't have any particular comments on this series, so
-> please consider it,
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> 
-Thanks a lot.
-
-Regards
-Dong Aisheng
