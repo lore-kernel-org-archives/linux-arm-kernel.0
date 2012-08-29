@@ -1,9 +1,9 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 29 Aug 2012 16:31:03 +0300
-Subject: [PATCH v2 4/8] ARM/dts: OMAP4: Add McBSP entries
+Date: Wed, 29 Aug 2012 16:31:04 +0300
+Subject: [PATCH v2 5/8] ARM/dts: OMAP5: Add McBSP entries
 In-Reply-To: <1346247067-9632-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1346247067-9632-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1346247067-9632-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1346247067-9632-6-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,16 +12,16 @@ DT.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/omap4.dtsi |   47 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 47 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/omap5.dtsi |   36 ++++++++++++++++++++++++++++++++++++
+ 1 files changed, 36 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 04cbbcb..258435f 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -295,5 +295,52 @@
- 			interrupt-parent = <&gic>;
- 			ti,hwmods = "dmic";
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 881d60c..57ca7c1 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -211,5 +211,41 @@
+ 			ti,hwmods = "mmc5";
+ 			ti,needs-special-reset;
  		};
 +
 +		mcbsp1: mcbsp at 40122000 {
@@ -58,17 +58,6 @@ index 04cbbcb..258435f 100644
 +			interrupt-parent = <&gic>;
 +			ti,buffer-size = <128>;
 +			ti,hwmods = "mcbsp3";
-+		};
-+
-+		mcbsp4: mcbsp at 48096000 {
-+			compatible = "ti,omap4-mcbsp";
-+			reg = <0x48096000 0xff>; /* L4 Interconnect */
-+			reg-names = "mpu";
-+			interrupts = <0 16 0x4>;
-+			interrupt-names = "common";
-+			interrupt-parent = <&gic>;
-+			ti,buffer-size = <128>;
-+			ti,hwmods = "mcbsp4";
 +		};
  	};
  };
