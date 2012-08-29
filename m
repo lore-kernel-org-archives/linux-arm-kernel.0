@@ -1,22 +1,35 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 28 Aug 2012 19:58:51 -0400
-Subject: [PATCH 9/9] ARM: OMAP: remove plat/board.h file
-In-Reply-To: <1346195937-6383-10-git-send-email-grinberg@compulab.co.il> (Igor
- Grinberg's message of "Wed, 29 Aug 2012 02:18:57 +0300")
-References: <1346195937-6383-1-git-send-email-grinberg@compulab.co.il>
- <1346195937-6383-10-git-send-email-grinberg@compulab.co.il>
-Message-ID: <877gsiwouc.fsf@octavius.laptop.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 28 Aug 2012 20:02:24 -0400
+Subject: arm: move plat-orion platform_data headers to the right place
+In-Reply-To: <1346180349-25123-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1346180349-25123-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20120829000224.GN19437@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Aug 28, 2012 at 08:59:01PM +0200, Thomas Petazzoni wrote:
+> Hello,
+> 
+> plat-orion/include/plat contains a bunch of headers with platform_data
+> structure definitions. Those headers should now be in
+> <linux/platform_data/...>, so this patch series is moving them
+> here. This impacts the MTD, USB EHCI, sound, MMC, DMA XOR drivers.
+> 
+> Moreover, this series takes this opportunity to move two other
+> platform_data headers that were in <linux/...>. This impacts the I2C
+> and Ethernet drivers.
+> 
+> This series has been built tested for orion5x_defconfig,
+> dove_defconfig, kirkwood_defconfig and mv78x00_defconfig.
+> 
+> Thanks,
+> 
+> Thomas
 
-On Tue, Aug 28 2012, Igor Grinberg wrote:
->  drivers/mmc/host/omap.c                      |    1 -
->  drivers/mmc/host/omap_hsmmc.c                |    1 -
+Entire series applied to:
 
-Acked-by: Chris Ball <cjb@laptop.org>
+git://git.infradead.org/users/jcooper/linux.git boards-for-v3.7-v2
 
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+thx,
+
+Jason.
