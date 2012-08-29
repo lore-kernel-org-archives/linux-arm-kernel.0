@@ -1,74 +1,144 @@
-From: nicolas.thery@st.com (Nicolas THERY)
-Date: Wed, 29 Aug 2012 16:55:32 +0200
-Subject: [PATCH] [media] atmel_isi: allocate memory to store the isi
- platform data.
-In-Reply-To: <1346235093-28613-1-git-send-email-josh.wu@atmel.com>
-References: <1346235093-28613-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <503E2D64.1020303@st.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 29 Aug 2012 18:04:24 +0300
+Subject: [PATCH 6/9] ARM: OMAP1: move omap1_bl pdata out of arch/arm/*
+In-Reply-To: <1346195937-6383-7-git-send-email-grinberg@compulab.co.il>
+References: <1346195937-6383-1-git-send-email-grinberg@compulab.co.il>
+ <1346195937-6383-7-git-send-email-grinberg@compulab.co.il>
+Message-ID: <1346252664.12380.0.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On 2012-08-29 12:11, Josh Wu wrote:
-> This patch fix the bug: ISI driver's platform data became invalid when isi platform data's attribution is __initdata.
+On Wed, 2012-08-29 at 02:18 +0300, Igor Grinberg wrote:
+> omap1 backlight platform data resides inside plat/board.h while it
+> should be inside include/linux/...
+> Move the omap1 backlight platform data to
+> include/linux/platform_data/.
 > 
-> If the isi platform data is passed as __initdata. Then we need store it in driver allocated memory. otherwise when we use it out of the probe() function, then the isi platform data is invalid.
-> 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> Cc: Richard Purdie <rpurdie@rpsys.net>
+> Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+> Cc: linux-fbdev at vger.kernel.org
+> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
 > ---
->  drivers/media/platform/soc_camera/atmel-isi.c |   12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
+>  arch/arm/mach-omap1/board-osk.c         |    1 +
+>  arch/arm/mach-omap1/board-palmte.c      |    1 +
+>  arch/arm/mach-omap1/board-palmtt.c      |    1 +
+>  arch/arm/mach-omap1/board-palmz71.c     |    1 +
+>  arch/arm/plat-omap/include/plat/board.h |    7 -------
+>  drivers/video/backlight/omap1_bl.c      |    2 +-
+>  include/linux/platform_data/omap1_bl.h  |   11 +++++++++++
+>  7 files changed, 16 insertions(+), 8 deletions(-)
+>  create mode 100644 include/linux/platform_data/omap1_bl.h
 > 
-> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-> index ec3f6a0..dc0fdec 100644
-> --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-> @@ -926,6 +926,7 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
->  	clk_put(isi->mck);
->  	clk_unprepare(isi->pclk);
->  	clk_put(isi->pclk);
-> +	kfree(isi->pdata);
-
-Not needed if you use devm_kzalloc().  See below.
-
->  	kfree(isi);
+> diff --git a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
+> index 8784705..569b687 100644
+> --- a/arch/arm/mach-omap1/board-osk.c
+> +++ b/arch/arm/mach-omap1/board-osk.c
+> @@ -39,6 +39,7 @@
+>  #include <linux/mtd/partitions.h>
+>  #include <linux/mtd/physmap.h>
+>  #include <linux/i2c/tps65010.h>
+> +#include <linux/platform_data/omap1_bl.h>
 >  
->  	return 0;
-> @@ -968,8 +969,15 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
->  		goto err_alloc_isi;
->  	}
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> diff --git a/arch/arm/mach-omap1/board-palmte.c b/arch/arm/mach-omap1/board-palmte.c
+> index 26bcb9d..7bf00ba 100644
+> --- a/arch/arm/mach-omap1/board-palmte.c
+> +++ b/arch/arm/mach-omap1/board-palmte.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/apm-emulation.h>
+>  #include <linux/omapfb.h>
+> +#include <linux/platform_data/omap1_bl.h>
 >  
-> +	isi->pdata = kzalloc(sizeof(struct isi_platform_data), GFP_KERNEL);
-> +	if (!isi->pdata) {
-> +		ret = -ENOMEM;
-> +		dev_err(&pdev->dev, "Can't allocate isi platform data!\n");
-> +		goto err_alloc_isi_pdata;
-> +	}
-> +	memcpy(isi->pdata, pdata, sizeof(struct isi_platform_data));
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> diff --git a/arch/arm/mach-omap1/board-palmtt.c b/arch/arm/mach-omap1/board-palmtt.c
+> index 4d09944..2cce505 100644
+> --- a/arch/arm/mach-omap1/board-palmtt.c
+> +++ b/arch/arm/mach-omap1/board-palmtt.c
+> @@ -27,6 +27,7 @@
+>  #include <linux/omapfb.h>
+>  #include <linux/spi/spi.h>
+>  #include <linux/spi/ads7846.h>
+> +#include <linux/platform_data/omap1_bl.h>
+>  
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> diff --git a/arch/arm/mach-omap1/board-palmz71.c b/arch/arm/mach-omap1/board-palmz71.c
+> index 3559803..45ab9f0 100644
+> --- a/arch/arm/mach-omap1/board-palmz71.c
+> +++ b/arch/arm/mach-omap1/board-palmz71.c
+> @@ -30,6 +30,7 @@
+>  #include <linux/omapfb.h>
+>  #include <linux/spi/spi.h>
+>  #include <linux/spi/ads7846.h>
+> +#include <linux/platform_data/omap1_bl.h>
+>  
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> diff --git a/arch/arm/plat-omap/include/plat/board.h b/arch/arm/plat-omap/include/plat/board.h
+> index 5938c72..d0bc46e 100644
+> --- a/arch/arm/plat-omap/include/plat/board.h
+> +++ b/arch/arm/plat-omap/include/plat/board.h
+> @@ -19,13 +19,6 @@ struct omap_lcd_config {
+>  	u8   data_lines;
+>  };
+>  
+> -struct device;
+> -struct fb_info;
+> -struct omap_backlight_config {
+> -	int default_intensity;
+> -	int (*set_power)(struct device *dev, int state);
+> -};
+> -
+>  /* for TI reference platforms sharing the same debug card */
+>  extern int debug_card_init(u32 addr, unsigned gpio);
+>  
+> diff --git a/drivers/video/backlight/omap1_bl.c b/drivers/video/backlight/omap1_bl.c
+> index bfdc5fb..92257ef 100644
+> --- a/drivers/video/backlight/omap1_bl.c
+> +++ b/drivers/video/backlight/omap1_bl.c
+> @@ -27,9 +27,9 @@
+>  #include <linux/fb.h>
+>  #include <linux/backlight.h>
+>  #include <linux/slab.h>
+> +#include <linux/platform_data/omap1_bl.h>
+>  
+>  #include <mach/hardware.h>
+> -#include <plat/board.h>
+>  #include <plat/mux.h>
+>  
+>  #define OMAPBL_MAX_INTENSITY		0xff
+> diff --git a/include/linux/platform_data/omap1_bl.h b/include/linux/platform_data/omap1_bl.h
+> new file mode 100644
+> index 0000000..881a8e9
+> --- /dev/null
+> +++ b/include/linux/platform_data/omap1_bl.h
+> @@ -0,0 +1,11 @@
+> +#ifndef __OMAP1_BL_H__
+> +#define __OMAP1_BL_H__
 > +
+> +#include <linux/device.h>
 
-It is more idiomatic to use sizeof(*isi->pdata) in kzalloc() and memcpy() calls
-to be resilient to future type changes.
+You could use struct device; here.
 
-You may also want to use dev_kzalloc() which frees memory automagically on
-driver detach.
+> +
+> +struct omap_backlight_config {
+> +	int default_intensity;
+> +	int (*set_power)(struct device *dev, int state);
+> +};
+> +
+> +#endif
 
->  	isi->pclk = pclk;
-> -	isi->pdata = pdata;
->  	isi->active = NULL;
->  	spin_lock_init(&isi->lock);
->  	init_waitqueue_head(&isi->vsync_wq);
-> @@ -1073,6 +1081,8 @@ err_set_mck_rate:
->  err_clk_prepare_mck:
->  	clk_put(isi->mck);
->  err_clk_get:
-> +	kfree(isi->pdata);
-> +err_alloc_isi_pdata:
->  	kfree(isi);
->  err_alloc_isi:
->  	clk_unprepare(pclk);
-> 
+Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 
-Best regards,
-Nicolas
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120829/ca68f5be/attachment.sig>
