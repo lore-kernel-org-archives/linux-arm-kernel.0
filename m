@@ -1,57 +1,55 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 29 Aug 2012 18:11:33 +0800
-Subject: [PATCH] [media] atmel_isi: allocate memory to store the isi platform
- data.
-Message-ID: <1346235093-28613-1-git-send-email-josh.wu@atmel.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Wed, 29 Aug 2012 13:18:10 +0300
+Subject: [PATCH v6 1/3] USB: chipidea: add imx usbmisc support
+In-Reply-To: <20120829081020.GX26594@pengutronix.de>
+References: <1346137109-32247-1-git-send-email-richard.zhao@freescale.com>
+ <1346137109-32247-2-git-send-email-richard.zhao@freescale.com>
+ <871uiqkuhb.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120829081020.GX26594@pengutronix.de>
+Message-ID: <87ehmqj925.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fix the bug: ISI driver's platform data became invalid when isi platform data's attribution is __initdata.
+Sascha Hauer <s.hauer@pengutronix.de> writes:
 
-If the isi platform data is passed as __initdata. Then we need store it in driver allocated memory. otherwise when we use it out of the probe() function, then the isi platform data is invalid.
+> On Wed, Aug 29, 2012 at 10:50:08AM +0300, Alexander Shishkin wrote:
+>> Richard Zhao <richard.zhao@freescale.com> writes:
+>> 
+>> > i.MX usb controllers shares non-core registers, which may include
+>> > SoC specific controls. We take it as a usbmisc device and usbmisc
+>> > driver set operations needed by ci13xxx_imx driver.
+>> >
+>> > For example, Sabrelite board has bad over-current design, we can
+>> > usbmisc to disable over-current detect.
+>> 
+>> Why does this have to be part of the usb driver instead of SoC specific
+>> code? It looks like you've created a whole new device/driver
+>> infrastructure just to disable overcurrent for a specific board.
+>
+> Richards code indeed only handles overcurrent for a specific board, but
+> there are more bits to configure in the longer run: power pin
+> polarities, ULPI/serial mode select and some more.
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
- drivers/media/platform/soc_camera/atmel-isi.c |   12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+Sounds to me like these things that should be taken care of by the phy
+driver, which will likely be simpler from both driver's and devicetree's
+perspective.
 
-diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-index ec3f6a0..dc0fdec 100644
---- a/drivers/media/platform/soc_camera/atmel-isi.c
-+++ b/drivers/media/platform/soc_camera/atmel-isi.c
-@@ -926,6 +926,7 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
- 	clk_put(isi->mck);
- 	clk_unprepare(isi->pclk);
- 	clk_put(isi->pclk);
-+	kfree(isi->pdata);
- 	kfree(isi);
- 
- 	return 0;
-@@ -968,8 +969,15 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
- 		goto err_alloc_isi;
- 	}
- 
-+	isi->pdata = kzalloc(sizeof(struct isi_platform_data), GFP_KERNEL);
-+	if (!isi->pdata) {
-+		ret = -ENOMEM;
-+		dev_err(&pdev->dev, "Can't allocate isi platform data!\n");
-+		goto err_alloc_isi_pdata;
-+	}
-+	memcpy(isi->pdata, pdata, sizeof(struct isi_platform_data));
-+
- 	isi->pclk = pclk;
--	isi->pdata = pdata;
- 	isi->active = NULL;
- 	spin_lock_init(&isi->lock);
- 	init_waitqueue_head(&isi->vsync_wq);
-@@ -1073,6 +1081,8 @@ err_set_mck_rate:
- err_clk_prepare_mck:
- 	clk_put(isi->mck);
- err_clk_get:
-+	kfree(isi->pdata);
-+err_alloc_isi_pdata:
- 	kfree(isi);
- err_alloc_isi:
- 	clk_unprepare(pclk);
--- 
-1.7.9.5
+>
+>> 
+>> And the infrastructure boils down to a complex way of passing a callback
+>> from imx driver to another imx driver, that only works if they are
+>> probed in the right order. I don't see any point in doing it like this
+>> other than inflating the device tree tables even further.
+>> 
+>> Why can't this be part of the SoC code like it is done, for example in
+>> arch/arm/mach-omap2/control.c?
+>
+> The settings are board specific, so there must be some way to configure
+> them in the devicetree.
+
+But I'm sure there's a way to control board-specific settings/kludges
+from devicetree?
+
+Regards,
+--
+Alex
