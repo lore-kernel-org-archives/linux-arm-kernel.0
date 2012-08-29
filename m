@@ -1,38 +1,36 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 29 Aug 2012 17:31:28 -0500
-Subject: [PATCH 02/10] gpio: pxa: add explicit includes for cpu_is_X macros
+Date: Wed, 29 Aug 2012 17:31:29 -0500
+Subject: [PATCH 03/10] serial: atmel: add explict mach/gpio.h include
 In-Reply-To: <1346279496-26286-1-git-send-email-robherring2@gmail.com>
 References: <1346279496-26286-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1346279496-26286-3-git-send-email-robherring2@gmail.com>
+Message-ID: <1346279496-26286-4-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-In preparation to remove implicit inclusion of mach/gpio.h, add the
-necessary includes for cpu_is_X macros.
+In preparation to remove implicit inclusion of mach/gpio.h, add explicit
+include of mach/gpio.h.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Alan Cox <alan@linux.intel.com>
 ---
- drivers/gpio/gpio-pxa.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/tty/serial/atmel_serial.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-index 9cac88a..4d44e2f 100644
---- a/drivers/gpio/gpio-pxa.c
-+++ b/drivers/gpio/gpio-pxa.c
-@@ -27,6 +27,10 @@
- #include <linux/slab.h>
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 3d7e1ee..c799001 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -48,7 +48,7 @@
  
- #include <mach/irqs.h>
-+#include <mach/hardware.h>
-+#ifdef CONFIG_ARCH_MMP
-+#include <mach/cputype.h>
-+#endif
+ #ifdef CONFIG_ARM
+ #include <mach/cpu.h>
+-#include <asm/gpio.h>
++#include <mach/gpio.h>
+ #endif
  
- /*
-  * We handle the GPIOs by banks, each bank covers up to 32 GPIOs with
+ #define PDC_BUFFER_SIZE		512
 -- 
 1.7.9.5
