@@ -1,82 +1,88 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 29 Aug 2012 14:41:02 -0700
-Subject: [PATCH v2 1/4] [RFC] clk: new locking scheme for reentrancy
-In-Reply-To: <CADTbHxob_pkYN_73AD4YL_Ki5i40iLTJuN0rPuFzYcyyhfoMAQ@mail.gmail.com>
-References: <1345074214-17531-1-git-send-email-mturquette@linaro.org>
- <1345074214-17531-2-git-send-email-mturquette@linaro.org>
- <CADTbHxob_pkYN_73AD4YL_Ki5i40iLTJuN0rPuFzYcyyhfoMAQ@mail.gmail.com>
-Message-ID: <20120829214102.4450.35547@nucleus>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 30 Aug 2012 00:42:40 +0300
+Subject: [PATCH 6/9] ARM: OMAP1: move omap1_bl pdata out of arch/arm/*
+In-Reply-To: <1346252664.12380.0.camel@deskari>
+References: <1346195937-6383-1-git-send-email-grinberg@compulab.co.il>
+ <1346195937-6383-7-git-send-email-grinberg@compulab.co.il>
+ <1346252664.12380.0.camel@deskari>
+Message-ID: <503E8CD0.2090608@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Pankaj Jangra (2012-08-27 10:05:29)
-> Hi Mike,
-> 
-> On Thu, Aug 16, 2012 at 5:13 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> > +}
-> > +
-> > +void __clk_unprepare(struct clk *clk, struct clk *top)
-> 
-> Why do you need to change the signature of __clk_prepare and
-> __clk_unprepare functions ?
-> I mean i did not understand the use of passing struct clk *top? As i
-> understand, it tells when you reach at the last
-> clk struct in the tree which needs to be prepared/unprepared. Do we
-> have extra benefit of this or if i am missing something?
-> 
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-This series breaks compatibility with the internal clk functions.  So if
-you were using __clk_prepare in your code somewhere then this will no
-longer work.  It is likely you could just call clk_prepare in the same
-place since there is some reentrancy introduced in this series.
+On 08/29/12 18:04, Tomi Valkeinen wrote:
+> On Wed, 2012-08-29 at 02:18 +0300, Igor Grinberg wrote:
+>> omap1 backlight platform data resides inside plat/board.h while it
+>> should be inside include/linux/...
+>> Move the omap1 backlight platform data to
+>> include/linux/platform_data/.
+>>
+>> Cc: Richard Purdie <rpurdie@rpsys.net>
+>> Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+>> Cc: linux-fbdev at vger.kernel.org
+>> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+>> ---
+>>  arch/arm/mach-omap1/board-osk.c         |    1 +
+>>  arch/arm/mach-omap1/board-palmte.c      |    1 +
+>>  arch/arm/mach-omap1/board-palmtt.c      |    1 +
+>>  arch/arm/mach-omap1/board-palmz71.c     |    1 +
+>>  arch/arm/plat-omap/include/plat/board.h |    7 -------
+>>  drivers/video/backlight/omap1_bl.c      |    2 +-
+>>  include/linux/platform_data/omap1_bl.h  |   11 +++++++++++
+>>  7 files changed, 16 insertions(+), 8 deletions(-)
+>>  create mode 100644 include/linux/platform_data/omap1_bl.h
 
-Your understanding of top is correct: I want to avoid walking to the
-root of the clock tree every time.  We determine the top based on
-finding a positive clk->enable_count value.  There is no "extra
-benefit", but locking to the root of the tree would destroy the goal of
-reentrancy since there would be locking collisions at the top of the
-tree.
+[...]
 
-<snip>
-> > +               if (IS_ERR(top)) {
-> > +                       pr_debug("%s: %s failed with %ld on attempt %d\n",
-> > +                                       __func__, clk->name, PTR_ERR(top),
-> > +                                       tries);
-> > +                       wait_for_completion(&clk_completion);
-> > +                       if (WAIT_TRIES == ++tries)
-> > +                               break;
-> > +               } else
-> > +                       break;
+>> diff --git a/include/linux/platform_data/omap1_bl.h b/include/linux/platform_data/omap1_bl.h
+>> new file mode 100644
+>> index 0000000..881a8e9
+>> --- /dev/null
+>> +++ b/include/linux/platform_data/omap1_bl.h
+>> @@ -0,0 +1,11 @@
+>> +#ifndef __OMAP1_BL_H__
+>> +#define __OMAP1_BL_H__
+>> +
+>> +#include <linux/device.h>
 > 
-> Braces around else part please.
-> 
+> You could use struct device; here.
 
-OK.
-
-> > +       }
-> > +
-> > +       if (WAIT_TRIES == tries) {
-> > +               pr_warning("%s: failed to lock clocks; cyclical dependency?\n",
-> > +                               __func__);
-> > +               return;
-> > +       }
-> > +
-> > +       /* unprepare the list of clocks from clk to top */
-> > +       __clk_unprepare(clk, top);
-> > +
-> 
-> > +       /* unprepare the list of clocks from clk to top */
-> > +       __clk_prepare(clk, top);
-> 
-> You mean prepare right ? :)
-> 
-
-Right.  Will fix in next version of RFC.
-
-Thanks much for the review,
-Mike
+Yes I know, but I don't think it is any better.
 
 > 
+>> +
+>> +struct omap_backlight_config {
+>> +	int default_intensity;
+>> +	int (*set_power)(struct device *dev, int state);
+>> +};
+>> +
+>> +#endif
 > 
-> Regards,
-> Pankaj Kumar
+> Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+
+Thanks!
+
+
+- -- 
+Regards,
+Igor.
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2.0.17 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+
+iQIcBAEBAgAGBQJQPozJAAoJEBDE8YO64EfasmQP/2v38LY4t30rnl3jOvs6vvsa
+RPFFQG1lxkFTpMHMkOvb4pW/k00IHxkcv2hRrGmoBWbEJqel7b0LyEFVV+M+uCSo
+nCVsnd/Pu7jftCwC2Ggy2PBE16n+9I6UttN4Vsh7a8f2qwtXdOxL01xxyM7cVtn4
+YQRhyVrKMiiKhNfKtvQV2V0npsVVksgnKm0K1zNRiZkTuKjZ4sJrliGYaU6B5F32
+MHx31U0r1VbxZwOi9m19Ucyuf1CYvVKhlmeMop1fE4+3Dkt1708pMWOpK9iknMQU
+m5cA+25a7YolDIluvfXlH+7hDFZixDUd5pFeJA0llaqOv2PSHGT0kYDOTmtRyKvD
+D3mq22amwPlqgjXdxJMS5gckF6N3KrBjA3AHW4FpoTQjdCciiql3k+DMaRNM6Dzm
+WjCCZBOQHy5dSRn6HzNo2iSP+B8mANh8eoJJAoyS3JJ+ihf4hiV1PEC9jXxWTg1H
+M449feGQccXUfYj8pTlXtTXEk8L5x3kBlU9VMMzlA1kQN0VoFOQRhSl+UVdu2ckA
+SPotVgiUCUzT9x1xEoIBjrz+kLAk0bYvRv2vUflzzH8lf+/MYz4UxDikSCsifpF1
+s/5evCRgSUokm1VxlFEMLiUG0gb8FJR3TylJU4CD5U9dbkel2urKoE1zfc4LyPRT
+ycdLeCP+C7ZcsaNApWMS
+=kElj
+-----END PGP SIGNATURE-----
