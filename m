@@ -1,114 +1,128 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 29 Aug 2012 09:40:17 +0200
-Subject: [PATCH 2/4] mtd nand mxc_nand: swap iomem resource order
+Date: Wed, 29 Aug 2012 09:40:18 +0200
+Subject: [PATCH 3/4] mtd nand mxc_nand: add i.MX53 support
 In-Reply-To: <1346226019-23560-1-git-send-email-s.hauer@pengutronix.de>
 References: <1346226019-23560-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1346226019-23560-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1346226019-23560-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX v3 nand controller (i.MX5) needs two memory resources.
-Traditionally we have the AXI resource first. For sorting in this
-driver into the devicetree it feels much more natural to have the
-IP resource first. This patch swaps the ordering of these two
-resources.
+The only relevant change between i.MX51 and i.MX53 is that
+a bitfield is shifted one bit to the left.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/plat-mxc/devices/platform-mxc_nand.c |   11 ++++----
- drivers/mtd/nand/mxc_nand.c                   |   35 ++++++++++++++-----------
- 2 files changed, 24 insertions(+), 22 deletions(-)
+ drivers/mtd/nand/mxc_nand.c |   48 +++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 42 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/devices/platform-mxc_nand.c b/arch/arm/plat-mxc/devices/platform-mxc_nand.c
-index 1568f39..95b75cc 100644
---- a/arch/arm/plat-mxc/devices/platform-mxc_nand.c
-+++ b/arch/arm/plat-mxc/devices/platform-mxc_nand.c
-@@ -63,10 +63,6 @@ struct platform_device *__init imx_add_mxc_nand(
- 	/* AXI has to come first, that's how the mxc_nand driver expect it */
- 	struct resource res[] = {
- 		{
--			.start = data->axibase,
--			.end = data->axibase + SZ_16K - 1,
--			.flags = IORESOURCE_MEM,
--		}, {
- 			.start = data->iobase,
- 			.end = data->iobase + data->iosize - 1,
- 			.flags = IORESOURCE_MEM,
-@@ -74,10 +70,13 @@ struct platform_device *__init imx_add_mxc_nand(
- 			.start = data->irq,
- 			.end = data->irq,
- 			.flags = IORESOURCE_IRQ,
-+		}, {
-+			.start = data->axibase,
-+			.end = data->axibase + SZ_16K - 1,
-+			.flags = IORESOURCE_MEM,
- 		},
- 	};
- 	return imx_add_platform_device("mxc_nand", data->id,
--			res + !data->axibase,
--			ARRAY_SIZE(res) - !data->axibase,
-+			res, ARRAY_SIZE(res) - !data->axibase,
- 			pdata, sizeof(*pdata));
- }
 diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 268c0dc..efbc72c 100644
+index efbc72c..49557c8 100644
 --- a/drivers/mtd/nand/mxc_nand.c
 +++ b/drivers/mtd/nand/mxc_nand.c
-@@ -1376,7 +1376,25 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 	if (IS_ERR(host->clk))
- 		return PTR_ERR(host->clk);
+@@ -43,8 +43,8 @@
  
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	err = mxcnd_probe_dt(host);
-+	if (err > 0)
-+		err = mxcnd_probe_pdata(host);
-+	if (err < 0)
-+		return err;
+ #define nfc_is_v21()		(cpu_is_mx25() || cpu_is_mx35())
+ #define nfc_is_v1()		(cpu_is_mx31() || cpu_is_mx27() || cpu_is_mx21())
+-#define nfc_is_v3_2()		(cpu_is_mx51() || cpu_is_mx53())
+-#define nfc_is_v3()		nfc_is_v3_2()
++#define nfc_is_v3_2a()		cpu_is_mx51()
++#define nfc_is_v3_2b()		cpu_is_mx53()
+ 
+ /* Addresses for NFC registers */
+ #define NFC_V1_V2_BUF_SIZE		(host->regs + 0x00)
+@@ -122,7 +122,7 @@
+ #define NFC_V3_CONFIG2_2CMD_PHASES		(1 << 4)
+ #define NFC_V3_CONFIG2_NUM_ADDR_PHASE0		(1 << 5)
+ #define NFC_V3_CONFIG2_ECC_MODE_8		(1 << 6)
+-#define NFC_V3_CONFIG2_PPB(x)			(((x) & 0x3) << 7)
++#define NFC_V3_CONFIG2_PPB(x, shift)		(((x) & 0x3) << shift)
+ #define NFC_V3_CONFIG2_NUM_ADDR_PHASE1(x)	(((x) & 0x3) << 12)
+ #define NFC_V3_CONFIG2_INT_MSK			(1 << 15)
+ #define NFC_V3_CONFIG2_ST_CMD(x)		(((x) & 0xff) << 24)
+@@ -174,6 +174,7 @@ struct mxc_nand_devtype_data {
+ 	int spare_len;
+ 	int eccbytes;
+ 	int eccsize;
++	int ppb_shift;
+ };
+ 
+ struct mxc_nand_host {
+@@ -1021,7 +1022,9 @@ static void preset_v3(struct mtd_info *mtd)
+ 	}
+ 
+ 	if (mtd->writesize) {
+-		config2 |= NFC_V3_CONFIG2_PPB(ffs(mtd->erasesize / mtd->writesize) - 6);
++		config2 |= NFC_V3_CONFIG2_PPB(
++				ffs(mtd->erasesize / mtd->writesize) - 6,
++				host->devtype_data->ppb_shift);
+ 		host->eccsize = get_eccsize(mtd);
+ 		if (host->eccsize == 8)
+ 			config2 |= NFC_V3_CONFIG2_ECC_MODE_8;
+@@ -1234,7 +1237,7 @@ static const struct mxc_nand_devtype_data imx25_nand_devtype_data = {
+ 	.eccsize = 0,
+ };
+ 
+-/* v3: i.MX51, i.MX53 */
++/* v3.2a: i.MX51 */
+ static const struct mxc_nand_devtype_data imx51_nand_devtype_data = {
+ 	.preset = preset_v3,
+ 	.send_cmd = send_cmd_v3,
+@@ -1258,6 +1261,34 @@ static const struct mxc_nand_devtype_data imx51_nand_devtype_data = {
+ 	.spare_len = 64,
+ 	.eccbytes = 0,
+ 	.eccsize = 0,
++	.ppb_shift = 7,
++};
 +
-+	if (host->devtype_data->needs_ip) {
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+		if (!res)
-+			return -ENODEV;
-+		host->regs_ip = devm_request_and_ioremap(&pdev->dev, res);
-+		if (!host->regs_ip)
-+			return -ENOMEM;
-+
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	} else {
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	}
-+
- 	if (!res)
- 		return -ENODEV;
++/* v3.2b: i.MX53 */
++static const struct mxc_nand_devtype_data imx53_nand_devtype_data = {
++	.preset = preset_v3,
++	.send_cmd = send_cmd_v3,
++	.send_addr = send_addr_v3,
++	.send_page = send_page_v3,
++	.send_read_id = send_read_id_v3,
++	.get_dev_status = get_dev_status_v3,
++	.check_int = check_int_v3,
++	.irq_control = irq_control_v3,
++	.get_ecc_status = get_ecc_status_v3,
++	.ecclayout_512 = &nandv2_hw_eccoob_smallpage,
++	.ecclayout_2k = &nandv2_hw_eccoob_largepage,
++	.ecclayout_4k = &nandv2_hw_eccoob_smallpage, /* XXX: needs fix */
++	.select_chip = mxc_nand_select_chip_v1_v3,
++	.correct_data = mxc_nand_correct_data_v2_v3,
++	.irqpending_quirk = 0,
++	.needs_ip = 1,
++	.regs_offset = 0,
++	.spare0_offset = 0x1000,
++	.axi_offset = 0x1e00,
++	.spare_len = 64,
++	.eccbytes = 0,
++	.eccsize = 0,
++	.ppb_shift = 8,
+ };
  
-@@ -1386,12 +1404,6 @@ static int __init mxcnd_probe(struct platform_device *pdev)
+ #ifdef CONFIG_OF_MTD
+@@ -1274,6 +1305,9 @@ static const struct of_device_id mxcnd_dt_ids[] = {
+ 	}, {
+ 		.compatible = "fsl,imx51-nand",
+ 		.data = &imx51_nand_devtype_data,
++	}, {
++		.compatible = "fsl,imx53-nand",
++		.data = &imx53_nand_devtype_data,
+ 	},
+ 	{ /* sentinel */ }
+ };
+@@ -1327,8 +1361,10 @@ static int __init mxcnd_probe_pdata(struct mxc_nand_host *host)
+ 			host->devtype_data = &imx27_nand_devtype_data;
+ 	} else if (nfc_is_v21()) {
+ 		host->devtype_data = &imx25_nand_devtype_data;
+-	} else if (nfc_is_v3_2()) {
++	} else if (nfc_is_v3_2a()) {
+ 		host->devtype_data = &imx51_nand_devtype_data;
++	} else if (nfc_is_v3_2b()) {
++		host->devtype_data = &imx53_nand_devtype_data;
+ 	} else
+ 		BUG();
  
- 	host->main_area0 = host->base;
- 
--	err = mxcnd_probe_dt(host);
--	if (err > 0)
--		err = mxcnd_probe_pdata(host);
--	if (err < 0)
--		return err;
--
- 	if (host->devtype_data->regs_offset)
- 		host->regs = host->base + host->devtype_data->regs_offset;
- 	host->spare0 = host->base + host->devtype_data->spare0_offset;
-@@ -1405,15 +1417,6 @@ static int __init mxcnd_probe(struct platform_device *pdev)
- 	this->ecc.size = 512;
- 	this->ecc.layout = host->devtype_data->ecclayout_512;
- 
--	if (host->devtype_data->needs_ip) {
--		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
--		if (!res)
--			return -ENODEV;
--		host->regs_ip = devm_request_and_ioremap(&pdev->dev, res);
--		if (!host->regs_ip)
--			return -ENOMEM;
--	}
--
- 	if (host->pdata.hw_ecc) {
- 		this->ecc.calculate = mxc_nand_calculate_ecc;
- 		this->ecc.hwctl = mxc_nand_enable_hwecc;
 -- 
 1.7.10.4
