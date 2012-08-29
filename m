@@ -1,65 +1,84 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Wed, 29 Aug 2012 14:06:10 +0200
-Subject: [PATCH v11 0/4] AT91: replace old i2c-at91.c TWI driver
-In-Reply-To: <cover.1346225321.git.n.voss@weinmann.de>
-References: <cover.1346225321.git.n.voss@weinmann.de>
-Message-ID: <503E05B2.2020204@atmel.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Wed, 29 Aug 2012 17:37:13 +0530
+Subject: [PATCH] ARM: EXYNOS: Add clocks for EXYNOS Audio Subsystem.
+In-Reply-To: <CAAgF-Bdp817_RD3n6Sdo9zi=OrB4-Uiu5PDt4UB1BL-f0M4aJg@mail.gmail.com>
+References: <1343218056-30432-1-git-send-email-padma.v@samsung.com>
+ <031501cd6f98$dd67c550$98374ff0$%kim@samsung.com>
+ <CAAgF-Bdp817_RD3n6Sdo9zi=OrB4-Uiu5PDt4UB1BL-f0M4aJg@mail.gmail.com>
+Message-ID: <503E05F1.8050903@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nikolaus,
+On 08/01/2012 06:39 PM, Padma Venkat wrote:
+> Hi,
+> 
+> On Wed, Aug 1, 2012 at 9:21 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> Padmavathi Venna wrote:
+>>>
+>>> Audiocdclk frequency is 16.9344MHz in SMDK5250 and this clock is
+>>> board specific. So this patch adds a function to set the required
+>>> audio codec clk frequency from machine file.
+>>>
+>>> This patch also adds all the required clock instances for audio
+>>> subsystem and adds the clock alias names for i2sclk and busclk.
+>>>
+>>> Signed-off-by: Taylor Hutt <thutt@chromium.org>
+>>> Signed-off-by: sangsu4u.park <sangsu4u.park@samsung.com>
+>>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+>>> ---
+>>>  arch/arm/mach-exynos/clock-exynos5.c           |  129
+>>> ++++++++++++++++++++++++
+>>>  arch/arm/mach-exynos/common.h                  |    1 +
+>>>  arch/arm/mach-exynos/include/mach/regs-audss.h |   12 ++
+>>>  arch/arm/mach-exynos/mach-exynos5-dt.c         |    1 +
+>>>  4 files changed, 143 insertions(+), 0 deletions(-)
+>>>
 
-Le 08/29/2012 09:28 AM, Nikolaus Voss a ?crit :
-> The old driver has two main deficencies:
-> i)  No repeated start (Sr) condiction is possible, this makes it unusable
->      e.g. for most SMBus transfers.
-> ii) I/O was done with polling/busy waiting what caused over-/underruns
->      even at light system loads and clock speeds.
->
-> The new driver overcomes these deficencies and in addition allows for
-> more than one TWI interface.
->
-> A remaining limitation is the fact, that only one repeated start is
-> possible (two concatenated messages). This limitation is imposed by
-> the hardware. However, this should not be a problem as all common
-> i2c-client communication does not rely on more than one repeated start.
->
-> Changes since v11:
-> - corrected wrong id_entry on sam9261 twi gpio pdev
->
+[...]
 
-Thanks for this new version, you can add
-Tested-By: Ludovic Desroches <ludovic.desroches@atmel.com>
-for the whole series.
+>>> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+>>> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+>>> @@ -69,6 +69,7 @@ static void __init exynos5250_dt_machine_init(void)
+>>>  {
+>>>       of_platform_populate(NULL, of_default_bus_match_table,
+>>>                               exynos5250_auxdata_lookup, NULL);
+>>> +     exynos5_set_audiocdclk_rate(16934400);
+>>
+>> As you commented, the value of clock can be changed according to the board,
+>> and this file, mach-exynos5-dt.c is not only for smdk5250, now there is no
+>> board for exynos5250 though.
+> Please suggest me some file where I can call this function then.
+>>
 
-Concerning the open drain issue, even if I don't have it on my board 
-your patch is correct it is needed also for chips. Once I'll have the 
-complete list, I'll send an additional patch.
-
-Regards
-
-Ludovic
+Will it be a good idea to split this into two patches, one adding basic
+audio subsystem defines and another one adding specific support for EXYNOS5?
 
 
-> Nikolaus Voss (4):
->    drivers/i2c/busses/i2c-at91.c: remove old polling driver
->    Replace clk_lookup.con_id with clk_lookup.dev_id entries for twi clk
->    drivers/i2c/busses/i2c-at91.c: add new driver
->    G45 TWI: remove open drain setting for twi function gpios
->
->   arch/arm/mach-at91/at91rm9200.c            |    1 +
->   arch/arm/mach-at91/at91rm9200_devices.c    |    9 +
->   arch/arm/mach-at91/at91sam9260.c           |    1 +
->   arch/arm/mach-at91/at91sam9261.c           |    1 +
->   arch/arm/mach-at91/at91sam9261_devices.c   |    9 +
->   arch/arm/mach-at91/at91sam9263.c           |    1 +
->   arch/arm/mach-at91/at91sam9g45.c           |    2 +
->   arch/arm/mach-at91/at91sam9g45_devices.c   |    6 -
->   arch/arm/mach-at91/at91sam9rl.c            |    2 +
->   arch/arm/mach-at91/at91sam9x5.c            |    3 +
->   arch/arm/mach-at91/include/mach/at91_twi.h |   68 ----
->   drivers/i2c/busses/Kconfig                 |   11 +-
->   drivers/i2c/busses/i2c-at91.c              |  591 ++++++++++++++++++----------
->   13 files changed, 418 insertions(+), 287 deletions(-)
->   delete mode 100644 arch/arm/mach-at91/include/mach/at91_twi.h
->
+>> [...]
+>>
+>> Thanks.
+>>
+>> Best regards,
+>> Kgene.
+> 
+> Thanks for your review.
+> 
+> Best Regards
+> Padma
+>> --
+>> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+>> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+
+-- 
+Tushar Behera
