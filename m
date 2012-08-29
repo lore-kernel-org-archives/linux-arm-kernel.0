@@ -1,83 +1,61 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 29 Aug 2012 18:46:00 +0800
-Subject: [PATCH v2 05/11] USB: chipidea: don't let probe fail if otg
- controller start one role failed
-In-Reply-To: <87mx1ejag0.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
- <1346137397-32374-6-git-send-email-richard.zhao@freescale.com>
- <87ligz2yyo.fsf@ashishki-desk.ger.corp.intel.com>
- <20120828092730.GY4011@b20223-02.ap.freescale.net>
- <87vcg2jeyu.fsf@ashishki-desk.ger.corp.intel.com>
- <20120829083337.GI4011@b20223-02.ap.freescale.net>
- <87mx1ejag0.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20120829104559.GB25433@b20223-02.ap.freescale.net>
+Date: Wed, 29 Aug 2012 18:57:21 +0800
+Subject: [PATCH v6 1/3] USB: chipidea: add imx usbmisc support
+In-Reply-To: <87ehmqj925.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1346137109-32247-1-git-send-email-richard.zhao@freescale.com>
+ <1346137109-32247-2-git-send-email-richard.zhao@freescale.com>
+ <871uiqkuhb.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120829081020.GX26594@pengutronix.de>
+ <87ehmqj925.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20120829105720.GC25433@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2012 at 12:48:15PM +0300, Alexander Shishkin wrote:
-> Richard Zhao <richard.zhao@freescale.com> writes:
+On Wed, Aug 29, 2012 at 01:18:10PM +0300, Alexander Shishkin wrote:
+> Sascha Hauer <s.hauer@pengutronix.de> writes:
 > 
-> > On Wed, Aug 29, 2012 at 11:10:33AM +0300, Alexander Shishkin wrote:
+> > On Wed, Aug 29, 2012 at 10:50:08AM +0300, Alexander Shishkin wrote:
 > >> Richard Zhao <richard.zhao@freescale.com> writes:
 > >> 
-> >> > On Tue, Aug 28, 2012 at 11:38:23AM +0300, Alexander Shishkin wrote:
-> >> >> Richard Zhao <richard.zhao@freescale.com> writes:
-> >> >> 
-> >> >> > One role failed, but the other role will possiblly still work.
-> >> >> > For example, when udc start failed, if plug in a host device,
-> >> >> > it works.
-> >> >> 
-> >> >> If you're a host device, ci->role should be HOST at this point and
-> >> >> ci_role_start() shouldn't fail. If ci->role is detected wrongly, the
-> >> >> role detection must be fixed. If ci_role_start() fails for host, but it
-> >> >> still works when it's called again after the id pin change is detected,
-> >> >> again, the problem is elsewhere.
-> >> > The check is only for OTG device. For single role device, it just fail
-> >> > if it start the role failed.
+> >> > i.MX usb controllers shares non-core registers, which may include
+> >> > SoC specific controls. We take it as a usbmisc device and usbmisc
+> >> > driver set operations needed by ci13xxx_imx driver.
+> >> >
+> >> > For example, Sabrelite board has bad over-current design, we can
+> >> > usbmisc to disable over-current detect.
 > >> 
-> >> Sorry, can you rephrase?
-> >> 
-> >> >> 
-> >> >> >
-> >> >> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> >> >> > ---
-> >> >> >  drivers/usb/chipidea/core.c |    7 +++++--
-> >> >> >  1 file changed, 5 insertions(+), 2 deletions(-)
-> >> >> >
-> >> >> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> >> >> > index 19ef324..8fd390a 100644
-> >> >> > --- a/drivers/usb/chipidea/core.c
-> >> >> > +++ b/drivers/usb/chipidea/core.c
-> >> >> > @@ -473,8 +473,11 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
-> >> >> >  	ret = ci_role_start(ci, ci->role);
-> >> >> >  	if (ret) {
-> >> >> >  		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
-> >> >> > -		ret = -ENODEV;
-> >> >> > -		goto rm_wq;
-> >> >> > +		ci->role = CI_ROLE_END;
-> >> >> 
-> >> >> So are you relying on id pin interrupt for initializing the role after
-> >> >> this? Can you provide more details?
-> >> > Yes. The ID pin detect still works. My case is, gadget role failed,
-> >> > host role works. I was trying not to ruin host function.
-> >> 
-> >> But it shouldn't even try to start the gadget, because ci_otg_role()
-> >> should set ci->role to HOST before ci_role_start() happens.
-> > It depends on ID pin. If ID pin is gadget and gadget is not support well,
-> > ci_role_start will fail. See below example.
-> >> 
-> >> Another question is, why does gadget start fail?
-> > There's one example:
-> > If usb phy don't support otg yet, otg_set_peripheral will fail, and
-> > then cause udc_start fail.
+> >> Why does this have to be part of the usb driver instead of SoC specific
+> >> code? It looks like you've created a whole new device/driver
+> >> infrastructure just to disable overcurrent for a specific board.
+> >
+> > Richards code indeed only handles overcurrent for a specific board, but
+> > there are more bits to configure in the longer run: power pin
+> > polarities, ULPI/serial mode select and some more.
 > 
-> So you should drop the CI13XXX_REQUIRE_TRANSCEIVER flag from imx
-> platform data till the phy is fully implemented.
-It's just an example. We can not assume udc_start always success. If it
-fails, isn't it better to continue support of host than say game over?
+> Sounds to me like these things that should be taken care of by the phy
+> driver, which will likely be simpler from both driver's and devicetree's
+> perspective.
+No, it's controlled by a set of usb misc registers, which is not in phy
+IP or usb controller IP.
 
 Thanks
 Richard
+> 
+> >
+> >> 
+> >> And the infrastructure boils down to a complex way of passing a callback
+> >> from imx driver to another imx driver, that only works if they are
+> >> probed in the right order. I don't see any point in doing it like this
+> >> other than inflating the device tree tables even further.
+> >> 
+> >> Why can't this be part of the SoC code like it is done, for example in
+> >> arch/arm/mach-omap2/control.c?
+> >
+> > The settings are board specific, so there must be some way to configure
+> > them in the devicetree.
+> 
+> But I'm sure there's a way to control board-specific settings/kludges
+> from devicetree?
 > 
 > Regards,
 > --
