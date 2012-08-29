@@ -1,37 +1,74 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Wed, 29 Aug 2012 18:46:01 +0300
-Subject: [PATCH] mtd: orion_nand: remove <mach/hardware.h> include
-In-Reply-To: <1346110528-30858-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <20120816183708.GT22226@titan.lakedaemon.net>
- <1346110528-30858-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1346110528-30858-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1346255161.2848.515.camel@sauron.fi.intel.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 29 Aug 2012 18:02:18 +0200 (CEST)
+Subject: [PATCH] [media] atmel_isi: allocate memory to store the isi
+ platform data.
+In-Reply-To: <503E323A.8060409@samsung.com>
+References: <1346235093-28613-1-git-send-email-josh.wu@atmel.com>
+ <503E323A.8060409@samsung.com>
+Message-ID: <alpine.DEB.2.00.1208291755220.3095@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-08-28 at 01:35 +0200, Thomas Petazzoni wrote:
-> Commit c085d965fb63ac3b4cc7379d45588c0b39e2bdb0 made the ARCH_MVEBU
-> platform select PLAT_ORION, which means that now all Orion drivers can
-> be enabled on ARCH_MVEBU. This works fine for most drivers, except for
-> orion_nand, because it includes <mach/hardware.h>, but mach-mvebu does
-> not have a mach/hardware.h header (it is considered as a deprecated
-> practice).
-> 
-> It turns out that the <mach/hardware.h> include in orion_nand is not
-> necessary: the driver builds perfectly fine without it, so we simply
-> get rid of it.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On Wed, 29 Aug 2012, Sylwester Nawrocki wrote:
 
-Pushed to l2-mtd.git, thanks!
+> Hi,
+> 
+> On 08/29/2012 12:11 PM, Josh Wu wrote:
+> > This patch fix the bug: ISI driver's platform data became invalid 
+> > when isi platform data's attribution is __initdata.
+> > 
+> > If the isi platform data is passed as __initdata. Then we need store
+> > it in driver allocated memory. otherwise when we use it out of the 
+> > probe() function, then the isi platform data is invalid.
+> > 
+> > Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> > ---
+> >  drivers/media/platform/soc_camera/atmel-isi.c |   12 +++++++++++-
+> >  1 file changed, 11 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+> > index ec3f6a0..dc0fdec 100644
+> > --- a/drivers/media/platform/soc_camera/atmel-isi.c
+> > +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+> > @@ -926,6 +926,7 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
+> >  	clk_put(isi->mck);
+> >  	clk_unprepare(isi->pclk);
+> >  	clk_put(isi->pclk);
+> > +	kfree(isi->pdata);
+> >  	kfree(isi);
+> >  
+> >  	return 0;
+> > @@ -968,8 +969,15 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
+> >  		goto err_alloc_isi;
+> >  	}
+> >  
+> > +	isi->pdata = kzalloc(sizeof(struct isi_platform_data), GFP_KERNEL);
+> > +	if (!isi->pdata) {
+> > +		ret = -ENOMEM;
+> > +		dev_err(&pdev->dev, "Can't allocate isi platform data!\n");
+> > +		goto err_alloc_isi_pdata;
+> > +	}
+> > +	memcpy(isi->pdata, pdata, sizeof(struct isi_platform_data));
+> > +
+> 
+> Why not just embed struct isi_platform_data in struct atmel_isi and drop this
+> another kzalloc() ?
+> Then you could simply do isi->pdata = *pdata.
+> 
+> Also, is this going to work when this driver is build and as a module
+> and its loading is deferred past system booting ? At that time the driver's
+> platform data may be well discarded.
 
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120829/1f20e517/attachment.sig>
+Right, it will be gone, I think.
+
+> You may wan't to duplicate it on the
+> running boards in board code with kmemdup() or something.
+
+How about removing __initdata from board code?
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
