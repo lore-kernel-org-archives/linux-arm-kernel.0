@@ -1,38 +1,96 @@
 From: chanho61.park@samsung.com (Chanho Park)
-Date: Wed, 29 Aug 2012 10:14:53 +0900
-Subject: [PATCH v3 0/4] Add support to enable ARM PMU for EXYNOS
-Message-ID: <1346202897-27306-1-git-send-email-chanho61.park@samsung.com>
+Date: Wed, 29 Aug 2012 10:14:55 +0900
+Subject: [PATCH v3 2/4] ARM: EXYNOS: Correct combined IRQs for exynos4412
+In-Reply-To: <1346202897-27306-1-git-send-email-chanho61.park@samsung.com>
+References: <1346202897-27306-1-git-send-email-chanho61.park@samsung.com>
+Message-ID: <1346202897-27306-3-git-send-email-chanho61.park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset fixes irq numbers of ARM Performance Monitoring unit and enable it
-for Perf(Performance Counter) on the exynos 4 and 5. The exynos4 and 5 use 2
-more cpu cores which has its own pmu.
-The exynos uses combiner-irq type for arm-pmu. Especially, the exynos4412 has 4
-extra combined irq groups. So, we need to change a max combiner number.
-To enable perf, we need also to implement a set_irq_affinity function about the
-combiner-irq. After applying this patch, we can use the perf for the exynos
-machine.
+This patch corrects combined IRQs for exynos4412 platform. The exynos4412 has
+four extra combined irq group. Each irq is mapped to IRQ_SPI(xx). Unfortunately,
+extra combined IRQs isn't sequential. So, we need to map the irq manually.
 
-Changes from v2:
- - Convert to dt binding of exynos5250
+Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/common.c            |   31 ++++++++++++++++++++++++------
+ arch/arm/mach-exynos/include/mach/irqs.h |    2 +-
+ 2 files changed, 26 insertions(+), 7 deletions(-)
 
-Changes from v1:
- - Split arm-pmu init of exynos from plat-samsung
- - Correct combined irqs of exynos4412
- - Use soc_is_xxx function instead of CONFIG_XXX to identify dynamically
-
-Chanho Park (4):
-  ARM: EXYNOS: Add set_irq_affinity function for combiner_irq
-  ARM: EXYNOS: Correct combined IRQs for exynos4412
-  ARM: EXYNOS: Enable PMUs for exynos4
-  ARM: EXYNOS: Add arm-pmu DT binding for exynos5250
-
- arch/arm/boot/dts/exynos5250.dtsi        |    6 ++
- arch/arm/mach-exynos/common.c            |  106 ++++++++++++++++++++++++++----
- arch/arm/mach-exynos/include/mach/irqs.h |   10 ++-
- arch/arm/plat-samsung/devs.c             |    2 +-
- 4 files changed, 109 insertions(+), 15 deletions(-)
-
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index f194bbc..be61564 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -560,23 +560,39 @@ static struct irq_domain_ops combiner_irq_domain_ops = {
+ 	.map	= combiner_irq_domain_map,
+ };
+ 
++static unsigned int get_combiner_extra_irq(int group)
++{
++	switch (group) {
++	case 16:
++		return IRQ_SPI(107);
++	case 17:
++		return IRQ_SPI(108);
++	case 18:
++		return IRQ_SPI(48);
++	case 19:
++		return IRQ_SPI(42);
++	default:
++		return 0;
++	}
++}
++
+ static void __init combiner_init(void __iomem *combiner_base,
+ 				 struct device_node *np)
+ {
+ 	int i, irq, irq_base;
+ 	unsigned int max_nr, nr_irq;
+ 
++	max_nr = soc_is_exynos5250() ? EXYNOS5_MAX_COMBINER_NR :
++					EXYNOS4_MAX_COMBINER_NR;
++
+ 	if (np) {
+ 		if (of_property_read_u32(np, "samsung,combiner-nr", &max_nr)) {
+ 			pr_warning("%s: number of combiners not specified, "
+ 				"setting default as %d.\n",
+-				__func__, EXYNOS4_MAX_COMBINER_NR);
+-			max_nr = EXYNOS4_MAX_COMBINER_NR;
++				__func__, max_nr);
+ 		}
+-	} else {
+-		max_nr = soc_is_exynos5250() ? EXYNOS5_MAX_COMBINER_NR :
+-						EXYNOS4_MAX_COMBINER_NR;
+ 	}
++
+ 	nr_irq = max_nr * MAX_IRQ_IN_COMBINER;
+ 
+ 	irq_base = irq_alloc_descs(COMBINER_IRQ(0, 0), 1, nr_irq, 0);
+@@ -593,7 +609,10 @@ static void __init combiner_init(void __iomem *combiner_base,
+ 	}
+ 
+ 	for (i = 0; i < max_nr; i++) {
+-		irq = IRQ_SPI(i);
++		if (i < 16 || soc_is_exynos5250())
++			irq = IRQ_SPI(i);
++		else
++			irq = get_combiner_extra_irq(i);
+ #ifdef CONFIG_OF
+ 		if (np)
+ 			irq = irq_of_parse_and_map(np, i);
+diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
+index 35bced6..357ed7f 100644
+--- a/arch/arm/mach-exynos/include/mach/irqs.h
++++ b/arch/arm/mach-exynos/include/mach/irqs.h
+@@ -165,7 +165,7 @@
+ #define EXYNOS4_IRQ_FIMD0_VSYNC		COMBINER_IRQ(11, 1)
+ #define EXYNOS4_IRQ_FIMD0_SYSTEM	COMBINER_IRQ(11, 2)
+ 
+-#define EXYNOS4_MAX_COMBINER_NR		16
++#define EXYNOS4_MAX_COMBINER_NR		20
+ 
+ #define EXYNOS4_IRQ_GPIO1_NR_GROUPS	16
+ #define EXYNOS4_IRQ_GPIO2_NR_GROUPS	9
 -- 
 1.7.9.5
