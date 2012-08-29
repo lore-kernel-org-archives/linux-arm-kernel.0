@@ -1,65 +1,47 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 29 Aug 2012 16:31:04 +0300
-Subject: [PATCH v2 5/8] ARM/dts: OMAP5: Add McBSP entries
-In-Reply-To: <1346247067-9632-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1346247067-9632-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1346247067-9632-6-git-send-email-peter.ujfalusi@ti.com>
+Date: Wed, 29 Aug 2012 16:30:59 +0300
+Subject: [PATCH v2 0/8] ARM/dts: OMAP audio related updates for OMAP2/3/4/5
+Message-ID: <1346247067-9632-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create the sections describing the McBSP ports to be able to use them via
-DT.
+Hello,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+I have extended and rebased the previous set:
+'ARM/dts: omap McBSP and audio support for BeagleBoard'
+
+Changes since v1:
+- Rebased on current l-o:devel-dt branch
+- Two new patch, one for OMAP4 to add reg-names for the mem areas, one for OMAP5
+  to add McPDM and DMIC section
+
+The rest of the series remaind the same: adds the McBSP sections to OMAP2/3/4/5
+and also enable the audio support for BeagleBoard when booting with DT.
+
+Regards,
+Peter
 ---
- arch/arm/boot/dts/omap5.dtsi |   36 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 36 insertions(+), 0 deletions(-)
+Peter Ujfalusi (8):
+  ARM/dts: OMAP2: Add McBSP entries for OMAP2420 and OMAP2430 SoC
+  ARM/dts: omap2420-h4: Include omap2420.dtsi file instead the common
+    omap2
+  ARM/dts: OMAP3: Add McBSP entries
+  ARM/dts: OMAP4: Add McBSP entries
+  ARM/dts: OMAP5: Add McBSP entries
+  ARM/dts: omap3-beagle: Enable audio support
+  ARM/dts: omap4: Add reg-names for McPDM and DMIC
+  ARM/dts: omap5: Add McPDM and DMIC section to the dtsi file
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 881d60c..57ca7c1 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -211,5 +211,41 @@
- 			ti,hwmods = "mmc5";
- 			ti,needs-special-reset;
- 		};
-+
-+		mcbsp1: mcbsp at 40122000 {
-+			compatible = "ti,omap4-mcbsp";
-+			reg = <0x40122000 0xff>, /* MPU private access */
-+			      <0x49022000 0xff>; /* L3 Interconnect */
-+			reg-names = "mpu", "dma";
-+			interrupts = <0 17 0x4>;
-+			interrupt-names = "common";
-+			interrupt-parent = <&gic>;
-+			ti,buffer-size = <128>;
-+			ti,hwmods = "mcbsp1";
-+		};
-+
-+		mcbsp2: mcbsp at 40124000 {
-+			compatible = "ti,omap4-mcbsp";
-+			reg = <0x40124000 0xff>, /* MPU private access */
-+			      <0x49024000 0xff>; /* L3 Interconnect */
-+			reg-names = "mpu", "dma";
-+			interrupts = <0 22 0x4>;
-+			interrupt-names = "common";
-+			interrupt-parent = <&gic>;
-+			ti,buffer-size = <128>;
-+			ti,hwmods = "mcbsp2";
-+		};
-+
-+		mcbsp3: mcbsp at 40126000 {
-+			compatible = "ti,omap4-mcbsp";
-+			reg = <0x40126000 0xff>, /* MPU private access */
-+			      <0x49026000 0xff>; /* L3 Interconnect */
-+			reg-names = "mpu", "dma";
-+			interrupts = <0 23 0x4>;
-+			interrupt-names = "common";
-+			interrupt-parent = <&gic>;
-+			ti,buffer-size = <128>;
-+			ti,hwmods = "mcbsp3";
-+		};
- 	};
- };
+ arch/arm/boot/dts/omap2420-h4.dts  |    2 +-
+ arch/arm/boot/dts/omap2420.dtsi    |   39 +++++++++++++++++
+ arch/arm/boot/dts/omap2430.dtsi    |   83 ++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-beagle.dts |   14 ++++++
+ arch/arm/boot/dts/omap3.dtsi       |   69 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap4.dtsi       |   49 +++++++++++++++++++++
+ arch/arm/boot/dts/omap5.dtsi       |   56 ++++++++++++++++++++++++
+ 7 files changed, 311 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap2420.dtsi
+ create mode 100644 arch/arm/boot/dts/omap2430.dtsi
+
 -- 
 1.7.8.6
