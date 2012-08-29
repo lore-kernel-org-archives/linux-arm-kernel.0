@@ -1,77 +1,199 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Wed, 29 Aug 2012 12:48:15 +0300
-Subject: [PATCH v2 05/11] USB: chipidea: don't let probe fail if otg
- controller start one role failed
-In-Reply-To: <20120829083337.GI4011@b20223-02.ap.freescale.net>
-References: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
- <1346137397-32374-6-git-send-email-richard.zhao@freescale.com>
- <87ligz2yyo.fsf@ashishki-desk.ger.corp.intel.com>
- <20120828092730.GY4011@b20223-02.ap.freescale.net>
- <87vcg2jeyu.fsf@ashishki-desk.ger.corp.intel.com>
- <20120829083337.GI4011@b20223-02.ap.freescale.net>
-Message-ID: <87mx1ejag0.fsf@ashishki-desk.ger.corp.intel.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Wed, 29 Aug 2012 15:18:11 +0530
+Subject: [RFC PATCH] ARM: OMAP2+: omap-device: Do not overwrite resources
+ allocated by OF layer
+Message-ID: <1346233691-10294-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Zhao <richard.zhao@freescale.com> writes:
+With the new devices (like, AM33XX and OMAP5) we now only support
+DT boot mode of operation and now it is the time to start killing
+slowly the dependency on hwmod, so with this patch, we are starting
+with device resources.
+The idea here is implemented considering to both boot modes -
+  - DT boot mode
+    OF framework will construct the resource structure (currently
+    does for MEM & IRQ resource) and we should respect/use these
+    resources, killing hwmod dependency.
+    If pdev->num_resources > 0, we assume that MEM & IRQ resources
+    have been allocated by OF layer already (through DTB).
 
-> On Wed, Aug 29, 2012 at 11:10:33AM +0300, Alexander Shishkin wrote:
->> Richard Zhao <richard.zhao@freescale.com> writes:
->> 
->> > On Tue, Aug 28, 2012 at 11:38:23AM +0300, Alexander Shishkin wrote:
->> >> Richard Zhao <richard.zhao@freescale.com> writes:
->> >> 
->> >> > One role failed, but the other role will possiblly still work.
->> >> > For example, when udc start failed, if plug in a host device,
->> >> > it works.
->> >> 
->> >> If you're a host device, ci->role should be HOST at this point and
->> >> ci_role_start() shouldn't fail. If ci->role is detected wrongly, the
->> >> role detection must be fixed. If ci_role_start() fails for host, but it
->> >> still works when it's called again after the id pin change is detected,
->> >> again, the problem is elsewhere.
->> > The check is only for OTG device. For single role device, it just fail
->> > if it start the role failed.
->> 
->> Sorry, can you rephrase?
->> 
->> >> 
->> >> >
->> >> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
->> >> > ---
->> >> >  drivers/usb/chipidea/core.c |    7 +++++--
->> >> >  1 file changed, 5 insertions(+), 2 deletions(-)
->> >> >
->> >> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
->> >> > index 19ef324..8fd390a 100644
->> >> > --- a/drivers/usb/chipidea/core.c
->> >> > +++ b/drivers/usb/chipidea/core.c
->> >> > @@ -473,8 +473,11 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
->> >> >  	ret = ci_role_start(ci, ci->role);
->> >> >  	if (ret) {
->> >> >  		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
->> >> > -		ret = -ENODEV;
->> >> > -		goto rm_wq;
->> >> > +		ci->role = CI_ROLE_END;
->> >> 
->> >> So are you relying on id pin interrupt for initializing the role after
->> >> this? Can you provide more details?
->> > Yes. The ID pin detect still works. My case is, gadget role failed,
->> > host role works. I was trying not to ruin host function.
->> 
->> But it shouldn't even try to start the gadget, because ci_otg_role()
->> should set ci->role to HOST before ci_role_start() happens.
-> It depends on ID pin. If ID pin is gadget and gadget is not support well,
-> ci_role_start will fail. See below example.
->> 
->> Another question is, why does gadget start fail?
-> There's one example:
-> If usb phy don't support otg yet, otg_set_peripheral will fail, and
-> then cause udc_start fail.
+    Once DMA resource is available from OF layer, we should
+    kill filling any resources from hwmod.
 
-So you should drop the CI13XXX_REQUIRE_TRANSCEIVER flag from imx
-platform data till the phy is fully implemented.
+  - Non-DT boot mode
+    Here, pdev->num_resources = 0, and we should get all the
+    resources from hwmod (following existing steps)
 
-Regards,
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
+---
+This patch is tested on BeagleBone and AM37xEVM.
+
+Why RFC?
+Still we have function duplication omap_device_fill_resources() and
+omap_device_fill_dma_resources(), we can actually split the function
+into 3 resources and avoid duplication -
+  - omap_device_fill_dma_resources()
+  - omap_device_fill_mem_resources()
+  - omap_device_fill_irq_resources()
+
+Actually I wanted to clean it further but thought of getting
+feedback first and then proceed further.
+
+ arch/arm/mach-omap2/omap_hwmod.c             |   27 ++++++++++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
+ arch/arm/plat-omap/omap_device.c             |   72 +++++++++++++++++++++----
+ 3 files changed, 88 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 31ec283..edabfb3 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -3330,6 +3330,33 @@ int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res)
+ }
+
+ /**
++ * omap_hwmod_fill_dma_resources - fill struct resource array with dma data
++ * @oh: struct omap_hwmod *
++ * @res: pointer to the array of struct resource to fill
++ *
++ * Fill the struct resource array @res with dma resource data from the
++ * omap_hwmod @oh.  Intended to be called by code that registers
++ * omap_devices.  See also omap_hwmod_count_resources().  Returns the
++ * number of array elements filled.
++ */
++int omap_hwmod_fill_dma_resources(struct omap_hwmod *oh, struct resource *res)
++{
++	int i, sdma_reqs_cnt;
++	int r = 0;
++
++	sdma_reqs_cnt = _count_sdma_reqs(oh);
++	for (i = 0; i < sdma_reqs_cnt; i++) {
++		(res + r)->name = (oh->sdma_reqs + i)->name;
++		(res + r)->start = (oh->sdma_reqs + i)->dma_req;
++		(res + r)->end = (oh->sdma_reqs + i)->dma_req;
++		(res + r)->flags = IORESOURCE_DMA;
++		r++;
++	}
++
++	return r;
++}
++
++/**
+  * omap_hwmod_get_resource_byname - fetch IP block integration data by name
+  * @oh: struct omap_hwmod * to operate on
+  * @type: one of the IORESOURCE_* constants from include/linux/ioport.h
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index 9b9646c..0533073 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -615,6 +615,7 @@ int omap_hwmod_softreset(struct omap_hwmod *oh);
+
+ int omap_hwmod_count_resources(struct omap_hwmod *oh);
+ int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res);
++int omap_hwmod_fill_dma_resources(struct omap_hwmod *oh, struct resource *res);
+ int omap_hwmod_get_resource_byname(struct omap_hwmod *oh, unsigned int type,
+ 				   const char *name, struct resource *res);
+
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index c490240..fd15a3a 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -486,6 +486,33 @@ static int omap_device_fill_resources(struct omap_device *od,
+ }
+
+ /**
++ * omap_device_fill_dma_resources - fill in array of struct resource with dma resources
++ * @od: struct omap_device *
++ * @res: pointer to an array of struct resource to be filled in
++ *
++ * Populate one or more empty struct resource pointed to by @res with
++ * the dma resource data for this omap_device @od.  Used by
++ * omap_device_alloc() after calling omap_device_count_resources().
++ *
++ * Ideally this function would not be needed at all.  If we have
++ * mechanism to get dma resources from DT.
++ *
++ * Returns 0.
++ */
++static int omap_device_fill_dma_resources(struct omap_device *od,
++				      struct resource *res)
++{
++	int i, r;
++
++	for (i = 0; i < od->hwmods_cnt; i++) {
++		r = omap_hwmod_fill_dma_resources(od->hwmods[i], res);
++		res += r;
++	}
++
++	return 0;
++}
++
++/**
+  * omap_device_alloc - allocate an omap_device
+  * @pdev: platform_device that will be included in this omap_device
+  * @oh: ptr to the single omap_hwmod that backs this omap_device
+@@ -524,24 +551,45 @@ struct omap_device *omap_device_alloc(struct platform_device *pdev,
+ 	od->hwmods = hwmods;
+ 	od->pdev = pdev;
+
++	res_count = omap_device_count_resources(od);
+ 	/*
+-	 * HACK: Ideally the resources from DT should match, and hwmod
+-	 * should just add the missing ones. Since the name is not
+-	 * properly populated by DT, stick to hwmod resources only.
++	 * DT Boot:
++	 *   OF framework will construct the resource structure (currently
++	 *   does for MEM & IRQ resource) and we should respect/use these
++	 *   resources, killing hwmod dependency.
++	 *   If pdev->num_resources > 0, we assume that MEM & IRQ resources
++	 *   have been allocated by OF layer already (through DTB).
++	 *
++	 * Non-DT Boot:
++	 *   Here, pdev->num_resources = 0, and we should get all the
++	 *   resources from hwmod.
++	 *
++	 * TODO: Once DMA resource is available from OF layer, we should
++	 *   kill filling any resources from hwmod.
+ 	 */
+-	if (pdev->num_resources && pdev->resource)
+-		dev_warn(&pdev->dev, "%s(): resources already allocated %d\n",
+-			__func__, pdev->num_resources);
+-
+-	res_count = omap_device_count_resources(od);
+-	if (res_count > 0) {
+-		dev_dbg(&pdev->dev, "%s(): resources allocated from hwmod %d\n",
+-			__func__, res_count);
++	if (res_count > pdev->num_resources) {
++		/* Allocate resources memory to account for new resources */
+ 		res = kzalloc(sizeof(struct resource) * res_count, GFP_KERNEL);
+ 		if (!res)
+ 			goto oda_exit3;
+
+-		omap_device_fill_resources(od, res);
++		/*
++		 * If pdev->num_resources > 0, then assume that,
++		 * MEM and IRQ resources will only come from DT and only
++		 * fill DMA resource from hwmod layer.
++		 */
++		if (pdev->num_resources && pdev->resource) {
++			dev_dbg(&pdev->dev, "%s(): resources already allocated %d\n",
++					__func__, res_count);
++			memcpy(res, pdev->resource,
++				sizeof(struct resource) * pdev->num_resources);
++			omap_device_fill_dma_resources(od,
++					&res[pdev->num_resources]);
++		} else {
++			dev_dbg(&pdev->dev, "%s(): using resources from hwmod %d\n",
++					__func__, res_count);
++			omap_device_fill_resources(od, res);
++		}
+
+ 		ret = platform_device_add_resources(pdev, res, res_count);
+ 		kfree(res);
 --
-Alex
+1.7.0.4
