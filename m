@@ -1,47 +1,51 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 29 Aug 2012 16:30:59 +0300
-Subject: [PATCH v2 0/8] ARM/dts: OMAP audio related updates for OMAP2/3/4/5
-Message-ID: <1346247067-9632-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Wed, 29 Aug 2012 16:31:05 +0300
+Subject: [PATCH v2 6/8] ARM/dts: omap3-beagle: Enable audio support
+In-Reply-To: <1346247067-9632-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1346247067-9632-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1346247067-9632-7-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add the needed sections to enable audio support on BeagleBoard when booted
+with DT blob.
 
-I have extended and rebased the previous set:
-'ARM/dts: omap McBSP and audio support for BeagleBoard'
-
-Changes since v1:
-- Rebased on current l-o:devel-dt branch
-- Two new patch, one for OMAP4 to add reg-names for the mem areas, one for OMAP5
-  to add McPDM and DMIC section
-
-The rest of the series remaind the same: adds the McBSP sections to OMAP2/3/4/5
-and also enable the audio support for BeagleBoard when booting with DT.
-
-Regards,
-Peter
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Peter Ujfalusi (8):
-  ARM/dts: OMAP2: Add McBSP entries for OMAP2420 and OMAP2430 SoC
-  ARM/dts: omap2420-h4: Include omap2420.dtsi file instead the common
-    omap2
-  ARM/dts: OMAP3: Add McBSP entries
-  ARM/dts: OMAP4: Add McBSP entries
-  ARM/dts: OMAP5: Add McBSP entries
-  ARM/dts: omap3-beagle: Enable audio support
-  ARM/dts: omap4: Add reg-names for McPDM and DMIC
-  ARM/dts: omap5: Add McPDM and DMIC section to the dtsi file
+ arch/arm/boot/dts/omap3-beagle.dts |   14 ++++++++++++++
+ 1 files changed, 14 insertions(+), 0 deletions(-)
 
- arch/arm/boot/dts/omap2420-h4.dts  |    2 +-
- arch/arm/boot/dts/omap2420.dtsi    |   39 +++++++++++++++++
- arch/arm/boot/dts/omap2430.dtsi    |   83 ++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap3-beagle.dts |   14 ++++++
- arch/arm/boot/dts/omap3.dtsi       |   69 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap4.dtsi       |   49 +++++++++++++++++++++
- arch/arm/boot/dts/omap5.dtsi       |   56 ++++++++++++++++++++++++
- 7 files changed, 311 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap2420.dtsi
- create mode 100644 arch/arm/boot/dts/omap2430.dtsi
-
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index cdcb98c..28cf180 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -17,6 +17,14 @@
+ 		device_type = "memory";
+ 		reg = <0x80000000 0x20000000>; /* 512 MB */
+ 	};
++
++	sound {
++		compatible = "ti,omap-twl4030";
++		ti,model = "omap3beagle";
++
++		ti,mcbsp = <&mcbsp2>;
++		ti,codec = <&twl_audio>;
++	};
+ };
+ 
+ &i2c1 {
+@@ -32,6 +40,12 @@
+ 			regulator-min-microvolt = <1800000>;
+ 			regulator-max-microvolt = <3000000>;
+ 		};
++
++		twl_audio: audio {
++			compatible = "ti,twl4030-audio";
++			codec {
++			};
++		};
+ 	};
+ };
+ 
 -- 
 1.7.8.6
