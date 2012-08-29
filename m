@@ -1,203 +1,71 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 29 Aug 2012 22:25:24 +0100
-Subject: [PATCH v2 2/2] ARM: delay: add registration mechanism for delay timer
- sources
-In-Reply-To: <1346275524-13817-1-git-send-email-will.deacon@arm.com>
-References: <1346275524-13817-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1346275524-13817-2-git-send-email-will.deacon@arm.com>
+Date: Wed, 29 Aug 2012 22:34:05 +0100
+Subject: [PATCH v3 3/4] ARM: EXYNOS: Enable PMUs for exynos4
+In-Reply-To: <1346202897-27306-4-git-send-email-chanho61.park@samsung.com>
+References: <1346202897-27306-1-git-send-email-chanho61.park@samsung.com>
+ <1346202897-27306-4-git-send-email-chanho61.park@samsung.com>
+Message-ID: <20120829213405.GC13868@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonathan Austin <Jonathan.Austin@arm.com>
+On Wed, Aug 29, 2012 at 02:14:56AM +0100, Chanho Park wrote:
+> This patch define irq numbers of ARM performance monitoring unit for exynos4.
+> The number of CPU cores and PMU irq numbers are vary according to soc types.
+> So we need to identify each soc type using soc_is_xxx function and define the
+> pmu irqs dynamically. In case of exynos4412, there are 4 cpu cores and pmus.
+> 
+> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-exynos/common.c            |   45 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-exynos/include/mach/irqs.h |    8 ++++--
+>  arch/arm/plat-samsung/devs.c             |    2 +-
+>  3 files changed, 52 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+> index be61564..24b78bd 100644
+> --- a/arch/arm/mach-exynos/common.c
+> +++ b/arch/arm/mach-exynos/common.c
+> @@ -30,11 +30,13 @@
+>  #include <asm/mach/map.h>
+>  #include <asm/mach/irq.h>
+>  #include <asm/cacheflush.h>
+> +#include <asm/pmu.h>
 
-The current timer-based delay loop relies on the architected timer to
-initiate the switch away from the polling-based implementation. This is
-unfortunate for platforms without the architected timers but with a
-suitable delay source (that is, constant frequency, always powered-up
-and ticking as long as the CPUs are online).
+Why do you need this header file?
 
-This patch introduces a registration mechanism for the delay timer
-(which provides an unconditional read_current_timer implementation) and
-updates the architected timer code to use the new interface.
+>  #include <mach/regs-irq.h>
+>  #include <mach/regs-pmu.h>
+>  #include <mach/regs-gpio.h>
+>  #include <mach/pmu.h>
+> +#include <mach/irqs.h>
+>  
+>  #include <plat/cpu.h>
+>  #include <plat/clock.h>
+> @@ -1056,3 +1058,46 @@ static int __init exynos_init_irq_eint(void)
+>  	return 0;
+>  }
+>  arch_initcall(exynos_init_irq_eint);
+> +
+> +#if defined(CONFIG_CPU_EXYNOS4210) || defined(CONFIG_SOC_EXYNOS4212)
+> +static struct resource exynos42xx_pmu_resource[] = {
+> +	DEFINE_RES_IRQ(EXYNOS4_IRQ_PMU),
+> +	DEFINE_RES_IRQ(EXYNOS4_IRQ_PMU_CPU1),
+> +};
+> +
+> +static struct platform_device exynos42xx_device_pmu = {
+> +	.name		= "arm-pmu",
+> +	.num_resources	= ARRAY_SIZE(exynos42xx_pmu_resource),
+> +	.resource	= exynos42xx_pmu_resource,
+> +};
+> +#endif
 
-Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+Given that you don't pass an id and your device-tree binding is that for
+Cortex A15, I assume this patch series is based on my perf/updates branch?
 
-v2: Changed prototype for low-level read_current_timer to return the
-    timer value directly.
+That's good because it reduces the potential for conflicts, but you should
+make sure that whoever you send this to is aware of the dependency.
 
- arch/arm/include/asm/arch_timer.h |    1 -
- arch/arm/include/asm/delay.h      |    9 +++++++++
- arch/arm/include/asm/timex.h      |    6 ------
- arch/arm/kernel/arch_timer.c      |   17 ++++++++---------
- arch/arm/lib/delay.c              |   31 ++++++++++++++++++++++---------
- 5 files changed, 39 insertions(+), 25 deletions(-)
+Cheers,
 
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index 62e7547..88401c2 100644
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -4,7 +4,6 @@
- #include <asm/errno.h>
- 
- #ifdef CONFIG_ARM_ARCH_TIMER
--#define ARCH_HAS_READ_CURRENT_TIMER
- int arch_timer_of_register(void);
- int arch_timer_sched_clock_init(void);
- #else
-diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
-index dc61451..50928e8 100644
---- a/arch/arm/include/asm/delay.h
-+++ b/arch/arm/include/asm/delay.h
-@@ -15,6 +15,11 @@
- 
- #ifndef __ASSEMBLY__
- 
-+struct delay_timer {
-+	unsigned long (*read_current_timer)(void);
-+	unsigned long freq;
-+};
-+
- extern struct arm_delay_ops {
- 	void (*delay)(unsigned long);
- 	void (*const_udelay)(unsigned long);
-@@ -56,6 +61,10 @@ extern void __loop_delay(unsigned long loops);
- extern void __loop_udelay(unsigned long usecs);
- extern void __loop_const_udelay(unsigned long);
- 
-+/* Delay-loop timer registration. */
-+#define ARCH_HAS_READ_CURRENT_TIMER
-+extern void register_current_timer_delay(struct delay_timer *timer);
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif /* defined(_ARM_DELAY_H) */
-diff --git a/arch/arm/include/asm/timex.h b/arch/arm/include/asm/timex.h
-index ce11944..9acc135 100644
---- a/arch/arm/include/asm/timex.h
-+++ b/arch/arm/include/asm/timex.h
-@@ -12,15 +12,9 @@
- #ifndef _ASMARM_TIMEX_H
- #define _ASMARM_TIMEX_H
- 
--#include <asm/arch_timer.h>
- #include <mach/timex.h>
- 
- typedef unsigned long cycles_t;
--
--#ifdef ARCH_HAS_READ_CURRENT_TIMER
- #define get_cycles()	({ cycles_t c; read_current_timer(&c) ? 0 : c; })
--#else
--#define get_cycles()	(0)
--#endif
- 
- #endif
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index cf25880..700917a 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -21,6 +21,7 @@
- #include <linux/io.h>
- 
- #include <asm/cputype.h>
-+#include <asm/delay.h>
- #include <asm/localtimer.h>
- #include <asm/arch_timer.h>
- #include <asm/system_info.h>
-@@ -31,8 +32,7 @@ static int arch_timer_ppi;
- static int arch_timer_ppi2;
- 
- static struct clock_event_device __percpu **arch_timer_evt;
--
--extern void init_current_timer_delay(unsigned long freq);
-+static struct delay_timer arch_delay_timer;
- 
- /*
-  * Architected system timer support.
-@@ -225,12 +225,9 @@ static cycle_t arch_counter_read(struct clocksource *cs)
- 	return arch_counter_get_cntpct();
- }
- 
--int read_current_timer(unsigned long *timer_val)
-+static unsigned long arch_timer_read_current_timer(void)
- {
--	if (!arch_timer_rate)
--		return -ENXIO;
--	*timer_val = arch_counter_get_cntpct();
--	return 0;
-+	return arch_counter_get_cntpct();
- }
- 
- static struct clocksource clocksource_counter = {
-@@ -302,11 +299,13 @@ static int __init arch_timer_register(void)
- 		arch_timer_global_evt.cpumask = cpumask_of(0);
- 		err = arch_timer_setup(&arch_timer_global_evt);
- 	}
--
- 	if (err)
- 		goto out_free_irq;
- 
--	init_current_timer_delay(arch_timer_rate);
-+	/* Use the architected timer for the delay loop. */
-+	arch_delay_timer.read_current_timer = &arch_timer_read_current_timer;
-+	arch_delay_timer.freq = arch_timer_rate;
-+	register_current_timer_delay(&arch_delay_timer);
- 	return 0;
- 
- out_free_irq:
-diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-index 395d5fb..fe6f4fb 100644
---- a/arch/arm/lib/delay.c
-+++ b/arch/arm/lib/delay.c
-@@ -34,7 +34,14 @@ struct arm_delay_ops arm_delay_ops = {
- 	.udelay		= __loop_udelay,
- };
- 
--#ifdef ARCH_HAS_READ_CURRENT_TIMER
-+static struct delay_timer *delay_timer;
-+static bool delay_calibrated;
-+
-+int read_current_timer(unsigned long *timer_val)
-+{
-+	return delay_timer ? delay_timer->read_current_timer() : -ENXIO;
-+}
-+
- static void __timer_delay(unsigned long cycles)
- {
- 	cycles_t start = get_cycles();
-@@ -55,18 +62,24 @@ static void __timer_udelay(unsigned long usecs)
- 	__timer_const_udelay(usecs * UDELAY_MULT);
- }
- 
--void __init init_current_timer_delay(unsigned long freq)
-+void __init register_current_timer_delay(struct delay_timer *timer)
- {
--	pr_info("Switching to timer-based delay loop\n");
--	lpj_fine			= freq / HZ;
--	loops_per_jiffy			= lpj_fine;
--	arm_delay_ops.delay		= __timer_delay;
--	arm_delay_ops.const_udelay	= __timer_const_udelay;
--	arm_delay_ops.udelay		= __timer_udelay;
-+	if (!delay_calibrated) {
-+		pr_info("Switching to timer-based delay loop\n");
-+		delay_timer			= timer;
-+		lpj_fine			= timer->freq / HZ;
-+		loops_per_jiffy			= lpj_fine;
-+		arm_delay_ops.delay		= __timer_delay;
-+		arm_delay_ops.const_udelay	= __timer_const_udelay;
-+		arm_delay_ops.udelay		= __timer_udelay;
-+		delay_calibrated		= true;
-+	} else {
-+		pr_info("Ignoring duplicate/late registration of read_current_timer delay\n");
-+	}
- }
- 
- unsigned long __cpuinit calibrate_delay_is_known(void)
- {
-+	delay_calibrated = true;
- 	return lpj_fine;
- }
--#endif
--- 
-1.7.4.1
+Will
