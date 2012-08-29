@@ -1,47 +1,27 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 29 Aug 2012 09:14:58 +0200
-Subject: [PATCH] ARM: imx27-phytec-phycore: Fix I2C EEPROM address
-In-Reply-To: <1346196165-5024-1-git-send-email-festevam@gmail.com>
-References: <1346196165-5024-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120829071458.GU26594@pengutronix.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 29 Aug 2012 00:20:55 -0700
+Subject: [PATCH] ARM: Build dtb files in all target
+In-Reply-To: <1346218523-15958-1-git-send-email-andrew@lunn.ch>
+References: <1346218523-15958-1-git-send-email-andrew@lunn.ch>
+Message-ID: <503DC2D7.2080107@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2012 at 08:22:45PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Fix I2C EEPROM address as per 24c32 datasheet.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On 8/28/2012 10:35 PM, Andrew Lunn wrote:
+> Tools like kisskb are good at finding build regressions in the kernel
+> sources. However, regressions in the DT desscriptions are not found,
+> because generally these build systems don't build the DT binary blobs.
+>
+> Extend the ARM all target to build all enabled DTB files.
+>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-Applied, thanks
+You should probably put a star (*) next to the dtbs info in the help
+text too.
 
-Sascha
-
-> ---
->  arch/arm/boot/dts/imx27-phytec-phycore.dts |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx27-phytec-phycore.dts b/arch/arm/boot/dts/imx27-phytec-phycore.dts
-> index 2b0ff60..2acc86c 100644
-> --- a/arch/arm/boot/dts/imx27-phytec-phycore.dts
-> +++ b/arch/arm/boot/dts/imx27-phytec-phycore.dts
-> @@ -49,7 +49,7 @@
->  			i2c at 1001d000 {
->  				clock-frequency = <400000>;
->  				status = "okay";
-> -				at24 at 4c {
-> +				at24 at 52 {
->  					compatible = "at,24c32";
->  					pagesize = <32>;
->  					reg = <0x52>;
-> -- 
-> 1.7.9.5
-> 
-> 
+Have you tried this in a clean tree? Also, should this only be default
+true if USE_OF is true?
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
