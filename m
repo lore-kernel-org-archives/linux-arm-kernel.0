@@ -1,78 +1,33 @@
-From: valentin.longchamp@keymile.com (Valentin Longchamp)
-Date: Wed, 29 Aug 2012 10:15:51 +0200
-Subject: [RFC PATCH] ARM: initial DTS support for km_kirkwood
-In-Reply-To: <20120828172344.GE19437@titan.lakedaemon.net>
-References: <1346154976-16916-1-git-send-email-valentin.longchamp@keymile.com>
- <20120828172344.GE19437@titan.lakedaemon.net>
-Message-ID: <503DCFB7.4080804@keymile.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 29 Aug 2012 10:56:01 +0300
+Subject: [PATCH 1/1] mxc_nand : allow swapping the Bad block Indicator
+ for NFC v1.
+In-Reply-To: <1345825064-9147-1-git-send-email-gcembed@gmail.com>
+References: <1345811288.2848.308.camel@sauron.fi.intel.com>
+ <1345825064-9147-1-git-send-email-gcembed@gmail.com>
+Message-ID: <1346226961.2848.424.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2012 07:23 PM, Jason Cooper wrote:
-> On Tue, Aug 28, 2012 at 01:56:16PM +0200, Valentin Longchamp wrote:
->> This is a first attempt to support the km_kirkwood reference design with
->> a device tree. This km_kirkwood design is present in many Keymile
->> products. It is based on the Marvell Bobcat SOC which integrates a
->> Kirkwood CPU next to a big L2 Ethernet Switch. The Kirkwood in the SOC
->> is very similar to the "normal" one, but there are a few differences.
->>
->> This initial support is minimal: the kernel can boot with network
->> (ge0), serial port and NAND functional.
->>
->> Signed-off-by: Valentin Longchamp <valentin.longchamp@keymile.com>
->> Cc: Holger Brunck <holger.brunck@keymile.com>
->> ---
->>  arch/arm/boot/dts/kirkwood-km_kirkwood.dts |   29 +++++++++++
->>  arch/arm/mach-kirkwood/Kconfig             |    7 +++
->>  arch/arm/mach-kirkwood/Makefile            |    1 +
->>  arch/arm/mach-kirkwood/Makefile.boot       |    1 +
->>  arch/arm/mach-kirkwood/board-dt.c          |    4 ++
->>  arch/arm/mach-kirkwood/board-km_kirkwood.c |   75 ++++++++++++++++++++++++++++
->>  arch/arm/mach-kirkwood/common.h            |    6 ++
->>  7 files changed, 123 insertions(+), 0 deletions(-)
->>  create mode 100644 arch/arm/boot/dts/kirkwood-km_kirkwood.dts
->>  create mode 100644 arch/arm/mach-kirkwood/board-km_kirkwood.c
->>
->> diff --git a/arch/arm/boot/dts/kirkwood-km_kirkwood.dts b/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
->> new file mode 100644
->> index 0000000..60118d5
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
->> @@ -0,0 +1,29 @@
->> +/dts-v1/;
->> +
->> +/include/ "kirkwood.dtsi"
->> +
->> +/ {
->> +	model = "Keymile Kirkwood Reference Design";
->> +	compatible = "keymile,km_kirkwood", "marvell,kirkwood-88f6281", "marvell,kirkwood";
->> +
->> +	memory {
->> +		device_type = "memory";
->> +		reg = <0x00000000 0x08000000>;
->> +	};
->> +
->> +	chosen {
->> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
->> +	};
->> +
->> +	ocp at f1000000 {
->> +		serial at 12000 {
->> +			clock-frequency = <200000000>;
->> +			status = "ok";
->> +		};
->> +
->> +		nand at 3000000 {
->> +			status = "ok";
->> +			chip-delay = <25>;
->> +		};
+On Fri, 2012-08-24 at 18:17 +0200, Ga?tan Carlier wrote:
+> Swap the BI-byte on position 0x7D0 with a data byte at 0x835.  To fix a bug
+> in Freescale imx NFC v1 SoC's for 2K page NAND flashes: imx27 and imx31.
+> Warning: The same solution needs to be applied to the boot loader and the
+> flash programmer.
 > 
-> Is there a partition layout for this board?
->
+> This is a modified version of patch sent by J?rgen Lambrecht :
+> [PATCH] Add 'config IMX_NFC_V1_BISWAP' to swap the Bad block Indicator,
+> and use for imx27pdk nand support.
 
-Well, there is one: one big UBI partition on the whole NAND chip (we then create
-UBI volumes when building the initial system and dynamically create additional
-ones when neeeded). But this UBI partition gets detected perfecly well without
-this partition layout so I left it out.
+Pushed to l2-mtd.git, thanks!
 
-Valentin
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120829/125da8ea/attachment.sig>
