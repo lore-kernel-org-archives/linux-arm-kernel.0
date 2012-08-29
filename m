@@ -1,111 +1,50 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 29 Aug 2012 16:39:35 +0530
-Subject: [PATCH v3 2/4] ARM: EXYNOS: Correct combined IRQs for exynos4412
-In-Reply-To: <1346202897-27306-3-git-send-email-chanho61.park@samsung.com>
-References: <1346202897-27306-1-git-send-email-chanho61.park@samsung.com>
- <1346202897-27306-3-git-send-email-chanho61.park@samsung.com>
-Message-ID: <CAJuYYwSH19-GmNo7jZyXd9TC4VeKGxVCd=N0Vi4=kUNZPZNx6g@mail.gmail.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 29 Aug 2012 18:56:51 +0800
+Subject: [PATCH v4 0/7] add syscon driver based on regmap for general
+ registers access
+Message-ID: <1346237818-9498-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 August 2012 06:44, Chanho Park <chanho61.park@samsung.com> wrote:
-> This patch corrects combined IRQs for exynos4412 platform. The exynos4412 has
-> four extra combined irq group. Each irq is mapped to IRQ_SPI(xx). Unfortunately,
-> extra combined IRQs isn't sequential. So, we need to map the irq manually.
->
-> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/common.c            |   31 ++++++++++++++++++++++++------
->  arch/arm/mach-exynos/include/mach/irqs.h |    2 +-
->  2 files changed, 26 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-> index f194bbc..be61564 100644
-> --- a/arch/arm/mach-exynos/common.c
-> +++ b/arch/arm/mach-exynos/common.c
-> @@ -560,23 +560,39 @@ static struct irq_domain_ops combiner_irq_domain_ops = {
->         .map    = combiner_irq_domain_map,
->  };
->
-> +static unsigned int get_combiner_extra_irq(int group)
-> +{
-> +       switch (group) {
-> +       case 16:
-> +               return IRQ_SPI(107);
-> +       case 17:
-> +               return IRQ_SPI(108);
-> +       case 18:
-> +               return IRQ_SPI(48);
-> +       case 19:
-> +               return IRQ_SPI(42);
-> +       default:
-> +               return 0;
-> +       }
-> +}
-> +
->  static void __init combiner_init(void __iomem *combiner_base,
->                                  struct device_node *np)
->  {
->         int i, irq, irq_base;
->         unsigned int max_nr, nr_irq;
->
-> +       max_nr = soc_is_exynos5250() ? EXYNOS5_MAX_COMBINER_NR :
-> +                                       EXYNOS4_MAX_COMBINER_NR;
-> +
->         if (np) {
->                 if (of_property_read_u32(np, "samsung,combiner-nr", &max_nr)) {
->                         pr_warning("%s: number of combiners not specified, "
->                                 "setting default as %d.\n",
-> -                               __func__, EXYNOS4_MAX_COMBINER_NR);
-> -                       max_nr = EXYNOS4_MAX_COMBINER_NR;
-> +                               __func__, max_nr);
->                 }
-> -       } else {
-> -               max_nr = soc_is_exynos5250() ? EXYNOS5_MAX_COMBINER_NR :
-> -                                               EXYNOS4_MAX_COMBINER_NR;
->         }
-> +
->         nr_irq = max_nr * MAX_IRQ_IN_COMBINER;
+This patch series mainly adds an syscon driver which is used to access
+general system controller registers like FSL IOMUXC GPR and ANATOP,
+after that, we convert all the exist private access general registers code to use
+standard API from regmap to access registers.
+Finally we remove the old mfd anatop driver which is only for anatop register
+access.
 
-Along with this change, this patch should update the default value
-"samsung,combiner-nr" binding in device tree binding documentation for
-combiner. It should state that is Exynos5 will use 32 and Exynos4 will
-use 20 as the default value.
+The patch series is based on linus's tree 3.6-rc3 since commit 9160338.
 
->
->         irq_base = irq_alloc_descs(COMBINER_IRQ(0, 0), 1, nr_irq, 0);
-> @@ -593,7 +609,10 @@ static void __init combiner_init(void __iomem *combiner_base,
->         }
->
->         for (i = 0; i < max_nr; i++) {
-> -               irq = IRQ_SPI(i);
-> +               if (i < 16 || soc_is_exynos5250())
-> +                       irq = IRQ_SPI(i);
-> +               else
-> +                       irq = get_combiner_extra_irq(i);
->  #ifdef CONFIG_OF
->                 if (np)
->                         irq = irq_of_parse_and_map(np, i);
-> diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
-> index 35bced6..357ed7f 100644
-> --- a/arch/arm/mach-exynos/include/mach/irqs.h
-> +++ b/arch/arm/mach-exynos/include/mach/irqs.h
-> @@ -165,7 +165,7 @@
->  #define EXYNOS4_IRQ_FIMD0_VSYNC                COMBINER_IRQ(11, 1)
->  #define EXYNOS4_IRQ_FIMD0_SYSTEM       COMBINER_IRQ(11, 2)
->
-> -#define EXYNOS4_MAX_COMBINER_NR                16
-> +#define EXYNOS4_MAX_COMBINER_NR                20
+ChangeLog v3->v4:
+Only '[PATCH v4 1/7] mfd: add syscon driver based on regmap' is changed.
 
-Will this not break Exynos4210 which has only 16 combiners? This is
-fine in case max-combiner values is listed in dt mode, but in non-dt
-mode or if max-combiner is not specified in dt, this will not be
-correct.
+Dong Aisheng (7):
+  mfd: add syscon driver based on regmap
+  ARM: imx6q: add iomuxc gpr support into syscon
+  ARM: imx6q: add anatop support into syscon
+  regulator: anatop-regulator: convert to use syscon to access anatop
+    register
+  ARM: imx6q: convert to use syscon to access anatop registers
+  ARM: dts: imx6q: add simple-bus compatible string for anatop
+  mfd: anatop-mfd: remove anatop driver
 
->
->  #define EXYNOS4_IRQ_GPIO1_NR_GROUPS    16
->  #define EXYNOS4_IRQ_GPIO2_NR_GROUPS    9
-> --
-> 1.7.9.5
->
+ Documentation/devicetree/bindings/mfd/syscon.txt |   20 ++
+ arch/arm/boot/dts/imx6q.dtsi                     |    9 +-
+ arch/arm/mach-imx/Kconfig                        |    2 +-
+ arch/arm/mach-imx/mach-imx6q.c                   |   47 ++--
+ drivers/mfd/Kconfig                              |   13 +-
+ drivers/mfd/Makefile                             |    2 +-
+ drivers/mfd/anatop-mfd.c                         |  124 ---------
+ drivers/mfd/syscon.c                             |  170 ++++++++++++
+ drivers/regulator/Kconfig                        |    2 +-
+ drivers/regulator/anatop-regulator.c             |   30 ++-
+ include/linux/fsl/imx6q-iomuxc-gpr.h             |  319 ++++++++++++++++++++++
+ include/linux/mfd/anatop.h                       |   40 ---
+ include/linux/mfd/syscon.h                       |   23 ++
+ 13 files changed, 586 insertions(+), 215 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/syscon.txt
+ delete mode 100644 drivers/mfd/anatop-mfd.c
+ create mode 100644 drivers/mfd/syscon.c
+ create mode 100644 include/linux/fsl/imx6q-iomuxc-gpr.h
+ delete mode 100644 include/linux/mfd/anatop.h
+ create mode 100644 include/linux/mfd/syscon.h
