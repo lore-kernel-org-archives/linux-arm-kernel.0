@@ -1,82 +1,76 @@
 From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Wed, 29 Aug 2012 12:44:40 +0300
-Subject: [PATCH v2 04/11] USB: chipidea: clear gadget struct at udc_start
- fail path
-In-Reply-To: <20120829082254.GH4011@b20223-02.ap.freescale.net>
+Date: Wed, 29 Aug 2012 12:48:15 +0300
+Subject: [PATCH v2 05/11] USB: chipidea: don't let probe fail if otg
+ controller start one role failed
+In-Reply-To: <20120829083337.GI4011@b20223-02.ap.freescale.net>
 References: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
- <1346137397-32374-5-git-send-email-richard.zhao@freescale.com>
- <87oblv2zdc.fsf@ashishki-desk.ger.corp.intel.com>
- <20120828090942.GX4011@b20223-02.ap.freescale.net>
- <87y5kyjfa3.fsf@ashishki-desk.ger.corp.intel.com>
- <20120829082254.GH4011@b20223-02.ap.freescale.net>
-Message-ID: <87pq6ajalz.fsf@ashishki-desk.ger.corp.intel.com>
+ <1346137397-32374-6-git-send-email-richard.zhao@freescale.com>
+ <87ligz2yyo.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120828092730.GY4011@b20223-02.ap.freescale.net>
+ <87vcg2jeyu.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120829083337.GI4011@b20223-02.ap.freescale.net>
+Message-ID: <87mx1ejag0.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Richard Zhao <richard.zhao@freescale.com> writes:
 
-> On Wed, Aug 29, 2012 at 11:03:48AM +0300, Alexander Shishkin wrote:
+> On Wed, Aug 29, 2012 at 11:10:33AM +0300, Alexander Shishkin wrote:
 >> Richard Zhao <richard.zhao@freescale.com> writes:
 >> 
->> > On Tue, Aug 28, 2012 at 11:29:35AM +0300, Alexander Shishkin wrote:
+>> > On Tue, Aug 28, 2012 at 11:38:23AM +0300, Alexander Shishkin wrote:
 >> >> Richard Zhao <richard.zhao@freescale.com> writes:
 >> >> 
->> >> > States in gadget are not needed any more, set it to zero.
+>> >> > One role failed, but the other role will possiblly still work.
+>> >> > For example, when udc start failed, if plug in a host device,
+>> >> > it works.
 >> >> 
->> >> It's generally a good practice to mention in the commit message what is
->> >> it that you are fixing with this patch.
->> > It fixes the following dump if udc_start register gadget->dev but fail
->> > the start process:
->> > kobject (bf8330a0): tried to init an initialized object, something is seriously wrong.
->> > [<80011d90>] (dump_backtrace+0x0/0x10c) from [<804b65ac>] (dump_stack+0x18/0x1c)
->> > [<804b6594>] (dump_stack+0x0/0x1c) from [<80247d98>] (kobject_init+0x7c/0x9c)
->> > [<80247d1c>] (kobject_init+0x0/0x9c) from [<802a3870>] (device_initialize+0x28/0x70)
->> > [<802a3848>] (device_initialize+0x0/0x70) from [<802a4798>] (device_register+0x14/0x20)
->> > [<802a4784>] (device_register+0x0/0x20) from [<80359a70>] (udc_start+0x180/0x2c8)
->> > [<803598f0>] (udc_start+0x0/0x2c8) from [<80356e9c>] (ci_role_work+0xc8/0xec)
->> > [<80356dd4>] (ci_role_work+0x0/0xec) from [<8003a8a0>] (process_one_work+0x158/0x474)
->> > [<8003a748>] (process_one_work+0x0/0x474) from [<8003af6c>] (worker_thread+0x140/0x3b4)
->> > [<8003ae2c>] (worker_thread+0x0/0x3b4) from [<8003fe60>] (kthread+0x90/0x9c)
->> > [<8003fdd0>] (kthread+0x0/0x9c) from [<8002774c>] (do_exit+0x0/0x350)
+>> >> If you're a host device, ci->role should be HOST at this point and
+>> >> ci_role_start() shouldn't fail. If ci->role is detected wrongly, the
+>> >> role detection must be fixed. If ci_role_start() fails for host, but it
+>> >> still works when it's called again after the id pin change is detected,
+>> >> again, the problem is elsewhere.
+>> > The check is only for OTG device. For single role device, it just fail
+>> > if it start the role failed.
+>> 
+>> Sorry, can you rephrase?
+>> 
 >> >> 
+>> >> >
 >> >> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 >> >> > ---
->> >> >  drivers/usb/chipidea/udc.c |    1 +
->> >> >  1 file changed, 1 insertion(+)
+>> >> >  drivers/usb/chipidea/core.c |    7 +++++--
+>> >> >  1 file changed, 5 insertions(+), 2 deletions(-)
 >> >> >
->> >> > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
->> >> > index c7a032a..9fb6394 100644
->> >> > --- a/drivers/usb/chipidea/udc.c
->> >> > +++ b/drivers/usb/chipidea/udc.c
->> >> > @@ -1746,6 +1746,7 @@ free_pools:
->> >> >  	dma_pool_destroy(ci->td_pool);
->> >> >  free_qh_pool:
->> >> >  	dma_pool_destroy(ci->qh_pool);
->> >> > +	memset(&ci->gadget, 0, sizeof(ci->gadget));
+>> >> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+>> >> > index 19ef324..8fd390a 100644
+>> >> > --- a/drivers/usb/chipidea/core.c
+>> >> > +++ b/drivers/usb/chipidea/core.c
+>> >> > @@ -473,8 +473,11 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
+>> >> >  	ret = ci_role_start(ci, ci->role);
+>> >> >  	if (ret) {
+>> >> >  		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
+>> >> > -		ret = -ENODEV;
+>> >> > -		goto rm_wq;
+>> >> > +		ci->role = CI_ROLE_END;
 >> >> 
->> >> I understand that you're probably hitting "kobject already initialized"
->> >> warning here, but I think the real problem is that this function gets
->> >> called twice and fails the first time. Why does that happen?
->> > I saw the dump at early stage of adding imx otg support, when there's
->> > things not ready. I think it's less important why udc_start fail,
->> > because no one enable imx otg before.  It's important when it fails,
->> > the dump shows up.
+>> >> So are you relying on id pin interrupt for initializing the role after
+>> >> this? Can you provide more details?
+>> > Yes. The ID pin detect still works. My case is, gadget role failed,
+>> > host role works. I was trying not to ruin host function.
 >> 
->> I'd prefer that whenever udc_start() fails it doesn't go unnoticed,
->> except probably for the cases when it fails due to transceiver not being
->> ready at the probe time, which needs to be handled separately.
-> Is it related to the patch? The patch is logically right that reset the
-> status, agree?
+>> But it shouldn't even try to start the gadget, because ci_otg_role()
+>> should set ci->role to HOST before ci_role_start() happens.
+> It depends on ID pin. If ID pin is gadget and gadget is not support well,
+> ci_role_start will fail. See below example.
+>> 
+>> Another question is, why does gadget start fail?
+> There's one example:
+> If usb phy don't support otg yet, otg_set_peripheral will fail, and
+> then cause udc_start fail.
 
-No. This warning means that we have called udc_start() once, failed
-(thus didn't call udc_stop()) due to some unknown reason, and called it
-again at a later point in time. This -- failing for unknown reason --
-should not happen. If it does, we should fix the reason, not paper over
-the warning that is telling us that something is wrong.
-
-If we decide that we want to allow udc_start to fail for *certain*
-reasons, we should do it explicitly, not by shutting up all warnings for
-good.
+So you should drop the CI13XXX_REQUIRE_TRANSCEIVER flag from imx
+platform data till the phy is fully implemented.
 
 Regards,
 --
