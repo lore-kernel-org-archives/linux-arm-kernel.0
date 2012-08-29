@@ -1,90 +1,74 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 29 Aug 2012 16:08:53 +0200
-Subject: [PATCH v2] ARM: EXYNOS: Add support for secondary CPU bring-up on
- Exynos4412
-Message-ID: <1393767.3tjq8gL245@amdc1227>
+From: nicolas.thery@st.com (Nicolas THERY)
+Date: Wed, 29 Aug 2012 16:55:32 +0200
+Subject: [PATCH] [media] atmel_isi: allocate memory to store the isi
+ platform data.
+In-Reply-To: <1346235093-28613-1-git-send-email-josh.wu@atmel.com>
+References: <1346235093-28613-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <503E2D64.1020303@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos4412 uses different information register for each core. This patch
-adjusts the bring-up code to take that into account.
+Hello,
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos/platsmp.c | 27 +++++++++++++++++++++------
- 1 file changed, 21 insertions(+), 6 deletions(-)
+On 2012-08-29 12:11, Josh Wu wrote:
+> This patch fix the bug: ISI driver's platform data became invalid when isi platform data's attribution is __initdata.
+> 
+> If the isi platform data is passed as __initdata. Then we need store it in driver allocated memory. otherwise when we use it out of the probe() function, then the isi platform data is invalid.
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+>  drivers/media/platform/soc_camera/atmel-isi.c |   12 +++++++++++-
+>  1 file changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+> index ec3f6a0..dc0fdec 100644
+> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+> @@ -926,6 +926,7 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
+>  	clk_put(isi->mck);
+>  	clk_unprepare(isi->pclk);
+>  	clk_put(isi->pclk);
+> +	kfree(isi->pdata);
 
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 36c3984..816a27d 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -34,8 +34,19 @@
- 
- extern void exynos4_secondary_startup(void);
- 
--#define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1 ? \
--				S5P_INFORM5 : S5P_VA_SYSRAM)
-+static inline void __iomem *cpu_boot_reg_base(void)
-+{
-+	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
-+		return S5P_INFORM5;
-+	return S5P_VA_SYSRAM;
-+}
-+
-+static inline void __iomem *cpu_boot_reg(int cpu)
-+{
-+	if (soc_is_exynos4412())
-+		return cpu_boot_reg_base() + 4*cpu;
-+	return cpu_boot_reg_base();
-+}
- 
- /*
-  * control for which core is the next to come out of the secondary
-@@ -89,6 +100,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
- int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	unsigned long timeout;
-+	unsigned long phys_cpu = cpu_logical_map(cpu);
- 
- 	/*
- 	 * Set synchronisation state between this boot processor
-@@ -104,7 +116,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	 * Note that "pen_release" is the hardware CPU ID, whereas
- 	 * "cpu" is Linux's internal ID.
- 	 */
--	write_pen_release(cpu_logical_map(cpu));
-+	write_pen_release(phys_cpu);
- 
- 	if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
- 		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
-@@ -138,7 +150,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 		smp_rmb();
- 
- 		__raw_writel(virt_to_phys(exynos4_secondary_startup),
--			CPU1_BOOT_REG);
-+							cpu_boot_reg(phys_cpu));
- 		gic_raise_softirq(cpumask_of(cpu), 1);
- 
- 		if (pen_release == -1)
-@@ -186,6 +198,8 @@ void __init smp_init_cpus(void)
- 
- void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- {
-+	int i;
-+
- 	if (!soc_is_exynos5250())
- 		scu_enable(scu_base_addr());
- 
-@@ -195,6 +209,7 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- 	 * until it receives a soft interrupt, and then the
- 	 * secondary CPU branches to this address.
- 	 */
--	__raw_writel(virt_to_phys(exynos4_secondary_startup),
--			CPU1_BOOT_REG);
-+	for (i = 1; i < max_cpus; ++i)
-+		__raw_writel(virt_to_phys(exynos4_secondary_startup),
-+					cpu_boot_reg(cpu_logical_map(i)));
- }
--- 
-1.7.12
+Not needed if you use devm_kzalloc().  See below.
+
+>  	kfree(isi);
+>  
+>  	return 0;
+> @@ -968,8 +969,15 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
+>  		goto err_alloc_isi;
+>  	}
+>  
+> +	isi->pdata = kzalloc(sizeof(struct isi_platform_data), GFP_KERNEL);
+> +	if (!isi->pdata) {
+> +		ret = -ENOMEM;
+> +		dev_err(&pdev->dev, "Can't allocate isi platform data!\n");
+> +		goto err_alloc_isi_pdata;
+> +	}
+> +	memcpy(isi->pdata, pdata, sizeof(struct isi_platform_data));
+> +
+
+It is more idiomatic to use sizeof(*isi->pdata) in kzalloc() and memcpy() calls
+to be resilient to future type changes.
+
+You may also want to use dev_kzalloc() which frees memory automagically on
+driver detach.
+
+>  	isi->pclk = pclk;
+> -	isi->pdata = pdata;
+>  	isi->active = NULL;
+>  	spin_lock_init(&isi->lock);
+>  	init_waitqueue_head(&isi->vsync_wq);
+> @@ -1073,6 +1081,8 @@ err_set_mck_rate:
+>  err_clk_prepare_mck:
+>  	clk_put(isi->mck);
+>  err_clk_get:
+> +	kfree(isi->pdata);
+> +err_alloc_isi_pdata:
+>  	kfree(isi);
+>  err_alloc_isi:
+>  	clk_unprepare(pclk);
+> 
+
+Best regards,
+Nicolas
