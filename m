@@ -1,24 +1,23 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 30 Aug 2012 00:40:30 +0100
-Subject: [PATCH 00/10] Make mach/gpio.h optional
-In-Reply-To: <1346279496-26286-1-git-send-email-robherring2@gmail.com>
-References: <1346279496-26286-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20120829234030.GV18957@n2100.arm.linux.org.uk>
+Date: Thu, 30 Aug 2012 00:53:53 +0100
+Subject: [RFC/PATCH] ARM: smp: Fix cpu_up() racing with sys_reboot
+In-Reply-To: <1345608229-5707-1-git-send-email-sboyd@codeaurora.org>
+References: <1345608229-5707-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20120829235353.GW18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2012 at 05:31:26PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> This series makes mach/gpio.h optional like we have done for other mach
-> headers in preparation for multi-platform kernel images. Unfortunately,
-> it adds more mach includes to drivers/, but really they are just now
-> explicitly included and easily found.
+On Tue, Aug 21, 2012 at 09:03:49PM -0700, Stephen Boyd wrote:
+> Nothing stops a process from hotplugging in a CPU concurrently
+> with a sys_reboot() call. In such a situation we could have
+> ipi_cpu_stop() mark a cpu as 'offline' and _cpu_up() ignore the
+> fact that the CPU is not really offline and call the
+> CPU_UP_PREPARE notifier. When this happens stop_machine code will
+> complain that the cpu thread already exists and BUG_ON().
 
-This in general looks like a complete backwards step rather than a forwards
-step for multi-platform kernels.  All these drivers are not going to be
-usable in multi-platform kernel images, because with mach/ includes they're
-not going to be picking up the correct set of headers.
+This puts us at odds with x86, which is a bad thing without first
+investigating whether a generic solution which fixes all arches would
+be more appropriate.
 
-So all these SoC types might as well not be part of the multi-platform
-project until they get their act together with their headers.
+A better solution may be to mark those CPUs as being not-present,
+which will prevent them being hot-plugged back.
