@@ -1,1096 +1,436 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 29 Aug 2012 17:49:56 -0500
-Subject: [PATCH 2/6] ARM: introduce Kconfig.mach
+Date: Wed, 29 Aug 2012 17:49:59 -0500
+Subject: [PATCH 5/6] ARM: initial multiplatform support
 In-Reply-To: <1346280600-29395-1-git-send-email-robherring2@gmail.com>
 References: <1346280600-29395-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1346280600-29395-3-git-send-email-robherring2@gmail.com>
+Message-ID: <1346280600-29395-6-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Move all the mach related config options into separate Kconfig.mach file.
+This lets us build a multiplatform kernel for experimental purposes.
+However, it will not be useful for any real work, because it relies
+on a number of useful things to be disabled for now:
 
+* SMP support must be turned off because of conflicting symbols.
+  Marc Zyngier has proposed a solution by adding a new SOC
+  operations structure to hold indirect function pointers
+  for these, but that work is currently stalled
+
+* We turn on SPARSE_IRQ unconditionally, which is not supported
+  on most platforms. Each of them is currently in a different
+  state, but most are being worked on.
+
+* A common clock framework is in place since v3.4 but not yet
+  being used. Work on this is on its way.
+
+* DEBUG_LL for early debugging is currently disabled.
+
+* THUMB2_KERNEL does not work with allyesconfig because the
+  kernel gets too big
+
+[Rob Herring]: Rebased to not be dependent on the mass mach header rename.
+As a result, omap2plus, imx, mxs and ux500 are not converted. Highbank,
+picoxcell, mvebu, socfpga, and vexpress are converted.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/Kconfig      |  529 +------------------------------------------------
- arch/arm/Kconfig.mach |  528 ++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 529 insertions(+), 528 deletions(-)
- create mode 100644 arch/arm/Kconfig.mach
+ arch/arm/Kconfig.mach            |   57 ++++++++++++++
+ arch/arm/Makefile                |  155 ++++++++++++++++++++------------------
+ arch/arm/boot/compressed/misc.c  |    6 ++
+ arch/arm/include/asm/timex.h     |    4 +
+ arch/arm/mach-highbank/Kconfig   |    2 +-
+ arch/arm/mach-mvebu/Kconfig      |    2 +-
+ arch/arm/mach-mvebu/Makefile     |    2 +
+ arch/arm/mach-picoxcell/Kconfig  |    2 +-
+ arch/arm/mach-socfpga/Kconfig    |    2 +-
+ arch/arm/mach-vexpress/Kconfig   |    2 +-
+ arch/arm/mach-vexpress/Makefile  |    2 +
+ arch/arm/plat-versatile/Makefile |    2 +
+ 12 files changed, 158 insertions(+), 80 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 3ad82c6..fa34df2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -248,534 +248,7 @@ config MMU
- 	  Select if you want MMU-based virtualised addressing space
- 	  support by paged memory management. If unsure, say 'Y'.
- 
--#
--# The "ARM system type" choice list is ordered alphabetically by option
--# text.  Please add new entries in the option alphabetic order.
--#
--choice
--	prompt "ARM system type"
--	default ARCH_VERSATILE
--
--config ARCH_SOCFPGA_CHOICE
--	bool "Altera SOCFPGA family"
--	select ARCH_SOCFPGA
--	help
--	  This enables support for Altera SOCFPGA Cyclone V platform
--
--config ARCH_INTEGRATOR_CHOICE
--	bool "ARM Ltd. Integrator family"
--	select ARCH_INTEGRATOR
--	help
--	  Support for ARM's Integrator platform.
--
--config ARCH_REALVIEW_CHOICE
--	bool "ARM Ltd. RealView family"
--	select ARCH_REALVIEW
--	help
--	  This enables support for ARM Ltd RealView boards.
--
--config ARCH_VERSATILE_CHOICE
--	bool "ARM Ltd. Versatile family"
--	select ARCH_VERSATILE
--	help
--	  This enables support for ARM Ltd Versatile board.
--
--config ARCH_VEXPRESS_CHOICE
--	bool "ARM Ltd. Versatile Express family"
--	select ARCH_VEXPRESS
--	help
--	  This enables support for the ARM Ltd Versatile Express boards.
--
--config ARCH_AT91_CHOICE
--	bool "Atmel AT91"
--	select ARCH_AT91
--	help
--	  This enables support for systems based on Atmel
--	  AT91RM9200 and AT91SAM9* processors.
--
--config ARCH_BCMRING_CHOICE
--	bool "Broadcom BCMRING"
--	depends on MMU
--	select ARCH_BCMRING
--	help
--	  Support for Broadcom's BCMRing platform.
--
--config ARCH_HIGHBANK_CHOICE
--	bool "Calxeda Highbank-based"
--	select ARCH_HIGHBANK
--	help
--	  Support for the Calxeda Highbank SoC based boards.
--
--config ARCH_CLPS711X_CHOICE
--	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
--	select ARCH_CLPS711X
--	help
--	  Support for Cirrus Logic 711x/721x/731x based boards.
--
--config ARCH_CNS3XXX_CHOICE
--	bool "Cavium Networks CNS3XXX family"
--	select ARCH_CNS3XXX
--	help
--	  Support for Cavium Networks CNS3XXX platform.
--
--config ARCH_GEMINI_CHOICE
--	bool "Cortina Systems Gemini"
--	select ARCH_GEMINI
--	help
--	  Support for the Cortina Systems Gemini family SoCs
--
--config ARCH_PRIMA2_CHOICE
--	bool "CSR SiRFSoC PRIMA2 ARM Cortex A9 Platform"
--	select ARCH_PRIMA2
--	help
--          Support for CSR SiRFSoC ARM Cortex A9 Platform
--
--config ARCH_EBSA110_CHOICE
--	bool "EBSA-110"
--	select ARCH_EBSA110
--	help
--	  This is an evaluation board for the StrongARM processor available
--	  from Digital. It has limited hardware on-board, including an
--	  Ethernet interface, two PCMCIA sockets, two serial ports and a
--	  parallel port.
--
--config ARCH_EP93XX_CHOICE
--	bool "EP93xx-based"
--	select ARCH_EP93XX
--	help
--	  This enables support for the Cirrus EP93xx series of CPUs.
--
--config ARCH_FOOTBRIDGE_CHOICE
--	bool "FootBridge"
--	select ARCH_FOOTBRIDGE
--	help
--	  Support for systems based on the DC21285 companion chip
--	  ("FootBridge"), such as the Simtec CATS and the Rebel NetWinder.
--
--config ARCH_MXC_CHOICE
--	bool "Freescale MXC/iMX-based"
--	select ARCH_MXC
--	help
--	  Support for Freescale MXC/iMX-based family of processors
--
--config ARCH_MXS_CHOICE
--	bool "Freescale MXS-based"
--	select ARCH_MXS
--	help
--	  Support for Freescale MXS-based family of processors
--
--config ARCH_NETX_CHOICE
--	bool "Hilscher NetX based"
--	select ARCH_NETX
--	help
--	  This enables support for systems based on the Hilscher NetX Soc
--
--config ARCH_H720X_CHOICE
--	bool "Hynix HMS720x-based"
--	select ARCH_H720X
--	help
--	  This enables support for systems based on the Hynix HMS720x
--
--config ARCH_IOP13XX_CHOICE
--	bool "IOP13xx-based"
--	depends on MMU
--	select ARCH_IOP13XX
--	help
--	  Support for Intel's IOP13XX (XScale) family of processors.
--
--config ARCH_IOP32X_CHOICE
--	bool "IOP32x-based"
--	depends on MMU
--	select ARCH_IOP32X
--	help
--	  Support for Intel's 80219 and IOP32X (XScale) family of
--	  processors.
--
--config ARCH_IOP33X_CHOICE
--	bool "IOP33x-based"
--	depends on MMU
--	select ARCH_IOP33X
--	help
--	  Support for Intel's IOP33X (XScale) family of processors.
--
--config ARCH_IXP4XX_CHOICE
--	bool "IXP4xx-based"
--	depends on MMU
--	select ARCH_IXP4XX
--	help
--	  Support for Intel's IXP4XX (XScale) family of processors.
--
--config ARCH_MVEBU_CHOICE
--	bool "Marvell SOCs with Device Tree support"
--	select ARCH_MVEBU
--	help
--	  Support for the Marvell SoC Family with device tree support
--
--config ARCH_DOVE_CHOICE
--	bool "Marvell Dove"
--	select ARCH_DOVE
--	help
--	  Support for the Marvell Dove SoC 88AP510
--
--config ARCH_KIRKWOOD_CHOICE
--	bool "Marvell Kirkwood"
--	select ARCH_KIRKWOOD
--	help
--	  Support for the following Marvell Kirkwood series SoCs:
--	  88F6180, 88F6192 and 88F6281.
--
--config ARCH_LPC32XX_CHOICE
--	bool "NXP LPC32XX"
--	select ARCH_LPC32XX
--	help
--	  Support for the NXP LPC32XX family of processors
--
--config ARCH_MV78XX0_CHOICE
--	bool "Marvell MV78xx0"
--	select ARCH_MV78XX0
--	help
--	  Support for the following Marvell MV78xx0 series SoCs:
--	  MV781x0, MV782x0.
--
--config ARCH_ORION5X_CHOICE
--	bool "Marvell Orion"
--	depends on MMU
--	select ARCH_ORION5X
--	help
--	  Support for the following Marvell Orion 5x series SoCs:
--	  Orion-1 (5181), Orion-VoIP (5181L), Orion-NAS (5182),
--	  Orion-2 (5281), Orion-1-90 (6183).
--
--config ARCH_MMP_CHOICE
--	bool "Marvell PXA168/910/MMP2"
--	depends on MMU
--	select ARCH_MMP
--	help
--	  Support for Marvell's PXA168/PXA910(MMP) and MMP2 processor line.
--
--config ARCH_KS8695_CHOICE
--	bool "Micrel/Kendin KS8695"
--	select ARCH_KS8695
--	help
--	  Support for Micrel/Kendin KS8695 "Centaur" (ARM922T) based
--	  System-on-Chip devices.
--
--config ARCH_W90X900_CHOICE
--	bool "Nuvoton W90X900 CPU"
--	select ARCH_W90X900
--	help
--	  Support for Nuvoton (Winbond logic dept.) ARM9 processor,
--	  At present, the w90x900 has been renamed nuc900, regarding
--	  the ARM series product line, you can login the following
--	  link address to know more.
--
--	  <http://www.nuvoton.com/hq/enu/ProductAndSales/ProductLines/
--		ConsumerElectronicsIC/ARMMicrocontroller/ARMMicrocontroller>
--
--config ARCH_TEGRA_CHOICE
--	bool "NVIDIA Tegra"
--	select ARCH_TEGRA
--	help
--	  This enables support for NVIDIA Tegra based systems (Tegra APX,
--	  Tegra 6xx and Tegra 2 series).
--
--config ARCH_PICOXCELL_CHOICE
--	bool "Picochip picoXcell"
--	select ARCH_PICOXCELL
--	help
--	  This enables support for systems based on the Picochip picoXcell
--	  family of Femtocell devices.  The picoxcell support requires device tree
--	  for all boards.
--
--config ARCH_PNX4008_CHOICE
--	bool "Philips Nexperia PNX4008 Mobile"
--	select ARCH_PNX4008
--	help
--	  This enables support for Philips PNX4008 mobile platform.
--
--config ARCH_PXA_CHOICE
--	bool "PXA2xx/PXA3xx-based"
--	depends on MMU
--	select ARCH_PXA
--	help
--	  Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
--
--config ARCH_MSM_CHOICE
--	bool "Qualcomm MSM"
--	select ARCH_MSM
--	help
--	  Support for Qualcomm MSM/QSD based systems.  This runs on the
--	  apps processor of the MSM/QSD and depends on a shared memory
--	  interface to the modem processor which runs the baseband
--	  stack and controls some vital subsystems
--	  (clock and power control, etc).
--
--config ARCH_SHMOBILE_CHOICE
--	bool "Renesas SH-Mobile / R-Mobile"
--	select ARCH_SHMOBILE
--	help
--	  Support for Renesas's SH-Mobile and R-Mobile ARM platforms.
--
--config ARCH_RPC_CHOICE
--	bool "RiscPC"
--	select ARCH_RPC
--	help
--	  On the Acorn Risc-PC, Linux can support the internal IDE disk and
--	  CD-ROM interface, serial and parallel port, and the floppy drive.
--
--config ARCH_SA1100_CHOICE
--	bool "SA1100-based"
--	select ARCH_SA1100
--	help
--	  Support for StrongARM 11x0 based boards.
--
--config ARCH_S3C24XX_CHOICE
--	bool "Samsung S3C24XX SoCs"
--	select ARCH_S3C24XX
--	help
--	  Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442, S3C2443
--	  and S3C2450 SoCs based systems, such as the Simtec Electronics BAST
--	  (<http://www.simtec.co.uk/products/EB110ITX/>), the IPAQ 1940 or the
--	  Samsung SMDK2410 development board (and derivatives).
--
--config ARCH_S3C64XX_CHOICE
--	bool "Samsung S3C64XX"
--	select ARCH_S3C64XX
--	help
--	  Samsung S3C64XX series based systems
--
--config ARCH_S5P64X0_CHOICE
--	bool "Samsung S5P6440 S5P6450"
--	select ARCH_S5P64X0
--	help
--	  Samsung S5P64X0 CPU based systems, such as the Samsung SMDK6440,
--	  SMDK6450.
--
--config ARCH_S5PC100_CHOICE
--	bool "Samsung S5PC100"
--	select ARCH_S5PC100
--	help
--	  Samsung S5PC100 series based systems
--
--config ARCH_S5PV210_CHOICE
--	bool "Samsung S5PV210/S5PC110"
--	select ARCH_S5PV210
--	help
--	  Samsung S5PV210/S5PC110 series based systems
--
--config ARCH_EXYNOS_CHOICE
--	bool "SAMSUNG EXYNOS"
--	select ARCH_EXYNOS
--	help
--	  Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
--
--config ARCH_SHARK_CHOICE
--	bool "Shark"
--	select ARCH_SHARK
--	help
--	  Support for the StrongARM based Digital DNARD machine, also known
--	  as "Shark" (<http://www.shark-linux.de/shark.html>).
--
--config ARCH_U300_CHOICE
--	bool "ST-Ericsson U300 Series"
--	depends on MMU
--	select ARCH_U300
--	help
--	  Support for ST-Ericsson U300 series mobile platforms.
--
--config ARCH_U8500_CHOICE
--	bool "ST-Ericsson U8500 Series"
--	depends on MMU
--	select ARCH_U8500
--	help
--	  Support for ST-Ericsson's Ux500 architecture
--
--config ARCH_NOMADIK_CHOICE
--	bool "STMicroelectronics Nomadik"
--	select ARCH_NOMADIK
--	help
--	  Support for the Nomadik platform by ST-Ericsson
--
--config ARCH_DAVINCI_CHOICE
--	bool "TI DaVinci"
--	select ARCH_DAVINCI
--	select NEED_MACH_GPIO_H
--	help
--	  Support for TI's DaVinci platform.
--
--config ARCH_OMAP_CHOICE
--	bool "TI OMAP"
--	depends on MMU
--	select ARCH_OMAP
--	help
--	  Support for TI's OMAP platform (OMAP1/2/3/4).
--
--config PLAT_SPEAR_CHOICE
--	bool "ST SPEAr"
--	select PLAT_SPEAR
--	help
--	  Support for ST's SPEAr platform (SPEAr3xx, SPEAr6xx and SPEAr13xx).
--
--config ARCH_VT8500_CHOICE
--	bool "VIA/WonderMedia 85xx"
--	select ARCH_VT8500
--	help
--	  Support for VIA/WonderMedia VT8500/WM85xx System-on-Chip.
--
--config ARCH_ZYNQ_CHOICE
--	bool "Xilinx Zynq ARM Cortex A9 Platform"
--	select ARCH_ZYNQ
--	help
--	  Support for Xilinx Zynq ARM Cortex A9 Platform
--endchoice
--
--#
--# This is sorted alphabetically by mach-* pathname.  However, plat-*
--# Kconfigs may be included either alphabetically (according to the
--# plat- suffix) or along side the corresponding mach-* source.
--#
--source "arch/arm/mach-mvebu/Kconfig"
--
--source "arch/arm/mach-at91/Kconfig"
--
--source "arch/arm/mach-bcmring/Kconfig"
--
--source "arch/arm/mach-clps711x/Kconfig"
--
--source "arch/arm/mach-cns3xxx/Kconfig"
--
--source "arch/arm/mach-davinci/Kconfig"
--
--source "arch/arm/mach-dove/Kconfig"
--
--source "arch/arm/mach-ebsa110/Kconfig"
--
--source "arch/arm/mach-ep93xx/Kconfig"
--
--source "arch/arm/mach-footbridge/Kconfig"
--
--source "arch/arm/mach-gemini/Kconfig"
--
--source "arch/arm/mach-h720x/Kconfig"
--
--source "arch/arm/mach-highbank/Kconfig"
--
--source "arch/arm/mach-integrator/Kconfig"
--
--source "arch/arm/mach-iop32x/Kconfig"
--
--source "arch/arm/mach-iop33x/Kconfig"
--
--source "arch/arm/mach-iop13xx/Kconfig"
--
--source "arch/arm/mach-ixp4xx/Kconfig"
--
--source "arch/arm/mach-kirkwood/Kconfig"
--
--source "arch/arm/mach-ks8695/Kconfig"
--
--source "arch/arm/mach-lpc32xx/Kconfig"
--
--source "arch/arm/mach-msm/Kconfig"
--
--source "arch/arm/mach-mv78xx0/Kconfig"
--
--source "arch/arm/plat-mxc/Kconfig"
--
--source "arch/arm/mach-mxs/Kconfig"
--
--source "arch/arm/mach-netx/Kconfig"
--
--source "arch/arm/mach-nomadik/Kconfig"
--source "arch/arm/plat-nomadik/Kconfig"
--
--source "arch/arm/plat-omap/Kconfig"
--
--source "arch/arm/mach-omap1/Kconfig"
--
--source "arch/arm/mach-omap2/Kconfig"
--
--source "arch/arm/mach-orion5x/Kconfig"
--
--source "arch/arm/mach-picoxcell/Kconfig"
--
--source "arch/arm/mach-pnx4008/Kconfig"
--
--source "arch/arm/mach-pxa/Kconfig"
--source "arch/arm/plat-pxa/Kconfig"
--
--source "arch/arm/mach-mmp/Kconfig"
--
--source "arch/arm/mach-realview/Kconfig"
--
--source "arch/arm/mach-rpc/Kconfig"
--
--source "arch/arm/mach-sa1100/Kconfig"
--
--source "arch/arm/plat-samsung/Kconfig"
--source "arch/arm/plat-s3c24xx/Kconfig"
--
--source "arch/arm/mach-shark/Kconfig"
--
--source "arch/arm/mach-socfpga/Kconfig"
--
--source "arch/arm/plat-spear/Kconfig"
--
--source "arch/arm/mach-s3c24xx/Kconfig"
--if ARCH_S3C24XX
--source "arch/arm/mach-s3c2412/Kconfig"
--source "arch/arm/mach-s3c2440/Kconfig"
--endif
--
--source "arch/arm/mach-s3c64xx/Kconfig"
--
--source "arch/arm/mach-s5p64x0/Kconfig"
--
--source "arch/arm/mach-s5pc100/Kconfig"
--
--source "arch/arm/mach-s5pv210/Kconfig"
--
--source "arch/arm/mach-exynos/Kconfig"
--
--source "arch/arm/mach-shmobile/Kconfig"
--
--source "arch/arm/mach-tegra/Kconfig"
--
--source "arch/arm/mach-u300/Kconfig"
--
--source "arch/arm/mach-ux500/Kconfig"
--
--source "arch/arm/mach-versatile/Kconfig"
--
--source "arch/arm/mach-vexpress/Kconfig"
--source "arch/arm/plat-versatile/Kconfig"
--
--source "arch/arm/mach-vt8500/Kconfig"
--
--source "arch/arm/mach-w90x900/Kconfig"
--
--source "arch/arm/mach-zynq/Kconfig"
--
--# Definitions to make life easier
--config ARCH_ACORN
--	bool
--
--config PLAT_IOP
--	bool
--	select GENERIC_CLOCKEVENTS
--
--config PLAT_ORION
--	bool
--	select CLKSRC_MMIO
--	select GENERIC_IRQ_CHIP
--	select IRQ_DOMAIN
--	select COMMON_CLK
--
--config PLAT_PXA
--	bool
--
--config PLAT_VERSATILE
--	bool
-+source "arch/arm/Kconfig.mach"
- 
- config ARM_TIMER_SP804
- 	bool
 diff --git a/arch/arm/Kconfig.mach b/arch/arm/Kconfig.mach
-new file mode 100644
-index 0000000..60f0386
---- /dev/null
+index 60f0386..7a21abb 100644
+--- a/arch/arm/Kconfig.mach
 +++ b/arch/arm/Kconfig.mach
-@@ -0,0 +1,528 @@
-+#
-+# The "ARM system type" choice list is ordered alphabetically by option
-+# text.  Please add new entries in the option alphabetic order.
-+#
-+choice
-+	prompt "ARM system type"
-+	default ARCH_VERSATILE
+@@ -4,6 +4,7 @@
+ #
+ choice
+ 	prompt "ARM system type"
++	depends on !ARCH_MULTIPLATFORM
+ 	default ARCH_VERSATILE
+ 
+ config ARCH_SOCFPGA_CHOICE
+@@ -378,6 +379,62 @@ config ARCH_ZYNQ_CHOICE
+ 	  Support for Xilinx Zynq ARM Cortex A9 Platform
+ endchoice
+ 
++menuconfig ARCH_MULTIPLATFORM
++	bool "Multiple platform selection"
++	select USE_OF
++	select COMMON_CLK
++	select SPARSE_IRQ
++	select MULTI_IRQ_HANDLER
++	select AUTO_ZRELADDR
++	depends on MMU
 +
-+config ARCH_SOCFPGA_CHOICE
-+	bool "Altera SOCFPGA family"
-+	select ARCH_SOCFPGA
-+	help
-+	  This enables support for Altera SOCFPGA Cyclone V platform
++if ARCH_MULTIPLATFORM
 +
-+config ARCH_INTEGRATOR_CHOICE
-+	bool "ARM Ltd. Integrator family"
-+	select ARCH_INTEGRATOR
-+	help
-+	  Support for ARM's Integrator platform.
++comment "CPU Core family selection"
 +
-+config ARCH_REALVIEW_CHOICE
-+	bool "ARM Ltd. RealView family"
-+	select ARCH_REALVIEW
-+	help
-+	  This enables support for ARM Ltd RealView boards.
++config ARCH_MULTI_V4
++	bool "ARMv4 based platforms (FA526, StrongARM)"
++	select ARCH_MULTI_V4_V5
++	depends on !ARCH_MULTI_V6_V7
 +
-+config ARCH_VERSATILE_CHOICE
-+	bool "ARM Ltd. Versatile family"
-+	select ARCH_VERSATILE
-+	help
-+	  This enables support for ARM Ltd Versatile board.
++config ARCH_MULTI_V4T
++	bool "ARMv4T based platforms (ARM720T, ARM920T, ...)"
++	select ARCH_MULTI_V4_V5
++	depends on !ARCH_MULTI_V6_V7
 +
-+config ARCH_VEXPRESS_CHOICE
-+	bool "ARM Ltd. Versatile Express family"
++config ARCH_MULTI_V5
++	bool "ARMv5 based platforms (ARM926T, XSCALE, PJ1, ...)"
++	select ARCH_MULTI_V4_V5
++	depends on !ARCH_MULTI_V6_V7
++
++config ARCH_MULTI_V4_V5
++	bool
++
++config ARCH_MULTI_V6
++	bool "ARMv6 based platforms (ARM11, Scorpion, ...)"
++	select CPU_V6
++	select ARCH_MULTI_V6_V7
++
++config ARCH_MULTI_V7
++	bool "ARMv7 based platforms (Cortex-A, PJ4, Krait)"
++	select CPU_V7
 +	select ARCH_VEXPRESS
-+	help
-+	  This enables support for the ARM Ltd Versatile Express boards.
++	default y
++	select ARCH_MULTI_V6_V7
 +
-+config ARCH_AT91_CHOICE
-+	bool "Atmel AT91"
-+	select ARCH_AT91
-+	help
-+	  This enables support for systems based on Atmel
-+	  AT91RM9200 and AT91SAM9* processors.
++config ARCH_MULTI_V6_V7
++	bool
 +
-+config ARCH_BCMRING_CHOICE
-+	bool "Broadcom BCMRING"
-+	depends on MMU
-+	select ARCH_BCMRING
-+	help
-+	  Support for Broadcom's BCMRing platform.
++config ARCH_MULTI_CPU_AUTO
++	def_bool !(ARCH_MULTI_V4 || ARCH_MULTI_V4T || ARCH_MULTI_V6_V7)
++	select ARCH_MULTI_V5
 +
-+config ARCH_HIGHBANK_CHOICE
-+	bool "Calxeda Highbank-based"
-+	select ARCH_HIGHBANK
-+	help
-+	  Support for the Calxeda Highbank SoC based boards.
-+
-+config ARCH_CLPS711X_CHOICE
-+	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
-+	select ARCH_CLPS711X
-+	help
-+	  Support for Cirrus Logic 711x/721x/731x based boards.
-+
-+config ARCH_CNS3XXX_CHOICE
-+	bool "Cavium Networks CNS3XXX family"
-+	select ARCH_CNS3XXX
-+	help
-+	  Support for Cavium Networks CNS3XXX platform.
-+
-+config ARCH_GEMINI_CHOICE
-+	bool "Cortina Systems Gemini"
-+	select ARCH_GEMINI
-+	help
-+	  Support for the Cortina Systems Gemini family SoCs
-+
-+config ARCH_PRIMA2_CHOICE
-+	bool "CSR SiRFSoC PRIMA2 ARM Cortex A9 Platform"
-+	select ARCH_PRIMA2
-+	help
-+          Support for CSR SiRFSoC ARM Cortex A9 Platform
-+
-+config ARCH_EBSA110_CHOICE
-+	bool "EBSA-110"
-+	select ARCH_EBSA110
-+	help
-+	  This is an evaluation board for the StrongARM processor available
-+	  from Digital. It has limited hardware on-board, including an
-+	  Ethernet interface, two PCMCIA sockets, two serial ports and a
-+	  parallel port.
-+
-+config ARCH_EP93XX_CHOICE
-+	bool "EP93xx-based"
-+	select ARCH_EP93XX
-+	help
-+	  This enables support for the Cirrus EP93xx series of CPUs.
-+
-+config ARCH_FOOTBRIDGE_CHOICE
-+	bool "FootBridge"
-+	select ARCH_FOOTBRIDGE
-+	help
-+	  Support for systems based on the DC21285 companion chip
-+	  ("FootBridge"), such as the Simtec CATS and the Rebel NetWinder.
-+
-+config ARCH_MXC_CHOICE
-+	bool "Freescale MXC/iMX-based"
-+	select ARCH_MXC
-+	help
-+	  Support for Freescale MXC/iMX-based family of processors
-+
-+config ARCH_MXS_CHOICE
-+	bool "Freescale MXS-based"
-+	select ARCH_MXS
-+	help
-+	  Support for Freescale MXS-based family of processors
-+
-+config ARCH_NETX_CHOICE
-+	bool "Hilscher NetX based"
-+	select ARCH_NETX
-+	help
-+	  This enables support for systems based on the Hilscher NetX Soc
-+
-+config ARCH_H720X_CHOICE
-+	bool "Hynix HMS720x-based"
-+	select ARCH_H720X
-+	help
-+	  This enables support for systems based on the Hynix HMS720x
-+
-+config ARCH_IOP13XX_CHOICE
-+	bool "IOP13xx-based"
-+	depends on MMU
-+	select ARCH_IOP13XX
-+	help
-+	  Support for Intel's IOP13XX (XScale) family of processors.
-+
-+config ARCH_IOP32X_CHOICE
-+	bool "IOP32x-based"
-+	depends on MMU
-+	select ARCH_IOP32X
-+	help
-+	  Support for Intel's 80219 and IOP32X (XScale) family of
-+	  processors.
-+
-+config ARCH_IOP33X_CHOICE
-+	bool "IOP33x-based"
-+	depends on MMU
-+	select ARCH_IOP33X
-+	help
-+	  Support for Intel's IOP33X (XScale) family of processors.
-+
-+config ARCH_IXP4XX_CHOICE
-+	bool "IXP4xx-based"
-+	depends on MMU
-+	select ARCH_IXP4XX
-+	help
-+	  Support for Intel's IXP4XX (XScale) family of processors.
-+
-+config ARCH_MVEBU_CHOICE
-+	bool "Marvell SOCs with Device Tree support"
-+	select ARCH_MVEBU
-+	help
-+	  Support for the Marvell SoC Family with device tree support
-+
-+config ARCH_DOVE_CHOICE
-+	bool "Marvell Dove"
-+	select ARCH_DOVE
-+	help
-+	  Support for the Marvell Dove SoC 88AP510
-+
-+config ARCH_KIRKWOOD_CHOICE
-+	bool "Marvell Kirkwood"
-+	select ARCH_KIRKWOOD
-+	help
-+	  Support for the following Marvell Kirkwood series SoCs:
-+	  88F6180, 88F6192 and 88F6281.
-+
-+config ARCH_LPC32XX_CHOICE
-+	bool "NXP LPC32XX"
-+	select ARCH_LPC32XX
-+	help
-+	  Support for the NXP LPC32XX family of processors
-+
-+config ARCH_MV78XX0_CHOICE
-+	bool "Marvell MV78xx0"
-+	select ARCH_MV78XX0
-+	help
-+	  Support for the following Marvell MV78xx0 series SoCs:
-+	  MV781x0, MV782x0.
-+
-+config ARCH_ORION5X_CHOICE
-+	bool "Marvell Orion"
-+	depends on MMU
-+	select ARCH_ORION5X
-+	help
-+	  Support for the following Marvell Orion 5x series SoCs:
-+	  Orion-1 (5181), Orion-VoIP (5181L), Orion-NAS (5182),
-+	  Orion-2 (5281), Orion-1-90 (6183).
-+
-+config ARCH_MMP_CHOICE
-+	bool "Marvell PXA168/910/MMP2"
-+	depends on MMU
-+	select ARCH_MMP
-+	help
-+	  Support for Marvell's PXA168/PXA910(MMP) and MMP2 processor line.
-+
-+config ARCH_KS8695_CHOICE
-+	bool "Micrel/Kendin KS8695"
-+	select ARCH_KS8695
-+	help
-+	  Support for Micrel/Kendin KS8695 "Centaur" (ARM922T) based
-+	  System-on-Chip devices.
-+
-+config ARCH_W90X900_CHOICE
-+	bool "Nuvoton W90X900 CPU"
-+	select ARCH_W90X900
-+	help
-+	  Support for Nuvoton (Winbond logic dept.) ARM9 processor,
-+	  At present, the w90x900 has been renamed nuc900, regarding
-+	  the ARM series product line, you can login the following
-+	  link address to know more.
-+
-+	  <http://www.nuvoton.com/hq/enu/ProductAndSales/ProductLines/
-+		ConsumerElectronicsIC/ARMMicrocontroller/ARMMicrocontroller>
-+
-+config ARCH_TEGRA_CHOICE
-+	bool "NVIDIA Tegra"
-+	select ARCH_TEGRA
-+	help
-+	  This enables support for NVIDIA Tegra based systems (Tegra APX,
-+	  Tegra 6xx and Tegra 2 series).
-+
-+config ARCH_PICOXCELL_CHOICE
-+	bool "Picochip picoXcell"
-+	select ARCH_PICOXCELL
-+	help
-+	  This enables support for systems based on the Picochip picoXcell
-+	  family of Femtocell devices.  The picoxcell support requires device tree
-+	  for all boards.
-+
-+config ARCH_PNX4008_CHOICE
-+	bool "Philips Nexperia PNX4008 Mobile"
-+	select ARCH_PNX4008
-+	help
-+	  This enables support for Philips PNX4008 mobile platform.
-+
-+config ARCH_PXA_CHOICE
-+	bool "PXA2xx/PXA3xx-based"
-+	depends on MMU
-+	select ARCH_PXA
-+	help
-+	  Support for Intel/Marvell's PXA2xx/PXA3xx processor line.
-+
-+config ARCH_MSM_CHOICE
-+	bool "Qualcomm MSM"
-+	select ARCH_MSM
-+	help
-+	  Support for Qualcomm MSM/QSD based systems.  This runs on the
-+	  apps processor of the MSM/QSD and depends on a shared memory
-+	  interface to the modem processor which runs the baseband
-+	  stack and controls some vital subsystems
-+	  (clock and power control, etc).
-+
-+config ARCH_SHMOBILE_CHOICE
-+	bool "Renesas SH-Mobile / R-Mobile"
-+	select ARCH_SHMOBILE
-+	help
-+	  Support for Renesas's SH-Mobile and R-Mobile ARM platforms.
-+
-+config ARCH_RPC_CHOICE
-+	bool "RiscPC"
-+	select ARCH_RPC
-+	help
-+	  On the Acorn Risc-PC, Linux can support the internal IDE disk and
-+	  CD-ROM interface, serial and parallel port, and the floppy drive.
-+
-+config ARCH_SA1100_CHOICE
-+	bool "SA1100-based"
-+	select ARCH_SA1100
-+	help
-+	  Support for StrongARM 11x0 based boards.
-+
-+config ARCH_S3C24XX_CHOICE
-+	bool "Samsung S3C24XX SoCs"
-+	select ARCH_S3C24XX
-+	help
-+	  Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442, S3C2443
-+	  and S3C2450 SoCs based systems, such as the Simtec Electronics BAST
-+	  (<http://www.simtec.co.uk/products/EB110ITX/>), the IPAQ 1940 or the
-+	  Samsung SMDK2410 development board (and derivatives).
-+
-+config ARCH_S3C64XX_CHOICE
-+	bool "Samsung S3C64XX"
-+	select ARCH_S3C64XX
-+	help
-+	  Samsung S3C64XX series based systems
-+
-+config ARCH_S5P64X0_CHOICE
-+	bool "Samsung S5P6440 S5P6450"
-+	select ARCH_S5P64X0
-+	help
-+	  Samsung S5P64X0 CPU based systems, such as the Samsung SMDK6440,
-+	  SMDK6450.
-+
-+config ARCH_S5PC100_CHOICE
-+	bool "Samsung S5PC100"
-+	select ARCH_S5PC100
-+	help
-+	  Samsung S5PC100 series based systems
-+
-+config ARCH_S5PV210_CHOICE
-+	bool "Samsung S5PV210/S5PC110"
-+	select ARCH_S5PV210
-+	help
-+	  Samsung S5PV210/S5PC110 series based systems
-+
-+config ARCH_EXYNOS_CHOICE
-+	bool "SAMSUNG EXYNOS"
-+	select ARCH_EXYNOS
-+	help
-+	  Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
-+
-+config ARCH_SHARK_CHOICE
-+	bool "Shark"
-+	select ARCH_SHARK
-+	help
-+	  Support for the StrongARM based Digital DNARD machine, also known
-+	  as "Shark" (<http://www.shark-linux.de/shark.html>).
-+
-+config ARCH_U300_CHOICE
-+	bool "ST-Ericsson U300 Series"
-+	depends on MMU
-+	select ARCH_U300
-+	help
-+	  Support for ST-Ericsson U300 series mobile platforms.
-+
-+config ARCH_U8500_CHOICE
-+	bool "ST-Ericsson U8500 Series"
-+	depends on MMU
-+	select ARCH_U8500
-+	help
-+	  Support for ST-Ericsson's Ux500 architecture
-+
-+config ARCH_NOMADIK_CHOICE
-+	bool "STMicroelectronics Nomadik"
-+	select ARCH_NOMADIK
-+	help
-+	  Support for the Nomadik platform by ST-Ericsson
-+
-+config ARCH_DAVINCI_CHOICE
-+	bool "TI DaVinci"
-+	select ARCH_DAVINCI
-+	help
-+	  Support for TI's DaVinci platform.
-+
-+config ARCH_OMAP_CHOICE
-+	bool "TI OMAP"
-+	depends on MMU
-+	select ARCH_OMAP
-+	help
-+	  Support for TI's OMAP platform (OMAP1/2/3/4).
-+
-+config PLAT_SPEAR_CHOICE
-+	bool "ST SPEAr"
-+	select PLAT_SPEAR
-+	help
-+	  Support for ST's SPEAr platform (SPEAr3xx, SPEAr6xx and SPEAr13xx).
-+
-+config ARCH_VT8500_CHOICE
-+	bool "VIA/WonderMedia 85xx"
-+	select ARCH_VT8500
-+	help
-+	  Support for VIA/WonderMedia VT8500/WM85xx System-on-Chip.
-+
-+config ARCH_ZYNQ_CHOICE
-+	bool "Xilinx Zynq ARM Cortex A9 Platform"
-+	select ARCH_ZYNQ
-+	help
-+	  Support for Xilinx Zynq ARM Cortex A9 Platform
-+endchoice
-+
-+#
-+# This is sorted alphabetically by mach-* pathname.  However, plat-*
-+# Kconfigs may be included either alphabetically (according to the
-+# plat- suffix) or along side the corresponding mach-* source.
-+#
-+source "arch/arm/mach-mvebu/Kconfig"
-+
-+source "arch/arm/mach-at91/Kconfig"
-+
-+source "arch/arm/mach-bcmring/Kconfig"
-+
-+source "arch/arm/mach-clps711x/Kconfig"
-+
-+source "arch/arm/mach-cns3xxx/Kconfig"
-+
-+source "arch/arm/mach-davinci/Kconfig"
-+
-+source "arch/arm/mach-dove/Kconfig"
-+
-+source "arch/arm/mach-ebsa110/Kconfig"
-+
-+source "arch/arm/mach-ep93xx/Kconfig"
-+
-+source "arch/arm/mach-footbridge/Kconfig"
-+
-+source "arch/arm/mach-gemini/Kconfig"
-+
-+source "arch/arm/mach-h720x/Kconfig"
-+
-+source "arch/arm/mach-highbank/Kconfig"
-+
-+source "arch/arm/mach-integrator/Kconfig"
-+
-+source "arch/arm/mach-iop32x/Kconfig"
-+
-+source "arch/arm/mach-iop33x/Kconfig"
-+
-+source "arch/arm/mach-iop13xx/Kconfig"
-+
-+source "arch/arm/mach-ixp4xx/Kconfig"
-+
-+source "arch/arm/mach-kirkwood/Kconfig"
-+
-+source "arch/arm/mach-ks8695/Kconfig"
-+
-+source "arch/arm/mach-lpc32xx/Kconfig"
-+
-+source "arch/arm/mach-msm/Kconfig"
-+
-+source "arch/arm/mach-mv78xx0/Kconfig"
-+
-+source "arch/arm/plat-mxc/Kconfig"
-+
-+source "arch/arm/mach-mxs/Kconfig"
-+
-+source "arch/arm/mach-netx/Kconfig"
-+
-+source "arch/arm/mach-nomadik/Kconfig"
-+source "arch/arm/plat-nomadik/Kconfig"
-+
-+source "arch/arm/plat-omap/Kconfig"
-+
-+source "arch/arm/mach-omap1/Kconfig"
-+
-+source "arch/arm/mach-omap2/Kconfig"
-+
-+source "arch/arm/mach-orion5x/Kconfig"
-+
-+source "arch/arm/mach-picoxcell/Kconfig"
-+
-+source "arch/arm/mach-pnx4008/Kconfig"
-+
-+source "arch/arm/mach-pxa/Kconfig"
-+source "arch/arm/plat-pxa/Kconfig"
-+
-+source "arch/arm/mach-mmp/Kconfig"
-+
-+source "arch/arm/mach-realview/Kconfig"
-+
-+source "arch/arm/mach-rpc/Kconfig"
-+
-+source "arch/arm/mach-sa1100/Kconfig"
-+
-+source "arch/arm/plat-samsung/Kconfig"
-+source "arch/arm/plat-s3c24xx/Kconfig"
-+
-+source "arch/arm/mach-shark/Kconfig"
-+
-+source "arch/arm/mach-socfpga/Kconfig"
-+
-+source "arch/arm/plat-spear/Kconfig"
-+
-+source "arch/arm/mach-s3c24xx/Kconfig"
-+if ARCH_S3C24XX
-+source "arch/arm/mach-s3c2412/Kconfig"
-+source "arch/arm/mach-s3c2440/Kconfig"
 +endif
 +
-+source "arch/arm/mach-s3c64xx/Kconfig"
++if ARCH_MULTIPLATFORM
++comment "SoC family selection"
++endif
 +
-+source "arch/arm/mach-s5p64x0/Kconfig"
+ #
+ # This is sorted alphabetically by mach-* pathname.  However, plat-*
+ # Kconfigs may be included either alphabetically (according to the
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 30eae87..fe6e05e 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -135,84 +135,84 @@ textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
+ 
+ # Machine directory name.  This list is sorted alphanumerically
+ # by CONFIG_* macro name.
+-machine-$(CONFIG_ARCH_AT91)		:= at91
+-machine-$(CONFIG_ARCH_BCMRING)		:= bcmring
+-machine-$(CONFIG_ARCH_CLPS711X)		:= clps711x
+-machine-$(CONFIG_ARCH_CNS3XXX)		:= cns3xxx
+-machine-$(CONFIG_ARCH_DAVINCI)		:= davinci
+-machine-$(CONFIG_ARCH_DOVE)		:= dove
+-machine-$(CONFIG_ARCH_EBSA110)		:= ebsa110
+-machine-$(CONFIG_ARCH_EP93XX)		:= ep93xx
+-machine-$(CONFIG_ARCH_GEMINI)		:= gemini
+-machine-$(CONFIG_ARCH_H720X)		:= h720x
+-machine-$(CONFIG_ARCH_HIGHBANK)		:= highbank
+-machine-$(CONFIG_ARCH_INTEGRATOR)	:= integrator
+-machine-$(CONFIG_ARCH_IOP13XX)		:= iop13xx
+-machine-$(CONFIG_ARCH_IOP32X)		:= iop32x
+-machine-$(CONFIG_ARCH_IOP33X)		:= iop33x
+-machine-$(CONFIG_ARCH_IXP4XX)		:= ixp4xx
+-machine-$(CONFIG_ARCH_KIRKWOOD)		:= kirkwood
+-machine-$(CONFIG_ARCH_KS8695)		:= ks8695
+-machine-$(CONFIG_ARCH_LPC32XX)		:= lpc32xx
+-machine-$(CONFIG_ARCH_MMP)		:= mmp
+-machine-$(CONFIG_ARCH_MSM)		:= msm
+-machine-$(CONFIG_ARCH_MV78XX0)		:= mv78xx0
+-machine-$(CONFIG_ARCH_IMX_V4_V5)	:= imx
+-machine-$(CONFIG_ARCH_IMX_V6_V7)	:= imx
+-machine-$(CONFIG_ARCH_MXS)		:= mxs
+-machine-$(CONFIG_ARCH_MVEBU)		:= mvebu
+-machine-$(CONFIG_ARCH_NETX)		:= netx
+-machine-$(CONFIG_ARCH_NOMADIK)		:= nomadik
+-machine-$(CONFIG_ARCH_OMAP1)		:= omap1
+-machine-$(CONFIG_ARCH_OMAP2PLUS)	:= omap2
+-machine-$(CONFIG_ARCH_ORION5X)		:= orion5x
+-machine-$(CONFIG_ARCH_PICOXCELL)	:= picoxcell
+-machine-$(CONFIG_ARCH_PNX4008)		:= pnx4008
+-machine-$(CONFIG_ARCH_PRIMA2)		:= prima2
+-machine-$(CONFIG_ARCH_PXA)		:= pxa
+-machine-$(CONFIG_ARCH_REALVIEW)		:= realview
+-machine-$(CONFIG_ARCH_RPC)		:= rpc
+-machine-$(CONFIG_ARCH_S3C24XX)		:= s3c24xx s3c2412 s3c2440
+-machine-$(CONFIG_ARCH_S3C64XX)		:= s3c64xx
+-machine-$(CONFIG_ARCH_S5P64X0)		:= s5p64x0
+-machine-$(CONFIG_ARCH_S5PC100)		:= s5pc100
+-machine-$(CONFIG_ARCH_S5PV210)		:= s5pv210
+-machine-$(CONFIG_ARCH_EXYNOS4)		:= exynos
+-machine-$(CONFIG_ARCH_EXYNOS5)		:= exynos
+-machine-$(CONFIG_ARCH_SA1100)		:= sa1100
+-machine-$(CONFIG_ARCH_SHARK)		:= shark
+-machine-$(CONFIG_ARCH_SHMOBILE) 	:= shmobile
+-machine-$(CONFIG_ARCH_TEGRA)		:= tegra
+-machine-$(CONFIG_ARCH_U300)		:= u300
+-machine-$(CONFIG_ARCH_U8500)		:= ux500
+-machine-$(CONFIG_ARCH_VERSATILE)	:= versatile
+-machine-$(CONFIG_ARCH_VEXPRESS)		:= vexpress
+-machine-$(CONFIG_ARCH_VT8500)		:= vt8500
+-machine-$(CONFIG_ARCH_W90X900)		:= w90x900
+-machine-$(CONFIG_FOOTBRIDGE)		:= footbridge
+-machine-$(CONFIG_ARCH_SOCFPGA)		:= socfpga
+-machine-$(CONFIG_MACH_SPEAR1310)	:= spear13xx
+-machine-$(CONFIG_MACH_SPEAR1340)	:= spear13xx
+-machine-$(CONFIG_MACH_SPEAR300)		:= spear3xx
+-machine-$(CONFIG_MACH_SPEAR310)		:= spear3xx
+-machine-$(CONFIG_MACH_SPEAR320)		:= spear3xx
+-machine-$(CONFIG_MACH_SPEAR600)		:= spear6xx
+-machine-$(CONFIG_ARCH_ZYNQ)		:= zynq
++machine-$(CONFIG_ARCH_AT91)		+= at91
++machine-$(CONFIG_ARCH_BCMRING)		+= bcmring
++machine-$(CONFIG_ARCH_CLPS711X)		+= clps711x
++machine-$(CONFIG_ARCH_CNS3XXX)		+= cns3xxx
++machine-$(CONFIG_ARCH_DAVINCI)		+= davinci
++machine-$(CONFIG_ARCH_DOVE)		+= dove
++machine-$(CONFIG_ARCH_EBSA110)		+= ebsa110
++machine-$(CONFIG_ARCH_EP93XX)		+= ep93xx
++machine-$(CONFIG_ARCH_GEMINI)		+= gemini
++machine-$(CONFIG_ARCH_H720X)		+= h720x
++machine-$(CONFIG_ARCH_HIGHBANK)		+= highbank
++machine-$(CONFIG_ARCH_INTEGRATOR)	+= integrator
++machine-$(CONFIG_ARCH_IOP13XX)		+= iop13xx
++machine-$(CONFIG_ARCH_IOP32X)		+= iop32x
++machine-$(CONFIG_ARCH_IOP33X)		+= iop33x
++machine-$(CONFIG_ARCH_IXP4XX)		+= ixp4xx
++machine-$(CONFIG_ARCH_KIRKWOOD)		+= kirkwood
++machine-$(CONFIG_ARCH_KS8695)		+= ks8695
++machine-$(CONFIG_ARCH_LPC32XX)		+= lpc32xx
++machine-$(CONFIG_ARCH_MMP)		+= mmp
++machine-$(CONFIG_ARCH_MSM)		+= msm
++machine-$(CONFIG_ARCH_MV78XX0)		+= mv78xx0
++machine-$(CONFIG_ARCH_IMX_V4_V5)	+= imx
++machine-$(CONFIG_ARCH_IMX_V6_V7)	+= imx
++machine-$(CONFIG_ARCH_MXS)		+= mxs
++machine-$(CONFIG_ARCH_MVEBU)		+= mvebu
++machine-$(CONFIG_ARCH_NETX)		+= netx
++machine-$(CONFIG_ARCH_NOMADIK)		+= nomadik
++machine-$(CONFIG_ARCH_OMAP1)		+= omap1
++machine-$(CONFIG_ARCH_OMAP2PLUS)	+= omap2
++machine-$(CONFIG_ARCH_ORION5X)		+= orion5x
++machine-$(CONFIG_ARCH_PICOXCELL)	+= picoxcell
++machine-$(CONFIG_ARCH_PNX4008)		+= pnx4008
++machine-$(CONFIG_ARCH_PRIMA2)		+= prima2
++machine-$(CONFIG_ARCH_PXA)		+= pxa
++machine-$(CONFIG_ARCH_REALVIEW)		+= realview
++machine-$(CONFIG_ARCH_RPC)		+= rpc
++machine-$(CONFIG_ARCH_S3C24XX)		+= s3c24xx s3c2412 s3c2440
++machine-$(CONFIG_ARCH_S3C64XX)		+= s3c64xx
++machine-$(CONFIG_ARCH_S5P64X0)		+= s5p64x0
++machine-$(CONFIG_ARCH_S5PC100)		+= s5pc100
++machine-$(CONFIG_ARCH_S5PV210)		+= s5pv210
++machine-$(CONFIG_ARCH_EXYNOS4)		+= exynos
++machine-$(CONFIG_ARCH_EXYNOS5)		+= exynos
++machine-$(CONFIG_ARCH_SA1100)		+= sa1100
++machine-$(CONFIG_ARCH_SHARK)		+= shark
++machine-$(CONFIG_ARCH_SHMOBILE) 	+= shmobile
++machine-$(CONFIG_ARCH_TEGRA)		+= tegra
++machine-$(CONFIG_ARCH_U300)		+= u300
++machine-$(CONFIG_ARCH_U8500)		+= ux500
++machine-$(CONFIG_ARCH_VERSATILE)	+= versatile
++machine-$(CONFIG_ARCH_VEXPRESS)		+= vexpress
++machine-$(CONFIG_ARCH_VT8500)		+= vt8500
++machine-$(CONFIG_ARCH_W90X900)		+= w90x900
++machine-$(CONFIG_FOOTBRIDGE)		+= footbridge
++machine-$(CONFIG_ARCH_SOCFPGA)		+= socfpga
++machine-$(CONFIG_MACH_SPEAR1310)	+= spear13xx
++machine-$(CONFIG_MACH_SPEAR1340)	+= spear13xx
++machine-$(CONFIG_MACH_SPEAR300)		+= spear3xx
++machine-$(CONFIG_MACH_SPEAR310)		+= spear3xx
++machine-$(CONFIG_MACH_SPEAR320)		+= spear3xx
++machine-$(CONFIG_MACH_SPEAR600)		+= spear6xx
++machine-$(CONFIG_ARCH_ZYNQ)		+= zynq
+ 
+ # Platform directory name.  This list is sorted alphanumerically
+ # by CONFIG_* macro name.
+-plat-$(CONFIG_ARCH_MXC)		:= mxc
+-plat-$(CONFIG_ARCH_OMAP)	:= omap
+-plat-$(CONFIG_ARCH_S3C64XX)	:= samsung
+-plat-$(CONFIG_ARCH_ZYNQ)	:= versatile
+-plat-$(CONFIG_PLAT_IOP)		:= iop
+-plat-$(CONFIG_PLAT_NOMADIK)	:= nomadik
+-plat-$(CONFIG_PLAT_ORION)	:= orion
+-plat-$(CONFIG_PLAT_PXA)		:= pxa
+-plat-$(CONFIG_PLAT_S3C24XX)	:= s3c24xx samsung
+-plat-$(CONFIG_PLAT_S5P)		:= samsung
+-plat-$(CONFIG_PLAT_SPEAR)	:= spear
+-plat-$(CONFIG_PLAT_VERSATILE)	:= versatile
++plat-$(CONFIG_ARCH_MXC)		+= mxc
++plat-$(CONFIG_ARCH_OMAP)	+= omap
++plat-$(CONFIG_ARCH_S3C64XX)	+= samsung
++plat-$(CONFIG_ARCH_ZYNQ)	+= versatile
++plat-$(CONFIG_PLAT_IOP)		+= iop
++plat-$(CONFIG_PLAT_NOMADIK)	+= nomadik
++plat-$(CONFIG_PLAT_ORION)	+= orion
++plat-$(CONFIG_PLAT_PXA)		+= pxa
++plat-$(CONFIG_PLAT_S3C24XX)	+= s3c24xx samsung
++plat-$(CONFIG_PLAT_S5P)		+= samsung
++plat-$(CONFIG_PLAT_SPEAR)	+= spear
++plat-$(CONFIG_PLAT_VERSATILE)	+= versatile
+ 
+ ifeq ($(CONFIG_ARCH_EBSA110),y)
+ # This is what happens if you forget the IOCS16 line.
+@@ -230,15 +230,20 @@ MACHINE  := arch/arm/mach-$(word 1,$(machine-y))/
+ else
+ MACHINE  :=
+ endif
++ifeq ($(CONFIG_ARCH_MULTIPLATFORM),y)
++MACHINE  :=
++endif
+ 
+ machdirs := $(patsubst %,arch/arm/mach-%/,$(machine-y))
+ platdirs := $(patsubst %,arch/arm/plat-%/,$(plat-y))
+ 
++ifneq ($(CONFIG_ARCH_MULTIPLATFORM),y)
+ ifeq ($(KBUILD_SRC),)
+ KBUILD_CPPFLAGS += $(patsubst %,-I%include,$(machdirs) $(platdirs))
+ else
+ KBUILD_CPPFLAGS += $(patsubst %,-I$(srctree)/%include,$(machdirs) $(platdirs))
+ endif
++endif
+ 
+ export	TEXT_OFFSET GZFLAGS MMUEXT
+ 
+diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+index 8e2a8fc..df89983 100644
+--- a/arch/arm/boot/compressed/misc.c
++++ b/arch/arm/boot/compressed/misc.c
+@@ -25,7 +25,13 @@ unsigned int __machine_arch_type;
+ static void putstr(const char *ptr);
+ extern void error(char *x);
+ 
++#ifdef CONFIG_ARCH_MULTIPLATFORM
++static inline void putc(int c) {}
++static inline void flush(void) {}
++static inline void arch_decomp_setup(void) {}
++#else
+ #include <mach/uncompress.h>
++#endif
+ 
+ #ifdef CONFIG_DEBUG_ICEDCC
+ 
+diff --git a/arch/arm/include/asm/timex.h b/arch/arm/include/asm/timex.h
+index ce11944..963342a 100644
+--- a/arch/arm/include/asm/timex.h
++++ b/arch/arm/include/asm/timex.h
+@@ -13,7 +13,11 @@
+ #define _ASMARM_TIMEX_H
+ 
+ #include <asm/arch_timer.h>
++#ifdef CONFIG_ARCH_MULTIPLATFORM
++#define CLOCK_TICK_RATE 1000000
++#else
+ #include <mach/timex.h>
++#endif
+ 
+ typedef unsigned long cycles_t;
+ 
+diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
+index d4f1b23..0e1d0a4 100644
+--- a/arch/arm/mach-highbank/Kconfig
++++ b/arch/arm/mach-highbank/Kconfig
+@@ -1,5 +1,5 @@
+ config ARCH_HIGHBANK
+-	bool
++	bool "Calxeda ECX-1000 (Highbank)" if ARCH_MULTI_V7
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_AMBA
+ 	select ARM_GIC
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 1ed7d15..7b27035 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -1,5 +1,5 @@
+ config ARCH_MVEBU
+-	bool
++	bool "Marvell SOCs with Device Tree support" if ARCH_MULTI_V7
+ 	select CLKSRC_MMIO
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index e61d2b8..6ea8998 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -1,2 +1,4 @@
++ccflags-$(ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
 +
-+source "arch/arm/mach-s5pc100/Kconfig"
+ obj-y += system-controller.o
+ obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o
+diff --git a/arch/arm/mach-picoxcell/Kconfig b/arch/arm/mach-picoxcell/Kconfig
+index b0fd5a1..868796f 100644
+--- a/arch/arm/mach-picoxcell/Kconfig
++++ b/arch/arm/mach-picoxcell/Kconfig
+@@ -1,5 +1,5 @@
+ config ARCH_PICOXCELL
+-	bool
++	bool "Picochip PicoXcell" if ARCH_MULTI_V6
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_PATCH_PHYS_VIRT
+ 	select ARM_VIC
+diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
+index 51b04ba..803a328 100644
+--- a/arch/arm/mach-socfpga/Kconfig
++++ b/arch/arm/mach-socfpga/Kconfig
+@@ -1,5 +1,5 @@
+ config ARCH_SOCFPGA
+-	bool
++	bool "Altera SOCFPGA family" if ARCH_MULTI_V7
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_AMBA
+ 	select ARM_GIC
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 8ce13a7..498ea15 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -1,5 +1,5 @@
+ config ARCH_VEXPRESS
+-	bool
++	bool "ARM Ltd. Versatile Express family" if ARCH_MULTI_V7
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_AMBA
+ 	select ARM_TIMER_SP804
+diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
+index 90551b9..42703e8 100644
+--- a/arch/arm/mach-vexpress/Makefile
++++ b/arch/arm/mach-vexpress/Makefile
+@@ -1,6 +1,8 @@
+ #
+ # Makefile for the linux kernel.
+ #
++ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
++	-I$(srctree)/arch/arm/plat-versatile/include
+ 
+ obj-y					:= v2m.o
+ obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)	+= ct-ca9x4.o
+diff --git a/arch/arm/plat-versatile/Makefile b/arch/arm/plat-versatile/Makefile
+index 272769a8..74cfd94 100644
+--- a/arch/arm/plat-versatile/Makefile
++++ b/arch/arm/plat-versatile/Makefile
+@@ -1,3 +1,5 @@
++ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
 +
-+source "arch/arm/mach-s5pv210/Kconfig"
-+
-+source "arch/arm/mach-exynos/Kconfig"
-+
-+source "arch/arm/mach-shmobile/Kconfig"
-+
-+source "arch/arm/mach-tegra/Kconfig"
-+
-+source "arch/arm/mach-u300/Kconfig"
-+
-+source "arch/arm/mach-ux500/Kconfig"
-+
-+source "arch/arm/mach-versatile/Kconfig"
-+
-+source "arch/arm/mach-vexpress/Kconfig"
-+source "arch/arm/plat-versatile/Kconfig"
-+
-+source "arch/arm/mach-vt8500/Kconfig"
-+
-+source "arch/arm/mach-w90x900/Kconfig"
-+
-+source "arch/arm/mach-zynq/Kconfig"
-+
-+# Definitions to make life easier
-+config ARCH_ACORN
-+	bool
-+
-+config PLAT_IOP
-+	bool
-+	select GENERIC_CLOCKEVENTS
-+
-+config PLAT_ORION
-+	bool
-+	select CLKSRC_MMIO
-+	select GENERIC_IRQ_CHIP
-+	select IRQ_DOMAIN
-+	select COMMON_CLK
-+
-+config PLAT_PXA
-+	bool
-+
-+config PLAT_VERSATILE
-+	bool
-+
+ obj-$(CONFIG_PLAT_VERSATILE_CLOCK) += clock.o
+ obj-$(CONFIG_PLAT_VERSATILE_CLCD) += clcd.o
+ obj-$(CONFIG_PLAT_VERSATILE_FPGA_IRQ) += fpga-irq.o
 -- 
 1.7.9.5
