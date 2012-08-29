@@ -1,74 +1,38 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 29 Aug 2012 18:02:18 +0200 (CEST)
-Subject: [PATCH] [media] atmel_isi: allocate memory to store the isi
- platform data.
-In-Reply-To: <503E323A.8060409@samsung.com>
-References: <1346235093-28613-1-git-send-email-josh.wu@atmel.com>
- <503E323A.8060409@samsung.com>
-Message-ID: <alpine.DEB.2.00.1208291755220.3095@axis700.grange>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 29 Aug 2012 13:14:51 -0400
+Subject: [RFC PATCH] ARM: initial DTS support for km_kirkwood
+In-Reply-To: <503DCFB7.4080804@keymile.com>
+References: <1346154976-16916-1-git-send-email-valentin.longchamp@keymile.com>
+ <20120828172344.GE19437@titan.lakedaemon.net>
+ <503DCFB7.4080804@keymile.com>
+Message-ID: <20120829171451.GP19437@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Aug 2012, Sylwester Nawrocki wrote:
-
-> Hi,
-> 
-> On 08/29/2012 12:11 PM, Josh Wu wrote:
-> > This patch fix the bug: ISI driver's platform data became invalid 
-> > when isi platform data's attribution is __initdata.
+On Wed, Aug 29, 2012 at 10:15:51AM +0200, Valentin Longchamp wrote:
+> On 08/28/2012 07:23 PM, Jason Cooper wrote:
+> > On Tue, Aug 28, 2012 at 01:56:16PM +0200, Valentin Longchamp wrote:
+> >> +	ocp at f1000000 {
+> >> +		serial at 12000 {
+> >> +			clock-frequency = <200000000>;
+> >> +			status = "ok";
+> >> +		};
+> >> +
+> >> +		nand at 3000000 {
+> >> +			status = "ok";
+> >> +			chip-delay = <25>;
+> >> +		};
 > > 
-> > If the isi platform data is passed as __initdata. Then we need store
-> > it in driver allocated memory. otherwise when we use it out of the 
-> > probe() function, then the isi platform data is invalid.
-> > 
-> > Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> > ---
-> >  drivers/media/platform/soc_camera/atmel-isi.c |   12 +++++++++++-
-> >  1 file changed, 11 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-> > index ec3f6a0..dc0fdec 100644
-> > --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> > +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-> > @@ -926,6 +926,7 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
-> >  	clk_put(isi->mck);
-> >  	clk_unprepare(isi->pclk);
-> >  	clk_put(isi->pclk);
-> > +	kfree(isi->pdata);
-> >  	kfree(isi);
-> >  
-> >  	return 0;
-> > @@ -968,8 +969,15 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
-> >  		goto err_alloc_isi;
-> >  	}
-> >  
-> > +	isi->pdata = kzalloc(sizeof(struct isi_platform_data), GFP_KERNEL);
-> > +	if (!isi->pdata) {
-> > +		ret = -ENOMEM;
-> > +		dev_err(&pdev->dev, "Can't allocate isi platform data!\n");
-> > +		goto err_alloc_isi_pdata;
-> > +	}
-> > +	memcpy(isi->pdata, pdata, sizeof(struct isi_platform_data));
-> > +
+> > Is there a partition layout for this board?
 > 
-> Why not just embed struct isi_platform_data in struct atmel_isi and drop this
-> another kzalloc() ?
-> Then you could simply do isi->pdata = *pdata.
-> 
-> Also, is this going to work when this driver is build and as a module
-> and its loading is deferred past system booting ? At that time the driver's
-> platform data may be well discarded.
+> Well, there is one: one big UBI partition on the whole NAND chip (we then create
+> UBI volumes when building the initial system and dynamically create additional
+> ones when neeeded). But this UBI partition gets detected perfecly well without
+> this partition layout so I left it out.
 
-Right, it will be gone, I think.
+ok, just wanted to make sure it wasn't left out.  I look forward to v2
+with Andrew's suggestions.
 
-> You may wan't to duplicate it on the
-> running boards in board code with kmemdup() or something.
+thx,
 
-How about removing __initdata from board code?
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Jason.
