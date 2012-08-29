@@ -1,100 +1,90 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 29 Aug 2012 16:31:18 +0530
-Subject: [PATCH v3 1/4] ARM: EXYNOS: Add set_irq_affinity function for
- combiner_irq
-In-Reply-To: <1346202897-27306-2-git-send-email-chanho61.park@samsung.com>
-References: <1346202897-27306-1-git-send-email-chanho61.park@samsung.com>
- <1346202897-27306-2-git-send-email-chanho61.park@samsung.com>
-Message-ID: <CAJuYYwRab+BvZhE+vcUGtsrfpxHW_LfhtHGYj3W6eX6TjEFbvA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 29 Aug 2012 13:01:37 +0200
+Subject: [PATCH v6 1/3] USB: chipidea: add imx usbmisc support
+In-Reply-To: <87ehmqj925.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1346137109-32247-1-git-send-email-richard.zhao@freescale.com>
+ <1346137109-32247-2-git-send-email-richard.zhao@freescale.com>
+ <871uiqkuhb.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120829081020.GX26594@pengutronix.de>
+ <87ehmqj925.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20120829110137.GA26594@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 August 2012 06:44, Chanho Park <chanho61.park@samsung.com> wrote:
-> This patch adds set_irq_affinity function for combiner_irq. We need this
-> function to enable a arm-pmu because the pmu of exynos has combined type irqs.
->
-> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/common.c |   30 +++++++++++++++++++++++++-----
->  1 file changed, 25 insertions(+), 5 deletions(-)
+On Wed, Aug 29, 2012 at 01:18:10PM +0300, Alexander Shishkin wrote:
+> Sascha Hauer <s.hauer@pengutronix.de> writes:
+> 
+> > On Wed, Aug 29, 2012 at 10:50:08AM +0300, Alexander Shishkin wrote:
+> >> Richard Zhao <richard.zhao@freescale.com> writes:
+> >> 
+> >> > i.MX usb controllers shares non-core registers, which may include
+> >> > SoC specific controls. We take it as a usbmisc device and usbmisc
+> >> > driver set operations needed by ci13xxx_imx driver.
+> >> >
+> >> > For example, Sabrelite board has bad over-current design, we can
+> >> > usbmisc to disable over-current detect.
+> >> 
+> >> Why does this have to be part of the usb driver instead of SoC specific
+> >> code? It looks like you've created a whole new device/driver
+> >> infrastructure just to disable overcurrent for a specific board.
+> >
+> > Richards code indeed only handles overcurrent for a specific board, but
+> > there are more bits to configure in the longer run: power pin
+> > polarities, ULPI/serial mode select and some more.
+> 
+> Sounds to me like these things that should be taken care of by the phy
+> driver, which will likely be simpler from both driver's and devicetree's
+> perspective.
 
-Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
+Most i.MX SoCs have three instances of the chipidea core. These cores
+share a single register space for controlling the mentioned bits (the
+usbmisc register space). The usbmisc looks different on the different
+SoCs.
+Indeed they control some phy specific aspects, but the phy itself may
+also be an external ULPI or UTMI phy with a separate driver. So if we
+integrate the usbmisc into the phy wouldn't that mean that it has to
+be integrated into all possible phy drivers?
 
->
-> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-> index 4eb39cd..f194bbc 100644
-> --- a/arch/arm/mach-exynos/common.c
-> +++ b/arch/arm/mach-exynos/common.c
-> @@ -405,6 +405,7 @@ struct combiner_chip_data {
->         unsigned int irq_offset;
->         unsigned int irq_mask;
->         void __iomem *base;
-> +       unsigned int parent_irq;
->  };
->
->  static struct irq_domain *combiner_irq_domain;
-> @@ -461,10 +462,28 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
->         chained_irq_exit(chip, desc);
->  }
->
-> +#ifdef CONFIG_SMP
-> +static int combiner_set_affinity(struct irq_data *d,
-> +                                const struct cpumask *mask_val, bool force)
-> +{
-> +       struct combiner_chip_data *chip_data = irq_data_get_irq_chip_data(d);
-> +       struct irq_chip *chip = irq_get_chip(chip_data->parent_irq);
-> +       struct irq_data *data = irq_get_irq_data(chip_data->parent_irq);
-> +
-> +       if (chip && chip->irq_set_affinity)
-> +               return chip->irq_set_affinity(data, mask_val, force);
-> +       else
-> +               return -EINVAL;
-> +}
-> +#endif
-> +
->  static struct irq_chip combiner_chip = {
-> -       .name           = "COMBINER",
-> -       .irq_mask       = combiner_mask_irq,
-> -       .irq_unmask     = combiner_unmask_irq,
-> +       .name                   = "COMBINER",
-> +       .irq_mask               = combiner_mask_irq,
-> +       .irq_unmask             = combiner_unmask_irq,
-> +#ifdef CONFIG_SMP
-> +       .irq_set_affinity       = combiner_set_affinity,
-> +#endif
->  };
->
->  static void __init combiner_cascade_irq(unsigned int combiner_nr, unsigned int irq)
-> @@ -484,12 +503,13 @@ static void __init combiner_cascade_irq(unsigned int combiner_nr, unsigned int i
->  }
->
->  static void __init combiner_init_one(unsigned int combiner_nr,
-> -                                    void __iomem *base)
-> +                                    void __iomem *base, unsigned int irq)
->  {
->         combiner_data[combiner_nr].base = base;
->         combiner_data[combiner_nr].irq_offset = irq_find_mapping(
->                 combiner_irq_domain, combiner_nr * MAX_IRQ_IN_COMBINER);
->         combiner_data[combiner_nr].irq_mask = 0xff << ((combiner_nr % 4) << 3);
-> +       combiner_data[combiner_nr].parent_irq = irq;
->
->         /* Disable all interrupts */
->         __raw_writel(combiner_data[combiner_nr].irq_mask,
-> @@ -573,12 +593,12 @@ static void __init combiner_init(void __iomem *combiner_base,
->         }
->
->         for (i = 0; i < max_nr; i++) {
-> -               combiner_init_one(i, combiner_base + (i >> 2) * 0x10);
->                 irq = IRQ_SPI(i);
->  #ifdef CONFIG_OF
->                 if (np)
->                         irq = irq_of_parse_and_map(np, i);
->  #endif
-> +               combiner_init_one(i, combiner_base + (i >> 2) * 0x10, irq);
->                 combiner_cascade_irq(i, irq);
->         }
->  }
-> --
-> 1.7.9.5
->
+>From a devicetrees perspective it makes sense to integrate the flags
+into the chipidea nodes, because there is one node per chipidea core,
+but only one usbmisc unit for all ports on the SoC. So we can do a:
+
+	chipidea at ofs {
+		disable-overcurrent = <1>;
+	};
+
+instead of
+
+	usbmisc at ofs {
+		disable-overcurrent-port0 = <1>;
+		disable-overcurrent-port1 = <0>;
+		...
+	};
+
+> 
+> >
+> >> 
+> >> And the infrastructure boils down to a complex way of passing a callback
+> >> from imx driver to another imx driver, that only works if they are
+> >> probed in the right order. I don't see any point in doing it like this
+> >> other than inflating the device tree tables even further.
+> >> 
+> >> Why can't this be part of the SoC code like it is done, for example in
+> >> arch/arm/mach-omap2/control.c?
+> >
+> > The settings are board specific, so there must be some way to configure
+> > them in the devicetree.
+> 
+> But I'm sure there's a way to control board-specific settings/kludges
+> from devicetree?
+
+Hm, yes. That's what Richard does, right? I may be misunderstanding you
+here.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
