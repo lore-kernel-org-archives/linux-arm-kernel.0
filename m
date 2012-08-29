@@ -1,49 +1,53 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 29 Aug 2012 11:49:18 +0200
-Subject: [PATCH] USB: ohci-at91: fix PIO handling in relation with number of
- ports
-Message-ID: <1346233758-27009-1-git-send-email-nicolas.ferre@atmel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 29 Aug 2012 11:49:57 +0200
+Subject: [PATCH] ARM: tegra_defconfig: enable APB DMA support
+In-Reply-To: <503DDEA8.1000405@nvidia.com>
+References: <1346230800-3167-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <503DDEA8.1000405@nvidia.com>
+Message-ID: <20120829094957.GF28643@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the number of ports present on the SoC/board is not the maximum
-and that the platform data is not filled with all data, there is
-an easy way to mess the PIO setup for this interface.
-This quick fix addresses mis-configuration in USB host platform data
-that is common in at91 boards since commit 0ee6d1e (USB: ohci-at91:
-change maximum number of ports) that did not modified the associatd
-board files.
+On Wed, Aug 29, 2012 at 02:49:36PM +0530, Laxman Dewangan wrote:
+> On Wednesday 29 August 2012 02:30 PM, Uwe Kleine-K?nig wrote:
+> >Additionally DMADEVICES needs to be enabled as TEGRA20_APB_DMA depends
+> >on that.
+> >
+> >Signed-off-by: Uwe Kleine-K?nig<u.kleine-koenig@pengutronix.de>
+> >---
+> >  arch/arm/configs/tegra_defconfig |    2 ++
+> >  1 file changed, 2 insertions(+)
+> >
+> >diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+> >index db22453..0d6bb73 100644
+> >--- a/arch/arm/configs/tegra_defconfig
+> >+++ b/arch/arm/configs/tegra_defconfig
+> >@@ -145,6 +145,8 @@ CONFIG_MMC_SDHCI_TEGRA=y
+> >  CONFIG_RTC_CLASS=y
+> >  CONFIG_RTC_DRV_EM3027=y
+> >  CONFIG_RTC_DRV_TEGRA=y
+> >+CONFIG_DMADEVICES=y
+> >+CONFIG_TEGRA20_APB_DMA=y
+> >  CONFIG_STAGING=y
+> >  CONFIG_SENSORS_ISL29018=y
+> >  CONFIG_SENSORS_ISL29028=y
+> 
+> Hi Uwe,
+> Tegra team is working on to enable the new dma drivr which is
+> dmaengine based. We have dma legacy driver as of now in mach-tegra.
+> Some of the tests are failing with new dmadriver and so we are not
+> able to enable it.
+So it depends on what you wanna do with the defconfig. There are two
+purposes for them:
 
-Reported-by: Klaus Falkner <klaus.falkner@solectrix.de>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-usb at vger.kernel.org
-Cc: Stable <stable@vger.kernel.org> [3.4+]
----
- drivers/usb/host/ohci-at91.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ a) compile coverage
+ b) starting point for machine support
 
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index a665b3e..aaa8d2b 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -570,6 +570,16 @@ static int __devinit ohci_hcd_at91_drv_probe(struct platform_device *pdev)
- 
- 	if (pdata) {
- 		at91_for_each_port(i) {
-+			/*
-+			 * do not configure PIO if not in relation with
-+			 * real USB port on board
-+			 */
-+			if (i >= pdata->ports) {
-+				pdata->vbus_pin[i] = -EINVAL;
-+				pdata->overcurrent_pin[i] = -EINVAL;
-+				break;
-+			}
-+
- 			if (!gpio_is_valid(pdata->vbus_pin[i]))
- 				continue;
- 			gpio = pdata->vbus_pin[i];
+So it all depends on what you consider to be more important.
+
+Best regards
+Uwe
+
 -- 
-1.7.10
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
