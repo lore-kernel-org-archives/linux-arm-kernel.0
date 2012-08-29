@@ -1,71 +1,82 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 29 Aug 2012 22:34:05 +0100
-Subject: [PATCH v3 3/4] ARM: EXYNOS: Enable PMUs for exynos4
-In-Reply-To: <1346202897-27306-4-git-send-email-chanho61.park@samsung.com>
-References: <1346202897-27306-1-git-send-email-chanho61.park@samsung.com>
- <1346202897-27306-4-git-send-email-chanho61.park@samsung.com>
-Message-ID: <20120829213405.GC13868@mudshark.cambridge.arm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 29 Aug 2012 14:41:02 -0700
+Subject: [PATCH v2 1/4] [RFC] clk: new locking scheme for reentrancy
+In-Reply-To: <CADTbHxob_pkYN_73AD4YL_Ki5i40iLTJuN0rPuFzYcyyhfoMAQ@mail.gmail.com>
+References: <1345074214-17531-1-git-send-email-mturquette@linaro.org>
+ <1345074214-17531-2-git-send-email-mturquette@linaro.org>
+ <CADTbHxob_pkYN_73AD4YL_Ki5i40iLTJuN0rPuFzYcyyhfoMAQ@mail.gmail.com>
+Message-ID: <20120829214102.4450.35547@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2012 at 02:14:56AM +0100, Chanho Park wrote:
-> This patch define irq numbers of ARM performance monitoring unit for exynos4.
-> The number of CPU cores and PMU irq numbers are vary according to soc types.
-> So we need to identify each soc type using soc_is_xxx function and define the
-> pmu irqs dynamically. In case of exynos4412, there are 4 cpu cores and pmus.
+Quoting Pankaj Jangra (2012-08-27 10:05:29)
+> Hi Mike,
 > 
-> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/common.c            |   45 ++++++++++++++++++++++++++++++
->  arch/arm/mach-exynos/include/mach/irqs.h |    8 ++++--
->  arch/arm/plat-samsung/devs.c             |    2 +-
->  3 files changed, 52 insertions(+), 3 deletions(-)
+> On Thu, Aug 16, 2012 at 5:13 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> > +}
+> > +
+> > +void __clk_unprepare(struct clk *clk, struct clk *top)
 > 
-> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-> index be61564..24b78bd 100644
-> --- a/arch/arm/mach-exynos/common.c
-> +++ b/arch/arm/mach-exynos/common.c
-> @@ -30,11 +30,13 @@
->  #include <asm/mach/map.h>
->  #include <asm/mach/irq.h>
->  #include <asm/cacheflush.h>
-> +#include <asm/pmu.h>
+> Why do you need to change the signature of __clk_prepare and
+> __clk_unprepare functions ?
+> I mean i did not understand the use of passing struct clk *top? As i
+> understand, it tells when you reach at the last
+> clk struct in the tree which needs to be prepared/unprepared. Do we
+> have extra benefit of this or if i am missing something?
+> 
 
-Why do you need this header file?
+This series breaks compatibility with the internal clk functions.  So if
+you were using __clk_prepare in your code somewhere then this will no
+longer work.  It is likely you could just call clk_prepare in the same
+place since there is some reentrancy introduced in this series.
 
->  #include <mach/regs-irq.h>
->  #include <mach/regs-pmu.h>
->  #include <mach/regs-gpio.h>
->  #include <mach/pmu.h>
-> +#include <mach/irqs.h>
->  
->  #include <plat/cpu.h>
->  #include <plat/clock.h>
-> @@ -1056,3 +1058,46 @@ static int __init exynos_init_irq_eint(void)
->  	return 0;
->  }
->  arch_initcall(exynos_init_irq_eint);
-> +
-> +#if defined(CONFIG_CPU_EXYNOS4210) || defined(CONFIG_SOC_EXYNOS4212)
-> +static struct resource exynos42xx_pmu_resource[] = {
-> +	DEFINE_RES_IRQ(EXYNOS4_IRQ_PMU),
-> +	DEFINE_RES_IRQ(EXYNOS4_IRQ_PMU_CPU1),
-> +};
-> +
-> +static struct platform_device exynos42xx_device_pmu = {
-> +	.name		= "arm-pmu",
-> +	.num_resources	= ARRAY_SIZE(exynos42xx_pmu_resource),
-> +	.resource	= exynos42xx_pmu_resource,
-> +};
-> +#endif
+Your understanding of top is correct: I want to avoid walking to the
+root of the clock tree every time.  We determine the top based on
+finding a positive clk->enable_count value.  There is no "extra
+benefit", but locking to the root of the tree would destroy the goal of
+reentrancy since there would be locking collisions at the top of the
+tree.
 
-Given that you don't pass an id and your device-tree binding is that for
-Cortex A15, I assume this patch series is based on my perf/updates branch?
+<snip>
+> > +               if (IS_ERR(top)) {
+> > +                       pr_debug("%s: %s failed with %ld on attempt %d\n",
+> > +                                       __func__, clk->name, PTR_ERR(top),
+> > +                                       tries);
+> > +                       wait_for_completion(&clk_completion);
+> > +                       if (WAIT_TRIES == ++tries)
+> > +                               break;
+> > +               } else
+> > +                       break;
+> 
+> Braces around else part please.
+> 
 
-That's good because it reduces the potential for conflicts, but you should
-make sure that whoever you send this to is aware of the dependency.
+OK.
 
-Cheers,
+> > +       }
+> > +
+> > +       if (WAIT_TRIES == tries) {
+> > +               pr_warning("%s: failed to lock clocks; cyclical dependency?\n",
+> > +                               __func__);
+> > +               return;
+> > +       }
+> > +
+> > +       /* unprepare the list of clocks from clk to top */
+> > +       __clk_unprepare(clk, top);
+> > +
+> 
+> > +       /* unprepare the list of clocks from clk to top */
+> > +       __clk_prepare(clk, top);
+> 
+> You mean prepare right ? :)
+> 
 
-Will
+Right.  Will fix in next version of RFC.
+
+Thanks much for the review,
+Mike
+
+> 
+> 
+> Regards,
+> Pankaj Kumar
