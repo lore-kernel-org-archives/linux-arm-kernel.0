@@ -1,37 +1,86 @@
-From: chanho61.park@samsung.com (Chanho Park)
-Date: Wed, 29 Aug 2012 10:14:57 +0900
-Subject: [PATCH v3 4/4] ARM: EXYNOS: Add arm-pmu DT binding for exynos5250
-In-Reply-To: <1346202897-27306-1-git-send-email-chanho61.park@samsung.com>
-References: <1346202897-27306-1-git-send-email-chanho61.park@samsung.com>
-Message-ID: <1346202897-27306-5-git-send-email-chanho61.park@samsung.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 29 Aug 2012 10:00:50 +0800
+Subject: [PATCH v3 1/7] mfd: add syscon driver based on regmap
+In-Reply-To: <503D4C08.8040605@wwwdotorg.org>
+References: <1346145005-17961-1-git-send-email-b29396@freescale.com>
+ <1346145005-17961-2-git-send-email-b29396@freescale.com>
+ <503D4C08.8040605@wwwdotorg.org>
+Message-ID: <20120829020049.GA29464@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables arm-pmu to bind device tree for exynos5250. The exynos5250
-has two pmus which have combiner irq type.
+On Wed, Aug 29, 2012 at 06:54:00AM +0800, Stephen Warren wrote:
+> On 08/28/2012 02:09 AM, Dong Aisheng wrote:
+> > From: Dong Aisheng <dong.aisheng@linaro.org>
+> > 
+> > Add regmap based syscon driver.
+> > This is usually used for access misc bits in registers which does not belong
+> > to a specific module, for example, IMX IOMUXC GPR and ANATOP.
+> > With this driver, client can use generic regmap API to access registers
+> > which are registered into syscon.
+> 
+> > diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
+> 
+> > +* System Controller Registers R/W driver
+> 
+> I think the binding document could use some information about what a
+> "syscon" actually is, especially since the compatible value is something
+> generic like "syscon" rather than something with a vendor-specific
+> prefix.
+Yes, we'd better have it.
 
-Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/boot/dts/exynos5250.dtsi |    6 ++++++
- 1 file changed, 6 insertions(+)
+> How about:
+> 
+> A system controller node represents a register region containing a set
+> of miscellaneous registers. The registers are not cohesive enough to
+> represent as any specific type of device. The typical use-case is for
+> some other node's driver, or platform-specific code, to acquire a
+> reference to the syscon node (e.g. by phandle, node path, or search
+> using a specific compatible value), interrogate the node (or associated
+> OS driver) to determine the location of the registers, and access the
+> registers directly.
+> 
+It looks very good to me.
+Thanks for the help.
 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 004aaa8..45746cbf 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -52,6 +52,12 @@
- 			     <0 28 0>, <0 29 0>, <0 30 0>, <0 31 0>;
- 	};
- 
-+	pmu {
-+		compatible = "arm,cortex-a15-pmu";
-+		interrupt-parent = <&combiner>;
-+		interrupts = <1 2>, <22 4>;
-+	};
-+
- 	watchdog {
- 		compatible = "samsung,s3c2410-wdt";
- 		reg = <0x101D0000 0x100>;
--- 
-1.7.9.5
+> > +Required properties:
+> > +- compatible: Should contain "syscon".
+> > +- reg: the register range can be access from syscon
+> > +
+> > +Examples:
+> > +gpr: iomuxc-gpr at 020e0000 {
+> > +	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
+> > +	reg = <0x020e0000 0x38>;
+> > +};
+> 
+> > diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> 
+> > +config MFD_SYSCON
+> > +        bool "System Controller Register R/W Based on Regmap"
+> > +        select REGMAP_MMIO
+> > +        help
+> > +          Select this option to enable accessing system control registers
+> > +	  via regmap.
+> 
+> I think the indentation is off there.
+> 
+You're right.
+Will fix it.
+
+> > +static int __devinit syscon_probe(struct platform_device *pdev)
+> ...
+> > +	regcache_cache_only(syscon->regmap, false);
+> 
+> Isn't that the default?
+> 
+Correct, will remove.
+
+> Aside from that, I don't have any particular comments on this series, so
+> please consider it,
+> 
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> 
+Thanks a lot.
+
+Regards
+Dong Aisheng
