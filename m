@@ -1,107 +1,24 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 29 Aug 2012 22:00:32 +0200
-Subject: [PATCH v6 1/3] USB: chipidea: add imx usbmisc support
-In-Reply-To: <20120829110137.GA26594@pengutronix.de>
-References: <1346137109-32247-1-git-send-email-richard.zhao@freescale.com>
- <1346137109-32247-2-git-send-email-richard.zhao@freescale.com>
- <871uiqkuhb.fsf@ashishki-desk.ger.corp.intel.com>
- <20120829081020.GX26594@pengutronix.de>
- <87ehmqj925.fsf@ashishki-desk.ger.corp.intel.com>
- <20120829110137.GA26594@pengutronix.de>
-Message-ID: <503E74E0.6040503@pengutronix.de>
+From: j-pihet@ti.com (Pihet-XID, Jean)
+Date: Wed, 29 Aug 2012 13:48:25 -0700
+Subject: TI SoC Linux BoF @ Linux Plumbers Conference: tomorrow
+In-Reply-To: <alpine.DEB.2.00.1208291837040.1619@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1208291837040.1619@utopia.booyaka.com>
+Message-ID: <CAN5iSWp9LJjC9B3fiAJhuYVkfNzC98WkvQKPiVt8+tqxr==COg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/29/2012 01:01 PM, Sascha Hauer wrote:
-> On Wed, Aug 29, 2012 at 01:18:10PM +0300, Alexander Shishkin wrote:
->> Sascha Hauer <s.hauer@pengutronix.de> writes:
->>
->>> On Wed, Aug 29, 2012 at 10:50:08AM +0300, Alexander Shishkin wrote:
->>>> Richard Zhao <richard.zhao@freescale.com> writes:
->>>>
->>>>> i.MX usb controllers shares non-core registers, which may include
->>>>> SoC specific controls. We take it as a usbmisc device and usbmisc
->>>>> driver set operations needed by ci13xxx_imx driver.
->>>>>
->>>>> For example, Sabrelite board has bad over-current design, we can
->>>>> usbmisc to disable over-current detect.
->>>>
->>>> Why does this have to be part of the usb driver instead of SoC specific
->>>> code? It looks like you've created a whole new device/driver
->>>> infrastructure just to disable overcurrent for a specific board.
->>>
->>> Richards code indeed only handles overcurrent for a specific board, but
->>> there are more bits to configure in the longer run: power pin
->>> polarities, ULPI/serial mode select and some more.
+On Wed, Aug 29, 2012 at 11:41 AM, Paul Walmsley <paul@pwsan.com> wrote:
+>
+> Hi,
+>
+> for everyone at Linux Plumbers Conference/LinuxCon, we'll be having a
+> Linux on TI SoCs BoF on Thursday, August 30 in Nautilus 1.
+Great! Is there a schedule already?
 
-We already have a patch adding a usbmisc_imx53_init() function to that
-driver.
+Thanks!
+Jean
 
->> Sounds to me like these things that should be taken care of by the phy
->> driver, which will likely be simpler from both driver's and devicetree's
->> perspective.
-> 
-> Most i.MX SoCs have three instances of the chipidea core. These cores
-> share a single register space for controlling the mentioned bits (the
-> usbmisc register space). The usbmisc looks different on the different
-> SoCs.
-> Indeed they control some phy specific aspects, but the phy itself may
-> also be an external ULPI or UTMI phy with a separate driver. So if we
-> integrate the usbmisc into the phy wouldn't that mean that it has to
-> be integrated into all possible phy drivers?
-> 
-> From a devicetrees perspective it makes sense to integrate the flags
-> into the chipidea nodes, because there is one node per chipidea core,
-> but only one usbmisc unit for all ports on the SoC. So we can do a:
-> 
-> 	chipidea at ofs {
-> 		disable-overcurrent = <1>;
-> 	};
-> 
-> instead of
-> 
-> 	usbmisc at ofs {
-> 		disable-overcurrent-port0 = <1>;
-> 		disable-overcurrent-port1 = <0>;
-> 		...
-> 	};
-
-+1
-
-IMHO looks much cleaner.
-
->>>> And the infrastructure boils down to a complex way of passing a callback
->>>> from imx driver to another imx driver, that only works if they are
->>>> probed in the right order. I don't see any point in doing it like this
->>>> other than inflating the device tree tables even further.
->>>>
->>>> Why can't this be part of the SoC code like it is done, for example in
->>>> arch/arm/mach-omap2/control.c?
->>>
->>> The settings are board specific, so there must be some way to configure
->>> them in the devicetree.
->>
->> But I'm sure there's a way to control board-specific settings/kludges
->> from devicetree?
-> 
-> Hm, yes. That's what Richard does, right? I may be misunderstanding you
-> here.
-> 
-> Sascha
-
-Marc
-
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120829/a2f19d86/attachment.sig>
+>
+>
+>
+> - Paul
