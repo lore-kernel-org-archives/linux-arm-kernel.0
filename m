@@ -1,63 +1,128 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 29 Aug 2012 17:16:10 +0200
-Subject: [PATCH] [media] atmel_isi: allocate memory to store the isi
- platform data.
-In-Reply-To: <1346235093-28613-1-git-send-email-josh.wu@atmel.com>
-References: <1346235093-28613-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <503E323A.8060409@samsung.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 29 Aug 2012 17:20:17 +0200
+Subject: mxc_nand.c on mach-imx/imx53
+In-Reply-To: <20120829074122.GV26594@pengutronix.de>
+References: <5035F84E.3000901@antcom.de>
+ <20120829074122.GV26594@pengutronix.de>
+Message-ID: <503E3331.8050203@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sascha,
 
-On 08/29/2012 12:11 PM, Josh Wu wrote:
-> This patch fix the bug: ISI driver's platform data became invalid 
-> when isi platform data's attribution is __initdata.
+On 08/29/2012 09:41 AM, Sascha Hauer wrote:
+> On Thu, Aug 23, 2012 at 11:30:54AM +0200, Roland Stigge wrote:
+>> Hi,
+>>
+>> I'd like to know about the current state of mxc_nand.c on imx53, because
+>> I got an error on probe() because the clock that mxc_nand is requesting
+>> is "nfc" but imx53 only defines the clock "mxc_nand".
 > 
-> If the isi platform data is passed as __initdata. Then we need store
-> it in driver allocated memory. otherwise when we use it out of the 
-> probe() function, then the isi platform data is invalid.
-> 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
->  drivers/media/platform/soc_camera/atmel-isi.c |   12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-> index ec3f6a0..dc0fdec 100644
-> --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-> @@ -926,6 +926,7 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
->  	clk_put(isi->mck);
->  	clk_unprepare(isi->pclk);
->  	clk_put(isi->pclk);
-> +	kfree(isi->pdata);
->  	kfree(isi);
->  
->  	return 0;
-> @@ -968,8 +969,15 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
->  		goto err_alloc_isi;
->  	}
->  
-> +	isi->pdata = kzalloc(sizeof(struct isi_platform_data), GFP_KERNEL);
-> +	if (!isi->pdata) {
-> +		ret = -ENOMEM;
-> +		dev_err(&pdev->dev, "Can't allocate isi platform data!\n");
-> +		goto err_alloc_isi_pdata;
-> +	}
-> +	memcpy(isi->pdata, pdata, sizeof(struct isi_platform_data));
-> +
+> The driver generally works on i.MX53, only some pieces are missing. I
+> just resent the corresponding series and put you on Cc.
 
-Why not just embed struct isi_platform_data in struct atmel_isi and drop this
-another kzalloc() ?
-Then you could simply do isi->pdata = *pdata.
+Good - thank you for the patches, didn't know about them.
 
-Also, is this going to work when this driver is build and as a module
-and its loading is deferred past system booting ? At that time the driver's
-platform data may be well discarded. You may wan't to duplicate it on the
-running boards in board code with kmemdup() or something.
+Now, my flash is detected:
 
---
+NAND device: Manufacturer ID: 0x2c, Chip ID: 0xdc (Micron NAND 512MiB
+3,3V 8-bit), page size: 4096, OOB size: 128
 
-Regards,
-Sylwester
+However, when I read a partition, kernel (mxc_nand_correct_data_v2_v3())
+says:
+
+...
+UnCorrectable RS-ECC Error
+UnCorrectable RS-ECC Error
+UnCorrectable RS-ECC Error
+UnCorrectable RS-ECC Error
+UnCorrectable RS-ECC Error
+UnCorrectable RS-ECC Error
+UnCorrectable RS-ECC Error
+...
+
+I'm using the following dt (on an Emtrion DIMM-MX53 board):
+
+                        nand at 63fdb000 {
+                                status = "okay";
+                                #address-cells = <1>;
+                                #size-cells = <1>;
+                                nand-bus-width = <8>;
+                                nand-ecc-mode = "hw";
+
+                                mtd0 at 00000000 {
+                                        label = "bootstrap";
+                                        reg = <0x00000000 0x80000>;
+                                        read-only;
+                                };
+                                mtd1 at 00080000 {
+                                        label = "uboot";
+                                        reg = <0x00080000 0x80000>;
+                                        read-only;
+                                };
+                                mtd2 at 00100000 {
+                                        label = "NVRAM";
+                                        reg = <0x00100000 0x100000>;
+                                };
+                                mtd3 at 00200000 {
+                                        label = "bootlogo";
+                                        reg = <0x00200000 0x80000>;
+                                };
+                                mtd4 at 00280000 {
+                                        label = "linux";
+                                        reg = <0x00280000 0x400000>;
+                                };
+                                mtd5 at 00680000 {
+                                        label = "rootfs";
+                                        reg = <0x00680000 0x8000000>;
+                                };
+                                mtd6 at 08680000 {
+                                        label = "appfs";
+                                        reg = <0x08680000 0x17980000>;
+                                };
+                        };
+
+NAND info from u-boot:
+
+NAND:  512 MiB
+Manufacturer      : Micron (0x2c)
+Device Code       : 0xdc
+Cell Technology   : SLC
+Chip Size         : 512 MiB
+Pages per Block   : 64
+Page Geometry     : 4096+218
+ECC Strength      : 8 bits
+ECC Size          : 512 B
+Data Setup Time   : 20 ns
+Data Hold Time    : 10 ns
+Address Setup Time: 10 ns
+GPMI Sample Delay : 6 ns
+tREA              : Unknown
+tRLOH             : Unknown
+tRHOH             : Unknown
+Description       : MT29F4G08ABAEA
+
+I guess I hit a documented open issue:
+
+/* v3.2b: i.MX53 */
+static const struct mxc_nand_devtype_data imx53_nand_devtype_data = {
+        .preset = preset_v3,
+        .send_cmd = send_cmd_v3,
+        .send_addr = send_addr_v3,
+        .send_page = send_page_v3,
+        .send_read_id = send_read_id_v3,
+        .get_dev_status = get_dev_status_v3,
+        .check_int = check_int_v3,
+        .irq_control = irq_control_v3,
+        .get_ecc_status = get_ecc_status_v3,
+        .ecclayout_512 = &nandv2_hw_eccoob_smallpage,
+        .ecclayout_2k = &nandv2_hw_eccoob_largepage,
+        .ecclayout_4k = &nandv2_hw_eccoob_smallpage, /* XXX: needs fix */
+
+Using  ".ecclayout_4k = &nandv2_hw_eccoob_4k" also doesn't work. So is
+there any hint how I can proceed from here? Any plans or hint regarding
+the "XXX"?
+
+Thanks in advance,
+
+Roland
