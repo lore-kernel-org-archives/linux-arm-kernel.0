@@ -1,43 +1,75 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 29 Aug 2012 09:31:31 +0100
-Subject: [PATCH RESEND 1/4] ARM: OMAP2+: AM33XX: Add tps65910 device tree
- data
-In-Reply-To: <20120828172133.GH4534@opensource.wolfsonmicro.com>
-References: <1342766789-28148-1-git-send-email-anilkumar@ti.com>
- <1342766789-28148-2-git-send-email-anilkumar@ti.com>
- <20120720095935.GQ4495@opensource.wolfsonmicro.com>
- <331ABD5ECB02734CA317220B2BBEABC13E9FA91E@DBDE01.ent.ti.com>
- <20120720113806.GW4495@opensource.wolfsonmicro.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA01F1E@DBDE01.ent.ti.com>
- <20120723133400.GU4435@opensource.wolfsonmicro.com>
- <20120828112603.GC25786@gmail.com>
- <20120828172133.GH4534@opensource.wolfsonmicro.com>
-Message-ID: <20120829083129.GB3439@gmail.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 29 Aug 2012 16:33:38 +0800
+Subject: [PATCH v2 05/11] USB: chipidea: don't let probe fail if otg
+ controller start one role failed
+In-Reply-To: <87vcg2jeyu.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
+ <1346137397-32374-6-git-send-email-richard.zhao@freescale.com>
+ <87ligz2yyo.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120828092730.GY4011@b20223-02.ap.freescale.net>
+ <87vcg2jeyu.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20120829083337.GI4011@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2012 at 10:21:33AM -0700, Mark Brown wrote:
-> On Tue, Aug 28, 2012 at 12:26:07PM +0100, Lee Jones wrote:
+On Wed, Aug 29, 2012 at 11:10:33AM +0300, Alexander Shishkin wrote:
+> Richard Zhao <richard.zhao@freescale.com> writes:
 > 
-> > > > arch/arm/boot/dts/db8500.dtsi
+> > On Tue, Aug 28, 2012 at 11:38:23AM +0300, Alexander Shishkin wrote:
+> >> Richard Zhao <richard.zhao@freescale.com> writes:
+> >> 
+> >> > One role failed, but the other role will possiblly still work.
+> >> > For example, when udc start failed, if plug in a host device,
+> >> > it works.
+> >> 
+> >> If you're a host device, ci->role should be HOST at this point and
+> >> ci_role_start() shouldn't fail. If ci->role is detected wrongly, the
+> >> role detection must be fixed. If ci_role_start() fails for host, but it
+> >> still works when it's called again after the id pin change is detected,
+> >> again, the problem is elsewhere.
+> > The check is only for OTG device. For single role device, it just fail
+> > if it start the role failed.
 > 
-> > > I'm not actually seeing anything terribly problematic here, though the
-> > > regulator-name properties should really be removed as they're fairly
-> > > useless and seem to be missing the point of having the property.
+> Sorry, can you rephrase?
 > 
-> > Just looking at this now. 
+> >> 
+> >> >
+> >> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> >> > ---
+> >> >  drivers/usb/chipidea/core.c |    7 +++++--
+> >> >  1 file changed, 5 insertions(+), 2 deletions(-)
+> >> >
+> >> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> >> > index 19ef324..8fd390a 100644
+> >> > --- a/drivers/usb/chipidea/core.c
+> >> > +++ b/drivers/usb/chipidea/core.c
+> >> > @@ -473,8 +473,11 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
+> >> >  	ret = ci_role_start(ci, ci->role);
+> >> >  	if (ret) {
+> >> >  		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
+> >> > -		ret = -ENODEV;
+> >> > -		goto rm_wq;
+> >> > +		ci->role = CI_ROLE_END;
+> >> 
+> >> So are you relying on id pin interrupt for initializing the role after
+> >> this? Can you provide more details?
+> > Yes. The ID pin detect still works. My case is, gadget role failed,
+> > host role works. I was trying not to ruin host function.
 > 
-> > The regulator-name property is used to populate constrains->name. Are
-> > you sure you still want them all removed?
+> But it shouldn't even try to start the gadget, because ci_otg_role()
+> should set ci->role to HOST before ci_role_start() happens.
+It depends on ID pin. If ID pin is gadget and gadget is not support well,
+ci_role_start will fail. See below example.
 > 
-> Yes, of course.  There's no way that a generic .dtsi used for any
-> possible board could come up with a sensible value.
+> Another question is, why does gadget start fail?
+There's one example:
+If usb phy don't support otg yet, otg_set_peripheral will fail, and
+then cause udc_start fail.
 
-So how should constrains->name be populated then? Would you prefer
-regulator-names moved to the .dts file(s), or something else?
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks
+Richard
+> 
+> Regards,
+> --
+> Alex
+> 
