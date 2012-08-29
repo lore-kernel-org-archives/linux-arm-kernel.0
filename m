@@ -1,74 +1,107 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 29 Aug 2012 20:27:02 +0200
-Subject: [PATCH 2/4] ARM: ks8695: use [readl|writel]_relaxed()
-Message-ID: <1346264822-20347-1-git-send-email-linus.walleij@linaro.org>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 29 Aug 2012 22:00:32 +0200
+Subject: [PATCH v6 1/3] USB: chipidea: add imx usbmisc support
+In-Reply-To: <20120829110137.GA26594@pengutronix.de>
+References: <1346137109-32247-1-git-send-email-richard.zhao@freescale.com>
+ <1346137109-32247-2-git-send-email-richard.zhao@freescale.com>
+ <871uiqkuhb.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120829081020.GX26594@pengutronix.de>
+ <87ehmqj925.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120829110137.GA26594@pengutronix.de>
+Message-ID: <503E74E0.6040503@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have no clue why __raw* macros are used here, but I strongly
-suspect there is no good reason at all for this, so removing
-another bad example.
+On 08/29/2012 01:01 PM, Sascha Hauer wrote:
+> On Wed, Aug 29, 2012 at 01:18:10PM +0300, Alexander Shishkin wrote:
+>> Sascha Hauer <s.hauer@pengutronix.de> writes:
+>>
+>>> On Wed, Aug 29, 2012 at 10:50:08AM +0300, Alexander Shishkin wrote:
+>>>> Richard Zhao <richard.zhao@freescale.com> writes:
+>>>>
+>>>>> i.MX usb controllers shares non-core registers, which may include
+>>>>> SoC specific controls. We take it as a usbmisc device and usbmisc
+>>>>> driver set operations needed by ci13xxx_imx driver.
+>>>>>
+>>>>> For example, Sabrelite board has bad over-current design, we can
+>>>>> usbmisc to disable over-current detect.
+>>>>
+>>>> Why does this have to be part of the usb driver instead of SoC specific
+>>>> code? It looks like you've created a whole new device/driver
+>>>> infrastructure just to disable overcurrent for a specific board.
+>>>
+>>> Richards code indeed only handles overcurrent for a specific board, but
+>>> there are more bits to configure in the longer run: power pin
+>>> polarities, ULPI/serial mode select and some more.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ks8695/time.c |   24 ++++++++++++------------
- 1 files changed, 12 insertions(+), 12 deletions(-)
+We already have a patch adding a usbmisc_imx53_init() function to that
+driver.
 
-diff --git a/arch/arm/mach-ks8695/time.c b/arch/arm/mach-ks8695/time.c
-index 6427b7c..ae9dacc 100644
---- a/arch/arm/mach-ks8695/time.c
-+++ b/arch/arm/mach-ks8695/time.c
-@@ -67,11 +67,11 @@ static unsigned long ks8695_gettimeoffset (void)
- 	 * interrupt.  We solve this by ensuring that the counter has not
- 	 * reloaded between our two reads.
- 	 */
--	elapsed = __raw_readl(KS8695_TMR_VA + KS8695_T1TC) + __raw_readl(KS8695_TMR_VA + KS8695_T1PD);
-+	elapsed = readl_relaxed(KS8695_TMR_VA + KS8695_T1TC) + readl_relaxed(KS8695_TMR_VA + KS8695_T1PD);
- 	do {
- 		tick2 = elapsed;
--		intpending = __raw_readl(KS8695_IRQ_VA + KS8695_INTST) & (1 << KS8695_IRQ_TIMER1);
--		elapsed = __raw_readl(KS8695_TMR_VA + KS8695_T1TC) + __raw_readl(KS8695_TMR_VA + KS8695_T1PD);
-+		intpending = readl_relaxed(KS8695_IRQ_VA + KS8695_INTST) & (1 << KS8695_IRQ_TIMER1);
-+		elapsed = readl_relaxed(KS8695_TMR_VA + KS8695_T1TC) + readl_relaxed(KS8695_TMR_VA + KS8695_T1PD);
- 	} while (elapsed > tick2);
- 
- 	/* Convert to number of ticks expired (not remaining) */
-@@ -106,14 +106,14 @@ static void ks8695_timer_setup(void)
- 	unsigned long tmcon;
- 
- 	/* disable timer1 */
--	tmcon = __raw_readl(KS8695_TMR_VA + KS8695_TMCON);
--	__raw_writel(tmcon & ~TMCON_T1EN, KS8695_TMR_VA + KS8695_TMCON);
-+	tmcon = readl_relaxed(KS8695_TMR_VA + KS8695_TMCON);
-+	writel_relaxed(tmcon & ~TMCON_T1EN, KS8695_TMR_VA + KS8695_TMCON);
- 
--	__raw_writel(tmout / 2, KS8695_TMR_VA + KS8695_T1TC);
--	__raw_writel(tmout / 2, KS8695_TMR_VA + KS8695_T1PD);
-+	writel_relaxed(tmout / 2, KS8695_TMR_VA + KS8695_T1TC);
-+	writel_relaxed(tmout / 2, KS8695_TMR_VA + KS8695_T1PD);
- 
- 	/* re-enable timer1 */
--	__raw_writel(tmcon | TMCON_T1EN, KS8695_TMR_VA + KS8695_TMCON);
-+	writel_relaxed(tmcon | TMCON_T1EN, KS8695_TMR_VA + KS8695_TMCON);
- }
- 
- static void __init ks8695_timer_init (void)
-@@ -138,12 +138,12 @@ void ks8695_restart(char mode, const char *cmd)
- 		soft_restart(0);
- 
- 	/* disable timer0 */
--	reg = __raw_readl(KS8695_TMR_VA + KS8695_TMCON);
--	__raw_writel(reg & ~TMCON_T0EN, KS8695_TMR_VA + KS8695_TMCON);
-+	reg = readl_relaxed(KS8695_TMR_VA + KS8695_TMCON);
-+	writel_relaxed(reg & ~TMCON_T0EN, KS8695_TMR_VA + KS8695_TMCON);
- 
- 	/* enable watchdog mode */
--	__raw_writel((10 << 8) | T0TC_WATCHDOG, KS8695_TMR_VA + KS8695_T0TC);
-+	writel_relaxed((10 << 8) | T0TC_WATCHDOG, KS8695_TMR_VA + KS8695_T0TC);
- 
- 	/* re-enable timer0 */
--	__raw_writel(reg | TMCON_T0EN, KS8695_TMR_VA + KS8695_TMCON);
-+	writel_relaxed(reg | TMCON_T0EN, KS8695_TMR_VA + KS8695_TMCON);
- }
+>> Sounds to me like these things that should be taken care of by the phy
+>> driver, which will likely be simpler from both driver's and devicetree's
+>> perspective.
+> 
+> Most i.MX SoCs have three instances of the chipidea core. These cores
+> share a single register space for controlling the mentioned bits (the
+> usbmisc register space). The usbmisc looks different on the different
+> SoCs.
+> Indeed they control some phy specific aspects, but the phy itself may
+> also be an external ULPI or UTMI phy with a separate driver. So if we
+> integrate the usbmisc into the phy wouldn't that mean that it has to
+> be integrated into all possible phy drivers?
+> 
+> From a devicetrees perspective it makes sense to integrate the flags
+> into the chipidea nodes, because there is one node per chipidea core,
+> but only one usbmisc unit for all ports on the SoC. So we can do a:
+> 
+> 	chipidea at ofs {
+> 		disable-overcurrent = <1>;
+> 	};
+> 
+> instead of
+> 
+> 	usbmisc at ofs {
+> 		disable-overcurrent-port0 = <1>;
+> 		disable-overcurrent-port1 = <0>;
+> 		...
+> 	};
+
++1
+
+IMHO looks much cleaner.
+
+>>>> And the infrastructure boils down to a complex way of passing a callback
+>>>> from imx driver to another imx driver, that only works if they are
+>>>> probed in the right order. I don't see any point in doing it like this
+>>>> other than inflating the device tree tables even further.
+>>>>
+>>>> Why can't this be part of the SoC code like it is done, for example in
+>>>> arch/arm/mach-omap2/control.c?
+>>>
+>>> The settings are board specific, so there must be some way to configure
+>>> them in the devicetree.
+>>
+>> But I'm sure there's a way to control board-specific settings/kludges
+>> from devicetree?
+> 
+> Hm, yes. That's what Richard does, right? I may be misunderstanding you
+> here.
+> 
+> Sascha
+
+Marc
+
+
 -- 
-1.7.7.6
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120829/a2f19d86/attachment.sig>
