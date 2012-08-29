@@ -1,75 +1,60 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 29 Aug 2012 16:33:38 +0800
-Subject: [PATCH v2 05/11] USB: chipidea: don't let probe fail if otg
- controller start one role failed
-In-Reply-To: <87vcg2jeyu.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
- <1346137397-32374-6-git-send-email-richard.zhao@freescale.com>
- <87ligz2yyo.fsf@ashishki-desk.ger.corp.intel.com>
- <20120828092730.GY4011@b20223-02.ap.freescale.net>
- <87vcg2jeyu.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20120829083337.GI4011@b20223-02.ap.freescale.net>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 29 Aug 2012 14:26:13 +0530
+Subject: [PATCH v4 0/3] Prepare for OMAP2+ movement to Common Clk
+Message-ID: <1346230576-20004-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2012 at 11:10:33AM +0300, Alexander Shishkin wrote:
-> Richard Zhao <richard.zhao@freescale.com> writes:
-> 
-> > On Tue, Aug 28, 2012 at 11:38:23AM +0300, Alexander Shishkin wrote:
-> >> Richard Zhao <richard.zhao@freescale.com> writes:
-> >> 
-> >> > One role failed, but the other role will possiblly still work.
-> >> > For example, when udc start failed, if plug in a host device,
-> >> > it works.
-> >> 
-> >> If you're a host device, ci->role should be HOST at this point and
-> >> ci_role_start() shouldn't fail. If ci->role is detected wrongly, the
-> >> role detection must be fixed. If ci_role_start() fails for host, but it
-> >> still works when it's called again after the id pin change is detected,
-> >> again, the problem is elsewhere.
-> > The check is only for OTG device. For single role device, it just fail
-> > if it start the role failed.
-> 
-> Sorry, can you rephrase?
-> 
-> >> 
-> >> >
-> >> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> >> > ---
-> >> >  drivers/usb/chipidea/core.c |    7 +++++--
-> >> >  1 file changed, 5 insertions(+), 2 deletions(-)
-> >> >
-> >> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> >> > index 19ef324..8fd390a 100644
-> >> > --- a/drivers/usb/chipidea/core.c
-> >> > +++ b/drivers/usb/chipidea/core.c
-> >> > @@ -473,8 +473,11 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
-> >> >  	ret = ci_role_start(ci, ci->role);
-> >> >  	if (ret) {
-> >> >  		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
-> >> > -		ret = -ENODEV;
-> >> > -		goto rm_wq;
-> >> > +		ci->role = CI_ROLE_END;
-> >> 
-> >> So are you relying on id pin interrupt for initializing the role after
-> >> this? Can you provide more details?
-> > Yes. The ID pin detect still works. My case is, gadget role failed,
-> > host role works. I was trying not to ruin host function.
-> 
-> But it shouldn't even try to start the gadget, because ci_otg_role()
-> should set ci->role to HOST before ci_role_start() happens.
-It depends on ID pin. If ID pin is gadget and gadget is not support well,
-ci_role_start will fail. See below example.
-> 
-> Another question is, why does gadget start fail?
-There's one example:
-If usb phy don't support otg yet, otg_set_peripheral will fail, and
-then cause udc_start fail.
+Changes in v4:
+* Added *hack* comments around clk_prepare usage in hwmod
+rebased on 3.6-rc
 
-Thanks
-Richard
-> 
-> Regards,
-> --
-> Alex
-> 
+Changes in v3:
+* Fixed various checkpatch warning/errors as reported by Paul W.
+
+Changes in v2:
+* Dropped all driver clk_prepare/clk_unprepare changes, will be
+  sent seperately to respective lists
+
+This is a preparatory series for the OMAP Common Clk
+conversion. They mostly add clk_prepare/clk_unprepare
+in OMAP platform code. Also gets rid of omap_clk_get_by_name
+and uses clk_get, and removes all direct 'struct clk'
+dereferrencing and uses helpers similar to what is provided
+by Common Clk.
+
+Patches are boot tested on OMAP2430sdp, 3630 Beagle-Xm
+and 4430/4460 Panda and suspend tested on 3630 Beagle-Xm
+and 4430 Panda. Patches apply on 3.6-rc3.
+
+Rajendra Nayak (3):
+  ARM: omap: clk: add clk_prepare and clk_unprepare
+  ARM: omap: hwmod: get rid of all omap_clk_get_by_name usage
+  ARM: OMAP2+: clock: Remove all direct dereferencing of struct clk
+
+ arch/arm/mach-omap2/board-apollon.c          |    4 +-
+ arch/arm/mach-omap2/board-h4.c               |    6 +-
+ arch/arm/mach-omap2/board-omap4panda.c       |    2 +-
+ arch/arm/mach-omap2/clkt2xxx_apll.c          |    2 +-
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |   10 ++-
+ arch/arm/mach-omap2/clkt34xx_dpll3m2.c       |   20 +++---
+ arch/arm/mach-omap2/clkt_clksel.c            |   91 ++++++++++++++++----------
+ arch/arm/mach-omap2/clkt_dpll.c              |   26 ++++----
+ arch/arm/mach-omap2/clock.c                  |   11 ++--
+ arch/arm/mach-omap2/clock2420_data.c         |   17 +++++
+ arch/arm/mach-omap2/clock2430_data.c         |   21 ++++++
+ arch/arm/mach-omap2/clock3xxx.c              |    8 +--
+ arch/arm/mach-omap2/clock3xxx_data.c         |   23 +++++++
+ arch/arm/mach-omap2/clock44xx_data.c         |    6 ++
+ arch/arm/mach-omap2/display.c                |    4 +-
+ arch/arm/mach-omap2/dpll3xxx.c               |   48 ++++++++------
+ arch/arm/mach-omap2/gpmc.c                   |    2 +-
+ arch/arm/mach-omap2/omap_hwmod.c             |   45 ++++++++++---
+ arch/arm/mach-omap2/pm.c                     |    2 +-
+ arch/arm/plat-omap/clock.c                   |   27 --------
+ arch/arm/plat-omap/include/plat/clock.h      |    5 ++
+ arch/arm/plat-omap/omap_device.c             |    6 +-
+ 22 files changed, 251 insertions(+), 135 deletions(-)
+
+-- 
+1.7.9.5
