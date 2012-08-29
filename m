@@ -1,46 +1,114 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 29 Aug 2012 09:40:15 +0200
-Subject: [PATCH resend] i.MX53 Nand support
-Message-ID: <1346226019-23560-1-git-send-email-s.hauer@pengutronix.de>
+Date: Wed, 29 Aug 2012 09:40:17 +0200
+Subject: [PATCH 2/4] mtd nand mxc_nand: swap iomem resource order
+In-Reply-To: <1346226019-23560-1-git-send-email-s.hauer@pengutronix.de>
+References: <1346226019-23560-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1346226019-23560-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+The i.MX v3 nand controller (i.MX5) needs two memory resources.
+Traditionally we have the AXI resource first. For sorting in this
+driver into the devicetree it feels much more natural to have the
+IP resource first. This patch swaps the ordering of these two
+resources.
 
-The following patches add i.MX53 and dt support to mxc_nand. This
-is only a resent based on v3.6-rc3 as it seems this series slipped
-through the cracks last time I posted it.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/plat-mxc/devices/platform-mxc_nand.c |   11 ++++----
+ drivers/mtd/nand/mxc_nand.c                   |   35 ++++++++++++++-----------
+ 2 files changed, 24 insertions(+), 22 deletions(-)
 
-So Artem, if there are no objections, please consider applying up to
-3/4, I would then take 4/4 through my tree.
-
-Sascha
-
-The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
-
-  Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/mtd-imx53-nand
-
-for you to fetch changes up to 587450da74aa7db28fe0e9a9ee2a3816140fa8f4:
-
-  ARM i.MX5: Add nand oftree support (2012-08-29 09:33:47 +0200)
-
-----------------------------------------------------------------
-Add i.MX53 and dt support to the mxc_nand driver
-
-----------------------------------------------------------------
-Sascha Hauer (4):
-      mtd nand mxc_nand: Use managed resources
-      mtd nand mxc_nand: swap iomem resource order
-      mtd nand mxc_nand: add i.MX53 support
-      ARM i.MX5: Add nand oftree support
-
- arch/arm/boot/dts/imx51.dtsi                  |    7 ++
- arch/arm/boot/dts/imx53.dtsi                  |    7 ++
- arch/arm/mach-imx/clk-imx51-imx53.c           |    2 +
- arch/arm/plat-mxc/devices/platform-mxc_nand.c |   11 +-
- drivers/mtd/nand/mxc_nand.c                   |  137 ++++++++++++++-----------
- 5 files changed, 97 insertions(+), 67 deletions(-)
+diff --git a/arch/arm/plat-mxc/devices/platform-mxc_nand.c b/arch/arm/plat-mxc/devices/platform-mxc_nand.c
+index 1568f39..95b75cc 100644
+--- a/arch/arm/plat-mxc/devices/platform-mxc_nand.c
++++ b/arch/arm/plat-mxc/devices/platform-mxc_nand.c
+@@ -63,10 +63,6 @@ struct platform_device *__init imx_add_mxc_nand(
+ 	/* AXI has to come first, that's how the mxc_nand driver expect it */
+ 	struct resource res[] = {
+ 		{
+-			.start = data->axibase,
+-			.end = data->axibase + SZ_16K - 1,
+-			.flags = IORESOURCE_MEM,
+-		}, {
+ 			.start = data->iobase,
+ 			.end = data->iobase + data->iosize - 1,
+ 			.flags = IORESOURCE_MEM,
+@@ -74,10 +70,13 @@ struct platform_device *__init imx_add_mxc_nand(
+ 			.start = data->irq,
+ 			.end = data->irq,
+ 			.flags = IORESOURCE_IRQ,
++		}, {
++			.start = data->axibase,
++			.end = data->axibase + SZ_16K - 1,
++			.flags = IORESOURCE_MEM,
+ 		},
+ 	};
+ 	return imx_add_platform_device("mxc_nand", data->id,
+-			res + !data->axibase,
+-			ARRAY_SIZE(res) - !data->axibase,
++			res, ARRAY_SIZE(res) - !data->axibase,
+ 			pdata, sizeof(*pdata));
+ }
+diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+index 268c0dc..efbc72c 100644
+--- a/drivers/mtd/nand/mxc_nand.c
++++ b/drivers/mtd/nand/mxc_nand.c
+@@ -1376,7 +1376,25 @@ static int __init mxcnd_probe(struct platform_device *pdev)
+ 	if (IS_ERR(host->clk))
+ 		return PTR_ERR(host->clk);
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	err = mxcnd_probe_dt(host);
++	if (err > 0)
++		err = mxcnd_probe_pdata(host);
++	if (err < 0)
++		return err;
++
++	if (host->devtype_data->needs_ip) {
++		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++		if (!res)
++			return -ENODEV;
++		host->regs_ip = devm_request_and_ioremap(&pdev->dev, res);
++		if (!host->regs_ip)
++			return -ENOMEM;
++
++		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	} else {
++		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	}
++
+ 	if (!res)
+ 		return -ENODEV;
+ 
+@@ -1386,12 +1404,6 @@ static int __init mxcnd_probe(struct platform_device *pdev)
+ 
+ 	host->main_area0 = host->base;
+ 
+-	err = mxcnd_probe_dt(host);
+-	if (err > 0)
+-		err = mxcnd_probe_pdata(host);
+-	if (err < 0)
+-		return err;
+-
+ 	if (host->devtype_data->regs_offset)
+ 		host->regs = host->base + host->devtype_data->regs_offset;
+ 	host->spare0 = host->base + host->devtype_data->spare0_offset;
+@@ -1405,15 +1417,6 @@ static int __init mxcnd_probe(struct platform_device *pdev)
+ 	this->ecc.size = 512;
+ 	this->ecc.layout = host->devtype_data->ecclayout_512;
+ 
+-	if (host->devtype_data->needs_ip) {
+-		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-		if (!res)
+-			return -ENODEV;
+-		host->regs_ip = devm_request_and_ioremap(&pdev->dev, res);
+-		if (!host->regs_ip)
+-			return -ENOMEM;
+-	}
+-
+ 	if (host->pdata.hw_ecc) {
+ 		this->ecc.calculate = mxc_nand_calculate_ecc;
+ 		this->ecc.hwctl = mxc_nand_enable_hwecc;
+-- 
+1.7.10.4
