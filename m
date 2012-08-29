@@ -1,137 +1,85 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 29 Aug 2012 16:31:12 +0530
-Subject: [PATCH v4 3/3] ARM: dts: Add nodes for dw_mmc controllers for Samsung
- Exynos5250 platforms
-In-Reply-To: <1346238072-7324-1-git-send-email-thomas.abraham@linaro.org>
-References: <1346238072-7324-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1346238072-7324-4-git-send-email-thomas.abraham@linaro.org>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 29 Aug 2012 18:46:00 +0800
+Subject: [PATCH v2 05/11] USB: chipidea: don't let probe fail if otg
+ controller start one role failed
+In-Reply-To: <87mx1ejag0.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
+ <1346137397-32374-6-git-send-email-richard.zhao@freescale.com>
+ <87ligz2yyo.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120828092730.GY4011@b20223-02.ap.freescale.net>
+ <87vcg2jeyu.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120829083337.GI4011@b20223-02.ap.freescale.net>
+ <87mx1ejag0.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20120829104559.GB25433@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device nodes for the four instances of dw_mmc controllers in Exynos5250
-and enable instance 0 and 2 for the smdk5250 board.
+On Wed, Aug 29, 2012 at 12:48:15PM +0300, Alexander Shishkin wrote:
+> Richard Zhao <richard.zhao@freescale.com> writes:
+> 
+> > On Wed, Aug 29, 2012 at 11:10:33AM +0300, Alexander Shishkin wrote:
+> >> Richard Zhao <richard.zhao@freescale.com> writes:
+> >> 
+> >> > On Tue, Aug 28, 2012 at 11:38:23AM +0300, Alexander Shishkin wrote:
+> >> >> Richard Zhao <richard.zhao@freescale.com> writes:
+> >> >> 
+> >> >> > One role failed, but the other role will possiblly still work.
+> >> >> > For example, when udc start failed, if plug in a host device,
+> >> >> > it works.
+> >> >> 
+> >> >> If you're a host device, ci->role should be HOST at this point and
+> >> >> ci_role_start() shouldn't fail. If ci->role is detected wrongly, the
+> >> >> role detection must be fixed. If ci_role_start() fails for host, but it
+> >> >> still works when it's called again after the id pin change is detected,
+> >> >> again, the problem is elsewhere.
+> >> > The check is only for OTG device. For single role device, it just fail
+> >> > if it start the role failed.
+> >> 
+> >> Sorry, can you rephrase?
+> >> 
+> >> >> 
+> >> >> >
+> >> >> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> >> >> > ---
+> >> >> >  drivers/usb/chipidea/core.c |    7 +++++--
+> >> >> >  1 file changed, 5 insertions(+), 2 deletions(-)
+> >> >> >
+> >> >> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> >> >> > index 19ef324..8fd390a 100644
+> >> >> > --- a/drivers/usb/chipidea/core.c
+> >> >> > +++ b/drivers/usb/chipidea/core.c
+> >> >> > @@ -473,8 +473,11 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
+> >> >> >  	ret = ci_role_start(ci, ci->role);
+> >> >> >  	if (ret) {
+> >> >> >  		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
+> >> >> > -		ret = -ENODEV;
+> >> >> > -		goto rm_wq;
+> >> >> > +		ci->role = CI_ROLE_END;
+> >> >> 
+> >> >> So are you relying on id pin interrupt for initializing the role after
+> >> >> this? Can you provide more details?
+> >> > Yes. The ID pin detect still works. My case is, gadget role failed,
+> >> > host role works. I was trying not to ruin host function.
+> >> 
+> >> But it shouldn't even try to start the gadget, because ci_otg_role()
+> >> should set ci->role to HOST before ci_role_start() happens.
+> > It depends on ID pin. If ID pin is gadget and gadget is not support well,
+> > ci_role_start will fail. See below example.
+> >> 
+> >> Another question is, why does gadget start fail?
+> > There's one example:
+> > If usb phy don't support otg yet, otg_set_peripheral will fail, and
+> > then cause udc_start fail.
+> 
+> So you should drop the CI13XXX_REQUIRE_TRANSCEIVER flag from imx
+> platform data till the phy is fully implemented.
+It's just an example. We can not assume udc_start always success. If it
+fails, isn't it better to continue support of host than say game over?
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- arch/arm/boot/dts/exynos5250-smdk5250.dts |   55 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos5250.dtsi         |   32 +++++++++++++++++
- 2 files changed, 87 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index 8a5e348..d57e8e0 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -16,6 +16,13 @@
- 	model = "SAMSUNG SMDK5250 board based on EXYNOS5250";
- 	compatible = "samsung,smdk5250", "samsung,exynos5250";
- 
-+	aliases {
-+		mshc0 = &dwmmc_0;
-+		mshc1 = &dwmmc_1;
-+		mshc2 = &dwmmc_2;
-+		mshc3 = &dwmmc_3;
-+	};
-+
- 	memory {
- 		reg = <0x40000000 0x80000000>;
- 	};
-@@ -72,6 +79,54 @@
- 		status = "disabled";
- 	};
- 
-+	dwmmc_0: dwmmc0 at 12200000 {
-+		num-slots = <1>;
-+		supports-highspeed;
-+		broken-cd;
-+		fifo-depth = <0x80>;
-+		card-detect-delay = <200>;
-+		samsung,dw-mshc-sdr-timing = <2 3 3>;
-+		samsung,dw-mshc-ddr-timing = <1 2 3>;
-+
-+		slot at 0 {
-+			reg = <0>;
-+			bus-width = <8>;
-+			gpios = <&gpc0 0 2 0 3>, <&gpc0 1 2 0 3>,
-+				<&gpc1 0 2 3 3>, <&gpc1 1 2 3 3>,
-+				<&gpc1 2 2 3 3>, <&gpc1 3 2 3 3>,
-+				<&gpc0 3 2 3 3>, <&gpc0 4 2 3 3>,
-+				<&gpc0 5 2 3 3>, <&gpc0 6 2 3 3>;
-+		};
-+	};
-+
-+	dwmmc_1: dwmmc1 at 12210000 {
-+		status = "disabled";
-+	};
-+
-+	dwmmc_2: dwmmc2 at 12220000 {
-+		num-slots = <1>;
-+		supports-highspeed;
-+		fifo-depth = <0x80>;
-+		card-detect-delay = <200>;
-+		samsung,dw-mshc-sdr-timing = <2 3 3>;
-+		samsung,dw-mshc-ddr-timing = <1 2 3>;
-+
-+		slot at 0 {
-+			reg = <0>;
-+			bus-width = <4>;
-+			samsung,cd-pinmux-gpio = <&gpc3 2 2 3 3>;
-+			gpios = <&gpc3 0 2 0 3>, <&gpc3 1 2 0 3>,
-+				<&gpc3 3 2 3 3>, <&gpc3 4 2 3 3>,
-+				<&gpc3 5 2 3 3>, <&gpc3 6 2 3 3>,
-+				<&gpc4 3 3 3 3>, <&gpc4 3 3 3 3>,
-+				<&gpc4 5 3 3 3>, <&gpc4 6 3 3 3>;
-+		};
-+	};
-+
-+	dwmmc_3: dwmmc3 at 12230000 {
-+		status = "disabled";
-+	};
-+
- 	spi_0: spi at 12d20000 {
- 		status = "disabled";
- 	};
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 004aaa8..f69e389 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -182,6 +182,38 @@
- 		#size-cells = <0>;
- 	};
- 
-+	dwmmc0 at 12200000 {
-+		compatible = "samsung,exynos5250-dw-mshc";
-+		reg = <0x12200000 0x1000>;
-+		interrupts = <0 75 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	dwmmc1 at 12210000 {
-+		compatible = "samsung,exynos5250-dw-mshc";
-+		reg = <0x12210000 0x1000>;
-+		interrupts = <0 76 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	dwmmc2 at 12220000 {
-+		compatible = "samsung,exynos5250-dw-mshc";
-+		reg = <0x12220000 0x1000>;
-+		interrupts = <0 77 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	dwmmc3 at 12230000 {
-+		compatible = "samsung,exynos5250-dw-mshc";
-+		reg = <0x12230000 0x1000>;
-+		interrupts = <0 78 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
- 	amba {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--- 
-1.6.6.rc2
+Thanks
+Richard
+> 
+> Regards,
+> --
+> Alex
+> 
