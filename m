@@ -1,90 +1,58 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 29 Aug 2012 13:01:37 +0200
-Subject: [PATCH v6 1/3] USB: chipidea: add imx usbmisc support
-In-Reply-To: <87ehmqj925.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1346137109-32247-1-git-send-email-richard.zhao@freescale.com>
- <1346137109-32247-2-git-send-email-richard.zhao@freescale.com>
- <871uiqkuhb.fsf@ashishki-desk.ger.corp.intel.com>
- <20120829081020.GX26594@pengutronix.de>
- <87ehmqj925.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20120829110137.GA26594@pengutronix.de>
+From: sangsu4u.park@samsung.com (Sangsu Park)
+Date: Wed, 29 Aug 2012 20:06:32 +0900
+Subject: [PATCH] ASoC: SAMSUNG: Add SND_SOC_DAIFMT_CONT option for
+ snd_soc_set_fmt()
+In-Reply-To: <20120827204550.GA4400@opensource.wolfsonmicro.com>
+References: <003101cd8367$3476e650$9d64b2f0$@samsung.com>
+ <20120827204550.GA4400@opensource.wolfsonmicro.com>
+Message-ID: <001d01cd85d6$59298040$0b7c80c0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2012 at 01:18:10PM +0300, Alexander Shishkin wrote:
-> Sascha Hauer <s.hauer@pengutronix.de> writes:
-> 
-> > On Wed, Aug 29, 2012 at 10:50:08AM +0300, Alexander Shishkin wrote:
-> >> Richard Zhao <richard.zhao@freescale.com> writes:
-> >> 
-> >> > i.MX usb controllers shares non-core registers, which may include
-> >> > SoC specific controls. We take it as a usbmisc device and usbmisc
-> >> > driver set operations needed by ci13xxx_imx driver.
-> >> >
-> >> > For example, Sabrelite board has bad over-current design, we can
-> >> > usbmisc to disable over-current detect.
-> >> 
-> >> Why does this have to be part of the usb driver instead of SoC specific
-> >> code? It looks like you've created a whole new device/driver
-> >> infrastructure just to disable overcurrent for a specific board.
+On Sun, Aug 26, 2012 at 05:45:54PM +0900, Mark Brown wrote:
+> On Sun, Aug 26, 2012 at 05:45:54PM +0900,  ?    wrote:
+> > SND_SOC_DAIFMT_CONT option is now needed because of below commit:
 > >
-> > Richards code indeed only handles overcurrent for a specific board, but
-> > there are more bits to configure in the longer run: power pin
-> > polarities, ULPI/serial mode select and some more.
+> > ASoC: Allow DAI formats to be specified in the dai_link
 > 
-> Sounds to me like these things that should be taken care of by the phy
-> driver, which will likely be simpler from both driver's and devicetree's
-> perspective.
+> Clearly it's not a direct consequence of this commit, that just introduces a new optional facility
+> which...
+OK, I'll change it.
+> 
+> >  	/* Set the cpu DAI configuration */
+> >  	ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_DSP_B
+> > +				| SND_SOC_DAIFMT_CONT
+> >  				| SND_SOC_DAIFMT_IB_NF
+> >  				| SND_SOC_DAIFMT_CBS_CFS);
+> 
+> ...isn't being used by the driver.
+> 
+> Looking at the above it looks like the PCM driver is doing something very odd - _CONT doesn't make
+> a whole lot of sense on the slave side, it's related to the clock generation so should have no
+> effect at all on the slave side.  The driver code looks reasonably sensible though.
+You mean cpu side is slave? 
+And I think that pcm driver can be changed to solve this issue.
+> 
+> What specifically is going wrong here?
+SND_SOC_DAIFMT_CONT is used sound/soc/Samsung/pcm.c (s3c_pcm_set_fmt()) like below.
 
-Most i.MX SoCs have three instances of the chipidea core. These cores
-share a single register space for controlling the mentioned bits (the
-usbmisc register space). The usbmisc looks different on the different
-SoCs.
-Indeed they control some phy specific aspects, but the phy itself may
-also be an external ULPI or UTMI phy with a separate driver. So if we
-integrate the usbmisc into the phy wouldn't that mean that it has to
-be integrated into all possible phy drivers?
+switch (fmt & SND_SOC_DAIFMT_CLOCK_MASK) {
+        case SND_SOC_DAIFMT_CONT:
+                pcm->idleclk = 1;
+                break;
+        case SND_SOC_DAIFMT_GATED:
+                pcm->idleclk = 0;
+                break;
+        default:
+                dev_err(pcm->dev, "Invalid Clock gating request!\n");
+                ret = -EINVAL;
+                goto exit;
+        }
 
->From a devicetrees perspective it makes sense to integrate the flags
-into the chipidea nodes, because there is one node per chipidea core,
-but only one usbmisc unit for all ports on the SoC. So we can do a:
-
-	chipidea at ofs {
-		disable-overcurrent = <1>;
-	};
-
-instead of
-
-	usbmisc at ofs {
-		disable-overcurrent-port0 = <1>;
-		disable-overcurrent-port1 = <0>;
-		...
-	};
+If fmt argument has no SND_SOC_DAIFMT_ option, s3c_pcm_set_fmt() return -EINVAL.
 
 > 
-> >
-> >> 
-> >> And the infrastructure boils down to a complex way of passing a callback
-> >> from imx driver to another imx driver, that only works if they are
-> >> probed in the right order. I don't see any point in doing it like this
-> >> other than inflating the device tree tables even further.
-> >> 
-> >> Why can't this be part of the SoC code like it is done, for example in
-> >> arch/arm/mach-omap2/control.c?
-> >
-> > The settings are board specific, so there must be some way to configure
-> > them in the devicetree.
-> 
-> But I'm sure there's a way to control board-specific settings/kludges
-> from devicetree?
-
-Hm, yes. That's what Richard does, right? I may be misunderstanding you
-here.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
