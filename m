@@ -1,40 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 29 Aug 2012 15:40:24 +0200
-Subject: [PATCH 4/4] ARM: dts: mxs: add oled support for the cfa-10036
-In-Reply-To: <20120823144541.GL24242@S2101-09.ap.freescale.net>
-References: <1345711351-16367-1-git-send-email-maxime.ripard@free-electrons.com>
- <1345711351-16367-5-git-send-email-maxime.ripard@free-electrons.com>
- <20120823144541.GL24242@S2101-09.ap.freescale.net>
-Message-ID: <503E1BC8.8060500@free-electrons.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 29 Aug 2012 15:52:23 +0200
+Subject: [PATCH 1/3] ARM: EXYNOS: Use EXYNOS4210_GPEx instead of
+ EXYNOS4_GPEx
+In-Reply-To: <CAH9JG2UF6cqPcX4idYLRBHwLvs27ErtbwsjEFvMZbyfz_KNsZw@mail.gmail.com>
+References: <4648723.rWnut7F0uJ@amdc1227> <503D57EF.2090402@samsung.com>
+ <CAH9JG2UF6cqPcX4idYLRBHwLvs27ErtbwsjEFvMZbyfz_KNsZw@mail.gmail.com>
+Message-ID: <3351890.rVcxVBV0WB@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Le 23/08/2012 16:45, Shawn Guo a ?crit :
-> On Thu, Aug 23, 2012 at 10:42:31AM +0200, Maxime Ripard wrote:
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> Cc: Brian Lilly <brian@crystalfontz.com>
->> ---
->>  arch/arm/boot/dts/imx28-cfa10036.dts |   20 ++++++++++++++++++++
->>  1 file changed, 20 insertions(+)
->>
-> Looks mostly good, but I have to postpone it until driver part gets
-> accepted.
+On Wednesday 29 of August 2012 09:03:12 Kyungmin Park wrote:
+> On 8/29/12, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Please see my comments on Joonyoung Shim's previous patch...
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/101522.h
+> > tml
+> It's perference issue. some person like this style. others doesn't.
+> Moreever vender, System LSI, provided codes have whole different style.
+> It lists up whole gpios for each SoCs.
+> 
+> EXYNOS4210_{A0, .... Z}
+> EXYNOS4412_{A0, .... V4}
+> EXYNOS5250_{A0, .... Z}
+> 
+> anyway, just remain it as broken, and try to use pinctl as Thomas
+> mentioned.
 
-Yes, I totally understand that.
+OK, I will drop this patchset for the time being. Let's get the pinctrl 
+driver merged first and then investigate Exynos4x12 support in it.
 
-Florian, are you ok with merging the fb driver in the first patch?
-
-> Some minor comments below.
-
-Ok, I'll send an update with the next version of the patchset if there
-is comments on the driver, or alone if the driver is merged as is.
-
-Maxime
-
+Best regards,
 -- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Tomasz Figa
+Samsung Poland R&D Center
