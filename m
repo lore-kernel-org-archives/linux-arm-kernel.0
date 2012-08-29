@@ -1,66 +1,128 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Wed, 29 Aug 2012 11:03:48 +0300
-Subject: [PATCH v2 04/11] USB: chipidea: clear gadget struct at udc_start
- fail path
-In-Reply-To: <20120828090942.GX4011@b20223-02.ap.freescale.net>
-References: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
- <1346137397-32374-5-git-send-email-richard.zhao@freescale.com>
- <87oblv2zdc.fsf@ashishki-desk.ger.corp.intel.com>
- <20120828090942.GX4011@b20223-02.ap.freescale.net>
-Message-ID: <87y5kyjfa3.fsf@ashishki-desk.ger.corp.intel.com>
+From: valentin.longchamp@keymile.com (Valentin Longchamp)
+Date: Wed, 29 Aug 2012 10:04:21 +0200
+Subject: [RFC PATCH] ARM: initial DTS support for km_kirkwood
+In-Reply-To: <20120828122054.GG31704@lunn.ch>
+References: <1346154976-16916-1-git-send-email-valentin.longchamp@keymile.com>
+ <20120828122054.GG31704@lunn.ch>
+Message-ID: <503DCD05.5040500@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Zhao <richard.zhao@freescale.com> writes:
+Hi Andrew,
 
-> On Tue, Aug 28, 2012 at 11:29:35AM +0300, Alexander Shishkin wrote:
->> Richard Zhao <richard.zhao@freescale.com> writes:
->> 
->> > States in gadget are not needed any more, set it to zero.
->> 
->> It's generally a good practice to mention in the commit message what is
->> it that you are fixing with this patch.
-> It fixes the following dump if udc_start register gadget->dev but fail
-> the start process:
-> kobject (bf8330a0): tried to init an initialized object, something is seriously wrong.
-> [<80011d90>] (dump_backtrace+0x0/0x10c) from [<804b65ac>] (dump_stack+0x18/0x1c)
-> [<804b6594>] (dump_stack+0x0/0x1c) from [<80247d98>] (kobject_init+0x7c/0x9c)
-> [<80247d1c>] (kobject_init+0x0/0x9c) from [<802a3870>] (device_initialize+0x28/0x70)
-> [<802a3848>] (device_initialize+0x0/0x70) from [<802a4798>] (device_register+0x14/0x20)
-> [<802a4784>] (device_register+0x0/0x20) from [<80359a70>] (udc_start+0x180/0x2c8)
-> [<803598f0>] (udc_start+0x0/0x2c8) from [<80356e9c>] (ci_role_work+0xc8/0xec)
-> [<80356dd4>] (ci_role_work+0x0/0xec) from [<8003a8a0>] (process_one_work+0x158/0x474)
-> [<8003a748>] (process_one_work+0x0/0x474) from [<8003af6c>] (worker_thread+0x140/0x3b4)
-> [<8003ae2c>] (worker_thread+0x0/0x3b4) from [<8003fe60>] (kthread+0x90/0x9c)
-> [<8003fdd0>] (kthread+0x0/0x9c) from [<8002774c>] (do_exit+0x0/0x350)
->> 
->> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
->> > ---
->> >  drivers/usb/chipidea/udc.c |    1 +
->> >  1 file changed, 1 insertion(+)
->> >
->> > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
->> > index c7a032a..9fb6394 100644
->> > --- a/drivers/usb/chipidea/udc.c
->> > +++ b/drivers/usb/chipidea/udc.c
->> > @@ -1746,6 +1746,7 @@ free_pools:
->> >  	dma_pool_destroy(ci->td_pool);
->> >  free_qh_pool:
->> >  	dma_pool_destroy(ci->qh_pool);
->> > +	memset(&ci->gadget, 0, sizeof(ci->gadget));
->> 
->> I understand that you're probably hitting "kobject already initialized"
->> warning here, but I think the real problem is that this function gets
->> called twice and fails the first time. Why does that happen?
-> I saw the dump at early stage of adding imx otg support, when there's
-> things not ready. I think it's less important why udc_start fail,
-> because no one enable imx otg before.  It's important when it fails,
-> the dump shows up.
+On 08/28/2012 02:20 PM, Andrew Lunn wrote:
+> Hi Valentin
+> 
+>> This is a first attempt to support the km_kirkwood reference design with
+>> a device tree. This km_kirkwood design is present in many Keymile
+>> products. It is based on the Marvell Bobcat SOC which integrates a
+>> Kirkwood CPU next to a big L2 Ethernet Switch. The Kirkwood in the SOC
+>> is very similar to the "normal" one, but there are a few differences.
+> 
+> Is there a public datasheet for this device?
 
-I'd prefer that whenever udc_start() fails it doesn't go unnoticed,
-except probably for the cases when it fails due to transceiver not being
-ready at the probe time, which needs to be handled separately.
+Unfortunately I am not aware of such a document. I have just checked on
+Marvell's website and I haven't found anything. All the documents we have are
+under NDA.
 
-Regards,
---
-Alex
+> 
+>> diff --git a/arch/arm/mach-kirkwood/board-km_kirkwood.c b/arch/arm/mach-kirkwood/board-km_kirkwood.c
+>> new file mode 100644
+>> index 0000000..7a103db
+>> --- /dev/null
+>> +++ b/arch/arm/mach-kirkwood/board-km_kirkwood.c
+>> @@ -0,0 +1,75 @@
+>> +/*
+>> + * Copyright 2012 2012 KEYMILE AG, CH-3097 Bern
+>> + * Valentin Longchamp <valentin.longchamp@keymile.com>
+>> + *
+>> + * arch/arm/mach-kirkwood/board-km_kirkwood.c
+>> + *
+>> + * Keymile km_kirkwood Reference Desing Init for drivers not converted to
+>> + * flattened device tree yet.
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2.  This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/init.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/ata_platform.h>
+>> +#include <linux/mv643xx_eth.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/of_fdt.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/of_platform.h>
+>> +#include <linux/gpio.h>
+>> +#include <linux/mtd/physmap.h>
+>> +#include <linux/spi/flash.h>
+>> +#include <linux/spi/spi.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/clk-private.h>
+>> +#include <asm/mach-types.h>
+>> +#include <asm/mach/arch.h>
+>> +#include <asm/mach/map.h>
+>> +#include <mach/kirkwood.h>
+>> +#include <mach/bridge-regs.h>
+>> +#include <plat/mvsdio.h>
+>> +#include "common.h"
+>> +#include "mpp.h"
+> 
+> Please remove all the header files you don't need.
+
+OK.
+
+> 
+>> +
+>> +static struct mv643xx_eth_platform_data km_kirkwood_ge00_data = {
+>> +	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+>> +};
+>> +
+>> +static unsigned int km_kirkwood_mpp_config[] __initdata = {
+>> +	MPP8_GPIO,	/* I2C SDA */
+>> +	MPP9_GPIO,	/* I2C SCL */
+>> +	0
+>> +};
+>> +
+>> +void __init km_kirkwood_init(void)
+>> +{
+>> +	struct clk *sata_clk;
+>> +	/*
+>> +	 * Basic setup. Needs to be called early.
+>> +	 */
+>> +
+>> +	kirkwood_mpp_conf(km_kirkwood_mpp_config);
+>> +
+>> +	/*
+>> +	 * Our variant of kirkwood (integrated in the Bobcat) hangs on accessing
+>> +	 * SATA bits (14-15) of the Clock Gating Control Register. Since these
+>> +	 * devices are also not present in this variant, their clocks get
+>> +	 * disabled because unused when clk_disable_unused() gets called.
+> 
+> So there is no SATA at all on this SoC? Anything else missing which a
+> 'normal' kirkwood has?
+
+No SATA at all. Yes, other missing peripherals are RTC, SDIO, I2S (Audio), TDM,
+TS (MPEG-2 Transport Stream).
+
+> 
+> If there a way to identify the chipset? e.g. what does 
+> 
+> kirkwood_pcie_id(&dev, &rev);
+> 
+> give? It would be better to not create the clocks at all, if we could
+> determine at runtime the hardware was not there.
+> 
+
+Yeah I agree, it would be much better. However here is what is returned from the
+kirkwood_pcie_id call in kirkwood_dt_init() (kirkwood_id())
+
+> Kirkwood: MV88F6281-A0, TCLK=200000000.
+
+To me it looks like this is the exact same ID as the usual kirkwood version so
+we cannot determine this at runtime (at least not with that ID).
+
+Valentin
