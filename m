@@ -1,33 +1,40 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 29 Aug 2012 07:35:23 +0200
-Subject: [PATCH] ARM: Build dtb files in all target
-Message-ID: <1346218523-15958-1-git-send-email-andrew@lunn.ch>
+From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
+Date: Wed, 29 Aug 2012 07:56:25 +0200
+Subject: [PATCH] clk: Make the generic clock API available by default
+In-Reply-To: <1346186104-4083-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1346186104-4083-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <20120829055625.GA17753@samfundet.no>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tools like kisskb are good at finding build regressions in the kernel
-sources. However, regressions in the DT desscriptions are not found,
-because generally these build systems don't build the DT binary blobs.
+Around Tue 28 Aug 2012 13:35:04 -0700 or thereabout, Mark Brown wrote:
+> Rather than requiring platforms to select the generic clock API to make
+> it available make the API available as a user selectable option unless the
+> user either selects HAVE_CUSTOM_CLK (if they have their own implementation)
+> or selects COMMON_CLK (if they depend on the generic implementation).
+> 
+> All current architectures that HAVE_CLK but don't use the common clock
+> framework have selects of HAVE_CUSTOM_CLK added.
+> 
+> This allows drivers to use the generic API on platforms which have no need
+> for the clock API at platform level.
+> 
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+> 
+> This depends on having one of the patches I've sent adding a generic
+> clkdev.h added merged - Arnd was expecting to merge one of those, there
+> was just the lack of clarity about the most practical Kbuild hookup.
+> 
+>  arch/arm/Kconfig            |   12 ++++++++++++
+>  arch/avr32/Kconfig          |    1 +
 
-Extend the ARM all target to build all enabled DTB files.
+For the AVR32 related changes
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/Makefile |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 30eae87..aee2b1e 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -268,7 +268,7 @@ else
- KBUILD_IMAGE := zImage
- endif
- 
--all:	$(KBUILD_IMAGE)
-+all:	$(KBUILD_IMAGE) dtbs
- 
- boot := arch/arm/boot
- 
+<snipp>
+
 -- 
-1.7.10.4
+mvh
+Hans-Christian Egtvedt
