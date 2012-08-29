@@ -1,106 +1,135 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 29 Aug 2012 09:55:33 +0300
-Subject: [RFC 3/5] ARM: dma-mapping: New dma_map_ops->iova_alloc*_at* function
+Date: Wed, 29 Aug 2012 09:55:31 +0300
+Subject: [RFC 1/5] ARM: dma-mapping: New dma_map_ops->iova_get_free_{total,
+ max} functions
 In-Reply-To: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
 References: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1346223335-31455-4-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1346223335-31455-2-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allocate IOVA area at specified address
+->iova>_get_free_total() returns the sum of available free areas.
+->iova>_get_free_max() returns the largest available free area size.
 
 Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
- arch/arm/include/asm/dma-mapping.h |    9 +++++++++
- arch/arm/mm/dma-mapping.c          |   35 +++++++++++++++++++++++++++++++++++
- include/linux/dma-mapping.h        |    2 ++
- 3 files changed, 46 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/dma-mapping.h |   16 ++++++++++
+ arch/arm/mm/dma-mapping.c          |   54 ++++++++++++++++++++++++++++++++++++
+ include/linux/dma-mapping.h        |    3 ++
+ 3 files changed, 73 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 5b86600..f04a533 100644
+index 2300484..1cbd279 100644
 --- a/arch/arm/include/asm/dma-mapping.h
 +++ b/arch/arm/include/asm/dma-mapping.h
-@@ -187,6 +187,15 @@ static inline void dma_iova_free(struct device *dev, dma_addr_t addr,
- 	ops->iova_free(dev, addr, size);
+@@ -170,6 +170,22 @@ static inline void dma_free_attrs(struct device *dev, size_t size,
+ 	ops->free(dev, size, cpu_addr, dma_handle, attrs);
  }
  
-+static inline dma_addr_t dma_iova_alloc_at(struct device *dev, dma_addr_t addr,
-+					   size_t size)
++static inline size_t dma_iova_get_free_total(struct device *dev)
 +{
 +	struct dma_map_ops *ops = get_dma_ops(dev);
 +	BUG_ON(!ops);
 +
-+	return ops->iova_alloc_at(dev, addr, size);
++	return ops->iova_get_free_total(dev);
 +}
 +
- static inline size_t dma_iova_get_free_total(struct device *dev)
- {
- 	struct dma_map_ops *ops = get_dma_ops(dev);
++static inline size_t dma_iova_get_free_max(struct device *dev)
++{
++	struct dma_map_ops *ops = get_dma_ops(dev);
++	BUG_ON(!ops);
++
++	return ops->iova_get_free_max(dev);
++}
++
+ /**
+  * arm_dma_mmap - map a coherent DMA allocation into user space
+  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
 diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index c18522a..8ca2d1a 100644
+index e4746b7..db17338 100644
 --- a/arch/arm/mm/dma-mapping.c
 +++ b/arch/arm/mm/dma-mapping.c
-@@ -1080,6 +1080,40 @@ static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
- 	return mapping->base + (start << (mapping->order + PAGE_SHIFT));
- }
+@@ -1001,6 +1001,57 @@ fs_initcall(dma_debug_do_init);
  
-+static dma_addr_t __alloc_iova_at(struct dma_iommu_mapping *mapping,
-+				  dma_addr_t iova, size_t size)
-+{
-+	unsigned int count, start, orig;
-+	unsigned long flags;
-+
-+	count = ((PAGE_ALIGN(size) >> PAGE_SHIFT) +
-+		 (1 << mapping->order) - 1) >> mapping->order;
-+
-+	spin_lock_irqsave(&mapping->lock, flags);
-+
-+	orig = (iova - mapping->base) >> (mapping->order + PAGE_SHIFT);
-+	start = bitmap_find_next_zero_area(mapping->bitmap, mapping->bits,
-+					   orig, count, 0);
-+
-+	if ((start > mapping->bits) || (orig != start)) {
-+		spin_unlock_irqrestore(&mapping->lock, flags);
-+		return DMA_ERROR_CODE;
-+	}
-+
-+	bitmap_set(mapping->bitmap, start, count);
-+	spin_unlock_irqrestore(&mapping->lock, flags);
-+
-+	return mapping->base + (start << (mapping->order + PAGE_SHIFT));
-+}
-+
-+static dma_addr_t arm_iommu_iova_alloc_at(struct device *dev, dma_addr_t iova,
-+				size_t size)
+ /* IOMMU */
+ 
++static size_t arm_iommu_iova_get_free_total(struct device *dev)
 +{
 +	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
++	unsigned long flags;
++	size_t size = 0;
++	unsigned long start = 0;
 +
-+	return __alloc_iova_at(mapping, iova, size);
++	BUG_ON(!dev);
++	BUG_ON(!mapping);
++
++	spin_lock_irqsave(&mapping->lock, flags);
++	while (1) {
++		unsigned long end;
++
++		start = bitmap_find_next_zero_area(mapping->bitmap,
++						   mapping->bits, start, 1, 0);
++		if (start > mapping->bits)
++			break;
++
++		end = find_next_bit(mapping->bitmap, mapping->bits, start);
++		size += end - start;
++		start = end;
++	}
++	spin_unlock_irqrestore(&mapping->lock, flags);
++	return size << (mapping->order + PAGE_SHIFT);
 +}
 +
- static dma_addr_t arm_iommu_iova_alloc(struct device *dev, size_t size)
++static size_t arm_iommu_iova_get_free_max(struct device *dev)
++{
++	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
++	unsigned long flags;
++	size_t max_free = 0;
++	unsigned long start = 0;
++
++	spin_lock_irqsave(&mapping->lock, flags);
++	while (1) {
++		unsigned long end;
++
++		start = bitmap_find_next_zero_area(mapping->bitmap,
++						   mapping->bits, start, 1, 0);
++		if (start > mapping->bits)
++			break;
++
++		end = find_next_bit(mapping->bitmap, mapping->bits, start);
++		max_free = max_t(size_t, max_free, end - start);
++		start = end;
++	}
++	spin_unlock_irqrestore(&mapping->lock, flags);
++	return max_free << (mapping->order + PAGE_SHIFT);
++}
++
+ static inline dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
+ 				      size_t size)
  {
- 	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
-@@ -1789,6 +1823,7 @@ struct dma_map_ops iommu_ops = {
+@@ -1721,6 +1772,9 @@ struct dma_map_ops iommu_ops = {
+ 	.unmap_sg		= arm_iommu_unmap_sg,
+ 	.sync_sg_for_cpu	= arm_iommu_sync_sg_for_cpu,
  	.sync_sg_for_device	= arm_iommu_sync_sg_for_device,
++
++	.iova_get_free_total	= arm_iommu_iova_get_free_total,
++	.iova_get_free_max	= arm_iommu_iova_get_free_max,
+ };
  
- 	.iova_alloc		= arm_iommu_iova_alloc,
-+	.iova_alloc_at		= arm_iommu_iova_alloc_at,
- 	.iova_free		= arm_iommu_iova_free,
- 	.iova_get_free_total	= arm_iommu_iova_get_free_total,
- 	.iova_get_free_max	= arm_iommu_iova_get_free_max,
+ struct dma_map_ops iommu_coherent_ops = {
 diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index e85aa04..4cf4427 100644
+index 94af418..0337182 100644
 --- a/include/linux/dma-mapping.h
 +++ b/include/linux/dma-mapping.h
-@@ -54,6 +54,8 @@ struct dma_map_ops {
+@@ -53,6 +53,9 @@ struct dma_map_ops {
+ #ifdef ARCH_HAS_DMA_GET_REQUIRED_MASK
  	u64 (*get_required_mask)(struct device *dev);
  #endif
- 	dma_addr_t (*iova_alloc)(struct device *dev, size_t size);
-+	dma_addr_t (*iova_alloc_at)(struct device *dev, dma_addr_t dma_addr,
-+				    size_t size);
- 	void (*iova_free)(struct device *dev, dma_addr_t addr, size_t size);
- 	size_t (*iova_get_free_total)(struct device *dev);
- 	size_t (*iova_get_free_max)(struct device *dev);
++	size_t (*iova_get_free_total)(struct device *dev);
++	size_t (*iova_get_free_max)(struct device *dev);
++
+ 	int is_phys;
+ };
+ 
 -- 
 1.7.5.4
