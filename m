@@ -1,128 +1,64 @@
-From: valentin.longchamp@keymile.com (Valentin Longchamp)
-Date: Wed, 29 Aug 2012 10:04:21 +0200
-Subject: [RFC PATCH] ARM: initial DTS support for km_kirkwood
-In-Reply-To: <20120828122054.GG31704@lunn.ch>
-References: <1346154976-16916-1-git-send-email-valentin.longchamp@keymile.com>
- <20120828122054.GG31704@lunn.ch>
-Message-ID: <503DCD05.5040500@keymile.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Wed, 29 Aug 2012 11:10:33 +0300
+Subject: [PATCH v2 05/11] USB: chipidea: don't let probe fail if otg
+ controller start one role failed
+In-Reply-To: <20120828092730.GY4011@b20223-02.ap.freescale.net>
+References: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
+ <1346137397-32374-6-git-send-email-richard.zhao@freescale.com>
+ <87ligz2yyo.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120828092730.GY4011@b20223-02.ap.freescale.net>
+Message-ID: <87vcg2jeyu.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Richard Zhao <richard.zhao@freescale.com> writes:
 
-On 08/28/2012 02:20 PM, Andrew Lunn wrote:
-> Hi Valentin
-> 
->> This is a first attempt to support the km_kirkwood reference design with
->> a device tree. This km_kirkwood design is present in many Keymile
->> products. It is based on the Marvell Bobcat SOC which integrates a
->> Kirkwood CPU next to a big L2 Ethernet Switch. The Kirkwood in the SOC
->> is very similar to the "normal" one, but there are a few differences.
-> 
-> Is there a public datasheet for this device?
+> On Tue, Aug 28, 2012 at 11:38:23AM +0300, Alexander Shishkin wrote:
+>> Richard Zhao <richard.zhao@freescale.com> writes:
+>> 
+>> > One role failed, but the other role will possiblly still work.
+>> > For example, when udc start failed, if plug in a host device,
+>> > it works.
+>> 
+>> If you're a host device, ci->role should be HOST at this point and
+>> ci_role_start() shouldn't fail. If ci->role is detected wrongly, the
+>> role detection must be fixed. If ci_role_start() fails for host, but it
+>> still works when it's called again after the id pin change is detected,
+>> again, the problem is elsewhere.
+> The check is only for OTG device. For single role device, it just fail
+> if it start the role failed.
 
-Unfortunately I am not aware of such a document. I have just checked on
-Marvell's website and I haven't found anything. All the documents we have are
-under NDA.
+Sorry, can you rephrase?
 
-> 
->> diff --git a/arch/arm/mach-kirkwood/board-km_kirkwood.c b/arch/arm/mach-kirkwood/board-km_kirkwood.c
->> new file mode 100644
->> index 0000000..7a103db
->> --- /dev/null
->> +++ b/arch/arm/mach-kirkwood/board-km_kirkwood.c
->> @@ -0,0 +1,75 @@
->> +/*
->> + * Copyright 2012 2012 KEYMILE AG, CH-3097 Bern
->> + * Valentin Longchamp <valentin.longchamp@keymile.com>
->> + *
->> + * arch/arm/mach-kirkwood/board-km_kirkwood.c
->> + *
->> + * Keymile km_kirkwood Reference Desing Init for drivers not converted to
->> + * flattened device tree yet.
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2.  This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/init.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/ata_platform.h>
->> +#include <linux/mv643xx_eth.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_fdt.h>
->> +#include <linux/of_irq.h>
->> +#include <linux/of_platform.h>
->> +#include <linux/gpio.h>
->> +#include <linux/mtd/physmap.h>
->> +#include <linux/spi/flash.h>
->> +#include <linux/spi/spi.h>
->> +#include <linux/clk.h>
->> +#include <linux/clk-private.h>
->> +#include <asm/mach-types.h>
->> +#include <asm/mach/arch.h>
->> +#include <asm/mach/map.h>
->> +#include <mach/kirkwood.h>
->> +#include <mach/bridge-regs.h>
->> +#include <plat/mvsdio.h>
->> +#include "common.h"
->> +#include "mpp.h"
-> 
-> Please remove all the header files you don't need.
+>> 
+>> >
+>> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+>> > ---
+>> >  drivers/usb/chipidea/core.c |    7 +++++--
+>> >  1 file changed, 5 insertions(+), 2 deletions(-)
+>> >
+>> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+>> > index 19ef324..8fd390a 100644
+>> > --- a/drivers/usb/chipidea/core.c
+>> > +++ b/drivers/usb/chipidea/core.c
+>> > @@ -473,8 +473,11 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
+>> >  	ret = ci_role_start(ci, ci->role);
+>> >  	if (ret) {
+>> >  		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
+>> > -		ret = -ENODEV;
+>> > -		goto rm_wq;
+>> > +		ci->role = CI_ROLE_END;
+>> 
+>> So are you relying on id pin interrupt for initializing the role after
+>> this? Can you provide more details?
+> Yes. The ID pin detect still works. My case is, gadget role failed,
+> host role works. I was trying not to ruin host function.
 
-OK.
+But it shouldn't even try to start the gadget, because ci_otg_role()
+should set ci->role to HOST before ci_role_start() happens.
 
-> 
->> +
->> +static struct mv643xx_eth_platform_data km_kirkwood_ge00_data = {
->> +	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
->> +};
->> +
->> +static unsigned int km_kirkwood_mpp_config[] __initdata = {
->> +	MPP8_GPIO,	/* I2C SDA */
->> +	MPP9_GPIO,	/* I2C SCL */
->> +	0
->> +};
->> +
->> +void __init km_kirkwood_init(void)
->> +{
->> +	struct clk *sata_clk;
->> +	/*
->> +	 * Basic setup. Needs to be called early.
->> +	 */
->> +
->> +	kirkwood_mpp_conf(km_kirkwood_mpp_config);
->> +
->> +	/*
->> +	 * Our variant of kirkwood (integrated in the Bobcat) hangs on accessing
->> +	 * SATA bits (14-15) of the Clock Gating Control Register. Since these
->> +	 * devices are also not present in this variant, their clocks get
->> +	 * disabled because unused when clk_disable_unused() gets called.
-> 
-> So there is no SATA at all on this SoC? Anything else missing which a
-> 'normal' kirkwood has?
+Another question is, why does gadget start fail?
 
-No SATA at all. Yes, other missing peripherals are RTC, SDIO, I2S (Audio), TDM,
-TS (MPEG-2 Transport Stream).
-
-> 
-> If there a way to identify the chipset? e.g. what does 
-> 
-> kirkwood_pcie_id(&dev, &rev);
-> 
-> give? It would be better to not create the clocks at all, if we could
-> determine at runtime the hardware was not there.
-> 
-
-Yeah I agree, it would be much better. However here is what is returned from the
-kirkwood_pcie_id call in kirkwood_dt_init() (kirkwood_id())
-
-> Kirkwood: MV88F6281-A0, TCLK=200000000.
-
-To me it looks like this is the exact same ID as the usual kirkwood version so
-we cannot determine this at runtime (at least not with that ID).
-
-Valentin
+Regards,
+--
+Alex
