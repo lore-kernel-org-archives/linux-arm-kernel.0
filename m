@@ -1,46 +1,64 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Wed, 29 Aug 2012 06:29:19 +0000
-Subject: [alsa-devel] [PATCH V2 1/6] ASoC: davinci: davinci-pcm does not
- need to be a plaform_driver
-In-Reply-To: <20120829062534.GB11919@newmaster.mivlgu.local>
-References: <1346074004-22172-1-git-send-email-gururaja.hebbar@ti.com>
- <1346074004-22172-2-git-send-email-gururaja.hebbar@ti.com>
- <20120829062534.GB11919@newmaster.mivlgu.local>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA6D3D0@DBDE01.ent.ti.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 29 Aug 2012 09:55:30 +0300
+Subject: [RFC 0/5] ARM: dma-mapping: New dma_map_ops to control IOVA more
+ precisely
+Message-ID: <1346223335-31455-1-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2012 at 11:55:34, Sergey Vlasov wrote:
-> On Mon, Aug 27, 2012 at 06:56:39PM +0530, Hebbar, Gururaja wrote:
-> > Same as the commit 518de86 (ASoC: tegra: register 'platform' from DAIs,
-> > get rid of pdev). It makes davinci-pcm not a platform_driver but helper
-> > to register "platform", so that the platform_device for davinci-pcm can
-> > be saved completely.
-> > 
-> > Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
-> > ---
-> > Changes from V1:
-> > 	- New Commit. Instanciate seudo-device (davinci-pcm) directly from DAI
-> > 	  driver rather than having a separate virtual-device registered
-> > 
-> > :100644 100644 c80c20a... 4b37e2a... M	sound/soc/davinci/davinci-evm.c
-> > :100644 100644 0a74b95... 407df72... M	sound/soc/davinci/davinci-i2s.c
-> > :100644 100644 6a2c54c... 34ee2f1... M	sound/soc/davinci/davinci-mcasp.c
+Hi,
 
-...snip...
-...snip...
+The following APIs are needed for us to support the legacy Tegra
+memory manager for devices("NvMap") with *DMA mapping API*.
 
-> >  	.name = "Voice Codec - CQ93VC",
-> >  	.stream_name = "CQ93",
-> >  	.cpu_dai_name = "davinci-vcif",
-> >  	.codec_dai_name = "cq93vc-hifi",
-> >  	.codec_name = "cq93vc-codec",
-> > +	.platform_name = "avinci-vcif",
-> 
-> Typo?
-> 
+New API:
 
-Oops. Sorry. Will send back a corrected patch ASAP
+ ->iova_alloc(): To allocate IOVA area.
+ ->iova_alloc_at(): To allocate IOVA area at specific address.
+ ->iova_free():  To free IOVA area.
 
-Regards, 
-Gururaja
+ ->map_page_at(): To map page at specific IOVA.
+
+misc:
+ ->iova_get_free_total(): To return how much IOVA is available totally.
+ ->iova_get_free_max():   To return the size of biggest IOVA area.
+
+Although  NvMap itself will be replaced soon, there are cases for the
+above API where we need to specify IOVA explicitly.
+
+(1) HWAs may require the address for special purpose, like reset vector.
+(2) IOVA linear mapping: ex: [RFC 5/5] ARM: dma-mapping: Introduce
+    dma_map_linear_attrs() for IOVA linear map
+(3) To support different heaps. To have allocation and mapping
+    independently.
+
+Some of them could be supported with creating different mappings, but
+currently a device can have a single contiguous mapping, and we cannot
+specifiy any address inside of a map since all IOVA alloction is done
+implicitly now.
+
+This is the revised version of:
+
+ http://lists.linaro.org/pipermail/linaro-mm-sig/2012-May/001947.html
+ http://lists.linaro.org/pipermail/linaro-mm-sig/2012-May/001948.html
+ http://lists.linaro.org/pipermail/linaro-mm-sig/2012-May/001949.html
+
+Any comment would be really appreciated.
+
+Hiroshi Doyu (5):
+  ARM: dma-mapping: New dma_map_ops->iova_get_free_{total,max}
+    functions
+  ARM: dma-mapping: New dma_map_ops->iova_{alloc,free}() functions
+  ARM: dma-mapping: New dma_map_ops->iova_alloc*_at* function
+  ARM: dma-mapping: New dma_map_ops->map_page*_at* function
+  ARM: dma-mapping: Introduce dma_map_linear_attrs() for IOVA linear
+    map
+
+ arch/arm/include/asm/dma-mapping.h       |   55 +++++++++++++
+ arch/arm/mm/dma-mapping.c                |  124 ++++++++++++++++++++++++++++++
+ include/asm-generic/dma-mapping-common.h |   20 +++++
+ include/linux/dma-mapping.h              |   14 ++++
+ 4 files changed, 213 insertions(+), 0 deletions(-)
+
+-- 
+1.7.5.4
