@@ -1,22 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 Aug 2012 16:50:38 -0700
-Subject: [PATCH 09/17] ARM: ux500: Add AB8500 CODEC node to DB8500 Device
- Tree
-In-Reply-To: <1345816913-4113-10-git-send-email-lee.jones@linaro.org>
-References: <1345816913-4113-1-git-send-email-lee.jones@linaro.org>
- <1345816913-4113-10-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdY057+e=Hc2r-EkTP4pneNfPKWVaz80DjaUcG-gGyJRxg@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 30 Aug 2012 16:51:13 -0700
+Subject: [PATCH v2 1/2] ARM: delay: set loops_per_jiffy when moving to
+ timer-based loop
+In-Reply-To: <1346275524-13817-1-git-send-email-will.deacon@arm.com>
+References: <1346275524-13817-1-git-send-email-will.deacon@arm.com>
+Message-ID: <503FFC71.1070506@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2012 at 7:01 AM, Lee Jones <lee.jones@linaro.org> wrote:
-
-> Ensure correct probing and pass though important configuration
-> options to the AB8500 CODEC driver when DT is enabled
+On 8/29/2012 2:25 PM, Will Deacon wrote:
+> The delay functions may be called by some platforms between switching to
+> the timer-based delay loop but before calibration. In this case, the
+> initial loops_per_jiffy may not be suitable for the timer (although a
+> compromise may be achievable) and delay times may be considered too
+> inaccurate.
 >
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> This patch updates loops_per_jiffy when switching to the timer-based
+> delay loop so that delays are consistent prior to calibration.
+>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Yours,
-Linus Walleij
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
