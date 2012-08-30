@@ -1,55 +1,36 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 30 Aug 2012 14:52:49 +0900
-Subject: [PATCH] ARM: shmobile: r8a7740: add USB24 clock explain and sample
- code
-In-Reply-To: <1346305969-27110-1-git-send-email-horms@verge.net.au>
-References: <1346305969-27110-1-git-send-email-horms@verge.net.au>
-Message-ID: <1346305969-27110-2-git-send-email-horms@verge.net.au>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 30 Aug 2012 09:29:05 +0300
+Subject: [PATCH resend] i.MX53 Nand support
+In-Reply-To: <1346226019-23560-1-git-send-email-s.hauer@pengutronix.de>
+References: <1346226019-23560-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1346308145.2848.529.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On Wed, 2012-08-29 at 09:40 +0200, Sascha Hauer wrote:
+> Hi All,
+> 
+> The following patches add i.MX53 and dt support to mxc_nand. This
+> is only a resent based on v3.6-rc3 as it seems this series slipped
+> through the cracks last time I posted it.
+> 
+> So Artem, if there are no objections, please consider applying up to
+> 3/4, I would then take 4/4 through my tree.
 
-USBCKCR is controlling USB parent clock and divide rate.
-This parent clock is used as a "usb24s" from other devices,
-but the "divide rate" is not used.
-Further, this clock itself is known as "usb24".
-So, to set this clock is a little confusable.
-This patch adds quick explain and sample code for this clock.
+Please, take a look at the l2-mtd.git tree, I already have all these
+patches. Actually, they are already in dwmw2's tree, the and were
+supposed to be merged already, but unfortunately the merge window was
+missed because (a) dwmw2 did not send a pull request early enough and
+(b) Linus decided to punish late pull-request senders and closed the
+merge window 2 days earlier than usually.
 
-Cc: Damian Hobson-Garcia <dhobsong@igel.co.jp>
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms@verge.net.au>
----
- arch/arm/mach-shmobile/clock-r8a7740.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
-index ad5fccc..a6a7583 100644
---- a/arch/arm/mach-shmobile/clock-r8a7740.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7740.c
-@@ -188,6 +188,22 @@ static struct clk pllc1_div2_clk = {
- };
- 
- /* USB clock */
-+/*
-+ * USBCKCR is controlling usb24 clock
-+ * bit[7] : parent clock
-+ * bit[6] : clock divide rate
-+ * And this bit[7] is used as a "usb24s" from other devices.
-+ * (Video clock / Sub clock / SPU clock)
-+ * You can controll this clock as a below.
-+ *
-+ * struct clk *usb24	= clk_get(dev,  "usb24");
-+ * struct clk *usb24s	= clk_get(NULL, "usb24s");
-+ * struct clk *system	= clk_get(NULL, "system_clk");
-+ * int rate = clk_get_rate(system);
-+ *
-+ * clk_set_parent(usb24s, system);  // for bit[7]
-+ * clk_set_rate(usb24, rate / 2);   // for bit[6]
-+ */
- static struct clk *usb24s_parents[] = {
- 	[0] = &system_clk,
- 	[1] = &extal2_clk
 -- 
-1.7.10.2.484.gcd07cc5
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120830/63b16be4/attachment.sig>
