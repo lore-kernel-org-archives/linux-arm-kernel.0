@@ -1,38 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 Aug 2012 16:30:55 -0700
-Subject: [PATCH 5/6] ARM: integrator: convert AMBA devices to device tree
-In-Reply-To: <20120820080210.GF7439@game.jcrosoft.org>
-References: <1345119373-22774-1-git-send-email-linus.walleij@linaro.org>
- <20120816124002.GB7439@game.jcrosoft.org>
- <CACRpkdZDMxk30YTkrumRveR3OuWptSpzNevrAvC2FxYShOZp-A@mail.gmail.com>
- <20120820080210.GF7439@game.jcrosoft.org>
-Message-ID: <CACRpkdYkfgY-dYD1L3_HkhFJL49d9GaSWd8ax2Rqm3BGFFHhdQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 30 Aug 2012 16:40:25 -0700
+Subject: [PATCH] clk: Make the generic clock API available by default
+In-Reply-To: <20120830171918.GE4356@opensource.wolfsonmicro.com>
+References: <1346186104-4083-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <503E8E6E.1010101@wwwdotorg.org>
+ <20120830171918.GE4356@opensource.wolfsonmicro.com>
+Message-ID: <503FF9E9.4020701@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2012 at 1:02 AM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 00:42 Sun 19 Aug     , Linus Walleij wrote:
-
-> no I mean why
->> >> +     OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_RTC_BASE,
->> >> +             "rtc", NULL),
->> >> +     OF_DEV_AUXDATA("arm,primecell", KMI0_BASE,
->> >> +             "kmi0", NULL),
->> >> +     OF_DEV_AUXDATA("arm,primecell", KMI1_BASE,
->> >> +             "kmi1", NULL),
+On 08/30/12 10:19, Mark Brown wrote:
+> On Wed, Aug 29, 2012 at 02:49:34PM -0700, Stephen Warren wrote:
+>> On 08/28/12 13:35, Mark Brown wrote:
 >
-> no platform data why do you use the AUXDATA?
+>>> @@ -674,6 +676,7 @@ config ARCH_TEGRA
+>>>   	select GENERIC_CLOCKEVENTS
+>>>   	select GENERIC_GPIO
+>>>   	select HAVE_CLK
+>>> +	select HAVE_CUSTOM_CLK
 >
-> as the OF_DEV_AUXDATA is deprecated now
+>> For 3.7, Tegra will switch to the common clock framework. I think
+>> this patch would then disable that. How should we resolve this -
+>> rebase the Tegra common-clk tree on top of any branch containing
+>> this patch in order to remove that select statement?
+>
+> I'd expect this to be applied on a separate branch so you should be able
+> to rebase your conversion on top of it or merge it into your branch
+> which should deal with things well enough I think?
 
-OK this is to get the right bus names of the devices.
-
-As I support boot from both device tree and without device tree, I cannot
-change all the names that e.g. the clock framework is tied to.
-
-Once we switch to pure device tree this can be changed at the user
-sites and all auxdata be removed.
-
-Yours,
-Linus Walleij
+That should work.
