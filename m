@@ -1,35 +1,34 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 30 Aug 2012 14:38:59 +0900
-Subject: [PATCH] ARM: shmobile: marzen: fixup smsc911x id for regulator
-In-Reply-To: <1346305139-24337-1-git-send-email-horms@verge.net.au>
-References: <1346305139-24337-1-git-send-email-horms@verge.net.au>
-Message-ID: <1346305139-24337-2-git-send-email-horms@verge.net.au>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 30 Aug 2012 07:39:12 +0200
+Subject: [PATCH] ARM: Kirkwood: Fix 'SZ_1M' undeclared here for
+ db88f6281-bp-setup.c
+Message-ID: <1346305152-14618-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Linux-next has failed to compile for kirkwood since 23 August with:
 
-dummy_supplies for smsc911x are registered as "smsc911x".
-smsc911x driver needs id = -1
+arch/arm/mach-kirkwood/db88f6281-bp-setup.c:29: error: 'SZ_1M' undeclared here (not in a function)
+arch/arm/mach-kirkwood/db88f6281-bp-setup.c:33: error: 'SZ_4M' undeclared here (not in a function)
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms@verge.net.au>
+Add missing <linux/sizes.h>
+
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/mach-shmobile/board-marzen.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-kirkwood/db88f6281-bp-setup.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-index 3a528cf..fcf5a47 100644
---- a/arch/arm/mach-shmobile/board-marzen.c
-+++ b/arch/arm/mach-shmobile/board-marzen.c
-@@ -67,7 +67,7 @@ static struct smsc911x_platform_config smsc911x_platdata = {
+diff --git a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+index d933593..be90b7d 100644
+--- a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
++++ b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+@@ -10,6 +10,7 @@
  
- static struct platform_device eth_device = {
- 	.name		= "smsc911x",
--	.id		= 0,
-+	.id		= -1,
- 	.dev  = {
- 		.platform_data = &smsc911x_platdata,
- 	},
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/sizes.h>
+ #include <linux/platform_device.h>
+ #include <linux/mtd/partitions.h>
+ #include <linux/ata_platform.h>
 -- 
-1.7.10.2.484.gcd07cc5
+1.7.10.4
