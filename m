@@ -1,38 +1,105 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 30 Aug 2012 08:31:07 +0200
-Subject: [PATCH resend] i.MX53 Nand support
-In-Reply-To: <1346308145.2848.529.camel@sauron.fi.intel.com>
-References: <1346226019-23560-1-git-send-email-s.hauer@pengutronix.de>
- <1346308145.2848.529.camel@sauron.fi.intel.com>
-Message-ID: <20120830063107.GD26594@pengutronix.de>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 30 Aug 2012 14:27:57 +0800
+Subject: [PATCH] [media] atmel_isi: allocate memory to store the isi
+ platform data.
+In-Reply-To: <alpine.DEB.2.00.1208291755220.3095@axis700.grange>
+References: <1346235093-28613-1-git-send-email-josh.wu@atmel.com>
+ <503E323A.8060409@samsung.com>
+ <alpine.DEB.2.00.1208291755220.3095@axis700.grange>
+Message-ID: <503F07ED.6080802@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2012 at 09:29:05AM +0300, Artem Bityutskiy wrote:
-> On Wed, 2012-08-29 at 09:40 +0200, Sascha Hauer wrote:
-> > Hi All,
-> > 
-> > The following patches add i.MX53 and dt support to mxc_nand. This
-> > is only a resent based on v3.6-rc3 as it seems this series slipped
-> > through the cracks last time I posted it.
-> > 
-> > So Artem, if there are no objections, please consider applying up to
-> > 3/4, I would then take 4/4 through my tree.
-> 
-> Please, take a look at the l2-mtd.git tree, I already have all these
-> patches. Actually, they are already in dwmw2's tree, the and were
-> supposed to be merged already, but unfortunately the merge window was
-> missed because (a) dwmw2 did not send a pull request early enough and
-> (b) Linus decided to punish late pull-request senders and closed the
-> merge window 2 days earlier than usually.
+Hi, all
 
-Ah, I missed to check the tree. Sorry for the noise then.
+Sorry, My mistake here. After checking the code, this ISI bug doesn't 
+exist in current mainline code. So I will *cancel* this patch.
 
-Thanks
- Sascha
+Since current mainline will copy this __initdata isi platform data to 
+one static structure in function at91_add_device_isi(...). Then pass 
+this static structure to the driver.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+So the ISI driver has no bug that isi platform became invalid. I meet 
+this is because I'm not call the at91_add_device_isi(...) since I try in 
+the DT support board.
+
+At last, even no above bug in the code, This isi_platform_data is still 
+need to stored in ISI driver. Since if we support DT then we need this 
+isi platform data and the function at91_add_device_isi(...) will not to 
+be called (it is in device file).
+
+So I think after soc-camera DT support is merged. Then I will send a DT 
+support patch for ISI driver which will embed the isi_platform_data into 
+atmel_isi.
+
+Thank you all for the replies. That helps a lot even in this small 
+patch.  :)
+
+On 8/30/2012 12:02 AM, Guennadi Liakhovetski wrote:
+> On Wed, 29 Aug 2012, Sylwester Nawrocki wrote:
+>
+>> Hi,
+>>
+>> On 08/29/2012 12:11 PM, Josh Wu wrote:
+>>> This patch fix the bug: ISI driver's platform data became invalid
+>>> when isi platform data's attribution is __initdata.
+>>>
+>>> If the isi platform data is passed as __initdata. Then we need store
+>>> it in driver allocated memory. otherwise when we use it out of the
+>>> probe() function, then the isi platform data is invalid.
+>>>
+>>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>>> ---
+>>>   drivers/media/platform/soc_camera/atmel-isi.c |   12 +++++++++++-
+>>>   1 file changed, 11 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+>>> index ec3f6a0..dc0fdec 100644
+>>> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+>>> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+>>> @@ -926,6 +926,7 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
+>>>   	clk_put(isi->mck);
+>>>   	clk_unprepare(isi->pclk);
+>>>   	clk_put(isi->pclk);
+>>> +	kfree(isi->pdata);
+>>>   	kfree(isi);
+>>>   
+>>>   	return 0;
+>>> @@ -968,8 +969,15 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
+>>>   		goto err_alloc_isi;
+>>>   	}
+>>>   
+>>> +	isi->pdata = kzalloc(sizeof(struct isi_platform_data), GFP_KERNEL);
+>>> +	if (!isi->pdata) {
+>>> +		ret = -ENOMEM;
+>>> +		dev_err(&pdev->dev, "Can't allocate isi platform data!\n");
+>>> +		goto err_alloc_isi_pdata;
+>>> +	}
+>>> +	memcpy(isi->pdata, pdata, sizeof(struct isi_platform_data));
+>>> +
+>> Why not just embed struct isi_platform_data in struct atmel_isi and drop this
+>> another kzalloc() ?
+>> Then you could simply do isi->pdata = *pdata.
+>>
+>> Also, is this going to work when this driver is build and as a module
+>> and its loading is deferred past system booting ? At that time the driver's
+>> platform data may be well discarded.
+> Right, it will be gone, I think.
+>
+>> You may wan't to duplicate it on the
+>> running boards in board code with kmemdup() or something.
+> How about removing __initdata from board code?
+>
+> Thanks
+> Guennadi
+> ---
+> Guennadi Liakhovetski, Ph.D.
+> Freelance Open-Source Software Developer
+> http://www.open-technology.de/
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Best Regards,
+Josh Wu
