@@ -1,105 +1,45 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 30 Aug 2012 14:27:57 +0800
-Subject: [PATCH] [media] atmel_isi: allocate memory to store the isi
- platform data.
-In-Reply-To: <alpine.DEB.2.00.1208291755220.3095@axis700.grange>
-References: <1346235093-28613-1-git-send-email-josh.wu@atmel.com>
- <503E323A.8060409@samsung.com>
- <alpine.DEB.2.00.1208291755220.3095@axis700.grange>
-Message-ID: <503F07ED.6080802@atmel.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 30 Aug 2012 16:10:11 +0900
+Subject: [PATCH] pwm: Call pwm_enable() before pwm_config()
+In-Reply-To: <50364FA4.7000401@metafoo.de>
+References: <217877237.2758643.1345731587941.JavaMail.root@advansee.com>
+ <50364FA4.7000401@metafoo.de>
+Message-ID: <002001cd867e$7e964130$7bc2c390$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, all
+On Friday, August 24, 2012 12:44 AM, Lars-Peter Clausen wrote:
+> 
+> On 08/23/2012 04:19 PM, Beno?t Th?baudeau wrote:
+> > Some PWM drivers enable the clock of the PWM peripheral in pwm_enable(). Hence,
+> > for these drivers, a call to pwm_config() does not have any effect before
+> > pwm_enable() has been called.
+> >
+> > This patch fixes the PWM users to make sure that they call pwm_enable() before
+> > pwm_config().
+> >
+> > This fixes the first setting of brightness through sysfs that had no effect with
+> > leds-pwm and the i.MX PWM driver.
+> 
+> But isn't this a bug in the PWM peripheral driver? With this change the PWM
+> will start with the old settings first. While this is not so much of a problem
+> for a backlight (although it might cause a short flickering) it might cause
+> problems for other applications, like using the PWM pin as a timing generator.
+> In my opinion it's better to fix the PWM peripheral drivers which have this
+> problem instead of trying to work around it in every user of the PWM API.
 
-Sorry, My mistake here. After checking the code, this ISI bug doesn't 
-exist in current mainline code. So I will *cancel* this patch.
+Hi Lars-Peter Clausen,
 
-Since current mainline will copy this __initdata isi platform data to 
-one static structure in function at91_add_device_isi(...). Then pass 
-this static structure to the driver.
+I think so.
+It would be better to fix the PWM peripheral drivers.
 
-So the ISI driver has no bug that isi platform became invalid. I meet 
-this is because I'm not call the at91_add_device_isi(...) since I try in 
-the DT support board.
 
-At last, even no above bug in the code, This isi_platform_data is still 
-need to stored in ISI driver. Since if we support DT then we need this 
-isi platform data and the function at91_add_device_isi(...) will not to 
-be called (it is in device file).
+Best regards,
+Jingoo Han
 
-So I think after soc-camera DT support is merged. Then I will send a DT 
-support patch for ISI driver which will embed the isi_platform_data into 
-atmel_isi.
-
-Thank you all for the replies. That helps a lot even in this small 
-patch.  :)
-
-On 8/30/2012 12:02 AM, Guennadi Liakhovetski wrote:
-> On Wed, 29 Aug 2012, Sylwester Nawrocki wrote:
->
->> Hi,
->>
->> On 08/29/2012 12:11 PM, Josh Wu wrote:
->>> This patch fix the bug: ISI driver's platform data became invalid
->>> when isi platform data's attribution is __initdata.
->>>
->>> If the isi platform data is passed as __initdata. Then we need store
->>> it in driver allocated memory. otherwise when we use it out of the
->>> probe() function, then the isi platform data is invalid.
->>>
->>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->>> ---
->>>   drivers/media/platform/soc_camera/atmel-isi.c |   12 +++++++++++-
->>>   1 file changed, 11 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
->>> index ec3f6a0..dc0fdec 100644
->>> --- a/drivers/media/platform/soc_camera/atmel-isi.c
->>> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
->>> @@ -926,6 +926,7 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
->>>   	clk_put(isi->mck);
->>>   	clk_unprepare(isi->pclk);
->>>   	clk_put(isi->pclk);
->>> +	kfree(isi->pdata);
->>>   	kfree(isi);
->>>   
->>>   	return 0;
->>> @@ -968,8 +969,15 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
->>>   		goto err_alloc_isi;
->>>   	}
->>>   
->>> +	isi->pdata = kzalloc(sizeof(struct isi_platform_data), GFP_KERNEL);
->>> +	if (!isi->pdata) {
->>> +		ret = -ENOMEM;
->>> +		dev_err(&pdev->dev, "Can't allocate isi platform data!\n");
->>> +		goto err_alloc_isi_pdata;
->>> +	}
->>> +	memcpy(isi->pdata, pdata, sizeof(struct isi_platform_data));
->>> +
->> Why not just embed struct isi_platform_data in struct atmel_isi and drop this
->> another kzalloc() ?
->> Then you could simply do isi->pdata = *pdata.
->>
->> Also, is this going to work when this driver is build and as a module
->> and its loading is deferred past system booting ? At that time the driver's
->> platform data may be well discarded.
-> Right, it will be gone, I think.
->
->> You may wan't to duplicate it on the
->> running boards in board code with kmemdup() or something.
-> How about removing __initdata from board code?
->
-> Thanks
-> Guennadi
-> ---
-> Guennadi Liakhovetski, Ph.D.
-> Freelance Open-Source Software Developer
-> http://www.open-technology.de/
+> 
+> - Lars
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-Best Regards,
-Josh Wu
