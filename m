@@ -1,34 +1,20 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 30 Aug 2012 07:39:12 +0200
-Subject: [PATCH] ARM: Kirkwood: Fix 'SZ_1M' undeclared here for
- db88f6281-bp-setup.c
-Message-ID: <1346305152-14618-1-git-send-email-andrew@lunn.ch>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 30 Aug 2012 14:43:13 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC: KZM-9A-GT for 3.7
+In-Reply-To: <503C1B97.3070004@kmckk.co.jp>
+References: <1346113116-20252-1-git-send-email-horms@verge.net.au>
+ <503C1B97.3070004@kmckk.co.jp>
+Message-ID: <20120830054313.GA25362@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linux-next has failed to compile for kirkwood since 23 August with:
+On Tue, Aug 28, 2012 at 10:15:03AM +0900, Tetsuyuki Kobayashi wrote:
+> (2012/08/28 9:18), Simon Horman wrote:
+> > Hi Olaf, Hi Arnd,
+> > 
+> > please consider the following enhancement for the KZM-9A-GT board
+> 
+> Just a minor correction :)
+> The board name is KZM-A9-GT.
 
-arch/arm/mach-kirkwood/db88f6281-bp-setup.c:29: error: 'SZ_1M' undeclared here (not in a function)
-arch/arm/mach-kirkwood/db88f6281-bp-setup.c:33: error: 'SZ_4M' undeclared here (not in a function)
-
-Add missing <linux/sizes.h>
-
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/mach-kirkwood/db88f6281-bp-setup.c |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
-index d933593..be90b7d 100644
---- a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
-+++ b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
-@@ -10,6 +10,7 @@
- 
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/sizes.h>
- #include <linux/platform_device.h>
- #include <linux/mtd/partitions.h>
- #include <linux/ata_platform.h>
--- 
-1.7.10.4
+Thanks, sorry about that.
