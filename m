@@ -1,66 +1,32 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Thu, 30 Aug 2012 09:35:35 +0200
-Subject: [PATCH v11 3/4] drivers/i2c/busses/i2c-at91.c: add new driver
-In-Reply-To: <EF2E73589CA71846A15D0B2CDF79505D090EC3D6F6@wm021.weinmann.com>
-References: <cover.1345618760.git.n.voss@weinmann.de>
- <4f3dcfbf1e8eab3e251ab3558e9e1e9123643928.1345618760.git.n.voss@weinmann.de>,
- <503B4919.6080306@atmel.com>
- <BC0F374A1C27184AB96177CDFEC2F54225ECC330@EXMDB06.org.aalto.fi>,
- <503B623C.4030304@atmel.com>
- <BC0F374A1C27184AB96177CDFEC2F54225ECD36E@EXMDB06.org.aalto.fi>
- <EF2E73589CA71846A15D0B2CDF79505D090EC3D6F6@wm021.weinmann.com>
-Message-ID: <503F17C7.5010807@atmel.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 30 Aug 2012 10:25:18 +0200
+Subject: MX28 & finding out boot mode
+Message-ID: <20120830082518.GA27306@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 08/27/2012 03:32 PM, Voss, Nikolaus a ?crit :
-> Hi Adian,
->
-> Yanes Martinez Adrian wrote on Monday, August 27, 2012 2:46 PM:
->> Le 08/27/2012 12:40 PM, Yanes Martinez Adrian a ?crit :
->>> Hi Ludovic,
->>>
->>>> Tested on at91rm9200, at91sam9261, at91sam9g20 and at91sam9m10 with
->>>> eeprom, temperature sensor and rtc devices (and wolfson chip for
->>>> sam9g20).
->>>
->>> concerning the at91rm9200, what was the amount of bytes you
->> transmitted?
->>>
->>
->>> I have only checked that I can communicate with i2c devices so the
->>> amount is very low (1-4 bytes).
->>
->> IIRC it was from >7 bytes when the issues appeared.
->>
->>> Some months ago I performed some testing[1] with the previous version of
->>> the patch and the main conclusion was that the absence of PDC in the
->>> AT91RM9200 made this driver unusable in such platform.
->
-> I didn't get your last post  in that thread. In my opinion RM9200 should really
-> be excluded from being configured with this driver, what's your opinion
-> Ludovic?
->
+Hi,
 
-After investigation, the transmission issue may concern rm9200, 9261, 
-9260 and 9263. The main cause of this issue is we do not have clock 
-stretching.
-Using a low clock frequency should reduce the underrun issue so this 
-driver can be used on those chips but a warning have to be added to 
-indicate this potential issue. I'll do it when I'll resend patches for 
-DT support.
+is there a way to find out how the MX28 was booted? I could read out the
+bootmode-pins for indication. Still, either by button or by empty NAND,
+the CPU could have been booted via USB recovery mode. And going through
+the docs and the bootlets code, I can't find a way to determine if USB
+recovery was used.
 
+So, can USB recovery mode be detected somehow? Then, this and reading
+pins should be sufficent, no?
 
-Regards
+Thanks,
 
-Ludovic
+   Wolfram
 
-> Regards,
-> Niko
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
->
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120830/b1553e27/attachment.sig>
