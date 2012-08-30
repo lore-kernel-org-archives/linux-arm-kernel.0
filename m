@@ -1,51 +1,28 @@
-From: m-karicheri2@ti.com (Karicheri, Muralidharan)
-Date: Thu, 30 Aug 2012 16:17:14 +0000
-Subject: [PATCH] arm:davinci: clk - migrate to new common clock API
-In-Reply-To: <5029F079.8010901@ti.com>
-References: <1343926428-5210-1-git-send-email-m-karicheri2@ti.com>
- <5029F079.8010901@ti.com>
-Message-ID: <3E54258959B69E4282D79E01AB1F32B7041AD30F@DFLE12.ent.ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 30 Aug 2012 16:19:14 +0000 (UTC)
+Subject: TI SoC Linux BoF @ Linux Plumbers Conference: tomorrow
+In-Reply-To: <B1BA3B0F-098D-4AC8-A514-6862D0F98EC6@ti.com>
+References: <alpine.DEB.2.00.1208291837040.1619@utopia.booyaka.com>
+ <CAN5iSWp9LJjC9B3fiAJhuYVkfNzC98WkvQKPiVt8+tqxr==COg@mail.gmail.com>
+ <CAGF5oy_-3g3A8Eadn7uRm5srPCsuufFZ42estfRuAWy4JiqQ-w@mail.gmail.com>,
+ <CAGF5oy9hf8ys=Cqvhto8tPnW=iuf2V3sRmJW+aoAmZS4Sdroyg@mail.gmail.com>
+ <B1BA3B0F-098D-4AC8-A514-6862D0F98EC6@ti.com>
+Message-ID: <alpine.DEB.2.00.1208301615430.8816@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Agreed. So I am not re-sending this patch.
+On Wed, 29 Aug 2012, Locke, Matthew wrote:
 
-Murali Karicheri
-Software Design Engineer
+> During lunch
+
+On the schedule[1], the TI Linux BoF is from 12:35pm to 13:20pm.  So it 
+looks like people can get a quick lunch outside from 12:05pm to 12:30pm, 
+then head to Nautilus 1 for the BoF.
+
+It's all informal, so please drop in and say hello if you're using 
+OMAP/AM/DM/C6x/whatever chips.
 
 
->> -----Original Message-----
->> From: Nori, Sekhar
->> Sent: Tuesday, August 14, 2012 2:30 AM
->> To: Karicheri, Muralidharan
->> Cc: linux-arm-kernel at lists.infradead.org; davinci-linux-open-
->> source at linux.davincidsp.com; linux-keystone at list.ti.com - Linux developers for Keystone
->> family of devices (May contain non-TIers); Turquette, Mike; Chemparathy, Cyril;
->> linux at arm.linux.org.uk
->> Subject: Re: [PATCH] arm:davinci: clk - migrate to new common clock API
->> 
->> 
->> Hi Murali,
->> 
->> On 8/2/2012 10:23 PM, Murali Karicheri wrote:
->> > As a first step towards migrating davinci platforms to use common clock
->> > framework, replace all instances of clk_enable() with clk_prepare_enable()
->> > and clk_disable() with clk_disable_unprepare(). Until the platform is
->> > switched to use the CONFIG_HAVE_CLK_PREPARE Kconfig variable, this just
->> > adds a might_sleep() call and would work without any issues.
->> >
->> > This will make it easy later to switch to common clk based implementation
->> > of clk driver from DaVinci specific driver.
->> >
->> > Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> 
->> Queuing this patch for v3.7. The subject line should have ARM in
->> capitals for consistency. Also, you are not really migrating to new API
->> in this patch - just preparing for migration so I prefer:
->> 
->> "ARM: davinci: convert platform code to use clk_prepare/clk_unprepare"
->> 
->> I will make this change while committing.
->> 
->> Thanks,
->> Sekhar
+- Paul
+
+1. http://summit.linuxplumbersconf.org/lpc-2012/2012-08-30/display?
