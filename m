@@ -1,102 +1,135 @@
 From: chanho61.park@samsung.com (Chanho Park)
-Date: Thu, 30 Aug 2012 11:13:44 +0900
-Subject: [PATCH v3 3/4] ARM: EXYNOS: Enable PMUs for exynos4
-In-Reply-To: <20120829213405.GC13868@mudshark.cambridge.arm.com>
+Date: Thu, 30 Aug 2012 11:53:51 +0900
+Subject: [PATCH v3 2/4] ARM: EXYNOS: Correct combined IRQs for exynos4412
+In-Reply-To: <CAJuYYwSH19-GmNo7jZyXd9TC4VeKGxVCd=N0Vi4=kUNZPZNx6g@mail.gmail.com>
 References: <1346202897-27306-1-git-send-email-chanho61.park@samsung.com>
- <1346202897-27306-4-git-send-email-chanho61.park@samsung.com>
- <20120829213405.GC13868@mudshark.cambridge.arm.com>
-Message-ID: <003501cd8655$15317f80$3f947e80$@samsung.com>
+ <1346202897-27306-3-git-send-email-chanho61.park@samsung.com>
+ <CAJuYYwSH19-GmNo7jZyXd9TC4VeKGxVCd=N0Vi4=kUNZPZNx6g@mail.gmail.com>
+Message-ID: <003701cd865a$af73c170$0e5b4450$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
-> kernel-bounces at lists.infradead.org] On Behalf Of Will Deacon
-> Sent: Thursday, August 30, 2012 6:34 AM
+> From: Thomas Abraham [mailto:thomas.abraham at linaro.org]
+> Sent: Wednesday, August 29, 2012 8:10 PM
 > To: Chanho Park
-> Cc: linux-samsung-soc at vger.kernel.org; linux at arm.linux.org.uk;
-> sachin.kamat at linaro.org; Kyungmin Park; kgene.kim at samsung.com;
-> thomas.abraham at linaro.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v3 3/4] ARM: EXYNOS: Enable PMUs for exynos4
+> Cc: kgene.kim at samsung.com; linux-arm-kernel at lists.infradead.org; linux-
+> samsung-soc at vger.kernel.org; linux at arm.linux.org.uk;
+> sachin.kamat at linaro.org; will.deacon at arm.com; Kyungmin Park
+> Subject: Re: [PATCH v3 2/4] ARM: EXYNOS: Correct combined IRQs for
+> exynos4412
 > 
-> On Wed, Aug 29, 2012 at 02:14:56AM +0100, Chanho Park wrote:
-> > This patch define irq numbers of ARM performance monitoring unit for
-> exynos4.
-> > The number of CPU cores and PMU irq numbers are vary according to soc
-> types.
-> > So we need to identify each soc type using soc_is_xxx function and
-> > define the pmu irqs dynamically. In case of exynos4412, there are 4 cpu
-> cores and pmus.
+> On 29 August 2012 06:44, Chanho Park <chanho61.park@samsung.com>
+> wrote:
+> > This patch corrects combined IRQs for exynos4412 platform. The
+> > exynos4412 has four extra combined irq group. Each irq is mapped to
+> > IRQ_SPI(xx). Unfortunately, extra combined IRQs isn't sequential. So, we
+> need to map the irq manually.
 > >
 > > Signed-off-by: Chanho Park <chanho61.park@samsung.com>
 > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > > ---
-> >  arch/arm/mach-exynos/common.c            |   45
-> ++++++++++++++++++++++++++++++
-> >  arch/arm/mach-exynos/include/mach/irqs.h |    8 ++++--
-> >  arch/arm/plat-samsung/devs.c             |    2 +-
-> >  3 files changed, 52 insertions(+), 3 deletions(-)
+> >  arch/arm/mach-exynos/common.c            |   31
+> ++++++++++++++++++++++++------
+> >  arch/arm/mach-exynos/include/mach/irqs.h |    2 +-
+> >  2 files changed, 26 insertions(+), 7 deletions(-)
 > >
 > > diff --git a/arch/arm/mach-exynos/common.c
-> > b/arch/arm/mach-exynos/common.c index be61564..24b78bd 100644
+> > b/arch/arm/mach-exynos/common.c index f194bbc..be61564 100644
 > > --- a/arch/arm/mach-exynos/common.c
 > > +++ b/arch/arm/mach-exynos/common.c
-> > @@ -30,11 +30,13 @@
-> >  #include <asm/mach/map.h>
-> >  #include <asm/mach/irq.h>
-> >  #include <asm/cacheflush.h>
-> > +#include <asm/pmu.h>
-> 
-> Why do you need this header file?
-
-Oh, I'll remove  it. Thanks.
-
-> 
-> >  #include <mach/regs-irq.h>
-> >  #include <mach/regs-pmu.h>
-> >  #include <mach/regs-gpio.h>
-> >  #include <mach/pmu.h>
-> > +#include <mach/irqs.h>
+> > @@ -560,23 +560,39 @@ static struct irq_domain_ops
+> combiner_irq_domain_ops = {
+> >         .map    = combiner_irq_domain_map,
+> >  };
 > >
-> >  #include <plat/cpu.h>
-> >  #include <plat/clock.h>
-> > @@ -1056,3 +1058,46 @@ static int __init exynos_init_irq_eint(void)
-> >  	return 0;
-> >  }
-> >  arch_initcall(exynos_init_irq_eint);
+> > +static unsigned int get_combiner_extra_irq(int group) {
+> > +       switch (group) {
+> > +       case 16:
+> > +               return IRQ_SPI(107);
+> > +       case 17:
+> > +               return IRQ_SPI(108);
+> > +       case 18:
+> > +               return IRQ_SPI(48);
+> > +       case 19:
+> > +               return IRQ_SPI(42);
+> > +       default:
+> > +               return 0;
+> > +       }
+> > +}
 > > +
-> > +#if defined(CONFIG_CPU_EXYNOS4210) ||
-> defined(CONFIG_SOC_EXYNOS4212)
-> > +static struct resource exynos42xx_pmu_resource[] = {
-> > +	DEFINE_RES_IRQ(EXYNOS4_IRQ_PMU),
-> > +	DEFINE_RES_IRQ(EXYNOS4_IRQ_PMU_CPU1),
-> > +};
+> >  static void __init combiner_init(void __iomem *combiner_base,
+> >                                  struct device_node *np)  {
+> >         int i, irq, irq_base;
+> >         unsigned int max_nr, nr_irq;
+> >
+> > +       max_nr = soc_is_exynos5250() ? EXYNOS5_MAX_COMBINER_NR :
+> > +                                       EXYNOS4_MAX_COMBINER_NR;
 > > +
-> > +static struct platform_device exynos42xx_device_pmu = {
-> > +	.name		= "arm-pmu",
-> > +	.num_resources	= ARRAY_SIZE(exynos42xx_pmu_resource),
-> > +	.resource	= exynos42xx_pmu_resource,
-> > +};
-> > +#endif
+> >         if (np) {
+> >                 if (of_property_read_u32(np, "samsung,combiner-nr", &max_nr))
+> {
+> >                         pr_warning("%s: number of combiners not specified, "
+> >                                 "setting default as %d.\n",
+> > -                               __func__, EXYNOS4_MAX_COMBINER_NR);
+> > -                       max_nr = EXYNOS4_MAX_COMBINER_NR;
+> > +                               __func__, max_nr);
+> >                 }
+> > -       } else {
+> > -               max_nr = soc_is_exynos5250() ? EXYNOS5_MAX_COMBINER_NR :
+> > -                                               EXYNOS4_MAX_COMBINER_NR;
+> >         }
+> > +
+> >         nr_irq = max_nr * MAX_IRQ_IN_COMBINER;
 > 
-> Given that you don't pass an id and your device-tree binding is that for
-> Cortex A15, I assume this patch series is based on my perf/updates branch?
+> Along with this change, this patch should update the default value
+> "samsung,combiner-nr" binding in device tree binding documentation for
+> combiner. It should state that is Exynos5 will use 32 and Exynos4 will use 20 as
+> the default value.
 > 
-> That's good because it reduces the potential for conflicts, but you should
-> make sure that whoever you send this to is aware of the dependency.
+> >
+> >         irq_base = irq_alloc_descs(COMBINER_IRQ(0, 0), 1, nr_irq, 0);
+> > @@ -593,7 +609,10 @@ static void __init combiner_init(void __iomem
+> *combiner_base,
+> >         }
+> >
+> >         for (i = 0; i < max_nr; i++) {
+> > -               irq = IRQ_SPI(i);
+> > +               if (i < 16 || soc_is_exynos5250())
+> > +                       irq = IRQ_SPI(i);
+> > +               else
+> > +                       irq = get_combiner_extra_irq(i);
+> >  #ifdef CONFIG_OF
+> >                 if (np)
+> >                         irq = irq_of_parse_and_map(np, i); diff --git
+> > a/arch/arm/mach-exynos/include/mach/irqs.h
+> > b/arch/arm/mach-exynos/include/mach/irqs.h
+> > index 35bced6..357ed7f 100644
+> > --- a/arch/arm/mach-exynos/include/mach/irqs.h
+> > +++ b/arch/arm/mach-exynos/include/mach/irqs.h
+> > @@ -165,7 +165,7 @@
+> >  #define EXYNOS4_IRQ_FIMD0_VSYNC                COMBINER_IRQ(11, 1)
+> >  #define EXYNOS4_IRQ_FIMD0_SYSTEM       COMBINER_IRQ(11, 2)
+> >
+> > -#define EXYNOS4_MAX_COMBINER_NR                16
+> > +#define EXYNOS4_MAX_COMBINER_NR                20
+> 
+> Will this not break Exynos4210 which has only 16 combiners? This is fine in
+> case max-combiner values is listed in dt mode, but in non-dt mode or if max-
+> combiner is not specified in dt, this will not be correct.
 
-Yes. This patch is based on your latest patchset to avoid conflict because I saw Kukjin had acked your patch.
-I think he'll resolve the dependency. If not, I'll re-submit this patch after applied your patch.
+I didn't have test about exynos4210 because I don't have the 4210 board.
+However, there is no problem of exynos4212 which has 18 combiner.
+On second thought, it might break by accessing undefined area.
+Ok, I'll resolve it and resubmit patch.
 
 Best regards,
 Chanho Park
 
 > 
-> Cheers,
-> 
-> Will
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+> >  #define EXYNOS4_IRQ_GPIO1_NR_GROUPS    16
+> >  #define EXYNOS4_IRQ_GPIO2_NR_GROUPS    9
+> > --
+> > 1.7.9.5
+> >
