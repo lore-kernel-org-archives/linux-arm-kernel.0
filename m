@@ -1,28 +1,38 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 30 Aug 2012 16:28:08 -0700
-Subject: [PATCH v3 1/2] ARM: arch_timers: enable the use of the virtual
- timer
-In-Reply-To: <1345819976-6339-2-git-send-email-marc.zyngier@arm.com>
-References: <1345819976-6339-1-git-send-email-marc.zyngier@arm.com>
- <1345819976-6339-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <503FF708.10603@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 30 Aug 2012 16:30:55 -0700
+Subject: [PATCH 5/6] ARM: integrator: convert AMBA devices to device tree
+In-Reply-To: <20120820080210.GF7439@game.jcrosoft.org>
+References: <1345119373-22774-1-git-send-email-linus.walleij@linaro.org>
+ <20120816124002.GB7439@game.jcrosoft.org>
+ <CACRpkdZDMxk30YTkrumRveR3OuWptSpzNevrAvC2FxYShOZp-A@mail.gmail.com>
+ <20120820080210.GF7439@game.jcrosoft.org>
+Message-ID: <CACRpkdYkfgY-dYD1L3_HkhFJL49d9GaSWd8ax2Rqm3BGFFHhdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/24/2012 7:52 AM, Marc Zyngier wrote:
-> At the moment, the arch_timer driver only uses the physical timer,
-> which can cause problem if PL2 hasn't enabled PL1 access in CNTHCTL,
-> which is likely in a virtualized environment. Instead, the virtual
-> timer is always available.
+On Mon, Aug 20, 2012 at 1:02 AM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 00:42 Sun 19 Aug     , Linus Walleij wrote:
+
+> no I mean why
+>> >> +     OF_DEV_AUXDATA("arm,primecell", INTEGRATOR_RTC_BASE,
+>> >> +             "rtc", NULL),
+>> >> +     OF_DEV_AUXDATA("arm,primecell", KMI0_BASE,
+>> >> +             "kmi0", NULL),
+>> >> +     OF_DEV_AUXDATA("arm,primecell", KMI1_BASE,
+>> >> +             "kmi1", NULL),
 >
-> This patch enables the use of the virtual timer, unless no
-> interrupt is provided in the DT for it, in which case it falls
-> back to the physical timer.
+> no platform data why do you use the AUXDATA?
+>
+> as the OF_DEV_AUXDATA is deprecated now
 
-Is this a good candidate for static keys? It looks like we make the
-decision fairly early and then we're done and have a bunch of if
-statements. Maybe its premature optimization though...
+OK this is to get the right bus names of the devices.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+As I support boot from both device tree and without device tree, I cannot
+change all the names that e.g. the clock framework is tied to.
+
+Once we switch to pure device tree this can be changed at the user
+sites and all auxdata be removed.
+
+Yours,
+Linus Walleij
