@@ -1,51 +1,57 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 30 Aug 2012 10:43:18 -0700
-Subject: [PATCH] ASoC: SAMSUNG: Add SND_SOC_DAIFMT_CONT option for
- snd_soc_set_fmt()
-In-Reply-To: <001d01cd85d6$59298040$0b7c80c0$@samsung.com>
-References: <003101cd8367$3476e650$9d64b2f0$@samsung.com>
- <20120827204550.GA4400@opensource.wolfsonmicro.com>
- <001d01cd85d6$59298040$0b7c80c0$@samsung.com>
-Message-ID: <20120830174317.GG4356@opensource.wolfsonmicro.com>
+From: hein_tibosch@yahoo.es (Hein Tibosch)
+Date: Fri, 31 Aug 2012 00:34:27 +0800
+Subject: [PATCH v2 2/2] mmc: atmel-mci: AP700x PDC is not connected to MCI
+Message-ID: <503F9613.5060007@yahoo.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2012 at 08:06:32PM +0900, Sangsu Park wrote:
+Earlier, atmel-mci was adapted to make use of the peripheral DMA
+controller (PDC), in case normal DMA wouldn't work.
+( http://comments.gmane.org/gmane.linux.kernel.mmc/9403 )
+This works OK on ARM platforms (AT91), but it broke the driver
+for AVR32, the AP700x.
+Although the MCI has PDC support, the connection is not done for
+AVR chips
 
-Please check your mailer configuration, it looks like it's reformatting
-all the text with much longer line widths.
+This patch makes the use of PDC depend on CONFIG_AVR32
 
-> On Sun, Aug 26, 2012 at 05:45:54PM +0900, Mark Brown wrote:
+Signed-off-by: Hein Tibosch <hein_tibosch@yahoo.es>
 
-> > a whole lot of sense on the slave side, it's related to the clock generation so should have no
-> > effect at all on the slave side.  The driver code looks reasonably sensible though.
+---
+ drivers/mmc/host/atmel-mci-regs.h |    7 +++++++
+ drivers/mmc/host/atmel-mci.c      |    2 +-
+ 2 files changed, 8 insertions(+), 1 deletions(-)
 
-> You mean cpu side is slave? 
-
-Yes.
-
-
-> > What specifically is going wrong here?
-
-> SND_SOC_DAIFMT_CONT is used sound/soc/Samsung/pcm.c (s3c_pcm_set_fmt()) like below.
-
-> switch (fmt & SND_SOC_DAIFMT_CLOCK_MASK) {
->         case SND_SOC_DAIFMT_CONT:
->                 pcm->idleclk = 1;
->                 break;
->         case SND_SOC_DAIFMT_GATED:
->                 pcm->idleclk = 0;
->                 break;
->         default:
->                 dev_err(pcm->dev, "Invalid Clock gating request!\n");
->                 ret = -EINVAL;
->                 goto exit;
->         }
-
-> If fmt argument has no SND_SOC_DAIFMT_ option, s3c_pcm_set_fmt() return -EINVAL.
-
-So, clearly this is unrelated to the change you mentioned in your commit
-message - it looks like this is just a plain issue in the machine
-driver.  That said the above code should be changed to at least ignore
-the setting in slave mode (since the clock shouldn't be being driven and
-it doesn't matter).
+diff --git a/drivers/mmc/host/atmel-mci-regs.h b/drivers/mmc/host/atmel-mci-regs.h
+index ab56f7d..c97001e 100644
+--- a/drivers/mmc/host/atmel-mci-regs.h
++++ b/drivers/mmc/host/atmel-mci-regs.h
+@@ -140,6 +140,13 @@
+ #define atmci_writel(port,reg,value)			\
+ 	__raw_writel((value), (port)->regs + reg)
+ 
++/* On AVR chips the Peripheral DMA Controller is not connected to MCI. */
++#ifdef CONFIG_AVR32
++#	define ATMCI_PDC_CONNECTED	0
++#else
++#	define ATMCI_PDC_CONNECTED	1
++#endif
++
+ /*
+  * Fix sconfig's burst size according to atmel MCI. We need to convert them as:
+  * 1 -> 0, 4 -> 1, 8 -> 2, 16 -> 3.
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index a6a5593..b8de891 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -2208,7 +2208,7 @@ static void __init atmci_get_cap(struct atmel_mci *host)
+ 			"version: 0x%x\n", version);
+ 
+ 	host->caps.has_dma_conf_reg = 0;
+-	host->caps.has_pdc = 1;
++	host->caps.has_pdc = ATMCI_PDC_CONNECTED;
+ 	host->caps.has_cfg_reg = 0;
+ 	host->caps.has_cstor_reg = 0;
+ 	host->caps.has_highspeed = 0;
+-- 
+1.7.8.0
