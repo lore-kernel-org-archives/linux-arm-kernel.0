@@ -1,44 +1,102 @@
-From: dhobsong@igel.co.jp (Damian Hobson-Garcia)
-Date: Thu, 30 Aug 2012 11:03:43 +0900
-Subject: [PATCH 0/2] Renesas IPMMU driver for sh7372
-In-Reply-To: <20120825071344.GI29755@verge.net.au>
-References: <1343197742-13630-1-git-send-email-hdk@igel.co.jp>
- <20120825071344.GI29755@verge.net.au>
-Message-ID: <503EC9FF.1090100@igel.co.jp>
+From: chanho61.park@samsung.com (Chanho Park)
+Date: Thu, 30 Aug 2012 11:13:44 +0900
+Subject: [PATCH v3 3/4] ARM: EXYNOS: Enable PMUs for exynos4
+In-Reply-To: <20120829213405.GC13868@mudshark.cambridge.arm.com>
+References: <1346202897-27306-1-git-send-email-chanho61.park@samsung.com>
+ <1346202897-27306-4-git-send-email-chanho61.park@samsung.com>
+ <20120829213405.GC13868@mudshark.cambridge.arm.com>
+Message-ID: <003501cd8655$15317f80$3f947e80$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On 2012/08/25 16:13, Simon Horman wrote:
-> On Wed, Jul 25, 2012 at 03:29:00PM +0900, Hideki EIRAKU wrote:
->> This is the Renesas IPMMU driver, IOMMU API implementation and IPMMU
->> device support for sh7372 (AP4EVB and Mackerel).
->>
->> The IPMMU module supports the MMU function and the PMB function.  The
->> MMU function provides address translation by pagetable compatible with
->> ARMv6.  The PMB function provides address translation including
->> tile-linear translation.  This is implementation of the MMU function.
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> kernel-bounces at lists.infradead.org] On Behalf Of Will Deacon
+> Sent: Thursday, August 30, 2012 6:34 AM
+> To: Chanho Park
+> Cc: linux-samsung-soc at vger.kernel.org; linux at arm.linux.org.uk;
+> sachin.kamat at linaro.org; Kyungmin Park; kgene.kim at samsung.com;
+> thomas.abraham at linaro.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v3 3/4] ARM: EXYNOS: Enable PMUs for exynos4
 > 
-> Hi,
+> On Wed, Aug 29, 2012 at 02:14:56AM +0100, Chanho Park wrote:
+> > This patch define irq numbers of ARM performance monitoring unit for
+> exynos4.
+> > The number of CPU cores and PMU irq numbers are vary according to soc
+> types.
+> > So we need to identify each soc type using soc_is_xxx function and
+> > define the pmu irqs dynamically. In case of exynos4412, there are 4 cpu
+> cores and pmus.
+> >
+> > Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  arch/arm/mach-exynos/common.c            |   45
+> ++++++++++++++++++++++++++++++
+> >  arch/arm/mach-exynos/include/mach/irqs.h |    8 ++++--
+> >  arch/arm/plat-samsung/devs.c             |    2 +-
+> >  3 files changed, 52 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-exynos/common.c
+> > b/arch/arm/mach-exynos/common.c index be61564..24b78bd 100644
+> > --- a/arch/arm/mach-exynos/common.c
+> > +++ b/arch/arm/mach-exynos/common.c
+> > @@ -30,11 +30,13 @@
+> >  #include <asm/mach/map.h>
+> >  #include <asm/mach/irq.h>
+> >  #include <asm/cacheflush.h>
+> > +#include <asm/pmu.h>
 > 
-> I am wondering if anyone has had a chance to review this short series.
-> It seems reasonable to me with the minor exception that I would
-> be happier the second patch to update the relevant defconfigs
-> to either enable or disable the driver.
+> Why do you need this header file?
+
+Oh, I'll remove  it. Thanks.
+
 > 
-> I am also curious to know how this driver may be tested.
+> >  #include <mach/regs-irq.h>
+> >  #include <mach/regs-pmu.h>
+> >  #include <mach/regs-gpio.h>
+> >  #include <mach/pmu.h>
+> > +#include <mach/irqs.h>
+> >
+> >  #include <plat/cpu.h>
+> >  #include <plat/clock.h>
+> > @@ -1056,3 +1058,46 @@ static int __init exynos_init_irq_eint(void)
+> >  	return 0;
+> >  }
+> >  arch_initcall(exynos_init_irq_eint);
+> > +
+> > +#if defined(CONFIG_CPU_EXYNOS4210) ||
+> defined(CONFIG_SOC_EXYNOS4212)
+> > +static struct resource exynos42xx_pmu_resource[] = {
+> > +	DEFINE_RES_IRQ(EXYNOS4_IRQ_PMU),
+> > +	DEFINE_RES_IRQ(EXYNOS4_IRQ_PMU_CPU1),
+> > +};
+> > +
+> > +static struct platform_device exynos42xx_device_pmu = {
+> > +	.name		= "arm-pmu",
+> > +	.num_resources	= ARRAY_SIZE(exynos42xx_pmu_resource),
+> > +	.resource	= exynos42xx_pmu_resource,
+> > +};
+> > +#endif
+> 
+> Given that you don't pass an id and your device-tree binding is that for
+> Cortex A15, I assume this patch series is based on my perf/updates branch?
+> 
+> That's good because it reduces the potential for conflicts, but you should
+> make sure that whoever you send this to is aware of the dependency.
 
-Since this patch series configures the LCDC, and CEU to use the IPMMU,
-checking the memory addresses that those blocks are using are properly
-registered in the IPMMU, and verifying that they actually function seems
-like the best way to test this driver. I'll take a look at doing that.
+Yes. This patch is based on your latest patchset to avoid conflict because I saw Kukjin had acked your patch.
+I think he'll resolve the dependency. If not, I'll re-submit this patch after applied your patch.
 
-That said, there currently isn't any way to use this with UIO devices,
-since enabling the IPMMU with break direct accesses to physical memory
-from all of the IP blocks on the ICB (LCDC, CEU, VPU, VEU, etc.)
-For these devices, memory allocated with the dma-mapping API *must* be
-used with IPMMU enabled.  The current uio_pdrv_genirq driver isn't set
-up to deal with this right now.
+Best regards,
+Chanho Park
 
-Damian
+> 
+> Cheers,
+> 
+> Will
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
