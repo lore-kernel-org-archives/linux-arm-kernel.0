@@ -1,35 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 30 Aug 2012 13:31:48 +0100
-Subject: [PATCH 18/22] ARM: ux500: Rename MSP board file to something
- more meaningful
-In-Reply-To: <CACRpkdaJcfLNzZ4s4NOyBLROjNbNfP8m0EewFkwe6tTrCS-Hog@mail.gmail.com>
-References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
- <1344527268-5964-19-git-send-email-lee.jones@linaro.org>
- <CACRpkdaJcfLNzZ4s4NOyBLROjNbNfP8m0EewFkwe6tTrCS-Hog@mail.gmail.com>
-Message-ID: <20120830123146.GF14145@gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 30 Aug 2012 13:33:47 +0100
+Subject: [PATCH] clk: convert ARM RealView to common clk
+In-Reply-To: <1344270728-7550-1-git-send-email-linus.walleij@stericsson.com>
+References: <1344270728-7550-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1346330027.2623.4.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 01:20:32PM +0200, Linus Walleij wrote:
-> On Thu, Aug 9, 2012 at 5:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Hi Linus,
+
+I'm working on moving the VE clocking into driver/clk on top of your
+Realview change, and just spotted one minor issue...
+
+On Mon, 2012-08-06 at 17:32 +0100, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> > The 'msp' board file does more than just register MSP devices. It
-> > also registers some other components necessary to get audio working
-> > on ux500 based platforms; such as the PCM and Machine Drivers. For
-> > that reason we're changing the filename to be more encompassing -
-> > 'audio'.
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> This converts the ARM RealView machine over to using the common
+> clock. The approach is similar to the one used for the Integrator,
+> and we're reusing the ICST wrapper code.
+[...]
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 7f0b5ca..89b726d 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -40,4 +40,11 @@ config COMMON_CLK_WM831X
+>            Supports the clocking subsystem of the WM831x/2x series of
+>           PMICs from Wolfson Microlectronics.
 > 
-> Ideally I want Ola to confirm this but it looks OK to me.
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> +config COMMON_CLK_VERSATILE
+> +       tristate "Clock driver for ARM Reference designs"
 
-Poke for Ola.
+It can't really be a "tristate", can it? To my mind there is no way of
+making it a module, so a "bool" seems more appropriate?
 
-I'm guessing it's okay, as Ola told me to rename the file 'msp' -> 'audio'.
+> +       depends on ARCH_INTEGRATOR || ARCH_REALVIEW
+> +       ---help---
+> +          Supports clocking on ARM Reference designs Integrator/AP,
+> +         Integrator/CP, RealView PB1176, EB, PB11MP and PBX.
+> +
+>  endmenu
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Cheers!
+
+Pawe?
