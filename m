@@ -1,32 +1,34 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 30 Aug 2012 20:08:53 +0200
-Subject: [PATCH] ARM: Kirkwood: Fix 'SZ_1M' undeclared here for
- db88f6281-bp-setup.c
-In-Reply-To: <20120830171236.GS19437@titan.lakedaemon.net>
-References: <1346305152-14618-1-git-send-email-andrew@lunn.ch>
- <20120830171236.GS19437@titan.lakedaemon.net>
-Message-ID: <20120830180853.GP9886@lunn.ch>
+From: fernando.lugo@ti.com (Fernando Guzman Lugo)
+Date: Thu, 30 Aug 2012 13:26:11 -0500
+Subject: [PATCHv2 0/3] remoteproc: introduce rproc recovery
+Message-ID: <1346351174-28441-1-git-send-email-fernando.lugo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2012 at 01:12:36PM -0400, Jason Cooper wrote:
-> On Thu, Aug 30, 2012 at 07:39:12AM +0200, Andrew Lunn wrote:
-> > Linux-next has failed to compile for kirkwood since 23 August with:
-> > 
-> > arch/arm/mach-kirkwood/db88f6281-bp-setup.c:29: error: 'SZ_1M' undeclared here (not in a function)
-> > arch/arm/mach-kirkwood/db88f6281-bp-setup.c:33: error: 'SZ_4M' undeclared here (not in a function)
-> > 
-> > Add missing <linux/sizes.h>
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> 
-> Applied to: fixes-for-v3.6
-> 
-> Also, I added a CC for stable so greg can pick it up.
+These set of patches make possible the remoteproc recover after a crash.
+This is a hard recovery, that means the remoteproc is reset and it will
+start from the beginning. When a crash happen all the virtio devices are
+destroyed. Therefore, both rpmsg drivers and devices are gracefully
+removed which also cause rproc users become 0 and the remoteproc is turned
+off. After the virtio devices are destroyed the crash handler function
+will read the virtio information from the firmware in order to recreate
+the virtio devices that will boot the remoteproc and everything will be
+functional again.
 
-Hi Jason
+-Version 2
+* Wait untill there is no more rproc users before realoding the FW again
+  in order to make sure the recovery will work fine. As suggested by
+  Sjur BRENDELAND
 
-Stable does not need it. As i said, it only broke 23 August with
-linux-next. So this is needed for only 3.7.
+Fernando Guzman Lugo (3):
+  remoteproc: add rproc_report_crash function to notify rproc crashes
+  remoteproc: recover a remoteproc when it has crashed
+  remoteproc: create debugfs entry to disable/enable recovery
+    dynamically
 
-	    Andrew
+ Documentation/remoteproc.txt             |    7 ++
+ drivers/remoteproc/remoteproc_core.c     |  116 ++++++++++++++++++++++++++++--
+ drivers/remoteproc/remoteproc_debugfs.c  |   83 +++++++++++++++++++++
+ drivers/remoteproc/remoteproc_internal.h |    1 +
+ include/linux/remoteproc.h               |   22 ++++++
+ 5 files changed, 222 insertions(+), 7 deletions(-)
