@@ -1,30 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 30 Aug 2012 13:48:26 -0700
-Subject: [PATCH 2/2] arm/dts: Cleanup regulator naming and remove @0,1..
-In-Reply-To: <503C6380.4090107@ti.com>
-References: <1343653940-16614-1-git-send-email-rnayak@ti.com>
- <1343653940-16614-3-git-send-email-rnayak@ti.com>
- <20120824202725.GA1303@atomide.com> <503C6380.4090107@ti.com>
-Message-ID: <20120830204825.GE1303@atomide.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 30 Aug 2012 20:56:14 +0000 (UTC)
+Subject: [PATCH v4 0/3] Prepare for OMAP2+ movement to Common Clk
+In-Reply-To: <1346230576-20004-1-git-send-email-rnayak@ti.com>
+References: <1346230576-20004-1-git-send-email-rnayak@ti.com>
+Message-ID: <alpine.DEB.2.00.1208302052210.29754@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rajendra Nayak <rnayak@ti.com> [120827 23:22]:
-> Hi Tony,
-> 
-> >* Rajendra Nayak<rnayak@ti.com>  [120730 06:17]:
-> >>regulators do not have a 'reg' property, hence the regulator at 0,
-> >>regulator at 1 do not make sense. get rid of it.
-> >
-> >Looks like this needs to be refreshed to apply. Care to
-> >refresh against current devel-dt branch in case other
-> >places need the same change?
-> 
-> Looks like devel-dt is missing the PATCH 1/2 from this series,
-> which you have already pushed in the -rc for merge.
-> With that applied, this ones applies cleanly too.
+Hi Rajendra
 
-Oh OK thanks :) I'll apply it on top of the fix and merge
-into devel-dt.
+On Wed, 29 Aug 2012, Rajendra Nayak wrote:
 
-Tony
+> Changes in v4:
+> * Added *hack* comments around clk_prepare usage in hwmod
+> rebased on 3.6-rc
+
+Assuming this is so (haven't looked closely at this series yet), and after 
+the existing comments are taken into consideration and a new version 
+reposted, will queue this series for 3.7.
+
+Care to respin your series that converts the data also, on top of your new 
+version of this series?  We should try to get that into 3.7 also.
+BTW are you still waiting for something from Vaibhav Hiremath for this?  
+Or can the scripts convert the existing clock33xx_data.c also?
+
+
+- Paul
