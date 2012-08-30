@@ -1,38 +1,42 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 30 Aug 2012 13:29:25 -0700
-Subject: [PATCH 0/5] hwrng/ARM: OMAP: convert to use runtime PM
-In-Reply-To: <20120830202708.GZ1303@atomide.com>
-References: <20120827232922.15045.56522.stgit@dusk.lan>
- <20120830202708.GZ1303@atomide.com>
-Message-ID: <20120830202925.GA32300@gondor.apana.org.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 30 Aug 2012 13:32:35 -0700
+Subject: [PATCH RESEND v4 1/3] arm/dts: AM33XX: Add basic pinctrl
+ device tree data
+In-Reply-To: <1346141454-18786-2-git-send-email-anilkumar@ti.com>
+References: <1346141454-18786-1-git-send-email-anilkumar@ti.com>
+ <1346141454-18786-2-git-send-email-anilkumar@ti.com>
+Message-ID: <20120830203234.GA1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2012 at 01:27:08PM -0700, Tony Lindgren wrote:
-> * Paul Walmsley <paul@pwsan.com> [120827 16:39]:
-> > This series converts the OMAP hardware random number generator driver
-> > to use runtime PM.  Hardware integration data is added for OMAP2xxx
-> > systems.  I'm pretty sure this device is available on other OMAP chips
-> > too, but may require some experimentation with the integration details.
+* AnilKumar Ch <anilkumar@ti.com> [120828 01:11]:
+> Adds basic pinctrl device tree data for AM33XX family of devices.
+> This patch is based on the pinctrl-single driver.
 > 
-> Good to hear. I believe that at some point this got moved to be
-> only accessible in the secure mode on later omaps?
+> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> ---
+>  arch/arm/boot/dts/am33xx.dtsi |    9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index dde76f7..dfe9c559 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -40,6 +40,15 @@
+>  		};
+>  	};
 >  
-> > There are still a few rough edges with this series.  Something is
-> > still not right with the reset behavior on OMAP2430, at least.  But it
-> > would be good to get acks from the hwrng folks for the three patches that
-> > touch files in that directory.  Will continue with the testing process
-> > here.
-> 
-> Yes Matt & Herbert, care to ack the drivers/char/hw_random related changes?
+> +	am3358_pinmux: pinmux at 44E10800 {
+> +		compatible = "pinctrl-single";
+> +		reg = <0x44E10800 0x0238>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-single,register-width = <32>;
+> +		pinctrl-single,function-mask = <0x7F>;
+> +	};
+> +
 
-Acked-by: Herbert Xu <herbert@gondor.apana.org.au>
+Nit: Please use lower case for the hex numbers as that's the
+standard in Linux kernel.
 
-> This series will conflict with the planned ARM common zImage changes
-> that we have planned so I'd like to merge them via the ARM soc tree.
-
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Tony
