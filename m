@@ -1,28 +1,23 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 30 Aug 2012 20:56:14 +0000 (UTC)
-Subject: [PATCH v4 0/3] Prepare for OMAP2+ movement to Common Clk
-In-Reply-To: <1346230576-20004-1-git-send-email-rnayak@ti.com>
-References: <1346230576-20004-1-git-send-email-rnayak@ti.com>
-Message-ID: <alpine.DEB.2.00.1208302052210.29754@utopia.booyaka.com>
+Date: Thu, 30 Aug 2012 20:57:30 +0000 (UTC)
+Subject: [PATCH 0/5] hwrng/ARM: OMAP: convert to use runtime PM
+In-Reply-To: <20120830202925.GA32300@gondor.apana.org.au>
+References: <20120827232922.15045.56522.stgit@dusk.lan>
+ <20120830202708.GZ1303@atomide.com>
+ <20120830202925.GA32300@gondor.apana.org.au>
+Message-ID: <alpine.DEB.2.00.1208302056330.29754@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra
+On Thu, 30 Aug 2012, Herbert Xu wrote:
 
-On Wed, 29 Aug 2012, Rajendra Nayak wrote:
+> Acked-by: Herbert Xu <herbert@gondor.apana.org.au>
 
-> Changes in v4:
-> * Added *hack* comments around clk_prepare usage in hwmod
-> rebased on 3.6-rc
+Great, thanks Herbert.
 
-Assuming this is so (haven't looked closely at this series yet), and after 
-the existing comments are taken into consideration and a new version 
-reposted, will queue this series for 3.7.
-
-Care to respin your series that converts the data also, on top of your new 
-version of this series?  We should try to get that into 3.7 also.
-BTW are you still waiting for something from Vaibhav Hiremath for this?  
-Or can the scripts convert the existing clock33xx_data.c also?
+At some point in the next month or so, there should be similar series for 
+the OMAP crypto IP blocks too, which will need some acks - just as a 
+heads-up.
 
 
 - Paul
