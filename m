@@ -1,20 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 29 Aug 2012 16:20:27 -0700
-Subject: TI SoC Linux BoF @ Linux Plumbers Conference: tomorrow
-In-Reply-To: <B1BA3B0F-098D-4AC8-A514-6862D0F98EC6@ti.com>
-References: <alpine.DEB.2.00.1208291837040.1619@utopia.booyaka.com>
- <CAN5iSWp9LJjC9B3fiAJhuYVkfNzC98WkvQKPiVt8+tqxr==COg@mail.gmail.com>
- <CAGF5oy_-3g3A8Eadn7uRm5srPCsuufFZ42estfRuAWy4JiqQ-w@mail.gmail.com>
- <CAGF5oy9hf8ys=Cqvhto8tPnW=iuf2V3sRmJW+aoAmZS4Sdroyg@mail.gmail.com>
- <B1BA3B0F-098D-4AC8-A514-6862D0F98EC6@ti.com>
-Message-ID: <20120829232026.GD1303@atomide.com>
+From: fernando.lugo@ti.com (Fernando Guzman Lugo)
+Date: Wed, 29 Aug 2012 19:24:52 -0500
+Subject: [PATCH] rpmsg: use right device paramter when calling
+ dma_free_coherent function
+Message-ID: <1346286292-21773-1-git-send-email-fernando.lugo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Locke, Matthew <mlocke@ti.com> [120829 15:08]:
-> During lunch
+dma_alloc/free_coherent APIs requires the platform specific remoteproc
+device as the device parameter. We are passing vdev->dev.parent to the
+dma_free_coherent function which is the generic rproc device and it is
+wrong, it has to be vdev->dev.parent->parent instead, same as when we
+call dma_alloc_coherent function.
 
-Oops I'm already heading back home today. But you guys have
-a fun BoF!
+Signed-off-by: Fernando Guzman Lugo <fernando.lugo@ti.com>
+---
+ drivers/rpmsg/virtio_rpmsg_bus.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-Tony
+diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
+index 590cfaf..1859f71 100644
+--- a/drivers/rpmsg/virtio_rpmsg_bus.c
++++ b/drivers/rpmsg/virtio_rpmsg_bus.c
+@@ -1008,8 +1008,8 @@ static int rpmsg_probe(struct virtio_device *vdev)
+ 	return 0;
+ 
+ free_coherent:
+-	dma_free_coherent(vdev->dev.parent, RPMSG_TOTAL_BUF_SPACE, bufs_va,
+-					vrp->bufs_dma);
++	dma_free_coherent(vdev->dev.parent->parent, RPMSG_TOTAL_BUF_SPACE,
++					bufs_va, vrp->bufs_dma);
+ vqs_del:
+ 	vdev->config->del_vqs(vrp->vdev);
+ free_vrp:
+@@ -1043,7 +1043,7 @@ static void __devexit rpmsg_remove(struct virtio_device *vdev)
+ 
+ 	vdev->config->del_vqs(vrp->vdev);
+ 
+-	dma_free_coherent(vdev->dev.parent, RPMSG_TOTAL_BUF_SPACE,
++	dma_free_coherent(vdev->dev.parent->parent, RPMSG_TOTAL_BUF_SPACE,
+ 					vrp->rbufs, vrp->bufs_dma);
+ 
+ 	kfree(vrp);
+-- 
+1.7.1
