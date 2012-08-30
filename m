@@ -1,65 +1,41 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 30 Aug 2012 14:07:18 -0500
-Subject: [PATCH 1/6] ARM: move ARCH config definitions into mach dirs
-In-Reply-To: <20120830164551.GY18957@n2100.arm.linux.org.uk>
-References: <1346280600-29395-1-git-send-email-robherring2@gmail.com>
- <1346280600-29395-2-git-send-email-robherring2@gmail.com>
- <20120829233159.GS18957@n2100.arm.linux.org.uk> <503F845C.10406@gmail.com>
- <20120830164551.GY18957@n2100.arm.linux.org.uk>
-Message-ID: <503FB9E6.7020102@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 30 Aug 2012 20:14:12 +0100
+Subject: [PATCH v2] ARM: Build dtb files in all target
+In-Reply-To: <20120830183711.GY19437@titan.lakedaemon.net>
+References: <1346303687-7795-1-git-send-email-andrew@lunn.ch>
+ <20120830165224.GR19437@titan.lakedaemon.net>
+ <20120830172304.GA18957@n2100.arm.linux.org.uk>
+ <20120830183711.GY19437@titan.lakedaemon.net>
+Message-ID: <20120830191412.GC18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/30/2012 11:45 AM, Russell King - ARM Linux wrote:
-> On Thu, Aug 30, 2012 at 10:18:52AM -0500, Rob Herring wrote:
->> Then what do you suggest? I can think of a few alternatives.
->>
->> Leave the current name and make the hidden option a new name like
->> ARCH_xx_OPTIONS. This would require renaming ARCH_xxx for each platform
->> all over the tree. I don't care to sign up for that task...
+On Thu, Aug 30, 2012 at 02:37:11PM -0400, Jason Cooper wrote:
+> On Thu, Aug 30, 2012 at 06:23:04PM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Aug 30, 2012 at 12:52:24PM -0400, Jason Cooper wrote:
+> > > I've CC'd stable to see if they want to pick this up.
+> > 
+> > That's not how stable works - and you'll probably receive a standard form
+> > whinge from them about that.  Please read up on the submission requirements
+> > to the stable kernel trees.
 > 
-> Well, requiring everyone to spend hours redoing their configuration also
-> isn't practical either.
-> 
->> Move platforms one by one out of the choice as they are converted. I
->> can't think of a reason for a platform to be in both places except we
->> would have to figure out something for getting DEBUG_LL to work.
-> 
-> No you don't.  We've already decided how we're going to deal with
-> DEBUG_LL, and we are _not_ going to make that multi-platform.  You
-> select one of the output options, and that is it.  We've already
-> been moving in that direction, albiet slowly.  Again, anyone who wants
-> to be part of a multiplatform kernel better use the provided choice
-> or they will get no DEBUG_LL facility - simples.
+> Ah, thanks.  usually, I just add the Cc: line for fixes I send to
+> arm-soc.  Since this patch affects more than just kirkwood/marvell, I
+> didn't feel it was appropriate to pull it in through my tree.
 
-Right. The problem is with current patches (and Arnd's version) you
-cannot select even 1 DEBUG_LL choice as mach/debug-macro.S is not in the
-include path any more when multi-plat is enabled. If we move platforms
-out of the choice, then we need some way to enable DEBUG_LL.
+Yes, you put the Cc: line in the commit, but you don't actually send it
+to that address.  The only time that you do mail that address is when
+the commit is _in_ mainline and it doesn't have the Cc: tag or the stable
+team haven't picked it up.
 
-> 
-> That also means we can start to think about moving the mach/debug-macros.S
-> header elsewhere, remembering that this facility is shared between the
-> decompressor for debugging and the kernel.
+> I submitted a patch six months ago for the exact same thing and was
+> informed that others already had a pending patch in your queue for it.
+> However, I can't for the life of me locate the thread atm.  I remember
+> it because it was the first patch I did that needed to go into your
+> queue instead of through arm-soc.  Obviously, I did something horribly
+> wrong.  ;-)
 
-I was thinking we could convert the phys and virt addresses to config
-values and then the DEBUG_LL choices could just be "Use PL01x uart" and
-"Use 8250 uart". This would cut down the number of debug-macro.S files
-and choices.
-
-Using a fixed virtual address for all platforms might also help simplify
-DEBUG_LL.
-
-But I'd like to find a more simple solution to get past enabling
-multi-platform and deal with a more complex change later.
-
-Rob
-
-> Remember that DEBUG_LL is the low-level *debug* facility.  It is not
-> the early console, even if it ended up being used as such (which is
-> not something I really care for.)  Read the previous discussions on
-> this subject if you disagree, but I'm not changing my position over
-> DEBUG_LL because that will just require me to re-invent the facility
-> yet again (which is what DEBUG_LL is there to stop.)  It was _never_
-> intended to be an early console facility.
-> 
+I don't see anything in there for it - I tried searching for patches
+containing 'dtbs' and the latest one it found was 7152/1 on 8th
+November.  I also see no notifications from the patch system for a
+patch from you...
