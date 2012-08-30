@@ -1,55 +1,31 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 30 Aug 2012 15:47:06 -0400
-Subject: [PATCH] ARM: Make sure dtc is built before running it
-In-Reply-To: <1346180398-8079-1-git-send-email-davidb@codeaurora.org>
-References: <1346180398-8079-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <20120830194706.GB19437@titan.lakedaemon.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 30 Aug 2012 13:14:16 -0700
+Subject: [RFC RESEND 1/4] arm/dts: OMAP: Add timer nodes
+In-Reply-To: <502D0BEE.3010609@ti.com>
+References: <1342218413-30116-1-git-send-email-jon-hunter@ti.com>
+ <1342218413-30116-2-git-send-email-jon-hunter@ti.com>
+ <5000D647.4090200@gmail.com> <500439A8.1050705@ti.com>
+ <500D6CAB.4030504@ti.com> <502B67DD.6050904@ti.com>
+ <502D0BEE.3010609@ti.com>
+Message-ID: <20120830201415.GX1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2012 at 11:59:58AM -0700, David Brown wrote:
-> 'make dtbs' in a clean tree will try running the dtc before actually
-> building it.  Make these rules depend upon the scripts to build it.
-
-David,
-
-Could you please send this into rmk's queue? [1]  This fix has been
-cropping up by various submitters for the past 6 months or so, it would
-be nice to finally get it in.
-
-thx,
-
-Jason.
-
-[1] http://www.arm.linux.org.uk/developer/patches/
-
-> ---
->  arch/arm/Makefile | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+* Jon Hunter <jon-hunter@ti.com> [120816 08:05]:
+> On 08/15/2012 04:11 AM, Vaibhav Hiremath wrote:
+> > 
+> > Did we get conclude on this? I haven't got anything further on this
+> > thread, this may block baseport support for the new devices in omap2
+> > family, like AM33xx and OMAP5.
 > 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 0298b00..926d840 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -279,10 +279,10 @@ zImage Image xipImage bootpImage uImage: vmlinux
->  zinstall uinstall install: vmlinux
->  	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
->  
-> -%.dtb:
-> +%.dtb: scripts
->  	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
->  
-> -dtbs:
-> +dtbs: scripts
->  	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
->  
->  # We use MRPROPER_FILES and CLEAN_FILES now
-> -- 
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Sorry I have been out of the office. However, no update on this so far.
+> I need to check with Tony if he has any preference for handling this. I
+> will follow-up with him and keep you posted.
+
+Jon please repost these without the RFC in the subject line
+assuming the pending comments have been addressed so people
+can ack them.
+
+Regards,
+
+Tony
