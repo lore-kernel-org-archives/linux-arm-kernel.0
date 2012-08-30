@@ -1,25 +1,43 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 30 Aug 2012 12:19:22 +0300
-Subject: [PATCH v2 02/14] MFD: twl4030-audio: Convert to use devm_kzalloc
-In-Reply-To: <1346147410.2182.96.camel@sokoban>
-References: <1344954162-7985-1-git-send-email-peter.ujfalusi@ti.com>
- <1344954162-7985-3-git-send-email-peter.ujfalusi@ti.com>
- <1346147410.2182.96.camel@sokoban>
-Message-ID: <503F301A.1090200@ti.com>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Thu, 30 Aug 2012 09:40:05 +0000
+Subject: MX28 & finding out boot mode
+In-Reply-To: <20120830091318.GC27306@pengutronix.de>
+References: <20120830082518.GA27306@pengutronix.de>
+ <20120830081215.GA1198@shlinux2.ap.freescale.net>
+ <F281D0F91ED19E4D8E63A7504E8A649803C63005@039-SN2MPN1-023.039d.mgd.msft.net>
+ <20120830091318.GC27306@pengutronix.de>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803C630EF@039-SN2MPN1-023.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
-
-On 08/28/2012 12:50 PM, Tero Kristo wrote:
-> On Tue, 2012-08-14 at 17:22 +0300, Peter Ujfalusi wrote:
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+ 
 > 
-> I think this one could use a short commit message, also about why
-> kfree():s are dropped (handled internally by devm_* etc.)
+> Some customers want this to handle the recovery case differently than
+> the standard case.
+> 
 
-I don't like empty commit messages either but this patch is self explaining I
-would think that the commit title explains it.
+If you can't find method at datasheet (like reading some registers), a workaround
+is according to usb register, usually, usbcmd.rs (pull-up DP) stands for usb is using
+or not.
 
--- 
-P?ter
+1. Make sure usbcmd.rs = 0 is the default value.
+2. Before the usb code is running, the usbcmd.rs should be 0 at normal mode
+So, get a flag before usb code is running
+
+if (usbcmd.rs == 0)
+	usb_recover_mode = 0;
+else
+	usb_recover_mode = 1;
+
+
+Peter
+
+> Thanks for the help!
+> 
+>    Wolfram
+> 
+> --
+> Pengutronix e.K.                           | Wolfram Sang
+> |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/
+> |
