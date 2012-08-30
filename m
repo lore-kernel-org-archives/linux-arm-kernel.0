@@ -1,109 +1,37 @@
-From: vbyravarasu@nvidia.com (Venu Byravarasu)
-Date: Thu, 30 Aug 2012 10:46:35 +0530
-Subject: [PATCH] usb: tegra: moving phy driver into drivers directory
-In-Reply-To: <503E51C9.7000606@wwwdotorg.org>
-References: <1346146338-4996-1-git-send-email-vbyravarasu@nvidia.com>
- <503CD0A0.7080300@wwwdotorg.org>
- <D958900912E20642BCBC71664EFECE3E6DDE14DD7C@BGMAIL02.nvidia.com>
- <503E51C9.7000606@wwwdotorg.org>
-Message-ID: <D958900912E20642BCBC71664EFECE3E6DDE14DF54@BGMAIL02.nvidia.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 30 Aug 2012 14:36:03 +0900
+Subject: [PATCH] ARM: mach-shmobile: Add compilation support for dtbs using
+ 'make dtbs'
+In-Reply-To: <1346304963-23457-1-git-send-email-horms@verge.net.au>
+References: <1346304963-23457-1-git-send-email-horms@verge.net.au>
+Message-ID: <1346304963-23457-2-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-tegra-owner at vger.kernel.org [mailto:linux-tegra-
-> owner at vger.kernel.org] On Behalf Of Stephen Warren
-> Sent: Wednesday, August 29, 2012 11:01 PM
-> To: Venu Byravarasu
-> Cc: ccross at android.com; olof at lixom.net; linux at arm.linux.org.uk;
-> stern at rowland.harvard.edu; gregkh at linuxfoundation.org; balbi at ti.com;
-> linux-kernel at vger.kernel.org; linux-tegra at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-usb at vger.kernel.org
-> Subject: Re: [PATCH] usb: tegra: moving phy driver into drivers directory
-> 
-> On 08/28/12 22:17, Venu Byravarasu wrote:
-> > Stephen Warren wrote at Tuesday, August 28, 2012 7:37 PM:
-> >> On 08/28/2012 02:32 AM, Venu Byravarasu wrote:
-> >>> In order to keep up with the USB driver files organization,
-> >>> moving USB phy driver from mach-tegra to drivers/USB directory.
-> >>>
-> >>> Signed-off-by: Venu Byravarasu <vbyravarasu@nvidia.com>
-> >>
-> >>> diff --git a/arch/arm/mach-tegra/devices.c b/arch/arm/mach-
-> >> tegra/devices.c
-> >>
-> >>> -struct tegra_ulpi_config tegra_ehci2_ulpi_phy_config = {
-> >>> -	.reset_gpio = -1,
-> >>> -	.clk = "cdev2",
-> >>> -};
-> >>> -
-> >>>   struct tegra_ehci_platform_data tegra_ehci1_pdata = {
-> >>>   	.operating_mode = TEGRA_USB_OTG,
-> >>>   	.power_down_on_bus_suspend = 1,
-> >>> @@ -450,7 +444,7 @@ struct tegra_ehci_platform_data
-> tegra_ehci1_pdata
-> >> = {
-> >>>   };
-> >>>
-> >>>   struct tegra_ehci_platform_data tegra_ehci2_pdata = {
-> >>> -	.phy_config = &tegra_ehci2_ulpi_phy_config,
-> >>> +	.phy_config = NULL,
-> >>
-> >> The PHY driver checks that field isn't NULL, and fails if it is:
-> >>
-> >>> struct tegra_usb_phy *tegra_usb_phy_open(struct device *dev, int
-> >> instance,
-> >>>          void __iomem *regs, void *config, enum tegra_usb_phy_mode
-> >> phy_mode)
-> >>> {
-> >> ...
-> >>>          phy->config = config;
-> >>>          phy->mode = phy_mode;
-> >>>
-> >>>          if (!phy->config) {
-> >>>                  if (phy_is_ulpi(phy)) {
-> >>>                          pr_err("%s: ulpi phy configuration missing", __func__);
-> >>>                          err = -EINVAL;
-> >>>                          goto err0;
-> >>
-> >> So, this change will completely break ULPI support, which currently
-> >> works fine. So, NAK.
-> >
-> > My initial plan was to add support for phy interfaces one by one.
-> > As part of that thought of UTMI only support at first and then add
-> > ULPI and HSIC in next patches.
-> > However as you were mentioning that it is not correct way, will
-> > push ULPI & UTMI support at once in next patches.
-> 
-> But with the existing code, both ULPI and UTMI work. This patch breaks
-> something that already works.
-> 
-> >> I also plan on deleting devices.[ch] in kernel 3.7, and moving the USB
-> >> platform data into board-dt-tegra20.c, since that's the only place it's
-> >> used right now. So, this patch would conflict with that rather badly. I
-> >> just posted the patches for that to the linux-tegra mailing list last
-> >> night. Do you have better proposals for that? Perhaps usb_phy.c should
-> >> set phy->config to &ulpi_default in a similar fashion to how it works
-> >> for UTMI; that would remove some of the coupling between the changes.
-> >>
-> >> BTW, in your response to Felipe, you said...
-> >>
-> >>> Thanks Felipe for your comments.
-> >>> Created a patch to separate out phy related stuff to phy.h with you as a
-> >> reviewer.
-> >>> Plz let me know your comments.
-> >>
-> >> ... where is that patch?
-> >
-> > Plz see https://lkml.org/lkml/2012/8/28/58
-> 
-> Doesn't that link point at the patch I replied to?
+From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
 
-Sorry, by mistake I sent the wrong one.
-Here is the correct one: https://lkml.org/lkml/2012/8/29/40  
+Add compilation support for dtbs using 'make dtbs'
 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Cc: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Cc: Simon Horman <horms@verge.net.au>
+Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ arch/arm/mach-shmobile/Makefile.boot | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
+index 498efd9..5e41019 100644
+--- a/arch/arm/mach-shmobile/Makefile.boot
++++ b/arch/arm/mach-shmobile/Makefile.boot
+@@ -7,3 +7,7 @@ __ZRELADDR	:= $(shell /bin/bash -c 'printf "0x%08x" \
+ #
+ #params_phys-y (Instead: Pass atags pointer in r2)
+ #initrd_phys-y (Instead: Use compiled-in initramfs)
++
++dtb-$(CONFIG_MACH_KZM9G) += sh73a0-kzm9g.dtb
++dtb-$(CONFIG_MACH_KZM9D) += emev2-kzm9d.dtb
++dtb-$(CONFIG_MACH_ARMADILLO800EVA) += r8a7740-armadillo800eva.dtb
+-- 
+1.7.10.2.484.gcd07cc5
