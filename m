@@ -1,31 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 Aug 2012 19:39:00 +0200
-Subject: [PATCH] clk: versatile: make config option boolean
-Message-ID: <1346348340-19020-1-git-send-email-linus.walleij@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 30 Aug 2012 10:43:18 -0700
+Subject: [PATCH] ASoC: SAMSUNG: Add SND_SOC_DAIFMT_CONT option for
+ snd_soc_set_fmt()
+In-Reply-To: <001d01cd85d6$59298040$0b7c80c0$@samsung.com>
+References: <003101cd8367$3476e650$9d64b2f0$@samsung.com>
+ <20120827204550.GA4400@opensource.wolfsonmicro.com>
+ <001d01cd85d6$59298040$0b7c80c0$@samsung.com>
+Message-ID: <20120830174317.GG4356@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no choice to have the RealView clocks as module for sure,
-so turn this config option into a boolean.
+On Wed, Aug 29, 2012 at 08:06:32PM +0900, Sangsu Park wrote:
 
-Reported-by: Pawel Moll <pawel.moll@arm.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/clk/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Please check your mailer configuration, it looks like it's reformatting
+all the text with much longer line widths.
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 89b726d..df33b8e 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -41,7 +41,7 @@ config COMMON_CLK_WM831X
- 	  PMICs from Wolfson Microlectronics.
- 
- config COMMON_CLK_VERSATILE
--	tristate "Clock driver for ARM Reference designs"
-+	bool "Clock driver for ARM Reference designs"
- 	depends on ARCH_INTEGRATOR || ARCH_REALVIEW
- 	---help---
-           Supports clocking on ARM Reference designs Integrator/AP,
--- 
-1.7.7.6
+> On Sun, Aug 26, 2012 at 05:45:54PM +0900, Mark Brown wrote:
+
+> > a whole lot of sense on the slave side, it's related to the clock generation so should have no
+> > effect at all on the slave side.  The driver code looks reasonably sensible though.
+
+> You mean cpu side is slave? 
+
+Yes.
+
+
+> > What specifically is going wrong here?
+
+> SND_SOC_DAIFMT_CONT is used sound/soc/Samsung/pcm.c (s3c_pcm_set_fmt()) like below.
+
+> switch (fmt & SND_SOC_DAIFMT_CLOCK_MASK) {
+>         case SND_SOC_DAIFMT_CONT:
+>                 pcm->idleclk = 1;
+>                 break;
+>         case SND_SOC_DAIFMT_GATED:
+>                 pcm->idleclk = 0;
+>                 break;
+>         default:
+>                 dev_err(pcm->dev, "Invalid Clock gating request!\n");
+>                 ret = -EINVAL;
+>                 goto exit;
+>         }
+
+> If fmt argument has no SND_SOC_DAIFMT_ option, s3c_pcm_set_fmt() return -EINVAL.
+
+So, clearly this is unrelated to the change you mentioned in your commit
+message - it looks like this is just a plain issue in the machine
+driver.  That said the above code should be changed to at least ignore
+the setting in slave mode (since the clock shouldn't be being driven and
+it doesn't matter).
