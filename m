@@ -1,31 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 30 Aug 2012 16:40:25 -0700
-Subject: [PATCH] clk: Make the generic clock API available by default
-In-Reply-To: <20120830171918.GE4356@opensource.wolfsonmicro.com>
-References: <1346186104-4083-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <503E8E6E.1010101@wwwdotorg.org>
- <20120830171918.GE4356@opensource.wolfsonmicro.com>
-Message-ID: <503FF9E9.4020701@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 30 Aug 2012 16:46:17 -0700
+Subject: [PATCH 01/17] ASoC: Ux500: Move MSP pinctrl setup into the MSP
+ driver
+In-Reply-To: <1345816913-4113-2-git-send-email-lee.jones@linaro.org>
+References: <1345816913-4113-1-git-send-email-lee.jones@linaro.org>
+ <1345816913-4113-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdai+RObHsq7xe0+Fk24K7r-Wzoc8o3RbvHT78=EeHkjSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/30/12 10:19, Mark Brown wrote:
-> On Wed, Aug 29, 2012 at 02:49:34PM -0700, Stephen Warren wrote:
->> On 08/28/12 13:35, Mark Brown wrote:
->
->>> @@ -674,6 +676,7 @@ config ARCH_TEGRA
->>>   	select GENERIC_CLOCKEVENTS
->>>   	select GENERIC_GPIO
->>>   	select HAVE_CLK
->>> +	select HAVE_CUSTOM_CLK
->
->> For 3.7, Tegra will switch to the common clock framework. I think
->> this patch would then disable that. How should we resolve this -
->> rebase the Tegra common-clk tree on top of any branch containing
->> this patch in order to remove that select statement?
->
-> I'd expect this to be applied on a separate branch so you should be able
-> to rebase your conversion on top of it or merge it into your branch
-> which should deal with things well enough I think?
+On Fri, Aug 24, 2012 at 7:01 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-That should work.
+> In the initial submission of the MSP driver msp1 and msp3's associated
+> pinctrl mechanism was passed back to platform code using a plat_init()
+> call-back routine, but it has no place in platform code. The MSP driver
+> should set this up for the appropriate ports. Instead we use a use_pinctrl
+> identifier which is passed from platform_data/Device Tree which indicates
+> which ports should use pinctrl.
+>
+> CC: alsa-devel at alsa-project.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+
+Looks good to me, so Acked-by: Linus Walleij <linus.walleij@linaro.org>
+for the ux500 mach part.
+
+However I'd request Ola/Roger to ACK it too on the ALSA side.
+
+Yours,
+Linus Walleij
