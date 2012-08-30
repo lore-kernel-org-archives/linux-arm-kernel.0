@@ -1,59 +1,73 @@
-From: kyungmin.park@samsung.com (Kyungmin Park)
-Date: Thu, 30 Aug 2012 09:54:01 +0900
-Subject: [PATCH 0/6] ARM: EXYNOS: Add support for Trats board using device
- tree
-In-Reply-To: <1346245980-2658-1-git-send-email-t.figa@samsung.com>
-References: <1346245980-2658-1-git-send-email-t.figa@samsung.com>
-Message-ID: <040101cd8649$f1dab7f0$d59027d0$%park@samsung.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 29 Aug 2012 18:03:18 -0700
+Subject: CMA page migration failure due to buffers on bh_lru
+Message-ID: <503EBBD6.5080504@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Thomas Abraham,
+Hi,
 
-> -----Original Message-----
-> From: Tomasz Figa [mailto:t.figa at samsung.com]
-> Sent: Wednesday, August 29, 2012 10:13 PM
-> To: linux-samsung-soc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; kyungmin.park at samsung.com;
-> kgene.kim at samsung.com; jy0922.shim at samsung.com; Tomasz Figa
-> Subject: [PATCH 0/6] ARM: EXYNOS: Add support for Trats board using device
-> tree
-> 
-> This patch series adds basic device tree support for Samsung Trats board
-> along with any necessary prerequisites.
-> 
-> In addition it refactors Exynos4 dts include files to split parts common
-> to
-> the whole Exynos4 part from parts specific to Exynos4210 to allow further
-> extension of Exynos4210 dts include file and addition of include files for
-> other SoCs from Exynos4 line.
-> 
-> Dependencies:
-> -> [PATCH v5] mmc: sdhci-s3c: Add device tree support
-> http://www.spinics.net/lists/linux-samsung-soc/msg12056.html
-> -> [PATCH v5 2/2] regulator: add device tree support for max8997
-> http://www.spinics.net/lists/kernel/msg1328117.html
-> 
-> Tomasz Figa (6):
->   ARM: dts: Move parts common to Exynos4 from Exynos4210.dtsi to
->     Exynos4.dtsi
->   ARM: EXYNOS: exynos4-dt: Use exynos4 prefix instead of exynos4210
->   ARM: Exynos4: dts: Specify address and size cells for i2c controllers
->   ARM: Exynos4: Add OF compatibility lookups for Exynos4 i2c adapters
->   ARM: EXYNOS: Increase maximum possible memory bank size to 512MiB
->   ARM: Exynos: Add basic dts file for Samsung Trats board
-> 
->  arch/arm/boot/dts/exynos4.dtsi             | 418
-> +++++++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos4210-trats.dts     | 287 ++++++++++++++++++++
->  arch/arm/boot/dts/exynos4210.dtsi          | 377
-+-------------------------
->  arch/arm/mach-exynos/Makefile.boot         |   2 +-
->  arch/arm/mach-exynos/include/mach/memory.h |   4 +-
->  arch/arm/mach-exynos/mach-exynos4-dt.c     |  34 ++-
->  6 files changed, 734 insertions(+), 388 deletions(-)
->  create mode 100644 arch/arm/boot/dts/exynos4.dtsi
->  create mode 100644 arch/arm/boot/dts/exynos4210-trats.dts
-> 
-> --
-> 1.7.12
+I've been observing a high rate of failures with CMA allocations on my
+ARM system. I've set up a test case set up with a 56MB CMA region that
+essentially does the following:
+
+	total_failures = 0;
+	loop forever:
+		loop_failure = 0;
+		for (i = 0; i < 56; i++)
+			chunk[i] = dma_allocate(&cma_dev, 1MB)
+			if (!chunk[i])
+				loop_failure = 0
+
+		if (loop_failure)
+			total_failures++
+			loop_failure = 0
+
+		for (i = 0; i < 56; i++)
+			dma_free(&cma_dev, chunk[i], 1MB)
+
+In the background, I also have a process doing some amount of filesystem
+activity (adb push/pull since this is an android system). During the 
+course of my investigations I generally get ~8500 loops total and ~450 
+total failures (i.e. one or more buffers could not be allocated). This 
+is unacceptably high for our use cases.
+
+In every case the allocation failure was ultimately due to a migration
+failure; the pages contained buffers which could not be dropped because 
+the buffers were busy (move_to_new_page -> fallback_migrate_page ->
+try_to_release_page -> try_to_free_buffers -> drop_buffers -> 
+buffer_busy). In every case, the b_count on the buffer head was always 1.
+
+The problem arises because of the LRU lists for buffer heads:
+
+__getblk
+     __getblk_slow
+         grow_buffers
+             grow_dev_page
+                 find_or_create_page -- create a possibly movable page
+         __find_get_block
+	    __find_get_block_slow
+                 find_get_page -- return the movable page
+             bh_lru_install
+                 get_bh -- buffer head now has a reference
+
+The reference taken in bh_lru_install won't be dropped until the bh is 
+evicted from the lru. This means the page cannot be migrated as long as 
+the buffer exists on an LRU list. The real issue is that unless the 
+buffer gets evicted quickly the page can remain non-migratible for long 
+periods of time. This makes CMA regions unusable for long periods of 
+time given that we generally don't want to size CMA regions any larger 
+than necessary ergo any failure will cause a problem.
+
+My quick and dirty workaround for testing is to remove the GFP_MOVABLE 
+flag from find_or_create_page but this seems significantly less than 
+optimal. Ideally, it seems like the buffers should be evicted from the 
+LRU when trying to drop (expand on invalid_bh_lru?) but I'm not familiar 
+enough with the code path to know if this is a good approach.
+
+Any suggestions/feedback is appreciated. Thanks.
+
+Laura
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
