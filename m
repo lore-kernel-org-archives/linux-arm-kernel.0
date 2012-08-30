@@ -1,29 +1,52 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu, 30 Aug 2012 21:02:10 +0400
-Subject: [PATCH] ARM: clps711x: convert to clocksource/clockevents
-In-Reply-To: <1346344678-18248-1-git-send-email-linus.walleij@linaro.org>
-References: <1346344678-18248-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20120830210210.55e0899d.shc_work@mail.ru>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 30 Aug 2012 13:12:36 -0400
+Subject: [PATCH] ARM: Kirkwood: Fix 'SZ_1M' undeclared here for
+ db88f6281-bp-setup.c
+In-Reply-To: <1346305152-14618-1-git-send-email-andrew@lunn.ch>
+References: <1346305152-14618-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20120830171236.GS19437@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Aug 2012 18:37:58 +0200
-Linus Walleij <linus.walleij@linaro.org> wrote:
+On Thu, Aug 30, 2012 at 07:39:12AM +0200, Andrew Lunn wrote:
+> Linux-next has failed to compile for kirkwood since 23 August with:
+> 
+> arch/arm/mach-kirkwood/db88f6281-bp-setup.c:29: error: 'SZ_1M' undeclared here (not in a function)
+> arch/arm/mach-kirkwood/db88f6281-bp-setup.c:33: error: 'SZ_4M' undeclared here (not in a function)
+> 
+> Add missing <linux/sizes.h>
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-> This converts the ageing clps711x timer driver to the modern
-> clocksource/clockevent API.
-The patch does not account for the changes that I sent to the mailing list
-recently, where I did support different clock frequencies for the processor.
+Applied to: fixes-for-v3.6
 
-> This was blind-coded using the datasheet, it'd be great if someone
-> who has this machine could test it.
-...
-> +	/* Set both timers to 512 kHz */
-The patch uses a second timer, which does not allow its use for other purposes,
-I can not test the functionality of the device in this case, unfortunately.
+Also, I added a CC for stable so greg can pick it up.
 
-I have also tried to do something like this without using additional processor
-resources, but not yet brought to the finish line yet.
+thx,
 
--- 
-Alexander Shiyan <shc_work@mail.ru>
+Jason.
+
+> ---
+>  arch/arm/mach-kirkwood/db88f6281-bp-setup.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+> index d933593..be90b7d 100644
+> --- a/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+> +++ b/arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+> @@ -10,6 +10,7 @@
+>  
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+> +#include <linux/sizes.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/mtd/partitions.h>
+>  #include <linux/ata_platform.h>
+> -- 
+> 1.7.10.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
