@@ -1,37 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 Aug 2012 15:17:39 -0700
-Subject: [PATCH 02/10] gpio: pxa: add explicit includes for cpu_is_X macros
-In-Reply-To: <1346279496-26286-3-git-send-email-robherring2@gmail.com>
-References: <1346279496-26286-1-git-send-email-robherring2@gmail.com>
- <1346279496-26286-3-git-send-email-robherring2@gmail.com>
-Message-ID: <CACRpkdasWv8toA1eBzpYo4QactNhkpzhuBk-D8kJbbM03WZN2Q@mail.gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Fri, 31 Aug 2012 01:26:51 +0300
+Subject: [PATCH] ARM: OMAP: timer: obey the !CONFIG_OMAP_32K_TIMER
+In-Reply-To: <20120830202057.GY1303@atomide.com>
+References: <1346106374-3283-1-git-send-email-grinberg@compulab.co.il>
+ <CAMQu2gxZBq0wMw4rgbFpDT2pmA83ULKAJ-Mwv+VKvQQZMRQ4Dw@mail.gmail.com>
+ <503E9129.9060408@compulab.co.il> <20120830202057.GY1303@atomide.com>
+Message-ID: <503FE8AB.9010801@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2012 at 3:31 PM, Rob Herring <robherring2@gmail.com> wrote:
+On 08/30/12 23:20, Tony Lindgren wrote:
+> * Igor Grinberg <grinberg@compulab.co.il> [120829 15:02]:
+>> On 08/28/12 01:43, Shilimkar, Santosh wrote:
+>>> On Mon, Aug 27, 2012 at 3:26 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>>>> Currently, omap2_sync32k_clocksource_init() function initializes the 32K
+>>>> timer as the system clock source regardless of the CONFIG_OMAP_32K_TIMER
+>>>> setting.
+>>>> Fix this by providing a default implementation for
+>>>> !CONFIG_OMAP_32K_TIMER case.
+>>>>
+>>>> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+>>>> Reviewed-by: Paul Walmsley <paul@pwsan.com>
+>>>> ---
+>>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>
+>> Thanks Santosh!
+>>
+>> Tony, apparently, this bug has been there for a while,
+>> so probably I should have added:
+>> Cc: stable at vger.kernel.org
+> 
+> Thanks I'll apply this into fixes with Cc: stable. Note that
+> Cc: stable is usually added at commit time, or at least you're
+> not supposed to send the patch for review there.
 
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> In preparation to remove implicit inclusion of mach/gpio.h, add the
-> necessary includes for cpu_is_X macros.
+Yeah yeah, I know, I just forgot to add it while committing.
 
-The commit message talks about gpio.h, but...
+Thanks!
 
->  #include <mach/irqs.h>
-> +#include <mach/hardware.h>
-> +#ifdef CONFIG_ARCH_MMP
-> +#include <mach/cputype.h>
-> +#endif
-
-This seems completely unrelated, but correct in the sense that every driver
-should include its resources.
-
-But isn't the proper fix to move arch/arm/mach-pxa/include/mach/cputype.h to
-include/linux/*/pxa-cputype.h or something (note: no clue what "*" should be!),
-or even better, modify this one driver to take a flag from platform data and/or
-DT?
-
-Anyway, we need the PXA maintainers to look at this.
-
-Yours,
-Linus Walleij
+-- 
+Regards,
+Igor.
