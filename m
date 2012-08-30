@@ -1,28 +1,27 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 30 Aug 2012 19:14:46 +0200
-Subject: [PATCH 05/10] ARM: at91: explicitly include mach/gpio.h
-In-Reply-To: <1346279496-26286-6-git-send-email-robherring2@gmail.com>
-References: <1346279496-26286-1-git-send-email-robherring2@gmail.com>
- <1346279496-26286-6-git-send-email-robherring2@gmail.com>
-Message-ID: <20120830171446.GC7629@game.jcrosoft.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 30 Aug 2012 10:19:19 -0700
+Subject: [PATCH] clk: Make the generic clock API available by default
+In-Reply-To: <503E8E6E.1010101@wwwdotorg.org>
+References: <1346186104-4083-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <503E8E6E.1010101@wwwdotorg.org>
+Message-ID: <20120830171918.GE4356@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:31 Wed 29 Aug     , Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> In preparation to remove implicit inclusion of mach/gpio.h, add explict
-> include of mach/gpio.h.
-I'm going to drop it for 3.7 too
+On Wed, Aug 29, 2012 at 02:49:34PM -0700, Stephen Warren wrote:
+> On 08/28/12 13:35, Mark Brown wrote:
 
-the attached patch will do the same but in a more simpler way
+> >@@ -674,6 +676,7 @@ config ARCH_TEGRA
+> >  	select GENERIC_CLOCKEVENTS
+> >  	select GENERIC_GPIO
+> >  	select HAVE_CLK
+> >+	select HAVE_CUSTOM_CLK
 
-Best Regards,
-J.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-arm-at91-move-old-style-gpio-and-mux-to-arch-arm-mac.patch
-Type: text/x-diff
-Size: 10441 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120830/3ada4f76/attachment-0001.bin>
+> For 3.7, Tegra will switch to the common clock framework. I think
+> this patch would then disable that. How should we resolve this -
+> rebase the Tegra common-clk tree on top of any branch containing
+> this patch in order to remove that select statement?
+
+I'd expect this to be applied on a separate branch so you should be able
+to rebase your conversion on top of it or merge it into your branch
+which should deal with things well enough I think?
