@@ -1,53 +1,41 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 30 Aug 2012 14:12:04 +0100
-Subject: [PATCH 8/8] input: ab8500-ponkey: Rely on MFD core to convert
- IRQs to virtual
-In-Reply-To: <20120821164244.GA4672@core.coreip.homeip.net>
-References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
- <1344527635-6163-9-git-send-email-lee.jones@linaro.org>
- <CACRpkdZ-HOGy_sdsCQSNOdYTDzHFszk0OySM88TjO-neSJUz0A@mail.gmail.com>
- <20120821092328.GC26899@gmail.com>
- <20120821164244.GA4672@core.coreip.homeip.net>
-Message-ID: <20120830131202.GG14145@gmail.com>
+Date: Thu, 30 Aug 2012 14:18:08 +0100
+Subject: [PATCH 04/22] ASoC: Ux500: Move MSP pinctrl setup into the MSP
+ driver
+In-Reply-To: <CACRpkdZse9Nq1acoAujV8ojhRKxykNX0ymcr51QAoanUbDW14g@mail.gmail.com>
+References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
+ <1344527268-5964-5-git-send-email-lee.jones@linaro.org>
+ <CACRpkda_xOyu9BFGRK4xTsXOO9RCJu7BbU-kPGpttVkR6mDMZg@mail.gmail.com>
+ <20120820115914.GP8450@gmail.com>
+ <CACRpkdZse9Nq1acoAujV8ojhRKxykNX0ymcr51QAoanUbDW14g@mail.gmail.com>
+Message-ID: <20120830131807.GI14145@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Sorry for the delay. Yes, this shoudl be fine, but since it is
-> essentially a revert of the original patch it should be pushed in as
-> such.
+On Mon, Aug 27, 2012 at 04:09:46PM -0700, Linus Walleij wrote:
+> On Mon, Aug 20, 2012 at 4:59 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Tue, Aug 14, 2012 at 10:51:02AM +0200, Linus Walleij wrote:
+> 
+> >> But wait. These are just local statics. Surelty you can put these into
+> >> struct ux500_msp instead? Here it looks like these will be used for
+> >> all ports, so MSP2 will enable the pins requested by MSP1 etc
+> >> completely broken. So put it into the struct ux500_msp state
+> >> container from ux500_msp_i2s.h where it belongs.
+> >>
+> >> Refer to drivers/tty/serial/amba-pl011.c when in trouble. This
+> >> one is a good pinctrl example.
+> >
+> > How do you see the MSP1 and MSP3 usage protection working if I hide it
+> > all away in MSP specific structs?
+> 
+> Usage protection? Sorry not following. Please elaborate...
 
-How's this?
+Don't worry about it, I think I sorted it.
 
-Author: Lee Jones <lee.jones@linaro.org>
-Date:   Thu Aug 30 14:08:19 2012 +0100
+Please see the lastest version of the patch (sent on 24th Aug).
 
-    Revert "input: ab8500-ponkey: Create AB8500 domain IRQ mapping"
-    
-    This reverts commit ca3b3faf9bee4dc5df4f10eae2d1e48f7de0a8ad.
-    
-    There was a plan to place ab8500_irq_get_virq() calls in each AB8500
-    child device prior to requesting an IRQ, but as we're no longer using
-    Device Tree to collect our IRQ numbers, it's actually better to allow
-    the core to do this during device registration time. So the IRQ number
-    we pull from its resource has already been converted to a virtual IRQ.
-    
-    CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-    CC: linux-input at vger.kernel.org
-    Acked-by: Linus Walleij <linus.walleij@linaro.org>
-    Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
-index f06231b..84ec691 100644
---- a/drivers/input/misc/ab8500-ponkey.c
-+++ b/drivers/input/misc/ab8500-ponkey.c
-@@ -74,8 +74,8 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
- 
-        ponkey->idev = input;
-        ponkey->ab8500 = ab8500;
--       ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, irq_dbf);
--       ponkey->irq_dbr = ab8500_irq_get_virq(ab8500, irq_dbr);
-+       ponkey->irq_dbf = irq_dbf;
-+       ponkey->irq_dbr = irq_dbr;
- 
-        input->name = "AB8500 POn(PowerOn) Key";
-        input->dev.parent = &pdev->dev;
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
