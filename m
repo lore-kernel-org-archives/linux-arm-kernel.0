@@ -1,34 +1,32 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 30 Aug 2012 11:03:57 -0700
-Subject: [PATCH v2] ARM: Build dtb files in all target
-In-Reply-To: <20120830165224.GR19437@titan.lakedaemon.net>
-References: <1346303687-7795-1-git-send-email-andrew@lunn.ch>
- <20120830165224.GR19437@titan.lakedaemon.net>
-Message-ID: <20120830180357.GA2459@kroah.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 30 Aug 2012 20:08:53 +0200
+Subject: [PATCH] ARM: Kirkwood: Fix 'SZ_1M' undeclared here for
+ db88f6281-bp-setup.c
+In-Reply-To: <20120830171236.GS19437@titan.lakedaemon.net>
+References: <1346305152-14618-1-git-send-email-andrew@lunn.ch>
+ <20120830171236.GS19437@titan.lakedaemon.net>
+Message-ID: <20120830180853.GP9886@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2012 at 12:52:24PM -0400, Jason Cooper wrote:
-> On Thu, Aug 30, 2012 at 07:14:47AM +0200, Andrew Lunn wrote:
-> > Tools like kisskb are good at finding build regressions in the kernel
-> > sources. However, regressions in the DT desscriptions are not found,
-> > because generally these build systems don't build the DT binary blobs.
+On Thu, Aug 30, 2012 at 01:12:36PM -0400, Jason Cooper wrote:
+> On Thu, Aug 30, 2012 at 07:39:12AM +0200, Andrew Lunn wrote:
+> > Linux-next has failed to compile for kirkwood since 23 August with:
 > > 
-> > Extend the ARM all target to build all enabled DTB files.
+> > arch/arm/mach-kirkwood/db88f6281-bp-setup.c:29: error: 'SZ_1M' undeclared here (not in a function)
+> > arch/arm/mach-kirkwood/db88f6281-bp-setup.c:33: error: 'SZ_4M' undeclared here (not in a function)
+> > 
+> > Add missing <linux/sizes.h>
 > > 
 > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > 
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> Applied to: fixes-for-v3.6
 > 
-> I've CC'd stable to see if they want to pick this up.  It does depend on
-> having dtc built.  A patch already exists to build dtc on demand, but
-> I'm not sure if it has made it into mainline yet.  It may be in
-> Russell's queue.
+> Also, I added a CC for stable so greg can pick it up.
 
-<formletter>
+Hi Jason
 
-This is not the correct way to submit patches for inclusion in the
-stable kernel tree.  Please read Documentation/stable_kernel_rules.txt
-for how to do this properly.
+Stable does not need it. As i said, it only broke 23 August with
+linux-next. So this is needed for only 3.7.
 
-</formletter>
+	    Andrew
