@@ -1,45 +1,46 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 30 Aug 2012 16:10:11 +0900
-Subject: [PATCH] pwm: Call pwm_enable() before pwm_config()
-In-Reply-To: <50364FA4.7000401@metafoo.de>
-References: <217877237.2758643.1345731587941.JavaMail.root@advansee.com>
- <50364FA4.7000401@metafoo.de>
-Message-ID: <002001cd867e$7e964130$7bc2c390$%han@samsung.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 30 Aug 2012 09:31:37 +0200
+Subject: [PATCH RESEND 0/6] ARM: EXYNOS: Add support for Trats board using
+ device tree
+Message-ID: <1346311903-15920-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, August 24, 2012 12:44 AM, Lars-Peter Clausen wrote:
-> 
-> On 08/23/2012 04:19 PM, Beno?t Th?baudeau wrote:
-> > Some PWM drivers enable the clock of the PWM peripheral in pwm_enable(). Hence,
-> > for these drivers, a call to pwm_config() does not have any effect before
-> > pwm_enable() has been called.
-> >
-> > This patch fixes the PWM users to make sure that they call pwm_enable() before
-> > pwm_config().
-> >
-> > This fixes the first setting of brightness through sysfs that had no effect with
-> > leds-pwm and the i.MX PWM driver.
-> 
-> But isn't this a bug in the PWM peripheral driver? With this change the PWM
-> will start with the old settings first. While this is not so much of a problem
-> for a backlight (although it might cause a short flickering) it might cause
-> problems for other applications, like using the PWM pin as a timing generator.
-> In my opinion it's better to fix the PWM peripheral drivers which have this
-> problem instead of trying to work around it in every user of the PWM API.
+This patch series adds basic device tree support for Samsung Trats board
+along with any necessary prerequisites.
 
-Hi Lars-Peter Clausen,
+In addition it refactors Exynos4 dts include files to split parts common to
+the whole Exynos4 part from parts specific to Exynos4210 to allow further
+extension of Exynos4210 dts include file and addition of include files for
+other SoCs from Exynos4 line.
 
-I think so.
-It would be better to fix the PWM peripheral drivers.
+Dependencies:
+-> [PATCH v5] mmc: sdhci-s3c: Add device tree support
+http://www.spinics.net/lists/linux-samsung-soc/msg12056.html
+-> [PATCH v5 2/2] regulator: add device tree support for max8997
+http://www.spinics.net/lists/kernel/msg1328117.html
 
+This is a resend, because previous messages somehow did not get to the mailing
+lists.
 
-Best regards,
-Jingoo Han
+Tomasz Figa (6):
+  ARM: dts: Move parts common to Exynos4 from Exynos4210.dtsi to
+    Exynos4.dtsi
+  ARM: EXYNOS: exynos4-dt: Use exynos4 prefix instead of exynos4210
+  ARM: Exynos4: dts: Specify address and size cells for i2c controllers
+  ARM: Exynos4: Add OF compatibility lookups for Exynos4 i2c adapters
+  ARM: EXYNOS: Increase maximum possible memory bank size to 512MiB
+  ARM: Exynos: Add basic dts file for Samsung Trats board
 
-> 
-> - Lars
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+ arch/arm/boot/dts/exynos4.dtsi             | 418 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos4210-trats.dts     | 287 ++++++++++++++++++++
+ arch/arm/boot/dts/exynos4210.dtsi          | 377 +-------------------------
+ arch/arm/mach-exynos/Makefile.boot         |   2 +-
+ arch/arm/mach-exynos/include/mach/memory.h |   4 +-
+ arch/arm/mach-exynos/mach-exynos4-dt.c     |  34 ++-
+ 6 files changed, 734 insertions(+), 388 deletions(-)
+ create mode 100644 arch/arm/boot/dts/exynos4.dtsi
+ create mode 100644 arch/arm/boot/dts/exynos4210-trats.dts
+
+-- 
+1.7.12
