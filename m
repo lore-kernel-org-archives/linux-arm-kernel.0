@@ -1,19 +1,28 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 30 Aug 2012 13:14:28 -0400
-Subject: [GIT PULL] kirkwood fix for v3.6
-Message-ID: <20120830171428.GT19437@titan.lakedaemon.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 30 Aug 2012 19:14:46 +0200
+Subject: [PATCH 05/10] ARM: at91: explicitly include mach/gpio.h
+In-Reply-To: <1346279496-26286-6-git-send-email-robherring2@gmail.com>
+References: <1346279496-26286-1-git-send-email-robherring2@gmail.com>
+ <1346279496-26286-6-git-send-email-robherring2@gmail.com>
+Message-ID: <20120830171446.GC7629@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b74ffd85e32d44e8ed405a2a0a175ef4cd39cf67:
+On 17:31 Wed 29 Aug     , Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> In preparation to remove implicit inclusion of mach/gpio.h, add explict
+> include of mach/gpio.h.
+I'm going to drop it for 3.7 too
 
-  ARM: Kirkwood: fix Makefile.boot (2012-08-15 13:58:52 +0000)
+the attached patch will do the same but in a more simpler way
 
-are available in the git repository at:
-  git://git.infradead.org/users/jcooper/linux.git fixes-for-v3.6
-
-Andrew Lunn (1):
-      ARM: Kirkwood: Fix 'SZ_1M' undeclared here for db88f6281-bp-setup.c
-
- arch/arm/mach-kirkwood/db88f6281-bp-setup.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Best Regards,
+J.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-arm-at91-move-old-style-gpio-and-mux-to-arch-arm-mac.patch
+Type: text/x-diff
+Size: 10441 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120830/3ada4f76/attachment-0001.bin>
