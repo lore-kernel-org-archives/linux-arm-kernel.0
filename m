@@ -1,35 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 30 Aug 2012 18:24:52 +0100
-Subject: [PATCH 05/10] ARM: at91: explicitly include mach/gpio.h
-In-Reply-To: <20120830171446.GC7629@game.jcrosoft.org>
-References: <1346279496-26286-1-git-send-email-robherring2@gmail.com>
- <1346279496-26286-6-git-send-email-robherring2@gmail.com>
- <20120830171446.GC7629@game.jcrosoft.org>
-Message-ID: <20120830172452.GB18957@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 30 Aug 2012 19:22:36 +0200
+Subject: [PATCH] ARM: gemini: fix the gemini build
+Message-ID: <1346347356-18786-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2012 at 07:14:46PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 17:31 Wed 29 Aug     , Rob Herring wrote:
-> > From: Rob Herring <rob.herring@calxeda.com>
-> > 
-> > In preparation to remove implicit inclusion of mach/gpio.h, add explict
-> > include of mach/gpio.h.
-> I'm going to drop it for 3.7 too
-> 
-> the attached patch will do the same but in a more simpler way
+Test-compiling obscure machines I notice that the gemini (which
+by the way lacks a defconfig) is broken since some time back.
+Adding a simple missing include makes it build again.
 
-I wonder whether you read your patches before you send them... it's
-sometimes quite a good idea to review your own patches. :)
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC guys: please apply this patch directly to the -rc:s
+unless there is some obvious problem with it.
+---
+ arch/arm/mach-gemini/irq.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-> diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-> index c5d7e1e..6803baa 100644
-> --- a/arch/arm/mach-at91/gpio.c
-> +++ b/arch/arm/mach-at91/gpio.c
-> @@ -30,6 +30,7 @@
->  #include <mach/at91_pio.h>
->  
->  #include "generic.h"
-> +#include "generic.h"
-
-That's fairly obviously wrong.
+diff --git a/arch/arm/mach-gemini/irq.c b/arch/arm/mach-gemini/irq.c
+index ca70e5f..020852d 100644
+--- a/arch/arm/mach-gemini/irq.c
++++ b/arch/arm/mach-gemini/irq.c
+@@ -17,6 +17,7 @@
+ #include <linux/sched.h>
+ #include <asm/irq.h>
+ #include <asm/mach/irq.h>
++#include <asm/system_misc.h>
+ #include <mach/hardware.h>
+ 
+ #define IRQ_SOURCE(base_addr)	(base_addr + 0x00)
+-- 
+1.7.7.6
