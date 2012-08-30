@@ -1,41 +1,55 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 30 Aug 2012 15:40:43 -0400
-Subject: [PATCH v2] ARM: Build dtb files in all target
-In-Reply-To: <20120830191412.GC18957@n2100.arm.linux.org.uk>
-References: <1346303687-7795-1-git-send-email-andrew@lunn.ch>
- <20120830165224.GR19437@titan.lakedaemon.net>
- <20120830172304.GA18957@n2100.arm.linux.org.uk>
- <20120830183711.GY19437@titan.lakedaemon.net>
- <20120830191412.GC18957@n2100.arm.linux.org.uk>
-Message-ID: <20120830194043.GA19437@titan.lakedaemon.net>
+Date: Thu, 30 Aug 2012 15:47:06 -0400
+Subject: [PATCH] ARM: Make sure dtc is built before running it
+In-Reply-To: <1346180398-8079-1-git-send-email-davidb@codeaurora.org>
+References: <1346180398-8079-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <20120830194706.GB19437@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2012 at 08:14:12PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Aug 30, 2012 at 02:37:11PM -0400, Jason Cooper wrote:
-> > On Thu, Aug 30, 2012 at 06:23:04PM +0100, Russell King - ARM Linux wrote:
-> > > On Thu, Aug 30, 2012 at 12:52:24PM -0400, Jason Cooper wrote:
-...
-> > I submitted a patch six months ago for the exact same thing and was
-> > informed that others already had a pending patch in your queue for it.
-> > However, I can't for the life of me locate the thread atm.  I remember
-> > it because it was the first patch I did that needed to go into your
-> > queue instead of through arm-soc.  Obviously, I did something horribly
-> > wrong.  ;-)
-> 
-> I don't see anything in there for it - I tried searching for patches
-> containing 'dtbs' and the latest one it found was 7152/1 on 8th
-> November.  I also see no notifications from the patch system for a
-> patch from you...
+On Tue, Aug 28, 2012 at 11:59:58AM -0700, David Brown wrote:
+> 'make dtbs' in a clean tree will try running the dtc before actually
+> building it.  Make these rules depend upon the scripts to build it.
 
-I should have been more clear, I sent it to lakml, was told to send it
-to your queue, and then I was told there was already a patch by someone
-else in your queue.  So, I dropped mine from the next version of my
-dreamplug series.  Sorry to generate unnecessary searching on your part.
+David,
 
-Since it still hasn't made it in, I'll ask David Brown to feed his
-version into your queue.
+Could you please send this into rmk's queue? [1]  This fix has been
+cropping up by various submitters for the past 6 months or so, it would
+be nice to finally get it in.
 
 thx,
 
 Jason.
+
+[1] http://www.arm.linux.org.uk/developer/patches/
+
+> ---
+>  arch/arm/Makefile | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 0298b00..926d840 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -279,10 +279,10 @@ zImage Image xipImage bootpImage uImage: vmlinux
+>  zinstall uinstall install: vmlinux
+>  	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
+>  
+> -%.dtb:
+> +%.dtb: scripts
+>  	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
+>  
+> -dtbs:
+> +dtbs: scripts
+>  	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
+>  
+>  # We use MRPROPER_FILES and CLEAN_FILES now
+> -- 
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
