@@ -1,73 +1,44 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 29 Aug 2012 18:03:18 -0700
-Subject: CMA page migration failure due to buffers on bh_lru
-Message-ID: <503EBBD6.5080504@codeaurora.org>
+From: dhobsong@igel.co.jp (Damian Hobson-Garcia)
+Date: Thu, 30 Aug 2012 11:03:43 +0900
+Subject: [PATCH 0/2] Renesas IPMMU driver for sh7372
+In-Reply-To: <20120825071344.GI29755@verge.net.au>
+References: <1343197742-13630-1-git-send-email-hdk@igel.co.jp>
+ <20120825071344.GI29755@verge.net.au>
+Message-ID: <503EC9FF.1090100@igel.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Simon,
 
-I've been observing a high rate of failures with CMA allocations on my
-ARM system. I've set up a test case set up with a 56MB CMA region that
-essentially does the following:
+On 2012/08/25 16:13, Simon Horman wrote:
+> On Wed, Jul 25, 2012 at 03:29:00PM +0900, Hideki EIRAKU wrote:
+>> This is the Renesas IPMMU driver, IOMMU API implementation and IPMMU
+>> device support for sh7372 (AP4EVB and Mackerel).
+>>
+>> The IPMMU module supports the MMU function and the PMB function.  The
+>> MMU function provides address translation by pagetable compatible with
+>> ARMv6.  The PMB function provides address translation including
+>> tile-linear translation.  This is implementation of the MMU function.
+> 
+> Hi,
+> 
+> I am wondering if anyone has had a chance to review this short series.
+> It seems reasonable to me with the minor exception that I would
+> be happier the second patch to update the relevant defconfigs
+> to either enable or disable the driver.
+> 
+> I am also curious to know how this driver may be tested.
 
-	total_failures = 0;
-	loop forever:
-		loop_failure = 0;
-		for (i = 0; i < 56; i++)
-			chunk[i] = dma_allocate(&cma_dev, 1MB)
-			if (!chunk[i])
-				loop_failure = 0
+Since this patch series configures the LCDC, and CEU to use the IPMMU,
+checking the memory addresses that those blocks are using are properly
+registered in the IPMMU, and verifying that they actually function seems
+like the best way to test this driver. I'll take a look at doing that.
 
-		if (loop_failure)
-			total_failures++
-			loop_failure = 0
+That said, there currently isn't any way to use this with UIO devices,
+since enabling the IPMMU with break direct accesses to physical memory
+from all of the IP blocks on the ICB (LCDC, CEU, VPU, VEU, etc.)
+For these devices, memory allocated with the dma-mapping API *must* be
+used with IPMMU enabled.  The current uio_pdrv_genirq driver isn't set
+up to deal with this right now.
 
-		for (i = 0; i < 56; i++)
-			dma_free(&cma_dev, chunk[i], 1MB)
-
-In the background, I also have a process doing some amount of filesystem
-activity (adb push/pull since this is an android system). During the 
-course of my investigations I generally get ~8500 loops total and ~450 
-total failures (i.e. one or more buffers could not be allocated). This 
-is unacceptably high for our use cases.
-
-In every case the allocation failure was ultimately due to a migration
-failure; the pages contained buffers which could not be dropped because 
-the buffers were busy (move_to_new_page -> fallback_migrate_page ->
-try_to_release_page -> try_to_free_buffers -> drop_buffers -> 
-buffer_busy). In every case, the b_count on the buffer head was always 1.
-
-The problem arises because of the LRU lists for buffer heads:
-
-__getblk
-     __getblk_slow
-         grow_buffers
-             grow_dev_page
-                 find_or_create_page -- create a possibly movable page
-         __find_get_block
-	    __find_get_block_slow
-                 find_get_page -- return the movable page
-             bh_lru_install
-                 get_bh -- buffer head now has a reference
-
-The reference taken in bh_lru_install won't be dropped until the bh is 
-evicted from the lru. This means the page cannot be migrated as long as 
-the buffer exists on an LRU list. The real issue is that unless the 
-buffer gets evicted quickly the page can remain non-migratible for long 
-periods of time. This makes CMA regions unusable for long periods of 
-time given that we generally don't want to size CMA regions any larger 
-than necessary ergo any failure will cause a problem.
-
-My quick and dirty workaround for testing is to remove the GFP_MOVABLE 
-flag from find_or_create_page but this seems significantly less than 
-optimal. Ideally, it seems like the buffers should be evicted from the 
-LRU when trying to drop (expand on invalid_bh_lru?) but I'm not familiar 
-enough with the code path to know if this is a good approach.
-
-Any suggestions/feedback is appreciated. Thanks.
-
-Laura
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Damian
