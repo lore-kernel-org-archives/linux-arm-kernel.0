@@ -1,45 +1,53 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 30 Aug 2012 13:33:47 +0100
-Subject: [PATCH] clk: convert ARM RealView to common clk
-In-Reply-To: <1344270728-7550-1-git-send-email-linus.walleij@stericsson.com>
-References: <1344270728-7550-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1346330027.2623.4.camel@hornet>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 30 Aug 2012 14:12:04 +0100
+Subject: [PATCH 8/8] input: ab8500-ponkey: Rely on MFD core to convert
+ IRQs to virtual
+In-Reply-To: <20120821164244.GA4672@core.coreip.homeip.net>
+References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
+ <1344527635-6163-9-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZ-HOGy_sdsCQSNOdYTDzHFszk0OySM88TjO-neSJUz0A@mail.gmail.com>
+ <20120821092328.GC26899@gmail.com>
+ <20120821164244.GA4672@core.coreip.homeip.net>
+Message-ID: <20120830131202.GG14145@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+> Sorry for the delay. Yes, this shoudl be fine, but since it is
+> essentially a revert of the original patch it should be pushed in as
+> such.
 
-I'm working on moving the VE clocking into driver/clk on top of your
-Realview change, and just spotted one minor issue...
+How's this?
 
-On Mon, 2012-08-06 at 17:32 +0100, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> This converts the ARM RealView machine over to using the common
-> clock. The approach is similar to the one used for the Integrator,
-> and we're reusing the ICST wrapper code.
-[...]
-> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-> index 7f0b5ca..89b726d 100644
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@ -40,4 +40,11 @@ config COMMON_CLK_WM831X
->            Supports the clocking subsystem of the WM831x/2x series of
->           PMICs from Wolfson Microlectronics.
-> 
-> +config COMMON_CLK_VERSATILE
-> +       tristate "Clock driver for ARM Reference designs"
+Author: Lee Jones <lee.jones@linaro.org>
+Date:   Thu Aug 30 14:08:19 2012 +0100
 
-It can't really be a "tristate", can it? To my mind there is no way of
-making it a module, so a "bool" seems more appropriate?
+    Revert "input: ab8500-ponkey: Create AB8500 domain IRQ mapping"
+    
+    This reverts commit ca3b3faf9bee4dc5df4f10eae2d1e48f7de0a8ad.
+    
+    There was a plan to place ab8500_irq_get_virq() calls in each AB8500
+    child device prior to requesting an IRQ, but as we're no longer using
+    Device Tree to collect our IRQ numbers, it's actually better to allow
+    the core to do this during device registration time. So the IRQ number
+    we pull from its resource has already been converted to a virtual IRQ.
+    
+    CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+    CC: linux-input at vger.kernel.org
+    Acked-by: Linus Walleij <linus.walleij@linaro.org>
+    Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-> +       depends on ARCH_INTEGRATOR || ARCH_REALVIEW
-> +       ---help---
-> +          Supports clocking on ARM Reference designs Integrator/AP,
-> +         Integrator/CP, RealView PB1176, EB, PB11MP and PBX.
-> +
->  endmenu
-
-Cheers!
-
-Pawe?
+diff --git a/drivers/input/misc/ab8500-ponkey.c b/drivers/input/misc/ab8500-ponkey.c
+index f06231b..84ec691 100644
+--- a/drivers/input/misc/ab8500-ponkey.c
++++ b/drivers/input/misc/ab8500-ponkey.c
+@@ -74,8 +74,8 @@ static int __devinit ab8500_ponkey_probe(struct platform_device *pdev)
+ 
+        ponkey->idev = input;
+        ponkey->ab8500 = ab8500;
+-       ponkey->irq_dbf = ab8500_irq_get_virq(ab8500, irq_dbf);
+-       ponkey->irq_dbr = ab8500_irq_get_virq(ab8500, irq_dbr);
++       ponkey->irq_dbf = irq_dbf;
++       ponkey->irq_dbr = irq_dbr;
+ 
+        input->name = "AB8500 POn(PowerOn) Key";
+        input->dev.parent = &pdev->dev;
