@@ -1,36 +1,48 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 30 Aug 2012 10:27:15 -0500
-Subject: [PATCH 00/10] Make mach/gpio.h optional
-In-Reply-To: <20120829234030.GV18957@n2100.arm.linux.org.uk>
-References: <1346279496-26286-1-git-send-email-robherring2@gmail.com>
- <20120829234030.GV18957@n2100.arm.linux.org.uk>
-Message-ID: <503F8653.40908@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 30 Aug 2012 11:59:14 -0400 (EDT)
+Subject: [PATCH - 2/2] arm: disable caches based on config option
+In-Reply-To: <1346337826-27232-2-git-send-email-m-karicheri2@ti.com>
+References: <1346337826-27232-1-git-send-email-m-karicheri2@ti.com>
+ <1346337826-27232-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <alpine.LFD.2.02.1208301156390.1784@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/29/2012 06:40 PM, Russell King - ARM Linux wrote:
-> On Wed, Aug 29, 2012 at 05:31:26PM -0500, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> This series makes mach/gpio.h optional like we have done for other mach
->> headers in preparation for multi-platform kernel images. Unfortunately,
->> it adds more mach includes to drivers/, but really they are just now
->> explicitly included and easily found.
+On Thu, 30 Aug 2012, Murali Karicheri wrote:
+
+> CONFIG_CPU_ICACHE_DISABLE and CONFIG_CPU_DCACHE_DISABLE are available
+> to allow disabling of D-Cache and I-Cache. However the compressed version
+> of head.S currently doesn't check these variables. This patch will fix
+> this issue and is written similar to the uncompressed version of head.S
 > 
-> This in general looks like a complete backwards step rather than a forwards
-> step for multi-platform kernels.  All these drivers are not going to be
-> usable in multi-platform kernel images, because with mach/ includes they're
-> not going to be picking up the correct set of headers.
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 
-These drivers are already not usable. I'm just making that obvious.
+Acked-by: nicolas Pitre <nico@linaro.org>
 
-> So all these SoC types might as well not be part of the multi-platform
-> project until they get their act together with their headers.
+You may submit your patch to http://www.arm.linux.org.uk/developer/patches/.
 
-Precisely the point. It is pushing the problem to the sub-arches so they
-can clean-up their stuff if they want to get into a multi-plat image. I
-expect we will see some clean starting in parallel with this. The omap
-folks are working omap headers and there were some clean-ups for Marvell
-parts posted. Arnd has platform_data header series he is working on.
 
-Rob
+> ---
+>  arch/arm/boot/compressed/head.S |    6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index b8c64b8..e1d2124 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -659,6 +659,12 @@ __armv7_mmu_cache_on:
+>  #ifdef CONFIG_CPU_ENDIAN_BE8
+>  		orr	r0, r0, #1 << 25	@ big-endian page tables
+>  #endif
+> +#ifdef CONFIG_CPU_DCACHE_DISABLE
+> +		bic	r0, r0, #1 << 2
+> +#endif
+> +#ifdef CONFIG_CPU_ICACHE_DISABLE
+> +		bic	r0, r0, #1 << 12
+> +#endif
+>  		orrne	r0, r0, #1		@ MMU enabled
+>  		movne	r1, #0xfffffffd		@ domain 0 = client
+>  		mcrne	p15, 0, r3, c2, c0, 0	@ load page table pointer
+> -- 
+> 1.7.9.5
+> 
