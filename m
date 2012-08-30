@@ -1,53 +1,30 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 30 Aug 2012 13:35:59 -0700
-Subject: [PATCH v4 3/3] arm/dts: AM33XX: Add D_CAN device tree data
-In-Reply-To: <1346141454-18786-4-git-send-email-anilkumar@ti.com>
-References: <1346141454-18786-1-git-send-email-anilkumar@ti.com>
- <1346141454-18786-4-git-send-email-anilkumar@ti.com>
-Message-ID: <20120830203558.GC1303@atomide.com>
+Date: Thu, 30 Aug 2012 13:48:26 -0700
+Subject: [PATCH 2/2] arm/dts: Cleanup regulator naming and remove @0,1..
+In-Reply-To: <503C6380.4090107@ti.com>
+References: <1343653940-16614-1-git-send-email-rnayak@ti.com>
+ <1343653940-16614-3-git-send-email-rnayak@ti.com>
+ <20120824202725.GA1303@atomide.com> <503C6380.4090107@ti.com>
+Message-ID: <20120830204825.GE1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* AnilKumar Ch <anilkumar@ti.com> [120828 01:11]:
-> Add Bosch D_CAN controller device tree data to AM33XX dtsi
-> file by adding d_can device nodes with all the necessary
-> parameters.
+* Rajendra Nayak <rnayak@ti.com> [120827 23:22]:
+> Hi Tony,
 > 
-> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
-> ---
->  arch/arm/boot/dts/am33xx.dtsi |   18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
+> >* Rajendra Nayak<rnayak@ti.com>  [120730 06:17]:
+> >>regulators do not have a 'reg' property, hence the regulator at 0,
+> >>regulator at 1 do not make sense. get rid of it.
+> >
+> >Looks like this needs to be refreshed to apply. Care to
+> >refresh against current devel-dt branch in case other
+> >places need the same change?
 > 
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index dfe9c559..d965137 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -177,5 +177,23 @@
->  			compatible = "ti,omap3-wdt";
->  			ti,hwmods = "wd_timer2";
->  		};
-> +
-> +		dcan0: d_can at 481CC000 {
-> +			compatible = "bosch,d_can";
-> +			ti,hwmods = "d_can0";
-> +			reg = <0x481CC000 0x2000>;
-> +			interrupts = <52>;
-> +			interrupt-parent = <&intc>;
-> +			status = "disabled";
-> +		};
-> +
-> +		dcan1: d_can at 481D0000 {
-> +			compatible = "bosch,d_can";
-> +			ti,hwmods = "d_can1";
-> +			reg = <0x481D0000 0x2000>;
-> +			interrupts = <55>;
-> +			interrupt-parent = <&intc>;
-> +			status = "disabled";
-> +		};
->  	};
->  };
+> Looks like devel-dt is missing the PATCH 1/2 from this series,
+> which you have already pushed in the -rc for merge.
+> With that applied, this ones applies cleanly too.
 
-Use lower case for hex numbers here too and add support to claim the pins
-in the dcan driver.
+Oh OK thanks :) I'll apply it on top of the fix and merge
+into devel-dt.
 
 Tony
