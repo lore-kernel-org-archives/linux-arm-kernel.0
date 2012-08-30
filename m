@@ -1,41 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 30 Aug 2012 14:18:08 +0100
-Subject: [PATCH 04/22] ASoC: Ux500: Move MSP pinctrl setup into the MSP
- driver
-In-Reply-To: <CACRpkdZse9Nq1acoAujV8ojhRKxykNX0ymcr51QAoanUbDW14g@mail.gmail.com>
-References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
- <1344527268-5964-5-git-send-email-lee.jones@linaro.org>
- <CACRpkda_xOyu9BFGRK4xTsXOO9RCJu7BbU-kPGpttVkR6mDMZg@mail.gmail.com>
- <20120820115914.GP8450@gmail.com>
- <CACRpkdZse9Nq1acoAujV8ojhRKxykNX0ymcr51QAoanUbDW14g@mail.gmail.com>
-Message-ID: <20120830131807.GI14145@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 30 Aug 2012 11:09:49 -0300
+Subject: [PATCH] clk: mxs: Register USB clocks for mx23
+In-Reply-To: <CAOMZO5AME0NXarMF_rarYJeQ4-rGc+DpV7nvL4OeQj+LfkLLQw@mail.gmail.com>
+References: <1340148392-9847-1-git-send-email-festevam@gmail.com>
+ <20120620143830.GF2253@S2101-09.ap.freescale.net>
+ <CAOMZO5AaLKN9bhuPRLJkA8ytiwVi_yrpwzL0mJAzf6VS4PSRLQ@mail.gmail.com>
+ <20120806030014.GB22302@S2101-09.ap.freescale.net>
+ <CAOMZO5AME0NXarMF_rarYJeQ4-rGc+DpV7nvL4OeQj+LfkLLQw@mail.gmail.com>
+Message-ID: <CAOMZO5CZjOopAy1EhWOOCszgJQNW52Z-UPjzVwU6MAp_HtDCzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2012 at 04:09:46PM -0700, Linus Walleij wrote:
-> On Mon, Aug 20, 2012 at 4:59 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Tue, Aug 14, 2012 at 10:51:02AM +0200, Linus Walleij wrote:
-> 
-> >> But wait. These are just local statics. Surelty you can put these into
-> >> struct ux500_msp instead? Here it looks like these will be used for
-> >> all ports, so MSP2 will enable the pins requested by MSP1 etc
-> >> completely broken. So put it into the struct ux500_msp state
-> >> container from ux500_msp_i2s.h where it belongs.
-> >>
-> >> Refer to drivers/tty/serial/amba-pl011.c when in trouble. This
-> >> one is a good pinctrl example.
-> >
-> > How do you see the MSP1 and MSP3 usage protection working if I hide it
-> > all away in MSP specific structs?
-> 
-> Usage protection? Sorry not following. Please elaborate...
+Shawn,
 
-Don't worry about it, I think I sorted it.
+On Mon, Aug 13, 2012 at 12:06 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> Shawn,
+>
+> On Mon, Aug 6, 2012 at 12:00 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>
+>> Probably, no, as I plan to freeze the addition to clkdev lookup table
+>> and replace it with DT clock lookup.
+>
+> Could you please suggest how can I register the USB clocks for mx23?
+> Any example I can refer to implement a "DT clock lookup"?
 
-Please see the lastest version of the patch (sent on 24th Aug).
+Ping?
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I saw some patches from you that changes the way dt clocks are
+registered for mx23/mx28, but not sure if these were applied or not.
+
+Please let me know how should I proceed regarding mx23 usb clocks registration.
+
+Regards,
+
+Fabio Estevam
