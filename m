@@ -1,38 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 31 Aug 2012 08:31:33 +0100
-Subject: [PATCH 8/8] input: ab8500-ponkey: Rely on MFD core to convert
- IRQs to virtual
-In-Reply-To: <20120830230323.GE21501@core.coreip.homeip.net>
-References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
- <1344527635-6163-9-git-send-email-lee.jones@linaro.org>
- <CACRpkdZ-HOGy_sdsCQSNOdYTDzHFszk0OySM88TjO-neSJUz0A@mail.gmail.com>
- <20120821092328.GC26899@gmail.com>
- <20120821164244.GA4672@core.coreip.homeip.net>
- <20120830131202.GG14145@gmail.com>
- <20120830230221.GD21501@core.coreip.homeip.net>
- <20120830230323.GE21501@core.coreip.homeip.net>
-Message-ID: <20120831073123.GA13298@gmail.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Fri, 31 Aug 2012 09:52:53 +0200
+Subject: [PATCH 0/2] dts for i2c-omap: fix incorrect adapter id
+Message-ID: <1346399575-7285-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2012 at 04:03:23PM -0700, Dmitry Torokhov wrote:
-> On Thu, Aug 30, 2012 at 04:02:21PM -0700, Dmitry Torokhov wrote:
-> > On Thu, Aug 30, 2012 at 02:12:04PM +0100, Lee Jones wrote:
-> > > > Sorry for the delay. Yes, this shoudl be fine, but since it is
-> > > > essentially a revert of the original patch it should be pushed in as
-> > > > such.
-> > > 
-> > > How's this?
-> > > 
-> > 
-> > Excellent.
-> 
-> I assume you will be merging it with the rest of AB8500 patches, right?
+Hello,
 
-Yes, if that's okay with you of course?
+This patchset fixes the i2c adapter id on OMAP3 and OMAP4/AM33xx when booting
+from a device tree.
+
+Currently, pdev->id is used, regardless of the boot method. The first patch
+checks for of_node, and get the id from the alias if a device tree is found.
+The boot message is updated accordingly.
+
+The second patch add the necessary aliases for OMAP3, OMAP4 and AM33xx.
+
+This patchset applies on 3.6-rc3 and has been tested on OMAP3 (Gumstix Overo).
+
+Regards,
+
+Florian
+
+
+Florian Vaussard (2):
+  i2c-omap: Fix incorrect adapter id when booting from a device tree
+  arm/dts: Add i2c aliases for OMAP3 and OMAP4/AM33xx
+
+ arch/arm/boot/dts/am33xx.dtsi |    3 +++
+ arch/arm/boot/dts/omap3.dtsi  |    3 +++
+ arch/arm/boot/dts/omap4.dtsi  |    4 ++++
+ drivers/i2c/busses/i2c-omap.c |   19 +++++++++++++++----
+ 4 files changed, 25 insertions(+), 4 deletions(-)
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.5.4
