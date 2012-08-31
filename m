@@ -1,97 +1,58 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Fri, 31 Aug 2012 13:46:54 -0700
-Subject: CMA page migration failure due to buffers on bh_lru
-In-Reply-To: <503EBBD6.5080504@codeaurora.org>
-References: <503EBBD6.5080504@codeaurora.org>
-Message-ID: <504122BE.8080706@codeaurora.org>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Fri, 31 Aug 2012 22:47:15 +0200
+Subject: [PATCH 3/8] i2c: at91: use an id table for SoC dependent
+ parameters
+In-Reply-To: <5040CF80.8060201@atmel.com>
+References: <1346404884-18451-1-git-send-email-ludovic.desroches@atmel.com>
+ <1346404884-18451-4-git-send-email-ludovic.desroches@atmel.com>
+ <20120831142944.GA23867@game.jcrosoft.org> <5040CF80.8060201@atmel.com>
+Message-ID: <504122D3.70507@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/29/2012 6:03 PM, Laura Abbott wrote:
+On 08/31/2012 04:51 PM, Nicolas Ferre wrote:
+>>> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+>>> index f2112f9..0bc91e5 100644
+>>> --- a/arch/arm/mach-at91/at91rm9200.c
+>>> +++ b/arch/arm/mach-at91/at91rm9200.c
+>>> @@ -187,7 +187,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>>>   	CLKDEV_CON_DEV_ID("pclk", "ssc.0",&ssc0_clk),
+>>>   	CLKDEV_CON_DEV_ID("pclk", "ssc.1",&ssc1_clk),
+>>>   	CLKDEV_CON_DEV_ID("pclk", "ssc.2",&ssc2_clk),
+>>> -	CLKDEV_CON_DEV_ID(NULL, "at91_i2c",&twi_clk),
+>>> +	CLKDEV_CON_DEV_ID(NULL, "at91rm9200_i2c",&twi_clk),
+>> use i2c-xxx as on other drivers
+>>
+>> and I do not like to have platform_device_id
+> 
+> Me, I like it and find this implementation very elegant.
+> 
+>> as we need to touch the driver to add a new soc
+> 
+> So what? We still keep the compatibility if the new SoC has it
+> compatibility assured with previous revision: there is nothing to modify.
 
-> My quick and dirty workaround for testing is to remove the GFP_MOVABLE
-> flag from find_or_create_page but this seems significantly less than
-> optimal. Ideally, it seems like the buffers should be evicted from the
-> LRU when trying to drop (expand on invalid_bh_lru?) but I'm not familiar
-> enough with the code path to know if this is a good approach.
->
-> Any suggestions/feedback is appreciated. Thanks.
->
-> Laura
+I agree. The driver would need to be touched to support new SoC only if
+the IP there have had some differences, which would have needed to be 
+resolved anyway.
 
-I came up with what I think is a reasonable fix to this. Feedback is 
-appreciated. Thanks.
+>> please use platform data
 
-Laura
+Using platform data for the dt platforms would have been more troublesome,
+wouldn't it ? I like Ludovic's approach which handles both: dt and non-dt 
+cases in uniform way from the driver's POV.
 
+> No, it does not have to be exposed to the user: these data are highly
+> dependent on the actual hardware (IP revision in fact). So, no need to
+> mess with platform data.
 
-8<---
+Agreed.
+ 
+> So I will acknowledge Ludo's patches.
+> 
+> Bye,
 
-diff --git a/fs/buffer.c b/fs/buffer.c
-index ad5938c..daa0c3d 100644
---- a/fs/buffer.c
-+++ b/fs/buffer.c
-@@ -1399,12 +1399,49 @@ static bool has_bh_in_lru(int cpu, void *dummy)
-  	return 0;
-  }
+--
 
-+static void __evict_bh_lru(void *arg)
-+{
-+	struct bh_lru *b = &get_cpu_var(bh_lrus);
-+	struct buffer_head *bh = arg;
-+	int i;
-+
-+	for (i = 0; i < BH_LRU_SIZE; i++) {
-+		if (b->bhs[i] == bh) {
-+			brelse(b->bhs[i]);
-+			b->bhs[i] = NULL;
-+			goto out;
-+		}
-+	}
-+out:
-+	put_cpu_var(bh_lrus);
-+}
-+
-+static bool bh_exists_in_lru(int cpu, void *arg)
-+{
-+	struct bh_lru *b = per_cpu_ptr(&bh_lrus, cpu);
-+	struct buffer_head *bh = arg;
-+	int i;
-+
-+	for (i = 0; i < BH_LRU_SIZE; i++) {
-+		if (b->bhs[i] == bh)
-+			return 1;
-+	}
-+
-+	return 0;
-+
-+}
-  void invalidate_bh_lrus(void)
-  {
-  	on_each_cpu_cond(has_bh_in_lru, invalidate_bh_lru, NULL, 1, GFP_KERNEL);
-  }
-  EXPORT_SYMBOL_GPL(invalidate_bh_lrus);
-
-+void evict_bh_lrus(struct buffer_head *bh)
-+{
-+	on_each_cpu_cond(bh_exists_in_lru, __evict_bh_lru, bh, 1, GFP_ATOMIC);
-+}
-+EXPORT_SYMBOL_GPL(evict_bh_lrus);
-+
-  void set_bh_page(struct buffer_head *bh,
-  		struct page *page, unsigned long offset)
-  {
-@@ -3052,6 +3089,7 @@ drop_buffers(struct page *page, struct buffer_head 
-**buffers_to_free)
-
-  	bh = head;
-  	do {
-+		evict_bh_lrus(bh);
-  		if (buffer_write_io_error(bh) && page->mapping)
-  			set_bit(AS_EIO, &page->mapping->flags);
-  		if (buffer_busy(bh))
--- 
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Regards,
+Sylwester
