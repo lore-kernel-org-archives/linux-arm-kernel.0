@@ -1,54 +1,33 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 31 Aug 2012 18:52:19 +0900
-Subject: [PATCH 1/2] ARM: exynos: delete redundant HAVE_SCHED_CLOCK option
- in Kconfig
-In-Reply-To: <1346406296-16223-1-git-send-email-Barry.Song@csr.com>
-References: <1346406296-16223-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <CAH9JG2W8xZrkmGkVw_JDY3qSsqHnaTi8-BNoW99V3FUyvWBXng@mail.gmail.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Fri, 31 Aug 2012 11:53:37 +0200
+Subject: [PATCH 1/2] i2c-omap: Fix incorrect adapter id when booting from
+ a device tree
+In-Reply-To: <5040806C.9080003@ti.com>
+References: <1346399575-7285-1-git-send-email-florian.vaussard@epfl.ch>
+ <1346399575-7285-2-git-send-email-florian.vaussard@epfl.ch>
+ <5040806C.9080003@ti.com>
+Message-ID: <504089A1.3030000@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Benoit,
 
-then where select it HAVE_SCHED_CLOCK? apart from other exynos board,
-universal have to use another clock.
+> [    0.658843] omap_i2c i2c.15: bus -1 rev2.4.0 at 400 kHz
+> [    0.760192] omap_i2c i2c.16: bus -1 rev2.4.0 at 400 kHz
+> [    0.775817] omap_i2c i2c.17: bus -1 rev2.4.0 at 400 kHz
+> [    0.791442] omap_i2c i2c.18: bus -1 rev2.4.0 at 400 kHz
+>
+> OK, it is true that the current log is not that nice with bus -1, but
+> maybe we should just remove that.
+>
+> Or we can potentially retrieve the i2c adapter number assign later, and
+> delay the log.
+>
+>>   	r = i2c_add_numbered_adapter(adap);
+>>   	if (r) {
+>>   		dev_err(dev->dev, "failure adding adapter\n");
+I agree, we should defer the log if we want a nice print. I will send a 
+new patch.
 
-Thank you,
-Kyungmin Park
-
-On 8/31/12, Barry Song <Barry.Song@csr.com> wrote:
-> From: Barry Song <Baohua.Song@csr.com>
->
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  arch/arm/mach-exynos/Kconfig |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index b5b4c8c..3fd4ab3 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -243,7 +243,6 @@ config MACH_UNIVERSAL_C210
->  	select CPU_EXYNOS4210
->  	select S5P_HRT
->  	select CLKSRC_MMIO
-> -	select HAVE_SCHED_CLOCK
->  	select S5P_GPIO_INT
->  	select S5P_DEV_FIMC0
->  	select S5P_DEV_FIMC1
-> --
-> 1.7.0.4
->
->
->
-> Member of the CSR plc group of companies. CSR plc registered in England and
-> Wales, registered number 4187346, registered office Churchill House,
-> Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-> More information can be found at www.csr.com. Follow CSR on Twitter at
-> http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Regards,
+Florian
