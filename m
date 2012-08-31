@@ -1,68 +1,81 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 31 Aug 2012 16:00:41 +0200
-Subject: [PATCH 2/2] ARM: dts: mxs: Add the second I2C adapter to the CFA10049
- expansion board
-In-Reply-To: <1346421641-3765-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1346421641-3765-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1346421641-3765-3-git-send-email-maxime.ripard@free-electrons.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 31 Aug 2012 09:26:29 +0800
+Subject: [PATCH v4 1/7] mfd: add syscon driver based on regmap
+In-Reply-To: <1346237818-9498-2-git-send-email-b29396@freescale.com>
+References: <1346237818-9498-1-git-send-email-b29396@freescale.com>
+ <1346237818-9498-2-git-send-email-b29396@freescale.com>
+Message-ID: <20120831012626.GA7726@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/imx28-cfa10049.dts |   31 +++++++++++++++++++++++++++++++
- arch/arm/mach-mxs/Makefile.boot      |    1 +
- 2 files changed, 32 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx28-cfa10049.dts
+On Wed, Aug 29, 2012 at 06:56:52PM +0800, Dong Aisheng wrote:
+> +config MFD_SYSCON
+> +        bool "System Controller Register R/W Based on Regmap"
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
-new file mode 100644
-index 0000000..e0e4b8c
---- /dev/null
-+++ b/arch/arm/boot/dts/imx28-cfa10049.dts
-@@ -0,0 +1,31 @@
-+/*
-+ * Copyright 2012 Free Electrons
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/*
-+ * The CFA-10049 is an expansion board for the CFA-10036 module, thus we
-+ * need to include the CFA-10036 DTS.
-+ */
-+/include/ "imx28-cfa10036.dts"
-+
-+/ {
-+	model = "Crystalfontz CFA-10049 Board";
-+	compatible = "crystalfontz,cfa10049", "crystalfontz,cfa10036", "fsl,imx28";
-+
-+	apb at 80000000 {
-+		apbx at 80040000 {
-+			i2c1: i2c at 8005a000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&i2c1_pins_a>;
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-mxs/Makefile.boot b/arch/arm/mach-mxs/Makefile.boot
-index 4582999..8bd23a8 100644
---- a/arch/arm/mach-mxs/Makefile.boot
-+++ b/arch/arm/mach-mxs/Makefile.boot
-@@ -5,6 +5,7 @@ dtb-y += imx23-evk.dtb \
- 	 imx23-stmp378x_devb.dtb \
- 	 imx28-apx4devkit.dtb \
- 	 imx28-cfa10036.dtb \
-+	 imx28-cfa10049.dtb \
- 	 imx28-evk.dtb \
- 	 imx28-m28evk.dtb \
- 	 imx28-tx28.dtb \
--- 
-1.7.9.5
+If the driver only compiles and works for device tree probe, we should
+have the following?
+
+	depends on OF
+
+> +        select REGMAP_MMIO
+> +        help
+> +	  Select this option to enable accessing system control registers
+> +	  via regmap.
+> +
+
+<snip>
+
+> +struct regmap *syscon_node_to_regmap(struct device_node *np)
+> +{
+> +	struct syscon *syscon;
+> +	struct device *dev;
+> +
+> +	dev = driver_find_device(&syscon_driver.driver, NULL, np,
+> +				 syscon_match);
+> +	of_node_put(np);
+
+This looks a little unnatural to me.  Function syscon_node_to_regmap
+becomes an API visible to clients, who might never know that np will
+be put inside the API.  I'm saying the client may also call of_node_put
+to put the node they get.
+
+I think of_node_put should be moved out from here and put into
+syscon_node_to_regmap and syscon_regmap_lookup_by_compatible.
+
+Regards,
+Shawn
+
+> +
+> +	if (!dev)
+> +		return ERR_PTR(-EPROBE_DEFER);
+> +
+> +	syscon = dev_get_drvdata(dev);
+> +
+> +	return syscon->regmap;
+> +}
+> +EXPORT_SYMBOL_GPL(syscon_node_to_regmap);
+> +
+> +struct regmap *syscon_regmap_lookup_by_compatible(const char *s)
+> +{
+> +	struct device_node *syscon_np;
+> +
+> +	syscon_np = of_find_compatible_node(NULL, NULL, s);
+> +	if (!syscon_np)
+> +		return ERR_PTR(-ENODEV);
+> +
+> +	return syscon_node_to_regmap(syscon_np);
+> +}
+> +EXPORT_SYMBOL_GPL(syscon_regmap_lookup_by_compatible);
+> +
+> +struct regmap *syscon_regmap_lookup_by_phandle(struct device_node *np,
+> +					const char *property)
+> +{
+> +	struct device_node *syscon_np;
+> +
+> +	syscon_np = of_parse_phandle(np, property, 0);
+> +	if (!syscon_np)
+> +		return ERR_PTR(-ENODEV);
+> +
+> +	return syscon_node_to_regmap(syscon_np);
+> +}
+> +EXPORT_SYMBOL_GPL(syscon_regmap_lookup_by_phandle);
