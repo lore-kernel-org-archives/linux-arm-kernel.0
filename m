@@ -1,47 +1,116 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 31 Aug 2012 12:11:38 +0100
-Subject: [PATCH 1/6] ARM: move ARCH config definitions into mach dirs
-In-Reply-To: <20120831110512.GA24490@glitch>
-References: <1346280600-29395-1-git-send-email-robherring2@gmail.com>
- <1346280600-29395-2-git-send-email-robherring2@gmail.com>
- <20120829233159.GS18957@n2100.arm.linux.org.uk> <503F845C.10406@gmail.com>
- <20120830164551.GY18957@n2100.arm.linux.org.uk> <503FB9E6.7020102@gmail.com>
- <20120830192831.GD18957@n2100.arm.linux.org.uk>
- <20120831110512.GA24490@glitch>
-Message-ID: <20120831111138.GG18957@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 31 Aug 2012 13:22:58 +0200
+Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the
+ Nomadik I2C driver
+In-Reply-To: <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
+References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
+ <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20120831112258.GA2624@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2012 at 01:05:12PM +0200, Domenico Andreoli wrote:
-> On Thu, Aug 30, 2012 at 08:28:31PM +0100, Russell King - ARM Linux wrote:
-> > 
-> > I think what we need is arch/arm/include/debug, move the platform specific
-> > debug-macros headers into there, named using platform specific file names.
-> > Then we have the config system define a string-based config:
-> > 
-> > config DEBUG_LL_INCLUDE
-> > 	string
-> > 	default "<debug/icedcc.S>" if DEBUG_ICEDCC
-> > 	default "<debug/msm.S>" if DEBUG_MSM_UART1 || DEBUG_MSM_UART2 || DEBUG_MSM_UART3
-> > ... etc ...
-> > 	default "mach/debug-macros.S"
-> > 
-> > And then we can have the various assembly codes do:
-> > 
-> > #include CONFIG_DEBUG_LL_INCLUDE
-> > 
-> > Not only does this give a migration path, but it also gives folk a reason
-> > to move to the 'new way' if they want to be part of a multi-platform
-> > kernel - and it's a trivial thing to do.  Just move the include file,
-> > add an entry to the DEBUG_LL_INCLUDE entry and the "Kernel low-level
-> > debugging port" choice statement, and job done for both non-multi-platform
-> > and multi-platform kernels.
-> > 
-> > What's even nicer about this approach is it doesn't require everyone to
-> > change simultaneously - it can be done progressively as required.
+On Thu, Aug 23, 2012 at 04:01:27PM +0100, Lee Jones wrote:
+> Here we apply the bindings required for successful Device Tree
+> probing of the i2c-nomadik driver.
 > 
-> This means that:
+> Cc: linux-i2c at vger.kernel.org
+> Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
 
-I'm not about to re-open the debate again.  Please go back and read the
-previous discussions during the last year about this where eventually
-agreement on this way forward was reached.  Thanks.
+Two acks? I'd think this cannot work for multiple reasons.
+
+BTW, patch 2 and 3 should be merged. It is a lot easier to review the
+code with the binding description together.
+
+Is there some dependency other than updating the dts files? If not, I'd
+like to pick up the patch via I2C.
+
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/i2c/busses/i2c-nomadik.c |   28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+> 
+> diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+> index 61b00ed..8168389 100644
+> --- a/drivers/i2c/busses/i2c-nomadik.c
+> +++ b/drivers/i2c/busses/i2c-nomadik.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/platform_data/i2c-nomadik.h>
+> +#include <linux/of.h>
+>  
+>  #define DRIVER_NAME "nmk-i2c"
+>  
+> @@ -920,15 +921,42 @@ static struct nmk_i2c_controller u8500_i2c = {
+>  	.sm             = I2C_FREQ_MODE_FAST,
+>  };
+>  
+> +static void nmk_i2c_of_probe(struct device_node *np,
+> +			struct nmk_i2c_controller *pdata)
+> +{
+> +	/* Provide the default configuration as a base. */
+> +	pdata = &u8500_i2c;
+
+?????? I wonder how that could work... have you tested the patch?
+
+> +
+> +	of_property_read_u32(np, "clock-frequency", (u32*)&pdata->clk_freq);
+
+Might be worth changing clk_freq to u32?
+
+> +
+> +	/* This driver only supports 'standard' and 'fast' modes of operation. */
+> +	if (pdata->clk_freq <= 100000)
+> +		pdata->sm = I2C_FREQ_MODE_STANDARD;
+
+Is standard == 100000 Hz?
+
+
+> +	else
+> +		pdata->sm = I2C_FREQ_MODE_FAST;
+
+If those two are fixed frequencies, you should omit a warning if the
+devicetree has a different frequency set and report which one is going
+to be used actually.
+
+
+> +}
+> +
+>  static atomic_t adapter_id = ATOMIC_INIT(0);
+>  
+>  static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
+>  {
+>  	int ret = 0;
+>  	struct nmk_i2c_controller *pdata = adev->dev.platform_data;
+> +	struct device_node *np = adev->dev.of_node;
+>  	struct nmk_i2c_dev	*dev;
+>  	struct i2c_adapter *adap;
+>  
+> +	if (np) {
+> +		if (!pdata) {
+> +			pdata = devm_kzalloc(&adev->dev, sizeof(*pdata), GFP_KERNEL);
+> +			if (!pdata) {
+> +				ret = -ENOMEM;
+> +				goto err_no_mem;
+> +			}
+> +		}
+> +		nmk_i2c_of_probe(np, pdata);
+> +	}
+> +
+>  	if (!pdata)
+>  		/* No i2c configuration found, using the default. */
+>  		pdata = &u8500_i2c;
+> -- 
+> 1.7.9.5
+> 
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120831/8d00663e/attachment.sig>
