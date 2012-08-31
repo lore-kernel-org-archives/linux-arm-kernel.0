@@ -1,59 +1,41 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 31 Aug 2012 05:45:49 +0800
-Subject: i.MX pwm patches
-In-Reply-To: <1346154504-5623-1-git-send-email-s.hauer@pengutronix.de>
-References: <1346154504-5623-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120830214547.GC3613@r65073-Latitude-D630>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Fri, 31 Aug 2012 11:59:39 +0100
+Subject: [PATCH] hvc_dcc : add support to armv4 and armv5 core
+In-Reply-To: <20120831103351.GE18957@n2100.arm.linux.org.uk>
+References: <1346404916-27616-1-git-send-email-castet.matthieu@free.fr>
+ <20120831110444.25d9b9fe@pyramind.ukuu.org.uk>
+ <504091F0.1090703@parrot.com>
+ <20120831103351.GE18957@n2100.arm.linux.org.uk>
+Message-ID: <20120831115939.23fd4a08@pyramind.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2012 at 01:48:15PM +0200, Sascha Hauer wrote:
-> Hi All,
-> 
-> The following patches are an overdue work on the i.MX pwm driver.
-> 
-> - introduce SoC specific functions to make the driver easier to maintain
-> - use peripheral clock for pwm output unconditionally
-> - separate the two clocks this module has
-> - enable ipg clock for register accesses, peripheral clock for enabling
->   the pwm
-> - make the driver safe for calling pwm_config before pwm_enable
-> - Add devicetree support for i.MX53
-> 
-> The platform device support is still implemented using cpu_is_*, I think
-> this can be dropped completely soon
+On Fri, 31 Aug 2012 11:33:51 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-Anything stops us from doing this right now?  The bonus point of
-cleaning this is that we can remove the #include <mach/hardware.h>
-from the driver, which is helpful for single-kernel project.
+> On Fri, Aug 31, 2012 at 12:29:04PM +0200, Matthieu CASTET wrote:
+> > Alan Cox a ?crit :
+> > > On Fri, 31 Aug 2012 11:21:56 +0200
+> > > Matthieu CASTET <castet.matthieu@free.fr> wrote:
+> > > 
+> > >> Signed-off-by: Matthieu Castet <matthieu.castet@parrot.com>
+> > >> ---
+> > >>  drivers/tty/hvc/hvc_dcc.c |   34 ++++++++++++++++++++++++++++++++++
+> > >>  1 file changed, 34 insertions(+)
+> > > 
+> > > This is a step in the wrong direction. This should all be runtime handled
+> > > 
+> > > NAK.
+> > > 
+> > 
+> > AFAIK you can't build a arm kernel that support arm6/armv7 and armv5.
+> > And I am not sure it will be possible one day.
+> 
+> There are no plans to ever make it possible; there are too many significant
+> differences between ARMv4, v5 architectures and ARMv6,v7 architectures
+> to warrant making this runtime selectable.
 
-Regards,
-Shawn
+Then bury this crap in platform files please not in the drivers/tty layer
+code. Make it a platform driver provided callback or something.
 
-> as this driver has no in kernel users
-> currently, so there should be no need to keep compatibility for platform
-> based boards.
-> 
-> Hopefully this series fixes the issues mentioned by Beno?t. It has been
-> tested on an i.MX53 only.
-> 
-> Sascha
-> 
-> ----------------------------------------------------------------
-> Philipp Zabel (3):
->       pwm i.MX: add devicetree support
->       pwm i.MX: fix clock lookup
->       pwm i.MX: add devicetree support
-> 
-> Sascha Hauer (6):
->       pwm i.MX: factor out SoC specific functions
->       pwm i.MX: remove unnecessary if in pwm_[en|dis]able
->       pwm i.MX: add functions to enable/disable pwm.
->       pwm i.MX: Use module_platform_driver
->       pwm i.MX: use per clock unconditionally
->       ARM i.MX53: Add pwms to dtsi
-> 
->  arch/arm/boot/dts/imx53.dtsi        |   14 ++
->  arch/arm/mach-imx/clk-imx51-imx53.c |    4 +
->  drivers/pwm/pwm-imx.c               |  278 +++++++++++++++++++++++------------
->  3 files changed, 202 insertions(+), 94 deletions(-)
+Alan
