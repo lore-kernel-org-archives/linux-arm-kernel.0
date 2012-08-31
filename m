@@ -1,36 +1,41 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 31 Aug 2012 02:40:50 -0700
-Subject: [PATCH v2 6/9] misc: Generic on-chip SRAM allocation driver
-In-Reply-To: <1346405848.5316.11.camel@coredoba.hi.pengutronix.de>
-References: <1346405224-20399-1-git-send-email-p.zabel@pengutronix.de>
- <1346405224-20399-7-git-send-email-p.zabel@pengutronix.de>
- <1346405848.5316.11.camel@coredoba.hi.pengutronix.de>
-Message-ID: <CAMQu2gxsdeX4z2Zrnb2NW7-gnh2Tyjcxkd2pOMOagkdkHGsgWQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 31 Aug 2012 10:44:38 +0100
+Subject: [PATCH 2/8] irqdomain: Take interrupt-parent property into
+ account if specified
+In-Reply-To: <CACRpkdZMoisfUD_NSkVy2w-jZVUDGn0E8LmvKSWnJ0YRGZO-tQ@mail.gmail.com>
+References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
+ <1344527635-6163-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZMoisfUD_NSkVy2w-jZVUDGn0E8LmvKSWnJ0YRGZO-tQ@mail.gmail.com>
+Message-ID: <20120831094434.GF13298@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2012 at 2:37 AM, Jan L?bbe <jlu@pengutronix.de> wrote:
->
-> On Fri, 2012-08-31 at 11:27 +0200, Philipp Zabel wrote:
-> > This driver requests and remaps a memory region as configured in the
-> > device tree. It serves memory from this region via the genalloc API.
+On Tue, Aug 14, 2012 at 10:19:08AM +0200, Linus Walleij wrote:
+> On Thu, Aug 9, 2012 at 5:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > irq_find_host() currently ignores the 'interrupt-parent' property
+> > even if it's specified in the Device Tree. Meaning that a node can
+> > match to a domain in its hierarchy even if it doesn't belong to it.
+> > By searching for the parent first using of_irq_find_parent() we
+> > insist that the 'interrupt-parent' property is taken into account
+> > ensuring a greater chance of returning the correct domain.
 > >
-> > Other drivers can retrieve the genalloc pool from a phandle pointing
-> > to this drivers' device node in the device tree.
-> >
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > ---
-> >  drivers/misc/Kconfig  |    8 ++++
-> >  drivers/misc/Makefile |    1 +
-> >  drivers/misc/sram.c   |  105
-> > +++++++++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 114 insertions(+)
-> >  create mode 100644 drivers/misc/sram.c
->
-> We now have drivers/memory, which seems to be a good place for this.
->
-drivers/memory is created for Memory controller device drivers. SRAM is
-just pool of memory and should belong to some other place.
+> > CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> > CC: Grant Likely <grant.likely@secretlab.ca>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> This (with 1/8) is the right solution. Thanks, and I think
+> Mark may want to look at this too since I recognize he asked
+> you to work in this direction.
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Regards
-Santosh
+Rob, did this get your Ack too?
+
+Ben, Grant, Mark, would you like to take a look also?
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
