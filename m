@@ -1,34 +1,85 @@
-From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
-Date: Fri, 31 Aug 2012 11:37:28 +0200
-Subject: [PATCH v2 6/9] misc: Generic on-chip SRAM allocation driver
-In-Reply-To: <1346405224-20399-7-git-send-email-p.zabel@pengutronix.de>
-References: <1346405224-20399-1-git-send-email-p.zabel@pengutronix.de>
- <1346405224-20399-7-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1346405848.5316.11.camel@coredoba.hi.pengutronix.de>
+From: anilkumar@ti.com (AnilKumar Ch)
+Date: Fri, 31 Aug 2012 15:07:20 +0530
+Subject: [PATCH 2/2] arm/dts: AM33XX: Add device tree OPP table
+In-Reply-To: <1346405840-31058-1-git-send-email-anilkumar@ti.com>
+References: <1346405840-31058-1-git-send-email-anilkumar@ti.com>
+Message-ID: <1346405840-31058-3-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-08-31 at 11:27 +0200, Philipp Zabel wrote:
-> This driver requests and remaps a memory region as configured in the
-> device tree. It serves memory from this region via the genalloc API.
-> 
-> Other drivers can retrieve the genalloc pool from a phandle pointing
-> to this drivers' device node in the device tree.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->  drivers/misc/Kconfig  |    8 ++++
->  drivers/misc/Makefile |    1 +
->  drivers/misc/sram.c   |  105 +++++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 114 insertions(+)
->  create mode 100644 drivers/misc/sram.c
+Add DT OPP table for AM33XX family of devices. This data is
+decoded by OF with of_init_opp_table() helper function.
 
-We now have drivers/memory, which seems to be a good place for this.
+Also adds cpu0 supply name to the corresponding dts files.
+cpu0-supply name is used by cpufreq-cpu0 driver to get the
+regulator pointer for voltage modifications.
 
-Regards,
-Jan
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+ arch/arm/boot/dts/am335x-bone.dts |    6 ++++++
+ arch/arm/boot/dts/am335x-evm.dts  |    6 ++++++
+ arch/arm/boot/dts/am33xx.dtsi     |   15 +++++++++++++++
+ 3 files changed, 27 insertions(+)
+
+diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+index ce486fc..2767b5f 100644
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone.dts
+@@ -13,6 +13,12 @@
+ 	model = "TI AM335x BeagleBone";
+ 	compatible = "ti,am335x-bone", "ti,am33xx";
+ 
++	cpus {
++		cpu at 0 {
++			cpu0-supply = <&dcdc2_reg>;
++		};
++	};
++
+ 	memory {
+ 		device_type = "memory";
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index baa3276..54d972c 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -13,6 +13,12 @@
+ 	model = "TI AM335x EVM";
+ 	compatible = "ti,am335x-evm", "ti,am33xx";
+ 
++	cpus {
++		cpu at 0 {
++			cpu0-supply = <&vdd1_reg>;
++		};
++	};
++
+ 	memory {
+ 		device_type = "memory";
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index ab744d6..2043b53 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -25,6 +25,21 @@
+ 	cpus {
+ 		cpu at 0 {
+ 			compatible = "arm,cortex-a8";
++
++			/*
++			 * To consider voltage drop between PMIC and SoC,
++			 * tolerance value is reduced to 2% from 4% and
++			 * voltage value is increased as a precaution.
++			 */
++			operating-points = <
++				/* kHz    uV */
++				720000  1285000
++				600000  1225000
++				500000  1125000
++				275000  1125000
++			>;
++			voltage-tolerance = <2>; /* 2 percentage */
++			clock-latency = <300000>; /* From omap-cpufreq driver */
+ 		};
+ 	};
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
