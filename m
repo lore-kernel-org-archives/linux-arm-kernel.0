@@ -1,30 +1,31 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 31 Aug 2012 17:42:01 +0200
-Subject: [RFC PATCH] ARM: OMAP2+: omap-device: Do not overwrite resources
- allocated by OF layer
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA9EA8E@DBDE01.ent.ti.com>
-References: <1346233691-10294-1-git-send-email-hvaibhav@ti.com>
- <5040D745.5010909@ti.com>
- <79CD15C6BA57404B839C016229A409A83EA9EA8E@DBDE01.ent.ti.com>
-Message-ID: <5040DB49.9000403@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 31 Aug 2012 11:43:18 -0400
+Subject: [GIT PULL] kirkwood fix for v3.6
+In-Reply-To: <20120830171428.GT19437@titan.lakedaemon.net>
+References: <20120830171428.GT19437@titan.lakedaemon.net>
+Message-ID: <20120831154318.GH19437@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/31/2012 05:36 PM, Hiremath, Vaibhav wrote:
-> On Fri, Aug 31, 2012 at 20:54:53, Cousson, Benoit wrote:
-...
-> I think you are getting confused between Vaibhav B and Vaibhav H :)
-> We have two Vaibhav's roaming around here ;-)
+On Thu, Aug 30, 2012 at 01:14:28PM -0400, Jason Cooper wrote:
+> The following changes since commit b74ffd85e32d44e8ed405a2a0a175ef4cd39cf67:
+> 
+>   ARM: Kirkwood: fix Makefile.boot (2012-08-15 13:58:52 +0000)
+> 
+> are available in the git repository at:
+>   git://git.infradead.org/users/jcooper/linux.git fixes-for-v3.6
+> 
+> Andrew Lunn (1):
+>       ARM: Kirkwood: Fix 'SZ_1M' undeclared here for db88f6281-bp-setup.c
+> 
+>  arch/arm/mach-kirkwood/db88f6281-bp-setup.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 
-Oops, sorry, this is the very first time I realized that two different
-Vaibhav were sending patches on very similar topic...
-That's why you were so good generating a lot of patches :-) You have a
-dual channel of patches :-)
+Arnd, Olof,
 
-> I was not there during LPC this time, it was Vaibhav B who attended it.
-> I will sync up with him and try to get more info on it.
+I'm going to issue a v2 for this.  Andrew has determined that this
+does not need to go to stable.
 
-Sorry again for the confusion.
+thx,
 
-Thanks,
-Benoit
+Jason.
