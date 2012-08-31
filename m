@@ -1,227 +1,68 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 31 Aug 2012 17:24:53 +0200
-Subject: [RFC PATCH] ARM: OMAP2+: omap-device: Do not overwrite resources
- allocated by OF layer
-In-Reply-To: <1346233691-10294-1-git-send-email-hvaibhav@ti.com>
-References: <1346233691-10294-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <5040D745.5010909@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 31 Aug 2012 10:35:20 +0800
+Subject: [PATCH] spi/imx: set the inactive state of the clock according
+ to the clock polarity
+In-Reply-To: <1346403311-25080-1-git-send-email-dirk.behme@de.bosch.com>
+References: <1346403311-25080-1-git-send-email-dirk.behme@de.bosch.com>
+Message-ID: <20120831023518.GE7726@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav,
+Copy Uwe ...
 
-On 08/29/2012 11:48 AM, Vaibhav Hiremath wrote:
-> With the new devices (like, AM33XX and OMAP5) we now only support
-> DT boot mode of operation and now it is the time to start killing
-> slowly the dependency on hwmod, so with this patch, we are starting
-> with device resources.
-
-Thanks for working on that.
-
-> The idea here is implemented considering to both boot modes -
->   - DT boot mode
->     OF framework will construct the resource structure (currently
->     does for MEM & IRQ resource) and we should respect/use these
->     resources, killing hwmod dependency.
->     If pdev->num_resources > 0, we assume that MEM & IRQ resources
->     have been allocated by OF layer already (through DTB).
+On Fri, Aug 31, 2012 at 10:55:11AM +0200, Dirk Behme wrote:
+> From: Knut Wohlrab <knut.wohlrab@de.bosch.com>
 > 
->     Once DMA resource is available from OF layer, we should
->     kill filling any resources from hwmod.
-
-Yeap, I did a similar patch some months ago and decided to drop it
-because I was expected the DMA binding to be there and wanted to avoid
-adding more code that we are going to remove later.
-
-The other potential issue is that when the binding will be there, we
-will have to update all the drivers and DTS first before being able to
-change the hwmod code from hwmod DMA to DTS DMA.
-I was thinking of something smoother that will check if DMA is in DTS
-and fall back to hwmod if not to avoid that.
-But again, I'm not sure it worth the effort.
-
->   - Non-DT boot mode
->     Here, pdev->num_resources = 0, and we should get all the
->     resources from hwmod (following existing steps)
+> There are SPI devices which need a SPI clock with active low polarity and
+> high inactive state.
 > 
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@ti.com>
+> Add the setting of the inactive state ECSPIx_CONFIGREG:SCLK CTL
+> according to the clock polarity ECSPIx_CONFIGREG:SCLK POL:
+> 
+> DT without "spi-cpol" = 0 = clock active high polarity = inactive state low
+> DT with    "spi-cpol" = 1 = clock active low  polarity = inactive state high
+> 
+> Signed-off-by: Knut Wohlrab <knut.wohlrab@de.bosch.com>
 > ---
-> This patch is tested on BeagleBone and AM37xEVM.
+> 
+> Question: Are there real world examples for a need of an individual setting of
+> clock polarity/inactive state?
 
-I'll try to do more testing on Panda next week.
+I'm less concerned about that.  We can always patch the driver when
+the real world example occurs?
 
-> Why RFC?
-> Still we have function duplication omap_device_fill_resources() and
-> omap_device_fill_dma_resources(), we can actually split the function
-> into 3 resources and avoid duplication -
->   - omap_device_fill_dma_resources()
->   - omap_device_fill_mem_resources()
->   - omap_device_fill_irq_resources()
-> 
-> Actually I wanted to clean it further but thought of getting
-> feedback first and then proceed further.
+Regards,
+Shawn
 
-Well, that's anyway temporary code that should be gone in 6 months from
-now (ideally). So that looks pretty good to me.
-
->  arch/arm/mach-omap2/omap_hwmod.c             |   27 ++++++++++
->  arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
->  arch/arm/plat-omap/omap_device.c             |   72 +++++++++++++++++++++----
->  3 files changed, 88 insertions(+), 12 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 31ec283..edabfb3 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -3330,6 +3330,33 @@ int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res)
->  }
+>  drivers/spi/spi-imx.c |    6 ++++--
+>  1 files changed, 4 insertions(+), 2 deletions(-)
 > 
->  /**
-> + * omap_hwmod_fill_dma_resources - fill struct resource array with dma data
-> + * @oh: struct omap_hwmod *
-> + * @res: pointer to the array of struct resource to fill
-> + *
-> + * Fill the struct resource array @res with dma resource data from the
-> + * omap_hwmod @oh.  Intended to be called by code that registers
-> + * omap_devices.  See also omap_hwmod_count_resources().  Returns the
-> + * number of array elements filled.
-> + */
-> +int omap_hwmod_fill_dma_resources(struct omap_hwmod *oh, struct resource *res)
-> +{
-> +	int i, sdma_reqs_cnt;
-> +	int r = 0;
-> +
-> +	sdma_reqs_cnt = _count_sdma_reqs(oh);
-> +	for (i = 0; i < sdma_reqs_cnt; i++) {
-> +		(res + r)->name = (oh->sdma_reqs + i)->name;
-> +		(res + r)->start = (oh->sdma_reqs + i)->dma_req;
-> +		(res + r)->end = (oh->sdma_reqs + i)->dma_req;
-> +		(res + r)->flags = IORESOURCE_DMA;
-> +		r++;
-> +	}
-> +
-> +	return r;
-> +}
-> +
-> +/**
->   * omap_hwmod_get_resource_byname - fetch IP block integration data by name
->   * @oh: struct omap_hwmod * to operate on
->   * @type: one of the IORESOURCE_* constants from include/linux/ioport.h
-> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> index 9b9646c..0533073 100644
-> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> @@ -615,6 +615,7 @@ int omap_hwmod_softreset(struct omap_hwmod *oh);
-> 
->  int omap_hwmod_count_resources(struct omap_hwmod *oh);
->  int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res);
-> +int omap_hwmod_fill_dma_resources(struct omap_hwmod *oh, struct resource *res);
->  int omap_hwmod_get_resource_byname(struct omap_hwmod *oh, unsigned int type,
->  				   const char *name, struct resource *res);
-> 
-> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-> index c490240..fd15a3a 100644
-> --- a/arch/arm/plat-omap/omap_device.c
-> +++ b/arch/arm/plat-omap/omap_device.c
-> @@ -486,6 +486,33 @@ static int omap_device_fill_resources(struct omap_device *od,
->  }
-> 
->  /**
-> + * omap_device_fill_dma_resources - fill in array of struct resource with dma resources
-> + * @od: struct omap_device *
-> + * @res: pointer to an array of struct resource to be filled in
-> + *
-> + * Populate one or more empty struct resource pointed to by @res with
-> + * the dma resource data for this omap_device @od.  Used by
-> + * omap_device_alloc() after calling omap_device_count_resources().
-> + *
-> + * Ideally this function would not be needed at all.  If we have
-> + * mechanism to get dma resources from DT.
-> + *
-> + * Returns 0.
-> + */
-> +static int omap_device_fill_dma_resources(struct omap_device *od,
-> +				      struct resource *res)
-> +{
-> +	int i, r;
-> +
-> +	for (i = 0; i < od->hwmods_cnt; i++) {
-> +		r = omap_hwmod_fill_dma_resources(od->hwmods[i], res);
-> +		res += r;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +/**
->   * omap_device_alloc - allocate an omap_device
->   * @pdev: platform_device that will be included in this omap_device
->   * @oh: ptr to the single omap_hwmod that backs this omap_device
-> @@ -524,24 +551,45 @@ struct omap_device *omap_device_alloc(struct platform_device *pdev,
->  	od->hwmods = hwmods;
->  	od->pdev = pdev;
-> 
-> +	res_count = omap_device_count_resources(od);
->  	/*
-> -	 * HACK: Ideally the resources from DT should match, and hwmod
-> -	 * should just add the missing ones. Since the name is not
-> -	 * properly populated by DT, stick to hwmod resources only.
-> +	 * DT Boot:
-> +	 *   OF framework will construct the resource structure (currently
-> +	 *   does for MEM & IRQ resource) and we should respect/use these
-> +	 *   resources, killing hwmod dependency.
-> +	 *   If pdev->num_resources > 0, we assume that MEM & IRQ resources
-> +	 *   have been allocated by OF layer already (through DTB).
-> +	 *
-> +	 * Non-DT Boot:
-> +	 *   Here, pdev->num_resources = 0, and we should get all the
-> +	 *   resources from hwmod.
-> +	 *
-> +	 * TODO: Once DMA resource is available from OF layer, we should
-> +	 *   kill filling any resources from hwmod.
->  	 */
-> -	if (pdev->num_resources && pdev->resource)
-> -		dev_warn(&pdev->dev, "%s(): resources already allocated %d\n",
-> -			__func__, pdev->num_resources);
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index e834ff8..d64655b 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -197,6 +197,7 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
+>  #define MX51_ECSPI_CONFIG_SCLKPOL(cs)	(1 << ((cs) +  4))
+>  #define MX51_ECSPI_CONFIG_SBBCTRL(cs)	(1 << ((cs) +  8))
+>  #define MX51_ECSPI_CONFIG_SSBPOL(cs)	(1 << ((cs) + 12))
+> +#define MX51_ECSPI_CONFIG_SCLKCTL(cs)	(1 << ((cs) + 20))
+>  
+>  #define MX51_ECSPI_INT		0x10
+>  #define MX51_ECSPI_INT_TEEN		(1 <<  0)
+> @@ -287,9 +288,10 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
+>  	if (config->mode & SPI_CPHA)
+>  		cfg |= MX51_ECSPI_CONFIG_SCLKPHA(config->cs);
+>  
+> -	if (config->mode & SPI_CPOL)
+> +	if (config->mode & SPI_CPOL) {
+>  		cfg |= MX51_ECSPI_CONFIG_SCLKPOL(config->cs);
 > -
-> -	res_count = omap_device_count_resources(od);
-> -	if (res_count > 0) {
-> -		dev_dbg(&pdev->dev, "%s(): resources allocated from hwmod %d\n",
-> -			__func__, res_count);
-> +	if (res_count > pdev->num_resources) {
-> +		/* Allocate resources memory to account for new resources */
->  		res = kzalloc(sizeof(struct resource) * res_count, GFP_KERNEL);
->  		if (!res)
->  			goto oda_exit3;
+> +		cfg |= MX51_ECSPI_CONFIG_SCLKCTL(config->cs);
+> +	}
+>  	if (config->mode & SPI_CS_HIGH)
+>  		cfg |= MX51_ECSPI_CONFIG_SSBPOL(config->cs);
+>  
+> -- 
+> 1.7.0.4
 > 
-> -		omap_device_fill_resources(od, res);
-> +		/*
-> +		 * If pdev->num_resources > 0, then assume that,
-> +		 * MEM and IRQ resources will only come from DT and only
-> +		 * fill DMA resource from hwmod layer.
-> +		 */
-> +		if (pdev->num_resources && pdev->resource) {
-> +			dev_dbg(&pdev->dev, "%s(): resources already allocated %d\n",
-> +					__func__, res_count);
-> +			memcpy(res, pdev->resource,
-> +				sizeof(struct resource) * pdev->num_resources);
-> +			omap_device_fill_dma_resources(od,
-> +					&res[pdev->num_resources]);
-> +		} else {
-> +			dev_dbg(&pdev->dev, "%s(): using resources from hwmod %d\n",
-> +					__func__, res_count);
-> +			omap_device_fill_resources(od, res);
-> +		}
-
-Considering the temporary aspect of that, I'm more than fine with that
-approach.
-
-BTW, did you attend the discussion about the DMA binding during PLC?
-Is this going to be finalized soon?
-
-Thanks,
-Benoit
