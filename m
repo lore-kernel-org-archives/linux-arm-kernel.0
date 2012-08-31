@@ -1,31 +1,48 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Fri, 31 Aug 2012 11:02:54 +0530
-Subject: [PATCH RESEND 0/6] ARM: EXYNOS: Add support for Trats board using
- device tree
-In-Reply-To: <1346311903-15920-1-git-send-email-t.figa@samsung.com>
-References: <1346311903-15920-1-git-send-email-t.figa@samsung.com>
-Message-ID: <CAJuYYwSUCNdfMXbMVVULPgTVC=zh=4qQR1YiA29JXvUCj6meGA@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 31 Aug 2012 07:47:34 +0200
+Subject: [PATCH] ARM: Kirkwood: Fix 'SZ_1M' undeclared here for
+ db88f6281-bp-setup.c
+In-Reply-To: <20120830185050.GZ19437@titan.lakedaemon.net>
+References: <1346305152-14618-1-git-send-email-andrew@lunn.ch>
+ <20120830171236.GS19437@titan.lakedaemon.net>
+ <20120830180853.GP9886@lunn.ch>
+ <20120830185050.GZ19437@titan.lakedaemon.net>
+Message-ID: <20120831054734.GA30111@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 August 2012 13:01, Tomasz Figa <t.figa@samsung.com> wrote:
-> This patch series adds basic device tree support for Samsung Trats board
-> along with any necessary prerequisites.
->
-> In addition it refactors Exynos4 dts include files to split parts common to
-> the whole Exynos4 part from parts specific to Exynos4210 to allow further
-> extension of Exynos4210 dts include file and addition of include files for
-> other SoCs from Exynos4 line.
->
-> Dependencies:
-> -> [PATCH v5] mmc: sdhci-s3c: Add device tree support
-> http://www.spinics.net/lists/linux-samsung-soc/msg12056.html
-> -> [PATCH v5 2/2] regulator: add device tree support for max8997
-> http://www.spinics.net/lists/kernel/msg1328117.html
+On Thu, Aug 30, 2012 at 02:50:50PM -0400, Jason Cooper wrote:
+> On Thu, Aug 30, 2012 at 08:08:53PM +0200, Andrew Lunn wrote:
+> > On Thu, Aug 30, 2012 at 01:12:36PM -0400, Jason Cooper wrote:
+> > > On Thu, Aug 30, 2012 at 07:39:12AM +0200, Andrew Lunn wrote:
+> > > > Linux-next has failed to compile for kirkwood since 23 August with:
+> > > > 
+> > > > arch/arm/mach-kirkwood/db88f6281-bp-setup.c:29: error: 'SZ_1M' undeclared here (not in a function)
+> > > > arch/arm/mach-kirkwood/db88f6281-bp-setup.c:33: error: 'SZ_4M' undeclared here (not in a function)
+> > > > 
+> > > > Add missing <linux/sizes.h>
+> > > > 
+> > > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > > 
+> > > Applied to: fixes-for-v3.6
+> > > 
+> > > Also, I added a CC for stable so greg can pick it up.
+> > 
+> > Stable does not need it. As i said, it only broke 23 August with
+> > linux-next. So this is needed for only 3.7.
+> 
+> Do we know caused the break?  Is it a fix destined for -stable?
 
-I will follow up on this patch and resubmit it.
+Hi Jason
 
-Thanks,
-Thomas.
+If im groking the output from gcc -E correctly, it was this change:
 
-[...]
+http://git.kernel.org/?p=linux/kernel/git/next/linux-next.git;a=commitdiff;h=8f039ba3191e67bf48e560f5737d0c285720d4d8
+
+The #include <asm/memory.h> has been dropped, and its from there that
+it was getting <linux/sizes.h>.
+
+This does not look like a change that will get backported to anything
+earlier than 3.7.
+
+	Andrew
