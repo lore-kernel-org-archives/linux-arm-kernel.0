@@ -1,33 +1,47 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 31 Aug 2012 12:08:22 +0100
-Subject: [rtc-linux] [PATCH 1/1] drivers/rtc/rtc-ab8500.c: Revoke Device
- Tree enablement
-In-Reply-To: <CACRpkdZa-72QogrZ-P5jbDHTTX64babZo3ydjzfgC-4LWUBfMg@mail.gmail.com>
-References: <1344527828-6283-1-git-send-email-lee.jones@linaro.org>
- <1344527828-6283-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdZa-72QogrZ-P5jbDHTTX64babZo3ydjzfgC-4LWUBfMg@mail.gmail.com>
-Message-ID: <20120831110818.GA5962@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 31 Aug 2012 12:11:38 +0100
+Subject: [PATCH 1/6] ARM: move ARCH config definitions into mach dirs
+In-Reply-To: <20120831110512.GA24490@glitch>
+References: <1346280600-29395-1-git-send-email-robherring2@gmail.com>
+ <1346280600-29395-2-git-send-email-robherring2@gmail.com>
+ <20120829233159.GS18957@n2100.arm.linux.org.uk> <503F845C.10406@gmail.com>
+ <20120830164551.GY18957@n2100.arm.linux.org.uk> <503FB9E6.7020102@gmail.com>
+ <20120830192831.GD18957@n2100.arm.linux.org.uk>
+ <20120831110512.GA24490@glitch>
+Message-ID: <20120831111138.GG18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 10:32:02AM +0200, Linus Walleij wrote:
-> On Thu, Aug 9, 2012 at 5:57 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Fri, Aug 31, 2012 at 01:05:12PM +0200, Domenico Andreoli wrote:
+> On Thu, Aug 30, 2012 at 08:28:31PM +0100, Russell King - ARM Linux wrote:
+> > 
+> > I think what we need is arch/arm/include/debug, move the platform specific
+> > debug-macros headers into there, named using platform specific file names.
+> > Then we have the config system define a string-based config:
+> > 
+> > config DEBUG_LL_INCLUDE
+> > 	string
+> > 	default "<debug/icedcc.S>" if DEBUG_ICEDCC
+> > 	default "<debug/msm.S>" if DEBUG_MSM_UART1 || DEBUG_MSM_UART2 || DEBUG_MSM_UART3
+> > ... etc ...
+> > 	default "mach/debug-macros.S"
+> > 
+> > And then we can have the various assembly codes do:
+> > 
+> > #include CONFIG_DEBUG_LL_INCLUDE
+> > 
+> > Not only does this give a migration path, but it also gives folk a reason
+> > to move to the 'new way' if they want to be part of a multi-platform
+> > kernel - and it's a trivial thing to do.  Just move the include file,
+> > add an entry to the DEBUG_LL_INCLUDE entry and the "Kernel low-level
+> > debugging port" choice statement, and job done for both non-multi-platform
+> > and multi-platform kernels.
+> > 
+> > What's even nicer about this approach is it doesn't require everyone to
+> > change simultaneously - it can be done progressively as required.
 > 
-> > All AB8500 devices are now registered via MFD core, so Device Tree
-> > capability is no longer required for probing. Here we pull the DT
-> > match table to ensure we're no longer probed during Device Tree
-> > start-up.
-> >
-> > CC: Alessandro Zummo <a.zummo@towertech.it>
-> > CC: rtc-linux at googlegroups.com
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> This means that:
 
-I'm guessing we still need Alessandro's Ack?
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I'm not about to re-open the debate again.  Please go back and read the
+previous discussions during the last year about this where eventually
+agreement on this way forward was reached.  Thanks.
