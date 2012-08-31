@@ -1,97 +1,70 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Fri, 31 Aug 2012 14:21:28 +0200
-Subject: [PATCH 1/4] clk: Provide option for clk_get_rate to issue hw for new
- rate
+Date: Fri, 31 Aug 2012 14:21:29 +0200
+Subject: [PATCH 2/4] clk: ux500: Support for prmcu_rate clock
 In-Reply-To: <1346415691-13371-1-git-send-email-ulf.hansson@stericsson.com>
 References: <1346415691-13371-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1346415691-13371-2-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1346415691-13371-3-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ulf Hansson <ulf.hansson@linaro.org>
 
-By using CLK_GET_RATE_NOCACHE flag, we tell the clk_get_rate API to
-issue the hw for an updated clock rate. This can be used for a clock
-which rate may be updated without a client necessary modifying it.
+The prmcu_rate clock is not gateable and has a rate which
+only can be fetched.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/clk/clk.c            |   43 +++++++++++++++++++++++-------------------
- include/linux/clk-provider.h |    1 +
- 2 files changed, 25 insertions(+), 19 deletions(-)
+ drivers/clk/ux500/clk-prcmu.c |   14 ++++++++++++++
+ drivers/clk/ux500/clk.h       |    5 +++++
+ 2 files changed, 19 insertions(+)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index efdfd00..d9cbae0 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -558,25 +558,6 @@ int clk_enable(struct clk *clk)
- EXPORT_SYMBOL_GPL(clk_enable);
+diff --git a/drivers/clk/ux500/clk-prcmu.c b/drivers/clk/ux500/clk-prcmu.c
+index 1d779ad..930cdfe 100644
+--- a/drivers/clk/ux500/clk-prcmu.c
++++ b/drivers/clk/ux500/clk-prcmu.c
+@@ -153,6 +153,11 @@ static struct clk_ops clk_prcmu_gate_ops = {
+ 	.recalc_rate = clk_prcmu_recalc_rate,
+ };
  
- /**
-- * clk_get_rate - return the rate of clk
-- * @clk: the clk whose rate is being returned
-- *
-- * Simply returns the cached rate of the clk.  Does not query the hardware.  If
-- * clk is NULL then returns 0.
-- */
--unsigned long clk_get_rate(struct clk *clk)
--{
--	unsigned long rate;
--
--	mutex_lock(&prepare_lock);
--	rate = __clk_get_rate(clk);
--	mutex_unlock(&prepare_lock);
--
--	return rate;
--}
--EXPORT_SYMBOL_GPL(clk_get_rate);
--
--/**
-  * __clk_round_rate - round the given rate for a clk
-  * @clk: round the rate of this clock
-  *
-@@ -702,6 +683,30 @@ static void __clk_recalc_rates(struct clk *clk, unsigned long msg)
++static struct clk_ops clk_prcmu_rate_ops = {
++	.is_enabled = clk_prcmu_is_enabled,
++	.recalc_rate = clk_prcmu_recalc_rate,
++};
++
+ static struct clk_ops clk_prcmu_opp_gate_ops = {
+ 	.prepare = clk_prcmu_opp_prepare,
+ 	.unprepare = clk_prcmu_opp_unprepare,
+@@ -228,6 +233,15 @@ struct clk *clk_reg_prcmu_gate(const char *name,
+ 			&clk_prcmu_gate_ops);
  }
  
- /**
-+ * clk_get_rate - return the rate of clk
-+ * @clk: the clk whose rate is being returned
-+ *
-+ * Simply returns the cached rate of the clk, unless CLK_GET_RATE_NOCACHE flag
-+ * is set, which means a recalc_rate will be issued.
-+ * If clk is NULL then returns 0.
-+ */
-+unsigned long clk_get_rate(struct clk *clk)
++struct clk *clk_reg_prcmu_rate(const char *name,
++			       const char *parent_name,
++			       u8 cg_sel,
++			       unsigned long flags)
 +{
-+	unsigned long rate;
-+
-+	mutex_lock(&prepare_lock);
-+
-+	if (clk && (clk->flags & CLK_GET_RATE_NOCACHE))
-+		__clk_recalc_rates(clk, 0);
-+
-+	rate = __clk_get_rate(clk);
-+	mutex_unlock(&prepare_lock);
-+
-+	return rate;
++	return clk_reg_prcmu(name, parent_name, cg_sel, 0, flags,
++			&clk_prcmu_rate_ops);
 +}
-+EXPORT_SYMBOL_GPL(clk_get_rate);
 +
-+/**
-  * __clk_speculate_rates
-  * @clk: first clk in the subtree
-  * @parent_rate: the "future" rate of clk's parent
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 77335fa..1b15307 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -26,6 +26,7 @@
- #define CLK_IGNORE_UNUSED	BIT(3) /* do not gate even if unused */
- #define CLK_IS_ROOT		BIT(4) /* root clk, has no parent */
- #define CLK_IS_BASIC		BIT(5) /* Basic clk, can't do a to_clk_foo() */
-+#define CLK_GET_RATE_NOCACHE	BIT(6) /* do not use the cached clk rate */
+ struct clk *clk_reg_prcmu_opp_gate(const char *name,
+ 				   const char *parent_name,
+ 				   u8 cg_sel,
+diff --git a/drivers/clk/ux500/clk.h b/drivers/clk/ux500/clk.h
+index 32085aa..836d7d1 100644
+--- a/drivers/clk/ux500/clk.h
++++ b/drivers/clk/ux500/clk.h
+@@ -35,6 +35,11 @@ struct clk *clk_reg_prcmu_gate(const char *name,
+ 			       u8 cg_sel,
+ 			       unsigned long flags);
  
- struct clk_hw;
- 
++struct clk *clk_reg_prcmu_rate(const char *name,
++			       const char *parent_name,
++			       u8 cg_sel,
++			       unsigned long flags);
++
+ struct clk *clk_reg_prcmu_opp_gate(const char *name,
+ 				   const char *parent_name,
+ 				   u8 cg_sel,
 -- 
 1.7.10
