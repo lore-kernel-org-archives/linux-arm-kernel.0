@@ -1,130 +1,35 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 31 Aug 2012 09:34:37 +0900
-Subject: [PATCH 02/10] marzen: add SDHI0 support
+Date: Fri, 31 Aug 2012 09:34:42 +0900
+Subject: [PATCH 07/10] ARM: shmobile: r8a7779: add USB OHCI clock support
 In-Reply-To: <1346373285-19588-1-git-send-email-horms@verge.net.au>
 References: <1346373285-19588-1-git-send-email-horms@verge.net.au>
-Message-ID: <1346373285-19588-3-git-send-email-horms@verge.net.au>
+Message-ID: <1346373285-19588-8-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Phil Edworthy <phil.edworthy@renesas.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+ohci-platform driver require these clocks
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/configs/marzen_defconfig     |  4 +--
- arch/arm/mach-shmobile/board-marzen.c | 52 ++++++++++++++++++++++++++++++++++-
- 2 files changed, 53 insertions(+), 3 deletions(-)
+ arch/arm/mach-shmobile/clock-r8a7779.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
-index 864f9a5..bf42ad2 100644
---- a/arch/arm/configs/marzen_defconfig
-+++ b/arch/arm/configs/marzen_defconfig
-@@ -71,12 +71,12 @@ CONFIG_GPIO_SYSFS=y
- CONFIG_SSB=y
- # CONFIG_HID_SUPPORT is not set
- # CONFIG_USB_SUPPORT is not set
-+CONFIG_MMC=y
-+CONFIG_MMC_SDHI=y
- CONFIG_UIO=y
- CONFIG_UIO_PDRV_GENIRQ=y
- # CONFIG_IOMMU_SUPPORT is not set
- # CONFIG_FILE_LOCKING is not set
--# CONFIG_DNOTIFY is not set
--# CONFIG_INOTIFY_USER is not set
- CONFIG_TMPFS=y
- # CONFIG_MISC_FILESYSTEMS is not set
- CONFIG_MAGIC_SYSRQ=y
-diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-index 3a528cf..dec3ffc 100644
---- a/arch/arm/mach-shmobile/board-marzen.c
-+++ b/arch/arm/mach-shmobile/board-marzen.c
-@@ -30,6 +30,8 @@
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/machine.h>
- #include <linux/smsc911x.h>
-+#include <linux/mmc/sh_mobile_sdhi.h>
-+#include <linux/mfd/tmio.h>
- #include <mach/hardware.h>
- #include <mach/r8a7779.h>
- #include <mach/common.h>
-@@ -39,6 +41,12 @@
- #include <asm/hardware/gic.h>
- #include <asm/traps.h>
- 
-+/* Fixed 3.3V regulator to be used by SDHI0 */
-+static struct regulator_consumer_supply fixed3v3_power_consumers[] = {
-+	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.0"),
-+	REGULATOR_SUPPLY("vqmmc", "sh_mobile_sdhi.0"),
-+};
-+
- /* Dummy supplies, where voltage doesn't matter */
- static struct regulator_consumer_supply dummy_supplies[] = {
- 	REGULATOR_SUPPLY("vddvario", "smsc911x"),
-@@ -75,13 +83,45 @@ static struct platform_device eth_device = {
- 	.num_resources	= ARRAY_SIZE(smsc911x_resources),
- };
- 
-+static struct resource sdhi0_resources[] = {
-+	[0] = {
-+		.name	= "sdhi0",
-+		.start	= 0xffe4c000,
-+		.end	= 0xffe4c0ff,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= gic_spi(104),
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct sh_mobile_sdhi_info sdhi0_platform_data = {
-+	.tmio_flags = TMIO_MMC_WRPROTECT_DISABLE | TMIO_MMC_HAS_IDLE_WAIT,
-+	.tmio_caps = MMC_CAP_SD_HIGHSPEED,
-+};
-+
-+static struct platform_device sdhi0_device = {
-+	.name = "sh_mobile_sdhi",
-+	.num_resources = ARRAY_SIZE(sdhi0_resources),
-+	.resource = sdhi0_resources,
-+	.id = 0,
-+	.dev = {
-+		.platform_data = &sdhi0_platform_data,
-+	}
-+};
-+
- static struct platform_device *marzen_devices[] __initdata = {
- 	&eth_device,
-+	&sdhi0_device,
- };
- 
- static void __init marzen_init(void)
- {
--	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
-+	regulator_register_always_on(0, "fixed-3.3V", fixed3v3_power_consumers,
-+				ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
-+	regulator_register_fixed(0, dummy_supplies,
-+				ARRAY_SIZE(dummy_supplies));
- 
- 	r8a7779_pinmux_init();
- 
-@@ -97,6 +137,16 @@ static void __init marzen_init(void)
- 	gpio_request(GPIO_FN_EX_CS0, NULL); /* nCS */
- 	gpio_request(GPIO_FN_IRQ1_B, NULL); /* IRQ + PME */
- 
-+	/* SD0 (CN20) */
-+	gpio_request(GPIO_FN_SD0_CLK, NULL);
-+	gpio_request(GPIO_FN_SD0_CMD, NULL);
-+	gpio_request(GPIO_FN_SD0_DAT0, NULL);
-+	gpio_request(GPIO_FN_SD0_DAT1, NULL);
-+	gpio_request(GPIO_FN_SD0_DAT2, NULL);
-+	gpio_request(GPIO_FN_SD0_DAT3, NULL);
-+	gpio_request(GPIO_FN_SD0_CD, NULL);
-+	gpio_request(GPIO_FN_SD0_WP, NULL);
-+
- 	r8a7779_add_standard_devices();
- 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
- }
+diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
+index 1d8842b..7c62e3d 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7779.c
++++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+@@ -158,7 +158,9 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP022]), /* SCIF4 */
+ 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP021]), /* SCIF6 */
+ 	CLKDEV_DEV_ID("ehci-platform.1", &mstp_clks[MSTP101]), /* USB EHCI port2 */
++	CLKDEV_DEV_ID("ohci-platform.1", &mstp_clks[MSTP101]), /* USB OHCI port2 */
+ 	CLKDEV_DEV_ID("ehci-platform.0", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
++	CLKDEV_DEV_ID("ohci-platform.0", &mstp_clks[MSTP100]), /* USB OHCI port0/1 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP323]), /* SDHI0 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
 -- 
 1.7.10.2.484.gcd07cc5
