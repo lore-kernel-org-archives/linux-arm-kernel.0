@@ -1,74 +1,31 @@
-From: a0393947@ti.com (Archit Taneja)
-Date: Fri, 31 Aug 2012 11:53:41 +0530
-Subject: [PATCH v4 2/3] ARM: omap: hwmod: get rid of all
- omap_clk_get_by_name usage
-In-Reply-To: <1346344933.2327.43.camel@deskari>
-References: <1346230576-20004-1-git-send-email-rnayak@ti.com>
- <1346230576-20004-3-git-send-email-rnayak@ti.com>
- <CAJOA=zM2sFsrdohooKp1+zsV_AK6dKnoN37+Gs2oskBUK4J00w@mail.gmail.com>
- <503F26A4.3050902@ti.com> <503F5517.4010100@ti.com>
- <1346344933.2327.43.camel@deskari>
-Message-ID: <5040586D.2020406@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 31 Aug 2012 15:26:15 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC: AG5EVM for 3.7
+Message-ID: <1346394376-11951-1-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 August 2012 10:12 PM, Tomi Valkeinen wrote:
-> On Thu, 2012-08-30 at 13:57 +0200, Benoit Cousson wrote:
->> On 08/30/2012 10:39 AM, Rajendra Nayak wrote:
->>> On Thursday 30 August 2012 05:45 AM, Turquette, Mike wrote:
->>>> On Wed, Aug 29, 2012 at 1:56 AM, Rajendra Nayak<rnayak@ti.com>  wrote:
->>>>> diff --git a/arch/arm/mach-omap2/clock44xx_data.c
->>>>> b/arch/arm/mach-omap2/clock44xx_data.c
->>>>> index d7f55e4..a3831a2 100644
->>>>> --- a/arch/arm/mach-omap2/clock44xx_data.c
->>>>> +++ b/arch/arm/mach-omap2/clock44xx_data.c
->>>>> @@ -3156,6 +3156,7 @@ static struct omap_clk omap44xx_clks[] = {
->>>>>           CLK(NULL,       "dss_tv_clk",&dss_tv_clk,    CK_443X),
->>>>>           CLK(NULL,       "dss_48mhz_clk",&dss_48mhz_clk, CK_443X),
->>>>>           CLK(NULL,       "dss_dss_clk",&dss_dss_clk,   CK_443X),
->>>>> +       CLK(NULL,       "dss_fck",&dss_fck,       CK_443X),
->>>>>           CLK("omapdss_dss",      "ick",&dss_fck,       CK_443X),
->>>>
->>>> Is it right to re-use dss_fck for the "ick" here?  I think it is due
->>>> to omap4 modulemode stuff but I don't have DM in front of me and
->>>> wanted a double-check...
->>>
->>> yes, its because of the wierdness of DSS clocks where a so-called
->>> optional clock is actually a function clock.
->>
->> Not only, it is a hack to allow the DSS to be enabled whenever a DSS
->> submodule has to be enabled. Since they are sharing the ick, it will
->> enable the modulemode when the DISPC will be enabled.
->>
->> That hack should disappear as soon as the DSS will be able to handle the
->> PM dependency between DSS submodules and the DSS itself using pm_runtime
->> parent/child link.
->> And then we will have to remove this fake ick modulemode clock node and
->> let hwmod handle that properly.
->>
->> Tomi already cleaned the DSS part, I guess it should be upstreamed soon,
->> if this is not already the case.
->
-> This is in 3.5. omapdss_dss is now the parent for the rest of the dss
-> submodules, and runtime PM is being used.
->
-> I think we should now revisit this dss clock handling to see if there
-> are any other changes required in the omapdss side, but I hope they are
-> already according to our discussions and correct.
+Hi Olof, Hi Arnd,
 
-The only little problem was that during bootup, when hwmods are setup, 
-only the 'parent' hwmod was able to get reset properly, all the other 
-'child' hwmods don't have modulemode bits tied to them, and hence 
-weren't able to reset. So we got some error prints.
+please consider the following enhancement to the AG5EVM board
+by Wei Yongjun for inclusion in 3.7.
 
-Once DSS driver kicks in, the driver ensures the parent is enabled for 
-any child to be enabled, so we don't face the issue again.
+----------------------------------------------------------------
+The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
 
-So, if DSS driver is not built in, and if the bootloader left DSS in a 
-bad state, the DSS clocks might remain messed up all the time since 
-hwmod fwk wasn't able to reset them.
+  Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
 
-I think this is why we didn't proceed with remove "dss_fck" as a slave 
-clock. If this issue is minor, we could go ahead and remove it.
+are available in the git repository at:
 
-Archit
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git ag5evm
+
+for you to fetch changes up to aa9c1ba4412d2f9348b6e700aa4831569a25a7ca:
+
+  ARM: mach-shmobile: remove duplicated include from board-ag5evm.c (2012-08-31 15:02:02 +0900)
+
+----------------------------------------------------------------
+Wei Yongjun (1):
+      ARM: mach-shmobile: remove duplicated include from board-ag5evm.c
+
+ arch/arm/mach-shmobile/board-ag5evm.c | 1 -
+ 1 file changed, 1 deletion(-)
