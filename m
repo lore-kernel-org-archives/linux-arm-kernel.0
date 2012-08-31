@@ -1,54 +1,25 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 31 Aug 2012 16:29:44 +0200
-Subject: [PATCH 3/8] i2c: at91: use an id table for SoC dependent
- parameters
-In-Reply-To: <1346404884-18451-4-git-send-email-ludovic.desroches@atmel.com>
-References: <1346404884-18451-1-git-send-email-ludovic.desroches@atmel.com>
- <1346404884-18451-4-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20120831142944.GA23867@game.jcrosoft.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 31 Aug 2012 09:39:26 +0800
+Subject: [PATCH v4 7/7] mfd: anatop-mfd: remove anatop driver
+In-Reply-To: <1346237818-9498-8-git-send-email-b29396@freescale.com>
+References: <1346237818-9498-1-git-send-email-b29396@freescale.com>
+ <1346237818-9498-8-git-send-email-b29396@freescale.com>
+Message-ID: <20120831013924.GB7726@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:21 Fri 31 Aug     , ludovic.desroches at atmel.com wrote:
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> Use the id_table to store configuration structures which are depending on
-> SoC.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->  arch/arm/mach-at91/at91rm9200.c          |  2 +-
->  arch/arm/mach-at91/at91rm9200_devices.c  | 11 +----
->  arch/arm/mach-at91/at91sam9260.c         |  3 +-
->  arch/arm/mach-at91/at91sam9260_devices.c |  8 ++-
->  arch/arm/mach-at91/at91sam9261.c         |  3 +-
->  arch/arm/mach-at91/at91sam9261_devices.c | 17 +++----
->  arch/arm/mach-at91/at91sam9263.c         |  2 +-
->  arch/arm/mach-at91/at91sam9263_devices.c |  2 +-
->  arch/arm/mach-at91/at91sam9g45.c         |  4 +-
->  arch/arm/mach-at91/at91sam9g45_devices.c |  4 +-
->  arch/arm/mach-at91/at91sam9rl.c          |  4 +-
->  arch/arm/mach-at91/at91sam9rl_devices.c  |  2 +-
->  drivers/i2c/busses/i2c-at91.c            | 85 +++++++++++++++++++++++++-------
->  13 files changed, 95 insertions(+), 52 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-> index f2112f9..0bc91e5 100644
-> --- a/arch/arm/mach-at91/at91rm9200.c
-> +++ b/arch/arm/mach-at91/at91rm9200.c
-> @@ -187,7 +187,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
->  	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
->  	CLKDEV_CON_DEV_ID("pclk", "ssc.2", &ssc2_clk),
-> -	CLKDEV_CON_DEV_ID(NULL, "at91_i2c", &twi_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "at91rm9200_i2c", &twi_clk),
-use i2c-xxx as on other drivers
+On Wed, Aug 29, 2012 at 06:56:58PM +0800, Dong Aisheng wrote:
+> -config MFD_ANATOP
+> -	bool "Support for Freescale i.MX on-chip ANATOP controller"
+> -	depends on SOC_IMX6Q
+> -	help
+> -	  Select this option to enable Freescale i.MX on-chip ANATOP
+> -	  MFD controller. This controller embeds regulator and
+> -	  thermal devices for Freescale i.MX platforms.
+> -
 
-and I do not like to have platform_device_id
+All the occurrences of MFD_ANATOP should be removed too.  I know there
+is one in arch/arm/mach-imx/Kconfig.
 
-as we need to touch the driver to add a new soc
-
-please use platform data
-
-Best Regards,
-J.
+Regards,
+Shawn
