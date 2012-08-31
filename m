@@ -1,73 +1,69 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Fri, 31 Aug 2012 14:59:16 +0530
-Subject: [PATCH v5 0/5] Add device tree data for AM33XX devices
-Message-ID: <1346405361-29711-1-git-send-email-anilkumar@ti.com>
+Date: Fri, 31 Aug 2012 14:59:21 +0530
+Subject: [PATCH 5/5] of: Modify c_can binding documentation
+In-Reply-To: <1346405361-29711-1-git-send-email-anilkumar@ti.com>
+References: <1346405361-29711-1-git-send-email-anilkumar@ti.com>
+Message-ID: <1346405361-29711-6-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl and d_can device tree data to AM33XX family of devices.
-First two patches add support for pinctrl DT data and third one
-adds dcan DT data.
+Modify c_can binding documentation according to recent review comments
+on device tree data addition patches.
 
-Reason behind combining these patches is to apply cleanly on
-linux-omap tree, because these are sequential patches.
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+ .../devicetree/bindings/net/can/c_can.txt          |   25 ++++++++++++++++----
+ 1 file changed, 20 insertions(+), 5 deletions(-)
 
-These patches were tested on AM335x-Bone, AM335x-EVM and based
-on linux-omap:master with this patch
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg74393.html
-
-d_can:
-  Changes from v4:
-	- Incorporated Tony's comments on v4
-	  * Converted all hex numbers to lower-case.
-	- Updated C_CAN bindings documentation according to recent
-	  changes.
-
-  Changes from v3:
-	- Removed d_can1 node from am335x-evm.dts file. Instance
-	  one of CAN (d_can1) is available on AM335x-EVM only under
-	  a specific CPLD mode selection. am335x-evm.dts does not
-          support this mode so remove the d_can1 node.
-	- Dropped d_can pinmux settings patch, above comment
-	  applies here as well.
-
-  Changes from v2:
-	- Incorporated Vaibhav H's comments on v2
-	  * Added dcan0 instances to am33xx.dtsi file
-
-  Changes from v1:
-	- These two patches separated from c_can DT support
-	  patch series.
-
-pinctrl:
-  Changes from v4:
-	- Incorporated Tony's comments on v4
-	  * Converted all hex numbers to lower-case.
-	- Added pinctrl api to leds-gpio driver to configure led
-	  pins to GPIO mode.
-
-  Changes from v3:
-	- Updated the reg length based on latest AM335x TRM.
-
-  Changes from v2:
-	- user led pinmux comments updated according to Tony's
-	  comment.
-
-  Changes from v1:
-	- Rebased the patches based on latest pinctrl-single driver
-
-AnilKumar Ch (5):
-  arm/dts: AM33XX: Add basic pinctrl device tree data
-  arm/dts: AM33XX: Configure pinmuxs for user leds control on Bone
-  arm/dts: AM33XX: Add D_CAN device tree data
-  leds: leds-gpio: adopt pinctrl support
-  of: Modify c_can binding documentation
-
- .../devicetree/bindings/net/can/c_can.txt          |   25 +++++++++---
- arch/arm/boot/dts/am335x-bone.dts                  |   41 ++++++++++++++++++++
- arch/arm/boot/dts/am33xx.dtsi                      |   27 +++++++++++++
- drivers/leds/leds-gpio.c                           |   31 +++++++++++----
- 4 files changed, 112 insertions(+), 12 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/net/can/c_can.txt b/Documentation/devicetree/bindings/net/can/c_can.txt
+index a43f083..90a70be 100644
+--- a/Documentation/devicetree/bindings/net/can/c_can.txt
++++ b/Documentation/devicetree/bindings/net/can/c_can.txt
+@@ -8,6 +8,8 @@ Required properties:
+ 			  registers map
+ - interrupts		: property with a value describing the interrupt
+ 			  number
++- status		: describes the node status either "disabled" or
++			  "okay"
+ 
+ Optional properties:
+ - interrupt-parent	: The parent interrupt controller
+@@ -20,18 +22,31 @@ Future plan is to migrate hwmod data base contents into device tree
+ blob so that, all the required data will be used from device tree dts
+ file.
+ 
+-Examples:
++Example:
+ 
+-	d_can at 481D0000 {
++Step1: SoC common .dtsi file
++
++	d_can1: d_can at 481d0000 {
+ 		compatible = "bosch,d_can";
+-		reg = <0x481D0000 0x1000>;
+-		interrupts = <55 0x4>;
++		reg = <0x481d0000 0x2000>;
++		interrupts = <55>;
+ 		interrupt-parent = <&intc>;
++		status = "disabled";
+ 	};
+ 
+ (or)
+ 
+-	d_can at 481D0000 {
++	d_can1: d_can at 481d0000 {
+ 		compatible = "bosch,d_can";
+ 		ti,hwmods = "d_can1";
++		reg = <0x481d0000 0x2000>;
++		interrupts = <55>;
++		interrupt-parent = <&intc>;
++		status = "disabled";
++	};
++
++Step 2: board specific .dts file
++
++	&dcan1 {
++		status = "okay";
+ 	};
 -- 
 1.7.9.5
