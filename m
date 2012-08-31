@@ -1,175 +1,150 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 31 Aug 2012 10:28:19 +0900
-Subject: [PATCH 08/11] ARM: shmobile: marzen: add USB EHCI driver support
+Date: Fri, 31 Aug 2012 10:28:16 +0900
+Subject: [PATCH 05/11] ARM: shmobile: r8a7779: add USB common phy initializer
 In-Reply-To: <1346376502-12114-1-git-send-email-horms@verge.net.au>
 References: <1346376502-12114-1-git-send-email-horms@verge.net.au>
-Message-ID: <1346376502-12114-9-git-send-email-horms@verge.net.au>
+Message-ID: <1346376502-12114-6-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This patch supports CN21/CN22 USB 2.0 (port 0/1/2),
-and enable USB momery on defconfig
+This patch adds common USB phy ports initializer for r8a7779.
+
+The note is that each USB IP have own MSTP clock bit,
+and common USB phy port doesn't have MSTP clock,
+but this USB phy needs USB clock.
+Each USB driver / platform should keep USB MSTP clock somehow.
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/configs/marzen_defconfig     |  6 +++
- arch/arm/mach-shmobile/Kconfig        |  1 +
- arch/arm/mach-shmobile/board-marzen.c | 88 +++++++++++++++++++++++++++++++++++
- 3 files changed, 95 insertions(+)
+ arch/arm/mach-shmobile/include/mach/common.h |  1 +
+ arch/arm/mach-shmobile/setup-r8a7779.c       | 93 ++++++++++++++++++++++++++++
+ 2 files changed, 94 insertions(+)
 
-diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
-index cd2dc21..61d1c55 100644
---- a/arch/arm/configs/marzen_defconfig
-+++ b/arch/arm/configs/marzen_defconfig
-@@ -47,6 +47,8 @@ CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_STANDALONE is not set
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
- # CONFIG_FW_LOADER is not set
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
- CONFIG_NETDEVICES=y
- # CONFIG_NET_VENDOR_BROADCOM is not set
- # CONFIG_NET_VENDOR_FARADAY is not set
-@@ -75,6 +77,10 @@ CONFIG_SSB=y
- # CONFIG_USB_SUPPORT is not set
- CONFIG_MMC=y
- CONFIG_MMC_SDHI=y
-+CONFIG_USB=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_HCD_PLATFORM=y
-+CONFIG_USB_STORAGE=y
- CONFIG_UIO=y
- CONFIG_UIO_PDRV_GENIRQ=y
- # CONFIG_IOMMU_SUPPORT is not set
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 4cacc2d..8937d69 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -41,6 +41,7 @@ config ARCH_R8A7779
- 	select SH_CLK_CPG
- 	select ARM_GIC
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
-+	select USB_ARCH_HAS_EHCI
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index 45e61da..00b2eb5 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -78,6 +78,7 @@ extern void r8a7779_clock_init(void);
+ extern void r8a7779_pinmux_init(void);
+ extern void r8a7779_pm_init(void);
+ extern void r8a7740_meram_workaround(void);
++extern int r8a7779_usb_phy_init(u32 usbpctrl0);
  
- config ARCH_EMEV2
- 	bool "Emma Mobile EV2"
-diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-index dec3ffc..0249c0e 100644
---- a/arch/arm/mach-shmobile/board-marzen.c
-+++ b/arch/arm/mach-shmobile/board-marzen.c
-@@ -32,6 +32,8 @@
- #include <linux/smsc911x.h>
- #include <linux/mmc/sh_mobile_sdhi.h>
- #include <linux/mfd/tmio.h>
-+#include <linux/usb/ehci_pdriver.h>
+ extern unsigned int r8a7779_get_core_count(void);
+ extern int r8a7779_platform_cpu_kill(unsigned int cpu);
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index e98e46f..17fdd1f 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -25,6 +25,7 @@
+ #include <linux/delay.h>
+ #include <linux/input.h>
+ #include <linux/io.h>
 +#include <linux/pm_runtime.h>
- #include <mach/hardware.h>
- #include <mach/r8a7779.h>
- #include <mach/common.h>
-@@ -116,6 +118,80 @@ static struct platform_device *marzen_devices[] __initdata = {
- 	&sdhi0_device,
+ #include <linux/serial_sci.h>
+ #include <linux/sh_intc.h>
+ #include <linux/sh_timer.h>
+@@ -243,6 +244,98 @@ static struct platform_device *r8a7779_early_devices[] __initdata = {
+ static struct platform_device *r8a7779_late_devices[] __initdata = {
  };
  
-+/* USB */
-+static int xhci_power_on(struct platform_device *pdev)
++/* USBH common register */
++#define USBPCTRL0	0x0800
++#define USBPCTRL1	0x0804
++#define USBST		0x0808
++#define USBEH0		0x080C
++#define USBOH0		0x081C
++#define USBCTL0		0x0858
++#define EIIBC1		0x0094
++#define EIIBC2		0x009C
++
++#ifdef CONFIG_ARCH_SUPPORTS_BIG_ENDIAN
++# define xHCI_ENDIAN "BIG"
++# define xHCI_NO_SWAP 0x00000003
++#else
++# define xHCI_ENDIAN "LITTLE"
++# define xHCI_NO_SWAP 0x00000000
++#endif
++
++/*
++ * USB initial/install operation.
++ *
++ * This function setup USB phy.
++ * The used value and setting order came from
++ * [USB :: Initial setting] on datasheet.
++ */
++int __init r8a7779_usb_phy_init(u32 usbpctrl0)
 +{
-+	pm_runtime_enable(&pdev->dev);
-+	pm_runtime_get_sync(&pdev->dev);
++	void __iomem *reg0, *reg1;
++	int i;
++	u32 val;
++
++	reg0 = ioremap_nocache(0xffe70000, 0x900);
++	reg1 = ioremap_nocache(0xfff70000, 0x900);
++
++	/*----------------------------------------*
++	 * USB phy start-up
++	 *----------------------------------------*/
++
++	/* (1) USB-PHY standby release */
++	iowrite32(0x00000001, (reg0 + USBPCTRL1));
++
++	/* (2) start USB-PHY internal PLL */
++	iowrite32(0x00000003, (reg0 + USBPCTRL1));
++
++	/* (3) USB module status check */
++	for (i = 0; i < 1024; i++) {
++		udelay(10);
++		val = ioread32(reg0 + USBST);
++		if (0xc0000000 == val)
++			goto usb_module_is_working;
++	}
++	pr_err("USB module not ready\n");
++	return -EIO;
++
++usb_module_is_working:
++	/* (4) USB-PHY reset clear */
++	iowrite32(0x00000007, (reg0 + USBPCTRL1));
++
++	/* set platform specific port settings */
++	iowrite32(usbpctrl0, (reg0 + USBPCTRL0));
++
++	/*----------------------------------------*
++	 * EHCI IP Internal Buffer Setting
++	 *----------------------------------------*/
++
++	/* (1) EHCI IP internal buffer setting */
++	iowrite32(0x00ff0040, (reg0 + EIIBC1));
++	iowrite32(0x00ff0040, (reg1 + EIIBC1));
++
++	/* (2) EHCI IP internal buffer enable */
++	iowrite32(0x00000001, (reg0 + EIIBC2));
++	iowrite32(0x00000001, (reg1 + EIIBC2));
++
++	/*----------------------------------------*
++	 * Bus alignment settings
++	 *----------------------------------------*/
++
++	/* (1) EHCI bus alignment */
++	iowrite32(xHCI_NO_SWAP, (reg0 + USBEH0));
++
++	/* (1) OHCI bus alignment */
++	iowrite32(xHCI_NO_SWAP, (reg0 + USBOH0));
++
++	pr_info("USB xHCI alignment was initialized as %s endian no swap\n",
++		xHCI_ENDIAN);
++
++	iounmap(reg0);
++	iounmap(reg1);
 +
 +	return 0;
 +}
 +
-+static void xhci_power_off(struct platform_device *pdev)
-+{
-+	pm_runtime_put_sync(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
-+}
-+
-+static struct usb_ehci_pdata ehcix_pdata = {
-+	.power_on	= xhci_power_on,
-+	.power_off	= xhci_power_off,
-+	.power_suspend	= xhci_power_off,
-+};
-+
-+static struct resource ehci0_resources[] = {
-+	[0] = {
-+		.start	= 0xffe70000,
-+		.end	= 0xffe70400 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= gic_spi(44),
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device ehci0_device = {
-+	.name	= "ehci-platform",
-+	.id	= 0,
-+	.dev	= {
-+		.dma_mask		= &ehci0_device.dev.coherent_dma_mask,
-+		.coherent_dma_mask	= 0xffffffff,
-+		.platform_data		= &ehcix_pdata,
-+	},
-+	.num_resources	= ARRAY_SIZE(ehci0_resources),
-+	.resource	= ehci0_resources,
-+};
-+
-+static struct resource ehci1_resources[] = {
-+	[0] = {
-+		.start	= 0xfff70000,
-+		.end	= 0xfff70400 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= gic_spi(45),
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device ehci1_device = {
-+	.name	= "ehci-platform",
-+	.id	= 1,
-+	.dev	= {
-+		.dma_mask		= &ehci1_device.dev.coherent_dma_mask,
-+		.coherent_dma_mask	= 0xffffffff,
-+		.platform_data		= &ehcix_pdata,
-+	},
-+	.num_resources	= ARRAY_SIZE(ehci1_resources),
-+	.resource	= ehci1_resources,
-+};
-+
-+static struct platform_device *marzen_usb_devices[] __initdata = {
-+	&ehci0_device,
-+	&ehci1_device,
-+};
-+
- static void __init marzen_init(void)
+ void __init r8a7779_add_standard_devices(void)
  {
- 	regulator_register_always_on(0, "fixed-3.3V", fixed3v3_power_consumers,
-@@ -147,8 +223,20 @@ static void __init marzen_init(void)
- 	gpio_request(GPIO_FN_SD0_CD, NULL);
- 	gpio_request(GPIO_FN_SD0_WP, NULL);
- 
-+	/* USB (CN21) */
-+	gpio_request(GPIO_FN_USB_OVC0, NULL);
-+	gpio_request(GPIO_FN_USB_OVC1, NULL);
-+	gpio_request(GPIO_FN_USB_OVC2, NULL);
-+
-+	/* USB (CN22) */
-+	gpio_request(GPIO_FN_USB_PENC2, NULL);
-+
- 	r8a7779_add_standard_devices();
- 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
-+
-+	if (0 == r8a7779_usb_phy_init(0))
-+		platform_add_devices(marzen_usb_devices,
-+				     ARRAY_SIZE(marzen_usb_devices));
- }
- 
- MACHINE_START(MARZEN, "marzen")
+ #ifdef CONFIG_CACHE_L2X0
 -- 
 1.7.10.2.484.gcd07cc5
