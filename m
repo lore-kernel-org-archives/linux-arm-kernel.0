@@ -1,120 +1,73 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Fri, 31 Aug 2012 12:29:06 -0700
-Subject: [PATCH 1/4] clk: Provide option for clk_get_rate to issue hw for
- new rate
-In-Reply-To: <1346415691-13371-2-git-send-email-ulf.hansson@stericsson.com>
-References: <1346415691-13371-1-git-send-email-ulf.hansson@stericsson.com>
- <1346415691-13371-2-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20120831192906.31162.97714@nucleus>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 31 Aug 2012 14:41:27 +0800
+Subject: [PATCH v2 1/4] clk: add of_clk_src_onecell_get() support
+In-Reply-To: <1345642590-29905-2-git-send-email-shawn.guo@linaro.org>
+References: <1345642590-29905-1-git-send-email-shawn.guo@linaro.org>
+ <1345642590-29905-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120831064125.GA3271@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ulf Hansson (2012-08-31 05:21:28)
-> From: Ulf Hansson <ulf.hansson@linaro.org>
-> 
-> By using CLK_GET_RATE_NOCACHE flag, we tell the clk_get_rate API to
-> issue the hw for an updated clock rate. This can be used for a clock
-> which rate may be updated without a client necessary modifying it.
-> 
-
-I'm glad to see this.  We discussed whether the default behavior should
-be cached or from the hardware at length some time back, so having a
-flag to support the non-default is great.
-
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/clk/clk.c            |   43 +++++++++++++++++++++++-------------------
->  include/linux/clk-provider.h |    1 +
->  2 files changed, 25 insertions(+), 19 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index efdfd00..d9cbae0 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -558,25 +558,6 @@ int clk_enable(struct clk *clk)
->  EXPORT_SYMBOL_GPL(clk_enable);
->  
->  /**
-> - * clk_get_rate - return the rate of clk
-> - * @clk: the clk whose rate is being returned
-> - *
-> - * Simply returns the cached rate of the clk.  Does not query the hardware.  If
-> - * clk is NULL then returns 0.
-> - */
-> -unsigned long clk_get_rate(struct clk *clk)
-> -{
-> -       unsigned long rate;
-> -
-> -       mutex_lock(&prepare_lock);
-> -       rate = __clk_get_rate(clk);
-> -       mutex_unlock(&prepare_lock);
-> -
-> -       return rate;
-> -}
-> -EXPORT_SYMBOL_GPL(clk_get_rate);
-> -
-> -/**
->   * __clk_round_rate - round the given rate for a clk
->   * @clk: round the rate of this clock
->   *
-> @@ -702,6 +683,30 @@ static void __clk_recalc_rates(struct clk *clk, unsigned long msg)
->  }
->  
->  /**
-> + * clk_get_rate - return the rate of clk
-> + * @clk: the clk whose rate is being returned
-> + *
-> + * Simply returns the cached rate of the clk, unless CLK_GET_RATE_NOCACHE flag
-> + * is set, which means a recalc_rate will be issued.
-> + * If clk is NULL then returns 0.
-> + */
-> +unsigned long clk_get_rate(struct clk *clk)
-> +{
-> +       unsigned long rate;
-> +
-> +       mutex_lock(&prepare_lock);
-> +
-> +       if (clk && (clk->flags & CLK_GET_RATE_NOCACHE))
-> +               __clk_recalc_rates(clk, 0);
-
-This is a bit subtle.  Calling __clk_recalc_rates will walk the subtree
-of children recalculating rates as well as firing off notifiers.  Is
-this what you want?  If your clock changes rates behind your back AND
-has chilren then this is probably the right thing to do.  However you
-might be better off with:
-
-	if (clk && (clk->flags & CLK_GET_RATE_NOCACHE))
-		rate = clk->ops->recalc_rate(clk->hw, clk->parent->rate);
-
-This doesn't update children or fire off notifiers.  What is best for
-your platform?
+Ping, Mike.
 
 Regards,
-Mike
+Shawn
 
+On Wed, Aug 22, 2012 at 09:36:27PM +0800, Shawn Guo wrote:
+> For those SoCs that have hundreds of clock outputs, their clock
+> DT bindings could reasonably define #clock-cells as 1 and require
+> the client device specify the index of the clock it consumes in the
+> cell of its "clocks" phandle.
+> 
+> Add a generic of_clk_src_onecell_get() function for this purpose.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  drivers/clk/clk.c            |   14 ++++++++++++++
+>  include/linux/clk-provider.h |    5 +++++
+>  2 files changed, 19 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index efdfd00..308f058 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1582,6 +1582,20 @@ struct clk *of_clk_src_simple_get(struct of_phandle_args *clkspec,
+>  }
+>  EXPORT_SYMBOL_GPL(of_clk_src_simple_get);
+>  
+> +struct clk *of_clk_src_onecell_get(struct of_phandle_args *clkspec, void *data)
+> +{
+> +	struct clk_onecell_data *clk_data = data;
+> +	unsigned int idx = clkspec->args[0];
 > +
-> +       rate = __clk_get_rate(clk);
-> +       mutex_unlock(&prepare_lock);
+> +	if (idx >= clk_data->clk_num) {
+> +		pr_err("%s: invalid clock index %d\n", __func__, idx);
+> +		return ERR_PTR(-EINVAL);
+> +	}
 > +
-> +       return rate;
+> +	return clk_data->clks[idx];
 > +}
-> +EXPORT_SYMBOL_GPL(clk_get_rate);
+> +EXPORT_SYMBOL_GPL(of_clk_src_onecell_get);
 > +
-> +/**
->   * __clk_speculate_rates
->   * @clk: first clk in the subtree
->   * @parent_rate: the "future" rate of clk's parent
+>  /**
+>   * of_clk_add_provider() - Register a clock provider for a node
+>   * @np: Device node pointer associated with clock provider
 > diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 77335fa..1b15307 100644
+> index 77335fa..8fe6ec7 100644
 > --- a/include/linux/clk-provider.h
 > +++ b/include/linux/clk-provider.h
-> @@ -26,6 +26,7 @@
->  #define CLK_IGNORE_UNUSED      BIT(3) /* do not gate even if unused */
->  #define CLK_IS_ROOT            BIT(4) /* root clk, has no parent */
->  #define CLK_IS_BASIC           BIT(5) /* Basic clk, can't do a to_clk_foo() */
-> +#define CLK_GET_RATE_NOCACHE   BIT(6) /* do not use the cached clk rate */
->  
->  struct clk_hw;
+> @@ -360,6 +360,11 @@ int of_clk_add_provider(struct device_node *np,
+>  void of_clk_del_provider(struct device_node *np);
+>  struct clk *of_clk_src_simple_get(struct of_phandle_args *clkspec,
+>  				  void *data);
+> +struct clk_onecell_data {
+> +	struct clk **clks;
+> +	unsigned int clk_num;
+> +};
+> +struct clk *of_clk_src_onecell_get(struct of_phandle_args *clkspec, void *data);
+>  const char *of_clk_get_parent_name(struct device_node *np, int index);
+>  void of_clk_init(const struct of_device_id *matches);
 >  
 > -- 
-> 1.7.10
+> 1.7.5.4
+> 
