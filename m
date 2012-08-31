@@ -1,112 +1,39 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 31 Aug 2012 11:26:56 +0200
-Subject: [PATCH v2 1/9] ARM i.MX: Switch IRAM allocator to device tree
- initialization
-In-Reply-To: <1346405224-20399-1-git-send-email-p.zabel@pengutronix.de>
-References: <1346405224-20399-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1346405224-20399-2-git-send-email-p.zabel@pengutronix.de>
+From: anilkumar@ti.com (AnilKumar Ch)
+Date: Fri, 31 Aug 2012 14:59:17 +0530
+Subject: [PATCH v5 1/5] arm/dts: AM33XX: Add basic pinctrl device tree data
+In-Reply-To: <1346405361-29711-1-git-send-email-anilkumar@ti.com>
+References: <1346405361-29711-1-git-send-email-anilkumar@ti.com>
+Message-ID: <1346405361-29711-2-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/plat-mxc/include/mach/iram.h |    6 -----
- arch/arm/plat-mxc/iram_alloc.c        |   44 ++++++++++++++++++++++++++++++---
- 2 files changed, 41 insertions(+), 9 deletions(-)
+Adds basic pinctrl device tree data for AM33XX family of devices.
+This patch is based on the pinctrl-single driver.
 
-diff --git a/arch/arm/plat-mxc/include/mach/iram.h b/arch/arm/plat-mxc/include/mach/iram.h
-index 022690c..d5c863f 100644
---- a/arch/arm/plat-mxc/include/mach/iram.h
-+++ b/arch/arm/plat-mxc/include/mach/iram.h
-@@ -20,17 +20,11 @@
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+ arch/arm/boot/dts/am33xx.dtsi |    9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index be43511..bf5f713 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -40,6 +40,15 @@
+ 		};
+ 	};
  
- #ifdef CONFIG_IRAM_ALLOC
- 
--int __init iram_init(unsigned long base, unsigned long size);
- void __iomem *iram_alloc(unsigned int size, unsigned long *dma_addr);
- void iram_free(unsigned long dma_addr, unsigned int size);
- 
- #else
- 
--static inline int __init iram_init(unsigned long base, unsigned long size)
--{
--	return -ENOMEM;
--}
--
- static inline void __iomem *iram_alloc(unsigned int size, unsigned long *dma_addr)
- {
- 	return NULL;
-diff --git a/arch/arm/plat-mxc/iram_alloc.c b/arch/arm/plat-mxc/iram_alloc.c
-index 074c386..673deb4 100644
---- a/arch/arm/plat-mxc/iram_alloc.c
-+++ b/arch/arm/plat-mxc/iram_alloc.c
-@@ -22,6 +22,8 @@
- #include <linux/module.h>
- #include <linux/spinlock.h>
- #include <linux/genalloc.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
- #include <mach/iram.h>
- 
- static unsigned long iram_phys_base;
-@@ -55,15 +57,26 @@ void iram_free(unsigned long addr, unsigned int size)
- }
- EXPORT_SYMBOL(iram_free);
- 
--int __init iram_init(unsigned long base, unsigned long size)
-+static int __devinit iram_probe(struct platform_device *pdev)
- {
--	iram_phys_base = base;
-+	struct resource *res;
-+	unsigned long size;
++	am3358_pinmux: pinmux at 44e10800 {
++		compatible = "pinctrl-single";
++		reg = <0x44e10800 0x0238>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-single,register-width = <32>;
++		pinctrl-single,function-mask = <0x7f>;
++	};
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res)
-+		return -EINVAL;
-+
-+	if (iram_phys_base)
-+		return -EBUSY;
-+
-+	iram_phys_base = res->start;
-+	size = resource_size(res);
- 
- 	iram_pool = gen_pool_create(PAGE_SHIFT, -1);
- 	if (!iram_pool)
- 		return -ENOMEM;
- 
--	gen_pool_add(iram_pool, base, size, -1);
-+	gen_pool_add(iram_pool, res->start, size, -1);
- 	iram_virt_base = ioremap(iram_phys_base, size);
- 	if (!iram_virt_base)
- 		return -EIO;
-@@ -71,3 +84,28 @@ int __init iram_init(unsigned long base, unsigned long size)
- 	pr_debug("i.MX IRAM pool: %ld KB at 0x%p\n", size / 1024, iram_virt_base);
- 	return 0;
- }
-+
-+static int __devexit iram_remove(struct platform_device *pdev)
-+{
-+	gen_pool_destroy(iram_pool);
-+	iram_pool = NULL;
-+	return 0;
-+}
-+
-+#ifdef CONFIG_OF
-+static struct of_device_id iram_dt_ids[] = {
-+	{ .compatible = "fsl,imx-iram" },
-+	{ /* sentinel */ }
-+};
-+#endif
-+
-+static struct platform_driver iram_driver = {
-+	.driver = {
-+		.name = "imx-iram",
-+		.of_match_table = of_match_ptr(iram_dt_ids),
-+	},
-+	.probe = iram_probe,
-+	.remove = __devexit_p(iram_remove),
-+};
-+
-+module_platform_driver(iram_driver);
+ 	/*
+ 	 * XXX: Use a flat representation of the AM33XX interconnect.
+ 	 * The real AM33XX interconnect network is quite complex.Since
 -- 
-1.7.10.4
+1.7.9.5
