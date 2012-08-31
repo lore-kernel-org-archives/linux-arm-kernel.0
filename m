@@ -1,64 +1,44 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 31 Aug 2012 19:58:18 +0900
-Subject: [PATCH 1/2] ARM: exynos: delete redundant HAVE_SCHED_CLOCK option
- in Kconfig
-In-Reply-To: <CAGsJ_4xUBDGn1hDdWvUX68MfC98936v-_vLfPrisLNL7RY6nEw@mail.gmail.com>
-References: <1346406296-16223-1-git-send-email-Barry.Song@csr.com>
- <CAH9JG2W8xZrkmGkVw_JDY3qSsqHnaTi8-BNoW99V3FUyvWBXng@mail.gmail.com>
- <CAGsJ_4xUBDGn1hDdWvUX68MfC98936v-_vLfPrisLNL7RY6nEw@mail.gmail.com>
-Message-ID: <CAH9JG2W3KL=K7MHDsF4_NScjY01X56JLc=nBy+wvh3EFQefQmw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 31 Aug 2012 11:59:01 +0100
+Subject: [PATCH] hvc_dcc : add support to armv4 and armv5 core
+In-Reply-To: <20120831115939.23fd4a08@pyramind.ukuu.org.uk>
+References: <1346404916-27616-1-git-send-email-castet.matthieu@free.fr>
+ <20120831110444.25d9b9fe@pyramind.ukuu.org.uk> <504091F0.1090703@parrot.com>
+ <20120831103351.GE18957@n2100.arm.linux.org.uk>
+ <20120831115939.23fd4a08@pyramind.ukuu.org.uk>
+Message-ID: <20120831105901.GF18957@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+On Fri, Aug 31, 2012 at 11:59:39AM +0100, Alan Cox wrote:
+> On Fri, 31 Aug 2012 11:33:51 +0100
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+> > On Fri, Aug 31, 2012 at 12:29:04PM +0200, Matthieu CASTET wrote:
+> > > Alan Cox a ?crit :
+> > > > On Fri, 31 Aug 2012 11:21:56 +0200
+> > > > Matthieu CASTET <castet.matthieu@free.fr> wrote:
+> > > > 
+> > > >> Signed-off-by: Matthieu Castet <matthieu.castet@parrot.com>
+> > > >> ---
+> > > >>  drivers/tty/hvc/hvc_dcc.c |   34 ++++++++++++++++++++++++++++++++++
+> > > >>  1 file changed, 34 insertions(+)
+> > > > 
+> > > > This is a step in the wrong direction. This should all be runtime handled
+> > > > 
+> > > > NAK.
+> > > > 
+> > > 
+> > > AFAIK you can't build a arm kernel that support arm6/armv7 and armv5.
+> > > And I am not sure it will be possible one day.
+> > 
+> > There are no plans to ever make it possible; there are too many significant
+> > differences between ARMv4, v5 architectures and ARMv6,v7 architectures
+> > to warrant making this runtime selectable.
+> 
+> Then bury this crap in platform files please not in the drivers/tty layer
+> code. Make it a platform driver provided callback or something.
 
-# git grep HAVE_SCHED_CLOCK arch/arm/
-arch/arm/Kconfig:       select HAVE_SCHED_CLOCK
-arch/arm/mach-exynos/Kconfig:   select HAVE_SCHED_CLOCK
-
-On 8/31/12, Barry Song <21cnbao@gmail.com> wrote:
-> 2012/8/31 Kyungmin Park <kmpark@infradead.org>:
->> Hi,
->>
->> then where select it HAVE_SCHED_CLOCK? apart from other exynos board,
->> universal have to use another clock.
->
-> The old arch/arm/kernel/Makefile:
-> obj-$(CONFIG_HAVE_SCHED_CLOCK)  += sched_clock.o
-> has become:
-> obj-y += sched_clock.o
->
->>
->> Thank you,
->> Kyungmin Park
->>
->> On 8/31/12, Barry Song <Barry.Song@csr.com> wrote:
->>> From: Barry Song <Baohua.Song@csr.com>
->>>
->>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->>> ---
->>>  arch/arm/mach-exynos/Kconfig |    1 -
->>>  1 files changed, 0 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
->>> index b5b4c8c..3fd4ab3 100644
->>> --- a/arch/arm/mach-exynos/Kconfig
->>> +++ b/arch/arm/mach-exynos/Kconfig
->>> @@ -243,7 +243,6 @@ config MACH_UNIVERSAL_C210
->>>       select CPU_EXYNOS4210
->>>       select S5P_HRT
->>>       select CLKSRC_MMIO
->>> -     select HAVE_SCHED_CLOCK
->>>       select S5P_GPIO_INT
->>>       select S5P_DEV_FIMC0
->>>       select S5P_DEV_FIMC1
->>> --
->>> 1.7.0.4
->>>
-> -barry
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+Platform driver callbacks via platform data are incompatible with DT,
+which is where folk elsewhere in the kernel community have kicked ARM
+towards, away from the platform driver/device with platform data model.
