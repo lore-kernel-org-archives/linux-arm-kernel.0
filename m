@@ -1,44 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 31 Aug 2012 11:59:01 +0100
-Subject: [PATCH] hvc_dcc : add support to armv4 and armv5 core
-In-Reply-To: <20120831115939.23fd4a08@pyramind.ukuu.org.uk>
-References: <1346404916-27616-1-git-send-email-castet.matthieu@free.fr>
- <20120831110444.25d9b9fe@pyramind.ukuu.org.uk> <504091F0.1090703@parrot.com>
- <20120831103351.GE18957@n2100.arm.linux.org.uk>
- <20120831115939.23fd4a08@pyramind.ukuu.org.uk>
-Message-ID: <20120831105901.GF18957@n2100.arm.linux.org.uk>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Fri, 31 Aug 2012 13:05:12 +0200
+Subject: [PATCH 1/6] ARM: move ARCH config definitions into mach dirs
+In-Reply-To: <20120830192831.GD18957@n2100.arm.linux.org.uk>
+References: <1346280600-29395-1-git-send-email-robherring2@gmail.com>
+ <1346280600-29395-2-git-send-email-robherring2@gmail.com>
+ <20120829233159.GS18957@n2100.arm.linux.org.uk>
+ <503F845C.10406@gmail.com>
+ <20120830164551.GY18957@n2100.arm.linux.org.uk>
+ <503FB9E6.7020102@gmail.com>
+ <20120830192831.GD18957@n2100.arm.linux.org.uk>
+Message-ID: <20120831110512.GA24490@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2012 at 11:59:39AM +0100, Alan Cox wrote:
-> On Fri, 31 Aug 2012 11:33:51 +0100
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Thu, Aug 30, 2012 at 08:28:31PM +0100, Russell King - ARM Linux wrote:
 > 
-> > On Fri, Aug 31, 2012 at 12:29:04PM +0200, Matthieu CASTET wrote:
-> > > Alan Cox a ?crit :
-> > > > On Fri, 31 Aug 2012 11:21:56 +0200
-> > > > Matthieu CASTET <castet.matthieu@free.fr> wrote:
-> > > > 
-> > > >> Signed-off-by: Matthieu Castet <matthieu.castet@parrot.com>
-> > > >> ---
-> > > >>  drivers/tty/hvc/hvc_dcc.c |   34 ++++++++++++++++++++++++++++++++++
-> > > >>  1 file changed, 34 insertions(+)
-> > > > 
-> > > > This is a step in the wrong direction. This should all be runtime handled
-> > > > 
-> > > > NAK.
-> > > > 
-> > > 
-> > > AFAIK you can't build a arm kernel that support arm6/armv7 and armv5.
-> > > And I am not sure it will be possible one day.
-> > 
-> > There are no plans to ever make it possible; there are too many significant
-> > differences between ARMv4, v5 architectures and ARMv6,v7 architectures
-> > to warrant making this runtime selectable.
+> I think what we need is arch/arm/include/debug, move the platform specific
+> debug-macros headers into there, named using platform specific file names.
+> Then we have the config system define a string-based config:
 > 
-> Then bury this crap in platform files please not in the drivers/tty layer
-> code. Make it a platform driver provided callback or something.
+> config DEBUG_LL_INCLUDE
+> 	string
+> 	default "<debug/icedcc.S>" if DEBUG_ICEDCC
+> 	default "<debug/msm.S>" if DEBUG_MSM_UART1 || DEBUG_MSM_UART2 || DEBUG_MSM_UART3
+> ... etc ...
+> 	default "mach/debug-macros.S"
+> 
+> And then we can have the various assembly codes do:
+> 
+> #include CONFIG_DEBUG_LL_INCLUDE
+> 
+> Not only does this give a migration path, but it also gives folk a reason
+> to move to the 'new way' if they want to be part of a multi-platform
+> kernel - and it's a trivial thing to do.  Just move the include file,
+> add an entry to the DEBUG_LL_INCLUDE entry and the "Kernel low-level
+> debugging port" choice statement, and job done for both non-multi-platform
+> and multi-platform kernels.
+> 
+> What's even nicer about this approach is it doesn't require everyone to
+> change simultaneously - it can be done progressively as required.
 
-Platform driver callbacks via platform data are incompatible with DT,
-which is where folk elsewhere in the kernel community have kicked ARM
-towards, away from the platform driver/device with platform data model.
+This means that:
+
+  1) DEBUG_LL console is specified statically (it's a debug option so you
+     are supposed to be already building the kernel, right?)
+
+  2) It's not portable across incompatible SoCs so it must really stay
+     disabled on production multi-platform kernels.
+
+Regards,
+Domenico
