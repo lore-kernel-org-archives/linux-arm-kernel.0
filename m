@@ -1,63 +1,72 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Fri, 31 Aug 2012 09:52:55 +0200
-Subject: [PATCH 2/2] arm/dts: Add i2c aliases for OMAP3 and OMAP4/AM33xx
-In-Reply-To: <1346399575-7285-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1346399575-7285-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1346399575-7285-3-git-send-email-florian.vaussard@epfl.ch>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Fri, 31 Aug 2012 10:02:47 +0200
+Subject: [PATCH v2 2/2] tty: serial: imx: don't reinit clock in
+ imx_setup_ufcr()
+Message-ID: <1346400167-24669-1-git-send-email-dirk.behme@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I2C aliases need to be set, for the omap-i2c driver to get a correct adapter id.
+Remove the clock configuration from imx_setup_ufcr(). This
+isn't needed here and will cause garbage output if done.
 
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+To be be sure that we only touch the bits we want (TXTL and RXTL)
+we have to mask out all other bits of the UFCR register. Add
+one non-existing bit macro for this, too (bit 6, DCEDTE on i.MX6).
+
+Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+CC: Shawn Guo <shawn.guo@linaro.org>
+CC: Sascha Hauer <s.hauer@pengutronix.de>
+CC: Troy Kisky <troy.kisky@boundarydevices.com>
+CC: Xinyu Chen <xinyu.chen@freescale.com>
+CC: <stable@vger.kernel.org>
 ---
- arch/arm/boot/dts/am33xx.dtsi |    3 +++
- arch/arm/boot/dts/omap3.dtsi  |    3 +++
- arch/arm/boot/dts/omap4.dtsi  |    4 ++++
- 3 files changed, 10 insertions(+), 0 deletions(-)
+Changes in v2: Instead of disabling imx_setup_ufcr() with an
+ifndef CONFIG_SERIAL_CORE_CONSOLE, remove the unneeded clock 
+configuration from imx_setup_ufcr() itself as proposed by Troy Kisky.
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 59509c4..ff2d879 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -20,6 +20,9 @@
- 		serial3 = &uart4;
- 		serial4 = &uart5;
- 		serial5 = &uart6;
-+		i2c0 = &i2c1;
-+		i2c1 = &i2c2;
-+		i2c2 = &i2c3;
- 	};
+Note: If this patch is accepted, it should go to the same stable
+kernels as patch #1 of this series. So most probably 3.4 and 3.5.
+
+ drivers/tty/serial/imx.c |   18 ++++--------------
+ 1 files changed, 4 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 908178f..e309e8b 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -132,6 +132,7 @@
+ #define  UCR4_OREN  	 (1<<1)  /* Receiver overrun interrupt enable */
+ #define  UCR4_DREN  	 (1<<0)  /* Recv data ready interrupt enable */
+ #define  UFCR_RXTL_SHF   0       /* Receiver trigger level shift */
++#define  UFCR_DCEDTE	 (1<<6)  /* DCE/DTE mode select */
+ #define  UFCR_RFDIV      (7<<7)  /* Reference freq divider mask */
+ #define  UFCR_RFDIV_REG(x)	(((x) < 7 ? 6 - (x) : 6) << 7)
+ #define  UFCR_TXTL_SHF   10      /* Transmitter trigger level shift */
+@@ -667,22 +668,11 @@ static void imx_break_ctl(struct uart_port *port, int break_state)
+ static int imx_setup_ufcr(struct imx_port *sport, unsigned int mode)
+ {
+ 	unsigned int val;
+-	unsigned int ufcr_rfdiv;
+-
+-	/* set receiver / transmitter trigger level.
+-	 * RFDIV is set such way to satisfy requested uartclk value
+-	 */
+-	val = TXTL << 10 | RXTL;
+-	ufcr_rfdiv = (clk_get_rate(sport->clk_per) + sport->port.uartclk / 2)
+-			/ sport->port.uartclk;
+-
+-	if(!ufcr_rfdiv)
+-		ufcr_rfdiv = 1;
+-
+-	val |= UFCR_RFDIV_REG(ufcr_rfdiv);
  
- 	cpus {
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 8109471..a7d2f83 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -18,6 +18,9 @@
- 		serial1 = &uart2;
- 		serial2 = &uart3;
- 		serial3 = &uart4;
-+		i2c0 = &i2c1;
-+		i2c1 = &i2c2;
-+		i2c2 = &i2c3;
- 	};
++	/* set receiver / transmitter trigger level */
++	val = readl(sport->port.membase + UFCR) & (UFCR_RFDIV | UFCR_DCEDTE);
++	val |= TXTL << UFCR_TXTL_SHF | RXTL;
+ 	writel(val, sport->port.membase + UFCR);
+-
+ 	return 0;
+ }
  
- 	cpus {
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 04cbbcb..496c7ce 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -25,6 +25,10 @@
- 		serial1 = &uart2;
- 		serial2 = &uart3;
- 		serial3 = &uart4;
-+		i2c0 = &i2c1;
-+		i2c1 = &i2c2;
-+		i2c2 = &i2c3;
-+		i2c3 = &i2c4;
- 	};
- 
- 	cpus {
 -- 
-1.7.5.4
+1.7.0.4
