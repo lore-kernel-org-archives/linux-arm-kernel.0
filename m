@@ -1,41 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 31 Aug 2012 10:44:38 +0100
-Subject: [PATCH 2/8] irqdomain: Take interrupt-parent property into
- account if specified
-In-Reply-To: <CACRpkdZMoisfUD_NSkVy2w-jZVUDGn0E8LmvKSWnJ0YRGZO-tQ@mail.gmail.com>
-References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
- <1344527635-6163-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdZMoisfUD_NSkVy2w-jZVUDGn0E8LmvKSWnJ0YRGZO-tQ@mail.gmail.com>
-Message-ID: <20120831094434.GF13298@gmail.com>
+From: Barry.Song@csr.com (Barry Song)
+Date: Fri, 31 Aug 2012 17:44:55 +0800
+Subject: [PATCH 1/2] ARM: exynos: delete redundant HAVE_SCHED_CLOCK option in
+ Kconfig
+Message-ID: <1346406296-16223-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2012 at 10:19:08AM +0200, Linus Walleij wrote:
-> On Thu, Aug 9, 2012 at 5:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > irq_find_host() currently ignores the 'interrupt-parent' property
-> > even if it's specified in the Device Tree. Meaning that a node can
-> > match to a domain in its hierarchy even if it doesn't belong to it.
-> > By searching for the parent first using of_irq_find_parent() we
-> > insist that the 'interrupt-parent' property is taken into account
-> > ensuring a greater chance of returning the correct domain.
-> >
-> > CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> > CC: Grant Likely <grant.likely@secretlab.ca>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> This (with 1/8) is the right solution. Thanks, and I think
-> Mark may want to look at this too since I recognize he asked
-> you to work in this direction.
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+From: Barry Song <Baohua.Song@csr.com>
 
-Rob, did this get your Ack too?
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/mach-exynos/Kconfig |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-Ben, Grant, Mark, would you like to take a look also?
-
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index b5b4c8c..3fd4ab3 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -243,7 +243,6 @@ config MACH_UNIVERSAL_C210
+ 	select CPU_EXYNOS4210
+ 	select S5P_HRT
+ 	select CLKSRC_MMIO
+-	select HAVE_SCHED_CLOCK
+ 	select S5P_GPIO_INT
+ 	select S5P_DEV_FIMC0
+ 	select S5P_DEV_FIMC1
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.0.4
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
