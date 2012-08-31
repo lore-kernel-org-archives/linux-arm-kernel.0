@@ -1,35 +1,66 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 31 Aug 2012 09:34:44 +0900
-Subject: [PATCH 09/10] ARM: shmobile: marzen: fixup regulator id for smsc911x
+Date: Fri, 31 Aug 2012 09:34:45 +0900
+Subject: [PATCH 10/10] ARM: shmobile: marzen: enable thermal sensor
 In-Reply-To: <1346373285-19588-1-git-send-email-horms@verge.net.au>
 References: <1346373285-19588-1-git-send-email-horms@verge.net.au>
-Message-ID: <1346373285-19588-10-git-send-email-horms@verge.net.au>
+Message-ID: <1346373285-19588-11-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-regulator id = 0 is used for sh_mobile_sdhi.
-smsc911x's regulator can use id = 1
+Marzen board can measure its thermal by this patch.
+	cat /sys/class/thermal/thermal_zoneX/temp
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-marzen.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/configs/marzen_defconfig     |  2 ++
+ arch/arm/mach-shmobile/board-marzen.c | 16 ++++++++++++++++
+ 2 files changed, 18 insertions(+)
 
+diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
+index 61d1c55..c30ea5e 100644
+--- a/arch/arm/configs/marzen_defconfig
++++ b/arch/arm/configs/marzen_defconfig
+@@ -73,6 +73,8 @@ CONFIG_SERIAL_SH_SCI_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
++CONFIG_THERMAL=y
++CONFIG_RCAR_THERMAL=y
+ CONFIG_SSB=y
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_MMC=y
 diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-index 0249c0e..91e81e9 100644
+index 91e81e9..eb0a05a 100644
 --- a/arch/arm/mach-shmobile/board-marzen.c
 +++ b/arch/arm/mach-shmobile/board-marzen.c
-@@ -196,7 +196,7 @@ static void __init marzen_init(void)
- {
- 	regulator_register_always_on(0, "fixed-3.3V", fixed3v3_power_consumers,
- 				ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
--	regulator_register_fixed(0, dummy_supplies,
-+	regulator_register_fixed(1, dummy_supplies,
- 				ARRAY_SIZE(dummy_supplies));
+@@ -113,9 +113,25 @@ static struct platform_device sdhi0_device = {
+ 	}
+ };
  
- 	r8a7779_pinmux_init();
++/* Thermal */
++static struct resource thermal_resources[] = {
++	[0] = {
++		.start		= 0xFFC48000,
++		.end		= 0xFFC48038 - 1,
++		.flags		= IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device thermal_device = {
++	.name		= "rcar_thermal",
++	.resource	= thermal_resources,
++	.num_resources	= ARRAY_SIZE(thermal_resources),
++};
++
+ static struct platform_device *marzen_devices[] __initdata = {
+ 	&eth_device,
+ 	&sdhi0_device,
++	&thermal_device,
+ };
+ 
+ /* USB */
 -- 
 1.7.10.2.484.gcd07cc5
