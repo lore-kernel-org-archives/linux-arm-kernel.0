@@ -1,99 +1,66 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 31 Aug 2012 11:14:20 +0200
-Subject: [PATCH 1/2] i2c-omap: Fix incorrect adapter id when booting from
- a device tree
-In-Reply-To: <1346399575-7285-2-git-send-email-florian.vaussard@epfl.ch>
-References: <1346399575-7285-1-git-send-email-florian.vaussard@epfl.ch>
- <1346399575-7285-2-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <5040806C.9080003@ti.com>
+From: castet.matthieu@free.fr (Matthieu CASTET)
+Date: Fri, 31 Aug 2012 11:21:56 +0200
+Subject: [PATCH] hvc_dcc : add support to armv4 and armv5 core
+Message-ID: <1346404916-27616-1-git-send-email-castet.matthieu@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Signed-off-by: Matthieu Castet <matthieu.castet@parrot.com>
+---
+ drivers/tty/hvc/hvc_dcc.c |   34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-On 08/31/2012 09:52 AM, Florian Vaussard wrote:
-> When booting from a device tree, the omap driver is using pdev->id,
-> which is incorrect. 
-
-Not really, see below...
-
-> The proposed patch uses aliases, as done in omap-serial.
-
-Mmm, but is it really needed?
-In the case of serial the id is important because of the tty number used
-as device interface.
-In the case of I2C, the id is mostly irrelevant.
-
-In fact, using the pdev->id = -1 was used on purpose to have a dynamic
-assignment:
-
-int i2c_add_numbered_adapter(struct i2c_adapter *adap)
-...
-        if (adap->nr == -1) /* -1 means dynamically assign bus id */
-                return i2c_add_adapter(adap);
-
-> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-> ---
->  drivers/i2c/busses/i2c-omap.c |   19 +++++++++++++++----
->  1 files changed, 15 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 5d19a49..9445d1f 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -1064,9 +1064,6 @@ omap_i2c_probe(struct platform_device *pdev)
->  		goto err_unuse_clocks;
->  	}
->  
-> -	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", pdev->id,
-> -		 dev->dtrev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
-> -
-
-[    0.658843] omap_i2c i2c.15: bus -1 rev2.4.0 at 400 kHz
-[    0.760192] omap_i2c i2c.16: bus -1 rev2.4.0 at 400 kHz
-[    0.775817] omap_i2c i2c.17: bus -1 rev2.4.0 at 400 kHz
-[    0.791442] omap_i2c i2c.18: bus -1 rev2.4.0 at 400 kHz
-
-OK, it is true that the current log is not that nice with bus -1, but
-maybe we should just remove that.
-
-Or we can potentially retrieve the i2c adapter number assign later, and
-delay the log.
-
->  	r = i2c_add_numbered_adapter(adap);
->  	if (r) {
->  		dev_err(dev->dev, "failure adding adapter\n");
-
-
-Regards,
-Benoit
-
-
->  	adap = &dev->adapter;
->  	i2c_set_adapdata(adap, dev);
->  	adap->owner = THIS_MODULE;
-> @@ -1076,8 +1073,22 @@ omap_i2c_probe(struct platform_device *pdev)
->  	adap->dev.parent = &pdev->dev;
->  	adap->dev.of_node = pdev->dev.of_node;
->  
-> +	if (adap->dev.of_node)
-> +		adap->nr = of_alias_get_id(adap->dev.of_node, "i2c");
-> +	else
-> +		adap->nr = pdev->id;
-> +
-> +	if (adap->nr < 0) {
-> +		dev_err(&pdev->dev, "failed to get alias/pdev id, errno %d\n",
-> +				adap->nr);
-> +		r = -ENODEV;
-> +		goto err_free_irq;
-> +	}
-> +
-> +	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", adap->nr,
-> +		 dev->dtrev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
-> +
->  	/* i2c device drivers may be active on return from add_adapter() */
-> -	adap->nr = pdev->id;
->  	r = i2c_add_numbered_adapter(adap);
->  	if (r) {
->  		dev_err(dev->dev, "failure adding adapter\n");
-> 
+diff --git a/drivers/tty/hvc/hvc_dcc.c b/drivers/tty/hvc/hvc_dcc.c
+index 44fbeba..489e9e5 100644
+--- a/drivers/tty/hvc/hvc_dcc.c
++++ b/drivers/tty/hvc/hvc_dcc.c
+@@ -26,6 +26,7 @@
+ 
+ #include "hvc_console.h"
+ 
++#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V7)
+ /* DCC Status Bits */
+ #define DCC_STATUS_RX		(1 << 30)
+ #define DCC_STATUS_TX		(1 << 29)
+@@ -58,6 +59,39 @@ static inline void __dcc_putchar(char c)
+ 		: "r" (c));
+ 	isb();
+ }
++#else
++/* DCC Status Bits */
++#define DCC_STATUS_RX		(1 << 0)
++#define DCC_STATUS_TX		(1 << 1)
++
++/* primitive JTAG1 protocol utilities */
++static inline u32 __dcc_getstatus(void)
++{
++	u32 ret;
++
++	asm __volatile__ ("mrc p14, 0, %0, c0, c0	@ read comms ctrl reg"
++		: "=r" (ret));
++
++	return ret;
++}
++
++static inline char __dcc_getchar(void)
++{
++	char c;
++
++	asm __volatile__ ("mrc p14, 0, %0, c1, c0	@ read comms data reg"
++		: "=r" (c));
++
++	return c;
++}
++
++static inline void __dcc_putchar(unsigned char c)
++{
++	asm __volatile__ ("mcr p14, 0, %0, c1, c0	@ write a char"
++		: /* no output register */
++		: "r" (c));
++}
++#endif
+ 
+ static int hvc_dcc_put_chars(uint32_t vt, const char *buf, int count)
+ {
+-- 
+1.7.10.4
