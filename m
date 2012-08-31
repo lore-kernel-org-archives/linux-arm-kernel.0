@@ -1,77 +1,26 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 31 Aug 2012 13:04:15 +0100
-Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
- I2C driver
-In-Reply-To: <20120831112258.GA2624@pengutronix.de>
-References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
- <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
- <20120831112258.GA2624@pengutronix.de>
-Message-ID: <20120831120411.GB5962@gmail.com>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Fri, 31 Aug 2012 13:25:19 +0100
+Subject: [PATCH] hvc_dcc : add support to armv4 and armv5 core
+In-Reply-To: <5040A481.7020403@parrot.com>
+References: <1346404916-27616-1-git-send-email-castet.matthieu@free.fr>
+ <20120831110444.25d9b9fe@pyramind.ukuu.org.uk>
+ <504091F0.1090703@parrot.com>
+ <20120831103351.GE18957@n2100.arm.linux.org.uk>
+ <20120831115939.23fd4a08@pyramind.ukuu.org.uk>
+ <5040A481.7020403@parrot.com>
+Message-ID: <20120831132519.7c33f648@pyramind.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Is there some dependency other than updating the dts files? If not, I'd
-> like to pick up the patch via I2C.
+> > Then bury this crap in platform files please not in the drivers/tty layer
+> > code. Make it a platform driver provided callback or something.
+> > 
+> I posted a new v2 patch that make the selection dynamic.
 
-There's no other dependency. Feel free to take them into your tree.
+Thanks - fine with that one - or with burying it in headers etc in the arm
+subdirs.
 
-> > +static void nmk_i2c_of_probe(struct device_node *np,
-> > +			struct nmk_i2c_controller *pdata)
-> > +{
-> > +	/* Provide the default configuration as a base. */
-> > +	pdata = &u8500_i2c;
-> 
-> ?????? I wonder how that could work... have you tested the patch?
+Greg's email address btw has changed - you want his current one as
+suse.de bounces.
 
-Wow, that's a great spot!
-
-I have tested the patch, but I don't have any i2c devices, so can't
-test full functionality. I, wrongly it seems, assumed there would be
-a complaint from the I2C subsystem if any of the values seemed wrong.
-What I will do before next submission is print out the entire pdata
-structure to ensure it's populated in the correct way.
-
-> > +
-> > +	of_property_read_u32(np, "clock-frequency", (u32*)&pdata->clk_freq);
-> 
-> Might be worth changing clk_freq to u32?
-
-Yes, makes sense. 
-
-> > +
-> > +	/* This driver only supports 'standard' and 'fast' modes of operation. */
-> > +	if (pdata->clk_freq <= 100000)
-> > +		pdata->sm = I2C_FREQ_MODE_STANDARD;
-> 
-> Is standard == 100000 Hz?
-
-Well it depends on how you interpret the comments in:
-     include/linux/platform_data/i2c-nomadik.h
-
-enum i2c_freq_mode {
-        I2C_FREQ_MODE_STANDARD,         /* up to 100 Kb/s */
-        I2C_FREQ_MODE_FAST,             /* up to 400 Kb/s */
-        I2C_FREQ_MODE_HIGH_SPEED,       /* up to 3.4 Mb/s */
-        I2C_FREQ_MODE_FAST_PLUS,        /* up to 1 Mb/s */
-};
-
-I guess your guess would be better than mine.
-
-> > +	else
-> > +		pdata->sm = I2C_FREQ_MODE_FAST;
-> 
-> If those two are fixed frequencies, you should omit a warning if the
-> devicetree has a different frequency set and report which one is going
-> to be used actually.
-
-Well, again by the comments above I would say that in between values
-were valid, but I'm willing to bow down to your knowledge if you think
-they are fixed values?
-
-Thanks for reviewing.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Alan
