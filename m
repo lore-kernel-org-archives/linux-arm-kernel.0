@@ -1,38 +1,78 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 1 Sep 2012 00:28:29 +0200
-Subject: [PATCH 1/6] gpio/mxs: adopt irq_domain support for mxs gpio driver
-In-Reply-To: <20120824010904.GN24242@S2101-09.ap.freescale.net>
-References: <1345472400-31262-1-git-send-email-shawn.guo@linaro.org>
- <1345472400-31262-2-git-send-email-shawn.guo@linaro.org>
- <CACRpkdbSaa6ZOZYB1Cm7WjW0O51kvwsTAxhjefEKd-7XaBB3dw@mail.gmail.com>
- <20120824010904.GN24242@S2101-09.ap.freescale.net>
-Message-ID: <CACRpkdYhxxPw5Chw0U6gqc0cuSTpC5aMYV==dqbqBT=xnOO9Hg@mail.gmail.com>
+Date: Sat, 1 Sep 2012 00:44:10 +0200
+Subject: [PATCH] GPIO: Add support for GPIO on CLPS711X-target platform
+In-Reply-To: <20120824074552.97d32478.shc_work@mail.ru>
+References: <1345635383-12224-1-git-send-email-shc_work@mail.ru>
+ <CACRpkdZrcBLz+sg-AwWnBD0SA697uWQzocUYnbC1nPYG14LYyA@mail.gmail.com>
+ <20120824074552.97d32478.shc_work@mail.ru>
+Message-ID: <CACRpkdZEh1sg5h5-uzpsYwxYM5W47q-1hk4sS3=dQQLaVUC1Vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2012 at 3:09 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Thu, Aug 23, 2012 at 11:49:50PM +0200, Linus Walleij wrote:
->> On Mon, Aug 20, 2012 at 4:19 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Fri, Aug 24, 2012 at 5:45 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> On Fri, 24 Aug 2012 00:08:45 +0200
+> Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+> ...
+>> > +static int gpio_clps711x_get(struct gpio_chip *chip, unsigned offset)
+>> > +{
+>> > +       int ret;
+>> > +       struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
+>> > +
+>> > +       mutex_lock(&gpio->lock);
+>> > +       ret = clps_readb(gpio_clps711x_port_dataaddr(chip)) & (1 << offset);
+>> > +       mutex_unlock(&gpio->lock);
+>> > +
+>> > +       return !!ret;
+>> > +}
 >>
->> > Remove irq_domain_add_legacy call from mach-mxs.c and have the gpio
->> > driver adopt irqdomain support, so that we can have the mapping
->> > between gpio and irq number available without using virtual_irq_start
->> > and MXS_GPIO_IRQ_START.
->> >
->> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->> > Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Please get rid of this clps_readb() business. I can see it's just this:
+>> #define clps_readb(off)         readb(CLPS711X_VIRT_BASE + (off))
 >>
->> OK patch applied, thanks!
->>
-> I was planning to have the patch to go via arm-soc tree with your ACK.
-> But it also works to have it on gpio tree and I ask arm-soc people to
-> pull gpio tree into arm-soc, but you need to ensure the branch is
-> stable (no rebase).
+>> This makes stuff hard to understand, please pass the virtual base as
+>> a memory resource to the platform device, store it in the state holder
+>> and just use readb() in the driver from that offset.
+>
+> This will break the whole concept of this platform. All the CPU registers
+> are in one particular area, and therefore access to the registers of all
+> the drivers performed using the macro.
+> Maybe just add a short comment?
 
-OK sorry (and sorry for the delay) I took the patch out again, please take
-this through your tree as needed.
+It does not break if you pass the offset CLPS711X_VIRT_BASE as
+a memory resource and reference from that, e.g.:
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Add a base:
 
-Yours.
+struct clps711x_gpio {
+       struct gpio_chip       chip[CLPS711X_GPIO_PORTS];
+       struct mutex            lock;
++     void __iomem         *base;
+};
+
+Fish out the base from the platform device (provided it's added to
+the platform device) in .probe:
+
+res = platform_get_resource(dev, IORESOURCE_MEM, 0);
+if (!res) {
+        ret = -ENOENT;
+        goto out;
+}
+gpio->base = res->start;
+
+The access registers like this:
+
+foo = readb(gpio->base + gpio_clps711x_port_diraddr(chip));
+
+It's no big change, just that the offset is included in every
+access instead of using custom accessor functions which
+are in an obscure <mach/*> header, and we want to get rid
+of all such headers.
+
+If you do this, you should no longer need to include
+<mach/hardware.h> (or something more is wrong...)
+
+BTW I cannot see where this patch adds the platform device
+named "gpio-clps711x"? Are you intending to do this later?
+
+Yours,
 Linus Walleij
