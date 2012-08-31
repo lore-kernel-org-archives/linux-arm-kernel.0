@@ -1,56 +1,64 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 31 Aug 2012 12:57:37 +0200
-Subject: mxc_nand.c on mach-imx/imx53
-In-Reply-To: <50407E44.5080408@antcom.de>
-References: <5035F84E.3000901@antcom.de>
- <20120829074122.GV26594@pengutronix.de> <503E3331.8050203@antcom.de>
- <20120829172820.43bbe68e@eb-e6520> <50407E44.5080408@antcom.de>
-Message-ID: <504098A1.4050208@antcom.de>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 31 Aug 2012 19:58:18 +0900
+Subject: [PATCH 1/2] ARM: exynos: delete redundant HAVE_SCHED_CLOCK option
+ in Kconfig
+In-Reply-To: <CAGsJ_4xUBDGn1hDdWvUX68MfC98936v-_vLfPrisLNL7RY6nEw@mail.gmail.com>
+References: <1346406296-16223-1-git-send-email-Barry.Song@csr.com>
+ <CAH9JG2W8xZrkmGkVw_JDY3qSsqHnaTi8-BNoW99V3FUyvWBXng@mail.gmail.com>
+ <CAGsJ_4xUBDGn1hDdWvUX68MfC98936v-_vLfPrisLNL7RY6nEw@mail.gmail.com>
+Message-ID: <CAH9JG2W3KL=K7MHDsF4_NScjY01X56JLc=nBy+wvh3EFQefQmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/31/2012 11:05 AM, Roland Stigge wrote:
-> I tried to port this on top of Sascha's patches for imx53, only for mxc v3 for now, as below.
-> 
-> Unfortunately, I still get:
-> 
-> ...
-> UnCorrectable RS-ECC Error
-> UnCorrectable RS-ECC Error
-> UnCorrectable RS-ECC Error
-> UnCorrectable RS-ECC Error
-> UnCorrectable RS-ECC Error
-> ...
-> 
-> from mxc_nand.c's mxc_nand_correct_data_v2_v3(). Maybe there's still sth. missing in the
-> error correction code?
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-With the below incremental fix, it works. :-)
+# git grep HAVE_SCHED_CLOCK arch/arm/
+arch/arm/Kconfig:       select HAVE_SCHED_CLOCK
+arch/arm/mach-exynos/Kconfig:   select HAVE_SCHED_CLOCK
 
-Thanks,
-
-Roland
-
-PS: Will you prepare a patch for l2-mtd.git? I only have an imx53, can't test the v1/v2 etc.
-configs.
-
-
---- linux-2.6.orig/drivers/mtd/nand/mxc_nand.c
-+++ linux-2.6/drivers/mtd/nand/mxc_nand.c
-@@ -1141,14 +1141,14 @@ static void mxc_nand_command(struct mtd_
-                host->devtype_data->send_cmd(host, command, true);
-                mxc_do_addr_cycle(mtd, column, page_addr);
-                host->devtype_data->send_read_id(host);
--               host->buf_start = column;
-+               host->buf_start = 0;
-                break;
- 
-        case NAND_CMD_PARAM:
-                host->devtype_data->send_cmd(host, command, true);
-                mxc_do_addr_cycle(mtd, column, page_addr);
-                host->devtype_data->send_read_param(host);
--               host->buf_start = column;
-+               host->buf_start = 0;
-                break;
- 
-        case NAND_CMD_ERASE1:
+On 8/31/12, Barry Song <21cnbao@gmail.com> wrote:
+> 2012/8/31 Kyungmin Park <kmpark@infradead.org>:
+>> Hi,
+>>
+>> then where select it HAVE_SCHED_CLOCK? apart from other exynos board,
+>> universal have to use another clock.
+>
+> The old arch/arm/kernel/Makefile:
+> obj-$(CONFIG_HAVE_SCHED_CLOCK)  += sched_clock.o
+> has become:
+> obj-y += sched_clock.o
+>
+>>
+>> Thank you,
+>> Kyungmin Park
+>>
+>> On 8/31/12, Barry Song <Barry.Song@csr.com> wrote:
+>>> From: Barry Song <Baohua.Song@csr.com>
+>>>
+>>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>>> ---
+>>>  arch/arm/mach-exynos/Kconfig |    1 -
+>>>  1 files changed, 0 insertions(+), 1 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+>>> index b5b4c8c..3fd4ab3 100644
+>>> --- a/arch/arm/mach-exynos/Kconfig
+>>> +++ b/arch/arm/mach-exynos/Kconfig
+>>> @@ -243,7 +243,6 @@ config MACH_UNIVERSAL_C210
+>>>       select CPU_EXYNOS4210
+>>>       select S5P_HRT
+>>>       select CLKSRC_MMIO
+>>> -     select HAVE_SCHED_CLOCK
+>>>       select S5P_GPIO_INT
+>>>       select S5P_DEV_FIMC0
+>>>       select S5P_DEV_FIMC1
+>>> --
+>>> 1.7.0.4
+>>>
+> -barry
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
