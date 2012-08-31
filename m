@@ -1,73 +1,52 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 31 Aug 2012 14:41:27 +0800
-Subject: [PATCH v2 1/4] clk: add of_clk_src_onecell_get() support
-In-Reply-To: <1345642590-29905-2-git-send-email-shawn.guo@linaro.org>
-References: <1345642590-29905-1-git-send-email-shawn.guo@linaro.org>
- <1345642590-29905-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120831064125.GA3271@r65073-Latitude-D630>
+Date: Fri, 31 Aug 2012 14:42:38 +0800
+Subject: [PATCH v3 0/3] Add a generic cpufreq-cpu0 driver
+In-Reply-To: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
+References: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120831064236.GB3271@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping, Mike.
+Ping, Rafael.
 
 Regards,
 Shawn
 
-On Wed, Aug 22, 2012 at 09:36:27PM +0800, Shawn Guo wrote:
-> For those SoCs that have hundreds of clock outputs, their clock
-> DT bindings could reasonably define #clock-cells as 1 and require
-> the client device specify the index of the clock it consumes in the
-> cell of its "clocks" phandle.
+On Fri, Aug 10, 2012 at 01:37:22PM +0800, Shawn Guo wrote:
+> Patch "cpufreq: Add a generic cpufreq-cpu0 driver" has a dependency
+> on following branch.
 > 
-> Add a generic of_clk_src_onecell_get() function for this purpose.
+>  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git topic/tol
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  drivers/clk/clk.c            |   14 ++++++++++++++
->  include/linux/clk-provider.h |    5 +++++
->  2 files changed, 19 insertions(+), 0 deletions(-)
+> Changes since v2:
+> * Drop patch "regulator: add a new API regulator_set_voltage_tol()",
+>   which has been applied on regulator tree as above.
+> * Rewrite function of_init_opp_table to make it concise.
+>   
+> Regards,
+> Shawn
 > 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index efdfd00..308f058 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1582,6 +1582,20 @@ struct clk *of_clk_src_simple_get(struct of_phandle_args *clkspec,
->  }
->  EXPORT_SYMBOL_GPL(of_clk_src_simple_get);
->  
-> +struct clk *of_clk_src_onecell_get(struct of_phandle_args *clkspec, void *data)
-> +{
-> +	struct clk_onecell_data *clk_data = data;
-> +	unsigned int idx = clkspec->args[0];
-> +
-> +	if (idx >= clk_data->clk_num) {
-> +		pr_err("%s: invalid clock index %d\n", __func__, idx);
-> +		return ERR_PTR(-EINVAL);
-> +	}
-> +
-> +	return clk_data->clks[idx];
-> +}
-> +EXPORT_SYMBOL_GPL(of_clk_src_onecell_get);
-> +
->  /**
->   * of_clk_add_provider() - Register a clock provider for a node
->   * @np: Device node pointer associated with clock provider
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 77335fa..8fe6ec7 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -360,6 +360,11 @@ int of_clk_add_provider(struct device_node *np,
->  void of_clk_del_provider(struct device_node *np);
->  struct clk *of_clk_src_simple_get(struct of_phandle_args *clkspec,
->  				  void *data);
-> +struct clk_onecell_data {
-> +	struct clk **clks;
-> +	unsigned int clk_num;
-> +};
-> +struct clk *of_clk_src_onecell_get(struct of_phandle_args *clkspec, void *data);
->  const char *of_clk_get_parent_name(struct device_node *np, int index);
->  void of_clk_init(const struct of_device_id *matches);
->  
+> Richard Zhao (1):
+>   ARM: add cpufreq transiton notifier to adjust loops_per_jiffy for smp
+> 
+> Shawn Guo (2):
+>   PM / OPP: Initialize OPP table from device tree
+>   cpufreq: Add a generic cpufreq-cpu0 driver
+> 
+>  .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |   55 ++++
+>  Documentation/devicetree/bindings/power/opp.txt    |   25 ++
+>  arch/arm/kernel/smp.c                              |   54 ++++
+>  drivers/base/power/opp.c                           |   47 ++++
+>  drivers/cpufreq/Kconfig                            |   11 +
+>  drivers/cpufreq/Makefile                           |    2 +
+>  drivers/cpufreq/cpufreq-cpu0.c                     |  271 ++++++++++++++++++++
+>  include/linux/opp.h                                |    8 +
+>  8 files changed, 473 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+>  create mode 100644 Documentation/devicetree/bindings/power/opp.txt
+>  create mode 100644 drivers/cpufreq/cpufreq-cpu0.c
+> 
 > -- 
 > 1.7.5.4
+> 
 > 
