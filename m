@@ -1,56 +1,156 @@
 From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Fri, 31 Aug 2012 11:21:16 +0200
-Subject: [PATCH 0/8] i2c: at91: cleanup and dt support
-Message-ID: <1346404884-18451-1-git-send-email-ludovic.desroches@atmel.com>
+Date: Fri, 31 Aug 2012 11:21:17 +0200
+Subject: [PATCH 1/8] i2c: at91: use managed resources
+In-Reply-To: <1346404884-18451-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1346404884-18451-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1346404884-18451-2-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Hi,
+Use managed resources to ease the cleanup.
 
-This set of patches is based on Nikolaus at91_i2c driver.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/i2c/busses/i2c-at91.c | 85 +++++++++++++------------------------------
+ 1 file changed, 25 insertions(+), 60 deletions(-)
 
-Ludovic Desroches (8):
-  i2c: at91: use managed resources
-  i2c: at91: add warning about transmission issues for some devices
-  i2c: at91: use an id table for SoC dependent parameters
-  ARM: at91: do not configure at91sam9g10 twi pio as open-drain
-  i2c: at91: add dt support to i2c-at91
-  ARM: at91: add clocks for I2C DT entries
-  ARM: dts: add twi nodes for atmel SOCs
-  ARM: dts: add twi nodes for atmel boards
-
- .../devicetree/bindings/i2c/atmel-i2c.txt          |  30 +++
- arch/arm/boot/dts/at91sam9260.dtsi                 |  23 +--
- arch/arm/boot/dts/at91sam9263.dtsi                 |  23 +--
- arch/arm/boot/dts/at91sam9263ek.dts                |  20 +-
- arch/arm/boot/dts/at91sam9g20.dtsi                 |   4 +
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi        |  28 +--
- arch/arm/boot/dts/at91sam9g25ek.dts                |  12 ++
- arch/arm/boot/dts/at91sam9g45.dtsi                 |  33 ++--
- arch/arm/boot/dts/at91sam9m10g45ek.dts             |   8 +
- arch/arm/boot/dts/at91sam9n12.dtsi                 |  33 ++--
- arch/arm/boot/dts/at91sam9n12ek.dts                |   8 +
- arch/arm/boot/dts/at91sam9x5.dtsi                  |  69 +++----
- arch/arm/mach-at91/at91rm9200.c                    |   2 +-
- arch/arm/mach-at91/at91rm9200_devices.c            |  11 +-
- arch/arm/mach-at91/at91sam9260.c                   |   4 +-
- arch/arm/mach-at91/at91sam9260_devices.c           |   8 +-
- arch/arm/mach-at91/at91sam9261.c                   |   3 +-
- arch/arm/mach-at91/at91sam9261_devices.c           |  31 ++-
- arch/arm/mach-at91/at91sam9263.c                   |   3 +-
- arch/arm/mach-at91/at91sam9263_devices.c           |   2 +-
- arch/arm/mach-at91/at91sam9g45.c                   |   6 +-
- arch/arm/mach-at91/at91sam9g45_devices.c           |   4 +-
- arch/arm/mach-at91/at91sam9n12.c                   |   2 +
- arch/arm/mach-at91/at91sam9rl.c                    |   4 +-
- arch/arm/mach-at91/at91sam9rl_devices.c            |   2 +-
- arch/arm/mach-at91/at91sam9x5.c                    |   6 +-
- drivers/i2c/busses/Kconfig                         |   6 +
- drivers/i2c/busses/i2c-at91.c                      | 217 +++++++++++++--------
- 28 files changed, 367 insertions(+), 235 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/i2c/atmel-i2c.txt
-
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index 2b8b2c2..08aaee7 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -326,61 +326,49 @@ static struct i2c_algorithm at91_twi_algorithm = {
+ static int __devinit at91_twi_probe(struct platform_device *pdev)
+ {
+ 	struct at91_twi_dev *dev;
+-	struct resource *mem, *ioarea;
+-	int irq, rc;
++	struct resource *mem;
++	int rc;
++
++	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
++	if (!dev)
++		return -ENOMEM;
++	init_completion(&dev->cmd_complete);
++	dev->dev = &pdev->dev;
+ 
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!mem)
+ 		return -ENODEV;
+ 
+-	irq = platform_get_irq(pdev, 0);
+-	if (irq < 0)
+-		return irq;
+-
+-	ioarea = request_mem_region(mem->start, resource_size(mem), pdev->name);
+-	if (!ioarea)
++	dev->base = devm_request_and_ioremap(&pdev->dev, mem);
++	if (!dev->base)
+ 		return -EBUSY;
+ 
+-	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+-	if (!dev) {
+-		rc = -ENOMEM;
+-		goto err_release_region;
++	dev->irq = platform_get_irq(pdev, 0);
++	if (dev->irq < 0)
++		return dev->irq;
++
++	rc = devm_request_irq(&pdev->dev, dev->irq, atmel_twi_interrupt, 0,
++			 dev_name(dev->dev), dev);
++	if (rc) {
++		dev_err(dev->dev, "Cannot get irq %d: %d\n", dev->irq, rc);
++		return rc;
+ 	}
+ 
+ 	if (pdev->id_entry)
+ 		dev->ip_id = pdev->id_entry->driver_data;
+ 
+-	init_completion(&dev->cmd_complete);
+-
+-	dev->dev = &pdev->dev;
+-	dev->irq = irq;
+ 	platform_set_drvdata(pdev, dev);
+ 
+-	dev->clk = clk_get(dev->dev, NULL);
++	dev->clk = devm_clk_get(dev->dev, NULL);
+ 	if (IS_ERR(dev->clk)) {
+ 		dev_err(dev->dev, "no clock defined\n");
+-		rc = -ENODEV;
+-		goto err_free_mem;
+-	}
+-	clk_prepare(dev->clk);
+-	clk_enable(dev->clk);
+-
+-	dev->base = ioremap(mem->start, resource_size(mem));
+-	if (!dev->base) {
+-		rc = -EBUSY;
+-		goto err_mem_ioremap;
++		return -ENODEV;
+ 	}
++	clk_prepare_enable(dev->clk);
+ 
+ 	at91_calc_twi_clock(dev, TWI_CLK_HZ);
+ 	at91_init_twi_bus(dev);
+ 
+-	rc = request_irq(dev->irq, atmel_twi_interrupt, 0,
+-			 dev_name(dev->dev), dev);
+-	if (rc) {
+-		dev_err(dev->dev, "Cannot get irq %d: %d\n", dev->irq, rc);
+-		goto err_unuse_clocks;
+-	}
+-
+ 	snprintf(dev->adapter.name, sizeof(dev->adapter.name), "AT91");
+ 	i2c_set_adapdata(&dev->adapter, dev);
+ 	dev->adapter.owner = THIS_MODULE;
+@@ -394,44 +382,21 @@ static int __devinit at91_twi_probe(struct platform_device *pdev)
+ 	if (rc) {
+ 		dev_err(dev->dev, "Adapter %s registration failed\n",
+ 			dev->adapter.name);
+-		goto err_free_irq;
++		clk_disable_unprepare(dev->clk);
++		return rc;
+ 	}
+ 
+ 	dev_info(dev->dev, "AT91 i2c bus driver.\n");
+ 	return 0;
+-
+-err_free_irq:
+-	free_irq(dev->irq, dev);
+-err_unuse_clocks:
+-	iounmap(dev->base);
+-err_mem_ioremap:
+-	clk_disable(dev->clk);
+-	clk_unprepare(dev->clk);
+-	clk_put(dev->clk);
+-err_free_mem:
+-	kfree(dev);
+-err_release_region:
+-	release_mem_region(mem->start, resource_size(mem));
+-
+-	return rc;
+ }
+ 
+ static int __devexit at91_twi_remove(struct platform_device *pdev)
+ {
+ 	struct at91_twi_dev *dev = platform_get_drvdata(pdev);
+-	struct resource *mem;
+ 	int rc;
+ 
+ 	rc = i2c_del_adapter(&dev->adapter);
+-	clk_disable(dev->clk);
+-	clk_unprepare(dev->clk);
+-	clk_put(dev->clk);
+-	free_irq(dev->irq, dev);
+-	iounmap(dev->base);
+-	kfree(dev);
+-
+-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	release_mem_region(mem->start, resource_size(mem));
++	clk_disable_unprepare(dev->clk);
+ 
+ 	return rc;
+ }
 -- 
 1.7.11.3
