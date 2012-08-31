@@ -1,68 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 31 Aug 2012 16:51:44 +0200
-Subject: [PATCH 3/8] i2c: at91: use an id table for SoC dependent
- parameters
-In-Reply-To: <20120831142944.GA23867@game.jcrosoft.org>
-References: <1346404884-18451-1-git-send-email-ludovic.desroches@atmel.com>
- <1346404884-18451-4-git-send-email-ludovic.desroches@atmel.com>
- <20120831142944.GA23867@game.jcrosoft.org>
-Message-ID: <5040CF80.8060201@atmel.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Fri, 31 Aug 2012 20:24:51 +0530
+Subject: Without MACH_ option Early printk (DEBUG_LL)
+Message-ID: <5040D03B.2050304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/31/2012 04:29 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> On 11:21 Fri 31 Aug     , ludovic.desroches at atmel.com wrote:
->> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->>
->> Use the id_table to store configuration structures which are depending on
->> SoC.
->>
->> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->> ---
->>  arch/arm/mach-at91/at91rm9200.c          |  2 +-
->>  arch/arm/mach-at91/at91rm9200_devices.c  | 11 +----
->>  arch/arm/mach-at91/at91sam9260.c         |  3 +-
->>  arch/arm/mach-at91/at91sam9260_devices.c |  8 ++-
->>  arch/arm/mach-at91/at91sam9261.c         |  3 +-
->>  arch/arm/mach-at91/at91sam9261_devices.c | 17 +++----
->>  arch/arm/mach-at91/at91sam9263.c         |  2 +-
->>  arch/arm/mach-at91/at91sam9263_devices.c |  2 +-
->>  arch/arm/mach-at91/at91sam9g45.c         |  4 +-
->>  arch/arm/mach-at91/at91sam9g45_devices.c |  4 +-
->>  arch/arm/mach-at91/at91sam9rl.c          |  4 +-
->>  arch/arm/mach-at91/at91sam9rl_devices.c  |  2 +-
->>  drivers/i2c/busses/i2c-at91.c            | 85 +++++++++++++++++++++++++-------
->>  13 files changed, 95 insertions(+), 52 deletions(-)
->>
->> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
->> index f2112f9..0bc91e5 100644
->> --- a/arch/arm/mach-at91/at91rm9200.c
->> +++ b/arch/arm/mach-at91/at91rm9200.c
->> @@ -187,7 +187,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
->>  	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
->>  	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
->>  	CLKDEV_CON_DEV_ID("pclk", "ssc.2", &ssc2_clk),
->> -	CLKDEV_CON_DEV_ID(NULL, "at91_i2c", &twi_clk),
->> +	CLKDEV_CON_DEV_ID(NULL, "at91rm9200_i2c", &twi_clk),
-> use i2c-xxx as on other drivers
-> 
-> and I do not like to have platform_device_id
+Hi Russell & Tony,
 
-Me, I like it and find this implementation very elegant.
+AM335X EVM (based on AM33XX device) only supports DT boot mode and
+doesn't have CONFIG_MACH_AM335XEVM option defined. Some time back during
+baseport submission we had aligned that, we won't create separate EVM
+options, killing the board file all-together.
 
-> as we need to touch the driver to add a new soc
+Having said that, the early printk option (DEBUG_LL) is broken, the
+auto-generated file "./include/generated/mach-types.h" still refers to
+CONFIG_MACH_AM335XEVM option,
 
-So what? We still keep the compatibility if the new SoC has it
-compatibility assured with previous revision: there is nothing to modify.
+#ifdef CONFIG_MACH_AM335XEVM
+# ifdef machine_arch_type
+#  undef machine_arch_type
+#  define machine_arch_type     __machine_arch_type
+# else
+#  define machine_arch_type     MACH_TYPE_AM335XEVM
+# endif
+# define machine_is_am335xevm() (machine_arch_type == MACH_TYPE_AM335XEVM)
+#else
+# define machine_is_am335xevm() (0)
+#endif
 
-> please use platform data
 
-No, it does not have to be exposed to the user: these data are highly
-dependent on the actual hardware (IP revision in fact). So, no need to
-mess with platform data.
+So I am thinking of changing the config_xxx option to SOC_AM33XX or
+ARCH_OMAP2PLUS, something like below,
 
-So I will acknowledge Ludo's patches.
+am335xevm        SOC_AM33XX          AM335XEVM         3589
 
-Bye,
--- 
-Nicolas Ferre
+OR
+
+am335xevm        ARCH_OMAP2PLUS      AM335XEVM         3589
+
+
+Can you comment on this? Based on that I will submit the patch.
+
+Thanks,
+Vaibhav
