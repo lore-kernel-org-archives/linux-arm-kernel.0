@@ -1,27 +1,32 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Fri, 31 Aug 2012 15:07:18 +0530
-Subject: [PATCH 0/2] ARM: OMAP2: AM33XX: Add cpufreq support
-Message-ID: <1346405840-31058-1-git-send-email-anilkumar@ti.com>
+Date: Fri, 31 Aug 2012 15:07:19 +0530
+Subject: [PATCH 1/2] ARM: OMAP2+: AM33XX: Add clock entries to omap_clk data
+In-Reply-To: <1346405840-31058-1-git-send-email-anilkumar@ti.com>
+References: <1346405840-31058-1-git-send-email-anilkumar@ti.com>
+Message-ID: <1346405840-31058-2-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add cpufreq support to AM33XX family of devices by adding OPP
-information, clock entry with cpu0 name and voltage supplies
-to cpu0.
+Add AM335x cpu0 clock entry to the corresponding clock data
+file. This is useful in getting the correct mpu clock pointer
+to change the cpu frequency in cpufreq driver.
 
-These patches have been tested on AM335x-EVM, AM335x-Bone and
-these patches are based on cpufreq-cpu0 driver
-http://marc.info/?l=linux-arm-kernel&m=134457735413293&w=2
-
-AnilKumar Ch (2):
-  ARM: OMAP2+: AM33XX: Add clock entries to omap_clk data
-  arm/dts: AM33XX: Add device tree OPP table
-
- arch/arm/boot/dts/am335x-bone.dts    |    6 ++++++
- arch/arm/boot/dts/am335x-evm.dts     |    6 ++++++
- arch/arm/boot/dts/am33xx.dtsi        |   15 +++++++++++++++
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
  arch/arm/mach-omap2/clock33xx_data.c |    1 +
- 4 files changed, 28 insertions(+)
+ 1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm/mach-omap2/clock33xx_data.c b/arch/arm/mach-omap2/clock33xx_data.c
+index 23251fa..7afefe8 100644
+--- a/arch/arm/mach-omap2/clock33xx_data.c
++++ b/arch/arm/mach-omap2/clock33xx_data.c
+@@ -1013,6 +1013,7 @@ static struct omap_clk am33xx_clks[] = {
+ 	CLK(NULL,	"dpll_core_m5_ck",	&dpll_core_m5_ck,	CK_AM33XX),
+ 	CLK(NULL,	"dpll_core_m6_ck",	&dpll_core_m6_ck,	CK_AM33XX),
+ 	CLK(NULL,	"dpll_mpu_ck",		&dpll_mpu_ck,	CK_AM33XX),
++	CLK("cpu0",	NULL,			&dpll_mpu_ck,		CK_AM33XX),
+ 	CLK(NULL,	"dpll_mpu_m2_ck",	&dpll_mpu_m2_ck,	CK_AM33XX),
+ 	CLK(NULL,	"dpll_ddr_ck",		&dpll_ddr_ck,	CK_AM33XX),
+ 	CLK(NULL,	"dpll_ddr_m2_ck",	&dpll_ddr_m2_ck,	CK_AM33XX),
 -- 
 1.7.9.5
