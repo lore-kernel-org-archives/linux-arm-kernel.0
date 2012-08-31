@@ -1,167 +1,52 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Fri, 31 Aug 2012 11:24:56 +0200
-Subject: [PATCH 8/8] ARM: dts: add twi nodes for atmel boards
-In-Reply-To: <1346404884-18451-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1346404884-18451-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1346405096-18660-1-git-send-email-ludovic.desroches@atmel.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 31 Aug 2012 11:26:55 +0200
+Subject: [PATCH v2 0/9] Add device tree support for on-chip SRAM 
+Message-ID: <1346405224-20399-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+These patches add support to configure on-chip SRAM via device-tree
+node and to obtain the resulting genalloc pool from a phandle pointing
+at the node.
+This allows drivers to allocate SRAM with the genalloc API without
+hard-coding the genalloc pool address.
 
-Use the atmel twi instead of gpio for i2c stuff.
+The on-chip SRAM on i.MX53 and i.MX6q is registered via device tree and
+changed to use the simple generic SRAM driver:
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+		ocram: ocram at 00900000 {
+			compatible = "fsl,imx-ocram", "sram";
+			reg = <0x00900000 0x3f000>;
+ 		};
+
+A driver that needs to allocate SRAM buffers, like the video processing
+unit on i.MX53, can retrieve the genalloc pool from a phandle in the
+device tree using of_get_named_gen_pool(node, "iram", 0) from patch 5:
+
+		vpu at 63ff4000 {
+			/* ... */
+			iram = <&ocram>;
+ 		};
+
+Changes since v1:
+ - Added a generic SRAM driver in drivers/misc that does nothing but
+   request/ioremap its given memory region and serve it via the genalloc
+   API.
+ - Renamed the i.MX device tree nodes from "iram" to "ocram".
+
+regards
+Philipp
+
 ---
- arch/arm/boot/dts/at91sam9263ek.dts         | 20 ++++++++++----------
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi | 28 ++++++++++++++--------------
- arch/arm/boot/dts/at91sam9g25ek.dts         | 12 ++++++++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts      |  8 ++++++++
- arch/arm/boot/dts/at91sam9n12ek.dts         |  8 ++++++++
- 5 files changed, 52 insertions(+), 24 deletions(-)
-
-diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
-index f86ac4b..772ab75 100644
---- a/arch/arm/boot/dts/at91sam9263ek.dts
-+++ b/arch/arm/boot/dts/at91sam9263ek.dts
-@@ -50,6 +50,16 @@
- 				atmel,vbus-gpio = <&pioA 25 0>;
- 				status = "okay";
- 			};
-+
-+			i2c0: i2c at fff88000 {
-+				status = "okay";
-+
-+				24c512 at 50 {
-+					compatible = "24c512";
-+					reg = <0x50>;
-+					pagesize = <128>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-@@ -143,14 +153,4 @@
- 			gpio-key,wakeup;
- 		};
- 	};
--
--	i2c at 0 {
--		status = "okay";
--
--		24c512 at 50 {
--			compatible = "24c512";
--			reg = <0x50>;
--			pagesize = <128>;
--		};
--	};
- };
-diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-index b06c0db..712106b 100644
---- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-@@ -51,6 +51,20 @@
- 				atmel,vbus-gpio = <&pioC 5 0>;
- 				status = "okay";
- 			};
-+
-+			i2c0: i2c at fffac000 {
-+				status = "okay";
-+
-+				24c512 at 50 {
-+					compatible = "24c512";
-+					reg = <0x50>;
-+				};
-+
-+				wm8731 at 1b {
-+					compatible = "wm8731";
-+					reg = <0x1b>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-@@ -106,20 +120,6 @@
- 		};
- 	};
- 
--	i2c at 0 {
--		status = "okay";
--
--		24c512 at 50 {
--			compatible = "24c512";
--			reg = <0x50>;
--		};
--
--		wm8731 at 1b {
--			compatible = "wm8731";
--			reg = <0x1b>;
--		};
--	};
--
- 	gpio_keys {
- 		compatible = "gpio-keys";
- 		#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
-index 7829a4d..3b0adbc 100644
---- a/arch/arm/boot/dts/at91sam9g25ek.dts
-+++ b/arch/arm/boot/dts/at91sam9g25ek.dts
-@@ -32,6 +32,18 @@
- 				phy-mode = "rmii";
- 				status = "okay";
- 			};
-+
-+			i2c0: i2c at f8010000 {
-+				status = "okay";
-+			};
-+
-+			i2c1: i2c at f8014000 {
-+				status = "okay";
-+			};
-+
-+			i2c2: i2c at f8018000 {
-+				status = "okay";
-+			};
- 		};
- 
- 		usb0: ohci at 00600000 {
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index a3633bd..15e1dd4 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -46,6 +46,14 @@
- 				phy-mode = "rmii";
- 				status = "okay";
- 			};
-+
-+			i2c0: i2c at fff84000 {
-+				status = "okay";
-+			};
-+
-+			i2c1: i2c at fff88000 {
-+				status = "okay";
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-index f4e43e3..912b2c2 100644
---- a/arch/arm/boot/dts/at91sam9n12ek.dts
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -37,6 +37,14 @@
- 			dbgu: serial at fffff200 {
- 				status = "okay";
- 			};
-+
-+			i2c0: i2c at f8010000 {
-+				status = "okay";
-+			};
-+
-+			i2c1: i2c at f8014000 {
-+				status = "okay";
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
--- 
-1.7.11.3
+ arch/arm/boot/dts/imx53.dtsi          |    5 ++
+ arch/arm/boot/dts/imx6q.dtsi          |    5 ++
+ arch/arm/plat-mxc/Kconfig             |    4 --
+ arch/arm/plat-mxc/Makefile            |    1 -
+ arch/arm/plat-mxc/include/mach/iram.h |   41 -------------
+ arch/arm/plat-mxc/iram_alloc.c        |   73 -----------------------
+ drivers/misc/Kconfig                  |    8 +++
+ drivers/misc/Makefile                 |    1 +
+ drivers/misc/sram.c                   |  105 +++++++++++++++++++++++++++++++++
+ include/linux/genalloc.h              |   14 +++++
+ lib/genalloc.c                        |   77 ++++++++++++++++++++++++
+ 11 files changed, 215 insertions(+), 119 deletions(-)
