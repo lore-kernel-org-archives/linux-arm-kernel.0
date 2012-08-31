@@ -1,48 +1,53 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 31 Aug 2012 21:32:18 +0530
-Subject: [PATCH v3 3/3] spi: spi-davinci: convert to DMA engine API
-In-Reply-To: <20120830144307.GA26737@beef>
-References: <1345684176-21472-1-git-send-email-mporter@ti.com>
- <1345684176-21472-4-git-send-email-mporter@ti.com> <503F75C0.1050507@ti.com>
- <20120830144307.GA26737@beef>
-Message-ID: <5040E00A.3080600@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 31 Aug 2012 09:04:04 -0700
+Subject: [PATCH 4/5] leds: leds-gpio: adopt pinctrl support
+In-Reply-To: <1346405361-29711-5-git-send-email-anilkumar@ti.com>
+References: <1346405361-29711-1-git-send-email-anilkumar@ti.com>
+ <1346405361-29711-5-git-send-email-anilkumar@ti.com>
+Message-ID: <20120831160402.GN1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
-
-On 8/30/2012 8:13 PM, Matt Porter wrote:
-> On Thu, Aug 30, 2012 at 07:46:32PM +0530, Sekhar Nori wrote:
->> Hi Matt,
->>
->> On 8/23/2012 6:39 AM, Matt Porter wrote:
->>> Removes use of the DaVinci EDMA private DMA API and replaces
->>> it with use of the DMA engine API.
->>>
->>> Signed-off-by: Matt Porter <mporter@ti.com>
->>
->> I tried testing this patch on my OMAP-L138 EVM, but SPI fails to 
->> initialize after applying the patch.
->>
->> root at arago:~# dmesg | grep -i spi                                               
->> spi_davinci spi_davinci.1: request RX DMA channel failed                        
+* AnilKumar Ch <anilkumar@ti.com> [120831 02:30]:
+> Adopt pinctrl support to leds-gpio driver, based on the device
+> pointer (leds-gpio) pinctrl driver configure SoC pins to GPIO
+> mode.
 > 
-> Hi Sekhar,
+> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> ---
+>  drivers/leds/leds-gpio.c |   31 ++++++++++++++++++++++++-------
+>  1 file changed, 24 insertions(+), 7 deletions(-)
 > 
-> Most likely CONFIG_TI_EDMA is off as it defaults to off in the v3
-> series. Try enabling this and if it's the problem then this error
-> path can be fixed to properly fallback to PIO only or fail to
-> initialize as needed.
+> diff --git a/drivers/leds/leds-gpio.c b/drivers/leds/leds-gpio.c
+> index c032b21..d98dfb9 100644
+> --- a/drivers/leds/leds-gpio.c
+> +++ b/drivers/leds/leds-gpio.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/slab.h>
+>  #include <linux/workqueue.h>
+>  #include <linux/module.h>
+> +#include <linux/pinctrl/consumer.h>
+>  
+>  struct gpio_led_data {
+>  	struct led_classdev cdev;
+> @@ -236,14 +237,23 @@ static int __devinit gpio_led_probe(struct platform_device *pdev)
+>  {
+>  	struct gpio_led_platform_data *pdata = pdev->dev.platform_data;
+>  	struct gpio_leds_priv *priv;
+> -	int i, ret = 0;
+> +	struct pinctrl *pinctrl;
+> +	int i = 0;
+> +	int ret = 0;
+> +
+> +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+> +	if (IS_ERR(pinctrl)) {
+> +		return PTR_ERR(pinctrl);
+> +	}
 
-Yes, this was the problem. Since the SPI driver now depends on
-CONFIG_TI_EDMA for basic operation may be select CONFIG_TI_EDMA in
-Kconfig if SPI is enabled? That should do until the fallback to PIO is
-implemented.
+I think you need to just print out a warning here as most systems don't
+have the pinctrl implemented. And some people just do static pinmuxing
+in the bootloader.
 
-With that fixed, I tested SPI on OMAP-L138 EVM and it works great.
-Tested a JFFS2 mount as well as some raw chardev read/write tests.
+Regards,
 
-Tested-by: Sekhar Nori <nsekhar@ti.com>
-
-Thanks,
-Sekhar
+Tony
