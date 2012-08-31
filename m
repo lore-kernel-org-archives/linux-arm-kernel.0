@@ -1,53 +1,65 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 31 Aug 2012 10:28:12 +0900
-Subject: [PATCH 01/11] r8a7779: add SDHI clock support
-In-Reply-To: <1346376502-12114-1-git-send-email-horms@verge.net.au>
-References: <1346376502-12114-1-git-send-email-horms@verge.net.au>
-Message-ID: <1346376502-12114-2-git-send-email-horms@verge.net.au>
+Date: Fri, 31 Aug 2012 10:28:11 +0900
+Subject: [GIT PULL v2] Renesas ARM-based SoC: Marzen and r8a7779 for 3.7
+Message-ID: <1346376502-12114-1-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Phil Edworthy <phil.edworthy@renesas.com>
+Hi Olof, Hi Arnd,
 
-Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms@verge.net.au>
----
- arch/arm/mach-shmobile/clock-r8a7779.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+please consider the following enhancements to the Marzen board
+and r8a7779 SoC by Phil Edworthy, Morimoto-san and myself for 3.7.
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-index 339c62c..3cafb6a 100644
---- a/arch/arm/mach-shmobile/clock-r8a7779.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-@@ -86,11 +86,16 @@ static struct clk div4_clks[DIV4_NR] = {
- 				      0x0300, CLK_ENABLE_ON_INIT),
- };
- 
--enum { MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
-+enum { MSTP323, MSTP322, MSTP321, MSTP320,
-+	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
- 	MSTP016, MSTP015, MSTP014,
- 	MSTP_NR };
- 
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP323] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 23, 0), /* SDHI0 */
-+	[MSTP322] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 22, 0), /* SDHI1 */
-+	[MSTP321] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 21, 0), /* SDHI2 */
-+	[MSTP320] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 20, 0), /* SDHI3 */
- 	[MSTP026] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 26, 0), /* SCIF0 */
- 	[MSTP025] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 25, 0), /* SCIF1 */
- 	[MSTP024] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 24, 0), /* SCIF2 */
-@@ -149,6 +154,10 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP023]), /* SCIF3 */
- 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP022]), /* SCIF4 */
- 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP021]), /* SCIF6 */
-+	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP323]), /* SDHI0 */
-+	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
-+	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
-+	CLKDEV_DEV_ID("sh_mobile_sdhi.3", &mstp_clks[MSTP320]), /* SDHI3 */
- };
- 
- void __init r8a7779_clock_init(void)
--- 
-1.7.10.2.484.gcd07cc5
+* This pull requests superceedes the previous request,
+  "[GIT PULL v2] Renesas ARM-based SoC: Marzen and r8a7779 for 3.7"
+  which I made earlier today. The difference to that request is that
+  I have pushed one more patch. There was no rebase.
+
+* This pull request is based on the usb-next branch of Greg KH's USB tree,
+  git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git,
+  which is based on v3.6-rc3.
+
+  This is to satisfy compile-time dependencies.
+  Please let me know if you would like this handled a different way.
+
+----------------------------------------------------------------
+The following changes since commit a7bdf7fa33127bf08eb0810698bca607a9462df4:
+
+  Merge v3.6-rc3 into usb-next (2012-08-27 07:15:30 -0700)
+
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git marzen
+
+for you to fetch changes up to 3553395437f2ac42a73255a0ffac09efc9acf5c4:
+
+  ARM: shmobile: marzen: add USB OHCI driver support (2012-08-31 09:41:44 +0900)
+
+----------------------------------------------------------------
+Kuninori Morimoto (8):
+      ARM: shmobile: r8a7779: PFC rename PENCx -> USB_PENCx
+      ARM: shmobile: r8a7779: add USB common phy initializer
+      ARM: shmobile: r8a7779: add USB EHCI clock support
+      ARM: shmobile: r8a7779: add USB OHCI clock support
+      ARM: shmobile: marzen: add USB EHCI driver support
+      ARM: shmobile: marzen: fixup regulator id for smsc911x
+      ARM: shmobile: marzen: enable thermal sensor
+      ARM: shmobile: marzen: add USB OHCI driver support
+
+Phil Edworthy (2):
+      r8a7779: add SDHI clock support
+      marzen: add SDHI0 support
+
+Simon Horman (1):
+      ARM: mach-shmobile: marzen: defconfig update
+
+ arch/arm/configs/marzen_defconfig             |  30 ++--
+ arch/arm/mach-shmobile/Kconfig                |   2 +
+ arch/arm/mach-shmobile/board-marzen.c         | 213 +++++++++++++++++++++++++-
+ arch/arm/mach-shmobile/clock-r8a7779.c        |  18 ++-
+ arch/arm/mach-shmobile/include/mach/common.h  |   1 +
+ arch/arm/mach-shmobile/include/mach/r8a7779.h |   2 +-
+ arch/arm/mach-shmobile/pfc-r8a7779.c          |  16 +-
+ arch/arm/mach-shmobile/setup-r8a7779.c        |  93 +++++++++++
+ 8 files changed, 355 insertions(+), 20 deletions(-)
