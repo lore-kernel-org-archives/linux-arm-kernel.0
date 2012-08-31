@@ -1,92 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 31 Aug 2012 13:23:27 +0100
-Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
- I2C driver
-In-Reply-To: <20120831112258.GA2624@pengutronix.de>
-References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
- <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
- <20120831112258.GA2624@pengutronix.de>
-Message-ID: <20120831122323.GC5962@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 31 Aug 2012 15:05:02 +0200
+Subject: i.MX pwm patches
+In-Reply-To: <20120830214547.GC3613@r65073-Latitude-D630>
+References: <1346154504-5623-1-git-send-email-s.hauer@pengutronix.de>
+ <20120830214547.GC3613@r65073-Latitude-D630>
+Message-ID: <20120831130502.GR26594@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hopefully this is more to your liking:
+On Fri, Aug 31, 2012 at 05:45:49AM +0800, Shawn Guo wrote:
+> On Tue, Aug 28, 2012 at 01:48:15PM +0200, Sascha Hauer wrote:
+> > Hi All,
+> > 
+> > The following patches are an overdue work on the i.MX pwm driver.
+> > 
+> > - introduce SoC specific functions to make the driver easier to maintain
+> > - use peripheral clock for pwm output unconditionally
+> > - separate the two clocks this module has
+> > - enable ipg clock for register accesses, peripheral clock for enabling
+> >   the pwm
+> > - make the driver safe for calling pwm_config before pwm_enable
+> > - Add devicetree support for i.MX53
+> > 
+> > The platform device support is still implemented using cpu_is_*, I think
+> > this can be dropped completely soon
+> 
+> Anything stops us from doing this right now?  The bonus point of
+> cleaning this is that we can remove the #include <mach/hardware.h>
+> from the driver, which is helpful for single-kernel project.
 
-Author: Lee Jones <lee.jones@linaro.org>
-Date:   Mon Aug 6 11:09:57 2012 +0100
+The pwm driver currently has no in kernel user, so I'd say yes.
 
-    i2c: nomadik: Add Device Tree support to the Nomadik I2C driver
-    
-    Here we apply the bindings required for successful Device Tree
-    probing of the i2c-nomadik driver.
-    
-    Cc: linux-i2c at vger.kernel.org
-    Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Sascha
 
-diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index 61b00ed..2c85de1 100644
---- a/drivers/i2c/busses/i2c-nomadik.c
-+++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -25,6 +25,7 @@
- #include <linux/regulator/consumer.h>
- #include <linux/pm_runtime.h>
- #include <linux/platform_data/i2c-nomadik.h>
-+#include <linux/of.h>
- 
- #define DRIVER_NAME "nmk-i2c"
- 
-@@ -920,15 +921,41 @@ static struct nmk_i2c_controller u8500_i2c = {
-        .sm             = I2C_FREQ_MODE_FAST,
- };
- 
-+static void nmk_i2c_of_probe(struct device_node *np,
-+                       struct nmk_i2c_controller *pdata)
-+{
-+       of_property_read_u32(np, "clock-frequency", &pdata->clk_freq);
-+
-+       /* This driver only supports 'standard' and 'fast' modes of operation. */
-+       if (pdata->clk_freq <= 100000)
-+               pdata->sm = I2C_FREQ_MODE_STANDARD;
-+       else
-+               pdata->sm = I2C_FREQ_MODE_FAST;
-+}
-+
- static atomic_t adapter_id = ATOMIC_INIT(0);
- 
- static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
- {
-        int ret = 0;
-        struct nmk_i2c_controller *pdata = adev->dev.platform_data;
-+       struct device_node *np = adev->dev.of_node;
-        struct nmk_i2c_dev      *dev;
-        struct i2c_adapter *adap;
- 
-+       if (np) {
-+               if (!pdata) {
-+                       pdata = devm_kzalloc(&adev->dev, sizeof(*pdata), GFP_KERNEL);
-+                       if (!pdata) {
-+                               ret = -ENOMEM;
-+                               goto err_no_mem;
-+                       }
-+               }
-+               /* Provide the default configuration as a base. */
-+               pdata = &u8500_i2c;
-+               nmk_i2c_of_probe(np, pdata);
-+       }
-+
-        if (!pdata)
-                /* No i2c configuration found, using the default. */
-                pdata = &u8500_i2c;
-diff --git a/include/linux/platform_data/i2c-nomadik.h b/include/linux/platform_data/i2c-nomadik.h
-index c2303c3..3a8be9c 100644
---- a/include/linux/platform_data/i2c-nomadik.h
-+++ b/include/linux/platform_data/i2c-nomadik.h
-@@ -28,7 +28,7 @@ enum i2c_freq_mode {
-  * @sm:                speed mode
-  */
- struct nmk_i2c_controller {
--       unsigned long   clk_freq;
-+       u32             clk_freq;
-        unsigned short  slsu;
-        unsigned char   tft;
-        unsigned char   rft;
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
