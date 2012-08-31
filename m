@@ -1,8 +1,10 @@
 From: Barry.Song@csr.com (Barry Song)
-Date: Fri, 31 Aug 2012 17:44:55 +0800
-Subject: [PATCH 1/2] ARM: exynos: delete redundant HAVE_SCHED_CLOCK option in
- Kconfig
-Message-ID: <1346406296-16223-1-git-send-email-Barry.Song@csr.com>
+Date: Fri, 31 Aug 2012 17:44:56 +0800
+Subject: [PATCH 2/2] ARM: timer_sp804: delete redundant HAVE_SCHED_CLOCK
+ option in Kconfig
+In-Reply-To: <1346406296-16223-1-git-send-email-Barry.Song@csr.com>
+References: <1346406296-16223-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <1346406296-16223-2-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,21 +12,21 @@ From: Barry Song <Baohua.Song@csr.com>
 
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- arch/arm/mach-exynos/Kconfig |    1 -
+ arch/arm/Kconfig |    1 -
  1 files changed, 0 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index b5b4c8c..3fd4ab3 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -243,7 +243,6 @@ config MACH_UNIVERSAL_C210
- 	select CPU_EXYNOS4210
- 	select S5P_HRT
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2c1ca9f..00ef0e0 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1157,7 +1157,6 @@ config PLAT_VERSATILE
+ config ARM_TIMER_SP804
+ 	bool
  	select CLKSRC_MMIO
 -	select HAVE_SCHED_CLOCK
- 	select S5P_GPIO_INT
- 	select S5P_DEV_FIMC0
- 	select S5P_DEV_FIMC1
+ 
+ source arch/arm/mm/Kconfig
+ 
 -- 
 1.7.0.4
 
