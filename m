@@ -1,58 +1,48 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Fri, 31 Aug 2012 22:47:15 +0200
-Subject: [PATCH 3/8] i2c: at91: use an id table for SoC dependent
- parameters
-In-Reply-To: <5040CF80.8060201@atmel.com>
-References: <1346404884-18451-1-git-send-email-ludovic.desroches@atmel.com>
- <1346404884-18451-4-git-send-email-ludovic.desroches@atmel.com>
- <20120831142944.GA23867@game.jcrosoft.org> <5040CF80.8060201@atmel.com>
-Message-ID: <504122D3.70507@gmail.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Fri, 31 Aug 2012 14:11:55 -0700
+Subject: [PATCH v2] ARM: Build dtb files in all target
+In-Reply-To: <20120830191412.GC18957@n2100.arm.linux.org.uk>
+References: <1346303687-7795-1-git-send-email-andrew@lunn.ch>
+ <20120830165224.GR19437@titan.lakedaemon.net>
+ <20120830172304.GA18957@n2100.arm.linux.org.uk>
+ <20120830183711.GY19437@titan.lakedaemon.net>
+ <20120830191412.GC18957@n2100.arm.linux.org.uk>
+Message-ID: <1346447515.13980.19.camel@deadeye.wl.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/31/2012 04:51 PM, Nicolas Ferre wrote:
->>> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
->>> index f2112f9..0bc91e5 100644
->>> --- a/arch/arm/mach-at91/at91rm9200.c
->>> +++ b/arch/arm/mach-at91/at91rm9200.c
->>> @@ -187,7 +187,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
->>>   	CLKDEV_CON_DEV_ID("pclk", "ssc.0",&ssc0_clk),
->>>   	CLKDEV_CON_DEV_ID("pclk", "ssc.1",&ssc1_clk),
->>>   	CLKDEV_CON_DEV_ID("pclk", "ssc.2",&ssc2_clk),
->>> -	CLKDEV_CON_DEV_ID(NULL, "at91_i2c",&twi_clk),
->>> +	CLKDEV_CON_DEV_ID(NULL, "at91rm9200_i2c",&twi_clk),
->> use i2c-xxx as on other drivers
->>
->> and I do not like to have platform_device_id
+On Thu, 2012-08-30 at 20:14 +0100, Russell King - ARM Linux wrote:
+> On Thu, Aug 30, 2012 at 02:37:11PM -0400, Jason Cooper wrote:
+> > On Thu, Aug 30, 2012 at 06:23:04PM +0100, Russell King - ARM Linux wrote:
+> > > On Thu, Aug 30, 2012 at 12:52:24PM -0400, Jason Cooper wrote:
+> > > > I've CC'd stable to see if they want to pick this up.
+> > > 
+> > > That's not how stable works - and you'll probably receive a standard form
+> > > whinge from them about that.  Please read up on the submission requirements
+> > > to the stable kernel trees.
+> > 
+> > Ah, thanks.  usually, I just add the Cc: line for fixes I send to
+> > arm-soc.  Since this patch affects more than just kirkwood/marvell, I
+> > didn't feel it was appropriate to pull it in through my tree.
 > 
-> Me, I like it and find this implementation very elegant.
-> 
->> as we need to touch the driver to add a new soc
-> 
-> So what? We still keep the compatibility if the new SoC has it
-> compatibility assured with previous revision: there is nothing to modify.
+> Yes, you put the Cc: line in the commit, but you don't actually send it
+> to that address.
+[...]
 
-I agree. The driver would need to be touched to support new SoC only if
-the IP there have had some differences, which would have needed to be 
-resolved anyway.
+It's OK to cc the stable address when submitting to the relevant
+subsystem maintainer *as well as* including the cc: line in the commit
+message.  It just can't be used as a substitute for the commit line.
 
->> please use platform data
+Ben.
 
-Using platform data for the dt platforms would have been more troublesome,
-wouldn't it ? I like Ludovic's approach which handles both: dt and non-dt 
-cases in uniform way from the driver's POV.
-
-> No, it does not have to be exposed to the user: these data are highly
-> dependent on the actual hardware (IP revision in fact). So, no need to
-> mess with platform data.
-
-Agreed.
- 
-> So I will acknowledge Ludo's patches.
-> 
-> Bye,
-
---
-
-Regards,
-Sylwester
+-- 
+Ben Hutchings
+Theory and practice are closer in theory than in practice.
+                                - John Levine, moderator of comp.compilers
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120831/65be9d18/attachment.sig>
