@@ -1,72 +1,62 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Fri, 31 Aug 2012 10:02:47 +0200
-Subject: [PATCH v2 2/2] tty: serial: imx: don't reinit clock in
- imx_setup_ufcr()
-Message-ID: <1346400167-24669-1-git-send-email-dirk.behme@de.bosch.com>
+From: a0393947@ti.com (Archit Taneja)
+Date: Fri, 31 Aug 2012 13:50:31 +0530
+Subject: [PATCH v4 2/3] ARM: omap: hwmod: get rid of all
+ omap_clk_get_by_name usage
+In-Reply-To: <1346397309.18766.5.camel@lappyti>
+References: <1346230576-20004-1-git-send-email-rnayak@ti.com>
+ <1346230576-20004-3-git-send-email-rnayak@ti.com>
+ <CAJOA=zM2sFsrdohooKp1+zsV_AK6dKnoN37+Gs2oskBUK4J00w@mail.gmail.com>
+ <503F26A4.3050902@ti.com> <503F5517.4010100@ti.com>
+ <1346344933.2327.43.camel@deskari> <5040586D.2020406@ti.com>
+ <1346397309.18766.5.camel@lappyti>
+Message-ID: <504073CF.6010804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the clock configuration from imx_setup_ufcr(). This
-isn't needed here and will cause garbage output if done.
+On Friday 31 August 2012 12:45 PM, Tomi Valkeinen wrote:
+> On Fri, 2012-08-31 at 11:53 +0530, Archit Taneja wrote:
+>
+>> The only little problem was that during bootup, when hwmods are setup,
+>> only the 'parent' hwmod was able to get reset properly, all the other
+>> 'child' hwmods don't have modulemode bits tied to them, and hence
+>> weren't able to reset. So we got some error prints.
+>>
+>> Once DSS driver kicks in, the driver ensures the parent is enabled for
+>> any child to be enabled, so we don't face the issue again.
+>>
+>> So, if DSS driver is not built in, and if the bootloader left DSS in a
+>> bad state, the DSS clocks might remain messed up all the time since
+>> hwmod fwk wasn't able to reset them.
+>>
+>> I think this is why we didn't proceed with remove "dss_fck" as a slave
+>> clock. If this issue is minor, we could go ahead and remove it.
+>
+> I wonder if we could handle this with a custom reset function. We
+> already have a reset func for dss core. If I remember right, the main
+> point for that is the fact that omap4 doesn't have a softreset for dss
+> core, so we manually write the default values to registers.
+>
+> For omap2/3 this would be simple: skip the resets for all other dss
+> submodules, and dss core's reset would enable all the clocks and set the
+> softreset bit. This would reset all the submodules also.
+>
+> Omap4 is more tricky. I guess we'd need to enable all the clocks, clear
+> manually dss core's registers, and then set softreset bits in all the
+> submodules. So in this case dss core would need to have information
+> about the other submodules.
 
-To be be sure that we only touch the bits we want (TXTL and RXTL)
-we have to mask out all other bits of the UFCR register. Add
-one non-existing bit macro for this, too (bit 6, DCEDTE on i.MX6).
+The is a good idea. I don't clearly understand your approach though. Are 
+you saying we have a custom reset function for only dss core? And reset 
+the submodules in it manually?
 
-Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
-CC: Shawn Guo <shawn.guo@linaro.org>
-CC: Sascha Hauer <s.hauer@pengutronix.de>
-CC: Troy Kisky <troy.kisky@boundarydevices.com>
-CC: Xinyu Chen <xinyu.chen@freescale.com>
-CC: <stable@vger.kernel.org>
----
-Changes in v2: Instead of disabling imx_setup_ufcr() with an
-ifndef CONFIG_SERIAL_CORE_CONSOLE, remove the unneeded clock 
-configuration from imx_setup_ufcr() itself as proposed by Troy Kisky.
+An alternative approach would be to implement custom reset functions for 
+each submodule(or each hwmod), and in the beginning of every reset 
+function, add a hack to enable MODULEMODE bits(since we don't want hwmod 
+fwk to touch MODULEMODE for the DSS submodules), and then set the soft 
+reset bits.
 
-Note: If this patch is accepted, it should go to the same stable
-kernels as patch #1 of this series. So most probably 3.4 and 3.5.
+Your approach would ensure that we get a clean reset of DSS, but it 
+would still give the annoying prints when each of the submodule tries to 
+reset itself.
 
- drivers/tty/serial/imx.c |   18 ++++--------------
- 1 files changed, 4 insertions(+), 14 deletions(-)
-
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 908178f..e309e8b 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -132,6 +132,7 @@
- #define  UCR4_OREN  	 (1<<1)  /* Receiver overrun interrupt enable */
- #define  UCR4_DREN  	 (1<<0)  /* Recv data ready interrupt enable */
- #define  UFCR_RXTL_SHF   0       /* Receiver trigger level shift */
-+#define  UFCR_DCEDTE	 (1<<6)  /* DCE/DTE mode select */
- #define  UFCR_RFDIV      (7<<7)  /* Reference freq divider mask */
- #define  UFCR_RFDIV_REG(x)	(((x) < 7 ? 6 - (x) : 6) << 7)
- #define  UFCR_TXTL_SHF   10      /* Transmitter trigger level shift */
-@@ -667,22 +668,11 @@ static void imx_break_ctl(struct uart_port *port, int break_state)
- static int imx_setup_ufcr(struct imx_port *sport, unsigned int mode)
- {
- 	unsigned int val;
--	unsigned int ufcr_rfdiv;
--
--	/* set receiver / transmitter trigger level.
--	 * RFDIV is set such way to satisfy requested uartclk value
--	 */
--	val = TXTL << 10 | RXTL;
--	ufcr_rfdiv = (clk_get_rate(sport->clk_per) + sport->port.uartclk / 2)
--			/ sport->port.uartclk;
--
--	if(!ufcr_rfdiv)
--		ufcr_rfdiv = 1;
--
--	val |= UFCR_RFDIV_REG(ufcr_rfdiv);
- 
-+	/* set receiver / transmitter trigger level */
-+	val = readl(sport->port.membase + UFCR) & (UFCR_RFDIV | UFCR_DCEDTE);
-+	val |= TXTL << UFCR_TXTL_SHF | RXTL;
- 	writel(val, sport->port.membase + UFCR);
--
- 	return 0;
- }
- 
--- 
-1.7.0.4
+Archit
