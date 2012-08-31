@@ -1,63 +1,143 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Fri, 31 Aug 2012 13:46:29 +0200
-Subject: [PATCH 1/6] ARM: move ARCH config definitions into mach dirs
-In-Reply-To: <20120831111138.GG18957@n2100.arm.linux.org.uk>
-References: <1346280600-29395-1-git-send-email-robherring2@gmail.com>
- <1346280600-29395-2-git-send-email-robherring2@gmail.com>
- <20120829233159.GS18957@n2100.arm.linux.org.uk>
- <503F845C.10406@gmail.com>
- <20120830164551.GY18957@n2100.arm.linux.org.uk>
- <503FB9E6.7020102@gmail.com>
- <20120830192831.GD18957@n2100.arm.linux.org.uk>
- <20120831110512.GA24490@glitch>
- <20120831111138.GG18957@n2100.arm.linux.org.uk>
-Message-ID: <20120831114629.GB24490@glitch>
+From: castet.matthieu@free.fr (Matthieu CASTET)
+Date: Fri, 31 Aug 2012 13:47:25 +0200
+Subject: [PATCH v2] hvc_dcc : add support to armv4 and armv5 core
+Message-ID: <1346413645-4593-1-git-send-email-castet.matthieu@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2012 at 12:11:38PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Aug 31, 2012 at 01:05:12PM +0200, Domenico Andreoli wrote:
-> > On Thu, Aug 30, 2012 at 08:28:31PM +0100, Russell King - ARM Linux wrote:
-> > > 
-> > > I think what we need is arch/arm/include/debug, move the platform specific
-> > > debug-macros headers into there, named using platform specific file names.
-> > > Then we have the config system define a string-based config:
-> > > 
-> > > config DEBUG_LL_INCLUDE
-> > > 	string
-> > > 	default "<debug/icedcc.S>" if DEBUG_ICEDCC
-> > > 	default "<debug/msm.S>" if DEBUG_MSM_UART1 || DEBUG_MSM_UART2 || DEBUG_MSM_UART3
-> > > ... etc ...
-> > > 	default "mach/debug-macros.S"
-> > > 
-> > > And then we can have the various assembly codes do:
-> > > 
-> > > #include CONFIG_DEBUG_LL_INCLUDE
-> > > 
-> > > Not only does this give a migration path, but it also gives folk a reason
-> > > to move to the 'new way' if they want to be part of a multi-platform
-> > > kernel - and it's a trivial thing to do.  Just move the include file,
-> > > add an entry to the DEBUG_LL_INCLUDE entry and the "Kernel low-level
-> > > debugging port" choice statement, and job done for both non-multi-platform
-> > > and multi-platform kernels.
-> > > 
-> > > What's even nicer about this approach is it doesn't require everyone to
-> > > change simultaneously - it can be done progressively as required.
-> > 
-> > This means that:
-> 
-> I'm not about to re-open the debate again.  Please go back and read the
-> previous discussions during the last year about this where eventually
-> agreement on this way forward was reached.  Thanks.
+Signed-off-by: Matthieu Castet <matthieu.castet@parrot.com>
+---
+ drivers/tty/hvc/hvc_dcc.c |   83 +++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 76 insertions(+), 7 deletions(-)
 
-I don't want to reopen anything, it's only that I've clearly missed the
-discussion (*) as also my patches in the area may show (**). So I really
-wanted to understand if, for once, I've understood the thing correctly.
-
-cheers,
-Domenico
-
-(*) I would have appreciated if you had pointed it to me in the only
-comment you made on those patches but that's ok, it has been fun anyway
-
-(**) http://lists.infradead.org/pipermail/linux-arm-kernel/2012-July/109457.html
+diff --git a/drivers/tty/hvc/hvc_dcc.c b/drivers/tty/hvc/hvc_dcc.c
+index 44fbeba..5f8827f 100644
+--- a/drivers/tty/hvc/hvc_dcc.c
++++ b/drivers/tty/hvc/hvc_dcc.c
+@@ -27,10 +27,10 @@
+ #include "hvc_console.h"
+ 
+ /* DCC Status Bits */
+-#define DCC_STATUS_RX		(1 << 30)
+-#define DCC_STATUS_TX		(1 << 29)
++#define DCC_STATUS_RX_V6		(1 << 30)
++#define DCC_STATUS_TX_V6		(1 << 29)
+ 
+-static inline u32 __dcc_getstatus(void)
++static inline u32 __dcc_getstatus_v6(void)
+ {
+ 	u32 __ret;
+ 	asm volatile("mrc p14, 0, %0, c0, c1, 0	@ read comms ctrl reg"
+@@ -40,7 +40,7 @@ static inline u32 __dcc_getstatus(void)
+ }
+ 
+ 
+-static inline char __dcc_getchar(void)
++static inline char __dcc_getchar_v6(void)
+ {
+ 	char __c;
+ 
+@@ -51,7 +51,7 @@ static inline char __dcc_getchar(void)
+ 	return __c;
+ }
+ 
+-static inline void __dcc_putchar(char c)
++static inline void __dcc_putchar_v6(char c)
+ {
+ 	asm volatile("mcr p14, 0, %0, c0, c5, 0	@ write a char"
+ 		: /* no output register */
+@@ -59,6 +59,69 @@ static inline void __dcc_putchar(char c)
+ 	isb();
+ }
+ 
++static int hvc_dcc_put_chars_v6(uint32_t vt, const char *buf, int count)
++{
++	int i;
++
++	for (i = 0; i < count; i++) {
++		while (__dcc_getstatus_v6() & DCC_STATUS_TX_V6)
++			cpu_relax();
++
++		__dcc_putchar_v6(buf[i]);
++	}
++
++	return count;
++}
++
++static int hvc_dcc_get_chars_v6(uint32_t vt, char *buf, int count)
++{
++	int i;
++
++	for (i = 0; i < count; ++i)
++		if (__dcc_getstatus_v6() & DCC_STATUS_RX_V6)
++			buf[i] = __dcc_getchar_v6();
++		else
++			break;
++
++	return i;
++}
++
++static const struct hv_ops hvc_dcc_get_put_ops_v6 = {
++	.get_chars = hvc_dcc_get_chars_v6,
++	.put_chars = hvc_dcc_put_chars_v6,
++};
++
++#define DCC_STATUS_RX		(1 << 0)
++#define DCC_STATUS_TX		(1 << 1)
++
++/* primitive JTAG1 protocol utilities */
++static inline u32 __dcc_getstatus(void)
++{
++	u32 ret;
++
++	asm __volatile__ ("mrc p14, 0, %0, c0, c0	@ read comms ctrl reg"
++		: "=r" (ret));
++
++	return ret;
++}
++
++static inline char __dcc_getchar(void)
++{
++	char c;
++
++	asm __volatile__ ("mrc p14, 0, %0, c1, c0	@ read comms data reg"
++		: "=r" (c));
++
++	return c;
++}
++
++static inline void __dcc_putchar(unsigned char c)
++{
++	asm __volatile__ ("mcr p14, 0, %0, c1, c0	@ write a char"
++		: /* no output register */
++		: "r" (c));
++}
++
+ static int hvc_dcc_put_chars(uint32_t vt, const char *buf, int count)
+ {
+ 	int i;
+@@ -93,14 +156,20 @@ static const struct hv_ops hvc_dcc_get_put_ops = {
+ 
+ static int __init hvc_dcc_console_init(void)
+ {
+-	hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
++	if (cpu_architecture() >= CPU_ARCH_ARMv6)
++		hvc_instantiate(0, 0, &hvc_dcc_get_put_ops_v6);
++	else
++		hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
+ 	return 0;
+ }
+ console_initcall(hvc_dcc_console_init);
+ 
+ static int __init hvc_dcc_init(void)
+ {
+-	hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
++	if (cpu_architecture() >= CPU_ARCH_ARMv6)
++		hvc_alloc(0, 0, &hvc_dcc_get_put_ops_v6, 128);
++	else
++		hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
+ 	return 0;
+ }
+ device_initcall(hvc_dcc_init);
+-- 
+1.7.10.4
