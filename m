@@ -1,157 +1,248 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 31 Aug 2012 11:24:37 -0700
-Subject: [PATCH v3] clk: add Loongson1B clock support
-In-Reply-To: <1345457135-12737-1-git-send-email-keguang.zhang@gmail.com>
-References: <1345457135-12737-1-git-send-email-keguang.zhang@gmail.com>
-Message-ID: <20120831182437.26807.56140@nucleus>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 31 Aug 2012 13:29:19 -0500
+Subject: [PATCH 1/3] ARM: move debug macros to common location
+Message-ID: <1346437761-17039-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kelvin Cheung (2012-08-20 03:05:35)
-> This adds clock support to Loongson1B SoC using the common clock
-> infrastructure.
-> 
-> Signed-off-by: Kelvin Cheung <keguang.zhang@gmail.com>
+From: Rob Herring <rob.herring@calxeda.com>
 
-Looks good.  I've taken this into clk-next.
+Based on suggestion by Russell King, create a common location for debug
+macros and select the included debug macro file using config option.
 
-Thanks,
-Mike
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/Kconfig.debug          |    5 +++
+ arch/arm/include/debug/icedcc.S |   90 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/debug.S         |   87 ++-----------------------------------
+ arch/arm/kernel/head.S          |    4 +-
+ 4 files changed, 100 insertions(+), 86 deletions(-)
+ create mode 100644 arch/arm/include/debug/icedcc.S
 
-> ---
->  drivers/clk/Makefile   |    1 +
->  drivers/clk/clk-ls1x.c |  111 ++++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 112 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/clk/clk-ls1x.c
-> 
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index 5869ea3..018ec57 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -10,6 +10,7 @@ obj-$(CONFIG_ARCH_SOCFPGA)    += socfpga/
->  obj-$(CONFIG_PLAT_SPEAR)       += spear/
->  obj-$(CONFIG_ARCH_U300)                += clk-u300.o
->  obj-$(CONFIG_ARCH_INTEGRATOR)  += versatile/
-> +obj-$(CONFIG_MACH_LOONGSON1)   += clk-ls1x.o
->  
->  # Chip specific
->  obj-$(CONFIG_COMMON_CLK_WM831X) += clk-wm831x.o
-> diff --git a/drivers/clk/clk-ls1x.c b/drivers/clk/clk-ls1x.c
-> new file mode 100644
-> index 0000000..f20b750
-> --- /dev/null
-> +++ b/drivers/clk/clk-ls1x.c
-> @@ -0,0 +1,111 @@
-> +/*
-> + * Copyright (c) 2012 Zhang, Keguang <keguang.zhang@gmail.com>
-> + *
-> + * This program is free software; you can redistribute  it and/or modify it
-> + * under  the terms of  the GNU General  Public License as published by the
-> + * Free Software Foundation;  either version 2 of the  License, or (at your
-> + * option) any later version.
-> + */
-> +
-> +#include <linux/clkdev.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/io.h>
-> +#include <linux/slab.h>
-> +#include <linux/err.h>
-> +
-> +#include <loongson1.h>
-> +
-> +#define OSC    33
-> +
-> +static DEFINE_SPINLOCK(_lock);
-> +
-> +static int ls1x_pll_clk_enable(struct clk_hw *hw)
-> +{
-> +       return 0;
-> +}
-> +
-> +static void ls1x_pll_clk_disable(struct clk_hw *hw)
-> +{
-> +}
-> +
-> +static unsigned long ls1x_pll_recalc_rate(struct clk_hw *hw,
-> +                                            unsigned long parent_rate)
-> +{
-> +       u32 pll, rate;
-> +
-> +       pll = __raw_readl(LS1X_CLK_PLL_FREQ);
-> +       rate = ((12 + (pll & 0x3f)) * 1000000) +
-> +               ((((pll >> 8) & 0x3ff) * 1000000) >> 10);
-> +       rate *= OSC;
-> +       rate >>= 1;
-> +
-> +       return rate;
-> +}
-> +
-> +static const struct clk_ops ls1x_pll_clk_ops = {
-> +       .enable = ls1x_pll_clk_enable,
-> +       .disable = ls1x_pll_clk_disable,
-> +       .recalc_rate = ls1x_pll_recalc_rate,
-> +};
-> +
-> +static struct clk * __init clk_register_pll(struct device *dev,
-> +        const char *name, const char *parent_name, unsigned long flags)
-> +{
-> +       struct clk_hw *hw;
-> +       struct clk *clk;
-> +       struct clk_init_data init;
-> +
-> +       /* allocate the divider */
-> +       hw = kzalloc(sizeof(struct clk_hw), GFP_KERNEL);
-> +       if (!hw) {
-> +               pr_err("%s: could not allocate clk_hw\n", __func__);
-> +               return ERR_PTR(-ENOMEM);
-> +       }
-> +
-> +       init.name = name;
-> +       init.ops = &ls1x_pll_clk_ops;
-> +       init.flags = flags | CLK_IS_BASIC;
-> +       init.parent_names = (parent_name ? &parent_name : NULL);
-> +       init.num_parents = (parent_name ? 1 : 0);
-> +       hw->init = &init;
-> +
-> +       /* register the clock */
-> +       clk = clk_register(dev, hw);
-> +
-> +       if (IS_ERR(clk))
-> +               kfree(hw);
-> +
-> +       return clk;
-> +}
-> +
-> +void __init ls1x_clk_init(void)
-> +{
-> +       struct clk *clk;
-> +
-> +       clk = clk_register_pll(NULL, "pll_clk", NULL, CLK_IS_ROOT);
-> +       clk_prepare_enable(clk);
-> +
-> +       clk = clk_register_divider(NULL, "cpu_clk", "pll_clk",
-> +                       CLK_SET_RATE_PARENT, LS1X_CLK_PLL_DIV, DIV_CPU_SHIFT,
-> +                       DIV_CPU_WIDTH, CLK_DIVIDER_ONE_BASED, &_lock);
-> +       clk_prepare_enable(clk);
-> +       clk_register_clkdev(clk, "cpu", NULL);
-> +
-> +       clk = clk_register_divider(NULL, "dc_clk", "pll_clk",
-> +                       CLK_SET_RATE_PARENT, LS1X_CLK_PLL_DIV, DIV_DC_SHIFT,
-> +                       DIV_DC_WIDTH, CLK_DIVIDER_ONE_BASED, &_lock);
-> +       clk_prepare_enable(clk);
-> +       clk_register_clkdev(clk, "dc", NULL);
-> +
-> +       clk = clk_register_divider(NULL, "ahb_clk", "pll_clk",
-> +                       CLK_SET_RATE_PARENT, LS1X_CLK_PLL_DIV, DIV_DDR_SHIFT,
-> +                       DIV_DDR_WIDTH, CLK_DIVIDER_ONE_BASED, &_lock);
-> +       clk_prepare_enable(clk);
-> +       clk_register_clkdev(clk, "ahb", NULL);
-> +       clk_register_clkdev(clk, "stmmaceth", NULL);
-> +
-> +       clk = clk_register_fixed_factor(NULL, "apb_clk", "ahb_clk", 0, 1, 2);
-> +       clk_prepare_enable(clk);
-> +       clk_register_clkdev(clk, "apb", NULL);
-> +       clk_register_clkdev(clk, "serial8250", NULL);
-> +}
-> -- 
-> 1.7.1
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index f15f82b..71bbda2 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -373,6 +373,11 @@ choice
+ 
+ endchoice
+ 
++config DEBUG_LL_INCLUDE
++	string
++	default "debug/icedcc.S" if DEBUG_ICEDCC
++	default "mach/debug-macros.S"
++
+ config EARLY_PRINTK
+ 	bool "Early printk"
+ 	depends on DEBUG_LL
+diff --git a/arch/arm/include/debug/icedcc.S b/arch/arm/include/debug/icedcc.S
+new file mode 100644
+index 0000000..43afcb0
+--- /dev/null
++++ b/arch/arm/include/debug/icedcc.S
+@@ -0,0 +1,90 @@
++/*
++ *  arch/arm/include/debug/icedcc.S
++ *
++ *  Copyright (C) 1994-1999 Russell King
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++		@@ debug using ARM EmbeddedICE DCC channel
++
++		.macro	addruart, rp, rv, tmp
++		.endm
++
++#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
++
++		.macro	senduart, rd, rx
++		mcr	p14, 0, \rd, c0, c5, 0
++		.endm
++
++		.macro	busyuart, rd, rx
++1001:
++		mrc	p14, 0, \rx, c0, c1, 0
++		tst	\rx, #0x20000000
++		beq	1001b
++		.endm
++
++		.macro	waituart, rd, rx
++		mov	\rd, #0x2000000
++1001:
++		subs	\rd, \rd, #1
++		bmi	1002f
++		mrc	p14, 0, \rx, c0, c1, 0
++		tst	\rx, #0x20000000
++		bne	1001b
++1002:
++		.endm
++
++#elif defined(CONFIG_CPU_XSCALE)
++
++		.macro	senduart, rd, rx
++		mcr	p14, 0, \rd, c8, c0, 0
++		.endm
++
++		.macro	busyuart, rd, rx
++1001:
++		mrc	p14, 0, \rx, c14, c0, 0
++		tst	\rx, #0x10000000
++		beq	1001b
++		.endm
++
++		.macro	waituart, rd, rx
++		mov	\rd, #0x10000000
++1001:
++		subs	\rd, \rd, #1
++		bmi	1002f
++		mrc	p14, 0, \rx, c14, c0, 0
++		tst	\rx, #0x10000000
++		bne	1001b
++1002:
++		.endm
++
++#else
++
++		.macro	senduart, rd, rx
++		mcr	p14, 0, \rd, c1, c0, 0
++		.endm
++
++		.macro	busyuart, rd, rx
++1001:
++		mrc	p14, 0, \rx, c0, c0, 0
++		tst	\rx, #2
++		beq	1001b
++
++		.endm
++
++		.macro	waituart, rd, rx
++		mov	\rd, #0x2000000
++1001:
++		subs	\rd, \rd, #1
++		bmi	1002f
++		mrc	p14, 0, \rx, c0, c0, 0
++		tst	\rx, #2
++		bne	1001b
++1002:
++		.endm
++
++#endif	/* CONFIG_CPU_V6 */
+diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
+index c45522c..66f711b 100644
+--- a/arch/arm/kernel/debug.S
++++ b/arch/arm/kernel/debug.S
+@@ -20,90 +20,9 @@
+  * references to these in a production kernel!
+  */
+ 
+-#if defined(CONFIG_DEBUG_ICEDCC)
+-		@@ debug using ARM EmbeddedICE DCC channel
+-
+-		.macro	addruart, rp, rv, tmp
+-		.endm
+-
+-#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
+-
+-		.macro	senduart, rd, rx
+-		mcr	p14, 0, \rd, c0, c5, 0
+-		.endm
+-
+-		.macro	busyuart, rd, rx
+-1001:
+-		mrc	p14, 0, \rx, c0, c1, 0
+-		tst	\rx, #0x20000000
+-		beq	1001b
+-		.endm
+-
+-		.macro	waituart, rd, rx
+-		mov	\rd, #0x2000000
+-1001:
+-		subs	\rd, \rd, #1
+-		bmi	1002f
+-		mrc	p14, 0, \rx, c0, c1, 0
+-		tst	\rx, #0x20000000
+-		bne	1001b
+-1002:
+-		.endm
+-
+-#elif defined(CONFIG_CPU_XSCALE)
+-
+-		.macro	senduart, rd, rx
+-		mcr	p14, 0, \rd, c8, c0, 0
+-		.endm
+-
+-		.macro	busyuart, rd, rx
+-1001:
+-		mrc	p14, 0, \rx, c14, c0, 0
+-		tst	\rx, #0x10000000
+-		beq	1001b
+-		.endm
+-
+-		.macro	waituart, rd, rx
+-		mov	\rd, #0x10000000
+-1001:
+-		subs	\rd, \rd, #1
+-		bmi	1002f
+-		mrc	p14, 0, \rx, c14, c0, 0
+-		tst	\rx, #0x10000000
+-		bne	1001b
+-1002:
+-		.endm
+-
+-#else
+-
+-		.macro	senduart, rd, rx
+-		mcr	p14, 0, \rd, c1, c0, 0
+-		.endm
+-
+-		.macro	busyuart, rd, rx
+-1001:
+-		mrc	p14, 0, \rx, c0, c0, 0
+-		tst	\rx, #2
+-		beq	1001b
+-
+-		.endm
+-
+-		.macro	waituart, rd, rx
+-		mov	\rd, #0x2000000
+-1001:
+-		subs	\rd, \rd, #1
+-		bmi	1002f
+-		mrc	p14, 0, \rx, c0, c0, 0
+-		tst	\rx, #2
+-		bne	1001b
+-1002:
+-		.endm
+-
+-#endif	/* CONFIG_CPU_V6 */
+-
+-#elif !defined(CONFIG_DEBUG_SEMIHOSTING)
+-#include <mach/debug-macro.S>
+-#endif	/* CONFIG_DEBUG_ICEDCC */
++#if !defined(CONFIG_DEBUG_SEMIHOSTING)
++#include CONFIG_DEBUG_LL_INCLUDE
++#endif
+ 
+ #ifdef CONFIG_MMU
+ 		.macro	addruart_current, rx, tmp1, tmp2
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 3db960e..9874d07 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -23,8 +23,8 @@
+ #include <asm/thread_info.h>
+ #include <asm/pgtable.h>
+ 
+-#ifdef CONFIG_DEBUG_LL
+-#include <mach/debug-macro.S>
++#if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_SEMIHOSTING)
++#include CONFIG_DEBUG_LL_INCLUDE
+ #endif
+ 
+ /*
+-- 
+1.7.9.5
