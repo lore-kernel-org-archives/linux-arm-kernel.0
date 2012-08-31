@@ -1,10 +1,10 @@
 From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Fri, 31 Aug 2012 11:21:20 +0200
+Date: Fri, 31 Aug 2012 11:23:30 +0200
 Subject: [PATCH 4/8] ARM: at91: do not configure at91sam9g10 twi pio as
  open-drain
 In-Reply-To: <1346404884-18451-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1346404884-18451-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1346404884-18451-5-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1346405010-18499-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
