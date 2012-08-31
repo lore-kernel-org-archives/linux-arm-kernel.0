@@ -1,32 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 31 Aug 2012 08:16:06 +0800
-Subject: [PATCH 8/9] ARM i.MX53: Add pwms to dtsi
-In-Reply-To: <20120831130723.GS26594@pengutronix.de>
-References: <1346154504-5623-1-git-send-email-s.hauer@pengutronix.de>
- <1346154504-5623-9-git-send-email-s.hauer@pengutronix.de>
- <20120830223219.GF3613@r65073-Latitude-D630>
- <20120831130723.GS26594@pengutronix.de>
-Message-ID: <20120831001604.GG3613@r65073-Latitude-D630>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 31 Aug 2012 08:58:49 -0500
+Subject: [PATCH 2/8] irqdomain: Take interrupt-parent property into account
+ if specified
+In-Reply-To: <20120831094434.GF13298@gmail.com>
+References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
+ <1344527635-6163-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZMoisfUD_NSkVy2w-jZVUDGn0E8LmvKSWnJ0YRGZO-tQ@mail.gmail.com>
+ <20120831094434.GF13298@gmail.com>
+Message-ID: <5040C319.5080704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2012 at 03:07:23PM +0200, Sascha Hauer wrote:
-> > >  	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "63fcc000.ssi");
-> > >  	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "50014000.ssi");
-> > >  	clk_register_clkdev(clk[ssi3_ipg_gate], NULL, "63fd0000.ssi");
-> > > +	clk_register_clkdev(clk[pwm1_ipg_gate], "ipg", "53fb4000.pwm");
-> > > +	clk_register_clkdev(clk[pwm1_hf_gate], "per", "53fb4000.pwm");
-> > > +	clk_register_clkdev(clk[pwm2_ipg_gate], "ipg", "53fb8000.pwm");
-> > > +	clk_register_clkdev(clk[pwm2_hf_gate], "per", "53fb8000.pwm");
-> > 
-> > It should be in a separate patch?
+On 08/31/2012 04:44 AM, Lee Jones wrote:
+> On Tue, Aug 14, 2012 at 10:19:08AM +0200, Linus Walleij wrote:
+>> On Thu, Aug 9, 2012 at 5:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>>
+>>> irq_find_host() currently ignores the 'interrupt-parent' property
+>>> even if it's specified in the Device Tree. Meaning that a node can
+>>> match to a domain in its hierarchy even if it doesn't belong to it.
+>>> By searching for the parent first using of_irq_find_parent() we
+>>> insist that the 'interrupt-parent' property is taken into account
+>>> ensuring a greater chance of returning the correct domain.
+>>>
+>>> CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+>>> CC: Grant Likely <grant.likely@secretlab.ca>
+>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>
+>> This (with 1/8) is the right solution. Thanks, and I think
+>> Mark may want to look at this too since I recognize he asked
+>> you to work in this direction.
+>>
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> Should it? Surely I can do this, I had the feeling though that it
-> belongs together.
-> 
->From patch subject, I do not expect these changes in the patch.  It's
-okay to have it but we need a more proper patch subject then.  
+> Rob, did this get your Ack too?
 
--- 
-Regards,
-Shawn
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+
+Rob
+
+> 
+> Ben, Grant, Mark, would you like to take a look also?
+> 
