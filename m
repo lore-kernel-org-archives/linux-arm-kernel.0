@@ -1,41 +1,68 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 31 Aug 2012 07:50:13 -0700
-Subject: [PATCH 8/8] input: ab8500-ponkey: Rely on MFD core to convert
- IRQs to virtual
-In-Reply-To: <20120831073123.GA13298@gmail.com>
-References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
- <1344527635-6163-9-git-send-email-lee.jones@linaro.org>
- <CACRpkdZ-HOGy_sdsCQSNOdYTDzHFszk0OySM88TjO-neSJUz0A@mail.gmail.com>
- <20120821092328.GC26899@gmail.com>
- <20120821164244.GA4672@core.coreip.homeip.net>
- <20120830131202.GG14145@gmail.com>
- <20120830230221.GD21501@core.coreip.homeip.net>
- <20120830230323.GE21501@core.coreip.homeip.net>
- <20120831073123.GA13298@gmail.com>
-Message-ID: <20120831145012.GA26858@core.coreip.homeip.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 31 Aug 2012 16:51:44 +0200
+Subject: [PATCH 3/8] i2c: at91: use an id table for SoC dependent
+ parameters
+In-Reply-To: <20120831142944.GA23867@game.jcrosoft.org>
+References: <1346404884-18451-1-git-send-email-ludovic.desroches@atmel.com>
+ <1346404884-18451-4-git-send-email-ludovic.desroches@atmel.com>
+ <20120831142944.GA23867@game.jcrosoft.org>
+Message-ID: <5040CF80.8060201@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2012 at 08:31:33AM +0100, Lee Jones wrote:
-> On Thu, Aug 30, 2012 at 04:03:23PM -0700, Dmitry Torokhov wrote:
-> > On Thu, Aug 30, 2012 at 04:02:21PM -0700, Dmitry Torokhov wrote:
-> > > On Thu, Aug 30, 2012 at 02:12:04PM +0100, Lee Jones wrote:
-> > > > > Sorry for the delay. Yes, this shoudl be fine, but since it is
-> > > > > essentially a revert of the original patch it should be pushed in as
-> > > > > such.
-> > > > 
-> > > > How's this?
-> > > > 
-> > > 
-> > > Excellent.
-> > 
-> > I assume you will be merging it with the rest of AB8500 patches, right?
+On 08/31/2012 04:29 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> On 11:21 Fri 31 Aug     , ludovic.desroches at atmel.com wrote:
+>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+>>
+>> Use the id_table to store configuration structures which are depending on
+>> SoC.
+>>
+>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+>> ---
+>>  arch/arm/mach-at91/at91rm9200.c          |  2 +-
+>>  arch/arm/mach-at91/at91rm9200_devices.c  | 11 +----
+>>  arch/arm/mach-at91/at91sam9260.c         |  3 +-
+>>  arch/arm/mach-at91/at91sam9260_devices.c |  8 ++-
+>>  arch/arm/mach-at91/at91sam9261.c         |  3 +-
+>>  arch/arm/mach-at91/at91sam9261_devices.c | 17 +++----
+>>  arch/arm/mach-at91/at91sam9263.c         |  2 +-
+>>  arch/arm/mach-at91/at91sam9263_devices.c |  2 +-
+>>  arch/arm/mach-at91/at91sam9g45.c         |  4 +-
+>>  arch/arm/mach-at91/at91sam9g45_devices.c |  4 +-
+>>  arch/arm/mach-at91/at91sam9rl.c          |  4 +-
+>>  arch/arm/mach-at91/at91sam9rl_devices.c  |  2 +-
+>>  drivers/i2c/busses/i2c-at91.c            | 85 +++++++++++++++++++++++++-------
+>>  13 files changed, 95 insertions(+), 52 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+>> index f2112f9..0bc91e5 100644
+>> --- a/arch/arm/mach-at91/at91rm9200.c
+>> +++ b/arch/arm/mach-at91/at91rm9200.c
+>> @@ -187,7 +187,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>>  	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
+>>  	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
+>>  	CLKDEV_CON_DEV_ID("pclk", "ssc.2", &ssc2_clk),
+>> -	CLKDEV_CON_DEV_ID(NULL, "at91_i2c", &twi_clk),
+>> +	CLKDEV_CON_DEV_ID(NULL, "at91rm9200_i2c", &twi_clk),
+> use i2c-xxx as on other drivers
 > 
-> Yes, if that's okay with you of course?
+> and I do not like to have platform_device_id
 
-Sure, please go ahead,
+Me, I like it and find this implementation very elegant.
 
-Thanks.
+> as we need to touch the driver to add a new soc
 
+So what? We still keep the compatibility if the new SoC has it
+compatibility assured with previous revision: there is nothing to modify.
+
+> please use platform data
+
+No, it does not have to be exposed to the user: these data are highly
+dependent on the actual hardware (IP revision in fact). So, no need to
+mess with platform data.
+
+So I will acknowledge Ludo's patches.
+
+Bye,
 -- 
-Dmitry
+Nicolas Ferre
