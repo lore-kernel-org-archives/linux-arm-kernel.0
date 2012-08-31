@@ -1,46 +1,92 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Fri, 31 Aug 2012 14:21:31 +0200
-Subject: [PATCH 4/4] clk: ux500: Define smp_twd clock for u8500
-In-Reply-To: <1346415691-13371-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1346415691-13371-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1346415691-13371-5-git-send-email-ulf.hansson@stericsson.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 31 Aug 2012 13:23:27 +0100
+Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
+ I2C driver
+In-Reply-To: <20120831112258.GA2624@pengutronix.de>
+References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
+ <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
+ <20120831112258.GA2624@pengutronix.de>
+Message-ID: <20120831122323.GC5962@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+Hopefully this is more to your liking:
 
-The smp_twd clock is based upon a prcmu_rate clock type
-for the PRCMU_ARMSS clock.
+Author: Lee Jones <lee.jones@linaro.org>
+Date:   Mon Aug 6 11:09:57 2012 +0100
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/clk/ux500/u8500_clk.c |   12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+    i2c: nomadik: Add Device Tree support to the Nomadik I2C driver
+    
+    Here we apply the bindings required for successful Device Tree
+    probing of the i2c-nomadik driver.
+    
+    Cc: linux-i2c at vger.kernel.org
+    Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
-index 5c1fca1..ca4a25e 100644
---- a/drivers/clk/ux500/u8500_clk.c
-+++ b/drivers/clk/ux500/u8500_clk.c
-@@ -205,12 +205,16 @@ void u8500_clk_init(void)
- 	clk_register_clkdev(clk, "dsilp2", "dsilink.2");
- 	clk_register_clkdev(clk, "dsilp2", "mcde");
+diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+index 61b00ed..2c85de1 100644
+--- a/drivers/i2c/busses/i2c-nomadik.c
++++ b/drivers/i2c/busses/i2c-nomadik.c
+@@ -25,6 +25,7 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/platform_data/i2c-nomadik.h>
++#include <linux/of.h>
  
-+	clk = clk_reg_prcmu_rate("smp_twd", NULL, PRCMU_ARMSS,
-+				CLK_IS_ROOT|CLK_GET_RATE_NOCACHE|
-+				CLK_IGNORE_UNUSED);
-+	clk_register_clkdev(clk, NULL, "smp_twd");
+ #define DRIVER_NAME "nmk-i2c"
+ 
+@@ -920,15 +921,41 @@ static struct nmk_i2c_controller u8500_i2c = {
+        .sm             = I2C_FREQ_MODE_FAST,
+ };
+ 
++static void nmk_i2c_of_probe(struct device_node *np,
++                       struct nmk_i2c_controller *pdata)
++{
++       of_property_read_u32(np, "clock-frequency", &pdata->clk_freq);
 +
- 	/*
- 	 * FIXME: Add special handled PRCMU clocks here:
--	 * 1. smp_twd, use PRCMU_ARMSS.
--	 * 2. clk_arm, use PRCMU_ARMCLK.
--	 * 3. clkout0yuv, use PRCMU as parent + need regulator + pinctrl.
--	 * 4. ab9540_clkout1yuv, see clkout0yuv
-+	 * 1. clk_arm, use PRCMU_ARMCLK.
-+	 * 2. clkout0yuv, use PRCMU as parent + need regulator + pinctrl.
-+	 * 3. ab9540_clkout1yuv, see clkout0yuv
- 	 */
++       /* This driver only supports 'standard' and 'fast' modes of operation. */
++       if (pdata->clk_freq <= 100000)
++               pdata->sm = I2C_FREQ_MODE_STANDARD;
++       else
++               pdata->sm = I2C_FREQ_MODE_FAST;
++}
++
+ static atomic_t adapter_id = ATOMIC_INIT(0);
  
- 	/* PRCC P-clocks */
--- 
-1.7.10
+ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
+ {
+        int ret = 0;
+        struct nmk_i2c_controller *pdata = adev->dev.platform_data;
++       struct device_node *np = adev->dev.of_node;
+        struct nmk_i2c_dev      *dev;
+        struct i2c_adapter *adap;
+ 
++       if (np) {
++               if (!pdata) {
++                       pdata = devm_kzalloc(&adev->dev, sizeof(*pdata), GFP_KERNEL);
++                       if (!pdata) {
++                               ret = -ENOMEM;
++                               goto err_no_mem;
++                       }
++               }
++               /* Provide the default configuration as a base. */
++               pdata = &u8500_i2c;
++               nmk_i2c_of_probe(np, pdata);
++       }
++
+        if (!pdata)
+                /* No i2c configuration found, using the default. */
+                pdata = &u8500_i2c;
+diff --git a/include/linux/platform_data/i2c-nomadik.h b/include/linux/platform_data/i2c-nomadik.h
+index c2303c3..3a8be9c 100644
+--- a/include/linux/platform_data/i2c-nomadik.h
++++ b/include/linux/platform_data/i2c-nomadik.h
+@@ -28,7 +28,7 @@ enum i2c_freq_mode {
+  * @sm:                speed mode
+  */
+ struct nmk_i2c_controller {
+-       unsigned long   clk_freq;
++       u32             clk_freq;
+        unsigned short  slsu;
+        unsigned char   tft;
+        unsigned char   rft;
