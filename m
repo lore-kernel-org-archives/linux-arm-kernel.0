@@ -1,23 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 31 Aug 2012 08:39:22 -0700
-Subject: [PATCH 08/10] ARM: omap2: add explict mach/gpio.h includes
-In-Reply-To: <1346279496-26286-9-git-send-email-robherring2@gmail.com>
-References: <1346279496-26286-1-git-send-email-robherring2@gmail.com>
- <1346279496-26286-9-git-send-email-robherring2@gmail.com>
-Message-ID: <20120831153921.GK1303@atomide.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Fri, 31 Aug 2012 17:42:01 +0200
+Subject: [RFC PATCH] ARM: OMAP2+: omap-device: Do not overwrite resources
+ allocated by OF layer
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA9EA8E@DBDE01.ent.ti.com>
+References: <1346233691-10294-1-git-send-email-hvaibhav@ti.com>
+ <5040D745.5010909@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EA9EA8E@DBDE01.ent.ti.com>
+Message-ID: <5040DB49.9000403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robherring2@gmail.com> [120829 15:32]:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> In preparation to remove implicit inclusion of mach/gpio.h, add explict
-> include of mach/gpio.h.
+On 08/31/2012 05:36 PM, Hiremath, Vaibhav wrote:
+> On Fri, Aug 31, 2012 at 20:54:53, Cousson, Benoit wrote:
+...
+> I think you are getting confused between Vaibhav B and Vaibhav H :)
+> We have two Vaibhav's roaming around here ;-)
 
-Just for reference, as Rob already mentioned, these should no longer be
-needed for omaps after the "Clean up hardcoded IRQs for mach-omap2,
-enable SPARSE_IRQ, plaform_data/gpio-omap.h" series I posted yesterday.
+Oops, sorry, this is the very first time I realized that two different
+Vaibhav were sending patches on very similar topic...
+That's why you were so good generating a lot of patches :-) You have a
+dual channel of patches :-)
 
-Regards,
+> I was not there during LPC this time, it was Vaibhav B who attended it.
+> I will sync up with him and try to get more info on it.
 
-Tony
+Sorry again for the confusion.
+
+Thanks,
+Benoit
