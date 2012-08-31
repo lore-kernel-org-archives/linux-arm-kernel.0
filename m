@@ -1,29 +1,58 @@
-From: vkoul@infradead.org (Vinod Koul)
-Date: Fri, 31 Aug 2012 22:32:57 +0530
-Subject: [PATCH v3 3/3] spi: spi-davinci: convert to DMA engine API
-In-Reply-To: <5040E6C7.6030106@ti.com>
-References: <1345684176-21472-1-git-send-email-mporter@ti.com>
- <1345684176-21472-4-git-send-email-mporter@ti.com>
- <503F75C0.1050507@ti.com> <20120830144307.GA26737@beef>
- <5040E00A.3080600@ti.com> <1346430709.15463.15.camel@vkoul-mobl4>
- <5040E6C7.6030106@ti.com>
-Message-ID: <1346432577.15463.16.camel@vkoul-mobl4>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 31 Aug 2012 10:06:14 -0700
+Subject: Without MACH_ option Early printk (DEBUG_LL)
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EA9EBD1@DBDE01.ent.ti.com>
+References: <5040D03B.2050304@ti.com> <20120831155226.GL1303@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA9EB0F@DBDE01.ent.ti.com>
+ <20120831161122.GO1303@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EA9EBD1@DBDE01.ent.ti.com>
+Message-ID: <20120831170614.GP1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-08-31 at 22:01 +0530, Sekhar Nori wrote:
-> >> Yes, this was the problem. Since the SPI driver now depends on
-> >> CONFIG_TI_EDMA for basic operation may be select CONFIG_TI_EDMA in
-> >> Kconfig if SPI is enabled? That should do until the fallback to PIO
-> is
-> >> implemented.
-> > Then this should be enabled for SPI. Care to send a patch
+* Hiremath, Vaibhav <hvaibhav@ti.com> [120831 09:47]:
+> > On Fri, Aug 31, 2012 at 21:41:22, Tony Lindgren wrote:
 > 
-> By 'this' you mean the Kconfig select? Then there should be no need of
-> a
-> new patch for this. It can be part of this patch itself, no? 
-Either way is okay for me.
+> Can you please review below patch? If you think its ok, I will send the 
+> patch -
 
--- 
-~Vinod Koul
-Intel Corp.
+Yeah thanks looks OK to me, at least I can't think of better options for now.
+
+Regards,
+
+Tony
+ 
+ 
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index fccbdf0..eccafb4 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -104,6 +104,9 @@ config SOC_AM33XX
+>         select CPU_V7
+>         select ARM_CPU_SUSPEND if PM
+>         select MULTI_IRQ_HANDLER
+> +       select MACH_AM335XEVM
+> +       select MACH_AM335XIAEVM
+> +       select MACH_TAM335X
+> 
+>  config OMAP_PACKAGE_ZAF
+>         bool
+> @@ -140,6 +143,15 @@ config MACH_OMAP_GENERIC
+>           Support for generic TI OMAP2+ boards using Flattened Device Tree.
+>           More information at Documentation/devicetree
+> 
+> +config MACH_AM335XEVM
+> +       bool
+> +
+> +config MACH_AM335XIAEVM
+> +       bool
+> +
+> +config MACH_TAM335X
+> +       bool
+> +
+>  config MACH_OMAP2_TUSB6010
+>         bool
+>         depends on ARCH_OMAP2 && SOC_OMAP2420
+> 
+> Thanks,
+> Vaibhav
