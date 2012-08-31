@@ -1,46 +1,50 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 31 Aug 2012 05:01:55 +0800
-Subject: [PATCH] clk: mxs: Register USB clocks for mx23
-In-Reply-To: <CAOMZO5CZjOopAy1EhWOOCszgJQNW52Z-UPjzVwU6MAp_HtDCzw@mail.gmail.com>
-References: <1340148392-9847-1-git-send-email-festevam@gmail.com>
- <20120620143830.GF2253@S2101-09.ap.freescale.net>
- <CAOMZO5AaLKN9bhuPRLJkA8ytiwVi_yrpwzL0mJAzf6VS4PSRLQ@mail.gmail.com>
- <20120806030014.GB22302@S2101-09.ap.freescale.net>
- <CAOMZO5AME0NXarMF_rarYJeQ4-rGc+DpV7nvL4OeQj+LfkLLQw@mail.gmail.com>
- <CAOMZO5CZjOopAy1EhWOOCszgJQNW52Z-UPjzVwU6MAp_HtDCzw@mail.gmail.com>
-Message-ID: <20120830210155.GA3617@r65073-Latitude-D630>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 31 Aug 2012 18:05:17 +0800
+Subject: [PATCH 1/2] ARM: exynos: delete redundant HAVE_SCHED_CLOCK option
+ in Kconfig
+In-Reply-To: <CAH9JG2W8xZrkmGkVw_JDY3qSsqHnaTi8-BNoW99V3FUyvWBXng@mail.gmail.com>
+References: <1346406296-16223-1-git-send-email-Barry.Song@csr.com>
+ <CAH9JG2W8xZrkmGkVw_JDY3qSsqHnaTi8-BNoW99V3FUyvWBXng@mail.gmail.com>
+Message-ID: <CAGsJ_4xUBDGn1hDdWvUX68MfC98936v-_vLfPrisLNL7RY6nEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2012 at 11:09:49AM -0300, Fabio Estevam wrote:
-> Shawn,
-> 
-> On Mon, Aug 13, 2012 at 12:06 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> > Shawn,
-> >
-> > On Mon, Aug 6, 2012 at 12:00 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> >
-> >> Probably, no, as I plan to freeze the addition to clkdev lookup table
-> >> and replace it with DT clock lookup.
-> >
-> > Could you please suggest how can I register the USB clocks for mx23?
-> > Any example I can refer to implement a "DT clock lookup"?
-> 
-> Ping?
-> 
-> I saw some patches from you that changes the way dt clocks are
-> registered for mx23/mx28, but not sure if these were applied or not.
-> 
-The v2 patch solving Russell's comment has been acked by Rob.  I'm
-waiting for Mike to apply it, and then I can publish a mxs branch
-based on that.
+2012/8/31 Kyungmin Park <kmpark@infradead.org>:
+> Hi,
+>
+> then where select it HAVE_SCHED_CLOCK? apart from other exynos board,
+> universal have to use another clock.
 
-> Please let me know how should I proceed regarding mx23 usb clocks registration.
-> 
-> Regards,
-> 
-> Fabio Estevam
+The old arch/arm/kernel/Makefile:
+obj-$(CONFIG_HAVE_SCHED_CLOCK)  += sched_clock.o
+has become:
+obj-y += sched_clock.o
 
--- 
-Regards,
-Shawn
+>
+> Thank you,
+> Kyungmin Park
+>
+> On 8/31/12, Barry Song <Barry.Song@csr.com> wrote:
+>> From: Barry Song <Baohua.Song@csr.com>
+>>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> ---
+>>  arch/arm/mach-exynos/Kconfig |    1 -
+>>  1 files changed, 0 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+>> index b5b4c8c..3fd4ab3 100644
+>> --- a/arch/arm/mach-exynos/Kconfig
+>> +++ b/arch/arm/mach-exynos/Kconfig
+>> @@ -243,7 +243,6 @@ config MACH_UNIVERSAL_C210
+>>       select CPU_EXYNOS4210
+>>       select S5P_HRT
+>>       select CLKSRC_MMIO
+>> -     select HAVE_SCHED_CLOCK
+>>       select S5P_GPIO_INT
+>>       select S5P_DEV_FIMC0
+>>       select S5P_DEV_FIMC1
+>> --
+>> 1.7.0.4
+>>
+-barry
