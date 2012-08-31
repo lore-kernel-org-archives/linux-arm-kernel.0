@@ -1,47 +1,23 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 31 Aug 2012 17:23:12 +0000
-Subject: Without MACH_ option Early printk (DEBUG_LL)
-In-Reply-To: <20120831171336.GA6978@n2100.arm.linux.org.uk>
-References: <5040D03B.2050304@ti.com>
- <20120831171336.GA6978@n2100.arm.linux.org.uk>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EA9EC8B@DBDE01.ent.ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 31 Aug 2012 10:27:30 -0700
+Subject: [PATCH V3] ASoC: Davinci: machine: Add device tree binding
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA70165@DBDE01.ent.ti.com>
+References: <1346148830-2965-1-git-send-email-gururaja.hebbar@ti.com>
+ <1BAFE6F6C881BF42822005164F1491C33EA70165@DBDE01.ent.ti.com>
+Message-ID: <20120831172729.GE25575@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2012 at 22:43:36, Russell King - ARM Linux wrote:
-> On Fri, Aug 31, 2012 at 08:24:51PM +0530, Vaibhav Hiremath wrote:
-> > Hi Russell & Tony,
-> > 
-> > AM335X EVM (based on AM33XX device) only supports DT boot mode and
-> > doesn't have CONFIG_MACH_AM335XEVM option defined. Some time back during
-> > baseport submission we had aligned that, we won't create separate EVM
-> > options, killing the board file all-together.
-> > 
-> > Having said that, the early printk option (DEBUG_LL) is broken, the
-> > auto-generated file "./include/generated/mach-types.h" still refers to
-> > CONFIG_MACH_AM335XEVM option,
-> > 
-> > #ifdef CONFIG_MACH_AM335XEVM
-> > # ifdef machine_arch_type
-> > #  undef machine_arch_type
-> > #  define machine_arch_type     __machine_arch_type
-> > # else
-> > #  define machine_arch_type     MACH_TYPE_AM335XEVM
-> > # endif
-> > # define machine_is_am335xevm() (machine_arch_type == MACH_TYPE_AM335XEVM)
-> > #else
-> > # define machine_is_am335xevm() (0)
-> > #endif
+On Fri, Aug 31, 2012 at 08:55:39AM +0000, Hebbar, Gururaja wrote:
 > 
-> machine types are entirely meaningless for DT based systems.
+> Gentle Ping. Any updates about this version or can it be pulled into the tree.
 > 
-> > Can you comment on this? Based on that I will submit the patch.
-> 
-> Pointless.  You can't use machine_is_am335xevm() when you're using DT.
-> 
+> On Thu, Aug 30, 2012 at 09:29:55, Hebbar, Gururaja wrote:
 
-They how do you recommend to resolve early prink issue (required during 
-decompression)?
+Please don't do this:
 
-Thanks,
-Vaibhav
+ - Never top post.
+ - If the patch genuinely has been forgotten you need to resend it.
+ - You've allowed less than 24 hours for a reply, this is unreasonable.
+   Unless there's a critical bug fix you should only be worrying after a
+   few weeks or so.
