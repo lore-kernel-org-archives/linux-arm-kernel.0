@@ -1,364 +1,173 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Fri, 31 Aug 2012 08:55:39 +0000
-Subject: [PATCH V3] ASoC: Davinci: machine: Add device tree binding
-References: <1346148830-2965-1-git-send-email-gururaja.hebbar@ti.com> 
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EA70165@DBDE01.ent.ti.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 31 Aug 2012 11:05:08 +0200
+Subject: mxc_nand.c on mach-imx/imx53
+In-Reply-To: <20120829172820.43bbe68e@eb-e6520>
+References: <5035F84E.3000901@antcom.de>
+ <20120829074122.GV26594@pengutronix.de> <503E3331.8050203@antcom.de>
+ <20120829172820.43bbe68e@eb-e6520>
+Message-ID: <50407E44.5080408@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Eric,
 
-Gentle Ping. Any updates about this version or can it be pulled into the tree.
+On 08/29/2012 05:28 PM, Eric B?nard wrote:
+> Le Wed, 29 Aug 2012 17:20:17 +0200,
+> Roland Stigge <stigge@antcom.de> a ?crit :
+>> Using  ".ecclayout_4k = &nandv2_hw_eccoob_4k" also doesn't work. So is
+>> there any hint how I can proceed from here? Any plans or hint regarding
+>> the "XXX"?
+>>
+> you may need something like this patch from barebox :
+> http://git.pengutronix.de/?p=barebox.git;a=commit;h=632c45795065e6a7471ab82be38e808eb6204341
 
-On Thu, Aug 30, 2012 at 09:29:55, Hebbar, Gururaja wrote:
-> 
-> Hi,
-> 
-> Gentle Ping.
-> 
-> 
-> On Tue, Aug 28, 2012 at 15:43:50, Hebbar, Gururaja wrote:
-> > Device tree support for Davinci Machine driver
-> > 
-> > When the board boots with device tree, the driver will receive card,
-> > codec, dai interface details (like the card name, DAPM routing map,
-> > phandle for the audio components described in the dts file, codec mclk
-> > speed).
-> > The card will be set up based on this information.
-> > Since the routing is provided via DT we can mark the card fully routed
-> > so core can take care of disconnecting the unused pins.
-> > 
-> > When here, code indentation and comment style is also fixed
-> > 
-> > Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
-> > ---
-> > Changes from V1:
-> > 	- Change DT parameter from "ti,codec-clock" to "ti,codec-clock-rate"
-> > 	- add more explanation to DT parameters
-> > 
-> > Changes from V2:
-> > 	- Update Documentation details
-> > 	- Remove irrelevant commit message
-> > 
-> > :000000 100644 0000000... b248014... A	Documentation/devicetree/bindings/sound/davinci-evm-audio.txt
-> > :100644 100644 ab0ad45... ca2a547... M	sound/soc/davinci/davinci-evm.c
-> >  .../bindings/sound/davinci-evm-audio.txt           |   66 +++++++
-> >  sound/soc/davinci/davinci-evm.c                    |  185 +++++++++++++++++--
-> >  2 files changed, 231 insertions(+), 20 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/sound/davinci-evm-audio.txt b/Documentation/devicetree/bindings/sound/davinci-evm-audio.txt
-> > new file mode 100644
-> > index 0000000..b248014
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/sound/davinci-evm-audio.txt
-> > @@ -0,0 +1,66 @@
-> > +* Texas Instruments SoC audio setups with TLV320AIC3X Codec
-> > +
-> > +Required properties:
-> > +- compatible : "ti,davinci-evm-audio"
-> > +- ti,model : The user-visible name of this sound complex.
-> > +- ti,audio-routing : A list of the connections between audio components.
-> > +  Each entry is a pair of strings, the first being the connection's sink,
-> > +  the second being the connection's source. Valid names for sources and
-> > +  sinks are the codec's pins, and the jacks on the board:
-> > +
-> > +  Codec pins:
-> > +
-> > +  * MIC3L
-> > +  * MIC3R
-> > +  * LINE1L
-> > +  * LINE2L
-> > +  * LINE1R
-> > +  * LINE2R
-> > +
-> > +  Board connectors:
-> > +
-> > +  * Headphone Jack
-> > +  * Line Out
-> > +  * Mic Jack
-> > +
-> > +- ti,mcasp-controller : The phandle of the McASP controller
-> > +- ti,audio-codec : The phandle of the TLV320AIC3x audio codec
-> > +- ti,codec-clock-rate : The Codec Clock rate (in Hz) applied to the Codec
-> > +
-> > +- dai-data		: A list of DAI data used by SOC code to register
-> > +			  DAI, Codecs platform.
-> > +			  The string index "should" be as shown below.
-> > +dai-data =
-> > +"<DAI Name>", 		"<DAI Stream Name>",
-> > +"<CODEC DAI Name>",	"<true if evm_aic3x_init is required, else false>",
-> > +"<evm ops required (evm_ops or evm_spdif_ops)>";
-> > +
-> > +Here fields
-> > +"<DAI Name>"		: used to indicate the DAI Name
-> > +"<DAI Stream Name>"	: used to indicate the Stream Name
-> > +"<CODEC DAI Name>"	: used to bind the link between Codec DAI and ASOC DAI
-> > +
-> > +Machine related options
-> > +"<true/false>"		: Whether the machine specific initialization
-> > +			: evm_aic3x_init() is required
-> > +
-> > +"<evm ops required>"	: Which hardware ops function is to be used.
-> > +			: (evm_ops or evm_spdif_ops)
-> > +			: use evm-spdif-ops if DAI is working in DIT mode
-> > +			: else use evm-ops. These ops setup hw param callbacks
-> > +			: which are used to setup CODEC/cpu DAI configuration
-> > +			: and codec system clock.
-> > +
-> > +Example:
-> > +
-> > +sound {
-> > +	compatible = "ti,davinci-evm-audio";
-> > +	ti,model = "DA830 EVM";
-> > +	ti,audio-codec = <&tlv320aic3x>;
-> > +	ti,mcasp-controller = <&mcasp1>;
-> > +	ti,codec-clock-rate = <12000000>;
-> > +	dai-data =
-> > +		"TLV320AIC3X", 		"AIC3X",
-> > +		"tlv320aic3x-hifi",	"true",
-> > +		"evm-ops";
-> > +};
-> > diff --git a/sound/soc/davinci/davinci-evm.c b/sound/soc/davinci/davinci-evm.c
-> > index ab0ad45..ca2a547 100644
-> > --- a/sound/soc/davinci/davinci-evm.c
-> > +++ b/sound/soc/davinci/davinci-evm.c
-> > @@ -34,27 +34,38 @@ static int evm_hw_params(struct snd_pcm_substream *substream,
-> >  	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-> >  	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-> >  	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-> > +	struct snd_soc_codec *codec = rtd->codec;
-> > +	struct snd_soc_card *soc_card = codec->card;
-> > +	struct device_node *np = soc_card->dev->of_node;
-> >  	int ret = 0;
-> >  	unsigned sysclk;
-> >  
-> > -	/* ASP1 on DM355 EVM is clocked by an external oscillator */
-> > -	if (machine_is_davinci_dm355_evm() || machine_is_davinci_dm6467_evm() ||
-> > -	    machine_is_davinci_dm365_evm())
-> > -		sysclk = 27000000;
-> > -
-> > -	/* ASP0 in DM6446 EVM is clocked by U55, as configured by
-> > -	 * board-dm644x-evm.c using GPIOs from U18.  There are six
-> > -	 * options; here we "know" we use a 48 KHz sample rate.
-> > -	 */
-> > -	else if (machine_is_davinci_evm())
-> > -		sysclk = 12288000;
-> > -
-> > -	else if (machine_is_davinci_da830_evm() ||
-> > -				machine_is_davinci_da850_evm())
-> > -		sysclk = 24576000;
-> > -
-> > -	else
-> > -		return -EINVAL;
-> > +	if (np) {
-> > +		ret = of_property_read_u32(np, "ti,codec-clock-rate", &sysclk);
-> > +		if (ret < 0)
-> > +			return ret;
-> > +	} else {
-> > +		/* ASP1 on DM355 EVM is clocked by an external oscillator */
-> > +		if (machine_is_davinci_dm355_evm() ||
-> > +			machine_is_davinci_dm6467_evm() ||
-> > +			machine_is_davinci_dm365_evm())
-> > +			sysclk = 27000000;
-> > +
-> > +		/*
-> > +		 * ASP0 in DM6446 EVM is clocked by U55, as configured by
-> > +		 * board-dm644x-evm.c using GPIOs from U18.  There are six
-> > +		 * options; here we "know" we use a 48 KHz sample rate.
-> > +		 */
-> > +		else if (machine_is_davinci_evm())
-> > +			sysclk = 12288000;
-> > +
-> > +		else if (machine_is_davinci_da830_evm() ||
-> > +					machine_is_davinci_da850_evm())
-> > +			sysclk = 24576000;
-> > +
-> > +		else
-> > +			return -EINVAL;
-> > +	}
-> >  
-> >  	/* set codec DAI configuration */
-> >  	ret = snd_soc_dai_set_fmt(codec_dai, AUDIO_FORMAT);
-> > @@ -127,13 +138,22 @@ static int evm_aic3x_init(struct snd_soc_pcm_runtime *rtd)
-> >  {
-> >  	struct snd_soc_codec *codec = rtd->codec;
-> >  	struct snd_soc_dapm_context *dapm = &codec->dapm;
-> > +	struct device_node *np = codec->card->dev->of_node;
-> > +	int ret;
-> >  
-> >  	/* Add davinci-evm specific widgets */
-> >  	snd_soc_dapm_new_controls(dapm, aic3x_dapm_widgets,
-> >  				  ARRAY_SIZE(aic3x_dapm_widgets));
-> >  
-> > -	/* Set up davinci-evm specific audio path audio_map */
-> > -	snd_soc_dapm_add_routes(dapm, audio_map, ARRAY_SIZE(audio_map));
-> > +	if (np) {
-> > +		ret = snd_soc_of_parse_audio_routing(codec->card,
-> > +							"ti,audio-routing");
-> > +		if (ret)
-> > +			return ret;
-> > +	} else {
-> > +		/* Set up davinci-evm specific audio path audio_map */
-> > +		snd_soc_dapm_add_routes(dapm, audio_map, ARRAY_SIZE(audio_map));
-> > +	}
-> >  
-> >  	/* not connected */
-> >  	snd_soc_dapm_disable_pin(dapm, "MONO_LOUT");
-> > @@ -282,6 +302,113 @@ static struct snd_soc_card da850_snd_soc_card = {
-> >  	.num_links = 1,
-> >  };
-> >  
-> > +#if defined(CONFIG_OF)
-> > +/*
-> > + * This struct is just used as place holder. It will be filled with
-> > + * data from dt node
-> > + */
-> > +static struct snd_soc_dai_link evm_dai = {
-> > +};
-> > +
-> > +/* davinci evm audio machine driver */
-> > +static struct snd_soc_card evm_soc_card = {
-> > +	.owner = THIS_MODULE,
-> > +	.dai_link = &evm_dai,
-> > +	.num_links = 1,
-> > +};
-> > +
-> > +static int davinci_evm_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device_node *np = pdev->dev.of_node;
-> > +	const char *stringPtr, *propname;
-> > +	u32 val;
-> > +	int ret = 0;
-> > +
-> > +	propname = "dai-data";
-> > +	val = of_property_count_strings(np, propname);
-> > +	if (val < 0)
-> > +		return val;
-> > +
-> > +	ret = of_property_read_string_index(np, propname, 0, &evm_dai.name);
-> > +	if (ret < 0)
-> > +		return ret;
-> > +
-> > +	ret = of_property_read_string_index(np, propname, 1,
-> > +						&evm_dai.stream_name);
-> > +	if (ret < 0)
-> > +		return ret;
-> > +
-> > +	ret = of_property_read_string_index(np, propname, 2,
-> > +						&evm_dai.codec_dai_name);
-> > +	if (ret < 0)
-> > +		return ret;
-> > +
-> > +	ret = of_property_read_string_index(np, propname, 3, &stringPtr);
-> > +	if (ret < 0)
-> > +		return ret;
-> > +	else
-> > +		if (strcasecmp(stringPtr, "true") == 0)
-> > +			evm_dai.init = evm_aic3x_init;
-> > +
-> > +	ret = of_property_read_string_index(np, propname, 4, &stringPtr);
-> > +	if (ret < 0) {
-> > +		return ret;
-> > +	} else {
-> > +		if (strcasecmp(stringPtr, "evm-ops") == 0)
-> > +			evm_dai.ops = &evm_ops;
-> > +		else if (strcasecmp(stringPtr, "evm-spdif-ops") == 0)
-> > +			evm_dai.ops = &evm_spdif_ops;
-> > +	}
-> > +
-> > +	evm_dai.codec_of_node = of_parse_phandle(np, "ti,audio-codec", 0);
-> > +	if (!evm_dai.codec_of_node)
-> > +		return -EINVAL;
-> > +
-> > +	evm_dai.cpu_dai_of_node = of_parse_phandle(np,
-> > +						"ti,mcasp-controller", 0);
-> > +	if (!evm_dai.cpu_dai_of_node)
-> > +		return -EINVAL;
-> > +
-> > +	evm_dai.platform_of_node = evm_dai.cpu_dai_of_node;
-> > +
-> > +	evm_soc_card.dev = &pdev->dev;
-> > +	ret = snd_soc_of_parse_card_name(&evm_soc_card, "ti,model");
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	ret = snd_soc_register_card(&evm_soc_card);
-> > +	if (ret)
-> > +		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n", ret);
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static int __devexit davinci_evm_remove(struct platform_device *pdev)
-> > +{
-> > +	struct snd_soc_card *card = platform_get_drvdata(pdev);
-> > +
-> > +	snd_soc_unregister_card(card);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct of_device_id davinci_evm_dt_ids[] = {
-> > +	{ .compatible = "ti,davinci-evm-audio", },
-> > +	{ /* sentinel */ }
-> > +};
-> > +MODULE_DEVICE_TABLE(of, davinci_mcasp_dt_ids);
-> > +
-> > +static struct platform_driver davinci_evm_driver = {
-> > +	.probe		= davinci_evm_probe,
-> > +	.remove		= __devexit_p(davinci_evm_remove),
-> > +	.driver		= {
-> > +		.name	= "davinci_evm",
-> > +		.owner	= THIS_MODULE,
-> > +		.of_match_table = of_match_ptr(davinci_evm_dt_ids),
-> > +	},
-> > +};
-> > +#endif
-> > +
-> >  static struct platform_device *evm_snd_device;
-> >  
-> >  static int __init evm_init(void)
-> > @@ -289,6 +416,14 @@ static int __init evm_init(void)
-> >  	struct snd_soc_card *evm_snd_dev_data;
-> >  	int index;
-> >  	int ret;
-> > +#if defined(CONFIG_OF)
-> > +	struct device_node *np;
-> > +
-> > +	np = of_find_compatible_node(NULL, NULL, "ti,davinci-evm-audio");
-> > +	if (np) {
-> > +		return platform_driver_register(&davinci_evm_driver);
-> > +	}
-> > +#endif
-> >  
-> >  	if (machine_is_davinci_evm()) {
-> >  		evm_snd_dev_data = &dm6446_snd_soc_card_evm;
-> > @@ -325,6 +460,16 @@ static int __init evm_init(void)
-> >  
-> >  static void __exit evm_exit(void)
-> >  {
-> > +#if defined(CONFIG_OF)
-> > +	struct device_node *np;
-> > +
-> > +	np = of_find_compatible_node(NULL, NULL, "ti,davinci-evm-audio");
-> > +	if (np) {
-> > +		platform_driver_unregister(&davinci_evm_driver);
-> > +		return;
-> > +	}
-> > +#endif
-> > +
-> >  	platform_device_unregister(evm_snd_device);
-> >  }
-> >  
-> > -- 
-> > 1.7.1
-> > 
-> > 
-> 
-> 
-> Regards, 
-> Gururaja
-> 
+Thank you for the link!
+
+I tried to port this on top of Sascha's patches for imx53, only for mxc v3 for now, as below.
+
+Unfortunately, I still get:
+
+...
+UnCorrectable RS-ECC Error
+UnCorrectable RS-ECC Error
+UnCorrectable RS-ECC Error
+UnCorrectable RS-ECC Error
+UnCorrectable RS-ECC Error
+...
+
+from mxc_nand.c's mxc_nand_correct_data_v2_v3(). Maybe there's still sth. missing in the
+error correction code?
+
+Tracing reveals that in mxc_nand_command()'s switch statement, NAND_CMD_READID is handled,
+but the NAND_CMD_PARAM case never gets triggered. (Under which circumstances is this
+supposed to happen?) Further, I still wonder why the bootloader identifies the NAND as:
+
+NAND:  512 MiB
+Manufacturer      : Micron (0x2c)
+Device Code       : 0xdc
+Cell Technology   : SLC
+Chip Size         : 512 MiB
+Pages per Block   : 64
+Page Geometry     : 4096+218
+ECC Strength      : 8 bits
+ECC Size          : 512 B
+Data Setup Time   : 20 ns
+Data Hold Time    : 10 ns
+Address Setup Time: 10 ns
+GPMI Sample Delay : 6 ns
+tREA              : Unknown
+tRLOH             : Unknown
+tRHOH             : Unknown
+Description       : MT29F4G08ABAEA
+
+But Linux says:
+
+NAND device: Manufacturer ID: 0x2c, Chip ID: 0xdc (Micron NAND 512MiB 3,3V 8-bit), page size: 4096, OOB size: 128
+
+(See OOB size 128 vs. 218).
+
+Thanks in advance,
+
+Roland
 
 
-Regards, 
-Gururaja
+---
+ drivers/mtd/nand/mxc_nand.c |   36 ++++++++++++++++++++++++++++++++----
+ 1 file changed, 32 insertions(+), 4 deletions(-)
+
+--- linux-2.6.orig/drivers/mtd/nand/mxc_nand.c
++++ linux-2.6/drivers/mtd/nand/mxc_nand.c
+@@ -150,6 +150,7 @@ struct mxc_nand_devtype_data {
+        void (*send_addr)(struct mxc_nand_host *, uint16_t, int);
+        void (*send_page)(struct mtd_info *, unsigned int);
+        void (*send_read_id)(struct mxc_nand_host *);
++       void (*send_read_param)(struct mxc_nand_host *);
+        uint16_t (*get_dev_status)(struct mxc_nand_host *);
+        int (*check_int)(struct mxc_nand_host *);
+        void (*irq_control)(struct mxc_nand_host *, int);
+@@ -543,6 +544,16 @@ static void send_read_id_v3(struct mxc_n
+        memcpy32_fromio(host->data_buf, host->main_area0, 16);
+ }
+ 
++static void send_read_param_v3(struct mxc_nand_host *host)
++{
++       /* Read param into main buffer */
++       writel(NFC_OUTPUT, NFC_V3_LAUNCH);
++
++       wait_op_done(host, true);
++
++       memcpy32_fromio(host->data_buf, host->main_area0, 1024);
++}
++
+ /* Request the NANDFC to perform a read of the NAND device ID. */
+ static void send_read_id_v1_v2(struct mxc_nand_host *host)
+ {
+@@ -741,6 +752,10 @@ static void mxc_nand_read_buf(struct mtd
+ 
+        n = min(n, len);
+ 
++       /* handle the read param special case */
++       if ((mtd->writesize == 0) && (len != 0))
++               n = len;
++
+        memcpy(buf, host->data_buf + col, n);
+ 
+        host->buf_start += n;
+@@ -842,9 +857,12 @@ static void mxc_do_addr_cycle(struct mtd
+                 * MXC NANDFC can only perform full page+spare or
+                 * spare-only read/write.  When the upper layers
+                 * perform a read/write buf operation, the saved column
+-                 * address is used to index into the full page.
++                * address is used to index into the full page.
++                *
++                * The colum address must be sent to the flash in
++                * order to get the ONFI header (0x20)
+                 */
+-               host->devtype_data->send_addr(host, 0, page_addr == -1);
++               host->devtype_data->send_addr(host, column, page_addr == -1);
+                if (mtd->writesize > 512)
+                        /* another col addr cycle for 2k page */
+                        host->devtype_data->send_addr(host, 0, false);
+@@ -998,9 +1016,11 @@ static void preset_v3(struct mtd_info *m
+ 
+        writel(0, NFC_V3_IPC);
+ 
++       /* if the flash has a 224 oob, the NFC must be configured to 218 */
+        config2 = NFC_V3_CONFIG2_ONE_CYCLE |
+                NFC_V3_CONFIG2_2CMD_PHASES |
+-               NFC_V3_CONFIG2_SPAS(mtd->oobsize >> 1) |
++               NFC_V3_CONFIG2_SPAS(((mtd->oobsize > 218) ?
++                                    218 : mtd->oobsize) >> 1) |
+                NFC_V3_CONFIG2_ST_CMD(0x70) |
+                NFC_V3_CONFIG2_INT_MSK |
+                NFC_V3_CONFIG2_NUM_ADDR_PHASE0;
+@@ -1124,6 +1144,13 @@ static void mxc_nand_command(struct mtd_
+                host->buf_start = column;
+                break;
+ 
++       case NAND_CMD_PARAM:
++               host->devtype_data->send_cmd(host, command, true);
++               mxc_do_addr_cycle(mtd, column, page_addr);
++               host->devtype_data->send_read_param(host);
++               host->buf_start = column;
++               break;
++
+        case NAND_CMD_ERASE1:
+        case NAND_CMD_ERASE2:
+                host->devtype_data->send_cmd(host, command, false);
+@@ -1271,13 +1298,14 @@ static const struct mxc_nand_devtype_dat
+        .send_addr = send_addr_v3,
+        .send_page = send_page_v3,
+        .send_read_id = send_read_id_v3,
++       .send_read_param = send_read_param_v3,
+        .get_dev_status = get_dev_status_v3,
+        .check_int = check_int_v3,
+        .irq_control = irq_control_v3,
+        .get_ecc_status = get_ecc_status_v3,
+        .ecclayout_512 = &nandv2_hw_eccoob_smallpage,
+        .ecclayout_2k = &nandv2_hw_eccoob_largepage,
+-       .ecclayout_4k = &nandv2_hw_eccoob_smallpage, /* XXX: needs fix */
++       .ecclayout_4k = &nandv2_hw_eccoob_4k,
+        .select_chip = mxc_nand_select_chip_v1_v3,
+        .correct_data = mxc_nand_correct_data_v2_v3,
+        .irqpending_quirk = 0,
