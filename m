@@ -1,44 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 1 Sep 2012 01:28:34 +0200
-Subject: [rtc-linux] [PATCH 1/1] drivers/rtc/rtc-ab8500.c: Revoke Device
- Tree enablement
-In-Reply-To: <CACRpkdat3zj_47r7ENz7Qv3N8cNOSKDV+k5em9DjOhkNycy9gQ@mail.gmail.com>
-References: <1344527828-6283-1-git-send-email-lee.jones@linaro.org>
- <1344527828-6283-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdZa-72QogrZ-P5jbDHTTX64babZo3ydjzfgC-4LWUBfMg@mail.gmail.com>
- <20120831110818.GA5962@gmail.com>
- <CACRpkdat3zj_47r7ENz7Qv3N8cNOSKDV+k5em9DjOhkNycy9gQ@mail.gmail.com>
-Message-ID: <CACRpkdbXwLXoWL+PS-wJ9cbztC-jWhyc=vr+98ffg70f6coaiQ@mail.gmail.com>
+Date: Sat, 1 Sep 2012 01:32:55 +0200
+Subject: [PATCH 0/4] clk: Support for smp_twd clock for ux500
+In-Reply-To: <1346415691-13371-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1346415691-13371-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <CACRpkdbymhVyWrvRpoZHYp9FanO1As0dnEVJ5tSQm9AGE6-gBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 1, 2012 at 1:27 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Aug 31, 2012 at 1:08 PM, Lee Jones <lee.jones@linaro.org> wrote:
->> On Tue, Aug 14, 2012 at 10:32:02AM +0200, Linus Walleij wrote:
->>> On Thu, Aug 9, 2012 at 5:57 PM, Lee Jones <lee.jones@linaro.org> wrote:
->>>
->>> > All AB8500 devices are now registered via MFD core, so Device Tree
->>> > capability is no longer required for probing. Here we pull the DT
->>> > match table to ensure we're no longer probed during Device Tree
->>> > start-up.
->>> >
->>> > CC: Alessandro Zummo <a.zummo@towertech.it>
->>> > CC: rtc-linux at googlegroups.com
->>> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>>
->>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->>
->> I'm guessing we still need Alessandro's Ack?
->
-> Well, usually we have Andrew Morton merging patches for RTC, so
-> put him on CC.
->
-> If I was the MFD maintainer I'd just merge this though, it's quite
-> obvious.
->
-> Sam: do you agree?
+On Fri, Aug 31, 2012 at 2:21 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
 
-Or wait, Sam was not on the To: line...
+> From: Ulf Hansson <ulf.hansson@linaro.org>
+>
+> To implement support for the smp_twd clock for ux500 several steps
+> was needed. This patchseries has also proposed some new changes in the
+> common clock core, which the ux500 smp_twd clock definition are
+> relying on.
+
+This is a great series,
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+For the ux500 parts.
+
+Mike it'd be great if you could merge this once you have the semantics
+of [1/4] sorted out with Ulf.
 
 Yours,
 Linus Walleij
