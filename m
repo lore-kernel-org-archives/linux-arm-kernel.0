@@ -1,28 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 1 Sep 2012 00:46:50 +0200
-Subject: [PATCH 0/3] ARM: EXYNOS: Add support for GPIO on Exynos4x12
-In-Reply-To: <CAJuYYwTBeCczF7M=9pJzYUgGB3Xg1md2kRDKbYEU-ji-C1_hug@mail.gmail.com>
-References: <4648723.rWnut7F0uJ@amdc1227>
- <CAJuYYwTBeCczF7M=9pJzYUgGB3Xg1md2kRDKbYEU-ji-C1_hug@mail.gmail.com>
-Message-ID: <CACRpkdaMqvQOUETPKFuzBw1bW+GciHLE1uvtdkPV5FoxrowftQ@mail.gmail.com>
+Date: Sat, 1 Sep 2012 00:52:11 +0200
+Subject: [PATCH] gpio: samsung: add devicetree init for s3c24xx arches
+In-Reply-To: <201208252353.59345.heiko@sntech.de>
+References: <201208252353.59345.heiko@sntech.de>
+Message-ID: <CACRpkdZws9ifr3WLKGJ-Mz0uYY5=itcd0GmnZYXBOTN7AkU=nQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2012 at 4:58 PM, Thomas Abraham
-<thomas.abraham@linaro.org> wrote:
-> On 28 August 2012 15:31, Tomasz Figa <t.figa@samsung.com> wrote:
+On Sat, Aug 25, 2012 at 11:53 PM, Heiko St?bner <heiko@sntech.de> wrote:
 
->> This patch series makes necessary preparations and adds support for GPIO on
->> Exynos4x12 SoCs.
+> Until now the Exynos-SoC was the only Samsung-SoC supporting the GPIOs
+> via the device tree. This patch implements dt-support for the
+> s3c24xx arches.
 >
-> Hopefully, we can get device tree support merged for Exynos4412 soon
-> and then switch over to using pinctrl driver. That can simplfy the
-> gpio/pinmux support for Exynos4 SoC's.
+> The controllers contain only 3 cells, as the underlying gpio controller
+> does not support controlling the drive strength on a gpio level.
+>
+> Tested with the gpio-keys driver on a s3c2416 based machine.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-This sounds like a NACK.
+I cannot figure out if you guys have reached consensus on this
+patch or not.
 
-I will not merge these patches until Ben or Kukjin (the Samsung
-maintainers listed in MAINTAINERS) ACK it.
+I guess this will go through the Samsung tree in any case, I have no
+objections from a GPIO subsystem point of view.
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
