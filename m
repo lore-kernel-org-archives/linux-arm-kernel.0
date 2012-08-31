@@ -1,24 +1,42 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 31 Aug 2012 16:56:20 +0200
-Subject: [PATCH 7/8] ARM: dts: add twi nodes for atmel SOCs
-In-Reply-To: <20120831144105.GB23867@game.jcrosoft.org>
-References: <1346404884-18451-1-git-send-email-ludovic.desroches@atmel.com>
- <1346405077-18620-1-git-send-email-ludovic.desroches@atmel.com>
- <20120831144105.GB23867@game.jcrosoft.org>
-Message-ID: <5040D094.3060306@atmel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 31 Aug 2012 10:02:48 +0800
+Subject: [PATCH v4 2/7] ARM: imx6q: add iomuxc gpr support into syscon
+In-Reply-To: <1346237818-9498-3-git-send-email-b29396@freescale.com>
+References: <1346237818-9498-1-git-send-email-b29396@freescale.com>
+ <1346237818-9498-3-git-send-email-b29396@freescale.com>
+Message-ID: <20120831020247.GC7726@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/31/2012 04:41 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> On 11:24 Fri 31 Aug     , ludovic.desroches at atmel.com wrote:
->> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->>
->> Add twi nodes for atmel SOCs and remove i2c-gpio ones.
-> Only drop the i2c-gpio on the soc that are kn own to have no issue on the hw
-> IP. For hte onther one keep both in the dtsi
+On Wed, Aug 29, 2012 at 06:56:53PM +0800, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> Include headfile for easy using.
+> 
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi         |    5 +
+>  include/linux/fsl/imx6q-iomuxc-gpr.h |  319 ++++++++++++++++++++++++++++++++++
 
-Yes, I agree with this.
+I assume that all the users of this header file are imx6q syscon
+clients.  In that case, this header belongs to mfd/syscon subsystem.
 
-Bye,
+I have been told by people that it was a mistake to create
+include/linux/fsl.  Each header in include/linux should go to
+respective subsystem sub-directory.  For this particular case,
+it should be include/linux/mfd or include/linux/mfd/syscon even
+better, IMO.
+
+<snip>
+
+> +#define IMX6Q_GPR13_SATA_PHY_1_MED		(0x1 << 0)
+> +#define IMX6Q_GPR13_SATA_PHY_1_SLOW		(0x2 << 0)
+> +
+> +#endif /* !__LINUX_IMX6Q_IOMUXC_GPR_H */
+
+Nit: why do we have a "!" there?
+
 -- 
-Nicolas Ferre
+Regards,
+Shawn
