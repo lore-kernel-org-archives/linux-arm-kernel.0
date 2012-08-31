@@ -1,35 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 Aug 2012 16:56:03 -0700
-Subject: [PATCH 13/22] ARM: ux500: Fork MSP platform registration for
- step-by-step DT enablement
-In-Reply-To: <20120828074812.GA12957@gmail.com>
-References: <1344527268-5964-1-git-send-email-lee.jones@linaro.org>
- <1344527268-5964-14-git-send-email-lee.jones@linaro.org>
- <CACRpkdaem6t3mvy-_9e=GEgwWoeBQSoX3Hf1L=hjWsvLJdsVAQ@mail.gmail.com>
- <20120820080632.GD8450@gmail.com>
- <CACRpkdZRJ1yX-o8-NUuMzXMz5ebbp=H21Xa6JMy1y56Chq-T9g@mail.gmail.com>
- <20120828074812.GA12957@gmail.com>
-Message-ID: <CACRpkdY0jwV7MOOGbFOcFhujMzanRyxx6TofA72ZwLi_D4HhHw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 30 Aug 2012 17:00:22 -0700
+Subject: [PATCHv2] ARM: msm: Implement read_current_timer for msm timers
+Message-ID: <1346371222-7450-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2012 at 12:48 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Mon, Aug 27, 2012 at 04:07:58PM -0700, Linus Walleij wrote:
+Setup the same timer used as the clocksource to be used as the
+read_current_timer implementation. This allows us to support a
+stable udelay implementation on MSMs where it's possible for the
+CPUs to scale speeds independently of one another.
 
->> If you're adding and then removing *all* of them in this set,
->> why add them in the first place?
->
-> So that there's no breakage during bisection.
->
-> You should be able to roll the kernel back in between each of these
-> patches and there to be full compatibility at each point. At least
-> that was the intention. Is that wrong?
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-No it's correct, the only way to do what I'm thinking on may be
-to squash them all into one gigantic patch, which is not good either.
+Changes since v1:
+ * Updated for new function signature
 
-So go ahead with this scheme, it's the lesser of two evils.
-Acked-by etc.
+ arch/arm/mach-msm/timer.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index ce6b008..6e3b91b 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -28,6 +28,7 @@
+ #include <asm/hardware/gic.h>
+ #include <asm/localtimer.h>
+ #include <asm/sched_clock.h>
++#include <asm/delay.h>
+ 
+ #include "common.h"
+ 
+@@ -173,6 +174,15 @@ static notrace u32 msm_sched_clock_read(void)
+ 	return msm_clocksource.read(&msm_clocksource);
+ }
+ 
++static unsigned long msm_read_current_timer(void)
++{
++	return msm_clocksource.read(&msm_clocksource);
++}
++
++static struct delay_timer msm_delay_timer = {
++	.read_current_timer = msm_read_current_timer,
++};
++
+ static void __init msm_timer_init(u32 dgt_hz, int sched_bits, int irq,
+ 				  bool percpu)
+ {
+@@ -217,6 +227,8 @@ err:
+ 	if (res)
+ 		pr_err("clocksource_register failed\n");
+ 	setup_sched_clock(msm_sched_clock_read, sched_bits, dgt_hz);
++	msm_delay_timer.freq = dgt_hz;
++	register_current_timer_delay(&msm_delay_timer);
+ }
+ 
+ #ifdef CONFIG_OF
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
