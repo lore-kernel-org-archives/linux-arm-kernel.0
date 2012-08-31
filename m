@@ -1,59 +1,63 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Fri, 31 Aug 2012 09:52:54 +0200
-Subject: [PATCH 1/2] i2c-omap: Fix incorrect adapter id when booting from a
- device tree
+Date: Fri, 31 Aug 2012 09:52:55 +0200
+Subject: [PATCH 2/2] arm/dts: Add i2c aliases for OMAP3 and OMAP4/AM33xx
 In-Reply-To: <1346399575-7285-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1346399575-7285-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1346399575-7285-2-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1346399575-7285-3-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting from a device tree, the omap driver is using pdev->id,
-which is incorrect. The proposed patch uses aliases, as done in
-omap-serial.
+I2C aliases need to be set, for the omap-i2c driver to get a correct adapter id.
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- drivers/i2c/busses/i2c-omap.c |   19 +++++++++++++++----
- 1 files changed, 15 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/am33xx.dtsi |    3 +++
+ arch/arm/boot/dts/omap3.dtsi  |    3 +++
+ arch/arm/boot/dts/omap4.dtsi  |    4 ++++
+ 3 files changed, 10 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 5d19a49..9445d1f 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1064,9 +1064,6 @@ omap_i2c_probe(struct platform_device *pdev)
- 		goto err_unuse_clocks;
- 	}
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 59509c4..ff2d879 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -20,6 +20,9 @@
+ 		serial3 = &uart4;
+ 		serial4 = &uart5;
+ 		serial5 = &uart6;
++		i2c0 = &i2c1;
++		i2c1 = &i2c2;
++		i2c2 = &i2c3;
+ 	};
  
--	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", pdev->id,
--		 dev->dtrev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
--
- 	adap = &dev->adapter;
- 	i2c_set_adapdata(adap, dev);
- 	adap->owner = THIS_MODULE;
-@@ -1076,8 +1073,22 @@ omap_i2c_probe(struct platform_device *pdev)
- 	adap->dev.parent = &pdev->dev;
- 	adap->dev.of_node = pdev->dev.of_node;
+ 	cpus {
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 8109471..a7d2f83 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -18,6 +18,9 @@
+ 		serial1 = &uart2;
+ 		serial2 = &uart3;
+ 		serial3 = &uart4;
++		i2c0 = &i2c1;
++		i2c1 = &i2c2;
++		i2c2 = &i2c3;
+ 	};
  
-+	if (adap->dev.of_node)
-+		adap->nr = of_alias_get_id(adap->dev.of_node, "i2c");
-+	else
-+		adap->nr = pdev->id;
-+
-+	if (adap->nr < 0) {
-+		dev_err(&pdev->dev, "failed to get alias/pdev id, errno %d\n",
-+				adap->nr);
-+		r = -ENODEV;
-+		goto err_free_irq;
-+	}
-+
-+	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", adap->nr,
-+		 dev->dtrev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
-+
- 	/* i2c device drivers may be active on return from add_adapter() */
--	adap->nr = pdev->id;
- 	r = i2c_add_numbered_adapter(adap);
- 	if (r) {
- 		dev_err(dev->dev, "failure adding adapter\n");
+ 	cpus {
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 04cbbcb..496c7ce 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -25,6 +25,10 @@
+ 		serial1 = &uart2;
+ 		serial2 = &uart3;
+ 		serial3 = &uart4;
++		i2c0 = &i2c1;
++		i2c1 = &i2c2;
++		i2c2 = &i2c3;
++		i2c3 = &i2c4;
+ 	};
+ 
+ 	cpus {
 -- 
 1.7.5.4
