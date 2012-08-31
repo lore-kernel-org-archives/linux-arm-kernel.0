@@ -1,66 +1,48 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Fri, 31 Aug 2012 17:53:18 +0200
-Subject: [PATCH RESEND v4 2/3] arm/dts: AM33XX: Configure pinmuxs for user
- leds control on Bone
-In-Reply-To: <20120830203505.GB1303@atomide.com>
-References: <1346141454-18786-1-git-send-email-anilkumar@ti.com>
- <1346141454-18786-3-git-send-email-anilkumar@ti.com>
- <20120830203505.GB1303@atomide.com>
-Message-ID: <C1D7B7D4-D576-4256-83F3-09689B4087C3@dominion.thruhere.net>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 31 Aug 2012 21:32:18 +0530
+Subject: [PATCH v3 3/3] spi: spi-davinci: convert to DMA engine API
+In-Reply-To: <20120830144307.GA26737@beef>
+References: <1345684176-21472-1-git-send-email-mporter@ti.com>
+ <1345684176-21472-4-git-send-email-mporter@ti.com> <503F75C0.1050507@ti.com>
+ <20120830144307.GA26737@beef>
+Message-ID: <5040E00A.3080600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Matt,
 
-Op 30 aug. 2012, om 22:35 heeft Tony Lindgren <tony@atomide.com> het volgende geschreven:
-
-> * AnilKumar Ch <anilkumar@ti.com> [120828 01:11]:
->> Adds GPIO pinctrl nodes to am3358_pinmux master node to control
->> user leds (USR0, USR1, USR2 and USR3) present on BeagleBone.
->> 
->> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
->> ---
->> arch/arm/boot/dts/am335x-bone.dts |   14 ++++++++++++++
->> 1 file changed, 14 insertions(+)
->> 
->> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
->> index a7906cb..58f5042 100644
->> --- a/arch/arm/boot/dts/am335x-bone.dts
->> +++ b/arch/arm/boot/dts/am335x-bone.dts
->> @@ -18,6 +18,20 @@
->> 		reg = <0x80000000 0x10000000>; /* 256 MB */
->> 	};
->> 
->> +	am3358_pinmux: pinmux at 44E10800 {
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&userled_pins>;
->> +
->> +		userled_pins: pinmux_userled_pins {
->> +			pinctrl-single,pins = <
->> +				0x54 0x7	/* gpmc_a5.gpio1_21, OUTPUT | MODE7 */
->> +				0x58 0x17	/* gpmc_a6.gpio1_22, OUTPUT_PULLUP | MODE7 */
->> +				0x5C 0x7	/* gpmc_a7.gpio1_23, OUTPUT | MODE7 */
->> +				0x60 0x17	/* gpmc_a8.gpio1_24, OUTPUT_PULLUP | MODE7 */
->> +			>;
->> +		};
->> +	};
->> +
+On 8/30/2012 8:13 PM, Matt Porter wrote:
+> On Thu, Aug 30, 2012 at 07:46:32PM +0530, Sekhar Nori wrote:
+>> Hi Matt,
+>>
+>> On 8/23/2012 6:39 AM, Matt Porter wrote:
+>>> Removes use of the DaVinci EDMA private DMA API and replaces
+>>> it with use of the DMA engine API.
+>>>
+>>> Signed-off-by: Matt Porter <mporter@ti.com>
+>>
+>> I tried testing this patch on my OMAP-L138 EVM, but SPI fails to 
+>> initialize after applying the patch.
+>>
+>> root at arago:~# dmesg | grep -i spi                                               
+>> spi_davinci spi_davinci.1: request RX DMA channel failed                        
 > 
-> Looks like this patch should also claim these pins by the led driver.
-> Then the led driver should just do pinctrl_get_select_default(&pdev->dev)
-> in it's probe function to set the pins.
+> Hi Sekhar,
+> 
+> Most likely CONFIG_TI_EDMA is off as it defaults to off in the v3
+> series. Try enabling this and if it's the problem then this error
+> path can be fixed to properly fallback to PIO only or fail to
+> initialize as needed.
 
-FWIW, I've been using this for a while now:
+Yes, this was the problem. Since the SPI driver now depends on
+CONFIG_TI_EDMA for basic operation may be select CONFIG_TI_EDMA in
+Kconfig if SPI is enabled? That should do until the fallback to PIO is
+implemented.
 
-+       leds {
-+               compatible = "gpio-leds";
-+               heartbeat {
-+                       label = "beaglebone::usr0";
-+                       gpios = <&gpio2 21 0>;
-+                       linux,default-trigger = "heartbeat";
-+               };
-+
-+               mmc {
-+                       label = "beaglebone:usr1";
-+                       gpios = <&gpio2 22 0>;
-+                       linux,default-trigger = "mmc0";
-+               };
+With that fixed, I tested SPI on OMAP-L138 EVM and it works great.
+Tested a JFFS2 mount as well as some raw chardev read/write tests.
+
+Tested-by: Sekhar Nori <nsekhar@ti.com>
+
+Thanks,
+Sekhar
