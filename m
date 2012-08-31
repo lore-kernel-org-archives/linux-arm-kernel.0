@@ -1,53 +1,104 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 31 Aug 2012 09:34:36 +0900
-Subject: [PATCH 01/10] r8a7779: add SDHI clock support
+Date: Fri, 31 Aug 2012 09:34:39 +0900
+Subject: [PATCH 04/10] ARM: shmobile: r8a7779: PFC rename PENCx -> USB_PENCx
 In-Reply-To: <1346373285-19588-1-git-send-email-horms@verge.net.au>
 References: <1346373285-19588-1-git-send-email-horms@verge.net.au>
-Message-ID: <1346373285-19588-2-git-send-email-horms@verge.net.au>
+Message-ID: <1346373285-19588-5-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Phil Edworthy <phil.edworthy@renesas.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+PENCx is Power Enable Control pin for USB.
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7779.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/include/mach/r8a7779.h |  2 +-
+ arch/arm/mach-shmobile/pfc-r8a7779.c          | 16 ++++++++--------
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-index 339c62c..3cafb6a 100644
---- a/arch/arm/mach-shmobile/clock-r8a7779.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-@@ -86,11 +86,16 @@ static struct clk div4_clks[DIV4_NR] = {
- 				      0x0300, CLK_ENABLE_ON_INIT),
- };
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7779.h b/arch/arm/mach-shmobile/include/mach/r8a7779.h
+index b07ad31..7597a37 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7779.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7779.h
+@@ -71,7 +71,7 @@ enum {
+ 	GPIO_FN_A19,
  
--enum { MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
-+enum { MSTP323, MSTP322, MSTP321, MSTP320,
-+	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
- 	MSTP016, MSTP015, MSTP014,
- 	MSTP_NR };
+ 	/* IPSR0 */
+-	GPIO_FN_PENC2, GPIO_FN_SCK0, GPIO_FN_PWM1, GPIO_FN_PWMFSW0,
++	GPIO_FN_USB_PENC2, GPIO_FN_SCK0, GPIO_FN_PWM1, GPIO_FN_PWMFSW0,
+ 	GPIO_FN_SCIF_CLK, GPIO_FN_TCLK0_C, GPIO_FN_BS, GPIO_FN_SD1_DAT2,
+ 	GPIO_FN_MMC0_D2, GPIO_FN_FD2, GPIO_FN_ATADIR0, GPIO_FN_SDSELF,
+ 	GPIO_FN_HCTS1, GPIO_FN_TX4_C, GPIO_FN_A0, GPIO_FN_SD1_DAT3,
+diff --git a/arch/arm/mach-shmobile/pfc-r8a7779.c b/arch/arm/mach-shmobile/pfc-r8a7779.c
+index d14c9b0..9fac32e4 100644
+--- a/arch/arm/mach-shmobile/pfc-r8a7779.c
++++ b/arch/arm/mach-shmobile/pfc-r8a7779.c
+@@ -140,7 +140,7 @@ enum {
+ 	FN_IP7_3_2, FN_IP7_6_4, FN_IP7_9_7, FN_IP7_12_10,
+ 	FN_IP7_14_13, FN_IP2_7_4, FN_IP2_11_8, FN_IP2_15_12,
+ 	FN_IP1_28_25, FN_IP2_3_0, FN_IP8_3_0, FN_IP8_7_4,
+-	FN_IP8_11_8, FN_IP8_15_12, FN_PENC0, FN_PENC1,
++	FN_IP8_11_8, FN_IP8_15_12, FN_USB_PENC0, FN_USB_PENC1,
+ 	FN_IP0_2_0, FN_IP8_17_16, FN_IP8_18, FN_IP8_19,
  
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP323] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 23, 0), /* SDHI0 */
-+	[MSTP322] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 22, 0), /* SDHI1 */
-+	[MSTP321] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 21, 0), /* SDHI2 */
-+	[MSTP320] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 20, 0), /* SDHI3 */
- 	[MSTP026] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 26, 0), /* SCIF0 */
- 	[MSTP025] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 25, 0), /* SCIF1 */
- 	[MSTP024] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 24, 0), /* SCIF2 */
-@@ -149,6 +154,10 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP023]), /* SCIF3 */
- 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP022]), /* SCIF4 */
- 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP021]), /* SCIF6 */
-+	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP323]), /* SDHI0 */
-+	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
-+	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
-+	CLKDEV_DEV_ID("sh_mobile_sdhi.3", &mstp_clks[MSTP320]), /* SDHI3 */
- };
+ 	/* GPSR5 */
+@@ -176,7 +176,7 @@ enum {
+ 	FN_A0, FN_SD1_DAT3, FN_MMC0_D3, FN_FD3,
+ 	FN_BS, FN_SD1_DAT2, FN_MMC0_D2, FN_FD2,
+ 	FN_ATADIR0, FN_SDSELF, FN_HCTS1, FN_TX4_C,
+-	FN_PENC2, FN_SCK0, FN_PWM1, FN_PWMFSW0,
++	FN_USB_PENC2, FN_SCK0, FN_PWM1, FN_PWMFSW0,
+ 	FN_SCIF_CLK, FN_TCLK0_C,
  
- void __init r8a7779_clock_init(void)
+ 	/* IPSR1 */
+@@ -447,7 +447,7 @@ enum {
+ 	A0_MARK, SD1_DAT3_MARK, MMC0_D3_MARK, FD3_MARK,
+ 	BS_MARK, SD1_DAT2_MARK, MMC0_D2_MARK, FD2_MARK,
+ 	ATADIR0_MARK, SDSELF_MARK, HCTS1_MARK, TX4_C_MARK,
+-	PENC2_MARK, SCK0_MARK, PWM1_MARK, PWMFSW0_MARK,
++	USB_PENC2_MARK, SCK0_MARK, PWM1_MARK, PWMFSW0_MARK,
+ 	SCIF_CLK_MARK, TCLK0_C_MARK,
+ 
+ 	EX_CS0_MARK, RX3_C_IRDA_RX_C_MARK, MMC0_D6_MARK,
+@@ -658,7 +658,7 @@ static pinmux_enum_t pinmux_data[] = {
+ 	PINMUX_DATA(A18_MARK, FN_A18),
+ 	PINMUX_DATA(A19_MARK, FN_A19),
+ 
+-	PINMUX_IPSR_DATA(IP0_2_0, PENC2),
++	PINMUX_IPSR_DATA(IP0_2_0, USB_PENC2),
+ 	PINMUX_IPSR_MODSEL_DATA(IP0_2_0, SCK0, SEL_SCIF0_0),
+ 	PINMUX_IPSR_DATA(IP0_2_0, PWM1),
+ 	PINMUX_IPSR_MODSEL_DATA(IP0_2_0, PWMFSW0, SEL_PWMFSW_0),
+@@ -1456,7 +1456,7 @@ static struct pinmux_gpio pinmux_gpios[] = {
+ 	GPIO_FN(A19),
+ 
+ 	/* IPSR0 */
+-	GPIO_FN(PENC2), GPIO_FN(SCK0), GPIO_FN(PWM1), GPIO_FN(PWMFSW0),
++	GPIO_FN(USB_PENC2), GPIO_FN(SCK0), GPIO_FN(PWM1), GPIO_FN(PWMFSW0),
+ 	GPIO_FN(SCIF_CLK), GPIO_FN(TCLK0_C), GPIO_FN(BS), GPIO_FN(SD1_DAT2),
+ 	GPIO_FN(MMC0_D2), GPIO_FN(FD2), GPIO_FN(ATADIR0), GPIO_FN(SDSELF),
+ 	GPIO_FN(HCTS1), GPIO_FN(TX4_C), GPIO_FN(A0), GPIO_FN(SD1_DAT3),
+@@ -1865,8 +1865,8 @@ static struct pinmux_cfg_reg pinmux_config_regs[] = {
+ 		GP_4_30_FN, FN_IP8_18,
+ 		GP_4_29_FN, FN_IP8_17_16,
+ 		GP_4_28_FN, FN_IP0_2_0,
+-		GP_4_27_FN, FN_PENC1,
+-		GP_4_26_FN, FN_PENC0,
++		GP_4_27_FN, FN_USB_PENC1,
++		GP_4_26_FN, FN_USB_PENC0,
+ 		GP_4_25_FN, FN_IP8_15_12,
+ 		GP_4_24_FN, FN_IP8_11_8,
+ 		GP_4_23_FN, FN_IP8_7_4,
+@@ -1981,7 +1981,7 @@ static struct pinmux_cfg_reg pinmux_config_regs[] = {
+ 		FN_BS, FN_SD1_DAT2, FN_MMC0_D2, FN_FD2,
+ 		FN_ATADIR0, FN_SDSELF, FN_HCTS1, FN_TX4_C,
+ 		/* IP0_2_0 [3] */
+-		FN_PENC2, FN_SCK0, FN_PWM1, FN_PWMFSW0,
++		FN_USB_PENC2, FN_SCK0, FN_PWM1, FN_PWMFSW0,
+ 		FN_SCIF_CLK, FN_TCLK0_C, 0, 0 }
+ 	},
+ 	{ PINMUX_CFG_REG_VAR("IPSR1", 0xfffc0024, 32,
 -- 
 1.7.10.2.484.gcd07cc5
