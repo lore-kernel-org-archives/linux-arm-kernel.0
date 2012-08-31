@@ -1,76 +1,63 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 31 Aug 2012 06:32:20 +0800
-Subject: [PATCH 8/9] ARM i.MX53: Add pwms to dtsi
-In-Reply-To: <1346154504-5623-9-git-send-email-s.hauer@pengutronix.de>
-References: <1346154504-5623-1-git-send-email-s.hauer@pengutronix.de>
- <1346154504-5623-9-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120830223219.GF3613@r65073-Latitude-D630>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Fri, 31 Aug 2012 13:46:29 +0200
+Subject: [PATCH 1/6] ARM: move ARCH config definitions into mach dirs
+In-Reply-To: <20120831111138.GG18957@n2100.arm.linux.org.uk>
+References: <1346280600-29395-1-git-send-email-robherring2@gmail.com>
+ <1346280600-29395-2-git-send-email-robherring2@gmail.com>
+ <20120829233159.GS18957@n2100.arm.linux.org.uk>
+ <503F845C.10406@gmail.com>
+ <20120830164551.GY18957@n2100.arm.linux.org.uk>
+ <503FB9E6.7020102@gmail.com>
+ <20120830192831.GD18957@n2100.arm.linux.org.uk>
+ <20120831110512.GA24490@glitch>
+ <20120831111138.GG18957@n2100.arm.linux.org.uk>
+Message-ID: <20120831114629.GB24490@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2012 at 01:48:23PM +0200, Sascha Hauer wrote:
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+On Fri, Aug 31, 2012 at 12:11:38PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Aug 31, 2012 at 01:05:12PM +0200, Domenico Andreoli wrote:
+> > On Thu, Aug 30, 2012 at 08:28:31PM +0100, Russell King - ARM Linux wrote:
+> > > 
+> > > I think what we need is arch/arm/include/debug, move the platform specific
+> > > debug-macros headers into there, named using platform specific file names.
+> > > Then we have the config system define a string-based config:
+> > > 
+> > > config DEBUG_LL_INCLUDE
+> > > 	string
+> > > 	default "<debug/icedcc.S>" if DEBUG_ICEDCC
+> > > 	default "<debug/msm.S>" if DEBUG_MSM_UART1 || DEBUG_MSM_UART2 || DEBUG_MSM_UART3
+> > > ... etc ...
+> > > 	default "mach/debug-macros.S"
+> > > 
+> > > And then we can have the various assembly codes do:
+> > > 
+> > > #include CONFIG_DEBUG_LL_INCLUDE
+> > > 
+> > > Not only does this give a migration path, but it also gives folk a reason
+> > > to move to the 'new way' if they want to be part of a multi-platform
+> > > kernel - and it's a trivial thing to do.  Just move the include file,
+> > > add an entry to the DEBUG_LL_INCLUDE entry and the "Kernel low-level
+> > > debugging port" choice statement, and job done for both non-multi-platform
+> > > and multi-platform kernels.
+> > > 
+> > > What's even nicer about this approach is it doesn't require everyone to
+> > > change simultaneously - it can be done progressively as required.
+> > 
+> > This means that:
 > 
-> Conflicts:
-> 	arch/arm/mach-imx/clk-imx51-imx53.c
+> I'm not about to re-open the debate again.  Please go back and read the
+> previous discussions during the last year about this where eventually
+> agreement on this way forward was reached.  Thanks.
 
-Yeah, I know you have sorted out conflicts :)
+I don't want to reopen anything, it's only that I've clearly missed the
+discussion (*) as also my patches in the area may show (**). So I really
+wanted to understand if, for once, I've understood the thing correctly.
 
-> ---
->  arch/arm/boot/dts/imx53.dtsi        |   14 ++++++++++++++
->  arch/arm/mach-imx/clk-imx51-imx53.c |    4 ++++
->  2 files changed, 18 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> index cd37165..7ec17e4 100644
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -189,6 +189,20 @@
->  				status = "disabled";
->  			};
->  
-> +			pwm1: pwm at 53fb4000 {
-> +				#pwm-cells = <3>;
+cheers,
+Domenico
 
-pwm-cells should be 2?
+(*) I would have appreciated if you had pointed it to me in the only
+comment you made on those patches but that's ok, it has been fun anyway
 
-> +				compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
-> +				reg = <0x53fb4000 0x4000>;
-> +				interrupts = <61>;
-> +			};
-> +
-> +			pwm2: pwm at 53fb8000 {
-> +				#pwm-cells = <3>;
-> +				compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
-> +				reg = <0x53fb8000 0x4000>;
-> +				interrupts = <94>;
-> +			};
-> +
->  			uart1: serial at 53fbc000 {
->  				compatible = "fsl,imx53-uart", "fsl,imx21-uart";
->  				reg = <0x53fbc000 0x4000>;
-> diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-> index 4bdcaa9..b522411 100644
-> --- a/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -455,6 +455,10 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
->  	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "63fcc000.ssi");
->  	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "50014000.ssi");
->  	clk_register_clkdev(clk[ssi3_ipg_gate], NULL, "63fd0000.ssi");
-> +	clk_register_clkdev(clk[pwm1_ipg_gate], "ipg", "53fb4000.pwm");
-> +	clk_register_clkdev(clk[pwm1_hf_gate], "per", "53fb4000.pwm");
-> +	clk_register_clkdev(clk[pwm2_ipg_gate], "ipg", "53fb8000.pwm");
-> +	clk_register_clkdev(clk[pwm2_hf_gate], "per", "53fb8000.pwm");
-
-It should be in a separate patch?
-
->  
->  	/* set SDHC root clock to 200MHZ*/
->  	clk_set_rate(clk[esdhc_a_podf], 200000000);
-> -- 
-> 1.7.10.4
-> 
-
--- 
-Regards,
-Shawn
+(**) http://lists.infradead.org/pipermail/linux-arm-kernel/2012-July/109457.html
