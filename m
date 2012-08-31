@@ -1,104 +1,67 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Fri, 31 Aug 2012 06:12:13 -0400
-Subject: [PATCH 2/2] mmc: mxs-mmc: fix deadlock caused by recursion loop
-In-Reply-To: <1342534570-8293-3-git-send-email-lauri.hintsala@bluegiga.com>
- (Lauri Hintsala's message of "Tue, 17 Jul 2012 17:16:10 +0300")
-References: <1342534570-8293-1-git-send-email-lauri.hintsala@bluegiga.com>
- <1342534570-8293-3-git-send-email-lauri.hintsala@bluegiga.com>
-Message-ID: <87txvjnzeq.fsf@octavius.laptop.org>
+From: sourav.poddar@ti.com (Poddar, Sourav)
+Date: Fri, 31 Aug 2012 15:51:20 +0530
+Subject: [PATCHv3 0/4] Add device tree data for omap5
+In-Reply-To: <504084B9.3000701@ti.com>
+References: <1344961473-13675-1-git-send-email-sourav.poddar@ti.com>
+ <CAKdam57L8txFtE9ahy3u3vLW0XRP5z4QaNQKVFj9KaEFZE1qvg@mail.gmail.com>
+ <503229F5.4030405@ti.com>
+ <CAKdam543ATO96rbhgCWKtGUGRQ_+=KSyAk-nGBknjC+BvJSmOw@mail.gmail.com>
+ <504084B9.3000701@ti.com>
+Message-ID: <CAKdam573NqiCd2=CQ2kg1g+VqjS6z8g=QbPfMZZbm8P98yDP_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Benoit,
 
-On Tue, Jul 17 2012, Lauri Hintsala wrote:
-> Release the lock before mmc_signal_sdio_irq is called by
-> mxs_mmc_enable_sdio_irq.
+On Fri, Aug 31, 2012 at 3:02 PM, Benoit Cousson <b-cousson@ti.com> wrote:
+> Hi Sourav,
 >
-> Backtrace:
-> [   65.470000] =============================================
-> [   65.470000] [ INFO: possible recursive locking detected ]
-> [   65.470000] 3.5.0-rc5 #2 Not tainted
-> [   65.470000] ---------------------------------------------
-> [   65.470000] ksdioirqd/mmc0/73 is trying to acquire lock:
-> [   65.470000]  (&(&host->lock)->rlock#2){-.-...}, at: [<bf054120>] mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc]
-> [   65.470000]
-> [   65.470000] but task is already holding lock:
-> [   65.470000]  (&(&host->lock)->rlock#2){-.-...}, at: [<bf054120>] mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc]
-> [   65.470000]
-> [   65.470000] other info that might help us debug this:
-> [   65.470000]  Possible unsafe locking scenario:
-> [   65.470000]
-> [   65.470000]        CPU0
-> [   65.470000]        ----
-> [   65.470000]   lock(&(&host->lock)->rlock#2);
-> [   65.470000]   lock(&(&host->lock)->rlock#2);
-> [   65.470000]
-> [   65.470000]  *** DEADLOCK ***
-> [   65.470000]
-> [   65.470000]  May be due to missing lock nesting notation
-> [   65.470000]
-> [   65.470000] 1 lock held by ksdioirqd/mmc0/73:
-> [   65.470000]  #0:  (&(&host->lock)->rlock#2){-.-...}, at: [<bf054120>] mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc]
-> [   65.470000]
-> [   65.470000] stack backtrace:
-> [   65.470000] [<c0014990>] (unwind_backtrace+0x0/0xf4) from [<c005ccb8>] (__lock_acquire+0x14f8/0x1b98)
-> [   65.470000] [<c005ccb8>] (__lock_acquire+0x14f8/0x1b98) from [<c005d3f8>] (lock_acquire+0xa0/0x108)
-> [   65.470000] [<c005d3f8>] (lock_acquire+0xa0/0x108) from [<c02f671c>] (_raw_spin_lock_irqsave+0x48/0x5c)
-> [   65.470000] [<c02f671c>] (_raw_spin_lock_irqsave+0x48/0x5c) from [<bf054120>] (mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc])
-> [   65.470000] [<bf054120>] (mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc]) from [<bf0541d0>] (mxs_mmc_enable_sdio_irq+0xc8/0xdc [mxs_mmc])
-> [   65.470000] [<bf0541d0>] (mxs_mmc_enable_sdio_irq+0xc8/0xdc [mxs_mmc]) from [<c0219b38>] (sdio_irq_thread+0x1bc/0x274)
-> [   65.470000] [<c0219b38>] (sdio_irq_thread+0x1bc/0x274) from [<c003c324>] (kthread+0x8c/0x98)
-> [   65.470000] [<c003c324>] (kthread+0x8c/0x98) from [<c00101ac>] (kernel_thread_exit+0x0/0x8)
-> [   65.470000] BUG: spinlock lockup suspected on CPU#0, ksdioirqd/mmc0/73
-> [   65.470000]  lock: 0xc3358724, .magic: dead4ead, .owner: ksdioirqd/mmc0/73, .owner_cpu: 0
-> [   65.470000] [<c0014990>] (unwind_backtrace+0x0/0xf4) from [<c01b46b0>] (do_raw_spin_lock+0x100/0x144)
-> [   65.470000] [<c01b46b0>] (do_raw_spin_lock+0x100/0x144) from [<c02f6724>] (_raw_spin_lock_irqsave+0x50/0x5c)
-> [   65.470000] [<c02f6724>] (_raw_spin_lock_irqsave+0x50/0x5c) from [<bf054120>] (mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc])
-> [   65.470000] [<bf054120>] (mxs_mmc_enable_sdio_irq+0x18/0xdc [mxs_mmc]) from [<bf0541d0>] (mxs_mmc_enable_sdio_irq+0xc8/0xdc [mxs_mmc])
-> [   65.470000] [<bf0541d0>] (mxs_mmc_enable_sdio_irq+0xc8/0xdc [mxs_mmc]) from [<c0219b38>] (sdio_irq_thread+0x1bc/0x274)
-> [   65.470000] [<c0219b38>] (sdio_irq_thread+0x1bc/0x274) from [<c003c324>] (kthread+0x8c/0x98)
-> [   65.470000] [<c003c324>] (kthread+0x8c/0x98) from [<c00101ac>] (kernel_thread_exit+0x0/0x8)
+> While rebasing your series on top of Tony's lo/devel-dt, I realized that the keypad nodes are not located at the correct place :-(
 >
-> Reported-by: Attila Kinali <attila@kinali.ch>
-> Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  drivers/mmc/host/mxs-mmc.c |   10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
+> At the moment they are just floating at the top level of the dts while they belong to the ocp bus and thus should be put there.
 >
-> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-> index 20a0550..e1fd2c8 100644
-> --- a/drivers/mmc/host/mxs-mmc.c
-> +++ b/drivers/mmc/host/mxs-mmc.c
-> @@ -637,11 +637,6 @@ static void mxs_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
->  		       host->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_SET);
->  		writel(BM_SSP_CTRL1_SDIO_IRQ_EN,
->  		       host->base + HW_SSP_CTRL1(host) + STMP_OFFSET_REG_SET);
-> -
-> -		if (readl(host->base + HW_SSP_STATUS(host)) &
-> -				BM_SSP_STATUS_SDIO_IRQ)
-> -			mmc_signal_sdio_irq(host->mmc);
-> -
->  	} else {
->  		writel(BM_SSP_CTRL0_SDIO_IRQ_CHECK,
->  		       host->base + HW_SSP_CTRL0 + STMP_OFFSET_REG_CLR);
-> @@ -650,6 +645,11 @@ static void mxs_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
->  	}
->  
->  	spin_unlock_irqrestore(&host->lock, flags);
-> +
-> +	if (enable && readl(host->base + HW_SSP_STATUS(host)) &
-> +			BM_SSP_STATUS_SDIO_IRQ)
-> +		mmc_signal_sdio_irq(host->mmc);
-> +
->  }
->  
->  static const struct mmc_host_ops mxs_mmc_ops = {
+My bad, never realised always used it at the top level. Sorry for the
+inconvenience.
+> I fixed that since it was trivial and cleaned as well the changelog and the comments to aligned then properly. I added as well the physical address to the node name and a label for easy reference at board level.
+>
+Thanks for fixing it up.
+> I did some basic test on my OMAP4 sdp, but that all I can do so far.
+>
+> Could you just check if this is still fine for OMAP5 before I ask Tony to pull that.
+>
+I just booted the below mentioned branch and its booting fine on omap5. Did
+some keypad functionality test also and keypad seems to be working
+fine on omap5.
+> I based that on top of Tony's DT patches due to conflict with the existing MMC patch in it.
+>
+>
+>
+> The following changes since commit 85d7ff9b907685b6469058888f1d961b3e8d47ad:
+>   Olof Johansson (1):
+>         ARM: omap: add dtb targets
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.7/dts
+>
+> Sourav Poddar (6):
+>       arm/dts: omap5-evm: Add I2C support
+>       arm/dts: omap5-evm: Add tmp102 sensor support
+>       arm/dts: omap5-evm: Add keypad data
+>       arm/dts: omap5-evm: Add bmp085 sensor support
+>       arm/dts: omap4-sdp: Add keypad data
+>       Documentation: dt: i2c: trivial-devices: Update for tmp102
+>
+>  .../devicetree/bindings/i2c/trivial-devices.txt    |    1 +
+>  arch/arm/boot/dts/omap4-sdp.dts                    |   70 ++++++++++++++++++++
+>  arch/arm/boot/dts/omap4.dtsi                       |    5 ++
+>  arch/arm/boot/dts/omap5-evm.dts                    |   33 +++++++++
+>  arch/arm/boot/dts/omap5.dtsi                       |   40 +++++++++++
+>  5 files changed, 149 insertions(+), 0 deletions(-)
+>
+> Regards,
+> Benoit
+>
 
-Thanks, pushed to mmc-next for 3.6 with a stable@ tag.
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Thanks,
+Sourav
