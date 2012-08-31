@@ -1,173 +1,99 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 31 Aug 2012 11:05:08 +0200
-Subject: mxc_nand.c on mach-imx/imx53
-In-Reply-To: <20120829172820.43bbe68e@eb-e6520>
-References: <5035F84E.3000901@antcom.de>
- <20120829074122.GV26594@pengutronix.de> <503E3331.8050203@antcom.de>
- <20120829172820.43bbe68e@eb-e6520>
-Message-ID: <50407E44.5080408@antcom.de>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Fri, 31 Aug 2012 11:14:20 +0200
+Subject: [PATCH 1/2] i2c-omap: Fix incorrect adapter id when booting from
+ a device tree
+In-Reply-To: <1346399575-7285-2-git-send-email-florian.vaussard@epfl.ch>
+References: <1346399575-7285-1-git-send-email-florian.vaussard@epfl.ch>
+ <1346399575-7285-2-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <5040806C.9080003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi Florian,
 
-On 08/29/2012 05:28 PM, Eric B?nard wrote:
-> Le Wed, 29 Aug 2012 17:20:17 +0200,
-> Roland Stigge <stigge@antcom.de> a ?crit :
->> Using  ".ecclayout_4k = &nandv2_hw_eccoob_4k" also doesn't work. So is
->> there any hint how I can proceed from here? Any plans or hint regarding
->> the "XXX"?
->>
-> you may need something like this patch from barebox :
-> http://git.pengutronix.de/?p=barebox.git;a=commit;h=632c45795065e6a7471ab82be38e808eb6204341
+On 08/31/2012 09:52 AM, Florian Vaussard wrote:
+> When booting from a device tree, the omap driver is using pdev->id,
+> which is incorrect. 
 
-Thank you for the link!
+Not really, see below...
 
-I tried to port this on top of Sascha's patches for imx53, only for mxc v3 for now, as below.
+> The proposed patch uses aliases, as done in omap-serial.
 
-Unfortunately, I still get:
+Mmm, but is it really needed?
+In the case of serial the id is important because of the tty number used
+as device interface.
+In the case of I2C, the id is mostly irrelevant.
 
+In fact, using the pdev->id = -1 was used on purpose to have a dynamic
+assignment:
+
+int i2c_add_numbered_adapter(struct i2c_adapter *adap)
 ...
-UnCorrectable RS-ECC Error
-UnCorrectable RS-ECC Error
-UnCorrectable RS-ECC Error
-UnCorrectable RS-ECC Error
-UnCorrectable RS-ECC Error
-...
+        if (adap->nr == -1) /* -1 means dynamically assign bus id */
+                return i2c_add_adapter(adap);
 
-from mxc_nand.c's mxc_nand_correct_data_v2_v3(). Maybe there's still sth. missing in the
-error correction code?
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> ---
+>  drivers/i2c/busses/i2c-omap.c |   19 +++++++++++++++----
+>  1 files changed, 15 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 5d19a49..9445d1f 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -1064,9 +1064,6 @@ omap_i2c_probe(struct platform_device *pdev)
+>  		goto err_unuse_clocks;
+>  	}
+>  
+> -	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", pdev->id,
+> -		 dev->dtrev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
+> -
 
-Tracing reveals that in mxc_nand_command()'s switch statement, NAND_CMD_READID is handled,
-but the NAND_CMD_PARAM case never gets triggered. (Under which circumstances is this
-supposed to happen?) Further, I still wonder why the bootloader identifies the NAND as:
+[    0.658843] omap_i2c i2c.15: bus -1 rev2.4.0 at 400 kHz
+[    0.760192] omap_i2c i2c.16: bus -1 rev2.4.0 at 400 kHz
+[    0.775817] omap_i2c i2c.17: bus -1 rev2.4.0 at 400 kHz
+[    0.791442] omap_i2c i2c.18: bus -1 rev2.4.0 at 400 kHz
 
-NAND:  512 MiB
-Manufacturer      : Micron (0x2c)
-Device Code       : 0xdc
-Cell Technology   : SLC
-Chip Size         : 512 MiB
-Pages per Block   : 64
-Page Geometry     : 4096+218
-ECC Strength      : 8 bits
-ECC Size          : 512 B
-Data Setup Time   : 20 ns
-Data Hold Time    : 10 ns
-Address Setup Time: 10 ns
-GPMI Sample Delay : 6 ns
-tREA              : Unknown
-tRLOH             : Unknown
-tRHOH             : Unknown
-Description       : MT29F4G08ABAEA
+OK, it is true that the current log is not that nice with bus -1, but
+maybe we should just remove that.
 
-But Linux says:
+Or we can potentially retrieve the i2c adapter number assign later, and
+delay the log.
 
-NAND device: Manufacturer ID: 0x2c, Chip ID: 0xdc (Micron NAND 512MiB 3,3V 8-bit), page size: 4096, OOB size: 128
-
-(See OOB size 128 vs. 218).
-
-Thanks in advance,
-
-Roland
+>  	r = i2c_add_numbered_adapter(adap);
+>  	if (r) {
+>  		dev_err(dev->dev, "failure adding adapter\n");
 
 
----
- drivers/mtd/nand/mxc_nand.c |   36 ++++++++++++++++++++++++++++++++----
- 1 file changed, 32 insertions(+), 4 deletions(-)
+Regards,
+Benoit
 
---- linux-2.6.orig/drivers/mtd/nand/mxc_nand.c
-+++ linux-2.6/drivers/mtd/nand/mxc_nand.c
-@@ -150,6 +150,7 @@ struct mxc_nand_devtype_data {
-        void (*send_addr)(struct mxc_nand_host *, uint16_t, int);
-        void (*send_page)(struct mtd_info *, unsigned int);
-        void (*send_read_id)(struct mxc_nand_host *);
-+       void (*send_read_param)(struct mxc_nand_host *);
-        uint16_t (*get_dev_status)(struct mxc_nand_host *);
-        int (*check_int)(struct mxc_nand_host *);
-        void (*irq_control)(struct mxc_nand_host *, int);
-@@ -543,6 +544,16 @@ static void send_read_id_v3(struct mxc_n
-        memcpy32_fromio(host->data_buf, host->main_area0, 16);
- }
- 
-+static void send_read_param_v3(struct mxc_nand_host *host)
-+{
-+       /* Read param into main buffer */
-+       writel(NFC_OUTPUT, NFC_V3_LAUNCH);
-+
-+       wait_op_done(host, true);
-+
-+       memcpy32_fromio(host->data_buf, host->main_area0, 1024);
-+}
-+
- /* Request the NANDFC to perform a read of the NAND device ID. */
- static void send_read_id_v1_v2(struct mxc_nand_host *host)
- {
-@@ -741,6 +752,10 @@ static void mxc_nand_read_buf(struct mtd
- 
-        n = min(n, len);
- 
-+       /* handle the read param special case */
-+       if ((mtd->writesize == 0) && (len != 0))
-+               n = len;
-+
-        memcpy(buf, host->data_buf + col, n);
- 
-        host->buf_start += n;
-@@ -842,9 +857,12 @@ static void mxc_do_addr_cycle(struct mtd
-                 * MXC NANDFC can only perform full page+spare or
-                 * spare-only read/write.  When the upper layers
-                 * perform a read/write buf operation, the saved column
--                 * address is used to index into the full page.
-+                * address is used to index into the full page.
-+                *
-+                * The colum address must be sent to the flash in
-+                * order to get the ONFI header (0x20)
-                 */
--               host->devtype_data->send_addr(host, 0, page_addr == -1);
-+               host->devtype_data->send_addr(host, column, page_addr == -1);
-                if (mtd->writesize > 512)
-                        /* another col addr cycle for 2k page */
-                        host->devtype_data->send_addr(host, 0, false);
-@@ -998,9 +1016,11 @@ static void preset_v3(struct mtd_info *m
- 
-        writel(0, NFC_V3_IPC);
- 
-+       /* if the flash has a 224 oob, the NFC must be configured to 218 */
-        config2 = NFC_V3_CONFIG2_ONE_CYCLE |
-                NFC_V3_CONFIG2_2CMD_PHASES |
--               NFC_V3_CONFIG2_SPAS(mtd->oobsize >> 1) |
-+               NFC_V3_CONFIG2_SPAS(((mtd->oobsize > 218) ?
-+                                    218 : mtd->oobsize) >> 1) |
-                NFC_V3_CONFIG2_ST_CMD(0x70) |
-                NFC_V3_CONFIG2_INT_MSK |
-                NFC_V3_CONFIG2_NUM_ADDR_PHASE0;
-@@ -1124,6 +1144,13 @@ static void mxc_nand_command(struct mtd_
-                host->buf_start = column;
-                break;
- 
-+       case NAND_CMD_PARAM:
-+               host->devtype_data->send_cmd(host, command, true);
-+               mxc_do_addr_cycle(mtd, column, page_addr);
-+               host->devtype_data->send_read_param(host);
-+               host->buf_start = column;
-+               break;
-+
-        case NAND_CMD_ERASE1:
-        case NAND_CMD_ERASE2:
-                host->devtype_data->send_cmd(host, command, false);
-@@ -1271,13 +1298,14 @@ static const struct mxc_nand_devtype_dat
-        .send_addr = send_addr_v3,
-        .send_page = send_page_v3,
-        .send_read_id = send_read_id_v3,
-+       .send_read_param = send_read_param_v3,
-        .get_dev_status = get_dev_status_v3,
-        .check_int = check_int_v3,
-        .irq_control = irq_control_v3,
-        .get_ecc_status = get_ecc_status_v3,
-        .ecclayout_512 = &nandv2_hw_eccoob_smallpage,
-        .ecclayout_2k = &nandv2_hw_eccoob_largepage,
--       .ecclayout_4k = &nandv2_hw_eccoob_smallpage, /* XXX: needs fix */
-+       .ecclayout_4k = &nandv2_hw_eccoob_4k,
-        .select_chip = mxc_nand_select_chip_v1_v3,
-        .correct_data = mxc_nand_correct_data_v2_v3,
-        .irqpending_quirk = 0,
+
+>  	adap = &dev->adapter;
+>  	i2c_set_adapdata(adap, dev);
+>  	adap->owner = THIS_MODULE;
+> @@ -1076,8 +1073,22 @@ omap_i2c_probe(struct platform_device *pdev)
+>  	adap->dev.parent = &pdev->dev;
+>  	adap->dev.of_node = pdev->dev.of_node;
+>  
+> +	if (adap->dev.of_node)
+> +		adap->nr = of_alias_get_id(adap->dev.of_node, "i2c");
+> +	else
+> +		adap->nr = pdev->id;
+> +
+> +	if (adap->nr < 0) {
+> +		dev_err(&pdev->dev, "failed to get alias/pdev id, errno %d\n",
+> +				adap->nr);
+> +		r = -ENODEV;
+> +		goto err_free_irq;
+> +	}
+> +
+> +	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", adap->nr,
+> +		 dev->dtrev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
+> +
+>  	/* i2c device drivers may be active on return from add_adapter() */
+> -	adap->nr = pdev->id;
+>  	r = i2c_add_numbered_adapter(adap);
+>  	if (r) {
+>  		dev_err(dev->dev, "failure adding adapter\n");
+> 
