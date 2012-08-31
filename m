@@ -1,30 +1,41 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Fri, 31 Aug 2012 16:46:34 +0200
-Subject: [PATCH 7/8] ARM: dts: add twi nodes for atmel SOCs
-In-Reply-To: <20120831144105.GB23867@game.jcrosoft.org>
-References: <1346404884-18451-1-git-send-email-ludovic.desroches@atmel.com>
- <1346405077-18620-1-git-send-email-ludovic.desroches@atmel.com>
- <20120831144105.GB23867@game.jcrosoft.org>
-Message-ID: <5040CE4A.7070005@atmel.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 31 Aug 2012 07:50:13 -0700
+Subject: [PATCH 8/8] input: ab8500-ponkey: Rely on MFD core to convert
+ IRQs to virtual
+In-Reply-To: <20120831073123.GA13298@gmail.com>
+References: <1344527635-6163-1-git-send-email-lee.jones@linaro.org>
+ <1344527635-6163-9-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZ-HOGy_sdsCQSNOdYTDzHFszk0OySM88TjO-neSJUz0A@mail.gmail.com>
+ <20120821092328.GC26899@gmail.com>
+ <20120821164244.GA4672@core.coreip.homeip.net>
+ <20120830131202.GG14145@gmail.com>
+ <20120830230221.GD21501@core.coreip.homeip.net>
+ <20120830230323.GE21501@core.coreip.homeip.net>
+ <20120831073123.GA13298@gmail.com>
+Message-ID: <20120831145012.GA26858@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 08/31/2012 04:41 PM, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
-> On 11:24 Fri 31 Aug     , ludovic.desroches at atmel.com wrote:
->> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->>
->> Add twi nodes for atmel SOCs and remove i2c-gpio ones.
-> Only drop the i2c-gpio on the soc that are kn own to have no issue on the hw
-> IP. For hte onther one keep both in the dtsi
->
+On Fri, Aug 31, 2012 at 08:31:33AM +0100, Lee Jones wrote:
+> On Thu, Aug 30, 2012 at 04:03:23PM -0700, Dmitry Torokhov wrote:
+> > On Thu, Aug 30, 2012 at 04:02:21PM -0700, Dmitry Torokhov wrote:
+> > > On Thu, Aug 30, 2012 at 02:12:04PM +0100, Lee Jones wrote:
+> > > > > Sorry for the delay. Yes, this shoudl be fine, but since it is
+> > > > > essentially a revert of the original patch it should be pushed in as
+> > > > > such.
+> > > > 
+> > > > How's this?
+> > > > 
+> > > 
+> > > Excellent.
+> > 
+> > I assume you will be merging it with the rest of AB8500 patches, right?
+> 
+> Yes, if that's okay with you of course?
 
-Ok I'll keep it.
+Sure, please go ahead,
 
-Regards
+Thanks.
 
-Ludovic
-
-> Best Regards,
-> J.
->
->
+-- 
+Dmitry
