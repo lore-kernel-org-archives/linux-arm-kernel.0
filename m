@@ -1,75 +1,62 @@
-From: mporter@ti.com (Matt Porter)
-Date: Sat, 1 Sep 2012 09:14:42 -0400
-Subject: [PATCH v3 3/3] spi: spi-davinci: convert to DMA engine API
-In-Reply-To: <1346461349.2806.4.camel@vkoul-mobl4>
-References: <1345684176-21472-1-git-send-email-mporter@ti.com>
- <1345684176-21472-4-git-send-email-mporter@ti.com>
- <503F75C0.1050507@ti.com> <20120830144307.GA26737@beef>
- <5040E00A.3080600@ti.com> <1346430709.15463.15.camel@vkoul-mobl4>
- <5040E6C7.6030106@ti.com> <1346432577.15463.16.camel@vkoul-mobl4>
- <1346461349.2806.4.camel@vkoul-mobl4>
-Message-ID: <20120901131442.GE27758@beef>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Sat, 01 Sep 2012 15:20:16 +0100
+Subject: [PATCH v2] ARM: Build dtb files in all target
+In-Reply-To: <20120831223219.GA6906@n2100.arm.linux.org.uk>
+References: <1346303687-7795-1-git-send-email-andrew@lunn.ch>
+ <20120830165224.GR19437@titan.lakedaemon.net>
+ <20120830172304.GA18957@n2100.arm.linux.org.uk>
+ <20120830183711.GY19437@titan.lakedaemon.net>
+ <20120830191412.GC18957@n2100.arm.linux.org.uk>
+ <1346447515.13980.19.camel@deadeye.wl.decadent.org.uk>
+ <20120831223219.GA6906@n2100.arm.linux.org.uk>
+Message-ID: <1346509216.13980.23.camel@deadeye.wl.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 01, 2012 at 06:32:29AM +0530, Vinod Koul wrote:
-> On Fri, 2012-08-31 at 22:32 +0530, Vinod Koul wrote:
-> > On Fri, 2012-08-31 at 22:01 +0530, Sekhar Nori wrote:
-> > > >> Yes, this was the problem. Since the SPI driver now depends on
-> > > >> CONFIG_TI_EDMA for basic operation may be select CONFIG_TI_EDMA in
-> > > >> Kconfig if SPI is enabled? That should do until the fallback to PIO
-> > > is
-> > > >> implemented.
-> > > > Then this should be enabled for SPI. Care to send a patch
+On Fri, 2012-08-31 at 23:32 +0100, Russell King - ARM Linux wrote:
+> On Fri, Aug 31, 2012 at 02:11:55PM -0700, Ben Hutchings wrote:
+> > On Thu, 2012-08-30 at 20:14 +0100, Russell King - ARM Linux wrote:
+> > > On Thu, Aug 30, 2012 at 02:37:11PM -0400, Jason Cooper wrote:
+> > > > On Thu, Aug 30, 2012 at 06:23:04PM +0100, Russell King - ARM Linux wrote:
+> > > > > On Thu, Aug 30, 2012 at 12:52:24PM -0400, Jason Cooper wrote:
+> > > > > > I've CC'd stable to see if they want to pick this up.
+> > > > > 
+> > > > > That's not how stable works - and you'll probably receive a standard form
+> > > > > whinge from them about that.  Please read up on the submission requirements
+> > > > > to the stable kernel trees.
+> > > > 
+> > > > Ah, thanks.  usually, I just add the Cc: line for fixes I send to
+> > > > arm-soc.  Since this patch affects more than just kirkwood/marvell, I
+> > > > didn't feel it was appropriate to pull it in through my tree.
 > > > 
-> > > By 'this' you mean the Kconfig select? Then there should be no need of
-> > > a
-> > > new patch for this. It can be part of this patch itself, no? 
-> > Either way is okay for me.
-> And am in good mood :)
+> > > Yes, you put the Cc: line in the commit, but you don't actually send it
+> > > to that address.
+> > [...]
+> > 
+> > It's OK to cc the stable address when submitting to the relevant
+> > subsystem maintainer *as well as* including the cc: line in the commit
+> > message.  It just can't be used as a substitute for the commit line.
+> 
+> No it is not.  It seems you also need to read
+> Documentation/stable_kernel_rules.txt
+[...]
 
-I am as well...thanks for taking care of the patch to address the Kconfig
-issue and applying. It's nice to return from holiday and not have to do
-anything with this series. :)
+None of which contradicts what I said above.  There is no need for
+people to specifically filter out stable at vger.kernel.org from mail
+recipients.  I never see any complaints from Greg or others when patches
+have it cc'd in both the commit message and the mail header; only when
+it is in the mail header *only*.
 
--Matt
+Ben.
 
-> Applied all with this as well
-> 
-> >From b5f14330590118e6a0659255476c0f24ab681e05 Mon Sep 17 00:00:00 2001
-> From: Vinod Koul <vinod.koul@linux.intel.com>
-> Date: Sat, 1 Sep 2012 06:29:22 +0530
-> Subject: [PATCH] spi: davici - make davinci select edma
-> 
-> Reported-by: Sekhar Nori <nsekhar@ti.com>
-> Signed-off-by: Vinod Koul <vinod.koul@linux.intel.com>
-> ---
->  drivers/spi/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-> index 5f84b55..b9fb9a1 100644
-> --- a/drivers/spi/Kconfig
-> +++ b/drivers/spi/Kconfig
-> @@ -134,6 +134,7 @@ config SPI_DAVINCI
->  	tristate "Texas Instruments DaVinci/DA8x/OMAP-L/AM1x SoC SPI
-> controller"
->  	depends on ARCH_DAVINCI
->  	select SPI_BITBANG
-> +	select TI_EDMA
->  	help
->  	  SPI master controller for DaVinci/DA8x/OMAP-L/AM1x SPI modules.
->  
-> -- 
-> 1.7.9.5
-> 
-> 
-> 
-> -- 
-> ~Vinod Koul
-> Intel Corp.
-> 
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+-- 
+Ben Hutchings
+Theory and practice are closer in theory than in practice.
+                                - John Levine, moderator of comp.compilers
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120901/484b5bae/attachment.sig>
