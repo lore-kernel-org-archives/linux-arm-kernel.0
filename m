@@ -1,15 +1,35 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 31 Aug 2012 17:47:25 -0700
-Subject: [PATCH 3/3] ASoC: Davinci: evm: Fix typo in cpu dai name
-In-Reply-To: <1346417459-30042-4-git-send-email-gururaja.hebbar@ti.com>
-References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
- <1346417459-30042-4-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <20120901004724.GC21451@opensource.wolfsonmicro.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 31 Aug 2012 21:48:30 -0400 (EDT)
+Subject: [PATCH 2/2] ARM: allow for ATAGS to be configured out when DT
+ support is selected
+In-Reply-To: <CACRpkdZqgjkOOfR7b9Fs8uixkDAnjj-VFmSfYQ_eN1-GuZtb+Q@mail.gmail.com>
+References: <1346361008-7320-1-git-send-email-nicolas.pitre@linaro.org>
+ <1346361008-7320-2-git-send-email-nicolas.pitre@linaro.org>
+ <CACRpkdZqgjkOOfR7b9Fs8uixkDAnjj-VFmSfYQ_eN1-GuZtb+Q@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1208312145520.1784@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2012 at 06:20:59PM +0530, Hebbar, Gururaja wrote:
-> Fix typo caused by recent commit (cf53756 - ASoC: davinci: davinci-pcm
-> does not need to be a plaform_driver)
+On Sat, 1 Sep 2012, Linus Walleij wrote:
 
-Applied, thanks.
+> On Thu, Aug 30, 2012 at 11:10 PM, Nicolas Pitre
+> <nicolas.pitre@linaro.org> wrote:
+> 
+> > Now that ATAGS support is well contained, we can easily remove it from
+> > the kernel build if so desired.  It has to explicitly be disabled, and
+> > only when DT support is selected.
+> 
+> I patched this on top of my Integrator patch stack and disabled
+> the ATAGS, it just works.
+> 
+> Tested-by: Linus Walleij <linus.walleij@linaro.org>
+
+Thanks.
+
+> I'd suggest you to put this into Russells tracker then?
+
+Certainly.  I just wanted someone else than myself to test it / look at it 
+before I do so.
+
+
+Nicolas
