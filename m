@@ -1,42 +1,85 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 1 Sep 2012 18:32:47 +0000
-Subject: [PATCH 2/6 v2] ARM: integrator: check PL010 device name rather
- than base address
-In-Reply-To: <1346471760-23993-2-git-send-email-linus.walleij@linaro.org>
+Date: Sat, 1 Sep 2012 18:41:58 +0000
+Subject: [PATCH 4/6 v2] ARM: integrator: initial device tree support
+In-Reply-To: <1346471760-23993-4-git-send-email-linus.walleij@linaro.org>
 References: <1346471760-23993-1-git-send-email-linus.walleij@linaro.org>
- <1346471760-23993-2-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201209011832.47805.arnd@arndb.de>
+ <1346471760-23993-3-git-send-email-linus.walleij@linaro.org>
+ <1346471760-23993-4-git-send-email-linus.walleij@linaro.org>
+Message-ID: <201209011841.58977.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Saturday 01 September 2012, Linus Walleij wrote:
-> In the PL010 UART callback a comparison against the base address is
-> done to figure out which UART is doing the callback. This does not
-> play well with device tree, so let's check the dev_name() of the
-> device instead.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Hmm, I think the dev_name would also not be that nice, because it changes
-after the conversion to DT is complete.
+> diff --git a/arch/arm/boot/dts/integratorcp.dts b/arch/arm/boot/dts/integratorcp.dts
+> new file mode 100644
+> index 0000000..8fad5a1
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/integratorcp.dts
+> @@ -0,0 +1,69 @@
+> +/*
+> + * Device Tree for the ARM Integrator/CP platform
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	model = "ARM Integrator/CP";
+> +	compatible = "arm,integrator-cp";
+> +	ranges;
+> +
+> +	aliases {
+> +		arm,integrator-clocksource = &timer2;
+> +		arm,integrator-clockevent = &timer1;
+> +	};
 
->  arch/arm/mach-integrator/core.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
-> index 5ba4bc8..67ea181 100644
-> --- a/arch/arm/mach-integrator/core.c
-> +++ b/arch/arm/mach-integrator/core.c
-> @@ -100,7 +100,7 @@ static void integrator_uart_set_mctrl(struct amba_device *dev, void __iomem *bas
->  {
->         unsigned int ctrls = 0, ctrlc = 0, rts_mask, dtr_mask;
+It looks like this file is almost a direct superset of the integratorap.dts
+file. How about including the other file from here and just adding the
+extra nodes and overriding the few bits that are actually different?
+
 >  
-> -       if (dev == &uart0_device) {
-> +       if (!strcmp(dev_name(&dev->dev), "uart0")) {
->                 rts_mask = 1 << 4;
->                 dtr_mask = 1 << 5;
->         } else {
+> +#ifdef CONFIG_OF
+> +
+...
+> +DT_MACHINE_START(INTEGRATOR_AP_DT, "ARM Integrator/AP (Device Tree)")
+> +	.reserve	= integrator_reserve,
+> +	.map_io		= ap_map_io,
+> +	.nr_irqs	= NR_IRQS_INTEGRATOR_AP,
+> +	.init_early	= ap_init_early,
+> +	.init_irq	= ap_init_irq_of,
+> +	.handle_irq	= fpga_handle_irq,
+> +	.timer		= &ap_of_timer,
+> +	.init_machine	= ap_init,
+> +	.restart	= integrator_restart,
+> +	.dt_compat      = ap_dt_board_compat,
+> +MACHINE_END
+> +
+> +#else
+> +
+...
+>  MACHINE_START(INTEGRATOR, "ARM-Integrator")
+>  	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
+>  	.atag_offset	= 0x100,
+> @@ -486,3 +571,5 @@ MACHINE_START(INTEGRATOR, "ARM-Integrator")
+>  	.init_machine	= ap_init,
+>  	.restart	= integrator_restart,
+>  MACHINE_END
+> +
+> +#endif
 
-Maybe it's possible to compare the base pointer against INTEGRATOR_UART0_BASE instead?
+I think we discussed this before. It would be nice to replace the #if/#else
+with 
+
+#ifdef CONFIG_OF
+...
+#endif
+#ifdef CONFIG_ATAG
+...
+#endif
+
+so you can actually support both in the same binary. The other alternative
+would be to remove the ATAG boot capability right away, as some other
+platforms have done when they moved to DT.
 
 	Arnd
