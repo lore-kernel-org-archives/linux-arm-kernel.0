@@ -1,124 +1,75 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Sat, 1 Sep 2012 12:51:04 +0000
-Subject: [PATCH RESEND v4 2/3] arm/dts: AM33XX: Configure pinmuxs for
- user leds control on Bone
-In-Reply-To: <6D25CE9A-4FA3-4F1E-9549-6A512F2FDCEC@dominion.thruhere.net>
-References: <1346141454-18786-1-git-send-email-anilkumar@ti.com>
- <1346141454-18786-3-git-send-email-anilkumar@ti.com>
- <20120830203505.GB1303@atomide.com>
- <C1D7B7D4-D576-4256-83F3-09689B4087C3@dominion.thruhere.net>
- <331ABD5ECB02734CA317220B2BBEABC13EA234A9@DBDE01.ent.ti.com>
- <6D25CE9A-4FA3-4F1E-9549-6A512F2FDCEC@dominion.thruhere.net>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA23682@DBDE01.ent.ti.com>
+From: mporter@ti.com (Matt Porter)
+Date: Sat, 1 Sep 2012 09:14:42 -0400
+Subject: [PATCH v3 3/3] spi: spi-davinci: convert to DMA engine API
+In-Reply-To: <1346461349.2806.4.camel@vkoul-mobl4>
+References: <1345684176-21472-1-git-send-email-mporter@ti.com>
+ <1345684176-21472-4-git-send-email-mporter@ti.com>
+ <503F75C0.1050507@ti.com> <20120830144307.GA26737@beef>
+ <5040E00A.3080600@ti.com> <1346430709.15463.15.camel@vkoul-mobl4>
+ <5040E6C7.6030106@ti.com> <1346432577.15463.16.camel@vkoul-mobl4>
+ <1346461349.2806.4.camel@vkoul-mobl4>
+Message-ID: <20120901131442.GE27758@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Koen,
+On Sat, Sep 01, 2012 at 06:32:29AM +0530, Vinod Koul wrote:
+> On Fri, 2012-08-31 at 22:32 +0530, Vinod Koul wrote:
+> > On Fri, 2012-08-31 at 22:01 +0530, Sekhar Nori wrote:
+> > > >> Yes, this was the problem. Since the SPI driver now depends on
+> > > >> CONFIG_TI_EDMA for basic operation may be select CONFIG_TI_EDMA in
+> > > >> Kconfig if SPI is enabled? That should do until the fallback to PIO
+> > > is
+> > > >> implemented.
+> > > > Then this should be enabled for SPI. Care to send a patch
+> > > 
+> > > By 'this' you mean the Kconfig select? Then there should be no need of
+> > > a
+> > > new patch for this. It can be part of this patch itself, no? 
+> > Either way is okay for me.
+> And am in good mood :)
 
-On Sat, Sep 01, 2012 at 16:17:35, Koen Kooi wrote:
-> 
-> 
-> Op 1 sep. 2012 om 09:01 heeft "AnilKumar, Chimata" <anilkumar@ti.com> het volgende geschreven:
-> 
-> > Hi Koen,
-> > 
-> > On Fri, Aug 31, 2012 at 21:23:18, Koen Kooi wrote:
-> >> 
-> >> Op 30 aug. 2012, om 22:35 heeft Tony Lindgren <tony@atomide.com> het volgende geschreven:
-> >> 
-> >>> * AnilKumar Ch <anilkumar@ti.com> [120828 01:11]:
-> >>>> Adds GPIO pinctrl nodes to am3358_pinmux master node to control
-> >>>> user leds (USR0, USR1, USR2 and USR3) present on BeagleBone.
-> >>>> 
-> >>>> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
-> >>>> ---
-> >>>> arch/arm/boot/dts/am335x-bone.dts |   14 ++++++++++++++
-> >>>> 1 file changed, 14 insertions(+)
-> >>>> 
-> >>>> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-> >>>> index a7906cb..58f5042 100644
-> >>>> --- a/arch/arm/boot/dts/am335x-bone.dts
-> >>>> +++ b/arch/arm/boot/dts/am335x-bone.dts
-> >>>> @@ -18,6 +18,20 @@
-> >>>>        reg = <0x80000000 0x10000000>; /* 256 MB */
-> >>>>    };
-> >>>> 
-> >>>> +    am3358_pinmux: pinmux at 44E10800 {
-> >>>> +        pinctrl-names = "default";
-> >>>> +        pinctrl-0 = <&userled_pins>;
-> >>>> +
-> >>>> +        userled_pins: pinmux_userled_pins {
-> >>>> +            pinctrl-single,pins = <
-> >>>> +                0x54 0x7    /* gpmc_a5.gpio1_21, OUTPUT | MODE7 */
-> >>>> +                0x58 0x17    /* gpmc_a6.gpio1_22, OUTPUT_PULLUP | MODE7 */
-> >>>> +                0x5C 0x7    /* gpmc_a7.gpio1_23, OUTPUT | MODE7 */
-> >>>> +                0x60 0x17    /* gpmc_a8.gpio1_24, OUTPUT_PULLUP | MODE7 */
-> >>>> +            >;
-> >>>> +        };
-> >>>> +    };
-> >>>> +
-> >>> 
-> >>> Looks like this patch should also claim these pins by the led driver.
-> >>> Then the led driver should just do pinctrl_get_select_default(&pdev->dev)
-> >>> in it's probe function to set the pins.
-> >> 
-> >> FWIW, I've been using this for a while now:
-> >> 
-> >> +       leds {
-> >> +               compatible = "gpio-leds";
-> >> +               heartbeat {
-> >> +                       label = "beaglebone::usr0";
-> >> +                       gpios = <&gpio2 21 0>;
-> >> +                       linux,default-trigger = "heartbeat";
-> >> +               };
-> >> +
-> >> +               mmc {
-> >> +                       label = "beaglebone:usr1";
-> >> +                       gpios = <&gpio2 22 0>;
-> >> +                       linux,default-trigger = "mmc0";
-> >> +               };
-> > 
-> > Thanks for the inputs, similar data but not exact is added to
-> > v5 series.
-> > 
-> > +        gpio-leds {
-> > +            compatible = "gpio-leds";
-> > +            pinctrl-names = "default";
-> > +            pinctrl-0 = <&userled_pins>;
-> > +
-> > +            led0 {
-> > +                label = "status:green:user0";
-> > +                gpios = <&gpio2 21 0>;
-> > +                default-state = "off";
-> > +            };
-> > +
-> > +            led1 {
-> > +                label = "status:green:user1";
-> > +                gpios = <&gpio2 22 0>;
-> > +                default-state = "off";
-> > +            };
-> > +
-> > +            led2 {
-> > +                label = "status:green:user2";
-> > +                gpios = <&gpio2 23 0>;
-> > +                default-state = "off";
-> > +            };
-> > +
-> > +            led3 {
-> > +                label = "status:green:user3";
-> > +                gpios = <&gpio2 24 0>;
-> > +                default-state = "off";
-> > +            };
-> > +        };
-> > +
-> > 
-> > Can you review my v5 patches and tell me if there are any
-> > modifications/changes required?
-> 
-> It would be nice to keep de heartbeat and mmc triggers like we have in the 3.2 kernel that ships with the bone
-> 
+I am as well...thanks for taking care of the patch to address the Kconfig
+issue and applying. It's nice to return from holiday and not have to do
+anything with this series. :)
 
-I will merge your changes and repost the patches.
+-Matt
 
-Thanks
-AnilKumar
+> Applied all with this as well
+> 
+> >From b5f14330590118e6a0659255476c0f24ab681e05 Mon Sep 17 00:00:00 2001
+> From: Vinod Koul <vinod.koul@linux.intel.com>
+> Date: Sat, 1 Sep 2012 06:29:22 +0530
+> Subject: [PATCH] spi: davici - make davinci select edma
+> 
+> Reported-by: Sekhar Nori <nsekhar@ti.com>
+> Signed-off-by: Vinod Koul <vinod.koul@linux.intel.com>
+> ---
+>  drivers/spi/Kconfig |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+> index 5f84b55..b9fb9a1 100644
+> --- a/drivers/spi/Kconfig
+> +++ b/drivers/spi/Kconfig
+> @@ -134,6 +134,7 @@ config SPI_DAVINCI
+>  	tristate "Texas Instruments DaVinci/DA8x/OMAP-L/AM1x SoC SPI
+> controller"
+>  	depends on ARCH_DAVINCI
+>  	select SPI_BITBANG
+> +	select TI_EDMA
+>  	help
+>  	  SPI master controller for DaVinci/DA8x/OMAP-L/AM1x SPI modules.
+>  
+> -- 
+> 1.7.9.5
+> 
+> 
+> 
+> -- 
+> ~Vinod Koul
+> Intel Corp.
+> 
+> _______________________________________________
+> Davinci-linux-open-source mailing list
+> Davinci-linux-open-source at linux.davincidsp.com
+> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
