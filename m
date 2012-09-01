@@ -1,49 +1,77 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 31 Aug 2012 16:52:12 -0700
-Subject: [PATCH 5/9] ARM: OMAP2+: Remove hardcoded twl4030 gpio_base,
- irq_base and irq_end
-In-Reply-To: <20120831005230.28732.1131.stgit@muffinssi.local>
-References: <20120831004828.28732.902.stgit@muffinssi.local>
- <20120831005230.28732.1131.stgit@muffinssi.local>
-Message-ID: <20120831235212.GS1303@atomide.com>
+Date: Fri, 31 Aug 2012 17:26:20 -0700
+Subject: [PATCH 1/4] ARM: OMAP: Remove unused old gpio-switch.h
+In-Reply-To: <20120901002534.23715.28654.stgit@muffinssi.local>
+References: <20120901002534.23715.28654.stgit@muffinssi.local>
+Message-ID: <20120901002620.23715.3322.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120830 17:53]:
-> We can't use hardcoded interrupts for SPARSE_IRQ, and can replace
-> the hardcoded gpio_base with twl_gpiochip.base after it's been
-> allocated.
-...
+This is no longer used anywhere.
 
-> --- a/include/linux/mfd/twl6040.h
-> +++ b/include/linux/mfd/twl6040.h
-> @@ -194,7 +194,6 @@ struct twl6040_vibra_data {
->  
->  struct twl6040_platform_data {
->  	int audpwron_gpio;	/* audio power-on gpio */
-> -	unsigned int irq_base;
->  
->  	struct twl6040_codec_data *codec;
->  	struct twl6040_vibra_data *vibra;
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/plat-omap/include/plat/gpio-switch.h |   54 -------------------------
+ 1 file changed, 54 deletions(-)
+ delete mode 100644 arch/arm/plat-omap/include/plat/gpio-switch.h
 
-The platform_data irq_base is not being used it seems..
-
-> @@ -222,7 +221,6 @@ struct twl6040 {
->  	unsigned int mclk;
->  
->  	unsigned int irq;
-> -	unsigned int irq_base;
->  	u8 irq_masks_cur;
->  	u8 irq_masks_cache;
->  };
-
-..but irq_base here is still in use as that's where the value from
-irq_alloc_descs() is being stored to. So I'll drop the changes to
-struct twl6040 from this patch as otherwise twl6040 code won't compile.
-
-Turns out I did not have twl6040 selected in any of the testconfigs
-that I ran.
-
-Regards,
-
-Tony
+diff --git a/arch/arm/plat-omap/include/plat/gpio-switch.h b/arch/arm/plat-omap/include/plat/gpio-switch.h
+deleted file mode 100644
+index 10da0e0..0000000
+--- a/arch/arm/plat-omap/include/plat/gpio-switch.h
++++ /dev/null
+@@ -1,54 +0,0 @@
+-/*
+- * GPIO switch definitions
+- *
+- * Copyright (C) 2006 Nokia Corporation
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#ifndef __ASM_ARCH_OMAP_GPIO_SWITCH_H
+-#define __ASM_ARCH_OMAP_GPIO_SWITCH_H
+-
+-#include <linux/types.h>
+-
+-/* Cover:
+- *	high -> closed
+- *	low  -> open
+- * Connection:
+- *	high -> connected
+- *	low  -> disconnected
+- * Activity:
+- *	high -> active
+- *	low  -> inactive
+- *
+- */
+-#define OMAP_GPIO_SWITCH_TYPE_COVER		0x0000
+-#define OMAP_GPIO_SWITCH_TYPE_CONNECTION	0x0001
+-#define OMAP_GPIO_SWITCH_TYPE_ACTIVITY		0x0002
+-#define OMAP_GPIO_SWITCH_FLAG_INVERTED		0x0001
+-#define OMAP_GPIO_SWITCH_FLAG_OUTPUT		0x0002
+-
+-struct omap_gpio_switch {
+-	const char *name;
+-	s16 gpio;
+-	unsigned flags:4;
+-	unsigned type:4;
+-
+-	/* Time in ms to debounce when transitioning from
+-	 * inactive state to active state. */
+-	u16 debounce_rising;
+-	/* Same for transition from active to inactive state. */
+-	u16 debounce_falling;
+-
+-	/* notify board-specific code about state changes */
+-	void (* notify)(void *data, int state);
+-	void *notify_data;
+-};
+-
+-/* Call at init time only */
+-extern void omap_register_gpio_switches(const struct omap_gpio_switch *tbl,
+-					int count);
+-
+-#endif
