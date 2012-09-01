@@ -1,27 +1,62 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 1 Sep 2012 02:23:48 +0200
-Subject: [PATCH 2/2] ARM: allow for ATAGS to be configured out when DT
- support is selected
-In-Reply-To: <1346361008-7320-2-git-send-email-nicolas.pitre@linaro.org>
-References: <1346361008-7320-1-git-send-email-nicolas.pitre@linaro.org>
- <1346361008-7320-2-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <CACRpkdZqgjkOOfR7b9Fs8uixkDAnjj-VFmSfYQ_eN1-GuZtb+Q@mail.gmail.com>
+From: vkoul@infradead.org (Vinod Koul)
+Date: Sat, 01 Sep 2012 06:32:29 +0530
+Subject: [PATCH v3 3/3] spi: spi-davinci: convert to DMA engine API
+In-Reply-To: <1346432577.15463.16.camel@vkoul-mobl4>
+References: <1345684176-21472-1-git-send-email-mporter@ti.com>
+ <1345684176-21472-4-git-send-email-mporter@ti.com>
+ <503F75C0.1050507@ti.com> <20120830144307.GA26737@beef>
+ <5040E00A.3080600@ti.com> <1346430709.15463.15.camel@vkoul-mobl4>
+ <5040E6C7.6030106@ti.com> <1346432577.15463.16.camel@vkoul-mobl4>
+Message-ID: <1346461349.2806.4.camel@vkoul-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2012 at 11:10 PM, Nicolas Pitre
-<nicolas.pitre@linaro.org> wrote:
+On Fri, 2012-08-31 at 22:32 +0530, Vinod Koul wrote:
+> On Fri, 2012-08-31 at 22:01 +0530, Sekhar Nori wrote:
+> > >> Yes, this was the problem. Since the SPI driver now depends on
+> > >> CONFIG_TI_EDMA for basic operation may be select CONFIG_TI_EDMA in
+> > >> Kconfig if SPI is enabled? That should do until the fallback to PIO
+> > is
+> > >> implemented.
+> > > Then this should be enabled for SPI. Care to send a patch
+> > 
+> > By 'this' you mean the Kconfig select? Then there should be no need of
+> > a
+> > new patch for this. It can be part of this patch itself, no? 
+> Either way is okay for me.
+And am in good mood :)
 
-> Now that ATAGS support is well contained, we can easily remove it from
-> the kernel build if so desired.  It has to explicitly be disabled, and
-> only when DT support is selected.
+Applied all with this as well
 
-I patched this on top of my Integrator patch stack and disabled
-the ATAGS, it just works.
+>From b5f14330590118e6a0659255476c0f24ab681e05 Mon Sep 17 00:00:00 2001
+From: Vinod Koul <vinod.koul@linux.intel.com>
+Date: Sat, 1 Sep 2012 06:29:22 +0530
+Subject: [PATCH] spi: davici - make davinci select edma
 
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
+Reported-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Vinod Koul <vinod.koul@linux.intel.com>
+---
+ drivers/spi/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-I'd suggest you to put this into Russells tracker then?
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 5f84b55..b9fb9a1 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -134,6 +134,7 @@ config SPI_DAVINCI
+ 	tristate "Texas Instruments DaVinci/DA8x/OMAP-L/AM1x SoC SPI
+controller"
+ 	depends on ARCH_DAVINCI
+ 	select SPI_BITBANG
++	select TI_EDMA
+ 	help
+ 	  SPI master controller for DaVinci/DA8x/OMAP-L/AM1x SPI modules.
+ 
+-- 
+1.7.9.5
 
-Yours,
-Linus Walleij
+
+
+-- 
+~Vinod Koul
+Intel Corp.
