@@ -1,64 +1,51 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 1 Sep 2012 16:49:22 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 1 Sep 2012 16:25:44 +0100
 Subject: [PATCH v2] ARM: Build dtb files in all target
-In-Reply-To: <1346303687-7795-1-git-send-email-andrew@lunn.ch>
+In-Reply-To: <1346509216.13980.23.camel@deadeye.wl.decadent.org.uk>
 References: <1346303687-7795-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20120901144922.GA25277@lunn.ch>
+ <20120830165224.GR19437@titan.lakedaemon.net>
+ <20120830172304.GA18957@n2100.arm.linux.org.uk>
+ <20120830183711.GY19437@titan.lakedaemon.net>
+ <20120830191412.GC18957@n2100.arm.linux.org.uk>
+ <1346447515.13980.19.camel@deadeye.wl.decadent.org.uk>
+ <20120831223219.GA6906@n2100.arm.linux.org.uk>
+ <1346509216.13980.23.camel@deadeye.wl.decadent.org.uk>
+Message-ID: <20120901152544.GB24085@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2012 at 07:14:47AM +0200, Andrew Lunn wrote:
-> Tools like kisskb are good at finding build regressions in the kernel
-> sources. However, regressions in the DT desscriptions are not found,
-> because generally these build systems don't build the DT binary blobs.
+On Sat, Sep 01, 2012 at 03:20:16PM +0100, Ben Hutchings wrote:
+> On Fri, 2012-08-31 at 23:32 +0100, Russell King - ARM Linux wrote:
+> > On Fri, Aug 31, 2012 at 02:11:55PM -0700, Ben Hutchings wrote:
+> > > On Thu, 2012-08-30 at 20:14 +0100, Russell King - ARM Linux wrote:
+> > > > On Thu, Aug 30, 2012 at 02:37:11PM -0400, Jason Cooper wrote:
+> > > > > On Thu, Aug 30, 2012 at 06:23:04PM +0100, Russell King - ARM Linux wrote:
+> > > > > > On Thu, Aug 30, 2012 at 12:52:24PM -0400, Jason Cooper wrote:
+> > > > > > > I've CC'd stable to see if they want to pick this up.
+> > > > > > 
+> > > > > > That's not how stable works - and you'll probably receive a standard form
+> > > > > > whinge from them about that.  Please read up on the submission requirements
+> > > > > > to the stable kernel trees.
+> > > > > 
+> > > > > Ah, thanks.  usually, I just add the Cc: line for fixes I send to
+> > > > > arm-soc.  Since this patch affects more than just kirkwood/marvell, I
+> > > > > didn't feel it was appropriate to pull it in through my tree.
+> > > > 
+> > > > Yes, you put the Cc: line in the commit, but you don't actually send it
+> > > > to that address.
+> > > [...]
+> > > 
+> > > It's OK to cc the stable address when submitting to the relevant
+> > > subsystem maintainer *as well as* including the cc: line in the commit
+> > > message.  It just can't be used as a substitute for the commit line.
+> > 
+> > No it is not.  It seems you also need to read
+> > Documentation/stable_kernel_rules.txt
+> [...]
 > 
-> Extend the ARM all target to build all enabled DTB files.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
-> v2: * in the help test
->     Only invoke dtbs if CONFIGUSE_OF=y
-> 
->  arch/arm/Makefile |    9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 30eae87..0457ef4 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -268,7 +268,12 @@ else
->  KBUILD_IMAGE := zImage
->  endif
->  
-> -all:	$(KBUILD_IMAGE)
-> +# Build the DT binary blobs if we have OF configured
-> +ifeq ($(CONFIG_USE_OF),y)
-> +KBUILD_DTBS := dtbs
-> +endif
-> +
-> +all:	$(KBUILD_IMAGE) $(KBUILD_DTBS)
->  
->  boot := arch/arm/boot
->  
-> @@ -306,7 +311,7 @@ define archhelp
->    echo  '  uImage        - U-Boot wrapped zImage'
->    echo  '  bootpImage    - Combined zImage and initial RAM disk' 
->    echo  '                  (supply initrd image via make variable INITRD=<path>)'
-> -  echo  '  dtbs          - Build device tree blobs for enabled boards'
-> +  echo  '* dtbs          - Build device tree blobs for enabled boards'
->    echo  '  install       - Install uncompressed kernel'
->    echo  '  zinstall      - Install compressed kernel'
->    echo  '  uinstall      - Install U-Boot wrapped compressed kernel'
-> -- 
-> 1.7.10.4
-> 
+> None of which contradicts what I said above.  There is no need for
 
-Hi Folks
-
-Would anybody like to comment about the patch itself?
-
-Assuming the patch is acceptable, through which maintainers tree
-should it be submitted?
-
-       Thanks
-  	  Andrew
+I really can't believe you just said that.  You have not read the document.
+Further discussion is pointless until you do, and I suggest everyone ignores
+your comments on this subject until you have read the document, because you
+are currently misleading people.
