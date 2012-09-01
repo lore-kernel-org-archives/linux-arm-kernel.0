@@ -1,62 +1,64 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Sat, 01 Sep 2012 15:20:16 +0100
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 1 Sep 2012 16:49:22 +0200
 Subject: [PATCH v2] ARM: Build dtb files in all target
-In-Reply-To: <20120831223219.GA6906@n2100.arm.linux.org.uk>
+In-Reply-To: <1346303687-7795-1-git-send-email-andrew@lunn.ch>
 References: <1346303687-7795-1-git-send-email-andrew@lunn.ch>
- <20120830165224.GR19437@titan.lakedaemon.net>
- <20120830172304.GA18957@n2100.arm.linux.org.uk>
- <20120830183711.GY19437@titan.lakedaemon.net>
- <20120830191412.GC18957@n2100.arm.linux.org.uk>
- <1346447515.13980.19.camel@deadeye.wl.decadent.org.uk>
- <20120831223219.GA6906@n2100.arm.linux.org.uk>
-Message-ID: <1346509216.13980.23.camel@deadeye.wl.decadent.org.uk>
+Message-ID: <20120901144922.GA25277@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-08-31 at 23:32 +0100, Russell King - ARM Linux wrote:
-> On Fri, Aug 31, 2012 at 02:11:55PM -0700, Ben Hutchings wrote:
-> > On Thu, 2012-08-30 at 20:14 +0100, Russell King - ARM Linux wrote:
-> > > On Thu, Aug 30, 2012 at 02:37:11PM -0400, Jason Cooper wrote:
-> > > > On Thu, Aug 30, 2012 at 06:23:04PM +0100, Russell King - ARM Linux wrote:
-> > > > > On Thu, Aug 30, 2012 at 12:52:24PM -0400, Jason Cooper wrote:
-> > > > > > I've CC'd stable to see if they want to pick this up.
-> > > > > 
-> > > > > That's not how stable works - and you'll probably receive a standard form
-> > > > > whinge from them about that.  Please read up on the submission requirements
-> > > > > to the stable kernel trees.
-> > > > 
-> > > > Ah, thanks.  usually, I just add the Cc: line for fixes I send to
-> > > > arm-soc.  Since this patch affects more than just kirkwood/marvell, I
-> > > > didn't feel it was appropriate to pull it in through my tree.
-> > > 
-> > > Yes, you put the Cc: line in the commit, but you don't actually send it
-> > > to that address.
-> > [...]
-> > 
-> > It's OK to cc the stable address when submitting to the relevant
-> > subsystem maintainer *as well as* including the cc: line in the commit
-> > message.  It just can't be used as a substitute for the commit line.
+On Thu, Aug 30, 2012 at 07:14:47AM +0200, Andrew Lunn wrote:
+> Tools like kisskb are good at finding build regressions in the kernel
+> sources. However, regressions in the DT desscriptions are not found,
+> because generally these build systems don't build the DT binary blobs.
 > 
-> No it is not.  It seems you also need to read
-> Documentation/stable_kernel_rules.txt
-[...]
+> Extend the ARM all target to build all enabled DTB files.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+> v2: * in the help test
+>     Only invoke dtbs if CONFIGUSE_OF=y
+> 
+>  arch/arm/Makefile |    9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 30eae87..0457ef4 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -268,7 +268,12 @@ else
+>  KBUILD_IMAGE := zImage
+>  endif
+>  
+> -all:	$(KBUILD_IMAGE)
+> +# Build the DT binary blobs if we have OF configured
+> +ifeq ($(CONFIG_USE_OF),y)
+> +KBUILD_DTBS := dtbs
+> +endif
+> +
+> +all:	$(KBUILD_IMAGE) $(KBUILD_DTBS)
+>  
+>  boot := arch/arm/boot
+>  
+> @@ -306,7 +311,7 @@ define archhelp
+>    echo  '  uImage        - U-Boot wrapped zImage'
+>    echo  '  bootpImage    - Combined zImage and initial RAM disk' 
+>    echo  '                  (supply initrd image via make variable INITRD=<path>)'
+> -  echo  '  dtbs          - Build device tree blobs for enabled boards'
+> +  echo  '* dtbs          - Build device tree blobs for enabled boards'
+>    echo  '  install       - Install uncompressed kernel'
+>    echo  '  zinstall      - Install compressed kernel'
+>    echo  '  uinstall      - Install U-Boot wrapped compressed kernel'
+> -- 
+> 1.7.10.4
+> 
 
-None of which contradicts what I said above.  There is no need for
-people to specifically filter out stable at vger.kernel.org from mail
-recipients.  I never see any complaints from Greg or others when patches
-have it cc'd in both the commit message and the mail header; only when
-it is in the mail header *only*.
+Hi Folks
 
-Ben.
+Would anybody like to comment about the patch itself?
 
--- 
-Ben Hutchings
-Theory and practice are closer in theory than in practice.
-                                - John Levine, moderator of comp.compilers
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120901/484b5bae/attachment.sig>
+Assuming the patch is acceptable, through which maintainers tree
+should it be submitted?
+
+       Thanks
+  	  Andrew
