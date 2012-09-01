@@ -1,58 +1,110 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sat, 1 Sep 2012 07:53:26 +0200
-Subject: [PATCH v3 0/3] Add a generic cpufreq-cpu0 driver
-In-Reply-To: <20120831064236.GB3271@r65073-Latitude-D630>
-References: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
- <20120831064236.GB3271@r65073-Latitude-D630>
-Message-ID: <201209010753.27095.rjw@sisk.pl>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Sat, 1 Sep 2012 07:01:09 +0000
+Subject: [PATCH RESEND v4 2/3] arm/dts: AM33XX: Configure pinmuxs for
+ user leds control on Bone
+In-Reply-To: <C1D7B7D4-D576-4256-83F3-09689B4087C3@dominion.thruhere.net>
+References: <1346141454-18786-1-git-send-email-anilkumar@ti.com>
+ <1346141454-18786-3-git-send-email-anilkumar@ti.com>
+ <20120830203505.GB1303@atomide.com>
+ <C1D7B7D4-D576-4256-83F3-09689B4087C3@dominion.thruhere.net>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA234A9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, August 31, 2012, Shawn Guo wrote:
-> Ping, Rafael.
+Hi Koen,
 
-Yeah, sorry for the delay.
-
-I'll get to it when I get back from LinuxCon/Plumbers Conf. (early next week).
-
-Thanks,
-Rafael
-
-
-> On Fri, Aug 10, 2012 at 01:37:22PM +0800, Shawn Guo wrote:
-> > Patch "cpufreq: Add a generic cpufreq-cpu0 driver" has a dependency
-> > on following branch.
-> > 
-> >  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git topic/tol
-> > 
-> > Changes since v2:
-> > * Drop patch "regulator: add a new API regulator_set_voltage_tol()",
-> >   which has been applied on regulator tree as above.
-> > * Rewrite function of_init_opp_table to make it concise.
-> >   
-> > Regards,
-> > Shawn
-> > 
-> > Richard Zhao (1):
-> >   ARM: add cpufreq transiton notifier to adjust loops_per_jiffy for smp
-> > 
-> > Shawn Guo (2):
-> >   PM / OPP: Initialize OPP table from device tree
-> >   cpufreq: Add a generic cpufreq-cpu0 driver
-> > 
-> >  .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |   55 ++++
-> >  Documentation/devicetree/bindings/power/opp.txt    |   25 ++
-> >  arch/arm/kernel/smp.c                              |   54 ++++
-> >  drivers/base/power/opp.c                           |   47 ++++
-> >  drivers/cpufreq/Kconfig                            |   11 +
-> >  drivers/cpufreq/Makefile                           |    2 +
-> >  drivers/cpufreq/cpufreq-cpu0.c                     |  271 ++++++++++++++++++++
-> >  include/linux/opp.h                                |    8 +
-> >  8 files changed, 473 insertions(+), 0 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> >  create mode 100644 Documentation/devicetree/bindings/power/opp.txt
-> >  create mode 100644 drivers/cpufreq/cpufreq-cpu0.c
-> > 
+On Fri, Aug 31, 2012 at 21:23:18, Koen Kooi wrote:
 > 
+> Op 30 aug. 2012, om 22:35 heeft Tony Lindgren <tony@atomide.com> het volgende geschreven:
 > 
+> > * AnilKumar Ch <anilkumar@ti.com> [120828 01:11]:
+> >> Adds GPIO pinctrl nodes to am3358_pinmux master node to control
+> >> user leds (USR0, USR1, USR2 and USR3) present on BeagleBone.
+> >> 
+> >> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> >> ---
+> >> arch/arm/boot/dts/am335x-bone.dts |   14 ++++++++++++++
+> >> 1 file changed, 14 insertions(+)
+> >> 
+> >> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+> >> index a7906cb..58f5042 100644
+> >> --- a/arch/arm/boot/dts/am335x-bone.dts
+> >> +++ b/arch/arm/boot/dts/am335x-bone.dts
+> >> @@ -18,6 +18,20 @@
+> >> 		reg = <0x80000000 0x10000000>; /* 256 MB */
+> >> 	};
+> >> 
+> >> +	am3358_pinmux: pinmux at 44E10800 {
+> >> +		pinctrl-names = "default";
+> >> +		pinctrl-0 = <&userled_pins>;
+> >> +
+> >> +		userled_pins: pinmux_userled_pins {
+> >> +			pinctrl-single,pins = <
+> >> +				0x54 0x7	/* gpmc_a5.gpio1_21, OUTPUT | MODE7 */
+> >> +				0x58 0x17	/* gpmc_a6.gpio1_22, OUTPUT_PULLUP | MODE7 */
+> >> +				0x5C 0x7	/* gpmc_a7.gpio1_23, OUTPUT | MODE7 */
+> >> +				0x60 0x17	/* gpmc_a8.gpio1_24, OUTPUT_PULLUP | MODE7 */
+> >> +			>;
+> >> +		};
+> >> +	};
+> >> +
+> > 
+> > Looks like this patch should also claim these pins by the led driver.
+> > Then the led driver should just do pinctrl_get_select_default(&pdev->dev)
+> > in it's probe function to set the pins.
 > 
+> FWIW, I've been using this for a while now:
+> 
+> +       leds {
+> +               compatible = "gpio-leds";
+> +               heartbeat {
+> +                       label = "beaglebone::usr0";
+> +                       gpios = <&gpio2 21 0>;
+> +                       linux,default-trigger = "heartbeat";
+> +               };
+> +
+> +               mmc {
+> +                       label = "beaglebone:usr1";
+> +                       gpios = <&gpio2 22 0>;
+> +                       linux,default-trigger = "mmc0";
+> +               };
+
+Thanks for the inputs, similar data but not exact is added to
+v5 series.
+
++		gpio-leds {
++			compatible = "gpio-leds";
++			pinctrl-names = "default";
++			pinctrl-0 = <&userled_pins>;
++
++			led0 {
++				label = "status:green:user0";
++				gpios = <&gpio2 21 0>;
++				default-state = "off";
++			};
++
++			led1 {
++				label = "status:green:user1";
++				gpios = <&gpio2 22 0>;
++				default-state = "off";
++			};
++
++			led2 {
++				label = "status:green:user2";
++				gpios = <&gpio2 23 0>;
++				default-state = "off";
++			};
++
++			led3 {
++				label = "status:green:user3";
++				gpios = <&gpio2 24 0>;
++				default-state = "off";
++			};
++		};
++
+
+Can you review my v5 patches and tell me if there are any
+modifications/changes required?
+
+Thanks
+AnilKumar
