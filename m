@@ -1,62 +1,38 @@
-From: vkoul@infradead.org (Vinod Koul)
-Date: Sat, 01 Sep 2012 06:32:29 +0530
-Subject: [PATCH v3 3/3] spi: spi-davinci: convert to DMA engine API
-In-Reply-To: <1346432577.15463.16.camel@vkoul-mobl4>
-References: <1345684176-21472-1-git-send-email-mporter@ti.com>
- <1345684176-21472-4-git-send-email-mporter@ti.com>
- <503F75C0.1050507@ti.com> <20120830144307.GA26737@beef>
- <5040E00A.3080600@ti.com> <1346430709.15463.15.camel@vkoul-mobl4>
- <5040E6C7.6030106@ti.com> <1346432577.15463.16.camel@vkoul-mobl4>
-Message-ID: <1346461349.2806.4.camel@vkoul-mobl4>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 1 Sep 2012 03:14:15 +0200
+Subject: [PATCH 3/6] ARM: plat-versatile: add DT support to FPGA IRQ
+ controller
+In-Reply-To: <201208161350.49063.arnd@arndb.de>
+References: <1345119357-22702-1-git-send-email-linus.walleij@linaro.org>
+ <201208161350.49063.arnd@arndb.de>
+Message-ID: <CACRpkdamVhbW_nizDODTu2wg7wX+4ENnLMGH=RoHkG4hwn3Yfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-08-31 at 22:32 +0530, Vinod Koul wrote:
-> On Fri, 2012-08-31 at 22:01 +0530, Sekhar Nori wrote:
-> > >> Yes, this was the problem. Since the SPI driver now depends on
-> > >> CONFIG_TI_EDMA for basic operation may be select CONFIG_TI_EDMA in
-> > >> Kconfig if SPI is enabled? That should do until the fallback to PIO
-> > is
-> > >> implemented.
-> > > Then this should be enabled for SPI. Care to send a patch
-> > 
-> > By 'this' you mean the Kconfig select? Then there should be no need of
-> > a
-> > new patch for this. It can be part of this patch itself, no? 
-> Either way is okay for me.
-And am in good mood :)
+On Thu, Aug 16, 2012 at 3:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 16 August 2012, Linus Walleij wrote:
+>> +- irq-start: the u32 hardware IRQ number of the first interrupt handled by
+>> +  this FPGA IRQ instance - since there may be many FPGA IRQ controller
+>> +  instances, each will have its unique hardware offset number.
+>
+> The irq-start value is a Linux specific invention, the hardware doesn't
+> know anything about these. As long as you depend on specific IRQ numbers
+> to get assigned, I would use something like auxdata to find the
+> start number.
 
-Applied all with this as well
+Sorry that does not work. Auxdata is not used with IRQ controllers,
+only with devices.
 
->From b5f14330590118e6a0659255476c0f24ab681e05 Mon Sep 17 00:00:00 2001
-From: Vinod Koul <vinod.koul@linux.intel.com>
-Date: Sat, 1 Sep 2012 06:29:22 +0530
-Subject: [PATCH] spi: davici - make davinci select edma
+of_irq_init() will dereference the .data field of struct of_device_id
+and use as a callback function to initialize the IRQ controller, no
+chance to pass any other data that way.
 
-Reported-by: Sekhar Nori <nsekhar@ti.com>
-Signed-off-by: Vinod Koul <vinod.koul@linux.intel.com>
----
- drivers/spi/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+> When all devices get their IRQ numbers from the device
+> tree, you can move to linear IRQ domains instead of legacy, and let
+> the irq domain code pick the numbers.
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 5f84b55..b9fb9a1 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -134,6 +134,7 @@ config SPI_DAVINCI
- 	tristate "Texas Instruments DaVinci/DA8x/OMAP-L/AM1x SoC SPI
-controller"
- 	depends on ARCH_DAVINCI
- 	select SPI_BITBANG
-+	select TI_EDMA
- 	help
- 	  SPI master controller for DaVinci/DA8x/OMAP-L/AM1x SPI modules.
- 
--- 
-1.7.9.5
+It seems I have no other choice here than to move directly to
+linear numbers or atleast dynamically allocated descriptors.
 
-
-
--- 
-~Vinod Koul
-Intel Corp.
+Yours,
+Linus Walleij
