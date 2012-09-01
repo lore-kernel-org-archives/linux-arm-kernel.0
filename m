@@ -1,46 +1,58 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Sun, 30 Sep 2012 23:34:50 -0600
-Subject: [PATCH 1/1] Fix segfault in DTC
-In-Reply-To: <20120929235342.GA23078@truffula.fritz.box>
-References: <1348526885-2113-1-git-send-email-mmayer@broadcom.com>
- <1348595889-6495-1-git-send-email-mmayer@broadcom.com>
- <1348595889-6495-2-git-send-email-mmayer@broadcom.com>
- <20120925233054.GL9800@truffula.fritz.box> <50624393.30607@broadcom.com>
- <20120926003508.GB31993@truffula.fritz.box> <50632F78.4030709@broadcom.com>
- <5065D9C7.40906@wwwdotorg.org> <E1THfgr-0006Fg-KT@jdl.com>
- <5065F4FD.4010807@wwwdotorg.org> <20120929235342.GA23078@truffula.fritz.box>
-Message-ID: <50692B7A.8000405@wwwdotorg.org>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sat, 1 Sep 2012 07:53:26 +0200
+Subject: [PATCH v3 0/3] Add a generic cpufreq-cpu0 driver
+In-Reply-To: <20120831064236.GB3271@r65073-Latitude-D630>
+References: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
+ <20120831064236.GB3271@r65073-Latitude-D630>
+Message-ID: <201209010753.27095.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29/2012 05:53 PM, David Gibson wrote:
-> On Fri, Sep 28, 2012 at 01:05:33PM -0600, Stephen Warren wrote:
->> On 09/28/2012 12:53 PM, Jon Loeliger wrote:
->>>>>
->>>>> Yeah, seems like the kernel DTC is quite old.
->>>>
->>>> FYI, I'm working on a patch to the kernel to bring in the latest dtc.
->>>
->>> Awesome.  Thank you.
->>>
->>>> I've run a regression test vs. the old dtc in the kernel ...
->>>
->>> Which is the icky step.  Again, thank you.
->>>
->>>> ... and found that
->>>> some of the PowerPC .dts files don't compile with the new dtc (but did
->>>> with the old), all due to non-existent labels/paths being referenced.
->>>> I'll try and track down whether this is a regression in dtc, or simply
->>>> buggy .dts files that weren't noticed before.
->>>
->>> I think you should just smack the PowerPC guys. :-)
->>
->> For the record in this thread, it was a regression I introduced into dtc
->> - the patch I just sent was for this.
-> 
-> I would be nice to add a testcase for this regression into dtc.
+On Friday, August 31, 2012, Shawn Guo wrote:
+> Ping, Rafael.
 
-The issue here was caused by uninitialized memory, so it would, I think,
-be basically impossible to create a test-case that would be guaranteed
-to fail because of this; it'd depend on the internal details of the
-malloc library and how/when it re-used previously free()d memory blocks.
+Yeah, sorry for the delay.
+
+I'll get to it when I get back from LinuxCon/Plumbers Conf. (early next week).
+
+Thanks,
+Rafael
+
+
+> On Fri, Aug 10, 2012 at 01:37:22PM +0800, Shawn Guo wrote:
+> > Patch "cpufreq: Add a generic cpufreq-cpu0 driver" has a dependency
+> > on following branch.
+> > 
+> >  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git topic/tol
+> > 
+> > Changes since v2:
+> > * Drop patch "regulator: add a new API regulator_set_voltage_tol()",
+> >   which has been applied on regulator tree as above.
+> > * Rewrite function of_init_opp_table to make it concise.
+> >   
+> > Regards,
+> > Shawn
+> > 
+> > Richard Zhao (1):
+> >   ARM: add cpufreq transiton notifier to adjust loops_per_jiffy for smp
+> > 
+> > Shawn Guo (2):
+> >   PM / OPP: Initialize OPP table from device tree
+> >   cpufreq: Add a generic cpufreq-cpu0 driver
+> > 
+> >  .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |   55 ++++
+> >  Documentation/devicetree/bindings/power/opp.txt    |   25 ++
+> >  arch/arm/kernel/smp.c                              |   54 ++++
+> >  drivers/base/power/opp.c                           |   47 ++++
+> >  drivers/cpufreq/Kconfig                            |   11 +
+> >  drivers/cpufreq/Makefile                           |    2 +
+> >  drivers/cpufreq/cpufreq-cpu0.c                     |  271 ++++++++++++++++++++
+> >  include/linux/opp.h                                |    8 +
+> >  8 files changed, 473 insertions(+), 0 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+> >  create mode 100644 Documentation/devicetree/bindings/power/opp.txt
+> >  create mode 100644 drivers/cpufreq/cpufreq-cpu0.c
+> > 
+> 
+> 
+> 
