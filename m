@@ -1,29 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 1 Sep 2012 18:22:34 +0000
-Subject: [PATCH 1/3] ARM: move debug macros to common location
-In-Reply-To: <1346437761-17039-1-git-send-email-robherring2@gmail.com>
-References: <1346437761-17039-1-git-send-email-robherring2@gmail.com>
-Message-ID: <201209011822.34824.arnd@arndb.de>
+Date: Sat, 1 Sep 2012 20:25:27 +0000
+Subject: [PATCH 2/2] ARM: allow for ATAGS to be configured out when DT
+ support is selected
+In-Reply-To: <1346361008-7320-2-git-send-email-nicolas.pitre@linaro.org>
+References: <1346361008-7320-1-git-send-email-nicolas.pitre@linaro.org>
+ <1346361008-7320-2-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <201209012025.27962.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 August 2012, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On Thursday 30 August 2012, Nicolas Pitre wrote:
+> Now that ATAGS support is well contained, we can easily remove it from
+> the kernel build if so desired.  It has to explicitly be disabled, and
+> only when DT support is selected.
 > 
-> Based on suggestion by Russell King, create a common location for debug
-> macros and select the included debug macro file using config option.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  arch/arm/Kconfig.debug          |    5 +++
->  arch/arm/include/debug/icedcc.S |   90 +++++++++++++++++++++++++++++++++++++++
->  arch/arm/kernel/debug.S         |   87 ++-----------------------------------
->  arch/arm/kernel/head.S          |    4 +-
->  4 files changed, 100 insertions(+), 86 deletions(-)
->  create mode 100644 arch/arm/include/debug/icedcc.S
+> Note: disabling kernel ATAGS support does not prevent the usage of
+> CONFIG_ARM_ATAG_DTB_COMPAT.
 
-I haven't followed that discussion, but it sure sounds like a good idea.
+> ...
+
+> +config ATAGS
+> +	bool "Support for the traditional ATAGS boot data passing" if USE_OF
+> +	default y
+> +	help
+> +	  This is the traditional way of passing data to the kernel at boot
+> +	  time. If you are solely relying on the flattened device tree (or
+> +	  the ARM_ATAG_DTB_COMPAT option) then you may unselect this option
+> +	  to remove ATAGS support from your kernel binary.  If unsure,
+> +	  leave this to y.
+
+That's a clever way of implementing it, I had not though of making it an
+optional default-y symbol.
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Any preference which tree to use for merging this?
+Should we do patches to the individual platforms bsaed on this to disable
+the ATAG based board files when CONFIG_ATAG is disabled?
+
+	Arnd
