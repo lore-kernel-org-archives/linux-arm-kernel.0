@@ -1,35 +1,26 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 31 Aug 2012 21:48:30 -0400 (EDT)
-Subject: [PATCH 2/2] ARM: allow for ATAGS to be configured out when DT
- support is selected
-In-Reply-To: <CACRpkdZqgjkOOfR7b9Fs8uixkDAnjj-VFmSfYQ_eN1-GuZtb+Q@mail.gmail.com>
-References: <1346361008-7320-1-git-send-email-nicolas.pitre@linaro.org>
- <1346361008-7320-2-git-send-email-nicolas.pitre@linaro.org>
- <CACRpkdZqgjkOOfR7b9Fs8uixkDAnjj-VFmSfYQ_eN1-GuZtb+Q@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1208312145520.1784@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 31 Aug 2012 19:06:54 -0700
+Subject: [PATCH 2/4] ARM: OMAP: Split plat/hardware.h, introduce local
+ hardware.h and soc.h for omap2+
+In-Reply-To: <20120901002753.GA21451@opensource.wolfsonmicro.com>
+References: <20120901002534.23715.28654.stgit@muffinssi.local>
+ <20120901002622.23715.68557.stgit@muffinssi.local>
+ <20120901002753.GA21451@opensource.wolfsonmicro.com>
+Message-ID: <20120901020654.GT1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 1 Sep 2012, Linus Walleij wrote:
-
-> On Thu, Aug 30, 2012 at 11:10 PM, Nicolas Pitre
-> <nicolas.pitre@linaro.org> wrote:
+* Mark Brown <broonie@opensource.wolfsonmicro.com> [120831 17:28]:
+> On Fri, Aug 31, 2012 at 05:26:22PM -0700, Tony Lindgren wrote:
+> > As the plat and mach includes need to disappear for single zImage work,
+> > we need to remove plat/hardware.h.
 > 
-> > Now that ATAGS support is well contained, we can easily remove it from
-> > the kernel build if so desired.  It has to explicitly be disabled, and
-> > only when DT support is selected.
+> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > 
-> I patched this on top of my Integrator patch stack and disabled
-> the ATAGS, it just works.
-> 
-> Tested-by: Linus Walleij <linus.walleij@linaro.org>
+> There's a topic/omap branch in ASoC which you can pull in to help reduce
+> conflicts, or I could merge this there if that's sensible.
 
-Thanks.
+Thanks. Did not see it yet at git://opensource.wolfsonmicro.com/linux-2.6-asoc,
+maybe it's not yet pushed out?
 
-> I'd suggest you to put this into Russells tracker then?
-
-Certainly.  I just wanted someone else than myself to test it / look at it 
-before I do so.
-
-
-Nicolas
+Tony
