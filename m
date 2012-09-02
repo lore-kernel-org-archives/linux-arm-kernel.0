@@ -1,45 +1,37 @@
-From: gerg@snapgear.com (Greg Ungerer)
-Date: Sun, 2 Sep 2012 21:46:27 +1000
-Subject: [PATCH v2] ARM: ks8695: convert to generic time and clocksource
-In-Reply-To: <CACRpkdY0i77U5kGoNzWj2KwtyJ=ayptNGTE_7=95tJ0v4Tv5xw@mail.gmail.com>
-References: <1346456995-21572-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdY0i77U5kGoNzWj2KwtyJ=ayptNGTE_7=95tJ0v4Tv5xw@mail.gmail.com>
-Message-ID: <50434713.8090604@snapgear.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Sun, 02 Sep 2012 20:25:47 +0800
+Subject: [PATCH] ARM: ux500: Fix build error due to missing include of
+ asm/pmu.h in cpu-db8500.c
+Message-ID: <1346588747.7909.2.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2012 10:14 AM, Linus Walleij wrote:
-> On Sat, Sep 1, 2012 at 1:49 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> Old platforms using ancient gettimeoffset() and other arcane
->> APIs are standing in the way of cleaning up the ARM kernel.
->>
->> This is an attempt at blind-coding a generic time and clocksource
->> driver for the platform by way of a datasheet and looking at the
->> old code, it'd be great if someone who is actually using this
->> machine could test it.
->>
->> If noone volunteers to do this I will instead propose a patch
->> deleting the machine altogether.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> ChangeLog v1->v2:
->> - Corrected the mask when setting clockevents from & TMCON_T1EN
->>    to & ~TMCON_T1EN so it doesn't shut down the clock source.
->
-> BTW: Greg if this would happen to work - could you try to enable
-> CONFIG_TICK_ONESHOT and CONFIG_NO_HZ as well to see
-> if we can work fine in oneshot mode as well?
+Include asm/pmu.h to fix below build error:
 
-Will do. Let you know how it goes.
+  CC      arch/arm/mach-ux500/cpu-db8500.o
+arch/arm/mach-ux500/cpu-db8500.c:118:8: error: variable 'db8500_pmu_platdata' has initializer but incomplete type
+arch/arm/mach-ux500/cpu-db8500.c:119:2: error: unknown field 'handle_irq' specified in initializer
+arch/arm/mach-ux500/cpu-db8500.c:119:2: warning: excess elements in struct initializer [enabled by default]
+arch/arm/mach-ux500/cpu-db8500.c:119:2: warning: (near initialization for 'db8500_pmu_platdata') [enabled by default]
+make[1]: *** [arch/arm/mach-ux500/cpu-db8500.o] Error 1
+make: *** [arch/arm/mach-ux500] Error 2
 
-Regards
-Greg
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+ arch/arm/mach-ux500/cpu-db8500.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 8169f2c..3ce7d94 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -18,6 +18,7 @@
+ #include <linux/io.h>
+ #include <linux/mfd/abx500/ab8500.h>
+ 
++#include <asm/pmu.h>
+ #include <asm/mach/map.h>
+ #include <plat/gpio-nomadik.h>
+ #include <mach/hardware.h>
 -- 
-------------------------------------------------------------------------
-Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
-SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
-8 Gardner Close,                            FAX:         +61 7 3891 3630
-Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
+1.7.9.5
