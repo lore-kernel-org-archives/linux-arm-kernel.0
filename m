@@ -1,37 +1,43 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Sun, 02 Sep 2012 20:25:47 +0800
-Subject: [PATCH] ARM: ux500: Fix build error due to missing include of
- asm/pmu.h in cpu-db8500.c
-Message-ID: <1346588747.7909.2.camel@phoenix>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Sun, 02 Sep 2012 14:54:27 +0100
+Subject: [PATCH v2] ARM: Build dtb files in all target
+In-Reply-To: <20120901201105.GD24085@n2100.arm.linux.org.uk>
+References: <20120830172304.GA18957@n2100.arm.linux.org.uk>
+ <20120830183711.GY19437@titan.lakedaemon.net>
+ <20120830191412.GC18957@n2100.arm.linux.org.uk>
+ <1346447515.13980.19.camel@deadeye.wl.decadent.org.uk>
+ <20120831223219.GA6906@n2100.arm.linux.org.uk>
+ <1346509216.13980.23.camel@deadeye.wl.decadent.org.uk>
+ <20120901152544.GB24085@n2100.arm.linux.org.uk>
+ <20120901163235.GB748@mannheim-rule.local>
+ <20120901182207.GC24085@n2100.arm.linux.org.uk>
+ <20120901183859.GA958@mannheim-rule.local>
+ <20120901201105.GD24085@n2100.arm.linux.org.uk>
+Message-ID: <1346594067.4958.7.camel@deadeye.wl.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include asm/pmu.h to fix below build error:
+On Sat, 2012-09-01 at 21:11 +0100, Russell King - ARM Linux wrote:
+[...]
+> It is as clear as mud now when stable at vger.kernel.org should be Cc'd and
+> when it should not.
+[...]
 
-  CC      arch/arm/mach-ux500/cpu-db8500.o
-arch/arm/mach-ux500/cpu-db8500.c:118:8: error: variable 'db8500_pmu_platdata' has initializer but incomplete type
-arch/arm/mach-ux500/cpu-db8500.c:119:2: error: unknown field 'handle_irq' specified in initializer
-arch/arm/mach-ux500/cpu-db8500.c:119:2: warning: excess elements in struct initializer [enabled by default]
-arch/arm/mach-ux500/cpu-db8500.c:119:2: warning: (near initialization for 'db8500_pmu_platdata') [enabled by default]
-make[1]: *** [arch/arm/mach-ux500/cpu-db8500.o] Error 1
-make: *** [arch/arm/mach-ux500] Error 2
+Perhaps what you're missing is that it's an open mailing list (as was
+stable at kernel.org), not an alias for 'the stable team'.  As with any
+other kernel mailing list, you don't need to get explicit permission to
+send mail to it.  So there is no 'should not'.
 
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
- arch/arm/mach-ux500/cpu-db8500.c |    1 +
- 1 file changed, 1 insertion(+)
+Ben.
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 8169f2c..3ce7d94 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -18,6 +18,7 @@
- #include <linux/io.h>
- #include <linux/mfd/abx500/ab8500.h>
- 
-+#include <asm/pmu.h>
- #include <asm/mach/map.h>
- #include <plat/gpio-nomadik.h>
- #include <mach/hardware.h>
 -- 
-1.7.9.5
+Ben Hutchings
+Theory and practice are closer in theory than in practice.
+                                - John Levine, moderator of comp.compilers
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120902/4e3526a3/attachment.sig>
