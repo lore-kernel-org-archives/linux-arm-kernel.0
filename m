@@ -1,28 +1,51 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 2 Sep 2012 08:23:19 -0700
-Subject: [GIT PULL] Renesas ARM-based SoC fix for v3.6
-In-Reply-To: <1346305139-24337-1-git-send-email-horms@verge.net.au>
-References: <1346305139-24337-1-git-send-email-horms@verge.net.au>
-Message-ID: <CAOesGMi6XRD_R0m1_vpAJkoVBKX-qpuym+9br4aw5jYmfzD3XQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 2 Sep 2012 16:54:49 +0100
+Subject: [PATCH 2/2] ARM: allow for ATAGS to be configured out when DT
+ support is selected
+In-Reply-To: <1346361008-7320-2-git-send-email-nicolas.pitre@linaro.org>
+References: <1346361008-7320-1-git-send-email-nicolas.pitre@linaro.org>
+ <1346361008-7320-2-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20120902155449.GF18950@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2012 at 10:38 PM, Simon Horman <horms@verge.net.au> wrote:
-> Hi Olof, Hi Arnd,
->
-> please consider the following boot-failure fix for the Marzen board from
-> Morimoto-san for inclusion in 3.6.
->
-> ----------------------------------------------------------------
-> The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
->
->   Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git fixes
+On Thu, Aug 30, 2012 at 10:10:08PM +0100, Nicolas Pitre wrote:
+> Now that ATAGS support is well contained, we can easily remove it from
+> the kernel build if so desired.  It has to explicitly be disabled, and
+> only when DT support is selected.
+> 
+> Note: disabling kernel ATAGS support does not prevent the usage of
+> CONFIG_ARM_ATAG_DTB_COMPAT.
+> 
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> ---
+>  arch/arm/Kconfig         | 26 +++++++++++++++++++-------
+>  arch/arm/kernel/Makefile |  5 +++--
+>  arch/arm/kernel/atags.h  | 11 +++++++++++
+>  3 files changed, 33 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index c5f9ae5dbd..5c7302e208 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1891,12 +1891,6 @@ config CC_STACKPROTECTOR
+>  	  neutralized via a kernel panic.
+>  	  This feature requires gcc version 4.2 or above.
+>  
+> -config DEPRECATED_PARAM_STRUCT
+> -	bool "Provide old way to pass kernel parameters"
+> -	help
+> -	  This was deprecated in 2001 and announced to live on for 5 years.
+> -	  Some old boot loaders still use this way.
+> -
+>  endmenu
 
-Pulled, thanks.
+Since you're in this area, do we need to carry this forward? If somebody is
+using it then obviously we have to keep it but it might be worth asking
+around.
 
+Back on topic, this looks good to me:
 
--Olof
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
