@@ -1,85 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 1 Sep 2012 18:41:58 +0000
-Subject: [PATCH 4/6 v2] ARM: integrator: initial device tree support
-In-Reply-To: <1346471760-23993-4-git-send-email-linus.walleij@linaro.org>
-References: <1346471760-23993-1-git-send-email-linus.walleij@linaro.org>
- <1346471760-23993-3-git-send-email-linus.walleij@linaro.org>
- <1346471760-23993-4-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201209011841.58977.arnd@arndb.de>
+Date: Sun, 2 Sep 2012 18:49:53 +0000
+Subject: [PATCH 4/4] ARM: ks8695: convert to generic time and clocksource
+In-Reply-To: <CACRpkdZ0Gw5H_yRcN2CmC+F8NtUcySTrLehuzZdWrbDwL4HHWw@mail.gmail.com>
+References: <1346264842-20411-1-git-send-email-linus.walleij@linaro.org>
+ <504057A8.7030302@snapgear.com>
+ <CACRpkdZ0Gw5H_yRcN2CmC+F8NtUcySTrLehuzZdWrbDwL4HHWw@mail.gmail.com>
+Message-ID: <201209021849.54348.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 01 September 2012, Linus Walleij wrote:
+On Friday 31 August 2012, Linus Walleij wrote:
+> On Fri, Aug 31, 2012 at 8:20 AM, Greg Ungerer <gerg@snapgear.com> wrote:
+> 
+> > Ok, tested on a KS8695 based machine. Boots and runs, obviously
+> > clock is basically working. But 'date' never shows the time
+> > increasing:
+> >
+> >   # date
+> >   Thu Jan  1 00:00:00 UTC 1970
+> >   # date
+> >   Thu Jan  1 00:00:00 UTC 1970
+> >   # date
+> >   Thu Jan  1 00:00:00 UTC 1970
+> >   #
+> >
+> > And yes, that did work before applying this patch :-)
+> 
+> That mean clockevent is running but not clocksource.
+> 
+> And I think that is because I forgot a ~ in the mask for disabling
+> the T1 timer, so setting up the clockevent disables the clocksource ...
+> 
+> I'll send out a fixed version, plese test!
+> 
+> (BTW I had not clue the 68K maintainer had a platform like
+> this, fun!)
 
-> diff --git a/arch/arm/boot/dts/integratorcp.dts b/arch/arm/boot/dts/integratorcp.dts
-> new file mode 100644
-> index 0000000..8fad5a1
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/integratorcp.dts
-> @@ -0,0 +1,69 @@
-> +/*
-> + * Device Tree for the ARM Integrator/CP platform
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +	model = "ARM Integrator/CP";
-> +	compatible = "arm,integrator-cp";
-> +	ranges;
-> +
-> +	aliases {
-> +		arm,integrator-clocksource = &timer2;
-> +		arm,integrator-clockevent = &timer1;
-> +	};
+Note that this platform is one of those we talked about removing
+from the kernel for potentially being completely unused. Do we have
+reason to believe that people are still using ks8695 for anything
+with new kernels?
 
-It looks like this file is almost a direct superset of the integratorap.dts
-file. How about including the other file from here and just adding the
-extra nodes and overriding the few bits that are actually different?
-
->  
-> +#ifdef CONFIG_OF
-> +
-...
-> +DT_MACHINE_START(INTEGRATOR_AP_DT, "ARM Integrator/AP (Device Tree)")
-> +	.reserve	= integrator_reserve,
-> +	.map_io		= ap_map_io,
-> +	.nr_irqs	= NR_IRQS_INTEGRATOR_AP,
-> +	.init_early	= ap_init_early,
-> +	.init_irq	= ap_init_irq_of,
-> +	.handle_irq	= fpga_handle_irq,
-> +	.timer		= &ap_of_timer,
-> +	.init_machine	= ap_init,
-> +	.restart	= integrator_restart,
-> +	.dt_compat      = ap_dt_board_compat,
-> +MACHINE_END
-> +
-> +#else
-> +
-...
->  MACHINE_START(INTEGRATOR, "ARM-Integrator")
->  	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
->  	.atag_offset	= 0x100,
-> @@ -486,3 +571,5 @@ MACHINE_START(INTEGRATOR, "ARM-Integrator")
->  	.init_machine	= ap_init,
->  	.restart	= integrator_restart,
->  MACHINE_END
-> +
-> +#endif
-
-I think we discussed this before. It would be nice to replace the #if/#else
-with 
-
-#ifdef CONFIG_OF
-...
-#endif
-#ifdef CONFIG_ATAG
-...
-#endif
-
-so you can actually support both in the same binary. The other alternative
-would be to remove the ATAG boot capability right away, as some other
-platforms have done when they moved to DT.
+If any of you are doing that, we'll definitely keep the port around,
+the idea is not to break anything that people are actually using.
+In that case, I would like to see a MAINTAINERS entry for the platform
+so we have a contact for someone who is able to ack and maybe test
+patches.
 
 	Arnd
