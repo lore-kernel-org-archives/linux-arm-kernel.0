@@ -1,20 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 2 Sep 2012 08:21:55 -0700
-Subject: [GIT PULL V2] kirkwood fix for v3.6
-In-Reply-To: <20120831155039.GI19437@titan.lakedaemon.net>
-References: <20120830171428.GT19437@titan.lakedaemon.net>
- <20120831155039.GI19437@titan.lakedaemon.net>
-Message-ID: <CAOesGMi2OZmSt3JdVBzO=hFdL1-Wa6xjMkZKz2nNtnbkknbyfw@mail.gmail.com>
+Date: Sun, 2 Sep 2012 08:23:19 -0700
+Subject: [GIT PULL] Renesas ARM-based SoC fix for v3.6
+In-Reply-To: <1346305139-24337-1-git-send-email-horms@verge.net.au>
+References: <1346305139-24337-1-git-send-email-horms@verge.net.au>
+Message-ID: <CAOesGMi6XRD_R0m1_vpAJkoVBKX-qpuym+9br4aw5jYmfzD3XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2012 at 8:50 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> The following changes since commit b74ffd85e32d44e8ed405a2a0a175ef4cd39cf67:
+On Wed, Aug 29, 2012 at 10:38 PM, Simon Horman <horms@verge.net.au> wrote:
+> Hi Olof, Hi Arnd,
 >
->   ARM: Kirkwood: fix Makefile.boot (2012-08-15 13:58:52 +0000)
+> please consider the following boot-failure fix for the Marzen board from
+> Morimoto-san for inclusion in 3.6.
+>
+> ----------------------------------------------------------------
+> The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
+>
+>   Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
 >
 > are available in the git repository at:
->   git://git.infradead.org/users/jcooper/linux.git fixes-for-v3.6-v2
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git fixes
 
 Pulled, thanks.
 
