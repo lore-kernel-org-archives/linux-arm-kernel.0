@@ -1,67 +1,43 @@
-From: alexg@meprolight.com (Alex Gershgorin)
-Date: Sun, 2 Sep 2012 09:27:20 +0300
-Subject: [PATCH] ARM: i.MX35: Implement camera and keypad clocks
-Message-ID: <1346567240-7114-1-git-send-email-alexg@meprolight.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 2 Sep 2012 09:30:45 +0200
+Subject: [PATCH v2 1/9] pinctrl: mvebu: pinctrl driver core
+In-Reply-To: <503AF8B4.1070206@wwwdotorg.org>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1345623750-10645-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1345623750-10645-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <5035445B.6000500@wwwdotorg.org>
+ <CABJ1b_Tdr80DGqb-FRzwDbF3m7g6fBguk5GtRAfRUYx5Sqy_cA@mail.gmail.com>
+ <50366E44.4030606@wwwdotorg.org> <50369305.6050304@gmail.com>
+ <50369FEE.8000003@wwwdotorg.org> <5036B639.20608@gmail.com>
+ <5036F651.4020700@wwwdotorg.org> <5038F50E.7030807@gmail.com>
+ <503AF8B4.1070206@wwwdotorg.org>
+Message-ID: <CACRpkdYsPadKr1i8m5cCAFUUvJYUnLmc3j8evKM_6rPU5oGzRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch also adds mux and divider for camera clock.
-Tested on i.MX35-pdk. 
+On Mon, Aug 27, 2012 at 6:33 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/25/2012 08:53 AM, Sebastian Hesselbarth wrote:
+>>
+>> now I do understand but in the current driver we pass pingroups associated
+>> with the available functions, i.e. "mpp2" with "uart1", "uart2",
+>> "sdio0", aso.
+>> IMHO for the above three functions it would be better to have functions
+>> associated
+>> with the corresponding groups, i.e. "uart1" with "mpp_uart1", "mpp2",
+>> "mpp3", aso.
+>
+> The pinctrl subsystem does expect a list of functions, and for each
+> function, a list of the groups where it can be selected. I admit that
+> when I think about this, it's slightly backward, since HW typically has
+> a list of pins/groups, and for each, a certain set of functions can be
+> selected. Oh well...
 
-Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
----
- arch/arm/mach-imx/clk-imx35.c |   11 ++++++++---
- 1 files changed, 8 insertions(+), 3 deletions(-)
+I agree that this is how we engineered it, would it create big hassles
+for you to fix up the driver so it's the other way around Sebastian?
 
-diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
-index c6422fb..cebc71d 100644
---- a/arch/arm/mach-imx/clk-imx35.c
-+++ b/arch/arm/mach-imx/clk-imx35.c
-@@ -62,8 +62,8 @@ enum mx35_clks {
- 	kpp_gate, mlb_gate, mshc_gate, owire_gate, pwm_gate, rngc_gate,
- 	rtc_gate, rtic_gate, scc_gate, sdma_gate, spba_gate, spdif_gate,
- 	ssi1_gate, ssi2_gate, uart1_gate, uart2_gate, uart3_gate, usbotg_gate,
--	wdog_gate, max_gate, admux_gate, csi_gate, iim_gate, gpu2d_gate,
--	clk_max
-+	wdog_gate, max_gate, admux_gate, csi_gate, csi_div, csi_sel, iim_gate,
-+	gpu2d_gate, clk_max
- };
- 
- static struct clk *clk[clk_max];
-@@ -142,6 +142,9 @@ int __init mx35_clocks_init()
- 
- 	clk[nfc_div] = imx_clk_divider("nfc_div", "ahb", base + MX35_CCM_PDR4, 28, 4);
- 
-+	clk[csi_sel] = imx_clk_mux("csi_sel", base + MX35_CCM_PDR2, 7, 1, std_sel, ARRAY_SIZE(std_sel));
-+	clk[csi_div] = imx_clk_divider("csi_div", "csi_sel", base + MX35_CCM_PDR2, 16, 6);
-+
- 	clk[asrc_gate] = imx_clk_gate2("asrc_gate", "ipg", base + MX35_CCM_CGR0,  0);
- 	clk[pata_gate] = imx_clk_gate2("pata_gate", "ipg", base + MX35_CCM_CGR0,  2);
- 	clk[audmux_gate] = imx_clk_gate2("audmux_gate", "ipg", base + MX35_CCM_CGR0,  4);
-@@ -192,7 +195,7 @@ int __init mx35_clocks_init()
- 	clk[max_gate] = imx_clk_gate2("max_gate", "dummy", base + MX35_CCM_CGR2, 26);
- 	clk[admux_gate] = imx_clk_gate2("admux_gate", "ipg", base + MX35_CCM_CGR2, 30);
- 
--	clk[csi_gate] = imx_clk_gate2("csi_gate", "ipg", base + MX35_CCM_CGR3,  0);
-+	clk[csi_gate] = imx_clk_gate2("csi_gate", "csi_div", base + MX35_CCM_CGR3,  0);
- 	clk[iim_gate] = imx_clk_gate2("iim_gate", "ipg", base + MX35_CCM_CGR3,  2);
- 	clk[gpu2d_gate] = imx_clk_gate2("gpu2d_gate", "ahb", base + MX35_CCM_CGR3,  4);
- 
-@@ -228,6 +231,7 @@ int __init mx35_clocks_init()
- 	clk_register_clkdev(clk[i2c3_gate], NULL, "imx-i2c.2");
- 	clk_register_clkdev(clk[ipu_gate], NULL, "ipu-core");
- 	clk_register_clkdev(clk[ipu_gate], NULL, "mx3_sdc_fb");
-+	clk_register_clkdev(clk[kpp_gate], NULL, "imx-keypad");
- 	clk_register_clkdev(clk[owire_gate], NULL, "mxc_w1");
- 	clk_register_clkdev(clk[sdma_gate], NULL, "imx35-sdma");
- 	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.0");
-@@ -255,6 +259,7 @@ int __init mx35_clocks_init()
- 	clk_register_clkdev(clk[usbotg_gate], "ahb", "fsl-usb2-udc");
- 	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
- 	clk_register_clkdev(clk[nfc_div], NULL, "mxc_nand.0");
-+	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
- 
- 	clk_prepare_enable(clk[spba_gate]);
- 	clk_prepare_enable(clk[gpio1_gate]);
--- 
-1.7.0.4
+I understand that the driver is perfectly working as it is, but from
+a subsystem maintainer point of view it is annoying if one driver
+turns the concepts around and it gets hard to maintain.
+
+Yours,
+Linus Walleij
