@@ -1,37 +1,62 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Sat, 01 Sep 2012 19:02:38 -0700
-Subject: [PATCH 5/5] of: Modify c_can binding documentation
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA234C7@DBDE01.ent.ti.com>
-References: <1346405361-29711-1-git-send-email-anilkumar@ti.com>
- <1346405361-29711-6-git-send-email-anilkumar@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA234C7@DBDE01.ent.ti.com>
-Message-ID: <5042BE3E.8040808@wwwdotorg.org>
+From: jrnieder@gmail.com (Jonathan Nieder)
+Date: Sat, 1 Sep 2012 23:30:55 -0700
+Subject: When to cc stable@vger.kernel.org (Re: [PATCH v2] ARM: Build dtb
+ files in all target)
+In-Reply-To: <20120901201105.GD24085@n2100.arm.linux.org.uk>
+References: <20120830183711.GY19437@titan.lakedaemon.net>
+ <20120830191412.GC18957@n2100.arm.linux.org.uk>
+ <1346447515.13980.19.camel@deadeye.wl.decadent.org.uk>
+ <20120831223219.GA6906@n2100.arm.linux.org.uk>
+ <1346509216.13980.23.camel@deadeye.wl.decadent.org.uk>
+ <20120901152544.GB24085@n2100.arm.linux.org.uk>
+ <20120901163235.GB748@mannheim-rule.local>
+ <20120901182207.GC24085@n2100.arm.linux.org.uk>
+ <20120901183859.GA958@mannheim-rule.local>
+ <20120901201105.GD24085@n2100.arm.linux.org.uk>
+Message-ID: <20120902063055.GA1608@mannheim-rule.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2012 12:05 AM, AnilKumar, Chimata wrote:
-> On Fri, Aug 31, 2012 at 14:59:21, AnilKumar, Chimata wrote:
->> Modify c_can binding documentation according to recent review comments
->> on device tree data addition patches.
+Russell King wrote:
+(out of order for convenience)
 
->> diff --git a/Documentation/devicetree/bindings/net/can/c_can.txt b/Documentation/devicetree/bindings/net/can/c_can.txt
->> index a43f083..90a70be 100644
->> --- a/Documentation/devicetree/bindings/net/can/c_can.txt
->> +++ b/Documentation/devicetree/bindings/net/can/c_can.txt
->> @@ -8,6 +8,8 @@ Required properties:
->>  			  registers map
->>  - interrupts		: property with a value describing the interrupt
->>  			  number
->> +- status		: describes the node status either "disabled" or
->> +			  "okay"
+> Okay, if you think it's clear, then you tell me where in this text,
+> which is a direct quote from the stable_kernel_rules.txt document:
+[...]
+> it gives you permission to send a patch to the stable team email address
+> _without_ the commit ID.  Note carefully the sentence which starts "You
 
-That's a standrd property that applies to any node, and doesn't describe
-data required by the device itself (as do regs/interrupts) by simply
-whether the node is activated; I'm not sure it's worth mentioning it in
-a device-specific binding.
+Right here:
 
-A similar comment exists for the pre-existing description of
-interrupt-parent below.
+[...]
+> |  - To have the patch automatically included in the stable tree, add the tag
+> |      Cc: stable at vger.kernel.org
+> |    in the sign-off area. Once the patch is merged it will be applied to
+> |    the stable tree without anything else needing to be done by the author
+> |    or subsystem maintainer.
 
->>  Optional properties:
->>  - interrupt-parent	: The parent interrupt controller
+If the tag "Cc: stable at vger.kernel.org" is in the sign-off area, you
+may cc the stable@ list or not.  By justifying your change clearly and
+putting that tag in the sign-off area, you have done your job.
+Anything beyond that is completely up to you.
+
+That means:
+
+> In which case, why did Greg reply with his standard form email telling
+> Jason to read the stable_kernel_rules.txt document when Jason added the
+> Cc to his email?
+
+Because the "cc: stable" line was not in the sign-off area.
+
+Perhaps an extra sentence in stable_kernel_rules.txt would help.
+E.g.,
+
+    In this case, you may cc the stable at vger.kernel.org list when
+    submitting your patch to keep the stable tree maintainers
+    informed of the resulting discussion, but that is not required.
+    Once the patch is merged it will be applied to the stable tree
+    without anything else needing to be done by the author or
+    subsystem maintainer.
+
+Thanks,
+Jonathan
