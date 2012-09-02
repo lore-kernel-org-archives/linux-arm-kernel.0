@@ -1,173 +1,53 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sun,  2 Sep 2012 18:37:03 +0200
-Subject: [PATCH] ARM: Samsung: Remove unused code for the clocks debug-fs
- interface
-Message-ID: <1346603823-14422-1-git-send-email-sylvester.nawrocki@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 2 Sep 2012 18:04:34 +0100
+Subject: [PATCH v2] ARM: Build dtb files in all target
+In-Reply-To: <1346594067.4958.7.camel@deadeye.wl.decadent.org.uk>
+References: <20120830191412.GC18957@n2100.arm.linux.org.uk>
+ <1346447515.13980.19.camel@deadeye.wl.decadent.org.uk>
+ <20120831223219.GA6906@n2100.arm.linux.org.uk>
+ <1346509216.13980.23.camel@deadeye.wl.decadent.org.uk>
+ <20120901152544.GB24085@n2100.arm.linux.org.uk>
+ <20120901163235.GB748@mannheim-rule.local>
+ <20120901182207.GC24085@n2100.arm.linux.org.uk>
+ <20120901183859.GA958@mannheim-rule.local>
+ <20120901201105.GD24085@n2100.arm.linux.org.uk>
+ <1346594067.4958.7.camel@deadeye.wl.decadent.org.uk>
+Message-ID: <20120902170434.GA31141@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit f86c6660927614fcda257 "ARM: SAMSUNG: Add clkdev infrastructure"
-disabled population of the 'clocks' list - the clocks are now on the
-clkdev clock list. However, this effectively broke the existing clocks
-debug-fs interface on all Samsung platforms. Nobody complained about
-this missing feature for over one year, so remove the unused code.
+On Sun, Sep 02, 2012 at 02:54:27PM +0100, Ben Hutchings wrote:
+> On Sat, 2012-09-01 at 21:11 +0100, Russell King - ARM Linux wrote:
+> [...]
+> > It is as clear as mud now when stable at vger.kernel.org should be Cc'd and
+> > when it should not.
+> [...]
+> 
+> Perhaps what you're missing is that it's an open mailing list (as was
+> stable at kernel.org), not an alias for 'the stable team'.  As with any
+> other kernel mailing list, you don't need to get explicit permission to
+> send mail to it.  So there is no 'should not'.
 
-This functionality will be restored when switching to the common clock
-framework.
+Then please explain why people keep getting Greg's standard form "this
+is not how you submit patches for stable" when they CC a _discussion_
+to the address.
 
-Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
----
- arch/arm/plat-samsung/clock.c              |   92 ----------------------------
- arch/arm/plat-samsung/include/plat/clock.h |    8 +--
- 2 files changed, 1 insertions(+), 99 deletions(-)
+What you're saying does not tie up with what _actually_ happens in
+reality.  Therefore I can only believe that you are wrong, even though
+you may be part of "the stable team".
 
-diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
-index 65c5eca..a8a69af 100644
---- a/arch/arm/plat-samsung/clock.c
-+++ b/arch/arm/plat-samsung/clock.c
-@@ -39,25 +39,17 @@
- #include <linux/clk.h>
- #include <linux/spinlock.h>
- #include <linux/io.h>
--#if defined(CONFIG_DEBUG_FS)
--#include <linux/debugfs.h>
--#endif
+Please get your (collective) policy sorted out and properly documented,
+and you _all_ start behaving consistently.  If you want
+stable at vger.kernel.org to be a list for discussion of stable patches,
+then fine - just don't then send standard form emails telling people
+they did something wrong when they _do_ try to use it for discussion.
 
- #include <mach/hardware.h>
- #include <asm/irq.h>
+As I have pointed out many times in this thread, there is inconsistency
+between what you are saying, what Greg has said, what the documentation
+says, and the reaction that people get from Greg when they do send to
+that address.  Something needs to change, and that isn't me - it's how
+the stable stuff operates.  Because it's very confusing and inconsistent
+at the moment.
 
- #include <plat/cpu-freq.h>
--
- #include <plat/clock.h>
- #include <plat/cpu.h>
-
- #include <linux/serial_core.h>
- #include <plat/regs-serial.h> /* for s3c24xx_uart_devs */
-
--/* clock information */
--
--static LIST_HEAD(clocks);
--
- /* We originally used an mutex here, but some contexts (see resume)
-  * are calling functions such as clk_set_parent() with IRQs disabled
-  * causing an BUG to be triggered.
-@@ -381,87 +373,3 @@ int __init s3c24xx_register_baseclocks(unsigned long xtal)
-
- 	return 0;
- }
--
--#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
--/* debugfs support to trace clock tree hierarchy and attributes */
--
--static struct dentry *clk_debugfs_root;
--
--static int clk_debugfs_register_one(struct clk *c)
--{
--	int err;
--	struct dentry *d;
--	struct clk *pa = c->parent;
--	char s[255];
--	char *p = s;
--
--	p += sprintf(p, "%s", c->devname);
--
--	d = debugfs_create_dir(s, pa ? pa->dent : clk_debugfs_root);
--	if (!d)
--		return -ENOMEM;
--
--	c->dent = d;
--
--	d = debugfs_create_u8("usecount", S_IRUGO, c->dent, (u8 *)&c->usage);
--	if (!d) {
--		err = -ENOMEM;
--		goto err_out;
--	}
--
--	d = debugfs_create_u32("rate", S_IRUGO, c->dent, (u32 *)&c->rate);
--	if (!d) {
--		err = -ENOMEM;
--		goto err_out;
--	}
--	return 0;
--
--err_out:
--	debugfs_remove_recursive(c->dent);
--	return err;
--}
--
--static int clk_debugfs_register(struct clk *c)
--{
--	int err;
--	struct clk *pa = c->parent;
--
--	if (pa && !pa->dent) {
--		err = clk_debugfs_register(pa);
--		if (err)
--			return err;
--	}
--
--	if (!c->dent) {
--		err = clk_debugfs_register_one(c);
--		if (err)
--			return err;
--	}
--	return 0;
--}
--
--static int __init clk_debugfs_init(void)
--{
--	struct clk *c;
--	struct dentry *d;
--	int err;
--
--	d = debugfs_create_dir("clock", NULL);
--	if (!d)
--		return -ENOMEM;
--	clk_debugfs_root = d;
--
--	list_for_each_entry(c, &clocks, list) {
--		err = clk_debugfs_register(c);
--		if (err)
--			goto err_out;
--	}
--	return 0;
--
--err_out:
--	debugfs_remove_recursive(clk_debugfs_root);
--	return err;
--}
--late_initcall(clk_debugfs_init);
--
--#endif /* defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS) */
-diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
-index a62753d..16f3cd6 100644
---- a/arch/arm/plat-samsung/include/plat/clock.h
-+++ b/arch/arm/plat-samsung/include/plat/clock.h
-@@ -1,5 +1,4 @@
--/* linux/arch/arm/plat-s3c/include/plat/clock.h
-- *
-+/*
-  * Copyright (c) 2004-2005 Simtec Electronics
-  *	http://www.simtec.co.uk/products/SWLINUX/
-  *	Written by Ben Dooks, <ben@simtec.co.uk>
-@@ -40,8 +39,6 @@ struct clk_ops {
- };
-
- struct clk {
--	struct list_head      list;
--	struct module        *owner;
- 	struct clk           *parent;
- 	const char           *name;
- 	const char		*devname;
-@@ -53,9 +50,6 @@ struct clk {
- 	struct clk_ops		*ops;
- 	int		    (*enable)(struct clk *, int enable);
- 	struct clk_lookup	lookup;
--#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
--	struct dentry		*dent;	/* For visible tree hierarchy */
--#endif
- };
-
- /* other clocks which may be registered by board support */
---
-1.7.4.1
+Fix that problem and we can then all move along.  Continue to ignore it
+and I'll continue my crusade against this blatent inconsistency. :)
