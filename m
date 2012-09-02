@@ -1,62 +1,67 @@
-From: jrnieder@gmail.com (Jonathan Nieder)
-Date: Sat, 1 Sep 2012 23:30:55 -0700
-Subject: When to cc stable@vger.kernel.org (Re: [PATCH v2] ARM: Build dtb
- files in all target)
-In-Reply-To: <20120901201105.GD24085@n2100.arm.linux.org.uk>
-References: <20120830183711.GY19437@titan.lakedaemon.net>
- <20120830191412.GC18957@n2100.arm.linux.org.uk>
- <1346447515.13980.19.camel@deadeye.wl.decadent.org.uk>
- <20120831223219.GA6906@n2100.arm.linux.org.uk>
- <1346509216.13980.23.camel@deadeye.wl.decadent.org.uk>
- <20120901152544.GB24085@n2100.arm.linux.org.uk>
- <20120901163235.GB748@mannheim-rule.local>
- <20120901182207.GC24085@n2100.arm.linux.org.uk>
- <20120901183859.GA958@mannheim-rule.local>
- <20120901201105.GD24085@n2100.arm.linux.org.uk>
-Message-ID: <20120902063055.GA1608@mannheim-rule.local>
+From: alexg@meprolight.com (Alex Gershgorin)
+Date: Sun, 2 Sep 2012 09:27:20 +0300
+Subject: [PATCH] ARM: i.MX35: Implement camera and keypad clocks
+Message-ID: <1346567240-7114-1-git-send-email-alexg@meprolight.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote:
-(out of order for convenience)
+This patch also adds mux and divider for camera clock.
+Tested on i.MX35-pdk. 
 
-> Okay, if you think it's clear, then you tell me where in this text,
-> which is a direct quote from the stable_kernel_rules.txt document:
-[...]
-> it gives you permission to send a patch to the stable team email address
-> _without_ the commit ID.  Note carefully the sentence which starts "You
+Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
+---
+ arch/arm/mach-imx/clk-imx35.c |   11 ++++++++---
+ 1 files changed, 8 insertions(+), 3 deletions(-)
 
-Right here:
-
-[...]
-> |  - To have the patch automatically included in the stable tree, add the tag
-> |      Cc: stable at vger.kernel.org
-> |    in the sign-off area. Once the patch is merged it will be applied to
-> |    the stable tree without anything else needing to be done by the author
-> |    or subsystem maintainer.
-
-If the tag "Cc: stable at vger.kernel.org" is in the sign-off area, you
-may cc the stable@ list or not.  By justifying your change clearly and
-putting that tag in the sign-off area, you have done your job.
-Anything beyond that is completely up to you.
-
-That means:
-
-> In which case, why did Greg reply with his standard form email telling
-> Jason to read the stable_kernel_rules.txt document when Jason added the
-> Cc to his email?
-
-Because the "cc: stable" line was not in the sign-off area.
-
-Perhaps an extra sentence in stable_kernel_rules.txt would help.
-E.g.,
-
-    In this case, you may cc the stable at vger.kernel.org list when
-    submitting your patch to keep the stable tree maintainers
-    informed of the resulting discussion, but that is not required.
-    Once the patch is merged it will be applied to the stable tree
-    without anything else needing to be done by the author or
-    subsystem maintainer.
-
-Thanks,
-Jonathan
+diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
+index c6422fb..cebc71d 100644
+--- a/arch/arm/mach-imx/clk-imx35.c
++++ b/arch/arm/mach-imx/clk-imx35.c
+@@ -62,8 +62,8 @@ enum mx35_clks {
+ 	kpp_gate, mlb_gate, mshc_gate, owire_gate, pwm_gate, rngc_gate,
+ 	rtc_gate, rtic_gate, scc_gate, sdma_gate, spba_gate, spdif_gate,
+ 	ssi1_gate, ssi2_gate, uart1_gate, uart2_gate, uart3_gate, usbotg_gate,
+-	wdog_gate, max_gate, admux_gate, csi_gate, iim_gate, gpu2d_gate,
+-	clk_max
++	wdog_gate, max_gate, admux_gate, csi_gate, csi_div, csi_sel, iim_gate,
++	gpu2d_gate, clk_max
+ };
+ 
+ static struct clk *clk[clk_max];
+@@ -142,6 +142,9 @@ int __init mx35_clocks_init()
+ 
+ 	clk[nfc_div] = imx_clk_divider("nfc_div", "ahb", base + MX35_CCM_PDR4, 28, 4);
+ 
++	clk[csi_sel] = imx_clk_mux("csi_sel", base + MX35_CCM_PDR2, 7, 1, std_sel, ARRAY_SIZE(std_sel));
++	clk[csi_div] = imx_clk_divider("csi_div", "csi_sel", base + MX35_CCM_PDR2, 16, 6);
++
+ 	clk[asrc_gate] = imx_clk_gate2("asrc_gate", "ipg", base + MX35_CCM_CGR0,  0);
+ 	clk[pata_gate] = imx_clk_gate2("pata_gate", "ipg", base + MX35_CCM_CGR0,  2);
+ 	clk[audmux_gate] = imx_clk_gate2("audmux_gate", "ipg", base + MX35_CCM_CGR0,  4);
+@@ -192,7 +195,7 @@ int __init mx35_clocks_init()
+ 	clk[max_gate] = imx_clk_gate2("max_gate", "dummy", base + MX35_CCM_CGR2, 26);
+ 	clk[admux_gate] = imx_clk_gate2("admux_gate", "ipg", base + MX35_CCM_CGR2, 30);
+ 
+-	clk[csi_gate] = imx_clk_gate2("csi_gate", "ipg", base + MX35_CCM_CGR3,  0);
++	clk[csi_gate] = imx_clk_gate2("csi_gate", "csi_div", base + MX35_CCM_CGR3,  0);
+ 	clk[iim_gate] = imx_clk_gate2("iim_gate", "ipg", base + MX35_CCM_CGR3,  2);
+ 	clk[gpu2d_gate] = imx_clk_gate2("gpu2d_gate", "ahb", base + MX35_CCM_CGR3,  4);
+ 
+@@ -228,6 +231,7 @@ int __init mx35_clocks_init()
+ 	clk_register_clkdev(clk[i2c3_gate], NULL, "imx-i2c.2");
+ 	clk_register_clkdev(clk[ipu_gate], NULL, "ipu-core");
+ 	clk_register_clkdev(clk[ipu_gate], NULL, "mx3_sdc_fb");
++	clk_register_clkdev(clk[kpp_gate], NULL, "imx-keypad");
+ 	clk_register_clkdev(clk[owire_gate], NULL, "mxc_w1");
+ 	clk_register_clkdev(clk[sdma_gate], NULL, "imx35-sdma");
+ 	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.0");
+@@ -255,6 +259,7 @@ int __init mx35_clocks_init()
+ 	clk_register_clkdev(clk[usbotg_gate], "ahb", "fsl-usb2-udc");
+ 	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
+ 	clk_register_clkdev(clk[nfc_div], NULL, "mxc_nand.0");
++	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
+ 
+ 	clk_prepare_enable(clk[spba_gate]);
+ 	clk_prepare_enable(clk[gpio1_gate]);
+-- 
+1.7.0.4
