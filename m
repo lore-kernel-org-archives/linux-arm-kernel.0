@@ -1,50 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 2 Sep 2012 18:49:53 +0000
-Subject: [PATCH 4/4] ARM: ks8695: convert to generic time and clocksource
-In-Reply-To: <CACRpkdZ0Gw5H_yRcN2CmC+F8NtUcySTrLehuzZdWrbDwL4HHWw@mail.gmail.com>
-References: <1346264842-20411-1-git-send-email-linus.walleij@linaro.org>
- <504057A8.7030302@snapgear.com>
- <CACRpkdZ0Gw5H_yRcN2CmC+F8NtUcySTrLehuzZdWrbDwL4HHWw@mail.gmail.com>
-Message-ID: <201209021849.54348.arnd@arndb.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 2 Sep 2012 21:14:24 +0200
+Subject: [PATCH v2] ARM: Build dtb files in all target
+In-Reply-To: <20120902180537.GB31141@n2100.arm.linux.org.uk>
+References: <1346509216.13980.23.camel@deadeye.wl.decadent.org.uk>
+ <20120901152544.GB24085@n2100.arm.linux.org.uk>
+ <20120901163235.GB748@mannheim-rule.local>
+ <20120901182207.GC24085@n2100.arm.linux.org.uk>
+ <20120901183859.GA958@mannheim-rule.local>
+ <20120901201105.GD24085@n2100.arm.linux.org.uk>
+ <1346594067.4958.7.camel@deadeye.wl.decadent.org.uk>
+ <20120902170434.GA31141@n2100.arm.linux.org.uk>
+ <1346606781.7787.25.camel@deadeye.wl.decadent.org.uk>
+ <20120902180537.GB31141@n2100.arm.linux.org.uk>
+Message-ID: <20120902191424.GS28643@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 August 2012, Linus Walleij wrote:
-> On Fri, Aug 31, 2012 at 8:20 AM, Greg Ungerer <gerg@snapgear.com> wrote:
-> 
-> > Ok, tested on a KS8695 based machine. Boots and runs, obviously
-> > clock is basically working. But 'date' never shows the time
-> > increasing:
-> >
-> >   # date
-> >   Thu Jan  1 00:00:00 UTC 1970
-> >   # date
-> >   Thu Jan  1 00:00:00 UTC 1970
-> >   # date
-> >   Thu Jan  1 00:00:00 UTC 1970
-> >   #
-> >
-> > And yes, that did work before applying this patch :-)
-> 
-> That mean clockevent is running but not clocksource.
-> 
-> And I think that is because I forgot a ~ in the mask for disabling
-> the T1 timer, so setting up the clockevent disables the clocksource ...
-> 
-> I'll send out a fixed version, plese test!
-> 
-> (BTW I had not clue the 68K maintainer had a platform like
-> this, fun!)
+Hello,
 
-Note that this platform is one of those we talked about removing
-from the kernel for potentially being completely unused. Do we have
-reason to believe that people are still using ks8695 for anything
-with new kernels?
+I try once to point out what I think is the misunderstanding in this
+thread.
 
-If any of you are doing that, we'll definitely keep the port around,
-the idea is not to break anything that people are actually using.
-In that case, I would like to see a MAINTAINERS entry for the platform
-so we have a contact for someone who is able to ack and maybe test
-patches.
+The stable team is never the first team/person who picks up a patch. So
+Jason saying:
 
-	Arnd
+	I've CC'd stable to see if they want to pick this up.
+
+got something wrong (either by not knowing how stable works or by being
+unclear). That's why Greg send out his form letter.
+
+Nevertheless you may still cc stable, but if you have the expectation
+that they pick it up without an other maintainer taking it first, you
+will be disappointed. If your mail's purpose is only to make the stable
+team aware of a patch that they might want to pick up later this is ok
+(and not covered by Documentation/stable_kernel_rules.txt).
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
