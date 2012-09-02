@@ -1,43 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 2 Sep 2012 21:14:24 +0200
-Subject: [PATCH v2] ARM: Build dtb files in all target
-In-Reply-To: <20120902180537.GB31141@n2100.arm.linux.org.uk>
-References: <1346509216.13980.23.camel@deadeye.wl.decadent.org.uk>
- <20120901152544.GB24085@n2100.arm.linux.org.uk>
- <20120901163235.GB748@mannheim-rule.local>
- <20120901182207.GC24085@n2100.arm.linux.org.uk>
- <20120901183859.GA958@mannheim-rule.local>
- <20120901201105.GD24085@n2100.arm.linux.org.uk>
- <1346594067.4958.7.camel@deadeye.wl.decadent.org.uk>
- <20120902170434.GA31141@n2100.arm.linux.org.uk>
- <1346606781.7787.25.camel@deadeye.wl.decadent.org.uk>
- <20120902180537.GB31141@n2100.arm.linux.org.uk>
-Message-ID: <20120902191424.GS28643@pengutronix.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 02 Sep 2012 17:59:10 -0500
+Subject: [PATCH 4/6 v2] ARM: integrator: initial device tree support
+In-Reply-To: <1346471760-23993-4-git-send-email-linus.walleij@linaro.org>
+References: <1346471760-23993-1-git-send-email-linus.walleij@linaro.org>
+ <1346471760-23993-2-git-send-email-linus.walleij@linaro.org>
+ <1346471760-23993-3-git-send-email-linus.walleij@linaro.org>
+ <1346471760-23993-4-git-send-email-linus.walleij@linaro.org>
+Message-ID: <5043E4BE.1060508@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 08/31/2012 10:55 PM, Linus Walleij wrote:
+> This is initial device tree support for the ARM Integrator family,
+> we create a very basic device tree, #ifdef out the non-DT machines
+> when compiling for device tree.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Also switch over clocksource and clockevent to device tree.
+>   Else the IRQ mapping goes bananas.
+> ---
 
-I try once to point out what I think is the misunderstanding in this
-thread.
+snip
 
-The stable team is never the first team/person who picks up a patch. So
-Jason saying:
+> +++ b/arch/arm/boot/dts/integratorcp.dts
+> @@ -0,0 +1,69 @@
+> +/*
+> + * Device Tree for the ARM Integrator/CP platform
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	model = "ARM Integrator/CP";
+> +	compatible = "arm,integrator-cp";
+> +	ranges;
+> +
+> +	aliases {
+> +		arm,integrator-clocksource = &timer2;
+> +		arm,integrator-clockevent = &timer1;
 
-	I've CC'd stable to see if they want to pick this up.
+This is linux specific and a common issue we need a solution for. Grant
+had done something for versatile and we discussed it some, but nothing
+ever got close to finalized. IIRC, Grant's solution was just add a
+"linux,clockevent" or "linux,clocksource" to the nodes that are to be
+used. But he wasn't really happy with it. Perhaps using these names as
+aliases would be better.
 
-got something wrong (either by not knowing how stable works or by being
-unclear). That's why Greg send out his form letter.
-
-Nevertheless you may still cc stable, but if you have the expectation
-that they pick it up without an other maintainer taking it first, you
-will be disappointed. If your mail's purpose is only to make the stable
-team aware of a patch that they might want to pick up later this is ok
-(and not covered by Documentation/stable_kernel_rules.txt).
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Rob
