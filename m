@@ -1,29 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 2 Sep 2012 09:49:56 +0100
-Subject: [PATCH 1/6] ARM: move ARCH config definitions into mach dirs
-In-Reply-To: <50415B6A.5060601@gmail.com>
-References: <1346280600-29395-1-git-send-email-robherring2@gmail.com>
- <1346280600-29395-2-git-send-email-robherring2@gmail.com>
- <20120829233159.GS18957@n2100.arm.linux.org.uk> <503F845C.10406@gmail.com>
- <20120830164551.GY18957@n2100.arm.linux.org.uk> <503FB9E6.7020102@gmail.com>
- <20120830192831.GD18957@n2100.arm.linux.org.uk> <50415B6A.5060601@gmail.com>
-Message-ID: <20120902084956.GE24085@n2100.arm.linux.org.uk>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Sun, 2 Sep 2012 21:45:32 +1000
+Subject: [PATCH 4/4] ARM: ks8695: convert to generic time and clocksource
+In-Reply-To: <CACRpkdZ0Gw5H_yRcN2CmC+F8NtUcySTrLehuzZdWrbDwL4HHWw@mail.gmail.com>
+References: <1346264842-20411-1-git-send-email-linus.walleij@linaro.org>
+ <504057A8.7030302@snapgear.com>
+ <CACRpkdZ0Gw5H_yRcN2CmC+F8NtUcySTrLehuzZdWrbDwL4HHWw@mail.gmail.com>
+Message-ID: <504346DC.4080801@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2012 at 07:48:42PM -0500, Rob Herring wrote:
-> On 08/30/2012 02:28 PM, Russell King - ARM Linux wrote:
-> > It's not only about virtual addresses, it's about physical addresses too,
-> > and we can't dictate that all hardware exposes a UART at any particular
-> > physical address.
-> 
-> We have 3 things to track for each platform: the type of uart, the
-> uart's phys address, and the virtual address we map it to.
+Hi Linus,
 
-Right, thanks for explaining it more properly the second time around.
+On 09/01/2012 09:43 AM, Linus Walleij wrote:
+> On Fri, Aug 31, 2012 at 8:20 AM, Greg Ungerer <gerg@snapgear.com> wrote:
+>> Ok, tested on a KS8695 based machine. Boots and runs, obviously
+>> clock is basically working. But 'date' never shows the time
+>> increasing:
+>>
+>>    # date
+>>    Thu Jan  1 00:00:00 UTC 1970
+>>    # date
+>>    Thu Jan  1 00:00:00 UTC 1970
+>>    # date
+>>    Thu Jan  1 00:00:00 UTC 1970
+>>    #
+>>
+>> And yes, that did work before applying this patch :-)
+>
+> That mean clockevent is running but not clocksource.
+>
+> And I think that is because I forgot a ~ in the mask for disabling
+> the T1 timer, so setting up the clockevent disables the clocksource ...
+>
+> I'll send out a fixed version, plese test!
 
-However, you actually have four things to track:
-1. The physical address
-2. The virtual address
-3. The inter-register offset
-4. The type of the UART
+Yep, I'll give it a try. I don't have the board in front of me
+right now, but when I get in to the office tomorrow I can try it.
+
+
+> (BTW I had not clue the 68K maintainer had a platform like
+> this, fun!)
+
+Ooohh, I have many weird and wonderful boards, across quite a few
+different architectures. I seem to have collected and developed on
+quite a few over to many years to remember.
+
+Maintaining m68k/ColdFire is just for fun - it doesn't pay the bills
+though :-)
+
+Regards
+Greg
+
+
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close,                            FAX:         +61 7 3891 3630
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
