@@ -1,97 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 3 Sep 2012 12:32:35 +0100
-Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
- I2C driver
-In-Reply-To: <CACRpkdb8owKBxawAv4LVVYx5kUgZ9cUSiQ=BV0f3Pf3bHtknuQ@mail.gmail.com>
-References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
- <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
- <20120831112258.GA2624@pengutronix.de>
- <20120831122323.GC5962@gmail.com>
- <CACRpkdZ=C1EV4WO2b=1YLHPNhsDsQdq7Kfnpzm8i7uGRtVjJuQ@mail.gmail.com>
- <20120903094448.GB11780@pengutronix.de>
- <20120903100656.GC5782@gmail.com>
- <CACRpkdb8owKBxawAv4LVVYx5kUgZ9cUSiQ=BV0f3Pf3bHtknuQ@mail.gmail.com>
-Message-ID: <CAF2Aj3j25w1Nn9O6hV+=i-j1ts_p_Ucswk_M7r04S7i5BzPkHg@mail.gmail.com>
+From: lrg@ti.com (Liam Girdwood)
+Date: Mon, 03 Sep 2012 17:59:13 +0100
+Subject: [RFC 1/3] ASoC: dmaengine: Don't use runtime private data for
+ dmaengine data
+In-Reply-To: <20120903165832.GA31511@n2100.arm.linux.org.uk>
+References: <20120903165832.GA31511@n2100.arm.linux.org.uk>
+Message-ID: <E1T8ZzV-0002vp-2j@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looking at this again ...
+Use a dedicated member to store dmaengine data so that drivers can
+use private data for their own purposes.
 
-On 3 September 2012 12:07, Linus Walleij <linus.walleij@linaro.org> wrote:
+Signed-off-by: Liam Girdwood <lrg@ti.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ include/sound/pcm.h           |    2 ++
+ sound/soc/soc-dmaengine-pcm.c |    2 +-
+ 2 files changed, 3 insertions(+), 1 deletions(-)
 
-> On Mon, Sep 3, 2012 at 12:07 PM, Lee Jones <lee.jones@linaro.org> wrote:
->
-> (...)
-> > +       if (np) {
-> > +               if (!pdata) {
-> > +                       pdata = devm_kzalloc(&adev->dev, sizeof(*pdata),
-> GFP_KERNEL);
-> > +                       if (!pdata) {
-> > +                               ret = -ENOMEM;
-> > +                               goto err_no_mem;
-> > +                       }
-> > +               }
-> > +               /* Provide the default configuration as a base. */
-> > +               memcpy(pdata, &u8500_i2c, sizeof(struct
-> nmk_i2c_controller));
->
-> Here you blank out any pdata passed from say a board file or
-> whatever if pdata != NULL.
->
-
-Right, this should be in 'if (!pdata) {}' . I'll correct this now.
-
-
->
-> > +
-> > +               nmk_i2c_of_probe(np, pdata);
-> > +       }
-> > +
-> >         if (!pdata)
-> >                 /* No i2c configuration found, using the default. */
-> >                 pdata = &u8500_i2c;
->
-> So this is still wrong, if pdata is passed to the driver it will
-> not override the DT, you have the semantics the other way
-> around, DT overrides pdata.
->
-
-This is correct, however. If there is DT, it should override any platform
-data.
-
-Actually, if there is DT then no platform data should be passed in the
-first place.
-
-
-> Look at the switch statement in my previous comment,
-> just add the allocations and a memcpy() and it still holds:
->
-> if (!pdata) {
->     if (np) {
->               pdata = devm_kzalloc(&adev->dev, sizeof(*pdata), GFP_KERNEL);
->                       if (!pdata) {
->                               ret = -ENOMEM;
->                               goto err_no_mem;
->                       }
->               }
->               /* Provide the default configuration as a base. */
->               memcpy(pdata, &u8500_i2c, sizeof(struct nmk_i2c_controller));
->               nmk_i2c_of_probe(np, pdata);
->     } else
->          /* Just use the static pdata */
->          pdata = &u8500_i2c;
-> }
->
->
-No, this is wrong. Platform data should not override DT.
-
-If DT is enabled and passed, it should have highest priority.
-
+diff --git a/include/sound/pcm.h b/include/sound/pcm.h
+index cdca2ab..f9e4909 100644
+--- a/include/sound/pcm.h
++++ b/include/sound/pcm.h
+@@ -269,6 +269,7 @@ struct snd_pcm_hw_constraint_list {
+ };
+ 
+ struct snd_pcm_hwptr_log;
++struct dmaengine_pcm_runtime_data;
+ 
+ struct snd_pcm_runtime {
+ 	/* -- Status -- */
+@@ -345,6 +346,7 @@ struct snd_pcm_runtime {
+ 	unsigned char *dma_area;	/* DMA area */
+ 	dma_addr_t dma_addr;		/* physical bus address (not accessible from main CPU) */
+ 	size_t dma_bytes;		/* size of DMA area */
++	struct dmaengine_pcm_runtime_data *dmaengine_data;
+ 
+ 	struct snd_dma_buffer *dma_buffer_p;	/* allocated buffer */
+ 
+diff --git a/sound/soc/soc-dmaengine-pcm.c b/sound/soc/soc-dmaengine-pcm.c
+index 5df529e..27fa5ad 100644
+--- a/sound/soc/soc-dmaengine-pcm.c
++++ b/sound/soc/soc-dmaengine-pcm.c
+@@ -40,7 +40,7 @@ struct dmaengine_pcm_runtime_data {
+ static inline struct dmaengine_pcm_runtime_data *substream_to_prtd(
+ 	const struct snd_pcm_substream *substream)
+ {
+-	return substream->runtime->private_data;
++	return substream->runtime->dmaengine_data;
+ }
+ 
+ /**
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120903/8487d887/attachment-0001.html>
+1.7.4.4
