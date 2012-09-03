@@ -1,5 +1,5 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 3 Sep 2012 12:11:07 +0100
+Date: Mon, 3 Sep 2012 12:32:35 +0100
 Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
  I2C driver
 In-Reply-To: <CACRpkdb8owKBxawAv4LVVYx5kUgZ9cUSiQ=BV0f3Pf3bHtknuQ@mail.gmail.com>
@@ -11,15 +11,11 @@ References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
  <20120903094448.GB11780@pengutronix.de>
  <20120903100656.GC5782@gmail.com>
  <CACRpkdb8owKBxawAv4LVVYx5kUgZ9cUSiQ=BV0f3Pf3bHtknuQ@mail.gmail.com>
-Message-ID: <CAF2Aj3hUo=Dx37cpwdJT74dLQoCfcOHVY4CAZnKDoiniG8Xkag@mail.gmail.com>
+Message-ID: <CAF2Aj3j25w1Nn9O6hV+=i-j1ts_p_Ucswk_M7r04S7i5BzPkHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-You're right. I rushed it to get it out the door, as I'm working on
-something else.
-
-Leave it with me. I'll spend more time on the semantics before posting
-again.
+Looking at this again ...
 
 On 3 September 2012 12:07, Linus Walleij <linus.walleij@linaro.org> wrote:
 
@@ -42,6 +38,11 @@ On 3 September 2012 12:07, Linus Walleij <linus.walleij@linaro.org> wrote:
 > Here you blank out any pdata passed from say a board file or
 > whatever if pdata != NULL.
 >
+
+Right, this should be in 'if (!pdata) {}' . I'll correct this now.
+
+
+>
 > > +
 > > +               nmk_i2c_of_probe(np, pdata);
 > > +       }
@@ -54,6 +55,14 @@ On 3 September 2012 12:07, Linus Walleij <linus.walleij@linaro.org> wrote:
 > not override the DT, you have the semantics the other way
 > around, DT overrides pdata.
 >
+
+This is correct, however. If there is DT, it should override any platform
+data.
+
+Actually, if there is DT then no platform data should be passed in the
+first place.
+
+
 > Look at the switch statement in my previous comment,
 > just add the allocations and a memcpy() and it still holds:
 >
@@ -73,11 +82,10 @@ On 3 September 2012 12:07, Linus Walleij <linus.walleij@linaro.org> wrote:
 >          pdata = &u8500_i2c;
 > }
 >
-> Yours,
-> Linus Walleij
 >
+No, this is wrong. Platform data should not override DT.
 
-
+If DT is enabled and passed, it should have highest priority.
 
 -- 
 Lee Jones
@@ -86,4 +94,4 @@ Linaro.org ? Open source software for ARM SoCs
 Follow Linaro: Facebook | Twitter | Blog
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120903/f5680a71/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120903/8487d887/attachment-0001.html>
