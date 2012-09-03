@@ -1,28 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 3 Sep 2012 12:39:51 +0000
-Subject: [PATCH v2 17/31] arm64: System calls handling
-In-Reply-To: <20120903114831.GA3313@mbp>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <20120822171309.GC2582@arm.com> <20120903114831.GA3313@mbp>
-Message-ID: <201209031239.51515.arnd@arndb.de>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Mon, 3 Sep 2012 12:41:27 +0000
+Subject: [PATCH] ARM: OMAP2+: select PINCTRL in Kconfig
+In-Reply-To: <1346047244-26909-1-git-send-email-anilkumar@ti.com>
+References: <1346047244-26909-1-git-send-email-anilkumar@ti.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA25D99@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 September 2012, Catalin Marinas wrote:
-> I forgot about this at the KS and we haven't got to a clear conclusion.
+Hi Tony,
+
+On Mon, Aug 27, 2012 at 11:30:44, AnilKumar, Chimata wrote:
+> Select PINCTRL in Kconfig under Typical OMAP configuration, this
+> is required to add pinctrl driver to omap2+ family of devices.
 > 
-> Do we (1) stick with the sys_mmap() for 64-bit systems and avoid offset
-> conversion in both glibc and kernel or (2) use sys_mmap2() with a 12
-> shift in glibc and (PAGE_SHIFT - 12) in the kernel wrapper?
+> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> ---
+>  arch/arm/mach-omap2/Kconfig |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> I personally prefer (1) as it doesn't require a kernel wrapper and we
-> avoid the double shifting. 
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index dd2db02..a164568 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -18,6 +18,7 @@ config ARCH_OMAP2PLUS_TYPICAL
+>  	select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
+>  	select TWL4030_POWER if ARCH_OMAP3 || ARCH_OMAP4
+>  	select HIGHMEM
+> +	select PINCTRL
+>  	help
+>  	  Compile a kernel suitable for booting most boards
+>  
+> -- 
+> 1.7.9.5
+> 
+> 
 
-Yes, I think it's ok this way.
+If there are no comments on this patch, can you push this patch to devel-dt?
 
-> A reason for (2) would be if we ever need file offsets greater than 16EB.
-
-Let's not worry about this for now, all the other architectures will
-have the same problem when we get there.
-
-	Arnd
+Thanks
+AnilKumar
