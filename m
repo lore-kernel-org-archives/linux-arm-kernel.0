@@ -1,86 +1,134 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Mon,  3 Sep 2012 15:54:50 +0200
-Subject: [PATCH 2/3] gpio-twl4030: new dt properties for BeagleBoard and
- omap3-EVM
+Date: Mon,  3 Sep 2012 15:54:49 +0200
+Subject: [PATCH 1/3] gpio-twl4030: get platform data from device tree
 In-Reply-To: <1346680491-4211-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1346680491-4211-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1346680491-4211-3-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1346680491-4211-2-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree properties for twl4030/gpio, according to the
-platform data of corresponding boards. This enables the led
-connected to LEDB output for both boards, as well as
-pullups/pulldowns on GPIO for the BeagleBoard.
+Adds a number of missing properties to the device tree of
+twl4030/gpio:
+- "ti,use-leds"  -> .use_leds
+- "ti,debounce"  -> .debounce
+- "ti,mmc-cd"    -> .mmc_cd
+- "ti,pullups"   -> .pullups
+- "ti,pulldowns" -> .pulldowns
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- arch/arm/boot/dts/omap3-beagle.dts |   20 ++++++++++++++++++++
- arch/arm/boot/dts/omap3-evm.dts    |   13 +++++++++++++
- 2 files changed, 33 insertions(+), 0 deletions(-)
+ drivers/gpio/gpio-twl4030.c |   86 +++++++++++++++++++++++++++++-------------
+ 1 files changed, 59 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index cdcb98c..16bff8b 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -17,6 +17,14 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x20000000>; /* 512 MB */
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pmu_stat {
-+			label = "beagleboard::pmu_stat";
-+			gpios = <&twl_gpio 19 0>; /* LEDB */
-+		};
-+	};
- };
+diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
+index 94256fe..dabe76b 100644
+--- a/drivers/gpio/gpio-twl4030.c
++++ b/drivers/gpio/gpio-twl4030.c
+@@ -395,6 +395,33 @@ static int __devinit gpio_twl4030_debounce(u32 debounce, u8 mmc_cd)
  
- &i2c1 {
-@@ -67,3 +75,15 @@
- &mmc3 {
- 	status = "disabled";
- };
+ static int gpio_twl4030_remove(struct platform_device *pdev);
+ 
++static struct twl4030_gpio_platform_data *of_gpio_twl4030(struct device *dev)
++{
++	struct twl4030_gpio_platform_data *omap_twl_info;
++	const char *of_use_leds;
 +
-+&twl_gpio {
-+	ti,use-leds = "true";
-+	/* pullups: BIT(1) */
-+	ti,pullups = <2>;
++	omap_twl_info = devm_kzalloc(dev, sizeof(*omap_twl_info), GFP_KERNEL);
++	if (!omap_twl_info)
++		return NULL;
++
++	omap_twl_info->gpio_base = -1;
++
++	of_property_read_string(dev->of_node, "ti,use-leds", &of_use_leds);
++	if (!strcmp(of_use_leds, "true"))
++		omap_twl_info->use_leds = true;
++
++	of_property_read_u32(dev->of_node, "ti,debounce",
++				&omap_twl_info->debounce);
++	of_property_read_u32(dev->of_node, "ti,mmc-cd",
++				(u32 *)&omap_twl_info->mmc_cd);
++	of_property_read_u32(dev->of_node, "ti,pullups",
++				&omap_twl_info->pullups);
++	of_property_read_u32(dev->of_node, "ti,pulldowns",
++				&omap_twl_info->pulldowns);
++
++	return omap_twl_info;
++}
++
+ static int __devinit gpio_twl4030_probe(struct platform_device *pdev)
+ {
+ 	struct twl4030_gpio_platform_data *pdata = pdev->dev.platform_data;
+@@ -423,39 +450,44 @@ static int __devinit gpio_twl4030_probe(struct platform_device *pdev)
+ 	twl4030_gpio_irq_base = irq_base;
+ 
+ no_irqs:
+-	twl_gpiochip.base = -1;
+ 	twl_gpiochip.ngpio = TWL4030_GPIO_MAX;
+ 	twl_gpiochip.dev = &pdev->dev;
+ 
+-	if (pdata) {
+-		twl_gpiochip.base = pdata->gpio_base;
++	if (node)
++		pdata = of_gpio_twl4030(&pdev->dev);
+ 
+-		/*
+-		 * NOTE:  boards may waste power if they don't set pullups
+-		 * and pulldowns correctly ... default for non-ULPI pins is
+-		 * pulldown, and some other pins may have external pullups
+-		 * or pulldowns.  Careful!
+-		 */
+-		ret = gpio_twl4030_pulls(pdata->pullups, pdata->pulldowns);
+-		if (ret)
+-			dev_dbg(&pdev->dev, "pullups %.05x %.05x --> %d\n",
+-					pdata->pullups, pdata->pulldowns,
+-					ret);
+-
+-		ret = gpio_twl4030_debounce(pdata->debounce, pdata->mmc_cd);
+-		if (ret)
+-			dev_dbg(&pdev->dev, "debounce %.03x %.01x --> %d\n",
+-					pdata->debounce, pdata->mmc_cd,
+-					ret);
+-
+-		/*
+-		 * NOTE: we assume VIBRA_CTL.VIBRA_EN, in MODULE_AUDIO_VOICE,
+-		 * is (still) clear if use_leds is set.
+-		 */
+-		if (pdata->use_leds)
+-			twl_gpiochip.ngpio += 2;
++	if (pdata == NULL) {
++		dev_err(&pdev->dev, "Platform data is missing\n");
++		return -ENXIO;
+ 	}
+ 
++	twl_gpiochip.base = pdata->gpio_base;
++
 +	/*
-+	 * pulldowns:
-+	 * BIT(2), BIT(6), BIT(7), BIT(8), BIT(13)
-+	 * BIT(15), BIT(16), BIT(17)
++	 * NOTE:  boards may waste power if they don't set pullups
++	 * and pulldowns correctly ... default for non-ULPI pins is
++	 * pulldown, and some other pins may have external pullups
++	 * or pulldowns.  Careful!
 +	 */
-+	ti,pulldowns = <238020>;
-+};
-diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
-index f349ee9..f1e18fe 100644
---- a/arch/arm/boot/dts/omap3-evm.dts
-+++ b/arch/arm/boot/dts/omap3-evm.dts
-@@ -17,6 +17,15 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x10000000>; /* 256 MB */
- 	};
++	ret = gpio_twl4030_pulls(pdata->pullups, pdata->pulldowns);
++	if (ret)
++		dev_dbg(&pdev->dev, "pullups %.05x %.05x --> %d\n",
++				pdata->pullups, pdata->pulldowns,
++				ret);
 +
-+	leds {
-+		compatible = "gpio-leds";
-+		ledb {
-+			label = "omap3evm::ledb";
-+			gpios = <&twl_gpio 19 0>; /* LEDB */
-+			linux,default-trigger = "default-on";
-+		};
-+	};
- };
- 
- &i2c1 {
-@@ -46,3 +55,7 @@
- 		reg = <0x5c>;
- 	};
- };
++	ret = gpio_twl4030_debounce(pdata->debounce, pdata->mmc_cd);
++	if (ret)
++		dev_dbg(&pdev->dev, "debounce %.03x %.01x --> %d\n",
++				pdata->debounce, pdata->mmc_cd,
++				ret);
 +
-+&twl_gpio {
-+	ti,use-leds = "true";
-+};
++	/*
++	 * NOTE: we assume VIBRA_CTL.VIBRA_EN, in MODULE_AUDIO_VOICE,
++	 * is (still) clear if use_leds is set.
++	 */
++	if (pdata->use_leds)
++		twl_gpiochip.ngpio += 2;
++
+ 	ret = gpiochip_add(&twl_gpiochip);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "could not register gpiochip, %d\n", ret);
 -- 
 1.7.5.4
