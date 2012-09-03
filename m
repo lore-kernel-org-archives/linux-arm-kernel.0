@@ -1,36 +1,22 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  3 Sep 2012 12:05:49 +0200
-Subject: [PATCHv2 3/3] dts: mxs: spi: Add SSP3 to the 10049 board
-In-Reply-To: <1346666749-6094-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1346666749-6094-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1346666749-6094-3-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 03 Sep 2012 12:06:18 +0200
+Subject: [PATCH 1/3] ARM: dts: mxs: Add missing address and size cells
+ in SSP3
+In-Reply-To: <20120903093521.GW28643@pengutronix.de>
+References: <1346664517-5734-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20120903093521.GW28643@pengutronix.de>
+Message-ID: <5044811A.7000108@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/imx28-cfa10049.dts |    9 +++++++++
- 1 file changed, 9 insertions(+)
+Le 03/09/2012 11:35, Uwe Kleine-K?nig a ?crit :
+> The subject only talks about ssp3, but your patch touches ssp0-ssp3.
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
-index c73b9b8..a0c7b83 100644
---- a/arch/arm/boot/dts/imx28-cfa10049.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10049.dts
-@@ -16,6 +16,15 @@
- 	compatible = "crystalfontz,cfa10049", "crystalfontz,cfa10036", "fsl,imx28";
- 
- 	apb at 80000000 {
-+		apbh at 80000000 {
-+			ssp3: ssp at 80016000 {
-+				compatible = "fsl,imx28-spi";
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&spi3_pins_b>;
-+				status = "okay";
-+			};
-+		};
-+
- 		apbx at 80040000 {
- 			i2c1: i2c at 8005a000 {
- 				pinctrl-names = "default";
+Ah right, stupid mistake.
+Thanks!
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
