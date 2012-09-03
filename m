@@ -1,63 +1,51 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 03 Sep 2012 10:38:50 -0500
-Subject: [PATCH 02/10] gpio: pxa: add explicit includes for cpu_is_X macros
-In-Reply-To: <CAN1soZzDr4pi7zs188Rw-nQaA9ef-0VoVnwkMo=PCd0KPU22cg@mail.gmail.com>
-References: <1346279496-26286-1-git-send-email-robherring2@gmail.com>
- <1346279496-26286-3-git-send-email-robherring2@gmail.com>
- <CACRpkdasWv8toA1eBzpYo4QactNhkpzhuBk-D8kJbbM03WZN2Q@mail.gmail.com>
- <CAN1soZzDr4pi7zs188Rw-nQaA9ef-0VoVnwkMo=PCd0KPU22cg@mail.gmail.com>
-Message-ID: <5044CF0A.7040208@gmail.com>
+From: kth3321@gmail.com (Taehun Kim)
+Date: Tue, 4 Sep 2012 00:39:00 +0900
+Subject: [PATCH] ARM: S3C24XX: Add WIZnet W5300E01-ARM board support
+In-Reply-To: <5044702E.3070209@samsung.com>
+References: <1346653236-19728-1-git-send-email-kth3321@gmail.com>
+ <CA+E=qVfGN9_Lj5GWqERfZGQsTtnnK_fARgXuCujdVeZ0PBoJEQ@mail.gmail.com>
+ <5044702E.3070209@samsung.com>
+Message-ID: <CAOkfWjeDY2nh2vZoNZVc7PFKjmqCdbSMjnJVntT2uQPHoJ8Uxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2012 10:19 PM, Haojian Zhuang wrote:
-> On Fri, Aug 31, 2012 at 6:17 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Wed, Aug 29, 2012 at 3:31 PM, Rob Herring <robherring2@gmail.com> wrote:
+2012/9/3 Sylwester Nawrocki <s.nawrocki@samsung.com>:
+> Hi,
+>
+> On 09/03/2012 09:56 AM, Vasily Khoruzhick wrote:
+>>> +static void __init w5300e01_init(void)
+>>> +{
+>>> +       s3c_nand_set_platdata(&w5300e01_nand_info);
+>>> +       platform_add_devices(w5300e01_devices, ARRAY_SIZE(w5300e01_devices));
+>>> +
+>>> +       /* W5300 interrupt pin. */
+>>> +       s3c2410_gpio_cfgpin(S3C2410_GPF(0), S3C2410_GPIO_IRQ);
+>>> +
+>>> +       s3c2410_gpio_cfgpin(S3C2410_GPF(4), S3C2410_GPIO_OUTPUT);
+>>> +       s3c2410_gpio_cfgpin(S3C2410_GPF(5), S3C2410_GPIO_OUTPUT);
+>>> +       s3c2410_gpio_cfgpin(S3C2410_GPF(6), S3C2410_GPIO_OUTPUT);
+>>> +       s3c2410_gpio_cfgpin(S3C2410_GPF(7), S3C2410_GPIO_OUTPUT);
+>>> +
+>>> +       s3c2410_gpio_setpin(S3C2410_GPF(0), 1);
+>>> +       s3c2410_gpio_setpin(S3C2410_GPF(4), 1);
+>>> +       s3c2410_gpio_setpin(S3C2410_GPF(5), 1);
+>>> +       s3c2410_gpio_setpin(S3C2410_GPF(6), 1);
+>>> +       s3c2410_gpio_setpin(S3C2410_GPF(7), 1);
+>>> +
 >>
->>> From: Rob Herring <rob.herring@calxeda.com>
->>>
->>> In preparation to remove implicit inclusion of mach/gpio.h, add the
->>> necessary includes for cpu_is_X macros.
->>
->> The commit message talks about gpio.h, but...
->>
->>>  #include <mach/irqs.h>
->>> +#include <mach/hardware.h>
->>> +#ifdef CONFIG_ARCH_MMP
->>> +#include <mach/cputype.h>
->>> +#endif
->>
->> This seems completely unrelated, but correct in the sense that every driver
->> should include its resources.
->>
->> But isn't the proper fix to move arch/arm/mach-pxa/include/mach/cputype.h to
->> include/linux/*/pxa-cputype.h or something (note: no clue what "*" should be!),
->> or even better, modify this one driver to take a flag from platform data and/or
->> DT?
->>
->> Anyway, we need the PXA maintainers to look at this.
->>
->> Yours,
->> Linus Walleij
-> 
-> It's no problem to include cputype.h. I agree Linus's comments to use a same
-> name head file. For example, add cputype.h in arch-pxa. Use cputype.h to include
-> hardware.h.
+>> Please use gpiolib API, legacy s3c2410_gpio_* API will be removed soon.
+>
+> Right, you'll find some information about this in
+> Documentation/arm/Samsung-S3C24XX/GPIO.txt.
+>
+> These links may be useful as well:
+> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg11985.html
+> http://www.spinics.net/lists/arm-kernel/msg192119.html
+>
+> --
+>
+> Regards,
+> Sylwester
 
-I think the right fix is really removing the use of cpu_is_X macros
-altogether.
-
-> My question is whether your patches are also based on Arnd's
-> multi-header branch.
-> I remember that some changes are done in his multiplatform branch. Should we
-> do any patches on his multiplatform branch?
-
-It is not based on it. We decided at the ARM mini-summit to not do the
-mach header rename and to deprecate including mach headers outside of
-arch/arm.
-
-I'm thinking I will just make PXA and MMP select CONFIG_NEED_MACH_GPIO_H
-and drop this patch. If pxa and mmp want to be included in
-multi-platform images, then this will need to be fixed.
-
-Rob
+Thank you for the feedback. I will rewrite the gpio functions and
+propose the new patch soon.
