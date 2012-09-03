@@ -1,65 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Sep 2012 11:22:28 +0200
-Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
- I2C driver
-In-Reply-To: <20120831122323.GC5962@gmail.com>
-References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
- <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
- <20120831112258.GA2624@pengutronix.de>
- <20120831122323.GC5962@gmail.com>
-Message-ID: <CACRpkdZ=C1EV4WO2b=1YLHPNhsDsQdq7Kfnpzm8i7uGRtVjJuQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon,  3 Sep 2012 11:28:35 +0200
+Subject: [PATCH 1/3] ARM: dts: mxs: Add missing address and size cells in SSP3
+Message-ID: <1346664517-5734-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2012 at 2:23 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/imx28.dtsi |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-(...)
->  static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
->  {
->         int ret = 0;
->         struct nmk_i2c_controller *pdata = adev->dev.platform_data;
-> +       struct device_node *np = adev->dev.of_node;
->         struct nmk_i2c_dev      *dev;
->         struct i2c_adapter *adap;
->
-> +       if (np) {
-> +               if (!pdata) {
-
-So, if no pdata is provided, we go on to allocate some ...
-
-> +                       pdata = devm_kzalloc(&adev->dev, sizeof(*pdata), GFP_KERNEL);
-> +                       if (!pdata) {
-> +                               ret = -ENOMEM;
-> +                               goto err_no_mem;
-> +                       }
-> +               }
-> +               /* Provide the default configuration as a base. */
-> +               pdata = &u8500_i2c;
-
-Then you just override that pointer with a pointer to the local config.
-
-> +               nmk_i2c_of_probe(np, pdata);
-> +       }
-> +
->         if (!pdata)
->                 /* No i2c configuration found, using the default. */
->                 pdata = &u8500_i2c;
-
-This in it's entirety does not look sound. I *think* this is what you
-want to do,
-replace all of the above codde (including the last if (!pdata) clause) with:
-
-if (!pdata) {
-    /* If no platform data passed in, use the default configuration as
-a base. */
-    pdata = &u8500_i2c;
-    if (np)
-        /* Further, if we have a DT node, override the default with this */
-        nmk_i2c_of_probe(np, pdata);
-}
-
-This makes any passed pdata take precedence, else default pdata
-complemented with DT info. Which is what we want.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 26a166c..8497a0e 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -86,6 +86,8 @@
+ 			};
+ 
+ 			ssp0: ssp at 80010000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x80010000 2000>;
+ 				interrupts = <96 82>;
+ 				fsl,ssp-dma-channel = <0>;
+@@ -93,6 +95,8 @@
+ 			};
+ 
+ 			ssp1: ssp at 80012000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x80012000 2000>;
+ 				interrupts = <97 83>;
+ 				fsl,ssp-dma-channel = <1>;
+@@ -100,6 +104,8 @@
+ 			};
+ 
+ 			ssp2: ssp at 80014000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x80014000 2000>;
+ 				interrupts = <98 84>;
+ 				fsl,ssp-dma-channel = <2>;
+@@ -107,6 +113,8 @@
+ 			};
+ 
+ 			ssp3: ssp at 80016000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x80016000 2000>;
+ 				interrupts = <99 85>;
+ 				fsl,ssp-dma-channel = <3>;
+-- 
+1.7.9.5
