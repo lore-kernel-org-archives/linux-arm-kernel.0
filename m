@@ -1,54 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 3 Sep 2012 12:48:31 +0100
-Subject: [PATCH v2 17/31] arm64: System calls handling
-In-Reply-To: <20120822171309.GC2582@arm.com>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <201208220756.31149.arnd@arndb.de> <20120822102953.GA24136@arm.com>
- <201208221227.14274.arnd@arndb.de> <20120822171309.GC2582@arm.com>
-Message-ID: <20120903114831.GA3313@mbp>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 3 Sep 2012 19:50:55 +0800
+Subject: [PATCH 1/3] ARM: PRIMA2: add missing interrupts property for
+ pinctrl node
+In-Reply-To: <CACRpkdaNhas-xLC18Dow95vv=arq9MudF0s0xsZPLJZ++syfXQ@mail.gmail.com>
+References: <1345690074-31327-1-git-send-email-Barry.Song@csr.com>
+ <1345690074-31327-2-git-send-email-Barry.Song@csr.com>
+ <CACRpkdaNhas-xLC18Dow95vv=arq9MudF0s0xsZPLJZ++syfXQ@mail.gmail.com>
+Message-ID: <CAGsJ_4zzcg92OVDS0G8UkHBJ21o5zSWHS5f_sHcyudAABwHnPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+2012/9/3 Linus Walleij <linus.walleij@linaro.org>:
+> On Thu, Aug 23, 2012 at 4:47 AM, Barry Song <Barry.Song@csr.com> wrote:
+>
+>> From: Barry Song <Baohua.Song@csr.com>
+>>
+>> commit 5130216265f6f924a4 missed the interrupts property
+>>
+>> Signed-off-by: Barry Song <Barry.Song@csr.com>
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> I expect that you take this patch through the ARM SoC tree?
+>
+> If you want me to carry it in the pinctrl tree, tell me.
 
-On Wed, Aug 22, 2012 at 06:13:10PM +0100, Catalin Marinas wrote:
-> On Wed, Aug 22, 2012 at 01:27:14PM +0100, Arnd Bergmann wrote:
-> > On Wednesday 22 August 2012, Catalin Marinas wrote:
-> > > But what's more important - moving this wrapper to glibc causes issues
-> > > with the page size. We support both 4KB and 64KB pages on 64-bit systems
-> > > (the latter without compat support). The kernel is in a better position
-> > > to do the shift by a compile-time constant. Glibc would need to enquire
-> > > the actual page size to do the shift before calling sys_mmap_pgoff. If
-> > > we assume in glibc that the shift is always 12, we need another wrapper
-> > > in the kernel anyway for 64KB page configuration. So passing the offset
-> > > in bytes worked best for us.
-> > 
-> > Right, the kernel interface should really be independent of the page
-> > size, as sys_mmap2 normally is, and sys_mmap2 is not provided here.
-> 
-> sys_mmap2 is indeed independent of the page size on most architectures
-> assuming that the last argument represents the offset in units of 4096.
-> The cris and ia64 seem to differ (one being 8K, the other variable).
-> 
-> sys_mmap is also independent of the page size.
-> 
-> But using sys_mmap2 for a 64-bit architecture, especially when the page
-> size is not always 4K, does not bring any advantages. We end up doing a
-> shift by 12 in glibc and another shift by (PAGE_SHIFT - 12) in the
-> kernel wrapper. Unless I missed your point, I don't see the reason for
-> using sys_mmap2 on a 64-bit architecture, apart from it being newer (and
-> compat support should not have any relevance, we have different syscall
-> tables anyway).
+thanks a lot, linus! taking these through ARM SoC tree is the best way
+to avoid possible conflict.
+i have not done that in prima2 common clk driver, then i have a
+strange pull request:
+http://www.spinics.net/lists/arm-kernel/msg191412.html
 
-I forgot about this at the KS and we haven't got to a clear conclusion.
+>
+> Yours,
+> Linus Walleij
+>
 
-Do we (1) stick with the sys_mmap() for 64-bit systems and avoid offset
-conversion in both glibc and kernel or (2) use sys_mmap2() with a 12
-shift in glibc and (PAGE_SHIFT - 12) in the kernel wrapper?
-
-I personally prefer (1) as it doesn't require a kernel wrapper and we
-avoid the double shifting. A reason for (2) would be if we ever need
-file offsets greater than 16EB.
-
--- 
-Catalin
+-barry
