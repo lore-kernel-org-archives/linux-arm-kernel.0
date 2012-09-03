@@ -1,49 +1,20 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 3 Sep 2012 16:34:19 +0000
-Subject: [PATCH v2] ARM: initial multiplatform support
-In-Reply-To: <1346436765-9709-1-git-send-email-robherring2@gmail.com>
-References: <1346280600-29395-1-git-send-email-robherring2@gmail.com>
- <1346436765-9709-1-git-send-email-robherring2@gmail.com>
-Message-ID: <201209031634.19301.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Sep 2012 17:58:32 +0100
+Subject: [RFC 0/3] Initial stab at converting OMAP ASoC support to DMA engine
+Message-ID: <20120903165832.GA31511@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 August 2012, Rob Herring wrote:
-> [Rob Herring]: Rebased to not be dependent on the mass mach header rename.
-> As a result, omap2plus, imx, mxs and ux500 are not converted. Highbank,
-> picoxcell, mvebu, socfpga, and vexpress are converted.
-> 
-> v2: This version avoids the kconfig symbol name changes and simply moves
-> multi-platform enabled platform kconfig option out of the choice option
-> and into the platform's mach directory. A separate series fixes DEBUG_LL
-> for multi-platform.
+The following series of three patches is an attempt to convert the OMAP
+ASoC backend to use the DMA engine support.
 
-This looks like a nice start to play with multiplatform, and I guess it
-would be nice to merge it for v3.7.
+I'll bring your attention to the comments in patch 3 which highlight
+some of the features lost in this process.  Some questions need
+answering there (in particular the one concerning pause/resume)
+especially as it seems the present driver could well be buggy wrt
+comments recently on the mailing list about ALSA pause/resume
+requirements.
 
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -254,27 +254,9 @@ config MMU
->  #
->  choice
->         prompt "ARM system type"
-> +       depends on !ARCH_MULTIPLATFORM
->         default ARCH_VERSATILE
-
-Why did you move ARCH_MULTIPLATFORM out of the "choice" statement?
-If we leave it in there, and make it the default, then we don't
-even have to change the defconfigs any more (except the versatile
-one, which is no longer the default), which I think is quite clever
-and helps git-bisecting across this commit.
-
-I also still think that we should allow platforms to be part of
-both multi-platform and single-platform builds, for cases it helps
-with.
-
-For instance, we could enable one platform to be used in
-multiplatform kernels with the subset of its board files and
-device drivers that are possible, while leaving board files
-that cannot work with sparse-irq and drivers that rely on
-platform specific headers as "depends on !ARCH_MULTIPLATFORM".
-
-	Arnd
+This works for me, given the wind is in the right direction and if
+it's sunny outside.  I find the audio support on OMAP to be rather
+flakey at best, requiring reboots if it doesn't work first time.
