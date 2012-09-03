@@ -1,53 +1,93 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon,  3 Sep 2012 18:02:04 +0200
-Subject: [PATCH v3 0/4] Add device tree support for on-chip SRAM 
-Message-ID: <1346688128-22395-1-git-send-email-p.zabel@pengutronix.de>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 3 Sep 2012 18:20:53 +0200
+Subject: [PATCH] ARM: dts: OMAP4: Cleanup and move GIC outside of the OCP node
+Message-ID: <5044D8E5.5010705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches add support to configure on-chip SRAM via device-tree
-node and to obtain the resulting genalloc pool from a phandle pointing
-at the node.
-This allows drivers to allocate SRAM with the genalloc API without
-hard-coding the genalloc pool address.
+Remove a useless comment and move GIC controller outside
+of the OCP node since it does use the MPU internal bus and
+not the OCP.
+This will not change the functionality but will reflect the
+reality more accurately.
 
-The on-chip SRAM on i.MX53 and i.MX6q is registered via device tree and
-changed to use the simple generic SRAM driver:
-
-		ocram: ocram at 00900000 {
-			compatible = "fsl,imx-ocram", "sram";
-			reg = <0x00900000 0x3f000>;
- 		};
-
-A driver that needs to allocate SRAM buffers, like the video processing
-unit on i.MX53, can retrieve the genalloc pool from a phandle in the
-device tree using of_get_named_gen_pool(node, "iram", 0) from patch 5:
-
-		vpu at 63ff4000 {
-			/* ... */
-			iram = <&ocram>;
- 		};
-
-Changes since v2, as per Shawn's suggestions:
- - Moved struct device_node declaration out of #ifdef CONFIG_OF.
- - Simplified of_get_named_gen_pool using of_parse_phandle and
-   of_address_to_resource.
- - Return -EADDRNOTAVAIL if devm_request_and_ioremap fails.
- - Squashed i.MX changes together.
-
-regards
-Philipp
-
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 ---
- arch/arm/boot/dts/imx53.dtsi          |    5 ++
- arch/arm/boot/dts/imx6q.dtsi          |    5 ++
- arch/arm/plat-mxc/Kconfig             |    4 --
- arch/arm/plat-mxc/Makefile            |    1 -
- arch/arm/plat-mxc/include/mach/iram.h |   41 -------------
- arch/arm/plat-mxc/iram_alloc.c        |   73 -----------------------
- drivers/misc/Kconfig                  |    9 +++
- drivers/misc/Makefile                 |    1 +
- drivers/misc/sram.c                   |  105 +++++++++++++++++++++++++++++++++
- include/linux/genalloc.h              |   14 +++++
- lib/genalloc.c                        |   67 +++++++++++++++++++++
- 11 files changed, 206 insertions(+), 119 deletions(-)
+
+Hi Tony
+
+This is a minor cleanup done since Santosh's series is introducing some more MPU devices that does not belong to the TI main OCP interconnect. It makes sense for consistency / accuracy to move GIC to the same location.
+
+Regards,
+Benoit
+
+ arch/arm/boot/dts/omap4.dtsi |   40 ++++++++--------------------------------
+ 1 files changed, 8 insertions(+), 32 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 2b670ab..1853dc7 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -38,6 +38,14 @@
+ 		};
+ 	};
+ 
++	gic: interrupt-controller at 48241000 {
++		compatible = "arm,cortex-a9-gic";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		reg = <0x48241000 0x1000>,
++		      <0x48240100 0x0100>;
++	};
++
+ 	L2: l2-cache-controller at 48242000 {
+ 		compatible = "arm,pl310-cache";
+ 		reg = <0x48242000 0x1000>;
+@@ -76,30 +84,6 @@
+ 	/*
+ 	 * XXX: Use a flat representation of the OMAP4 interconnect.
+ 	 * The real OMAP interconnect network is quite complex.
+-	 *
+-	 * MPU -+-- MPU_PRIVATE - GIC, L2
+-	 *      |
+-	 *      +----------------+----------+
+-	 *      |                |          |
+-	 *      +            +- EMIF - DDR  |
+-	 *      |            |              |
+-	 *      |            +     +--------+
+-	 *      |            |     |
+-	 *      |            +- L4_ABE - AESS, MCBSP, TIMERs...
+-	 *      |            |
+-	 *      +- L3_MAIN --+- L4_CORE - IPs...
+-	 *                   |
+-	 *                   +- L4_PER - IPs...
+-	 *                   |
+-	 *                   +- L4_CFG -+- L4_WKUP - IPs...
+-	 *                   |          |
+-	 *                   |          +- IPs...
+-	 *                   +- IPU ----+
+-	 *                   |          |
+-	 *                   +- DSP ----+
+-	 *                   |          |
+-	 *                   +- DSS ----+
+-	 *
+ 	 * Since that will not bring real advantage to represent that in DT for
+ 	 * the moment, just use a fake OCP bus entry to represent the whole bus
+ 	 * hierarchy.
+@@ -111,14 +95,6 @@
+ 		ranges;
+ 		ti,hwmods = "l3_main_1", "l3_main_2", "l3_main_3";
+ 
+-		gic: interrupt-controller at 48241000 {
+-			compatible = "arm,cortex-a9-gic";
+-			interrupt-controller;
+-			#interrupt-cells = <3>;
+-			reg = <0x48241000 0x1000>,
+-			      <0x48240100 0x0100>;
+-		};
+-
+ 		gpio1: gpio at 4a310000 {
+ 			compatible = "ti,omap4-gpio";
+ 			ti,hwmods = "gpio1";
+-- 
+1.7.0.4
