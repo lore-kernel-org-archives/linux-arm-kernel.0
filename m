@@ -1,66 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Sep 2012 13:07:24 +0200
-Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
- I2C driver
-In-Reply-To: <20120903100656.GC5782@gmail.com>
-References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
- <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
- <20120831112258.GA2624@pengutronix.de>
- <20120831122323.GC5962@gmail.com>
- <CACRpkdZ=C1EV4WO2b=1YLHPNhsDsQdq7Kfnpzm8i7uGRtVjJuQ@mail.gmail.com>
- <20120903094448.GB11780@pengutronix.de>
- <20120903100656.GC5782@gmail.com>
-Message-ID: <CACRpkdb8owKBxawAv4LVVYx5kUgZ9cUSiQ=BV0f3Pf3bHtknuQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Sep 2012 12:11:06 +0100
+Subject: [PATCH] gpio/omap: fix possible memory leak in
+ omap2_gpio_dev_init()
+In-Reply-To: <CAPgLHd9A0-Esqt8D87RunMWFFG7uTCERksia26DSO1xw8OUfmg@mail.gmail.com>
+References: <CAPgLHd9A0-Esqt8D87RunMWFFG7uTCERksia26DSO1xw8OUfmg@mail.gmail.com>
+Message-ID: <20120903111106.GA24189@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 3, 2012 at 12:07 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Mon, Sep 03, 2012 at 06:13:33PM +0800, Wei Yongjun wrote:
+> @@ -130,6 +132,7 @@ static int __init omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+>  
+>  	pdev = omap_device_build(name, id - 1, oh, pdata,
+>  				sizeof(*pdata),	NULL, 0, false);
+> +	kfree(pdata->regs);
+>  	kfree(pdata);
 
-(...)
-> +       if (np) {
-> +               if (!pdata) {
-> +                       pdata = devm_kzalloc(&adev->dev, sizeof(*pdata), GFP_KERNEL);
-> +                       if (!pdata) {
-> +                               ret = -ENOMEM;
-> +                               goto err_no_mem;
-> +                       }
-> +               }
-> +               /* Provide the default configuration as a base. */
-> +               memcpy(pdata, &u8500_i2c, sizeof(struct nmk_i2c_controller));
+This one looks wrong.  pdata is copied by the internals of
+omap_device_build(), which includes the 'regs' pointer, so it should not
+be freed after a successful call to omap_device_build().  (It should,
+however, be freed after an unsuccessful call.)
 
-Here you blank out any pdata passed from say a board file or
-whatever if pdata != NULL.
-
-> +
-> +               nmk_i2c_of_probe(np, pdata);
-> +       }
-> +
->         if (!pdata)
->                 /* No i2c configuration found, using the default. */
->                 pdata = &u8500_i2c;
-
-So this is still wrong, if pdata is passed to the driver it will
-not override the DT, you have the semantics the other way
-around, DT overrides pdata.
-
-Look at the switch statement in my previous comment,
-just add the allocations and a memcpy() and it still holds:
-
-if (!pdata) {
-    if (np) {
-              pdata = devm_kzalloc(&adev->dev, sizeof(*pdata), GFP_KERNEL);
-                      if (!pdata) {
-                              ret = -ENOMEM;
-                              goto err_no_mem;
-                      }
-              }
-              /* Provide the default configuration as a base. */
-              memcpy(pdata, &u8500_i2c, sizeof(struct nmk_i2c_controller));
-              nmk_i2c_of_probe(np, pdata);
-    } else
-         /* Just use the static pdata */
-         pdata = &u8500_i2c;
-}
-
-Yours,
-Linus Walleij
+BTW, you want to copy Paul Walmsley with this patch (address in Cc).
