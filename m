@@ -1,49 +1,32 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Mon, 3 Sep 2012 18:13:33 +0800
-Subject: [PATCH] gpio/omap: fix possible memory leak in omap2_gpio_dev_init()
-Message-ID: <CAPgLHd9A0-Esqt8D87RunMWFFG7uTCERksia26DSO1xw8OUfmg@mail.gmail.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 3 Sep 2012 10:14:54 +0000
+Subject: [PATCH 6/9] ARM: OMAP: Move gpio.h to include/linux/platform_data
+In-Reply-To: <20120831005234.28732.10624.stgit@muffinssi.local>
+References: <20120831004828.28732.902.stgit@muffinssi.local>
+ <20120831005234.28732.10624.stgit@muffinssi.local>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9DC3AF@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Hi,
 
-pdata and pdata->regs have been allocated in this function and 
-should be freed before leaving it, and in the other error handling
-cases too.
+On Fri, Aug 31, 2012 at 06:22:34, Tony Lindgren wrote:
+> This way we can remove includes of plat/gpio.h which won't work
+> with the single zImage support.
+> 
+> Note that we also remove the cpu_class_is_omap2() check
+> in gpio-omap.c as the drivers should not call it as we need to
+> make it local to arch/arm/mach-omap2 for single zImage support.
+> 
+> While at it, arrange the related includes in the standard way.
+> 
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: linux-mtd at lists.infradead.org
+> Cc: alsa-devel at alsa-project.org
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-spatch with a semantic match is used to found this problem.
-(http://coccinelle.lip6.fr/)
+I think there is only one Tony ;)
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- arch/arm/mach-omap2/gpio.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-index 9ad7d48..3bfa4bb 100644
---- a/arch/arm/mach-omap2/gpio.c
-+++ b/arch/arm/mach-omap2/gpio.c
-@@ -60,6 +60,7 @@ static int __init omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 	pdata->regs = kzalloc(sizeof(struct omap_gpio_reg_offs), GFP_KERNEL);
- 	if (!pdata->regs) {
- 		pr_err("gpio%d: Memory allocation failed\n", id);
-+		kfree(pdata);
- 		return -ENOMEM;
- 	}
- 
-@@ -121,6 +122,7 @@ static int __init omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 		break;
- 	default:
- 		WARN(1, "Invalid gpio bank_type\n");
-+		kfree(pdata->regs);
- 		kfree(pdata);
- 		return -EINVAL;
- 	}
-@@ -130,6 +132,7 @@ static int __init omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 
- 	pdev = omap_device_build(name, id - 1, oh, pdata,
- 				sizeof(*pdata),	NULL, 0, false);
-+	kfree(pdata->regs);
- 	kfree(pdata);
- 
- 	if (IS_ERR(pdev)) {
+Regards
+Afzal
