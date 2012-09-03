@@ -1,44 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Sep 2012 21:40:23 +0200
-Subject: [PATCH 2/6 v2] ARM: integrator: check PL010 device name rather
- than base address
-In-Reply-To: <201209011832.47805.arnd@arndb.de>
-References: <1346471760-23993-1-git-send-email-linus.walleij@linaro.org>
- <1346471760-23993-2-git-send-email-linus.walleij@linaro.org>
- <201209011832.47805.arnd@arndb.de>
-Message-ID: <CACRpkdYMjJFHscO1BztOFBRMf+YZo+jO5pCrEiGeeeU_Oh_rfw@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 3 Sep 2012 15:47:35 -0400
+Subject: [PATCH v2 1/9] pinctrl: mvebu: pinctrl driver core
+In-Reply-To: <50431871.1030507@gmail.com>
+References: <CABJ1b_Tdr80DGqb-FRzwDbF3m7g6fBguk5GtRAfRUYx5Sqy_cA@mail.gmail.com>
+ <50366E44.4030606@wwwdotorg.org> <50369305.6050304@gmail.com>
+ <50369FEE.8000003@wwwdotorg.org> <5036B639.20608@gmail.com>
+ <5036F651.4020700@wwwdotorg.org> <5038F50E.7030807@gmail.com>
+ <503AF8B4.1070206@wwwdotorg.org>
+ <CACRpkdYsPadKr1i8m5cCAFUUvJYUnLmc3j8evKM_6rPU5oGzRg@mail.gmail.com>
+ <50431871.1030507@gmail.com>
+Message-ID: <20120903194735.GO19437@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 1, 2012 at 8:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 01 September 2012, Linus Walleij wrote:
->> In the PL010 UART callback a comparison against the base address is
->> done to figure out which UART is doing the callback. This does not
->> play well with device tree, so let's check the dev_name() of the
->> device instead.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Hmm, I think the dev_name would also not be that nice, because it changes
-> after the conversion to DT is complete.
+On Sun, Sep 02, 2012 at 10:27:29AM +0200, Sebastian Hesselbarth wrote:
+> Maybe Jason can also comment on what branch he wants to have it based
+> on, as we all agreed to get it through the Marvell tree.
 
-Hmmmm yeah. I do tie down the name to "uart0" using auxdata.
+Please base against:
 
-(...)
->> +++ b/arch/arm/mach-integrator/core.c
->> @@ -100,7 +100,7 @@ static void integrator_uart_set_mctrl(struct amba_device *dev, void __iomem *bas
->>  {
->>         unsigned int ctrls = 0, ctrlc = 0, rts_mask, dtr_mask;
->>
->> -       if (dev == &uart0_device) {
->> +       if (!strcmp(dev_name(&dev->dev), "uart0")) {
->>                 rts_mask = 1 << 4;
->>                 dtr_mask = 1 << 5;
->>         } else {
->
-> Maybe it's possible to compare the base pointer against INTEGRATOR_UART0_BASE instead?
+git://git.infradead.org/users/jcooper/linux.git boards-for-v3.7-v2
 
-Nope, that is an ioremapped() base, I have no clue what it may be.
+thx,
 
-Yours,
-Linus Walleij
+Jason.
