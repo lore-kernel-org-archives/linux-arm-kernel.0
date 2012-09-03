@@ -1,134 +1,46 @@
-From: gcembed@gmail.com (=?UTF-8?q?Ga=C3=ABtan=20Carlier?=)
-Date: Mon,  3 Sep 2012 10:49:21 +0200
-Subject: [PATCH] ASoC: imx-mc13783: use defines instead of numerical address
- of register
-Message-ID: <1346662161-7642-1-git-send-email-gcembed@gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 03 Sep 2012 10:54:06 +0200
+Subject: [PATCH] ARM: S3C24XX: Add WIZnet W5300E01-ARM board support
+In-Reply-To: <CA+E=qVfGN9_Lj5GWqERfZGQsTtnnK_fARgXuCujdVeZ0PBoJEQ@mail.gmail.com>
+References: <1346653236-19728-1-git-send-email-kth3321@gmail.com>
+ <CA+E=qVfGN9_Lj5GWqERfZGQsTtnnK_fARgXuCujdVeZ0PBoJEQ@mail.gmail.com>
+Message-ID: <5044702E.3070209@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This uses already defined name of registers and makes code more readable.
+Hi,
 
-Signed-off-by: Ga?tan Carlier <gcembed@gmail.com>
----
- sound/soc/codecs/mc13783.c |   58 +++++++++++++++++++++++--------------------
- 1 files changed, 31 insertions(+), 27 deletions(-)
+On 09/03/2012 09:56 AM, Vasily Khoruzhick wrote:
+>> +static void __init w5300e01_init(void)
+>> +{
+>> +       s3c_nand_set_platdata(&w5300e01_nand_info);
+>> +       platform_add_devices(w5300e01_devices, ARRAY_SIZE(w5300e01_devices));
+>> +
+>> +       /* W5300 interrupt pin. */
+>> +       s3c2410_gpio_cfgpin(S3C2410_GPF(0), S3C2410_GPIO_IRQ);
+>> +
+>> +       s3c2410_gpio_cfgpin(S3C2410_GPF(4), S3C2410_GPIO_OUTPUT);
+>> +       s3c2410_gpio_cfgpin(S3C2410_GPF(5), S3C2410_GPIO_OUTPUT);
+>> +       s3c2410_gpio_cfgpin(S3C2410_GPF(6), S3C2410_GPIO_OUTPUT);
+>> +       s3c2410_gpio_cfgpin(S3C2410_GPF(7), S3C2410_GPIO_OUTPUT);
+>> +
+>> +       s3c2410_gpio_setpin(S3C2410_GPF(0), 1);
+>> +       s3c2410_gpio_setpin(S3C2410_GPF(4), 1);
+>> +       s3c2410_gpio_setpin(S3C2410_GPF(5), 1);
+>> +       s3c2410_gpio_setpin(S3C2410_GPF(6), 1);
+>> +       s3c2410_gpio_setpin(S3C2410_GPF(7), 1);
+>> +
+> 
+> Please use gpiolib API, legacy s3c2410_gpio_* API will be removed soon.
 
-diff --git a/sound/soc/codecs/mc13783.c b/sound/soc/codecs/mc13783.c
-index 8f726c0..bbfa553 100644
---- a/sound/soc/codecs/mc13783.c
-+++ b/sound/soc/codecs/mc13783.c
-@@ -426,16 +426,16 @@ static int mc13783_set_tdm_slot_sync(struct snd_soc_dai *dai,
- }
- 
- static const struct snd_kcontrol_new mc1l_amp_ctl =
--	SOC_DAPM_SINGLE("Switch", 38, 7, 1, 0);
-+	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_TX, 7, 1, 0);
- 
- static const struct snd_kcontrol_new mc1r_amp_ctl =
--	SOC_DAPM_SINGLE("Switch", 38, 5, 1, 0);
-+	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_TX, 5, 1, 0);
- 
- static const struct snd_kcontrol_new mc2_amp_ctl =
--	SOC_DAPM_SINGLE("Switch", 38, 9, 1, 0);
-+	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_TX, 9, 1, 0);
- 
- static const struct snd_kcontrol_new atx_amp_ctl =
--	SOC_DAPM_SINGLE("Switch", 38, 11, 1, 0);
-+	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_TX, 11, 1, 0);
- 
- 
- /* Virtual mux. The chip does the input selection automatically
-@@ -461,22 +461,22 @@ static const struct snd_kcontrol_new right_input_mux =
- 	SOC_DAPM_ENUM_VIRT("Route", adcr_enum);
- 
- static const struct snd_kcontrol_new samp_ctl =
--	SOC_DAPM_SINGLE("Switch", 36, 3, 1, 0);
-+	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_RX0, 3, 1, 0);
- 
- static const struct snd_kcontrol_new lamp_ctl =
--	SOC_DAPM_SINGLE("Switch", 36, 5, 1, 0);
-+	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_RX0, 5, 1, 0);
- 
- static const struct snd_kcontrol_new hlamp_ctl =
--	SOC_DAPM_SINGLE("Switch", 36, 10, 1, 0);
-+	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_RX0, 10, 1, 0);
- 
- static const struct snd_kcontrol_new hramp_ctl =
--	SOC_DAPM_SINGLE("Switch", 36, 9, 1, 0);
-+	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_RX0, 9, 1, 0);
- 
- static const struct snd_kcontrol_new llamp_ctl =
--	SOC_DAPM_SINGLE("Switch", 36, 16, 1, 0);
-+	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_RX0, 16, 1, 0);
- 
- static const struct snd_kcontrol_new lramp_ctl =
--	SOC_DAPM_SINGLE("Switch", 36, 15, 1, 0);
-+	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_RX0, 15, 1, 0);
- 
- static const struct snd_soc_dapm_widget mc13783_dapm_widgets[] = {
- /* Input */
-@@ -487,13 +487,13 @@ static const struct snd_soc_dapm_widget mc13783_dapm_widgets[] = {
- 	SND_SOC_DAPM_INPUT("RXINL"),
- 	SND_SOC_DAPM_INPUT("TXIN"),
- 
--	SND_SOC_DAPM_SUPPLY("MC1 Bias", 38, 0, 0, NULL, 0),
--	SND_SOC_DAPM_SUPPLY("MC2 Bias", 38, 1, 0, NULL, 0),
-+	SND_SOC_DAPM_SUPPLY("MC1 Bias", MC13783_AUDIO_TX, 0, 0, NULL, 0),
-+	SND_SOC_DAPM_SUPPLY("MC2 Bias", MC13783_AUDIO_TX, 1, 0, NULL, 0),
- 
--	SND_SOC_DAPM_SWITCH("MC1L Amp", 38, 7, 0, &mc1l_amp_ctl),
--	SND_SOC_DAPM_SWITCH("MC1R Amp", 38, 5, 0, &mc1r_amp_ctl),
--	SND_SOC_DAPM_SWITCH("MC2 Amp", 38, 9, 0, &mc2_amp_ctl),
--	SND_SOC_DAPM_SWITCH("TXIN Amp", 38, 11, 0, &atx_amp_ctl),
-+	SND_SOC_DAPM_SWITCH("MC1L Amp", MC13783_AUDIO_TX, 7, 0, &mc1l_amp_ctl),
-+	SND_SOC_DAPM_SWITCH("MC1R Amp", MC13783_AUDIO_TX, 5, 0, &mc1r_amp_ctl),
-+	SND_SOC_DAPM_SWITCH("MC2 Amp", MC13783_AUDIO_TX, 9, 0, &mc2_amp_ctl),
-+	SND_SOC_DAPM_SWITCH("TXIN Amp", MC13783_AUDIO_TX, 11, 0, &atx_amp_ctl),
- 
- 	SND_SOC_DAPM_VIRT_MUX("PGA Left Input Mux", SND_SOC_NOPM, 0, 0,
- 			      &left_input_mux),
-@@ -503,12 +503,12 @@ static const struct snd_soc_dapm_widget mc13783_dapm_widgets[] = {
- 	SND_SOC_DAPM_PGA("PGA Left Input", SND_SOC_NOPM, 0, 0, NULL, 0),
- 	SND_SOC_DAPM_PGA("PGA Right Input", SND_SOC_NOPM, 0, 0, NULL, 0),
- 
--	SND_SOC_DAPM_ADC("ADC", "Capture", 40, 11, 0),
--	SND_SOC_DAPM_SUPPLY("ADC_Reset", 40, 15, 0, NULL, 0),
-+	SND_SOC_DAPM_ADC("ADC", "Capture", MC13783_AUDIO_CODEC, 11, 0),
-+	SND_SOC_DAPM_SUPPLY("ADC_Reset", MC13783_AUDIO_CODEC, 15, 0, NULL, 0),
- 
- /* Output */
--	SND_SOC_DAPM_SUPPLY("DAC_E", 41, 11, 0, NULL, 0),
--	SND_SOC_DAPM_SUPPLY("DAC_Reset", 41, 15, 0, NULL, 0),
-+	SND_SOC_DAPM_SUPPLY("DAC_E", MC13783_AUDIO_DAC, 11, 0, NULL, 0),
-+	SND_SOC_DAPM_SUPPLY("DAC_Reset", MC13783_AUDIO_DAC, 15, 0, NULL, 0),
- 	SND_SOC_DAPM_OUTPUT("RXOUTL"),
- 	SND_SOC_DAPM_OUTPUT("RXOUTR"),
- 	SND_SOC_DAPM_OUTPUT("HSL"),
-@@ -516,14 +516,18 @@ static const struct snd_soc_dapm_widget mc13783_dapm_widgets[] = {
- 	SND_SOC_DAPM_OUTPUT("LSP"),
- 	SND_SOC_DAPM_OUTPUT("SP"),
- 
--	SND_SOC_DAPM_SWITCH("Speaker Amp", 36, 3, 0, &samp_ctl),
-+	SND_SOC_DAPM_SWITCH("Speaker Amp", MC13783_AUDIO_RX0, 3, 0, &samp_ctl),
- 	SND_SOC_DAPM_SWITCH("Loudspeaker Amp", SND_SOC_NOPM, 0, 0, &lamp_ctl),
--	SND_SOC_DAPM_SWITCH("Headset Amp Left", 36, 10, 0, &hlamp_ctl),
--	SND_SOC_DAPM_SWITCH("Headset Amp Right", 36, 9, 0, &hramp_ctl),
--	SND_SOC_DAPM_SWITCH("Line out Amp Left", 36, 16, 0, &llamp_ctl),
--	SND_SOC_DAPM_SWITCH("Line out Amp Right", 36, 15, 0, &lramp_ctl),
--	SND_SOC_DAPM_DAC("DAC", "Playback", 36, 22, 0),
--	SND_SOC_DAPM_PGA("DAC PGA", 37, 5, 0, NULL, 0),
-+	SND_SOC_DAPM_SWITCH("Headset Amp Left", MC13783_AUDIO_RX0, 10, 0,
-+			&hlamp_ctl),
-+	SND_SOC_DAPM_SWITCH("Headset Amp Right", MC13783_AUDIO_RX0, 9, 0,
-+			&hramp_ctl),
-+	SND_SOC_DAPM_SWITCH("Line out Amp Left", MC13783_AUDIO_RX0, 16, 0,
-+			&llamp_ctl),
-+	SND_SOC_DAPM_SWITCH("Line out Amp Right", MC13783_AUDIO_RX0, 15, 0,
-+			&lramp_ctl),
-+	SND_SOC_DAPM_DAC("DAC", "Playback", MC13783_AUDIO_RX0, 22, 0),
-+	SND_SOC_DAPM_PGA("DAC PGA", MC13783_AUDIO_RX1, 5, 0, NULL, 0),
- };
- 
- static struct snd_soc_dapm_route mc13783_routes[] = {
--- 
-1.7.7.4
+Right, you'll find some information about this in
+Documentation/arm/Samsung-S3C24XX/GPIO.txt.
+
+These links may be useful as well:
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg11985.html
+http://www.spinics.net/lists/arm-kernel/msg192119.html
+
+--
+
+Regards,
+Sylwester
