@@ -1,182 +1,153 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon,  3 Sep 2012 18:02:08 +0200
-Subject: [PATCH v3 4/4] ARM i.MX: remove IRAM_ALLOC facility
+Date: Mon,  3 Sep 2012 18:02:05 +0200
+Subject: [PATCH v3 1/4] genalloc: add a global pool list,
+ allow to find pools by phys address
 In-Reply-To: <1346688128-22395-1-git-send-email-p.zabel@pengutronix.de>
 References: <1346688128-22395-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1346688128-22395-5-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1346688128-22395-2-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A generic on-chip SRAM allocator driver can be used instead.
-Users of the iram_alloc/free API should convert to the genalloc API:
-
--	virt = iram_alloc(SIZE, &phys);
-+	gen_pool_alloc(iram_pool, SIZE);
-+	phys = gen_pool_virt_to_phys(iram_pool, virt);
- 	/* ... */
--	iram_free(virt, SIZE);
-+	gen_pool_free(iram_pool, virt, SIZE);
+This patch keeps all created pools in a global list and adds two
+functions that allow to retrieve the gen_pool pointer from a known
+physical address and from a device tree node.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- arch/arm/plat-mxc/Kconfig             |    4 --
- arch/arm/plat-mxc/Makefile            |    1 -
- arch/arm/plat-mxc/include/mach/iram.h |   41 ------------------
- arch/arm/plat-mxc/iram_alloc.c        |   73 ---------------------------------
- 4 files changed, 119 deletions(-)
- delete mode 100644 arch/arm/plat-mxc/include/mach/iram.h
- delete mode 100644 arch/arm/plat-mxc/iram_alloc.c
+Changes since v2:
+ - Moved struct device_node declaration out of #ifdef CONFIG_OF.
+ - Simplified of_get_named_gen_pool using of_parse_phandle and
+   of_address_to_resource.
+---
+ include/linux/genalloc.h |   14 ++++++++++
+ lib/genalloc.c           |   67 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 81 insertions(+)
 
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index baf9064..8e63f10 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -82,8 +82,4 @@ config IMX_HAVE_IOMUX_V1
- config ARCH_MXC_IOMUX_V3
- 	bool
+diff --git a/include/linux/genalloc.h b/include/linux/genalloc.h
+index 5e98eeb..d498c43 100644
+--- a/include/linux/genalloc.h
++++ b/include/linux/genalloc.h
+@@ -33,6 +33,7 @@
+  *  General purpose special memory pool descriptor.
+  */
+ struct gen_pool {
++	struct list_head next_pool;	/* pool in global list */
+ 	spinlock_t lock;
+ 	struct list_head chunks;	/* list of chunks in this pool */
+ 	int min_alloc_order;		/* minimum allocation order */
+@@ -78,4 +79,17 @@ extern void gen_pool_for_each_chunk(struct gen_pool *,
+ 	void (*)(struct gen_pool *, struct gen_pool_chunk *, void *), void *);
+ extern size_t gen_pool_avail(struct gen_pool *);
+ extern size_t gen_pool_size(struct gen_pool *);
++extern struct gen_pool *gen_pool_find_by_phys(phys_addr_t phys);
++
++struct device_node;
++#ifdef CONFIG_OF
++extern struct gen_pool *of_get_named_gen_pool(struct device_node *np,
++	const char *propname, int index);
++#else
++inline struct gen_pool *of_get_named_gen_pool(struct device_node *np,
++	const char *propname, int index)
++{
++	return NULL;
++}
++#endif
+ #endif /* __GENALLOC_H__ */
+diff --git a/lib/genalloc.c b/lib/genalloc.c
+index 6bc04aa..90699ac 100644
+--- a/lib/genalloc.c
++++ b/lib/genalloc.c
+@@ -34,6 +34,11 @@
+ #include <linux/rculist.h>
+ #include <linux/interrupt.h>
+ #include <linux/genalloc.h>
++#include <linux/of_address.h>
++#include <linux/of_device.h>
++
++static LIST_HEAD(pools);
++static DEFINE_SPINLOCK(list_lock);
  
--config IRAM_ALLOC
--	bool
--	select GENERIC_ALLOCATOR
--
- endif
-diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-index 6ac7200..bdf370f 100644
---- a/arch/arm/plat-mxc/Makefile
-+++ b/arch/arm/plat-mxc/Makefile
-@@ -10,7 +10,6 @@ obj-$(CONFIG_MXC_AVIC) += avic.o
+ static int set_bits_ll(unsigned long *addr, unsigned long mask_to_set)
+ {
+@@ -152,6 +157,9 @@ struct gen_pool *gen_pool_create(int min_alloc_order, int nid)
+ 		spin_lock_init(&pool->lock);
+ 		INIT_LIST_HEAD(&pool->chunks);
+ 		pool->min_alloc_order = min_alloc_order;
++		spin_lock(&list_lock);
++		list_add_rcu(&pool->next_pool, &pools);
++		spin_unlock(&list_lock);
+ 	}
+ 	return pool;
+ }
+@@ -234,6 +242,9 @@ void gen_pool_destroy(struct gen_pool *pool)
+ 	int order = pool->min_alloc_order;
+ 	int bit, end_bit;
  
- obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
- obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
--obj-$(CONFIG_IRAM_ALLOC) += iram_alloc.o
- obj-$(CONFIG_MXC_ULPI) += ulpi.o
- obj-$(CONFIG_MXC_USE_EPIT) += epit.o
- obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
-diff --git a/arch/arm/plat-mxc/include/mach/iram.h b/arch/arm/plat-mxc/include/mach/iram.h
-deleted file mode 100644
-index 022690c..0000000
---- a/arch/arm/plat-mxc/include/mach/iram.h
-+++ /dev/null
-@@ -1,41 +0,0 @@
--/*
-- * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version 2
-- * of the License, or (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-- * MA 02110-1301, USA.
-- */
--#include <linux/errno.h>
--
--#ifdef CONFIG_IRAM_ALLOC
--
--int __init iram_init(unsigned long base, unsigned long size);
--void __iomem *iram_alloc(unsigned int size, unsigned long *dma_addr);
--void iram_free(unsigned long dma_addr, unsigned int size);
--
--#else
--
--static inline int __init iram_init(unsigned long base, unsigned long size)
--{
--	return -ENOMEM;
--}
--
--static inline void __iomem *iram_alloc(unsigned int size, unsigned long *dma_addr)
--{
--	return NULL;
--}
--
--static inline void iram_free(unsigned long base, unsigned long size) {}
--
--#endif
-diff --git a/arch/arm/plat-mxc/iram_alloc.c b/arch/arm/plat-mxc/iram_alloc.c
-deleted file mode 100644
-index 074c386..0000000
---- a/arch/arm/plat-mxc/iram_alloc.c
-+++ /dev/null
-@@ -1,73 +0,0 @@
--/*
-- * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version 2
-- * of the License, or (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-- * MA 02110-1301, USA.
-- */
--
--#include <linux/kernel.h>
--#include <linux/io.h>
--#include <linux/module.h>
--#include <linux/spinlock.h>
--#include <linux/genalloc.h>
--#include <mach/iram.h>
--
--static unsigned long iram_phys_base;
--static void __iomem *iram_virt_base;
--static struct gen_pool *iram_pool;
--
--static inline void __iomem *iram_phys_to_virt(unsigned long p)
--{
--	return iram_virt_base + (p - iram_phys_base);
--}
--
--void __iomem *iram_alloc(unsigned int size, unsigned long *dma_addr)
--{
--	if (!iram_pool)
--		return NULL;
--
--	*dma_addr = gen_pool_alloc(iram_pool, size);
--	pr_debug("iram alloc - %dB at 0x%lX\n", size, *dma_addr);
--	if (!*dma_addr)
--		return NULL;
--	return iram_phys_to_virt(*dma_addr);
--}
--EXPORT_SYMBOL(iram_alloc);
--
--void iram_free(unsigned long addr, unsigned int size)
--{
--	if (!iram_pool)
--		return;
--
--	gen_pool_free(iram_pool, addr, size);
--}
--EXPORT_SYMBOL(iram_free);
--
--int __init iram_init(unsigned long base, unsigned long size)
--{
--	iram_phys_base = base;
--
--	iram_pool = gen_pool_create(PAGE_SHIFT, -1);
--	if (!iram_pool)
--		return -ENOMEM;
--
--	gen_pool_add(iram_pool, base, size, -1);
--	iram_virt_base = ioremap(iram_phys_base, size);
--	if (!iram_virt_base)
--		return -EIO;
--
--	pr_debug("i.MX IRAM pool: %ld KB at 0x%p\n", size / 1024, iram_virt_base);
--	return 0;
--}
++	spin_lock(&list_lock);
++	list_del_rcu(&pool->next_pool);
++	spin_unlock(&list_lock);
+ 	list_for_each_safe(_chunk, _next_chunk, &pool->chunks) {
+ 		chunk = list_entry(_chunk, struct gen_pool_chunk, next_chunk);
+ 		list_del(&chunk->next_chunk);
+@@ -400,3 +411,59 @@ size_t gen_pool_size(struct gen_pool *pool)
+ 	return size;
+ }
+ EXPORT_SYMBOL_GPL(gen_pool_size);
++
++/**
++ * gen_pool_find_by_phys - find a pool by physical start address
++ * @phys: physical address as added with gen_pool_add_virt
++ *
++ * Returns the pool that contains the chunk starting at phys,
++ * or NULL if not found.
++ */
++struct gen_pool *gen_pool_find_by_phys(phys_addr_t phys)
++{
++	struct gen_pool *pool, *found = NULL;
++	struct gen_pool_chunk *chunk;
++
++	rcu_read_lock();
++	list_for_each_entry_rcu(pool, &pools, next_pool) {
++		list_for_each_entry_rcu(chunk, &pool->chunks, next_chunk) {
++			if (phys == chunk->phys_addr) {
++				found = pool;
++				break;
++			}
++		}
++	}
++	rcu_read_unlock();
++
++	return found;
++}
++EXPORT_SYMBOL_GPL(gen_pool_find_by_phys);
++
++#ifdef CONFIG_OF
++/**
++ * of_get_named_gen_pool - find a pool by phandle property
++ * @np: device node
++ * @propname: property name containing phandle(s)
++ * @index: index into the phandle array
++ *
++ * Returns the pool that contains the chunk starting at the physical
++ * address of the device tree node pointed at by the phandle property,
++ * or NULL if not found.
++ */
++struct gen_pool *of_get_named_gen_pool(struct device_node *np,
++	const char *propname, int index)
++{
++	struct device_node *np_pool;
++	struct resource res;
++	int ret;
++
++	np_pool = of_parse_phandle(np, propname, index);
++	if (!np_pool)
++		return NULL;
++	ret = of_address_to_resource(np_pool, 0, &res);
++	if (ret < 0)
++		return NULL;
++	return gen_pool_find_by_phys((phys_addr_t) res.start);
++}
++EXPORT_SYMBOL_GPL(of_get_named_gen_pool);
++#endif /* CONFIG_OF */
 -- 
 1.7.10.4
