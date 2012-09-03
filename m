@@ -1,25 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 3 Sep 2012 13:24:22 +0000
-Subject: [PATCH 4/4] ARM: ks8695: convert to generic time and clocksource
-In-Reply-To: <5044A954.4000706@snapgear.com>
-References: <1346264842-20411-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdab72Z86i21TNohS0YO=Bav7eQgHwQyXa0tXQB=0hhgAg@mail.gmail.com>
- <5044A954.4000706@snapgear.com>
-Message-ID: <201209031324.22877.arnd@arndb.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 03 Sep 2012 15:28:05 +0200
+Subject: [PATCH] ARM: dts: exynos4: Enable serial controllers on Origen and
+ SMDKV310
+In-Reply-To: <1346675674-16034-4-git-send-email-t.figa@samsung.com>
+References: <1346675674-16034-1-git-send-email-t.figa@samsung.com>
+ <1346675674-16034-4-git-send-email-t.figa@samsung.com>
+Message-ID: <1808225.QZz0WEipT7@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 September 2012, Greg Ungerer wrote:
-> > I suspect
-> > some of these platforms may have more users than we
-> > believe.
-> 
-> I know the guys at www.opengear.com are still building hardware around
-> the KS8695. And they update to modern kernels from time to time. So its
-> not completely obsolete yet. I have some SnapGear boards based around it
-> too, though they went out of production about 2 years ago.
+This patch adds status override of serial nodes to enable used serial ports
+on Origen and SMDKV310 board.
 
-Ok, good to know. Maybe we can catch their interest with this mail thread
-here and get them to contribute upstream as well.
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/boot/dts/exynos4210-origen.dts   | 16 ++++++++++++++++
+ arch/arm/boot/dts/exynos4210-smdkv310.dts | 16 ++++++++++++++++
+ 2 files changed, 32 insertions(+)
 
-	Arnd
+diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
+index d1a1101..c7295fb 100644
+--- a/arch/arm/boot/dts/exynos4210-origen.dts
++++ b/arch/arm/boot/dts/exynos4210-origen.dts
+@@ -57,6 +57,22 @@
+ 		status = "okay";
+ 	};
+ 
++	serial at 13800000 {
++		status = "okay";
++	};
++
++	serial at 13810000 {
++		status = "okay";
++	};
++
++	serial at 13820000 {
++		status = "okay";
++	};
++
++	serial at 13830000 {
++		status = "okay";
++	};
++
+ 	gpio_keys {
+ 		compatible = "gpio-keys";
+ 		#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+index b87cca2..f634907 100644
+--- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
++++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+@@ -43,6 +43,22 @@
+ 		status = "okay";
+ 	};
+ 
++	serial at 13800000 {
++		status = "okay";
++	};
++
++	serial at 13810000 {
++		status = "okay";
++	};
++
++	serial at 13820000 {
++		status = "okay";
++	};
++
++	serial at 13830000 {
++		status = "okay";
++	};
++
+ 	keypad at 100A0000 {
+ 		samsung,keypad-num-rows = <2>;
+ 		samsung,keypad-num-columns = <8>;
+-- 
+1.7.12
