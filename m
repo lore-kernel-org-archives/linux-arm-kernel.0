@@ -1,55 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Sep 2012 23:51:48 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Sep 2012 22:55:05 +0100
 Subject: [PATCH 4/6 v2] ARM: integrator: initial device tree support
-In-Reply-To: <5043E4BE.1060508@gmail.com>
+In-Reply-To: <CACRpkdZhJyqeeXV_Zcfi7S01oH1Kw95qvAmOqrMKwhSLb-mX=Q@mail.gmail.com>
 References: <1346471760-23993-1-git-send-email-linus.walleij@linaro.org>
- <1346471760-23993-2-git-send-email-linus.walleij@linaro.org>
  <1346471760-23993-3-git-send-email-linus.walleij@linaro.org>
  <1346471760-23993-4-git-send-email-linus.walleij@linaro.org>
- <5043E4BE.1060508@gmail.com>
-Message-ID: <CACRpkdbTRCUnx1JjCQ+WT4PoxtDG38MP=ctUp6TBPd64xQ39jw@mail.gmail.com>
+ <201209011841.58977.arnd@arndb.de>
+ <CACRpkdZhJyqeeXV_Zcfi7S01oH1Kw95qvAmOqrMKwhSLb-mX=Q@mail.gmail.com>
+Message-ID: <20120903215505.GB31511@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 3, 2012 at 12:59 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On 08/31/2012 10:55 PM, Linus Walleij wrote:
+On Mon, Sep 03, 2012 at 11:43:37PM +0200, Linus Walleij wrote:
+> On Sat, Sep 1, 2012 at 8:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > I think we discussed this before. It would be nice to replace the #if/#else
+> > with
+> >
+> > #ifdef CONFIG_OF
+> > ...
+> > #endif
+> > #ifdef CONFIG_ATAG
+> > ...
+> > #endif
+> 
+> Sure, have you applied Nico's patch adding CONFIG_ATAG to and
+> ARM SoC branch so I can base my patches on it?
+> 
+> I was under the impression that his patch would go through Russell's
+> tree and I would thus not be able to rely on it until it has landed there
+> and you have pulled Russell's stuff into your tree.
 
->> +/ {
->> +     model = "ARM Integrator/CP";
->> +     compatible = "arm,integrator-cp";
->> +     ranges;
->> +
->> +     aliases {
->> +             arm,integrator-clocksource = &timer2;
->> +             arm,integrator-clockevent = &timer1;
->
-> This is linux specific and a common issue we need a solution for. Grant
-> had done something for versatile and we discussed it some, but nothing
-> ever got close to finalized. IIRC, Grant's solution was just add a
-> "linux,clockevent" or "linux,clocksource" to the nodes that are to be
-> used. But he wasn't really happy with it. Perhaps using these names as
-> aliases would be better.
+One of them is already in my tree - I put it in on Saturday though on an
+unstable branch.
 
-Atleast I'm honest about what this is, IMHO this is better than
-any of the solutions we already have in boot/dts.
+> Currently I would make it impossible to use ATAGs if I do this since
+> the symbol does not exist, so I really need to base such an
+> approach in a tree which has CONFIG_ATAG in the first place.
 
-Look at the versatile express
-arch/arm/boot/dts/vexpress-v2m.dtsi:
-
-        aliases {
-                arm,v2m_timer = &v2m_timer01;
-        };
-
-It's quite hard to tell that this "vtm_timer" is actually the block
-serving as clock source and clockevent for the Vexpress,
-but if you inspect the code you can see that this is what it is.
-
-I can of course skip the aliases and go for the timer nodes
-I want directly, but that isn't any helpful for people reading the
-device tree, is it?
-
-Maybe primary-timer, secondary-timer is sufficiently
-good and neutral aliases?
-
-Yours,
-Linus Walleij
+I've just merged that patch though.
