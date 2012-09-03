@@ -1,497 +1,786 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon,  3 Sep 2012 17:25:29 +0100
-Subject: [PATCH 09/11] misc: Versatile Express system registers driver
+Date: Mon,  3 Sep 2012 17:25:31 +0100
+Subject: [PATCH 11/11] ARM: vexpress: Start using new Versatile Express
+ infrastructure
 In-Reply-To: <1346689531-7212-1-git-send-email-pawel.moll@arm.com>
 References: <1346689531-7212-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1346689531-7212-10-git-send-email-pawel.moll@arm.com>
+Message-ID: <1346689531-7212-12-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a platform driver for Versatile Express' "system
-register" block. It's a random collection of registers providing
-the following functionality:
+This patch starts using all the configuration infrastructure.
 
-- low level platform functions like board ID access; in order to
-  use those, the driver must be initialized early, either statically
-  or based on the DT
+- generic GPIO library is forced now
 
-- config bus bridge via "system control" interface; as the response
-  from the controller does not generate interrupt (yet), the status
-  register is periodically polled using a timer
+- sysreg GPIOs are used to as MMC CD and WP information sources;
+  thanks to this MMCI auxiliary data is not longer necessary
 
-- pseudo GPIO lines providing MMC card status and Flash WP#
-  signal control
+- DVI muxer and mode control is removed from non-DT V2P-CA9 code
+  as this is now handled by the vexpress-display driver
 
-- LED interface for a set of 8 LEDs on the motherboard, with
-  "heartbeat" and "mmc0" as default triggers for 2 of them
+- oscillator control is removed as is being handled by the
+  common clock driver now
+
+- the sysreg and sysctl control is now delegated to the
+  appropriate drivers and all related code was removed
+
+- NOR Flash set_vpp function has been removed as the control
+  bit used does _not_ control its VPP line, but the #WP signal
+  instead (which is de facto unusable in case of Linux MTD
+  drivers); this also allowed the remove its DT auxiliary
+  data
+
+The non-DT code defines only minimal required number of
+the config devices. Device Trees are updated to make use
+of all new features.
 
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- drivers/misc/vexpress/Makefile |    1 +
- drivers/misc/vexpress/sysreg.c |  423 ++++++++++++++++++++++++++++++++++++++++
- include/linux/vexpress.h       |   13 ++
- 3 files changed, 437 insertions(+)
- create mode 100644 drivers/misc/vexpress/sysreg.c
+ arch/arm/Kconfig                                  |    4 +-
+ arch/arm/include/asm/hardware/sp810.h             |    6 -
+ arch/arm/mach-vexpress/ct-ca9x4.c                 |   37 +--
+ arch/arm/mach-vexpress/include/mach/motherboard.h |   81 ------
+ arch/arm/mach-vexpress/platsmp.c                  |    3 +-
+ arch/arm/mach-vexpress/v2m.c                      |  321 +++++----------------
+ 6 files changed, 86 insertions(+), 366 deletions(-)
 
-diff --git a/drivers/misc/vexpress/Makefile b/drivers/misc/vexpress/Makefile
-index d83d6b6..45af621 100644
---- a/drivers/misc/vexpress/Makefile
-+++ b/drivers/misc/vexpress/Makefile
-@@ -1,3 +1,4 @@
- obj-$(CONFIG_VEXPRESS_CONFIG_BUS) += config_bus.o
- obj-$(CONFIG_VEXPRESS_CONFIG_BUS) += display.o
- obj-$(CONFIG_VEXPRESS_CONFIG_BUS) += reset.o
-+obj-$(CONFIG_VEXPRESS_CONFIG_BUS) += sysreg.o
-diff --git a/drivers/misc/vexpress/sysreg.c b/drivers/misc/vexpress/sysreg.c
-new file mode 100644
-index 0000000..e43abc8
---- /dev/null
-+++ b/drivers/misc/vexpress/sysreg.c
-@@ -0,0 +1,423 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * Copyright (C) 2012 ARM Limited
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/gpio.h>
-+#include <linux/io.h>
-+#include <linux/leds.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/driver.h>
-+#include <linux/stat.h>
-+#include <linux/timer.h>
-+#include <linux/vexpress.h>
-+
-+#define SYS_ID			0x000
-+#define SYS_SW			0x004
-+#define SYS_LED			0x008
-+#define SYS_100HZ		0x024
-+#define SYS_FLAGS		0x030
-+#define SYS_FLAGSSET		0x030
-+#define SYS_FLAGSCLR		0x034
-+#define SYS_NVFLAGS		0x038
-+#define SYS_NVFLAGSSET		0x038
-+#define SYS_NVFLAGSCLR		0x03c
-+#define SYS_MCI			0x048
-+#define SYS_FLASH		0x04c
-+#define SYS_CFGSW		0x058
-+#define SYS_24MHZ		0x05c
-+#define SYS_MISC		0x060
-+#define SYS_DMA			0x064
-+#define SYS_PROCID0		0x084
-+#define SYS_PROCID1		0x088
-+#define SYS_CFGDATA		0x0a0
-+#define SYS_CFGCTRL		0x0a4
-+#define SYS_CFGSTAT		0x0a8
-+
-+#define SYS_HBI_MASK		0xfff
-+#define SYS_ID_HBI_SHIFT	16
-+#define SYS_PROCIDx_HBI_SHIFT	0
-+
-+#define SYS_MCI_CARDIN		(1 << 0)
-+#define SYS_MCI_WPROT		(1 << 1)
-+
-+#define SYS_FLASH_WPn		(1 << 0)
-+
-+#define SYS_MISC_MASTERSITE	(1 << 14)
-+
-+#define SYS_CFGCTRL_START	(1 << 31)
-+#define SYS_CFGCTRL_WRITE	(1 << 30)
-+#define SYS_CFGCTRL_DCC(n)	(((n) & 0xf) << 26)
-+#define SYS_CFGCTRL_FUNC(n)	(((n) & 0x3f) << 20)
-+#define SYS_CFGCTRL_SITE(n)	(((n) & 0x3) << 16)
-+#define SYS_CFGCTRL_POSITION(n)	(((n) & 0xf) << 12)
-+#define SYS_CFGCTRL_DEVICE(n)	(((n) & 0xfff) << 0)
-+
-+#define SYS_CFGSTAT_ERR		(1 << 1)
-+#define SYS_CFGSTAT_COMPLETE	(1 << 0)
-+
-+
-+static void __iomem *vexpress_sysreg_base;
-+static struct device *vexpress_sysreg_dev;
-+static int vexpress_master_site;
-+
-+
-+void __init vexpress_flags_set(u32 data)
-+{
-+	writel(~0, vexpress_sysreg_base + SYS_FLAGSCLR);
-+	writel(data, vexpress_sysreg_base + SYS_FLAGSSET);
-+}
-+
-+u32 vexpress_get_procid(int site)
-+{
-+	if (site == VEXPRESS_SITE_MASTER)
-+		site = vexpress_master_site;
-+
-+	return readl(vexpress_sysreg_base + (site == VEXPRESS_SITE_DB1 ?
-+			SYS_PROCID0 : SYS_PROCID1));
-+}
-+
-+u32 vexpress_get_hbi(int site)
-+{
-+	u32 id;
-+
-+	switch (site) {
-+	case VEXPRESS_SITE_MB:
-+		id = readl(vexpress_sysreg_base + SYS_ID);
-+		return (id >> SYS_ID_HBI_SHIFT) & SYS_HBI_MASK;
-+	case VEXPRESS_SITE_MASTER:
-+	case VEXPRESS_SITE_DB1:
-+	case VEXPRESS_SITE_DB2:
-+		id = vexpress_get_procid(site);
-+		return (id >> SYS_PROCIDx_HBI_SHIFT) & SYS_HBI_MASK;
-+	}
-+
-+	return ~0;
-+}
-+
-+void __iomem *vexpress_get_24mhz_clock_base(void)
-+{
-+	return vexpress_sysreg_base + SYS_24MHZ;
-+}
-+
-+
-+static struct vexpress_config_bridge *vexpress_sysreg_config_bridge;
-+static struct timer_list vexpress_sysreg_config_timer;
-+static u32 *vexpress_sysreg_config_data;
-+static int vexpress_sysreg_config_tries;
-+
-+static int vexpress_sysreg_config_command(bool async, bool write,
-+		unsigned func, struct vexpress_config_address *addr, u32 *data)
-+{
-+	int res = 0;
-+	u32 command;
-+
-+	if (WARN_ON(!vexpress_sysreg_base))
-+		return -ENOENT;
-+
-+	command = readl(vexpress_sysreg_base + SYS_CFGCTRL);
-+	if (WARN_ON(command & SYS_CFGCTRL_START))
-+		return -EBUSY;
-+
-+	command = SYS_CFGCTRL_START;
-+	command |= write ? SYS_CFGCTRL_WRITE : 0;
-+	command |= SYS_CFGCTRL_DCC(addr->dcc);
-+	command |= SYS_CFGCTRL_FUNC(func);
-+	command |= SYS_CFGCTRL_SITE(addr->site);
-+	command |= SYS_CFGCTRL_POSITION(addr->position);
-+	command |= SYS_CFGCTRL_DEVICE(addr->device);
-+
-+	if (write)
-+		writel(*data, vexpress_sysreg_base + SYS_CFGDATA);
-+	else
-+		vexpress_sysreg_config_data = data;
-+	writel(0, vexpress_sysreg_base + SYS_CFGSTAT);
-+	writel(command, vexpress_sysreg_base + SYS_CFGCTRL);
-+	mb();
-+
-+	if (async) {
-+		vexpress_sysreg_config_tries = 100;
-+		mod_timer(&vexpress_sysreg_config_timer,
-+				jiffies + usecs_to_jiffies(100));
-+	} else {
-+		u32 val;
-+
-+		do {
-+			cpu_relax();
-+			val = readl(vexpress_sysreg_base + SYS_CFGSTAT);
-+		} while (!val);
-+
-+		if (!write && (val & SYS_CFGSTAT_COMPLETE))
-+			*data = readl(vexpress_sysreg_base + SYS_CFGDATA);
-+
-+		if (val & SYS_CFGSTAT_ERR)
-+			res = -EINVAL;
-+	}
-+
-+	return res;
-+}
-+
-+struct vexpress_config_bridge_info vexpress_sysreg_config_bridge_info = {
-+	.name = "vexpress-sysreg",
-+	.command = vexpress_sysreg_config_command,
-+};
-+
-+static void vexpress_sysreg_config_complete(unsigned long data)
-+{
-+	int err = 0;
-+	u32 val = readl(vexpress_sysreg_base + SYS_CFGSTAT);
-+
-+	if (val & SYS_CFGSTAT_ERR)
-+		err = -EINVAL;
-+	if (!vexpress_sysreg_config_tries--)
-+		err = -ETIMEDOUT;
-+
-+	if (!err && !(val & SYS_CFGSTAT_COMPLETE)) {
-+		mod_timer(&vexpress_sysreg_config_timer,
-+				jiffies + usecs_to_jiffies(50));
-+		return;
-+	}
-+
-+	if (vexpress_sysreg_config_data) {
-+		*vexpress_sysreg_config_data = readl(vexpress_sysreg_base +
-+				SYS_CFGDATA);
-+		vexpress_sysreg_config_data = NULL;
-+	}
-+
-+	vexpress_config_complete(vexpress_sysreg_config_bridge, err);
-+}
-+
-+
-+static struct vexpress_sysreg_gpio {
-+	unsigned long reg;
-+	u32 value;
-+} vexpress_sysreg_gpios[] = {
-+	[VEXPRESS_GPIO_MMC_CARDIN] = {
-+		.reg = SYS_MCI,
-+		.value = SYS_MCI_CARDIN,
-+	},
-+	[VEXPRESS_GPIO_MMC_WPROT] = {
-+		.reg = SYS_MCI,
-+		.value = SYS_MCI_WPROT,
-+	},
-+	[VEXPRESS_GPIO_FLASH_WPn] = {
-+		.reg = SYS_FLASH,
-+		.value = SYS_FLASH_WPn,
-+	},
-+};
-+
-+static int vexpress_sysreg_gpio_direction_input(struct gpio_chip *chip,
-+				       unsigned offset)
-+{
-+	return 0;
-+}
-+
-+static int vexpress_sysreg_gpio_direction_output(struct gpio_chip *chip,
-+						unsigned offset, int value)
-+{
-+	return 0;
-+}
-+
-+static int vexpress_sysreg_gpio_get(struct gpio_chip *chip,
-+				       unsigned offset)
-+{
-+	struct vexpress_sysreg_gpio *gpio = &vexpress_sysreg_gpios[offset];
-+	u32 reg_value = readl(vexpress_sysreg_base + gpio->reg);
-+
-+	return !!(reg_value & gpio->value);
-+}
-+
-+static void vexpress_sysreg_gpio_set(struct gpio_chip *chip,
-+				       unsigned offset, int value)
-+{
-+	struct vexpress_sysreg_gpio *gpio = &vexpress_sysreg_gpios[offset];
-+	u32 reg_value = readl(vexpress_sysreg_base + gpio->reg);
-+
-+	if (value)
-+		reg_value |= gpio->value;
-+	else
-+		reg_value &= ~gpio->value;
-+
-+	writel(reg_value, vexpress_sysreg_base + gpio->reg);
-+}
-+
-+static struct gpio_chip vexpress_sysreg_gpio_chip = {
-+	.label = "vexpress-sysreg",
-+	.direction_input = vexpress_sysreg_gpio_direction_input,
-+	.direction_output = vexpress_sysreg_gpio_direction_output,
-+	.get = vexpress_sysreg_gpio_get,
-+	.set = vexpress_sysreg_gpio_set,
-+	.ngpio = ARRAY_SIZE(vexpress_sysreg_gpios),
-+	.base = 0,
-+};
-+
-+
-+void __init vexpress_sysreg_early_init(void __iomem *base)
-+{
-+	if (WARN_ON(!base))
-+		return;
-+
-+	vexpress_sysreg_base = base;
-+
-+	if (readl(vexpress_sysreg_base + SYS_MISC) & SYS_MISC_MASTERSITE)
-+		vexpress_master_site = VEXPRESS_SITE_DB2;
-+	else
-+		vexpress_master_site = VEXPRESS_SITE_DB1;
-+
-+	vexpress_config_set_master_site(vexpress_master_site);
-+
-+	vexpress_sysreg_config_bridge = vexpress_config_bridge_register(
-+			&vexpress_sysreg_config_bridge_info);
-+}
-+
-+void __init vexpress_sysreg_of_early_init(void)
-+{
-+	struct device_node *node = of_find_compatible_node(NULL, NULL,
-+			"arm,vexpress-sysreg");
-+
-+	vexpress_sysreg_early_init(of_iomap(node, 0));
-+}
-+
-+
-+static ssize_t vexpress_sysreg_sys_id_show(struct device *dev,
-+		struct device_attribute *attr, char *buf)
-+{
-+	return sprintf(buf, "0x%08x\n", readl(vexpress_sysreg_base + SYS_ID));
-+}
-+
-+DEVICE_ATTR(sys_id, S_IRUGO, vexpress_sysreg_sys_id_show, NULL);
-+
-+static int __devinit vexpress_sysreg_probe(struct platform_device *pdev)
-+{
-+	int err;
-+	struct resource *res = platform_get_resource(pdev,
-+			IORESOURCE_MEM, 0);
-+
-+	if (!devm_request_mem_region(&pdev->dev, res->start,
-+			resource_size(res), pdev->name)) {
-+		dev_err(&pdev->dev, "Failed to request memory region!\n");
-+		return -EBUSY;
-+	}
-+
-+	if (!vexpress_sysreg_base)
-+		vexpress_sysreg_base = devm_ioremap(&pdev->dev, res->start,
-+				resource_size(res));
-+
-+	if (!vexpress_sysreg_base) {
-+		dev_err(&pdev->dev, "Failed to obtain base address!\n");
-+		return -EFAULT;
-+	}
-+
-+	setup_timer(&vexpress_sysreg_config_timer,
-+			vexpress_sysreg_config_complete, 0);
-+
-+	vexpress_sysreg_gpio_chip.dev = &pdev->dev;
-+	err = gpiochip_add(&vexpress_sysreg_gpio_chip);
-+	if (err) {
-+		dev_err(&pdev->dev, "Failed to register GPIO chip! (%d)\n",
-+				err);
-+		return err;
-+	}
-+
-+	vexpress_sysreg_dev = &pdev->dev;
-+
-+	device_create_file(vexpress_sysreg_dev, &dev_attr_sys_id);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id vexpress_sysreg_match[] = {
-+	{ .compatible = "arm,vexpress-sysreg", },
-+	{},
-+};
-+
-+static struct platform_driver vexpress_sysreg_driver = {
-+	.driver = {
-+		.name = "vexpress-sysreg",
-+		.of_match_table = vexpress_sysreg_match,
-+	},
-+	.probe = vexpress_sysreg_probe,
-+};
-+
-+static int __init vexpress_sysreg_init(void)
-+{
-+	return platform_driver_register(&vexpress_sysreg_driver);
-+}
-+subsys_initcall(vexpress_sysreg_init);
-+
-+
-+struct vexpress_sysreg_led {
-+	u32 mask;
-+	struct led_classdev cdev;
-+} vexpress_sysreg_leds[] = {
-+	{ .mask = 1 << 0, .cdev.name = "v2m:green:user1",
-+			.cdev.default_trigger = "heartbeat", },
-+	{ .mask = 1 << 1, .cdev.name = "v2m:green:user2",
-+			.cdev.default_trigger = "mmc0", },
-+	{ .mask = 1 << 2, .cdev.name = "v2m:green:user3", },
-+	{ .mask = 1 << 3, .cdev.name = "v2m:green:user4", },
-+	{ .mask = 1 << 4, .cdev.name = "v2m:green:user5", },
-+	{ .mask = 1 << 5, .cdev.name = "v2m:green:user6", },
-+	{ .mask = 1 << 6, .cdev.name = "v2m:green:user7", },
-+	{ .mask = 1 << 7, .cdev.name = "v2m:green:user8", },
-+};
-+
-+static DEFINE_SPINLOCK(vexpress_sysreg_leds_lock);
-+
-+static void vexpress_sysreg_led_brightness_set(struct led_classdev *cdev,
-+		enum led_brightness brightness)
-+{
-+	struct vexpress_sysreg_led *led = container_of(cdev,
-+			struct vexpress_sysreg_led, cdev);
-+	unsigned long flags;
-+	u32 val;
-+
-+	spin_lock_irqsave(&vexpress_sysreg_leds_lock, flags);
-+
-+	val = readl(vexpress_sysreg_base + SYS_LED);
-+	if (brightness == LED_OFF)
-+		val &= ~led->mask;
-+	else
-+		val |= led->mask;
-+	writel(val, vexpress_sysreg_base + SYS_LED);
-+
-+	spin_unlock_irqrestore(&vexpress_sysreg_leds_lock, flags);
-+}
-+
-+static int __init vexpress_sysreg_init_leds(void)
-+{
-+	struct vexpress_sysreg_led *led;
-+	int i;
-+
-+	/* Clear all user LEDs */
-+	writel(0, vexpress_sysreg_base + SYS_LED);
-+
-+	for (i = 0, led = vexpress_sysreg_leds;
-+			i < ARRAY_SIZE(vexpress_sysreg_leds); i++, led++) {
-+		int err;
-+
-+		led->cdev.brightness_set = vexpress_sysreg_led_brightness_set;
-+		err = led_classdev_register(vexpress_sysreg_dev, &led->cdev);
-+		if (err) {
-+			dev_err(vexpress_sysreg_dev,
-+					"Failed to register LED %d! (%d)\n",
-+					i, err);
-+			while (led--, i--)
-+				led_classdev_unregister(&led->cdev);
-+			return err;
-+		}
-+	}
-+
-+	return 0;
-+}
-+device_initcall(vexpress_sysreg_init_leds);
-diff --git a/include/linux/vexpress.h b/include/linux/vexpress.h
-index 18f03d1..c44d2dc 100644
---- a/include/linux/vexpress.h
-+++ b/include/linux/vexpress.h
-@@ -134,4 +134,17 @@ int vexpress_osc_driver_register(void);
- void vexpress_clk_init(void __iomem *sp810_base);
- void vexpress_clk_of_init(void);
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e88fe09..45a5d88 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -322,11 +322,12 @@ config ARCH_VERSATILE
  
-+/* System facilities */
-+void vexpress_sysreg_early_init(void __iomem *base);
-+void vexpress_sysreg_of_early_init(void);
-+u32 vexpress_get_procid(int site);
-+u32 vexpress_get_hbi(int site);
-+void *vexpress_get_24mhz_clock_base(void);
-+void __init vexpress_flags_set(u32 data);
+ config ARCH_VEXPRESS
+ 	bool "ARM Ltd. Versatile Express family"
+-	select ARCH_WANT_OPTIONAL_GPIOLIB
++	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_AMBA
+ 	select ARM_TIMER_SP804
+ 	select CLKDEV_LOOKUP
+ 	select COMMON_CLK
++	select COMMON_CLK_VERSATILE
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_CLK
+ 	select HAVE_PATA_PLATFORM
+@@ -335,6 +336,7 @@ config ARCH_VEXPRESS
+ 	select PLAT_VERSATILE
+ 	select PLAT_VERSATILE_CLCD
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
++	select VEXPRESS_CONFIG_BUS
+ 	help
+ 	  This enables support for the ARM Ltd Versatile Express boards.
+ 
+diff --git a/arch/arm/include/asm/hardware/sp810.h b/arch/arm/include/asm/hardware/sp810.h
+index afd7e91..6636430 100644
+--- a/arch/arm/include/asm/hardware/sp810.h
++++ b/arch/arm/include/asm/hardware/sp810.h
+@@ -50,12 +50,6 @@
+ #define SCPCELLID2		0xFF8
+ #define SCPCELLID3		0xFFC
+ 
+-#define SCCTRL_TIMEREN0SEL_REFCLK	(0 << 15)
+-#define SCCTRL_TIMEREN0SEL_TIMCLK	(1 << 15)
+-
+-#define SCCTRL_TIMEREN1SEL_REFCLK	(0 << 17)
+-#define SCCTRL_TIMEREN1SEL_TIMCLK	(1 << 17)
+-
+ #define SCCTRL_TIMERENnSEL_SHIFT(n)	(15 + ((n) * 2))
+ 
+ static inline void sysctl_soft_reset(void __iomem *base)
+diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
+index 61c4924..3e93058 100644
+--- a/arch/arm/mach-vexpress/ct-ca9x4.c
++++ b/arch/arm/mach-vexpress/ct-ca9x4.c
+@@ -9,6 +9,7 @@
+ #include <linux/amba/bus.h>
+ #include <linux/amba/clcd.h>
+ #include <linux/clkdev.h>
++#include <linux/vexpress.h>
+ 
+ #include <asm/hardware/arm_timer.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -64,19 +65,6 @@ static void __init ct_ca9x4_init_irq(void)
+ 	ca9x4_twd_init();
+ }
+ 
+-static void ct_ca9x4_clcd_enable(struct clcd_fb *fb)
+-{
+-	u32 site = v2m_get_master_site();
+-
+-	/*
+-	 * Old firmware was using the "site" component of the command
+-	 * to control the DVI muxer (while it should be always 0 ie. MB).
+-	 * Newer firmware uses the data register. Keep both for compatibility.
+-	 */
+-	v2m_cfg_write(SYS_CFG_MUXFPGA | SYS_CFG_SITE(site), site);
+-	v2m_cfg_write(SYS_CFG_DVIMODE | SYS_CFG_SITE(SYS_CFG_SITE_MB), 2);
+-}
+-
+ static int ct_ca9x4_clcd_setup(struct clcd_fb *fb)
+ {
+ 	unsigned long framesize = 1024 * 768 * 2;
+@@ -93,7 +81,6 @@ static struct clcd_board ct_ca9x4_clcd_data = {
+ 	.caps		= CLCD_CAP_5551 | CLCD_CAP_565,
+ 	.check		= clcdfb_check,
+ 	.decode		= clcdfb_decode,
+-	.enable		= ct_ca9x4_clcd_enable,
+ 	.setup		= ct_ca9x4_clcd_setup,
+ 	.mmap		= versatile_clcd_mmap_dma,
+ 	.remove		= versatile_clcd_remove_dma,
+@@ -111,12 +98,23 @@ static struct amba_device *ct_ca9x4_amba_devs[] __initdata = {
+ 	&gpio_device,
+ };
+ 
++static const char * const ct_ca9x4_osc1_periphs[] = {
++	"ct:clcd",
++	NULL
++};
+ 
+-static struct v2m_osc ct_osc1 = {
+-	.osc = 1,
++static struct vexpress_osc_info ct_ca9x4_osc1_info = {
++	.clock_name = "clcdclk",
+ 	.rate_min = 10000000,
+ 	.rate_max = 80000000,
+-	.rate_default = 23750000,
++	.dev_ids = ct_ca9x4_osc1_periphs,
++};
 +
-+/* System pseudo-GPIOs */
-+#define VEXPRESS_GPIO_MMC_CARDIN	0
-+#define VEXPRESS_GPIO_MMC_WPROT		1
-+#define VEXPRESS_GPIO_FLASH_WPn		2
++static struct vexpress_config_device ct_ca9x4_osc1_device = {
++	.name		= "ct:osc1",
++	.func		= VEXPRESS_CONFIG_FUNC_OSC,
++	.addr		= { VEXPRESS_SITE_MASTER, 0, 0, 1 },
++	.dev.platform_data = &ct_ca9x4_osc1_info,
+ };
+ 
+ static struct resource pmu_resources[] = {
+@@ -152,7 +150,6 @@ static struct platform_device pmu_device = {
+ static void __init ct_ca9x4_init(void)
+ {
+ 	int i;
+-	struct clk *clk;
+ 
+ #ifdef CONFIG_CACHE_L2X0
+ 	void __iomem *l2x0_base = ioremap(CT_CA9X4_L2CC, SZ_4K);
+@@ -164,9 +161,7 @@ static void __init ct_ca9x4_init(void)
+ 	l2x0_init(l2x0_base, 0x00400000, 0xfe0fffff);
+ #endif
+ 
+-	ct_osc1.site = v2m_get_master_site();
+-	clk = v2m_osc_register("ct:osc1", &ct_osc1);
+-	clk_register_clkdev(clk, NULL, "ct:clcd");
++	vexpress_config_device_register(&ct_ca9x4_osc1_device);
+ 
+ 	for (i = 0; i < ARRAY_SIZE(ct_ca9x4_amba_devs); i++)
+ 		amba_device_register(ct_ca9x4_amba_devs[i], &iomem_resource);
+diff --git a/arch/arm/mach-vexpress/include/mach/motherboard.h b/arch/arm/mach-vexpress/include/mach/motherboard.h
+index 1e388c7..68abc8b 100644
+--- a/arch/arm/mach-vexpress/include/mach/motherboard.h
++++ b/arch/arm/mach-vexpress/include/mach/motherboard.h
+@@ -1,8 +1,6 @@
+ #ifndef __MACH_MOTHERBOARD_H
+ #define __MACH_MOTHERBOARD_H
+ 
+-#include <linux/clk-provider.h>
+-
+ /*
+  * Physical addresses, offset from V2M_PA_CS0-3
+  */
+@@ -41,31 +39,6 @@
+ #define V2M_CF			(V2M_PA_CS7 + 0x0001a000)
+ #define V2M_CLCD		(V2M_PA_CS7 + 0x0001f000)
+ 
+-/*
+- * Offsets from SYSREGS base
+- */
+-#define V2M_SYS_ID		0x000
+-#define V2M_SYS_SW		0x004
+-#define V2M_SYS_LED		0x008
+-#define V2M_SYS_100HZ		0x024
+-#define V2M_SYS_FLAGS		0x030
+-#define V2M_SYS_FLAGSSET	0x030
+-#define V2M_SYS_FLAGSCLR	0x034
+-#define V2M_SYS_NVFLAGS		0x038
+-#define V2M_SYS_NVFLAGSSET	0x038
+-#define V2M_SYS_NVFLAGSCLR	0x03c
+-#define V2M_SYS_MCI		0x048
+-#define V2M_SYS_FLASH		0x03c
+-#define V2M_SYS_CFGSW		0x058
+-#define V2M_SYS_24MHZ		0x05c
+-#define V2M_SYS_MISC		0x060
+-#define V2M_SYS_DMA		0x064
+-#define V2M_SYS_PROCID0		0x084
+-#define V2M_SYS_PROCID1		0x088
+-#define V2M_SYS_CFGDATA		0x0a0
+-#define V2M_SYS_CFGCTRL		0x0a4
+-#define V2M_SYS_CFGSTAT		0x0a8
+-
+ 
+ /*
+  * Interrupts.  Those in {} are for AMBA devices
+@@ -91,43 +64,6 @@
+ 
+ 
+ /*
+- * Configuration
+- */
+-#define SYS_CFG_START		(1 << 31)
+-#define SYS_CFG_WRITE		(1 << 30)
+-#define SYS_CFG_OSC		(1 << 20)
+-#define SYS_CFG_VOLT		(2 << 20)
+-#define SYS_CFG_AMP		(3 << 20)
+-#define SYS_CFG_TEMP		(4 << 20)
+-#define SYS_CFG_RESET		(5 << 20)
+-#define SYS_CFG_SCC		(6 << 20)
+-#define SYS_CFG_MUXFPGA		(7 << 20)
+-#define SYS_CFG_SHUTDOWN	(8 << 20)
+-#define SYS_CFG_REBOOT		(9 << 20)
+-#define SYS_CFG_DVIMODE		(11 << 20)
+-#define SYS_CFG_POWER		(12 << 20)
+-#define SYS_CFG_SITE(n)		((n) << 16)
+-#define SYS_CFG_SITE_MB		0
+-#define SYS_CFG_SITE_DB1	1
+-#define SYS_CFG_SITE_DB2	2
+-#define SYS_CFG_STACK(n)	((n) << 12)
+-
+-#define SYS_CFG_ERR		(1 << 1)
+-#define SYS_CFG_COMPLETE	(1 << 0)
+-
+-int v2m_cfg_write(u32 devfn, u32 data);
+-int v2m_cfg_read(u32 devfn, u32 *data);
+-void v2m_flags_set(u32 data);
+-
+-/*
+- * Miscellaneous
+- */
+-#define SYS_MISC_MASTERSITE	(1 << 14)
+-#define SYS_PROCIDx_HBI_MASK	0xfff
+-
+-int v2m_get_master_site(void);
+-
+-/*
+  * Core tile IDs
+  */
+ #define V2M_CT_ID_CA9		0x0c000191
+@@ -149,21 +85,4 @@ struct ct_desc {
+ 
+ extern struct ct_desc *ct_desc;
+ 
+-/*
+- * OSC clock provider
+- */
+-struct v2m_osc {
+-	struct clk_hw hw;
+-	u8 site; /* 0 = motherboard, 1 = site 1, 2 = site 2 */
+-	u8 stack; /* board stack position */
+-	u16 osc;
+-	unsigned long rate_min;
+-	unsigned long rate_max;
+-	unsigned long rate_default;
+-};
+-
+-#define to_v2m_osc(osc) container_of(osc, struct v2m_osc, hw)
+-
+-struct clk *v2m_osc_register(const char *name, struct v2m_osc *osc);
+-
+ #endif
+diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+index 14ba112..f07cb2f 100644
+--- a/arch/arm/mach-vexpress/platsmp.c
++++ b/arch/arm/mach-vexpress/platsmp.c
+@@ -13,6 +13,7 @@
+ #include <linux/smp.h>
+ #include <linux/io.h>
+ #include <linux/of_fdt.h>
++#include <linux/vexpress.h>
+ 
+ #include <asm/smp_scu.h>
+ #include <asm/hardware/gic.h>
+@@ -193,5 +194,5 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+ 	 * until it receives a soft interrupt, and then the
+ 	 * secondary CPU branches to this address.
+ 	 */
+-	v2m_flags_set(virt_to_phys(versatile_secondary_startup));
++	vexpress_flags_set(virt_to_phys(versatile_secondary_startup));
+ }
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index 37608f2..e4535db 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -15,11 +15,10 @@
+ #include <linux/smsc911x.h>
+ #include <linux/spinlock.h>
+ #include <linux/usb/isp1760.h>
+-#include <linux/clkdev.h>
+-#include <linux/clk-provider.h>
+ #include <linux/mtd/physmap.h>
+ #include <linux/regulator/fixed.h>
+ #include <linux/regulator/machine.h>
++#include <linux/vexpress.h>
+ 
+ #include <asm/arch_timer.h>
+ #include <asm/mach-types.h>
+@@ -32,7 +31,6 @@
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/hardware/timer-sp.h>
+-#include <asm/hardware/sp810.h>
+ 
+ #include <mach/ct-ca9x4.h>
+ #include <mach/motherboard.h>
+@@ -56,22 +54,6 @@ static struct map_desc v2m_io_desc[] __initdata = {
+ 	},
+ };
+ 
+-static void __iomem *v2m_sysreg_base;
+-
+-static void __init v2m_sysctl_init(void __iomem *base)
+-{
+-	u32 scctrl;
+-
+-	if (WARN_ON(!base))
+-		return;
+-
+-	/* Select 1MHz TIMCLK as the reference clock for SP804 timers */
+-	scctrl = readl(base + SCCTRL);
+-	scctrl |= SCCTRL_TIMEREN0SEL_TIMCLK;
+-	scctrl |= SCCTRL_TIMEREN1SEL_TIMCLK;
+-	writel(scctrl, base + SCCTRL);
+-}
+-
+ static void __init v2m_sp804_init(void __iomem *base, unsigned int irq)
+ {
+ 	if (WARN_ON(!base || irq == NO_IRQ))
+@@ -85,69 +67,6 @@ static void __init v2m_sp804_init(void __iomem *base, unsigned int irq)
+ }
+ 
+ 
+-static DEFINE_SPINLOCK(v2m_cfg_lock);
+-
+-int v2m_cfg_write(u32 devfn, u32 data)
+-{
+-	/* Configuration interface broken? */
+-	u32 val;
+-
+-	printk("%s: writing %08x to %08x\n", __func__, data, devfn);
+-
+-	devfn |= SYS_CFG_START | SYS_CFG_WRITE;
+-
+-	spin_lock(&v2m_cfg_lock);
+-	val = readl(v2m_sysreg_base + V2M_SYS_CFGSTAT);
+-	writel(val & ~SYS_CFG_COMPLETE, v2m_sysreg_base + V2M_SYS_CFGSTAT);
+-
+-	writel(data, v2m_sysreg_base +  V2M_SYS_CFGDATA);
+-	writel(devfn, v2m_sysreg_base + V2M_SYS_CFGCTRL);
+-
+-	do {
+-		val = readl(v2m_sysreg_base + V2M_SYS_CFGSTAT);
+-	} while (val == 0);
+-	spin_unlock(&v2m_cfg_lock);
+-
+-	return !!(val & SYS_CFG_ERR);
+-}
+-
+-int v2m_cfg_read(u32 devfn, u32 *data)
+-{
+-	u32 val;
+-
+-	devfn |= SYS_CFG_START;
+-
+-	spin_lock(&v2m_cfg_lock);
+-	writel(0, v2m_sysreg_base + V2M_SYS_CFGSTAT);
+-	writel(devfn, v2m_sysreg_base + V2M_SYS_CFGCTRL);
+-
+-	mb();
+-
+-	do {
+-		cpu_relax();
+-		val = readl(v2m_sysreg_base + V2M_SYS_CFGSTAT);
+-	} while (val == 0);
+-
+-	*data = readl(v2m_sysreg_base + V2M_SYS_CFGDATA);
+-	spin_unlock(&v2m_cfg_lock);
+-
+-	return !!(val & SYS_CFG_ERR);
+-}
+-
+-void __init v2m_flags_set(u32 data)
+-{
+-	writel(~0, v2m_sysreg_base + V2M_SYS_FLAGSCLR);
+-	writel(data, v2m_sysreg_base + V2M_SYS_FLAGSSET);
+-}
+-
+-int v2m_get_master_site(void)
+-{
+-	u32 misc = readl(v2m_sysreg_base + V2M_SYS_MISC);
+-
+-	return misc & SYS_MISC_MASTERSITE ? SYS_CFG_SITE_DB2 : SYS_CFG_SITE_DB1;
+-}
+-
+-
+ static struct resource v2m_pcie_i2c_resource = {
+ 	.start	= V2M_SERIAL_BUS_PCI,
+ 	.end	= V2M_SERIAL_BUS_PCI + SZ_4K - 1,
+@@ -235,14 +154,8 @@ static struct platform_device v2m_usb_device = {
+ 	.dev.platform_data = &v2m_usb_config,
+ };
+ 
+-static void v2m_flash_set_vpp(struct platform_device *pdev, int on)
+-{
+-	writel(on != 0, v2m_sysreg_base + V2M_SYS_FLASH);
+-}
+-
+ static struct physmap_flash_data v2m_flash_data = {
+ 	.width		= 4,
+-	.set_vpp	= v2m_flash_set_vpp,
+ };
+ 
+ static struct resource v2m_flash_resources[] = {
+@@ -289,14 +202,49 @@ static struct platform_device v2m_cf_device = {
+ 	.dev.platform_data = &v2m_pata_data,
+ };
+ 
+-static unsigned int v2m_mmci_status(struct device *dev)
+-{
+-	return readl(v2m_sysreg_base + V2M_SYS_MCI) & (1 << 0);
+-}
+-
+ static struct mmci_platform_data v2m_mmci_data = {
+ 	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+-	.status		= v2m_mmci_status,
++	.gpio_wp	= VEXPRESS_GPIO_MMC_WPROT,
++	.gpio_cd	= VEXPRESS_GPIO_MMC_CARDIN,
++};
 +
++static struct resource v2m_sysreg_resources[] = {
++	{
++		.start	= V2M_SYSREGS,
++		.end	= V2M_SYSREGS + 0xfff,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device v2m_sysreg_device = {
++	.name		= "vexpress-sysreg",
++	.id		= -1,
++	.resource	= v2m_sysreg_resources,
++	.num_resources	= ARRAY_SIZE(v2m_sysreg_resources),
++};
++
++static struct vexpress_config_device v2m_muxfpga_device = {
++	.name		= "mb:muxfpga",
++	.func		= VEXPRESS_CONFIG_FUNC_MUXFPGA,
++	.addr		= { VEXPRESS_SITE_MB, 0, 0, 0 },
++};
++
++static struct vexpress_config_device v2m_shutdown_device = {
++	.name		= "mb:shutdown",
++	.func		= VEXPRESS_CONFIG_FUNC_SHUTDOWN,
++	.addr		= { VEXPRESS_SITE_MB, 0, 0, 0 },
++};
++
++static struct vexpress_config_device v2m_reboot_device = {
++	.name		= "mb:reboot",
++	.func		= VEXPRESS_CONFIG_FUNC_REBOOT,
++	.addr		= { VEXPRESS_SITE_MB, 0, 0, 0 },
++};
++
++static struct vexpress_config_device v2m_dvimode_device = {
++	.name		= "mb:dvimode",
++	.func		= VEXPRESS_CONFIG_FUNC_DVIMODE,
++	.addr		= { VEXPRESS_SITE_MB, 0, 0, 0 },
+ };
+ 
+ static AMBA_APB_DEVICE(aaci,  "mb:aaci",  0, V2M_AACI, IRQ_V2M_AACI, NULL);
+@@ -323,123 +271,9 @@ static struct amba_device *v2m_amba_devs[] __initdata = {
+ 	&rtc_device,
+ };
+ 
+-
+-static unsigned long v2m_osc_recalc_rate(struct clk_hw *hw,
+-		unsigned long parent_rate)
+-{
+-	struct v2m_osc *osc = to_v2m_osc(hw);
+-
+-	return !parent_rate ? osc->rate_default : parent_rate;
+-}
+-
+-static long v2m_osc_round_rate(struct clk_hw *hw, unsigned long rate,
+-		unsigned long *parent_rate)
+-{
+-	struct v2m_osc *osc = to_v2m_osc(hw);
+-
+-	if (WARN_ON(rate < osc->rate_min))
+-		rate = osc->rate_min;
+-
+-	if (WARN_ON(rate > osc->rate_max))
+-		rate = osc->rate_max;
+-
+-	return rate;
+-}
+-
+-static int v2m_osc_set_rate(struct clk_hw *hw, unsigned long rate,
+-		unsigned long parent_rate)
+-{
+-	struct v2m_osc *osc = to_v2m_osc(hw);
+-
+-	v2m_cfg_write(SYS_CFG_OSC | SYS_CFG_SITE(osc->site) |
+-			SYS_CFG_STACK(osc->stack) | osc->osc, rate);
+-
+-	return 0;
+-}
+-
+-static struct clk_ops v2m_osc_ops = {
+-	.recalc_rate = v2m_osc_recalc_rate,
+-	.round_rate = v2m_osc_round_rate,
+-	.set_rate = v2m_osc_set_rate,
+-};
+-
+-struct clk * __init v2m_osc_register(const char *name, struct v2m_osc *osc)
+-{
+-	struct clk_init_data init;
+-
+-	WARN_ON(osc->site > 2);
+-	WARN_ON(osc->stack > 15);
+-	WARN_ON(osc->osc > 4095);
+-
+-	init.name = name;
+-	init.ops = &v2m_osc_ops;
+-	init.flags = CLK_IS_ROOT;
+-	init.num_parents = 0;
+-
+-	osc->hw.init = &init;
+-
+-	return clk_register(NULL, &osc->hw);
+-}
+-
+-static struct v2m_osc v2m_mb_osc1 = {
+-	.site = SYS_CFG_SITE_MB,
+-	.osc = 1,
+-	.rate_min = 23750000,
+-	.rate_max = 63500000,
+-	.rate_default = 23750000,
+-};
+-
+-static const char *v2m_ref_clk_periphs[] __initconst = {
+-	"mb:wdt",   "1000f000.wdt",  "1c0f0000.wdt",	/* SP805 WDT */
+-};
+-
+-static const char *v2m_osc1_periphs[] __initconst = {
+-	"mb:clcd",  "1001f000.clcd", "1c1f0000.clcd",	/* PL111 CLCD */
+-};
+-
+-static const char *v2m_osc2_periphs[] __initconst = {
+-	"mb:mmci",  "10005000.mmci", "1c050000.mmci",	/* PL180 MMCI */
+-	"mb:kmi0",  "10006000.kmi",  "1c060000.kmi",	/* PL050 KMI0 */
+-	"mb:kmi1",  "10007000.kmi",  "1c070000.kmi",	/* PL050 KMI1 */
+-	"mb:uart0", "10009000.uart", "1c090000.uart",	/* PL011 UART0 */
+-	"mb:uart1", "1000a000.uart", "1c0a0000.uart",	/* PL011 UART1 */
+-	"mb:uart2", "1000b000.uart", "1c0b0000.uart",	/* PL011 UART2 */
+-	"mb:uart3", "1000c000.uart", "1c0c0000.uart",	/* PL011 UART3 */
+-};
+-
+-static void __init v2m_clk_init(void)
+-{
+-	struct clk *clk;
+-	int i;
+-
+-	clk = clk_register_fixed_rate(NULL, "dummy_apb_pclk", NULL,
+-			CLK_IS_ROOT, 0);
+-	WARN_ON(clk_register_clkdev(clk, "apb_pclk", NULL));
+-
+-	clk = clk_register_fixed_rate(NULL, "mb:ref_clk", NULL,
+-			CLK_IS_ROOT, 32768);
+-	for (i = 0; i < ARRAY_SIZE(v2m_ref_clk_periphs); i++)
+-		WARN_ON(clk_register_clkdev(clk, NULL, v2m_ref_clk_periphs[i]));
+-
+-	clk = clk_register_fixed_rate(NULL, "mb:sp804_clk", NULL,
+-			CLK_IS_ROOT, 1000000);
+-	WARN_ON(clk_register_clkdev(clk, "v2m-timer0", "sp804"));
+-	WARN_ON(clk_register_clkdev(clk, "v2m-timer1", "sp804"));
+-
+-	clk = v2m_osc_register("mb:osc1", &v2m_mb_osc1);
+-	for (i = 0; i < ARRAY_SIZE(v2m_osc1_periphs); i++)
+-		WARN_ON(clk_register_clkdev(clk, NULL, v2m_osc1_periphs[i]));
+-
+-	clk = clk_register_fixed_rate(NULL, "mb:osc2", NULL,
+-			CLK_IS_ROOT, 24000000);
+-	for (i = 0; i < ARRAY_SIZE(v2m_osc2_periphs); i++)
+-		WARN_ON(clk_register_clkdev(clk, NULL, v2m_osc2_periphs[i]));
+-}
+-
+ static void __init v2m_timer_init(void)
+ {
+-	v2m_sysctl_init(ioremap(V2M_SYSCTL, SZ_4K));
+-	v2m_clk_init();
++	vexpress_clk_init(ioremap(V2M_SYSCTL, SZ_4K));
+ 	v2m_sp804_init(ioremap(V2M_TIMER01, SZ_4K), IRQ_V2M_TIMER0);
+ }
+ 
+@@ -451,19 +285,7 @@ static void __init v2m_init_early(void)
+ {
+ 	if (ct_desc->init_early)
+ 		ct_desc->init_early();
+-	versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
+-}
+-
+-static void v2m_power_off(void)
+-{
+-	if (v2m_cfg_write(SYS_CFG_SHUTDOWN | SYS_CFG_SITE(SYS_CFG_SITE_MB), 0))
+-		printk(KERN_EMERG "Unable to shutdown\n");
+-}
+-
+-static void v2m_restart(char str, const char *cmd)
+-{
+-	if (v2m_cfg_write(SYS_CFG_REBOOT | SYS_CFG_SITE(SYS_CFG_SITE_MB), 0))
+-		printk(KERN_EMERG "Unable to reboot\n");
++	versatile_sched_clock_init(vexpress_get_24mhz_clock_base(), 24000000);
+ }
+ 
+ struct ct_desc *ct_desc;
+@@ -480,7 +302,7 @@ static void __init v2m_populate_ct_desc(void)
+ 	u32 current_tile_id;
+ 
+ 	ct_desc = NULL;
+-	current_tile_id = readl(v2m_sysreg_base + V2M_SYS_PROCID0)
++	current_tile_id = vexpress_get_procid(VEXPRESS_SITE_MASTER)
+ 				& V2M_CT_ID_MASK;
+ 
+ 	for (i = 0; i < ARRAY_SIZE(ct_descs) && !ct_desc; ++i)
+@@ -496,7 +318,7 @@ static void __init v2m_populate_ct_desc(void)
+ static void __init v2m_map_io(void)
+ {
+ 	iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc));
+-	v2m_sysreg_base = ioremap(V2M_SYSREGS, SZ_4K);
++	vexpress_sysreg_early_init(ioremap(V2M_SYSREGS, SZ_4K));
+ 	v2m_populate_ct_desc();
+ 	ct_desc->map_io();
+ }
+@@ -513,6 +335,12 @@ static void __init v2m_init(void)
+ 	regulator_register_fixed(0, v2m_eth_supplies,
+ 			ARRAY_SIZE(v2m_eth_supplies));
+ 
++	vexpress_config_device_register(&v2m_muxfpga_device);
++	vexpress_config_device_register(&v2m_shutdown_device);
++	vexpress_config_device_register(&v2m_reboot_device);
++	vexpress_config_device_register(&v2m_dvimode_device);
++
++	platform_device_register(&v2m_sysreg_device);
+ 	platform_device_register(&v2m_pcie_i2c_device);
+ 	platform_device_register(&v2m_ddc_i2c_device);
+ 	platform_device_register(&v2m_flash_device);
+@@ -523,7 +351,7 @@ static void __init v2m_init(void)
+ 	for (i = 0; i < ARRAY_SIZE(v2m_amba_devs); i++)
+ 		amba_device_register(v2m_amba_devs[i], &iomem_resource);
+ 
+-	pm_power_off = v2m_power_off;
++	pm_power_off = vexpress_power_off;
+ 
+ 	ct_desc->init_tile();
+ }
+@@ -536,7 +364,7 @@ MACHINE_START(VEXPRESS, "ARM-Versatile Express")
+ 	.timer		= &v2m_timer,
+ 	.handle_irq	= gic_handle_irq,
+ 	.init_machine	= v2m_init,
+-	.restart	= v2m_restart,
++	.restart	= vexpress_restart,
+ MACHINE_END
+ 
+ #if defined(CONFIG_ARCH_VEXPRESS_DT)
+@@ -579,20 +407,13 @@ void __init v2m_dt_map_io(void)
+ 
+ void __init v2m_dt_init_early(void)
+ {
+-	struct device_node *node;
+ 	u32 dt_hbi;
+ 
+-	node = of_find_compatible_node(NULL, NULL, "arm,vexpress-sysreg");
+-	v2m_sysreg_base = of_iomap(node, 0);
+-	if (WARN_ON(!v2m_sysreg_base))
+-		return;
++	vexpress_sysreg_of_early_init();
+ 
+ 	/* Confirm board type against DT property, if available */
+ 	if (of_property_read_u32(allnodes, "arm,hbi", &dt_hbi) == 0) {
+-		int site = v2m_get_master_site();
+-		u32 id = readl(v2m_sysreg_base + (site == SYS_CFG_SITE_DB2 ?
+-				V2M_SYS_PROCID1 : V2M_SYS_PROCID0));
+-		u32 hbi = id & SYS_PROCIDx_HBI_MASK;
++		u32 hbi = vexpress_get_hbi(VEXPRESS_SITE_MASTER);
+ 
+ 		if (WARN_ON(dt_hbi != hbi))
+ 			pr_warning("vexpress: DT HBI (%x) is not matching "
+@@ -608,6 +429,7 @@ static  struct of_device_id vexpress_irq_match[] __initdata = {
+ static void __init v2m_dt_init_irq(void)
+ {
+ 	of_irq_init(vexpress_irq_match);
++	vexpress_config_of_populate();
+ }
+ 
+ static void __init v2m_dt_timer_init(void)
+@@ -616,47 +438,34 @@ static void __init v2m_dt_timer_init(void)
+ 	const char *path;
+ 	int err;
+ 
+-	node = of_find_compatible_node(NULL, NULL, "arm,sp810");
+-	v2m_sysctl_init(of_iomap(node, 0));
+-
+-	v2m_clk_init();
++	vexpress_clk_of_init();
+ 
+ 	err = of_property_read_string(of_aliases, "arm,v2m_timer", &path);
+ 	if (WARN_ON(err))
+ 		return;
+ 	node = of_find_node_by_path(path);
+ 	v2m_sp804_init(of_iomap(node, 0), irq_of_parse_and_map(node, 0));
++
+ 	if (arch_timer_of_register() != 0)
+ 		twd_local_timer_of_register();
+ 
+ 	if (arch_timer_sched_clock_init() != 0)
+-		versatile_sched_clock_init(v2m_sysreg_base + V2M_SYS_24MHZ, 24000000);
++		versatile_sched_clock_init(vexpress_get_24mhz_clock_base(),
++				24000000);
+ }
+ 
+ static struct sys_timer v2m_dt_timer = {
+ 	.init = v2m_dt_timer_init,
+ };
+ 
+-static struct of_dev_auxdata v2m_dt_auxdata_lookup[] __initdata = {
+-	OF_DEV_AUXDATA("arm,vexpress-flash", V2M_NOR0, "physmap-flash",
+-			&v2m_flash_data),
+-	OF_DEV_AUXDATA("arm,primecell", V2M_MMCI, "mb:mmci", &v2m_mmci_data),
+-	/* RS1 memory map */
+-	OF_DEV_AUXDATA("arm,vexpress-flash", 0x08000000, "physmap-flash",
+-			&v2m_flash_data),
+-	OF_DEV_AUXDATA("arm,primecell", 0x1c050000, "mb:mmci", &v2m_mmci_data),
+-	{}
+-};
+-
+ static void __init v2m_dt_init(void)
+ {
+ 	l2x0_of_init(0x00400000, 0xfe0fffff);
+-	of_platform_populate(NULL, of_default_bus_match_table,
+-			v2m_dt_auxdata_lookup, NULL);
+-	pm_power_off = v2m_power_off;
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	pm_power_off = vexpress_power_off;
+ }
+ 
+-const static char *v2m_dt_match[] __initconst = {
++static const char * const v2m_dt_match[] __initconst = {
+ 	"arm,vexpress",
+ 	NULL,
+ };
+@@ -669,7 +478,7 @@ DT_MACHINE_START(VEXPRESS_DT, "ARM-Versatile Express")
+ 	.timer		= &v2m_dt_timer,
+ 	.init_machine	= v2m_dt_init,
+ 	.handle_irq	= gic_handle_irq,
+-	.restart	= v2m_restart,
++	.restart	= vexpress_restart,
+ MACHINE_END
+ 
  #endif
 -- 
 1.7.9.5
