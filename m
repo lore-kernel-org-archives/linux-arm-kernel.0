@@ -1,57 +1,65 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Mon, 03 Sep 2012 20:29:28 +0800
-Subject: [PATCH] ARM: ep93xx: Fix build error due to 'SZ_32M' undeclared
-Message-ID: <1346675368.15950.0.camel@phoenix>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 3 Sep 2012 13:34:31 +0100
+Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
+ I2C driver
+In-Reply-To: <CACRpkdZ5VFhrbONy=0K5MFh4e6BDFckq0yqzjQ2QkW9MgwKqBg@mail.gmail.com>
+References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
+ <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
+ <20120831112258.GA2624@pengutronix.de>
+ <20120831122323.GC5962@gmail.com>
+ <CACRpkdZ=C1EV4WO2b=1YLHPNhsDsQdq7Kfnpzm8i7uGRtVjJuQ@mail.gmail.com>
+ <20120903094448.GB11780@pengutronix.de>
+ <20120903100656.GC5782@gmail.com>
+ <CACRpkdb8owKBxawAv4LVVYx5kUgZ9cUSiQ=BV0f3Pf3bHtknuQ@mail.gmail.com>
+ <CAF2Aj3j25w1Nn9O6hV+=i-j1ts_p_Ucswk_M7r04S7i5BzPkHg@mail.gmail.com>
+ <CACRpkdZ5VFhrbONy=0K5MFh4e6BDFckq0yqzjQ2QkW9MgwKqBg@mail.gmail.com>
+Message-ID: <20120903123424.GA31163@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include linux/sizes.h to fix below build errors:
+On Mon, Sep 03, 2012 at 01:58:04PM +0200, Linus Walleij wrote:
+> On Mon, Sep 3, 2012 at 1:32 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > No, this is wrong. Platform data should not override DT.
+> >
+> > If DT is enabled and passed, it should have highest priority.
+> 
+> Oh is that so.
 
-  CC      arch/arm/mach-ep93xx/adssphere.o
-arch/arm/mach-ep93xx/adssphere.c: In function 'adssphere_init_machine':
-arch/arm/mach-ep93xx/adssphere.c:32:49: error: 'SZ_32M' undeclared (first use in this function)
-arch/arm/mach-ep93xx/adssphere.c:32:49: note: each undeclared identifier is reported only once for each function it appears in
-make[1]: *** [arch/arm/mach-ep93xx/adssphere.o] Error 1
-make: *** [arch/arm/mach-ep93xx] Error 2
+:)
 
-  CC      arch/arm/mach-ep93xx/gesbc9312.o
-arch/arm/mach-ep93xx/gesbc9312.c: In function 'gesbc9312_init_machine':
-arch/arm/mach-ep93xx/gesbc9312.c:32:49: error: 'SZ_8M' undeclared (first use in this function)
-arch/arm/mach-ep93xx/gesbc9312.c:32:49: note: each undeclared identifier is reported only once for each function it appears in
-make[1]: *** [arch/arm/mach-ep93xx/gesbc9312.o] Error 1
-make: *** [arch/arm/mach-ep93xx] Error 2
+> Rob: do we have a clear consensus on this? Then we should document
+> it in Documentation/devicetree/usage-model.txt.
+> 
+> (That document isn't part of the binding I believe, so we could define
+> Linux-specific behaviours in it.)
+> 
+> I always thought it was the other way around, that pdata took priority.
+> 
+> Usecase: hardcoded bootloader passer erroneous DT to a platform.
+> No way out. What to do? Override with pdata.
+> 
+> Yours,
+> Linus Walleij
 
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
-This patch is against linux-next tree.
-Axel
- arch/arm/mach-ep93xx/adssphere.c |    1 +
- arch/arm/mach-ep93xx/gesbc9312.c |    1 +
- 2 files changed, 2 insertions(+)
+Hmmm... I see your point, but this won't work.
 
-diff --git a/arch/arm/mach-ep93xx/adssphere.c b/arch/arm/mach-ep93xx/adssphere.c
-index a472777..41383bf 100644
---- a/arch/arm/mach-ep93xx/adssphere.c
-+++ b/arch/arm/mach-ep93xx/adssphere.c
-@@ -13,6 +13,7 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
-+#include <linux/sizes.h>
- 
- #include <mach/hardware.h>
- 
-diff --git a/arch/arm/mach-ep93xx/gesbc9312.c b/arch/arm/mach-ep93xx/gesbc9312.c
-index 437c341..7fd705b 100644
---- a/arch/arm/mach-ep93xx/gesbc9312.c
-+++ b/arch/arm/mach-ep93xx/gesbc9312.c
-@@ -13,6 +13,7 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
-+#include <linux/sizes.h>
- 
- #include <mach/hardware.h>
- 
+When booting DT booting take a different path and no platform data
+is passed. We can't boot DT AND register devices with platform data
+or else we will double probe every device. The only way to pass
+pdata when booting with DT is with AUX_DATA() and that's a hack to
+get around things we don't have support for yet. Up until now that
+has been DMA bindings, clock and pinctrl names and call-backs.
+
+If DT is corrupt or missing the kernel will boot using platform 
+data, but np will always be NULL, so we don't have the problem you
+were alluding to above.
+
+Let me know if I didn't explain that well enough and I will have
+another go.
+
 -- 
-1.7.9.5
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
