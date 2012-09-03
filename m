@@ -1,69 +1,163 @@
 From: N.Voss@weinmann.de (Voss, Nikolaus)
-Date: Mon, 3 Sep 2012 07:57:09 +0200
-Subject: [PATCH 4/8] ARM: at91: do not configure at91sam9g10 twi pio as
- open-drain
-In-Reply-To: <1346404884-18451-5-git-send-email-ludovic.desroches@atmel.com>
+Date: Mon, 3 Sep 2012 07:58:03 +0200
+Subject: [PATCH 5/8] i2c: at91: add dt support to i2c-at91
+In-Reply-To: <1346405029-18539-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1346404884-18451-1-git-send-email-ludovic.desroches@atmel.com>
- <1346404884-18451-5-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <EF2E73589CA71846A15D0B2CDF79505D090EC8F374@wm021.weinmann.com>
+ <1346405029-18539-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <EF2E73589CA71846A15D0B2CDF79505D090EC8F376@wm021.weinmann.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ludovic.desroches at atmel.com wrote on Friday, August 31, 2012 11:21 AM
+ludovic.desroches at atmel.com wrote on Friday, August 31, 2012 11:24 AM
 > From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> As indicated in the datasheet, TWD and TWCK must not be programmed as
-> open-drain.
 > 
 > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 Acked-by: Nikolaus Voss <n.voss@weinmann.de>
 
-
 > ---
->  arch/arm/mach-at91/at91sam9261_devices.c | 18 ++++++++++--------
->  1 file changed, 10 insertions(+), 8 deletions(-)
+>  .../devicetree/bindings/i2c/atmel-i2c.txt          | 30 +++++++++++++
+>  drivers/i2c/busses/i2c-at91.c                      | 49 ++++++++++++++++++++++
+>  2 files changed, 79 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/atmel-i2c.txt
 > 
-> diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-
-> at91/at91sam9261_devices.c
-> index c94495d..405f603 100644
-> --- a/arch/arm/mach-at91/at91sam9261_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9261_devices.c
-> @@ -324,20 +324,22 @@ static struct platform_device
-> at91sam9261_twi_device = {
+> diff --git a/Documentation/devicetree/bindings/i2c/atmel-i2c.txt
+> b/Documentation/devicetree/bindings/i2c/atmel-i2c.txt
+> new file mode 100644
+> index 0000000..b689a0d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/i2c/atmel-i2c.txt
+> @@ -0,0 +1,30 @@
+> +I2C for Atmel platforms
+> +
+> +Required properties :
+> +- compatible : Must be "atmel,at91rm9200-i2c", "atmel,at91sam9261-i2c",
+> +     "atmel,at91sam9260-i2c", "atmel,at91sam9g20-i2c",
+> "atmel,at91sam9g10-i2c"
+> +     or "atmel,at91sam9x5-i2c"
+> +- reg: physical base address of the controller and length of memory
+> mapped
+> +     region.
+> +- interrupts: interrupt number to the cpu.
+> +- #address-cells = <1>;
+> +- #size-cells = <0>;
+> +
+> +Optional properties:
+> +- Child nodes conforming to i2c bus binding
+> +
+> +Examples :
+> +
+> +i2c0: i2c at fff84000 {
+> +	compatible = "atmel,at91sam9g20-i2c";
+> +	reg = <0xfff84000 0x100>;
+> +	interrupts = <12 4 6>;
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	24c512 at 50 {
+> +		compatible = "24c512";
+> +		reg = <0x50>;
+> +		pagesize = <128>;
+> +	}
+> +}
+> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+> index bcf9a5c..7a80982 100644
+> --- a/drivers/i2c/busses/i2c-at91.c
+> +++ b/drivers/i2c/busses/i2c-at91.c
+> @@ -24,6 +24,9 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/io.h>
+>  #include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_i2c.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/slab.h>
 > 
->  void __init at91_add_device_i2c(struct i2c_board_info *devices, int
-> nr_devices)
+> @@ -347,6 +350,12 @@ static struct at91_twi_pdata at91sam9g10_config = {
+>  	.has_unre_flag = false,
+>  };
+> 
+> +static struct at91_twi_pdata at91sam9x5_config = {
+> +	.clk_max_div = 7,
+> +	.clk_offset = 4,
+> +	.has_unre_flag = false,
+> +};
+> +
+>  static const struct platform_device_id at91_twi_devtypes[] = {
+>  	{
+>  		.name = "at91rm9200_i2c",
+> @@ -368,6 +377,42 @@ static const struct platform_device_id
+> at91_twi_devtypes[] = {
+>  	}
+>  };
+> 
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id atmel_twi_dt_ids[] = {
+> +	{
+> +		.compatible = "atmel,at91sam9260-i2c",
+> +		.data = &at91sam9260_config,
+> +	} , {
+> +		.compatible = "atmel,at91sam9g20-i2c",
+> +		.data = &at91sam9g20_config,
+> +	} , {
+> +		.compatible = "atmel,at91sam9g10-i2c",
+> +		.data = &at91sam9g10_config,
+> +	}, {
+> +		.compatible = "atmel,at91sam9x5-i2c",
+> +		.data = &at91sam9x5_config,
+> +	}, {
+> +		/* sentinel */
+> +	}
+> +};
+> +MODULE_DEVICE_TABLE(of, atmel_twi_dt_ids);
+> +#else
+> +#define atmel_twi_dt_ids NULL
+> +#endif
+> +
+> +static struct at91_twi_pdata * __devinit at91_twi_get_driver_data(
+> +					struct platform_device *pdev)
+> +{
+> +	if (pdev->dev.of_node) {
+> +		const struct of_device_id *match;
+> +		match = of_match_node(atmel_twi_dt_ids, pdev-
+> >dev.of_node);
+> +		if (!match)
+> +			return NULL;
+> +		return match->data;
+> +	}
+> +	return (struct at91_twi_pdata *) platform_get_device_id(pdev)-
+> >driver_data;
+> +}
+> +
+>  static int __devinit at91_twi_probe(struct platform_device *pdev)
 >  {
-> -	/* IP version is not the same on 9261 and g10 */
-> +	/*
-> +	 * IP version is not the same on 9261 and g10 and only 9261 one
-> +	 * requires to configure PIO as open-drain.
-> +	 */
->  	if (cpu_is_at91sam9g10()) {
->  		at91sam9261_twi_device.name = "at91sam9g10_i2c";
-> +		at91_set_A_periph(AT91_PIN_PA7, 0);		/* TWD
-> */
-> +		at91_set_A_periph(AT91_PIN_PA8, 0);		/*
-> TWCK */
->  	} else {
->  		at91sam9261_twi_device.name = "at91sam9261_i2c";
-> +		at91_set_A_periph(AT91_PIN_PA7, 0);		/* TWD
-> */
-> +		at91_set_multi_drive(AT91_PIN_PA7, 1);
-> +		at91_set_A_periph(AT91_PIN_PA8, 0);		/*
-> TWCK */
-> +		at91_set_multi_drive(AT91_PIN_PA8, 1);
+>  	struct at91_twi_dev *dev;
+> @@ -423,6 +468,7 @@ static int __devinit at91_twi_probe(struct
+> platform_device *pdev)
+>  	dev->adapter.dev.parent = dev->dev;
+>  	dev->adapter.nr = pdev->id;
+>  	dev->adapter.timeout = AT91_I2C_TIMEOUT;
+> +	dev->adapter.dev.of_node = pdev->dev.of_node;
+> 
+>  	rc = i2c_add_numbered_adapter(&dev->adapter);
+>  	if (rc) {
+> @@ -432,6 +478,8 @@ static int __devinit at91_twi_probe(struct
+> platform_device *pdev)
+>  		return rc;
 >  	}
 > 
-> -	/* pins used for TWI interface */
-> -	at91_set_A_periph(AT91_PIN_PA7, 0);		/* TWD */
-> -	at91_set_multi_drive(AT91_PIN_PA7, 1);
-> -
-> -	at91_set_A_periph(AT91_PIN_PA8, 0);		/* TWCK */
-> -	at91_set_multi_drive(AT91_PIN_PA8, 1);
-> -
->  	i2c_register_board_info(0, devices, nr_devices);
->  	platform_device_register(&at91sam9261_twi_device);
+> +	of_i2c_register_devices(&dev->adapter);
+> +
+>  	dev_info(dev->dev, "AT91 i2c bus driver.\n");
+>  	return 0;
 >  }
+> @@ -482,6 +530,7 @@ static struct platform_driver at91_twi_driver = {
+>  	.driver		= {
+>  		.name	= "at91_i2c",
+>  		.owner	= THIS_MODULE,
+> +		.of_match_table = atmel_twi_dt_ids,
+>  		.pm	= at91_twi_pm_ops,
+>  	},
+>  };
 > --
 > 1.7.11.3
