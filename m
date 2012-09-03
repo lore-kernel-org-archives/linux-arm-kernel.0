@@ -1,38 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Sep 2012 16:35:55 +0200
-Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
- I2C driver
-In-Reply-To: <5044BFD1.10708@nvidia.com>
-References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
- <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
- <20120831112258.GA2624@pengutronix.de>
- <20120831122323.GC5962@gmail.com>
- <CACRpkdZ=C1EV4WO2b=1YLHPNhsDsQdq7Kfnpzm8i7uGRtVjJuQ@mail.gmail.com>
- <20120903094448.GB11780@pengutronix.de>
- <20120903100656.GC5782@gmail.com>
- <CACRpkdb8owKBxawAv4LVVYx5kUgZ9cUSiQ=BV0f3Pf3bHtknuQ@mail.gmail.com>
- <CAF2Aj3j25w1Nn9O6hV+=i-j1ts_p_Ucswk_M7r04S7i5BzPkHg@mail.gmail.com>
- <CACRpkdZ5VFhrbONy=0K5MFh4e6BDFckq0yqzjQ2QkW9MgwKqBg@mail.gmail.com>
- <5044BFD1.10708@nvidia.com>
-Message-ID: <CACRpkda0akcLRe3J=fVcyYpxHmkJmVe+c1doXQ4=vOA6iNxe2g@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 3 Sep 2012 22:39:09 +0800
+Subject: [PATCHv2] ARM: dts: mxs: Enable USB1 Host on the CFA-10049
+ expansion board
+In-Reply-To: <1346681725-19195-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1346681725-19195-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20120903143906.GG2362@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 3, 2012 at 4:33 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> On 09/03/2012 05:58 AM, Linus Walleij wrote:
->> On Mon, Sep 3, 2012 at 1:32 PM, Lee Jones <lee.jones@linaro.org> wrote:
->>
->>> No, this is wrong. Platform data should not override DT.
->>>
->>> If DT is enabled and passed, it should have highest priority.
->
-> No, that's wrong. If platform data is specified, it overrides DT, so
-> that if the DT needs any fixup, it can be provided using platform data.
+On Mon, Sep 03, 2012 at 04:15:25PM +0200, Maxime Ripard wrote:
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Thanks Stephen, now there are two of us saying this, Lee please
-follow this design pattern.
+Applied, thanks.
 
-(Unless Rob/Grant start shouting counter-orders...)
-
-Yours,
-Linus Walleij
+> ---
+>  arch/arm/boot/dts/imx28-cfa10049.dts |   25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+> index a0c7b83..f8f8dd4 100644
+> --- a/arch/arm/boot/dts/imx28-cfa10049.dts
+> +++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+> @@ -31,6 +31,31 @@
+>  				pinctrl-0 = <&i2c1_pins_a>;
+>  				status = "okay";
+>  			};
+> +
+> +			usbphy1: usbphy at 8007e000 {
+> +				status = "okay";
+> +			};
+> +		};
+> +	};
+> +
+> +	ahb at 80080000 {
+> +		usb1: usb at 80090000 {
+> +			vbus-supply = <&reg_usb1_vbus>;
+> +			pinctrl-0 = <&usbphy1_pins_a>;
+> +			pinctrl-names = "default";
+> +			status = "okay";
+> +		};
+> +	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +
+> +		reg_usb1_vbus: usb1_vbus {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "usb1_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio0 7 1>;
+>  		};
+>  	};
+>  };
+> -- 
+> 1.7.9.5
+> 
