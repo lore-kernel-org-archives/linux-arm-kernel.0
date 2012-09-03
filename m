@@ -1,24 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Sep 2012 12:11:06 +0100
-Subject: [PATCH] gpio/omap: fix possible memory leak in
- omap2_gpio_dev_init()
-In-Reply-To: <CAPgLHd9A0-Esqt8D87RunMWFFG7uTCERksia26DSO1xw8OUfmg@mail.gmail.com>
-References: <CAPgLHd9A0-Esqt8D87RunMWFFG7uTCERksia26DSO1xw8OUfmg@mail.gmail.com>
-Message-ID: <20120903111106.GA24189@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 3 Sep 2012 13:14:44 +0200
+Subject: [PATCH v3 1/4] pinctrl: add samsung pinctrl and gpiolib driver
+In-Reply-To: <1345720529-32315-2-git-send-email-thomas.abraham@linaro.org>
+References: <1345720529-32315-1-git-send-email-thomas.abraham@linaro.org>
+ <1345720529-32315-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CACRpkdbVe77pAYdOw0+_2G2FWVWcn4GKQty6R-LXXEz-OkUdUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 03, 2012 at 06:13:33PM +0800, Wei Yongjun wrote:
-> @@ -130,6 +132,7 @@ static int __init omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
->  
->  	pdev = omap_device_build(name, id - 1, oh, pdata,
->  				sizeof(*pdata),	NULL, 0, false);
-> +	kfree(pdata->regs);
->  	kfree(pdata);
+On Thu, Aug 23, 2012 at 1:15 PM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
 
-This one looks wrong.  pdata is copied by the internals of
-omap_device_build(), which includes the 'regs' pointer, so it should not
-be freed after a successful call to omap_device_build().  (It should,
-however, be freed after an unsuccessful call.)
+> Add a new device tree enabled pinctrl and gpiolib driver for Samsung
+> SoC's. This driver provides a common and extensible framework for all
+> Samsung SoC's to interface with the pinctrl and gpiolib subsystems. This
+> driver supports only device tree based instantiation and hence can be
+> used only on those Samsung platforms that have device tree enabled.
+>
+> This driver is split into two parts: the pinctrl interface and the gpiolib
+> interface. The pinctrl interface registers pinctrl devices with the pinctrl
+> subsystem and gpiolib interface registers gpio chips with the gpiolib
+> subsystem. The information about the pins, pin groups, pin functions and
+> gpio chips, which are SoC specific, are parsed from device tree node.
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 
-BTW, you want to copy Paul Walmsley with this patch (address in Cc).
+Looks good to me, I saw Stephen had some minor comments and
+I expect that you probably fix them before applying to the Samsung
+tree so:
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+
+Feel free to push this through ARM SoC, I guess that's the plan?
+
+Yours,
+Linus Walleij
