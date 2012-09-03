@@ -1,41 +1,203 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 3 Sep 2012 16:02:00 +0800
-Subject: [PATCH v4 1/7] mfd: add syscon driver based on regmap
-In-Reply-To: <20120903030858.GF2362@S2101-09.ap.freescale.net>
-References: <1346237818-9498-1-git-send-email-b29396@freescale.com>
- <1346237818-9498-2-git-send-email-b29396@freescale.com>
- <20120831012626.GA7726@r65073-Latitude-D630>
- <20120903023102.GA11891@shlinux2.ap.freescale.net>
- <20120903030858.GF2362@S2101-09.ap.freescale.net>
-Message-ID: <20120903080159.GA1740@shlinux2.ap.freescale.net>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Mon, 3 Sep 2012 13:40:40 +0530
+Subject: [PATCH V2] ASoC: Davinci: McASP: add support new McASP IP Variant
+Message-ID: <1346659840-18228-1-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 03, 2012 at 11:09:01AM +0800, Shawn Guo wrote:
-> On Mon, Sep 03, 2012 at 10:31:03AM +0800, Dong Aisheng wrote:
-> > > 
-> > > I think of_node_put should be moved out from here and put into
-> > > syscon_node_to_regmap and syscon_regmap_lookup_by_compatible.
-> > > 
-> > I guess no, if you want to move of_node_put into syscon_regmap_lookup_by_phandle,
-> > then syscon_regmap_lookup_by_phandle has the same issue.
-> 
-> I guess not.  syscon_regmap_lookup_by_phandle itself calls of_parse_phandle,
-> and that's where the refcount gets incremented, so syscon_regmap_lookup_by_phandle
-> should be responsible for calling of_node_put to get the refcount decremented.
-> 
-Yes, the of_node_put will be done in syscon_node_to_regmap which is called by
-syscon_regmap_lookup_by_phandle,
-The reason why we do it is as i said in my last reply.
+The OMAP2+ variant of McASP is different from Davinci variant w.r.to
+some register offset.
 
-I think one known issue is that syscon_node_to_regmap may not be suitable to
-be used by the driver who still wants to use the regmap node after calling the
-syscon_node_to_regmap.
-I still do not find such using case but i'm not sure whether it may exist.
+Changes
+- Add new MCASP_VERSION_3 to identify new variant. New DT compatible
+  "ti,omap2-mcasp-audio" to identify version 3 controller.
+- The register offsets are handled depending on the version.
 
-Probably the safe way currently to do is just as you said:
-Not put the node in syscon_node_to_regmap and let user decide.
-Ok, i will update it.
+Note:
+    DMA parameters (dma fifo offset) are not updated and will be done later.
 
-Regards
-Dong Aisheng
+Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
+---
+Changes in V2:
+    Use "switch" instead of "if" statement to allow future revisions
+
+:100644 100644 e6148ec... 374e145... M	Documentation/devicetree/bindings/sound/davinci-mcasp-audio.txt
+:100644 100644 79c26aa... d0c5825... M	include/linux/platform_data/davinci_asp.h
+:100644 100644 c3eae1d... 714e51e... M	sound/soc/davinci/davinci-mcasp.c
+ .../bindings/sound/davinci-mcasp-audio.txt         |    1 +
+ include/linux/platform_data/davinci_asp.h          |    1 +
+ sound/soc/davinci/davinci-mcasp.c                  |   86 +++++++++++++++++---
+ 3 files changed, 75 insertions(+), 13 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/sound/davinci-mcasp-audio.txt b/Documentation/devicetree/bindings/sound/davinci-mcasp-audio.txt
+index e6148ec..374e145 100644
+--- a/Documentation/devicetree/bindings/sound/davinci-mcasp-audio.txt
++++ b/Documentation/devicetree/bindings/sound/davinci-mcasp-audio.txt
+@@ -4,6 +4,7 @@ Required properties:
+ - compatible :
+ 	"ti,dm646x-mcasp-audio"	: for DM646x platforms
+ 	"ti,da830-mcasp-audio"	: for both DA830 & DA850 platforms
++	"ti,omap2-mcasp-audio"	: for OMAP2 platforms (TI81xx, AM33xx)
+ 
+ - reg : Should contain McASP registers offset and length
+ - interrupts : Interrupt number for McASP
+diff --git a/include/linux/platform_data/davinci_asp.h b/include/linux/platform_data/davinci_asp.h
+index 79c26aa..d0c5825 100644
+--- a/include/linux/platform_data/davinci_asp.h
++++ b/include/linux/platform_data/davinci_asp.h
+@@ -87,6 +87,7 @@ struct snd_platform_data {
+ enum {
+ 	MCASP_VERSION_1 = 0,	/* DM646x */
+ 	MCASP_VERSION_2,	/* DA8xx/OMAPL1x */
++	MCASP_VERSION_3,        /* TI81xx/AM33xx */
+ };
+ 
+ enum mcbsp_clk_input_pin {
+diff --git a/sound/soc/davinci/davinci-mcasp.c b/sound/soc/davinci/davinci-mcasp.c
+index c3eae1d..714e51e 100644
+--- a/sound/soc/davinci/davinci-mcasp.c
++++ b/sound/soc/davinci/davinci-mcasp.c
+@@ -111,6 +111,10 @@
+ #define DAVINCI_MCASP_WFIFOSTS		(0x1014)
+ #define DAVINCI_MCASP_RFIFOCTL		(0x1018)
+ #define DAVINCI_MCASP_RFIFOSTS		(0x101C)
++#define MCASP_VER3_WFIFOCTL		(0x1000)
++#define MCASP_VER3_WFIFOSTS		(0x1004)
++#define MCASP_VER3_RFIFOCTL		(0x1008)
++#define MCASP_VER3_RFIFOSTS		(0x100C)
+ 
+ /*
+  * DAVINCI_MCASP_PWREMUMGT_REG - Power Down and Emulation Management
+@@ -384,18 +388,36 @@ static void davinci_mcasp_start(struct davinci_audio_dev *dev, int stream)
+ {
+ 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+ 		if (dev->txnumevt) {	/* enable FIFO */
+-			mcasp_clr_bits(dev->base + DAVINCI_MCASP_WFIFOCTL,
++			switch (dev->version) {
++			case MCASP_VERSION_3:
++				mcasp_clr_bits(dev->base + MCASP_VER3_WFIFOCTL,
+ 								FIFO_ENABLE);
+-			mcasp_set_bits(dev->base + DAVINCI_MCASP_WFIFOCTL,
++				mcasp_set_bits(dev->base + MCASP_VER3_WFIFOCTL,
+ 								FIFO_ENABLE);
++				break;
++			default:
++				mcasp_clr_bits(dev->base +
++					DAVINCI_MCASP_WFIFOCTL,	FIFO_ENABLE);
++				mcasp_set_bits(dev->base +
++					DAVINCI_MCASP_WFIFOCTL,	FIFO_ENABLE);
++			}
+ 		}
+ 		mcasp_start_tx(dev);
+ 	} else {
+ 		if (dev->rxnumevt) {	/* enable FIFO */
+-			mcasp_clr_bits(dev->base + DAVINCI_MCASP_RFIFOCTL,
++			switch (dev->version) {
++			case MCASP_VERSION_3:
++				mcasp_clr_bits(dev->base + MCASP_VER3_RFIFOCTL,
+ 								FIFO_ENABLE);
+-			mcasp_set_bits(dev->base + DAVINCI_MCASP_RFIFOCTL,
++				mcasp_set_bits(dev->base + MCASP_VER3_RFIFOCTL,
+ 								FIFO_ENABLE);
++				break;
++			default:
++				mcasp_clr_bits(dev->base +
++					DAVINCI_MCASP_RFIFOCTL,	FIFO_ENABLE);
++				mcasp_set_bits(dev->base +
++					DAVINCI_MCASP_RFIFOCTL,	FIFO_ENABLE);
++			}
+ 		}
+ 		mcasp_start_rx(dev);
+ 	}
+@@ -416,14 +438,31 @@ static void mcasp_stop_tx(struct davinci_audio_dev *dev)
+ static void davinci_mcasp_stop(struct davinci_audio_dev *dev, int stream)
+ {
+ 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+-		if (dev->txnumevt)	/* disable FIFO */
+-			mcasp_clr_bits(dev->base + DAVINCI_MCASP_WFIFOCTL,
++		if (dev->txnumevt) {	/* disable FIFO */
++			switch (dev->version) {
++			case MCASP_VERSION_3:
++				mcasp_clr_bits(dev->base + MCASP_VER3_WFIFOCTL,
+ 								FIFO_ENABLE);
++				break;
++			default:
++				mcasp_clr_bits(dev->base +
++					DAVINCI_MCASP_WFIFOCTL,	FIFO_ENABLE);
++			}
++		}
+ 		mcasp_stop_tx(dev);
+ 	} else {
+-		if (dev->rxnumevt)	/* disable FIFO */
+-			mcasp_clr_bits(dev->base + DAVINCI_MCASP_RFIFOCTL,
++		if (dev->rxnumevt) {	/* disable FIFO */
++			switch (dev->version) {
++			case MCASP_VERSION_3:
++				mcasp_clr_bits(dev->base + MCASP_VER3_RFIFOCTL,
+ 								FIFO_ENABLE);
++			break;
++
++			default:
++				mcasp_clr_bits(dev->base +
++					DAVINCI_MCASP_RFIFOCTL,	FIFO_ENABLE);
++			}
++		}
+ 		mcasp_stop_rx(dev);
+ 	}
+ }
+@@ -622,20 +661,37 @@ static void davinci_hw_common_param(struct davinci_audio_dev *dev, int stream)
+ 		if (dev->txnumevt * tx_ser > 64)
+ 			dev->txnumevt = 1;
+ 
+-		mcasp_mod_bits(dev->base + DAVINCI_MCASP_WFIFOCTL, tx_ser,
++		switch (dev->version) {
++		case MCASP_VERSION_3:
++			mcasp_mod_bits(dev->base + MCASP_VER3_WFIFOCTL, tx_ser,
+ 								NUMDMA_MASK);
+-		mcasp_mod_bits(dev->base + DAVINCI_MCASP_WFIFOCTL,
++			mcasp_mod_bits(dev->base + MCASP_VER3_WFIFOCTL,
+ 				((dev->txnumevt * tx_ser) << 8), NUMEVT_MASK);
++			break;
++		default:
++			mcasp_mod_bits(dev->base + DAVINCI_MCASP_WFIFOCTL,
++							tx_ser,	NUMDMA_MASK);
++			mcasp_mod_bits(dev->base + DAVINCI_MCASP_WFIFOCTL,
++				((dev->txnumevt * tx_ser) << 8), NUMEVT_MASK);
++		}
+ 	}
+ 
+ 	if (dev->rxnumevt && stream == SNDRV_PCM_STREAM_CAPTURE) {
+ 		if (dev->rxnumevt * rx_ser > 64)
+ 			dev->rxnumevt = 1;
+-
+-		mcasp_mod_bits(dev->base + DAVINCI_MCASP_RFIFOCTL, rx_ser,
++		switch (dev->version) {
++		case MCASP_VERSION_3:
++			mcasp_mod_bits(dev->base + MCASP_VER3_RFIFOCTL, rx_ser,
+ 								NUMDMA_MASK);
+-		mcasp_mod_bits(dev->base + DAVINCI_MCASP_RFIFOCTL,
++			mcasp_mod_bits(dev->base + MCASP_VER3_RFIFOCTL,
++				((dev->rxnumevt * rx_ser) << 8), NUMEVT_MASK);
++			break;
++		default:
++			mcasp_mod_bits(dev->base + DAVINCI_MCASP_RFIFOCTL,
++							rx_ser,	NUMDMA_MASK);
++			mcasp_mod_bits(dev->base + DAVINCI_MCASP_RFIFOCTL,
+ 				((dev->rxnumevt * rx_ser) << 8), NUMEVT_MASK);
++		}
+ 	}
+ }
+ 
+@@ -874,6 +930,10 @@ static const struct of_device_id mcasp_dt_ids[] = {
+ 		.compatible = "ti,da830-mcasp-audio",
+ 		.data = (void *)MCASP_VERSION_2,
+ 	},
++	{
++		.compatible = "ti,omap2-mcasp-audio",
++		.data = (void *)MCASP_VERSION_3,
++	},
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, mcasp_dt_ids);
+-- 
+1.7.1
