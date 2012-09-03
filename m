@@ -1,85 +1,31 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Mon, 3 Sep 2012 12:20:02 +0200
-Subject: [PATCH v2 8/8] ARM: dts: add twi nodes for atmel boards
-In-Reply-To: <1346667367-7969-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1346667367-7969-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1346667602-8140-1-git-send-email-ludovic.desroches@atmel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 3 Sep 2012 12:47:51 +0200
+Subject: [PATCH] ARM: ux500: Fix build error due to missing include of
+ asm/pmu.h in cpu-db8500.c
+In-Reply-To: <1346588747.7909.2.camel@phoenix>
+References: <1346588747.7909.2.camel@phoenix>
+Message-ID: <CACRpkdYxYGa=C092rbTU5bo=YEu6wqiTUD7W4pLS_wNfmAe4Zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Sun, Sep 2, 2012 at 2:25 PM, Axel Lin <axel.lin@gmail.com> wrote:
 
-Still use i2c-gpio on boards which have a SoC with a TWI IP which
-doesn't have clock stretching in transmission mode.
+> Include asm/pmu.h to fix below build error:
+>
+>   CC      arch/arm/mach-ux500/cpu-db8500.o
+> arch/arm/mach-ux500/cpu-db8500.c:118:8: error: variable 'db8500_pmu_platdata' has initializer but incomplete type
+> arch/arm/mach-ux500/cpu-db8500.c:119:2: error: unknown field 'handle_irq' specified in initializer
+> arch/arm/mach-ux500/cpu-db8500.c:119:2: warning: excess elements in struct initializer [enabled by default]
+> arch/arm/mach-ux500/cpu-db8500.c:119:2: warning: (near initialization for 'db8500_pmu_platdata') [enabled by default]
+> make[1]: *** [arch/arm/mach-ux500/cpu-db8500.o] Error 1
+> make: *** [arch/arm/mach-ux500] Error 2
+>
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91sam9g25ek.dts    | 12 ++++++++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts |  8 ++++++++
- arch/arm/boot/dts/at91sam9n12ek.dts    |  8 ++++++++
- 3 files changed, 28 insertions(+)
+That's on linux-next not on v3.6-rcN right?
 
-diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
-index 7829a4d..3b0adbc 100644
---- a/arch/arm/boot/dts/at91sam9g25ek.dts
-+++ b/arch/arm/boot/dts/at91sam9g25ek.dts
-@@ -32,6 +32,18 @@
- 				phy-mode = "rmii";
- 				status = "okay";
- 			};
-+
-+			i2c0: i2c at f8010000 {
-+				status = "okay";
-+			};
-+
-+			i2c1: i2c at f8014000 {
-+				status = "okay";
-+			};
-+
-+			i2c2: i2c at f8018000 {
-+				status = "okay";
-+			};
- 		};
- 
- 		usb0: ohci at 00600000 {
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index a3633bd..15e1dd4 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -46,6 +46,14 @@
- 				phy-mode = "rmii";
- 				status = "okay";
- 			};
-+
-+			i2c0: i2c at fff84000 {
-+				status = "okay";
-+			};
-+
-+			i2c1: i2c at fff88000 {
-+				status = "okay";
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-index f4e43e3..912b2c2 100644
---- a/arch/arm/boot/dts/at91sam9n12ek.dts
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -37,6 +37,14 @@
- 			dbgu: serial at fffff200 {
- 				status = "okay";
- 			};
-+
-+			i2c0: i2c at f8010000 {
-+				status = "okay";
-+			};
-+
-+			i2c1: i2c at f8014000 {
-+				status = "okay";
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
--- 
-1.7.11.3
+I've applied it to my ux500 branch and will carry it unless Will Deacon
+express an interest in it, PMU is his territory...
+
+Yours,
+Linus Walleij
