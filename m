@@ -1,70 +1,55 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 3 Sep 2012 15:10:23 +0200
-Subject: [PATCH] ARM: ux500: Correct Ux500 family names usage
-Message-ID: <1346677823-28158-1-git-send-email-linus.walleij@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 3 Sep 2012 15:19:13 +0200
+Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
+ I2C driver
+In-Reply-To: <20120903123424.GA31163@gmail.com>
+References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
+ <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
+ <20120831112258.GA2624@pengutronix.de>
+ <20120831122323.GC5962@gmail.com>
+ <CACRpkdZ=C1EV4WO2b=1YLHPNhsDsQdq7Kfnpzm8i7uGRtVjJuQ@mail.gmail.com>
+ <20120903094448.GB11780@pengutronix.de>
+ <20120903100656.GC5782@gmail.com>
+ <CACRpkdb8owKBxawAv4LVVYx5kUgZ9cUSiQ=BV0f3Pf3bHtknuQ@mail.gmail.com>
+ <CAF2Aj3j25w1Nn9O6hV+=i-j1ts_p_Ucswk_M7r04S7i5BzPkHg@mail.gmail.com>
+ <CACRpkdZ5VFhrbONy=0K5MFh4e6BDFckq0yqzjQ2QkW9MgwKqBg@mail.gmail.com>
+ <20120903123424.GA31163@gmail.com>
+Message-ID: <CACRpkdZvWkH2gQQuNvCkNuB-faT8qHAjyiULSqPKrn+FCktvLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Loic PALLARDY <loic.pallardy@st.com>
+On Mon, Sep 3, 2012 at 2:34 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Update users with cpu_is_ux540_family() to keep x540
-family functional.
+> When booting DT booting take a different path and no platform data
+> is passed. We can't boot DT AND register devices with platform data
+> or else we will double probe every device. The only way to pass
+> pdata when booting with DT is with AUX_DATA() and that's a hack to
+> get around things we don't have support for yet. Up until now that
+> has been DMA bindings, clock and pinctrl names and call-backs.
 
-Signed-off-by: Loic Pallardy <loic.pallardy@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Hi Arnd, Olof:
+So if we pass some augmented platform data using AUX_DATA()
+that appears as pdata in this case, and gets discarded.
 
-This patch goes on top of the ux500-asicid patches pulled earlier,
-into your ux500/asic-id branch, it'd be best if you just applied
-this one on top manually. If you prefer I can send a new pull
-request from the same branch.
+Thus we cannot use AUX_DATA() to override a broken, as in
+"the interrupt number is wrong" device tree.
 
-Linus
----
- arch/arm/mach-ux500/clock.c   | 2 +-
- arch/arm/mach-ux500/platsmp.c | 2 +-
- arch/arm/mach-ux500/timer.c   | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+> If DT is corrupt or missing the kernel will boot using platform
+> data, but np will always be NULL, so we don't have the problem you
+> were alluding to above.
 
-diff --git a/arch/arm/mach-ux500/clock.c b/arch/arm/mach-ux500/clock.c
-index 8d73b06..bc5a516 100644
---- a/arch/arm/mach-ux500/clock.c
-+++ b/arch/arm/mach-ux500/clock.c
-@@ -149,7 +149,7 @@ static unsigned long clk_mtu_get_rate(struct clk *clk)
- 	unsigned long mturate;
- 	unsigned long retclk;
- 
--	if (cpu_is_u8500_family())
-+	if (cpu_is_u8500_family() || cpu_is_ux540_family())
- 		addr = __io_address(U8500_PRCMU_BASE);
- 	else
- 		ux500_unknown_soc();
-diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
-index cb35897..a5dda684 100644
---- a/arch/arm/mach-ux500/platsmp.c
-+++ b/arch/arm/mach-ux500/platsmp.c
-@@ -118,7 +118,7 @@ static void __init wakeup_secondary(void)
- {
- 	void __iomem *backupram;
- 
--	if (cpu_is_u8500_family())
-+	if (cpu_is_u8500_family() || cpu_is_ux540_family())
- 		backupram = __io_address(U8500_BACKUPRAM0_BASE);
- 	else
- 		ux500_unknown_soc();
-diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
-index 66e7f00..6f39731 100644
---- a/arch/arm/mach-ux500/timer.c
-+++ b/arch/arm/mach-ux500/timer.c
-@@ -54,7 +54,7 @@ static void __init ux500_timer_init(void)
- 	void __iomem *tmp_base;
- 	struct device_node *np;
- 
--	if (cpu_is_u8500_family()) {
-+	if (cpu_is_u8500_family() || cpu_is_ux540_family()) {
- 		mtu_timer_base = __io_address(U8500_MTU0_BASE);
- 		prcmu_timer_base = __io_address(U8500_PRCMU_TIMER_4_BASE);
- 	} else {
--- 
-1.7.11.3
+That was not the problem I had in mind.
+
+I had a valid, but incorrect device tree in mind. I.e the device
+is there, but with wrong base address, or wrong IRQ number.
+
+If pdata takes precedence, we can use AUX_DATA() to
+override such errors from the platform, since drivers/of/platform.c
+helpfully pokes in the auxdata as the platform data.
+I thought this was one of the reasons why auxdata exist
+at all.
+
+Or is the proper solution to runtime-patch the device tree
+per se in such cases? How is that actually done then?
+
+Yours,
+Linus Walleij
