@@ -1,48 +1,33 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue,  4 Sep 2012 15:08:02 +0300
-Subject: [RFC update 2/2] ASoC: omap-pcm: Do not check DMA sync_mode
-In-Reply-To: <1346760482-12794-1-git-send-email-peter.ujfalusi@ti.com>
-References: <E1T8a09-0002vz-Bl@rmk-PC.arm.linux.org.uk>
- <1346760482-12794-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1346760482-12794-3-git-send-email-peter.ujfalusi@ti.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 03 Sep 2012 17:59:33 +0100
+Subject: [RFC 2/3] Fix "ASoC: dmaengine: Don't use runtime private data for
+ dmaengine data"
+In-Reply-To: <20120903165832.GA31511@n2100.arm.linux.org.uk>
+References: <20120903165832.GA31511@n2100.arm.linux.org.uk>
+Message-ID: <E1T8Zzp-0002vv-7e@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP dmaengine now supports element mode also in cyclic DMA so we do not
-need to block non PACKET modes.
+The above commit was not initializing the correct substream runtime
+member with the ASoC DMA engine runtime data.  Fix that.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- sound/soc/omap/omap-pcm.c | 10 ----------
- 1 file changed, 10 deletions(-)
+ sound/soc/soc-dmaengine-pcm.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/sound/soc/omap/omap-pcm.c b/sound/soc/omap/omap-pcm.c
-index 50ae048..0f88db3 100644
---- a/sound/soc/omap/omap-pcm.c
-+++ b/sound/soc/omap/omap-pcm.c
-@@ -32,7 +32,6 @@
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
+diff --git a/sound/soc/soc-dmaengine-pcm.c b/sound/soc/soc-dmaengine-pcm.c
+index 27fa5ad..6fb9a2a 100644
+--- a/sound/soc/soc-dmaengine-pcm.c
++++ b/sound/soc/soc-dmaengine-pcm.c
+@@ -293,7 +293,7 @@ int snd_dmaengine_pcm_open(struct snd_pcm_substream *substream,
+ 		return ret;
+ 	}
  
--#include <plat/dma.h> /* needed just for OMAP_DMA_SYNC_PACKET */
- #include "omap-pcm.h"
+-	substream->runtime->private_data = prtd;
++	substream->runtime->dmaengine_data = prtd;
  
- static const struct snd_pcm_hardware omap_pcm_hardware = {
-@@ -83,15 +82,6 @@ static int omap_pcm_hw_params(struct snd_pcm_substream *substream,
- 		return 0;
- 	prtd->dma_data = dma_data;
- 
--	/*
--	 * This is the only parameter we don't handle with DMA
--	 * engine - so we insist on OMAP_DMA_SYNC_PACKET here.
--	 */
--	if (dma_data->sync_mode != OMAP_DMA_SYNC_PACKET) {
--		pr_warn("ALSA: omap-dma: DMA using non-packet mode?\n");
--		return -EINVAL;
--	}
--
- 	req = dma_data->dma_req;
- 	err = snd_dmaengine_pcm_open(substream, omap_dma_filter_fn, &req);
- 	if (err)
+ 	return 0;
+ }
 -- 
-1.7.12
+1.7.4.4
