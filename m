@@ -1,46 +1,82 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 03 Sep 2012 10:54:06 +0200
-Subject: [PATCH] ARM: S3C24XX: Add WIZnet W5300E01-ARM board support
-In-Reply-To: <CA+E=qVfGN9_Lj5GWqERfZGQsTtnnK_fARgXuCujdVeZ0PBoJEQ@mail.gmail.com>
-References: <1346653236-19728-1-git-send-email-kth3321@gmail.com>
- <CA+E=qVfGN9_Lj5GWqERfZGQsTtnnK_fARgXuCujdVeZ0PBoJEQ@mail.gmail.com>
-Message-ID: <5044702E.3070209@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 3 Sep 2012 17:54:29 +0900
+Subject: Booting DT kernel on a non-DT bootloader
+Message-ID: <20120903085428.GA18323@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 09/03/2012 09:56 AM, Vasily Khoruzhick wrote:
->> +static void __init w5300e01_init(void)
->> +{
->> +       s3c_nand_set_platdata(&w5300e01_nand_info);
->> +       platform_add_devices(w5300e01_devices, ARRAY_SIZE(w5300e01_devices));
->> +
->> +       /* W5300 interrupt pin. */
->> +       s3c2410_gpio_cfgpin(S3C2410_GPF(0), S3C2410_GPIO_IRQ);
->> +
->> +       s3c2410_gpio_cfgpin(S3C2410_GPF(4), S3C2410_GPIO_OUTPUT);
->> +       s3c2410_gpio_cfgpin(S3C2410_GPF(5), S3C2410_GPIO_OUTPUT);
->> +       s3c2410_gpio_cfgpin(S3C2410_GPF(6), S3C2410_GPIO_OUTPUT);
->> +       s3c2410_gpio_cfgpin(S3C2410_GPF(7), S3C2410_GPIO_OUTPUT);
->> +
->> +       s3c2410_gpio_setpin(S3C2410_GPF(0), 1);
->> +       s3c2410_gpio_setpin(S3C2410_GPF(4), 1);
->> +       s3c2410_gpio_setpin(S3C2410_GPF(5), 1);
->> +       s3c2410_gpio_setpin(S3C2410_GPF(6), 1);
->> +       s3c2410_gpio_setpin(S3C2410_GPF(7), 1);
->> +
-> 
-> Please use gpiolib API, legacy s3c2410_gpio_* API will be removed soon.
+it has come to pass that for some of the boards under mach-shmobile
+we are in the following situation:
 
-Right, you'll find some information about this in
-Documentation/arm/Samsung-S3C24XX/GPIO.txt.
+* The kernel requires a device tree for booting
+* The default boot loader for the board does not support device tree;
+  and in general it is not practical for developers to upload the
+  boot-loader.
 
-These links may be useful as well:
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg11985.html
-http://www.spinics.net/lists/arm-kernel/msg192119.html
+Fortunately there is a solution, which is to append a device tree to
+the kernel image and boot that by the normal means supported by the
+boot loader.
 
---
+Here is how to achieve that:
 
-Regards,
-Sylwester
+1. Make sure you have CONFIG_ARM_APPENDED_DTB=y in your .config
+
+2. Create original zImage
+
+    ARCH=arm make zImage
+
+3. Create flattened device tree (run this in kernel tree)
+
+   i) There is code in the next branch of my renesas tree to allow
+      this to be achieved using
+
+      # make dtbs
+
+      This will create the device tree for the prevaling kernel config,
+      if one exists.
+
+      e.g For Armadillo 800 EVA
+
+      # make dtbs
+      scripts/kconfig/conf --silentoldconfig Kconfig
+        DTC     arch/arm/boot/r8a7740-armadillo800eva.dtb
+      DTC: dts->dtb  on file "arch/arm/boot/dts/r8a7740-armadillo800eva.dts"
+
+      Else it will do nothing
+      # make dtbs
+      scripts/kconfig/conf --silentoldconfig Kconfig
+      make[1]: Nothing to be done for `arch/arm/boot/dtbs'.
+
+
+   ii) If you are running a current or other kernel, which does not
+       support "make dtbs" for mach-shmobile boards, then the dtb
+       may manually be compiled using dtc.
+
+       e.g. For the Armadillo 800 EVA
+
+       dtc -I dts -O dtb arch/arm/boot/dts/r8a7740-armadillo800eva.dts \
+           -o arch/arm/boot/dts/r8a7740-armadillo800eva.dtb
+
+    Note: Please make sure you have a recent version of dtc.
+          I have verified that the above works with DTC 1.3.0 from
+	  the Debian device-tree-compiler 1.3.0-2 package.
+	  I have had reports that it fails using DTC 1.2.0.
+
+4. Append device tree to zImage (very high-tech!)
+
+   cat arch/arm/boot/zImage \
+	arch/arm/boot/dts/r8a7740-armadillo800eva.dtb >
+	arch/arm/boot/zImage.dtb
+
+5. Create uImage (optional)
+
+   If you need to create a uImage then this may be done using
+   the new zImage + dtb as follows:
+
+   # cp arch/arm/boot/zImage.dtb arch/arm/boot/zImage
+   # $(cut -f 3- -d ' ' < arch/arm/boot/.uImage.cmd)
+
+6. You should now be able to either boot the resulting zImage.dtb
+   or uImage, use whichever suits the needs of the bootloader in use.
