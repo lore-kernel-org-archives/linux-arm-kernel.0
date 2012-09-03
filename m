@@ -1,39 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Sep 2012 21:43:25 +0100
-Subject: [alsa-devel] [RFC 1/3] ASoC: dmaengine: Don't use runtime
- private data for dmaengine data
-In-Reply-To: <5045124D.3050604@metafoo.de>
-References: <20120903165832.GA31511@n2100.arm.linux.org.uk>
- <E1T8ZzV-0002vp-2j@rmk-PC.arm.linux.org.uk> <5045124D.3050604@metafoo.de>
-Message-ID: <20120903204325.GA728@n2100.arm.linux.org.uk>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 03 Sep 2012 22:45:11 +0200
+Subject: [PATCH 0/3] gpio-twl4030: add new device tree properties
+In-Reply-To: <5044BE79.4040100@ti.com>
+References: <1346680491-4211-1-git-send-email-florian.vaussard@epfl.ch>
+ <5044BE79.4040100@ti.com>
+Message-ID: <504516D7.3060101@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 03, 2012 at 10:25:49PM +0200, Lars-Peter Clausen wrote:
-> On 09/03/2012 06:59 PM, Liam Girdwood wrote:
-> > Use a dedicated member to store dmaengine data so that drivers can
-> > use private data for their own purposes.
-> > 
-> 
-> The idea was that we'll eventually get to a point where we won't need private
-> data for the drivers using the generic dmaengine code. But for the transitional
-> period there is snd_dmaengine_pcm_{set,get}_data which allows to attach driver
-> private data to the dmaengine pcm. For an example see how the other users of
-> dmaengine pcm handle this.
+Hi Benoit,
 
-That's fine if you are writing new drivers from scatch, or know the
-driver you're converting inside-out.  Neither applies here (I've
-struggled to do anything with the OMAP audio stuff for many many
-reasons.)
+> Nit #2: the DTS file does not belong to the gpio subsystem. So you
+> should prefix them using the *convention* for ARM DTS patches:
+>
+> arm/dts: omap3: Add gpio-twl4030 properties for BeagleBoard and omap3-EVM
+>
+> Or maybe "ARM: dts: " because it looks like most people are using that
+> nowadays.
+>
+> The convention for the gpio directory is similar:
+> gpio/twl4030: get platform data from device tree
+>
+>>    gpio-twl4030: updates the bindings for new dt properties
+>>
+>>   .../devicetree/bindings/gpio/gpio-twl4030.txt      |    6 ++
+>>   arch/arm/boot/dts/omap3-beagle.dts                 |   20 +++++
+>>   arch/arm/boot/dts/omap3-evm.dts                    |   13 +++
+>>   drivers/gpio/gpio-twl4030.c                        |   86 +++++++++++++------
+>>   4 files changed, 98 insertions(+), 27 deletions(-)
+> Thanks,
+> Benoit
+>
+Thank you for your review, I will send a new version soon.
 
-I rather wish that people who did know the OMAP ASoC driver had stepped
-up to this conversion, but alas they haven't.
-
-In any case, if you want people to use the this soc-dmaengine helper
-then you have to make the conversion to it simple, and requiring
-everyone to totally restructure their drivers to use it does not make
-that process simple.
-
-What you have here is the result of several transformations to the
-driver, which would _not_ have been possible without this first patch
-from Liam.
+Regards,
+Florian
