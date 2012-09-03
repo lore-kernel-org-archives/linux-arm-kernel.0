@@ -1,99 +1,47 @@
-From: zhangfei.gao@marvell.com (Zhangfei Gao)
-Date: Mon,  3 Sep 2012 11:03:47 +0800
-Subject: [PATCH v5 3/3] ARM: dt: mmp-dma: add binding file
-In-Reply-To: <1346641427-5002-1-git-send-email-zhangfei.gao@marvell.com>
-References: <1346641427-5002-1-git-send-email-zhangfei.gao@marvell.com>
-Message-ID: <1346641427-5002-4-git-send-email-zhangfei.gao@marvell.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Mon, 3 Sep 2012 10:46:06 +0800
+Subject: [PATCH v4 2/7] ARM: imx6q: add iomuxc gpr support into syscon
+In-Reply-To: <20120831020247.GC7726@r65073-Latitude-D630>
+References: <1346237818-9498-1-git-send-email-b29396@freescale.com>
+ <1346237818-9498-3-git-send-email-b29396@freescale.com>
+ <20120831020247.GC7726@r65073-Latitude-D630>
+Message-ID: <20120903024606.GC11891@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- Documentation/devicetree/bindings/dma/mmp-dma.txt |   75 +++++++++++++++++++++
- 1 files changed, 75 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/mmp-dma.txt
+On Fri, Aug 31, 2012 at 10:02:48AM +0800, Shawn Guo wrote:
+> On Wed, Aug 29, 2012 at 06:56:53PM +0800, Dong Aisheng wrote:
+> > From: Dong Aisheng <dong.aisheng@linaro.org>
+> > 
+> > Include headfile for easy using.
+> > 
+> > Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/imx6q.dtsi         |    5 +
+> >  include/linux/fsl/imx6q-iomuxc-gpr.h |  319 ++++++++++++++++++++++++++++++++++
+> 
+> I assume that all the users of this header file are imx6q syscon
+> clients.  In that case, this header belongs to mfd/syscon subsystem.
+> 
+> I have been told by people that it was a mistake to create
+> include/linux/fsl.  Each header in include/linux should go to
+> respective subsystem sub-directory.  For this particular case,
+> it should be include/linux/mfd or include/linux/mfd/syscon even
+> better, IMO.
+> 
+I like the later one if not put in include/linux/fsl. :)
 
-diff --git a/Documentation/devicetree/bindings/dma/mmp-dma.txt b/Documentation/devicetree/bindings/dma/mmp-dma.txt
-new file mode 100644
-index 0000000..36254c4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/mmp-dma.txt
-@@ -0,0 +1,75 @@
-+* MARVELL MMP DMA controller
-+
-+Marvell Peripheral DMA Controller
-+Used platfroms: pxa688, pxa910, pxa3xx, etc
-+
-+Required properties:
-+- compatible: Should be "marvell,pdma-1.0"
-+- reg: Should contain DMA registers location and length.
-+- interrupts: Either contain all of the per-channel DMA interrupts
-+		or one irq for pdma device
-+- #dma-channels: Number of DMA channels supported by the controller.
-+
-+"marvell,pdma-1.0"
-+Used platfroms: pxa25x, pxa27x, pxa3xx, pxa93x, pxa168, pxa910, pxa688.
-+
-+Examples:
-+
-+/*
-+ * Each channel has specific irq
-+ * ICU parse out irq channel from ICU register,
-+ * while DMA controller may not able to distinguish the irq channel
-+ * Using this method, interrupt-parent is required as demuxer
-+ * For example, pxa688 icu register 0x128, bit 0~15 is PDMA channel irq,
-+ * 18~21 is ADMA irq
-+ */
-+pdma: dma-controller at d4000000 {
-+	      compatible = "marvell,pdma-1.0";
-+	      reg = <0xd4000000 0x10000>;
-+	      interrupts = <0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15>;
-+	      interrupt-parent = <&intcmux32>;
-+	      #dma-channels = <16>;
-+      };
-+
-+/*
-+ * One irq for all channels
-+ * Dmaengine driver (DMA controller) distinguish irq channel via
-+ * parsing internal register
-+ */
-+pdma: dma-controller at d4000000 {
-+	      compatible = "marvell,pdma-1.0";
-+	      reg = <0xd4000000 0x10000>;
-+	      interrupts = <47>;
-+	      #dma-channels = <16>;
-+      };
-+
-+
-+Marvell Two Channel DMA Controller used specifically for audio
-+Used platfroms: pxa688, pxa910
-+
-+Required properties:
-+- compatible: Should be "marvell,adma-1.0" or "marvell,pxa910-squ"
-+- reg: Should contain DMA registers location and length.
-+- interrupts: Either contain all of the per-channel DMA interrupts
-+		or one irq for dma device
-+
-+"marvell,adma-1.0" used on pxa688
-+"marvell,pxa910-squ" used on pxa910
-+
-+Examples:
-+
-+/* each channel has specific irq */
-+adma0: dma-controller at d42a0800 {
-+	      compatible = "marvell,adma-1.0";
-+	      reg = <0xd42a0800 0x100>;
-+	      interrupts = <18 19>;
-+	      interrupt-parent = <&intcmux32>;
-+      };
-+
-+/* One irq for all channels */
-+squ: dma-controller at d42a0800 {
-+	      compatible = "marvell,pxa910-squ";
-+	      reg = <0xd42a0800 0x100>;
-+	      interrupts = <46>;
-+      };
-+
--- 
-1.7.1
+> > +#define IMX6Q_GPR13_SATA_PHY_1_MED		(0x1 << 0)
+> > +#define IMX6Q_GPR13_SATA_PHY_1_SLOW		(0x2 << 0)
+> > +
+> > +#endif /* !__LINUX_IMX6Q_IOMUXC_GPR_H */
+> 
+> Nit: why do we have a "!" there?
+> 
+You're right.
+We do not need a '!' for such macro.
+Sorry for my mistake.
+
+Regards
+Dong Aisheng
