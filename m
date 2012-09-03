@@ -1,203 +1,134 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Mon, 3 Sep 2012 13:40:40 +0530
-Subject: [PATCH V2] ASoC: Davinci: McASP: add support new McASP IP Variant
-Message-ID: <1346659840-18228-1-git-send-email-gururaja.hebbar@ti.com>
+From: gcembed@gmail.com (=?UTF-8?q?Ga=C3=ABtan=20Carlier?=)
+Date: Mon,  3 Sep 2012 10:49:21 +0200
+Subject: [PATCH] ASoC: imx-mc13783: use defines instead of numerical address
+ of register
+Message-ID: <1346662161-7642-1-git-send-email-gcembed@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP2+ variant of McASP is different from Davinci variant w.r.to
-some register offset.
+This uses already defined name of registers and makes code more readable.
 
-Changes
-- Add new MCASP_VERSION_3 to identify new variant. New DT compatible
-  "ti,omap2-mcasp-audio" to identify version 3 controller.
-- The register offsets are handled depending on the version.
-
-Note:
-    DMA parameters (dma fifo offset) are not updated and will be done later.
-
-Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
+Signed-off-by: Ga?tan Carlier <gcembed@gmail.com>
 ---
-Changes in V2:
-    Use "switch" instead of "if" statement to allow future revisions
+ sound/soc/codecs/mc13783.c |   58 +++++++++++++++++++++++--------------------
+ 1 files changed, 31 insertions(+), 27 deletions(-)
 
-:100644 100644 e6148ec... 374e145... M	Documentation/devicetree/bindings/sound/davinci-mcasp-audio.txt
-:100644 100644 79c26aa... d0c5825... M	include/linux/platform_data/davinci_asp.h
-:100644 100644 c3eae1d... 714e51e... M	sound/soc/davinci/davinci-mcasp.c
- .../bindings/sound/davinci-mcasp-audio.txt         |    1 +
- include/linux/platform_data/davinci_asp.h          |    1 +
- sound/soc/davinci/davinci-mcasp.c                  |   86 +++++++++++++++++---
- 3 files changed, 75 insertions(+), 13 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/sound/davinci-mcasp-audio.txt b/Documentation/devicetree/bindings/sound/davinci-mcasp-audio.txt
-index e6148ec..374e145 100644
---- a/Documentation/devicetree/bindings/sound/davinci-mcasp-audio.txt
-+++ b/Documentation/devicetree/bindings/sound/davinci-mcasp-audio.txt
-@@ -4,6 +4,7 @@ Required properties:
- - compatible :
- 	"ti,dm646x-mcasp-audio"	: for DM646x platforms
- 	"ti,da830-mcasp-audio"	: for both DA830 & DA850 platforms
-+	"ti,omap2-mcasp-audio"	: for OMAP2 platforms (TI81xx, AM33xx)
- 
- - reg : Should contain McASP registers offset and length
- - interrupts : Interrupt number for McASP
-diff --git a/include/linux/platform_data/davinci_asp.h b/include/linux/platform_data/davinci_asp.h
-index 79c26aa..d0c5825 100644
---- a/include/linux/platform_data/davinci_asp.h
-+++ b/include/linux/platform_data/davinci_asp.h
-@@ -87,6 +87,7 @@ struct snd_platform_data {
- enum {
- 	MCASP_VERSION_1 = 0,	/* DM646x */
- 	MCASP_VERSION_2,	/* DA8xx/OMAPL1x */
-+	MCASP_VERSION_3,        /* TI81xx/AM33xx */
- };
- 
- enum mcbsp_clk_input_pin {
-diff --git a/sound/soc/davinci/davinci-mcasp.c b/sound/soc/davinci/davinci-mcasp.c
-index c3eae1d..714e51e 100644
---- a/sound/soc/davinci/davinci-mcasp.c
-+++ b/sound/soc/davinci/davinci-mcasp.c
-@@ -111,6 +111,10 @@
- #define DAVINCI_MCASP_WFIFOSTS		(0x1014)
- #define DAVINCI_MCASP_RFIFOCTL		(0x1018)
- #define DAVINCI_MCASP_RFIFOSTS		(0x101C)
-+#define MCASP_VER3_WFIFOCTL		(0x1000)
-+#define MCASP_VER3_WFIFOSTS		(0x1004)
-+#define MCASP_VER3_RFIFOCTL		(0x1008)
-+#define MCASP_VER3_RFIFOSTS		(0x100C)
- 
- /*
-  * DAVINCI_MCASP_PWREMUMGT_REG - Power Down and Emulation Management
-@@ -384,18 +388,36 @@ static void davinci_mcasp_start(struct davinci_audio_dev *dev, int stream)
- {
- 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
- 		if (dev->txnumevt) {	/* enable FIFO */
--			mcasp_clr_bits(dev->base + DAVINCI_MCASP_WFIFOCTL,
-+			switch (dev->version) {
-+			case MCASP_VERSION_3:
-+				mcasp_clr_bits(dev->base + MCASP_VER3_WFIFOCTL,
- 								FIFO_ENABLE);
--			mcasp_set_bits(dev->base + DAVINCI_MCASP_WFIFOCTL,
-+				mcasp_set_bits(dev->base + MCASP_VER3_WFIFOCTL,
- 								FIFO_ENABLE);
-+				break;
-+			default:
-+				mcasp_clr_bits(dev->base +
-+					DAVINCI_MCASP_WFIFOCTL,	FIFO_ENABLE);
-+				mcasp_set_bits(dev->base +
-+					DAVINCI_MCASP_WFIFOCTL,	FIFO_ENABLE);
-+			}
- 		}
- 		mcasp_start_tx(dev);
- 	} else {
- 		if (dev->rxnumevt) {	/* enable FIFO */
--			mcasp_clr_bits(dev->base + DAVINCI_MCASP_RFIFOCTL,
-+			switch (dev->version) {
-+			case MCASP_VERSION_3:
-+				mcasp_clr_bits(dev->base + MCASP_VER3_RFIFOCTL,
- 								FIFO_ENABLE);
--			mcasp_set_bits(dev->base + DAVINCI_MCASP_RFIFOCTL,
-+				mcasp_set_bits(dev->base + MCASP_VER3_RFIFOCTL,
- 								FIFO_ENABLE);
-+				break;
-+			default:
-+				mcasp_clr_bits(dev->base +
-+					DAVINCI_MCASP_RFIFOCTL,	FIFO_ENABLE);
-+				mcasp_set_bits(dev->base +
-+					DAVINCI_MCASP_RFIFOCTL,	FIFO_ENABLE);
-+			}
- 		}
- 		mcasp_start_rx(dev);
- 	}
-@@ -416,14 +438,31 @@ static void mcasp_stop_tx(struct davinci_audio_dev *dev)
- static void davinci_mcasp_stop(struct davinci_audio_dev *dev, int stream)
- {
- 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
--		if (dev->txnumevt)	/* disable FIFO */
--			mcasp_clr_bits(dev->base + DAVINCI_MCASP_WFIFOCTL,
-+		if (dev->txnumevt) {	/* disable FIFO */
-+			switch (dev->version) {
-+			case MCASP_VERSION_3:
-+				mcasp_clr_bits(dev->base + MCASP_VER3_WFIFOCTL,
- 								FIFO_ENABLE);
-+				break;
-+			default:
-+				mcasp_clr_bits(dev->base +
-+					DAVINCI_MCASP_WFIFOCTL,	FIFO_ENABLE);
-+			}
-+		}
- 		mcasp_stop_tx(dev);
- 	} else {
--		if (dev->rxnumevt)	/* disable FIFO */
--			mcasp_clr_bits(dev->base + DAVINCI_MCASP_RFIFOCTL,
-+		if (dev->rxnumevt) {	/* disable FIFO */
-+			switch (dev->version) {
-+			case MCASP_VERSION_3:
-+				mcasp_clr_bits(dev->base + MCASP_VER3_RFIFOCTL,
- 								FIFO_ENABLE);
-+			break;
-+
-+			default:
-+				mcasp_clr_bits(dev->base +
-+					DAVINCI_MCASP_RFIFOCTL,	FIFO_ENABLE);
-+			}
-+		}
- 		mcasp_stop_rx(dev);
- 	}
- }
-@@ -622,20 +661,37 @@ static void davinci_hw_common_param(struct davinci_audio_dev *dev, int stream)
- 		if (dev->txnumevt * tx_ser > 64)
- 			dev->txnumevt = 1;
- 
--		mcasp_mod_bits(dev->base + DAVINCI_MCASP_WFIFOCTL, tx_ser,
-+		switch (dev->version) {
-+		case MCASP_VERSION_3:
-+			mcasp_mod_bits(dev->base + MCASP_VER3_WFIFOCTL, tx_ser,
- 								NUMDMA_MASK);
--		mcasp_mod_bits(dev->base + DAVINCI_MCASP_WFIFOCTL,
-+			mcasp_mod_bits(dev->base + MCASP_VER3_WFIFOCTL,
- 				((dev->txnumevt * tx_ser) << 8), NUMEVT_MASK);
-+			break;
-+		default:
-+			mcasp_mod_bits(dev->base + DAVINCI_MCASP_WFIFOCTL,
-+							tx_ser,	NUMDMA_MASK);
-+			mcasp_mod_bits(dev->base + DAVINCI_MCASP_WFIFOCTL,
-+				((dev->txnumevt * tx_ser) << 8), NUMEVT_MASK);
-+		}
- 	}
- 
- 	if (dev->rxnumevt && stream == SNDRV_PCM_STREAM_CAPTURE) {
- 		if (dev->rxnumevt * rx_ser > 64)
- 			dev->rxnumevt = 1;
--
--		mcasp_mod_bits(dev->base + DAVINCI_MCASP_RFIFOCTL, rx_ser,
-+		switch (dev->version) {
-+		case MCASP_VERSION_3:
-+			mcasp_mod_bits(dev->base + MCASP_VER3_RFIFOCTL, rx_ser,
- 								NUMDMA_MASK);
--		mcasp_mod_bits(dev->base + DAVINCI_MCASP_RFIFOCTL,
-+			mcasp_mod_bits(dev->base + MCASP_VER3_RFIFOCTL,
-+				((dev->rxnumevt * rx_ser) << 8), NUMEVT_MASK);
-+			break;
-+		default:
-+			mcasp_mod_bits(dev->base + DAVINCI_MCASP_RFIFOCTL,
-+							rx_ser,	NUMDMA_MASK);
-+			mcasp_mod_bits(dev->base + DAVINCI_MCASP_RFIFOCTL,
- 				((dev->rxnumevt * rx_ser) << 8), NUMEVT_MASK);
-+		}
- 	}
+diff --git a/sound/soc/codecs/mc13783.c b/sound/soc/codecs/mc13783.c
+index 8f726c0..bbfa553 100644
+--- a/sound/soc/codecs/mc13783.c
++++ b/sound/soc/codecs/mc13783.c
+@@ -426,16 +426,16 @@ static int mc13783_set_tdm_slot_sync(struct snd_soc_dai *dai,
  }
  
-@@ -874,6 +930,10 @@ static const struct of_device_id mcasp_dt_ids[] = {
- 		.compatible = "ti,da830-mcasp-audio",
- 		.data = (void *)MCASP_VERSION_2,
- 	},
-+	{
-+		.compatible = "ti,omap2-mcasp-audio",
-+		.data = (void *)MCASP_VERSION_3,
-+	},
- 	{ /* sentinel */ }
+ static const struct snd_kcontrol_new mc1l_amp_ctl =
+-	SOC_DAPM_SINGLE("Switch", 38, 7, 1, 0);
++	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_TX, 7, 1, 0);
+ 
+ static const struct snd_kcontrol_new mc1r_amp_ctl =
+-	SOC_DAPM_SINGLE("Switch", 38, 5, 1, 0);
++	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_TX, 5, 1, 0);
+ 
+ static const struct snd_kcontrol_new mc2_amp_ctl =
+-	SOC_DAPM_SINGLE("Switch", 38, 9, 1, 0);
++	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_TX, 9, 1, 0);
+ 
+ static const struct snd_kcontrol_new atx_amp_ctl =
+-	SOC_DAPM_SINGLE("Switch", 38, 11, 1, 0);
++	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_TX, 11, 1, 0);
+ 
+ 
+ /* Virtual mux. The chip does the input selection automatically
+@@ -461,22 +461,22 @@ static const struct snd_kcontrol_new right_input_mux =
+ 	SOC_DAPM_ENUM_VIRT("Route", adcr_enum);
+ 
+ static const struct snd_kcontrol_new samp_ctl =
+-	SOC_DAPM_SINGLE("Switch", 36, 3, 1, 0);
++	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_RX0, 3, 1, 0);
+ 
+ static const struct snd_kcontrol_new lamp_ctl =
+-	SOC_DAPM_SINGLE("Switch", 36, 5, 1, 0);
++	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_RX0, 5, 1, 0);
+ 
+ static const struct snd_kcontrol_new hlamp_ctl =
+-	SOC_DAPM_SINGLE("Switch", 36, 10, 1, 0);
++	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_RX0, 10, 1, 0);
+ 
+ static const struct snd_kcontrol_new hramp_ctl =
+-	SOC_DAPM_SINGLE("Switch", 36, 9, 1, 0);
++	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_RX0, 9, 1, 0);
+ 
+ static const struct snd_kcontrol_new llamp_ctl =
+-	SOC_DAPM_SINGLE("Switch", 36, 16, 1, 0);
++	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_RX0, 16, 1, 0);
+ 
+ static const struct snd_kcontrol_new lramp_ctl =
+-	SOC_DAPM_SINGLE("Switch", 36, 15, 1, 0);
++	SOC_DAPM_SINGLE("Switch", MC13783_AUDIO_RX0, 15, 1, 0);
+ 
+ static const struct snd_soc_dapm_widget mc13783_dapm_widgets[] = {
+ /* Input */
+@@ -487,13 +487,13 @@ static const struct snd_soc_dapm_widget mc13783_dapm_widgets[] = {
+ 	SND_SOC_DAPM_INPUT("RXINL"),
+ 	SND_SOC_DAPM_INPUT("TXIN"),
+ 
+-	SND_SOC_DAPM_SUPPLY("MC1 Bias", 38, 0, 0, NULL, 0),
+-	SND_SOC_DAPM_SUPPLY("MC2 Bias", 38, 1, 0, NULL, 0),
++	SND_SOC_DAPM_SUPPLY("MC1 Bias", MC13783_AUDIO_TX, 0, 0, NULL, 0),
++	SND_SOC_DAPM_SUPPLY("MC2 Bias", MC13783_AUDIO_TX, 1, 0, NULL, 0),
+ 
+-	SND_SOC_DAPM_SWITCH("MC1L Amp", 38, 7, 0, &mc1l_amp_ctl),
+-	SND_SOC_DAPM_SWITCH("MC1R Amp", 38, 5, 0, &mc1r_amp_ctl),
+-	SND_SOC_DAPM_SWITCH("MC2 Amp", 38, 9, 0, &mc2_amp_ctl),
+-	SND_SOC_DAPM_SWITCH("TXIN Amp", 38, 11, 0, &atx_amp_ctl),
++	SND_SOC_DAPM_SWITCH("MC1L Amp", MC13783_AUDIO_TX, 7, 0, &mc1l_amp_ctl),
++	SND_SOC_DAPM_SWITCH("MC1R Amp", MC13783_AUDIO_TX, 5, 0, &mc1r_amp_ctl),
++	SND_SOC_DAPM_SWITCH("MC2 Amp", MC13783_AUDIO_TX, 9, 0, &mc2_amp_ctl),
++	SND_SOC_DAPM_SWITCH("TXIN Amp", MC13783_AUDIO_TX, 11, 0, &atx_amp_ctl),
+ 
+ 	SND_SOC_DAPM_VIRT_MUX("PGA Left Input Mux", SND_SOC_NOPM, 0, 0,
+ 			      &left_input_mux),
+@@ -503,12 +503,12 @@ static const struct snd_soc_dapm_widget mc13783_dapm_widgets[] = {
+ 	SND_SOC_DAPM_PGA("PGA Left Input", SND_SOC_NOPM, 0, 0, NULL, 0),
+ 	SND_SOC_DAPM_PGA("PGA Right Input", SND_SOC_NOPM, 0, 0, NULL, 0),
+ 
+-	SND_SOC_DAPM_ADC("ADC", "Capture", 40, 11, 0),
+-	SND_SOC_DAPM_SUPPLY("ADC_Reset", 40, 15, 0, NULL, 0),
++	SND_SOC_DAPM_ADC("ADC", "Capture", MC13783_AUDIO_CODEC, 11, 0),
++	SND_SOC_DAPM_SUPPLY("ADC_Reset", MC13783_AUDIO_CODEC, 15, 0, NULL, 0),
+ 
+ /* Output */
+-	SND_SOC_DAPM_SUPPLY("DAC_E", 41, 11, 0, NULL, 0),
+-	SND_SOC_DAPM_SUPPLY("DAC_Reset", 41, 15, 0, NULL, 0),
++	SND_SOC_DAPM_SUPPLY("DAC_E", MC13783_AUDIO_DAC, 11, 0, NULL, 0),
++	SND_SOC_DAPM_SUPPLY("DAC_Reset", MC13783_AUDIO_DAC, 15, 0, NULL, 0),
+ 	SND_SOC_DAPM_OUTPUT("RXOUTL"),
+ 	SND_SOC_DAPM_OUTPUT("RXOUTR"),
+ 	SND_SOC_DAPM_OUTPUT("HSL"),
+@@ -516,14 +516,18 @@ static const struct snd_soc_dapm_widget mc13783_dapm_widgets[] = {
+ 	SND_SOC_DAPM_OUTPUT("LSP"),
+ 	SND_SOC_DAPM_OUTPUT("SP"),
+ 
+-	SND_SOC_DAPM_SWITCH("Speaker Amp", 36, 3, 0, &samp_ctl),
++	SND_SOC_DAPM_SWITCH("Speaker Amp", MC13783_AUDIO_RX0, 3, 0, &samp_ctl),
+ 	SND_SOC_DAPM_SWITCH("Loudspeaker Amp", SND_SOC_NOPM, 0, 0, &lamp_ctl),
+-	SND_SOC_DAPM_SWITCH("Headset Amp Left", 36, 10, 0, &hlamp_ctl),
+-	SND_SOC_DAPM_SWITCH("Headset Amp Right", 36, 9, 0, &hramp_ctl),
+-	SND_SOC_DAPM_SWITCH("Line out Amp Left", 36, 16, 0, &llamp_ctl),
+-	SND_SOC_DAPM_SWITCH("Line out Amp Right", 36, 15, 0, &lramp_ctl),
+-	SND_SOC_DAPM_DAC("DAC", "Playback", 36, 22, 0),
+-	SND_SOC_DAPM_PGA("DAC PGA", 37, 5, 0, NULL, 0),
++	SND_SOC_DAPM_SWITCH("Headset Amp Left", MC13783_AUDIO_RX0, 10, 0,
++			&hlamp_ctl),
++	SND_SOC_DAPM_SWITCH("Headset Amp Right", MC13783_AUDIO_RX0, 9, 0,
++			&hramp_ctl),
++	SND_SOC_DAPM_SWITCH("Line out Amp Left", MC13783_AUDIO_RX0, 16, 0,
++			&llamp_ctl),
++	SND_SOC_DAPM_SWITCH("Line out Amp Right", MC13783_AUDIO_RX0, 15, 0,
++			&lramp_ctl),
++	SND_SOC_DAPM_DAC("DAC", "Playback", MC13783_AUDIO_RX0, 22, 0),
++	SND_SOC_DAPM_PGA("DAC PGA", MC13783_AUDIO_RX1, 5, 0, NULL, 0),
  };
- MODULE_DEVICE_TABLE(of, mcasp_dt_ids);
+ 
+ static struct snd_soc_dapm_route mc13783_routes[] = {
 -- 
-1.7.1
+1.7.7.4
