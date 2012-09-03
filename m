@@ -1,30 +1,51 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 3 Sep 2012 10:34:14 +0800
-Subject: [PATCH v4 7/7] mfd: anatop-mfd: remove anatop driver
-In-Reply-To: <20120831013924.GB7726@r65073-Latitude-D630>
-References: <1346237818-9498-1-git-send-email-b29396@freescale.com>
- <1346237818-9498-8-git-send-email-b29396@freescale.com>
- <20120831013924.GB7726@r65073-Latitude-D630>
-Message-ID: <20120903023414.GB11891@shlinux2.ap.freescale.net>
+From: zhangfei.gao@marvell.com (Zhangfei Gao)
+Date: Mon,  3 Sep 2012 11:03:44 +0800
+Subject: [PATCH v5 0/3] dmaengine: add support mmp-pdma
+Message-ID: <1346641427-5002-1-git-send-email-zhangfei.gao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2012 at 09:39:26AM +0800, Shawn Guo wrote:
-> On Wed, Aug 29, 2012 at 06:56:58PM +0800, Dong Aisheng wrote:
-> > -config MFD_ANATOP
-> > -	bool "Support for Freescale i.MX on-chip ANATOP controller"
-> > -	depends on SOC_IMX6Q
-> > -	help
-> > -	  Select this option to enable Freescale i.MX on-chip ANATOP
-> > -	  MFD controller. This controller embeds regulator and
-> > -	  thermal devices for Freescale i.MX platforms.
-> > -
-> 
-> All the occurrences of MFD_ANATOP should be removed too.  I know there
-> is one in arch/arm/mach-imx/Kconfig.
-> 
-Yes, it has been made in patch 5:
-[PATCH v4 5/7] ARM: imx6q: convert to use syscon to access anatop registers
+v4->v5
+Split mmp-dma.txt 
+Based on linux.git Sep 1
 
-Regards
-Dong Aisheng
+v3->v4
+Set DMA_MEM_TO_MEM as default setting for memcpy, Suggested by Russell.
+"By default, any channel being asked to do memcpy
+should deal with the channel configuration itself and not require it
+to be set"
+
+v2->v3 
+Use "#dma-channels", instead of "dma-channels", suggested by Arnd
+
+v1->v2
+Sync with Arnd and Haojoan, change compatible name to "marvell,pdma-1.0"
+Used platfroms: pxa25x, pxa27x, pxa3xx, pxa93x, pxa168, pxa910, pxa688.
+Use IP name rather than platform name
+
+Also change "marvell,mmp-adma" to "marvell,adma-1.0"
+
+v0->v1
+Update dt member and desc according to Arnd's suggestion
+Use dma_slave_config.slave_id to transfer drcmr followed Vinod's suggestion
+
+mmp-pdma is added under dmaengine framework.
+The final purpose is replacing arch/arm/plat-pxa/dma.c
+
+Test on pxa910 with pxa3xx-nand and dmatest.ko
+
+Zhangfei Gao (3):
+  dmaengine: mmp-pdma support
+  dmaengine: mmp_tdma: add dt support
+  ARM: dt: mmp-dma: add binding file
+
+ Documentation/devicetree/bindings/dma/mmp-dma.txt |   75 ++
+ drivers/dma/Kconfig                               |    7 +
+ drivers/dma/Makefile                              |    1 +
+ drivers/dma/mmp_pdma.c                            |  875 +++++++++++++++++++++
+ drivers/dma/mmp_tdma.c                            |   51 +-
+ include/linux/platform_data/mmp_dma.h             |   19 +
+ 6 files changed, 1008 insertions(+), 20 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/mmp-dma.txt
+ create mode 100644 drivers/dma/mmp_pdma.c
+ create mode 100644 include/linux/platform_data/mmp_dma.h
