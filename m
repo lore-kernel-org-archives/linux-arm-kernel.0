@@ -1,50 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 3 Sep 2012 12:57:27 +0000
-Subject: [PATCH v2] hvc_dcc : add support to armv4 and armv5 core
-In-Reply-To: <5040EAF7.9010003@codeaurora.org>
-References: <1346413645-4593-1-git-send-email-castet.matthieu@free.fr>
- <5040EAF7.9010003@codeaurora.org>
-Message-ID: <201209031257.28213.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 3 Sep 2012 13:58:11 +0100
+Subject: [PATCH v2 20/31] arm64: User access library function
+In-Reply-To: <201208151449.54834.arnd@arndb.de>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-21-git-send-email-catalin.marinas@arm.com>
+ <201208151449.54834.arnd@arndb.de>
+Message-ID: <20120903125810.GB3313@mbp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 August 2012, Stephen Boyd wrote:
-> > +static int hvc_dcc_put_chars_v6(uint32_t vt, const char *buf, int count)
-> > +{
-> > +     int i;
-> > +
-> > +     for (i = 0; i < count; i++) {
-> > +             while (__dcc_getstatus_v6() & DCC_STATUS_TX_V6)
-> > +                     cpu_relax();
-> > +
-> > +             __dcc_putchar_v6(buf[i]);
-> > +     }
-> > +
-> > +     return count;
-> > +}
+On Wed, Aug 15, 2012 at 03:49:54PM +0100, Arnd Bergmann wrote:
+> On Tuesday 14 August 2012, Catalin Marinas wrote:
 > 
-> It's unfortunate that the main logic is duplicated. I wonder if we could
-> push the runtime decision slightly lower into the accessor functions
-> instead and make some new functions dcc_tx_busy() and dcc_rx_busy() or
-> something. Then these loops stay the same.
+> > +/*
+> > + * Single-value transfer routines.  They automatically use the right
+> > + * size if we just have the right pointer type.  Note that the functions
+> > + * which read from user space (*get_*) need to take care not to leak
+> > + * kernel data even if the calling code is buggy and fails to check
+> > + * the return value.  This means zeroing out the destination variable
+> > + * or buffer on error.  Normally this is done out of line by the
+> > + * fixup code, but there are a few places where it intrudes on the
+> > + * main code path.  When we only write to user space, there is no
+> > + * problem.
+> > + */
+> > +extern long __get_user_1(void *);
+> > +extern long __get_user_2(void *);
+> > +extern long __get_user_4(void *);
+> > +extern long __get_user_8(void *);
+> > +
+> > +#define __get_user_x(__r2,__p,__e,__s,__i...)				\
+> > +	   asm volatile(						\
+> > +		__asmeq("%0", "x0") __asmeq("%1", "x2")			\
+> > +		"bl	__get_user_" #__s				\
+> > +		: "=&r" (__e), "=r" (__r2)				\
+> > +		: "0" (__p)						\
+> > +		: __i, "cc")
+> > +
+> > +#define get_user(x,p)							\
+> > +	({								\
+> > +		register const typeof(*(p)) __user *__p asm("x0") = (p);\
+> > +		register unsigned long __r2 asm("x2");			\
+> > +		register long __e asm("x0");				\
+> > +		switch (sizeof(*(__p))) {				\
+> > +		case 1:							\
+> > +			__get_user_x(__r2, __p, __e, 1, "x30");		\
+> > +			break;						\
+> > +		case 2:							\
+> > +			__get_user_x(__r2, __p, __e, 2, "x3", "x30");	\
+> > +			break;						\
+> > +		case 4:							\
+> > +			__get_user_x(__r2, __p, __e, 4, "x30");		\
+> > +			break;						\
+> > +		case 8:							\
+> > +			__get_user_x(__r2, __p, __e, 8, "x30");		\
+> > +			break;						\
+> > +		default: __e = __get_user_bad(); break;			\
+> > +		}							\
+> > +		x = (typeof(*(p))) __r2;				\
+> > +		__e;							\
+> > +	})
+> 
+> It's fairly unusual to have out of line get_user/put_user functions.
+> What is the reason for this, other than copying from ARM?
 
-Agreed. Ideally, you should be able to get the code to be compiled into
-the same binary as before for ARMv6+. If only the inline assembly differs,
-you can do something like
+I changed these to inline asm. The only reason which I don't think
+matters much in this case is a few KB increase in Image size.
 
-static inline char __dcc_getchar(void)
-{
-        char __c;
-
-        if (__LINUX_ARM_ARCH >= 6)
-		asm volatile("mrc p14, 0, %0, c0, c5, 0 @ read comms data reg"
-	                : "=r" (__c));
-	else
-		asm volatile ("mrc p14, 0, %0, c1, c0  @ read comms data reg"
-			: "=r" (ret));
-        isb();
-
-        return __c;
-}
-
-	Arnd
+-- 
+Catalin
