@@ -1,91 +1,222 @@
 From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Mon, 3 Sep 2012 12:19:04 +0200
-Subject: [PATCH v2 6/8] ARM: at91: add clocks for I2C DT entries
+Date: Mon, 3 Sep 2012 12:19:25 +0200
+Subject: [PATCH v2 7/8] ARM: dts: add twi nodes for atmel SoCs
 In-Reply-To: <1346667367-7969-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1346667367-7969-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1346667544-8060-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1346667565-8100-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
+Add TWI nodes for atmel SoCs but keep i2c-gpio ones in order to let the
+choice to the user in dts files.
+
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Acked-by: Nikolaus Voss <n.voss@weinmann.de>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/at91sam9260.c | 1 +
- arch/arm/mach-at91/at91sam9263.c | 1 +
- arch/arm/mach-at91/at91sam9g45.c | 2 ++
- arch/arm/mach-at91/at91sam9n12.c | 2 ++
- arch/arm/mach-at91/at91sam9x5.c  | 6 +++---
- 5 files changed, 9 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/at91sam9260.dtsi | 10 ++++++++++
+ arch/arm/boot/dts/at91sam9263.dtsi | 10 ++++++++++
+ arch/arm/boot/dts/at91sam9g20.dtsi |  4 ++++
+ arch/arm/boot/dts/at91sam9g45.dtsi | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9n12.dtsi | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9x5.dtsi  | 30 ++++++++++++++++++++++++++++++
+ 6 files changed, 94 insertions(+)
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 5bd19a4..ad29f93 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -221,6 +221,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("usart", "fffd0000.serial", &usart3_clk),
- 	CLKDEV_CON_DEV_ID("usart", "fffd4000.serial", &usart4_clk),
- 	CLKDEV_CON_DEV_ID("usart", "fffd8000.serial", &usart5_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffac000.i2c", &twi_clk),
- 	/* more tc lookup table for DT entries */
- 	CLKDEV_CON_DEV_ID("t0_clk", "fffa0000.timer", &tc0_clk),
- 	CLKDEV_CON_DEV_ID("t1_clk", "fffa0000.timer", &tc1_clk),
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index e6b5956..200d5a7b 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -211,6 +211,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("hclk", "a00000.ohci", &ohci_clk),
- 	CLKDEV_CON_DEV_ID("spi_clk", "fffa4000.spi", &spi0_clk),
- 	CLKDEV_CON_DEV_ID("spi_clk", "fffa8000.spi", &spi1_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fff88000.i2c", &twi_clk),
- };
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index 66389c1..edef452 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -28,6 +28,7 @@
+ 		gpio2 = &pioC;
+ 		tcb0 = &tcb0;
+ 		tcb1 = &tcb1;
++		i2c0 = &i2c0;
+ 	};
+ 	cpus {
+ 		cpu at 0 {
+@@ -199,6 +200,15 @@
+ 				status = "disabled";
+ 			};
  
- static struct clk_lookup usart_clocks_lookups[] = {
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 858f032..84af1b5 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -256,6 +256,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("t0_clk", "fffd4000.timer", &tcb0_clk),
- 	CLKDEV_CON_DEV_ID("hclk", "700000.ohci", &uhphs_clk),
- 	CLKDEV_CON_DEV_ID("ehci_clk", "800000.ehci", &uhphs_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fff84000.i2c", &twi0_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fff88000.i2c", &twi1_clk),
- 	/* fake hclk clock */
- 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &uhphs_clk),
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
-diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
-index 0849466..732d3d3 100644
---- a/arch/arm/mach-at91/at91sam9n12.c
-+++ b/arch/arm/mach-at91/at91sam9n12.c
-@@ -169,6 +169,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("t0_clk", "f8008000.timer", &tcb_clk),
- 	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb_clk),
- 	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "f8010000.i2c", &twi0_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "f8014000.i2c", &twi1_clk),
- 	CLKDEV_CON_ID("pioA", &pioAB_clk),
- 	CLKDEV_CON_ID("pioB", &pioAB_clk),
- 	CLKDEV_CON_ID("pioC", &pioCD_clk),
-diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-index 4bad4a2..e503538 100644
---- a/arch/arm/mach-at91/at91sam9x5.c
-+++ b/arch/arm/mach-at91/at91sam9x5.c
-@@ -231,9 +231,9 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb0_clk),
- 	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma0_clk),
- 	CLKDEV_CON_DEV_ID("dma_clk", "ffffee00.dma-controller", &dma1_clk),
--	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.0", &twi0_clk),
--	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.1", &twi1_clk),
--	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.2", &twi2_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "f8010000.i2c", &twi0_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "f8014000.i2c", &twi1_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "f8018000.i2c", &twi2_clk),
- 	CLKDEV_CON_ID("pioA", &pioAB_clk),
- 	CLKDEV_CON_ID("pioB", &pioAB_clk),
- 	CLKDEV_CON_ID("pioC", &pioCD_clk),
++			i2c0: i2c at fffac000 {
++				compatible = "atmel,at91sam9260-i2c";
++				reg = <0xfffac000 0x100>;
++				interrupts = <11 4 6>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
++
+ 			adc0: adc at fffe0000 {
+ 				compatible = "atmel,at91sam9260-adc";
+ 				reg = <0xfffe0000 0x100>;
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index b460d6c..e7942c7 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -24,6 +24,7 @@
+ 		gpio3 = &pioD;
+ 		gpio4 = &pioE;
+ 		tcb0 = &tcb0;
++		i2c0 = &i2c0;
+ 	};
+ 	cpus {
+ 		cpu at 0 {
+@@ -180,6 +181,15 @@
+ 				interrupts = <24 4 2>;
+ 				status = "disabled";
+ 			};
++
++			i2c0: i2c at fff88000 {
++				compatible = "atmel,at91sam9263-i2c";
++				reg = <0xfff88000 0x100>;
++				interrupts = <13 4 6>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+index 2a1d1ca..75ce6e7 100644
+--- a/arch/arm/boot/dts/at91sam9g20.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+@@ -18,6 +18,10 @@
+ 
+ 	ahb {
+ 		apb {
++			i2c0: i2c at fffac000 {
++				compatible = "atmel,at91sam9g20-i2c";
++			};
++
+ 			adc0: adc at fffe0000 {
+ 				atmel,adc-startup-time = <40>;
+ 			};
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index bafa880..ae4bb6d 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -29,6 +29,8 @@
+ 		gpio4 = &pioE;
+ 		tcb0 = &tcb0;
+ 		tcb1 = &tcb1;
++		i2c0 = &i2c0;
++		i2c1 = &i2c1;
+ 	};
+ 	cpus {
+ 		cpu at 0 {
+@@ -201,6 +203,24 @@
+ 				status = "disabled";
+ 			};
+ 
++			i2c0: i2c at fff84000 {
++				compatible = "atmel,at91sam9g10-i2c";
++				reg = <0xfff84000 0x100>;
++				interrupts = <12 4 6>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
++
++			i2c1: i2c at fff88000 {
++				compatible = "atmel,at91sam9g10-i2c";
++				reg = <0xfff88000 0x100>;
++				interrupts = <13 4 6>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
++
+ 			adc0: adc at fffb0000 {
+ 				compatible = "atmel,at91sam9260-adc";
+ 				reg = <0xfffb0000 0x100>;
+diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+index bfac0df..42e9fba 100644
+--- a/arch/arm/boot/dts/at91sam9n12.dtsi
++++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+@@ -26,6 +26,8 @@
+ 		gpio3 = &pioD;
+ 		tcb0 = &tcb0;
+ 		tcb1 = &tcb1;
++		i2c0 = &i2c0;
++		i2c1 = &i2c1;
+ 	};
+ 	cpus {
+ 		cpu at 0 {
+@@ -178,6 +180,24 @@
+ 				atmel,use-dma-tx;
+ 				status = "disabled";
+ 			};
++
++			i2c0: i2c at f8010000 {
++				compatible = "atmel,at91sam9x5-i2c";
++				reg = <0xf8010000 0x100>;
++				interrupts = <9 4 6>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
++
++			i2c1: i2c at f8014000 {
++				compatible = "atmel,at91sam9x5-i2c";
++				reg = <0xf8014000 0x100>;
++				interrupts = <10 4 6>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 4a18c39..e05afbc 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -27,6 +27,9 @@
+ 		gpio3 = &pioD;
+ 		tcb0 = &tcb0;
+ 		tcb1 = &tcb1;
++		i2c0 = &i2c0;
++		i2c1 = &i2c1;
++		i2c2 = &i2c2;
+ 	};
+ 	cpus {
+ 		cpu at 0 {
+@@ -192,6 +195,33 @@
+ 				status = "disabled";
+ 			};
+ 
++			i2c0: i2c at f8010000 {
++				compatible = "atmel,at91sam9x5-i2c";
++				reg = <0xf8010000 0x100>;
++				interrupts = <9 4 6>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
++
++			i2c1: i2c at f8014000 {
++				compatible = "atmel,at91sam9x5-i2c";
++				reg = <0xf8014000 0x100>;
++				interrupts = <10 4 6>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
++
++			i2c2: i2c at f8018000 {
++				compatible = "atmel,at91sam9x5-i2c";
++				reg = <0xf8018000 0x100>;
++				interrupts = <11 4 6>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
++
+ 			adc0: adc at f804c000 {
+ 				compatible = "atmel,at91sam9260-adc";
+ 				reg = <0xf804c000 0x100>;
 -- 
 1.7.11.3
