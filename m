@@ -1,20 +1,19 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Sep 2012 13:17:55 +0200
-Subject: [PATCH v2 1/2] ARM: dts: Add pinctrl node entries for Samsung
- Exynos4210 SoC
-In-Reply-To: <1345721098-32459-2-git-send-email-thomas.abraham@linaro.org>
+Date: Mon, 3 Sep 2012 13:18:24 +0200
+Subject: [PATCH v2 2/2] ARM: EXYNOS: Enable pinctrl driver support for
+ Exynos4 device tree enabled platform
+In-Reply-To: <1345721098-32459-3-git-send-email-thomas.abraham@linaro.org>
 References: <1345721098-32459-1-git-send-email-thomas.abraham@linaro.org>
- <1345721098-32459-2-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <CACRpkdY0ncdy7Yza+-qXkKXeGxQm+m_mM0dXh3b1d6YkbuO1Lg@mail.gmail.com>
+ <1345721098-32459-3-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CACRpkdZX+E7Nj6QniK_ogcf_GL6uK5+_b2HPBG=3sb00JTZvkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Aug 23, 2012 at 1:24 PM, Thomas Abraham
 <thomas.abraham@linaro.org> wrote:
 
-> Add pinctrl driver nodes for the three instances of pin controllers
-> in Samsung Exynos4210 SoC and add the pin group nodes available in the
-> each of those three instances.
+> This enables support for Samsung and Exynos4 pinctrl driver for device
+> tree enabled Exynos4 platforms.
 >
 > Cc: Kukjin Kim <kgene.kim@samsung.com>
 > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
