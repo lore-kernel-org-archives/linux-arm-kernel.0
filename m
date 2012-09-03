@@ -1,9 +1,9 @@
 From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Mon, 3 Sep 2012 12:18:45 +0200
-Subject: [PATCH v2 5/8] i2c: at91: add dt support to i2c-at91
+Date: Mon, 3 Sep 2012 12:19:04 +0200
+Subject: [PATCH v2 6/8] ARM: at91: add clocks for I2C DT entries
 In-Reply-To: <1346667367-7969-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1346667367-7969-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1346667525-8020-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1346667544-8060-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,141 +13,79 @@ Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 Acked-by: Nikolaus Voss <n.voss@weinmann.de>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- .../devicetree/bindings/i2c/atmel-i2c.txt          | 30 +++++++++++++
- drivers/i2c/busses/i2c-at91.c                      | 49 ++++++++++++++++++++++
- 2 files changed, 79 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/i2c/atmel-i2c.txt
+ arch/arm/mach-at91/at91sam9260.c | 1 +
+ arch/arm/mach-at91/at91sam9263.c | 1 +
+ arch/arm/mach-at91/at91sam9g45.c | 2 ++
+ arch/arm/mach-at91/at91sam9n12.c | 2 ++
+ arch/arm/mach-at91/at91sam9x5.c  | 6 +++---
+ 5 files changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/i2c/atmel-i2c.txt b/Documentation/devicetree/bindings/i2c/atmel-i2c.txt
-new file mode 100644
-index 0000000..b689a0d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/atmel-i2c.txt
-@@ -0,0 +1,30 @@
-+I2C for Atmel platforms
-+
-+Required properties :
-+- compatible : Must be "atmel,at91rm9200-i2c", "atmel,at91sam9261-i2c",
-+     "atmel,at91sam9260-i2c", "atmel,at91sam9g20-i2c", "atmel,at91sam9g10-i2c"
-+     or "atmel,at91sam9x5-i2c"
-+- reg: physical base address of the controller and length of memory mapped
-+     region.
-+- interrupts: interrupt number to the cpu.
-+- #address-cells = <1>;
-+- #size-cells = <0>;
-+
-+Optional properties:
-+- Child nodes conforming to i2c bus binding
-+
-+Examples :
-+
-+i2c0: i2c at fff84000 {
-+	compatible = "atmel,at91sam9g20-i2c";
-+	reg = <0xfff84000 0x100>;
-+	interrupts = <12 4 6>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	24c512 at 50 {
-+		compatible = "24c512";
-+		reg = <0x50>;
-+		pagesize = <128>;
-+	}
-+}
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index 78bcad0..aa59a25 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -24,6 +24,9 @@
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_i2c.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- 
-@@ -347,6 +350,12 @@ static struct at91_twi_pdata at91sam9g10_config = {
- 	.has_unre_flag = false,
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index 5bd19a4..ad29f93 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -221,6 +221,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("usart", "fffd0000.serial", &usart3_clk),
+ 	CLKDEV_CON_DEV_ID("usart", "fffd4000.serial", &usart4_clk),
+ 	CLKDEV_CON_DEV_ID("usart", "fffd8000.serial", &usart5_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffac000.i2c", &twi_clk),
+ 	/* more tc lookup table for DT entries */
+ 	CLKDEV_CON_DEV_ID("t0_clk", "fffa0000.timer", &tc0_clk),
+ 	CLKDEV_CON_DEV_ID("t1_clk", "fffa0000.timer", &tc1_clk),
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index e6b5956..200d5a7b 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -211,6 +211,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("hclk", "a00000.ohci", &ohci_clk),
+ 	CLKDEV_CON_DEV_ID("spi_clk", "fffa4000.spi", &spi0_clk),
+ 	CLKDEV_CON_DEV_ID("spi_clk", "fffa8000.spi", &spi1_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fff88000.i2c", &twi_clk),
  };
  
-+static struct at91_twi_pdata at91sam9x5_config = {
-+	.clk_max_div = 7,
-+	.clk_offset = 4,
-+	.has_unre_flag = false,
-+};
-+
- static const struct platform_device_id at91_twi_devtypes[] = {
- 	{
- 		.name = "i2c-at91rm9200",
-@@ -368,6 +377,42 @@ static const struct platform_device_id at91_twi_devtypes[] = {
- 	}
- };
- 
-+#if defined(CONFIG_OF)
-+static const struct of_device_id atmel_twi_dt_ids[] = {
-+	{
-+		.compatible = "atmel,at91sam9260-i2c",
-+		.data = &at91sam9260_config,
-+	} , {
-+		.compatible = "atmel,at91sam9g20-i2c",
-+		.data = &at91sam9g20_config,
-+	} , {
-+		.compatible = "atmel,at91sam9g10-i2c",
-+		.data = &at91sam9g10_config,
-+	}, {
-+		.compatible = "atmel,at91sam9x5-i2c",
-+		.data = &at91sam9x5_config,
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(of, atmel_twi_dt_ids);
-+#else
-+#define atmel_twi_dt_ids NULL
-+#endif
-+
-+static struct at91_twi_pdata * __devinit at91_twi_get_driver_data(
-+					struct platform_device *pdev)
-+{
-+	if (pdev->dev.of_node) {
-+		const struct of_device_id *match;
-+		match = of_match_node(atmel_twi_dt_ids, pdev->dev.of_node);
-+		if (!match)
-+			return NULL;
-+		return match->data;
-+	}
-+	return (struct at91_twi_pdata *) platform_get_device_id(pdev)->driver_data;
-+}
-+
- static int __devinit at91_twi_probe(struct platform_device *pdev)
- {
- 	struct at91_twi_dev *dev;
-@@ -423,6 +468,7 @@ static int __devinit at91_twi_probe(struct platform_device *pdev)
- 	dev->adapter.dev.parent = dev->dev;
- 	dev->adapter.nr = pdev->id;
- 	dev->adapter.timeout = AT91_I2C_TIMEOUT;
-+	dev->adapter.dev.of_node = pdev->dev.of_node;
- 
- 	rc = i2c_add_numbered_adapter(&dev->adapter);
- 	if (rc) {
-@@ -432,6 +478,8 @@ static int __devinit at91_twi_probe(struct platform_device *pdev)
- 		return rc;
- 	}
- 
-+	of_i2c_register_devices(&dev->adapter);
-+
- 	dev_info(dev->dev, "AT91 i2c bus driver.\n");
- 	return 0;
- }
-@@ -482,6 +530,7 @@ static struct platform_driver at91_twi_driver = {
- 	.driver		= {
- 		.name	= "at91_i2c",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = atmel_twi_dt_ids,
- 		.pm	= at91_twi_pm_ops,
- 	},
- };
+ static struct clk_lookup usart_clocks_lookups[] = {
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 858f032..84af1b5 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -256,6 +256,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("t0_clk", "fffd4000.timer", &tcb0_clk),
+ 	CLKDEV_CON_DEV_ID("hclk", "700000.ohci", &uhphs_clk),
+ 	CLKDEV_CON_DEV_ID("ehci_clk", "800000.ehci", &uhphs_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fff84000.i2c", &twi0_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fff88000.i2c", &twi1_clk),
+ 	/* fake hclk clock */
+ 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &uhphs_clk),
+ 	CLKDEV_CON_ID("pioA", &pioA_clk),
+diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
+index 0849466..732d3d3 100644
+--- a/arch/arm/mach-at91/at91sam9n12.c
++++ b/arch/arm/mach-at91/at91sam9n12.c
+@@ -169,6 +169,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("t0_clk", "f8008000.timer", &tcb_clk),
+ 	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb_clk),
+ 	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma_clk),
++	CLKDEV_CON_DEV_ID(NULL, "f8010000.i2c", &twi0_clk),
++	CLKDEV_CON_DEV_ID(NULL, "f8014000.i2c", &twi1_clk),
+ 	CLKDEV_CON_ID("pioA", &pioAB_clk),
+ 	CLKDEV_CON_ID("pioB", &pioAB_clk),
+ 	CLKDEV_CON_ID("pioC", &pioCD_clk),
+diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+index 4bad4a2..e503538 100644
+--- a/arch/arm/mach-at91/at91sam9x5.c
++++ b/arch/arm/mach-at91/at91sam9x5.c
+@@ -231,9 +231,9 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb0_clk),
+ 	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma0_clk),
+ 	CLKDEV_CON_DEV_ID("dma_clk", "ffffee00.dma-controller", &dma1_clk),
+-	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.0", &twi0_clk),
+-	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.1", &twi1_clk),
+-	CLKDEV_CON_DEV_ID(NULL, "at91_i2c.2", &twi2_clk),
++	CLKDEV_CON_DEV_ID(NULL, "f8010000.i2c", &twi0_clk),
++	CLKDEV_CON_DEV_ID(NULL, "f8014000.i2c", &twi1_clk),
++	CLKDEV_CON_DEV_ID(NULL, "f8018000.i2c", &twi2_clk),
+ 	CLKDEV_CON_ID("pioA", &pioAB_clk),
+ 	CLKDEV_CON_ID("pioB", &pioAB_clk),
+ 	CLKDEV_CON_ID("pioC", &pioCD_clk),
 -- 
 1.7.11.3
