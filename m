@@ -1,57 +1,34 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Mon, 3 Sep 2012 17:22:16 +0530
-Subject: [PATCH 1/4] can: c_can: Adopt pinctrl support
-In-Reply-To: <1346673139-14540-1-git-send-email-anilkumar@ti.com>
-References: <1346673139-14540-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1346673139-14540-2-git-send-email-anilkumar@ti.com>
+Date: Mon, 3 Sep 2012 17:22:15 +0530
+Subject: [PATCH 0/4] can: c_can: Add suspend/resume and pinctrl support
+Message-ID: <1346673139-14540-1-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adopt pinctrl support to c_can driver based on c_can device
-pointer, pinctrl driver configure SoC pins to d_can mode
-according to definitions provided in .dts file.
+Adds suspend/resume functionality of d_can driver along with d_can
+raminit support which is required to initialize RAM while data
+transmission.
 
-In device specific device tree file 'pinctrl-names = "default";'
-and 'pinctrl-0 = <&d_can1_pins>;' needs to add to configure pins
-from c_can driver. d_can1_pins node contains the pinmux/config
-details of d_can L/H pins.
+This patch series also adds pinctrl support to c_can driver. These
+patches were tested on AM335x-EVM.
 
-Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
----
- drivers/net/can/c_can/c_can_platform.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+This patch-series is based ontop of runtimePM patch submitted
+earlier - https://patchwork.kernel.org/patch/1348081/
 
-diff --git a/drivers/net/can/c_can/c_can_platform.c b/drivers/net/can/c_can/c_can_platform.c
-index 90801c4..c351975 100644
---- a/drivers/net/can/c_can/c_can_platform.c
-+++ b/drivers/net/can/c_can/c_can_platform.c
-@@ -33,6 +33,7 @@
- #include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/pm_runtime.h>
-+#include <linux/pinctrl/consumer.h>
- 
- #include <linux/can/dev.h>
- 
-@@ -98,6 +99,7 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
- 	struct c_can_priv *priv;
- 	const struct of_device_id *match;
- 	const struct platform_device_id *id;
-+	struct pinctrl *pinctrl;
- 	struct resource *mem;
- 	int irq;
- 	struct clk *clk;
-@@ -114,6 +116,11 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
- 		id = platform_get_device_id(pdev);
- 	}
- 
-+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+	if (IS_ERR(pinctrl))
-+		dev_warn(&pdev->dev,
-+			"failed to configure pins from driver\n");
-+
- 	/* get the appropriate clk */
- 	clk = clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(clk)) {
+AnilKumar Ch (4):
+  can: c_can: Adopt pinctrl support
+  can: c_can: Add d_can raminit support
+  ARM: AM33XX: board-generic: Add of_dev_auxdata to pass d_can raminit
+  can: c_can: Add d_can suspend resume support
+
+ arch/arm/mach-omap2/board-generic.c    |   40 +++++++++++++-
+ arch/arm/mach-omap2/control.h          |    4 ++
+ drivers/net/can/c_can/c_can.c          |   91 ++++++++++++++++++++++++++++++++
+ drivers/net/can/c_can/c_can.h          |    7 +++
+ drivers/net/can/c_can/c_can_platform.c |   87 ++++++++++++++++++++++++++++--
+ include/linux/can/platform/c_can.h     |   36 +++++++++++++
+ 6 files changed, 261 insertions(+), 4 deletions(-)
+ create mode 100644 include/linux/can/platform/c_can.h
+
 -- 
 1.7.9.5
