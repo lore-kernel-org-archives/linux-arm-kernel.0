@@ -1,256 +1,145 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 3 Sep 2012 21:00:54 +0300
-Subject: [PATCH v2] ARM: S3C24XX: Add WIZnet W5300E01-ARM board support
-In-Reply-To: <1346693799.3485.2.camel@taehun-desktop>
-References: <1346653236-19728-1-git-send-email-kth3321@gmail.com>
- <1346693799.3485.2.camel@taehun-desktop>
-Message-ID: <CA+E=qVchRQb3fX8QTn0otF6Hydqcgjuq6m0g9D0j12=efW4e9A@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon,  3 Sep 2012 20:29:34 +0200
+Subject: [PATCH] Crypto: CESA: Add support for DT based instantiation.
+Message-ID: <1346696974-23443-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 3, 2012 at 8:36 PM, Taehun Kim <kth3321@gmail.com> wrote:
-> This patch adds WIZnet W5300E01 board changed to the new gpio functions.
-> Please review this patch and apply it if do not have any problems.
->
-> Signed-off-by: Taehun Kim <kth3321@gmail.com>
-> ---
->  arch/arm/mach-s3c24xx/Kconfig         |    5 +
->  arch/arm/mach-s3c24xx/Makefile        |    1 +
->  arch/arm/mach-s3c24xx/mach-w5300e01.c |  186
-> +++++++++++++++++++++++++++++++++
->  3 files changed, 192 insertions(+)
->  create mode 100644 arch/arm/mach-s3c24xx/mach-w5300e01.c
->
-> diff --git a/arch/arm/mach-s3c24xx/Kconfig
-> b/arch/arm/mach-s3c24xx/Kconfig
-> index d56b0f7..94b60ca 100644
-> --- a/arch/arm/mach-s3c24xx/Kconfig
-> +++ b/arch/arm/mach-s3c24xx/Kconfig
-> @@ -248,6 +248,11 @@ config MACH_VR1000
->         help
->           Say Y here if you are using the Thorcom VR1000 board.
->
-> +config MACH_W5300E01
-> +       bool "WIZnet W5300E01-ARM Board"
-> +       help
-> +         Say Y here if you are using the Wiznet W5300E01-ARM board.
-> +
->  endif  # CPU_S3C2410
->
->  config S3C2412_PM_SLEEP
-> diff --git a/arch/arm/mach-s3c24xx/Makefile
-> b/arch/arm/mach-s3c24xx/Makefile
-> index 0ab6ab1..fc1a89e 100644
-> --- a/arch/arm/mach-s3c24xx/Makefile
-> +++ b/arch/arm/mach-s3c24xx/Makefile
-> @@ -61,6 +61,7 @@ obj-$(CONFIG_MACH_QT2410)             += mach-qt2410.o
->  obj-$(CONFIG_ARCH_SMDK2410)            += mach-smdk2410.o
->  obj-$(CONFIG_MACH_TCT_HAMMER)          += mach-tct_hammer.o
->  obj-$(CONFIG_MACH_VR1000)              += mach-vr1000.o
-> +obj-$(CONFIG_MACH_W5300E01)            += mach-w5300e01.o
->
->  obj-$(CONFIG_MACH_JIVE)                        += mach-jive.o
->  obj-$(CONFIG_MACH_SMDK2413)            += mach-smdk2413.o
-> diff --git a/arch/arm/mach-s3c24xx/mach-w5300e01.c
-> b/arch/arm/mach-s3c24xx/mach-w5300e01.c
-> new file mode 100644
-> index 0000000..7daf82e
-> --- /dev/null
-> +++ b/arch/arm/mach-s3c24xx/mach-w5300e01.c
-> @@ -0,0 +1,186 @@
-> +/* linux/arch/arm/mach-s3c24xx/mach-w5300e01.c
-> + *
-> + * Copyright (c) 2012 Taehun Kim <kth3321@gmail.com>
-> + *
-> + * For product information, visit http://www.wiznet.co.kr/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * @History:
-> + * derived from linux/arch/arm/mach-s3c24xx/mach-bast.c, written by
-> + * Ben Dooks <ben@simtec.co.uk>
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/types.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/list.h>
-> +#include <linux/timer.h>
-> +#include <linux/init.h>
-> +#include <linux/serial_core.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/gpio.h>
-> +#include <linux/io.h>
-> +#include <linux/mtd/mtd.h>
-> +#include <linux/mtd/nand.h>
-> +#include <linux/mtd/map.h>
-> +#include <linux/mtd/partitions.h>
-> +
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/map.h>
-> +#include <asm/mach/irq.h>
-> +#include <asm/mach-types.h>
-> +
-> +#include <mach/regs-gpio.h>
-> +#include <plat/gpio-cfg.h>
-> +#include <plat/cpu.h>
-> +#include <plat/devs.h>
-> +#include <plat/regs-serial.h>
-> +#include <plat/nand.h>
-> +#include <plat/pm.h>
-> +
-> +static struct map_desc w5300e01_iodesc[] __initdata = {
-> +       /* Character LCD register map. */
-> +       { 0xf8000000, __phys_to_pfn(S3C2410_CS3), SZ_1M, MT_DEVICE }
-> +};
-> +
-> +#define UCON S3C2410_UCON_DEFAULT
-> +#define ULCON (S3C2410_LCON_CS8 | S3C2410_LCON_PNONE |
-> S3C2410_LCON_STOPB)
-> +#define UFCON (S3C2410_UFCON_RXTRIG8 | S3C2410_UFCON_FIFOMODE)
-> +
-> +static struct s3c2410_uartcfg w5300e01_uartcfgs[] __initdata = {
-> +       [0] = {
-> +               .hwport = 0,
-> +               .flags  = 0,
-> +               .ucon   = UCON,
-> +               .ulcon  = ULCON,
-> +               .ufcon  = UFCON,
-> +       },
-> +       [1] = {
-> +               .hwport = 1,
-> +               .flags  = 0,
-> +               .ucon   = UCON,
-> +               .ulcon  = ULCON,
-> +               .ufcon  = UFCON,
-> +       },
-> +       [2] = {
-> +               .hwport = 2,
-> +               .flags  = 0,
-> +               .ucon   = UCON,
-> +               .ulcon  = ULCON,
-> +               .ufcon  = UFCON,
-> +       }
-> +};
-> +
-> +static struct mtd_partition w5300e01_mtd_partitions[] = {
-> +       [0] = {
-> +               .name           = "Bootloader",
-> +               .size           = 0x20000,
-> +               .offset         = 0,
-> +               .mask_flags     = MTD_WRITEABLE,
-> +       },
-> +       [1] = {
-> +               .name           = "Boot Param",
-> +               .size           = 0x20000,
-> +               .offset         = MTDPART_OFS_APPEND,
-> +       },
-> +       [2] = {
-> +               .name           = "Kernel",
-> +               .size           = 0x3C0000,
-> +               .offset         = MTDPART_OFS_APPEND,
-> +       },
-> +       [3] = {
-> +               .name           = "Ramdisk",
-> +               .size           = 0x1000000,
-> +               .offset         = MTDPART_OFS_APPEND,
-> +       },
-> +       [4] = {
-> +               .name           = "JFFS2 FileSystem",
-> +               .size           = MTDPART_SIZ_FULL,
-> +               .offset         = MTDPART_OFS_APPEND,
-> +       },
-> +};
-> +
-> +static struct resource w5300_resources[] = {
-> +       [0] = {
-> +               .start  = S3C2410_CS2,
-> +               .end    = S3C2410_CS2 + SZ_1M,
-> +               .flags  = IORESOURCE_MEM,
-> +       },
-> +       [1] = {
-> +               .start  = IRQ_EINT0,
-> +               .end    = IRQ_EINT0,
-> +               .flags  = IORESOURCE_IRQ,
-> +       },
-> +};
-> +
-> +static struct platform_device w5300_device = {
-> +       .name           = "w5300",
-> +       .num_resources  = ARRAY_SIZE(w5300_resources),
-> +       .resource       = w5300_resources,
-> +};
-> +
-> +static struct s3c2410_nand_set w5300e01_nand_sets[] = {
-> +       [0] = {
-> +               .name           = "W5300E01",
-> +               .nr_chips       = 1,
-> +               .nr_partitions  = ARRAY_SIZE(w5300e01_mtd_partitions),
-> +               .partitions     = w5300e01_mtd_partitions,
-> +       },
-> +};
-> +
-> +static struct s3c2410_platform_nand w5300e01_nand_info = {
-> +       .tacls          = 20,
-> +       .twrph0         = 60,
-> +       .twrph1         = 30,
-> +       .nr_sets        = ARRAY_SIZE(w5300e01_nand_sets),
-> +       .sets           = w5300e01_nand_sets,
-> +};
-> +
-> +static struct platform_device *w5300e01_devices[] __initdata = {
-> +       &s3c_device_nand,
-> +       &s3c_device_usbgadget,
-> +       &s3c_device_wdt,
-> +       &s3c_device_i2c0,
-> +       &s3c_device_iis,
-> +       &w5300_device,
-> +};
-> +
-> +static void __init w5300e01_map_io(void)
-> +{
-> +       s3c24xx_init_io(w5300e01_iodesc, ARRAY_SIZE(w5300e01_iodesc));
-> +       s3c24xx_init_clocks(0);
-> +       s3c24xx_init_uarts(w5300e01_uartcfgs, ARRAY_SIZE(w5300e01_uartcfgs));
-> +}
-> +
-> +static void __init w5300e01_init(void)
-> +{
-> +       s3c_nand_set_platdata(&w5300e01_nand_info);
-> +       platform_add_devices(w5300e01_devices, ARRAY_SIZE(w5300e01_devices));
-> +
-> +       /* W5300 interrupt pin. */
-> +       s3c_gpio_cfgpin(S3C2410_GPF(0), S3C2410_GPIO_IRQ);
-> +
-> +       s3c_gpio_cfgpin(S3C2410_GPF(4), S3C2410_GPIO_OUTPUT);
-> +       s3c_gpio_cfgpin(S3C2410_GPF(5), S3C2410_GPIO_OUTPUT);
-> +       s3c_gpio_cfgpin(S3C2410_GPF(6), S3C2410_GPIO_OUTPUT);
-> +       s3c_gpio_cfgpin(S3C2410_GPF(7), S3C2410_GPIO_OUTPUT);
-> +
-> +       gpio_set_value(S3C2410_GPF(0), 1);
-> +       gpio_set_value(S3C2410_GPF(4), 1);
-> +       gpio_set_value(S3C2410_GPF(5), 1);
-> +       gpio_set_value(S3C2410_GPF(6), 1);
-> +       gpio_set_value(S3C2410_GPF(7), 1);
+Based on work by Michael Waller and Jason Cooper.
 
-You need to call gpio_request() (or gpio_request_{one,array}) before
-using pin. Please look at
-Documentation/gpio.txt
+Added support for getting the interrupt number and address of SRAM
+from DT.
 
-> +       s3c_pm_init();
-> +}
-> +
-> +MACHINE_START(W5300E01, "WIZnet W5300E01-ARM")
-> +       .atag_offset    = S3C2410_SDRAM_PA + 0x100,
-> +       .map_io         = w5300e01_map_io,
-> +       .init_irq       = s3c24xx_init_irq,
-> +       .init_machine   = w5300e01_init,
-> +       .timer          = &s3c24xx_timer,
-> +MACHINE_END
-> --
-> 1.7.9.5
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ .../devicetree/bindings/crypto/mv_cesa.txt         |   20 ++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood.dtsi                    |   12 +++++++++++-
+ arch/arm/mach-kirkwood/board-dt.c                  |    2 +-
+ drivers/crypto/mv_cesa.c                           |   17 +++++++++++++++--
+ 4 files changed, 47 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/crypto/mv_cesa.txt
 
-Regards
-Vasily
+diff --git a/Documentation/devicetree/bindings/crypto/mv_cesa.txt b/Documentation/devicetree/bindings/crypto/mv_cesa.txt
+new file mode 100644
+index 0000000..47229b1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/crypto/mv_cesa.txt
+@@ -0,0 +1,20 @@
++Marvell Cryptographic Engines And Security Accelerator
++
++Required properties:
++- compatible : should be "marvell,orion-crypto"
++- reg : base physical address of the engine and length of memory mapped
++        region, followed by base physical address of sram and its memory
++        length
++- reg-names : "regs" , "sram";
++- interrupts : interrupt number
++
++Examples:
++
++	crypto at 30000 {
++		compatible = "marvell,orion-crypto";
++		reg = <0x30000 0x10000>,
++		      <0x4000000 0x800>;
++		reg-names = "regs" , "sram";
++		interrupts = <22>;
++		status = "okay";
++	};
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index b36bb85..fbaf728 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -14,7 +14,8 @@
+ 
+ 	ocp at f1000000 {
+ 		compatible = "simple-bus";
+-		ranges = <0 0xf1000000 0x4000000>;
++		ranges = <0x00000000 0xf1000000 0x4000000
++		          0xf5000000 0xf5000000 0x0000400>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 
+@@ -113,5 +114,14 @@
+ 			clock-frequency = <100000>;
+ 			status = "disabled";
+ 		};
++
++		crypto at 30000 {
++			compatible = "marvell,orion-crypto";
++			reg = <0x30000 0x10000>,
++			      <0xf5000000 0x800>;
++			reg-names = "regs", "sram";
++			interrupts = <22>;
++			status = "okay";
++		};
+ 	};
+ };
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 16b767e..007661c 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -34,6 +34,7 @@ struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("marvell,orion-sata", 0xf1080000, "sata_mv.0", NULL),
+ 	OF_DEV_AUXDATA("marvell,orion-nand", 0xf4000000, "orion_nand", NULL),
+ 	OF_DEV_AUXDATA("marvell,orion-ehci", 0xf1050000, "orion-ehci.0", NULL),
++	OF_DEV_AUXDATA("marvell,orion-crypto", 0xf1030000, "mv_crypto", NULL),
+ 	{},
+ };
+ 
+@@ -61,7 +62,6 @@ static void __init kirkwood_dt_init(void)
+ 	/* internal devices that every board has */
+ 	kirkwood_xor0_init();
+ 	kirkwood_xor1_init();
+-	kirkwood_crypto_init();
+ 
+ #ifdef CONFIG_KEXEC
+ 	kexec_reinit = kirkwood_enable_pcie;
+diff --git a/drivers/crypto/mv_cesa.c b/drivers/crypto/mv_cesa.c
+index 21c1a87..24ccae4 100644
+--- a/drivers/crypto/mv_cesa.c
++++ b/drivers/crypto/mv_cesa.c
+@@ -19,6 +19,9 @@
+ #include <linux/clk.h>
+ #include <crypto/internal/hash.h>
+ #include <crypto/sha.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/of_irq.h>
+ 
+ #include "mv_cesa.h"
+ 
+@@ -1062,7 +1065,10 @@ static int mv_probe(struct platform_device *pdev)
+ 		goto err_unmap_reg;
+ 	}
+ 
+-	irq = platform_get_irq(pdev, 0);
++	if (pdev->dev.of_node)
++		irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
++	else
++		irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0 || irq == NO_IRQ) {
+ 		ret = irq;
+ 		goto err_unmap_sram;
+@@ -1170,12 +1176,19 @@ static int mv_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id mv_cesa_of_match_table[] = {
++	{ .compatible = "marvell,orion-crypto", },
++	{}
++};
++MODULE_DEVICE_TABLE(of, mv_cesa_of_match_table);
++
+ static struct platform_driver marvell_crypto = {
+ 	.probe		= mv_probe,
+-	.remove		= mv_remove,
++	.remove		= __devexit_p(mv_remove),
+ 	.driver		= {
+ 		.owner	= THIS_MODULE,
+ 		.name	= "mv_crypto",
++		.of_match_table = of_match_ptr(mv_cesa_of_match_table),
+ 	},
+ };
+ MODULE_ALIAS("platform:mv_crypto");
+-- 
+1.7.10.4
