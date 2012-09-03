@@ -1,93 +1,91 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 3 Sep 2012 18:20:53 +0200
-Subject: [PATCH] ARM: dts: OMAP4: Cleanup and move GIC outside of the OCP node
-Message-ID: <5044D8E5.5010705@ti.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon,  3 Sep 2012 17:25:20 +0100
+Subject: [PATCH 00/11] Versatile Express infrastructure
+Message-ID: <1346689531-7212-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove a useless comment and move GIC controller outside
-of the OCP node since it does use the MPU internal bus and
-not the OCP.
-This will not change the functionality but will reflect the
-reality more accurately.
+Hi All,
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
----
+This series is a complete set of patches implementing platform
+control infrastructure, clocking etc. It is sent as a one off
+for completeness, but eventually ambakmi, hwmon and regulators
+patches will go through their subsystems.
 
-Hi Tony
+The clocking patches depend on Linus Walleij's "clk: convert
+ARM RealView to common clk" and should go through Mike
+Turquette's tree. I am a little bit worried about merging
+this, as it depends on the "config_bus" infrastructure which
+should go through arm-soc. Any ideas and suggestions more
+then welcome.
 
-This is a minor cleanup done since Santosh's series is introducing some more MPU devices that does not belong to the TI main OCP interconnect. It makes sense for consistency / accuracy to move GIC to the same location.
+Most of the random bits and pieces (reset controllers and alike)
+are located in drivers/misc/vexpress now, and I'm more than
+happy to move them if anyone has better idea.
 
-Regards,
-Benoit
+Regards
 
- arch/arm/boot/dts/omap4.dtsi |   40 ++++++++--------------------------------
- 1 files changed, 8 insertions(+), 32 deletions(-)
+Pawel
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 2b670ab..1853dc7 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -38,6 +38,14 @@
- 		};
- 	};
- 
-+	gic: interrupt-controller at 48241000 {
-+		compatible = "arm,cortex-a9-gic";
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		reg = <0x48241000 0x1000>,
-+		      <0x48240100 0x0100>;
-+	};
-+
- 	L2: l2-cache-controller at 48242000 {
- 		compatible = "arm,pl310-cache";
- 		reg = <0x48242000 0x1000>;
-@@ -76,30 +84,6 @@
- 	/*
- 	 * XXX: Use a flat representation of the OMAP4 interconnect.
- 	 * The real OMAP interconnect network is quite complex.
--	 *
--	 * MPU -+-- MPU_PRIVATE - GIC, L2
--	 *      |
--	 *      +----------------+----------+
--	 *      |                |          |
--	 *      +            +- EMIF - DDR  |
--	 *      |            |              |
--	 *      |            +     +--------+
--	 *      |            |     |
--	 *      |            +- L4_ABE - AESS, MCBSP, TIMERs...
--	 *      |            |
--	 *      +- L3_MAIN --+- L4_CORE - IPs...
--	 *                   |
--	 *                   +- L4_PER - IPs...
--	 *                   |
--	 *                   +- L4_CFG -+- L4_WKUP - IPs...
--	 *                   |          |
--	 *                   |          +- IPs...
--	 *                   +- IPU ----+
--	 *                   |          |
--	 *                   +- DSP ----+
--	 *                   |          |
--	 *                   +- DSS ----+
--	 *
- 	 * Since that will not bring real advantage to represent that in DT for
- 	 * the moment, just use a fake OCP bus entry to represent the whole bus
- 	 * hierarchy.
-@@ -111,14 +95,6 @@
- 		ranges;
- 		ti,hwmods = "l3_main_1", "l3_main_2", "l3_main_3";
- 
--		gic: interrupt-controller at 48241000 {
--			compatible = "arm,cortex-a9-gic";
--			interrupt-controller;
--			#interrupt-cells = <3>;
--			reg = <0x48241000 0x1000>,
--			      <0x48240100 0x0100>;
--		};
--
- 		gpio1: gpio at 4a310000 {
- 			compatible = "ti,omap4-gpio";
- 			ti,hwmods = "gpio1";
+
+Pawel Moll (11):
+  input: ambakmi: Add missing clk_[un]prepare() calls
+  misc: Versatile Express config bus infrastructure
+  misc: Versatile Express reset driver
+  misc: Versatile Express display muxer driver
+  clk: Versatile Express clock generators ("osc") driver
+  clk: Common clocks implementation for Versatile Express
+  regulators: Versatile Express regulator driver
+  hwmon: Versatile Express hwmon driver
+  misc: Versatile Express system registers driver
+  ARM: vexpress: Add config bus components and clocks to DTs
+  ARM: vexpress: Start using new Versatile Express infrastructure
+
+ Documentation/devicetree/bindings/arm/vexpress.txt |  173 +++++-
+ arch/arm/Kconfig                                   |    4 +-
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi            |  136 ++++-
+ arch/arm/boot/dts/vexpress-v2m.dtsi                |  136 ++++-
+ arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts        |  103 ++++
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |  169 ++++++
+ arch/arm/boot/dts/vexpress-v2p-ca5s.dts            |   71 +++
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts             |  121 ++++
+ arch/arm/include/asm/hardware/sp810.h              |    6 +-
+ arch/arm/mach-vexpress/ct-ca9x4.c                  |   37 +-
+ arch/arm/mach-vexpress/include/mach/motherboard.h  |   81 ---
+ arch/arm/mach-vexpress/platsmp.c                   |    3 +-
+ arch/arm/mach-vexpress/v2m.c                       |  321 +++--------
+ drivers/clk/Kconfig                                |    8 +-
+ drivers/clk/versatile/Makefile                     |    2 +
+ drivers/clk/versatile/clk-vexpress-osc.c           |  154 +++++
+ drivers/clk/versatile/clk-vexpress.c               |  174 ++++++
+ drivers/hwmon/Kconfig                              |    8 +
+ drivers/hwmon/Makefile                             |    1 +
+ drivers/hwmon/vexpress.c                           |  275 +++++++++
+ drivers/input/serio/ambakmi.c                      |    9 +-
+ drivers/misc/Kconfig                               |    1 +
+ drivers/misc/Makefile                              |    1 +
+ drivers/misc/vexpress/Kconfig                      |    5 +
+ drivers/misc/vexpress/Makefile                     |    4 +
+ drivers/misc/vexpress/config_bus.c                 |  596 ++++++++++++++++++++
+ drivers/misc/vexpress/display.c                    |  197 +++++++
+ drivers/misc/vexpress/reset.c                      |  110 ++++
+ drivers/misc/vexpress/sysreg.c                     |  423 ++++++++++++++
+ drivers/regulator/Kconfig                          |    7 +
+ drivers/regulator/Makefile                         |    1 +
+ drivers/regulator/vexpress.c                       |  144 +++++
+ include/linux/vexpress.h                           |  150 +++++
+ 33 files changed, 3257 insertions(+), 374 deletions(-)
+ create mode 100644 drivers/clk/versatile/clk-vexpress-osc.c
+ create mode 100644 drivers/clk/versatile/clk-vexpress.c
+ create mode 100644 drivers/hwmon/vexpress.c
+ create mode 100644 drivers/misc/vexpress/Kconfig
+ create mode 100644 drivers/misc/vexpress/Makefile
+ create mode 100644 drivers/misc/vexpress/config_bus.c
+ create mode 100644 drivers/misc/vexpress/display.c
+ create mode 100644 drivers/misc/vexpress/reset.c
+ create mode 100644 drivers/misc/vexpress/sysreg.c
+ create mode 100644 drivers/regulator/vexpress.c
+ create mode 100644 include/linux/vexpress.h
+
 -- 
-1.7.0.4
+1.7.9.5
