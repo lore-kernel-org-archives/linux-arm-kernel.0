@@ -1,52 +1,63 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 03 Sep 2012 17:22:52 +0200
-Subject: [PATCHv2 2/3] ARM: dts: mxs Add additionnal muxing options for
- SSP3
-In-Reply-To: <20120903145343.GI2362@S2101-09.ap.freescale.net>
-References: <1346666749-6094-1-git-send-email-maxime.ripard@free-electrons.com>
- <1346666749-6094-2-git-send-email-maxime.ripard@free-electrons.com>
- <20120903145343.GI2362@S2101-09.ap.freescale.net>
-Message-ID: <5044CB4C.7080302@free-electrons.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 03 Sep 2012 10:38:50 -0500
+Subject: [PATCH 02/10] gpio: pxa: add explicit includes for cpu_is_X macros
+In-Reply-To: <CAN1soZzDr4pi7zs188Rw-nQaA9ef-0VoVnwkMo=PCd0KPU22cg@mail.gmail.com>
+References: <1346279496-26286-1-git-send-email-robherring2@gmail.com>
+ <1346279496-26286-3-git-send-email-robherring2@gmail.com>
+ <CACRpkdasWv8toA1eBzpYo4QactNhkpzhuBk-D8kJbbM03WZN2Q@mail.gmail.com>
+ <CAN1soZzDr4pi7zs188Rw-nQaA9ef-0VoVnwkMo=PCd0KPU22cg@mail.gmail.com>
+Message-ID: <5044CF0A.7040208@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/09/2012 16:53, Shawn Guo a ?crit :
-> On Mon, Sep 03, 2012 at 12:05:48PM +0200, Maxime Ripard wrote:
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>  arch/arm/boot/dts/imx28.dtsi |   11 +++++++++++
->>  1 file changed, 11 insertions(+)
+On 09/02/2012 10:19 PM, Haojian Zhuang wrote:
+> On Fri, Aug 31, 2012 at 6:17 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Wed, Aug 29, 2012 at 3:31 PM, Rob Herring <robherring2@gmail.com> wrote:
 >>
->> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
->> index 8497a0e..6c51ff4 100644
->> --- a/arch/arm/boot/dts/imx28.dtsi
->> +++ b/arch/arm/boot/dts/imx28.dtsi
->> @@ -586,6 +586,17 @@
->>  					fsl,voltage = <1>;
->>  					fsl,pull-up = <1>;
->>  				};
->> +
->> +				spi3_pins_b: spi3 at 1 {
->> +					reg = <1>;
->> +					fsl,pinmux-ids = <
->> +						0x0181 /* MX28_PAD_GPMI_RDN__SSP3_SCK */
->> +						0x01c1 /* MX28_PAD_GPMI_RESETN__SSP3_CMD */
+>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> In preparation to remove implicit inclusion of mach/gpio.h, add the
+>>> necessary includes for cpu_is_X macros.
+>>
+>> The commit message talks about gpio.h, but...
+>>
+>>>  #include <mach/irqs.h>
+>>> +#include <mach/hardware.h>
+>>> +#ifdef CONFIG_ARCH_MMP
+>>> +#include <mach/cputype.h>
+>>> +#endif
+>>
+>> This seems completely unrelated, but correct in the sense that every driver
+>> should include its resources.
+>>
+>> But isn't the proper fix to move arch/arm/mach-pxa/include/mach/cputype.h to
+>> include/linux/*/pxa-cputype.h or something (note: no clue what "*" should be!),
+>> or even better, modify this one driver to take a flag from platform data and/or
+>> DT?
+>>
+>> Anyway, we need the PXA maintainers to look at this.
+>>
+>> Yours,
+>> Linus Walleij
 > 
-> The spi only needs two pins to work?
+> It's no problem to include cputype.h. I agree Linus's comments to use a same
+> name head file. For example, add cputype.h in arch-pxa. Use cputype.h to include
+> hardware.h.
 
-Oops. I only used MOSI, so I forgot to mux MISO.
-Sorry about that, this will be fixed in the new version.
+I think the right fix is really removing the use of cpu_is_X macros
+altogether.
 
-> Has spi3_pins_a been defined?  I haven't seen it.
+> My question is whether your patches are also based on Arnd's
+> multi-header branch.
+> I remember that some changes are done in his multiplatform branch. Should we
+> do any patches on his multiplatform branch?
 
-It's the same thing as the first patch. I had Marek's last patch in my
-tree that adds spi3_pins_a. I will change it in the next version.
+It is not based on it. We decided at the ARM mini-summit to not do the
+mach header rename and to deprecate including mach headers outside of
+arch/arm.
 
-Thanks,
-Maxime
+I'm thinking I will just make PXA and MMP select CONFIG_NEED_MACH_GPIO_H
+and drop this patch. If pxa and mmp want to be included in
+multi-platform images, then this will need to be fixed.
 
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Rob
