@@ -1,38 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Sep 2012 14:38:39 +0100
-Subject: [PATCH] ARM: ux500: Fix build error due to missing include of
- asm/pmu.h in cpu-db8500.c
-In-Reply-To: <CACRpkdYxYGa=C092rbTU5bo=YEu6wqiTUD7W4pLS_wNfmAe4Zw@mail.gmail.com>
-References: <1346588747.7909.2.camel@phoenix>
- <CACRpkdYxYGa=C092rbTU5bo=YEu6wqiTUD7W4pLS_wNfmAe4Zw@mail.gmail.com>
-Message-ID: <20120903133839.GC31542@mudshark.cambridge.arm.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon,  3 Sep 2012 15:54:48 +0200
+Subject: [PATCH 0/3] gpio-twl4030: add new device tree properties
+Message-ID: <1346680491-4211-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 03, 2012 at 11:47:51AM +0100, Linus Walleij wrote:
-> On Sun, Sep 2, 2012 at 2:25 PM, Axel Lin <axel.lin@gmail.com> wrote:
-> 
-> > Include asm/pmu.h to fix below build error:
-> >
-> >   CC      arch/arm/mach-ux500/cpu-db8500.o
-> > arch/arm/mach-ux500/cpu-db8500.c:118:8: error: variable 'db8500_pmu_platdata' has initializer but incomplete type
-> > arch/arm/mach-ux500/cpu-db8500.c:119:2: error: unknown field 'handle_irq' specified in initializer
-> > arch/arm/mach-ux500/cpu-db8500.c:119:2: warning: excess elements in struct initializer [enabled by default]
-> > arch/arm/mach-ux500/cpu-db8500.c:119:2: warning: (near initialization for 'db8500_pmu_platdata') [enabled by default]
-> > make[1]: *** [arch/arm/mach-ux500/cpu-db8500.o] Error 1
-> > make: *** [arch/arm/mach-ux500] Error 2
-> >
-> > Signed-off-by: Axel Lin <axel.lin@gmail.com>
-> 
-> That's on linux-next not on v3.6-rcN right?
-> 
-> I've applied it to my ux500 branch and will carry it unless Will Deacon
-> express an interest in it, PMU is his territory...
+A number of platform data are missing when using twl4030/gpio from a
+device tree. This patchset adds the missing properties, updates
+existing device trees and updates the documentation of bindings.
+It mainly enables LEDA and LEDB outputs, as well as pullups /
+pulldowns on GPIOs.
 
-I've already sent a pull for those patches, so please can you carry the
-fixup? u8500 is the only platform using the arm_pmu_platdata at the moment
-so it has to keep the include.
+The 1st patch changes the device driver.
+The 2nd patch updates the device trees for BeagleBoard and omap3-evm.
+The 3rd patch updates the documentation of bindings.
 
-Cheers,
+Tested:
+- Boot tested on Gumstix Overo for "ti,use-leds". Corresponding
+  patch is not provided, as the device tree is not yet merged.
+  The support can be found in the git tree [1], branch
+  omap3-devel-dt-overo.
+- Device trees for BeagleBoard and omap3-evm were compiled, but not
+  tested on hardware.
 
-Will
+Would someone be willing to test on BeagleBoard / omap3-evm?
+
+Regards,
+Florian
+
+[1] https://github.com/vaussard/linux.git (not safe for merge)
+
+
+Florian Vaussard (3):
+  gpio-twl4030: get platform data from device tree
+  gpio-twl4030: new dt properties for BeagleBoard and omap3-EVM
+  gpio-twl4030: updates the bindings for new dt properties
+
+ .../devicetree/bindings/gpio/gpio-twl4030.txt      |    6 ++
+ arch/arm/boot/dts/omap3-beagle.dts                 |   20 +++++
+ arch/arm/boot/dts/omap3-evm.dts                    |   13 +++
+ drivers/gpio/gpio-twl4030.c                        |   86 +++++++++++++------
+ 4 files changed, 98 insertions(+), 27 deletions(-)
+
+-- 
+1.7.5.4
