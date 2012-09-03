@@ -1,70 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 3 Sep 2012 13:58:11 +0100
-Subject: [PATCH v2 20/31] arm64: User access library function
-In-Reply-To: <201208151449.54834.arnd@arndb.de>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-21-git-send-email-catalin.marinas@arm.com>
- <201208151449.54834.arnd@arndb.de>
-Message-ID: <20120903125810.GB3313@mbp>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Mon, 3 Sep 2012 22:57:56 +1000
+Subject: [PATCH 4/4] ARM: ks8695: convert to generic time and clocksource
+In-Reply-To: <CACRpkdab72Z86i21TNohS0YO=Bav7eQgHwQyXa0tXQB=0hhgAg@mail.gmail.com>
+References: <1346264842-20411-1-git-send-email-linus.walleij@linaro.org>
+ <504057A8.7030302@snapgear.com>
+ <CACRpkdZ0Gw5H_yRcN2CmC+F8NtUcySTrLehuzZdWrbDwL4HHWw@mail.gmail.com>
+ <201209021849.54348.arnd@arndb.de>
+ <CACRpkdab72Z86i21TNohS0YO=Bav7eQgHwQyXa0tXQB=0hhgAg@mail.gmail.com>
+Message-ID: <5044A954.4000706@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2012 at 03:49:54PM +0100, Arnd Bergmann wrote:
-> On Tuesday 14 August 2012, Catalin Marinas wrote:
-> 
-> > +/*
-> > + * Single-value transfer routines.  They automatically use the right
-> > + * size if we just have the right pointer type.  Note that the functions
-> > + * which read from user space (*get_*) need to take care not to leak
-> > + * kernel data even if the calling code is buggy and fails to check
-> > + * the return value.  This means zeroing out the destination variable
-> > + * or buffer on error.  Normally this is done out of line by the
-> > + * fixup code, but there are a few places where it intrudes on the
-> > + * main code path.  When we only write to user space, there is no
-> > + * problem.
-> > + */
-> > +extern long __get_user_1(void *);
-> > +extern long __get_user_2(void *);
-> > +extern long __get_user_4(void *);
-> > +extern long __get_user_8(void *);
-> > +
-> > +#define __get_user_x(__r2,__p,__e,__s,__i...)				\
-> > +	   asm volatile(						\
-> > +		__asmeq("%0", "x0") __asmeq("%1", "x2")			\
-> > +		"bl	__get_user_" #__s				\
-> > +		: "=&r" (__e), "=r" (__r2)				\
-> > +		: "0" (__p)						\
-> > +		: __i, "cc")
-> > +
-> > +#define get_user(x,p)							\
-> > +	({								\
-> > +		register const typeof(*(p)) __user *__p asm("x0") = (p);\
-> > +		register unsigned long __r2 asm("x2");			\
-> > +		register long __e asm("x0");				\
-> > +		switch (sizeof(*(__p))) {				\
-> > +		case 1:							\
-> > +			__get_user_x(__r2, __p, __e, 1, "x30");		\
-> > +			break;						\
-> > +		case 2:							\
-> > +			__get_user_x(__r2, __p, __e, 2, "x3", "x30");	\
-> > +			break;						\
-> > +		case 4:							\
-> > +			__get_user_x(__r2, __p, __e, 4, "x30");		\
-> > +			break;						\
-> > +		case 8:							\
-> > +			__get_user_x(__r2, __p, __e, 8, "x30");		\
-> > +			break;						\
-> > +		default: __e = __get_user_bad(); break;			\
-> > +		}							\
-> > +		x = (typeof(*(p))) __r2;				\
-> > +		__e;							\
-> > +	})
-> 
-> It's fairly unusual to have out of line get_user/put_user functions.
-> What is the reason for this, other than copying from ARM?
+Hi Liunus,
 
-I changed these to inline asm. The only reason which I don't think
-matters much in this case is a few KB increase in Image size.
+On 09/03/2012 10:02 PM, Linus Walleij wrote:
+> On Sun, Sep 2, 2012 at 8:49 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Friday 31 August 2012, Linus Walleij wrote:
+>
+>>> (BTW I had not clue the 68K maintainer had a platform like
+>>> this, fun!)
+>>
+>> Note that this platform is one of those we talked about removing
+>> from the kernel for potentially being completely unused.
+>
+> This clock stuff was a lackmus test from my side. The idea
+> was that if noone tested the patches I would instead
+> propose a patch deleting the platform.
+>
+> Guess what: Greg jumps out like jack-in-the-box.
+
+That is annoying :-)
+
+
+> I suspect
+> some of these platforms may have more users than we
+> believe.
+
+I know the guys at www.opengear.com are still building hardware around
+the KS8695. And they update to modern kernels from time to time. So its
+not completely obsolete yet. I have some SnapGear boards based around it
+too, though they went out of production about 2 years ago.
+
+Regards
+Greg
+
 
 -- 
-Catalin
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close,                            FAX:         +61 7 3891 3630
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
