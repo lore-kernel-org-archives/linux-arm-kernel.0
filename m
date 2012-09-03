@@ -1,40 +1,51 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Mon,  3 Sep 2012 15:54:51 +0200
-Subject: [PATCH 3/3] gpio-twl4030: updates the bindings for new dt properties
-In-Reply-To: <1346680491-4211-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1346680491-4211-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1346680491-4211-4-git-send-email-florian.vaussard@epfl.ch>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon,  3 Sep 2012 15:56:50 +0200
+Subject: [PATCH] ARM: dts: mxs: Enable USB1 Host on the CFA-10049 expansion
+ board
+Message-ID: <1346680611-18974-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the new properties to the documentation of bindings.
-
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- .../devicetree/bindings/gpio/gpio-twl4030.txt      |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx28-cfa10049.dts |   25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-twl4030.txt b/Documentation/devicetree/bindings/gpio/gpio-twl4030.txt
-index 16695d9..690a32e 100644
---- a/Documentation/devicetree/bindings/gpio/gpio-twl4030.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio-twl4030.txt
-@@ -11,6 +11,11 @@ Required properties:
- - interrupt-controller: Mark the device node as an interrupt controller
-   The first cell is the GPIO number.
-   The second cell is not used.
-+- ti,use-leds : Enables LEDA and LEDB outputs if set to "true"
-+- ti,debounce : if n-th bit is set, debounces GPIO-n
-+- ti,mmc-cd : if n-th bit is set, GPIO-n controls VMMC(n+1)
-+- ti,pullups : if n-th bit is set, set a pullup on GPIO-n
-+- ti,pulldowns : if n-th bit is set, set a pulldown on GPIO-n
- 
- Example:
- 
-@@ -20,4 +25,5 @@ twl_gpio: gpio {
-     gpio-controller;
-     #interrupt-cells = <2>;
-     interrupt-controller;
-+    ti,use-leds = "true";
+diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+index a0c7b83..7a5261b 100644
+--- a/arch/arm/boot/dts/imx28-cfa10049.dts
++++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+@@ -31,6 +31,31 @@
+ 				pinctrl-0 = <&i2c1_pins_a>;
+ 				status = "okay";
+ 			};
++
++			usbphy1: usbphy at 8007e000 {
++				status = "okay";
++			};
++		};
++	};
++
++	ahb at 80080000 {
++		usb1: usb at 80090000 {
++			vbus-supply = <&reg_usb1_vbus>;
++			pinctrl-0 = <&usb1_pins_a>;
++			pinctrl-names = "default";
++			status = "okay";
++		};
++	};
++
++	regulators {
++		compatible = "simple-bus";
++
++		reg_usb1_vbus: usb1_vbus {
++			compatible = "regulator-fixed";
++			regulator-name = "usb1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio0 7 1>;
+ 		};
+ 	};
  };
 -- 
-1.7.5.4
+1.7.9.5
