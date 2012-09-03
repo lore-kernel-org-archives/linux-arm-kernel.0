@@ -1,82 +1,69 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 3 Sep 2012 17:54:29 +0900
-Subject: Booting DT kernel on a non-DT bootloader
-Message-ID: <20120903085428.GA18323@verge.net.au>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 3 Sep 2012 10:55:17 +0200
+Subject: mxc_nand.c on mach-imx/imx53
+In-Reply-To: <504098A1.4050208@antcom.de>
+References: <5035F84E.3000901@antcom.de>
+ <20120829074122.GV26594@pengutronix.de>
+ <503E3331.8050203@antcom.de> <20120829172820.43bbe68e@eb-e6520>
+ <50407E44.5080408@antcom.de> <504098A1.4050208@antcom.de>
+Message-ID: <20120903085517.GE26594@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Aug 31, 2012 at 12:57:37PM +0200, Roland Stigge wrote:
+> On 08/31/2012 11:05 AM, Roland Stigge wrote:
+> > I tried to port this on top of Sascha's patches for imx53, only for mxc v3 for now, as below.
+> > 
+> > Unfortunately, I still get:
+> > 
+> > ...
+> > UnCorrectable RS-ECC Error
+> > UnCorrectable RS-ECC Error
+> > UnCorrectable RS-ECC Error
+> > UnCorrectable RS-ECC Error
+> > UnCorrectable RS-ECC Error
 
-it has come to pass that for some of the boards under mach-shmobile
-we are in the following situation:
+Have you written the data you are unable to read with this driver?
 
-* The kernel requires a device tree for booting
-* The default boot loader for the board does not support device tree;
-  and in general it is not practical for developers to upload the
-  boot-loader.
+> > ...
+> > 
+> > from mxc_nand.c's mxc_nand_correct_data_v2_v3(). Maybe there's still sth. missing in the
+> > error correction code?
+> 
+> With the below incremental fix, it works. :-)
+> 
+> Thanks,
+> 
+> Roland
+> 
+> PS: Will you prepare a patch for l2-mtd.git? I only have an imx53, can't test the v1/v2 etc.
+> configs.
+> 
+> 
+> --- linux-2.6.orig/drivers/mtd/nand/mxc_nand.c
+> +++ linux-2.6/drivers/mtd/nand/mxc_nand.c
+> @@ -1141,14 +1141,14 @@ static void mxc_nand_command(struct mtd_
+>                 host->devtype_data->send_cmd(host, command, true);
+>                 mxc_do_addr_cycle(mtd, column, page_addr);
+>                 host->devtype_data->send_read_id(host);
+> -               host->buf_start = column;
+> +               host->buf_start = 0;
+>                 break;
+>  
+>         case NAND_CMD_PARAM:
+>                 host->devtype_data->send_cmd(host, command, true);
+>                 mxc_do_addr_cycle(mtd, column, page_addr);
+>                 host->devtype_data->send_read_param(host);
+> -               host->buf_start = column;
+> +               host->buf_start = 0;
 
-Fortunately there is a solution, which is to append a device tree to
-the kernel image and boot that by the normal means supported by the
-boot loader.
+On what tree are you working? I cannot find a handling of
+NAND_CMD_PARAM in my tree.
 
-Here is how to achieve that:
+Sascha
 
-1. Make sure you have CONFIG_ARM_APPENDED_DTB=y in your .config
-
-2. Create original zImage
-
-    ARCH=arm make zImage
-
-3. Create flattened device tree (run this in kernel tree)
-
-   i) There is code in the next branch of my renesas tree to allow
-      this to be achieved using
-
-      # make dtbs
-
-      This will create the device tree for the prevaling kernel config,
-      if one exists.
-
-      e.g For Armadillo 800 EVA
-
-      # make dtbs
-      scripts/kconfig/conf --silentoldconfig Kconfig
-        DTC     arch/arm/boot/r8a7740-armadillo800eva.dtb
-      DTC: dts->dtb  on file "arch/arm/boot/dts/r8a7740-armadillo800eva.dts"
-
-      Else it will do nothing
-      # make dtbs
-      scripts/kconfig/conf --silentoldconfig Kconfig
-      make[1]: Nothing to be done for `arch/arm/boot/dtbs'.
-
-
-   ii) If you are running a current or other kernel, which does not
-       support "make dtbs" for mach-shmobile boards, then the dtb
-       may manually be compiled using dtc.
-
-       e.g. For the Armadillo 800 EVA
-
-       dtc -I dts -O dtb arch/arm/boot/dts/r8a7740-armadillo800eva.dts \
-           -o arch/arm/boot/dts/r8a7740-armadillo800eva.dtb
-
-    Note: Please make sure you have a recent version of dtc.
-          I have verified that the above works with DTC 1.3.0 from
-	  the Debian device-tree-compiler 1.3.0-2 package.
-	  I have had reports that it fails using DTC 1.2.0.
-
-4. Append device tree to zImage (very high-tech!)
-
-   cat arch/arm/boot/zImage \
-	arch/arm/boot/dts/r8a7740-armadillo800eva.dtb >
-	arch/arm/boot/zImage.dtb
-
-5. Create uImage (optional)
-
-   If you need to create a uImage then this may be done using
-   the new zImage + dtb as follows:
-
-   # cp arch/arm/boot/zImage.dtb arch/arm/boot/zImage
-   # $(cut -f 3- -d ' ' < arch/arm/boot/.uImage.cmd)
-
-6. You should now be able to either boot the resulting zImage.dtb
-   or uImage, use whichever suits the needs of the bootloader in use.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
