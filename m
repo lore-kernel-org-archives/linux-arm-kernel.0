@@ -1,78 +1,39 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 03 Sep 2012 22:42:04 +0200
-Subject: [PATCH 1/4] can: c_can: Adopt pinctrl support
-In-Reply-To: <1346673139-14540-2-git-send-email-anilkumar@ti.com>
-References: <1346673139-14540-1-git-send-email-anilkumar@ti.com>
- <1346673139-14540-2-git-send-email-anilkumar@ti.com>
-Message-ID: <5045161C.4000100@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Sep 2012 21:43:25 +0100
+Subject: [alsa-devel] [RFC 1/3] ASoC: dmaengine: Don't use runtime
+ private data for dmaengine data
+In-Reply-To: <5045124D.3050604@metafoo.de>
+References: <20120903165832.GA31511@n2100.arm.linux.org.uk>
+ <E1T8ZzV-0002vp-2j@rmk-PC.arm.linux.org.uk> <5045124D.3050604@metafoo.de>
+Message-ID: <20120903204325.GA728@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/2012 01:52 PM, AnilKumar Ch wrote:
-> Adopt pinctrl support to c_can driver based on c_can device
-> pointer, pinctrl driver configure SoC pins to d_can mode
-> according to definitions provided in .dts file.
+On Mon, Sep 03, 2012 at 10:25:49PM +0200, Lars-Peter Clausen wrote:
+> On 09/03/2012 06:59 PM, Liam Girdwood wrote:
+> > Use a dedicated member to store dmaengine data so that drivers can
+> > use private data for their own purposes.
+> > 
 > 
-> In device specific device tree file 'pinctrl-names = "default";'
-> and 'pinctrl-0 = <&d_can1_pins>;' needs to add to configure pins
-> from c_can driver. d_can1_pins node contains the pinmux/config
-> details of d_can L/H pins.
+> The idea was that we'll eventually get to a point where we won't need private
+> data for the drivers using the generic dmaengine code. But for the transitional
+> period there is snd_dmaengine_pcm_{set,get}_data which allows to attach driver
+> private data to the dmaengine pcm. For an example see how the other users of
+> dmaengine pcm handle this.
 
-Looks good, is the pinctrl property documented in the dt bindings already?
+That's fine if you are writing new drivers from scatch, or know the
+driver you're converting inside-out.  Neither applies here (I've
+struggled to do anything with the OMAP audio stuff for many many
+reasons.)
 
-Marc
+I rather wish that people who did know the OMAP ASoC driver had stepped
+up to this conversion, but alas they haven't.
 
-> 
-> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
-> ---
->  drivers/net/can/c_can/c_can_platform.c |    7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/drivers/net/can/c_can/c_can_platform.c b/drivers/net/can/c_can/c_can_platform.c
-> index 90801c4..c351975 100644
-> --- a/drivers/net/can/c_can/c_can_platform.c
-> +++ b/drivers/net/can/c_can/c_can_platform.c
-> @@ -33,6 +33,7 @@
->  #include <linux/of.h>
->  #include <linux/of_device.h>
->  #include <linux/pm_runtime.h>
-> +#include <linux/pinctrl/consumer.h>
->  
->  #include <linux/can/dev.h>
->  
-> @@ -98,6 +99,7 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
->  	struct c_can_priv *priv;
->  	const struct of_device_id *match;
->  	const struct platform_device_id *id;
-> +	struct pinctrl *pinctrl;
->  	struct resource *mem;
->  	int irq;
->  	struct clk *clk;
-> @@ -114,6 +116,11 @@ static int __devinit c_can_plat_probe(struct platform_device *pdev)
->  		id = platform_get_device_id(pdev);
->  	}
->  
-> +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-> +	if (IS_ERR(pinctrl))
-> +		dev_warn(&pdev->dev,
-> +			"failed to configure pins from driver\n");
-> +
->  	/* get the appropriate clk */
->  	clk = clk_get(&pdev->dev, NULL);
->  	if (IS_ERR(clk)) {
-> 
+In any case, if you want people to use the this soc-dmaengine helper
+then you have to make the conversion to it simple, and requiring
+everyone to totally restructure their drivers to use it does not make
+that process simple.
 
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120903/17105472/attachment.sig>
+What you have here is the result of several transformations to the
+driver, which would _not_ have been possible without this first patch
+from Liam.
