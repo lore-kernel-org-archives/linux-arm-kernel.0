@@ -1,73 +1,178 @@
-From: sangsu4u.park@samsung.com (Sangsu Park)
-Date: Mon, 03 Sep 2012 11:10:03 +0900
-Subject: [PATCH] ASoC: SAMSUNG: Add SND_SOC_DAIFMT_CONT option for
- snd_soc_set_fmt()
-In-Reply-To: <20120830174317.GG4356@opensource.wolfsonmicro.com>
-References: <003101cd8367$3476e650$9d64b2f0$@samsung.com>
- <20120827204550.GA4400@opensource.wolfsonmicro.com>
- <001d01cd85d6$59298040$0b7c80c0$@samsung.com>
- <20120830174317.GG4356@opensource.wolfsonmicro.com>
-Message-ID: <001001cd8979$3b260d10$b1722730$@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 3 Sep 2012 10:19:53 +0800
+Subject: [PATCH v2 6/9] misc: Generic on-chip SRAM allocation driver
+In-Reply-To: <1346405224-20399-7-git-send-email-p.zabel@pengutronix.de>
+References: <1346405224-20399-1-git-send-email-p.zabel@pengutronix.de>
+ <1346405224-20399-7-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20120903021950.GD2362@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Aug 31, 2012 at 11:27:01AM +0200, Philipp Zabel wrote:
+> This driver requests and remaps a memory region as configured in the
+> device tree. It serves memory from this region via the genalloc API.
+> 
+> Other drivers can retrieve the genalloc pool from a phandle pointing
+> to this drivers' device node in the device tree.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+>  drivers/misc/Kconfig  |    8 ++++
+>  drivers/misc/Makefile |    1 +
+>  drivers/misc/sram.c   |  105 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 114 insertions(+)
+>  create mode 100644 drivers/misc/sram.c
+> 
+> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+> index 98a442d..8a55284 100644
+> --- a/drivers/misc/Kconfig
+> +++ b/drivers/misc/Kconfig
+> @@ -509,6 +509,14 @@ config USB_SWITCH_FSA9480
+>  	  stereo and mono audio, video, microphone and UART data to use
+>  	  a common connector port.
+>  
+> +config SRAM
+> +	bool "Generic on-chip SRAM driver\n"
 
-On Sun, Aug 31, 2012 at 2:43 AM +0900, Mark Brown wrote:
-> On Wed, Aug 29, 2012 at 08:06:32PM +0900, Sangsu Park wrote:
-> 
-> Please check your mailer configuration, it looks like it's reformatting
-> all the text with much longer line widths.
+Remove the "\n".
 
-I've changed line width configuration. Is it ok now?
+And "depends on HAS_IOMEM"?
 
-> 
-> > On Sun, Aug 26, 2012 at 05:45:54PM +0900, Mark Brown wrote:
-> 
-> > > a whole lot of sense on the slave side, it's related to the clock
-> generation so should have no
-> > > effect at all on the slave side.  The driver code looks reasonably
-> sensible though.
-> 
-> > You mean cpu side is slave?
-> 
-> Yes.
+> +	select GENERIC_ALLOCATOR
+> +	help
+> +	  This driver allows to declare a memory region to be managed
+> +	  by the genalloc API. It is supposed to be used for small
+> +	  on-chip SRAM areas found on many ARM SoCs.
+> +
+>  source "drivers/misc/c2port/Kconfig"
+>  source "drivers/misc/eeprom/Kconfig"
+>  source "drivers/misc/cb710/Kconfig"
+> diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+> index b88df7a..ccc759a 100644
+> --- a/drivers/misc/Makefile
+> +++ b/drivers/misc/Makefile
+> @@ -50,3 +50,4 @@ obj-y				+= carma/
+>  obj-$(CONFIG_USB_SWITCH_FSA9480) += fsa9480.o
+>  obj-$(CONFIG_ALTERA_STAPL)	+=altera-stapl/
+>  obj-$(CONFIG_INTEL_MEI)		+= mei/
+> +obj-$(CONFIG_SRAM)		+= sram.o
+> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
+> new file mode 100644
+> index 0000000..c5cf67e
+> --- /dev/null
+> +++ b/drivers/misc/sram.c
+> @@ -0,0 +1,105 @@
+> +/*
+> + * Generic on-chip SRAM allocation driver
+> + *
+> + * Copyright (C) 2012 Philipp Zabel, Pengutronix
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+> + * MA 02110-1301, USA.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/genalloc.h>
+> +
+> +struct sram_dev {
+> +	struct gen_pool *pool;
+> +};
+> +
+> +static int __devinit sram_probe(struct platform_device *pdev)
+> +{
+> +	void __iomem *virt_base;
+> +	struct sram_dev *sram;
+> +	struct resource *res;
+> +	unsigned long size;
+> +	int ret;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res)
+> +		return -EINVAL;
+> +
+> +	size = resource_size(res);
+> +
+> +	virt_base = devm_request_and_ioremap(&pdev->dev, res);
+> +	if (!virt_base)
+> +		return -ENOMEM;
 
-But, Samsung pcm is working only for cpu master. 
+The kerneldoc of devm_request_and_ioremap suggests -EADDRNOTAVAIL.
 
-> 
-> 
-> > > What specifically is going wrong here?
-> 
-> > SND_SOC_DAIFMT_CONT is used sound/soc/Samsung/pcm.c (s3c_pcm_set_fmt()) like
-> below.
-> 
-> > switch (fmt & SND_SOC_DAIFMT_CLOCK_MASK) {
-> >         case SND_SOC_DAIFMT_CONT:
-> >                 pcm->idleclk = 1;
-> >                 break;
-> >         case SND_SOC_DAIFMT_GATED:
-> >                 pcm->idleclk = 0;
-> >                 break;
-> >         default:
-> >                 dev_err(pcm->dev, "Invalid Clock gating request!\n");
-> >                 ret = -EINVAL;
-> >                 goto exit;
-> >         }
-> 
-> > If fmt argument has no SND_SOC_DAIFMT_ option, s3c_pcm_set_fmt() return -
-> EINVAL.
-> 
-> So, clearly this is unrelated to the change you mentioned in your commit
-> message - it looks like this is just a plain issue in the machine
-> driver.  That said the above code should be changed to at least ignore
-> the setting in slave mode (since the clock shouldn't be being driven and
-> it doesn't matter).
+Regards,
+Shawn
 
-Do you think that changing pcm driver is right approach?
-Then I'll fix pcm driver. (I think that pcm driver has some strange code.)
-
+> +
+> +	sram = devm_kzalloc(&pdev->dev, sizeof(*sram), GFP_KERNEL);
+> +	if (!sram)
+> +		return -ENOMEM;
+> +
+> +	sram->pool = gen_pool_create(PAGE_SHIFT, -1);
+> +	if (!sram->pool)
+> +		return -ENOMEM;
+> +
+> +	ret = gen_pool_add_virt(sram->pool, (unsigned long)virt_base,
+> +				res->start, size, -1);
+> +	if (ret < 0) {
+> +		gen_pool_destroy(sram->pool);
+> +		return ret;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, sram);
+> +
+> +	dev_dbg(&pdev->dev, "SRAM pool: %ld KiB @ 0x%p\n", size / 1024, virt_base);
+> +
+> +	return 0;
+> +}
+> +
+> +static int __devexit sram_remove(struct platform_device *pdev)
+> +{
+> +	struct sram_dev *sram = platform_get_drvdata(pdev);
+> +
+> +	if (gen_pool_avail(sram->pool) < gen_pool_size(sram->pool))
+> +		dev_dbg(&pdev->dev, "removed while SRAM allocated\n");
+> +
+> +	gen_pool_destroy(sram->pool);
+> +
+> +	return 0;
+> +}
+> +
+> +#ifdef CONFIG_OF
+> +static struct of_device_id sram_dt_ids[] = {
+> +	{ .compatible = "sram" },
+> +	{ /* sentinel */ }
+> +};
+> +#endif
+> +
+> +static struct platform_driver sram_driver = {
+> +	.driver = {
+> +		.name = "sram",
+> +		.of_match_table = of_match_ptr(sram_dt_ids),
+> +	},
+> +	.probe = sram_probe,
+> +	.remove = __devexit_p(sram_remove),
+> +};
+> +
+> +module_platform_driver(sram_driver);
+> +
+> +MODULE_LICENSE("GPL");
+> +MODULE_AUTHOR("Philipp Zabel, Pengutronix");
+> +MODULE_DESCRIPTION("Generic SRAM allocator driver");
+> -- 
+> 1.7.10.4
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
