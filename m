@@ -1,183 +1,73 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 3 Sep 2012 10:09:35 +0800
-Subject: [PATCH v2 5/9] genalloc: add a global pool list, allow to find
- pools by phys address
-In-Reply-To: <1346405224-20399-6-git-send-email-p.zabel@pengutronix.de>
-References: <1346405224-20399-1-git-send-email-p.zabel@pengutronix.de>
- <1346405224-20399-6-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20120903020933.GC2362@S2101-09.ap.freescale.net>
+From: sangsu4u.park@samsung.com (Sangsu Park)
+Date: Mon, 03 Sep 2012 11:10:03 +0900
+Subject: [PATCH] ASoC: SAMSUNG: Add SND_SOC_DAIFMT_CONT option for
+ snd_soc_set_fmt()
+In-Reply-To: <20120830174317.GG4356@opensource.wolfsonmicro.com>
+References: <003101cd8367$3476e650$9d64b2f0$@samsung.com>
+ <20120827204550.GA4400@opensource.wolfsonmicro.com>
+ <001d01cd85d6$59298040$0b7c80c0$@samsung.com>
+ <20120830174317.GG4356@opensource.wolfsonmicro.com>
+Message-ID: <001001cd8979$3b260d10$b1722730$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2012 at 11:27:00AM +0200, Philipp Zabel wrote:
-> This patch keeps all created pools in a global list and adds two
-> functions that allow to retrieve the gen_pool pointer from a known
-> physical address and from a device tree node.
+
+On Sun, Aug 31, 2012 at 2:43 AM +0900, Mark Brown wrote:
+> On Wed, Aug 29, 2012 at 08:06:32PM +0900, Sangsu Park wrote:
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->  include/linux/genalloc.h |   14 +++++++++
->  lib/genalloc.c           |   77 ++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 91 insertions(+)
+> Please check your mailer configuration, it looks like it's reformatting
+> all the text with much longer line widths.
+
+I've changed line width configuration. Is it ok now?
+
 > 
-> diff --git a/include/linux/genalloc.h b/include/linux/genalloc.h
-> index 5e98eeb..46ff435 100644
-> --- a/include/linux/genalloc.h
-> +++ b/include/linux/genalloc.h
-> @@ -33,6 +33,7 @@
->   *  General purpose special memory pool descriptor.
->   */
->  struct gen_pool {
-> +	struct list_head next_pool;	/* pool in global list */
->  	spinlock_t lock;
->  	struct list_head chunks;	/* list of chunks in this pool */
->  	int min_alloc_order;		/* minimum allocation order */
-> @@ -78,4 +79,17 @@ extern void gen_pool_for_each_chunk(struct gen_pool *,
->  	void (*)(struct gen_pool *, struct gen_pool_chunk *, void *), void *);
->  extern size_t gen_pool_avail(struct gen_pool *);
->  extern size_t gen_pool_size(struct gen_pool *);
-> +extern struct gen_pool *gen_pool_find_by_phys(phys_addr_t phys);
-> +
-> +#ifdef CONFIG_OF
-> +struct device_node;
-
-This should be put above/outside #ifdef, as it's used in #else block
-as well?
-
-> +extern struct gen_pool *of_get_named_gen_pool(struct device_node *np,
-> +	const char *propname, int index);
-> +#else
-> +inline struct gen_pool *of_get_named_gen_pool(struct device_node *np,
-> +	const char *propname, int index)
-> +{
-> +	return NULL;
-> +}
-> +#endif
->  #endif /* __GENALLOC_H__ */
-> diff --git a/lib/genalloc.c b/lib/genalloc.c
-> index 6bc04aa..df2d8f9 100644
-> --- a/lib/genalloc.c
-> +++ b/lib/genalloc.c
-> @@ -34,6 +34,11 @@
->  #include <linux/rculist.h>
->  #include <linux/interrupt.h>
->  #include <linux/genalloc.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_device.h>
-> +
-> +static LIST_HEAD(pools);
-> +static DEFINE_SPINLOCK(list_lock);
->  
->  static int set_bits_ll(unsigned long *addr, unsigned long mask_to_set)
->  {
-> @@ -152,6 +157,9 @@ struct gen_pool *gen_pool_create(int min_alloc_order, int nid)
->  		spin_lock_init(&pool->lock);
->  		INIT_LIST_HEAD(&pool->chunks);
->  		pool->min_alloc_order = min_alloc_order;
-> +		spin_lock(&list_lock);
-> +		list_add_rcu(&pool->next_pool, &pools);
-> +		spin_unlock(&list_lock);
->  	}
->  	return pool;
->  }
-> @@ -234,6 +242,9 @@ void gen_pool_destroy(struct gen_pool *pool)
->  	int order = pool->min_alloc_order;
->  	int bit, end_bit;
->  
-> +	spin_lock(&list_lock);
-> +	list_del_rcu(&pool->next_pool);
-> +	spin_unlock(&list_lock);
->  	list_for_each_safe(_chunk, _next_chunk, &pool->chunks) {
->  		chunk = list_entry(_chunk, struct gen_pool_chunk, next_chunk);
->  		list_del(&chunk->next_chunk);
-> @@ -400,3 +411,69 @@ size_t gen_pool_size(struct gen_pool *pool)
->  	return size;
->  }
->  EXPORT_SYMBOL_GPL(gen_pool_size);
-> +
-> +/**
-> + * gen_pool_find_by_phys - find a pool by physical start address
-> + * @phys: physical address as added with gen_pool_add_virt
-> + *
-> + * Returns the pool that contains the chunk starting at phys,
-> + * or NULL if not found.
-> + */
-> +struct gen_pool *gen_pool_find_by_phys(phys_addr_t phys)
-> +{
-> +	struct gen_pool *pool, *found = NULL;
-> +	struct gen_pool_chunk *chunk;
-> +
-> +	rcu_read_lock();
-> +	list_for_each_entry_rcu(pool, &pools, next_pool) {
-> +		list_for_each_entry_rcu(chunk, &pool->chunks, next_chunk) {
-> +			if (phys == chunk->phys_addr) {
-> +				found = pool;
-> +				break;
-> +			}
-> +		}
-> +	}
-> +	rcu_read_unlock();
-> +
-> +	return found;
-> +}
-> +EXPORT_SYMBOL_GPL(gen_pool_find_by_phys);
-> +
-> +#ifdef CONFIG_OF
-> +/**
-> + * of_get_named_gen_pool - find a pool by the physical address in
-
-"in" what?
-
-> + * @np: device node
-
-@propname
-@index
-
-> + *
-> + * Returns the pool that contains the chunk starting at the physical
-> + * address of the np device node, or NULL if not found.
-> + */
-> +struct gen_pool *of_get_named_gen_pool(struct device_node *np,
-> +	const char *propname, int index)
-> +{
-> +	struct property *prop;
-> +	const __be32 *list;
-> +	int size;
-> +	phandle phandle;
-> +	struct device_node *np_pool;
-> +	const u32 *reg;
-> +	u64 addr;
-> +
-> +	prop = of_find_property(np, propname, &size);
-> +	if (!prop)
-> +		return NULL;
-> +	list = prop->value;
-> +	size /= sizeof(*list);
-> +	phandle = be32_to_cpup(list);
-> +	np_pool = of_find_node_by_phandle(phandle);
-> +	if (!np_pool)
-> +		return NULL;
-
-Helper of_parse_phandle() helps here.
-
-> +	reg = of_get_property(np_pool, "reg", NULL);
-> +	if (!reg)
-> +		return NULL;
-> +	addr = of_translate_address(np_pool, reg);
-> +	if (addr == OF_BAD_ADDR)
-> +		return NULL;
-
-I would suggest use of_address_to_resource instead and then retrieve
-the address from resource->start.
-
-> +	return gen_pool_find_by_phys((phys_addr_t) addr);
-> +}
-> +EXPORT_SYMBOL_GPL(of_get_named_gen_pool);
-> +#endif /* CONFIG_OF */
-> -- 
-> 1.7.10.4
+> > On Sun, Aug 26, 2012 at 05:45:54PM +0900, Mark Brown wrote:
 > 
+> > > a whole lot of sense on the slave side, it's related to the clock
+> generation so should have no
+> > > effect at all on the slave side.  The driver code looks reasonably
+> sensible though.
+> 
+> > You mean cpu side is slave?
+> 
+> Yes.
 
--- 
-Regards,
-Shawn
+But, Samsung pcm is working only for cpu master. 
+
+> 
+> 
+> > > What specifically is going wrong here?
+> 
+> > SND_SOC_DAIFMT_CONT is used sound/soc/Samsung/pcm.c (s3c_pcm_set_fmt()) like
+> below.
+> 
+> > switch (fmt & SND_SOC_DAIFMT_CLOCK_MASK) {
+> >         case SND_SOC_DAIFMT_CONT:
+> >                 pcm->idleclk = 1;
+> >                 break;
+> >         case SND_SOC_DAIFMT_GATED:
+> >                 pcm->idleclk = 0;
+> >                 break;
+> >         default:
+> >                 dev_err(pcm->dev, "Invalid Clock gating request!\n");
+> >                 ret = -EINVAL;
+> >                 goto exit;
+> >         }
+> 
+> > If fmt argument has no SND_SOC_DAIFMT_ option, s3c_pcm_set_fmt() return -
+> EINVAL.
+> 
+> So, clearly this is unrelated to the change you mentioned in your commit
+> message - it looks like this is just a plain issue in the machine
+> driver.  That said the above code should be changed to at least ignore
+> the setting in slave mode (since the clock shouldn't be being driven and
+> it doesn't matter).
+
+Do you think that changing pcm driver is right approach?
+Then I'll fix pcm driver. (I think that pcm driver has some strange code.)
+
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
