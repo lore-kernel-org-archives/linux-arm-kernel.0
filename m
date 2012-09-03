@@ -1,26 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Sep 2012 13:25:03 +0200
-Subject: [PATCH 3/3] pinctrl: sirf: add DT-binding pinmux mapping support
-In-Reply-To: <1345690074-31327-4-git-send-email-Barry.Song@csr.com>
-References: <1345690074-31327-1-git-send-email-Barry.Song@csr.com>
- <1345690074-31327-4-git-send-email-Barry.Song@csr.com>
-Message-ID: <CACRpkdY1o1i4TjPHKu-LMKwM2b7Hr9fJ5PZZqY0crirjYi57HA@mail.gmail.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Mon, 3 Sep 2012 19:40:24 +0800
+Subject: [PATCH] ARM: ux500: Fix build error due to missing include of
+ asm/pmu.h in cpu-db8500.c
+In-Reply-To: <CACRpkdYxYGa=C092rbTU5bo=YEu6wqiTUD7W4pLS_wNfmAe4Zw@mail.gmail.com>
+References: <1346588747.7909.2.camel@phoenix>
+ <CACRpkdYxYGa=C092rbTU5bo=YEu6wqiTUD7W4pLS_wNfmAe4Zw@mail.gmail.com>
+Message-ID: <CAF+7xWnwH17Bxjpm3nMAJL45D4XUsEfDpJAoG=feJwKtgwpUkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2012 at 4:47 AM, Barry Song <Barry.Song@csr.com> wrote:
-
-> From: Barry Song <Baohua.Song@csr.com>
+2012/9/3 Linus Walleij <linus.walleij@linaro.org>:
+> On Sun, Sep 2, 2012 at 2:25 PM, Axel Lin <axel.lin@gmail.com> wrote:
 >
-> This makes us possible to define pinmux mapping in board-specific DTS.
-> prima2.dtsi provides all possible (groups,functions) configuration, and
-> device in .dts select configurations from dtsi files.
+>> Include asm/pmu.h to fix below build error:
+>>
+>>   CC      arch/arm/mach-ux500/cpu-db8500.o
+>> arch/arm/mach-ux500/cpu-db8500.c:118:8: error: variable 'db8500_pmu_platdata' has initializer but incomplete type
+>> arch/arm/mach-ux500/cpu-db8500.c:119:2: error: unknown field 'handle_irq' specified in initializer
+>> arch/arm/mach-ux500/cpu-db8500.c:119:2: warning: excess elements in struct initializer [enabled by default]
+>> arch/arm/mach-ux500/cpu-db8500.c:119:2: warning: (near initialization for 'db8500_pmu_platdata') [enabled by default]
+>> make[1]: *** [arch/arm/mach-ux500/cpu-db8500.o] Error 1
+>> make: *** [arch/arm/mach-ux500] Error 2
+>>
+>> Signed-off-by: Axel Lin <axel.lin@gmail.com>
 >
-> Signed-off-by: Barry Song <Barry.Song@csr.com>
+> That's on linux-next not on v3.6-rcN right?
+Yes, This patch is against linux-next tree.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> I've applied it to my ux500 branch and will carry it unless Will Deacon
+> express an interest in it, PMU is his territory...
 
-(Again, assume that you take this through ARM SoC.)
-
-Yours,
-Linus Walleij
+Thanks,
+Axel
