@@ -1,57 +1,50 @@
-From: gerg@snapgear.com (Greg Ungerer)
-Date: Mon, 3 Sep 2012 22:51:50 +1000
-Subject: [PATCH 4/4] ARM: ks8695: convert to generic time and clocksource
-In-Reply-To: <201209031115.18539.arnd@arndb.de>
-References: <1346264842-20411-1-git-send-email-linus.walleij@linaro.org>
- <201209021849.54348.arnd@arndb.de> <504434E8.9040205@snapgear.com>
- <201209031115.18539.arnd@arndb.de>
-Message-ID: <5044A7E6.10908@snapgear.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 3 Sep 2012 12:57:27 +0000
+Subject: [PATCH v2] hvc_dcc : add support to armv4 and armv5 core
+In-Reply-To: <5040EAF7.9010003@codeaurora.org>
+References: <1346413645-4593-1-git-send-email-castet.matthieu@free.fr>
+ <5040EAF7.9010003@codeaurora.org>
+Message-ID: <201209031257.28213.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Friday 31 August 2012, Stephen Boyd wrote:
+> > +static int hvc_dcc_put_chars_v6(uint32_t vt, const char *buf, int count)
+> > +{
+> > +     int i;
+> > +
+> > +     for (i = 0; i < count; i++) {
+> > +             while (__dcc_getstatus_v6() & DCC_STATUS_TX_V6)
+> > +                     cpu_relax();
+> > +
+> > +             __dcc_putchar_v6(buf[i]);
+> > +     }
+> > +
+> > +     return count;
+> > +}
+> 
+> It's unfortunate that the main logic is duplicated. I wonder if we could
+> push the runtime decision slightly lower into the accessor functions
+> instead and make some new functions dcc_tx_busy() and dcc_rx_busy() or
+> something. Then these loops stay the same.
 
-On 09/03/2012 09:15 PM, Arnd Bergmann wrote:
-> On Monday 03 September 2012, Greg Ungerer wrote:
->>>
->>> Note that this platform is one of those we talked about removing
->>> from the kernel for potentially being completely unused. Do we have
->>> reason to believe that people are still using ks8695 for anything
->>> with new kernels?
->>
->> I'll put my hand up as a user of it. I run every release kernel
->> on KS8695 platforms, though I don't tend to do much testing of
->> rc kernels on it.
->
-> Ok, very good. Booting every new kernel on a platform is more testing
-> than a lot of the older platforms get as far as I can tell.
->
->>> If any of you are doing that, we'll definitely keep the port around,
->>> the idea is not to break anything that people are actually using.
->>> In that case, I would like to see a MAINTAINERS entry for the platform
->>> so we have a contact for someone who is able to ack and maybe test
->>> patches.
->>
->> I am happy enough to ack and test changes, if no one else wants to
->> do it. I don't expect to do any real active development on it though.
->> I do have some board files that would have been nice to push into
->> mainline, but I have been holding off (for quite a while), hoping
->> that someone might support DTs on this sub-arch.
->
-> If nobody is actually working on new stuff, we might be better off
-> with just merging the board files you have. If you don't mind, just
-> post what you have and then we can decide what to do with them.
+Agreed. Ideally, you should be able to get the code to be compiled into
+the same binary as before for ARMv6+. If only the inline assembly differs,
+you can do something like
 
-Ok, will do.
+static inline char __dcc_getchar(void)
+{
+        char __c;
 
-Regards
-Greg
+        if (__LINUX_ARM_ARCH >= 6)
+		asm volatile("mrc p14, 0, %0, c0, c5, 0 @ read comms data reg"
+	                : "=r" (__c));
+	else
+		asm volatile ("mrc p14, 0, %0, c1, c0  @ read comms data reg"
+			: "=r" (ret));
+        isb();
 
+        return __c;
+}
 
-
--- 
-------------------------------------------------------------------------
-Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
-SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
-8 Gardner Close,                            FAX:         +61 7 3891 3630
-Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
+	Arnd
