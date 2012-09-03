@@ -1,19 +1,19 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Sep 2012 23:43:37 +0200
+Date: Mon, 3 Sep 2012 23:51:48 +0200
 Subject: [PATCH 4/6 v2] ARM: integrator: initial device tree support
-In-Reply-To: <201209011841.58977.arnd@arndb.de>
+In-Reply-To: <5043E4BE.1060508@gmail.com>
 References: <1346471760-23993-1-git-send-email-linus.walleij@linaro.org>
+ <1346471760-23993-2-git-send-email-linus.walleij@linaro.org>
  <1346471760-23993-3-git-send-email-linus.walleij@linaro.org>
  <1346471760-23993-4-git-send-email-linus.walleij@linaro.org>
- <201209011841.58977.arnd@arndb.de>
-Message-ID: <CACRpkdZhJyqeeXV_Zcfi7S01oH1Kw95qvAmOqrMKwhSLb-mX=Q@mail.gmail.com>
+ <5043E4BE.1060508@gmail.com>
+Message-ID: <CACRpkdbTRCUnx1JjCQ+WT4PoxtDG38MP=ctUp6TBPd64xQ39jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 1, 2012 at 8:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Mon, Sep 3, 2012 at 12:59 AM, Rob Herring <robherring2@gmail.com> wrote:
+> On 08/31/2012 10:55 PM, Linus Walleij wrote:
 
-> On Saturday 01 September 2012, Linus Walleij wrote:
->> diff --git a/arch/arm/boot/dts/integratorcp.dts b/arch/arm/boot/dts/integratorcp.dts
 >> +/ {
 >> +     model = "ARM Integrator/CP";
 >> +     compatible = "arm,integrator-cp";
@@ -22,64 +22,34 @@ On Sat, Sep 1, 2012 at 8:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 >> +     aliases {
 >> +             arm,integrator-clocksource = &timer2;
 >> +             arm,integrator-clockevent = &timer1;
->> +     };
 >
-> It looks like this file is almost a direct superset of the integratorap.dts
-> file. How about including the other file from here and just adding the
-> extra nodes and overriding the few bits that are actually different?
+> This is linux specific and a common issue we need a solution for. Grant
+> had done something for versatile and we discussed it some, but nothing
+> ever got close to finalized. IIRC, Grant's solution was just add a
+> "linux,clockevent" or "linux,clocksource" to the nodes that are to be
+> used. But he wasn't really happy with it. Perhaps using these names as
+> aliases would be better.
 
-Isn't it more apropriate to create an integrator.dtsi for the common
-stuff and include that into integratorap.dts and integratorcp.dts?
+Atleast I'm honest about what this is, IMHO this is better than
+any of the solutions we already have in boot/dts.
 
->> +#ifdef CONFIG_OF
->> +
-> ...
->> +DT_MACHINE_START(INTEGRATOR_AP_DT, "ARM Integrator/AP (Device Tree)")
->> +     .reserve        = integrator_reserve,
->> +     .map_io         = ap_map_io,
->> +     .nr_irqs        = NR_IRQS_INTEGRATOR_AP,
->> +     .init_early     = ap_init_early,
->> +     .init_irq       = ap_init_irq_of,
->> +     .handle_irq     = fpga_handle_irq,
->> +     .timer          = &ap_of_timer,
->> +     .init_machine   = ap_init,
->> +     .restart        = integrator_restart,
->> +     .dt_compat      = ap_dt_board_compat,
->> +MACHINE_END
->> +
->> +#else
->> +
-> ...
->>  MACHINE_START(INTEGRATOR, "ARM-Integrator")
->>       /* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
->>       .atag_offset    = 0x100,
->> @@ -486,3 +571,5 @@ MACHINE_START(INTEGRATOR, "ARM-Integrator")
->>       .init_machine   = ap_init,
->>       .restart        = integrator_restart,
->>  MACHINE_END
->> +
->> +#endif
->
-> I think we discussed this before. It would be nice to replace the #if/#else
-> with
->
-> #ifdef CONFIG_OF
-> ...
-> #endif
-> #ifdef CONFIG_ATAG
-> ...
-> #endif
+Look at the versatile express
+arch/arm/boot/dts/vexpress-v2m.dtsi:
 
-Sure, have you applied Nico's patch adding CONFIG_ATAG to and
-ARM SoC branch so I can base my patches on it?
+        aliases {
+                arm,v2m_timer = &v2m_timer01;
+        };
 
-I was under the impression that his patch would go through Russell's
-tree and I would thus not be able to rely on it until it has landed there
-and you have pulled Russell's stuff into your tree.
+It's quite hard to tell that this "vtm_timer" is actually the block
+serving as clock source and clockevent for the Vexpress,
+but if you inspect the code you can see that this is what it is.
 
-Currently I would make it impossible to use ATAGs if I do this since
-the symbol does not exist, so I really need to base such an
-approach in a tree which has CONFIG_ATAG in the first place.
+I can of course skip the aliases and go for the timer nodes
+I want directly, but that isn't any helpful for people reading the
+device tree, is it?
+
+Maybe primary-timer, secondary-timer is sufficiently
+good and neutral aliases?
 
 Yours,
 Linus Walleij
