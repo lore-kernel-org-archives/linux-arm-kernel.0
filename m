@@ -1,58 +1,57 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  3 Sep 2012 14:43:52 +0200
-Subject: [PATCH] arm: mm: fix DMA pool affiliation check
-Message-ID: <1346676232-3566-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Mon, 3 Sep 2012 22:51:50 +1000
+Subject: [PATCH 4/4] ARM: ks8695: convert to generic time and clocksource
+In-Reply-To: <201209031115.18539.arnd@arndb.de>
+References: <1346264842-20411-1-git-send-email-linus.walleij@linaro.org>
+ <201209021849.54348.arnd@arndb.de> <504434E8.9040205@snapgear.com>
+ <201209031115.18539.arnd@arndb.de>
+Message-ID: <5044A7E6.10908@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The __free_from_pool() function was changed in
-e9da6e9905e639b0f842a244bc770b48ad0523e9. Unfortunately, the test that
-checks whether the provided (start,size) is within the DMA pool has
-been improperly modified. It used to be:
+Hi Arnd,
 
-  if (start < coherent_head.vm_start || end > coherent_head.vm_end)
+On 09/03/2012 09:15 PM, Arnd Bergmann wrote:
+> On Monday 03 September 2012, Greg Ungerer wrote:
+>>>
+>>> Note that this platform is one of those we talked about removing
+>>> from the kernel for potentially being completely unused. Do we have
+>>> reason to believe that people are still using ks8695 for anything
+>>> with new kernels?
+>>
+>> I'll put my hand up as a user of it. I run every release kernel
+>> on KS8695 platforms, though I don't tend to do much testing of
+>> rc kernels on it.
+>
+> Ok, very good. Booting every new kernel on a platform is more testing
+> than a lot of the older platforms get as far as I can tell.
+>
+>>> If any of you are doing that, we'll definitely keep the port around,
+>>> the idea is not to break anything that people are actually using.
+>>> In that case, I would like to see a MAINTAINERS entry for the platform
+>>> so we have a contact for someone who is able to ack and maybe test
+>>> patches.
+>>
+>> I am happy enough to ack and test changes, if no one else wants to
+>> do it. I don't expect to do any real active development on it though.
+>> I do have some board files that would have been nice to push into
+>> mainline, but I have been holding off (for quite a while), hoping
+>> that someone might support DTs on this sub-arch.
+>
+> If nobody is actually working on new stuff, we might be better off
+> with just merging the board files you have. If you don't mind, just
+> post what you have and then we can decide what to do with them.
 
-Where coherent_head.vm_end was non-inclusive (i.e, it did not include
-the first byte after the pool). The test has been changed to:
+Ok, will do.
 
-  if (start < pool->vaddr || start > pool->vaddr + pool->size)
+Regards
+Greg
 
-So now pool->vaddr + pool->size is inclusive (i.e, it includes the
-first byte after the pool), so the test should be >= instead of >.
 
-This bug causes the following message when freeing the *first* DMA
-coherent buffer that has been allocated, because its virtual address
-is exactly equal to pool->vaddr + pool->size :
 
-WARNING: at /home/thomas/projets/linux-2.6/arch/arm/mm/dma-mapping.c:463 __free_from_pool+0xa4/0xc0()
-freeing wrong coherent size from pool
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Lior Amsalem <alior@marvell.com>
-Cc: Maen Suleiman <maen@marvell.com>
-Cc: Tawfik Bayouk <tawfik@marvell.com>
-Cc: Shadi Ammouri <shadi@marvell.com>
-Cc: Eran Ben-Avi <benavi@marvell.com>
-Cc: Yehuda Yitschak <yehuday@marvell.com>
-Cc: Nadav Haklai <nadavh@marvell.com>
----
- arch/arm/mm/dma-mapping.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 4e7d118..59d9062 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -456,7 +456,7 @@ static int __free_from_pool(void *start, size_t size)
- 	unsigned long pageno, count;
- 	unsigned long flags;
- 
--	if (start < pool->vaddr || start > pool->vaddr + pool->size)
-+	if (start < pool->vaddr || start >= pool->vaddr + pool->size)
- 		return 0;
- 
- 	if (start + size > pool->vaddr + pool->size) {
 -- 
-1.7.9.5
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close,                            FAX:         +61 7 3891 3630
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
