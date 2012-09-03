@@ -1,50 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 3 Sep 2012 22:53:46 +0800
-Subject: [PATCHv2 2/3] ARM: dts: mxs Add additionnal muxing options for
- SSP3
-In-Reply-To: <1346666749-6094-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1346666749-6094-1-git-send-email-maxime.ripard@free-electrons.com>
- <1346666749-6094-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20120903145343.GI2362@S2101-09.ap.freescale.net>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Mon, 3 Sep 2012 16:55:41 +0200
+Subject: [PATCH 4/4] ARM: ks8695: convert to generic time and clocksource
+In-Reply-To: <201209031324.22877.arnd@arndb.de>
+References: <1346264842-20411-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdab72Z86i21TNohS0YO=Bav7eQgHwQyXa0tXQB=0hhgAg@mail.gmail.com>
+ <5044A954.4000706@snapgear.com> <201209031324.22877.arnd@arndb.de>
+Message-ID: <CAFumwP28D-ijJtBpQ39qDXkimMx-ucvwgS6jG3jdQ+DoYpgx9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 03, 2012 at 12:05:48PM +0200, Maxime Ripard wrote:
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/boot/dts/imx28.dtsi |   11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 8497a0e..6c51ff4 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -586,6 +586,17 @@
->  					fsl,voltage = <1>;
->  					fsl,pull-up = <1>;
->  				};
-> +
-> +				spi3_pins_b: spi3 at 1 {
-> +					reg = <1>;
-> +					fsl,pinmux-ids = <
-> +						0x0181 /* MX28_PAD_GPMI_RDN__SSP3_SCK */
-> +						0x01c1 /* MX28_PAD_GPMI_RESETN__SSP3_CMD */
+hi,
 
-The spi only needs two pins to work?
+On Mon, Sep 3, 2012 at 3:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 03 September 2012, Greg Ungerer wrote:
+>> > I suspect
+>> > some of these platforms may have more users than we
+>> > believe.
+>>
+>> I know the guys at www.opengear.com are still building hardware around
+>> the KS8695. And they update to modern kernels from time to time. So its
+>> not completely obsolete yet. I have some SnapGear boards based around it
+>> too, though they went out of production about 2 years ago.
+>
+> Ok, good to know. Maybe we can catch their interest with this mail thread
+> here and get them to contribute upstream as well.
 
-Has spi3_pins_a been defined?  I haven't seen it.
+
+Vision System GmbH are (or were) also using the KS8695.
+
 
 Regards,
-Shawn
-
-> +					>;
-> +					fsl,drive-strength = <1>;
-> +					fsl,voltage = <1>;
-> +					fsl,pull-up = <1>;
-> +				};
->  			};
->  
->  			digctl at 8001c000 {
-> -- 
-> 1.7.9.5
-> 
+  Andrew Victor
