@@ -1,27 +1,134 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 3 Sep 2012 20:10:45 +0000
-Subject: [PATCH 2/6 v3] ARM: integrator: check PL010 base address from
- resource
-In-Reply-To: <1346702775-19828-1-git-send-email-linus.walleij@linaro.org>
-References: <1346702775-19828-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201209032010.46141.arnd@arndb.de>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 03 Sep 2012 22:11:14 +0200
+Subject: [PATCH 3/4] ARM: AM33XX: board-generic: Add of_dev_auxdata to
+ pass d_can raminit
+In-Reply-To: <1346673139-14540-4-git-send-email-anilkumar@ti.com>
+References: <1346673139-14540-1-git-send-email-anilkumar@ti.com>
+ <1346673139-14540-4-git-send-email-anilkumar@ti.com>
+Message-ID: <50450EE2.3000107@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 September 2012, Linus Walleij wrote:
-> In the PL010 UART callback a comparison against the location of the
-> statically allocated PL010 device is done to figure out which UART
-> is doing the callback. This does not play well with dynamic devices
-> such as in device tree, so let's check the base address of the
-> memory resource inside the amba_device instead.
+On 09/03/2012 01:52 PM, AnilKumar Ch wrote:
+> Add of_dev_auxdata to pass d_can raminit callback APIs to initialize
+> d_can RAM. D_CAN RAM initialization bits are present in CONTROL module
+> address space, which can be accessed by platform specific code. So
+> callback functions are added to serve this purpose, this can done by
+> using of_dev_auxdata.
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Callback API is added to of_dev_auxdata with different instance numbers
+> for two instances of D_CAN IP. These callback functions are used to
+> enable/disable D_CAN RAM from CAN driver.
+> 
+> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+
+This will be a more complicated. This patch will go over the arm tree,
+but needs a header going via net.
+
+Marc
+
 > ---
-> ChangeLog v2->v3:
-> - Check for the base address of the physical memory resource instead
->   of checking for the device name (which will also be dynamic when
->   we use device tree).
+>  arch/arm/mach-omap2/board-generic.c |   40 ++++++++++++++++++++++++++++++++++-
+>  arch/arm/mach-omap2/control.h       |    4 ++++
+>  2 files changed, 43 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> index 6f93a20..b68e642 100644
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/irqdomain.h>
+> +#include <linux/can/platform/c_can.h>
+>  
+>  #include <mach/hardware.h>
+>  #include <asm/hardware/gic.h>
+> @@ -22,6 +23,8 @@
+>  
+>  #include <plat/board.h>
+>  #include "common.h"
+> +#include "control.h"
+> +#include "iomap.h"
+>  #include "common-board-devices.h"
+>  
+>  #if !(defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3))
+> @@ -37,11 +40,46 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
+>  	{ }
+>  };
+>  
+> +void d_can_hw_raminit(unsigned int instance, bool enable)
+> +{
+> +	u32 val;
+> +
+> +	val = readl(AM33XX_CTRL_REGADDR(AM33XX_CONTROL_DCAN_RAMINIT));
+> +	if (enable) {
+> +		val &= ~AM33XX_DCAN_RAMINIT_START_MASK(instance);
+> +		val |= AM33XX_DCAN_RAMINIT_START_MASK(instance);
+> +		writel(val, AM33XX_CTRL_REGADDR(AM33XX_CONTROL_DCAN_RAMINIT));
+> +	} else {
+> +		val &= ~AM33XX_DCAN_RAMINIT_START_MASK(instance);
+> +		writel(val, AM33XX_CTRL_REGADDR(AM33XX_CONTROL_DCAN_RAMINIT));
+> +	}
+> +}
+> +
+> +static struct c_can_platform_data d_can0_pdata = {
+> +	.ram_init	= d_can_hw_raminit,
+> +	.instance	= 0,
+> +};
+> +
+> +static struct c_can_platform_data d_can1_pdata = {
+> +	.ram_init	= d_can_hw_raminit,
+> +	.instance	= 1,
+> +};
+> +
+> +static const struct of_dev_auxdata am33xx_auxdata_lookup[] __initconst = {
+> +	OF_DEV_AUXDATA("bosch,d_can", 0x481cc000, NULL, &d_can0_pdata),
+> +	OF_DEV_AUXDATA("bosch,d_can", 0x481d0000, NULL, &d_can1_pdata),
+> +	{ },
+> +};
+> +
+>  static void __init omap_generic_init(void)
+>  {
+>  	omap_sdrc_init(NULL, NULL);
+>  
+> -	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
+> +	if (of_machine_is_compatible("ti,am33xx"))
+> +		of_platform_populate(NULL, omap_dt_match_table,
+> +				am33xx_auxdata_lookup, NULL);
+> +	else
+> +		of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
+>  }
+>  
+>  #ifdef CONFIG_SOC_OMAP2420
+> diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+> index b8cdc85..afd189b 100644
+> --- a/arch/arm/mach-omap2/control.h
+> +++ b/arch/arm/mach-omap2/control.h
+> @@ -356,6 +356,10 @@
+>  #define AM33XX_CONTROL_STATUS_SYSBOOT1_SHIFT		22
+>  #define AM33XX_CONTROL_STATUS_SYSBOOT1_MASK		(0x3 << 22)
+>  
+> +/* AM33XX DCAN bitfields */
+> +#define AM33XX_CONTROL_DCAN_RAMINIT		0x644
+> +#define AM33XX_DCAN_RAMINIT_START_MASK(i)	(1 << (i))
+> +
+>  /* CONTROL OMAP STATUS register to identify OMAP3 features */
+>  #define OMAP3_CONTROL_OMAP_STATUS	0x044c
+>  
+> 
 
-Ok, looks good to me.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120903/dd972ef0/attachment-0001.sig>
