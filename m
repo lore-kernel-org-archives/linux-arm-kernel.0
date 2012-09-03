@@ -1,39 +1,34 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Sep 2012 13:58:04 +0200
-Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
- I2C driver
-In-Reply-To: <CAF2Aj3j25w1Nn9O6hV+=i-j1ts_p_Ucswk_M7r04S7i5BzPkHg@mail.gmail.com>
-References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
- <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
- <20120831112258.GA2624@pengutronix.de>
- <20120831122323.GC5962@gmail.com>
- <CACRpkdZ=C1EV4WO2b=1YLHPNhsDsQdq7Kfnpzm8i7uGRtVjJuQ@mail.gmail.com>
- <20120903094448.GB11780@pengutronix.de>
- <20120903100656.GC5782@gmail.com>
- <CACRpkdb8owKBxawAv4LVVYx5kUgZ9cUSiQ=BV0f3Pf3bHtknuQ@mail.gmail.com>
- <CAF2Aj3j25w1Nn9O6hV+=i-j1ts_p_Ucswk_M7r04S7i5BzPkHg@mail.gmail.com>
-Message-ID: <CACRpkdZ5VFhrbONy=0K5MFh4e6BDFckq0yqzjQ2QkW9MgwKqBg@mail.gmail.com>
+Date: Mon, 3 Sep 2012 14:02:34 +0200
+Subject: [PATCH 4/4] ARM: ks8695: convert to generic time and clocksource
+In-Reply-To: <201209021849.54348.arnd@arndb.de>
+References: <1346264842-20411-1-git-send-email-linus.walleij@linaro.org>
+ <504057A8.7030302@snapgear.com>
+ <CACRpkdZ0Gw5H_yRcN2CmC+F8NtUcySTrLehuzZdWrbDwL4HHWw@mail.gmail.com>
+ <201209021849.54348.arnd@arndb.de>
+Message-ID: <CACRpkdab72Z86i21TNohS0YO=Bav7eQgHwQyXa0tXQB=0hhgAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 3, 2012 at 1:32 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Sun, Sep 2, 2012 at 8:49 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 31 August 2012, Linus Walleij wrote:
 
-> No, this is wrong. Platform data should not override DT.
+>> (BTW I had not clue the 68K maintainer had a platform like
+>> this, fun!)
 >
-> If DT is enabled and passed, it should have highest priority.
+> Note that this platform is one of those we talked about removing
+> from the kernel for potentially being completely unused.
 
-Oh is that so.
+This clock stuff was a lackmus test from my side. The idea
+was that if noone tested the patches I would instead
+propose a patch deleting the platform.
 
-Rob: do we have a clear consensus on this? Then we should document
-it in Documentation/devicetree/usage-model.txt.
+Guess what: Greg jumps out like jack-in-the-box. I suspect
+some of these platforms may have more users than we
+believe.
 
-(That document isn't part of the binding I believe, so we could define
-Linux-specific behaviours in it.)
-
-I always thought it was the other way around, that pdata took priority.
-
-Usecase: hardcoded bootloader passer erroneous DT to a platform.
-No way out. What to do? Override with pdata.
+Unsure about the genesis though, it has not even
+compiled for a while. I'm poking some of them one by one.
 
 Yours,
 Linus Walleij
