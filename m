@@ -1,112 +1,68 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 3 Sep 2012 16:46:53 +0200
-Subject: [PATCH v2 1/8] ARM/dts: OMAP2: Add McBSP entries for OMAP2420
- and OMAP2430 SoC
-In-Reply-To: <1346247067-9632-2-git-send-email-peter.ujfalusi@ti.com>
-References: <1346247067-9632-1-git-send-email-peter.ujfalusi@ti.com>
- <1346247067-9632-2-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <5044C2DD.5000705@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 3 Sep 2012 22:49:44 +0800
+Subject: [PATCHv2 1/3] ARM: dts: mxs: Add missing address and size cells
+ in SSP* nodes
+In-Reply-To: <1346666749-6094-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1346666749-6094-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20120903144941.GH2362@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Which tree your patches are based on?  Neither does it apply on v3.6-rc
+nor my mxs/dt-for-3.7 branch.
 
-The overall series looks good to me, but I do have a couple of comments.
-
-On 08/29/2012 03:31 PM, Peter Ujfalusi wrote:
-> The McBSP IP within OMAP2420 and 2430 is different we need to create separate
-> dtsi files for them.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  arch/arm/boot/dts/omap2420.dtsi |   39 ++++++++++++++++++
->  arch/arm/boot/dts/omap2430.dtsi |   83 +++++++++++++++++++++++++++++++++++++++
->  2 files changed, 122 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/omap2420.dtsi
->  create mode 100644 arch/arm/boot/dts/omap2430.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
-> new file mode 100644
-> index 0000000..f375c68
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap2420.dtsi
-> @@ -0,0 +1,39 @@
-> +/*
-> + * Device Tree Source for OMAP2420 SoC
-> + *
-> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-
-Nit: 2012
-
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +
-> +/include/ "omap2.dtsi"
-> +
-> +/ {
-> +	compatible = "ti,omap2420", "ti,omap2";
-> +
-> +	ocp {
-> +		mcbsp1: mcbsp at 48074000 {
-> +			compatible = "ti,omap2420-mcbsp";
-> +			reg = <0x48074000 0xff>;
-> +			reg-names = "mpu";
-> +			interrupts = <0 59 0x4>, /* TX interrupt */
-> +				     <0 60 0x4>; /* RX interrupt */
-
-That one is not correct because it does comply with the interrupt
-controller specifier that require only one cell:
-
-		intc: interrupt-controller at 48200000 {
-			compatible = "ti,omap2-intc";
-			interrupt-controller;
-			#interrupt-cells = <1>;
-...
-
-The one you are using is for GIC IRQ controller.
-It works probably because we are using hwmod so far :-)
-
-Didn't you get some warning?
-
-In the case of OMAP2 & 3, it is much simpler:
-
-> +			interrupts = <59>, /* TX interrupt */
-> +				     <60>; /* RX interrupt */
-
-That comment is applicable for OMAP2420, OMAP2430, and OMAP3 in general.
-
-> +			interrupt-names = "tx", "rx";
-> +			interrupt-parent = <&intc>;
-> +			ti,hwmods = "mcbsp1";
-> +		};
-> +
-> +		mcbsp2: mcbsp at 48076000 {
-> +			compatible = "ti,omap2420-mcbsp";
-> +			reg = <0x48076000 0xff>;
-> +			reg-names = "mpu";
-> +			interrupts = <0 62 0x4>, /* TX interrupt */
-> +				     <0 63 0x4>; /* RX interrupt */
-> +			interrupt-names = "tx", "rx";
-> +			interrupt-parent = <&intc>;
-> +			ti,hwmods = "mcbsp2";
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
-> new file mode 100644
-> index 0000000..531e346
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap2430.dtsi
-> @@ -0,0 +1,83 @@
-> +/*
-> + * Device Tree Source for OMAP243x SoC
-> + *
-> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-
-2012.
+Nit: The "*" in subject is not really needed.  "... in SSP nodes" looks
+just fine.
 
 Regards,
-Benoit
+Shawn
+
+On Mon, Sep 03, 2012 at 12:05:47PM +0200, Maxime Ripard wrote:
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/imx28.dtsi |    8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 26a166c..8497a0e 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -86,6 +86,8 @@
+>  			};
+>  
+>  			ssp0: ssp at 80010000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+>  				reg = <0x80010000 2000>;
+>  				interrupts = <96 82>;
+>  				fsl,ssp-dma-channel = <0>;
+> @@ -93,6 +95,8 @@
+>  			};
+>  
+>  			ssp1: ssp at 80012000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+>  				reg = <0x80012000 2000>;
+>  				interrupts = <97 83>;
+>  				fsl,ssp-dma-channel = <1>;
+> @@ -100,6 +104,8 @@
+>  			};
+>  
+>  			ssp2: ssp at 80014000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+>  				reg = <0x80014000 2000>;
+>  				interrupts = <98 84>;
+>  				fsl,ssp-dma-channel = <2>;
+> @@ -107,6 +113,8 @@
+>  			};
+>  
+>  			ssp3: ssp at 80016000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+>  				reg = <0x80016000 2000>;
+>  				interrupts = <99 85>;
+>  				fsl,ssp-dma-channel = <3>;
+> -- 
+> 1.7.9.5
+> 
