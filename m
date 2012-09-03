@@ -1,60 +1,65 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 03 Sep 2012 11:10:27 +0200
-Subject: mxc_nand.c on mach-imx/imx53
-In-Reply-To: <20120903085517.GE26594@pengutronix.de>
-References: <5035F84E.3000901@antcom.de>
- <20120829074122.GV26594@pengutronix.de> <503E3331.8050203@antcom.de>
- <20120829172820.43bbe68e@eb-e6520> <50407E44.5080408@antcom.de>
- <504098A1.4050208@antcom.de> <20120903085517.GE26594@pengutronix.de>
-Message-ID: <50447403.4010003@antcom.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 3 Sep 2012 11:22:28 +0200
+Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
+ I2C driver
+In-Reply-To: <20120831122323.GC5962@gmail.com>
+References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
+ <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
+ <20120831112258.GA2624@pengutronix.de>
+ <20120831122323.GC5962@gmail.com>
+Message-ID: <CACRpkdZ=C1EV4WO2b=1YLHPNhsDsQdq7Kfnpzm8i7uGRtVjJuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/2012 10:55 AM, Sascha Hauer wrote:
-> On Fri, Aug 31, 2012 at 12:57:37PM +0200, Roland Stigge wrote:
->> On 08/31/2012 11:05 AM, Roland Stigge wrote:
->>> I tried to port this on top of Sascha's patches for imx53, only for mxc v3 for now, as below.
->>>
->>> Unfortunately, I still get:
->>>
->>> ...
->>> UnCorrectable RS-ECC Error
->>> UnCorrectable RS-ECC Error
->>> UnCorrectable RS-ECC Error
->>> UnCorrectable RS-ECC Error
->>> UnCorrectable RS-ECC Error
-> 
-> Have you written the data you are unable to read with this driver?
+On Fri, Aug 31, 2012 at 2:23 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-No, maybe that's one of the reasons. The bootloader also seems to
-implement a different on-flash layout. But as written, the problem is
-gone with the below fix.
+(...)
+>  static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
+>  {
+>         int ret = 0;
+>         struct nmk_i2c_controller *pdata = adev->dev.platform_data;
+> +       struct device_node *np = adev->dev.of_node;
+>         struct nmk_i2c_dev      *dev;
+>         struct i2c_adapter *adap;
+>
+> +       if (np) {
+> +               if (!pdata) {
 
->> --- linux-2.6.orig/drivers/mtd/nand/mxc_nand.c
->> +++ linux-2.6/drivers/mtd/nand/mxc_nand.c
->> @@ -1141,14 +1141,14 @@ static void mxc_nand_command(struct mtd_
->>                 host->devtype_data->send_cmd(host, command, true);
->>                 mxc_do_addr_cycle(mtd, column, page_addr);
->>                 host->devtype_data->send_read_id(host);
->> -               host->buf_start = column;
->> +               host->buf_start = 0;
->>                 break;
->>  
->>         case NAND_CMD_PARAM:
->>                 host->devtype_data->send_cmd(host, command, true);
->>                 mxc_do_addr_cycle(mtd, column, page_addr);
->>                 host->devtype_data->send_read_param(host);
->> -               host->buf_start = column;
->> +               host->buf_start = 0;
-> 
-> On what tree are you working? I cannot find a handling of
-> NAND_CMD_PARAM in my tree.
+So, if no pdata is provided, we go on to allocate some ...
 
-That's on top of the patch I ported from Eric's barebox driver (other
-mail, but only for imx53/v3 for now). Sorry for the confusion.
+> +                       pdata = devm_kzalloc(&adev->dev, sizeof(*pdata), GFP_KERNEL);
+> +                       if (!pdata) {
+> +                               ret = -ENOMEM;
+> +                               goto err_no_mem;
+> +                       }
+> +               }
+> +               /* Provide the default configuration as a base. */
+> +               pdata = &u8500_i2c;
 
-I can prepare a single patch, but maybe Eric's more knowledgeable on
-this driver (including v1/v2 that I can't test), he announced a patch
-for this week.
+Then you just override that pointer with a pointer to the local config.
 
-Roland
+> +               nmk_i2c_of_probe(np, pdata);
+> +       }
+> +
+>         if (!pdata)
+>                 /* No i2c configuration found, using the default. */
+>                 pdata = &u8500_i2c;
+
+This in it's entirety does not look sound. I *think* this is what you
+want to do,
+replace all of the above codde (including the last if (!pdata) clause) with:
+
+if (!pdata) {
+    /* If no platform data passed in, use the default configuration as
+a base. */
+    pdata = &u8500_i2c;
+    if (np)
+        /* Further, if we have a DT node, override the default with this */
+        nmk_i2c_of_probe(np, pdata);
+}
+
+This makes any passed pdata take precedence, else default pdata
+complemented with DT info. Which is what we want.
+
+Yours,
+Linus Walleij
