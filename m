@@ -1,159 +1,52 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Mon, 3 Sep 2012 12:25:36 +0000
-Subject: [PATCH RESEND v4 2/3] arm/dts: AM33XX: Configure pinmuxs for
- user leds control on Bone
-References: <1346141454-18786-1-git-send-email-anilkumar@ti.com>
- <1346141454-18786-3-git-send-email-anilkumar@ti.com>
- <20120830203505.GB1303@atomide.com>
- <C1D7B7D4-D576-4256-83F3-09689B4087C3@dominion.thruhere.net>
- <331ABD5ECB02734CA317220B2BBEABC13EA234A9@DBDE01.ent.ti.com>
- <6D25CE9A-4FA3-4F1E-9549-6A512F2FDCEC@dominion.thruhere.net>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA25D38@DBDE01.ent.ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 03 Sep 2012 14:28:32 +0200
+Subject: [PATCH 6/6] ARM: Exynos: Add basic dts file for Samsung Trats
+ board
+In-Reply-To: <CAJuYYwSPfEk7fkcR=vP0GmSe924BJPNwoO=1CaSXX3zUFWwBoQ@mail.gmail.com>
+References: <1346311903-15920-1-git-send-email-t.figa@samsung.com>
+ <1346311903-15920-7-git-send-email-t.figa@samsung.com>
+ <CAJuYYwSPfEk7fkcR=vP0GmSe924BJPNwoO=1CaSXX3zUFWwBoQ@mail.gmail.com>
+Message-ID: <1968975.iys2N65Q5Y@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Koen,
+Hi Thomas,
 
-On Sat, Sep 01, 2012 at 18:21:10, AnilKumar, Chimata wrote:
-> Hi Koen,
+Thanks for reviewing the patch.
+
+On Friday 31 of August 2012 09:54:20 Thomas Abraham wrote:
+> > +       wakeup_eint: interrupt-controller-wakeup-eint {
+> > +               compatible = "samsung,exynos4210-wakeup-eint";
+> > +               reg = <0x11000000 0x1000>;
+> > +               #interrupt-cells = <2>;
+> > +               interrupt-controller;
+> > +               interrupts =    <0 16 0>, <0 17 0>, <0 18 0>, <0 19 0>,
+> > +                               <0 20 0>, <0 21 0>, <0 22 0>, <0 23 0>,
+> > +                               <0 24 0>, <0 25 0>, <0 26 0>, <0 27 0>,
+> > +                               <0 28 0>, <0 29 0>, <0 30 0>, <0 31 0>,
+> > +                               <0 32 0>;
+> > +       };
 > 
-> On Sat, Sep 01, 2012 at 16:17:35, Koen Kooi wrote:
-> > 
-> > 
-> > Op 1 sep. 2012 om 09:01 heeft "AnilKumar, Chimata" <anilkumar@ti.com> het volgende geschreven:
-> > 
-> > > Hi Koen,
-> > > 
-> > > On Fri, Aug 31, 2012 at 21:23:18, Koen Kooi wrote:
-> > >> 
-> > >> Op 30 aug. 2012, om 22:35 heeft Tony Lindgren <tony@atomide.com> het volgende geschreven:
-> > >> 
-> > >>> * AnilKumar Ch <anilkumar@ti.com> [120828 01:11]:
-> > >>>> Adds GPIO pinctrl nodes to am3358_pinmux master node to control
-> > >>>> user leds (USR0, USR1, USR2 and USR3) present on BeagleBone.
-> > >>>> 
-> > >>>> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
-> > >>>> ---
-> > >>>> arch/arm/boot/dts/am335x-bone.dts |   14 ++++++++++++++
-> > >>>> 1 file changed, 14 insertions(+)
-> > >>>> 
-> > >>>> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-> > >>>> index a7906cb..58f5042 100644
-> > >>>> --- a/arch/arm/boot/dts/am335x-bone.dts
-> > >>>> +++ b/arch/arm/boot/dts/am335x-bone.dts
-> > >>>> @@ -18,6 +18,20 @@
-> > >>>>        reg = <0x80000000 0x10000000>; /* 256 MB */
-> > >>>>    };
-> > >>>> 
-> > >>>> +    am3358_pinmux: pinmux at 44E10800 {
-> > >>>> +        pinctrl-names = "default";
-> > >>>> +        pinctrl-0 = <&userled_pins>;
-> > >>>> +
-> > >>>> +        userled_pins: pinmux_userled_pins {
-> > >>>> +            pinctrl-single,pins = <
-> > >>>> +                0x54 0x7    /* gpmc_a5.gpio1_21, OUTPUT | MODE7 */
-> > >>>> +                0x58 0x17    /* gpmc_a6.gpio1_22, OUTPUT_PULLUP | MODE7 */
-> > >>>> +                0x5C 0x7    /* gpmc_a7.gpio1_23, OUTPUT | MODE7 */
-> > >>>> +                0x60 0x17    /* gpmc_a8.gpio1_24, OUTPUT_PULLUP | MODE7 */
-> > >>>> +            >;
-> > >>>> +        };
-> > >>>> +    };
-> > >>>> +
-> > >>> 
-> > >>> Looks like this patch should also claim these pins by the led driver.
-> > >>> Then the led driver should just do pinctrl_get_select_default(&pdev->dev)
-> > >>> in it's probe function to set the pins.
-> > >> 
-> > >> FWIW, I've been using this for a while now:
-> > >> 
-> > >> +       leds {
-> > >> +               compatible = "gpio-leds";
-> > >> +               heartbeat {
-> > >> +                       label = "beaglebone::usr0";
-> > >> +                       gpios = <&gpio2 21 0>;
-> > >> +                       linux,default-trigger = "heartbeat";
-> > >> +               };
-> > >> +
-> > >> +               mmc {
-> > >> +                       label = "beaglebone:usr1";
-> > >> +                       gpios = <&gpio2 22 0>;
-> > >> +                       linux,default-trigger = "mmc0";
-> > >> +               };
-> > > 
-> > > Thanks for the inputs, similar data but not exact is added to
-> > > v5 series.
-> > > 
-> > > +        gpio-leds {
-> > > +            compatible = "gpio-leds";
-> > > +            pinctrl-names = "default";
-> > > +            pinctrl-0 = <&userled_pins>;
-> > > +
-> > > +            led0 {
-> > > +                label = "status:green:user0";
-> > > +                gpios = <&gpio2 21 0>;
-> > > +                default-state = "off";
-> > > +            };
-> > > +
-> > > +            led1 {
-> > > +                label = "status:green:user1";
-> > > +                gpios = <&gpio2 22 0>;
-> > > +                default-state = "off";
-> > > +            };
-> > > +
-> > > +            led2 {
-> > > +                label = "status:green:user2";
-> > > +                gpios = <&gpio2 23 0>;
-> > > +                default-state = "off";
-> > > +            };
-> > > +
-> > > +            led3 {
-> > > +                label = "status:green:user3";
-> > > +                gpios = <&gpio2 24 0>;
-> > > +                default-state = "off";
-> > > +            };
-> > > +        };
-> > > +
-> > > 
-> > > Can you review my v5 patches and tell me if there are any
-> > > modifications/changes required?
-> > 
-> > It would be nice to keep de heartbeat and mmc triggers like we have in the 3.2 kernel that ships with the bone
-> > 
+> The external wakeup node should be in the exynos4.dtsi file since this
+> is common across all Exynos4 SoC's. Besides, the device tree support
+> patches for wakeup-interrupts is not being pursed anymore, since it is
+> now handled in pinctrl driver itself. So it would be better not to
+> include this node.
+
+Right. We will eventually add support for external wakeup sources using 
+pinctrl.
+
+> > +       spi_2: spi at 13940000 {
+> > +               status = "disabled";
+> > +       };
+> > +};
 > 
-> I will merge your changes and repost the patches.
-> 
+> If we choose to mark the nodes in dtsi files as "disabled" then we can
+> avoid these here.
 
-Adding first two leds according to your inputs and for other two
-I am adding like this.
+OK.
 
-+                       heartbeat {
-+                               label = "beaglebone:green:usr0";
-+                               gpios = <&gpio2 21 0>;
-+                               linux,default-trigger = "heartbeat";
-+                               default-state = "off";
-+                       };
-+
-+                       mmc {
-+                               label = "beaglebone:green:usr1";
-+                               gpios = <&gpio2 22 0>;
-+                               linux,default-trigger = "mmc0";
-+                               default-state = "off";
-+                       };
-+
-+                       timer {
-+                               label = "beaglebone:green:usr2";
-+                               gpios = <&gpio2 23 0>;
-+                               linux,default-trigger = "timer";
-+                               default-state = "off";
-+                       };
-+
-+                       led3 {
-+                               label = "beaglebone:green:usr3";
-+                               gpios = <&gpio2 24 0>;
-+                               default-state = "off";
-+                       };
-+               };
-+
-
-Thanks
-AnilKumar
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
