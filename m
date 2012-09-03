@@ -1,61 +1,66 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 03 Sep 2012 13:00:24 +0200
-Subject: [GIT PULL] DMA-mapping fixes for v3.6
-Message-ID: <1346670024-504-1-git-send-email-m.szyprowski@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 3 Sep 2012 13:07:24 +0200
+Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
+ I2C driver
+In-Reply-To: <20120903100656.GC5782@gmail.com>
+References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
+ <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
+ <20120831112258.GA2624@pengutronix.de>
+ <20120831122323.GC5962@gmail.com>
+ <CACRpkdZ=C1EV4WO2b=1YLHPNhsDsQdq7Kfnpzm8i7uGRtVjJuQ@mail.gmail.com>
+ <20120903094448.GB11780@pengutronix.de>
+ <20120903100656.GC5782@gmail.com>
+Message-ID: <CACRpkdb8owKBxawAv4LVVYx5kUgZ9cUSiQ=BV0f3Pf3bHtknuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Mon, Sep 3, 2012 at 12:07 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-I would like to ask for pulling another set of fixes for ARM dma-mapping
-subsystem. Commit e9da6e9905e6 replaced custom consistent buffer
-remapping code with generic vmalloc areas. It however introduced some
-regressions caused by limited support for allocations in atomic context.
-This series contains fixes for those regressions. For some subplatforms
-the default, pre-allocated pool for atomic allocations turned out to be
-too small, so a function for setting its size has been added. Another
-set of patches adds support for atomic allocations to IOMMU-aware
-DMA-mapping implementation. The last part of this pull request contains
-two fixes for Contiguous Memory Allocator, which relax too strict
-requirements.
+(...)
+> +       if (np) {
+> +               if (!pdata) {
+> +                       pdata = devm_kzalloc(&adev->dev, sizeof(*pdata), GFP_KERNEL);
+> +                       if (!pdata) {
+> +                               ret = -ENOMEM;
+> +                               goto err_no_mem;
+> +                       }
+> +               }
+> +               /* Provide the default configuration as a base. */
+> +               memcpy(pdata, &u8500_i2c, sizeof(struct nmk_i2c_controller));
 
-The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
+Here you blank out any pdata passed from say a board file or
+whatever if pdata != NULL.
 
-  Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
+> +
+> +               nmk_i2c_of_probe(np, pdata);
+> +       }
+> +
+>         if (!pdata)
+>                 /* No i2c configuration found, using the default. */
+>                 pdata = &u8500_i2c;
 
-are available in the git repository at:
+So this is still wrong, if pdata is passed to the driver it will
+not override the DT, you have the semantics the other way
+around, DT overrides pdata.
 
-   fixes-for-3.6
+Look at the switch statement in my previous comment,
+just add the allocations and a memcpy() and it still holds:
 
-for you to fetch changes up to 479ed93a4b98eef03fd8260f7ddc00019221c450:
+if (!pdata) {
+    if (np) {
+              pdata = devm_kzalloc(&adev->dev, sizeof(*pdata), GFP_KERNEL);
+                      if (!pdata) {
+                              ret = -ENOMEM;
+                              goto err_no_mem;
+                      }
+              }
+              /* Provide the default configuration as a base. */
+              memcpy(pdata, &u8500_i2c, sizeof(struct nmk_i2c_controller));
+              nmk_i2c_of_probe(np, pdata);
+    } else
+         /* Just use the static pdata */
+         pdata = &u8500_i2c;
+}
 
-  ARM: dma-mapping: IOMMU allocates pages from atomic_pool with GFP_ATOMIC (2012-08-28 21:01:07 +0200)
-
-Thanks!
-
-Best regards
-Marek Szyprowski
-Samsung Poland R&D Center
-
-----------------------------------------------------------------
-Patch summary:
-
-Hiroshi Doyu (4):
-      ARM: dma-mapping: atomic_pool with struct page **pages
-      ARM: dma-mapping: Refactor out to introduce __in_atomic_pool
-      ARM: dma-mapping: Introduce __atomic_get_pages() for __iommu_get_pages()
-      ARM: dma-mapping: IOMMU allocates pages from atomic_pool with GFP_ATOMIC
-
-Marek Szyprowski (5):
-      mm: cma: fix alignment requirements for contiguous regions
-      ARM: relax conditions required for enabling Contiguous Memory Allocator
-      ARM: DMA-Mapping: add function for setting coherent pool size from platform code
-      ARM: DMA-Mapping: print warning when atomic coherent allocation fails
-      ARM: Kirkwood: increase atomic coherent pool size
-
- arch/arm/Kconfig                   |    2 +-
- arch/arm/include/asm/dma-mapping.h |    7 ++
- arch/arm/mach-kirkwood/common.c    |    7 ++
- arch/arm/mm/dma-mapping.c          |  114 ++++++++++++++++++++++++++++++++---
- drivers/base/dma-contiguous.c      |    2 +-
- 5 files changed, 120 insertions(+), 12 deletions(-)
+Yours,
+Linus Walleij
