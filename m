@@ -1,34 +1,95 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Sep 2012 14:02:34 +0200
-Subject: [PATCH 4/4] ARM: ks8695: convert to generic time and clocksource
-In-Reply-To: <201209021849.54348.arnd@arndb.de>
-References: <1346264842-20411-1-git-send-email-linus.walleij@linaro.org>
- <504057A8.7030302@snapgear.com>
- <CACRpkdZ0Gw5H_yRcN2CmC+F8NtUcySTrLehuzZdWrbDwL4HHWw@mail.gmail.com>
- <201209021849.54348.arnd@arndb.de>
-Message-ID: <CACRpkdab72Z86i21TNohS0YO=Bav7eQgHwQyXa0tXQB=0hhgAg@mail.gmail.com>
+Date: Mon, 3 Sep 2012 14:15:35 +0200
+Subject: [PATCH] ARM: ux500: Provide SMSC911x fixed-regulator when not
+ booting DT
+In-Reply-To: <1345809612-30992-1-git-send-email-lee.jones@linaro.org>
+References: <1345809612-30992-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZX=bHYJ-BOZg68wjPZ6ZxwBq5BTL+0yR8sRdYAYAm9pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 2, 2012 at 8:49 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 31 August 2012, Linus Walleij wrote:
+On Fri, Aug 24, 2012 at 2:00 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
->> (BTW I had not clue the 68K maintainer had a platform like
->> this, fun!)
+> The SMSC911x Ethernet chip requires a fixed-regulator in order to
+> function correctly.
+
+Thanks for fixing this.
+
+> +#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
+
+No, just select REGULATOR_FIXED_VOLTAGE in apropriate
+Kconfig entry, that's simpler. (Suspect under MACH_MOP500.)
+
+(...)
+> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+> index de10f8f..0e904c8 100644
+> --- a/arch/arm/mach-ux500/board-mop500.c
+> +++ b/arch/arm/mach-ux500/board-mop500.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/spi/spi.h>
+>  #include <linux/mfd/abx500/ab8500.h>
+>  #include <linux/regulator/ab8500.h>
+> +#include <linux/regulator/fixed.h>
+>  #include <linux/mfd/tc3589x.h>
+>  #include <linux/mfd/tps6105x.h>
+>  #include <linux/mfd/abx500/ab8500-gpio.h>
+> @@ -75,6 +76,25 @@ static struct platform_device snowball_led_dev = {
+>         },
+>  };
 >
-> Note that this platform is one of those we talked about removing
-> from the kernel for potentially being completely unused.
+> +#ifdef CONFIG_REGULATOR_FIXED_VOLTAGE
 
-This clock stuff was a lackmus test from my side. The idea
-was that if noone tested the patches I would instead
-propose a patch deleting the platform.
+Here too, get rid of the #ifdef.
 
-Guess what: Greg jumps out like jack-in-the-box. I suspect
-some of these platforms may have more users than we
-believe.
+> +static struct fixed_voltage_config snowball_gpio_en_3v3_data = {
+> +       .supply_name            = "EN-3V3",
+> +       .gpio                   = SNOWBALL_EN_3V3_ETH_GPIO,
+> +       .microvolts             = 3300000,
+> +       .enable_high            = 1,
+> +       .init_data              = &gpio_en_3v3_regulator,
+> +       .startup_delay          = 5000, /* 1200us */
+> +};
+> +
+> +static struct platform_device snowball_gpio_en_3v3_regulator_dev = {
+> +       .name   = "reg-fixed-voltage",
+> +       .id     = 1,
+> +       .dev    = {
+> +               .platform_data  = &snowball_gpio_en_3v3_data,
+> +       },
+> +};
+> +#endif
 
-Unsure about the genesis though, it has not even
-compiled for a while. I'm poking some of them one by one.
+(...)
+>  static struct ab8500_gpio_platform_data ab8500_gpio_pdata = {
+>         .gpio_base              = MOP500_AB8500_PIN_GPIO(1),
+>         .irq_base               = MOP500_AB8500_VIR_GPIO_IRQ_BASE,
+> @@ -585,6 +605,7 @@ static struct platform_device *snowball_platform_devs[] __initdata = {
+>         &snowball_led_dev,
+>         &snowball_key_dev,
+>         &snowball_sbnet_dev,
+> +       &snowball_gpio_en_3v3_regulator_dev,
+
+Since as you're not #ifdef:in around this entry it will not compile anyway
+without fixed regulators.
+
+(...)
+>  /* Snowball specific GPIO assignments, this board has no GPIO expander */
+> +#define SNOWBALL_EN_3V3_ETH_GPIO       26
+>  #define SNOWBALL_ACCEL_INT1_GPIO       163
+>  #define SNOWBALL_ACCEL_INT2_GPIO       164
+>  #define SNOWBALL_MAGNET_DRDY_GPIO      165
+> @@ -76,7 +77,6 @@
+>  #define SNOWBALL_PM_GPIO4_GPIO         MOP500_AB8500_PIN_GPIO(4)       /* SYSCLKREQ6/GPIO4 */
+>  #define SNOWBALL_EN_3V6_GPIO           MOP500_AB8500_PIN_GPIO(16)      /* PWMOUT3/GPIO16 */
+>  #define SNOWBALL_PME_ETH_GPIO          MOP500_AB8500_PIN_GPIO(24)      /* SYSCLKREQ7/GPIO24 */
+> -#define SNOWBALL_EN_3V3_ETH_GPIO       MOP500_AB8500_PIN_GPIO(26)      /* GPIO26 */
+
+As noted by Philippe, please drop this hunk off the patch for now.
+The AB8500 GPIO is the right one... Probably you're lucky that U-boot
+draws the pin high and activates this voltage.
+
+BTW: disablingt the AB8500 pin 26 and thus noting that ethernet screws
+up may be a good test for the AB8500 GPIO driver.
 
 Yours,
 Linus Walleij
