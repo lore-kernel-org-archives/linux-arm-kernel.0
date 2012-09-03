@@ -1,66 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 3 Sep 2012 21:38:40 +0000
-Subject: [PATCH 05/11] ARM: shmobile: r8a7779: add USB common phy
- initializer
-In-Reply-To: <1346376502-12114-6-git-send-email-horms@verge.net.au>
-References: <1346376502-12114-1-git-send-email-horms@verge.net.au>
- <1346376502-12114-6-git-send-email-horms@verge.net.au>
-Message-ID: <201209032138.41485.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 3 Sep 2012 23:43:37 +0200
+Subject: [PATCH 4/6 v2] ARM: integrator: initial device tree support
+In-Reply-To: <201209011841.58977.arnd@arndb.de>
+References: <1346471760-23993-1-git-send-email-linus.walleij@linaro.org>
+ <1346471760-23993-3-git-send-email-linus.walleij@linaro.org>
+ <1346471760-23993-4-git-send-email-linus.walleij@linaro.org>
+ <201209011841.58977.arnd@arndb.de>
+Message-ID: <CACRpkdZhJyqeeXV_Zcfi7S01oH1Kw95qvAmOqrMKwhSLb-mX=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 August 2012, Simon Horman wrote:
-> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> 
-> This patch adds common USB phy ports initializer for r8a7779.
-> 
-> The note is that each USB IP have own MSTP clock bit,
-> and common USB phy port doesn't have MSTP clock,
-> but this USB phy needs USB clock.
-> Each USB driver / platform should keep USB MSTP clock somehow.
-> 
-> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Signed-off-by: Simon Horman <horms@verge.net.au>
-> ---
->  arch/arm/mach-shmobile/include/mach/common.h |  1 +
->  arch/arm/mach-shmobile/setup-r8a7779.c       | 93 ++++++++++++++++++++++++++++
->  2 files changed, 94 insertions(+)
+On Sat, Sep 1, 2012 at 8:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Shouldn't the USB PHY driver go to drivers/usb/phy/ or
-drivers/usb/host/ehci-sh.c?
+> On Saturday 01 September 2012, Linus Walleij wrote:
+>> diff --git a/arch/arm/boot/dts/integratorcp.dts b/arch/arm/boot/dts/integratorcp.dts
+>> +/ {
+>> +     model = "ARM Integrator/CP";
+>> +     compatible = "arm,integrator-cp";
+>> +     ranges;
+>> +
+>> +     aliases {
+>> +             arm,integrator-clocksource = &timer2;
+>> +             arm,integrator-clockevent = &timer1;
+>> +     };
+>
+> It looks like this file is almost a direct superset of the integratorap.dts
+> file. How about including the other file from here and just adding the
+> extra nodes and overriding the few bits that are actually different?
 
-We are trying hard to move driver code out of the platform and into driver
-directories these days, and having it wired up as part of the platform
-the way you do also means it is always powered on.
+Isn't it more apropriate to create an integrator.dtsi for the common
+stuff and include that into integratorap.dts and integratorcp.dts?
 
-On Friday 31 August 2012, Simon Horman wrote:
-> +#ifdef CONFIG_ARCH_SUPPORTS_BIG_ENDIAN
-> +# define xHCI_ENDIAN "BIG"
-> +# define xHCI_NO_SWAP 0x00000003
-> +#else
-> +# define xHCI_ENDIAN "LITTLE"
-> +# define xHCI_NO_SWAP 0x00000000
-> +#endif
-> +
-> +/*
-> + * USB initial/install operation.
-> + *
-> + * This function setup USB phy.
-> + * The used value and setting order came from
-> + * [USB :: Initial setting] on datasheet.
-> + */
-> +int __init r8a7779_usb_phy_init(u32 usbpctrl0)
-> +{
-> +       void __iomem *reg0, *reg1;
-> +       int i;
-> +       u32 val;
-> +
-> +       reg0 = ioremap_nocache(0xffe70000, 0x900);
-> +       reg1 = ioremap_nocache(0xfff70000, 0x900);
-> +
+>> +#ifdef CONFIG_OF
+>> +
+> ...
+>> +DT_MACHINE_START(INTEGRATOR_AP_DT, "ARM Integrator/AP (Device Tree)")
+>> +     .reserve        = integrator_reserve,
+>> +     .map_io         = ap_map_io,
+>> +     .nr_irqs        = NR_IRQS_INTEGRATOR_AP,
+>> +     .init_early     = ap_init_early,
+>> +     .init_irq       = ap_init_irq_of,
+>> +     .handle_irq     = fpga_handle_irq,
+>> +     .timer          = &ap_of_timer,
+>> +     .init_machine   = ap_init,
+>> +     .restart        = integrator_restart,
+>> +     .dt_compat      = ap_dt_board_compat,
+>> +MACHINE_END
+>> +
+>> +#else
+>> +
+> ...
+>>  MACHINE_START(INTEGRATOR, "ARM-Integrator")
+>>       /* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
+>>       .atag_offset    = 0x100,
+>> @@ -486,3 +571,5 @@ MACHINE_START(INTEGRATOR, "ARM-Integrator")
+>>       .init_machine   = ap_init,
+>>       .restart        = integrator_restart,
+>>  MACHINE_END
+>> +
+>> +#endif
+>
+> I think we discussed this before. It would be nice to replace the #if/#else
+> with
+>
+> #ifdef CONFIG_OF
+> ...
+> #endif
+> #ifdef CONFIG_ATAG
+> ...
+> #endif
 
-I see neither big-endian support on shmobile, nor any XHCI (USB-3.0) driver, just
-the old EHCI (USB-2.0) and OHCI (USB-1.1) drivers. Are you submitting the XHCI
-support and big-endian platform code separately?
+Sure, have you applied Nico's patch adding CONFIG_ATAG to and
+ARM SoC branch so I can base my patches on it?
 
-	Arnd
+I was under the impression that his patch would go through Russell's
+tree and I would thus not be able to rely on it until it has landed there
+and you have pulled Russell's stuff into your tree.
+
+Currently I would make it impossible to use ATAGs if I do this since
+the symbol does not exist, so I really need to base such an
+approach in a tree which has CONFIG_ATAG in the first place.
+
+Yours,
+Linus Walleij
