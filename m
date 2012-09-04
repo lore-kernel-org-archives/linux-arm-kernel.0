@@ -1,59 +1,60 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  4 Sep 2012 12:40:32 +0200
-Subject: [PATCH V2 6/6] arm: l2x0: add aurora related properties to OF binding
+Date: Tue,  4 Sep 2012 12:40:31 +0200
+Subject: [PATCH V2 5/6] arm: mvebu: add Aurora L2 Cache Controller to the DT
 In-Reply-To: <1346755232-26006-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1346755232-26006-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1346755232-26006-7-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1346755232-26006-6-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aurora is a L2 Cache Controller designed to be compatible with the
-L2x0 Cache Controller. L2X0 OF bindings are extended to support some
-specificity of Aurora (no cache id part number available through
-hardware, always write through mode, choice between outer cache and
-system cache).
-
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
+Tested-and-reviewed-by: Yehuda Yitschak <yehuday@marvell.com>
 Tested-and-reviewed-by: Lior Amsalem <alior@marvell.com>
 
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Barry Song <21cnbao@gmail.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Olof Johansson <olof@lixom.net>
 ---
- Documentation/devicetree/bindings/arm/l2cc.txt |    9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/armada-370.dtsi |    6 ++++++
+ arch/arm/boot/dts/armada-xp.dtsi  |    7 +++++++
+ 2 files changed, 13 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-index 7ca5216..76b0ee6 100644
---- a/Documentation/devicetree/bindings/arm/l2cc.txt
-+++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-@@ -10,6 +10,12 @@ Required properties:
- 	"arm,pl310-cache"
- 	"arm,l220-cache"
- 	"arm,l210-cache"
-+	"marvell,aurora-system-cache": Marvell Controller designed to be
-+     compatible with the ARM one, with system cache mode (meaning
-+     maintenance operations on L1 are broadcasted to the L2 and L2
-+     performs the same operation).
-+	"marvell,"aurora-outer-cache: Marvell Controller designed to be
-+	 compatible with the ARM one with outer cache mode.
- - cache-unified : Specifies the cache is a unified cache.
- - cache-level : Should be set to 2 for a level 2 cache.
- - reg : Physical base address and size of cache controller's memory mapped
-@@ -29,6 +35,9 @@ Optional properties:
-   filter. Addresses in the filter window are directed to the M1 port. Other
-   addresses will go to the M0 port.
- - interrupts : 1 combined interrupt.
-+- cache-id-part: cache id part number to be used if it is not present
-+  on hardware
-+- wt-override: If present then L2 is forced to Write through mode
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 3228ccc..fa60478 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -20,6 +20,12 @@
+ / {
+ 	model = "Marvell Armada 370 family SoC";
+ 	compatible = "marvell,armada370", "marvell,armada-370-xp";
++	L2: l2-cache {
++		compatible = "marvell,aurora-outer-cache";
++		reg = <0xd0008000 0x1000>;
++		cache-id-part = <0x100>;
++		wt-override;
++	};
  
- Example:
+ 	mpic: interrupt-controller at d0020000 {
+ 	      reg = <0xd0020a00 0x1d0>,
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 71d6b5d..0186f62 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -22,6 +22,13 @@
+ 	model = "Marvell Armada XP family SoC";
+ 	compatible = "marvell,armadaxp", "marvell,armada-370-xp";
  
++	L2: l2-cache {
++		compatible = "marvell,aurora-system-cache";
++		reg = <0xd0008000 0x1000>;
++		cache-id-part = <0x100>;
++		wt-override;
++	};
++
+ 	mpic: interrupt-controller at d0020000 {
+ 	      reg = <0xd0020a00 0x1d0>,
+ 		    <0xd0021870 0x58>;
 -- 
 1.7.9.5
