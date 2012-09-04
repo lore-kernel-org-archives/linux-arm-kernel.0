@@ -1,58 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 Sep 2012 19:14:06 +0100
-Subject: [alsa-devel] [RFC 1/3] ASoC: dmaengine: Don't use runtime
- private data for dmaengine data
-In-Reply-To: <50460184.4000404@ti.com>
-References: <20120903165832.GA31511@n2100.arm.linux.org.uk>
- <E1T8ZzV-0002vp-2j@rmk-PC.arm.linux.org.uk> <5045124D.3050604@metafoo.de>
- <20120903204325.GA728@n2100.arm.linux.org.uk> <50451A4A.9000108@metafoo.de>
- <s5ha9x62an0.wl%tiwai@suse.de> <50460184.4000404@ti.com>
-Message-ID: <20120904181406.GB24189@n2100.arm.linux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 4 Sep 2012 20:31:25 +0200
+Subject: [PATCH 1/4] net: mvneta: driver for Marvell Armada 370/XP
+ network unit
+In-Reply-To: <20120904175610.2c2934f1@skate>
+References: <1346764004-16332-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1346764004-16332-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201209041436.36430.arnd@arndb.de> <20120904175610.2c2934f1@skate>
+Message-ID: <20120904183125.GB14683@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 04, 2012 at 04:26:28PM +0300, Peter Ujfalusi wrote:
-> Hi Takashi,
+> > I think we normally put the phy into a separate device node on an
+> > mdio bus and then use the of_phy_* functions to connect it to
+> > the ethernet device.
 > 
-> On 09/04/2012 04:14 PM, Takashi Iwai wrote:
-> >> Ok, it might have been helpful in the conversion process, but for the final
-> >> patch it would be nice if you could replace
-> >>
-> >> struct snd_pcm_runtime *runtime = substream->runtime;
-> >> struct omap_runtime_data *prtd = runtime->private_data;
-> >> struct omap_pcm_dma_data *dma_data = prtd->dma_data;
-> >> with
-> >> struct omap_pcm_dma_data *dma_data = snd_dmaengine_pcm_get_data(substream);
-> >>
-> >> and in the hwparams callback use
-> >>
-> >> snd_dmaengine_pcm_set_data(substream, dma_data);
-> >>
-> >> and then drop patch 1 and 2 from the series.
-> > 
-> > We discussed with Liam about the addition of new field in ALSA core,
-> > and concluded that a bit different approach, at least, more generic
-> > name is preferred, even if a new field is inevitably needed.
-> > 
-> > So, eventually some change may happen in near future in ALSA core
-> > side, but still it'd be really helpful if the callers have been
-> > standardized beforehand with a helper function like above.
+> Even though it may not be a convincing argument, none of the existing DT
+> files in arch/arm/boot/dts seem to instantiate a separate PHY device
+> and a proper MDIO bus. However, the PowerPC platforms indeed make this
+> distinction a lot clearer.
 > 
-> If the omap-pcm dmaengine conversion works on all OMAP versions (from OMAP1 to
-> OMAP5) it is possible to avoid the additional field.
-> My main concern at the moment is if we will need two sets of drivers to
-> support OMAP1 and OMAP2/3/4/5.
-> In all case we use the same omap-mcbsp driver which would need deal with two
-> different type of ASoC platform driver (dmaengine and non-dmaengine).
-> I hope we get confirmation from Janusz soon regarding to OMAP1 with dmaengine
-> so we can plan on how to move forward.
+> However, this network unit has a clever MAC that autonomously queries
+> the PHY for the link status, and reports changes (link, duplex, speed)
+> in the form of MAC interrupts and MAC registers. Therefore, for basic
+> operation, there is no need for a separate PHY driver nor to expose the
+> MDIO bus in any way. The only thing needed is the PHY address, which is
+> filled into a register of the MAC so that it can start its automatic
+> query of the PHY.
 
-As the target for the DMA engine work is to kill off the OMAP private DMA
-APIs, then if OMAP1 doesn't work with the OMAP DMA engine driver, that's
-what needs fixing, rather than having two ASoC platform drivers.
+Hi Thomas
 
-Note that time is ticking for the removal of the OMAP private DMA APIs (see
-feature-removal-schedule.txt) and it has to happen so that the next stage
-of the OMAP DMA engine conversion can happen - that is, to make the OMAP
-DMA engine support be a proper driver rather than just a DMA Engine to OMAP
-private DMA API conversion shim.
+I've used Marvell switch chipsets, which have a phy polling unit,
+PPU. This sounds very similar. You can do a lot with the PPU, but when
+you want to configure subsets of auto-negotiation rates/duplex modes,
+or fixed speeds/duplex modes, the PPU could not do it. You had to
+disable the PPU and configure the PHY directly.
+
+I see you have some of the ethtools API calls implemented, but not the
+ones needed for auto-neg and rates/duplex mode configurations. Does
+the neta PPU support this, or will you need to export the MDIO bus for
+these sorts of configuration options?
+
+   Thanks
+      Andrew
