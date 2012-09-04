@@ -1,49 +1,79 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  4 Sep 2012 10:44:03 +0200
-Subject: [PATCHv3 2/2] dts: mxs: spi: Add SSP3 to the 10049 board
-In-Reply-To: <1346748243-28675-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1346748243-28675-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1346748243-28675-2-git-send-email-maxime.ripard@free-electrons.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Tue, 4 Sep 2012 08:46:21 +0000
+Subject: [PATCH 7/9] ARM: OMAP2+: Prepare for irqs.h removal
+In-Reply-To: <20120831005237.28732.96766.stgit@muffinssi.local>
+References: <20120831004828.28732.902.stgit@muffinssi.local>
+ <20120831005237.28732.96766.stgit@muffinssi.local>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9DC9F4@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/imx28-cfa10049.dts |   22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+Hi Tony,
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
-index e0e4b8c..845663e 100644
---- a/arch/arm/boot/dts/imx28-cfa10049.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10049.dts
-@@ -20,6 +20,28 @@
- 	compatible = "crystalfontz,cfa10049", "crystalfontz,cfa10036", "fsl,imx28";
- 
- 	apb at 80000000 {
-+		apbh at 80000000 {
-+			pinctrl at 80018000 {
-+				spi3_pins_cfa10049: spi3-cfa10049 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x0181 /* MX28_PAD_GPMI_RDN__SSP3_SCK */
-+						0x01c1 /* MX28_PAD_GPMI_RESETN__SSP3_CMD */
-+					>;
-+					fsl,drive-strength = <1>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <1>;
-+				};
-+			};
-+
-+			ssp3: ssp at 80016000 {
-+				compatible = "fsl,imx28-spi";
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&spi3_pins_cfa10049>;
-+				status = "okay";
-+			};
-+		};
-+
- 		apbx at 80040000 {
- 			i2c1: i2c at 8005a000 {
- 				pinctrl-names = "default";
--- 
-1.7.9.5
+On Fri, Aug 31, 2012 at 06:22:37, Tony Lindgren wrote:
+> As the interrupts should only be defined in the platform_data, and
+> eventually coming from device tree, there's no need to define them
+> in header files.
+> 
+> Let's remove the hardcoded references to irqs.h and fix up the includes
+> so we don't rely on headers included in irqs.h. While at it, sort
+> the includes the standard way.
+
+>  arch/arm/mach-omap2/gpmc.c                         |   11 +++++---
+
+> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+
+>  /* GPMC register offsets */
+>  #define GPMC_REVISION		0x00
+>  #define GPMC_SYSCONFIG		0x10
+> @@ -846,16 +849,16 @@ static int __init gpmc_init(void)
+>  			l = OMAP2420_GPMC_BASE;
+>  		else
+>  			l = OMAP34XX_GPMC_BASE;
+> -		gpmc_irq = INT_34XX_GPMC_IRQ;
+> +		gpmc_irq = 20;
+>  	} else if (cpu_is_omap34xx()) {
+>  		ck = "gpmc_fck";
+>  		l = OMAP34XX_GPMC_BASE;
+> -		gpmc_irq = INT_34XX_GPMC_IRQ;
+> +		gpmc_irq = 20;
+>  	} else if (cpu_is_omap44xx() || soc_is_omap54xx()) {
+>  		/* Base address and irq number are same for OMAP4/5 */
+>  		ck = "gpmc_ck";
+>  		l = OMAP44XX_GPMC_BASE;
+> -		gpmc_irq = OMAP44XX_IRQ_GPMC;
+> +		gpmc_irq = 20 + OMAP44XX_IRQ_GIC_START;
+
+I have a suggestion to avoid above hardcoded patching on gpmc.c.
+With driver conversion series it again would have to be patched.
+
+
+I have made a basic gpmc driver conversion, which is expected to
+be non-controversial. This was done over your devel-gpmc branch.
+It is working fine, has only 3 patches
+
+1. Add hwmod entry
+2. Adapt to hwmod
+3. Basic driver conversion
+
+Here the basic driver gets resources and clk in driver probe
+using con-id "fck", it has no platform data as of now
+
+It is available
+@git://gitorious.org/x0148406-public/linux-kernel.git gpmc-simple-drv
+
+
+Originally this was made on top of my series,
+"OMAP-GPMC: generic time calc, prepare for driver"
+It was modified so that it can be applied to your devel-gpmc branch.
+
+*I am not sending the patches now to avoid confusion by way of having
+too many patch series*
+
+In case you like this, let me know, I will post.
+
+As I am proceeding with Paul's suggestion on hwmod reset,
+I hope Paul can take the first one.
+
+Regards
+Afzal
