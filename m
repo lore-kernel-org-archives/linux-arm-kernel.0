@@ -1,42 +1,31 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue,  4 Sep 2012 16:34:38 -0600
-Subject: [PATCH] MAINTAINERS: tegra: remove Olof/Colin, add device tree files
-Message-ID: <1346798078-28682-1-git-send-email-swarren@wwwdotorg.org>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 4 Sep 2012 15:36:24 -0700
+Subject: [PATCH] kernel/sys.c: call disable_nonboot_cpus in kernel_restart
+In-Reply-To: <1346682298-13958-1-git-send-email-shawn.guo@linaro.org>
+References: <1346682298-13958-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120904153624.d4aaed4e.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Mon,  3 Sep 2012 22:24:58 +0800
+Shawn Guo <shawn.guo@linaro.org> wrote:
 
-At Linux Plumbers conference, Olof and Colin both told me to remove them
-from the MAINTAINERS file. Thank you both very much for all the help with
-Tegra!
+> Like kernel_power_off calls disable_nonboot_cpus, we may want to have
+> kernel_restart call disable_nonboot_cpus as well.  Doing so can help
+> the machines that require boot cpu be the last alive cpu during reboot
+> to survive with kernel restart.
 
-Also, include all Tegra-related device-tree files in the file list.
+That does sound logical.  But the changelog is very vague and fluffy. 
+Does this patch actually fix any known problem on any known machine?
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- MAINTAINERS |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ae54678..7c9fdb0 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6776,14 +6776,13 @@ F:	drivers/net/team/
- F:	include/linux/if_team.h
- 
- TEGRA SUPPORT
--M:	Colin Cross <ccross@android.com>
--M:	Olof Johansson <olof@lixom.net>
- M:	Stephen Warren <swarren@wwwdotorg.org>
- L:	linux-tegra at vger.kernel.org
- Q:	http://patchwork.ozlabs.org/project/linux-tegra/list/
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
- S:	Supported
- F:	arch/arm/mach-tegra
-+F:	arch/arm/boot/dts/tegra*
- F:	arch/arm/configs/tegra_defconfig
- 
- TEHUTI ETHERNET DRIVER
--- 
-1.7.0.4
+> ...
+> --- a/kernel/sys.c
+> +++ b/kernel/sys.c
+> @@ -368,6 +368,7 @@ EXPORT_SYMBOL(unregister_reboot_notifier);
+>  void kernel_restart(char *cmd)
+>  {
+>  	kernel_restart_prepare(cmd);
+> +	disable_nonboot_cpus();
+>  	if (!cmd)
+>  		printk(KERN_EMERG "Restarting system.\n");
+>  	else
