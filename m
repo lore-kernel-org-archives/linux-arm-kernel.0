@@ -1,107 +1,35 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 4 Sep 2012 14:45:41 +0300
-Subject: [PATCH v3 00/23] OMAP UART patches
-In-Reply-To: <20120824104045.GC5172@arwen.pp.htv.fi>
-References: <1345717983-18179-1-git-send-email-balbi@ti.com>
- <20120824104045.GC5172@arwen.pp.htv.fi>
-Message-ID: <20120904114540.GF12901@arwen.pp.htv.fi>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 04 Sep 2012 12:53:22 +0100
+Subject: [PATCH 06/11] clk: Common clocks implementation for Versatile
+ Express
+In-Reply-To: <201209032124.02224.arnd@arndb.de>
+References: <1346689531-7212-1-git-send-email-pawel.moll@arm.com>
+ <1346689531-7212-7-git-send-email-pawel.moll@arm.com>
+ <201209032124.02224.arnd@arndb.de>
+Message-ID: <1346759602.2605.69.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Aug 24, 2012 at 01:40:47PM +0300, Felipe Balbi wrote:
-> Forgot to Cc greg initially, my bad
-
-a gentle ping on this series so we don't miss it for v3.7 merge window.
-
-Greg, let me know if you need me to resend.
-
-cheers
-
-> On Thu, Aug 23, 2012 at 01:32:40PM +0300, Felipe Balbi wrote:
-> > Hi guys,
-> > 
-> > here's v3 and hopefully final version of this series. A whole bunch of new
-> > patches added but the good thing is that now I had another engineer's help to
-> > test, so he's got his Tested-by in all patches.
-> > 
-> > Changes since v2:
-> > 	. Added a bunch of new patches
-> > 	. Fixed a problem where we would always return IRQ_NONE even though we
-> > 		handled IRQ
-> > 
-> > Changes since v1:
-> >         . improved commit log on patch 9/13 (formerly 10/13)
-> >         . removed patch 2/13
-> >         . added a new patch switching from spin_lock_irqsave() to spin_lock and
-> >                 spin_unlock_irqrestore to spin_unlock
-> > 
-> > Alan, if you prefer in pull request form, here it is:
-> > 
-> > The following changes since commit d9875690d9b89a866022ff49e3fcea892345ad92:
-> > 
-> >   Linux 3.6-rc2 (2012-08-16 14:51:24 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git uart
-> > 
-> > for you to fetch changes up to a29230f14d8466c9b8c25171715378bf52189453:
-> > 
-> >   serial: omap: enable RX and TX FIFO usage (2012-08-23 09:25:16 +0300)
-> > 
-> > ----------------------------------------------------------------
-> > Felipe Balbi (20):
-> >       serial: omap: define and use to_uart_omap_port()
-> >       serial: omap: define helpers for pdata function pointers
-> >       serial: omap: don't access the platform_device
-> >       serial: omap: drop DMA support
-> >       serial: add OMAP-specific defines
-> >       serial: omap: simplify IRQ handling
-> >       serial: omap: refactor receive_chars() into rdi/rlsi handlers
-> >       serial: omap: move THRE check to transmit_chars()
-> >       serial: omap: stick to put_autosuspend
-> >       serial: omap: set dev->drvdata before enabling pm_runtime
-> >       serial: omap: drop unnecessary check from remove
-> >       serial: omap: make sure to suspend device before remove
-> >       serial: omap: don't save IRQ flags on hardirq
-> >       serial: omap: optimization with section annotations
-> >       serial: omap: drop "inline" from IRQ handler prototype
-> >       serial: omap: implement set_wake
-> >       serial: omap: make sure to put() on poll_get_char
-> >       serial: omap: remove unnecessary header and add a missing one
-> >       serial: omap: move uart_omap_port definition to C file
-> >       serial: omap: enable RX and TX FIFO usage
-> > 
-> > Ruchika Kharwar (2):
-> >       serial: omap: fix sequence of pm_runtime_* calls.
-> >       serial: omap: unlock the port lock
-> > 
-> > Vikram Pandita (1):
-> >       serial: omap: fix software flow control
-> > 
-> >  arch/arm/mach-omap2/serial.c                  |  15 +-
-> >  arch/arm/plat-omap/include/plat/omap-serial.h |  47 +-
-> >  drivers/tty/serial/omap-serial.c              | 808 ++++++++++----------------
-> >  include/linux/serial_reg.h                    |   4 +
-> >  4 files changed, 330 insertions(+), 544 deletions(-)
-> > 
-> > -- 
-> > 1.7.12.rc3
-> > 
+On Mon, 2012-09-03 at 22:24 +0100, Arnd Bergmann wrote:
+> On Monday 03 September 2012, Pawel Moll wrote:
+> > +void __init vexpress_clk_init(void __iomem *sp810_base)
+> > +{
+> > +       struct clk *clk;
+> > +       int i;
+> > +
+> > +       clk = clk_register_fixed_rate(NULL, "dummy_apb_pclk", NULL,
+> > +                       CLK_IS_ROOT, 0);
+> > +       WARN_ON(clk_register_clkdev(clk, "apb_pclk", NULL));
+> > +
 > 
-> -- 
-> balbi
+> Isn't it time to just remove the non-DT parts of vexpress? That would
+> also simplify this driver.
 
+It would simplify not only this driver, but the whole infrastructure
+indeed. But we are still "CLCD driver away" from the full features
+replacement. Ryan Harkin is working on this, but it doesn't look like he
+was going to make it in time for 3.7. A second after this happens I'll
+post a "big kill" patch removing all non-DT stuff - I'm really looking
+forward to it :-)
 
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120904/cc84452e/attachment.sig>
+Pawel
