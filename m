@@ -1,31 +1,61 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 04 Sep 2012 12:53:24 +0100
-Subject: [PATCH 04/11] misc: Versatile Express display muxer driver
-In-Reply-To: <201209032121.03306.arnd@arndb.de>
-References: <1346689531-7212-1-git-send-email-pawel.moll@arm.com>
- <1346689531-7212-5-git-send-email-pawel.moll@arm.com>
- <201209032121.03306.arnd@arndb.de>
-Message-ID: <1346759604.2605.70.camel@hornet>
+From: andi@etezian.org (Andi Shyti)
+Date: Tue, 4 Sep 2012 13:35:45 +0200
+Subject: [PATCH v5 1/4] mfd: add syscon driver based on regmap
+In-Reply-To: <1346728811-25788-2-git-send-email-b29396@freescale.com>
+References: <1346728811-25788-1-git-send-email-b29396@freescale.com>
+ <1346728811-25788-2-git-send-email-b29396@freescale.com>
+Message-ID: <20120904113545.GD4657@jack.whiskey>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-09-03 at 22:21 +0100, Arnd Bergmann wrote:
-> On Monday 03 September 2012, Pawel Moll wrote:
-> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> > ---
-> >  Documentation/devicetree/bindings/arm/vexpress.txt |   19 ++
-> >  drivers/misc/vexpress/Makefile                     |    1 +
-> >  drivers/misc/vexpress/display.c                    |  197 ++++++++++++++++++++
-> >  3 files changed, 217 insertions(+)
-> >  create mode 100644 drivers/misc/vexpress/display.c
-> > 
-> 
-> Shouldn't this go into the drivers/video directory?
+Hi Dong,
 
-I sort of assumed that drivers/video contain frame buffer drivers only,
-but now I see there are some "control modules" there as well. Fine with
-me.
+On Tue, Sep 04, 2012 at 11:20:08AM +0800, Dong Aisheng wrote:
+> +static int __devinit syscon_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
 
-Cheers!
+Do we really need this variable? Anyway you are using it only
+once in the dev_info.
 
-Pawel
+> +	struct device_node *np = dev->of_node;
+> +	struct syscon *syscon;
+> +	struct resource res;
+> +	int ret;
+> +
+> +	if (!np)
+> +		return -ENOENT;
+> +
+> +	syscon = devm_kzalloc(&pdev->dev, sizeof(struct syscon),
+> +			    GFP_KERNEL);
+> +	if (!syscon)
+> +		return -ENOMEM;
+> +
+> +	syscon->base = of_iomap(np, 0);
+> +	if (!syscon->base)
+> +		return -EADDRNOTAVAIL;
+> +
+> +	ret = of_address_to_resource(np, 0, &res);
+> +	if (ret)
+> +		return ret;
+> +
+> +	syscon_regmap_config.max_register = res.end - res.start - 3;
+> +	syscon->regmap = devm_regmap_init_mmio(&pdev->dev, syscon->base,
+> +					&syscon_regmap_config);
+> +	if (IS_ERR(syscon->regmap)) {
+> +		dev_err(&pdev->dev, "regmap init failed\n");
+> +		return PTR_ERR(syscon->regmap);
+> +	}
+> +
+> +	syscon->dev = &pdev->dev;
+> +	platform_set_drvdata(pdev, syscon);
+> +
+> +	dev_info(dev, "syscon regmap start 0x%x end 0x%x registered\n",
+> +		res.start, res.end);
+> +
+> +	return 0;
+
+in case of error you are not freeing syscon.
+Moreover, in my opinion, some dev_err more should not heart
+
+Andi
