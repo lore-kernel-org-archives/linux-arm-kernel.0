@@ -1,76 +1,220 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 4 Sep 2012 17:56:10 +0200
-Subject: [PATCH 1/4] net: mvneta: driver for Marvell Armada 370/XP
- network unit
-In-Reply-To: <201209041436.36430.arnd@arndb.de>
-References: <1346764004-16332-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1346764004-16332-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <201209041436.36430.arnd@arndb.de>
-Message-ID: <20120904175610.2c2934f1@skate>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 4 Sep 2012 23:57:43 +0800
+Subject: [RFC/PATCH] ARM: PRIMA2: initial support for SiRFmarco dual-core
+ SoC
+In-Reply-To: <201209031410.50729.arnd@arndb.de>
+References: <1346409312-16778-1-git-send-email-Barry.Song@csr.com>
+ <201209031410.50729.arnd@arndb.de>
+Message-ID: <CAGsJ_4yKN2QvOGYE0NFX0GvLM+fRr36=hrPxpuXxUwHuNUkp4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+Hi Arnd,
+Thanks a lot for reviewing.
 
-Thanks for looking so quickly into this driver!
+2012/9/3 Arnd Bergmann <arnd@arndb.de>:
+> On Friday 31 August 2012, Barry Song wrote:
+>
+>> +             l2-cache-controller at c0030000 {
+>> +                     compatible = "arm,pl310-cache", "sirf,marco-pl310-cache";
+>> +                     reg = <0xc0030000 0x1000>;
+>> +                     interrupts = <0 59 0>;
+>> +                     arm,tag-latency = <1 1 1>;
+>> +                     arm,data-latency = <1 1 1>;
+>> +                     arm,filter-ranges = <0x40000000 0xc0000000>;
+>> +             };
+>> +
+>> +                gic: interrupt-controller at c0011000 {
+>> +                        compatible = "arm,cortex-a9-gic";
+>> +                        interrupt-controller;
+>> +                        #interrupt-cells = <3>;
+>> +                        reg = <0xc0011000 0x1000>,
+>> +                              <0xc0010100 0x0100>;
+>> +                };
+>
+> The indentation here looks broken. Just use tabs instead of sapces everywhere.
 
-Le Tue, 4 Sep 2012 14:36:36 +0000,
-Arnd Bergmann <arnd@arndb.de> a ?crit :
+ok.
 
-> On Tuesday 04 September 2012, Thomas Petazzoni wrote:
-> >  .../devicetree/bindings/net/marvell-neta.txt       |   24 +
-> >  drivers/net/ethernet/marvell/Kconfig               |   11 +
-> >  drivers/net/ethernet/marvell/Makefile              |    1 +
-> >  drivers/net/ethernet/marvell/mvneta.c              | 2732 ++++++++++++++++++++
-> >  drivers/net/ethernet/marvell/mvneta.h              |  496 ++++
-> >  5 files changed, 3264 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/net/marvell-neta.txt
-> >  create mode 100644 drivers/net/ethernet/marvell/mvneta.c
-> >  create mode 100644 drivers/net/ethernet/marvell/mvneta.h
-> 
-> I usually prefer putting the definitions into the .c file rather
-> than a separate header if there is only only file including it
-> anyway.
+>
+>> +              rstc-iobg {
+>> +                     compatible = "simple-bus";
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <1>;
+>> +                     ranges = <0xc2000000 0xc2000000 0x10000>;
+>> +
+>> +                     reset-controller at c2000000 {
+>> +                             compatible = "sirf,marco-rstc";
+>> +                             reg = <0xc2000000 0x10000>;
+>> +                     };
+>> +             };
+>> +
+>> +             sys-iobg {
+>> +                     compatible = "simple-bus";
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <1>;
+>> +                     ranges = <0xc3000000 0xc3000000 0x30000>;
+>
+> It looks to me that the sub-buses all have a size of 0x1000000, so I would
+> recommend listing that one in the ranges, rather than only enough to
+> provide the devices that you actually use.
 
-Fine. I hesitated on this one, but since the driver was already quite
-long, I thought a separate header would be nicer, but I don't have a
-strong opinion, so I'll resubmit with this change.
+these ranges come from the hw spec. it seems you mean something like:
+                  ranges = <0xcc050000 0xcc050000 0x1000
+                            0xcc060000 0xcc060000 0x1000
+                            0xcc190000 0xcc190000 0x1000
+                            ....>;
+then the list will be very long. i can't really understand the
+benefit.  of course, if a driver makes misoperations to map an address
+not in this list, io mapping will fail for it.
+here <0xc3000000 0xc3000000 0x30000> is the filter range that will go
+through sys-iobg in marco SoC. if an address located in this range
+doesn't locate in a real hardware which exists, the driver should fail
+due to hw error.
 
-> > +eth at d0070000 {
-> > +               compatible = "marvell,neta";
-> > +               reg = <0xd0070000 0x2500>;
-> > +               interrupts = <8>;
-> > +               device_type = "network";
-> > +               clock-frequency = <250000000>;
-> > +               status = "okay";
-> > +               phy-mode = "sgmii";
-> > +               phy-addr = <25>;
-> 
-> I think we normally put the phy into a separate device node on an
-> mdio bus and then use the of_phy_* functions to connect it to
-> the ethernet device.
+>
+>> +                     uart0: uart at cc050000 {
+>> +                             cell-index = <0>;
+>> +                             compatible = "sirf,marco-uart";
+>> +                             reg = <0xcc050000 0x1000>;
+>> +                             interrupts = <0 17 0>;
+>> +                             fifosize = <128>;
+>> +                     };
+>> +
+>> +                     uart1: uart at cc060000 {
+>> +                             cell-index = <1>;
+>> +                             compatible = "sirf,marco-uart";
+>> +                             reg = <0xcc060000 0x1000>;
+>> +                             interrupts = <0 18 0>;
+>> +                             fifosize = <32>;
+>> +                     };
+>
+> For the uart, as well as any other device that only provides a connection
+> to the board rather than being useful by itself, we commonly put a
+> 'status = "disabled"' property in each node in the .dtsi file, and then
+> override them from the board specific .dts file with 'status= "ok"'. That
+> way, only the devices that are actually populated on a particular board
+> and up being registered as platform_devices in Linux.
 
-Even though it may not be a convincing argument, none of the existing DT
-files in arch/arm/boot/dts seem to instantiate a separate PHY device
-and a proper MDIO bus. However, the PowerPC platforms indeed make this
-distinction a lot clearer.
+ok.
 
-However, this network unit has a clever MAC that autonomously queries
-the PHY for the link status, and reports changes (link, duplex, speed)
-in the form of MAC interrupts and MAC registers. Therefore, for basic
-operation, there is no need for a separate PHY driver nor to expose the
-MDIO bus in any way. The only thing needed is the PHY address, which is
-filled into a register of the MAC so that it can start its automatic
-query of the PHY.
+>
+>> +
+>> +                     spi0: spi at cc0D0000 {
+>> +                             cell-index = <0>;
+>> +                             compatible = "sirf,marco-spi";
+>> +                             reg = <0xcc0D0000 0x10000>;
+>> +                             interrupts = <0 15 0>;
+>> +                             sirf,spi-num-chipselects = <1>;
+>> +                             cs-gpios = <&gpio 0 0>;
+>> +                     };
+>> +
+>> +                     spi1: spi at cc170000 {
+>> +                             cell-index = <1>;
+>> +                             compatible = "sirf,marco-spi";
+>> +                             reg = <0xcc170000 0x10000>;
+>> +                             interrupts = <0 16 0>;
+>> +                             sirf,spi-num-chipselects = <1>;
+>> +                             cs-gpios = <&gpio 0 0>;
+>> +                     };
+>> +
+>> +                     i2c0: i2c at cc0e0000 {
+>> +                             cell-index = <0>;
+>> +                             compatible = "sirf,marco-i2c";
+>> +                             reg = <0xcc0e0000 0x10000>;
+>> +                             interrupts = <0 24 0>;
+>> +                     };
+>> +
+>> +                     i2c1: i2c at cc0f0000 {
+>> +                             cell-index = <1>;
+>> +                             compatible = "sirf,marco-i2c";
+>> +                             reg = <0xcc0f0000 0x10000>;
+>> +                             interrupts = <0 25 0>;
+>> +                     };
+>
+> Same thing here.
+>
+>
+>> +                     pci-iobg {
+>> +                             compatible = "sirf,marco-pciiobg", "simple-bus";
+>> +                             #address-cells = <1>;
+>> +                             #size-cells = <1>;
+>> +                             ranges = <0xcD000000 0xcD000000 0x1000000>;
+>> +
+>> +                             sd0: sdhci at cD000000 {
+>> +                                     cell-index = <0>;
+>> +                                     compatible = "sirf,marco-sdhc";
+>> +                                     reg = <0xcD000000 0x100000>;
+>> +                                     interrupts = <0 38 0>;
+>> +                             };
+>> +
+>> +                             sd1: sdhci at cD100000 {
+>> +                                     cell-index = <1>;
+>> +                                     compatible = "sirf,marco-sdhc";
+>> +                                     reg = <0xcD100000 0x100000>;
+>> +                                     interrupts = <0 38 0>;
+>> +                             };
+>
+> And here. Note that these you are probably missing the gpio lines for
+> card detect and write protect as well as the required "bus-width" property.
 
-Knowing this, would it be acceptable to have this driver without an
-explicit MDIO bus in the DT?
+ok. i will check. we don't have brought up SD driver yet.
 
-Thanks,
+>
+>> diff --git a/arch/arm/configs/marcocb_defconfig b/arch/arm/configs/marcocb_defconfig
+>> new file mode 100644
+>> index 0000000..1a9829d
+>> --- /dev/null
+>> +++ b/arch/arm/configs/marcocb_defconfig
+>
+> Can you make the defconfig a superset of prima2 and marco? We are trying
+> to keep the number of distinct defconfig files low, while trying to also
+> have build coverage over many drivers.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+yes, i can. the only problem is actually we don't want prima2 to have
+SMP. but of course we can make the uniprocessor work on mpcore sw.
+
+>
+>> diff --git a/arch/arm/mach-prima2/hotplug.c b/arch/arm/mach-prima2/hotplug.c
+>> new file mode 100644
+>> index 0000000..7d5febe
+>> --- /dev/null
+>> +++ b/arch/arm/mach-prima2/hotplug.c
+>
+>> +extern volatile int pen_release;
+>> +
+>> +static inline void platform_do_lowpower(unsigned int cpu)
+>> +{
+>> +     flush_cache_all();
+>
+> This file will get a merge conflict when we also integrate the
+> patch series to let us abstract the SMP operations into a run-time
+> selectable structure.
+
+yes. smp_ops(sirfsoc_smp_ops) came to my plan, but i haven't updated
+to that yet.
+
+>
+>> diff --git a/arch/arm/mach-prima2/timer-marco.c b/arch/arm/mach-prima2/timer-marco.c
+>> new file mode 100644
+>> index 0000000..eb5adad
+>> --- /dev/null
+>> +++ b/arch/arm/mach-prima2/timer-marco.c
+>
+>> diff --git a/arch/arm/mach-prima2/timer.c b/arch/arm/mach-prima2/timer-prima2.c
+>> similarity index 98%
+>> rename from arch/arm/mach-prima2/timer.c
+>> rename to arch/arm/mach-prima2/timer-prima2.c
+>> index d95bf25..305cbcc 100644
+>> --- a/arch/arm/mach-prima2/timer.c
+>> +++ b/arch/arm/mach-prima2/timer-prima2.c
+>
+> Both of these files should now be moved out of the platform directory into
+> drivers/clocksource/.
+
+ok.
+
+>
+>         Arnd
+
+-barry
