@@ -1,49 +1,46 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 5 Sep 2012 07:37:10 +1000
-Subject: [PATCH] bus: fix omap compile error if CONFIG_OF is true
-In-Reply-To: <20120904144123.25261.79625.stgit@localhost.localdomain>
-References: <20120904144123.25261.79625.stgit@localhost.localdomain>
-Message-ID: <20120905073710.566eabb8561b1a701a58e438@canb.auug.org.au>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 05 Sep 2012 06:39:56 +0900
+Subject: [PATCH] gpio: samsung: Update documentation
+In-Reply-To: <5045B89D.50503@samsung.com>
+References: <503D267A.2090406@gmail.com>
+ <1346603089-14122-1-git-send-email-sylvester.nawrocki@gmail.com>
+ <CACRpkdbudOv9AvS1XuyPB+BZ63+Ymu5dhkBBWFCo2qYDV+jAmw@mail.gmail.com>
+ <5045B89D.50503@samsung.com>
+Message-ID: <226401cd8ae5$d3e0ee90$7ba2cbb0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
-On Tue, 04 Sep 2012 15:41:35 +0100 Alan Cox <alan@lxorguk.ukuu.org.uk> wrote:
->
-> From: Alan Cox <alan@linux.intel.com>
+Sylwester Nawrocki wrote:
 > 
-> Signed-off-by: Alan Cox <alan@linux.intel.com>
-> ---
+> On 09/04/2012 09:27 AM, Linus Walleij wrote:
+> > On Sun, Sep 2, 2012 at 6:24 PM, Sylwester Nawrocki
+> > <sylvester.nawrocki@gmail.com> wrote:
+> >
+> >> Update Samsung GPIO API documentation to reflect removal of
+> >> the s3c24xx specific gpio API. While at it, fix some typos.
+> >>
+> >> The notes on conversion from s3c2410_* functions to the gpiolib
+> >> API are left here just in case there is any out of tree code that
+> >> still needs to be converted.
+> >>
+> >> Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+> >
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> >
+> > Get the Samsung maintainers to apply this patch since they carry
+> > the API changes.
 > 
->  drivers/bus/omap-ocp2scp.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Linus, thanks for your ack.
+
+> Thanks Linus. Kgene, this is the documentation update we talked about
+> previously. Can you please pick this patch as well ?
 > 
-> diff --git a/drivers/bus/omap-ocp2scp.c b/drivers/bus/omap-ocp2scp.c
-> index 9075ef8..ff63560 100644
-> --- a/drivers/bus/omap-ocp2scp.c
-> +++ b/drivers/bus/omap-ocp2scp.c
-> @@ -67,7 +67,7 @@ static const struct of_device_id omap_ocp2scp_id_table[] = {
->  	{ .compatible = "ti,omap-ocp2scp" },
->  	{}
->  };
-> -MODULE_DEVICE_TABLE(of, omap_usb2_id_table);
-> +MODULE_DEVICE_TABLE(of, omap_ocp2scp_id_table);
->  #endif
->  
->  static struct platform_driver omap_ocp2scp_driver = {
+Sure, I will apply this into Samsung tree.
 
-This was caused by commit 26a84b3eaef0 ("drivers: bus: add a new driver
-for omap-ocp2scp") which has been in the arm-soc tree for a few days ...
+Thanks.
 
-Thanks, Alan.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120905/71c9693f/attachment.sig>
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
