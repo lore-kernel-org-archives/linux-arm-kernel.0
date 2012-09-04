@@ -1,50 +1,56 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 04 Sep 2012 16:26:28 +0300
-Subject: [alsa-devel] [RFC 1/3] ASoC: dmaengine: Don't use runtime	private
- data for dmaengine data
-In-Reply-To: <s5ha9x62an0.wl%tiwai@suse.de>
-References: <20120903165832.GA31511@n2100.arm.linux.org.uk>
- <E1T8ZzV-0002vp-2j@rmk-PC.arm.linux.org.uk> <5045124D.3050604@metafoo.de>
- <20120903204325.GA728@n2100.arm.linux.org.uk> <50451A4A.9000108@metafoo.de>
- <s5ha9x62an0.wl%tiwai@suse.de>
-Message-ID: <50460184.4000404@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 4 Sep 2012 15:37:44 +0200
+Subject: [PATCH 01/11] input: ambakmi: Add missing clk_[un]prepare() calls
+In-Reply-To: <1346689531-7212-2-git-send-email-pawel.moll@arm.com>
+References: <1346689531-7212-1-git-send-email-pawel.moll@arm.com>
+ <1346689531-7212-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <20120904153744.10e07940@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Takashi,
+Pawel,
 
-On 09/04/2012 04:14 PM, Takashi Iwai wrote:
->> Ok, it might have been helpful in the conversion process, but for the final
->> patch it would be nice if you could replace
->>
->> struct snd_pcm_runtime *runtime = substream->runtime;
->> struct omap_runtime_data *prtd = runtime->private_data;
->> struct omap_pcm_dma_data *dma_data = prtd->dma_data;
->> with
->> struct omap_pcm_dma_data *dma_data = snd_dmaengine_pcm_get_data(substream);
->>
->> and in the hwparams callback use
->>
->> snd_dmaengine_pcm_set_data(substream, dma_data);
->>
->> and then drop patch 1 and 2 from the series.
+Le Mon,  3 Sep 2012 17:25:21 +0100,
+Pawel Moll <pawel.moll@arm.com> a ?crit :
+
+> Clocks must be prepared before enabling and unprepared
+> after disabling. Without that clk_enable() fails with
+> warning.
 > 
-> We discussed with Liam about the addition of new field in ALSA core,
-> and concluded that a bit different approach, at least, more generic
-> name is preferred, even if a new field is inevitably needed.
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+>  drivers/input/serio/ambakmi.c |    9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
 > 
-> So, eventually some change may happen in near future in ALSA core
-> side, but still it'd be really helpful if the callers have been
-> standardized beforehand with a helper function like above.
+> diff --git a/drivers/input/serio/ambakmi.c b/drivers/input/serio/ambakmi.c
+> index 2ffd110..ab2d25b 100644
+> --- a/drivers/input/serio/ambakmi.c
+> +++ b/drivers/input/serio/ambakmi.c
+> @@ -72,10 +72,14 @@ static int amba_kmi_open(struct serio *io)
+>  	unsigned int divisor;
+>  	int ret;
+>  
+> -	ret = clk_enable(kmi->clk);
+> +	ret = clk_prepare(kmi->clk);
+>  	if (ret)
+>  		goto out;
+>  
+> +	ret = clk_enable(kmi->clk);
+> +	if (ret)
+> +		goto clk_unprepare;
+> +
 
-If the omap-pcm dmaengine conversion works on all OMAP versions (from OMAP1 to
-OMAP5) it is possible to avoid the additional field.
-My main concern at the moment is if we will need two sets of drivers to
-support OMAP1 and OMAP2/3/4/5.
-In all case we use the same omap-mcbsp driver which would need deal with two
-different type of ASoC platform driver (dmaengine and non-dmaengine).
-I hope we get confirmation from Janusz soon regarding to OMAP1 with dmaengine
-so we can plan on how to move forward.
+What about using clk_prepare_enable() here?
 
+>  	free_irq(kmi->irq, kmi);
+>  	clk_disable(kmi->clk);
+> +	clk_unprepare(kmi->clk);
+
+And clk_disable_unprepare() here?
+
+Thomas
 -- 
-P?ter
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
