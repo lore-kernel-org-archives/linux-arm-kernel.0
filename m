@@ -1,32 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 04 Sep 2012 15:48:31 -0600
-Subject: [PATCH v2] usb: move phy driver from mach-tegra to drivers/usb
-In-Reply-To: <1346395526-18219-1-git-send-email-vbyravarasu@nvidia.com>
-References: <1346395526-18219-1-git-send-email-vbyravarasu@nvidia.com>
-Message-ID: <5046772F.6060908@wwwdotorg.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 05 Sep 2012 06:58:41 +0900
+Subject: [PATCH v2 0/2] ARM: Exynos4-DT: Enable pinctrl driver support
+In-Reply-To: <1345721098-32459-1-git-send-email-thomas.abraham@linaro.org>
+References: <1345721098-32459-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <226f01cd8ae8$7236eb60$56a4c220$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/31/2012 12:45 AM, Venu Byravarasu wrote:
-> As part of this patch:
-> 	1. Moved existing tegra phy driver to drivers/USB directory.
-> 	2. Added standard USB phy driver APIs to tegra phy driver.
+Thomas Abraham wrote:
 > 
-> Signed-off-by: Venu Byravarasu <vbyravarasu@nvidia.com>
+> This patch series enables support for pin controller driver for Exynos4210
+> SoC
+> based device tree enabled platforms. The first patch in this series adds
+> the
+> pin group nodes for each of the three pin controller instances, but it is
+> not
+> a exhaustive list of all possible pin group nodes. As the coverage of
+> pinctrl
+> driver is extended device drivers used on Exynos4210 platforms, additional
+> pin group nodes can be added as required.
+> 
+> Thomas Abraham (2):
+>   ARM: dts: Add pinctrl node entries for Samsung Exynos4210 SoC
+>   ARM: EXYNOS: Enable pinctrl driver support for Exynos4 device tree
+> enabled platform
+> 
+>  arch/arm/boot/dts/exynos4210-pinctrl.dtsi |  457
+> +++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos4210.dtsi         |   37 +++
+>  arch/arm/mach-exynos/Kconfig              |    2 +
+>  3 files changed, 496 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/exynos4210-pinctrl.dt?
 
-Tested-by: Stephen Warren <swarren@nvidia.com>
+Looks good to me, will apply this series with Linus Walleij's ack.
 
-Felipe, Would it be possible to apply this patch to a topic branch, so
-that I can merge it into the Tegra tree? The reason is that I'd like to
-remove Tegra's devices.[ch] in kernel 3.7, but to do that, I need to
-move a tiny chunk of code out of that file somewhere else, and doing
-that relies on adding a #include to usb_phy.h/tegra_usb_phy.h, which is
-renamed in this patch.
-
-Alternatively, if you don't think it'll cause any merge conflicts with
-the USB PHY tree, I can just take this patch through the Tegra tree if
-you want. Venu, do you plan any other patches within the next couple
-weeks or so (i.e. before 3.6-rc6) that will depend on this patch? If so,
-taking it only through the Tegra tree might not work so well.
+Note, this will be applied on top of v4 pinctrl driver will be submitted by
+Thomas.
 
 Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
