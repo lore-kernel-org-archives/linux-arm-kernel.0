@@ -1,26 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 4 Sep 2012 08:08:24 +0000
-Subject: linux-next: manual merge of the arm-soc tree with the arm-current
- tree
-In-Reply-To: <20120904160626.f1dcb67ebbb145053c49da8c@canb.auug.org.au>
-References: <20120904160626.f1dcb67ebbb145053c49da8c@canb.auug.org.au>
-Message-ID: <201209040808.25103.arnd@arndb.de>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 04 Sep 2012 10:15:25 +0200
+Subject: [PATCH] gpio: samsung: Update documentation
+In-Reply-To: <CACRpkdbudOv9AvS1XuyPB+BZ63+Ymu5dhkBBWFCo2qYDV+jAmw@mail.gmail.com>
+References: <503D267A.2090406@gmail.com>
+ <1346603089-14122-1-git-send-email-sylvester.nawrocki@gmail.com>
+ <CACRpkdbudOv9AvS1XuyPB+BZ63+Ymu5dhkBBWFCo2qYDV+jAmw@mail.gmail.com>
+Message-ID: <5045B89D.50503@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 September 2012, Stephen Rothwell wrote:
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> arch/arm/mm/mmu.c between commit a849088aa155 ("ARM: Fix ioremap() of
-> address zero") from the arm-current tree and commit c2794437091a ("ARM:
-> Add fixed PCI i/o mapping") from the arm-soc tree.
+On 09/04/2012 09:27 AM, Linus Walleij wrote:
+> On Sun, Sep 2, 2012 at 6:24 PM, Sylwester Nawrocki
+> <sylvester.nawrocki@gmail.com> wrote:
 > 
-> I am not sure how to fix this, so I have used the arm-current version of
-> the change to pmd_empty_section_gap() since that changed the vm->flags.
-> It may be that just changing the vm->flags value in vm_reserve_area_early()
-> would be ok?
+>> Update Samsung GPIO API documentation to reflect removal of
+>> the s3c24xx specific gpio API. While at it, fix some typos.
+>>
+>> The notes on conversion from s3c2410_* functions to the gpiolib
+>> API are left here just in case there is any out of tree code that
+>> still needs to be converted.
+>>
+>> Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Get the Samsung maintainers to apply this patch since they carry
+> the API changes.
 
-If I read this correctly, we want pci_reserve_io to use VM_ARM_STATIC_MAPPING
-while pmd_empty_section_gap should use VM_ARM_EMPTY_MAPPING, so we probably
-want to add a flag argument to the vm_reserve_area_early() function.
+Thanks Linus. Kgene, this is the documentation update we talked about
+previously. Can you please pick this patch as well ?
 
-	Arnd
+--
+
+Regards,
+Sylwester
