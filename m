@@ -1,98 +1,29 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Tue, 4 Sep 2012 12:57:27 +0530
-Subject: [PATCH 2/3] gpio-twl4030: new dt properties for BeagleBoard and
- omap3-EVM
-In-Reply-To: <1346680491-4211-3-git-send-email-florian.vaussard@epfl.ch>
-References: <1346680491-4211-1-git-send-email-florian.vaussard@epfl.ch>
- <1346680491-4211-3-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <5045AD5F.2030503@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 4 Sep 2012 09:27:55 +0200
+Subject: [PATCH] gpio: samsung: Update documentation
+In-Reply-To: <1346603089-14122-1-git-send-email-sylvester.nawrocki@gmail.com>
+References: <503D267A.2090406@gmail.com>
+ <1346603089-14122-1-git-send-email-sylvester.nawrocki@gmail.com>
+Message-ID: <CACRpkdbudOv9AvS1XuyPB+BZ63+Ymu5dhkBBWFCo2qYDV+jAmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Sep 2, 2012 at 6:24 PM, Sylwester Nawrocki
+<sylvester.nawrocki@gmail.com> wrote:
 
+> Update Samsung GPIO API documentation to reflect removal of
+> the s3c24xx specific gpio API. While at it, fix some typos.
+>
+> The notes on conversion from s3c2410_* functions to the gpiolib
+> API are left here just in case there is any out of tree code that
+> still needs to be converted.
+>
+> Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
 
-On 9/3/2012 7:24 PM, Florian Vaussard wrote:
-> Add device tree properties for twl4030/gpio, according to the
-> platform data of corresponding boards. This enables the led
-> connected to LEDB output for both boards, as well as
-> pullups/pulldowns on GPIO for the BeagleBoard.
-> 
-> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-> ---
->  arch/arm/boot/dts/omap3-beagle.dts |   20 ++++++++++++++++++++
->  arch/arm/boot/dts/omap3-evm.dts    |   13 +++++++++++++
->  2 files changed, 33 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-> index cdcb98c..16bff8b 100644
-> --- a/arch/arm/boot/dts/omap3-beagle.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle.dts
-> @@ -17,6 +17,14 @@
->  		device_type = "memory";
->  		reg = <0x80000000 0x20000000>; /* 512 MB */
->  	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pmu_stat {
-> +			label = "beagleboard::pmu_stat";
-> +			gpios = <&twl_gpio 19 0>; /* LEDB */
-> +		};
-> +	};
->  };
->  
->  &i2c1 {
-> @@ -67,3 +75,15 @@
->  &mmc3 {
->  	status = "disabled";
->  };
-> +
-> +&twl_gpio {
-> +	ti,use-leds = "true";
-> +	/* pullups: BIT(1) */
-> +	ti,pullups = <2>;
-> +	/*
-> +	 * pulldowns:
-> +	 * BIT(2), BIT(6), BIT(7), BIT(8), BIT(13)
-> +	 * BIT(15), BIT(16), BIT(17)
-> +	 */
-> +	ti,pulldowns = <238020>;
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Consider changing above value to hex presentation.
-Otherwise looks ok to me, also I have tested it on OMAP3EVM.
+Get the Samsung maintainers to apply this patch since they carry
+the API changes.
 
-Tested-&-Acked-By: Vaibhav Hiremath <hvaibhav@ti.com>
-
-Thanks,
-Vaibhav
-
-> +};
-> diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
-> index f349ee9..f1e18fe 100644
-> --- a/arch/arm/boot/dts/omap3-evm.dts
-> +++ b/arch/arm/boot/dts/omap3-evm.dts
-> @@ -17,6 +17,15 @@
->  		device_type = "memory";
->  		reg = <0x80000000 0x10000000>; /* 256 MB */
->  	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		ledb {
-> +			label = "omap3evm::ledb";
-> +			gpios = <&twl_gpio 19 0>; /* LEDB */
-> +			linux,default-trigger = "default-on";
-> +		};
-> +	};
->  };
->  
->  &i2c1 {
-> @@ -46,3 +55,7 @@
->  		reg = <0x5c>;
->  	};
->  };
-> +
-> +&twl_gpio {
-> +	ti,use-leds = "true";
-> +};
-> 
+Yours,
+Linus Walleij
