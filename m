@@ -1,232 +1,29 @@
-From: gerg@snapgear.com (Greg Ungerer)
-Date: Tue, 4 Sep 2012 18:49:54 +1000
-Subject: [PATCH 4/4 v4] ARM: ks8695: convert to generic time and
- clocksource
-In-Reply-To: <1346742590-10719-1-git-send-email-linus.walleij@linaro.org>
-References: <1346742590-10719-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <5045C0B2.6010509@snapgear.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 4 Sep 2012 10:01:32 +0100
+Subject: linux-next: manual merge of the arm-soc tree with the
+ arm-current tree
+In-Reply-To: <201209040808.25103.arnd@arndb.de>
+References: <20120904160626.f1dcb67ebbb145053c49da8c@canb.auug.org.au>
+ <201209040808.25103.arnd@arndb.de>
+Message-ID: <20120904090132.GG24085@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, Sep 04, 2012 at 08:08:24AM +0000, Arnd Bergmann wrote:
+> On Tuesday 04 September 2012, Stephen Rothwell wrote:
+> > Today's linux-next merge of the arm-soc tree got a conflict in
+> > arch/arm/mm/mmu.c between commit a849088aa155 ("ARM: Fix ioremap() of
+> > address zero") from the arm-current tree and commit c2794437091a ("ARM:
+> > Add fixed PCI i/o mapping") from the arm-soc tree.
+> > 
+> > I am not sure how to fix this, so I have used the arm-current version of
+> > the change to pmd_empty_section_gap() since that changed the vm->flags.
+> > It may be that just changing the vm->flags value in vm_reserve_area_early()
+> > would be ok?
+> 
+> If I read this correctly, we want pci_reserve_io to use VM_ARM_STATIC_MAPPING
+> while pmd_empty_section_gap should use VM_ARM_EMPTY_MAPPING, so we probably
+> want to add a flag argument to the vm_reserve_area_early() function.
 
-On 09/04/2012 05:09 PM, Linus Walleij wrote:
-> Old platforms using ancient gettimeoffset() and other arcane
-> APIs are standing in the way of cleaning up the ARM kernel.
-> The gettimeoffset() was also broken: it would try to read out
-> the timer counter value, while this would not work (the
-> counter statically returns the initially programmed value)
-> so the implementation would anyway fall back to a homebrew
-> version of jiffie calculation.
->
-> This is an attempt at blind-coding a generic time and clocksource
-> driver for the platform by way of a datasheet and looking at the
-> old code.
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v3->v4:
-> - Skip trying to provide an MMIO clocksource, there is no
->    clocksource to be found on this system, so set up a clockevent
->    and let the timekeeping core fall back to jiffies.
-
-Almost, but not quite :-(
-
-
-> ChangeLog v2->v3:
-> - Correct the MMIO timer read function: this timer counts DOWN
->    not up - since clocksources shall move forward in time, the
->    ever decreasing clocksource was likely ignored.
-> ChangeLog v1->v2:
-> - Corrected the mask when setting clockevents from & TMCON_T1EN
->    to & ~TMCON_T1EN so it doesn't shut down the clock source.
-> ---
->   arch/arm/Kconfig            |   3 +-
->   arch/arm/mach-ks8695/time.c | 105 ++++++++++++++++++++++++++++----------------
->   2 files changed, 69 insertions(+), 39 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 6d6e18f..e9ce038 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -652,8 +652,9 @@ config ARCH_KS8695
->   	bool "Micrel/Kendin KS8695"
->   	select CPU_ARM922T
->   	select ARCH_REQUIRE_GPIOLIB
-> -	select ARCH_USES_GETTIMEOFFSET
->   	select NEED_MACH_MEMORY_H
-> +	select CLKSRC_MMIO
-> +	select GENERIC_CLOCKEVENTS
->   	help
->   	  Support for Micrel/Kendin KS8695 "Centaur" (ARM922T) based
->   	  System-on-Chip devices.
-> diff --git a/arch/arm/mach-ks8695/time.c b/arch/arm/mach-ks8695/time.c
-> index 6974c23..f9b4a5a 100644
-> --- a/arch/arm/mach-ks8695/time.c
-> +++ b/arch/arm/mach-ks8695/time.c
-> @@ -25,6 +25,7 @@
->   #include <linux/kernel.h>
->   #include <linux/sched.h>
->   #include <linux/io.h>
-> +#include <linux/clockchips.h>
->
->   #include <asm/mach/time.h>
->   #include <asm/system_misc.h>
-> @@ -53,44 +54,69 @@
->   /* Timer0 Timeout Counter Register */
->   #define T0TC_WATCHDOG		(0xff)		/* Enable watchdog mode */
->
-> -/*
-> - * Returns number of ms since last clock interrupt.  Note that interrupts
-> - * will have been disabled by do_gettimeoffset()
-> - */
-> -static unsigned long ks8695_gettimeoffset (void)
-> +static void ks8695_set_mode(enum clock_event_mode mode,
-> +			    struct clock_event_device *evt)
->   {
-> -	unsigned long elapsed, tick2, intpending;
-> +	u32 tmcon;
->
-> -	/*
-> -	 * Get the current number of ticks.  Note that there is a race
-> -	 * condition between us reading the timer and checking for an
-> -	 * interrupt.  We solve this by ensuring that the counter has not
-> -	 * reloaded between our two reads.
-> -	 */
-> -	elapsed = readl_relaxed(KS8695_TMR_VA + KS8695_T1TC) + readl_relaxed(KS8695_TMR_VA + KS8695_T1PD);
-> -	do {
-> -		tick2 = elapsed;
-> -		intpending = readl_relaxed(KS8695_IRQ_VA + KS8695_INTST) & (1 << KS8695_IRQ_TIMER1);
-> -		elapsed = readl_relaxed(KS8695_TMR_VA + KS8695_T1TC) + readl_relaxed(KS8695_TMR_VA + KS8695_T1PD);
-> -	} while (elapsed > tick2);
-> -
-> -	/* Convert to number of ticks expired (not remaining) */
-> -	elapsed = (CLOCK_TICK_RATE / HZ) - elapsed;
-> -
-> -	/* Is interrupt pending?  If so, then timer has been reloaded already. */
-> -	if (intpending)
-> -		elapsed += (CLOCK_TICK_RATE / HZ);
-> -
-> -	/* Convert ticks to usecs */
-> -	return (unsigned long)(elapsed * (tick_nsec / 1000)) / LATCH;
-> +	/* Disable timer 1 */
-> +	tmcon = readl_relaxed(KS8695_TMR_VA + KS8695_TMCON);
-> +	tmcon &= ~TMCON_T1EN;
-> +	writel_relaxed(tmcon, KS8695_TMR_VA + KS8695_TMCON);
-
-Moving this outside the "if" below causes it to hang during boot.
-It hangs at "Calibrating delay loop...".
-
-Putting it back inside the "if" and it all works as expected.
-
-Regards
-Greg
-
-
-
-
-> +	if (mode == CLOCK_EVT_FEAT_PERIODIC) {
-> +		u32 rate = DIV_ROUND_CLOSEST(KS8695_CLOCK_RATE, HZ);
-> +		u32 half = DIV_ROUND_CLOSEST(rate, 2);
-> +
-> +		/* Both registers need to count down */
-> +		writel_relaxed(half, KS8695_TMR_VA + KS8695_T1TC);
-> +		writel_relaxed(half, KS8695_TMR_VA + KS8695_T1PD);
-> +
-> +		/* Re-enable timer1 */
-> +		tmcon |= TMCON_T1EN;
-> +		writel_relaxed(tmcon, KS8695_TMR_VA + KS8695_TMCON);
-> +	}
->   }
->
-> +static int ks8695_set_next_event(unsigned long cycles,
-> +				 struct clock_event_device *evt)
-> +
-> +{
-> +	u32 half = DIV_ROUND_CLOSEST(cycles, 2);
-> +	u32 tmcon;
-> +
-> +	/* Disable timer 1 */
-> +	tmcon = readl_relaxed(KS8695_TMR_VA + KS8695_TMCON);
-> +	tmcon &= ~TMCON_T1EN;
-> +	writel_relaxed(tmcon, KS8695_TMR_VA + KS8695_TMCON);
-> +
-> +	/* Both registers need to count down */
-> +	writel_relaxed(half, KS8695_TMR_VA + KS8695_T1TC);
-> +	writel_relaxed(half, KS8695_TMR_VA + KS8695_T1PD);
-> +
-> +	/* Re-enable timer1 */
-> +	tmcon |= TMCON_T1EN;
-> +	writel_relaxed(tmcon, KS8695_TMR_VA + KS8695_TMCON);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct clock_event_device clockevent_ks8695 = {
-> +	.name		= "ks8695_t1tc",
-> +	.rating		= 300, /* Reasonably fast and accurate clock event */
-> +	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
-> +	.set_next_event	= ks8695_set_next_event,
-> +	.set_mode	= ks8695_set_mode,
-> +};
-> +
->   /*
->    * IRQ handler for the timer.
->    */
->   static irqreturn_t ks8695_timer_interrupt(int irq, void *dev_id)
->   {
-> -	timer_tick();
-> +	struct clock_event_device *evt = &clockevent_ks8695;
-> +
-> +	evt->event_handler(evt);
->   	return IRQ_HANDLED;
->   }
->
-> @@ -102,18 +128,22 @@ static struct irqaction ks8695_timer_irq = {
->
->   static void ks8695_timer_setup(void)
->   {
-> -	unsigned long tmout = CLOCK_TICK_RATE / HZ;
->   	unsigned long tmcon;
->
-> -	/* disable timer1 */
-> +	/* Disable timer 0 and 1 */
->   	tmcon = readl_relaxed(KS8695_TMR_VA + KS8695_TMCON);
-> -	writel_relaxed(tmcon & ~TMCON_T1EN, KS8695_TMR_VA + KS8695_TMCON);
-> -
-> -	writel_relaxed(tmout / 2, KS8695_TMR_VA + KS8695_T1TC);
-> -	writel_relaxed(tmout / 2, KS8695_TMR_VA + KS8695_T1PD);
-> +	tmcon &= ~TMCON_T0EN;
-> +	tmcon &= ~TMCON_T1EN;
-> +	writel_relaxed(tmcon, KS8695_TMR_VA + KS8695_TMCON);
->
-> -	/* re-enable timer1 */
-> -	writel_relaxed(tmcon | TMCON_T1EN, KS8695_TMR_VA + KS8695_TMCON);
-> +	/*
-> +	 * Use timer 1 to fire IRQs on the timeline, minimum 2 cycles
-> +	 * (one on each counter) maximum 2*2^32, but the API will only
-> +	 * accept up to a 32bit full word (0xFFFFFFFFU).
-> +	 */
-> +	clockevents_config_and_register(&clockevent_ks8695,
-> +					KS8695_CLOCK_RATE, 2,
-> +					0xFFFFFFFFU);
->   }
->
->   static void __init ks8695_timer_init (void)
-> @@ -126,7 +156,6 @@ static void __init ks8695_timer_init (void)
->
->   struct sys_timer ks8695_timer = {
->   	.init		= ks8695_timer_init,
-> -	.offset		= ks8695_gettimeoffset,
->   };
->
->   void ks8695_restart(char mode, const char *cmd)
->
-
-
--- 
-------------------------------------------------------------------------
-Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
-SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
-8 Gardner Close,                            FAX:         +61 7 3891 3630
-Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
+Whereas Rob said to me that both can use VM_ARM_EMPTY_MAPPING when I
+queried this conflict last week.
