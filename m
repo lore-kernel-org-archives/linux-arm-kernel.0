@@ -1,44 +1,24 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 05 Sep 2012 07:10:00 +0900
-Subject: [PATCH 1/2] ARM: exynos: delete redundant HAVE_SCHED_CLOCK option
- in Kconfig
-In-Reply-To: <1346406296-16223-1-git-send-email-Barry.Song@csr.com>
-References: <1346406296-16223-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <227101cd8aea$06a06e10$13e14a30$%kim@samsung.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 4 Sep 2012 15:14:29 -0700
+Subject: [PATCHv2] ARM: msm: Implement read_current_timer for msm timers
+In-Reply-To: <1346371222-7450-1-git-send-email-sboyd@codeaurora.org>
+References: <1346371222-7450-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20120904221429.GB6432@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Barry Song wrote:
-> 
-> From: Barry Song <Baohua.Song@csr.com>
-> 
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+On Thu, Aug 30, 2012 at 05:00:22PM -0700, Stephen Boyd wrote:
+> Setup the same timer used as the clocksource to be used as the
+> read_current_timer implementation. This allows us to support a
+> stable udelay implementation on MSMs where it's possible for the
+> CPUs to scale speeds independently of one another.
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Did you intend to send this "To" the MSM maintainers?  As it stands,
+it's a little ambiguous who is supposed to pick up this patch, since I
+don't think Will maintains a tree with pull requests.
 
-Thanks.
+David
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> ---
->  arch/arm/mach-exynos/Kconfig |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index b5b4c8c..3fd4ab3 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -243,7 +243,6 @@ config MACH_UNIVERSAL_C210
->  	select CPU_EXYNOS4210
->  	select S5P_HRT
->  	select CLKSRC_MMIO
-> -	select HAVE_SCHED_CLOCK
->  	select S5P_GPIO_INT
->  	select S5P_DEV_FIMC0
->  	select S5P_DEV_FIMC1
-> --
-> 1.7.0.4
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
