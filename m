@@ -1,37 +1,50 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 4 Sep 2012 23:19:55 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the
- arm-current tree
-In-Reply-To: <201209041311.02222.arnd@arndb.de>
-References: <20120904160626.f1dcb67ebbb145053c49da8c@canb.auug.org.au>
- <20120904090132.GG24085@n2100.arm.linux.org.uk>
- <5045F7A0.1090400@gmail.com> <201209041311.02222.arnd@arndb.de>
-Message-ID: <20120904231955.fb82c1b44e7c4568f626c915@canb.auug.org.au>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 04 Sep 2012 16:26:28 +0300
+Subject: [alsa-devel] [RFC 1/3] ASoC: dmaengine: Don't use runtime	private
+ data for dmaengine data
+In-Reply-To: <s5ha9x62an0.wl%tiwai@suse.de>
+References: <20120903165832.GA31511@n2100.arm.linux.org.uk>
+ <E1T8ZzV-0002vp-2j@rmk-PC.arm.linux.org.uk> <5045124D.3050604@metafoo.de>
+ <20120903204325.GA728@n2100.arm.linux.org.uk> <50451A4A.9000108@metafoo.de>
+ <s5ha9x62an0.wl%tiwai@suse.de>
+Message-ID: <50460184.4000404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Sep 2012 13:11:02 +0000 Arnd Bergmann <arnd@arndb.de> wrote:
->
-> On Tuesday 04 September 2012, Rob Herring wrote:
-> > Right. The PCI i/o reserved area has a dummy physical address of 0 and 
-> > needs to be skipped by ioremap searches. So we don't set 
-> > VM_ARM_STATIC_MAPPING to prevent matches by ioremap. The vm_struct settings
-> > don't really matter when we do the real mapping of the i/o space.
-> > 
-> > Here's my merge:
-> 
-> Ok, thanks for the clarification. I've merged Russell's fixes branch
-> into the cleanup/io-pci branch now to resolve the conflict.
+Hi Takashi,
 
-Even better than me handling it.  Thanks guys.
+On 09/04/2012 04:14 PM, Takashi Iwai wrote:
+>> Ok, it might have been helpful in the conversion process, but for the final
+>> patch it would be nice if you could replace
+>>
+>> struct snd_pcm_runtime *runtime = substream->runtime;
+>> struct omap_runtime_data *prtd = runtime->private_data;
+>> struct omap_pcm_dma_data *dma_data = prtd->dma_data;
+>> with
+>> struct omap_pcm_dma_data *dma_data = snd_dmaengine_pcm_get_data(substream);
+>>
+>> and in the hwparams callback use
+>>
+>> snd_dmaengine_pcm_set_data(substream, dma_data);
+>>
+>> and then drop patch 1 and 2 from the series.
+> 
+> We discussed with Liam about the addition of new field in ALSA core,
+> and concluded that a bit different approach, at least, more generic
+> name is preferred, even if a new field is inevitably needed.
+> 
+> So, eventually some change may happen in near future in ALSA core
+> side, but still it'd be really helpful if the callers have been
+> standardized beforehand with a helper function like above.
+
+If the omap-pcm dmaengine conversion works on all OMAP versions (from OMAP1 to
+OMAP5) it is possible to avoid the additional field.
+My main concern at the moment is if we will need two sets of drivers to
+support OMAP1 and OMAP2/3/4/5.
+In all case we use the same omap-mcbsp driver which would need deal with two
+different type of ASoC platform driver (dmaengine and non-dmaengine).
+I hope we get confirmation from Janusz soon regarding to OMAP1 with dmaengine
+so we can plan on how to move forward.
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120904/d1fac2e9/attachment.sig>
+P?ter
