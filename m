@@ -1,44 +1,97 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 4 Sep 2012 20:31:25 +0200
-Subject: [PATCH 1/4] net: mvneta: driver for Marvell Armada 370/XP
- network unit
-In-Reply-To: <20120904175610.2c2934f1@skate>
-References: <1346764004-16332-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1346764004-16332-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <201209041436.36430.arnd@arndb.de> <20120904175610.2c2934f1@skate>
-Message-ID: <20120904183125.GB14683@lunn.ch>
+From: kth3321@gmail.com (Taehun Kim)
+Date: Wed, 5 Sep 2012 03:32:50 +0900
+Subject: [PATCH v2] ARM: S3C24XX: Add WIZnet W5300E01-ARM board support
+In-Reply-To: <50450472.5090603@gmail.com>
+References: <1346653236-19728-1-git-send-email-kth3321@gmail.com>
+ <1346693799.3485.2.camel@taehun-desktop>
+ <50450472.5090603@gmail.com>
+Message-ID: <CAOkfWjfEO43WOtaM24P4xp_yW9FWfL5q99yNwftoXDONCAM9Kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > I think we normally put the phy into a separate device node on an
-> > mdio bus and then use the of_phy_* functions to connect it to
-> > the ethernet device.
-> 
-> Even though it may not be a convincing argument, none of the existing DT
-> files in arch/arm/boot/dts seem to instantiate a separate PHY device
-> and a proper MDIO bus. However, the PowerPC platforms indeed make this
-> distinction a lot clearer.
-> 
-> However, this network unit has a clever MAC that autonomously queries
-> the PHY for the link status, and reports changes (link, duplex, speed)
-> in the form of MAC interrupts and MAC registers. Therefore, for basic
-> operation, there is no need for a separate PHY driver nor to expose the
-> MDIO bus in any way. The only thing needed is the PHY address, which is
-> filled into a register of the MAC so that it can start its automatic
-> query of the PHY.
+2012/9/4 Sylwester Nawrocki <sylvester.nawrocki@gmail.com>:
+> On 09/03/2012 07:36 PM, Taehun Kim wrote:
+>> +static void __init w5300e01_init(void)
+>> +{
+>> +     s3c_nand_set_platdata(&w5300e01_nand_info);
+>> +     platform_add_devices(w5300e01_devices, ARRAY_SIZE(w5300e01_devices));
+>> +
+>> +     /* W5300 interrupt pin. */
+>> +     s3c_gpio_cfgpin(S3C2410_GPF(0), S3C2410_GPIO_IRQ);
+>> +
+>> +     s3c_gpio_cfgpin(S3C2410_GPF(4), S3C2410_GPIO_OUTPUT);
+>> +     s3c_gpio_cfgpin(S3C2410_GPF(5), S3C2410_GPIO_OUTPUT);
+>> +     s3c_gpio_cfgpin(S3C2410_GPF(6), S3C2410_GPIO_OUTPUT);
+>> +     s3c_gpio_cfgpin(S3C2410_GPF(7), S3C2410_GPIO_OUTPUT);
+>
+> Please don't use these obsolete S3C2410_GPIO_* defines, they will be
+> gone soon, if aren't yet.
+>
+>> +     gpio_set_value(S3C2410_GPF(0), 1);
+>> +     gpio_set_value(S3C2410_GPF(4), 1);
+>> +     gpio_set_value(S3C2410_GPF(5), 1);
+>> +     gpio_set_value(S3C2410_GPF(6), 1);
+>> +     gpio_set_value(S3C2410_GPF(7), 1);
+>
+> Instead I would do something like:
+>
+> 8<-----------------------------------------------------------------
+>
+> static const struct gpio gpios[] = {
+>         { S3C2410_GPF(4), GPIOF_OUT_INIT_HIGH, NULL },
+>         { S3C2410_GPF(5), GPIOF_OUT_INIT_HIGH, NULL },
+>         { S3C2410_GPF(6), GPIOF_OUT_INIT_HIGH, NULL },
+>         { S3C2410_GPF(7), GPIOF_OUT_INIT_HIGH, NULL },
+> };
+>
+> if (!WARN_ON(gpio_request_array(gpios, ARRAY_SIZE(gpios)))
+>         gpios_free_array(gpios);
+>
+> /* W5300 interrupt pin. */
+> if (!WARN_ON(gpio_request(S3C2410_GPF(0), GPIOF_IN, NULL))) {
+>         s3c_gpio_cfgpin(S3C2410_GPF(0), S3C_GPIO_SFN(2)); /* EINT0 */
+>         gpio_free(S3C2410_GPF(0));
+> }
+>
+> 8<-----------------------------------------------------------------
+>
+> --
+>
+> Regards,
+> Sylwester
 
-Hi Thomas
+Thank you for your feedback. I will change the gpio routine as follows:
 
-I've used Marvell switch chipsets, which have a phy polling unit,
-PPU. This sounds very similar. You can do a lot with the PPU, but when
-you want to configure subsets of auto-negotiation rates/duplex modes,
-or fixed speeds/duplex modes, the PPU could not do it. You had to
-disable the PPU and configure the PHY directly.
+-----------------------------------------------------------------
 
-I see you have some of the ethtools API calls implemented, but not the
-ones needed for auto-neg and rates/duplex mode configurations. Does
-the neta PPU support this, or will you need to export the MDIO bus for
-these sorts of configuration options?
+static const struct gpio w5300e01_gpios[] = {
+	{ S3C2410_GPF(4), GPIOF_OUT_INIT_HIGH, NULL },
+	{ S3C2410_GPF(5), GPIOF_OUT_INIT_HIGH, NULL },
+	{ S3C2410_GPF(6), GPIOF_OUT_INIT_HIGH, NULL },
+	{ S3C2410_GPF(7), GPIOF_OUT_INIT_HIGH, NULL },
+};
 
-   Thanks
-      Andrew
+static void __init w5300_init(void)
+{
+	/* W5300 interrupt pin. */
+	if (WARN_ON(gpio_request(S3C2410_GPF(0), "W5300 irq"))) {
+		pr_err("%s: GPIO request failed.\n", __func__);
+		return;
+	}
+	s3c_gpio_cfgpin(S3C2410_GPF(0), S3C_GPIO_SFN(2)); /* EINT0 */
+}
+
+static void __init w5300e01_init(void)
+{
+	s3c_nand_set_platdata(&w5300e01_nand_info);
+	platform_add_devices(w5300e01_devices, ARRAY_SIZE(w5300e01_devices));
+
+	if (WARN_ON(gpio_request_array(w5300e01_gpios, ARRAY_SIZE(w5300e01_gpios))))
+		pr_err("%s: GPIO request failed\n", __func__);
+
+	w5300_init();
+	s3c_pm_init();
+}
+-----------------------------------------------------------------
+
+Does anybody have a other comments?
