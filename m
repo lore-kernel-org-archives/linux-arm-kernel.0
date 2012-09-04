@@ -1,59 +1,56 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 4 Sep 2012 23:03:23 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the
- arm-current tree
-In-Reply-To: <5045F7A0.1090400@gmail.com>
-References: <20120904160626.f1dcb67ebbb145053c49da8c@canb.auug.org.au>
- <201209040808.25103.arnd@arndb.de>
- <20120904090132.GG24085@n2100.arm.linux.org.uk>
- <5045F7A0.1090400@gmail.com>
-Message-ID: <20120904230323.4e7e4a9b1b73644ef44236cd@canb.auug.org.au>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 04 Sep 2012 14:05:20 +0100
+Subject: [PATCH 10/11] ARM: vexpress: Add config bus components and
+ clocks to DTs
+In-Reply-To: <5045FAEC.6030906@gmail.com>
+References: <1346689531-7212-1-git-send-email-pawel.moll@arm.com>
+ <1346689531-7212-11-git-send-email-pawel.moll@arm.com>
+ <5045FAEC.6030906@gmail.com>
+Message-ID: <1346763920.2605.81.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Tue, 04 Sep 2012 07:44:16 -0500 Rob Herring <robherring2@gmail.com> wrote:
->
-> Right. The PCI i/o reserved area has a dummy physical address of 0 and 
-> needs to be skipped by ioremap searches. So we don't set 
-> VM_ARM_STATIC_MAPPING to prevent matches by ioremap. The vm_struct settings
-> don't really matter when we do the real mapping of the i/o space.
+On Tue, 2012-09-04 at 13:58 +0100, Rob Herring wrote:
+> > -			sysctl at 020000 {
+> > +			v2m_sysctl: sysctl at 020000 {
+> >  				compatible = "arm,sp810", "arm,primecell";
+> >  				reg = <0x020000 0x1000>;
+> > +				clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&v2m_osc_clk0>;
+> > +				clock-names = "refclk", "timclk", "apb_pclk";
 > 
-> Here's my merge:
+> See Documentation/devicetree/bindings/arm/primecell.txt
+> 
+> apb_pclk should be first in the list.
 
-Thanks, I shall use this in tomorrow's tree.
+Hm. Why, if you don't mind me asking? The amba_get_enable_pclk()
+explicitly asks for "apb_pclk" id:
 
-> diff --cc arch/arm/mm/mmu.c
-> index 4c2d045,c2fa21d,512b2c0..18144e6
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@@@ -785,6 -785,6 -786,19 +786,19 @@@@ void __init iotable_init(struct map_des
->         }
->    }
->    
-> ++ void __init vm_reserve_area_early(unsigned long addr, unsigned long size,
-> ++                                void *caller)
-> ++ {
-> ++      struct vm_struct *vm;
-> ++ 
-> ++      vm = early_alloc_aligned(sizeof(*vm), __alignof__(*vm));
-> ++      vm->addr = (void *)addr;
-> ++      vm->size = size;
->   -     vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
-> +++     vm->flags = VM_IOREMAP | VM_ARM_EMPTY_MAPPING;
-> ++      vm->caller = caller;
-> ++      vm_area_add_early(vm);
-> ++ }
-> ++ 
+struct clk *pclk = clk_get(&pcdev->dev, "apb_pclk");
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120904/6b1ea622/attachment.sig>
+Now, let's have a look at MMCI:
+
+                        mmci at 050000 {
+                                compatible = "arm,pl180", "arm,primecell";
+                                reg = <0x050000 0x1000>;
+                                interrupts = <9 10>;
++                               cd-gpios = <&v2m_sysreg 0 0>;
++                               wp-gpios = <&v2m_sysreg 1 0>;
++                               max-frequency = <12000000>;
++                               vmmc-supply = <&v2m_fixed_3v3>;
++                               clocks = <&v2m_clk_24mhz>, <&v2m_osc_clk0>;
++                               clock-names = "mclk", "apb_pclk";
+                        };
+
+and mmci_probe() does:
+
+        host->clk = clk_get(&dev->dev, NULL);
+        if (IS_ERR(host->clk)) {
+                ret = PTR_ERR(host->clk);
+                host->clk = NULL;
+                goto host_free;
+        }       
+
+Now, if I put "apb_pclk" first, before "mclk", the driver will get the
+wrong clock.
+
+Pawe?
