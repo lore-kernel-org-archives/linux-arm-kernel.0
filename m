@@ -1,70 +1,61 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 04 Sep 2012 09:31:16 -0500
-Subject: [PATCH 10/11] ARM: vexpress: Add config bus components and clocks
- to DTs
-In-Reply-To: <1346763920.2605.81.camel@hornet>
-References: <1346689531-7212-1-git-send-email-pawel.moll@arm.com>
- <1346689531-7212-11-git-send-email-pawel.moll@arm.com>
- <5045FAEC.6030906@gmail.com> <1346763920.2605.81.camel@hornet>
-Message-ID: <504610B4.6060902@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 4 Sep 2012 14:36:36 +0000
+Subject: [PATCH 1/4] net: mvneta: driver for Marvell Armada 370/XP network
+ unit
+In-Reply-To: <1346764004-16332-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1346764004-16332-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1346764004-16332-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <201209041436.36430.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2012 08:05 AM, Pawel Moll wrote:
-> On Tue, 2012-09-04 at 13:58 +0100, Rob Herring wrote:
->>> -			sysctl at 020000 {
->>> +			v2m_sysctl: sysctl at 020000 {
->>>  				compatible = "arm,sp810", "arm,primecell";
->>>  				reg = <0x020000 0x1000>;
->>> +				clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&v2m_osc_clk0>;
->>> +				clock-names = "refclk", "timclk", "apb_pclk";
->>
->> See Documentation/devicetree/bindings/arm/primecell.txt
->>
->> apb_pclk should be first in the list.
-> 
-> Hm. Why, if you don't mind me asking? The amba_get_enable_pclk()
-> explicitly asks for "apb_pclk" id:
+On Tuesday 04 September 2012, Thomas Petazzoni wrote:
+>  .../devicetree/bindings/net/marvell-neta.txt       |   24 +
+>  drivers/net/ethernet/marvell/Kconfig               |   11 +
+>  drivers/net/ethernet/marvell/Makefile              |    1 +
+>  drivers/net/ethernet/marvell/mvneta.c              | 2732 ++++++++++++++++++++
+>  drivers/net/ethernet/marvell/mvneta.h              |  496 ++++
+>  5 files changed, 3264 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/marvell-neta.txt
+>  create mode 100644 drivers/net/ethernet/marvell/mvneta.c
+>  create mode 100644 drivers/net/ethernet/marvell/mvneta.h
 
-So apb_pclk is always in the same position in the list and I had to
-define something. Clock names are supposed to be optional, so we have to
-be able to identify which clock is the bus clock without the name.
+I usually prefer putting the definitions into the .c file rather
+than a separate header if there is only only file including it
+anyway.
 
-> struct clk *pclk = clk_get(&pcdev->dev, "apb_pclk");
-> 
-> Now, let's have a look at MMCI:
-> 
->                         mmci at 050000 {
->                                 compatible = "arm,pl180", "arm,primecell";
->                                 reg = <0x050000 0x1000>;
->                                 interrupts = <9 10>;
-> +                               cd-gpios = <&v2m_sysreg 0 0>;
-> +                               wp-gpios = <&v2m_sysreg 1 0>;
-> +                               max-frequency = <12000000>;
-> +                               vmmc-supply = <&v2m_fixed_3v3>;
-> +                               clocks = <&v2m_clk_24mhz>, <&v2m_osc_clk0>;
-> +                               clock-names = "mclk", "apb_pclk";
->                         };
-> 
-> and mmci_probe() does:
-> 
->         host->clk = clk_get(&dev->dev, NULL);
->         if (IS_ERR(host->clk)) {
->                 ret = PTR_ERR(host->clk);
->                 host->clk = NULL;
->                 goto host_free;
->         }       
-> 
-> Now, if I put "apb_pclk" first, before "mclk", the driver will get the
-> wrong clock.
+> diff --git a/Documentation/devicetree/bindings/net/marvell-neta.txt b/Documentation/devicetree/bindings/net/marvell-neta.txt
+> new file mode 100644
+> index 0000000..a031978
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/marvell-neta.txt
+> @@ -0,0 +1,24 @@
+> +* Marvell Armada 370 / Armada XP Ethernet Controller (NETA)
+> +
+> +Required properties:
+> +- compatible: should be "marvell,neta".
+> +- reg: address and length of the register set for the device.
+> +- interrupts: interrupt for the device
+> +- phy-mode: String, operation mode of the PHY interface. Supported
+> +  values are "sgmii" and "rmii".
+> +- phy-addr: Integer, address of the PHY.
+> +- device_type: should be "network".
+> +- clock-frequency: frequency of the peripheral clock of the SoC.
+> +
+> +Example:
+> +
+> +eth at d0070000 {
+> +               compatible = "marvell,neta";
+> +               reg = <0xd0070000 0x2500>;
+> +               interrupts = <8>;
+> +               device_type = "network";
+> +               clock-frequency = <250000000>;
+> +               status = "okay";
+> +               phy-mode = "sgmii";
+> +               phy-addr = <25>;
 
-You're getting lucky with how clk_get is implemented. The driver should
-be more specific with which clock it wants if there is more than 1.
-Perhaps we need a clk_get_by_index() function?
+I think we normally put the phy into a separate device node on an
+mdio bus and then use the of_phy_* functions to connect it to
+the ethernet device.
 
-Rob
-
-> 
-> Pawe?
-> 
-> 
+	Arnd
