@@ -1,36 +1,62 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 04 Sep 2012 10:15:25 +0200
-Subject: [PATCH] gpio: samsung: Update documentation
-In-Reply-To: <CACRpkdbudOv9AvS1XuyPB+BZ63+Ymu5dhkBBWFCo2qYDV+jAmw@mail.gmail.com>
-References: <503D267A.2090406@gmail.com>
- <1346603089-14122-1-git-send-email-sylvester.nawrocki@gmail.com>
- <CACRpkdbudOv9AvS1XuyPB+BZ63+Ymu5dhkBBWFCo2qYDV+jAmw@mail.gmail.com>
-Message-ID: <5045B89D.50503@samsung.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 4 Sep 2012 10:27:22 +0200
+Subject: [PATCH] USB: ohci-at91: fix PIO handling in relation with number
+ of ports
+In-Reply-To: <1346233758-27009-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1346233758-27009-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <5045BB6A.8060309@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2012 09:27 AM, Linus Walleij wrote:
-> On Sun, Sep 2, 2012 at 6:24 PM, Sylwester Nawrocki
-> <sylvester.nawrocki@gmail.com> wrote:
+On 08/29/2012 11:49 AM, Nicolas Ferre :
+> If the number of ports present on the SoC/board is not the maximum
+> and that the platform data is not filled with all data, there is
+> an easy way to mess the PIO setup for this interface.
+> This quick fix addresses mis-configuration in USB host platform data
+> that is common in at91 boards since commit 0ee6d1e (USB: ohci-at91:
+> change maximum number of ports) that did not modified the associatd
+> board files.
 > 
->> Update Samsung GPIO API documentation to reflect removal of
->> the s3c24xx specific gpio API. While at it, fix some typos.
->>
->> The notes on conversion from s3c2410_* functions to the gpiolib
->> API are left here just in case there is any out of tree code that
->> still needs to be converted.
->>
->> Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+> Reported-by: Klaus Falkner <klaus.falkner@solectrix.de>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: linux-usb at vger.kernel.org
+> Cc: Stable <stable@vger.kernel.org> [3.4+]
+
+Alan, Greg, gentle ping...
+
+I really would like to seen it landing in stable soon...
+
+Thanks, best regards,
+
+> ---
+>  drivers/usb/host/ohci-at91.c |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+> index a665b3e..aaa8d2b 100644
+> --- a/drivers/usb/host/ohci-at91.c
+> +++ b/drivers/usb/host/ohci-at91.c
+> @@ -570,6 +570,16 @@ static int __devinit ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+>  
+>  	if (pdata) {
+>  		at91_for_each_port(i) {
+> +			/*
+> +			 * do not configure PIO if not in relation with
+> +			 * real USB port on board
+> +			 */
+> +			if (i >= pdata->ports) {
+> +				pdata->vbus_pin[i] = -EINVAL;
+> +				pdata->overcurrent_pin[i] = -EINVAL;
+> +				break;
+> +			}
+> +
+>  			if (!gpio_is_valid(pdata->vbus_pin[i]))
+>  				continue;
+>  			gpio = pdata->vbus_pin[i];
 > 
-> Get the Samsung maintainers to apply this patch since they carry
-> the API changes.
 
-Thanks Linus. Kgene, this is the documentation update we talked about
-previously. Can you please pick this patch as well ?
 
---
-
-Regards,
-Sylwester
+-- 
+Nicolas Ferre
