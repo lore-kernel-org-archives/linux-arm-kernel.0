@@ -1,31 +1,87 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Wed, 05 Sep 2012 00:37:30 +0200
-Subject: [alsa-devel] [RFC update 0/2] dmaengine/ASoC: omap: Enable
- element mode in cyclic DMA
-In-Reply-To: <1346760482-12794-1-git-send-email-peter.ujfalusi@ti.com>
-References: <E1T8a09-0002vz-Bl@rmk-PC.arm.linux.org.uk>
- <1346760482-12794-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <11245085.Nc6xDQ9liJ@acer>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 05 Sep 2012 07:41:14 +0900
+Subject: [PATCH] ARM: Samsung: Remove unused code for the clocks debug-fs
+ interface
+In-Reply-To: <1346603823-14422-1-git-send-email-sylvester.nawrocki@gmail.com>
+References: <1346603823-14422-1-git-send-email-sylvester.nawrocki@gmail.com>
+Message-ID: <227c01cd8aee$638ee0d0$2aaca270$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Sep 2012 15:08:00 Peter Ujfalusi wrote:
-> Hi Russell,
+Sylwester Nawrocki wrote:
 > 
-> Enable the element mode (thus allowing mono playback and probably unblocking
-> OMAP1, OMAP2420) in OMAP dmaengine and omap-pcm.
+> Commit f86c6660927614fcda257 "ARM: SAMSUNG: Add clkdev infrastructure"
+> disabled population of the 'clocks' list - the clocks are now on the
+> clkdev clock list. However, this effectively broke the existing clocks
+> debug-fs interface on all Samsung platforms. Nobody complained about
+> this missing feature for over one year, so remove the unused code.
 > 
-> Janusz: would it be possible for you to test Russell's series plus this on
-> OMAP1 to make sure that we do not broke it?
+Yeah, could be. BTW, following will fix it on Samsung platforms?
 
-Hi Peter, Russell,
-I'll be happy to make this test for you. This will take some time (I 
-work away from home), but I expect to have it done by Monday.
+From: Arve Hj<C3><B8>nnev<C3><A5>g <arve@android.com>
+Subject: [PATCH] ARM: SAMSUNG: Fix clock debugfs code
 
-BTW, I haven't been following OMAP development very closely last weeks, 
-and I didn't even know about the OMAP DMA engine availability. Which 
-Linux version should I base my test on? Would 3.6-rc be OK? Or l-o 
-master?
+Restore list add deleted by commit f86c66609276('ARM: SAMSUNG:
+Add clkdev infrastructure') and fix clk_debugfs_register_one
+to not crash when devname is NULL.
 
-Thanks,
-Janusz
+Signed-off-by: Arve Hj<C3><B8>nnev<C3><A5>g <arve@android.com>
+Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+---
+ arch/arm/plat-samsung/clock.c |   15 ++++++++++++++-
+ 1 files changed, 14 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
+index 65c5eca..b7338ce 100644
+--- a/arch/arm/plat-samsung/clock.c
++++ b/arch/arm/plat-samsung/clock.c
+@@ -281,6 +281,15 @@ int s3c24xx_register_clock(struct clk *clk)
+ 	if (clk->enable == NULL)
+ 		clk->enable = clk_null_enable;
+ 
++	/* add to the list of available clocks */
++
++	/* Quick check to see if this clock has already been registered. */
++	BUG_ON(clk->list.prev != clk->list.next);
++
++	spin_lock(&clocks_lock);
++	list_add(&clk->list, &clocks);
++	spin_unlock(&clocks_lock);
++
+ 	/* fill up the clk_lookup structure and register it*/
+ 	clk->lookup.dev_id = clk->devname;
+ 	clk->lookup.con_id = clk->name;
+@@ -395,7 +404,11 @@ static int clk_debugfs_register_one(struct clk *c)
+ 	char s[255];
+ 	char *p = s;
+ 
+-	p += sprintf(p, "%s", c->devname);
++	if (c->name)
++		p += sprintf(p, "%s", c->name);
++
++	if (c->devname)
++		p += sprintf(p, ":%s", c->devname);
+ 
+ 	d = debugfs_create_dir(s, pa ? pa->dent : clk_debugfs_root);
+ 	if (!d)
+-- 
+1.7.1
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> This functionality will be restored when switching to the common clock
+> framework.
+> 
+> Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+> ---
+>  arch/arm/plat-samsung/clock.c              |   92
+---------------------------
+> -
+>  arch/arm/plat-samsung/include/plat/clock.h |    8 +--
+>  2 files changed, 1 insertions(+), 99 deletions(-)
