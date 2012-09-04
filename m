@@ -1,32 +1,34 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  4 Sep 2012 15:06:40 +0200
-Subject: net: Network driver for the Armada 370 and Armada XP ARM Marvell SoCs
-Message-ID: <1346764004-16332-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue,  4 Sep 2012 15:06:42 +0200
+Subject: [PATCH 2/4] net: mvneta: update MAINTAINERS file for the mvneta
+ maintainers
+In-Reply-To: <1346764004-16332-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1346764004-16332-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1346764004-16332-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David, Lennert,
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ MAINTAINERS |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-This patch set adds a new network driver for the network unit
-available in the newest Marvell ARM SoCs Armada 370 and Armada XP, as
-well as the necessary Device Tree information to use this driver in
-the two evaluation platforms of those SoCs.
-
-In details:
-
- * Patch 1 contains the driver itself. The commit log contains a
-   detailed explanation about why a new driver is needed for this new
-   Marvell SoC, compared to older Marvell SoCs (Orion, Kirkwood, Dove)
-   that use the mv643xx_eth driver.
-
- * Patch 2 adds the necessary entry to the MAINTAINERS file.
-
- * Patch 3 adds the SoC-level Device Tree information for Armada 370
-   and Armada XP.
-
- * Patch 4 adds the board-level Device Tree information for the
-   Marvell evaluation boards of Armada 370 and Armada XP.
-
-Thanks,
-
-Thomas Petazzoni
+diff --git a/MAINTAINERS b/MAINTAINERS
+index fdc0119..35418e8 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -4436,6 +4436,12 @@ S:	Maintained
+ F:	drivers/net/ethernet/marvell/mv643xx_eth.*
+ F:	include/linux/mv643xx.h
+ 
++MARVELL MVNETA ETHERNET DRIVER
++M:	Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++L:	netdev at vger.kernel.org
++S:	Maintained
++F:	drivers/net/ethernet/marvell/mvneta.*
++
+ MARVELL MWIFIEX WIRELESS DRIVER
+ M:	Bing Zhao <bzhao@marvell.com>
+ L:	linux-wireless at vger.kernel.org
+-- 
+1.7.9.5
