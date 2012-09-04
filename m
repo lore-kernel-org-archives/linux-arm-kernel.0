@@ -1,62 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 4 Sep 2012 19:46:46 +0000
-Subject: [RFC/PATCH] ARM: PRIMA2: initial support for SiRFmarco dual-core
- SoC
-In-Reply-To: <CAGsJ_4yKN2QvOGYE0NFX0GvLM+fRr36=hrPxpuXxUwHuNUkp4g@mail.gmail.com>
-References: <1346409312-16778-1-git-send-email-Barry.Song@csr.com>
- <201209031410.50729.arnd@arndb.de>
- <CAGsJ_4yKN2QvOGYE0NFX0GvLM+fRr36=hrPxpuXxUwHuNUkp4g@mail.gmail.com>
-Message-ID: <201209041946.47068.arnd@arndb.de>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 5 Sep 2012 01:17:48 +0530
+Subject: [PATCH v3 1/4] pinctrl: add samsung pinctrl and gpiolib driver
+In-Reply-To: <CACRpkdbVe77pAYdOw0+_2G2FWVWcn4GKQty6R-LXXEz-OkUdUg@mail.gmail.com>
+References: <1345720529-32315-1-git-send-email-thomas.abraham@linaro.org>
+ <1345720529-32315-2-git-send-email-thomas.abraham@linaro.org>
+ <CACRpkdbVe77pAYdOw0+_2G2FWVWcn4GKQty6R-LXXEz-OkUdUg@mail.gmail.com>
+Message-ID: <CAJuYYwTD+vMg=YjUj4G0E-uakk=Y_SD+cUU22QSx0yRC50V75w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 September 2012, Barry Song wrote:
+On 3 September 2012 16:44, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Aug 23, 2012 at 1:15 PM, Thomas Abraham
+> <thomas.abraham@linaro.org> wrote:
+>
+>> Add a new device tree enabled pinctrl and gpiolib driver for Samsung
+>> SoC's. This driver provides a common and extensible framework for all
+>> Samsung SoC's to interface with the pinctrl and gpiolib subsystems. This
+>> driver supports only device tree based instantiation and hence can be
+>> used only on those Samsung platforms that have device tree enabled.
+>>
+>> This driver is split into two parts: the pinctrl interface and the gpiolib
+>> interface. The pinctrl interface registers pinctrl devices with the pinctrl
+>> subsystem and gpiolib interface registers gpio chips with the gpiolib
+>> subsystem. The information about the pins, pin groups, pin functions and
+>> gpio chips, which are SoC specific, are parsed from device tree node.
+>>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>
+> Looks good to me, I saw Stephen had some minor comments and
+> I expect that you probably fix them before applying to the Samsung
+> tree so:
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Feel free to push this through ARM SoC, I guess that's the plan?
 
-> >
-> >> +              rstc-iobg {
-> >> +                     compatible = "simple-bus";
-> >> +                     #address-cells = <1>;
-> >> +                     #size-cells = <1>;
-> >> +                     ranges = <0xc2000000 0xc2000000 0x10000>;
-> >> +
-> >> +                     reset-controller at c2000000 {
-> >> +                             compatible = "sirf,marco-rstc";
-> >> +                             reg = <0xc2000000 0x10000>;
-> >> +                     };
-> >> +             };
-> >> +
-> >> +             sys-iobg {
-> >> +                     compatible = "simple-bus";
-> >> +                     #address-cells = <1>;
-> >> +                     #size-cells = <1>;
-> >> +                     ranges = <0xc3000000 0xc3000000 0x30000>;
-> >
-> > It looks to me that the sub-buses all have a size of 0x1000000, so I would
-> > recommend listing that one in the ranges, rather than only enough to
-> > provide the devices that you actually use.
-> 
-> these ranges come from the hw spec. it seems you mean something like:
->                   ranges = <0xcc050000 0xcc050000 0x1000
->                             0xcc060000 0xcc060000 0x1000
->                             0xcc190000 0xcc190000 0x1000
->                             ....>;
-> then the list will be very long. i can't really understand the
-> benefit.  of course, if a driver makes misoperations to map an address
-> not in this list, io mapping will fail for it.
-> here <0xc3000000 0xc3000000 0x30000> is the filter range that will go
-> through sys-iobg in marco SoC. if an address located in this range
-> doesn't locate in a real hardware which exists, the driver should fail
-> due to hw error.
+Hi Linus,
 
-I actually meant 
+Thanks for reviewing the Samsung pinctrl driver patches. I will do the
+changes that Stephen has listed and resubmit. I will request Samsung
+maintainer to consider the support for pinctrl driver for 3.7.
 
-	ranges = <0xc2000000 0xc2000000 0x1000000>;
-
-Since each iobg range seems to be 16MB apart from the previous one,
-I would assume that the actual ranges that get translated are also
-16 MB, not 64 KB or 192 KB as in the examples above. The rule however
-is that you should model what the hardware does, and if that bus
-has a 192KB window, then you should list that in the DT source.
-
-
-	Arnd
+Thanks,
+Thomas.
