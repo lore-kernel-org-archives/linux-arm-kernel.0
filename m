@@ -1,75 +1,54 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 4 Sep 2012 09:38:58 +0800
-Subject: [PATCH 02/10] gpio: pxa: add explicit includes for cpu_is_X macros
-In-Reply-To: <5044CF0A.7040208@gmail.com>
-References: <1346279496-26286-1-git-send-email-robherring2@gmail.com>
- <1346279496-26286-3-git-send-email-robherring2@gmail.com>
- <CACRpkdasWv8toA1eBzpYo4QactNhkpzhuBk-D8kJbbM03WZN2Q@mail.gmail.com>
- <CAN1soZzDr4pi7zs188Rw-nQaA9ef-0VoVnwkMo=PCd0KPU22cg@mail.gmail.com>
- <5044CF0A.7040208@gmail.com>
-Message-ID: <CAN1soZw=0Phm8pb3a=x3--rb=0niXqB06RPzOgudG7S-B4rUpg@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 03 Sep 2012 22:04:21 -0400 (EDT)
+Subject: Without MACH_ option Early printk (DEBUG_LL)
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E9DC099@DBDE01.ent.ti.com>
+References: <5040D03B.2050304@ti.com>
+ <20120831171336.GA6978@n2100.arm.linux.org.uk>
+ <79CD15C6BA57404B839C016229A409A83EA9EC8B@DBDE01.ent.ti.com>
+ <alpine.LFD.2.02.1208311422450.1784@xanadu.home>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9DC099@DBDE01.ent.ti.com>
+Message-ID: <alpine.LFD.2.02.1209032201451.1784@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 3, 2012 at 11:38 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 09/02/2012 10:19 PM, Haojian Zhuang wrote:
->> On Fri, Aug 31, 2012 at 6:17 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>> On Wed, Aug 29, 2012 at 3:31 PM, Rob Herring <robherring2@gmail.com> wrote:
->>>
->>>> From: Rob Herring <rob.herring@calxeda.com>
->>>>
->>>> In preparation to remove implicit inclusion of mach/gpio.h, add the
->>>> necessary includes for cpu_is_X macros.
->>>
->>> The commit message talks about gpio.h, but...
->>>
->>>>  #include <mach/irqs.h>
->>>> +#include <mach/hardware.h>
->>>> +#ifdef CONFIG_ARCH_MMP
->>>> +#include <mach/cputype.h>
->>>> +#endif
->>>
->>> This seems completely unrelated, but correct in the sense that every driver
->>> should include its resources.
->>>
->>> But isn't the proper fix to move arch/arm/mach-pxa/include/mach/cputype.h to
->>> include/linux/*/pxa-cputype.h or something (note: no clue what "*" should be!),
->>> or even better, modify this one driver to take a flag from platform data and/or
->>> DT?
->>>
->>> Anyway, we need the PXA maintainers to look at this.
->>>
->>> Yours,
->>> Linus Walleij
->>
->> It's no problem to include cputype.h. I agree Linus's comments to use a same
->> name head file. For example, add cputype.h in arch-pxa. Use cputype.h to include
->> hardware.h.
->
-> I think the right fix is really removing the use of cpu_is_X macros
-> altogether.
->
-We'll support non-DT mode at least half a year. So we don't plan to
-remove cpu_is_X
-macros so quickly.
+On Mon, 3 Sep 2012, Mohammed, Afzal wrote:
 
->> My question is whether your patches are also based on Arnd's
->> multi-header branch.
->> I remember that some changes are done in his multiplatform branch. Should we
->> do any patches on his multiplatform branch?
->
-> It is not based on it. We decided at the ARM mini-summit to not do the
-> mach header rename and to deprecate including mach headers outside of
-> arch/arm.
->
-> I'm thinking I will just make PXA and MMP select CONFIG_NEED_MACH_GPIO_H
-> and drop this patch. If pxa and mmp want to be included in
-> multi-platform images, then this will need to be fixed.
->
-> Rob
+> Hi,
+> 
+> On Fri, Aug 31, 2012 at 23:53:32, Nicolas Pitre wrote:
+> > On Fri, 31 Aug 2012, Hiremath, Vaibhav wrote:
+> > > On Fri, Aug 31, 2012 at 22:43:36, Russell King - ARM Linux wrote:
+> > > > On Fri, Aug 31, 2012 at 08:24:51PM +0530, Vaibhav Hiremath wrote:
+> 
+> > > > > AM335X EVM (based on AM33XX device) only supports DT boot mode and
+> > > > > doesn't have CONFIG_MACH_AM335XEVM option defined. Some time back during
+> > > > > baseport submission we had aligned that, we won't create separate EVM
+> > > > > options, killing the board file all-together.
+> > > > > 
+> > > > > Having said that, the early printk option (DEBUG_LL) is broken, the
+> > > > > auto-generated file "./include/generated/mach-types.h" still refers to
+> > > > > CONFIG_MACH_AM335XEVM option,
+> > > > machine types are entirely meaningless for DT based systems.
+> > > > 
+> > > > > Can you comment on this? Based on that I will submit the patch.
+> > > > 
+> > > > Pointless.  You can't use machine_is_am335xevm() when you're using DT.
+> > > > 
+> > > 
+> > > They how do you recommend to resolve early prink issue (required during 
+> > > decompression)?
+> > 
+> > Right now the best you can do is to have empty stubs that display 
+> > nothing.
+> 
+> Won't having compile time selection of debug uart over machine based
+> runtime detection help here ?
 
-I checked with Arnd that new patches would be on his multiplatform
-branch in that
-summit. And mulitplatform branch is based on multiheader branch.
+It certainly would.  But then your kernel won't run on anything but the 
+specific machine for which the compile time UART selection was made.  As 
+soon as you have more than one possible UART config for the set of 
+machines you want your kernel binary to run on, you'll have to give up 
+on the early output during kernel decompression.
 
-It's ok to enable CONFIG_NEED_MACH_GPIO_H and drop this patch.
+
+Nicolas
