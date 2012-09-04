@@ -1,43 +1,36 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 04 Sep 2012 10:50:07 +0200
-Subject: [PATCH v2 3/5] ARM: Exynos4: Add OF compatibility lookups for Exynos4
- i2c adapters
+Date: Tue, 04 Sep 2012 10:50:08 +0200
+Subject: [PATCH v2 4/5] ARM: EXYNOS: Increase maximum possible memory bank size
+ to 512MiB
 In-Reply-To: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
 References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1346748609-11115-4-git-send-email-t.figa@samsung.com>
+Message-ID: <1346748609-11115-5-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Some boards have larger memory banks than 256MiB. This patch increses
+maximum bank size for Exynos-based boards to 512MiB.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/mach-exynos4-dt.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/mach-exynos/include/mach/memory.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
-index 8dad4ec..5f805b4 100644
---- a/arch/arm/mach-exynos/mach-exynos4-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
-@@ -55,6 +55,20 @@ static const struct of_dev_auxdata exynos4_auxdata_lookup[] __initconst = {
- 				"exynos4-sdhci.3", NULL),
- 	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(0),
- 				"s3c2440-i2c.0", NULL),
-+	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(1),
-+				"s3c2440-i2c.1", NULL),
-+	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(2),
-+				"s3c2440-i2c.2", NULL),
-+	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(3),
-+				"s3c2440-i2c.3", NULL),
-+	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(4),
-+				"s3c2440-i2c.4", NULL),
-+	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(5),
-+				"s3c2440-i2c.5", NULL),
-+	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(6),
-+				"s3c2440-i2c.6", NULL),
-+	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(7),
-+				"s3c2440-i2c.7", NULL),
- 	OF_DEV_AUXDATA("samsung,exynos4210-spi", EXYNOS4_PA_SPI0,
- 				"exynos4210-spi.0", NULL),
- 	OF_DEV_AUXDATA("samsung,exynos4210-spi", EXYNOS4_PA_SPI1,
+diff --git a/arch/arm/mach-exynos/include/mach/memory.h b/arch/arm/mach-exynos/include/mach/memory.h
+index 374ef2c..d4db508 100644
+--- a/arch/arm/mach-exynos/include/mach/memory.h
++++ b/arch/arm/mach-exynos/include/mach/memory.h
+@@ -15,8 +15,8 @@
+ 
+ #define PLAT_PHYS_OFFSET		UL(0x40000000)
+ 
+-/* Maximum of 256MiB in one bank */
++/* Maximum of 512MiB in one bank */
+ #define MAX_PHYSMEM_BITS	32
+-#define SECTION_SIZE_BITS	28
++#define SECTION_SIZE_BITS	29
+ 
+ #endif /* __ASM_ARCH_MEMORY_H */
 -- 
 1.7.12
