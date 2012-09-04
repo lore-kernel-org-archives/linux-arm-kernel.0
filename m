@@ -1,56 +1,24 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  4 Sep 2012 12:40:30 +0200
-Subject: [PATCH V2 4/6] arm: mvebu: add L2 cache support
-In-Reply-To: <1346755232-26006-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1346755232-26006-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1346755232-26006-5-git-send-email-gregory.clement@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 4 Sep 2012 12:42:34 +0200
+Subject: [PATCH 4/4 v4] ARM: ks8695: convert to generic time and
+ clocksource
+In-Reply-To: <5045C0B2.6010509@snapgear.com>
+References: <1346742590-10719-1-git-send-email-linus.walleij@linaro.org>
+ <5045C0B2.6010509@snapgear.com>
+Message-ID: <CACRpkdZmOO1AeKHBaX3kcxiwkVZgrJ=yaY+QfC3spOmixMx+iA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Tested-and-reviewed-by: Yehuda Yitschak <yehuday@marvell.com>
-Tested-and-reviewed-by: Lior Amsalem <alior@marvell.com>
+On Tue, Sep 4, 2012 at 10:49 AM, Greg Ungerer <gerg@snapgear.com> wrote:
 
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
----
- arch/arm/mach-mvebu/Kconfig             |    1 +
- arch/arm/mach-mvebu/irq-armada-370-xp.c |    4 ++++
- 2 files changed, 5 insertions(+)
+> Moving this outside the "if" below causes it to hang during boot.
+> It hangs at "Calibrating delay loop...".
+>
+> Putting it back inside the "if" and it all works as expected.
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index caa2c5e..e20c5e9 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -6,6 +6,7 @@ config MACH_ARMADA_370_XP
- 	bool "Marvell Armada 370 and Aramada XP boards"
- 	select ARMADA_370_XP_TIMER
- 	select CPU_V7
-+	select CACHE_L2X0
- 	help
- 
- 	  Say 'Y' here if you want your kernel to support boards based on
-diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/arch/arm/mach-mvebu/irq-armada-370-xp.c
-index 5f5f939..570be84 100644
---- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/irq-armada-370-xp.c
-@@ -24,6 +24,7 @@
- #include <linux/irqdomain.h>
- #include <asm/mach/arch.h>
- #include <asm/exception.h>
-+#include <asm/hardware/cache-l2x0.h>
- 
- /* Interrupt Controller Registers Map */
- #define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
-@@ -130,4 +131,7 @@ static const struct of_device_id mpic_of_match[] __initconst = {
- void __init armada_370_xp_init_irq(void)
- {
- 	of_irq_init(mpic_of_match);
-+#ifdef CONFIG_CACHE_L2X0
-+	l2x0_of_init(0, ~0UL);
-+#endif
- }
--- 
-1.7.9.5
+Hm, I wonder why. Oh well, nevermind, I'll respin again...
+
+Thanks for your patience!
+
+Yours,
+Linus Walleij
