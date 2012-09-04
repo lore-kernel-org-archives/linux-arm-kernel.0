@@ -1,43 +1,55 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Tue, 4 Sep 2012 08:34:11 +0000
-Subject: [PATCH 1/4] can: c_can: Adopt pinctrl support
-In-Reply-To: <5045B0D9.6060003@pengutronix.de>
-References: <1346673139-14540-1-git-send-email-anilkumar@ti.com>
- <1346673139-14540-2-git-send-email-anilkumar@ti.com>
- <5045161C.4000100@pengutronix.de>
- <331ABD5ECB02734CA317220B2BBEABC13EA2630A@DBDE01.ent.ti.com>
- <5045B0D9.6060003@pengutronix.de>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA26482@DBDE01.ent.ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue,  4 Sep 2012 10:44:02 +0200
+Subject: [PATCHv3 1/2] ARM: dts: mxs: Add missing address and size cells in
+ SSP nodes
+Message-ID: <1346748243-28675-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 04, 2012 at 13:12:17, Marc Kleine-Budde wrote:
-> On 09/04/2012 08:14 AM, AnilKumar, Chimata wrote:
-> > Hi Marc,
-> > 
-> > On Tue, Sep 04, 2012 at 02:12:04, Marc Kleine-Budde wrote:
-> >> On 09/03/2012 01:52 PM, AnilKumar Ch wrote:
-> >>> Adopt pinctrl support to c_can driver based on c_can device
-> >>> pointer, pinctrl driver configure SoC pins to d_can mode
-> >>> according to definitions provided in .dts file.
-> >>>
-> >>> In device specific device tree file 'pinctrl-names = "default";'
-> >>> and 'pinctrl-0 = <&d_can1_pins>;' needs to add to configure pins
-> >>> from c_can driver. d_can1_pins node contains the pinmux/config
-> >>> details of d_can L/H pins.
-> >>
-> >> Looks good, is the pinctrl property documented in the dt bindings already?
-> >>
-> > 
-> > Yes, its here Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
-> 
-> Sorry, I meant not the generic pinctrl, but the c_can/d_can bindings
-> documentation (Documentation/devicetree/bindings/net/can/).
-> 
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/imx28.dtsi |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-No, I have not included because those are pinctrl driver specific
-bindings. If the SoC supports pinmux/conf feature then those should
-be added according to pinctrl driver. If the SoC is not supported pinmux/config then this configuration is not required.
-
-Thanks
-AnilKumar
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 1d6382d..e3ec682 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -86,6 +86,8 @@
+ 			};
+ 
+ 			ssp0: ssp at 80010000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x80010000 0x2000>;
+ 				interrupts = <96 82>;
+ 				fsl,ssp-dma-channel = <0>;
+@@ -93,6 +95,8 @@
+ 			};
+ 
+ 			ssp1: ssp at 80012000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x80012000 0x2000>;
+ 				interrupts = <97 83>;
+ 				fsl,ssp-dma-channel = <1>;
+@@ -100,6 +104,8 @@
+ 			};
+ 
+ 			ssp2: ssp at 80014000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x80014000 0x2000>;
+ 				interrupts = <98 84>;
+ 				fsl,ssp-dma-channel = <2>;
+@@ -107,6 +113,8 @@
+ 			};
+ 
+ 			ssp3: ssp at 80016000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x80016000 0x2000>;
+ 				interrupts = <99 85>;
+ 				fsl,ssp-dma-channel = <3>;
+-- 
+1.7.9.5
