@@ -1,24 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 4 Sep 2012 08:25:48 -0300
-Subject: [PATCH] ARM: mx28evk: Add I2C EEPROM support
-In-Reply-To: <1346096399-10114-1-git-send-email-fabio.estevam@freescale.com>
-References: <1346096399-10114-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <CAOMZO5BxaJoPLr9Rm58XW_k2_UGTgPtzUGh4qP5q-UiLQQt5Bw@mail.gmail.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Tue, 4 Sep 2012 13:30:12 +0200
+Subject: [PATCH] ARM: dts: OMAP4: Cleanup and move GIC outside of the
+ OCP node
+In-Reply-To: <CAMQu2gz7M7zWogTdCtR6K3n-9CPoLf7NO4a314WmKhN-BeXCiQ@mail.gmail.com>
+References: <5044D8E5.5010705@ti.com>
+ <CAMQu2gz7M7zWogTdCtR6K3n-9CPoLf7NO4a314WmKhN-BeXCiQ@mail.gmail.com>
+Message-ID: <5045E644.9000904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn
+On 09/04/2012 07:47 AM, Shilimkar, Santosh wrote:
+> On Mon, Sep 3, 2012 at 9:20 AM, Benoit Cousson <b-cousson@ti.com> wrote:
+>> Remove a useless comment and move GIC controller outside
+>> of the OCP node since it does use the MPU internal bus and
+>> not the OCP.
+>> This will not change the functionality but will reflect the
+>> reality more accurately.
+>>
+>> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+>> ---
+>>
+> Make sense.
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> 
 
-On Mon, Aug 27, 2012 at 4:39 PM, Fabio Estevam
-<fabio.estevam@freescale.com> wrote:
-> mx28evk has a free slot U50 that can be used to populate an I2C EEPROM.
->
-> Add support for it.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Thanks Santosh,
 
-Is this patch OK?
+I'll update the patch with your ack are will add it after your series
+for Tony to pull.
 
 Thanks,
-
-Fabio Estevam
+Benoit
