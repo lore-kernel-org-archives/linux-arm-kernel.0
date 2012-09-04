@@ -1,95 +1,49 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 4 Sep 2012 04:51:36 +0000
-Subject: [PATCH 0/3] gpio-twl4030: add new device tree properties
-In-Reply-To: <5044BE79.4040100@ti.com>
-References: <1346680491-4211-1-git-send-email-florian.vaussard@epfl.ch>
- <5044BE79.4040100@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EAA073E@DBDE01.ent.ti.com>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Tue, 4 Sep 2012 15:24:38 +1000
+Subject: [PATCH v2] ARM: ks8695: convert to generic time and clocksource
+In-Reply-To: <CACRpkdY0i77U5kGoNzWj2KwtyJ=ayptNGTE_7=95tJ0v4Tv5xw@mail.gmail.com>
+References: <1346456995-21572-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdY0i77U5kGoNzWj2KwtyJ=ayptNGTE_7=95tJ0v4Tv5xw@mail.gmail.com>
+Message-ID: <50459096.1040609@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 03, 2012 at 19:58:09, Cousson, Benoit wrote:
-> + Vaibhav for the omap3-evm
-> 
+Hi Linus,
 
-Reviewing and testing it now...
+On 09/01/2012 10:14 AM, Linus Walleij wrote:
+> On Sat, Sep 1, 2012 at 1:49 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+>> Old platforms using ancient gettimeoffset() and other arcane
+>> APIs are standing in the way of cleaning up the ARM kernel.
+>>
+>> This is an attempt at blind-coding a generic time and clocksource
+>> driver for the platform by way of a datasheet and looking at the
+>> old code, it'd be great if someone who is actually using this
+>> machine could test it.
+>>
+>> If noone volunteers to do this I will instead propose a patch
+>> deleting the machine altogether.
+>>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> ChangeLog v1->v2:
+>> - Corrected the mask when setting clockevents from & TMCON_T1EN
+>>    to & ~TMCON_T1EN so it doesn't shut down the clock source.
+>
+> BTW: Greg if this would happen to work - could you try to enable
+> CONFIG_TICK_ONESHOT and CONFIG_NO_HZ as well to see
+> if we can work fine in oneshot mode as well?
 
-Thanks,
-Vaibhav
+It worked in oneshot mode, if I removed the clocksource init code.
+So that looks good too.
+
+Regards
+Greg
 
 
-> Hi Florian,
-> 
-> On 09/03/2012 03:54 PM, Florian Vaussard wrote:
-> > A number of platform data are missing when using twl4030/gpio from a
-> > device tree.
-> 
-> Yeah, I know, I was too lazy when I did the DT conversion at that time :-)
-> 
-> Many thanks for completing the work.
-> 
-> >  This patchset adds the missing properties, updates
-> > existing device trees and updates the documentation of bindings.
-> > It mainly enables LEDA and LEDB outputs, as well as pullups /
-> > pulldowns on GPIOs.
-> > 
-> > The 1st patch changes the device driver.
-> > The 2nd patch updates the device trees for BeagleBoard and omap3-evm.
-> > The 3rd patch updates the documentation of bindings.
-> 
-> OK, that's a nit, but in general, you'd better introduce the binding
-> before using it.
-> 
-> The binding documentation could/should be updated along with the driver
-> change that does introduce the binding. You could just merged patch #1
-> and #3.
-> 
-> > Tested:
-> > - Boot tested on Gumstix Overo for "ti,use-leds". Corresponding
-> >   patch is not provided, as the device tree is not yet merged.
-> >   The support can be found in the git tree [1], branch
-> >   omap3-devel-dt-overo.
-> > - Device trees for BeagleBoard and omap3-evm were compiled, but not
-> >   tested on hardware.
-> > 
-> > Would someone be willing to test on BeagleBoard / omap3-evm?
-> 
-> I'll try to do it on Beagle. This is the least I can do since I did not
-> do the job myself :-)
-> 
-> I added vaibhav as well since I do not have any omap3-evm board.
-> 
-> > 
-> > Regards,
-> > Florian
-> > 
-> > [1] https://github.com/vaussard/linux.git (not safe for merge)
-> > 
-> > 
-> > Florian Vaussard (3):
-> >   gpio-twl4030: get platform data from device tree
-> >   gpio-twl4030: new dt properties for BeagleBoard and omap3-EVM
-> 
-> Nit #2: the DTS file does not belong to the gpio subsystem. So you
-> should prefix them using the *convention* for ARM DTS patches:
-> 
-> arm/dts: omap3: Add gpio-twl4030 properties for BeagleBoard and omap3-EVM
-> 
-> Or maybe "ARM: dts: " because it looks like most people are using that
-> nowadays.
-> 
-> The convention for the gpio directory is similar:
-> gpio/twl4030: get platform data from device tree
-> 
-> >   gpio-twl4030: updates the bindings for new dt properties
-> > 
-> >  .../devicetree/bindings/gpio/gpio-twl4030.txt      |    6 ++
-> >  arch/arm/boot/dts/omap3-beagle.dts                 |   20 +++++
-> >  arch/arm/boot/dts/omap3-evm.dts                    |   13 +++
-> >  drivers/gpio/gpio-twl4030.c                        |   86 +++++++++++++------
-> >  4 files changed, 98 insertions(+), 27 deletions(-)
-> 
-> Thanks,
-> Benoit
-> 
-> 
+-- 
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close,                            FAX:         +61 7 3891 3630
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
