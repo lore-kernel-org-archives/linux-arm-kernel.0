@@ -1,49 +1,33 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 04 Sep 2012 09:42:17 +0200
-Subject: [PATCH 1/4] can: c_can: Adopt pinctrl support
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA2630A@DBDE01.ent.ti.com>
-References: <1346673139-14540-1-git-send-email-anilkumar@ti.com>
- <1346673139-14540-2-git-send-email-anilkumar@ti.com>
- <5045161C.4000100@pengutronix.de>
- <331ABD5ECB02734CA317220B2BBEABC13EA2630A@DBDE01.ent.ti.com>
-Message-ID: <5045B0D9.6060003@pengutronix.de>
+From: chanho.min@lge.com (Chanho Min)
+Date: Tue, 4 Sep 2012 17:01:43 +0900
+Subject: [PATCH] ARM: Fix build warning in do_alignment.
+Message-ID: <011401cd8a73$85edd1c0$91c97540$@min@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2012 08:14 AM, AnilKumar, Chimata wrote:
-> Hi Marc,
-> 
-> On Tue, Sep 04, 2012 at 02:12:04, Marc Kleine-Budde wrote:
->> On 09/03/2012 01:52 PM, AnilKumar Ch wrote:
->>> Adopt pinctrl support to c_can driver based on c_can device
->>> pointer, pinctrl driver configure SoC pins to d_can mode
->>> according to definitions provided in .dts file.
->>>
->>> In device specific device tree file 'pinctrl-names = "default";'
->>> and 'pinctrl-0 = <&d_can1_pins>;' needs to add to configure pins
->>> from c_can driver. d_can1_pins node contains the pinmux/config
->>> details of d_can L/H pins.
->>
->> Looks good, is the pinctrl property documented in the dt bindings already?
->>
-> 
-> Yes, its here Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
+Fix the following build warning:
 
-Sorry, I meant not the generic pinctrl, but the c_can/d_can bindings
-documentation (Documentation/devicetree/bindings/net/can/).
+arch/arm/mm/alignment.c: In function 'do_alignment':
+arch/arm/mm/alignment.c:327:15: warning: 'offset.un' may be used uninitialized in this function [-Wuninitialized]
+arch/arm/mm/alignment.c:749:21: note: 'offset.un' was declared here
 
-Marc
+Signed-off-by: Chanho Min <chanho.min@lge.com>
+---
+ arch/arm/mm/alignment.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index 9107231..f83b38c 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -746,7 +746,7 @@ do_alignment_t32_to_handler(unsigned long *pinstr, struct pt_regs *regs,
+ static int
+ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ {
+-	union offset_union offset;
++	union offset_union offset = {0};
+ 	unsigned long instr = 0, instrptr;
+ 	int (*handler)(unsigned long addr, unsigned long instr, struct pt_regs *regs);
+ 	unsigned int type;
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120904/07c12490/attachment.sig>
+1.7.9.5
