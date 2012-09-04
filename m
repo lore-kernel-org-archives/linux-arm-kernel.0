@@ -1,33 +1,42 @@
-From: rubini@gnudd.com (Alessandro Rubini)
-Date: Tue, 4 Sep 2012 19:35:20 +0200
-Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the
- Nomadik I2C driver
-In-Reply-To: <CACRpkdZESujO=2BU3jeKiX3Cm+JY2UPEXwGkro75FWa5Gio5YQ@mail.gmail.com>
-References: <CACRpkdZESujO=2BU3jeKiX3Cm+JY2UPEXwGkro75FWa5Gio5YQ@mail.gmail.com>
- <20120831122323.GC5962@gmail.com>  <5044C82E.5060207@gmail.com>
- <20120903152012.GH31163@gmail.com>  <201209041428.21409.arnd@arndb.de>
-Message-ID: <20120904173520.GA18209@mail.gnudd.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  4 Sep 2012 18:38:47 +0100
+Subject: [PATCH v4 0/2] arch_timers patches to enable KVM support
+Message-ID: <1346780329-14451-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Alessandro Rubini is actively working on bridging this (and
-> other amba_device primecells) to PCI, that is the reason why it
-> was recently converted to an amba_device.
+This series is aimed at offering the minimum level of support that KVM
+needs when it comes to architected timers.
 
-Yes, I've been inactive for a while but I'm on it right now.
+The first patch changes the driver to use the virtual timer by default
+instead of the physical one (access to the later is conditioned by the
+hypervisor settings, while the former is always available). This could
+be required even if the kernel is not running as a guest.
 
-> How is he then supposed to get the proper parameters into the
-> driver? Note that the PCI ID is no help at all since the parameters
-> depend on what is connected to the I2C bus, not on what it itself is
-> connected to. Isn't platform data used in such cases?
+The second patch exposes a clockcycle counter that can be used by
+other subsystems.
 
-I'm using platform data currently, but Davide Ciminaghi is actively
-working to convert the configuration to device-tree: the way we pass
-platform data to the pci device (and thus amba) is not considered
-acceptable by Peter Anvin.
+Tested on A15 (VE+TC2), both as a host and a KVM guest. Patches
+against v3.6-rc4.
 
-I'm thus asking Davide if he's happy to remove the platform data
-configuration path right now (I personally wouldn't be very happy, but
-I acknowledge it should happen, sooner or later).
+* From v3:
+- Use %Q/%R qualifiers to read 64bit registers, and move accessors
+  into a separate function.
+- Some minor cleanup.
 
-/alessandro
+* From v2:
+- Trick the compiler into generating really nice code, at the expense
+  of a certain lack of abstraction
+- Don't mandate physical timer non-secure PPI, in order to stay
+  compatible with existing and possibly incomplete DTs.
+
+Marc Zyngier (2):
+  ARM: arch_timers: enable the use of the virtual timer
+  ARM: arch_timers: register a time/cycle counter
+
+ arch/arm/include/asm/arch_timer.h |   7 +
+ arch/arm/kernel/arch_timer.c      | 368 +++++++++++++++++++++++++++-----------
+ 2 files changed, 273 insertions(+), 102 deletions(-)
+
+-- 
+1.7.12
