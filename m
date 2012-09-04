@@ -1,133 +1,75 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Tue, 4 Sep 2012 09:12:43 +0530
-Subject: [PATCH v2 1/8] ARM/dts: OMAP2: Add McBSP entries for OMAP2420
- and OMAP2430 SoC
-In-Reply-To: <5044C2DD.5000705@ti.com>
-References: <1346247067-9632-1-git-send-email-peter.ujfalusi@ti.com>
- <1346247067-9632-2-git-send-email-peter.ujfalusi@ti.com>
- <5044C2DD.5000705@ti.com>
-Message-ID: <504578B3.3090804@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue,  4 Sep 2012 06:04:25 +0200
+Subject: [PATCH] mxs/dma: Enlarge the CCW descriptor area to 4 pages
+Message-ID: <1346731465-6301-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In case of a large SPI flash, the amount of DMA descriptors
+available to the DMA driver is not large enough anymore. For
+example 8MB SPI flash now needs 129 descriptors to be transfered
+in one long read. There are currently 53 descriptors available in
+one PAGE_SIZE-big block. Enlarge the allocated descriptor area to
+four PAGE_SIZE blocks to fulfill such requirements.
 
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Dan Williams <djbw@fb.com>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/dma/mxs-dma.c |   14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
-On 9/3/2012 8:16 PM, Benoit Cousson wrote:
-> Hi Peter,
-> 
-> The overall series looks good to me, but I do have a couple of comments.
-> 
-> On 08/29/2012 03:31 PM, Peter Ujfalusi wrote:
->> The McBSP IP within OMAP2420 and 2430 is different we need to create separate
->> dtsi files for them.
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> ---
->>  arch/arm/boot/dts/omap2420.dtsi |   39 ++++++++++++++++++
->>  arch/arm/boot/dts/omap2430.dtsi |   83 +++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 122 insertions(+), 0 deletions(-)
->>  create mode 100644 arch/arm/boot/dts/omap2420.dtsi
->>  create mode 100644 arch/arm/boot/dts/omap2430.dtsi
->>
->> diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
->> new file mode 100644
->> index 0000000..f375c68
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/omap2420.dtsi
->> @@ -0,0 +1,39 @@
->> +/*
->> + * Device Tree Source for OMAP2420 SoC
->> + *
->> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-> 
-> Nit: 2012
-> 
->> + *
->> + * This file is licensed under the terms of the GNU General Public License
->> + * version 2.  This program is licensed "as is" without any warranty of any
->> + * kind, whether express or implied.
->> + */
->> +
->> +/include/ "omap2.dtsi"
->> +
->> +/ {
->> +	compatible = "ti,omap2420", "ti,omap2";
->> +
->> +	ocp {
->> +		mcbsp1: mcbsp at 48074000 {
->> +			compatible = "ti,omap2420-mcbsp";
->> +			reg = <0x48074000 0xff>;
->> +			reg-names = "mpu";
->> +			interrupts = <0 59 0x4>, /* TX interrupt */
->> +				     <0 60 0x4>; /* RX interrupt */
-> 
-> That one is not correct because it does comply with the interrupt
-> controller specifier that require only one cell:
-> 
-> 		intc: interrupt-controller at 48200000 {
-> 			compatible = "ti,omap2-intc";
-> 			interrupt-controller;
-> 			#interrupt-cells = <1>;
-> ...
-> 
-> The one you are using is for GIC IRQ controller.
-> It works probably because we are using hwmod so far :-)
-> 
-
-I think now we should kill the resource overwrite path, and should
-respect and use resources passed from DT.
-
-Benoit,
-Did you get a chance to validate patch submitted towards this??
-
-https://patchwork.kernel.org/patch/1384351/
-
-Thanks,
-Vaibhav
-> Didn't you get some warning?
-> 
-> In the case of OMAP2 & 3, it is much simpler:
-> 
->> +			interrupts = <59>, /* TX interrupt */
->> +				     <60>; /* RX interrupt */
-> 
-> That comment is applicable for OMAP2420, OMAP2430, and OMAP3 in general.
-> 
->> +			interrupt-names = "tx", "rx";
->> +			interrupt-parent = <&intc>;
->> +			ti,hwmods = "mcbsp1";
->> +		};
->> +
->> +		mcbsp2: mcbsp at 48076000 {
->> +			compatible = "ti,omap2420-mcbsp";
->> +			reg = <0x48076000 0xff>;
->> +			reg-names = "mpu";
->> +			interrupts = <0 62 0x4>, /* TX interrupt */
->> +				     <0 63 0x4>; /* RX interrupt */
->> +			interrupt-names = "tx", "rx";
->> +			interrupt-parent = <&intc>;
->> +			ti,hwmods = "mcbsp2";
->> +		};
->> +	};
->> +};
->> diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
->> new file mode 100644
->> index 0000000..531e346
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/omap2430.dtsi
->> @@ -0,0 +1,83 @@
->> +/*
->> + * Device Tree Source for OMAP243x SoC
->> + *
->> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-> 
-> 2012.
-> 
-> Regards,
-> Benoit
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
-> 
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index 7f41b25..e269325 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -101,7 +101,8 @@ struct mxs_dma_ccw {
+ 	u32		pio_words[MXS_PIO_WORDS];
+ };
+ 
+-#define NUM_CCW	(int)(PAGE_SIZE / sizeof(struct mxs_dma_ccw))
++#define CCW_BLOCK_SIZE	(4 * PAGE_SIZE)
++#define NUM_CCW	(int)(CCW_BLOCK_SIZE / sizeof(struct mxs_dma_ccw))
+ 
+ struct mxs_dma_chan {
+ 	struct mxs_dma_engine		*mxs_dma;
+@@ -354,14 +355,15 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
+ 
+ 	mxs_chan->chan_irq = data->chan_irq;
+ 
+-	mxs_chan->ccw = dma_alloc_coherent(mxs_dma->dma_device.dev, PAGE_SIZE,
+-				&mxs_chan->ccw_phys, GFP_KERNEL);
++	mxs_chan->ccw = dma_alloc_coherent(mxs_dma->dma_device.dev,
++				CCW_BLOCK_SIZE, &mxs_chan->ccw_phys,
++				GFP_KERNEL);
+ 	if (!mxs_chan->ccw) {
+ 		ret = -ENOMEM;
+ 		goto err_alloc;
+ 	}
+ 
+-	memset(mxs_chan->ccw, 0, PAGE_SIZE);
++	memset(mxs_chan->ccw, 0, CCW_BLOCK_SIZE);
+ 
+ 	if (mxs_chan->chan_irq != NO_IRQ) {
+ 		ret = request_irq(mxs_chan->chan_irq, mxs_dma_int_handler,
+@@ -387,7 +389,7 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
+ err_clk:
+ 	free_irq(mxs_chan->chan_irq, mxs_dma);
+ err_irq:
+-	dma_free_coherent(mxs_dma->dma_device.dev, PAGE_SIZE,
++	dma_free_coherent(mxs_dma->dma_device.dev, CCW_BLOCK_SIZE,
+ 			mxs_chan->ccw, mxs_chan->ccw_phys);
+ err_alloc:
+ 	return ret;
+@@ -402,7 +404,7 @@ static void mxs_dma_free_chan_resources(struct dma_chan *chan)
+ 
+ 	free_irq(mxs_chan->chan_irq, mxs_dma);
+ 
+-	dma_free_coherent(mxs_dma->dma_device.dev, PAGE_SIZE,
++	dma_free_coherent(mxs_dma->dma_device.dev, CCW_BLOCK_SIZE,
+ 			mxs_chan->ccw, mxs_chan->ccw_phys);
+ 
+ 	clk_disable_unprepare(mxs_dma->clk);
+-- 
+1.7.10.4
