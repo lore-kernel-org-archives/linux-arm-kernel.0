@@ -1,47 +1,49 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue,  4 Sep 2012 13:17:33 -0700
-Subject: [PATCH] ARM: msm: Fix sparse warnings due to incorrect type
-Message-ID: <1346789853-824-1-git-send-email-sboyd@codeaurora.org>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 5 Sep 2012 07:37:10 +1000
+Subject: [PATCH] bus: fix omap compile error if CONFIG_OF is true
+In-Reply-To: <20120904144123.25261.79625.stgit@localhost.localdomain>
+References: <20120904144123.25261.79625.stgit@localhost.localdomain>
+Message-ID: <20120905073710.566eabb8561b1a701a58e438@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/mach-msm/timer.c:153:3: warning: incorrect type in initializer (different address spaces)
-arch/arm/mach-msm/timer.c:153:3:    expected void const [noderef] <asn:3>*__vpp_verify
-arch/arm/mach-msm/timer.c:153:3:    got struct clock_event_device [noderef] <asn:3>**<noident>
-arch/arm/mach-msm/timer.c:153:38: warning: incorrect type in assignment (different address spaces)
-arch/arm/mach-msm/timer.c:153:38:    expected struct clock_event_device [noderef] <asn:3>*<noident>
-arch/arm/mach-msm/timer.c:153:38:    got struct clock_event_device *evt
-arch/arm/mach-msm/timer.c:191:22: warning: incorrect type in assignment (different address spaces)
-arch/arm/mach-msm/timer.c:191:22:    expected struct clock_event_device [noderef] <asn:3>**static [toplevel] percpu_evt
-arch/arm/mach-msm/timer.c:191:22:    got struct clock_event_device *[noderef] <asn:3>*<noident>
-arch/arm/mach-msm/timer.c:196:4: warning: incorrect type in initializer (different address spaces)
-arch/arm/mach-msm/timer.c:196:4:    expected void const [noderef] <asn:3>*__vpp_verify
-arch/arm/mach-msm/timer.c:196:4:    got struct clock_event_device [noderef] <asn:3>**<noident>
-arch/arm/mach-msm/timer.c:196:39: warning: incorrect type in assignment (different address spaces)
-arch/arm/mach-msm/timer.c:196:39:    expected struct clock_event_device [noderef] <asn:3>*<noident>
-arch/arm/mach-msm/timer.c:196:39:    got struct clock_event_device *ce
-arch/arm/mach-msm/timer.c:198:24: warning: incorrect type in argument 4 (different address spaces)
-arch/arm/mach-msm/timer.c:198:24:    expected void [noderef] <asn:3>*percpu_dev_id
-arch/arm/mach-msm/timer.c:198:24:    got struct clock_event_device [noderef] <asn:3>**static [toplevel] percpu_evt
+Hi all,
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/mach-msm/timer.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Tue, 04 Sep 2012 15:41:35 +0100 Alan Cox <alan@lxorguk.ukuu.org.uk> wrote:
+>
+> From: Alan Cox <alan@linux.intel.com>
+> 
+> Signed-off-by: Alan Cox <alan@linux.intel.com>
+> ---
+> 
+>  drivers/bus/omap-ocp2scp.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/bus/omap-ocp2scp.c b/drivers/bus/omap-ocp2scp.c
+> index 9075ef8..ff63560 100644
+> --- a/drivers/bus/omap-ocp2scp.c
+> +++ b/drivers/bus/omap-ocp2scp.c
+> @@ -67,7 +67,7 @@ static const struct of_device_id omap_ocp2scp_id_table[] = {
+>  	{ .compatible = "ti,omap-ocp2scp" },
+>  	{}
+>  };
+> -MODULE_DEVICE_TABLE(of, omap_usb2_id_table);
+> +MODULE_DEVICE_TABLE(of, omap_ocp2scp_id_table);
+>  #endif
+>  
+>  static struct platform_driver omap_ocp2scp_driver = {
 
-diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
-index 81280825..004f935 100644
---- a/arch/arm/mach-msm/timer.c
-+++ b/arch/arm/mach-msm/timer.c
-@@ -101,7 +101,7 @@ static struct clock_event_device msm_clockevent = {
- 
- static union {
- 	struct clock_event_device *evt;
--	struct clock_event_device __percpu **percpu_evt;
-+	struct clock_event_device * __percpu *percpu_evt;
- } msm_evt;
- 
- static void __iomem *source_base;
+This was caused by commit 26a84b3eaef0 ("drivers: bus: add a new driver
+for omap-ocp2scp") which has been in the arm-soc tree for a few days ...
+
+Thanks, Alan.
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum, hosted by The Linux Foundation
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120905/71c9693f/attachment.sig>
