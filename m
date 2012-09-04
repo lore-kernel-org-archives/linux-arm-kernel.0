@@ -1,21 +1,45 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 4 Sep 2012 11:06:21 -0400 (EDT)
-Subject: [PATCH 1/2] ARM: Kirkwood: ehci-orion: Add device tree binding
-In-Reply-To: <1346491586-23480-1-git-send-email-andrew@lunn.ch>
-Message-ID: <Pine.LNX.4.44L0.1209041105460.1605-100000@iolanthe.rowland.org>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 04 Sep 2012 16:37:03 +0100
+Subject: [PATCH 10/11] ARM: vexpress: Add config bus components and
+ clocks to DTs
+In-Reply-To: <504610B4.6060902@gmail.com>
+References: <1346689531-7212-1-git-send-email-pawel.moll@arm.com>
+ <1346689531-7212-11-git-send-email-pawel.moll@arm.com>
+ <5045FAEC.6030906@gmail.com> <1346763920.2605.81.camel@hornet>
+ <504610B4.6060902@gmail.com>
+Message-ID: <1346773023.20599.15.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 1 Sep 2012, Andrew Lunn wrote:
-
-> Based on previous work by Michael Walle and Jason Cooper.
+On Tue, 2012-09-04 at 15:31 +0100, Rob Herring wrote:
+> On 09/04/2012 08:05 AM, Pawel Moll wrote:
+> > On Tue, 2012-09-04 at 13:58 +0100, Rob Herring wrote:
+> >>> -			sysctl at 020000 {
+> >>> +			v2m_sysctl: sysctl at 020000 {
+> >>>  				compatible = "arm,sp810", "arm,primecell";
+> >>>  				reg = <0x020000 0x1000>;
+> >>> +				clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&v2m_osc_clk0>;
+> >>> +				clock-names = "refclk", "timclk", "apb_pclk";
+> >>
+> >> See Documentation/devicetree/bindings/arm/primecell.txt
+> >>
+> >> apb_pclk should be first in the list.
+> > 
+> > Hm. Why, if you don't mind me asking? The amba_get_enable_pclk()
+> > explicitly asks for "apb_pclk" id:
 > 
-> Made their work actually work, which required added interrupt from DT
-> and auxdata, along with setting the dma_mask, which DT does not
-> currently do.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> So apb_pclk is always in the same position in the list and I had to
+> define something. Clock names are supposed to be optional, so we have to
+> be able to identify which clock is the bus clock without the name.
+[snip]
+> You're getting lucky with how clk_get is implemented. The driver should
+> be more specific with which clock it wants if there is more than 1.
+> Perhaps we need a clk_get_by_index() function?
 
-For the changes to ehci-orion.c:
+But the clocking framework doesn't know what "index", while it knows
+exactly what is "id" (string). How about making the clock names
+obligatory in the tree when there a node has more than one clock input?
+This sounds much simpler to me and seems to be in line with the clocking
+API. And the apb_pclk wouldn't have to be first/last/whatever.
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Pawe?
