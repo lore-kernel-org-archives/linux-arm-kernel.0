@@ -1,55 +1,49 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  4 Sep 2012 10:44:02 +0200
-Subject: [PATCHv3 1/2] ARM: dts: mxs: Add missing address and size cells in
- SSP nodes
-Message-ID: <1346748243-28675-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Tue,  4 Sep 2012 10:44:03 +0200
+Subject: [PATCHv3 2/2] dts: mxs: spi: Add SSP3 to the 10049 board
+In-Reply-To: <1346748243-28675-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1346748243-28675-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1346748243-28675-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/imx28.dtsi |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/imx28-cfa10049.dts |   22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 1d6382d..e3ec682 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -86,6 +86,8 @@
- 			};
+diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+index e0e4b8c..845663e 100644
+--- a/arch/arm/boot/dts/imx28-cfa10049.dts
++++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+@@ -20,6 +20,28 @@
+ 	compatible = "crystalfontz,cfa10049", "crystalfontz,cfa10036", "fsl,imx28";
  
- 			ssp0: ssp at 80010000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0x80010000 0x2000>;
- 				interrupts = <96 82>;
- 				fsl,ssp-dma-channel = <0>;
-@@ -93,6 +95,8 @@
- 			};
- 
- 			ssp1: ssp at 80012000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0x80012000 0x2000>;
- 				interrupts = <97 83>;
- 				fsl,ssp-dma-channel = <1>;
-@@ -100,6 +104,8 @@
- 			};
- 
- 			ssp2: ssp at 80014000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0x80014000 0x2000>;
- 				interrupts = <98 84>;
- 				fsl,ssp-dma-channel = <2>;
-@@ -107,6 +113,8 @@
- 			};
- 
- 			ssp3: ssp at 80016000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0x80016000 0x2000>;
- 				interrupts = <99 85>;
- 				fsl,ssp-dma-channel = <3>;
+ 	apb at 80000000 {
++		apbh at 80000000 {
++			pinctrl at 80018000 {
++				spi3_pins_cfa10049: spi3-cfa10049 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x0181 /* MX28_PAD_GPMI_RDN__SSP3_SCK */
++						0x01c1 /* MX28_PAD_GPMI_RESETN__SSP3_CMD */
++					>;
++					fsl,drive-strength = <1>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <1>;
++				};
++			};
++
++			ssp3: ssp at 80016000 {
++				compatible = "fsl,imx28-spi";
++				pinctrl-names = "default";
++				pinctrl-0 = <&spi3_pins_cfa10049>;
++				status = "okay";
++			};
++		};
++
+ 		apbx at 80040000 {
+ 			i2c1: i2c at 8005a000 {
+ 				pinctrl-names = "default";
 -- 
 1.7.9.5
