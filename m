@@ -1,49 +1,22 @@
-From: gerg@snapgear.com (Greg Ungerer)
-Date: Tue, 4 Sep 2012 15:24:38 +1000
-Subject: [PATCH v2] ARM: ks8695: convert to generic time and clocksource
-In-Reply-To: <CACRpkdY0i77U5kGoNzWj2KwtyJ=ayptNGTE_7=95tJ0v4Tv5xw@mail.gmail.com>
-References: <1346456995-21572-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdY0i77U5kGoNzWj2KwtyJ=ayptNGTE_7=95tJ0v4Tv5xw@mail.gmail.com>
-Message-ID: <50459096.1040609@snapgear.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Mon, 3 Sep 2012 22:47:51 -0700
+Subject: [PATCH] ARM: dts: OMAP4: Cleanup and move GIC outside of the OCP
+ node
+In-Reply-To: <5044D8E5.5010705@ti.com>
+References: <5044D8E5.5010705@ti.com>
+Message-ID: <CAMQu2gz7M7zWogTdCtR6K3n-9CPoLf7NO4a314WmKhN-BeXCiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On 09/01/2012 10:14 AM, Linus Walleij wrote:
-> On Sat, Sep 1, 2012 at 1:49 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Mon, Sep 3, 2012 at 9:20 AM, Benoit Cousson <b-cousson@ti.com> wrote:
+> Remove a useless comment and move GIC controller outside
+> of the OCP node since it does use the MPU internal bus and
+> not the OCP.
+> This will not change the functionality but will reflect the
+> reality more accurately.
 >
->> Old platforms using ancient gettimeoffset() and other arcane
->> APIs are standing in the way of cleaning up the ARM kernel.
->>
->> This is an attempt at blind-coding a generic time and clocksource
->> driver for the platform by way of a datasheet and looking at the
->> old code, it'd be great if someone who is actually using this
->> machine could test it.
->>
->> If noone volunteers to do this I will instead propose a patch
->> deleting the machine altogether.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> ChangeLog v1->v2:
->> - Corrected the mask when setting clockevents from & TMCON_T1EN
->>    to & ~TMCON_T1EN so it doesn't shut down the clock source.
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> ---
 >
-> BTW: Greg if this would happen to work - could you try to enable
-> CONFIG_TICK_ONESHOT and CONFIG_NO_HZ as well to see
-> if we can work fine in oneshot mode as well?
-
-It worked in oneshot mode, if I removed the clocksource init code.
-So that looks good too.
-
-Regards
-Greg
-
-
--- 
-------------------------------------------------------------------------
-Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
-SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
-8 Gardner Close,                            FAX:         +61 7 3891 3630
-Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
+Make sense.
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
