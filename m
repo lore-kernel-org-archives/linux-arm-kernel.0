@@ -1,33 +1,26 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 4 Sep 2012 13:30:12 +0200
-Subject: [PATCH] ARM: dts: OMAP4: Cleanup and move GIC outside of the
- OCP node
-In-Reply-To: <CAMQu2gz7M7zWogTdCtR6K3n-9CPoLf7NO4a314WmKhN-BeXCiQ@mail.gmail.com>
-References: <5044D8E5.5010705@ti.com>
- <CAMQu2gz7M7zWogTdCtR6K3n-9CPoLf7NO4a314WmKhN-BeXCiQ@mail.gmail.com>
-Message-ID: <5045E644.9000904@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 4 Sep 2012 19:34:32 +0800
+Subject: [PATCH v5 3/4] regulator: anatop-regulator: convert to use
+ syscon to access anatop register
+In-Reply-To: <1346728811-25788-4-git-send-email-b29396@freescale.com>
+References: <1346728811-25788-1-git-send-email-b29396@freescale.com>
+ <1346728811-25788-4-git-send-email-b29396@freescale.com>
+Message-ID: <20120904113429.GK2362@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2012 07:47 AM, Shilimkar, Santosh wrote:
-> On Mon, Sep 3, 2012 at 9:20 AM, Benoit Cousson <b-cousson@ti.com> wrote:
->> Remove a useless comment and move GIC controller outside
->> of the OCP node since it does use the MPU internal bus and
->> not the OCP.
->> This will not change the functionality but will reflect the
->> reality more accurately.
->>
->> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
->> ---
->>
-> Make sense.
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> 
+On Tue, Sep 04, 2012 at 11:20:10AM +0800, Dong Aisheng wrote:
+> +
+> +	anatop_np = of_get_parent(np);
+> +	if (!anatop_np)
+> +		return -ENODEV;
+> +	sreg->anatop = syscon_node_to_regmap(anatop_np);
+> +	if (IS_ERR(sreg->anatop))
+> +		return PTR_ERR(sreg->anatop);
+> +
+With of_node_put moved out from syscon_node_to_regmap, shouldn't
+we put anatop_np here then?
 
-Thanks Santosh,
-
-I'll update the patch with your ack are will add it after your series
-for Tony to pull.
-
-Thanks,
-Benoit
+-- 
+Regards,
+Shawn
