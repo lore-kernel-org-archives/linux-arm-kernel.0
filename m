@@ -1,51 +1,58 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 04 Sep 2012 12:51:32 -0500
-Subject: [PATCH 10/11] ARM: vexpress: Add config bus components and clocks
- to DTs
-In-Reply-To: <1346773023.20599.15.camel@hornet>
-References: <1346689531-7212-1-git-send-email-pawel.moll@arm.com>
- <1346689531-7212-11-git-send-email-pawel.moll@arm.com>
- <5045FAEC.6030906@gmail.com> <1346763920.2605.81.camel@hornet>
- <504610B4.6060902@gmail.com> <1346773023.20599.15.camel@hornet>
-Message-ID: <50463FA4.90106@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 4 Sep 2012 19:14:06 +0100
+Subject: [alsa-devel] [RFC 1/3] ASoC: dmaengine: Don't use runtime
+ private data for dmaengine data
+In-Reply-To: <50460184.4000404@ti.com>
+References: <20120903165832.GA31511@n2100.arm.linux.org.uk>
+ <E1T8ZzV-0002vp-2j@rmk-PC.arm.linux.org.uk> <5045124D.3050604@metafoo.de>
+ <20120903204325.GA728@n2100.arm.linux.org.uk> <50451A4A.9000108@metafoo.de>
+ <s5ha9x62an0.wl%tiwai@suse.de> <50460184.4000404@ti.com>
+Message-ID: <20120904181406.GB24189@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2012 10:37 AM, Pawel Moll wrote:
-> On Tue, 2012-09-04 at 15:31 +0100, Rob Herring wrote:
->> On 09/04/2012 08:05 AM, Pawel Moll wrote:
->>> On Tue, 2012-09-04 at 13:58 +0100, Rob Herring wrote:
->>>>> -			sysctl at 020000 {
->>>>> +			v2m_sysctl: sysctl at 020000 {
->>>>>  				compatible = "arm,sp810", "arm,primecell";
->>>>>  				reg = <0x020000 0x1000>;
->>>>> +				clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&v2m_osc_clk0>;
->>>>> +				clock-names = "refclk", "timclk", "apb_pclk";
->>>>
->>>> See Documentation/devicetree/bindings/arm/primecell.txt
->>>>
->>>> apb_pclk should be first in the list.
->>>
->>> Hm. Why, if you don't mind me asking? The amba_get_enable_pclk()
->>> explicitly asks for "apb_pclk" id:
->>
->> So apb_pclk is always in the same position in the list and I had to
->> define something. Clock names are supposed to be optional, so we have to
->> be able to identify which clock is the bus clock without the name.
-> [snip]
->> You're getting lucky with how clk_get is implemented. The driver should
->> be more specific with which clock it wants if there is more than 1.
->> Perhaps we need a clk_get_by_index() function?
+On Tue, Sep 04, 2012 at 04:26:28PM +0300, Peter Ujfalusi wrote:
+> Hi Takashi,
 > 
-> But the clocking framework doesn't know what "index", while it knows
-> exactly what is "id" (string). How about making the clock names
-> obligatory in the tree when there a node has more than one clock input?
-> This sounds much simpler to me and seems to be in line with the clocking
-> API. And the apb_pclk wouldn't have to be first/last/whatever.
+> On 09/04/2012 04:14 PM, Takashi Iwai wrote:
+> >> Ok, it might have been helpful in the conversion process, but for the final
+> >> patch it would be nice if you could replace
+> >>
+> >> struct snd_pcm_runtime *runtime = substream->runtime;
+> >> struct omap_runtime_data *prtd = runtime->private_data;
+> >> struct omap_pcm_dma_data *dma_data = prtd->dma_data;
+> >> with
+> >> struct omap_pcm_dma_data *dma_data = snd_dmaengine_pcm_get_data(substream);
+> >>
+> >> and in the hwparams callback use
+> >>
+> >> snd_dmaengine_pcm_set_data(substream, dma_data);
+> >>
+> >> and then drop patch 1 and 2 from the series.
+> > 
+> > We discussed with Liam about the addition of new field in ALSA core,
+> > and concluded that a bit different approach, at least, more generic
+> > name is preferred, even if a new field is inevitably needed.
+> > 
+> > So, eventually some change may happen in near future in ALSA core
+> > side, but still it'd be really helpful if the callers have been
+> > standardized beforehand with a helper function like above.
+> 
+> If the omap-pcm dmaengine conversion works on all OMAP versions (from OMAP1 to
+> OMAP5) it is possible to avoid the additional field.
+> My main concern at the moment is if we will need two sets of drivers to
+> support OMAP1 and OMAP2/3/4/5.
+> In all case we use the same omap-mcbsp driver which would need deal with two
+> different type of ASoC platform driver (dmaengine and non-dmaengine).
+> I hope we get confirmation from Janusz soon regarding to OMAP1 with dmaengine
+> so we can plan on how to move forward.
 
-I did say they are *supposed* to be optional, but the amba bus code
-essentially makes them required. Ideally, Linux doesn't dictate what
-goes in the dtb or not, but I don't have a problem if specific users of
-the clock binding require the names.
+As the target for the DMA engine work is to kill off the OMAP private DMA
+APIs, then if OMAP1 doesn't work with the OMAP DMA engine driver, that's
+what needs fixing, rather than having two ASoC platform drivers.
 
-Rob
+Note that time is ticking for the removal of the OMAP private DMA APIs (see
+feature-removal-schedule.txt) and it has to happen so that the next stage
+of the OMAP DMA engine conversion can happen - that is, to make the OMAP
+DMA engine support be a proper driver rather than just a DMA Engine to OMAP
+private DMA API conversion shim.
