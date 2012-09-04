@@ -1,60 +1,32 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 05 Sep 2012 06:45:16 +0900
-Subject: [PATCH v3 1/4] pinctrl: add samsung pinctrl and gpiolib driver
-In-Reply-To: <CAJuYYwTD+vMg=YjUj4G0E-uakk=Y_SD+cUU22QSx0yRC50V75w@mail.gmail.com>
-References: <1345720529-32315-1-git-send-email-thomas.abraham@linaro.org>
- <1345720529-32315-2-git-send-email-thomas.abraham@linaro.org>
- <CACRpkdbVe77pAYdOw0+_2G2FWVWcn4GKQty6R-LXXEz-OkUdUg@mail.gmail.com>
- <CAJuYYwTD+vMg=YjUj4G0E-uakk=Y_SD+cUU22QSx0yRC50V75w@mail.gmail.com>
-Message-ID: <226e01cd8ae6$928010b0$b7803210$%kim@samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 04 Sep 2012 15:48:31 -0600
+Subject: [PATCH v2] usb: move phy driver from mach-tegra to drivers/usb
+In-Reply-To: <1346395526-18219-1-git-send-email-vbyravarasu@nvidia.com>
+References: <1346395526-18219-1-git-send-email-vbyravarasu@nvidia.com>
+Message-ID: <5046772F.6060908@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
+On 08/31/2012 12:45 AM, Venu Byravarasu wrote:
+> As part of this patch:
+> 	1. Moved existing tegra phy driver to drivers/USB directory.
+> 	2. Added standard USB phy driver APIs to tegra phy driver.
 > 
-> On 3 September 2012 16:44, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > On Thu, Aug 23, 2012 at 1:15 PM, Thomas Abraham
-> > <thomas.abraham@linaro.org> wrote:
-> >
-> >> Add a new device tree enabled pinctrl and gpiolib driver for Samsung
-> >> SoC's. This driver provides a common and extensible framework for all
-> >> Samsung SoC's to interface with the pinctrl and gpiolib subsystems.
-> This
-> >> driver supports only device tree based instantiation and hence can be
-> >> used only on those Samsung platforms that have device tree enabled.
-> >>
-> >> This driver is split into two parts: the pinctrl interface and the
-> gpiolib
-> >> interface. The pinctrl interface registers pinctrl devices with the
-> pinctrl
-> >> subsystem and gpiolib interface registers gpio chips with the gpiolib
-> >> subsystem. The information about the pins, pin groups, pin functions
-> and
-> >> gpio chips, which are SoC specific, are parsed from device tree node.
-> >>
-> >> Cc: Linus Walleij <linus.walleij@linaro.org>
-> >> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> >> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> >
-> > Looks good to me, I saw Stephen had some minor comments and
-> > I expect that you probably fix them before applying to the Samsung
-> > tree so:
-> > Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> >
-> > Feel free to push this through ARM SoC, I guess that's the plan?
-> 
-> Hi Linus,
-> 
-> Thanks for reviewing the Samsung pinctrl driver patches. I will do the
-> changes that Stephen has listed and resubmit. I will request Samsung
-> maintainer to consider the support for pinctrl driver for 3.7.
-> 
-Looks OK, I will apply updated patches Thomas said into Samsung tree.
+> Signed-off-by: Venu Byravarasu <vbyravarasu@nvidia.com>
+
+Tested-by: Stephen Warren <swarren@nvidia.com>
+
+Felipe, Would it be possible to apply this patch to a topic branch, so
+that I can merge it into the Tegra tree? The reason is that I'd like to
+remove Tegra's devices.[ch] in kernel 3.7, but to do that, I need to
+move a tiny chunk of code out of that file somewhere else, and doing
+that relies on adding a #include to usb_phy.h/tegra_usb_phy.h, which is
+renamed in this patch.
+
+Alternatively, if you don't think it'll cause any merge conflicts with
+the USB PHY tree, I can just take this patch through the Tegra tree if
+you want. Venu, do you plan any other patches within the next couple
+weeks or so (i.e. before 3.6-rc6) that will depend on this patch? If so,
+taking it only through the Tegra tree might not work so well.
 
 Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
