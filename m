@@ -1,62 +1,43 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 4 Sep 2012 10:27:22 +0200
-Subject: [PATCH] USB: ohci-at91: fix PIO handling in relation with number
- of ports
-In-Reply-To: <1346233758-27009-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1346233758-27009-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <5045BB6A.8060309@atmel.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Tue, 4 Sep 2012 08:34:11 +0000
+Subject: [PATCH 1/4] can: c_can: Adopt pinctrl support
+In-Reply-To: <5045B0D9.6060003@pengutronix.de>
+References: <1346673139-14540-1-git-send-email-anilkumar@ti.com>
+ <1346673139-14540-2-git-send-email-anilkumar@ti.com>
+ <5045161C.4000100@pengutronix.de>
+ <331ABD5ECB02734CA317220B2BBEABC13EA2630A@DBDE01.ent.ti.com>
+ <5045B0D9.6060003@pengutronix.de>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA26482@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/29/2012 11:49 AM, Nicolas Ferre :
-> If the number of ports present on the SoC/board is not the maximum
-> and that the platform data is not filled with all data, there is
-> an easy way to mess the PIO setup for this interface.
-> This quick fix addresses mis-configuration in USB host platform data
-> that is common in at91 boards since commit 0ee6d1e (USB: ohci-at91:
-> change maximum number of ports) that did not modified the associatd
-> board files.
+On Tue, Sep 04, 2012 at 13:12:17, Marc Kleine-Budde wrote:
+> On 09/04/2012 08:14 AM, AnilKumar, Chimata wrote:
+> > Hi Marc,
+> > 
+> > On Tue, Sep 04, 2012 at 02:12:04, Marc Kleine-Budde wrote:
+> >> On 09/03/2012 01:52 PM, AnilKumar Ch wrote:
+> >>> Adopt pinctrl support to c_can driver based on c_can device
+> >>> pointer, pinctrl driver configure SoC pins to d_can mode
+> >>> according to definitions provided in .dts file.
+> >>>
+> >>> In device specific device tree file 'pinctrl-names = "default";'
+> >>> and 'pinctrl-0 = <&d_can1_pins>;' needs to add to configure pins
+> >>> from c_can driver. d_can1_pins node contains the pinmux/config
+> >>> details of d_can L/H pins.
+> >>
+> >> Looks good, is the pinctrl property documented in the dt bindings already?
+> >>
+> > 
+> > Yes, its here Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
 > 
-> Reported-by: Klaus Falkner <klaus.falkner@solectrix.de>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: linux-usb at vger.kernel.org
-> Cc: Stable <stable@vger.kernel.org> [3.4+]
-
-Alan, Greg, gentle ping...
-
-I really would like to seen it landing in stable soon...
-
-Thanks, best regards,
-
-> ---
->  drivers/usb/host/ohci-at91.c |   10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index a665b3e..aaa8d2b 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -570,6 +570,16 @@ static int __devinit ohci_hcd_at91_drv_probe(struct platform_device *pdev)
->  
->  	if (pdata) {
->  		at91_for_each_port(i) {
-> +			/*
-> +			 * do not configure PIO if not in relation with
-> +			 * real USB port on board
-> +			 */
-> +			if (i >= pdata->ports) {
-> +				pdata->vbus_pin[i] = -EINVAL;
-> +				pdata->overcurrent_pin[i] = -EINVAL;
-> +				break;
-> +			}
-> +
->  			if (!gpio_is_valid(pdata->vbus_pin[i]))
->  				continue;
->  			gpio = pdata->vbus_pin[i];
+> Sorry, I meant not the generic pinctrl, but the c_can/d_can bindings
+> documentation (Documentation/devicetree/bindings/net/can/).
 > 
 
+No, I have not included because those are pinctrl driver specific
+bindings. If the SoC supports pinmux/conf feature then those should
+be added according to pinctrl driver. If the SoC is not supported pinmux/config then this configuration is not required.
 
--- 
-Nicolas Ferre
+Thanks
+AnilKumar
