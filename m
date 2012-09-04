@@ -1,48 +1,94 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 04 Sep 2012 10:50:04 +0200
-Subject: [PATCH v2 0/5] ARM: EXYNOS: Add support for Trats board using device
- tree
-Message-ID: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
+Date: Tue, 04 Sep 2012 10:50:06 +0200
+Subject: [PATCH v2 2/5] ARM: Exynos4: dts: Specify address and size cells for
+ i2c controllers
+In-Reply-To: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
+References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1346748609-11115-3-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds basic device tree support for Samsung Trats board
-along with any necessary prerequisites.
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/boot/dts/exynos4.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-In addition it refactors Exynos4 dts include files to split parts common to
-the whole Exynos4 part from parts specific to Exynos4210 to allow further
-extension of Exynos4210 dts include file and addition of include files for
-other SoCs from Exynos4 line.
-
-Changes since v1:
- - Split into two series, general Exynos4 DT reorganization and this one.
- - Addressed comments from v1.
-
-Dependencies:
--> [PATCH v5] mmc: sdhci-s3c: Add device tree support
-http://www.spinics.net/lists/linux-samsung-soc/msg12056.html
--> [PATCH v5 2/2] regulator: add device tree support for max8997
-http://www.spinics.net/lists/kernel/msg1328117.html
--> [PATCH 0/3] ARM: dts: Exynos4 dts reorganization
-http://www.spinics.net/lists/arm-kernel/msg192237.html
-
-Tomasz Figa (5):
-  mmc: host: sdhci-s3c: Add broken-voltage DT property for broken
-    voltage quirk
-  ARM: Exynos4: dts: Specify address and size cells for i2c controllers
-  ARM: Exynos4: Add OF compatibility lookups for Exynos4 i2c adapters
-  ARM: EXYNOS: Increase maximum possible memory bank size to 512MiB
-  ARM: Exynos: Add basic dts file for Samsung Trats board
-
- Documentation/devicetree/bindings/mmc/mmc.txt |   1 +
- arch/arm/boot/dts/exynos4.dtsi                |  16 ++
- arch/arm/boot/dts/exynos4210-trats.dts        | 237 ++++++++++++++++++++++++++
- arch/arm/mach-exynos/Makefile.boot            |   2 +-
- arch/arm/mach-exynos/include/mach/memory.h    |   4 +-
- arch/arm/mach-exynos/mach-exynos4-dt.c        |  14 ++
- drivers/mmc/host/sdhci-s3c.c                  |   3 +
- 7 files changed, 274 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/dts/exynos4210-trats.dts
-
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 9b71b61..718e3d2 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -122,6 +122,8 @@
+ 	};
+ 
+ 	i2c at 13860000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x13860000 0x100>;
+ 		interrupts = <0 58 0>;
+@@ -129,6 +131,8 @@
+ 	};
+ 
+ 	i2c at 13870000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x13870000 0x100>;
+ 		interrupts = <0 59 0>;
+@@ -136,6 +140,8 @@
+ 	};
+ 
+ 	i2c at 13880000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x13880000 0x100>;
+ 		interrupts = <0 60 0>;
+@@ -143,6 +149,8 @@
+ 	};
+ 
+ 	i2c at 13890000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x13890000 0x100>;
+ 		interrupts = <0 61 0>;
+@@ -150,6 +158,8 @@
+ 	};
+ 
+ 	i2c at 138A0000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x138A0000 0x100>;
+ 		interrupts = <0 62 0>;
+@@ -157,6 +167,8 @@
+ 	};
+ 
+ 	i2c at 138B0000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x138B0000 0x100>;
+ 		interrupts = <0 63 0>;
+@@ -164,6 +176,8 @@
+ 	};
+ 
+ 	i2c at 138C0000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x138C0000 0x100>;
+ 		interrupts = <0 64 0>;
+@@ -171,6 +185,8 @@
+ 	};
+ 
+ 	i2c at 138D0000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x138D0000 0x100>;
+ 		interrupts = <0 65 0>;
 -- 
 1.7.12
