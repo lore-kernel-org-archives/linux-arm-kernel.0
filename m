@@ -1,28 +1,150 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 4 Sep 2012 09:19:10 +0200
-Subject: [PATCH 4/6 v2] ARM: integrator: initial device tree support
-In-Reply-To: <20120903215505.GB31511@n2100.arm.linux.org.uk>
-References: <1346471760-23993-1-git-send-email-linus.walleij@linaro.org>
- <1346471760-23993-3-git-send-email-linus.walleij@linaro.org>
- <1346471760-23993-4-git-send-email-linus.walleij@linaro.org>
- <201209011841.58977.arnd@arndb.de>
- <CACRpkdZhJyqeeXV_Zcfi7S01oH1Kw95qvAmOqrMKwhSLb-mX=Q@mail.gmail.com>
- <20120903215505.GB31511@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdbXSaBNystUv9RTmDKrmV=OakFF49LPkoQtoi9FnaXmDg@mail.gmail.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Tue, 4 Sep 2012 12:57:16 +0530
+Subject: [PATCH 1/3] gpio-twl4030: get platform data from device tree
+In-Reply-To: <1346680491-4211-2-git-send-email-florian.vaussard@epfl.ch>
+References: <1346680491-4211-1-git-send-email-florian.vaussard@epfl.ch>
+ <1346680491-4211-2-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <5045AD54.5030503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 3, 2012 at 11:55 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> [Me]
->> Currently I would make it impossible to use ATAGs if I do this since
->> the symbol does not exist, so I really need to base such an
->> approach in a tree which has CONFIG_ATAG in the first place.
->
-> I've just merged that patch though.
 
-OK great, Arnd do you have a Russell baseline in ARM SoC or is it
-easier if I try to submit this series directly to Russell?
 
-Yours,
-Linus Walleij
+On 9/3/2012 7:24 PM, Florian Vaussard wrote:
+> Adds a number of missing properties to the device tree of
+> twl4030/gpio:
+> - "ti,use-leds"  -> .use_leds
+> - "ti,debounce"  -> .debounce
+> - "ti,mmc-cd"    -> .mmc_cd
+> - "ti,pullups"   -> .pullups
+> - "ti,pulldowns" -> .pulldowns
+> 
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> ---
+>  drivers/gpio/gpio-twl4030.c |   86 +++++++++++++++++++++++++++++-------------
+>  1 files changed, 59 insertions(+), 27 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
+> index 94256fe..dabe76b 100644
+> --- a/drivers/gpio/gpio-twl4030.c
+> +++ b/drivers/gpio/gpio-twl4030.c
+> @@ -395,6 +395,33 @@ static int __devinit gpio_twl4030_debounce(u32 debounce, u8 mmc_cd)
+>  
+>  static int gpio_twl4030_remove(struct platform_device *pdev);
+>  
+> +static struct twl4030_gpio_platform_data *of_gpio_twl4030(struct device *dev)
+> +{
+> +	struct twl4030_gpio_platform_data *omap_twl_info;
+> +	const char *of_use_leds;
+> +
+> +	omap_twl_info = devm_kzalloc(dev, sizeof(*omap_twl_info), GFP_KERNEL);
+> +	if (!omap_twl_info)
+> +		return NULL;
+> +
+> +	omap_twl_info->gpio_base = -1;
+> +
+> +	of_property_read_string(dev->of_node, "ti,use-leds", &of_use_leds);
+> +	if (!strcmp(of_use_leds, "true"))
+> +		omap_twl_info->use_leds = true;
+> +
+
+You can replace this with
+
+omap_twl_info->use_leds = of_property_read_bool(dev->of_node,
+"ti,use-leds");
+
+Otherwise looks OK to me, also I have tested it on OMAP3EVM.
+
+Tested-&-Acked-By: Vaibhav Hiremath <hvaibhav@ti.com>
+
+
+Thanks,
+Vaibhav
+> +	of_property_read_u32(dev->of_node, "ti,debounce",
+> +				&omap_twl_info->debounce);
+> +	of_property_read_u32(dev->of_node, "ti,mmc-cd",
+> +				(u32 *)&omap_twl_info->mmc_cd);
+> +	of_property_read_u32(dev->of_node, "ti,pullups",
+> +				&omap_twl_info->pullups);
+> +	of_property_read_u32(dev->of_node, "ti,pulldowns",
+> +				&omap_twl_info->pulldowns);
+> +
+> +	return omap_twl_info;
+> +}
+> +
+>  static int __devinit gpio_twl4030_probe(struct platform_device *pdev)
+>  {
+>  	struct twl4030_gpio_platform_data *pdata = pdev->dev.platform_data;
+> @@ -423,39 +450,44 @@ static int __devinit gpio_twl4030_probe(struct platform_device *pdev)
+>  	twl4030_gpio_irq_base = irq_base;
+>  
+>  no_irqs:
+> -	twl_gpiochip.base = -1;
+>  	twl_gpiochip.ngpio = TWL4030_GPIO_MAX;
+>  	twl_gpiochip.dev = &pdev->dev;
+>  
+> -	if (pdata) {
+> -		twl_gpiochip.base = pdata->gpio_base;
+> +	if (node)
+> +		pdata = of_gpio_twl4030(&pdev->dev);
+>  
+> -		/*
+> -		 * NOTE:  boards may waste power if they don't set pullups
+> -		 * and pulldowns correctly ... default for non-ULPI pins is
+> -		 * pulldown, and some other pins may have external pullups
+> -		 * or pulldowns.  Careful!
+> -		 */
+> -		ret = gpio_twl4030_pulls(pdata->pullups, pdata->pulldowns);
+> -		if (ret)
+> -			dev_dbg(&pdev->dev, "pullups %.05x %.05x --> %d\n",
+> -					pdata->pullups, pdata->pulldowns,
+> -					ret);
+> -
+> -		ret = gpio_twl4030_debounce(pdata->debounce, pdata->mmc_cd);
+> -		if (ret)
+> -			dev_dbg(&pdev->dev, "debounce %.03x %.01x --> %d\n",
+> -					pdata->debounce, pdata->mmc_cd,
+> -					ret);
+> -
+> -		/*
+> -		 * NOTE: we assume VIBRA_CTL.VIBRA_EN, in MODULE_AUDIO_VOICE,
+> -		 * is (still) clear if use_leds is set.
+> -		 */
+> -		if (pdata->use_leds)
+> -			twl_gpiochip.ngpio += 2;
+> +	if (pdata == NULL) {
+> +		dev_err(&pdev->dev, "Platform data is missing\n");
+> +		return -ENXIO;
+>  	}
+>  
+> +	twl_gpiochip.base = pdata->gpio_base;
+> +
+> +	/*
+> +	 * NOTE:  boards may waste power if they don't set pullups
+> +	 * and pulldowns correctly ... default for non-ULPI pins is
+> +	 * pulldown, and some other pins may have external pullups
+> +	 * or pulldowns.  Careful!
+> +	 */
+> +	ret = gpio_twl4030_pulls(pdata->pullups, pdata->pulldowns);
+> +	if (ret)
+> +		dev_dbg(&pdev->dev, "pullups %.05x %.05x --> %d\n",
+> +				pdata->pullups, pdata->pulldowns,
+> +				ret);
+> +
+> +	ret = gpio_twl4030_debounce(pdata->debounce, pdata->mmc_cd);
+> +	if (ret)
+> +		dev_dbg(&pdev->dev, "debounce %.03x %.01x --> %d\n",
+> +				pdata->debounce, pdata->mmc_cd,
+> +				ret);
+> +
+> +	/*
+> +	 * NOTE: we assume VIBRA_CTL.VIBRA_EN, in MODULE_AUDIO_VOICE,
+> +	 * is (still) clear if use_leds is set.
+> +	 */
+> +	if (pdata->use_leds)
+> +		twl_gpiochip.ngpio += 2;
+> +
+>  	ret = gpiochip_add(&twl_gpiochip);
+>  	if (ret < 0) {
+>  		dev_err(&pdev->dev, "could not register gpiochip, %d\n", ret);
+> 
