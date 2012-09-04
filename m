@@ -1,31 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 4 Sep 2012 14:28:21 +0000
-Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
- I2C driver
-In-Reply-To: <20120903152012.GH31163@gmail.com>
-References: <20120831122323.GC5962@gmail.com> <5044C82E.5060207@gmail.com>
- <20120903152012.GH31163@gmail.com>
-Message-ID: <201209041428.21409.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 04 Sep 2012 09:31:16 -0500
+Subject: [PATCH 10/11] ARM: vexpress: Add config bus components and clocks
+ to DTs
+In-Reply-To: <1346763920.2605.81.camel@hornet>
+References: <1346689531-7212-1-git-send-email-pawel.moll@arm.com>
+ <1346689531-7212-11-git-send-email-pawel.moll@arm.com>
+ <5045FAEC.6030906@gmail.com> <1346763920.2605.81.camel@hornet>
+Message-ID: <504610B4.6060902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 September 2012, Lee Jones wrote:
-> > But if you are handling both, then I agree that platform_data should
-> > override DT.
+On 09/04/2012 08:05 AM, Pawel Moll wrote:
+> On Tue, 2012-09-04 at 13:58 +0100, Rob Herring wrote:
+>>> -			sysctl at 020000 {
+>>> +			v2m_sysctl: sysctl at 020000 {
+>>>  				compatible = "arm,sp810", "arm,primecell";
+>>>  				reg = <0x020000 0x1000>;
+>>> +				clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&v2m_osc_clk0>;
+>>> +				clock-names = "refclk", "timclk", "apb_pclk";
+>>
+>> See Documentation/devicetree/bindings/arm/primecell.txt
+>>
+>> apb_pclk should be first in the list.
 > 
-> I do agree with this, but I haven't stumbled over such a use-case yet.
-> I have only provided; clock names, DMA settings and call-back information
-> via AUX_DATA() thus far, and those are being removed too when a) the 
-> correct bindings are mainlined and b) I have the time.
+> Hm. Why, if you don't mind me asking? The amba_get_enable_pclk()
+> explicitly asks for "apb_pclk" id:
 
-I'd prefer if you just disallow the case where pdata and DT have conflicting
-information. We don't seem to have a clear rule that is enforced over the
-kernel, so I don't think we can rely on either one taking precedence over
-the other in general.
+So apb_pclk is always in the same position in the list and I had to
+define something. Clock names are supposed to be optional, so we have to
+be able to identify which clock is the bus clock without the name.
 
-In this particular case, we don't have a single board file providing a
-struct nmk_i2c_controller definition for platform data, so the best way
-to handle this IMHO is to remove the header file with the platform
-data definition, and just encode the defaults in the driver.
+> struct clk *pclk = clk_get(&pcdev->dev, "apb_pclk");
+> 
+> Now, let's have a look at MMCI:
+> 
+>                         mmci at 050000 {
+>                                 compatible = "arm,pl180", "arm,primecell";
+>                                 reg = <0x050000 0x1000>;
+>                                 interrupts = <9 10>;
+> +                               cd-gpios = <&v2m_sysreg 0 0>;
+> +                               wp-gpios = <&v2m_sysreg 1 0>;
+> +                               max-frequency = <12000000>;
+> +                               vmmc-supply = <&v2m_fixed_3v3>;
+> +                               clocks = <&v2m_clk_24mhz>, <&v2m_osc_clk0>;
+> +                               clock-names = "mclk", "apb_pclk";
+>                         };
+> 
+> and mmci_probe() does:
+> 
+>         host->clk = clk_get(&dev->dev, NULL);
+>         if (IS_ERR(host->clk)) {
+>                 ret = PTR_ERR(host->clk);
+>                 host->clk = NULL;
+>                 goto host_free;
+>         }       
+> 
+> Now, if I put "apb_pclk" first, before "mclk", the driver will get the
+> wrong clock.
 
-	Arnd
+You're getting lucky with how clk_get is implemented. The driver should
+be more specific with which clock it wants if there is more than 1.
+Perhaps we need a clk_get_by_index() function?
+
+Rob
+
+> 
+> Pawe?
+> 
+> 
