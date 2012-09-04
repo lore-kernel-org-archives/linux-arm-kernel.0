@@ -1,87 +1,40 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 05 Sep 2012 07:41:14 +0900
-Subject: [PATCH] ARM: Samsung: Remove unused code for the clocks debug-fs
- interface
-In-Reply-To: <1346603823-14422-1-git-send-email-sylvester.nawrocki@gmail.com>
-References: <1346603823-14422-1-git-send-email-sylvester.nawrocki@gmail.com>
-Message-ID: <227c01cd8aee$638ee0d0$2aaca270$%kim@samsung.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Tue, 04 Sep 2012 16:07:15 -0700
+Subject: [PATCH] clk: versatile: make config option boolean
+In-Reply-To: <1346348340-19020-1-git-send-email-linus.walleij@linaro.org>
+References: <1346348340-19020-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20120904230715.31162.53150@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
+Quoting Linus Walleij (2012-08-30 10:39:00)
+> There is no choice to have the RealView clocks as module for sure,
+> so turn this config option into a boolean.
 > 
-> Commit f86c6660927614fcda257 "ARM: SAMSUNG: Add clkdev infrastructure"
-> disabled population of the 'clocks' list - the clocks are now on the
-> clkdev clock list. However, this effectively broke the existing clocks
-> debug-fs interface on all Samsung platforms. Nobody complained about
-> this missing feature for over one year, so remove the unused code.
-> 
-Yeah, could be. BTW, following will fix it on Samsung platforms?
+> Reported-by: Pawel Moll <pawel.moll@arm.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-From: Arve Hj<C3><B8>nnev<C3><A5>g <arve@android.com>
-Subject: [PATCH] ARM: SAMSUNG: Fix clock debugfs code
+Thanks for the fix.  Taken into clk-next.
 
-Restore list add deleted by commit f86c66609276('ARM: SAMSUNG:
-Add clkdev infrastructure') and fix clk_debugfs_register_one
-to not crash when devname is NULL.
+Regards,
+Mike
 
-Signed-off-by: Arve Hj<C3><B8>nnev<C3><A5>g <arve@android.com>
-Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
----
- arch/arm/plat-samsung/clock.c |   15 ++++++++++++++-
- 1 files changed, 14 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
-index 65c5eca..b7338ce 100644
---- a/arch/arm/plat-samsung/clock.c
-+++ b/arch/arm/plat-samsung/clock.c
-@@ -281,6 +281,15 @@ int s3c24xx_register_clock(struct clk *clk)
- 	if (clk->enable == NULL)
- 		clk->enable = clk_null_enable;
- 
-+	/* add to the list of available clocks */
-+
-+	/* Quick check to see if this clock has already been registered. */
-+	BUG_ON(clk->list.prev != clk->list.next);
-+
-+	spin_lock(&clocks_lock);
-+	list_add(&clk->list, &clocks);
-+	spin_unlock(&clocks_lock);
-+
- 	/* fill up the clk_lookup structure and register it*/
- 	clk->lookup.dev_id = clk->devname;
- 	clk->lookup.con_id = clk->name;
-@@ -395,7 +404,11 @@ static int clk_debugfs_register_one(struct clk *c)
- 	char s[255];
- 	char *p = s;
- 
--	p += sprintf(p, "%s", c->devname);
-+	if (c->name)
-+		p += sprintf(p, "%s", c->name);
-+
-+	if (c->devname)
-+		p += sprintf(p, ":%s", c->devname);
- 
- 	d = debugfs_create_dir(s, pa ? pa->dent : clk_debugfs_root);
- 	if (!d)
--- 
-1.7.1
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> This functionality will be restored when switching to the common clock
-> framework.
-> 
-> Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
 > ---
->  arch/arm/plat-samsung/clock.c              |   92
----------------------------
-> -
->  arch/arm/plat-samsung/include/plat/clock.h |    8 +--
->  2 files changed, 1 insertions(+), 99 deletions(-)
+>  drivers/clk/Kconfig |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 89b726d..df33b8e 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -41,7 +41,7 @@ config COMMON_CLK_WM831X
+>           PMICs from Wolfson Microlectronics.
+>  
+>  config COMMON_CLK_VERSATILE
+> -       tristate "Clock driver for ARM Reference designs"
+> +       bool "Clock driver for ARM Reference designs"
+>         depends on ARCH_INTEGRATOR || ARCH_REALVIEW
+>         ---help---
+>            Supports clocking on ARM Reference designs Integrator/AP,
+> -- 
+> 1.7.7.6
