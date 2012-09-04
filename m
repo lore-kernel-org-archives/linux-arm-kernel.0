@@ -1,207 +1,84 @@
-From: shiraz.hashim@st.com (Shiraz Hashim)
-Date: Tue, 4 Sep 2012 09:49:40 +0530
-Subject: [GIT PULL] SPEAr pinctrl updates for v-3.5
-In-Reply-To: <CACRpkdZok471mc_XqogZo2orS7aCeMDSz0oxXfncm5HgMv37aw@mail.gmail.com>
-References: <1336562136-24498-1-git-send-email-viresh.kumar@st.com>
- <CAOh2x=mGdV_wbJC64wvb9+UV_FBgnsat9=ojD8BJYVxT+HoWhQ@mail.gmail.com>
- <201205122142.02318.arnd@arndb.de>
- <CACRpkdZgSJGcM9cT3yMv1jhUrD9hKXv=VVb1mFSWrMzRPYu-=g@mail.gmail.com>
- <4FB47DE2.4070704@st.com>
- <CACRpkdYGuqg3xy+x+adREEzkPL9RFzDDBaEBttR-HarZ7jWuFA@mail.gmail.com>
- <CAOh2x=kOU=X2V5zBg4G_SWzNSfQyoeygwgW-vO-xxRkDXzZDJQ@mail.gmail.com>
- <CACRpkday9+zhMHWWjNNBfhhQ2NXPc+RoGkHvxodud5HY7hLm4g@mail.gmail.com>
- <CAPub14-CQCXf3pfZqXjHarfMfaYG3Me7aNffFJ3JMYhr8J4osg@mail.gmail.com>
- <CACRpkdZok471mc_XqogZo2orS7aCeMDSz0oxXfncm5HgMv37aw@mail.gmail.com>
-Message-ID: <20120904041940.GA2037@localhost.localdomain>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 4 Sep 2012 04:27:27 +0000
+Subject: Without MACH_ option Early printk (DEBUG_LL)
+In-Reply-To: <alpine.LFD.2.02.1209032201451.1784@xanadu.home>
+References: <5040D03B.2050304@ti.com>
+ <20120831171336.GA6978@n2100.arm.linux.org.uk>
+ <79CD15C6BA57404B839C016229A409A83EA9EC8B@DBDE01.ent.ti.com>
+ <alpine.LFD.2.02.1208311422450.1784@xanadu.home>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9DC099@DBDE01.ent.ti.com>
+ <alpine.LFD.2.02.1209032201451.1784@xanadu.home>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EAA06A9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-Thanks for reviewing,
-
-On Mon, Sep 03, 2012 at 01:48:04PM +0200, Linus Walleij wrote:
-> On Sat, Sep 1, 2012 at 1:22 PM, shiraz hashim
-> >     gpiolib: provide provision for gpios to register pin range
-> >
-> >     pinctrl subsystem needs gpio chip base to prepare set of gpio pin ranges
-> >     which a given pinctrl driver can handle. This is important to handle
-> >     pinctrl gpio request calls in order to program a given pin properly for
-> >     gpio operation.
-> >
-> >     As gpio base is allocated dynamically while gpiochip registration,
-> >     presently there exists no clean way to pass this information to the
-> >     pinctrl subsystem.
-> >
-> >     After few discussions from [1], it was concluded that may be gpio
-> >     reporting the pin range it supports is a better way than pinctrl
-> >     subsystem directly registering it.
-> >
-> >     [1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/166668
-> >
-> >     Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
+On Tue, Sep 04, 2012 at 07:34:21, Nicolas Pitre wrote:
+> On Mon, 3 Sep 2012, Mohammed, Afzal wrote:
 > 
-> (Some spelling/grammar errors above but I can fix that, no big issue.)
+> > Hi,
+> > 
+> > On Fri, Aug 31, 2012 at 23:53:32, Nicolas Pitre wrote:
+> > > On Fri, 31 Aug 2012, Hiremath, Vaibhav wrote:
+> > > > On Fri, Aug 31, 2012 at 22:43:36, Russell King - ARM Linux wrote:
+> > > > > On Fri, Aug 31, 2012 at 08:24:51PM +0530, Vaibhav Hiremath wrote:
+> > 
+> > > > > > AM335X EVM (based on AM33XX device) only supports DT boot mode and
+> > > > > > doesn't have CONFIG_MACH_AM335XEVM option defined. Some time back during
+> > > > > > baseport submission we had aligned that, we won't create separate EVM
+> > > > > > options, killing the board file all-together.
+> > > > > > 
+> > > > > > Having said that, the early printk option (DEBUG_LL) is broken, the
+> > > > > > auto-generated file "./include/generated/mach-types.h" still refers to
+> > > > > > CONFIG_MACH_AM335XEVM option,
+> > > > > machine types are entirely meaningless for DT based systems.
+> > > > > 
+> > > > > > Can you comment on this? Based on that I will submit the patch.
+> > > > > 
+> > > > > Pointless.  You can't use machine_is_am335xevm() when you're using DT.
+> > > > > 
+> > > > 
+> > > > They how do you recommend to resolve early prink issue (required during 
+> > > > decompression)?
+> > > 
+> > > Right now the best you can do is to have empty stubs that display 
+> > > nothing.
+> > 
+> > Won't having compile time selection of debug uart over machine based
+> > runtime detection help here ?
 > 
-
-Sorry for the English.
-
-> > +2.1) gpio-controller and pinctrl subsystem
-> > +------------------------------------------
-> >
-> > +gpio-controller on a SOC might be tightly coupled with the pinctrl
-> > +subsystem, in the sense that the pins can be used by other functions
-> > +together with optional gpio feature.
-> > +
-> > +While the pin allocation is totally managed by the pin ctrl subsystem,
-> > +gpio (under gpiolib) is still maintained by gpio drivers. It may happen
-> > +that different pin ranges in a SoC is managed by different gpio drivers.
-> > +
-> > +This makes it logical to let gpio drivers announce their pin ranges to
-> > +the pin ctrl subsystem and call 'pinctrl_request_gpio' in order to
-> > +request the corresponding pin before any gpio usage.
-> > +
-> > +For this, the gpio controller can use a pinctrl phandle and pins to
-> > +announce the pinrange to the pin ctrl subsystem. For example,
-> > +
-> > +       qe_pio_e: gpio-controller at 1460 {
-> > +               #gpio-cells = <2>;
-> > +               compatible = "fsl,qe-pario-bank-e", "fsl,qe-pario-bank";
-> > +               reg = <0x1460 0x18>;
-> > +               gpio-controller;
-> > +                                 pins = <&pinctrl1 20 10>,
-> > +                                <&pinctrl2 50 20>;
-> > +
-> > +    }
+> It certainly would.  But then your kernel won't run on anything but the 
+> specific machine for which the compile time UART selection was made.  As 
+> soon as you have more than one possible UART config for the set of 
+> machines you want your kernel binary to run on, you'll have to give up 
+> on the early output during kernel decompression.
 > 
-> This needs to go into the binding document in
-> Documentation/devicetree/bindings/gpio/gpio.txt as well.
 > 
 
-right.
+Yes, I understand that, here at this early stage things are very tricky and 
+difficult to handle.
 
-> > +
-> > +where,
-> > +   &pinctrl1 and &pinctrl2 is the phandle to the pinctrl DT node.
-> > +
-> > +   Next values specify the base pin and number of pins for the range
-> > +   handled by 'qe_pio_e' gpio. In the given example from base pin 20 to
-> > +   pin 29 under pinctrl1 and pin 50 to pin 69 under pinctrl2 is handled
-> > +   by this gpio controller.
-> 
-> The above implies that only devcie tree is used for this. That is not
-> the case: other architectures like Blackfin, MIPS and x86 shall also use
-> the pinctrl subsystem, and they may not have device tree. Maybe they
-> have ACPI, maybe BIOS or SFI (Simple Firmware Interface).
+Yeah certainly we can ignore this and give up on early output, but just 
+would like to make sure that we explore all options and drop it.
 
-Okay.
+Isn't defining something below should solve the purpose, without breaking 
+anything,
 
-> So the basic problem with the patch is that you cannot hard-code it
-> to use *only* device tree, it must also accept ranges registered
-> directly, not using of_*.
+am335xevm        SOC_AM33XX          AM335XEVM         3589
 
-For describing gpio pin ranges, we need to know corresponding pinctrl
-implementation handling this range, base pin and number of pins
-belonging to the range. Further there can be multiple such ranges for
-a gpio driver.
+It just says, AM33XX based machines (AM335XEVM, Bone and others) depends on
+CONFIG_SOC_AM33XX. Does it break anything? May be I am missing something 
+here.
 
-With devicetree it was easy to provide this information and parse it
-inside gpiolib itself. Without DT how do you suggest gpio drivers must
-pass range information to gpiolib ?
+Also, I was looking at some other platforms and architectures, some of them 
+are trying to detect the uart port runtime, by checking for,
+
+	- Which UART is enabled/clocked (most likely by bootloader)?
+	- Does it configured or brought out of reset?
+
+This brings-in more complexity at this early stage and not sure we really 
+should go down to this patch, assuming the various flavors of devices and 
+architectures we have currently.
 
 
-> Basically this comes down to creating two functions more
-> to add pin ranges from GPIO chips, see below comments.
-> 
-> Also, you should put a big "DEPRECATED" mark on the old gpio
-> range concept, and refer to the new way of doing things.
-
-Okay.
-
-
-[...]
-
-> >  void of_gpiochip_remove(struct gpio_chip *chip)
-> >  {
-> > +       of_gpiochip_remove_pin_range(chip);
-> > +
-> >         if (chip->of_node)
-> >                 of_node_put(chip->of_node);
-> >  }
-> 
-> This part looks good.
-> 
-> But I want two similar function named:
-> 
-> gpiochip_add_pin_range();
-> gpiochip_remove_pin_range();
-> 
-> that can be used for platforms that doesn't support DT.
-
-How to pass the information required by these functions is something we
-need to think about.
-
-
-[...]
-
-> >  #ifdef CONFIG_GPIOLIB
-> >
-> > @@ -47,6 +48,21 @@ struct seq_file;
-> >  struct module;
-> >  struct device_node;
-> >
-> > +#ifdef CONFIG_PINCTRL
-> 
-> There's no need to #ifdef this I think.
-> 
-
-Yes, you are right.
-
-> > +/**
-> > + * struct gpio_pin_range - pin range controlled by a gpio chip
-> > + * @head: list for maintaining set of pin ranges, used internally
-> > + * @pctldev: pinctrl device which handles corresponding pins
-> > + * @range: actual range of pins controlled by a gpio controller
-> > + */
-> > +
-> > +struct gpio_pin_range {
-> > +       struct list_head node;
-> > +       struct pinctrl_dev *pctldev;
-> > +       struct pinctrl_gpio_range range;
-> > +};
-> > +#endif
-> 
-> Hm I cannot really decide whether thus range should be in
-> <linux/pinctrl/pinctrl.h> or here. Isn't it easier to just put it in
-> <linux/pinctrl/pinctrl.h>?
-> 
-
-pinctrl describes gpio range through 'pinctrl_gpio_range' while
-'gpio_pin_range' is defined here to maintain gpio exported pin ranges.
-
-Since pinctrl is only bothered about pinctrl_gpio_range and not
-gpio_pin_range, I think we can keep it here.
-
-[...]
-
-> > +++ b/include/linux/pinctrl/pinctrl.h
-> > @@ -133,6 +133,12 @@ extern void pinctrl_add_gpio_range(struct
-> > pinctrl_dev *pctldev,
-> >                                 struct pinctrl_gpio_range *range);
-> >  extern void pinctrl_remove_gpio_range(struct pinctrl_dev *pctldev,
-> >                                 struct pinctrl_gpio_range *range);
-> > +#ifdef CONFIG_OF
-> > +extern struct pinctrl_dev *of_pinctrl_add_gpio_range(struct device_node *np,
-> > +               struct pinctrl_gpio_range *range);
-> > +
-> > +#endif
-> 
-> Don't #ifdef this, then all code using it has to be #ifdef:ed too.
-> 
-> Provide a stub function below like with all the other functions instead.
-
-Sure.
-
---
-regards
-Shiraz
+Thanks,
+Vaibhav
