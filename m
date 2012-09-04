@@ -1,46 +1,39 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 05 Sep 2012 06:58:41 +0900
-Subject: [PATCH v2 0/2] ARM: Exynos4-DT: Enable pinctrl driver support
-In-Reply-To: <1345721098-32459-1-git-send-email-thomas.abraham@linaro.org>
-References: <1345721098-32459-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <226f01cd8ae8$7236eb60$56a4c220$%kim@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 04 Sep 2012 17:02:15 -0500
+Subject: [PATCH 1/3] ARM: move debug macros to common location
+In-Reply-To: <20120901085340.GA20497@lunn.ch>
+References: <20120901085340.GA20497@lunn.ch>
+Message-ID: <50467A67.3010300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
+On 09/01/2012 03:53 AM, Andrew Lunn wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> Based on suggestion by Russell King, create a common location for debug
+>> macros and select the included debug macro file using config option.
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> ---
+>>  arch/arm/Kconfig.debug          |    5 +++
+>>  arch/arm/include/debug/icedcc.S |   90 +++++++++++++++++++++++++++++++++++++++
+>>  arch/arm/kernel/debug.S         |   87 ++-----------------------------------
+>>  arch/arm/kernel/head.S          |    4 +-
+>>  4 files changed, 100 insertions(+), 86 deletions(-)
+>>  create mode 100644 arch/arm/include/debug/icedcc.S
 > 
-> This patch series enables support for pin controller driver for Exynos4210
-> SoC
-> based device tree enabled platforms. The first patch in this series adds
-> the
-> pin group nodes for each of the three pin controller instances, but it is
-> not
-> a exhaustive list of all possible pin group nodes. As the coverage of
-> pinctrl
-> driver is extended device drivers used on Exynos4210 platforms, additional
-> pin group nodes can be added as required.
+> Hi Rob
 > 
-> Thomas Abraham (2):
->   ARM: dts: Add pinctrl node entries for Samsung Exynos4210 SoC
->   ARM: EXYNOS: Enable pinctrl driver support for Exynos4 device tree
-> enabled platform
+> What about arch/arm/include/asm/hardware/debug-8250.S and
+> arch/arm/include/asm/hardware/debug-pl01x.S?
 > 
->  arch/arm/boot/dts/exynos4210-pinctrl.dtsi |  457
-> +++++++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos4210.dtsi         |   37 +++
->  arch/arm/mach-exynos/Kconfig              |    2 +
->  3 files changed, 496 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/exynos4210-pinctrl.dt?
+> Might be nice to have these two also in arch/arm/include/debug/, or
+> follow the naming convention set by these two and have
+> arch/arm/include/asm/hardware/debug-icedcc.S?
 
-Looks good to me, will apply this series with Linus Walleij's ack.
+I agree we should move those, but would rather do it after moving all
+the debug-macro.S files into include/debug. As I mentioned in the
+multi-platform thread, I think there are further improvements we can do
+and eliminate many of the debug-macro.S files.
 
-Note, this will be applied on top of v4 pinctrl driver will be submitted by
-Thomas.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Rob
