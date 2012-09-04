@@ -1,110 +1,94 @@
 From: linuxzsc@gmail.com (Richard Zhao)
-Date: Tue, 4 Sep 2012 22:10:52 +0800
-Subject: [PATCH v6 1/3] USB: chipidea: add imx usbmisc support
-In-Reply-To: <503E74E0.6040503@pengutronix.de>
-References: <1346137109-32247-1-git-send-email-richard.zhao@freescale.com>
- <1346137109-32247-2-git-send-email-richard.zhao@freescale.com>
- <871uiqkuhb.fsf@ashishki-desk.ger.corp.intel.com>
- <20120829081020.GX26594@pengutronix.de>
- <87ehmqj925.fsf@ashishki-desk.ger.corp.intel.com>
- <20120829110137.GA26594@pengutronix.de>
- <503E74E0.6040503@pengutronix.de>
-Message-ID: <20120904141050.GB19897@richard-laptop>
+Date: Tue, 4 Sep 2012 22:17:33 +0800
+Subject: [PATCH v2 05/11] USB: chipidea: don't let probe fail if otg
+ controller start one role failed
+In-Reply-To: <20120829104559.GB25433@b20223-02.ap.freescale.net>
+References: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
+ <1346137397-32374-6-git-send-email-richard.zhao@freescale.com>
+ <87ligz2yyo.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120828092730.GY4011@b20223-02.ap.freescale.net>
+ <87vcg2jeyu.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120829083337.GI4011@b20223-02.ap.freescale.net>
+ <87mx1ejag0.fsf@ashishki-desk.ger.corp.intel.com>
+ <20120829104559.GB25433@b20223-02.ap.freescale.net>
+Message-ID: <20120904141732.GC19897@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2012 at 10:00:32PM +0200, Marc Kleine-Budde wrote:
-> On 08/29/2012 01:01 PM, Sascha Hauer wrote:
-> > On Wed, Aug 29, 2012 at 01:18:10PM +0300, Alexander Shishkin wrote:
-> >> Sascha Hauer <s.hauer@pengutronix.de> writes:
-> >>
-> >>> On Wed, Aug 29, 2012 at 10:50:08AM +0300, Alexander Shishkin wrote:
-> >>>> Richard Zhao <richard.zhao@freescale.com> writes:
-> >>>>
-> >>>>> i.MX usb controllers shares non-core registers, which may include
-> >>>>> SoC specific controls. We take it as a usbmisc device and usbmisc
-> >>>>> driver set operations needed by ci13xxx_imx driver.
-> >>>>>
-> >>>>> For example, Sabrelite board has bad over-current design, we can
-> >>>>> usbmisc to disable over-current detect.
-> >>>>
-> >>>> Why does this have to be part of the usb driver instead of SoC specific
-> >>>> code? It looks like you've created a whole new device/driver
-> >>>> infrastructure just to disable overcurrent for a specific board.
-> >>>
-> >>> Richards code indeed only handles overcurrent for a specific board, but
-> >>> there are more bits to configure in the longer run: power pin
-> >>> polarities, ULPI/serial mode select and some more.
-> 
-> We already have a patch adding a usbmisc_imx53_init() function to that
-> driver.
-> 
-> >> Sounds to me like these things that should be taken care of by the phy
-> >> driver, which will likely be simpler from both driver's and devicetree's
-> >> perspective.
+On Wed, Aug 29, 2012 at 06:46:00PM +0800, Richard Zhao wrote:
+> On Wed, Aug 29, 2012 at 12:48:15PM +0300, Alexander Shishkin wrote:
+> > Richard Zhao <richard.zhao@freescale.com> writes:
 > > 
-> > Most i.MX SoCs have three instances of the chipidea core. These cores
-> > share a single register space for controlling the mentioned bits (the
-> > usbmisc register space). The usbmisc looks different on the different
-> > SoCs.
-> > Indeed they control some phy specific aspects, but the phy itself may
-> > also be an external ULPI or UTMI phy with a separate driver. So if we
-> > integrate the usbmisc into the phy wouldn't that mean that it has to
-> > be integrated into all possible phy drivers?
+> > > On Wed, Aug 29, 2012 at 11:10:33AM +0300, Alexander Shishkin wrote:
+> > >> Richard Zhao <richard.zhao@freescale.com> writes:
+> > >> 
+> > >> > On Tue, Aug 28, 2012 at 11:38:23AM +0300, Alexander Shishkin wrote:
+> > >> >> Richard Zhao <richard.zhao@freescale.com> writes:
+> > >> >> 
+> > >> >> > One role failed, but the other role will possiblly still work.
+> > >> >> > For example, when udc start failed, if plug in a host device,
+> > >> >> > it works.
+> > >> >> 
+> > >> >> If you're a host device, ci->role should be HOST at this point and
+> > >> >> ci_role_start() shouldn't fail. If ci->role is detected wrongly, the
+> > >> >> role detection must be fixed. If ci_role_start() fails for host, but it
+> > >> >> still works when it's called again after the id pin change is detected,
+> > >> >> again, the problem is elsewhere.
+> > >> > The check is only for OTG device. For single role device, it just fail
+> > >> > if it start the role failed.
+> > >> 
+> > >> Sorry, can you rephrase?
+> > >> 
+> > >> >> 
+> > >> >> >
+> > >> >> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > >> >> > ---
+> > >> >> >  drivers/usb/chipidea/core.c |    7 +++++--
+> > >> >> >  1 file changed, 5 insertions(+), 2 deletions(-)
+> > >> >> >
+> > >> >> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> > >> >> > index 19ef324..8fd390a 100644
+> > >> >> > --- a/drivers/usb/chipidea/core.c
+> > >> >> > +++ b/drivers/usb/chipidea/core.c
+> > >> >> > @@ -473,8 +473,11 @@ static int __devinit ci_hdrc_probe(struct platform_device *pdev)
+> > >> >> >  	ret = ci_role_start(ci, ci->role);
+> > >> >> >  	if (ret) {
+> > >> >> >  		dev_err(dev, "can't start %s role\n", ci_role(ci)->name);
+> > >> >> > -		ret = -ENODEV;
+> > >> >> > -		goto rm_wq;
+> > >> >> > +		ci->role = CI_ROLE_END;
+> > >> >> 
+> > >> >> So are you relying on id pin interrupt for initializing the role after
+> > >> >> this? Can you provide more details?
+> > >> > Yes. The ID pin detect still works. My case is, gadget role failed,
+> > >> > host role works. I was trying not to ruin host function.
+> > >> 
+> > >> But it shouldn't even try to start the gadget, because ci_otg_role()
+> > >> should set ci->role to HOST before ci_role_start() happens.
+> > > It depends on ID pin. If ID pin is gadget and gadget is not support well,
+> > > ci_role_start will fail. See below example.
+> > >> 
+> > >> Another question is, why does gadget start fail?
+> > > There's one example:
+> > > If usb phy don't support otg yet, otg_set_peripheral will fail, and
+> > > then cause udc_start fail.
 > > 
-> > From a devicetrees perspective it makes sense to integrate the flags
-> > into the chipidea nodes, because there is one node per chipidea core,
-> > but only one usbmisc unit for all ports on the SoC. So we can do a:
-> > 
-> > 	chipidea at ofs {
-> > 		disable-overcurrent = <1>;
-> > 	};
-> > 
-> > instead of
-> > 
-> > 	usbmisc at ofs {
-> > 		disable-overcurrent-port0 = <1>;
-> > 		disable-overcurrent-port1 = <0>;
-> > 		...
-> > 	};
-> 
-> +1
-> 
-> IMHO looks much cleaner.
-So, Marc agree on the patch too. Maybe you can give a reviewed-by? :)
-
+> > So you should drop the CI13XXX_REQUIRE_TRANSCEIVER flag from imx
+> > platform data till the phy is fully implemented.
+> It's just an example. We can not assume udc_start always success. If it
+> fails, isn't it better to continue support of host than say game over?
 Hi Alex,
 
-What do you think?
+Is it persuadable? Could you please give comments of other patches too?
 
 Thanks
 Richard
 > 
-> >>>> And the infrastructure boils down to a complex way of passing a callback
-> >>>> from imx driver to another imx driver, that only works if they are
-> >>>> probed in the right order. I don't see any point in doing it like this
-> >>>> other than inflating the device tree tables even further.
-> >>>>
-> >>>> Why can't this be part of the SoC code like it is done, for example in
-> >>>> arch/arm/mach-omap2/control.c?
-> >>>
-> >>> The settings are board specific, so there must be some way to configure
-> >>> them in the devicetree.
-> >>
-> >> But I'm sure there's a way to control board-specific settings/kludges
-> >> from devicetree?
+> Thanks
+> Richard
 > > 
-> > Hm, yes. That's what Richard does, right? I may be misunderstanding you
-> > here.
+> > Regards,
+> > --
+> > Alex
 > > 
-> > Sascha
-> 
-> Marc
-> 
-> 
-> -- 
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 > 
