@@ -1,62 +1,49 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 3 Sep 2012 22:47:42 -0400 (EDT)
+Date: Mon, 3 Sep 2012 22:56:26 -0400 (EDT)
 Subject: [PATCH 2/2] ARM: allow for ATAGS to be configured out when DT
  support is selected
-In-Reply-To: <20120902155449.GF18950@mudshark.cambridge.arm.com>
+In-Reply-To: <201209012025.27962.arnd@arndb.de>
 References: <1346361008-7320-1-git-send-email-nicolas.pitre@linaro.org>
  <1346361008-7320-2-git-send-email-nicolas.pitre@linaro.org>
- <20120902155449.GF18950@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1209032217360.1784@xanadu.home>
+ <201209012025.27962.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.02.1209032249200.1784@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2 Sep 2012, Will Deacon wrote:
+On Sat, 1 Sep 2012, Arnd Bergmann wrote:
 
-> On Thu, Aug 30, 2012 at 10:10:08PM +0100, Nicolas Pitre wrote:
+> On Thursday 30 August 2012, Nicolas Pitre wrote:
 > > Now that ATAGS support is well contained, we can easily remove it from
 > > the kernel build if so desired.  It has to explicitly be disabled, and
 > > only when DT support is selected.
 > > 
 > > Note: disabling kernel ATAGS support does not prevent the usage of
 > > CONFIG_ARM_ATAG_DTB_COMPAT.
-> > 
-> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > ---
-> >  arch/arm/Kconfig         | 26 +++++++++++++++++++-------
-> >  arch/arm/kernel/Makefile |  5 +++--
-> >  arch/arm/kernel/atags.h  | 11 +++++++++++
-> >  3 files changed, 33 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index c5f9ae5dbd..5c7302e208 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -1891,12 +1891,6 @@ config CC_STACKPROTECTOR
-> >  	  neutralized via a kernel panic.
-> >  	  This feature requires gcc version 4.2 or above.
-> >  
-> > -config DEPRECATED_PARAM_STRUCT
-> > -	bool "Provide old way to pass kernel parameters"
-> > -	help
-> > -	  This was deprecated in 2001 and announced to live on for 5 years.
-> > -	  Some old boot loaders still use this way.
-> > -
-> >  endmenu
 > 
-> Since you're in this area, do we need to carry this forward? If somebody is
-> using it then obviously we have to keep it but it might be worth asking
-> around.
-
-That should be a separate patch if that has to be dropped.  Right now 
-that code is already in a file of its own and not getting in the way of 
-anything else, and I didn't want to change any behavior on legacy 
-platforms.
-
-> Back on topic, this looks good to me:
+> > ...
 > 
-> Acked-by: Will Deacon <will.deacon@arm.com>
+> > +config ATAGS
+> > +	bool "Support for the traditional ATAGS boot data passing" if USE_OF
+> > +	default y
+> > +	help
+> > +	  This is the traditional way of passing data to the kernel at boot
+> > +	  time. If you are solely relying on the flattened device tree (or
+> > +	  the ARM_ATAG_DTB_COMPAT option) then you may unselect this option
+> > +	  to remove ATAGS support from your kernel binary.  If unsure,
+> > +	  leave this to y.
+> 
+> That's a clever way of implementing it, I had not though of making it an
+> optional default-y symbol.
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
 Thanks.
+
+> Should we do patches to the individual platforms bsaed on this to disable
+> the ATAG based board files when CONFIG_ATAG is disabled?
+
+Well... that could be a good thing to make them depend on ATAGS indeed.  
+But that can be done incrementally in later patches.
 
 
 Nicolas
