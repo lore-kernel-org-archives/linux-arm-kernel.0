@@ -1,38 +1,43 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 5 Sep 2012 10:32:07 +0530
-Subject: [PATCH v3 3/3] cpufreq: Add a generic cpufreq-cpu0 driver
-In-Reply-To: <20120905011219.GN2362@S2101-09.ap.freescale.net>
-References: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
- <1344577046-14847-4-git-send-email-shawn.guo@linaro.org>
- <201209050118.39045.rjw@sisk.pl>
- <20120905011219.GN2362@S2101-09.ap.freescale.net>
-Message-ID: <CAMQu2gwjqhi2EJ_3yk+0k9gRWDaGu4yG+V7E4BJ2G3Ki7uGk6g@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 4 Sep 2012 22:05:31 -0700
+Subject: [PATCH 4/4] ARM: ks8695: convert to generic time and clocksource
+In-Reply-To: <CAFumwP28D-ijJtBpQ39qDXkimMx-ucvwgS6jG3jdQ+DoYpgx9w@mail.gmail.com>
+References: <1346264842-20411-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdab72Z86i21TNohS0YO=Bav7eQgHwQyXa0tXQB=0hhgAg@mail.gmail.com>
+ <5044A954.4000706@snapgear.com> <201209031324.22877.arnd@arndb.de>
+ <CAFumwP28D-ijJtBpQ39qDXkimMx-ucvwgS6jG3jdQ+DoYpgx9w@mail.gmail.com>
+Message-ID: <20120905050531.GE6747@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
+On Mon, Sep 03, 2012 at 04:55:41PM +0200, Andrew Victor wrote:
+> hi,
+> 
+> On Mon, Sep 3, 2012 at 3:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 03 September 2012, Greg Ungerer wrote:
+> >> > I suspect
+> >> > some of these platforms may have more users than we
+> >> > believe.
+> >>
+> >> I know the guys at www.opengear.com are still building hardware around
+> >> the KS8695. And they update to modern kernels from time to time. So its
+> >> not completely obsolete yet. I have some SnapGear boards based around it
+> >> too, though they went out of production about 2 years ago.
+> >
+> > Ok, good to know. Maybe we can catch their interest with this mail thread
+> > here and get them to contribute upstream as well.
+> 
+> 
+> Vision System GmbH are (or were) also using the KS8695.
 
-On Wed, Sep 5, 2012 at 6:42 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Wed, Sep 05, 2012 at 01:18:38AM +0200, Rafael J. Wysocki wrote:
->> On Friday, August 10, 2012, Shawn Guo wrote:
->> > It adds a generic cpufreq driver for CPU0 frequency management based on
->> > clk, regulator, OPP and device tree support.  It can support both
->> > uniprocessor (UP) and those symmetric multiprocessor (SMP) systems which
->> > share clock and voltage across all CPUs.
->> >
->> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->>
->> I seem to recall that this has been discussed with several people and
->> undergone some changes as a result of comments.  Would it be possible
->> to get some ACKs from the people involved?
->>
->
-> Mark, Santosh,
->
-> Reviewed-by, please?
->
-As commented already, the name of file was bit odd to me
-otherwise, patch itself is fine by me.
+Ok, cool. Definitely not a candidate for removal based on what we've
+seen then.
 
-FWIW ,
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+I would like to consolidate some of the defconfigs though, since
+there are currently three of them and the platform supports multi-board
+kernels. Anyone objecting to moving over to ks8695_defconfig as a superset
+of the current three ones (acs5k{,_tiny}_defconfigs)? I'll post a patch
+to NAK tomorrow. :)
+
+
+-Olof
