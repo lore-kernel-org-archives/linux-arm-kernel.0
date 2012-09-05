@@ -1,139 +1,66 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Wed, 5 Sep 2012 11:51:19 +0200
-Subject: [PATCH] ARM : i.MX27 : split code for allocation of ressources of
- camera and eMMA
-In-Reply-To: <50471CEE.60606@gmail.com>
-References: <1346763398-13536-1-git-send-email-gcembed@gmail.com>
- <CACKLOr0PO1jbxrfRoEwEAGFNkNkAFUA-oB2vLZpw1kDxEYPBQw@mail.gmail.com>
- <5047013E.30508@gmail.com>
- <CACKLOr1RipM3QVJBaTjXHFotqSMdrCsWLkBsgiiuauTWpxR6EQ@mail.gmail.com>
- <50471187.3040809@gmail.com>
- <CACKLOr0=TccMNoQV-LfkeBrCN5=0E8eqTEaT7PRk-KAv_mQ5RQ@mail.gmail.com>
- <50471CEE.60606@gmail.com>
-Message-ID: <CACKLOr3fM9bn05qKLcUa8nTz4G-vhnM_DffNJzNBmxeKmfGZ0w@mail.gmail.com>
+From: loic.pallardy-ext@stericsson.com (Loic Pallardy)
+Date: Wed, 5 Sep 2012 11:58:56 +0200
+Subject: [PATCH 00/17] Add ST-Ericsson U9540 support
+Message-ID: <1346839153-6465-1-git-send-email-loic.pallardy-ext@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 September 2012 11:35, Ga?tan Carlier <gcembed@gmail.com> wrote:
-> On 09/05/2012 11:11 AM, javier Martin wrote:
->>
->> On 5 September 2012 10:47, Ga?tan Carlier <gcembed@gmail.com> wrote:
->>>
->>> On 09/05/2012 10:22 AM, javier Martin wrote:
->>>>
->>>>
->>>> On 5 September 2012 09:37, Ga?tan Carlier <gcembed@gmail.com> wrote:
->>>>>
->>>>>
->>>>> Hi Javier,
->>>>> This is because I will send a patch to add support of eMMA-PP. eMMA-PrP
->>>>> is
->>>>> not only used for soc-camera. It can also be used as stand-alone driver
->>>>> and
->>>>> now to be able to use eMMA-PrP module, IMX_HAVE_PLATFORM_MX2_CAMERA
->>>>> must
->>>>> be
->>>>> set.
->>>>
->>>>
->>>>
->>>> Do you mean the following stand-alone driver I submitted some time
->>>> ago? Are you working on some improvements to it?
->>>>
->>>>
->>>> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=drivers/media/video/mx2_emmaprp.c;h=5f8a6f5b98f91c3af4e1bdbd06654e7b496d8d65;hb=HEAD
->>>
->>>
->>> yes
->>>
->>>>
->>>> This driver can be used without applying your patch. Please take a
->>>> look at the following patch which is pending to get merged in
->>>> linux-media tree:
->>>> https://patchwork.kernel.org/patch/1347921/
->>>>
->>>>
->>>>> And if I follow this logic, I have to put declaration of eMMA-PP with
->>>>> imx-fb
->>>>> and eMMA-PP can only be enabled if IMX_HAVE_PLATFORM_IMX_FB.
->>>>> Of course, eMMA-PrP is almost always used with soc-camera and eMMA-PP
->>>>> with
->>>>> LCDC (imx-fb) but eMMA can be used to do HW accelarated colorspace
->>>>> conversion.
->>>>
->>>>
->>>>
->>>> Agree, there is already one driver supporting this feature.
->>>>
->>>>> It is not a problem for me to keep eMMA-PrP and mx2-camera together. It
->>>>> was
->>>>> just to have a more independant eMMA driver.
->>>>
->>>>
->>>>
->>>> I won't oppose to it, for me it is just aesthetic. However, you must
->>>> do it properly without breaking existing boards such as Visstrim_M10.
->>>
->>>
->>> Ok, I missed your patch in mailing-list and I work with linux-next
->>> (20120824) so I didn't know that my patch would break yours. Sorry.
->>>
->>>>
->>>>> For the Visstrim_M10 board, I don't think that it is needed to set
->>>>> IMX_HAVE_PLATFORM_MX2_EMMA because there is no reference to m2m-emmaprp
->>>>> and
->>>>> mx2-camera embeds handling of eMMA-PrP without using eMMA-PrP driver.
->>>>
->>>>
->>>>
->>>> The following patch was sent to the list in Agust the 20th and will be
->>>> merged in the linux-media tree. This patch does reference m2m-emmaprp
->>>> in Visstrim_M10
->>>> https://patchwork.kernel.org/patch/1347921/
->>>>
->>>> So, please, since you have to fix the wrong chunk and have to send a
->>>> v2 anyways I strongly encourage you to add the flag
->>>> IMX_HAVE_PLATFORM_MX2_EMMA to Visstrim_M10. This way nothing will be
->>>> broken no matter your patch gets merged after or before mine.
->>>
->>>
->>> What do you mean by "wrong chunk" ?
->>
->>
->>
->> Your patch does not apply cleanly to linux-next due to the following
->> chunk:
->>
->>   diff --git a/arch/arm/mach-imx/devices-imx27.h
->> b/arch/arm/mach-imx/devices-imx27.h
->> index 0482293..d8eb4a0 100644
->> --- a/arch/arm/mach-imx/devices-imx27.h
->> +++ b/arch/arm/mach-imx/devices-imx27.h
->> @@ -54,8 +54,10 @@ extern const struct imx_imx_uart_1irq_data
->> imx27_imx_uart_data[];
->>   extern const struct imx_mx2_camera_data imx27_mx2_camera_data;
->>   #define imx27_add_mx2_camera(pdata)    \
->>          imx_add_mx2_camera(&imx27_mx2_camera_data, pdata)
->> +
->> +extern const struct imx_mx2_emma_data imx27_mx2_emmaprp_data;
->>   #define imx27_add_mx2_emmaprp()        \
->> -       imx_add_mx2_emmaprp(&imx27_mx2_camera_data)
->> +       imx_add_mx2_emmaprp(&imx27_mx2_emmaprp_data)
->>
->>
-> When I apply the patch (I save my mail and apply it), there is no
-> conflict/reject. Tested on linux-next-20120824 and linux-next-20120905.
+Hi,
 
-Ok, this is my fault then, sorry.
+The following patch series contains board files and prcmu driver modifications
+to support ST-Ericsson U9540 chipset and CCU9540 board configuration.
+It includes:
+ - mfd db8500-prmcu: adaptation to support new chipset
+ - mfd dbx540-prmcu: creation for u9540 platform
+ - arm ux500: add u9540 chipset definition
 
-If you resend the patch adding the new flag to Visstrim_SM10 it's fine with me.
+Best regards,
+Loic
 
-Regards.
+Loic Pallardy (17):
+  arm: ux500: add u9540 pin configuration
+  arm: ux500: add ccu9540 board support
+  arm: ux500: Create board-specific IRQ init callback
+  mfd: dbx500-prcmu: Introduce TCDM mapping struct
+  mfd: dbx500-prcmu: Handle TCDM mapping
+  arm: ux500: Add u9540 PRCMU TCDM configuration
+  mfd: prcmu: configurable tcdm base address
+  arm: ux500: update DB internal irq nb
+  mfd: prcmu: add db9540 support
+  mfd: prcmu: dbx500-prmcu creation
+  mfd: pcrmu: create common header file for legacy mailbox
+  mfd: prcmu: make fw_project_name generic
+  mfd: prcmu: make legacy mailbox services configurable
+  mfd: db8500-prcmu: use db8500 legacy services
+  mfd: dbx540-prcmu creation
+  arm: ux500: add dbx540 prcmu platform data
+  mfd: db8500-prcmu: activate dbx540-prcmu driver
+
+ arch/arm/mach-ux500/board-mop500-pins.c    |  200 ++
+ arch/arm/mach-ux500/board-mop500-sdi.c     |   12 +
+ arch/arm/mach-ux500/board-mop500.c         |   67 +-
+ arch/arm/mach-ux500/board-mop500.h         |    2 +
+ arch/arm/mach-ux500/cpu-db8500.c           |   18 +-
+ arch/arm/mach-ux500/cpu.c                  |    4 +-
+ arch/arm/mach-ux500/include/mach/devices.h |    6 +
+ arch/arm/mach-ux500/include/mach/irqs.h    |    2 +-
+ drivers/mfd/Kconfig                        |   21 +
+ drivers/mfd/Makefile                       |    2 +
+ drivers/mfd/db8500-prcmu.c                 | 1161 ++++++------
+ drivers/mfd/dbx500-prcmu-regs.h            |    1 +
+ drivers/mfd/dbx500-prcmu.c                 |  815 ++++++++
+ drivers/mfd/dbx500-prcmu.h                 |  465 +++++
+ drivers/mfd/dbx540-prcmu-regs.h            |  106 ++
+ drivers/mfd/dbx540-prcmu.c                 | 2807 ++++++++++++++++++++++++++++
+ include/linux/mfd/db8500-prcmu.h           |  274 +--
+ include/linux/mfd/dbx500-prcmu.h           |  593 +++---
+ include/linux/mfd/dbx540-prcmu.h           |   96 +
+ 19 files changed, 5455 insertions(+), 1197 deletions(-)
+ create mode 100644 drivers/mfd/dbx500-prcmu.c
+ create mode 100644 drivers/mfd/dbx500-prcmu.h
+ create mode 100644 drivers/mfd/dbx540-prcmu-regs.h
+ create mode 100644 drivers/mfd/dbx540-prcmu.c
+ create mode 100644 include/linux/mfd/dbx540-prcmu.h
+
 -- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+1.7.11.1
