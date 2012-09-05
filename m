@@ -1,39 +1,108 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed,  5 Sep 2012 15:35:23 +0200
-Subject: [PATCH 4/8] pwm i.MX: Use module_platform_driver
+Date: Wed,  5 Sep 2012 15:35:26 +0200
+Subject: [PATCH 7/8] pwm i.MX: fix clock lookup
 In-Reply-To: <1346852127-25226-1-git-send-email-s.hauer@pengutronix.de>
 References: <1346852127-25226-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1346852127-25226-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1346852127-25226-8-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Philipp Zabel <p.zabel@pengutronix.de>
+
+The i.MX pwm core has two clocks: The ipg clock and the ipg highfreq
+(peripheral) clock. The ipg clock has to be enabled for this hardware
+to work. The actual pwm output can either be driven by the ipg clock
+or the ipg highfreq. The ipg highfreq has the advantage that it runs
+even when the SoC is in low power modes.
+This patch requests both clocks and enables the ipg clock for accessing
+registers and the peripheral clock to actually turn on the pwm.
+
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/pwm/pwm-imx.c |   12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/pwm/pwm-imx.c |   33 +++++++++++++++++++++++++--------
+ 1 file changed, 25 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-index 3fc4ae8..a689144 100644
+index b234288..5b03ace 100644
 --- a/drivers/pwm/pwm-imx.c
 +++ b/drivers/pwm/pwm-imx.c
-@@ -270,17 +270,7 @@ static struct platform_driver imx_pwm_driver = {
- 	.remove		= __devexit_p(imx_pwm_remove),
- };
+@@ -40,7 +40,8 @@
+ #define MX3_PWMCR_EN              (1 << 0)
  
--static int __init imx_pwm_init(void)
--{
--	return platform_driver_register(&imx_pwm_driver);
--}
--arch_initcall(imx_pwm_init);
--
--static void __exit imx_pwm_exit(void)
--{
--	platform_driver_unregister(&imx_pwm_driver);
--}
--module_exit(imx_pwm_exit);
-+module_platform_driver(imx_pwm_driver);
+ struct imx_chip {
+-	struct clk	*clk;
++	struct clk	*clk_per;
++	struct clk	*clk_ipg;
  
- MODULE_LICENSE("GPL v2");
- MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
+ 	int		enabled;
+ 	void __iomem	*mmio_base;
+@@ -105,7 +106,7 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
+ 	unsigned long period_cycles, duty_cycles, prescale;
+ 	u32 cr;
+ 
+-	c = clk_get_rate(imx->clk);
++	c = clk_get_rate(imx->clk_per);
+ 	c = c * period_ns;
+ 	do_div(c, 1000000000);
+ 	period_cycles = c;
+@@ -160,8 +161,15 @@ static int imx_pwm_config(struct pwm_chip *chip,
+ 		struct pwm_device *pwm, int duty_ns, int period_ns)
+ {
+ 	struct imx_chip *imx = to_imx_chip(chip);
++	int ret;
+ 
+-	return imx->config(chip, pwm, duty_ns, period_ns);
++	clk_prepare_enable(imx->clk_ipg);
++
++	ret = imx->config(chip, pwm, duty_ns, period_ns);
++
++	clk_disable_unprepare(imx->clk_ipg);
++
++	return ret;
+ }
+ 
+ static int imx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+@@ -169,7 +177,7 @@ static int imx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	struct imx_chip *imx = to_imx_chip(chip);
+ 	int rc;
+ 
+-	rc = clk_prepare_enable(imx->clk);
++	rc = clk_prepare_enable(imx->clk_per);
+ 	if (rc)
+ 		return rc;
+ 
+@@ -186,7 +194,7 @@ static void imx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 
+ 	imx->set_enable(chip, false);
+ 
+-	clk_disable_unprepare(imx->clk);
++	clk_disable_unprepare(imx->clk_per);
+ 	imx->enabled = 0;
+ }
+ 
+@@ -238,10 +246,19 @@ static int __devinit imx_pwm_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
+-	imx->clk = devm_clk_get(&pdev->dev, "pwm");
++	imx->clk_per = devm_clk_get(&pdev->dev, "per");
++	if (IS_ERR(imx->clk_per)) {
++		dev_err(&pdev->dev, "getting per clock failed with %ld\n",
++				PTR_ERR(imx->clk_per));
++		return PTR_ERR(imx->clk_per);
++	}
+ 
+-	if (IS_ERR(imx->clk))
+-		return PTR_ERR(imx->clk);
++	imx->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
++	if (IS_ERR(imx->clk_ipg)) {
++		dev_err(&pdev->dev, "getting ipg clock failed with %ld\n",
++				PTR_ERR(imx->clk_ipg));
++		return PTR_ERR(imx->clk_ipg);
++	}
+ 
+ 	imx->chip.ops = &imx_pwm_ops;
+ 	imx->chip.dev = &pdev->dev;
 -- 
 1.7.10.4
