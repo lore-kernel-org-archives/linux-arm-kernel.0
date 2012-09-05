@@ -1,50 +1,38 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  5 Sep 2012 10:40:51 +0200
-Subject: [PATCH 2/8] gpio: 74x164: Use devm_kzalloc
-In-Reply-To: <1346834457-6257-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1346834457-6257-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1346834457-6257-2-git-send-email-maxime.ripard@free-electrons.com>
+Date: Wed,  5 Sep 2012 10:40:50 +0200
+Subject: [PATCH 1/8] gpio: 74x164: Use module_spi_driver boiler plate function
+Message-ID: <1346834457-6257-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpio/gpio-74x164.c |    8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ drivers/gpio/gpio-74x164.c |   13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
 diff --git a/drivers/gpio/gpio-74x164.c b/drivers/gpio/gpio-74x164.c
-index 2975036..604b998 100644
+index a31ad6f..2975036 100644
 --- a/drivers/gpio/gpio-74x164.c
 +++ b/drivers/gpio/gpio-74x164.c
-@@ -90,7 +90,7 @@ static int __devinit gen_74x164_probe(struct spi_device *spi)
- 	if (ret < 0)
- 		return ret;
+@@ -159,18 +159,7 @@ static struct spi_driver gen_74x164_driver = {
+ 	.probe		= gen_74x164_probe,
+ 	.remove		= __devexit_p(gen_74x164_remove),
+ };
+-
+-static int __init gen_74x164_init(void)
+-{
+-	return spi_register_driver(&gen_74x164_driver);
+-}
+-subsys_initcall(gen_74x164_init);
+-
+-static void __exit gen_74x164_exit(void)
+-{
+-	spi_unregister_driver(&gen_74x164_driver);
+-}
+-module_exit(gen_74x164_exit);
++module_spi_driver(gen_74x164_driver);
  
--	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
-+	chip = devm_kzalloc(&spi->dev, sizeof(*chip), GFP_KERNEL);
- 	if (!chip)
- 		return -ENOMEM;
- 
-@@ -125,7 +125,6 @@ static int __devinit gen_74x164_probe(struct spi_device *spi)
- exit_destroy:
- 	dev_set_drvdata(&spi->dev, NULL);
- 	mutex_destroy(&chip->lock);
--	kfree(chip);
- 	return ret;
- }
- 
-@@ -141,10 +140,9 @@ static int __devexit gen_74x164_remove(struct spi_device *spi)
- 	dev_set_drvdata(&spi->dev, NULL);
- 
- 	ret = gpiochip_remove(&chip->gpio_chip);
--	if (!ret) {
-+	if (!ret)
- 		mutex_destroy(&chip->lock);
--		kfree(chip);
--	} else
-+	else
- 		dev_err(&spi->dev, "Failed to remove the GPIO controller: %d\n",
- 				ret);
- 
+ MODULE_AUTHOR("Gabor Juhos <juhosg@openwrt.org>");
+ MODULE_AUTHOR("Miguel Gaio <miguel.gaio@efixo.com>");
 -- 
 1.7.9.5
