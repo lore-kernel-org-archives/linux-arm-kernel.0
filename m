@@ -1,108 +1,57 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed,  5 Sep 2012 15:35:26 +0200
-Subject: [PATCH 7/8] pwm i.MX: fix clock lookup
+Date: Wed,  5 Sep 2012 15:35:27 +0200
+Subject: [PATCH 8/8] ARM i.MX53: Add pwm support
 In-Reply-To: <1346852127-25226-1-git-send-email-s.hauer@pengutronix.de>
 References: <1346852127-25226-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1346852127-25226-8-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1346852127-25226-9-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Zabel <p.zabel@pengutronix.de>
-
-The i.MX pwm core has two clocks: The ipg clock and the ipg highfreq
-(peripheral) clock. The ipg clock has to be enabled for this hardware
-to work. The actual pwm output can either be driven by the ipg clock
-or the ipg highfreq. The ipg highfreq has the advantage that it runs
-even when the SoC is in low power modes.
-This patch requests both clocks and enables the ipg clock for accessing
-registers and the peripheral clock to actually turn on the pwm.
-
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/pwm/pwm-imx.c |   33 +++++++++++++++++++++++++--------
- 1 file changed, 25 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/imx53.dtsi        |   14 ++++++++++++++
+ arch/arm/mach-imx/clk-imx51-imx53.c |    4 ++++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-index b234288..5b03ace 100644
---- a/drivers/pwm/pwm-imx.c
-+++ b/drivers/pwm/pwm-imx.c
-@@ -40,7 +40,8 @@
- #define MX3_PWMCR_EN              (1 << 0)
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index cd37165..18b9fc3 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -189,6 +189,20 @@
+ 				status = "disabled";
+ 			};
  
- struct imx_chip {
--	struct clk	*clk;
-+	struct clk	*clk_per;
-+	struct clk	*clk_ipg;
- 
- 	int		enabled;
- 	void __iomem	*mmio_base;
-@@ -105,7 +106,7 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
- 	unsigned long period_cycles, duty_cycles, prescale;
- 	u32 cr;
- 
--	c = clk_get_rate(imx->clk);
-+	c = clk_get_rate(imx->clk_per);
- 	c = c * period_ns;
- 	do_div(c, 1000000000);
- 	period_cycles = c;
-@@ -160,8 +161,15 @@ static int imx_pwm_config(struct pwm_chip *chip,
- 		struct pwm_device *pwm, int duty_ns, int period_ns)
- {
- 	struct imx_chip *imx = to_imx_chip(chip);
-+	int ret;
- 
--	return imx->config(chip, pwm, duty_ns, period_ns);
-+	clk_prepare_enable(imx->clk_ipg);
++			pwm1: pwm at 53fb4000 {
++				#pwm-cells = <2>;
++				compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
++				reg = <0x53fb4000 0x4000>;
++				interrupts = <61>;
++			};
 +
-+	ret = imx->config(chip, pwm, duty_ns, period_ns);
++			pwm2: pwm at 53fb8000 {
++				#pwm-cells = <2>;
++				compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
++				reg = <0x53fb8000 0x4000>;
++				interrupts = <94>;
++			};
 +
-+	clk_disable_unprepare(imx->clk_ipg);
-+
-+	return ret;
- }
+ 			uart1: serial at 53fbc000 {
+ 				compatible = "fsl,imx53-uart", "fsl,imx21-uart";
+ 				reg = <0x53fbc000 0x4000>;
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 4bdcaa9..b522411 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -455,6 +455,10 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
+ 	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "63fcc000.ssi");
+ 	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "50014000.ssi");
+ 	clk_register_clkdev(clk[ssi3_ipg_gate], NULL, "63fd0000.ssi");
++	clk_register_clkdev(clk[pwm1_ipg_gate], "ipg", "53fb4000.pwm");
++	clk_register_clkdev(clk[pwm1_hf_gate], "per", "53fb4000.pwm");
++	clk_register_clkdev(clk[pwm2_ipg_gate], "ipg", "53fb8000.pwm");
++	clk_register_clkdev(clk[pwm2_hf_gate], "per", "53fb8000.pwm");
  
- static int imx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-@@ -169,7 +177,7 @@ static int imx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- 	struct imx_chip *imx = to_imx_chip(chip);
- 	int rc;
- 
--	rc = clk_prepare_enable(imx->clk);
-+	rc = clk_prepare_enable(imx->clk_per);
- 	if (rc)
- 		return rc;
- 
-@@ -186,7 +194,7 @@ static void imx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- 
- 	imx->set_enable(chip, false);
- 
--	clk_disable_unprepare(imx->clk);
-+	clk_disable_unprepare(imx->clk_per);
- 	imx->enabled = 0;
- }
- 
-@@ -238,10 +246,19 @@ static int __devinit imx_pwm_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
--	imx->clk = devm_clk_get(&pdev->dev, "pwm");
-+	imx->clk_per = devm_clk_get(&pdev->dev, "per");
-+	if (IS_ERR(imx->clk_per)) {
-+		dev_err(&pdev->dev, "getting per clock failed with %ld\n",
-+				PTR_ERR(imx->clk_per));
-+		return PTR_ERR(imx->clk_per);
-+	}
- 
--	if (IS_ERR(imx->clk))
--		return PTR_ERR(imx->clk);
-+	imx->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
-+	if (IS_ERR(imx->clk_ipg)) {
-+		dev_err(&pdev->dev, "getting ipg clock failed with %ld\n",
-+				PTR_ERR(imx->clk_ipg));
-+		return PTR_ERR(imx->clk_ipg);
-+	}
- 
- 	imx->chip.ops = &imx_pwm_ops;
- 	imx->chip.dev = &pdev->dev;
+ 	/* set SDHC root clock to 200MHZ*/
+ 	clk_set_rate(clk[esdhc_a_podf], 200000000);
 -- 
 1.7.10.4
