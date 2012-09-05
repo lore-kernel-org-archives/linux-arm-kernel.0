@@ -1,99 +1,32 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 5 Sep 2012 11:04:06 +0200
-Subject: [PATCH 10/10] net/macb: Offset first RX buffer by two bytes
-In-Reply-To: <cover.1346775479.git.nicolas.ferre@atmel.com>
-References: <cover.1346775479.git.nicolas.ferre@atmel.com>
-Message-ID: <68a0e4baf2ace47c04874f1918a3bd5f1e5784dc.1346775479.git.nicolas.ferre@atmel.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Wed, 5 Sep 2012 09:03:58 +0000
+Subject: [PATCH 7/9] ARM: OMAP2+: Prepare for irqs.h removal
+In-Reply-To: <20120905010921.GY1303@atomide.com>
+References: <20120831004828.28732.902.stgit@muffinssi.local>
+ <20120831005237.28732.96766.stgit@muffinssi.local>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9DC9F4@DBDE01.ent.ti.com>
+ <20120905010921.GY1303@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9DE2F3@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Havard Skinnemoen <havard@skinnemoen.net>
+Hi Tony,
 
-Make the ethernet frame payload word-aligned, possibly making the
-memcpy into the skb a bit faster. This will be even more important
-after we eliminate the copy altogether.
+On Wed, Sep 05, 2012 at 06:39:22, Tony Lindgren wrote:
+> * Mohammed, Afzal <afzal@ti.com> [120904 01:47]:
 
-Also eliminate the redundant RX_OFFSET constant -- it has the same
-definition and purpose as NET_IP_ALIGN.
+> > *I am not sending the patches now to avoid confusion by way of having
+> > too many patch series*
+> > 
+> > In case you like this, let me know, I will post.
+> 
+> Yes please post the patches rebased on testing-cleanup branch that I
+> just pushed. That branch is not immutable yet though as we're waiting
+> to hear from Arnd regrading the first patch in the branch.
 
-Signed-off-by: Havard Skinnemoen <havard@skinnemoen.net>
-[nicolas.ferre at atmel.com: adapt to newer kernel]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/net/ethernet/cadence/macb.c |   23 ++++++++++++++++-------
- 1 file changed, 16 insertions(+), 7 deletions(-)
+The patches rebased on testing-cleanup branch has been posted [1].
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index f31c0a7..f7716b6 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -33,9 +33,6 @@
- #define RX_RING_SIZE		512
- #define RX_RING_BYTES		(sizeof(struct macb_dma_desc) * RX_RING_SIZE)
- 
--/* Make the IP header word-aligned (the ethernet header is 14 bytes) */
--#define RX_OFFSET		2
--
- #define TX_RING_SIZE		128
- #define TX_RING_BYTES		(sizeof(struct macb_dma_desc) * TX_RING_SIZE)
- 
-@@ -466,7 +463,7 @@ static int macb_rx_frame(struct macb *bp, unsigned int first_frag,
- {
- 	unsigned int len;
- 	unsigned int frag;
--	unsigned int offset = 0;
-+	unsigned int offset;
- 	struct sk_buff *skb;
- 	struct macb_dma_desc *desc;
- 
-@@ -477,7 +474,16 @@ static int macb_rx_frame(struct macb *bp, unsigned int first_frag,
- 		macb_rx_ring_wrap(first_frag),
- 		macb_rx_ring_wrap(last_frag), len);
- 
--	skb = netdev_alloc_skb(bp->dev, len + RX_OFFSET);
-+	/*
-+	 * The ethernet header starts NET_IP_ALIGN bytes into the
-+	 * first buffer. Since the header is 14 bytes, this makes the
-+	 * payload word-aligned.
-+	 *
-+	 * Instead of calling skb_reserve(NET_IP_ALIGN), we just copy
-+	 * the two padding bytes into the skb so that we avoid hitting
-+	 * the slowpath in memcpy(), and pull them off afterwards.
-+	 */
-+	skb = netdev_alloc_skb(bp->dev, len + NET_IP_ALIGN);
- 	if (!skb) {
- 		bp->stats.rx_dropped++;
- 		for (frag = first_frag; ; frag++) {
-@@ -493,7 +499,8 @@ static int macb_rx_frame(struct macb *bp, unsigned int first_frag,
- 		return 1;
- 	}
- 
--	skb_reserve(skb, RX_OFFSET);
-+	offset = 0;
-+	len += NET_IP_ALIGN;
- 	skb_checksum_none_assert(skb);
- 	skb_put(skb, len);
- 
-@@ -517,10 +524,11 @@ static int macb_rx_frame(struct macb *bp, unsigned int first_frag,
- 	/* Make descriptor updates visible to hardware */
- 	wmb();
- 
-+	__skb_pull(skb, NET_IP_ALIGN);
- 	skb->protocol = eth_type_trans(skb, bp->dev);
- 
- 	bp->stats.rx_packets++;
--	bp->stats.rx_bytes += len;
-+	bp->stats.rx_bytes += skb->len;
- 	netdev_vdbg(bp->dev, "received skb of length %u, csum: %08x\n",
- 		   skb->len, skb->csum);
- 	netif_receive_skb(skb);
-@@ -985,6 +993,7 @@ static void macb_init_hw(struct macb *bp)
- 	__macb_set_hwaddr(bp);
- 
- 	config = macb_mdc_clk_div(bp);
-+	config |= MACB_BF(RBOF, NET_IP_ALIGN);	/* Make eth data aligned */
- 	config |= MACB_BIT(PAE);		/* PAuse Enable */
- 	config |= MACB_BIT(DRFCS);		/* Discard Rx FCS */
- 	config |= MACB_BIT(BIG);		/* Receive oversized frames */
--- 
-1.7.10
+Regards
+Afzal
+
+[1] http://marc.info/?l=linux-omap&m=134683495407871&w=2
