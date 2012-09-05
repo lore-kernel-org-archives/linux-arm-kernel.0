@@ -1,18 +1,18 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 5 Sep 2012 16:46:26 +0200
+Date: Wed, 5 Sep 2012 16:46:43 +0200
 Subject: [PATCH] ARM: omap_hwmod: Fix up resource names when booted with
  devicetree
 In-Reply-To: <50476143.3010509@ti.com>
 References: <1345730049-12675-1-git-send-email-peter.ujfalusi@ti.com>
  <alpine.DEB.2.00.1208241536290.25436@utopia.booyaka.com>
  <5037A9CE.1080809@ti.com> <50476143.3010509@ti.com>
-Message-ID: <504765C2.3010600@ti.com>
+Message-ID: <504765D3.5070103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Peter,
 
-I will just slighty change the subject since it is a omap_device.c patch and not an omap_hwmod.c one.
+I will just slighty change the subject since it is an omap_device.c patch and not an omap_hwmod.c one.
 
 ARM: OMAP: omap_device: Fix up resource names when booted with devicetree
 
