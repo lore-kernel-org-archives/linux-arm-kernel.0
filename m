@@ -1,39 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 5 Sep 2012 22:01:37 +0100
-Subject: [PATCH v2 20/31] arm64: User access library function
-In-Reply-To: <20120905191312.GH24085@n2100.arm.linux.org.uk>
-References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
- <1344966752-16102-21-git-send-email-catalin.marinas@arm.com>
- <201208151449.54834.arnd@arndb.de>
- <20120905191312.GH24085@n2100.arm.linux.org.uk>
-Message-ID: <20120905210135.GA87548@MacBook-Pro.local>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed,  5 Sep 2012 14:03:31 -0700
+Subject: [PATCH] ARM: Fix semihosting Kconfig text
+Message-ID: <1346879011-7765-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2012 at 08:13:12PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Aug 15, 2012 at 02:49:54PM +0000, Arnd Bergmann wrote:
-> > It's fairly unusual to have out of line get_user/put_user functions.
-> > What is the reason for this, other than copying from ARM?
-> 
-> Actually, we never used to out of line on ARM, and then I experimented,
-> and found there was a net benefit - not only in code size but also
-> there appeared to be a performance benefit by out of lining them.
+It seems we were missing some text in the title for the
+semihosting DEBUG_LL option. Add in the "/O" and fix up some
+minor typos in the help text.
 
-There are indeed a few KB gain in code size but that's probably coming
-from the exception table since otherwise you just replace a bl with
-ldrt. It depends on what the compiler does as well, the arm code has
-some carefully chosen registers when calling the __get_user_x function.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+---
+ arch/arm/Kconfig.debug | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-If you do the access_ok inline and the __get_user_x separately, the size
-increase is even greater (at least in the arm64 case it can get to over
-20KB). I think x86 does the access_ok check out of line.
-
-For now I changed the arm64 code to inline as most of the other
-architectures but I'll revisit this when I get some hardware. Another
-thing to be optimised is the size of the exception table entry. I use
-two .quad declarations for the fault address and branch but I guess they
-could be made relative to PAGE_OFFSET and only use .long (or some
-prel31).
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index f15f82b..e968a52 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -356,15 +356,15 @@ choice
+ 		  is nothing connected to read from the DCC.
+ 
+ 	config DEBUG_SEMIHOSTING
+-		bool "Kernel low-level debug output via semihosting I"
++		bool "Kernel low-level debug output via semihosting I/O"
+ 		help
+ 		  Semihosting enables code running on an ARM target to use
+ 		  the I/O facilities on a host debugger/emulator through a
+-		  simple SVC calls. The host debugger or emulator must have
++		  simple SVC call. The host debugger or emulator must have
+ 		  semihosting enabled for the special svc call to be trapped
+ 		  otherwise the kernel will crash.
+ 
+-		  This is known to work with OpenOCD, as wellas
++		  This is known to work with OpenOCD, as well as
+ 		  ARM's Fast Models, or any other controlling environment
+ 		  that implements semihosting.
+ 
 -- 
-Catalin
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
