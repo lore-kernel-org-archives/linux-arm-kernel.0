@@ -1,66 +1,110 @@
 From: loic.pallardy-ext@stericsson.com (Loic Pallardy)
-Date: Wed, 5 Sep 2012 11:58:56 +0200
-Subject: [PATCH 00/17] Add ST-Ericsson U9540 support
-Message-ID: <1346839153-6465-1-git-send-email-loic.pallardy-ext@stericsson.com>
+Date: Wed, 5 Sep 2012 11:58:58 +0200
+Subject: [PATCH 02/17] arm: ux500: add ccu9540 board support
+In-Reply-To: <1346839153-6465-1-git-send-email-loic.pallardy-ext@stericsson.com>
+References: <1346839153-6465-1-git-send-email-loic.pallardy-ext@stericsson.com>
+Message-ID: <1346839153-6465-3-git-send-email-loic.pallardy-ext@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Upgrade existing mop500 definition to support new ccu9540
+board.
 
-The following patch series contains board files and prcmu driver modifications
-to support ST-Ericsson U9540 chipset and CCU9540 board configuration.
-It includes:
- - mfd db8500-prmcu: adaptation to support new chipset
- - mfd dbx540-prmcu: creation for u9540 platform
- - arm ux500: add u9540 chipset definition
+Signed-off-by: Loic Pallardy <loic.pallardy@stericsson.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500-sdi.c | 12 ++++++++++++
+ arch/arm/mach-ux500/board-mop500.c     | 35 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-ux500/board-mop500.h     |  1 +
+ 3 files changed, 48 insertions(+)
 
-Best regards,
-Loic
-
-Loic Pallardy (17):
-  arm: ux500: add u9540 pin configuration
-  arm: ux500: add ccu9540 board support
-  arm: ux500: Create board-specific IRQ init callback
-  mfd: dbx500-prcmu: Introduce TCDM mapping struct
-  mfd: dbx500-prcmu: Handle TCDM mapping
-  arm: ux500: Add u9540 PRCMU TCDM configuration
-  mfd: prcmu: configurable tcdm base address
-  arm: ux500: update DB internal irq nb
-  mfd: prcmu: add db9540 support
-  mfd: prcmu: dbx500-prmcu creation
-  mfd: pcrmu: create common header file for legacy mailbox
-  mfd: prcmu: make fw_project_name generic
-  mfd: prcmu: make legacy mailbox services configurable
-  mfd: db8500-prcmu: use db8500 legacy services
-  mfd: dbx540-prcmu creation
-  arm: ux500: add dbx540 prcmu platform data
-  mfd: db8500-prcmu: activate dbx540-prcmu driver
-
- arch/arm/mach-ux500/board-mop500-pins.c    |  200 ++
- arch/arm/mach-ux500/board-mop500-sdi.c     |   12 +
- arch/arm/mach-ux500/board-mop500.c         |   67 +-
- arch/arm/mach-ux500/board-mop500.h         |    2 +
- arch/arm/mach-ux500/cpu-db8500.c           |   18 +-
- arch/arm/mach-ux500/cpu.c                  |    4 +-
- arch/arm/mach-ux500/include/mach/devices.h |    6 +
- arch/arm/mach-ux500/include/mach/irqs.h    |    2 +-
- drivers/mfd/Kconfig                        |   21 +
- drivers/mfd/Makefile                       |    2 +
- drivers/mfd/db8500-prcmu.c                 | 1161 ++++++------
- drivers/mfd/dbx500-prcmu-regs.h            |    1 +
- drivers/mfd/dbx500-prcmu.c                 |  815 ++++++++
- drivers/mfd/dbx500-prcmu.h                 |  465 +++++
- drivers/mfd/dbx540-prcmu-regs.h            |  106 ++
- drivers/mfd/dbx540-prcmu.c                 | 2807 ++++++++++++++++++++++++++++
- include/linux/mfd/db8500-prcmu.h           |  274 +--
- include/linux/mfd/dbx500-prcmu.h           |  593 +++---
- include/linux/mfd/dbx540-prcmu.h           |   96 +
- 19 files changed, 5455 insertions(+), 1197 deletions(-)
- create mode 100644 drivers/mfd/dbx500-prcmu.c
- create mode 100644 drivers/mfd/dbx500-prcmu.h
- create mode 100644 drivers/mfd/dbx540-prcmu-regs.h
- create mode 100644 drivers/mfd/dbx540-prcmu.c
- create mode 100644 include/linux/mfd/dbx540-prcmu.h
-
+diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
+index 18ff781..4fd21fe 100644
+--- a/arch/arm/mach-ux500/board-mop500-sdi.c
++++ b/arch/arm/mach-ux500/board-mop500-sdi.c
+@@ -255,6 +255,18 @@ void __init mop500_sdi_init(struct device *parent)
+ 	 */
+ }
+ 
++void __init ccu9540_sdi_init(struct device *parent)
++{
++	/* On-board eMMC */
++	db8500_add_sdi4(parent, &mop500_sdi4_data, U8500_SDI_V2_PERIPHID);
++
++	/*
++	 * On boards with the TC35892 GPIO expander, sdi0 will finally
++	 * be added when the TC35892 initializes and calls
++	 * mop500_sdi_tc35892_init() above.
++	 */
++}
++
+ void __init snowball_sdi_init(struct device *parent)
+ {
+ 	/* On Snowball MMC_CAP_SD_HIGHSPEED isn't supported (Hardware issue?) */
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index fe1ff85..fa75f95 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -691,6 +691,30 @@ static void __init hrefv60_init_machine(void)
+ 	mop500_uib_init();
+ }
+ 
++
++static void __init u9540_init_machine(void)
++{
++	struct device *parent;
++	int i;
++
++	ccu9540_pins_init();
++
++	parent = u8500_init_devices(&ab8500_platdata);
++
++	for (i = 0; i < ARRAY_SIZE(mop500_platform_devs); i++)
++		mop500_platform_devs[i]->dev.parent = parent;
++
++	platform_add_devices(mop500_platform_devs,
++				ARRAY_SIZE(mop500_platform_devs));
++	mop500_i2c_init(parent);
++	ccu9540_sdi_init(parent);
++	mop500_msp_init(parent);
++	mop500_uart_init(parent);
++
++	/* This board has full regulator constraints */
++	regulator_has_full_constraints();
++}
++
+ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
+ 	/* Maintainer: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> */
+ 	.atag_offset	= 0x100,
+@@ -727,6 +751,17 @@ MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
+ 	.init_late	= ux500_init_late,
+ MACHINE_END
+ 
++MACHINE_START(U9540, "ST-Ericsson 9540 platform")
++	.atag_offset	= 0x100,
++	.map_io		= u8500_map_io,
++	.nr_irqs	= UX500_NR_IRQS,
++	.init_irq	= ux500_init_irq,
++	.timer		= &ux500_timer,
++	.handle_irq	= gic_handle_irq,
++	.init_machine	= u9540_init_machine,
++	.init_late	= ux500_init_late,
++MACHINE_END
++
+ #ifdef CONFIG_MACH_UX500_DT
+ 
+ struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+index b696ab0..e5b2d3c 100644
+--- a/arch/arm/mach-ux500/board-mop500.h
++++ b/arch/arm/mach-ux500/board-mop500.h
+@@ -84,6 +84,7 @@ extern struct mmci_platform_data mop500_sdi4_data;
+ extern struct arm_pmu_platdata db8500_pmu_platdata;
+ 
+ extern void mop500_sdi_init(struct device *parent);
++extern void ccu9540_sdi_init(struct device *parent);
+ extern void snowball_sdi_init(struct device *parent);
+ extern void hrefv60_sdi_init(struct device *parent);
+ extern void mop500_sdi_tc35892_init(struct device *parent);
 -- 
 1.7.11.1
