@@ -1,139 +1,36 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Wed, 5 Sep 2012 11:11:23 +0200
-Subject: [PATCH] ARM : i.MX27 : split code for allocation of ressources of
- camera and eMMA
-In-Reply-To: <50471187.3040809@gmail.com>
-References: <1346763398-13536-1-git-send-email-gcembed@gmail.com>
- <CACKLOr0PO1jbxrfRoEwEAGFNkNkAFUA-oB2vLZpw1kDxEYPBQw@mail.gmail.com>
- <5047013E.30508@gmail.com>
- <CACKLOr1RipM3QVJBaTjXHFotqSMdrCsWLkBsgiiuauTWpxR6EQ@mail.gmail.com>
- <50471187.3040809@gmail.com>
-Message-ID: <CACKLOr0=TccMNoQV-LfkeBrCN5=0E8eqTEaT7PRk-KAv_mQ5RQ@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 5 Sep 2012 09:15:28 +0000
+Subject: [PATCH v2 1/8] ARM/dts: OMAP2: Add McBSP entries for OMAP2420
+ and OMAP2430 SoC
+In-Reply-To: <50470C1E.7090300@ti.com>
+References: <1346247067-9632-1-git-send-email-peter.ujfalusi@ti.com>
+ <1346247067-9632-2-git-send-email-peter.ujfalusi@ti.com>
+ <5044C2DD.5000705@ti.com> <504578B3.3090804@ti.com> <5045D557.30404@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EAA7C99@DBDE01.ent.ti.com>
+ <50470C1E.7090300@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EAA8014@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 September 2012 10:47, Ga?tan Carlier <gcembed@gmail.com> wrote:
-> On 09/05/2012 10:22 AM, javier Martin wrote:
->>
->> On 5 September 2012 09:37, Ga?tan Carlier <gcembed@gmail.com> wrote:
->>>
->>> Hi Javier,
->>> This is because I will send a patch to add support of eMMA-PP. eMMA-PrP
->>> is
->>> not only used for soc-camera. It can also be used as stand-alone driver
->>> and
->>> now to be able to use eMMA-PrP module, IMX_HAVE_PLATFORM_MX2_CAMERA must
->>> be
->>> set.
->>
->>
->> Do you mean the following stand-alone driver I submitted some time
->> ago? Are you working on some improvements to it?
->>
->> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=drivers/media/video/mx2_emmaprp.c;h=5f8a6f5b98f91c3af4e1bdbd06654e7b496d8d65;hb=HEAD
->
-> yes
->
->>
->> This driver can be used without applying your patch. Please take a
->> look at the following patch which is pending to get merged in
->> linux-media tree:
->> https://patchwork.kernel.org/patch/1347921/
->>
->>
->>> And if I follow this logic, I have to put declaration of eMMA-PP with
->>> imx-fb
->>> and eMMA-PP can only be enabled if IMX_HAVE_PLATFORM_IMX_FB.
->>> Of course, eMMA-PrP is almost always used with soc-camera and eMMA-PP
->>> with
->>> LCDC (imx-fb) but eMMA can be used to do HW accelarated colorspace
->>> conversion.
->>
->>
->> Agree, there is already one driver supporting this feature.
->>
->>> It is not a problem for me to keep eMMA-PrP and mx2-camera together. It
->>> was
->>> just to have a more independant eMMA driver.
->>
->>
->> I won't oppose to it, for me it is just aesthetic. However, you must
->> do it properly without breaking existing boards such as Visstrim_M10.
->
-> Ok, I missed your patch in mailing-list and I work with linux-next
-> (20120824) so I didn't know that my patch would break yours. Sorry.
->
->>
->>> For the Visstrim_M10 board, I don't think that it is needed to set
->>> IMX_HAVE_PLATFORM_MX2_EMMA because there is no reference to m2m-emmaprp
->>> and
->>> mx2-camera embeds handling of eMMA-PrP without using eMMA-PrP driver.
->>
->>
->> The following patch was sent to the list in Agust the 20th and will be
->> merged in the linux-media tree. This patch does reference m2m-emmaprp
->> in Visstrim_M10
->> https://patchwork.kernel.org/patch/1347921/
->>
->> So, please, since you have to fix the wrong chunk and have to send a
->> v2 anyways I strongly encourage you to add the flag
->> IMX_HAVE_PLATFORM_MX2_EMMA to Visstrim_M10. This way nothing will be
->> broken no matter your patch gets merged after or before mine.
->
-> What do you mean by "wrong chunk" ?
+On Wed, Sep 05, 2012 at 13:53:58, Ujfalusi, Peter wrote:
+> Hi,
+> 
+> On 09/05/2012 09:11 AM, Hiremath, Vaibhav wrote:
+> >> Not yet, but we discussed that with Peter and since he does have these
+> >> patches for DT, he'll be able to test your series with the McBSP changes.
+> >>
+> > 
+> > Great.
+> 
+> With his series and your patch for omap-hwmod audio was probing and working on
+> OMAP3/4/5 without issues.
+> 
+Peter,
+Care to provide your Tested-By??
+
+Benoit,
+Can we merge this patch now?
 
 
-Your patch does not apply cleanly to linux-next due to the following chunk:
-
- diff --git a/arch/arm/mach-imx/devices-imx27.h
-b/arch/arm/mach-imx/devices-imx27.h
-index 0482293..d8eb4a0 100644
---- a/arch/arm/mach-imx/devices-imx27.h
-+++ b/arch/arm/mach-imx/devices-imx27.h
-@@ -54,8 +54,10 @@ extern const struct imx_imx_uart_1irq_data
-imx27_imx_uart_data[];
- extern const struct imx_mx2_camera_data imx27_mx2_camera_data;
- #define imx27_add_mx2_camera(pdata)    \
-        imx_add_mx2_camera(&imx27_mx2_camera_data, pdata)
-+
-+extern const struct imx_mx2_emma_data imx27_mx2_emmaprp_data;
- #define imx27_add_mx2_emmaprp()        \
--       imx_add_mx2_emmaprp(&imx27_mx2_camera_data)
-+       imx_add_mx2_emmaprp(&imx27_mx2_emmaprp_data)
-
-
->>
->>> It seems that eMMA-PrP embeded in mx2camera handles more case than
->>> stand-alone eMMA-PrP driver. Maybe eMMA-PrP driver needs some review to
->>> handle all In/Out image formats ?
->>
->>
->> eMMa-PrP is currently used in two drivers:
->>
->> 1.
->> http://git.linuxtv.org/media_tree.git/blob/refs/heads/staging/for_v3.7:/drivers/media/platform/soc_camera/mx2_camera.c
->> Where it is used as a substitute to a DMA that moves data between the
->> CSI and RAM apart from providing more features like format conversion,
->> etc... This is a soc_camera video capture driver.
->>
->> 2.
->> http://git.linuxtv.org/media_tree.git/blob/refs/heads/staging/for_v3.7:/drivers/media/platform/mx2_emmaprp.c
->> This is a stand-alone mem2mem v4l2 driver that can get YUYV 422 in the
->> input and transform it to YUV 420. Of course, the driver can be
->> extended to support more kinds of conversions.
->>
->> Regards.
->>
-> Regards,
-> Ga?tan.
-
-
-
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Thanks,
+Vaibhav
