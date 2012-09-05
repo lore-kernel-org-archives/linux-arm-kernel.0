@@ -1,49 +1,18 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 5 Sep 2012 09:29:36 +0530
-Subject: [PATCH v2 3/5] ARM: Exynos4: Add OF compatibility lookups for
- Exynos4 i2c adapters
-In-Reply-To: <1346748609-11115-4-git-send-email-t.figa@samsung.com>
-References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
- <1346748609-11115-4-git-send-email-t.figa@samsung.com>
-Message-ID: <CAJuYYwR3GEHjQ9UVUW_+ycDnqGHR2Wt9J0m2vQnqHi-UPvNZpQ@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 5 Sep 2012 12:01:26 +0800
+Subject: [PATCH 1/3] ASoC: Davinci: McASP: add support new McASP IP Variant
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EA718B0@DBDE01.ent.ti.com>
+References: <1346417459-30042-1-git-send-email-gururaja.hebbar@ti.com>
+ <1346417459-30042-2-git-send-email-gururaja.hebbar@ti.com>
+ <20120901004443.GB21451@opensource.wolfsonmicro.com>
+ <1BAFE6F6C881BF42822005164F1491C33EA718B0@DBDE01.ent.ti.com>
+Message-ID: <20120905040125.GA9388@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 September 2012 14:20, Tomasz Figa <t.figa@samsung.com> wrote:
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/mach-exynos4-dt.c | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
+On Mon, Sep 03, 2012 at 06:57:22AM +0000, Hebbar, Gururaja wrote:
 
-Acked-by: Thomas Abraham <thomas.abraham@linaro.org>
+> Ok I will update this. Since 3/3 is already accepted & I don?t see any reviews
+> for 2/3, I will only resend this patch (1/3). Is it ok?
 
->
-> diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
-> index 8dad4ec..5f805b4 100644
-> --- a/arch/arm/mach-exynos/mach-exynos4-dt.c
-> +++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
-> @@ -55,6 +55,20 @@ static const struct of_dev_auxdata exynos4_auxdata_lookup[] __initconst = {
->                                 "exynos4-sdhci.3", NULL),
->         OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(0),
->                                 "s3c2440-i2c.0", NULL),
-> +       OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(1),
-> +                               "s3c2440-i2c.1", NULL),
-> +       OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(2),
-> +                               "s3c2440-i2c.2", NULL),
-> +       OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(3),
-> +                               "s3c2440-i2c.3", NULL),
-> +       OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(4),
-> +                               "s3c2440-i2c.4", NULL),
-> +       OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(5),
-> +                               "s3c2440-i2c.5", NULL),
-> +       OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(6),
-> +                               "s3c2440-i2c.6", NULL),
-> +       OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(7),
-> +                               "s3c2440-i2c.7", NULL),
->         OF_DEV_AUXDATA("samsung,exynos4210-spi", EXYNOS4_PA_SPI0,
->                                 "exynos4210-spi.0", NULL),
->         OF_DEV_AUXDATA("samsung,exynos4210-spi", EXYNOS4_PA_SPI1,
-> --
-> 1.7.12
->
+Yes.
