@@ -1,268 +1,151 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Wed, 5 Sep 2012 18:07:38 +0530
-Subject: [PATCH v8 3/3] ARM: OMAP2+: gpmc: minimal driver support
-In-Reply-To: <cover.1346846464.git.afzal@ti.com>
-References: <cover.1346846464.git.afzal@ti.com>
-Message-ID: <da87aaa4d52c94e755459b4aecdd2ddb62898488.1346846464.git.afzal@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 5 Sep 2012 14:39:03 +0200
+Subject: [st-ericsson] [PATCH 15/17] mfd: dbx540-prcmu creation
+In-Reply-To: <201209051210.04880.arnd@arndb.de>
+References: <1346839153-6465-1-git-send-email-loic.pallardy-ext@stericsson.com>
+ <1346839153-6465-16-git-send-email-loic.pallardy-ext@stericsson.com>
+ <201209051210.04880.arnd@arndb.de>
+Message-ID: <CACRpkdavDUEvJukHfSFqG8-ueDDo+86SzoV1SA0ZdWghuUxTPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a minimal driver out of gpmc code.
-Responsibilities handled by earlier gpmc
-initialization is now achieved in probe.
+On Wed, Sep 5, 2012 at 2:10 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 05 September 2012, Loic Pallardy wrote:
+>>
+>> Signed-off-by: Loic Pallardy <loic.pallardy@stericsson.com>
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> This makes me doubt the quality of Linus' Ack on other patches...
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/mach-omap2/gpmc.c |  171 +++++++++++++++++++++++++++++++-------------
- 1 files changed, 122 insertions(+), 49 deletions(-)
+Basically the rationale is that to me the driver looks better after these
+patches than before. But the basic problem is that I've read
+the driver so much internally that I am already unable to see
+some of it's shortcomings. (And a fair share of these comments
+would apply to the already in-tree driver as well.) And we really
+need help to figure out how to handle this beast. So fresh reviews
+like this are much, much appreciated....
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index c45f185..4ae2bb8 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -24,6 +24,7 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/interrupt.h>
-+#include <linux/platform_device.h>
- 
- #include <asm/mach-types.h>
- 
-@@ -85,6 +86,12 @@
- #define ENABLE_PREFETCH		(0x1 << 7)
- #define DMA_MPU_MODE		2
- 
-+#define	GPMC_REVISION_MAJOR(l)		((l >> 4) & 0xf)
-+#define	GPMC_REVISION_MINOR(l)		(l & 0xf)
-+
-+#define	GPMC_HAS_WR_ACCESS		0x1
-+#define	GPMC_HAS_WR_DATA_MUX_BUS	0x2
-+
- /* XXX: Only NAND irq has been considered,currently these are the only ones used
-  */
- #define	GPMC_NR_IRQ		2
-@@ -130,7 +137,10 @@ static struct resource	gpmc_cs_mem[GPMC_CS_NUM];
- static DEFINE_SPINLOCK(gpmc_mem_lock);
- static unsigned int gpmc_cs_map;	/* flag for cs which are initialized */
- static int gpmc_ecc_used = -EINVAL;	/* cs using ecc engine */
--
-+static struct device *gpmc_dev;
-+static int gpmc_irq;
-+static resource_size_t phys_base, mem_size;
-+static unsigned gpmc_capability;
- static void __iomem *gpmc_base;
- 
- static struct clk *gpmc_l3_clk;
-@@ -320,10 +330,10 @@ int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t)
- 
- 	GPMC_SET_ONE(GPMC_CS_CONFIG5, 24, 27, page_burst_access);
- 
--	if (cpu_is_omap34xx()) {
-+	if (gpmc_capability & GPMC_HAS_WR_DATA_MUX_BUS)
- 		GPMC_SET_ONE(GPMC_CS_CONFIG6, 16, 19, wr_data_mux_bus);
-+	if (gpmc_capability & GPMC_HAS_WR_ACCESS)
- 		GPMC_SET_ONE(GPMC_CS_CONFIG6, 24, 28, wr_access);
--	}
- 
- 	/* caller is expected to have initialized CONFIG1 to cover
- 	 * at least sync vs async
-@@ -433,6 +443,19 @@ static int gpmc_cs_insert_mem(int cs, unsigned long base, unsigned long size)
- 	return r;
- }
- 
-+static int gpmc_cs_delete_mem(int cs)
-+{
-+	struct resource	*res = &gpmc_cs_mem[cs];
-+	int r;
-+
-+	spin_lock(&gpmc_mem_lock);
-+	r = release_resource(&gpmc_cs_mem[cs]);
-+	res->start = res->end = 0;
-+	spin_unlock(&gpmc_mem_lock);
-+
-+	return r;
-+}
-+
- int gpmc_cs_request(int cs, unsigned long size, unsigned long *base)
- {
- 	struct resource *res = &gpmc_cs_mem[cs];
-@@ -769,7 +792,7 @@ static void gpmc_irq_noop(struct irq_data *data) { }
- 
- static unsigned int gpmc_irq_noop_ret(struct irq_data *data) { return 0; }
- 
--static int gpmc_setup_irq(int gpmc_irq)
-+static int gpmc_setup_irq(void)
- {
- 	int i;
- 	u32 regval;
-@@ -813,7 +836,37 @@ static int gpmc_setup_irq(int gpmc_irq)
- 	return request_irq(gpmc_irq, gpmc_handle_irq, 0, "gpmc", NULL);
- }
- 
--static void __init gpmc_mem_init(void)
-+static __exit int gpmc_free_irq(void)
-+{
-+	int i;
-+
-+	if (gpmc_irq)
-+		free_irq(gpmc_irq, NULL);
-+
-+	for (i = 0; i < GPMC_NR_IRQ; i++) {
-+		irq_set_handler(gpmc_client_irq[i].irq, NULL);
-+		irq_set_chip(gpmc_client_irq[i].irq, &no_irq_chip);
-+		irq_modify_status(gpmc_client_irq[i].irq, 0, 0);
-+	}
-+
-+	irq_free_descs(gpmc_irq_start, GPMC_NR_IRQ);
-+
-+	return 0;
-+}
-+
-+static void __devexit gpmc_mem_exit(void)
-+{
-+	int cs;
-+
-+	for (cs = 0; cs < GPMC_CS_NUM; cs++) {
-+		if (!gpmc_cs_mem_enabled(cs))
-+			continue;
-+		gpmc_cs_delete_mem(cs);
-+	}
-+
-+}
-+
-+static void __devinit gpmc_mem_init(void)
- {
- 	int cs;
- 	unsigned long boot_rom_space = 0;
-@@ -840,65 +893,85 @@ static void __init gpmc_mem_init(void)
- 	}
- }
- 
--static int __init gpmc_init(void)
-+static __devinit int gpmc_probe(struct platform_device *pdev)
- {
- 	u32 l;
--	int ret = -EINVAL;
--	int gpmc_irq;
--	char *ck = NULL;
--
--	if (cpu_is_omap24xx()) {
--		ck = "core_l3_ck";
--		if (cpu_is_omap2420())
--			l = OMAP2420_GPMC_BASE;
--		else
--			l = OMAP34XX_GPMC_BASE;
--		gpmc_irq = 20 + OMAP_INTC_START;
--	} else if (cpu_is_omap34xx()) {
--		ck = "gpmc_fck";
--		l = OMAP34XX_GPMC_BASE;
--		gpmc_irq = 20 + OMAP_INTC_START;
--	} else if (cpu_is_omap44xx() || soc_is_omap54xx()) {
--		/* Base address and irq number are same for OMAP4/5 */
--		ck = "gpmc_ck";
--		l = OMAP44XX_GPMC_BASE;
--		gpmc_irq = 20 + OMAP44XX_IRQ_GIC_START;
--	}
-+	struct resource *res;
- 
--	if (WARN_ON(!ck))
--		return ret;
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (res == NULL)
-+		return -ENOENT;
- 
--	gpmc_l3_clk = clk_get(NULL, ck);
--	if (IS_ERR(gpmc_l3_clk)) {
--		printk(KERN_ERR "Could not get GPMC clock %s\n", ck);
--		BUG();
--	}
-+	phys_base = res->start;
-+	mem_size = resource_size(res);
- 
--	gpmc_base = ioremap(l, SZ_4K);
-+	gpmc_base = devm_request_and_ioremap(&pdev->dev, res);
- 	if (!gpmc_base) {
--		clk_put(gpmc_l3_clk);
--		printk(KERN_ERR "Could not get GPMC register memory\n");
--		BUG();
-+		dev_err(&pdev->dev, "error: request memory / ioremap\n");
-+		return -EADDRNOTAVAIL;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-+	if (res == NULL)
-+		dev_warn(&pdev->dev, "Failed to get resource: irq\n");
-+	else
-+		gpmc_irq = res->start;
-+
-+	gpmc_l3_clk = clk_get(&pdev->dev, "fck");
-+	if (IS_ERR(gpmc_l3_clk)) {
-+		dev_err(&pdev->dev, "error: clk_get\n");
-+		gpmc_irq = 0;
-+		return PTR_ERR(gpmc_l3_clk);
- 	}
- 
- 	clk_enable(gpmc_l3_clk);
- 
-+	gpmc_dev = &pdev->dev;
-+
- 	l = gpmc_read_reg(GPMC_REVISION);
--	printk(KERN_INFO "GPMC revision %d.%d\n", (l >> 4) & 0x0f, l & 0x0f);
--	/* Set smart idle mode and automatic L3 clock gating */
--	l = gpmc_read_reg(GPMC_SYSCONFIG);
--	l &= 0x03 << 3;
--	l |= (0x02 << 3) | (1 << 0);
--	gpmc_write_reg(GPMC_SYSCONFIG, l);
-+	if (GPMC_REVISION_MAJOR(l) > 0x4)
-+		gpmc_capability = GPMC_HAS_WR_ACCESS | GPMC_HAS_WR_DATA_MUX_BUS;
-+	dev_info(gpmc_dev, "GPMC revision %d.%d\n",
-+				GPMC_REVISION_MAJOR(l), GPMC_REVISION_MINOR(l));
-+
- 	gpmc_mem_init();
- 
--	ret = gpmc_setup_irq(gpmc_irq);
--	if (ret)
--		pr_err("gpmc: irq-%d could not claim: err %d\n",
--						gpmc_irq, ret);
--	return ret;
-+	if (IS_ERR_VALUE(gpmc_setup_irq()))
-+		dev_warn(gpmc_dev, "gpmc_setup_irq failed\n");
-+
-+	return 0;
-+}
-+
-+static __exit int gpmc_remove(struct platform_device *pdev)
-+{
-+	gpmc_free_irq();
-+	gpmc_mem_exit();
-+	gpmc_dev = NULL;
-+	return 0;
-+}
-+
-+static struct platform_driver gpmc_driver = {
-+	.probe		= gpmc_probe,
-+	.remove		= __devexit_p(gpmc_remove),
-+	.driver		= {
-+		.name	= DEVICE_NAME,
-+		.owner	= THIS_MODULE,
-+	},
-+};
-+
-+static __init int gpmc_init(void)
-+{
-+	return platform_driver_register(&gpmc_driver);
-+}
-+
-+static __exit void gpmc_exit(void)
-+{
-+	platform_driver_unregister(&gpmc_driver);
-+
- }
-+
- postcore_initcall(gpmc_init);
-+module_exit(gpmc_exit);
- 
- static int __init omap_gpmc_init(void)
- {
--- 
-1.7.1
+>> +#define PRCM_PLLDSITV_FREQ         (_PRCMU_BASE + 0x500)
+>> +#define PRCM_PLLDSITV_ENABLE       (_PRCMU_BASE + 0x504)
+>> +#define PRCM_PLLDSITV_LOCKP        (_PRCMU_BASE + 0x508)
+>> +#define PRCM_PLLDSILCD_FREQ        (_PRCMU_BASE + 0x290)
+>> +#define PRCM_PLLDSILCD_ENABLE      (_PRCMU_BASE + 0x294)
+>> +#define PRCM_PLLDSILCD_LOCKP       (_PRCMU_BASE + 0x298)
+>
+> Please get rid of the global _PRCMU_BASE variable, at least for new
+> code. Instead, please use ioremap() of the resources passed in the
+> device tree, like we do for all other drivers.
+
+Sounds reasonable, but historically we needed to write and control the
+PRCMU before ioremap() is available. (Like at irq_init() time.)
+
+If I'm not mistaken this has been fixed now, so what you say is true.
+
+>> +#define CLK_MGT_ENTRY(_name, _branch, _clk38div)[PRCMU_##_name] = \
+>> +     { (PRCM_##_name##_MGT), 0 , _branch, _clk38div}
+>> +static struct clk_mgt clk_mgt[PRCMU_NUM_REG_CLOCKS] = {
+>> +     CLK_MGT_ENTRY(SGACLK, PLL_DIV, false),
+>> +     CLK_MGT_ENTRY(UARTCLK, PLL_FIX, true),
+>(...)
+> Another option would be to put the table into the device tree so you
+> can abstract the differences between the two prmu versions more easily.
+
+This falls back to the debate of whether SoC properties shall be
+heavily encoded into the device tree, a point of contention. Doing
+that may make the driver even harder to read than these macros,
+like you need the driver, the device tree and the data sheet and
+read all three simultaneously to understand what is going on.
+
+>> +/**
+>> + * replug_cpu1 - Power gate ON CPU1 for U9540
+>> + * * void
+>> + * * Returns:
+>> + */
+>> +static int replug_cpu1(void)
+>> +{
+>> +     int r = 0;
+>> +#ifdef CONFIG_UX500_ROMCODE_SHARED_MUTEX
+>> +     struct upap_req req;
+>> +     struct upap_ack ack;
+>
+> Can you move these to a separate cpu-hotplug file?
+
+Isn't this a more general comment such as that we should distribute
+out the code in the PRCMU out into the device drivers? I think you or
+someone else said that at some point, and that would then go for
+all of them I think, then the PRCMU driver would just be a MFD
+hub and mailbox/regmap provider in the end.
+
+How to get there is another question...
+
+>> +static unsigned long dbx540_prcmu_clock_rate(u8 clock)
+>> +{
+>> +     if (clock < PRCMU_NUM_REG_CLOCKS)
+>> +             return clock_rate(clock);
+>> +     else if (clock == PRCMU_TIMCLK)
+>> +             return ROOT_CLOCK_RATE / 16;
+>> +     else if (clock == PRCMU_SYSCLK)
+>> +             return ROOT_CLOCK_RATE;
+>> +     else if (clock == PRCMU_PLLSOC0)
+>> +             return pll_rate(PRCM_PLLSOC0_FREQ, ROOT_CLOCK_RATE, PLL_RAW);
+>> +     else if (clock == PRCMU_PLLSOC1)
+>> +             return pll_rate(PRCM_PLLSOC1_FREQ, ROOT_CLOCK_RATE, PLL_RAW);
+>> +     else if (clock == PRCMU_PLLDDR)
+>> +             return pll_rate(PRCM_PLLDDR_FREQ, ROOT_CLOCK_RATE, PLL_RAW);
+>> +     else if (clock == PRCMU_PLLDSI)
+>> +             return pll_rate(PRCM_PLLDSITV_FREQ, clock_rate(PRCMU_HDMICLK),
+>> +                     PLL_RAW);
+>> +     else if (clock == PRCMU_ARMSS)
+>> +             return KHZ_TO_HZ(armss_rate());
+>> +     else if (clock == PRCMU_ARMCLK)
+>> +             return KHZ_TO_HZ(get_arm_freq());
+>> +     else if ((clock == PRCMU_DSI0CLK) || (clock == PRCMU_DSI1CLK))
+>> +             return dsiclk_rate(clock - PRCMU_DSI0CLK, false);
+>> +     else if ((PRCMU_DSI0ESCCLK <= clock) && (clock <= PRCMU_DSI2ESCCLK))
+>> +             return dsiescclk_rate(clock - PRCMU_DSI0ESCCLK);
+>> +     else if (clock == PRCMU_PLLDSI_LCD)
+>> +             return pll_rate(PRCM_PLLDSILCD_FREQ,
+>> +                                     clock_rate(PRCMU_SPARE1CLK), PLL_RAW);
+>> +     else if ((clock == PRCMU_DSI0CLK_LCD) || (clock == PRCMU_DSI1CLK_LCD))
+>> +             return dsiclk_rate(clock - PRCMU_DSI0CLK_LCD, true);
+>> +     else
+>> +             return 0;
+>> +}
+>
+> Please use the common clock code for managing these.
+> No more private clock implementations.
+
+So here again there is a driver split issue. I think Ulf's current clock
+implementation just use these implementations, so this would be a matter
+of pushing that code down into the clock driver and decentralize this
+PRCMU driver a bit more.
+
+>> +     db8500_prcmu_init_mb0(&mb0);
+>> +     /*  mailbox 1 used by UniqPAP */
+>> +     db8500_prcmu_init_mb2(&mb2);
+>> +     db8500_prcmu_init_mb3(&mb3);
+>> +     db8500_prcmu_init_mb4(&mb4);
+>> +     db8500_prcmu_init_mb5(&mb5);
+>
+> I think it would be good to split out all the mailbox handling into a
+> separate file, and provide a proper abstraction for it,
+
+This is what is happening in patch 11/17, elbeit it's just a separate
+header. Thinking of it, I think it's possible to create a separate file
+for the code too.
+
+> based on a
+> data structure that can hold pointers to the init/read/write/... functions
+> as well as the common data for all mailboxes, such as
+>
+> struct prcmu_mailbox {
+>         struct mutex lock;
+>         struct completion complete;
+>         bool (*read)(struct prcmu_mailbox *);
+>         void (*init)(struct prcmu_mailbox *):
+> }
+
+This looks like a good idea.
+
+Yours,
+Linus Walleij
