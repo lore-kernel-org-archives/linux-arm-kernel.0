@@ -1,39 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 5 Sep 2012 08:53:54 +0200
-Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
- I2C driver
-In-Reply-To: <20120905064106.GA4233@gmail.com>
-References: <20120831122323.GC5962@gmail.com> <5044C82E.5060207@gmail.com>
- <20120903152012.GH31163@gmail.com>
- <201209041428.21409.arnd@arndb.de>
- <CACRpkdZESujO=2BU3jeKiX3Cm+JY2UPEXwGkro75FWa5Gio5YQ@mail.gmail.com>
- <20120905064106.GA4233@gmail.com>
-Message-ID: <CACRpkdaeNXU6ye2uO0cVPnVMVABVq7UoEG=0C_sES+csiYObdA@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 5 Sep 2012 15:08:29 +0800
+Subject: [GIT PULL] CSR SiRFprimaII dt-binding pinmux mapping
+Message-ID: <CAGsJ_4z-A1JXwrHwFpggdwo5Ku64fdNH-z=cMSDNRdf8YzEF9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 5, 2012 at 8:41 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Tue, Sep 04, 2012 at 07:27:10PM +0200, Linus Walleij wrote:
->> On Tue, Sep 4, 2012 at 4:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>
->> > In this particular case, we don't have a single board file providing a
->> > struct nmk_i2c_controller definition for platform data, so the best way
->> > to handle this IMHO is to remove the header file with the platform
->> > data definition, and just encode the defaults in the driver.
->>
->> Alessandro Rubini is actively working on bridging this (and
->> other amba_device primecells) to PCI, that is the reason why it
->> was recently converted to an amba_device. How is he then supposed to
->> get the proper parameters into the driver? Note that the PCI ID
->> is no help at all since the parameters depend on what is connected
->> to the I2C bus, not on what it itself is connected to. Isn't platform data
->> used in such cases?
->
-> So why can't Alessandro continue to use Platform Data in the normal way?
+Hi Olof, Arnd,
+Please pull the following patches which are making prima2 pinctrl
+driver support dt-binding mapping.
+All have been acked by Linus and we think it is better to take them by arm soc.
 
-He probably can, this is not an argument about that, what I am worried
-about is Arnd's suggestion to delete the platform data header if there
-are potential users of it.
+Thanks
+barry
 
-Yours,
-Linus Walleij
+The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
+
+  Linux 3.6-rc4 (2012-09-01 10:39:58 -0700)
+
+are available in the git repository at:
+  git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git pinmux-dt
+
+Barry Song (3):
+      ARM: PRIMA2: add missing interrupts property for pinctrl node
+      ARM: PRIMA2: rename prima2-cb.dts to prima2.dtsi as it only has
+SoC features
+      pinctrl: sirf: add DT-binding pinmux mapping support
+
+ arch/arm/boot/dts/prima2-cb.dts    |  424 ------------------------
+ arch/arm/boot/dts/prima2-evb.dts   |   37 ++
+ arch/arm/boot/dts/prima2.dtsi      |  640 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-prima2/Makefile.boot |    2 +
+ drivers/pinctrl/pinctrl-sirf.c     |   58 ++++-
+ 5 files changed, 736 insertions(+), 425 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/prima2-cb.dts
+ create mode 100644 arch/arm/boot/dts/prima2-evb.dts
+ create mode 100644 arch/arm/boot/dts/prima2.dtsi
