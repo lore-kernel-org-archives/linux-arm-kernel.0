@@ -1,34 +1,39 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Wed, 5 Sep 2012 14:53:46 +0800
-Subject: [PATCH] [ARM] msm: dma: use list_move_tail instead of
- list_del/list_add_tail
-Message-ID: <CAPgLHd9biJTeYFwR-OOgJVbRCo=2bvG6NjXMz_b_w61vdjy9jw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 5 Sep 2012 08:53:54 +0200
+Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
+ I2C driver
+In-Reply-To: <20120905064106.GA4233@gmail.com>
+References: <20120831122323.GC5962@gmail.com> <5044C82E.5060207@gmail.com>
+ <20120903152012.GH31163@gmail.com>
+ <201209041428.21409.arnd@arndb.de>
+ <CACRpkdZESujO=2BU3jeKiX3Cm+JY2UPEXwGkro75FWa5Gio5YQ@mail.gmail.com>
+ <20120905064106.GA4233@gmail.com>
+Message-ID: <CACRpkdaeNXU6ye2uO0cVPnVMVABVq7UoEG=0C_sES+csiYObdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Wed, Sep 5, 2012 at 8:41 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Tue, Sep 04, 2012 at 07:27:10PM +0200, Linus Walleij wrote:
+>> On Tue, Sep 4, 2012 at 4:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>
+>> > In this particular case, we don't have a single board file providing a
+>> > struct nmk_i2c_controller definition for platform data, so the best way
+>> > to handle this IMHO is to remove the header file with the platform
+>> > data definition, and just encode the defaults in the driver.
+>>
+>> Alessandro Rubini is actively working on bridging this (and
+>> other amba_device primecells) to PCI, that is the reason why it
+>> was recently converted to an amba_device. How is he then supposed to
+>> get the proper parameters into the driver? Note that the PCI ID
+>> is no help at all since the parameters depend on what is connected
+>> to the I2C bus, not on what it itself is connected to. Isn't platform data
+>> used in such cases?
+>
+> So why can't Alessandro continue to use Platform Data in the normal way?
 
-Using list_move_tail() instead of list_del() + list_add_tail().
+He probably can, this is not an argument about that, what I am worried
+about is Arnd's suggestion to delete the platform data header if there
+are potential users of it.
 
-spatch with a semantic match is used to found this problem.
-(http://coccinelle.lip6.fr/)
-
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- arch/arm/mach-msm/dma.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-msm/dma.c b/arch/arm/mach-msm/dma.c
-index 02cae5e..354b91d 100644
---- a/arch/arm/mach-msm/dma.c
-+++ b/arch/arm/mach-msm/dma.c
-@@ -223,8 +223,7 @@ static irqreturn_t msm_datamover_irq_handler(int irq, void *dev_id)
- 			PRINT_FLOW("msm_datamover_irq_handler id %d, status %x\n", id, ch_status);
- 			if ((ch_status & DMOV_STATUS_CMD_PTR_RDY) && !list_empty(&ready_commands[id])) {
- 				cmd = list_entry(ready_commands[id].next, typeof(*cmd), list);
--				list_del(&cmd->list);
--				list_add_tail(&cmd->list, &active_commands[id]);
-+				list_move_tail(&cmd->list, &active_commands[id]);
- 				if (cmd->execute_func)
- 					cmd->execute_func(cmd);
- 				PRINT_FLOW("msm_datamover_irq_handler id %d, start command\n", id);
+Yours,
+Linus Walleij
