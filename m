@@ -1,44 +1,62 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 5 Sep 2012 10:40:49 +0800
-Subject: [PATCH] arm: mxs: Fix MMC WP pin being inverted
-In-Reply-To: <1346811082-27295-1-git-send-email-marex@denx.de>
-References: <1346811082-27295-1-git-send-email-marex@denx.de>
-Message-ID: <20120905024046.GR2362@S2101-09.ap.freescale.net>
+Date: Wed, 5 Sep 2012 10:48:32 +0800
+Subject: [PATCHv3 1/2] ARM: dts: mxs: Add missing address and size cells
+ in SSP nodes
+In-Reply-To: <1346748243-28675-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1346748243-28675-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20120905024829.GS2362@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please resend with subject "arm: " changing to "ARM: ", or even better
-the one below.
+On Tue, Sep 04, 2012 at 10:44:02AM +0200, Maxime Ripard wrote:
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-  ARM: dts: m28evk: ...
+Applied, thanks.
 
-On Wed, Sep 05, 2012 at 04:11:22AM +0200, Marek Vasut wrote:
-> The MMC WP is active high on the m28evk, fix this.
-> 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
 > ---
->  arch/arm/boot/dts/imx28-m28evk.dts |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/boot/dts/imx28.dtsi |    8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/imx28-m28evk.dts b/arch/arm/boot/dts/imx28-m28evk.dts
-> index 845bb42..10868f1 100644
-> --- a/arch/arm/boot/dts/imx28-m28evk.dts
-> +++ b/arch/arm/boot/dts/imx28-m28evk.dts
-> @@ -63,7 +63,7 @@
->  					     &mmc0_cd_cfg
->  					     &mmc0_sck_cfg>;
->  				bus-width = <8>;
-> -				wp-gpios = <&gpio3 10 1>;
-> +				wp-gpios = <&gpio3 10 0>;
->  				vmmc-supply = <&reg_vddio_sd0>;
->  				status = "okay";
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 1d6382d..e3ec682 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -86,6 +86,8 @@
 >  			};
+>  
+>  			ssp0: ssp at 80010000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+>  				reg = <0x80010000 0x2000>;
+>  				interrupts = <96 82>;
+>  				fsl,ssp-dma-channel = <0>;
+> @@ -93,6 +95,8 @@
+>  			};
+>  
+>  			ssp1: ssp at 80012000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+>  				reg = <0x80012000 0x2000>;
+>  				interrupts = <97 83>;
+>  				fsl,ssp-dma-channel = <1>;
+> @@ -100,6 +104,8 @@
+>  			};
+>  
+>  			ssp2: ssp at 80014000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+>  				reg = <0x80014000 0x2000>;
+>  				interrupts = <98 84>;
+>  				fsl,ssp-dma-channel = <2>;
+> @@ -107,6 +113,8 @@
+>  			};
+>  
+>  			ssp3: ssp at 80016000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+>  				reg = <0x80016000 0x2000>;
+>  				interrupts = <99 85>;
+>  				fsl,ssp-dma-channel = <3>;
 > -- 
-> 1.7.10.4
+> 1.7.9.5
 > 
-
--- 
-Regards,
-Shawn
