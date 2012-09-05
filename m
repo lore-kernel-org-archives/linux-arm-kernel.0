@@ -1,36 +1,109 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 5 Sep 2012 11:20:12 +0200
-Subject: [PATCH 5/8] gpio: 74x164: Add output pin support
-In-Reply-To: <1346834457-6257-5-git-send-email-maxime.ripard@free-electrons.com>
-References: <1346834457-6257-1-git-send-email-maxime.ripard@free-electrons.com>
- <1346834457-6257-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20120905112012.13ce2c86@skate>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 05 Sep 2012 11:23:38 +0200
+Subject: [PATCH V2 3/6] arm: cache-l2x0: add support for Aurora L2 cache
+ ctrl
+In-Reply-To: <20120904172623.GP2458@mudshark.cambridge.arm.com>
+References: <1346755232-26006-1-git-send-email-gregory.clement@free-electrons.com>
+ <1346755232-26006-4-git-send-email-gregory.clement@free-electrons.com>
+ <20120904112247.GF2458@mudshark.cambridge.arm.com>
+ <5046152A.1050601@free-electrons.com>
+ <20120904172623.GP2458@mudshark.cambridge.arm.com>
+Message-ID: <50471A1A.90605@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Wed,  5 Sep 2012 10:40:54 +0200,
-Maxime Ripard <maxime.ripard@free-electrons.com> a ?crit :
-
-> The shift registers have an output that, when enabled, propagates the
-> values of its internal register to the pins. Make use of this pin
-> through the output-latch-gpio dt property.
+On 09/04/2012 07:26 PM, Will Deacon wrote:
+> On Tue, Sep 04, 2012 at 03:50:18PM +0100, Gregory CLEMENT wrote:
+>>>> +       /*
+>>>> +        * Clean and invalidate partial last cache line.
+>>>> +        */
+>>>> +       if (start < end && end & (CACHE_LINE_SIZE - 1)) {
+>>>> +               writel((end & ~(CACHE_LINE_SIZE - 1)) & ~0x1f,
+>>>> +                       l2x0_base + AURORA_FLUSH_PHY_ADDR_REG);
+>>>> +               cache_sync();
+>>>> +               end &= ~(CACHE_LINE_SIZE - 1);
+>>>> +       }
+>>>> +
+>>>> +       /*
+>>>> +        * Invalidate all full cache lines between 'start' and 'end'.
+>>>> +        */
+>>>> +       while (start < end) {
+>>>> +               unsigned long range_end = calc_range_end(start, end);
+>>>> +               aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
+>>>> +                               AURORA_INVAL_RANGE_REG);
+>>>> +               start = range_end;
+>>>> +       }
+>>>> +
+>>>> +       dsb();
+>>>
+>>> Why? (same for the other dsbs following writels/cache_syncs).
+>>
+>> I will ask if it is really needed.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> I just think you'll get the dsb() via aurora_pa_range, so you shouldn't need
+> the extra one after the loop.
 
-Well, thinking more about this, and reviewing the i.MX 28 datasheet a
-bit more thoroughly, I don't think you need this GPIO thing. It is an
-active-low pin that should be kept low during the entire duration of
-the transfer, which basically is a chip select. And in turns out that
-the CFA10049 board uses pins that can be controlled as chip selects
-directly by the SPI controller, so you should rather use this rather
-than introduce a specially handled GPIO. This needs testing, but I
-don't see why it wouldn't work.
+Well actually we get a cache_sync() and not a dsb from aurora_pa_range. But
+I've just received the confirmation that the cache_sync is enough, so I will
+remove the dsb.
 
-Best regards,
+> 
+>>>> +static void aurora_resume(void)
+>>>> +{
+>>>> +       u32 u;
+>>>> +
+>>>> +       u = readl(l2x0_base + L2X0_CTRL);
+>>>> +       if (!(u & 1)) {
+>>>
+>>> We should probably add a L2X0_CTRL_EN define and use that (also update the
+>>> enabling code to use it as well).
+>>>
+>>
+>> Should it be a separate patch or can I include it with this one?
+> 
+> I think you can just include it here (it's trivial to implement).
 
-Thomas
+OK (it's already done).
+
+> 
+>>>> +static void __init aurora_of_setup(const struct device_node *np,
+>>>> +                               u32 *aux_val, u32 *aux_mask)
+>>>> +{
+>>>> +       u32 val = AURORA_ACR_REPLACEMENT_TYPE_SEMIPLRU;
+>>>> +       u32 mask =  AURORA_ACR_REPLACEMENT_MASK;
+>>>> +
+>>>> +       of_property_read_u32(np, "cache-id-part",
+>>>> +                       &cache_id_part_number_from_dt);
+>>>> +
+>>>> +       /* Determine and save the write policy */
+>>>> +       l2_wt_override = of_property_read_bool(np, "wt-override");
+>>>> +
+>>>> +       if (l2_wt_override) {
+>>>> +               val |= AURORA_ACR_FORCE_WRITE_THRO_POLICY;
+>>>> +               mask |= AURORA_ACR_FORCE_WRITE_POLICY_MASK;
+>>>> +       }
+>>>
+>>> smp_mb() after the assignment to l2_wt_override?
+>>
+>> Sorry I don't get your point, why do you think we need this?
+> 
+> In case you get an outer_cache operation from a different core before the
+> assignment to l2_wt_override has become visible, in which case you might
+> accidentally skip the operation (e.g. if it's clean). This may well be
+> overkill, since we probably have the same problem for stuff like the base
+> address already.
+
+But aurora_of_setup is called during the init, and this init is called
+before any smp initializations: when this function is called only one
+core is running. So there is no need to worry about it.
+
+> 
+> Will
+> 
+
+
 -- 
-Thomas Petazzoni, Free Electrons
+Gregory Clement, Free Electrons
 Kernel, drivers, real-time and embedded Linux
 development, consulting, training and support.
 http://free-electrons.com
