@@ -1,45 +1,32 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Wed, 05 Sep 2012 18:24:44 +0800
-Subject: [PATCH] mtd: atmel_nand: fix the compile error which miss label
- "err_ecc_ioremap".
-In-Reply-To: <1346824842-18875-1-git-send-email-josh.wu@atmel.com>
-References: <1346824842-18875-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <5047286C.4060705@atmel.com>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Wed, 5 Sep 2012 12:26:52 +0200
+Subject: [PATCH 5/8] gpio: 74x164: Add output pin support
+In-Reply-To: <20120905120906.12d08bf5@skate>
+References: <1346834457-6257-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1346834457-6257-5-git-send-email-maxime.ripard@free-electrons.com>
+ <20120905112012.13ce2c86@skate> <20120905114645.57bfe591@eb-e6520>
+ <20120905120906.12d08bf5@skate>
+Message-ID: <20120905122652.7c752e96@eb-e6520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, all
+Hi,
 
-This patch is for latest l2-mtd.git tree. It fixes the compile error 
-after JC's commit: b654a9a4
+Le Wed, 5 Sep 2012 12:09:06 +0200,
+Thomas Petazzoni <thomas.petazzoni@free-electrons.com> a ?crit :
+> I don't think the /OE pin can be used as a chip select, because when it
+> is high, the state of the output pins is not maintained to their
+> previous state: the pins are turned into the high impedance state. If
+> used as a chip select, it would mean that the value of the output pins
+> transition from their old state to high impedance at the beginning of
+> the transfer, and then from the high impedance to their new state at
+> the end of the transfer.
 
-On 9/5/2012 2:00 PM, Josh Wu wrote:
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
->   drivers/mtd/nand/atmel_nand.c |    3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-> index 6a5a35b..9144557 100644
-> --- a/drivers/mtd/nand/atmel_nand.c
-> +++ b/drivers/mtd/nand/atmel_nand.c
-> @@ -1399,7 +1399,7 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
->   	if (pdev->dev.of_node) {
->   		res = atmel_of_init_port(host, pdev->dev.of_node);
->   		if (res)
-> -			goto err_nand_ioremap;
-> +			goto err_ecc_ioremap;
->   	} else {
->   		memcpy(&host->board, pdev->dev.platform_data,
->   		       sizeof(struct atmel_nand_data));
-> @@ -1560,6 +1560,7 @@ err_no_card:
->   	platform_set_drvdata(pdev, NULL);
->   	if (host->dma_chan)
->   		dma_release_channel(host->dma_chan);
-> +err_ecc_ioremap:
->   	iounmap(host->io_base);
->   err_nand_ioremap:
->   	kfree(host);
+OK that's exactly what I was thinking to ;-)
 
-Best Regards,
-Josh Wu
+> And of course, this signal is inverted compared to a normal chip select.
+
+polarity of the chip select can vary (mc13xxx-spi has an active high CS
+for example).
+
+Eric
