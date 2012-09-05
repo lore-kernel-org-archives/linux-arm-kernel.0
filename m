@@ -1,49 +1,38 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  5 Sep 2012 10:40:56 +0200
-Subject: [PATCH 7/8] gpio: 74x164: dts: Add documentation for the dt binding
+Date: Wed,  5 Sep 2012 10:40:53 +0200
+Subject: [PATCH 4/8] gpio: 74x164: Add device tree support
 In-Reply-To: <1346834457-6257-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1346834457-6257-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1346834457-6257-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1346834457-6257-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- .../devicetree/bindings/gpio/gpio-74x164.txt       |   26 ++++++++++++++++++++
- 1 file changed, 26 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-74x164.txt
+ drivers/gpio/gpio-74x164.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-74x164.txt b/Documentation/devicetree/bindings/gpio/gpio-74x164.txt
-new file mode 100644
-index 0000000..e2a40a5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-74x164.txt
-@@ -0,0 +1,26 @@
-+* Generic 8-bits shift register GPIO driver
-+
-+Required properties:
-+- compatible : Should be "fairchild,74hc595"
-+- reg : chip select number
-+- gpio-controller : Marks the device node as a gpio controller.
-+- #gpio-cells : Should be two.  The first cell is the pin number and
-+  the second cell is used to specify the gpio polarity:
-+      0 = active high
-+      1 = active low
-+- register-number: Number of daisy-chained shift registers
-+- output-latch-gpio: GPIO connected to the output pin of the registers
-+
-+Optional properties:
-+- latch-active-low: If the output pin is active low
-+
-+Example:
-+
-+gpio5: gpio5 at 0 {
-+	compatible = "fairchild,74hc595";
-+	gpio-controller;
-+	#gpio-cells = <2>;
-+	registers-number = <4>;
-+	output-latch-gpio = <&gpio0 26 0>;
-+	spi-max-frequency = <100000>;
+diff --git a/drivers/gpio/gpio-74x164.c b/drivers/gpio/gpio-74x164.c
+index 24cfe4c..613067c 100644
+--- a/drivers/gpio/gpio-74x164.c
++++ b/drivers/gpio/gpio-74x164.c
+@@ -141,10 +141,17 @@ static int __devexit gen_74x164_remove(struct spi_device *spi)
+ 	return ret;
+ }
+ 
++static const struct of_device_id gen_74x164_dt_ids[] = {
++	{ .compatible = "fairchild,74hc595" },
++	{},
 +};
++MODULE_DEVICE_TABLE(of, gen_74x164_dt_ids);
++
+ static struct spi_driver gen_74x164_driver = {
+ 	.driver = {
+ 		.name		= "74x164",
+ 		.owner		= THIS_MODULE,
++		.of_match_table	= of_match_ptr(gen_74x164_dt_ids),
+ 	},
+ 	.probe		= gen_74x164_probe,
+ 	.remove		= __devexit_p(gen_74x164_remove),
 -- 
 1.7.9.5
