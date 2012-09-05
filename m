@@ -1,50 +1,255 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Wed, 05 Sep 2012 10:50:28 +0200
-Subject: [PATCH 4/8] gpio: 74x164: Add device tree support
-In-Reply-To: <1346834457-6257-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1346834457-6257-1-git-send-email-maxime.ripard@free-electrons.com>
- <1346834457-6257-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <3289095.PtLZhVmAnO@flexo>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Wed, 5 Sep 2012 14:20:09 +0530
+Subject: [PATCH v7 3/3] ARM: OMAP2+: gpmc: minimal driver support
+In-Reply-To: <cover.1346829350.git.afzal@ti.com>
+References: <cover.1346829350.git.afzal@ti.com>
+Message-ID: <dd56963ba88d021f3c176c08d58e3a00df9946aa.1346829351.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 05 September 2012 10:40:53 Maxime Ripard wrote:
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Create a minimal driver out of gpmc code.
+Responsibilities handled by earlier gpmc
+initialization is now achieved in probe.
 
-Acked-by: Florian Fainelli <florian@openwrt.org>
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+---
+ arch/arm/mach-omap2/gpmc.c |  167 +++++++++++++++++++++++++++++++------------
+ 1 files changed, 120 insertions(+), 47 deletions(-)
 
-> ---
->  drivers/gpio/gpio-74x164.c |    7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/drivers/gpio/gpio-74x164.c b/drivers/gpio/gpio-74x164.c
-> index 24cfe4c..613067c 100644
-> --- a/drivers/gpio/gpio-74x164.c
-> +++ b/drivers/gpio/gpio-74x164.c
-> @@ -141,10 +141,17 @@ static int __devexit gen_74x164_remove(struct 
-spi_device *spi)
->  	return ret;
->  }
->  
-> +static const struct of_device_id gen_74x164_dt_ids[] = {
-> +	{ .compatible = "fairchild,74hc595" },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, gen_74x164_dt_ids);
-> +
->  static struct spi_driver gen_74x164_driver = {
->  	.driver = {
->  		.name		= "74x164",
->  		.owner		= THIS_MODULE,
-> +		.of_match_table	= of_match_ptr(gen_74x164_dt_ids),
->  	},
->  	.probe		= gen_74x164_probe,
->  	.remove		= __devexit_p(gen_74x164_remove),
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index c45f185..f633b0d 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -24,6 +24,7 @@
+ #include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/interrupt.h>
++#include <linux/platform_device.h>
+ 
+ #include <asm/mach-types.h>
+ 
+@@ -85,6 +86,12 @@
+ #define ENABLE_PREFETCH		(0x1 << 7)
+ #define DMA_MPU_MODE		2
+ 
++#define	GPMC_REVISION_MAJOR(l)		((l >> 4) & 0xf)
++#define	GPMC_REVISION_MINOR(l)		(l & 0xf)
++
++#define	GPMC_HAS_WR_ACCESS		0x1
++#define	GPMC_HAS_WR_DATA_MUX_BUS	0x2
++
+ /* XXX: Only NAND irq has been considered,currently these are the only ones used
+  */
+ #define	GPMC_NR_IRQ		2
+@@ -130,7 +137,10 @@ static struct resource	gpmc_cs_mem[GPMC_CS_NUM];
+ static DEFINE_SPINLOCK(gpmc_mem_lock);
+ static unsigned int gpmc_cs_map;	/* flag for cs which are initialized */
+ static int gpmc_ecc_used = -EINVAL;	/* cs using ecc engine */
+-
++static struct device *gpmc_dev;
++static int gpmc_irq;
++static resource_size_t phys_base, mem_size;
++static unsigned gpmc_capability;
+ static void __iomem *gpmc_base;
+ 
+ static struct clk *gpmc_l3_clk;
+@@ -433,6 +443,19 @@ static int gpmc_cs_insert_mem(int cs, unsigned long base, unsigned long size)
+ 	return r;
+ }
+ 
++static int gpmc_cs_delete_mem(int cs)
++{
++	struct resource	*res = &gpmc_cs_mem[cs];
++	int r;
++
++	spin_lock(&gpmc_mem_lock);
++	r = release_resource(&gpmc_cs_mem[cs]);
++	res->start = res->end = 0;
++	spin_unlock(&gpmc_mem_lock);
++
++	return r;
++}
++
+ int gpmc_cs_request(int cs, unsigned long size, unsigned long *base)
+ {
+ 	struct resource *res = &gpmc_cs_mem[cs];
+@@ -769,7 +792,7 @@ static void gpmc_irq_noop(struct irq_data *data) { }
+ 
+ static unsigned int gpmc_irq_noop_ret(struct irq_data *data) { return 0; }
+ 
+-static int gpmc_setup_irq(int gpmc_irq)
++static int gpmc_setup_irq(void)
+ {
+ 	int i;
+ 	u32 regval;
+@@ -813,7 +836,37 @@ static int gpmc_setup_irq(int gpmc_irq)
+ 	return request_irq(gpmc_irq, gpmc_handle_irq, 0, "gpmc", NULL);
+ }
+ 
+-static void __init gpmc_mem_init(void)
++static __exit int gpmc_free_irq(void)
++{
++	int i;
++
++	if (gpmc_irq)
++		free_irq(gpmc_irq, NULL);
++
++	for (i = 0; i < GPMC_NR_IRQ; i++) {
++		irq_set_handler(gpmc_client_irq[i].irq, NULL);
++		irq_set_chip(gpmc_client_irq[i].irq, &no_irq_chip);
++		irq_modify_status(gpmc_client_irq[i].irq, 0, 0);
++	}
++
++	irq_free_descs(gpmc_irq_start, GPMC_NR_IRQ);
++
++	return 0;
++}
++
++static void __devexit gpmc_mem_exit(void)
++{
++	int cs;
++
++	for (cs = 0; cs < GPMC_CS_NUM; cs++) {
++		if (!gpmc_cs_mem_enabled(cs))
++			continue;
++		gpmc_cs_delete_mem(cs);
++	}
++
++}
++
++static void __devinit gpmc_mem_init(void)
+ {
+ 	int cs;
+ 	unsigned long boot_rom_space = 0;
+@@ -840,65 +893,85 @@ static void __init gpmc_mem_init(void)
+ 	}
+ }
+ 
+-static int __init gpmc_init(void)
++static __devinit int gpmc_probe(struct platform_device *pdev)
+ {
+ 	u32 l;
+-	int ret = -EINVAL;
+-	int gpmc_irq;
+-	char *ck = NULL;
+-
+-	if (cpu_is_omap24xx()) {
+-		ck = "core_l3_ck";
+-		if (cpu_is_omap2420())
+-			l = OMAP2420_GPMC_BASE;
+-		else
+-			l = OMAP34XX_GPMC_BASE;
+-		gpmc_irq = 20 + OMAP_INTC_START;
+-	} else if (cpu_is_omap34xx()) {
+-		ck = "gpmc_fck";
+-		l = OMAP34XX_GPMC_BASE;
+-		gpmc_irq = 20 + OMAP_INTC_START;
+-	} else if (cpu_is_omap44xx() || soc_is_omap54xx()) {
+-		/* Base address and irq number are same for OMAP4/5 */
+-		ck = "gpmc_ck";
+-		l = OMAP44XX_GPMC_BASE;
+-		gpmc_irq = 20 + OMAP44XX_IRQ_GIC_START;
+-	}
++	struct resource *res;
+ 
+-	if (WARN_ON(!ck))
+-		return ret;
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (res == NULL)
++		return -ENOENT;
+ 
+-	gpmc_l3_clk = clk_get(NULL, ck);
+-	if (IS_ERR(gpmc_l3_clk)) {
+-		printk(KERN_ERR "Could not get GPMC clock %s\n", ck);
+-		BUG();
+-	}
++	phys_base = res->start;
++	mem_size = resource_size(res);
+ 
+-	gpmc_base = ioremap(l, SZ_4K);
++	gpmc_base = devm_request_and_ioremap(&pdev->dev, res);
+ 	if (!gpmc_base) {
+-		clk_put(gpmc_l3_clk);
+-		printk(KERN_ERR "Could not get GPMC register memory\n");
+-		BUG();
++		dev_err(&pdev->dev, "error: request memory / ioremap\n");
++		return -EADDRNOTAVAIL;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
++	if (res == NULL)
++		dev_warn(&pdev->dev, "Failed to get resource: irq\n");
++	else
++		gpmc_irq = res->start;
++
++	gpmc_l3_clk = clk_get(&pdev->dev, "fck");
++	if (IS_ERR(gpmc_l3_clk)) {
++		dev_err(&pdev->dev, "error: clk_get\n");
++		gpmc_irq = 0;
++		return PTR_ERR(gpmc_l3_clk);
+ 	}
+ 
+ 	clk_enable(gpmc_l3_clk);
+ 
++	gpmc_dev = &pdev->dev;
++
+ 	l = gpmc_read_reg(GPMC_REVISION);
+-	printk(KERN_INFO "GPMC revision %d.%d\n", (l >> 4) & 0x0f, l & 0x0f);
+-	/* Set smart idle mode and automatic L3 clock gating */
+-	l = gpmc_read_reg(GPMC_SYSCONFIG);
+-	l &= 0x03 << 3;
+-	l |= (0x02 << 3) | (1 << 0);
+-	gpmc_write_reg(GPMC_SYSCONFIG, l);
++	if (GPMC_REVISION_MAJOR(l) > 0x4)
++		gpmc_capability = GPMC_HAS_WR_ACCESS | GPMC_HAS_WR_DATA_MUX_BUS;
++	dev_info(gpmc_dev, "GPMC revision %d.%d\n",
++				GPMC_REVISION_MAJOR(l), GPMC_REVISION_MINOR(l));
++
+ 	gpmc_mem_init();
+ 
+-	ret = gpmc_setup_irq(gpmc_irq);
+-	if (ret)
+-		pr_err("gpmc: irq-%d could not claim: err %d\n",
+-						gpmc_irq, ret);
+-	return ret;
++	if (IS_ERR_VALUE(gpmc_setup_irq()))
++		dev_warn(gpmc_dev, "gpmc_setup_irq failed\n");
++
++	return 0;
++}
++
++static __exit int gpmc_remove(struct platform_device *pdev)
++{
++	gpmc_free_irq();
++	gpmc_mem_exit();
++	gpmc_dev = NULL;
++	return 0;
+ }
++
++static struct platform_driver gpmc_driver = {
++	.probe		= gpmc_probe,
++	.remove		= __devexit_p(gpmc_remove),
++	.driver		= {
++		.name	= DEVICE_NAME,
++		.owner	= THIS_MODULE,
++	},
++};
++
++static __init int gpmc_init(void)
++{
++	return platform_driver_register(&gpmc_driver);
++}
++
++static __exit void gpmc_exit(void)
++{
++	platform_driver_unregister(&gpmc_driver);
++
++}
++
+ postcore_initcall(gpmc_init);
++module_exit(gpmc_exit);
+ 
+ static int __init omap_gpmc_init(void)
+ {
+-- 
+1.7.1
