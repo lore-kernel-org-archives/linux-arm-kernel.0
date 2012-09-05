@@ -1,37 +1,100 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 5 Sep 2012 05:55:30 +0200
-Subject: [PATCH] arm: mxs: Fix MMC WP pin being inverted
-In-Reply-To: <20120905031953.GU2362@S2101-09.ap.freescale.net>
-References: <1346811082-27295-1-git-send-email-marex@denx.de>
- <201209050457.03707.marex@denx.de>
- <20120905031953.GU2362@S2101-09.ap.freescale.net>
-Message-ID: <201209050555.30635.marex@denx.de>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 5 Sep 2012 09:28:29 +0530
+Subject: [PATCH v2 2/5] ARM: Exynos4: dts: Specify address and size cells
+ for i2c controllers
+In-Reply-To: <1346748609-11115-3-git-send-email-t.figa@samsung.com>
+References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
+ <1346748609-11115-3-git-send-email-t.figa@samsung.com>
+Message-ID: <CAJuYYwSDcVTi=4dmgQ_FrN7hiWxoPiEy4_dUFRe9JYrcBx9BgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+On 4 September 2012 14:20, Tomasz Figa <t.figa@samsung.com> wrote:
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4.dtsi | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
 
-> On Wed, Sep 05, 2012 at 04:57:03AM +0200, Marek Vasut wrote:
-> > Dear Shawn Guo,
-> > 
-> > > Please resend with subject "arm: " changing to "ARM: ", or even better
-> > > the one below.
-> > > 
-> > >   ARM: dts: m28evk: ...
-> > 
-> > I really don't like this game ...
-> 
-> You either stay out of the game or play it well.
+Acked-by: Thomas Abraham <thomas.abraham@linaro.org>
 
-You know, as I already complained, well defined rules would be welcome.
-
-All these tags seem to me just as a tool for maintainers to unnecesarily torture 
-people. I'd be much happier if we had a tool or something that'd either check 
-them or generate them -- that'd make my life much easier. I think I'm not alone 
-here.
-
-Maybe a checkpatch-alike tool? But we have no list of valid tags, so, there're 
-no well-defined rules, only some unspoken agreement :-(
-
-Best regards,
-Marek Vasut
+>
+> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+> index 9b71b61..718e3d2 100644
+> --- a/arch/arm/boot/dts/exynos4.dtsi
+> +++ b/arch/arm/boot/dts/exynos4.dtsi
+> @@ -122,6 +122,8 @@
+>         };
+>
+>         i2c at 13860000 {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+>                 compatible = "samsung,s3c2440-i2c";
+>                 reg = <0x13860000 0x100>;
+>                 interrupts = <0 58 0>;
+> @@ -129,6 +131,8 @@
+>         };
+>
+>         i2c at 13870000 {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+>                 compatible = "samsung,s3c2440-i2c";
+>                 reg = <0x13870000 0x100>;
+>                 interrupts = <0 59 0>;
+> @@ -136,6 +140,8 @@
+>         };
+>
+>         i2c at 13880000 {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+>                 compatible = "samsung,s3c2440-i2c";
+>                 reg = <0x13880000 0x100>;
+>                 interrupts = <0 60 0>;
+> @@ -143,6 +149,8 @@
+>         };
+>
+>         i2c at 13890000 {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+>                 compatible = "samsung,s3c2440-i2c";
+>                 reg = <0x13890000 0x100>;
+>                 interrupts = <0 61 0>;
+> @@ -150,6 +158,8 @@
+>         };
+>
+>         i2c at 138A0000 {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+>                 compatible = "samsung,s3c2440-i2c";
+>                 reg = <0x138A0000 0x100>;
+>                 interrupts = <0 62 0>;
+> @@ -157,6 +167,8 @@
+>         };
+>
+>         i2c at 138B0000 {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+>                 compatible = "samsung,s3c2440-i2c";
+>                 reg = <0x138B0000 0x100>;
+>                 interrupts = <0 63 0>;
+> @@ -164,6 +176,8 @@
+>         };
+>
+>         i2c at 138C0000 {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+>                 compatible = "samsung,s3c2440-i2c";
+>                 reg = <0x138C0000 0x100>;
+>                 interrupts = <0 64 0>;
+> @@ -171,6 +185,8 @@
+>         };
+>
+>         i2c at 138D0000 {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+>                 compatible = "samsung,s3c2440-i2c";
+>                 reg = <0x138D0000 0x100>;
+>                 interrupts = <0 65 0>;
+> --
+> 1.7.12
+>
