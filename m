@@ -1,27 +1,20 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 4 Sep 2012 22:24:32 -0700
-Subject: [PATCH 2/2] ARM: allow for ATAGS to be configured out when DT
- support is selected
-In-Reply-To: <1346361008-7320-2-git-send-email-nicolas.pitre@linaro.org>
-References: <1346361008-7320-1-git-send-email-nicolas.pitre@linaro.org>
- <1346361008-7320-2-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20120905052432.GH6747@quad.lixom.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 5 Sep 2012 07:24:49 +0200
+Subject: [PATCH] ARM: gemini: fix the gemini build
+In-Reply-To: <20120905052221.GG6747@quad.lixom.net>
+References: <1346347356-18786-1-git-send-email-linus.walleij@linaro.org>
+ <20120905052221.GG6747@quad.lixom.net>
+Message-ID: <CACRpkda+uXjCZM9PBWhf7YeOjz3u+CpCs5vkWqeAPt4CBfcfaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2012 at 05:10:08PM -0400, Nicolas Pitre wrote:
-> Now that ATAGS support is well contained, we can easily remove it from
-> the kernel build if so desired.  It has to explicitly be disabled, and
-> only when DT support is selected.
-> 
-> Note: disabling kernel ATAGS support does not prevent the usage of
-> CONFIG_ARM_ATAG_DTB_COMPAT.
-> 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+On Wed, Sep 5, 2012 at 7:22 AM, Olof Johansson <olof@lixom.net> wrote:
 
-Nice!
+> The platform has a listed maintainer (cc:d here) and has had new
+> development within the last 18 months so it doesn't seem abandoned.
 
-Acked-by: Olof Johansson <olof@lixom.net>
+OK I also have a clocksource/clockevent patch for it cooking,
+will fix and send that out soon.
 
-
--Olof
+Yours,
+Linus Walleij
