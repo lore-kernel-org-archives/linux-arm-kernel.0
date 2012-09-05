@@ -1,60 +1,34 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 05 Sep 2012 14:14:31 +0300
-Subject: [PATCH v2 1/8] ARM/dts: OMAP2: Add McBSP entries for OMAP2420
- and OMAP2430 SoC
-In-Reply-To: <5044C2DD.5000705@ti.com>
-References: <1346247067-9632-1-git-send-email-peter.ujfalusi@ti.com>
- <1346247067-9632-2-git-send-email-peter.ujfalusi@ti.com>
- <5044C2DD.5000705@ti.com>
-Message-ID: <50473417.8050907@ti.com>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Wed, 05 Sep 2012 21:09:13 +0530
+Subject: [PATCH V4 0/2] video: drm: Add Device tree support to DRM-FIMD
+Message-ID: <1346859555-13527-1-git-send-email-l.krishna@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+This patch set adds device tree support for DRM-FIMD for Samsung's Exynos5250.
+It includes parsing platform data from dts file. Also, adds the driver data
+for exynos4 and exynos5 devices.
 
-On 09/03/2012 05:46 PM, Benoit Cousson wrote:
->> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-> 
-> Nit: 2012
+This patchset is based and tested on top of v3.6-rc4
+Also depends on below patchset
+http://lists.freedesktop.org/archives/dri-devel/2012-August/026076.html
 
-Oh, I missed that (copy-paste of the header...)
+Changes since V3:
+        - Removed the fimd version from driver data and using timing base
+          address instead
+        - Removed the drm_ prefixes to the structures and fucntions
 
->> + *
->> + * This file is licensed under the terms of the GNU General Public License
->> + * version 2.  This program is licensed "as is" without any warranty of any
->> + * kind, whether express or implied.
->> + */
->> +
->> +/include/ "omap2.dtsi"
->> +
->> +/ {
->> +	compatible = "ti,omap2420", "ti,omap2";
->> +
->> +	ocp {
->> +		mcbsp1: mcbsp at 48074000 {
->> +			compatible = "ti,omap2420-mcbsp";
->> +			reg = <0x48074000 0xff>;
->> +			reg-names = "mpu";
->> +			interrupts = <0 59 0x4>, /* TX interrupt */
->> +				     <0 60 0x4>; /* RX interrupt */
-> 
-> That one is not correct because it does comply with the interrupt
-> controller specifier that require only one cell:
-> 
-> 		intc: interrupt-controller at 48200000 {
-> 			compatible = "ti,omap2-intc";
-> 			interrupt-controller;
-> 			#interrupt-cells = <1>;
-> ...
-> 
-> The one you are using is for GIC IRQ controller.
-> It works probably because we are using hwmod so far :-)
-> 
-> Didn't you get some warning?
+Changes since V2:
+        - Added driver data to exynos5-drm-fimd as per Marek Szyprowski suggestion
 
-dtb compiles fine. I'll fix OMAP2 and OMAP3 as well.
+Changes since V1:
+        - Corrected typo errors and changed compatibility string
 
-Will send the updated series shortly.
+Leela Krishna Amudala (2):
+  drm/exynos: add platform_device_id table and driver data for drm fimd
+  video: drm: exynos: Add device tree support
 
--- 
-P?ter
+ Documentation/devicetree/bindings/fb/drm-fimd.txt |   80 ++++++++++++
+ drivers/gpu/drm/exynos/exynos_drm_fimd.c          |  140 +++++++++++++++++++-
+ 2 files changed, 213 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/fb/drm-fimd.txt
