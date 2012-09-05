@@ -1,33 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 5 Sep 2012 10:39:22 +0800
-Subject: [PATCH] mxs/dma: Enlarge the CCW descriptor area to 4 pages
-In-Reply-To: <201209050346.39253.marex@denx.de>
-References: <1346731465-6301-1-git-send-email-marex@denx.de>
- <20120905014000.GP2362@S2101-09.ap.freescale.net>
- <201209050346.39253.marex@denx.de>
-Message-ID: <20120905023919.GQ2362@S2101-09.ap.freescale.net>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 05 Sep 2012 12:40:17 +1000
+Subject: [PATCH 13/25] macintosh/mediabay: add a const qualifier
+In-Reply-To: <1343034810-3386-14-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1343034810-3386-14-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1346812817.2257.23.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2012 at 03:46:39AM +0200, Marek Vasut wrote:
-> Let me ask about another thing. If there'll eventually be some device that'd 
-> need even larger transfer (say ... hundreds of megs) we'd end up with trouble 
-> again.
+On Mon, 2012-07-23 at 11:13 +0200, Uwe Kleine-K?nig wrote:
+> This prepares *of_device_id.data becoming const. Without this change
+> the following warning would occur:
 > 
-> One way to fix this is to recycle descriptors that were already used during the 
-> transfer, but can we really do it fast enough, so the DMA would do it's job at 
-> one end of the descriptor chain and we'd be building the other?
+> 	drivers/macintosh/mediabay.c: In function 'media_bay_attach':
+> 	drivers/macintosh/mediabay.c:589:11: warning: assignment discards 'const' qualifier from pointer target type [enabled by default]
 > 
-It looks like a solution, but I'm not sure if it works either.
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
 
-Regards,
-Shawn
+Ack all of these assuming you test built (I didn't). Do you need me to
+carry any of this via the powerpc tree ?
 
-> The other (easier) way is to let the device that claims the particular DMA 
-> channel allocate as much descriptors as it might ever need, which I think is 
-> wrong.
+Cheers,
+Ben.
+
+>  drivers/macintosh/mediabay.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> What do you think ?
-> 
-> Best regards,
-> Marek Vasut
+> diff --git a/drivers/macintosh/mediabay.c b/drivers/macintosh/mediabay.c
+> index 831d751..54bf584 100644
+> --- a/drivers/macintosh/mediabay.c
+> +++ b/drivers/macintosh/mediabay.c
+> @@ -63,7 +63,7 @@ struct media_bay_info {
+>  	int				value_count;
+>  	int				timer;
+>  	struct macio_dev		*mdev;
+> -	struct mb_ops*			ops;
+> +	const struct mb_ops*		ops;
+>  	int				index;
+>  	int				cached_gpio;
+>  	int				sleeping;
