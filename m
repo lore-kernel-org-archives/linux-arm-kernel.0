@@ -1,255 +1,79 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Wed, 5 Sep 2012 14:20:09 +0530
-Subject: [PATCH v7 3/3] ARM: OMAP2+: gpmc: minimal driver support
-In-Reply-To: <cover.1346829350.git.afzal@ti.com>
-References: <cover.1346829350.git.afzal@ti.com>
-Message-ID: <dd56963ba88d021f3c176c08d58e3a00df9946aa.1346829351.git.afzal@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 5 Sep 2012 10:56:38 +0200
+Subject: [PATCH 6/8] gpio: 74x164: Add support for daisy-chaining
+In-Reply-To: <1346834457-6257-6-git-send-email-maxime.ripard@free-electrons.com>
+References: <1346834457-6257-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1346834457-6257-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20120905105638.153471c6@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a minimal driver out of gpmc code.
-Responsibilities handled by earlier gpmc
-initialization is now achieved in probe.
+Le Wed,  5 Sep 2012 10:40:55 +0200,
+Maxime Ripard <maxime.ripard@free-electrons.com> a ?crit :
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/mach-omap2/gpmc.c |  167 +++++++++++++++++++++++++++++++------------
- 1 files changed, 120 insertions(+), 47 deletions(-)
+> +	for (i = chip->registers - 1; i >= 0; i--) {
+> +		ret = spi_write(chip->spi,
+> +				chip->buffer + i, sizeof(u8));
+> +		if (ret)
+> +			return ret;
+> +	}
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index c45f185..f633b0d 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -24,6 +24,7 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/interrupt.h>
-+#include <linux/platform_device.h>
- 
- #include <asm/mach-types.h>
- 
-@@ -85,6 +86,12 @@
- #define ENABLE_PREFETCH		(0x1 << 7)
- #define DMA_MPU_MODE		2
- 
-+#define	GPMC_REVISION_MAJOR(l)		((l >> 4) & 0xf)
-+#define	GPMC_REVISION_MINOR(l)		(l & 0xf)
-+
-+#define	GPMC_HAS_WR_ACCESS		0x1
-+#define	GPMC_HAS_WR_DATA_MUX_BUS	0x2
-+
- /* XXX: Only NAND irq has been considered,currently these are the only ones used
-  */
- #define	GPMC_NR_IRQ		2
-@@ -130,7 +137,10 @@ static struct resource	gpmc_cs_mem[GPMC_CS_NUM];
- static DEFINE_SPINLOCK(gpmc_mem_lock);
- static unsigned int gpmc_cs_map;	/* flag for cs which are initialized */
- static int gpmc_ecc_used = -EINVAL;	/* cs using ecc engine */
--
-+static struct device *gpmc_dev;
-+static int gpmc_irq;
-+static resource_size_t phys_base, mem_size;
-+static unsigned gpmc_capability;
- static void __iomem *gpmc_base;
- 
- static struct clk *gpmc_l3_clk;
-@@ -433,6 +443,19 @@ static int gpmc_cs_insert_mem(int cs, unsigned long base, unsigned long size)
- 	return r;
- }
- 
-+static int gpmc_cs_delete_mem(int cs)
-+{
-+	struct resource	*res = &gpmc_cs_mem[cs];
-+	int r;
-+
-+	spin_lock(&gpmc_mem_lock);
-+	r = release_resource(&gpmc_cs_mem[cs]);
-+	res->start = res->end = 0;
-+	spin_unlock(&gpmc_mem_lock);
-+
-+	return r;
-+}
-+
- int gpmc_cs_request(int cs, unsigned long size, unsigned long *base)
- {
- 	struct resource *res = &gpmc_cs_mem[cs];
-@@ -769,7 +792,7 @@ static void gpmc_irq_noop(struct irq_data *data) { }
- 
- static unsigned int gpmc_irq_noop_ret(struct irq_data *data) { return 0; }
- 
--static int gpmc_setup_irq(int gpmc_irq)
-+static int gpmc_setup_irq(void)
- {
- 	int i;
- 	u32 regval;
-@@ -813,7 +836,37 @@ static int gpmc_setup_irq(int gpmc_irq)
- 	return request_irq(gpmc_irq, gpmc_handle_irq, 0, "gpmc", NULL);
- }
- 
--static void __init gpmc_mem_init(void)
-+static __exit int gpmc_free_irq(void)
-+{
-+	int i;
-+
-+	if (gpmc_irq)
-+		free_irq(gpmc_irq, NULL);
-+
-+	for (i = 0; i < GPMC_NR_IRQ; i++) {
-+		irq_set_handler(gpmc_client_irq[i].irq, NULL);
-+		irq_set_chip(gpmc_client_irq[i].irq, &no_irq_chip);
-+		irq_modify_status(gpmc_client_irq[i].irq, 0, 0);
-+	}
-+
-+	irq_free_descs(gpmc_irq_start, GPMC_NR_IRQ);
-+
-+	return 0;
-+}
-+
-+static void __devexit gpmc_mem_exit(void)
-+{
-+	int cs;
-+
-+	for (cs = 0; cs < GPMC_CS_NUM; cs++) {
-+		if (!gpmc_cs_mem_enabled(cs))
-+			continue;
-+		gpmc_cs_delete_mem(cs);
-+	}
-+
-+}
-+
-+static void __devinit gpmc_mem_init(void)
- {
- 	int cs;
- 	unsigned long boot_rom_space = 0;
-@@ -840,65 +893,85 @@ static void __init gpmc_mem_init(void)
- 	}
- }
- 
--static int __init gpmc_init(void)
-+static __devinit int gpmc_probe(struct platform_device *pdev)
- {
- 	u32 l;
--	int ret = -EINVAL;
--	int gpmc_irq;
--	char *ck = NULL;
--
--	if (cpu_is_omap24xx()) {
--		ck = "core_l3_ck";
--		if (cpu_is_omap2420())
--			l = OMAP2420_GPMC_BASE;
--		else
--			l = OMAP34XX_GPMC_BASE;
--		gpmc_irq = 20 + OMAP_INTC_START;
--	} else if (cpu_is_omap34xx()) {
--		ck = "gpmc_fck";
--		l = OMAP34XX_GPMC_BASE;
--		gpmc_irq = 20 + OMAP_INTC_START;
--	} else if (cpu_is_omap44xx() || soc_is_omap54xx()) {
--		/* Base address and irq number are same for OMAP4/5 */
--		ck = "gpmc_ck";
--		l = OMAP44XX_GPMC_BASE;
--		gpmc_irq = 20 + OMAP44XX_IRQ_GIC_START;
--	}
-+	struct resource *res;
- 
--	if (WARN_ON(!ck))
--		return ret;
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (res == NULL)
-+		return -ENOENT;
- 
--	gpmc_l3_clk = clk_get(NULL, ck);
--	if (IS_ERR(gpmc_l3_clk)) {
--		printk(KERN_ERR "Could not get GPMC clock %s\n", ck);
--		BUG();
--	}
-+	phys_base = res->start;
-+	mem_size = resource_size(res);
- 
--	gpmc_base = ioremap(l, SZ_4K);
-+	gpmc_base = devm_request_and_ioremap(&pdev->dev, res);
- 	if (!gpmc_base) {
--		clk_put(gpmc_l3_clk);
--		printk(KERN_ERR "Could not get GPMC register memory\n");
--		BUG();
-+		dev_err(&pdev->dev, "error: request memory / ioremap\n");
-+		return -EADDRNOTAVAIL;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-+	if (res == NULL)
-+		dev_warn(&pdev->dev, "Failed to get resource: irq\n");
-+	else
-+		gpmc_irq = res->start;
-+
-+	gpmc_l3_clk = clk_get(&pdev->dev, "fck");
-+	if (IS_ERR(gpmc_l3_clk)) {
-+		dev_err(&pdev->dev, "error: clk_get\n");
-+		gpmc_irq = 0;
-+		return PTR_ERR(gpmc_l3_clk);
- 	}
- 
- 	clk_enable(gpmc_l3_clk);
- 
-+	gpmc_dev = &pdev->dev;
-+
- 	l = gpmc_read_reg(GPMC_REVISION);
--	printk(KERN_INFO "GPMC revision %d.%d\n", (l >> 4) & 0x0f, l & 0x0f);
--	/* Set smart idle mode and automatic L3 clock gating */
--	l = gpmc_read_reg(GPMC_SYSCONFIG);
--	l &= 0x03 << 3;
--	l |= (0x02 << 3) | (1 << 0);
--	gpmc_write_reg(GPMC_SYSCONFIG, l);
-+	if (GPMC_REVISION_MAJOR(l) > 0x4)
-+		gpmc_capability = GPMC_HAS_WR_ACCESS | GPMC_HAS_WR_DATA_MUX_BUS;
-+	dev_info(gpmc_dev, "GPMC revision %d.%d\n",
-+				GPMC_REVISION_MAJOR(l), GPMC_REVISION_MINOR(l));
-+
- 	gpmc_mem_init();
- 
--	ret = gpmc_setup_irq(gpmc_irq);
--	if (ret)
--		pr_err("gpmc: irq-%d could not claim: err %d\n",
--						gpmc_irq, ret);
--	return ret;
-+	if (IS_ERR_VALUE(gpmc_setup_irq()))
-+		dev_warn(gpmc_dev, "gpmc_setup_irq failed\n");
-+
-+	return 0;
-+}
-+
-+static __exit int gpmc_remove(struct platform_device *pdev)
-+{
-+	gpmc_free_irq();
-+	gpmc_mem_exit();
-+	gpmc_dev = NULL;
-+	return 0;
- }
-+
-+static struct platform_driver gpmc_driver = {
-+	.probe		= gpmc_probe,
-+	.remove		= __devexit_p(gpmc_remove),
-+	.driver		= {
-+		.name	= DEVICE_NAME,
-+		.owner	= THIS_MODULE,
-+	},
-+};
-+
-+static __init int gpmc_init(void)
-+{
-+	return platform_driver_register(&gpmc_driver);
-+}
-+
-+static __exit void gpmc_exit(void)
-+{
-+	platform_driver_unregister(&gpmc_driver);
-+
-+}
-+
- postcore_initcall(gpmc_init);
-+module_exit(gpmc_exit);
- 
- static int __init omap_gpmc_init(void)
- {
+I think you should have a comment on top of this loop to explain why
+this loop is done in the reverse direction. Of course, I personally
+know why, but the reviewers/readers may not.
+
+>  static int gen_74x164_get_value(struct gpio_chip *gc, unsigned offset)
+>  {
+>  	struct gen_74x164_chip *chip = gpio_to_74x164_chip(gc);
+> +	u8 bank = offset / 8;
+> +	u8 pin = offset % 8;
+>  	int ret;
+>  
+>  	mutex_lock(&chip->lock);
+> -	ret = (chip->port_config >> offset) & 0x1;
+> +	ret = (*(chip->buffer + bank) >> pin) & 0x1;
+
+	ret = (chip->buffer[bank] >> pin) & 0x1;
+
+>  {
+>  	struct gen_74x164_chip *chip = gpio_to_74x164_chip(gc);
+> +	u8 bank = offset / 8;
+> +	u8 pin = offset % 8;
+>  
+>  	mutex_lock(&chip->lock);
+>  	if (val)
+> -		chip->port_config |= (1 << offset);
+> +		*(chip->buffer + bank) |= (1 << pin);
+
+		chip->buffer[bank] |= (1 << pin)
+
+>  	else
+> -		chip->port_config &= ~(1 << offset);
+> +		*(chip->buffer + bank) &= ~(1 << pin);
+
+		chip->buffer[bank] &= ~(1 << pin)
+
+
+> +	if (of_property_read_u32(spi->dev.of_node, "registers-number", &chip->registers)) {
+> +		dev_err(&spi->dev, "Missing registers-number property in the DT.\n");
+> +		ret = -EINVAL;
+> +		goto exit_destroy;
+> +	}
+
+I'm wondering whether this shouldn't be named daisy-chain-length or
+something like that, but I'm not sure.
+
+
+> +	chip->gpio_chip.ngpio = 8 * chip->registers;
+
+Maybe make "8" a #define so that it becomes self-explanatory what this
+8 is?
+
+Best regards,
+
+Thomas
 -- 
-1.7.1
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
