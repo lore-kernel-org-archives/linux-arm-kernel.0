@@ -1,87 +1,99 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Wed, 05 Sep 2012 10:48:14 +0200
-Subject: [PATCH 3/8] gpio: 74x164: Remove platform data and use dynamic
- gpio number assignment
-In-Reply-To: <1346834457-6257-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1346834457-6257-1-git-send-email-maxime.ripard@free-electrons.com>
- <1346834457-6257-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <9763805.kende5OlsI@flexo>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Wed, 5 Sep 2012 14:18:52 +0530
+Subject: [PATCH v7 0/3] GPMC driver conversion
+Message-ID: <cover.1346829350.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 05 September 2012 10:40:52 Maxime Ripard wrote:
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi,
 
-No, please don't do it that way, rather check if the platform_data pointer is 
-null, and if it is, fall-back to dynamic gpio base assignment. There is a 
-currently out of tree user of this for which it matters to be able to set a 
-specific gpio base numbering.
+Basic gpmc driver conversion series. Driver that is now created out of
+gpmc code is a simple one, it handles tasks that were earlier executed
+by gpmc_init. Now instead of relying on cpu_is_* checks, it obtains
+resources and clk handle in the standard Linux way. The existing gpmc
+interface works as was without this series.
 
-> ---
->  drivers/gpio/gpio-74x164.c |   10 +---------
->  include/linux/spi/74x164.h |    9 ---------
->  2 files changed, 1 insertion(+), 18 deletions(-)
->  delete mode 100644 include/linux/spi/74x164.h
-> 
-> diff --git a/drivers/gpio/gpio-74x164.c b/drivers/gpio/gpio-74x164.c
-> index 604b998..24cfe4c 100644
-> --- a/drivers/gpio/gpio-74x164.c
-> +++ b/drivers/gpio/gpio-74x164.c
-> @@ -12,7 +12,6 @@
->  #include <linux/init.h>
->  #include <linux/mutex.h>
->  #include <linux/spi/spi.h>
-> -#include <linux/spi/74x164.h>
->  #include <linux/gpio.h>
->  #include <linux/slab.h>
->  #include <linux/module.h>
-> @@ -72,15 +71,8 @@ static int gen_74x164_direction_output(struct gpio_chip 
-*gc,
->  static int __devinit gen_74x164_probe(struct spi_device *spi)
->  {
->  	struct gen_74x164_chip *chip;
-> -	struct gen_74x164_chip_platform_data *pdata;
->  	int ret;
->  
-> -	pdata = spi->dev.platform_data;
-> -	if (!pdata || !pdata->base) {
-> -		dev_dbg(&spi->dev, "incorrect or missing platform data\n");
-> -		return -EINVAL;
-> -	}
-> -
->  	/*
->  	 * bits_per_word cannot be configured in platform data
->  	 */
-> @@ -104,7 +96,7 @@ static int __devinit gen_74x164_probe(struct spi_device 
-*spi)
->  	chip->gpio_chip.direction_output = gen_74x164_direction_output;
->  	chip->gpio_chip.get = gen_74x164_get_value;
->  	chip->gpio_chip.set = gen_74x164_set_value;
-> -	chip->gpio_chip.base = pdata->base;
-> +	chip->gpio_chip.base = -1;
->  	chip->gpio_chip.ngpio = 8;
->  	chip->gpio_chip.can_sleep = 1;
->  	chip->gpio_chip.dev = &spi->dev;
-> diff --git a/include/linux/spi/74x164.h b/include/linux/spi/74x164.h
-> deleted file mode 100644
-> index 0aa6acc..0000000
-> --- a/include/linux/spi/74x164.h
-> +++ /dev/null
-> @@ -1,9 +0,0 @@
-> -#ifndef LINUX_SPI_74X164_H
-> -#define LINUX_SPI_74X164_H
-> -
-> -struct gen_74x164_chip_platform_data {
-> -	/* number assigned to the first GPIO */
-> -	unsigned	base;
-> -};
-> -
-> -#endif
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+HWMOD patch also has been brought into this series back.
+
+As this creates only a basic driver, further gpmc driver work can be
+based over this, while having a driver first in place.
+
+This series is based on l-o/testing-cleanup as on 5-Sep-12,
+i.e. over commit,
+
+e3a5c14 ARM: OMAP1: Move SoC specific headers from plat to mach for omap1
+
+per Tony's suggestion.
+
+It is available
+@git://gitorious.org/x0148406-public/linux-kernel.git gpmc-drv-v7
+
+This series has been tested on omap3evm (rev G).
+
+
+GPMC (General Purpose Memory Controller) in brief:
+GPMC is an unified memory controller dedicated to interfacing external
+memory devices like
+ Asynchronous SRAM like memories and application specific integrated circuit devices.
+ Asynchronous, synchronous, and page mode burst NOR flash devices NAND flash
+ Pseudo-SRAM devices
+
+GPMC details can be referred in AM335X Technical Reference Manual
+@ http://www.ti.com/lit/pdf/spruh73
+
+Regards
+Afzal
+
+v7:
+    Create a simple driver that gets resources & clk the standard Linux way
+    Pull in HMWOD patch back into this series
+
+v6: Capability flag added that stores features based on revision
+    Macros used for finding revision
+    Return value from memory setup function corrected
+    Comments added to clarify handling of device type, size
+    Bool type time setting patch removed as has been taken care in [2]
+    Handle variable number of waitpin
+    Warn if driver is unable to configure interrupt
+    Enhance some of commit messages
+    Handle shared writeprotect case
+    Fix a bug in gpmc_create_device
+    Get clk from hwmod
+    Remove unwanted code
+v5: Make this a purely driver conversion series, i.e. gpmc-mtd
+    interactions has been made as a separate series, so is adding
+    hwmod entry for OMAP2/3.
+    And modifying gpmc peripheral platform initialization has been
+    separated out of this series, so is migrating boards to use new
+    driver interface. GPMC driver conversion which was done in a few
+    patches in v4 has been tranformed to series of small patches.
+    Also care has been taken care that old interface will not break
+    with any of these patches, so both interfaces can coexist.
+    This helps in converting boards one-by-one gradually. Acquiring
+    CS has been thrown out. And conclusive comments on v4 has been
+    addressed.
+v4: Handle wait pin (except for interrupts), enhance configuration
+    & timing interface of GPMC to take care of all boards. Dynamic
+    allocation of interrupt instead of static. Convert remaining
+    peripherals to work with GPMC driver. Handle acquiring NAND CS#,
+    adapt to HWMOD, update HWMOD OMAP2/3 entries, other minor
+    commenst on v3.
+v3: Single device structure passed from platform for peripherals using
+    multiple CS instead of using multiple device structure having a few
+    redundant data, handle interrupts, GPMC NAND handling by GPMC NAND
+    driver instead of GPMC driver
+v2: Avoid code movement that kept similar code together (for easy review)
+
+Afzal Mohammed (3):
+  ARM: OMAP2/3: hwmod data: add gpmc
+  ARM: OMAP2+: gpmc: Adapt to HWMOD
+  ARM: OMAP2+: gpmc: minimal driver support
+
+ arch/arm/mach-omap2/gpmc.c                         |  193 +++++++++++++++-----
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   18 ++
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   18 ++
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |   44 +++++-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   54 ++++++
+ arch/arm/mach-omap2/omap_hwmod_common_data.h       |    1 +
+ arch/arm/mach-omap2/prcm-common.h                  |    2 +
+ 7 files changed, 282 insertions(+), 48 deletions(-)
