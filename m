@@ -1,52 +1,49 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 5 Sep 2012 17:09:37 -0400 (EDT)
-Subject: [PATCH] ARM: Fix semihosting Kconfig text
-In-Reply-To: <1346879011-7765-1-git-send-email-sboyd@codeaurora.org>
-References: <1346879011-7765-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <alpine.LFD.2.02.1209051709040.1784@xanadu.home>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 05 Sep 2012 17:30:23 -0400 (EDT)
+Subject: [PATCH 04/10] net/macb: Fix a race in macb_start_xmit()
+In-Reply-To: <40f02ee50a29aaec6c949432a1bcf09f4b027181.1346775479.git.nicolas.ferre@atmel.com>
+References: <cover.1346775479.git.nicolas.ferre@atmel.com>
+ <40f02ee50a29aaec6c949432a1bcf09f4b027181.1346775479.git.nicolas.ferre@atmel.com>
+Message-ID: <20120905.173023.2235590074897156746.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 5 Sep 2012, Stephen Boyd wrote:
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
+Date: Wed, 5 Sep 2012 10:19:11 +0200
 
-> It seems we were missing some text in the title for the
-> semihosting DEBUG_LL option. Add in the "/O" and fix up some
-> minor typos in the help text.
+> From: Havard Skinnemoen <havard@skinnemoen.net>
 > 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-> ---
->  arch/arm/Kconfig.debug | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+> Fix a race in macb_start_xmit() where we unconditionally set the TSTART bit.
+> If an underrun just happened (we do this with interrupts disabled, so it might
+> not have been handled yet), the controller starts transmitting from the first
+> entry in the ring, which is usually wrong.
+> Restart the controller after error handling.
 > 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index f15f82b..e968a52 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -356,15 +356,15 @@ choice
->  		  is nothing connected to read from the DCC.
->  
->  	config DEBUG_SEMIHOSTING
-> -		bool "Kernel low-level debug output via semihosting I"
-> +		bool "Kernel low-level debug output via semihosting I/O"
->  		help
->  		  Semihosting enables code running on an ARM target to use
->  		  the I/O facilities on a host debugger/emulator through a
-> -		  simple SVC calls. The host debugger or emulator must have
-> +		  simple SVC call. The host debugger or emulator must have
->  		  semihosting enabled for the special svc call to be trapped
->  		  otherwise the kernel will crash.
->  
-> -		  This is known to work with OpenOCD, as wellas
-> +		  This is known to work with OpenOCD, as well as
->  		  ARM's Fast Models, or any other controlling environment
->  		  that implements semihosting.
->  
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
+> Signed-off-by: Havard Skinnemoen <havard@skinnemoen.net>
+> [nicolas.ferre at atmel.com: split patch in topics]
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Accumulating special case code and checks into the hot path of TX packet
+processing is extremely unwise.
+
+Instead, when you handle the TX error conditions and reset the chip you
+should first ensure that there are no flows of control in the transmit
+function of your driver by using the appropriate locking et al. facilities.
+
+For example, you can quiesce the transmit path by handling the chip error
+interrupt as follows:
+
+1) Disable chip interrupt generation.
+
+2) Schedule a workqueue so you can process the reset outside of hard
+   interrupt context.
+
+3) In the workqueue function, disable NAPI and perform a
+   netif_tx_disable() to guarentee there are no threads of
+   execution trying to queue up packets for TX into the driver.
+
+4) Perform your chip reset and whatever else is necessary.
+
+5) Re-enable NAPI and TX.
+
+Then you don't need any special checks in your xmit method at all.
