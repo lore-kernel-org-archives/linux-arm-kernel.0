@@ -1,131 +1,86 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed,  5 Sep 2012 15:35:24 +0200
-Subject: [PATCH 5/8] pwm i.MX: add devicetree support
-In-Reply-To: <1346852127-25226-1-git-send-email-s.hauer@pengutronix.de>
-References: <1346852127-25226-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1346852127-25226-6-git-send-email-s.hauer@pengutronix.de>
+From: vbyravarasu@nvidia.com (Venu Byravarasu)
+Date: Wed, 5 Sep 2012 19:05:49 +0530
+Subject: [PATCH v2] usb: move phy driver from mach-tegra to drivers/usb
+In-Reply-To: <20120905125210.GG19591@arwen.pp.htv.fi>
+References: <1346395526-18219-1-git-send-email-vbyravarasu@nvidia.com>
+ <5046772F.6060908@wwwdotorg.org>
+ <D958900912E20642BCBC71664EFECE3E6DDE77533D@BGMAIL02.nvidia.com>
+ <20120905125210.GG19591@arwen.pp.htv.fi>
+Message-ID: <D958900912E20642BCBC71664EFECE3E6DDE77534D@BGMAIL02.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Zabel <p.zabel@pengutronix.de>
+Hi Felipe,
 
-At the same time remove platform based support. No user for
-this driver has made it into mainline so far, so all we break
-is out of tree stuff.
+> -----Original Message-----
+> From: Felipe Balbi [mailto:balbi at ti.com]
+> Sent: Wednesday, September 05, 2012 6:22 PM
+> To: Venu Byravarasu
+> Cc: Stephen Warren; balbi at ti.com; ccross at android.com; olof at lixom.net;
+> linux at arm.linux.org.uk; stern at rowland.harvard.edu;
+> gregkh at linuxfoundation.org; linux-kernel at vger.kernel.org; linux-
+> tegra at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> usb at vger.kernel.org
+> Subject: Re: [PATCH v2] usb: move phy driver from mach-tegra to drivers/usb
+> 
+> * PGP Signed by an unknown key
+> 
+> Hi,
+> 
+> On Wed, Sep 05, 2012 at 06:24:13PM +0530, Venu Byravarasu wrote:
+> >
+> > > -----Original Message-----
+> > > From: Stephen Warren [mailto:swarren at wwwdotorg.org]
+> > > Sent: Wednesday, September 05, 2012 3:19 AM
+> > > To: balbi at ti.com
+> > > Cc: Venu Byravarasu; ccross at android.com; olof at lixom.net;
+> > > linux at arm.linux.org.uk; stern at rowland.harvard.edu;
+> > > gregkh at linuxfoundation.org; linux-kernel at vger.kernel.org; linux-
+> > > tegra at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> > > usb at vger.kernel.org
+> > > Subject: Re: [PATCH v2] usb: move phy driver from mach-tegra to
+> drivers/usb
+> > >
+> > > On 08/31/2012 12:45 AM, Venu Byravarasu wrote:
+> > > > As part of this patch:
+> > > > 	1. Moved existing tegra phy driver to drivers/USB directory.
+> > > > 	2. Added standard USB phy driver APIs to tegra phy driver.
+> > > >
+> > > > Signed-off-by: Venu Byravarasu <vbyravarasu@nvidia.com>
+> > >
+> > > Tested-by: Stephen Warren <swarren@nvidia.com>
+> > >
+> > > Felipe, Would it be possible to apply this patch to a topic branch, so
+> > > that I can merge it into the Tegra tree? The reason is that I'd like to
+> > > remove Tegra's devices.[ch] in kernel 3.7, but to do that, I need to
+> > > move a tiny chunk of code out of that file somewhere else, and doing
+> > > that relies on adding a #include to usb_phy.h/tegra_usb_phy.h, which is
+> > > renamed in this patch.
+> > >
+> > > Alternatively, if you don't think it'll cause any merge conflicts with
+> > > the USB PHY tree, I can just take this patch through the Tegra tree if
+> > > you want. Venu, do you plan any other patches within the next couple
+> > > weeks or so (i.e. before 3.6-rc6) that will depend on this patch? If so,
+> > > taking it only through the Tegra tree might not work so well.
+> >
+> > Thanks Stephen for verifying the changes.
+> > I'm planning to push next patches, with tegra3 phy support added, very
+> soon.
+> 
+> Unfortunately the patch didn't apply on my xceiv branch. Could you
+> rebase on top of that ?
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- Documentation/devicetree/bindings/pwm/imx-pwm.txt |   17 ++++++++
- drivers/pwm/pwm-imx.c                             |   45 ++++++++++++++++-----
- 2 files changed, 52 insertions(+), 10 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pwm/imx-pwm.txt
+Rebased on to your branch and sent patch for your review.
+Plz review and merge.
 
-diff --git a/Documentation/devicetree/bindings/pwm/imx-pwm.txt b/Documentation/devicetree/bindings/pwm/imx-pwm.txt
-new file mode 100644
-index 0000000..9b9b185
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/imx-pwm.txt
-@@ -0,0 +1,17 @@
-+Freescale i.MX PWM controller
-+
-+Required properties:
-+- compatible: should be "fsl,<soc>-pwm"
-+- reg: physical base address and length of the controller's registers
-+- #pwm-cells: should be 2.  The first cell specifies the per-chip index
-+  of the PWM to use and the second cell is the duty cycle in nanoseconds.
-+- interrupts: The interrupt for the pwm controller
-+
-+Example:
-+
-+pwm1: pwm at 53fb4000 {
-+	#pwm-cells = <2>;
-+	compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
-+	reg = <0x53fb4000 0x4000>;
-+	interrupts = <61>;
-+};
-diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-index a689144..af77045 100644
---- a/drivers/pwm/pwm-imx.c
-+++ b/drivers/pwm/pwm-imx.c
-@@ -16,8 +16,7 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/pwm.h>
--#include <mach/hardware.h>
--
-+#include <linux/of_device.h>
- 
- /* i.MX1 and i.MX21 share the same PWM function block: */
- 
-@@ -203,12 +202,41 @@ static struct pwm_ops imx_pwm_ops = {
- 	.owner = THIS_MODULE,
- };
- 
-+struct imx_pwm_data {
-+	int (*config)(struct pwm_chip *chip,
-+		struct pwm_device *pwm, int duty_ns, int period_ns);
-+	void (*set_enable)(struct pwm_chip *chip, bool enable);
-+};
-+
-+static struct imx_pwm_data imx_pwm_data_v1 = {
-+	.config = imx_pwm_config_v1,
-+	.set_enable = imx_pwm_set_enable_v1,
-+};
-+
-+static struct imx_pwm_data imx_pwm_data_v2 = {
-+	.config = imx_pwm_config_v2,
-+	.set_enable = imx_pwm_set_enable_v2,
-+};
-+
-+static const struct of_device_id imx_pwm_dt_ids[] = {
-+	{ .compatible = "fsl,imx1-pwm", .data = &imx_pwm_data_v1, },
-+	{ .compatible = "fsl,imx27-pwm", .data = &imx_pwm_data_v2, },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, imx_pwm_dt_ids);
-+
- static int __devinit imx_pwm_probe(struct platform_device *pdev)
- {
-+	const struct of_device_id *of_id =
-+			of_match_device(imx_pwm_dt_ids, &pdev->dev);
-+	struct imx_pwm_data *data;
- 	struct imx_chip *imx;
- 	struct resource *r;
- 	int ret = 0;
- 
-+	if (!of_id)
-+		return -ENODEV;
-+
- 	imx = devm_kzalloc(&pdev->dev, sizeof(*imx), GFP_KERNEL);
- 	if (imx == NULL) {
- 		dev_err(&pdev->dev, "failed to allocate memory\n");
-@@ -235,13 +263,9 @@ static int __devinit imx_pwm_probe(struct platform_device *pdev)
- 	if (imx->mmio_base == NULL)
- 		return -EADDRNOTAVAIL;
- 
--	if (cpu_is_mx1() || cpu_is_mx21()) {
--		imx->config = imx_pwm_config_v1;
--		imx->set_enable = imx_pwm_set_enable_v1;
--	} else {
--		imx->config = imx_pwm_config_v2;
--		imx->set_enable = imx_pwm_set_enable_v2;
--	}
-+	data = of_id->data;
-+	imx->config = data->config;
-+	imx->set_enable = data->set_enable;
- 
- 	ret = pwmchip_add(&imx->chip);
- 	if (ret < 0)
-@@ -264,7 +288,8 @@ static int __devexit imx_pwm_remove(struct platform_device *pdev)
- 
- static struct platform_driver imx_pwm_driver = {
- 	.driver		= {
--		.name	= "mxc_pwm",
-+		.name	= "imx-pwm",
-+		.of_match_table = of_match_ptr(imx_pwm_dt_ids),
- 	},
- 	.probe		= imx_pwm_probe,
- 	.remove		= __devexit_p(imx_pwm_remove),
--- 
-1.7.10.4
+Thanks,
+Venu 
+
+> 
+> thanks a lot
+> 
+> --
+> balbi
+> 
+> * Unknown Key
+> * 0x35CAA444
