@@ -1,44 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 4 Sep 2012 21:09:00 -0700
-Subject: [GIT PULL] CSR SiRFmarco preparing patches
-In-Reply-To: <CAGsJ_4xY17w96vVs1966KJBC5Tt24qyR=YAPbQWMTFrDRs+xog@mail.gmail.com>
-References: <CAGsJ_4xY17w96vVs1966KJBC5Tt24qyR=YAPbQWMTFrDRs+xog@mail.gmail.com>
-Message-ID: <20120905040900.GA6747@quad.lixom.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 5 Sep 2012 12:09:29 +0800
+Subject: [PATCH] arm: mxs: Fix MMC WP pin being inverted
+In-Reply-To: <201209050555.30635.marex@denx.de>
+References: <1346811082-27295-1-git-send-email-marex@denx.de>
+ <201209050457.03707.marex@denx.de>
+ <20120905031953.GU2362@S2101-09.ap.freescale.net>
+ <201209050555.30635.marex@denx.de>
+Message-ID: <20120905040927.GY2362@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2012 at 05:35:42PM +0800, Barry Song wrote:
-> Hi Olof, Arnd,
+On Wed, Sep 05, 2012 at 05:55:30AM +0200, Marek Vasut wrote:
+> You know, as I already complained, well defined rules would be welcome.
 > 
-> Please pull the following patches which are making mach-prima2 common
-> for prima2 and coming new marco SoC.
-> Note the 3/5 patches depend on 2/5:
-> ARM: PRIMA2: convert to common clk and finish full clk tree
-> clk: prima2: move from arch/arm/mach to drivers/clk
-> which have been in Mike's clk-next, you might see:
-> http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=shortlog;h=refs/heads/clk-next
+> All these tags seem to me just as a tool for maintainers to unnecesarily torture 
+> people. I'd be much happier if we had a tool or something that'd either check 
+> them or generate them -- that'd make my life much easier. I think I'm not alone 
+> here.
 > 
-> so i rebase other 3 patches on top of commit
-> bc0e489eb07f4aa2fb5cb9b7ff1fdf4b6ba3bda5.
+> Maybe a checkpatch-alike tool? But we have no list of valid tags, so, there're 
+> no well-defined rules, only some unspoken agreement :-(
 > 
-> i guess Mike will not rebase prima2 clk patches any more, so there
-> will not be merge conflict.
-> 
-> anyway, if i have let prima2-clk go through arm-soc tree but not clk
-> tree, things should be better.
-> 
-> Regards,
-> Barry
-> 
-> The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
-> 
->   Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
-> 
-> are available in the git repository at:
->   git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git marco-prepare
+I'm pretty sure you know the rule, since I have been told you time and
+time again.
 
-Thanks, pulled into next/cleanup. Mike, speak up if you anticipate need to
-rebuild your branch and thus rebase the two patches pulled in.
+It's not about rule but attitude, really.
 
-
--Olof
+-- 
+Regards,
+Shawn
