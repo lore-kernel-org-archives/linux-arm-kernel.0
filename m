@@ -1,48 +1,52 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 5 Sep 2012 13:56:46 +0200
-Subject: [PATCH 5/8] gpio: 74x164: Add output pin support
-In-Reply-To: <20120905122652.7c752e96@eb-e6520>
-References: <1346834457-6257-1-git-send-email-maxime.ripard@free-electrons.com>
- <1346834457-6257-5-git-send-email-maxime.ripard@free-electrons.com>
- <20120905112012.13ce2c86@skate> <20120905114645.57bfe591@eb-e6520>
- <20120905120906.12d08bf5@skate> <20120905122652.7c752e96@eb-e6520>
-Message-ID: <20120905135646.3bbf98fa@skate>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed,  5 Sep 2012 14:58:48 +0300
+Subject: [PATCH v3 0/8] ARM/dts: OMAP audio related updates for OMAP2/3/4/5
+Message-ID: <1346846336-27321-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Wed, 5 Sep 2012 12:26:52 +0200,
-Eric B?nard <eric@eukrea.com> a ?crit :
+Hello,
 
-> Le Wed, 5 Sep 2012 12:09:06 +0200,
-> Thomas Petazzoni <thomas.petazzoni@free-electrons.com> a ?crit :
-> > I don't think the /OE pin can be used as a chip select, because when it
-> > is high, the state of the output pins is not maintained to their
-> > previous state: the pins are turned into the high impedance state. If
-> > used as a chip select, it would mean that the value of the output pins
-> > transition from their old state to high impedance at the beginning of
-> > the transfer, and then from the high impedance to their new state at
-> > the end of the transfer.
-> 
-> OK that's exactly what I was thinking to ;-)
+Changes since v2:
+- Fixed the interrupts properties of McBSP for OMAP2/3
+- omap2420.dtsi, omap2430.dtsi header date updated to 2012
 
-Good. So, do you think it's reasonable to use the STCP as a chip-select
-for this device?
+Changes since v1:
+- Rebased on current l-o:devel-dt branch
+- Two new patch, one for OMAP4 to add reg-names for the mem areas, one for OMAP5
+  to add McPDM and DMIC section
 
-> > And of course, this signal is inverted compared to a normal chip select.
-> 
-> polarity of the chip select can vary (mc13xxx-spi has an active high CS
-> for example).
+The series adds/fixes the audio related IPs (McBSP, McPDM, DMIC) in the dtsi
+files and enable the audio on BeagleBoard when booted with DT.
 
-Sure, but I guess it depends on capabilities of the SPI controller in
-your SoC. I haven't seen a way of configuring the polarity of the chip
-selects in the i.MX28 SPI controller, but maybe I've missed it.
-Anyway, /OE isn't usable as a chip-select, so we don't care.
+I have created on top of:
+git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
+for_3.7/dts
 
-Best regards,
+Regards,
+Peter
+---
+Peter Ujfalusi (8):
+  ARM/dts: omap2: Add McBSP entries for OMAP2420 and OMAP2430 SoC
+  ARM/dts: omap2420-h4: Include omap2420.dtsi file instead the common
+    omap2
+  ARM/dts: omap3: Add McBSP entries
+  ARM/dts: omap4: Add McBSP entries
+  ARM/dts: omap4: Add reg-names for McPDM and DMIC
+  ARM/dts: omap5: Add McBSP entries
+  ARM/dts: omap5: Add McPDM and DMIC section to the dtsi file
+  ARM/dts: omap3-beagle: Enable audio support
 
-Thomas
+ arch/arm/boot/dts/omap2420-h4.dts  |  2 +-
+ arch/arm/boot/dts/omap2420.dtsi    | 39 ++++++++++++++++++
+ arch/arm/boot/dts/omap2430.dtsi    | 83 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-beagle.dts | 14 +++++++
+ arch/arm/boot/dts/omap3.dtsi       | 69 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap4.dtsi       | 49 ++++++++++++++++++++++
+ arch/arm/boot/dts/omap5.dtsi       | 56 +++++++++++++++++++++++++
+ 7 files changed, 311 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/omap2420.dtsi
+ create mode 100644 arch/arm/boot/dts/omap2430.dtsi
+
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.12
