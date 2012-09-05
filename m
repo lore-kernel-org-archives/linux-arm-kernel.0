@@ -1,96 +1,32 @@
 From: loic.pallardy-ext@stericsson.com (Loic Pallardy)
-Date: Wed, 5 Sep 2012 11:59:08 +0200
-Subject: [PATCH 12/17] mfd: prcmu: make fw_project_name generic
+Date: Wed, 5 Sep 2012 11:59:04 +0200
+Subject: [PATCH 08/17] arm: ux500: update DB internal irq nb
 In-Reply-To: <1346839153-6465-1-git-send-email-loic.pallardy-ext@stericsson.com>
 References: <1346839153-6465-1-git-send-email-loic.pallardy-ext@stericsson.com>
-Message-ID: <1346839153-6465-13-git-send-email-loic.pallardy-ext@stericsson.com>
+Message-ID: <1346839153-6465-9-git-send-email-loic.pallardy-ext@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Project_name_id must be increased to support 8500 and x540 project.
+To support DB9540 chipset, nb internal irq must be updated.
 
 Signed-off-by: Loic Pallardy <loic.pallardy@stericsson.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/mfd/db8500-prcmu.c       |  4 +++-
- include/linux/mfd/db8500-prcmu.h | 14 --------------
- include/linux/mfd/dbx500-prcmu.h | 17 +++++++++++++++++
- 3 files changed, 20 insertions(+), 15 deletions(-)
+ arch/arm/mach-ux500/include/mach/irqs.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 96487a0..327e9f6 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -2335,7 +2335,7 @@ static struct irq_chip prcmu_irq_chip = {
- 	.irq_unmask	= prcmu_irq_unmask,
- };
+diff --git a/arch/arm/mach-ux500/include/mach/irqs.h b/arch/arm/mach-ux500/include/mach/irqs.h
+index fc77b42..c1a6908 100644
+--- a/arch/arm/mach-ux500/include/mach/irqs.h
++++ b/arch/arm/mach-ux500/include/mach/irqs.h
+@@ -24,7 +24,7 @@
+  */
+ #define IRQ_MTU0		(IRQ_SHPI_START + 4)
  
--static char *fw_project_name(u8 project)
-+char *fw_project_name(u32 project)
- {
- 	switch (project) {
- 	case PRCMU_FW_PROJECT_U8500:
-@@ -2350,6 +2350,8 @@ static char *fw_project_name(u8 project)
- 		return "U8520";
- 	case PRCMU_FW_PROJECT_U8420:
- 		return "U8420";
-+	case PRCMU_FW_PROJECT_U9540:
-+		return "U9540";
- 	default:
- 		return "Unknown";
- 	}
-diff --git a/include/linux/mfd/db8500-prcmu.h b/include/linux/mfd/db8500-prcmu.h
-index a6d7298..f3b8b60 100644
---- a/include/linux/mfd/db8500-prcmu.h
-+++ b/include/linux/mfd/db8500-prcmu.h
-@@ -470,20 +470,6 @@ struct prcmu_auto_pm_config {
- 	u8 sva_policy;
- };
+-#define DBX500_NR_INTERNAL_IRQS		166
++#define DBX500_NR_INTERNAL_IRQS		(IRQ_SHPI_START + 224)
  
--#define PRCMU_FW_PROJECT_U8500		2
--#define PRCMU_FW_PROJECT_U9500		4
--#define PRCMU_FW_PROJECT_U8500_C2	7
--#define PRCMU_FW_PROJECT_U9500_C2	11
--#define PRCMU_FW_PROJECT_U8520		13
--#define PRCMU_FW_PROJECT_U8420		14
--
--struct prcmu_fw_version {
--	u8 project;
--	u8 api_version;
--	u8 func_version;
--	u8 errata;
--};
--
- #ifdef CONFIG_MFD_DB8500_PRCMU
- 
- struct prcmu_fops_register_data *db8500_prcmu_early_init(
-diff --git a/include/linux/mfd/dbx500-prcmu.h b/include/linux/mfd/dbx500-prcmu.h
-index d76114e..49e71a7 100644
---- a/include/linux/mfd/dbx500-prcmu.h
-+++ b/include/linux/mfd/dbx500-prcmu.h
-@@ -235,6 +235,23 @@ struct prcmu_tcdm_map {
- 	u32 legacy_offset;
- };
- 
-+#define PRCMU_FW_PROJECT_U8500		2
-+#define PRCMU_FW_PROJECT_U9500		4 /* Customer specific */
-+#define PRCMU_FW_PROJECT_U8500_C2	7
-+#define PRCMU_FW_PROJECT_U9500_C2	11 /* Customer specific */
-+#define PRCMU_FW_PROJECT_U8520		13
-+#define PRCMU_FW_PROJECT_U8420		14
-+#define PRCMU_FW_PROJECT_U9540		(6<<8)
-+
-+#define PRCMU_FW_PROJECT_NAME_LEN	20
-+struct prcmu_fw_version {
-+	u8 project;
-+	u8 api_version;
-+	u8 func_version;
-+	u8 errata;
-+	char project_name[PRCMU_FW_PROJECT_NAME_LEN];
-+};
-+
- #include <linux/mfd/db8500-prcmu.h>
- 
- #if defined(CONFIG_UX500_SOC_DB8500)
+ /* After chip-specific IRQ numbers we have the GPIO ones */
+ #define NOMADIK_NR_GPIO			288
 -- 
 1.7.11.1
