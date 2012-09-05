@@ -1,23 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 5 Sep 2012 21:59:40 +0800
-Subject: [PATCH v3 3/3] cpufreq: Add a generic cpufreq-cpu0 driver
-In-Reply-To: <201209051538.12916.rjw@sisk.pl>
-References: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
- <201209050118.39045.rjw@sisk.pl>
- <20120905011219.GN2362@S2101-09.ap.freescale.net>
- <201209051538.12916.rjw@sisk.pl>
-Message-ID: <20120905135937.GA2362@S2101-09.ap.freescale.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 5 Sep 2012 11:22:08 -0300
+Subject: [PATCH 0/7] Add support for Freescale's mc34708 to mc13xxx driver
+In-Reply-To: <11987916.rOoNGcb1ly@dev1>
+References: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <11987916.rOoNGcb1ly@dev1>
+Message-ID: <CAOMZO5AVP1L-6A7cmV-kQEfG1C+vczFKT=sQbFtLJDaGau0kRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2012 at 03:38:12PM +0200, Rafael J. Wysocki wrote:
-> Well, what about actually avoiding the code duplication?  That is,
-> can you make OMAP be a user of your new core function and drop the
-> OMAP-specific one, perhaps?
-> 
-I would expect that the driver will replace the omap-cpufreq driver
-completely at some point, where omap becomes a DT only platform.
+Hi Samuel,
 
--- 
+On Thu, Jul 12, 2012 at 8:02 PM, Marc Reilly <marc@cpdesign.com.au> wrote:
+> Hi Uwe,
+>
+>> This series was tested on a Phytec pcm038 (mc13783 on spi) using
+>> traditional boot (i.e. not dt) and on a i.MX53 based machine (mc34708 on
+>> i2c) using dt boot.
+>>
+>> Philippe's patches are already in next, they are just included here for
+>> those who want to test the patches. The 'mfd/mc13xxx: drop modifying
+>> driver's id_table in probe' was already sent out yesterday and is
+>> included here because the last patch depends on it.
+>>
+>
+> For all patches (that don't already have it):
+> Acked-by: Marc Reilly <marc@cpdesign.com.au>
+
+Can this series be applied?
+
 Regards,
-Shawn
+
+Fabio Estevam
