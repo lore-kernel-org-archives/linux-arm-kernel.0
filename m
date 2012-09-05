@@ -1,51 +1,46 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed,  5 Sep 2012 10:34:50 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC fix for v3.6 #2
-Message-ID: <1346808893-14124-1-git-send-email-horms@verge.net.au>
+Date: Wed,  5 Sep 2012 10:34:51 +0900
+Subject: [PATCH 1/3] ARM: shmobile: armadillo800eva: fixup: sound card
+ detection order
+In-Reply-To: <1346808893-14124-1-git-send-email-horms@verge.net.au>
+References: <1346808893-14124-1-git-send-email-horms@verge.net.au>
+Message-ID: <1346808893-14124-2-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-please consider the following fixes for the Armadillo800 EVA and
-Mackerel boards from Morimoto-san.
+Since armadillo800eva has 2 sound cards,
+and had reversed deferred probe order issue,
+it was purposely registered in reverse order.
 
-* "ARM: shmobile: armadillo800eva: fixup: sound card detection order"
-  is a regression fix.
-* "ARM: shmobile: mackerel: fixup usb module order"
-  is a regression fix.
-* "ARM: shmobile: armadillo800eva: enable rw rootfs mount"
-  is a boot-loader compatibility fix.
+But it was solved by
+1d29cfa57471a5e4b8a7c2a7433eeba170d3ad92
+(driver core: fixup reversed deferred probe order)
 
-All of the changes are aimed at improving the end-user experience.
+armadillo800eva board is expecting that
+FSI-WM8978 is the 1st, and FSI-HDMI is the 2nd sound card.
+This patch fixes it up
 
-Notes:
-
-* This pull request is based on my previous
-  "[GIT PULL] Renesas ARM-based SoC fix for v3.6" pull request
-  which was recently pulled by Olof. Please let me know
-  if you would like me to handle this a different way.
-
-----------------------------------------------------------------
-The following changes since commit 497dcf6fc355f0734faf851662b6957386715d24:
-
-  ARM: shmobile: marzen: fixup smsc911x id for regulator (2012-08-30 14:10:08 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git fixes
-
-for you to fetch changes up to 28e515878f8896b33c325ff9767cb0237210fb4c:
-
-  ARM: shmobile: armadillo800eva: enable rw rootfs mount (2012-09-03 17:31:34 +0900)
-
-----------------------------------------------------------------
-Kuninori Morimoto (3):
-      ARM: shmobile: armadillo800eva: fixup: sound card detection order
-      ARM: shmobile: mackerel: fixup usb module order
-      ARM: shmobile: armadillo800eva: enable rw rootfs mount
-
- arch/arm/configs/armadillo800eva_defconfig     |    2 +-
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
  arch/arm/mach-shmobile/board-armadillo800eva.c |    2 +-
- arch/arm/mach-shmobile/board-mackerel.c        |    3 ++-
- 3 files changed, 4 insertions(+), 3 deletions(-)
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index cf10f92..ecd8136 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -901,8 +901,8 @@ static struct platform_device *eva_devices[] __initdata = {
+ 	&camera_device,
+ 	&ceu0_device,
+ 	&fsi_device,
+-	&fsi_hdmi_device,
+ 	&fsi_wm8978_device,
++	&fsi_hdmi_device,
+ };
+ 
+ static void __init eva_clock_init(void)
+-- 
+1.7.10.4
