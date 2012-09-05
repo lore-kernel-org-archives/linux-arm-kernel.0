@@ -1,33 +1,129 @@
-From: matthew.leach@arm.com (Matthew Leach)
-Date: Wed,  5 Sep 2012 12:35:34 +0100
-Subject: [PATCH] ARM: decompressor: reset SCTLR.TRE for VMSA ARMv7 cores
-Message-ID: <1346844934-30518-1-git-send-email-matthew.leach@arm.com>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Wed, 05 Sep 2012 21:09:14 +0530
+Subject: [PATCH V4 1/2] drm/exynos: add platform_device_id table and driver
+ data for drm fimd
+In-Reply-To: <1346859555-13527-1-git-send-email-l.krishna@samsung.com>
+References: <1346859555-13527-1-git-send-email-l.krishna@samsung.com>
+Message-ID: <1346859555-13527-2-git-send-email-l.krishna@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch zeroes the SCTLR.TRE prior to setting the mapping as
-cacheable for ARMv7 cores in the decompressor, ensuring that the
-memory region attributes are obtained from the C and B bits, not from
-the page tables.
+The name of the exynos drm fimd device is renamed to exynos-drm-fimd
+and two device ids are created for exynos4-fb and exynos5-fb.
+Also, added driver data for exynos4 and exynos5 to pick the timing base address
+at runtime to write data into appropriate register address.
 
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Matthew Leach <matthew.leach@arm.com>
+Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
 ---
- arch/arm/boot/compressed/head.S | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/gpu/drm/exynos/exynos_drm_fimd.c |   45 ++++++++++++++++++++++++++---
+ 1 files changed, 40 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 81769c1..e8d3f7f 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -653,6 +653,7 @@ __armv7_mmu_cache_on:
- 		mcrne	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+index 24c0bd4..3701fbe 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+@@ -57,6 +57,18 @@
+ 
+ #define get_fimd_context(dev)	platform_get_drvdata(to_platform_device(dev))
+ 
++struct fimd_driver_data {
++	unsigned int timing_base;
++};
++
++struct fimd_driver_data exynos4_fimd_driver_data = {
++	.timing_base = 0x0,
++};
++
++struct fimd_driver_data exynos5_fimd_driver_data = {
++	.timing_base = 0x20000,
++};
++
+ struct fimd_win_data {
+ 	unsigned int		offset_x;
+ 	unsigned int		offset_y;
+@@ -91,6 +103,13 @@ struct fimd_context {
+ 	struct exynos_drm_panel_info *panel;
+ };
+ 
++static inline struct fimd_driver_data *drm_fimd_get_driver_data(
++	struct platform_device *pdev)
++{
++	return (struct fimd_driver_data *)
++		platform_get_device_id(pdev)->driver_data;
++}
++
+ static bool fimd_display_is_connected(struct device *dev)
+ {
+ 	DRM_DEBUG_KMS("%s\n", __FILE__);
+@@ -194,32 +213,35 @@ static void fimd_commit(struct device *dev)
+ 	struct fimd_context *ctx = get_fimd_context(dev);
+ 	struct exynos_drm_panel_info *panel = ctx->panel;
+ 	struct fb_videomode *timing = &panel->timing;
++	struct fimd_driver_data *driver_data;
++	struct platform_device *pdev = to_platform_device(dev);
+ 	u32 val;
+ 
++	driver_data = drm_fimd_get_driver_data(pdev);
+ 	if (ctx->suspended)
+ 		return;
+ 
+ 	DRM_DEBUG_KMS("%s\n", __FILE__);
+ 
+ 	/* setup polarity values from machine code. */
+-	writel(ctx->vidcon1, ctx->regs + VIDCON1);
++	writel(ctx->vidcon1, ctx->regs + driver_data->timing_base + VIDCON1);
+ 
+ 	/* setup vertical timing values. */
+ 	val = VIDTCON0_VBPD(timing->upper_margin - 1) |
+ 	       VIDTCON0_VFPD(timing->lower_margin - 1) |
+ 	       VIDTCON0_VSPW(timing->vsync_len - 1);
+-	writel(val, ctx->regs + VIDTCON0);
++	writel(val, ctx->regs + driver_data->timing_base + VIDTCON0);
+ 
+ 	/* setup horizontal timing values.  */
+ 	val = VIDTCON1_HBPD(timing->left_margin - 1) |
+ 	       VIDTCON1_HFPD(timing->right_margin - 1) |
+ 	       VIDTCON1_HSPW(timing->hsync_len - 1);
+-	writel(val, ctx->regs + VIDTCON1);
++	writel(val, ctx->regs + driver_data->timing_base + VIDTCON1);
+ 
+ 	/* setup horizontal and vertical display size. */
+ 	val = VIDTCON2_LINEVAL(timing->yres - 1) |
+ 	       VIDTCON2_HOZVAL(timing->xres - 1);
+-	writel(val, ctx->regs + VIDTCON2);
++	writel(val, ctx->regs + driver_data->timing_base + VIDTCON2);
+ 
+ 	/* setup clock source, clock divider, enable dma. */
+ 	val = ctx->vidcon0;
+@@ -982,6 +1004,18 @@ static int fimd_runtime_resume(struct device *dev)
+ }
  #endif
- 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
-+		bic	r0, r0, #1 << 28	@ clear the SCTLR.TRE
- 		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
- 		orr	r0, r0, #0x003c		@ write buffer
- #ifdef CONFIG_MMU
+ 
++static struct platform_device_id fimd_driver_ids[] = {
++	{
++		.name		= "exynos4-fb",
++		.driver_data	= (unsigned long)&exynos4_fimd_driver_data,
++	}, {
++		.name		= "exynos5-fb",
++		.driver_data	= (unsigned long)&exynos5_fimd_driver_data,
++	},
++	{},
++};
++MODULE_DEVICE_TABLE(platform, fimd_driver_ids);
++
+ static const struct dev_pm_ops fimd_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(fimd_suspend, fimd_resume)
+ 	SET_RUNTIME_PM_OPS(fimd_runtime_suspend, fimd_runtime_resume, NULL)
+@@ -990,8 +1024,9 @@ static const struct dev_pm_ops fimd_pm_ops = {
+ struct platform_driver fimd_driver = {
+ 	.probe		= fimd_probe,
+ 	.remove		= __devexit_p(fimd_remove),
++	.id_table       = fimd_driver_ids,
+ 	.driver		= {
+-		.name	= "exynos4-fb",
++		.name	= "exynos-drm-fimd",
+ 		.owner	= THIS_MODULE,
+ 		.pm	= &fimd_pm_ops,
+ 	},
 -- 
-1.7.12
+1.7.0.4
