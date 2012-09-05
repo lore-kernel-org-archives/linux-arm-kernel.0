@@ -1,36 +1,185 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 5 Sep 2012 07:41:07 +0100
-Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
- I2C driver
-In-Reply-To: <CACRpkdZESujO=2BU3jeKiX3Cm+JY2UPEXwGkro75FWa5Gio5YQ@mail.gmail.com>
-References: <20120831122323.GC5962@gmail.com> <5044C82E.5060207@gmail.com>
- <20120903152012.GH31163@gmail.com>
- <201209041428.21409.arnd@arndb.de>
- <CACRpkdZESujO=2BU3jeKiX3Cm+JY2UPEXwGkro75FWa5Gio5YQ@mail.gmail.com>
-Message-ID: <20120905064106.GA4233@gmail.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Wed, 5 Sep 2012 08:49:02 +0200
+Subject: [PATCH] ARM : i.MX27 : split code for allocation of ressources of
+ camera and eMMA
+In-Reply-To: <1346763398-13536-1-git-send-email-gcembed@gmail.com>
+References: <1346763398-13536-1-git-send-email-gcembed@gmail.com>
+Message-ID: <CACKLOr0PO1jbxrfRoEwEAGFNkNkAFUA-oB2vLZpw1kDxEYPBQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 04, 2012 at 07:27:10PM +0200, Linus Walleij wrote:
-> On Tue, Sep 4, 2012 at 4:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > In this particular case, we don't have a single board file providing a
-> > struct nmk_i2c_controller definition for platform data, so the best way
-> > to handle this IMHO is to remove the header file with the platform
-> > data definition, and just encode the defaults in the driver.
-> 
-> Alessandro Rubini is actively working on bridging this (and
-> other amba_device primecells) to PCI, that is the reason why it
-> was recently converted to an amba_device. How is he then supposed to
-> get the proper parameters into the driver? Note that the PCI ID
-> is no help at all since the parameters depend on what is connected
-> to the I2C bus, not on what it itself is connected to. Isn't platform data
-> used in such cases?
+Hi Ga?tan,
+is there any real technical reason to do this or is the patch only for
+cosmetic purposes?
 
-So why can't Alessandro continue to use Platform Data in the normal way?
+The following patch, which is meant to go through the linux-media
+tree, adds support for mx2_emmaprp in the Visstrim_M10 boards:
+https://patchwork.kernel.org/patch/1347921/
+
+Could you please add the flag IMX_HAVE_PLATFORM_MX2_EMMA for the
+Visstrim_M10 board in this patch?
+
+On 4 September 2012 14:56, Ga?tan Carlier <gcembed@gmail.com> wrote:
+> IMX_HAVE_PLATFORM_MX2_EMMA define has been added.
+>
+> Signed-off-by: Ga?tan Carlier <gcembed@gmail.com>
+> ---
+>  arch/arm/mach-imx/devices-imx27.h               |    4 ++-
+>  arch/arm/plat-mxc/devices/Kconfig               |    3 ++
+>  arch/arm/plat-mxc/devices/Makefile              |    1 +
+>  arch/arm/plat-mxc/devices/platform-mx2-camera.c |   17 ---------
+>  arch/arm/plat-mxc/devices/platform-mx2-emma.c   |   41 +++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/devices-common.h |    9 ++++-
+>  6 files changed, 56 insertions(+), 19 deletions(-)
+>  create mode 100644 arch/arm/plat-mxc/devices/platform-mx2-emma.c
+>
+> diff --git a/arch/arm/mach-imx/devices-imx27.h b/arch/arm/mach-imx/devices-imx27.h
+> index 0482293..d8eb4a0 100644
+> --- a/arch/arm/mach-imx/devices-imx27.h
+> +++ b/arch/arm/mach-imx/devices-imx27.h
+> @@ -54,8 +54,10 @@ extern const struct imx_imx_uart_1irq_data imx27_imx_uart_data[];
+>  extern const struct imx_mx2_camera_data imx27_mx2_camera_data;
+>  #define imx27_add_mx2_camera(pdata)    \
+>         imx_add_mx2_camera(&imx27_mx2_camera_data, pdata)
+> +
+> +extern const struct imx_mx2_emma_data imx27_mx2_emmaprp_data;
+>  #define imx27_add_mx2_emmaprp()        \
+> -       imx_add_mx2_emmaprp(&imx27_mx2_camera_data)
+> +       imx_add_mx2_emmaprp(&imx27_mx2_emmaprp_data)
+>
+>  extern const struct imx_mxc_ehci_data imx27_mxc_ehci_otg_data;
+>  #define imx27_add_mxc_ehci_otg(pdata)  \
+
+This chunk doesn't seem ok. What kernel branch are you development against?
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-imx/devices-imx27.h;h=436c5720fe6a40255a2c3bc5ab05378c23855e02;hb=HEAD#l50
+
+> diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
+> index 6b46cee..96feef7 100644
+> --- a/arch/arm/plat-mxc/devices/Kconfig
+> +++ b/arch/arm/plat-mxc/devices/Kconfig
+> @@ -56,6 +56,9 @@ config IMX_HAVE_PLATFORM_MX1_CAMERA
+>  config IMX_HAVE_PLATFORM_MX2_CAMERA
+>         bool
+>
+> +config IMX_HAVE_PLATFORM_MX2_EMMA
+> +       bool
+> +
+>  config IMX_HAVE_PLATFORM_MXC_EHCI
+>         bool
+>
+> diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
+> index 76f3195..7292c1f 100644
+> --- a/arch/arm/plat-mxc/devices/Makefile
+> +++ b/arch/arm/plat-mxc/devices/Makefile
+> @@ -28,3 +28,4 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_W1) += platform-mxc_w1.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX) += platform-sdhci-esdhc-imx.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_SPI_IMX) +=  platform-spi_imx.o
+>  obj-$(CONFIG_IMX_HAVE_PLATFORM_AHCI) +=  platform-ahci-imx.o
+> +obj-$(CONFIG_IMX_HAVE_PLATFORM_MX2_EMMA) += platform-mx2-emma.o
+> diff --git a/arch/arm/plat-mxc/devices/platform-mx2-camera.c b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
+> index 11eace9..11c688f 100644
+> --- a/arch/arm/plat-mxc/devices/platform-mx2-camera.c
+> +++ b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
+> @@ -63,20 +63,3 @@ struct platform_device *__init imx_add_mx2_camera(
+>                         pdata, sizeof(*pdata), DMA_BIT_MASK(32));
+>  }
+>
+> -struct platform_device *__init imx_add_mx2_emmaprp(
+> -               const struct imx_mx2_camera_data *data)
+> -{
+> -       struct resource res[] = {
+> -               {
+> -                       .start = data->iobaseemmaprp,
+> -                       .end = data->iobaseemmaprp + data->iosizeemmaprp - 1,
+> -                       .flags = IORESOURCE_MEM,
+> -               }, {
+> -                       .start = data->irqemmaprp,
+> -                       .end = data->irqemmaprp,
+> -                       .flags = IORESOURCE_IRQ,
+> -               },
+> -       };
+> -       return imx_add_platform_device_dmamask("m2m-emmaprp", 0,
+> -                       res, 2, NULL, 0, DMA_BIT_MASK(32));
+> -}
+> diff --git a/arch/arm/plat-mxc/devices/platform-mx2-emma.c b/arch/arm/plat-mxc/devices/platform-mx2-emma.c
+> new file mode 100644
+> index 0000000..a51749a
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/devices/platform-mx2-emma.c
+> @@ -0,0 +1,41 @@
+> +/*
+> + * Copyright (C) 2010 Pengutronix
+> + * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it under
+> + * the terms of the GNU General Public License version 2 as published by the
+> + * Free Software Foundation.
+> + */
+> +#include <mach/hardware.h>
+> +#include <mach/devices-common.h>
+> +
+> +#define imx_mx2_emmaprp_data_entry_single(soc)                         \
+> +       {                                                               \
+> +               .iobase = soc ## _EMMAPRP_BASE_ADDR,                    \
+> +               .iosize = SZ_32,                                        \
+> +               .irq = soc ## _INT_EMMAPRP,                             \
+> +       }
+> +
+> +#ifdef CONFIG_SOC_IMX27
+> +const struct imx_mx2_emma_data imx27_mx2_emmaprp_data __initconst =
+> +       imx_mx2_emmaprp_data_entry_single(MX27);
+> +#endif /* ifdef CONFIG_SOC_IMX27 */
+> +
+> +struct platform_device *__init imx_add_mx2_emmaprp(
+> +               const struct imx_mx2_emma_data *data)
+> +{
+> +       struct resource res[] = {
+> +               {
+> +                       .start = data->iobase,
+> +                       .end = data->iobase + data->iosize - 1,
+> +                       .flags = IORESOURCE_MEM,
+> +               }, {
+> +                       .start = data->irq,
+> +                       .end = data->irq,
+> +                       .flags = IORESOURCE_IRQ,
+> +               },
+> +       };
+> +       return imx_add_platform_device_dmamask("m2m-emmaprp", 0,
+> +                       res, 2, NULL, 0, DMA_BIT_MASK(32));
+> +}
+> +
+> diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
+> index 762780c..2117072 100644
+> --- a/arch/arm/plat-mxc/include/mach/devices-common.h
+> +++ b/arch/arm/plat-mxc/include/mach/devices-common.h
+> @@ -229,8 +229,15 @@ struct imx_mx2_camera_data {
+>  struct platform_device *__init imx_add_mx2_camera(
+>                 const struct imx_mx2_camera_data *data,
+>                 const struct mx2_camera_platform_data *pdata);
+> +
+> +
+> +struct imx_mx2_emma_data {
+> +       resource_size_t iobase;
+> +       resource_size_t iosize;
+> +       resource_size_t irq;
+> +};
+>  struct platform_device *__init imx_add_mx2_emmaprp(
+> -               const struct imx_mx2_camera_data *data);
+> +               const struct imx_mx2_emma_data *data);
+>
+>  #include <mach/mxc_ehci.h>
+>  struct imx_mxc_ehci_data {
+> --
+> 1.7.7.4
+>
+
+Regards.
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
