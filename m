@@ -1,40 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 5 Sep 2012 09:54:45 -0700
-Subject: [PATCH 5/9] ARM: OMAP2+: Remove hardcoded twl4030 gpio_base,
- irq_base and irq_end
-In-Reply-To: <50474FC0.6010805@ti.com>
-References: <20120831004828.28732.902.stgit@muffinssi.local>
- <20120831005230.28732.1131.stgit@muffinssi.local>
- <20120831235212.GS1303@atomide.com> <50474FC0.6010805@ti.com>
-Message-ID: <20120905165445.GD1303@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 5 Sep 2012 10:42:40 -0700
+Subject: [GIT PULL] ks8695 timer changes for v3.7
+In-Reply-To: <CACRpkdbKJU9gp2MLKZQTGiyysoM38owyxJx8S2zFzRJiv61c5Q@mail.gmail.com>
+References: <CACRpkdbKJU9gp2MLKZQTGiyysoM38owyxJx8S2zFzRJiv61c5Q@mail.gmail.com>
+Message-ID: <20120905174240.GA24952@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [120905 06:12]:
-> Hi Tony,
+On Wed, Sep 05, 2012 at 10:20:28AM +0200, Linus Walleij wrote:
+> Hi Arnd, Olof:
 > 
-> On 09/01/2012 02:52 AM, Tony Lindgren wrote:
-> > 
-> > ..but irq_base here is still in use as that's where the value from
-> > irq_alloc_descs() is being stored to. So I'll drop the changes to
-> > struct twl6040 from this patch as otherwise twl6040 code won't compile.
-> > 
-> > Turns out I did not have twl6040 selected in any of the testconfigs
-> > that I ran.
+> Here is that patch series that switches KS8695 over to using generic
+> time and clockevents. Signed tag provided.
 > 
-> I store the irq_base in a private data for the MFD driver so child drivers can
-> request the correct IRQ.
+> All tested by Greg Ungerer.
 > 
-> You can safely remove the irq_base from twl6040_platform_data struct
+> Please pull it in!
+> 
+> The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
+> 
+>   Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
+> 
+> are available in the git repository at:
+> 
+>   http://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> tags/ks8695-time-for-arm-soc
 
-Can you please do a patch for that against testing-cleanup branch? That
-way we'll know that the twl changes get tested for audio ;)
+Thanks, pulled in as ks8695/timer into next/cleanup.
 
-Maybe also check if Felipe's earlier patch also has something else that
-can be removed? That's the "[PATCH] arm: omap: drop unused IRQ defines":
+Btw, feel free to use git:// URLs in the future since the server
+supports them.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/103274.html#
 
-Regards,
-
-Tony
+-Olof
