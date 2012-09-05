@@ -1,60 +1,37 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed,  5 Sep 2012 15:44:36 +0200
-Subject: [PATCH V3 5/6] arm: mvebu: add Aurora L2 Cache Controller to the DT
+Date: Wed,  5 Sep 2012 15:44:33 +0200
+Subject: [PATCH V3 2/6] arm: cache-l2x0: add an optional register to
+ save/restore
 In-Reply-To: <1346852677-5381-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1346852677-5381-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1346852677-5381-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1346852677-5381-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
 Tested-and-reviewed-by: Yehuda Yitschak <yehuday@marvell.com>
 Tested-and-reviewed-by: Lior Amsalem <alior@marvell.com>
 
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Barry Song <21cnbao@gmail.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Olof Johansson <olof@lixom.net>
 ---
- arch/arm/boot/dts/armada-370.dtsi |    6 ++++++
- arch/arm/boot/dts/armada-xp.dtsi  |    7 +++++++
- 2 files changed, 13 insertions(+)
+ arch/arm/include/asm/hardware/cache-l2x0.h |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 3228ccc..fa60478 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -20,6 +20,12 @@
- / {
- 	model = "Marvell Armada 370 family SoC";
- 	compatible = "marvell,armada370", "marvell,armada-370-xp";
-+	L2: l2-cache {
-+		compatible = "marvell,aurora-outer-cache";
-+		reg = <0xd0008000 0x1000>;
-+		cache-id-part = <0x100>;
-+		wt-override;
-+	};
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index c4c87bc..5f2c7b4 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -126,6 +126,7 @@ struct l2x0_regs {
+ 	unsigned long filter_end;
+ 	unsigned long prefetch_ctrl;
+ 	unsigned long pwr_ctrl;
++	unsigned long ctrl;
+ };
  
- 	mpic: interrupt-controller at d0020000 {
- 	      reg = <0xd0020a00 0x1d0>,
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 59167dc..3415e82 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -22,6 +22,13 @@
- 	model = "Marvell Armada XP family SoC";
- 	compatible = "marvell,armadaxp", "marvell,armada-370-xp";
- 
-+	L2: l2-cache {
-+		compatible = "marvell,aurora-system-cache";
-+		reg = <0xd0008000 0x1000>;
-+		cache-id-part = <0x100>;
-+		wt-override;
-+	};
-+
- 	mpic: interrupt-controller at d0020000 {
- 	      reg = <0xd0020a00 0x1d0>,
- 		    <0xd0021870 0x58>;
+ extern struct l2x0_regs l2x0_saved_regs;
 -- 
 1.7.9.5
