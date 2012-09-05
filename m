@@ -1,46 +1,33 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Wed, 5 Sep 2012 17:05:33 +0530
-Subject: [PATCHv2 0/4] Add mfd driver for smsc-ece1099 chip
-Message-ID: <1346844933-24809-1-git-send-email-sourav.poddar@ti.com>
+From: matthew.leach@arm.com (Matthew Leach)
+Date: Wed,  5 Sep 2012 12:35:34 +0100
+Subject: [PATCH] ARM: decompressor: reset SCTLR.TRE for VMSA ARMv7 cores
+Message-ID: <1346844934-30518-1-git-send-email-matthew.leach@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch zeroes the SCTLR.TRE prior to setting the mapping as
+cacheable for ARMv7 cores in the decompressor, ensuring that the
+memory region attributes are obtained from the C and B bits, not from
+the page tables.
 
-Add a smsc-ece1099 mfd driver which will work as
-keypad scan device or a gpio expander device.
+Cc: Nicolas Pitre <nico@fluxnic.net>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Matthew Leach <matthew.leach@arm.com>
+---
+ arch/arm/boot/compressed/head.S | 1 +
+ 1 file changed, 1 insertion(+)
 
-Patch 1 creates the parent mfd driver.
-Patch 2 add keypad support. Patch 3 adds dts
-support for keypad in omap5 dts file.
-Patch 4 add gpio expansion driver for chip (RFC).
-
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-
-G, Manjunath Kondaiah (1):
-  Input: keypad: Add smsc ece1099 keypad driver
-
-Sourav Poddar (3):
-  mfd: smsc: Add support for smsc gpio io/keypad driver
-  arm/dts: omap5-evm: Add keypad support
-  gpio: smscece: Add support for gpio IO expander feature
-
- Documentation/smsc_ece1099.txt               |   56 ++++
- arch/arm/boot/dts/omap5-evm.dts              |   95 +++++++
- drivers/gpio/Kconfig                         |    7 +
- drivers/gpio/Makefile                        |    1 +
- drivers/gpio/gpio-smscece.c                  |  380 ++++++++++++++++++++++++++
- drivers/input/keyboard/Kconfig               |   11 +
- drivers/input/keyboard/Makefile              |    1 +
- drivers/input/keyboard/smsc-ece1099-keypad.c |  306 +++++++++++++++++++++
- drivers/mfd/Kconfig                          |   12 +
- drivers/mfd/Makefile                         |    1 +
- drivers/mfd/smsc-ece1099.c                   |  110 ++++++++
- include/linux/mfd/smsc.h                     |  111 ++++++++
- 12 files changed, 1091 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/smsc_ece1099.txt
- create mode 100644 drivers/gpio/gpio-smscece.c
- create mode 100644 drivers/input/keyboard/smsc-ece1099-keypad.c
- create mode 100644 drivers/mfd/smsc-ece1099.c
- create mode 100644 include/linux/mfd/smsc.h
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 81769c1..e8d3f7f 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -653,6 +653,7 @@ __armv7_mmu_cache_on:
+ 		mcrne	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
+ #endif
+ 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
++		bic	r0, r0, #1 << 28	@ clear the SCTLR.TRE
+ 		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
+ 		orr	r0, r0, #0x003c		@ write buffer
+ #ifdef CONFIG_MMU
+-- 
+1.7.12
