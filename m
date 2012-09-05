@@ -1,23 +1,25 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 5 Sep 2012 22:18:50 +0200
-Subject: [PATCH v3 3/3] cpufreq: Add a generic cpufreq-cpu0 driver
-In-Reply-To: <20120905135937.GA2362@S2101-09.ap.freescale.net>
-References: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
- <201209051538.12916.rjw@sisk.pl>
- <20120905135937.GA2362@S2101-09.ap.freescale.net>
-Message-ID: <201209052218.50634.rjw@sisk.pl>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 5 Sep 2012 13:18:56 -0700
+Subject: [PATCH v3 00/23] OMAP UART patches
+In-Reply-To: <20120904114540.GF12901@arwen.pp.htv.fi>
+References: <1345717983-18179-1-git-send-email-balbi@ti.com>
+ <20120824104045.GC5172@arwen.pp.htv.fi>
+ <20120904114540.GF12901@arwen.pp.htv.fi>
+Message-ID: <20120905201856.GA17634@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 05, 2012, Shawn Guo wrote:
-> On Wed, Sep 05, 2012 at 03:38:12PM +0200, Rafael J. Wysocki wrote:
-> > Well, what about actually avoiding the code duplication?  That is,
-> > can you make OMAP be a user of your new core function and drop the
-> > OMAP-specific one, perhaps?
-> > 
-> I would expect that the driver will replace the omap-cpufreq driver
-> completely at some point, where omap becomes a DT only platform.
+On Tue, Sep 04, 2012 at 02:45:41PM +0300, Felipe Balbi wrote:
+> Hi,
+> 
+> On Fri, Aug 24, 2012 at 01:40:47PM +0300, Felipe Balbi wrote:
+> > Forgot to Cc greg initially, my bad
+> 
+> a gentle ping on this series so we don't miss it for v3.7 merge window.
+> 
+> Greg, let me know if you need me to resend.
 
-That's fine, but why do we need two almost identical functions to start with?
+No need, sorry, was on vacation and then the Kernel summit.  I'll get to
+these now...
 
-Rafael
+greg k-h
