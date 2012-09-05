@@ -1,93 +1,82 @@
 From: loic.pallardy-ext@stericsson.com (Loic Pallardy)
-Date: Wed, 5 Sep 2012 11:58:59 +0200
-Subject: [PATCH 03/17] arm: ux500: Create board-specific IRQ init callback
+Date: Wed, 5 Sep 2012 11:59:01 +0200
+Subject: [PATCH 05/17] mfd: dbx500-prcmu: Handle TCDM mapping
 In-Reply-To: <1346839153-6465-1-git-send-email-loic.pallardy-ext@stericsson.com>
 References: <1346839153-6465-1-git-send-email-loic.pallardy-ext@stericsson.com>
-Message-ID: <1346839153-6465-4-git-send-email-loic.pallardy-ext@stericsson.com>
+Message-ID: <1346839153-6465-6-git-send-email-loic.pallardy-ext@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-First step to have a cpu-specific prcmu early init.
 
 Signed-off-by: Loic Pallardy <loic.pallardy@stericsson.com>
 Signed-off-by: Maxime Coquelin <maxime.coquelin@stericsson.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c | 15 +++++++++++----
- arch/arm/mach-ux500/cpu.c          |  2 --
- 2 files changed, 11 insertions(+), 6 deletions(-)
+ arch/arm/mach-ux500/cpu.c        | 2 +-
+ drivers/mfd/db8500-prcmu.c       | 2 +-
+ include/linux/mfd/db8500-prcmu.h | 4 ++--
+ include/linux/mfd/dbx500-prcmu.h | 2 +-
+ 4 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index fa75f95..057dfdb 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -21,6 +21,7 @@
- #include <linux/amba/pl022.h>
- #include <linux/amba/serial.h>
- #include <linux/spi/spi.h>
-+#include <linux/mfd/dbx500-prcmu.h>
- #include <linux/mfd/abx500/ab8500.h>
- #include <linux/regulator/ab8500.h>
- #include <linux/mfd/tc3589x.h>
-@@ -715,12 +716,18 @@ static void __init u9540_init_machine(void)
- 	regulator_has_full_constraints();
- }
- 
-+static void __init mop500_init_irq(void)
-+{
-+	prcmu_early_init();
-+	ux500_init_irq();
-+}
-+
- MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
- 	/* Maintainer: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> */
- 	.atag_offset	= 0x100,
- 	.map_io		= u8500_map_io,
- 	.nr_irqs	= UX500_NR_IRQS,
--	.init_irq	= ux500_init_irq,
-+	.init_irq	= mop500_init_irq,
- 	/* we re-use nomadik timer here */
- 	.timer		= &ux500_timer,
- 	.handle_irq	= gic_handle_irq,
-@@ -732,7 +739,7 @@ MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
- 	.atag_offset	= 0x100,
- 	.map_io		= u8500_map_io,
- 	.nr_irqs	= UX500_NR_IRQS,
--	.init_irq	= ux500_init_irq,
-+	.init_irq	= mop500_init_irq,
- 	.timer		= &ux500_timer,
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= hrefv60_init_machine,
-@@ -743,7 +750,7 @@ MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
- 	.atag_offset	= 0x100,
- 	.map_io		= u8500_map_io,
- 	.nr_irqs	= UX500_NR_IRQS,
--	.init_irq	= ux500_init_irq,
-+	.init_irq	= mop500_init_irq,
- 	/* we re-use nomadik timer here */
- 	.timer		= &ux500_timer,
- 	.handle_irq	= gic_handle_irq,
-@@ -755,7 +762,7 @@ MACHINE_START(U9540, "ST-Ericsson 9540 platform")
- 	.atag_offset	= 0x100,
- 	.map_io		= u8500_map_io,
- 	.nr_irqs	= UX500_NR_IRQS,
--	.init_irq	= ux500_init_irq,
-+	.init_irq	= mop500_init_irq,
- 	.timer		= &ux500_timer,
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= u9540_init_machine,
 diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index 4b0a9b3..4a5177b 100644
+index 4a5177b..08672be 100644
 --- a/arch/arm/mach-ux500/cpu.c
 +++ b/arch/arm/mach-ux500/cpu.c
-@@ -68,8 +68,6 @@ void __init ux500_init_irq(void)
- 	 * Init clocks here so that they are available for system timer
- 	 * initialization.
- 	 */
--	if (cpu_is_u8500_family())
--		db8500_prcmu_early_init();
- 	clk_init();
+@@ -9,7 +9,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/clk.h>
+-#include <linux/mfd/db8500-prcmu.h>
++#include <linux/mfd/dbx500-prcmu.h>
+ #include <linux/clksrc-dbx500-prcmu.h>
+ #include <linux/sys_soc.h>
+ #include <linux/err.h>
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index de09113..1d2fb45 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -2668,7 +2668,7 @@ static int db8500_irq_init(struct device_node *np)
+ 	return 0;
  }
  
+-void __init db8500_prcmu_early_init(void)
++void __init db8500_prcmu_early_init(struct prcmu_tcdm_map *map)
+ {
+ 	if (cpu_is_u8500v2()) {
+ 		void *tcpm_base = ioremap_nocache(U8500_PRCMU_TCPM_BASE, SZ_4K);
+diff --git a/include/linux/mfd/db8500-prcmu.h b/include/linux/mfd/db8500-prcmu.h
+index b82f6ee..f932a56 100644
+--- a/include/linux/mfd/db8500-prcmu.h
++++ b/include/linux/mfd/db8500-prcmu.h
+@@ -509,7 +509,7 @@ struct prcmu_fw_version {
+ 
+ #ifdef CONFIG_MFD_DB8500_PRCMU
+ 
+-void db8500_prcmu_early_init(void);
++void db8500_prcmu_early_init(struct prcmu_tcdm_map *map);
+ int prcmu_set_rc_a2p(enum romcode_write);
+ enum romcode_read prcmu_get_rc_p2a(void);
+ enum ap_pwrst prcmu_get_xp70_current_state(void);
+@@ -573,7 +573,7 @@ void db8500_prcmu_write_masked(unsigned int reg, u32 mask, u32 value);
+ 
+ #else /* !CONFIG_MFD_DB8500_PRCMU */
+ 
+-static inline void db8500_prcmu_early_init(void) {}
++static inline void db8500_prcmu_early_init(struct prcmu_tcdm_map *map) {}
+ 
+ static inline int prcmu_set_rc_a2p(enum romcode_write code)
+ {
+diff --git a/include/linux/mfd/dbx500-prcmu.h b/include/linux/mfd/dbx500-prcmu.h
+index 55025ba..aab183d 100644
+--- a/include/linux/mfd/dbx500-prcmu.h
++++ b/include/linux/mfd/dbx500-prcmu.h
+@@ -226,7 +226,7 @@ struct prcmu_tcdm_map {
+ 
+ static inline void __init prcmu_early_init(struct prcmu_tcdm_map *map)
+ {
+-	return db8500_prcmu_early_init();
++	return db8500_prcmu_early_init(map);
+ }
+ 
+ static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
 -- 
 1.7.11.1
