@@ -1,95 +1,56 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed,  5 Sep 2012 15:44:31 +0200
-Subject: [PATCH V3] Add support for Aurora L2 Cache Controller
-Message-ID: <1346852677-5381-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Wed,  5 Sep 2012 15:44:35 +0200
+Subject: [PATCH V3 4/6] arm: mvebu: add L2 cache support
+In-Reply-To: <1346852677-5381-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1346852677-5381-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1346852677-5381-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Tested-and-reviewed-by: Yehuda Yitschak <yehuday@marvell.com>
+Tested-and-reviewed-by: Lior Amsalem <alior@marvell.com>
 
-This a the 3rd version of the patch set (the forth if we include the
-RFC). See the end of this email for the changelog.
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/mach-mvebu/Kconfig             |    1 +
+ arch/arm/mach-mvebu/irq-armada-370-xp.c |    4 ++++
+ 2 files changed, 5 insertions(+)
 
-The purpose of this patch set is to add support for Aurora L2 Cache
-Controller used by Armada 370 and Armada XP SoCs. As it was initially
-designed by Marvell engineer to be compatible with the ARM L2 Cache
-Controller, we chose to reuse the existing code and to just extend it
-to support the differences and improvements brought by the Aurora
-controller.The diffstat looks like:
-
- Documentation/devicetree/bindings/arm/l2cc.txt  |    9 +
- arch/arm/boot/dts/armada-370.dtsi               |    6 +
- arch/arm/boot/dts/armada-xp.dtsi                |    7 +
- arch/arm/include/asm/hardware/cache-aurora-l2.h |   55 +++++
- arch/arm/include/asm/hardware/cache-l2x0.h      |    5 +
- arch/arm/mach-mvebu/Kconfig                     |    1 +
- arch/arm/mach-mvebu/irq-armada-370-xp.c         |    4 +
- arch/arm/mm/cache-l2x0.c                        |  275 +++++++++++++++++++++--
- 8 files changed, 341 insertions(+), 21 deletions(-)
-
-The main differences and improvements are:
-
-- no cache id part number available through hardware (need to get it
-  by the DT).
-- always write through mode available.
-- two flavors of the controller 'outer cache' and 'system cache' (the
-  last one meaning maintenance operations on L1 are broadcasted to the
-  L2 and L2 performs the same operation).
-- in outer cache mode, the cache maintenance operations are improved
-  and can be done on a range inside a page and are not limited to a
-  cache line.
-- during resume the controller need to restore the ctrl register.
-
-The first patch adds some modifications in the driver
-infrastructure. As most of the outer cache functions can use the
-Aurora improvements, we had to introduce new functions. So we thought
-it was better to use a outer_cache_fns field inside l2x0_of_data and
-just memcopy it into outer_cache depending of the type of the l2x0
-cache.
-
-Changelog:
-V2 -> V3:
-- Use define instead of literal value for AURORA_CTRL_FW,
-  AURORA_WAY_SIZE_SHIFT, L2X0_WAY_SIZE_SHIFT and L2X0_CTRL_EN.
-- Used ALIGN, IS_ALUGNED and PAGE_ALIGN macro instead of bitwise
-  operation.
-- Calculate the number of way for Aurora instead of using a switch
-  case.
-- removed inaccurate BUG() call and replaced them by a pr_warn if
-  needed.
-- In aurora_inv_range round the start and end addresses to cache line
-  size. The initial code was supposed to invalidate partial line cache
-  but actually invalidate the full line, so there was no point to do
-  it outside the aurora_pa_range call.
-- Removed the dsb call in the aurora_*_range function: the
-  cache_sync() call inside aurora_pa_range() is enough.
-- And as usual tested on Armada 370 and Armada XP boards and ran
-  benchmark without seeing any regression. Results are updated on the
-  wiki page.
-
-V1 -> V2:
-- Rebased L2 pach set onto v3.6-rc4.
-- Changed the compatible names to be more explicit, from
-  aurora-cache-with-outer to aurora-outer-cache , and from
-  aurora-cache-without-outer to aurora-system-cache.
-- Add an isb() after the call to mcr in aurora_broadcast_l2_commands().
-- Added the tested and reviewed-by from Lior Amsalem and Yehuda
-  Yitschak.
-- Tested on Armada 370 and Armada XP boards and ran benchmark without
-  seeing any regression.
-
-RFC -> V1:
-- Rebased the series on to V3.6-rc3
-- Added missing Signed-off-by
-- Corrected a compilation warning that I have missed
-- Ran benchmarks without seeing any regression
-
-Benchmarks results are visible here:
-https://github.com/MISL-EBU-System-SW/mainline-public/wiki/Non-official-cache-bench-results-on-the-mainline-Linux-port-%28-kernels-3.6-rcX%29-of-Armada-XP-and-Armada-370
-
-The git branch aurora-L2-cache-ctrl is visible at
-https://github.com/MISL-EBU-System-SW/mainline-public.git
-
-Regards,
-
-Gregory
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index caa2c5e..e20c5e9 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -6,6 +6,7 @@ config MACH_ARMADA_370_XP
+ 	bool "Marvell Armada 370 and Aramada XP boards"
+ 	select ARMADA_370_XP_TIMER
+ 	select CPU_V7
++	select CACHE_L2X0
+ 	help
+ 
+ 	  Say 'Y' here if you want your kernel to support boards based on
+diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/arch/arm/mach-mvebu/irq-armada-370-xp.c
+index 5f5f939..570be84 100644
+--- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
++++ b/arch/arm/mach-mvebu/irq-armada-370-xp.c
+@@ -24,6 +24,7 @@
+ #include <linux/irqdomain.h>
+ #include <asm/mach/arch.h>
+ #include <asm/exception.h>
++#include <asm/hardware/cache-l2x0.h>
+ 
+ /* Interrupt Controller Registers Map */
+ #define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
+@@ -130,4 +131,7 @@ static const struct of_device_id mpic_of_match[] __initconst = {
+ void __init armada_370_xp_init_irq(void)
+ {
+ 	of_irq_init(mpic_of_match);
++#ifdef CONFIG_CACHE_L2X0
++	l2x0_of_init(0, ~0UL);
++#endif
+ }
+-- 
+1.7.9.5
