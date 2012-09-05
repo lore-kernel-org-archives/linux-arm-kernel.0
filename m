@@ -1,31 +1,46 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 5 Sep 2012 10:47:25 -0300
-Subject: [PATCH] ARM : i.MX27 : split code for allocation of ressources of
- camera and eMMA
-In-Reply-To: <50471CEE.60606@gmail.com>
-References: <1346763398-13536-1-git-send-email-gcembed@gmail.com>
- <CACKLOr0PO1jbxrfRoEwEAGFNkNkAFUA-oB2vLZpw1kDxEYPBQw@mail.gmail.com>
- <5047013E.30508@gmail.com>
- <CACKLOr1RipM3QVJBaTjXHFotqSMdrCsWLkBsgiiuauTWpxR6EQ@mail.gmail.com>
- <50471187.3040809@gmail.com>
- <CACKLOr0=TccMNoQV-LfkeBrCN5=0E8eqTEaT7PRk-KAv_mQ5RQ@mail.gmail.com>
- <50471CEE.60606@gmail.com>
-Message-ID: <CAOMZO5D7DrUwg1YYwPnXgMj4nsgS=2ctnb7J3n-60hkreoP3yw@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 05 Sep 2012 15:55:00 +0200
+Subject: [PATCH v2 0/4] can: c_can: Add suspend/resume and pinctrl support
+In-Reply-To: <50473D92.9000500@pengutronix.de>
+References: <1346843564-25343-1-git-send-email-anilkumar@ti.com>
+ <50473D92.9000500@pengutronix.de>
+Message-ID: <504759B4.6060203@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier/Ga?tan,
+On 09/05/2012 01:54 PM, Marc Kleine-Budde wrote:
+> On 09/05/2012 01:12 PM, AnilKumar Ch wrote:
+>> Adds suspend/resume functionality of d_can driver along with d_can
+>> raminit support which is required to initialize RAM while data
+>> transmission.
+>>
+>> This patch series also adds pinctrl support to c_can driver. These
+>> patches were tested on AM335x-EVM.
+>>
+>> This patch-series is based ontop of runtimePM patch submitted
+>> earlier - https://patchwork.kernel.org/patch/1348081/
+> 
+> Looks good, I'll apply the series after Tony acks the patch 3
+> ([PATCH RESEND 3/4] ARM: AM33XX: board-generic: Add of_dev_auxdata to
+> pass d_can raminit).
 
-On Wed, Sep 5, 2012 at 6:35 AM, Ga?tan Carlier <gcembed@gmail.com> wrote:
+I've pushed all patches to can-next/master [1]. When Tony gives his Ack,
+I'll send David a pull request (of a tree including that Ack).
 
-> When I apply the patch (I save my mail and apply it), there is no
-> conflict/reject. Tested on linux-next-20120824 and linux-next-20120905.
+Marc
 
-Can you please confirm whether you are able to run mx2_camera on
-linux-next-20120905?
+[1] https://gitorious.org/linux-can/linux-can-next
 
-Tried it on my mx27pdk (and mx31pdk also) and the ov2640 is not detected.
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-Regards,
-
-Fabio Estevam
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 259 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120905/05315798/attachment-0001.sig>
