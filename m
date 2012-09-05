@@ -1,52 +1,62 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 5 Sep 2012 16:18:21 -0700
-Subject: [GIT PULL] ARM: mach-pnx4008: Remove architecture
-In-Reply-To: <503A3402.7090508@antcom.de>
-References: <1345724548-18130-1-git-send-email-stigge@antcom.de>
- <50378084.3080102@antcom.de> <201208260441.25905.arnd@arndb.de>
- <503A3402.7090508@antcom.de>
-Message-ID: <20120905231821.GG32084@quad.lixom.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 5 Sep 2012 16:18:38 -0700
+Subject: [PATCH RESEND 3/4] ARM: AM33XX: board-generic: Add
+ of_dev_auxdata to pass d_can raminit
+In-Reply-To: <1346843564-25343-4-git-send-email-anilkumar@ti.com>
+References: <1346843564-25343-1-git-send-email-anilkumar@ti.com>
+ <1346843564-25343-4-git-send-email-anilkumar@ti.com>
+Message-ID: <20120905231837.GI1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 26, 2012 at 04:34:42PM +0200, Roland Stigge wrote:
-> On 26/08/12 06:41, Arnd Bergmann wrote:
-> > On Friday 24 August 2012, Roland Stigge wrote:
-> >> On 23/08/12 14:22, Roland Stigge wrote:
-> >>> This patch removes the ARM architecture mach-pnx4008. No direct support or user
-> >>> feedback since 2006. Acknowledgements from NXP/Philips and Linux arm-soc
-> >>> maintainers.
-> >>>
-> >>> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> >>
-> >> The patch was a bit too big for the mailing list - sorry.
-> >>
-> >> Now re-proposing via pull request, below.
-> > 
-> > I think the removal of the frame buffer driver should go separately via the
-> > framebuffer maintainer (Florian Schandinat), I can take the rest through the
-> > arm-soc tree.
-> 
-> Fine - consider the new pull request for arch-pnx4008, below.
-> 
-> (Patch for video is separate, now.)
-> 
-> Thanks,
-> 
-> Roland
-> 
-> 
-> The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
-> 
->   Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.antcom.de/linux-2.6.git pnx4008-removal
+Hi,
 
-Thanks, pulled into next/cleanup. If we can get an Ack out of the FB maintainer
-for the driver removal we can pick that up too, or it can go in through his
-tree.
+* AnilKumar Ch <anilkumar@ti.com> [120905 04:14]:
+> Add of_dev_auxdata to pass d_can raminit callback APIs to initialize
+> d_can RAM. D_CAN RAM initialization bits are present in CONTROL module
+> address space, which can be accessed by platform specific code. So
+> callback functions are added to serve this purpose, this can done by
+> using of_dev_auxdata.
+> 
+> Two callback APIs are added to of_dev_auxdata used by two instances of
+> D_CAN IP. These callback functions are used to enable/disable D_CAN RAM
+> from CAN driver.
 
+I'd like to avoid the callbacks to the platform code where possible as
+that's the biggest pain we already have moving things to work with device
+tree for the existing drivers.
 
--Olof
+And I'm pretty convinced that whatever is done with callbacks should be
+done with some Linux generic framework from the driver that has it's own
+binding, such as clock framework, regulator framework, pinctrl framework,
+runtime PM etc.
+
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -37,11 +40,46 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
+>  	{ }
+>  };
+>  
+> +void d_can_hw_raminit(unsigned int instance, bool enable)
+> +{
+> +	u32 val;
+> +
+> +	val = readl(AM33XX_CTRL_REGADDR(AM33XX_CONTROL_DCAN_RAMINIT));
+> +	if (enable) {
+> +		val &= ~AM33XX_DCAN_RAMINIT_START_MASK(instance);
+> +		val |= AM33XX_DCAN_RAMINIT_START_MASK(instance);
+> +		writel(val, AM33XX_CTRL_REGADDR(AM33XX_CONTROL_DCAN_RAMINIT));
+> +	} else {
+> +		val &= ~AM33XX_DCAN_RAMINIT_START_MASK(instance);
+> +		writel(val, AM33XX_CTRL_REGADDR(AM33XX_CONTROL_DCAN_RAMINIT));
+> +	}
+> +}
+
+This part does not look good to me, this is tweaking the omap control
+module register bits directly. To me it seems that the above should
+be implemented in the omap/am33xx hwmod code that gets initialized when
+the dcan driver calls pm_runtime_enable()? Paul, got any other ideas?
+
+Regards,
+
+Tony
