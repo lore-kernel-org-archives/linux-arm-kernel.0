@@ -1,56 +1,94 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 5 Sep 2012 09:32:14 +0200
-Subject: [PATCH 1/4] net: mvneta: driver for Marvell Armada 370/XP
- network unit
-In-Reply-To: <20120904183125.GB14683@lunn.ch>
-References: <1346764004-16332-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1346764004-16332-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <201209041436.36430.arnd@arndb.de> <20120904175610.2c2934f1@skate>
- <20120904183125.GB14683@lunn.ch>
-Message-ID: <20120905093214.379ef16c@skate>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 5 Sep 2012 08:33:20 +0100
+Subject: [PATCH 3/3] i2c: nomadik: Add Device Tree support to the Nomadik
+ I2C driver
+In-Reply-To: <20120831112258.GA2624@pengutronix.de>
+References: <1345734087-21803-1-git-send-email-lee.jones@linaro.org>
+ <1345734087-21803-3-git-send-email-lee.jones@linaro.org>
+ <20120831112258.GA2624@pengutronix.de>
+Message-ID: <20120905073319.GF4233@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andrew,
+Author: Lee Jones <lee.jones@linaro.org>
+Date:   Mon Aug 6 11:09:57 2012 +0100
 
-Le Tue, 4 Sep 2012 20:31:25 +0200,
-Andrew Lunn <andrew@lunn.ch> a ?crit :
+    i2c: nomadik: Add Device Tree support to the Nomadik I2C driver
+    
+    Here we apply the bindings required for successful Device Tree
+    probing of the i2c-nomadik driver.
+    
+    Cc: linux-i2c at vger.kernel.org
+    Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-> I've used Marvell switch chipsets, which have a phy polling unit,
-> PPU. This sounds very similar. You can do a lot with the PPU, but when
-> you want to configure subsets of auto-negotiation rates/duplex modes,
-> or fixed speeds/duplex modes, the PPU could not do it. You had to
-> disable the PPU and configure the PHY directly.
-> 
-> I see you have some of the ethtools API calls implemented, but not the
-> ones needed for auto-neg and rates/duplex mode configurations. Does
-> the neta PPU support this, or will you need to export the MDIO bus for
-> these sorts of configuration options?
-
-There's nothing named 'PPU' in the datasheet for Armada XP/370, but the
-Ethernet controller registers indeed allow to change the
-auto-negotiation, duplex and speed without talking to the PHY.
-
-In addition to the GMAC_STATUS register (offset 0x2C10) that the driver
-currently uses to find out the state of the link (up/down, speed,
-duplex), there is a "Port Auto-Negotiation Configuration
-Register" (offset 0x2C0C), which allows to set:
-
- * Manual duplex or auto duplex detection
- * If manual duplex, choose full/half
- * Manual or automatic detection of flow control
- * If manual flow control, decide the flow control value
- * Manual or automatic detection of speed
- * If manual speed, set the speed value
-
-And a few other things. So indeed, we can configure the PHY parameters
-without having to talk to the PHY directly.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+index 61b00ed..5d1a970 100644
+--- a/drivers/i2c/busses/i2c-nomadik.c
++++ b/drivers/i2c/busses/i2c-nomadik.c
+@@ -25,6 +25,7 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/platform_data/i2c-nomadik.h>
++#include <linux/of.h>
+ 
+ #define DRIVER_NAME "nmk-i2c"
+ 
+@@ -920,18 +921,42 @@ static struct nmk_i2c_controller u8500_i2c = {
+        .sm             = I2C_FREQ_MODE_FAST,
+ };
+ 
++static void nmk_i2c_of_probe(struct device_node *np,
++                       struct nmk_i2c_controller *pdata)
++{
++       of_property_read_u32(np, "clock-frequency", &pdata->clk_freq);
++
++       /* This driver only supports 'standard' and 'fast' modes of operation. */
++       if (pdata->clk_freq <= 100000)
++               pdata->sm = I2C_FREQ_MODE_STANDARD;
++       else
++               pdata->sm = I2C_FREQ_MODE_FAST;
++}
++
+ static atomic_t adapter_id = ATOMIC_INIT(0);
+ 
+ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
+ {
+        int ret = 0;
+        struct nmk_i2c_controller *pdata = adev->dev.platform_data;
++       struct device_node *np = adev->dev.of_node;
+        struct nmk_i2c_dev      *dev;
+        struct i2c_adapter *adap;
+ 
+-       if (!pdata)
+-               /* No i2c configuration found, using the default. */
+-               pdata = &u8500_i2c;
++       if (!pdata) {
++               if (np) {
++                       pdata = devm_kzalloc(&adev->dev, sizeof(*pdata), GFP_KERNEL);
++                       if (!pdata) {
++                               ret = -ENOMEM;
++                               goto err_no_mem;
++                       }
++                       /* Provide the default configuration as a base. */
++                       memcpy(pdata, &u8500_i2c, sizeof(struct nmk_i2c_controller));
++                       nmk_i2c_of_probe(np, pdata);
++               } else
++                       /* No i2c configuration found, using the default. */
++                       pdata = &u8500_i2c;
++       }
+ 
+        dev = kzalloc(sizeof(struct nmk_i2c_dev), GFP_KERNEL);
+        if (!dev) {
+diff --git a/include/linux/platform_data/i2c-nomadik.h b/include/linux/platform_data/i2c-nomadik.h
+index c2303c3..3a8be9c 100644
+--- a/include/linux/platform_data/i2c-nomadik.h
++++ b/include/linux/platform_data/i2c-nomadik.h
+@@ -28,7 +28,7 @@ enum i2c_freq_mode {
+  * @sm:                speed mode
+  */
+ struct nmk_i2c_controller {
+-       unsigned long   clk_freq;
++       u32             clk_freq;
+        unsigned short  slsu;
+        unsigned char   tft;
+        unsigned char   rft;
