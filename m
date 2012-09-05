@@ -1,51 +1,51 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 05 Sep 2012 13:08:53 +0300
-Subject: Converting OMAP's custom vram allocator
-Message-ID: <1346839733.32747.1.camel@deskari>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 5 Sep 2012 12:09:06 +0200
+Subject: [PATCH 5/8] gpio: 74x164: Add output pin support
+In-Reply-To: <20120905114645.57bfe591@eb-e6520>
+References: <1346834457-6257-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1346834457-6257-5-git-send-email-maxime.ripard@free-electrons.com>
+ <20120905112012.13ce2c86@skate> <20120905114645.57bfe591@eb-e6520>
+Message-ID: <20120905120906.12d08bf5@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Le Wed, 5 Sep 2012 11:46:45 +0200,
+Eric B?nard <eric@eukrea.com> a ?crit :
 
-OMAP has a custom video ram allocator, which I'd like to remove and use
-the standard dma allocation functions.
+> > Well, thinking more about this, and reviewing the i.MX 28 datasheet a
+> > bit more thoroughly, I don't think you need this GPIO thing. It is an
+> > active-low pin that should be kept low during the entire duration of
+> > the transfer, which basically is a chip select. And in turns out that
+> > the CFA10049 board uses pins that can be controlled as chip selects
+> > directly by the SPI controller, so you should rather use this rather
+> > than introduce a specially handled GPIO. This needs testing, but I
+> > don't see why it wouldn't work.
+> > 
+> are you talking of the /OE pin of the 74HC595 ?
 
-There are two problems for which I'd like to hear suggestions or
-comments:
+No. Our chip select lines are connected to the STCP pin. It is
+technically not a chip select, but a low-to-high transition on this pin
+triggers the apparition on the output pins of the 74HC595 of the
+contents of the storage register. So, doing a high-to-low transition
+before the SPI transfer, and then a low-to-high transition after the
+SPI transfer will actually do what we want. But maybe this is an abuse
+of the chip select concept, I don't know.
 
-First one is that the dma_alloc_* functions map the allocated memory for
-cpu use. In many cases with OMAP DSS (display subsystem) this is not
-needed: the memory may be written only by the SGX or the DSP, and it's
-only read by the DSS, so it's never touched by the CPU.
+I don't think the /OE pin can be used as a chip select, because when it
+is high, the state of the output pins is not maintained to their
+previous state: the pins are turned into the high impedance state. If
+used as a chip select, it would mean that the value of the output pins
+transition from their old state to high impedance at the beginning of
+the transfer, and then from the high impedance to their new state at
+the end of the transfer. And of course, this signal is inverted
+compared to a normal chip select.
 
-This is even more true when using VRFB on omap3 (and probably TILER on
-omap4) for rotation, as VRFB hides the actual memory and offers rotated
-views. In this case the backend memory is never accessed by anyone else
-than VRFB.
+Note that I may be completely wrong, I'm a software guy, not a hardware
+one :)
 
-Is there a way to allocate the memory without creating a mapping? While
-it won't break anything as such, the allocated areas can be quite large
-thus causing large areas of the kernel's memory space to be needlessly
-reserved.
-
-The second case is passing a framebuffer address from the bootloader to
-the kernel. Often with mobile devices the bootloader will initialize the
-display hardware, showing a company logo or such. To keep the image on
-the screen when kernel starts we need to reserve the same physical
-memory area early at boot, and use that for the framebuffer.
-
-I'm not sure if there's any actual problem with this one, presuming
-there is a solution for the first case. Somehow the memory is reserved
-at early boot time, and this is passed to the fb driver. But can the
-memory be managed the same way as in normal case (for example freeing
-it), or does it need to be handled as a special case?
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120905/583648a8/attachment.sig>
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
