@@ -1,26 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 5 Sep 2012 07:47:01 +0200
-Subject: [PATCH 4/6 v2] ARM: integrator: initial device tree support
-In-Reply-To: <20120905053402.GI6747@quad.lixom.net>
-References: <1346471760-23993-1-git-send-email-linus.walleij@linaro.org>
- <1346471760-23993-3-git-send-email-linus.walleij@linaro.org>
- <1346471760-23993-4-git-send-email-linus.walleij@linaro.org>
- <201209011841.58977.arnd@arndb.de>
- <CACRpkdZhJyqeeXV_Zcfi7S01oH1Kw95qvAmOqrMKwhSLb-mX=Q@mail.gmail.com>
- <20120903215505.GB31511@n2100.arm.linux.org.uk>
- <CACRpkdbXSaBNystUv9RTmDKrmV=OakFF49LPkoQtoi9FnaXmDg@mail.gmail.com>
- <20120905053402.GI6747@quad.lixom.net>
-Message-ID: <CACRpkdaerxxe+idaEfDH4byPDwUi0YyLthFsRsup1KYOP3SCCw@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 05 Sep 2012 07:53:25 +0200
+Subject: [PATCH v2 5/5] ARM: Exynos: Add basic dts file for Samsung Trats
+ board
+In-Reply-To: <CAJuYYwTV1giNYJ7RTz=DHqK=i6FD2GsV4rNY2p5scVAnQz0kdg@mail.gmail.com>
+References: <1346748609-11115-1-git-send-email-t.figa@samsung.com>
+ <1346748609-11115-6-git-send-email-t.figa@samsung.com>
+ <CAJuYYwTV1giNYJ7RTz=DHqK=i6FD2GsV4rNY2p5scVAnQz0kdg@mail.gmail.com>
+Message-ID: <3039444.Ol4zGlGWJ2@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 5, 2012 at 7:34 AM, Olof Johansson <olof@lixom.net> wrote:
+Hi,
 
-> So, Linus, it's up to you (and Russell) what you prefer, but I'd be
-> happy to take it through arm-soc if we get a stable base.
+Thanks for reviewing the patch.
 
-I'll fix up the usage of CONFIG_ATAGS in this patch and put it into
-Russell's tracker to minimize the hazzle.
+On Wednesday 05 of September 2012 09:35:49 Thomas Abraham wrote:
+> > +
+> > +       memory {
+> > +               reg =  <0x40000000 0x20000000
+> > +                       0x60000000 0x20000000>;
+> > +       };
+> 
+> Why does this have to be split. Why not have a single entry with the
+> size as 0x40000000?
 
-Yours,
-Linus Walleij
+The memory node corresponds to struct meminfo and each entry (with two 
+values) makes one struct membank defining a memory bank.
+
+I've been talking with Kyungmin about this. Originally bootloaders used to 
+report 4 banks of 256 MiB, but it turned out that real bank configuration 
+on Trats is 2 banks of 512 MiB.
+
+I'm not into memory management internals, so I don't know if this has any 
+significance, but I defined the node to represent the real configuration 
+(otherwise I would have probably used 4 banks of 256 MiB and drop the 4th 
+patch).
+
+> > +               max8997_pmic at 66 {
+> > +                       compatible = "maxim,max8997-pmic";
+> > +
+> > +                       reg = <0x66>;
+> 
+> Probably, the interrupts can be listed when we have pinctrl driver
+> merged in Samsung tree.
+> 
+
+Right.
+
+--
+Best regards,
+Tomasz Figa
