@@ -1,31 +1,38 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 5 Sep 2012 09:01:18 +0530
-Subject: [PATCH 0/3] ARM: dts: Exynos4 dts reorganization
-In-Reply-To: <1346675674-16034-1-git-send-email-t.figa@samsung.com>
-References: <1346675674-16034-1-git-send-email-t.figa@samsung.com>
-Message-ID: <CAJuYYwRWqvzw_MdLa7NfE9ppbPiz8=HTXUW+-mXedvu2GPQWBg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 5 Sep 2012 11:51:10 +0800
+Subject: RCU warning during UBI file system mount
+In-Reply-To: <50462190.7090702@grid-net.com>
+References: <5042EC5D.1010207@grid-net.com>
+ <1346744796.12610.6.camel@sauron.fi.intel.com>
+ <20120904144813.GC2593@linux.vnet.ibm.com>
+ <50462190.7090702@grid-net.com>
+Message-ID: <20120905035108.GV2362@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 September 2012 18:04, Tomasz Figa <t.figa@samsung.com> wrote:
-> This patch series prepares existing Exynos4210 DT infrastructure to be
-> further extended for new SoCs from Exynos4 line and new boards.
->
-> Tomasz Figa (3):
->   ARM: dts: Move parts common to Exynos4 from Exynos4210.dtsi to
->     Exynos4.dtsi
->   ARM: EXYNOS: exynos4-dt: Use exynos4 prefix instead of exynos4210
->   ARM: dts: exynos4: Assume status of all optional nodes as disabled
->
->  arch/arm/boot/dts/exynos4.dtsi            | 232 ++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos4210-origen.dts   |  58 +-------
->  arch/arm/boot/dts/exynos4210-smdkv310.dts |  52 +------
->  arch/arm/boot/dts/exynos4210.dtsi         | 181 +----------------------
->  arch/arm/mach-exynos/mach-exynos4-dt.c    |  18 +--
->  5 files changed, 248 insertions(+), 293 deletions(-)
->  create mode 100644 arch/arm/boot/dts/exynos4.dtsi
->
+On Tue, Sep 04, 2012 at 08:43:12AM -0700, Subodh Nijsure wrote:
+> MX28 is ARM device. I removed following from my config and these
+> warnings went away.
+> 
+> CONFIG_CPU_IDLE=y
+> CONFIG_CPU_IDLE_GOV_LADDER=y
+> CONFIG_CPU_IDLE_GOV_MENU=y
+> 
+There is no cpuidle implemented on imx28.  I do not understand how
+these options influence the result here.
 
-Thanks, we can build Exynos4412 device tree support on top of this series.
+> I have attached the kernel configuration file I used.
+> 
+> It doesn't affect specific hw I am working with as device is not
+> required to enter idle mode.
+> I am Cc-ing linux-arm folks,  in case someone on arm platform
+> requires CPU idele &, RCU to work.
+> 
+I just ran a case with CONFIG_CPU_IDLE and RCU support and failed
+to reproduce the warning.  Is this something specific to gpmi-nand
+or we can see it with any other imx28 drivers/cases?  Sorry, I do
+not have NAND flash set up on my imx28 board.
 
-Acked-by: Thomas Abraham <thomas.abraham@linaro.org>
+-- 
+Regards,
+Shawn
