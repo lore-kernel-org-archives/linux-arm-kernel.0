@@ -1,38 +1,51 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 5 Sep 2012 10:23:38 +0900
-Subject: [PATCH] ARM: shmobile: r8a7779: remove USB phy initializer
-In-Reply-To: <20120905012056.GC4232@verge.net.au>
-References: <1346376502-12114-1-git-send-email-horms@verge.net.au>
- <1346376502-12114-6-git-send-email-horms@verge.net.au>
- <201209032138.41485.arnd@arndb.de>
- <87k3wafxj4.wl%kuninori.morimoto.gx@renesas.com>
- <20120904003402.GE6095@verge.net.au>
- <87ehmifl3b.wl%kuninori.morimoto.gx@renesas.com>
- <20120905012056.GC4232@verge.net.au>
-Message-ID: <20120905012337.GD4232@verge.net.au>
+Date: Wed,  5 Sep 2012 10:34:50 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC fix for v3.6 #2
+Message-ID: <1346808893-14124-1-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2012 at 10:20:57AM +0900, Simon Horman wrote:
-> On Mon, Sep 03, 2012 at 09:50:03PM -0700, Kuninori Morimoto wrote:
-> > f9929ab55cf967791c65a3b58696d77e26d19a6f
-> > (ARM: shmobile: r8a7779: add USB common phy initializer)
-> > added r8a7779 USB phy initializer,
-> > but ARM kernel is trying hard to move driver code out of the platform
-> > and into driver directories.
-> > This patch remove USB phy initializer code from platform.
-> 
-> Hi Morimoto-san,
-> 
-> my preferred approach is to drop the following patches from the marzen
-> branch and get the remaining changes merged (hopefully). Then look at
-> USB once again.
-> 
-> f58f278 ARM: shmobile: marzen: add USB EHCI driver support
-> 4150c1d ARM: shmobile: r8a7779: add USB OHCI clock support
-> 535b372c ARM: shmobile: r8a7779: add USB EHCI clock support
-> f9929ab ARM: shmobile: r8a7779: add USB common phy initializer
+Hi Olof, Hi Arnd,
 
-and
+please consider the following fixes for the Armadillo800 EVA and
+Mackerel boards from Morimoto-san.
 
-3553395 ARM: shmobile: marzen: add USB OHCI driver support
+* "ARM: shmobile: armadillo800eva: fixup: sound card detection order"
+  is a regression fix.
+* "ARM: shmobile: mackerel: fixup usb module order"
+  is a regression fix.
+* "ARM: shmobile: armadillo800eva: enable rw rootfs mount"
+  is a boot-loader compatibility fix.
+
+All of the changes are aimed at improving the end-user experience.
+
+Notes:
+
+* This pull request is based on my previous
+  "[GIT PULL] Renesas ARM-based SoC fix for v3.6" pull request
+  which was recently pulled by Olof. Please let me know
+  if you would like me to handle this a different way.
+
+----------------------------------------------------------------
+The following changes since commit 497dcf6fc355f0734faf851662b6957386715d24:
+
+  ARM: shmobile: marzen: fixup smsc911x id for regulator (2012-08-30 14:10:08 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git fixes
+
+for you to fetch changes up to 28e515878f8896b33c325ff9767cb0237210fb4c:
+
+  ARM: shmobile: armadillo800eva: enable rw rootfs mount (2012-09-03 17:31:34 +0900)
+
+----------------------------------------------------------------
+Kuninori Morimoto (3):
+      ARM: shmobile: armadillo800eva: fixup: sound card detection order
+      ARM: shmobile: mackerel: fixup usb module order
+      ARM: shmobile: armadillo800eva: enable rw rootfs mount
+
+ arch/arm/configs/armadillo800eva_defconfig     |    2 +-
+ arch/arm/mach-shmobile/board-armadillo800eva.c |    2 +-
+ arch/arm/mach-shmobile/board-mackerel.c        |    3 ++-
+ 3 files changed, 4 insertions(+), 3 deletions(-)
