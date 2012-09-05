@@ -1,34 +1,46 @@
-From: l.krishna@samsung.com (Leela Krishna Amudala)
-Date: Wed, 05 Sep 2012 21:09:13 +0530
-Subject: [PATCH V4 0/2] video: drm: Add Device tree support to DRM-FIMD
-Message-ID: <1346859555-13527-1-git-send-email-l.krishna@samsung.com>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Wed, 5 Sep 2012 17:05:33 +0530
+Subject: [PATCHv2 0/4] Add mfd driver for smsc-ece1099 chip
+Message-ID: <1346844933-24809-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds device tree support for DRM-FIMD for Samsung's Exynos5250.
-It includes parsing platform data from dts file. Also, adds the driver data
-for exynos4 and exynos5 devices.
 
-This patchset is based and tested on top of v3.6-rc4
-Also depends on below patchset
-http://lists.freedesktop.org/archives/dri-devel/2012-August/026076.html
+Add a smsc-ece1099 mfd driver which will work as
+keypad scan device or a gpio expander device.
 
-Changes since V3:
-        - Removed the fimd version from driver data and using timing base
-          address instead
-        - Removed the drm_ prefixes to the structures and fucntions
+Patch 1 creates the parent mfd driver.
+Patch 2 add keypad support. Patch 3 adds dts
+support for keypad in omap5 dts file.
+Patch 4 add gpio expansion driver for chip (RFC).
 
-Changes since V2:
-        - Added driver data to exynos5-drm-fimd as per Marek Szyprowski suggestion
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Changes since V1:
-        - Corrected typo errors and changed compatibility string
+G, Manjunath Kondaiah (1):
+  Input: keypad: Add smsc ece1099 keypad driver
 
-Leela Krishna Amudala (2):
-  drm/exynos: add platform_device_id table and driver data for drm fimd
-  video: drm: exynos: Add device tree support
+Sourav Poddar (3):
+  mfd: smsc: Add support for smsc gpio io/keypad driver
+  arm/dts: omap5-evm: Add keypad support
+  gpio: smscece: Add support for gpio IO expander feature
 
- Documentation/devicetree/bindings/fb/drm-fimd.txt |   80 ++++++++++++
- drivers/gpu/drm/exynos/exynos_drm_fimd.c          |  140 +++++++++++++++++++-
- 2 files changed, 213 insertions(+), 7 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/fb/drm-fimd.txt
+ Documentation/smsc_ece1099.txt               |   56 ++++
+ arch/arm/boot/dts/omap5-evm.dts              |   95 +++++++
+ drivers/gpio/Kconfig                         |    7 +
+ drivers/gpio/Makefile                        |    1 +
+ drivers/gpio/gpio-smscece.c                  |  380 ++++++++++++++++++++++++++
+ drivers/input/keyboard/Kconfig               |   11 +
+ drivers/input/keyboard/Makefile              |    1 +
+ drivers/input/keyboard/smsc-ece1099-keypad.c |  306 +++++++++++++++++++++
+ drivers/mfd/Kconfig                          |   12 +
+ drivers/mfd/Makefile                         |    1 +
+ drivers/mfd/smsc-ece1099.c                   |  110 ++++++++
+ include/linux/mfd/smsc.h                     |  111 ++++++++
+ 12 files changed, 1091 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/smsc_ece1099.txt
+ create mode 100644 drivers/gpio/gpio-smscece.c
+ create mode 100644 drivers/input/keyboard/smsc-ece1099-keypad.c
+ create mode 100644 drivers/mfd/smsc-ece1099.c
+ create mode 100644 include/linux/mfd/smsc.h
