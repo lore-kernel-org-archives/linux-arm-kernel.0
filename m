@@ -1,109 +1,52 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 05 Sep 2012 11:23:38 +0200
-Subject: [PATCH V2 3/6] arm: cache-l2x0: add support for Aurora L2 cache
- ctrl
-In-Reply-To: <20120904172623.GP2458@mudshark.cambridge.arm.com>
-References: <1346755232-26006-1-git-send-email-gregory.clement@free-electrons.com>
- <1346755232-26006-4-git-send-email-gregory.clement@free-electrons.com>
- <20120904112247.GF2458@mudshark.cambridge.arm.com>
- <5046152A.1050601@free-electrons.com>
- <20120904172623.GP2458@mudshark.cambridge.arm.com>
-Message-ID: <50471A1A.90605@free-electrons.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 05 Sep 2012 19:23:43 +1000
+Subject: [PATCH 13/25] macintosh/mediabay: add a const qualifier
+In-Reply-To: <20120905080249.GI28643@pengutronix.de>
+References: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1343034810-3386-14-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1346812817.2257.23.camel@pasglop> <20120905080249.GI28643@pengutronix.de>
+Message-ID: <1346837023.2257.57.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2012 07:26 PM, Will Deacon wrote:
-> On Tue, Sep 04, 2012 at 03:50:18PM +0100, Gregory CLEMENT wrote:
->>>> +       /*
->>>> +        * Clean and invalidate partial last cache line.
->>>> +        */
->>>> +       if (start < end && end & (CACHE_LINE_SIZE - 1)) {
->>>> +               writel((end & ~(CACHE_LINE_SIZE - 1)) & ~0x1f,
->>>> +                       l2x0_base + AURORA_FLUSH_PHY_ADDR_REG);
->>>> +               cache_sync();
->>>> +               end &= ~(CACHE_LINE_SIZE - 1);
->>>> +       }
->>>> +
->>>> +       /*
->>>> +        * Invalidate all full cache lines between 'start' and 'end'.
->>>> +        */
->>>> +       while (start < end) {
->>>> +               unsigned long range_end = calc_range_end(start, end);
->>>> +               aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
->>>> +                               AURORA_INVAL_RANGE_REG);
->>>> +               start = range_end;
->>>> +       }
->>>> +
->>>> +       dsb();
->>>
->>> Why? (same for the other dsbs following writels/cache_syncs).
->>
->> I will ask if it is really needed.
+On Wed, 2012-09-05 at 10:02 +0200, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> I just think you'll get the dsb() via aurora_pa_range, so you shouldn't need
-> the extra one after the loop.
+> On Wed, Sep 05, 2012 at 12:40:17PM +1000, Benjamin Herrenschmidt wrote:
+> > On Mon, 2012-07-23 at 11:13 +0200, Uwe Kleine-K?nig wrote:
+> > > This prepares *of_device_id.data becoming const. Without this change
+> > > the following warning would occur:
+> > > 
+> > > 	drivers/macintosh/mediabay.c: In function 'media_bay_attach':
+> > > 	drivers/macintosh/mediabay.c:589:11: warning: assignment discards 'const' qualifier from pointer target type [enabled by default]
+> > > 
+> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > > ---
+> > 
+> > Ack all of these assuming you test built (I didn't).
+> "all" means the two mediabay patches? And yes, they are all built
+> tested.
 
-Well actually we get a cache_sync() and not a dsb from aurora_pa_range. But
-I've just received the confirmation that the cache_sync is enough, so I will
-remove the dsb.
+Yeah, anything powerpc you had in your series, but the two mediabay ones
+are what I spotted when digging through stuff today :-)
 
+> >                                                      Do you need me to
+> > carry any of this via the powerpc tree ?
+> The patch that adds the const to of_device_id depends[1] on this patch.
+> And the other mediabay is only valid after that const is added. So the
+> easiest is if the series is pulled in one go. Arnd intended to let Linus
+> pull it for 3.6-rc1 but it was missed because of a communication
+> problem. So I intend to get it in during the 3.7 merge window.
+
+Ok, I'm happy for Arnd to carry all of these, I trust his
+judgement/review for that stuff including for ppc specific bits.
+
+Cheers,
+Ben.
+
+> Best regards
+> Uwe
 > 
->>>> +static void aurora_resume(void)
->>>> +{
->>>> +       u32 u;
->>>> +
->>>> +       u = readl(l2x0_base + L2X0_CTRL);
->>>> +       if (!(u & 1)) {
->>>
->>> We should probably add a L2X0_CTRL_EN define and use that (also update the
->>> enabling code to use it as well).
->>>
->>
->> Should it be a separate patch or can I include it with this one?
+> [1] it's only a soft depend, because the result is "only" a warning, but
+> still.
 > 
-> I think you can just include it here (it's trivial to implement).
-
-OK (it's already done).
-
-> 
->>>> +static void __init aurora_of_setup(const struct device_node *np,
->>>> +                               u32 *aux_val, u32 *aux_mask)
->>>> +{
->>>> +       u32 val = AURORA_ACR_REPLACEMENT_TYPE_SEMIPLRU;
->>>> +       u32 mask =  AURORA_ACR_REPLACEMENT_MASK;
->>>> +
->>>> +       of_property_read_u32(np, "cache-id-part",
->>>> +                       &cache_id_part_number_from_dt);
->>>> +
->>>> +       /* Determine and save the write policy */
->>>> +       l2_wt_override = of_property_read_bool(np, "wt-override");
->>>> +
->>>> +       if (l2_wt_override) {
->>>> +               val |= AURORA_ACR_FORCE_WRITE_THRO_POLICY;
->>>> +               mask |= AURORA_ACR_FORCE_WRITE_POLICY_MASK;
->>>> +       }
->>>
->>> smp_mb() after the assignment to l2_wt_override?
->>
->> Sorry I don't get your point, why do you think we need this?
-> 
-> In case you get an outer_cache operation from a different core before the
-> assignment to l2_wt_override has become visible, in which case you might
-> accidentally skip the operation (e.g. if it's clean). This may well be
-> overkill, since we probably have the same problem for stuff like the base
-> address already.
-
-But aurora_of_setup is called during the init, and this init is called
-before any smp initializations: when this function is called only one
-core is running. So there is no need to worry about it.
-
-> 
-> Will
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
