@@ -1,53 +1,144 @@
-From: msb@chromium.org (Mandeep Singh Baines)
-Date: Wed,  5 Sep 2012 14:36:13 -0700
-Subject: [PATCH] ARM: exynos: mct: cache mct upper count
-Message-ID: <1346880973-31519-1-git-send-email-msb@chromium.org>
+From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
+Date: Wed, 5 Sep 2012 23:42:34 +0200 (CEST)
+Subject: [PATCH 5/8] pwm i.MX: add devicetree support
+In-Reply-To: <1346852127-25226-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <811985020.3713350.1346881354214.JavaMail.root@advansee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Saves one register read.
+On Wednesday, September 5, 2012 3:35:24 PM, Sascha Hauer wrote:
+> 
+> From: Philipp Zabel <p.zabel@pengutronix.de>
+> 
+> At the same time remove platform based support. No user for
+> this driver has made it into mainline so far, so all we break
+> is out of tree stuff.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  Documentation/devicetree/bindings/pwm/imx-pwm.txt |   17 ++++++++
+>  drivers/pwm/pwm-imx.c                             |   45
+>  ++++++++++++++++-----
+>  2 files changed, 52 insertions(+), 10 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/imx-pwm.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pwm/imx-pwm.txt
+> b/Documentation/devicetree/bindings/pwm/imx-pwm.txt
+> new file mode 100644
+> index 0000000..9b9b185
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/imx-pwm.txt
+> @@ -0,0 +1,17 @@
+> +Freescale i.MX PWM controller
+> +
+> +Required properties:
+> +- compatible: should be "fsl,<soc>-pwm"
+> +- reg: physical base address and length of the controller's
+> registers
+> +- #pwm-cells: should be 2.  The first cell specifies the per-chip
+> index
+> +  of the PWM to use and the second cell is the duty cycle in
+> nanoseconds.
+> +- interrupts: The interrupt for the pwm controller
+> +
+> +Example:
+> +
+> +pwm1: pwm at 53fb4000 {
+> +	#pwm-cells = <2>;
+> +	compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
+> +	reg = <0x53fb4000 0x4000>;
+> +	interrupts = <61>;
+> +};
+> diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+> index a689144..af77045 100644
+> --- a/drivers/pwm/pwm-imx.c
+> +++ b/drivers/pwm/pwm-imx.c
+> @@ -16,8 +16,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/io.h>
+>  #include <linux/pwm.h>
+> -#include <mach/hardware.h>
+> -
+> +#include <linux/of_device.h>
+>  
+>  /* i.MX1 and i.MX21 share the same PWM function block: */
+>  
+> @@ -203,12 +202,41 @@ static struct pwm_ops imx_pwm_ops = {
+>  	.owner = THIS_MODULE,
+>  };
+>  
+> +struct imx_pwm_data {
+> +	int (*config)(struct pwm_chip *chip,
+> +		struct pwm_device *pwm, int duty_ns, int period_ns);
+> +	void (*set_enable)(struct pwm_chip *chip, bool enable);
+> +};
+> +
+> +static struct imx_pwm_data imx_pwm_data_v1 = {
+> +	.config = imx_pwm_config_v1,
+> +	.set_enable = imx_pwm_set_enable_v1,
+> +};
+> +
+> +static struct imx_pwm_data imx_pwm_data_v2 = {
+> +	.config = imx_pwm_config_v2,
+> +	.set_enable = imx_pwm_set_enable_v2,
+> +};
+> +
+> +static const struct of_device_id imx_pwm_dt_ids[] = {
+> +	{ .compatible = "fsl,imx1-pwm", .data = &imx_pwm_data_v1, },
+> +	{ .compatible = "fsl,imx27-pwm", .data = &imx_pwm_data_v2, },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, imx_pwm_dt_ids);
+> +
+>  static int __devinit imx_pwm_probe(struct platform_device *pdev)
+>  {
+> +	const struct of_device_id *of_id =
+> +			of_match_device(imx_pwm_dt_ids, &pdev->dev);
+> +	struct imx_pwm_data *data;
+>  	struct imx_chip *imx;
+>  	struct resource *r;
+>  	int ret = 0;
+>  
+> +	if (!of_id)
+> +		return -ENODEV;
+> +
+>  	imx = devm_kzalloc(&pdev->dev, sizeof(*imx), GFP_KERNEL);
+>  	if (imx == NULL) {
+>  		dev_err(&pdev->dev, "failed to allocate memory\n");
+> @@ -235,13 +263,9 @@ static int __devinit imx_pwm_probe(struct
+> platform_device *pdev)
+>  	if (imx->mmio_base == NULL)
+>  		return -EADDRNOTAVAIL;
+>  
+> -	if (cpu_is_mx1() || cpu_is_mx21()) {
+> -		imx->config = imx_pwm_config_v1;
+> -		imx->set_enable = imx_pwm_set_enable_v1;
+> -	} else {
+> -		imx->config = imx_pwm_config_v2;
+> -		imx->set_enable = imx_pwm_set_enable_v2;
+> -	}
+> +	data = of_id->data;
+> +	imx->config = data->config;
+> +	imx->set_enable = data->set_enable;
+>  
+>  	ret = pwmchip_add(&imx->chip);
+>  	if (ret < 0)
+> @@ -264,7 +288,8 @@ static int __devexit imx_pwm_remove(struct
+> platform_device *pdev)
+>  
+>  static struct platform_driver imx_pwm_driver = {
+>  	.driver		= {
+> -		.name	= "mxc_pwm",
+> +		.name	= "imx-pwm",
+> +		.of_match_table = of_match_ptr(imx_pwm_dt_ids),
+>  	},
+>  	.probe		= imx_pwm_probe,
+>  	.remove		= __devexit_p(imx_pwm_remove),
 
-Before (perf report):
+Since this is supposed to remove platform-based support, why don't you also
+remove the PWM stuff from arch/arm/plat-mxc and
+arch/arm/mach-imx/devices-imx*.h?
 
-     1.40%  [k] exynos4_frc_read
-            |
-            |--87.20%-- ktime_get_ts
-            |          |
-            |          |--93.60%-- posix_ktime_get_ts
-
-After (perf report):
-
-     1.00%  [k] exynos4_frc_read
-            |
-            |--88.61%-- ktime_get_ts
-            |          |
-            |          |--92.70%-- posix_ktime_get_ts
-
-Signed-off-by: Mandeep Singh Baines <msb@chromium.org>
-CC: Sonny Rao <sonnyrao@chromium.org>
-CC: Olof Johansson <olofj@chromium.org>
-CC: Kukjin Kim <kgene.kim@samsung.com>
-CC: Russell King <linux@arm.linux.org.uk>
-CC: linux-arm-kernel at lists.infradead.org
-CC: linux-samsung-soc at vger.kernel.org
----
- arch/arm/mach-exynos/mct.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/mct.c b/arch/arm/mach-exynos/mct.c
-index b601fb8..2bbd533 100644
---- a/arch/arm/mach-exynos/mct.c
-+++ b/arch/arm/mach-exynos/mct.c
-@@ -128,8 +128,8 @@ static void exynos4_mct_frc_start(u32 hi, u32 lo)
- 
- static cycle_t exynos4_frc_read(struct clocksource *cs)
- {
--	unsigned int lo, hi;
--	u32 hi2 = __raw_readl(EXYNOS4_MCT_G_CNT_U);
-+	u32 lo, hi;
-+	static u32 hi2;
- 
- 	do {
- 		hi = hi2;
--- 
-1.7.7.3
+Best regards,
+Beno?t
