@@ -1,74 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 4 Sep 2012 17:36:18 -0700
-Subject: [PATCH 4/4] [RFC] ARM: treewide: manually change more
- mach-*/*.h includes
-In-Reply-To: <20120830190431.GU1303@atomide.com>
-References: <201208221253.07278.arnd@arndb.de>
- <20120822214323.GA12255@n2100.arm.linux.org.uk>
- <201208231135.11688.arnd@arndb.de>
- <201208231726.11293.arnd@arndb.de>
- <20120824203622.GB1303@atomide.com>
- <20120830190431.GU1303@atomide.com>
-Message-ID: <20120905003617.GX1303@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 5 Sep 2012 08:51:36 +0800
+Subject: [PATCH] kernel/sys.c: call disable_nonboot_cpus in kernel_restart
+In-Reply-To: <20120904153624.d4aaed4e.akpm@linux-foundation.org>
+References: <1346682298-13958-1-git-send-email-shawn.guo@linaro.org>
+ <20120904153624.d4aaed4e.akpm@linux-foundation.org>
+Message-ID: <20120905005134.GM2362@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120830 12:05]:
-> * Tony Lindgren <tony@atomide.com> [120824 13:37]:
-> > * Arnd Bergmann <arnd@arndb.de> [120823 10:27]:
-> > > On Thursday 23 August 2012, Arnd Bergmann wrote:
-> > > > On Wednesday 22 August 2012, Russell King - ARM Linux wrote:
-> > > > > In any case, what we should be doing here as well is moving the headers
-> > > > > included by drivers for platform data out of the arch/arm/mach/ subtrees
-> > > > > and into include/linux/platform_data.  That will substantially reduce the
-> > > > > amount of mach/ headers to deal with.
-> > > > 
-> > > > I've just looked at the {mach,plat}/*.h files that get included in ARM
-> > > > specific drivers. Out of the 342 header files that get used in this way,
-> > > > I found 93 that are practically just platform data, and a few that
-> > > > are platform_data mixed with something else.
-> > > > 
-> > > > How about I move all the pure platform data definition files now and
-> > > > rebase the other patches on top of that. Here is a list of suggested
-> > > > file names in include/linux/platform_data/:
-> > > 
-> > > I've just scripted this and am running my build testsuite over it now.
-> > > 
-> > > Please let me know what you think about it.
-> > > 
-> > > 	Arnd
-> > > 
-> > > The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
-> > > 
-> > >   Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
-> > > 
-> > > are available in the git repository at:
-> > > 
-> > >   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git 
-> > 
-> > I'd like to run some checks on this, but branch name missing here for
-> > pulling a branch in for testing..
+On Tue, Sep 04, 2012 at 03:36:24PM -0700, Andrew Morton wrote:
+> On Mon,  3 Sep 2012 22:24:58 +0800
+> Shawn Guo <shawn.guo@linaro.org> wrote:
 > 
-> FYI, after talking with Arnd this is the testing/platform-data branch
-> in the arm soc tree. Seems to build and work fine on omaps:
+> > Like kernel_power_off calls disable_nonboot_cpus, we may want to have
+> > kernel_restart call disable_nonboot_cpus as well.  Doing so can help
+> > the machines that require boot cpu be the last alive cpu during reboot
+> > to survive with kernel restart.
 > 
-> Tested-by: Tony Lindgren <tony@atomide.com>
+> That does sound logical.  But the changelog is very vague and fluffy. 
+> Does this patch actually fix any known problem on any known machine?
 > 
-> Arnd, can you please provide a stable branch to use as a base of
-> other related header changes?
+Yes, it fixes one reboot issue seen on imx6q (Cortex-A9 Quad).  The
+machine requires the restart routine run on primary cpu than secondary
+ones.  Otherwise, the secondary core running restart routine will fail
+to come to online after reboot.
 
-Actually it's probably best if I just take your commit 0c6f1498
-(ARM: omap: move platform_data definitions) into my cleanup branch
-to avoid the dependency of getting acks from all the subarch
-maintainers.
-
-That's because I want to base more things on this patch that will
-cause merge conflicts otherwise.
-
-Also, Peter Ujfalusi wanted to change the dsp-mcbsp.h name to
-ti-mcbsp.h. I can post the updated patch assuming hat's OK with
-you Arnd?
-
+-- 
 Regards,
-
-Tony
+Shawn
