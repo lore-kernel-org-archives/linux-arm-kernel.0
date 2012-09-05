@@ -1,37 +1,75 @@
-From: loic.pallardy@st.com (Loic PALLARDY)
-Date: Wed, 5 Sep 2012 13:38:32 +0200
-Subject: [PATCH 02/17] arm: ux500: add ccu9540 board support
-In-Reply-To: <201209051042.00887.arnd@arndb.de>
-References: <1346839153-6465-1-git-send-email-loic.pallardy-ext@stericsson.com>
- <1346839153-6465-3-git-send-email-loic.pallardy-ext@stericsson.com>
- <201209051042.00887.arnd@arndb.de>
-Message-ID: <504739B8.10604@st.com>
+From: anilkumar@ti.com (AnilKumar Ch)
+Date: Wed, 5 Sep 2012 17:10:57 +0530
+Subject: [PATCH v6 0/3] arm/dts: Add device tree data for AM33XX devices
+Message-ID: <1346845260-10978-1-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add pinctrl and d_can device tree data to AM33XX family of devices.
+First two patches add support for pinctrl DT data and third one
+adds dcan DT data.
 
-On 09/05/2012 12:42 PM, Arnd Bergmann wrote:
-> On Wednesday 05 September 2012, Loic Pallardy wrote:
->> +MACHINE_START(U9540, "ST-Ericsson 9540 platform")
->> +       .atag_offset    = 0x100,
->> +       .map_io         = u8500_map_io,
->> +       .nr_irqs        = UX500_NR_IRQS,
->> +       .init_irq       = ux500_init_irq,
->> +       .timer          =&ux500_timer,
->> +       .handle_irq     = gic_handle_irq,
->> +       .init_machine   = u9540_init_machine,
->> +       .init_late      = ux500_init_late,
->> +MACHINE_END
->> +
->
-> Please don't add another ATAG based board definition to ux500. We're closing in
-> on having full support for DT booting with this platform, so your patch is just
-> making it harder for us to complete this.
->
-> 	Arnd
-Yes I know and agree.
-Please consider this patch as a temporary one waiting for 9540 support 
-from Lee.
+Reason behind combining these patches is to apply cleanly on
+linux-omap tree, because these are sequential patches.
 
-Regards,
-Loic
+These patches were tested on AM335x-Bone, AM335x-EVM and based
+on linux-omap:master with this patch
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg74393.html
+
+Changes from v5:
+	- Incorporated Koen's comments on v5 series, user leds
+	  trigger modifications.
+	- Dropped 4th and 5th patches, submitted v2 versions of
+	  those in their corresponding mailing lists.
+
+d_can:
+  Changes from v4:
+	- Incorporated Tony's comments on v4
+	  * Converted all hex numbers to lower-case.
+	- Updated C_CAN bindings documentation according to recent
+	  changes.
+
+  Changes from v3:
+	- Removed d_can1 node from am335x-evm.dts file. Instance
+	  one of CAN (d_can1) is available on AM335x-EVM only under
+	  a specific CPLD mode selection. am335x-evm.dts does not
+          support this mode so remove the d_can1 node.
+	- Dropped d_can pinmux settings patch, above comment
+	  applies here as well.
+
+  Changes from v2:
+	- Incorporated Vaibhav H's comments on v2
+	  * Added dcan0 instances to am33xx.dtsi file
+
+  Changes from v1:
+	- These two patches separated from c_can DT support
+	  patch series.
+
+pinctrl:
+  Changes from v4:
+	- Incorporated Tony's comments on v4
+	  * Converted all hex numbers to lower-case.
+	- Added pinctrl api to leds-gpio driver to configure led
+	  pins to GPIO mode.
+
+  Changes from v3:
+	- Updated the reg length based on latest AM335x TRM.
+
+  Changes from v2:
+	- user led pinmux comments updated according to Tony's
+	  comment.
+
+  Changes from v1:
+	- Rebased the patches based on latest pinctrl-single driver
+
+AnilKumar Ch (3):
+  arm/dts: AM33XX: Add basic pinctrl device tree data
+  arm/dts: AM33XX: Configure pinmuxs for user leds control on Bone
+  arm/dts: AM33XX: Add D_CAN device tree data
+
+ arch/arm/boot/dts/am335x-bone.dts |   43 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/am33xx.dtsi     |   27 +++++++++++++++++++++++
+ 2 files changed, 70 insertions(+)
+
+-- 
+1.7.9.5
