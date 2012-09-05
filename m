@@ -1,14 +1,11 @@
 From: msb@chromium.org (Mandeep Singh Baines)
-Date: Wed,  5 Sep 2012 14:34:54 -0700
+Date: Wed,  5 Sep 2012 14:36:13 -0700
 Subject: [PATCH] ARM: exynos: mct: cache mct upper count
-Message-ID: <1346880894-31316-1-git-send-email-msb@chromium.org>
+Message-ID: <1346880973-31519-1-git-send-email-msb@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Saves one register read.
-
-BUG=none
-TEST=See below.
 
 Before (perf report):
 
