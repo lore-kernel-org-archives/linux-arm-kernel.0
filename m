@@ -1,48 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 5 Sep 2012 14:41:27 +0200
-Subject: [st-ericsson] [PATCH 02/17] arm: ux500: add ccu9540 board support
-In-Reply-To: <201209051211.13021.arnd@arndb.de>
-References: <1346839153-6465-1-git-send-email-loic.pallardy-ext@stericsson.com>
- <201209051042.00887.arnd@arndb.de> <504739B8.10604@st.com>
- <201209051211.13021.arnd@arndb.de>
-Message-ID: <CACRpkdb3KtkxoL6CntaHTu3U0=fCW0NcKVL6i6gKT4JUJ9gZtQ@mail.gmail.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Wed, 5 Sep 2012 12:48:15 +0000
+Subject: [PATCH 7/9] ARM: OMAP2+: Prepare for irqs.h removal
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E9DE2F3@DBDE01.ent.ti.com>
+References: <20120831004828.28732.902.stgit@muffinssi.local>
+ <20120831005237.28732.96766.stgit@muffinssi.local>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9DC9F4@DBDE01.ent.ti.com>
+ <20120905010921.GY1303@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9DE2F3@DBDE01.ent.ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9DE658@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 5, 2012 at 2:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 05 September 2012, Loic PALLARDY wrote:
->>
->> On 09/05/2012 12:42 PM, Arnd Bergmann wrote:
->> > On Wednesday 05 September 2012, Loic Pallardy wrote:
->> >> +MACHINE_START(U9540, "ST-Ericsson 9540 platform")
->> >> +       .atag_offset    = 0x100,
->> >> +       .map_io         = u8500_map_io,
->> >> +       .nr_irqs        = UX500_NR_IRQS,
->> >> +       .init_irq       = ux500_init_irq,
->> >> +       .timer          =&ux500_timer,
->> >> +       .handle_irq     = gic_handle_irq,
->> >> +       .init_machine   = u9540_init_machine,
->> >> +       .init_late      = ux500_init_late,
->> >> +MACHINE_END
->> >> +
->> >
->> > Please don't add another ATAG based board definition to ux500. We're closing in
->> > on having full support for DT booting with this platform, so your patch is just
->> > making it harder for us to complete this.
->> >
->> >       Arnd
->> Yes I know and agree.
->> Please consider this patch as a temporary one waiting for 9540 support
->> from Lee.
->
-> Why are you even posting the patches that you know won't make it then?
+Hi Tony,
 
-My fault! I wanted an outside look at them before we take them
-too far.
+On Wed, Sep 05, 2012 at 14:33:58, Mohammed, Afzal wrote:
+> On Wed, Sep 05, 2012 at 06:39:22, Tony Lindgren wrote:
+> > * Mohammed, Afzal <afzal@ti.com> [120904 01:47]:
+> 
+> > > *I am not sending the patches now to avoid confusion by way of having
+> > > too many patch series*
+> > > 
+> > > In case you like this, let me know, I will post.
+> > 
+> > Yes please post the patches rebased on testing-cleanup branch that I
+> > just pushed. That branch is not immutable yet though as we're waiting
+> > to hear from Arnd regrading the first patch in the branch.
+> 
+> The patches rebased on testing-cleanup branch has been posted [1].
 
-I should've requested to have the "RFC" prefix attached to them.
+Latest version (v8) of patch series has been posted [A] with an
+enhancement, please ignore v7.
 
-Sorry if it annoyed you too much...
+Regards
+Afzal
 
-Yours,
-Linus Walleij
+[A] http://marc.info/?l=linux-omap&m=134684859913232&w=2
