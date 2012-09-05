@@ -1,23 +1,50 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 5 Sep 2012 15:41:14 -0500
-Subject: [PATCH v8 3/3] ARM: OMAP2+: gpmc: minimal driver support
-In-Reply-To: <da87aaa4d52c94e755459b4aecdd2ddb62898488.1346846464.git.afzal@ti.com>
-References: <cover.1346846464.git.afzal@ti.com>
- <da87aaa4d52c94e755459b4aecdd2ddb62898488.1346846464.git.afzal@ti.com>
-Message-ID: <5047B8EA.3090208@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed,  5 Sep 2012 14:01:26 -0700
+Subject: [PATCH] ARM: Fix deadlock scenario with smp_send_stop()
+Message-ID: <1346878886-7159-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
+If one process calls sys_reboot and that process then stops other
+CPUs while those CPUs are within a spin_lock() region we can
+potentially encounter a deadlock scenario like below.
 
-On 09/05/2012 07:37 AM, Afzal Mohammed wrote:
-> Create a minimal driver out of gpmc code.
-> Responsibilities handled by earlier gpmc
-> initialization is now achieved in probe.
-> 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+CPU 0                   CPU 1
+-----                   -----
+                        spin_lock(my_lock)
+smp_send_stop()
+ send_IPI               handle_IPI()
+                         disable_preemption/irqs
+                          while(1);
+ <PREEMPT>
+spin_lock(my_lock) <--- Waits forever
 
-Reviewed-by: Jon Hunter <jon-hunter@ti.com>
+We shouldn't attempt to run any other tasks after we send a stop
+IPI to a CPU so disable preemption so that the reboot task runs to
+completion.
 
-Cheers
-Jon
+Reported-by: Sundarajan Srinivasan <sundaraj@codeaurora.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+
+Unfortunately this won't fix the other problem I mentioned two weeks
+ago where smp_send_stop races with other CPUs calling cpu_up().
+
+ arch/arm/kernel/process.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 693b744..663a7a8 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -239,6 +239,7 @@ __setup("reboot=", reboot_setup);
+ 
+ void machine_shutdown(void)
+ {
++	preempt_disable();
+ #ifdef CONFIG_SMP
+ 	smp_send_stop();
+ #endif
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
