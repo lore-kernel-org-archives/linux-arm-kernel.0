@@ -1,74 +1,31 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 05 Sep 2012 15:46:58 +0200
-Subject: [PATCH RESEND v5 3/3] arm/dts: AM33XX: Add D_CAN device tree data
-In-Reply-To: <1346845260-10978-4-git-send-email-anilkumar@ti.com>
-References: <1346845260-10978-1-git-send-email-anilkumar@ti.com>
- <1346845260-10978-4-git-send-email-anilkumar@ti.com>
-Message-ID: <504757D2.90601@pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 5 Sep 2012 10:47:25 -0300
+Subject: [PATCH] ARM : i.MX27 : split code for allocation of ressources of
+ camera and eMMA
+In-Reply-To: <50471CEE.60606@gmail.com>
+References: <1346763398-13536-1-git-send-email-gcembed@gmail.com>
+ <CACKLOr0PO1jbxrfRoEwEAGFNkNkAFUA-oB2vLZpw1kDxEYPBQw@mail.gmail.com>
+ <5047013E.30508@gmail.com>
+ <CACKLOr1RipM3QVJBaTjXHFotqSMdrCsWLkBsgiiuauTWpxR6EQ@mail.gmail.com>
+ <50471187.3040809@gmail.com>
+ <CACKLOr0=TccMNoQV-LfkeBrCN5=0E8eqTEaT7PRk-KAv_mQ5RQ@mail.gmail.com>
+ <50471CEE.60606@gmail.com>
+Message-ID: <CAOMZO5D7DrUwg1YYwPnXgMj4nsgS=2ctnb7J3n-60hkreoP3yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2012 01:41 PM, AnilKumar Ch wrote:
-> Add Bosch D_CAN controller device tree data to AM33XX dtsi
-> file by adding d_can device nodes with all the necessary
-> parameters.
-> 
-> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
-> ---
->  arch/arm/boot/dts/am33xx.dtsi |   18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index bf5f713..ab744d6 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -177,5 +177,23 @@
->  			compatible = "ti,omap3-wdt";
->  			ti,hwmods = "wd_timer2";
->  		};
-> +
-> +		dcan0: d_can at 481cc000 {
-> +			compatible = "bosch,d_can";
+Javier/Ga?tan,
 
-On imx/mxs we also add a compatible for the current hardware, this may
-look like this:
+On Wed, Sep 5, 2012 at 6:35 AM, Ga?tan Carlier <gcembed@gmail.com> wrote:
 
-			compatible = "ti,am33xx-can", "bosch,d_can";
+> When I apply the patch (I save my mail and apply it), there is no
+> conflict/reject. Tested on linux-next-20120824 and linux-next-20120905.
 
-But I don't know if this is a generic policy or just an imx/mxs thing :)
+Can you please confirm whether you are able to run mx2_camera on
+linux-next-20120905?
 
-Marc
+Tried it on my mx27pdk (and mx31pdk also) and the ov2640 is not detected.
 
-> +			ti,hwmods = "d_can0";
-> +			reg = <0x481cc000 0x2000>;
-> +			interrupts = <52>;
-> +			interrupt-parent = <&intc>;
-> +			status = "disabled";
-> +		};
-> +
-> +		dcan1: d_can at 481d0000 {
-> +			compatible = "bosch,d_can";
-> +			ti,hwmods = "d_can1";
-> +			reg = <0x481d0000 0x2000>;
-> +			interrupts = <55>;
-> +			interrupt-parent = <&intc>;
-> +			status = "disabled";
-> +		};
->  	};
->  };
-> 
+Regards,
 
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120905/e976f849/attachment.sig>
+Fabio Estevam
