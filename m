@@ -1,53 +1,39 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Wed, 5 Sep 2012 17:01:42 +0200
-Subject: [PATCH v2 00/11] chipidea/imx: add otg support and some bug fix
-In-Reply-To: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
-References: <1346137397-32374-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20120905150142.GD4406@pengutronix.de>
+From: gcembed@gmail.com (=?UTF-8?B?R2HDq3RhbiBDYXJsaWVy?=)
+Date: Wed, 05 Sep 2012 17:03:43 +0200
+Subject: [PATCH] ARM : i.MX27 : split code for allocation of ressources
+ of camera and eMMA
+In-Reply-To: <CAOMZO5D7DrUwg1YYwPnXgMj4nsgS=2ctnb7J3n-60hkreoP3yw@mail.gmail.com>
+References: <1346763398-13536-1-git-send-email-gcembed@gmail.com>
+ <CACKLOr0PO1jbxrfRoEwEAGFNkNkAFUA-oB2vLZpw1kDxEYPBQw@mail.gmail.com>
+ <5047013E.30508@gmail.com>
+ <CACKLOr1RipM3QVJBaTjXHFotqSMdrCsWLkBsgiiuauTWpxR6EQ@mail.gmail.com>
+ <50471187.3040809@gmail.com>
+ <CACKLOr0=TccMNoQV-LfkeBrCN5=0E8eqTEaT7PRk-KAv_mQ5RQ@mail.gmail.com>
+ <50471CEE.60606@gmail.com>
+ <CAOMZO5D7DrUwg1YYwPnXgMj4nsgS=2ctnb7J3n-60hkreoP3yw@mail.gmail.com>
+Message-ID: <504769CF.2070904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2012 at 03:03:06PM +0800, Richard Zhao wrote:
-> The patch set is tested on imx6q_sabrelite board.
-> 
-> The patch can also be found at
-> https://github.com/riczhao/kernel-imx/commits/topics/usb-driver
-> 
-> For test which merged platform patches:
-> https://github.com/riczhao/kernel-imx/commits/topics/usb-test
-> 
-> Changes since v1:
->  - move usbmisc as the other patch series.
->  - remove regulater_disable and old comments in ci13xxx_imx.
-> 
-> Richard Zhao (11):
->   USB: chipidea: imx: add pinctrl support
->   USB: chipidea: delay 2ms before read ID status at probe time
->   USB: chipidea: move OTGSC_IDIS clearing from ci_role_work to irq
->     handler
->   USB: chipidea: clear gadget struct at udc_start fail path
->   USB: chipidea: don't let probe fail if otg controller start one role
->     failed
->   USB: mxs-phy: add basic otg support
->   USB: chipidea: add vbus detect for udc
->   USB: chipidea: convert to use devm_request_irq
->   USB: chipidea: add -DDEBUG if CONFIG_USB_CHIPIDEA_DEBUG
->   USB: chipidea: add set_vbus_power support
->   USB: chipidea: re-order irq handling to avoid unhandled irq
-> 
->  drivers/usb/chipidea/Makefile      |    2 ++
->  drivers/usb/chipidea/ci.h          |    1 +
->  drivers/usb/chipidea/ci13xxx_imx.c |   51 +++++++++++++++++++++++-------------
->  drivers/usb/chipidea/core.c        |   36 +++++++++++++++----------
->  drivers/usb/chipidea/host.c        |    8 ++++++
->  drivers/usb/chipidea/udc.c         |   40 +++++++++++++++++++++++++++-
->  drivers/usb/otg/mxs-phy.c          |   21 +++++++++++++++
->  include/linux/usb/chipidea.h       |    2 ++
->  8 files changed, 128 insertions(+), 33 deletions(-)
-
-Tested-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-
-To get this series applied, probably patch 04/11 and 05/11 should just
-be dropped for now.
-
-Michael
+On 09/05/2012 03:47 PM, Fabio Estevam wrote:
+> Javier/Ga?tan,
+>
+> On Wed, Sep 5, 2012 at 6:35 AM, Ga?tan Carlier <gcembed@gmail.com> wrote:
+>
+>> When I apply the patch (I save my mail and apply it), there is no
+>> conflict/reject. Tested on linux-next-20120824 and linux-next-20120905.
+>
+> Can you please confirm whether you are able to run mx2_camera on
+> linux-next-20120905?
+With or without my patch ? I have burnt out my ov2640 while previous 
+experimentation so it is hard for me to test that and I have to write 
+driver for MT9V111 to be able to test soc-camera on Kernel 3.x.
+>
+> Tried it on my mx27pdk (and mx31pdk also) and the ov2640 is not detected.
+>
+> Regards,
+>
+> Fabio Estevam
+>
+Regards,
+Ga?tan Carlier
