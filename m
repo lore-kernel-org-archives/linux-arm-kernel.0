@@ -1,64 +1,40 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 5 Sep 2012 10:19:11 +0200
-Subject: [PATCH 04/10] net/macb: Fix a race in macb_start_xmit()
-In-Reply-To: <cover.1346775479.git.nicolas.ferre@atmel.com>
-References: <cover.1346775479.git.nicolas.ferre@atmel.com>
-Message-ID: <40f02ee50a29aaec6c949432a1bcf09f4b027181.1346775479.git.nicolas.ferre@atmel.com>
+Date: Wed, 5 Sep 2012 10:19:07 +0200
+Subject: [PATCH 00/10] net/macb: driver enhancement concerning GEM support,
+ ring logic and cleanup
+Message-ID: <cover.1346775479.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Havard Skinnemoen <havard@skinnemoen.net>
+This is an enhancement work that began several years ago. I try to catchup with
+some performance improvement that has been implemented then by Havard.
+The ring index logic and the TX error path modification are the biggest changes
+but some cleanup/debugging have been added along the way.
+The GEM revision will benefit from the Gigabit support.
 
-Fix a race in macb_start_xmit() where we unconditionally set the TSTART bit.
-If an underrun just happened (we do this with interrupts disabled, so it might
-not have been handled yet), the controller starts transmitting from the first
-entry in the ring, which is usually wrong.
-Restart the controller after error handling.
+The series has been tested on several Atmel AT91 SoC with the two MACB/GEM
+flavors.
 
-Signed-off-by: Havard Skinnemoen <havard@skinnemoen.net>
-[nicolas.ferre at atmel.com: split patch in topics]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/net/ethernet/cadence/macb.c |   20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+Havard Skinnemoen (5):
+  net/macb: memory barriers cleanup
+  net/macb: change debugging messages
+  net/macb: Fix a race in macb_start_xmit()
+  net/macb: clean up ring buffer logic
+  net/macb: Offset first RX buffer by two bytes
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 2228dfc..f4b8adf 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -390,6 +390,13 @@ static void macb_tx(struct macb *bp)
- 		dev_kfree_skb_irq(skb);
- 	}
- 
-+	/*
-+	 * Someone may have submitted a new frame while this interrupt
-+	 * was pending, or we may just have handled an error.
-+	 */
-+	if (head != tail && !(status & MACB_BIT(TGO)))
-+		macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(TSTART));
-+
- 	bp->tx_tail = tail;
- 	if (netif_queue_stopped(bp->dev) &&
- 	    TX_BUFFS_AVAIL(bp) > MACB_TX_WAKEUP_THRESH)
-@@ -696,7 +703,18 @@ static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
- 
- 	skb_tx_timestamp(skb);
- 
--	macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(TSTART));
-+	/*
-+	 * Only start the controller if the queue was empty; otherwise
-+	 * we may race against the hardware resetting the ring pointer
-+	 * due to a transmit error.
-+	 *
-+	 * If the controller is idle but the queue isn't empty, there
-+	 * must be a pending interrupt that will trigger as soon as we
-+	 * re-enable interrupts, and the interrupt handler will make
-+	 * sure the controler is started.
-+	 */
-+	if (NEXT_TX(bp->tx_tail) == bp->tx_head)
-+		macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(TSTART));
- 
- 	if (TX_BUFFS_AVAIL(bp) < 1)
- 		netif_stop_queue(dev);
+Nicolas Ferre (4):
+  net/macb: better manage tx errors
+  net/macb: tx status is more than 8 bits now
+  net/macb: macb_get_drvinfo: add GEM/MACB suffix to differentiate
+    revision
+  net/macb: ethtool interface: add register dump feature
+
+Patrice Vilchez (1):
+  net/macb: Add support for Gigabit Ethernet mode
+
+ drivers/net/ethernet/cadence/macb.c |  408 ++++++++++++++++++++++++-----------
+ drivers/net/ethernet/cadence/macb.h |   29 ++-
+ 2 files changed, 304 insertions(+), 133 deletions(-)
+
 -- 
 1.7.10
