@@ -1,82 +1,67 @@
 From: loic.pallardy-ext@stericsson.com (Loic Pallardy)
-Date: Wed, 5 Sep 2012 11:59:01 +0200
-Subject: [PATCH 05/17] mfd: dbx500-prcmu: Handle TCDM mapping
+Date: Wed, 5 Sep 2012 11:59:05 +0200
+Subject: [PATCH 09/17] mfd: prcmu: add db9540 support
 In-Reply-To: <1346839153-6465-1-git-send-email-loic.pallardy-ext@stericsson.com>
 References: <1346839153-6465-1-git-send-email-loic.pallardy-ext@stericsson.com>
-Message-ID: <1346839153-6465-6-git-send-email-loic.pallardy-ext@stericsson.com>
+Message-ID: <1346839153-6465-10-git-send-email-loic.pallardy-ext@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Light modifications to add db9540 support
+and ab9540 detection.
+
 Signed-off-by: Loic Pallardy <loic.pallardy@stericsson.com>
-Signed-off-by: Maxime Coquelin <maxime.coquelin@stericsson.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ux500/cpu.c        | 2 +-
- drivers/mfd/db8500-prcmu.c       | 2 +-
- include/linux/mfd/db8500-prcmu.h | 4 ++--
- include/linux/mfd/dbx500-prcmu.h | 2 +-
- 4 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/mfd/db8500-prcmu.c | 26 ++++++++++++++++++++++++--
+ 1 file changed, 24 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index 4a5177b..08672be 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -9,7 +9,7 @@
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/clk.h>
--#include <linux/mfd/db8500-prcmu.h>
-+#include <linux/mfd/dbx500-prcmu.h>
- #include <linux/clksrc-dbx500-prcmu.h>
- #include <linux/sys_soc.h>
- #include <linux/err.h>
 diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index de09113..1d2fb45 100644
+index 3df427f..eb327f3 100644
 --- a/drivers/mfd/db8500-prcmu.c
 +++ b/drivers/mfd/db8500-prcmu.c
-@@ -2668,7 +2668,7 @@ static int db8500_irq_init(struct device_node *np)
- 	return 0;
- }
+@@ -2994,6 +2994,23 @@ static struct mfd_cell db8500_prcmu_devs[] = {
+ 	},
+ };
  
--void __init db8500_prcmu_early_init(void)
-+void __init db8500_prcmu_early_init(struct prcmu_tcdm_map *map)
- {
- 	if (cpu_is_u8500v2()) {
- 		void *tcpm_base = ioremap_nocache(U8500_PRCMU_TCPM_BASE, SZ_4K);
-diff --git a/include/linux/mfd/db8500-prcmu.h b/include/linux/mfd/db8500-prcmu.h
-index b82f6ee..f932a56 100644
---- a/include/linux/mfd/db8500-prcmu.h
-+++ b/include/linux/mfd/db8500-prcmu.h
-@@ -509,7 +509,7 @@ struct prcmu_fw_version {
++static struct mfd_cell db9540_prcmu_devs[] = {
++	{
++		.name = "db8500-prcmu-regulators",
++		.of_compatible = "stericsson,db8500-prcmu-regulator",
++		.platform_data = &db8500_regulators,
++		.pdata_size = sizeof(db8500_regulators),
++	},
++	{
++		.name = "ab9540-i2c",
++		.of_compatible = "stericsson,ab8500",
++		.num_resources = ARRAY_SIZE(ab8500_resources),
++		.resources = ab8500_resources,
++		.id = AB8500_VERSION_AB9540,
++	},
++};
++
++
+ /**
+  * prcmu_fw_init - arch init call for the Linux PRCMU fw init logic
+  *
+@@ -3035,11 +3052,16 @@ static int __devinit db8500_prcmu_probe(struct platform_device *pdev)
+ 		}
+ 	}
  
- #ifdef CONFIG_MFD_DB8500_PRCMU
+-	if (cpu_is_u8500v20_or_later())
++	if (cpu_is_u8500v20_or_later() && !cpu_is_u9540())
+ 		prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_RET);
  
--void db8500_prcmu_early_init(void);
-+void db8500_prcmu_early_init(struct prcmu_tcdm_map *map);
- int prcmu_set_rc_a2p(enum romcode_write);
- enum romcode_read prcmu_get_rc_p2a(void);
- enum ap_pwrst prcmu_get_xp70_current_state(void);
-@@ -573,7 +573,7 @@ void db8500_prcmu_write_masked(unsigned int reg, u32 mask, u32 value);
- 
- #else /* !CONFIG_MFD_DB8500_PRCMU */
- 
--static inline void db8500_prcmu_early_init(void) {}
-+static inline void db8500_prcmu_early_init(struct prcmu_tcdm_map *map) {}
- 
- static inline int prcmu_set_rc_a2p(enum romcode_write code)
- {
-diff --git a/include/linux/mfd/dbx500-prcmu.h b/include/linux/mfd/dbx500-prcmu.h
-index 55025ba..aab183d 100644
---- a/include/linux/mfd/dbx500-prcmu.h
-+++ b/include/linux/mfd/dbx500-prcmu.h
-@@ -226,7 +226,7 @@ struct prcmu_tcdm_map {
- 
- static inline void __init prcmu_early_init(struct prcmu_tcdm_map *map)
- {
--	return db8500_prcmu_early_init();
-+	return db8500_prcmu_early_init(map);
- }
- 
- static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
+-	err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
++	if (cpu_is_u9540())
++			err = mfd_add_devices(&pdev->dev, 0, db9540_prcmu_devs,
++			ARRAY_SIZE(db9540_prcmu_devs), NULL, 0);
++	else
++		err = mfd_add_devices(&pdev->dev, 0, db8500_prcmu_devs,
+ 			ARRAY_SIZE(db8500_prcmu_devs), NULL, 0);
++
+ 	if (err) {
+ 		pr_err("prcmu: Failed to add subdevices\n");
+ 		return err;
 -- 
 1.7.11.1
