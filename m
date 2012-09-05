@@ -1,84 +1,36 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 5 Sep 2012 14:55:23 -0500
-Subject: [PATCH v8 2/3] ARM: OMAP2+: gpmc: Adapt to HWMOD
-In-Reply-To: <c14607ff57fca419dc9d7e0beaea197e001f4e25.1346846464.git.afzal@ti.com>
-References: <cover.1346846464.git.afzal@ti.com>
- <c14607ff57fca419dc9d7e0beaea197e001f4e25.1346846464.git.afzal@ti.com>
-Message-ID: <5047AE2B.30807@ti.com>
+From: cmetcalf@tilera.com (Chris Metcalf)
+Date: Wed, 5 Sep 2012 15:56:27 -0400
+Subject: [PATCH v2 16/31] arm64: ELF definitions
+In-Reply-To: <201208212017.08110.arnd@arndb.de>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <201208161237.53594.arnd@arndb.de> <20120821160653.GH12708@arm.com>
+ <201208212017.08110.arnd@arndb.de>
+Message-ID: <5047AE6B.6090508@tilera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
-
-On 09/05/2012 07:37 AM, Afzal Mohammed wrote:
-> Create API for platforms to adapt GPMC to HWMOD
+On 8/21/2012 4:17 PM, Arnd Bergmann wrote:
+> On Tuesday 21 August 2012, Catalin Marinas wrote:
+>> On Thu, Aug 16, 2012 at 01:37:53PM +0100, Arnd Bergmann wrote:
+>>> No, the uname output is meant to tell you about the system, not the
+>>> instruction set that you are using (you already know that in compiled
+>>> code).
+>>
+>> OK, so we assumed that compat tasks should get a uname as close as
+>> possible to a 32-bit system, i.e. armv8l, for full compatibility. This
+>> would allow us to run something like 32-bit Debian on an AArch64 kernel
+>> without worrying about any scripts failing.
 > 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
->  arch/arm/mach-omap2/gpmc.c |   26 ++++++++++++++++++++++++++
->  1 files changed, 26 insertions(+), 0 deletions(-)
+> You can still do that, just boot with init="/sbin/setarch armv7 /sbin/init".
 > 
-> diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-> index dbc1ebc..c45f185 100644
-> --- a/arch/arm/mach-omap2/gpmc.c
-> +++ b/arch/arm/mach-omap2/gpmc.c
-> @@ -29,11 +29,14 @@
->  
->  #include <plat/gpmc.h>
->  #include <plat/sdrc.h>
-> +#include <plat/omap_device.h>
->  
->  #include "soc.h"
->  
->  #include "common.h"
->  
-> +#define	DEVICE_NAME		"omap-gpmc"
-> +
->  /* GPMC register offsets */
->  #define GPMC_REVISION		0x00
->  #define GPMC_SYSCONFIG		0x10
-> @@ -897,6 +900,29 @@ static int __init gpmc_init(void)
->  }
->  postcore_initcall(gpmc_init);
->  
-> +static int __init omap_gpmc_init(void)
-> +{
-> +	struct omap_hwmod *oh;
-> +	struct platform_device *pdev;
-> +	char *oh_name = "gpmc";
-> +
-> +	oh = omap_hwmod_lookup(oh_name);
-> +	if (!oh) {
-> +		pr_err("Could not look up %s\n", oh_name);
-> +		return -ENODEV;
-> +	}
-> +
-> +	pdev = omap_device_build(DEVICE_NAME, -1, oh, NULL, 0, NULL, 0, 0);
-> +	if (IS_ERR(pdev)) {
-> +		WARN(1, "Can't build omap_device for %s:%s.\n",
-> +						DEVICE_NAME, oh->name);
-> +		return PTR_ERR(pdev);
-> +	}
-> +
-> +	return 0;
-
-Nit-pick, I see some devices writing the above as ...
-
-	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
-
- 	return IS_ERR(pdev) ? PTR_ERR(pdev) : 0;
-
-> +}
-> +postcore_initcall(omap_gpmc_init);
-> +
->  static irqreturn_t gpmc_handle_irq(int irq, void *dev)
->  {
->  	int i;
+>> But I can see on x86 that it always reports x86_64 even if the task is
+>> x86_32.
 > 
+> Not just x86, the same behavior is used on powerpc, s390, mips, sparc and
+> parisc. Not sure about tile though.
 
-Otherwise ...
-
-Reviewed-by: Jon Hunter <jon-hunter@ti.com>
-
-Cheers
-Jon
+tile also reports "tilegx" regardless of whether the task is 64-bit or
+32-bit compat.
+-- 
+Chris Metcalf, Tilera Corp.
+http://www.tilera.com
