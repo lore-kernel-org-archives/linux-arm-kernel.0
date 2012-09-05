@@ -1,30 +1,90 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 5 Sep 2012 08:51:36 +0800
-Subject: [PATCH] kernel/sys.c: call disable_nonboot_cpus in kernel_restart
-In-Reply-To: <20120904153624.d4aaed4e.akpm@linux-foundation.org>
-References: <1346682298-13958-1-git-send-email-shawn.guo@linaro.org>
- <20120904153624.d4aaed4e.akpm@linux-foundation.org>
-Message-ID: <20120905005134.GM2362@S2101-09.ap.freescale.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 4 Sep 2012 18:09:22 -0700
+Subject: [PATCH 7/9] ARM: OMAP2+: Prepare for irqs.h removal
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E9DC9F4@DBDE01.ent.ti.com>
+References: <20120831004828.28732.902.stgit@muffinssi.local>
+ <20120831005237.28732.96766.stgit@muffinssi.local>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9DC9F4@DBDE01.ent.ti.com>
+Message-ID: <20120905010921.GY1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 04, 2012 at 03:36:24PM -0700, Andrew Morton wrote:
-> On Mon,  3 Sep 2012 22:24:58 +0800
-> Shawn Guo <shawn.guo@linaro.org> wrote:
+* Mohammed, Afzal <afzal@ti.com> [120904 01:47]:
+> Hi Tony,
 > 
-> > Like kernel_power_off calls disable_nonboot_cpus, we may want to have
-> > kernel_restart call disable_nonboot_cpus as well.  Doing so can help
-> > the machines that require boot cpu be the last alive cpu during reboot
-> > to survive with kernel restart.
+> On Fri, Aug 31, 2012 at 06:22:37, Tony Lindgren wrote:
+> > As the interrupts should only be defined in the platform_data, and
+> > eventually coming from device tree, there's no need to define them
+> > in header files.
+> > 
+> > Let's remove the hardcoded references to irqs.h and fix up the includes
+> > so we don't rely on headers included in irqs.h. While at it, sort
+> > the includes the standard way.
 > 
-> That does sound logical.  But the changelog is very vague and fluffy. 
-> Does this patch actually fix any known problem on any known machine?
+> >  arch/arm/mach-omap2/gpmc.c                         |   11 +++++---
 > 
-Yes, it fixes one reboot issue seen on imx6q (Cortex-A9 Quad).  The
-machine requires the restart routine run on primary cpu than secondary
-ones.  Otherwise, the secondary core running restart routine will fail
-to come to online after reboot.
+> > diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+> 
+> >  /* GPMC register offsets */
+> >  #define GPMC_REVISION		0x00
+> >  #define GPMC_SYSCONFIG		0x10
+> > @@ -846,16 +849,16 @@ static int __init gpmc_init(void)
+> >  			l = OMAP2420_GPMC_BASE;
+> >  		else
+> >  			l = OMAP34XX_GPMC_BASE;
+> > -		gpmc_irq = INT_34XX_GPMC_IRQ;
+> > +		gpmc_irq = 20;
+> >  	} else if (cpu_is_omap34xx()) {
+> >  		ck = "gpmc_fck";
+> >  		l = OMAP34XX_GPMC_BASE;
+> > -		gpmc_irq = INT_34XX_GPMC_IRQ;
+> > +		gpmc_irq = 20;
+> >  	} else if (cpu_is_omap44xx() || soc_is_omap54xx()) {
+> >  		/* Base address and irq number are same for OMAP4/5 */
+> >  		ck = "gpmc_ck";
+> >  		l = OMAP44XX_GPMC_BASE;
+> > -		gpmc_irq = OMAP44XX_IRQ_GPMC;
+> > +		gpmc_irq = 20 + OMAP44XX_IRQ_GIC_START;
+> 
+> I have a suggestion to avoid above hardcoded patching on gpmc.c.
+> With driver conversion series it again would have to be patched.
+> 
+> 
+> I have made a basic gpmc driver conversion, which is expected to
+> be non-controversial. This was done over your devel-gpmc branch.
+> It is working fine, has only 3 patches
+> 
+> 1. Add hwmod entry
+> 2. Adapt to hwmod
+> 3. Basic driver conversion
+> 
+> Here the basic driver gets resources and clk in driver probe
+> using con-id "fck", it has no platform data as of now
+> 
+> It is available
+> @git://gitorious.org/x0148406-public/linux-kernel.git gpmc-simple-drv
+ 
+Great, please post that. But let's get this cleanup out of the way
+first. It's OK if we have to go back and forth a bit if it means
+we can avoid dependencies between the patches as this is already
+all over the place.
+ 
+> Originally this was made on top of my series,
+> "OMAP-GPMC: generic time calc, prepare for driver"
+> It was modified so that it can be applied to your devel-gpmc branch.
+> 
+> *I am not sending the patches now to avoid confusion by way of having
+> too many patch series*
+> 
+> In case you like this, let me know, I will post.
 
--- 
-Regards,
-Shawn
+Yes please post the patches rebased on testing-cleanup branch that I
+just pushed. That branch is not immutable yet though as we're waiting
+to hear from Arnd regrading the first patch in the branch.
+ 
+> As I am proceeding with Paul's suggestion on hwmod reset,
+> I hope Paul can take the first one.
+
+Let's first nail down the cleanup changes though..
+
+Tony
