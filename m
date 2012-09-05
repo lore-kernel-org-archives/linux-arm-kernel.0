@@ -1,30 +1,31 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 05 Sep 2012 12:03:44 +1000
-Subject: [PATCH] clk: Make the generic clock API available by default
-In-Reply-To: <1346186104-4083-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1346186104-4083-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1346810624.2257.22.camel@pasglop>
+From: marex@denx.de (Marek Vasut)
+Date: Wed,  5 Sep 2012 04:11:22 +0200
+Subject: [PATCH] arm: mxs: Fix MMC WP pin being inverted
+Message-ID: <1346811082-27295-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-08-28 at 13:35 -0700, Mark Brown wrote:
-> Rather than requiring platforms to select the generic clock API to make
-> it available make the API available as a user selectable option unless the
-> user either selects HAVE_CUSTOM_CLK (if they have their own implementation)
-> or selects COMMON_CLK (if they depend on the generic implementation).
-> 
-> All current architectures that HAVE_CLK but don't use the common clock
-> framework have selects of HAVE_CUSTOM_CLK added.
-> 
-> This allows drivers to use the generic API on platforms which have no need
-> for the clock API at platform level.
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
+The MMC WP is active high on the m28evk, fix this.
 
-For powerpc:
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx28-m28evk.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Acked-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-
-Cheers,
-Ben.
+diff --git a/arch/arm/boot/dts/imx28-m28evk.dts b/arch/arm/boot/dts/imx28-m28evk.dts
+index 845bb42..10868f1 100644
+--- a/arch/arm/boot/dts/imx28-m28evk.dts
++++ b/arch/arm/boot/dts/imx28-m28evk.dts
+@@ -63,7 +63,7 @@
+ 					     &mmc0_cd_cfg
+ 					     &mmc0_sck_cfg>;
+ 				bus-width = <8>;
+-				wp-gpios = <&gpio3 10 1>;
++				wp-gpios = <&gpio3 10 0>;
+ 				vmmc-supply = <&reg_vddio_sd0>;
+ 				status = "okay";
+ 			};
+-- 
+1.7.10.4
