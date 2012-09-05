@@ -1,31 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 5 Sep 2012 15:36:23 -0700
-Subject: [GIT PULL v2] Renesas ARM-based SoC: Core for 3.7
-In-Reply-To: <1346304963-23457-1-git-send-email-horms@verge.net.au>
-References: <1346304963-23457-1-git-send-email-horms@verge.net.au>
-Message-ID: <20120905223623.GB32084@quad.lixom.net>
+Date: Wed, 5 Sep 2012 15:44:13 -0700
+Subject: [GIT PULL] Renesas ARM-based SoC: KZM-A9-GT for 3.7 #2
+In-Reply-To: <1346305648-25263-1-git-send-email-horms@verge.net.au>
+References: <1346305648-25263-1-git-send-email-horms@verge.net.au>
+Message-ID: <20120905224413.GC32084@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2012 at 02:36:02PM +0900, Simon Horman wrote:
+On Thu, Aug 30, 2012 at 02:47:27PM +0900, Simon Horman wrote:
 > Hi Olof, Hi Arnd,
 > 
-> please consider the following enhancement for the Renesas ARM-based SoC
-> Core from Kobayashi-san for inclusion in 3.7.
+> please consider the following enhancement to the KZM-A9-GT board by
+> from Morimoto-san for inclusion in 3.7.
 > 
-> This replaces v1 of this pull request which included an
-> old and incorrect version of Kobayashi-san's patch.
+> * This pull request is based on the devel branch of
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git
+>   which is based on v3.6-rc2.
 > 
-> ----------------------------------------------------------------
-> The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
-> 
->   Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc-core
+>   This is to satisfy compile-time dependencies.
+>   Please let me know if you would like this handled a different way.
 
-Thanks, pulled into next/dt.
+Hi,
+
+It seems like Linus W's devel branch is not a stable one, since at least the
+topmost commit you pulled in from his branch is no longer available on it. This
+means we can't pull it in as a dependency in arm-soc without risking merge
+conflicts, etc.
+
+So, we can't pull in this branch with its dependency without an agreement that
+Linus holds a branch stable with at least the pcf857x patch on it. Linus?
 
 
 -Olof
