@@ -1,32 +1,30 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 05 Sep 2012 11:00:22 +0900
-Subject: [PATCH] ARM: shmobile: r8a7779: remove USB phy initializer
-In-Reply-To: <20120905012337.GD4232@verge.net.au>
-References: <1346376502-12114-1-git-send-email-horms@verge.net.au>
- <1346376502-12114-6-git-send-email-horms@verge.net.au>
- <201209032138.41485.arnd@arndb.de>
- <87k3wafxj4.wl%kuninori.morimoto.gx@renesas.com>
- <20120904003402.GE6095@verge.net.au>
- <87ehmifl3b.wl%kuninori.morimoto.gx@renesas.com>
- <20120905012056.GC4232@verge.net.au> <20120905012337.GD4232@verge.net.au>
-Message-ID: <w3p4nndz0st.wl%kuninori.morimoto.gx@renesas.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 05 Sep 2012 12:03:44 +1000
+Subject: [PATCH] clk: Make the generic clock API available by default
+In-Reply-To: <1346186104-4083-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1346186104-4083-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1346810624.2257.22.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Simon
-
-> > my preferred approach is to drop the following patches from the marzen
-> > branch and get the remaining changes merged (hopefully). Then look at
-> > USB once again.
-> > 
-> > f58f278 ARM: shmobile: marzen: add USB EHCI driver support
-> > 4150c1d ARM: shmobile: r8a7779: add USB OHCI clock support
-> > 535b372c ARM: shmobile: r8a7779: add USB EHCI clock support
-> > f9929ab ARM: shmobile: r8a7779: add USB common phy initializer
+On Tue, 2012-08-28 at 13:35 -0700, Mark Brown wrote:
+> Rather than requiring platforms to select the generic clock API to make
+> it available make the API available as a user selectable option unless the
+> user either selects HAVE_CUSTOM_CLK (if they have their own implementation)
+> or selects COMMON_CLK (if they depend on the generic implementation).
 > 
-> and
+> All current architectures that HAVE_CLK but don't use the common clock
+> framework have selects of HAVE_CUSTOM_CLK added.
 > 
-> 3553395 ARM: shmobile: marzen: add USB OHCI driver support
+> This allows drivers to use the generic API on platforms which have no need
+> for the clock API at platform level.
+> 
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
 
-Thank you for your help
+For powerpc:
+
+Acked-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+
+Cheers,
+Ben.
