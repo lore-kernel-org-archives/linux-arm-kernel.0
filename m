@@ -1,46 +1,54 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 05 Sep 2012 15:55:00 +0200
-Subject: [PATCH v2 0/4] can: c_can: Add suspend/resume and pinctrl support
-In-Reply-To: <50473D92.9000500@pengutronix.de>
-References: <1346843564-25343-1-git-send-email-anilkumar@ti.com>
- <50473D92.9000500@pengutronix.de>
-Message-ID: <504759B4.6060203@pengutronix.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 05 Sep 2012 15:50:40 +0200
+Subject: [PATCH v3 1/4] pinctrl: add samsung pinctrl and gpiolib driver
+References: <1345720529-32315-1-git-send-email-thomas.abraham@linaro.org>
+ <1345720529-32315-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <k27lbg$hrj$1@ger.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2012 01:54 PM, Marc Kleine-Budde wrote:
-> On 09/05/2012 01:12 PM, AnilKumar Ch wrote:
->> Adds suspend/resume functionality of d_can driver along with d_can
->> raminit support which is required to initialize RAM while data
->> transmission.
->>
->> This patch series also adds pinctrl support to c_can driver. These
->> patches were tested on AM335x-EVM.
->>
->> This patch-series is based ontop of runtimePM patch submitted
->> earlier - https://patchwork.kernel.org/patch/1348081/
+Hi Thomas,
+
+Thomas Abraham wrote:
+> Add a new device tree enabled pinctrl and gpiolib driver for Samsung
+> SoC's. This driver provides a common and extensible framework for all
+> Samsung SoC's to interface with the pinctrl and gpiolib subsystems. This
+> driver supports only device tree based instantiation and hence can be
+> used only on those Samsung platforms that have device tree enabled.
 > 
-> Looks good, I'll apply the series after Tony acks the patch 3
-> ([PATCH RESEND 3/4] ARM: AM33XX: board-generic: Add of_dev_auxdata to
-> pass d_can raminit).
+> This driver is split into two parts: the pinctrl interface and the gpiolib
+> interface. The pinctrl interface registers pinctrl devices with the
+> pinctrl subsystem and gpiolib interface registers gpio chips with the
+> gpiolib subsystem. The information about the pins, pin groups, pin
+> functions and gpio chips, which are SoC specific, are parsed from device
+> tree node.
+> 
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 
-I've pushed all patches to can-next/master [1]. When Tony gives his Ack,
-I'll send David a pull request (of a tree including that Ack).
+Does the driver provide any kind of compatibility with current gpiolib 
+users?
 
-Marc
+Let me show an example of what I mean. We have a fixed voltage regulator 
+defined in device tree of an imaginary board
 
-[1] https://gitorious.org/linux-can/linux-can-next
+	vemmc_reg: voltage-regulator at 0 {
+	        compatible = "regulator-fixed";
+		regulator-name = "VMEM_VDD_2.8V";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <2800000>;
+		gpio = <&gpk0 2 1 0 0>;
+		enable-active-high;
+	};
 
+The gpio pin used to control status of the regulator is defined using the 
+gpio property and regulator-fixed driver uses of_get_named_gpio to get the 
+pin number from device tree.
+
+Is this kind of setup also valid when using your pinctrl driver?
+
+Best regards,
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 259 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120905/05315798/attachment-0001.sig>
+Tomasz Figa
+Samsung Poland R&D Center
