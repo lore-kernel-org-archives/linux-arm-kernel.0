@@ -1,44 +1,66 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed,  5 Sep 2012 17:20:39 +0900
-Subject: [GIT PULL v3] Renesas ARM-based SoC: Marzen and r8a7779 for 3.7
-Message-ID: <1346833244-30432-1-git-send-email-horms@verge.net.au>
+Date: Wed,  5 Sep 2012 17:20:44 +0900
+Subject: [PATCH 5/5] ARM: shmobile: marzen: enable thermal sensor
+In-Reply-To: <1346833244-30432-1-git-send-email-horms@verge.net.au>
+References: <1346833244-30432-1-git-send-email-horms@verge.net.au>
+Message-ID: <1346833244-30432-6-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-please consider the following enhancements to the Marzen board
-and r8a7779 SoC by Phil Edworthy, Morimoto-san and myself for 3.7.
+Marzen board can measure its thermal by this patch.
+	cat /sys/class/thermal/thermal_zoneX/temp
 
-This pull-request differs from v2 in that USB-related changes
-have been omitted and the pull-request is no longer based on usb-next.
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ arch/arm/configs/marzen_defconfig     |    2 ++
+ arch/arm/mach-shmobile/board-marzen.c |   16 ++++++++++++++++
+ 2 files changed, 18 insertions(+)
 
-----------------------------------------------------------------------
-The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
-
-  Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git marzen
-
-for you to fetch changes up to 978792e04b58985eda62aa8cc97c6d46433103f2:
-
-  ARM: shmobile: marzen: enable thermal sensor (2012-09-05 10:22:48 +0900)
-
-----------------------------------------------------------------
-Kuninori Morimoto (2):
-      ARM: shmobile: marzen: fixup regulator id for smsc911x
-      ARM: shmobile: marzen: enable thermal sensor
-
-Phil Edworthy (2):
-      r8a7779: add SDHI clock support
-      marzen: add SDHI0 support
-
-Simon Horman (1):
-      ARM: mach-shmobile: marzen: defconfig update
-
- arch/arm/configs/marzen_defconfig      |   19 +++++----
- arch/arm/mach-shmobile/board-marzen.c  |   68 +++++++++++++++++++++++++++++++-
- arch/arm/mach-shmobile/clock-r8a7779.c |   11 +++++-
- 3 files changed, 89 insertions(+), 9 deletions(-)
+diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
+index cd2dc21..b46914f 100644
+--- a/arch/arm/configs/marzen_defconfig
++++ b/arch/arm/configs/marzen_defconfig
+@@ -71,6 +71,8 @@ CONFIG_SERIAL_SH_SCI_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
++CONFIG_THERMAL=y
++CONFIG_RCAR_THERMAL=y
+ CONFIG_SSB=y
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_MMC=y
+diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
+index cbf9f25..2e884b6 100644
+--- a/arch/arm/mach-shmobile/board-marzen.c
++++ b/arch/arm/mach-shmobile/board-marzen.c
+@@ -111,9 +111,25 @@ static struct platform_device sdhi0_device = {
+ 	}
+ };
+ 
++/* Thermal */
++static struct resource thermal_resources[] = {
++	[0] = {
++		.start		= 0xFFC48000,
++		.end		= 0xFFC48038 - 1,
++		.flags		= IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device thermal_device = {
++	.name		= "rcar_thermal",
++	.resource	= thermal_resources,
++	.num_resources	= ARRAY_SIZE(thermal_resources),
++};
++
+ static struct platform_device *marzen_devices[] __initdata = {
+ 	&eth_device,
+ 	&sdhi0_device,
++	&thermal_device,
+ };
+ 
+ static void __init marzen_init(void)
+-- 
+1.7.10.4
