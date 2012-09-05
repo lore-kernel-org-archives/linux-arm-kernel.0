@@ -1,42 +1,44 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 05 Sep 2012 12:40:17 +1000
-Subject: [PATCH 13/25] macintosh/mediabay: add a const qualifier
-In-Reply-To: <1343034810-3386-14-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1343034810-3386-14-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1346812817.2257.23.camel@pasglop>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 5 Sep 2012 10:40:49 +0800
+Subject: [PATCH] arm: mxs: Fix MMC WP pin being inverted
+In-Reply-To: <1346811082-27295-1-git-send-email-marex@denx.de>
+References: <1346811082-27295-1-git-send-email-marex@denx.de>
+Message-ID: <20120905024046.GR2362@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-07-23 at 11:13 +0200, Uwe Kleine-K?nig wrote:
-> This prepares *of_device_id.data becoming const. Without this change
-> the following warning would occur:
+Please resend with subject "arm: " changing to "ARM: ", or even better
+the one below.
+
+  ARM: dts: m28evk: ...
+
+On Wed, Sep 05, 2012 at 04:11:22AM +0200, Marek Vasut wrote:
+> The MMC WP is active high on the m28evk, fix this.
 > 
-> 	drivers/macintosh/mediabay.c: In function 'media_bay_attach':
-> 	drivers/macintosh/mediabay.c:589:11: warning: assignment discards 'const' qualifier from pointer target type [enabled by default]
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
 > ---
-
-Ack all of these assuming you test built (I didn't). Do you need me to
-carry any of this via the powerpc tree ?
-
-Cheers,
-Ben.
-
->  drivers/macintosh/mediabay.c |    2 +-
+>  arch/arm/boot/dts/imx28-m28evk.dts |    2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/macintosh/mediabay.c b/drivers/macintosh/mediabay.c
-> index 831d751..54bf584 100644
-> --- a/drivers/macintosh/mediabay.c
-> +++ b/drivers/macintosh/mediabay.c
-> @@ -63,7 +63,7 @@ struct media_bay_info {
->  	int				value_count;
->  	int				timer;
->  	struct macio_dev		*mdev;
-> -	struct mb_ops*			ops;
-> +	const struct mb_ops*		ops;
->  	int				index;
->  	int				cached_gpio;
->  	int				sleeping;
+> diff --git a/arch/arm/boot/dts/imx28-m28evk.dts b/arch/arm/boot/dts/imx28-m28evk.dts
+> index 845bb42..10868f1 100644
+> --- a/arch/arm/boot/dts/imx28-m28evk.dts
+> +++ b/arch/arm/boot/dts/imx28-m28evk.dts
+> @@ -63,7 +63,7 @@
+>  					     &mmc0_cd_cfg
+>  					     &mmc0_sck_cfg>;
+>  				bus-width = <8>;
+> -				wp-gpios = <&gpio3 10 1>;
+> +				wp-gpios = <&gpio3 10 0>;
+>  				vmmc-supply = <&reg_vddio_sd0>;
+>  				status = "okay";
+>  			};
+> -- 
+> 1.7.10.4
+> 
+
+-- 
+Regards,
+Shawn
