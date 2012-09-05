@@ -1,53 +1,139 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 5 Sep 2012 17:05:28 +0800
-Subject: [PATCH 1/2] ARM: exynos: delete redundant HAVE_SCHED_CLOCK option
- in Kconfig
-In-Reply-To: <227101cd8aea$06a06e10$13e14a30$%kim@samsung.com>
-References: <1346406296-16223-1-git-send-email-Barry.Song@csr.com>
- <227101cd8aea$06a06e10$13e14a30$%kim@samsung.com>
-Message-ID: <CAGsJ_4xCct_7H3oU6goNsXNqOxRZ57N_6qsAdoU37q1gLhUbTg@mail.gmail.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Wed, 5 Sep 2012 11:11:23 +0200
+Subject: [PATCH] ARM : i.MX27 : split code for allocation of ressources of
+ camera and eMMA
+In-Reply-To: <50471187.3040809@gmail.com>
+References: <1346763398-13536-1-git-send-email-gcembed@gmail.com>
+ <CACKLOr0PO1jbxrfRoEwEAGFNkNkAFUA-oB2vLZpw1kDxEYPBQw@mail.gmail.com>
+ <5047013E.30508@gmail.com>
+ <CACKLOr1RipM3QVJBaTjXHFotqSMdrCsWLkBsgiiuauTWpxR6EQ@mail.gmail.com>
+ <50471187.3040809@gmail.com>
+Message-ID: <CACKLOr0=TccMNoQV-LfkeBrCN5=0E8eqTEaT7PRk-KAv_mQ5RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/9/5 Kukjin Kim <kgene.kim@samsung.com>:
-> Barry Song wrote:
+On 5 September 2012 10:47, Ga?tan Carlier <gcembed@gmail.com> wrote:
+> On 09/05/2012 10:22 AM, javier Martin wrote:
 >>
->> From: Barry Song <Baohua.Song@csr.com>
+>> On 5 September 2012 09:37, Ga?tan Carlier <gcembed@gmail.com> wrote:
+>>>
+>>> Hi Javier,
+>>> This is because I will send a patch to add support of eMMA-PP. eMMA-PrP
+>>> is
+>>> not only used for soc-camera. It can also be used as stand-alone driver
+>>> and
+>>> now to be able to use eMMA-PrP module, IMX_HAVE_PLATFORM_MX2_CAMERA must
+>>> be
+>>> set.
 >>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-
-Kukjin, Thanks. i assume this will be taken by samsung tree. Who will
-take care the other one:
-http://www.spinics.net/lists/arm-kernel/msg191939.html
-
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->> ---
->>  arch/arm/mach-exynos/Kconfig |    1 -
->>  1 files changed, 0 insertions(+), 1 deletions(-)
 >>
->> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
->> index b5b4c8c..3fd4ab3 100644
->> --- a/arch/arm/mach-exynos/Kconfig
->> +++ b/arch/arm/mach-exynos/Kconfig
->> @@ -243,7 +243,6 @@ config MACH_UNIVERSAL_C210
->>       select CPU_EXYNOS4210
->>       select S5P_HRT
->>       select CLKSRC_MMIO
->> -     select HAVE_SCHED_CLOCK
->>       select S5P_GPIO_INT
->>       select S5P_DEV_FIMC0
->>       select S5P_DEV_FIMC1
->> --
->> 1.7.0.4
+>> Do you mean the following stand-alone driver I submitted some time
+>> ago? Are you working on some improvements to it?
+>>
+>> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=drivers/media/video/mx2_emmaprp.c;h=5f8a6f5b98f91c3af4e1bdbd06654e7b496d8d65;hb=HEAD
+>
+> yes
+>
+>>
+>> This driver can be used without applying your patch. Please take a
+>> look at the following patch which is pending to get merged in
+>> linux-media tree:
+>> https://patchwork.kernel.org/patch/1347921/
+>>
+>>
+>>> And if I follow this logic, I have to put declaration of eMMA-PP with
+>>> imx-fb
+>>> and eMMA-PP can only be enabled if IMX_HAVE_PLATFORM_IMX_FB.
+>>> Of course, eMMA-PrP is almost always used with soc-camera and eMMA-PP
+>>> with
+>>> LCDC (imx-fb) but eMMA can be used to do HW accelarated colorspace
+>>> conversion.
+>>
+>>
+>> Agree, there is already one driver supporting this feature.
+>>
+>>> It is not a problem for me to keep eMMA-PrP and mx2-camera together. It
+>>> was
+>>> just to have a more independant eMMA driver.
+>>
+>>
+>> I won't oppose to it, for me it is just aesthetic. However, you must
+>> do it properly without breaking existing boards such as Visstrim_M10.
+>
+> Ok, I missed your patch in mailing-list and I work with linux-next
+> (20120824) so I didn't know that my patch would break yours. Sorry.
+>
+>>
+>>> For the Visstrim_M10 board, I don't think that it is needed to set
+>>> IMX_HAVE_PLATFORM_MX2_EMMA because there is no reference to m2m-emmaprp
+>>> and
+>>> mx2-camera embeds handling of eMMA-PrP without using eMMA-PrP driver.
+>>
+>>
+>> The following patch was sent to the list in Agust the 20th and will be
+>> merged in the linux-media tree. This patch does reference m2m-emmaprp
+>> in Visstrim_M10
+>> https://patchwork.kernel.org/patch/1347921/
+>>
+>> So, please, since you have to fix the wrong chunk and have to send a
+>> v2 anyways I strongly encourage you to add the flag
+>> IMX_HAVE_PLATFORM_MX2_EMMA to Visstrim_M10. This way nothing will be
+>> broken no matter your patch gets merged after or before mine.
+>
+> What do you mean by "wrong chunk" ?
 
--barry
+
+Your patch does not apply cleanly to linux-next due to the following chunk:
+
+ diff --git a/arch/arm/mach-imx/devices-imx27.h
+b/arch/arm/mach-imx/devices-imx27.h
+index 0482293..d8eb4a0 100644
+--- a/arch/arm/mach-imx/devices-imx27.h
++++ b/arch/arm/mach-imx/devices-imx27.h
+@@ -54,8 +54,10 @@ extern const struct imx_imx_uart_1irq_data
+imx27_imx_uart_data[];
+ extern const struct imx_mx2_camera_data imx27_mx2_camera_data;
+ #define imx27_add_mx2_camera(pdata)    \
+        imx_add_mx2_camera(&imx27_mx2_camera_data, pdata)
++
++extern const struct imx_mx2_emma_data imx27_mx2_emmaprp_data;
+ #define imx27_add_mx2_emmaprp()        \
+-       imx_add_mx2_emmaprp(&imx27_mx2_camera_data)
++       imx_add_mx2_emmaprp(&imx27_mx2_emmaprp_data)
+
+
+>>
+>>> It seems that eMMA-PrP embeded in mx2camera handles more case than
+>>> stand-alone eMMA-PrP driver. Maybe eMMA-PrP driver needs some review to
+>>> handle all In/Out image formats ?
+>>
+>>
+>> eMMa-PrP is currently used in two drivers:
+>>
+>> 1.
+>> http://git.linuxtv.org/media_tree.git/blob/refs/heads/staging/for_v3.7:/drivers/media/platform/soc_camera/mx2_camera.c
+>> Where it is used as a substitute to a DMA that moves data between the
+>> CSI and RAM apart from providing more features like format conversion,
+>> etc... This is a soc_camera video capture driver.
+>>
+>> 2.
+>> http://git.linuxtv.org/media_tree.git/blob/refs/heads/staging/for_v3.7:/drivers/media/platform/mx2_emmaprp.c
+>> This is a stand-alone mem2mem v4l2 driver that can get YUYV 422 in the
+>> input and transform it to YUV 420. Of course, the driver can be
+>> extended to support more kinds of conversions.
+>>
+>> Regards.
+>>
+> Regards,
+> Ga?tan.
+
+
+
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
