@@ -1,67 +1,60 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 05 Sep 2012 15:02:09 +0200
-Subject: [PATCH 5/8] gpio: 74x164: Add output pin support
-In-Reply-To: <20120905145411.195f8438@eb-e6520>
-References: <1346834457-6257-1-git-send-email-maxime.ripard@free-electrons.com>
- <1346834457-6257-5-git-send-email-maxime.ripard@free-electrons.com>
- <20120905112012.13ce2c86@skate> <20120905114645.57bfe591@eb-e6520>
- <20120905120906.12d08bf5@skate> <20120905122652.7c752e96@eb-e6520>
- <20120905135646.3bbf98fa@skate> <20120905142244.003e5e4b@eb-e6520>
- <20120905142952.2e1f12fd@skate> <20120905145411.195f8438@eb-e6520>
-Message-ID: <50474D51.40007@free-electrons.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 05 Sep 2012 16:12:32 +0300
+Subject: [PATCH 5/9] ARM: OMAP2+: Remove hardcoded twl4030 gpio_base,
+ irq_base and irq_end
+In-Reply-To: <20120831235212.GS1303@atomide.com>
+References: <20120831004828.28732.902.stgit@muffinssi.local>
+ <20120831005230.28732.1131.stgit@muffinssi.local>
+ <20120831235212.GS1303@atomide.com>
+Message-ID: <50474FC0.6010805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/09/2012 14:54, Eric B?nard a ?crit :
-> Le Wed, 5 Sep 2012 14:29:52 +0200,
-> Thomas Petazzoni <thomas.petazzoni@free-electrons.com> a ?crit :
-> 
->> Le Wed, 5 Sep 2012 14:22:44 +0200,
->> Eric B?nard <eric@eukrea.com> a ?crit :
->>
->>>>> OK that's exactly what I was thinking to ;-)
->>>>
->>>> Good. So, do you think it's reasonable to use the STCP as a chip-select
->>>> for this device?
->>>
->>> in your case maybe but that really depends on how the chip is wired to
->>> the CPU so I'm not sure that can be a generic choice.
->>
->> I'm not sure to see how this chip could be wired differently to the
->> CPU. The CPU must do a low-to-high transition on STCP to get the values
->> out from the internal register.
->>
->> So, in other words, we don't know how to choose between:
->>
->>  *) Keep the current solution Maxime has implemented, where we have a
->>     specific latch GPIO property in the Device Tree for this 74HC595,
->>     and the 74HC595 driver is responsible for toggling this GPIO when
->>     needed.
->>
->>  *) Use the internal SPI controller logic to control this pin as a
->>     chip-select, and therefore get rid of Maxime's code with the
->>     specific latch GPIO property in the Device Tree.
->>
-> daisy chaining won't work in the second case (I may be wrong but IIRC
-> the chip select will toggle at each spi_write) unless you configure the
-> spi controller to send a 8x(number of 74HC595) bits word :
-> 
->  	gpio_set_value(chip->chip_select, 0);
-> 	for (i = chip->registers - 1; i >= 0; i--) {
-> 		ret = spi_write(chip->spi,
-> 				chip->buffer + i, sizeof(u8));
-> 		if (ret)
-> 			return ret;
-> 	}
-> 
->  	gpio_set_value(chip->chip_select, 1);
+Hi Tony,
 
-And what about using the spi_message structure and one single spi_sync
-instead of several spi_write ? Would that work in our case ?
+On 09/01/2012 02:52 AM, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [120830 17:53]:
+>> We can't use hardcoded interrupts for SPARSE_IRQ, and can replace
+>> the hardcoded gpio_base with twl_gpiochip.base after it's been
+>> allocated.
+> ...
+> 
+>> --- a/include/linux/mfd/twl6040.h
+>> +++ b/include/linux/mfd/twl6040.h
+>> @@ -194,7 +194,6 @@ struct twl6040_vibra_data {
+>>  
+>>  struct twl6040_platform_data {
+>>  	int audpwron_gpio;	/* audio power-on gpio */
+>> -	unsigned int irq_base;
+>>  
+>>  	struct twl6040_codec_data *codec;
+>>  	struct twl6040_vibra_data *vibra;
+> 
+> The platform_data irq_base is not being used it seems..
 
+Yes, this is not in use.
+
+> 
+>> @@ -222,7 +221,6 @@ struct twl6040 {
+>>  	unsigned int mclk;
+>>  
+>>  	unsigned int irq;
+>> -	unsigned int irq_base;
+>>  	u8 irq_masks_cur;
+>>  	u8 irq_masks_cache;
+>>  };
+> 
+> ..but irq_base here is still in use as that's where the value from
+> irq_alloc_descs() is being stored to. So I'll drop the changes to
+> struct twl6040 from this patch as otherwise twl6040 code won't compile.
+> 
+> Turns out I did not have twl6040 selected in any of the testconfigs
+> that I ran.
+
+I store the irq_base in a private data for the MFD driver so child drivers can
+request the correct IRQ.
+
+You can safely remove the irq_base from twl6040_platform_data struct
 
 -- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+P?ter
