@@ -1,29 +1,51 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 4 Sep 2012 21:38:36 -0700
-Subject: [PATCH] ARM: ux500: Correct Ux500 family names usage
-In-Reply-To: <1346677823-28158-1-git-send-email-linus.walleij@stericsson.com>
-References: <1346677823-28158-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20120905043836.GC6747@quad.lixom.net>
+Date: Tue, 4 Sep 2012 21:44:41 -0700
+Subject: [GIT PULL] Renesas ARM-based SoC fix for v3.6 #2
+In-Reply-To: <1346808893-14124-1-git-send-email-horms@verge.net.au>
+References: <1346808893-14124-1-git-send-email-horms@verge.net.au>
+Message-ID: <20120905044441.GD6747@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 03, 2012 at 03:10:23PM +0200, Linus Walleij wrote:
-> From: Loic PALLARDY <loic.pallardy@st.com>
+On Wed, Sep 05, 2012 at 10:34:50AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
 > 
-> Update users with cpu_is_ux540_family() to keep x540
-> family functional.
+> please consider the following fixes for the Armadillo800 EVA and
+> Mackerel boards from Morimoto-san.
 > 
-> Signed-off-by: Loic Pallardy <loic.pallardy@stericsson.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Hi Arnd, Olof:
+> * "ARM: shmobile: armadillo800eva: fixup: sound card detection order"
+>   is a regression fix.
+> * "ARM: shmobile: mackerel: fixup usb module order"
+>   is a regression fix.
+> * "ARM: shmobile: armadillo800eva: enable rw rootfs mount"
+>   is a boot-loader compatibility fix.
 > 
-> This patch goes on top of the ux500-asicid patches pulled earlier,
-> into your ux500/asic-id branch, it'd be best if you just applied
-> this one on top manually. If you prefer I can send a new pull
-> request from the same branch.
+> All of the changes are aimed at improving the end-user experience.
+> 
+> Notes:
+> 
+> * This pull request is based on my previous
+>   "[GIT PULL] Renesas ARM-based SoC fix for v3.6" pull request
+>   which was recently pulled by Olof. Please let me know
+>   if you would like me to handle this a different way.
 
-Sure, applied.
+That's exactly the way to do it. In this case it meant I have two pulls after
+each other from the same tree, and I suppose I could replace the older one with
+the newer one but that means rebasing so I just pulled it in. Either way, you
+just need to send a delta pull request like you did, the rest would be up to
+us.
+
+> 
+> ----------------------------------------------------------------
+> The following changes since commit 497dcf6fc355f0734faf851662b6957386715d24:
+> 
+>   ARM: shmobile: marzen: fixup smsc911x id for regulator (2012-08-30 14:10:08 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git fixes
+
+Pulled, thanks!
 
 
 -Olof
