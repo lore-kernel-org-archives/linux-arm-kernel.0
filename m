@@ -1,49 +1,25 @@
 From: davem@davemloft.net (David Miller)
-Date: Wed, 05 Sep 2012 17:30:23 -0400 (EDT)
-Subject: [PATCH 04/10] net/macb: Fix a race in macb_start_xmit()
-In-Reply-To: <40f02ee50a29aaec6c949432a1bcf09f4b027181.1346775479.git.nicolas.ferre@atmel.com>
+Date: Wed, 05 Sep 2012 17:31:18 -0400 (EDT)
+Subject: [PATCH 08/10] net/macb: macb_get_drvinfo: add GEM/MACB suffix
+ to differentiate revision
+In-Reply-To: <fc701a2ed18198b7a671c55f1e65725f1709509c.1346775479.git.nicolas.ferre@atmel.com>
 References: <cover.1346775479.git.nicolas.ferre@atmel.com>
- <40f02ee50a29aaec6c949432a1bcf09f4b027181.1346775479.git.nicolas.ferre@atmel.com>
-Message-ID: <20120905.173023.2235590074897156746.davem@davemloft.net>
+ <fc701a2ed18198b7a671c55f1e65725f1709509c.1346775479.git.nicolas.ferre@atmel.com>
+Message-ID: <20120905.173118.1107211725393320514.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nicolas Ferre <nicolas.ferre@atmel.com>
-Date: Wed, 5 Sep 2012 10:19:11 +0200
+Date: Wed, 5 Sep 2012 11:00:53 +0200
 
-> From: Havard Skinnemoen <havard@skinnemoen.net>
-> 
-> Fix a race in macb_start_xmit() where we unconditionally set the TSTART bit.
-> If an underrun just happened (we do this with interrupts disabled, so it might
-> not have been handled yet), the controller starts transmitting from the first
-> entry in the ring, which is usually wrong.
-> Restart the controller after error handling.
-> 
-> Signed-off-by: Havard Skinnemoen <havard@skinnemoen.net>
-> [nicolas.ferre at atmel.com: split patch in topics]
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>  	strcpy(info->driver, bp->pdev->dev.driver->name);
+> +	if (macb_is_gem(bp))
+> +		strcat(info->driver, " GEM");
+> +	else
+> +		strcat(info->driver, " MACB");
 
-Accumulating special case code and checks into the hot path of TX packet
-processing is extremely unwise.
+This is a driver string, which means the software driver, and has
+absolutely nothing to do with the exact type of the underlying
+physical hardware.
 
-Instead, when you handle the TX error conditions and reset the chip you
-should first ensure that there are no flows of control in the transmit
-function of your driver by using the appropriate locking et al. facilities.
-
-For example, you can quiesce the transmit path by handling the chip error
-interrupt as follows:
-
-1) Disable chip interrupt generation.
-
-2) Schedule a workqueue so you can process the reset outside of hard
-   interrupt context.
-
-3) In the workqueue function, disable NAPI and perform a
-   netif_tx_disable() to guarentee there are no threads of
-   execution trying to queue up packets for TX into the driver.
-
-4) Perform your chip reset and whatever else is necessary.
-
-5) Re-enable NAPI and TX.
-
-Then you don't need any special checks in your xmit method at all.
+Therefore the these suffixes should be left out of the driver string.
