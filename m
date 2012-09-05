@@ -1,43 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 4 Sep 2012 22:16:56 -0700
-Subject: [GIT PULL] ARM perf updates for 3.7
-In-Reply-To: <20120829211034.GA13222@mudshark.cambridge.arm.com>
-References: <20120829211034.GA13222@mudshark.cambridge.arm.com>
-Message-ID: <20120905051656.GF6747@quad.lixom.net>
+Date: Tue, 4 Sep 2012 22:22:21 -0700
+Subject: [PATCH] ARM: gemini: fix the gemini build
+In-Reply-To: <1346347356-18786-1-git-send-email-linus.walleij@linaro.org>
+References: <1346347356-18786-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20120905052221.GG6747@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2012 at 10:10:34PM +0100, Will Deacon wrote:
-> Hi Arnd, Olof,
+On Thu, Aug 30, 2012 at 07:22:36PM +0200, Linus Walleij wrote:
+> Test-compiling obscure machines I notice that the gemini (which
+> by the way lacks a defconfig) is broken since some time back.
+> Adding a simple missing include makes it build again.
 > 
-> I appreciate that perf changes don't usually go via arm-soc, but in this
-> case I'm touching a bunch of platforms (albeit in a fairly mechanical way)
-> so it would be great if you could pull this into a branch for 3.7. Jon can
-> then use it as a base for his OMAP PMU patches and I think that ST and
-> Samsung may also have patches that depend on this lot.
-> 
-> The changes outside of platform code are restricted to perf files and the
-> whole series has been in -next since -rc1.
-> 
-> Cheers,
-> 
-> Will
-> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
-> 
-> The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
-> 
->   Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git tags/arm-perf-3.7
+> ARM SoC guys: please apply this patch directly to the -rc:s
+> unless there is some obvious problem with it.
 
-Seems reasonable. Pulled in as pmu/cleanup in next/cleanup.
+Thanks, applied.
 
-Russell, protest if you want this through your tree instead, but since
-it's a prereq for some of the other work we'll need to pull it in in
-some form or other anyway.
+The platform has a listed maintainer (cc:d here) and has had new
+development within the last 18 months so it doesn't seem abandoned.
 
 
 -Olof
