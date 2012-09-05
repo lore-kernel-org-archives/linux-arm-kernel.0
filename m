@@ -1,28 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 5 Sep 2012 09:42:59 +0100
-Subject: [PATCHv2] ARM: msm: Implement read_current_timer for msm timers
-In-Reply-To: <20120904232111.GA7598@codeaurora.org>
-References: <1346371222-7450-1-git-send-email-sboyd@codeaurora.org>
- <20120904232111.GA7598@codeaurora.org>
-Message-ID: <20120905084259.GA881@mudshark.cambridge.arm.com>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Wed, 05 Sep 2012 10:46:36 +0200
+Subject: [PATCH 1/8] gpio: 74x164: Use module_spi_driver boiler plate
+ function
+In-Reply-To: <1346834457-6257-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1346834457-6257-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <11134998.TjEjXZWkgF@flexo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2012 at 12:21:11AM +0100, David Brown wrote:
-> On Thu, Aug 30, 2012 at 05:00:22PM -0700, Stephen Boyd wrote:
-> > Setup the same timer used as the clocksource to be used as the
-> > read_current_timer implementation. This allows us to support a
-> > stable udelay implementation on MSMs where it's possible for the
-> > CPUs to scale speeds independently of one another.
-> > 
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> Acked-by: David Brown <davidb@codeaurora.org>
-> 
-> Will, let me know if you'd prefer that I pull this.
+On Wednesday 05 September 2012 10:40:50 Maxime Ripard wrote:
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-It probably makes sense for you to take Stephen's patch, however I'll merge
-my series through Russell separately. If you want it for 3.7, I can ask Arnd
-to pull it into arm-soc as well?
+Acked-by: Florian Fainelli <florian@openwrt.org>
 
-Will
+> ---
+>  drivers/gpio/gpio-74x164.c |   13 +------------
+>  1 file changed, 1 insertion(+), 12 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-74x164.c b/drivers/gpio/gpio-74x164.c
+> index a31ad6f..2975036 100644
+> --- a/drivers/gpio/gpio-74x164.c
+> +++ b/drivers/gpio/gpio-74x164.c
+> @@ -159,18 +159,7 @@ static struct spi_driver gen_74x164_driver = {
+>  	.probe		= gen_74x164_probe,
+>  	.remove		= __devexit_p(gen_74x164_remove),
+>  };
+> -
+> -static int __init gen_74x164_init(void)
+> -{
+> -	return spi_register_driver(&gen_74x164_driver);
+> -}
+> -subsys_initcall(gen_74x164_init);
+> -
+> -static void __exit gen_74x164_exit(void)
+> -{
+> -	spi_unregister_driver(&gen_74x164_driver);
+> -}
+> -module_exit(gen_74x164_exit);
+> +module_spi_driver(gen_74x164_driver);
+>  
+>  MODULE_AUTHOR("Gabor Juhos <juhosg@openwrt.org>");
+>  MODULE_AUTHOR("Miguel Gaio <miguel.gaio@efixo.com>");
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
