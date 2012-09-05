@@ -1,51 +1,49 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed,  5 Sep 2012 14:58:56 +0300
-Subject: [PATCH v3 8/8] ARM/dts: omap3-beagle: Enable audio support
-In-Reply-To: <1346846336-27321-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1346846336-27321-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1346846336-27321-9-git-send-email-peter.ujfalusi@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 5 Sep 2012 14:08:10 +0200
+Subject: [PATCH 02/17] arm: ux500: add ccu9540 board support
+In-Reply-To: <504739B8.10604@st.com>
+References: <1346839153-6465-1-git-send-email-loic.pallardy-ext@stericsson.com>
+ <1346839153-6465-3-git-send-email-loic.pallardy-ext@stericsson.com>
+ <201209051042.00887.arnd@arndb.de> <504739B8.10604@st.com>
+Message-ID: <CACRpkdY2d1dGcV0OArM+vY29HZisXeA583D46p8rmiUSGeS27g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the needed sections to enable audio support on BeagleBoard when booted
-with DT blob.
+On Wed, Sep 5, 2012 at 1:38 PM, Loic PALLARDY <loic.pallardy@st.com> wrote:
+> On 09/05/2012 12:42 PM, Arnd Bergmann wrote:
+>> On Wednesday 05 September 2012, Loic Pallardy wrote:
+>>> +MACHINE_START(U9540, "ST-Ericsson 9540 platform")
+>>> +       .atag_offset    = 0x100,
+>>> +       .map_io         = u8500_map_io,
+>>> +       .nr_irqs        = UX500_NR_IRQS,
+>>> +       .init_irq       = ux500_init_irq,
+>>> +       .timer          =&ux500_timer,
+>>> +       .handle_irq     = gic_handle_irq,
+>>> +       .init_machine   = u9540_init_machine,
+>>> +       .init_late      = ux500_init_late,
+>>> +MACHINE_END
+>>
+>> Please don't add another ATAG based board definition to ux500. We're closing in
+>> on having full support for DT booting with this platform, so your patch is just
+>> making it harder for us to complete this.
+>>
+>>       Arnd
+> Yes I know and agree.
+> Please consider this patch as a temporary one waiting for 9540 support
+> from Lee.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/boot/dts/omap3-beagle.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+It seems it would still be possible to create a patch series containing
+just the PRCMU refactorings (which are really nice) and necessary
+modifications to the MOP500 series so we could get this ground work
+into the 3.7 merge window (if Sam is happy with it).
 
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index 16bff8b..10d87a2 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -25,6 +25,14 @@
- 			gpios = <&twl_gpio 19 0>; /* LEDB */
- 		};
- 	};
-+
-+	sound {
-+		compatible = "ti,omap-twl4030";
-+		ti,model = "omap3beagle";
-+
-+		ti,mcbsp = <&mcbsp2>;
-+		ti,codec = <&twl_audio>;
-+	};
- };
- 
- &i2c1 {
-@@ -40,6 +48,12 @@
- 			regulator-min-microvolt = <1800000>;
- 			regulator-max-microvolt = <3000000>;
- 		};
-+
-+		twl_audio: audio {
-+			compatible = "ti,twl4030-audio";
-+			codec {
-+			};
-+		};
- 	};
- };
- 
--- 
-1.7.12
+Actually it'd be nice to have a patch series containing that *and*
+Lee's recent patches for e.g. IRQ domain on the PRCMU in one
+big series, that would prepare the ground very nicely, then only
+the DT board stuff would be missing for a successful U9540 DT
+boot.
+
+Is this possible?
+
+Yours,
+Linus Walleij
