@@ -1,10 +1,10 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 5 Sep 2012 14:47:16 -0500
+Date: Wed, 5 Sep 2012 14:47:29 -0500
 Subject: [PATCH v8 1/3] ARM: OMAP2/3: hwmod data: add gpmc
 In-Reply-To: <17b686d1aaf6fa6bfdbe30993804dd5a269ae6db.1346846464.git.afzal@ti.com>
 References: <cover.1346846464.git.afzal@ti.com>
  <17b686d1aaf6fa6bfdbe30993804dd5a269ae6db.1346846464.git.afzal@ti.com>
-Message-ID: <5047AC44.2060208@ti.com>
+Message-ID: <5047AC51.9010409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
