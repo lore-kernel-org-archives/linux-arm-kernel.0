@@ -1,136 +1,76 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed,  5 Sep 2012 14:58:49 +0300
-Subject: [PATCH v3 1/8] ARM/dts: omap2: Add McBSP entries for OMAP2420 and
- OMAP2430 SoC
+Date: Wed,  5 Sep 2012 14:58:51 +0300
+Subject: [PATCH v3 3/8] ARM/dts: omap3: Add McBSP entries
 In-Reply-To: <1346846336-27321-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1346846336-27321-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1346846336-27321-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1346846336-27321-4-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The McBSP IP within OMAP2420 and 2430 is different we need to create separate
-dtsi files for them.
+Create the needed sections to be able to probe McBSP ports via DT.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/omap2420.dtsi | 39 +++++++++++++++++++
- arch/arm/boot/dts/omap2430.dtsi | 83 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 122 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap2420.dtsi
- create mode 100644 arch/arm/boot/dts/omap2430.dtsi
+ arch/arm/boot/dts/omap3.dtsi | 69 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 69 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
-new file mode 100644
-index 0000000..6174d3d
---- /dev/null
-+++ b/arch/arm/boot/dts/omap2420.dtsi
-@@ -0,0 +1,39 @@
-+/*
-+ * Device Tree Source for OMAP2420 SoC
-+ *
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 8109471..f024bb3 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -220,5 +220,74 @@
+ 			compatible = "ti,omap3-wdt";
+ 			ti,hwmods = "wd_timer2";
+ 		};
 +
-+/include/ "omap2.dtsi"
-+
-+/ {
-+	compatible = "ti,omap2420", "ti,omap2";
-+
-+	ocp {
 +		mcbsp1: mcbsp at 48074000 {
-+			compatible = "ti,omap2420-mcbsp";
++			compatible = "ti,omap3-mcbsp";
 +			reg = <0x48074000 0xff>;
-+			reg-names = "mpu";
-+			interrupts = <59>, /* TX interrupt */
-+				     <60>; /* RX interrupt */
-+			interrupt-names = "tx", "rx";
-+			interrupt-parent = <&intc>;
-+			ti,hwmods = "mcbsp1";
-+		};
-+
-+		mcbsp2: mcbsp at 48076000 {
-+			compatible = "ti,omap2420-mcbsp";
-+			reg = <0x48076000 0xff>;
-+			reg-names = "mpu";
-+			interrupts = <62>, /* TX interrupt */
-+				     <63>; /* RX interrupt */
-+			interrupt-names = "tx", "rx";
-+			interrupt-parent = <&intc>;
-+			ti,hwmods = "mcbsp2";
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
-new file mode 100644
-index 0000000..59a639a
---- /dev/null
-+++ b/arch/arm/boot/dts/omap2430.dtsi
-@@ -0,0 +1,83 @@
-+/*
-+ * Device Tree Source for OMAP243x SoC
-+ *
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/include/ "omap2.dtsi"
-+
-+/ {
-+	compatible = "ti,omap2430", "ti,omap2";
-+
-+	ocp {
-+		mcbsp1: mcbsp at 48074000 {
-+			compatible = "ti,omap2430-mcbsp";
-+			reg = <0x48074000 0xff>;
-+			reg-names = "mpu";
-+			interrupts = <64>, /* OCP compliant interrupt */
-+				     <59>, /* TX interrupt */
-+				     <60>, /* RX interrupt */
-+				     <61>; /* RX overflow interrupt */
-+			interrupt-names = "common", "tx", "rx", "rx_overflow";
-+			interrupt-parent = <&intc>;
-+			ti,buffer-size = <128>;
-+			ti,hwmods = "mcbsp1";
-+		};
-+
-+		mcbsp2: mcbsp at 48076000 {
-+			compatible = "ti,omap2430-mcbsp";
-+			reg = <0x48076000 0xff>;
 +			reg-names = "mpu";
 +			interrupts = <16>, /* OCP compliant interrupt */
-+				     <62>, /* TX interrupt */
-+				     <63>; /* RX interrupt */
++				     <59>, /* TX interrupt */
++				     <60>; /* RX interrupt */
 +			interrupt-names = "common", "tx", "rx";
 +			interrupt-parent = <&intc>;
 +			ti,buffer-size = <128>;
++			ti,hwmods = "mcbsp1";
++		};
++
++		mcbsp2: mcbsp at 49022000 {
++			compatible = "ti,omap3-mcbsp";
++			reg = <0x49022000 0xff>,
++			      <0x49028000 0xff>;
++			reg-names = "mpu", "sidetone";
++			interrupts = <17>, /* OCP compliant interrupt */
++				     <62>, /* TX interrupt */
++				     <63>, /* RX interrupt */
++				     <4>;  /* Sidetone */
++			interrupt-names = "common", "tx", "rx", "sidetone";
++			interrupt-parent = <&intc>;
++			ti,buffer-size = <1280>;
 +			ti,hwmods = "mcbsp2";
 +		};
 +
-+		mcbsp3: mcbsp at 4808c000 {
-+			compatible = "ti,omap2430-mcbsp";
-+			reg = <0x4808c000 0xff>;
-+			reg-names = "mpu";
-+			interrupts = <17>, /* OCP compliant interrupt */
++		mcbsp3: mcbsp at 49024000 {
++			compatible = "ti,omap3-mcbsp";
++			reg = <0x49024000 0xff>,
++			      <0x4902a000 0xff>;
++			reg-names = "mpu", "sidetone";
++			interrupts = <22>, /* OCP compliant interrupt */
 +				     <89>, /* TX interrupt */
-+				     <90>; /* RX interrupt */
-+			interrupt-names = "common", "tx", "rx";
++				     <90>, /* RX interrupt */
++				     <5>;  /* Sidetone */
++			interrupt-names = "common", "tx", "rx", "sidetone";
 +			interrupt-parent = <&intc>;
 +			ti,buffer-size = <128>;
 +			ti,hwmods = "mcbsp3";
 +		};
 +
-+		mcbsp4: mcbsp at 4808e000 {
-+			compatible = "ti,omap2430-mcbsp";
-+			reg = <0x4808e000 0xff>;
++		mcbsp4: mcbsp at 49026000 {
++			compatible = "ti,omap3-mcbsp";
++			reg = <0x49026000 0xff>;
 +			reg-names = "mpu";
-+			interrupts = <18>, /* OCP compliant interrupt */
++			interrupts = <23>, /* OCP compliant interrupt */
 +				     <54>, /* TX interrupt */
 +				     <55>; /* RX interrupt */
 +			interrupt-names = "common", "tx", "rx";
@@ -140,10 +80,10 @@ index 0000000..59a639a
 +		};
 +
 +		mcbsp5: mcbsp at 48096000 {
-+			compatible = "ti,omap2430-mcbsp";
++			compatible = "ti,omap3-mcbsp";
 +			reg = <0x48096000 0xff>;
 +			reg-names = "mpu";
-+			interrupts = <19>, /* OCP compliant interrupt */
++			interrupts = <27>, /* OCP compliant interrupt */
 +				     <81>, /* TX interrupt */
 +				     <82>; /* RX interrupt */
 +			interrupt-names = "common", "tx", "rx";
@@ -151,7 +91,7 @@ index 0000000..59a639a
 +			ti,buffer-size = <128>;
 +			ti,hwmods = "mcbsp5";
 +		};
-+	};
-+};
+ 	};
+ };
 -- 
 1.7.12
