@@ -1,46 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 5 Sep 2012 10:20:28 +0200
-Subject: [GIT PULL] ks8695 timer changes for v3.7
-Message-ID: <CACRpkdbKJU9gp2MLKZQTGiyysoM38owyxJx8S2zFzRJiv61c5Q@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed,  5 Sep 2012 17:20:43 +0900
+Subject: [PATCH 4/5] ARM: shmobile: marzen: fixup regulator id for smsc911x
+In-Reply-To: <1346833244-30432-1-git-send-email-horms@verge.net.au>
+References: <1346833244-30432-1-git-send-email-horms@verge.net.au>
+Message-ID: <1346833244-30432-5-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof:
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Here is that patch series that switches KS8695 over to using generic
-time and clockevents. Signed tag provided.
+regulator id = 0 is used for sh_mobile_sdhi.
+smsc911x's regulator can use id = 1
 
-All tested by Greg Ungerer.
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ arch/arm/mach-shmobile/board-marzen.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Please pull it in!
-
-The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
-
-  Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
-
-are available in the git repository at:
-
-  http://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ks8695-time-for-arm-soc
-
-for you to fetch changes up to c7e783d6adc7798307e7063e11f4127117446d5a:
-
-  ARM: ks8695: convert to generic time and clocksource (2012-09-05
-08:49:22 +0200)
-
-----------------------------------------------------------------
-This cleans up the ks8695 timer driver and converts
-it to use generic time and clock events.
-
-----------------------------------------------------------------
-Linus Walleij (4):
-      ARM: ks8695: merge the timer header into the timer driver
-      ARM: ks8695: use [readl|writel]_relaxed()
-      ARM: ks8695: delete resume hook from timer
-      ARM: ks8695: convert to generic time and clocksource
-
- arch/arm/Kconfig                               |   3 +-
- arch/arm/mach-ks8695/include/mach/regs-timer.h |  40 --------
- arch/arm/mach-ks8695/time.c                    | 133 +++++++++++++++++--------
- 3 files changed, 92 insertions(+), 84 deletions(-)
- delete mode 100644 arch/arm/mach-ks8695/include/mach/regs-timer.h
+diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
+index dec3ffc..cbf9f25 100644
+--- a/arch/arm/mach-shmobile/board-marzen.c
++++ b/arch/arm/mach-shmobile/board-marzen.c
+@@ -120,7 +120,7 @@ static void __init marzen_init(void)
+ {
+ 	regulator_register_always_on(0, "fixed-3.3V", fixed3v3_power_consumers,
+ 				ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
+-	regulator_register_fixed(0, dummy_supplies,
++	regulator_register_fixed(1, dummy_supplies,
+ 				ARRAY_SIZE(dummy_supplies));
+ 
+ 	r8a7779_pinmux_init();
+-- 
+1.7.10.4
