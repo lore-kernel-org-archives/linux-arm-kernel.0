@@ -1,26 +1,38 @@
 From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 5 Sep 2012 10:28:45 +0530
-Subject: [PATCH] ARM: OMAP4: Fix array size for irq_target_cpu
-In-Reply-To: <20120905000309.GW1303@atomide.com>
-References: <20120905000309.GW1303@atomide.com>
-Message-ID: <CAMQu2gx5aojH1mzDV-QfqLFJsm3CTf=NLK0ZNVkjYAk6YBKYtQ@mail.gmail.com>
+Date: Wed, 5 Sep 2012 10:32:07 +0530
+Subject: [PATCH v3 3/3] cpufreq: Add a generic cpufreq-cpu0 driver
+In-Reply-To: <20120905011219.GN2362@S2101-09.ap.freescale.net>
+References: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
+ <1344577046-14847-4-git-send-email-shawn.guo@linaro.org>
+ <201209050118.39045.rjw@sisk.pl>
+ <20120905011219.GN2362@S2101-09.ap.freescale.net>
+Message-ID: <CAMQu2gwjqhi2EJ_3yk+0k9gRWDaGu4yG+V7E4BJ2G3Ki7uGk6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 5, 2012 at 5:33 AM, Tony Lindgren <tony@atomide.com> wrote:
+Shawn,
+
+On Wed, Sep 5, 2012 at 6:42 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Wed, Sep 05, 2012 at 01:18:38AM +0200, Rafael J. Wysocki wrote:
+>> On Friday, August 10, 2012, Shawn Guo wrote:
+>> > It adds a generic cpufreq driver for CPU0 frequency management based on
+>> > clk, regulator, OPP and device tree support.  It can support both
+>> > uniprocessor (UP) and those symmetric multiprocessor (SMP) systems which
+>> > share clock and voltage across all CPUs.
+>> >
+>> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+>>
+>> I seem to recall that this has been discussed with several people and
+>> undergone some changes as a result of comments.  Would it be possible
+>> to get some ACKs from the people involved?
+>>
 >
-> If NR_IRQS is less than MAX_IRQS, we end up writing past the
-> irq_target_cpu array in omap_wakeupgen_init():
+> Mark, Santosh,
 >
-> /* Associate all the IRQs to boot CPU like GIC init does. */
-> for (i = 0; i < max_irqs; i++)
->         irq_target_cpu[i] = boot_cpu;
+> Reviewed-by, please?
 >
-> This can happen if SPARSE_IRQ is enabled as by default NR_IRQS is
-> set to 16. Without this patch we're overwriting other data during
-> the boot.
->
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
->
-Looks good.
+As commented already, the name of file was bit odd to me
+otherwise, patch itself is fine by me.
+
+FWIW ,
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
