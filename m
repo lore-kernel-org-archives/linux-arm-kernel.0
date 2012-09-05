@@ -1,96 +1,55 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 5 Sep 2012 05:13:08 +0200
-Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
-In-Reply-To: <CAK5ve-Jqc1xpXa0VM7=+MN1cvm=8ysg9W9WRiG66yq7GRfh+Gw@mail.gmail.com>
-References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
- <CAK5ve-Jqc1xpXa0VM7=+MN1cvm=8ysg9W9WRiG66yq7GRfh+Gw@mail.gmail.com>
-Message-ID: <201209050513.08588.marex@denx.de>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 5 Sep 2012 10:57:12 +0800
+Subject: [PATCH v6 0/4] add syscon driver based on regmap for general
+ registers access
+Message-ID: <1346813836-28736-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Bryan Wu,
+This patch series mainly adds an syscon driver which is used to access
+general system controller registers like FSL IOMUXC GPR and ANATOP,
+after that, we convert all the exist private access general registers code to use
+standard API from regmap to access registers.
+Finally we remove the old mfd anatop driver which is only for anatop register
+access.
 
-> On Sat, Sep 1, 2012 at 4:16 PM, AnilKumar Ch <anilkumar@ti.com> wrote:
-> > Adopt pinctrl support to leds-gpio driver based on leds-gpio
-> > device pointer, pinctrl driver configure SoC pins to GPIO
-> > mode according to definitions provided in .dts file.
-> 
-> Thanks for this, actually Marek Vasut submitted a similar patch
-> before. I'm pretty fine with this patch.
+The patch series is based on linus's tree 3.6-rc4 since commit 5b716ac.
 
-Thanks for submitting this actually ... I didn't have time to properly 
-investigate this.
+ChangeLog v5->v6:
+ * put node after call syscon_node_to_regmap in anatop regulator driver
+ * using dev instead of &pdev->dev in syscon probe
+ChangeLog v4->v5:
+ * change syscon driver depends on OF
+ * do not call of_node_put in syscon_node_to_regmap
+ * renamed: include/linux/fsl/imx6q-iomuxc-gpr.h ->
+	    include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+ChangeLog v3->v4:
+Only '[PATCH v4 1/7] mfd: add syscon driver based on regmap' is changed.
 
-> But without proper DT setting, it will also give us warning I think.
-> or we can provide some dummy functions as a temp solution as Shawn
-> pointed out before.
+Dong Aisheng (4):
+  mfd: add syscon driver based on regmap
+  ARM: imx6q: add iomuxc gpr support into syscon
+  regulator: anatop-regulator: convert to use syscon to access anatop
+    register
+  mfd: anatop-mfd: remove anatop driver
 
-But this driver is also used on hardware that's not yet coverted to DT, so I'd 
-say dev_warn() if CONFIG_OF is enabled and otherwise simply go on ? Actually, 
-can we not skip whole this pinctrl thing if CONFIG_OF is disabled? Actually (2), 
-what's the relationship between OF and pinctrl?
-
-> -Bryan
-> 
-> > Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
-> > ---
-> > 
-> > Changes from v1:
-> >         - Seperated from "Add DT for AM33XX devices" patch series
-> >         - Incorporated Tony's comments on v1
-> >         
-> >           * Changed to warning message instead od error return
-> >  
-> >  drivers/leds/leds-gpio.c |    7 +++++++
-> >  1 file changed, 7 insertions(+)
-> > 
-> > diff --git a/drivers/leds/leds-gpio.c b/drivers/leds/leds-gpio.c
-> > index c032b21..ad577f4 100644
-> > --- a/drivers/leds/leds-gpio.c
-> > +++ b/drivers/leds/leds-gpio.c
-> > @@ -20,6 +20,7 @@
-> > 
-> >  #include <linux/slab.h>
-> >  #include <linux/workqueue.h>
-> >  #include <linux/module.h>
-> > 
-> > +#include <linux/pinctrl/consumer.h>
-> > 
-> >  struct gpio_led_data {
-> >  
-> >         struct led_classdev cdev;
-> > 
-> > @@ -236,8 +237,14 @@ static int __devinit gpio_led_probe(struct
-> > platform_device *pdev)
-> > 
-> >  {
-> >  
-> >         struct gpio_led_platform_data *pdata = pdev->dev.platform_data;
-> >         struct gpio_leds_priv *priv;
-> > 
-> > +       struct pinctrl *pinctrl;
-> > 
-> >         int i, ret = 0;
-> > 
-> > +       pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-> > +       if (IS_ERR(pinctrl))
-> > +               dev_warn(&pdev->dev,
-> > +                       "pins are not configured from the driver\n");
-> > +
-> > 
-> >         if (pdata && pdata->num_leds) {
-> >         
-> >                 priv = devm_kzalloc(&pdev->dev,
-> >                 
-> >                                 sizeof_gpio_leds_priv(pdata->num_leds),
-> > 
-> > --
-> > 1.7.9.5
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-leds" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-Best regards,
-Marek Vasut
+ Documentation/devicetree/bindings/mfd/syscon.txt |   20 ++
+ arch/arm/boot/dts/imx6q.dtsi                     |    9 +-
+ arch/arm/mach-imx/Kconfig                        |    2 +-
+ arch/arm/mach-imx/mach-imx6q.c                   |   47 ++--
+ drivers/mfd/Kconfig                              |   12 +-
+ drivers/mfd/Makefile                             |    2 +-
+ drivers/mfd/anatop-mfd.c                         |  124 ---------
+ drivers/mfd/syscon.c                             |  176 ++++++++++++
+ drivers/regulator/Kconfig                        |    2 +-
+ drivers/regulator/anatop-regulator.c             |   31 ++-
+ include/linux/mfd/anatop.h                       |   40 ---
+ include/linux/mfd/syscon.h                       |   23 ++
+ include/linux/mfd/syscon/imx6q-iomuxc-gpr.h      |  319 ++++++++++++++++++++++
+ 13 files changed, 593 insertions(+), 214 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/syscon.txt
+ delete mode 100644 drivers/mfd/anatop-mfd.c
+ create mode 100644 drivers/mfd/syscon.c
+ delete mode 100644 include/linux/mfd/anatop.h
+ create mode 100644 include/linux/mfd/syscon.h
+ create mode 100644 include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
