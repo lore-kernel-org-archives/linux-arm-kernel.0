@@ -1,86 +1,111 @@
-From: vbyravarasu@nvidia.com (Venu Byravarasu)
-Date: Wed, 5 Sep 2012 19:05:49 +0530
-Subject: [PATCH v2] usb: move phy driver from mach-tegra to drivers/usb
-In-Reply-To: <20120905125210.GG19591@arwen.pp.htv.fi>
-References: <1346395526-18219-1-git-send-email-vbyravarasu@nvidia.com>
- <5046772F.6060908@wwwdotorg.org>
- <D958900912E20642BCBC71664EFECE3E6DDE77533D@BGMAIL02.nvidia.com>
- <20120905125210.GG19591@arwen.pp.htv.fi>
-Message-ID: <D958900912E20642BCBC71664EFECE3E6DDE77534D@BGMAIL02.nvidia.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed,  5 Sep 2012 15:44:32 +0200
+Subject: [PATCH V3 1/6] arm: cache-l2x0: make outer_cache_fns a field of
+ l2x0_of_data
+In-Reply-To: <1346852677-5381-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1346852677-5381-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1346852677-5381-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+Instead of having multiple functions belonging to outer_cache and
+filling this structure on the fly, use a outer_cache_fns field inside
+l2x0_of_data and just memcopy it into outer_cache depending of the
+type of the l2x0 cache. For non DT case, the former code was kept.
 
-> -----Original Message-----
-> From: Felipe Balbi [mailto:balbi at ti.com]
-> Sent: Wednesday, September 05, 2012 6:22 PM
-> To: Venu Byravarasu
-> Cc: Stephen Warren; balbi at ti.com; ccross at android.com; olof at lixom.net;
-> linux at arm.linux.org.uk; stern at rowland.harvard.edu;
-> gregkh at linuxfoundation.org; linux-kernel at vger.kernel.org; linux-
-> tegra at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> usb at vger.kernel.org
-> Subject: Re: [PATCH v2] usb: move phy driver from mach-tegra to drivers/usb
-> 
-> * PGP Signed by an unknown key
-> 
-> Hi,
-> 
-> On Wed, Sep 05, 2012 at 06:24:13PM +0530, Venu Byravarasu wrote:
-> >
-> > > -----Original Message-----
-> > > From: Stephen Warren [mailto:swarren at wwwdotorg.org]
-> > > Sent: Wednesday, September 05, 2012 3:19 AM
-> > > To: balbi at ti.com
-> > > Cc: Venu Byravarasu; ccross at android.com; olof at lixom.net;
-> > > linux at arm.linux.org.uk; stern at rowland.harvard.edu;
-> > > gregkh at linuxfoundation.org; linux-kernel at vger.kernel.org; linux-
-> > > tegra at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> > > usb at vger.kernel.org
-> > > Subject: Re: [PATCH v2] usb: move phy driver from mach-tegra to
-> drivers/usb
-> > >
-> > > On 08/31/2012 12:45 AM, Venu Byravarasu wrote:
-> > > > As part of this patch:
-> > > > 	1. Moved existing tegra phy driver to drivers/USB directory.
-> > > > 	2. Added standard USB phy driver APIs to tegra phy driver.
-> > > >
-> > > > Signed-off-by: Venu Byravarasu <vbyravarasu@nvidia.com>
-> > >
-> > > Tested-by: Stephen Warren <swarren@nvidia.com>
-> > >
-> > > Felipe, Would it be possible to apply this patch to a topic branch, so
-> > > that I can merge it into the Tegra tree? The reason is that I'd like to
-> > > remove Tegra's devices.[ch] in kernel 3.7, but to do that, I need to
-> > > move a tiny chunk of code out of that file somewhere else, and doing
-> > > that relies on adding a #include to usb_phy.h/tegra_usb_phy.h, which is
-> > > renamed in this patch.
-> > >
-> > > Alternatively, if you don't think it'll cause any merge conflicts with
-> > > the USB PHY tree, I can just take this patch through the Tegra tree if
-> > > you want. Venu, do you plan any other patches within the next couple
-> > > weeks or so (i.e. before 3.6-rc6) that will depend on this patch? If so,
-> > > taking it only through the Tegra tree might not work so well.
-> >
-> > Thanks Stephen for verifying the changes.
-> > I'm planning to push next patches, with tegra3 phy support added, very
-> soon.
-> 
-> Unfortunately the patch didn't apply on my xceiv branch. Could you
-> rebase on top of that ?
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Tested-and-reviewed-by: Yehuda Yitschak <yehuday@marvell.com>
+Tested-and-reviewed-by: Lior Amsalem <alior@marvell.com>
 
-Rebased on to your branch and sent patch for your review.
-Plz review and merge.
+Cc: Barry Song <21cnbao@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/mm/cache-l2x0.c |   38 ++++++++++++++++++++++++++++++--------
+ 1 file changed, 30 insertions(+), 8 deletions(-)
 
-Thanks,
-Venu 
-
-> 
-> thanks a lot
-> 
-> --
-> balbi
-> 
-> * Unknown Key
-> * 0x35CAA444
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 2a8e380..3591940 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -39,7 +39,7 @@ struct l2x0_regs l2x0_saved_regs;
+ struct l2x0_of_data {
+ 	void (*setup)(const struct device_node *, u32 *, u32 *);
+ 	void (*save)(void);
+-	void (*resume)(void);
++	struct outer_cache_fns outer_cache;
+ };
+ 
+ static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
+@@ -376,6 +376,7 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 		writel_relaxed(1, l2x0_base + L2X0_CTRL);
+ 	}
+ 
++#ifndef CONFIG_OF
+ 	outer_cache.inv_range = l2x0_inv_range;
+ 	outer_cache.clean_range = l2x0_clean_range;
+ 	outer_cache.flush_range = l2x0_flush_range;
+@@ -383,6 +384,7 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 	outer_cache.flush_all = l2x0_flush_all;
+ 	outer_cache.inv_all = l2x0_inv_all;
+ 	outer_cache.disable = l2x0_disable;
++#endif
+ 
+ 	printk(KERN_INFO "%s cache controller enabled\n", type);
+ 	printk(KERN_INFO "l2x0: %d ways, CACHE_ID 0x%08x, AUX_CTRL 0x%08x, Cache size: %d B\n",
+@@ -533,15 +535,34 @@ static void pl310_resume(void)
+ }
+ 
+ static const struct l2x0_of_data pl310_data = {
+-	pl310_of_setup,
+-	pl310_save,
+-	pl310_resume,
++	.setup = pl310_of_setup,
++	.save  = pl310_save,
++	.outer_cache = {
++		.resume      = pl310_resume,
++		.inv_range   = l2x0_inv_range,
++		.clean_range = l2x0_clean_range,
++		.flush_range = l2x0_flush_range,
++		.sync        = l2x0_cache_sync,
++		.flush_all   = l2x0_flush_all,
++		.inv_all     = l2x0_inv_all,
++		.disable     = l2x0_disable,
++		.set_debug   = pl310_set_debug,
++	},
+ };
+ 
+ static const struct l2x0_of_data l2x0_data = {
+-	l2x0_of_setup,
+-	NULL,
+-	l2x0_resume,
++	.setup = l2x0_of_setup,
++	.save  = NULL,
++	.outer_cache = {
++		.resume      = l2x0_resume,
++		.inv_range   = l2x0_inv_range,
++		.clean_range = l2x0_clean_range,
++		.flush_range = l2x0_flush_range,
++		.sync        = l2x0_cache_sync,
++		.flush_all   = l2x0_flush_all,
++		.inv_all     = l2x0_inv_all,
++		.disable     = l2x0_disable,
++	},
+ };
+ 
+ static const struct of_device_id l2x0_ids[] __initconst = {
+@@ -583,7 +604,8 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ 
+ 	l2x0_init(l2x0_base, aux_val, aux_mask);
+ 
+-	outer_cache.resume = data->resume;
++	memcpy(&outer_cache, &data->outer_cache, sizeof(outer_cache));
++
+ 	return 0;
+ }
+ #endif
+-- 
+1.7.9.5
