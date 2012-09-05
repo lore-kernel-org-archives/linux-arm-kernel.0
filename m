@@ -1,35 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 5 Sep 2012 10:42:40 -0700
-Subject: [GIT PULL] ks8695 timer changes for v3.7
-In-Reply-To: <CACRpkdbKJU9gp2MLKZQTGiyysoM38owyxJx8S2zFzRJiv61c5Q@mail.gmail.com>
-References: <CACRpkdbKJU9gp2MLKZQTGiyysoM38owyxJx8S2zFzRJiv61c5Q@mail.gmail.com>
-Message-ID: <20120905174240.GA24952@quad.lixom.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 5 Sep 2012 10:49:24 -0700
+Subject: [GIT PULL] ARM: OMAP2+: PRCM/hwmod: some fixes for 3.6-rc
+In-Reply-To: <alpine.DEB.2.00.1209051613580.11516@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1209051613580.11516@utopia.booyaka.com>
+Message-ID: <20120905174923.GE1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2012 at 10:20:28AM +0200, Linus Walleij wrote:
-> Hi Arnd, Olof:
+* Paul Walmsley <paul@pwsan.com> [120905 09:16]:
+> Hi Tony,
 > 
-> Here is that patch series that switches KS8695 over to using generic
-> time and clockevents. Signed tag provided.
+> The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
 > 
-> All tested by Greg Ungerer.
-> 
-> Please pull it in!
-> 
-> The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
-> 
->   Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
+>   Linux 3.6-rc4 (2012-09-01 10:39:58 -0700)
 > 
 > are available in the git repository at:
 > 
->   http://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> tags/ks8695-time-for-arm-soc
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-fixes-a-for-3.6rc
+> 
+> for you to fetch changes up to 8a94febc21743fe121bdaf1d1470d98b1135acc2:
+> 
+>   Merge branches 'clkdev_fixes_3.6rc', 'clkdm_fixes_3.6rc' and 'hwmod_data_fixes_a_3.6rc' into omap_fixes_a_3.6rc (2012-09-03 11:52:02 -0600)
+> 
+> ----------------------------------------------------------------
+> 
+> Some hwmod, clockdomain, am335x fixes against v3.6-rc4.
+> 
+> Test logs can be found here:
+> 
+>    http://www.pwsan.com/omap/testlogs/omap_fixes_a_3.6rc/20120904110254/
+> 
 
-Thanks, pulled in as ks8695/timer into next/cleanup.
+Thanks pulled into fixes.
 
-Btw, feel free to use git:// URLs in the future since the server
-supports them.
-
-
--Olof
+Tony
