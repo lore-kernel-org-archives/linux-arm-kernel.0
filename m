@@ -1,87 +1,70 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 5 Sep 2012 14:04:31 -0500
-Subject: [PATCH 09/10] ARM: OMAP: Add dmtimer interrupt disable function
+Date: Wed, 5 Sep 2012 14:04:32 -0500
+Subject: [PATCH 10/10] ARM: OMAP: Remove unnecessary call to clk_get()
 In-Reply-To: <1346871872-24413-1-git-send-email-jon-hunter@ti.com>
 References: <1346871872-24413-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1346871872-24413-10-git-send-email-jon-hunter@ti.com>
+Message-ID: <1346871872-24413-11-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP dmtimer driver does not currently have a function to disable the
-timer interrupts. For some timer instances the timer interrupt enable
-function can be used to disable the interrupts because the same interrupt
-enable register is used to disable interrupts. However, some timer instances
-have separate interrupt enable/disable registers and so this will not work.
-Therefore, add a dedicated function to disable interrupts.
+Whenever we call the function omap_dm_timer_set_source() to set the clock
+source of a dmtimer we look-up the dmtimer functional clock source by
+calling clk_get(). This is not necessary because on requesting a dmtimer
+we look-up the functional clock source and store it in the omap_dm_timer
+structure. So instead of looking up the clock again used the clock handle
+that stored in the omap_dm_timer structure.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 ---
- arch/arm/plat-omap/dmtimer.c              |   31 +++++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/dmtimer.h |    3 ++-
- 2 files changed, 33 insertions(+), 1 deletion(-)
+ arch/arm/plat-omap/dmtimer.c |   14 ++++----------
+ 1 file changed, 4 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index 541adbb..3b548dc 100644
+index 3b548dc..a4cc122 100644
 --- a/arch/arm/plat-omap/dmtimer.c
 +++ b/arch/arm/plat-omap/dmtimer.c
-@@ -612,6 +612,37 @@ int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer,
- }
- EXPORT_SYMBOL_GPL(omap_dm_timer_set_int_enable);
- 
-+/**
-+ * omap_dm_timer_set_int_disable - disable timer interrupts
-+ * @timer:	pointer to timer handle
-+ * @mask:	bit mask of interrupts to be disabled
-+ *
-+ * Disables the specified timer interrupts for a timer.
-+ */
-+int omap_dm_timer_set_int_disable(struct omap_dm_timer *timer, u32 mask)
-+{
-+	u32 l = mask;
-+
-+	if (unlikely(!timer))
-+		return -EINVAL;
-+
-+	omap_dm_timer_enable(timer);
-+
-+	if (timer->revision == 1)
-+		l = __raw_readl(timer->irq_ena) & ~mask;
-+
-+	__raw_writel(l, timer->irq_dis);
-+	l = __omap_dm_timer_read(timer, OMAP_TIMER_WAKEUP_EN_REG) & ~mask;
-+	__omap_dm_timer_write(timer, OMAP_TIMER_WAKEUP_EN_REG, l);
-+
-+	/* Save the context */
-+	timer->context.tier &= ~mask;
-+	timer->context.twer &= ~mask;
-+	omap_dm_timer_disable(timer);
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(omap_dm_timer_set_int_disable);
-+
- unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer)
+@@ -400,7 +400,7 @@ int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
  {
- 	unsigned int l;
-diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
-index b3150a3..820f0ce 100644
---- a/arch/arm/plat-omap/include/plat/dmtimer.h
-+++ b/arch/arm/plat-omap/include/plat/dmtimer.h
-@@ -130,6 +130,7 @@ int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on, int toggle, i
- int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler);
+ 	int ret;
+ 	char *parent_name = NULL;
+-	struct clk *fclk, *parent;
++	struct clk *parent;
+ 	struct dmtimer_platform_data *pdata;
  
- int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer, unsigned int value);
-+int omap_dm_timer_set_int_disable(struct omap_dm_timer *timer, u32 mask);
+ 	if (unlikely(!timer))
+@@ -419,11 +419,8 @@ int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
+ 	if (pdata->set_timer_src)
+ 		return pdata->set_timer_src(timer->pdev, source);
  
- unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer);
- int omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value);
-@@ -314,7 +315,7 @@ static inline void __omap_dm_timer_init_regs(struct omap_dm_timer *timer)
- 				OMAP_TIMER_V1_SYS_STAT_OFFSET;
- 		timer->irq_stat = timer->io_base + OMAP_TIMER_V1_STAT_OFFSET;
- 		timer->irq_ena = timer->io_base + OMAP_TIMER_V1_INT_EN_OFFSET;
--		timer->irq_dis = NULL;
-+		timer->irq_dis = timer->io_base + OMAP_TIMER_V1_INT_EN_OFFSET;
- 		timer->pend = timer->io_base + _OMAP_TIMER_WRITE_PEND_OFFSET;
- 		timer->func_base = timer->io_base;
- 	} else {
+-	fclk = clk_get(&timer->pdev->dev, "fck");
+-	if (IS_ERR_OR_NULL(fclk)) {
+-		pr_err("%s: fck not found\n", __func__);
++	if (!timer->fclk)
+ 		return -EINVAL;
+-	}
+ 
+ 	switch (source) {
+ 	case OMAP_TIMER_SRC_SYS_CLK:
+@@ -442,18 +439,15 @@ int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
+ 	parent = clk_get(&timer->pdev->dev, parent_name);
+ 	if (IS_ERR_OR_NULL(parent)) {
+ 		pr_err("%s: %s not found\n", __func__, parent_name);
+-		ret = -EINVAL;
+-		goto out;
++		return -EINVAL;
+ 	}
+ 
+-	ret = clk_set_parent(fclk, parent);
++	ret = clk_set_parent(timer->fclk, parent);
+ 	if (IS_ERR_VALUE(ret))
+ 		pr_err("%s: failed to set %s as parent\n", __func__,
+ 			parent_name);
+ 
+ 	clk_put(parent);
+-out:
+-	clk_put(fclk);
+ 
+ 	return ret;
+ }
 -- 
 1.7.9.5
