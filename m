@@ -1,35 +1,45 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed,  5 Sep 2012 15:35:19 +0200
-Subject: [PATCH v2] pwm i.MX: add devicetree support
-Message-ID: <1346852127-25226-1-git-send-email-s.hauer@pengutronix.de>
+Date: Wed,  5 Sep 2012 15:35:25 +0200
+Subject: [PATCH 6/8] pwm i.MX: use per clock unconditionally
+In-Reply-To: <1346852127-25226-1-git-send-email-s.hauer@pengutronix.de>
+References: <1346852127-25226-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1346852127-25226-7-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The i.MX pwm core has two clocks: The ipg clock and the ipg highfreq
+(peripheral) clock. The ipg clock has to be enabled for this hardware
+to work. The actual pwm output can either be driven by the ipg clock
+or the ipg highfreq. The ipg highfreq has the advantage that it runs
+even when the SoC is in low power modes.
+Use the always running clock also on i.MX25.
 
-Changes since v1:
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/pwm/pwm-imx.c |    7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
-- Add devicetree binding documentation
-- Merge 5/9 and 9/9
-- fix #pwm-cells (must be 2 instead of 3)
-- fix wrong name in MODULE_DEVICE_TABLE
-- drop platform based probing while introducing devicetree based probe
-
-----------------------------------------------------------------
-Philipp Zabel (2):
-      pwm i.MX: add devicetree support
-      pwm i.MX: fix clock lookup
-
-Sascha Hauer (6):
-      pwm i.MX: factor out SoC specific functions
-      pwm i.MX: remove unnecessary if in pwm_[en|dis]able
-      pwm i.MX: add functions to enable/disable pwm.
-      pwm i.MX: Use module_platform_driver
-      pwm i.MX: use per clock unconditionally
-      ARM i.MX53: Add pwm support
-
- Documentation/devicetree/bindings/pwm/imx-pwm.txt |   17 ++
- arch/arm/boot/dts/imx53.dtsi                      |   14 ++
- arch/arm/mach-imx/clk-imx51-imx53.c               |    4 +
- drivers/pwm/pwm-imx.c                             |  275 ++++++++++++++-------
- 4 files changed, 214 insertions(+), 96 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pwm/imx-pwm.txt
+diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+index af77045..b234288 100644
+--- a/drivers/pwm/pwm-imx.c
++++ b/drivers/pwm/pwm-imx.c
+@@ -131,16 +131,11 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
+ 
+ 	cr = MX3_PWMCR_PRESCALER(prescale) |
+ 		MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN |
+-		MX3_PWMCR_DBGEN;
++		MX3_PWMCR_DBGEN | MX3_PWMCR_CLKSRC_IPG_HIGH;
+ 
+ 	if (imx->enabled)
+ 		cr |= MX3_PWMCR_EN;
+ 
+-	if (cpu_is_mx25())
+-		cr |= MX3_PWMCR_CLKSRC_IPG;
+-	else
+-		cr |= MX3_PWMCR_CLKSRC_IPG_HIGH;
+-
+ 	writel(cr, imx->mmio_base + MX3_PWMCR);
+ 
+ 	return 0;
+-- 
+1.7.10.4
