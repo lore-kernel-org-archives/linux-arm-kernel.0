@@ -1,262 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  5 Sep 2012 21:29:19 +0200
-Subject: [PATCH 6/6 v2] ARM: integrator: convert platform devices to Device
- Tree
-Message-ID: <1346873359-17363-1-git-send-email-linus.walleij@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 5 Sep 2012 15:34:16 -0700
+Subject: [GIT PULL] Renesas ARM-based SoC: KZM-9A-GT for 3.7
+In-Reply-To: <1346113116-20252-1-git-send-email-horms@verge.net.au>
+References: <1346113116-20252-1-git-send-email-horms@verge.net.au>
+Message-ID: <20120905223416.GA32084@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves the physmap flash and SMSC91x ethernet devices
-over to the device tree, moving the static board code down
-into the #ifndef CONFIG_OF section.
+On Tue, Aug 28, 2012 at 09:18:35AM +0900, Simon Horman wrote:
+> Hi Olaf, Hi Arnd,
+> 
+> please consider the following enhancement for the KZM-9A-GT board
+> from Tetsuyuki Kobayashi for inclusion in 3.7.
+> 
+> ----------------------------------------------------------------
+> The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
+> 
+>   Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git kzm9g
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Move flash device definition to the common "integrator.dtsi"
-  file.
----
- arch/arm/boot/dts/integrator.dtsi        |  5 ++
- arch/arm/boot/dts/integratorcp.dts       |  7 +++
- arch/arm/mach-integrator/integrator_ap.c | 36 ++++++-------
- arch/arm/mach-integrator/integrator_cp.c | 92 ++++++++++++++++----------------
- 4 files changed, 77 insertions(+), 63 deletions(-)
+Thanks, pulled into next/soc.
 
-diff --git a/arch/arm/boot/dts/integrator.dtsi b/arch/arm/boot/dts/integrator.dtsi
-index 9bcc09d..813b91d 100644
---- a/arch/arm/boot/dts/integrator.dtsi
-+++ b/arch/arm/boot/dts/integrator.dtsi
-@@ -31,6 +31,11 @@
- 		clear-mask = <0xffffffff>;
- 	};
- 
-+	flash at 24000000 {
-+		compatible = "cfi-flash";
-+		reg = <0x24000000 0x02000000>;
-+	};
-+
- 	fpga {
- 		compatible = "arm,amba-bus", "simple-bus";
- 		#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/integratorcp.dts b/arch/arm/boot/dts/integratorcp.dts
-index 7bd4946..2dd5e4e 100644
---- a/arch/arm/boot/dts/integratorcp.dts
-+++ b/arch/arm/boot/dts/integratorcp.dts
-@@ -52,6 +52,13 @@
- 		valid-mask = <0x00000fff>;
- 	};
- 
-+	ethernet at c8000000 {
-+		compatible = "smsc,lan91c111";
-+		reg = <0xc8000000 0x10>;
-+		interrupt-parent = <&pic>;
-+		interrupts = <27>;
-+	};
-+
- 	fpga {
- 		/*
- 		 * These PrimeCells are at the same location and using
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index 8cd0560..ff1255a 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -256,22 +256,6 @@ static struct physmap_flash_data ap_flash_data = {
- 	.set_vpp	= ap_flash_set_vpp,
- };
- 
--static struct resource cfi_flash_resource = {
--	.start		= INTEGRATOR_FLASH_BASE,
--	.end		= INTEGRATOR_FLASH_BASE + INTEGRATOR_FLASH_SIZE - 1,
--	.flags		= IORESOURCE_MEM,
--};
--
--static struct platform_device cfi_flash_device = {
--	.name		= "physmap-flash",
--	.id		= 0,
--	.dev		= {
--		.platform_data	= &ap_flash_data,
--	},
--	.num_resources	= 1,
--	.resource	= &cfi_flash_resource,
--};
--
- /*
-  * Where is the timer (VA)?
-  */
-@@ -476,6 +460,8 @@ static struct of_dev_auxdata ap_auxdata_lookup[] __initdata = {
- 		"kmi0", NULL),
- 	OF_DEV_AUXDATA("arm,primecell", KMI1_BASE,
- 		"kmi1", NULL),
-+	OF_DEV_AUXDATA("cfi-flash", INTEGRATOR_FLASH_BASE,
-+		"physmap-flash", &ap_flash_data),
- 	{ /* sentinel */ },
- };
- 
-@@ -487,8 +473,6 @@ static void __init ap_init_of(void)
- 	of_platform_populate(NULL, of_default_bus_match_table,
- 			ap_auxdata_lookup, NULL);
- 
--	platform_device_register(&cfi_flash_device);
--
- 	sc_dec = readl(VA_SC_BASE + INTEGRATOR_SC_DEC_OFFSET);
- 	for (i = 0; i < 4; i++) {
- 		struct lm_device *lmdev;
-@@ -537,6 +521,22 @@ MACHINE_END
-  * for eventual deletion.
-  */
- 
-+static struct resource cfi_flash_resource = {
-+	.start		= INTEGRATOR_FLASH_BASE,
-+	.end		= INTEGRATOR_FLASH_BASE + INTEGRATOR_FLASH_SIZE - 1,
-+	.flags		= IORESOURCE_MEM,
-+};
-+
-+static struct platform_device cfi_flash_device = {
-+	.name		= "physmap-flash",
-+	.id		= 0,
-+	.dev		= {
-+		.platform_data	= &ap_flash_data,
-+	},
-+	.num_resources	= 1,
-+	.resource	= &cfi_flash_resource,
-+};
-+
- static void __init ap_init_timer(void)
- {
- 	struct clk *clk;
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index f032238..f51363e 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -52,12 +52,9 @@
- #include "common.h"
- 
- #define INTCP_PA_FLASH_BASE		0x24000000
--#define INTCP_FLASH_SIZE		SZ_32M
- 
- #define INTCP_PA_CLCD_BASE		0xc0000000
- 
--#define INTCP_ETH_SIZE			0x10
--
- #define INTCP_VA_CTRL_BASE		IO_ADDRESS(INTEGRATOR_CP_CTL_BASE)
- #define INTCP_FLASHPROG			0x04
- #define CINTEGRATOR_FLASHPROG_FLVPPEN	(1 << 0)
-@@ -184,47 +181,6 @@ static struct physmap_flash_data intcp_flash_data = {
- 	.set_vpp	= intcp_flash_set_vpp,
- };
- 
--static struct resource intcp_flash_resource = {
--	.start		= INTCP_PA_FLASH_BASE,
--	.end		= INTCP_PA_FLASH_BASE + INTCP_FLASH_SIZE - 1,
--	.flags		= IORESOURCE_MEM,
--};
--
--static struct platform_device intcp_flash_device = {
--	.name		= "physmap-flash",
--	.id		= 0,
--	.dev		= {
--		.platform_data	= &intcp_flash_data,
--	},
--	.num_resources	= 1,
--	.resource	= &intcp_flash_resource,
--};
--
--static struct resource smc91x_resources[] = {
--	[0] = {
--		.start	= INTEGRATOR_CP_ETH_BASE,
--		.end	= INTEGRATOR_CP_ETH_BASE + INTCP_ETH_SIZE - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_CP_ETHINT,
--		.end	= IRQ_CP_ETHINT,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device smc91x_device = {
--	.name		= "smc91x",
--	.id		= 0,
--	.num_resources	= ARRAY_SIZE(smc91x_resources),
--	.resource	= smc91x_resources,
--};
--
--static struct platform_device *intcp_devs[] __initdata = {
--	&intcp_flash_device,
--	&smc91x_device,
--};
--
- /*
-  * It seems that the card insertion interrupt remains active after
-  * we've acknowledged it.  We therefore ignore the interrupt, and
-@@ -375,6 +331,8 @@ static struct of_dev_auxdata intcp_auxdata_lookup[] __initdata = {
- 		"aaci", &mmc_data),
- 	OF_DEV_AUXDATA("arm,primecell", INTCP_PA_CLCD_BASE,
- 		"clcd", &clcd_data),
-+	OF_DEV_AUXDATA("cfi-flash", INTCP_PA_FLASH_BASE,
-+		"physmap-flash", &intcp_flash_data),
- 	{ /* sentinel */ },
- };
- 
-@@ -382,7 +340,6 @@ static void __init intcp_init_of(void)
- {
- 	of_platform_populate(NULL, of_default_bus_match_table,
- 			intcp_auxdata_lookup, NULL);
--	platform_add_devices(intcp_devs, ARRAY_SIZE(intcp_devs));
- }
- 
- static const char * intcp_dt_board_compat[] = {
-@@ -412,6 +369,51 @@ MACHINE_END
-  * for eventual deletion.
-  */
- 
-+#define INTCP_FLASH_SIZE		SZ_32M
-+
-+static struct resource intcp_flash_resource = {
-+	.start		= INTCP_PA_FLASH_BASE,
-+	.end		= INTCP_PA_FLASH_BASE + INTCP_FLASH_SIZE - 1,
-+	.flags		= IORESOURCE_MEM,
-+};
-+
-+static struct platform_device intcp_flash_device = {
-+	.name		= "physmap-flash",
-+	.id		= 0,
-+	.dev		= {
-+		.platform_data	= &intcp_flash_data,
-+	},
-+	.num_resources	= 1,
-+	.resource	= &intcp_flash_resource,
-+};
-+
-+#define INTCP_ETH_SIZE			0x10
-+
-+static struct resource smc91x_resources[] = {
-+	[0] = {
-+		.start	= INTEGRATOR_CP_ETH_BASE,
-+		.end	= INTEGRATOR_CP_ETH_BASE + INTCP_ETH_SIZE - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= IRQ_CP_ETHINT,
-+		.end	= IRQ_CP_ETHINT,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device smc91x_device = {
-+	.name		= "smc91x",
-+	.id		= 0,
-+	.num_resources	= ARRAY_SIZE(smc91x_resources),
-+	.resource	= smc91x_resources,
-+};
-+
-+static struct platform_device *intcp_devs[] __initdata = {
-+	&intcp_flash_device,
-+	&smc91x_device,
-+};
-+
- #define INTCP_VA_CIC_BASE		__io_address(INTEGRATOR_HDR_BASE + 0x40)
- #define INTCP_VA_PIC_BASE		__io_address(INTEGRATOR_IC_BASE)
- #define INTCP_VA_SIC_BASE		__io_address(INTEGRATOR_CP_SIC_BASE)
--- 
-1.7.11.4
+
+-Olof
