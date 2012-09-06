@@ -1,44 +1,34 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 07 Sep 2012 07:25:38 +0900
-Subject: [PATCH v2] gpio: samsung: add devicetree init for s3c24xx arches
-In-Reply-To: <CACRpkdYqYhtHHVw8C5HhDr96V6diV-0M+55xCHnoATOiyDp3Jg@mail.gmail.com>
-References: <201208282355.44268.heiko@sntech.de> <503D4FB1.1020206@samsung.com>
- <CACRpkdYqYhtHHVw8C5HhDr96V6diV-0M+55xCHnoATOiyDp3Jg@mail.gmail.com>
-Message-ID: <241b01cd8c7e$8b07bb00$a1173100$%kim@samsung.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 6 Sep 2012 19:25:51 -0300
+Subject: [PATCH 01/11] ARM: defconfig: Remove CONFIG_MISC_DEVICES
+In-Reply-To: <201208181808.21484.arnd@arndb.de>
+References: <1345307035-3545-1-git-send-email-festevam@gmail.com>
+ <201208181808.21484.arnd@arndb.de>
+Message-ID: <CAOMZO5C2ihKUeQk17JOHc9VXAB3KTeQLS3OcLOiiUC8jucsexg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote:
-> 
-> On Wed, Aug 29, 2012 at 1:09 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > On 08/28/12 14:55, Heiko St?bner wrote:
-> >>
-> >> Until now the Exynos-SoC was the only Samsung-SoC supporting the GPIOs
-> >> via the device tree. This patch implements dt-support for the
-> >> s3c24xx arches.
-> >>
-> >> The controllers contain only 3 cells, as the underlying gpio controller
-> >> does not support controlling the drive strength on a gpio level.
-> >>
-> >> Tested with the gpio-keys driver on a s3c2416 based machine.
-> >>
-> >> Signed-off-by: Heiko Stuebner<heiko@sntech.de>
-> >> Reviewed-by: Thomas Abraham<thomas.abraham@linaro.org>
-> >
-> >
-> > Yeah, looks good to me...
-> >
-> > Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> 
-> OK are you taking this into the Samsung tree or shall I take care of it?
-> 
-Hmm...yeah, Samsung tree is better.
-Applied with your ack :-)
+Hi Arnd,
 
-Thanks.
+On Sat, Aug 18, 2012 at 3:08 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday 18 August 2012, Fabio Estevam wrote:
+>>
+>> From: Fabio Estevam <fabio.estevam@freescale.com>
+>>
+>> commit 7c5763 (drivers:misc: Remove MISC_DEVICES config option) removed
+>> CONFIG_MISC_DEVICES option, so remove the occurrences from the config files
+>> as well.
+>>
+>> Cc: <linux-arm-kernel@lists.infradead.org>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+I am not sure who would pick up this series.
+
+Is it possible for you to apply these patches?
+
+Thanks,
+
+Fabio Estevam
