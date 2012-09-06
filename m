@@ -1,51 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 6 Sep 2012 10:45:31 -0700
-Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
-In-Reply-To: <201209060405.08997.marex@denx.de>
-References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
- <201209050513.08588.marex@denx.de>
- <20120905233416.GP1303@atomide.com>
- <201209060405.08997.marex@denx.de>
-Message-ID: <20120906174531.GX1303@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 6 Sep 2012 10:53:57 -0700
+Subject: [PATCH] MAINTAINERS: tegra: remove Olof/Colin,
+ add device tree files
+In-Reply-To: <1346798078-28682-1-git-send-email-swarren@wwwdotorg.org>
+References: <1346798078-28682-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <CAOesGMhhQK-DXzE7SNgagwraFFAcN5MQAzBCzkdDvGE=Vv6rfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Marek Vasut <marex@denx.de> [120905 19:05]:
-> Hi Tony,
-> 
-> > * Marek Vasut <marex@denx.de> [120904 20:13]:
-> > > Dear Bryan Wu,
-> > > 
-> > > > On Sat, Sep 1, 2012 at 4:16 PM, AnilKumar Ch <anilkumar@ti.com> wrote:
-> > > > > Adopt pinctrl support to leds-gpio driver based on leds-gpio
-> > > > > device pointer, pinctrl driver configure SoC pins to GPIO
-> > > > > mode according to definitions provided in .dts file.
-> > > > 
-> > > > Thanks for this, actually Marek Vasut submitted a similar patch
-> > > > before. I'm pretty fine with this patch.
-> > > 
-> > > Thanks for submitting this actually ... I didn't have time to properly
-> > > investigate this.
-> > > 
-> > > > But without proper DT setting, it will also give us warning I think.
-> > > > or we can provide some dummy functions as a temp solution as Shawn
-> > > > pointed out before.
-> > > 
-> > > But this driver is also used on hardware that's not yet coverted to DT,
-> > > so I'd say dev_warn() if CONFIG_OF is enabled and otherwise simply go on
-> > > ? Actually, can we not skip whole this pinctrl thing if CONFIG_OF is
-> > > disabled? Actually (2), what's the relationship between OF and pinctrl?
-> > 
-> > The warning should be pinctrl related as the pinctrl drivers may not be
-> > device tree based drivers.
-> 
-> Exactly my concern. Also the warning shouldnt be present on systems where 
-> pinctrl is disabled.
+Oops, last reply was off-list by mistake.
 
-But pinctrl_get_select() returns 0 in include/linux/pinctrl/consumer.h if
-CONFIG_PINCTRL is not selected, so no warning is produced AFAIK ;)
+On Tue, Sep 4, 2012 at 3:34 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+>
+> At Linux Plumbers conference, Olof and Colin both told me to remove them
+> from the MAINTAINERS file. Thank you both very much for all the help with
+> Tegra!
+>
+> Also, include all Tegra-related device-tree files in the file list.
+>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-Or do you get some warning if CONFIG_PINCTRL is not selected for your
-hardware?
+Yeah, I've been a deadbeat for quite a while now, you've been managing
+quite well on your own. Thanks for picking it all up!
 
-Tony
+Acked-by: Olof Johansson <olof@lixom.net>
