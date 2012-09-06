@@ -1,60 +1,83 @@
-From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Thu, 6 Sep 2012 17:45:33 +0530
-Subject: [PATCH v7 1/7] drivers: usb: phy: add a new driver for omap usb2
- phy
-In-Reply-To: <1344258480-4304-2-git-send-email-kishon@ti.com>
-References: <1344258480-4304-1-git-send-email-kishon@ti.com>
- <1344258480-4304-2-git-send-email-kishon@ti.com>
-Message-ID: <CAAe_U6KBNZpT03xATmPTNTgxm5hj+wJdsShdnm08EmF4Q=hTCw@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 6 Sep 2012 14:23:26 +0200
+Subject: [PATCH] ARM: i.MX35: Implement camera and keypad clocks
+In-Reply-To: <1346567240-7114-1-git-send-email-alexg@meprolight.com>
+References: <1346567240-7114-1-git-send-email-alexg@meprolight.com>
+Message-ID: <20120906122326.GX26594@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Sep 02, 2012 at 09:27:20AM +0300, Alex Gershgorin wrote:
+> This patch also adds mux and divider for camera clock.
+> Tested on i.MX35-pdk. 
+> 
+> Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
 
-On Mon, Aug 6, 2012 at 6:37 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> All phy related programming like enabling/disabling the clocks, powering
-> on/off the phy is taken care of by this driver. It is also used for OTG
-> related functionality like srp.
->
-> This also includes device tree support for usb2 phy driver and
-> the documentation with device tree binding information is updated.
->
-> Currently writing to control module register is taken care in this
-> driver which will be removed once the control module driver is in place.
->
-> Cc: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Applied, thanks
+
+Sascha
+
 > ---
->  .../devicetree/bindings/bus/omap-ocp2scp.txt       |    3 +
->  Documentation/devicetree/bindings/usb/omap-usb.txt |   17 ++
->  drivers/usb/phy/Kconfig                            |   10 +
->  drivers/usb/phy/Makefile                           |    1 +
->  drivers/usb/phy/omap-usb2.c                        |  271 ++++++++++++++++++++
->  include/linux/usb/omap_usb.h                       |   46 ++++
->  include/linux/usb/phy_companion.h                  |   34 +++
->  7 files changed, 382 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/omap-usb.txt
->  create mode 100644 drivers/usb/phy/omap-usb2.c
->  create mode 100644 include/linux/usb/omap_usb.h
->  create mode 100644 include/linux/usb/phy_companion.h
->
-> diff --git a/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt b/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
-> index d2fe064..bb0c7f4 100644
-> --- a/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
-> +++ b/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
-> @@ -8,3 +8,6 @@ properties:
->
->  Sub-nodes:
->  All the devices connected to ocp2scp are described using sub-node to ocp2scp
-> +- usb2phy :
-> +   The binding details of usb2phy can be found in:
-> +   Documentation/devicetree/bindings/usb/omap-usb.txt
+>  arch/arm/mach-imx/clk-imx35.c |   11 ++++++++---
+>  1 files changed, 8 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx35.c b/arch/arm/mach-imx/clk-imx35.c
+> index c6422fb..cebc71d 100644
+> --- a/arch/arm/mach-imx/clk-imx35.c
+> +++ b/arch/arm/mach-imx/clk-imx35.c
+> @@ -62,8 +62,8 @@ enum mx35_clks {
+>  	kpp_gate, mlb_gate, mshc_gate, owire_gate, pwm_gate, rngc_gate,
+>  	rtc_gate, rtic_gate, scc_gate, sdma_gate, spba_gate, spdif_gate,
+>  	ssi1_gate, ssi2_gate, uart1_gate, uart2_gate, uart3_gate, usbotg_gate,
+> -	wdog_gate, max_gate, admux_gate, csi_gate, iim_gate, gpu2d_gate,
+> -	clk_max
+> +	wdog_gate, max_gate, admux_gate, csi_gate, csi_div, csi_sel, iim_gate,
+> +	gpu2d_gate, clk_max
+>  };
+>  
+>  static struct clk *clk[clk_max];
+> @@ -142,6 +142,9 @@ int __init mx35_clocks_init()
+>  
+>  	clk[nfc_div] = imx_clk_divider("nfc_div", "ahb", base + MX35_CCM_PDR4, 28, 4);
+>  
+> +	clk[csi_sel] = imx_clk_mux("csi_sel", base + MX35_CCM_PDR2, 7, 1, std_sel, ARRAY_SIZE(std_sel));
+> +	clk[csi_div] = imx_clk_divider("csi_div", "csi_sel", base + MX35_CCM_PDR2, 16, 6);
+> +
+>  	clk[asrc_gate] = imx_clk_gate2("asrc_gate", "ipg", base + MX35_CCM_CGR0,  0);
+>  	clk[pata_gate] = imx_clk_gate2("pata_gate", "ipg", base + MX35_CCM_CGR0,  2);
+>  	clk[audmux_gate] = imx_clk_gate2("audmux_gate", "ipg", base + MX35_CCM_CGR0,  4);
+> @@ -192,7 +195,7 @@ int __init mx35_clocks_init()
+>  	clk[max_gate] = imx_clk_gate2("max_gate", "dummy", base + MX35_CCM_CGR2, 26);
+>  	clk[admux_gate] = imx_clk_gate2("admux_gate", "ipg", base + MX35_CCM_CGR2, 30);
+>  
+> -	clk[csi_gate] = imx_clk_gate2("csi_gate", "ipg", base + MX35_CCM_CGR3,  0);
+> +	clk[csi_gate] = imx_clk_gate2("csi_gate", "csi_div", base + MX35_CCM_CGR3,  0);
+>  	clk[iim_gate] = imx_clk_gate2("iim_gate", "ipg", base + MX35_CCM_CGR3,  2);
+>  	clk[gpu2d_gate] = imx_clk_gate2("gpu2d_gate", "ahb", base + MX35_CCM_CGR3,  4);
+>  
+> @@ -228,6 +231,7 @@ int __init mx35_clocks_init()
+>  	clk_register_clkdev(clk[i2c3_gate], NULL, "imx-i2c.2");
+>  	clk_register_clkdev(clk[ipu_gate], NULL, "ipu-core");
+>  	clk_register_clkdev(clk[ipu_gate], NULL, "mx3_sdc_fb");
+> +	clk_register_clkdev(clk[kpp_gate], NULL, "imx-keypad");
+>  	clk_register_clkdev(clk[owire_gate], NULL, "mxc_w1");
+>  	clk_register_clkdev(clk[sdma_gate], NULL, "imx35-sdma");
+>  	clk_register_clkdev(clk[ipg], "ipg", "imx-ssi.0");
+> @@ -255,6 +259,7 @@ int __init mx35_clocks_init()
+>  	clk_register_clkdev(clk[usbotg_gate], "ahb", "fsl-usb2-udc");
+>  	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
+>  	clk_register_clkdev(clk[nfc_div], NULL, "mxc_nand.0");
+> +	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
+>  
+>  	clk_prepare_enable(clk[spba_gate]);
+>  	clk_prepare_enable(clk[gpio1_gate]);
+> -- 
+> 1.7.0.4
+> 
+> 
 
-The above two lines should be added in omap-ocp2scp.txt (this file was
-added as part of omap: add ocp2scp as a bus driver and is in
-linux-next). However this file is still not in Felipe's xceiv branch.
-So I'm not sure how I can get this patch merged in Felipe's tree
-without conflict.
-
-Thanks
-Kishon
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
