@@ -1,40 +1,80 @@
-From: koba@kmckk.co.jp (Tetsuyuki Kobayshi)
-Date: Thu,  6 Sep 2012 18:09:31 +0900
-Subject: [PATCH] ARM: shmobile: kzm9g: enable DMAEngine on SHDI0 and SDHI2
-Message-ID: <1346922571-16271-1-git-send-email-koba@kmckk.co.jp>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Sep 2012 10:11:28 +0100
+Subject: [PATCH v2 1/2] ARM: shmobile: sh73a0: enable PMU(Performance
+ Monitoring Unit)
+In-Reply-To: <1346909447-12526-2-git-send-email-koba@kmckk.co.jp>
+References: <1346813317-4030-1-git-send-email-koba@kmckk.co.jp>
+ <1346909447-12526-1-git-send-email-koba@kmckk.co.jp>
+ <1346909447-12526-2-git-send-email-koba@kmckk.co.jp>
+Message-ID: <20120906091128.GB858@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+On Thu, Sep 06, 2012 at 06:30:46AM +0100, Tetsuyuki Kobayshi wrote:
+> From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+> 
+> This patch enables PMU(Performance Monitoring Unit) for sh73a0.
+> 
+> Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+> ---
+> Changes for v2:
+> - Removed #ifdef CONFIG_HW_PERF_EVENTS
+> - Added kzm9g_defconfig
+> 
+>  arch/arm/configs/kzm9g_defconfig      |    1 +
+>  arch/arm/mach-shmobile/setup-sh73a0.c |   22 ++++++++++++++++++++++
+>  2 files changed, 23 insertions(+)
+> 
+> diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
+> index 2388c86..5d0c667 100644
+> --- a/arch/arm/configs/kzm9g_defconfig
+> +++ b/arch/arm/configs/kzm9g_defconfig
+> @@ -14,6 +14,7 @@ CONFIG_NAMESPACES=y
+>  CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+>  CONFIG_SYSCTL_SYSCALL=y
+>  CONFIG_EMBEDDED=y
+> +CONFIG_PERF_EVENTS=y
+>  CONFIG_SLAB=y
+>  CONFIG_MODULES=y
+>  CONFIG_MODULE_FORCE_LOAD=y
+> diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+> index d230af6..8186a08 100644
+> --- a/arch/arm/mach-shmobile/setup-sh73a0.c
+> +++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+> @@ -39,6 +39,7 @@
+>  #include <asm/mach/map.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/time.h>
+> +#include <asm/pmu.h>
+>  
+>  static struct map_desc sh73a0_io_desc[] __initdata = {
+>  	/* create a 1:1 entity map for 0xe6xxxxxx
+> @@ -734,6 +735,26 @@ static struct platform_device mpdma0_device = {
+>  	},
+>  };
+>  
+> +static struct resource pmu_resources[] = {
+> +	[0] = {
+> +		.start	= gic_spi(55),
+> +		.end	= gic_spi(55),
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +	[1] = {
+> +		.start	= gic_spi(56),
+> +		.end	= gic_spi(56),
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct platform_device pmu_device = {
+> +	.name		= "arm-pmu",
+> +	.id		= ARM_PMU_DEVICE_CPU,
+> +	.num_resources	= ARRAY_SIZE(pmu_resources),
+> +	.resource	= pmu_resources,
+> +};
 
-This patch enables DMAEngine on SHDI0 and SDHI2 for kzm9g.
+Please check my latest perf stuff to go into arm-soc (pmu/cleanup). The
+ARM_PMU_DEVICE_CPU crap has disappeared and you won't need to include
+asm/pmu.h anymore.
 
-Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
----
- arch/arm/mach-shmobile/board-kzm9g.c |    4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
-index 87ec4ce..d849e6d 100644
---- a/arch/arm/mach-shmobile/board-kzm9g.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g.c
-@@ -384,6 +384,8 @@ static struct regulator_consumer_supply fixed2v8_power_consumers[] =
- 
- /* SDHI */
- static struct sh_mobile_sdhi_info sdhi0_info = {
-+	.dma_slave_tx	= SHDMA_SLAVE_SDHI0_TX,
-+	.dma_slave_rx	= SHDMA_SLAVE_SDHI0_RX,
- 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT,
- 	.tmio_caps	= MMC_CAP_SD_HIGHSPEED,
- 	.tmio_ocr_mask	= MMC_VDD_27_28 | MMC_VDD_28_29,
-@@ -424,6 +426,8 @@ static struct platform_device sdhi0_device = {
- 
- /* Micro SD */
- static struct sh_mobile_sdhi_info sdhi2_info = {
-+	.dma_slave_tx	= SHDMA_SLAVE_SDHI2_TX,
-+	.dma_slave_rx	= SHDMA_SLAVE_SDHI2_RX,
- 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT |
- 			  TMIO_MMC_USE_GPIO_CD |
- 			  TMIO_MMC_WRPROTECT_DISABLE,
--- 
-1.7.9.5
+Will
