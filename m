@@ -1,75 +1,101 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu,  6 Sep 2012 15:45:32 +0300
-Subject: [PATCH v4 13/21] serial: omap: optimization with section annotations
+Date: Thu,  6 Sep 2012 15:45:23 +0300
+Subject: [PATCH v4 04/21] serial: omap: simplify IRQ handling
 In-Reply-To: <1346935540-1792-1-git-send-email-balbi@ti.com>
 References: <20120906122948.GC29202@arwen.pp.htv.fi>
  <1346935540-1792-1-git-send-email-balbi@ti.com>
-Message-ID: <1346935540-1792-14-git-send-email-balbi@ti.com>
+Message-ID: <1346935540-1792-5-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two functions:
-omap_serial_fill_features_erratas() and
-of_get_uart_port_info() are only called from probe().
-Marking them as __devinit gives us another
-oportunity to free some code after .init.text
-is done.
+quite a few changes here, though they are
+pretty obvious. In summary we're making sure
+to detect which interrupt type we need to
+handle before calling the underlying interrupt
+handling procedure.
 
 Tested-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-Signed-off-by: Ruchika Kharwar <ruchika@ti.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/tty/serial/omap-serial.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/tty/serial/omap-serial.c | 51 ++++++++++++++++++++++++++++++----------
+ 1 file changed, 38 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index f5dcb5a..9068260 100644
+index dd3971f..d5a08cb 100644
 --- a/drivers/tty/serial/omap-serial.c
 +++ b/drivers/tty/serial/omap-serial.c
-@@ -1168,7 +1168,7 @@ static int serial_omap_resume(struct device *dev)
- }
- #endif
- 
--static void omap_serial_fill_features_erratas(struct uart_omap_port *up)
-+static void __devinit omap_serial_fill_features_erratas(struct uart_omap_port *up)
+@@ -351,33 +351,58 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
  {
- 	u32 mvr, scheme;
- 	u16 revision, major, minor;
-@@ -1221,7 +1221,7 @@ static void omap_serial_fill_features_erratas(struct uart_omap_port *up)
+ 	struct uart_omap_port *up = dev_id;
+ 	unsigned int iir, lsr;
++	unsigned int type;
+ 	unsigned long flags;
++	irqreturn_t ret = IRQ_NONE;
+ 
++	spin_lock_irqsave(&up->port.lock, flags);
+ 	pm_runtime_get_sync(up->dev);
+ 	iir = serial_in(up, UART_IIR);
+-	if (iir & UART_IIR_NO_INT) {
+-		pm_runtime_mark_last_busy(up->dev);
+-		pm_runtime_put_autosuspend(up->dev);
+-		return IRQ_NONE;
+-	}
++again:
++	if (iir & UART_IIR_NO_INT)
++		goto out;
+ 
+-	spin_lock_irqsave(&up->port.lock, flags);
++	ret = IRQ_HANDLED;
+ 	lsr = serial_in(up, UART_LSR);
+-	if (iir & UART_IIR_RLSI) {
++
++	/* extract IRQ type from IIR register */
++	type = iir & 0x3e;
++
++	switch (type) {
++	case UART_IIR_MSI:
++		check_modem_status(up);
++		break;
++	case UART_IIR_THRI:
++		if (lsr & UART_LSR_THRE)
++			transmit_chars(up);
++		break;
++	case UART_IIR_RDI:
+ 		if (lsr & UART_LSR_DR)
+ 			receive_chars(up, &lsr);
++		break;
++	case UART_IIR_RLSI:
++		if (lsr & UART_LSR_BRK_ERROR_BITS)
++			receive_chars(up, &lsr);
++		break;
++	case UART_IIR_RX_TIMEOUT:
++		receive_chars(up, &lsr);
++		break;
++	case UART_IIR_CTS_RTS_DSR:
++		iir = serial_in(up, UART_IIR);
++		goto again;
++	case UART_IIR_XOFF:
++		/* FALLTHROUGH */
++	default:
++		break;
  	}
+ 
+-	check_modem_status(up);
+-	if ((lsr & UART_LSR_THRE) && (iir & UART_IIR_THRI))
+-		transmit_chars(up);
+-
++out:
+ 	spin_unlock_irqrestore(&up->port.lock, flags);
+ 	pm_runtime_mark_last_busy(up->dev);
+ 	pm_runtime_put_autosuspend(up->dev);
+-
+ 	up->port_activity = jiffies;
+-	return IRQ_HANDLED;
++
++	return ret;
  }
  
--static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
-+static __devinit struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
- {
- 	struct omap_uart_port_info *omap_up_info;
- 
-@@ -1234,7 +1234,7 @@ static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
- 	return omap_up_info;
- }
- 
--static int serial_omap_probe(struct platform_device *pdev)
-+static int __devinit serial_omap_probe(struct platform_device *pdev)
- {
- 	struct uart_omap_port	*up;
- 	struct resource		*mem, *irq;
-@@ -1364,7 +1364,7 @@ err_port_line:
- 	return ret;
- }
- 
--static int serial_omap_remove(struct platform_device *dev)
-+static int __devexit serial_omap_remove(struct platform_device *dev)
- {
- 	struct uart_omap_port *up = platform_get_drvdata(dev);
- 
-@@ -1508,7 +1508,7 @@ MODULE_DEVICE_TABLE(of, omap_serial_of_match);
- 
- static struct platform_driver serial_omap_driver = {
- 	.probe          = serial_omap_probe,
--	.remove         = serial_omap_remove,
-+	.remove         = __devexit_p(serial_omap_remove),
- 	.driver		= {
- 		.name	= DRIVER_NAME,
- 		.pm	= &serial_omap_dev_pm_ops,
+ static unsigned int serial_omap_tx_empty(struct uart_port *port)
 -- 
 1.7.12.rc3
