@@ -1,89 +1,45 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 6 Sep 2012 08:28:21 +0000
-Subject: [PATCH] ARM: omap_hwmod: Fix up resource names when booted with
- devicetree
-In-Reply-To: <504852B9.5000403@ti.com>
-References: <1345730049-12675-1-git-send-email-peter.ujfalusi@ti.com>
- <alpine.DEB.2.00.1208241536290.25436@utopia.booyaka.com>
- <5037A9CE.1080809@ti.com> <50476143.3010509@ti.com>
- <5047B079.6040209@ti.com> <504852B9.5000403@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EAAB2F7@DBDE01.ent.ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 6 Sep 2012 09:36:07 +0100
+Subject: [PATCH v2 20/31] arm64: User access library function
+In-Reply-To: <20120905210534.GI24085@n2100.arm.linux.org.uk>
+References: <1344966752-16102-1-git-send-email-catalin.marinas@arm.com>
+ <1344966752-16102-21-git-send-email-catalin.marinas@arm.com>
+ <201208151449.54834.arnd@arndb.de>
+ <20120905191312.GH24085@n2100.arm.linux.org.uk>
+ <20120905210135.GA87548@MacBook-Pro.local>
+ <20120905210534.GI24085@n2100.arm.linux.org.uk>
+Message-ID: <20120906083607.GA13975@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 13:07:29, Cousson, Benoit wrote:
-> Hi Vaibhav,
+On Wed, Sep 05, 2012 at 10:05:34PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Sep 05, 2012 at 10:01:37PM +0100, Catalin Marinas wrote:
+> > There are indeed a few KB gain in code size but that's probably coming
+> > from the exception table since otherwise you just replace a bl with
+> > ldrt. It depends on what the compiler does as well, the arm code has
+> > some carefully chosen registers when calling the __get_user_x function.
 > 
-> On 09/05/2012 10:05 PM, Vaibhav Hiremath wrote:
-> > On 9/5/2012 7:57 PM, Benoit Cousson wrote:
-> >> Hi Paul,
-> >>
-> >> On 08/24/2012 06:20 PM, Peter Ujfalusi wrote:
-> >>> Hi Paul,
-> >>>
-> >>> On 08/24/2012 06:38 PM, Paul Walmsley wrote:
-> >>>> Do we need both this one and your '[PATCH] driver core: Check if r->name 
-> >>>> is valid in platform_get_resource_byname()' ?  Or would that second patch 
-> >>>> be enough?  Is the crash happening in the platform_get_resource_byname() 
-> >>>> iterator?
-> >>>
-> >>> The crash happens in platform_get_resource_byname(). What I see as a problem
-> >>> that when we boot without DT the r->name is configured for the hwmods. If we
-> >>> boot with DT we discard the resources created by the OF (which also have the
-> >>> r->name configured). We replace the resources from hwmods but we do not fix up
-> >>> the resource names (which is done in other cases).
-> >>> I have sent the patch for the drivers core as well since I think it is a good
-> >>> practice anyway to check for NULL pointer before strcmp().
-> >>>
-> >>> Either is good, but IMHO we should fix this in omap_hwmod (at least).
-> >>
-> >> Yes, clearly we do have a corner case today due to the mix of hwmod /
-> >> DTS resource management.
-> >> - Legacy boot + hwmod resources is OK
-> >> - DTS boot with DTS resources will be OK
-> >> - DTS boot with hwmod resources is not OK since the resource name will
-> >>   not be populated in the case resources are not named :-(
-> >>
-> >> If you are OK, I'll take that patch along with Vaibhav one to handle
-> >> properly the resources from DTS long with the DTS patches I'm queuing
-> >> for 3.7.
-> >>
-> > 
-> > Benoit,
-> > Note that this patch will add device name to all resources, since none
-> > of the resource will have name property and may break drivers;
-> > especially after my patch which respects DT resources.
-> 
-> So you do have to add the name in the DTS if the driver is expecting that.
-> 
-> > Also I just read the thread you started sometime back on _byname api,
-> > not sure that was the conclusion, but it seems like it is not
-> > recommended to use _byname. The driver should be fixed while converting
-> > to DT.
-> 
-> No the DT name for reg and interrupt was accepted and Peter is taking advantage on that.
-> The only missing binding is the DMA now.
-> 
-> Here is what Peter did.
-> 
->  			compatible = "ti,omap4-mcpdm";
->  			reg = <0x40132000 0x7f>, /* MPU private access */
->  			      <0x49032000 0x7f>; /* L3 Interconnect */
-> +			reg-names = "mpu", "dma";
->  			interrupts = <0 112 0x4>;
->  			interrupt-parent = <&gic>;
->  			ti,hwmods = "mcpdm";
-> 
+> It's more than that - it's not just the ldr but also a zeroing of a
+> temporary register to hold the error code should the instruction fault.
+> So it's not only the exception tables but also an increase in the
+> main path - and that's where you benefit from having it out of line and
+> thereby a hotter i-cache.
 
-Thanks for sharing this and now I found it in 
-Documentation/devicetree/bindings/resource-names.txt
+On 32-bit we have __get_user() inline and get_user() out of line. What
+was the history behind this?
 
-In that case, we do not have any issues and you can merge this patch.
+> > If you do the access_ok inline and the __get_user_x separately, the size
+> > increase is even greater (at least in the arm64 case it can get to over
+> > 20KB). I think x86 does the access_ok check out of line.
+> 
+> Please talk to Will about get_user() and put_user().  Afterwards you
+> will definitely want to keep them out of line on 64-bit ARM.
 
-Thanks,
-Vaibhav
-> 
-> Regards,
-> Benoit
-> 
-> 
+As I said, I already made the change to always inline get_user/put_user
+with some penalty in the Image size but it makes the code cleaner. I'm
+not entirely convinced of the performance gain/loss especially on ARMv8
+cores with physically tagged caches. There is room for optimisation when
+I get real silicon.
+
+-- 
+Catalin
