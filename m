@@ -1,14 +1,53 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 6 Sep 2012 18:47:51 +0800
-Subject: [PATCH Resend2] ASoC: imx-mc13783: use defines instead of
- numerical address of register
-In-Reply-To: <1346917212-2824-1-git-send-email-gcembed@gmail.com>
-References: <1346917212-2824-1-git-send-email-gcembed@gmail.com>
-Message-ID: <20120906104733.GG22330@opensource.wolfsonmicro.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 06 Sep 2012 13:05:31 +0200
+Subject: [PATCH V4 2/2] video: drm: exynos: Add device tree support
+In-Reply-To: <CAAQKjZNmizjZ-=JN9_AysPMPHTOh7eydfE_OCYE6-v0JAJMydw@mail.gmail.com>
+References: <1346859555-13527-1-git-send-email-l.krishna@samsung.com>
+ <1346859555-13527-3-git-send-email-l.krishna@samsung.com>
+ <CAH9JG2X_3iUTiGWv2cxjiX-s_VUtptVbzxhAJTub70W_2Dxecg@mail.gmail.com>
+ <CAAQKjZNmizjZ-=JN9_AysPMPHTOh7eydfE_OCYE6-v0JAJMydw@mail.gmail.com>
+Message-ID: <5048837B.6020903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 09:40:12AM +0200, Ga?tan Carlier wrote:
-> This uses already defined name of registers and makes code more readable.
+Hi,
 
-Applied, thanks.
+On 09/06/2012 09:21 AM, InKi Dae wrote:
+>>> +Required properties:
+>>> + - compatible: Should be "samsung,exynos5-fimd" or "samsung,exynos4-fb" for
+>> Doesn't better to use single word? fimd or fb?. I think 'fb' is used
+>> for framebuffer historically.
+>> but now it's used both fb and drm, so fimd is neutral and architecture
+>> specific.
+>>
+>> To do this, Modify arch-exynos first and update it at each drivers it properly.
+>>
+>> Thank you,
+>> Kyungmin Park
+>>
+> 
+> I agree with Kyungmin but I'd like to use as is. the reason we used
+> 'exynos4-fb' as device name, is for that it uses fimd driver's
+> platform device commonly and gets fimd clock. so I think that dts file
+> should be defined with hardware specific name but not driver name such
+> as 'exynos4-fb'. but with this, we can't get fimd clock with device's
+> name because 'exynos4-fb' is used as device name of fimd clock. so to
+> use 'exynos4-fimd', we should modify the device name of fimd clock
+> from 'exynos4-fb'  to 'exynos4-fimd' and also ids definitions of
+> s3c-fb and drm fimd driver. so my conclusion is that it merges this
+
+I think it's good moment to put those things in order, i.e. use uniform 
+'compatible' names: "samsung,exynos4-fimd", "samsung,exynos5-fimd". 
+Platform device names are separate issue, but could perhaps be unified 
+at this time as well.
+
+> patch set as is and then let's modify related things later.
+> any opinions, welcome~ anytime.
+> 
+> Thanks.
+> Inki Dae
+
+--
+
+Regards,
+Sylwester
