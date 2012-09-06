@@ -1,27 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 6 Sep 2012 07:58:02 +0200
-Subject: [GIT PULL] Renesas ARM-based SoC: KZM-A9-GT for 3.7 #2
-In-Reply-To: <20120905224413.GC32084@quad.lixom.net>
-References: <1346305648-25263-1-git-send-email-horms@verge.net.au>
- <20120905224413.GC32084@quad.lixom.net>
-Message-ID: <CACRpkdZBOjO124w3WwPpL7ekf2dU1w2HCub9EG=LUxFSPn8Ayw@mail.gmail.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Thu, 6 Sep 2012 06:09:29 +0000
+Subject: [PATCH v2 0/4] can: c_can: Add suspend/resume and pinctrl support
+In-Reply-To: <20120905232609.GL1303@atomide.com>
+References: <1346843564-25343-1-git-send-email-anilkumar@ti.com>
+ <50473D92.9000500@pengutronix.de> <504759B4.6060203@pengutronix.de>
+ <20120905232609.GL1303@atomide.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA27D69@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 6, 2012 at 12:44 AM, Olof Johansson <olof@lixom.net> wrote:
+On Thu, Sep 06, 2012 at 04:56:10, Tony Lindgren wrote:
+> * Marc Kleine-Budde <mkl@pengutronix.de> [120905 06:55]:
+> > On 09/05/2012 01:54 PM, Marc Kleine-Budde wrote:
+> > > On 09/05/2012 01:12 PM, AnilKumar Ch wrote:
+> > >> Adds suspend/resume functionality of d_can driver along with d_can
+> > >> raminit support which is required to initialize RAM while data
+> > >> transmission.
+> > >>
+> > >> This patch series also adds pinctrl support to c_can driver. These
+> > >> patches were tested on AM335x-EVM.
+> > >>
+> > >> This patch-series is based ontop of runtimePM patch submitted
+> > >> earlier - https://patchwork.kernel.org/patch/1348081/
+> > > 
+> > > Looks good, I'll apply the series after Tony acks the patch 3
+> > > ([PATCH RESEND 3/4] ARM: AM33XX: board-generic: Add of_dev_auxdata to
+> > > pass d_can raminit).
+> > 
+> > I've pushed all patches to can-next/master [1]. When Tony gives his Ack,
+> > I'll send David a pull request (of a tree including that Ack).
+> 
+> To me it looks like we can avoid the platform callbacks and the ram
+> init changes to the driver by implementing right runtime PM calls
+> for omap/am33xx. So NAK on few patches, and ACK on one :)
+> 
 
-> So, we can't pull in this branch with its dependency without an agreement that
-> Linus holds a branch stable with at least the pcf857x patch on it. Linus?
+Marc,
 
-OMG! OK let's claim that it's stable now then, it's close enough
-to the merge window.
+Can you please queue ACK patch for 3.7, I will submit v3 for rest of
+the patches, once we found the clear way of doing RAMINIT.
 
-Ironically his was caused by a Samsung commit (IIRC) which I
-applied to the GPIO tree but shouldn't be there (instead to be
-funneled through ARM SoC) so I had to take it out after
-a week. So maybe we're not so good off with these mixtures
-of "ARM SoC pulls GPIO" vs "ACK and push it all through ARM SoC"
-hm, maybe it's just one of those things we have to live with...
-
-Yours,
-Linus Walleij
+Thanks
+AnilKumar
