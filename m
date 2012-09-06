@@ -1,48 +1,85 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Thu, 6 Sep 2012 11:47:03 +0200
-Subject: [PATCH] ARM: add support for BCM2708/BCM2835 and Raspberry Pi
-In-Reply-To: <201209060904.14903.arnd@arndb.de>
-References: <1346908038-22421-1-git-send-email-swarren@wwwdotorg.org>
- <201209060904.14903.arnd@arndb.de>
-Message-ID: <20120906094703.GA7308@glitch>
+From: koba@kmckk.co.jp (Tetsuyuki Kobayashi)
+Date: Thu, 06 Sep 2012 18:57:04 +0900
+Subject: [PATCH v2 1/2] ARM: shmobile: sh73a0: enable PMU(Performance
+ Monitoring Unit)
+In-Reply-To: <20120906091128.GB858@mudshark.cambridge.arm.com>
+References: <1346813317-4030-1-git-send-email-koba@kmckk.co.jp>
+ <1346909447-12526-1-git-send-email-koba@kmckk.co.jp>
+ <1346909447-12526-2-git-send-email-koba@kmckk.co.jp>
+ <20120906091128.GB858@mudshark.cambridge.arm.com>
+Message-ID: <50487370.6000409@kmckk.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 09:04:14AM +0000, Arnd Bergmann wrote:
-> On Thursday 06 September 2012, Stephen Warren wrote:
-> 
-> > Questions:
-> > * It is asserted (I believe by Broadcom) that the BCM2835 is the only SoC
-> >   in the series likely to see Linux support. Irrespective, those working
-> >   on BCM2835 support downstream (see git URL above) have chosen to name
-> >   the kernel support after the primary SoC (BCM2708) rather than the
-> >   particular instance in use on the Raspberry Pi (BCM2835). I've followed
-> >   that here, although I wonder if it's really the correct thing to do?
-> 
-> Doesn't matter too much. Depending on how different the various broadcom
-> SoCs actually are, we might even name this mach-bcm and eventually try to
-> merge the existing bcmring into it.
+Hello, Will
 
-I've some stuff for the BCM4760. Working at clean-room patches, which is
-easy because the reference published GPL sources [0] are based on 2.6.28 and
-may look scary (190k lines of register definitions header file, completely
-broken and unused monster to manage clocks, no pinctrl, old-style gpios,
-reimplementation of pl011, pl080 - old style dma, to say a few).
-
-Moreover many IP blocks are already in the kernel (PL011, PL081, sdhci,
-dwc-usb2 in the device-only implementation of s3c-hsotg).
-
-It's incomplete, has a lot of issues. sdhci and usb not working. PMU
-BCM59040 is barely implemented, only regulators. But it can boot from
-initramfs, minimal user space works. Yeah... a side project, mostly a
-continous-study project.
-
-I could find some similarities with something in bcmring, while grepping,
-but I've never dig into it. I also quickly looked into the Raspberry PI
-SoC but I could not find anything familiar.  However there could be some
-code to share. I'll manage a first post of these patches if interested.
-
-Regards,
-Domenico
-
-[0] http://www.tomtom.com/page.php?Page=gpl
+(2012/09/06 18:11), Will Deacon wrote:
+> On Thu, Sep 06, 2012 at 06:30:46AM +0100, Tetsuyuki Kobayshi wrote:
+>> From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+>>
+>> This patch enables PMU(Performance Monitoring Unit) for sh73a0.
+>>
+>> Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+>> ---
+>> Changes for v2:
+>> - Removed #ifdef CONFIG_HW_PERF_EVENTS
+>> - Added kzm9g_defconfig
+>>
+>>   arch/arm/configs/kzm9g_defconfig      |    1 +
+>>   arch/arm/mach-shmobile/setup-sh73a0.c |   22 ++++++++++++++++++++++
+>>   2 files changed, 23 insertions(+)
+>>
+>> diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
+>> index 2388c86..5d0c667 100644
+>> --- a/arch/arm/configs/kzm9g_defconfig
+>> +++ b/arch/arm/configs/kzm9g_defconfig
+>> @@ -14,6 +14,7 @@ CONFIG_NAMESPACES=y
+>>   CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+>>   CONFIG_SYSCTL_SYSCALL=y
+>>   CONFIG_EMBEDDED=y
+>> +CONFIG_PERF_EVENTS=y
+>>   CONFIG_SLAB=y
+>>   CONFIG_MODULES=y
+>>   CONFIG_MODULE_FORCE_LOAD=y
+>> diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+>> index d230af6..8186a08 100644
+>> --- a/arch/arm/mach-shmobile/setup-sh73a0.c
+>> +++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+>> @@ -39,6 +39,7 @@
+>>   #include <asm/mach/map.h>
+>>   #include <asm/mach/arch.h>
+>>   #include <asm/mach/time.h>
+>> +#include <asm/pmu.h>
+>>
+>>   static struct map_desc sh73a0_io_desc[] __initdata = {
+>>   	/* create a 1:1 entity map for 0xe6xxxxxx
+>> @@ -734,6 +735,26 @@ static struct platform_device mpdma0_device = {
+>>   	},
+>>   };
+>>
+>> +static struct resource pmu_resources[] = {
+>> +	[0] = {
+>> +		.start	= gic_spi(55),
+>> +		.end	= gic_spi(55),
+>> +		.flags	= IORESOURCE_IRQ,
+>> +	},
+>> +	[1] = {
+>> +		.start	= gic_spi(56),
+>> +		.end	= gic_spi(56),
+>> +		.flags	= IORESOURCE_IRQ,
+>> +	},
+>> +};
+>> +
+>> +static struct platform_device pmu_device = {
+>> +	.name		= "arm-pmu",
+>> +	.id		= ARM_PMU_DEVICE_CPU,
+>> +	.num_resources	= ARRAY_SIZE(pmu_resources),
+>> +	.resource	= pmu_resources,
+>> +};
+>
+> Please check my latest perf stuff to go into arm-soc (pmu/cleanup). The
+> ARM_PMU_DEVICE_CPU crap has disappeared and you won't need to include
+> asm/pmu.h anymore.
+>
+Thak you, Will. I'm checking out pmu/cleanup branch of arm-soc.
+I will post v3 patch based on it.
