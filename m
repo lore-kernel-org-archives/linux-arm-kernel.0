@@ -1,301 +1,290 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu,  6 Sep 2012 14:42:41 -0500
-Subject: [PATCH v2 4/6] ARM: shmobile: move custom gpio functions to sh-gpio.h
+Date: Thu,  6 Sep 2012 14:42:42 -0500
+Subject: [PATCH v2 5/6] ARM: orion: move custom gpio functions to orion-gpio.h
 In-Reply-To: <1346960563-18689-1-git-send-email-robherring2@gmail.com>
 References: <1346960563-18689-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1346960563-18689-5-git-send-email-robherring2@gmail.com>
+Message-ID: <1346960563-18689-6-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Move custom shmobile gpio code to a sh-gpio.h to remove the dependency
-on mach/gpio.h. shmobile always uses gpiolib, so we can remove
-__GPIOLIB_COMPLEX define from mach/gpio.h.
+Move custom orion platforms gpio code to orion-gpio to remove the
+dependency on mach/gpio.h.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Paul Mundt <lethal@linux-sh.org>
-Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/mach-shmobile/board-ap4evb.c          |    2 +
- arch/arm/mach-shmobile/board-armadillo800eva.c |    2 +
- arch/arm/mach-shmobile/board-g4evm.c           |    2 +
- arch/arm/mach-shmobile/board-mackerel.c        |    2 +
- arch/arm/mach-shmobile/include/mach/gpio.h     |   63 +-----------------------
- arch/arm/mach-shmobile/pfc-r8a7740.c           |    2 +-
- arch/arm/mach-shmobile/pfc-r8a7779.c           |    2 +-
- arch/arm/mach-shmobile/pfc-sh7367.c            |    2 +-
- arch/arm/mach-shmobile/pfc-sh7372.c            |    2 +-
- arch/arm/mach-shmobile/pfc-sh7377.c            |    2 +-
- arch/arm/mach-shmobile/pfc-sh73a0.c            |    2 +-
- arch/arm/mach-shmobile/sh-gpio.h               |   48 ++++++++++++++++++
- drivers/sh/pfc/gpio.c                          |    1 +
- 13 files changed, 64 insertions(+), 68 deletions(-)
- create mode 100644 arch/arm/mach-shmobile/sh-gpio.h
+ arch/arm/mach-dove/include/mach/gpio.h        |   10 +------
+ arch/arm/mach-dove/irq.c                      |    1 +
+ arch/arm/mach-dove/mpp.c                      |    1 +
+ arch/arm/mach-kirkwood/include/mach/gpio.h    |   10 +------
+ arch/arm/mach-kirkwood/irq.c                  |    1 +
+ arch/arm/mach-kirkwood/rd88f6192-nas-setup.c  |    1 +
+ arch/arm/mach-mv78xx0/irq.c                   |    1 +
+ arch/arm/mach-orion5x/d2net-setup.c           |    1 +
+ arch/arm/mach-orion5x/dns323-setup.c          |    1 +
+ arch/arm/mach-orion5x/include/mach/gpio.h     |   10 +------
+ arch/arm/mach-orion5x/irq.c                   |    1 +
+ arch/arm/mach-orion5x/net2big-setup.c         |    1 +
+ arch/arm/plat-orion/include/plat/gpio.h       |   37 -------------------------
+ arch/arm/plat-orion/include/plat/orion-gpio.h |   37 +++++++++++++++++++++++++
+ arch/arm/plat-orion/mpp.c                     |    1 +
+ 15 files changed, 50 insertions(+), 64 deletions(-)
+ delete mode 100644 arch/arm/plat-orion/include/plat/gpio.h
+ create mode 100644 arch/arm/plat-orion/include/plat/orion-gpio.h
 
-diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
-index f172ca8..c7f164e 100644
---- a/arch/arm/mach-shmobile/board-ap4evb.c
-+++ b/arch/arm/mach-shmobile/board-ap4evb.c
-@@ -66,6 +66,8 @@
- #include <asm/mach/arch.h>
- #include <asm/setup.h>
- 
-+#include "sh-gpio.h"
-+
- /*
-  * Address	Interface		BusWidth	note
-  * ------------------------------------------------------------------
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index cf10f92..15ffb4c 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -54,6 +54,8 @@
- #include <sound/sh_fsi.h>
- #include <sound/simple_card.h>
- 
-+#include "sh-gpio.h"
-+
- /*
-  * CON1		Camera Module
-  * CON2		Extension Bus
-diff --git a/arch/arm/mach-shmobile/board-g4evm.c b/arch/arm/mach-shmobile/board-g4evm.c
-index fa5dfc5..eeee12e 100644
---- a/arch/arm/mach-shmobile/board-g4evm.c
-+++ b/arch/arm/mach-shmobile/board-g4evm.c
-@@ -42,6 +42,8 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
-+#include "sh-gpio.h"
-+
- /*
-  * SDHI
-  *
-diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index 7ea2b31..7654404 100644
---- a/arch/arm/mach-shmobile/board-mackerel.c
-+++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -64,6 +64,8 @@
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
- 
-+#include "sh-gpio.h"
-+
- /*
-  * Address	Interface		BusWidth	note
-  * ------------------------------------------------------------------
-diff --git a/arch/arm/mach-shmobile/include/mach/gpio.h b/arch/arm/mach-shmobile/include/mach/gpio.h
-index 844507d..40a8c17 100644
---- a/arch/arm/mach-shmobile/include/mach/gpio.h
-+++ b/arch/arm/mach-shmobile/include/mach/gpio.h
-@@ -1,62 +1 @@
+diff --git a/arch/arm/mach-dove/include/mach/gpio.h b/arch/arm/mach-dove/include/mach/gpio.h
+index e7e5101..40a8c17 100644
+--- a/arch/arm/mach-dove/include/mach/gpio.h
++++ b/arch/arm/mach-dove/include/mach/gpio.h
+@@ -1,9 +1 @@
 -/*
-- * Generic GPIO API and pinmux table support
+- * arch/arm/mach-dove/include/mach/gpio.h
 - *
-- * Copyright (c) 2008  Magnus Damm
-- *
-- * This file is subject to the terms and conditions of the GNU General Public
-- * License.  See the file "COPYING" in the main directory of this archive
-- * for more details.
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
 - */
--#ifndef __ASM_ARCH_GPIO_H
--#define __ASM_ARCH_GPIO_H
 -
--#include <linux/kernel.h>
--#include <linux/errno.h>
--#include <linux/sh_pfc.h>
--#include <linux/io.h>
--
--#ifdef CONFIG_GPIOLIB
--
--static inline int irq_to_gpio(unsigned int irq)
--{
--	return -ENOSYS;
--}
--
--#else
--
--#define __ARM_GPIOLIB_COMPLEX
--
--#endif /* CONFIG_GPIOLIB */
--
--/*
-- * FIXME !!
-- *
-- * current gpio frame work doesn't have
-- * the method to control only pull up/down/free.
-- * this function should be replaced by correct gpio function
-- */
--static inline void __init gpio_direction_none(u32 addr)
--{
--	__raw_writeb(0x00, addr);
--}
--
--static inline void __init gpio_request_pullup(u32 addr)
--{
--	u8 data = __raw_readb(addr);
--
--	data &= 0x0F;
--	data |= 0xC0;
--	__raw_writeb(data, addr);
--}
--
--static inline void __init gpio_request_pulldown(u32 addr)
--{
--	u8 data = __raw_readb(addr);
--
--	data &= 0x0F;
--	data |= 0xA0;
--
--	__raw_writeb(data, addr);
--}
--
--#endif /* __ASM_ARCH_GPIO_H */
+-#include <plat/gpio.h>
 +/* empty */
-diff --git a/arch/arm/mach-shmobile/pfc-r8a7740.c b/arch/arm/mach-shmobile/pfc-r8a7740.c
-index ce9e7fa..134d1b9 100644
---- a/arch/arm/mach-shmobile/pfc-r8a7740.c
-+++ b/arch/arm/mach-shmobile/pfc-r8a7740.c
-@@ -20,7 +20,7 @@
-  */
- #include <linux/init.h>
- #include <linux/kernel.h>
--#include <linux/gpio.h>
-+#include <linux/sh_pfc.h>
- #include <mach/r8a7740.h>
- #include <mach/irqs.h>
+diff --git a/arch/arm/mach-dove/irq.c b/arch/arm/mach-dove/irq.c
+index 9bc97a5..186357f 100644
+--- a/arch/arm/mach-dove/irq.c
++++ b/arch/arm/mach-dove/irq.c
+@@ -18,6 +18,7 @@
+ #include <asm/mach/irq.h>
+ #include <mach/pm.h>
+ #include <mach/bridge-regs.h>
++#include <plat/orion-gpio.h>
+ #include "common.h"
  
-diff --git a/arch/arm/mach-shmobile/pfc-r8a7779.c b/arch/arm/mach-shmobile/pfc-r8a7779.c
-index d14c9b0..cbc26ba 100644
---- a/arch/arm/mach-shmobile/pfc-r8a7779.c
-+++ b/arch/arm/mach-shmobile/pfc-r8a7779.c
-@@ -19,7 +19,7 @@
-  */
- #include <linux/init.h>
- #include <linux/kernel.h>
--#include <linux/gpio.h>
-+#include <linux/sh_pfc.h>
- #include <linux/ioport.h>
- #include <mach/r8a7779.h>
+ static void pmu_irq_mask(struct irq_data *d)
+diff --git a/arch/arm/mach-dove/mpp.c b/arch/arm/mach-dove/mpp.c
+index 7f70afc..60bd729 100644
+--- a/arch/arm/mach-dove/mpp.c
++++ b/arch/arm/mach-dove/mpp.c
+@@ -13,6 +13,7 @@
+ #include <linux/io.h>
+ #include <plat/mpp.h>
+ #include <mach/dove.h>
++#include <plat/orion-gpio.h>
+ #include "mpp.h"
  
-diff --git a/arch/arm/mach-shmobile/pfc-sh7367.c b/arch/arm/mach-shmobile/pfc-sh7367.c
-index e6e5246..c0c137f 100644
---- a/arch/arm/mach-shmobile/pfc-sh7367.c
-+++ b/arch/arm/mach-shmobile/pfc-sh7367.c
-@@ -18,7 +18,7 @@
-  */
- #include <linux/init.h>
+ struct dove_mpp_grp {
+diff --git a/arch/arm/mach-kirkwood/include/mach/gpio.h b/arch/arm/mach-kirkwood/include/mach/gpio.h
+index 84f340b..40a8c17 100644
+--- a/arch/arm/mach-kirkwood/include/mach/gpio.h
++++ b/arch/arm/mach-kirkwood/include/mach/gpio.h
+@@ -1,9 +1 @@
+-/*
+- * arch/asm-arm/mach-kirkwood/include/mach/gpio.h
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#include <plat/gpio.h>
++/* empty */
+diff --git a/arch/arm/mach-kirkwood/irq.c b/arch/arm/mach-kirkwood/irq.c
+index 720063f..20149a7 100644
+--- a/arch/arm/mach-kirkwood/irq.c
++++ b/arch/arm/mach-kirkwood/irq.c
+@@ -11,6 +11,7 @@
  #include <linux/kernel.h>
--#include <linux/gpio.h>
-+#include <linux/sh_pfc.h>
- #include <mach/sh7367.h>
+ #include <linux/irq.h>
+ #include <mach/bridge-regs.h>
++#include <plat/orion-gpio.h>
+ #include <plat/irq.h>
  
- #define CPU_ALL_PORT(fn, pfx, sfx)				\
-diff --git a/arch/arm/mach-shmobile/pfc-sh7372.c b/arch/arm/mach-shmobile/pfc-sh7372.c
-index 336093f9..7a1525f 100644
---- a/arch/arm/mach-shmobile/pfc-sh7372.c
-+++ b/arch/arm/mach-shmobile/pfc-sh7372.c
-@@ -22,7 +22,7 @@
-  */
- #include <linux/init.h>
+ static int __initdata gpio0_irqs[4] = {
+diff --git a/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c b/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
+index f742a66..19072c8 100644
+--- a/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
++++ b/arch/arm/mach-kirkwood/rd88f6192-nas-setup.c
+@@ -19,6 +19,7 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <mach/kirkwood.h>
++#include <plat/orion-gpio.h>
+ #include "common.h"
+ 
+ #define RD88F6192_GPIO_USB_VBUS		10
+diff --git a/arch/arm/mach-mv78xx0/irq.c b/arch/arm/mach-mv78xx0/irq.c
+index eff9a75..4d720f2 100644
+--- a/arch/arm/mach-mv78xx0/irq.c
++++ b/arch/arm/mach-mv78xx0/irq.c
+@@ -11,6 +11,7 @@
  #include <linux/kernel.h>
--#include <linux/gpio.h>
-+#include <linux/sh_pfc.h>
- #include <mach/irqs.h>
- #include <mach/sh7372.h>
+ #include <linux/irq.h>
+ #include <mach/bridge-regs.h>
++#include <plat/orion-gpio.h>
+ #include <plat/irq.h>
+ #include "common.h"
  
-diff --git a/arch/arm/mach-shmobile/pfc-sh7377.c b/arch/arm/mach-shmobile/pfc-sh7377.c
-index 2f10511..f3117f6 100644
---- a/arch/arm/mach-shmobile/pfc-sh7377.c
-+++ b/arch/arm/mach-shmobile/pfc-sh7377.c
-@@ -19,7 +19,7 @@
-  */
- #include <linux/init.h>
+diff --git a/arch/arm/mach-orion5x/d2net-setup.c b/arch/arm/mach-orion5x/d2net-setup.c
+index d75dcfa..e3629c0 100644
+--- a/arch/arm/mach-orion5x/d2net-setup.c
++++ b/arch/arm/mach-orion5x/d2net-setup.c
+@@ -27,6 +27,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/pci.h>
+ #include <mach/orion5x.h>
++#include <plat/orion-gpio.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
+index d470864..0e19db6 100644
+--- a/arch/arm/mach-orion5x/dns323-setup.c
++++ b/arch/arm/mach-orion5x/dns323-setup.c
+@@ -34,6 +34,7 @@
+ #include <asm/mach/pci.h>
+ #include <asm/system_info.h>
+ #include <mach/orion5x.h>
++#include <plat/orion-gpio.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+diff --git a/arch/arm/mach-orion5x/include/mach/gpio.h b/arch/arm/mach-orion5x/include/mach/gpio.h
+index a1d0b78..40a8c17 100644
+--- a/arch/arm/mach-orion5x/include/mach/gpio.h
++++ b/arch/arm/mach-orion5x/include/mach/gpio.h
+@@ -1,9 +1 @@
+-/*
+- * arch/arm/mach-orion5x/include/mach/gpio.h
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#include <plat/gpio.h>
++/* empty */
+diff --git a/arch/arm/mach-orion5x/irq.c b/arch/arm/mach-orion5x/irq.c
+index 17da709..e152641 100644
+--- a/arch/arm/mach-orion5x/irq.c
++++ b/arch/arm/mach-orion5x/irq.c
+@@ -13,6 +13,7 @@
  #include <linux/kernel.h>
--#include <linux/gpio.h>
-+#include <linux/sh_pfc.h>
- #include <mach/sh7377.h>
+ #include <linux/irq.h>
+ #include <mach/bridge-regs.h>
++#include <plat/orion-gpio.h>
+ #include <plat/irq.h>
  
- #define CPU_ALL_PORT(fn, pfx, sfx)				\
-diff --git a/arch/arm/mach-shmobile/pfc-sh73a0.c b/arch/arm/mach-shmobile/pfc-sh73a0.c
-index 4a547b8..b442f9d 100644
---- a/arch/arm/mach-shmobile/pfc-sh73a0.c
-+++ b/arch/arm/mach-shmobile/pfc-sh73a0.c
-@@ -20,7 +20,7 @@
-  */
- #include <linux/init.h>
- #include <linux/kernel.h>
--#include <linux/gpio.h>
-+#include <linux/sh_pfc.h>
- #include <mach/sh73a0.h>
- #include <mach/irqs.h>
+ static int __initdata gpio0_irqs[4] = {
+diff --git a/arch/arm/mach-orion5x/net2big-setup.c b/arch/arm/mach-orion5x/net2big-setup.c
+index 0180c39..3506f16 100644
+--- a/arch/arm/mach-orion5x/net2big-setup.c
++++ b/arch/arm/mach-orion5x/net2big-setup.c
+@@ -25,6 +25,7 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <mach/orion5x.h>
++#include <plat/orion-gpio.h>
+ #include "common.h"
+ #include "mpp.h"
  
-diff --git a/arch/arm/mach-shmobile/sh-gpio.h b/arch/arm/mach-shmobile/sh-gpio.h
+diff --git a/arch/arm/plat-orion/include/plat/gpio.h b/arch/arm/plat-orion/include/plat/gpio.h
+deleted file mode 100644
+index 81c6fc8..0000000
+--- a/arch/arm/plat-orion/include/plat/gpio.h
++++ /dev/null
+@@ -1,37 +0,0 @@
+-/*
+- * arch/arm/plat-orion/include/plat/gpio.h
+- *
+- * Marvell Orion SoC GPIO handling.
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#ifndef __PLAT_GPIO_H
+-#define __PLAT_GPIO_H
+-
+-#include <linux/init.h>
+-#include <linux/types.h>
+-#include <linux/irqdomain.h>
+-/*
+- * Orion-specific GPIO API extensions.
+- */
+-void orion_gpio_set_unused(unsigned pin);
+-void orion_gpio_set_blink(unsigned pin, int blink);
+-int orion_gpio_led_blink_set(unsigned gpio, int state,
+-	unsigned long *delay_on, unsigned long *delay_off);
+-
+-#define GPIO_INPUT_OK		(1 << 0)
+-#define GPIO_OUTPUT_OK		(1 << 1)
+-void orion_gpio_set_valid(unsigned pin, int mode);
+-
+-/* Initialize gpiolib. */
+-void __init orion_gpio_init(struct device_node *np,
+-			    int gpio_base, int ngpio,
+-			    void __iomem *base, int mask_offset,
+-			    int secondary_irq_base,
+-			    int irq[4]);
+-
+-void __init orion_gpio_of_init(int irq_gpio_base);
+-#endif
+diff --git a/arch/arm/plat-orion/include/plat/orion-gpio.h b/arch/arm/plat-orion/include/plat/orion-gpio.h
 new file mode 100644
-index 0000000..7ba1877
+index 0000000..81c6fc8
 --- /dev/null
-+++ b/arch/arm/mach-shmobile/sh-gpio.h
-@@ -0,0 +1,48 @@
++++ b/arch/arm/plat-orion/include/plat/orion-gpio.h
+@@ -0,0 +1,37 @@
 +/*
-+ * Generic GPIO API and pinmux table support
++ * arch/arm/plat-orion/include/plat/gpio.h
 + *
-+ * Copyright (c) 2008  Magnus Damm
++ * Marvell Orion SoC GPIO handling.
 + *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
-+#ifndef __ASM_ARCH_GPIO_H
-+#define __ASM_ARCH_GPIO_H
 +
-+#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/io.h>
++#ifndef __PLAT_GPIO_H
++#define __PLAT_GPIO_H
 +
++#include <linux/init.h>
++#include <linux/types.h>
++#include <linux/irqdomain.h>
 +/*
-+ * FIXME !!
-+ *
-+ * current gpio frame work doesn't have
-+ * the method to control only pull up/down/free.
-+ * this function should be replaced by correct gpio function
++ * Orion-specific GPIO API extensions.
 + */
-+static inline void __init gpio_direction_none(u32 addr)
-+{
-+	__raw_writeb(0x00, addr);
-+}
++void orion_gpio_set_unused(unsigned pin);
++void orion_gpio_set_blink(unsigned pin, int blink);
++int orion_gpio_led_blink_set(unsigned gpio, int state,
++	unsigned long *delay_on, unsigned long *delay_off);
 +
-+static inline void __init gpio_request_pullup(u32 addr)
-+{
-+	u8 data = __raw_readb(addr);
++#define GPIO_INPUT_OK		(1 << 0)
++#define GPIO_OUTPUT_OK		(1 << 1)
++void orion_gpio_set_valid(unsigned pin, int mode);
 +
-+	data &= 0x0F;
-+	data |= 0xC0;
-+	__raw_writeb(data, addr);
-+}
++/* Initialize gpiolib. */
++void __init orion_gpio_init(struct device_node *np,
++			    int gpio_base, int ngpio,
++			    void __iomem *base, int mask_offset,
++			    int secondary_irq_base,
++			    int irq[4]);
 +
-+static inline void __init gpio_request_pulldown(u32 addr)
-+{
-+	u8 data = __raw_readb(addr);
-+
-+	data &= 0x0F;
-+	data |= 0xA0;
-+
-+	__raw_writeb(data, addr);
-+}
-+
-+#endif /* __ASM_ARCH_GPIO_H */
-diff --git a/drivers/sh/pfc/gpio.c b/drivers/sh/pfc/gpio.c
-index 62bca98..038fa07 100644
---- a/drivers/sh/pfc/gpio.c
-+++ b/drivers/sh/pfc/gpio.c
-@@ -17,6 +17,7 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/pinctrl/consumer.h>
-+#include <linux/sh_pfc.h>
++void __init orion_gpio_of_init(int irq_gpio_base);
++#endif
+diff --git a/arch/arm/plat-orion/mpp.c b/arch/arm/plat-orion/mpp.c
+index 3b1e17b..c140c2f 100644
+--- a/arch/arm/plat-orion/mpp.c
++++ b/arch/arm/plat-orion/mpp.c
+@@ -14,6 +14,7 @@
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+ #include <mach/hardware.h>
++#include <plat/gpio.h>
+ #include <plat/mpp.h>
  
- struct sh_pfc_chip {
- 	struct sh_pfc		*pfc;
+ /* Address of the ith MPP control register */
 -- 
 1.7.9.5
