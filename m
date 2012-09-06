@@ -1,32 +1,40 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 6 Sep 2012 15:18:07 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC: KZM-A9-GT for 3.7 #2
-In-Reply-To: <CACRpkdZBOjO124w3WwPpL7ekf2dU1w2HCub9EG=LUxFSPn8Ayw@mail.gmail.com>
-References: <1346305648-25263-1-git-send-email-horms@verge.net.au>
- <20120905224413.GC32084@quad.lixom.net>
- <CACRpkdZBOjO124w3WwPpL7ekf2dU1w2HCub9EG=LUxFSPn8Ayw@mail.gmail.com>
-Message-ID: <20120906061807.GA3326@verge.net.au>
+From: gcembed@gmail.com (=?UTF-8?q?Ga=C3=ABtan=20Carlier?=)
+Date: Thu,  6 Sep 2012 08:25:53 +0200
+Subject: [PATCH 1/1] [ASoC] Fix v2: Revert 'ASoC: imx-ssi: Remove mono
+ support'.
+Message-ID: <1346912753-2030-1-git-send-email-gcembed@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 07:58:02AM +0200, Linus Walleij wrote:
-> On Thu, Sep 6, 2012 at 12:44 AM, Olof Johansson <olof@lixom.net> wrote:
-> 
-> > So, we can't pull in this branch with its dependency without an agreement that
-> > Linus holds a branch stable with at least the pcf857x patch on it. Linus?
-> 
-> OMG! OK let's claim that it's stable now then, it's close enough
-> to the merge window.
-> 
-> Ironically his was caused by a Samsung commit (IIRC) which I
-> applied to the GPIO tree but shouldn't be there (instead to be
-> funneled through ARM SoC) so I had to take it out after
-> a week. So maybe we're not so good off with these mixtures
-> of "ARM SoC pulls GPIO" vs "ACK and push it all through ARM SoC"
-> hm, maybe it's just one of those things we have to live with...
+When patch of Javier Martin is applied on linux-next-20120824
+the patch failed because comment line is missing.
 
-It seems to me that I should rebase the my branch and it can
-then go through either the ARM SoC or GPIO tree. Either is fine by me.
+Signed-off-by: Ga?tan Carlier <gcembed@gmail.com>
+Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+---
+ sound/soc/fsl/imx-ssi.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
-As an aside, the patch does include a defconfig change.
-Olof, Should that be broken out into a separate patch?
+diff --git a/sound/soc/fsl/imx-ssi.c b/sound/soc/fsl/imx-ssi.c
+index 7074ae6..3c520c4 100644
+--- a/sound/soc/fsl/imx-ssi.c
++++ b/sound/soc/fsl/imx-ssi.c
+@@ -380,14 +380,13 @@ static int imx_ssi_dai_probe(struct snd_soc_dai *dai)
+ static struct snd_soc_dai_driver imx_ssi_dai = {
+ 	.probe = imx_ssi_dai_probe,
+ 	.playback = {
+-		/* The SSI does not support monaural audio. */
+-		.channels_min = 2,
++		.channels_min = 1,
+ 		.channels_max = 2,
+ 		.rates = SNDRV_PCM_RATE_8000_96000,
+ 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
+ 	},
+ 	.capture = {
+-		.channels_min = 2,
++		.channels_min = 1,
+ 		.channels_max = 2,
+ 		.rates = SNDRV_PCM_RATE_8000_96000,
+ 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
+-- 
+1.7.7.4
