@@ -1,108 +1,60 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu,  6 Sep 2012 15:12:21 +0300
-Subject: [PATCH v3 14/14] ASoC: twl4030: Support for DT booted kernel
-In-Reply-To: <1346933541-21547-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1346933541-21547-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1346933541-21547-15-git-send-email-peter.ujfalusi@ti.com>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Thu, 6 Sep 2012 17:45:33 +0530
+Subject: [PATCH v7 1/7] drivers: usb: phy: add a new driver for omap usb2
+ phy
+In-Reply-To: <1344258480-4304-2-git-send-email-kishon@ti.com>
+References: <1344258480-4304-1-git-send-email-kishon@ti.com>
+ <1344258480-4304-2-git-send-email-kishon@ti.com>
+Message-ID: <CAAe_U6KBNZpT03xATmPTNTgxm5hj+wJdsShdnm08EmF4Q=hTCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the kernel has been booted with DT blob the platform data is NULL for
-the driver.
-We need to construct the pdata based on the DT information for runtime use.
+Hi,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- sound/soc/codecs/twl4030.c | 57 +++++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 49 insertions(+), 8 deletions(-)
+On Mon, Aug 6, 2012 at 6:37 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> All phy related programming like enabling/disabling the clocks, powering
+> on/off the phy is taken care of by this driver. It is also used for OTG
+> related functionality like srp.
+>
+> This also includes device tree support for usb2 phy driver and
+> the documentation with device tree binding information is updated.
+>
+> Currently writing to control module register is taken care in this
+> driver which will be removed once the control module driver is in place.
+>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  .../devicetree/bindings/bus/omap-ocp2scp.txt       |    3 +
+>  Documentation/devicetree/bindings/usb/omap-usb.txt |   17 ++
+>  drivers/usb/phy/Kconfig                            |   10 +
+>  drivers/usb/phy/Makefile                           |    1 +
+>  drivers/usb/phy/omap-usb2.c                        |  271 ++++++++++++++++++++
+>  include/linux/usb/omap_usb.h                       |   46 ++++
+>  include/linux/usb/phy_companion.h                  |   34 +++
+>  7 files changed, 382 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/omap-usb.txt
+>  create mode 100644 drivers/usb/phy/omap-usb2.c
+>  create mode 100644 include/linux/usb/omap_usb.h
+>  create mode 100644 include/linux/usb/phy_companion.h
+>
+> diff --git a/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt b/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
+> index d2fe064..bb0c7f4 100644
+> --- a/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
+> +++ b/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
+> @@ -8,3 +8,6 @@ properties:
+>
+>  Sub-nodes:
+>  All the devices connected to ocp2scp are described using sub-node to ocp2scp
+> +- usb2phy :
+> +   The binding details of usb2phy can be found in:
+> +   Documentation/devicetree/bindings/usb/omap-usb.txt
 
-diff --git a/sound/soc/codecs/twl4030.c b/sound/soc/codecs/twl4030.c
-index 8b13d50..f13c91a 100644
---- a/sound/soc/codecs/twl4030.c
-+++ b/sound/soc/codecs/twl4030.c
-@@ -26,6 +26,8 @@
- #include <linux/pm.h>
- #include <linux/i2c.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
-+#include <linux/of_gpio.h>
- #include <linux/i2c/twl.h>
- #include <linux/slab.h>
- #include <linux/gpio.h>
-@@ -295,13 +297,59 @@ static inline void twl4030_reset_registers(struct snd_soc_codec *codec)
- 
- }
- 
--static void twl4030_init_chip(struct snd_soc_codec *codec)
-+static void twl4030_setup_pdata_of(struct twl4030_codec_data *pdata,
-+				   struct device_node *node)
-+{
-+	int value;
-+
-+	of_property_read_u32(node, "ti,digimic_delay",
-+			     &pdata->digimic_delay);
-+	of_property_read_u32(node, "ti,ramp_delay_value",
-+			     &pdata->ramp_delay_value);
-+	of_property_read_u32(node, "ti,offset_cncl_path",
-+			     &pdata->offset_cncl_path);
-+	if (!of_property_read_u32(node, "ti,hs_extmute", &value))
-+		pdata->hs_extmute = value;
-+
-+	pdata->hs_extmute_gpio = of_get_named_gpio(node,
-+						   "ti,hs_extmute_gpio", 0);
-+	if (gpio_is_valid(pdata->hs_extmute_gpio))
-+		pdata->hs_extmute = 1;
-+}
-+
-+static struct twl4030_codec_data *twl4030_get_pdata(struct snd_soc_codec *codec)
- {
- 	struct twl4030_codec_data *pdata = dev_get_platdata(codec->dev);
-+	struct device_node *twl4030_codec_node = NULL;
-+
-+#ifdef CONFIG_OF
-+	twl4030_codec_node = of_find_node_by_name(codec->dev->parent->of_node,
-+						  "codec");
-+#endif
-+
-+	if (!pdata && twl4030_codec_node) {
-+		pdata = devm_kzalloc(codec->dev,
-+				     sizeof(struct twl4030_codec_data),
-+				     GFP_KERNEL);
-+		if (!pdata) {
-+			dev_err(codec->dev, "Can not allocate memory\n");
-+			return NULL;
-+		}
-+		twl4030_setup_pdata_of(pdata, twl4030_codec_node);
-+	}
-+
-+	return pdata;
-+}
-+
-+static void twl4030_init_chip(struct snd_soc_codec *codec)
-+{
-+	struct twl4030_codec_data *pdata;
- 	struct twl4030_priv *twl4030 = snd_soc_codec_get_drvdata(codec);
- 	u8 reg, byte;
- 	int i = 0;
- 
-+	pdata = twl4030_get_pdata(codec);
-+
- 	if (pdata && pdata->hs_extmute &&
- 	    gpio_is_valid(pdata->hs_extmute_gpio)) {
- 		int ret;
-@@ -2284,13 +2332,6 @@ static struct snd_soc_codec_driver soc_codec_dev_twl4030 = {
- 
- static int __devinit twl4030_codec_probe(struct platform_device *pdev)
- {
--	struct twl4030_codec_data *pdata = pdev->dev.platform_data;
--
--	if (!pdata) {
--		dev_err(&pdev->dev, "platform_data is missing\n");
--		return -EINVAL;
--	}
--
- 	return snd_soc_register_codec(&pdev->dev, &soc_codec_dev_twl4030,
- 			twl4030_dai, ARRAY_SIZE(twl4030_dai));
- }
--- 
-1.7.12
+The above two lines should be added in omap-ocp2scp.txt (this file was
+added as part of omap: add ocp2scp as a bus driver and is in
+linux-next). However this file is still not in Felipe's xceiv branch.
+So I'm not sure how I can get this patch merged in Felipe's tree
+without conflict.
+
+Thanks
+Kishon
