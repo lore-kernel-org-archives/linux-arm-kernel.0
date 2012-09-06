@@ -1,31 +1,55 @@
-From: jrnieder@gmail.com (Jonathan Nieder)
-Date: Thu, 6 Sep 2012 00:18:06 -0700
-Subject: Dockstar fails to boot since v3.0-rc6-6-g3835d69
-In-Reply-To: <1346915288@msgid.manchmal.in-ulm.de>
-References: <20120906054034.GA28549@lunn.ch>
- <1346915288@msgid.manchmal.in-ulm.de>
-Message-ID: <20120906071806.GA383@mannheim-rule.local>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Thu, 6 Sep 2012 12:30:15 +0530
+Subject: [PATCH RESEND] arm/dts: AM33XX: Add SPI device tree data
+Message-ID: <1346914815-860-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Christoph Biedl wrote:
+Add McSPI data node to AM33XX device tree file. The McSPI module (and so
+as the driver) is reused from OMAP4.
 
->                                          Comparing .config and playing
-> suggests that disabling CONFIG_ARM_PATCH_PHYS_VIRT is a least a
-> workaround. Anything more I can test?
+Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
+---
+Resenting patch because ARM & OMAP mailing list was not copied.
 
-Hmm, my previous reaction might have been premature --- this might
-be [1] after all.  Any idea why 3835d69a6c70 affected anything?  If
-you take a .config that reproduced this and try
+:100644 100644 bb31bff... 6b469bd... M	arch/arm/boot/dts/am33xx.dtsi
+ arch/arm/boot/dts/am33xx.dtsi |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
 
-	git checkout 3835d69a6c70^
-	make deb-pkg
-
-does that give you a non-broken kernel?
-
-Do you use uBoot, and if so, what version?  If not, what bootloader?
-
-Thanks,
-Jonathan
-
-[1] https://bugzilla.kernel.org/show_bug.cgi?id=42680
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index bb31bff..6b469bd 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -210,5 +210,30 @@
+ 			interrupt-parent = <&intc>;
+ 			interrupts = <91>;
+ 		};
++
++		spi0: spi at 48030000 {
++			compatible = "ti,omap4-mcspi";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x4830000 0x400>;
++			interrupt-parent = <&intc>;
++			interrupt = <65>;
++			ti,spi-num-cs = <2>;
++			ti,hwmods = "spi0";
++			status = "disabled";
++
++		};
++
++		spi1: spi at 481a0000 {
++			compatible = "ti,omap4-mcspi";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x481a0000 0x400>;
++			interrupt-parent = <&intc>;
++			interrupt = <125>;
++			ti,spi-num-cs = <2>;
++			ti,hwmods = "spi1";
++			status = "disabled";
++		};
+ 	};
+ };
+-- 
+1.7.1
