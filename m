@@ -1,27 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 6 Sep 2012 09:16:14 +0200
-Subject: [GIT PULL] Renesas ARM-based SoC: KZM-A9-GT for 3.7 #2
-In-Reply-To: <20120906061807.GA3326@verge.net.au>
-References: <1346305648-25263-1-git-send-email-horms@verge.net.au>
- <20120905224413.GC32084@quad.lixom.net>
- <CACRpkdZBOjO124w3WwPpL7ekf2dU1w2HCub9EG=LUxFSPn8Ayw@mail.gmail.com>
- <20120906061807.GA3326@verge.net.au>
-Message-ID: <CACRpkdYe1pa6udnw6UTEewcCdzzyLRLZ6dSo2pYG4nLu_DAMrg@mail.gmail.com>
+From: jrnieder@gmail.com (Jonathan Nieder)
+Date: Thu, 6 Sep 2012 00:18:06 -0700
+Subject: Dockstar fails to boot since v3.0-rc6-6-g3835d69
+In-Reply-To: <1346915288@msgid.manchmal.in-ulm.de>
+References: <20120906054034.GA28549@lunn.ch>
+ <1346915288@msgid.manchmal.in-ulm.de>
+Message-ID: <20120906071806.GA383@mannheim-rule.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 6, 2012 at 8:18 AM, Simon Horman <horms@verge.net.au> wrote:
+Christoph Biedl wrote:
 
-> It seems to me that I should rebase the my branch and it can
-> then go through either the ARM SoC or GPIO tree. Either is fine by me.
+>                                          Comparing .config and playing
+> suggests that disabling CONFIG_ARM_PATCH_PHYS_VIRT is a least a
+> workaround. Anything more I can test?
 
-Me too...
+Hmm, my previous reaction might have been premature --- this might
+be [1] after all.  Any idea why 3835d69a6c70 affected anything?  If
+you take a .config that reproduced this and try
 
-> As an aside, the patch does include a defconfig change.
-> Olof, Should that be broken out into a separate patch?
+	git checkout 3835d69a6c70^
+	make deb-pkg
 
-IIRC Arnd told me he actually likes when we patch defconfigs as
-part of other fixes so leave it in.
+does that give you a non-broken kernel?
 
-Yours,
-Linus Walleij
+Do you use uBoot, and if so, what version?  If not, what bootloader?
+
+Thanks,
+Jonathan
+
+[1] https://bugzilla.kernel.org/show_bug.cgi?id=42680
