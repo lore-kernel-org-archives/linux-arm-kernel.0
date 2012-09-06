@@ -1,80 +1,48 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Thu, 6 Sep 2012 15:08:23 +0530
-Subject: [PATCH v7 2/3] arm/dts: AM33XX: Configure pinmuxs for user leds
- control on Bone
+Date: Thu, 6 Sep 2012 15:08:24 +0530
+Subject: [PATCH v7 3/3] arm/dts: AM33XX: Add D_CAN device tree data
 In-Reply-To: <1346924304-27425-1-git-send-email-anilkumar@ti.com>
 References: <1346924304-27425-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1346924304-27425-3-git-send-email-anilkumar@ti.com>
+Message-ID: <1346924304-27425-4-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds GPIO pinctrl nodes to am3358_pinmux master node to control
-user leds (USR0, USR1, USR2 and USR3) present on BeagleBone.
+Add Bosch D_CAN controller device tree data to AM33XX dtsi
+file by adding d_can device nodes with all the necessary
+parameters.
 
-[koen at dominion.thruhere.net: led0, led1 suggested by koen]
 Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 ---
- arch/arm/boot/dts/am335x-bone.dts |   43 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+ arch/arm/boot/dts/am33xx.dtsi |   18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index c634f87..b0a7409 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -18,11 +18,54 @@
- 		reg = <0x80000000 0x10000000>; /* 256 MB */
- 	};
- 
-+	am33xx_pinmux: pinmux at 44e10800 {
-+		userled_pins: pinmux_userled_pins {
-+			pinctrl-single,pins = <
-+				0x54 0x7	/* gpmc_a5.gpio1_21, OUTPUT | MODE7 */
-+				0x58 0x17	/* gpmc_a6.gpio1_22, OUTPUT_PULLUP | MODE7 */
-+				0x5c 0x7	/* gpmc_a7.gpio1_23, OUTPUT | MODE7 */
-+				0x60 0x17	/* gpmc_a8.gpio1_24, OUTPUT_PULLUP | MODE7 */
-+			>;
-+		};
-+	};
-+
- 	ocp {
- 		uart1: serial at 44e09000 {
- 			status = "okay";
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 58cffb7..600c3053 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -177,5 +177,23 @@
+ 			compatible = "ti,omap3-wdt";
+ 			ti,hwmods = "wd_timer2";
  		};
- 
-+		leds {
-+			compatible = "gpio-leds";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&userled_pins>;
 +
-+			heartbeat {
-+				label = "beaglebone:green:usr0";
-+				gpios = <&gpio2 21 0>;
-+				linux,default-trigger = "heartbeat";
-+				default-state = "off";
-+			};
-+
-+			mmc {
-+				label = "beaglebone:green:usr1";
-+				gpios = <&gpio2 22 0>;
-+				linux,default-trigger = "mmc0";
-+				default-state = "off";
-+			};
-+
-+			led2 {
-+				label = "beaglebone:green:usr2";
-+				gpios = <&gpio2 23 0>;
-+				default-state = "off";
-+			};
-+
-+			led3 {
-+				label = "beaglebone:green:usr3";
-+				gpios = <&gpio2 24 0>;
-+				default-state = "off";
-+			};
++		dcan0: d_can at 481cc000 {
++			compatible = "bosch,d_can";
++			ti,hwmods = "d_can0";
++			reg = <0x481cc000 0x2000>;
++			interrupts = <52>;
++			interrupt-parent = <&intc>;
++			status = "disabled";
 +		};
 +
- 		i2c1: i2c at 44e0b000 {
- 			status = "okay";
- 			clock-frequency = <400000>;
++		dcan1: d_can at 481d0000 {
++			compatible = "bosch,d_can";
++			ti,hwmods = "d_can1";
++			reg = <0x481d0000 0x2000>;
++			interrupts = <55>;
++			interrupt-parent = <&intc>;
++			status = "disabled";
++		};
+ 	};
+ };
 -- 
 1.7.9.5
