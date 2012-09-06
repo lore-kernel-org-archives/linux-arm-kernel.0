@@ -1,84 +1,53 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 6 Sep 2012 17:55:29 +0300
-Subject: [PATCH 2/2] ARM: tegra: fix debugfs entry for Tegra30
-In-Reply-To: <1346943329-4898-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1346943329-4898-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1346943329-4898-2-git-send-email-pdeschrijver@nvidia.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 6 Sep 2012 20:27:05 +0530
+Subject: [PATCH 0/5] usb: phy/otg: add dt support
+Message-ID: <1346943430-18236-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tegra30 has more powerdomains than Tegra20. The debugfs code did not take this
-into account.
+This patch series adds device tree support for phy's (twl4030 and twl6030).
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- arch/arm/mach-tegra/powergate.c |   40 ++++++++++++++++++++++++++++++++++----
- 1 files changed, 35 insertions(+), 5 deletions(-)
+A new omap-usb2 phy driver has been added (with only dt suppport)
+to perform phy configurations. Previously this configuration was
+performed by twl6030, using pdata function pointers.
 
-diff --git a/arch/arm/mach-tegra/powergate.c b/arch/arm/mach-tegra/powergate.c
-index 27aee4a..de0662d 100644
---- a/arch/arm/mach-tegra/powergate.c
-+++ b/arch/arm/mach-tegra/powergate.c
-@@ -199,7 +199,9 @@ int __init tegra_powergate_init(void)
- 
- #ifdef CONFIG_DEBUG_FS
- 
--static const char * const powergate_name[] = {
-+static const char * const *powergate_name;
-+
-+static const char * const powergate_name_t20[] = {
- 	[TEGRA_POWERGATE_CPU]	= "cpu",
- 	[TEGRA_POWERGATE_3D]	= "3d",
- 	[TEGRA_POWERGATE_VENC]	= "venc",
-@@ -209,6 +211,23 @@ static const char * const powergate_name[] = {
- 	[TEGRA_POWERGATE_MPE]	= "mpe",
- };
- 
-+static const char * const powergate_name_t30[] = {
-+	[TEGRA_POWERGATE_CPU]	= "cpu0",
-+	[TEGRA_POWERGATE_3D]	= "3d0",
-+	[TEGRA_POWERGATE_VENC]	= "venc",
-+	[TEGRA_POWERGATE_VDEC]	= "vdec",
-+	[TEGRA_POWERGATE_PCIE]	= "pcie",
-+	[TEGRA_POWERGATE_L2]	= "l2",
-+	[TEGRA_POWERGATE_MPE]	= "mpe",
-+	[TEGRA_POWERGATE_HEG]	= "heg",
-+	[TEGRA_POWERGATE_SATA]	= "sata",
-+	[TEGRA_POWERGATE_CPU1]	= "cpu1",
-+	[TEGRA_POWERGATE_CPU2]	= "cpu2",
-+	[TEGRA_POWERGATE_CPU3]	= "cpu3",
-+	[TEGRA_POWERGATE_CELP]	= "celp",
-+	[TEGRA_POWERGATE_3D1]	= "3d1",
-+};
-+
- static int powergate_show(struct seq_file *s, void *data)
- {
- 	int i;
-@@ -238,10 +257,21 @@ int __init tegra_powergate_debugfs_init(void)
- {
- 	struct dentry *d;
- 
--	d = debugfs_create_file("powergate", S_IRUGO, NULL, NULL,
--		&powergate_fops);
--	if (!d)
--		return -ENOMEM;
-+	switch (tegra_chip_id) {
-+	case TEGRA20:
-+		powergate_name = powergate_name_t20;
-+		break;
-+	case TEGRA30:
-+		powergate_name = powergate_name_t30;
-+		break;
-+	}
-+
-+	if (powergate_name) {
-+		d = debugfs_create_file("powergate", S_IRUGO, NULL, NULL,
-+			&powergate_fops);
-+		if (!d)
-+			return -ENOMEM;
-+	}
- 
- 	return 0;
- }
+With the addition of omap-usb2 to perform phy configurations,
+twl6030 is made as a comparator driver to detect VBUS and ID events
+and notify it to the glue layer.
+
+Previously these patches were part of
+[PATCH v7 0/7] omap: musb: Add device tree support
+
+This patch series was developed on
+git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git xceiv
+
+Kishon Vijay Abraham I (5):
+  drivers: usb: phy: add a new driver for omap usb2 phy
+  drivers: usb: otg: make twl6030_usb as a comparator driver to
+    omap_usb2
+  drivers: usb: twl6030: Add dt support for twl6030 usb
+  drivers: usb: twl4030: Add device tree support for twl4030 usb
+  arm: omap: phy: remove unused functions from omap-phy-internal.c
+
+ .../devicetree/bindings/usb/twlxxxx-usb.txt        |   40 +++
+ Documentation/devicetree/bindings/usb/usb-phy.txt  |   17 ++
+ arch/arm/mach-omap2/omap_phy_internal.c            |  138 ----------
+ arch/arm/mach-omap2/twl-common.c                   |    5 -
+ arch/arm/mach-omap2/usb-musb.c                     |    3 -
+ drivers/usb/otg/Kconfig                            |    2 +-
+ drivers/usb/otg/twl4030-usb.c                      |   26 +-
+ drivers/usb/otg/twl6030-usb.c                      |  157 ++++--------
+ drivers/usb/phy/Kconfig                            |    9 +
+ drivers/usb/phy/Makefile                           |    1 +
+ drivers/usb/phy/omap-usb2.c                        |  271 ++++++++++++++++++++
+ include/linux/usb/omap_usb.h                       |   46 ++++
+ include/linux/usb/phy_companion.h                  |   34 +++
+ 13 files changed, 483 insertions(+), 266 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/twlxxxx-usb.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/usb-phy.txt
+ create mode 100644 drivers/usb/phy/omap-usb2.c
+ create mode 100644 include/linux/usb/omap_usb.h
+ create mode 100644 include/linux/usb/phy_companion.h
+
 -- 
-1.7.7.rc0.72.g4b5ea.dirty
+1.7.9.5
