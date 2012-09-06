@@ -1,73 +1,47 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 06 Sep 2012 14:53:00 +0530
-Subject: [PATCH 1/2] i2c: s3c2410: add optional pin configuration using pinctrl
- interface
+Date: Thu, 06 Sep 2012 14:53:01 +0530
+Subject: [PATCH 2/2] ARM: dts: exynos4: allow i2c0 bus to be configured using
+ pinctrl interface
 In-Reply-To: <1346923381-14144-1-git-send-email-thomas.abraham@linaro.org>
 References: <1346923381-14144-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1346923381-14144-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1346923381-14144-3-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add optional support for i2c bus pin configuration using pinctrl interface
+Add a default pin state for i2c0 controller which the pinctrl interface can
+use to setup the i2c0 bus.
 
-Cc: Ben Dooks <ben-linux@fluff.org>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- drivers/i2c/busses/i2c-s3c2410.c |   19 ++++++++++++++++---
- 1 files changed, 16 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/exynos4210-smdkv310.dts |    2 --
+ arch/arm/boot/dts/exynos4210.dtsi         |    2 ++
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index 5ae3b02..f4b2d6f 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -38,6 +38,7 @@
- #include <linux/io.h>
- #include <linux/of_i2c.h>
- #include <linux/of_gpio.h>
-+#include <linux/pinctrl/consumer.h>
+diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+index 1beccc8..ea76542 100644
+--- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
++++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+@@ -126,8 +126,6 @@
+ 		#size-cells = <0>;
+ 		samsung,i2c-sda-delay = <100>;
+ 		samsung,i2c-max-bus-freq = <20000>;
+-		gpios = <&gpd1 0 2 3 0>,
+-			<&gpd1 1 2 3 0>;
  
- #include <asm/irq.h>
+ 		eeprom at 50 {
+ 			compatible = "samsung,24ad0xd1";
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index a4bd0c9..e08387f 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -157,6 +157,8 @@
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x13860000 0x100>;
+ 		interrupts = <0 58 0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c0_bus>;
+ 	};
  
-@@ -83,6 +84,8 @@ struct s3c24xx_i2c {
- 
- 	struct s3c2410_platform_i2c	*pdata;
- 	int			gpios[2];
-+	struct pinctrl		*pctrl;
-+	struct pinctrl_state	*pctrl_state;
- #ifdef CONFIG_CPU_FREQ
- 	struct notifier_block	freq_transition;
- #endif
-@@ -859,11 +862,17 @@ static int s3c24xx_i2c_init(struct s3c24xx_i2c *i2c)
- 
- 	/* inititalise the gpio */
- 
--	if (pdata->cfg_gpio)
-+	if (pdata->cfg_gpio) {
- 		pdata->cfg_gpio(to_platform_device(i2c->dev));
--	else
--		if (s3c24xx_i2c_parse_dt_gpio(i2c))
-+	} else if (!IS_ERR_OR_NULL(i2c->pctrl) &&
-+			!IS_ERR_OR_NULL(i2c->pctrl_state)) {
-+		if (pinctrl_select_state(i2c->pctrl, i2c->pctrl_state)) {
-+			dev_err(i2c->dev, "failed to configure io-pins\n");
-+			return -ENXIO;
-+		}
-+	} else if (s3c24xx_i2c_parse_dt_gpio(i2c)) {
- 			return -EINVAL;
-+	}
- 
- 	/* write slave address */
- 
-@@ -1013,6 +1022,10 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
- 	i2c->adap.algo_data = i2c;
- 	i2c->adap.dev.parent = &pdev->dev;
- 
-+	i2c->pctrl = devm_pinctrl_get(i2c->dev);
-+	if (!IS_ERR_OR_NULL(i2c->pctrl))
-+		i2c->pctrl_state = pinctrl_lookup_state(i2c->pctrl, "default");
-+
- 	/* initialise the i2c controller */
- 
- 	ret = s3c24xx_i2c_init(i2c);
+ 	i2c at 13870000 {
 -- 
 1.6.6.rc2
