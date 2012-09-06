@@ -1,79 +1,47 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu,  6 Sep 2012 15:12:11 +0300
-Subject: [PATCH v3 04/14] MFD: twl-core: Add API to query the HFCLK rate
+Date: Thu,  6 Sep 2012 15:12:08 +0300
+Subject: [PATCH v3 01/14] MFD: twl4030-audio: Clean up MODULE_* and
+ platform_driver part
 In-Reply-To: <1346933541-21547-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1346933541-21547-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1346933541-21547-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1346933541-21547-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CFG_BOOT register's HFCLK_FREQ field hold information about the used HFCLK
-frequency.
-Add possibility for users to get the configured rate based on this
-register.
-This register was configured during boot, without it the chip would not
-operate correctly, so we can trust on this information.
+Place the MODULE_* lines in the same block and add MODULE_DESCRIPTION.
+Rearange the platform_driver structure at the same time.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/mfd/twl-core.c  | 32 ++++++++++++++++++++++++++++++++
- include/linux/i2c/twl.h |  1 +
- 2 files changed, 33 insertions(+)
+ drivers/mfd/twl4030-audio.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
-index 1c32afe..f162b68 100644
---- a/drivers/mfd/twl-core.c
-+++ b/drivers/mfd/twl-core.c
-@@ -552,6 +552,38 @@ int twl_get_version(void)
+diff --git a/drivers/mfd/twl4030-audio.c b/drivers/mfd/twl4030-audio.c
+index 838ce4e..ac04b4f 100644
+--- a/drivers/mfd/twl4030-audio.c
++++ b/drivers/mfd/twl4030-audio.c
+@@ -250,18 +250,18 @@ static int __devexit twl4030_audio_remove(struct platform_device *pdev)
+ 	return 0;
  }
- EXPORT_SYMBOL_GPL(twl_get_version);
  
-+/**
-+ * twl_get_hfclk_rate - API to get TWL external HFCLK clock rate.
-+ *
-+ * Api to get the TWL HFCLK rate based on BOOT_CFG register.
-+ */
-+int twl_get_hfclk_rate(void)
-+{
-+	u8 ctrl;
-+	int rate;
-+
-+	twl_i2c_read_u8(TWL_MODULE_PM_MASTER, &ctrl, R_CFG_BOOT);
-+
-+	switch (ctrl & 0x3) {
-+	case HFCLK_FREQ_19p2_MHZ:
-+		rate = 19200000;
-+		break;
-+	case HFCLK_FREQ_26_MHZ:
-+		rate = 26000000;
-+		break;
-+	case HFCLK_FREQ_38p4_MHZ:
-+		rate = 38400000;
-+		break;
-+	default:
-+		pr_err("TWL4030: HFCLK is not configured\n");
-+		rate = -EINVAL;
-+		break;
-+	}
-+
-+	return rate;
-+}
-+EXPORT_SYMBOL_GPL(twl_get_hfclk_rate);
-+
- static struct device *
- add_numbered_child(unsigned chip, const char *name, int num,
- 		void *pdata, unsigned pdata_len,
-diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
-index 7ea898c..ac6488c 100644
---- a/include/linux/i2c/twl.h
-+++ b/include/linux/i2c/twl.h
-@@ -188,6 +188,7 @@ int twl_i2c_read(u8 mod_no, u8 *value, u8 reg, unsigned num_bytes);
+-MODULE_ALIAS("platform:twl4030-audio");
+-
+ static struct platform_driver twl4030_audio_driver = {
+-	.probe		= twl4030_audio_probe,
+-	.remove		= __devexit_p(twl4030_audio_remove),
+ 	.driver		= {
+ 		.owner	= THIS_MODULE,
+ 		.name	= "twl4030-audio",
+ 	},
++	.probe		= twl4030_audio_probe,
++	.remove		= __devexit_p(twl4030_audio_remove),
+ };
  
- int twl_get_type(void);
- int twl_get_version(void);
-+int twl_get_hfclk_rate(void);
+ module_platform_driver(twl4030_audio_driver);
  
- int twl6030_interrupt_unmask(u8 bit_mask, u8 offset);
- int twl6030_interrupt_mask(u8 bit_mask, u8 offset);
+ MODULE_AUTHOR("Peter Ujfalusi <peter.ujfalusi@ti.com>");
++MODULE_DESCRIPTION("TWL4030 audio block MFD driver");
+ MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:twl4030-audio");
 -- 
 1.7.12
