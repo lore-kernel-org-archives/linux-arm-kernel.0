@@ -1,27 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 6 Sep 2012 12:38:47 -0300
-Subject: DTS support for the Iomega ix2-200
-In-Reply-To: <CADhrpJ4p4U2f6uj+uDQg0f0yGaOodAyBTLhBJQeWKCn-vSkY3w@mail.gmail.com>
-References: <CADhrpJ4p4U2f6uj+uDQg0f0yGaOodAyBTLhBJQeWKCn-vSkY3w@mail.gmail.com>
-Message-ID: <CAOMZO5Bp4NcaZZ8bsny5CM-o8JQnyWQkkEEimY18vjUhZMmBpA@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 6 Sep 2012 08:43:45 -0700
+Subject: [PATCH] ARM: EXYNOS: no duplicate mask/unmask in eint0_15
+In-Reply-To: <1346944864-12434-1-git-send-email-djkurtz@chromium.org>
+References: <1346944864-12434-1-git-send-email-djkurtz@chromium.org>
+Message-ID: <CAD=FV=UTa4a8wewEdqu=ZnOKe-M5Brv-ex8ZGWfkTb6fqsRB_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2012 at 9:46 AM, alan butler <alanbutty12@gmail.com> wrote:
-
-> I have created a dts file and a board config and made the appropriate
-> changes to build
-> the support into the kernel but when i try to boot the kernel it just stops
-> at the following
-> line:
+On Thu, Sep 6, 2012 at 8:21 AM, Daniel Kurtz <djkurtz@chromium.org> wrote:
+> chained_irq_enter/exit() already mask&ack/unmask the chained interrupt.
+> There is no need to also explicitly do it in the handler.
 >
-> turn off boot console earlycon0
+> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+> ---
+>  arch/arm/mach-exynos/common.c |    7 -------
+>  1 files changed, 0 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+> index 4eb39cd..0a85aec 100644
+> --- a/arch/arm/mach-exynos/common.c
+> +++ b/arch/arm/mach-exynos/common.c
+> @@ -965,14 +965,7 @@ static void exynos_irq_eint0_15(unsigned int irq, struct irq_desc *desc)
+>         struct irq_chip *chip = irq_get_chip(irq);
+>
+>         chained_irq_enter(chip, desc);
+> -       chip->irq_mask(&desc->irq_data);
+> -
+> -       if (chip->irq_ack)
+> -               chip->irq_ack(&desc->irq_data);
+> -
+>         generic_handle_irq(*irq_data);
+> -
+> -       chip->irq_unmask(&desc->irq_data);
+>         chained_irq_exit(chip, desc);
+>  }
+>
+> --
+> 1.7.7.3
+>
 
-Not sure if is is the same issue, but I got the same message sometime
-ago when booting mx31 and the reason was a missing
-pinctrl_provide_dummies():
-http://www.spinics.net/lists/arm-kernel/msg176093.html
-
-Regards,
-
-Fabio Estevam
+Acked-by: Doug Anderson <dianders@chromium.org>
