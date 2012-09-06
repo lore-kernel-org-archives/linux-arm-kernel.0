@@ -1,60 +1,102 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 6 Sep 2012 09:30:56 -0500
-Subject: [PATCH 00/10] ARM: OMAP: DMTIMER fixes and clean-up
-In-Reply-To: <50489DEB.9010709@ti.com>
-References: <1346871872-24413-1-git-send-email-jon-hunter@ti.com>
- <50489DEB.9010709@ti.com>
-Message-ID: <5048B3A0.5090108@ti.com>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Thu, 6 Sep 2012 15:34:44 +0100
+Subject: [PATCH v2 09/10] net/macb: ethtool interface: add register dump
+ feature
+In-Reply-To: <1346941256-15676-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1346888174.5325.55.camel@bwh-desktop.uk.solarflarecom.com>
+ <1346941256-15676-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1346942084.17321.22.camel@deadeye.wl.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 09/06/2012 07:58 AM, Vaibhav Hiremath wrote:
+On Thu, 2012-09-06 at 16:20 +0200, Nicolas Ferre wrote:
+> Add macb_get_regs() ethtool function and its helper function:
+> macb_get_regs_len().
+> The version field is deduced from the IP revision which gives the
+> "MACB or GEM" information. An additional version field is reserved.
 > 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Reviewed-by: Ben Hutchings <bhutchings@solarflare.com>
+> ---
+> v2: - modify MACB_GREGS_NBR name and adapt to number of registers
+>       actually displayed.
+>     - change version format to reflect register layout and
+>       add a version number to be future proof.
 > 
-> On 9/6/2012 12:34 AM, Jon Hunter wrote:
->> This series includes several fixes for the OMAP DMTIMER driver and a few
->> clean-ups to simplify some of the code. This series is based upon 3.6-rc4.
->>
->> Tested on OMAP5912 OSK, OMAP2420 H4, OMAP3430 Beagle and OMAP4430 Panda.
->> Testing includes ...
->> 1. Booting kernel on above boards
->> 2. Set date and ensuring time of day is correct after 24 hours
->> 3. Checking the timer counter is incrementing when configuring and starting
->>    a timer
->> 4. Checking the timer overflow interrupt when timer expires.
->> 5. Using different clock sources to operate the timer with.
->> 6. Running a loop test overnight that continually runs test #3 and #4 for
->>    each available timer
->>
+>  drivers/net/ethernet/cadence/macb.c |   40 +++++++++++++++++++++++++++++++++++
+>  drivers/net/ethernet/cadence/macb.h |    3 +++
+>  2 files changed, 43 insertions(+)
 > 
-> On the other hand I have validated this patch-series on both AM37xEVM
-> and BeagleBone platform. I used the test code which you shared with me
-> to validate it.
-
-Thanks!
-
-> AM33XX Clock tree needs minor change here,
-> 
-> diff --git a/arch/arm/mach-omap2/clock33xx_data.c
-> b/arch/arm/mach-omap2/clock33xx_data.c
-> index a4006b2..daa36a5 100644
-> --- a/arch/arm/mach-omap2/clock33xx_data.c
-> +++ b/arch/arm/mach-omap2/clock33xx_data.c
-> @@ -1070,6 +1070,8 @@ static struct omap_clk am33xx_clks[] = {
->         CLK(NULL,       "gfx_fck_div_ck",       &gfx_fck_div_ck,
-> CK_AM33XX),
->         CLK(NULL,       "sysclkout_pre_ck",     &sysclkout_pre_ck,
-> CK_AM33XX),
->         CLK(NULL,       "clkout2_ck",           &clkout2_ck,    CK_AM33XX),
-> +       CLK(NULL,       "timer_32k_ck",         &clkdiv32k_ick, CK_AM33XX),
-> +       CLK(NULL,       "timer_sys_ck",         &sys_clkin_ck,  CK_AM33XX),
+> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+> index dc34ff1..cab42e7 100644
+> --- a/drivers/net/ethernet/cadence/macb.c
+> +++ b/drivers/net/ethernet/cadence/macb.c
+> @@ -1223,9 +1223,49 @@ static int macb_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+>  	return phy_ethtool_sset(phydev, cmd);
+>  }
+>  
+> +static int macb_get_regs_len(struct net_device *netdev)
+> +{
+> +	return MACB_GREGS_NBR * sizeof(u32);
+> +}
+> +
+> +static void macb_get_regs(struct net_device *dev, struct ethtool_regs *regs,
+> +			  void *p)
+> +{
+> +	struct macb *bp = netdev_priv(dev);
+> +	unsigned int tail, head;
+> +	u32 *regs_buff = p;
+> +
+> +	regs->version = (macb_readl(bp, MID) & ((1 << MACB_REV_SIZE) - 1))
+> +			| MACB_GREGS_VERSION;
+> +
+> +	tail = macb_tx_ring_wrap(bp->tx_tail);
+> +	head = macb_tx_ring_wrap(bp->tx_head);
+> +
+> +	regs_buff[0]  = macb_readl(bp, NCR);
+> +	regs_buff[1]  = macb_or_gem_readl(bp, NCFGR);
+> +	regs_buff[2]  = macb_readl(bp, NSR);
+> +	regs_buff[3]  = macb_readl(bp, TSR);
+> +	regs_buff[4]  = macb_readl(bp, RBQP);
+> +	regs_buff[5]  = macb_readl(bp, TBQP);
+> +	regs_buff[6]  = macb_readl(bp, RSR);
+> +	regs_buff[7]  = macb_readl(bp, IMR);
+> +
+> +	regs_buff[8]  = tail;
+> +	regs_buff[9]  = head;
+> +	regs_buff[10] = macb_tx_dma(bp, tail);
+> +	regs_buff[11] = macb_tx_dma(bp, head);
+> +
+> +	if (macb_is_gem(bp)) {
+> +		regs_buff[12] = gem_readl(bp, USRIO);
+> +		regs_buff[13] = gem_readl(bp, DMACFG);
+> +	}
+> +}
+> +
+>  static const struct ethtool_ops macb_ethtool_ops = {
+>  	.get_settings		= macb_get_settings,
+>  	.set_settings		= macb_set_settings,
+> +	.get_regs_len		= macb_get_regs_len,
+> +	.get_regs		= macb_get_regs,
+>  	.get_link		= ethtool_op_get_link,
 >  };
-> 
->  int __init am33xx_clk_init(void)
+>  
+> diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
+> index f69ceef..bcadc3c 100644
+> --- a/drivers/net/ethernet/cadence/macb.h
+> +++ b/drivers/net/ethernet/cadence/macb.h
+> @@ -10,6 +10,9 @@
+>  #ifndef _MACB_H
+>  #define _MACB_H
+>  
+> +#define MACB_GREGS_NBR 16
+> +#define MACB_GREGS_VERSION 1
+> +
+>  /* MACB register offsets */
+>  #define MACB_NCR				0x0000
+>  #define MACB_NCFGR				0x0004
 
-Ok, do you plan to submit this? If I need to do a V2 of this series, I
-can include this one too.
-
-Cheers
-Jon
+-- 
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
