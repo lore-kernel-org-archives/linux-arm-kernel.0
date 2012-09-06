@@ -1,91 +1,301 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu,  6 Sep 2012 14:42:40 -0500
-Subject: [PATCH v2 3/6] ARM: pxa: use gpio_to_irq for sharppm_sl
+Date: Thu,  6 Sep 2012 14:42:41 -0500
+Subject: [PATCH v2 4/6] ARM: shmobile: move custom gpio functions to sh-gpio.h
 In-Reply-To: <1346960563-18689-1-git-send-email-robherring2@gmail.com>
 References: <1346960563-18689-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1346960563-18689-4-git-send-email-robherring2@gmail.com>
+Message-ID: <1346960563-18689-5-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Replace custom PXA_GPIO_TO_IRQ macro with standard gpio_to_irq.
+Move custom shmobile gpio code to a sh-gpio.h to remove the dependency
+on mach/gpio.h. shmobile always uses gpiolib, so we can remove
+__GPIOLIB_COMPLEX define from mach/gpio.h.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Paul Mundt <lethal@linux-sh.org>
+Cc: Magnus Damm <magnus.damm@gmail.com>
 ---
- arch/arm/mach-pxa/sharpsl_pm.c |   30 +++++++++++++++++-------------
- 1 file changed, 17 insertions(+), 13 deletions(-)
+ arch/arm/mach-shmobile/board-ap4evb.c          |    2 +
+ arch/arm/mach-shmobile/board-armadillo800eva.c |    2 +
+ arch/arm/mach-shmobile/board-g4evm.c           |    2 +
+ arch/arm/mach-shmobile/board-mackerel.c        |    2 +
+ arch/arm/mach-shmobile/include/mach/gpio.h     |   63 +-----------------------
+ arch/arm/mach-shmobile/pfc-r8a7740.c           |    2 +-
+ arch/arm/mach-shmobile/pfc-r8a7779.c           |    2 +-
+ arch/arm/mach-shmobile/pfc-sh7367.c            |    2 +-
+ arch/arm/mach-shmobile/pfc-sh7372.c            |    2 +-
+ arch/arm/mach-shmobile/pfc-sh7377.c            |    2 +-
+ arch/arm/mach-shmobile/pfc-sh73a0.c            |    2 +-
+ arch/arm/mach-shmobile/sh-gpio.h               |   48 ++++++++++++++++++
+ drivers/sh/pfc/gpio.c                          |    1 +
+ 13 files changed, 64 insertions(+), 68 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/sh-gpio.h
 
-diff --git a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
-index bdf4cb8..9a154ba 100644
---- a/arch/arm/mach-pxa/sharpsl_pm.c
-+++ b/arch/arm/mach-pxa/sharpsl_pm.c
-@@ -879,7 +879,7 @@ static const struct platform_suspend_ops sharpsl_pm_ops = {
+diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
+index f172ca8..c7f164e 100644
+--- a/arch/arm/mach-shmobile/board-ap4evb.c
++++ b/arch/arm/mach-shmobile/board-ap4evb.c
+@@ -66,6 +66,8 @@
+ #include <asm/mach/arch.h>
+ #include <asm/setup.h>
  
- static int __devinit sharpsl_pm_probe(struct platform_device *pdev)
- {
--	int ret;
-+	int ret, irq;
++#include "sh-gpio.h"
++
+ /*
+  * Address	Interface		BusWidth	note
+  * ------------------------------------------------------------------
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index cf10f92..15ffb4c 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -54,6 +54,8 @@
+ #include <sound/sh_fsi.h>
+ #include <sound/simple_card.h>
  
- 	if (!pdev->dev.platform_data)
- 		return -EINVAL;
-@@ -907,24 +907,28 @@ static int __devinit sharpsl_pm_probe(struct platform_device *pdev)
- 	gpio_direction_input(sharpsl_pm.machinfo->gpio_batlock);
++#include "sh-gpio.h"
++
+ /*
+  * CON1		Camera Module
+  * CON2		Extension Bus
+diff --git a/arch/arm/mach-shmobile/board-g4evm.c b/arch/arm/mach-shmobile/board-g4evm.c
+index fa5dfc5..eeee12e 100644
+--- a/arch/arm/mach-shmobile/board-g4evm.c
++++ b/arch/arm/mach-shmobile/board-g4evm.c
+@@ -42,6 +42,8 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
  
- 	/* Register interrupt handlers */
--	if (request_irq(PXA_GPIO_TO_IRQ(sharpsl_pm.machinfo->gpio_acin), sharpsl_ac_isr, IRQF_DISABLED | IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING, "AC Input Detect", sharpsl_ac_isr)) {
--		dev_err(sharpsl_pm.dev, "Could not get irq %d.\n", PXA_GPIO_TO_IRQ(sharpsl_pm.machinfo->gpio_acin));
-+	irq = gpio_to_irq(sharpsl_pm.machinfo->gpio_acin);
-+	if (request_irq(irq, sharpsl_ac_isr, IRQF_DISABLED | IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING, "AC Input Detect", sharpsl_ac_isr)) {
-+		dev_err(sharpsl_pm.dev, "Could not get irq %d.\n", irq);
- 	}
++#include "sh-gpio.h"
++
+ /*
+  * SDHI
+  *
+diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
+index 7ea2b31..7654404 100644
+--- a/arch/arm/mach-shmobile/board-mackerel.c
++++ b/arch/arm/mach-shmobile/board-mackerel.c
+@@ -64,6 +64,8 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
  
--	if (request_irq(PXA_GPIO_TO_IRQ(sharpsl_pm.machinfo->gpio_batlock), sharpsl_fatal_isr, IRQF_DISABLED | IRQF_TRIGGER_FALLING, "Battery Cover", sharpsl_fatal_isr)) {
--		dev_err(sharpsl_pm.dev, "Could not get irq %d.\n", PXA_GPIO_TO_IRQ(sharpsl_pm.machinfo->gpio_batlock));
-+	irq = gpio_to_irq(sharpsl_pm.machinfo->gpio_batlock);
-+	if (request_irq(irq, sharpsl_fatal_isr, IRQF_DISABLED | IRQF_TRIGGER_FALLING, "Battery Cover", sharpsl_fatal_isr)) {
-+		dev_err(sharpsl_pm.dev, "Could not get irq %d.\n", irq);
- 	}
++#include "sh-gpio.h"
++
+ /*
+  * Address	Interface		BusWidth	note
+  * ------------------------------------------------------------------
+diff --git a/arch/arm/mach-shmobile/include/mach/gpio.h b/arch/arm/mach-shmobile/include/mach/gpio.h
+index 844507d..40a8c17 100644
+--- a/arch/arm/mach-shmobile/include/mach/gpio.h
++++ b/arch/arm/mach-shmobile/include/mach/gpio.h
+@@ -1,62 +1 @@
+-/*
+- * Generic GPIO API and pinmux table support
+- *
+- * Copyright (c) 2008  Magnus Damm
+- *
+- * This file is subject to the terms and conditions of the GNU General Public
+- * License.  See the file "COPYING" in the main directory of this archive
+- * for more details.
+- */
+-#ifndef __ASM_ARCH_GPIO_H
+-#define __ASM_ARCH_GPIO_H
+-
+-#include <linux/kernel.h>
+-#include <linux/errno.h>
+-#include <linux/sh_pfc.h>
+-#include <linux/io.h>
+-
+-#ifdef CONFIG_GPIOLIB
+-
+-static inline int irq_to_gpio(unsigned int irq)
+-{
+-	return -ENOSYS;
+-}
+-
+-#else
+-
+-#define __ARM_GPIOLIB_COMPLEX
+-
+-#endif /* CONFIG_GPIOLIB */
+-
+-/*
+- * FIXME !!
+- *
+- * current gpio frame work doesn't have
+- * the method to control only pull up/down/free.
+- * this function should be replaced by correct gpio function
+- */
+-static inline void __init gpio_direction_none(u32 addr)
+-{
+-	__raw_writeb(0x00, addr);
+-}
+-
+-static inline void __init gpio_request_pullup(u32 addr)
+-{
+-	u8 data = __raw_readb(addr);
+-
+-	data &= 0x0F;
+-	data |= 0xC0;
+-	__raw_writeb(data, addr);
+-}
+-
+-static inline void __init gpio_request_pulldown(u32 addr)
+-{
+-	u8 data = __raw_readb(addr);
+-
+-	data &= 0x0F;
+-	data |= 0xA0;
+-
+-	__raw_writeb(data, addr);
+-}
+-
+-#endif /* __ASM_ARCH_GPIO_H */
++/* empty */
+diff --git a/arch/arm/mach-shmobile/pfc-r8a7740.c b/arch/arm/mach-shmobile/pfc-r8a7740.c
+index ce9e7fa..134d1b9 100644
+--- a/arch/arm/mach-shmobile/pfc-r8a7740.c
++++ b/arch/arm/mach-shmobile/pfc-r8a7740.c
+@@ -20,7 +20,7 @@
+  */
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+-#include <linux/gpio.h>
++#include <linux/sh_pfc.h>
+ #include <mach/r8a7740.h>
+ #include <mach/irqs.h>
  
- 	if (sharpsl_pm.machinfo->gpio_fatal) {
--		if (request_irq(PXA_GPIO_TO_IRQ(sharpsl_pm.machinfo->gpio_fatal), sharpsl_fatal_isr, IRQF_DISABLED | IRQF_TRIGGER_FALLING, "Fatal Battery", sharpsl_fatal_isr)) {
--			dev_err(sharpsl_pm.dev, "Could not get irq %d.\n", PXA_GPIO_TO_IRQ(sharpsl_pm.machinfo->gpio_fatal));
-+		irq = gpio_to_irq(sharpsl_pm.machinfo->gpio_fatal);
-+		if (request_irq(irq, sharpsl_fatal_isr, IRQF_DISABLED | IRQF_TRIGGER_FALLING, "Fatal Battery", sharpsl_fatal_isr)) {
-+			dev_err(sharpsl_pm.dev, "Could not get irq %d.\n", irq);
- 		}
- 	}
+diff --git a/arch/arm/mach-shmobile/pfc-r8a7779.c b/arch/arm/mach-shmobile/pfc-r8a7779.c
+index d14c9b0..cbc26ba 100644
+--- a/arch/arm/mach-shmobile/pfc-r8a7779.c
++++ b/arch/arm/mach-shmobile/pfc-r8a7779.c
+@@ -19,7 +19,7 @@
+  */
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+-#include <linux/gpio.h>
++#include <linux/sh_pfc.h>
+ #include <linux/ioport.h>
+ #include <mach/r8a7779.h>
  
- 	if (sharpsl_pm.machinfo->batfull_irq) {
- 		/* Register interrupt handler. */
--		if (request_irq(PXA_GPIO_TO_IRQ(sharpsl_pm.machinfo->gpio_batfull), sharpsl_chrg_full_isr, IRQF_DISABLED | IRQF_TRIGGER_RISING, "CO", sharpsl_chrg_full_isr)) {
--			dev_err(sharpsl_pm.dev, "Could not get irq %d.\n", PXA_GPIO_TO_IRQ(sharpsl_pm.machinfo->gpio_batfull));
-+		irq = gpio_to_irq(sharpsl_pm.machinfo->gpio_batfull);
-+		if (request_irq(irq, sharpsl_chrg_full_isr, IRQF_DISABLED | IRQF_TRIGGER_RISING, "CO", sharpsl_chrg_full_isr)) {
-+			dev_err(sharpsl_pm.dev, "Could not get irq %d.\n", irq);
- 		}
- 	}
+diff --git a/arch/arm/mach-shmobile/pfc-sh7367.c b/arch/arm/mach-shmobile/pfc-sh7367.c
+index e6e5246..c0c137f 100644
+--- a/arch/arm/mach-shmobile/pfc-sh7367.c
++++ b/arch/arm/mach-shmobile/pfc-sh7367.c
+@@ -18,7 +18,7 @@
+  */
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+-#include <linux/gpio.h>
++#include <linux/sh_pfc.h>
+ #include <mach/sh7367.h>
  
-@@ -953,14 +957,14 @@ static int sharpsl_pm_remove(struct platform_device *pdev)
+ #define CPU_ALL_PORT(fn, pfx, sfx)				\
+diff --git a/arch/arm/mach-shmobile/pfc-sh7372.c b/arch/arm/mach-shmobile/pfc-sh7372.c
+index 336093f9..7a1525f 100644
+--- a/arch/arm/mach-shmobile/pfc-sh7372.c
++++ b/arch/arm/mach-shmobile/pfc-sh7372.c
+@@ -22,7 +22,7 @@
+  */
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+-#include <linux/gpio.h>
++#include <linux/sh_pfc.h>
+ #include <mach/irqs.h>
+ #include <mach/sh7372.h>
  
- 	led_trigger_unregister_simple(sharpsl_charge_led_trigger);
+diff --git a/arch/arm/mach-shmobile/pfc-sh7377.c b/arch/arm/mach-shmobile/pfc-sh7377.c
+index 2f10511..f3117f6 100644
+--- a/arch/arm/mach-shmobile/pfc-sh7377.c
++++ b/arch/arm/mach-shmobile/pfc-sh7377.c
+@@ -19,7 +19,7 @@
+  */
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+-#include <linux/gpio.h>
++#include <linux/sh_pfc.h>
+ #include <mach/sh7377.h>
  
--	free_irq(PXA_GPIO_TO_IRQ(sharpsl_pm.machinfo->gpio_acin), sharpsl_ac_isr);
--	free_irq(PXA_GPIO_TO_IRQ(sharpsl_pm.machinfo->gpio_batlock), sharpsl_fatal_isr);
-+	free_irq(gpio_to_irq(sharpsl_pm.machinfo->gpio_acin), sharpsl_ac_isr);
-+	free_irq(gpio_to_irq(sharpsl_pm.machinfo->gpio_batlock), sharpsl_fatal_isr);
+ #define CPU_ALL_PORT(fn, pfx, sfx)				\
+diff --git a/arch/arm/mach-shmobile/pfc-sh73a0.c b/arch/arm/mach-shmobile/pfc-sh73a0.c
+index 4a547b8..b442f9d 100644
+--- a/arch/arm/mach-shmobile/pfc-sh73a0.c
++++ b/arch/arm/mach-shmobile/pfc-sh73a0.c
+@@ -20,7 +20,7 @@
+  */
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+-#include <linux/gpio.h>
++#include <linux/sh_pfc.h>
+ #include <mach/sh73a0.h>
+ #include <mach/irqs.h>
  
- 	if (sharpsl_pm.machinfo->gpio_fatal)
--		free_irq(PXA_GPIO_TO_IRQ(sharpsl_pm.machinfo->gpio_fatal), sharpsl_fatal_isr);
-+		free_irq(gpio_to_irq(sharpsl_pm.machinfo->gpio_fatal), sharpsl_fatal_isr);
+diff --git a/arch/arm/mach-shmobile/sh-gpio.h b/arch/arm/mach-shmobile/sh-gpio.h
+new file mode 100644
+index 0000000..7ba1877
+--- /dev/null
++++ b/arch/arm/mach-shmobile/sh-gpio.h
+@@ -0,0 +1,48 @@
++/*
++ * Generic GPIO API and pinmux table support
++ *
++ * Copyright (c) 2008  Magnus Damm
++ *
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ */
++#ifndef __ASM_ARCH_GPIO_H
++#define __ASM_ARCH_GPIO_H
++
++#include <linux/kernel.h>
++#include <linux/errno.h>
++#include <linux/io.h>
++
++/*
++ * FIXME !!
++ *
++ * current gpio frame work doesn't have
++ * the method to control only pull up/down/free.
++ * this function should be replaced by correct gpio function
++ */
++static inline void __init gpio_direction_none(u32 addr)
++{
++	__raw_writeb(0x00, addr);
++}
++
++static inline void __init gpio_request_pullup(u32 addr)
++{
++	u8 data = __raw_readb(addr);
++
++	data &= 0x0F;
++	data |= 0xC0;
++	__raw_writeb(data, addr);
++}
++
++static inline void __init gpio_request_pulldown(u32 addr)
++{
++	u8 data = __raw_readb(addr);
++
++	data &= 0x0F;
++	data |= 0xA0;
++
++	__raw_writeb(data, addr);
++}
++
++#endif /* __ASM_ARCH_GPIO_H */
+diff --git a/drivers/sh/pfc/gpio.c b/drivers/sh/pfc/gpio.c
+index 62bca98..038fa07 100644
+--- a/drivers/sh/pfc/gpio.c
++++ b/drivers/sh/pfc/gpio.c
+@@ -17,6 +17,7 @@
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/pinctrl/consumer.h>
++#include <linux/sh_pfc.h>
  
- 	if (sharpsl_pm.machinfo->batfull_irq)
--		free_irq(PXA_GPIO_TO_IRQ(sharpsl_pm.machinfo->gpio_batfull), sharpsl_chrg_full_isr);
-+		free_irq(gpio_to_irq(sharpsl_pm.machinfo->gpio_batfull), sharpsl_chrg_full_isr);
- 
- 	gpio_free(sharpsl_pm.machinfo->gpio_batlock);
- 	gpio_free(sharpsl_pm.machinfo->gpio_batfull);
+ struct sh_pfc_chip {
+ 	struct sh_pfc		*pfc;
 -- 
 1.7.9.5
