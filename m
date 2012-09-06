@@ -1,59 +1,113 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Thu, 6 Sep 2012 21:04:58 +0530
-Subject: [PATCH 1/3] arm: omap: hwmod: add a new addr space in otg for
- writing to control module
-In-Reply-To: <1346943331-18120-2-git-send-email-kishon@ti.com>
-References: <1346943331-18120-1-git-send-email-kishon@ti.com>
- <1346943331-18120-2-git-send-email-kishon@ti.com>
-Message-ID: <5048C2A2.2020104@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 06 Sep 2012 10:35:49 -0500
+Subject: [PATCH 4/6 v2] ARM: integrator: initial device tree support
+In-Reply-To: <CACRpkdYy2CZXXA+kkEaOTznaucxXEwiwSn-5ux0ByHjXrsm-2A@mail.gmail.com>
+References: <1346471760-23993-1-git-send-email-linus.walleij@linaro.org>
+ <1346471760-23993-2-git-send-email-linus.walleij@linaro.org>
+ <1346471760-23993-3-git-send-email-linus.walleij@linaro.org>
+ <1346471760-23993-4-git-send-email-linus.walleij@linaro.org>
+ <5043E4BE.1060508@gmail.com>
+ <CACRpkdbTRCUnx1JjCQ+WT4PoxtDG38MP=ctUp6TBPd64xQ39jw@mail.gmail.com>
+ <5048A31E.2090704@gmail.com>
+ <CACRpkdYy2CZXXA+kkEaOTznaucxXEwiwSn-5ux0ByHjXrsm-2A@mail.gmail.com>
+Message-ID: <5048C2D5.1020808@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 9/6/2012 8:25 PM, Kishon Vijay Abraham I wrote:
-> The mailbox register for usb otg in omap is present in control module.
-> On detection of any events VBUS or ID, this register should be written
-> to send the notification to musb core.
+On 09/06/2012 08:56 AM, Linus Walleij wrote:
+> On Thu, Sep 6, 2012 at 3:20 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> [Me]
+>>> I can of course skip the aliases and go for the timer nodes
+>>> I want directly, but that isn't any helpful for people reading the
+>>> device tree, is it?
+>>
+>> Well, the dts doesn't really need to describe how Linux is using things.
 > 
-> Till we have a separate control module driver to write to control module,
-> omap2430 will handle the register writes to control module by itself. So
-> a new address space to represent this control module register is added
-> to usb_otg_hs.
+> The arm,integrator-clocksource and arm,integrator-clockevent
+> are renamed arm,timer-primary and arm,timer-secondary in the
+> last patch set.
 > 
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    5 +++++
->  1 file changed, 5 insertions(+)
+> Are you OK with this for now, going forward? I'd be happy to
+> take a round refactoring it for the next cycle as outlined
+> below.
 > 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index 242aee4..02341bc 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -5890,6 +5890,11 @@ static struct omap_hwmod_addr_space omap44xx_usb_otg_hs_addrs[] = {
->  		.pa_end		= 0x4a0ab003,
->  		.flags		= ADDR_TYPE_RT
->  	},
-> +	{
-> +		.pa_start	= 0x4a00233c,
-> +		.pa_end		= 0x4a00233f,
-> +		.flags		= ADDR_TYPE_RT
-> +	},
-
-I do not have any objection/comment here, but I believe this is control
-module address space required for USB module, right?
-I am not sure this is right way of accessing control module space.
-Actually Control Module Access required for drivers is one of the
-blocking issue we have currently.
-
-Also there was some effort put up by 'Konstantine' to convert Control
-module to MFD driver, I haven't seen any further update on it. But it
-would be good to check with him.
-
-Thanks,
-Vaibhav
->  	{ }
->  };
->  
+>> I'd like to get to common DT code for sp804 so all platforms just have a
+>> call to sp804_dt_init() which does all the initialization.
 > 
+> The Integrator/AP does not have the SP804 timer, it has a
+> precursor with similar, yet different register setup. The
+> driver is in the integrator_ab. core file.
+
+Right, that was really just an example. We have the general problem that
+platforms have N timers and how do we assign them to clk source and clk
+event. I'm fine with aliases if we decide that other options have issues
+or are not worth the complexity. A "linux,X" property really needs to be
+a last resort.
+
+> (I could look into merging this SP804 ancestor into the SP804
+> driver with some flag or so, but that would be a different
+> TODO item.)
+> 
+> The Integrator/CP has the SP804 however.
+> 
+>>> Maybe primary-timer, secondary-timer is sufficiently
+>>> good and neutral aliases?
+>>
+>> That doesn't distinguish clk-event vs. clk-source. Perhaps we can use
+>> presence of interrupt to distinguish that.
+> 
+> They all have interrupts in the Integrator case so all timers
+> are equal. But I vaguely recall someone whisper bad things about
+> timer0.
+
+Then that is a "feature" of the h/w. So perhaps a "arm,timer-horked"
+should be added as a property. Certainly wouldn't be the first timer
+with that feature. :)
+
+>> It shouldn't really matter
+>> which timer Linux picks as long as the h/w has the necessary features.
+> 
+> That is true, what I've been doing so far is just a 1-to-1 mapping
+> to current usage without much massaging of the abstract resource
+> concept.
+> 
+>> We just need to make sure dts describes those features. Some of the
+>> things we have to deal with:
+>>
+>> Highbank has interrupt for timer0, but not on timer1, so timer0 must be
+>> clk-event. It also users timer1 for sched clock, but ARM Ltd platforms
+>> use a different timer.
+> 
+> So I guess this SP804? They just didn't route the IRQ line
+> I guess... :-(
+> 
+>> Realview and Versatile use timer0 for clk-event and timer3 for clk-src.
+>> Is there something broken with timer1 and timer2? It is certainly
+>> possible the h/w has the clock tied off for 1 of the 2 timers.
+> 
+> Integrator use timer2 for clockevent and timer1 for clocksource,
+> and legends tell that timer0 should be avoided. But I guess
+> I could try to find out by experience, I fear that it could work
+> but be instable so that it appears to work but in reality does not...
+> 
+>> VExpress CA9 has broken timers on the core tile (at least they were
+>> ifdef'ed out before the last clean-up). We could just remove/disable
+>> them in the dts so they are not used.
+> 
+> There is something about the DT ambition here (or for that matter
+> the boardfile ambition). On the RealView PB1176 there is
+> a broken DMA engine, we just deleted it from the resource
+> list. Other people might want to have all available resources
+> listed but marked "broken" in the DT for completeness.
+> 
+> The latter has the upside of providing hints to the next
+> engineer who would otherwise come around and ask why
+> the hardware in the refman is not listed in the DT and start
+> to try to add it and find out it is broken. Knowing it's there
+> and it's broken is encoding real knowledge at the expense
+> of a few DT bytes.
+> 
+
+Yes, saving that information somewhere is useful.
+
+Rob
