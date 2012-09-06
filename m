@@ -1,79 +1,28 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 6 Sep 2012 20:28:05 +0300
-Subject: [PATCH] arm: omap: hwmod: make *phy_48m* as the main_clk of
- ocp2scp
-In-Reply-To: <1341219337-25815-1-git-send-email-kishon@ti.com>
-References: <1341219337-25815-1-git-send-email-kishon@ti.com>
-Message-ID: <20120906172802.GD30717@arwen.pp.htv.fi>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 06 Sep 2012 11:33:55 -0600
+Subject: [PATCH v3 1/4] pinctrl: add samsung pinctrl and gpiolib driver
+In-Reply-To: <1346826046-30484-1-git-send-email-thomas.abraham@linaro.org>
+References: <226e01cd8ae6$928010b0$b7803210$%kim@samsung.com>
+ <1346826046-30484-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <5048DE83.4050203@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jul 02, 2012 at 02:25:37PM +0530, Kishon Vijay Abraham I wrote:
-> Made *ocp2scp_usb_phy_phy_48m* as the main_clk for ocp2scp.
-> Since this ocp2scp module does not have any fck but does have a
-> single opt_clock, it is added as the main_clk for ocp2scp. Also
-> removed phy_48m as the optional clock since it is now made as the
-> main clock.
-
-Just one comment here, you failed to note what good does it do from the
-driver perspective, other than that, you can add my Reviewed-by as below
-
-> Cc: Beno?t Cousson <b-cousson@ti.com>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-
-FWIW:
-
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-
-> ---
-> Changes from [RFC PATCH 1/5] arm: omap: hwmod: make *phy_48m* as the main_clk
-> of ocp2scp:
-> * Removed *ocp2scp_usb_phy_phy_48m* as the optional functional clock
+On 09/05/2012 12:20 AM, Thomas Abraham wrote:
+> Add a new device tree enabled pinctrl and gpiolib driver for Samsung
+> SoC's. This driver provides a common and extensible framework for all
+> Samsung SoC's to interface with the pinctrl and gpiolib subsystems. This
+> driver supports only device tree based instantiation and hence can be
+> used only on those Samsung platforms that have device tree enabled.
 > 
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    7 +------
->  1 files changed, 1 insertions(+), 6 deletions(-)
+> This driver is split into two parts: the pinctrl interface and the gpiolib
+> interface. The pinctrl interface registers pinctrl devices with the pinctrl
+> subsystem and gpiolib interface registers gpio chips with the gpiolib
+> subsystem. The information about the pins, pin groups, pin functions and
+> gpio chips, which are SoC specific, are parsed from device tree node.
 > 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index f30e861..17cf933 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -2504,14 +2504,11 @@ static struct omap_hwmod_class omap44xx_ocp2scp_hwmod_class = {
->  };
->  
->  /* ocp2scp_usb_phy */
-> -static struct omap_hwmod_opt_clk ocp2scp_usb_phy_opt_clks[] = {
-> -	{ .role = "phy_48m", .clk = "ocp2scp_usb_phy_phy_48m" },
-> -};
-> -
->  static struct omap_hwmod omap44xx_ocp2scp_usb_phy_hwmod = {
->  	.name		= "ocp2scp_usb_phy",
->  	.class		= &omap44xx_ocp2scp_hwmod_class,
->  	.clkdm_name	= "l3_init_clkdm",
-> +	.main_clk	= "ocp2scp_usb_phy_phy_48m",
->  	.prcm = {
->  		.omap4 = {
->  			.clkctrl_offs = OMAP4_CM_L3INIT_USBPHYOCP2SCP_CLKCTRL_OFFSET,
-> @@ -2519,8 +2516,6 @@ static struct omap_hwmod omap44xx_ocp2scp_usb_phy_hwmod = {
->  			.modulemode   = MODULEMODE_HWCTRL,
->  		},
->  	},
-> -	.opt_clks	= ocp2scp_usb_phy_opt_clks,
-> -	.opt_clks_cnt	= ARRAY_SIZE(ocp2scp_usb_phy_opt_clks),
->  };
->  
->  /*
-> -- 
-> 1.7.5.4
-> 
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120906/9eea0718/attachment.sig>
+Acked-by: Stephen Warren <swarren@nvidia.com>
