@@ -1,62 +1,43 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 6 Sep 2012 16:52:45 +0200
-Subject: [PATCH 04/10] net/macb: Fix a race in macb_start_xmit()
-In-Reply-To: <20120905.173023.2235590074897156746.davem@davemloft.net>
-References: <cover.1346775479.git.nicolas.ferre@atmel.com>
- <40f02ee50a29aaec6c949432a1bcf09f4b027181.1346775479.git.nicolas.ferre@atmel.com>
- <20120905.173023.2235590074897156746.davem@davemloft.net>
-Message-ID: <5048B8BD.3000804@atmel.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 6 Sep 2012 20:25:29 +0530
+Subject: [PATCH 1/3] arm: omap: hwmod: add a new addr space in otg for writing
+ to control module
+In-Reply-To: <1346943331-18120-1-git-send-email-kishon@ti.com>
+References: <1346943331-18120-1-git-send-email-kishon@ti.com>
+Message-ID: <1346943331-18120-2-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2012 11:30 PM, David Miller :
-> From: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Date: Wed, 5 Sep 2012 10:19:11 +0200
-> 
->> From: Havard Skinnemoen <havard@skinnemoen.net>
->>
->> Fix a race in macb_start_xmit() where we unconditionally set the TSTART bit.
->> If an underrun just happened (we do this with interrupts disabled, so it might
->> not have been handled yet), the controller starts transmitting from the first
->> entry in the ring, which is usually wrong.
->> Restart the controller after error handling.
->>
->> Signed-off-by: Havard Skinnemoen <havard@skinnemoen.net>
->> [nicolas.ferre at atmel.com: split patch in topics]
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Accumulating special case code and checks into the hot path of TX packet
-> processing is extremely unwise.
-> 
-> Instead, when you handle the TX error conditions and reset the chip you
-> should first ensure that there are no flows of control in the transmit
-> function of your driver by using the appropriate locking et al. facilities.
-> 
-> For example, you can quiesce the transmit path by handling the chip error
-> interrupt as follows:
-> 
-> 1) Disable chip interrupt generation.
-> 
-> 2) Schedule a workqueue so you can process the reset outside of hard
->    interrupt context.
-> 
-> 3) In the workqueue function, disable NAPI and perform a
->    netif_tx_disable() to guarentee there are no threads of
->    execution trying to queue up packets for TX into the driver.
-> 
-> 4) Perform your chip reset and whatever else is necessary.
-> 
-> 5) Re-enable NAPI and TX.
-> 
-> Then you don't need any special checks in your xmit method at all.
+The mailbox register for usb otg in omap is present in control module.
+On detection of any events VBUS or ID, this register should be written
+to send the notification to musb core.
 
-I see... I will rework the series and try to implement this as part of
-the "[PATCH 06/10] net/macb: better manage tx errors"
+Till we have a separate control module driver to write to control module,
+omap2430 will handle the register writes to control module by itself. So
+a new address space to represent this control module register is added
+to usb_otg_hs.
 
-So this patch will disappear in future v2 series and patch 06 will be
-seriously modified. In fact I will also try to stack "cosmetic" patches
-at the beginning of the series.
+Cc: Benoit Cousson <b-cousson@ti.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-Thanks, best regards,
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 242aee4..02341bc 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -5890,6 +5890,11 @@ static struct omap_hwmod_addr_space omap44xx_usb_otg_hs_addrs[] = {
+ 		.pa_end		= 0x4a0ab003,
+ 		.flags		= ADDR_TYPE_RT
+ 	},
++	{
++		.pa_start	= 0x4a00233c,
++		.pa_end		= 0x4a00233f,
++		.flags		= ADDR_TYPE_RT
++	},
+ 	{ }
+ };
+ 
 -- 
-Nicolas Ferre
+1.7.9.5
