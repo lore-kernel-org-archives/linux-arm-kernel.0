@@ -1,27 +1,29 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 6 Sep 2012 13:02:45 +0530
-Subject: [PATCH] cpufreq: OMAP: remove redundant loops_per_jiffy code
-In-Reply-To: <1346915424-25868-1-git-send-email-shawn.guo@linaro.org>
-References: <1346915424-25868-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAMQu2gwcBNNAPs12GqZb6rteW3AzcAxQEv51YJb+rPjuCv-QEg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 6 Sep 2012 09:35:21 +0200
+Subject: [GIT PULL] Renesas ARM-based SoC: KZM-A9-GT for 3.7 #2
+In-Reply-To: <CACRpkdZBOjO124w3WwPpL7ekf2dU1w2HCub9EG=LUxFSPn8Ayw@mail.gmail.com>
+References: <1346305648-25263-1-git-send-email-horms@verge.net.au>
+ <20120905224413.GC32084@quad.lixom.net>
+ <CACRpkdZBOjO124w3WwPpL7ekf2dU1w2HCub9EG=LUxFSPn8Ayw@mail.gmail.com>
+Message-ID: <CACRpkdaj0Jc3TKgkC6AUt-j4t+hQg5weGrceTfROHaYmW1KsBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
-
-On Thu, Sep 6, 2012 at 12:40 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> With ARM smp common code updating loops_per_jiffy in a cpufreq
-> transiton notifier call, the loops_per_jiffy code in omap-cpufreq
-> driver becomes redundant.  Remove it.
+On Thu, Sep 6, 2012 at 7:58 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Sep 6, 2012 at 12:44 AM, Olof Johansson <olof@lixom.net> wrote:
 >
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Kevin Hilman <khilman@ti.com>
-> ---
-I have acked this patch when Richard Zhao posted
-it earlier [1]. Seems to be the same patch so ack applies
-here as well.
+>> So, we can't pull in this branch with its dependency without an agreement that
+>> Linus holds a branch stable with at least the pcf857x patch on it. Linus?
+>
+> OMG! OK let's claim that it's stable now then, it's close enough
+> to the merge window.
 
-Regards
-Santosh
+Oh! And by the way, make sure you pull in the "devel" branch:
 
-[1] http://www.spinics.net/lists/cpufreq/msg02992.html
+git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git devel
+
+My "for-next" is a mixdown of fixes and devel, so the stuff that
+will really go into next merge window is on devel.
+
+Yours,
+Linus Walleij
