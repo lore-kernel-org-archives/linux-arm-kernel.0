@@ -1,64 +1,80 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  6 Sep 2012 14:48:06 +0200
-Subject: [PATCH v3] pwm i.MX: add devicetree support
-Message-ID: <1346935695-25179-1-git-send-email-s.hauer@pengutronix.de>
+Date: Thu,  6 Sep 2012 14:48:08 +0200
+Subject: [PATCH 2/9] pwm i.MX: remove unnecessary if in pwm_[en|dis]able
+In-Reply-To: <1346935695-25179-1-git-send-email-s.hauer@pengutronix.de>
+References: <1346935695-25179-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1346935695-25179-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following is the third version of the i.MX pwm series. I integrated
-the remaining comments from Shawn and Beno?t and added their tags.
+The pwm core makes sure that pwm_enable/disable are called only
+once. Still keep the enabled state since we will need it in
+pwm_config.
 
-So Thierry, please pull the attached patches. The pull request only
-contains the pwm framework specific patches, the remaining two I'd
-like to push via the arm-soc tree in case the i.MX5 also gets devicetree
-clock lookups.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+Reviewed-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+---
+ drivers/pwm/pwm-imx.c |   25 +++++++++++--------------
+ 1 file changed, 11 insertions(+), 14 deletions(-)
 
-Sascha
-
-
-Changes since v2:
-
-- check return value of clk_prepare_enable
-- remove platform based probing
-
-Changes since v1:
-
-- Add devicetree binding documentation
-- Merge 5/9 and 9/9
-- fix #pwm-cells (must be 2 instead of 3)
-- fix wrong name in MODULE_DEVICE_TABLE
-- drop platform based probing while introducing devicetree based probe
-
-
-The following changes since commit fea7a08acb13524b47711625eebea40a0ede69a0:
-
-  Linux 3.6-rc3 (2012-08-22 13:29:06 -0700)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-pwm-oftree
-
-for you to fetch changes up to 8424520ae5f2ad2c8c6cd5e990054cf06f479006:
-
-  pwm i.MX: fix clock lookup (2012-09-06 12:35:58 +0200)
-
-----------------------------------------------------------------
-This series cleans up the i.MX PWM driver and converts it to
-devicetree probing.
-
-----------------------------------------------------------------
-Philipp Zabel (2):
-      pwm i.MX: add devicetree support
-      pwm i.MX: fix clock lookup
-
-Sascha Hauer (5):
-      pwm i.MX: factor out SoC specific functions
-      pwm i.MX: remove unnecessary if in pwm_[en|dis]able
-      pwm i.MX: add functions to enable/disable pwm.
-      pwm i.MX: Use module_platform_driver
-      pwm i.MX: use per clock unconditionally
-
- Documentation/devicetree/bindings/pwm/imx-pwm.txt |   17 ++
- drivers/pwm/pwm-imx.c                             |  277 ++++++++++++++-------
- 2 files changed, 198 insertions(+), 96 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pwm/imx-pwm.txt
+diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+index 38270f4..609b540 100644
+--- a/drivers/pwm/pwm-imx.c
++++ b/drivers/pwm/pwm-imx.c
+@@ -42,7 +42,7 @@
+ struct imx_chip {
+ 	struct clk	*clk;
+ 
+-	int		clk_enabled;
++	int		enabled;
+ 	void __iomem	*mmio_base;
+ 
+ 	struct pwm_chip	chip;
+@@ -138,14 +138,15 @@ static int imx_pwm_config(struct pwm_chip *chip,
+ static int imx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
+ 	struct imx_chip *imx = to_imx_chip(chip);
+-	int rc = 0;
++	int ret;
+ 
+-	if (!imx->clk_enabled) {
+-		rc = clk_prepare_enable(imx->clk);
+-		if (!rc)
+-			imx->clk_enabled = 1;
+-	}
+-	return rc;
++	ret = clk_prepare_enable(imx->clk);
++	if (ret)
++		return ret;
++
++	imx->enabled = 1;
++
++	return 0;
+ }
+ 
+ static void imx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+@@ -154,10 +155,8 @@ static void imx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 
+ 	writel(0, imx->mmio_base + MX3_PWMCR);
+ 
+-	if (imx->clk_enabled) {
+-		clk_disable_unprepare(imx->clk);
+-		imx->clk_enabled = 0;
+-	}
++	clk_disable_unprepare(imx->clk);
++	imx->enabled = 0;
+ }
+ 
+ static struct pwm_ops imx_pwm_ops = {
+@@ -189,8 +188,6 @@ static int __devinit imx_pwm_probe(struct platform_device *pdev)
+ 	imx->chip.base = -1;
+ 	imx->chip.npwm = 1;
+ 
+-	imx->clk_enabled = 0;
+-
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (r == NULL) {
+ 		dev_err(&pdev->dev, "no memory resource defined\n");
+-- 
+1.7.10.4
