@@ -1,59 +1,129 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 6 Sep 2012 20:42:56 +0200
-Subject: [PATCH 7/9] pwm i.MX: fix clock lookup
-In-Reply-To: <996111492.3799131.1346956318651.JavaMail.root@advansee.com>
-References: <1346935695-25179-8-git-send-email-s.hauer@pengutronix.de>
- <996111492.3799131.1346956318651.JavaMail.root@advansee.com>
-Message-ID: <20120906184256.GJ26594@pengutronix.de>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Thu, 6 Sep 2012 20:56:03 +0200
+Subject: [PATCH] perf: Use pre-empt safe cpu_get/put insted of
+ smp_processor_id
+In-Reply-To: <1344607558-15481-1-git-send-email-rogerq@ti.com>
+References: <1344607558-15481-1-git-send-email-rogerq@ti.com>
+Message-ID: <CAORVsuW+Vb6+GyTDfEmW3n=FY33rk_KDiMkFHPv29ZS=Y4yuFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 08:31:58PM +0200, Beno?t Th?baudeau wrote:
-> On Thursday, September 6, 2012 2:48:13 PM, Sascha Hauer wrote:
-> > 
-> > +	int ret;
-> > +
-> > +	ret = clk_prepare_enable(imx->clk_ipg);
-> > +	if (ret)
-> > +		return ret;
-> >  
-> > -	return imx->config(chip, pwm, duty_ns, period_ns);
-> > +	ret = imx->config(chip, pwm, duty_ns, period_ns);
-> > +
-> > +	clk_disable_unprepare(imx->clk_ipg);
-> > +
-> > +	return ret;
-> >  }
-> >  
-> >  static int imx_pwm_enable(struct pwm_chip *chip, struct pwm_device
-> >  *pwm)
-> > @@ -169,7 +179,7 @@ static int imx_pwm_enable(struct pwm_chip *chip,
-> > struct pwm_device *pwm)
-> >  	struct imx_chip *imx = to_imx_chip(chip);
-> >  	int ret;
-> >  
-> > -	ret = clk_prepare_enable(imx->clk);
-> > +	ret = clk_prepare_enable(imx->clk_per);
-> >  	if (ret)
-> >  		return ret;
-> 
-> Have you tested that this actually works on i.MX53?
-> 
-> I have tested it successfully on i.MX35 (with a few additions to platform code).
-> But i.MX35 has a single bit controlling both PWM IPG and PER clock gates.
-> 
-> On i.MX53, there are 2 separate control bits for these. So, if ipg clk is
-> strictly required to access PWM registers, even if per clk is enabled, this code
-> should not work without adding
+Hi Roger,
 
-I tested this on i.MX53, but you're right, this seems to be wrong. I'll
-recheck tomorrow.
+On Fri, Aug 10, 2012 at 4:05 PM, Roger Quadros <rogerq@ti.com> wrote:
+> gets rid of below messages with CONFIG_DEBUG_PREEMPT enabled
+>
+> [   28.832916] debug_smp_processor_id: 18 callbacks suppressed
+> [   28.832946] BUG: using smp_processor_id() in preemptible [00000000] code: modprobe/1763
+> [   28.841491] caller is pwrdm_set_next_pwrst+0x54/0x120
+>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
 
-Sascha
+What his the status of the patch? Has it been reviewed and taken in an
+integration tree? I cannot find anything about it in l-o and
+linux-next.
 
+I have some changes on-going in the OMAP PM code and I would like to
+know if $SUBJECT is applicable.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Jean
+
+> ---
+>  arch/arm/mach-omap2/clock.c       |    9 ++++++---
+>  arch/arm/mach-omap2/pm34xx.c      |   12 ++++++++----
+>  arch/arm/mach-omap2/powerdomain.c |    6 ++++--
+>  3 files changed, 18 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+> index ea3f565..06747b6 100644
+> --- a/arch/arm/mach-omap2/clock.c
+> +++ b/arch/arm/mach-omap2/clock.c
+> @@ -285,7 +285,8 @@ void omap2_clk_disable(struct clk *clk)
+>         pr_debug("clock: %s: disabling in hardware\n", clk->name);
+>
+>         if (clk->ops && clk->ops->disable) {
+> -               trace_clock_disable(clk->name, 0, smp_processor_id());
+> +               trace_clock_disable(clk->name, 0, get_cpu());
+> +               put_cpu();
+>                 clk->ops->disable(clk);
+>         }
+>
+> @@ -339,7 +340,8 @@ int omap2_clk_enable(struct clk *clk)
+>         }
+>
+>         if (clk->ops && clk->ops->enable) {
+> -               trace_clock_enable(clk->name, 1, smp_processor_id());
+> +               trace_clock_enable(clk->name, 1, get_cpu());
+> +               put_cpu();
+>                 ret = clk->ops->enable(clk);
+>                 if (ret) {
+>                         WARN(1, "clock: %s: could not enable: %d\n",
+> @@ -380,7 +382,8 @@ int omap2_clk_set_rate(struct clk *clk, unsigned long rate)
+>
+>         /* dpll_ck, core_ck, virt_prcm_set; plus all clksel clocks */
+>         if (clk->set_rate) {
+> -               trace_clock_set_rate(clk->name, rate, smp_processor_id());
+> +               trace_clock_set_rate(clk->name, rate, get_cpu());
+> +               put_cpu();
+>                 ret = clk->set_rate(clk, rate);
+>         }
+>
+> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> index e4fc88c..81fec2e 100644
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -357,18 +357,22 @@ void omap_sram_idle(void)
+>
+>  static void omap3_pm_idle(void)
+>  {
+> +       unsigned cpu;
+> +
+>         local_fiq_disable();
+>
+>         if (omap_irq_pending())
+>                 goto out;
+>
+> -       trace_power_start(POWER_CSTATE, 1, smp_processor_id());
+> -       trace_cpu_idle(1, smp_processor_id());
+> +       cpu = get_cpu();
+> +       trace_power_start(POWER_CSTATE, 1, cpu);
+> +       trace_cpu_idle(1, cpu);
+>
+>         omap_sram_idle();
+>
+> -       trace_power_end(smp_processor_id());
+> -       trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
+> +       trace_power_end(cpu);
+> +       trace_cpu_idle(PWR_EVENT_EXIT, cpu);
+> +       put_cpu();
+>
+>  out:
+>         local_fiq_enable();
+> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+> index 69b36e1..138bf86 100644
+> --- a/arch/arm/mach-omap2/powerdomain.c
+> +++ b/arch/arm/mach-omap2/powerdomain.c
+> @@ -169,7 +169,8 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+>                                        ((state & OMAP_POWERSTATE_MASK) << 8) |
+>                                        ((prev & OMAP_POWERSTATE_MASK) << 0));
+>                         trace_power_domain_target(pwrdm->name, trace_state,
+> -                                                 smp_processor_id());
+> +                                                 get_cpu());
+> +                       put_cpu();
+>                 }
+>                 break;
+>         default:
+> @@ -491,7 +492,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
+>         if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
+>                 /* Trace the pwrdm desired target state */
+>                 trace_power_domain_target(pwrdm->name, pwrst,
+> -                                         smp_processor_id());
+> +                                         get_cpu());
+> +               put_cpu();
+>                 /* Program the pwrdm desired target state */
+>                 ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
+>         }
+> --
+> 1.7.4.1
+>
