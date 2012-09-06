@@ -1,24 +1,95 @@
-From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Thu, 6 Sep 2012 20:32:41 +0530
-Subject: [RFC PATCH 2/5] arm: omap: remove ocp2scp_usb_phy_ick clock node
-In-Reply-To: <1338375394-16268-3-git-send-email-kishon@ti.com>
-References: <1338375394-16268-1-git-send-email-kishon@ti.com>
- <1338375394-16268-3-git-send-email-kishon@ti.com>
-Message-ID: <CAAe_U6Ji3KbqkFcBsZ8m-oLQBHyOQfuKTz+NkaoQyxMLascU5g@mail.gmail.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Thu, 6 Sep 2012 17:12:58 +0200
+Subject: [PATCH 2/2] ARM: OMAP: hwmod: revise deassert sequence
+In-Reply-To: <1345614150-25723-3-git-send-email-omar.luna@linaro.org>
+References: <1345614150-25723-1-git-send-email-omar.luna@linaro.org>
+ <1345614150-25723-3-git-send-email-omar.luna@linaro.org>
+Message-ID: <5048BD7A.7060408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Omar,
 
-On Wed, May 30, 2012 at 4:26 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> "ocp2scp_usb_phy_ick" clock node was a fake clock node created
-> to control MODULEMODE of ocp2scp. Since the hwmod for ocp2scp is now added
-> (which can be used to control MODULEMODE) this clock node is removed.
->
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+On 08/22/2012 07:42 AM, Omar Ramirez Luna wrote:
+> For a reset sequence to complete cleanly, a module needs its
+> associated clocks to be enabled, otherwise the timeout check
+> in prcm code can print a false failure (failed to hardreset)
+> that occurs because the clocks aren't powered ON and the status
+> bit checked can't transition without them.
+> 
+> Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod.c |   37 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index eaedc33..b65e021 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -1509,6 +1509,7 @@ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
+>  {
+>  	struct omap_hwmod_rst_info ohri;
+>  	int ret = -EINVAL;
+> +	int hwsup = 0;
+>  
+>  	if (!oh)
+>  		return -EINVAL;
+> @@ -1520,10 +1521,46 @@ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
+>  	if (IS_ERR_VALUE(ret))
+>  		return ret;
+>  
+> +	if (oh->clkdm) {
+> +		/*
+> +		 * A clockdomain must be in SW_SUP otherwise reset
+> +		 * might not be completed. The clockdomain can be set
+> +		 * in HW_AUTO only when the module become ready.
+> +		 */
+> +		hwsup = clkdm_in_hwsup(oh->clkdm);
+> +		ret = clkdm_hwmod_enable(oh->clkdm, oh);
+> +		if (ret) {> 
 
-If there isn't any comments for this patch, can someone queue it up?
+> +			WARN(1, "omap_hwmod: %s: could not enable clockdomain %s: %d\n",
+> +			     oh->name, oh->clkdm->name, ret);
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	_enable_clocks(oh);
+> +	if (soc_ops.enable_module)
+> +		soc_ops.enable_module(oh);
+> +
+>  	ret = soc_ops.deassert_hardreset(oh, &ohri);
+> +
+> +	if (soc_ops.disable_module)
+> +		soc_ops.disable_module(oh);
+> +	_disable_clocks(oh);
+> +
+>  	if (ret == -EBUSY)
+>  		pr_warning("omap_hwmod: %s: failed to hardreset\n", oh->name);
+>  
+> +	if (!ret) {
+> +		/*
+> +		 * Set the clockdomain to HW_AUTO, assuming that the
+> +		 * previous state was HW_AUTO.
+> +		 */
+> +		if (oh->clkdm && hwsup)
+> +			clkdm_allow_idle(oh->clkdm);
+> +	} else {
+> +		if (oh->clkdm)
+> +			clkdm_hwmod_disable(oh->clkdm, oh);
+> +	}
+> +
+>  	return ret;
+>  }
+>  
 
-Thanks
-Kishon
+The sequence is good, I'm just a little bit concern about the
+duplication of code compared to _enable sequence.
+
+That being said, this is the consequence of removing the hardreset
+sequence outside of the main _enable/_shutdown sequence.
+
+So I'm not sure I have any better way of doing that :-(
+
+Regards,
+Benoit
