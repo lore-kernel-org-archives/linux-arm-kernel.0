@@ -1,80 +1,101 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 06 Sep 2012 08:45:26 -0500
-Subject: [RFC RESEND 1/4] arm/dts: OMAP: Add timer nodes
-In-Reply-To: <500D6CAB.4030504@ti.com>
-References: <1342218413-30116-1-git-send-email-jon-hunter@ti.com>
- <1342218413-30116-2-git-send-email-jon-hunter@ti.com>
- <5000D647.4090200@gmail.com> <500439A8.1050705@ti.com>
- <500D6CAB.4030504@ti.com>
-Message-ID: <5048A8F6.6080108@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 6 Sep 2012 15:56:27 +0200
+Subject: [PATCH 4/6 v2] ARM: integrator: initial device tree support
+In-Reply-To: <5048A31E.2090704@gmail.com>
+References: <1346471760-23993-1-git-send-email-linus.walleij@linaro.org>
+ <1346471760-23993-2-git-send-email-linus.walleij@linaro.org>
+ <1346471760-23993-3-git-send-email-linus.walleij@linaro.org>
+ <1346471760-23993-4-git-send-email-linus.walleij@linaro.org>
+ <5043E4BE.1060508@gmail.com>
+ <CACRpkdbTRCUnx1JjCQ+WT4PoxtDG38MP=ctUp6TBPd64xQ39jw@mail.gmail.com>
+ <5048A31E.2090704@gmail.com>
+Message-ID: <CACRpkdYy2CZXXA+kkEaOTznaucxXEwiwSn-5ux0ByHjXrsm-2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2012 10:24 AM, Jon Hunter wrote:
-> Hi Rob,
-> 
-> On 07/16/2012 10:56 AM, Jon Hunter wrote:
->> Hi Rob,
->>
->> On 07/13/2012 09:15 PM, Rob Herring wrote:
->>> On 07/13/2012 05:26 PM, Jon Hunter wrote:
->>>> Add the 12 GP timers nodes present in OMAP3.
->>>> Add the 11 GP timers nodes present in OMAP4.
->>>>
->>>> Add documentation for timer properties specific to OMAP.
->>>>
->>>> For each timer an alias is being added. The purpose for doing this is because
->>>> the OMAP dmtimer driver uses an ID to distinguish between the different timer
->>>> instances. For example, a timer can be requested by its ID. By adding an alias
->>>> for each timer we can then use the function of_alias_get_id() to extract the
->>>> ID for each timer from the alias name. The same method is used for the TTY
->>>> serial devices. If it is preferred that such an alias is not added and there
->>>> is a better way to pass an ID from device-tree let me know.
->>>
->>> I'm not sure this is really a good use of aliases. UARTs use aliases
->>> because it is important that the UART number to tty number is known and
->>> fixed. IIUC, as an example you are picking timer1 because it has
->>> properties X, Y and Z. If so, then you should describe those h/w
->>> properties within the timer nodes so you can pick which timer to use
->>> based on it's h/w properties.
->>
->> Thanks for the feedback. What you suggest could definitely work for most
->> timers. The only item that I would need to resolve here is the handling
->> of system timers (ie. those used for clockevents and clocksource). These
->> system timers (for OMAP) are reserved during early boot based upon the
->> timer ID today and so this is before the actual main timer driver has
->> been probed and all the attributes of the timers has been read for
->> device-tree.
->>
->> One thought would be to move the reservation of the system timers out of
->> the kernel and into device-tree itself. Then we query device tree on
->> start-up to see which we should use. I am wondering if this could be a
->> better use of alias? For example, say I want to use timer1 as my
->> clockevent timer and so I could have an alias of ...
->>
->> alias {
->> 	clockevent_timer = &timer1;
->> }
->>
->> However, I am not sure if this is even correct, because there does not
->> appear to be an API to search the aliases by name and return the
->> phandle, just of_alias_get_id(). Alternatively, I could add another
->> property called "ti,timer-clockevent" that is populated for the timer
->> used as the clockevent timer.
-> 
-> Do you have any inputs on the above? Does it make sense to reserve timer
-> resources for kernel system timers in device-tree?
+On Thu, Sep 6, 2012 at 3:20 PM, Rob Herring <robherring2@gmail.com> wrote:
+> [Me]
+>> I can of course skip the aliases and go for the timer nodes
+>> I want directly, but that isn't any helpful for people reading the
+>> device tree, is it?
+>
+> Well, the dts doesn't really need to describe how Linux is using things.
 
-This issue is not unique to omap. So if we do specify clockevent and
-clocksource in dts, then it should be in a common way. I think using
-"linux,clockevent" either as an alias name or property within the timer
-node would work. I don't have a strong preference, but I tend to lean
-toward an alias. Primarily this is because we are already using aliases
-for similar purposes.
+The arm,integrator-clocksource and arm,integrator-clockevent
+are renamed arm,timer-primary and arm,timer-secondary in the
+last patch set.
 
-However, I still think this could be done by looking at properties.
-There's not really any reason you can't check properties at timer init
-stage. The FDT has already been un-flattened. What are the features or
-lack of features you care about to determine which timer to use?
+Are you OK with this for now, going forward? I'd be happy to
+take a round refactoring it for the next cycle as outlined
+below.
 
-Rob
+> I'd like to get to common DT code for sp804 so all platforms just have a
+> call to sp804_dt_init() which does all the initialization.
+
+The Integrator/AP does not have the SP804 timer, it has a
+precursor with similar, yet different register setup. The
+driver is in the integrator_ab. core file.
+
+(I could look into merging this SP804 ancestor into the SP804
+driver with some flag or so, but that would be a different
+TODO item.)
+
+The Integrator/CP has the SP804 however.
+
+>> Maybe primary-timer, secondary-timer is sufficiently
+>> good and neutral aliases?
+>
+> That doesn't distinguish clk-event vs. clk-source. Perhaps we can use
+> presence of interrupt to distinguish that.
+
+They all have interrupts in the Integrator case so all timers
+are equal. But I vaguely recall someone whisper bad things about
+timer0.
+
+> It shouldn't really matter
+> which timer Linux picks as long as the h/w has the necessary features.
+
+That is true, what I've been doing so far is just a 1-to-1 mapping
+to current usage without much massaging of the abstract resource
+concept.
+
+> We just need to make sure dts describes those features. Some of the
+> things we have to deal with:
+>
+> Highbank has interrupt for timer0, but not on timer1, so timer0 must be
+> clk-event. It also users timer1 for sched clock, but ARM Ltd platforms
+> use a different timer.
+
+So I guess this SP804? They just didn't route the IRQ line
+I guess... :-(
+
+> Realview and Versatile use timer0 for clk-event and timer3 for clk-src.
+> Is there something broken with timer1 and timer2? It is certainly
+> possible the h/w has the clock tied off for 1 of the 2 timers.
+
+Integrator use timer2 for clockevent and timer1 for clocksource,
+and legends tell that timer0 should be avoided. But I guess
+I could try to find out by experience, I fear that it could work
+but be instable so that it appears to work but in reality does not...
+
+> VExpress CA9 has broken timers on the core tile (at least they were
+> ifdef'ed out before the last clean-up). We could just remove/disable
+> them in the dts so they are not used.
+
+There is something about the DT ambition here (or for that matter
+the boardfile ambition). On the RealView PB1176 there is
+a broken DMA engine, we just deleted it from the resource
+list. Other people might want to have all available resources
+listed but marked "broken" in the DT for completeness.
+
+The latter has the upside of providing hints to the next
+engineer who would otherwise come around and ask why
+the hardware in the refman is not listed in the DT and start
+to try to add it and find out it is broken. Knowing it's there
+and it's broken is encoding real knowledge at the expense
+of a few DT bytes.
+
+(I'm fine with either.)
+
+Yours,
+Linus Walleij
