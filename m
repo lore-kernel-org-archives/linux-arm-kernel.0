@@ -1,96 +1,17 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 6 Sep 2012 16:20:56 +0200
-Subject: [PATCH v2 09/10] net/macb: ethtool interface: add register dump
- feature
-In-Reply-To: <1346888174.5325.55.camel@bwh-desktop.uk.solarflarecom.com>
-References: <1346888174.5325.55.camel@bwh-desktop.uk.solarflarecom.com>
-Message-ID: <1346941256-15676-1-git-send-email-nicolas.ferre@atmel.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 6 Sep 2012 18:56:39 +0800
+Subject: [PATCH v2] ASoC: samsung dma - Don't indicate support for
+ pause/resume.
+In-Reply-To: <1346488699-11027-1-git-send-email-dgreid@chromium.org>
+References: <1346488699-11027-1-git-send-email-dgreid@chromium.org>
+Message-ID: <20120906105626.GH22330@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add macb_get_regs() ethtool function and its helper function:
-macb_get_regs_len().
-The version field is deduced from the IP revision which gives the
-"MACB or GEM" information. An additional version field is reserved.
+On Sat, Sep 01, 2012 at 01:38:19AM -0700, Dylan Reid wrote:
+> The pause and resume operations indicate that the stream can be
+> un-paused/resumed from the exact location they were paused/suspended.
+> This is not true for this driver, the pause and suspend triggers share
+> the same code path with stop, they flush all pending DMA transfers.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-v2: - modify MACB_GREGS_NBR name and adapt to number of registers
-      actually displayed.
-    - change version format to reflect register layout and
-      add a version number to be future proof.
-
- drivers/net/ethernet/cadence/macb.c |   40 +++++++++++++++++++++++++++++++++++
- drivers/net/ethernet/cadence/macb.h |    3 +++
- 2 files changed, 43 insertions(+)
-
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index dc34ff1..cab42e7 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -1223,9 +1223,49 @@ static int macb_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
- 	return phy_ethtool_sset(phydev, cmd);
- }
- 
-+static int macb_get_regs_len(struct net_device *netdev)
-+{
-+	return MACB_GREGS_NBR * sizeof(u32);
-+}
-+
-+static void macb_get_regs(struct net_device *dev, struct ethtool_regs *regs,
-+			  void *p)
-+{
-+	struct macb *bp = netdev_priv(dev);
-+	unsigned int tail, head;
-+	u32 *regs_buff = p;
-+
-+	regs->version = (macb_readl(bp, MID) & ((1 << MACB_REV_SIZE) - 1))
-+			| MACB_GREGS_VERSION;
-+
-+	tail = macb_tx_ring_wrap(bp->tx_tail);
-+	head = macb_tx_ring_wrap(bp->tx_head);
-+
-+	regs_buff[0]  = macb_readl(bp, NCR);
-+	regs_buff[1]  = macb_or_gem_readl(bp, NCFGR);
-+	regs_buff[2]  = macb_readl(bp, NSR);
-+	regs_buff[3]  = macb_readl(bp, TSR);
-+	regs_buff[4]  = macb_readl(bp, RBQP);
-+	regs_buff[5]  = macb_readl(bp, TBQP);
-+	regs_buff[6]  = macb_readl(bp, RSR);
-+	regs_buff[7]  = macb_readl(bp, IMR);
-+
-+	regs_buff[8]  = tail;
-+	regs_buff[9]  = head;
-+	regs_buff[10] = macb_tx_dma(bp, tail);
-+	regs_buff[11] = macb_tx_dma(bp, head);
-+
-+	if (macb_is_gem(bp)) {
-+		regs_buff[12] = gem_readl(bp, USRIO);
-+		regs_buff[13] = gem_readl(bp, DMACFG);
-+	}
-+}
-+
- static const struct ethtool_ops macb_ethtool_ops = {
- 	.get_settings		= macb_get_settings,
- 	.set_settings		= macb_set_settings,
-+	.get_regs_len		= macb_get_regs_len,
-+	.get_regs		= macb_get_regs,
- 	.get_link		= ethtool_op_get_link,
- };
- 
-diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-index f69ceef..bcadc3c 100644
---- a/drivers/net/ethernet/cadence/macb.h
-+++ b/drivers/net/ethernet/cadence/macb.h
-@@ -10,6 +10,9 @@
- #ifndef _MACB_H
- #define _MACB_H
- 
-+#define MACB_GREGS_NBR 16
-+#define MACB_GREGS_VERSION 1
-+
- /* MACB register offsets */
- #define MACB_NCR				0x0000
- #define MACB_NCFGR				0x0004
--- 
-1.7.10
+Applied, thanks.
