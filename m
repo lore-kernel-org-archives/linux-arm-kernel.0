@@ -1,201 +1,258 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 6 Sep 2012 20:27:10 +0530
-Subject: [PATCH 5/5] arm: omap: phy: remove unused functions from
- omap-phy-internal.c
+Date: Thu, 6 Sep 2012 20:27:07 +0530
+Subject: [PATCH 2/5] drivers: usb: otg: make twl6030_usb as a comparator
+ driver to omap_usb2
 In-Reply-To: <1346943430-18236-1-git-send-email-kishon@ti.com>
 References: <1346943430-18236-1-git-send-email-kishon@ti.com>
-Message-ID: <1346943430-18236-6-git-send-email-kishon@ti.com>
+Message-ID: <1346943430-18236-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the unnessary functions in omap-phy-internal is removed.
-These functionality are now handled by omap-usb2 phy driver.
+All the PHY configuration other than VBUS, ID GND and OTG SRP are removed
+from twl6030. The phy configurations are taken care by the dedicated
+usb2 phy driver. So twl6030 is made as comparator driver for VBUS and
+ID detection.
 
-Cc: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/omap_phy_internal.c |  138 -------------------------------
- arch/arm/mach-omap2/twl-common.c        |    5 --
- arch/arm/mach-omap2/usb-musb.c          |    3 -
- 3 files changed, 146 deletions(-)
+ drivers/usb/otg/Kconfig       |    2 +-
+ drivers/usb/otg/twl6030-usb.c |  118 +++++++----------------------------------
+ 2 files changed, 19 insertions(+), 101 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_phy_internal.c b/arch/arm/mach-omap2/omap_phy_internal.c
-index d52651a..874aecc 100644
---- a/arch/arm/mach-omap2/omap_phy_internal.c
-+++ b/arch/arm/mach-omap2/omap_phy_internal.c
-@@ -31,144 +31,6 @@
- #include <plat/usb.h>
- #include "control.h"
+diff --git a/drivers/usb/otg/Kconfig b/drivers/usb/otg/Kconfig
+index 13fd1ddf..d8c8a42 100644
+--- a/drivers/usb/otg/Kconfig
++++ b/drivers/usb/otg/Kconfig
+@@ -68,7 +68,7 @@ config TWL4030_USB
  
--/* OMAP control module register for UTMI PHY */
--#define CONTROL_DEV_CONF		0x300
--#define PHY_PD				0x1
--
--#define USBOTGHS_CONTROL		0x33c
--#define	AVALID				BIT(0)
--#define	BVALID				BIT(1)
--#define	VBUSVALID			BIT(2)
--#define	SESSEND				BIT(3)
--#define	IDDIG				BIT(4)
--
--static struct clk *phyclk, *clk48m, *clk32k;
--static void __iomem *ctrl_base;
--static int usbotghs_control;
--
--int omap4430_phy_init(struct device *dev)
--{
--	ctrl_base = ioremap(OMAP443X_SCM_BASE, SZ_1K);
--	if (!ctrl_base) {
--		pr_err("control module ioremap failed\n");
--		return -ENOMEM;
--	}
--	/* Power down the phy */
--	__raw_writel(PHY_PD, ctrl_base + CONTROL_DEV_CONF);
--
--	if (!dev) {
--		iounmap(ctrl_base);
--		return 0;
--	}
--
--	phyclk = clk_get(dev, "ocp2scp_usb_phy_ick");
--	if (IS_ERR(phyclk)) {
--		dev_err(dev, "cannot clk_get ocp2scp_usb_phy_ick\n");
--		iounmap(ctrl_base);
--		return PTR_ERR(phyclk);
--	}
--
--	clk48m = clk_get(dev, "ocp2scp_usb_phy_phy_48m");
--	if (IS_ERR(clk48m)) {
--		dev_err(dev, "cannot clk_get ocp2scp_usb_phy_phy_48m\n");
--		clk_put(phyclk);
--		iounmap(ctrl_base);
--		return PTR_ERR(clk48m);
--	}
--
--	clk32k = clk_get(dev, "usb_phy_cm_clk32k");
--	if (IS_ERR(clk32k)) {
--		dev_err(dev, "cannot clk_get usb_phy_cm_clk32k\n");
--		clk_put(phyclk);
--		clk_put(clk48m);
--		iounmap(ctrl_base);
--		return PTR_ERR(clk32k);
--	}
--	return 0;
--}
--
--int omap4430_phy_set_clk(struct device *dev, int on)
--{
--	static int state;
--
--	if (on && !state) {
--		/* Enable the phy clocks */
--		clk_enable(phyclk);
--		clk_enable(clk48m);
--		clk_enable(clk32k);
--		state = 1;
--	} else if (state) {
--		/* Disable the phy clocks */
--		clk_disable(phyclk);
--		clk_disable(clk48m);
--		clk_disable(clk32k);
--		state = 0;
--	}
--	return 0;
--}
--
--int omap4430_phy_power(struct device *dev, int ID, int on)
--{
--	if (on) {
--		if (ID)
--			/* enable VBUS valid, IDDIG groung */
--			__raw_writel(AVALID | VBUSVALID, ctrl_base +
--							USBOTGHS_CONTROL);
--		else
--			/*
--			 * Enable VBUS Valid, AValid and IDDIG
--			 * high impedance
--			 */
--			__raw_writel(IDDIG | AVALID | VBUSVALID,
--						ctrl_base + USBOTGHS_CONTROL);
--	} else {
--		/* Enable session END and IDIG to high impedance. */
--		__raw_writel(SESSEND | IDDIG, ctrl_base +
--					USBOTGHS_CONTROL);
--	}
--	return 0;
--}
--
--int omap4430_phy_suspend(struct device *dev, int suspend)
--{
--	if (suspend) {
--		/* Disable the clocks */
--		omap4430_phy_set_clk(dev, 0);
--		/* Power down the phy */
--		__raw_writel(PHY_PD, ctrl_base + CONTROL_DEV_CONF);
--
--		/* save the context */
--		usbotghs_control = __raw_readl(ctrl_base + USBOTGHS_CONTROL);
--	} else {
--		/* Enable the internel phy clcoks */
--		omap4430_phy_set_clk(dev, 1);
--		/* power on the phy */
--		if (__raw_readl(ctrl_base + CONTROL_DEV_CONF) & PHY_PD) {
--			__raw_writel(~PHY_PD, ctrl_base + CONTROL_DEV_CONF);
--			mdelay(200);
--		}
--
--		/* restore the context */
--		__raw_writel(usbotghs_control, ctrl_base + USBOTGHS_CONTROL);
--	}
--
--	return 0;
--}
--
--int omap4430_phy_exit(struct device *dev)
--{
--	if (ctrl_base)
--		iounmap(ctrl_base);
--	if (phyclk)
--		clk_put(phyclk);
--	if (clk48m)
--		clk_put(clk48m);
--	if (clk32k)
--		clk_put(clk32k);
--
--	return 0;
--}
--
- void am35x_musb_reset(void)
- {
- 	u32	regval;
-diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-index de47f17..e2cdf67 100644
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -250,11 +250,6 @@ void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
+ config TWL6030_USB
+ 	tristate "TWL6030 USB Transceiver Driver"
+-	depends on TWL4030_CORE
++	depends on TWL4030_CORE && OMAP_USB2
+ 	select USB_OTG_UTILS
+ 	help
+ 	  Enable this to support the USB OTG transceiver on TWL6030
+diff --git a/drivers/usb/otg/twl6030-usb.c b/drivers/usb/otg/twl6030-usb.c
+index 6907d8d..32525bb 100644
+--- a/drivers/usb/otg/twl6030-usb.c
++++ b/drivers/usb/otg/twl6030-usb.c
+@@ -25,8 +25,9 @@
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+-#include <linux/usb/otg.h>
+ #include <linux/usb/musb-omap.h>
++#include <linux/usb/phy_companion.h>
++#include <linux/usb/omap_usb.h>
+ #include <linux/i2c/twl.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/err.h>
+@@ -87,7 +88,7 @@
+ #define	VBUS_DET			BIT(2)
  
- #if defined(CONFIG_ARCH_OMAP4)
- static struct twl4030_usb_data omap4_usb_pdata = {
--	.phy_init	= omap4430_phy_init,
--	.phy_exit	= omap4430_phy_exit,
--	.phy_power	= omap4430_phy_power,
--	.phy_set_clock	= omap4430_phy_set_clk,
--	.phy_suspend	= omap4430_phy_suspend,
+ struct twl6030_usb {
+-	struct usb_phy		phy;
++	struct phy_companion	comparator;
+ 	struct device		*dev;
+ 
+ 	/* for vbus reporting with irqs disabled */
+@@ -107,7 +108,7 @@ struct twl6030_usb {
+ 	unsigned long		features;
  };
  
- static struct regulator_init_data omap4_vdac_idata = {
-diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
-index c4a5768..e9b4b23 100644
---- a/arch/arm/mach-omap2/usb-musb.c
-+++ b/arch/arm/mach-omap2/usb-musb.c
-@@ -117,7 +117,4 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
- 	dev->dma_mask = &musb_dmamask;
- 	dev->coherent_dma_mask = musb_dmamask;
- 	put_device(dev);
--
--	if (cpu_is_omap44xx())
--		omap4430_phy_init(dev);
+-#define phy_to_twl(x)		container_of((x), struct twl6030_usb, phy)
++#define	comparator_to_twl(x) container_of((x), struct twl6030_usb, comparator)
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+@@ -137,50 +138,9 @@ static inline u8 twl6030_readb(struct twl6030_usb *twl, u8 module, u8 address)
+ 	return ret;
  }
+ 
+-static int twl6030_phy_init(struct usb_phy *x)
++static int twl6030_start_srp(struct phy_companion *comparator)
+ {
+-	struct twl6030_usb *twl;
+-	struct device *dev;
+-	struct twl4030_usb_data *pdata;
+-
+-	twl = phy_to_twl(x);
+-	dev  = twl->dev;
+-	pdata = dev->platform_data;
+-
+-	if (twl->linkstat == OMAP_MUSB_ID_GROUND)
+-		pdata->phy_power(twl->dev, 1, 1);
+-	else
+-		pdata->phy_power(twl->dev, 0, 1);
+-
+-	return 0;
+-}
+-
+-static void twl6030_phy_shutdown(struct usb_phy *x)
+-{
+-	struct twl6030_usb *twl;
+-	struct device *dev;
+-	struct twl4030_usb_data *pdata;
+-
+-	twl = phy_to_twl(x);
+-	dev  = twl->dev;
+-	pdata = dev->platform_data;
+-	pdata->phy_power(twl->dev, 0, 0);
+-}
+-
+-static int twl6030_phy_suspend(struct usb_phy *x, int suspend)
+-{
+-	struct twl6030_usb *twl = phy_to_twl(x);
+-	struct device *dev = twl->dev;
+-	struct twl4030_usb_data *pdata = dev->platform_data;
+-
+-	pdata->phy_suspend(dev, suspend);
+-
+-	return 0;
+-}
+-
+-static int twl6030_start_srp(struct usb_otg *otg)
+-{
+-	struct twl6030_usb *twl = phy_to_twl(otg->phy);
++	struct twl6030_usb *twl = comparator_to_twl(comparator);
+ 
+ 	twl6030_writeb(twl, TWL_MODULE_USB, 0x24, USB_VBUS_CTRL_SET);
+ 	twl6030_writeb(twl, TWL_MODULE_USB, 0x84, USB_VBUS_CTRL_SET);
+@@ -313,23 +273,8 @@ static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int twl6030_set_peripheral(struct usb_otg *otg,
+-		struct usb_gadget *gadget)
++static int twl6030_enable_irq(struct twl6030_usb *twl)
+ {
+-	if (!otg)
+-		return -ENODEV;
+-
+-	otg->gadget = gadget;
+-	if (!gadget)
+-		otg->phy->state = OTG_STATE_UNDEFINED;
+-
+-	return 0;
+-}
+-
+-static int twl6030_enable_irq(struct usb_phy *x)
+-{
+-	struct twl6030_usb *twl = phy_to_twl(x);
+-
+ 	twl6030_writeb(twl, TWL_MODULE_USB, 0x1, USB_ID_INT_EN_HI_SET);
+ 	twl6030_interrupt_unmask(0x05, REG_INT_MSK_LINE_C);
+ 	twl6030_interrupt_unmask(0x05, REG_INT_MSK_STS_C);
+@@ -362,9 +307,9 @@ static void otg_set_vbus_work(struct work_struct *data)
+ 							CHARGERUSB_CTRL1);
+ }
+ 
+-static int twl6030_set_vbus(struct usb_otg *otg, bool enabled)
++static int twl6030_set_vbus(struct phy_companion *comparator, bool enabled)
+ {
+-	struct twl6030_usb *twl = phy_to_twl(otg->phy);
++	struct twl6030_usb *twl = comparator_to_twl(comparator);
+ 
+ 	twl->vbus_enable = enabled;
+ 	schedule_work(&twl->set_vbus_work);
+@@ -372,23 +317,12 @@ static int twl6030_set_vbus(struct usb_otg *otg, bool enabled)
+ 	return 0;
+ }
+ 
+-static int twl6030_set_host(struct usb_otg *otg, struct usb_bus *host)
+-{
+-	if (!otg)
+-		return -ENODEV;
+-
+-	otg->host = host;
+-	if (!host)
+-		otg->phy->state = OTG_STATE_UNDEFINED;
+-	return 0;
+-}
+-
+ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
+ {
++	u32 ret;
+ 	struct twl6030_usb	*twl;
+ 	int			status, err;
+ 	struct twl4030_usb_data *pdata;
+-	struct usb_otg		*otg;
+ 	struct device *dev = &pdev->dev;
+ 	pdata = dev->platform_data;
+ 
+@@ -396,28 +330,20 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
+ 	if (!twl)
+ 		return -ENOMEM;
+ 
+-	otg = devm_kzalloc(dev, sizeof *otg, GFP_KERNEL);
+-	if (!otg)
+-		return -ENOMEM;
+-
+ 	twl->dev		= &pdev->dev;
+ 	twl->irq1		= platform_get_irq(pdev, 0);
+ 	twl->irq2		= platform_get_irq(pdev, 1);
+ 	twl->features		= pdata->features;
+ 	twl->linkstat		= OMAP_MUSB_UNKNOWN;
+ 
+-	twl->phy.dev		= twl->dev;
+-	twl->phy.label		= "twl6030";
+-	twl->phy.otg		= otg;
+-	twl->phy.init		= twl6030_phy_init;
+-	twl->phy.shutdown	= twl6030_phy_shutdown;
+-	twl->phy.set_suspend	= twl6030_phy_suspend;
++	twl->comparator.set_vbus	= twl6030_set_vbus;
++	twl->comparator.start_srp	= twl6030_start_srp;
+ 
+-	otg->phy		= &twl->phy;
+-	otg->set_host		= twl6030_set_host;
+-	otg->set_peripheral	= twl6030_set_peripheral;
+-	otg->set_vbus		= twl6030_set_vbus;
+-	otg->start_srp		= twl6030_start_srp;
++	ret = omap_usb2_set_comparator(&twl->comparator);
++	if (ret == -ENODEV) {
++		dev_info(&pdev->dev, "phy not ready, deferring probe");
++		return -EPROBE_DEFER;
++	}
+ 
+ 	/* init spinlock for workqueue */
+ 	spin_lock_init(&twl->lock);
+@@ -427,7 +353,6 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "ldo init failed\n");
+ 		return err;
+ 	}
+-	usb_add_phy(&twl->phy, USB_PHY_TYPE_USB2);
+ 
+ 	platform_set_drvdata(pdev, twl);
+ 	if (device_create_file(&pdev->dev, &dev_attr_vbus))
+@@ -458,9 +383,7 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	twl->asleep = 0;
+-	pdata->phy_init(dev);
+-	twl6030_phy_suspend(&twl->phy, 0);
+-	twl6030_enable_irq(&twl->phy);
++	twl6030_enable_irq(twl);
+ 	dev_info(&pdev->dev, "Initialized TWL6030 USB module\n");
+ 
+ 	return 0;
+@@ -470,10 +393,6 @@ static int __exit twl6030_usb_remove(struct platform_device *pdev)
+ {
+ 	struct twl6030_usb *twl = platform_get_drvdata(pdev);
+ 
+-	struct twl4030_usb_data *pdata;
+-	struct device *dev = &pdev->dev;
+-	pdata = dev->platform_data;
+-
+ 	twl6030_interrupt_mask(TWL6030_USBOTG_INT_MASK,
+ 		REG_INT_MSK_LINE_C);
+ 	twl6030_interrupt_mask(TWL6030_USBOTG_INT_MASK,
+@@ -481,7 +400,6 @@ static int __exit twl6030_usb_remove(struct platform_device *pdev)
+ 	free_irq(twl->irq1, twl);
+ 	free_irq(twl->irq2, twl);
+ 	regulator_put(twl->usb3v3);
+-	pdata->phy_exit(twl->dev);
+ 	device_remove_file(twl->dev, &dev_attr_vbus);
+ 	cancel_work_sync(&twl->set_vbus_work);
+ 
 -- 
 1.7.9.5
