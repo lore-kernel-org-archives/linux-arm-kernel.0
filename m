@@ -1,40 +1,50 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 6 Sep 2012 15:57:51 +0200
-Subject: [PATCH 0/2] arm/dts: AM33XX: Add reg and interrupt property for
- all nodes
-In-Reply-To: <1346070714-6122-1-git-send-email-hvaibhav@ti.com>
-References: <1346070714-6122-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <5048ABDF.6020609@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 6 Sep 2012 16:01:34 +0200
+Subject: [PATCH 08/10] net/macb: macb_get_drvinfo: add GEM/MACB suffix
+ to differentiate revision
+In-Reply-To: <1346887671.5325.47.camel@bwh-desktop.uk.solarflarecom.com>
+References: <cover.1346775479.git.nicolas.ferre@atmel.com>
+ <fc701a2ed18198b7a671c55f1e65725f1709509c.1346775479.git.nicolas.ferre@atmel.com>
+ <1346887671.5325.47.camel@bwh-desktop.uk.solarflarecom.com>
+Message-ID: <5048ACBE.2030205@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaihbav,
+On 09/06/2012 01:27 AM, Ben Hutchings :
+> On Wed, 2012-09-05 at 11:00 +0200, Nicolas Ferre wrote:
+>> Add an indication about which revision of the hardware we are running in
+>> info->driver string.
+>>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>>  drivers/net/ethernet/cadence/macb.c |    4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+>> index bd331fd..c7c39f1 100644
+>> --- a/drivers/net/ethernet/cadence/macb.c
+>> +++ b/drivers/net/ethernet/cadence/macb.c
+>> @@ -1313,6 +1313,10 @@ static void macb_get_drvinfo(struct net_device *dev,
+>>  	struct macb *bp = netdev_priv(dev);
+>>  
+>>  	strcpy(info->driver, bp->pdev->dev.driver->name);
+>> +	if (macb_is_gem(bp))
+>> +		strcat(info->driver, " GEM");
+>> +	else
+>> +		strcat(info->driver, " MACB");
+>>  	strcpy(info->version, "$Revision: 1.14 $");
+> 
+> Related to hardware revisions (which don't belong here, as David said),
+> I rather doubt this CVS ID is very useful as a driver version.
+> 
+> If the driver doesn't have a meaningful version (aside from the kernel
+> version) then you can remove this function and let the ethtool core fill
+> in the other two fields automatically.
 
-On 08/27/2012 02:31 PM, Vaibhav Hiremath wrote:
-> This series is trivial patch-series and should be considered as
-> preparation for the future where we supposed to get rid of
-> hwmod dependency.
-> 
-> 1/2: Converts all hex numbers to lowercase, fixing inconsistency
-> 2/2: Add reg and interrupt property  to all device/module nodes inside
->      DTS files. 
-> 
-> Although currently hwmod overwrites resources, I have validated this
-> patch series by changing the omap_device layer to respect DT resources
-> and boot Tested on BeagleBone platform.
-> I will be submitting the changes for omap_device layer as well, still
-> needs to fix on certain things.
-> 
-> Vaibhav Hiremath (2):
->   arm/dts: AM33XX: Convert all hex numbers to lower-case
->   arm/dts: AM33XX: Specify reg and interrupt property for all nodes
-> 
->  arch/arm/boot/dts/am335x-bone.dts |    2 +-
->  arch/arm/boot/dts/am335x-evm.dts  |    2 +-
->  arch/arm/boot/dts/am33xx.dtsi     |   62 +++++++++++++++++++++++++++++++------
->  3 files changed, 54 insertions(+), 12 deletions(-)
+Absolutely, I will do this.
 
-I'll queue that along with the other DT stuff for 3.7.
+Thanks for the tip.
 
-Thanks,
-Benoit
+Best regards,
+-- 
+Nicolas Ferre
