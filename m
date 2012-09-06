@@ -1,251 +1,135 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu,  6 Sep 2012 15:12:44 -0500
-Subject: [PATCH 01/12] ARM: move debug macros to common location
-In-Reply-To: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
-References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1346962375-26163-2-git-send-email-robherring2@gmail.com>
+Date: Thu,  6 Sep 2012 15:12:43 -0500
+Subject: [PATCH v3 00/12] Initial multi-platform support
+Message-ID: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Based on suggestion by Russell King, create a common location for debug
-macros and select the included debug macro file using config option.
+This series enables initial ARM multi-platform support for highbank, mvebu,
+socfpga, picoxcell, and vexpress. Multi-platform support is dependent on
+some DEBUG_LL and dtb build rules restructuring. This series is also
+dependent on my gpio clean-up series posted here:
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
----
- arch/arm/Kconfig.debug          |    5 +++
- arch/arm/include/debug/icedcc.S |   90 +++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/debug.S         |   87 ++-----------------------------------
- arch/arm/kernel/head.S          |    4 +-
- 4 files changed, 100 insertions(+), 86 deletions(-)
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-September/118138.html
+
+New in this version:
+- Moved ARCH_MULTIPLATFORM back into choice so converted platforms'
+  defconfigs work before and after conversion.
+- Added mvebu, socfpga and picoxcell DEBUG_LL support. DEBUG_LL should
+  work for all converted platforms.
+- Fixed make dtbs.
+- Removed all unused headers (timex.h, uncompress.h) and Makefile.boot
+- Add ARCH_MULTIPLATFORM depends for XIP found with randconfig builds
+- Split out Vexpress to separate patch as now DT board support is always
+  enabled.
+
+This series plus gpio clean-up is available here:
+git://sources.calxeda.com/kernel/linux.git multi-plat
+
+Rob
+
+Arnd Bergmann (1):
+  ARM: vexpress: remove dependency on mach/* headers
+
+Rob Herring (11):
+  ARM: move debug macros to common location
+  ARM: highbank: move debug macros to include/debug
+  ARM: vexpress: move debug macros to include/debug
+  ARM: mvebu: move debug macros to include/debug
+  ARM: socfpga: move debug macros to include/debug
+  ARM: picoxcell: move debug macros to include/debug
+  ARM: move all dtb targets out of Makefile.boot
+  ARM: picoxcell: remove dependency on mach/* headers
+  ARM: mvebu: move armada-370-xp.h in mach dir
+  ARM: initial multiplatform support
+  ARM: vexpress: convert to multi-platform
+
+ arch/arm/Kconfig                                   |  142 ++++++++----------
+ arch/arm/Kconfig.debug                             |   33 +++++
+ arch/arm/Makefile                                  |  155 ++++++++++----------
+ arch/arm/boot/Makefile                             |    2 +
+ arch/arm/boot/compressed/misc.c                    |    6 +
+ arch/arm/boot/dts/Makefile                         |   41 ++++++
+ arch/arm/include/asm/timex.h                       |    4 +
+ .../debug-macro.S => include/debug/highbank.S}     |    6 +-
+ arch/arm/include/debug/icedcc.S                    |   90 ++++++++++++
+ .../mach/debug-macro.S => include/debug/mvebu.S}   |    3 +-
+ .../debug-macro.S => include/debug/picoxcell.S}    |    0
+ .../mach/debug-macro.S => include/debug/socfpga.S} |    0
+ .../debug-macro.S => include/debug/vexpress.S}     |    0
+ arch/arm/kernel/debug.S                            |   87 +----------
+ arch/arm/kernel/head.S                             |    4 +-
+ arch/arm/mach-at91/Makefile.boot                   |   24 ---
+ arch/arm/mach-exynos/Makefile.boot                 |    3 -
+ arch/arm/mach-highbank/Kconfig                     |   15 ++
+ arch/arm/mach-highbank/Makefile.boot               |    1 -
+ arch/arm/mach-highbank/include/mach/timex.h        |    6 -
+ arch/arm/mach-highbank/include/mach/uncompress.h   |    9 --
+ arch/arm/mach-imx/Makefile.boot                    |    7 -
+ arch/arm/mach-kirkwood/Makefile.boot               |   11 --
+ arch/arm/mach-lpc32xx/Makefile.boot                |    2 -
+ arch/arm/mach-mvebu/Kconfig                        |   10 ++
+ arch/arm/mach-mvebu/Makefile                       |    2 +
+ arch/arm/mach-mvebu/Makefile.boot                  |    3 -
+ arch/arm/mach-mvebu/armada-370-xp.c                |    2 +-
+ .../mach-mvebu/{include/mach => }/armada-370-xp.h  |    0
+ arch/arm/mach-mvebu/include/mach/timex.h           |   13 --
+ arch/arm/mach-mvebu/include/mach/uncompress.h      |   43 ------
+ arch/arm/mach-mxs/Makefile.boot                    |    9 --
+ arch/arm/mach-picoxcell/Kconfig                    |   14 ++
+ arch/arm/mach-picoxcell/Makefile.boot              |    1 -
+ arch/arm/mach-picoxcell/common.c                   |    6 +-
+ arch/arm/mach-picoxcell/include/mach/hardware.h    |   21 ---
+ arch/arm/mach-picoxcell/include/mach/map.h         |   25 ----
+ arch/arm/mach-picoxcell/include/mach/timex.h       |   25 ----
+ arch/arm/mach-picoxcell/include/mach/uncompress.h  |   21 ---
+ .../{include/mach => }/picoxcell_soc.h             |    0
+ arch/arm/mach-socfpga/Kconfig                      |   16 ++
+ arch/arm/mach-socfpga/Makefile.boot                |    1 -
+ arch/arm/mach-socfpga/include/mach/timex.h         |   19 ---
+ arch/arm/mach-socfpga/include/mach/uncompress.h    |    9 --
+ arch/arm/mach-spear13xx/Makefile.boot              |    3 -
+ arch/arm/mach-spear3xx/Makefile.boot               |    4 -
+ arch/arm/mach-spear6xx/Makefile.boot               |    2 -
+ arch/arm/mach-tegra/Makefile.boot                  |    8 -
+ arch/arm/mach-ux500/Makefile.boot                  |    2 -
+ arch/arm/mach-vexpress/Kconfig                     |   64 ++++----
+ arch/arm/mach-vexpress/Makefile                    |    2 +
+ arch/arm/mach-vexpress/Makefile.boot               |   10 --
+ arch/arm/mach-vexpress/ct-ca9x4.c                  |    1 +
+ arch/arm/mach-vexpress/include/mach/irqs.h         |    2 +
+ arch/arm/mach-vexpress/v2m.c                       |    4 -
+ arch/arm/plat-versatile/Makefile                   |    2 +
+ 56 files changed, 423 insertions(+), 572 deletions(-)
+ create mode 100644 arch/arm/boot/dts/Makefile
+ rename arch/arm/{mach-highbank/include/mach/debug-macro.S => include/debug/highbank.S} (83%)
  create mode 100644 arch/arm/include/debug/icedcc.S
+ rename arch/arm/{mach-mvebu/include/mach/debug-macro.S => include/debug/mvebu.S} (86%)
+ rename arch/arm/{mach-picoxcell/include/mach/debug-macro.S => include/debug/picoxcell.S} (100%)
+ rename arch/arm/{mach-socfpga/include/mach/debug-macro.S => include/debug/socfpga.S} (100%)
+ rename arch/arm/{mach-vexpress/include/mach/debug-macro.S => include/debug/vexpress.S} (100%)
+ create mode 100644 arch/arm/mach-highbank/Kconfig
+ delete mode 100644 arch/arm/mach-highbank/Makefile.boot
+ delete mode 100644 arch/arm/mach-highbank/include/mach/timex.h
+ delete mode 100644 arch/arm/mach-highbank/include/mach/uncompress.h
+ delete mode 100644 arch/arm/mach-mvebu/Makefile.boot
+ rename arch/arm/mach-mvebu/{include/mach => }/armada-370-xp.h (100%)
+ delete mode 100644 arch/arm/mach-mvebu/include/mach/timex.h
+ delete mode 100644 arch/arm/mach-mvebu/include/mach/uncompress.h
+ create mode 100644 arch/arm/mach-picoxcell/Kconfig
+ delete mode 100644 arch/arm/mach-picoxcell/Makefile.boot
+ delete mode 100644 arch/arm/mach-picoxcell/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-picoxcell/include/mach/map.h
+ delete mode 100644 arch/arm/mach-picoxcell/include/mach/timex.h
+ delete mode 100644 arch/arm/mach-picoxcell/include/mach/uncompress.h
+ rename arch/arm/mach-picoxcell/{include/mach => }/picoxcell_soc.h (100%)
+ create mode 100644 arch/arm/mach-socfpga/Kconfig
+ delete mode 100644 arch/arm/mach-socfpga/Makefile.boot
+ delete mode 100644 arch/arm/mach-socfpga/include/mach/timex.h
+ delete mode 100644 arch/arm/mach-socfpga/include/mach/uncompress.h
+ delete mode 100644 arch/arm/mach-vexpress/Makefile.boot
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index f15f82b..4f9760b 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -373,6 +373,11 @@ choice
- 
- endchoice
- 
-+config DEBUG_LL_INCLUDE
-+	string
-+	default "debug/icedcc.S" if DEBUG_ICEDCC
-+	default "mach/debug-macro.S"
-+
- config EARLY_PRINTK
- 	bool "Early printk"
- 	depends on DEBUG_LL
-diff --git a/arch/arm/include/debug/icedcc.S b/arch/arm/include/debug/icedcc.S
-new file mode 100644
-index 0000000..43afcb0
---- /dev/null
-+++ b/arch/arm/include/debug/icedcc.S
-@@ -0,0 +1,90 @@
-+/*
-+ *  arch/arm/include/debug/icedcc.S
-+ *
-+ *  Copyright (C) 1994-1999 Russell King
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+		@@ debug using ARM EmbeddedICE DCC channel
-+
-+		.macro	addruart, rp, rv, tmp
-+		.endm
-+
-+#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
-+
-+		.macro	senduart, rd, rx
-+		mcr	p14, 0, \rd, c0, c5, 0
-+		.endm
-+
-+		.macro	busyuart, rd, rx
-+1001:
-+		mrc	p14, 0, \rx, c0, c1, 0
-+		tst	\rx, #0x20000000
-+		beq	1001b
-+		.endm
-+
-+		.macro	waituart, rd, rx
-+		mov	\rd, #0x2000000
-+1001:
-+		subs	\rd, \rd, #1
-+		bmi	1002f
-+		mrc	p14, 0, \rx, c0, c1, 0
-+		tst	\rx, #0x20000000
-+		bne	1001b
-+1002:
-+		.endm
-+
-+#elif defined(CONFIG_CPU_XSCALE)
-+
-+		.macro	senduart, rd, rx
-+		mcr	p14, 0, \rd, c8, c0, 0
-+		.endm
-+
-+		.macro	busyuart, rd, rx
-+1001:
-+		mrc	p14, 0, \rx, c14, c0, 0
-+		tst	\rx, #0x10000000
-+		beq	1001b
-+		.endm
-+
-+		.macro	waituart, rd, rx
-+		mov	\rd, #0x10000000
-+1001:
-+		subs	\rd, \rd, #1
-+		bmi	1002f
-+		mrc	p14, 0, \rx, c14, c0, 0
-+		tst	\rx, #0x10000000
-+		bne	1001b
-+1002:
-+		.endm
-+
-+#else
-+
-+		.macro	senduart, rd, rx
-+		mcr	p14, 0, \rd, c1, c0, 0
-+		.endm
-+
-+		.macro	busyuart, rd, rx
-+1001:
-+		mrc	p14, 0, \rx, c0, c0, 0
-+		tst	\rx, #2
-+		beq	1001b
-+
-+		.endm
-+
-+		.macro	waituart, rd, rx
-+		mov	\rd, #0x2000000
-+1001:
-+		subs	\rd, \rd, #1
-+		bmi	1002f
-+		mrc	p14, 0, \rx, c0, c0, 0
-+		tst	\rx, #2
-+		bne	1001b
-+1002:
-+		.endm
-+
-+#endif	/* CONFIG_CPU_V6 */
-diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-index c45522c..66f711b 100644
---- a/arch/arm/kernel/debug.S
-+++ b/arch/arm/kernel/debug.S
-@@ -20,90 +20,9 @@
-  * references to these in a production kernel!
-  */
- 
--#if defined(CONFIG_DEBUG_ICEDCC)
--		@@ debug using ARM EmbeddedICE DCC channel
--
--		.macro	addruart, rp, rv, tmp
--		.endm
--
--#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
--
--		.macro	senduart, rd, rx
--		mcr	p14, 0, \rd, c0, c5, 0
--		.endm
--
--		.macro	busyuart, rd, rx
--1001:
--		mrc	p14, 0, \rx, c0, c1, 0
--		tst	\rx, #0x20000000
--		beq	1001b
--		.endm
--
--		.macro	waituart, rd, rx
--		mov	\rd, #0x2000000
--1001:
--		subs	\rd, \rd, #1
--		bmi	1002f
--		mrc	p14, 0, \rx, c0, c1, 0
--		tst	\rx, #0x20000000
--		bne	1001b
--1002:
--		.endm
--
--#elif defined(CONFIG_CPU_XSCALE)
--
--		.macro	senduart, rd, rx
--		mcr	p14, 0, \rd, c8, c0, 0
--		.endm
--
--		.macro	busyuart, rd, rx
--1001:
--		mrc	p14, 0, \rx, c14, c0, 0
--		tst	\rx, #0x10000000
--		beq	1001b
--		.endm
--
--		.macro	waituart, rd, rx
--		mov	\rd, #0x10000000
--1001:
--		subs	\rd, \rd, #1
--		bmi	1002f
--		mrc	p14, 0, \rx, c14, c0, 0
--		tst	\rx, #0x10000000
--		bne	1001b
--1002:
--		.endm
--
--#else
--
--		.macro	senduart, rd, rx
--		mcr	p14, 0, \rd, c1, c0, 0
--		.endm
--
--		.macro	busyuart, rd, rx
--1001:
--		mrc	p14, 0, \rx, c0, c0, 0
--		tst	\rx, #2
--		beq	1001b
--
--		.endm
--
--		.macro	waituart, rd, rx
--		mov	\rd, #0x2000000
--1001:
--		subs	\rd, \rd, #1
--		bmi	1002f
--		mrc	p14, 0, \rx, c0, c0, 0
--		tst	\rx, #2
--		bne	1001b
--1002:
--		.endm
--
--#endif	/* CONFIG_CPU_V6 */
--
--#elif !defined(CONFIG_DEBUG_SEMIHOSTING)
--#include <mach/debug-macro.S>
--#endif	/* CONFIG_DEBUG_ICEDCC */
-+#if !defined(CONFIG_DEBUG_SEMIHOSTING)
-+#include CONFIG_DEBUG_LL_INCLUDE
-+#endif
- 
- #ifdef CONFIG_MMU
- 		.macro	addruart_current, rx, tmp1, tmp2
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 3db960e..9874d07 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -23,8 +23,8 @@
- #include <asm/thread_info.h>
- #include <asm/pgtable.h>
- 
--#ifdef CONFIG_DEBUG_LL
--#include <mach/debug-macro.S>
-+#if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_SEMIHOSTING)
-+#include CONFIG_DEBUG_LL_INCLUDE
- #endif
- 
- /*
 -- 
 1.7.9.5
