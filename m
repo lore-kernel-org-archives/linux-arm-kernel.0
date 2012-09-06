@@ -1,27 +1,33 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 6 Sep 2012 09:18:35 -0700
-Subject: [PATCH v4 00/21] OMAP UART Patches
-In-Reply-To: <1346935540-1792-1-git-send-email-balbi@ti.com>
-References: <20120906122948.GC29202@arwen.pp.htv.fi>
- <1346935540-1792-1-git-send-email-balbi@ti.com>
-Message-ID: <20120906161835.GA7923@kroah.com>
+From: spartacus06@gmail.com (Seth Jennings)
+Date: Thu, 6 Sep 2012 11:53:26 -0500
+Subject: [PATCH] ARM: add support for BCM2708/BCM2835 and Raspberry Pi
+In-Reply-To: <1346908038-22421-1-git-send-email-swarren@wwwdotorg.org>
+References: <1346908038-22421-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <CAG-w=x77y6ykh3FcyTtVAN85eOk1RP2CZ=ZG-_1091i5jYDF2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 03:45:19PM +0300, Felipe Balbi wrote:
-> Hi guys,
-> 
-> here's v4 of the omap uart patchset. No changes other than a rebase on top of
-> Greg's tty-next branch and Tony's Acked-by being added to a couple patches
-> 
-> Note: I'm resending the series with Vikram's Software Flow Control fix anyway
-> as it can just be ignored if it's decided it needs to go into this merge
-> window.
-> 
-> Changes since v3:
-> 	. Rebased on top of Greg's tty-next branch
-> 	. Added Tony's Acked-by
+(sorry for the dup Stephen, forgot to reply all :-/)
 
-Thanks for rebasing, all now applied.
+On Thu, Sep 6, 2012 at 12:07 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>
+> The BCM2708 is an ARM SoC from Broadcom. It is the primary SoC in a
+> series which contains the BCM2835 amongst other variants. This patch
+> adds very basic support for this series of SoCs, under the BCM2708 name.
 
-greg k-h
+Great work! I'm glad to see this heading upstream :)
+
+> This series was extracted from git://github.com/lp0/linux.git branch
+> rpi-next or rpi-linear from 3-4 months ago, and significantly stripped
+> down and modified since.
+
+I've used Simon's tree before and it will boot up all the way with UART
+support (no graphics, usb, network).  I also think it has a fully
+populated device
+tree.  Why, in particular, did you strip it down?
+
+I'm new to the ARM SoC upstreaming scene so there might be a obvious
+reason of which I'm not aware.
+
+--
+Seth
