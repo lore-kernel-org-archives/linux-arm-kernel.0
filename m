@@ -1,73 +1,84 @@
-From: benoit.thebaudeau@advansee.com (=?utf-8?Q?Beno=C3=AEt_Th=C3=A9baudeau?=)
-Date: Thu, 6 Sep 2012 21:09:42 +0200 (CEST)
-Subject: [PATCH 7/9] pwm i.MX: fix clock lookup
-In-Reply-To: <20120906184256.GJ26594@pengutronix.de>
-Message-ID: <1355578446.3801048.1346958582085.JavaMail.root@advansee.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 6 Sep 2012 12:12:17 -0700
+Subject: [PATCH 5/5] omap-serial: Request pins using pinctrl framework
+In-Reply-To: <20120906185832.1172.31013.stgit@muffinssi.local>
+References: <20120906185615.1172.23588.stgit@muffinssi.local>
+ <20120906185832.1172.31013.stgit@muffinssi.local>
+Message-ID: <20120906191216.GA1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 6, 2012 8:42:56 PM, Sascha Hauer wrote:
-> On Thu, Sep 06, 2012 at 08:31:58PM +0200, Beno?t Th?baudeau wrote:
-> > On Thursday, September 6, 2012 2:48:13 PM, Sascha Hauer wrote:
-> > > 
-> > > +	int ret;
-> > > +
-> > > +	ret = clk_prepare_enable(imx->clk_ipg);
-> > > +	if (ret)
-> > > +		return ret;
-> > >  
-> > > -	return imx->config(chip, pwm, duty_ns, period_ns);
-> > > +	ret = imx->config(chip, pwm, duty_ns, period_ns);
-> > > +
-> > > +	clk_disable_unprepare(imx->clk_ipg);
-> > > +
-> > > +	return ret;
-> > >  }
-> > >  
-> > >  static int imx_pwm_enable(struct pwm_chip *chip, struct
-> > >  pwm_device
-> > >  *pwm)
-> > > @@ -169,7 +179,7 @@ static int imx_pwm_enable(struct pwm_chip
-> > > *chip,
-> > > struct pwm_device *pwm)
-> > >  	struct imx_chip *imx = to_imx_chip(chip);
-> > >  	int ret;
-> > >  
-> > > -	ret = clk_prepare_enable(imx->clk);
-> > > +	ret = clk_prepare_enable(imx->clk_per);
-> > >  	if (ret)
-> > >  		return ret;
-> > 
-> > Have you tested that this actually works on i.MX53?
-> > 
-> > I have tested it successfully on i.MX35 (with a few additions to
-> > platform code).
-> > But i.MX35 has a single bit controlling both PWM IPG and PER clock
-> > gates.
-> > 
-> > On i.MX53, there are 2 separate control bits for these. So, if ipg
-> > clk is
-> > strictly required to access PWM registers, even if per clk is
-> > enabled, this code
-> > should not work without adding
+* Tony Lindgren <tony@atomide.com> [120906 11:59]:
+> Request pins using pinctrl framework. Only show a warning
+> on error as some boards set the pins in the bootloader
+> even if CONFIG_PINCTRL is enabled.
 > 
-> I tested this on i.MX53, but you're right, this seems to be wrong.
-> I'll
-> recheck tomorrow.
+> Cc: linux-serial at vger.kernel.org
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
 
-I've performed a few more tests with bare register accesses in the bootloader to
-see how the PWM IP behaves.
+Greg, this patch should be OK for you to pick, it should not break
+anything even if pinctrl is not available yet. Let me know if it
+needs rebasing on top of other things you've queued for omap-serial.
 
-On i.MX25, i.MX35 and i.MX51, read accesses always work, whatever the state of
-the IPG and PER clock gates.
+Regards,
 
-On i.MX25 and i.MX51, write accesses always work, whatever the state of the IPG
-and PER clock gates.
+Tony
 
-On i.MX35, write accesses work if and only if the IPG and PER clocks are not
-gated off (single control bit for both).
-
-I don't have i.MX53 or i.MX6Q platforms to test that.
-
-Best regards,
-Beno?t
+>  arch/arm/plat-omap/include/plat/omap-serial.h |    1 +
+>  drivers/tty/serial/omap-serial.c              |   10 ++++++++++
+>  2 files changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
+> index 1a52725..0f4de14 100644
+> --- a/arch/arm/plat-omap/include/plat/omap-serial.h
+> +++ b/arch/arm/plat-omap/include/plat/omap-serial.h
+> @@ -106,6 +106,7 @@ struct uart_omap_port {
+>  	struct uart_port	port;
+>  	struct uart_omap_dma	uart_dma;
+>  	struct platform_device	*pdev;
+> +	struct pinctrl		*pins;
+>  
+>  	unsigned char		ier;
+>  	unsigned char		lcr;
+> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> index d3cda0c..068e88c 100644
+> --- a/drivers/tty/serial/omap-serial.c
+> +++ b/drivers/tty/serial/omap-serial.c
+> @@ -39,6 +39,7 @@
+>  #include <linux/irq.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/of.h>
+> +#include <linux/pinctrl/consumer.h>
+>  
+>  #include <plat/dma.h>
+>  #include <plat/dmtimer.h>
+> @@ -1492,6 +1493,13 @@ static int serial_omap_probe(struct platform_device *pdev)
+>  		goto err_port_line;
+>  	}
+>  
+> +	up->pins = pinctrl_get_select_default(&pdev->dev);
+> +	if (IS_ERR(up->pins)) {
+> +		dev_warn(&pdev->dev, "did not get pins for uart%i error: %li\n",
+> +			 up->port.line, PTR_ERR(up->pins));
+> +		up->pins = NULL;
+> +	}
+> +
+>  	sprintf(up->name, "OMAP UART%d", up->port.line);
+>  	up->port.mapbase = mem->start;
+>  	up->port.membase = devm_ioremap(&pdev->dev, mem->start,
+> @@ -1570,6 +1578,8 @@ static int serial_omap_remove(struct platform_device *dev)
+>  		pm_runtime_disable(&up->pdev->dev);
+>  		uart_remove_one_port(&serial_omap_reg, &up->port);
+>  		pm_qos_remove_request(&up->pm_qos_request);
+> +		if (up->pins)
+> +			pinctrl_put(up->pins);
+>  	}
+>  
+>  	platform_set_drvdata(dev, NULL);
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
