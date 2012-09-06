@@ -1,49 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 6 Sep 2012 12:11:52 +0100
-Subject: [PATCH V3 3/6] arm: cache-l2x0: add support for Aurora L2 cache
- ctrl
-In-Reply-To: <1346852677-5381-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1346852677-5381-1-git-send-email-gregory.clement@free-electrons.com>
- <1346852677-5381-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20120906111152.GE858@mudshark.cambridge.arm.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 6 Sep 2012 16:44:54 +0530
+Subject: [PATCH 2/2] ARM: dts: exynos4: allow i2c0 bus to be configured
+ using pinctrl interface
+In-Reply-To: <5320531.svfjn4BD9X@amdc1227>
+References: <1346923381-14144-1-git-send-email-thomas.abraham@linaro.org>
+ <1346923381-14144-3-git-send-email-thomas.abraham@linaro.org>
+ <5320531.svfjn4BD9X@amdc1227>
+Message-ID: <CAJuYYwSC6nvs4eJ7GOTD2Ti8EvcTPPGZ7Fj7reT2eY65nvq22Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2012 at 02:44:34PM +0100, Gregory CLEMENT wrote:
-> Aurora Cache Controller was designed to be compatible with the ARM L2
-> Cache Controller. It comes with some difference or improvement such
-> as:
-> - no cache id part number available through hardware (need to get it
->   by the DT).
-> - always write through mode available.
-> - two flavors of the controller outer cache and system cache (meaning
->   maintenance operations on L1 are broadcasted to the L2 and L2
->   performs the same operation).
-> - in outer cache mode, the cache maintenance operations are improved and
->   can be done on a range inside a page and are not limited to a cache
->   line.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
-> Tested-and-reviewed-by: Lior Amsalem <alior@marvell.com>
-> 
-> Cc: Barry Song <21cnbao@gmail.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> ---
->  arch/arm/include/asm/hardware/cache-aurora-l2.h |   55 ++++++
->  arch/arm/include/asm/hardware/cache-l2x0.h      |    4 +
->  arch/arm/mm/cache-l2x0.c                        |  237 +++++++++++++++++++++--
->  3 files changed, 283 insertions(+), 13 deletions(-)
->  create mode 100644 arch/arm/include/asm/hardware/cache-aurora-l2.h
+On 6 September 2012 15:43, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Thomas,
+>
+> On Thursday 06 of September 2012 14:53:01 Thomas Abraham wrote:
+>>               compatible = "samsung,s3c2440-i2c";
+>>               reg = <0x13860000 0x100>;
+>>               interrupts = <0 58 0>;
+>> +             pinctrl-names = "default";
+>> +             pinctrl-0 = <&i2c0_bus>;
+>
+> If pinctrl-names property is omitted then the state index is used as a name
+> (e.g. pinctrl-0 would be named "0"). Maybe it would be better to use this
+> approach (with respective adjustment in first patch)? What do you think?
 
-This is looking pretty good now:
+I tend to prefer to name the states because it is easier to
+cross-reference code and dts files. i2c was a simple one, but for mmc
+controllers, there will 1-bit state, 4-bit state and 8-bit state, and
+it will be nicer to name then accordingly. So I prefer to use names
+but if there is wider consensus on not using names, we can drop names.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+Thanks,
+Thomas.
 
-Cheers,
-
-Will
+>
+> Best regards,
+> --
+> Tomasz Figa
+> Samsung Poland R&D Center
+>
