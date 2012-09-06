@@ -1,61 +1,65 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 6 Sep 2012 16:16:24 +0300
-Subject: [PATCH v7 1/7] drivers: usb: phy: add a new driver for omap usb2
- phy
-In-Reply-To: <201209061303.02454.arnd@arndb.de>
-References: <1344258480-4304-1-git-send-email-kishon@ti.com>
- <1344258480-4304-2-git-send-email-kishon@ti.com>
- <CAAe_U6KBNZpT03xATmPTNTgxm5hj+wJdsShdnm08EmF4Q=hTCw@mail.gmail.com>
- <201209061303.02454.arnd@arndb.de>
-Message-ID: <20120906131623.GI29202@arwen.pp.htv.fi>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 06 Sep 2012 15:25:21 +0200
+Subject: [PATCH v3 0/3] DaVinci DMA engine conversion
+In-Reply-To: <503B933F.2030803@gmail.com>
+References: <1345684176-21472-1-git-send-email-mporter@ti.com>
+ <503B933F.2030803@gmail.com>
+Message-ID: <5048A441.3010109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 01:03:02PM +0000, Arnd Bergmann wrote:
-> On Thursday 06 September 2012, ABRAHAM, KISHON VIJAY wrote:
-> > > diff --git a/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt b/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
-> > > index d2fe064..bb0c7f4 100644
-> > > --- a/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
-> > > +++ b/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
-> > > @@ -8,3 +8,6 @@ properties:
-> > >
-> > >  Sub-nodes:
-> > >  All the devices connected to ocp2scp are described using sub-node to ocp2scp
-> > > +- usb2phy :
-> > > +   The binding details of usb2phy can be found in:
-> > > +   Documentation/devicetree/bindings/usb/omap-usb.txt
-> > 
-> > The above two lines should be added in omap-ocp2scp.txt (this file was
-> > added as part of omap: add ocp2scp as a bus driver and is in
-> > linux-next). However this file is still not in Felipe's xceiv branch.
-> > So I'm not sure how I can get this patch merged in Felipe's tree
-> > without conflict.
-> > 
-> 
-> There are three possible ways to do that:
-> 
-> * Not add that text. Is is actually required? The ocp2scp bus driver 
-> doesn't actually care what is connected to it, does it?
-> 
-> * Ask Felipe to merge the drivers/ocp2scp branch from arm-soc into
-> his branch, then apply your patch on top. The branch is scheduled
-> for merging in 3.7 and is stable, so there is no harm merging it
-> into his tree, as long as Olof and I are aware of this.
-> 
-> * Split out this change and apply the patch to add this documentation
-> change on top of the drivers/ocp2scp branch in the arm-soc tree.
-> There is no strict dependency between this change and the others
-> you want to merge, so it does not matter which tree it is merged through.
+Hi Matt,
 
-I'd be more comfortable with option 3 or 1, whatever you guys decide is
-fine ;-)
+On 27.08.2012 17:33, Daniel Mack wrote:
+> On 23.08.2012 03:09, Matt Porter wrote:
+>> This series begins the conversion of the DaVinci private EDMA API
+>> implementation to a DMA engine driver and converts two of the three
+>> in-kernel users of the private EDMA API to DMA engine.
+>>
+>> The approach taken is similar to the recent OMAP DMA Engine
+>> conversion. The EDMA DMA Engine driver is a wrapper around the existing
+>> private EDMA implementation and registers the platform device within
+>> the driver.  This allows the conversion series to stand alone with just
+>> the drivers and no changes to platform code. It also allows peripheral
+>> drivers to continue to use the private EDMA implementation until they
+>> are converted.
+>>
+>> The EDMA DMA Engine driver supports slave transfers only at this time. It
+>> is planned to add cyclic transfers in support of audio peripherals.
+>>
+>> There are three users of the private EDMA API in the kernel now:
+>> davinci_mmc, spi-davinci, and davinci-mcasp.  This series provides DMA
+>> Engine conversions for the davinci_mmc and spi-davinci drivers which
+>> use the supported slave transfers.
+>>
+>> This series has been tested on an AM18x EVM and Hawkboard with
+>> driver performance comparable to that of the private EDMA API
+>> implementations. Both MMC0 and MMC1 are tested which handles the
+>> DA850/OMAP-L138/AM18x specific case where MMC1 uses DMA channels on
+>> a second EDMA channel controller.  All other platforms have a simpler
+>> design with just a single EDMA channel controller.
+>>
+>> For those wanting to easily test this series, I've pushed a branch for
+>> each version to my github tree at https://github.com/ohporter/linux. The
+>> current branch is edma-dmaengine-v3.
+>>
+>> After this series, the current plan is to complete the mcasp driver
+>> conversion which includes adding cyclic dma support. This will then
+>> enable the removal and refactoring of the private EDMA API functionality
+>> into the EDMA DMA Engine driver.  Since EDMA is also used on the AM33xx
+>> family of parts in mach-omap2/, the plan is to enable this driver on
+>> that platform as well.
+> 
+> Once you have a patch for the McASP driver conversion, I can happily
+> test this on a AM33xx board, together with Gururaja's latest McASP
+> refactoring series. Let me know how I can help you here.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120906/30dd4690/attachment.sig>
+Did you find some time yet to continue on this side? I don't want to
+appear pushy, but as I need to finish some DT transition on a
+AM33xx-based board, I would much like to help out here, in case I can do
+anything to help speed things along.
+
+
+Many thanks for your work!
+
+Daniel
