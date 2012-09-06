@@ -1,50 +1,124 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 6 Sep 2012 16:01:34 +0200
-Subject: [PATCH 08/10] net/macb: macb_get_drvinfo: add GEM/MACB suffix
- to differentiate revision
-In-Reply-To: <1346887671.5325.47.camel@bwh-desktop.uk.solarflarecom.com>
-References: <cover.1346775479.git.nicolas.ferre@atmel.com>
- <fc701a2ed18198b7a671c55f1e65725f1709509c.1346775479.git.nicolas.ferre@atmel.com>
- <1346887671.5325.47.camel@bwh-desktop.uk.solarflarecom.com>
-Message-ID: <5048ACBE.2030205@atmel.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 6 Sep 2012 09:06:08 -0500
+Subject: [PATCH 01/10] ARM: OMAP3+: Implement timer workaround for errata
+ i103 and i767
+In-Reply-To: <50482FAC.3080807@ti.com>
+References: <1346871872-24413-1-git-send-email-jon-hunter@ti.com>
+ <1346871872-24413-2-git-send-email-jon-hunter@ti.com>
+ <50482FAC.3080807@ti.com>
+Message-ID: <5048ADD0.4050804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/2012 01:27 AM, Ben Hutchings :
-> On Wed, 2012-09-05 at 11:00 +0200, Nicolas Ferre wrote:
->> Add an indication about which revision of the hardware we are running in
->> info->driver string.
+
+On 09/06/2012 12:07 AM, Vaibhav Hiremath wrote:
+> 
+> 
+> On 9/6/2012 12:34 AM, Jon Hunter wrote:
+>> Errata Titles:
+>> i103: Delay needed to read some GP timer, WD timer and sync timer registers
+>>       after wakeup (OMAP3/4)
+>> i767: Delay needed to read some GP timer registers after wakeup (OMAP5)
 >>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Description (i103/i767):
+>> If a General Purpose Timer (GPTimer) is in posted mode (TSICR [2].POSTED=1),
+>> due to internal resynchronizations, values read in TCRR, TCAR1 and TCAR2
+>> registers right after the timer interface clock (L4) goes from stopped to
+>> active may not return the expected values. The most common event leading to
+>> this situation occurs upon wake up from idle.
+>>
+>> GPTimer non-posted synchronization mode is not impacted by this limitation.
+>>
+>> Workarounds:
+>> 1). Disable posted mode
+>> 2). Use static dependency between timer clock domain and MPUSS clock domain
+>> 3). Use no-idle mode when the timer is active
+>>
+>> Workarounds #2 and #3 are not pratical from a power standpoint and so
+>> workaround #1 has been implemented. Disabling posted mode adds some CPU overhead
+>> for configuring the timers as the CPU has to wait for the write to complete.
+>> However, disabling posted mode guarantees correct operation.
+>>
+>> Please note that it is safe to use posted mode for timers if the counter (TCRR)
+>> and capture (TCARx) registers will never be read. An example of this is the
+>> clock-event system timer. This is used by the kernel to schedule events however,
+>> the timers counter is never read and capture registers are not used. Given that
+>> the kernel configures this timer often yet never reads the counter register it
+>> is safe to enable posted mode in this case. Hence, for the timer used for kernel
+>> clock-events, posted mode is enabled by overriding the errata for devices that
+>> are impacted by this defect.
+>>
+>> Although both dmtimers and watchdogs are impacted by this defect this patch only
+>> implements the workaround for the dmtimer. Currently the watchdog driver does
+>> not read the counter register and so no workaround is necessary.
+>>
+>> Confirmed with Vaibhav Hiremath that this bug also impacts AM33xx devices.
+>>
+> 
+> Thanks for pinging me on this and getting it confirmed.
+> 
+>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 >> ---
->>  drivers/net/ethernet/cadence/macb.c |    4 ++++
->>  1 file changed, 4 insertions(+)
+>>  arch/arm/mach-omap2/timer.c               |    9 +++++++
+>>  arch/arm/plat-omap/dmtimer.c              |    2 ++
+>>  arch/arm/plat-omap/include/plat/dmtimer.h |   39 +++++++++++++++++++++++++++++
+>>  3 files changed, 50 insertions(+)
 >>
->> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
->> index bd331fd..c7c39f1 100644
->> --- a/drivers/net/ethernet/cadence/macb.c
->> +++ b/drivers/net/ethernet/cadence/macb.c
->> @@ -1313,6 +1313,10 @@ static void macb_get_drvinfo(struct net_device *dev,
->>  	struct macb *bp = netdev_priv(dev);
+>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+>> index 2ff6d41..5471706 100644
+>> --- a/arch/arm/mach-omap2/timer.c
+>> +++ b/arch/arm/mach-omap2/timer.c
+>> @@ -208,6 +208,13 @@ static void __init omap2_gp_clockevent_init(int gptimer_id,
+>>  {
+>>  	int res;
 >>  
->>  	strcpy(info->driver, bp->pdev->dev.driver->name);
->> +	if (macb_is_gem(bp))
->> +		strcat(info->driver, " GEM");
->> +	else
->> +		strcat(info->driver, " MACB");
->>  	strcpy(info->version, "$Revision: 1.14 $");
+>> +	/*
+>> +	 * For clock-event timers we never read the timer counter and
+>> +	 * so we are not impacted by errata i103 and i767. Therefore,
+>> +	 * we can safely ignore this errata for clock-event timers.
+>> +	 */
+>> +	__omap_dm_timer_populate_errata(&clkev, OMAP_TIMER_ERRATA_I103_I767);
+>> +
 > 
-> Related to hardware revisions (which don't belong here, as David said),
-> I rather doubt this CVS ID is very useful as a driver version.
+> Couple of points,
 > 
-> If the driver doesn't have a meaningful version (aside from the kernel
-> version) then you can remove this function and let the ethtool core fill
-> in the other two fields automatically.
+> 1. It is confusing to me, as you are passing the errata flag so i expect
+> api should set it. Why can't we do reverse way, you pass 0 here, since
+> you don't want to set and pass this flag every other places where you
+> want to enable this errata.
 
-Absolutely, I will do this.
+Per the design of the __omap_dm_timer_populate_errata function, the 2nd
+argument is called override to allow us to override an errata. I am not
+a huge fan of this, but I wanted to be explicit in the code that we are
+intentionally allowing posted mode for the clock-events timer.
 
-Thanks for the tip.
+I did not wish to pass the flags we want to set because if there more
+flags added in the future then we will have to keep changing the calls
+to the populate_errata function to add these.
 
-Best regards,
--- 
-Nicolas Ferre
+> 2. Why can't we enable for all timers? Even though clock-event is anyway
+> not reading it, but still is is applicable to it, right?
+
+Yes it is still applicable but we never read it so it is ok to override.
+If you see Richard W's original patch for enabling posted mode it is to
+reduce overhead of programming timers, specifically the clock-events
+timer which is program very often.
+
+For other timers, we do not know how they will be used and so by default
+we disable posted mode as this is safe.
+
+> 3. Why can't we just simply Add this flag to hwmod_data file and read it
+> back in omap_timer_init() and omap_dm_timer_init_one(). Wouldn't that be
+> a good approach to handle it?
+
+It could be done in this case, but typically I have not seen errata
+flags added to HWMOD. One limitation you would have with HWMOD is if an
+erratum is only specific to a certain revision of the device. In this
+case it is not and so it could work.
+
+In general I think that having errata described by HWMOD would be a good
+thing, but if think that should be a longer term goal with agreement
+from Benoit and add some general errata helpers to HWMOD.
+
+Cheers
+Jon
