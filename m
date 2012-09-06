@@ -1,112 +1,47 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu,  6 Sep 2012 11:04:32 +0900
-Subject: [PATCH 1/3] ARM: shmobile: marzen: add SDHI0 support
-In-Reply-To: <1346897074-6276-1-git-send-email-horms@verge.net.au>
-References: <1346897074-6276-1-git-send-email-horms@verge.net.au>
-Message-ID: <1346897074-6276-2-git-send-email-horms@verge.net.au>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 6 Sep 2012 04:05:08 +0200
+Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
+In-Reply-To: <20120905233416.GP1303@atomide.com>
+References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
+ <201209050513.08588.marex@denx.de> <20120905233416.GP1303@atomide.com>
+Message-ID: <201209060405.08997.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Phil Edworthy <phil.edworthy@renesas.com>
+Hi Tony,
 
-[horms at verge.net.au: moved defconfig portion into a separate patch]
-[horms at verge.net.au: added "ARM: shmobile:" to title]
-Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms@verge.net.au>
----
- arch/arm/mach-shmobile/board-marzen.c |   52 ++++++++++++++++++++++++++++++++-
- 1 file changed, 51 insertions(+), 1 deletion(-)
+> * Marek Vasut <marex@denx.de> [120904 20:13]:
+> > Dear Bryan Wu,
+> > 
+> > > On Sat, Sep 1, 2012 at 4:16 PM, AnilKumar Ch <anilkumar@ti.com> wrote:
+> > > > Adopt pinctrl support to leds-gpio driver based on leds-gpio
+> > > > device pointer, pinctrl driver configure SoC pins to GPIO
+> > > > mode according to definitions provided in .dts file.
+> > > 
+> > > Thanks for this, actually Marek Vasut submitted a similar patch
+> > > before. I'm pretty fine with this patch.
+> > 
+> > Thanks for submitting this actually ... I didn't have time to properly
+> > investigate this.
+> > 
+> > > But without proper DT setting, it will also give us warning I think.
+> > > or we can provide some dummy functions as a temp solution as Shawn
+> > > pointed out before.
+> > 
+> > But this driver is also used on hardware that's not yet coverted to DT,
+> > so I'd say dev_warn() if CONFIG_OF is enabled and otherwise simply go on
+> > ? Actually, can we not skip whole this pinctrl thing if CONFIG_OF is
+> > disabled? Actually (2), what's the relationship between OF and pinctrl?
+> 
+> The warning should be pinctrl related as the pinctrl drivers may not be
+> device tree based drivers.
 
-diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-index 3a528cf..dec3ffc 100644
---- a/arch/arm/mach-shmobile/board-marzen.c
-+++ b/arch/arm/mach-shmobile/board-marzen.c
-@@ -30,6 +30,8 @@
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/machine.h>
- #include <linux/smsc911x.h>
-+#include <linux/mmc/sh_mobile_sdhi.h>
-+#include <linux/mfd/tmio.h>
- #include <mach/hardware.h>
- #include <mach/r8a7779.h>
- #include <mach/common.h>
-@@ -39,6 +41,12 @@
- #include <asm/hardware/gic.h>
- #include <asm/traps.h>
- 
-+/* Fixed 3.3V regulator to be used by SDHI0 */
-+static struct regulator_consumer_supply fixed3v3_power_consumers[] = {
-+	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.0"),
-+	REGULATOR_SUPPLY("vqmmc", "sh_mobile_sdhi.0"),
-+};
-+
- /* Dummy supplies, where voltage doesn't matter */
- static struct regulator_consumer_supply dummy_supplies[] = {
- 	REGULATOR_SUPPLY("vddvario", "smsc911x"),
-@@ -75,13 +83,45 @@ static struct platform_device eth_device = {
- 	.num_resources	= ARRAY_SIZE(smsc911x_resources),
- };
- 
-+static struct resource sdhi0_resources[] = {
-+	[0] = {
-+		.name	= "sdhi0",
-+		.start	= 0xffe4c000,
-+		.end	= 0xffe4c0ff,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= gic_spi(104),
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct sh_mobile_sdhi_info sdhi0_platform_data = {
-+	.tmio_flags = TMIO_MMC_WRPROTECT_DISABLE | TMIO_MMC_HAS_IDLE_WAIT,
-+	.tmio_caps = MMC_CAP_SD_HIGHSPEED,
-+};
-+
-+static struct platform_device sdhi0_device = {
-+	.name = "sh_mobile_sdhi",
-+	.num_resources = ARRAY_SIZE(sdhi0_resources),
-+	.resource = sdhi0_resources,
-+	.id = 0,
-+	.dev = {
-+		.platform_data = &sdhi0_platform_data,
-+	}
-+};
-+
- static struct platform_device *marzen_devices[] __initdata = {
- 	&eth_device,
-+	&sdhi0_device,
- };
- 
- static void __init marzen_init(void)
- {
--	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
-+	regulator_register_always_on(0, "fixed-3.3V", fixed3v3_power_consumers,
-+				ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
-+	regulator_register_fixed(0, dummy_supplies,
-+				ARRAY_SIZE(dummy_supplies));
- 
- 	r8a7779_pinmux_init();
- 
-@@ -97,6 +137,16 @@ static void __init marzen_init(void)
- 	gpio_request(GPIO_FN_EX_CS0, NULL); /* nCS */
- 	gpio_request(GPIO_FN_IRQ1_B, NULL); /* IRQ + PME */
- 
-+	/* SD0 (CN20) */
-+	gpio_request(GPIO_FN_SD0_CLK, NULL);
-+	gpio_request(GPIO_FN_SD0_CMD, NULL);
-+	gpio_request(GPIO_FN_SD0_DAT0, NULL);
-+	gpio_request(GPIO_FN_SD0_DAT1, NULL);
-+	gpio_request(GPIO_FN_SD0_DAT2, NULL);
-+	gpio_request(GPIO_FN_SD0_DAT3, NULL);
-+	gpio_request(GPIO_FN_SD0_CD, NULL);
-+	gpio_request(GPIO_FN_SD0_WP, NULL);
-+
- 	r8a7779_add_standard_devices();
- 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
- }
--- 
-1.7.10.4
+Exactly my concern. Also the warning shouldnt be present on systems where 
+pinctrl is disabled.
+
+> Regards,
+> 
+> Tony
+
+Best regards,
+Marek Vasut
