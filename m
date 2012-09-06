@@ -1,57 +1,31 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Thu,  6 Sep 2012 19:55:34 +0530
-Subject: [PATCH 2/2] ARM: SAMSUNG: Add check for NULL in clock interface
-Message-ID: <1346941534-4501-1-git-send-email-chander.kashyap@linaro.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 6 Sep 2012 09:26:58 -0500
+Subject: [PATCH 09/10] ARM: OMAP: Add dmtimer interrupt disable function
+In-Reply-To: <50489DD9.90903@ti.com>
+References: <1346871872-24413-1-git-send-email-jon-hunter@ti.com>
+ <1346871872-24413-10-git-send-email-jon-hunter@ti.com>
+ <50489DD9.90903@ti.com>
+Message-ID: <5048B2B2.1030401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock instance parameter in Samsung clock interface is not being checked
-for NULL pointers. Add checks for NULL pointers.
 
-Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
----
- arch/arm/plat-samsung/clock.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+On 09/06/2012 07:58 AM, Vaibhav Hiremath wrote:
+> 
+> 
+> On 9/6/2012 12:34 AM, Jon Hunter wrote:
+>> The OMAP dmtimer driver does not currently have a function to disable the
+>> timer interrupts. For some timer instances the timer interrupt enable
+>> function can be used to disable the interrupts because the same interrupt
+>> enable register is used to disable interrupts. However, some timer instances
+>> have separate interrupt enable/disable registers and so this will not work.
+>> Therefore, add a dedicated function to disable interrupts.
+>>
+> 
+> I think you should clearly specify which timer and which device you are
+> referring to.
 
-diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
-index 65c5eca..7938fbc 100644
---- a/arch/arm/plat-samsung/clock.c
-+++ b/arch/arm/plat-samsung/clock.c
-@@ -119,7 +119,7 @@ void clk_disable(struct clk *clk)
- 
- unsigned long clk_get_rate(struct clk *clk)
- {
--	if (IS_ERR(clk))
-+	if (IS_ERR_OR_NULL(clk))
- 		return 0;
- 
- 	if (clk->rate != 0)
-@@ -136,7 +136,7 @@ unsigned long clk_get_rate(struct clk *clk)
- 
- long clk_round_rate(struct clk *clk, unsigned long rate)
- {
--	if (!IS_ERR(clk) && clk->ops && clk->ops->round_rate)
-+	if (!IS_ERR_OR_NULL(clk) && clk->ops && clk->ops->round_rate)
- 		return (clk->ops->round_rate)(clk, rate);
- 
- 	return rate;
-@@ -146,7 +146,7 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
- {
- 	int ret;
- 
--	if (IS_ERR(clk))
-+	if (IS_ERR_OR_NULL(clk))
- 		return -EINVAL;
- 
- 	/* We do not default just do a clk->rate = rate as
-@@ -175,7 +175,7 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
- {
- 	int ret = 0;
- 
--	if (IS_ERR(clk))
-+	if (IS_ERR_OR_NULL(clk) || IS_ERR_OR_NULL(parent))
- 		return -EINVAL;
- 
- 	spin_lock(&clocks_lock);
--- 
-1.7.9.5
+OMAP4+ devices. For OMAP4 all timers apart from 1, 2 and 10. For OMAP5
+all timers.
+
+Jon
