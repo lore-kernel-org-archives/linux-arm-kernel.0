@@ -1,45 +1,27 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 6 Sep 2012 09:15:14 +0200
-Subject: [PATCH 7/8] pwm i.MX: fix clock lookup
-In-Reply-To: <1698432111.3713458.1346881731396.JavaMail.root@advansee.com>
-References: <1346852127-25226-8-git-send-email-s.hauer@pengutronix.de>
- <1698432111.3713458.1346881731396.JavaMail.root@advansee.com>
-Message-ID: <20120906071514.GM26594@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 6 Sep 2012 09:16:14 +0200
+Subject: [GIT PULL] Renesas ARM-based SoC: KZM-A9-GT for 3.7 #2
+In-Reply-To: <20120906061807.GA3326@verge.net.au>
+References: <1346305648-25263-1-git-send-email-horms@verge.net.au>
+ <20120905224413.GC32084@quad.lixom.net>
+ <CACRpkdZBOjO124w3WwPpL7ekf2dU1w2HCub9EG=LUxFSPn8Ayw@mail.gmail.com>
+ <20120906061807.GA3326@verge.net.au>
+Message-ID: <CACRpkdYe1pa6udnw6UTEewcCdzzyLRLZ6dSo2pYG4nLu_DAMrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2012 at 11:48:51PM +0200, Beno?t Th?baudeau wrote:
-> >  
-> > -	c = clk_get_rate(imx->clk);
-> > +	c = clk_get_rate(imx->clk_per);
-> >  	c = c * period_ns;
-> >  	do_div(c, 1000000000);
-> >  	period_cycles = c;
-> > @@ -160,8 +161,15 @@ static int imx_pwm_config(struct pwm_chip *chip,
-> >  		struct pwm_device *pwm, int duty_ns, int period_ns)
-> >  {
-> >  	struct imx_chip *imx = to_imx_chip(chip);
-> > +	int ret;
-> >  
-> > -	return imx->config(chip, pwm, duty_ns, period_ns);
-> > +	clk_prepare_enable(imx->clk_ipg);
-> 
-> Why don't you test the return value like in imx_pwm_enable()?
+On Thu, Sep 6, 2012 at 8:18 AM, Simon Horman <horms@verge.net.au> wrote:
 
-Will do next time.
+> It seems to me that I should rebase the my branch and it can
+> then go through either the ARM SoC or GPIO tree. Either is fine by me.
 
-Sascha
+Me too...
 
-> 
-> I have reviewed the whole series. Apart from the comments I made, it looks good
-> to me.
+> As an aside, the patch does include a defconfig change.
+> Olof, Should that be broken out into a separate patch?
 
-Thanks. I can take this as a reviewed-by, right?
+IIRC Arnd told me he actually likes when we patch defconfigs as
+part of other fixes so leave it in.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Yours,
+Linus Walleij
