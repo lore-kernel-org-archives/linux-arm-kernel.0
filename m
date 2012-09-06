@@ -1,51 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 6 Sep 2012 14:17:26 -0700
-Subject: [PATCH 5/5] omap-serial: Request pins using pinctrl framework
-In-Reply-To: <20120906195605.GA32145@arwen.pp.htv.fi>
-References: <20120906185615.1172.23588.stgit@muffinssi.local>
- <20120906185832.1172.31013.stgit@muffinssi.local>
- <20120906195605.GA32145@arwen.pp.htv.fi>
-Message-ID: <20120906211725.GQ1303@atomide.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Thu, 6 Sep 2012 16:35:04 -0500
+Subject: Converting OMAP's custom vram allocator
+In-Reply-To: <1346839733.32747.1.camel@deskari>
+References: <1346839733.32747.1.camel@deskari>
+Message-ID: <CAF6AEGuaWO=8yueQQiCC=dr7pYaMRjTTdLzySfGd3PmX-R3P6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [120906 13:01]:
+On Wed, Sep 5, 2012 at 5:08 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
 > Hi,
-> 
-> On Thu, Sep 06, 2012 at 11:58:32AM -0700, Tony Lindgren wrote:
-> > Request pins using pinctrl framework. Only show a warning
-> > on error as some boards set the pins in the bootloader
-> > even if CONFIG_PINCTRL is enabled.
-> > 
-> > Cc: linux-serial at vger.kernel.org
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > ---
-> >  arch/arm/plat-omap/include/plat/omap-serial.h |    1 +
-> >  drivers/tty/serial/omap-serial.c              |   10 ++++++++++
-> >  2 files changed, 11 insertions(+)
-> > 
-> > diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
-> > index 1a52725..0f4de14 100644
-> > --- a/arch/arm/plat-omap/include/plat/omap-serial.h
-> > +++ b/arch/arm/plat-omap/include/plat/omap-serial.h
-> > @@ -106,6 +106,7 @@ struct uart_omap_port {
-> >  	struct uart_port	port;
-> >  	struct uart_omap_dma	uart_dma;
-> >  	struct platform_device	*pdev;
-> > +	struct pinctrl		*pins;
-> 
-> this won't apply to Greg's tty-next as I moved this structure to the C
-> file :-s
+>
+> OMAP has a custom video ram allocator, which I'd like to remove and use
+> the standard dma allocation functions.
+>
+> There are two problems for which I'd like to hear suggestions or
+> comments:
+>
+> First one is that the dma_alloc_* functions map the allocated memory for
+> cpu use. In many cases with OMAP DSS (display subsystem) this is not
+> needed: the memory may be written only by the SGX or the DSP, and it's
+> only read by the DSS, so it's never touched by the CPU.
 
-Hmm the tty-next fails to build right now for omaps:
+see dma_alloc_attrs() and DMA_ATTR_NO_KERNEL_MAPPING
 
-drivers/tty/serial/omap-serial.c: In function ?serial_omap_set_mctrl?:
-drivers/tty/serial/omap-serial.c:514: error: ?struct uart_omap_port? has no member named ?DTR_gpio?
+> This is even more true when using VRFB on omap3 (and probably TILER on
+> omap4) for rotation, as VRFB hides the actual memory and offers rotated
+> views. In this case the backend memory is never accessed by anyone else
+> than VRFB.
 
-Maybe check how you want to fix that first? I can then update
-my patch for tty-next.
+just fwiw, we don't actually need contiguous memory on o4/tiler :-)
 
-Regards,
+(well, at least if you ignore things like secure playback)
 
-Tony
+> Is there a way to allocate the memory without creating a mapping? While
+> it won't break anything as such, the allocated areas can be quite large
+> thus causing large areas of the kernel's memory space to be needlessly
+> reserved.
+>
+> The second case is passing a framebuffer address from the bootloader to
+> the kernel. Often with mobile devices the bootloader will initialize the
+> display hardware, showing a company logo or such. To keep the image on
+> the screen when kernel starts we need to reserve the same physical
+> memory area early at boot, and use that for the framebuffer.
+
+with a bit of handwaving, this is possible.  You can pass a base
+address to dma_declare_contiguous() when you setup your device's CMA
+pool.  Although that doesn't really guarantee you're allocation from
+that pool is at offset zero, I suppose.
+
+> I'm not sure if there's any actual problem with this one, presuming
+> there is a solution for the first case. Somehow the memory is reserved
+> at early boot time, and this is passed to the fb driver. But can the
+> memory be managed the same way as in normal case (for example freeing
+> it), or does it need to be handled as a special case?
+
+special-casing it might be better.. although possibly a dma attr could
+be added for this to tell dma_alloc_from_contiguous() that we need a
+particular address within the CMA pool.  It seems a bit like a hack,
+but OTOH I guess pretty much every consumer device would need a hack
+like this.
+
+BR,
+-R
+
+>  Tomi
+>
