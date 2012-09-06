@@ -1,201 +1,294 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu,  6 Sep 2012 15:12:55 -0500
-Subject: [PATCH 12/12] ARM: vexpress: convert to multi-platform
+Date: Thu,  6 Sep 2012 15:12:50 -0500
+Subject: [PATCH 07/12] ARM: move all dtb targets out of Makefile.boot
 In-Reply-To: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
 References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1346962375-26163-13-git-send-email-robherring2@gmail.com>
+Message-ID: <1346962375-26163-8-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Convert vexpress to multi-platform. This always enables vexpress DT and
-makes it the default v7 platform.
+In preparation to support multi-platform kernels, move all the dtb targets
+out of the mach Makefile.boot and into the arch/arm/boot/dts/Makefile
+which is closer to the sources.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Andrew Victor <linux@maxim.org.za>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Viresh Kumar <viresh.linux@gmail.com>
+Cc: Shiraz Hashim <shiraz.hashim@st.com>
+Cc: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/Kconfig                     |   19 +---------
- arch/arm/mach-vexpress/Kconfig       |   64 +++++++++++++++++-----------------
- arch/arm/mach-vexpress/Makefile      |    2 ++
- arch/arm/mach-vexpress/Makefile.boot |    5 ---
- arch/arm/mach-vexpress/v2m.c         |    4 ---
- arch/arm/plat-versatile/Makefile     |    2 ++
- 6 files changed, 37 insertions(+), 59 deletions(-)
- delete mode 100644 arch/arm/mach-vexpress/Makefile.boot
+ arch/arm/boot/Makefile                |    2 ++
+ arch/arm/boot/dts/Makefile            |   41 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/Makefile.boot      |   24 -------------------
+ arch/arm/mach-exynos/Makefile.boot    |    3 ---
+ arch/arm/mach-imx/Makefile.boot       |    7 ------
+ arch/arm/mach-kirkwood/Makefile.boot  |   11 ---------
+ arch/arm/mach-lpc32xx/Makefile.boot   |    2 --
+ arch/arm/mach-mvebu/Makefile.boot     |    2 --
+ arch/arm/mach-mxs/Makefile.boot       |    9 --------
+ arch/arm/mach-spear13xx/Makefile.boot |    3 ---
+ arch/arm/mach-spear3xx/Makefile.boot  |    4 ----
+ arch/arm/mach-spear6xx/Makefile.boot  |    2 --
+ arch/arm/mach-tegra/Makefile.boot     |    8 -------
+ arch/arm/mach-ux500/Makefile.boot     |    2 --
+ arch/arm/mach-vexpress/Makefile.boot  |    5 ----
+ 15 files changed, 43 insertions(+), 82 deletions(-)
+ create mode 100644 arch/arm/boot/dts/Makefile
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ebaf088..16773aa 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -319,24 +319,6 @@ config ARCH_VERSATILE
- 	help
- 	  This enables support for ARM Ltd Versatile board.
+diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+index c877087..3fdab01 100644
+--- a/arch/arm/boot/Makefile
++++ b/arch/arm/boot/Makefile
+@@ -15,6 +15,8 @@ ifneq ($(MACHINE),)
+ include $(srctree)/$(MACHINE)/Makefile.boot
+ endif
  
--config ARCH_VEXPRESS
--	bool "ARM Ltd. Versatile Express family"
--	select ARCH_WANT_OPTIONAL_GPIOLIB
--	select ARM_AMBA
--	select ARM_TIMER_SP804
--	select CLKDEV_LOOKUP
--	select COMMON_CLK
--	select GENERIC_CLOCKEVENTS
--	select HAVE_CLK
--	select HAVE_PATA_PLATFORM
--	select ICST
--	select NO_IOPORT
--	select PLAT_VERSATILE
--	select PLAT_VERSATILE_CLCD
--	select REGULATOR_FIXED_VOLTAGE if REGULATOR
--	help
--	  This enables support for the ARM Ltd Versatile Express boards.
--
- config ARCH_AT91
- 	bool "Atmel AT91"
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -1016,6 +998,7 @@ config ARCH_MULTI_V6
- config ARCH_MULTI_V7
- 	bool "ARMv7 based platforms (Cortex-A, PJ4, Krait)"
- 	select CPU_V7
-+	select ARCH_VEXPRESS
- 	default y
- 	select ARCH_MULTI_V6_V7
- 
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index fc3730f..c952960 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -1,38 +1,23 @@
--menu "Versatile Express platform type"
--	depends on ARCH_VEXPRESS
--
--config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
--	bool "Enable A5 and A9 only errata work-arounds"
--	default y
--	select ARM_ERRATA_720789
--	select ARM_ERRATA_751472
--	select PL310_ERRATA_753970 if CACHE_PL310
--	help
--	  Provides common dependencies for Versatile Express platforms
--	  based on Cortex-A5 and Cortex-A9 processors. In order to
--	  build a working kernel, you must also enable relevant core
--	  tile support or Flattened Device Tree based support options.
--
--config ARCH_VEXPRESS_CA9X4
--	bool "Versatile Express Cortex-A9x4 tile"
--	select ARM_GIC
--	select CPU_V7
--	select HAVE_SMP
--	select MIGHT_HAVE_CACHE_L2X0
--
--config ARCH_VEXPRESS_DT
--	bool "Device Tree support for Versatile Express platforms"
-+config ARCH_VEXPRESS
-+	bool "ARM Ltd. Versatile Express family" if ARCH_MULTI_V7
-+	select ARCH_WANT_OPTIONAL_GPIOLIB
-+	select ARM_AMBA
- 	select ARM_GIC
--	select ARM_PATCH_PHYS_VIRT
--	select AUTO_ZRELADDR
-+	select ARM_TIMER_SP804
-+	select CLKDEV_LOOKUP
-+	select COMMON_CLK
- 	select CPU_V7
-+	select GENERIC_CLOCKEVENTS
-+	select HAVE_CLK
-+	select HAVE_PATA_PLATFORM
- 	select HAVE_SMP
-+	select ICST
- 	select MIGHT_HAVE_CACHE_L2X0
--	select USE_OF
-+	select NO_IOPORT
-+	select PLAT_VERSATILE
-+	select PLAT_VERSATILE_CLCD
-+	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 	help
--	  New Versatile Express platforms require Flattened Device Tree to
--	  be passed to the kernel.
--
- 	  This option enables support for systems using Cortex processor based
- 	  ARM core and logic (FPGA) tiles on the Versatile Express motherboard,
- 	  for example:
-@@ -48,7 +33,22 @@ config ARCH_VEXPRESS_DT
- 	  platforms. The traditional (ATAGs) boot method is not usable on
- 	  these boards with this option.
- 
--	  If your bootloader supports Flattened Device Tree based booting,
--	  say Y here.
-+menu "Versatile Express platform type"
-+	depends on ARCH_VEXPRESS
++include $(srctree)/arch/arm/boot/dts/Makefile
 +
-+config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
-+	bool "Enable A5 and A9 only errata work-arounds"
-+	default y
-+	select ARM_ERRATA_720789
-+	select ARM_ERRATA_751472
-+	select PL310_ERRATA_753970 if CACHE_PL310
-+	help
-+	  Provides common dependencies for Versatile Express platforms
-+	  based on Cortex-A5 and Cortex-A9 processors. In order to
-+	  build a working kernel, you must also enable relevant core
-+	  tile support or Flattened Device Tree based support options.
-+
-+config ARCH_VEXPRESS_CA9X4
-+	bool "Versatile Express Cortex-A9x4 tile"
- 
- endmenu
-diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
-index 90551b9..42703e8 100644
---- a/arch/arm/mach-vexpress/Makefile
-+++ b/arch/arm/mach-vexpress/Makefile
-@@ -1,6 +1,8 @@
- #
- # Makefile for the linux kernel.
- #
-+ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
-+	-I$(srctree)/arch/arm/plat-versatile/include
- 
- obj-y					:= v2m.o
- obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)	+= ct-ca9x4.o
+ # Note: the following conditions must always be true:
+ #   ZRELADDR == virt_to_phys(PAGE_OFFSET + TEXT_OFFSET)
+ #   PARAMS_PHYS must be within 4MB of ZRELADDR
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+new file mode 100644
+index 0000000..e59586b
+--- /dev/null
++++ b/arch/arm/boot/dts/Makefile
+@@ -0,0 +1,41 @@
++dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb
++dtb-$(CONFIG_ARCH_LPC32XX) += ea3250.dtb phy3250.dtb
++dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += tegra20-harmony.dtb tegra20-paz00.dtb \
++	tegra20-seaboard.dtb tegra20-trimslice.dtb tegra20-ventana.dtb \
++	tegra20-whistler.dtb
++dtb-$(CONFIG_ARCH_TEGRA_3x_SOC) += tegra30-cardhu.dtb
++dtb-$(CONFIG_BOARD_SPEAR600_DT)	+= spear600-evb.dtb
++dtb-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-db.dtb armada-xp-db.dtb
++dtb-$(CONFIG_MACH_AT91SAM_DT) += aks-cdu.dtb at91sam9263ek.dtb \
++	at91sam9g20ek_2mmc.dtb at91sam9g20ek.dtb at91sam9g25ek.dtb \
++	at91sam9m10g45ek.dtb at91sam9n12ek.dtb ethernut5.dtb evk-pro3.dtb \
++	kizbox.dtb tny_a9260.dtb tny_a9263.dtb tny_a9g20.dtb usb_a9260.dtb \
++	usb_a9263.dtb usb_a9g20.dtb
++dtb-$(CONFIG_MACH_DLINK_KIRKWOOD_DT) += kirkwood-dns320.dtb kirkwood-dns325.dtb
++dtb-$(CONFIG_MACH_DREAMPLUG_DT) += kirkwood-dreamplug.dtb
++dtb-$(CONFIG_MACH_EXYNOS4_DT) += exynos4210-origen.dtb exynos4210-smdkv310.dtb
++dtb-$(CONFIG_MACH_EXYNOS5_DT) += exynos5250-smdk5250.dtb
++dtb-$(CONFIG_MACH_GOFLEXNET_DT) += kirkwood-goflexnet.dtb
++dtb-$(CONFIG_MACH_IB62X0_DT) += kirkwood-ib62x0.dtb
++dtb-$(CONFIG_MACH_ICONNECT_DT) += kirkwood-iconnect.dtb
++dtb-$(CONFIG_MACH_IMX51_DT) += imx51-babbage.dtb
++dtb-$(CONFIG_MACH_IMX53_DT) += imx53-ard.dtb imx53-evk.dtb \
++	imx53-qsb.dtb imx53-smd.dtb
++dtb-$(CONFIG_MACH_LSXL_DT) += kirkwood-lschlv2.dtb
++dtb-$(CONFIG_MACH_LSXL_DT) += kirkwood-lsxhl.dtb
++dtb-$(CONFIG_MACH_SNOWBALL) += snowball.dtb
++dtb-$(CONFIG_MACH_SPEAR1310) += spear1310-evb.dtb
++dtb-$(CONFIG_MACH_SPEAR1340) += spear1340-evb.dtb
++dtb-$(CONFIG_MACH_SPEAR300) += spear300-evb.dtb
++dtb-$(CONFIG_MACH_SPEAR310) += spear310-evb.dtb
++dtb-$(CONFIG_MACH_SPEAR320) += spear320-evb.dtb
++dtb-$(CONFIG_MACH_TS219_DT) += kirkwood-ts219-6281.dtb kirkwood-ts219-6282.dtb
++dtb-$(CONFIG_SOC_IMX6Q)	+= imx6q-arm2.dtb imx6q-sabrelite.dtb \
++			   imx6q-sabresd.dtb
++dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb imx23-olinuxino.dtb \
++	 imx23-stmp378x_devb.dtb imx28-apx4devkit.dtb \
++	 imx28-cfa10036.dtb imx28-evk.dtb \
++	 imx28-m28evk.dtb imx28-tx28.dtb
++dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2p-ca5s.dtb \
++	   vexpress-v2p-ca9.dtb vexpress-v2p-ca15-tc1.dtb \
++	   vexpress-v2p-ca15_a7.dtb
+diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
+index 30bb733..5309f9b 100644
+--- a/arch/arm/mach-at91/Makefile.boot
++++ b/arch/arm/mach-at91/Makefile.boot
+@@ -12,27 +12,3 @@ else
+ params_phys-y	:= 0x20000100
+ initrd_phys-y	:= 0x20410000
+ endif
+-
+-# Keep dtb files sorted alphabetically for each SoC
+-# sam9260
+-dtb-$(CONFIG_MACH_AT91SAM_DT) += aks-cdu.dtb
+-dtb-$(CONFIG_MACH_AT91SAM_DT) += ethernut5.dtb
+-dtb-$(CONFIG_MACH_AT91SAM_DT) += evk-pro3.dtb
+-dtb-$(CONFIG_MACH_AT91SAM_DT) += tny_a9260.dtb
+-dtb-$(CONFIG_MACH_AT91SAM_DT) += usb_a9260.dtb
+-# sam9263
+-dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9263ek.dtb
+-dtb-$(CONFIG_MACH_AT91SAM_DT) += tny_a9263.dtb
+-dtb-$(CONFIG_MACH_AT91SAM_DT) += usb_a9263.dtb
+-# sam9g20
+-dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9g20ek.dtb
+-dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9g20ek_2mmc.dtb
+-dtb-$(CONFIG_MACH_AT91SAM_DT) += kizbox.dtb
+-dtb-$(CONFIG_MACH_AT91SAM_DT) += tny_a9g20.dtb
+-dtb-$(CONFIG_MACH_AT91SAM_DT) += usb_a9g20.dtb
+-# sam9g45
+-dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9m10g45ek.dtb
+-# sam9n12
+-dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9n12ek.dtb
+-# sam9x5
+-dtb-$(CONFIG_MACH_AT91SAM_DT) += at91sam9g25ek.dtb
+diff --git a/arch/arm/mach-exynos/Makefile.boot b/arch/arm/mach-exynos/Makefile.boot
+index 31bd181..b9862e2 100644
+--- a/arch/arm/mach-exynos/Makefile.boot
++++ b/arch/arm/mach-exynos/Makefile.boot
+@@ -1,5 +1,2 @@
+    zreladdr-y	+= 0x40008000
+ params_phys-y	:= 0x40000100
+-
+-dtb-$(CONFIG_MACH_EXYNOS4_DT) += exynos4210-origen.dtb exynos4210-smdkv310.dtb
+-dtb-$(CONFIG_MACH_EXYNOS5_DT) += exynos5250-smdk5250.dtb
+diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
+index 05541cf..b27815d 100644
+--- a/arch/arm/mach-imx/Makefile.boot
++++ b/arch/arm/mach-imx/Makefile.boot
+@@ -37,10 +37,3 @@ initrd_phys-$(CONFIG_SOC_IMX53)	:= 0x70800000
+ zreladdr-$(CONFIG_SOC_IMX6Q)	+= 0x10008000
+ params_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10000100
+ initrd_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10800000
+-
+-dtb-$(CONFIG_MACH_IMX51_DT) += imx51-babbage.dtb
+-dtb-$(CONFIG_MACH_IMX53_DT) += imx53-ard.dtb imx53-evk.dtb \
+-			       imx53-qsb.dtb imx53-smd.dtb
+-dtb-$(CONFIG_SOC_IMX6Q)	+= imx6q-arm2.dtb \
+-			   imx6q-sabrelite.dtb \
+-			   imx6q-sabresd.dtb \
+diff --git a/arch/arm/mach-kirkwood/Makefile.boot b/arch/arm/mach-kirkwood/Makefile.boot
+index a13299d..760a0ef 100644
+--- a/arch/arm/mach-kirkwood/Makefile.boot
++++ b/arch/arm/mach-kirkwood/Makefile.boot
+@@ -1,14 +1,3 @@
+    zreladdr-y	+= 0x00008000
+ params_phys-y	:= 0x00000100
+ initrd_phys-y	:= 0x00800000
+-
+-dtb-$(CONFIG_MACH_DREAMPLUG_DT) += kirkwood-dreamplug.dtb
+-dtb-$(CONFIG_MACH_DLINK_KIRKWOOD_DT) += kirkwood-dns320.dtb
+-dtb-$(CONFIG_MACH_DLINK_KIRKWOOD_DT) += kirkwood-dns325.dtb
+-dtb-$(CONFIG_MACH_ICONNECT_DT) += kirkwood-iconnect.dtb
+-dtb-$(CONFIG_MACH_IB62X0_DT) += kirkwood-ib62x0.dtb
+-dtb-$(CONFIG_MACH_TS219_DT)	+= kirkwood-ts219-6281.dtb
+-dtb-$(CONFIG_MACH_TS219_DT)	+= kirkwood-ts219-6282.dtb
+-dtb-$(CONFIG_MACH_GOFLEXNET_DT) += kirkwood-goflexnet.dtb
+-dtb-$(CONFIG_MACH_LSXL_DT) += kirkwood-lschlv2.dtb
+-dtb-$(CONFIG_MACH_LSXL_DT) += kirkwood-lsxhl.dtb
+diff --git a/arch/arm/mach-lpc32xx/Makefile.boot b/arch/arm/mach-lpc32xx/Makefile.boot
+index 697323b..d7392a4 100644
+--- a/arch/arm/mach-lpc32xx/Makefile.boot
++++ b/arch/arm/mach-lpc32xx/Makefile.boot
+@@ -1,5 +1,3 @@
+    zreladdr-y	+= 0x80008000
+ params_phys-y	:= 0x80000100
+ initrd_phys-y	:= 0x82000000
+-
+-dtb-$(CONFIG_ARCH_LPC32XX) += ea3250.dtb phy3250.dtb
+diff --git a/arch/arm/mach-mvebu/Makefile.boot b/arch/arm/mach-mvebu/Makefile.boot
+index 2579a2f..b327175 100644
+--- a/arch/arm/mach-mvebu/Makefile.boot
++++ b/arch/arm/mach-mvebu/Makefile.boot
+@@ -1,3 +1 @@
+ zreladdr-y := 0x00008000
+-dtb-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-db.dtb
+-dtb-$(CONFIG_MACH_ARMADA_370_XP) += armada-xp-db.dtb
+diff --git a/arch/arm/mach-mxs/Makefile.boot b/arch/arm/mach-mxs/Makefile.boot
+index 4582999..07b11fe 100644
+--- a/arch/arm/mach-mxs/Makefile.boot
++++ b/arch/arm/mach-mxs/Makefile.boot
+@@ -1,10 +1 @@
+ zreladdr-y += 0x40008000
+-
+-dtb-y += imx23-evk.dtb \
+-	 imx23-olinuxino.dtb \
+-	 imx23-stmp378x_devb.dtb \
+-	 imx28-apx4devkit.dtb \
+-	 imx28-cfa10036.dtb \
+-	 imx28-evk.dtb \
+-	 imx28-m28evk.dtb \
+-	 imx28-tx28.dtb \
+diff --git a/arch/arm/mach-spear13xx/Makefile.boot b/arch/arm/mach-spear13xx/Makefile.boot
+index 403efd7..4674a4c 100644
+--- a/arch/arm/mach-spear13xx/Makefile.boot
++++ b/arch/arm/mach-spear13xx/Makefile.boot
+@@ -1,6 +1,3 @@
+ zreladdr-y	+= 0x00008000
+ params_phys-y	:= 0x00000100
+ initrd_phys-y	:= 0x00800000
+-
+-dtb-$(CONFIG_MACH_SPEAR1310)	+= spear1310-evb.dtb
+-dtb-$(CONFIG_MACH_SPEAR1340)	+= spear1340-evb.dtb
+diff --git a/arch/arm/mach-spear3xx/Makefile.boot b/arch/arm/mach-spear3xx/Makefile.boot
+index d93e217..4674a4c 100644
+--- a/arch/arm/mach-spear3xx/Makefile.boot
++++ b/arch/arm/mach-spear3xx/Makefile.boot
+@@ -1,7 +1,3 @@
+ zreladdr-y	+= 0x00008000
+ params_phys-y	:= 0x00000100
+ initrd_phys-y	:= 0x00800000
+-
+-dtb-$(CONFIG_MACH_SPEAR300)	+= spear300-evb.dtb
+-dtb-$(CONFIG_MACH_SPEAR310)	+= spear310-evb.dtb
+-dtb-$(CONFIG_MACH_SPEAR320)	+= spear320-evb.dtb
+diff --git a/arch/arm/mach-spear6xx/Makefile.boot b/arch/arm/mach-spear6xx/Makefile.boot
+index af493da..4674a4c 100644
+--- a/arch/arm/mach-spear6xx/Makefile.boot
++++ b/arch/arm/mach-spear6xx/Makefile.boot
+@@ -1,5 +1,3 @@
+ zreladdr-y	+= 0x00008000
+ params_phys-y	:= 0x00000100
+ initrd_phys-y	:= 0x00800000
+-
+-dtb-$(CONFIG_BOARD_SPEAR600_DT)	+= spear600-evb.dtb
+diff --git a/arch/arm/mach-tegra/Makefile.boot b/arch/arm/mach-tegra/Makefile.boot
+index 7a1bb62..2943381 100644
+--- a/arch/arm/mach-tegra/Makefile.boot
++++ b/arch/arm/mach-tegra/Makefile.boot
+@@ -1,11 +1,3 @@
+ zreladdr-$(CONFIG_ARCH_TEGRA_2x_SOC)	+= 0x00008000
+ params_phys-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00000100
+ initrd_phys-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00800000
+-
+-dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += tegra20-harmony.dtb
+-dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += tegra20-paz00.dtb
+-dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += tegra20-seaboard.dtb
+-dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += tegra20-trimslice.dtb
+-dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += tegra20-ventana.dtb
+-dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += tegra20-whistler.dtb
+-dtb-$(CONFIG_ARCH_TEGRA_3x_SOC) += tegra30-cardhu.dtb
+diff --git a/arch/arm/mach-ux500/Makefile.boot b/arch/arm/mach-ux500/Makefile.boot
+index dd5cd00..760a0ef 100644
+--- a/arch/arm/mach-ux500/Makefile.boot
++++ b/arch/arm/mach-ux500/Makefile.boot
+@@ -1,5 +1,3 @@
+    zreladdr-y	+= 0x00008000
+ params_phys-y	:= 0x00000100
+ initrd_phys-y	:= 0x00800000
+-
+-dtb-$(CONFIG_MACH_SNOWBALL) += snowball.dtb
 diff --git a/arch/arm/mach-vexpress/Makefile.boot b/arch/arm/mach-vexpress/Makefile.boot
-deleted file mode 100644
-index c6dd891..0000000
+index 318d308..c6dd891 100644
 --- a/arch/arm/mach-vexpress/Makefile.boot
-+++ /dev/null
-@@ -1,5 +0,0 @@
--# Those numbers are used only by the non-DT V2P-CA9 platform
--# The DT-enabled ones require CONFIG_AUTO_ZRELADDR=y
--   zreladdr-y	+= 0x60008000
--params_phys-y	:= 0x60000100
--initrd_phys-y	:= 0x60800000
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 37608f2..2ca86c5 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -539,8 +539,6 @@ MACHINE_START(VEXPRESS, "ARM-Versatile Express")
- 	.restart	= v2m_restart,
- MACHINE_END
- 
--#if defined(CONFIG_ARCH_VEXPRESS_DT)
++++ b/arch/arm/mach-vexpress/Makefile.boot
+@@ -3,8 +3,3 @@
+    zreladdr-y	+= 0x60008000
+ params_phys-y	:= 0x60000100
+ initrd_phys-y	:= 0x60800000
 -
- static struct map_desc v2m_rs1_io_desc __initdata = {
- 	.virtual	= V2M_PERIPH,
- 	.pfn		= __phys_to_pfn(0x1c000000),
-@@ -671,5 +669,3 @@ DT_MACHINE_START(VEXPRESS_DT, "ARM-Versatile Express")
- 	.handle_irq	= gic_handle_irq,
- 	.restart	= v2m_restart,
- MACHINE_END
--
--#endif
-diff --git a/arch/arm/plat-versatile/Makefile b/arch/arm/plat-versatile/Makefile
-index 272769a8..74cfd94 100644
---- a/arch/arm/plat-versatile/Makefile
-+++ b/arch/arm/plat-versatile/Makefile
-@@ -1,3 +1,5 @@
-+ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
-+
- obj-$(CONFIG_PLAT_VERSATILE_CLOCK) += clock.o
- obj-$(CONFIG_PLAT_VERSATILE_CLCD) += clcd.o
- obj-$(CONFIG_PLAT_VERSATILE_FPGA_IRQ) += fpga-irq.o
+-dtb-$(CONFIG_ARCH_VEXPRESS_DT)	+= vexpress-v2p-ca5s.dtb \
+-				   vexpress-v2p-ca9.dtb \
+-				   vexpress-v2p-ca15-tc1.dtb \
+-				   vexpress-v2p-ca15_a7.dtb
 -- 
 1.7.9.5
