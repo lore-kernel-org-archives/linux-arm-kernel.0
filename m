@@ -1,18 +1,18 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 06 Sep 2012 13:56:59 +0200
-Subject: [GIT PULL] ARM: LPC32xx: dts update
-Message-ID: <50488F8B.4070801@antcom.de>
+Date: Thu, 06 Sep 2012 13:58:14 +0200
+Subject: [GIT PULL] ARM: LPC32xx: core update
+Message-ID: <50488FD6.4080402@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd and Olof,
 
-below is the LPC32xx dts update branch for 3.7. Updates for reference boards
-PHY3250 and EA3250.
+below is the LPC32xx core update branch for 3.7.
 
 Thanks,
 
 Roland
+
 
 
 The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
@@ -21,17 +21,18 @@ The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
 
 are available in the git repository at:
 
-  git://git.antcom.de/linux-2.6.git lpc32xx/dts
+  git://git.antcom.de/linux-2.6.git lpc32xx/core
 
-for you to fetch changes up to 25b3ab6c7e39e42245d98c27d25d9902baec7b65:
+for you to fetch changes up to 7a5deff68f9e0a1db170ac9dd3b2b4aaddc1b80c:
 
-  ARM: LPC32xx: Extend dts for EA3250 board (2012-09-06 11:40:48 +0200)
+  ARM: LPC32xx: Remove board specific GPIO init (2012-09-06 11:39:29 +0200)
 
 ----------------------------------------------------------------
-Roland Stigge (2):
-      ARM: LPC32xx: Adjust device tree node to new standard num-cs
-      ARM: LPC32xx: Extend dts for EA3250 board
+Roland Stigge (3):
+      ARM: LPC32xx: Use handle_edge_irq() callback on edge type irqs
+      ARM: LPC32xx: Provide DMA filter callbacks via platform data
+      ARM: LPC32xx: Remove board specific GPIO init
 
- arch/arm/boot/dts/ea3250.dts  |  109 ++++++++++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/phy3250.dts |    4 +-
- 2 files changed, 109 insertions(+), 4 deletions(-)
+ arch/arm/mach-lpc32xx/irq.c     |    7 ++++---
+ arch/arm/mach-lpc32xx/phy3250.c |   20 ++++++++++++++------
+ 2 files changed, 18 insertions(+), 9 deletions(-)
