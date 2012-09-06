@@ -1,47 +1,33 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu,  6 Sep 2012 15:12:08 +0300
-Subject: [PATCH v3 01/14] MFD: twl4030-audio: Clean up MODULE_* and
- platform_driver part
+Date: Thu,  6 Sep 2012 15:12:12 +0300
+Subject: [PATCH v3 05/14] MFD: twl4030-audio: Get audio MCLK via twl-core API
+ instead of pdata
 In-Reply-To: <1346933541-21547-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1346933541-21547-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1346933541-21547-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1346933541-21547-6-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Place the MODULE_* lines in the same block and add MODULE_DESCRIPTION.
-Rearange the platform_driver structure at the same time.
+twl-core has API to get the boot time configured HFCLK rate which has the
+same rate as the audio MCLK.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/mfd/twl4030-audio.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/mfd/twl4030-audio.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/mfd/twl4030-audio.c b/drivers/mfd/twl4030-audio.c
-index 838ce4e..ac04b4f 100644
+index ca2d669..a48bf3a 100644
 --- a/drivers/mfd/twl4030-audio.c
 +++ b/drivers/mfd/twl4030-audio.c
-@@ -250,18 +250,18 @@ static int __devexit twl4030_audio_remove(struct platform_device *pdev)
- 	return 0;
- }
+@@ -175,7 +175,7 @@ static int __devinit twl4030_audio_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
  
--MODULE_ALIAS("platform:twl4030-audio");
--
- static struct platform_driver twl4030_audio_driver = {
--	.probe		= twl4030_audio_probe,
--	.remove		= __devexit_p(twl4030_audio_remove),
- 	.driver		= {
- 		.owner	= THIS_MODULE,
- 		.name	= "twl4030-audio",
- 	},
-+	.probe		= twl4030_audio_probe,
-+	.remove		= __devexit_p(twl4030_audio_remove),
- };
+ 	mutex_init(&audio->mutex);
+-	audio->audio_mclk = pdata->audio_mclk;
++	audio->audio_mclk = twl_get_hfclk_rate();
  
- module_platform_driver(twl4030_audio_driver);
- 
- MODULE_AUTHOR("Peter Ujfalusi <peter.ujfalusi@ti.com>");
-+MODULE_DESCRIPTION("TWL4030 audio block MFD driver");
- MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:twl4030-audio");
+ 	/* Configure APLL_INFREQ and disable APLL if enabled */
+ 	switch (audio->audio_mclk) {
 -- 
 1.7.12
