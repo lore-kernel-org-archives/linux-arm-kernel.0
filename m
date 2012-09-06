@@ -1,53 +1,77 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu,  6 Sep 2012 15:12:48 -0500
-Subject: [PATCH 05/12] ARM: socfpga: move debug macros to include/debug
+Date: Thu,  6 Sep 2012 15:12:51 -0500
+Subject: [PATCH 08/12] ARM: picoxcell: remove dependency on mach/* headers
 In-Reply-To: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
 References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1346962375-26163-6-git-send-email-robherring2@gmail.com>
+Message-ID: <1346962375-26163-9-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Move socfpga debug-macro.S over to common debug macro directory.
-
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Dinh Nguyen <dinguyen@altera.com>
+Cc: Jamie Iles <jamie@jamieiles.com>
 ---
- arch/arm/Kconfig.debug                             |    8 ++++++++
- .../mach/debug-macro.S => include/debug/socfpga.S} |    0
- 2 files changed, 8 insertions(+)
- rename arch/arm/{mach-socfpga/include/mach/debug-macro.S => include/debug/socfpga.S} (100%)
+ arch/arm/mach-picoxcell/common.c                   |    6 ++---
+ arch/arm/mach-picoxcell/include/mach/map.h         |   25 --------------------
+ .../{include/mach => }/picoxcell_soc.h             |    0
+ 3 files changed, 3 insertions(+), 28 deletions(-)
+ delete mode 100644 arch/arm/mach-picoxcell/include/mach/map.h
+ rename arch/arm/mach-picoxcell/{include/mach => }/picoxcell_soc.h (100%)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 3bafdd2..aa56934 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -317,6 +317,13 @@ choice
- 		  The uncompressor code port configuration is now handled
- 		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
+diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
+index 8f9a0b4..a8b70b5 100644
+--- a/arch/arm/mach-picoxcell/common.c
++++ b/arch/arm/mach-picoxcell/common.c
+@@ -20,11 +20,11 @@
+ #include <asm/hardware/vic.h>
+ #include <asm/mach/map.h>
  
-+	config DEBUG_SOCFPGA_UART
-+		depends on ARCH_SOCFPGA
-+		bool "Use SOCFPGA UART for low-level debug"
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on SOCFPGA based platforms.
+-#include <mach/map.h>
+-#include <mach/picoxcell_soc.h>
+-
++#include "picoxcell_soc.h"
+ #include "common.h"
+ 
++#define PHYS_TO_IO(x)		(((x) & 0x00ffffff) | 0xfe000000)
 +
- 	config DEBUG_VEXPRESS_UART0_DETECT
- 		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
- 		depends on ARCH_VEXPRESS && CPU_CP15_MMU
-@@ -385,6 +392,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/icedcc.S" if DEBUG_ICEDCC
- 	default "debug/highbank.S" if DEBUG_HIGHBANK_UART
- 	default "debug/mvebu.S" if DEBUG_MVEBU_UART
-+	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
- 	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
- 		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
- 	default "mach/debug-macro.S"
-diff --git a/arch/arm/mach-socfpga/include/mach/debug-macro.S b/arch/arm/include/debug/socfpga.S
+ #define WDT_CTRL_REG_EN_MASK	(1 << 0)
+ #define WDT_CTRL_REG_OFFS	(0x00)
+ #define WDT_TIMEOUT_REG_OFFS	(0x04)
+diff --git a/arch/arm/mach-picoxcell/include/mach/map.h b/arch/arm/mach-picoxcell/include/mach/map.h
+deleted file mode 100644
+index c06afad..0000000
+--- a/arch/arm/mach-picoxcell/include/mach/map.h
++++ /dev/null
+@@ -1,25 +0,0 @@
+-/*
+- * Copyright (c) 2011 Picochip Ltd., Jamie Iles
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-#ifndef __PICOXCELL_MAP_H__
+-#define __PICOXCELL_MAP_H__
+-
+-#define PHYS_TO_IO(x)		(((x) & 0x00ffffff) | 0xfe000000)
+-
+-#ifdef __ASSEMBLY__
+-#define IO_ADDRESS(x)		PHYS_TO_IO((x))
+-#else
+-#define IO_ADDRESS(x)		(void __iomem __force *)(PHYS_TO_IO((x)))
+-#endif
+-
+-#endif /* __PICOXCELL_MAP_H__ */
+diff --git a/arch/arm/mach-picoxcell/include/mach/picoxcell_soc.h b/arch/arm/mach-picoxcell/picoxcell_soc.h
 similarity index 100%
-rename from arch/arm/mach-socfpga/include/mach/debug-macro.S
-rename to arch/arm/include/debug/socfpga.S
+rename from arch/arm/mach-picoxcell/include/mach/picoxcell_soc.h
+rename to arch/arm/mach-picoxcell/picoxcell_soc.h
 -- 
 1.7.9.5
