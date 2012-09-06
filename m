@@ -1,74 +1,56 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Thu, 6 Sep 2012 18:28:19 +0530
-Subject: [PATCH 00/10] ARM: OMAP: DMTIMER fixes and clean-up
-In-Reply-To: <1346871872-24413-1-git-send-email-jon-hunter@ti.com>
-References: <1346871872-24413-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <50489DEB.9010709@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Sep 2012 14:02:17 +0100
+Subject: [PATCH V3 3/6] arm: cache-l2x0: add support for Aurora L2 cache
+ ctrl
+In-Reply-To: <50488DB8.1010007@free-electrons.com>
+References: <1346852677-5381-1-git-send-email-gregory.clement@free-electrons.com>
+ <1346852677-5381-4-git-send-email-gregory.clement@free-electrons.com>
+ <20120906111152.GE858@mudshark.cambridge.arm.com>
+ <50488DB8.1010007@free-electrons.com>
+Message-ID: <20120906130217.GI858@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 06, 2012 at 12:49:12PM +0100, Gregory CLEMENT wrote:
+> On 09/06/2012 01:11 PM, Will Deacon wrote:
+> > On Wed, Sep 05, 2012 at 02:44:34PM +0100, Gregory CLEMENT wrote:
+> >> Aurora Cache Controller was designed to be compatible with the ARM L2
+> >> Cache Controller. It comes with some difference or improvement such
+> >> as:
+> >> - no cache id part number available through hardware (need to get it
+> >>   by the DT).
+> >> - always write through mode available.
+> >> - two flavors of the controller outer cache and system cache (meaning
+> >>   maintenance operations on L1 are broadcasted to the L2 and L2
+> >>   performs the same operation).
+> >> - in outer cache mode, the cache maintenance operations are improved and
+> >>   can be done on a range inside a page and are not limited to a cache
+> >>   line.
 
+[...]
 
-On 9/6/2012 12:34 AM, Jon Hunter wrote:
-> This series includes several fixes for the OMAP DMTIMER driver and a few
-> clean-ups to simplify some of the code. This series is based upon 3.6-rc4.
+> > Reviewed-by: Will Deacon <will.deacon@arm.com>
+> > 
 > 
-> Tested on OMAP5912 OSK, OMAP2420 H4, OMAP3430 Beagle and OMAP4430 Panda.
-> Testing includes ...
-> 1. Booting kernel on above boards
-> 2. Set date and ensuring time of day is correct after 24 hours
-> 3. Checking the timer counter is incrementing when configuring and starting
->    a timer
-> 4. Checking the timer overflow interrupt when timer expires.
-> 5. Using different clock sources to operate the timer with.
-> 6. Running a loop test overnight that continually runs test #3 and #4 for
->    each available timer
+> Thanks. I guess you also reviewed patches 1 and 2, don't you?
+
+Well I didn't really read those because they looked fairly boring :)
+Boring is good though, so I doubt they're problematic.
+
+> And then where should I push my series?
 > 
+> Patches 1,2 and 3 depend of ARM subsystem so they should be submitted
+> using Russell King's patch state system. Patches 4 and 5 are more soc
+> specific and should go to marvell tree and then arm-soc. But patches 4
+> and 5 are meaningless if the first patches are not applied. What is the
+> good practice?
 
-On the other hand I have validated this patch-series on both AM37xEVM
-and BeagleBone platform. I used the test code which you shared with me
-to validate it.
+When I end up in situations like this, I usually prepare a branch for
+Russell containing the patches that should go via his tree. Then, send him a
+pull request and once he has pulled it, Arnd and Olof can pull the same
+branch into arm-soc as a baseline branch. You can then base your other
+patches on top of that.
 
-AM33XX Clock tree needs minor change here,
+Make sense?
 
-diff --git a/arch/arm/mach-omap2/clock33xx_data.c
-b/arch/arm/mach-omap2/clock33xx_data.c
-index a4006b2..daa36a5 100644
---- a/arch/arm/mach-omap2/clock33xx_data.c
-+++ b/arch/arm/mach-omap2/clock33xx_data.c
-@@ -1070,6 +1070,8 @@ static struct omap_clk am33xx_clks[] = {
-        CLK(NULL,       "gfx_fck_div_ck",       &gfx_fck_div_ck,
-CK_AM33XX),
-        CLK(NULL,       "sysclkout_pre_ck",     &sysclkout_pre_ck,
-CK_AM33XX),
-        CLK(NULL,       "clkout2_ck",           &clkout2_ck,    CK_AM33XX),
-+       CLK(NULL,       "timer_32k_ck",         &clkdiv32k_ick, CK_AM33XX),
-+       CLK(NULL,       "timer_sys_ck",         &sys_clkin_ck,  CK_AM33XX),
- };
-
- int __init am33xx_clk_init(void)
-
-
-Thanks,
-Vaibhav
-
-> Jon Hunter (10):
->   ARM: OMAP3+: Implement timer workaround for errata i103 and i767
->   ARM: OMAP: Fix timer posted mode support
->   ARM: OMAP3: Correct HWMOD DMTIMER SYSC register declarations
->   ARM: OMAP2/3: Define HWMOD software reset status for DMTIMERs
->   ARM: OMAP2+: Don't use __omap_dm_timer_reset()
->   ARM: OMAP: Fix dmtimer reset for timer1
->   ARM: OMAP: Clean-up dmtimer reset code
->   ARM: OMAP: Clean-up timer posted mode support
->   ARM: OMAP: Add dmtimer interrupt disable function
->   ARM: OMAP: Remove unnecessary call to clk_get()
-> 
->  arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |   15 ++-
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   41 ++++----
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    4 +
->  arch/arm/mach-omap2/timer.c                        |   27 +++--
->  arch/arm/plat-omap/dmtimer.c                       |  109 +++++++++++++-------
->  arch/arm/plat-omap/include/plat/dmtimer.h          |   95 ++++++++++-------
->  6 files changed, 184 insertions(+), 107 deletions(-)
-> 
+Will
