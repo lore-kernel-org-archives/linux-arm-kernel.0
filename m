@@ -1,116 +1,96 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 6 Sep 2012 09:20:07 -0500
-Subject: [PATCH 02/10] ARM: OMAP: Fix timer posted mode support
-In-Reply-To: <50489DBD.5030200@ti.com>
-References: <1346871872-24413-1-git-send-email-jon-hunter@ti.com>
- <1346871872-24413-3-git-send-email-jon-hunter@ti.com>
- <50489DBD.5030200@ti.com>
-Message-ID: <5048B117.7050601@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 6 Sep 2012 16:20:56 +0200
+Subject: [PATCH v2 09/10] net/macb: ethtool interface: add register dump
+ feature
+In-Reply-To: <1346888174.5325.55.camel@bwh-desktop.uk.solarflarecom.com>
+References: <1346888174.5325.55.camel@bwh-desktop.uk.solarflarecom.com>
+Message-ID: <1346941256-15676-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add macb_get_regs() ethtool function and its helper function:
+macb_get_regs_len().
+The version field is deduced from the IP revision which gives the
+"MACB or GEM" information. An additional version field is reserved.
 
-On 09/06/2012 07:57 AM, Vaibhav Hiremath wrote:
-> 
-> 
-> On 9/6/2012 12:34 AM, Jon Hunter wrote:
->> Currently the dmtimer posted mode is being enabled when the function
->> __omap_dm_timer_reset() is called. This function is only being called for
->> OMAP1 timers and OMAP2+ timers that are being used as system timers. Hence,
->> for OMAP2+ timers that are NOT being used as a system timer, posted mode is
->> not enabled but the "timer->posted" variable is still set (incorrectly) in
->> the omap_dm_timer_prepare() function.
->>
->> This is a regression introduced by commit 3392cdd3 (ARM: OMAP: dmtimer:
->> switch-over to platform device driver) which changed the code to only call
->> omap_dm_timer_reset() for OMAP1 devices. Although this is a regression from
->> the original code it only impacts performance and so is not needed for stable.
->>
->> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->> ---
->>  arch/arm/mach-omap2/timer.c               |    3 +--
->>  arch/arm/plat-omap/dmtimer.c              |   14 +++++---------
->>  arch/arm/plat-omap/include/plat/dmtimer.h |    9 ++++++++-
->>  3 files changed, 14 insertions(+), 12 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
->> index 5471706..e24ee0f 100644
->> --- a/arch/arm/mach-omap2/timer.c
->> +++ b/arch/arm/mach-omap2/timer.c
->> @@ -194,10 +194,9 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
->>  	}
->>  	__omap_dm_timer_init_regs(timer);
->>  	__omap_dm_timer_reset(timer, 1, 1);
->> -	timer->posted = 1;
->> +	__omap_dm_timer_enable_posted(timer);
->>  
->>  	timer->rate = clk_get_rate(timer->fclk);
->> -
->>  	timer->reserved = 1;
->>  
->>  	return res;
->> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
->> index c34f55b..22790ea 100644
->> --- a/arch/arm/plat-omap/dmtimer.c
->> +++ b/arch/arm/plat-omap/dmtimer.c
->> @@ -122,21 +122,15 @@ static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
->>  
->>  static void omap_dm_timer_reset(struct omap_dm_timer *timer)
->>  {
->> -	omap_dm_timer_enable(timer);
->>  	if (timer->pdev->id != 1) {
->>  		omap_dm_timer_write_reg(timer, OMAP_TIMER_IF_CTRL_REG, 0x06);
->>  		omap_dm_timer_wait_for_reset(timer);
->>  	}
->> -
->>  	__omap_dm_timer_reset(timer, 0, 0);
->> -	omap_dm_timer_disable(timer);
->> -	timer->posted = 1;
->>  }
->>  
->>  int omap_dm_timer_prepare(struct omap_dm_timer *timer)
->>  {
->> -	int ret;
->> -
->>  	/*
->>  	 * FIXME: OMAP1 devices do not use the clock framework for dmtimers so
->>  	 * do not call clk_get() for these devices.
->> @@ -150,13 +144,15 @@ int omap_dm_timer_prepare(struct omap_dm_timer *timer)
->>  		}
->>  	}
->>  
->> +	omap_dm_timer_enable(timer);
->> +
->>  	if (timer->capability & OMAP_TIMER_NEEDS_RESET)
->>  		omap_dm_timer_reset(timer);
->>  
->> -	ret = omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
->> +	__omap_dm_timer_enable_posted(timer);
->> +	omap_dm_timer_disable(timer);
->>  
->> -	timer->posted = 1;
->> -	return ret;
->> +	return omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
-> 
-> May be I am speculating here and I know this is tested and supposed to
-> work, but Isn't it safe to set parent keeping module enables.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+v2: - modify MACB_GREGS_NBR name and adapt to number of registers
+      actually displayed.
+    - change version format to reflect register layout and
+      add a version number to be future proof.
 
-So you would rather change the functional clock while the timer is
-enabled/active? So although that we are doing this today, that does not
-sound like a good idea to me :-)
+ drivers/net/ethernet/cadence/macb.c |   40 +++++++++++++++++++++++++++++++++++
+ drivers/net/ethernet/cadence/macb.h |    3 +++
+ 2 files changed, 43 insertions(+)
 
-> I would still recommend you to move is before omap_dm_timer_disable().
-> There could be devices or hw bugs/issues, may be related to standby/idle
-> protocol happening underneath module enable/disable.
-
-The register for setting the timer parent clock is located in the
-Configuration Module (OMAP1) and PRCM (OMAP2+) and so there is no
-requirement to keep the timer active while doing this.
-
-Furthermore, if you look at the omap_dm_timer_set_source() function that
-can be called from any driver using the timer, we never enable the timer
-when setting the timer clock source. So this way is more consistent with
-how the set_source function is implemented.
-
-Cheers
-Jon
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index dc34ff1..cab42e7 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -1223,9 +1223,49 @@ static int macb_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+ 	return phy_ethtool_sset(phydev, cmd);
+ }
+ 
++static int macb_get_regs_len(struct net_device *netdev)
++{
++	return MACB_GREGS_NBR * sizeof(u32);
++}
++
++static void macb_get_regs(struct net_device *dev, struct ethtool_regs *regs,
++			  void *p)
++{
++	struct macb *bp = netdev_priv(dev);
++	unsigned int tail, head;
++	u32 *regs_buff = p;
++
++	regs->version = (macb_readl(bp, MID) & ((1 << MACB_REV_SIZE) - 1))
++			| MACB_GREGS_VERSION;
++
++	tail = macb_tx_ring_wrap(bp->tx_tail);
++	head = macb_tx_ring_wrap(bp->tx_head);
++
++	regs_buff[0]  = macb_readl(bp, NCR);
++	regs_buff[1]  = macb_or_gem_readl(bp, NCFGR);
++	regs_buff[2]  = macb_readl(bp, NSR);
++	regs_buff[3]  = macb_readl(bp, TSR);
++	regs_buff[4]  = macb_readl(bp, RBQP);
++	regs_buff[5]  = macb_readl(bp, TBQP);
++	regs_buff[6]  = macb_readl(bp, RSR);
++	regs_buff[7]  = macb_readl(bp, IMR);
++
++	regs_buff[8]  = tail;
++	regs_buff[9]  = head;
++	regs_buff[10] = macb_tx_dma(bp, tail);
++	regs_buff[11] = macb_tx_dma(bp, head);
++
++	if (macb_is_gem(bp)) {
++		regs_buff[12] = gem_readl(bp, USRIO);
++		regs_buff[13] = gem_readl(bp, DMACFG);
++	}
++}
++
+ static const struct ethtool_ops macb_ethtool_ops = {
+ 	.get_settings		= macb_get_settings,
+ 	.set_settings		= macb_set_settings,
++	.get_regs_len		= macb_get_regs_len,
++	.get_regs		= macb_get_regs,
+ 	.get_link		= ethtool_op_get_link,
+ };
+ 
+diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
+index f69ceef..bcadc3c 100644
+--- a/drivers/net/ethernet/cadence/macb.h
++++ b/drivers/net/ethernet/cadence/macb.h
+@@ -10,6 +10,9 @@
+ #ifndef _MACB_H
+ #define _MACB_H
+ 
++#define MACB_GREGS_NBR 16
++#define MACB_GREGS_VERSION 1
++
+ /* MACB register offsets */
+ #define MACB_NCR				0x0000
+ #define MACB_NCFGR				0x0004
+-- 
+1.7.10
