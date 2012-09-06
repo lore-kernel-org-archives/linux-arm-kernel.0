@@ -1,148 +1,41 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 06 Sep 2012 14:58:35 -0700
-Subject: [PATCH v4 20/21] serial: omap: move uart_omap_port definition to
- C file
-In-Reply-To: <1346935540-1792-21-git-send-email-balbi@ti.com> (Felipe Balbi's
- message of "Thu, 6 Sep 2012 15:45:39 +0300")
-References: <20120906122948.GC29202@arwen.pp.htv.fi>
- <1346935540-1792-1-git-send-email-balbi@ti.com>
- <1346935540-1792-21-git-send-email-balbi@ti.com>
-Message-ID: <87fw6uizjo.fsf@deeprootsystems.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 07 Sep 2012 07:03:53 +0900
+Subject: [PATCH v3 1/4] pinctrl: add samsung pinctrl and gpiolib driver
+In-Reply-To: <5048DE83.4050203@wwwdotorg.org>
+References: <226e01cd8ae6$928010b0$b7803210$%kim@samsung.com>
+ <1346826046-30484-1-git-send-email-thomas.abraham@linaro.org>
+ <5048DE83.4050203@wwwdotorg.org>
+Message-ID: <241701cd8c7b$81022580$83067080$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe Balbi <balbi@ti.com> writes:
+Stephen Warren wrote:
+> 
+> On 09/05/2012 12:20 AM, Thomas Abraham wrote:
+> > Add a new device tree enabled pinctrl and gpiolib driver for Samsung
+> > SoC's. This driver provides a common and extensible framework for all
+> > Samsung SoC's to interface with the pinctrl and gpiolib subsystems. This
+> > driver supports only device tree based instantiation and hence can be
+> > used only on those Samsung platforms that have device tree enabled.
+> >
+> > This driver is split into two parts: the pinctrl interface and the
+> gpiolib
+> > interface. The pinctrl interface registers pinctrl devices with the
+> pinctrl
+> > subsystem and gpiolib interface registers gpio chips with the gpiolib
+> > subsystem. The information about the pins, pin groups, pin functions and
+> > gpio chips, which are SoC specific, are parsed from device tree node.
+> >
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Kukjin Kim <kgene.kim@samsung.com>
+> > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> 
+> Acked-by: Stephen Warren <swarren@nvidia.com>
 
-> nobody needs to access the uart_omap_port structure
-> other than omap-serial.c file. Let's move that
-> structure definition to the C source file in order
-> to prevent anyone from accessing our structure.
->
-> Tested-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+Applied this whole series, thanks.
 
-This one is clearly broken, and causes compile breakage...
-
-> ---
->  arch/arm/plat-omap/include/plat/omap-serial.h | 37 --------------------------
->  drivers/tty/serial/omap-serial.c              | 38 +++++++++++++++++++++++++++
->  2 files changed, 38 insertions(+), 37 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
-> index a79ed8b..3c9fd3e 100644
-> --- a/arch/arm/plat-omap/include/plat/omap-serial.h
-> +++ b/arch/arm/plat-omap/include/plat/omap-serial.h
-> @@ -105,45 +105,8 @@ struct uart_omap_dma {
->  	unsigned int		rx_timeout;
->  };
->  
-> -struct uart_omap_port {
-> -	struct uart_port	port;
-> -	struct uart_omap_dma	uart_dma;
-> -	struct device		*dev;
-> -
-> -	unsigned char		ier;
-> -	unsigned char		lcr;
-> -	unsigned char		mcr;
-> -	unsigned char		fcr;
-> -	unsigned char		efr;
-> -	unsigned char		dll;
-> -	unsigned char		dlh;
-> -	unsigned char		mdr1;
-> -	unsigned char		scr;
-> -
-> -	int			use_dma;
-> -	/*
-> -	 * Some bits in registers are cleared on a read, so they must
-> -	 * be saved whenever the register is read but the bits will not
-> -	 * be immediately processed.
-> -	 */
-> -	unsigned int		lsr_break_flag;
-> -	unsigned char		msr_saved_flags;
-> -	char			name[20];
-> -	unsigned long		port_activity;
-> -	u32			context_loss_cnt;
-> -	u32			errata;
-> -	u8			wakeups_enabled;
->  
->  	int			DTR_gpio;
->  	int			DTR_inverted;
->  	int			DTR_active;
-
-The whole struct has moved, but some fields left behind?
-
-This looks to be caused by the rebase which includes Neil Brown's DTR
-GPIO change[1]
-
-> -
-> -	struct pm_qos_request	pm_qos_request;
-> -	u32			latency;
-> -	u32			calc_latency;
-> -	struct work_struct	qos_work;
-> -};
-> -
-> -#define to_uart_omap_port(p)	((container_of((p), struct uart_omap_port, port)))
-> -
->  #endif /* __OMAP_SERIAL_H__ */
-> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> index 881b652..164c3c9 100644
-> --- a/drivers/tty/serial/omap-serial.c
-> +++ b/drivers/tty/serial/omap-serial.c
-> @@ -70,6 +70,44 @@
->  #define OMAP_UART_MVR_MAJ_SHIFT		8
->  #define OMAP_UART_MVR_MIN_MASK		0x3f
->  
-> +struct uart_omap_port {
-> +	struct uart_port	port;
-> +	struct uart_omap_dma	uart_dma;
-> +	struct device		*dev;
-> +
-> +	unsigned char		ier;
-> +	unsigned char		lcr;
-> +	unsigned char		mcr;
-> +	unsigned char		fcr;
-> +	unsigned char		efr;
-> +	unsigned char		dll;
-> +	unsigned char		dlh;
-> +	unsigned char		mdr1;
-> +	unsigned char		scr;
-> +
-> +	int			use_dma;
-> +	/*
-> +	 * Some bits in registers are cleared on a read, so they must
-> +	 * be saved whenever the register is read but the bits will not
-> +	 * be immediately processed.
-> +	 */
-> +	unsigned int		lsr_break_flag;
-> +	unsigned char		msr_saved_flags;
-> +	char			name[20];
-> +	unsigned long		port_activity;
-> +	u32			context_loss_cnt;
-> +	u32			errata;
-> +	u8			wakeups_enabled;
-> +	unsigned int		irq_pending:1;
-
-And this field was not in the original, yet the changelog describes this
-as a move.
-
-Why is a this new field added (and not described in the changelog.)
-
-Kevin
-
-
-[1]
-commit 9574f36fb801035f6ab0fbb1b53ce2c12c17d100
-Author: NeilBrown <neilb@suse.de>
-Date:   Mon Jul 30 10:30:26 2012 +1000
-
-    OMAP/serial: Add support for driving a GPIO as DTR.
-    
-    OMAP hardware doesn't provide a phyisical DTR line, but
-    some configurations may need a DTR line which tracks whether
-    the device is open or not.
-    
-    So allow a gpio to be configured as the DTR line.
-    
-    Signed-off-by: NeilBrown <neilb@suse.de>
-    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
