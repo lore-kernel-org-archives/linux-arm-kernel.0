@@ -1,35 +1,54 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 6 Sep 2012 13:47:44 -0700
-Subject: [PATCH 1/3] gpio-twl4030: get platform data from device tree
-In-Reply-To: <CACRpkdY7AtvGRabo6A9Go=g1=nJY08YXGm3r5oL+Q9RKjW=Ncw@mail.gmail.com>
-References: <1346680491-4211-1-git-send-email-florian.vaussard@epfl.ch>
- <1346680491-4211-2-git-send-email-florian.vaussard@epfl.ch>
- <CACRpkdY7AtvGRabo6A9Go=g1=nJY08YXGm3r5oL+Q9RKjW=Ncw@mail.gmail.com>
-Message-ID: <20120906204744.GK1303@atomide.com>
+Date: Thu, 6 Sep 2012 13:51:23 -0700
+Subject: [PATCH v2 0/2] gpio-twl4030: add new device tree properties
+In-Reply-To: <50476496.7050107@ti.com>
+References: <1346831186-29947-1-git-send-email-florian.vaussard@epfl.ch>
+ <50476496.7050107@ti.com>
+Message-ID: <20120906205123.GL1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [120904 00:31]:
-> On Mon, Sep 3, 2012 at 3:54 PM, Florian Vaussard
-> <florian.vaussard@epfl.ch> wrote:
+* Benoit Cousson <b-cousson@ti.com> [120905 07:42]:
+> Hi Florian,
 > 
-> > Adds a number of missing properties to the device tree of
-> > twl4030/gpio:
-> > - "ti,use-leds"  -> .use_leds
-> > - "ti,debounce"  -> .debounce
-> > - "ti,mmc-cd"    -> .mmc_cd
-> > - "ti,pullups"   -> .pullups
-> > - "ti,pulldowns" -> .pulldowns
-> >
-> > Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> On 09/05/2012 09:46 AM, Florian Vaussard wrote:
+> > Hello,
+> > 
+> > A number of platform data are missing when using twl4030/gpio from a
+> > device tree. This patchset adds the missing properties, updates the 
+> > documentation with the new bindings, and updates existing device trees.
+> > It mainly enables LEDA and LEDB outputs, as well as pullups /
+> > pulldowns on GPIOs.
+> > 
+> > The 1st patch changes the device driver and updates the documentation.
+> > The 2nd patch updates the device trees for BeagleBoard and omap3-evm.
+> > 
+> > Changes since v1: 
+> > - Patches on driver and documentation merged into the same patch
+> > - Put device trees' values in hexadecimal
+> > - Handle bool property using of_property_read_bool()
+> > - Prefix the patches with the correct convention
 > 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Thanks for the update.
 > 
-> Tony will you carry this in the OMAP tree?
+> > Tested on Gumstix Overo. V1 was tested on omap3-evm by Vaibhav Hiremath.
+> 
+> I've just tested it on beagle xM. I can play with D12 led using:
+> 
+> echo 255 > /sys/class/leds/beagleboard\:\:pmu_stat/brightness
+> 
+> Tested-by: Benoit Cousson <b-cousson@ti.com>
+> 
+> 
+> > BTW: who will merge this?
+> 
+> Since Linus already acked it, Tony can merge it.
+> 
+> 
+> Tony,
+> 
+> I can add that series in my DTS series for 3.7 if you want.
 
-Yes thanks I can queue this once the acks are there,
-I guess Benoit is planning to test the series first.
-
-Regards,
+Yes please do thanks.
 
 Tony
