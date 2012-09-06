@@ -1,48 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 6 Sep 2012 13:03:02 +0000
-Subject: [PATCH v7 1/7] drivers: usb: phy: add a new driver for omap usb2
- phy
-In-Reply-To: <CAAe_U6KBNZpT03xATmPTNTgxm5hj+wJdsShdnm08EmF4Q=hTCw@mail.gmail.com>
-References: <1344258480-4304-1-git-send-email-kishon@ti.com>
- <1344258480-4304-2-git-send-email-kishon@ti.com>
- <CAAe_U6KBNZpT03xATmPTNTgxm5hj+wJdsShdnm08EmF4Q=hTCw@mail.gmail.com>
-Message-ID: <201209061303.02454.arnd@arndb.de>
+From: jbe@pengutronix.de (Juergen Beisert)
+Date: Thu, 6 Sep 2012 15:03:09 +0200
+Subject: [PATCH 1/1] mxc_nand : allow swapping the Bad block Indicator for
+ NFC v1.
+In-Reply-To: <1345825064-9147-1-git-send-email-gcembed@gmail.com>
+References: <1345811288.2848.308.camel@sauron.fi.intel.com>
+ <1345825064-9147-1-git-send-email-gcembed@gmail.com>
+Message-ID: <201209061503.09923.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 September 2012, ABRAHAM, KISHON VIJAY wrote:
-> > diff --git a/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt b/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
-> > index d2fe064..bb0c7f4 100644
-> > --- a/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
-> > +++ b/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
-> > @@ -8,3 +8,6 @@ properties:
-> >
-> >  Sub-nodes:
-> >  All the devices connected to ocp2scp are described using sub-node to ocp2scp
-> > +- usb2phy :
-> > +   The binding details of usb2phy can be found in:
-> > +   Documentation/devicetree/bindings/usb/omap-usb.txt
-> 
-> The above two lines should be added in omap-ocp2scp.txt (this file was
-> added as part of omap: add ocp2scp as a bus driver and is in
-> linux-next). However this file is still not in Felipe's xceiv branch.
-> So I'm not sure how I can get this patch merged in Felipe's tree
-> without conflict.
-> 
+Ga?tan Carlier wrote:
+> Swap the BI-byte on position 0x7D0 with a data byte at 0x835.  To fix a bug
+> in Freescale imx NFC v1 SoC's for 2K page NAND flashes: imx27 and imx31.
+> Warning: The same solution needs to be applied to the boot loader and the
+> flash programmer.
+>
+> This is a modified version of patch sent by J?rgen Lambrecht :
+> [PATCH] Add 'config IMX_NFC_V1_BISWAP' to swap the Bad block Indicator,
+> and use for imx27pdk nand support.
+>
+>  v3: - use accessor function for I/O memory accesses as suggested by Artem
+>        Bityutskiy
+>      - rename function name as suggested by Artem Bityutskiy
+>
+>  v2: - Use a flag in a mxc_nand_platform structure instead of adding option
+>        in Kconfig
+>
+>  v1: - Original patch "Add 'config IMX_NFC_V1_BISWAP'" by J?rgen Lambrecht
+>
+> Signed-off-by: Ga?tan Carlier <gcembed@gmail.com>
 
-There are three possible ways to do that:
+One additional note: If a user intend to boot from NAND (aka "external boot") 
+there is one drawback with this patch: the very first page of the NAND will 
+be read in hardware to load the bootstrap code. But the hardware doesn't know 
+anything about swapping bytes!
+So, when writing the very first page of the NAND the swap *must* be omitted 
+(which also means the factory bad block marker of the first block in the NAND 
+has to be interpreted differently).
 
-* Not add that text. Is is actually required? The ocp2scp bus driver 
-doesn't actually care what is connected to it, does it?
+Regards,
+Juergen
 
-* Ask Felipe to merge the drivers/ocp2scp branch from arm-soc into
-his branch, then apply your patch on top. The branch is scheduled
-for merging in 3.7 and is stable, so there is no harm merging it
-into his tree, as long as Olof and I are aware of this.
-
-* Split out this change and apply the patch to add this documentation
-change on top of the drivers/ocp2scp branch in the arm-soc tree.
-There is no strict dependency between this change and the others
-you want to merge, so it does not matter which tree it is merged through.
-
-	Arnd
+-- 
+Pengutronix e.K.                              | Juergen Beisert             |
+Linux Solutions for Science and Industry      | Phone: +49-5121-206917-5128 |
+Vertretung Sued/Muenchen, Germany             | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686              | http://www.pengutronix.de/  |
