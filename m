@@ -1,31 +1,53 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu,  6 Sep 2012 11:02:07 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC: SoC for 3.7
-Message-ID: <1346896928-5750-1-git-send-email-horms@verge.net.au>
+Date: Thu,  6 Sep 2012 11:02:08 +0900
+Subject: [PATCH] r8a7779: add SDHI clock support
+In-Reply-To: <1346896928-5750-1-git-send-email-horms@verge.net.au>
+References: <1346896928-5750-1-git-send-email-horms@verge.net.au>
+Message-ID: <1346896928-5750-2-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Phil Edworthy <phil.edworthy@renesas.com>
 
-please consider the following SoC enhancement from
-Phil Edworthy for inclusion in 3.7.
-
-----------------------------------------------------------------
-The following changes since commit 7952717adb69efc1d2443a1858f96d23c2fb93e0:
-
-  ARM: shmobile: kzm9g: enable restarting (2012-08-25 14:39:44 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc
-
-for you to fetch changes up to 263510ec774b490dffbd0b8db7b723025cf560c9:
-
-  r8a7779: add SDHI clock support (2012-09-06 10:49:18 +0900)
-
-----------------------------------------------------------------
-Phil Edworthy (1):
-      r8a7779: add SDHI clock support
-
+Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
  arch/arm/mach-shmobile/clock-r8a7779.c |   11 ++++++++++-
  1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
+index 339c62c..3cafb6a 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7779.c
++++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+@@ -86,11 +86,16 @@ static struct clk div4_clks[DIV4_NR] = {
+ 				      0x0300, CLK_ENABLE_ON_INIT),
+ };
+ 
+-enum { MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
++enum { MSTP323, MSTP322, MSTP321, MSTP320,
++	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
+ 	MSTP016, MSTP015, MSTP014,
+ 	MSTP_NR };
+ 
+ static struct clk mstp_clks[MSTP_NR] = {
++	[MSTP323] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 23, 0), /* SDHI0 */
++	[MSTP322] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 22, 0), /* SDHI1 */
++	[MSTP321] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 21, 0), /* SDHI2 */
++	[MSTP320] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 20, 0), /* SDHI3 */
+ 	[MSTP026] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 26, 0), /* SCIF0 */
+ 	[MSTP025] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 25, 0), /* SCIF1 */
+ 	[MSTP024] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 24, 0), /* SCIF2 */
+@@ -149,6 +154,10 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP023]), /* SCIF3 */
+ 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP022]), /* SCIF4 */
+ 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP021]), /* SCIF6 */
++	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP323]), /* SDHI0 */
++	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
++	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
++	CLKDEV_DEV_ID("sh_mobile_sdhi.3", &mstp_clks[MSTP320]), /* SDHI3 */
+ };
+ 
+ void __init r8a7779_clock_init(void)
+-- 
+1.7.10.4
