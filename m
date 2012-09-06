@@ -1,37 +1,61 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 06 Sep 2012 16:35:25 -0600
-Subject: [PATCH v3 1/3] ARM: add cpufreq transiton notifier to adjust
- loops_per_jiffy for smp
-In-Reply-To: <1344577046-14847-2-git-send-email-shawn.guo@linaro.org>
-References: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
- <1344577046-14847-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <5049252D.9000802@wwwdotorg.org>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Thu, 6 Sep 2012 17:35:24 -0600
+Subject: [PATCH 05/12] ARM: socfpga: move debug macros to include/debug
+In-Reply-To: <1346962375-26163-6-git-send-email-robherring2@gmail.com>
+References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
+ <1346962375-26163-6-git-send-email-robherring2@gmail.com>
+Message-ID: <1346974524.3740.3.camel@dinh-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/2012 11:37 PM, Shawn Guo wrote:
-> From: Richard Zhao <richard.zhao@linaro.org>
+Hi Rob,
+
+Sorry, resending the ack without the confidential stamp.
+
+On Thu, 2012-09-06 at 15:12 -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> If CONFIG_SMP, cpufreq skips loops_per_jiffy update, because different
-> arch has different per-cpu loops_per_jiffy definition.
+> Move socfpga debug-macro.S over to common debug macro directory.
 > 
-> Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Dinh Nguyen <dinguyen@altera.com>
+> ---
+>  arch/arm/Kconfig.debug                             |    8 ++++++++
+>  .../mach/debug-macro.S => include/debug/socfpga.S} |    0
+>  2 files changed, 8 insertions(+)
+>  rename arch/arm/{mach-socfpga/include/mach/debug-macro.S => include/debug/socfpga.S} (100%)
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 3bafdd2..aa56934 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -317,6 +317,13 @@ choice
+>  		  The uncompressor code port configuration is now handled
+>  		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
+>  
+> +	config DEBUG_SOCFPGA_UART
+> +		depends on ARCH_SOCFPGA
+> +		bool "Use SOCFPGA UART for low-level debug"
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on SOCFPGA based platforms.
+> +
+>  	config DEBUG_VEXPRESS_UART0_DETECT
+>  		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
+>  		depends on ARCH_VEXPRESS && CPU_CP15_MMU
+> @@ -385,6 +392,7 @@ config DEBUG_LL_INCLUDE
+>  	default "debug/icedcc.S" if DEBUG_ICEDCC
+>  	default "debug/highbank.S" if DEBUG_HIGHBANK_UART
+>  	default "debug/mvebu.S" if DEBUG_MVEBU_UART
+> +	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
+>  	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
+>  		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
+>  	default "mach/debug-macro.S"
+> diff --git a/arch/arm/mach-socfpga/include/mach/debug-macro.S b/arch/arm/include/debug/socfpga.S
+> similarity index 100%
+> rename from arch/arm/mach-socfpga/include/mach/debug-macro.S
+> rename to arch/arm/include/debug/socfpga.S
 
-I believe this patch is causing issues initializing PCI-Express on Tegra.
+Acked-by: Dinh Nguyen <dinguyen@altera.com>
 
-In next-20120906, I cold-booted 10 times. 3 times, PCIe initialized OK,
-and 7 times, the driver timed out in arch/arm/mach-tegra/pcie.c function
-tegra_pcie_check_link(). With this patch reverted, another 10 cold boot
-attempts all succeeded just fine. Similarly, the regression appeared in
-next-20120905, and I isolated it to arch/arm/kernel/, and this is the
-only patch in that directory between next-20120904 and next-20120905.
-
-Do you have any idea what the problem might be?
-
-Looking at the timestamps in dmesg in the failing case, the driver is
-waiting the expected (per pcie.c driver code) 1.2 seconds before giving
-up on the port, although I suppose if the kernel's idea of real-time is
-off, then the dmesg log timestamps might be off too.
+Dinh
