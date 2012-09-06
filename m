@@ -1,20 +1,51 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 06 Sep 2012 13:42:43 -0400 (EDT)
-Subject: [PATCH 08/10] net/macb: macb_get_drvinfo: add GEM/MACB suffix
- to differentiate revision
-In-Reply-To: <5048ACBE.2030205@atmel.com>
-References: <fc701a2ed18198b7a671c55f1e65725f1709509c.1346775479.git.nicolas.ferre@atmel.com>
- <1346887671.5325.47.camel@bwh-desktop.uk.solarflarecom.com>
- <5048ACBE.2030205@atmel.com>
-Message-ID: <20120906.134243.1315769133684804967.davem@davemloft.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 6 Sep 2012 10:45:31 -0700
+Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
+In-Reply-To: <201209060405.08997.marex@denx.de>
+References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
+ <201209050513.08588.marex@denx.de>
+ <20120905233416.GP1303@atomide.com>
+ <201209060405.08997.marex@denx.de>
+Message-ID: <20120906174531.GX1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
-Date: Thu, 6 Sep 2012 16:01:34 +0200
+* Marek Vasut <marex@denx.de> [120905 19:05]:
+> Hi Tony,
+> 
+> > * Marek Vasut <marex@denx.de> [120904 20:13]:
+> > > Dear Bryan Wu,
+> > > 
+> > > > On Sat, Sep 1, 2012 at 4:16 PM, AnilKumar Ch <anilkumar@ti.com> wrote:
+> > > > > Adopt pinctrl support to leds-gpio driver based on leds-gpio
+> > > > > device pointer, pinctrl driver configure SoC pins to GPIO
+> > > > > mode according to definitions provided in .dts file.
+> > > > 
+> > > > Thanks for this, actually Marek Vasut submitted a similar patch
+> > > > before. I'm pretty fine with this patch.
+> > > 
+> > > Thanks for submitting this actually ... I didn't have time to properly
+> > > investigate this.
+> > > 
+> > > > But without proper DT setting, it will also give us warning I think.
+> > > > or we can provide some dummy functions as a temp solution as Shawn
+> > > > pointed out before.
+> > > 
+> > > But this driver is also used on hardware that's not yet coverted to DT,
+> > > so I'd say dev_warn() if CONFIG_OF is enabled and otherwise simply go on
+> > > ? Actually, can we not skip whole this pinctrl thing if CONFIG_OF is
+> > > disabled? Actually (2), what's the relationship between OF and pinctrl?
+> > 
+> > The warning should be pinctrl related as the pinctrl drivers may not be
+> > device tree based drivers.
+> 
+> Exactly my concern. Also the warning shouldnt be present on systems where 
+> pinctrl is disabled.
 
-> Absolutely, I will do this.
+But pinctrl_get_select() returns 0 in include/linux/pinctrl/consumer.h if
+CONFIG_PINCTRL is not selected, so no warning is produced AFAIK ;)
 
-Please, when you receive feedback on your patches, you need to
-resubmit the whole patch series for review not just the patches where
-changes were asked for.
+Or do you get some warning if CONFIG_PINCTRL is not selected for your
+hardware?
+
+Tony
