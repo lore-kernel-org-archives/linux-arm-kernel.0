@@ -1,84 +1,117 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 6 Sep 2012 12:12:17 -0700
-Subject: [PATCH 5/5] omap-serial: Request pins using pinctrl framework
-In-Reply-To: <20120906185832.1172.31013.stgit@muffinssi.local>
-References: <20120906185615.1172.23588.stgit@muffinssi.local>
- <20120906185832.1172.31013.stgit@muffinssi.local>
-Message-ID: <20120906191216.GA1303@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu,  6 Sep 2012 14:42:37 -0500
+Subject: [PATCH v2 0/6] Make mach/gpio.h optional
+Message-ID: <1346960563-18689-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120906 11:59]:
-> Request pins using pinctrl framework. Only show a warning
-> on error as some boards set the pins in the bootloader
-> even if CONFIG_PINCTRL is enabled.
-> 
-> Cc: linux-serial at vger.kernel.org
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
+From: Rob Herring <rob.herring@calxeda.com>
 
-Greg, this patch should be OK for you to pick, it should not break
-anything even if pinctrl is not available yet. Let me know if it
-needs rebasing on top of other things you've queued for omap-serial.
+This is series makes mach/gpio.h optional like we have done for other
+mach headers in preparation for multi-platform kernel images.
 
-Regards,
+This version does not add any includes of mach/gpio.h. For orion and
+shmobile, the mach/gpio.h headers are renamed to platform specific names.
+I've dropped pxa, omap and at91 from this series until better clean-up
+is done. omap and at91 have clean-ups in the works. I included some of
+the pxa clean-ups I did, but this series is not dependent on them.
 
-Tony
+This is build tested on all ARM defconfigs.
 
->  arch/arm/plat-omap/include/plat/omap-serial.h |    1 +
->  drivers/tty/serial/omap-serial.c              |   10 ++++++++++
->  2 files changed, 11 insertions(+)
-> 
-> diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
-> index 1a52725..0f4de14 100644
-> --- a/arch/arm/plat-omap/include/plat/omap-serial.h
-> +++ b/arch/arm/plat-omap/include/plat/omap-serial.h
-> @@ -106,6 +106,7 @@ struct uart_omap_port {
->  	struct uart_port	port;
->  	struct uart_omap_dma	uart_dma;
->  	struct platform_device	*pdev;
-> +	struct pinctrl		*pins;
->  
->  	unsigned char		ier;
->  	unsigned char		lcr;
-> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> index d3cda0c..068e88c 100644
-> --- a/drivers/tty/serial/omap-serial.c
-> +++ b/drivers/tty/serial/omap-serial.c
-> @@ -39,6 +39,7 @@
->  #include <linux/irq.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/of.h>
-> +#include <linux/pinctrl/consumer.h>
->  
->  #include <plat/dma.h>
->  #include <plat/dmtimer.h>
-> @@ -1492,6 +1493,13 @@ static int serial_omap_probe(struct platform_device *pdev)
->  		goto err_port_line;
->  	}
->  
-> +	up->pins = pinctrl_get_select_default(&pdev->dev);
-> +	if (IS_ERR(up->pins)) {
-> +		dev_warn(&pdev->dev, "did not get pins for uart%i error: %li\n",
-> +			 up->port.line, PTR_ERR(up->pins));
-> +		up->pins = NULL;
-> +	}
-> +
->  	sprintf(up->name, "OMAP UART%d", up->port.line);
->  	up->port.mapbase = mem->start;
->  	up->port.membase = devm_ioremap(&pdev->dev, mem->start,
-> @@ -1570,6 +1578,8 @@ static int serial_omap_remove(struct platform_device *dev)
->  		pm_runtime_disable(&up->pdev->dev);
->  		uart_remove_one_port(&serial_omap_reg, &up->port);
->  		pm_qos_remove_request(&up->pm_qos_request);
-> +		if (up->pins)
-> +			pinctrl_put(up->pins);
->  	}
->  
->  	platform_set_drvdata(dev, NULL);
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+The series plus multi-platform support is available here:
+
+git://sources.calxeda.com/kernel/linux.git multi-plat
+
+Rob
+
+Rob Herring (6):
+  usb: pxa27x_udc: remove IRQ_USB define
+  net: pxaficp_ir: add irq resources
+  ARM: pxa: use gpio_to_irq for sharppm_sl
+  ARM: shmobile: move custom gpio functions to sh-gpio.h
+  ARM: orion: move custom gpio functions to orion-gpio.h
+  ARM: make mach/gpio.h headers optional
+
+ arch/arm/Kconfig                               |   21 ++++++++
+ arch/arm/include/asm/gpio.h                    |    2 +
+ arch/arm/mach-dove/include/mach/gpio.h         |    9 ----
+ arch/arm/mach-dove/irq.c                       |    1 +
+ arch/arm/mach-dove/mpp.c                       |    1 +
+ arch/arm/mach-ep93xx/include/mach/gpio.h       |    1 -
+ arch/arm/mach-highbank/include/mach/gpio.h     |    1 -
+ arch/arm/mach-ixp4xx/include/mach/gpio.h       |    2 -
+ arch/arm/mach-kirkwood/include/mach/gpio.h     |    9 ----
+ arch/arm/mach-kirkwood/irq.c                   |    1 +
+ arch/arm/mach-kirkwood/rd88f6192-nas-setup.c   |    1 +
+ arch/arm/mach-msm/include/mach/gpio.h          |    1 -
+ arch/arm/mach-mv78xx0/irq.c                    |    1 +
+ arch/arm/mach-mxs/include/mach/gpio.h          |    1 -
+ arch/arm/mach-nomadik/include/mach/gpio.h      |    4 --
+ arch/arm/mach-orion5x/d2net-setup.c            |    1 +
+ arch/arm/mach-orion5x/dns323-setup.c           |    1 +
+ arch/arm/mach-orion5x/include/mach/gpio.h      |    9 ----
+ arch/arm/mach-orion5x/irq.c                    |    1 +
+ arch/arm/mach-orion5x/net2big-setup.c          |    1 +
+ arch/arm/mach-picoxcell/include/mach/gpio.h    |    1 -
+ arch/arm/mach-pxa/devices.c                    |   15 ++++++
+ arch/arm/mach-pxa/sharpsl_pm.c                 |   30 +++++++-----
+ arch/arm/mach-realview/include/mach/gpio.h     |    1 -
+ arch/arm/mach-shmobile/board-ap4evb.c          |    2 +
+ arch/arm/mach-shmobile/board-armadillo800eva.c |    2 +
+ arch/arm/mach-shmobile/board-g4evm.c           |    2 +
+ arch/arm/mach-shmobile/board-mackerel.c        |    2 +
+ arch/arm/mach-shmobile/include/mach/gpio.h     |   62 ------------------------
+ arch/arm/mach-shmobile/pfc-r8a7740.c           |    2 +-
+ arch/arm/mach-shmobile/pfc-r8a7779.c           |    2 +-
+ arch/arm/mach-shmobile/pfc-sh7367.c            |    2 +-
+ arch/arm/mach-shmobile/pfc-sh7372.c            |    2 +-
+ arch/arm/mach-shmobile/pfc-sh7377.c            |    2 +-
+ arch/arm/mach-shmobile/pfc-sh73a0.c            |    2 +-
+ arch/arm/mach-shmobile/sh-gpio.h               |   48 ++++++++++++++++++
+ arch/arm/mach-spear13xx/include/mach/gpio.h    |   19 --------
+ arch/arm/mach-spear3xx/include/mach/gpio.h     |   19 --------
+ arch/arm/mach-spear6xx/include/mach/gpio.h     |   19 --------
+ arch/arm/mach-tegra/include/mach/gpio.h        |    1 -
+ arch/arm/mach-u300/include/mach/gpio.h         |    1 -
+ arch/arm/mach-ux500/include/mach/gpio.h        |    5 --
+ arch/arm/mach-versatile/include/mach/gpio.h    |    1 -
+ arch/arm/mach-vexpress/include/mach/gpio.h     |    1 -
+ arch/arm/mach-vt8500/include/mach/gpio.h       |    1 -
+ arch/arm/plat-mxc/include/mach/gpio.h          |    1 -
+ arch/arm/plat-orion/include/plat/gpio.h        |   37 --------------
+ arch/arm/plat-orion/include/plat/orion-gpio.h  |   37 ++++++++++++++
+ arch/arm/plat-orion/mpp.c                      |    1 +
+ arch/arm/plat-spear/include/plat/gpio.h        |    1 -
+ drivers/net/irda/pxaficp_ir.c                  |   28 ++++++-----
+ drivers/sh/pfc/gpio.c                          |    1 +
+ drivers/usb/gadget/pxa27x_udc.c                |    2 +-
+ 53 files changed, 183 insertions(+), 238 deletions(-)
+ delete mode 100644 arch/arm/mach-dove/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-ep93xx/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-highbank/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-ixp4xx/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-kirkwood/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-msm/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-mxs/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-nomadik/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-orion5x/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-picoxcell/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-realview/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-shmobile/include/mach/gpio.h
+ create mode 100644 arch/arm/mach-shmobile/sh-gpio.h
+ delete mode 100644 arch/arm/mach-spear13xx/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-spear3xx/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-spear6xx/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-tegra/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-u300/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-ux500/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-versatile/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-vexpress/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/gpio.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/gpio.h
+ delete mode 100644 arch/arm/plat-orion/include/plat/gpio.h
+ create mode 100644 arch/arm/plat-orion/include/plat/orion-gpio.h
+ delete mode 100644 arch/arm/plat-spear/include/plat/gpio.h
+
+-- 
+1.7.9.5
