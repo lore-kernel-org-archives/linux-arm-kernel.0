@@ -1,65 +1,66 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 06 Sep 2012 15:25:21 +0200
-Subject: [PATCH v3 0/3] DaVinci DMA engine conversion
-In-Reply-To: <503B933F.2030803@gmail.com>
-References: <1345684176-21472-1-git-send-email-mporter@ti.com>
- <503B933F.2030803@gmail.com>
-Message-ID: <5048A441.3010109@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 6 Sep 2012 16:22:24 +0300
+Subject: [PATCH 0/4] arm/dts: omap: add dt data for MUSB
+In-Reply-To: <1344259395-4559-1-git-send-email-kishon@ti.com>
+References: <1344259395-4559-1-git-send-email-kishon@ti.com>
+Message-ID: <20120906132223.GL29202@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
+Hi,
 
-On 27.08.2012 17:33, Daniel Mack wrote:
-> On 23.08.2012 03:09, Matt Porter wrote:
->> This series begins the conversion of the DaVinci private EDMA API
->> implementation to a DMA engine driver and converts two of the three
->> in-kernel users of the private EDMA API to DMA engine.
->>
->> The approach taken is similar to the recent OMAP DMA Engine
->> conversion. The EDMA DMA Engine driver is a wrapper around the existing
->> private EDMA implementation and registers the platform device within
->> the driver.  This allows the conversion series to stand alone with just
->> the drivers and no changes to platform code. It also allows peripheral
->> drivers to continue to use the private EDMA implementation until they
->> are converted.
->>
->> The EDMA DMA Engine driver supports slave transfers only at this time. It
->> is planned to add cyclic transfers in support of audio peripherals.
->>
->> There are three users of the private EDMA API in the kernel now:
->> davinci_mmc, spi-davinci, and davinci-mcasp.  This series provides DMA
->> Engine conversions for the davinci_mmc and spi-davinci drivers which
->> use the supported slave transfers.
->>
->> This series has been tested on an AM18x EVM and Hawkboard with
->> driver performance comparable to that of the private EDMA API
->> implementations. Both MMC0 and MMC1 are tested which handles the
->> DA850/OMAP-L138/AM18x specific case where MMC1 uses DMA channels on
->> a second EDMA channel controller.  All other platforms have a simpler
->> design with just a single EDMA channel controller.
->>
->> For those wanting to easily test this series, I've pushed a branch for
->> each version to my github tree at https://github.com/ohporter/linux. The
->> current branch is edma-dmaengine-v3.
->>
->> After this series, the current plan is to complete the mcasp driver
->> conversion which includes adding cyclic dma support. This will then
->> enable the removal and refactoring of the private EDMA API functionality
->> into the EDMA DMA Engine driver.  Since EDMA is also used on the AM33xx
->> family of parts in mach-omap2/, the plan is to enable this driver on
->> that platform as well.
+On Mon, Aug 06, 2012 at 06:53:11PM +0530, Kishon Vijay Abraham I wrote:
+> This patch series adds dt data for MUSB and related modules to
+> get MUSB working
 > 
-> Once you have a patch for the McASP driver conversion, I can happily
-> test this on a AM33xx board, together with Gururaja's latest McASP
-> refactoring series. Let me know how I can help you here.
+> These patches were initially part of
+> [PATCH v6 00/11] omap: musb: Add device tree support
+> 
+> These patches can be tested by applying it over
+> [PATCH v7 0/7] omap: musb: Add device tree support
+> 
+> These patches were developed on
+> git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git
+> 
+> If it needs to be rebased on some other tree, pls let me
+> know.
+> 
+> Performed MUSB device mode testing on omap4 panda,
+> omap4 sdp and omap3 beagle
 
-Did you find some time yet to continue on this side? I don't want to
-appear pushy, but as I need to finish some DT transition on a
-AM33xx-based board, I would much like to help out here, in case I can do
-anything to help speed things along.
+Grant, we already lost two merge windows on this patchset. Is it
+possible for you to take a look here so we don't loose another merge
+window ? Can Benoit just take these patches on his tree, so it goes
+upstream through the linux-omap tree ?
 
+cheers
 
-Many thanks for your work!
+> Kishon Vijay Abraham I (4):
+>   arm/dts: omap: Add omap-usb2 dt data
+>   arm/dts: Add twl6030-usb data
+>   arm/dts: Add twl4030-usb data
+>   arm/dts: omap: Add usb_otg and glue data
+> 
+>  arch/arm/boot/dts/omap3-beagle.dts |    6 ++++++
+>  arch/arm/boot/dts/omap3-evm.dts    |    6 ++++++
+>  arch/arm/boot/dts/omap3.dtsi       |    8 ++++++++
+>  arch/arm/boot/dts/omap4-panda.dts  |   10 ++++++++++
+>  arch/arm/boot/dts/omap4-sdp.dts    |   10 ++++++++++
+>  arch/arm/boot/dts/omap4.dtsi       |   13 +++++++++++++
+>  arch/arm/boot/dts/twl4030.dtsi     |   21 +++++++++++++++++++++
+>  arch/arm/boot/dts/twl6030.dtsi     |    5 +++++
+>  8 files changed, 79 insertions(+)
+> 
+> -- 
+> 1.7.9.5
+> 
 
-Daniel
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120906/ba8b8f13/attachment-0001.sig>
