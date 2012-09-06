@@ -1,56 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 6 Sep 2012 14:02:17 +0100
-Subject: [PATCH V3 3/6] arm: cache-l2x0: add support for Aurora L2 cache
- ctrl
-In-Reply-To: <50488DB8.1010007@free-electrons.com>
-References: <1346852677-5381-1-git-send-email-gregory.clement@free-electrons.com>
- <1346852677-5381-4-git-send-email-gregory.clement@free-electrons.com>
- <20120906111152.GE858@mudshark.cambridge.arm.com>
- <50488DB8.1010007@free-electrons.com>
-Message-ID: <20120906130217.GI858@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 6 Sep 2012 13:03:02 +0000
+Subject: [PATCH v7 1/7] drivers: usb: phy: add a new driver for omap usb2
+ phy
+In-Reply-To: <CAAe_U6KBNZpT03xATmPTNTgxm5hj+wJdsShdnm08EmF4Q=hTCw@mail.gmail.com>
+References: <1344258480-4304-1-git-send-email-kishon@ti.com>
+ <1344258480-4304-2-git-send-email-kishon@ti.com>
+ <CAAe_U6KBNZpT03xATmPTNTgxm5hj+wJdsShdnm08EmF4Q=hTCw@mail.gmail.com>
+Message-ID: <201209061303.02454.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 12:49:12PM +0100, Gregory CLEMENT wrote:
-> On 09/06/2012 01:11 PM, Will Deacon wrote:
-> > On Wed, Sep 05, 2012 at 02:44:34PM +0100, Gregory CLEMENT wrote:
-> >> Aurora Cache Controller was designed to be compatible with the ARM L2
-> >> Cache Controller. It comes with some difference or improvement such
-> >> as:
-> >> - no cache id part number available through hardware (need to get it
-> >>   by the DT).
-> >> - always write through mode available.
-> >> - two flavors of the controller outer cache and system cache (meaning
-> >>   maintenance operations on L1 are broadcasted to the L2 and L2
-> >>   performs the same operation).
-> >> - in outer cache mode, the cache maintenance operations are improved and
-> >>   can be done on a range inside a page and are not limited to a cache
-> >>   line.
-
-[...]
-
-> > Reviewed-by: Will Deacon <will.deacon@arm.com>
-> > 
+On Thursday 06 September 2012, ABRAHAM, KISHON VIJAY wrote:
+> > diff --git a/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt b/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
+> > index d2fe064..bb0c7f4 100644
+> > --- a/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
+> > +++ b/Documentation/devicetree/bindings/bus/omap-ocp2scp.txt
+> > @@ -8,3 +8,6 @@ properties:
+> >
+> >  Sub-nodes:
+> >  All the devices connected to ocp2scp are described using sub-node to ocp2scp
+> > +- usb2phy :
+> > +   The binding details of usb2phy can be found in:
+> > +   Documentation/devicetree/bindings/usb/omap-usb.txt
 > 
-> Thanks. I guess you also reviewed patches 1 and 2, don't you?
-
-Well I didn't really read those because they looked fairly boring :)
-Boring is good though, so I doubt they're problematic.
-
-> And then where should I push my series?
+> The above two lines should be added in omap-ocp2scp.txt (this file was
+> added as part of omap: add ocp2scp as a bus driver and is in
+> linux-next). However this file is still not in Felipe's xceiv branch.
+> So I'm not sure how I can get this patch merged in Felipe's tree
+> without conflict.
 > 
-> Patches 1,2 and 3 depend of ARM subsystem so they should be submitted
-> using Russell King's patch state system. Patches 4 and 5 are more soc
-> specific and should go to marvell tree and then arm-soc. But patches 4
-> and 5 are meaningless if the first patches are not applied. What is the
-> good practice?
 
-When I end up in situations like this, I usually prepare a branch for
-Russell containing the patches that should go via his tree. Then, send him a
-pull request and once he has pulled it, Arnd and Olof can pull the same
-branch into arm-soc as a baseline branch. You can then base your other
-patches on top of that.
+There are three possible ways to do that:
 
-Make sense?
+* Not add that text. Is is actually required? The ocp2scp bus driver 
+doesn't actually care what is connected to it, does it?
 
-Will
+* Ask Felipe to merge the drivers/ocp2scp branch from arm-soc into
+his branch, then apply your patch on top. The branch is scheduled
+for merging in 3.7 and is stable, so there is no harm merging it
+into his tree, as long as Olof and I are aware of this.
+
+* Split out this change and apply the patch to add this documentation
+change on top of the drivers/ocp2scp branch in the arm-soc tree.
+There is no strict dependency between this change and the others
+you want to merge, so it does not matter which tree it is merged through.
+
+	Arnd
