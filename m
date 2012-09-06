@@ -1,36 +1,30 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Thu,  6 Sep 2012 23:21:04 +0800
-Subject: [PATCH] ARM: EXYNOS: no duplicate mask/unmask in eint0_15
-Message-ID: <1346944864-12434-1-git-send-email-djkurtz@chromium.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 6 Sep 2012 23:31:06 +0800
+Subject: [PATCH RFC] clk: use spinlock for clk_get_rate
+In-Reply-To: <CAPDyKFo38_zJBZ2K1gNSre0+C4hF8A2bkg2eyZum=5izkEEELw@mail.gmail.com>
+References: <1346919146-25972-1-git-send-email-shawn.guo@linaro.org>
+ <CAPDyKFo38_zJBZ2K1gNSre0+C4hF8A2bkg2eyZum=5izkEEELw@mail.gmail.com>
+Message-ID: <20120906153102.GA26709@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-chained_irq_enter/exit() already mask&ack/unmask the chained interrupt.
-There is no need to also explicitly do it in the handler.
+On Thu, Sep 06, 2012 at 11:28:10AM +0200, Ulf Hansson wrote:
+> Hi Shawn,
+> 
+> Interesting problem you found. :-)
+> 
+> Just a note, that in my suggested patch: "[PATCH 1/4] clk: Provide
+> option for clk_get_rate to issue hw for new rate",
+> the prepare mutex will be required to keep.
+> 
+Right.  Just realized that the prepare mutex is also being used to
+protect clock tree topology in clk_get_rate, so it's required anyway.
+We may need to look for a fixing in smp_twd driver.
 
-Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
----
- arch/arm/mach-exynos/common.c |    7 -------
- 1 files changed, 0 insertions(+), 7 deletions(-)
+> Not sure if that should be considered as a part of the solution to the
+> cpufreq problem, but anyway, thought you should know.
+> 
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 4eb39cd..0a85aec 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -965,14 +965,7 @@ static void exynos_irq_eint0_15(unsigned int irq, struct irq_desc *desc)
- 	struct irq_chip *chip = irq_get_chip(irq);
- 
- 	chained_irq_enter(chip, desc);
--	chip->irq_mask(&desc->irq_data);
--
--	if (chip->irq_ack)
--		chip->irq_ack(&desc->irq_data);
--
- 	generic_handle_irq(*irq_data);
--
--	chip->irq_unmask(&desc->irq_data);
- 	chained_irq_exit(chip, desc);
- }
- 
 -- 
-1.7.7.3
+Regards,
+Shawn
