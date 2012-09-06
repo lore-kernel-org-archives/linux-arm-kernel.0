@@ -1,115 +1,40 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 6 Sep 2012 11:09:33 +0200
-Subject: [PATCH 1/4] clk: Provide option for clk_get_rate to issue hw for
- new rate
-In-Reply-To: <20120831192906.31162.97714@nucleus>
-References: <1346415691-13371-1-git-send-email-ulf.hansson@stericsson.com>
- <1346415691-13371-2-git-send-email-ulf.hansson@stericsson.com>
- <20120831192906.31162.97714@nucleus>
-Message-ID: <CAPDyKFrS7tKu5AcjL7+R8V5Nvo0O+BVwc8HtGFqQGSf12wMioQ@mail.gmail.com>
+From: koba@kmckk.co.jp (Tetsuyuki Kobayshi)
+Date: Thu,  6 Sep 2012 18:09:31 +0900
+Subject: [PATCH] ARM: shmobile: kzm9g: enable DMAEngine on SHDI0 and SDHI2
+Message-ID: <1346922571-16271-1-git-send-email-koba@kmckk.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
 
-Thanks for your input, and sorry for my late reply!
+This patch enables DMAEngine on SHDI0 and SDHI2 for kzm9g.
 
-On 31 August 2012 21:29, Mike Turquette <mturquette@ti.com> wrote:
-> Quoting Ulf Hansson (2012-08-31 05:21:28)
->> From: Ulf Hansson <ulf.hansson@linaro.org>
->>
->> By using CLK_GET_RATE_NOCACHE flag, we tell the clk_get_rate API to
->> issue the hw for an updated clock rate. This can be used for a clock
->> which rate may be updated without a client necessary modifying it.
->>
->
-> I'm glad to see this.  We discussed whether the default behavior should
-> be cached or from the hardware at length some time back, so having a
-> flag to support the non-default is great.
->
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> ---
->>  drivers/clk/clk.c            |   43 +++++++++++++++++++++++-------------------
->>  include/linux/clk-provider.h |    1 +
->>  2 files changed, 25 insertions(+), 19 deletions(-)
->>
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index efdfd00..d9cbae0 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -558,25 +558,6 @@ int clk_enable(struct clk *clk)
->>  EXPORT_SYMBOL_GPL(clk_enable);
->>
->>  /**
->> - * clk_get_rate - return the rate of clk
->> - * @clk: the clk whose rate is being returned
->> - *
->> - * Simply returns the cached rate of the clk.  Does not query the hardware.  If
->> - * clk is NULL then returns 0.
->> - */
->> -unsigned long clk_get_rate(struct clk *clk)
->> -{
->> -       unsigned long rate;
->> -
->> -       mutex_lock(&prepare_lock);
->> -       rate = __clk_get_rate(clk);
->> -       mutex_unlock(&prepare_lock);
->> -
->> -       return rate;
->> -}
->> -EXPORT_SYMBOL_GPL(clk_get_rate);
->> -
->> -/**
->>   * __clk_round_rate - round the given rate for a clk
->>   * @clk: round the rate of this clock
->>   *
->> @@ -702,6 +683,30 @@ static void __clk_recalc_rates(struct clk *clk, unsigned long msg)
->>  }
->>
->>  /**
->> + * clk_get_rate - return the rate of clk
->> + * @clk: the clk whose rate is being returned
->> + *
->> + * Simply returns the cached rate of the clk, unless CLK_GET_RATE_NOCACHE flag
->> + * is set, which means a recalc_rate will be issued.
->> + * If clk is NULL then returns 0.
->> + */
->> +unsigned long clk_get_rate(struct clk *clk)
->> +{
->> +       unsigned long rate;
->> +
->> +       mutex_lock(&prepare_lock);
->> +
->> +       if (clk && (clk->flags & CLK_GET_RATE_NOCACHE))
->> +               __clk_recalc_rates(clk, 0);
->
-> This is a bit subtle.  Calling __clk_recalc_rates will walk the subtree
-> of children recalculating rates as well as firing off notifiers.  Is
-> this what you want?  If your clock changes rates behind your back AND
-> has chilren then this is probably the right thing to do.  However you
-> might be better off with:
->
->         if (clk && (clk->flags & CLK_GET_RATE_NOCACHE))
->                 rate = clk->ops->recalc_rate(clk->hw, clk->parent->rate);
->
-> This doesn't update children or fire off notifiers.  What is best for
-> your platform?
+Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+---
+ arch/arm/mach-shmobile/board-kzm9g.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-For my platform, ux500 and for the clock connected to this
-patchseries, your suggesting above is enough. (Well some additional
-error handling is needed in your code proposal though :-) )
-
-The reason for why I used "__clk_recalc_rates" was because I think it
-could make sense to have a more generic approach, not sure if it is
-needed as you mention. Additionally, using  __clk_recalc_rates with
-"0" as the notification argument, should prevent notifications from
-happen, right?
-
-So basically, I wanted the clock rates for the children to be updated
-as well as the parent clock rate, but no notifications.
-
-I can happily update the patch according to your proposal if you still
-think it is the best way to do it, just tell me again then. :-)
-
-Kind regards
-Ulf Hansson
+diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
+index 87ec4ce..d849e6d 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g.c
++++ b/arch/arm/mach-shmobile/board-kzm9g.c
+@@ -384,6 +384,8 @@ static struct regulator_consumer_supply fixed2v8_power_consumers[] =
+ 
+ /* SDHI */
+ static struct sh_mobile_sdhi_info sdhi0_info = {
++	.dma_slave_tx	= SHDMA_SLAVE_SDHI0_TX,
++	.dma_slave_rx	= SHDMA_SLAVE_SDHI0_RX,
+ 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT,
+ 	.tmio_caps	= MMC_CAP_SD_HIGHSPEED,
+ 	.tmio_ocr_mask	= MMC_VDD_27_28 | MMC_VDD_28_29,
+@@ -424,6 +426,8 @@ static struct platform_device sdhi0_device = {
+ 
+ /* Micro SD */
+ static struct sh_mobile_sdhi_info sdhi2_info = {
++	.dma_slave_tx	= SHDMA_SLAVE_SDHI2_TX,
++	.dma_slave_rx	= SHDMA_SLAVE_SDHI2_RX,
+ 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT |
+ 			  TMIO_MMC_USE_GPIO_CD |
+ 			  TMIO_MMC_WRPROTECT_DISABLE,
+-- 
+1.7.9.5
