@@ -1,24 +1,59 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 06 Sep 2012 12:42:52 -0600
-Subject: [PATCH] MAINTAINERS: tegra: remove Olof/Colin, add device tree
- files
-In-Reply-To: <1346798078-28682-1-git-send-email-swarren@wwwdotorg.org>
-References: <1346798078-28682-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <5048EEAC.9040102@wwwdotorg.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 6 Sep 2012 20:42:56 +0200
+Subject: [PATCH 7/9] pwm i.MX: fix clock lookup
+In-Reply-To: <996111492.3799131.1346956318651.JavaMail.root@advansee.com>
+References: <1346935695-25179-8-git-send-email-s.hauer@pengutronix.de>
+ <996111492.3799131.1346956318651.JavaMail.root@advansee.com>
+Message-ID: <20120906184256.GJ26594@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2012 04:34 PM, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Thu, Sep 06, 2012 at 08:31:58PM +0200, Beno?t Th?baudeau wrote:
+> On Thursday, September 6, 2012 2:48:13 PM, Sascha Hauer wrote:
+> > 
+> > +	int ret;
+> > +
+> > +	ret = clk_prepare_enable(imx->clk_ipg);
+> > +	if (ret)
+> > +		return ret;
+> >  
+> > -	return imx->config(chip, pwm, duty_ns, period_ns);
+> > +	ret = imx->config(chip, pwm, duty_ns, period_ns);
+> > +
+> > +	clk_disable_unprepare(imx->clk_ipg);
+> > +
+> > +	return ret;
+> >  }
+> >  
+> >  static int imx_pwm_enable(struct pwm_chip *chip, struct pwm_device
+> >  *pwm)
+> > @@ -169,7 +179,7 @@ static int imx_pwm_enable(struct pwm_chip *chip,
+> > struct pwm_device *pwm)
+> >  	struct imx_chip *imx = to_imx_chip(chip);
+> >  	int ret;
+> >  
+> > -	ret = clk_prepare_enable(imx->clk);
+> > +	ret = clk_prepare_enable(imx->clk_per);
+> >  	if (ret)
+> >  		return ret;
 > 
-> At Linux Plumbers conference, Olof and Colin both told me to remove them
-> from the MAINTAINERS file. Thank you both very much for all the help with
-> Tegra!
+> Have you tested that this actually works on i.MX53?
 > 
-> Also, include all Tegra-related device-tree files in the file list.
+> I have tested it successfully on i.MX35 (with a few additions to platform code).
+> But i.MX35 has a single bit controlling both PWM IPG and PER clock gates.
 > 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> On i.MX53, there are 2 separate control bits for these. So, if ipg clk is
+> strictly required to access PWM registers, even if per clk is enabled, this code
+> should not work without adding
 
-Applied to Tegra's for-3.7/maintainers branch.
+I tested this on i.MX53, but you're right, this seems to be wrong. I'll
+recheck tomorrow.
 
-Thanks again for all the help.
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
