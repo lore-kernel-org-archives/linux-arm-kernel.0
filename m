@@ -1,41 +1,49 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 07 Sep 2012 07:03:53 +0900
-Subject: [PATCH v3 1/4] pinctrl: add samsung pinctrl and gpiolib driver
-In-Reply-To: <5048DE83.4050203@wwwdotorg.org>
-References: <226e01cd8ae6$928010b0$b7803210$%kim@samsung.com>
- <1346826046-30484-1-git-send-email-thomas.abraham@linaro.org>
- <5048DE83.4050203@wwwdotorg.org>
-Message-ID: <241701cd8c7b$81022580$83067080$%kim@samsung.com>
+From: simon@fire.lp0.eu (Simon Arlott)
+Date: Thu, 06 Sep 2012 23:10:45 +0100
+Subject: [PATCH] ARM: add support for BCM2708/BCM2835 and Raspberry Pi
+In-Reply-To: <CAG-w=x77y6ykh3FcyTtVAN85eOk1RP2CZ=ZG-_1091i5jYDF2A@mail.gmail.com>
+References: <1346908038-22421-1-git-send-email-swarren@wwwdotorg.org>
+ <CAG-w=x77y6ykh3FcyTtVAN85eOk1RP2CZ=ZG-_1091i5jYDF2A@mail.gmail.com>
+Message-ID: <50491F65.2020302@simon.arlott.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren wrote:
+On 06/09/12 17:53, Seth Jennings wrote:
+> (sorry for the dup Stephen, forgot to reply all :-/)
 > 
-> On 09/05/2012 12:20 AM, Thomas Abraham wrote:
-> > Add a new device tree enabled pinctrl and gpiolib driver for Samsung
-> > SoC's. This driver provides a common and extensible framework for all
-> > Samsung SoC's to interface with the pinctrl and gpiolib subsystems. This
-> > driver supports only device tree based instantiation and hence can be
-> > used only on those Samsung platforms that have device tree enabled.
-> >
-> > This driver is split into two parts: the pinctrl interface and the
-> gpiolib
-> > interface. The pinctrl interface registers pinctrl devices with the
-> pinctrl
-> > subsystem and gpiolib interface registers gpio chips with the gpiolib
-> > subsystem. The information about the pins, pin groups, pin functions and
-> > gpio chips, which are SoC specific, are parsed from device tree node.
-> >
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Kukjin Kim <kgene.kim@samsung.com>
-> > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> On Thu, Sep 6, 2012 at 12:07 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>
+>> The BCM2708 is an ARM SoC from Broadcom. It is the primary SoC in a
+>> series which contains the BCM2835 amongst other variants. This patch
+>> adds very basic support for this series of SoCs, under the BCM2708 name.
 > 
-> Acked-by: Stephen Warren <swarren@nvidia.com>
+> Great work! I'm glad to see this heading upstream :)
+> 
+>> This series was extracted from git://github.com/lp0/linux.git branch
+>> rpi-next or rpi-linear from 3-4 months ago, and significantly stripped
+>> down and modified since.
 
-Applied this whole series, thanks.
+I don't know why you're using the rpi-linear branch when the rpi-split
+branch has the same content but everything already split into separate
+patches...
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> I've used Simon's tree before and it will boot up all the way with UART
+> support (no graphics, usb, network).  I also think it has a fully
+> populated device tree.
+
+It has supported graphics for a while:
+https://github.com/raspberrypi/linux/wiki/How-to-boot-using-device-tree#wiki-Configuration
+
+I've been waiting over 3 months now for device tree support to be added
+to the GPU-based bootloader and it still hasn't appeared.
+
+> Why, in particular, did you strip it down?
+> 
+> I'm new to the ARM SoC upstreaming scene so there might be a obvious
+> reason of which I'm not aware.
+> 
+> --
+> Seth
+
+-- 
+Simon Arlott
