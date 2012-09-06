@@ -1,47 +1,35 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Thu,  6 Sep 2012 19:46:08 +0530
-Subject: [PATCH 1/2] ARM: Exynos4: Put PCM, Slimbus, Spdif clocks to off state
-Message-ID: <1346940968-4423-1-git-send-email-chander.kashyap@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 6 Sep 2012 14:19:07 +0000
+Subject: [PATCH 4/6 v2] ARM: integrator: initial device tree support
+In-Reply-To: <CACRpkdYy2CZXXA+kkEaOTznaucxXEwiwSn-5ux0ByHjXrsm-2A@mail.gmail.com>
+References: <1346471760-23993-1-git-send-email-linus.walleij@linaro.org>
+ <5048A31E.2090704@gmail.com>
+ <CACRpkdYy2CZXXA+kkEaOTznaucxXEwiwSn-5ux0ByHjXrsm-2A@mail.gmail.com>
+Message-ID: <201209061419.07325.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clocks for PCM, Slimbus, Spdif added to off list in order
-to turn them off at boot time.
+On Thursday 06 September 2012, Linus Walleij wrote:
+> On Thu, Sep 6, 2012 at 3:20 PM, Rob Herring <robherring2@gmail.com> wrote:
+> > [Me]
+> >> I can of course skip the aliases and go for the timer nodes
+> >> I want directly, but that isn't any helpful for people reading the
+> >> device tree, is it?
+> >
+> > Well, the dts doesn't really need to describe how Linux is using things.
+> 
+> The arm,integrator-clocksource and arm,integrator-clockevent
+> are renamed arm,timer-primary and arm,timer-secondary in the
+> last patch set.
+> 
+> Are you OK with this for now, going forward? I'd be happy to
+> take a round refactoring it for the next cycle as outlined
+> below.
 
-Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
----
- arch/arm/mach-exynos/clock-exynos4.c |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+If the timers are really free for use by anything and you want to
+encode how Linux uses them, I would suggest naming the aliases
+"linux.clocksource" and "linux,clockevent" to make it clear that
+you are not describing the hardware here but rather picking
+a configuration.
 
-diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-exynos/clock-exynos4.c
-index 7cc5491..6a45c9a 100644
---- a/arch/arm/mach-exynos/clock-exynos4.c
-+++ b/arch/arm/mach-exynos/clock-exynos4.c
-@@ -627,6 +627,25 @@ static struct clk exynos4_init_clocks_off[] = {
- 		.enable		= exynos4_clk_ip_peril_ctrl,
- 		.ctrlbit	= (1 << 21),
- 	}, {
-+		.name		= "pcm",
-+		.devname	= "samsung-pcm.1",
-+		.enable		= exynos4_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1 << 22),
-+	}, {
-+		.name		= "pcm",
-+		.devname	= "samsung-pcm.2",
-+		.enable		= exynos4_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1 << 23),
-+	}, {
-+		.name		= "slimbus",
-+		.enable		= exynos4_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1 << 25),
-+	}, {
-+		.name		= "spdif",
-+		.devname	= "samsung-spdif",
-+		.enable		= exynos4_clk_ip_peril_ctrl,
-+		.ctrlbit	= (1 << 26),
-+	}, {
- 		.name		= "ac97",
- 		.devname	= "samsung-ac97",
- 		.enable		= exynos4_clk_ip_peril_ctrl,
--- 
-1.7.9.5
+	Arnd
