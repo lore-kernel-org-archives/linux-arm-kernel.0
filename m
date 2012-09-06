@@ -1,47 +1,68 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  6 Sep 2012 14:48:12 +0200
-Subject: [PATCH 6/9] pwm i.MX: use per clock unconditionally
-In-Reply-To: <1346935695-25179-1-git-send-email-s.hauer@pengutronix.de>
-References: <1346935695-25179-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1346935695-25179-7-git-send-email-s.hauer@pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu,  6 Sep 2012 15:45:19 +0300
+Subject: [PATCH v4 00/21] OMAP UART Patches
+In-Reply-To: <20120906122948.GC29202@arwen.pp.htv.fi>
+References: <20120906122948.GC29202@arwen.pp.htv.fi>
+Message-ID: <1346935540-1792-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX pwm core has two clocks: The ipg clock and the ipg highfreq
-(peripheral) clock. The ipg clock has to be enabled for this hardware
-to work. The actual pwm output can either be driven by the ipg clock
-or the ipg highfreq. The ipg highfreq has the advantage that it runs
-even when the SoC is in low power modes.
-Use the always running clock also on i.MX25.
+Hi guys,
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
-Reviewed-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
----
- drivers/pwm/pwm-imx.c |    7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+here's v4 of the omap uart patchset. No changes other than a rebase on top of
+Greg's tty-next branch and Tony's Acked-by being added to a couple patches
 
-diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-index 675e2bb..ea4ab2c 100644
---- a/drivers/pwm/pwm-imx.c
-+++ b/drivers/pwm/pwm-imx.c
-@@ -131,16 +131,11 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
- 
- 	cr = MX3_PWMCR_PRESCALER(prescale) |
- 		MX3_PWMCR_DOZEEN | MX3_PWMCR_WAITEN |
--		MX3_PWMCR_DBGEN;
-+		MX3_PWMCR_DBGEN | MX3_PWMCR_CLKSRC_IPG_HIGH;
- 
- 	if (imx->enabled)
- 		cr |= MX3_PWMCR_EN;
- 
--	if (cpu_is_mx25())
--		cr |= MX3_PWMCR_CLKSRC_IPG;
--	else
--		cr |= MX3_PWMCR_CLKSRC_IPG_HIGH;
--
- 	writel(cr, imx->mmio_base + MX3_PWMCR);
- 
- 	return 0;
+Note: I'm resending the series with Vikram's Software Flow Control fix anyway
+as it can just be ignored if it's decided it needs to go into this merge
+window.
+
+Changes since v3:
+	. Rebased on top of Greg's tty-next branch
+	. Added Tony's Acked-by
+
+Changes since v2:
+        . Added a bunch of new patches
+        . Fixed a problem where we would always return IRQ_NONE even though we
+                handled IRQ
+
+Changes since v1:
+        . improved commit log on patch 9/13 (formerly 10/13)
+        . removed patch 2/13
+        . added a new patch switching from spin_lock_irqsave() to spin_lock and
+                spin_unlock_irqrestore to spin_unlock
+
+Felipe Balbi (18):
+  serial: omap: don't access the platform_device
+  serial: omap: drop DMA support
+  serial: add OMAP-specific defines
+  serial: omap: simplify IRQ handling
+  serial: omap: refactor receive_chars() into rdi/rlsi handlers
+  serial: omap: move THRE check to transmit_chars()
+  serial: omap: stick to put_autosuspend
+  serial: omap: set dev->drvdata before enabling pm_runtime
+  serial: omap: drop unnecessary check from remove
+  serial: omap: make sure to suspend device before remove
+  serial: omap: don't save IRQ flags on hardirq
+  serial: omap: optimization with section annotations
+  serial: omap: drop "inline" from IRQ handler prototype
+  serial: omap: implement set_wake
+  serial: omap: make sure to put() on poll_get_char
+  serial: omap: remove unnecessary header and add a missing one
+  serial: omap: move uart_omap_port definition to C file
+  serial: omap: enable RX and TX FIFO usage
+
+Ruchika Kharwar (2):
+  serial: omap: fix sequence of pm_runtime_* calls.
+  serial: omap: unlock the port lock
+
+Vikram Pandita (1):
+  serial: omap: fix software flow control
+
+ arch/arm/mach-omap2/serial.c                  |  15 +-
+ arch/arm/plat-omap/include/plat/omap-serial.h |  49 +-
+ drivers/tty/serial/omap-serial.c              | 740 +++++++++-----------------
+ include/linux/serial_reg.h                    |   4 +
+ 4 files changed, 282 insertions(+), 526 deletions(-)
+
 -- 
-1.7.10.4
+1.7.12.rc3
