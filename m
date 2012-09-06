@@ -1,54 +1,54 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 6 Sep 2012 13:51:23 -0700
-Subject: [PATCH v2 0/2] gpio-twl4030: add new device tree properties
-In-Reply-To: <50476496.7050107@ti.com>
-References: <1346831186-29947-1-git-send-email-florian.vaussard@epfl.ch>
- <50476496.7050107@ti.com>
-Message-ID: <20120906205123.GL1303@atomide.com>
+Date: Thu, 6 Sep 2012 13:52:28 -0700
+Subject: [PATCH 0/2] ARM: omap/dts: Add support for Gumstix Overo with
+ Tobi expansion
+In-Reply-To: <1346429172-5902-1-git-send-email-florian.vaussard@epfl.ch>
+References: <1346429172-5902-1-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <20120906205227.GM1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <b-cousson@ti.com> [120905 07:42]:
-> Hi Florian,
+* Florian Vaussard <florian.vaussard@epfl.ch> [120831 09:07]:
+> The Gumstix Overo is a computer on module using an OMAP3 processor.
+> This module must be plugged into an expansion board.
 > 
-> On 09/05/2012 09:46 AM, Florian Vaussard wrote:
-> > Hello,
-> > 
-> > A number of platform data are missing when using twl4030/gpio from a
-> > device tree. This patchset adds the missing properties, updates the 
-> > documentation with the new bindings, and updates existing device trees.
-> > It mainly enables LEDA and LEDB outputs, as well as pullups /
-> > pulldowns on GPIOs.
-> > 
-> > The 1st patch changes the device driver and updates the documentation.
-> > The 2nd patch updates the device trees for BeagleBoard and omap3-evm.
-> > 
-> > Changes since v1: 
-> > - Patches on driver and documentation merged into the same patch
-> > - Put device trees' values in hexadecimal
-> > - Handle bool property using of_property_read_bool()
-> > - Prefix the patches with the correct convention
+> This patchset adds a first device tree support for the Overo, using the
+> Tobi expansion board. The current support is able to boot and mount
+> the rootfs from MMC, with a few extra features.
 > 
-> Thanks for the update.
+> The first patch creates the device tree for both the Overo and the
+> Tobi expansion board, and updates the dtb build target.
 > 
-> > Tested on Gumstix Overo. V1 was tested on omap3-evm by Vaibhav Hiremath.
+> The second patch updates the omap/dts documentation.
 > 
-> I've just tested it on beagle xM. I can play with D12 led using:
-> 
-> echo 255 > /sys/class/leds/beagleboard\:\:pmu_stat/brightness
-> 
-> Tested-by: Benoit Cousson <b-cousson@ti.com>
-> 
-> 
-> > BTW: who will merge this?
-> 
-> Since Linus already acked it, Tony can merge it.
-> 
-> 
-> Tony,
-> 
-> I can add that series in my DTS series for 3.7 if you want.
+> This patchset applies on tony's tree [1], devel-dt branch.
 
-Yes please do thanks.
+Great, I'm assuming Benoit will pick this up as well.
+
+Regards,
 
 Tony
+ 
+> Regards,
+> 
+> Florian
+> 
+> [1] http://git.kernel.org/?p=linux/kernel/git/tmlind/linux-omap.git;a=summary
+> 
+> 
+> Florian Vaussard (2):
+>   ARM: omap/dts: Add support for Gumstix Overo with Tobi expansion
+>     board
+>   ARM: omap/dts: update the documentation
+> 
+>  .../devicetree/bindings/arm/omap/omap.txt          |    3 +
+>  arch/arm/boot/dts/omap3-overo.dtsi                 |   42 ++++++++++++++++++++
+>  arch/arm/boot/dts/omap3-tobi.dts                   |   35 ++++++++++++++++
+>  arch/arm/mach-omap2/Makefile.boot                  |    2 +-
+>  4 files changed, 81 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/omap3-overo.dtsi
+>  create mode 100644 arch/arm/boot/dts/omap3-tobi.dts
+> 
+> -- 
+> 1.7.5.4
+> 
