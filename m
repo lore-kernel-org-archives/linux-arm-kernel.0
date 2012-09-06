@@ -1,129 +1,49 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 6 Sep 2012 20:56:03 +0200
-Subject: [PATCH] perf: Use pre-empt safe cpu_get/put insted of
- smp_processor_id
-In-Reply-To: <1344607558-15481-1-git-send-email-rogerq@ti.com>
-References: <1344607558-15481-1-git-send-email-rogerq@ti.com>
-Message-ID: <CAORVsuW+Vb6+GyTDfEmW3n=FY33rk_KDiMkFHPv29ZS=Y4yuFA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 06 Sep 2012 11:58:18 -0700
+Subject: [PATCH 0/5] Enable pinctrl-single for omap2/3/4
+Message-ID: <20120906185615.1172.23588.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
+Hi all,
 
-On Fri, Aug 10, 2012 at 4:05 PM, Roger Quadros <rogerq@ti.com> wrote:
-> gets rid of below messages with CONFIG_DEBUG_PREEMPT enabled
->
-> [   28.832916] debug_smp_processor_id: 18 callbacks suppressed
-> [   28.832946] BUG: using smp_processor_id() in preemptible [00000000] code: modprobe/1763
-> [   28.841491] caller is pwrdm_set_next_pwrst+0x54/0x120
->
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-
-What his the status of the patch? Has it been reviewed and taken in an
-integration tree? I cannot find anything about it in l-o and
-linux-next.
-
-I have some changes on-going in the OMAP PM code and I would like to
-know if $SUBJECT is applicable.
+Now that pinctrl-single driver is merged, this series enables
+pinctrl for omap2/3/4.
 
 Regards,
-Jean
 
-> ---
->  arch/arm/mach-omap2/clock.c       |    9 ++++++---
->  arch/arm/mach-omap2/pm34xx.c      |   12 ++++++++----
->  arch/arm/mach-omap2/powerdomain.c |    6 ++++--
->  3 files changed, 18 insertions(+), 9 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-> index ea3f565..06747b6 100644
-> --- a/arch/arm/mach-omap2/clock.c
-> +++ b/arch/arm/mach-omap2/clock.c
-> @@ -285,7 +285,8 @@ void omap2_clk_disable(struct clk *clk)
->         pr_debug("clock: %s: disabling in hardware\n", clk->name);
->
->         if (clk->ops && clk->ops->disable) {
-> -               trace_clock_disable(clk->name, 0, smp_processor_id());
-> +               trace_clock_disable(clk->name, 0, get_cpu());
-> +               put_cpu();
->                 clk->ops->disable(clk);
->         }
->
-> @@ -339,7 +340,8 @@ int omap2_clk_enable(struct clk *clk)
->         }
->
->         if (clk->ops && clk->ops->enable) {
-> -               trace_clock_enable(clk->name, 1, smp_processor_id());
-> +               trace_clock_enable(clk->name, 1, get_cpu());
-> +               put_cpu();
->                 ret = clk->ops->enable(clk);
->                 if (ret) {
->                         WARN(1, "clock: %s: could not enable: %d\n",
-> @@ -380,7 +382,8 @@ int omap2_clk_set_rate(struct clk *clk, unsigned long rate)
->
->         /* dpll_ck, core_ck, virt_prcm_set; plus all clksel clocks */
->         if (clk->set_rate) {
-> -               trace_clock_set_rate(clk->name, rate, smp_processor_id());
-> +               trace_clock_set_rate(clk->name, rate, get_cpu());
-> +               put_cpu();
->                 ret = clk->set_rate(clk, rate);
->         }
->
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index e4fc88c..81fec2e 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -357,18 +357,22 @@ void omap_sram_idle(void)
->
->  static void omap3_pm_idle(void)
->  {
-> +       unsigned cpu;
-> +
->         local_fiq_disable();
->
->         if (omap_irq_pending())
->                 goto out;
->
-> -       trace_power_start(POWER_CSTATE, 1, smp_processor_id());
-> -       trace_cpu_idle(1, smp_processor_id());
-> +       cpu = get_cpu();
-> +       trace_power_start(POWER_CSTATE, 1, cpu);
-> +       trace_cpu_idle(1, cpu);
->
->         omap_sram_idle();
->
-> -       trace_power_end(smp_processor_id());
-> -       trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
-> +       trace_power_end(cpu);
-> +       trace_cpu_idle(PWR_EVENT_EXIT, cpu);
-> +       put_cpu();
->
->  out:
->         local_fiq_enable();
-> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> index 69b36e1..138bf86 100644
-> --- a/arch/arm/mach-omap2/powerdomain.c
-> +++ b/arch/arm/mach-omap2/powerdomain.c
-> @@ -169,7 +169,8 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
->                                        ((state & OMAP_POWERSTATE_MASK) << 8) |
->                                        ((prev & OMAP_POWERSTATE_MASK) << 0));
->                         trace_power_domain_target(pwrdm->name, trace_state,
-> -                                                 smp_processor_id());
-> +                                                 get_cpu());
-> +                       put_cpu();
->                 }
->                 break;
->         default:
-> @@ -491,7 +492,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
->         if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
->                 /* Trace the pwrdm desired target state */
->                 trace_power_domain_target(pwrdm->name, pwrst,
-> -                                         smp_processor_id());
-> +                                         get_cpu());
-> +               put_cpu();
->                 /* Program the pwrdm desired target state */
->                 ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
->         }
-> --
-> 1.7.4.1
->
+Tony
+
+---
+
+AnilKumar Ch (1):
+      ARM: OMAP2+: select PINCTRL in Kconfig
+
+Tony Lindgren (4):
+      arm/dts: Add omap36xx.dtsi file and rename omap3-beagle to omap3-beagle-xm
+      arm/dts: Add pinctrl driver entries for omap2/3/4
+      arm/dts: Mux uart pins for omap4-sdp
+      omap-serial: Request pins using pinctrl framework
+
+
+ arch/arm/boot/dts/omap2420-h4.dts             |    2 +
+ arch/arm/boot/dts/omap2420.dtsi               |   22 +++++++++++++
+ arch/arm/boot/dts/omap2430.dtsi               |   22 +++++++++++++
+ arch/arm/boot/dts/omap3-beagle-xm.dts         |    6 ++--
+ arch/arm/boot/dts/omap3.dtsi                  |   25 +++++++++++----
+ arch/arm/boot/dts/omap36xx.dtsi               |   25 +++++++++++++++
+ arch/arm/boot/dts/omap4-sdp.dts               |   42 +++++++++++++++++++++++++
+ arch/arm/boot/dts/omap4.dtsi                  |   17 ++++++++++
+ arch/arm/configs/omap2plus_defconfig          |    1 +
+ arch/arm/mach-omap2/Kconfig                   |    1 +
+ arch/arm/mach-omap2/Makefile.boot             |    2 +
+ arch/arm/plat-omap/include/plat/omap-serial.h |    1 +
+ drivers/tty/serial/omap-serial.c              |   10 ++++++
+ 13 files changed, 164 insertions(+), 12 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap2420.dtsi
+ create mode 100644 arch/arm/boot/dts/omap2430.dtsi
+ rename arch/arm/boot/dts/{omap3-beagle.dts => omap3-beagle-xm.dts} (89%)
+ create mode 100644 arch/arm/boot/dts/omap36xx.dtsi
+
+-- 
+Signature
