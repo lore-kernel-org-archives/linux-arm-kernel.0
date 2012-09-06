@@ -1,11 +1,10 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 6 Sep 2012 09:26:58 -0500
-Subject: [PATCH 09/10] ARM: OMAP: Add dmtimer interrupt disable function
-In-Reply-To: <50489DD9.90903@ti.com>
+Date: Thu, 6 Sep 2012 09:30:56 -0500
+Subject: [PATCH 00/10] ARM: OMAP: DMTIMER fixes and clean-up
+In-Reply-To: <50489DEB.9010709@ti.com>
 References: <1346871872-24413-1-git-send-email-jon-hunter@ti.com>
- <1346871872-24413-10-git-send-email-jon-hunter@ti.com>
- <50489DD9.90903@ti.com>
-Message-ID: <5048B2B2.1030401@ti.com>
+ <50489DEB.9010709@ti.com>
+Message-ID: <5048B3A0.5090108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,18 +13,48 @@ On 09/06/2012 07:58 AM, Vaibhav Hiremath wrote:
 > 
 > 
 > On 9/6/2012 12:34 AM, Jon Hunter wrote:
->> The OMAP dmtimer driver does not currently have a function to disable the
->> timer interrupts. For some timer instances the timer interrupt enable
->> function can be used to disable the interrupts because the same interrupt
->> enable register is used to disable interrupts. However, some timer instances
->> have separate interrupt enable/disable registers and so this will not work.
->> Therefore, add a dedicated function to disable interrupts.
+>> This series includes several fixes for the OMAP DMTIMER driver and a few
+>> clean-ups to simplify some of the code. This series is based upon 3.6-rc4.
+>>
+>> Tested on OMAP5912 OSK, OMAP2420 H4, OMAP3430 Beagle and OMAP4430 Panda.
+>> Testing includes ...
+>> 1. Booting kernel on above boards
+>> 2. Set date and ensuring time of day is correct after 24 hours
+>> 3. Checking the timer counter is incrementing when configuring and starting
+>>    a timer
+>> 4. Checking the timer overflow interrupt when timer expires.
+>> 5. Using different clock sources to operate the timer with.
+>> 6. Running a loop test overnight that continually runs test #3 and #4 for
+>>    each available timer
 >>
 > 
-> I think you should clearly specify which timer and which device you are
-> referring to.
+> On the other hand I have validated this patch-series on both AM37xEVM
+> and BeagleBone platform. I used the test code which you shared with me
+> to validate it.
 
-OMAP4+ devices. For OMAP4 all timers apart from 1, 2 and 10. For OMAP5
-all timers.
+Thanks!
 
+> AM33XX Clock tree needs minor change here,
+> 
+> diff --git a/arch/arm/mach-omap2/clock33xx_data.c
+> b/arch/arm/mach-omap2/clock33xx_data.c
+> index a4006b2..daa36a5 100644
+> --- a/arch/arm/mach-omap2/clock33xx_data.c
+> +++ b/arch/arm/mach-omap2/clock33xx_data.c
+> @@ -1070,6 +1070,8 @@ static struct omap_clk am33xx_clks[] = {
+>         CLK(NULL,       "gfx_fck_div_ck",       &gfx_fck_div_ck,
+> CK_AM33XX),
+>         CLK(NULL,       "sysclkout_pre_ck",     &sysclkout_pre_ck,
+> CK_AM33XX),
+>         CLK(NULL,       "clkout2_ck",           &clkout2_ck,    CK_AM33XX),
+> +       CLK(NULL,       "timer_32k_ck",         &clkdiv32k_ick, CK_AM33XX),
+> +       CLK(NULL,       "timer_sys_ck",         &sys_clkin_ck,  CK_AM33XX),
+>  };
+> 
+>  int __init am33xx_clk_init(void)
+
+Ok, do you plan to submit this? If I need to do a V2 of this series, I
+can include this one too.
+
+Cheers
 Jon
