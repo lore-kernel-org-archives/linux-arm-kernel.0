@@ -1,33 +1,89 @@
-From: spartacus06@gmail.com (Seth Jennings)
-Date: Thu, 6 Sep 2012 11:53:26 -0500
-Subject: [PATCH] ARM: add support for BCM2708/BCM2835 and Raspberry Pi
-In-Reply-To: <1346908038-22421-1-git-send-email-swarren@wwwdotorg.org>
-References: <1346908038-22421-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CAG-w=x77y6ykh3FcyTtVAN85eOk1RP2CZ=ZG-_1091i5jYDF2A@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 6 Sep 2012 10:11:54 -0700
+Subject: [GIT PULL] ARM: SoC fixes for v3.6-rc5
+Message-ID: <CAOesGMjWUgFJ_Gmpn_y5V7KOV5JAnDxW2=-Y1o-ZF6Ny-FUhdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(sorry for the dup Stephen, forgot to reply all :-/)
+Hi Linus,
 
-On Thu, Sep 6, 2012 at 12:07 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->
-> The BCM2708 is an ARM SoC from Broadcom. It is the primary SoC in a
-> series which contains the BCM2835 amongst other variants. This patch
-> adds very basic support for this series of SoCs, under the BCM2708 name.
+The following changes since commit 9acb172543aecb783e2e1e53e3f447d4c0f5c150:
 
-Great work! I'm glad to see this heading upstream :)
+  Merge tag 'fixes-3.6-rc3' of
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2012-08-25
+17:33:33 -0700)
 
-> This series was extracted from git://github.com/lp0/linux.git branch
-> rpi-next or rpi-linear from 3-4 months ago, and significantly stripped
-> down and modified since.
+are available in the git repository at:
 
-I've used Simon's tree before and it will boot up all the way with UART
-support (no graphics, usb, network).  I also think it has a fully
-populated device
-tree.  Why, in particular, did you strip it down?
 
-I'm new to the ARM SoC upstreaming scene so there might be a obvious
-reason of which I'm not aware.
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+tags/fixes-for-linus
 
---
-Seth
+for you to fetch changes up to e829c66745e66558b624fd635be4a384fe854944:
+
+  ARM: gemini: fix the gemini build (2012-09-04 22:17:34 -0700)
+
+----------------------------------------------------------------
+arm-soc: bug fixes for v3.6-rc5
+
+Mostly Renesas and Atmel bugfixes this time, targeting boot and build
+problems. A couple of patches for gemini and kirkwood as well. On a
+whole nothing very controversial.
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      ARM: Kirkwood: Fix 'SZ_1M' undeclared here for db88f6281-bp-setup.c
+
+Bo Shen (1):
+      ARM: at91/dts: remove partial parameter in at91sam9g25ek.dts
+
+Kuninori Morimoto (5):
+      ARM: shmobile: sh73a0: fixup RELOC_BASE of intca_irq_pins_desc
+      ARM: shmobile: marzen: fixup smsc911x id for regulator
+      ARM: shmobile: armadillo800eva: fixup: sound card detection order
+      ARM: shmobile: mackerel: fixup usb module order
+      ARM: shmobile: armadillo800eva: enable rw rootfs mount
+
+Laurent Pinchart (2):
+      ARM: mach-shmobile: armadillo800eva: Fix GPIO buttons descriptions
+      ARM: mach-shmobile: armadillo800eva: Enable power button as wakeup source
+
+Linus Walleij (1):
+      ARM: gemini: fix the gemini build
+
+Ludovic Desroches (3):
+      ARM: at91: fix system timer irq issue due to sparse irq support
+      ARM: at91: fix rtc-at91sam9 irq issue due to sparse irq support
+      ARM: at91/feature-removal-schedule: delay at91_mci removal
+
+Nicolas Ferre (1):
+      ARM: at91/clock: fix PLLA overclock warning
+
+Olof Johansson (6):
+      Merge branch 'fixes' of git://git.kernel.org/.../rafael/renesas into fixes
+      Merge tag 'at91-fixes' of git://github.com/at91linux/linux-at91 into fixes
+      Merge branch 'armadillo800eva' of
+git://git.kernel.org/.../horms/renesas into fixes
+      Merge branch 'fixes-for-v3.6-v2' of
+git://git.infradead.org/users/jcooper/linux into fixes
+      Merge branch 'fixes' of git://git.kernel.org/.../horms/renesas into fixes
+      Merge branch 'fixes' of git://git.kernel.org/.../horms/renesas into fixes
+
+ Documentation/feature-removal-schedule.txt     |  2 +-
+ arch/arm/boot/dts/at91sam9g25ek.dts            |  2 +-
+ arch/arm/configs/armadillo800eva_defconfig     |  2 +-
+ arch/arm/mach-at91/at91rm9200_time.c           |  2 +-
+ arch/arm/mach-at91/at91sam9260_devices.c       |  6 +++++-
+ arch/arm/mach-at91/at91sam9261_devices.c       |  6 +++++-
+ arch/arm/mach-at91/at91sam9263_devices.c       | 10 ++++++++--
+ arch/arm/mach-at91/at91sam9g45_devices.c       |  6 +++++-
+ arch/arm/mach-at91/at91sam9rl_devices.c        |  6 +++++-
+ arch/arm/mach-at91/clock.c                     | 12 ++++++++++++
+ arch/arm/mach-gemini/irq.c                     |  1 +
+ arch/arm/mach-kirkwood/db88f6281-bp-setup.c    |  1 +
+ arch/arm/mach-shmobile/board-armadillo800eva.c | 13 +++++++------
+ arch/arm/mach-shmobile/board-mackerel.c        |  3 ++-
+ arch/arm/mach-shmobile/board-marzen.c          |  2 +-
+ arch/arm/mach-shmobile/intc-sh73a0.c           |  4 ++--
+ drivers/rtc/rtc-at91sam9.c                     | 22 +++++++++++++++-------
+ 17 files changed, 73 insertions(+), 27 deletions(-)
