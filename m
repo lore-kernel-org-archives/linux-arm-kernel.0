@@ -1,27 +1,24 @@
 From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
-Date: Thu, 6 Sep 2012 20:30:35 +0530
-Subject: [PATCH] arm: omap: hwmod: make *phy_48m* as the main_clk of
- ocp2scp
-In-Reply-To: <1341219337-25815-1-git-send-email-kishon@ti.com>
-References: <1341219337-25815-1-git-send-email-kishon@ti.com>
-Message-ID: <CAAe_U6Kn6DxV45OqOMU3yqpk1OMbWS2621AWvJJQE0SW4vMcLw@mail.gmail.com>
+Date: Thu, 6 Sep 2012 20:32:41 +0530
+Subject: [RFC PATCH 2/5] arm: omap: remove ocp2scp_usb_phy_ick clock node
+In-Reply-To: <1338375394-16268-3-git-send-email-kishon@ti.com>
+References: <1338375394-16268-1-git-send-email-kishon@ti.com>
+ <1338375394-16268-3-git-send-email-kishon@ti.com>
+Message-ID: <CAAe_U6Ji3KbqkFcBsZ8m-oLQBHyOQfuKTz+NkaoQyxMLascU5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, Jul 2, 2012 at 2:25 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Made *ocp2scp_usb_phy_phy_48m* as the main_clk for ocp2scp.
-> Since this ocp2scp module does not have any fck but does have a
-> single opt_clock, it is added as the main_clk for ocp2scp. Also
-> removed phy_48m as the optional clock since it is now made as the
-> main clock.
+On Wed, May 30, 2012 at 4:26 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> "ocp2scp_usb_phy_ick" clock node was a fake clock node created
+> to control MODULEMODE of ocp2scp. Since the hwmod for ocp2scp is now added
+> (which can be used to control MODULEMODE) this clock node is removed.
 >
-> Cc: Beno?t Cousson <b-cousson@ti.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
 > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-If there is not any comments for this patch, can someone queue it.
-This is needed for musb to be functional with dt in omap4.
+If there isn't any comments for this patch, can someone queue it up?
 
 Thanks
 Kishon
