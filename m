@@ -1,52 +1,32 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Thu, 6 Sep 2012 06:17:29 +0000
-Subject: [PATCH v5 1/5] arm/dts: AM33XX: Add basic pinctrl device tree data
-In-Reply-To: <20120905233205.GO1303@atomide.com>
-References: <1346405361-29711-1-git-send-email-anilkumar@ti.com>
- <1346405361-29711-2-git-send-email-anilkumar@ti.com>
- <20120905233205.GO1303@atomide.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA27D93@DBDE01.ent.ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 6 Sep 2012 15:18:07 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC: KZM-A9-GT for 3.7 #2
+In-Reply-To: <CACRpkdZBOjO124w3WwPpL7ekf2dU1w2HCub9EG=LUxFSPn8Ayw@mail.gmail.com>
+References: <1346305648-25263-1-git-send-email-horms@verge.net.au>
+ <20120905224413.GC32084@quad.lixom.net>
+ <CACRpkdZBOjO124w3WwPpL7ekf2dU1w2HCub9EG=LUxFSPn8Ayw@mail.gmail.com>
+Message-ID: <20120906061807.GA3326@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 05:02:05, Tony Lindgren wrote:
-> * AnilKumar Ch <anilkumar@ti.com> [120831 02:30]:
-> > Adds basic pinctrl device tree data for AM33XX family of devices.
-> > This patch is based on the pinctrl-single driver.
-> > 
-> > Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
-> > ---
-> >  arch/arm/boot/dts/am33xx.dtsi |    9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> > index be43511..bf5f713 100644
-> > --- a/arch/arm/boot/dts/am33xx.dtsi
-> > +++ b/arch/arm/boot/dts/am33xx.dtsi
-> > @@ -40,6 +40,15 @@
-> >  		};
-> >  	};
-> >  
-> > +	am3358_pinmux: pinmux at 44e10800 {
-> > +		compatible = "pinctrl-single";
-> > +		reg = <0x44e10800 0x0238>;
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		pinctrl-single,register-width = <32>;
-> > +		pinctrl-single,function-mask = <0x7f>;
-> > +	};
-> > +
+On Thu, Sep 06, 2012 at 07:58:02AM +0200, Linus Walleij wrote:
+> On Thu, Sep 6, 2012 at 12:44 AM, Olof Johansson <olof@lixom.net> wrote:
 > 
-> Is this controller the same for all am33xx? If so, please use
-> am33xx_pinmux naming. Note that some padconf registers may not
-> be listed for all the variants, but the registers may still be
-> there for all the variants. So a generic entry is a better
-> choice here as otherwise you'l need to include am33xx.dtsi into
-> am3358.dtsi.
+> > So, we can't pull in this branch with its dependency without an agreement that
+> > Linus holds a branch stable with at least the pcf857x patch on it. Linus?
 > 
+> OMG! OK let's claim that it's stable now then, it's close enough
+> to the merge window.
+> 
+> Ironically his was caused by a Samsung commit (IIRC) which I
+> applied to the GPIO tree but shouldn't be there (instead to be
+> funneled through ARM SoC) so I had to take it out after
+> a week. So maybe we're not so good off with these mixtures
+> of "ARM SoC pulls GPIO" vs "ACK and push it all through ARM SoC"
+> hm, maybe it's just one of those things we have to live with...
 
-Controller is same for all am33xx devices, I will spin a patch
-by renaming to am33xx_****
+It seems to me that I should rebase the my branch and it can
+then go through either the ARM SoC or GPIO tree. Either is fine by me.
 
-Thanks
-AnilKumar
+As an aside, the patch does include a defconfig change.
+Olof, Should that be broken out into a separate patch?
