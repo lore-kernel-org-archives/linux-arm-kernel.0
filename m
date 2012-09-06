@@ -1,51 +1,130 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu,  6 Sep 2012 15:45:40 +0300
-Subject: [PATCH v4 21/21] serial: omap: enable RX and TX FIFO usage
-In-Reply-To: <1346935540-1792-1-git-send-email-balbi@ti.com>
-References: <20120906122948.GC29202@arwen.pp.htv.fi>
- <1346935540-1792-1-git-send-email-balbi@ti.com>
-Message-ID: <1346935540-1792-22-git-send-email-balbi@ti.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Thu, 6 Sep 2012 18:27:33 +0530
+Subject: [PATCH 02/10] ARM: OMAP: Fix timer posted mode support
+In-Reply-To: <1346871872-24413-3-git-send-email-jon-hunter@ti.com>
+References: <1346871872-24413-1-git-send-email-jon-hunter@ti.com>
+ <1346871872-24413-3-git-send-email-jon-hunter@ti.com>
+Message-ID: <50489DBD.5030200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enable RX FIFO for 16 characters and TX FIFO
-for 16 spaces.
 
-Tested-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- drivers/tty/serial/omap-serial.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 164c3c9..cfd2094 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -56,8 +56,8 @@
- #define OMAP_UART_SCR_RX_TRIG_GRANU1_MASK		(1 << 7)
- 
- /* FCR register bitmasks */
--#define OMAP_UART_FCR_RX_FIFO_TRIG_SHIFT		6
- #define OMAP_UART_FCR_RX_FIFO_TRIG_MASK			(0x3 << 6)
-+#define OMAP_UART_FCR_TX_FIFO_TRIG_MASK			(0x3 << 4)
- 
- /* MVR register bitmasks */
- #define OMAP_UART_MVR_SCHEME_SHIFT	30
-@@ -834,9 +834,13 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
- 
- 	up->scr |= OMAP_UART_SCR_RX_TRIG_GRANU1_MASK;
- 
--	/* Set receive FIFO threshold to 1 byte */
-+	/* Set receive FIFO threshold to 16 characters and
-+	 * transmit FIFO threshold to 16 spaces
-+	 */
- 	up->fcr &= ~OMAP_UART_FCR_RX_FIFO_TRIG_MASK;
--	up->fcr |= (0x1 << OMAP_UART_FCR_RX_FIFO_TRIG_SHIFT);
-+	up->fcr &= ~OMAP_UART_FCR_TX_FIFO_TRIG_MASK;
-+	up->fcr |= UART_FCR6_R_TRIGGER_16 | UART_FCR6_T_TRIGGER_24 |
-+		UART_FCR_ENABLE_FIFO;
- 
- 	serial_out(up, UART_FCR, up->fcr);
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
--- 
-1.7.12.rc3
+On 9/6/2012 12:34 AM, Jon Hunter wrote:
+> Currently the dmtimer posted mode is being enabled when the function
+> __omap_dm_timer_reset() is called. This function is only being called for
+> OMAP1 timers and OMAP2+ timers that are being used as system timers. Hence,
+> for OMAP2+ timers that are NOT being used as a system timer, posted mode is
+> not enabled but the "timer->posted" variable is still set (incorrectly) in
+> the omap_dm_timer_prepare() function.
+> 
+> This is a regression introduced by commit 3392cdd3 (ARM: OMAP: dmtimer:
+> switch-over to platform device driver) which changed the code to only call
+> omap_dm_timer_reset() for OMAP1 devices. Although this is a regression from
+> the original code it only impacts performance and so is not needed for stable.
+> 
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> ---
+>  arch/arm/mach-omap2/timer.c               |    3 +--
+>  arch/arm/plat-omap/dmtimer.c              |   14 +++++---------
+>  arch/arm/plat-omap/include/plat/dmtimer.h |    9 ++++++++-
+>  3 files changed, 14 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index 5471706..e24ee0f 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -194,10 +194,9 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+>  	}
+>  	__omap_dm_timer_init_regs(timer);
+>  	__omap_dm_timer_reset(timer, 1, 1);
+> -	timer->posted = 1;
+> +	__omap_dm_timer_enable_posted(timer);
+>  
+>  	timer->rate = clk_get_rate(timer->fclk);
+> -
+>  	timer->reserved = 1;
+>  
+>  	return res;
+> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+> index c34f55b..22790ea 100644
+> --- a/arch/arm/plat-omap/dmtimer.c
+> +++ b/arch/arm/plat-omap/dmtimer.c
+> @@ -122,21 +122,15 @@ static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
+>  
+>  static void omap_dm_timer_reset(struct omap_dm_timer *timer)
+>  {
+> -	omap_dm_timer_enable(timer);
+>  	if (timer->pdev->id != 1) {
+>  		omap_dm_timer_write_reg(timer, OMAP_TIMER_IF_CTRL_REG, 0x06);
+>  		omap_dm_timer_wait_for_reset(timer);
+>  	}
+> -
+>  	__omap_dm_timer_reset(timer, 0, 0);
+> -	omap_dm_timer_disable(timer);
+> -	timer->posted = 1;
+>  }
+>  
+>  int omap_dm_timer_prepare(struct omap_dm_timer *timer)
+>  {
+> -	int ret;
+> -
+>  	/*
+>  	 * FIXME: OMAP1 devices do not use the clock framework for dmtimers so
+>  	 * do not call clk_get() for these devices.
+> @@ -150,13 +144,15 @@ int omap_dm_timer_prepare(struct omap_dm_timer *timer)
+>  		}
+>  	}
+>  
+> +	omap_dm_timer_enable(timer);
+> +
+>  	if (timer->capability & OMAP_TIMER_NEEDS_RESET)
+>  		omap_dm_timer_reset(timer);
+>  
+> -	ret = omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
+> +	__omap_dm_timer_enable_posted(timer);
+> +	omap_dm_timer_disable(timer);
+>  
+> -	timer->posted = 1;
+> -	return ret;
+> +	return omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
+
+May be I am speculating here and I know this is tested and supposed to
+work, but Isn't it safe to set parent keeping module enables.
+
+I would still recommend you to move is before omap_dm_timer_disable().
+There could be devices or hw bugs/issues, may be related to standby/idle
+protocol happening underneath module enable/disable.
+
+Thanks,
+Vaibhav
+>  }
+>  
+>  static inline u32 omap_dm_timer_reserved_systimer(int id)
+> diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
+> index 5ce2f00..fa9d04b 100644
+> --- a/arch/arm/plat-omap/include/plat/dmtimer.h
+> +++ b/arch/arm/plat-omap/include/plat/dmtimer.h
+> @@ -348,13 +348,20 @@ static inline void __omap_dm_timer_reset(struct omap_dm_timer *timer,
+>  		l |= 1 << 2;
+>  
+>  	__raw_writel(l, timer->io_base + OMAP_TIMER_OCP_CFG_OFFSET);
+> +}
+> +
+> +static inline void __omap_dm_timer_enable_posted(struct omap_dm_timer *timer)
+> +{
+> +	if (timer->posted)
+> +		return;
+>  
+>  	if (timer->errata & OMAP_TIMER_ERRATA_I103_I767)
+>  		return;
+>  
+> -	/* Match hardware reset default of posted mode */
+>  	__omap_dm_timer_write(timer, OMAP_TIMER_IF_CTRL_REG,
+>  					OMAP_TIMER_CTRL_POSTED, 0);
+> +	timer->context.tsicr = OMAP_TIMER_CTRL_POSTED;
+> +	timer->posted = 1;
+>  }
+>  
+>  /**
+> 
