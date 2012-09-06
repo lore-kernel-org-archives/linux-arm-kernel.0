@@ -1,47 +1,110 @@
-From: havard@skinnemoen.net (Havard Skinnemoen)
-Date: Thu, 6 Sep 2012 17:49:11 +0200
-Subject: [PATCH 04/10] net/macb: Fix a race in macb_start_xmit()
-In-Reply-To: <20120905.173023.2235590074897156746.davem@davemloft.net>
-References: <cover.1346775479.git.nicolas.ferre@atmel.com>
- <40f02ee50a29aaec6c949432a1bcf09f4b027181.1346775479.git.nicolas.ferre@atmel.com>
- <20120905.173023.2235590074897156746.davem@davemloft.net>
-Message-ID: <CACiLriTSddM-5pnpii9c+4dA++OrsKovGLabegdwSRLchuSnAA@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 6 Sep 2012 11:01:21 -0500
+Subject: [PATCH 02/10] ARM: OMAP: Fix timer posted mode support
+In-Reply-To: <5048B117.7050601@ti.com>
+References: <1346871872-24413-1-git-send-email-jon-hunter@ti.com>
+ <1346871872-24413-3-git-send-email-jon-hunter@ti.com>
+ <50489DBD.5030200@ti.com> <5048B117.7050601@ti.com>
+Message-ID: <5048C8D1.6080806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 5, 2012 at 11:30 PM, David Miller <davem@davemloft.net> wrote:
-> From: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Date: Wed, 5 Sep 2012 10:19:11 +0200
->
->> From: Havard Skinnemoen <havard@skinnemoen.net>
+
+On 09/06/2012 09:20 AM, Jon Hunter wrote:
+> 
+> On 09/06/2012 07:57 AM, Vaibhav Hiremath wrote:
 >>
->> Fix a race in macb_start_xmit() where we unconditionally set the TSTART bit.
->> If an underrun just happened (we do this with interrupts disabled, so it might
->> not have been handled yet), the controller starts transmitting from the first
->> entry in the ring, which is usually wrong.
->> Restart the controller after error handling.
 >>
->> Signed-off-by: Havard Skinnemoen <havard@skinnemoen.net>
->> [nicolas.ferre at atmel.com: split patch in topics]
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->
-> Accumulating special case code and checks into the hot path of TX packet
-> processing is extremely unwise.
->
-> Instead, when you handle the TX error conditions and reset the chip you
-> should first ensure that there are no flows of control in the transmit
-> function of your driver by using the appropriate locking et al. facilities.
+>> On 9/6/2012 12:34 AM, Jon Hunter wrote:
+>>> Currently the dmtimer posted mode is being enabled when the function
+>>> __omap_dm_timer_reset() is called. This function is only being called for
+>>> OMAP1 timers and OMAP2+ timers that are being used as system timers. Hence,
+>>> for OMAP2+ timers that are NOT being used as a system timer, posted mode is
+>>> not enabled but the "timer->posted" variable is still set (incorrectly) in
+>>> the omap_dm_timer_prepare() function.
+>>>
+>>> This is a regression introduced by commit 3392cdd3 (ARM: OMAP: dmtimer:
+>>> switch-over to platform device driver) which changed the code to only call
+>>> omap_dm_timer_reset() for OMAP1 devices. Although this is a regression from
+>>> the original code it only impacts performance and so is not needed for stable.
+>>>
+>>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>>> ---
+>>>  arch/arm/mach-omap2/timer.c               |    3 +--
+>>>  arch/arm/plat-omap/dmtimer.c              |   14 +++++---------
+>>>  arch/arm/plat-omap/include/plat/dmtimer.h |    9 ++++++++-
+>>>  3 files changed, 14 insertions(+), 12 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+>>> index 5471706..e24ee0f 100644
+>>> --- a/arch/arm/mach-omap2/timer.c
+>>> +++ b/arch/arm/mach-omap2/timer.c
+>>> @@ -194,10 +194,9 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+>>>  	}
+>>>  	__omap_dm_timer_init_regs(timer);
+>>>  	__omap_dm_timer_reset(timer, 1, 1);
+>>> -	timer->posted = 1;
+>>> +	__omap_dm_timer_enable_posted(timer);
+>>>  
+>>>  	timer->rate = clk_get_rate(timer->fclk);
+>>> -
+>>>  	timer->reserved = 1;
+>>>  
+>>>  	return res;
+>>> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+>>> index c34f55b..22790ea 100644
+>>> --- a/arch/arm/plat-omap/dmtimer.c
+>>> +++ b/arch/arm/plat-omap/dmtimer.c
+>>> @@ -122,21 +122,15 @@ static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
+>>>  
+>>>  static void omap_dm_timer_reset(struct omap_dm_timer *timer)
+>>>  {
+>>> -	omap_dm_timer_enable(timer);
+>>>  	if (timer->pdev->id != 1) {
+>>>  		omap_dm_timer_write_reg(timer, OMAP_TIMER_IF_CTRL_REG, 0x06);
+>>>  		omap_dm_timer_wait_for_reset(timer);
+>>>  	}
+>>> -
+>>>  	__omap_dm_timer_reset(timer, 0, 0);
+>>> -	omap_dm_timer_disable(timer);
+>>> -	timer->posted = 1;
+>>>  }
+>>>  
+>>>  int omap_dm_timer_prepare(struct omap_dm_timer *timer)
+>>>  {
+>>> -	int ret;
+>>> -
+>>>  	/*
+>>>  	 * FIXME: OMAP1 devices do not use the clock framework for dmtimers so
+>>>  	 * do not call clk_get() for these devices.
+>>> @@ -150,13 +144,15 @@ int omap_dm_timer_prepare(struct omap_dm_timer *timer)
+>>>  		}
+>>>  	}
+>>>  
+>>> +	omap_dm_timer_enable(timer);
+>>> +
+>>>  	if (timer->capability & OMAP_TIMER_NEEDS_RESET)
+>>>  		omap_dm_timer_reset(timer);
+>>>  
+>>> -	ret = omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
+>>> +	__omap_dm_timer_enable_posted(timer);
+>>> +	omap_dm_timer_disable(timer);
+>>>  
+>>> -	timer->posted = 1;
+>>> -	return ret;
+>>> +	return omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
+>>
+>> May be I am speculating here and I know this is tested and supposed to
+>> work, but Isn't it safe to set parent keeping module enables.
+> 
+> So you would rather change the functional clock while the timer is
+> enabled/active? So although that we are doing this today, that does not
+> sound like a good idea to me :-)
 
-IIRC, the hardware resets the ring pointers when an error happens, and
-if we set TSTART right after that happens, the hardware will happily
-transmit whatever is sitting in the beginning of the ring. This is
-what I was trying to avoid.
+Actually, we are not doing this today. If you look at the current code
+we are only enabling the timer while doing the soft-reset for omap1
+devices. Hence, even in the current code we set the parent while the
+timer is not enabled. So there is no actual change here in the sequence.
 
-The details are a bit hazy as it's been a while since I looked at
-this, so it could be that simply letting it happen and using a bigger
-hammer during reset processing might work just as well. Just want to
-make sure y'all understand that we're talking about a race against
-hardware, not against interrupt handlers, threads or anything that can
-be solved by locking :)
-
-Havard
+Cheers
+Jon
