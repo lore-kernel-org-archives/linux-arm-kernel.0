@@ -1,41 +1,64 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 07 Sep 2012 09:37:30 -0600
-Subject: [PATCH V2] ARM: dt: tegra: harmony: add regulators
-In-Reply-To: <1346972447-7096-1-git-send-email-swarren@wwwdotorg.org>
-References: <1346972447-7096-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <504A14BA.9070109@wwwdotorg.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri,  7 Sep 2012 18:34:19 +0300
+Subject: [PATCH] serial: omap: fix compile breakage
+In-Reply-To: <20120907153136.GA8634@kroah.com>
+References: <20120907153136.GA8634@kroah.com>
+Message-ID: <1347032059-8901-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/2012 05:00 PM, Stephen Warren wrote:
-> From: Laxman Dewangan <ldewangan@nvidia.com>
-> 
-> Harmony uses a TPS6586x regulator. Instantiate this, and hook up a
-> couple of fixed GPIO-controlled regulators too.
-> 
-> Based on Ventana regulator patch by Stephen Warren <swarren@nvidia.com>
-> and converted to Harmony.
-> 
-> swarren made the following changes:
-> * Added ldo0 regulator configuration to device tree, and updated
->   board-harmony-pcie.c for the new regulator name.
-> * Fixed vdd_1v05's voltage from 10.5V to 1.05V.
-> * Modified board-harmony-pcie.c to obtain the en_vdd_1v05 GPIO number at
->   run-time from device tree instead of hard-coding it.
-> * Removed board-harmony{-power.c,.h} now that they're unused.
-> * Disabled vdd_1v05 regulator; the code in board-harmony-pcie.c hijacks
->   this GPIO for now. This will be fixed when the PCIe driver is re-
->   written as a driver. The code can't regulator_get("vdd_1v05") right
->   now, because the vdd_1v05 regulator's probe gets deferred due to its
->   supply being the PMIC, which gets probed after the regulator the first
->   time around, and this dependency is only resolved by repeated probing,
->   which happens when deferred_probe_initcall() is called, which happens
->   in a late initcall, whose runtime order relative to harmony_pcie_init()
->   is undefined, since that's also called from a late initcall.
-> * Removed unused harmony_pcie_initcall().
-> 
-> Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+when rebasing patches on top of Greg's tty-next,
+it looks like automerge broke a few things which
+I didn't catch (for whatever reason I didn't
+have OMAP Serial enabled on .config) so I ended
+up breaking the build on Greg's tty-next branch.
 
-Applied to Tegra's for-3.7/board-removal branch (since it relies on
-patches there, and allows board-harmony-power.c to be removed).
+Fix the breakage by re-adding the three missing
+members on struct uart_omap_port.
+
+Reported-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+
+Hi Greg,
+
+I just fetched your tree again and rebased again just to
+make sure. Everything is fine here, let me know if it
+still applies with fuzz.
+
+cheers
+
+ arch/arm/plat-omap/include/plat/omap-serial.h | 4 ----
+ drivers/tty/serial/omap-serial.c              | 4 ++++
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
+index 3c9fd3e..a531149 100644
+--- a/arch/arm/plat-omap/include/plat/omap-serial.h
++++ b/arch/arm/plat-omap/include/plat/omap-serial.h
+@@ -105,8 +105,4 @@ struct uart_omap_dma {
+ 	unsigned int		rx_timeout;
+ };
+ 
+-
+-	int			DTR_gpio;
+-	int			DTR_inverted;
+-	int			DTR_active;
+ #endif /* __OMAP_SERIAL_H__ */
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index cfd2094..0a6e78e 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -100,6 +100,10 @@ struct uart_omap_port {
+ 	u8			wakeups_enabled;
+ 	unsigned int		irq_pending:1;
+ 
++	int			DTR_gpio;
++	int			DTR_inverted;
++	int			DTR_active;
++
+ 	struct pm_qos_request	pm_qos_request;
+ 	u32			latency;
+ 	u32			calc_latency;
+-- 
+1.7.12.rc3
