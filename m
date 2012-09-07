@@ -1,84 +1,66 @@
-From: jm@lentin.co.uk (Jamie Lentin)
-Date: Fri,  7 Sep 2012 17:34:35 +0100
-Subject: [PATCH 2/2] ARM: kirkwood: Use devicetree to define DNS-32[05] fan
-In-Reply-To: <1347035675-23907-1-git-send-email-jm@lentin.co.uk>
-References: <1347035675-23907-1-git-send-email-jm@lentin.co.uk>
-Message-ID: <1347035675-23907-3-git-send-email-jm@lentin.co.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 7 Sep 2012 18:34:48 +0200
+Subject: [PATCH 04/10] net/macb: Fix a race in macb_start_xmit()
+In-Reply-To: <CACiLriTSddM-5pnpii9c+4dA++OrsKovGLabegdwSRLchuSnAA@mail.gmail.com>
+References: <cover.1346775479.git.nicolas.ferre@atmel.com>
+ <40f02ee50a29aaec6c949432a1bcf09f4b027181.1346775479.git.nicolas.ferre@atmel.com>
+ <20120905.173023.2235590074897156746.davem@davemloft.net>
+ <CACiLriTSddM-5pnpii9c+4dA++OrsKovGLabegdwSRLchuSnAA@mail.gmail.com>
+Message-ID: <504A2228.8050501@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove more board-specific code by using devicetree to define the fan
-attached to both boards.
+On 09/06/2012 05:49 PM, Havard Skinnemoen :
+> On Wed, Sep 5, 2012 at 11:30 PM, David Miller <davem@davemloft.net> wrote:
+>> From: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Date: Wed, 5 Sep 2012 10:19:11 +0200
+>>
+>>> From: Havard Skinnemoen <havard@skinnemoen.net>
+>>>
+>>> Fix a race in macb_start_xmit() where we unconditionally set the TSTART bit.
+>>> If an underrun just happened (we do this with interrupts disabled, so it might
+>>> not have been handled yet), the controller starts transmitting from the first
+>>> entry in the ring, which is usually wrong.
+>>> Restart the controller after error handling.
+>>>
+>>> Signed-off-by: Havard Skinnemoen <havard@skinnemoen.net>
+>>> [nicolas.ferre at atmel.com: split patch in topics]
+>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>
+>> Accumulating special case code and checks into the hot path of TX packet
+>> processing is extremely unwise.
+>>
+>> Instead, when you handle the TX error conditions and reset the chip you
+>> should first ensure that there are no flows of control in the transmit
+>> function of your driver by using the appropriate locking et al. facilities.
+> 
+> IIRC, the hardware resets the ring pointers when an error happens, and
+> if we set TSTART right after that happens, the hardware will happily
+> transmit whatever is sitting in the beginning of the ring. This is
+> what I was trying to avoid.
+> 
+> The details are a bit hazy as it's been a while since I looked at
+> this, so it could be that simply letting it happen and using a bigger
+> hammer during reset processing might work just as well. Just want to
+> make sure y'all understand that we're talking about a race against
+> hardware, not against interrupt handlers, threads or anything that can
+> be solved by locking :)
 
-Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
----
- arch/arm/boot/dts/kirkwood-dnskw.dtsi |   10 ++++++++++
- arch/arm/mach-kirkwood/board-dnskw.c  |   25 -------------------------
- 2 files changed, 10 insertions(+), 25 deletions(-)
+Yes, you are right Havard.
 
-diff --git a/arch/arm/boot/dts/kirkwood-dnskw.dtsi b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-index 7408655..9b32d02 100644
---- a/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-@@ -25,6 +25,16 @@
- 		};
- 	};
- 
-+	gpio_fan {
-+		/* Fan: ADDA AD045HB-G73 40mm 6000rpm at 5v */
-+		compatible = "gpio-fan";
-+		gpios = <&gpio1 14 1
-+			 &gpio1 13 1>;
-+		gpio-fan,speed-map = <0    0
-+				      3000 1
-+				      6000 2>;
-+	};
-+
- 	ocp at f1000000 {
- 		sata at 80000 {
- 			status = "okay";
-diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
-index 4ab3506..e202a07 100644
---- a/arch/arm/mach-kirkwood/board-dnskw.c
-+++ b/arch/arm/mach-kirkwood/board-dnskw.c
-@@ -67,29 +67,6 @@ static unsigned int dnskw_mpp_config[] __initdata = {
- 	0
- };
- 
--/* Fan: ADDA AD045HB-G73 40mm 6000rpm at 5v */
--static struct gpio_fan_speed dnskw_fan_speed[] = {
--	{    0,  0 },
--	{ 3000,	 1 },
--	{ 6000,	 2 },
--};
--static unsigned dnskw_fan_pins[] = {46, 45};
--
--static struct gpio_fan_platform_data dnskw_fan_data = {
--	.num_ctrl	= ARRAY_SIZE(dnskw_fan_pins),
--	.ctrl		= dnskw_fan_pins,
--	.num_speed	= ARRAY_SIZE(dnskw_fan_speed),
--	.speed		= dnskw_fan_speed,
--};
--
--static struct platform_device dnskw_fan_device = {
--	.name	= "gpio-fan",
--	.id	= -1,
--	.dev	= {
--		.platform_data	= &dnskw_fan_data,
--	},
--};
--
- static void dnskw_power_off(void)
- {
- 	gpio_set_value(36, 1);
-@@ -114,8 +91,6 @@ void __init dnskw_init(void)
- 	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&dnskw_ge00_data);
- 
--	platform_device_register(&dnskw_fan_device);
--
- 	/* Register power-off GPIO. */
- 	if (gpio_request(36, "dnskw:power:off") == 0
- 	    && gpio_direction_output(36, 0) == 0)
+I will see if we can let the transmitter go just before being
+interrupted by the pending error.
+
+It is true that there are several cases here:
+- tx immediately stopped again by the USED bit of a non initialized
+descriptor. We thus have to cleanup the error frame but also take care
+about the newly queued packet...
+- beginning of transmission of a not-related fragment that has just been
+queued by the start_xmit; just before catching the pending error IRQ. We
+may have to consider the consequences of this!
+
+So, stay tuned ;-)
+
+Best regards,
 -- 
-1.7.10.4
+Nicolas Ferre
