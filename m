@@ -1,143 +1,105 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 7 Sep 2012 09:55:24 +0300
-Subject: [PATCH] perf: Use pre-empt safe cpu_get/put insted of
- smp_processor_id
-In-Reply-To: <CAORVsuVCNy3L9af9iC9ZSeRbRvz-n=jN0P9ixMJday90NmVGfg@mail.gmail.com>
-References: <1344607558-15481-1-git-send-email-rogerq@ti.com>
- <CAORVsuW+Vb6+GyTDfEmW3n=FY33rk_KDiMkFHPv29ZS=Y4yuFA@mail.gmail.com>
- <CAORVsuVCNy3L9af9iC9ZSeRbRvz-n=jN0P9ixMJday90NmVGfg@mail.gmail.com>
-Message-ID: <50499A5C.60006@ti.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Fri, 7 Sep 2012 16:09:44 +0900
+Subject: [PATCH V4 2/2] video: drm: exynos: Add device tree support
+In-Reply-To: <CAAQKjZN_n5QfBTibk8+jNwvZzPU_yvxJN70F3VrvZN_Pitm9ag@mail.gmail.com>
+References: <1346859555-13527-1-git-send-email-l.krishna@samsung.com>
+ <1346859555-13527-3-git-send-email-l.krishna@samsung.com>
+ <CAH9JG2X_3iUTiGWv2cxjiX-s_VUtptVbzxhAJTub70W_2Dxecg@mail.gmail.com>
+ <CAAQKjZNmizjZ-=JN9_AysPMPHTOh7eydfE_OCYE6-v0JAJMydw@mail.gmail.com>
+ <5048837B.6020903@samsung.com>
+ <CAL1wa8cyhxCObHbMa+8X6DmsD8svt=W8s+JMrPx5cAEoWd4Lig@mail.gmail.com>
+ <CAAQKjZN_n5QfBTibk8+jNwvZzPU_yvxJN70F3VrvZN_Pitm9ag@mail.gmail.com>
+Message-ID: <CAAQKjZOzcyEVY2qCKW7pzS_jZW+xbEjhjT5Tuvbvmvrmtz2rCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+2012/9/7 Inki Dae <inki.dae@samsung.com>:
+> Hi
+>
+> 2012/9/7 Leela Krishna Amudala <l.krishna@samsung.com>:
+>> Hi,
+>>
+>> On Thu, Sep 6, 2012 at 4:35 PM, Sylwester Nawrocki
+>> <s.nawrocki@samsung.com> wrote:
+>>> Hi,
+>>>
+>>> On 09/06/2012 09:21 AM, InKi Dae wrote:
+>>>>>> +Required properties:
+>>>>>> + - compatible: Should be "samsung,exynos5-fimd" or "samsung,exynos4-fb" for
+>>>>> Doesn't better to use single word? fimd or fb?. I think 'fb' is used
+>>>>> for framebuffer historically.
+>>>>> but now it's used both fb and drm, so fimd is neutral and architecture
+>>>>> specific.
+>>>>>
+>>>>> To do this, Modify arch-exynos first and update it at each drivers it properly.
+>>>>>
+>>>>> Thank you,
+>>>>> Kyungmin Park
+>>>>>
+>>>>
+>>>> I agree with Kyungmin but I'd like to use as is. the reason we used
+>>>> 'exynos4-fb' as device name, is for that it uses fimd driver's
+>>>> platform device commonly and gets fimd clock. so I think that dts file
+>>>> should be defined with hardware specific name but not driver name such
+>>>> as 'exynos4-fb'. but with this, we can't get fimd clock with device's
+>>>> name because 'exynos4-fb' is used as device name of fimd clock. so to
+>>>> use 'exynos4-fimd', we should modify the device name of fimd clock
+>>>> from 'exynos4-fb'  to 'exynos4-fimd' and also ids definitions of
+>>>> s3c-fb and drm fimd driver. so my conclusion is that it merges this
+>>>
+>>> I think it's good moment to put those things in order, i.e. use uniform
+>>> 'compatible' names: "samsung,exynos4-fimd", "samsung,exynos5-fimd".
+>>> Platform device names are separate issue, but could perhaps be unified
+>>> at this time as well.
+>>
+>> Yes, Platform device name is independent of compatible string.
+>> Will change the compatible string to "samsung,exynos4-fimd" and will keep the
+>> device name as exynos4-fb for now. Will change the platform device
+>> names to exynosX-fimd
+>> later.
+>>
+>
+> I'm not sure that clk_get is worked well with this change. I think,
+> when driver called clk_get(), first of all, it tries to get a clk from
+> the registered list of clock providers in the dts file and next in
+> legacy way. but now legacy way(needing clock name and device' name)
+> would be failed if the dts file has no the list because platform
+> device's name differs from device name of clock. so I think we should
+> change device name of clock and also ids of related drivers for
+> compatibility with non-dt. for this, we need some patch sets, changing
+> arch/arm/mach-exynos/common.c and changing
+> arch/arm/mach-exynos/clock-exynos4/5.c and changing s3c-fb.c and last
+> this patch. if there are no other opinions, I'd like to merge this
+> patch set(v5) and next we can update others(maybe common.c,
+> clock-exynos4/5.c and s3c-fb.c) later.
+>
 
-My bad, I didn't follow up with this. My guess is that it has not been
-picked up. Tony, Kevin?
+there is my missing point. with dt, platform device's name is set by
+OF_DEV_AUXDATA's name so it doesn't need to modify things related to
+exynos4 anymore. we just need to update things related to exynos5.
 
-regards,
--roger
+Thanks.
+Inki Dae
 
-On 09/06/2012 09:59 PM, Jean Pihet wrote:
-> Fixed Paul's email address
-> 
-> On Thu, Sep 6, 2012 at 8:56 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
->> Hi Roger,
->>
->> On Fri, Aug 10, 2012 at 4:05 PM, Roger Quadros <rogerq@ti.com> wrote:
->>> gets rid of below messages with CONFIG_DEBUG_PREEMPT enabled
+> Thanks.
+> Inki Dae
+>
 >>>
->>> [   28.832916] debug_smp_processor_id: 18 callbacks suppressed
->>> [   28.832946] BUG: using smp_processor_id() in preemptible [00000000] code: modprobe/1763
->>> [   28.841491] caller is pwrdm_set_next_pwrst+0x54/0x120
+>>>> patch set as is and then let's modify related things later.
+>>>> any opinions, welcome~ anytime.
+>>>>
+>>>> Thanks.
+>>>> Inki Dae
 >>>
->>> Signed-off-by: Roger Quadros <rogerq@ti.com>
->>
->> What his the status of the patch? Has it been reviewed and taken in an
->> integration tree? I cannot find anything about it in l-o and
->> linux-next.
->>
->> I have some changes on-going in the OMAP PM code and I would like to
->> know if $SUBJECT is applicable.
->>
->> Regards,
->> Jean
->>
->>> ---
->>>  arch/arm/mach-omap2/clock.c       |    9 ++++++---
->>>  arch/arm/mach-omap2/pm34xx.c      |   12 ++++++++----
->>>  arch/arm/mach-omap2/powerdomain.c |    6 ++++--
->>>  3 files changed, 18 insertions(+), 9 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
->>> index ea3f565..06747b6 100644
->>> --- a/arch/arm/mach-omap2/clock.c
->>> +++ b/arch/arm/mach-omap2/clock.c
->>> @@ -285,7 +285,8 @@ void omap2_clk_disable(struct clk *clk)
->>>         pr_debug("clock: %s: disabling in hardware\n", clk->name);
->>>
->>>         if (clk->ops && clk->ops->disable) {
->>> -               trace_clock_disable(clk->name, 0, smp_processor_id());
->>> +               trace_clock_disable(clk->name, 0, get_cpu());
->>> +               put_cpu();
->>>                 clk->ops->disable(clk);
->>>         }
->>>
->>> @@ -339,7 +340,8 @@ int omap2_clk_enable(struct clk *clk)
->>>         }
->>>
->>>         if (clk->ops && clk->ops->enable) {
->>> -               trace_clock_enable(clk->name, 1, smp_processor_id());
->>> +               trace_clock_enable(clk->name, 1, get_cpu());
->>> +               put_cpu();
->>>                 ret = clk->ops->enable(clk);
->>>                 if (ret) {
->>>                         WARN(1, "clock: %s: could not enable: %d\n",
->>> @@ -380,7 +382,8 @@ int omap2_clk_set_rate(struct clk *clk, unsigned long rate)
->>>
->>>         /* dpll_ck, core_ck, virt_prcm_set; plus all clksel clocks */
->>>         if (clk->set_rate) {
->>> -               trace_clock_set_rate(clk->name, rate, smp_processor_id());
->>> +               trace_clock_set_rate(clk->name, rate, get_cpu());
->>> +               put_cpu();
->>>                 ret = clk->set_rate(clk, rate);
->>>         }
->>>
->>> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
->>> index e4fc88c..81fec2e 100644
->>> --- a/arch/arm/mach-omap2/pm34xx.c
->>> +++ b/arch/arm/mach-omap2/pm34xx.c
->>> @@ -357,18 +357,22 @@ void omap_sram_idle(void)
->>>
->>>  static void omap3_pm_idle(void)
->>>  {
->>> +       unsigned cpu;
->>> +
->>>         local_fiq_disable();
->>>
->>>         if (omap_irq_pending())
->>>                 goto out;
->>>
->>> -       trace_power_start(POWER_CSTATE, 1, smp_processor_id());
->>> -       trace_cpu_idle(1, smp_processor_id());
->>> +       cpu = get_cpu();
->>> +       trace_power_start(POWER_CSTATE, 1, cpu);
->>> +       trace_cpu_idle(1, cpu);
->>>
->>>         omap_sram_idle();
->>>
->>> -       trace_power_end(smp_processor_id());
->>> -       trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
->>> +       trace_power_end(cpu);
->>> +       trace_cpu_idle(PWR_EVENT_EXIT, cpu);
->>> +       put_cpu();
->>>
->>>  out:
->>>         local_fiq_enable();
->>> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
->>> index 69b36e1..138bf86 100644
->>> --- a/arch/arm/mach-omap2/powerdomain.c
->>> +++ b/arch/arm/mach-omap2/powerdomain.c
->>> @@ -169,7 +169,8 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
->>>                                        ((state & OMAP_POWERSTATE_MASK) << 8) |
->>>                                        ((prev & OMAP_POWERSTATE_MASK) << 0));
->>>                         trace_power_domain_target(pwrdm->name, trace_state,
->>> -                                                 smp_processor_id());
->>> +                                                 get_cpu());
->>> +                       put_cpu();
->>>                 }
->>>                 break;
->>>         default:
->>> @@ -491,7 +492,8 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
->>>         if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
->>>                 /* Trace the pwrdm desired target state */
->>>                 trace_power_domain_target(pwrdm->name, pwrst,
->>> -                                         smp_processor_id());
->>> +                                         get_cpu());
->>> +               put_cpu();
->>>                 /* Program the pwrdm desired target state */
->>>                 ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
->>>         }
 >>> --
->>> 1.7.4.1
 >>>
+>>> Regards,
+>>> Sylwester
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> http://lists.freedesktop.org/mailman/listinfo/dri-devel
