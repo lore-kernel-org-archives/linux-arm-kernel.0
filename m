@@ -1,210 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu,  6 Sep 2012 19:50:02 -0700
-Subject: [PATCH] ARM: msm: Remove uncompiled board-msm7x27
-Message-ID: <1346986202-21439-1-git-send-email-sboyd@codeaurora.org>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 7 Sep 2012 10:33:07 +0800
+Subject: [PATCH] serial: mxs-auart: put the device when exit or error
+In-Reply-To: <20120907024349.GH26709@S2101-09.ap.freescale.net>
+References: <20120907024349.GH26709@S2101-09.ap.freescale.net>
+Message-ID: <1346985187-30459-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This board file has never been compiled. Let's just remove it
-along with the one Kconfig reference to it in io.c.
+We call the get_device() in the mxs_auart_probe().
+For the balance of the reference count, we should put the
+device in the mxs_auart_remove() or in the error path of
+probe.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- arch/arm/mach-msm/board-msm7x27.c | 170 --------------------------------------
- arch/arm/mach-msm/io.c            |   3 +-
- 2 files changed, 1 insertion(+), 172 deletions(-)
- delete mode 100644 arch/arm/mach-msm/board-msm7x27.c
+ drivers/tty/serial/mxs-auart.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-msm/board-msm7x27.c b/arch/arm/mach-msm/board-msm7x27.c
-deleted file mode 100644
-index 451ab1d..0000000
---- a/arch/arm/mach-msm/board-msm7x27.c
-+++ /dev/null
-@@ -1,170 +0,0 @@
--/*
-- * Copyright (C) 2007 Google, Inc.
-- * Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
-- * Author: Brian Swetland <swetland@google.com>
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- */
--#include <linux/gpio.h>
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/input.h>
--#include <linux/io.h>
--#include <linux/delay.h>
--#include <linux/power_supply.h>
--
--#include <mach/hardware.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/map.h>
--#include <asm/mach/flash.h>
--#include <asm/setup.h>
--#ifdef CONFIG_CACHE_L2X0
--#include <asm/hardware/cache-l2x0.h>
--#endif
--
--#include <mach/vreg.h>
--#include <mach/mpp.h>
--#include <mach/board.h>
--#include <mach/msm_iomap.h>
--
--#include <linux/mtd/nand.h>
--#include <linux/mtd/partitions.h>
--
--#include "devices.h"
--#include "socinfo.h"
--#include "clock.h"
--
--static struct resource smc91x_resources[] = {
--	[0] = {
--		.start	= 0x9C004300,
--		.end	= 0x9C0043ff,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= MSM_GPIO_TO_INT(132),
--		.end	= MSM_GPIO_TO_INT(132),
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device smc91x_device = {
--	.name		= "smc91x",
--	.id		= 0,
--	.num_resources	= ARRAY_SIZE(smc91x_resources),
--	.resource	= smc91x_resources,
--};
--
--static struct platform_device *devices[] __initdata = {
--	&msm_device_uart3,
--	&msm_device_smd,
--	&msm_device_dmov,
--	&msm_device_nand,
--	&smc91x_device,
--};
--
--extern struct sys_timer msm_timer;
--
--static void __init msm7x2x_init_irq(void)
--{
--	msm_init_irq();
--}
--
--static void __init msm7x2x_init(void)
--{
--	if (socinfo_init() < 0)
--		BUG();
--
--	if (machine_is_msm7x25_ffa() || machine_is_msm7x27_ffa()) {
--		smc91x_resources[0].start = 0x98000300;
--		smc91x_resources[0].end = 0x980003ff;
--		smc91x_resources[1].start = MSM_GPIO_TO_INT(85);
--		smc91x_resources[1].end = MSM_GPIO_TO_INT(85);
--		if (gpio_tlmm_config(GPIO_CFG(85, 0,
--					      GPIO_INPUT,
--					      GPIO_PULL_DOWN,
--					      GPIO_2MA),
--				     GPIO_ENABLE)) {
--			printk(KERN_ERR
--			       "%s: Err: Config GPIO-85 INT\n",
--				__func__);
--		}
--	}
--
--	platform_add_devices(devices, ARRAY_SIZE(devices));
--}
--
--static void __init msm7x2x_map_io(void)
--{
--	msm_map_common_io();
--	/* Technically dependent on the SoC but using machine_is
--	 * macros since socinfo is not available this early and there
--	 * are plans to restructure the code which will eliminate the
--	 * need for socinfo.
--	 */
--	if (machine_is_msm7x27_surf() || machine_is_msm7x27_ffa())
--		msm_clock_init(msm_clocks_7x27, msm_num_clocks_7x27);
--
--	if (machine_is_msm7x25_surf() || machine_is_msm7x25_ffa())
--		msm_clock_init(msm_clocks_7x25, msm_num_clocks_7x25);
--
--#ifdef CONFIG_CACHE_L2X0
--	if (machine_is_msm7x27_surf() || machine_is_msm7x27_ffa()) {
--		/* 7x27 has 256KB L2 cache:
--			64Kb/Way and 4-Way Associativity;
--			R/W latency: 3 cycles;
--			evmon/parity/share disabled. */
--		l2x0_init(MSM_L2CC_BASE, 0x00068012, 0xfe000000);
--	}
--#endif
--}
--
--static void __init msm7x2x_init_late(void)
--{
--	smd_debugfs_init();
--}
--
--MACHINE_START(MSM7X27_SURF, "QCT MSM7x27 SURF")
--	.atag_offset	= 0x100,
--	.map_io		= msm7x2x_map_io,
--	.init_irq	= msm7x2x_init_irq,
--	.init_machine	= msm7x2x_init,
--	.init_late	= msm7x2x_init_late,
--	.timer		= &msm_timer,
--MACHINE_END
--
--MACHINE_START(MSM7X27_FFA, "QCT MSM7x27 FFA")
--	.atag_offset	= 0x100,
--	.map_io		= msm7x2x_map_io,
--	.init_irq	= msm7x2x_init_irq,
--	.init_machine	= msm7x2x_init,
--	.init_late	= msm7x2x_init_late,
--	.timer		= &msm_timer,
--MACHINE_END
--
--MACHINE_START(MSM7X25_SURF, "QCT MSM7x25 SURF")
--	.atag_offset	= 0x100,
--	.map_io		= msm7x2x_map_io,
--	.init_irq	= msm7x2x_init_irq,
--	.init_machine	= msm7x2x_init,
--	.init_late	= msm7x2x_init_late,
--	.timer		= &msm_timer,
--MACHINE_END
--
--MACHINE_START(MSM7X25_FFA, "QCT MSM7x25 FFA")
--	.atag_offset	= 0x100,
--	.map_io		= msm7x2x_map_io,
--	.init_irq	= msm7x2x_init_irq,
--	.init_machine	= msm7x2x_init,
--	.init_late	= msm7x2x_init_late,
--	.timer		= &msm_timer,
--MACHINE_END
-diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
-index 35d6926..d88a4eb 100644
---- a/arch/arm/mach-msm/io.c
-+++ b/arch/arm/mach-msm/io.c
-@@ -44,8 +44,7 @@
- 		MSM_CHIP_DEVICE_TYPE(name, chip, MT_DEVICE)
- #define MSM_DEVICE(name) MSM_CHIP_DEVICE(name, MSM)
+diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+index 3a667ee..203e512 100644
+--- a/drivers/tty/serial/mxs-auart.c
++++ b/drivers/tty/serial/mxs-auart.c
+@@ -781,6 +781,7 @@ out_free_irq:
+ 	auart_port[pdev->id] = NULL;
+ 	free_irq(s->irq, s);
+ out_free_clk:
++	put_device(s->dev);
+ 	clk_put(s->clk);
+ out_free:
+ 	kfree(s);
+@@ -796,6 +797,7 @@ static int __devexit mxs_auart_remove(struct platform_device *pdev)
  
--#if defined(CONFIG_ARCH_MSM7X00A) || defined(CONFIG_ARCH_MSM7X27) \
--	|| defined(CONFIG_ARCH_MSM7X25)
-+#if defined(CONFIG_ARCH_MSM7X00A)
- static struct map_desc msm_io_desc[] __initdata = {
- 	MSM_DEVICE_TYPE(VIC, MT_DEVICE_NONSHARED),
- 	MSM_CHIP_DEVICE_TYPE(CSR, MSM7X00, MT_DEVICE_NONSHARED),
+ 	auart_port[pdev->id] = NULL;
+ 
++	put_device(s->dev);
+ 	clk_put(s->clk);
+ 	free_irq(s->irq, s);
+ 	kfree(s);
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.0.4
