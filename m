@@ -1,41 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 7 Sep 2012 13:39:23 +0100
-Subject: [PATCH 04/19] ARM: ux500: Add SDI (MMC) support to the HREF
- Device Tree
-In-Reply-To: <201209071229.32027.arnd@arndb.de>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
- <1347016499-29354-5-git-send-email-lee.jones@linaro.org>
- <201209071229.32027.arnd@arndb.de>
-Message-ID: <20120907123922.GC29601@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 7 Sep 2012 20:40:53 +0800
+Subject: [PATCH] ARM: smp_twd: reprogram twd based on clk notifier
+In-Reply-To: <CAPDyKFoV5d2pdxVj=9ERubs7_3g1zVJQ08Uo8JXD7yogp0wHgA@mail.gmail.com>
+References: <1347005967-7604-1-git-send-email-shawn.guo@linaro.org>
+ <CAPDyKFoV5d2pdxVj=9ERubs7_3g1zVJQ08Uo8JXD7yogp0wHgA@mail.gmail.com>
+Message-ID: <20120907124050.GN26709@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 12:29:31PM +0000, Arnd Bergmann wrote:
-> On Friday 07 September 2012, Lee Jones wrote:
-> > +               // External Micro SD slot
-> > +               sdi at 80126000 {
-> > +                       arm,primecell-periphid = <0x10480180>;
-> > +                       max-frequency = <50000000>;
-> > +                       bus-width = <8>;
-> > +                       mmc-cap-sd-highspeed;
-> > +                       mmc-cap-mmc-highspeed;
-> > +                       vmmc-supply = <&ab8500_ldo_aux3_reg>;
-> > +
-> > +                       #gpio-cells = <1>;
-> > +                       cd-gpios  = <&gpio2 31 0x4>; // 95
-> > +
-> > +                       status = "okay";
-> > +               };
-> > +
+On Fri, Sep 07, 2012 at 01:59:40PM +0200, Ulf Hansson wrote:
+> Hi Shawn and Mike,
 > 
-> The #gpio-cells property seems misplaced here.
+> In general I am in favor of this patch, but I also see some
+> corresponding problems to resolve. Please correct me if I am wrong.
+> 
+> I suppose most machines is relying on that it enough to only take care
+> of the notification by using "cpufreq_notify_transition" from their
+> cpufreq drivers. Thus those have to make sure the updates for smp_twd
+> clock is supported from within the cpufreq driver I suppose.
+> 
+> In other words the cpufreq drivers needs to do clk_get of "smp_twd"
+> clock and then do a set_rate on it when it's has changed, to trigger a
+> rate change notification. Is this what you also have in mind or do you
+> have any other idea of how this should work?
+> 
+Here is how it works on imx6q.
 
-Are you reading my patches in reverse order? ;)
+1) There are clks arm and twd defined in imx6q clock tree.  And twd
+   is registered to clock framework as one child of arm clk with a fixed
+   divider 2.
 
-If not, good spot. :)
+	/*                                    name         parent_name     mult div */
+	clk[twd]       = imx_clk_fixed_factor("twd",       "arm",            1, 2);
+
+2) Register lookup "cpu0" and "smp_twd" for cpufreq and smp_twd drivers
+   respectively.
+
+	clk_register_clkdev(clk[twd], NULL, "smp_twd");
+	clk_register_clkdev(clk[arm], NULL, "cpu0");
+
+That's it.  The clock framework will just handle all the work nicely.
+When cpufreq driver scales arm clk, the framework will propagate the
+rate change to twd clk automatically.  And once twd clk rate changes,
+smp_twd will get the notification.
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Shawn
