@@ -1,98 +1,75 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 06 Sep 2012 18:23:47 -0700 (PDT)
-Subject: [PATCH] ARM: shmobile: r8a7740: add USB24 clock explain and
- sample code
-In-Reply-To: <20120905225431.GD32084@quad.lixom.net>
-References: <1346305969-27110-1-git-send-email-horms@verge.net.au>
- <1346305969-27110-2-git-send-email-horms@verge.net.au>
- <20120905225431.GD32084@quad.lixom.net>
-Message-ID: <87d31yaan3.wl%kuninori.morimoto.gx@renesas.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri,  7 Sep 2012 09:23:42 +0800
+Subject: [PATCH] cpufreq: OMAP: remove loops_per_jiffy recalculate for smp
+Message-ID: <1346981022-28011-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Richard Zhao <richard.zhao@freescale.com>
 
-Hi Olof
+With ARM smp common code recalculating loops_per_jiffy in a cpufreq
+transiton notifier call, the loops_per_jiffy recalculate in omap-cpufreq
+driver becomes redundant.  Remove it.
 
-Thank you for checking patch
-
-> On Thu, Aug 30, 2012 at 02:52:49PM +0900, Simon Horman wrote:
-> > From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> > 
-> > USBCKCR is controlling USB parent clock and divide rate.
-> > This parent clock is used as a "usb24s" from other devices,
-> > but the "divide rate" is not used.
-> > Further, this clock itself is known as "usb24".
-> > So, to set this clock is a little confusable.
-> > This patch adds quick explain and sample code for this clock.
-> > 
-> > Cc: Damian Hobson-Garcia <dhobsong@igel.co.jp>
-> > Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> > Signed-off-by: Simon Horman <horms@verge.net.au>
-> > ---
-> >  arch/arm/mach-shmobile/clock-r8a7740.c | 16 ++++++++++++++++
-> >  1 file changed, 16 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
-> > index ad5fccc..a6a7583 100644
-> > --- a/arch/arm/mach-shmobile/clock-r8a7740.c
-> > +++ b/arch/arm/mach-shmobile/clock-r8a7740.c
-> > @@ -188,6 +188,22 @@ static struct clk pllc1_div2_clk = {
-> >  };
-> >  
-> >  /* USB clock */
-> > +/*
-> > + * USBCKCR is controlling usb24 clock
-> > + * bit[7] : parent clock
-> > + * bit[6] : clock divide rate
-> 
-> The divisor is either 1 or 2 in this case, for bit[6] values of 0 and 1?
-
-Yes.
-if (0 == bit[6]) clock is 1/2
-if (1 == bit[6]) clock is 1/1
-
-> > + * And this bit[7] is used as a "usb24s" from other devices.
-> 
-> Sorry, I don't follow the explanation here.
-> 
-> This is how I interpret the current code, can you confirm if it's accurate?
-> 
-> usb24 is the (potentially) divided output from usb24s, while usb24s is
-> at a fixed pass-through rate from the parent if enabled. Both share the
-> same enable bit. In other words, usb24 is a directly derived, potentially
-> divided-by-two rate from usb24s?
-
-clcok A ---+  bit[7]                 bit[6]
-           |- select -> usb24s -+--> divide (1/1 or 1/2) -> usb24
-clock B ---+                    |
-                                +--> other clocks ->
-
-
-> > + * (Video clock / Sub clock / SPU clock)
-> > + * You can controll this clock as a below.
-> > + *
-> > + * struct clk *usb24	= clk_get(dev,  "usb24");
-> > + * struct clk *usb24s	= clk_get(NULL, "usb24s");
-> > + * struct clk *system	= clk_get(NULL, "system_clk");
-> > + * int rate = clk_get_rate(system);
-> > + *
-> > + * clk_set_parent(usb24s, system);  // for bit[7]
-> > + * clk_set_rate(usb24, rate / 2);   // for bit[6]
-> 
-> This is just standard clk infrastructure usage, I don't think there's need to
-> include the example code here.
-
-Ahh.. 50% yes.
-
-_If_ this usb24/usb24s explanation on datasheet is same as other clocks,
-it is easy to understand and can use clk_set_rate().
-
-But this setting style of these 2 clock is very special case on our datasheet.
-Maybe first case.
-So, I added sample setting code here,
-since it is difficult to understand how to set the clock from
-datasheet/clock tree and clock-r8a7740.c
-
-Best regards
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
-Kuninori Morimoto
+ drivers/cpufreq/omap-cpufreq.c |   35 -----------------------------------
+ 1 files changed, 0 insertions(+), 35 deletions(-)
+
+diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
+index 17fa04d..83a78ad 100644
+--- a/drivers/cpufreq/omap-cpufreq.c
++++ b/drivers/cpufreq/omap-cpufreq.c
+@@ -40,16 +40,6 @@
+ /* OPP tolerance in percentage */
+ #define	OPP_TOLERANCE	4
+ 
+-#ifdef CONFIG_SMP
+-struct lpj_info {
+-	unsigned long	ref;
+-	unsigned int	freq;
+-};
+-
+-static DEFINE_PER_CPU(struct lpj_info, lpj_ref);
+-static struct lpj_info global_lpj_ref;
+-#endif
+-
+ static struct cpufreq_frequency_table *freq_table;
+ static atomic_t freq_table_users = ATOMIC_INIT(0);
+ static struct clk *mpu_clk;
+@@ -161,31 +151,6 @@ static int omap_target(struct cpufreq_policy *policy,
+ 	}
+ 
+ 	freqs.new = omap_getspeed(policy->cpu);
+-#ifdef CONFIG_SMP
+-	/*
+-	 * Note that loops_per_jiffy is not updated on SMP systems in
+-	 * cpufreq driver. So, update the per-CPU loops_per_jiffy value
+-	 * on frequency transition. We need to update all dependent CPUs.
+-	 */
+-	for_each_cpu(i, policy->cpus) {
+-		struct lpj_info *lpj = &per_cpu(lpj_ref, i);
+-		if (!lpj->freq) {
+-			lpj->ref = per_cpu(cpu_data, i).loops_per_jiffy;
+-			lpj->freq = freqs.old;
+-		}
+-
+-		per_cpu(cpu_data, i).loops_per_jiffy =
+-			cpufreq_scale(lpj->ref, lpj->freq, freqs.new);
+-	}
+-
+-	/* And don't forget to adjust the global one */
+-	if (!global_lpj_ref.freq) {
+-		global_lpj_ref.ref = loops_per_jiffy;
+-		global_lpj_ref.freq = freqs.old;
+-	}
+-	loops_per_jiffy = cpufreq_scale(global_lpj_ref.ref, global_lpj_ref.freq,
+-					freqs.new);
+-#endif
+ 
+ done:
+ 	/* notifiers */
+-- 
+1.7.5.4
