@@ -1,53 +1,183 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri,  7 Sep 2012 14:43:42 +0200
-Subject: [PATCH v4 0/6] Add device tree support for on-chip SRAM 
-Message-ID: <1347021828-23034-1-git-send-email-p.zabel@pengutronix.de>
+Date: Fri,  7 Sep 2012 14:43:46 +0200
+Subject: [PATCH v4 4/6] ARM i.MX: remove IRAM_ALLOC facility
+In-Reply-To: <1347021828-23034-1-git-send-email-p.zabel@pengutronix.de>
+References: <1347021828-23034-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1347021828-23034-5-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches add support to configure on-chip SRAM via device-tree
-node and to obtain the resulting genalloc pool from a phandle pointing
-at the node.
-This allows drivers to allocate SRAM with the genalloc API without
-hard-coding the genalloc pool address.
+A generic on-chip SRAM allocator driver can be used instead.
+Users of the iram_alloc/free API should convert to the genalloc API:
 
-The on-chip SRAM on i.MX53 and i.MX6q is registered via device tree and
-changed to use the simple generic SRAM driver:
+-	virt = iram_alloc(SIZE, &phys);
++	gen_pool_alloc(iram_pool, SIZE);
++	phys = gen_pool_virt_to_phys(iram_pool, virt);
+ 	/* ... */
+-	iram_free(virt, SIZE);
++	gen_pool_free(iram_pool, virt, SIZE);
 
-		ocram: ocram at 00900000 {
-			compatible = "fsl,imx-ocram", "sram";
-			reg = <0x00900000 0x3f000>;
- 		};
-
-A driver that needs to allocate SRAM buffers, like the video processing
-unit on i.MX53, can retrieve the genalloc pool from a phandle in the
-device tree using of_get_named_gen_pool(node, "iram", 0) from patch 1:
-
-		vpu at 63ff4000 {
-			/* ... */
-			iram = <&ocram>;
- 		};
-
-Changes since v3:
- - Added devicetree binding documentation
- - Register platform driver early with postcore_initcall
- - Added optional SRAM clock support.
-
-regards
-Philipp
-
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- Documentation/devicetree/bindings/misc/sram.txt |   17 ++++
- arch/arm/boot/dts/imx53.dtsi                    |    5 +
- arch/arm/boot/dts/imx6q.dtsi                    |    5 +
- arch/arm/mach-imx/clk-imx6q.c                   |    1 +
- arch/arm/plat-mxc/Kconfig                       |    4 -
- arch/arm/plat-mxc/Makefile                      |    1 -
- arch/arm/plat-mxc/include/mach/iram.h           |   41 --------
- arch/arm/plat-mxc/iram_alloc.c                  |   73 --------------
- drivers/misc/Kconfig                            |    9 ++
- drivers/misc/Makefile                           |    1 +
- drivers/misc/sram.c                             |  121 +++++++++++++++++++++++
- include/linux/genalloc.h                        |   14 +++
- lib/genalloc.c                                  |   67 +++++++++++++
- 13 files changed, 240 insertions(+), 119 deletions(-)
+ arch/arm/plat-mxc/Kconfig             |    4 --
+ arch/arm/plat-mxc/Makefile            |    1 -
+ arch/arm/plat-mxc/include/mach/iram.h |   41 ------------------
+ arch/arm/plat-mxc/iram_alloc.c        |   73 ---------------------------------
+ 4 files changed, 119 deletions(-)
+ delete mode 100644 arch/arm/plat-mxc/include/mach/iram.h
+ delete mode 100644 arch/arm/plat-mxc/iram_alloc.c
+
+diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+index baf9064..8e63f10 100644
+--- a/arch/arm/plat-mxc/Kconfig
++++ b/arch/arm/plat-mxc/Kconfig
+@@ -82,8 +82,4 @@ config IMX_HAVE_IOMUX_V1
+ config ARCH_MXC_IOMUX_V3
+ 	bool
+ 
+-config IRAM_ALLOC
+-	bool
+-	select GENERIC_ALLOCATOR
+-
+ endif
+diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+index 6ac7200..bdf370f 100644
+--- a/arch/arm/plat-mxc/Makefile
++++ b/arch/arm/plat-mxc/Makefile
+@@ -10,7 +10,6 @@ obj-$(CONFIG_MXC_AVIC) += avic.o
+ 
+ obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
+ obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
+-obj-$(CONFIG_IRAM_ALLOC) += iram_alloc.o
+ obj-$(CONFIG_MXC_ULPI) += ulpi.o
+ obj-$(CONFIG_MXC_USE_EPIT) += epit.o
+ obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
+diff --git a/arch/arm/plat-mxc/include/mach/iram.h b/arch/arm/plat-mxc/include/mach/iram.h
+deleted file mode 100644
+index 022690c..0000000
+--- a/arch/arm/plat-mxc/include/mach/iram.h
++++ /dev/null
+@@ -1,41 +0,0 @@
+-/*
+- * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+- * MA 02110-1301, USA.
+- */
+-#include <linux/errno.h>
+-
+-#ifdef CONFIG_IRAM_ALLOC
+-
+-int __init iram_init(unsigned long base, unsigned long size);
+-void __iomem *iram_alloc(unsigned int size, unsigned long *dma_addr);
+-void iram_free(unsigned long dma_addr, unsigned int size);
+-
+-#else
+-
+-static inline int __init iram_init(unsigned long base, unsigned long size)
+-{
+-	return -ENOMEM;
+-}
+-
+-static inline void __iomem *iram_alloc(unsigned int size, unsigned long *dma_addr)
+-{
+-	return NULL;
+-}
+-
+-static inline void iram_free(unsigned long base, unsigned long size) {}
+-
+-#endif
+diff --git a/arch/arm/plat-mxc/iram_alloc.c b/arch/arm/plat-mxc/iram_alloc.c
+deleted file mode 100644
+index 074c386..0000000
+--- a/arch/arm/plat-mxc/iram_alloc.c
++++ /dev/null
+@@ -1,73 +0,0 @@
+-/*
+- * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+- * MA 02110-1301, USA.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/io.h>
+-#include <linux/module.h>
+-#include <linux/spinlock.h>
+-#include <linux/genalloc.h>
+-#include <mach/iram.h>
+-
+-static unsigned long iram_phys_base;
+-static void __iomem *iram_virt_base;
+-static struct gen_pool *iram_pool;
+-
+-static inline void __iomem *iram_phys_to_virt(unsigned long p)
+-{
+-	return iram_virt_base + (p - iram_phys_base);
+-}
+-
+-void __iomem *iram_alloc(unsigned int size, unsigned long *dma_addr)
+-{
+-	if (!iram_pool)
+-		return NULL;
+-
+-	*dma_addr = gen_pool_alloc(iram_pool, size);
+-	pr_debug("iram alloc - %dB at 0x%lX\n", size, *dma_addr);
+-	if (!*dma_addr)
+-		return NULL;
+-	return iram_phys_to_virt(*dma_addr);
+-}
+-EXPORT_SYMBOL(iram_alloc);
+-
+-void iram_free(unsigned long addr, unsigned int size)
+-{
+-	if (!iram_pool)
+-		return;
+-
+-	gen_pool_free(iram_pool, addr, size);
+-}
+-EXPORT_SYMBOL(iram_free);
+-
+-int __init iram_init(unsigned long base, unsigned long size)
+-{
+-	iram_phys_base = base;
+-
+-	iram_pool = gen_pool_create(PAGE_SHIFT, -1);
+-	if (!iram_pool)
+-		return -ENOMEM;
+-
+-	gen_pool_add(iram_pool, base, size, -1);
+-	iram_virt_base = ioremap(iram_phys_base, size);
+-	if (!iram_virt_base)
+-		return -EIO;
+-
+-	pr_debug("i.MX IRAM pool: %ld KB at 0x%p\n", size / 1024, iram_virt_base);
+-	return 0;
+-}
+-- 
+1.7.10.4
