@@ -1,36 +1,125 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Sep 2012 04:04:44 +0000
-Subject: [PATCH] ARM: add support for BCM2708/BCM2835 and Raspberry Pi
-In-Reply-To: <50495A94.2060904@wwwdotorg.org>
-References: <1346908038-22421-1-git-send-email-swarren@wwwdotorg.org>
- <201209060904.14903.arnd@arndb.de> <50495A94.2060904@wwwdotorg.org>
-Message-ID: <201209070404.45120.arnd@arndb.de>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Fri, 07 Sep 2012 14:37:37 +0530
+Subject: [PATCH V5 1/2] drm/exynos: add platform_device_id table and driver
+ data for drm fimd
+In-Reply-To: <1347008858-12069-1-git-send-email-l.krishna@samsung.com>
+References: <1347008858-12069-1-git-send-email-l.krishna@samsung.com>
+Message-ID: <1347008858-12069-2-git-send-email-l.krishna@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 September 2012, Stephen Warren wrote:
-> >> diff --git a/arch/arm/mach-bcm2708/common.c b/arch/arm/mach-bcm2708/common.c
-> >
-> > I think when this is the only file, we probably want to name this one bcm2708.c,
-> > same as the platform.
-> 
-> This was originally named bcm2708.c downstream, but I renamed it to
-> common.c following the example of mach-picoxcell and mach-zynq, which
-> IIRC you had pointed out as exemplary platforms. Still, I can rename it
-> back if you want.
+Two device ids are created for exynos4-fb and exynos5-fb.
+Also, added driver data for exynos4 and exynos5 to pick the timing base address
+at runtime to write data into appropriate register address.
 
-It's not a big thing either way. Highbank and socfpga are also good examples
-and they use the name of the platform.
+Signed-off-by: Leela Krishna Amudala <l.krishna@samsung.com>
+---
+ drivers/gpu/drm/exynos/exynos_drm_fimd.c |   43 +++++++++++++++++++++++++++---
+ 1 files changed, 39 insertions(+), 4 deletions(-)
 
-> >> diff --git a/arch/arm/mach-bcm2708/include/mach/timex.h b/arch/arm/mach-bcm2708/include/mach/timex.h
-> > 
-> > Very close to not being required any more, so you probably won't need it in 3.7.
-> 
-> OK. It's required right now though. I assume we should aim to check this
-> in for 3.7. Should I rebase this patch on top of whatever change removes
-> the need for timex.h? Such a patch doesn't appear to be in linux-next
-> right now though.
-
-Let's not worry about it for now, it's easy enough to remove later.
-
-	Arnd
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+index 24c0bd4..65e927b 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+@@ -57,6 +57,18 @@
+ 
+ #define get_fimd_context(dev)	platform_get_drvdata(to_platform_device(dev))
+ 
++struct fimd_driver_data {
++	unsigned int timing_base;
++};
++
++struct fimd_driver_data exynos4_fimd_driver_data = {
++	.timing_base = 0x0,
++};
++
++struct fimd_driver_data exynos5_fimd_driver_data = {
++	.timing_base = 0x20000,
++};
++
+ struct fimd_win_data {
+ 	unsigned int		offset_x;
+ 	unsigned int		offset_y;
+@@ -91,6 +103,13 @@ struct fimd_context {
+ 	struct exynos_drm_panel_info *panel;
+ };
+ 
++static inline struct fimd_driver_data *drm_fimd_get_driver_data(
++	struct platform_device *pdev)
++{
++	return (struct fimd_driver_data *)
++		platform_get_device_id(pdev)->driver_data;
++}
++
+ static bool fimd_display_is_connected(struct device *dev)
+ {
+ 	DRM_DEBUG_KMS("%s\n", __FILE__);
+@@ -194,32 +213,35 @@ static void fimd_commit(struct device *dev)
+ 	struct fimd_context *ctx = get_fimd_context(dev);
+ 	struct exynos_drm_panel_info *panel = ctx->panel;
+ 	struct fb_videomode *timing = &panel->timing;
++	struct fimd_driver_data *driver_data;
++	struct platform_device *pdev = to_platform_device(dev);
+ 	u32 val;
+ 
++	driver_data = drm_fimd_get_driver_data(pdev);
+ 	if (ctx->suspended)
+ 		return;
+ 
+ 	DRM_DEBUG_KMS("%s\n", __FILE__);
+ 
+ 	/* setup polarity values from machine code. */
+-	writel(ctx->vidcon1, ctx->regs + VIDCON1);
++	writel(ctx->vidcon1, ctx->regs + driver_data->timing_base + VIDCON1);
+ 
+ 	/* setup vertical timing values. */
+ 	val = VIDTCON0_VBPD(timing->upper_margin - 1) |
+ 	       VIDTCON0_VFPD(timing->lower_margin - 1) |
+ 	       VIDTCON0_VSPW(timing->vsync_len - 1);
+-	writel(val, ctx->regs + VIDTCON0);
++	writel(val, ctx->regs + driver_data->timing_base + VIDTCON0);
+ 
+ 	/* setup horizontal timing values.  */
+ 	val = VIDTCON1_HBPD(timing->left_margin - 1) |
+ 	       VIDTCON1_HFPD(timing->right_margin - 1) |
+ 	       VIDTCON1_HSPW(timing->hsync_len - 1);
+-	writel(val, ctx->regs + VIDTCON1);
++	writel(val, ctx->regs + driver_data->timing_base + VIDTCON1);
+ 
+ 	/* setup horizontal and vertical display size. */
+ 	val = VIDTCON2_LINEVAL(timing->yres - 1) |
+ 	       VIDTCON2_HOZVAL(timing->xres - 1);
+-	writel(val, ctx->regs + VIDTCON2);
++	writel(val, ctx->regs + driver_data->timing_base + VIDTCON2);
+ 
+ 	/* setup clock source, clock divider, enable dma. */
+ 	val = ctx->vidcon0;
+@@ -982,6 +1004,18 @@ static int fimd_runtime_resume(struct device *dev)
+ }
+ #endif
+ 
++static struct platform_device_id fimd_driver_ids[] = {
++	{
++		.name		= "exynos4-fb",
++		.driver_data	= (unsigned long)&exynos4_fimd_driver_data,
++	}, {
++		.name		= "exynos5-fb",
++		.driver_data	= (unsigned long)&exynos5_fimd_driver_data,
++	},
++	{},
++};
++MODULE_DEVICE_TABLE(platform, fimd_driver_ids);
++
+ static const struct dev_pm_ops fimd_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(fimd_suspend, fimd_resume)
+ 	SET_RUNTIME_PM_OPS(fimd_runtime_suspend, fimd_runtime_resume, NULL)
+@@ -990,6 +1024,7 @@ static const struct dev_pm_ops fimd_pm_ops = {
+ struct platform_driver fimd_driver = {
+ 	.probe		= fimd_probe,
+ 	.remove		= __devexit_p(fimd_remove),
++	.id_table       = fimd_driver_ids,
+ 	.driver		= {
+ 		.name	= "exynos4-fb",
+ 		.owner	= THIS_MODULE,
+-- 
+1.7.0.4
