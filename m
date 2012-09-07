@@ -1,34 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 7 Sep 2012 11:04:22 +0100
-Subject: [PATCH 2/2] ARM: kexec: Check segment memory addresses
-In-Reply-To: <20120907084937.GC13739@n2100.arm.linux.org.uk>
-References: <1347007260-13271-1-git-send-email-matthew.leach@arm.com>
- <1347007260-13271-3-git-send-email-matthew.leach@arm.com>
- <20120907084937.GC13739@n2100.arm.linux.org.uk>
-Message-ID: <20120907100422.GD15916@mudshark.cambridge.arm.com>
+From: Elen.Song@atmel.com (Song, Elen)
+Date: Fri, 7 Sep 2012 09:59:17 +0000
+Subject: DMA: get data count of descriptor in dmaengine
+Message-ID: <E8F7C03B253D5640818937FAAE6B175C39CD07A7@penmbx02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 09:49:38AM +0100, Russell King - ARM Linux wrote:
-> On Fri, Sep 07, 2012 at 09:41:00AM +0100, Matthew Leach wrote:
-> > Ensure that the memory regions that are set within the segments
-> > correspond to physical contiguous memory regions.
-> > 
-> > Reviewed-by: Simon Horman <horms@verge.net.au>
-> > Reviewed-by: Will Deacon <will.deacon@arm.com>
-> > Signed-off-by: Matthew Leach <matthew.leach@arm.com>
-> 
-> What about platforms which pull out bits of physical RAM from memblock
-> via arm_memblock_steal() ?  Doesn't this mean such platforms will reduce
-> their available memory on each subsequent kexec?
+Hi All:
 
-I don't think that will happen. All that kexec does is check that the
-location where it wants to load the new kernel is physically contiguous -- the
-memblock configuration is not inherited by the target kernel.
+	When I am developing using dma for uart receive, I found a problem.
+	I use a cyclic dma transfer and set descriptor transfer size to lk, 
+	only receive 1k bytes(descriptor transfer done) that will call an interrupt.
 
-What *might* happen is that a memblock_steal on the host kernel could cause
-the kexec to fail with -EINVAL if the area removed corresponds to the area
-where the target kernel wants to be loaded. I think this is correct
-behaviour, because we have no idea what the stolen region is being used for.
+	If I receive 1 byte, there will happened nothing except my peripherals have timeout function. 
+	Fortunately, I got timeout function in uart peripheral, in timeout handler, I can receive data from uart.
+	But I do not know how many data I have receive, so there should be a count register in dma.
 
-Will
+	I found the count register but I do not found correlative api in dmaengine, I think we should add one.
+	Even during a single or multi buffer transfer, knowing how many data has been transfer in current descriptor is necessary.
+	Through that, we will not lose a data.
+
+	So there should be an api to get current descriptor receive data count.
+	Or we could get current descriptor status , the status with count value?
+
+	I submit an patch to retrieve descriptor data transfer size.
+	We use this to get data count .
+	We use Atmel dma, but it could be a common demand.
+  
+FYI & Best Regards
+Elen Song
