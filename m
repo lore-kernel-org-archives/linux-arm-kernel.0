@@ -1,25 +1,30 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 7 Sep 2012 09:55:40 +0900
-Subject: [RFC PATCH 1/2] ARM: kexec: scan for dtb magic in segments
-In-Reply-To: <1346938503-18142-2-git-send-email-matthew.leach@arm.com>
-References: <1346938503-18142-1-git-send-email-matthew.leach@arm.com>
- <1346938503-18142-2-git-send-email-matthew.leach@arm.com>
-Message-ID: <20120907005540.GC23851@verge.net.au>
+From: spartacus06@gmail.com (Seth Jennings)
+Date: Thu, 6 Sep 2012 19:56:45 -0500
+Subject: [PATCH] ARM: add support for BCM2708/BCM2835 and Raspberry Pi
+In-Reply-To: <50491F65.2020302@simon.arlott.org.uk>
+References: <1346908038-22421-1-git-send-email-swarren@wwwdotorg.org>
+ <CAG-w=x77y6ykh3FcyTtVAN85eOk1RP2CZ=ZG-_1091i5jYDF2A@mail.gmail.com>
+ <50491F65.2020302@simon.arlott.org.uk>
+Message-ID: <CAG-w=x5dbjk+9E0nWWDd9n-=bhMshMtkCnbLjzP0zufezqFgqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 02:35:02PM +0100, Matthew Leach wrote:
-> This patch allows a dtb to be passed to a new kernel using the kexec
-> mechinism.
-> 
-> When loading segments from userspace, scan each segment's first four
-> bytes for the dtb magic. If this is found set the kexec_boot_atags
-> parameter to the relocate_kernel code to the phyical address of this
-> segment.
-> 
-> Cc: Simon Horman <horms@verge.net.au>
-> Reviewed-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Matthew Leach <matthew.leach@arm.com>
-> ---
+On Thu, Sep 6, 2012 at 5:10 PM, Simon Arlott <simon@fire.lp0.eu> wrote:
+> It has supported graphics for a while:
+> https://github.com/raspberrypi/linux/wiki/How-to-boot-using-device-tree#wiki-Configuration
 
-Reviewed-by: Simon Horman <horms@verge.net.au>
+Ah yes, you are correct sir.
+
+> I've been waiting over 3 months now for device tree support to be added
+> to the GPU-based bootloader and it still hasn't appeared.
+
+Are the attributes that are currently set by fdtput'ing on the dtb the
+ones you want to get from the bootloader?  Or are there others?
+
+I guess another way to say it is I'm interested in getting as much of
+this code as we can into mainline as we can before it bitrots (which
+can happen fast in on the ARM side I think).  We can make changes as
+the proprietary bits catch up.
+
+--
+Seth
