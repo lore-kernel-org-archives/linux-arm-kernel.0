@@ -1,27 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 7 Sep 2012 10:21:02 +0200
-Subject: [PATCH 1/4] clk: Provide option for clk_get_rate to issue hw for
- new rate
-In-Reply-To: <CAJOA=zM-u5ss8ZYWFHg43V7r5B6TXhRN70=JUccNjrppx4fDyg@mail.gmail.com>
-References: <1346415691-13371-1-git-send-email-ulf.hansson@stericsson.com>
- <1346415691-13371-2-git-send-email-ulf.hansson@stericsson.com>
- <20120831192906.31162.97714@nucleus>
- <CAPDyKFrS7tKu5AcjL7+R8V5Nvo0O+BVwc8HtGFqQGSf12wMioQ@mail.gmail.com>
- <20120907001927.20289.41627@nucleus>
- <CAJOA=zM-u5ss8ZYWFHg43V7r5B6TXhRN70=JUccNjrppx4fDyg@mail.gmail.com>
-Message-ID: <CACRpkdYVkQTH=205ggcauH7RbNPvpPEP+o12AK30wcpRWVnx4A@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 7 Sep 2012 10:22:39 +0200
+Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA2964C@DBDE01.ent.ti.com>
+References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
+ <201209070209.35379.marex@denx.de>
+ <331ABD5ECB02734CA317220B2BBEABC13EA2964C@DBDE01.ent.ti.com>
+Message-ID: <201209071022.39537.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 7, 2012 at 3:00 AM, Turquette, Mike <mturquette@ti.com> wrote:
-> On Thu, Sep 6, 2012 at 5:19 PM, Mike Turquette <mturquette@ti.com> wrote:
->> I'll take this series into clk-next.
->
-> Oops, I forgot to ask about patch #3.  Which tree do you want that to
-> go through?
+Dear AnilKumar, Chimata,
 
-Just take it all through your tree if there are no major conflicts.
-Acked-by etc.
+> On Fri, Sep 07, 2012 at 05:39:35, Marek Vasut wrote:
+> > Dear Tony Lindgren,
+> > 
+> > > * Marek Vasut <marex@denx.de> [120905 19:05]:
+> > > > Hi Tony,
+> > > > 
+> > > > > * Marek Vasut <marex@denx.de> [120904 20:13]:
+> > > > > > Dear Bryan Wu,
+> > > > > > 
+> > > > > > > On Sat, Sep 1, 2012 at 4:16 PM, AnilKumar Ch <anilkumar@ti.com> 
+wrote:
+> > > > > > > > Adopt pinctrl support to leds-gpio driver based on leds-gpio
+> > > > > > > > device pointer, pinctrl driver configure SoC pins to GPIO
+> > > > > > > > mode according to definitions provided in .dts file.
+> > > > > > > 
+> > > > > > > Thanks for this, actually Marek Vasut submitted a similar patch
+> > > > > > > before. I'm pretty fine with this patch.
+> > > > > > 
+> > > > > > Thanks for submitting this actually ... I didn't have time to
+> > > > > > properly investigate this.
+> > > > > > 
+> > > > > > > But without proper DT setting, it will also give us warning I
+> > > > > > > think. or we can provide some dummy functions as a temp
+> > > > > > > solution as Shawn pointed out before.
+> > > > > > 
+> > > > > > But this driver is also used on hardware that's not yet coverted
+> > > > > > to DT, so I'd say dev_warn() if CONFIG_OF is enabled and
+> > > > > > otherwise simply go on ? Actually, can we not skip whole this
+> > > > > > pinctrl thing if CONFIG_OF is disabled? Actually (2), what's the
+> > > > > > relationship between OF and pinctrl?
+> > > > > 
+> > > > > The warning should be pinctrl related as the pinctrl drivers may
+> > > > > not be device tree based drivers.
+> > > > 
+> > > > Exactly my concern. Also the warning shouldnt be present on systems
+> > > > where pinctrl is disabled.
+> > > 
+> > > But pinctrl_get_select() returns 0 in include/linux/pinctrl/consumer.h
+> > > if CONFIG_PINCTRL is not selected, so no warning is produced AFAIK ;)
+> > 
+> > Oh all right then.
+> 
+> Bryan,
+> 
+> If this patch looks fine, can you queue this for 3.7?
 
-Yours,
-Linus Walleij
+Looks good to me.
+
+> Thanks
+> AnilKumar
+
+Best regards,
+Marek Vasut
