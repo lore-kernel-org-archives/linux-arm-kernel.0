@@ -1,72 +1,85 @@
-From: matthew.leach@arm.com (Matthew Leach)
-Date: Fri,  7 Sep 2012 09:40:59 +0100
-Subject: [PATCH 1/2] ARM: kexec: scan for dtb magic in segments
-In-Reply-To: <1347007260-13271-1-git-send-email-matthew.leach@arm.com>
-References: <1347007260-13271-1-git-send-email-matthew.leach@arm.com>
-Message-ID: <1347007260-13271-2-git-send-email-matthew.leach@arm.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Fri, 7 Sep 2012 10:42:49 +0200
+Subject: [PATCH v2 1/8] ARM/dts: OMAP2: Add McBSP entries for OMAP2420
+ and OMAP2430 SoC
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA29468@DBDE01.ent.ti.com>
+References: <1346247067-9632-1-git-send-email-peter.ujfalusi@ti.com>
+ <1346247067-9632-2-git-send-email-peter.ujfalusi@ti.com>
+ <5044C2DD.5000705@ti.com> <504578B3.3090804@ti.com> <5045D557.30404@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EAA7C99@DBDE01.ent.ti.com>
+ <50470C1E.7090300@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EAA8014@DBDE01.ent.ti.com>
+ <5047544B.60105@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EAA8779@DBDE01.ent.ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA29468@DBDE01.ent.ti.com>
+Message-ID: <5049B389.2070903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows a dtb to be passed to a new kernel using the kexec
-mechinism.
+Hi Anil,
 
-When loading segments from userspace, scan each segment's first four
-bytes for the dtb magic. If this is found set the kexec_boot_atags
-parameter to the relocate_kernel code to the phyical address of this
-segment.
+On 09/07/2012 07:45 AM, AnilKumar, Chimata wrote:
+> On Wed, Sep 05, 2012 at 20:11:11, Hiremath, Vaibhav wrote:
+>> On Wed, Sep 05, 2012 at 19:01:55, Cousson, Benoit wrote:
+>>> Hi Vaibhav,
+>>>
+>>> On 09/05/2012 11:15 AM, Hiremath, Vaibhav wrote:
+>>>> On Wed, Sep 05, 2012 at 13:53:58, Ujfalusi, Peter wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On 09/05/2012 09:11 AM, Hiremath, Vaibhav wrote:
+>>>>>>> Not yet, but we discussed that with Peter and since he does have these
+>>>>>>> patches for DT, he'll be able to test your series with the McBSP changes.
+>>>>>>>
+>>>>>>
+>>>>>> Great.
+>>>>>
+>>>>> With his series and your patch for omap-hwmod audio was probing and working on
+>>>>> OMAP3/4/5 without issues.
+>>>>>
+>>>> Peter,
+>>>> Care to provide your Tested-By??
+>>>>
+>>>> Benoit,
+>>>> Can we merge this patch now?
+>>>
+>>> Yes, I'll include it in the pull request along with DTS patches.
+>>>
+>>> I've just tested it as well on OMAP4 by hacking the DTS for GPIO.
+>>> I'll try to update at least all the OMAP4 IPs as well with the proper
+>>> DTS resources for 3.7.
+>>>
+>>
+>> Thanks Benoit,
+>>
+>> There are other patches which are pending,
+>>
+>> arm/dts: AM33XX: Convert all hex numbers to lower-case
+>> https://patchwork.kernel.org/patch/1377351/
+>> arm/dts: AM33XX: Specify reg and interrupt property for all nodes
+>> https://patchwork.kernel.org/patch/1377361/
+>>
+> 
+> Few more DT patches which are pending
+> 
+> arm/dts: AM33XX: Add basic pinctrl device tree data
+> http://www.spinics.net/lists/linux-omap/msg76684.html
+> arm/dts: AM33XX: Configure pinmuxs for user leds control on Bone
+> http://www.spinics.net/lists/linux-omap/msg76682.html
+> arm/dts: AM33XX: Add D_CAN device tree data
+> http://www.spinics.net/lists/linux-omap/msg76683.html
 
-Reviewed-by: Simon Horman <horms@verge.net.au>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Matthew Leach <matthew.leach@arm.com>
----
- arch/arm/kernel/machine_kexec.c | 21 ++++++++++++++++++++-
- 1 file changed, 20 insertions(+), 1 deletion(-)
+These ones still need some acks, but looks fine to me.
 
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index dfcdb9f..a6bbc0f 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -9,6 +9,7 @@
- #include <linux/io.h>
- #include <linux/irq.h>
- #include <asm/pgtable.h>
-+#include <linux/of_fdt.h>
- #include <asm/pgalloc.h>
- #include <asm/mmu_context.h>
- #include <asm/cacheflush.h>
-@@ -32,6 +33,22 @@ static atomic_t waiting_for_crash_ipi;
- 
- int machine_kexec_prepare(struct kimage *image)
- {
-+	struct kexec_segment *current_segment;
-+	__be32 header;
-+	int i, err;
-+
-+	/* No segment at default ATAGs address. try to locate
-+	 * a dtb using magic */
-+	for (i = 0; i < image->nr_segments; i++) {
-+		current_segment = &image->segment[i];
-+
-+		err = get_user(header, (__be32*)current_segment->buf);
-+		if (err)
-+			return err;
-+
-+		if (be32_to_cpu(header) == OF_DT_HEADER)
-+			kexec_boot_atags = current_segment->mem;
-+	}
- 	return 0;
- }
- 
-@@ -122,7 +139,9 @@ void machine_kexec(struct kimage *image)
- 	kexec_start_address = image->start;
- 	kexec_indirection_page = page_list;
- 	kexec_mach_type = machine_arch_type;
--	kexec_boot_atags = image->start - KEXEC_ARM_ZIMAGE_OFFSET + KEXEC_ARM_ATAGS_OFFSET;
-+	if (!kexec_boot_atags)
-+		kexec_boot_atags = image->start - KEXEC_ARM_ZIMAGE_OFFSET + KEXEC_ARM_ATAGS_OFFSET;
-+
- 
- 	/* copy our kernel relocation code to the control code page */
- 	memcpy(reboot_code_buffer,
--- 
-1.7.12
+Can you rebase them on top of the branch that already contains some
+AM33xx patches from Vaibhav:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
+for_3.7/dts
+
+While you are rebasing, could you as well change the subject to use
+"ARM: dts: " prefix. It looks like everybody is using that convention
+now beside OMAP :-(
+
+Thanks,
+Benoit
