@@ -1,90 +1,77 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 7 Sep 2012 08:49:34 +0300
-Subject: [PATCH v4 00/21] OMAP UART Patches
-In-Reply-To: <87harahiv6.fsf@deeprootsystems.com>
-References: <20120906122948.GC29202@arwen.pp.htv.fi>
- <1346935540-1792-1-git-send-email-balbi@ti.com>
- <87harahiv6.fsf@deeprootsystems.com>
-Message-ID: <20120907054932.GB3136@arwen.pp.htv.fi>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 07 Sep 2012 07:55:47 +0200
+Subject: Converting OMAP's custom vram allocator
+In-Reply-To: <1346839733.32747.1.camel@deskari>
+References: <1346839733.32747.1.camel@deskari>
+Message-ID: <019b01cd8cbd$6fef8c50$4fcea4f0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On Thu, Sep 06, 2012 at 03:44:13PM -0700, Kevin Hilman wrote:
-> Felipe Balbi <balbi@ti.com> writes:
-> 
-> > Hi guys,
-> >
-> > here's v4 of the omap uart patchset. No changes other than a rebase on top of
-> > Greg's tty-next branch and Tony's Acked-by being added to a couple patches
-> >
-> > Note: I'm resending the series with Vikram's Software Flow Control fix anyway
-> > as it can just be ignored if it's decided it needs to go into this merge
-> > window.
-> 
-> Sorry to be late to the party... just getting back from some time off.
-> 
-> I'm assuming that this was not tested with PM, so decided I better do it
+On Wednesday, September 05, 2012 12:09 PM Tomi Valkeinen wrote:
 
-you assumed wrong. See the previous versions of the series and you'll
-see I mention all the basic pm testing I did.
-
-> myself seeing that Greg is has already merge it.  To test, I merged
-> Greg's tty-next branch with v3.6-rc4 and did some PM testing.
+> OMAP has a custom video ram allocator, which I'd like to remove and use
+> the standard dma allocation functions.
 > 
-> The bad news is that it doesn't even compile (see reply to [PATCH v4
-> 20/21]).  
-
-yeah, that was an automerge issue when rebasing on greg's tty-next
-branch, plus me assuming omap serial was already enabled on my .config
-and not checking the compile output. Sent a patch now.
-
-> Also, there is a big WARNING on boot[1], which seems to be triggered by
-> a new check added for v3.6-rc3[2].  This appears to be introduced by
-> $SUBJECT series, because I don't see it on vanilla v3.6-rc4.
+> There are two problems for which I'd like to hear suggestions or
+> comments:
 > 
-> The good news is that after hacking to fix up the compile problems,
-> basic PM testing seems to be fine: idle to retention and off as well as
-> suspend to retention and off work fine on 3430/n900, 3530/Overo,
-> 3730/OveroSTORM, 3730/Beagle-xM.
+> First one is that the dma_alloc_* functions map the allocated memory for
+> cpu use. In many cases with OMAP DSS (display subsystem) this is not
+> needed: the memory may be written only by the SGX or the DSP, and it's
+> only read by the DSS, so it's never touched by the CPU.
 > 
-> Kevin
+> This is even more true when using VRFB on omap3 (and probably TILER on
+> omap4) for rotation, as VRFB hides the actual memory and offers rotated
+> views. In this case the backend memory is never accessed by anyone else
+> than VRFB.
 > 
+> Is there a way to allocate the memory without creating a mapping? While
+> it won't break anything as such, the allocated areas can be quite large
+> thus causing large areas of the kernel's memory space to be needlessly
+> reserved.
+
+Please check commits d5724f172fd1 and 955c757e090 merged to v3.6-rc1. 
+Support for this attribute is now only available in IOMMU-aware 
+dma-mapping implementation, but I plan to add it also to standard linear
+ARM dma-mapping implementation based on alloc_pages_exact().
+
+Some not-well-documented example can be found here: 
+https://patchwork.kernel.org/patch/1323591/ (at the bottom).
+
+You probably might need to add your own custom dma_map_ops set of functions
+for TILER device, but I'm not really sure if I get right what does that 
+device do and what will be the use cases for it.
+
+ 
+> The second case is passing a framebuffer address from the bootloader to
+> the kernel. Often with mobile devices the bootloader will initialize the
+> display hardware, showing a company logo or such. To keep the image on
+> the screen when kernel starts we need to reserve the same physical
+> memory area early at boot, and use that for the framebuffer.
 > 
-> [1]
-> [    8.745666] WARNING: at /work/kernel/omap/pm/drivers/tty/tty_io.c:1420 tty_init_dev+0x14c/0x17c()
-> [    8.755218] tty_init_dev: ttyO driver does not set tty->port. This will crash the kernel later. Fix the driver!
-> [    8.765991] Modules linked in:
-> [    8.769287] [<c0013d90>] (unwind_backtrace+0x0/0xf0) from [<c0036eec>] (warn_slowpath_common+0x4c/0x64)
-> [    8.779327] [<c0036eec>] (warn_slowpath_common+0x4c/0x64) from [<c0036f98>] (warn_slowpath_fmt+0x30/0x40)
-> [    8.789550] [<c0036f98>] (warn_slowpath_fmt+0x30/0x40) from [<c02c626c>] (tty_init_dev+0x14c/0x17c)
-> [    8.799224] [<c02c626c>] (tty_init_dev+0x14c/0x17c) from [<c02c68a4>] (tty_open+0x11c/0x52c)
-> [    8.808258] [<c02c68a4>] (tty_open+0x11c/0x52c) from [<c00f86ac>] (chrdev_open+0x90/0x15c)
-> [    8.817108] [<c00f86ac>] (chrdev_open+0x90/0x15c) from [<c00f2b74>] (do_dentry_open+0x1e8/0x270)
-> [    8.826507] [<c00f2b74>] (do_dentry_open+0x1e8/0x270) from [<c00f2c30>] (finish_open+0x34/0x4c)
-> [    8.835784] [<c00f2c30>] (finish_open+0x34/0x4c) from [<c0102028>] (do_last.isra.21+0x5b0/0xbbc)
-> [    8.845184] [<c0102028>] (do_last.isra.21+0x5b0/0xbbc) from [<c01026dc>] (path_openat+0xa8/0x44c)
-> [    8.854675] [<c01026dc>] (path_openat+0xa8/0x44c) from [<c0102d34>] (do_filp_open+0x2c/0x80)
-> [    8.863708] [<c0102d34>] (do_filp_open+0x2c/0x80) from [<c00f3b6c>] (do_sys_open+0xe8/0x184)
-> [    8.872711] [<c00f3b6c>] (do_sys_open+0xe8/0x184) from [<c000db20>] (ret_fast_syscall+0x0/0x3c)
-> [    8.882019] ---[ end trace e9bf408c37051346 ]---
+> I'm not sure if there's any actual problem with this one, presuming
+> there is a solution for the first case. Somehow the memory is reserved
+> at early boot time, and this is passed to the fb driver. But can the
+> memory be managed the same way as in normal case (for example freeing
+> it), or does it need to be handled as a special case?
 
-This doesn't seem to be caused by $SUBJECT at all. See that we are
-calling uart_add_one_port() which will call tty_port_register_device()
-which, in turn, will call tty_port_link_device() and that will set
-driver->ports[index] correctly.
+The only solution I see here is to use custom coherent memory pool for the
+framebuffer device and setup it starting from the physical address of the
+framebuffer configured by bootloader. See dma_declare_coherent() function.
+Some usage example on ARM architecture can be found in 
+arch/arm/plat-samsung/s5p-dev-mfc.c
 
-Have you checked if this doesn't happen without my series before waving
-your blame hammer ? FWIW, that part of the code wasn't change by
-$SUBJECT at all.
+The other possibility is to enable Contiguous Memory Allocator and define
+a custom contiguous memory area for framebuffer device at the same 
+physical address as configured by bootloader:
+http://git.linaro.org/gitweb?p=people/mszyprowski/linux-archive.git;a=commitdiff;h=f8ff4f99cfa4f67e09a3c948e007e82a0c21434a
 
+Feel free to comment both possibilities, maybe we can work out something
+better for solving this quite common use case.
+
+Best regards
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120907/2a213f45/attachment.sig>
+Marek Szyprowski
+Samsung Poland R&D Center
