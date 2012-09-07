@@ -1,32 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 7 Sep 2012 23:09:01 +0200
-Subject: [PATCH 1/8] gpio: 74x164: Use module_spi_driver boiler plate
- function
-In-Reply-To: <5048AEE9.5030305@free-electrons.com>
-References: <1346834457-6257-1-git-send-email-maxime.ripard@free-electrons.com>
- <CACRpkdbaHK4AX8nnvu+gcsgPBYAzTNwvwKeBePxnr+GcUsa8AA@mail.gmail.com>
- <5048AEE9.5030305@free-electrons.com>
-Message-ID: <CACRpkdavwww8_deiM14h0zXgdK2k8SdCZn4hfkHpmSAJuG7u7w@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 7 Sep 2012 23:10:07 +0200
+Subject: [PATCH v2 RESEND] ARM: Build dtb files in all target
+In-Reply-To: <20120907145701.GB19437@titan.lakedaemon.net>
+References: <1346691487-17534-1-git-send-email-andrew@lunn.ch>
+ <20120907145701.GB19437@titan.lakedaemon.net>
+Message-ID: <20120907211007.GE21036@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 6, 2012 at 4:10 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Linus,
-> Le 06/09/2012 09:21, Linus Walleij a ?crit :
->>
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->>
->> I guess all of these will go through your kernel tree?
->> Tell me if you want me to apply these to my GPIO tree.
->
-> Since I don't have any kernel tree, I guess you can apply them in your
-> tree :)
+On Fri, Sep 07, 2012 at 10:57:01AM -0400, Jason Cooper wrote:
+> On Mon, Sep 03, 2012 at 06:58:07PM +0200, Andrew Lunn wrote:
+> > Tools like kisskb are good at finding build regressions in the kernel
+> > sources. However, regressions in the DT desscriptions are not found,
+> > because generally these build systems don't build the DT binary blobs.
+> > 
+> > Extend the ARM all target to build all enabled DTB files.
+> > 
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > Acked-by: Jason Cooper <jason@lakedaemon.net>
+> > Reviewed-by: Dave Martin <dave.martin@linaro.org>
+> 
+> Arnd, Olof,
+> 
+> Is it appropriate to take this directly into your tree or should it go
+> through Russell's?
 
-I was more thinking if the Free Electrons people were doing
-composite pull requests to ARM SoC. Oh well, nevermind,
-I'll take them.
+I put it into Russell's patch system yesterday.
 
-Applied!
-
-Linus Walleij
+  Andrew
