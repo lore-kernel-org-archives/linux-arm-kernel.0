@@ -1,57 +1,70 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Fri, 7 Sep 2012 09:10:50 +0000
-Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
-In-Reply-To: <CADjby3UyhW=Ok8Zy57MVUz65gd-=4z2PhE6uqd7F8xtaDXcWfQ@mail.gmail.com>
-References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
- <CADjby3UyhW=Ok8Zy57MVUz65gd-=4z2PhE6uqd7F8xtaDXcWfQ@mail.gmail.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA29819@DBDE01.ent.ti.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 7 Sep 2012 12:23:56 +0300
+Subject: [PATCHv4 2/8] ARM: OMAP3+: voltage/pwrdm/clkdm/clock add
+ recursive usecount tracking
+In-Reply-To: <87ipcv4myp.fsf@ti.com>
+References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
+ <1342189185-5306-3-git-send-email-t-kristo@ti.com>  <87ipcv4myp.fsf@ti.com>
+Message-ID: <1347009836.10702.92.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Domenico,
-
-On Fri, Sep 07, 2012 at 14:18:39, Domenico Andreoli wrote:
-> On Sat, Sep 1, 2012 at 10:16 AM, AnilKumar Ch <anilkumar@ti.com> wrote:
-> > Adopt pinctrl support to leds-gpio driver based on leds-gpio
-> > device pointer, pinctrl driver configure SoC pins to GPIO
-> > mode according to definitions provided in .dts file.
+On Mon, 2012-08-06 at 16:31 -0700, Kevin Hilman wrote:
+> Tero Kristo <t-kristo@ti.com> writes:
 > 
-> Shouldn't be the interaction with the pinctrl layer left to gpiolib?
+> > This patch fixes the usecount tracking for omap3+, previously the
+> > usecount numbers were rather bogus and were not really useful for
+> > any purpose. Now usecount numbers track the number of really active
+> > clients on each domain. This patch also adds support for usecount
+> > tracking on powerdomain level and autoidle flag for clocks that
+> > are hardware controlled and should be skipped in usecount
+> > calculations.
+> >
+> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Kevin Hilman <khilman@ti.com>
 > 
+> [...]
+> 
+> >  /* Clock control for DPLL outputs */
+> > diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+> > index 9611490..68bdf36 100644
+> > --- a/arch/arm/mach-omap2/powerdomain.c
+> > +++ b/arch/arm/mach-omap2/powerdomain.c
+> > @@ -981,6 +981,41 @@ int pwrdm_state_switch(struct powerdomain *pwrdm)
+> >  	return ret;
+> >  }
+> >  
+> > +/**
+> > + * pwrdm_clkdm_enable - increment powerdomain usecount
+> > + * @pwrdm: struct powerdomain *
+> > + *
+> > + * Increases the usecount for a powerdomain. Called from clockdomain
+> > + * code once a clockdomain's usecount reaches zero, i.e. it is ready
+> > + * to idle.
+> > + */
+> 
+> I think the comment here is wrong.
+> 
+> > +void pwrdm_clkdm_enable(struct powerdomain *pwrdm)
+> > +{
+> > +	if (!pwrdm)
+> > +		return;
+> > +
+> > +	atomic_inc(&pwrdm->usecount);
+> > +}
+> > +
+> > +/**
+> > + * pwrdm_clkdm_disable - decrease powerdomain usecount
+> > + * @pwrdm: struct powerdomain *
+> > + *
+> > + * Decreases the usecount for a powerdomain. Called from clockdomain
+> > + * code once a clockdomain becomes active.
+> > + */
+> 
+> Looks like these two comments need to be swapped?
 
-No, these gpio's are configured specifically for user leds.
+Ooops, that is true yes. Again my laziness in writing proper comments
+bites me.
 
-So, leds-gpio driver should have this call, because these gpio
-pins are used by leds-gpio driver.
-
-+       am33xx_pinmux: pinmux at 44e10800 {
-+               userled_pins: pinmux_userled_pins {
-+                       pinctrl-single,pins = <
-+                               0x54 0x7       
-+                               0x58 0x17       
-+                               0x5c 0x7        
-+                               0x60 0x17       
-+                       >;
-+               };
-+       };
-+
-
-[...]
-
-+               leds {
-+                       compatible = "gpio-leds";
-+                       pinctrl-names = "default";
-+                       pinctrl-0 = <&userled_pins>;
-                                      ^^^^^^^^^^^^
-
-This devm_pinctrl_get_select_default() call in leds-gpio driver
-will internally take userled_pins node and configure those pins
-according to the above definitions.
-
-Lets take gpio-keypad driver, in that case we have to configure
-pins as INPUT mode (generic gpio driver might not know what
-the end usecase is) and this leds case we configure as OUTPUT
-mode.
-
-Thanks
-AnilKumar
+-Tero
