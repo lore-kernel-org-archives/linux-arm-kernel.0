@@ -1,42 +1,40 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri,  7 Sep 2012 17:26:42 +0100
-Subject: [PATCH v3 07/31] arm64: Process management
+Date: Fri,  7 Sep 2012 17:26:40 +0100
+Subject: [PATCH v3 05/31] arm64: MMU initialisation
 In-Reply-To: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
 References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1347035226-18649-8-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1347035226-18649-6-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds support for thread creation and context switching. The
-context switching CPU specific code is introduced with the CPU support
-patch (part of the arch/arm64/mm/proc.S file). AArch64 supports
-ASID-tagged TLBs and the ASID can be either 8 or 16-bit wide (detectable
-via the ID_AA64AFR0_EL1 register).
+This patch contains the initialisation of the memory blocks, MMU
+attributes and the memory map. Only five memory types are defined:
+Device nGnRnE (equivalent to Strongly Ordered), Device nGnRE (classic
+Device memory), Device GRE, Normal Non-cacheable and Normal Cacheable.
+Cache policies are supported via the memory attributes register
+(MAIR_EL1) and only affect the Normal Cacheable mappings.
+
+This patch also adds the SPARSEMEM_VMEMMAP initialisation.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm64/include/asm/mmu_context.h |  152 +++++++++++++
- arch/arm64/include/asm/thread_info.h |  127 +++++++++++
- arch/arm64/kernel/process.c          |  412 ++++++++++++++++++++++++++++++++++
- arch/arm64/mm/context.c              |  159 +++++++++++++
- 4 files changed, 850 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/mmu_context.h
- create mode 100644 arch/arm64/include/asm/thread_info.h
- create mode 100644 arch/arm64/kernel/process.c
- create mode 100644 arch/arm64/mm/context.c
+ arch/arm64/include/asm/memblock.h |   21 ++
+ arch/arm64/mm/init.c              |  416 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/mmu.c               |  395 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 832 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm64/include/asm/memblock.h
+ create mode 100644 arch/arm64/mm/init.c
+ create mode 100644 arch/arm64/mm/mmu.c
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+diff --git a/arch/arm64/include/asm/memblock.h b/arch/arm64/include/asm/memblock.h
 new file mode 100644
-index 0000000..f68465d
+index 0000000..6afeed2
 --- /dev/null
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -0,0 +1,152 @@
++++ b/arch/arm64/include/asm/memblock.h
+@@ -0,0 +1,21 @@
 +/*
-+ * Based on arch/arm/include/asm/mmu_context.h
-+ *
-+ * Copyright (C) 1996 Russell King.
 + * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -51,284 +49,22 @@ index 0000000..f68465d
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#ifndef __ASM_MMU_CONTEXT_H
-+#define __ASM_MMU_CONTEXT_H
++#ifndef __ASM_MEMBLOCK_H
++#define __ASM_MEMBLOCK_H
 +
-+#include <linux/compiler.h>
-+#include <linux/sched.h>
-+
-+#include <asm/cacheflush.h>
-+#include <asm/proc-fns.h>
-+#include <asm-generic/mm_hooks.h>
-+#include <asm/cputype.h>
-+#include <asm/pgtable.h>
-+
-+#define MAX_ASID_BITS	16
-+
-+extern unsigned int cpu_last_asid;
-+
-+void __init_new_context(struct task_struct *tsk, struct mm_struct *mm);
-+void __new_context(struct mm_struct *mm);
-+
-+/*
-+ * Set TTBR0 to empty_zero_page. No translations will be possible via TTBR0.
-+ */
-+static inline void cpu_set_reserved_ttbr0(void)
-+{
-+	unsigned long ttbr = page_to_phys(empty_zero_page);
-+
-+	asm(
-+	"	msr	ttbr0_el1, %0			// set TTBR0\n"
-+	"	isb"
-+	:
-+	: "r" (ttbr));
-+}
-+
-+static inline void switch_new_context(struct mm_struct *mm)
-+{
-+	unsigned long flags;
-+
-+	__new_context(mm);
-+
-+	local_irq_save(flags);
-+	cpu_switch_mm(mm->pgd, mm);
-+	local_irq_restore(flags);
-+}
-+
-+static inline void check_and_switch_context(struct mm_struct *mm,
-+					    struct task_struct *tsk)
-+{
-+	/*
-+	 * Required during context switch to avoid speculative page table
-+	 * walking with the wrong TTBR.
-+	 */
-+	cpu_set_reserved_ttbr0();
-+
-+	if (!((mm->context.id ^ cpu_last_asid) >> MAX_ASID_BITS))
-+		/*
-+		 * The ASID is from the current generation, just switch to the
-+		 * new pgd. This condition is only true for calls from
-+		 * context_switch() and interrupts are already disabled.
-+		 */
-+		cpu_switch_mm(mm->pgd, mm);
-+	else if (irqs_disabled())
-+		/*
-+		 * Defer the new ASID allocation until after the context
-+		 * switch critical region since __new_context() cannot be
-+		 * called with interrupts disabled.
-+		 */
-+		set_ti_thread_flag(task_thread_info(tsk), TIF_SWITCH_MM);
-+	else
-+		/*
-+		 * That is a direct call to switch_mm() or activate_mm() with
-+		 * interrupts enabled and a new context.
-+		 */
-+		switch_new_context(mm);
-+}
-+
-+#define init_new_context(tsk,mm)	(__init_new_context(tsk,mm),0)
-+#define destroy_context(mm)		do { } while(0)
-+
-+#define finish_arch_post_lock_switch \
-+	finish_arch_post_lock_switch
-+static inline void finish_arch_post_lock_switch(void)
-+{
-+	if (test_and_clear_thread_flag(TIF_SWITCH_MM)) {
-+		struct mm_struct *mm = current->mm;
-+		unsigned long flags;
-+
-+		__new_context(mm);
-+
-+		local_irq_save(flags);
-+		cpu_switch_mm(mm->pgd, mm);
-+		local_irq_restore(flags);
-+	}
-+}
-+
-+/*
-+ * This is called when "tsk" is about to enter lazy TLB mode.
-+ *
-+ * mm:  describes the currently active mm context
-+ * tsk: task which is entering lazy tlb
-+ * cpu: cpu number which is entering lazy tlb
-+ *
-+ * tsk->mm will be NULL
-+ */
-+static inline void
-+enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
-+{
-+}
-+
-+/*
-+ * This is the actual mm switch as far as the scheduler
-+ * is concerned.  No registers are touched.  We avoid
-+ * calling the CPU specific function when the mm hasn't
-+ * actually changed.
-+ */
-+static inline void
-+switch_mm(struct mm_struct *prev, struct mm_struct *next,
-+	  struct task_struct *tsk)
-+{
-+	unsigned int cpu = smp_processor_id();
-+
-+#ifdef CONFIG_SMP
-+	/* check for possible thread migration */
-+	if (!cpumask_empty(mm_cpumask(next)) &&
-+	    !cpumask_test_cpu(cpu, mm_cpumask(next)))
-+		__flush_icache_all();
-+#endif
-+	if (!cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) || prev != next)
-+		check_and_switch_context(next, tsk);
-+}
-+
-+#define deactivate_mm(tsk,mm)	do { } while (0)
-+#define activate_mm(prev,next)	switch_mm(prev, next, NULL)
++extern void arm64_memblock_init(void);
 +
 +#endif
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
 new file mode 100644
-index 0000000..3659e46
+index 0000000..31428ca
 --- /dev/null
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -0,0 +1,127 @@
++++ b/arch/arm64/mm/init.c
+@@ -0,0 +1,416 @@
 +/*
-+ * Based on arch/arm/include/asm/thread_info.h
++ * Based on arch/arm/mm/init.c
 + *
-+ * Copyright (C) 2002 Russell King.
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_THREAD_INFO_H
-+#define __ASM_THREAD_INFO_H
-+
-+#ifdef __KERNEL__
-+
-+#include <linux/compiler.h>
-+
-+#ifndef CONFIG_ARM64_64K_PAGES
-+#define THREAD_SIZE_ORDER	1
-+#endif
-+
-+#define THREAD_SIZE		8192
-+#define THREAD_START_SP		(THREAD_SIZE - 16)
-+
-+#ifndef __ASSEMBLY__
-+
-+struct task_struct;
-+struct exec_domain;
-+
-+#include <asm/types.h>
-+
-+typedef unsigned long mm_segment_t;
-+
-+/*
-+ * low level task data that entry.S needs immediate access to.
-+ * __switch_to() assumes cpu_context follows immediately after cpu_domain.
-+ */
-+struct thread_info {
-+	unsigned long		flags;		/* low level flags */
-+	mm_segment_t		addr_limit;	/* address limit */
-+	struct task_struct	*task;		/* main task structure */
-+	struct exec_domain	*exec_domain;	/* execution domain */
-+	struct restart_block	restart_block;
-+	int			preempt_count;	/* 0 => preemptable, <0 => bug */
-+	int			cpu;		/* cpu */
-+};
-+
-+#define INIT_THREAD_INFO(tsk)						\
-+{									\
-+	.task		= &tsk,						\
-+	.exec_domain	= &default_exec_domain,				\
-+	.flags		= 0,						\
-+	.preempt_count	= INIT_PREEMPT_COUNT,				\
-+	.addr_limit	= KERNEL_DS,					\
-+	.restart_block	= {						\
-+		.fn	= do_no_restart_syscall,			\
-+	},								\
-+}
-+
-+#define init_thread_info	(init_thread_union.thread_info)
-+#define init_stack		(init_thread_union.stack)
-+
-+/*
-+ * how to get the thread information struct from C
-+ */
-+static inline struct thread_info *current_thread_info(void) __attribute_const__;
-+
-+static inline struct thread_info *current_thread_info(void)
-+{
-+	register unsigned long sp asm ("sp");
-+	return (struct thread_info *)(sp & ~(THREAD_SIZE - 1));
-+}
-+
-+#define thread_saved_pc(tsk)	\
-+	((unsigned long)(tsk->thread.cpu_context.pc))
-+#define thread_saved_sp(tsk)	\
-+	((unsigned long)(tsk->thread.cpu_context.sp))
-+#define thread_saved_fp(tsk)	\
-+	((unsigned long)(tsk->thread.cpu_context.fp))
-+
-+#endif
-+
-+/*
-+ * We use bit 30 of the preempt_count to indicate that kernel
-+ * preemption is occurring.  See <asm/hardirq.h>.
-+ */
-+#define PREEMPT_ACTIVE	0x40000000
-+
-+/*
-+ * thread information flags:
-+ *  TIF_SYSCALL_TRACE	- syscall trace active
-+ *  TIF_SIGPENDING	- signal pending
-+ *  TIF_NEED_RESCHED	- rescheduling necessary
-+ *  TIF_NOTIFY_RESUME	- callback before returning to user
-+ *  TIF_USEDFPU		- FPU was used by this task this quantum (SMP)
-+ *  TIF_POLLING_NRFLAG	- true if poll_idle() is polling TIF_NEED_RESCHED
-+ */
-+#define TIF_SIGPENDING		0
-+#define TIF_NEED_RESCHED	1
-+#define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
-+#define TIF_SYSCALL_TRACE	8
-+#define TIF_POLLING_NRFLAG	16
-+#define TIF_MEMDIE		18	/* is terminating due to OOM killer */
-+#define TIF_FREEZE		19
-+#define TIF_RESTORE_SIGMASK	20
-+#define TIF_SINGLESTEP		21
-+#define TIF_32BIT		22	/* 32bit process */
-+#define TIF_SWITCH_MM		23	/* deferred switch_mm */
-+
-+#define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
-+#define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
-+#define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
-+#define _TIF_32BIT		(1 << TIF_32BIT)
-+
-+#define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
-+				 _TIF_NOTIFY_RESUME)
-+
-+#endif /* __KERNEL__ */
-+#endif /* __ASM_THREAD_INFO_H */
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-new file mode 100644
-index 0000000..6dfd96f
---- /dev/null
-+++ b/arch/arm64/kernel/process.c
-@@ -0,0 +1,412 @@
-+/*
-+ * Based on arch/arm/kernel/process.c
-+ *
-+ * Original Copyright (C) 1995  Linus Torvalds
-+ * Copyright (C) 1996-2000 Russell King - Converted to ARM.
++ * Copyright (C) 1995-2005 Russell King
 + * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -344,408 +80,413 @@ index 0000000..6dfd96f
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <stdarg.h>
-+
-+#include <linux/export.h>
-+#include <linux/sched.h>
 +#include <linux/kernel.h>
-+#include <linux/mm.h>
-+#include <linux/stddef.h>
-+#include <linux/unistd.h>
-+#include <linux/user.h>
-+#include <linux/delay.h>
-+#include <linux/reboot.h>
-+#include <linux/interrupt.h>
-+#include <linux/kallsyms.h>
++#include <linux/export.h>
++#include <linux/errno.h>
++#include <linux/swap.h>
 +#include <linux/init.h>
-+#include <linux/cpu.h>
-+#include <linux/elfcore.h>
-+#include <linux/pm.h>
-+#include <linux/tick.h>
-+#include <linux/utsname.h>
-+#include <linux/uaccess.h>
-+#include <linux/random.h>
-+#include <linux/hw_breakpoint.h>
-+#include <linux/personality.h>
-+#include <linux/notifier.h>
++#include <linux/bootmem.h>
++#include <linux/mman.h>
++#include <linux/nodemask.h>
++#include <linux/initrd.h>
++#include <linux/gfp.h>
++#include <linux/memblock.h>
++#include <linux/sort.h>
++#include <linux/of_fdt.h>
 +
-+#include <asm/compat.h>
-+#include <asm/cacheflush.h>
-+#include <asm/processor.h>
-+#include <asm/stacktrace.h>
-+#include <asm/fpsimd.h>
++#include <asm/prom.h>
++#include <asm/sections.h>
++#include <asm/setup.h>
++#include <asm/sizes.h>
++#include <asm/tlb.h>
 +
-+extern void setup_mm_for_reboot(void);
++#include "mm.h"
 +
-+static void setup_restart(void)
++static unsigned long phys_initrd_start __initdata = 0;
++static unsigned long phys_initrd_size __initdata = 0;
++
++phys_addr_t memstart_addr __read_mostly = 0;
++
++void __init early_init_dt_setup_initrd_arch(unsigned long start,
++					    unsigned long end)
 +{
-+	/*
-+	 * Tell the mm system that we are going to reboot -
-+	 * we may need it to insert some 1:1 mappings so that
-+	 * soft boot works.
-+	 */
-+	setup_mm_for_reboot();
-+
-+	/* Clean and invalidate caches */
-+	flush_cache_all();
-+
-+	/* Turn off caching */
-+	cpu_proc_fin();
-+
-+	/* Push out any further dirty data, and ensure cache is empty */
-+	flush_cache_all();
++	phys_initrd_start = start;
++	phys_initrd_size = end - start;
 +}
 +
-+void soft_restart(unsigned long addr)
++static int __init early_initrd(char *p)
 +{
-+	setup_restart();
-+	cpu_reset(addr);
-+}
++	unsigned long start, size;
++	char *endp;
 +
-+/*
-+ * Function pointers to optional machine specific functions
-+ */
-+void (*pm_power_off)(void);
-+EXPORT_SYMBOL(pm_power_off);
++	start = memparse(p, &endp);
++	if (*endp == ',') {
++		size = memparse(endp + 1, NULL);
 +
-+void (*pm_restart)(const char *cmd);
-+EXPORT_SYMBOL_GPL(pm_restart);
-+
-+
-+/*
-+ * This is our default idle handler.
-+ */
-+static void default_idle(void)
-+{
-+	/*
-+	 * This should do all the clock switching and wait for interrupt
-+	 * tricks
-+	 */
-+	cpu_do_idle();
-+	local_irq_enable();
-+}
-+
-+void (*pm_idle)(void) = default_idle;
-+EXPORT_SYMBOL(pm_idle);
-+
-+/*
-+ * The idle thread, has rather strange semantics for calling pm_idle,
-+ * but this is what x86 does and we need to do the same, so that
-+ * things like cpuidle get called in the same way.  The only difference
-+ * is that we always respect 'hlt_counter' to prevent low power idle.
-+ */
-+void cpu_idle(void)
-+{
-+	local_fiq_enable();
-+
-+	/* endless idle loop with no priority at all */
-+	while (1) {
-+		tick_nohz_idle_enter();
-+		rcu_idle_enter();
-+		while (!need_resched()) {
-+			/*
-+			 * We need to disable interrupts here to ensure
-+			 * we don't miss a wakeup call.
-+			 */
-+			local_irq_disable();
-+			if (!need_resched()) {
-+				stop_critical_timings();
-+				pm_idle();
-+				start_critical_timings();
-+				/*
-+				 * pm_idle functions should always return
-+				 * with IRQs enabled.
-+				 */
-+				WARN_ON(irqs_disabled());
-+			} else {
-+				local_irq_enable();
-+			}
-+		}
-+		rcu_idle_exit();
-+		tick_nohz_idle_exit();
-+		schedule_preempt_disabled();
++		phys_initrd_start = start;
++		phys_initrd_size = size;
 +	}
++	return 0;
++}
++early_param("initrd", early_initrd);
++
++#define MAX_DMA32_PFN ((4UL * 1024 * 1024 * 1024) >> PAGE_SHIFT)
++
++static void __init zone_sizes_init(unsigned long min, unsigned long max)
++{
++	unsigned long zone_size[MAX_NR_ZONES];
++	unsigned long max_dma32 = min;
++
++	memset(zone_size, 0, sizeof(zone_size));
++
++	zone_size[0] = max - min;
++#ifdef CONFIG_ZONE_DMA32
++	/* 4GB maximum for 32-bit only capable devices */
++	max_dma32 = min(max, MAX_DMA32_PFN);
++	zone_size[ZONE_DMA32] = max_dma32 - min;
++#endif
++	zone_size[ZONE_NORMAL] = max - max_dma32;
++
++	free_area_init(zone_size);
 +}
 +
-+void machine_shutdown(void)
++#ifdef CONFIG_HAVE_ARCH_PFN_VALID
++int pfn_valid(unsigned long pfn)
 +{
-+#ifdef CONFIG_SMP
-+	smp_send_stop();
++	return memblock_is_memory(pfn << PAGE_SHIFT);
++}
++EXPORT_SYMBOL(pfn_valid);
++#endif
++
++#ifndef CONFIG_SPARSEMEM
++static void arm64_memory_present(void)
++{
++}
++#else
++static void arm64_memory_present(void)
++{
++	struct memblock_region *reg;
++
++	for_each_memblock(memory, reg)
++		memory_present(0, memblock_region_memory_base_pfn(reg),
++			       memblock_region_memory_end_pfn(reg));
++}
++#endif
++
++void __init arm64_memblock_init(void)
++{
++	u64 *reserve_map, base, size;
++
++	/* Register the kernel text, kernel data and initrd with memblock */
++	memblock_reserve(__pa(_text), _end - _text);
++#ifdef CONFIG_BLK_DEV_INITRD
++	if (phys_initrd_size) {
++		memblock_reserve(phys_initrd_start, phys_initrd_size);
++
++		/* Now convert initrd to virtual addresses */
++		initrd_start = __phys_to_virt(phys_initrd_start);
++		initrd_end = initrd_start + phys_initrd_size;
++	}
++#endif
++
++	/*
++	 * Reserve the page tables.  These are already in use,
++	 * and can only be in node 0.
++	 */
++	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_DIR_SIZE);
++	memblock_reserve(__pa(idmap_pg_dir), IDMAP_DIR_SIZE);
++
++	/* Reserve the dtb region */
++	memblock_reserve(virt_to_phys(initial_boot_params),
++			 be32_to_cpu(initial_boot_params->totalsize));
++
++	/*
++	 * Process the reserve map.  This will probably overlap the initrd
++	 * and dtb locations which are already reserved, but overlapping
++	 * doesn't hurt anything
++	 */
++	reserve_map = ((void*)initial_boot_params) +
++			be32_to_cpu(initial_boot_params->off_mem_rsvmap);
++	while (1) {
++		base = be64_to_cpup(reserve_map++);
++		size = be64_to_cpup(reserve_map++);
++		if (!size)
++			break;
++		memblock_reserve(base, size);
++	}
++
++	memblock_allow_resize();
++	memblock_dump_all();
++}
++
++void __init bootmem_init(void)
++{
++	unsigned long min, max;
++
++	min = PFN_UP(memblock_start_of_DRAM());
++	max = PFN_DOWN(memblock_end_of_DRAM());
++
++	/*
++	 * Sparsemem tries to allocate bootmem in memory_present(), so must be
++	 * done after the fixed reservations.
++	 */
++	arm64_memory_present();
++
++	sparse_init();
++	zone_sizes_init(min, max);
++
++	high_memory = __va((max << PAGE_SHIFT) - 1) + 1;
++	max_pfn = max_low_pfn = max;
++}
++
++static inline int free_area(unsigned long pfn, unsigned long end, char *s)
++{
++	unsigned int pages = 0, size = (end - pfn) << (PAGE_SHIFT - 10);
++
++	for (; pfn < end; pfn++) {
++		struct page *page = pfn_to_page(pfn);
++		ClearPageReserved(page);
++		init_page_count(page);
++		__free_page(page);
++		pages++;
++	}
++
++	if (size && s)
++		pr_info("Freeing %s memory: %dK\n", s, size);
++
++	return pages;
++}
++
++/*
++ * Poison init memory with an undefined instruction (0x0).
++ */
++static inline void poison_init_mem(void *s, size_t count)
++{
++	memset(s, 0, count);
++}
++
++#ifndef CONFIG_SPARSEMEM_VMEMMAP
++static inline void free_memmap(unsigned long start_pfn, unsigned long end_pfn)
++{
++	struct page *start_pg, *end_pg;
++	unsigned long pg, pgend;
++
++	/*
++	 * Convert start_pfn/end_pfn to a struct page pointer.
++	 */
++	start_pg = pfn_to_page(start_pfn - 1) + 1;
++	end_pg = pfn_to_page(end_pfn - 1) + 1;
++
++	/*
++	 * Convert to physical addresses, and round start upwards and end
++	 * downwards.
++	 */
++	pg = (unsigned long)PAGE_ALIGN(__pa(start_pg));
++	pgend = (unsigned long)__pa(end_pg) & PAGE_MASK;
++
++	/*
++	 * If there are free pages between these, free the section of the
++	 * memmap array.
++	 */
++	if (pg < pgend)
++		free_bootmem(pg, pgend - pg);
++}
++
++/*
++ * The mem_map array can get very big. Free the unused area of the memory map.
++ */
++static void __init free_unused_memmap(void)
++{
++	unsigned long start, prev_end = 0;
++	struct memblock_region *reg;
++
++	for_each_memblock(memory, reg) {
++		start = __phys_to_pfn(reg->base);
++
++#ifdef CONFIG_SPARSEMEM
++		/*
++		 * Take care not to free memmap entries that don't exist due
++		 * to SPARSEMEM sections which aren't present.
++		 */
++		start = min(start, ALIGN(prev_end, PAGES_PER_SECTION));
++#endif
++		/*
++		 * If we had a previous bank, and there is a space between the
++		 * current bank and the previous, free it.
++		 */
++		if (prev_end && prev_end < start)
++			free_memmap(prev_end, start);
++
++		/*
++		 * Align up here since the VM subsystem insists that the
++		 * memmap entries are valid from the bank end aligned to
++		 * MAX_ORDER_NR_PAGES.
++		 */
++		prev_end = ALIGN(start + __phys_to_pfn(reg->size),
++				 MAX_ORDER_NR_PAGES);
++	}
++
++#ifdef CONFIG_SPARSEMEM
++	if (!IS_ALIGNED(prev_end, PAGES_PER_SECTION))
++		free_memmap(prev_end, ALIGN(prev_end, PAGES_PER_SECTION));
 +#endif
 +}
++#endif	/* !CONFIG_SPARSEMEM_VMEMMAP */
 +
-+void machine_halt(void)
++/*
++ * mem_init() marks the free areas in the mem_map and tells us how much memory
++ * is free.  This is done after various parts of the system have claimed their
++ * memory after the kernel image.
++ */
++void __init mem_init(void)
 +{
-+	machine_shutdown();
-+	while (1);
-+}
++	unsigned long reserved_pages, free_pages;
++	struct memblock_region *reg;
 +
-+void machine_power_off(void)
-+{
-+	machine_shutdown();
-+	if (pm_power_off)
-+		pm_power_off();
-+}
++#if CONFIG_SWIOTLB
++	extern void __init arm64_swiotlb_init(size_t max_size);
++	arm64_swiotlb_init(max_pfn << (PAGE_SHIFT - 1));
++#endif
 +
-+void machine_restart(char *cmd)
-+{
-+	machine_shutdown();
++	max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
 +
-+	/* Disable interrupts first */
-+	local_irq_disable();
-+	local_fiq_disable();
++#ifndef CONFIG_SPARSEMEM_VMEMMAP
++	/* this will put all unused low memory onto the freelists */
++	free_unused_memmap();
++#endif
 +
-+	/* Now call the architecture specific reboot code. */
-+	if (pm_restart)
-+		pm_restart(cmd);
++	totalram_pages += free_all_bootmem();
++
++	reserved_pages = free_pages = 0;
++
++	for_each_memblock(memory, reg) {
++		unsigned int pfn1, pfn2;
++		struct page *page, *end;
++
++		pfn1 = __phys_to_pfn(reg->base);
++		pfn2 = pfn1 + __phys_to_pfn(reg->size);
++
++		page = pfn_to_page(pfn1);
++		end  = pfn_to_page(pfn2 - 1) + 1;
++
++		do {
++			if (PageReserved(page))
++				reserved_pages++;
++			else if (!page_count(page))
++				free_pages++;
++			page++;
++		} while (page < end);
++	}
 +
 +	/*
-+	 * Whoops - the architecture was unable to reboot.
-+	 * Tell the user!
++	 * Since our memory may not be contiguous, calculate the real number
++	 * of pages we have in this system.
 +	 */
-+	mdelay(1000);
-+	printk("Reboot failed -- System halted\n");
-+	while (1);
-+}
-+
-+void __show_regs(struct pt_regs *regs)
-+{
-+	int i;
-+
-+	printk("CPU: %d    %s  (%s %.*s)\n",
-+		raw_smp_processor_id(), print_tainted(),
-+		init_utsname()->release,
-+		(int)strcspn(init_utsname()->version, " "),
-+		init_utsname()->version);
-+	print_symbol("PC is at %s\n", instruction_pointer(regs));
-+	print_symbol("LR is at %s\n", regs->regs[30]);
-+	printk("pc : [<%016llx>] lr : [<%016llx>] pstate: %08llx\n",
-+	       regs->pc, regs->regs[30], regs->pstate);
-+	printk("sp : %016llx\n", regs->sp);
-+	for (i = 29; i >= 0; i--) {
-+		printk("x%-2d: %016llx ", i, regs->regs[i]);
-+		if (i % 2 == 0)
-+			printk("\n");
++	pr_info("Memory:");
++	num_physpages = 0;
++	for_each_memblock(memory, reg) {
++		unsigned long pages = memblock_region_memory_end_pfn(reg) -
++			memblock_region_memory_base_pfn(reg);
++		num_physpages += pages;
++		printk(" %ldMB", pages >> (20 - PAGE_SHIFT));
 +	}
-+	printk("\n");
-+}
++	printk(" = %luMB total\n", num_physpages >> (20 - PAGE_SHIFT));
 +
-+void show_regs(struct pt_regs * regs)
-+{
-+	printk("\n");
-+	printk("Pid: %d, comm: %20s\n", task_pid_nr(current), current->comm);
-+	__show_regs(regs);
-+}
++	pr_notice("Memory: %luk/%luk available, %luk reserved\n",
++		  nr_free_pages() << (PAGE_SHIFT-10),
++		  free_pages << (PAGE_SHIFT-10),
++		  reserved_pages << (PAGE_SHIFT-10));
 +
-+/*
-+ * Free current thread data structures etc..
-+ */
-+void exit_thread(void)
-+{
-+}
++#define MLK(b, t) b, t, ((t) - (b)) >> 10
++#define MLM(b, t) b, t, ((t) - (b)) >> 20
++#define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
 +
-+void flush_thread(void)
-+{
-+	fpsimd_flush_thread();
-+	flush_ptrace_hw_breakpoint(current);
-+}
++	pr_notice("Virtual kernel memory layout:\n"
++		  "    vmalloc : 0x%16lx - 0x%16lx   (%6ld MB)\n"
++#ifdef CONFIG_SPARSEMEM_VMEMMAP
++		  "    vmemmap : 0x%16lx - 0x%16lx   (%6ld MB)\n"
++#endif
++		  "    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n"
++		  "    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n"
++		  "      .init : 0x%p" " - 0x%p" "   (%6ld kB)\n"
++		  "      .text : 0x%p" " - 0x%p" "   (%6ld kB)\n"
++		  "      .data : 0x%p" " - 0x%p" "   (%6ld kB)\n",
++		  MLM(VMALLOC_START, VMALLOC_END),
++#ifdef CONFIG_SPARSEMEM_VMEMMAP
++		  MLM((unsigned long)virt_to_page(PAGE_OFFSET),
++		      (unsigned long)virt_to_page(high_memory)),
++#endif
++		  MLM(MODULES_VADDR, MODULES_END),
++		  MLM(PAGE_OFFSET, (unsigned long)high_memory),
 +
-+void release_thread(struct task_struct *dead_task)
-+{
-+}
++		  MLK_ROUNDUP(__init_begin, __init_end),
++		  MLK_ROUNDUP(_text, _etext),
++		  MLK_ROUNDUP(_sdata, _edata));
 +
-+int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
-+{
-+	fpsimd_save_state(&current->thread.fpsimd_state);
-+	*dst = *src;
-+	return 0;
-+}
++#undef MLK
++#undef MLM
++#undef MLK_ROUNDUP
 +
-+asmlinkage void ret_from_fork(void) asm("ret_from_fork");
++	/*
++	 * Check boundaries twice: Some fundamental inconsistencies can be
++	 * detected at build time already.
++	 */
++#ifdef CONFIG_COMPAT
++	BUILD_BUG_ON(TASK_SIZE_32			> TASK_SIZE_64);
++#endif
++	BUILD_BUG_ON(TASK_SIZE_64			> MODULES_VADDR);
++	BUG_ON(TASK_SIZE_64				> MODULES_VADDR);
 +
-+int copy_thread(unsigned long clone_flags, unsigned long stack_start,
-+		unsigned long stk_sz, struct task_struct *p,
-+		struct pt_regs *regs)
-+{
-+	struct pt_regs *childregs = task_pt_regs(p);
-+	unsigned long tls = p->thread.tp_value;
-+
-+	*childregs = *regs;
-+	childregs->regs[0] = 0;
-+
-+	if (is_compat_thread(task_thread_info(p)))
-+		childregs->compat_sp = stack_start;
-+	else {
++	if (PAGE_SIZE >= 16384 && num_physpages <= 128) {
++		extern int sysctl_overcommit_memory;
 +		/*
-+		 * Read the current TLS pointer from tpidr_el0 as it may be
-+		 * out-of-sync with the saved value.
++		 * On a machine this small we won't get anywhere without
++		 * overcommit, so turn it on by default.
 +		 */
-+		asm("mrs %0, tpidr_el0" : "=r" (tls));
-+		childregs->sp = stack_start;
++		sysctl_overcommit_memory = OVERCOMMIT_ALWAYS;
 +	}
-+
-+	memset(&p->thread.cpu_context, 0, sizeof(struct cpu_context));
-+	p->thread.cpu_context.sp = (unsigned long)childregs;
-+	p->thread.cpu_context.pc = (unsigned long)ret_from_fork;
-+
-+	/* If a TLS pointer was passed to clone, use that for the new thread. */
-+	if (clone_flags & CLONE_SETTLS)
-+		tls = regs->regs[3];
-+	p->thread.tp_value = tls;
-+
-+	ptrace_hw_copy_thread(p);
-+
-+	return 0;
 +}
 +
-+static void tls_thread_switch(struct task_struct *next)
++void free_initmem(void)
 +{
-+	unsigned long tpidr, tpidrro;
-+
-+	if (!is_compat_task()) {
-+		asm("mrs %0, tpidr_el0" : "=r" (tpidr));
-+		current->thread.tp_value = tpidr;
-+	}
-+
-+	if (is_compat_thread(task_thread_info(next))) {
-+		tpidr = 0;
-+		tpidrro = next->thread.tp_value;
-+	} else {
-+		tpidr = next->thread.tp_value;
-+		tpidrro = 0;
-+	}
-+
-+	asm(
-+	"	msr	tpidr_el0, %0\n"
-+	"	msr	tpidrro_el0, %1"
-+	: : "r" (tpidr), "r" (tpidrro));
++	poison_init_mem(__init_begin, __init_end - __init_begin);
++	totalram_pages += free_area(__phys_to_pfn(__pa(__init_begin)),
++				    __phys_to_pfn(__pa(__init_end)),
++				    "init");
 +}
 +
-+/*
-+ * Thread switching.
-+ */
-+struct task_struct *__switch_to(struct task_struct *prev,
-+				struct task_struct *next)
++#ifdef CONFIG_BLK_DEV_INITRD
++
++static int keep_initrd;
++
++void free_initrd_mem(unsigned long start, unsigned long end)
 +{
-+	struct task_struct *last;
-+
-+	fpsimd_thread_switch(next);
-+	tls_thread_switch(next);
-+	hw_breakpoint_thread_switch(next);
-+
-+	/* the actual thread switch */
-+	last = cpu_switch_to(prev, next);
-+
-+	return last;
++	if (!keep_initrd) {
++		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
++		totalram_pages += free_area(__phys_to_pfn(__pa(start)),
++					    __phys_to_pfn(__pa(end)),
++					    "initrd");
++	}
 +}
 +
-+/*
-+ * Fill in the task's elfregs structure for a core dump.
-+ */
-+int dump_task_regs(struct task_struct *t, elf_gregset_t *elfregs)
++static int __init keepinitrd_setup(char *__unused)
 +{
-+	elf_core_copy_regs(elfregs, task_pt_regs(t));
++	keep_initrd = 1;
 +	return 1;
 +}
 +
-+/*
-+ * fill in the fpe structure for a core dump...
-+ */
-+int dump_fpu (struct pt_regs *regs, struct user_fp *fp)
-+{
-+	return 0;
-+}
-+EXPORT_SYMBOL(dump_fpu);
-+
-+/*
-+ * Shuffle the argument into the correct register before calling the
-+ * thread function.  x1 is the thread argument, x2 is the pointer to
-+ * the thread function, and x3 points to the exit function.
-+ */
-+extern void kernel_thread_helper(void);
-+asm(	".section .text\n"
-+"	.align\n"
-+"	.type	kernel_thread_helper, #function\n"
-+"kernel_thread_helper:\n"
-+"	mov	x0, x1\n"
-+"	mov	x30, x3\n"
-+"	br	x2\n"
-+"	.size	kernel_thread_helper, . - kernel_thread_helper\n"
-+"	.previous");
-+
-+#define kernel_thread_exit	do_exit
-+
-+/*
-+ * Create a kernel thread.
-+ */
-+pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
-+{
-+	struct pt_regs regs;
-+
-+	memset(&regs, 0, sizeof(regs));
-+
-+	regs.regs[1] = (unsigned long)arg;
-+	regs.regs[2] = (unsigned long)fn;
-+	regs.regs[3] = (unsigned long)kernel_thread_exit;
-+	regs.pc = (unsigned long)kernel_thread_helper;
-+	regs.pstate = PSR_MODE_EL1h;
-+
-+	return do_fork(flags|CLONE_VM|CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
-+}
-+EXPORT_SYMBOL(kernel_thread);
-+
-+unsigned long get_wchan(struct task_struct *p)
-+{
-+	struct stackframe frame;
-+	int count = 0;
-+	if (!p || p == current || p->state == TASK_RUNNING)
-+		return 0;
-+
-+	frame.fp = thread_saved_fp(p);
-+	frame.sp = thread_saved_sp(p);
-+	frame.pc = thread_saved_pc(p);
-+	do {
-+		int ret = unwind_frame(&frame);
-+		if (ret < 0)
-+			return 0;
-+		if (!in_sched_functions(frame.pc))
-+			return frame.pc;
-+	} while (count ++ < 16);
-+	return 0;
-+}
-+
-+unsigned long arch_align_stack(unsigned long sp)
-+{
-+	if (!(current->personality & ADDR_NO_RANDOMIZE) && randomize_va_space)
-+		sp -= get_random_int() & ~PAGE_MASK;
-+	return sp & ~0xf;
-+}
-+
-+static unsigned long randomize_base(unsigned long base)
-+{
-+	unsigned long range_end = base + (STACK_RND_MASK << PAGE_SHIFT) + 1;
-+	return randomize_range(base, range_end, 0) ? : base;
-+}
-+
-+unsigned long arch_randomize_brk(struct mm_struct *mm)
-+{
-+	return randomize_base(mm->brk);
-+}
-+
-+unsigned long randomize_et_dyn(unsigned long base)
-+{
-+	return randomize_base(base);
-+}
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
++__setup("keepinitrd", keepinitrd_setup);
++#endif
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
 new file mode 100644
-index 0000000..baa758d
+index 0000000..d2dd438
 --- /dev/null
-+++ b/arch/arm64/mm/context.c
-@@ -0,0 +1,159 @@
++++ b/arch/arm64/mm/mmu.c
+@@ -0,0 +1,395 @@
 +/*
-+ * Based on arch/arm/mm/context.c
++ * Based on arch/arm/mm/mmu.c
 + *
-+ * Copyright (C) 2002-2003 Deep Blue Solutions Ltd, all rights reserved.
++ * Copyright (C) 1995-2005 Russell King
 + * Copyright (C) 2012 ARM Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -761,143 +502,379 @@ index 0000000..baa758d
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
++#include <linux/export.h>
++#include <linux/kernel.h>
++#include <linux/errno.h>
 +#include <linux/init.h>
-+#include <linux/sched.h>
-+#include <linux/mm.h>
-+#include <linux/smp.h>
-+#include <linux/percpu.h>
++#include <linux/mman.h>
++#include <linux/nodemask.h>
++#include <linux/memblock.h>
++#include <linux/fs.h>
 +
++#include <asm/cputype.h>
++#include <asm/sections.h>
++#include <asm/setup.h>
++#include <asm/sizes.h>
++#include <asm/tlb.h>
 +#include <asm/mmu_context.h>
-+#include <asm/tlbflush.h>
-+#include <asm/cachetype.h>
 +
-+#define asid_bits(reg) \
-+	(((read_cpuid(ID_AA64MMFR0_EL1) & 0xf0) >> 2) + 8)
-+
-+#define ASID_FIRST_VERSION	(1 << MAX_ASID_BITS)
-+
-+static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
-+unsigned int cpu_last_asid = ASID_FIRST_VERSION;
++#include "mm.h"
 +
 +/*
-+ * We fork()ed a process, and we need a new context for the child to run in.
++ * Empty_zero_page is a special page that is used for zero-initialized data
++ * and COW.
 + */
-+void __init_new_context(struct task_struct *tsk, struct mm_struct *mm)
-+{
-+	mm->context.id = 0;
-+	raw_spin_lock_init(&mm->context.id_lock);
-+}
++struct page *empty_zero_page;
++EXPORT_SYMBOL(empty_zero_page);
 +
-+static void flush_context(void)
++pgprot_t pgprot_default;
++EXPORT_SYMBOL(pgprot_default);
++
++static pmdval_t prot_sect_kernel;
++
++struct cachepolicy {
++	const char	policy[16];
++	u64		mair;
++	u64		tcr;
++};
++
++static struct cachepolicy cache_policies[] __initdata = {
++	{
++		.policy		= "uncached",
++		.mair		= 0x44,			/* inner, outer non-cacheable */
++		.tcr		= TCR_IRGN_NC | TCR_ORGN_NC,
++	}, {
++		.policy		= "writethrough",
++		.mair		= 0xaa,			/* inner, outer write-through, read-allocate */
++		.tcr		= TCR_IRGN_WT | TCR_ORGN_WT,
++	}, {
++		.policy		= "writeback",
++		.mair		= 0xee,			/* inner, outer write-back, read-allocate */
++		.tcr		= TCR_IRGN_WBnWA | TCR_ORGN_WBnWA,
++	}
++};
++
++/*
++ * These are useful for identifying cache coherency problems by allowing the
++ * cache or the cache and writebuffer to be turned off. It changes the Normal
++ * memory caching attributes in the MAIR_EL1 register.
++ */
++static int __init early_cachepolicy(char *p)
 +{
-+	/* set the reserved TTBR0 before flushing the TLB */
-+	cpu_set_reserved_ttbr0();
-+	flush_tlb_all();
-+	if (icache_is_aivivt())
-+		__flush_icache_all();
++	int i;
++	u64 tmp;
++
++	for (i = 0; i < ARRAY_SIZE(cache_policies); i++) {
++		int len = strlen(cache_policies[i].policy);
++
++		if (memcmp(p, cache_policies[i].policy, len) == 0)
++			break;
++	}
++	if (i == ARRAY_SIZE(cache_policies)) {
++		pr_err("ERROR: unknown or unsupported cache policy: %s\n", p);
++		return 0;
++	}
++
++	flush_cache_all();
++
++	/*
++	 * Modify MT_NORMAL attributes in MAIR_EL1.
++	 */
++	asm volatile(
++	"	mrs	%0, mair_el1\n"
++	"	bfi	%0, %1, #%2, #8\n"
++	"	msr	mair_el1, %0\n"
++	"	isb\n"
++	: "=&r" (tmp)
++	: "r" (cache_policies[i].mair), "i" (MT_NORMAL * 8));
++
++	/*
++	 * Modify TCR PTW cacheability attributes.
++	 */
++	asm volatile(
++	"	mrs	%0, tcr_el1\n"
++	"	bic	%0, %0, %2\n"
++	"	orr	%0, %0, %1\n"
++	"	msr	tcr_el1, %0\n"
++	"	isb\n"
++	: "=&r" (tmp)
++	: "r" (cache_policies[i].tcr), "r" (TCR_IRGN_MASK | TCR_ORGN_MASK));
++
++	flush_cache_all();
++
++	return 0;
 +}
++early_param("cachepolicy", early_cachepolicy);
++
++/*
++ * Adjust the PMD section entries according to the CPU in use.
++ */
++static void __init init_mem_pgprot(void)
++{
++	pteval_t default_pgprot;
++	int i;
++
++	default_pgprot = PTE_ATTRINDX(MT_NORMAL);
++	prot_sect_kernel = PMD_TYPE_SECT | PMD_SECT_AF | PMD_ATTRINDX(MT_NORMAL);
 +
 +#ifdef CONFIG_SMP
-+
-+static void set_mm_context(struct mm_struct *mm, unsigned int asid)
-+{
-+	unsigned long flags;
-+
 +	/*
-+	 * Locking needed for multi-threaded applications where the same
-+	 * mm->context.id could be set from different CPUs during the
-+	 * broadcast. This function is also called via IPI so the
-+	 * mm->context.id_lock has to be IRQ-safe.
++	 * Mark memory with the "shared" attribute for SMP systems
 +	 */
-+	raw_spin_lock_irqsave(&mm->context.id_lock, flags);
-+	if (likely((mm->context.id ^ cpu_last_asid) >> MAX_ASID_BITS)) {
-+		/*
-+		 * Old version of ASID found. Set the new one and reset
-+		 * mm_cpumask(mm).
-+		 */
-+		mm->context.id = asid;
-+		cpumask_clear(mm_cpumask(mm));
-+	}
-+	raw_spin_unlock_irqrestore(&mm->context.id_lock, flags);
-+
-+	/*
-+	 * Set the mm_cpumask(mm) bit for the current CPU.
-+	 */
-+	cpumask_set_cpu(smp_processor_id(), mm_cpumask(mm));
-+}
-+
-+/*
-+ * Reset the ASID on the current CPU. This function call is broadcast from the
-+ * CPU handling the ASID rollover and holding cpu_asid_lock.
-+ */
-+static void reset_context(void *info)
-+{
-+	unsigned int asid;
-+	unsigned int cpu = smp_processor_id();
-+	struct mm_struct *mm = current->active_mm;
-+
-+	smp_rmb();
-+	asid = cpu_last_asid + cpu;
-+
-+	flush_context();
-+	set_mm_context(mm, asid);
-+
-+	/* set the new ASID */
-+	cpu_switch_mm(mm->pgd, mm);
-+}
-+
-+#else
-+
-+static inline void set_mm_context(struct mm_struct *mm, unsigned int asid)
-+{
-+	mm->context.id = asid;
-+	cpumask_copy(mm_cpumask(mm), cpumask_of(smp_processor_id()));
-+}
-+
++	default_pgprot |= PTE_SHARED;
++	prot_sect_kernel |= PMD_SECT_S;
 +#endif
 +
-+void __new_context(struct mm_struct *mm)
-+{
-+	unsigned int asid;
-+	unsigned int bits = asid_bits();
++	for (i = 0; i < 16; i++) {
++		unsigned long v = pgprot_val(protection_map[i]);
++		protection_map[i] = __pgprot(v | default_pgprot);
++	}
 +
-+	raw_spin_lock(&cpu_asid_lock);
-+#ifdef CONFIG_SMP
++	pgprot_default = __pgprot(PTE_TYPE_PAGE | PTE_AF | default_pgprot);
++}
++
++pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
++			      unsigned long size, pgprot_t vma_prot)
++{
++	if (!pfn_valid(pfn))
++		return pgprot_noncached(vma_prot);
++	else if (file->f_flags & O_SYNC)
++		return pgprot_writecombine(vma_prot);
++	return vma_prot;
++}
++EXPORT_SYMBOL(phys_mem_access_prot);
++
++static void __init *early_alloc(unsigned long sz)
++{
++	void *ptr = __va(memblock_alloc(sz, sz));
++	memset(ptr, 0, sz);
++	return ptr;
++}
++
++static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
++				  unsigned long end, unsigned long pfn)
++{
++	pte_t *pte;
++
++	if (pmd_none(*pmd)) {
++		pte = early_alloc(PTRS_PER_PTE * sizeof(pte_t));
++		__pmd_populate(pmd, __pa(pte), PMD_TYPE_TABLE);
++	}
++	BUG_ON(pmd_bad(*pmd));
++
++	pte = pte_offset_kernel(pmd, addr);
++	do {
++		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
++		pfn++;
++	} while (pte++, addr += PAGE_SIZE, addr != end);
++}
++
++static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
++				  unsigned long end, phys_addr_t phys)
++{
++	pmd_t *pmd;
++	unsigned long next;
++
 +	/*
-+	 * Check the ASID again, in case the change was broadcast from another
-+	 * CPU before we acquired the lock.
++	 * Check for initial section mappings in the pgd/pud and remove them.
 +	 */
-+	if (!unlikely((mm->context.id ^ cpu_last_asid) >> MAX_ASID_BITS)) {
-+		cpumask_set_cpu(smp_processor_id(), mm_cpumask(mm));
-+		raw_spin_unlock(&cpu_asid_lock);
++	if (pud_none(*pud) || pud_bad(*pud)) {
++		pmd = early_alloc(PTRS_PER_PMD * sizeof(pmd_t));
++		pud_populate(&init_mm, pud, pmd);
++	}
++
++	pmd = pmd_offset(pud, addr);
++	do {
++		next = pmd_addr_end(addr, end);
++		/* try section mapping first */
++		if (((addr | next | phys) & ~SECTION_MASK) == 0)
++			set_pmd(pmd, __pmd(phys | prot_sect_kernel));
++		else
++			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys));
++		phys += next - addr;
++	} while (pmd++, addr = next, addr != end);
++}
++
++static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
++				  unsigned long end, unsigned long phys)
++{
++	pud_t *pud = pud_offset(pgd, addr);
++	unsigned long next;
++
++	do {
++		next = pud_addr_end(addr, end);
++		alloc_init_pmd(pud, addr, next, phys);
++		phys += next - addr;
++	} while (pud++, addr = next, addr != end);
++}
++
++/*
++ * Create the page directory entries and any necessary page tables for the
++ * mapping specified by 'md'.
++ */
++static void __init create_mapping(phys_addr_t phys, unsigned long virt,
++				  phys_addr_t size)
++{
++	unsigned long addr, length, end, next;
++	pgd_t *pgd;
++
++	if (virt < VMALLOC_START) {
++		pr_warning("BUG: not creating mapping for 0x%016llx@0x%016lx - outside kernel range\n",
++			   phys, virt);
 +		return;
 +	}
-+#endif
-+	/*
-+	 * At this point, it is guaranteed that the current mm (with an old
-+	 * ASID) isn't active on any other CPU since the ASIDs are changed
-+	 * simultaneously via IPI.
-+	 */
-+	asid = ++cpu_last_asid;
 +
-+	/*
-+	 * If we've used up all our ASIDs, we need to start a new version and
-+	 * flush the TLB.
-+	 */
-+	if (unlikely((asid & ((1 << bits) - 1)) == 0)) {
-+		/* increment the ASID version */
-+		cpu_last_asid += (1 << MAX_ASID_BITS) - (1 << bits);
-+		if (cpu_last_asid == 0)
-+			cpu_last_asid = ASID_FIRST_VERSION;
-+		asid = cpu_last_asid + smp_processor_id();
-+		flush_context();
-+#ifdef CONFIG_SMP
-+		smp_wmb();
-+		smp_call_function(reset_context, NULL, 1);
-+#endif
-+		cpu_last_asid += NR_CPUS - 1;
-+	}
++	addr = virt & PAGE_MASK;
++	length = PAGE_ALIGN(size + (virt & ~PAGE_MASK));
 +
-+	set_mm_context(mm, asid);
-+	raw_spin_unlock(&cpu_asid_lock);
++	pgd = pgd_offset_k(addr);
++	end = addr + length;
++	do {
++		next = pgd_addr_end(addr, end);
++		alloc_init_pud(pgd, addr, next, phys);
++		phys += next - addr;
++	} while (pgd++, addr = next, addr != end);
 +}
++
++static void __init map_mem(void)
++{
++	struct memblock_region *reg;
++
++	/* map all the memory banks */
++	for_each_memblock(memory, reg) {
++		phys_addr_t start = reg->base;
++		phys_addr_t end = start + reg->size;
++
++		if (start >= end)
++			break;
++
++		create_mapping(start, __phys_to_virt(start), end - start);
++	}
++}
++
++/*
++ * paging_init() sets up the page tables, initialises the zone memory
++ * maps and sets up the zero page.
++ */
++void __init paging_init(void)
++{
++	void *zero_page;
++
++	/*
++	 * Maximum PGDIR_SIZE addressable via the initial direct kernel
++	 * mapping in swapper_pg_dir.
++	 */
++	memblock_set_current_limit((PHYS_OFFSET & PGDIR_MASK) + PGDIR_SIZE);
++
++	init_mem_pgprot();
++	map_mem();
++
++	/*
++	 * Finally flush the caches and tlb to ensure that we're in a
++	 * consistent state.
++	 */
++	flush_cache_all();
++	flush_tlb_all();
++
++	/* allocate the zero page. */
++	zero_page = early_alloc(PAGE_SIZE);
++
++	bootmem_init();
++
++	empty_zero_page = virt_to_page(zero_page);
++	__flush_dcache_page(NULL, empty_zero_page);
++
++	/*
++	 * TTBR0 is only used for the identity mapping at this stage. Make it
++	 * point to zero page to avoid speculatively fetching new entries.
++	 */
++	cpu_set_reserved_ttbr0();
++	flush_tlb_all();
++}
++
++/*
++ * Enable the identity mapping to allow the MMU disabling.
++ */
++void setup_mm_for_reboot(void)
++{
++	cpu_switch_mm(idmap_pg_dir, &init_mm);
++	flush_tlb_all();
++}
++
++/*
++ * Check whether a kernel address is valid (derived from arch/x86/).
++ */
++int kern_addr_valid(unsigned long addr)
++{
++	pgd_t *pgd;
++	pud_t *pud;
++	pmd_t *pmd;
++	pte_t *pte;
++
++	if ((((long)addr) >> VA_BITS) != -1UL)
++		return 0;
++
++	pgd = pgd_offset_k(addr);
++	if (pgd_none(*pgd))
++		return 0;
++
++	pud = pud_offset(pgd, addr);
++	if (pud_none(*pud))
++		return 0;
++
++	pmd = pmd_offset(pud, addr);
++	if (pmd_none(*pmd))
++		return 0;
++
++	pte = pte_offset_kernel(pmd, addr);
++	if (pte_none(*pte))
++		return 0;
++
++	return pfn_valid(pte_pfn(*pte));
++}
++#ifdef CONFIG_SPARSEMEM_VMEMMAP
++#ifdef CONFIG_ARM64_64K_PAGES
++int __meminit vmemmap_populate(struct page *start_page,
++			       unsigned long size, int node)
++{
++	return vmemmap_populate_basepages(start_page, size, node);
++}
++#else	/* !CONFIG_ARM64_64K_PAGES */
++int __meminit vmemmap_populate(struct page *start_page,
++			       unsigned long size, int node)
++{
++	unsigned long addr = (unsigned long)start_page;
++	unsigned long end = (unsigned long)(start_page + size);
++	unsigned long next;
++	pgd_t *pgd;
++	pud_t *pud;
++	pmd_t *pmd;
++
++	do {
++		next = pmd_addr_end(addr, end);
++
++		pgd = vmemmap_pgd_populate(addr, node);
++		if (!pgd)
++			return -ENOMEM;
++
++		pud = vmemmap_pud_populate(pgd, addr, node);
++		if (!pud)
++			return -ENOMEM;
++
++		pmd = pmd_offset(pud, addr);
++		if (pmd_none(*pmd)) {
++			void *p = NULL;
++
++			p = vmemmap_alloc_block_buf(PMD_SIZE, node);
++			if (!p)
++				return -ENOMEM;
++
++			set_pmd(pmd, __pmd(__pa(p) | prot_sect_kernel));
++		} else
++			vmemmap_verify((pte_t *)pmd, node, addr, next);
++	} while (addr = next, addr != end);
++
++	return 0;
++}
++#endif	/* CONFIG_ARM64_64K_PAGES */
++#endif	/* CONFIG_SPARSEMEM_VMEMMAP */
