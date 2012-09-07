@@ -1,49 +1,34 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 7 Sep 2012 20:40:53 +0800
-Subject: [PATCH] ARM: smp_twd: reprogram twd based on clk notifier
-In-Reply-To: <CAPDyKFoV5d2pdxVj=9ERubs7_3g1zVJQ08Uo8JXD7yogp0wHgA@mail.gmail.com>
-References: <1347005967-7604-1-git-send-email-shawn.guo@linaro.org>
- <CAPDyKFoV5d2pdxVj=9ERubs7_3g1zVJQ08Uo8JXD7yogp0wHgA@mail.gmail.com>
-Message-ID: <20120907124050.GN26709@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 7 Sep 2012 12:41:16 +0000
+Subject: [PATCH 00/19] First HREF Device Tree enablement patch-set
+In-Reply-To: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <201209071241.17198.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 01:59:40PM +0200, Ulf Hansson wrote:
-> Hi Shawn and Mike,
+On Friday 07 September 2012, Lee Jones wrote:
+> Based on v3.6-rc4
 > 
-> In general I am in favor of this patch, but I also see some
-> corresponding problems to resolve. Please correct me if I am wrong.
-> 
-> I suppose most machines is relying on that it enough to only take care
-> of the notification by using "cpufreq_notify_transition" from their
-> cpufreq drivers. Thus those have to make sure the updates for smp_twd
-> clock is supported from within the cpufreq driver I suppose.
-> 
-> In other words the cpufreq drivers needs to do clk_get of "smp_twd"
-> clock and then do a set_rate on it when it's has changed, to trigger a
-> rate change notification. Is this what you also have in mind or do you
-> have any other idea of how this should work?
-> 
-Here is how it works on imx6q.
+> This patch consists of Device Tree related enablement for
+> ST-Ericsson's development HREF hardware reference board.
+> Most devices are very similar, if not the same to the
+> previously enabled Snowball low-cost development board.
+> These are referenced from the relevant .dtsi file and
+> merely enabled in the HREF specific Device Tree. There 
+> are also one or two minor Device Tree related fixes which
+> were stumbled upon along the way.
 
-1) There are clks arm and twd defined in imx6q clock tree.  And twd
-   is registered to clock framework as one child of arm clk with a fixed
-   divider 2.
+The patches basically look good to me (except patch 15, see
+comment there), but they are not ordered in a way that allows
+bisection. I can see two ways to do this better:
 
-	/*                                    name         parent_name     mult div */
-	clk[twd]       = imx_clk_fixed_factor("twd",       "arm",            1, 2);
+a) first do all the code changes, one by one, then add the
+fully populated device tree in the last patch.
 
-2) Register lookup "cpu0" and "smp_twd" for cpufreq and smp_twd drivers
-   respectively.
+b) as commented on patch 5, atomically change over each
+device in both the DT source and the board code.
+Also do the driver changes (i2c, tc3589x) before changing
+them in the device tree.
 
-	clk_register_clkdev(clk[twd], NULL, "smp_twd");
-	clk_register_clkdev(clk[arm], NULL, "cpu0");
-
-That's it.  The clock framework will just handle all the work nicely.
-When cpufreq driver scales arm clk, the framework will propagate the
-rate change to twd clk automatically.  And once twd clk rate changes,
-smp_twd will get the notification.
-
--- 
-Regards,
-Shawn
+	Arnd
