@@ -1,125 +1,115 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  7 Sep 2012 12:14:57 +0100
-Subject: [PATCH 17/19] mfd: Enable the tc3589x for Device Tree
+Date: Fri,  7 Sep 2012 12:14:59 +0100
+Subject: [PATCH 19/19] gpio: Enable the tc3298x GPIO expander driver for
+ Device Tree
 In-Reply-To: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
 References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1347016499-29354-18-git-send-email-lee.jones@linaro.org>
+Message-ID: <1347016499-29354-20-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Here we provide a means to probe and extract vital information
 from Device Tree when booting with it enabled. Without this
-patch sub-devices wouldn't be able to reference the tc3589x
-from Device Tree.
+patch sub-devices wouldn't be able to reference the tc3589x-gpio
+expander from Device Tree.
 
-CC: Samuel Ortiz <sameo@linux.intel.com>
+CC: Grant Likely <grant.likely@secretlab.ca>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/tc3589x.c |   43 ++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 40 insertions(+), 3 deletions(-)
+ drivers/gpio/gpio-tc3589x.c |   26 +++++++++++++++++---------
+ 1 file changed, 17 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/mfd/tc3589x.c b/drivers/mfd/tc3589x.c
-index 2df44ac..8f4c853 100644
---- a/drivers/mfd/tc3589x.c
-+++ b/drivers/mfd/tc3589x.c
-@@ -12,6 +12,7 @@
- #include <linux/irqdomain.h>
+diff --git a/drivers/gpio/gpio-tc3589x.c b/drivers/gpio/gpio-tc3589x.c
+index 6e89009..1e48317 100644
+--- a/drivers/gpio/gpio-tc3589x.c
++++ b/drivers/gpio/gpio-tc3589x.c
+@@ -11,6 +11,7 @@
+ #include <linux/platform_device.h>
  #include <linux/slab.h>
- #include <linux/i2c.h>
+ #include <linux/gpio.h>
 +#include <linux/of.h>
- #include <linux/mfd/core.h>
- #include <linux/mfd/tc3589x.h>
- 
-@@ -146,6 +147,7 @@ static struct mfd_cell tc3589x_dev_gpio[] = {
- 		.name		= "tc3589x-gpio",
- 		.num_resources	= ARRAY_SIZE(gpio_resources),
- 		.resources	= &gpio_resources[0],
-+		.of_compatible	= "tc3589x-gpio",
- 	},
- };
- 
-@@ -154,6 +156,7 @@ static struct mfd_cell tc3589x_dev_keypad[] = {
- 		.name           = "tc3589x-keypad",
- 		.num_resources  = ARRAY_SIZE(keypad_resources),
- 		.resources      = &keypad_resources[0],
-+		.of_compatible	= "tc3589x-keypad",
- 	},
- };
- 
-@@ -221,7 +224,7 @@ static struct irq_domain_ops tc3589x_irq_ops = {
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
+ #include <linux/interrupt.h>
+@@ -286,7 +287,8 @@ static struct irq_domain_ops tc3589x_irq_ops = {
          .xlate  = irq_domain_xlate_twocell,
  };
  
--static int tc3589x_irq_init(struct tc3589x *tc3589x)
-+static int tc3589x_irq_init(struct tc3589x *tc3589x, struct device_node *np)
+-static int tc3589x_gpio_irq_init(struct tc3589x_gpio *tc3589x_gpio)
++static int tc3589x_gpio_irq_init(struct tc3589x_gpio *tc3589x_gpio,
++				struct device_node *np)
  {
- 	int base = tc3589x->irq_base;
+ 	int base = tc3589x_gpio->irq_base;
  
-@@ -232,7 +235,7 @@ static int tc3589x_irq_init(struct tc3589x *tc3589x)
+@@ -297,7 +299,7 @@ static int tc3589x_gpio_irq_init(struct tc3589x_gpio *tc3589x_gpio)
  	}
  	else {
- 		tc3589x->domain = irq_domain_add_linear(
--			NULL, TC3589x_NR_INTERNAL_IRQS,
-+			np, TC3589x_NR_INTERNAL_IRQS,
- 			&tc3589x_irq_ops, tc3589x);
+ 		tc3589x_gpio->domain = irq_domain_add_linear(
+-			NULL, tc3589x_gpio->chip.ngpio,
++			np, tc3589x_gpio->chip.ngpio,
+ 			&tc3589x_irq_ops, tc3589x_gpio);
  	}
  
-@@ -309,13 +312,47 @@ static int __devinit tc3589x_device_init(struct tc3589x *tc3589x)
- 	return ret;
- }
- 
-+static int tc3589x_of_probe(struct device_node *np,
-+			struct tc3589x_platform_data *pdata)
-+{
-+	struct device_node *child;
-+
-+	for_each_child_of_node(np, child) {
-+		if (!strcmp(child->name, "tc3589x_gpio")) {
-+			pdata->block |= TC3589x_BLOCK_GPIO;
-+		}
-+		if (!strcmp(child->name, "tc3589x_keypad")) {
-+			pdata->block |= TC3589x_BLOCK_KEYPAD;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
- static int __devinit tc3589x_probe(struct i2c_client *i2c,
- 				   const struct i2c_device_id *id)
+@@ -313,13 +315,17 @@ static int __devinit tc3589x_gpio_probe(struct platform_device *pdev)
  {
- 	struct tc3589x_platform_data *pdata = i2c->dev.platform_data;
-+	struct device_node *np = i2c->dev.of_node;
- 	struct tc3589x *tc3589x;
+ 	struct tc3589x *tc3589x = dev_get_drvdata(pdev->dev.parent);
+ 	struct tc3589x_gpio_platform_data *pdata;
++	struct device_node *np = pdev->dev.of_node;
+ 	struct tc3589x_gpio *tc3589x_gpio;
+ 	int ret;
+ 	int irq;
+ 
+ 	pdata = tc3589x->pdata->gpio;
+-	if (!pdata)
+-		return -ENODEV;
++
++	if (!(pdata || np)) {
++		dev_err(&pdev->dev, "No platform data or Device Tree found\n");
++		return -EINVAL;
++	}
+ 
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0)
+@@ -337,9 +343,11 @@ static int __devinit tc3589x_gpio_probe(struct platform_device *pdev)
+ 	tc3589x_gpio->chip = template_chip;
+ 	tc3589x_gpio->chip.ngpio = tc3589x->num_gpio;
+ 	tc3589x_gpio->chip.dev = &pdev->dev;
+-	tc3589x_gpio->chip.base = pdata->gpio_base;
++	tc3589x_gpio->chip.base = (pdata) ? pdata->gpio_base : -1;
+ 
+-	tc3589x_gpio->irq_base = tc3589x->irq_base + TC3589x_INT_GPIO(0);
++#ifdef CONFIG_OF_GPIO
++        tc3589x_gpio->chip.of_node = np;
++#endif
+ 
+ 	tc3589x_gpio->irq_base = tc3589x->irq_base ?
+ 		tc3589x->irq_base + TC3589x_INT_GPIO(0) : 0;
+@@ -350,7 +358,7 @@ static int __devinit tc3589x_gpio_probe(struct platform_device *pdev)
+ 	if (ret < 0)
+ 		goto out_free;
+ 
+-	ret = tc3589x_gpio_irq_init(tc3589x_gpio);
++	ret = tc3589x_gpio_irq_init(tc3589x_gpio, np);
+ 	if (ret)
+ 		goto out_free;
+ 
+@@ -367,7 +375,7 @@ static int __devinit tc3589x_gpio_probe(struct platform_device *pdev)
+ 		goto out_freeirq;
+ 	}
+ 
+-	if (pdata->setup)
++	if (pdata && pdata->setup)
+ 		pdata->setup(tc3589x, tc3589x_gpio->chip.base);
+ 
+ 	platform_set_drvdata(pdev, tc3589x_gpio);
+@@ -389,7 +397,7 @@ static int __devexit tc3589x_gpio_remove(struct platform_device *pdev)
+ 	int irq = platform_get_irq(pdev, 0);
  	int ret;
  
-+	if (!pdata) {
-+		if (np) {
-+			pdata = devm_kzalloc(&i2c->dev, sizeof(*pdata), GFP_KERNEL);
-+			if (!pdata)
-+				return -ENOMEM;
-+
-+			ret = tc3589x_of_probe(np, pdata);
-+			if (ret)
-+				return ret;
-+		}
-+		else {
-+			dev_err(&i2c->dev, "No platform data or DT found\n");
-+			return -EINVAL;
-+		}
-+	}
-+
- 	if (!i2c_check_functionality(i2c->adapter, I2C_FUNC_SMBUS_BYTE_DATA
- 				     | I2C_FUNC_SMBUS_I2C_BLOCK))
- 		return -EIO;
-@@ -338,7 +375,7 @@ static int __devinit tc3589x_probe(struct i2c_client *i2c,
- 	if (ret)
- 		goto out_free;
+-	if (pdata->remove)
++	if (pdata && pdata->remove)
+ 		pdata->remove(tc3589x, tc3589x_gpio->chip.base);
  
--	ret = tc3589x_irq_init(tc3589x);
-+	ret = tc3589x_irq_init(tc3589x, np);
- 	if (ret)
- 		goto out_free;
- 
+ 	ret = gpiochip_remove(&tc3589x_gpio->chip);
 -- 
 1.7.9.5
