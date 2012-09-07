@@ -1,59 +1,48 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  7 Sep 2012 12:14:54 +0100
-Subject: [PATCH 14/19] ARM: ux500: Apply tc3589x's GPIO/IRQ properties to
- HREF's DT
+Date: Fri,  7 Sep 2012 12:14:55 +0100
+Subject: [PATCH 15/19] mfd: Don't convert just one IRQ using irqdomain if a
+ range is provided
 In-Reply-To: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
 References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1347016499-29354-15-git-send-email-lee.jones@linaro.org>
+Message-ID: <1347016499-29354-16-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch ensures the tc3589x and tc3598x-gpio devices are
-rightfully given interrupt controller status. We also describe
-the tc3598x-gpio GPIO expander in full and specify it as a GPIO
-controller. Finally we reference that the external MMC slot's
-Card Detection GPIO on the HREF is located on the tc3598x-gpio
-expander.
+MFD core code attempts to convert specified hardware (local) IRQ
+numbers to virtual-IRQs, which something Linux can understand. This
+works great when only one IRQ is specified. However, converting
+entire ranges is currently unsupported. If this occurs we issue a
+kernel warning to inform the user of this, but we continue to
+convert the first specified IRQ anyway and replace the range. This
+is not the correct behaviour. This patch ensures that if a range
+is specified, it is left untouched.
 
+CC: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/hrefv60plus.dts |   17 ++++++++++++++++-
- 1 file changed, 16 insertions(+), 1 deletion(-)
+ drivers/mfd/mfd-core.c |   10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
-index ec9ec4f..b3290c7 100644
---- a/arch/arm/boot/dts/hrefv60plus.dts
-+++ b/arch/arm/boot/dts/hrefv60plus.dts
-@@ -42,7 +42,7 @@
- 			mmc-cap-mmc-highspeed;
- 			vmmc-supply = <&ab8500_ldo_aux3_reg>;
- 
--			cd-gpios  = <&gpio2 31 0x4>; // 95
-+			cd-gpios  = <&tc3589x_gpio 3 0x4>;
- 
- 			status = "okay";
- 		};
-@@ -100,6 +100,21 @@
- 			tc3589x at 42 {
- 				compatible = "tc3589x";
- 				reg = <0x42>;
-+				interrupt-parent = <&gpio6>;
-+				interrupts = <25 0x1>;
-+
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+
-+				tc3589x_gpio: tc3589x_gpio {
-+					compatible = "tc3589x-gpio";
-+					interrupts = <0 0x1>;
-+
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+				};
- 			};
- 			tps61052 at 33 {
- 				compatible = "tps61052";
+diff --git a/drivers/mfd/mfd-core.c b/drivers/mfd/mfd-core.c
+index f8b7771..f07cf69 100644
+--- a/drivers/mfd/mfd-core.c
++++ b/drivers/mfd/mfd-core.c
+@@ -126,10 +126,12 @@ static int mfd_add_device(struct device *parent, int id,
+ 		} else if (cell->resources[r].flags & IORESOURCE_IRQ) {
+ 			if (domain) {
+ 				/* Unable to create mappings for IRQ ranges. */
+-				WARN_ON(cell->resources[r].start !=
+-					cell->resources[r].end);
+-				res[r].start = res[r].end = irq_create_mapping(
+-					domain, cell->resources[r].start);
++				if (!WARN_ON(cell->resources[r].start !=
++						cell->resources[r].end))
++					res[r].start = res[r].end =
++						irq_create_mapping(
++							domain,
++							cell->resources[r].start);
+ 			} else {
+ 				res[r].start = irq_base +
+ 					cell->resources[r].start;
 -- 
 1.7.9.5
