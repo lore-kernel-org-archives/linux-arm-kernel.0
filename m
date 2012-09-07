@@ -1,32 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Sep 2012 13:23:56 +0000
-Subject: [PATCH] ARM: ixp4xx: move fixed mapping of internal devices into
- vmalloc region
-In-Reply-To: <m3oblic6x0.fsf@intrepid.localdomain>
-References: <1346996400-5824-1-git-send-email-gerg@snapgear.com>
- <201209071223.30275.arnd@arndb.de> <m3oblic6x0.fsf@intrepid.localdomain>
-Message-ID: <201209071323.56574.arnd@arndb.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 7 Sep 2012 22:25:59 +0900
+Subject: [PATCH v3 0/2] ARM: shmobile: enable PMU(Performance Monitoring
+ Unit)
+In-Reply-To: <504952F7.6090906@kmckk.co.jp>
+References: <50487370.6000409@kmckk.co.jp>
+ <1346930047-9541-1-git-send-email-koba@kmckk.co.jp>
+ <20120906112109.GG858@mudshark.cambridge.arm.com>
+ <504952F7.6090906@kmckk.co.jp>
+Message-ID: <20120907132559.GD32187@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 September 2012, Krzysztof Halasa wrote:
-> >>   BUG: mapping for 0xc8000000 at 0xffbeb000 out of vmalloc space
-> >>   BUG: mapping for 0xc4000000 at 0xffbfe000 out of vmalloc space
-> >>   BUG: mapping for 0xc0000000 at 0xffbff000 out of vmalloc space
+On Fri, Sep 07, 2012 at 10:50:47AM +0900, Tetsuyuki Kobayashi wrote:
+> Hi, Will
+> Hi, Simon
 > 
-> > Imre, Krzysztof: do you prefer to take this patch into a branch of yours
-> > and send a pull request, or should we just apply it directly into arm-soc.
-> > In the former case, can you provide an Ack?
+> (2012/09/06 20:21), Will Deacon wrote:
+> >On Thu, Sep 06, 2012 at 12:14:05PM +0100, Tetsuyuki Kobayshi wrote:
+> >>From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+> >>
+> >>Hello, Will
+> >
+> >Hi,
+> >
+> >Thanks for updating the patches.
+> >
+> >>Could you apply this patch set to your pmu/cleanup branch on arm-soc?
+> >
+> >Actually, it's better if you just base your branch against that one when you
+> >send it to arm-soc for merging. That way, other SoCs can also develop
+> >against that branch without having to worry about each other.
+> >
+> I see.
+> I thought that removing ARM_PMU_DEVICE_CPU depends on your
+> pmu/cleanup branch, but I found it does not.
+> I verified this v3 patch can apply cleanly to soc branch on renesus.git
+> and works fine.
 > 
-> My intention is to push the following instead:
-> 
-> http://git.kernel.org/?p=linux/kernel/git/chris/linux.git;a=commitdiff;h=f62736b567ff532fb772afea76fccdbcd92ab473;hp=23e3b6cf1c37ef0615d90681d3705a8821305b5f
-> 
+> Simon-san, could you apply this v3 patch to soc branch after review ?
 
-Ok, fine with me. I noticed however that this is missing
-a changelog. Maybe you can take the text that Greg sent.
-
-I also wonder if this patch needs to be applied to earlier
-versions as well. Is linux-3.6 still working?
-
-	Arnd
+Sure, will do.
