@@ -1,97 +1,21 @@
-From: mpthompson@gmail.com (Mike Thompson)
-Date: Thu, 6 Sep 2012 22:03:35 -0700
-Subject: Tracking down suspend/resume ext3/mmc issues on imx233
-Message-ID: <CAEOSq-O3SfuAEhMsjX1y1ZgQuWBKef+XZzMR1b4yJhKhaRdymA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 7 Sep 2012 13:07:53 +0800
+Subject: mxs: mmc: Problems resetting first SSP/MMC module upon boot
+In-Reply-To: <EE31261C-7324-4E13-9EE0-D3BFB4C92B99@turczak.de>
+References: <FDB97EE7-CE8F-4B83-A384-2E256DADCEDA@turczak.de>
+ <20120907010143.GD26709@S2101-09.ap.freescale.net>
+ <EE31261C-7324-4E13-9EE0-D3BFB4C92B99@turczak.de>
+Message-ID: <20120907050750.GK26709@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Sep 07, 2012 at 05:35:18AM +0200, Peter Turczak wrote:
+> Exactly. Now after some testing I found out, any mmc[012] initialized first does not work. Everytime it's stmp_reset_block() fails for the respective block, which is strange.
+> 
+> When the bootloader (both ROM and u-boot from NAND) have initialized the slot before, smtp_reset_block() works and all mmc are available and working reliably.
+> 
+What bootloader are you using?  Mainline U-Boot or FSL one?
 
-I'm working on adding power management support for the imx233 on
-3.6-rc2.  In general I'm working on porting the pm.c file from the
-Freescale 2.6.35 kernel for both "standby" and "mem" suspend/resume.
-I'm making pretty good progress on porting the code, but I'm running
-into an issue outside the immediate code I'm working on.
-
-Right now I'm just testing out imx233 suspend/resume functionality by
-implementing a dummy "standby" function that just returns rather than
-putting the SoC into a low power state.  I believe this should have
-the kernel go through suspend operations, hit my dummy function which
-does nothing and then go through resume operations.  Unfortunately,
-upon resume I'm getting ext3 file system errors in that nothing can be
-read from the root file system on the SD card.  A trace of the
-suspend/resume cycle is show below:
-
-root at olinuxino:~# echo standby > /sys/power/state
-[   90.080000] PM: Syncing filesystems ... done.
-[   90.110000] mmc0: card aaaa removed
-[   90.330000] Freezing user space processes ... (elapsed 0.01 seconds) done.
-[   90.360000] Freezing remaining freezable tasks ... (elapsed 0.01
-seconds) done.
-[   90.400000] mxs_mmc_suspend()
-[   90.400000] PM: suspend of devices complete after 19.531 msecs
-[   90.410000] PM: late suspend of devices complete after 2.843 msecs
-[   90.420000] PM: noirq suspend of devices complete after 4.531 msecs
-[   90.430000] PM: noirq resume of devices complete after 1.906 msecs
-[   90.440000] PM: early resume of devices complete after 1.843 msecs
-[   90.450000] mxs_mmc_resume()
-[   90.500000] PM: resume of devices complete after 51.062 msecs
-[   90.510000] Restarting tasks ... done.
-[   90.640000] mmc0: host does not support reading read-only switch.
-assuming write-enable.
-[   90.650000] mmc0: new high speed SD card at address aaaa
-[   90.670000] mmcblk0: mmc0:aaaa SU02G 1.84 GiB
-[   90.680000]  mmcblk0: p1 p2
-[   90.700000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-reading directory #15970 offset 0
-[   90.710000] Aborting journal on device mmcblk0p2.
-[   90.720000] JBD: Error -5 detected when updating journal superblock
-for mmcblk0p2.
-[   90.730000] EXT3-fs (mmcblk0p2): error: remounting filesystem read-only
-[   90.730000] EXT3-fs (mmcblk0p2): I/O error while writing superblock
-[   90.740000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-reading directory #2 offset 0
-udevd[1309]: failed to execute '/sbin/modprobe' '/sbin/modprobe -b
-mmc:block': No such file or directory
-[   90.790000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-reading directory #15970 offset 0
-udevd[1310]: failed to execute '/sbin/blkid' '/sbin/blkid -o udev -p
-/dev/.tmp-block-179:8': No such file or directory
-udevd[1311]: failed to execute '/sbin/blkid' '/sbin/blkid -o udev -p
-/dev/.tmp-block-179:10': No such file or directory
-udevd[1312]: failed to execute '/sbin/blkid' '/sbin/blkid -o udev -p
-/dev/.tmp-block-179:9': No such file or directory
-root at olinuxino:~#
-root at olinuxino:~# ls
-[  432.780000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-reading directory #55890 offset 0
-[  432.790000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-reading directory #55891 offset 0
-[  432.800000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-reading directory #55890 offset 0
-[  432.810000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-reading directory #15970 offset 0
-[  432.820000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-reading directory #7985 offset 0
-[  432.840000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-reading directory #55890 offset 0
--bash: ls: command not found
-root at olinuxino:~#
-
-The first reported error is in the ext3 filesystem buffer code where
-the file system buffers aren't being filled by the underlying block
-device.  At least that's how I'm interpreting the portion of the ext3
-file system code that is failing.  However, the mmc device is
-correctly reporting finding p1 and p2 partitions on the device which
-it would indicate the partition data is being read from the SD card.
-
-I'm hoping others might have suggestions on how I should go about
-tracking down why the ext3 file system can no longer read from the mmc
-device upon resume.  For instance, useful places to put some tracing
-code to understand what might be failing, or how to determine what
-differences there might be before suspend and after resume that might
-point to the failure.
-
-Thanks,
-
-Mike Thompson
+-- 
+Regards,
+Shawn
