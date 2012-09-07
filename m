@@ -1,26 +1,46 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 07 Sep 2012 16:35:21 +0300
-Subject: [PATCH v3 08/14] Input: twl4030-vibra: Support for DT booted
- kernel
-In-Reply-To: <20120906161933.GA18562@core.coreip.homeip.net>
-References: <1346933541-21547-1-git-send-email-peter.ujfalusi@ti.com>
- <1346933541-21547-9-git-send-email-peter.ujfalusi@ti.com>
- <20120906161933.GA18562@core.coreip.homeip.net>
-Message-ID: <5049F819.1080101@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 7 Sep 2012 13:37:26 +0000
+Subject: [PATCH 15/19] mfd: Don't convert just one IRQ using irqdomain if
+ a range is provided
+In-Reply-To: <20120907124611.GD29601@gmail.com>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+ <201209071235.41785.arnd@arndb.de> <20120907124611.GD29601@gmail.com>
+Message-ID: <201209071337.26587.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
-
-On 09/06/2012 07:19 PM, Dmitry Torokhov wrote:
-> In patch 6 you added a stub for of_find_node_by_name(), so do you really
-> need this #ifdef?
-
-True. I'll resend the series since I left the #ifdef also in other patch.
-
-> Otherwise it looks good.
+On Friday 07 September 2012, Lee Jones wrote:
+> On Fri, Sep 07, 2012 at 12:35:41PM +0000, Arnd Bergmann wrote:
+> > On Friday 07 September 2012, Lee Jones wrote:
+> > > MFD core code attempts to convert specified hardware (local) IRQ
+> > > numbers to virtual-IRQs, which something Linux can understand. This
+> > > works great when only one IRQ is specified. However, converting
+> > > entire ranges is currently unsupported. If this occurs we issue a
+> > > kernel warning to inform the user of this, but we continue to
+> > > convert the first specified IRQ anyway and replace the range. This
+> > > is not the correct behaviour. This patch ensures that if a range
+> > > is specified, it is left untouched.
+> > > 
+> > > CC: Samuel Ortiz <sameo@linux.intel.com>
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > 
+> > I don't see the advantage of the change. The warning already tells
+> > us that the input to mfd_add_device was incorrect, so nothing the
+> > function does can reliably fix it. Leaving the resource empty
+> > is just as wrong as listing only the first interrupt.
 > 
-> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> My thinking was to leave them in a range, then have the target driver
+> convert each entry in the range manually. But what you're saying is
+> that no registration should be attempted using ranges at all? What if
+> the range was vast? Surely a resource array a few hundred lines long
+> isn't correct either? My immediate example would be "GPIO_INT6", which
+> has 31 lines. Do you want them all splitting out individually?
 
-Thank you,
-P?ter
+The examples I had seen before were all just ranges of two interrupts,
+and in those cases it was clear that splitting them would be best.
+
+In the exampled of the ab8500-gpio driver, it looks like the resource is
+not actually being used, and the gpio driver implements its own irq_chip,
+so maybe we can get away with not solving this problem for now.
+
+	Arnd
