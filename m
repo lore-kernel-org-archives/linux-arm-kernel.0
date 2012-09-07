@@ -1,67 +1,32 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 7 Sep 2012 23:23:31 +0200
-Subject: [PATCH 2/2] ARM: kirkwood: Use devicetree to define DNS-32[05] fan
-In-Reply-To: <1347035675-23907-3-git-send-email-jm@lentin.co.uk>
-References: <1347035675-23907-1-git-send-email-jm@lentin.co.uk>
- <1347035675-23907-3-git-send-email-jm@lentin.co.uk>
-Message-ID: <20120907212331.GF21036@lunn.ch>
+From: andi@firstfloor.org (Andi Kleen)
+Date: Fri, 07 Sep 2012 14:31:12 -0700
+Subject: [GIT PULL] Update LZO compression
+In-Reply-To: <CAPkEcwgv6f5B+Mrw7kzrHcZ5JZ+Yr0o=bLdoFqCB-e4CLiVx5A@mail.gmail.com>
+ (james northrup's message of "Thu, 16 Aug 2012 11:55:06 -0700")
+References: <50299142.2030504@oberhumer.com>
+ <20120814123937.GA14756@sig21.net> <502B8FE3.7080501@oberhumer.com>
+ <20120815144539.GA8300@sig21.net> <502C92C3.7090701@oberhumer.com>
+ <20120816150647.GA22010@sig21.net> <20120816232549.4d14a6aa@natsu>
+ <20120816175234.GL11413@one.firstfloor.org>
+ <CAMuHMdWK_Y=QwkgQD6K8tFBLaO04Fy0yVAzEpb2OYW6Ec0hGoA@mail.gmail.com>
+ <CAPkEcwgv6f5B+Mrw7kzrHcZ5JZ+Yr0o=bLdoFqCB-e4CLiVx5A@mail.gmail.com>
+Message-ID: <m2mx114j1b.fsf@firstfloor.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
-> index 4ab3506..e202a07 100644
-> --- a/arch/arm/mach-kirkwood/board-dnskw.c
-> +++ b/arch/arm/mach-kirkwood/board-dnskw.c
-> @@ -67,29 +67,6 @@ static unsigned int dnskw_mpp_config[] __initdata = {
->  	0
->  };
->  
-> -/* Fan: ADDA AD045HB-G73 40mm 6000rpm at 5v */
-> -static struct gpio_fan_speed dnskw_fan_speed[] = {
-> -	{    0,  0 },
-> -	{ 3000,	 1 },
-> -	{ 6000,	 2 },
-> -};
-> -static unsigned dnskw_fan_pins[] = {46, 45};
-> -
-> -static struct gpio_fan_platform_data dnskw_fan_data = {
-> -	.num_ctrl	= ARRAY_SIZE(dnskw_fan_pins),
-> -	.ctrl		= dnskw_fan_pins,
-> -	.num_speed	= ARRAY_SIZE(dnskw_fan_speed),
-> -	.speed		= dnskw_fan_speed,
-> -};
-> -
-> -static struct platform_device dnskw_fan_device = {
-> -	.name	= "gpio-fan",
-> -	.id	= -1,
-> -	.dev	= {
-> -		.platform_data	= &dnskw_fan_data,
-> -	},
-> -};
-> -
->  static void dnskw_power_off(void)
->  {
->  	gpio_set_value(36, 1);
-> @@ -114,8 +91,6 @@ void __init dnskw_init(void)
->  	kirkwood_ehci_init();
->  	kirkwood_ge00_init(&dnskw_ge00_data);
->  
-> -	platform_device_register(&dnskw_fan_device);
-> -
->  	/* Register power-off GPIO. */
->  	if (gpio_request(36, "dnskw:power:off") == 0
->  	    && gpio_direction_output(36, 0) == 0)
-> -- 
-> 1.7.10.4
-> 
+james northrup <northrup.james@gmail.com> writes:
 
-Hi Jamie
+> looks like ARM results are inconclusive from a lot of folks without bandwidth
+> to do a write-up, what about just plain STAGING status for ARM so the android
+> tweakers can beat on it for a while? ?
 
-Minor point. I expect you can remove the header file gpio-fan.h.
+Again staging doesn't really work for a core library, it's more
+for separate drivers.
 
-There are also a few other headers files which can be removed, but i
-suggest you do this in a separate cleanup patch. I think
-ata_platform.h, input.h, leds.h, map.h, bridge-regs.h and maybe also
-kirkwood.h are no longer needed.
+FWIW we did some tests and the new library seems to be generally faster
+on x86.
 
-  Andrew
+-Andi
+
+-- 
+ak at linux.intel.com -- Speaking for myself only
