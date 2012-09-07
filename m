@@ -1,60 +1,82 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 7 Sep 2012 19:26:12 +0200
-Subject: [PATCH 8/9] ARM i.MX53: Add pwms to dtsi
-In-Reply-To: <20120907132955.GH29340@avionic-0098.mockup.avionic-design.de>
-References: <1346154504-5623-1-git-send-email-s.hauer@pengutronix.de>
- <1346154504-5623-9-git-send-email-s.hauer@pengutronix.de>
- <20120830223219.GF3613@r65073-Latitude-D630>
- <20120831130723.GS26594@pengutronix.de>
- <20120907132955.GH29340@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20120907172612.GU26594@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 7 Sep 2012 10:28:09 -0700
+Subject: [PATCH 5/5] omap-serial: Request pins using pinctrl framework
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA291F9@DBDE01.ent.ti.com>
+References: <20120906185615.1172.23588.stgit@muffinssi.local>
+ <20120906185832.1172.31013.stgit@muffinssi.local>
+ <331ABD5ECB02734CA317220B2BBEABC13EA291F9@DBDE01.ent.ti.com>
+Message-ID: <20120907172809.GB1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 03:29:55PM +0200, Thierry Reding wrote:
-> On Fri, Aug 31, 2012 at 03:07:23PM +0200, Sascha Hauer wrote:
-> > On Fri, Aug 31, 2012 at 06:32:20AM +0800, Shawn Guo wrote:
-> > > On Tue, Aug 28, 2012 at 01:48:23PM +0200, Sascha Hauer wrote:
-> [...]
-> > > >  arch/arm/boot/dts/imx53.dtsi        |   14 ++++++++++++++
-> > > >  arch/arm/mach-imx/clk-imx51-imx53.c |    4 ++++
-> > > >  2 files changed, 18 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> > > > index cd37165..7ec17e4 100644
-> > > > --- a/arch/arm/boot/dts/imx53.dtsi
-> > > > +++ b/arch/arm/boot/dts/imx53.dtsi
-> > > > @@ -189,6 +189,20 @@
-> > > >  				status = "disabled";
-> > > >  			};
-> > > >  
-> > > > +			pwm1: pwm at 53fb4000 {
-> > > > +				#pwm-cells = <3>;
-> > > 
-> > > pwm-cells should be 2?
-> > 
-> > Yes, right. We have a patch internally that allows us to pass a
-> > 'inverted' flag to the pwm, hence I accidently have 3 here.
+* AnilKumar, Chimata <anilkumar@ti.com> [120906 20:27]:
+> Hi Tony,
 > 
-> There are patches in for-next that add support for setting the PWM
-> polarity, though there's currently no support for specifying it via a
-> third cell in the specifier. Would you mind sharing the patches that add
-> this?
+> On Fri, Sep 07, 2012 at 00:28:32, Tony Lindgren wrote:
+> > Request pins using pinctrl framework. Only show a warning
+> > on error as some boards set the pins in the bootloader
+> > even if CONFIG_PINCTRL is enabled.
+> > 
+> > Cc: linux-serial at vger.kernel.org
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> >  arch/arm/plat-omap/include/plat/omap-serial.h |    1 +
+> >  drivers/tty/serial/omap-serial.c              |   10 ++++++++++
+> >  2 files changed, 11 insertions(+)
+> > 
+> > diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
+> > index 1a52725..0f4de14 100644
+> > --- a/arch/arm/plat-omap/include/plat/omap-serial.h
+> > +++ b/arch/arm/plat-omap/include/plat/omap-serial.h
+> > @@ -106,6 +106,7 @@ struct uart_omap_port {
+> >  	struct uart_port	port;
+> >  	struct uart_omap_dma	uart_dma;
+> >  	struct platform_device	*pdev;
+> > +	struct pinctrl		*pins;
+> >  
+> >  	unsigned char		ier;
+> >  	unsigned char		lcr;
+> > diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> > index d3cda0c..068e88c 100644
+> > --- a/drivers/tty/serial/omap-serial.c
+> > +++ b/drivers/tty/serial/omap-serial.c
+> > @@ -39,6 +39,7 @@
+> >  #include <linux/irq.h>
+> >  #include <linux/pm_runtime.h>
+> >  #include <linux/of.h>
+> > +#include <linux/pinctrl/consumer.h>
+> >  
+> >  #include <plat/dma.h>
+> >  #include <plat/dmtimer.h>
+> > @@ -1492,6 +1493,13 @@ static int serial_omap_probe(struct platform_device *pdev)
+> >  		goto err_port_line;
+> >  	}
+> >  
+> > +	up->pins = pinctrl_get_select_default(&pdev->dev);
+> > +	if (IS_ERR(up->pins)) {
+> > +		dev_warn(&pdev->dev, "did not get pins for uart%i error: %li\n",
+> > +			 up->port.line, PTR_ERR(up->pins));
+> > +		up->pins = NULL;
+> > +	}
+> > +
+> >  	sprintf(up->name, "OMAP UART%d", up->port.line);
+> >  	up->port.mapbase = mem->start;
+> >  	up->port.membase = devm_ioremap(&pdev->dev, mem->start,
+> > @@ -1570,6 +1578,8 @@ static int serial_omap_remove(struct platform_device *dev)
+> >  		pm_runtime_disable(&up->pdev->dev);
+> >  		uart_remove_one_port(&serial_omap_reg, &up->port);
+> >  		pm_qos_remove_request(&up->pm_qos_request);
+> > +		if (up->pins)
+> > +			pinctrl_put(up->pins);
+> 
+> I think this can be removed if we use devm_pinctrl_get_select_default()
+> above.
 
-Yes, will do. I was afraid this leads to some discussion, so I skipped
-them so far.
+Yeah will do, I was initially thinking that would cause issues remuxing
+pins back to safe mode on unload, but we can still do that in
+serial_omap_remove().
 
-The basic idea was that the third cell is for flags from which bit0 set
-means 'inverted'. We currently implemented this i.MX specific, but if
-you think this is acceptable it's propably a good idea to implement this
-in a generic manner.
+Regards,
 
-Sascha
-
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Tony
