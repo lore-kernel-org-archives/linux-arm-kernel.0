@@ -1,149 +1,43 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri,  7 Sep 2012 14:43:43 +0200
-Subject: [PATCH v4 1/6] genalloc: add a global pool list,
- allow to find pools by phys address
-In-Reply-To: <1347021828-23034-1-git-send-email-p.zabel@pengutronix.de>
-References: <1347021828-23034-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1347021828-23034-2-git-send-email-p.zabel@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 7 Sep 2012 13:46:12 +0100
+Subject: [PATCH 15/19] mfd: Don't convert just one IRQ using irqdomain if
+ a range is provided
+In-Reply-To: <201209071235.41785.arnd@arndb.de>
+References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
+ <1347016499-29354-16-git-send-email-lee.jones@linaro.org>
+ <201209071235.41785.arnd@arndb.de>
+Message-ID: <20120907124611.GD29601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch keeps all created pools in a global list and adds two
-functions that allow to retrieve the gen_pool pointer from a known
-physical address and from a device tree node.
+On Fri, Sep 07, 2012 at 12:35:41PM +0000, Arnd Bergmann wrote:
+> On Friday 07 September 2012, Lee Jones wrote:
+> > MFD core code attempts to convert specified hardware (local) IRQ
+> > numbers to virtual-IRQs, which something Linux can understand. This
+> > works great when only one IRQ is specified. However, converting
+> > entire ranges is currently unsupported. If this occurs we issue a
+> > kernel warning to inform the user of this, but we continue to
+> > convert the first specified IRQ anyway and replace the range. This
+> > is not the correct behaviour. This patch ensures that if a range
+> > is specified, it is left untouched.
+> > 
+> > CC: Samuel Ortiz <sameo@linux.intel.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> I don't see the advantage of the change. The warning already tells
+> us that the input to mfd_add_device was incorrect, so nothing the
+> function does can reliably fix it. Leaving the resource empty
+> is just as wrong as listing only the first interrupt.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
----
- include/linux/genalloc.h |   14 ++++++++++
- lib/genalloc.c           |   67 ++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 81 insertions(+)
+My thinking was to leave them in a range, then have the target driver
+convert each entry in the range manually. But what you're saying is
+that no registration should be attempted using ranges at all? What if
+the range was vast? Surely a resource array a few hundred lines long
+isn't correct either? My immediate example would be "GPIO_INT6", which
+has 31 lines. Do you want them all splitting out individually?
 
-diff --git a/include/linux/genalloc.h b/include/linux/genalloc.h
-index 5e98eeb..d498c43 100644
---- a/include/linux/genalloc.h
-+++ b/include/linux/genalloc.h
-@@ -33,6 +33,7 @@
-  *  General purpose special memory pool descriptor.
-  */
- struct gen_pool {
-+	struct list_head next_pool;	/* pool in global list */
- 	spinlock_t lock;
- 	struct list_head chunks;	/* list of chunks in this pool */
- 	int min_alloc_order;		/* minimum allocation order */
-@@ -78,4 +79,17 @@ extern void gen_pool_for_each_chunk(struct gen_pool *,
- 	void (*)(struct gen_pool *, struct gen_pool_chunk *, void *), void *);
- extern size_t gen_pool_avail(struct gen_pool *);
- extern size_t gen_pool_size(struct gen_pool *);
-+extern struct gen_pool *gen_pool_find_by_phys(phys_addr_t phys);
-+
-+struct device_node;
-+#ifdef CONFIG_OF
-+extern struct gen_pool *of_get_named_gen_pool(struct device_node *np,
-+	const char *propname, int index);
-+#else
-+inline struct gen_pool *of_get_named_gen_pool(struct device_node *np,
-+	const char *propname, int index)
-+{
-+	return NULL;
-+}
-+#endif
- #endif /* __GENALLOC_H__ */
-diff --git a/lib/genalloc.c b/lib/genalloc.c
-index 6bc04aa..90699ac 100644
---- a/lib/genalloc.c
-+++ b/lib/genalloc.c
-@@ -34,6 +34,11 @@
- #include <linux/rculist.h>
- #include <linux/interrupt.h>
- #include <linux/genalloc.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+
-+static LIST_HEAD(pools);
-+static DEFINE_SPINLOCK(list_lock);
- 
- static int set_bits_ll(unsigned long *addr, unsigned long mask_to_set)
- {
-@@ -152,6 +157,9 @@ struct gen_pool *gen_pool_create(int min_alloc_order, int nid)
- 		spin_lock_init(&pool->lock);
- 		INIT_LIST_HEAD(&pool->chunks);
- 		pool->min_alloc_order = min_alloc_order;
-+		spin_lock(&list_lock);
-+		list_add_rcu(&pool->next_pool, &pools);
-+		spin_unlock(&list_lock);
- 	}
- 	return pool;
- }
-@@ -234,6 +242,9 @@ void gen_pool_destroy(struct gen_pool *pool)
- 	int order = pool->min_alloc_order;
- 	int bit, end_bit;
- 
-+	spin_lock(&list_lock);
-+	list_del_rcu(&pool->next_pool);
-+	spin_unlock(&list_lock);
- 	list_for_each_safe(_chunk, _next_chunk, &pool->chunks) {
- 		chunk = list_entry(_chunk, struct gen_pool_chunk, next_chunk);
- 		list_del(&chunk->next_chunk);
-@@ -400,3 +411,59 @@ size_t gen_pool_size(struct gen_pool *pool)
- 	return size;
- }
- EXPORT_SYMBOL_GPL(gen_pool_size);
-+
-+/**
-+ * gen_pool_find_by_phys - find a pool by physical start address
-+ * @phys: physical address as added with gen_pool_add_virt
-+ *
-+ * Returns the pool that contains the chunk starting at phys,
-+ * or NULL if not found.
-+ */
-+struct gen_pool *gen_pool_find_by_phys(phys_addr_t phys)
-+{
-+	struct gen_pool *pool, *found = NULL;
-+	struct gen_pool_chunk *chunk;
-+
-+	rcu_read_lock();
-+	list_for_each_entry_rcu(pool, &pools, next_pool) {
-+		list_for_each_entry_rcu(chunk, &pool->chunks, next_chunk) {
-+			if (phys == chunk->phys_addr) {
-+				found = pool;
-+				break;
-+			}
-+		}
-+	}
-+	rcu_read_unlock();
-+
-+	return found;
-+}
-+EXPORT_SYMBOL_GPL(gen_pool_find_by_phys);
-+
-+#ifdef CONFIG_OF
-+/**
-+ * of_get_named_gen_pool - find a pool by phandle property
-+ * @np: device node
-+ * @propname: property name containing phandle(s)
-+ * @index: index into the phandle array
-+ *
-+ * Returns the pool that contains the chunk starting at the physical
-+ * address of the device tree node pointed at by the phandle property,
-+ * or NULL if not found.
-+ */
-+struct gen_pool *of_get_named_gen_pool(struct device_node *np,
-+	const char *propname, int index)
-+{
-+	struct device_node *np_pool;
-+	struct resource res;
-+	int ret;
-+
-+	np_pool = of_parse_phandle(np, propname, index);
-+	if (!np_pool)
-+		return NULL;
-+	ret = of_address_to_resource(np_pool, 0, &res);
-+	if (ret < 0)
-+		return NULL;
-+	return gen_pool_find_by_phys((phys_addr_t) res.start);
-+}
-+EXPORT_SYMBOL_GPL(of_get_named_gen_pool);
-+#endif /* CONFIG_OF */
 -- 
-1.7.10.4
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
