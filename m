@@ -1,64 +1,59 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Sat, 8 Sep 2012 00:00:47 +0800
-Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA2964C@DBDE01.ent.ti.com>
-References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
- <201209060405.08997.marex@denx.de> <20120906174531.GX1303@atomide.com>
- <201209070209.35379.marex@denx.de>
- <331ABD5ECB02734CA317220B2BBEABC13EA2964C@DBDE01.ent.ti.com>
-Message-ID: <CAK5ve-KZdpLm6hNN+k7RZJSUp34vqoGwRRkk2dzWH2n+aLxLKA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 07 Sep 2012 10:19:46 -0600
+Subject: [PATCH v3 01/10] PCI: Keep pci_fixup_irqs() around after init
+In-Reply-To: <CAErSpo6cjOzJegJqXzmk59DChExcbLK1sOhwyAyQL4FZkTN21A@mail.gmail.com>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <1343332512-28762-2-git-send-email-thierry.reding@avionic-design.de>
+ <CAErSpo7v+i8i=mXCs7ZW8DtGTDN_4AEntwYLqGG8FcCzweySFg@mail.gmail.com>
+ <20120815192814.GA12870@avionic-0098.mockup.avionic-design.de>
+ <CAErSpo6cjOzJegJqXzmk59DChExcbLK1sOhwyAyQL4FZkTN21A@mail.gmail.com>
+Message-ID: <504A1EA2.9030008@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 7, 2012 at 3:59 PM, AnilKumar, Chimata <anilkumar@ti.com> wrote:
-> On Fri, Sep 07, 2012 at 05:39:35, Marek Vasut wrote:
->> Dear Tony Lindgren,
+On 08/15/2012 01:42 PM, Bjorn Helgaas wrote:
+> On Wed, Aug 15, 2012 at 1:28 PM, Thierry Reding
+> <thierry.reding@avionic-design.de> wrote:
+>> On Wed, Aug 15, 2012 at 10:06:27AM -0700, Bjorn Helgaas wrote:
+>>> On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
+>>> <thierry.reding@avionic-design.de> wrote:
+>>>> When using deferred driver probing, PCI host controller drivers may
+>>>> actually require this function after the init stage.
+>>>>
+>>>> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+>>>> ---
+>>>> Changes in v3:
+>>>> - none
+>>>>
+>>>> Changes in v2:
+>>>> - use __devinit annotations
+>>>
+>>> Your original patch removed __init completely.  Here you change it to
+>>> __devinit.  That means we decide whether to discard the function based
+>>> on whether CONFIG_HOTPLUG is supported.  But I think your point is not
+>>> about hotplug; it's merely that we should be able to scan a PCI bus
+>>> after init-time.  We ought to be able to do a late PCI scan even if
+>>> hotplug is not supported.
+>>>
+>>> Therefore, I'd be inclined to remove __init completely unless you have
+>>> another reason for preferring __devinit.
 >>
->> > * Marek Vasut <marex@denx.de> [120905 19:05]:
->> > > Hi Tony,
->> > >
->> > > > * Marek Vasut <marex@denx.de> [120904 20:13]:
->> > > > > Dear Bryan Wu,
->> > > > >
->> > > > > > On Sat, Sep 1, 2012 at 4:16 PM, AnilKumar Ch <anilkumar@ti.com> wrote:
->> > > > > > > Adopt pinctrl support to leds-gpio driver based on leds-gpio
->> > > > > > > device pointer, pinctrl driver configure SoC pins to GPIO
->> > > > > > > mode according to definitions provided in .dts file.
->> > > > > >
->> > > > > > Thanks for this, actually Marek Vasut submitted a similar patch
->> > > > > > before. I'm pretty fine with this patch.
->> > > > >
->> > > > > Thanks for submitting this actually ... I didn't have time to
->> > > > > properly investigate this.
->> > > > >
->> > > > > > But without proper DT setting, it will also give us warning I
->> > > > > > think. or we can provide some dummy functions as a temp solution
->> > > > > > as Shawn pointed out before.
->> > > > >
->> > > > > But this driver is also used on hardware that's not yet coverted to
->> > > > > DT, so I'd say dev_warn() if CONFIG_OF is enabled and otherwise
->> > > > > simply go on ? Actually, can we not skip whole this pinctrl thing if
->> > > > > CONFIG_OF is disabled? Actually (2), what's the relationship between
->> > > > > OF and pinctrl?
->> > > >
->> > > > The warning should be pinctrl related as the pinctrl drivers may not be
->> > > > device tree based drivers.
->> > >
->> > > Exactly my concern. Also the warning shouldnt be present on systems where
->> > > pinctrl is disabled.
->> >
->> > But pinctrl_get_select() returns 0 in include/linux/pinctrl/consumer.h if
->> > CONFIG_PINCTRL is not selected, so no warning is produced AFAIK ;)
->>
->> Oh all right then.
->>
->
-> Bryan,
->
-> If this patch looks fine, can you queue this for 3.7?
->
+>> I thought __devinit would resolve to nothing if HOTPLUG is defined and
+>> __init otherwise. That seemed more appropriate. However you are right
+>> that it is useful to always have it available, so I'm fine with removing
+>> the annotations altogether. Do you want me to follow up with a patch? Or
+>> can you just take the first version? I'm not sure if it still applies.
+> 
+> You're right about how __devinit works.  It's just that I don't think
+> hotplug is actually relevant here.  We're trying to make
+> pci_fixup_irqs() work after init, whether it's because of hotplug or
+> simply because the arch scans host bridges after init.
+> 
+> I applied this to my "next" branch.  Thanks!
 
-I've applied this to my for-next branch.
+Bjorn, I don't see this patch in next-20120907. Did it get dropped for
+some reason?
 
-Thanks,
--Bryan
+For the full history, see: http://patchwork.ozlabs.org/patch/173495/.
+
+Thanks.
