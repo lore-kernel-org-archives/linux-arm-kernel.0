@@ -1,84 +1,68 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Fri, 7 Sep 2012 14:30:59 +0000
-Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
-In-Reply-To: <20120907110251.GA7968@glitch>
-References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
- <CADjby3UyhW=Ok8Zy57MVUz65gd-=4z2PhE6uqd7F8xtaDXcWfQ@mail.gmail.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA29819@DBDE01.ent.ti.com>
- <20120907110251.GA7968@glitch>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA29BF3@DBDE01.ent.ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 7 Sep 2012 10:57:01 -0400
+Subject: [PATCH v2 RESEND] ARM: Build dtb files in all target
+In-Reply-To: <1346691487-17534-1-git-send-email-andrew@lunn.ch>
+References: <1346691487-17534-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20120907145701.GB19437@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 16:32:51, Domenico Andreoli wrote:
-> On Fri, Sep 07, 2012 at 09:10:50AM +0000, AnilKumar, Chimata wrote:
-> > Hi Domenico,
+On Mon, Sep 03, 2012 at 06:58:07PM +0200, Andrew Lunn wrote:
+> Tools like kisskb are good at finding build regressions in the kernel
+> sources. However, regressions in the DT desscriptions are not found,
+> because generally these build systems don't build the DT binary blobs.
 > 
-> Hi,
+> Extend the ARM all target to build all enabled DTB files.
 > 
-> > On Fri, Sep 07, 2012 at 14:18:39, Domenico Andreoli wrote:
-> > > On Sat, Sep 1, 2012 at 10:16 AM, AnilKumar Ch <anilkumar@ti.com> wrote:
-> > > > Adopt pinctrl support to leds-gpio driver based on leds-gpio
-> > > > device pointer, pinctrl driver configure SoC pins to GPIO
-> > > > mode according to definitions provided in .dts file.
-> > > 
-> > > Shouldn't be the interaction with the pinctrl layer left to gpiolib?
-> > > 
-> > 
-> > No, these gpio's are configured specifically for user leds.
-> 
-> So there are some special pad configs to make the leds work which are not
-> only muxing and direction setting? Because I expect these to be managed
-> privately between gpiolib and pinctrl but now I'm not sure any more,
-> I'll look the code.
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> Reviewed-by: Dave Martin <dave.martin@linaro.org>
 
-How can gpio driver knows that leds-gpio driver require
-these 4 pins?
+Arnd, Olof,
 
+Is it appropriate to take this directly into your tree or should it go
+through Russell's?
+
+thx,
+
+Jason.
+
+> ---
+>  arch/arm/Makefile |    9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
 > 
-> > So, leds-gpio driver should have this call, because these gpio
-> > pins are used by leds-gpio driver.
-> > 
-> > +       am33xx_pinmux: pinmux at 44e10800 {
-> > +               userled_pins: pinmux_userled_pins {
-> > +                       pinctrl-single,pins = <
-> > +                               0x54 0x7       
-> > +                               0x58 0x17       
-> > +                               0x5c 0x7        
-> > +                               0x60 0x17       
-> > +                       >;
-> > +               };
-> > +       };
-> > +
-> > 
-> > [...]
-> > 
-> > +               leds {
-> > +                       compatible = "gpio-leds";
-> > +                       pinctrl-names = "default";
-> > +                       pinctrl-0 = <&userled_pins>;
-> >                                       ^^^^^^^^^^^^
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 30eae87..0457ef4 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -268,7 +268,12 @@ else
+>  KBUILD_IMAGE := zImage
+>  endif
+>  
+> -all:	$(KBUILD_IMAGE)
+> +# Build the DT binary blobs if we have OF configured
+> +ifeq ($(CONFIG_USE_OF),y)
+> +KBUILD_DTBS := dtbs
+> +endif
+> +
+> +all:	$(KBUILD_IMAGE) $(KBUILD_DTBS)
+>  
+>  boot := arch/arm/boot
+>  
+> @@ -306,7 +311,7 @@ define archhelp
+>    echo  '  uImage        - U-Boot wrapped zImage'
+>    echo  '  bootpImage    - Combined zImage and initial RAM disk' 
+>    echo  '                  (supply initrd image via make variable INITRD=<path>)'
+> -  echo  '  dtbs          - Build device tree blobs for enabled boards'
+> +  echo  '* dtbs          - Build device tree blobs for enabled boards'
+>    echo  '  install       - Install uncompressed kernel'
+>    echo  '  zinstall      - Install compressed kernel'
+>    echo  '  uinstall      - Install U-Boot wrapped compressed kernel'
+> -- 
+> 1.7.10.4
 > 
-> I'm surprised to not see any gpio controller (ala irq) involved.
-
-GPIO controller data will be in GPIO node, should not be here.
-
 > 
-> > Lets take gpio-keypad driver, in that case we have to configure
-> > pins as INPUT mode (generic gpio driver might not know what
-> > the end usecase is) and this leds case we configure as OUTPUT
-> > mode.
-> 
-> gpio direction is modeled by gpiolib so, if no other out-of-gpiolib
-> capabilities are required for that led gpio, there is no need to directly
-> use pinctrl.
-> 
-
-Here leds-gpio driver requirement is to set mux configuration of
-those 4 pins to GPIO mode (mode 7) as well direction OUTPUT/INPUT.
-
-Set mux mode to 7 (GPIO usage) should be from led driver, because
-this driver have the requirement.
-
-Thanks
-AnilKumar
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
