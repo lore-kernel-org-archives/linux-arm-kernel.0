@@ -1,31 +1,67 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 7 Sep 2012 10:39:57 +0800
-Subject: [PATCH 07/12] ARM: move all dtb targets out of Makefile.boot
-In-Reply-To: <50495DB9.5030008@wwwdotorg.org>
-References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
- <1346962375-26163-8-git-send-email-robherring2@gmail.com>
- <20120907022711.GE26709@S2101-09.ap.freescale.net>
- <50495DB9.5030008@wwwdotorg.org>
-Message-ID: <20120907023955.GG26709@S2101-09.ap.freescale.net>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 7 Sep 2012 10:43:59 +0800
+Subject: [PATCH 1/2] serial: mxs-auart: fix the wrong setting order
+In-Reply-To: <20120907023841.GF26709@S2101-09.ap.freescale.net>
+References: <1346985521-2248-1-git-send-email-shijie8@gmail.com>
+ <20120907023841.GF26709@S2101-09.ap.freescale.net>
+Message-ID: <50495F6F.4040800@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 08:36:41PM -0600, Stephen Warren wrote:
-> On 09/06/2012 08:27 PM, Shawn Guo wrote:
-> > On Thu, Sep 06, 2012 at 03:12:50PM -0500, Rob Herring wrote:
-> >> +dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb
-> >> +dtb-$(CONFIG_ARCH_LPC32XX) += ea3250.dtb phy3250.dtb
-> >> +dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += tegra20-harmony.dtb tegra20-paz00.dtb \
-> >> +	tegra20-seaboard.dtb tegra20-trimslice.dtb tegra20-ventana.dtb \
-> >> +	tegra20-whistler.dtb
-> 
-> Hmm. The existing files all have one file per line, which makes
-> adding/removing files have a little less impact; whole lines are
-> added/removed rather than needing to reflow the whole list. Should we
-> apply the same layout here too?
-> 
-+1
+? 2012?09?07? 10:38, Shawn Guo ??:
+> On Thu, Sep 06, 2012 at 10:38:40PM -0400, Huang Shijie wrote:
+>> After set the AUART_CTRL0_CLKGATE, the UART will gate all the clocks off.
+>> So the following line will not take effect.
+>>         ................................................................
+>>   	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
+>>   			u->membase + AUART_INTR_CLR);
+>>         ................................................................
+>>
+>> To fix this issue, the patch moves this gate-off line to
+>> the end of setting registers.
+>>
+>> Signed-off-by: Huang Shijie<shijie8@gmail.com>
+> Acked-by: Shawn Guo<shawn.guo@linaro.org>
+>
+> Are you experiencing any user visible problem with this bug?
+>
+I do not experience any user problem.
+I found this bug when i tried to add DMA support for MXS-AUART.
 
--- 
-Regards,
-Shawn
+Best Regards
+Huang Shijie
+
+
+> Regards,
+> Shawn
+>
+>> ---
+>>   drivers/tty/serial/mxs-auart.c |    4 ++--
+>>   1 files changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+>> index dafeef2..ea5f888 100644
+>> --- a/drivers/tty/serial/mxs-auart.c
+>> +++ b/drivers/tty/serial/mxs-auart.c
+>> @@ -457,11 +457,11 @@ static void mxs_auart_shutdown(struct uart_port *u)
+>>
+>>   	writel(AUART_CTRL2_UARTEN, u->membase + AUART_CTRL2_CLR);
+>>
+>> -	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_SET);
+>> -
+>>   	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
+>>   			u->membase + AUART_INTR_CLR);
+>>
+>> +	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_SET);
+>> +
+>>   	clk_disable_unprepare(s->clk);
+>>   }
+>>
+>> -- 
+>> 1.7.4.4
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
