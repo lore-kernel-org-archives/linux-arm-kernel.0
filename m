@@ -1,53 +1,55 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  7 Sep 2012 14:18:11 +0200
-Subject: [PATCH 2/7] gpio: 74x164: Use devm_kzalloc
+Date: Fri,  7 Sep 2012 14:18:12 +0200
+Subject: [PATCH 3/7] gpio: 74x164: Use dynamic gpio number assignment if no
+ pdata is present
 In-Reply-To: <1347020296-18796-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1347020296-18796-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1347020296-18796-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1347020296-18796-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Florian Fainelli <florian@openwrt.org>
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/gpio/gpio-74x164.c |    8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ drivers/gpio/gpio-74x164.c |   13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/gpio/gpio-74x164.c b/drivers/gpio/gpio-74x164.c
-index 2975036..604b998 100644
+index 604b998..ef8baac 100644
 --- a/drivers/gpio/gpio-74x164.c
 +++ b/drivers/gpio/gpio-74x164.c
-@@ -90,7 +90,7 @@ static int __devinit gen_74x164_probe(struct spi_device *spi)
- 	if (ret < 0)
- 		return ret;
+@@ -75,12 +75,6 @@ static int __devinit gen_74x164_probe(struct spi_device *spi)
+ 	struct gen_74x164_chip_platform_data *pdata;
+ 	int ret;
  
--	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
-+	chip = devm_kzalloc(&spi->dev, sizeof(*chip), GFP_KERNEL);
+-	pdata = spi->dev.platform_data;
+-	if (!pdata || !pdata->base) {
+-		dev_dbg(&spi->dev, "incorrect or missing platform data\n");
+-		return -EINVAL;
+-	}
+-
+ 	/*
+ 	 * bits_per_word cannot be configured in platform data
+ 	 */
+@@ -94,6 +88,12 @@ static int __devinit gen_74x164_probe(struct spi_device *spi)
  	if (!chip)
  		return -ENOMEM;
  
-@@ -125,7 +125,6 @@ static int __devinit gen_74x164_probe(struct spi_device *spi)
- exit_destroy:
- 	dev_set_drvdata(&spi->dev, NULL);
- 	mutex_destroy(&chip->lock);
--	kfree(chip);
- 	return ret;
- }
- 
-@@ -141,10 +140,9 @@ static int __devexit gen_74x164_remove(struct spi_device *spi)
- 	dev_set_drvdata(&spi->dev, NULL);
- 
- 	ret = gpiochip_remove(&chip->gpio_chip);
--	if (!ret) {
-+	if (!ret)
- 		mutex_destroy(&chip->lock);
--		kfree(chip);
--	} else
++	pdata = spi->dev.platform_data;
++	if (pdata && pdata->base)
++		chip->gpio_chip.base = pdata->base;
 +	else
- 		dev_err(&spi->dev, "Failed to remove the GPIO controller: %d\n",
- 				ret);
++		chip->gpio_chip.base = -1;
++
+ 	mutex_init(&chip->lock);
  
+ 	dev_set_drvdata(&spi->dev, chip);
+@@ -104,7 +104,6 @@ static int __devinit gen_74x164_probe(struct spi_device *spi)
+ 	chip->gpio_chip.direction_output = gen_74x164_direction_output;
+ 	chip->gpio_chip.get = gen_74x164_get_value;
+ 	chip->gpio_chip.set = gen_74x164_set_value;
+-	chip->gpio_chip.base = pdata->base;
+ 	chip->gpio_chip.ngpio = 8;
+ 	chip->gpio_chip.can_sleep = 1;
+ 	chip->gpio_chip.dev = &spi->dev;
 -- 
 1.7.9.5
