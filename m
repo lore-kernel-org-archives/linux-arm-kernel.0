@@ -1,53 +1,42 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Fri, 7 Sep 2012 11:10:55 +0530
-Subject: [PATCH] ARM: tegra: Fix data type for io address
-Message-ID: <1346996455-31697-1-git-send-email-pgaikwad@nvidia.com>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Fri, 7 Sep 2012 15:42:28 +1000
+Subject: [PATCH 4/4] ARM: ks8695: convert to generic time and clocksource
+In-Reply-To: <201209031324.22877.arnd@arndb.de>
+References: <1346264842-20411-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdab72Z86i21TNohS0YO=Bav7eQgHwQyXa0tXQB=0hhgAg@mail.gmail.com>
+ <5044A954.4000706@snapgear.com> <201209031324.22877.arnd@arndb.de>
+Message-ID: <50498944.2060009@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Warnings were generated because following commit changed data type for
-address pointer
+Hi Arnd,
 
-195bbca ARM: 7500/1: io: avoid writeback addressing modes for __raw_ accessors
+On 03/09/12 23:24, Arnd Bergmann wrote:
+> On Monday 03 September 2012, Greg Ungerer wrote:
+>>> I suspect
+>>> some of these platforms may have more users than we
+>>> believe.
+>>
+>> I know the guys at www.opengear.com are still building hardware around
+>> the KS8695. And they update to modern kernels from time to time. So its
+>> not completely obsolete yet. I have some SnapGear boards based around it
+>> too, though they went out of production about 2 years ago.
+>
+> Ok, good to know. Maybe we can catch their interest with this mail thread
+> here and get them to contribute upstream as well.
 
-arch/arm/mach-tegra/tegra30_clocks.c: In function 'clk_measure_input_freq':
-arch/arm/mach-tegra/tegra30_clocks.c:418:2: warning: passing argument 2 of '__raw_writel' makes pointer from integer without a cast
-.../arch/arm/include/asm/io.h:88:20: note: expected 'volatile void *' but argument is of type 'unsigned int
+I have just posted a patch for the SnapGear boards. I had a bit of
+info and some code for the OpenGear boards too, so I posted a patch
+for some of them too.
 
-Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
----
- arch/arm/mach-tegra/tegra30_clocks.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+Regards
+Greg
 
-diff --git a/arch/arm/mach-tegra/tegra30_clocks.c b/arch/arm/mach-tegra/tegra30_clocks.c
-index 7dad44d..5cd502c 100644
---- a/arch/arm/mach-tegra/tegra30_clocks.c
-+++ b/arch/arm/mach-tegra/tegra30_clocks.c
-@@ -376,19 +376,19 @@ static void __iomem *misc_gp_hidrev_base = IO_ADDRESS(TEGRA_APB_MISC_BASE);
- static int tegra_periph_clk_enable_refcount[CLK_OUT_ENB_NUM * 32];
- 
- #define clk_writel(value, reg) \
--	__raw_writel(value, (u32)reg_clk_base + (reg))
-+	__raw_writel(value, reg_clk_base + (reg))
- #define clk_readl(reg) \
--	__raw_readl((u32)reg_clk_base + (reg))
-+	__raw_readl(reg_clk_base + (reg))
- #define pmc_writel(value, reg) \
--	__raw_writel(value, (u32)reg_pmc_base + (reg))
-+	__raw_writel(value, reg_pmc_base + (reg))
- #define pmc_readl(reg) \
--	__raw_readl((u32)reg_pmc_base + (reg))
-+	__raw_readl(reg_pmc_base + (reg))
- #define chipid_readl() \
--	__raw_readl((u32)misc_gp_hidrev_base + MISC_GP_HIDREV)
-+	__raw_readl(misc_gp_hidrev_base + MISC_GP_HIDREV)
- 
- #define clk_writel_delay(value, reg)					\
- 	do {								\
--		__raw_writel((value), (u32)reg_clk_base + (reg));	\
-+		__raw_writel((value), reg_clk_base + (reg));	\
- 		udelay(2);						\
- 	} while (0)
- 
+
+
 -- 
-1.7.4.1
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close                             FAX:         +61 7 3217 5323
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
