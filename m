@@ -1,46 +1,69 @@
-From: peter@turczak.de (Peter Turczak)
-Date: Fri, 7 Sep 2012 05:35:18 +0200
-Subject: mxs: mmc: Problems resetting first SSP/MMC module upon boot
-In-Reply-To: <20120907010143.GD26709@S2101-09.ap.freescale.net>
-References: <FDB97EE7-CE8F-4B83-A384-2E256DADCEDA@turczak.de>
- <20120907010143.GD26709@S2101-09.ap.freescale.net>
-Message-ID: <EE31261C-7324-4E13-9EE0-D3BFB4C92B99@turczak.de>
+From: l.krishna@samsung.com (Leela Krishna Amudala)
+Date: Fri, 7 Sep 2012 09:16:42 +0530
+Subject: [PATCH V4 2/2] video: drm: exynos: Add device tree support
+In-Reply-To: <5048837B.6020903@samsung.com>
+References: <1346859555-13527-1-git-send-email-l.krishna@samsung.com>
+ <1346859555-13527-3-git-send-email-l.krishna@samsung.com>
+ <CAH9JG2X_3iUTiGWv2cxjiX-s_VUtptVbzxhAJTub70W_2Dxecg@mail.gmail.com>
+ <CAAQKjZNmizjZ-=JN9_AysPMPHTOh7eydfE_OCYE6-v0JAJMydw@mail.gmail.com>
+ <5048837B.6020903@samsung.com>
+Message-ID: <CAL1wa8cyhxCObHbMa+8X6DmsD8svt=W8s+JMrPx5cAEoWd4Lig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi,
 
-On Sep 7, 2012, at 3:01 AM, Shawn Guo wrote
->> - When booting from usb, ethernet or NAND flash first mmc to be initialized in the machine init function fails. So when doing (example given is nearly literally from the code, the board name is not yet allocated with the registry):
->>        mx28_add_mxs_mmc(2, &board_mmc_pdata[2]);
->>        mx28_add_mxs_mmc(0, &board_mmc_pdata[0]);
->>   mmc0 works, mmc2 does not. When initializing mmc0 first mmc0 works.
-> 
-> When initializing mmc0 first, you meant mmc0 works or does not work?
-Exactly. Now after some testing I found out, any mmc[012] initialized first does not work. Everytime it's stmp_reset_block() fails for the respective block, which is strange.
+On Thu, Sep 6, 2012 at 4:35 PM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
+> Hi,
+>
+> On 09/06/2012 09:21 AM, InKi Dae wrote:
+>>>> +Required properties:
+>>>> + - compatible: Should be "samsung,exynos5-fimd" or "samsung,exynos4-fb" for
+>>> Doesn't better to use single word? fimd or fb?. I think 'fb' is used
+>>> for framebuffer historically.
+>>> but now it's used both fb and drm, so fimd is neutral and architecture
+>>> specific.
+>>>
+>>> To do this, Modify arch-exynos first and update it at each drivers it properly.
+>>>
+>>> Thank you,
+>>> Kyungmin Park
+>>>
+>>
+>> I agree with Kyungmin but I'd like to use as is. the reason we used
+>> 'exynos4-fb' as device name, is for that it uses fimd driver's
+>> platform device commonly and gets fimd clock. so I think that dts file
+>> should be defined with hardware specific name but not driver name such
+>> as 'exynos4-fb'. but with this, we can't get fimd clock with device's
+>> name because 'exynos4-fb' is used as device name of fimd clock. so to
+>> use 'exynos4-fimd', we should modify the device name of fimd clock
+>> from 'exynos4-fb'  to 'exynos4-fimd' and also ids definitions of
+>> s3c-fb and drm fimd driver. so my conclusion is that it merges this
+>
+> I think it's good moment to put those things in order, i.e. use uniform
+> 'compatible' names: "samsung,exynos4-fimd", "samsung,exynos5-fimd".
+> Platform device names are separate issue, but could perhaps be unified
+> at this time as well.
 
-When the bootloader (both ROM and u-boot from NAND) have initialized the slot before, smtp_reset_block() works and all mmc are available and working reliably.
+Yes, Platform device name is independent of compatible string.
+Will change the compatible string to "samsung,exynos4-fimd" and will keep the
+device name as exynos4-fb for now. Will change the platform device
+names to exynosX-fimd
+later.
 
-One more thing: A kernel 2.6.35 patched with the files provided by Freescale always successfully initializes all mmc on the board.
->> Ideas: 
->> - Maybe it the clock derivation is not set up properly before resetting as at least two ssp-modules seem to derive the clock from the same clock source. But I have no idea how to test or debug this.
->> 
-> ssp0 and ssp1 share one clock source, while ssp2 and ssp3 share
-> another one.  I'm not sure if it's the cause, but 3.5 kernel did miss
-> one bug fix below.
-> 
->  64e2bc4 clk: mxs: imx28: decrease the frequency of ref_io1 for SSP2 and SSP3
-> 
-> You can get it from 3.6-rc1 kernel.
-Thank you, I will give it a try and report back.
-> 
-> -- 
+>
+>> patch set as is and then let's modify related things later.
+>> any opinions, welcome~ anytime.
+>>
+>> Thanks.
+>> Inki Dae
+>
+> --
+>
 > Regards,
-> Shawn
-Best Regards,
-  Peter
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Sylwester
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
