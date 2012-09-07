@@ -1,25 +1,66 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Sep 2012 19:11:47 +0000
-Subject: [PATCH v3 06/31] arm64: MMU fault handling and page table
- management
-In-Reply-To: <1347035226-18649-7-git-send-email-catalin.marinas@arm.com>
+Date: Fri, 7 Sep 2012 19:20:16 +0000
+Subject: [PATCH v3 07/31] arm64: Process management
+In-Reply-To: <1347035226-18649-8-git-send-email-catalin.marinas@arm.com>
 References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-7-git-send-email-catalin.marinas@arm.com>
-Message-ID: <201209071911.48183.arnd@arndb.de>
+ <1347035226-18649-8-git-send-email-catalin.marinas@arm.com>
+Message-ID: <201209071920.17355.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 07 September 2012, Catalin Marinas wrote:
-> 
-> This patch adds support for the handling of the MMU faults (exception
-> entry code introduced by a previous patch) and page table management.
-> 
-> The user translation table is pointed to by TTBR0 and the kernel one
-> (swapper_pg_dir) by TTBR1. There is no translation information shared or
-> address space overlapping between user and kernel page tables.
+> The patch adds support for thread creation and context switching. The
+> context switching CPU specific code is introduced with the CPU support
+> patch (part of the arch/arm64/mm/proc.S file). AArch64 supports
+> ASID-tagged TLBs and the ASID can be either 8 or 16-bit wide (detectable
+> via the ID_AA64AFR0_EL1 register).
 > 
 > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 > Acked-by: Tony Lindgren <tony@atomide.com>
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+
+But please fix a few small issues in process.c:
+
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> new file mode 100644
+> index 0000000..6dfd96f
+> --- /dev/null
+> +++ b/arch/arm64/kernel/process.c
+
+> +
+> +extern void setup_mm_for_reboot(void);
+
+No extern declarations in .c files, put it in a header file instead.
+
+
+> +
+> +/*
+> + * Function pointers to optional machine specific functions
+> + */
+> +void (*pm_power_off)(void);
+> +EXPORT_SYMBOL(pm_power_off);
+> +
+> +void (*pm_restart)(const char *cmd);
+> +EXPORT_SYMBOL_GPL(pm_restart);
+> +
+>
+> +void (*pm_idle)(void) = default_idle;
+> +EXPORT_SYMBOL(pm_idle);
+
+I'd make them all EXPORT_SYMBOL_GPL. External modules have no business overriding them.
+
+> +	/*
+> +	 * Whoops - the architecture was unable to reboot.
+> +	 * Tell the user!
+> +	 */
+> +	mdelay(1000);
+> +	printk("Reboot failed -- System halted\n");
+> +	while (1);
+
+This delay seems pointless.
+
+
+	Arnd
