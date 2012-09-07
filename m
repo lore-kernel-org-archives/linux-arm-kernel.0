@@ -1,38 +1,90 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 7 Sep 2012 10:01:36 -0700
-Subject: [PATCH v7 0/3] arm/dts: Add device tree data for AM33XX devices
-In-Reply-To: <5049B245.9080807@ti.com>
-References: <1346924304-27425-1-git-send-email-anilkumar@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA293E9@DBDE01.ent.ti.com>
- <5049B245.9080807@ti.com>
-Message-ID: <20120907170135.GY1303@atomide.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 7 Sep 2012 22:31:49 +0530
+Subject: [PATCH v2 1/2] ARM: da850/omap-l138: Add SoC related definitions
+ for VPIF
+In-Reply-To: <1345471731-31678-2-git-send-email-prabhakar.lad@ti.com>
+References: <1345471731-31678-1-git-send-email-prabhakar.lad@ti.com>
+ <1345471731-31678-2-git-send-email-prabhakar.lad@ti.com>
+Message-ID: <504A287D.20408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <b-cousson@ti.com> [120907 01:38]:
-> Hi Anil,
-> 
-> On 09/07/2012 07:30 AM, AnilKumar, Chimata wrote:
-> > On Thu, Sep 06, 2012 at 15:08:21, AnilKumar, Chimata wrote:
-> >> Add pinctrl and d_can device tree data to AM33XX family of devices.
-> >> First two patches add support for pinctrl DT data and third one
-> >> adds dcan DT data.
-> >>
-> >> Reason behind combining these patches is to apply cleanly on
-> >> linux-omap tree, because these are sequential patches.
-> >>Yes, 
-> >> These patches were tested on AM335x-Bone, AM335x-EVM and based
-> >> on linux-omap:master with this patch
-> >> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg74393.html
-> >>
-> > 
-> > If there are no changes in this patch series ACK from
-> > reviewers (esp. Tony, koen and Marc) will help.
-> 
-> Yes, indeed. The series looks good to me, but it will be nice to get
-> some acks from people who commented previous revision.
+Hi Prabhakar,
 
-Acked two of them, but there's still some gpio-leds.c discussion
-going on that should be resolved first.
+On 8/20/2012 7:38 PM, Prabhakar Lad wrote:
+> From: Manjunath Hadli <manjunath.hadli@ti.com>
+> 
+> Add clock, pin mux definitions and registration function for
+> VPIF capture and display driver on DA850/OMAP-L138 SoC.
+> 
+> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> ---
 
-Tony
+> +/* VPIF resource, platform data */
+> +static u64 da850_vpif_dma_mask = DMA_BIT_MASK(32);
+> +
+> +static struct resource da850_vpif_resource[] = {
+> +	{
+> +		.start = DA8XX_VPIF_BASE,
+> +		.end   = DA8XX_VPIF_BASE + 0xfff,
+> +		.flags = IORESOURCE_MEM,
+> +	}
+> +};
+> +
+> +static struct platform_device da850_vpif_dev = {
+> +	.name		= "vpif",
+> +	.id		= -1,
+> +	.dev		= {
+> +		.dma_mask		= &da850_vpif_dma_mask,
+> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
+> +	},
+> +	.resource	= da850_vpif_resource,
+> +	.num_resources	= ARRAY_SIZE(da850_vpif_resource),
+> +};
+> +
+> +static struct platform_device da850_vpif_display_dev = {
+> +	.name		= "vpif_display",
+> +	.id		= -1,
+> +	.dev		= {
+> +		.dma_mask		= &da850_vpif_dma_mask,
+> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
+> +	},
+> +};
+> +
+> +static struct platform_device da850_vpif_capture_dev = {
+> +	.name		= "vpif_capture",
+> +	.id		= -1,
+> +	.dev		= {
+> +		.dma_mask		= &da850_vpif_dma_mask,
+> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
+> +	},
+> +};
+> +
+> +int __init da850_register_vpif(void)
+> +{
+> +	return platform_device_register(&da850_vpif_dev);
+> +}
+> +
+> +int __init da850_register_vpif_display(struct vpif_display_config
+> +						*display_config)
+> +{
+> +	struct resource da850_vpif_display_resource[] = {
+> +		{
+> +			.start = IRQ_DA850_VPIFINT,
+> +			.end   = IRQ_DA850_VPIFINT,
+> +			.flags = IORESOURCE_IRQ,
+> +		},
+> +	};
+> +	int ret;
+> +
+> +	ret = platform_device_add_resources(&da850_vpif_display_dev,
+> +				da850_vpif_display_resource,
+> +				ARRAY_SIZE(da850_vpif_display_resource));
+
+Its not obvious to me why you need to add the resources here instead of
+just statically defining them as is usually done.
+
+Thanks,
+Sekhar
