@@ -1,47 +1,77 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 7 Sep 2012 09:58:38 -0700
-Subject: [PATCH v7 1/3] arm/dts: AM33XX: Add basic pinctrl device tree data
-In-Reply-To: <1346924304-27425-2-git-send-email-anilkumar@ti.com>
-References: <1346924304-27425-1-git-send-email-anilkumar@ti.com>
- <1346924304-27425-2-git-send-email-anilkumar@ti.com>
-Message-ID: <20120907165838.GW1303@atomide.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 7 Sep 2012 19:00:24 +0200
+Subject: [PATCH v3 01/10] PCI: Keep pci_fixup_irqs() around after init
+In-Reply-To: <504A1EA2.9030008@wwwdotorg.org>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <1343332512-28762-2-git-send-email-thierry.reding@avionic-design.de>
+ <CAErSpo7v+i8i=mXCs7ZW8DtGTDN_4AEntwYLqGG8FcCzweySFg@mail.gmail.com>
+ <20120815192814.GA12870@avionic-0098.mockup.avionic-design.de>
+ <CAErSpo6cjOzJegJqXzmk59DChExcbLK1sOhwyAyQL4FZkTN21A@mail.gmail.com>
+ <504A1EA2.9030008@wwwdotorg.org>
+Message-ID: <20120907170024.GA16114@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* AnilKumar Ch <anilkumar@ti.com> [120906 02:39]:
-> Adds basic pinctrl device tree data for AM33XX family of devices.
-> This patch is based on the pinctrl-single driver.
+On Fri, Sep 07, 2012 at 10:19:46AM -0600, Stephen Warren wrote:
+> On 08/15/2012 01:42 PM, Bjorn Helgaas wrote:
+> > On Wed, Aug 15, 2012 at 1:28 PM, Thierry Reding
+> > <thierry.reding@avionic-design.de> wrote:
+> >> On Wed, Aug 15, 2012 at 10:06:27AM -0700, Bjorn Helgaas wrote:
+> >>> On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
+> >>> <thierry.reding@avionic-design.de> wrote:
+> >>>> When using deferred driver probing, PCI host controller drivers may
+> >>>> actually require this function after the init stage.
+> >>>>
+> >>>> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> >>>> ---
+> >>>> Changes in v3:
+> >>>> - none
+> >>>>
+> >>>> Changes in v2:
+> >>>> - use __devinit annotations
+> >>>
+> >>> Your original patch removed __init completely.  Here you change it to
+> >>> __devinit.  That means we decide whether to discard the function based
+> >>> on whether CONFIG_HOTPLUG is supported.  But I think your point is not
+> >>> about hotplug; it's merely that we should be able to scan a PCI bus
+> >>> after init-time.  We ought to be able to do a late PCI scan even if
+> >>> hotplug is not supported.
+> >>>
+> >>> Therefore, I'd be inclined to remove __init completely unless you have
+> >>> another reason for preferring __devinit.
+> >>
+> >> I thought __devinit would resolve to nothing if HOTPLUG is defined and
+> >> __init otherwise. That seemed more appropriate. However you are right
+> >> that it is useful to always have it available, so I'm fine with removing
+> >> the annotations altogether. Do you want me to follow up with a patch? Or
+> >> can you just take the first version? I'm not sure if it still applies.
+> > 
+> > You're right about how __devinit works.  It's just that I don't think
+> > hotplug is actually relevant here.  We're trying to make
+> > pci_fixup_irqs() work after init, whether it's because of hotplug or
+> > simply because the arch scans host bridges after init.
+> > 
+> > I applied this to my "next" branch.  Thanks!
 > 
-> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> Bjorn, I don't see this patch in next-20120907. Did it get dropped for
+> some reason?
 
-Assuming Benoit will queue this series:
+Yes, it turns out that dropping the annotations causes lots of section
+mismatches on other architectures. See here[0] for the details. I think
+the solution to the issue would be to either remove HOTPLUG altogether
+and drop __devinit and __devexit annotations or update all architectures
+to fix these warnings. I think Bjorn and I settled on the latter because
+it's obviously less intrusive. I've been busy building toolchains for
+all the PCI architectures and I think I have all of them. I'll just need
+some more time to build, find and fix any remaining section mismatches.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Thierry
 
-> ---
->  arch/arm/boot/dts/am33xx.dtsi |    9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index be43511..58cffb7 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -40,6 +40,15 @@
->  		};
->  	};
->  
-> +	am33xx_pinmux: pinmux at 44e10800 {
-> +		compatible = "pinctrl-single";
-> +		reg = <0x44e10800 0x0238>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-single,register-width = <32>;
-> +		pinctrl-single,function-mask = <0x7f>;
-> +	};
-> +
->  	/*
->  	 * XXX: Use a flat representation of the AM33XX interconnect.
->  	 * The real AM33XX interconnect network is quite complex.Since
-> -- 
-> 1.7.9.5
-> 
+[0]: http://www.linux-mips.org/archives/linux-mips/2012-08/msg00250.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120907/b2a2647a/attachment.sig>
