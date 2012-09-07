@@ -1,32 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Sep 2012 19:10:18 +0000
-Subject: [PATCH v3 04/31] arm64: MMU definitions
-In-Reply-To: <1347035226-18649-5-git-send-email-catalin.marinas@arm.com>
+Date: Fri, 7 Sep 2012 19:10:56 +0000
+Subject: [PATCH v3 05/31] arm64: MMU initialisation
+In-Reply-To: <1347035226-18649-6-git-send-email-catalin.marinas@arm.com>
 References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-5-git-send-email-catalin.marinas@arm.com>
-Message-ID: <201209071910.18527.arnd@arndb.de>
+ <1347035226-18649-6-git-send-email-catalin.marinas@arm.com>
+Message-ID: <201209071910.57084.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 07 September 2012, Catalin Marinas wrote:
 > 
-> The virtual memory layout is described in
-> Documentation/arm64/memory.txt. This patch adds the MMU definitions for
-> the 4KB and 64KB translation table configurations. The SECTION_SIZE is
-> 2MB with 4KB page and 512MB with 64KB page configuration.
+> This patch contains the initialisation of the memory blocks, MMU
+> attributes and the memory map. Only five memory types are defined:
+> Device nGnRnE (equivalent to Strongly Ordered), Device nGnRE (classic
+> Device memory), Device GRE, Normal Non-cacheable and Normal Cacheable.
+> Cache policies are supported via the memory attributes register
+> (MAIR_EL1) and only affect the Normal Cacheable mappings.
 > 
-> PHYS_OFFSET is calculated at run-time and stored in a variable (no
-> run-time code patching at this stage).
-> 
-> On the current implementation, both user and kernel address spaces are
-> 512G (39-bit) each with a maximum of 256G for the RAM linear mapping.
-> Linux uses 3 levels of translation tables with the 4K page configuration
-> and 2 levels with the 64K configuration. Extending the memory space
-> beyond 39-bit with the 4K pages or 42-bit with 64K pages requires an
-> additional level of translation tables.
-> 
-> The SPARSEMEM configuration is global to all AArch64 platforms and
-> allows for 1GB sections with SPARSEMEM_VMEMMAP enabled by default.
+> This patch also adds the SPARSEMEM_VMEMMAP initialisation.
 > 
 > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
