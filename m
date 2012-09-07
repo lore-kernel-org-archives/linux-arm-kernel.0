@@ -1,121 +1,244 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  7 Sep 2012 17:55:32 +0100
-Subject: [PATCH v2 5/7] ARM: virt: Add boot-time diagnostics
+Date: Fri,  7 Sep 2012 17:55:30 +0100
+Subject: [PATCH v2 3/7] ARM: zImage/virt: hyp mode entry support for the
+ zImage loader
 In-Reply-To: <1347036934-8519-1-git-send-email-marc.zyngier@arm.com>
 References: <1347036934-8519-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1347036934-8519-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1347036934-8519-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dave Martin <dave.martin@linaro.org>
 
-In order to easily detect pathological cases, print some diagnostics
-when the kernel boots.
+The zImage loader needs to turn on the MMU in order to take
+advantage of caching while decompressing the zImage.  Running this
+in hyp mode would require the LPAE pagetable format to be
+supported; to avoid this complexity, this patch switches out of hyp
+mode, and returns back to hyp mode just before booting the kernel.
 
-This also provides helpers to detect that HYP mode is actually available,
-which can be used by other subsystems to enable HYP specific features.
+This implementation assumes that the Hyp mode view of memory and the
+PL1 view of memory are coherent, providing that the MMU and caches
+are off in both, as required by the boot protocol.  The zImage
+decompression code must drain the write buffer on completion anyway, and
+entry into Hyp mode should flush any prefetch buffer, avoiding hazards
+associated with local write buffers and the pipeline.
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/virt.h | 17 +++++++++++++++++
- arch/arm/kernel/setup.c     | 20 ++++++++++++++++++++
- arch/arm/kernel/smp.c       |  3 +++
- 3 files changed, 40 insertions(+)
+ arch/arm/boot/compressed/.gitignore |  1 +
+ arch/arm/boot/compressed/Makefile   |  9 ++++-
+ arch/arm/boot/compressed/head.S     | 71 +++++++++++++++++++++++++++++++++----
+ arch/arm/kernel/hyp-stub.S          | 18 ++++++++++
+ 4 files changed, 91 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-index 0a99723..86164df 100644
---- a/arch/arm/include/asm/virt.h
-+++ b/arch/arm/include/asm/virt.h
-@@ -47,6 +47,23 @@ unsigned long __hyp_get_vectors(void);
- #define __boot_cpu_mode	(SVC_MODE)
- #endif
+diff --git a/arch/arm/boot/compressed/.gitignore b/arch/arm/boot/compressed/.gitignore
+index d0d441c..f79a08e 100644
+--- a/arch/arm/boot/compressed/.gitignore
++++ b/arch/arm/boot/compressed/.gitignore
+@@ -1,6 +1,7 @@
+ ashldi3.S
+ font.c
+ lib1funcs.S
++hyp-stub.S
+ piggy.gzip
+ piggy.lzo
+ piggy.lzma
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index bb26756..a517153 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -30,6 +30,10 @@ FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
+ OBJS		+= string.o
+ CFLAGS_string.o	:= -Os
  
-+#ifndef ZIMAGE
-+void hyp_mode_check(void);
++ifeq ($(CONFIG_ARM_VIRT_EXT),y)
++OBJS		+= hyp-stub.o
++endif
 +
-+/* Reports the availability of HYP mode */
-+static inline bool is_hyp_mode_available(void)
-+{
-+	return ((__boot_cpu_mode & MODE_MASK) == HYP_MODE &&
-+		!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH));
-+}
-+
-+/* Check if the bootloader has booted CPUs in different modes */
-+static inline bool is_hyp_mode_mismatched(void)
-+{
-+	return !!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH);
-+}
-+#endif
-+
- #endif /* __ASSEMBLY__ */
+ #
+ # Architecture dependencies
+ #
+@@ -126,7 +130,7 @@ KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
+ endif
  
- #endif /* ! VIRT_H */
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index a81dcec..04fd01f 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -55,6 +55,7 @@
- #include <asm/traps.h>
- #include <asm/unwind.h>
- #include <asm/memblock.h>
-+#include <asm/virt.h>
+ ccflags-y := -fpic -fno-builtin -I$(obj)
+-asflags-y := -Wa,-march=all
++asflags-y := -Wa,-march=all -DZIMAGE
  
- #if defined(CONFIG_DEPRECATED_PARAM_STRUCT)
- #include "compat.h"
-@@ -937,6 +938,21 @@ static int __init meminfo_cmp(const void *_a, const void *_b)
- 	return cmp < 0 ? -1 : cmp > 0 ? 1 : 0;
- }
+ # Supply kernel BSS size to the decompressor via a linker symbol.
+ KBSS_SZ = $(shell $(CROSS_COMPILE)size $(obj)/../../../../vmlinux | \
+@@ -198,3 +202,6 @@ $(obj)/font.c: $(FONTC)
  
-+void __init hyp_mode_check(void)
-+{
-+#ifdef CONFIG_ARM_VIRT_EXT
-+	if (is_hyp_mode_available()) {
-+		pr_info("CPU: All CPU(s) started in HYP mode.\n");
-+		pr_info("CPU: Virtualization extensions available.\n");
-+	} else if (is_hyp_mode_mismatched()) {
-+		pr_warn("CPU: WARNING: CPU(s) started in wrong/inconsistent modes (primary CPU mode 0x%x)\n",
-+			__boot_cpu_mode & MODE_MASK);
-+		pr_warn("CPU: This may indicate a broken bootloader or firmware.\n");
-+	} else
-+		pr_info("CPU: All CPU(s) started in SVC mode.\n");
-+#endif
-+}
+ $(obj)/vmlinux.lds: $(obj)/vmlinux.lds.in arch/arm/boot/Makefile $(KCONFIG_CONFIG)
+ 	@sed "$(SEDFLAGS)" < $< > $@
 +
- void __init setup_arch(char **cmdline_p)
- {
- 	struct machine_desc *mdesc;
-@@ -980,6 +996,10 @@ void __init setup_arch(char **cmdline_p)
- 	if (is_smp())
- 		smp_init_cpus();
- #endif
-+
-+	if (!is_smp())
-+		hyp_mode_check();
-+
- 	reserve_crashkernel();
- 
- 	tcm_init();
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index ebd8ad2..adf226e 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -42,6 +42,7 @@
- #include <asm/ptrace.h>
- #include <asm/localtimer.h>
- #include <asm/smp_plat.h>
-+#include <asm/virt.h>
++$(obj)/hyp-stub.S: $(srctree)/arch/$(SRCARCH)/kernel/hyp-stub.S
++	$(call cmd,shipped)
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index b8c64b8..0749a61 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -9,6 +9,7 @@
+  * published by the Free Software Foundation.
+  */
+ #include <linux/linkage.h>
++#include <asm/assembler.h>
  
  /*
-  * as from 2.5, kernels no longer have an init_tasks structure
-@@ -287,6 +288,8 @@ void __init smp_cpus_done(unsigned int max_cpus)
- 	       num_online_cpus(),
- 	       bogosum / (500000/HZ),
- 	       (bogosum / (5000/HZ)) % 100);
-+
-+	hyp_mode_check();
- }
+  * Debugging stuff
+@@ -132,7 +133,12 @@ start:
+ 		.word	start			@ absolute load/run zImage address
+ 		.word	_edata			@ zImage end address
+  THUMB(		.thumb			)
+-1:		mov	r7, r1			@ save architecture ID
++1:
++		mrs	r9, cpsr
++#ifdef CONFIG_ARM_VIRT_EXT
++		bl	__hyp_stub_install	@ get into SVC mode, reversibly
++#endif
++		mov	r7, r1			@ save architecture ID
+ 		mov	r8, r2			@ save atags pointer
  
- void __init smp_prepare_boot_cpu(void)
+ #ifndef __ARM_ARCH_2__
+@@ -148,9 +154,9 @@ start:
+  ARM(		swi	0x123456	)	@ angel_SWI_ARM
+  THUMB(		svc	0xab		)	@ angel_SWI_THUMB
+ not_angel:
+-		mrs	r2, cpsr		@ turn off interrupts to
+-		orr	r2, r2, #0xc0		@ prevent angel from running
+-		msr	cpsr_c, r2
++		safe_svcmode_maskall r0
++		msr	spsr_cxsf, r9		@ Save the CPU boot mode in
++						@ SPSR
+ #else
+ 		teqp	pc, #0x0c000003		@ turn off interrupts
+ #endif
+@@ -350,6 +356,20 @@ dtb_check_done:
+ 		adr	r5, restart
+ 		bic	r5, r5, #31
+ 
++/* Relocate the hyp vector base if necessary */
++#ifdef CONFIG_ARM_VIRT_EXT
++		mrs	r0, spsr
++		and	r0, r0, #MODE_MASK
++		cmp	r0, #HYP_MODE
++		bne	1f
++
++		bl	__hyp_get_vectors
++		sub	r0, r0, r5
++		add	r0, r0, r10
++		bl	__hyp_set_vectors
++1:
++#endif
++
+ 		sub	r9, r6, r5		@ size to copy
+ 		add	r9, r9, #31		@ rounded up to a multiple
+ 		bic	r9, r9, #31		@ ... of 32 bytes
+@@ -458,11 +478,29 @@ not_relocated:	mov	r0, #0
+ 		bl	decompress_kernel
+ 		bl	cache_clean_flush
+ 		bl	cache_off
+-		mov	r0, #0			@ must be zero
+ 		mov	r1, r7			@ restore architecture number
+ 		mov	r2, r8			@ restore atags pointer
+- ARM(		mov	pc, r4	)		@ call kernel
+- THUMB(		bx	r4	)		@ entry point is always ARM
++
++#ifdef CONFIG_ARM_VIRT_EXT
++		mrs	r0, spsr		@ Get saved CPU boot mode
++		and	r0, r0, #MODE_MASK
++		cmp	r0, #HYP_MODE		@ if not booted in HYP mode...
++		bne	__enter_kernel		@ boot kernel directly
++
++		adr	r12, .L__hyp_reentry_vectors_offset
++		ldr	r0, [r12]
++		add	r0, r0, r12
++
++		bl	__hyp_set_vectors
++		__HVC(0)			@ otherwise bounce to hyp mode
++
++		b	.			@ should never be reached
++
++		.align	2
++.L__hyp_reentry_vectors_offset:	.long	__hyp_reentry_vectors - .
++#else
++		b	__enter_kernel
++#endif
+ 
+ 		.align	2
+ 		.type	LC0, #object
+@@ -1191,6 +1229,25 @@ memdump:	mov	r12, r0
+ #endif
+ 
+ 		.ltorg
++
++#ifdef CONFIG_ARM_VIRT_EXT
++.align 5
++__hyp_reentry_vectors:
++		W(b)	.			@ reset
++		W(b)	.			@ undef
++		W(b)	.			@ svc
++		W(b)	.			@ pabort
++		W(b)	.			@ dabort
++		W(b)	__enter_kernel		@ hyp
++		W(b)	.			@ irq
++		W(b)	.			@ fiq
++#endif /* CONFIG_ARM_VIRT_EXT */
++
++__enter_kernel:
++		mov	r0, #0			@ must be 0
++ ARM(		mov	pc, r4	)		@ call kernel
++ THUMB(		bx	r4	)		@ entry point is always ARM
++
+ reloc_code_end:
+ 
+ 		.align
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index b03e924..7060941 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -21,6 +21,7 @@
+ #include <asm/assembler.h>
+ #include <asm/virt.h>
+ 
++#ifndef ZIMAGE
+ /*
+  * For the kernel proper, we need to find out the CPU boot mode long after
+  * boot, so we need to store it in a writable variable.
+@@ -59,6 +60,21 @@ ENTRY(__boot_cpu_mode)
+ 	strne	r7, [r5, r6]		@ record what happened and give up
+ 	.endm
+ 
++#else	/* ZIMAGE */
++
++	.macro	store_primary_cpu_mode	reg1:req, reg2:req, reg3:req
++	.endm
++
++/*
++ * The zImage loader only runs on one CPU, so we don't bother with mult-CPU
++ * consistency checking:
++ */
++	.macro	compare_cpu_mode_with_primary mode, reg1, reg2, reg3
++	cmp	\mode, \mode
++	.endm
++
++#endif /* ZIMAGE */
++
+ /*
+  * Hypervisor stub installation functions.
+  *
+@@ -174,9 +190,11 @@ ENTRY(__hyp_set_vectors)
+ 	bx	lr
+ ENDPROC(__hyp_set_vectors)
+ 
++#ifndef ZIMAGE
+ .align 2
+ .L__boot_cpu_mode_offset:
+ 	.long	__boot_cpu_mode - .
++#endif
+ 
+ .align 5
+ __hyp_stub_vectors:
 -- 
 1.7.12
