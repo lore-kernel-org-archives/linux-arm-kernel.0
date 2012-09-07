@@ -1,325 +1,261 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri,  7 Sep 2012 17:26:36 +0100
-Subject: [PATCH v3 01/31] arm64: Assembly macros and definitions
-In-Reply-To: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
-References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1347035226-18649-2-git-send-email-catalin.marinas@arm.com>
+Date: Fri,  7 Sep 2012 17:26:35 +0100
+Subject: [PATCH v3 00/31] AArch64 Linux kernel port
+Message-ID: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces several assembly macros and definitions used in
-the .S files across arch/arm64/ like IRQ disabling/enabling, together
-with asm-offsets.c.
+This is the 3rd version of patches implementing Linux kernel support for
+the 64-bit ARM architecture. Most of the review comments for the
+previous release have been implemented. There are a few left (like
+generic timer dts specification) but the main goal was to freeze the
+user ABI.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm64/include/asm/asm-offsets.h |    1 +
- arch/arm64/include/asm/assembler.h   |  109 ++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/asm-offsets.c      |  108 +++++++++++++++++++++++++++++++++
- arch/arm64/mm/proc-macros.S          |   55 +++++++++++++++++
- 4 files changed, 273 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/asm-offsets.h
- create mode 100644 arch/arm64/include/asm/assembler.h
- create mode 100644 arch/arm64/kernel/asm-offsets.c
- create mode 100644 arch/arm64/mm/proc-macros.S
+The Linux kernel patches are available on this tree:
 
-diff --git a/arch/arm64/include/asm/asm-offsets.h b/arch/arm64/include/asm/asm-offsets.h
-new file mode 100644
-index 0000000..d370ee3
---- /dev/null
-+++ b/arch/arm64/include/asm/asm-offsets.h
-@@ -0,0 +1 @@
-+#include <generated/asm-offsets.h>
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-new file mode 100644
-index 0000000..da2a13e
---- /dev/null
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -0,0 +1,109 @@
-+/*
-+ * Based on arch/arm/include/asm/assembler.h
-+ *
-+ * Copyright (C) 1996-2000 Russell King
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASSEMBLY__
-+#error "Only include this from assembly code"
-+#endif
-+
-+#include <asm/ptrace.h>
-+
-+/*
-+ * Stack pushing/popping (register pairs only). Equivalent to store decrement
-+ * before, load increment after.
-+ */
-+	.macro	push, xreg1, xreg2
-+	stp	\xreg1, \xreg2, [sp, #-16]!
-+	.endm
-+
-+	.macro	pop, xreg1, xreg2
-+	ldp	\xreg1, \xreg2, [sp], #16
-+	.endm
-+
-+/*
-+ * Enable and disable interrupts.
-+ */
-+	.macro	disable_irq
-+	msr	daifset, #2
-+	.endm
-+
-+	.macro	enable_irq
-+	msr	daifclr, #2
-+	.endm
-+
-+/*
-+ * Save/disable and restore interrupts.
-+ */
-+	.macro	save_and_disable_irqs, olddaif
-+	mrs	\olddaif, daif
-+	disable_irq
-+	.endm
-+
-+	.macro	restore_irqs, olddaif
-+	msr	daif, \olddaif
-+	.endm
-+
-+/*
-+ * Enable and disable debug exceptions.
-+ */
-+	.macro	disable_dbg
-+	msr	daifset, #8
-+	.endm
-+
-+	.macro	enable_dbg
-+	msr	daifclr, #8
-+	.endm
-+
-+	.macro	disable_step, tmp
-+	mrs	\tmp, mdscr_el1
-+	bic	\tmp, \tmp, #1
-+	msr	mdscr_el1, \tmp
-+	.endm
-+
-+	.macro	enable_step, tmp
-+	mrs	\tmp, mdscr_el1
-+	orr	\tmp, \tmp, #1
-+	msr	mdscr_el1, \tmp
-+	.endm
-+
-+	.macro	enable_dbg_if_not_stepping, tmp
-+	mrs	\tmp, mdscr_el1
-+	tbnz	\tmp, #1, 9990f
-+	enable_dbg
-+9990:
-+	.endm
-+
-+/*
-+ * SMP data memory barrier
-+ */
-+	.macro	smp_dmb, opt
-+#ifdef CONFIG_SMP
-+	dmb	\opt
-+#endif
-+	.endm
-+
-+#define USER(l, x...)				\
-+9999:	x;					\
-+	.section __ex_table,"a";		\
-+	.align	3;				\
-+	.quad	9999b,l;			\
-+	.previous
-+
-+/*
-+ * Register aliases.
-+ */
-+lr	.req	x30		// link register
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-new file mode 100644
-index 0000000..a2a4d81
---- /dev/null
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -0,0 +1,108 @@
-+/*
-+ * Based on arch/arm/kernel/asm-offsets.c
-+ *
-+ * Copyright (C) 1995-2003 Russell King
-+ *               2001-2002 Keith Owens
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/sched.h>
-+#include <linux/mm.h>
-+#include <linux/dma-mapping.h>
-+#include <asm/thread_info.h>
-+#include <asm/memory.h>
-+#include <asm/cputable.h>
-+#include <asm/vdso_datapage.h>
-+#include <linux/kbuild.h>
-+
-+int main(void)
-+{
-+  DEFINE(TSK_ACTIVE_MM,		offsetof(struct task_struct, active_mm));
-+  BLANK();
-+  DEFINE(TI_FLAGS,		offsetof(struct thread_info, flags));
-+  DEFINE(TI_PREEMPT,		offsetof(struct thread_info, preempt_count));
-+  DEFINE(TI_ADDR_LIMIT,		offsetof(struct thread_info, addr_limit));
-+  DEFINE(TI_TASK,		offsetof(struct thread_info, task));
-+  DEFINE(TI_EXEC_DOMAIN,	offsetof(struct thread_info, exec_domain));
-+  DEFINE(TI_CPU,		offsetof(struct thread_info, cpu));
-+  BLANK();
-+  DEFINE(THREAD_CPU_CONTEXT,	offsetof(struct task_struct, thread.cpu_context));
-+  BLANK();
-+  DEFINE(S_X0,			offsetof(struct pt_regs, regs[0]));
-+  DEFINE(S_X1,			offsetof(struct pt_regs, regs[1]));
-+  DEFINE(S_X2,			offsetof(struct pt_regs, regs[2]));
-+  DEFINE(S_X3,			offsetof(struct pt_regs, regs[3]));
-+  DEFINE(S_X4,			offsetof(struct pt_regs, regs[4]));
-+  DEFINE(S_X5,			offsetof(struct pt_regs, regs[5]));
-+  DEFINE(S_X6,			offsetof(struct pt_regs, regs[6]));
-+  DEFINE(S_X7,			offsetof(struct pt_regs, regs[7]));
-+  DEFINE(S_LR,			offsetof(struct pt_regs, regs[30]));
-+  DEFINE(S_SP,			offsetof(struct pt_regs, sp));
-+#ifdef CONFIG_COMPAT
-+  DEFINE(S_COMPAT_SP,		offsetof(struct pt_regs, compat_sp));
-+#endif
-+  DEFINE(S_PSTATE,		offsetof(struct pt_regs, pstate));
-+  DEFINE(S_PC,			offsetof(struct pt_regs, pc));
-+  DEFINE(S_ORIG_X0,		offsetof(struct pt_regs, orig_x0));
-+  DEFINE(S_SYSCALLNO,		offsetof(struct pt_regs, syscallno));
-+  DEFINE(S_FRAME_SIZE,		sizeof(struct pt_regs));
-+  BLANK();
-+  DEFINE(MM_CONTEXT_ID,		offsetof(struct mm_struct, context.id));
-+  BLANK();
-+  DEFINE(VMA_VM_MM,		offsetof(struct vm_area_struct, vm_mm));
-+  DEFINE(VMA_VM_FLAGS,		offsetof(struct vm_area_struct, vm_flags));
-+  BLANK();
-+  DEFINE(VM_EXEC,	       	VM_EXEC);
-+  BLANK();
-+  DEFINE(PAGE_SZ,	       	PAGE_SIZE);
-+  BLANK();
-+  DEFINE(CPU_INFO_SZ,		sizeof(struct cpu_info));
-+  DEFINE(CPU_INFO_SETUP,	offsetof(struct cpu_info, cpu_setup));
-+  BLANK();
-+  DEFINE(DMA_BIDIRECTIONAL,	DMA_BIDIRECTIONAL);
-+  DEFINE(DMA_TO_DEVICE,		DMA_TO_DEVICE);
-+  DEFINE(DMA_FROM_DEVICE,	DMA_FROM_DEVICE);
-+  BLANK();
-+  DEFINE(CLOCK_REALTIME,	CLOCK_REALTIME);
-+  DEFINE(CLOCK_MONOTONIC,	CLOCK_MONOTONIC);
-+  DEFINE(CLOCK_REALTIME_RES,	MONOTONIC_RES_NSEC);
-+  DEFINE(CLOCK_REALTIME_COARSE,	CLOCK_REALTIME_COARSE);
-+  DEFINE(CLOCK_MONOTONIC_COARSE,CLOCK_MONOTONIC_COARSE);
-+  DEFINE(CLOCK_COARSE_RES,	LOW_RES_NSEC);
-+  DEFINE(NSEC_PER_SEC,		NSEC_PER_SEC);
-+  BLANK();
-+  DEFINE(VDSO_CS_CYCLE_LAST,	offsetof(struct vdso_data, cs_cycle_last));
-+  DEFINE(VDSO_XTIME_CLK_SEC,	offsetof(struct vdso_data, xtime_clock_sec));
-+  DEFINE(VDSO_XTIME_CLK_NSEC,	offsetof(struct vdso_data, xtime_clock_nsec));
-+  DEFINE(VDSO_XTIME_CRS_SEC,	offsetof(struct vdso_data, xtime_coarse_sec));
-+  DEFINE(VDSO_XTIME_CRS_NSEC,	offsetof(struct vdso_data, xtime_coarse_nsec));
-+  DEFINE(VDSO_WTM_CLK_SEC,	offsetof(struct vdso_data, wtm_clock_sec));
-+  DEFINE(VDSO_WTM_CLK_NSEC,	offsetof(struct vdso_data, wtm_clock_nsec));
-+  DEFINE(VDSO_TB_SEQ_COUNT,	offsetof(struct vdso_data, tb_seq_count));
-+  DEFINE(VDSO_CS_MULT,		offsetof(struct vdso_data, cs_mult));
-+  DEFINE(VDSO_CS_SHIFT,		offsetof(struct vdso_data, cs_shift));
-+  DEFINE(VDSO_TZ_MINWEST,	offsetof(struct vdso_data, tz_minuteswest));
-+  DEFINE(VDSO_TZ_DSTTIME,	offsetof(struct vdso_data, tz_dsttime));
-+  DEFINE(VDSO_USE_SYSCALL,	offsetof(struct vdso_data, use_syscall));
-+  BLANK();
-+  DEFINE(TVAL_TV_SEC,		offsetof(struct timeval, tv_sec));
-+  DEFINE(TVAL_TV_USEC,		offsetof(struct timeval, tv_usec));
-+  DEFINE(TSPEC_TV_SEC,		offsetof(struct timespec, tv_sec));
-+  DEFINE(TSPEC_TV_NSEC,		offsetof(struct timespec, tv_nsec));
-+  BLANK();
-+  DEFINE(TZ_MINWEST,		offsetof(struct timezone, tz_minuteswest));
-+  DEFINE(TZ_DSTTIME,		offsetof(struct timezone, tz_dsttime));
-+  return 0;
-+}
-diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
-new file mode 100644
-index 0000000..8957b82
---- /dev/null
-+++ b/arch/arm64/mm/proc-macros.S
-@@ -0,0 +1,55 @@
-+/*
-+ * Based on arch/arm/mm/proc-macros.S
-+ *
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <asm/asm-offsets.h>
-+#include <asm/thread_info.h>
-+
-+/*
-+ * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
-+ */
-+	.macro	vma_vm_mm, rd, rn
-+	ldr	\rd, [\rn, #VMA_VM_MM]
-+	.endm
-+
-+/*
-+ * mmid - get context id from mm pointer (mm->context.id)
-+ */
-+	.macro	mmid, rd, rn
-+	ldr	\rd, [\rn, #MM_CONTEXT_ID]
-+	.endm
-+
-+/*
-+ * dcache_line_size - get the minimum D-cache line size from the CTR register.
-+ */
-+	.macro	dcache_line_size, reg, tmp
-+	mrs	\tmp, ctr_el0			// read CTR
-+	lsr	\tmp, \tmp, #16
-+	and	\tmp, \tmp, #0xf		// cache line size encoding
-+	mov	\reg, #4			// bytes per word
-+	lsl	\reg, \reg, \tmp		// actual cache line size
-+	.endm
-+
-+/*
-+ * icache_line_size - get the minimum I-cache line size from the CTR register.
-+ */
-+	.macro	icache_line_size, reg, tmp
-+	mrs	\tmp, ctr_el0			// read CTR
-+	and	\tmp, \tmp, #0xf		// cache line size encoding
-+	mov	\reg, #4			// bytes per word
-+	lsl	\reg, \reg, \tmp		// actual cache line size
-+	.endm
+git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git upstream
+
+Main changes since the previous version:
+- ptrace interface now using regsets for TLS and hardware debug
+  registers.
+- sys_personality fixes. PER_LINUX is the default for all tasks (32 or
+  64-bit) and there is no compat_sys_personality defined.
+- Kconfig clean-up (unused symbols, AARCH32_EMULATION removed in favour
+  of COMPAT).
+- Clean-up of the __cpuc_* function prefixes.
+- CPU information table implemented in C rather than assembly.
+- __bad_* function calls replaced with BUILD_BUG.
+- Inline get_user/put_user (code cleaner, slightly bigger kernel Image).
+- DMA API implementation simplified, defaulting to swiotlb. It will be
+  extended as hardware becomes available.
+- Arch-specific code in the generic timer patch moved to arch/arm64/.
+- Comment fixes and clarifications.
+
+
+Background to the 64-bit ARM architecture:
+
+ARM introduced AArch64 as part of the ARMv8 architecture and consists of
+a substantially revised exception model (with 4 exception levels: EL0 -
+user, EL1 - kernel, EL2 - hypervisor, EL3 - secure monitor), new A64
+instruction set based on larger register file, new FP/SIMD instructions.
+The new ABI is LP64 and takes advantage of the larger register file. It
+also mandates FP.
+
+AArch64 documentation currently available (publicly, though
+click-through agreement required):
+
+- Instruction Set Overview:
+http://infocenter.arm.com/help/topic/com.arm.doc.genc010197a/index.html
+
+- ABI (PCS, ELF, DWARF, C++):
+http://infocenter.arm.com/help/topic/com.arm.doc.ihi0059a/index.html
+
+
+Regards,
+
+Catalin
+
+
+Catalin Marinas (23):
+  arm64: Assembly macros and definitions
+  arm64: Kernel booting and initialisation
+  arm64: Exception handling
+  arm64: MMU definitions
+  arm64: MMU initialisation
+  arm64: MMU fault handling and page table management
+  arm64: Process management
+  arm64: CPU support
+  arm64: Cache maintenance routines
+  arm64: TLB maintenance functionality
+  arm64: Atomic operations
+  arm64: Device specific operations
+  arm64: DMA mapping API
+  arm64: SMP support
+  arm64: ELF definitions
+  arm64: System calls handling
+  arm64: Signal handling support
+  arm64: User access library functions
+  arm64: Floating point and SIMD
+  arm64: Add support for /proc/sys/debug/exception-trace
+  arm64: Miscellaneous header files
+  arm64: Build infrastructure
+  arm64: MAINTAINERS update
+
+Marc Zyngier (3):
+  arm64: IRQ handling
+  arm64: Miscellaneous library functions
+  arm64: Generic timers support
+
+Will Deacon (5):
+  arm64: VDSO support
+  arm64: 32-bit (compat) applications support
+  arm64: Debugging support
+  arm64: Performance counters support
+  arm64: Loadable modules
+
+ Documentation/arm64/booting.txt               |  152 +++
+ Documentation/arm64/memory.txt                |   69 ++
+ MAINTAINERS                                   |    6 +
+ arch/arm64/Kconfig                            |  222 ++++
+ arch/arm64/Kconfig.debug                      |   27 +
+ arch/arm64/Makefile                           |   71 ++
+ arch/arm64/boot/.gitignore                    |    2 +
+ arch/arm64/boot/Makefile                      |   36 +
+ arch/arm64/boot/install.sh                    |   46 +
+ arch/arm64/configs/defconfig                  |   85 ++
+ arch/arm64/include/asm/Kbuild                 |   51 +
+ arch/arm64/include/asm/arm_generic.h          |  100 ++
+ arch/arm64/include/asm/asm-offsets.h          |    1 +
+ arch/arm64/include/asm/assembler.h            |  109 ++
+ arch/arm64/include/asm/atomic.h               |  305 ++++++
+ arch/arm64/include/asm/auxvec.h               |   22 +
+ arch/arm64/include/asm/barrier.h              |   52 +
+ arch/arm64/include/asm/bitops.h               |   74 ++
+ arch/arm64/include/asm/bitsperlong.h          |   23 +
+ arch/arm64/include/asm/byteorder.h            |   21 +
+ arch/arm64/include/asm/cache.h                |   32 +
+ arch/arm64/include/asm/cacheflush.h           |  168 +++
+ arch/arm64/include/asm/cachetype.h            |   48 +
+ arch/arm64/include/asm/cmpxchg.h              |  173 ++++
+ arch/arm64/include/asm/compat.h               |  242 +++++
+ arch/arm64/include/asm/compiler.h             |   30 +
+ arch/arm64/include/asm/cputable.h             |   30 +
+ arch/arm64/include/asm/cputype.h              |   49 +
+ arch/arm64/include/asm/debug-monitors.h       |   88 ++
+ arch/arm64/include/asm/device.h               |   26 +
+ arch/arm64/include/asm/dma-mapping.h          |  124 +++
+ arch/arm64/include/asm/elf.h                  |  179 ++++
+ arch/arm64/include/asm/exception.h            |   23 +
+ arch/arm64/include/asm/exec.h                 |   23 +
+ arch/arm64/include/asm/fb.h                   |   34 +
+ arch/arm64/include/asm/fcntl.h                |   29 +
+ arch/arm64/include/asm/fpsimd.h               |   64 ++
+ arch/arm64/include/asm/futex.h                |  136 +++
+ arch/arm64/include/asm/hardirq.h              |   52 +
+ arch/arm64/include/asm/hw_breakpoint.h        |  137 +++
+ arch/arm64/include/asm/hwcap.h                |   53 +
+ arch/arm64/include/asm/io.h                   |  263 +++++
+ arch/arm64/include/asm/irq.h                  |    8 +
+ arch/arm64/include/asm/irqflags.h             |   91 ++
+ arch/arm64/include/asm/memblock.h             |   21 +
+ arch/arm64/include/asm/memory.h               |  144 +++
+ arch/arm64/include/asm/mmu.h                  |   27 +
+ arch/arm64/include/asm/mmu_context.h          |  152 +++
+ arch/arm64/include/asm/module.h               |   23 +
+ arch/arm64/include/asm/page.h                 |   67 ++
+ arch/arm64/include/asm/param.h                |   23 +
+ arch/arm64/include/asm/perf_event.h           |   22 +
+ arch/arm64/include/asm/pgalloc.h              |  113 ++
+ arch/arm64/include/asm/pgtable-2level-hwdef.h |   43 +
+ arch/arm64/include/asm/pgtable-2level-types.h |   60 ++
+ arch/arm64/include/asm/pgtable-3level-hwdef.h |   50 +
+ arch/arm64/include/asm/pgtable-3level-types.h |   66 ++
+ arch/arm64/include/asm/pgtable-hwdef.h        |   94 ++
+ arch/arm64/include/asm/pgtable.h              |  328 ++++++
+ arch/arm64/include/asm/pmu.h                  |   82 ++
+ arch/arm64/include/asm/proc-fns.h             |   51 +
+ arch/arm64/include/asm/processor.h            |  175 ++++
+ arch/arm64/include/asm/prom.h                 |    1 +
+ arch/arm64/include/asm/ptrace.h               |  212 ++++
+ arch/arm64/include/asm/setup.h                |   26 +
+ arch/arm64/include/asm/shmparam.h             |   28 +
+ arch/arm64/include/asm/sigcontext.h           |   69 ++
+ arch/arm64/include/asm/siginfo.h              |   23 +
+ arch/arm64/include/asm/signal.h               |   24 +
+ arch/arm64/include/asm/signal32.h             |   53 +
+ arch/arm64/include/asm/smp.h                  |   69 ++
+ arch/arm64/include/asm/sparsemem.h            |   24 +
+ arch/arm64/include/asm/spinlock.h             |  202 ++++
+ arch/arm64/include/asm/spinlock_types.h       |   38 +
+ arch/arm64/include/asm/stacktrace.h           |   29 +
+ arch/arm64/include/asm/stat.h                 |   62 ++
+ arch/arm64/include/asm/statfs.h               |   23 +
+ arch/arm64/include/asm/syscall.h              |  101 ++
+ arch/arm64/include/asm/syscalls.h             |   40 +
+ arch/arm64/include/asm/system_misc.h          |   54 +
+ arch/arm64/include/asm/thread_info.h          |  127 +++
+ arch/arm64/include/asm/timex.h                |   29 +
+ arch/arm64/include/asm/tlb.h                  |  190 ++++
+ arch/arm64/include/asm/tlbflush.h             |  122 +++
+ arch/arm64/include/asm/traps.h                |   30 +
+ arch/arm64/include/asm/uaccess.h              |  297 ++++++
+ arch/arm64/include/asm/ucontext.h             |   30 +
+ arch/arm64/include/asm/unistd.h               |   27 +
+ arch/arm64/include/asm/unistd32.h             |  758 ++++++++++++++
+ arch/arm64/include/asm/vdso.h                 |   41 +
+ arch/arm64/include/asm/vdso_datapage.h        |   43 +
+ arch/arm64/kernel/.gitignore                  |    1 +
+ arch/arm64/kernel/Makefile                    |   27 +
+ arch/arm64/kernel/arm64ksyms.c                |   46 +
+ arch/arm64/kernel/asm-offsets.c               |  108 ++
+ arch/arm64/kernel/cputable.c                  |   33 +
+ arch/arm64/kernel/debug-monitors.c            |  288 ++++++
+ arch/arm64/kernel/entry-fpsimd.S              |   80 ++
+ arch/arm64/kernel/entry.S                     |  695 +++++++++++++
+ arch/arm64/kernel/fpsimd.c                    |  106 ++
+ arch/arm64/kernel/head.S                      |  510 +++++++++
+ arch/arm64/kernel/hw_breakpoint.c             |  880 ++++++++++++++++
+ arch/arm64/kernel/io.c                        |   64 ++
+ arch/arm64/kernel/irq.c                       |   84 ++
+ arch/arm64/kernel/kuser32.S                   |   77 ++
+ arch/arm64/kernel/module.c                    |  456 ++++++++
+ arch/arm64/kernel/perf_event.c                | 1368 +++++++++++++++++++++++++
+ arch/arm64/kernel/process.c                   |  412 ++++++++
+ arch/arm64/kernel/ptrace.c                    | 1126 ++++++++++++++++++++
+ arch/arm64/kernel/setup.c                     |  351 +++++++
+ arch/arm64/kernel/signal.c                    |  437 ++++++++
+ arch/arm64/kernel/signal32.c                  |  876 ++++++++++++++++
+ arch/arm64/kernel/smp.c                       |  469 +++++++++
+ arch/arm64/kernel/stacktrace.c                |  127 +++
+ arch/arm64/kernel/sys.c                       |  138 +++
+ arch/arm64/kernel/sys32.S                     |  282 +++++
+ arch/arm64/kernel/sys_compat.c                |  164 +++
+ arch/arm64/kernel/time.c                      |   65 ++
+ arch/arm64/kernel/traps.c                     |  348 +++++++
+ arch/arm64/kernel/vdso.c                      |  261 +++++
+ arch/arm64/kernel/vdso/.gitignore             |    2 +
+ arch/arm64/kernel/vdso/Makefile               |   63 ++
+ arch/arm64/kernel/vdso/gen_vdso_offsets.sh    |   15 +
+ arch/arm64/kernel/vdso/gettimeofday.S         |  242 +++++
+ arch/arm64/kernel/vdso/note.S                 |   28 +
+ arch/arm64/kernel/vdso/sigreturn.S            |   37 +
+ arch/arm64/kernel/vdso/vdso.S                 |   33 +
+ arch/arm64/kernel/vdso/vdso.lds.S             |  100 ++
+ arch/arm64/kernel/vmlinux.lds.S               |  126 +++
+ arch/arm64/lib/Makefile                       |    4 +
+ arch/arm64/lib/bitops.c                       |   25 +
+ arch/arm64/lib/clear_page.S                   |   39 +
+ arch/arm64/lib/clear_user.S                   |   58 ++
+ arch/arm64/lib/copy_from_user.S               |   66 ++
+ arch/arm64/lib/copy_in_user.S                 |   63 ++
+ arch/arm64/lib/copy_page.S                    |   46 +
+ arch/arm64/lib/copy_to_user.S                 |   61 ++
+ arch/arm64/lib/delay.c                        |   55 +
+ arch/arm64/lib/strncpy_from_user.S            |   50 +
+ arch/arm64/lib/strnlen_user.S                 |   47 +
+ arch/arm64/mm/Makefile                        |    4 +
+ arch/arm64/mm/cache.S                         |  251 +++++
+ arch/arm64/mm/context.c                       |  159 +++
+ arch/arm64/mm/copypage.c                      |   34 +
+ arch/arm64/mm/dma-mapping.c                   |   79 ++
+ arch/arm64/mm/extable.c                       |   17 +
+ arch/arm64/mm/fault.c                         |  534 ++++++++++
+ arch/arm64/mm/flush.c                         |  138 +++
+ arch/arm64/mm/init.c                          |  416 ++++++++
+ arch/arm64/mm/ioremap.c                       |   84 ++
+ arch/arm64/mm/mm.h                            |    2 +
+ arch/arm64/mm/mmap.c                          |  144 +++
+ arch/arm64/mm/mmu.c                           |  395 +++++++
+ arch/arm64/mm/pgd.c                           |   54 +
+ arch/arm64/mm/proc-macros.S                   |   55 +
+ arch/arm64/mm/proc.S                          |  181 ++++
+ arch/arm64/mm/tlb.S                           |   71 ++
+ drivers/clocksource/Kconfig                   |    5 +
+ drivers/clocksource/Makefile                  |    1 +
+ drivers/clocksource/arm_generic.c             |  232 +++++
+ include/clocksource/arm_generic.h             |   21 +
+ include/linux/elf.h                           |    3 +
+ init/Kconfig                                  |    3 +-
+ kernel/sysctl.c                               |    2 +-
+ lib/Kconfig.debug                             |    6 +-
+ tools/perf/perf.h                             |    6 +
