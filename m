@@ -1,35 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Sep 2012 13:25:30 +0000
-Subject: [PATCH 07/12] ARM: move all dtb targets out of Makefile.boot
-In-Reply-To: <5049EDC8.1040406@gmail.com>
-References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
- <20120907051917.GD10582@lunn.ch> <5049EDC8.1040406@gmail.com>
-Message-ID: <201209071325.30522.arnd@arndb.de>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 7 Sep 2012 15:29:55 +0200
+Subject: [PATCH 8/9] ARM i.MX53: Add pwms to dtsi
+In-Reply-To: <20120831130723.GS26594@pengutronix.de>
+References: <1346154504-5623-1-git-send-email-s.hauer@pengutronix.de>
+ <1346154504-5623-9-git-send-email-s.hauer@pengutronix.de>
+ <20120830223219.GF3613@r65073-Latitude-D630>
+ <20120831130723.GS26594@pengutronix.de>
+Message-ID: <20120907132955.GH29340@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 September 2012, Rob Herring wrote:
-> 
-> On 09/07/2012 12:19 AM, Andrew Lunn wrote:
-> >>> PS. A little heads-up: if this lands on 3.7, there will be conflict
-> >>> on arch/arm/mach-mxs/Makefile.boot which gets new entries in this
-> >>> cycle.
-> >>
-> >> The same is true of Tegra:
-> >>
-> >> -dtb-$(CONFIG_ARCH_TEGRA_3x_SOC) += tegra30-cardhu.dtb
-> >> +dtb-$(CONFIG_ARCH_TEGRA_3x_SOC) += tegra30-cardhu-a02.dtb
-> >> +dtb-$(CONFIG_ARCH_TEGRA_3x_SOC) += tegra30-cardhu-a04.dtb
+On Fri, Aug 31, 2012 at 03:07:23PM +0200, Sascha Hauer wrote:
+> On Fri, Aug 31, 2012 at 06:32:20AM +0800, Shawn Guo wrote:
+> > On Tue, Aug 28, 2012 at 01:48:23PM +0200, Sascha Hauer wrote:
+[...]
+> > >  arch/arm/boot/dts/imx53.dtsi        |   14 ++++++++++++++
+> > >  arch/arm/mach-imx/clk-imx51-imx53.c |    4 ++++
+> > >  2 files changed, 18 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> > > index cd37165..7ec17e4 100644
+> > > --- a/arch/arm/boot/dts/imx53.dtsi
+> > > +++ b/arch/arm/boot/dts/imx53.dtsi
+> > > @@ -189,6 +189,20 @@
+> > >  				status = "disabled";
+> > >  			};
+> > >  
+> > > +			pwm1: pwm at 53fb4000 {
+> > > +				#pwm-cells = <3>;
 > > 
-> > Ditto kirkwood and mvebu. And Dove might also gain DT support,
-> > resulting in new entries in its Makefile.boot.
+> > pwm-cells should be 2?
 > 
-> It's basically scripted plus fix-up multi-line entries. We could do this
-> at the end of the merge window. I don't think "make dtbs" for
-> multi-platform enabled platforms being bisectable is too important.
+> Yes, right. We have a patch internally that allows us to pass a
+> 'inverted' flag to the pwm, hence I accidently have 3 here.
 
-I think I'd rather merge the series early in the merge window and
-then send a follow-up later. It shouldn't hurt to add the lines
-in the Makefile.boot files after this patch, right?
+There are patches in for-next that add support for setting the PWM
+polarity, though there's currently no support for specifying it via a
+third cell in the specifier. Would you mind sharing the patches that add
+this?
 
-	Arnd
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120907/c1d5759a/attachment.sig>
