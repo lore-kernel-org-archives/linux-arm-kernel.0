@@ -1,43 +1,41 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 07 Sep 2012 08:46:33 -0500
-Subject: [PATCH 07/12] ARM: move all dtb targets out of Makefile.boot
-In-Reply-To: <201209071325.30522.arnd@arndb.de>
-References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
- <20120907051917.GD10582@lunn.ch> <5049EDC8.1040406@gmail.com>
- <201209071325.30522.arnd@arndb.de>
-Message-ID: <5049FAB9.7080702@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 7 Sep 2012 15:50:47 +0200
+Subject: [PATCH] usb: gadget: at91_udc: fix dt support
+In-Reply-To: <1347024462-24144-1-git-send-email-fabio.porcedda@gmail.com>
+References: <1347024462-24144-1-git-send-email-fabio.porcedda@gmail.com>
+Message-ID: <5049FBB7.1010206@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2012 08:25 AM, Arnd Bergmann wrote:
-> On Friday 07 September 2012, Rob Herring wrote:
->>
->> On 09/07/2012 12:19 AM, Andrew Lunn wrote:
->>>>> PS. A little heads-up: if this lands on 3.7, there will be conflict
->>>>> on arch/arm/mach-mxs/Makefile.boot which gets new entries in this
->>>>> cycle.
->>>>
->>>> The same is true of Tegra:
->>>>
->>>> -dtb-$(CONFIG_ARCH_TEGRA_3x_SOC) += tegra30-cardhu.dtb
->>>> +dtb-$(CONFIG_ARCH_TEGRA_3x_SOC) += tegra30-cardhu-a02.dtb
->>>> +dtb-$(CONFIG_ARCH_TEGRA_3x_SOC) += tegra30-cardhu-a04.dtb
->>>
->>> Ditto kirkwood and mvebu. And Dove might also gain DT support,
->>> resulting in new entries in its Makefile.boot.
->>
->> It's basically scripted plus fix-up multi-line entries. We could do this
->> at the end of the merge window. I don't think "make dtbs" for
->> multi-platform enabled platforms being bisectable is too important.
+On 09/07/2012 03:27 PM, Fabio Porcedda :
+> Don't fail the initialization check for the platform_data
+> if there is avaiable an associated device tree node.
 > 
-> I think I'd rather merge the series early in the merge window and
-> then send a follow-up later. It shouldn't hurt to add the lines
-> in the Makefile.boot files after this patch, right?
+> Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
 
-In Steven's example, no, but if it's just a new line with only "
-board.dtb \" then it will have to be fixed.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-I suppose I could just move the converted platforms and leave the rest.
-That doesn't help mvebu though.
+Thanks, bye,
 
-Rob
+> ---
+>  drivers/usb/gadget/at91_udc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+> index c9e66df..4147219 100644
+> --- a/drivers/usb/gadget/at91_udc.c
+> +++ b/drivers/usb/gadget/at91_udc.c
+> @@ -1703,7 +1703,7 @@ static int __devinit at91udc_probe(struct platform_device *pdev)
+>  	int		retval;
+>  	struct resource	*res;
+>  
+> -	if (!dev->platform_data) {
+> +	if (!dev->platform_data && !pdev->dev.of_node) {
+>  		/* small (so we copy it) but critical! */
+>  		DBG("missing platform_data\n");
+>  		return -ENODEV;
+> 
+
+
+-- 
+Nicolas Ferre
