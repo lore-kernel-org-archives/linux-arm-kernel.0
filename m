@@ -1,21 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Sep 2012 19:09:30 +0000
-Subject: [PATCH v3 03/31] arm64: Exception handling
-In-Reply-To: <1347035226-18649-4-git-send-email-catalin.marinas@arm.com>
+Date: Fri, 7 Sep 2012 19:10:18 +0000
+Subject: [PATCH v3 04/31] arm64: MMU definitions
+In-Reply-To: <1347035226-18649-5-git-send-email-catalin.marinas@arm.com>
 References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-4-git-send-email-catalin.marinas@arm.com>
-Message-ID: <201209071909.30852.arnd@arndb.de>
+ <1347035226-18649-5-git-send-email-catalin.marinas@arm.com>
+Message-ID: <201209071910.18527.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 07 September 2012, Catalin Marinas wrote:
-> The patch contains the exception entry code (kernel/entry.S), pt_regs
-> structure and related accessors, undefined instruction trapping and
-> stack tracing.
 > 
-> AArch64 Linux kernel (including kernel threads) runs in EL1 mode using
-> the SP1 stack. The vectors don't have a fixed address, only alignment
-> (2^11) requirements.
+> The virtual memory layout is described in
+> Documentation/arm64/memory.txt. This patch adds the MMU definitions for
+> the 4KB and 64KB translation table configurations. The SECTION_SIZE is
+> 2MB with 4KB page and 512MB with 64KB page configuration.
+> 
+> PHYS_OFFSET is calculated at run-time and stored in a variable (no
+> run-time code patching at this stage).
+> 
+> On the current implementation, both user and kernel address spaces are
+> 512G (39-bit) each with a maximum of 256G for the RAM linear mapping.
+> Linux uses 3 levels of translation tables with the 4K page configuration
+> and 2 levels with the 64K configuration. Extending the memory space
+> beyond 39-bit with the 4K pages or 42-bit with 64K pages requires an
+> additional level of translation tables.
+> 
+> The SPARSEMEM configuration is global to all AArch64 platforms and
+> allows for 1GB sections with SPARSEMEM_VMEMMAP enabled by default.
 > 
 > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
