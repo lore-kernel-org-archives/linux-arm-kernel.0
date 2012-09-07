@@ -1,44 +1,49 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  7 Sep 2012 17:55:34 +0100
-Subject: [PATCH v2 7/7] ARM: virt: arch_timers: enable access to physical
- timers
+Date: Fri,  7 Sep 2012 17:55:33 +0100
+Subject: [PATCH v2 6/7] ARM: virt: Add CONFIG_ARM_VIRT_EXT option
 In-Reply-To: <1347036934-8519-1-git-send-email-marc.zyngier@arm.com>
 References: <1347036934-8519-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1347036934-8519-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1347036934-8519-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If booting in HYP mode, it makes sense to enable the use of the
-physical timers, so the kernel can use them directly.
+From: Dave Martin <dave.martin@linaro.org>
 
+It is now possible to enable the virtualization extention support.
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kernel/hyp-stub.S | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/mm/Kconfig | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index 7060941..65b2417 100644
---- a/arch/arm/kernel/hyp-stub.S
-+++ b/arch/arm/kernel/hyp-stub.S
-@@ -142,6 +142,19 @@ THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
- 	and	r7, #0x1f		@ Preserve HPMN
- 	mcr	p15, 4, r7, c1, c1, 1	@ HDCR
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 101b968..c9a4963 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -624,6 +624,23 @@ config ARM_THUMBEE
+ 	  Say Y here if you have a CPU with the ThumbEE extension and code to
+ 	  make use of it. Say N for code that can run on CPUs without ThumbEE.
  
-+#if !defined(ZIMAGE) && defined(CONFIG_ARM_ARCH_TIMER)
-+	@ make CNTP_* and CNTPCT accessible from PL1
-+	mrc	p15, 0, r7, c0, c1, 1	@ ID_PFR1
-+	lsr	r7, #16
-+	and	r7, #0xf
-+	cmp	r7, #1
-+	bne	1f
-+	mrc	p15, 4, r7, c14, c1, 0	@ CNTHCTL
-+	orr	r7, r7, #3		@ PL1PCEN | PL1PCTEN
-+	mcr	p15, 4, r7, c14, c1, 0	@ CNTHCTL
-+1:
-+#endif
++config ARM_VIRT_EXT
++	bool "Native support for the ARM Virtualization Extensions"
++	depends on MMU && CPU_V7
++	help
++	  Enable the kernel to make use of the ARM Virtualization
++	  Extensions to install hypervisors without run-time firmware
++	  assistance.
 +
- 	bic	r7, r4, #MODE_MASK
- 	orr	r7, r7, #SVC_MODE
- THUMB(	orr	r7, r7, #PSR_T_BIT	)
++	  A compliant bootloader is required in order to make maximum
++	  use of this feature.  Refer to Documentation/arm/Booting for
++	  details.
++
++	  It is safe to enable this option even if the kernel may not be
++	  booted in HYP mode, may not have support for the
++	  virtualization extensions, or may be booted with a
++	  non-compliant bootloader.
++
+ config SWP_EMULATE
+ 	bool "Emulate SWP/SWPB instructions"
+ 	depends on !CPU_USE_DOMAINS && CPU_V7
 -- 
 1.7.12
