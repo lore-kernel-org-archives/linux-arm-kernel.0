@@ -1,27 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Sep 2012 19:53:14 +0000
-Subject: [PATCH v3 28/31] arm64: Generic timers support
-In-Reply-To: <1347035226-18649-29-git-send-email-catalin.marinas@arm.com>
+From: viro@ZenIV.linux.org.uk (Al Viro)
+Date: Fri, 7 Sep 2012 20:54:14 +0100
+Subject: [PATCH v3 17/31] arm64: System calls handling
+In-Reply-To: <201209071943.37184.arnd@arndb.de>
 References: <1347035226-18649-1-git-send-email-catalin.marinas@arm.com>
- <1347035226-18649-29-git-send-email-catalin.marinas@arm.com>
-Message-ID: <201209071953.14680.arnd@arndb.de>
+ <1347035226-18649-18-git-send-email-catalin.marinas@arm.com>
+ <201209071943.37184.arnd@arndb.de>
+Message-ID: <20120907195414.GG13973@ZenIV.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 September 2012, Catalin Marinas wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> This patch adds support for the ARM generic timers with A64 instructions
-> for accessing the timer registers. It uses the physical counter as the
-> clock source and the virtual counter as sched_clock.
-> 
-> The timer frequency can be specified via DT or read from the CNTFRQ_EL0
-> register. The physical counter is also accessible from user space
-> allowing fast gettimeofday() implementation.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
+On Fri, Sep 07, 2012 at 07:43:36PM +0000, Arnd Bergmann wrote:
+> > +       asm(    "add    x0, %0, %1\n\t"
+> > +               "mov    x1, %2\n\t"
+> > +               "mov    x2, %3\n\t"
+> > +               "bl     memmove\n\t"    /* copy regs to top of stack */
+> > +               "mov    x27, #0\n\t"    /* not a syscall */
+> > +               "mov    x28, %0\n\t"    /* thread structure */
+> > +               "mov    sp, x0\n\t"     /* reposition stack pointer */
+> > +               "b      ret_to_user"
+> > +               :
+> > +               : "r" (current_thread_info()),
+> > +                 "Ir" (THREAD_START_SP - sizeof(regs)),
+> > +                 "r" (&regs),
+> > +                 "Ir" (sizeof(regs))
+> > +               : "x0", "x1", "x2", "x27", "x28", "x30", "memory");
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+This should just become ret_from_kernel_execve(); FWIW, arm variant is
+ENTRY(ret_from_kernel_execve)
+        mov     why, #0                 @ not a syscall
+        str     why, [r1, #S_R0]        @ ... and we want 0 in ->ARM_r0 as well
+        mov     r2, #S_FRAME_SIZE
+        bl      memmove                 @ copy regs to normal location; return
+                                        @ value is in r0 and it's the same as
+                                        @ the first argument, so r0 is unchanged.
+        get_thread_info tsk             @ thread structure
+        mov     sp, r0                  @ stack pointer just under pt_regs
+        b       ret_slow_syscall
+
+and AFAICS you want pretty much the same, modulo different registers - 'why'
+(aka r8) seems to correspond to your x27, 'tsk' (aka r9) - to x28 and the rest
+matches one-to-one: x1.. for arguments in place of r1.. and x0 for return value
+(instead of r0)...
