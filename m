@@ -1,155 +1,44 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 7 Sep 2012 11:54:17 +0800
-Subject: [PATCH v2 2/6] net: pxaficp_ir: add irq resources
-In-Reply-To: <1346960563-18689-3-git-send-email-robherring2@gmail.com>
+Date: Fri, 7 Sep 2012 11:56:46 +0800
+Subject: [PATCH v2 1/6] usb: pxa27x_udc: remove IRQ_USB define
+In-Reply-To: <1346960563-18689-2-git-send-email-robherring2@gmail.com>
 References: <1346960563-18689-1-git-send-email-robherring2@gmail.com>
- <1346960563-18689-3-git-send-email-robherring2@gmail.com>
-Message-ID: <CAMPhdO_KQGwFpnEsKqt_ijv55uQ0cYbuNY6Tn7=fhPr8=9YW4A@mail.gmail.com>
+ <1346960563-18689-2-git-send-email-robherring2@gmail.com>
+Message-ID: <CAMPhdO9pyVDaR03Cy53gXbPttbnekaejuP_60qARttUuaBUwWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Sep 7, 2012 at 3:42 AM, Rob Herring <robherring2@gmail.com> wrote:
 > From: Rob Herring <rob.herring@calxeda.com>
 >
-> In order to remove dependency on mach/irqs.h, add platform device
-> resources for irqs.
+> IRQ_USB was implicitly included by gpio.h. Use the existing variable
+> instead of IRQ_USB.
 >
-
-Looks good to me, we shall have this change landed long before this, thanks Rob
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 Acked-by: Eric Miao <eric.y.miao@gmail.com>
 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Samuel Ortiz <samuel@sortiz.org>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: netdev at vger.kernel.org
+Greg, guess this can go through the ARM tree.
+
 > ---
->  arch/arm/mach-pxa/devices.c   |   15 +++++++++++++++
->  drivers/net/irda/pxaficp_ir.c |   28 +++++++++++++++++-----------
->  2 files changed, 32 insertions(+), 11 deletions(-)
+>  drivers/usb/gadget/pxa27x_udc.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
-> index 166eee5..339eb2a 100644
-> --- a/arch/arm/mach-pxa/devices.c
-> +++ b/arch/arm/mach-pxa/devices.c
-> @@ -384,9 +384,24 @@ struct platform_device pxa_device_asoc_platform = {
->
->  static u64 pxaficp_dmamask = ~(u32)0;
->
-> +static struct resource pxa_ir_resources[] = {
-> +       [0] = {
-> +               .start  = IRQ_STUART,
-> +               .end    = IRQ_STUART,
-> +               .flags  = IORESOURCE_IRQ,
-> +       },
-> +       [1] = {
-> +               .start  = IRQ_ICP,
-> +               .end    = IRQ_ICP,
-> +               .flags  = IORESOURCE_IRQ,
-> +       },
-> +};
-> +
->  struct platform_device pxa_device_ficp = {
->         .name           = "pxa2xx-ir",
->         .id             = -1,
-> +       .num_resources  = ARRAY_SIZE(pxa_ir_resources),
-> +       .resource       = pxa_ir_resources,
->         .dev            = {
->                 .dma_mask = &pxaficp_dmamask,
->                 .coherent_dma_mask = 0xffffffff,
-> diff --git a/drivers/net/irda/pxaficp_ir.c b/drivers/net/irda/pxaficp_ir.c
-> index 8d54767..cb0a5d3 100644
-> --- a/drivers/net/irda/pxaficp_ir.c
-> +++ b/drivers/net/irda/pxaficp_ir.c
-> @@ -29,8 +29,8 @@
->
->  #include <mach/dma.h>
->  #include <mach/irda.h>
-> -#include <mach/regs-uart.h>
->  #include <mach/regs-ost.h>
-> +#include <mach/regs-uart.h>
->
->  #define FICP           __REG(0x40800000)  /* Start of FICP area */
->  #define ICCR0          __REG(0x40800000)  /* ICP Control Register 0 */
-> @@ -112,6 +112,9 @@ struct pxa_irda {
->         int                     txdma;
->         int                     rxdma;
->
-> +       int                     uart_irq;
-> +       int                     icp_irq;
-> +
->         struct irlap_cb         *irlap;
->         struct qos_info         qos;
->
-> @@ -672,19 +675,19 @@ static int pxa_irda_start(struct net_device *dev)
->
->         si->speed = 9600;
->
-> -       err = request_irq(IRQ_STUART, pxa_irda_sir_irq, 0, dev->name, dev);
-> +       err = request_irq(si->uart_irq, pxa_irda_sir_irq, 0, dev->name, dev);
->         if (err)
->                 goto err_irq1;
->
-> -       err = request_irq(IRQ_ICP, pxa_irda_fir_irq, 0, dev->name, dev);
-> +       err = request_irq(si->icp_irq, pxa_irda_fir_irq, 0, dev->name, dev);
->         if (err)
->                 goto err_irq2;
->
->         /*
->          * The interrupt must remain disabled for now.
->          */
-> -       disable_irq(IRQ_STUART);
-> -       disable_irq(IRQ_ICP);
-> +       disable_irq(si->uart_irq);
-> +       disable_irq(si->icp_irq);
->
->         err = -EBUSY;
->         si->rxdma = pxa_request_dma("FICP_RX",DMA_PRIO_LOW, pxa_irda_fir_dma_rx_irq, dev);
-> @@ -720,8 +723,8 @@ static int pxa_irda_start(struct net_device *dev)
->         /*
->          * Now enable the interrupt and start the queue
->          */
-> -       enable_irq(IRQ_STUART);
-> -       enable_irq(IRQ_ICP);
-> +       enable_irq(si->uart_irq);
-> +       enable_irq(si->icp_irq);
->         netif_start_queue(dev);
->
->         printk(KERN_DEBUG "pxa_ir: irda driver opened\n");
-> @@ -738,9 +741,9 @@ err_dma_rx_buff:
->  err_tx_dma:
->         pxa_free_dma(si->rxdma);
->  err_rx_dma:
-> -       free_irq(IRQ_ICP, dev);
-> +       free_irq(si->icp_irq, dev);
->  err_irq2:
-> -       free_irq(IRQ_STUART, dev);
-> +       free_irq(si->uart_irq, dev);
->  err_irq1:
->
->         return err;
-> @@ -760,8 +763,8 @@ static int pxa_irda_stop(struct net_device *dev)
->                 si->irlap = NULL;
+> diff --git a/drivers/usb/gadget/pxa27x_udc.c b/drivers/usb/gadget/pxa27x_udc.c
+> index 644b430..7a8713c 100644
+> --- a/drivers/usb/gadget/pxa27x_udc.c
+> +++ b/drivers/usb/gadget/pxa27x_udc.c
+> @@ -2508,7 +2508,7 @@ static int __init pxa_udc_probe(struct platform_device *pdev)
+>                         IRQF_SHARED, driver_name, udc);
+>         if (retval != 0) {
+>                 dev_err(udc->dev, "%s: can't get irq %i, err %d\n",
+> -                       driver_name, IRQ_USB, retval);
+> +                       driver_name, udc->irq, retval);
+>                 goto err_irq;
 >         }
->
-> -       free_irq(IRQ_STUART, dev);
-> -       free_irq(IRQ_ICP, dev);
-> +       free_irq(si->uart_irq, dev);
-> +       free_irq(si->icp_irq, dev);
->
->         pxa_free_dma(si->rxdma);
->         pxa_free_dma(si->txdma);
-> @@ -851,6 +854,9 @@ static int pxa_irda_probe(struct platform_device *pdev)
->         si->dev = &pdev->dev;
->         si->pdata = pdev->dev.platform_data;
->
-> +       si->uart_irq = platform_get_irq(pdev, 0);
-> +       si->icp_irq = platform_get_irq(pdev, 1);
-> +
->         si->sir_clk = clk_get(&pdev->dev, "UARTCLK");
->         si->fir_clk = clk_get(&pdev->dev, "FICPCLK");
->         if (IS_ERR(si->sir_clk) || IS_ERR(si->fir_clk)) {
+>         retval = usb_add_gadget_udc(&pdev->dev, &udc->gadget);
 > --
 > 1.7.9.5
 >
