@@ -1,290 +1,85 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 7 Sep 2012 22:48:53 +0530
-Subject: [PATCH v2 2/2] ARM: da850/omap-l138: Add EVM specific code for
- VPIF to work
-In-Reply-To: <1345471731-31678-3-git-send-email-prabhakar.lad@ti.com>
-References: <1345471731-31678-1-git-send-email-prabhakar.lad@ti.com>
- <1345471731-31678-3-git-send-email-prabhakar.lad@ti.com>
-Message-ID: <504A2C7D.1090702@ti.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 7 Sep 2012 10:22:28 -0700
+Subject: [PATCH v3 01/10] PCI: Keep pci_fixup_irqs() around after init
+In-Reply-To: <20120907170024.GA16114@avionic-0098.mockup.avionic-design.de>
+References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
+ <1343332512-28762-2-git-send-email-thierry.reding@avionic-design.de>
+ <CAErSpo7v+i8i=mXCs7ZW8DtGTDN_4AEntwYLqGG8FcCzweySFg@mail.gmail.com>
+ <20120815192814.GA12870@avionic-0098.mockup.avionic-design.de>
+ <CAErSpo6cjOzJegJqXzmk59DChExcbLK1sOhwyAyQL4FZkTN21A@mail.gmail.com>
+ <504A1EA2.9030008@wwwdotorg.org>
+ <20120907170024.GA16114@avionic-0098.mockup.avionic-design.de>
+Message-ID: <CAErSpo4Y4QXfahRkBoJ_jmKy6VAYqOzixTmCPkwSATfO+rzVxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prabhakar,
+On Fri, Sep 7, 2012 at 10:00 AM, Thierry Reding
+<thierry.reding@avionic-design.de> wrote:
+> On Fri, Sep 07, 2012 at 10:19:46AM -0600, Stephen Warren wrote:
+>> On 08/15/2012 01:42 PM, Bjorn Helgaas wrote:
+>> > On Wed, Aug 15, 2012 at 1:28 PM, Thierry Reding
+>> > <thierry.reding@avionic-design.de> wrote:
+>> >> On Wed, Aug 15, 2012 at 10:06:27AM -0700, Bjorn Helgaas wrote:
+>> >>> On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
+>> >>> <thierry.reding@avionic-design.de> wrote:
+>> >>>> When using deferred driver probing, PCI host controller drivers may
+>> >>>> actually require this function after the init stage.
+>> >>>>
+>> >>>> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+>> >>>> ---
+>> >>>> Changes in v3:
+>> >>>> - none
+>> >>>>
+>> >>>> Changes in v2:
+>> >>>> - use __devinit annotations
+>> >>>
+>> >>> Your original patch removed __init completely.  Here you change it to
+>> >>> __devinit.  That means we decide whether to discard the function based
+>> >>> on whether CONFIG_HOTPLUG is supported.  But I think your point is not
+>> >>> about hotplug; it's merely that we should be able to scan a PCI bus
+>> >>> after init-time.  We ought to be able to do a late PCI scan even if
+>> >>> hotplug is not supported.
+>> >>>
+>> >>> Therefore, I'd be inclined to remove __init completely unless you have
+>> >>> another reason for preferring __devinit.
+>> >>
+>> >> I thought __devinit would resolve to nothing if HOTPLUG is defined and
+>> >> __init otherwise. That seemed more appropriate. However you are right
+>> >> that it is useful to always have it available, so I'm fine with removing
+>> >> the annotations altogether. Do you want me to follow up with a patch? Or
+>> >> can you just take the first version? I'm not sure if it still applies.
+>> >
+>> > You're right about how __devinit works.  It's just that I don't think
+>> > hotplug is actually relevant here.  We're trying to make
+>> > pci_fixup_irqs() work after init, whether it's because of hotplug or
+>> > simply because the arch scans host bridges after init.
+>> >
+>> > I applied this to my "next" branch.  Thanks!
+>>
+>> Bjorn, I don't see this patch in next-20120907. Did it get dropped for
+>> some reason?
+>
+> Yes, it turns out that dropping the annotations causes lots of section
+> mismatches on other architectures. See here[0] for the details. I think
+> the solution to the issue would be to either remove HOTPLUG altogether
+> and drop __devinit and __devexit annotations or update all architectures
+> to fix these warnings. I think Bjorn and I settled on the latter because
+> it's obviously less intrusive. I've been busy building toolchains for
+> all the PCI architectures and I think I have all of them. I'll just need
+> some more time to build, find and fix any remaining section mismatches.
 
-On 8/20/2012 7:38 PM, Prabhakar Lad wrote:
-> From: Manjunath Hadli <manjunath.hadli@ti.com>
-> 
-> Include the expander settings to select VPIF peripheral on
-> UI card and add registration call in EVM init. Also add platform
-> data to configure display and capture devices.
-> 
-> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> ---
->  arch/arm/mach-davinci/Kconfig           |    9 ++
->  arch/arm/mach-davinci/board-da850-evm.c |  178 +++++++++++++++++++++++++++++++
->  2 files changed, 187 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-> index ab99c3c..436b47c 100644
-> --- a/arch/arm/mach-davinci/Kconfig
-> +++ b/arch/arm/mach-davinci/Kconfig
-> @@ -186,6 +186,15 @@ config DA850_UI_RMII
->  	  NOTE: Please take care while choosing this option, MII PHY will
->  	  not be functional if RMII mode is selected.
->  
-> +config DA850_UI_SD_VIDEO_PORT
-> +	bool "Video Port Interface"
-> +	help
-> +	  Say Y if you want to use Video Port Interface (VPIF) on the
-> +	  DA850/OMAP-L138 EVM. The Video decoders/encoders are found on the
-> +	  UI daughter card that is supplied with the EVM.
+Greg KH is actively removing CONFIG_HOTPLUG altogether -- see
+https://lkml.org/lkml/2012/9/4/489
 
-> +	  NOTE: Please make sure to disable RMII and CLCD options when you
-> +	  select Video Port Interface.
+That will make __devinit resolve to nothing in all cases, and we'll
+eventually remove __devinit completely.  So we don't want to convert
+__init to __devinit; we have to remove the __init altogether.  I think
+that means we have to update all arches first to avoid the section
+mismatches.
 
-I thought you agreed to remove this note. CLCD is not present in
-mainline and RMII cannot be selected along with video because of the
-choice. So, the note is basically useless.
+So I think Thierry is on the right track:
+  1) Change all arch pcibios_update_irq() implementations (and
+probably a few other things) to be non-__init
+  2) Change pci_fixup_irqs() to be non-__init
 
-> +
->  endchoice
->  
->  config DA850_WL12XX
-> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> index 0149fb4..cdbbced 100644
-> --- a/arch/arm/mach-davinci/board-da850-evm.c
-> +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> @@ -45,6 +45,8 @@
->  #include <mach/aemif.h>
->  #include <mach/spi.h>
->  
-> +#include <media/tvp514x.h>
-> +
->  #define DA850_EVM_PHY_ID		"davinci_mdio-0:00"
->  #define DA850_LCD_PWR_PIN		GPIO_TO_PIN(2, 8)
->  #define DA850_LCD_BL_PIN		GPIO_TO_PIN(2, 15)
-> @@ -121,6 +123,12 @@ static struct spi_board_info da850evm_spi_info[] = {
->  	},
->  };
->  
-> +#define TVP5147_CH0		"tvp514x-0"
-> +#define TVP5147_CH1		"tvp514x-1"
-> +
-> +#define VPIF_STATUS		0x002c
-> +#define VPIF_STATUS_CLR		0x0030
-> +
->  #ifdef CONFIG_MTD
->  static void da850_evm_m25p80_notify_add(struct mtd_info *mtd)
->  {
-> @@ -452,6 +460,15 @@ static void da850_evm_ui_keys_init(unsigned gpio)
->  	}
->  }
->  
-> +#ifdef CONFIG_DA850_UI_SD_VIDEO_PORT
-> +static inline void da850_evm_setup_video_port(int video_sel)
-> +{
-> +	gpio_set_value_cansleep(video_sel, 0);
-> +}
-> +#else
-> +static inline void da850_evm_setup_video_port(int video_sel) { }
-> +#endif
-> +
->  static int da850_evm_ui_expander_setup(struct i2c_client *client, unsigned gpio,
->  						unsigned ngpio, void *c)
->  {
-> @@ -497,6 +514,8 @@ static int da850_evm_ui_expander_setup(struct i2c_client *client, unsigned gpio,
->  
->  	da850_evm_setup_emac_rmii(sel_a);
->  
-> +	da850_evm_setup_video_port(sel_c);
-> +
->  	return 0;
->  
->  exp_setup_keys_fail:
-> @@ -1149,6 +1168,133 @@ static __init int da850_evm_init_cpufreq(void)
->  static __init int da850_evm_init_cpufreq(void) { return 0; }
->  #endif
->  
-> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
-> +
-> +/* VPIF capture configuration */
-> +static struct tvp514x_platform_data tvp5146_pdata = {
-> +	.clk_polarity = 0,
-> +	.hs_polarity = 1,
-> +	.vs_polarity = 1
-
-A ',' needed at the end of above line. It will be nice to line up the
-initialization using tabs too.
-
-> +};
-> +
-> +#define TVP514X_STD_ALL (V4L2_STD_NTSC | V4L2_STD_PAL)
-> +
-> +static const struct vpif_input da850_ch0_inputs[] = {
-> +	{
-> +		.input = {
-> +			.index = 0,
-> +			.name = "Composite",
-> +			.type = V4L2_INPUT_TYPE_CAMERA,
-> +			.std = TVP514X_STD_ALL,
-> +		},
-> +		.subdev_name = TVP5147_CH0,
-> +	},
-> +};
-> +
-> +static const struct vpif_input da850_ch1_inputs[] = {
-> +	{
-> +		.input = {
-> +			.index = 0,
-> +			.name = "S-Video",
-> +			.type = V4L2_INPUT_TYPE_CAMERA,
-> +			.std = TVP514X_STD_ALL,
-> +		},
-> +		.subdev_name = TVP5147_CH1,
-> +	},
-> +};
-> +#endif
-> +
-> +static struct vpif_subdev_info da850_vpif_capture_sdev_info[] = {
-> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
-
-You agreed to get rid of these multiple ifdefs but you have not fixed that.
-
-> +	{
-> +		.name	= TVP5147_CH0,
-> +		.board_info = {
-> +			I2C_BOARD_INFO("tvp5146", 0x5d),
-> +			.platform_data = &tvp5146_pdata,
-> +		},
-> +		.input = INPUT_CVBS_VI2B,
-> +		.output = OUTPUT_10BIT_422_EMBEDDED_SYNC,
-> +		.can_route = 1,
-> +		.vpif_if = {
-> +			.if_type = VPIF_IF_BT656,
-> +			.hd_pol = 1,
-> +			.vd_pol = 1,
-> +			.fid_pol = 0,
-> +		},
-> +	},
-> +	{
-> +		.name	= TVP5147_CH1,
-> +		.board_info = {
-> +			I2C_BOARD_INFO("tvp5146", 0x5c),
-> +			.platform_data = &tvp5146_pdata,
-> +		},
-> +		.input = INPUT_SVIDEO_VI2C_VI1C,
-> +		.output = OUTPUT_10BIT_422_EMBEDDED_SYNC,
-> +		.can_route = 1,
-> +		.vpif_if = {
-> +			.if_type = VPIF_IF_BT656,
-> +			.hd_pol = 1,
-> +			.vd_pol = 1,
-> +			.fid_pol = 0,
-> +		},
-> +	},
-> +#endif
-> +};
-> +
-> +static struct vpif_capture_config da850_vpif_capture_config = {
-> +	.subdev_info = da850_vpif_capture_sdev_info,
-> +	.subdev_count = ARRAY_SIZE(da850_vpif_capture_sdev_info),
-> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
-> +	.chan_config[0] = {
-> +		.inputs = da850_ch0_inputs,
-> +		.input_count = ARRAY_SIZE(da850_ch0_inputs),
-> +	},
-> +	.chan_config[1] = {
-> +		.inputs = da850_ch1_inputs,
-> +		.input_count = ARRAY_SIZE(da850_ch1_inputs),
-> +	},
-> +#endif
-> +	.card_name      = "DA850/OMAP-L138 Video Capture",
-> +};
-> +
-> +/* VPIF display configuration */
-> +static struct vpif_subdev_info da850_vpif_subdev[] = {
-> +	{
-> +		.name	= "adv7343",
-> +		.board_info = {
-> +			I2C_BOARD_INFO("adv7343", 0x2a),
-> +		},
-> +	},
-> +};
-> +
-> +static const char const *vpif_output[] = {
-> +	"Composite",
-> +	"Component",
-> +	"S-Video",
-> +};
-> +
-> +static struct vpif_display_config da850_vpif_display_config = {
-> +	.subdevinfo	= da850_vpif_subdev,
-> +	.subdev_count	= ARRAY_SIZE(da850_vpif_subdev),
-> +	.output		= vpif_output,
-> +	.output_count	= ARRAY_SIZE(vpif_output),
-> +	.card_name	= "DA850/OMAP-L138 Video Display",
-> +};
-> +
-> +#if defined(CONFIG_VIDEO_DAVINCI_VPIF_DISPLAY) ||\
-> +		defined(CONFIG_VIDEO_DAVINCI_VPIF_DISPLAY_MODULE)
-> +#define HAS_VPIF_DISPLAY 1
-> +#else
-> +#define HAS_VPIF_DISPLAY 0
-> +#endif
-> +
-> +#if defined(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) ||\
-> +		defined(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE_MODULE)
-> +#define HAS_VPIF_CAPTURE 1
-> +#else
-> +#define HAS_VPIF_CAPTURE 0
-> +#endif
-> +
->  #ifdef CONFIG_DA850_WL12XX
->  
->  static void wl12xx_set_power(int index, bool power_on)
-> @@ -1375,6 +1521,38 @@ static __init void da850_evm_init(void)
->  		pr_warning("da850_evm_init: suspend registration failed: %d\n",
->  				ret);
->  
-> +	if (HAS_VPIF_DISPLAY || HAS_VPIF_CAPTURE) {
-> +		ret = da850_register_vpif();
-> +		if (ret)
-> +			pr_warn("da850_evm_init: VPIF setup failed: %d\n", ret);
-> +	}
-> +
-> +	if (HAS_VPIF_CAPTURE) {
-> +		ret = davinci_cfg_reg_list(da850_vpif_capture_pins);
-> +		if (ret)
-> +			pr_warn(
-> +			"da850_evm_init: VPIF capture mux setup failed: %d\n",
-> +			ret);
-> +
-> +		ret = da850_register_vpif_capture(&da850_vpif_capture_config);
-> +		if (ret)
-> +			pr_warn(
-> +			"da850_evm_init: VPIF capture setup failed: %d\n", ret);
-> +	}
-> +
-> +	if (HAS_VPIF_DISPLAY) {
-> +		ret = davinci_cfg_reg_list(da850_vpif_display_pins);
-> +		if (ret)
-> +			pr_warn(
-> +			"da850_evm_init: VPIF display mux setup failed: %d\n",
-> +			ret);
-> +
-> +		ret = da850_register_vpif_display(&da850_vpif_display_config);
-> +		if (ret)
-> +			pr_warn(
-> +			"da850_evm_init: VPIF display setup failed: %d\n", ret);
-> +	}
-> +
-
-Registering the platform device only when driver is configured is not
-required. Platform device registration should just reflect what is
-present in the hardware. Removing this should also get rid of the ugly
-line breaks above.
-
-Thanks,
-Sekhar
+Bjorn
