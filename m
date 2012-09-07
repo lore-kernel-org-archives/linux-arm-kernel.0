@@ -1,67 +1,38 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 7 Sep 2012 10:43:59 +0800
-Subject: [PATCH 1/2] serial: mxs-auart: fix the wrong setting order
-In-Reply-To: <20120907023841.GF26709@S2101-09.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 7 Sep 2012 10:43:52 +0800
+Subject: [PATCH 2/2] serial: mxs-auart: put the device in mxs_auart_probe()
+In-Reply-To: <1346985521-2248-2-git-send-email-shijie8@gmail.com>
 References: <1346985521-2248-1-git-send-email-shijie8@gmail.com>
- <20120907023841.GF26709@S2101-09.ap.freescale.net>
-Message-ID: <50495F6F.4040800@freescale.com>
+ <1346985521-2248-2-git-send-email-shijie8@gmail.com>
+Message-ID: <20120907024349.GH26709@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?09?07? 10:38, Shawn Guo ??:
-> On Thu, Sep 06, 2012 at 10:38:40PM -0400, Huang Shijie wrote:
->> After set the AUART_CTRL0_CLKGATE, the UART will gate all the clocks off.
->> So the following line will not take effect.
->>         ................................................................
->>   	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
->>   			u->membase + AUART_INTR_CLR);
->>         ................................................................
->>
->> To fix this issue, the patch moves this gate-off line to
->> the end of setting registers.
->>
->> Signed-off-by: Huang Shijie<shijie8@gmail.com>
-> Acked-by: Shawn Guo<shawn.guo@linaro.org>
->
-> Are you experiencing any user visible problem with this bug?
->
-I do not experience any user problem.
-I found this bug when i tried to add DMA support for MXS-AUART.
+On Thu, Sep 06, 2012 at 10:38:41PM -0400, Huang Shijie wrote:
+> We call the get_device() in the mxs_auart_probe().
+> For the balance of the reference count, we should put the
+> device in the mxs_auart_remove().
+> 
+> Signed-off-by: Huang Shijie <shijie8@gmail.com>
+> ---
+>  drivers/tty/serial/mxs-auart.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+> index ea5f888..6898413 100644
+> --- a/drivers/tty/serial/mxs-auart.c
+> +++ b/drivers/tty/serial/mxs-auart.c
+> @@ -796,6 +796,7 @@ static int __devexit mxs_auart_remove(struct platform_device *pdev)
+>  
+>  	auart_port[pdev->id] = NULL;
+>  
+> +	put_device(s->dev);
+>  	clk_put(s->clk);
+>  	free_irq(s->irq, s);
+>  	kfree(s);
 
-Best Regards
-Huang Shijie
+So the error path of probe needs function fixing too, right?
 
-
-> Regards,
-> Shawn
->
->> ---
->>   drivers/tty/serial/mxs-auart.c |    4 ++--
->>   1 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
->> index dafeef2..ea5f888 100644
->> --- a/drivers/tty/serial/mxs-auart.c
->> +++ b/drivers/tty/serial/mxs-auart.c
->> @@ -457,11 +457,11 @@ static void mxs_auart_shutdown(struct uart_port *u)
->>
->>   	writel(AUART_CTRL2_UARTEN, u->membase + AUART_CTRL2_CLR);
->>
->> -	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_SET);
->> -
->>   	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
->>   			u->membase + AUART_INTR_CLR);
->>
->> +	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_SET);
->> +
->>   	clk_disable_unprepare(s->clk);
->>   }
->>
->> -- 
->> 1.7.4.4
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+-- 
+Regards,
+Shawn
