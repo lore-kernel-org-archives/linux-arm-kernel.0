@@ -1,54 +1,57 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 7 Sep 2012 14:39:15 +0530
-Subject: [PATCH v2] arm: omap: hwmod: make *phy_48m* as the main_clk of ocp2scp
-Message-ID: <1347008955-21310-1-git-send-email-kishon@ti.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Fri, 7 Sep 2012 09:10:50 +0000
+Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
+In-Reply-To: <CADjby3UyhW=Ok8Zy57MVUz65gd-=4z2PhE6uqd7F8xtaDXcWfQ@mail.gmail.com>
+References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
+ <CADjby3UyhW=Ok8Zy57MVUz65gd-=4z2PhE6uqd7F8xtaDXcWfQ@mail.gmail.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA29819@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Made *ocp2scp_usb_phy_phy_48m* as the main_clk for ocp2scp.
-Since this ocp2scp module does not have any fck but does have a
-single opt_clock, it is added as the main_clk for ocp2scp. Also
-removed phy_48m as the optional clock since it is now made as the
-main clock. By this the driver need not enable/disable phy_48m clk
-separately and runtime_get/runtime_put will take care of that.
+Hi Domenico,
 
-Cc: Beno?t Cousson <b-cousson@ti.com>
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
-Changes for v1:
- Amend the comment section with benefit for the driver because of this patch.
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+On Fri, Sep 07, 2012 at 14:18:39, Domenico Andreoli wrote:
+> On Sat, Sep 1, 2012 at 10:16 AM, AnilKumar Ch <anilkumar@ti.com> wrote:
+> > Adopt pinctrl support to leds-gpio driver based on leds-gpio
+> > device pointer, pinctrl driver configure SoC pins to GPIO
+> > mode according to definitions provided in .dts file.
+> 
+> Shouldn't be the interaction with the pinctrl layer left to gpiolib?
+> 
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 242aee4..e8e5405 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -2503,14 +2503,11 @@ static struct omap_hwmod_class omap44xx_ocp2scp_hwmod_class = {
- };
- 
- /* ocp2scp_usb_phy */
--static struct omap_hwmod_opt_clk ocp2scp_usb_phy_opt_clks[] = {
--	{ .role = "phy_48m", .clk = "ocp2scp_usb_phy_phy_48m" },
--};
--
- static struct omap_hwmod omap44xx_ocp2scp_usb_phy_hwmod = {
- 	.name		= "ocp2scp_usb_phy",
- 	.class		= &omap44xx_ocp2scp_hwmod_class,
- 	.clkdm_name	= "l3_init_clkdm",
-+	.main_clk	= "ocp2scp_usb_phy_phy_48m",
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = OMAP4_CM_L3INIT_USBPHYOCP2SCP_CLKCTRL_OFFSET,
-@@ -2518,8 +2515,6 @@ static struct omap_hwmod omap44xx_ocp2scp_usb_phy_hwmod = {
- 			.modulemode   = MODULEMODE_HWCTRL,
- 		},
- 	},
--	.opt_clks	= ocp2scp_usb_phy_opt_clks,
--	.opt_clks_cnt	= ARRAY_SIZE(ocp2scp_usb_phy_opt_clks),
- };
- 
- /*
--- 
-1.7.9.5
+No, these gpio's are configured specifically for user leds.
+
+So, leds-gpio driver should have this call, because these gpio
+pins are used by leds-gpio driver.
+
++       am33xx_pinmux: pinmux at 44e10800 {
++               userled_pins: pinmux_userled_pins {
++                       pinctrl-single,pins = <
++                               0x54 0x7       
++                               0x58 0x17       
++                               0x5c 0x7        
++                               0x60 0x17       
++                       >;
++               };
++       };
++
+
+[...]
+
++               leds {
++                       compatible = "gpio-leds";
++                       pinctrl-names = "default";
++                       pinctrl-0 = <&userled_pins>;
+                                      ^^^^^^^^^^^^
+
+This devm_pinctrl_get_select_default() call in leds-gpio driver
+will internally take userled_pins node and configure those pins
+according to the above definitions.
+
+Lets take gpio-keypad driver, in that case we have to configure
+pins as INPUT mode (generic gpio driver might not know what
+the end usecase is) and this leds case we configure as OUTPUT
+mode.
+
+Thanks
+AnilKumar
