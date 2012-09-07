@@ -1,32 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 7 Sep 2012 15:04:24 -0700
-Subject: [GIT PULL] ARM: LPC32xx: core update
-In-Reply-To: <50488FD6.4080402@antcom.de>
-References: <50488FD6.4080402@antcom.de>
-Message-ID: <20120907220424.GD3139@quad.lixom.net>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 07 Sep 2012 15:06:52 -0700
+Subject: [PATCH v2] gpio/omap: fix possible memory leak in
+ omap2_gpio_dev_init()
+In-Reply-To: <CAPgLHd-XS_AtLr+8R6yNkSXdNxO3i-NapK7o5zBUado-7R99=w@mail.gmail.com>
+ (Wei Yongjun's message of "Mon, 3 Sep 2012 20:42:27 +0800")
+References: <CAPgLHd-XS_AtLr+8R6yNkSXdNxO3i-NapK7o5zBUado-7R99=w@mail.gmail.com>
+Message-ID: <871uidjxmr.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 01:58:14PM +0200, Roland Stigge wrote:
-> Hi Arnd and Olof,
-> 
-> below is the LPC32xx core update branch for 3.7.
-> 
-> Thanks,
-> 
-> Roland
-> 
-> 
-> 
-> The following changes since commit 4cbe5a555fa58a79b6ecbb6c531b8bab0650778d:
-> 
->   Linux 3.6-rc4 (2012-09-01 10:39:58 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.antcom.de/linux-2.6.git lpc32xx/core
+Wei Yongjun <weiyj.lk@gmail.com> writes:
 
-Thanks, pulled into next/soc.
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+>
+> pdata and pdata->regs have been allocated in this function and 
+> should be freed before leaving it, and in the other error handling
+> cases too.
+>
+> spatch with a semantic match is used to found this problem.
+> (http://coccinelle.lip6.fr/)
+>
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
+Acked-by: Kevin Hilman <khilman@ti.com>
 
--Olof
+Tony, can you pick this one up for fixes?
+
+Thanks,
+
+Kevin
