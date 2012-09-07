@@ -1,63 +1,67 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 07 Sep 2012 14:22:36 -0700
-Subject: [PATCH RFC] clk: use spinlock for clk_get_rate
-In-Reply-To: <504A43D0.7060406@calxeda.com>
-References: <1346919146-25972-1-git-send-email-shawn.guo@linaro.org>
- <5049EFE5.4080002@calxeda.com> <504A43D0.7060406@calxeda.com>
-Message-ID: <20120907212236.20289.14547@nucleus>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 7 Sep 2012 23:23:31 +0200
+Subject: [PATCH 2/2] ARM: kirkwood: Use devicetree to define DNS-32[05] fan
+In-Reply-To: <1347035675-23907-3-git-send-email-jm@lentin.co.uk>
+References: <1347035675-23907-1-git-send-email-jm@lentin.co.uk>
+ <1347035675-23907-3-git-send-email-jm@lentin.co.uk>
+Message-ID: <20120907212331.GF21036@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Mark Langsdorf (2012-09-07 11:58:24)
-> > From: Shawn Guo <shawn.guo@linaro.org>
-> >
-> > A nested locking issue is seen on imx6q (CA9 Quad) as below when cpufreq
-> > driver is running.  It looks like the issue is caused by a simultaneous
-> > call to clk_get_rate from two smp_twd threads.
-> > 
-> > 1) cpu0_set_target
-> >      cpufreq_notify_transition
-> >        ...
-> >          twd_cpufreq_transition
-> >            twd_update_frequency
-> >              clk_get_rate
-> > 
-> > 2) do_exit
-> >      kernel_init
-> >        smp_prepare_cpus
-> >          percpu_timer_setup
-> >            twd_timer_setup
-> >              clk_get_rate
-> > 
-> > The patch "clk: new locking scheme for reentrancy" does not help the
-> > issue.  I'm not sure if this is an issue that should be fixed in
-> > smp_twd driver or it's an use case which should be supported by clk API.
-> > 
-> > Looking at clk_get_rate() API, it just reads a cached clock rate and
-> > should be fast enough to hold a spinlock than mutex.  It's a quick
-> > fix to the issue, but I'm not really sure it's the correct one. That's
-> > why this is a RFC patch.
-> 
-> I was seeing a similar issue while developing cpufreq support for the
-> Calxeda Highbank SoC. This patch seems to have resolved the issue. I
-> don't know if it's correct, but it works for me.
+> diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
+> index 4ab3506..e202a07 100644
+> --- a/arch/arm/mach-kirkwood/board-dnskw.c
+> +++ b/arch/arm/mach-kirkwood/board-dnskw.c
+> @@ -67,29 +67,6 @@ static unsigned int dnskw_mpp_config[] __initdata = {
+>  	0
+>  };
+>  
+> -/* Fan: ADDA AD045HB-G73 40mm 6000rpm at 5v */
+> -static struct gpio_fan_speed dnskw_fan_speed[] = {
+> -	{    0,  0 },
+> -	{ 3000,	 1 },
+> -	{ 6000,	 2 },
+> -};
+> -static unsigned dnskw_fan_pins[] = {46, 45};
+> -
+> -static struct gpio_fan_platform_data dnskw_fan_data = {
+> -	.num_ctrl	= ARRAY_SIZE(dnskw_fan_pins),
+> -	.ctrl		= dnskw_fan_pins,
+> -	.num_speed	= ARRAY_SIZE(dnskw_fan_speed),
+> -	.speed		= dnskw_fan_speed,
+> -};
+> -
+> -static struct platform_device dnskw_fan_device = {
+> -	.name	= "gpio-fan",
+> -	.id	= -1,
+> -	.dev	= {
+> -		.platform_data	= &dnskw_fan_data,
+> -	},
+> -};
+> -
+>  static void dnskw_power_off(void)
+>  {
+>  	gpio_set_value(36, 1);
+> @@ -114,8 +91,6 @@ void __init dnskw_init(void)
+>  	kirkwood_ehci_init();
+>  	kirkwood_ge00_init(&dnskw_ge00_data);
+>  
+> -	platform_device_register(&dnskw_fan_device);
+> -
+>  	/* Register power-off GPIO. */
+>  	if (gpio_request(36, "dnskw:power:off") == 0
+>  	    && gpio_direction_output(36, 0) == 0)
+> -- 
+> 1.7.10.4
 > 
 
-The fix is not correct.  clk->rate is protected by the prepare_lock
-mutex and not the enable_lock spinlock.  This change makes it so that we
-have two different locks protecting the same structure member at
-different times and accesses are unsynchronized.
+Hi Jamie
 
-This can be fixed in the framework and I'll post more on that soon.
+Minor point. I expect you can remove the header file gpio-fan.h.
 
-Regards,
-Mike
+There are also a few other headers files which can be removed, but i
+suggest you do this in a separate cleanup patch. I think
+ata_platform.h, input.h, leds.h, map.h, bridge-regs.h and maybe also
+kirkwood.h are no longer needed.
 
-> --Mark Langsdorf
-> Calxeda, Inc.
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+  Andrew
