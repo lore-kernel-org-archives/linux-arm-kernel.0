@@ -1,33 +1,56 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  7 Sep 2012 12:14:49 +0100
-Subject: [PATCH 09/19] ARM: ux500: Enable SSP (SPI) for HREF when booting
- Device Tree
+Date: Fri,  7 Sep 2012 12:14:51 +0100
+Subject: [PATCH 11/19] ARM: ux500: Add all known I2C sub-device nodes to the
+ HREF DT
 In-Reply-To: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
 References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1347016499-29354-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1347016499-29354-12-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we add a new SSP node to the HREF's Device Tree file which
-activates the generic one found in the .dtsi file. This will
-allow probing of the SSP driver when Device Tree is enabled.
+Here we add the skeleton nodes for each of the known I2C sub-devices
+currently registered on ST-Ericsson's HREF Development Platform. We
+will fill these nodes in turn as the drivers are enabled for Device
+Tree.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/hrefv60plus.dts |    4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/hrefv60plus.dts |   26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
 diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
-index d8ed29e..49bdabd 100644
+index 7f0dddb..ec9ec4f 100644
 --- a/arch/arm/boot/dts/hrefv60plus.dts
 +++ b/arch/arm/boot/dts/hrefv60plus.dts
-@@ -92,5 +92,9 @@
- 		msp3: msp at 80125000 {
+@@ -95,5 +95,31 @@
+ 		ssp at 80002000 {
  			status = "okay";
  		};
 +
-+		ssp at 80002000 {
-+			status = "okay";
++		i2c at 80004000 {
++			tc3589x at 42 {
++				compatible = "tc3589x";
++				reg = <0x42>;
++			};
++			tps61052 at 33 {
++				compatible = "tps61052";
++				reg = <0x33>;
++			};
++		};
++
++		i2c at 80128000 {
++			lp5521 at 0x33 {
++				compatible = "lp5521";
++				reg = <0x33>;
++			};
++			lp5521 at 0x34 {
++				compatible = "lp5521";
++				reg = <0x34>;
++			};
++			bh1780 at 0x29 {
++				compatible = "rohm,bh1780gli";
++				reg = <0x33>;
++			};
 +		};
  	};
  };
