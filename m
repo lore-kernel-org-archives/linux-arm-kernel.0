@@ -1,70 +1,139 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 7 Sep 2012 12:23:56 +0300
-Subject: [PATCHv4 2/8] ARM: OMAP3+: voltage/pwrdm/clkdm/clock add
- recursive usecount tracking
-In-Reply-To: <87ipcv4myp.fsf@ti.com>
-References: <1342189185-5306-1-git-send-email-t-kristo@ti.com>
- <1342189185-5306-3-git-send-email-t-kristo@ti.com>  <87ipcv4myp.fsf@ti.com>
-Message-ID: <1347009836.10702.92.camel@sokoban>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Fri, 07 Sep 2012 15:13:04 +0530
+Subject: [PATCH v4 3/3] ARM: dts: Add nodes for dw_mmc controllers for Samsung
+ Exynos5250 platforms
+In-Reply-To: <006301cd8b53$40024750$c006d5f0$%jun@samsung.com>
+References: <006301cd8b53$40024750$c006d5f0$%jun@samsung.com>
+Message-ID: <1347010984-9951-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-08-06 at 16:31 -0700, Kevin Hilman wrote:
-> Tero Kristo <t-kristo@ti.com> writes:
-> 
-> > This patch fixes the usecount tracking for omap3+, previously the
-> > usecount numbers were rather bogus and were not really useful for
-> > any purpose. Now usecount numbers track the number of really active
-> > clients on each domain. This patch also adds support for usecount
-> > tracking on powerdomain level and autoidle flag for clocks that
-> > are hardware controlled and should be skipped in usecount
-> > calculations.
-> >
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > Cc: Kevin Hilman <khilman@ti.com>
-> 
-> [...]
-> 
-> >  /* Clock control for DPLL outputs */
-> > diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> > index 9611490..68bdf36 100644
-> > --- a/arch/arm/mach-omap2/powerdomain.c
-> > +++ b/arch/arm/mach-omap2/powerdomain.c
-> > @@ -981,6 +981,41 @@ int pwrdm_state_switch(struct powerdomain *pwrdm)
-> >  	return ret;
-> >  }
-> >  
-> > +/**
-> > + * pwrdm_clkdm_enable - increment powerdomain usecount
-> > + * @pwrdm: struct powerdomain *
-> > + *
-> > + * Increases the usecount for a powerdomain. Called from clockdomain
-> > + * code once a clockdomain's usecount reaches zero, i.e. it is ready
-> > + * to idle.
-> > + */
-> 
-> I think the comment here is wrong.
-> 
-> > +void pwrdm_clkdm_enable(struct powerdomain *pwrdm)
-> > +{
-> > +	if (!pwrdm)
-> > +		return;
-> > +
-> > +	atomic_inc(&pwrdm->usecount);
-> > +}
-> > +
-> > +/**
-> > + * pwrdm_clkdm_disable - decrease powerdomain usecount
-> > + * @pwrdm: struct powerdomain *
-> > + *
-> > + * Decreases the usecount for a powerdomain. Called from clockdomain
-> > + * code once a clockdomain becomes active.
-> > + */
-> 
-> Looks like these two comments need to be swapped?
+Add device nodes for the four instances of dw_mmc controllers in Exynos5250
+and enable instance 0 and 2 for the smdk5250 board.
 
-Ooops, that is true yes. Again my laziness in writing proper comments
-bites me.
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |   57 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5250.dtsi         |   32 ++++++++++++++++
+ 2 files changed, 89 insertions(+), 0 deletions(-)
 
--Tero
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index 8a5e348..aac8abc 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -16,6 +16,13 @@
+ 	model = "SAMSUNG SMDK5250 board based on EXYNOS5250";
+ 	compatible = "samsung,smdk5250", "samsung,exynos5250";
+ 
++	aliases {
++		mshc0 = &dwmmc_0;
++		mshc1 = &dwmmc_1;
++		mshc2 = &dwmmc_2;
++		mshc3 = &dwmmc_3;
++	};
++
+ 	memory {
+ 		reg = <0x40000000 0x80000000>;
+ 	};
+@@ -72,6 +79,56 @@
+ 		status = "disabled";
+ 	};
+ 
++	dwmmc_0: dwmmc0 at 12200000 {
++		num-slots = <1>;
++		supports-highspeed;
++		broken-cd;
++		fifo-depth = <0x80>;
++		card-detect-delay = <200>;
++		samsung,dw-mshc-ciu-div = <3>;
++		samsung,dw-mshc-sdr-timing = <2 3>;
++		samsung,dw-mshc-ddr-timing = <1 2>;
++
++		slot at 0 {
++			reg = <0>;
++			bus-width = <8>;
++			gpios = <&gpc0 0 2 0 3>, <&gpc0 1 2 0 3>,
++				<&gpc1 0 2 3 3>, <&gpc1 1 2 3 3>,
++				<&gpc1 2 2 3 3>, <&gpc1 3 2 3 3>,
++				<&gpc0 3 2 3 3>, <&gpc0 4 2 3 3>,
++				<&gpc0 5 2 3 3>, <&gpc0 6 2 3 3>;
++		};
++	};
++
++	dwmmc_1: dwmmc1 at 12210000 {
++		status = "disabled";
++	};
++
++	dwmmc_2: dwmmc2 at 12220000 {
++		num-slots = <1>;
++		supports-highspeed;
++		fifo-depth = <0x80>;
++		card-detect-delay = <200>;
++		samsung,dw-mshc-ciu-div = <3>;
++		samsung,dw-mshc-sdr-timing = <2 3>;
++		samsung,dw-mshc-ddr-timing = <1 2>;
++
++		slot at 0 {
++			reg = <0>;
++			bus-width = <4>;
++			samsung,cd-pinmux-gpio = <&gpc3 2 2 3 3>;
++			gpios = <&gpc3 0 2 0 3>, <&gpc3 1 2 0 3>,
++				<&gpc3 3 2 3 3>, <&gpc3 4 2 3 3>,
++				<&gpc3 5 2 3 3>, <&gpc3 6 2 3 3>,
++				<&gpc4 3 3 3 3>, <&gpc4 3 3 3 3>,
++				<&gpc4 5 3 3 3>, <&gpc4 6 3 3 3>;
++		};
++	};
++
++	dwmmc_3: dwmmc3 at 12230000 {
++		status = "disabled";
++	};
++
+ 	spi_0: spi at 12d20000 {
+ 		status = "disabled";
+ 	};
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 004aaa8..f69e389 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -182,6 +182,38 @@
+ 		#size-cells = <0>;
+ 	};
+ 
++	dwmmc0 at 12200000 {
++		compatible = "samsung,exynos5250-dw-mshc";
++		reg = <0x12200000 0x1000>;
++		interrupts = <0 75 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
++	dwmmc1 at 12210000 {
++		compatible = "samsung,exynos5250-dw-mshc";
++		reg = <0x12210000 0x1000>;
++		interrupts = <0 76 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
++	dwmmc2 at 12220000 {
++		compatible = "samsung,exynos5250-dw-mshc";
++		reg = <0x12220000 0x1000>;
++		interrupts = <0 77 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
++	dwmmc3 at 12230000 {
++		compatible = "samsung,exynos5250-dw-mshc";
++		reg = <0x12230000 0x1000>;
++		interrupts = <0 78 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
+ 	amba {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-- 
+1.6.6.rc2
