@@ -1,40 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 7 Sep 2012 10:06:22 -0700
-Subject: [PATCH] ARM: dts: OMAP4: Add reg and interrupts for every nodes
-In-Reply-To: <504A11E4.6000406@ti.com>
-References: <504A11E4.6000406@ti.com>
-Message-ID: <20120907170621.GZ1303@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 7 Sep 2012 18:07:32 +0100
+Subject: [PATCH v2 2/2] ARM: delay: add registration mechanism for delay
+ timer sources
+In-Reply-To: <1346275524-13817-2-git-send-email-will.deacon@arm.com>
+References: <1346275524-13817-1-git-send-email-will.deacon@arm.com>
+ <1346275524-13817-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20120907170729.GJ15916@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <b-cousson@ti.com> [120907 08:26]:
-> Thanks to Vaibhav <hvaibhav@ti.com> omap_device fix
-> (ARM: OMAP: omap_device: Fix up resource names when booted with devicetre),
-> we can now specify reg and interrupts using standard device tree
-> attributes.
+On Wed, Aug 29, 2012 at 10:25:24PM +0100, Will Deacon wrote:
+> From: Jonathan Austin <Jonathan.Austin@arm.com>
 > 
-> Update the OMAP4 dtsi file with missing reg and interrupts attributes.
+> The current timer-based delay loop relies on the architected timer to
+> initiate the switch away from the polling-based implementation. This is
+> unfortunate for platforms without the architected timers but with a
+> suitable delay source (that is, constant frequency, always powered-up
+> and ticking as long as the CPUs are online).
 > 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Felipe Balbi <balbi@ti.com>
-> ---
-> 
-> Hi Tony,
-> 
-> This is the first step toward reduction of the hwmod data inside mach-omap2.
-> OMAP2/3/4 data still need to be there for legacy boards, but it will allow
-> OMAP5/AM33XX pure DT board to reduce the amount of data provided by hwmod.
+> This patch introduces a registration mechanism for the delay timer
+> (which provides an unconditional read_current_timer implementation) and
+> updates the architected timer code to use the new interface.
 
-That's good to hear, that should cut down the data by some hundreds of lines :)
- 
-> DMA is still missing, but I hope that the discussion that happened during
-> LPC will fixed that soon.
+[...]
 
-Yeah and that can be added when the binding is available. The drivers should
-work with and without DMA as the channels can run out.
+> +int read_current_timer(unsigned long *timer_val)
+> +{
+> +	return delay_timer ? delay_timer->read_current_timer() : -ENXIO;
+> +}
 
-Regards,
+So this is clearly wrong with the new function prototype -- I've fixed it on
+my delay branch (when the mirrors sync).
 
-Tony
+Will
