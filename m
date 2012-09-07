@@ -1,40 +1,55 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 6 Sep 2012 21:09:28 -0500
-Subject: [RFC RESEND 1/4] arm/dts: OMAP: Add timer nodes
-In-Reply-To: <5048A8F6.6080108@gmail.com>
-References: <1342218413-30116-1-git-send-email-jon-hunter@ti.com>
- <1342218413-30116-2-git-send-email-jon-hunter@ti.com>
- <5000D647.4090200@gmail.com> <500439A8.1050705@ti.com>
- <500D6CAB.4030504@ti.com> <5048A8F6.6080108@gmail.com>
-Message-ID: <50495758.5080500@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 06 Sep 2012 20:23:16 -0600
+Subject: [PATCH] ARM: add support for BCM2708/BCM2835 and Raspberry Pi
+In-Reply-To: <201209060904.14903.arnd@arndb.de>
+References: <1346908038-22421-1-git-send-email-swarren@wwwdotorg.org>
+ <201209060904.14903.arnd@arndb.de>
+Message-ID: <50495A94.2060904@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 09/06/2012 03:04 AM, Arnd Bergmann wrote:
+> On Thursday 06 September 2012, Stephen Warren wrote:
+>> The BCM2708 is an ARM SoC from Broadcom. It is the primary SoC in a
+>> series which contains the BCM2835 amongst other variants. This patch
+>> adds very basic support for this series of SoCs, under the BCM2708 name.
 
-On 09/06/2012 08:45 AM, Rob Herring wrote:
-> On 07/23/2012 10:24 AM, Jon Hunter wrote:
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
 
-[snip]
-
->> Do you have any inputs on the above? Does it make sense to reserve timer
->> resources for kernel system timers in device-tree?
+>> +CONFIG_SERIAL_8250=y
+>> +CONFIG_SERIAL_8250_CONSOLE=y
+>> +CONFIG_SERIAL_8250_NR_UARTS=48
+>> +CONFIG_SERIAL_8250_RUNTIME_UARTS=32
+>> +CONFIG_SERIAL_8250_EXTENDED=y
+>> +CONFIG_SERIAL_8250_MANY_PORTS=y
+>> +CONFIG_SERIAL_8250_SHARE_IRQ=y
+>> +CONFIG_SERIAL_AMBA_PL010=y
+>> +CONFIG_SERIAL_AMBA_PL010_CONSOLE=y
+>> +CONFIG_SERIAL_AMBA_PL011=y
+>> +CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
 > 
-> This issue is not unique to omap. So if we do specify clockevent and
-> clocksource in dts, then it should be in a common way. I think using
-> "linux,clockevent" either as an alias name or property within the timer
-> node would work. I don't have a strong preference, but I tend to lean
-> toward an alias. Primarily this is because we are already using aliases
-> for similar purposes.
+> All three kinds of serial ports really?
+
+The SoC does actually have two types of serial port; a PL011 which we're
+using as the primary UART, and a 16C650-alike port. There's no PL010
+present. I'll strip this down to just PL011 support since that's all
+that's in use right now.
+
+>> diff --git a/arch/arm/mach-bcm2708/common.c b/arch/arm/mach-bcm2708/common.c
+>
+> I think when this is the only file, we probably want to name this one bcm2708.c,
+> same as the platform.
+
+This was originally named bcm2708.c downstream, but I renamed it to
+common.c following the example of mach-picoxcell and mach-zynq, which
+IIRC you had pointed out as exemplary platforms. Still, I can rename it
+back if you want.
+
+>> diff --git a/arch/arm/mach-bcm2708/include/mach/timex.h b/arch/arm/mach-bcm2708/include/mach/timex.h
 > 
-> However, I still think this could be done by looking at properties.
-> There's not really any reason you can't check properties at timer init
-> stage. The FDT has already been un-flattened. What are the features or
-> lack of features you care about to determine which timer to use?
+> Very close to not being required any more, so you probably won't need it in 3.7.
 
-I agree. Currently, I am looking into implementing something that will
-use timer properties to select the system timers for the kernel and not
-require us to select them in the device-tree. Once I have something
-working I will send out for review.
-
-Cheers
-Jon
+OK. It's required right now though. I assume we should aim to check this
+in for 3.7. Should I rebase this patch on top of whatever change removes
+the need for timex.h? Such a patch doesn't appear to be in linux-next
+right now though.
