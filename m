@@ -1,56 +1,35 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 7 Sep 2012 15:26:21 +0200
-Subject: [PATCH] ARM: smp_twd: reprogram twd based on clk notifier
-In-Reply-To: <20120907124050.GN26709@S2101-09.ap.freescale.net>
-References: <1347005967-7604-1-git-send-email-shawn.guo@linaro.org>
- <CAPDyKFoV5d2pdxVj=9ERubs7_3g1zVJQ08Uo8JXD7yogp0wHgA@mail.gmail.com>
- <20120907124050.GN26709@S2101-09.ap.freescale.net>
-Message-ID: <CAPDyKFrWGKP+jNcti939-ARp_Q8ugLUrdSn9pb59v24nH=D36A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 7 Sep 2012 13:25:30 +0000
+Subject: [PATCH 07/12] ARM: move all dtb targets out of Makefile.boot
+In-Reply-To: <5049EDC8.1040406@gmail.com>
+References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
+ <20120907051917.GD10582@lunn.ch> <5049EDC8.1040406@gmail.com>
+Message-ID: <201209071325.30522.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 September 2012 14:40, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Fri, Sep 07, 2012 at 01:59:40PM +0200, Ulf Hansson wrote:
->> Hi Shawn and Mike,
->>
->> In general I am in favor of this patch, but I also see some
->> corresponding problems to resolve. Please correct me if I am wrong.
->>
->> I suppose most machines is relying on that it enough to only take care
->> of the notification by using "cpufreq_notify_transition" from their
->> cpufreq drivers. Thus those have to make sure the updates for smp_twd
->> clock is supported from within the cpufreq driver I suppose.
->>
->> In other words the cpufreq drivers needs to do clk_get of "smp_twd"
->> clock and then do a set_rate on it when it's has changed, to trigger a
->> rate change notification. Is this what you also have in mind or do you
->> have any other idea of how this should work?
->>
-> Here is how it works on imx6q.
->
-> 1) There are clks arm and twd defined in imx6q clock tree.  And twd
->    is registered to clock framework as one child of arm clk with a fixed
->    divider 2.
->
->         /*                                    name         parent_name     mult div */
->         clk[twd]       = imx_clk_fixed_factor("twd",       "arm",            1, 2);
->
-> 2) Register lookup "cpu0" and "smp_twd" for cpufreq and smp_twd drivers
->    respectively.
->
->         clk_register_clkdev(clk[twd], NULL, "smp_twd");
->         clk_register_clkdev(clk[arm], NULL, "cpu0");
->
-> That's it.  The clock framework will just handle all the work nicely.
-> When cpufreq driver scales arm clk, the framework will propagate the
-> rate change to twd clk automatically.  And once twd clk rate changes,
-> smp_twd will get the notification.
->
+On Friday 07 September 2012, Rob Herring wrote:
+> 
+> On 09/07/2012 12:19 AM, Andrew Lunn wrote:
+> >>> PS. A little heads-up: if this lands on 3.7, there will be conflict
+> >>> on arch/arm/mach-mxs/Makefile.boot which gets new entries in this
+> >>> cycle.
+> >>
+> >> The same is true of Tegra:
+> >>
+> >> -dtb-$(CONFIG_ARCH_TEGRA_3x_SOC) += tegra30-cardhu.dtb
+> >> +dtb-$(CONFIG_ARCH_TEGRA_3x_SOC) += tegra30-cardhu-a02.dtb
+> >> +dtb-$(CONFIG_ARCH_TEGRA_3x_SOC) += tegra30-cardhu-a04.dtb
+> > 
+> > Ditto kirkwood and mvebu. And Dove might also gain DT support,
+> > resulting in new entries in its Makefile.boot.
+> 
+> It's basically scripted plus fix-up multi-line entries. We could do this
+> at the end of the merge window. I don't think "make dtbs" for
+> multi-platform enabled platforms being bisectable is too important.
 
-That's a nice solution!
-This won't work for ux500 that simple though. Maybe I might be able to
-use some kind of clock "parent" thing though, let's see. Thanks for
-the information!
+I think I'd rather merge the series early in the merge window and
+then send a follow-up later. It shouldn't hurt to add the lines
+in the Makefile.boot files after this patch, right?
 
-Kind regards
-Ulf Hansson
+	Arnd
