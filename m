@@ -1,40 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 07 Sep 2012 10:55:00 -0600
-Subject: [PATCH v3 1/3] ARM: add cpufreq transiton notifier to adjust
- loops_per_jiffy for smp
-In-Reply-To: <20120907025847.GI26709@S2101-09.ap.freescale.net>
-References: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
- <1344577046-14847-2-git-send-email-shawn.guo@linaro.org>
- <5049252D.9000802@wwwdotorg.org>
- <20120907025847.GI26709@S2101-09.ap.freescale.net>
-Message-ID: <504A26E4.4070600@wwwdotorg.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri,  7 Sep 2012 17:55:28 +0100
+Subject: [PATCH v2 1/7] ARM: opcodes: add __ERET/__MSR_ELR_HYP instruction
+ encoding
+In-Reply-To: <1347036934-8519-1-git-send-email-marc.zyngier@arm.com>
+References: <1347036934-8519-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1347036934-8519-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/2012 08:58 PM, Shawn Guo wrote:
-> On Thu, Sep 06, 2012 at 04:35:25PM -0600, Stephen Warren wrote:
->> I believe this patch is causing issues initializing PCI-Express on Tegra.
->>
->> In next-20120906, I cold-booted 10 times. 3 times, PCIe initialized OK,
->> and 7 times, the driver timed out in arch/arm/mach-tegra/pcie.c function
->> tegra_pcie_check_link(). With this patch reverted, another 10 cold boot
->> attempts all succeeded just fine. Similarly, the regression appeared in
->> next-20120905, and I isolated it to arch/arm/kernel/, and this is the
->> only patch in that directory between next-20120904 and next-20120905.
->>
->> Do you have any idea what the problem might be?
->>
->> Looking at the timestamps in dmesg in the failing case, the driver is
->> waiting the expected (per pcie.c driver code) 1.2 seconds before giving
->> up on the port, although I suppose if the kernel's idea of real-time is
->> off, then the dmesg log timestamps might be off too.
-> 
-> Just for identifying the problem, can you test the following change to
-> see if it fixes the failure.
+Enabling boot from HYP mode requires the use of some more
+virt-specific instructions ("eret" and "msr elr_hyp, reg").
 
-Yes, that does solve the problem (well, with s/late_init/late_initcall/).
+Add the necessary encoding to asm/opcode-virt.h.
 
-As you imply, that change wouldn't help if cpu-tegra.c was built as a
-module. So, is this something you can work around in your patch?
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/opcodes-virt.h | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Thanks for the quick response.
+diff --git a/arch/arm/include/asm/opcodes-virt.h b/arch/arm/include/asm/opcodes-virt.h
+index b85665a..efcfdf9 100644
+--- a/arch/arm/include/asm/opcodes-virt.h
++++ b/arch/arm/include/asm/opcodes-virt.h
+@@ -26,4 +26,14 @@
+ 	0xF7E08000 | (((imm16) & 0xF000) << 4) | ((imm16) & 0x0FFF)	\
+ )
+ 
++#define __ERET	__inst_arm_thumb32(					\
++	0xE160006E,							\
++	0xF3DE8F00							\
++)
++
++#define __MSR_ELR_HYP(regnum)	__inst_arm_thumb32(			\
++	0xE12EF300 | regnum,						\
++	0xF3808E30 | (regnum << 16)					\
++)
++
+ #endif /* ! __ASM_ARM_OPCODES_VIRT_H */
+-- 
+1.7.12
