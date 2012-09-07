@@ -1,33 +1,38 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 06 Sep 2012 19:38:11 -0600
-Subject: [PATCH] ARM: add support for BCM2708/BCM2835 and Raspberry Pi
-In-Reply-To: <CAG-w=x77y6ykh3FcyTtVAN85eOk1RP2CZ=ZG-_1091i5jYDF2A@mail.gmail.com>
-References: <1346908038-22421-1-git-send-email-swarren@wwwdotorg.org>
- <CAG-w=x77y6ykh3FcyTtVAN85eOk1RP2CZ=ZG-_1091i5jYDF2A@mail.gmail.com>
-Message-ID: <50495003.500@wwwdotorg.org>
+From: koba@kmckk.co.jp (Tetsuyuki Kobayashi)
+Date: Fri, 07 Sep 2012 10:50:47 +0900
+Subject: [PATCH v3 0/2] ARM: shmobile: enable PMU(Performance Monitoring
+ Unit)
+In-Reply-To: <20120906112109.GG858@mudshark.cambridge.arm.com>
+References: <50487370.6000409@kmckk.co.jp>
+ <1346930047-9541-1-git-send-email-koba@kmckk.co.jp>
+ <20120906112109.GG858@mudshark.cambridge.arm.com>
+Message-ID: <504952F7.6090906@kmckk.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/2012 10:53 AM, Seth Jennings wrote:
-> (sorry for the dup Stephen, forgot to reply all :-/)
-> 
-> On Thu, Sep 6, 2012 at 12:07 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>
->> The BCM2708 is an ARM SoC from Broadcom. It is the primary SoC in a
->> series which contains the BCM2835 amongst other variants. This patch
->> adds very basic support for this series of SoCs, under the BCM2708 name.
-> 
-> Great work! I'm glad to see this heading upstream :)
-> 
->> This series was extracted from git://github.com/lp0/linux.git branch
->> rpi-next or rpi-linear from 3-4 months ago, and significantly stripped
->> down and modified since.
-> 
-> I've used Simon's tree before and it will boot up all the way with UART
-> support (no graphics, usb, network).  I also think it has a fully
-> populated device
-> tree.  Why, in particular, did you strip it down?
+Hi, Will
+Hi, Simon
 
-Mainly because not stripping it down would be a huge patch or set of
-patches to review at once. The smaller and more basic we start, the
-easier it is to get reviewed/applied etc., and then build on incrementally.
+(2012/09/06 20:21), Will Deacon wrote:
+> On Thu, Sep 06, 2012 at 12:14:05PM +0100, Tetsuyuki Kobayshi wrote:
+>> From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+>>
+>> Hello, Will
+>
+> Hi,
+>
+> Thanks for updating the patches.
+>
+>> Could you apply this patch set to your pmu/cleanup branch on arm-soc?
+>
+> Actually, it's better if you just base your branch against that one when you
+> send it to arm-soc for merging. That way, other SoCs can also develop
+> against that branch without having to worry about each other.
+>
+I see.
+I thought that removing ARM_PMU_DEVICE_CPU depends on your pmu/cleanup 
+branch, but I found it does not.
+I verified this v3 patch can apply cleanly to soc branch on renesus.git
+and works fine.
+
+Simon-san, could you apply this v3 patch to soc branch after review ?
