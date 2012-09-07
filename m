@@ -1,90 +1,40 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 7 Sep 2012 22:31:49 +0530
-Subject: [PATCH v2 1/2] ARM: da850/omap-l138: Add SoC related definitions
- for VPIF
-In-Reply-To: <1345471731-31678-2-git-send-email-prabhakar.lad@ti.com>
-References: <1345471731-31678-1-git-send-email-prabhakar.lad@ti.com>
- <1345471731-31678-2-git-send-email-prabhakar.lad@ti.com>
-Message-ID: <504A287D.20408@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 7 Sep 2012 10:06:22 -0700
+Subject: [PATCH] ARM: dts: OMAP4: Add reg and interrupts for every nodes
+In-Reply-To: <504A11E4.6000406@ti.com>
+References: <504A11E4.6000406@ti.com>
+Message-ID: <20120907170621.GZ1303@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prabhakar,
-
-On 8/20/2012 7:38 PM, Prabhakar Lad wrote:
-> From: Manjunath Hadli <manjunath.hadli@ti.com>
+* Benoit Cousson <b-cousson@ti.com> [120907 08:26]:
+> Thanks to Vaibhav <hvaibhav@ti.com> omap_device fix
+> (ARM: OMAP: omap_device: Fix up resource names when booted with devicetre),
+> we can now specify reg and interrupts using standard device tree
+> attributes.
 > 
-> Add clock, pin mux definitions and registration function for
-> VPIF capture and display driver on DA850/OMAP-L138 SoC.
+> Update the OMAP4 dtsi file with missing reg and interrupts attributes.
 > 
-> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Felipe Balbi <balbi@ti.com>
 > ---
+> 
+> Hi Tony,
+> 
+> This is the first step toward reduction of the hwmod data inside mach-omap2.
+> OMAP2/3/4 data still need to be there for legacy boards, but it will allow
+> OMAP5/AM33XX pure DT board to reduce the amount of data provided by hwmod.
 
-> +/* VPIF resource, platform data */
-> +static u64 da850_vpif_dma_mask = DMA_BIT_MASK(32);
-> +
-> +static struct resource da850_vpif_resource[] = {
-> +	{
-> +		.start = DA8XX_VPIF_BASE,
-> +		.end   = DA8XX_VPIF_BASE + 0xfff,
-> +		.flags = IORESOURCE_MEM,
-> +	}
-> +};
-> +
-> +static struct platform_device da850_vpif_dev = {
-> +	.name		= "vpif",
-> +	.id		= -1,
-> +	.dev		= {
-> +		.dma_mask		= &da850_vpif_dma_mask,
-> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> +	},
-> +	.resource	= da850_vpif_resource,
-> +	.num_resources	= ARRAY_SIZE(da850_vpif_resource),
-> +};
-> +
-> +static struct platform_device da850_vpif_display_dev = {
-> +	.name		= "vpif_display",
-> +	.id		= -1,
-> +	.dev		= {
-> +		.dma_mask		= &da850_vpif_dma_mask,
-> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> +	},
-> +};
-> +
-> +static struct platform_device da850_vpif_capture_dev = {
-> +	.name		= "vpif_capture",
-> +	.id		= -1,
-> +	.dev		= {
-> +		.dma_mask		= &da850_vpif_dma_mask,
-> +		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> +	},
-> +};
-> +
-> +int __init da850_register_vpif(void)
-> +{
-> +	return platform_device_register(&da850_vpif_dev);
-> +}
-> +
-> +int __init da850_register_vpif_display(struct vpif_display_config
-> +						*display_config)
-> +{
-> +	struct resource da850_vpif_display_resource[] = {
-> +		{
-> +			.start = IRQ_DA850_VPIFINT,
-> +			.end   = IRQ_DA850_VPIFINT,
-> +			.flags = IORESOURCE_IRQ,
-> +		},
-> +	};
-> +	int ret;
-> +
-> +	ret = platform_device_add_resources(&da850_vpif_display_dev,
-> +				da850_vpif_display_resource,
-> +				ARRAY_SIZE(da850_vpif_display_resource));
+That's good to hear, that should cut down the data by some hundreds of lines :)
+ 
+> DMA is still missing, but I hope that the discussion that happened during
+> LPC will fixed that soon.
 
-Its not obvious to me why you need to add the resources here instead of
-just statically defining them as is usually done.
+Yeah and that can be added when the binding is available. The drivers should
+work with and without DMA as the channels can run out.
 
-Thanks,
-Sekhar
+Regards,
+
+Tony
