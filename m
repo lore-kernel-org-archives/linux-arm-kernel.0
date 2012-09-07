@@ -1,25 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 7 Sep 2012 23:08:42 +0200
-Subject: [PATCH 5/7] gpio: 74x164: Add support for the daisy-chaining
-In-Reply-To: <2796775.6HPOQgPOKV@flexo>
-References: <1347020296-18796-1-git-send-email-maxime.ripard@free-electrons.com>
- <1347020296-18796-6-git-send-email-maxime.ripard@free-electrons.com>
- <2796775.6HPOQgPOKV@flexo>
-Message-ID: <CACRpkdboddXc5bay+1Nj-mx4mkXOvm7RoMbOdoKXcxqDUKbFdg@mail.gmail.com>
+Date: Fri, 7 Sep 2012 23:09:01 +0200
+Subject: [PATCH 1/8] gpio: 74x164: Use module_spi_driver boiler plate
+ function
+In-Reply-To: <5048AEE9.5030305@free-electrons.com>
+References: <1346834457-6257-1-git-send-email-maxime.ripard@free-electrons.com>
+ <CACRpkdbaHK4AX8nnvu+gcsgPBYAzTNwvwKeBePxnr+GcUsa8AA@mail.gmail.com>
+ <5048AEE9.5030305@free-electrons.com>
+Message-ID: <CACRpkdavwww8_deiM14h0zXgdK2k8SdCZn4hfkHpmSAJuG7u7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 7, 2012 at 4:03 PM, Florian Fainelli <florian@openwrt.org> wrote:
-
->> +     if (!spi->dev.of_node) {
->> +             dev_err(&spi->dev, "No device tree data available.\n");
->> +             return -EINVAL;
->> +     }
+On Thu, Sep 6, 2012 at 4:10 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Linus,
+> Le 06/09/2012 09:21, Linus Walleij a ?crit :
+>>
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> I guess all of these will go through your kernel tree?
+>> Tell me if you want me to apply these to my GPIO tree.
 >
-> Should not this be folded in your previous patch?
+> Since I don't have any kernel tree, I guess you can apply them in your
+> tree :)
 
-True, but I've applied it, keep it here or split off as a separate
-fix.
+I was more thinking if the Free Electrons people were doing
+composite pull requests to ARM SoC. Oh well, nevermind,
+I'll take them.
 
-Yours,
+Applied!
+
 Linus Walleij
