@@ -1,35 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 7 Sep 2012 09:35:42 -0700
-Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
-In-Reply-To: <20120907160025.GB14330@glitch>
-References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
- <CADjby3UyhW=Ok8Zy57MVUz65gd-=4z2PhE6uqd7F8xtaDXcWfQ@mail.gmail.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA29819@DBDE01.ent.ti.com>
- <20120907110251.GA7968@glitch>
- <331ABD5ECB02734CA317220B2BBEABC13EA29BF3@DBDE01.ent.ti.com>
- <20120907160025.GB14330@glitch>
-Message-ID: <20120907163542.GU1303@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 07 Sep 2012 10:55:00 -0600
+Subject: [PATCH v3 1/3] ARM: add cpufreq transiton notifier to adjust
+ loops_per_jiffy for smp
+In-Reply-To: <20120907025847.GI26709@S2101-09.ap.freescale.net>
+References: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
+ <1344577046-14847-2-git-send-email-shawn.guo@linaro.org>
+ <5049252D.9000802@wwwdotorg.org>
+ <20120907025847.GI26709@S2101-09.ap.freescale.net>
+Message-ID: <504A26E4.4070600@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Domenico Andreoli <cavokz@gmail.com> [120907 09:01]:
+On 09/06/2012 08:58 PM, Shawn Guo wrote:
+> On Thu, Sep 06, 2012 at 04:35:25PM -0600, Stephen Warren wrote:
+>> I believe this patch is causing issues initializing PCI-Express on Tegra.
+>>
+>> In next-20120906, I cold-booted 10 times. 3 times, PCIe initialized OK,
+>> and 7 times, the driver timed out in arch/arm/mach-tegra/pcie.c function
+>> tegra_pcie_check_link(). With this patch reverted, another 10 cold boot
+>> attempts all succeeded just fine. Similarly, the regression appeared in
+>> next-20120905, and I isolated it to arch/arm/kernel/, and this is the
+>> only patch in that directory between next-20120904 and next-20120905.
+>>
+>> Do you have any idea what the problem might be?
+>>
+>> Looking at the timestamps in dmesg in the failing case, the driver is
+>> waiting the expected (per pcie.c driver code) 1.2 seconds before giving
+>> up on the port, although I suppose if the kernel's idea of real-time is
+>> off, then the dmesg log timestamps might be off too.
 > 
-> So is this the preferred way to attach gpio users to gpio provides in DT
-> whenever gpios are muxed?
-> 
-> I would well see these info hidden in the gpio controller so, at least
-> for gpios, no magic numbers would be required in the DT (except the gpio
-> number relative to the owning controller).
+> Just for identifying the problem, can you test the following change to
+> see if it fixes the failure.
 
-In the pure GPIO pins only case it could be all done in the GPIO controller,
-but it's probably best to have the pins muxed by the drivers using them.
+Yes, that does solve the problem (well, with s/late_init/late_initcall/).
 
-Some drivers doing runtime PM may need to dynamically toggle the pins
-for idle mode to stop leakage, enable wakeup events for rx pins etc.
-Probably no need for that in the gpio leds case, but it would be confusing
-to have some pins claimed by the GPIO driver and some by the drivers
-using the pins.
+As you imply, that change wouldn't help if cpu-tegra.c was built as a
+module. So, is this something you can work around in your patch?
 
-Regards,
-
-Tony
+Thanks for the quick response.
