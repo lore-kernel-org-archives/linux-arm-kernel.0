@@ -1,85 +1,60 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 7 Sep 2012 10:22:28 -0700
-Subject: [PATCH v3 01/10] PCI: Keep pci_fixup_irqs() around after init
-In-Reply-To: <20120907170024.GA16114@avionic-0098.mockup.avionic-design.de>
-References: <1343332512-28762-1-git-send-email-thierry.reding@avionic-design.de>
- <1343332512-28762-2-git-send-email-thierry.reding@avionic-design.de>
- <CAErSpo7v+i8i=mXCs7ZW8DtGTDN_4AEntwYLqGG8FcCzweySFg@mail.gmail.com>
- <20120815192814.GA12870@avionic-0098.mockup.avionic-design.de>
- <CAErSpo6cjOzJegJqXzmk59DChExcbLK1sOhwyAyQL4FZkTN21A@mail.gmail.com>
- <504A1EA2.9030008@wwwdotorg.org>
- <20120907170024.GA16114@avionic-0098.mockup.avionic-design.de>
-Message-ID: <CAErSpo4Y4QXfahRkBoJ_jmKy6VAYqOzixTmCPkwSATfO+rzVxg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 7 Sep 2012 19:26:12 +0200
+Subject: [PATCH 8/9] ARM i.MX53: Add pwms to dtsi
+In-Reply-To: <20120907132955.GH29340@avionic-0098.mockup.avionic-design.de>
+References: <1346154504-5623-1-git-send-email-s.hauer@pengutronix.de>
+ <1346154504-5623-9-git-send-email-s.hauer@pengutronix.de>
+ <20120830223219.GF3613@r65073-Latitude-D630>
+ <20120831130723.GS26594@pengutronix.de>
+ <20120907132955.GH29340@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20120907172612.GU26594@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 7, 2012 at 10:00 AM, Thierry Reding
-<thierry.reding@avionic-design.de> wrote:
-> On Fri, Sep 07, 2012 at 10:19:46AM -0600, Stephen Warren wrote:
->> On 08/15/2012 01:42 PM, Bjorn Helgaas wrote:
->> > On Wed, Aug 15, 2012 at 1:28 PM, Thierry Reding
->> > <thierry.reding@avionic-design.de> wrote:
->> >> On Wed, Aug 15, 2012 at 10:06:27AM -0700, Bjorn Helgaas wrote:
->> >>> On Thu, Jul 26, 2012 at 12:55 PM, Thierry Reding
->> >>> <thierry.reding@avionic-design.de> wrote:
->> >>>> When using deferred driver probing, PCI host controller drivers may
->> >>>> actually require this function after the init stage.
->> >>>>
->> >>>> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
->> >>>> ---
->> >>>> Changes in v3:
->> >>>> - none
->> >>>>
->> >>>> Changes in v2:
->> >>>> - use __devinit annotations
->> >>>
->> >>> Your original patch removed __init completely.  Here you change it to
->> >>> __devinit.  That means we decide whether to discard the function based
->> >>> on whether CONFIG_HOTPLUG is supported.  But I think your point is not
->> >>> about hotplug; it's merely that we should be able to scan a PCI bus
->> >>> after init-time.  We ought to be able to do a late PCI scan even if
->> >>> hotplug is not supported.
->> >>>
->> >>> Therefore, I'd be inclined to remove __init completely unless you have
->> >>> another reason for preferring __devinit.
->> >>
->> >> I thought __devinit would resolve to nothing if HOTPLUG is defined and
->> >> __init otherwise. That seemed more appropriate. However you are right
->> >> that it is useful to always have it available, so I'm fine with removing
->> >> the annotations altogether. Do you want me to follow up with a patch? Or
->> >> can you just take the first version? I'm not sure if it still applies.
->> >
->> > You're right about how __devinit works.  It's just that I don't think
->> > hotplug is actually relevant here.  We're trying to make
->> > pci_fixup_irqs() work after init, whether it's because of hotplug or
->> > simply because the arch scans host bridges after init.
->> >
->> > I applied this to my "next" branch.  Thanks!
->>
->> Bjorn, I don't see this patch in next-20120907. Did it get dropped for
->> some reason?
->
-> Yes, it turns out that dropping the annotations causes lots of section
-> mismatches on other architectures. See here[0] for the details. I think
-> the solution to the issue would be to either remove HOTPLUG altogether
-> and drop __devinit and __devexit annotations or update all architectures
-> to fix these warnings. I think Bjorn and I settled on the latter because
-> it's obviously less intrusive. I've been busy building toolchains for
-> all the PCI architectures and I think I have all of them. I'll just need
-> some more time to build, find and fix any remaining section mismatches.
+On Fri, Sep 07, 2012 at 03:29:55PM +0200, Thierry Reding wrote:
+> On Fri, Aug 31, 2012 at 03:07:23PM +0200, Sascha Hauer wrote:
+> > On Fri, Aug 31, 2012 at 06:32:20AM +0800, Shawn Guo wrote:
+> > > On Tue, Aug 28, 2012 at 01:48:23PM +0200, Sascha Hauer wrote:
+> [...]
+> > > >  arch/arm/boot/dts/imx53.dtsi        |   14 ++++++++++++++
+> > > >  arch/arm/mach-imx/clk-imx51-imx53.c |    4 ++++
+> > > >  2 files changed, 18 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> > > > index cd37165..7ec17e4 100644
+> > > > --- a/arch/arm/boot/dts/imx53.dtsi
+> > > > +++ b/arch/arm/boot/dts/imx53.dtsi
+> > > > @@ -189,6 +189,20 @@
+> > > >  				status = "disabled";
+> > > >  			};
+> > > >  
+> > > > +			pwm1: pwm at 53fb4000 {
+> > > > +				#pwm-cells = <3>;
+> > > 
+> > > pwm-cells should be 2?
+> > 
+> > Yes, right. We have a patch internally that allows us to pass a
+> > 'inverted' flag to the pwm, hence I accidently have 3 here.
+> 
+> There are patches in for-next that add support for setting the PWM
+> polarity, though there's currently no support for specifying it via a
+> third cell in the specifier. Would you mind sharing the patches that add
+> this?
 
-Greg KH is actively removing CONFIG_HOTPLUG altogether -- see
-https://lkml.org/lkml/2012/9/4/489
+Yes, will do. I was afraid this leads to some discussion, so I skipped
+them so far.
 
-That will make __devinit resolve to nothing in all cases, and we'll
-eventually remove __devinit completely.  So we don't want to convert
-__init to __devinit; we have to remove the __init altogether.  I think
-that means we have to update all arches first to avoid the section
-mismatches.
+The basic idea was that the third cell is for flags from which bit0 set
+means 'inverted'. We currently implemented this i.MX specific, but if
+you think this is acceptable it's propably a good idea to implement this
+in a generic manner.
 
-So I think Thierry is on the right track:
-  1) Change all arch pcibios_update_irq() implementations (and
-probably a few other things) to be non-__init
-  2) Change pci_fixup_irqs() to be non-__init
+Sascha
 
-Bjorn
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
