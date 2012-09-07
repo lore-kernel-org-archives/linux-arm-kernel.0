@@ -1,35 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 7 Sep 2012 18:07:32 +0100
-Subject: [PATCH v2 2/2] ARM: delay: add registration mechanism for delay
- timer sources
-In-Reply-To: <1346275524-13817-2-git-send-email-will.deacon@arm.com>
-References: <1346275524-13817-1-git-send-email-will.deacon@arm.com>
- <1346275524-13817-2-git-send-email-will.deacon@arm.com>
-Message-ID: <20120907170729.GJ15916@mudshark.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 7 Sep 2012 19:14:11 +0200
+Subject: [PATCH v3] pwm i.MX: add devicetree support
+In-Reply-To: <20120907131037.GD29340@avionic-0098.mockup.avionic-design.de>
+References: <1346935695-25179-1-git-send-email-s.hauer@pengutronix.de>
+ <20120907131037.GD29340@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20120907171411.GT26594@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2012 at 10:25:24PM +0100, Will Deacon wrote:
-> From: Jonathan Austin <Jonathan.Austin@arm.com>
+On Fri, Sep 07, 2012 at 03:10:37PM +0200, Thierry Reding wrote:
+> On Thu, Sep 06, 2012 at 02:48:06PM +0200, Sascha Hauer wrote:
+> > The following is the third version of the i.MX pwm series. I integrated
+> > the remaining comments from Shawn and Beno?t and added their tags.
+> > 
+> > So Thierry, please pull the attached patches. The pull request only
+> > contains the pwm framework specific patches, the remaining two I'd
+> > like to push via the arm-soc tree in case the i.MX5 also gets devicetree
+> > clock lookups.
 > 
-> The current timer-based delay loop relies on the architected timer to
-> initiate the switch away from the polling-based implementation. This is
-> unfortunate for platforms without the architected timers but with a
-> suitable delay source (that is, constant frequency, always powered-up
-> and ticking as long as the CPUs are online).
+> Hi Sascha,
 > 
-> This patch introduces a registration mechanism for the delay timer
-> (which provides an unconditional read_current_timer implementation) and
-> updates the architected timer code to use the new interface.
+> Sorry for taking so long to get back to you. Apart from my comments to
+> patch 1, I really like how this series cleans up the i.MX driver. It's
+> already a bit late in the 3.6 release cycle for these kinds of changes
+> and none of them fix any regressions, so I'd like to queue them for
+> 3.7 after my comments have been addressed.
 
-[...]
+Sure, no problem. The patches were never intended to go in for 3.6. I
+will address your comments and resend on monday.
 
-> +int read_current_timer(unsigned long *timer_val)
-> +{
-> +	return delay_timer ? delay_timer->read_current_timer() : -ENXIO;
-> +}
+Thanks
+ Sascha
 
-So this is clearly wrong with the new function prototype -- I've fixed it on
-my delay branch (when the mirrors sync).
 
-Will
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
