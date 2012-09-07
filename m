@@ -1,30 +1,29 @@
-From: spartacus06@gmail.com (Seth Jennings)
-Date: Thu, 6 Sep 2012 19:56:45 -0500
-Subject: [PATCH] ARM: add support for BCM2708/BCM2835 and Raspberry Pi
-In-Reply-To: <50491F65.2020302@simon.arlott.org.uk>
-References: <1346908038-22421-1-git-send-email-swarren@wwwdotorg.org>
- <CAG-w=x77y6ykh3FcyTtVAN85eOk1RP2CZ=ZG-_1091i5jYDF2A@mail.gmail.com>
- <50491F65.2020302@simon.arlott.org.uk>
-Message-ID: <CAG-w=x5dbjk+9E0nWWDd9n-=bhMshMtkCnbLjzP0zufezqFgqw@mail.gmail.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Thu, 6 Sep 2012 18:00:10 -0700
+Subject: [PATCH 1/4] clk: Provide option for clk_get_rate to issue hw for
+ new rate
+In-Reply-To: <20120907001927.20289.41627@nucleus>
+References: <1346415691-13371-1-git-send-email-ulf.hansson@stericsson.com>
+ <1346415691-13371-2-git-send-email-ulf.hansson@stericsson.com>
+ <20120831192906.31162.97714@nucleus>
+ <CAPDyKFrS7tKu5AcjL7+R8V5Nvo0O+BVwc8HtGFqQGSf12wMioQ@mail.gmail.com>
+ <20120907001927.20289.41627@nucleus>
+Message-ID: <CAJOA=zM-u5ss8ZYWFHg43V7r5B6TXhRN70=JUccNjrppx4fDyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 6, 2012 at 5:10 PM, Simon Arlott <simon@fire.lp0.eu> wrote:
-> It has supported graphics for a while:
-> https://github.com/raspberrypi/linux/wiki/How-to-boot-using-device-tree#wiki-Configuration
+On Thu, Sep 6, 2012 at 5:19 PM, Mike Turquette <mturquette@ti.com> wrote:
+> I'll take this series into clk-next.
+>
 
-Ah yes, you are correct sir.
+Oops, I forgot to ask about patch #3.  Which tree do you want that to
+go through?
 
-> I've been waiting over 3 months now for device tree support to be added
-> to the GPU-based bootloader and it still hasn't appeared.
+Thanks,
+Mike
 
-Are the attributes that are currently set by fdtput'ing on the dtb the
-ones you want to get from the bootloader?  Or are there others?
-
-I guess another way to say it is I'm interested in getting as much of
-this code as we can into mainline as we can before it bitrots (which
-can happen fast in on the ARM side I think).  We can make changes as
-the proprietary bits catch up.
-
---
-Seth
+> Regards,
+> Mike
+>
+>> Kind regards
+>> Ulf Hansson
