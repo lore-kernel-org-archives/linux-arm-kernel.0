@@ -1,234 +1,446 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 7 Sep 2012 11:36:04 -0700
-Subject: [PATCH 1/2] hwmon: Add devicetree bindings to gpio-fan
-In-Reply-To: <1347035675-23907-2-git-send-email-jm@lentin.co.uk>
-References: <1347035675-23907-1-git-send-email-jm@lentin.co.uk>
- <1347035675-23907-2-git-send-email-jm@lentin.co.uk>
-Message-ID: <20120907183604.GA26986@roeck-us.net>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 7 Sep 2012 18:44:17 +0000
+Subject: [RFC PATCH] ARM: OMAP2+: omap-device: Do not overwrite
+ resources allocated by OF layer
+In-Reply-To: <504A3339.1020506@ti.com>
+References: <1346233691-10294-1-git-send-email-hvaibhav@ti.com>
+ <504A3339.1020506@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EAAE645@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 05:34:34PM +0100, Jamie Lentin wrote:
-> Allow a gpio-fan to be defined in devicetree, see binding documentation
-> for details.
+On Fri, Sep 07, 2012 at 23:17:37, Cousson, Benoit wrote:
+> Hi Vaibhav,
 > 
-> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+> The following patch is hacing some checkpatch issues. 
+> 
+> CHECK: Alignment should match open parenthesis
+> #169: FILE: arch/arm/plat-omap/omap_device.c:591:
+> +			dev_dbg(&pdev->dev, "%s(): resources already allocated %d\n",
+> +					__func__, res_count);
+> 
+> CHECK: Alignment should match open parenthesis
+> #171: FILE: arch/arm/plat-omap/omap_device.c:593:
+> +			memcpy(res, pdev->resource,
+> +				sizeof(struct resource) * pdev->num_resources);
+> 
+> CHECK: Alignment should match open parenthesis
+> #173: FILE: arch/arm/plat-omap/omap_device.c:595:
+> +			omap_device_fill_dma_resources(od,
+> +					&res[pdev->num_resources]);
+> 
+> CHECK: Alignment should match open parenthesis
+> #176: FILE: arch/arm/plat-omap/omap_device.c:598:
+> +			dev_dbg(&pdev->dev, "%s(): using resources from hwmod %d\n",
+> +					__func__, res_count);
+> 
+> total: 0 errors, 0 warnings, 4 checks, 130 lines checked
+> 
+> 
+> Since I was in a nice mood, because the week-end is almost there, I fixed them myself.
+> 
+
+My bad...I usually do check for checkpatch.pl and sparse warnings, not sure 
+how did I miss this one. I will be more careful here onwards.
+
+
+> Please note that I had to rename the API becasue it was way too long to do a proper alignement.
+> 
+>  omap_device_fill_dma_resources -> _od_fill_dma_resources
+> 
+> In fact I realized that some private APIs should probably be renamed as well like that for
+> consistency.
+> 
+> Just let me know if you have any issue with that version.
+> 
+
+Looks ok to me.
+
+Thanks,
+Vaibhav
+
+> Regards,
+> Benoit
+> 
 > ---
->  .../devicetree/bindings/gpio/gpio-fan.txt          |   25 +++++
->  drivers/hwmon/gpio-fan.c                           |  111 ++++++++++++++++++++
->  2 files changed, 136 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-fan.txt
+> From b82b04e8eb27abe0cfe9cd7bf4fee8bb1bb9b013 Mon Sep 17 00:00:00 2001
+> From: Vaibhav Hiremath <hvaibhav@ti.com>
+> Date: Wed, 29 Aug 2012 15:18:11 +0530
+> Subject: [PATCH] ARM: OMAP: omap_device: Do not overwrite resources allocated by OF layer
 > 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-fan.txt b/Documentation/devicetree/bindings/gpio/gpio-fan.txt
-> new file mode 100644
-> index 0000000..2dd457a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-fan.txt
-> @@ -0,0 +1,25 @@
-> +Bindings for fan connected to GPIO lines
-> +
-> +Required properties:
-> +- compatible : "gpio-fan"
-> +- gpios: Specifies the pins that map to bits in the control value,
-> +  ordered MSB-->LSB.
-> +- gpio-fan,speed-map: A mapping of possible fan RPM speeds and the
-> +  control value that should be set to achieve them. This array
-> +  must have the RPM values in ascending order.
-> +
-> +Optional properties:
-> +- alarm-gpios: This pin going active indicates something is wrong with
-> +  the fan, and a udev event will be fired.
-> +
-> +Examples:
-> +
-> +	gpio_fan {
-> +		compatible = "gpio-fan";
-> +		gpios = <&gpio1 14 1
-> +			 &gpio1 13 1>;
-> +		gpio-fan,speed-map = <0    0
-> +				      3000 1
-> +				      6000 2>;
-> +		alarm-gpios = <&gpio1 15 1>;
-> +	};
-> diff --git a/drivers/hwmon/gpio-fan.c b/drivers/hwmon/gpio-fan.c
-> index 2f4b01b..876ce41 100644
-> --- a/drivers/hwmon/gpio-fan.c
-> +++ b/drivers/hwmon/gpio-fan.c
-> @@ -31,6 +31,8 @@
->  #include <linux/hwmon.h>
->  #include <linux/gpio.h>
->  #include <linux/gpio-fan.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/of_gpio.h>
+> With the new devices (like, AM33XX and OMAP5) we now only support
+> DT boot mode of operation and now it is the time to start killing
+> slowly the dependency on hwmod, so with this patch, we are starting
+> with device resources.
+> The idea here is implemented considering to both boot modes -
+>   - DT boot mode
+>     OF framework will construct the resource structure (currently
+>     does for MEM & IRQ resource) and we should respect/use these
+>     resources, killing hwmod dependency.
+>     If pdev->num_resources > 0, we assume that MEM & IRQ resources
+>     have been allocated by OF layer already (through DTB).
+> 
+>     Once DMA resource is available from OF layer, we should
+>     kill filling any resources from hwmod.
+> 
+>   - Non-DT boot mode
+>     Here, pdev->num_resources = 0, and we should get all the
+>     resources from hwmod (following existing steps)
+> 
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> [b-cousson at ti.com: Fix some checkpatch CHECK issues]
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod.c             |   27 ++++++++++
+>  arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
+>  arch/arm/plat-omap/omap_device.c             |   71 +++++++++++++++++++++----
+>  3 files changed, 87 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 6ca8e51..7768804 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -3158,6 +3158,33 @@ int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res)
+>  }
 >  
->  struct gpio_fan_data {
->  	struct platform_device	*pdev;
-> @@ -400,12 +402,120 @@ static ssize_t show_name(struct device *dev,
->  
->  static DEVICE_ATTR(name, S_IRUGO, show_name, NULL);
->  
-> +
-> +#ifdef CONFIG_OF
-> +/*
-> + * Translate OpenFirmware node properties into platform_data
+>  /**
+> + * omap_hwmod_fill_dma_resources - fill struct resource array with dma data
+> + * @oh: struct omap_hwmod *
+> + * @res: pointer to the array of struct resource to fill
+> + *
+> + * Fill the struct resource array @res with dma resource data from the
+> + * omap_hwmod @oh.  Intended to be called by code that registers
+> + * omap_devices.  See also omap_hwmod_count_resources().  Returns the
+> + * number of array elements filled.
 > + */
-> +static int gpio_fan_get_of_pdata(struct device *dev,
-> +			    struct gpio_fan_platform_data *pdata)
+> +int omap_hwmod_fill_dma_resources(struct omap_hwmod *oh, struct resource *res)
 > +{
-> +	struct device_node *node;
-> +	struct gpio_fan_speed  *speed;
-> +	unsigned *ctrl;
-> +	unsigned i;
-> +	u32 u;
-> +	struct property *prop;
-> +	const __be32 *p;
+> +	int i, sdma_reqs_cnt;
+> +	int r = 0;
 > +
-> +	node = dev->of_node;
-> +
-> +	/* Fill GPIO pin array */
-> +	pdata->num_ctrl = of_gpio_count(node);
-> +	ctrl = devm_kzalloc(dev, pdata->num_ctrl * sizeof(unsigned),
-> +				GFP_KERNEL);
-> +	if (!ctrl)
-> +		return -ENOMEM;
-> +	for (i = 0; i < of_gpio_count(node); i++) {
-> +		int val;
-> +
-> +		val = of_get_gpio(node, i);
-> +		if (val >= 0)
-> +			ctrl[i] = val;
-> +		else
-> +			return -EINVAL;
-
-I very much prefer not to hide the error code and reverse the logic.
-
-		if (val < 0)
-			return val;
-		ctrl[i] = val;
-
+> +	sdma_reqs_cnt = _count_sdma_reqs(oh);
+> +	for (i = 0; i < sdma_reqs_cnt; i++) {
+> +		(res + r)->name = (oh->sdma_reqs + i)->name;
+> +		(res + r)->start = (oh->sdma_reqs + i)->dma_req;
+> +		(res + r)->end = (oh->sdma_reqs + i)->dma_req;
+> +		(res + r)->flags = IORESOURCE_DMA;
+> +		r++;
 > +	}
-> +	pdata->ctrl = ctrl;
 > +
-> +	/* Get speed map array size */
-> +	i = 0;
-> +	of_property_for_each_u32(node, "gpio-fan,speed-map", prop, p, u)
-> +		i++;
-
-Looking through the of code, isn't there a function which returns the
-number of elements ?
-
-Something like
-	int length;
-	struct property *prop;
-	
-	prop = of_find_property(node, "gpio-fan,speed-map", &length);
-
-> +	if (i & 1) {
-> +		dev_err(dev, "gpio-fan,speed-map contains odd number of entries");
-> +		return -ENODEV;
-> +	}
-
-How about i == 0 ?
-
-> +	pdata->num_speed = i >> 1;
-> +	speed = devm_kzalloc(dev,
-> +			pdata->num_speed * sizeof(struct gpio_fan_speed),
-> +			GFP_KERNEL);
-> +	if (!speed)
-> +		return -ENOMEM;
+> +	return r;
+> +}
 > +
-> +	/* Populate speed map */
-> +	i = 0;
-> +	of_property_for_each_u32(node, "gpio-fan,speed-map", prop, p, u) {
-> +		if (i & 1)
-> +			speed[i >> 1].ctrl_val = (int)u;
-> +		else
-> +			speed[i >> 1].rpm = (int)u;
-
-Are those type casts necessary ?
-
-> +		i++;
-> +	}
-> +	pdata->speed = speed;
+> +/**
+>   * omap_hwmod_get_resource_byname - fetch IP block integration data by name
+>   * @oh: struct omap_hwmod * to operate on
+>   * @type: one of the IORESOURCE_* constants from include/linux/ioport.h
+> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> index 6132972..5857b9c 100644
+> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> @@ -615,6 +615,7 @@ int omap_hwmod_softreset(struct omap_hwmod *oh);
+>  
+>  int omap_hwmod_count_resources(struct omap_hwmod *oh);
+>  int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res);
+> +int omap_hwmod_fill_dma_resources(struct omap_hwmod *oh, struct resource *res);
+>  int omap_hwmod_get_resource_byname(struct omap_hwmod *oh, unsigned int type,
+>  				   const char *name, struct resource *res);
+>  
+> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+> index ff57b5a..6f5c580 100644
+> --- a/arch/arm/plat-omap/omap_device.c
+> +++ b/arch/arm/plat-omap/omap_device.c
+> @@ -494,6 +494,33 @@ static int omap_device_fill_resources(struct omap_device *od,
+>  }
+>  
+>  /**
+> + * _od_fill_dma_resources - fill in array of struct resource with dma resources
+> + * @od: struct omap_device *
+> + * @res: pointer to an array of struct resource to be filled in
+> + *
+> + * Populate one or more empty struct resource pointed to by @res with
+> + * the dma resource data for this omap_device @od.  Used by
+> + * omap_device_alloc() after calling omap_device_count_resources().
+> + *
+> + * Ideally this function would not be needed at all.  If we have
+> + * mechanism to get dma resources from DT.
+> + *
+> + * Returns 0.
+> + */
+> +static int _od_fill_dma_resources(struct omap_device *od,
+> +				      struct resource *res)
+> +{
+> +	int i, r;
 > +
-> +	/* Alarm GPIO if one exists */
-> +	if (of_gpio_named_count(node, "alarm-gpios")) {
-> +		struct gpio_fan_alarm *alarm;
-> +		int val;
-> +		enum of_gpio_flags flags;
-> +
-> +		alarm = devm_kzalloc(dev, sizeof(struct gpio_fan_alarm),
-> +					GFP_KERNEL);
-> +		if (!alarm)
-> +			return -ENOMEM;
-> +
-> +		val = of_get_named_gpio_flags(node, "alarm-gpios", 0, &flags);
-> +		if (val >= 0) {
-> +			alarm->gpio = val;
-> +			alarm->active_low = flags & OF_GPIO_ACTIVE_LOW;
-> +		} else
-> +			return -EINVAL;
-> +
-How about
-		if (val < 0)
-			return val;
-		alarm->gpio = val;
-		alarm->active_low = flags & OF_GPIO_ACTIVE_LOW;
-
-> +		pdata->alarm = alarm;
+> +	for (i = 0; i < od->hwmods_cnt; i++) {
+> +		r = omap_hwmod_fill_dma_resources(od->hwmods[i], res);
+> +		res += r;
 > +	}
 > +
 > +	return 0;
 > +}
 > +
-> +static const struct of_device_id of_gpio_fan_match[] = {
-> +	{ .compatible = "gpio-fan", },
-> +	{},
-> +};
-> +#endif /* CONFIG_OF_GPIO */
-> +
->  static int __devinit gpio_fan_probe(struct platform_device *pdev)
->  {
->  	int err;
->  	struct gpio_fan_data *fan_data;
->  	struct gpio_fan_platform_data *pdata = pdev->dev.platform_data;
+> +/**
+>   * omap_device_alloc - allocate an omap_device
+>   * @pdev: platform_device that will be included in this omap_device
+>   * @oh: ptr to the single omap_hwmod that backs this omap_device
+> @@ -532,24 +559,44 @@ struct omap_device *omap_device_alloc(struct platform_device *pdev,
+>  	od->hwmods = hwmods;
+>  	od->pdev = pdev;
 >  
-> +#ifdef CONFIG_OF
-> +	if (!pdata) {
-> +		struct gpio_fan_platform_data *alt_pdata;
-> +
-Why not just use pdata ? I don't really see a reason for introducing
-a second variable. After all, we know here that pdata is NULL, and that it won't
-be used.
-
-> +		alt_pdata = devm_kzalloc(&pdev->dev,
-> +					sizeof(struct gpio_fan_platform_data),
-> +					GFP_KERNEL);
-> +		if (!alt_pdata)
-> +			return -ENOMEM;
-> +
-> +		err = gpio_fan_get_of_pdata(&pdev->dev, alt_pdata);
-> +		if (err)
-> +			return err;
-> +		pdata = alt_pdata;
-> +	}
-> +#endif /* CONFIG_OF_GPIO */
-> +
->  	if (!pdata)
->  		return -EINVAL;
-
-#else case, maybe ?
-
+> +	res_count = omap_device_count_resources(od);
+>  	/*
+> -	 * HACK: Ideally the resources from DT should match, and hwmod
+> -	 * should just add the missing ones. Since the name is not
+> -	 * properly populated by DT, stick to hwmod resources only.
+> +	 * DT Boot:
+> +	 *   OF framework will construct the resource structure (currently
+> +	 *   does for MEM & IRQ resource) and we should respect/use these
+> +	 *   resources, killing hwmod dependency.
+> +	 *   If pdev->num_resources > 0, we assume that MEM & IRQ resources
+> +	 *   have been allocated by OF layer already (through DTB).
+> +	 *
+> +	 * Non-DT Boot:
+> +	 *   Here, pdev->num_resources = 0, and we should get all the
+> +	 *   resources from hwmod.
+> +	 *
+> +	 * TODO: Once DMA resource is available from OF layer, we should
+> +	 *   kill filling any resources from hwmod.
+>  	 */
+> -	if (pdev->num_resources && pdev->resource)
+> -		dev_warn(&pdev->dev, "%s(): resources already allocated %d\n",
+> -			__func__, pdev->num_resources);
+> -
+> -	res_count = omap_device_count_resources(od);
+> -	if (res_count > 0) {
+> -		dev_dbg(&pdev->dev, "%s(): resources allocated from hwmod %d\n",
+> -			__func__, res_count);
+> +	if (res_count > pdev->num_resources) {
+> +		/* Allocate resources memory to account for new resources */
+>  		res = kzalloc(sizeof(struct resource) * res_count, GFP_KERNEL);
+>  		if (!res)
+>  			goto oda_exit3;
 >  
-> @@ -511,6 +621,7 @@ static struct platform_driver gpio_fan_driver = {
->  	.driver	= {
->  		.name	= "gpio-fan",
->  		.pm	= GPIO_FAN_PM,
-> +		.of_match_table = of_match_ptr(of_gpio_fan_match),
->  	},
->  };
+> -		omap_device_fill_resources(od, res);
+> +		/*
+> +		 * If pdev->num_resources > 0, then assume that,
+> +		 * MEM and IRQ resources will only come from DT and only
+> +		 * fill DMA resource from hwmod layer.
+> +		 */
+> +		if (pdev->num_resources && pdev->resource) {
+> +			dev_dbg(&pdev->dev, "%s(): resources already allocated %d\n",
+> +				__func__, res_count);
+> +			memcpy(res, pdev->resource,
+> +			       sizeof(struct resource) * pdev->num_resources);
+> +			_od_fill_dma_resources(od, &res[pdev->num_resources]);
+> +		} else {
+> +			dev_dbg(&pdev->dev, "%s(): using resources from hwmod %d\n",
+> +				__func__, res_count);
+> +			omap_device_fill_resources(od, res);
+> +		}
 >  
+>  		ret = platform_device_add_resources(pdev, res, res_count);
+>  		kfree(res);
 > -- 
-> 1.7.10.4
+> 1.7.0.4
+> 
+> 
+> 
+> On 08/29/2012 11:48 AM, Vaibhav Hiremath wrote:
+> > With the new devices (like, AM33XX and OMAP5) we now only support
+> > DT boot mode of operation and now it is the time to start killing
+> > slowly the dependency on hwmod, so with this patch, we are starting
+> > with device resources.
+> > The idea here is implemented considering to both boot modes -
+> >   - DT boot mode
+> >     OF framework will construct the resource structure (currently
+> >     does for MEM & IRQ resource) and we should respect/use these
+> >     resources, killing hwmod dependency.
+> >     If pdev->num_resources > 0, we assume that MEM & IRQ resources
+> >     have been allocated by OF layer already (through DTB).
+> > 
+> >     Once DMA resource is available from OF layer, we should
+> >     kill filling any resources from hwmod.
+> > 
+> >   - Non-DT boot mode
+> >     Here, pdev->num_resources = 0, and we should get all the
+> >     resources from hwmod (following existing steps)
+> > 
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > Cc: Benoit Cousson <b-cousson@ti.com>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Kevin Hilman <khilman@ti.com>
+> > ---
+> > This patch is tested on BeagleBone and AM37xEVM.
+> > 
+> > Why RFC?
+> > Still we have function duplication omap_device_fill_resources() and
+> > omap_device_fill_dma_resources(), we can actually split the function
+> > into 3 resources and avoid duplication -
+> >   - omap_device_fill_dma_resources()
+> >   - omap_device_fill_mem_resources()
+> >   - omap_device_fill_irq_resources()
+> > 
+> > Actually I wanted to clean it further but thought of getting
+> > feedback first and then proceed further.
+> > 
+> >  arch/arm/mach-omap2/omap_hwmod.c             |   27 ++++++++++
+> >  arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
+> >  arch/arm/plat-omap/omap_device.c             |   72 +++++++++++++++++++++----
+> >  3 files changed, 88 insertions(+), 12 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> > index 31ec283..edabfb3 100644
+> > --- a/arch/arm/mach-omap2/omap_hwmod.c
+> > +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> > @@ -3330,6 +3330,33 @@ int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res)
+> >  }
+> > 
+> >  /**
+> > + * omap_hwmod_fill_dma_resources - fill struct resource array with dma data
+> > + * @oh: struct omap_hwmod *
+> > + * @res: pointer to the array of struct resource to fill
+> > + *
+> > + * Fill the struct resource array @res with dma resource data from the
+> > + * omap_hwmod @oh.  Intended to be called by code that registers
+> > + * omap_devices.  See also omap_hwmod_count_resources().  Returns the
+> > + * number of array elements filled.
+> > + */
+> > +int omap_hwmod_fill_dma_resources(struct omap_hwmod *oh, struct resource *res)
+> > +{
+> > +	int i, sdma_reqs_cnt;
+> > +	int r = 0;
+> > +
+> > +	sdma_reqs_cnt = _count_sdma_reqs(oh);
+> > +	for (i = 0; i < sdma_reqs_cnt; i++) {
+> > +		(res + r)->name = (oh->sdma_reqs + i)->name;
+> > +		(res + r)->start = (oh->sdma_reqs + i)->dma_req;
+> > +		(res + r)->end = (oh->sdma_reqs + i)->dma_req;
+> > +		(res + r)->flags = IORESOURCE_DMA;
+> > +		r++;
+> > +	}
+> > +
+> > +	return r;
+> > +}
+> > +
+> > +/**
+> >   * omap_hwmod_get_resource_byname - fetch IP block integration data by name
+> >   * @oh: struct omap_hwmod * to operate on
+> >   * @type: one of the IORESOURCE_* constants from include/linux/ioport.h
+> > diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> > index 9b9646c..0533073 100644
+> > --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> > +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> > @@ -615,6 +615,7 @@ int omap_hwmod_softreset(struct omap_hwmod *oh);
+> > 
+> >  int omap_hwmod_count_resources(struct omap_hwmod *oh);
+> >  int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res);
+> > +int omap_hwmod_fill_dma_resources(struct omap_hwmod *oh, struct resource *res);
+> >  int omap_hwmod_get_resource_byname(struct omap_hwmod *oh, unsigned int type,
+> >  				   const char *name, struct resource *res);
+> > 
+> > diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+> > index c490240..fd15a3a 100644
+> > --- a/arch/arm/plat-omap/omap_device.c
+> > +++ b/arch/arm/plat-omap/omap_device.c
+> > @@ -486,6 +486,33 @@ static int omap_device_fill_resources(struct omap_device *od,
+> >  }
+> > 
+> >  /**
+> > + * omap_device_fill_dma_resources - fill in array of struct resource with dma resources
+> > + * @od: struct omap_device *
+> > + * @res: pointer to an array of struct resource to be filled in
+> > + *
+> > + * Populate one or more empty struct resource pointed to by @res with
+> > + * the dma resource data for this omap_device @od.  Used by
+> > + * omap_device_alloc() after calling omap_device_count_resources().
+> > + *
+> > + * Ideally this function would not be needed at all.  If we have
+> > + * mechanism to get dma resources from DT.
+> > + *
+> > + * Returns 0.
+> > + */
+> > +static int omap_device_fill_dma_resources(struct omap_device *od,
+> > +				      struct resource *res)
+> > +{
+> > +	int i, r;
+> > +
+> > +	for (i = 0; i < od->hwmods_cnt; i++) {
+> > +		r = omap_hwmod_fill_dma_resources(od->hwmods[i], res);
+> > +		res += r;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +/**
+> >   * omap_device_alloc - allocate an omap_device
+> >   * @pdev: platform_device that will be included in this omap_device
+> >   * @oh: ptr to the single omap_hwmod that backs this omap_device
+> > @@ -524,24 +551,45 @@ struct omap_device *omap_device_alloc(struct platform_device *pdev,
+> >  	od->hwmods = hwmods;
+> >  	od->pdev = pdev;
+> > 
+> > +	res_count = omap_device_count_resources(od);
+> >  	/*
+> > -	 * HACK: Ideally the resources from DT should match, and hwmod
+> > -	 * should just add the missing ones. Since the name is not
+> > -	 * properly populated by DT, stick to hwmod resources only.
+> > +	 * DT Boot:
+> > +	 *   OF framework will construct the resource structure (currently
+> > +	 *   does for MEM & IRQ resource) and we should respect/use these
+> > +	 *   resources, killing hwmod dependency.
+> > +	 *   If pdev->num_resources > 0, we assume that MEM & IRQ resources
+> > +	 *   have been allocated by OF layer already (through DTB).
+> > +	 *
+> > +	 * Non-DT Boot:
+> > +	 *   Here, pdev->num_resources = 0, and we should get all the
+> > +	 *   resources from hwmod.
+> > +	 *
+> > +	 * TODO: Once DMA resource is available from OF layer, we should
+> > +	 *   kill filling any resources from hwmod.
+> >  	 */
+> > -	if (pdev->num_resources && pdev->resource)
+> > -		dev_warn(&pdev->dev, "%s(): resources already allocated %d\n",
+> > -			__func__, pdev->num_resources);
+> > -
+> > -	res_count = omap_device_count_resources(od);
+> > -	if (res_count > 0) {
+> > -		dev_dbg(&pdev->dev, "%s(): resources allocated from hwmod %d\n",
+> > -			__func__, res_count);
+> > +	if (res_count > pdev->num_resources) {
+> > +		/* Allocate resources memory to account for new resources */
+> >  		res = kzalloc(sizeof(struct resource) * res_count, GFP_KERNEL);
+> >  		if (!res)
+> >  			goto oda_exit3;
+> > 
+> > -		omap_device_fill_resources(od, res);
+> > +		/*
+> > +		 * If pdev->num_resources > 0, then assume that,
+> > +		 * MEM and IRQ resources will only come from DT and only
+> > +		 * fill DMA resource from hwmod layer.
+> > +		 */
+> > +		if (pdev->num_resources && pdev->resource) {
+> > +			dev_dbg(&pdev->dev, "%s(): resources already allocated %d\n",
+> > +					__func__, res_count);
+> > +			memcpy(res, pdev->resource,
+> > +				sizeof(struct resource) * pdev->num_resources);
+> > +			omap_device_fill_dma_resources(od,
+> > +					&res[pdev->num_resources]);
+> > +		} else {
+> > +			dev_dbg(&pdev->dev, "%s(): using resources from hwmod %d\n",
+> > +					__func__, res_count);
+> > +			omap_device_fill_resources(od, res);
+> > +		}
+> > 
+> >  		ret = platform_device_add_resources(pdev, res, res_count);
+> >  		kfree(res);
+> > --
+> > 1.7.0.4
+> > 
 > 
 > 
