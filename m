@@ -1,49 +1,28 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri,  7 Sep 2012 14:43:45 +0200
-Subject: [PATCH v4 3/6] ARM: dts: add sram for imx53 and imx6q
+Date: Fri,  7 Sep 2012 14:43:48 +0200
+Subject: [PATCH v4 6/6] ARM i.MX6q: Add ocram clkdev entry
 In-Reply-To: <1347021828-23034-1-git-send-email-p.zabel@pengutronix.de>
 References: <1347021828-23034-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1347021828-23034-4-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1347021828-23034-7-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/imx53.dtsi |    5 +++++
- arch/arm/boot/dts/imx6q.dtsi |    5 +++++
- 2 files changed, 10 insertions(+)
+ arch/arm/mach-imx/clk-imx6q.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index cd37165..2767a92 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -337,5 +337,10 @@
- 				status = "disabled";
- 			};
- 		};
-+
-+		ocram: ocram at f8000000 {
-+			compatible = "fsl,imx-ocram", "sram";
-+			reg = <0xf8000000 0x20000>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index fd57079..1e463c4 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -111,6 +111,11 @@
- 		       status = "disabled";
- 		};
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 4233d9e..5912966 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -439,6 +439,7 @@ int __init mx6q_clocks_init(void)
+ 	clk_register_clkdev(clk[cko1_sel], "cko1_sel", NULL);
+ 	clk_register_clkdev(clk[ahb], "ahb", NULL);
+ 	clk_register_clkdev(clk[cko1], "cko1", NULL);
++	clk_register_clkdev(clk[ocram], NULL, "900000.ocram");
  
-+		ocram: ocram at 00900000 {
-+			compatible = "fsl,imx-ocram", "sram";
-+			reg = <0x00900000 0x3f000>;
-+		};
-+
- 		timer at 00a00600 {
- 			compatible = "arm,cortex-a9-twd-timer";
- 			reg = <0x00a00600 0x20>;
+ 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+ 		clk_prepare_enable(clk[clks_init_on[i]]);
 -- 
 1.7.10.4
