@@ -1,77 +1,38 @@
 From: gerg@snapgear.com (Greg Ungerer)
-Date: Sat, 8 Sep 2012 00:11:55 +1000
-Subject: [PATCH] ARM: ks8695: add board support for the OpenGear boards
- based on the KS8695
-In-Reply-To: <201209071221.56938.arnd@arndb.de>
-References: <1346996139-5692-1-git-send-email-gerg@snapgear.com>
- <201209071221.56938.arnd@arndb.de>
-Message-ID: <504A00AB.3050702@snapgear.com>
+Date: Sat, 8 Sep 2012 00:15:11 +1000
+Subject: [PATCH] ARM: ixp4xx: move fixed mapping of internal devices into
+ vmalloc region
+In-Reply-To: <201209071323.56574.arnd@arndb.de>
+References: <1346996400-5824-1-git-send-email-gerg@snapgear.com>
+ <201209071223.30275.arnd@arndb.de> <m3oblic6x0.fsf@intrepid.localdomain>
+ <201209071323.56574.arnd@arndb.de>
+Message-ID: <504A016F.6020304@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 09/07/2012 10:21 PM, Arnd Bergmann wrote:
-> On Friday 07 September 2012, gerg at snapgear.com wrote:
->> From: Greg Ungerer <gerg@uclinux.org>
+On 09/07/2012 11:23 PM, Arnd Bergmann wrote:
+> On Friday 07 September 2012, Krzysztof Halasa wrote:
+>>>>    BUG: mapping for 0xc8000000 at 0xffbeb000 out of vmalloc space
+>>>>    BUG: mapping for 0xc4000000 at 0xffbfe000 out of vmalloc space
+>>>>    BUG: mapping for 0xc0000000 at 0xffbff000 out of vmalloc space
 >>
->> A number of boards produced by OpenGear and based on the Micrel KS8695 SoC.
->> Add board support to the KS8695 kernel code to support them.
+>>> Imre, Krzysztof: do you prefer to take this patch into a branch of yours
+>>> and send a pull request, or should we just apply it directly into arm-soc.
+>>> In the former case, can you provide an Ack?
 >>
->> The following machine type entries will need to be added back into the
->> mach-types file with these in mainline:
+>> My intention is to push the following instead:
 >>
->>      cm4008      MACH_CM4008       CM4008       624
->>      cm41xx      MACH_CM41XX       CM41XX       672
->>      cm4002      MACH_CM4002       CM4002       876
->>      im42xx      MACH_IM42XX       IM42XX       1105
->>      im4004      MACH_IM4004       IM4004       1400
+>> http://git.kernel.org/?p=linux/kernel/git/chris/linux.git;a=commitdiff;h=f62736b567ff532fb772afea76fccdbcd92ab473;hp=23e3b6cf1c37ef0615d90681d3705a8821305b5f
 >>
->> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
 >
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
+> Ok, fine with me. I noticed however that this is missing
+> a changelog. Maybe you can take the text that Greg sent.
 >
-> Hi Greg,
->
-> Both ks8695 patches look good to me, I think we can apply them to the
-> arm-soc tree right away. If you agree, I'd also like to apply the
-> patch below to list you as a contact for the platform. If you prefer,
-> we can also list it as Maintained.
+> I also wonder if this patch needs to be applied to earlier
+> versions as well. Is linux-3.6 still working?
 
-Patch looks good. I am fine with marking it is maintained as well.
-
-
-> 	Arnd
->
-> 8<----
-> ARM: ks8695: add maintainers entry
->
-> Greg Ungerer has hardware for this platform and is testing it
-> regularly.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Acked-by: Greg Ungerer <gerg@uclinux.org>
-
-
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index fdc0119..f7b8d14 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -913,6 +913,12 @@ W:	http://www.digriz.org.uk/ts78xx/kernel
->   S:	Maintained
->   F:	arch/arm/mach-orion5x/ts78xx-*
->
-> +ARM/MICREL KS8695 ARCHITECTURE
-> +M:	Greg Ungerer <gerg@uclinux.org>
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +F:	arch/arm/mach-ks8695
-> +S:	Odd Fixes
-> +
->   ARM/MIOA701 MACHINE SUPPORT
->   M:	Robert Jarzmik <robert.jarzmik@free.fr>
->   L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+It only seemed to be a warning. The boards I tested on worked with
+no problems that I could see. That was on a linux-3.5 kernel.
 
 Regards
 Greg
