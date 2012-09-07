@@ -1,176 +1,44 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 7 Sep 2012 13:59:40 +0200
-Subject: [PATCH] ARM: smp_twd: reprogram twd based on clk notifier
-In-Reply-To: <1347005967-7604-1-git-send-email-shawn.guo@linaro.org>
-References: <1347005967-7604-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAPDyKFoV5d2pdxVj=9ERubs7_3g1zVJQ08Uo8JXD7yogp0wHgA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri,  7 Sep 2012 14:18:09 +0200
+Subject: [PATCHv2 0/7] gpios: Add daisy-chaining and dt support to 74x164
+Message-ID: <1347020296-18796-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn and Mike,
+Hi all,
 
-In general I am in favor of this patch, but I also see some
-corresponding problems to resolve. Please correct me if I am wrong.
+This is the second attempt at adding the support for chained 8 bit
+shift registers that are present in the cfa-10049.
 
-I suppose most machines is relying on that it enough to only take care
-of the notification by using "cpufreq_notify_transition" from their
-cpufreq drivers. Thus those have to make sure the updates for smp_twd
-clock is supported from within the cpufreq driver I suppose.
+This patchset also adds dt support to the 74x164 gpio driver.
 
-In other words the cpufreq drivers needs to do clk_get of "smp_twd"
-clock and then do a set_rate on it when it's has changed, to trigger a
-rate change notification. Is this what you also have in mind or do you
-have any other idea of how this should work?
+Thanks,
+Maxime
 
-Kind regards
-Ulf Hansson
+Changes since v1:
+  * Added back the possibility to set the gpio base from the platform
+    data
+  * Removed the output-latch-gpios dt property to use the regular spi
+    chip select mechanism that works in the same way.
+  * Moved from multiple spi_write to a single spi_sync call because the
+    chip select must be enabled during the whole transfer in our case,
+    and not disabled after sending every byte.
 
-On 7 September 2012 10:19, Shawn Guo <shawn.guo@linaro.org> wrote:
-> From: Mike Turquette <mturquette@linaro.org>
->
-> Running cpufreq driver on imx6q, the following warning is seen.
->
-> $ BUG: sleeping function called from invalid context at kernel/mutex.c:269
->
-> <snip>
->
-> stack backtrace:
-> Backtrace:
-> [<80011d64>] (dump_backtrace+0x0/0x10c) from [<803fc164>] (dump_stack+0x18/0x1c)
->  r6:bf8142e0 r5:bf814000 r4:806ac794 r3:bf814000
-> [<803fc14c>] (dump_stack+0x0/0x1c) from [<803fd444>] (print_usage_bug+0x250/0x2b
-> 8)
-> [<803fd1f4>] (print_usage_bug+0x0/0x2b8) from [<80060f90>] (mark_lock+0x56c/0x67
-> 0)
-> [<80060a24>] (mark_lock+0x0/0x670) from [<80061a20>] (__lock_acquire+0x98c/0x19b
-> 4)
-> [<80061094>] (__lock_acquire+0x0/0x19b4) from [<80062f14>] (lock_acquire+0x68/0x
-> 7c)
-> [<80062eac>] (lock_acquire+0x0/0x7c) from [<80400f28>] (mutex_lock_nested+0x78/0
-> x344)
->  r7:00000000 r6:bf872000 r5:805cc858 r4:805c2a04
-> [<80400eb0>] (mutex_lock_nested+0x0/0x344) from [<803089ac>] (clk_get_rate+0x1c/
-> 0x58)
-> [<80308990>] (clk_get_rate+0x0/0x58) from [<80013c48>] (twd_update_frequency+0x1
-> 8/0x50)
->  r5:bf253d04 r4:805cadf4
-> [<80013c30>] (twd_update_frequency+0x0/0x50) from [<80068e20>] (generic_smp_call
-> _function_single_interrupt+0xd4/0x13c)
->  r4:bf873ee0 r3:80013c30
-> [<80068d4c>] (generic_smp_call_function_single_interrupt+0x0/0x13c) from [<80013
-> 34c>] (handle_IPI+0xc0/0x194)
->  r8:00000001 r7:00000000 r6:80574e48 r5:bf872000 r4:80593958
-> [<8001328c>] (handle_IPI+0x0/0x194) from [<800084e8>] (gic_handle_irq+0x58/0x60)
->  r8:00000000 r7:bf873f8c r6:bf873f58 r5:80593070 r4:f4000100
-> r3:00000005
-> [<80008490>] (gic_handle_irq+0x0/0x60) from [<8000e124>] (__irq_svc+0x44/0x60)
-> Exception stack(0xbf873f58 to 0xbf873fa0)
-> 3f40:                                                       00000001 00000001
-> 3f60: 00000000 bf814000 bf872000 805cab48 80405aa4 80597648 00000000 412fc09a
-> 3f80: bf872000 bf873fac bf873f70 bf873fa0 80063844 8000f1f8 20000013 ffffffff
->  r6:ffffffff r5:20000013 r4:8000f1f8 r3:bf814000
-> [<8000f1b8>] (default_idle+0x0/0x4c) from [<8000f428>] (cpu_idle+0x98/0x114)
-> [<8000f390>] (cpu_idle+0x0/0x114) from [<803f9834>] (secondary_start_kernel+0x11
-> c/0x140)
-> [<803f9718>] (secondary_start_kernel+0x0/0x140) from [<103f9234>] (0x103f9234)
->  r6:10c03c7d r5:0000001f r4:4f86806a r3:803f921c
->
-> It looks that the warning is caused by that twd_update_frequency() gets
-> called from an atomic context while it calls clk_get_rate() where
-> a mutex gets held.
->
-> To fix the warning, let's convert the existing code to use clk notifiers
-> in place of CPUfreq notifiers.  This works out nicely for Cortex-A9
-> MPcore designs that scale all CPUs at the same frequency.
->
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/kernel/smp_twd.c |   32 +++++++++++++-------------------
->  1 files changed, 13 insertions(+), 19 deletions(-)
->
-> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-> index fef42b2..635e3ea 100644
-> --- a/arch/arm/kernel/smp_twd.c
-> +++ b/arch/arm/kernel/smp_twd.c
-> @@ -11,7 +11,6 @@
->  #include <linux/init.h>
->  #include <linux/kernel.h>
->  #include <linux/clk.h>
-> -#include <linux/cpufreq.h>
->  #include <linux/delay.h>
->  #include <linux/device.h>
->  #include <linux/err.h>
-> @@ -96,51 +95,46 @@ static void twd_timer_stop(struct clock_event_device *clk)
->         disable_percpu_irq(clk->irq);
->  }
->
-> -#ifdef CONFIG_CPU_FREQ
-> -
->  /*
->   * Updates clockevent frequency when the cpu frequency changes.
->   * Called on the cpu that is changing frequency with interrupts disabled.
->   */
-> -static void twd_update_frequency(void *data)
-> +static void twd_update_frequency(void *new_rate)
->  {
-> -       twd_timer_rate = clk_get_rate(twd_clk);
-> +       twd_timer_rate = *((unsigned long *) new_rate);
->
->         clockevents_update_freq(*__this_cpu_ptr(twd_evt), twd_timer_rate);
->  }
->
-> -static int twd_cpufreq_transition(struct notifier_block *nb,
-> -       unsigned long state, void *data)
-> +static int twd_rate_change(struct notifier_block *nb,
-> +       unsigned long flags, void *data)
->  {
-> -       struct cpufreq_freqs *freqs = data;
-> +       struct clk_notifier_data *cnd = data;
->
->         /*
->          * The twd clock events must be reprogrammed to account for the new
->          * frequency.  The timer is local to a cpu, so cross-call to the
->          * changing cpu.
->          */
-> -       if (state == CPUFREQ_POSTCHANGE || state == CPUFREQ_RESUMECHANGE)
-> -               smp_call_function_single(freqs->cpu, twd_update_frequency,
-> -                       NULL, 1);
-> +       if (flags == POST_RATE_CHANGE)
-> +               smp_call_function(twd_update_frequency,
-> +                                 (void *)&cnd->new_rate, 1);
->
->         return NOTIFY_OK;
->  }
->
-> -static struct notifier_block twd_cpufreq_nb = {
-> -       .notifier_call = twd_cpufreq_transition,
-> +static struct notifier_block twd_clk_nb = {
-> +       .notifier_call = twd_rate_change,
->  };
->
-> -static int twd_cpufreq_init(void)
-> +static int twd_clk_init(void)
->  {
->         if (twd_evt && *__this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
-> -               return cpufreq_register_notifier(&twd_cpufreq_nb,
-> -                       CPUFREQ_TRANSITION_NOTIFIER);
-> +               return clk_notifier_register(twd_clk, &twd_clk_nb);
->
->         return 0;
->  }
-> -core_initcall(twd_cpufreq_init);
-> -
-> -#endif
-> +core_initcall(twd_clk_init);
->
->  static void __cpuinit twd_calibrate_rate(void)
->  {
-> --
-> 1.7.5.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Maxime Ripard (7):
+  gpio: 74x164: Use module_spi_driver boiler plate function
+  gpio: 74x164: Use devm_kzalloc
+  gpio: 74x164: Use dynamic gpio number assignment if no pdata is
+    present
+  gpio: 74x164: Add device tree support
+  gpio: 74x164: Add support for the daisy-chaining
+  gpio: 74x164: dts: Add documentation for the dt binding
+  ARM: dts: cfa10049: Add the 74HC595 gpio expanders
+
+ .../devicetree/bindings/gpio/gpio-74x164.txt       |   22 ++++
+ arch/arm/boot/dts/imx28-cfa10049.dts               |   21 ++++
+ drivers/gpio/gpio-74x164.c                         |  105 ++++++++++++++------
+ 3 files changed, 120 insertions(+), 28 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-74x164.txt
+
+-- 
+1.7.9.5
