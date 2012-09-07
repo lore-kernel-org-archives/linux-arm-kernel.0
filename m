@@ -1,63 +1,51 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 7 Sep 2012 08:26:14 +0300
-Subject: [PATCH 5/5] omap-serial: Request pins using pinctrl framework
-In-Reply-To: <20120906211725.GQ1303@atomide.com>
-References: <20120906185615.1172.23588.stgit@muffinssi.local>
- <20120906185832.1172.31013.stgit@muffinssi.local>
- <20120906195605.GA32145@arwen.pp.htv.fi>
- <20120906211725.GQ1303@atomide.com>
-Message-ID: <20120907052613.GA3136@arwen.pp.htv.fi>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 07 Sep 2012 14:30:53 +0900
+Subject: [PATCH 0/2] ARM: EXYNOS: Set the capability of pdm0 and pdm1 as
+ DMA_PRIVATE
+In-Reply-To: <1346374330.15463.5.camel@vkoul-mobl4>
+References: <1346215585-31023-1-git-send-email-tushar.behera@linaro.org>
+ <1346374330.15463.5.camel@vkoul-mobl4>
+Message-ID: <243801cd8cb9$f303e6d0$d90bb470$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Sep 06, 2012 at 02:17:26PM -0700, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [120906 13:01]:
-> > Hi,
-> > 
-> > On Thu, Sep 06, 2012 at 11:58:32AM -0700, Tony Lindgren wrote:
-> > > Request pins using pinctrl framework. Only show a warning
-> > > on error as some boards set the pins in the bootloader
-> > > even if CONFIG_PINCTRL is enabled.
-> > > 
-> > > Cc: linux-serial at vger.kernel.org
-> > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > > ---
-> > >  arch/arm/plat-omap/include/plat/omap-serial.h |    1 +
-> > >  drivers/tty/serial/omap-serial.c              |   10 ++++++++++
-> > >  2 files changed, 11 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
-> > > index 1a52725..0f4de14 100644
-> > > --- a/arch/arm/plat-omap/include/plat/omap-serial.h
-> > > +++ b/arch/arm/plat-omap/include/plat/omap-serial.h
-> > > @@ -106,6 +106,7 @@ struct uart_omap_port {
-> > >  	struct uart_port	port;
-> > >  	struct uart_omap_dma	uart_dma;
-> > >  	struct platform_device	*pdev;
-> > > +	struct pinctrl		*pins;
-> > 
-> > this won't apply to Greg's tty-next as I moved this structure to the C
-> > file :-s
+Vinod Koul wrote:
 > 
-> Hmm the tty-next fails to build right now for omaps:
-> 
-> drivers/tty/serial/omap-serial.c: In function ?serial_omap_set_mctrl?:
-> drivers/tty/serial/omap-serial.c:514: error: ?struct uart_omap_port? has no member named ?DTR_gpio?
-> 
-> Maybe check how you want to fix that first? I can then update
-> my patch for tty-next.
+> On Wed, 2012-08-29 at 10:16 +0530, Tushar Behera wrote:
+> > DMA clients pdma0 and pdma1 are internal to the SoC and are used only
+> > by dedicated peripherals. Since they cannot be used for generic
+> > purpose, their capability should be set as DMA_PRIVATE.
+> >
+> > The patches are rebased on top of v3.6-rc3.
+> Kukjin, if you ack them I can take thru my tree, other way round is fine
+> with me too.
 
-oops, my bad. Patch sent.
+Hi Vinod,
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120907/10cbd027/attachment.sig>
+Looks good to me, please pick them into your tree with my ack.
+
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+
+If any problems, please kindly let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> >
+> > Tushar Behera (2):
+> >   ARM: EXYNOS: Set the capability of pdm0 and pdm1 as DMA_PRIVATE
+> >   DMA: PL330: Set the capability of pdm0 and pdm1 as DMA_PRIVATE
+> >
+> >  arch/arm/mach-exynos/dma.c |    2 ++
+> >  drivers/dma/pl330.c        |    1 +
+> >  2 files changed, 3 insertions(+), 0 deletions(-)
+> >
+> 
+> --
+> ~Vinod Koul
+> Intel Corp.
