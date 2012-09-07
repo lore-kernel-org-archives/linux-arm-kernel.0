@@ -1,42 +1,69 @@
-From: gerg@snapgear.com (Greg Ungerer)
-Date: Fri, 7 Sep 2012 15:42:28 +1000
-Subject: [PATCH 4/4] ARM: ks8695: convert to generic time and clocksource
-In-Reply-To: <201209031324.22877.arnd@arndb.de>
-References: <1346264842-20411-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdab72Z86i21TNohS0YO=Bav7eQgHwQyXa0tXQB=0hhgAg@mail.gmail.com>
- <5044A954.4000706@snapgear.com> <201209031324.22877.arnd@arndb.de>
-Message-ID: <50498944.2060009@snapgear.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Fri, 7 Sep 2012 05:45:17 +0000
+Subject: [PATCH v2 1/8] ARM/dts: OMAP2: Add McBSP entries for OMAP2420
+ and OMAP2430 SoC
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EAA8779@DBDE01.ent.ti.com>
+References: <1346247067-9632-1-git-send-email-peter.ujfalusi@ti.com>
+ <1346247067-9632-2-git-send-email-peter.ujfalusi@ti.com>
+ <5044C2DD.5000705@ti.com> <504578B3.3090804@ti.com> <5045D557.30404@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EAA7C99@DBDE01.ent.ti.com>
+ <50470C1E.7090300@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EAA8014@DBDE01.ent.ti.com>
+ <5047544B.60105@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EAA8779@DBDE01.ent.ti.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA29468@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 03/09/12 23:24, Arnd Bergmann wrote:
-> On Monday 03 September 2012, Greg Ungerer wrote:
->>> I suspect
->>> some of these platforms may have more users than we
->>> believe.
->>
->> I know the guys at www.opengear.com are still building hardware around
->> the KS8695. And they update to modern kernels from time to time. So its
->> not completely obsolete yet. I have some SnapGear boards based around it
->> too, though they went out of production about 2 years ago.
+On Wed, Sep 05, 2012 at 20:11:11, Hiremath, Vaibhav wrote:
+> On Wed, Sep 05, 2012 at 19:01:55, Cousson, Benoit wrote:
+> > Hi Vaibhav,
+> > 
+> > On 09/05/2012 11:15 AM, Hiremath, Vaibhav wrote:
+> > > On Wed, Sep 05, 2012 at 13:53:58, Ujfalusi, Peter wrote:
+> > >> Hi,
+> > >>
+> > >> On 09/05/2012 09:11 AM, Hiremath, Vaibhav wrote:
+> > >>>> Not yet, but we discussed that with Peter and since he does have these
+> > >>>> patches for DT, he'll be able to test your series with the McBSP changes.
+> > >>>>
+> > >>>
+> > >>> Great.
+> > >>
+> > >> With his series and your patch for omap-hwmod audio was probing and working on
+> > >> OMAP3/4/5 without issues.
+> > >>
+> > > Peter,
+> > > Care to provide your Tested-By??
+> > > 
+> > > Benoit,
+> > > Can we merge this patch now?
+> > 
+> > Yes, I'll include it in the pull request along with DTS patches.
+> > 
+> > I've just tested it as well on OMAP4 by hacking the DTS for GPIO.
+> > I'll try to update at least all the OMAP4 IPs as well with the proper
+> > DTS resources for 3.7.
+> > 
+> 
+> Thanks Benoit,
+> 
+> There are other patches which are pending,
+> 
+> arm/dts: AM33XX: Convert all hex numbers to lower-case
+> https://patchwork.kernel.org/patch/1377351/
+> arm/dts: AM33XX: Specify reg and interrupt property for all nodes
+> https://patchwork.kernel.org/patch/1377361/
 >
-> Ok, good to know. Maybe we can catch their interest with this mail thread
-> here and get them to contribute upstream as well.
 
-I have just posted a patch for the SnapGear boards. I had a bit of
-info and some code for the OpenGear boards too, so I posted a patch
-for some of them too.
+Few more DT patches which are pending
 
-Regards
-Greg
+arm/dts: AM33XX: Add basic pinctrl device tree data
+http://www.spinics.net/lists/linux-omap/msg76684.html
+arm/dts: AM33XX: Configure pinmuxs for user leds control on Bone
+http://www.spinics.net/lists/linux-omap/msg76682.html
+arm/dts: AM33XX: Add D_CAN device tree data
+http://www.spinics.net/lists/linux-omap/msg76683.html
 
-
-
--- 
-------------------------------------------------------------------------
-Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
-SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
-8 Gardner Close                             FAX:         +61 7 3217 5323
-Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
+Thanks
+AnilKumar
