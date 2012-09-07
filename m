@@ -1,59 +1,59 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Fri, 7 Sep 2012 07:59:55 +0000
-Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
-In-Reply-To: <201209070209.35379.marex@denx.de>
-References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
- <201209060405.08997.marex@denx.de> <20120906174531.GX1303@atomide.com>
- <201209070209.35379.marex@denx.de>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA2964C@DBDE01.ent.ti.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 7 Sep 2012 10:02:36 +0200
+Subject: [PATCH 1/2] serial: pl011: delete dangling bug flag
+Message-ID: <1347004956-15294-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2012 at 05:39:35, Marek Vasut wrote:
-> Dear Tony Lindgren,
-> 
-> > * Marek Vasut <marex@denx.de> [120905 19:05]:
-> > > Hi Tony,
-> > > 
-> > > > * Marek Vasut <marex@denx.de> [120904 20:13]:
-> > > > > Dear Bryan Wu,
-> > > > > 
-> > > > > > On Sat, Sep 1, 2012 at 4:16 PM, AnilKumar Ch <anilkumar@ti.com> wrote:
-> > > > > > > Adopt pinctrl support to leds-gpio driver based on leds-gpio
-> > > > > > > device pointer, pinctrl driver configure SoC pins to GPIO
-> > > > > > > mode according to definitions provided in .dts file.
-> > > > > > 
-> > > > > > Thanks for this, actually Marek Vasut submitted a similar patch
-> > > > > > before. I'm pretty fine with this patch.
-> > > > > 
-> > > > > Thanks for submitting this actually ... I didn't have time to
-> > > > > properly investigate this.
-> > > > > 
-> > > > > > But without proper DT setting, it will also give us warning I
-> > > > > > think. or we can provide some dummy functions as a temp solution
-> > > > > > as Shawn pointed out before.
-> > > > > 
-> > > > > But this driver is also used on hardware that's not yet coverted to
-> > > > > DT, so I'd say dev_warn() if CONFIG_OF is enabled and otherwise
-> > > > > simply go on ? Actually, can we not skip whole this pinctrl thing if
-> > > > > CONFIG_OF is disabled? Actually (2), what's the relationship between
-> > > > > OF and pinctrl?
-> > > > 
-> > > > The warning should be pinctrl related as the pinctrl drivers may not be
-> > > > device tree based drivers.
-> > > 
-> > > Exactly my concern. Also the warning shouldnt be present on systems where
-> > > pinctrl is disabled.
-> > 
-> > But pinctrl_get_select() returns 0 in include/linux/pinctrl/consumer.h if
-> > CONFIG_PINCTRL is not selected, so no warning is produced AFAIK ;)
-> 
-> Oh all right then.
-> 
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Bryan,
+The bug flag .interrupt_may_hang is not used since commit
+4fd0690bb0c3955983560bb2767ee82e2b197f9b
+"serial: pl011: implement workaround for CTS clear event issue"
+so delete it.
 
-If this patch looks fine, can you queue this for 3.7?
+Cc: Lee Jones <lee.jones@linaro.org>
+Cc: Rajanikanth H.V <rajanikanth.hv@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/tty/serial/amba-pl011.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-Thanks
-AnilKumar
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 05c15ec..cede938 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -77,7 +77,6 @@ struct vendor_data {
+ 	unsigned int		lcrh_tx;
+ 	unsigned int		lcrh_rx;
+ 	bool			oversampling;
+-	bool			interrupt_may_hang;   /* vendor-specific */
+ 	bool			dma_threshold;
+ 	bool			cts_event_workaround;
+ };
+@@ -98,7 +97,6 @@ static struct vendor_data vendor_st = {
+ 	.lcrh_tx		= ST_UART011_LCRH_TX,
+ 	.lcrh_rx		= ST_UART011_LCRH_RX,
+ 	.oversampling		= true,
+-	.interrupt_may_hang	= true,
+ 	.dma_threshold		= true,
+ 	.cts_event_workaround	= true,
+ };
+@@ -149,7 +147,6 @@ struct uart_amba_port {
+ 	unsigned int		old_cr;		/* state during shutdown */
+ 	bool			autorts;
+ 	char			type[12];
+-	bool			interrupt_may_hang; /* vendor-specific */
+ #ifdef CONFIG_DMA_ENGINE
+ 	/* DMA stuff */
+ 	bool			using_tx_dma;
+@@ -1952,7 +1949,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 	uap->lcrh_tx = vendor->lcrh_tx;
+ 	uap->old_cr = 0;
+ 	uap->fifosize = vendor->fifosize;
+-	uap->interrupt_may_hang = vendor->interrupt_may_hang;
+ 	uap->port.dev = &dev->dev;
+ 	uap->port.mapbase = dev->res.start;
+ 	uap->port.membase = base;
+-- 
+1.7.11.3
