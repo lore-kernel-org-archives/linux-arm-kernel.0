@@ -1,75 +1,46 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Fri, 7 Sep 2012 03:27:13 +0000
-Subject: [PATCH 5/5] omap-serial: Request pins using pinctrl framework
-In-Reply-To: <20120906185832.1172.31013.stgit@muffinssi.local>
-References: <20120906185615.1172.23588.stgit@muffinssi.local>
- <20120906185832.1172.31013.stgit@muffinssi.local>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA291F9@DBDE01.ent.ti.com>
+From: peter@turczak.de (Peter Turczak)
+Date: Fri, 7 Sep 2012 05:35:18 +0200
+Subject: mxs: mmc: Problems resetting first SSP/MMC module upon boot
+In-Reply-To: <20120907010143.GD26709@S2101-09.ap.freescale.net>
+References: <FDB97EE7-CE8F-4B83-A384-2E256DADCEDA@turczak.de>
+ <20120907010143.GD26709@S2101-09.ap.freescale.net>
+Message-ID: <EE31261C-7324-4E13-9EE0-D3BFB4C92B99@turczak.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi Shawn,
 
-On Fri, Sep 07, 2012 at 00:28:32, Tony Lindgren wrote:
-> Request pins using pinctrl framework. Only show a warning
-> on error as some boards set the pins in the bootloader
-> even if CONFIG_PINCTRL is enabled.
+On Sep 7, 2012, at 3:01 AM, Shawn Guo wrote
+>> - When booting from usb, ethernet or NAND flash first mmc to be initialized in the machine init function fails. So when doing (example given is nearly literally from the code, the board name is not yet allocated with the registry):
+>>        mx28_add_mxs_mmc(2, &board_mmc_pdata[2]);
+>>        mx28_add_mxs_mmc(0, &board_mmc_pdata[0]);
+>>   mmc0 works, mmc2 does not. When initializing mmc0 first mmc0 works.
 > 
-> Cc: linux-serial at vger.kernel.org
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/plat-omap/include/plat/omap-serial.h |    1 +
->  drivers/tty/serial/omap-serial.c              |   10 ++++++++++
->  2 files changed, 11 insertions(+)
+> When initializing mmc0 first, you meant mmc0 works or does not work?
+Exactly. Now after some testing I found out, any mmc[012] initialized first does not work. Everytime it's stmp_reset_block() fails for the respective block, which is strange.
+
+When the bootloader (both ROM and u-boot from NAND) have initialized the slot before, smtp_reset_block() works and all mmc are available and working reliably.
+
+One more thing: A kernel 2.6.35 patched with the files provided by Freescale always successfully initializes all mmc on the board.
+>> Ideas: 
+>> - Maybe it the clock derivation is not set up properly before resetting as at least two ssp-modules seem to derive the clock from the same clock source. But I have no idea how to test or debug this.
+>> 
+> ssp0 and ssp1 share one clock source, while ssp2 and ssp3 share
+> another one.  I'm not sure if it's the cause, but 3.5 kernel did miss
+> one bug fix below.
 > 
-> diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
-> index 1a52725..0f4de14 100644
-> --- a/arch/arm/plat-omap/include/plat/omap-serial.h
-> +++ b/arch/arm/plat-omap/include/plat/omap-serial.h
-> @@ -106,6 +106,7 @@ struct uart_omap_port {
->  	struct uart_port	port;
->  	struct uart_omap_dma	uart_dma;
->  	struct platform_device	*pdev;
-> +	struct pinctrl		*pins;
->  
->  	unsigned char		ier;
->  	unsigned char		lcr;
-> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> index d3cda0c..068e88c 100644
-> --- a/drivers/tty/serial/omap-serial.c
-> +++ b/drivers/tty/serial/omap-serial.c
-> @@ -39,6 +39,7 @@
->  #include <linux/irq.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/of.h>
-> +#include <linux/pinctrl/consumer.h>
->  
->  #include <plat/dma.h>
->  #include <plat/dmtimer.h>
-> @@ -1492,6 +1493,13 @@ static int serial_omap_probe(struct platform_device *pdev)
->  		goto err_port_line;
->  	}
->  
-> +	up->pins = pinctrl_get_select_default(&pdev->dev);
-> +	if (IS_ERR(up->pins)) {
-> +		dev_warn(&pdev->dev, "did not get pins for uart%i error: %li\n",
-> +			 up->port.line, PTR_ERR(up->pins));
-> +		up->pins = NULL;
-> +	}
-> +
->  	sprintf(up->name, "OMAP UART%d", up->port.line);
->  	up->port.mapbase = mem->start;
->  	up->port.membase = devm_ioremap(&pdev->dev, mem->start,
-> @@ -1570,6 +1578,8 @@ static int serial_omap_remove(struct platform_device *dev)
->  		pm_runtime_disable(&up->pdev->dev);
->  		uart_remove_one_port(&serial_omap_reg, &up->port);
->  		pm_qos_remove_request(&up->pm_qos_request);
-> +		if (up->pins)
-> +			pinctrl_put(up->pins);
-
-I think this can be removed if we use devm_pinctrl_get_select_default()
-above.
-
-Thanks
-AnilKumar
+>  64e2bc4 clk: mxs: imx28: decrease the frequency of ref_io1 for SSP2 and SSP3
+> 
+> You can get it from 3.6-rc1 kernel.
+Thank you, I will give it a try and report back.
+> 
+> -- 
+> Regards,
+> Shawn
+Best Regards,
+  Peter
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
