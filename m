@@ -1,147 +1,85 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Fri, 07 Sep 2012 16:03:11 +0200
-Subject: [PATCH 5/7] gpio: 74x164: Add support for the daisy-chaining
-In-Reply-To: <1347020296-18796-6-git-send-email-maxime.ripard@free-electrons.com>
-References: <1347020296-18796-1-git-send-email-maxime.ripard@free-electrons.com>
- <1347020296-18796-6-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <2796775.6HPOQgPOKV@flexo>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Sat, 8 Sep 2012 00:11:55 +1000
+Subject: [PATCH] ARM: ks8695: add board support for the OpenGear boards
+ based on the KS8695
+In-Reply-To: <201209071221.56938.arnd@arndb.de>
+References: <1346996139-5692-1-git-send-email-gerg@snapgear.com>
+ <201209071221.56938.arnd@arndb.de>
+Message-ID: <504A00AB.3050702@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maxime,
+Hi Arnd,
 
-On Friday 07 September 2012 14:18:14 Maxime Ripard wrote:
-> The shift registers have an output pin that, when enabled, propagates
-> the values of its internal register to the pins. If another value comes
-> to the register while the output pin is disabled, this new value will
-> makae the older shift into the next register in the chain.
-> 
-> This patch adds support for daisy-chaining the registers, using the
-> regular SPI chip select mechanism to manage the output pin, and the
-> registers-number dt property to set the number of chained registers.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On 09/07/2012 10:21 PM, Arnd Bergmann wrote:
+> On Friday 07 September 2012, gerg at snapgear.com wrote:
+>> From: Greg Ungerer <gerg@uclinux.org>
+>>
+>> A number of boards produced by OpenGear and based on the Micrel KS8695 SoC.
+>> Add board support to the KS8695 kernel code to support them.
+>>
+>> The following machine type entries will need to be added back into the
+>> mach-types file with these in mainline:
+>>
+>>      cm4008      MACH_CM4008       CM4008       624
+>>      cm41xx      MACH_CM41XX       CM41XX       672
+>>      cm4002      MACH_CM4002       CM4002       876
+>>      im42xx      MACH_IM42XX       IM42XX       1105
+>>      im4004      MACH_IM4004       IM4004       1400
+>>
+>> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 > ---
+>
+> Hi Greg,
+>
+> Both ks8695 patches look good to me, I think we can apply them to the
+> arm-soc tree right away. If you agree, I'd also like to apply the
+> patch below to list you as a contact for the platform. If you prefer,
+> we can also list it as Maintained.
 
-[snip]
+Patch looks good. I am fine with marking it is maintained as well.
 
->  static int __gen_74x164_write_config(struct gen_74x164_chip *chip)
->  {
-> -	return spi_write(chip->spi,
-> -			 &chip->port_config, sizeof(chip->port_config));
-> +	struct spi_message message;
-> +	struct spi_transfer *msg_buf;
-> +	int i, ret;
-> +
-> +	msg_buf = kzalloc(chip->registers * sizeof(struct spi_transfer),
-> +			GFP_KERNEL);
-> +	if (!msg_buf)
-> +		return -ENOMEM;
-> +
-> +	spi_message_init(&message);
-> +
-> +	/*
-> +	 * Since the registers are chained, every byte sent will make
-> +	 * the previous byte shift to the next register in the
-> +	 * chain. Thus, the first byte send will end up in the last
-> +	 * register at the end of the transfer. So, to have a logical
-> +	 * numbering, send the bytes in reverse order so that the last
-> +	 * byte of the buffer will end up in the last register.
-> +	 */
-> +	for (i = chip->registers - 1; i >= 0; i--) {
-> +		msg_buf[i].tx_buf = chip->buffer +i;
-> +		msg_buf[i].len = sizeof(u8);
-> +		spi_message_add_tail(msg_buf + i, &message);
-> +	}
-> +
-> +	ret = spi_sync(chip->spi, &message);
-> +	if (ret)
-> +		return ret;
 
-You are leaking msg_buf here in case of error.
+> 	Arnd
+>
+> 8<----
+> ARM: ks8695: add maintainers entry
+>
+> Greg Ungerer has hardware for this platform and is testing it
+> regularly.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> +
-> +	kfree(msg_buf);
-> +
-> +	return 0;
->  }
->  
->  static int gen_74x164_get_value(struct gpio_chip *gc, unsigned offset)
->  {
->  	struct gen_74x164_chip *chip = gpio_to_74x164_chip(gc);
-> +	u8 bank = offset / 8;
-> +	u8 pin = offset % 8;
->  	int ret;
->  
->  	mutex_lock(&chip->lock);
-> -	ret = (chip->port_config >> offset) & 0x1;
-> +	ret = (chip->buffer[bank] >> pin) & 0x1;
->  	mutex_unlock(&chip->lock);
->  
->  	return ret;
-> @@ -51,12 +87,14 @@ static void gen_74x164_set_value(struct gpio_chip *gc,
->  		unsigned offset, int val)
->  {
->  	struct gen_74x164_chip *chip = gpio_to_74x164_chip(gc);
-> +	u8 bank = offset / 8;
-> +	u8 pin = offset % 8;
->  
->  	mutex_lock(&chip->lock);
->  	if (val)
-> -		chip->port_config |= (1 << offset);
-> +		chip->buffer[bank] |= (1 << pin);
->  	else
-> -		chip->port_config &= ~(1 << offset);
-> +		chip->buffer[bank] &= ~(1 << pin);
->  
->  	__gen_74x164_write_config(chip);
->  	mutex_unlock(&chip->lock);
-> @@ -75,6 +113,11 @@ static int __devinit gen_74x164_probe(struct spi_device 
-*spi)
->  	struct gen_74x164_chip_platform_data *pdata;
->  	int ret;
->  
-> +	if (!spi->dev.of_node) {
-> +		dev_err(&spi->dev, "No device tree data available.\n");
-> +		return -EINVAL;
-> +	}
+Acked-by: Greg Ungerer <gerg@uclinux.org>
 
-Should not this be folded in your previous patch?
 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index fdc0119..f7b8d14 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -913,6 +913,12 @@ W:	http://www.digriz.org.uk/ts78xx/kernel
+>   S:	Maintained
+>   F:	arch/arm/mach-orion5x/ts78xx-*
+>
+> +ARM/MICREL KS8695 ARCHITECTURE
+> +M:	Greg Ungerer <gerg@uclinux.org>
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +F:	arch/arm/mach-ks8695
+> +S:	Odd Fixes
 > +
->  	/*
->  	 * bits_per_word cannot be configured in platform data
->  	 */
-> @@ -104,7 +147,20 @@ static int __devinit gen_74x164_probe(struct spi_device 
-*spi)
->  	chip->gpio_chip.direction_output = gen_74x164_direction_output;
->  	chip->gpio_chip.get = gen_74x164_get_value;
->  	chip->gpio_chip.set = gen_74x164_set_value;
-> -	chip->gpio_chip.ngpio = 8;
-> +
-> +	if (of_property_read_u32(spi->dev.of_node, "registers-number", &chip-
->registers)) {
-> +		dev_err(&spi->dev, "Missing registers-number property in the DT.
-\n");
-> +		ret = -EINVAL;
-> +		goto exit_destroy;
-> +	}
-> +
-> +	chip->gpio_chip.ngpio = GEN_74X164_NUMBER_GPIOS * chip->registers;
-> +	chip->buffer = devm_kzalloc(&spi->dev, chip->gpio_chip.ngpio, GFP_KERNEL);
-> +	if (!chip->buffer) {
-> +		ret = -ENOMEM;
-> +		goto exit_destroy;
-> +	}
-> +
->  	chip->gpio_chip.can_sleep = 1;
->  	chip->gpio_chip.dev = &spi->dev;
->  	chip->gpio_chip.owner = THIS_MODULE;
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>   ARM/MIOA701 MACHINE SUPPORT
+>   M:	Robert Jarzmik <robert.jarzmik@free.fr>
+>   L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+
+Regards
+Greg
+
+
+-- 
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close,                            FAX:         +61 7 3891 3630
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
