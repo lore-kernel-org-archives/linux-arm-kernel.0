@@ -1,34 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Sep 2012 12:41:16 +0000
-Subject: [PATCH 00/19] First HREF Device Tree enablement patch-set
-In-Reply-To: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
-References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <201209071241.17198.arnd@arndb.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri,  7 Sep 2012 14:43:45 +0200
+Subject: [PATCH v4 3/6] ARM: dts: add sram for imx53 and imx6q
+In-Reply-To: <1347021828-23034-1-git-send-email-p.zabel@pengutronix.de>
+References: <1347021828-23034-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1347021828-23034-4-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 September 2012, Lee Jones wrote:
-> Based on v3.6-rc4
-> 
-> This patch consists of Device Tree related enablement for
-> ST-Ericsson's development HREF hardware reference board.
-> Most devices are very similar, if not the same to the
-> previously enabled Snowball low-cost development board.
-> These are referenced from the relevant .dtsi file and
-> merely enabled in the HREF specific Device Tree. There 
-> are also one or two minor Device Tree related fixes which
-> were stumbled upon along the way.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx53.dtsi |    5 +++++
+ arch/arm/boot/dts/imx6q.dtsi |    5 +++++
+ 2 files changed, 10 insertions(+)
 
-The patches basically look good to me (except patch 15, see
-comment there), but they are not ordered in a way that allows
-bisection. I can see two ways to do this better:
-
-a) first do all the code changes, one by one, then add the
-fully populated device tree in the last patch.
-
-b) as commented on patch 5, atomically change over each
-device in both the DT source and the board code.
-Also do the driver changes (i2c, tc3589x) before changing
-them in the device tree.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index cd37165..2767a92 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -337,5 +337,10 @@
+ 				status = "disabled";
+ 			};
+ 		};
++
++		ocram: ocram at f8000000 {
++			compatible = "fsl,imx-ocram", "sram";
++			reg = <0xf8000000 0x20000>;
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index fd57079..1e463c4 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -111,6 +111,11 @@
+ 		       status = "disabled";
+ 		};
+ 
++		ocram: ocram at 00900000 {
++			compatible = "fsl,imx-ocram", "sram";
++			reg = <0x00900000 0x3f000>;
++		};
++
+ 		timer at 00a00600 {
+ 			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = <0x00a00600 0x20>;
+-- 
+1.7.10.4
