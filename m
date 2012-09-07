@@ -1,54 +1,98 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 7 Sep 2012 09:01:45 +0800
-Subject: mxs: mmc: Problems resetting first SSP/MMC module upon boot
-In-Reply-To: <FDB97EE7-CE8F-4B83-A384-2E256DADCEDA@turczak.de>
-References: <FDB97EE7-CE8F-4B83-A384-2E256DADCEDA@turczak.de>
-Message-ID: <20120907010143.GD26709@S2101-09.ap.freescale.net>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Thu, 06 Sep 2012 18:23:47 -0700 (PDT)
+Subject: [PATCH] ARM: shmobile: r8a7740: add USB24 clock explain and
+ sample code
+In-Reply-To: <20120905225431.GD32084@quad.lixom.net>
+References: <1346305969-27110-1-git-send-email-horms@verge.net.au>
+ <1346305969-27110-2-git-send-email-horms@verge.net.au>
+ <20120905225431.GD32084@quad.lixom.net>
+Message-ID: <87d31yaan3.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 03:34:30PM +0200, Peter Turczak wrote:
-> Hi,
-> 
-> while porting kernel 3.5 (pulled from the arm-soc git tree) to a new board based upon an MXS processor (ARM926EJ-S) I encountered a strange problem initializing the two ssp/mmc.
-> 
-> Given situation:
-> - The device has two mmc devices on board, connected to SSP0 and SSP2.
-> - When booting from the MMC both mmc are properly detected.
-> - When booting from usb, ethernet or NAND flash first mmc to be initialized in the machine init function fails. So when doing (example given is nearly literally from the code, the board name is not yet allocated with the registry):
->         mx28_add_mxs_mmc(2, &board_mmc_pdata[2]);
->         mx28_add_mxs_mmc(0, &board_mmc_pdata[0]);
->    mmc0 works, mmc2 does not. When initializing mmc0 first mmc0 works.
 
-When initializing mmc0 first, you meant mmc0 works or does not work?
+Hi Olof
 
-> - The init fails when trying to reset the respective ssp block in stmp_reset_block() from lib/stmp_device.c due to a timeout waiting for CLKGATE to become set again after setting the SFTRST   bit.
+Thank you for checking patch
+
+> On Thu, Aug 30, 2012 at 02:52:49PM +0900, Simon Horman wrote:
+> > From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > 
+> > USBCKCR is controlling USB parent clock and divide rate.
+> > This parent clock is used as a "usb24s" from other devices,
+> > but the "divide rate" is not used.
+> > Further, this clock itself is known as "usb24".
+> > So, to set this clock is a little confusable.
+> > This patch adds quick explain and sample code for this clock.
+> > 
+> > Cc: Damian Hobson-Garcia <dhobsong@igel.co.jp>
+> > Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > Signed-off-by: Simon Horman <horms@verge.net.au>
+> > ---
+> >  arch/arm/mach-shmobile/clock-r8a7740.c | 16 ++++++++++++++++
+> >  1 file changed, 16 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+> > index ad5fccc..a6a7583 100644
+> > --- a/arch/arm/mach-shmobile/clock-r8a7740.c
+> > +++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+> > @@ -188,6 +188,22 @@ static struct clk pllc1_div2_clk = {
+> >  };
+> >  
+> >  /* USB clock */
+> > +/*
+> > + * USBCKCR is controlling usb24 clock
+> > + * bit[7] : parent clock
+> > + * bit[6] : clock divide rate
 > 
-> Things I tried:
-> - Check code of lib/stmp_device.c against reference manual of processor (i.MX28 Applications Processor Reference Manual, Rev. 1, 2010) says in section 39.5.10 (Correct Way to Soft Reset a Block): Seems ok, as it successfully resets some other blocks.
-> - Added a routine to also wait for (de-) assertion of the reset/clock gating bits as advised by the reference manual. No success here.
-> - Checked the pin muxing, just to be sure. Not expecting anything and as expected gained nothing.
+> The divisor is either 1 or 2 in this case, for bit[6] values of 0 and 1?
+
+Yes.
+if (0 == bit[6]) clock is 1/2
+if (1 == bit[6]) clock is 1/1
+
+> > + * And this bit[7] is used as a "usb24s" from other devices.
 > 
-> Ideas: 
-> - Maybe it the clock derivation is not set up properly before resetting as at least two ssp-modules seem to derive the clock from the same clock source. But I have no idea how to test or debug this.
+> Sorry, I don't follow the explanation here.
 > 
-ssp0 and ssp1 share one clock source, while ssp2 and ssp3 share
-another one.  I'm not sure if it's the cause, but 3.5 kernel did miss
-one bug fix below.
-
-  64e2bc4 clk: mxs: imx28: decrease the frequency of ref_io1 for SSP2 and SSP3
-
-You can get it from 3.6-rc1 kernel.
-
-> Therefore help is very much appreciated, maybe I'm missing something here.
+> This is how I interpret the current code, can you confirm if it's accurate?
 > 
-> Thank you in advance,
->   Peter Turczak
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> usb24 is the (potentially) divided output from usb24s, while usb24s is
+> at a fixed pass-through rate from the parent if enabled. Both share the
+> same enable bit. In other words, usb24 is a directly derived, potentially
+> divided-by-two rate from usb24s?
 
--- 
-Regards,
-Shawn
+clcok A ---+  bit[7]                 bit[6]
+           |- select -> usb24s -+--> divide (1/1 or 1/2) -> usb24
+clock B ---+                    |
+                                +--> other clocks ->
+
+
+> > + * (Video clock / Sub clock / SPU clock)
+> > + * You can controll this clock as a below.
+> > + *
+> > + * struct clk *usb24	= clk_get(dev,  "usb24");
+> > + * struct clk *usb24s	= clk_get(NULL, "usb24s");
+> > + * struct clk *system	= clk_get(NULL, "system_clk");
+> > + * int rate = clk_get_rate(system);
+> > + *
+> > + * clk_set_parent(usb24s, system);  // for bit[7]
+> > + * clk_set_rate(usb24, rate / 2);   // for bit[6]
+> 
+> This is just standard clk infrastructure usage, I don't think there's need to
+> include the example code here.
+
+Ahh.. 50% yes.
+
+_If_ this usb24/usb24s explanation on datasheet is same as other clocks,
+it is easy to understand and can use clk_set_rate().
+
+But this setting style of these 2 clock is very special case on our datasheet.
+Maybe first case.
+So, I added sample setting code here,
+since it is difficult to understand how to set the clock from
+datasheet/clock tree and clock-r8a7740.c
+
+Best regards
+---
+Kuninori Morimoto
