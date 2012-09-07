@@ -1,42 +1,51 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 7 Sep 2012 17:05:52 +0530
-Subject: Perf doesn't support coresight or it doesn't read the PMU
- registers on Pandaboard Rev.A2
-In-Reply-To: <CAO8ONPwRiWi6JOHXVVK7wx9UOZ9Bsv-L7yV-w2hcCKpjXfLhOw@mail.gmail.com>
-References: <CAO8ONPyN_c9Tek1ym3jNx0K4B7SvEghRCON_ZP-dMeFP_jcirA@mail.gmail.com>
- <CAO8ONPwRiWi6JOHXVVK7wx9UOZ9Bsv-L7yV-w2hcCKpjXfLhOw@mail.gmail.com>
-Message-ID: <CAMQu2gx=C+KOZg_8xg1arPqL+i82_zm5iE99yDyf7ieL+hPS9g@mail.gmail.com>
+From: lauri.hintsala@bluegiga.com (Lauri Hintsala)
+Date: Fri,  7 Sep 2012 14:45:17 +0300
+Subject: [PATCH] mmc: mxs-mmc: implement broken-cd
+Message-ID: <1347018317-2222-1-git-send-email-lauri.hintsala@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 7, 2012 at 1:07 PM, Vanni Genua <vannigenua@gmail.com> wrote:
->
->
-> Hi there,
-> I'm testing a Pandaboard (OMAP4430, ARMv7) with Linux kernel 3.0.27-rt46
-> installed on it.
-> The following instruction is not working due to unsupported cache-misses
-> event.
-> #perf stat -e cache-misses echo "Hello"
-> Performance counter stats for 'echo "Hello" ':
->
->    <not supported> cache-misses
->
->        0.007507575 seconds time elapsed
->
-> How to solve this problem?
-> Is there any patch for Perf o Linux kernel?
+This feature allows to use SDIO bus without wiring card detect
+signal. This is relevant in cases where SDIO device is connected to
+SDIO bus and there is no way to disconnect device from bus (device
+is always present).
 
-You are missing some patches which recently got sorted out
-to get PMU event work on OMAP.
+Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+---
+ drivers/mmc/host/mxs-mmc.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Patches are against the latest tree, you can find on Jon's
-tree [1]
-
-They are against Linux 3.6-rc2, so you may have to back-port them
-to get counters working on 3.0.X kernel.
-
-Regards
-Santosh
-
-[1] https://github.com/jonhunter/linux/tree/dev-pmu
+diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+index ad3fcea..992760e 100644
+--- a/drivers/mmc/host/mxs-mmc.c
++++ b/drivers/mmc/host/mxs-mmc.c
+@@ -165,6 +165,7 @@ struct mxs_mmc_host {
+ 	int				sdio_irq_en;
+ 	int				wp_gpio;
+ 	bool				wp_inverted;
++	bool				broken_cd;
+ };
+ 
+ static int mxs_mmc_get_ro(struct mmc_host *mmc)
+@@ -187,6 +188,9 @@ static int mxs_mmc_get_cd(struct mmc_host *mmc)
+ {
+ 	struct mxs_mmc_host *host = mmc_priv(mmc);
+ 
++	if (host->broken_cd)
++		return -ENOSYS;
++
+ 	return !(readl(host->base + HW_SSP_STATUS(host)) &
+ 		 BM_SSP_STATUS_CARD_DETECT);
+ }
+@@ -808,6 +812,9 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+ 							&flags);
+ 		if (flags & OF_GPIO_ACTIVE_LOW)
+ 			host->wp_inverted = 1;
++
++		if (of_get_property(np, "broken-cd", NULL))
++			host->broken_cd = 1;
+ 	} else {
+ 		if (pdata->flags & SLOTF_8_BIT_CAPABLE)
+ 			mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
+-- 
+1.7.9.5
