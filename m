@@ -1,53 +1,38 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  7 Sep 2012 12:14:41 +0100
-Subject: [PATCH 01/19] ARM: ux500: Add skeleton Device Tree for the HREF
- reference board
+Date: Fri,  7 Sep 2012 12:14:46 +0100
+Subject: [PATCH 06/19] ARM: ux500: Add nodes for the MSP into the HREF Device
+ Tree
 In-Reply-To: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
 References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1347016499-29354-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1347016499-29354-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-First commit applying the new Device Tree for ST-Ericsson's u8500
-based hardware reference board.
+This patch enables the two important MSP devices for ST-Ericsson's
+hardware reference development board.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/hrefv60plus.dts |   26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
- create mode 100644 arch/arm/boot/dts/hrefv60plus.dts
+ arch/arm/boot/dts/hrefv60plus.dts |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
-new file mode 100644
-index 0000000..96bf8a3
---- /dev/null
+index 62b2ac1..4f0aee8 100644
+--- a/arch/arm/boot/dts/hrefv60plus.dts
 +++ b/arch/arm/boot/dts/hrefv60plus.dts
-@@ -0,0 +1,26 @@
-+/*
-+ * Copyright 2012 ST-Ericsson AB
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
+@@ -77,5 +77,13 @@
+ 
+ 			status = "okay";
+ 		};
 +
-+/dts-v1/;
-+/include/ "dbx5x0.dtsi"
++		msp1: msp at 80124000 {
++			status = "okay";
++		};
 +
-+/ {
-+	model = "ST-Ericsson HREF platform with Device Tree";
-+	compatible = "st-ericsson,hrefv60+";
-+
-+	memory {
-+		reg = <0x00000000 0x20000000>;
-+	};
-+
-+	soc-u9500 {
-+
-+	};
-+};
++		msp3: msp at 80125000 {
++			status = "okay";
++		};
+ 	};
+ };
 -- 
 1.7.9.5
