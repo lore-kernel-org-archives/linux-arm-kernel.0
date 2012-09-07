@@ -1,54 +1,276 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 7 Sep 2012 11:11:30 -0400
-Subject: [PATCH 10/12] ARM: mvebu: move armada-370-xp.h in mach dir
-In-Reply-To: <1346962375-26163-11-git-send-email-robherring2@gmail.com>
-References: <1346962375-26163-1-git-send-email-robherring2@gmail.com>
- <1346962375-26163-11-git-send-email-robherring2@gmail.com>
-Message-ID: <20120907151130.GF19437@titan.lakedaemon.net>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Fri, 7 Sep 2012 17:25:24 +0200
+Subject: [PATCH] ARM: dts: OMAP4: Add reg and interrupts for every nodes
+Message-ID: <504A11E4.6000406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 03:12:53PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
+Thanks to Vaibhav <hvaibhav@ti.com> omap_device fix
+(ARM: OMAP: omap_device: Fix up resource names when booted with devicetre),
+we can now specify reg and interrupts using standard device tree
+attributes.
 
-also, Cc: Gregory Clement for -mvebu, please.
+Update the OMAP4 dtsi file with missing reg and interrupts attributes.
 
-thx,
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Felipe Balbi <balbi@ti.com>
+---
 
-Jason.
+Hi Tony,
 
-> ---
->  arch/arm/mach-mvebu/armada-370-xp.c                |    2 +-
->  .../mach-mvebu/{include/mach => }/armada-370-xp.h  |    0
->  2 files changed, 1 insertion(+), 1 deletion(-)
->  rename arch/arm/mach-mvebu/{include/mach => }/armada-370-xp.h (100%)
-> 
-> diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-> index 4ef923b..b46418a 100644
-> --- a/arch/arm/mach-mvebu/armada-370-xp.c
-> +++ b/arch/arm/mach-mvebu/armada-370-xp.c
-> @@ -20,7 +20,7 @@
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
->  #include <asm/mach/time.h>
-> -#include <mach/armada-370-xp.h>
-> +#include "armada-370-xp.h"
->  #include "common.h"
->  
->  static struct map_desc armada_370_xp_io_desc[] __initdata = {
-> diff --git a/arch/arm/mach-mvebu/include/mach/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
-> similarity index 100%
-> rename from arch/arm/mach-mvebu/include/mach/armada-370-xp.h
-> rename to arch/arm/mach-mvebu/armada-370-xp.h
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+This is the first step toward reduction of the hwmod data inside mach-omap2.
+OMAP2/3/4 data still need to be there for legacy boards, but it will allow
+OMAP5/AM33XX pure DT board to reduce the amount of data provided by hwmod.
+
+DMA is still missing, but I hope that the discussion that happened during
+LPC will fixed that soon.
+
+Regards,
+Benoit
+
+
+ arch/arm/boot/dts/omap4.dtsi |   55 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 55 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 9f851df..75095e3 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -97,6 +97,8 @@
+ 
+ 		gpio1: gpio at 4a310000 {
+ 			compatible = "ti,omap4-gpio";
++			reg = <0x4a310000 0x200>;
++			interrupts = <0 29 0x4>;
+ 			ti,hwmods = "gpio1";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -106,6 +108,8 @@
+ 
+ 		gpio2: gpio at 48055000 {
+ 			compatible = "ti,omap4-gpio";
++			reg = <0x48055000 0x200>;
++			interrupts = <0 30 0x4>;
+ 			ti,hwmods = "gpio2";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -115,6 +119,8 @@
+ 
+ 		gpio3: gpio at 48057000 {
+ 			compatible = "ti,omap4-gpio";
++			reg = <0x48057000 0x200>;
++			interrupts = <0 31 0x4>;
+ 			ti,hwmods = "gpio3";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -124,6 +130,8 @@
+ 
+ 		gpio4: gpio at 48059000 {
+ 			compatible = "ti,omap4-gpio";
++			reg = <0x48059000 0x200>;
++			interrupts = <0 32 0x4>;
+ 			ti,hwmods = "gpio4";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -133,6 +141,8 @@
+ 
+ 		gpio5: gpio at 4805b000 {
+ 			compatible = "ti,omap4-gpio";
++			reg = <0x4805b000 0x200>;
++			interrupts = <0 33 0x4>;
+ 			ti,hwmods = "gpio5";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -142,6 +152,8 @@
+ 
+ 		gpio6: gpio at 4805d000 {
+ 			compatible = "ti,omap4-gpio";
++			reg = <0x4805d000 0x200>;
++			interrupts = <0 34 0x4>;
+ 			ti,hwmods = "gpio6";
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+@@ -151,30 +163,40 @@
+ 
+ 		uart1: serial at 4806a000 {
+ 			compatible = "ti,omap4-uart";
++			reg = <0x4806a000 0x100>;
++			interrupts = <0 72 0x4>;
+ 			ti,hwmods = "uart1";
+ 			clock-frequency = <48000000>;
+ 		};
+ 
+ 		uart2: serial at 4806c000 {
+ 			compatible = "ti,omap4-uart";
++			reg = <0x4806c000 0x100>;
++			interrupts = <0 73 0x4>;
+ 			ti,hwmods = "uart2";
+ 			clock-frequency = <48000000>;
+ 		};
+ 
+ 		uart3: serial at 48020000 {
+ 			compatible = "ti,omap4-uart";
++			reg = <0x48020000 0x100>;
++			interrupts = <0 74 0x4>;
+ 			ti,hwmods = "uart3";
+ 			clock-frequency = <48000000>;
+ 		};
+ 
+ 		uart4: serial at 4806e000 {
+ 			compatible = "ti,omap4-uart";
++			reg = <0x4806e000 0x100>;
++			interrupts = <0 70 0x4>;
+ 			ti,hwmods = "uart4";
+ 			clock-frequency = <48000000>;
+ 		};
+ 
+ 		i2c1: i2c at 48070000 {
+ 			compatible = "ti,omap4-i2c";
++			reg = <0x48070000 0x100>;
++			interrupts = <0 56 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c1";
+@@ -182,6 +204,8 @@
+ 
+ 		i2c2: i2c at 48072000 {
+ 			compatible = "ti,omap4-i2c";
++			reg = <0x48072000 0x100>;
++			interrupts = <0 57 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c2";
+@@ -189,6 +213,8 @@
+ 
+ 		i2c3: i2c at 48060000 {
+ 			compatible = "ti,omap4-i2c";
++			reg = <0x48060000 0x100>;
++			interrupts = <0 61 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c3";
+@@ -196,6 +222,8 @@
+ 
+ 		i2c4: i2c at 48350000 {
+ 			compatible = "ti,omap4-i2c";
++			reg = <0x48350000 0x100>;
++			interrupts = <0 62 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c4";
+@@ -203,6 +231,8 @@
+ 
+ 		mcspi1: spi at 48098000 {
+ 			compatible = "ti,omap4-mcspi";
++			reg = <0x48098000 0x200>;
++			interrupts = <0 65 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "mcspi1";
+@@ -211,6 +241,8 @@
+ 
+ 		mcspi2: spi at 4809a000 {
+ 			compatible = "ti,omap4-mcspi";
++			reg = <0x4809a000 0x200>;
++			interrupts = <0 66 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "mcspi2";
+@@ -219,6 +251,8 @@
+ 
+ 		mcspi3: spi at 480b8000 {
+ 			compatible = "ti,omap4-mcspi";
++			reg = <0x480b8000 0x200>;
++			interrupts = <0 91 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "mcspi3";
+@@ -227,6 +261,8 @@
+ 
+ 		mcspi4: spi at 480ba000 {
+ 			compatible = "ti,omap4-mcspi";
++			reg = <0x480ba000 0x200>;
++			interrupts = <0 48 0x4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "mcspi4";
+@@ -235,6 +271,8 @@
+ 
+ 		mmc1: mmc at 4809c000 {
+ 			compatible = "ti,omap4-hsmmc";
++			reg = <0x4809c000 0x400>;
++			interrupts = <0 83 0x4>;
+ 			ti,hwmods = "mmc1";
+ 			ti,dual-volt;
+ 			ti,needs-special-reset;
+@@ -242,30 +280,40 @@
+ 
+ 		mmc2: mmc at 480b4000 {
+ 			compatible = "ti,omap4-hsmmc";
++			reg = <0x480b4000 0x400>;
++			interrupts = <0 86 0x4>;
+ 			ti,hwmods = "mmc2";
+ 			ti,needs-special-reset;
+ 		};
+ 
+ 		mmc3: mmc at 480ad000 {
+ 			compatible = "ti,omap4-hsmmc";
++			reg = <0x480ad000 0x400>;
++			interrupts = <0 94 0x4>;
+ 			ti,hwmods = "mmc3";
+ 			ti,needs-special-reset;
+ 		};
+ 
+ 		mmc4: mmc at 480d1000 {
+ 			compatible = "ti,omap4-hsmmc";
++			reg = <0x480d1000 0x400>;
++			interrupts = <0 96 0x4>;
+ 			ti,hwmods = "mmc4";
+ 			ti,needs-special-reset;
+ 		};
+ 
+ 		mmc5: mmc at 480d5000 {
+ 			compatible = "ti,omap4-hsmmc";
++			reg = <0x480d5000 0x400>;
++			interrupts = <0 59 0x4>;
+ 			ti,hwmods = "mmc5";
+ 			ti,needs-special-reset;
+ 		};
+ 
+ 		wdt2: wdt at 4a314000 {
+ 			compatible = "ti,omap4-wdt", "ti,omap3-wdt";
++			reg = <0x4a314000 0x80>;
++			interrupts = <0 80 0x4>;
+ 			ti,hwmods = "wd_timer2";
+ 		};
+ 
+@@ -338,11 +386,16 @@
+ 
+ 		keypad: keypad at 4a31c000 {
+ 			compatible = "ti,omap4-keypad";
++			reg = <0x4a31c000 0x80>;
++			interrupts = <0 120 0x4>;
++			reg-names = "mpu";
+ 			ti,hwmods = "kbd";
+ 		};
+ 
+ 		emif1: emif at 4c000000 {
+ 			compatible = "ti,emif-4d";
++			reg = <0x4c000000 0x100>;
++			interrupts = <0 110 0x4>;
+ 			ti,hwmods = "emif1";
+ 			phy-type = <1>;
+ 			hw-caps-read-idle-ctrl;
+@@ -352,6 +405,8 @@
+ 
+ 		emif2: emif at 4d000000 {
+ 			compatible = "ti,emif-4d";
++			reg = <0x4d000000 0x100>;
++			interrupts = <0 111 0x4>;
+ 			ti,hwmods = "emif2";
+ 			phy-type = <1>;
+ 			hw-caps-read-idle-ctrl;
+-- 
+1.7.0.4
