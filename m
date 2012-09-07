@@ -1,71 +1,76 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  7 Sep 2012 12:14:43 +0100
-Subject: [PATCH 03/19] ARM: ux500: Pass SDI DMA information though AUX_DATA to
- MMCI
+Date: Fri,  7 Sep 2012 12:14:44 +0100
+Subject: [PATCH 04/19] ARM: ux500: Add SDI (MMC) support to the HREF Device
+ Tree
 In-Reply-To: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
 References: <1347016499-29354-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1347016499-29354-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1347016499-29354-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are four SDIs on the HREF, as opposed to the original two
-enabled on Snowball. To get them working we have to pass their DMA
-information in the same was as we need with the other two.
+Here we add the Device Tree nodes which are required to successfully
+probe the MMCI driver which will enable the four cards available on
+ST-Ericsson's HREF hardware development platform.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500-sdi.c |    4 ++--
- arch/arm/mach-ux500/board-mop500.c     |    2 ++
- arch/arm/mach-ux500/board-mop500.h     |    2 ++
- 3 files changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/hrefv60plus.dts |   45 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
-index 18ff781..9c8e4a9 100644
---- a/arch/arm/mach-ux500/board-mop500-sdi.c
-+++ b/arch/arm/mach-ux500/board-mop500-sdi.c
-@@ -152,7 +152,7 @@ static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
+diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
+index 32cd7a0..62b2ac1 100644
+--- a/arch/arm/boot/dts/hrefv60plus.dts
++++ b/arch/arm/boot/dts/hrefv60plus.dts
+@@ -32,5 +32,50 @@
+ 		uart at 80007000 {
+ 			status = "okay";
+ 		};
++
++		// External Micro SD slot
++		sdi at 80126000 {
++			arm,primecell-periphid = <0x10480180>;
++			max-frequency = <50000000>;
++			bus-width = <8>;
++			mmc-cap-sd-highspeed;
++			mmc-cap-mmc-highspeed;
++			vmmc-supply = <&ab8500_ldo_aux3_reg>;
++
++			#gpio-cells = <1>;
++			cd-gpios  = <&gpio2 31 0x4>; // 95
++
++			status = "okay";
++		};
++
++		// WLAN SDIO channel
++		sdi at 80118000 {
++			arm,primecell-periphid = <0x10480180>;
++			max-frequency = <50000000>;
++			bus-width = <4>;
++
++			status = "okay";
++		};
++
++		// PoP:ed eMMC
++		sdi at 80005000 {
++			arm,primecell-periphid = <0x10480180>;
++			max-frequency = <50000000>;
++			bus-width = <8>;
++			mmc-cap-mmc-highspeed;
++
++			status = "okay";
++		};
++
++		// On-board eMMC
++		sdi at 80114000 {
++			arm,primecell-periphid = <0x10480180>;
++		        max-frequency = <50000000>;
++			bus-width = <8>;
++			mmc-cap-mmc-highspeed;
++			vmmc-supply = <&ab8500_ldo_aux2_reg>;
++
++			status = "okay";
++		};
+ 	};
  };
- #endif
- 
--static struct mmci_platform_data mop500_sdi1_data = {
-+struct mmci_platform_data mop500_sdi1_data = {
- 	.ocr_mask	= MMC_VDD_29_30,
- 	.f_max		= 50000000,
- 	.capabilities	= MMC_CAP_4_BIT_DATA,
-@@ -189,7 +189,7 @@ static struct stedma40_chan_cfg mop500_sdi2_dma_cfg_tx = {
- };
- #endif
- 
--static struct mmci_platform_data mop500_sdi2_data = {
-+struct mmci_platform_data mop500_sdi2_data = {
- 	.ocr_mask	= MMC_VDD_165_195,
- 	.f_max		= 50000000,
- 	.capabilities	= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA |
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 9d2d08e..9575150 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -754,6 +754,8 @@ struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	/* Requires DMA bindings. */
- 	OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
- 	OF_DEV_AUXDATA("arm,pl18x", 0x80126000, "sdi0",  &mop500_sdi0_data),
-+	OF_DEV_AUXDATA("arm,pl18x", 0x80118000, "sdi1",  &mop500_sdi1_data),
-+	OF_DEV_AUXDATA("arm,pl18x", 0x80005000, "sdi2",  &mop500_sdi2_data),
- 	OF_DEV_AUXDATA("arm,pl18x", 0x80114000, "sdi4",  &mop500_sdi4_data),
- 	/* Requires clock name bindings. */
- 	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e000, "gpio.0", NULL),
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index a0f920d..1f86387 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -81,6 +81,8 @@
- struct device;
- struct i2c_board_info;
- extern struct mmci_platform_data mop500_sdi0_data;
-+extern struct mmci_platform_data mop500_sdi1_data;
-+extern struct mmci_platform_data mop500_sdi2_data;
- extern struct mmci_platform_data mop500_sdi4_data;
- extern struct msp_i2s_platform_data msp0_platform_data;
- extern struct msp_i2s_platform_data msp1_platform_data;
 -- 
 1.7.9.5
