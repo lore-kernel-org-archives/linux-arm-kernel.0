@@ -1,34 +1,26 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 7 Sep 2012 10:37:25 +0200
-Subject: [PATCH v7 0/3] arm/dts: Add device tree data for AM33XX devices
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA293E9@DBDE01.ent.ti.com>
-References: <1346924304-27425-1-git-send-email-anilkumar@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA293E9@DBDE01.ent.ti.com>
-Message-ID: <5049B245.9080807@ti.com>
+From: matthew.leach@arm.com (Matthew Leach)
+Date: Fri,  7 Sep 2012 09:40:58 +0100
+Subject: [PATCH 0/2] ARM: kexec: Add dtb kexce support
+Message-ID: <1347007260-13271-1-git-send-email-matthew.leach@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anil,
+Currently the value of r2 that is passed to the new kernel when
+performing a kexec() is hard coded to an address that is 16Kb before
+the kernel image. A dtb file may be much larger and thus get corrupted
+by the decompressor's page tables.
 
-On 09/07/2012 07:30 AM, AnilKumar, Chimata wrote:
-> On Thu, Sep 06, 2012 at 15:08:21, AnilKumar, Chimata wrote:
->> Add pinctrl and d_can device tree data to AM33XX family of devices.
->> First two patches add support for pinctrl DT data and third one
->> adds dcan DT data.
->>
->> Reason behind combining these patches is to apply cleanly on
->> linux-omap tree, because these are sequential patches.
->>Yes, 
->> These patches were tested on AM335x-Bone, AM335x-EVM and based
->> on linux-omap:master with this patch
->> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg74393.html
->>
-> 
-> If there are no changes in this patch series ACK from
-> reviewers (esp. Tony, koen and Marc) will help.
+These patches, along with a set of kexec-tools patches, move the dtb
+to a more sane location. The kernel will scan each segment for the dtb
+magic within the first four bytes of each segment to identify the
+physical address to pass through to the new kernel in r2.
 
-Yes, indeed. The series looks good to me, but it will be nice to get
-some acks from people who commented previous revision.
+Matthew Leach (2):
+  ARM: kexec: scan for dtb magic in segments
+  ARM: kexec: Check segment memory addresses
 
-Regards,
-Benoit
+ arch/arm/kernel/machine_kexec.c | 28 +++++++++++++++++++++++++++-
+ 1 file changed, 27 insertions(+), 1 deletion(-)
+
+-- 
+1.7.12
