@@ -1,46 +1,48 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 7 Sep 2012 10:58:49 +0800
-Subject: [PATCH v3 1/3] ARM: add cpufreq transiton notifier to adjust
- loops_per_jiffy for smp
-In-Reply-To: <5049252D.9000802@wwwdotorg.org>
-References: <1344577046-14847-1-git-send-email-shawn.guo@linaro.org>
- <1344577046-14847-2-git-send-email-shawn.guo@linaro.org>
- <5049252D.9000802@wwwdotorg.org>
-Message-ID: <20120907025847.GI26709@S2101-09.ap.freescale.net>
+Date: Fri, 7 Sep 2012 11:14:19 +0800
+Subject: [PATCH] serial: mxs-auart: put the device when exit or error
+In-Reply-To: <1346985187-30459-1-git-send-email-b32955@freescale.com>
+References: <20120907024349.GH26709@S2101-09.ap.freescale.net>
+ <1346985187-30459-1-git-send-email-b32955@freescale.com>
+Message-ID: <20120907031416.GJ26709@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2012 at 04:35:25PM -0600, Stephen Warren wrote:
-> I believe this patch is causing issues initializing PCI-Express on Tegra.
+On Fri, Sep 07, 2012 at 10:33:07AM +0800, Huang Shijie wrote:
+> We call the get_device() in the mxs_auart_probe().
+> For the balance of the reference count, we should put the
+> device in the mxs_auart_remove() or in the error path of
+> probe.
 > 
-> In next-20120906, I cold-booted 10 times. 3 times, PCIe initialized OK,
-> and 7 times, the driver timed out in arch/arm/mach-tegra/pcie.c function
-> tegra_pcie_check_link(). With this patch reverted, another 10 cold boot
-> attempts all succeeded just fine. Similarly, the regression appeared in
-> next-20120905, and I isolated it to arch/arm/kernel/, and this is the
-> only patch in that directory between next-20120904 and next-20120905.
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+
+> ---
+>  drivers/tty/serial/mxs-auart.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> Do you have any idea what the problem might be?
+> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+> index 3a667ee..203e512 100644
+> --- a/drivers/tty/serial/mxs-auart.c
+> +++ b/drivers/tty/serial/mxs-auart.c
+> @@ -781,6 +781,7 @@ out_free_irq:
+>  	auart_port[pdev->id] = NULL;
+>  	free_irq(s->irq, s);
+>  out_free_clk:
+> +	put_device(s->dev);
+>  	clk_put(s->clk);
+>  out_free:
+>  	kfree(s);
+> @@ -796,6 +797,7 @@ static int __devexit mxs_auart_remove(struct platform_device *pdev)
+>  
+>  	auart_port[pdev->id] = NULL;
+>  
+> +	put_device(s->dev);
+>  	clk_put(s->clk);
+>  	free_irq(s->irq, s);
+>  	kfree(s);
+> -- 
+> 1.7.0.4
 > 
-> Looking at the timestamps in dmesg in the failing case, the driver is
-> waiting the expected (per pcie.c driver code) 1.2 seconds before giving
-> up on the port, although I suppose if the kernel's idea of real-time is
-> off, then the dmesg log timestamps might be off too.
-
-Just for identifying the problem, can you test the following change to
-see if it fixes the failure.
-
-Regards,
-Shawn
-
-diff --git a/arch/arm/mach-tegra/cpu-tegra.c b/arch/arm/mach-tegra/cpu-tegra.c
-index ceb52db..a3bbdc9 100644
---- a/arch/arm/mach-tegra/cpu-tegra.c
-+++ b/arch/arm/mach-tegra/cpu-tegra.c
-@@ -247,5 +247,5 @@ static void __exit tegra_cpufreq_exit(void)
- MODULE_AUTHOR("Colin Cross <ccross@android.com>");
- MODULE_DESCRIPTION("cpufreq driver for Nvidia Tegra2");
- MODULE_LICENSE("GPL");
--module_init(tegra_cpufreq_init);
-+late_init(tegra_cpufreq_init);
- module_exit(tegra_cpufreq_exit);
+> 
