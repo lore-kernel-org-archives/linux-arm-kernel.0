@@ -1,110 +1,95 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 7 Sep 2012 14:05:54 +0800
-Subject: Tracking down suspend/resume ext3/mmc issues on imx233
-In-Reply-To: <CAEOSq-O3SfuAEhMsjX1y1ZgQuWBKef+XZzMR1b4yJhKhaRdymA@mail.gmail.com>
-References: <CAEOSq-O3SfuAEhMsjX1y1ZgQuWBKef+XZzMR1b4yJhKhaRdymA@mail.gmail.com>
-Message-ID: <20120907060552.GL26709@S2101-09.ap.freescale.net>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Fri, 7 Sep 2012 15:07:06 +0900
+Subject: [PATCH V4 2/2] video: drm: exynos: Add device tree support
+In-Reply-To: <CAL1wa8cyhxCObHbMa+8X6DmsD8svt=W8s+JMrPx5cAEoWd4Lig@mail.gmail.com>
+References: <1346859555-13527-1-git-send-email-l.krishna@samsung.com>
+ <1346859555-13527-3-git-send-email-l.krishna@samsung.com>
+ <CAH9JG2X_3iUTiGWv2cxjiX-s_VUtptVbzxhAJTub70W_2Dxecg@mail.gmail.com>
+ <CAAQKjZNmizjZ-=JN9_AysPMPHTOh7eydfE_OCYE6-v0JAJMydw@mail.gmail.com>
+ <5048837B.6020903@samsung.com>
+ <CAL1wa8cyhxCObHbMa+8X6DmsD8svt=W8s+JMrPx5cAEoWd4Lig@mail.gmail.com>
+Message-ID: <CAAQKjZN_n5QfBTibk8+jNwvZzPU_yvxJN70F3VrvZN_Pitm9ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Copy a few more lists to get wider audience ...
+Hi
 
-Regards,
-Shawn
-
-On Thu, Sep 06, 2012 at 10:03:35PM -0700, Mike Thompson wrote:
+2012/9/7 Leela Krishna Amudala <l.krishna@samsung.com>:
 > Hi,
-> 
-> I'm working on adding power management support for the imx233 on
-> 3.6-rc2.  In general I'm working on porting the pm.c file from the
-> Freescale 2.6.35 kernel for both "standby" and "mem" suspend/resume.
-> I'm making pretty good progress on porting the code, but I'm running
-> into an issue outside the immediate code I'm working on.
-> 
-> Right now I'm just testing out imx233 suspend/resume functionality by
-> implementing a dummy "standby" function that just returns rather than
-> putting the SoC into a low power state.  I believe this should have
-> the kernel go through suspend operations, hit my dummy function which
-> does nothing and then go through resume operations.  Unfortunately,
-> upon resume I'm getting ext3 file system errors in that nothing can be
-> read from the root file system on the SD card.  A trace of the
-> suspend/resume cycle is show below:
-> 
-> root at olinuxino:~# echo standby > /sys/power/state
-> [   90.080000] PM: Syncing filesystems ... done.
-> [   90.110000] mmc0: card aaaa removed
-> [   90.330000] Freezing user space processes ... (elapsed 0.01 seconds) done.
-> [   90.360000] Freezing remaining freezable tasks ... (elapsed 0.01
-> seconds) done.
-> [   90.400000] mxs_mmc_suspend()
-> [   90.400000] PM: suspend of devices complete after 19.531 msecs
-> [   90.410000] PM: late suspend of devices complete after 2.843 msecs
-> [   90.420000] PM: noirq suspend of devices complete after 4.531 msecs
-> [   90.430000] PM: noirq resume of devices complete after 1.906 msecs
-> [   90.440000] PM: early resume of devices complete after 1.843 msecs
-> [   90.450000] mxs_mmc_resume()
-> [   90.500000] PM: resume of devices complete after 51.062 msecs
-> [   90.510000] Restarting tasks ... done.
-> [   90.640000] mmc0: host does not support reading read-only switch.
-> assuming write-enable.
-> [   90.650000] mmc0: new high speed SD card at address aaaa
-> [   90.670000] mmcblk0: mmc0:aaaa SU02G 1.84 GiB
-> [   90.680000]  mmcblk0: p1 p2
-> [   90.700000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-> reading directory #15970 offset 0
-> [   90.710000] Aborting journal on device mmcblk0p2.
-> [   90.720000] JBD: Error -5 detected when updating journal superblock
-> for mmcblk0p2.
-> [   90.730000] EXT3-fs (mmcblk0p2): error: remounting filesystem read-only
-> [   90.730000] EXT3-fs (mmcblk0p2): I/O error while writing superblock
-> [   90.740000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-> reading directory #2 offset 0
-> udevd[1309]: failed to execute '/sbin/modprobe' '/sbin/modprobe -b
-> mmc:block': No such file or directory
-> [   90.790000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-> reading directory #15970 offset 0
-> udevd[1310]: failed to execute '/sbin/blkid' '/sbin/blkid -o udev -p
-> /dev/.tmp-block-179:8': No such file or directory
-> udevd[1311]: failed to execute '/sbin/blkid' '/sbin/blkid -o udev -p
-> /dev/.tmp-block-179:10': No such file or directory
-> udevd[1312]: failed to execute '/sbin/blkid' '/sbin/blkid -o udev -p
-> /dev/.tmp-block-179:9': No such file or directory
-> root at olinuxino:~#
-> root at olinuxino:~# ls
-> [  432.780000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-> reading directory #55890 offset 0
-> [  432.790000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-> reading directory #55891 offset 0
-> [  432.800000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-> reading directory #55890 offset 0
-> [  432.810000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-> reading directory #15970 offset 0
-> [  432.820000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-> reading directory #7985 offset 0
-> [  432.840000] EXT3-fs error (device mmcblk0p2): ext3_find_entry:
-> reading directory #55890 offset 0
-> -bash: ls: command not found
-> root at olinuxino:~#
-> 
-> The first reported error is in the ext3 filesystem buffer code where
-> the file system buffers aren't being filled by the underlying block
-> device.  At least that's how I'm interpreting the portion of the ext3
-> file system code that is failing.  However, the mmc device is
-> correctly reporting finding p1 and p2 partitions on the device which
-> it would indicate the partition data is being read from the SD card.
-> 
-> I'm hoping others might have suggestions on how I should go about
-> tracking down why the ext3 file system can no longer read from the mmc
-> device upon resume.  For instance, useful places to put some tracing
-> code to understand what might be failing, or how to determine what
-> differences there might be before suspend and after resume that might
-> point to the failure.
-> 
-> Thanks,
-> 
-> Mike Thompson
-> 
+>
+> On Thu, Sep 6, 2012 at 4:35 PM, Sylwester Nawrocki
+> <s.nawrocki@samsung.com> wrote:
+>> Hi,
+>>
+>> On 09/06/2012 09:21 AM, InKi Dae wrote:
+>>>>> +Required properties:
+>>>>> + - compatible: Should be "samsung,exynos5-fimd" or "samsung,exynos4-fb" for
+>>>> Doesn't better to use single word? fimd or fb?. I think 'fb' is used
+>>>> for framebuffer historically.
+>>>> but now it's used both fb and drm, so fimd is neutral and architecture
+>>>> specific.
+>>>>
+>>>> To do this, Modify arch-exynos first and update it at each drivers it properly.
+>>>>
+>>>> Thank you,
+>>>> Kyungmin Park
+>>>>
+>>>
+>>> I agree with Kyungmin but I'd like to use as is. the reason we used
+>>> 'exynos4-fb' as device name, is for that it uses fimd driver's
+>>> platform device commonly and gets fimd clock. so I think that dts file
+>>> should be defined with hardware specific name but not driver name such
+>>> as 'exynos4-fb'. but with this, we can't get fimd clock with device's
+>>> name because 'exynos4-fb' is used as device name of fimd clock. so to
+>>> use 'exynos4-fimd', we should modify the device name of fimd clock
+>>> from 'exynos4-fb'  to 'exynos4-fimd' and also ids definitions of
+>>> s3c-fb and drm fimd driver. so my conclusion is that it merges this
+>>
+>> I think it's good moment to put those things in order, i.e. use uniform
+>> 'compatible' names: "samsung,exynos4-fimd", "samsung,exynos5-fimd".
+>> Platform device names are separate issue, but could perhaps be unified
+>> at this time as well.
+>
+> Yes, Platform device name is independent of compatible string.
+> Will change the compatible string to "samsung,exynos4-fimd" and will keep the
+> device name as exynos4-fb for now. Will change the platform device
+> names to exynosX-fimd
+> later.
+>
+
+I'm not sure that clk_get is worked well with this change. I think,
+when driver called clk_get(), first of all, it tries to get a clk from
+the registered list of clock providers in the dts file and next in
+legacy way. but now legacy way(needing clock name and device' name)
+would be failed if the dts file has no the list because platform
+device's name differs from device name of clock. so I think we should
+change device name of clock and also ids of related drivers for
+compatibility with non-dt. for this, we need some patch sets, changing
+arch/arm/mach-exynos/common.c and changing
+arch/arm/mach-exynos/clock-exynos4/5.c and changing s3c-fb.c and last
+this patch. if there are no other opinions, I'd like to merge this
+patch set(v5) and next we can update others(maybe common.c,
+clock-exynos4/5.c and s3c-fb.c) later.
+
+Thanks.
+Inki Dae
+
+>>
+>>> patch set as is and then let's modify related things later.
+>>> any opinions, welcome~ anytime.
+>>>
+>>> Thanks.
+>>> Inki Dae
+>>
+>> --
+>>
+>> Regards,
+>> Sylwester
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
